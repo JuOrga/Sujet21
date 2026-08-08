@@ -4,9 +4,12 @@
 // un prototype semi-privé, les présets ne contiennent que des réglages.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { list, put } from '@vercel/blob'
+import { del, list, put } from '@vercel/blob'
 
-const KEY = 'presets.json'
+// Chaque écriture crée un blob à URL unique (suffixe aléatoire) et supprime
+// les versions précédentes : écraser un blob au même chemin garderait la même
+// URL, que le CDN continuerait de servir en cache pendant au moins une minute.
+const PREFIX = 'presets/'
 const MAX_PRESETS = 200
 
 interface SharedPreset {
@@ -34,23 +37,27 @@ function sanitize(input: unknown): SharedPreset | null {
 }
 
 async function readAll(): Promise<SharedPreset[]> {
-  const { blobs } = await list({ prefix: KEY })
-  const blob = blobs.find((b) => b.pathname === KEY)
-  if (!blob) return []
-  // cache-busting : l'URL du blob est servie par un CDN qui garde ~1 min
-  const r = await fetch(`${blob.url}?v=${Date.now()}`, { cache: 'no-store' })
+  const { blobs } = await list({ prefix: PREFIX })
+  if (blobs.length === 0) return []
+  const latest = [...blobs].sort(
+    (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
+  )[0]
+  const r = await fetch(latest.url, { cache: 'no-store' })
   if (!r.ok) return []
   const data = (await r.json().catch(() => [])) as unknown
   return Array.isArray(data) ? (data.filter((p) => sanitize(p) !== null) as SharedPreset[]) : []
 }
 
 async function writeAll(presets: SharedPreset[]): Promise<void> {
-  await put(KEY, JSON.stringify(presets), {
+  const { blobs } = await list({ prefix: PREFIX })
+  await put(`${PREFIX}v.json`, JSON.stringify(presets), {
     access: 'public',
-    addRandomSuffix: false,
-    allowOverwrite: true,
+    addRandomSuffix: true,
     contentType: 'application/json',
   })
+  if (blobs.length > 0) {
+    await del(blobs.map((b) => b.url)).catch(() => {})
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
