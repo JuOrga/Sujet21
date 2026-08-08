@@ -265,6 +265,51 @@ export class FluidSim {
     }
   }
 
+  // Vortex de regroupement (clic droit) : l'eau est entraînée vers un champ
+  // de courant en spirale rentrante. Un champ de vitesses cible (plutôt que
+  // des forces) garantit la convergence : une force tourbillonnaire pure
+  // ferait orbiter les gouttes jusqu'à les éjecter du rayon d'action.
+  // La rotation rallonge la spirale : plus de tourbillon = retour plus lent.
+  //
+  // `life` est la vie restante du vortex (1 → 0). Sur la fraction finale
+  // (vortexWindDown), le courant s'essouffle : le champ tend vers zéro mais
+  // l'entraînement reste — le vortex freine l'eau et la dépose immobile.
+  // Sans cette retombée, l'eau regroupée est lâchée en pleine giration et la
+  // force centrifuge fait éclater le corps dès que le champ disparaît.
+  applyVortex(cx: number, cy: number, dt: number, life = 1): void {
+    const p = this.params
+    const R = p.vortexRadius
+    const R2 = R * R
+    const fade = p.vortexWindDown > 0 ? Math.min(1, life / p.vortexWindDown) : 1
+    // La vitesse du courant se répartit entre rentrant et giratoire
+    const inv = 1 / Math.sqrt(1 + p.vortexSwirl * p.vortexSwirl)
+    const vIn = p.vortexPull * inv * fade
+    const vTan = p.vortexPull * p.vortexSwirl * inv * fade
+    // L'entraînement se renforce à mesure que le courant faiblit : l'eau suit
+    // le champ mourant sans retard et se fige au lieu de garder son élan.
+    const drag = p.vortexDrag / Math.max(0.15, fade)
+    const blend = 1 - Math.exp(-drag * dt)
+    for (let i = 0; i < this.count; i++) {
+      const dx = cx - this.posX[i]
+      const dy = cy - this.posY[i]
+      const d2 = dx * dx + dy * dy
+      if (d2 >= R2 || d2 < 1e-6) continue
+      const d = Math.sqrt(d2)
+      const ux = dx / d
+      const uy = dy / d
+      const rim = Math.min(1, (1 - d / R) * 2) // fondu au bord du rayon d'action
+      const settle = Math.min(1, d / (R * 0.08)) // l'eau se pose au centre au lieu d'osciller
+      // Cœur en rotation « corps solide » (vortex de Rankine) : sans lui,
+      // l'eau trouve une orbite d'équilibre (r ≈ vTan²/(drag·vIn)) et tourne
+      // sans jamais entrer. Le cœur doit englober ce rayon d'équilibre.
+      const tanScale = Math.min(1, d / (R * 0.5))
+      const tx = (ux * vIn * settle - uy * vTan * tanScale) * rim
+      const ty = (uy * vIn * settle + ux * vTan * tanScale) * rim
+      this.velX[i] += (tx - this.velX[i]) * blend
+      this.velY[i] += (ty - this.velY[i]) * blend
+    }
+  }
+
   step(dt: number): void {
     this.refreshDerived()
     const p = this.params

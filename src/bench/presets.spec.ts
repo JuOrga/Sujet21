@@ -1,0 +1,44 @@
+import { describe, expect, it } from 'vitest'
+import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
+import { copyParams, parsePresetFile, removePreset, serializePreset, upsertPreset, type Preset } from './presets'
+
+function makePreset(title: string, params: Partial<SimParams> = {}): Preset {
+  return { title, description: `desc ${title}`, savedAt: '2026-08-08T00:00:00Z', params }
+}
+
+describe('présets du banc', () => {
+  it('sérialise puis relit un préset avec titre et description', () => {
+    const preset = makePreset('cohésion forte', { sCorrK: 0.2, vortexPull: 500 })
+    const back = parsePresetFile(serializePreset(preset))
+    expect(back).toEqual(preset)
+  })
+
+  it('relit l’ancien format d’export (paramètres à plat, sans titre)', () => {
+    const legacy = JSON.stringify({ ...DEFAULT_PARAMS, sCorrK: 0.33 })
+    const back = parsePresetFile(legacy)
+    expect(back.title).toBe('')
+    expect(back.params.sCorrK).toBe(0.33)
+  })
+
+  it('n’applique que les paramètres numériques connus', () => {
+    const into: SimParams = { ...DEFAULT_PARAMS }
+    copyParams({ sCorrK: 0.4, inconnu: 99, ejectRate: NaN } as Partial<SimParams>, into)
+    expect(into.sCorrK).toBe(0.4)
+    expect(into.ejectRate).toBe(DEFAULT_PARAMS.ejectRate)
+    expect('inconnu' in into).toBe(false)
+  })
+
+  it('enregistrer sous un titre existant remplace, sinon crée (trié par titre)', () => {
+    let list = upsertPreset([], makePreset('b'))
+    list = upsertPreset(list, makePreset('a'))
+    expect(list.map((p) => p.title)).toEqual(['a', 'b'])
+    list = upsertPreset(list, makePreset('b', { sCorrK: 0.5 }))
+    expect(list).toHaveLength(2)
+    expect(list.find((p) => p.title === 'b')?.params.sCorrK).toBe(0.5)
+  })
+
+  it('supprime par titre', () => {
+    const list = upsertPreset(upsertPreset([], makePreset('a')), makePreset('b'))
+    expect(removePreset(list, 'a').map((p) => p.title)).toEqual(['b'])
+  })
+})

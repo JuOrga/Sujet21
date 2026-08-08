@@ -22,6 +22,14 @@ export interface SimParams {
   ejectSpeed: number // vitesse d'éjection relative au corps (unités monde / s)
   reabsorbCooldown: number // délai avant qu'une gouttelette éjectée soit réabsorbable (s)
 
+  // Vortex de regroupement (clic droit)
+  vortexRadius: number // rayon d'action autour du point cliqué (unités monde)
+  vortexPull: number // vitesse du courant du vortex (u/s)
+  vortexSwirl: number // part giratoire du courant — rallonge la spirale de retour
+  vortexDrag: number // taux d'entraînement de l'eau par le courant (1/s)
+  vortexDuration: number // durée du vortex après le clic (s)
+  vortexWindDown: number // fraction finale de la durée où le courant s'essouffle et dépose l'eau
+
   // Matériaux (§6)
   hydroBand: number // portée des effets de surface (unités monde)
   hydrophilePull: number // accélération d'adhésion vers la surface (u/s²)
@@ -75,6 +83,13 @@ export const DEFAULT_PARAMS: SimParams = {
   ejectRate: 32,
   ejectSpeed: 1400,
   reabsorbCooldown: 1.2,
+
+  vortexRadius: 260,
+  vortexPull: 420,
+  vortexSwirl: 1.4,
+  vortexDrag: 5,
+  vortexDuration: 1.6,
+  vortexWindDown: 0.35,
 
   hydroBand: 16,
   hydrophilePull: 900,

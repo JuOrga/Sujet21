@@ -52,6 +52,8 @@ help.textContent = [
   'TENSION DE SURFACE — tableau 1 (jalon 2)',
   'maintenir le pointeur : éjecter vers ce point (le corps part à l’opposé)',
   'rejoindre le sas vert — le surplus est mis en bonbonne',
+  'clic droit : vortex de regroupement (rappelle les gouttes autour du point cliqué)',
+  'molette : zoom manuel (bouton « Zoom auto » du banc pour reprendre le suivi)',
   ', / . : time warp    espace : pause    R : recommencer',
 ].join('\n')
 
@@ -65,15 +67,29 @@ input.attach(canvas)
 
 const monitor: BenchMonitor = { fps: 0, particles: 0, volume: 0, speed: 0, overview: false }
 
+// Vortex de regroupement : déclenché au clic droit, actif vortexDuration s
+const vortex = { x: 0, y: 0, timer: 0 }
+
 function restart(): void {
   run.exitTimer = 0
+  vortex.timer = 0
   sim = createSim(level)
   loop.reset()
   camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, camera.zoom)
 }
 
-const pane = createBench(params, monitor, { reset: restart })
+const pane = createBench(params, monitor, {
+  reset: restart,
+  autoZoom: () => camera.resetAutoZoom(),
+})
 input.onReset = restart
+input.onZoom = (factor) => camera.zoomBy(factor, params)
+input.onVortex = (clientX, clientY) => {
+  const w = camera.screenToWorld(clientX, clientY, window.innerWidth, window.innerHeight)
+  vortex.x = w.x
+  vortex.y = w.y
+  vortex.timer = params.vortexDuration
+}
 input.onTimeWarpChange = (warp) => {
   params.timeWarp = warp
   pane.refresh()
@@ -106,6 +122,11 @@ function frame(now: number): void {
     loop.advance(dtReal, params.timeWarp, params.dt, () => {
       if (input.aimActive && !sim.dispersed) {
         sim.eject(aim.x, aim.y, params.dt)
+      }
+      if (vortex.timer > 0) {
+        const life = Math.min(1, vortex.timer / params.vortexDuration)
+        sim.applyVortex(vortex.x, vortex.y, params.dt, life)
+        vortex.timer -= params.dt
       }
       sim.step(params.dt)
     })
@@ -150,7 +171,7 @@ function frame(now: number): void {
     `tableau  n°${run.tableau}   bonbonnes ${run.bonbonneLiters.toFixed(2)} L`,
     `volume   ${sim.liters().toFixed(2)} L  (${sim.playerCount} particules)`,
     `vitesse  ${speed.toFixed(0)} u/s`,
-    `état     ${sim.dispersed ? 'DISPERSÉ' : 'liquide'}${input.paused ? '  ·  pause' : ''}`,
+    `état     ${sim.dispersed ? 'DISPERSÉ' : 'liquide'}${vortex.timer > 0 ? '  ·  vortex' : ''}${input.paused ? '  ·  pause' : ''}`,
     `warp     ×${params.timeWarp}`,
   ].join('\n')
 
