@@ -24,7 +24,7 @@ npx serve .        # ou : python3 -m http.server
 | **1 – 5** | dilatation du temps (×0,25 à ×4) — le pas physique ne change jamais |
 | **R** | recommencer |
 | **T** | banc de réglage (sliders en direct + export JSON) |
-| **L** | légende : chaque surface, son effet, état par état |
+| **L** ou bouton « Légende » | légende : chaque surface, son effet, état par état — le bouton sert aussi au tactile |
 
 ## Ce que contient cette slice verticale
 

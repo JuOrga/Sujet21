@@ -436,8 +436,15 @@
 
   // ---------- Entrées ----------
 
+  // touche L au clavier, bouton « Légende » au tactile
+  function toggleLegend() {
+    const lg = document.getElementById("legend");
+    lg.style.display = lg.style.display === "none" ? "block" : "none";
+  }
+  document.getElementById("legendBtn").addEventListener("click", toggleLegend);
+
   window.addEventListener("mousedown", (e) => {
-    if (e.target.closest("#panel")) return;
+    if (e.target.closest("#panel") || e.target.closest("#legendBtn")) return;
     mouse.down = true; mouse.x = e.clientX; mouse.y = e.clientY;
   });
   window.addEventListener("mouseup", () => { mouse.down = false; });
@@ -447,10 +454,7 @@
     if (scales[e.code]) timeScale = scales[e.code];
     else if (e.code === "KeyR") reset();
     else if (e.code === "KeyT") Tuning.toggle();
-    else if (e.code === "KeyL") {
-      const lg = document.getElementById("legend");
-      lg.style.display = lg.style.display === "none" ? "block" : "none";
-    }
+    else if (e.code === "KeyL") toggleLegend();
   });
 
   // instrumentation pour les tests automatisés
