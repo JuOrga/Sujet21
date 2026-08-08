@@ -89,6 +89,7 @@ uniform int uBoxCount;
 uniform vec4 uBoxes[MAX_BOXES];   // minX, minY, maxX, maxY
 uniform float uBoxMats[MAX_BOXES]; // 0 mur, 1 hydrophile, 2 hydrophobe, 3 sas
 uniform float uTime;
+uniform float uExitRadius; // portée de l'aspiration du sas (halo de courant)
 uniform int uWaveCount;
 uniform vec4 uWaves[MAX_WAVES]; // x, y, instant de départ, amplitude
 out vec4 outColor;
@@ -97,6 +98,39 @@ float gridLine(vec2 world, float spacing, float widthWorld) {
   vec2 g = abs(fract(world / spacing) - 0.5) * spacing;
   float d = min(g.x, g.y);
   return 1.0 - smoothstep(0.0, widthWorld, d);
+}
+
+float hash21(vec2 p) {
+  p = fract(p * vec2(127.1, 311.7));
+  p += dot(p, p + 34.5);
+  return fract(p.x * p.y);
+}
+
+// Bruit de valeur lissé — la matière première du décor (nébulosité, textures)
+float vnoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  float a = hash21(i);
+  float b = hash21(i + vec2(1.0, 0.0));
+  float c = hash21(i + vec2(0.0, 1.0));
+  float d = hash21(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+// Points épars (étoiles, poussières) : au plus un par cellule de grille,
+// taille bornée en pixels pour ne pas scintiller au dézoom, et fondu global
+// quand les cellules passent sous quelques pixels (sinon : neige quadrillée).
+float specks(vec2 world, float cell, float density, float zoom) {
+  float vis = smoothstep(4.0, 12.0, cell * zoom);
+  if (vis <= 0.0) return 0.0;
+  vec2 g = floor(world / cell);
+  float h = hash21(g);
+  if (h > density) return 0.0;
+  vec2 center = (g + 0.5 + 0.7 * (vec2(hash21(g + 17.3), hash21(g + 39.7)) - 0.5)) * cell;
+  float r = max(cell * (0.015 + 0.035 * hash21(g + 5.1)), 1.2 / zoom);
+  float d = length(world - center);
+  return smoothstep(r * 2.5, r * 0.5, d) * (0.4 + 0.6 * hash21(g + 8.9)) * vis;
 }
 
 // distance signée à une boîte (négatif à l'intérieur)
@@ -119,24 +153,49 @@ void main() {
   vec2 css = gl_FragCoord.xy / uDpr;
   vec2 world = uCenter + (css - uViewport * 0.5) / uZoom;
 
-  // Fond froid, vignette légère
+  // La cuve d'essai flotte dans le vide : le décor se scinde en deux mondes
+  // de part et d'autre de la coque (roomD < 0 : intérieur).
+  vec2 dr = abs(world - uRoomCenter) - uRoomHalf;
+  float roomD = max(dr.x, dr.y);
+  float inRoom = 1.0 - smoothstep(0.0, 6.0 / uZoom, roomD);
+
+  // Dehors : nuit orbitale — nébulosité froide et deux couches d'étoiles,
+  // la lointaine en parallaxe (elle suit à moitié la caméra).
+  vec3 voidCol = vec3(0.004, 0.007, 0.014);
+  float neb = vnoise(world * 0.0016 + vec2(3.7, 1.3));
+  neb = neb * 0.6 + 0.4 * vnoise(world * 0.004 - vec2(1.1, 7.7));
+  voidCol += vec3(0.010, 0.018, 0.038) * neb;
+  voidCol += vec3(0.022, 0.010, 0.034) * vnoise(world * 0.0009 + 21.0);
+  voidCol += vec3(0.50, 0.60, 0.75) * specks(world + uCenter * 0.5, 130.0, 0.10, uZoom) * 0.55;
+  voidCol += vec3(0.75, 0.82, 0.95) * specks(world + 500.0, 200.0, 0.08, uZoom) * 0.85;
+
+  // Dedans : fond de cuve, vignette, caustiques discrètes (la lumière du
+  // labo joue dans l'eau de l'essai), trame de mesure, poussières en dérive.
   vec2 nuv = uv * 2.0 - 1.0;
   float vign = 1.0 - 0.35 * dot(nuv, nuv);
-  vec3 col = vec3(0.012, 0.022, 0.040) * vign;
-
-  // Trame de repère (§11) : deux échelles
+  vec3 tank = vec3(0.012, 0.022, 0.040) * vign;
+  float caus = vnoise(world * 0.012 + vec2(uTime * 0.05, -uTime * 0.03));
+  caus *= vnoise(world * 0.03 - vec2(uTime * 0.02, uTime * 0.04));
+  tank += vec3(0.010, 0.028, 0.040) * caus;
   float lw = 1.2 / uZoom;
-  col += vec3(0.05, 0.09, 0.13) * gridLine(world, 100.0, lw) * 0.35;
-  col += vec3(0.07, 0.12, 0.17) * gridLine(world, 500.0, lw * 1.6) * 0.5;
+  tank += vec3(0.05, 0.09, 0.13) * gridLine(world, 100.0, lw) * 0.30;
+  tank += vec3(0.07, 0.12, 0.17) * gridLine(world, 500.0, lw * 1.6) * 0.45;
+  tank += vec3(0.10, 0.16, 0.20) * specks(world + vec2(uTime * 7.0, uTime * 3.0), 70.0, 0.06, uZoom) * 0.5;
+  // halo le long des parois : la cuve est éclairée par sa coque
+  tank += vec3(0.020, 0.045, 0.060) * exp(min(0.0, roomD) * 0.02);
 
-  // Parois de la salle
-  vec2 dr = abs(world - uRoomCenter) - uRoomHalf;
-  float dEdge = abs(max(dr.x, dr.y));
-  float wall = 1.0 - smoothstep(0.0, 3.0 / uZoom, dEdge);
-  col += vec3(0.10, 0.20, 0.28) * wall;
+  vec3 col = mix(voidCol, tank, inRoom);
 
-  // Obstacles : remplissage + liseré, couleur par matériau (§6)
+  // La coque : bande métallique striée côté vide, arête lumineuse
+  float hull = smoothstep(-1.0, 2.0, roomD) * (1.0 - smoothstep(20.0, 34.0, roomD));
+  vec3 hullCol = vec3(0.055, 0.085, 0.115) * (0.85 + 0.15 * sin(roomD * 0.9));
+  col = mix(col, hullCol, hull);
+  float wallLine = 1.0 - smoothstep(0.0, 3.0 / uZoom, abs(roomD));
+  col += vec3(0.10, 0.22, 0.30) * wallLine;
+
+  // Obstacles : remplissage texturé + liseré, couleur par matériau (§6)
   float edgeW = 2.5 / uZoom;
+  float drainEye = 0.0; // œil du sas, retenu pour assombrir l'eau qui y coule
   for (int bi = 0; bi < MAX_BOXES; bi++) {
     if (bi >= uBoxCount) break;
     float d = boxSdf(world, uBoxes[bi]);
@@ -145,21 +204,45 @@ void main() {
       float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
       float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
       vec3 fillCol; vec3 edgeCol;
-      if (mat < 0.5) {        // mur neutre
-        fillCol = vec3(0.10, 0.13, 0.17); edgeCol = vec3(0.30, 0.38, 0.46);
-      } else if (mat < 1.5) { // hydrophile : mouillé, brillant
-        fillCol = vec3(0.05, 0.16, 0.20); edgeCol = vec3(0.20, 0.65, 0.70);
-      } else {                // hydrophobe : cireux, repoussant
-        fillCol = vec3(0.16, 0.11, 0.20); edgeCol = vec3(0.62, 0.42, 0.78);
+      if (mat < 0.5) {        // mur neutre : métal brossé
+        fillCol = vec3(0.10, 0.13, 0.17) * (0.88 + 0.24 * vnoise(world * vec2(0.03, 0.30)));
+        edgeCol = vec3(0.30, 0.38, 0.46);
+      } else if (mat < 1.5) { // hydrophile : mouillé, brillant, reflet qui glisse
+        float sheen = 0.5 + 0.5 * sin(world.x * 0.045 + world.y * 0.10 + uTime * 0.7);
+        fillCol = vec3(0.05, 0.16, 0.20) + vec3(0.015, 0.055, 0.065) * sheen;
+        edgeCol = vec3(0.20, 0.65, 0.70);
+      } else {                // hydrophobe : cireux, grain perlé qui repousse
+        float wax = smoothstep(0.72, 0.95, vnoise(world * 0.12));
+        fillCol = vec3(0.16, 0.11, 0.20) + vec3(0.07, 0.035, 0.10) * wax;
+        edgeCol = vec3(0.62, 0.42, 0.78);
       }
       col = mix(col, fillCol, fill);
       col = mix(col, edgeCol, edge * 0.9);
-    } else {                  // sas de sortie : liseré pulsant, pas de solide
-      float pulse = 0.6 + 0.4 * sin(uTime * 2.2);
-      float edge = 1.0 - smoothstep(0.0, edgeW * 2.0, abs(d));
-      float inner = 1.0 - smoothstep(-edgeW * 6.0, 0.0, d);
-      col += vec3(0.15, 0.75, 0.55) * edge * pulse;
-      col += vec3(0.05, 0.25, 0.18) * inner * (0.35 + 0.2 * pulse);
+    } else {
+      // Sas de sortie : une bouche d'aspiration — un trou dans lequel l'eau
+      // s'engouffre. Gorge sombre, œil noir, anneau qui respire, et stries
+      // spiralées qui matérialisent le courant jusqu'au rayon d'aspiration.
+      vec2 c = (uBoxes[bi].xy + uBoxes[bi].zw) * 0.5;
+      vec2 hb = (uBoxes[bi].zw - uBoxes[bi].xy) * 0.5;
+      float rad = min(hb.x, hb.y);
+      vec2 rel = world - c;
+      float dh = length(rel);
+      float ang = atan(rel.y, rel.x);
+      float pulse = 0.75 + 0.25 * sin(uTime * 2.0);
+      // halo de courant : stries qui convergent en spirale vers la bouche
+      float reach = 1.0 - smoothstep(rad * 0.6, max(uExitRadius, rad), dh);
+      float streaks = 0.5 + 0.5 * sin(ang * 5.0 - dh * 0.055 + uTime * 3.2);
+      col += vec3(0.05, 0.28, 0.22) * streaks * reach * reach * 0.35;
+      // gorge de l'entonnoir : l'espace s'assombrit en tombant vers le trou
+      float throat = 1.0 - smoothstep(0.0, rad, dh);
+      col = mix(col, vec3(0.004, 0.010, 0.012), throat * 0.85);
+      // œil du trou : noir profond
+      float eye = 1.0 - smoothstep(rad * 0.22, rad * 0.5, dh);
+      col = mix(col, vec3(0.0, 0.002, 0.004), eye);
+      drainEye = max(drainEye, eye);
+      // anneau lumineux qui respire au bord de la gorge
+      float ring = exp(-pow((dh - rad * 0.55) * 6.0 / rad, 2.0));
+      col += vec3(0.15, 0.75, 0.55) * ring * pulse * 0.8;
     }
   }
 
@@ -222,6 +305,8 @@ void main() {
   water += vec3(0.30, 0.55, 0.65) * waveGlow * 0.45;
 
   col = mix(col, water, body);
+  // L'eau qui recouvre l'œil du sas s'assombrit : elle sombre dans le trou
+  col *= 1.0 - drainEye * body * 0.55;
   outColor = vec4(col, 1.0);
 }`
 
@@ -486,6 +571,7 @@ export class Renderer {
     gl.uniform4fv(cu['uBoxes[0]'], this.boxScratch)
     gl.uniform1fv(cu['uBoxMats[0]'], this.matScratch)
     gl.uniform1f(cu['uTime'], timeSec)
+    gl.uniform1f(cu['uExitRadius'], params.exitRadius)
     gl.uniform1i(cu['uWaveCount'], waveCount)
     gl.uniform4fv(cu['uWaves[0]'], waves)
     gl.drawArrays(gl.TRIANGLES, 0, 3)

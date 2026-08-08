@@ -41,8 +41,13 @@ const level = TABLEAU_1
     }
   }
 }
-// Les boîtes rendues incluent le sas (rendu seulement, pas de physique)
+// Les boîtes rendues incluent le sas (rendu seulement, pas de physique solide)
 const renderBoxes: ObstacleBox[] = [...level.boxes, { ...level.exit, material: MAT_EXIT }]
+// La bouche d'aspiration du sas : l'eau s'y engouffre en entonnoir
+const exitMouth = {
+  x: (level.exit.minX + level.exit.maxX) * 0.5,
+  y: (level.exit.minY + level.exit.maxY) * 0.5,
+}
 
 const canvas = document.getElementById('glcanvas') as HTMLCanvasElement
 const overlay = document.getElementById('overlay') as HTMLDivElement
@@ -205,6 +210,7 @@ function frame(now: number): void {
         sim.applyVortex(vortex.x, vortex.y, params.dt, life)
         vortex.timer -= params.dt
       }
+      sim.applyExitSuction(exitMouth.x, exitMouth.y, params.dt)
       sim.step(params.dt)
     })
   }

@@ -274,6 +274,20 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Fraction finale de la durée où le vortex s’essouffle : il freine l’eau et la dépose au lieu de la lâcher en rotation. À 0, la force centrifuge fait éclater le corps à la fin.',
   )
 
+  const fExit = pane.addFolder({ title: 'Sas (bouche d’aspiration)', expanded: false })
+  describe(
+    fExit.addBinding(params, 'exitRadius', { min: 0, max: 600, step: 5, label: 'rayon' }),
+    'Portée de l’aspiration autour de la bouche du sas. À 0 : le sas n’aspire plus, il faut y entrer par ses propres moyens.',
+  )
+  describe(
+    fExit.addBinding(params, 'exitPull', { min: 0, max: 1000, step: 10, label: 'courant (u/s)' }),
+    'Vitesse du courant qui s’engouffre dans la bouche. Il se renforce à l’approche du trou, comme une vidange.',
+  )
+  describe(
+    fExit.addBinding(params, 'exitSwirl', { min: 0, max: 4, label: 'rotation' }),
+    'Part giratoire du courant : l’eau spirale en entonnoir au lieu de tomber tout droit dans la bouche. 0 : aspiration en ligne droite.',
+  )
+
   const fBody = pane.addFolder({ title: 'Corps', expanded: false })
   describe(
     fBody.addBinding(params, 'criticalVolumeFraction', { min: 0.05, max: 0.9, label: 'seuil dispersion' }),

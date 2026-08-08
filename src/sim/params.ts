@@ -32,6 +32,11 @@ export interface SimParams {
   vortexDuration: number // durée du vortex après le clic (s)
   vortexWindDown: number // fraction finale de la durée où le courant s'essouffle et dépose l'eau
 
+  // Sas de sortie : une bouche d'aspiration dans laquelle l'eau s'engouffre
+  exitRadius: number // portée de l'aspiration autour de la bouche (unités monde)
+  exitPull: number // vitesse du courant d'aspiration (u/s), renforcée à l'approche du trou
+  exitSwirl: number // part giratoire du courant : l'eau spirale en entonnoir
+
   // Matériaux (§6)
   hydroBand: number // portée des effets de surface (unités monde)
   hydrophilePull: number // accélération d'adhésion vers la surface (u/s²)
@@ -95,6 +100,10 @@ export const DEFAULT_PARAMS: SimParams = {
   vortexDrag: 5,
   vortexDuration: 1.6,
   vortexWindDown: 0.35,
+
+  exitRadius: 240,
+  exitPull: 300,
+  exitSwirl: 1.1,
 
   hydroBand: 16,
   hydrophilePull: 900,

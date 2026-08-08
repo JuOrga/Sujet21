@@ -388,6 +388,46 @@ export class FluidSim {
     }
   }
 
+  // Le sas est une bouche d'aspiration : dans son rayon d'action, un courant
+  // permanent entraîne l'eau vers le trou, en spirale rentrante (entonnoir).
+  // Même modèle en champ de vitesses que le vortex — une force pure ferait
+  // orbiter l'eau autour de la bouche sans jamais y entrer. Contrairement au
+  // vortex, le courant se renforce à l'approche du trou, comme une vidange,
+  // et il n'y a pas de retombée : le trou avale, il ne dépose pas.
+  applyExitSuction(cx: number, cy: number, dt: number): void {
+    const p = this.params
+    const R = p.exitRadius
+    if (R <= 0 || p.exitPull <= 0) return
+    const R2 = R * R
+    const inv = 1 / Math.sqrt(1 + p.exitSwirl * p.exitSwirl)
+    // Entraînement fixe : le courant du sas est permanent, l'eau le suit
+    // franchement sans qu'un curseur de plus soit nécessaire.
+    const blend = 1 - Math.exp(-4 * dt)
+    for (let i = 0; i < this.count; i++) {
+      const dx = cx - this.posX[i]
+      const dy = cy - this.posY[i]
+      const d2 = dx * dx + dy * dy
+      if (d2 >= R2 || d2 < 1e-6) continue
+      const d = Math.sqrt(d2)
+      const ux = dx / d
+      const uy = dy / d
+      const rim = Math.min(1, (1 - d / R) * 2) // fondu au bord du rayon d'action
+      // La vidange accélère vers le trou — sur le courant rentrant seulement :
+      // amplifier aussi la giration élargirait l'orbite d'équilibre au-delà
+      // du cœur de Rankine et l'eau tournerait sans jamais entrer.
+      const boost = 1 + 1.5 * (1 - d / R)
+      const vIn = p.exitPull * inv * boost
+      const vTan = p.exitPull * p.exitSwirl * inv
+      // Cœur en rotation « corps solide » (Rankine) : sans lui, l'eau trouve
+      // une orbite d'équilibre autour de la bouche et n'y entre jamais.
+      const tanScale = Math.min(1, d / (R * 0.5))
+      const tx = (ux * vIn - uy * vTan * tanScale) * rim
+      const ty = (uy * vIn + ux * vTan * tanScale) * rim
+      this.velX[i] += (tx - this.velX[i]) * blend
+      this.velY[i] += (ty - this.velY[i]) * blend
+    }
+  }
+
   step(dt: number): void {
     this.refreshDerived()
     const p = this.params
