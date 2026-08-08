@@ -28,6 +28,15 @@ export interface SpongeDef {
   capacityPerCell: number // particules absorbées avant qu'une cellule se solidifie
 }
 
+// Étiquette peinte dans le décor : chaque élément distinctif porte son nom,
+// dans la couleur de la légende — la surface s'identifie d'un coup d'œil.
+export interface WorldLabel {
+  x: number
+  y: number
+  text: string
+  tone: 'mur' | 'phile' | 'phobe' | 'eponge' | 'froid' | 'grille' | 'sas'
+}
+
 export interface LevelDef {
   name: string
   code: string // code d'essai du protocole (21-A, 21-B…)
@@ -37,6 +46,7 @@ export interface LevelDef {
   exit: { minX: number; minY: number; maxX: number; maxY: number }
   boxes: ObstacleBox[]
   sponges: SpongeDef[]
+  labels: WorldLabel[]
 }
 
 function box(minX: number, minY: number, maxX: number, maxY: number, material: number): ObstacleBox {
@@ -81,6 +91,12 @@ export const TABLEAU_1: LevelDef = {
       capacityPerCell: 5,
     },
   ],
+  labels: [
+    { x: -390, y: 0, text: 'HYDROPHOBE', tone: 'phobe' },
+    { x: 80, y: -100, text: 'HYDROPHILE', tone: 'phile' },
+    { x: 584, y: -60, text: 'ÉPONGE', tone: 'eponge' },
+    { x: 1110, y: -300, text: 'SAS', tone: 'sas' },
+  ],
 }
 
 // Tableau 2 — la chambre froide (une mécanique : l'état). Lecture :
@@ -112,6 +128,13 @@ export const TABLEAU_2: LevelDef = {
     box(700, 180, 760, 750, MAT_FROID),
   ],
   sponges: [],
+  labels: [
+    { x: -470, y: 430, text: 'PLAQUE FROIDE', tone: 'froid' },
+    { x: -60, y: -330, text: 'HYDROPHOBE', tone: 'phobe' },
+    { x: 220, y: 110, text: 'PLOT FROID', tone: 'froid' },
+    { x: 730, y: 440, text: 'PLAQUE FROIDE', tone: 'froid' },
+    { x: 1110, y: 0, text: 'SAS', tone: 'sas' },
+  ],
 }
 
 // Tableau 3 — le conduit (une mécanique : le gaz). Lecture :
@@ -141,6 +164,12 @@ export const TABLEAU_3: LevelDef = {
     box(520, 180, 580, 750, MAT_FROID),
   ],
   sponges: [],
+  labels: [
+    { x: -480, y: 320, text: 'GRILLE', tone: 'grille' },
+    { x: 420, y: 320, text: 'GRILLE', tone: 'grille' },
+    { x: 550, y: 440, text: 'PLAQUE FROIDE', tone: 'froid' },
+    { x: 1110, y: 0, text: 'SAS', tone: 'sas' },
+  ],
 }
 
 // L'ordre de la partie : chaque tableau enseigne une chose, puis on boucle.

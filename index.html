@@ -681,6 +681,35 @@
         border-color: var(--specimen);
       }
 
+      /* ---- Étiquettes de monde : chaque surface porte son nom, dans la
+             couleur de la légende — projetées par la caméra à chaque image ---- */
+      #world-labels {
+        position: fixed;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+        z-index: 5;
+      }
+      .world-label {
+        position: absolute;
+        top: 0;
+        left: 0;
+        font-family: var(--font-display);
+        font-size: 10px;
+        letter-spacing: 0.3em;
+        white-space: nowrap;
+        opacity: 0.78;
+        text-shadow: 0 1px 5px rgba(0, 0, 0, 0.9);
+        will-change: transform;
+      }
+      .wl-mur { color: #7f92a3; }
+      .wl-phile { color: #4fc4cf; }
+      .wl-phobe { color: #b48ad8; }
+      .wl-eponge { color: #d0b26a; }
+      .wl-froid { color: #b3dcf8; }
+      .wl-grille { color: #8fb3cc; }
+      .wl-sas { color: var(--valid); }
+
       /* ---- Légende : la lecture du vaisseau, surface par surface ---- */
       #legend {
         position: fixed;
@@ -846,6 +875,7 @@
   </head>
   <body>
     <div id="app"><canvas id="glcanvas"></canvas></div>
+    <div id="world-labels" aria-hidden="true"></div>
 
     <aside id="home" aria-label="Fiche d'essai">
       <div class="home-eyebrow">
