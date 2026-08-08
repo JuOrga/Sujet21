@@ -323,6 +323,12 @@ function toggleBench(): void {
 const chipLegend = touchButton('LÉGENDE', 'légende des surfaces (L)', toggleLegend, 'tb-chip')
 const chipStates = touchButton('ÉTATS', 'les trois états : qui bloque quoi (E)', toggleStates, 'tb-chip')
 const chipBench = touchButton('BANC', 'banc de réglage : la physique en direct', toggleBench, 'tb-chip')
+{
+  // au doigt, les chips ont leur rangée, les glyphes la leur
+  const brk = document.createElement('i')
+  brk.className = 'tb-break'
+  touchbar.appendChild(brk)
+}
 const btnPause = touchButton('⏸', 'pause (espace)', () => input.togglePause())
 touchButton('‹', 'ralentir le temps (,)', () => input.stepWarp(-1))
 touchButton('›', 'accélérer le temps (.)', () => input.stepWarp(1))
@@ -341,11 +347,16 @@ stateEau.addEventListener('click', () => {
 stateGlace.addEventListener('click', () => input.toggleFreeze())
 stateVapeur.addEventListener('click', () => input.toggleGas())
 touchButton('⌖', 'recadrer sur le corps (zoom et caméra auto)', () => camera.resetAutoZoom())
-const btnSound = touchButton('🔊', 'son : couper / activer', () => {
-  audio.resume()
-  audio.setEnabled(!audio.enabled)
-  pane.refresh()
-})
+const btnSound = touchButton(
+  '🔊',
+  'son : couper / activer',
+  () => {
+    audio.resume()
+    audio.setEnabled(!audio.enabled)
+    pane.refresh()
+  },
+  'tb-snd', // masqué au doigt : la bascule du son reste au banc (dossier Son)
+)
 touchButton('↺', 'recommencer (R)', restart)
 touchButton('≡', 'fiche d’essai (échap)', openHome)
 input.onTimeWarpChange = (warp) => {
