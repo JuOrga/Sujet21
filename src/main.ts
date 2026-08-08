@@ -1,3 +1,6 @@
+import '@fontsource/michroma'
+import '@fontsource/ibm-plex-mono/400.css'
+import '@fontsource/ibm-plex-mono/600.css'
 import { DEFAULT_PARAMS, type SimParams } from './sim/params'
 import { FluidSim, KIND_PLAYER } from './sim/solver'
 import { Camera } from './render/camera'
@@ -42,29 +45,41 @@ const level = TABLEAU_1
 const renderBoxes: ObstacleBox[] = [...level.boxes, { ...level.exit, material: MAT_EXIT }]
 
 const canvas = document.getElementById('glcanvas') as HTMLCanvasElement
-const hud = document.getElementById('hud') as HTMLDivElement
-const help = document.getElementById('help') as HTMLDivElement
 const overlay = document.getElementById('overlay') as HTMLDivElement
 const overlayTitle = document.getElementById('overlay-title') as HTMLDivElement
 const overlaySub = document.getElementById('overlay-sub') as HTMLDivElement
 
-const touchDevice = window.matchMedia('(pointer: coarse)').matches
-help.textContent = (touchDevice
-  ? [
-      'TENSION DE SURFACE — tableau 1 (jalon 2)',
-      'maintenir le doigt : éjecter vers ce point (le corps part à l’opposé)',
-      'rejoindre le sas vert — le surplus est mis en bonbonne',
-      'pincer à 2 doigts : zoom    🌀 puis toucher : vortex de regroupement',
-    ]
-  : [
-      'TENSION DE SURFACE — tableau 1 (jalon 2)',
-      'maintenir le pointeur : éjecter vers ce point (le corps part à l’opposé)',
-      'rejoindre le sas vert — le surplus est mis en bonbonne',
-      'clic droit : vortex de regroupement (rappelle les gouttes autour du point cliqué)',
-      'molette : zoom manuel (bouton « Zoom auto » du banc pour reprendre le suivi)',
-      ', / . : time warp    espace : pause    R : recommencer',
-    ]
-).join('\n')
+const el = (id: string) => document.getElementById(id) as HTMLElement
+const hudTableau = el('hud-tableau')
+const hudBonbonne = el('hud-bonbonne')
+const hudVolume = el('hud-volume')
+const hudSeuil = el('hud-seuil')
+const hudVitesse = el('hud-vitesse')
+const hudState = el('hud-state')
+const hudWarp = el('hud-warp')
+const gaugeFill = el('gauge-fill')
+const gaugeThreshold = el('gauge-threshold')
+const homeVolume = el('home-volume')
+const homeParticles = el('home-particles')
+const homeState = el('home-state')
+
+// Fiche d'essai : visible au chargement ; « échap » ou ≡ pour y revenir.
+// L'essai continue de dériver derrière la fiche — elle observe, elle ne fige pas.
+const startBtn = document.getElementById('start') as HTMLButtonElement
+function closeHome(): void {
+  document.body.classList.add('playing')
+  startBtn.textContent = "REPRENDRE L'ESSAI"
+}
+function openHome(): void {
+  document.body.classList.remove('playing')
+}
+startBtn.addEventListener('click', closeHome)
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (document.body.classList.contains('playing')) openHome()
+    else closeHome()
+  }
+})
 
 let sim = createSim(level)
 const camera = new Camera()
@@ -126,15 +141,17 @@ const btnVortex = touchButton('🌀', 'vortex : armer puis toucher l’écran (c
 })
 touchButton('⌖', 'zoom auto (après un zoom molette/pincement)', () => camera.resetAutoZoom())
 touchButton('↺', 'recommencer (R)', restart)
+touchButton('≡', 'fiche d’essai (échap)', openHome)
 input.onTimeWarpChange = (warp) => {
   params.timeWarp = warp
   pane.refresh()
 }
 
-function showOverlay(title: string, sub: string): void {
+function showOverlay(title: string, sub: string, tone: 'success' | 'danger'): void {
   overlayTitle.textContent = title
   overlaySub.textContent = sub
-  overlay.classList.add('visible')
+  overlay.classList.remove('success', 'danger')
+  overlay.classList.add('visible', tone)
 }
 
 let lastTime = performance.now()
@@ -177,6 +194,7 @@ function frame(now: number): void {
     showOverlay(
       'SAS ATTEINT',
       `Surplus mis en bonbonne : ${surplus.toFixed(2)} L — réserve totale ${run.bonbonneLiters.toFixed(2)} L`,
+      'success',
     )
   }
   if (run.exitTimer > 0) {
@@ -234,16 +252,31 @@ function frame(now: number): void {
   btnPause.classList.toggle('active', input.paused)
   btnVortex.classList.toggle('active', input.vortexArmed)
 
-  hud.textContent = [
-    `tableau  n°${run.tableau}   bonbonnes ${run.bonbonneLiters.toFixed(2)} L`,
-    `volume   ${sim.liters().toFixed(2)} L  (${sim.playerCount} particules)`,
-    `vitesse  ${speed.toFixed(0)} u/s`,
-    `état     ${sim.dispersed ? 'DISPERSÉ' : 'liquide'}${vortex.timer > 0 ? '  ·  vortex' : ''}${input.paused ? '  ·  pause' : ''}`,
-    `warp     ×${params.timeWarp}`,
-  ].join('\n')
+  // Instruments de bord
+  const fraction = sim.baseVolume > 0 ? sim.playerCount / sim.baseVolume : 0
+  hudTableau.textContent = `nº ${run.tableau}`
+  hudBonbonne.textContent = `${run.bonbonneLiters.toFixed(2)} L`
+  hudVolume.innerHTML = `${sim.liters().toFixed(2)} <small>L · ${sim.playerCount} part.</small>`
+  gaugeFill.style.width = `${Math.min(100, fraction * 100).toFixed(1)}%`
+  gaugeThreshold.style.left = `${(params.criticalVolumeFraction * 100).toFixed(1)}%`
+  hudSeuil.textContent = `${(params.criticalVolumeFraction * sim.baseVolume * params.litersPerParticle).toFixed(2)} L`
+  hudVitesse.textContent = `${speed.toFixed(0)} u/s`
+  const stateText = sim.dispersed ? 'DISPERSÉ' : 'liquide'
+  const suffix = `${vortex.timer > 0 ? ' · vortex' : ''}${input.paused ? ' · pause' : ''}`
+  hudState.textContent = stateText + suffix
+  hudState.classList.toggle('warn', sim.dispersed)
+  document.body.classList.toggle('dispersed', sim.dispersed)
+  hudWarp.textContent = `×${params.timeWarp}`
+
+  // Relevé vivant de la fiche d'essai
+  if (!document.body.classList.contains('playing')) {
+    homeVolume.textContent = `${sim.liters().toFixed(2)} L`
+    homeParticles.textContent = `${sim.playerCount}`
+    homeState.textContent = sim.dispersed ? 'dispersé' : 'en dérive'
+  }
 
   if (sim.dispersed && !tableauDone) {
-    showOverlay('DISPERSION', 'La cohésion ne tient plus. Appuyez sur R pour recommencer.')
+    showOverlay('DISPERSION', 'La cohésion ne tient plus. Appuyez sur R pour recommencer.', 'danger')
   } else if (!tableauDone) {
     overlay.classList.remove('visible')
   }

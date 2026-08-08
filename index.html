@@ -6,16 +6,58 @@
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
     />
-    <title>Tension de surface — banc de prototype</title>
+    <title>Tension de surface — essai nº 21</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%23030710'/%3E%3Ccircle cx='16' cy='17' r='9' fill='%2363b7e6'/%3E%3Ccircle cx='13' cy='14' r='3' fill='%23a7ddf5'/%3E%3C/svg%3E"
+    />
     <style>
+      :root {
+        --void: #030710;
+        --panel: rgba(9, 18, 30, 0.82);
+        --panel-solid: #0a1420;
+        --line: rgba(150, 200, 235, 0.16);
+        --line-strong: rgba(150, 200, 235, 0.38);
+        --ink: #d9ecf7;
+        --dim: #7f9cb0;
+        --specimen: #63b7e6;
+        --glow: #a7ddf5;
+        --valid: #3fd69b;
+        --alert: #e0685c;
+        --font-display: 'Michroma', 'Arial Black', sans-serif;
+        --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+
+        /* Thème du banc tweakpane, accordé à la fiche d'expérience */
+        --tp-base-background-color: rgba(9, 18, 30, 0.88);
+        --tp-base-shadow-color: rgba(0, 0, 0, 0.3);
+        --tp-container-background-color: rgba(120, 180, 220, 0.08);
+        --tp-container-background-color-active: rgba(120, 180, 220, 0.22);
+        --tp-container-background-color-focus: rgba(120, 180, 220, 0.18);
+        --tp-container-background-color-hover: rgba(120, 180, 220, 0.14);
+        --tp-container-foreground-color: #d9ecf7;
+        --tp-button-background-color: rgba(99, 183, 230, 0.22);
+        --tp-button-background-color-active: rgba(99, 183, 230, 0.5);
+        --tp-button-background-color-focus: rgba(99, 183, 230, 0.42);
+        --tp-button-background-color-hover: rgba(99, 183, 230, 0.32);
+        --tp-button-foreground-color: #d9ecf7;
+        --tp-input-background-color: rgba(3, 7, 16, 0.6);
+        --tp-input-background-color-active: rgba(3, 7, 16, 0.9);
+        --tp-input-background-color-focus: rgba(3, 7, 16, 0.8);
+        --tp-input-background-color-hover: rgba(3, 7, 16, 0.7);
+        --tp-input-foreground-color: #a7ddf5;
+        --tp-label-foreground-color: #7f9cb0;
+        --tp-monitor-background-color: rgba(3, 7, 16, 0.6);
+        --tp-monitor-foreground-color: #63b7e6;
+      }
+
       html,
       body {
         margin: 0;
         height: 100%;
         overflow: hidden;
-        background: #04070d;
-        color: #cfe6f5;
-        font-family: ui-monospace, Menlo, Consolas, monospace;
+        background: var(--void);
+        color: var(--ink);
+        font-family: var(--font-mono);
       }
       #app {
         position: fixed;
@@ -27,75 +69,326 @@
         height: 100%;
         touch-action: none;
       }
+      :focus-visible {
+        outline: 2px solid var(--specimen);
+        outline-offset: 2px;
+      }
+
+      /* ---- Accueil : la fiche d'expérience, en bandeau sur l'essai vivant ---- */
+      #home {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: min(430px, 100vw);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 22px;
+        padding: 28px clamp(20px, 4vw, 44px);
+        box-sizing: border-box;
+        background: linear-gradient(105deg, rgba(6, 13, 23, 0.94) 78%, rgba(6, 13, 23, 0.55));
+        border-right: 1px solid var(--line);
+        backdrop-filter: blur(6px);
+        overflow-y: auto;
+        z-index: 20;
+        transition: opacity 0.45s ease, transform 0.45s ease;
+      }
+      body.playing #home {
+        opacity: 0;
+        transform: translateX(-24px);
+        pointer-events: none;
+      }
+      .home-eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.22em;
+        color: var(--dim);
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 14px;
+      }
+      .home-title {
+        font-family: var(--font-display);
+        font-size: clamp(26px, 5.2vw, 38px);
+        line-height: 1.24;
+        letter-spacing: 0.08em;
+        margin: 0;
+        color: var(--ink);
+      }
+      .home-title em {
+        font-style: normal;
+        color: var(--specimen);
+      }
+      .home-pitch {
+        font-size: 13px;
+        line-height: 1.7;
+        color: var(--dim);
+        margin: 0;
+        max-width: 34ch;
+      }
+      .home-pitch strong {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      /* Relevé vivant : l'accueil lit l'échantillon qui dérive derrière */
+      .home-readout {
+        display: flex;
+        gap: 26px;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-left: 2px solid var(--specimen);
+        background: rgba(99, 183, 230, 0.05);
+      }
+      .home-readout div {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .home-readout dt {
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        color: var(--dim);
+        margin: 0;
+      }
+      .home-readout dd {
+        font-size: 17px;
+        color: var(--specimen);
+        margin: 0;
+      }
+
+      #start {
+        font-family: var(--font-display);
+        font-size: 13px;
+        letter-spacing: 0.14em;
+        padding: 15px 22px;
+        color: var(--void);
+        background: var(--specimen);
+        border: none;
+        cursor: pointer;
+        transition: background 0.2s ease, transform 0.15s ease;
+      }
+      #start:hover {
+        background: var(--glow);
+        transform: translateY(-1px);
+      }
+      .home-commands {
+        font-size: 11.5px;
+        line-height: 2.1;
+        color: var(--dim);
+        border-top: 1px solid var(--line);
+        padding-top: 14px;
+      }
+      .home-commands kbd {
+        font-family: inherit;
+        font-size: 10.5px;
+        color: var(--ink);
+        border: 1px solid var(--line-strong);
+        border-radius: 3px;
+        padding: 1px 6px;
+        margin-right: 6px;
+      }
+      .cmd-touch {
+        display: none;
+      }
+      @media (pointer: coarse) {
+        .cmd-touch {
+          display: block;
+        }
+        .cmd-desktop {
+          display: none;
+        }
+      }
+      .home-foot {
+        font-size: 10.5px;
+        letter-spacing: 0.06em;
+        color: var(--dim);
+        opacity: 0.75;
+      }
+
+      @media (max-width: 700px) {
+        #home {
+          inset: auto 0 0 0;
+          width: 100vw;
+          max-height: 82vh;
+          border-right: none;
+          border-top: 1px solid var(--line);
+          justify-content: flex-start;
+          background: linear-gradient(180deg, rgba(6, 13, 23, 0.88), rgba(6, 13, 23, 0.97));
+        }
+        body.playing #home {
+          transform: translateY(24px);
+        }
+      }
+
+      /* ---- HUD : instruments de bord ---- */
       #hud {
         position: fixed;
         left: 14px;
         bottom: 12px;
-        font-size: 12px;
-        line-height: 1.7;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
         pointer-events: none;
-        text-shadow: 0 1px 3px #000;
-        white-space: pre;
+        opacity: 0;
+        transition: opacity 0.5s ease 0.2s;
       }
-      #help {
-        position: fixed;
-        left: 14px;
-        top: 12px;
+      body.playing #hud {
+        opacity: 1;
+      }
+      .hud-panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-left: 2px solid var(--specimen);
+        padding: 9px 12px 10px;
+        min-width: 208px;
+        backdrop-filter: blur(4px);
+      }
+      .hud-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 16px;
         font-size: 11px;
-        opacity: 0.55;
-        pointer-events: none;
-        white-space: pre;
-        line-height: 1.6;
+        line-height: 1.9;
       }
-      /* Le banc ne doit jamais dépasser l'écran : il défile en interne */
-      .tp-dfwv {
-        max-height: calc(100dvh - 16px);
-        overflow-y: auto;
-        overscroll-behavior: contain;
+      .hud-row .k {
+        color: var(--dim);
+        letter-spacing: 0.14em;
+        font-size: 9.5px;
       }
-      /* Barre de commandes tactiles (pause, time warp, vortex, zoom, restart) */
+      .hud-row .v {
+        color: var(--ink);
+      }
+      #hud-volume {
+        font-size: 19px;
+        color: var(--specimen);
+      }
+      #hud-volume small {
+        font-size: 11px;
+        color: var(--dim);
+        margin-left: 5px;
+      }
+      /* Jauge de volume : le trait vertical marque le seuil de dispersion */
+      .gauge {
+        position: relative;
+        height: 5px;
+        margin: 6px 0 2px;
+        background: rgba(150, 200, 235, 0.12);
+        overflow: hidden;
+      }
+      #gauge-fill {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 100%;
+        background: linear-gradient(90deg, var(--specimen), var(--glow));
+        transition: width 0.25s ease;
+      }
+      #gauge-threshold {
+        position: absolute;
+        top: -2px;
+        bottom: -2px;
+        width: 2px;
+        background: var(--alert);
+      }
+      body.dispersed #hud-volume,
+      body.dispersed #gauge-fill {
+        background: var(--alert);
+        color: var(--alert);
+      }
+      #hud-state.warn {
+        color: var(--alert);
+      }
+
+      /* ---- Overlays : tampons de protocole ---- */
+      #overlay {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 14px;
+        background: rgba(3, 7, 16, 0.66);
+        backdrop-filter: blur(3px);
+        z-index: 15;
+      }
+      #overlay.visible {
+        display: flex;
+      }
+      #overlay-title {
+        font-family: var(--font-display);
+        font-size: clamp(22px, 4vw, 34px);
+        letter-spacing: 0.3em;
+        padding: 18px 34px 16px 40px;
+        border: 1px solid var(--line-strong);
+        border-left: 3px solid var(--specimen);
+        background: var(--panel);
+        animation: stamp 0.35s ease;
+      }
+      #overlay.success #overlay-title {
+        border-left-color: var(--valid);
+        color: var(--valid);
+      }
+      #overlay.danger #overlay-title {
+        border-left-color: var(--alert);
+        color: var(--alert);
+      }
+      #overlay-sub {
+        font-size: 12.5px;
+        color: var(--dim);
+        max-width: 52ch;
+        text-align: center;
+        line-height: 1.7;
+      }
+      @keyframes stamp {
+        from {
+          transform: scale(1.06);
+          opacity: 0;
+        }
+      }
+
+      /* ---- Barre tactile ---- */
       #touchbar {
         position: fixed;
         left: 50%;
         bottom: 10px;
         transform: translateX(-50%);
         display: flex;
-        gap: 8px;
+        gap: 7px;
         z-index: 10;
+        opacity: 0;
+        transition: opacity 0.5s ease 0.2s;
+      }
+      body.playing #touchbar {
+        opacity: 1;
       }
       #touchbar button {
         min-width: 44px;
         min-height: 44px;
-        border: 1px solid rgba(160, 200, 230, 0.25);
-        border-radius: 8px;
-        background: rgba(8, 14, 22, 0.75);
-        color: #cfe6f5;
-        font-family: inherit;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: var(--panel);
+        color: var(--ink);
+        font-family: var(--font-mono);
         font-size: 16px;
         cursor: pointer;
         touch-action: manipulation;
+        backdrop-filter: blur(4px);
+        transition: background 0.15s ease, border-color 0.15s ease;
+      }
+      #touchbar button:hover {
+        border-color: var(--line-strong);
       }
       #touchbar button.active {
-        background: rgba(70, 130, 180, 0.55);
-        border-color: rgba(160, 200, 230, 0.7);
+        background: rgba(99, 183, 230, 0.4);
+        border-color: var(--specimen);
       }
-      @media (max-width: 700px) {
-        #help {
-          font-size: 9px;
-        }
-        #hud {
-          font-size: 11px;
-          bottom: 66px; /* au-dessus de la barre tactile */
-        }
+
+      /* ---- Banc de réglage ---- */
+      .tp-dfwv {
+        max-height: calc(100dvh - 16px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        z-index: 30;
       }
-      /* Panneau d'explication du banc de réglage : décrit le réglage survolé.
-         Masqué quand le banc est replié. */
-      .tp-rotv:not(.tp-rotv-expanded) .bench-hint,
-      .tp-rotv:not(.tp-rotv-expanded) ~ .bench-hint {
-        display: none;
-      }
-      /* Journal des livraisons dans le banc : tweakpane calcule la hauteur du
-         dossier sans notre div — on la laisse libre quand il est déplié */
       .bench-log-folder.tp-fldv-expanded > .tp-fldv_c {
         height: auto !important;
       }
@@ -105,10 +398,10 @@
         padding: 6px 8px;
         font-size: 10px;
         line-height: 1.5;
-        color: #9db8cc;
+        color: var(--dim);
       }
       .bench-log-head {
-        color: #cfe6f5;
+        color: var(--ink);
         font-weight: bold;
         margin-top: 6px;
       }
@@ -116,47 +409,109 @@
         margin: 2px 0 6px;
         padding-left: 16px;
       }
+      .tp-rotv:not(.tp-rotv-expanded) .bench-hint,
+      .tp-rotv:not(.tp-rotv-expanded) ~ .bench-hint {
+        display: none;
+      }
       .bench-hint {
         padding: 8px 10px;
         font-size: 11px;
         line-height: 1.5;
-        color: #a8c4d8;
-        background: rgba(8, 14, 22, 0.92);
-        border-top: 1px solid rgba(160, 200, 230, 0.15);
+        color: var(--dim);
+        background: var(--panel);
+        border-top: 1px solid var(--line);
         border-radius: 0 0 6px 6px;
         min-height: 2.6em;
       }
-      #overlay {
-        position: fixed;
-        inset: 0;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        flex-direction: column;
-        gap: 10px;
-        background: rgba(2, 6, 12, 0.55);
-        font-size: 22px;
-        letter-spacing: 0.14em;
+
+      @media (max-width: 700px) {
+        #hud {
+          bottom: 66px;
+        }
+        .hud-panel {
+          min-width: 176px;
+          padding: 7px 10px 8px;
+        }
+        #hud-volume {
+          font-size: 16px;
+        }
       }
-      #overlay.visible {
-        display: flex;
-      }
-      #overlay small {
-        font-size: 12px;
-        opacity: 0.7;
-        letter-spacing: 0.04em;
+
+      @media (prefers-reduced-motion: reduce) {
+        #home,
+        #hud,
+        #touchbar,
+        #start,
+        #gauge-fill {
+          transition: none;
+        }
+        #overlay-title {
+          animation: none;
+        }
       }
     </style>
   </head>
   <body>
     <div id="app"><canvas id="glcanvas"></canvas></div>
-    <div id="help"></div>
-    <div id="hud"></div>
-    <div id="touchbar"></div>
+
+    <aside id="home" aria-label="Fiche d'essai">
+      <div class="home-eyebrow">LABORATOIRE ORBITAL — ESSAI Nº 21 · JALON 2</div>
+      <h1 class="home-title">TENSION<br />DE <em>SURFACE</em></h1>
+      <p class="home-pitch">
+        Vous êtes un volume d'eau en apesanteur. La seule façon d'avancer&nbsp;:
+        éjecter une partie de vous-même. <strong>Se déplacer, c'est rétrécir.</strong>
+        Rejoignez le sas avant de vous disperser.
+      </p>
+      <dl class="home-readout" aria-label="Relevé de l'échantillon">
+        <div><dt>ÉCHANTILLON</dt><dd id="home-volume">— L</dd></div>
+        <div><dt>PARTICULES</dt><dd id="home-particles">—</dd></div>
+        <div><dt>ÉTAT</dt><dd id="home-state">en dérive</dd></div>
+      </dl>
+      <button id="start" type="button">COMMENCER L'ESSAI</button>
+      <div class="home-commands cmd-desktop">
+        <kbd>maintenir</kbd>éjecter vers le pointeur — le corps part à l'opposé<br />
+        <kbd>clic droit</kbd>vortex de regroupement
+        <kbd>molette</kbd>zoom manuel<br />
+        <kbd>, .</kbd>time warp
+        <kbd>espace</kbd>pause
+        <kbd>R</kbd>recommencer
+        <kbd>échap</kbd>cette fiche
+      </div>
+      <div class="home-commands cmd-touch">
+        <kbd>toucher</kbd>éjecter vers le doigt — le corps part à l'opposé<br />
+        <kbd>2 doigts</kbd>pincer pour zoomer
+        <kbd>🌀</kbd>armer le vortex, puis toucher<br />
+        <kbd>≡</kbd>revenir à cette fiche
+      </div>
+      <div class="home-foot">
+        Prototype de travail — le banc de réglage (à droite) modifie la physique en direct.
+        Le journal des livraisons y consigne chaque mise à jour.
+      </div>
+    </aside>
+
+    <div id="hud">
+      <div class="hud-panel">
+        <div class="hud-row"><span class="k">TABLEAU</span><span class="v" id="hud-tableau">nº 1</span></div>
+        <div class="hud-row"><span class="k">BONBONNES</span><span class="v" id="hud-bonbonne">0.00 L</span></div>
+      </div>
+      <div class="hud-panel">
+        <div id="hud-volume">— <small>L</small></div>
+        <div class="gauge">
+          <div id="gauge-fill"></div>
+          <div id="gauge-threshold"></div>
+        </div>
+        <div class="hud-row"><span class="k">SEUIL DISPERSION</span><span class="v" id="hud-seuil">—</span></div>
+        <div class="hud-row"><span class="k">VITESSE</span><span class="v" id="hud-vitesse">0 u/s</span></div>
+        <div class="hud-row"><span class="k">ÉTAT</span><span class="v" id="hud-state">liquide</span></div>
+        <div class="hud-row"><span class="k">TEMPS</span><span class="v" id="hud-warp">×1</span></div>
+      </div>
+    </div>
+
     <div id="overlay">
       <div id="overlay-title">DISPERSION</div>
-      <small id="overlay-sub">La cohésion ne tient plus. Appuyez sur R pour recommencer.</small>
+      <div id="overlay-sub">La cohésion ne tient plus. Appuyez sur R pour recommencer.</div>
     </div>
+    <div id="touchbar"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
