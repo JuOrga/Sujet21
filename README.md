@@ -6,9 +6,11 @@ une partie de soi-même — **se déplacer, c'est rétrécir**.
 
 Le document de référence est [`docs/doc-fonctionnel.md`](docs/doc-fonctionnel.md).
 
-## État : jalon 1 — le corps et le geste
+## État : jalon 2 — le premier tableau
 
-Prototype jouable dans le navigateur :
+Prototype jouable dans le navigateur.
+
+**Jalon 1 — le corps et le geste :**
 
 - solveur de fluide **PBF 2D** (typed arrays, grille spatiale, pas de temps fixe) ;
 - **cohésion** par contrainte de densité en égalité + correction tensile —
@@ -22,6 +24,20 @@ Prototype jouable dans le navigateur :
 - **banc de réglage** Tweakpane : tous les paramètres en direct, export/import
   JSON (§13).
 
+**Jalon 2 — le premier tableau (§6, §7) :**
+
+- **matériaux** : parois **hydrophobes** (bande de répulsion + rebond) et
+  **hydrophiles** (adhésion, friction tangentielle, décoller se paie) ;
+- **l'éponge** : traînée au contact, absorption après un temps de contact
+  continu, saturation cellule par cellule — une cellule gorgée devient solide,
+  la brèche payée en volume est permanente ;
+- **le sas de sortie** et la boucle roguelike : pas d'eau à ramasser, le
+  surplus à la sortie est compressé en **bonbonne**, on repart à capacité
+  de base ;
+- tableau 1 : cloison hydrophobe à deux ouvertures, îlot hydrophile, mur
+  d'éponge avec couloir, sas derrière l'éponge ;
+- vue d'ensemble dans le banc, `?spawn=x,y` pour itérer sur le level design.
+
 ## Lancer
 
 ```bash
@@ -31,6 +47,7 @@ pnpm dev        # http://localhost:5173
 
 **Contrôles** : maintenir le pointeur pour éjecter vers ce point (le corps part
 à l'opposé) · `,` / `.` time warp · `espace` pause · `R` recommencer.
+Objectif : rejoindre le sas vert avec le plus de volume possible.
 
 ## Qualité
 
@@ -47,9 +64,7 @@ la grille spatiale et de l'étiquetage d'amas.
 
 ## Prochains jalons
 
-2. **Le premier tableau** — parois hydrophiles/hydrophobes, éponge à
-   saturation, sas de sortie, boucle entrée → traversée → surplus.
 3. **La chaleur et les états** — carte thermique, glace, vapeur,
    recondensation, refroidissement du vaisseau.
-4. **La boucle roguelike** — enchaînement de tableaux, bonbonnes, routes
-   ramifiées, méta-progression.
+4. **La boucle roguelike** — enchaînement de tableaux distincts, contenu des
+   bonbonnes (§8), routes ramifiées, méta-progression.

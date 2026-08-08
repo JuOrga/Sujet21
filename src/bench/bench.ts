@@ -15,6 +15,7 @@ export interface BenchMonitor {
   particles: number
   volume: number
   speed: number
+  overview: boolean
 }
 
 export function createBench(params: SimParams, monitor: BenchMonitor, actions: BenchActions): Pane {
@@ -43,10 +44,20 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   fBody.addBinding(params, 'linkRadiusFactor', { min: 0.6, max: 2, label: 'rayon amas (× h)' })
   fBody.addBinding(params, 'litersPerParticle', { min: 0.001, max: 0.05, label: 'L / particule' })
 
+  const fMat = pane.addFolder({ title: 'Matériaux (§6)', expanded: false })
+  fMat.addBinding(params, 'hydroBand', { min: 4, max: 60, label: 'portée bande' })
+  fMat.addBinding(params, 'hydrophilePull', { min: 0, max: 4000, step: 10, label: 'adhésion' })
+  fMat.addBinding(params, 'hydrophileFriction', { min: 0, max: 20, label: 'friction' })
+  fMat.addBinding(params, 'hydrophobeRepel', { min: 0, max: 6000, step: 10, label: 'répulsion' })
+  fMat.addBinding(params, 'hydrophobeRestitution', { min: 0, max: 1, label: 'rebond' })
+  fMat.addBinding(params, 'spongeDrag', { min: 0, max: 30, label: 'traînée éponge' })
+  fMat.addBinding(params, 'spongeAbsorbTime', { min: 0.05, max: 2, label: 'délai absorption' })
+
   const fCam = pane.addFolder({ title: 'Caméra & temps', expanded: false })
   fCam.addBinding(params, 'cameraFraction', { min: 0.1, max: 0.6, label: 'cadrage' })
   fCam.addBinding(params, 'cameraSmoothing', { min: 0.5, max: 10, label: 'lissage' })
   fCam.addBinding(params, 'timeWarp', { min: 0.1, max: 6, label: 'time warp' })
+  fCam.addBinding(monitor, 'overview', { label: 'vue d’ensemble' })
 
   const fRender = pane.addFolder({ title: 'Rendu', expanded: false })
   fRender.addBinding(params, 'fieldThreshold', { min: 0.1, max: 2, label: 'seuil champ' })

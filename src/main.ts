@@ -1,39 +1,61 @@
 import { DEFAULT_PARAMS, type SimParams } from './sim/params'
-import { FluidSim, KIND_FREE, KIND_PLAYER, type Bounds } from './sim/solver'
+import { FluidSim, KIND_PLAYER } from './sim/solver'
 import { Camera } from './render/camera'
 import { Renderer } from './render/renderer'
 import { FixedLoop } from './game/loop'
 import { Input } from './game/input'
+import { MAT_EXIT, TABLEAU_1, pointInBox, type LevelDef, type ObstacleBox } from './game/level'
 import { createBench, type BenchMonitor } from './bench/bench'
 
-const ROOM: Bounds = { minX: -1200, minY: -750, maxX: 1200, maxY: 750 }
-const PLAYER_SPAWN = { x: -650, y: 0, n: 900 }
 const CAPACITY = 4096
+const EXIT_LINGER = 2.6 // secondes d'affichage du bilan avant le tableau suivant
 
 const params: SimParams = { ...DEFAULT_PARAMS }
 
-function createSim(): FluidSim {
-  const sim = new FluidSim(params, ROOM, CAPACITY)
-  sim.spawnDisc(PLAYER_SPAWN.x, PLAYER_SPAWN.y, PLAYER_SPAWN.n, KIND_PLAYER)
-  // Salle-bac à sable : deux masses d'eau libres pour éprouver la fusion (§3.1)
-  sim.spawnDisc(350, 250, 140, KIND_FREE)
-  sim.spawnDisc(750, -300, 220, KIND_FREE)
+// État de la partie (§7.2) : le surplus de chaque tableau est mis en bonbonne.
+const run = {
+  tableau: 1,
+  bonbonneLiters: 0,
+  exitTimer: 0, // > 0 : bilan de sortie affiché, redémarrage imminent
+}
+
+function createSim(level: LevelDef): FluidSim {
+  const sim = new FluidSim(params, level.bounds, CAPACITY)
+  sim.setLevel(level.boxes, level.sponges)
+  sim.spawnDisc(level.spawn.x, level.spawn.y, level.spawn.n, KIND_PLAYER)
   sim.relabel()
   return sim
 }
+
+const level = TABLEAU_1
+// Aide au level design : ?spawn=x,y place le corps où l'on veut
+{
+  const spawnParam = new URLSearchParams(location.search).get('spawn')
+  if (spawnParam) {
+    const [sx, sy] = spawnParam.split(',').map(Number)
+    if (Number.isFinite(sx) && Number.isFinite(sy)) {
+      level.spawn = { ...level.spawn, x: sx, y: sy }
+    }
+  }
+}
+// Les boîtes rendues incluent le sas (rendu seulement, pas de physique)
+const renderBoxes: ObstacleBox[] = [...level.boxes, { ...level.exit, material: MAT_EXIT }]
 
 const canvas = document.getElementById('glcanvas') as HTMLCanvasElement
 const hud = document.getElementById('hud') as HTMLDivElement
 const help = document.getElementById('help') as HTMLDivElement
 const overlay = document.getElementById('overlay') as HTMLDivElement
+const overlayTitle = document.getElementById('overlay-title') as HTMLDivElement
+const overlaySub = document.getElementById('overlay-sub') as HTMLDivElement
 
 help.textContent = [
-  'TENSION DE SURFACE — banc de prototype (jalon 1)',
+  'TENSION DE SURFACE — tableau 1 (jalon 2)',
   'maintenir le pointeur : éjecter vers ce point (le corps part à l’opposé)',
+  'rejoindre le sas vert — le surplus est mis en bonbonne',
   ', / . : time warp    espace : pause    R : recommencer',
 ].join('\n')
 
-let sim = createSim()
+let sim = createSim(level)
 const camera = new Camera()
 camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, 1)
 const renderer = new Renderer(canvas, CAPACITY)
@@ -41,30 +63,36 @@ const loop = new FixedLoop()
 const input = new Input()
 input.attach(canvas)
 
-const monitor: BenchMonitor = { fps: 0, particles: 0, volume: 0, speed: 0 }
-const pane = createBench(params, monitor, {
-  reset: () => {
-    sim = createSim()
-    loop.reset()
-    camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, camera.zoom)
-  },
-})
-input.onReset = () => {
-  sim = createSim()
+const monitor: BenchMonitor = { fps: 0, particles: 0, volume: 0, speed: 0, overview: false }
+
+function restart(): void {
+  run.exitTimer = 0
+  sim = createSim(level)
   loop.reset()
   camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, camera.zoom)
 }
+
+const pane = createBench(params, monitor, { reset: restart })
+input.onReset = restart
 input.onTimeWarpChange = (warp) => {
   params.timeWarp = warp
   pane.refresh()
 }
 
+function showOverlay(title: string, sub: string): void {
+  overlayTitle.textContent = title
+  overlaySub.textContent = sub
+  overlay.classList.add('visible')
+}
+
 let lastTime = performance.now()
+let elapsed = 0
 let fpsSmoothed = 60
 
 function frame(now: number): void {
   const dtReal = Math.min((now - lastTime) / 1000, 0.1)
   lastTime = now
+  elapsed += dtReal
   if (dtReal > 0) fpsSmoothed += (1 / dtReal - fpsSmoothed) * 0.05
 
   const vw = window.innerWidth
@@ -72,8 +100,9 @@ function frame(now: number): void {
   const dpr = Math.min(window.devicePixelRatio || 1, 2)
 
   const aim = camera.screenToWorld(input.aimClientX, input.aimClientY, vw, vh)
+  const tableauDone = run.exitTimer > 0
 
-  if (!input.paused) {
+  if (!input.paused && !tableauDone) {
     loop.advance(dtReal, params.timeWarp, params.dt, () => {
       if (input.aimActive && !sim.dispersed) {
         sim.eject(aim.x, aim.y, params.dt)
@@ -82,8 +111,34 @@ function frame(now: number): void {
     })
   }
 
-  camera.update(dtReal, sim.stats.centroidX, sim.stats.centroidY, sim.stats.rmsRadius, vw, vh, params)
-  renderer.render(sim, camera, params, vw, vh, dpr)
+  // Sortie (§7.1-7.2) : le centre du corps franchit le sas
+  if (!tableauDone && !sim.dispersed && pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit)) {
+    const surplus = sim.liters()
+    run.bonbonneLiters += surplus
+    run.tableau++
+    run.exitTimer = EXIT_LINGER
+    showOverlay(
+      'SAS ATTEINT',
+      `Surplus mis en bonbonne : ${surplus.toFixed(2)} L — réserve totale ${run.bonbonneLiters.toFixed(2)} L`,
+    )
+  }
+  if (run.exitTimer > 0) {
+    run.exitTimer -= dtReal
+    if (run.exitTimer <= 0) {
+      overlay.classList.remove('visible')
+      restart()
+    }
+  }
+
+  // Caméra : suivi du corps, ou vue d'ensemble du tableau depuis le banc
+  if (monitor.overview) {
+    const b = sim.bounds
+    const fitZoom = Math.min(vw / (b.maxX - b.minX), vh / (b.maxY - b.minY)) * 0.94
+    camera.snapTo((b.minX + b.maxX) * 0.5, (b.minY + b.maxY) * 0.5, fitZoom)
+  } else {
+    camera.update(dtReal, sim.stats.centroidX, sim.stats.centroidY, sim.stats.rmsRadius, vw, vh, params)
+  }
+  renderer.render(sim, camera, params, vw, vh, dpr, renderBoxes, elapsed)
 
   const speed = Math.hypot(sim.stats.velX, sim.stats.velY)
   monitor.fps = fpsSmoothed
@@ -92,12 +147,18 @@ function frame(now: number): void {
   monitor.speed = speed
 
   hud.textContent = [
+    `tableau  n°${run.tableau}   bonbonnes ${run.bonbonneLiters.toFixed(2)} L`,
     `volume   ${sim.liters().toFixed(2)} L  (${sim.playerCount} particules)`,
     `vitesse  ${speed.toFixed(0)} u/s`,
     `état     ${sim.dispersed ? 'DISPERSÉ' : 'liquide'}${input.paused ? '  ·  pause' : ''}`,
     `warp     ×${params.timeWarp}`,
   ].join('\n')
-  overlay.classList.toggle('visible', sim.dispersed)
+
+  if (sim.dispersed && !tableauDone) {
+    showOverlay('DISPERSION', 'La cohésion ne tient plus. Appuyez sur R pour recommencer.')
+  } else if (!tableauDone) {
+    overlay.classList.remove('visible')
+  }
 
   requestAnimationFrame(frame)
 }

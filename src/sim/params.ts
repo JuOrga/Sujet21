@@ -22,6 +22,15 @@ export interface SimParams {
   ejectSpeed: number // vitesse d'éjection relative au corps (unités monde / s)
   reabsorbCooldown: number // délai avant qu'une gouttelette éjectée soit réabsorbable (s)
 
+  // Matériaux (§6)
+  hydroBand: number // portée des effets de surface (unités monde)
+  hydrophilePull: number // accélération d'adhésion vers la surface (u/s²)
+  hydrophileFriction: number // amortissement tangentiel au contact (1/s)
+  hydrophobeRepel: number // accélération de répulsion dans la bande (u/s²)
+  hydrophobeRestitution: number // rebond au contact (0..1)
+  spongeDrag: number // traînée dans une cellule absorbante (1/s)
+  spongeAbsorbTime: number // temps de contact continu avant absorption (s)
+
   // Corps
   litersPerParticle: number // conversion volume affiché
   criticalVolumeFraction: number // sous cette fraction du volume de base : dispersion (§3.1)
@@ -66,6 +75,14 @@ export const DEFAULT_PARAMS: SimParams = {
   ejectRate: 32,
   ejectSpeed: 1400,
   reabsorbCooldown: 1.2,
+
+  hydroBand: 16,
+  hydrophilePull: 900,
+  hydrophileFriction: 5,
+  hydrophobeRepel: 1400,
+  hydrophobeRestitution: 0.55,
+  spongeDrag: 7,
+  spongeAbsorbTime: 0.3,
 
   litersPerParticle: 0.005,
   criticalVolumeFraction: 0.35,

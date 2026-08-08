@@ -6,7 +6,10 @@
 import type { FluidSim } from '../sim/solver'
 import { KIND_PLAYER } from '../sim/solver'
 import type { SimParams } from '../sim/params'
+import type { ObstacleBox } from '../game/level'
 import type { Camera } from './camera'
+
+const MAX_BOXES = 24
 
 const SPLAT_VS = `#version 300 es
 layout(location = 0) in vec2 aPos;
@@ -49,6 +52,7 @@ void main() {
 
 const COMPOSE_FS = `#version 300 es
 precision highp float;
+#define MAX_BOXES 24
 uniform sampler2D uField;
 uniform vec2 uCanvasSize;  // px device
 uniform float uDpr;
@@ -60,12 +64,24 @@ uniform float uSoftness;
 uniform float uFieldScale;
 uniform vec2 uRoomCenter;
 uniform vec2 uRoomHalf;
+uniform int uBoxCount;
+uniform vec4 uBoxes[MAX_BOXES];   // minX, minY, maxX, maxY
+uniform float uBoxMats[MAX_BOXES]; // 0 mur, 1 hydrophile, 2 hydrophobe, 3 sas
+uniform float uTime;
 out vec4 outColor;
 
 float gridLine(vec2 world, float spacing, float widthWorld) {
   vec2 g = abs(fract(world / spacing) - 0.5) * spacing;
   float d = min(g.x, g.y);
   return 1.0 - smoothstep(0.0, widthWorld, d);
+}
+
+// distance signée à une boîte (négatif à l'intérieur)
+float boxSdf(vec2 world, vec4 b) {
+  vec2 c = (b.xy + b.zw) * 0.5;
+  vec2 half_ = (b.zw - b.xy) * 0.5;
+  vec2 q = abs(world - c) - half_;
+  return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
 }
 
 void main() {
@@ -96,6 +112,34 @@ void main() {
   float wall = 1.0 - smoothstep(0.0, 3.0 / uZoom, dEdge);
   col += vec3(0.10, 0.20, 0.28) * wall;
 
+  // Obstacles : remplissage + liseré, couleur par matériau (§6)
+  float edgeW = 2.5 / uZoom;
+  for (int bi = 0; bi < MAX_BOXES; bi++) {
+    if (bi >= uBoxCount) break;
+    float d = boxSdf(world, uBoxes[bi]);
+    float mat = uBoxMats[bi];
+    if (mat < 2.5) {
+      float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
+      float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
+      vec3 fillCol; vec3 edgeCol;
+      if (mat < 0.5) {        // mur neutre
+        fillCol = vec3(0.10, 0.13, 0.17); edgeCol = vec3(0.30, 0.38, 0.46);
+      } else if (mat < 1.5) { // hydrophile : mouillé, brillant
+        fillCol = vec3(0.05, 0.16, 0.20); edgeCol = vec3(0.20, 0.65, 0.70);
+      } else {                // hydrophobe : cireux, repoussant
+        fillCol = vec3(0.16, 0.11, 0.20); edgeCol = vec3(0.62, 0.42, 0.78);
+      }
+      col = mix(col, fillCol, fill);
+      col = mix(col, edgeCol, edge * 0.9);
+    } else {                  // sas de sortie : liseré pulsant, pas de solide
+      float pulse = 0.6 + 0.4 * sin(uTime * 2.2);
+      float edge = 1.0 - smoothstep(0.0, edgeW * 2.0, abs(d));
+      float inner = 1.0 - smoothstep(-edgeW * 6.0, 0.0, d);
+      col += vec3(0.15, 0.75, 0.55) * edge * pulse;
+      col += vec3(0.05, 0.25, 0.18) * inner * (0.35 + 0.2 * pulse);
+    }
+  }
+
   // Eau : seuillage du champ
   float th = uThreshold;
   float s = max(th * uSoftness, 1e-4);
@@ -114,6 +158,38 @@ void main() {
   water += vec3(0.20, 0.45, 0.55) * rim * 0.55;
 
   col = mix(col, water, body);
+  outColor = vec4(col, 1.0);
+}`
+
+// Cellules d'éponge : carrés pleins, couleur par état (sèche → gorgée →
+// solidifiée). Dessinés par-dessus la composition.
+const SPONGE_VS = `#version 300 es
+layout(location = 0) in vec2 aPos;
+layout(location = 1) in float aSat;
+uniform vec2 uCenter;
+uniform vec2 uViewport;
+uniform float uZoom;
+uniform float uPointSize;
+out float vSat;
+void main() {
+  vec2 clip = (aPos - uCenter) * uZoom / (uViewport * 0.5);
+  gl_Position = vec4(clip, 0.0, 1.0);
+  gl_PointSize = uPointSize;
+  vSat = aSat;
+}`
+
+const SPONGE_FS = `#version 300 es
+precision highp float;
+in float vSat;
+out vec4 outColor;
+void main() {
+  vec2 pc = gl_PointCoord * 2.0 - 1.0;
+  float d = max(abs(pc.x), abs(pc.y));
+  vec3 dry = vec3(0.30, 0.26, 0.15);      // absorbante : ocre poreux
+  vec3 wet = vec3(0.12, 0.18, 0.24);      // en cours de saturation
+  vec3 solid = vec3(0.20, 0.26, 0.32);    // gorgée : solide, pierre humide
+  vec3 col = vSat >= 1.0 ? solid : mix(dry, wet, clamp(vSat, 0.0, 1.0));
+  col *= 1.0 - 0.35 * smoothstep(0.7, 1.0, d); // bord de cellule plus sombre
   outColor = vec4(col, 1.0);
 }`
 
@@ -143,9 +219,15 @@ export class Renderer {
   private readonly canvas: HTMLCanvasElement
   private readonly splatProgram: WebGLProgram
   private readonly composeProgram: WebGLProgram
+  private readonly spongeProgram: WebGLProgram
   private readonly splatVao: WebGLVertexArrayObject
   private readonly splatVbo: WebGLBuffer
+  private readonly spongeVao: WebGLVertexArrayObject
+  private readonly spongeVbo: WebGLBuffer
+  private spongeScratch = new Float32Array(0)
   private readonly scratch: Float32Array
+  private readonly boxScratch = new Float32Array(MAX_BOXES * 4)
+  private readonly matScratch = new Float32Array(MAX_BOXES)
   private readonly floatField: boolean
   private fieldScale: number
   private fbo: WebGLFramebuffer | null = null
@@ -165,9 +247,11 @@ export class Renderer {
 
     this.splatProgram = link(gl, SPLAT_VS, SPLAT_FS)
     this.composeProgram = link(gl, COMPOSE_VS, COMPOSE_FS)
+    this.spongeProgram = link(gl, SPONGE_VS, SPONGE_FS)
     for (const [name, program] of [
       ['splat', this.splatProgram],
       ['compose', this.composeProgram],
+      ['sponge', this.spongeProgram],
     ] as const) {
       const map: Record<string, WebGLUniformLocation | null> = {}
       const count = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS) as number
@@ -191,6 +275,17 @@ export class Renderer {
     gl.vertexAttribPointer(1, 1, gl.FLOAT, false, stride, 8)
     gl.enableVertexAttribArray(2)
     gl.vertexAttribPointer(2, 1, gl.FLOAT, false, stride, 12)
+    gl.bindVertexArray(null)
+
+    this.spongeVao = gl.createVertexArray()!
+    this.spongeVbo = gl.createBuffer()!
+    gl.bindVertexArray(this.spongeVao)
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.spongeVbo)
+    const spongeStride = 3 * 4
+    gl.enableVertexAttribArray(0)
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, spongeStride, 0)
+    gl.enableVertexAttribArray(1)
+    gl.vertexAttribPointer(1, 1, gl.FLOAT, false, spongeStride, 8)
     gl.bindVertexArray(null)
   }
 
@@ -218,7 +313,16 @@ export class Renderer {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   }
 
-  render(sim: FluidSim, camera: Camera, params: SimParams, viewportW: number, viewportH: number, dpr: number): void {
+  render(
+    sim: FluidSim,
+    camera: Camera,
+    params: SimParams,
+    viewportW: number,
+    viewportH: number,
+    dpr: number,
+    boxes: ObstacleBox[],
+    timeSec: number,
+  ): void {
     const gl = this.gl
     const devW = Math.max(1, Math.round(viewportW * dpr))
     const devH = Math.max(1, Math.round(viewportH * dpr))
@@ -285,6 +389,57 @@ export class Renderer {
     const b = sim.bounds
     gl.uniform2f(cu['uRoomCenter'], (b.minX + b.maxX) * 0.5, (b.minY + b.maxY) * 0.5)
     gl.uniform2f(cu['uRoomHalf'], (b.maxX - b.minX) * 0.5, (b.maxY - b.minY) * 0.5)
+    const boxCount = Math.min(boxes.length, MAX_BOXES)
+    for (let i = 0; i < boxCount; i++) {
+      const bx = boxes[i]
+      this.boxScratch[i * 4] = bx.minX
+      this.boxScratch[i * 4 + 1] = bx.minY
+      this.boxScratch[i * 4 + 2] = bx.maxX
+      this.boxScratch[i * 4 + 3] = bx.maxY
+      this.matScratch[i] = bx.material
+    }
+    gl.uniform1i(cu['uBoxCount'], boxCount)
+    gl.uniform4fv(cu['uBoxes[0]'], this.boxScratch)
+    gl.uniform1fv(cu['uBoxMats[0]'], this.matScratch)
+    gl.uniform1f(cu['uTime'], timeSec)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
+
+    // Passe C — cellules d'éponge
+    this.drawSponges(sim, camera, viewportW, viewportH, dpr)
+  }
+
+  private drawSponges(sim: FluidSim, camera: Camera, viewportW: number, viewportH: number, dpr: number): void {
+    let totalCells = 0
+    for (const sp of sim.sponges) totalCells += sp.saturation.length
+    if (totalCells === 0) return
+    const gl = this.gl
+    if (this.spongeScratch.length < totalCells * 3) {
+      this.spongeScratch = new Float32Array(totalCells * 3)
+    }
+    const data = this.spongeScratch
+    let o = 0
+    let cellSize = 24
+    for (const sp of sim.sponges) {
+      const d = sp.def
+      cellSize = d.cellSize
+      for (let cell = 0; cell < sp.saturation.length; cell++) {
+        const cx = cell % d.cols
+        const cy = Math.floor(cell / d.cols)
+        data[o++] = d.minX + (cx + 0.5) * d.cellSize
+        data[o++] = d.minY + (cy + 0.5) * d.cellSize
+        data[o++] = sp.saturation[cell] / d.capacityPerCell
+      }
+    }
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.spongeVbo)
+    gl.bufferData(gl.ARRAY_BUFFER, data.subarray(0, totalCells * 3), gl.DYNAMIC_DRAW)
+    gl.useProgram(this.spongeProgram)
+    const su = this.uniforms['sponge']
+    gl.uniform2f(su['uCenter'], camera.x, camera.y)
+    gl.uniform2f(su['uViewport'], viewportW, viewportH)
+    gl.uniform1f(su['uZoom'], camera.zoom)
+    gl.uniform1f(su['uPointSize'], Math.max(1, cellSize * camera.zoom * dpr))
+    gl.bindVertexArray(this.spongeVao)
+    gl.drawArrays(gl.POINTS, 0, totalCells)
+    gl.bindVertexArray(null)
   }
 }

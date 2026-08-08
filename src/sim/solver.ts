@@ -13,6 +13,8 @@ import type { SimParams } from './params'
 import { SpatialGrid } from './grid'
 import { makeKernels, computeRestDensity, type Kernels } from './kernels'
 import { labelComponents } from './components'
+import { boxContact, Sponge, type ClosestPoint } from './obstacles'
+import { MAT_HYDROPHILE, MAT_HYDROPHOBE, type ObstacleBox, type SpongeDef } from '../game/level'
 
 export const KIND_FREE = 0
 export const KIND_PLAYER = 1
@@ -55,6 +57,14 @@ export class FluidSim {
   cooldown: Float32Array
   labels: Int32Array
 
+  boxes: ObstacleBox[] = []
+  sponges: Sponge[] = []
+  contactTime: Float32Array // temps de contact continu avec l'éponge
+  private contactMat: Int8Array // -1 aucun, sinon matériau du contact solide
+  private contactNX: Float32Array
+  private contactNY: Float32Array
+  private contactVn: Float32Array // vitesse normale entrante avant résolution
+
   baseVolume = 0
   playerCount = 0
   dispersed = false
@@ -90,6 +100,11 @@ export class FluidSim {
     this.cooldown = new Float32Array(capacity)
     this.labels = new Int32Array(capacity)
     this.stack = new Int32Array(capacity)
+    this.contactTime = new Float32Array(capacity)
+    this.contactMat = new Int8Array(capacity)
+    this.contactNX = new Float32Array(capacity)
+    this.contactNY = new Float32Array(capacity)
+    this.contactVn = new Float32Array(capacity)
 
     this.lastKernelRadius = params.kernelRadius
     this.lastSpacing = params.particleSpacing
@@ -122,6 +137,29 @@ export class FluidSim {
     }
   }
 
+  setLevel(boxes: ObstacleBox[], sponges: SpongeDef[]): void {
+    this.boxes = boxes
+    this.sponges = sponges.map((d) => new Sponge(d))
+  }
+
+  // Retrait par échange avec la dernière particule (absorption éponge).
+  removeParticle(i: number): void {
+    if (this.kind[i] === KIND_PLAYER) this.playerCount--
+    const last = this.count - 1
+    if (i !== last) {
+      this.posX[i] = this.posX[last]
+      this.posY[i] = this.posY[last]
+      this.prdX[i] = this.prdX[last]
+      this.prdY[i] = this.prdY[last]
+      this.velX[i] = this.velX[last]
+      this.velY[i] = this.velY[last]
+      this.kind[i] = this.kind[last]
+      this.cooldown[i] = this.cooldown[last]
+      this.contactTime[i] = this.contactTime[last]
+    }
+    this.count = last
+  }
+
   addParticle(x: number, y: number, kind: number): number {
     if (this.count >= this.capacity) return -1
     const i = this.count++
@@ -131,6 +169,7 @@ export class FluidSim {
     this.velY[i] = 0
     this.kind[i] = kind
     this.cooldown[i] = 0
+    this.contactTime[i] = 0
     if (kind === KIND_PLAYER) this.playerCount++
     return i
   }
@@ -334,7 +373,10 @@ export class FluidSim {
       }
     }
 
-    // 3. Bords du monde
+    // 3. Obstacles solides (parois, cellules d'éponge saturées)
+    this.resolveObstacles(dt)
+
+    // 3bis. Bords du monde
     const b = this.bounds
     const inset = p.particleSpacing * 0.5
     for (let i = 0; i < n; i++) {
@@ -361,6 +403,11 @@ export class FluidSim {
       velX[i] = vx
       velY[i] = vy
     }
+
+    // 4bis. Réponses matériaux : rebond hydrophobe, adhérence hydrophile,
+    // bandes d'influence (§6)
+    this.applyMaterialVelocities(dt)
+
     if (p.xsphC > 0) {
       grid.build(prdX, prdY, n)
       for (let i = 0; i < n; i++) {
@@ -396,9 +443,174 @@ export class FluidSim {
       posY[i] = prdY[i]
       if (this.cooldown[i] > 0) this.cooldown[i] -= dt
     }
+
+    // 5bis. Éponge : traînée, temps de contact, absorption (§6)
+    if (this.sponges.length > 0) this.processSponges(dt)
+
     this.stepIndex++
     if (this.stepIndex % Math.max(1, Math.round(p.componentEvery)) === 0) {
       this.relabel()
+    }
+  }
+
+  private readonly scratchCP: ClosestPoint = { dist: 0, nx: 0, ny: 0 }
+
+  // Pousse les particules hors des solides et enregistre le contact (normale,
+  // vitesse normale entrante, matériau) pour la réponse en vitesse.
+  private resolveObstacles(dt: number): void {
+    const n = this.count
+    const p = this.params
+    const rp = p.particleSpacing * 0.5
+    const invDt = 1 / dt
+    const cp = this.scratchCP
+    this.contactMat.fill(-1, 0, n)
+    if (this.boxes.length === 0 && this.sponges.length === 0) return
+
+    for (let i = 0; i < n; i++) {
+      let x = this.prdX[i]
+      let y = this.prdY[i]
+
+      for (const b of this.boxes) {
+        if (x < b.minX - rp || x > b.maxX + rp || y < b.minY - rp || y > b.maxY + rp) {
+          continue
+        }
+        boxContact(x, y, b, cp)
+        const sep = cp.dist - rp
+        if (sep < 0) {
+          const vn = ((x - this.posX[i]) * cp.nx + (y - this.posY[i]) * cp.ny) * invDt
+          x -= cp.nx * sep
+          y -= cp.ny * sep
+          this.contactMat[i] = b.material
+          this.contactNX[i] = cp.nx
+          this.contactNY[i] = cp.ny
+          this.contactVn[i] = vn
+        }
+      }
+
+      // Cellules d'éponge saturées : des murs. La particule peut chevaucher
+      // jusqu'à 4 cellules — on les résout toutes.
+      for (const sp of this.sponges) {
+        const d = sp.def
+        if (x < d.minX - rp || x >= sp.maxX + rp || y < d.minY - rp || y >= sp.maxY + rp) continue
+        const cx0 = Math.max(0, Math.floor((x - rp - d.minX) / d.cellSize))
+        const cy0 = Math.max(0, Math.floor((y - rp - d.minY) / d.cellSize))
+        const cx1 = Math.min(d.cols - 1, Math.floor((x + rp - d.minX) / d.cellSize))
+        const cy1 = Math.min(d.rows - 1, Math.floor((y + rp - d.minY) / d.cellSize))
+        for (let cy = cy0; cy <= cy1; cy++) {
+          for (let cx = cx0; cx <= cx1; cx++) {
+            const cell = cy * d.cols + cx
+            if (!sp.isSolid(cell)) continue
+            const cb = sp.cellBounds(cell)
+            boxContact(x, y, cb, cp)
+            const sep = cp.dist - rp
+            if (sep < 0) {
+              x -= cp.nx * sep
+              y -= cp.ny * sep
+              this.contactMat[i] = 0 // comportement mur neutre
+              this.contactNX[i] = cp.nx
+              this.contactNY[i] = cp.ny
+              this.contactVn[i] = 0
+            }
+          }
+        }
+      }
+
+      this.prdX[i] = x
+      this.prdY[i] = y
+    }
+  }
+
+  // Rebond hydrophobe, adhérence hydrophile, et bandes d'influence sans
+  // contact : la répulsion dévie les trajectoires, l'adhésion aspire vers la
+  // surface (§6).
+  private applyMaterialVelocities(dt: number): void {
+    if (this.boxes.length === 0) return
+    const n = this.count
+    const p = this.params
+    const rp = p.particleSpacing * 0.5
+    const cp = this.scratchCP
+    const band = p.hydroBand
+    const philDamp = Math.exp(-p.hydrophileFriction * dt)
+
+    for (let i = 0; i < n; i++) {
+      const mat = this.contactMat[i]
+      if (mat === MAT_HYDROPHOBE) {
+        const vnIn = this.contactVn[i]
+        if (vnIn < 0) {
+          const nx = this.contactNX[i]
+          const ny = this.contactNY[i]
+          const vn = this.velX[i] * nx + this.velY[i] * ny
+          const target = -vnIn * p.hydrophobeRestitution
+          this.velX[i] += (target - vn) * nx
+          this.velY[i] += (target - vn) * ny
+        }
+      } else if (mat === MAT_HYDROPHILE) {
+        const nx = this.contactNX[i]
+        const ny = this.contactNY[i]
+        let vn = this.velX[i] * nx + this.velY[i] * ny
+        let vtx = this.velX[i] - vn * nx
+        let vty = this.velY[i] - vn * ny
+        vtx *= philDamp
+        vty *= philDamp
+        if (vn > 0) vn *= 0.25 // décoller se paie
+        this.velX[i] = vtx + vn * nx
+        this.velY[i] = vty + vn * ny
+      }
+
+      const x = this.prdX[i]
+      const y = this.prdY[i]
+      for (const b of this.boxes) {
+        if (b.material !== MAT_HYDROPHILE && b.material !== MAT_HYDROPHOBE) continue
+        if (
+          x < b.minX - band - rp ||
+          x > b.maxX + band + rp ||
+          y < b.minY - band - rp ||
+          y > b.maxY + band + rp
+        ) {
+          continue
+        }
+        boxContact(x, y, b, cp)
+        const sep = cp.dist - rp
+        if (sep > 0 && sep < band) {
+          const f = 1 - sep / band
+          const a = (b.material === MAT_HYDROPHILE ? -p.hydrophilePull : p.hydrophobeRepel) * f * dt
+          this.velX[i] += cp.nx * a
+          this.velY[i] += cp.ny * a
+        }
+      }
+    }
+  }
+
+  // Le contact éponge n'est pas mortel : il englue et absorbe après un temps
+  // de contact continu. Chaque cellule se sature ; gorgée, elle devient
+  // solide — on peut payer un passage en volume (§6).
+  private processSponges(dt: number): void {
+    const p = this.params
+    const drag = Math.exp(-p.spongeDrag * dt)
+    let i = 0
+    while (i < this.count) {
+      let touching = false
+      let removed = false
+      const x = this.posX[i]
+      const y = this.posY[i]
+      for (const sp of this.sponges) {
+        if (!sp.contains(x, y)) continue
+        const cell = sp.cellIndexAt(x, y)
+        if (cell < 0 || sp.isSolid(cell)) continue
+        touching = true
+        this.velX[i] *= drag
+        this.velY[i] *= drag
+        this.contactTime[i] += dt
+        if (this.contactTime[i] >= p.spongeAbsorbTime) {
+          sp.absorb(cell)
+          this.removeParticle(i)
+          removed = true
+        }
+        break
+      }
+      if (removed) continue // l'indice i contient maintenant une autre particule
+      if (!touching) this.contactTime[i] = 0
+      i++
     }
   }
 
