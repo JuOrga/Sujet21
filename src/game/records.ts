@@ -8,6 +8,7 @@ export interface TableauRecord {
   liters: number
   time: number // secondes simulées entre l'entrée du tableau et la collecte
   essai: number // n° de l'échantillon qui détient le record
+  name: string // nom de l'opérateur au moment du record (façon borne d'arcade)
 }
 
 export interface HistoryEntry {
@@ -20,6 +21,7 @@ export interface HistoryEntry {
 
 interface RecordsData {
   essais: number // essais terminés en dispersion (l'échantillon courant est essais + 1)
+  operator: string // nom affiché sur les records
   tableaux: Record<string, TableauRecord>
   history: HistoryEntry[]
 }
@@ -34,7 +36,7 @@ const KEY = 'projet21.registres.v1'
 const HISTORY_MAX = 40
 
 function blank(): RecordsData {
-  return { essais: 0, tableaux: {}, history: [] }
+  return { essais: 0, operator: '', tableaux: {}, history: [] }
 }
 
 function defaultStorage(): StorageLike | null {
@@ -59,7 +61,10 @@ export class Records {
       const raw = this.storage?.getItem(KEY)
       if (raw) {
         const d = JSON.parse(raw) as RecordsData
-        if (typeof d.essais === 'number' && d.tableaux && Array.isArray(d.history)) return d
+        if (typeof d.essais === 'number' && d.tableaux && Array.isArray(d.history)) {
+          if (typeof d.operator !== 'string') d.operator = '' // registres d'avant le nom
+          return d
+        }
       }
     } catch {
       // registre corrompu ou stockage indisponible : on repart à vide
@@ -78,6 +83,16 @@ export class Records {
   /** N° de l'échantillon courant (le prochain à être consigné). */
   essaiNumber(): number {
     return this.data.essais + 1
+  }
+
+  operator(): string {
+    return this.data.operator
+  }
+
+  /** Le nom estampillé sur les prochains records (borne d'arcade). */
+  setOperator(name: string): void {
+    this.data.operator = name.trim().toUpperCase().slice(0, 12)
+    this.save()
   }
 
   tableauRecord(code: string): TableauRecord | null {
@@ -104,7 +119,12 @@ export class Records {
       entry.liters > prev.liters ||
       (entry.liters === prev.liters && entry.time < prev.time)
     if (beats) {
-      this.data.tableaux[code] = { liters: entry.liters, time: entry.time, essai: entry.no }
+      this.data.tableaux[code] = {
+        liters: entry.liters,
+        time: entry.time,
+        essai: entry.no,
+        name: this.data.operator,
+      }
     }
     this.save()
     return { newRecord: beats }

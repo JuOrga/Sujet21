@@ -50,6 +50,20 @@ describe('Records — les registres du labo', () => {
     expect(new Records(storage).essaiNumber()).toBe(1)
   })
 
+  it('le nom d’opérateur est estampillé sur les records et persiste', () => {
+    const storage = memoryStorage()
+    const r = new Records(storage)
+    r.setOperator('  julien du 21  ')
+    expect(r.operator()).toBe('JULIEN DU 21')
+    r.noteCollection('21-A', 3.0, 60)
+    expect(r.tableauRecord('21-A')).toMatchObject({ name: 'JULIEN DU 21' })
+    // un record battu porte le nom du nouvel opérateur
+    r.setOperator('vega')
+    r.noteCollection('21-A', 3.5, 60)
+    expect(r.tableauRecord('21-A')).toMatchObject({ name: 'VEGA' })
+    expect(new Records(storage).operator()).toBe('VEGA')
+  })
+
   it('survit à un stockage absent ou corrompu', () => {
     const none = new Records(null)
     expect(none.noteCollection('21-A', 1, 1).newRecord).toBe(true)
