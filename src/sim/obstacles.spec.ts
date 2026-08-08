@@ -112,6 +112,22 @@ describe('FluidSim — matériaux (§6)', () => {
     expect(sim.posX[0]).toBeGreaterThan(60)
   })
 
+  it('l’impact sur un mur neutre s’étale au lieu d’éclater (amorti)', () => {
+    // Deux gouttes lancées en biais sur le mur : avec l'amorti, la vitesse
+    // s'aligne sur la paroi (glissement) au lieu de repartir en jaillissant.
+    const sim = makeSim()
+    sim.setLevel([{ minX: 100, minY: -200, maxX: 140, maxY: 200, material: MAT_WALL }], [])
+    const i = sim.addParticle(60, 0, KIND_PLAYER)
+    sim.velX[i] = 500
+    sim.velY[i] = 200
+    sim.baseVolume = 1
+    for (let s = 0; s < 120; s++) sim.step(sim.params.dt)
+    // pas de jaillissement : la composante qui fuit la paroi reste faible…
+    expect(sim.velX[0]).toBeLessThan(40)
+    // …et le glissement tangentiel a continué le long du mur
+    expect(sim.posY[0]).toBeGreaterThan(30)
+  })
+
   it('removeParticle garde le corps cohérent', () => {
     const sim = makeSim()
     sim.spawnDisc(0, 0, 50, KIND_PLAYER)

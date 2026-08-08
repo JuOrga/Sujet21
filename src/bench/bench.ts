@@ -7,6 +7,7 @@
 
 import { Pane } from 'tweakpane'
 import type { SimParams } from '../sim/params'
+import { DELIVERIES } from './changelog'
 import {
   copyParams,
   loadStoredPresets,
@@ -272,6 +273,10 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Restitution des chocs sur parois hydrophobes. 1 : rebond parfait. 0 : l’eau s’écrase sans rebondir.',
   )
   describe(
+    fMat.addBinding(params, 'wallSplashDamp', { min: 0, max: 1, label: 'amorti impact' }),
+    'Amortit le rebond de l’eau sur les murs neutres : haut, l’impact s’étale et épouse la paroi ; à 0, l’eau éclate en jaillissant.',
+  )
+  describe(
     fMat.addBinding(params, 'spongeDrag', { min: 0, max: 30, label: 'traînée éponge' }),
     'Freinage de l’eau qui traverse une éponge : elle s’y englue avant d’être absorbée.',
   )
@@ -337,6 +342,31 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     fMon.addBinding(monitor, 'speed', { readonly: true, label: 'vitesse (u/s)', format: (v: number) => v.toFixed(0) }),
     'Vitesse du centre du corps, en unités monde par seconde.',
   )
+
+  // ---- Livraisons : le journal de ce qui a été livré, date et heure ----
+  const fLog = pane.addFolder({ title: 'Livraisons', expanded: false })
+  const log = document.createElement('div')
+  log.className = 'bench-log'
+  for (const d of DELIVERIES) {
+    const entry = document.createElement('div')
+    const head = document.createElement('div')
+    head.className = 'bench-log-head'
+    head.textContent = `${d.date} — ${d.title}`
+    entry.appendChild(head)
+    const ul = document.createElement('ul')
+    for (const note of d.notes) {
+      const li = document.createElement('li')
+      li.textContent = note
+      ul.appendChild(li)
+    }
+    entry.appendChild(ul)
+    log.appendChild(entry)
+  }
+  // Dans le conteneur repliable du dossier, pour suivre son état ouvert/fermé.
+  // La classe bench-log-folder neutralise la hauteur calculée par tweakpane
+  // (qui ignore ce div étranger et le clipperait).
+  fLog.element.classList.add('bench-log-folder')
+  ;(fLog.element.querySelector('.tp-fldv_c') ?? fLog.element).appendChild(log)
 
   describe(pane.addButton({ title: 'Recommencer (R)' }), 'Relance le tableau depuis le début.').on(
     'click',

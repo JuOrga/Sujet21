@@ -53,6 +53,7 @@ void main() {
 const COMPOSE_FS = `#version 300 es
 precision highp float;
 #define MAX_BOXES 24
+#define MAX_WAVES 8
 uniform sampler2D uField;
 uniform vec2 uCanvasSize;  // px device
 uniform float uDpr;
@@ -68,6 +69,8 @@ uniform int uBoxCount;
 uniform vec4 uBoxes[MAX_BOXES];   // minX, minY, maxX, maxY
 uniform float uBoxMats[MAX_BOXES]; // 0 mur, 1 hydrophile, 2 hydrophobe, 3 sas
 uniform float uTime;
+uniform int uWaveCount;
+uniform vec4 uWaves[MAX_WAVES]; // x, y, instant de départ, amplitude
 out vec4 outColor;
 
 float gridLine(vec2 world, float spacing, float widthWorld) {
@@ -140,10 +143,26 @@ void main() {
     }
   }
 
-  // Eau : seuillage du champ
+  // Ondes d'éjection : anneaux qui traversent le volume depuis le point
+  // d'éjection. Elles gonflent légèrement le champ (la surface ondule) et
+  // éclaircissent l'eau sur leur passage.
+  float waveGlow = 0.0;
+  for (int wi = 0; wi < MAX_WAVES; wi++) {
+    if (wi >= uWaveCount) break;
+    vec4 wv = uWaves[wi];
+    float age = uTime - wv.z;
+    if (age < 0.0 || age > 0.9) continue;
+    float radius = age * 320.0;
+    float dW = length(world - wv.xy);
+    float ring = exp(-pow((dW - radius) / 15.0, 2.0));
+    waveGlow += ring * exp(-age * 3.5) * wv.w;
+  }
+
+  // Eau : seuillage du champ (l'onde déforme la surface)
   float th = uThreshold;
   float s = max(th * uSoftness, 1e-4);
-  float body = smoothstep(th - s, th + s, field);
+  float field2 = field * (1.0 + 0.14 * waveGlow);
+  float body = smoothstep(th - s, th + s, field2);
 
   float speedT = clamp(speed, 0.0, 1.0);
   vec3 slow = vec3(0.07, 0.30, 0.48);
@@ -151,11 +170,26 @@ void main() {
   vec3 water = mix(slow, fast, speedT);
   water = mix(water * 0.40, water, clamp(player, 0.0, 1.0)); // eau libre plus sombre
 
+  // Relief : le gradient du champ donne une pseudo-normale — éclairage doux
+  // et reflet spéculaire, l'eau prend du volume au lieu d'être plate.
+  vec2 grad = vec2(dFdx(field2), dFdy(field2)) * uCanvasSize;
+  vec3 nrm = normalize(vec3(-grad * 0.55, 1.0));
+  vec3 lightDir = normalize(vec3(-0.35, 0.55, 0.75));
+  float diffuse = max(dot(nrm, lightDir), 0.0);
+  float specular = pow(max(reflect(-lightDir, nrm).z, 0.0), 28.0);
+
   // Cœur plus dense légèrement plus sombre, liseré plus clair
-  float core = smoothstep(th * 1.8, th * 3.2, field);
+  float core = smoothstep(th * 1.8, th * 3.2, field2);
   water = mix(water, water * 0.75, core * 0.5);
-  float rim = body * (1.0 - smoothstep(th + s, th * 1.9, field));
+  float rim = body * (1.0 - smoothstep(th + s, th * 1.9, field2));
   water += vec3(0.20, 0.45, 0.55) * rim * 0.55;
+
+  // Scintillement interne discret : l'eau vit même au repos
+  float shimmer = sin(world.x * 0.11 + uTime * 1.6) * sin(world.y * 0.09 - uTime * 1.2);
+  water *= 1.0 + 0.05 * shimmer * core;
+
+  water = water * (0.78 + 0.30 * diffuse) + vec3(0.85, 0.95, 1.0) * specular * 0.30;
+  water += vec3(0.30, 0.55, 0.65) * waveGlow * 0.45;
 
   col = mix(col, water, body);
   outColor = vec4(col, 1.0);
@@ -322,6 +356,8 @@ export class Renderer {
     dpr: number,
     boxes: ObstacleBox[],
     timeSec: number,
+    waves: Float32Array, // MAX_WAVES × (x, y, t0, amplitude)
+    waveCount: number,
   ): void {
     const gl = this.gl
     const devW = Math.max(1, Math.round(viewportW * dpr))
@@ -402,6 +438,8 @@ export class Renderer {
     gl.uniform4fv(cu['uBoxes[0]'], this.boxScratch)
     gl.uniform1fv(cu['uBoxMats[0]'], this.matScratch)
     gl.uniform1f(cu['uTime'], timeSec)
+    gl.uniform1i(cu['uWaveCount'], waveCount)
+    gl.uniform4fv(cu['uWaves[0]'], waves)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
 
     // Passe C — cellules d'éponge

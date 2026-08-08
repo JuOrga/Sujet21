@@ -38,6 +38,7 @@ export interface SimParams {
   hydrophobeRestitution: number // rebond au contact (0..1)
   spongeDrag: number // traînée dans une cellule absorbante (1/s)
   spongeAbsorbTime: number // temps de contact continu avant absorption (s)
+  wallSplashDamp: number // amorti du rebond normal près des murs neutres (0..1) : l'eau épouse la paroi au lieu d'éclater
 
   // Corps
   litersPerParticle: number // conversion volume affiché
@@ -98,6 +99,7 @@ export const DEFAULT_PARAMS: SimParams = {
   hydrophobeRestitution: 0.55,
   spongeDrag: 7,
   spongeAbsorbTime: 0.3,
+  wallSplashDamp: 0.65,
 
   litersPerParticle: 0.005,
   criticalVolumeFraction: 0.35,

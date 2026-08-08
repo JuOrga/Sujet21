@@ -79,6 +79,14 @@ const monitor: BenchMonitor = { fps: 0, particles: 0, volume: 0, speed: 0, overv
 // Vortex de regroupement : déclenché au clic droit, actif vortexDuration s
 const vortex = { x: 0, y: 0, timer: 0 }
 
+// Ondes d'éjection (rendu seulement) : une onde traverse le corps à chaque
+// salve d'éjection, depuis le point de sortie de la matière
+const MAX_WAVES = 8
+const WAVE_EVERY = 0.16 // s d'éjection continue entre deux ondes
+const waves: { x: number; y: number; t: number }[] = []
+const waveScratch = new Float32Array(MAX_WAVES * 4)
+let waveCarry = WAVE_EVERY // première salve : onde immédiate
+
 function restart(): void {
   run.exitTimer = 0
   vortex.timer = 0
@@ -179,6 +187,33 @@ function frame(now: number): void {
     }
   }
 
+  // Ondes d'éjection : naissance côté visée, sur le bord du corps
+  if (input.aimActive && !sim.dispersed && !input.paused && !tableauDone) {
+    waveCarry += dtReal
+    if (waveCarry >= WAVE_EVERY) {
+      waveCarry = 0
+      const dx = aim.x - sim.stats.centroidX
+      const dy = aim.y - sim.stats.centroidY
+      const len = Math.hypot(dx, dy) || 1
+      const r = sim.stats.rmsRadius * 1.1
+      waves.push({
+        x: sim.stats.centroidX + (dx / len) * r,
+        y: sim.stats.centroidY + (dy / len) * r,
+        t: elapsed,
+      })
+      if (waves.length > MAX_WAVES) waves.shift()
+    }
+  } else {
+    waveCarry = WAVE_EVERY
+  }
+  while (waves.length > 0 && elapsed - waves[0].t > 1) waves.shift()
+  for (let i = 0; i < waves.length; i++) {
+    waveScratch[i * 4] = waves[i].x
+    waveScratch[i * 4 + 1] = waves[i].y
+    waveScratch[i * 4 + 2] = waves[i].t
+    waveScratch[i * 4 + 3] = 1
+  }
+
   // Caméra : suivi du corps, ou vue d'ensemble du tableau depuis le banc
   if (monitor.overview) {
     const b = sim.bounds
@@ -187,7 +222,7 @@ function frame(now: number): void {
   } else {
     camera.update(dtReal, sim.stats.centroidX, sim.stats.centroidY, sim.stats.rmsRadius, vw, vh, params)
   }
-  renderer.render(sim, camera, params, vw, vh, dpr, renderBoxes, elapsed)
+  renderer.render(sim, camera, params, vw, vh, dpr, renderBoxes, elapsed, waveScratch, waves.length)
 
   const speed = Math.hypot(sim.stats.velX, sim.stats.velY)
   monitor.fps = fpsSmoothed

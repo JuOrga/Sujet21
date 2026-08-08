@@ -14,7 +14,7 @@ import { SpatialGrid } from './grid'
 import { makeKernels, computeRestDensity, type Kernels } from './kernels'
 import { labelComponents } from './components'
 import { boxContact, Sponge, type ClosestPoint } from './obstacles'
-import { MAT_HYDROPHILE, MAT_HYDROPHOBE, type ObstacleBox, type SpongeDef } from '../game/level'
+import { MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_WALL, type ObstacleBox, type SpongeDef } from '../game/level'
 
 export const KIND_FREE = 0
 export const KIND_PLAYER = 1
@@ -605,7 +605,9 @@ export class FluidSim {
       const x = this.prdX[i]
       const y = this.prdY[i]
       for (const b of this.boxes) {
-        if (b.material !== MAT_HYDROPHILE && b.material !== MAT_HYDROPHOBE) continue
+        if (b.material !== MAT_HYDROPHILE && b.material !== MAT_HYDROPHOBE && b.material !== MAT_WALL) {
+          continue
+        }
         if (
           x < b.minX - band - rp ||
           x > b.maxX + band + rp ||
@@ -618,6 +620,19 @@ export class FluidSim {
         const sep = cp.dist - rp
         if (sep > 0 && sep < band) {
           const f = 1 - sep / band
+          if (b.material === MAT_WALL) {
+            // Mur neutre : l'éclat d'impact vient du rebond de pression qui
+            // projette les particules loin de la paroi. On amortit la vitesse
+            // sortante dans la bande — l'eau s'étale et épouse la forme au
+            // lieu de jaillir ; le glissement tangentiel reste libre.
+            const vn = this.velX[i] * cp.nx + this.velY[i] * cp.ny
+            if (vn > 0) {
+              const damp = p.wallSplashDamp * f
+              this.velX[i] -= cp.nx * vn * damp
+              this.velY[i] -= cp.ny * vn * damp
+            }
+            continue
+          }
           const a = (b.material === MAT_HYDROPHILE ? -p.hydrophilePull : p.hydrophobeRepel) * f * dt
           this.velX[i] += cp.nx * a
           this.velY[i] += cp.ny * a
