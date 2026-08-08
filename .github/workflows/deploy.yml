@@ -1,0 +1,27 @@
+name: deploy
+
+# Auto-déploiement Vercel à chaque poussée sur la branche de développement :
+# le banc de réglage en ligne (sujet21.vercel.app) suit le dernier commit.
+# Déploiement en CLI avec token (secrets VERCEL_*) — pas d'intégration Git
+# Vercel, qui demanderait un plan Pro pour un dépôt privé d'organisation.
+on:
+  push:
+    branches: [claude/game-development-me41vn]
+  workflow_dispatch:
+
+concurrency:
+  group: vercel-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npx vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
