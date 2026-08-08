@@ -218,15 +218,20 @@ function touchButton(label: string, title: string, onTap: () => void): HTMLButto
 const btnPause = touchButton('⏸', 'pause (espace)', () => input.togglePause())
 touchButton('‹', 'ralentir le temps (,)', () => input.stepWarp(-1))
 touchButton('›', 'accélérer le temps (.)', () => input.stepWarp(1))
-const btnFreeze = touchButton('❄', 'se changer en glace / dégeler (F)', () => {
-  input.toggleFreeze()
-})
-const btnGas = touchButton('💨', 'se changer en vapeur / condenser (G)', () => {
-  input.toggleGas()
-})
 const btnVortex = touchButton('🌀', 'vortex : armer puis toucher l’écran (clic droit)', () => {
   input.vortexArmed = !input.vortexArmed
 })
+
+// Sélecteur d'état (EAU / GLACE / VAPEUR) : la commande centrale du jeu
+const stateEau = document.getElementById('state-eau') as HTMLButtonElement
+const stateGlace = document.getElementById('state-glace') as HTMLButtonElement
+const stateVapeur = document.getElementById('state-vapeur') as HTMLButtonElement
+stateEau.addEventListener('click', () => {
+  input.freezeIntent = false
+  input.gasIntent = false
+})
+stateGlace.addEventListener('click', () => input.toggleFreeze())
+stateVapeur.addEventListener('click', () => input.toggleGas())
 touchButton('⌖', 'zoom auto (après un zoom molette/pincement)', () => camera.resetAutoZoom())
 const btnSound = touchButton('🔊', 'son : couper / activer', () => {
   audio.resume()
@@ -397,8 +402,9 @@ function frame(now: number): void {
   btnPause.classList.toggle('active', input.paused)
   btnVortex.classList.toggle('active', input.vortexArmed)
   btnVortex.style.display = params.vortexEnabled >= 0.5 ? '' : 'none'
-  btnFreeze.classList.toggle('active', input.freezeIntent)
-  btnGas.classList.toggle('active', input.gasIntent)
+  stateEau.classList.toggle('active', !input.freezeIntent && !input.gasIntent)
+  stateGlace.classList.toggle('active', input.freezeIntent)
+  stateVapeur.classList.toggle('active', input.gasIntent)
   btnSound.textContent = audio.enabled ? '🔊' : '🔇'
 
   // Instruments de bord

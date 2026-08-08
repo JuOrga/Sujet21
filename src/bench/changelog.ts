@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '08/08/2026 22:54',
+    title: 'Sélecteur d’état : les transformations en évidence',
+    notes: [
+      'Les transformations quittent la barre d’outils : un sélecteur dédié EAU / GLACE / VAPEUR — gros boutons étiquetés, raccourcis F et G affichés, halo coloré sur l’état choisi.',
+      'Au doigt : en colonne à droite de l’écran, sous le pouce. Au clavier : F et G fonctionnent toujours.',
+    ],
+  },
+  {
     date: '08/08/2026 22:43',
     title: 'Effets sonores',
     notes: [
