@@ -14,7 +14,14 @@ import { SpatialGrid } from './grid'
 import { makeKernels, computeRestDensity, type Kernels } from './kernels'
 import { labelComponents } from './components'
 import { boxContact, Sponge, type ClosestPoint } from './obstacles'
-import { MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_WALL, type ObstacleBox, type SpongeDef } from '../game/level'
+import {
+  MAT_FROID,
+  MAT_HYDROPHILE,
+  MAT_HYDROPHOBE,
+  MAT_WALL,
+  type ObstacleBox,
+  type SpongeDef,
+} from '../game/level'
 
 export const KIND_FREE = 0
 export const KIND_PLAYER = 1
@@ -60,6 +67,11 @@ export class FluidSim {
   kind: Uint8Array
   cooldown: Float32Array
   labels: Int32Array
+  // Froid (§6, tableau 2) : givre 0 → 1, puis gel. Une particule gelée est
+  // ancrée au monde — masse infinie : elle pousse le liquide, rien ne la
+  // pousse. Le dégel rend l'eau à la simulation, sans élan.
+  frost: Float32Array
+  frozen: Uint8Array
 
   boxes: ObstacleBox[] = []
   sponges: Sponge[] = []
@@ -122,6 +134,8 @@ export class FluidSim {
     this.kind = new Uint8Array(capacity)
     this.cooldown = new Float32Array(capacity)
     this.labels = new Int32Array(capacity)
+    this.frost = new Float32Array(capacity)
+    this.frozen = new Uint8Array(capacity)
     this.stack = new Int32Array(capacity)
     this.nbStart = new Int32Array(capacity + 1)
     this.nbList = new Int32Array(capacity * MAX_NEIGHBORS)
@@ -166,9 +180,12 @@ export class FluidSim {
     }
   }
 
+  private hasCold = false
+
   setLevel(boxes: ObstacleBox[], sponges: SpongeDef[]): void {
     this.boxes = boxes
     this.sponges = sponges.map((d) => new Sponge(d))
+    this.hasCold = boxes.some((b) => b.material === MAT_FROID)
   }
 
   // Retrait par échange avec la dernière particule (absorption éponge).
@@ -185,6 +202,8 @@ export class FluidSim {
       this.kind[i] = this.kind[last]
       this.cooldown[i] = this.cooldown[last]
       this.contactTime[i] = this.contactTime[last]
+      this.frost[i] = this.frost[last]
+      this.frozen[i] = this.frozen[last]
     }
     this.count = last
   }
@@ -199,6 +218,8 @@ export class FluidSim {
     this.kind[i] = kind
     this.cooldown[i] = 0
     this.contactTime[i] = 0
+    this.frost[i] = 0
+    this.frozen[i] = 0
     if (kind === KIND_PLAYER) this.playerCount++
     return i
   }
@@ -241,7 +262,7 @@ export class FluidSim {
       let best = -1
       let bestD2 = Infinity
       for (let i = 0; i < this.count; i++) {
-        if (this.kind[i] !== KIND_PLAYER) continue
+        if (this.kind[i] !== KIND_PLAYER || this.frozen[i] === 1) continue
         const dx = this.posX[i] - aimX
         const dy = this.posY[i] - aimY
         const d2 = dx * dx + dy * dy
@@ -250,7 +271,7 @@ export class FluidSim {
           best = i
         }
       }
-      if (best < 0) return
+      if (best < 0) return // tout le corps est gelé : temps mort, rien à éjecter
 
       let dirX = aimX - this.posX[best]
       let dirY = aimY - this.posY[best]
@@ -296,7 +317,7 @@ export class FluidSim {
         const R = p.kernelRadius * 1.8
         const R2 = R * R
         for (let i = 0; i < this.count; i++) {
-          if (this.kind[i] !== KIND_PLAYER) continue
+          if (this.kind[i] !== KIND_PLAYER || this.frozen[i] === 1) continue
           const dx = departX - this.posX[i]
           const dy = departY - this.posY[i]
           const d2 = dx * dx + dy * dy
@@ -321,8 +342,10 @@ export class FluidSim {
       const locality = Math.min(1, Math.max(0, p.recoilLocality))
       const localR = p.kernelRadius * 3
       let wSum = 0
+      let liquid = 0
       for (let i = 0; i < this.count; i++) {
-        if (this.kind[i] !== KIND_PLAYER) continue
+        if (this.kind[i] !== KIND_PLAYER || this.frozen[i] === 1) continue
+        liquid++
         let w = 1 - locality
         const dx = this.posX[i] - departX
         const dy = this.posY[i] - departY
@@ -332,16 +355,17 @@ export class FluidSim {
         wSum += w
       }
       if (wSum < 1e-6) {
+        if (liquid === 0) continue // le reste du corps est gelé : la glace encaisse le recul
         // corps entier hors du rayon local (improbable) : repli uniforme
-        wSum = this.playerCount
+        wSum = liquid
         for (let i = 0; i < this.count; i++) {
-          if (this.kind[i] === KIND_PLAYER) this.dvX[i] = 1
+          if (this.kind[i] === KIND_PLAYER && this.frozen[i] === 0) this.dvX[i] = 1
         }
       }
       const rx = -(dvx + entrainX) / wSum
       const ry = -(dvy + entrainY) / wSum
       for (let i = 0; i < this.count; i++) {
-        if (this.kind[i] === KIND_PLAYER) {
+        if (this.kind[i] === KIND_PLAYER && this.frozen[i] === 0) {
           this.velX[i] += rx * this.dvX[i]
           this.velY[i] += ry * this.dvX[i]
         }
@@ -374,6 +398,7 @@ export class FluidSim {
     const drag = p.vortexDrag / Math.max(0.15, fade)
     const blend = 1 - Math.exp(-drag * dt)
     for (let i = 0; i < this.count; i++) {
+      if (this.frozen[i] === 1) continue // la glace est ancrée
       const dx = cx - this.posX[i]
       const dy = cy - this.posY[i]
       const d2 = dx * dx + dy * dy
@@ -413,6 +438,7 @@ export class FluidSim {
     // franchement sans qu'un curseur de plus soit nécessaire.
     const blend = 1 - Math.exp(-4 * dt)
     for (let i = 0; i < this.count; i++) {
+      if (this.frozen[i] === 1) continue // la glace est ancrée
       const dx = cx - this.posX[i]
       const dy = cy - this.posY[i]
       const d2 = dx * dx + dy * dy
@@ -448,7 +474,7 @@ export class FluidSim {
     while (i < this.count) {
       const dx = cx - this.posX[i]
       const dy = cy - this.posY[i]
-      if (dx * dx + dy * dy < swallowR2) {
+      if (this.frozen[i] === 0 && dx * dx + dy * dy < swallowR2) {
         this.removeParticle(i)
         this.swallowed++
         continue // l'indice i contient maintenant une autre particule
@@ -471,10 +497,19 @@ export class FluidSim {
     const invRho0 = 1 / rho0
     const grid = this.grid
 
-    // 1. Prédiction (apesanteur : pas de force externe)
+    // 1. Prédiction (apesanteur : pas de force externe). La glace ne bouge
+    // pas : sa prédiction est sa position, sa vitesse est nulle.
+    const frozen = this.frozen
     for (let i = 0; i < n; i++) {
-      prdX[i] = posX[i] + velX[i] * dt
-      prdY[i] = posY[i] + velY[i] * dt
+      if (frozen[i] === 1) {
+        velX[i] = 0
+        velY[i] = 0
+        prdX[i] = posX[i]
+        prdY[i] = posY[i]
+      } else {
+        prdX[i] = posX[i] + velX[i] * dt
+        prdY[i] = posY[i] + velY[i] * dt
+      }
     }
 
     // sCorr de référence : W(dq · h)
@@ -594,6 +629,7 @@ export class FluidSim {
       }
 
       for (let i = 0; i < n; i++) {
+        if (frozen[i] === 1) continue // masse infinie : la correction ne s'applique qu'au liquide
         prdX[i] += dpX[i]
         prdY[i] += dpY[i]
       }
@@ -636,6 +672,11 @@ export class FluidSim {
 
     if (p.xsphC > 0) {
       for (let i = 0; i < n; i++) {
+        if (frozen[i] === 1) {
+          dvX[i] = 0
+          dvY[i] = 0
+          continue
+        }
         const xi = prdX[i]
         const yi = prdY[i]
         const vxi = velX[i]
@@ -670,7 +711,10 @@ export class FluidSim {
       if (this.cooldown[i] > 0) this.cooldown[i] -= dt
     }
 
-    // 5bis. Éponge : traînée, temps de contact, absorption (§6)
+    // 5bis. Froid : givre, gel, dégel (§6, tableau 2)
+    if (this.hasCold) this.processCold(dt)
+
+    // 5ter. Éponge : traînée, temps de contact, absorption (§6)
     if (this.sponges.length > 0) this.processSponges(dt)
 
     this.stepIndex++
@@ -693,6 +737,7 @@ export class FluidSim {
     if (this.boxes.length === 0 && this.sponges.length === 0) return
 
     for (let i = 0; i < n; i++) {
+      if (this.frozen[i] === 1) continue // la glace ne bouge pas, rien à résoudre
       let x = this.prdX[i]
       let y = this.prdY[i]
 
@@ -759,6 +804,7 @@ export class FluidSim {
     const philDamp = Math.exp(-p.hydrophileFriction * dt)
 
     for (let i = 0; i < n; i++) {
+      if (this.frozen[i] === 1) continue // la glace ignore les bandes d'influence
       const mat = this.contactMat[i]
       if (mat === MAT_HYDROPHOBE) {
         const vnIn = this.contactVn[i]
@@ -830,6 +876,10 @@ export class FluidSim {
     const drag = Math.exp(-p.spongeDrag * dt)
     let i = 0
     while (i < this.count) {
+      if (this.frozen[i] === 1) {
+        i++
+        continue // la glace n'est ni engluée ni absorbée
+      }
       let touching = false
       let removed = false
       const x = this.posX[i]
@@ -852,6 +902,50 @@ export class FluidSim {
       if (removed) continue // l'indice i contient maintenant une autre particule
       if (!touching) this.contactTime[i] = 0
       i++
+    }
+  }
+
+  // Le froid (§6, tableau 2). Dans l'aura d'une plaque froide, le givre
+  // monte (d'autant plus vite qu'on est près) ; à 1, la particule gèle et
+  // s'ancre au monde. À l'écart du froid, le givre fond et l'eau redevient
+  // liquide — sous 0,55, pas à 0,99 : l'hystérésis évite le clignotement
+  // gel/dégel des particules posées en bord d'aura.
+  private processCold(dt: number): void {
+    const p = this.params
+    const band = p.coldBand
+    const rp = p.particleSpacing * 0.5
+    const freeze = dt / Math.max(0.05, p.freezeTime)
+    const thaw = dt / Math.max(0.1, p.thawTime)
+    const cp = this.scratchCP
+    for (let i = 0; i < this.count; i++) {
+      const x = this.posX[i]
+      const y = this.posY[i]
+      let exposure = 0
+      for (const b of this.boxes) {
+        if (b.material !== MAT_FROID) continue
+        if (
+          x < b.minX - band - rp ||
+          x > b.maxX + band + rp ||
+          y < b.minY - band - rp ||
+          y > b.maxY + band + rp
+        ) {
+          continue
+        }
+        boxContact(x, y, b, cp)
+        const f = 1 - Math.max(0, cp.dist - rp) / band
+        if (f > exposure) exposure = Math.min(1, f)
+      }
+      if (exposure > 0) {
+        this.frost[i] = Math.min(1, this.frost[i] + exposure * freeze)
+        if (this.frost[i] >= 1 && this.frozen[i] === 0) {
+          this.frozen[i] = 1
+          this.velX[i] = 0
+          this.velY[i] = 0
+        }
+      } else {
+        this.frost[i] = Math.max(0, this.frost[i] - thaw)
+        if (this.frozen[i] === 1 && this.frost[i] <= 0.55) this.frozen[i] = 0
+      }
     }
   }
 

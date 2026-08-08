@@ -7,7 +7,7 @@ import { Camera } from './render/camera'
 import { Renderer } from './render/renderer'
 import { FixedLoop } from './game/loop'
 import { Input } from './game/input'
-import { MAT_EXIT, TABLEAU_1, pointInBox, type LevelDef, type ObstacleBox } from './game/level'
+import { MAT_EXIT, TABLEAUX, pointInBox, type LevelDef, type ObstacleBox } from './game/level'
 import { createBench, type BenchMonitor } from './bench/bench'
 
 const CAPACITY = 4096
@@ -17,9 +17,8 @@ const params: SimParams = { ...DEFAULT_PARAMS }
 
 // État de la partie (§7.2) : le surplus de chaque tableau est mis en bonbonne.
 const run = {
-  tableau: 1,
   bonbonneLiters: 0,
-  exitTimer: 0, // > 0 : bilan de sortie affiché, redémarrage imminent
+  exitTimer: 0, // > 0 : bilan de sortie affiché, tableau suivant imminent
 }
 
 function createSim(level: LevelDef): FluidSim {
@@ -30,24 +29,34 @@ function createSim(level: LevelDef): FluidSim {
   return sim
 }
 
-const level = TABLEAU_1
-// Aide au level design : ?spawn=x,y place le corps où l'on veut
+// Enchaînement des tableaux : chaque sas mène au suivant, puis on boucle.
+let levelIndex = 0
+// Aide au level design : ?tableau=N démarre où l'on veut, ?spawn=x,y place le corps
 {
-  const spawnParam = new URLSearchParams(location.search).get('spawn')
+  const q = new URLSearchParams(location.search)
+  const t = Number(q.get('tableau'))
+  if (Number.isFinite(t) && t >= 1 && t <= TABLEAUX.length) levelIndex = t - 1
+  const spawnParam = q.get('spawn')
   if (spawnParam) {
     const [sx, sy] = spawnParam.split(',').map(Number)
     if (Number.isFinite(sx) && Number.isFinite(sy)) {
-      level.spawn = { ...level.spawn, x: sx, y: sy }
+      const lv = TABLEAUX[levelIndex]
+      lv.spawn = { ...lv.spawn, x: sx, y: sy }
     }
   }
 }
-// Les boîtes rendues incluent le sas (rendu seulement, pas de physique solide)
-const renderBoxes: ObstacleBox[] = [...level.boxes, { ...level.exit, material: MAT_EXIT }]
-// La bouche d'aspiration du sas : l'eau s'y engouffre en entonnoir
-const exitMouth = {
-  x: (level.exit.minX + level.exit.maxX) * 0.5,
-  y: (level.exit.minY + level.exit.maxY) * 0.5,
+let level: LevelDef = TABLEAUX[levelIndex]
+// Les boîtes rendues incluent le sas (rendu seulement, pas de physique solide),
+// et la bouche d'aspiration est le centre du sas du tableau courant.
+let renderBoxes: ObstacleBox[] = []
+const exitMouth = { x: 0, y: 0 }
+function applyLevel(): void {
+  level = TABLEAUX[levelIndex]
+  renderBoxes = [...level.boxes, { ...level.exit, material: MAT_EXIT }]
+  exitMouth.x = (level.exit.minX + level.exit.maxX) * 0.5
+  exitMouth.y = (level.exit.minY + level.exit.maxY) * 0.5
 }
+applyLevel()
 
 const canvas = document.getElementById('glcanvas') as HTMLCanvasElement
 const overlay = document.getElementById('overlay') as HTMLDivElement
@@ -110,6 +119,7 @@ let waveCarry = WAVE_EVERY // première salve : onde immédiate
 function restart(): void {
   run.exitTimer = 0
   vortex.timer = 0
+  applyLevel()
   sim = createSim(level)
   loop.reset()
   camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, camera.zoom)
@@ -122,6 +132,7 @@ const pane = createBench(params, monitor, {
 input.onReset = restart
 input.onZoom = (factor) => camera.zoomBy(factor, params)
 input.onVortex = (clientX, clientY) => {
+  if (params.vortexEnabled < 0.5) return // outil de test, coupé dans le protocole
   const w = camera.screenToWorld(clientX, clientY, window.innerWidth, window.innerHeight)
   vortex.x = w.x
   vortex.y = w.y
@@ -227,11 +238,10 @@ function frame(now: number): void {
   if (!tableauDone && !sim.dispersed && (drunk || reached)) {
     const surplus = sim.liters() + sim.swallowed * params.litersPerParticle
     run.bonbonneLiters += surplus
-    run.tableau++
     run.exitTimer = EXIT_LINGER
     showOverlay(
       'SAS ATTEINT',
-      `Surplus mis en bonbonne : ${surplus.toFixed(2)} L — réserve totale ${run.bonbonneLiters.toFixed(2)} L`,
+      `Surplus mis en bonbonne : ${surplus.toFixed(2)} L — réserve totale ${run.bonbonneLiters.toFixed(2)} L · tableau suivant…`,
       'success',
     )
   }
@@ -239,6 +249,7 @@ function frame(now: number): void {
     run.exitTimer -= dtReal
     if (run.exitTimer <= 0) {
       overlay.classList.remove('visible')
+      levelIndex = (levelIndex + 1) % TABLEAUX.length
       restart()
     }
   }
@@ -302,18 +313,25 @@ function frame(now: number): void {
   btnPause.textContent = input.paused ? '▶' : '⏸'
   btnPause.classList.toggle('active', input.paused)
   btnVortex.classList.toggle('active', input.vortexArmed)
+  btnVortex.style.display = params.vortexEnabled >= 0.5 ? '' : 'none'
 
   // Instruments de bord
   const fraction = sim.baseVolume > 0 ? sim.playerCount / sim.baseVolume : 0
-  hudTableau.textContent = `nº ${run.tableau}`
+  hudTableau.textContent = `nº ${levelIndex + 1}`
   hudBonbonne.textContent = `${run.bonbonneLiters.toFixed(2)} L`
   hudVolume.innerHTML = `${sim.liters().toFixed(2)} <small>L · ${sim.playerCount} part.</small>`
   gaugeFill.style.width = `${Math.min(100, fraction * 100).toFixed(1)}%`
   gaugeThreshold.style.left = `${(params.criticalVolumeFraction * 100).toFixed(1)}%`
   hudSeuil.textContent = `${(params.criticalVolumeFraction * sim.baseVolume * params.litersPerParticle).toFixed(2)} L`
   hudVitesse.textContent = `${speed.toFixed(0)} u/s`
-  const stateText = sim.dispersed ? 'DISPERSÉ' : 'liquide'
-  const suffix = `${vortex.timer > 0 ? ' · vortex' : ''}${input.paused ? ' · pause' : ''}`
+  let frozenCount = 0
+  for (let i = 0; i < sim.count; i++) {
+    if (sim.frozen[i] === 1 && sim.kind[i] === KIND_PLAYER) frozenCount++
+  }
+  const allFrozen = sim.playerCount > 0 && frozenCount >= sim.playerCount
+  const stateText = sim.dispersed ? 'DISPERSÉ' : allFrozen ? 'GELÉ' : 'liquide'
+  const gel = !allFrozen && frozenCount > 0 ? ' · gel partiel' : ''
+  const suffix = `${gel}${vortex.timer > 0 ? ' · vortex' : ''}${input.paused ? ' · pause' : ''}`
   hudState.textContent = stateText + suffix
   hudState.classList.toggle('warn', sim.dispersed)
   document.body.classList.toggle('dispersed', sim.dispersed)

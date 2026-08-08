@@ -24,13 +24,21 @@ export interface SimParams {
   recoilLocality: number // 0 : recul uniforme (corps rigide) ; 1 : recul concentré au point d'éjection, propagé par pression (le corps se déforme)
   reabsorbCooldown: number // délai avant qu'une gouttelette éjectée soit réabsorbable (s)
 
-  // Vortex de regroupement (clic droit)
+  // Vortex de regroupement (clic droit) — outil de test : il annule le coût
+  // de la perte d'eau, donc coupé par défaut dans le protocole
+  vortexEnabled: number // 0 : coupé ; 1 : actif (sandbox)
   vortexRadius: number // rayon d'action autour du point cliqué (unités monde)
   vortexPull: number // vitesse du courant du vortex (u/s)
   vortexSwirl: number // part giratoire du courant — rallonge la spirale de retour
   vortexDrag: number // taux d'entraînement de l'eau par le courant (1/s)
   vortexDuration: number // durée du vortex après le clic (s)
   vortexWindDown: number // fraction finale de la durée où le courant s'essouffle et dépose l'eau
+
+  // Froid (tableau 2) : les plaques froides gèlent l'eau qui s'y attarde.
+  // Gelée, elle est ancrée au monde — plus de mouvement, plus d'éjection.
+  coldBand: number // portée de l'aura de gel autour des plaques (unités monde)
+  freezeTime: number // s d'exposition en pleine aura avant le gel complet
+  thawTime: number // s de dégel une fois à l'écart du froid
 
   // Sas de sortie : une bouche d'aspiration dans laquelle l'eau s'engouffre
   exitRadius: number // portée de l'aspiration autour de la bouche (unités monde)
@@ -94,12 +102,17 @@ export const DEFAULT_PARAMS: SimParams = {
   recoilLocality: 0.6,
   reabsorbCooldown: 1.2,
 
+  vortexEnabled: 0,
   vortexRadius: 260,
   vortexPull: 420,
   vortexSwirl: 1.4,
   vortexDrag: 5,
   vortexDuration: 1.6,
   vortexWindDown: 0.35,
+
+  coldBand: 40,
+  freezeTime: 1.2,
+  thawTime: 3.5,
 
   exitRadius: 240,
   exitPull: 300,

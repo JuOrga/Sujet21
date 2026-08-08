@@ -16,6 +16,7 @@ layout(location = 0) in vec2 aPos;
 layout(location = 1) in float aSpeed;
 layout(location = 2) in float aPlayer;
 layout(location = 3) in vec2 aVel; // direction × étirement (0..~1.2)
+layout(location = 4) in float aFrost; // givre 0..1 (tableau 2)
 uniform vec2 uCenter;
 uniform vec2 uViewport; // px CSS
 uniform float uZoom;    // px CSS / unité monde
@@ -24,6 +25,7 @@ out float vSpeed;
 out float vPlayer;
 out vec2 vDir;
 out float vStretch;
+out float vFrost;
 void main() {
   vec2 clip = (aPos - uCenter) * uZoom / (uViewport * 0.5);
   gl_Position = vec4(clip, 0.0, 1.0);
@@ -37,6 +39,7 @@ void main() {
   vPlayer = aPlayer;
   vDir = s > 1e-4 ? aVel / s : vec2(1.0, 0.0);
   vStretch = s;
+  vFrost = aFrost;
 }`
 
 const SPLAT_FS = `#version 300 es
@@ -45,6 +48,7 @@ in float vSpeed;
 in float vPlayer;
 in vec2 vDir;
 in float vStretch;
+in float vFrost;
 uniform float uFieldScale;
 out vec4 outColor;
 void main() {
@@ -61,7 +65,9 @@ void main() {
   float t = 1.0 - r2;
   // Amplitude compensée : l'aire de l'ellipse a grandi de (1 + s)
   float f = t * t * uFieldScale / (1.0 + vStretch);
-  outColor = vec4(f, f * vSpeed, f * vPlayer, f);
+  // Alpha : champ pondéré par le givre — la composition retrouve la part de
+  // glace en le divisant par le champ total (canal R).
+  outColor = vec4(f, f * vSpeed, f * vPlayer, f * vFrost);
 }`
 
 const COMPOSE_VS = `#version 300 es
@@ -90,6 +96,7 @@ uniform vec4 uBoxes[MAX_BOXES];   // minX, minY, maxX, maxY
 uniform float uBoxMats[MAX_BOXES]; // 0 mur, 1 hydrophile, 2 hydrophobe, 3 sas
 uniform float uTime;
 uniform float uExitRadius; // portée de l'aspiration du sas (halo de courant)
+uniform float uColdBand;   // portée de l'aura de gel des plaques froides
 uniform int uWaveCount;
 uniform vec4 uWaves[MAX_WAVES]; // x, y, instant de départ, amplitude
 // Textures d'habillage (chargées en arrière-plan ; uHas* passe à 1 quand
@@ -161,6 +168,7 @@ void main() {
   float field = tex.r / uFieldScale;
   float speed = tex.g / max(tex.r, 1e-5);
   float player = tex.b / max(tex.r, 1e-5);
+  float icy = clamp(tex.a / max(tex.r, 1e-5), 0.0, 1.0); // part de givre locale
 
   // Reconstruction monde (repère y vers le haut, cohérent avec la passe A)
   vec2 css = gl_FragCoord.xy / uDpr;
@@ -254,6 +262,18 @@ void main() {
       }
       col = mix(col, fillCol, fill);
       col = mix(col, edgeCol, edge * 0.9);
+    } else if (mat > 3.5) {
+      // Plaque froide (tableau 2) : givre cristallin, arête pâle, et une
+      // aura de brume glacée — le danger se lit avant le contact.
+      float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
+      float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
+      float sparkle = smoothstep(0.72, 0.94, vnoise(world * 0.22));
+      vec3 fillCol = vec3(0.15, 0.21, 0.29) + vec3(0.26, 0.34, 0.40) * sparkle * 0.55;
+      col = mix(col, fillCol, fill);
+      col = mix(col, vec3(0.70, 0.86, 0.97), edge * 0.9);
+      float aura = (1.0 - smoothstep(0.0, uColdBand, max(d, 0.0))) * step(0.0, d);
+      float mist = 0.55 + 0.45 * vnoise(world * 0.05 + vec2(uTime * 0.10, -uTime * 0.06));
+      col += vec3(0.14, 0.27, 0.40) * aura * aura * mist;
     } else {
       // Sas de sortie : une bouche d'aspiration — un trou dans lequel l'eau
       // s'engouffre. Gorge sombre, œil noir, anneau qui respire, et stries
@@ -360,7 +380,12 @@ void main() {
   float surfaceZone = body * (1.0 - smoothstep(th * 1.4, th * 2.6, field2));
   water = mix(water, water * (0.55 + 0.75 * diffuse), surfaceZone * 0.55);
   water += vec3(0.85, 0.95, 1.0) * specular * 0.35 * surfaceZone;
-  water += vec3(0.30, 0.55, 0.65) * waveGlow * 0.45;
+  water += vec3(0.30, 0.55, 0.65) * waveGlow * 0.45 * (1.0 - icy);
+
+  // Gel (tableau 2) : la teinte pâlit vers la glace mate — le givre se lit
+  // sur le corps avant même la prise, la partie gelée devient blême et fixe.
+  vec3 iceCol = vec3(0.60, 0.76, 0.88) * (0.72 + 0.45 * diffuse);
+  water = mix(water, iceCol, icy * 0.9);
 
   col = mix(col, water, body);
   // L'eau qui recouvre l'œil du sas s'assombrit : elle sombre dans le trou
@@ -538,13 +563,13 @@ export class Renderer {
       this.uniforms[name] = map
     }
 
-    this.scratch = new Float32Array(capacity * 6)
+    this.scratch = new Float32Array(capacity * 7)
     this.splatVao = gl.createVertexArray()!
     this.splatVbo = gl.createBuffer()!
     gl.bindVertexArray(this.splatVao)
     gl.bindBuffer(gl.ARRAY_BUFFER, this.splatVbo)
     gl.bufferData(gl.ARRAY_BUFFER, this.scratch.byteLength, gl.DYNAMIC_DRAW)
-    const stride = 6 * 4
+    const stride = 7 * 4
     gl.enableVertexAttribArray(0)
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, stride, 0)
     gl.enableVertexAttribArray(1)
@@ -553,6 +578,8 @@ export class Renderer {
     gl.vertexAttribPointer(2, 1, gl.FLOAT, false, stride, 12)
     gl.enableVertexAttribArray(3)
     gl.vertexAttribPointer(3, 2, gl.FLOAT, false, stride, 16)
+    gl.enableVertexAttribArray(4)
+    gl.vertexAttribPointer(4, 1, gl.FLOAT, false, stride, 24)
     gl.bindVertexArray(null)
 
     this.spongeVao = gl.createVertexArray()!
@@ -676,7 +703,7 @@ export class Renderer {
     const invSpeedScale = 1 / Math.max(1, params.speedColorScale)
     const invStretchSpeed = 1 / 900 // vitesse (u/s) donnant un étirement ×2
     for (let i = 0; i < n; i++) {
-      const o = i * 6
+      const o = i * 7
       data[o] = sim.posX[i]
       data[o + 1] = sim.posY[i]
       const vx = sim.velX[i]
@@ -694,9 +721,10 @@ export class Renderer {
         data[o + 4] = 0
         data[o + 5] = 0
       }
+      data[o + 6] = sim.frost[i]
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, this.splatVbo)
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, data, 0, n * 6)
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, data, 0, n * 7)
 
     // Passe A — champ
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo)
@@ -751,6 +779,7 @@ export class Renderer {
     gl.uniform1fv(cu['uBoxMats[0]'], this.matScratch)
     gl.uniform1f(cu['uTime'], timeSec)
     gl.uniform1f(cu['uExitRadius'], params.exitRadius)
+    gl.uniform1f(cu['uColdBand'], params.coldBand)
     gl.uniform1i(cu['uWaveCount'], waveCount)
     gl.uniform4fv(cu['uWaves[0]'], waves)
     const bindTex = (unit: number, tex: WebGLTexture | null, sampler: string, flag: string) => {

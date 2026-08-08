@@ -300,7 +300,19 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Temps pendant lequel une goutte éjectée ne peut pas être réabsorbée — sinon elle recollerait aussitôt au corps.',
   )
 
-  const fVortex = pane.addFolder({ title: 'Vortex (clic droit)', expanded: false })
+  const fVortex = pane.addFolder({ title: 'Vortex (outil de test)', expanded: false })
+  const vortexToggle = {
+    get actif() {
+      return params.vortexEnabled >= 0.5
+    },
+    set actif(v: boolean) {
+      params.vortexEnabled = v ? 1 : 0
+    },
+  }
+  describe(
+    fVortex.addBinding(vortexToggle, 'actif'),
+    'Regroupement au clic droit (🌀 sur mobile). Coupé par défaut : il annule le coût de la perte d’eau, qui est le cœur du jeu — à réserver aux tests et au sandbox.',
+  )
   describe(
     fVortex.addBinding(params, 'vortexRadius', { min: 40, max: 600, step: 5, label: 'rayon' }),
     'Rayon autour du clic droit dans lequel l’eau est aspirée. Au-delà, aucune influence.',
@@ -324,6 +336,20 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   describe(
     fVortex.addBinding(params, 'vortexWindDown', { min: 0, max: 0.8, label: 'retombée' }),
     'Fraction finale de la durée où le vortex s’essouffle : il freine l’eau et la dépose au lieu de la lâcher en rotation. À 0, la force centrifuge fait éclater le corps à la fin.',
+  )
+
+  const fCold = pane.addFolder({ title: 'Froid (tableau 2)', expanded: false })
+  describe(
+    fCold.addBinding(params, 'coldBand', { min: 10, max: 120, step: 1, label: 'aura (u)' }),
+    'Portée de l’aura de gel autour des plaques froides. L’eau y givre d’autant plus vite qu’elle est près de la plaque.',
+  )
+  describe(
+    fCold.addBinding(params, 'freezeTime', { min: 0.2, max: 5, label: 'gel (s)' }),
+    'Temps d’exposition en pleine aura avant le gel complet. Gelée, l’eau est ancrée : elle ne bouge plus et ne peut plus être éjectée.',
+  )
+  describe(
+    fCold.addBinding(params, 'thawTime', { min: 0.5, max: 10, label: 'dégel (s)' }),
+    'Temps de dégel une fois à l’écart du froid. Le dégel rend l’eau au corps, sans élan — s’ancrer se paie en temps.',
   )
 
   const fExit = pane.addFolder({ title: 'Sas (bouche d’aspiration)', expanded: false })
