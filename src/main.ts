@@ -172,11 +172,15 @@ function openHome(): void {
 }
 startBtn.addEventListener('click', closeHome)
 window.addEventListener('keydown', (e) => {
+  const t = e.target as HTMLElement | null
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
   if (e.key === 'Escape') {
     if (document.body.classList.contains('playing')) openHome()
     else closeHome()
   } else if (e.key === 'l' || e.key === 'L') {
-    document.getElementById('legend')!.classList.toggle('visible')
+    toggleLegend()
+  } else if (e.key === 'e' || e.key === 'E') {
+    toggleStates()
   }
 })
 
@@ -272,14 +276,43 @@ input.onVortex = (clientX, clientY) => {
 
 // Barre tactile : les commandes clavier/souris accessibles au doigt
 const touchbar = document.getElementById('touchbar') as HTMLDivElement
-function touchButton(label: string, title: string, onTap: () => void): HTMLButtonElement {
+function touchButton(label: string, title: string, onTap: () => void, cls = ''): HTMLButtonElement {
   const b = document.createElement('button')
   b.textContent = label
   b.title = title
+  if (cls) b.className = cls
   b.addEventListener('click', onTap)
   touchbar.appendChild(b)
   return b
 }
+
+// Panneaux de lecture : la légende des surfaces et les trois états (qui
+// bloque quoi). Chips étiquetées en tête de barre — mises en évidence, sans
+// rivaliser avec le sélecteur d'état. Un seul panneau ouvert à la fois.
+const legend = document.getElementById('legend') as HTMLDivElement
+const statesPanel = document.getElementById('states') as HTMLDivElement
+function togglePanel(el: HTMLDivElement, other: HTMLDivElement): void {
+  const show = !el.classList.contains('visible')
+  other.classList.remove('visible')
+  el.classList.toggle('visible', show)
+}
+const toggleLegend = (): void => togglePanel(legend, statesPanel)
+const toggleStates = (): void => togglePanel(statesPanel, legend)
+document.getElementById('legend-close')!.addEventListener('click', toggleLegend)
+document.getElementById('states-close')!.addEventListener('click', toggleStates)
+
+// Banc de réglage : plus de panneau flottant permanent en haut — le bouton
+// BANC de la barre le montre et le masque.
+const benchHost = pane.element.closest('.tp-dfwv') as HTMLElement | null
+if (benchHost) benchHost.style.display = 'none'
+function toggleBench(): void {
+  if (!benchHost) return
+  benchHost.style.display = benchHost.style.display === 'none' ? '' : 'none'
+}
+
+const chipLegend = touchButton('LÉGENDE', 'légende des surfaces (L)', toggleLegend, 'tb-chip')
+const chipStates = touchButton('ÉTATS', 'les trois états : qui bloque quoi (E)', toggleStates, 'tb-chip')
+const chipBench = touchButton('BANC', 'banc de réglage : la physique en direct', toggleBench, 'tb-chip')
 const btnPause = touchButton('⏸', 'pause (espace)', () => input.togglePause())
 touchButton('‹', 'ralentir le temps (,)', () => input.stepWarp(-1))
 touchButton('›', 'accélérer le temps (.)', () => input.stepWarp(1))
@@ -303,13 +336,6 @@ const btnSound = touchButton('🔊', 'son : couper / activer', () => {
   audio.setEnabled(!audio.enabled)
   pane.refresh()
 })
-// Légende : quelle surface fait quoi, état par état — au doigt comme au clavier
-const legend = document.getElementById('legend') as HTMLDivElement
-function toggleLegend(): void {
-  legend.classList.toggle('visible')
-}
-document.getElementById('legend-close')!.addEventListener('click', toggleLegend)
-touchButton('?', 'lecture du vaisseau (L)', toggleLegend)
 touchButton('↺', 'recommencer (R)', restart)
 touchButton('≡', 'fiche d’essai (échap)', openHome)
 input.onTimeWarpChange = (warp) => {
@@ -480,6 +506,9 @@ function frame(now: number): void {
 
   btnPause.textContent = input.paused ? '▶' : '⏸'
   btnPause.classList.toggle('active', input.paused)
+  chipLegend.classList.toggle('active', legend.classList.contains('visible'))
+  chipStates.classList.toggle('active', statesPanel.classList.contains('visible'))
+  chipBench.classList.toggle('active', benchHost !== null && benchHost.style.display !== 'none')
   btnVortex.classList.toggle('active', input.vortexArmed)
   btnVortex.style.display = params.vortexEnabled >= 0.5 ? '' : 'none'
   stateEau.classList.toggle('active', !input.freezeIntent && !input.gasIntent)

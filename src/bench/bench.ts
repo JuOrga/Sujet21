@@ -57,9 +57,9 @@ export interface BenchMonitor {
 const HINT_DEFAULT = 'Survolez un réglage pour voir à quoi il sert.'
 
 export function createBench(params: SimParams, monitor: BenchMonitor, actions: BenchActions): Pane {
-  // Sur mobile, le banc démarre replié : l'écran appartient au jeu
-  const compact = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 700
-  const pane = new Pane({ title: 'Banc de réglage', expanded: !compact })
+  // Le banc n'apparaît qu'à la demande (bouton BANC de la barre, main.ts) :
+  // quand on l'ouvre, il est déplié — l'écran appartient au jeu le reste du temps
+  const pane = new Pane({ title: 'Banc de réglage', expanded: true })
 
   const hint = document.createElement('div')
   hint.className = 'bench-hint'
