@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '08/08/2026 17:08',
+    title: 'Performances smartphone et petits PC',
+    notes: [
+      'Solveur 2× plus rapide : les voisinages sont construits une fois par pas physique (au lieu de 4) et parcourus en boucles plates.',
+      'Qualité de rendu adaptative : la résolution baisse automatiquement si la machine ne suit pas (5 niveaux, visible dans Mesures). La physique n’est jamais dégradée.',
+      'Sous forte charge, le jeu ralentit en douceur au lieu de partir en spirale de rattrapage.',
+    ],
+  },
+  {
     date: '08/08/2026 16:55',
     title: 'Banc redessiné + présets partagés entre testeurs',
     notes: [

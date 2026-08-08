@@ -392,6 +392,7 @@ export class Renderer {
     timeSec: number,
     waves: Float32Array, // MAX_WAVES × (x, y, t0, amplitude)
     waveCount: number,
+    downsample = params.renderDownsample, // la qualité adaptative peut forcer plus grossier
   ): void {
     const gl = this.gl
     const devW = Math.max(1, Math.round(viewportW * dpr))
@@ -400,7 +401,7 @@ export class Renderer {
       this.canvas.width = devW
       this.canvas.height = devH
     }
-    const down = Math.max(1, params.renderDownsample)
+    const down = Math.max(1, downsample)
     const fboW = Math.max(1, Math.round(devW / down))
     const fboH = Math.max(1, Math.round(devH / down))
     this.ensureFieldTarget(fboW, fboH)

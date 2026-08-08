@@ -19,6 +19,10 @@ import { MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_WALL, type ObstacleBox, type Sponge
 export const KIND_FREE = 0
 export const KIND_PLAYER = 1
 
+// Voisins retenus par particule et par pas (au-delà : ignorés — les zones
+// aussi denses sont déjà sur-contraintes)
+const MAX_NEIGHBORS = 48
+
 export interface Bounds {
   minX: number
   minY: number
@@ -78,6 +82,12 @@ export class FluidSim {
   private ejectCarry = 0
   private stepIndex = 0
   private readonly stack: Int32Array
+  // Voisinages en listes plates, construits une fois par pas et réutilisés
+  // par toutes les itérations (et la viscosité) : les corrections par
+  // itération sont bornées à une fraction de h, le voisinage ne bouge pas
+  // significativement au sein d'un pas.
+  private readonly nbStart: Int32Array
+  private readonly nbList: Int32Array
 
   constructor(params: SimParams, bounds: Bounds, capacity = 4096) {
     this.params = params
@@ -100,6 +110,8 @@ export class FluidSim {
     this.cooldown = new Float32Array(capacity)
     this.labels = new Int32Array(capacity)
     this.stack = new Int32Array(capacity)
+    this.nbStart = new Int32Array(capacity + 1)
+    this.nbList = new Int32Array(capacity * MAX_NEIGHBORS)
     this.contactTime = new Float32Array(capacity)
     this.contactMat = new Int8Array(capacity)
     this.contactNX = new Float32Array(capacity)
@@ -390,27 +402,52 @@ export class FluidSim {
     const wDq = k.w(dq * dq)
     const invWDq = wDq > 0 ? 1 / wDq : 0
 
+    // 1bis. Voisinages : UNE construction de grille par pas, listes plates
+    // réutilisées par toutes les itérations et la viscosité — c'est le gros
+    // du coût CPU du solveur sur petites machines.
+    grid.build(prdX, prdY, n)
+    const nbStart = this.nbStart
+    const nbList = this.nbList
+    {
+      let cursor = 0
+      const reach = h * 1.15 // marge : les itérations déplacent un peu les particules
+      const reach2 = reach * reach
+      for (let i = 0; i < n; i++) {
+        nbStart[i] = cursor
+        const xi = prdX[i]
+        const yi = prdY[i]
+        const cap = nbStart[i] + MAX_NEIGHBORS
+        grid.forEachNeighbor(xi, yi, reach, (j) => {
+          if (j === i || cursor >= cap) return
+          const dx = xi - prdX[j]
+          const dy = yi - prdY[j]
+          if (dx * dx + dy * dy < reach2) nbList[cursor++] = j
+        })
+      }
+      nbStart[n] = cursor
+    }
+    const selfRho = k.poly6Coeff * h2 * h2 * h2
+
     // 2. Itérations de contrainte de densité
     for (let iter = 0; iter < p.solverIterations; iter++) {
-      grid.build(prdX, prdY, n)
-
       for (let i = 0; i < n; i++) {
         const xi = prdX[i]
         const yi = prdY[i]
-        let rho = 0
+        let rho = selfRho
         let sumGradX = 0
         let sumGradY = 0
         let sumGrad2 = 0
-        grid.forEachNeighbor(xi, yi, h, (j) => {
+        const end = nbStart[i + 1]
+        for (let e = nbStart[i]; e < end; e++) {
+          const j = nbList[e]
           const dx = xi - prdX[j]
           const dy = yi - prdY[j]
           const r2 = dx * dx + dy * dy
-          if (r2 >= h2) return
+          if (r2 >= h2) continue
           const t = h2 - r2
           rho += k.poly6Coeff * t * t * t
-          if (j === i) return
           const r = Math.sqrt(r2)
-          if (r < 1e-6) return
+          if (r < 1e-6) continue
           const tg = h - r
           const c = (k.spikyGradCoeff * tg * tg) / r
           const gx = c * dx * invRho0
@@ -418,7 +455,7 @@ export class FluidSim {
           sumGradX += gx
           sumGradY += gy
           sumGrad2 += gx * gx + gy * gy
-        })
+        }
         density[i] = rho
         const C = rho * invRho0 - 1
         const denom = sumGrad2 + sumGradX * sumGradX + sumGradY * sumGradY + p.epsilonLambda
@@ -437,14 +474,15 @@ export class FluidSim {
         const li = lambda[i]
         let dx0 = 0
         let dy0 = 0
-        grid.forEachNeighbor(xi, yi, h, (j) => {
-          if (j === i) return
+        const end = nbStart[i + 1]
+        for (let e = nbStart[i]; e < end; e++) {
+          const j = nbList[e]
           const dx = xi - prdX[j]
           const dy = yi - prdY[j]
           const r2 = dx * dx + dy * dy
-          if (r2 >= h2) return
+          if (r2 >= h2) continue
           const r = Math.sqrt(r2)
-          if (r < 1e-6) return
+          if (r < 1e-6) continue
           const t = h2 - r2
           const w = k.poly6Coeff * t * t * t
           const ratio = w * invWDq
@@ -462,7 +500,7 @@ export class FluidSim {
           }
           dx0 += px
           dy0 += py
-        })
+        }
         dpX[i] = dx0
         dpY[i] = dy0
       }
@@ -509,7 +547,6 @@ export class FluidSim {
     this.applyMaterialVelocities(dt)
 
     if (p.xsphC > 0) {
-      grid.build(prdX, prdY, n)
       for (let i = 0; i < n; i++) {
         const xi = prdX[i]
         const yi = prdY[i]
@@ -517,17 +554,18 @@ export class FluidSim {
         const vyi = velY[i]
         let ax = 0
         let ay = 0
-        grid.forEachNeighbor(xi, yi, h, (j) => {
-          if (j === i) return
+        const end = nbStart[i + 1]
+        for (let e = nbStart[i]; e < end; e++) {
+          const j = nbList[e]
           const dx = xi - prdX[j]
           const dy = yi - prdY[j]
           const r2 = dx * dx + dy * dy
-          if (r2 >= h2) return
+          if (r2 >= h2) continue
           const t = h2 - r2
           const w = k.poly6Coeff * t * t * t
           ax += (velX[j] - vxi) * w
           ay += (velY[j] - vyi) * w
-        })
+        }
         dvX[i] = ax * p.xsphC * invRho0
         dvY[i] = ay * p.xsphC * invRho0
       }

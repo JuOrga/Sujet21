@@ -42,6 +42,7 @@ export interface BenchMonitor {
   particles: number
   volume: number
   speed: number
+  quality: number
   overview: boolean
 }
 
@@ -377,6 +378,14 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   describe(
     fMon.addBinding(monitor, 'speed', { readonly: true, label: 'vitesse (u/s)', format: (v: number) => v.toFixed(0) }),
     'Vitesse du centre du corps, en unités monde par seconde.',
+  )
+  describe(
+    fMon.addBinding(monitor, 'quality', {
+      readonly: true,
+      label: 'qualité rendu',
+      format: (v: number) => ['maximale', 'haute', 'moyenne', 'basse', 'minimale'][Math.round(v)] ?? '?',
+    }),
+    'Qualité de rendu choisie automatiquement selon les FPS de la machine. La physique, elle, n’est jamais dégradée.',
   )
 
   // ---- Livraisons : le journal de ce qui a été livré, date et heure ----

@@ -5,7 +5,9 @@ export class FixedLoop {
   private accumulator = 0
   private readonly maxStepsPerFrame: number
 
-  constructor(maxStepsPerFrame = 24) {
+  // Plafond bas : sur machine lente, mieux vaut un jeu qui ralentit doucement
+  // qu'une spirale de rattrapage où chaque image en retard en impose plus.
+  constructor(maxStepsPerFrame = 6) {
     this.maxStepsPerFrame = maxStepsPerFrame
   }
 

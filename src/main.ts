@@ -89,7 +89,7 @@ const loop = new FixedLoop()
 const input = new Input()
 input.attach(canvas)
 
-const monitor: BenchMonitor = { fps: 0, particles: 0, volume: 0, speed: 0, overview: false }
+const monitor: BenchMonitor = { fps: 0, particles: 0, volume: 0, speed: 0, quality: 0, overview: false }
 
 // Vortex de regroupement : déclenché au clic droit, actif vortexDuration s
 const vortex = { x: 0, y: 0, timer: 0 }
@@ -158,15 +158,39 @@ let lastTime = performance.now()
 let elapsed = 0
 let fpsSmoothed = 60
 
+// Qualité adaptative : si la machine ne suit pas, on baisse la résolution de
+// rendu (densité de pixels, puis champ métaballes plus grossier). La physique
+// n'est jamais dégradée — sous forte charge, le jeu ralentit doucement
+// (plafond de pas par image) au lieu de saccader.
+const QUALITY_LEVELS = [
+  { dprCap: 2, down: 2 },
+  { dprCap: 1.5, down: 2 },
+  { dprCap: 1.25, down: 3 },
+  { dprCap: 1, down: 3 },
+  { dprCap: 0.8, down: 4 },
+]
+let qualityLevel = window.matchMedia('(pointer: coarse)').matches ? 1 : 0
+let qualityTimer = 0
+
+function updateQuality(dtReal: number): void {
+  qualityTimer += dtReal
+  if (qualityTimer < 1.5) return
+  qualityTimer = 0
+  if (fpsSmoothed < 42 && qualityLevel < QUALITY_LEVELS.length - 1) qualityLevel++
+  else if (fpsSmoothed > 56 && qualityLevel > 0) qualityLevel--
+}
+
 function frame(now: number): void {
   const dtReal = Math.min((now - lastTime) / 1000, 0.1)
   lastTime = now
   elapsed += dtReal
   if (dtReal > 0) fpsSmoothed += (1 / dtReal - fpsSmoothed) * 0.05
 
+  updateQuality(dtReal)
+  const quality = QUALITY_LEVELS[qualityLevel]
   const vw = window.innerWidth
   const vh = window.innerHeight
-  const dpr = Math.min(window.devicePixelRatio || 1, 2)
+  const dpr = Math.min(window.devicePixelRatio || 1, quality.dprCap)
 
   const aim = camera.screenToWorld(input.aimClientX, input.aimClientY, vw, vh)
   const tableauDone = run.exitTimer > 0
@@ -240,13 +264,26 @@ function frame(now: number): void {
   } else {
     camera.update(dtReal, sim.stats.centroidX, sim.stats.centroidY, sim.stats.rmsRadius, vw, vh, params)
   }
-  renderer.render(sim, camera, params, vw, vh, dpr, renderBoxes, elapsed, waveScratch, waves.length)
+  renderer.render(
+    sim,
+    camera,
+    params,
+    vw,
+    vh,
+    dpr,
+    renderBoxes,
+    elapsed,
+    waveScratch,
+    waves.length,
+    Math.max(params.renderDownsample, quality.down),
+  )
 
   const speed = Math.hypot(sim.stats.velX, sim.stats.velY)
   monitor.fps = fpsSmoothed
   monitor.particles = sim.count
   monitor.volume = sim.liters()
   monitor.speed = speed
+  monitor.quality = qualityLevel
 
   btnPause.textContent = input.paused ? '▶' : '⏸'
   btnPause.classList.toggle('active', input.paused)
