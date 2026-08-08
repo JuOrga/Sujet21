@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '08/08/2026 16:28',
+    title: 'Le creux de propulsion se voit',
+    notes: [
+      'L’entraînement ne pousse plus le liquide dans le sens du jet (il annulait le recul au même endroit) : il fait converger l’eau vers le point d’émission, en entonnoir.',
+      'Résultat : la surface se pince visiblement là où l’eau est éjectée — la déformation de propulsion n’est plus masquée.',
+    ],
+  },
+  {
     date: '08/08/2026 16:20',
     title: 'Recul fluide : le corps se déforme en accélérant',
     notes: [

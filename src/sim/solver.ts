@@ -256,9 +256,11 @@ export class FluidSim {
       this.cooldown[best] = p.reabsorbCooldown
       this.playerCount--
 
-      // Entraînement du voisinage : le liquide autour du point de départ est
-      // aspiré vers l'éjection — le corps se creuse en entonnoir au lieu de
-      // perdre des boules isolées, et la surface autour participe au geste.
+      // Entraînement du voisinage : le liquide voisin CONVERGE vers le point
+      // d'émission (radialement, comme l'entonnoir qui alimente une buse) —
+      // le corps se creuse sans recevoir de poussée dans le sens du jet.
+      // Pousser les voisines dans la direction de l'éjection annulerait
+      // localement le recul : la déformation de propulsion disparaîtrait.
       let entrainX = 0
       let entrainY = 0
       if (p.ejectEntrain > 0 && this.playerCount > 0) {
@@ -266,13 +268,15 @@ export class FluidSim {
         const R2 = R * R
         for (let i = 0; i < this.count; i++) {
           if (this.kind[i] !== KIND_PLAYER) continue
-          const dx = this.posX[i] - departX
-          const dy = this.posY[i] - departY
+          const dx = departX - this.posX[i]
+          const dy = departY - this.posY[i]
           const d2 = dx * dx + dy * dy
-          if (d2 >= R2) continue
-          const w = 1 - Math.sqrt(d2) / R
-          const ax = dirX * p.ejectSpeed * p.ejectEntrain * w
-          const ay = dirY * p.ejectSpeed * p.ejectEntrain * w
+          if (d2 >= R2 || d2 < 1e-6) continue
+          const d = Math.sqrt(d2)
+          const w = 1 - d / R
+          const a = (p.ejectSpeed * p.ejectEntrain * w) / d
+          const ax = dx * a
+          const ay = dy * a
           this.velX[i] += ax
           this.velY[i] += ay
           entrainX += ax

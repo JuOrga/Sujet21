@@ -208,7 +208,7 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   )
   describe(
     fProp.addBinding(params, 'ejectEntrain', { min: 0, max: 0.5, label: 'entraînement' }),
-    'Part de la vitesse d’éjection communiquée au liquide voisin du point de départ : le corps se creuse en entonnoir au lieu de perdre des boules isolées. À 0, ancien comportement.',
+    'Le liquide voisin converge vers le point d’émission (entonnoir qui alimente le jet) : le corps se creuse, sans poussée dans le sens du jet qui masquerait le recul. À 0 : désactivé.',
   )
   describe(
     fProp.addBinding(params, 'recoilLocality', { min: 0, max: 1, label: 'recul localisé' }),
