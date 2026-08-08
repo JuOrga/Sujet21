@@ -298,19 +298,16 @@
       }
 
       @media (max-width: 700px) {
-        /* Au doigt : feuille basse compacte — l'essai reste visible derrière,
-           la fiche tient sans défiler sur un téléphone courant */
+        /* Au doigt : la fiche occupe tout l'écran — un bout de cuve vide qui
+           dépasse en haut n'apporte rien, l'essai reprend au bouton */
         #home {
-          inset: auto 0 0 0;
+          inset: 0;
           width: 100vw;
-          max-height: 76vh;
-          max-height: 76dvh;
           gap: 13px;
-          padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
+          padding: calc(14px + env(safe-area-inset-top)) 18px calc(14px + env(safe-area-inset-bottom));
           border-right: none;
-          border-top: 1px solid var(--line);
           justify-content: flex-start;
-          background: linear-gradient(180deg, rgba(6, 13, 23, 0.9), rgba(6, 13, 23, 0.97));
+          background: linear-gradient(180deg, rgba(6, 13, 23, 0.96), rgba(6, 13, 23, 0.99));
         }
         body.playing #home {
           transform: translateY(24px);
