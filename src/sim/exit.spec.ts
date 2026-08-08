@@ -70,11 +70,12 @@ describe('FluidSim.applyExitSuction — le sas avale l’eau en entonnoir', () =
   })
 
   it('hors de l’emprise du sas, la dispersion reste possible', () => {
-    const sim = makeSim()
+    const sim = makeSim({ dispersalGrace: 0.1 })
     sim.spawnDisc(2000, 0, 60, KIND_PLAYER) // loin de la bouche
     sim.applyExitSuction(0, 0, sim.params.dt)
     while (sim.playerCount > 15) sim.removeParticle(0)
-    sim.relabel()
+    // le délai de grâce s'écoule : la dispersion est constatée puis tranchée
+    for (let s = 0; s < 30; s++) sim.step(sim.params.dt)
     expect(sim.dispersed).toBe(true)
   })
 })

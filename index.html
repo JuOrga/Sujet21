@@ -220,6 +220,29 @@
       }
       .rec-head #rec-essai {
         color: var(--specimen);
+        white-space: nowrap;
+      }
+      /* Le nom estampillé sur les records, façon borne d'arcade */
+      #rec-name {
+        flex: 1 1 auto;
+        min-width: 0;
+        max-width: 130px;
+        background: rgba(3, 7, 16, 0.6);
+        border: 1px solid var(--line);
+        color: var(--valid);
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 2px 7px;
+      }
+      #rec-name::placeholder {
+        color: var(--dim);
+        opacity: 0.7;
+      }
+      #rec-name:focus-visible {
+        outline: 1px solid var(--valid);
+        outline-offset: 1px;
       }
       .rec-row {
         display: flex;
@@ -953,7 +976,10 @@
       </dl>
       <button id="start" type="button">COMMENCER L'ESSAI</button>
       <div class="home-records" aria-label="Registres du labo">
-        <div class="rec-head"><span>REGISTRES DU LABO</span><span id="rec-essai"></span></div>
+        <div class="rec-head"><span>REGISTRES DU LABO</span>
+          <input id="rec-name" maxlength="12" placeholder="VOTRE NOM"
+            aria-label="Nom affiché sur les records" autocomplete="nickname" />
+          <span id="rec-essai"></span></div>
         <div id="rec-rows"></div>
       </div>
       <div class="home-commands cmd-desktop">

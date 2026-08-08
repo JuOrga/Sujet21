@@ -83,6 +83,11 @@ export class FluidSim {
   // évaporation. Le froid la condense avant de gérer quoi que ce soit d'autre.
   vapor: Float32Array
   gaseous: Uint8Array
+  // Mémoire de lien du gaz : à 1 tant que la particule est gazeuse, décroît
+  // lentement après (gasLinkDecay). Le rayon d'adjacence des amas et le
+  // rappel de condensation la suivent : un nuage qui redevient eau reste UN
+  // corps le temps de se regrouper — changer d'état ne disperse pas.
+  gasLink: Float32Array
   // Gel volontaire (touche F) / vapeur volontaire (touche G)
   freezeIntent = false
   gasIntent = false
@@ -161,6 +166,7 @@ export class FluidSim {
     this.frost = new Float32Array(capacity)
     this.frozen = new Uint8Array(capacity)
     this.vapor = new Float32Array(capacity)
+    this.gasLink = new Float32Array(capacity)
     this.gaseous = new Uint8Array(capacity)
     this.welded = new Uint8Array(capacity)
     this.iceVxSum = new Float32Array(capacity)
@@ -216,6 +222,11 @@ export class FluidSim {
   private hasCold = false
   private hasHeat = false
   private heatCarry = 0
+  // Règle de transformation : la dispersion se constate, elle ne se décrète
+  // pas — il faut rester sous le seuil critique dispersalGrace secondes
+  // d'affilée, le temps qu'un corps qui condense ou dégèle se regroupe.
+  private belowCritical = false
+  private criticalTimer = 0
 
   setLevel(boxes: ObstacleBox[], sponges: SpongeDef[]): void {
     this.boxes = boxes
@@ -267,6 +278,7 @@ export class FluidSim {
       this.frozen[i] = this.frozen[last]
       this.vapor[i] = this.vapor[last]
       this.gaseous[i] = this.gaseous[last]
+      this.gasLink[i] = this.gasLink[last]
       this.welded[i] = this.welded[last]
     }
     this.count = last
@@ -286,6 +298,7 @@ export class FluidSim {
     this.frozen[i] = 0
     this.vapor[i] = 0
     this.gaseous[i] = 0
+    this.gasLink[i] = 0
     this.welded[i] = 0
     if (kind === KIND_PLAYER) this.playerCount++
     return i
@@ -869,12 +882,45 @@ export class FluidSim {
     // 5bis. Froid : givre, gel volontaire (F), dégel
     this.processCold(dt)
 
+    // 5bis-b. Règle de transformation : la condensation regroupe — les
+    // gouttelettes qui redeviennent eau sont rappelées vers le corps
+    this.applyCondenseRegroup(dt)
+
     // 5ter. Éponge : traînée, temps de contact, absorption (§6)
     if (this.sponges.length > 0) this.processSponges(dt)
 
     this.stepIndex++
     if (this.stepIndex % Math.max(1, Math.round(p.componentEvery)) === 0) {
       this.relabel()
+    }
+    if (this.belowCritical && !this.dispersed) {
+      this.criticalTimer += dt
+      if (this.criticalTimer >= p.dispersalGrace) this.dispersed = true
+    } else if (!this.belowCritical) {
+      this.criticalTimer = 0
+    }
+  }
+
+  // Tant qu'une particule garde de la vapeur résiduelle (le corps est en
+  // train de redevenir liquide) et qu'on ne pilote pas le nuage, elle est
+  // rappelée vers le corps : redevenir eau ne disperse pas l'échantillon.
+  // Physiquement : la condensation nuclée — les gouttelettes retombent.
+  private applyCondenseRegroup(dt: number): void {
+    const p = this.params
+    if (p.condenseRegroup <= 0) return
+    const cx = this.stats.centroidX
+    const cy = this.stats.centroidY
+    for (let i = 0; i < this.count; i++) {
+      const v = Math.max(this.vapor[i], this.gasLink[i])
+      if (v <= 0.02 || this.frozen[i] === 1) continue
+      if (this.gasIntent && this.kind[i] === KIND_PLAYER) continue // le pilotage garde la main
+      const dx = cx - this.posX[i]
+      const dy = cy - this.posY[i]
+      const d = Math.hypot(dx, dy)
+      if (d < 1e-3) continue
+      const a = (p.condenseRegroup * v * dt) / d
+      this.velX[i] += dx * a
+      this.velY[i] += dy * a
     }
   }
 
@@ -1184,6 +1230,12 @@ export class FluidSim {
       if (vap >= 1) this.gaseous[i] = 1
       else if (this.gaseous[i] === 1 && vap <= 0.55) this.gaseous[i] = 0
 
+      // Mémoire de lien : pleine tant que gazeuse, s'éteint doucement après —
+      // le temps que le nuage condensé retombe sur le corps
+      if (this.gaseous[i] === 1) this.gasLink[i] = 1
+      else if (this.gasLink[i] > 0)
+        this.gasLink[i] = Math.max(0, this.gasLink[i] - dt / Math.max(0.2, p.gasLinkDecay))
+
       // Givre : jamais sur la vapeur — le froid doit d'abord la condenser.
       // La chaleur empêche la prise, et dégèle bien plus vite qu'à l'air libre.
       const wanted = intent && this.kind[i] === KIND_PLAYER && this.gaseous[i] === 0
@@ -1328,10 +1380,13 @@ export class FluidSim {
     const linkR = p.linkRadiusFactor * p.kernelRadius
     const linkR2 = linkR * linkR
     // Le nuage de vapeur est distendu : son rayon d'adjacence est élargi,
-    // sinon l'expansion du gaz compterait comme une dispersion.
+    // sinon l'expansion du gaz compterait comme une dispersion. Le rayon
+    // suit la vapeur RÉSIDUELLE (continue), pas l'étiquette gazeuse : en
+    // condensant, le lien se resserre au rythme où le corps se regroupe,
+    // au lieu de tomber d'un coup — redevenir eau ne scinde pas l'amas.
     const gasLinkR = linkR * Math.max(1, p.gasLinkFactor)
-    const gasLinkR2 = gasLinkR * gasLinkR
-    const { posX, posY, labels, gaseous } = this
+    const gasSpan = Math.max(1, p.gasLinkFactor) - 1
+    const { posX, posY, labels, gasLink } = this
     const grid = this.grid
     grid.build(posX, posY, n)
 
@@ -1343,8 +1398,13 @@ export class FluidSim {
         const dx = xi - posX[j]
         const dy = yi - posY[j]
         const r2 = dx * dx + dy * dy
-        const limit = gaseous[i] === 1 || gaseous[j] === 1 ? gasLinkR2 : linkR2
-        if (r2 <= limit) cb(j)
+        const v = Math.max(gasLink[i], gasLink[j])
+        if (v > 0) {
+          const lr = linkR * (1 + gasSpan * v)
+          if (r2 <= lr * lr) cb(j)
+        } else if (r2 <= linkR2) {
+          cb(j)
+        }
       })
     }
     const componentCount = labelComponents(n, labels, forEachNeighbor, this.stack)
@@ -1390,10 +1450,15 @@ export class FluidSim {
     this.playerCount = count
     this.updatePlayerStats()
 
-    if (inDrainGrip) return
-    if (this.baseVolume > 0 && count < this.baseVolume * p.criticalVolumeFraction) {
-      this.dispersed = true
+    if (inDrainGrip) {
+      this.belowCritical = false
+      return
     }
+    // Sous le seuil critique : constaté ici, tranché par le délai de grâce
+    // (dispersalGrace, dans step) — un corps en pleine transformation a le
+    // temps de se regrouper avant que le protocole ne conclue à la perte.
+    this.belowCritical =
+      this.baseVolume > 0 && count < this.baseVolume * p.criticalVolumeFraction
     if (count < 2) this.dispersed = true
   }
 

@@ -65,6 +65,10 @@ export interface SimParams {
   gasDrag: number // flottement : freinage propre du gaz (1/s)
   gasLossRate: number // particules évaporées / seconde de pilotage (perdues)
   gasLinkFactor: number // × le rayon d'amas : le nuage distendu reste un seul corps
+  // Règles de transformation : changer d'état ne doit pas tuer.
+  condenseRegroup: number // rappel des gouttelettes qui condensent vers le corps (u/s²)
+  gasLinkDecay: number // s d'extinction de la mémoire de lien du gaz après condensation
+  dispersalGrace: number // s continues sous le seuil critique avant de constater la dispersion
 
   // Sas de sortie : une bouche d'aspiration dans laquelle l'eau s'engouffre
   exitRadius: number // portée de l'aspiration autour de la bouche (unités monde)
@@ -159,6 +163,9 @@ export const DEFAULT_PARAMS: SimParams = {
   gasDrag: 1.3,
   gasLossRate: 5,
   gasLinkFactor: 3,
+  condenseRegroup: 420,
+  gasLinkDecay: 2.5,
+  dispersalGrace: 2,
 
   exitRadius: 240,
   exitPull: 300,

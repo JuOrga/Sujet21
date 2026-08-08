@@ -415,6 +415,14 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Temps de retour à l’état liquide quand l’intention est levée. Le froid condense beaucoup plus vite, qu’on le veuille ou non.',
   )
   describe(
+    fGas.addBinding(params, 'condenseRegroup', { min: 0, max: 1200, step: 20, label: 'regroupement' }),
+    'Rappel des gouttelettes qui condensent vers le corps (u/s²) : redevenir eau ne disperse pas l’échantillon — le nuage retombe en pluie sur lui-même.',
+  )
+  describe(
+    fGas.addBinding(params, 'gasLinkDecay', { min: 0.2, max: 6, step: 0.1, label: 'mémoire de lien (s)' }),
+    'Après la condensation, le nuage compte encore comme UN corps pendant ce temps (le lien élargi s’éteint doucement) — le temps de se regrouper.',
+  )
+  describe(
     fGas.addBinding(params, 'gasThrust', { min: 50, max: 1000, step: 10, label: 'poussée (u/s²)' }),
     'Accélération du nuage vers le pointeur. C’est le moteur du déplacement en gaz — sans recul et sans éjection.',
   )
@@ -454,6 +462,10 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   )
 
   const fBody = pane.addFolder({ title: 'Corps', expanded: false })
+  describe(
+    fBody.addBinding(params, 'dispersalGrace', { min: 0, max: 6, step: 0.1, label: 'grâce dispersion (s)' }),
+    'La dispersion se constate, elle ne se décrète pas : il faut rester sous le seuil critique aussi longtemps d’affilée. Le temps pour un corps qui condense ou dégèle de se regrouper.',
+  )
   describe(
     fBody.addBinding(params, 'criticalVolumeFraction', { min: 0.05, max: 0.9, label: 'seuil dispersion' }),
     'Fraction du volume initial sous laquelle le corps se disperse (défaite). Haut : partie plus punitive.',

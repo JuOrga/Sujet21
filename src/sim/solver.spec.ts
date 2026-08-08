@@ -120,7 +120,12 @@ describe('FluidSim — invariants physiques', () => {
   })
 
   it('sous le volume critique, le corps se disperse (§3.1)', () => {
-    const sim = makeSim({ criticalVolumeFraction: 0.5, ejectRate: 2000, reabsorbCooldown: 10 })
+    const sim = makeSim({
+      criticalVolumeFraction: 0.5,
+      ejectRate: 2000,
+      reabsorbCooldown: 10,
+      dispersalGrace: 0.1,
+    })
     sim.spawnDisc(0, 0, 200, KIND_PLAYER)
     sim.relabel()
     expect(sim.dispersed).toBe(false)
@@ -130,7 +135,8 @@ describe('FluidSim — invariants physiques', () => {
       sim.step(sim.params.dt)
       if (sim.dispersed) break
     }
-    sim.relabel()
+    // le délai de grâce s'écoule : la dispersion est constatée puis tranchée
+    for (let s = 0; s < 30; s++) sim.step(sim.params.dt)
     expect(sim.dispersed).toBe(true)
   })
 

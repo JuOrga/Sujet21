@@ -123,8 +123,9 @@ function renderRegistres(): void {
   recEssai.textContent = `ÉCHANTILLON Nº ${records.essaiNumber()}`
   const rows: string[] = TABLEAUX.map((t) => {
     const r = records.tableauRecord(t.code)
+    const holder = r?.name ? ` · ${r.name}` : ''
     const val = r
-      ? `<b>${r.liters.toFixed(2)} L</b> · ${fmtTime(r.time)} · éch. nº ${r.essai}`
+      ? `<b>${r.liters.toFixed(2)} L</b> · ${fmtTime(r.time)} · éch. nº ${r.essai}${holder}`
       : '<span class="rec-none">aucune collecte</span>'
     return `<div class="rec-row"><span class="rec-code">${t.code}</span><span class="rec-name">${t.name}</span><span class="rec-val">${val}</span></div>`
   })
@@ -138,6 +139,15 @@ function renderRegistres(): void {
   recRows.innerHTML = rows.join('')
 }
 renderRegistres()
+
+// Le nom estampillé sur les records, façon borne d'arcade
+const recName = document.getElementById('rec-name') as HTMLInputElement
+recName.value = records.operator()
+recName.addEventListener('change', () => {
+  records.setOperator(recName.value)
+  recName.value = records.operator()
+  renderRegistres()
+})
 const tableauCard = el('tableau-card')
 const cardCode = el('card-code')
 const cardLog = el('card-log')
