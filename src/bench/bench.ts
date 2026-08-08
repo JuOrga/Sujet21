@@ -41,6 +41,8 @@ export interface BenchActions {
   // Saut de tableau : tester un niveau sans rejouer les précédents
   tableaux: string[]
   gotoTableau(index: number): void
+  // Effets sonores (préférences hors présets : chacun règle son volume)
+  sound: { actif: boolean; volume: number }
 }
 
 export interface BenchMonitor {
@@ -252,6 +254,16 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
       hint.textContent = `Tableau ${index + 1} — ${name}.`
     })
   })
+
+  const fSound = pane.addFolder({ title: 'Son', expanded: false })
+  describe(
+    fSound.addBinding(actions.sound, 'actif'),
+    'Effets sonores (synthèse procédurale, aucun fichier téléchargé). Le navigateur n’autorise le son qu’après un premier clic ou toucher. Réglage local, hors présets.',
+  )
+  describe(
+    fSound.addBinding(actions.sound, 'volume', { min: 0, max: 1 }),
+    'Volume général des effets et du bourdon de la station.',
+  )
 
   const fSolver = pane.addFolder({ title: 'Solveur', expanded: false })
   describe(

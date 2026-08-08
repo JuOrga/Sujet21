@@ -86,6 +86,8 @@ export class FluidSim {
   freezeIntent = false
   gasIntent = false
   private gasCarry = 0
+  // Vitesse normale du dernier choc de bloc de glace (consommé par l'audio)
+  iceImpact = 0
   private readonly welded: Uint8Array // gelée au contact d'une plaque : soudée
   private readonly iceVxSum: Float32Array
   private readonly iceVySum: Float32Array
@@ -1230,6 +1232,7 @@ export class FluidSim {
           if (vn < 0) {
             vx -= (1 + rest) * vn * nx
             vy -= (1 + rest) * vn * ny
+            if (-vn > this.iceImpact) this.iceImpact = -vn
           }
         }
       }

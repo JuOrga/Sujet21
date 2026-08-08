@@ -8,6 +8,7 @@ import { Renderer } from './render/renderer'
 import { FixedLoop } from './game/loop'
 import { Input } from './game/input'
 import { MAT_EXIT, TABLEAUX, pointInBox, type LevelDef, type ObstacleBox } from './game/level'
+import { AudioFx, loadAudioPrefs } from './game/audio'
 import { createBench, type BenchMonitor } from './bench/bench'
 
 const CAPACITY = 4096
@@ -124,6 +125,13 @@ const exposeSim = (): void => {
 exposeSim()
 const camera = new Camera()
 ;(window as unknown as { __cam: Camera }).__cam = camera
+
+// Effets sonores : le contexte audio naît au premier geste (clic, toucher)
+const audio = new AudioFx(loadAudioPrefs())
+window.addEventListener('pointerdown', () => audio.resume())
+window.addEventListener('keydown', () => audio.resume())
+// Mémoire pour les transitions sonores (fronts d'état)
+const sfx = { allFrozen: false, allGas: false, dispersed: false, swallowed: 0 }
 camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, 1)
 const renderer = new Renderer(canvas, CAPACITY)
 const loop = new FixedLoop()
@@ -170,6 +178,21 @@ const pane = createBench(params, monitor, {
     levelIndex = index
     restart()
   },
+  sound: {
+    get actif() {
+      return audio.enabled
+    },
+    set actif(v: boolean) {
+      audio.resume()
+      audio.setEnabled(v)
+    },
+    get volume() {
+      return audio.volume
+    },
+    set volume(v: number) {
+      audio.setVolume(v)
+    },
+  },
 })
 input.onReset = restart
 input.onZoom = (factor) => camera.zoomBy(factor, params)
@@ -179,6 +202,7 @@ input.onVortex = (clientX, clientY) => {
   vortex.x = w.x
   vortex.y = w.y
   vortex.timer = params.vortexDuration
+  audio.vortex()
 }
 
 // Barre tactile : les commandes clavier/souris accessibles au doigt
@@ -204,6 +228,11 @@ const btnVortex = touchButton('🌀', 'vortex : armer puis toucher l’écran (c
   input.vortexArmed = !input.vortexArmed
 })
 touchButton('⌖', 'zoom auto (après un zoom molette/pincement)', () => camera.resetAutoZoom())
+const btnSound = touchButton('🔊', 'son : couper / activer', () => {
+  audio.resume()
+  audio.setEnabled(!audio.enabled)
+  pane.refresh()
+})
 touchButton('↺', 'recommencer (R)', restart)
 touchButton('≡', 'fiche d’essai (échap)', openHome)
 input.onTimeWarpChange = (warp) => {
@@ -297,6 +326,7 @@ function frame(now: number): void {
       `${surplus.toFixed(2)} L transférés en bonbonne — réserve du laboratoire : ${run.bonbonneLiters.toFixed(2)} L · l'essai continue…`,
       'success',
     )
+    audio.collect()
   }
   if (run.exitTimer > 0) {
     run.exitTimer -= dtReal
@@ -369,6 +399,7 @@ function frame(now: number): void {
   btnVortex.style.display = params.vortexEnabled >= 0.5 ? '' : 'none'
   btnFreeze.classList.toggle('active', input.freezeIntent)
   btnGas.classList.toggle('active', input.gasIntent)
+  btnSound.textContent = audio.enabled ? '🔊' : '🔇'
 
   // Instruments de bord
   const fraction = sim.baseVolume > 0 ? sim.playerCount / sim.baseVolume : 0
@@ -388,6 +419,29 @@ function frame(now: number): void {
   }
   const allFrozen = sim.playerCount > 0 && frozenCount >= sim.playerCount
   const allGas = sim.playerCount > 0 && gasCount >= sim.playerCount
+
+  // ---- Sons : boucles continues et fronts d'état ----
+  const audible = !input.paused && !tableauDone && !sim.dispersed
+  audio.setEjectLevel(audible && input.aimActive && !input.gasIntent ? 1 : 0)
+  audio.setGasLevel(audible && gasCount > 0 ? (input.aimActive && input.gasIntent ? 1 : 0.35) : 0)
+  const drainOn = params.exitRadius > 0 && params.exitPull > 0
+  const mouthDist = Math.hypot(sim.stats.centroidX - exitMouth.x, sim.stats.centroidY - exitMouth.y)
+  audio.setDrainLevel(
+    audible && drainOn ? Math.max(0, 1 - mouthDist / Math.max(1, params.exitRadius)) : 0,
+  )
+  if (sim.swallowed > sfx.swallowed) audio.pulseSwallow(sim.swallowed - sfx.swallowed)
+  sfx.swallowed = sim.swallowed
+  if (allFrozen && !sfx.allFrozen) audio.freezeOn()
+  else if (!allFrozen && sfx.allFrozen) audio.freezeOff()
+  sfx.allFrozen = allFrozen
+  if (allGas && !sfx.allGas) audio.vaporizeOn()
+  else if (!allGas && sfx.allGas) audio.vaporizeOff()
+  sfx.allGas = allGas
+  if (sim.dispersed && !sfx.dispersed) audio.disperse()
+  sfx.dispersed = sim.dispersed
+  if (sim.iceImpact > 60) audio.iceImpact(sim.iceImpact)
+  sim.iceImpact = 0
+
   const stateText = sim.dispersed ? 'DISPERSÉ' : allFrozen ? 'GLACE' : allGas ? 'VAPEUR' : 'liquide'
   const gel = !allFrozen && frozenCount > 0 ? ' · gel partiel' : ''
   const vape = !allGas && gasCount > 0 ? ' · vapeur partielle' : ''
