@@ -72,6 +72,12 @@ export class FluidSim {
   baseVolume = 0
   playerCount = 0
   dispersed = false
+  // Eau avalée par le sas : retirée de la simulation, mise en bonbonne à la
+  // sortie. Le sas boit — cette eau n'est pas perdue.
+  swallowed = 0
+  private mouthX = 0
+  private mouthY = 0
+  private drainOn = false
   stats: PlayerStats = { count: 0, centroidX: 0, centroidY: 0, velX: 0, velY: 0, rmsRadius: 1 }
 
   private grid: SpatialGrid
@@ -397,7 +403,10 @@ export class FluidSim {
   applyExitSuction(cx: number, cy: number, dt: number): void {
     const p = this.params
     const R = p.exitRadius
-    if (R <= 0 || p.exitPull <= 0) return
+    this.mouthX = cx
+    this.mouthY = cy
+    this.drainOn = R > 0 && p.exitPull > 0
+    if (!this.drainOn) return
     const R2 = R * R
     const inv = 1 / Math.sqrt(1 + p.exitSwirl * p.exitSwirl)
     // Entraînement fixe : le courant du sas est permanent, l'eau le suit
@@ -425,6 +434,22 @@ export class FluidSim {
       const ty = (uy * vIn + ux * vTan * tanScale) * rim
       this.velX[i] += (tx - this.velX[i]) * blend
       this.velY[i] += (ty - this.velY[i]) * blend
+    }
+
+    // Le trou avale : toute particule qui atteint l'œil est retirée de la
+    // simulation et comptée — elle sera mise en bonbonne à la sortie.
+    const swallowR = p.kernelRadius * 2.5
+    const swallowR2 = swallowR * swallowR
+    let i = 0
+    while (i < this.count) {
+      const dx = cx - this.posX[i]
+      const dy = cy - this.posY[i]
+      if (dx * dx + dy * dy < swallowR2) {
+        this.removeParticle(i)
+        this.swallowed++
+        continue // l'indice i contient maintenant une autre particule
+      }
+      i++
     }
   }
 
@@ -866,9 +891,17 @@ export class FluidSim {
         playerLabel = c
       }
     }
+    // Dans l'emprise du sas, la perte de cohésion n'est pas une dispersion :
+    // c'est le trou qui boit le corps — le jeu conclut en victoire, pas en
+    // défaite, même si le volume restant passe sous le seuil critique.
+    const inDrainGrip =
+      this.drainOn &&
+      Math.hypot(this.stats.centroidX - this.mouthX, this.stats.centroidY - this.mouthY) <
+        this.params.exitRadius
+
     if (playerLabel < 0) {
       this.playerCount = 0
-      this.dispersed = true
+      if (!inDrainGrip) this.dispersed = true
       return
     }
 
@@ -884,6 +917,7 @@ export class FluidSim {
     this.playerCount = count
     this.updatePlayerStats()
 
+    if (inDrainGrip) return
     if (this.baseVolume > 0 && count < this.baseVolume * p.criticalVolumeFraction) {
       this.dispersed = true
     }

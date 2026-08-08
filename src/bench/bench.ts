@@ -447,7 +447,7 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     const a = document.createElement('a')
     const slug = presetState.title.trim().toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-') || 'params'
     a.href = URL.createObjectURL(blob)
-    a.download = `tension-de-surface-${slug}.json`
+    a.download = `projet-21-${slug}.json`
     a.click()
     URL.revokeObjectURL(a.href)
   })

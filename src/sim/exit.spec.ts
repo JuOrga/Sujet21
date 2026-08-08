@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PARAMS, type SimParams } from './params'
-import { FluidSim, KIND_FREE, type Bounds } from './solver'
+import { FluidSim, KIND_FREE, KIND_PLAYER, type Bounds } from './solver'
 
 const OPEN: Bounds = { minX: -3000, minY: -3000, maxX: 3000, maxY: 3000 }
 
@@ -49,5 +49,32 @@ describe('FluidSim.applyExitSuction — le sas avale l’eau en entonnoir', () =
     const i = sim.addParticle(200, 0, KIND_FREE)
     runSuction(sim, 3)
     expect(distToOrigin(sim, i)).toBeLessThan(70)
+  })
+
+  it('avale le corps : les particules qui atteignent l’œil sont retirées et comptées', () => {
+    const sim = makeSim()
+    sim.spawnDisc(80, 0, 50, KIND_PLAYER)
+    runSuction(sim, 4)
+    expect(sim.swallowed).toBeGreaterThan(45)
+    expect(sim.swallowed + sim.count).toBe(50) // rien n'est perdu, tout est bu ou encore là
+    expect(sim.dispersed).toBe(false) // boire n'est pas disperser
+  })
+
+  it('dans l’emprise du sas, la perte de cohésion ne déclenche pas la dispersion', () => {
+    const sim = makeSim()
+    sim.spawnDisc(120, 0, 60, KIND_PLAYER) // dans le rayon d'aspiration (240)
+    sim.applyExitSuction(0, 0, sim.params.dt)
+    while (sim.playerCount > 15) sim.removeParticle(0) // sous le seuil critique (35 %)
+    sim.relabel()
+    expect(sim.dispersed).toBe(false)
+  })
+
+  it('hors de l’emprise du sas, la dispersion reste possible', () => {
+    const sim = makeSim()
+    sim.spawnDisc(2000, 0, 60, KIND_PLAYER) // loin de la bouche
+    sim.applyExitSuction(0, 0, sim.params.dt)
+    while (sim.playerCount > 15) sim.removeParticle(0)
+    sim.relabel()
+    expect(sim.dispersed).toBe(true)
   })
 })

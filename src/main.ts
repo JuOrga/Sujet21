@@ -215,9 +215,19 @@ function frame(now: number): void {
     })
   }
 
-  // Sortie (§7.1-7.2) : le centre du corps franchit le sas
-  if (!tableauDone && !sim.dispersed && pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit)) {
-    const surplus = sim.liters()
+  // Sortie (§7.1-7.2) : le centre du corps franchit le sas, ou le sas a bu
+  // le corps sous le seuil critique (les dernières gouttes plaquées contre la
+  // paroi par le courant ne doivent pas faire attendre — l'issue est jouée).
+  // L'eau avalée compte : elle est mise en bonbonne.
+  const drunk =
+    sim.swallowed > 0 &&
+    (sim.playerCount === 0 || sim.playerCount < sim.baseVolume * params.criticalVolumeFraction)
+  if (
+    !tableauDone &&
+    !sim.dispersed &&
+    (drunk || pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit))
+  ) {
+    const surplus = sim.liters() + sim.swallowed * params.litersPerParticle
     run.bonbonneLiters += surplus
     run.tableau++
     run.exitTimer = EXIT_LINGER
@@ -318,9 +328,12 @@ function frame(now: number): void {
     homeState.textContent = sim.dispersed ? 'dispersé' : 'en dérive'
   }
 
-  if (sim.dispersed && !tableauDone) {
+  // Recalculé (pas tableauDone) : si la victoire vient d'être déclenchée dans
+  // cette frame, le tampon SAS ATTEINT doit rester — sinon il serait effacé
+  // dans la même frame et le bilan de sortie ne s'afficherait jamais.
+  if (sim.dispersed && run.exitTimer <= 0) {
     showOverlay('DISPERSION', 'La cohésion ne tient plus. Appuyez sur R pour recommencer.', 'danger')
-  } else if (!tableauDone) {
+  } else if (run.exitTimer <= 0) {
     overlay.classList.remove('visible')
   }
 
