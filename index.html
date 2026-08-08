@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Tension de surface — prototype</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#0b0e14;
+               font-family:"Segoe UI", system-ui, sans-serif; color:#c8d6e5; }
+  canvas { position:absolute; top:0; left:0; }
+  #fluid { filter:url(#goo); }
+  #hud { position:absolute; top:12px; left:14px; font-size:15px; letter-spacing:.4px;
+         text-shadow:0 1px 3px #000; pointer-events:none; }
+  #hud .vol { font-size:22px; color:#9fdcff; }
+  #help { position:absolute; bottom:10px; left:0; right:0; text-align:center; font-size:12px;
+          color:#5c6b7f; pointer-events:none; }
+  #overlay { position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+             flex-direction:column; background:rgba(6,8,12,.55); text-align:center; }
+  #overlay h1 { font-weight:300; font-size:34px; margin:0 0 10px; color:#cfe8ff; }
+  #overlay p { color:#8fa3b8; margin:4px 0; }
+  #panel { position:absolute; top:0; right:0; bottom:0; width:270px; overflow-y:auto;
+           background:rgba(10,14,20,.92); border-left:1px solid #1d2635; padding:12px 14px;
+           display:none; font-size:12px; }
+  #panel h2 { font-size:13px; font-weight:600; color:#9fdcff; margin:10px 0 6px; }
+  #panel .row { margin:7px 0; }
+  #panel label { display:flex; justify-content:space-between; color:#8fa3b8; }
+  #panel label span.val { color:#cfe8ff; }
+  #panel input[type=range] { width:100%; }
+  #panel button { width:100%; margin-top:10px; padding:6px; background:#16324a; color:#9fdcff;
+                  border:1px solid #2a5578; border-radius:4px; cursor:pointer; }
+  #panel button:hover { background:#1d4360; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <filter id="goo">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur"/>
+      <feColorMatrix in="blur" mode="matrix"
+        values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -10" result="goo"/>
+      <feComposite in="goo" in2="goo" operator="atop"/>
+    </filter>
+  </defs>
+</svg>
+
+<canvas id="bg"></canvas>
+<canvas id="fluid"></canvas>
+
+<div id="hud"></div>
+<div id="help">
+  Maintenir le clic : éjecter de la matière vers le curseur (le corps part à l'opposé) ·
+  1–5 : dilatation du temps · R : recommencer · T : banc de réglage
+</div>
+<div id="overlay"><h1 id="ovTitle"></h1><p id="ovText"></p><p>Appuyez sur R pour recommencer.</p></div>
+<div id="panel"><h2>Banc de réglage</h2><div id="panelRows"></div>
+  <button id="exportBtn">Exporter les valeurs (JSON)</button></div>
+
+<script src="js/params.js"></script>
+<script src="js/grid.js"></script>
+<script src="js/fluid.js"></script>
+<script src="js/level.js"></script>
+<script src="js/render.js"></script>
+<script src="js/tuning.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
