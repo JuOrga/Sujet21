@@ -5,3 +5,6 @@ dist/
 .playwright-mcp/
 .vercel
 .env*
+
+# Originaux IA lourds (sources locales — seuls les WebP optimisés de public/assets sont versionnés)
+assets-src/

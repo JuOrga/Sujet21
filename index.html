@@ -98,11 +98,43 @@
         pointer-events: none;
       }
       .home-eyebrow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
         font-size: 11px;
         letter-spacing: 0.22em;
         color: var(--dim);
         border-bottom: 1px solid var(--line);
         padding-bottom: 14px;
+      }
+      /* Écusson de mission : l'image est carrée à fond plein, le cercle CSS la détoure */
+      .home-badge {
+        width: 58px;
+        height: 58px;
+        flex: none;
+        border-radius: 50%;
+        border: 1px solid var(--line-strong);
+        box-shadow: 0 0 14px rgba(99, 183, 230, 0.18);
+      }
+      .home-figure {
+        margin: 0;
+        border: 1px solid var(--line);
+        background: #04080f;
+      }
+      .home-figure img {
+        display: block;
+        width: 100%;
+        height: 170px;
+        object-fit: cover;
+        object-position: center 30%;
+      }
+      .home-figure figcaption {
+        font-size: 9.5px;
+        letter-spacing: 0.16em;
+        color: var(--dim);
+        padding: 7px 10px;
+        border-top: 1px solid var(--line);
       }
       .home-title {
         font-family: var(--font-display);
@@ -215,6 +247,18 @@
         }
         body.playing #home {
           transform: translateY(24px);
+        }
+        .home-figure img {
+          height: 104px;
+        }
+        .home-badge {
+          width: 46px;
+          height: 46px;
+        }
+      }
+      @media (max-height: 720px) {
+        .home-figure {
+          display: none; /* petits écrans : la fiche reste lisible sans la planche */
         }
       }
 
@@ -415,13 +459,20 @@
     <div id="app"><canvas id="glcanvas"></canvas></div>
 
     <aside id="home" aria-label="Fiche d'essai">
-      <div class="home-eyebrow">LABORATOIRE ORBITAL — PROTOCOLE « TENSION DE SURFACE » · JALON 2</div>
+      <div class="home-eyebrow">
+        <span>LABORATOIRE ORBITAL — PROTOCOLE «&nbsp;TENSION DE SURFACE&nbsp;» · JALON 2</span>
+        <img class="home-badge" src="/assets/badge.webp" alt="Écusson de la mission Projet 21" />
+      </div>
       <h1 class="home-title">PROJET <em>21</em></h1>
       <p class="home-pitch">
         Vous êtes un volume d'eau en apesanteur. La seule façon d'avancer&nbsp;:
         éjecter une partie de vous-même. <strong>Se déplacer, c'est rétrécir.</strong>
         Rejoignez le sas avant de vous disperser.
       </p>
+      <figure class="home-figure">
+        <img src="/assets/home.webp" alt="Échantillon d'eau en lévitation dans la cuve d'essai" loading="lazy" />
+        <figcaption>FIG. 1 — ÉCHANTILLON EN SUSPENSION, CUVE D'ESSAI</figcaption>
+      </figure>
       <dl class="home-readout" aria-label="Relevé de l'échantillon">
         <div><dt>ÉCHANTILLON</dt><dd id="home-volume">— L</dd></div>
         <div><dt>PARTICULES</dt><dd id="home-particles">—</dd></div>
