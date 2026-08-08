@@ -280,6 +280,25 @@
   });
   window.addEventListener("mouseup", () => { mouse.down = false; });
   window.addEventListener("mousemove", (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
+
+  // tactile : le doigt joue le rôle du curseur maintenu
+  window.addEventListener("touchstart", (e) => {
+    if (e.target instanceof Element &&
+        (e.target.closest("#panel") || e.target.closest("#overlay"))) return;
+    e.preventDefault();
+    mouse.down = true;
+    mouse.x = e.touches[0].clientX; mouse.y = e.touches[0].clientY;
+  }, { passive: false });
+  window.addEventListener("touchmove", (e) => {
+    if (!mouse.down) return;
+    e.preventDefault();
+    mouse.x = e.touches[0].clientX; mouse.y = e.touches[0].clientY;
+  }, { passive: false });
+  window.addEventListener("touchend", (e) => {
+    if (e.touches.length === 0) mouse.down = false;
+  });
+  // sur mobile, pas de touche R : toucher l'écran de fin relance
+  overlay.addEventListener("click", () => { if (state !== "play") reset(); });
   window.addEventListener("keydown", (e) => {
     const scales = { Digit1: 0.25, Digit2: 0.5, Digit3: 1, Digit4: 2, Digit5: 4 };
     if (scales[e.code]) timeScale = scales[e.code];

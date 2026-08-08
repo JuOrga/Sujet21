@@ -6,7 +6,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#0b0e14;
-               font-family:"Segoe UI", system-ui, sans-serif; color:#c8d6e5; }
+               font-family:"Segoe UI", system-ui, sans-serif; color:#c8d6e5;
+               touch-action:none; overscroll-behavior:none; }
   canvas { position:absolute; top:0; left:0; }
   #fluid { filter:url(#goo); }
   #hud { position:absolute; top:12px; left:14px; font-size:15px; letter-spacing:.4px;
@@ -52,7 +53,7 @@
   le froid gèle (on ne pilote plus), le chaud vaporise (poussée explosive) ·
   1–5 : dilatation du temps · R : recommencer · T : banc de réglage
 </div>
-<div id="overlay"><h1 id="ovTitle"></h1><p id="ovText"></p><p>Appuyez sur R pour recommencer.</p></div>
+<div id="overlay"><h1 id="ovTitle"></h1><p id="ovText"></p><p>Appuyez sur R — ou touchez l'écran — pour recommencer.</p></div>
 <div id="panel"><h2>Banc de réglage</h2><div id="panelRows"></div>
   <button id="exportBtn">Exporter les valeurs (JSON)</button></div>
 
