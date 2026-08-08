@@ -181,6 +181,10 @@ function openHome(): void {
   document.body.classList.remove('playing')
 }
 startBtn.addEventListener('click', closeHome)
+// Au doigt, la fiche va à l'essentiel : les commandes démarrent repliées
+if (window.matchMedia('(max-width: 700px)').matches) {
+  document.getElementById('cmd-details')!.removeAttribute('open')
+}
 window.addEventListener('keydown', (e) => {
   const t = e.target as HTMLElement | null
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
