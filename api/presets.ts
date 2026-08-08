@@ -36,21 +36,40 @@ function sanitize(input: unknown): SharedPreset | null {
   }
 }
 
-async function readAll(): Promise<SharedPreset[]> {
+interface Library {
+  presets: SharedPreset[]
+  defaultTitle: string | null // préset appliqué au lancement, pour tous
+}
+
+// Accepte le document courant { presets, defaultTitle } et, pour
+// compatibilité, l'ancien format « tableau de présets ».
+async function readAll(): Promise<Library> {
+  const empty: Library = { presets: [], defaultTitle: null }
   const { blobs } = await list({ prefix: PREFIX })
-  if (blobs.length === 0) return []
+  if (blobs.length === 0) return empty
   const latest = [...blobs].sort(
     (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
   )[0]
   const r = await fetch(latest.url, { cache: 'no-store' })
-  if (!r.ok) return []
-  const data = (await r.json().catch(() => [])) as unknown
-  return Array.isArray(data) ? (data.filter((p) => sanitize(p) !== null) as SharedPreset[]) : []
+  if (!r.ok) return empty
+  const data = (await r.json().catch(() => null)) as unknown
+  if (Array.isArray(data)) {
+    return { presets: data.filter((p) => sanitize(p) !== null) as SharedPreset[], defaultTitle: null }
+  }
+  if (data !== null && typeof data === 'object' && Array.isArray((data as Library).presets)) {
+    const lib = data as { presets: unknown[]; defaultTitle?: unknown }
+    return {
+      presets: lib.presets.filter((p) => sanitize(p) !== null) as SharedPreset[],
+      defaultTitle:
+        typeof lib.defaultTitle === 'string' && lib.defaultTitle ? lib.defaultTitle : null,
+    }
+  }
+  return empty
 }
 
-async function writeAll(presets: SharedPreset[]): Promise<void> {
+async function writeAll(library: Library): Promise<void> {
   const { blobs } = await list({ prefix: PREFIX })
-  await put(`${PREFIX}v.json`, JSON.stringify(presets), {
+  await put(`${PREFIX}v.json`, JSON.stringify(library), {
     access: 'public',
     addRandomSuffix: true,
     contentType: 'application/json',
@@ -68,15 +87,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
     if (req.method === 'POST') {
-      const preset = sanitize(req.body)
+      const body = req.body as Record<string, unknown> | null
+      // Deux actions : définir le préset par défaut (body { defaultTitle }),
+      // ou publier un préset (body préset complet avec params).
+      if (body !== null && typeof body === 'object' && 'defaultTitle' in body && !('params' in body)) {
+        const dt = body.defaultTitle
+        const lib = await readAll()
+        if (dt === null || dt === '') {
+          lib.defaultTitle = null
+        } else if (typeof dt === 'string' && lib.presets.some((q) => q.title === dt)) {
+          lib.defaultTitle = dt
+        } else {
+          res.status(400).json({ error: 'préset par défaut inconnu' })
+          return
+        }
+        await writeAll(lib)
+        res.status(200).json({ ok: true })
+        return
+      }
+      const preset = sanitize(body)
       if (!preset) {
         res.status(400).json({ error: 'préset invalide : il faut un titre et des paramètres' })
         return
       }
-      const all = (await readAll()).filter((q) => q.title !== preset.title)
-      all.push(preset)
-      all.sort((a, b) => a.title.localeCompare(b.title, 'fr'))
-      await writeAll(all.slice(0, MAX_PRESETS))
+      const lib = await readAll()
+      lib.presets = lib.presets.filter((q) => q.title !== preset.title)
+      lib.presets.push(preset)
+      lib.presets.sort((a, b) => a.title.localeCompare(b.title, 'fr'))
+      lib.presets = lib.presets.slice(0, MAX_PRESETS)
+      await writeAll(lib)
       res.status(200).json({ ok: true })
       return
     }
@@ -86,7 +125,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         res.status(400).json({ error: 'titre manquant' })
         return
       }
-      await writeAll((await readAll()).filter((q) => q.title !== title))
+      const lib = await readAll()
+      lib.presets = lib.presets.filter((q) => q.title !== title)
+      if (lib.defaultTitle === title) lib.defaultTitle = null // le défaut suit le préset
+      await writeAll(lib)
       res.status(200).json({ ok: true })
       return
     }

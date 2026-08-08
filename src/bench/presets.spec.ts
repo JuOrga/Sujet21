@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
-import { copyParams, mergePresets, parsePresetFile, removePreset, serializePreset, upsertPreset, type Preset } from './presets'
+import {
+  copyParams,
+  mergePresets,
+  parsePresetFile,
+  parseSharedPayload,
+  removePreset,
+  serializePreset,
+  upsertPreset,
+  type Preset,
+} from './presets'
 
 function makePreset(title: string, params: Partial<SimParams> = {}): Preset {
   return { title, description: `desc ${title}`, savedAt: '2026-08-08T00:00:00Z', params }
@@ -54,5 +63,23 @@ describe('présets du banc', () => {
   it('supprime par titre', () => {
     const list = upsertPreset(upsertPreset([], makePreset('a')), makePreset('b'))
     expect(removePreset(list, 'a').map((p) => p.title)).toEqual(['b'])
+  })
+
+  it('relit la bibliothèque partagée : nouveau format avec préset par défaut', () => {
+    const lib = parseSharedPayload({ presets: [makePreset('a')], defaultTitle: 'a' })
+    expect(lib.presets.map((p) => p.title)).toEqual(['a'])
+    expect(lib.defaultTitle).toBe('a')
+  })
+
+  it('relit l’ancien format de bibliothèque (tableau nu, sans défaut)', () => {
+    const lib = parseSharedPayload([makePreset('a'), makePreset('b')])
+    expect(lib.presets).toHaveLength(2)
+    expect(lib.defaultTitle).toBeNull()
+  })
+
+  it('bibliothèque illisible ou défaut vide : retombe proprement', () => {
+    expect(parseSharedPayload('n’importe quoi')).toEqual({ presets: [], defaultTitle: null })
+    expect(parseSharedPayload({ presets: [], defaultTitle: '' }).defaultTitle).toBeNull()
+    expect(parseSharedPayload({ presets: [makePreset('a')], defaultTitle: 42 }).defaultTitle).toBeNull()
   })
 })

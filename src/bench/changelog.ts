@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '08/08/2026 18:16',
+    title: 'Préset par défaut au lancement',
+    notes: [
+      'Nouveau bouton « Par défaut au lancement ★ » dans Présets : le préset sélectionné est appliqué automatiquement à l’ouverture du jeu, pour tous les testeurs (marqué ★ dans la liste).',
+      'Cliquer à nouveau sur le préset déjà par défaut retire ce statut (retour aux réglages d’usine). Supprimer le préset par défaut le retire aussi.',
+      'Hors connexion, le dernier défaut connu s’applique quand même (cache local) ; la bibliothèque partagée corrige dès qu’elle répond.',
+    ],
+  },
+  {
     date: '08/08/2026 17:50',
     title: 'Projet 21 : le titre, et le sas boit jusqu’au bout',
     notes: [

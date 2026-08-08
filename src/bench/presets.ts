@@ -13,6 +13,14 @@ export interface Preset {
 }
 
 const STORAGE_KEY = 'tension-de-surface-presets'
+const DEFAULT_KEY = 'tension-de-surface-default'
+
+// La bibliothèque partagée : les présets, plus le titre du préset appliqué
+// par défaut au lancement du jeu (commun à tous les testeurs).
+export interface SharedLibrary {
+  presets: Preset[]
+  defaultTitle: string | null
+}
 
 // Ne copie que les valeurs numériques connues : un fichier étranger ou une
 // vieille version ne peut pas injecter n'importe quoi dans les paramètres.
@@ -80,12 +88,49 @@ export function loadStoredPresets(): Preset[] {
 // En dev local (vite sans backend), ces appels échouent : le banc retombe
 // alors silencieusement en mode localStorage seul.
 
-export async function fetchSharedPresets(): Promise<Preset[]> {
+// Relit le document partagé : nouveau format { presets, defaultTitle } ou,
+// pour compatibilité, l'ancien format « tableau de présets » (sans défaut).
+export function parseSharedPayload(data: unknown): SharedLibrary {
+  if (Array.isArray(data)) {
+    return { presets: data.filter(isPresetLike), defaultTitle: null }
+  }
+  if (data !== null && typeof data === 'object' && Array.isArray((data as SharedLibrary).presets)) {
+    const lib = data as { presets: unknown[]; defaultTitle?: unknown }
+    return {
+      presets: lib.presets.filter(isPresetLike),
+      defaultTitle: typeof lib.defaultTitle === 'string' && lib.defaultTitle ? lib.defaultTitle : null,
+    }
+  }
+  return { presets: [], defaultTitle: null }
+}
+
+export async function fetchSharedPresets(): Promise<SharedLibrary> {
   const r = await fetch('/api/presets', { cache: 'no-store' })
   if (!r.ok) throw new Error(`bibliothèque partagée : ${r.status}`)
-  const data = (await r.json()) as unknown
-  if (!Array.isArray(data)) return []
-  return data.filter(isPresetLike)
+  return parseSharedPayload((await r.json()) as unknown)
+}
+
+// Définit (ou retire, avec null) le préset par défaut pour tous les testeurs.
+export async function setSharedDefault(title: string | null): Promise<void> {
+  const r = await fetch('/api/presets', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ defaultTitle: title }),
+  })
+  if (!r.ok) throw new Error(`bibliothèque partagée : ${r.status}`)
+}
+
+// Cache local du préset par défaut : appliqué immédiatement au lancement,
+// avant (et sans) la réponse de la bibliothèque partagée.
+export function loadStoredDefault(): string | null {
+  if (typeof localStorage === 'undefined') return null
+  return localStorage.getItem(DEFAULT_KEY) || null
+}
+
+export function storeStoredDefault(title: string | null): void {
+  if (typeof localStorage === 'undefined') return
+  if (title) localStorage.setItem(DEFAULT_KEY, title)
+  else localStorage.removeItem(DEFAULT_KEY)
 }
 
 export async function pushSharedPreset(preset: Preset): Promise<void> {

@@ -13,13 +13,16 @@ import {
   copyParams,
   deleteSharedPreset,
   fetchSharedPresets,
+  loadStoredDefault,
   loadStoredPresets,
   mergePresets,
   parsePresetFile,
   pushSharedPreset,
   removePreset,
   serializePreset,
+  setSharedDefault,
   storePresets,
+  storeStoredDefault,
   upsertPreset,
   type Preset,
 } from './presets'
@@ -73,8 +76,18 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
 
   // ---- Présets : enregistrer / modifier / charger des jeux de réglages ----
   let presets = loadStoredPresets()
+  // Préset appliqué automatiquement au lancement (commun aux testeurs) :
+  // le cache local répond tout de suite, la bibliothèque partagée corrige.
+  let defaultTitle = loadStoredDefault()
   const presetState = { title: '', description: '' }
   const fPresets = pane.addFolder({ title: 'Présets', expanded: true })
+
+  const applyPreset = (p: Preset): void => {
+    copyParams(p.params, params)
+    presetState.title = p.title
+    presetState.description = p.description
+    pane.refresh()
+  }
 
   describe(
     fPresets.addBinding(presetState, 'title', { label: 'titre' }),
@@ -89,7 +102,7 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   const rebuildList = (selected?: string) => {
     const options =
       presets.length > 0
-        ? presets.map((p) => ({ text: p.title, value: p.title }))
+        ? presets.map((p) => ({ text: p.title === defaultTitle ? `★ ${p.title}` : p.title, value: p.title }))
         : [{ text: '— aucun préset —', value: '' }]
     const value =
       selected !== undefined && presets.some((p) => p.title === selected)
@@ -114,12 +127,20 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   // La bibliothèque partagée se charge en arrière-plan ; sans backend
   // (dev local), le banc reste en mode localStorage sans bruit.
   void fetchSharedPresets()
-    .then((shared) => {
-      presets = mergePresets(presets, shared)
+    .then((lib) => {
+      presets = mergePresets(presets, lib.presets)
       storePresets(presets)
+      // Le défaut partagé fait foi : il corrige (ou efface) le cache local
+      const changed = lib.defaultTitle !== defaultTitle
+      defaultTitle = lib.defaultTitle
+      storeStoredDefault(defaultTitle)
       rebuildList(list?.value)
-      if (shared.length > 0) {
-        hint.textContent = `Bibliothèque partagée synchronisée : ${shared.length} préset(s).`
+      const def = changed ? presets.find((q) => q.title === defaultTitle) : undefined
+      if (def) {
+        applyPreset(def)
+        hint.textContent = `Bibliothèque synchronisée — préset par défaut « ${def.title} » appliqué.`
+      } else if (lib.presets.length > 0) {
+        hint.textContent = `Bibliothèque partagée synchronisée : ${lib.presets.length} préset(s).`
       }
     })
     .catch(() => {
@@ -163,11 +184,37 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
       hint.textContent = '⚠ Aucun préset sélectionné.'
       return
     }
-    copyParams(p.params, params)
-    presetState.title = p.title
-    presetState.description = p.description
-    pane.refresh()
+    applyPreset(p)
     hint.textContent = `Préset « ${p.title} » chargé.`
+  })
+
+  describe(
+    fPresets.addButton({ title: 'Par défaut au lancement ★' }),
+    'Le préset sélectionné sera appliqué automatiquement à l’ouverture du jeu, pour tous les testeurs (marqué ★ dans la liste). Cliquer à nouveau sur le préset déjà par défaut retire ce statut : retour aux réglages d’usine au lancement.',
+  ).on('click', () => {
+    const title = list?.value
+    if (!title || !presets.some((q) => q.title === title)) {
+      hint.textContent = '⚠ Aucun préset sélectionné.'
+      return
+    }
+    const clearing = defaultTitle === title
+    defaultTitle = clearing ? null : title
+    storeStoredDefault(defaultTitle)
+    rebuildList(title)
+    hint.textContent = clearing
+      ? 'Retrait du préset par défaut…'
+      : `« ${title} » défini par défaut…`
+    void setSharedDefault(defaultTitle)
+      .then(() => {
+        hint.textContent = clearing
+          ? 'Plus de préset par défaut : réglages d’usine au lancement (pour tous les testeurs).'
+          : `« ${title} » sera appliqué au lancement pour tous les testeurs.`
+      })
+      .catch(() => {
+        hint.textContent = clearing
+          ? 'Préset par défaut retiré sur cet appareil (bibliothèque partagée indisponible).'
+          : `« ${title} » par défaut sur cet appareil seulement (bibliothèque partagée indisponible).`
+      })
   })
 
   describe(
@@ -181,6 +228,11 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     }
     presets = removePreset(presets, title)
     storePresets(presets)
+    if (defaultTitle === title) {
+      // le défaut suit le préset supprimé (le serveur fait de même)
+      defaultTitle = null
+      storeStoredDefault(null)
+    }
     rebuildList()
     hint.textContent = `Préset « ${title} » supprimé.`
     void deleteSharedPreset(title).catch(() => {})
@@ -484,6 +536,16 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     }
     input.click()
   })
+
+  // Préset par défaut : appliqué dès l'ouverture depuis le cache local — la
+  // bibliothèque partagée, quand elle répond, confirme ou corrige ce choix.
+  {
+    const def = presets.find((q) => q.title === defaultTitle)
+    if (def) {
+      applyPreset(def)
+      hint.textContent = `Préset par défaut « ${def.title} » appliqué.`
+    }
+  }
 
   return pane
 }
