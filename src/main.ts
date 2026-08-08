@@ -215,18 +215,16 @@ function frame(now: number): void {
     })
   }
 
-  // Sortie (§7.1-7.2) : le centre du corps franchit le sas, ou le sas a bu
-  // le corps sous le seuil critique (les dernières gouttes plaquées contre la
-  // paroi par le courant ne doivent pas faire attendre — l'issue est jouée).
-  // L'eau avalée compte : elle est mise en bonbonne.
-  const drunk =
-    sim.swallowed > 0 &&
-    (sim.playerCount === 0 || sim.playerCount < sim.baseVolume * params.criticalVolumeFraction)
-  if (
-    !tableauDone &&
-    !sim.dispersed &&
-    (drunk || pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit))
-  ) {
+  // Sortie (§7.1-7.2). Sas aspirant : la victoire n'arrive que lorsque le sas
+  // a quasi tout bu (≤ 2 % du volume de base) — l'animation d'engloutissement
+  // se joue en entier, le tampon ne coupe plus la spirale. Sas désactivé au
+  // banc (rayon ou courant à 0) : règle historique, le centre du corps
+  // franchit la boîte. L'eau avalée est mise en bonbonne dans les deux cas.
+  const drainActive = params.exitRadius > 0 && params.exitPull > 0
+  const drunk = sim.swallowed > 0 && sim.playerCount <= Math.max(6, sim.baseVolume * 0.02)
+  const reached =
+    !drainActive && pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit)
+  if (!tableauDone && !sim.dispersed && (drunk || reached)) {
     const surplus = sim.liters() + sim.swallowed * params.litersPerParticle
     run.bonbonneLiters += surplus
     run.tableau++

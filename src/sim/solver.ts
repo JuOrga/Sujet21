@@ -424,12 +424,16 @@ export class FluidSim {
       // La vidange accélère vers le trou — sur le courant rentrant seulement :
       // amplifier aussi la giration élargirait l'orbite d'équilibre au-delà
       // du cœur de Rankine et l'eau tournerait sans jamais entrer.
-      const boost = 1 + 1.5 * (1 - d / R)
+      // Le second terme est la gorgée finale : tout près de la bouche, le
+      // courant plonge franchement — les dernières gouttes, même plaquées
+      // contre la paroi voisine, sont bues au lieu de tourner en rond.
+      const boost = 1 + 1.5 * (1 - d / R) + 1.5 * (1 - Math.min(1, d / (R * 0.3)))
       const vIn = p.exitPull * inv * boost
       const vTan = p.exitPull * p.exitSwirl * inv
-      // Cœur en rotation « corps solide » (Rankine) : sans lui, l'eau trouve
-      // une orbite d'équilibre autour de la bouche et n'y entre jamais.
-      const tanScale = Math.min(1, d / (R * 0.5))
+      // Cœur en rotation « corps solide » (Rankine), durci au carré : la
+      // giration s'efface à l'approche de la bouche, l'eau y tombe droit.
+      const t0 = Math.min(1, d / (R * 0.5))
+      const tanScale = t0 * t0
       const tx = (ux * vIn - uy * vTan * tanScale) * rim
       const ty = (uy * vIn + ux * vTan * tanScale) * rim
       this.velX[i] += (tx - this.velX[i]) * blend
@@ -438,7 +442,7 @@ export class FluidSim {
 
     // Le trou avale : toute particule qui atteint l'œil est retirée de la
     // simulation et comptée — elle sera mise en bonbonne à la sortie.
-    const swallowR = p.kernelRadius * 2.5
+    const swallowR = p.kernelRadius * 2.8
     const swallowR2 = swallowR * swallowR
     let i = 0
     while (i < this.count) {
@@ -894,10 +898,12 @@ export class FluidSim {
     // Dans l'emprise du sas, la perte de cohésion n'est pas une dispersion :
     // c'est le trou qui boit le corps — le jeu conclut en victoire, pas en
     // défaite, même si le volume restant passe sous le seuil critique.
+    // Marge ×1,3 : une éclaboussure qui déborde brièvement du rayon pendant
+    // que le sas boit ne doit pas requalifier la fin en dispersion.
     const inDrainGrip =
       this.drainOn &&
       Math.hypot(this.stats.centroidX - this.mouthX, this.stats.centroidY - this.mouthY) <
-        this.params.exitRadius
+        this.params.exitRadius * 1.3
 
     if (playerLabel < 0) {
       this.playerCount = 0
