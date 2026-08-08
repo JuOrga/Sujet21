@@ -65,6 +65,35 @@ function applyLevel(): void {
   renderBoxes = [...level.boxes, { ...level.exit, material: MAT_EXIT }]
   exitMouth.x = (level.exit.minX + level.exit.maxX) * 0.5
   exitMouth.y = (level.exit.minY + level.exit.maxY) * 0.5
+  buildWorldLabels()
+}
+
+// Étiquettes de monde : le nom de chaque surface, projeté par la caméra —
+// la lisibilité de la légende, mais dans le décor lui-même.
+const worldLabelsHost = document.getElementById('world-labels') as HTMLDivElement
+let labelEls: { span: HTMLSpanElement; x: number; y: number }[] = []
+function buildWorldLabels(): void {
+  worldLabelsHost.innerHTML = ''
+  labelEls = level.labels.map((l) => {
+    const span = document.createElement('span')
+    span.className = `world-label wl-${l.tone}`
+    span.textContent = l.text
+    worldLabelsHost.appendChild(span)
+    return { span, x: l.x, y: l.y }
+  })
+}
+
+function updateWorldLabels(vw: number, vh: number): void {
+  const scale = Math.max(0.6, Math.min(1.2, Math.sqrt(camera.zoom)))
+  for (const l of labelEls) {
+    const sx = vw * 0.5 + (l.x - camera.x) * camera.zoom
+    const sy = vh * 0.5 - (l.y - camera.y) * camera.zoom
+    const visible = sx > -160 && sx < vw + 160 && sy > -40 && sy < vh + 40
+    l.span.style.display = visible ? '' : 'none'
+    if (visible) {
+      l.span.style.transform = `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) translate(-50%, -50%) scale(${scale.toFixed(3)})`
+    }
+  }
 }
 applyLevel()
 
@@ -426,6 +455,7 @@ function frame(now: number): void {
   } else {
     camera.update(dtReal, sim.stats.centroidX, sim.stats.centroidY, sim.stats.rmsRadius, vw, vh, params)
   }
+  updateWorldLabels(vw, vh)
   renderer.render(
     sim,
     camera,
