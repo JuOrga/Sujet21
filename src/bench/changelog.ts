@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '08/08/2026 16:55',
+    title: 'Banc redessiné + présets partagés entre testeurs',
+    notes: [
+      'Refonte du banc : sections d’instrument, curseurs à barre de progression, colonnes équilibrées, boutons et champs assortis à la fiche d’essai.',
+      'Les présets sont maintenant partagés : « Enregistrer » publie dans une bibliothèque commune — chaque testeur voit les présets des autres (fusion avec les locaux, le plus récent gagne).',
+      'Sans connexion, le banc retombe en mode local sans rien perdre.',
+    ],
+  },
+  {
     date: '08/08/2026 16:40',
     title: 'Habillage complet : fiche d’essai, instruments, identité',
     notes: [

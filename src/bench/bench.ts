@@ -8,10 +8,15 @@
 import { Pane } from 'tweakpane'
 import type { SimParams } from '../sim/params'
 import { DELIVERIES } from './changelog'
+import './bench.css'
 import {
   copyParams,
+  deleteSharedPreset,
+  fetchSharedPresets,
   loadStoredPresets,
+  mergePresets,
   parsePresetFile,
+  pushSharedPreset,
   removePreset,
   serializePreset,
   storePresets,
@@ -97,7 +102,7 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
       value,
       index: 2,
     }) as unknown as ListApi
-    describe(list, 'Vos présets enregistrés (dans ce navigateur). Sélectionnez puis « Charger ».')
+    describe(list, 'La bibliothèque partagée entre testeurs, plus vos présets locaux. Sélectionnez puis « Charger ».')
     list.on('change', (ev) => {
       const p = presets.find((q) => q.title === ev.value)
       if (p) hint.textContent = p.description || '(pas de description)'
@@ -105,9 +110,24 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   }
   rebuildList()
 
+  // La bibliothèque partagée se charge en arrière-plan ; sans backend
+  // (dev local), le banc reste en mode localStorage sans bruit.
+  void fetchSharedPresets()
+    .then((shared) => {
+      presets = mergePresets(presets, shared)
+      storePresets(presets)
+      rebuildList(list?.value)
+      if (shared.length > 0) {
+        hint.textContent = `Bibliothèque partagée synchronisée : ${shared.length} préset(s).`
+      }
+    })
+    .catch(() => {
+      hint.textContent = 'Bibliothèque partagée indisponible — présets locaux seulement.'
+    })
+
   describe(
     fPresets.addButton({ title: 'Enregistrer / créer' }),
-    'Enregistre les réglages actuels sous ce titre (remplace si le titre existe déjà).',
+    'Enregistre les réglages actuels sous ce titre (remplace si le titre existe) et les publie dans la bibliothèque partagée entre testeurs.',
   ).on('click', () => {
     const title = presetState.title.trim()
     if (!title) {
@@ -123,7 +143,14 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     presets = upsertPreset(presets, preset)
     storePresets(presets)
     rebuildList(title)
-    hint.textContent = `Préset « ${title} » enregistré.`
+    hint.textContent = `Préset « ${title} » enregistré…`
+    void pushSharedPreset(preset)
+      .then(() => {
+        hint.textContent = `Préset « ${title} » enregistré et partagé avec les autres testeurs.`
+      })
+      .catch(() => {
+        hint.textContent = `Préset « ${title} » enregistré localement (bibliothèque partagée indisponible).`
+      })
   })
 
   describe(
@@ -144,7 +171,7 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
 
   describe(
     fPresets.addButton({ title: 'Supprimer' }),
-    'Supprime le préset sélectionné (les curseurs actuels ne bougent pas).',
+    'Supprime le préset sélectionné, localement et dans la bibliothèque partagée (les curseurs actuels ne bougent pas).',
   ).on('click', () => {
     const title = list?.value
     if (!title || !presets.some((q) => q.title === title)) {
@@ -155,6 +182,7 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     storePresets(presets)
     rebuildList()
     hint.textContent = `Préset « ${title} » supprimé.`
+    void deleteSharedPreset(title).catch(() => {})
   })
 
   const fSolver = pane.addFolder({ title: 'Solveur', expanded: false })
@@ -175,7 +203,7 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Lissage des vitesses entre voisines. Haut : eau sirupeuse et calme. Bas : éclaboussures vives, corps qui s’agite.',
   )
   describe(
-    fSolver.addBinding(params, 'maxDeltaPFactor', { min: 0.02, max: 0.5, label: 'plafond Δp (× h)' }),
+    fSolver.addBinding(params, 'maxDeltaPFactor', { min: 0.02, max: 0.5, label: 'plafond Δp' }),
     'Déplacement maximal d’une particule par itération. Garde-fou contre les projections violentes lors des chocs.',
   )
   describe(
@@ -199,11 +227,11 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
 
   const fProp = pane.addFolder({ title: 'Propulsion', expanded: true })
   describe(
-    fProp.addBinding(params, 'ejectRate', { min: 4, max: 120, step: 1, label: 'débit (part/s)' }),
+    fProp.addBinding(params, 'ejectRate', { min: 4, max: 120, step: 1, label: 'débit /s' }),
     'Particules éjectées par seconde quand on maintient le pointeur. Plus : poussée forte, mais on fond à vue d’œil.',
   )
   describe(
-    fProp.addBinding(params, 'ejectSpeed', { min: 200, max: 4000, step: 10, label: 'vitesse éject.' }),
+    fProp.addBinding(params, 'ejectSpeed', { min: 200, max: 4000, step: 10, label: 'vitesse' }),
     'Vitesse des particules éjectées. La poussée reçue est proportionnelle (conservation de la quantité de mouvement).',
   )
   describe(
@@ -215,13 +243,13 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Où s’applique le recul : 0 = uniforme, le corps part d’un bloc comme un solide ; 1 = concentré au point d’éjection, l’impulsion se propage par pression et le corps se déforme en accélérant.',
   )
   describe(
-    fProp.addBinding(params, 'reabsorbCooldown', { min: 0, max: 5, label: 'délai réabsorb. (s)' }),
+    fProp.addBinding(params, 'reabsorbCooldown', { min: 0, max: 5, label: 'réabsorption' }),
     'Temps pendant lequel une goutte éjectée ne peut pas être réabsorbée — sinon elle recollerait aussitôt au corps.',
   )
 
   const fVortex = pane.addFolder({ title: 'Vortex (clic droit)', expanded: false })
   describe(
-    fVortex.addBinding(params, 'vortexRadius', { min: 40, max: 600, step: 5, label: 'rayon d’action' }),
+    fVortex.addBinding(params, 'vortexRadius', { min: 40, max: 600, step: 5, label: 'rayon' }),
     'Rayon autour du clic droit dans lequel l’eau est aspirée. Au-delà, aucune influence.',
   )
   describe(
@@ -289,7 +317,7 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Freinage de l’eau qui traverse une éponge : elle s’y englue avant d’être absorbée.',
   )
   describe(
-    fMat.addBinding(params, 'spongeAbsorbTime', { min: 0.05, max: 2, label: 'délai absorption' }),
+    fMat.addBinding(params, 'spongeAbsorbTime', { min: 0.05, max: 2, label: 'absorption (s)' }),
     'Temps de contact continu avant qu’une éponge n’absorbe une particule. Chaque cellule se sature puis devient solide.',
   )
 
@@ -329,7 +357,7 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Taille du disque de densité dessiné par particule. Joue sur l’aspect « blob » de l’eau, pas sur la physique.',
   )
   describe(
-    fRender.addBinding(params, 'speedColorScale', { min: 50, max: 800, label: 'échelle vitesse' }),
+    fRender.addBinding(params, 'speedColorScale', { min: 50, max: 800, label: 'échelle teinte' }),
     'Vitesse à laquelle la teinte de l’eau atteint sa couleur « rapide ». Bas : tout scintille. Haut : teinte plus sobre.',
   )
 
@@ -339,7 +367,7 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Images par seconde réellement affichées (lissées).',
   )
   describe(
-    fMon.addBinding(monitor, 'particles', { readonly: true, format: (v: number) => v.toFixed(0) }),
+    fMon.addBinding(monitor, 'particles', { readonly: true, label: 'particules', format: (v: number) => v.toFixed(0) }),
     'Nombre total de particules simulées (corps + gouttes libres).',
   )
   describe(
@@ -417,10 +445,12 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
         presetState.title = preset.title
         presetState.description = preset.description
         if (preset.title) {
-          presets = upsertPreset(presets, { ...preset, savedAt: new Date().toISOString() })
+          const stamped = { ...preset, savedAt: new Date().toISOString() }
+          presets = upsertPreset(presets, stamped)
           storePresets(presets)
           rebuildList(preset.title)
           hint.textContent = `Préset « ${preset.title} » importé et ajouté à la liste.`
+          void pushSharedPreset(stamped).catch(() => {})
         } else {
           hint.textContent = 'Réglages importés (fichier sans titre).'
         }

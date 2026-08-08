@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
-import { copyParams, parsePresetFile, removePreset, serializePreset, upsertPreset, type Preset } from './presets'
+import { copyParams, mergePresets, parsePresetFile, removePreset, serializePreset, upsertPreset, type Preset } from './presets'
 
 function makePreset(title: string, params: Partial<SimParams> = {}): Preset {
   return { title, description: `desc ${title}`, savedAt: '2026-08-08T00:00:00Z', params }
@@ -35,6 +35,20 @@ describe('présets du banc', () => {
     list = upsertPreset(list, makePreset('b', { sCorrK: 0.5 }))
     expect(list).toHaveLength(2)
     expect(list.find((p) => p.title === 'b')?.params.sCorrK).toBe(0.5)
+  })
+
+  it('fusionne local et partagé : un préset par titre, le plus récent gagne', () => {
+    const local = [
+      { ...makePreset('a', { sCorrK: 0.1 }), savedAt: '2026-08-08T10:00:00Z' },
+      makePreset('mien'),
+    ]
+    const shared = [
+      { ...makePreset('a', { sCorrK: 0.9 }), savedAt: '2026-08-08T12:00:00Z' },
+      makePreset('ami'),
+    ]
+    const merged = mergePresets(local, shared)
+    expect(merged.map((p) => p.title)).toEqual(['a', 'ami', 'mien'])
+    expect(merged.find((p) => p.title === 'a')?.params.sCorrK).toBe(0.9)
   })
 
   it('supprime par titre', () => {
