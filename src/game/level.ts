@@ -30,6 +30,8 @@ export interface SpongeDef {
 
 export interface LevelDef {
   name: string
+  code: string // code d'essai du protocole (21-A, 21-B…)
+  journal: string // entrée du journal de bord, affichée à l'ouverture du tableau
   bounds: Bounds
   spawn: { x: number; y: number; n: number }
   exit: { minX: number; minY: number; maxX: number; maxY: number }
@@ -52,6 +54,9 @@ function box(minX: number, minY: number, maxX: number, maxY: number, material: n
 //    redescendre le long de la paroi.
 export const TABLEAU_1: LevelDef = {
   name: 'Le sas',
+  code: '21-A',
+  journal:
+    'Cohésion nominale. L’échantillon dérive vers le collecteur avec une constance… inhabituelle. Sept essais, sept trajectoires identiques. — Dr N. Véga',
   bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
   spawn: { x: -950, y: 0, n: 900 },
   exit: { minX: 1040, minY: -420, maxX: 1180, maxY: -180 },
@@ -88,6 +93,9 @@ export const TABLEAU_1: LevelDef = {
 //    juste, ou traverser en acceptant un gel partiel.
 export const TABLEAU_2: LevelDef = {
   name: 'La chambre froide',
+  code: '21-B',
+  journal:
+    'Installation de plaques cryogéniques sur demande. Si l’échantillon « choisit » ses trajectoires, le froid les lui fera payer. Note : il a appris à s’en servir. — Dr N. Véga',
   bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
   spawn: { x: -950, y: 0, n: 900 },
   exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
@@ -115,6 +123,9 @@ export const TABLEAU_2: LevelDef = {
 //    vapeur — on redevient liquide avant le sas, qu'on le veuille ou non.
 export const TABLEAU_3: LevelDef = {
   name: 'Le conduit',
+  code: '21-C',
+  journal:
+    'Les grilles retiennent l’eau et la glace. Ce matin, l’échantillon a traversé la première à l’état de vapeur. Je demande le passage en confinement de niveau 3. — Dr N. Véga',
   bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
   spawn: { x: -950, y: 0, n: 900 },
   exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },

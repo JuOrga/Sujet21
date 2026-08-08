@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '08/08/2026 22:31',
+    title: 'Le scénario commence : le journal du Dr Véga',
+    notes: [
+      'Le jeu se raconte : à bord du complexe orbital Méduse, le protocole « Tension de surface » étudie un échantillon d’eau qui… se déplace. Toute la narration passe par le journal de bord du Dr N. Véga.',
+      'À chaque ouverture de tableau, un carton affiche l’entrée du journal (pendant le plan large) : 21-A, 21-B, 21-C — le malaise du laboratoire monte d’essai en essai.',
+      'Les textes du jeu parlent la même langue : « ÉCHANTILLON COLLECTÉ » (le sas est un collecteur — chaque réussite nourrit la réserve du labo), « perte de l’échantillon » à la dispersion.',
+      'La bible narrative complète (trois actes, jusqu’à l’évasion réelle) est dans docs/scenario.md du dépôt.',
+    ],
+  },
+  {
     date: '08/08/2026 22:00',
     title: 'La vapeur devient fumée noire + bouton de reprise mobile',
     notes: [

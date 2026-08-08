@@ -76,6 +76,20 @@ const gaugeThreshold = el('gauge-threshold')
 const homeVolume = el('home-volume')
 const homeParticles = el('home-particles')
 const homeState = el('home-state')
+const tableauCard = el('tableau-card')
+const cardCode = el('card-code')
+const cardLog = el('card-log')
+
+// Carton d'ouverture : l'entrée du journal de bord du tableau, affichée
+// pendant le plan large puis effacée quand la caméra a plongé.
+let cardTimer: number | undefined
+function showTableauCard(): void {
+  cardCode.textContent = `ESSAI ${level.code} — ${level.name.toUpperCase()}`
+  cardLog.textContent = level.journal
+  tableauCard.classList.add('visible')
+  window.clearTimeout(cardTimer)
+  cardTimer = window.setTimeout(() => tableauCard.classList.remove('visible'), 6500)
+}
 
 // Fiche d'essai : visible au chargement ; « échap » ou ≡ pour y revenir.
 // L'essai continue de dériver derrière la fiche — elle observe, elle ne fige pas.
@@ -88,6 +102,7 @@ function closeHome(): void {
     // Premier lancement : zoom d'ouverture (les redémarrages ont le leur)
     hasPlayed = true
     camera.startIntro(sim.bounds, window.innerWidth, window.innerHeight)
+    showTableauCard()
   }
 }
 function openHome(): void {
@@ -139,6 +154,7 @@ function restart(): void {
   loop.reset()
   if (document.body.classList.contains('playing')) {
     camera.startIntro(sim.bounds, window.innerWidth, window.innerHeight)
+    showTableauCard()
   } else {
     camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, camera.zoom)
   }
@@ -277,8 +293,8 @@ function frame(now: number): void {
     run.bonbonneLiters += surplus
     run.exitTimer = EXIT_LINGER
     showOverlay(
-      'SAS ATTEINT',
-      `Surplus mis en bonbonne : ${surplus.toFixed(2)} L — réserve totale ${run.bonbonneLiters.toFixed(2)} L · tableau suivant…`,
+      'ÉCHANTILLON COLLECTÉ',
+      `${surplus.toFixed(2)} L transférés en bonbonne — réserve du laboratoire : ${run.bonbonneLiters.toFixed(2)} L · l'essai continue…`,
       'success',
     )
   }
@@ -392,7 +408,11 @@ function frame(now: number): void {
   // cette frame, le tampon SAS ATTEINT doit rester — sinon il serait effacé
   // dans la même frame et le bilan de sortie ne s'afficherait jamais.
   if (sim.dispersed && run.exitTimer <= 0) {
-    showOverlay('DISPERSION', 'La cohésion ne tient plus. Appuyez sur R pour recommencer.', 'danger')
+    showOverlay(
+      'DISPERSION',
+      'La cohésion ne tient plus. Le laboratoire consigne : perte de l’échantillon.',
+      'danger',
+    )
   } else if (run.exitTimer <= 0) {
     overlay.classList.remove('visible')
   }
