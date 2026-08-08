@@ -201,6 +201,68 @@
         background: var(--glow);
         transform: translateY(-1px);
       }
+      /* Registres du labo : l'écran record de la fiche d'expérience */
+      .home-records {
+        border: 1px solid var(--line);
+        border-left: 2px solid var(--valid);
+        background: rgba(63, 214, 155, 0.04);
+        padding: 10px 14px 11px;
+      }
+      .rec-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        color: var(--dim);
+        padding-bottom: 7px;
+        border-bottom: 1px solid var(--line);
+      }
+      .rec-head #rec-essai {
+        color: var(--specimen);
+      }
+      .rec-row {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        font-size: 11.5px;
+        line-height: 2;
+        white-space: nowrap;
+      }
+      .rec-code {
+        color: var(--valid);
+        letter-spacing: 0.1em;
+        flex: none;
+      }
+      .rec-name {
+        color: var(--dim);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .rec-val {
+        color: var(--ink);
+        flex: none;
+      }
+      .rec-val b {
+        color: var(--valid);
+        font-weight: 600;
+      }
+      .rec-none {
+        color: var(--dim);
+        opacity: 0.7;
+      }
+      .rec-hist {
+        margin-top: 7px;
+        padding-top: 7px;
+        border-top: 1px solid var(--line);
+        font-size: 10px;
+        line-height: 1.8;
+        color: var(--dim);
+        white-space: normal;
+      }
+
       .home-commands {
         font-size: 11.5px;
         line-height: 2.1;
@@ -236,24 +298,65 @@
       }
 
       @media (max-width: 700px) {
+        /* Au doigt : feuille basse compacte — l'essai reste visible derrière,
+           la fiche tient sans défiler sur un téléphone courant */
         #home {
           inset: auto 0 0 0;
           width: 100vw;
-          max-height: 82vh;
+          max-height: 76vh;
+          max-height: 76dvh;
+          gap: 13px;
+          padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
           border-right: none;
           border-top: 1px solid var(--line);
           justify-content: flex-start;
-          background: linear-gradient(180deg, rgba(6, 13, 23, 0.88), rgba(6, 13, 23, 0.97));
+          background: linear-gradient(180deg, rgba(6, 13, 23, 0.9), rgba(6, 13, 23, 0.97));
         }
         body.playing #home {
           transform: translateY(24px);
         }
-        .home-figure img {
-          height: 104px;
+        .home-eyebrow {
+          font-size: 9px;
+          letter-spacing: 0.16em;
+          padding-bottom: 10px;
         }
         .home-badge {
-          width: 46px;
-          height: 46px;
+          width: 40px;
+          height: 40px;
+        }
+        .home-title {
+          font-size: 23px;
+        }
+        .home-pitch {
+          font-size: 12px;
+          line-height: 1.6;
+          max-width: none;
+        }
+        .home-figure img {
+          height: 86px;
+        }
+        .home-readout {
+          justify-content: space-between;
+          gap: 10px;
+          padding: 10px 12px;
+        }
+        .home-readout dd {
+          font-size: 15px;
+        }
+        #start {
+          padding: 14px 18px;
+        }
+        .rec-row {
+          font-size: 10.5px;
+          gap: 8px;
+        }
+        .home-commands {
+          font-size: 10.5px;
+          line-height: 2;
+          padding-top: 10px;
+        }
+        .home-foot {
+          display: none; /* le méta-texte du prototype n'aide pas au doigt */
         }
       }
       @media (max-height: 720px) {
@@ -632,6 +735,10 @@
         <div><dt>ÉTAT</dt><dd id="home-state">en dérive</dd></div>
       </dl>
       <button id="start" type="button">COMMENCER L'ESSAI</button>
+      <div class="home-records" aria-label="Registres du labo">
+        <div class="rec-head"><span>REGISTRES DU LABO</span><span id="rec-essai"></span></div>
+        <div id="rec-rows"></div>
+      </div>
       <div class="home-commands cmd-desktop">
         <kbd>maintenir</kbd>éjecter vers le pointeur — le corps part à l'opposé<br />
         <kbd>F</kbd>se changer en glace : le bloc garde son élan — re-presser dégèle<br />

@@ -9,6 +9,7 @@ import { FixedLoop } from './game/loop'
 import { Input } from './game/input'
 import { MAT_EXIT, TABLEAUX, pointInBox, type LevelDef, type ObstacleBox } from './game/level'
 import { AudioFx, loadAudioPrefs } from './game/audio'
+import { Records } from './game/records'
 import { createBench, type BenchMonitor } from './bench/bench'
 
 const CAPACITY = 4096
@@ -20,6 +21,14 @@ const params: SimParams = { ...DEFAULT_PARAMS }
 const run = {
   bonbonneLiters: 0,
   exitTimer: 0, // > 0 : bilan de sortie affiché, tableau suivant imminent
+  tableauTime: 0, // secondes simulées depuis l'entrée du tableau (pour les records)
+}
+
+// Registres du labo (§10) : records par tableau et historique des essais.
+const records = new Records()
+
+function fmtTime(s: number): string {
+  return `${s.toFixed(1).replace('.', ',')} s`
 }
 
 function createSim(level: LevelDef): FluidSim {
@@ -77,6 +86,29 @@ const gaugeThreshold = el('gauge-threshold')
 const homeVolume = el('home-volume')
 const homeParticles = el('home-particles')
 const homeState = el('home-state')
+const recEssai = el('rec-essai')
+const recRows = el('rec-rows')
+
+// Écran record de la fiche : record par tableau + derniers essais consignés.
+function renderRegistres(): void {
+  recEssai.textContent = `ÉCHANTILLON Nº ${records.essaiNumber()}`
+  const rows: string[] = TABLEAUX.map((t) => {
+    const r = records.tableauRecord(t.code)
+    const val = r
+      ? `<b>${r.liters.toFixed(2)} L</b> · ${fmtTime(r.time)} · éch. nº ${r.essai}`
+      : '<span class="rec-none">aucune collecte</span>'
+    return `<div class="rec-row"><span class="rec-code">${t.code}</span><span class="rec-name">${t.name}</span><span class="rec-val">${val}</span></div>`
+  })
+  const hist = records.lastEntries(4)
+  if (hist.length > 0) {
+    const line = hist
+      .map((e) => `nº ${e.no} ${e.code} ${e.won ? `✓ ${e.liters.toFixed(2)} L` : '✕ dispersé'}`)
+      .join(' &nbsp;·&nbsp; ')
+    rows.push(`<div class="rec-hist">${line}</div>`)
+  }
+  recRows.innerHTML = rows.join('')
+}
+renderRegistres()
 const tableauCard = el('tableau-card')
 const cardCode = el('card-code')
 const cardLog = el('card-log')
@@ -153,6 +185,7 @@ let waveCarry = WAVE_EVERY // première salve : onde immédiate
 
 function restart(): void {
   run.exitTimer = 0
+  run.tableauTime = 0
   vortex.timer = 0
   input.freezeIntent = false
   input.gasIntent = false
@@ -255,6 +288,7 @@ function showOverlay(title: string, sub: string, tone: 'success' | 'danger'): vo
 let lastTime = performance.now()
 let elapsed = 0
 let fpsSmoothed = 60
+let dispersedEssaiNo = 1 // n° affiché sur le tampon DISPERSION
 
 // Qualité adaptative : si la machine ne suit pas, on baisse la résolution de
 // rendu (densité de pixels, puis champ métaballes plus grossier). La physique
@@ -310,6 +344,7 @@ function frame(now: number): void {
       }
       sim.applyExitSuction(exitMouth.x, exitMouth.y, params.dt)
       sim.step(params.dt)
+      run.tableauTime += params.dt // temps simulé : le time warp ne fausse pas les records
     })
   }
 
@@ -326,9 +361,14 @@ function frame(now: number): void {
     const surplus = sim.liters() + sim.swallowed * params.litersPerParticle
     run.bonbonneLiters += surplus
     run.exitTimer = EXIT_LINGER
+    const { newRecord } = records.noteCollection(level.code, surplus, run.tableauTime)
+    const recLine = newRecord
+      ? ` · NOUVEAU RECORD DU TABLEAU (${surplus.toFixed(2)} L en ${fmtTime(run.tableauTime)})`
+      : ` · record du tableau : ${records.tableauRecord(level.code)!.liters.toFixed(2)} L`
+    renderRegistres()
     showOverlay(
       'ÉCHANTILLON COLLECTÉ',
-      `${surplus.toFixed(2)} L transférés en bonbonne — réserve du laboratoire : ${run.bonbonneLiters.toFixed(2)} L · l'essai continue…`,
+      `${surplus.toFixed(2)} L transférés en bonbonne — réserve du laboratoire : ${run.bonbonneLiters.toFixed(2)} L${recLine} · l'essai continue…`,
       'success',
     )
     audio.collect()
@@ -443,7 +483,13 @@ function frame(now: number): void {
   if (allGas && !sfx.allGas) audio.vaporizeOn()
   else if (!allGas && sfx.allGas) audio.vaporizeOff()
   sfx.allGas = allGas
-  if (sim.dispersed && !sfx.dispersed) audio.disperse()
+  if (sim.dispersed && !sfx.dispersed) {
+    audio.disperse()
+    // fin de l'échantillon : le registre passe au suivant
+    dispersedEssaiNo = records.essaiNumber()
+    records.noteDispersion(level.code, run.tableauTime)
+    renderRegistres()
+  }
   sfx.dispersed = sim.dispersed
   if (sim.iceImpact > 60) audio.iceImpact(sim.iceImpact)
   sim.iceImpact = 0
@@ -470,7 +516,7 @@ function frame(now: number): void {
   if (sim.dispersed && run.exitTimer <= 0) {
     showOverlay(
       'DISPERSION',
-      'La cohésion ne tient plus. Le laboratoire consigne : perte de l’échantillon.',
+      `La cohésion ne tient plus. Le laboratoire consigne : perte de l’échantillon nº ${dispersedEssaiNo}. Le suivant est prêt.`,
       'danger',
     )
   } else if (run.exitTimer <= 0) {
