@@ -401,6 +401,10 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Répulsion interne du nuage : haut, la vapeur s’étale largement (plus fragile) ; bas, elle reste compacte.',
   )
   describe(
+    fGas.addBinding(params, 'gasTurb', { min: 0, max: 500, step: 5, label: 'turbulence' }),
+    'Tourbillons internes du nuage : la fumée se tord en volutes. 0 : nuage inerte. Haut : fumée furieuse (et plus dure à piloter finement).',
+  )
+  describe(
     fGas.addBinding(params, 'gasDrag', { min: 0, max: 5, label: 'flottement' }),
     'Freinage propre du gaz. Haut : le nuage s’arrête vite quand on relâche. Bas : il dérive longtemps.',
   )

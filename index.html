@@ -382,6 +382,21 @@
         text-align: center;
         line-height: 1.7;
       }
+      /* Reprise après dispersion : indispensable au doigt (pas de touche R) */
+      #overlay-btn {
+        display: none;
+        font-family: var(--font-display);
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        padding: 13px 20px;
+        color: var(--void);
+        background: var(--alert);
+        border: none;
+        cursor: pointer;
+      }
+      #overlay.danger #overlay-btn {
+        display: block;
+      }
       @keyframes stamp {
         from {
           transform: scale(1.06);
@@ -523,6 +538,7 @@
     <div id="overlay">
       <div id="overlay-title">DISPERSION</div>
       <div id="overlay-sub">La cohésion ne tient plus. Appuyez sur R pour recommencer.</div>
+      <button id="overlay-btn" type="button">RECOMMENCER L'ESSAI</button>
     </div>
     <div id="touchbar"></div>
     <script type="module" src="/src/main.ts"></script>

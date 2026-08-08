@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '08/08/2026 22:00',
+    title: 'La vapeur devient fumée noire + bouton de reprise mobile',
+    notes: [
+      'La vapeur refaite façon « fumée noire » : cœur d’encre, volutes internes qui roulent, bords déchiquetés qui bouillonnent (bruit animé), liseré gris qui accroche la lumière — et une vraie turbulence physique : le nuage se tord en tourbillons (curseur « turbulence » dans Gaz).',
+      'Après une DISPERSION, un bouton « RECOMMENCER L’ESSAI » apparaît dans le bandeau — indispensable au doigt, où la touche R n’existe pas.',
+    ],
+  },
+  {
     date: '08/08/2026 21:49',
     title: 'Tableau 3 : le conduit — se déplacer en gaz',
     notes: [

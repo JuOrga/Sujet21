@@ -144,6 +144,8 @@ function restart(): void {
   }
 }
 
+document.getElementById('overlay-btn')!.addEventListener('click', () => restart())
+
 const pane = createBench(params, monitor, {
   reset: restart,
   autoZoom: () => camera.resetAutoZoom(),

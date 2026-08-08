@@ -1054,12 +1054,27 @@ export class FluidSim {
     const { prdX, prdY, velX, velY } = this
     const nbStart = this.nbStart
     const nbList = this.nbList
+    // Turbulence : deux octaves de tourbillons (rotationnel d'un potentiel,
+    // donc sans divergence — le nuage se tord en volutes sans se déchirer).
+    // Déterministe : fonction de la position et du temps de simulation.
+    const time = this.stepIndex * dt
+    const k1 = 0.011
+    const k2 = 0.023
+    const turb = p.gasTurb * dt
     for (let i = 0; i < n; i++) {
       if (gaseous[i] !== 1) continue
       velX[i] *= drag
       velY[i] *= drag
       const xi = prdX[i]
       const yi = prdY[i]
+      if (turb > 0) {
+        const c1x = -Math.sin(xi * k1 + time * 0.8) * Math.sin(yi * k1 - time * 0.6)
+        const c1y = -Math.cos(xi * k1 + time * 0.8) * Math.cos(yi * k1 - time * 0.6)
+        const c2x = -Math.sin(xi * k2 - time * 1.3) * Math.sin(yi * k2 + time * 1.1)
+        const c2y = -Math.cos(xi * k2 - time * 1.3) * Math.cos(yi * k2 + time * 1.1)
+        velX[i] += (c1x * 0.65 + c2x * 0.35) * turb
+        velY[i] += (c1y * 0.65 + c2y * 0.35) * turb
+      }
       let ax = 0
       let ay = 0
       const end = nbStart[i + 1]

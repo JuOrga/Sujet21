@@ -52,6 +52,7 @@ export interface SimParams {
   gasThrust: number // accélération de pilotage du nuage vers le pointeur (u/s²)
   gasMaxSpeed: number // vitesse de croisière maximale du nuage (u/s)
   gasExpand: number // répulsion interne du nuage (u/s²) : la vapeur s'étale
+  gasTurb: number // turbulence : le nuage se tord en volutes (u/s²)
   gasDrag: number // flottement : freinage propre du gaz (1/s)
   gasLossRate: number // particules évaporées / seconde de pilotage (perdues)
   gasLinkFactor: number // × le rayon d'amas : le nuage distendu reste un seul corps
@@ -137,6 +138,7 @@ export const DEFAULT_PARAMS: SimParams = {
   gasThrust: 320,
   gasMaxSpeed: 220,
   gasExpand: 260,
+  gasTurb: 120,
   gasDrag: 1.3,
   gasLossRate: 5,
   gasLinkFactor: 3,

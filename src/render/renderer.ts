@@ -35,7 +35,7 @@ void main() {
   // mouvement — les gouttes rapides deviennent des traînées liquides.
   // Les gouttes libres sont plus fines que le corps : des gouttelettes,
   // pas des boules. La vapeur, elle, est plus large et plus diffuse.
-  gl_PointSize = uPointSize * (1.0 + s) * mix(0.6, 1.0, aPlayer) * (1.0 + 0.7 * gas);
+  gl_PointSize = uPointSize * (1.0 + s) * mix(0.6, 1.0, aPlayer) * (1.0 + 0.9 * gas);
   vSpeed = aSpeed;
   vPlayer = aPlayer;
   vDir = s > 1e-4 ? aVel / s : vec2(1.0, 0.0);
@@ -66,7 +66,7 @@ void main() {
   float t = 1.0 - r2;
   // Amplitude compensée : l'aire de l'ellipse a grandi de (1 + s)
   float gas = clamp(-vState, 0.0, 1.0);
-  float f = t * t * uFieldScale / (1.0 + vStretch) * (1.0 - 0.45 * gas);
+  float f = t * t * uFieldScale / (1.0 + vStretch) * (1.0 - 0.25 * gas);
   // Alpha : champ pondéré par l'état — givre en positif, vapeur en négatif.
   // La composition retrouve la part de chaque état en divisant par le champ
   // total (canal R) ; les zones mixtes se neutralisent en douceur.
@@ -357,10 +357,16 @@ void main() {
   // Eau : seuillage du champ (l'onde déforme la surface)
   float th = uThreshold;
   float s = max(th * uSoftness, 1e-4);
+  // Fumée : bruit advecté à deux octaves — volutes internes et bords rongés
+  float smokeN = vnoise(world * 0.045 + vec2(uTime * 0.22, -uTime * 0.15));
+  smokeN = 0.62 * smokeN + 0.38 * vnoise(world * 0.11 - vec2(uTime * 0.31, -uTime * 0.24));
+
   float field2 = field * (1.0 + 0.14 * waveGlow);
+  // Les bords du nuage bouillonnent : le bruit ronge et gonfle la surface
+  field2 *= 1.0 + vap * (smokeN - 0.5) * 1.1;
   float body = smoothstep(th - s, th + s, field2);
-  // La vapeur est translucide : le décor transparaît à travers le nuage
-  body *= 1.0 - 0.4 * vap;
+  // La fumée est trouée et translucide par endroits
+  body *= 1.0 - vap * (0.2 + 0.4 * smokeN);
 
   float speedT = clamp(speed, 0.0, 1.0);
   vec3 slow = vec3(0.07, 0.30, 0.48);
@@ -385,7 +391,7 @@ void main() {
   float core = smoothstep(th * 1.8, th * 3.2, field2);
   water = mix(water, water * 0.75, core * 0.5);
   float rim = body * (1.0 - smoothstep(th + s, th * 1.9, field2));
-  water += vec3(0.20, 0.45, 0.55) * rim * 0.55;
+  water += vec3(0.20, 0.45, 0.55) * rim * 0.55 * (1.0 - vap);
 
   // Scintillement interne discret : l'eau vit même au repos
   float shimmer = sin(world.x * 0.11 + uTime * 1.6) * sin(world.y * 0.09 - uTime * 1.2);
@@ -396,16 +402,21 @@ void main() {
   // se couvre de reflets granuleux qui trahissent les particules.
   float surfaceZone = body * (1.0 - smoothstep(th * 1.4, th * 2.6, field2));
   water = mix(water, water * (0.55 + 0.75 * diffuse), surfaceZone * 0.55);
-  water += vec3(0.85, 0.95, 1.0) * specular * 0.35 * surfaceZone;
-  water += vec3(0.30, 0.55, 0.65) * waveGlow * 0.45 * (1.0 - icy);
+  water += vec3(0.85, 0.95, 1.0) * specular * 0.35 * surfaceZone * (1.0 - vap);
+  water += vec3(0.30, 0.55, 0.65) * waveGlow * 0.45 * (1.0 - icy) * (1.0 - vap);
 
   // Gel (tableau 2) : la teinte pâlit vers la glace mate — le givre se lit
   // sur le corps avant même la prise, la partie gelée devient blême et fixe.
   vec3 iceCol = vec3(0.60, 0.76, 0.88) * (0.72 + 0.45 * diffuse);
   water = mix(water, iceCol, icy * 0.9);
-  // Vapeur (tableau 3) : brume claire et douce, sans reflet ni relief
-  vec3 gasCol = vec3(0.52, 0.72, 0.82) * (0.65 + 0.3 * diffuse);
-  water = mix(water, gasCol, vap * 0.8);
+  // Vapeur (tableau 3) : fumée noire — cœur d'encre, volutes qui roulent,
+  // liseré gris qui accroche la lumière sur les bords du nuage.
+  float smokeEdgeMix = 1.0 - smoothstep(th, th * 3.2, field2);
+  vec3 smokeCore = vec3(0.028, 0.032, 0.046);
+  vec3 smokeEdge = vec3(0.40, 0.44, 0.52);
+  vec3 smoke = mix(smokeCore, smokeEdge, smokeEdgeMix * (0.35 + 0.65 * smokeN));
+  smoke += vec3(0.10, 0.12, 0.16) * smokeN * smokeN; // volutes internes qui roulent
+  water = mix(water, smoke, vap * 0.96);
 
   col = mix(col, water, body);
   // L'eau qui recouvre l'œil du sas s'assombrit : elle sombre dans le trou
