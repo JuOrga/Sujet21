@@ -88,6 +88,13 @@ export class FluidSim {
   // significativement au sein d'un pas.
   private readonly nbStart: Int32Array
   private readonly nbList: Int32Array
+  // Données de paires calculées par la passe lambda et réutilisées telles
+  // quelles par la passe de déplacement (les positions ne bougent qu'après) :
+  // évite de refaire distances et noyaux deux fois par itération.
+  private readonly pairDx: Float32Array
+  private readonly pairDy: Float32Array
+  private readonly pairW: Float32Array
+  private readonly pairC: Float32Array
 
   constructor(params: SimParams, bounds: Bounds, capacity = 4096) {
     this.params = params
@@ -112,6 +119,10 @@ export class FluidSim {
     this.stack = new Int32Array(capacity)
     this.nbStart = new Int32Array(capacity + 1)
     this.nbList = new Int32Array(capacity * MAX_NEIGHBORS)
+    this.pairDx = new Float32Array(capacity * MAX_NEIGHBORS)
+    this.pairDy = new Float32Array(capacity * MAX_NEIGHBORS)
+    this.pairW = new Float32Array(capacity * MAX_NEIGHBORS)
+    this.pairC = new Float32Array(capacity * MAX_NEIGHBORS)
     this.contactTime = new Float32Array(capacity)
     this.contactMat = new Int8Array(capacity)
     this.contactNX = new Float32Array(capacity)
@@ -408,25 +419,23 @@ export class FluidSim {
     grid.build(prdX, prdY, n)
     const nbStart = this.nbStart
     const nbList = this.nbList
+    const pairDx = this.pairDx
+    const pairDy = this.pairDy
+    const pairW = this.pairW
+    const pairC = this.pairC
     {
       let cursor = 0
       const reach = h * 1.15 // marge : les itérations déplacent un peu les particules
-      const reach2 = reach * reach
       for (let i = 0; i < n; i++) {
         nbStart[i] = cursor
-        const xi = prdX[i]
-        const yi = prdY[i]
-        const cap = nbStart[i] + MAX_NEIGHBORS
-        grid.forEachNeighbor(xi, yi, reach, (j) => {
-          if (j === i || cursor >= cap) return
-          const dx = xi - prdX[j]
-          const dy = yi - prdY[j]
-          if (dx * dx + dy * dy < reach2) nbList[cursor++] = j
-        })
+        cursor = grid.collect(prdX, prdY, prdX[i], prdY[i], reach, i, nbList, cursor, MAX_NEIGHBORS)
       }
       nbStart[n] = cursor
     }
     const selfRho = k.poly6Coeff * h2 * h2 * h2
+    // Exposant de cohésion : puissance entière déroulée quand c'est possible
+    // (Math.pow dans la boucle de paires coûte cher sur petites machines)
+    const sCorrNInt = Math.abs(p.sCorrN - Math.round(p.sCorrN)) < 1e-9 ? Math.round(p.sCorrN) : 0
 
     // 2. Itérations de contrainte de densité
     for (let iter = 0; iter < p.solverIterations; iter++) {
@@ -443,13 +452,27 @@ export class FluidSim {
           const dx = xi - prdX[j]
           const dy = yi - prdY[j]
           const r2 = dx * dx + dy * dy
-          if (r2 >= h2) continue
+          if (r2 >= h2) {
+            pairW[e] = 0
+            pairC[e] = 0
+            continue
+          }
           const t = h2 - r2
-          rho += k.poly6Coeff * t * t * t
+          const w = k.poly6Coeff * t * t * t
+          rho += w
           const r = Math.sqrt(r2)
-          if (r < 1e-6) continue
+          if (r < 1e-6) {
+            pairW[e] = 0
+            pairC[e] = 0
+            continue
+          }
           const tg = h - r
           const c = (k.spikyGradCoeff * tg * tg) / r
+          // mémorisé pour la passe de déplacement de cette itération
+          pairDx[e] = dx
+          pairDy[e] = dy
+          pairW[e] = w
+          pairC[e] = c
           const gx = c * dx * invRho0
           const gy = c * dy * invRho0
           sumGradX += gx
@@ -469,29 +492,25 @@ export class FluidSim {
       const maxPairDp = p.maxDeltaPFactor * h
       const maxPairDp2 = maxPairDp * maxPairDp
       for (let i = 0; i < n; i++) {
-        const xi = prdX[i]
-        const yi = prdY[i]
         const li = lambda[i]
         let dx0 = 0
         let dy0 = 0
         const end = nbStart[i + 1]
         for (let e = nbStart[i]; e < end; e++) {
-          const j = nbList[e]
-          const dx = xi - prdX[j]
-          const dy = yi - prdY[j]
-          const r2 = dx * dx + dy * dy
-          if (r2 >= h2) continue
-          const r = Math.sqrt(r2)
-          if (r < 1e-6) continue
-          const t = h2 - r2
-          const w = k.poly6Coeff * t * t * t
-          const ratio = w * invWDq
-          const sCorr = -p.sCorrK * Math.pow(ratio, p.sCorrN)
-          const tg = h - r
-          const c = (k.spikyGradCoeff * tg * tg) / r
-          const scale = (li + lambda[j] + sCorr) * invRho0
-          let px = scale * c * dx
-          let py = scale * c * dy
+          const c = pairC[e]
+          if (c === 0) continue
+          const ratio = pairW[e] * invWDq
+          let powed: number
+          if (sCorrNInt > 0) {
+            powed = ratio
+            for (let q = 1; q < sCorrNInt; q++) powed *= ratio
+          } else {
+            powed = Math.pow(ratio, p.sCorrN)
+          }
+          const sCorr = -p.sCorrK * powed
+          const scale = (li + lambda[nbList[e]] + sCorr) * invRho0
+          let px = scale * c * pairDx[e]
+          let py = scale * c * pairDy[e]
           const m2 = px * px + py * py
           if (m2 > maxPairDp2) {
             const s = maxPairDp / Math.sqrt(m2)

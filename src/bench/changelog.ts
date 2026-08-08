@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '08/08/2026 17:15',
+    title: 'Performances, 2e passe : physique ×4',
+    notes: [
+      'Le pas physique passe de 9,9 ms à 2,4 ms (900 particules) : données de paires réutilisées entre les passes du solveur, exponentiation entière, collecte de voisins sans allocation.',
+      'Un PC moyen devrait maintenant tenir 60 fps sans baisser la qualité de rendu.',
+    ],
+  },
+  {
     date: '08/08/2026 17:08',
     title: 'Performances smartphone et petits PC',
     notes: [
