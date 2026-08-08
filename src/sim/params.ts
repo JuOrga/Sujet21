@@ -20,6 +20,7 @@ export interface SimParams {
   // Propulsion par éjection (§3.3)
   ejectRate: number // particules éjectées / seconde de maintien
   ejectSpeed: number // vitesse d'éjection relative au corps (unités monde / s)
+  ejectEntrain: number // part de la vitesse d'éjection communiquée au liquide voisin du point de départ (le corps se creuse)
   reabsorbCooldown: number // délai avant qu'une gouttelette éjectée soit réabsorbable (s)
 
   // Vortex de regroupement (clic droit)
@@ -83,6 +84,7 @@ export const DEFAULT_PARAMS: SimParams = {
 
   ejectRate: 32,
   ejectSpeed: 1400,
+  ejectEntrain: 0.16,
   reabsorbCooldown: 1.2,
 
   vortexRadius: 260,

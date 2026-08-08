@@ -15,32 +15,50 @@ const SPLAT_VS = `#version 300 es
 layout(location = 0) in vec2 aPos;
 layout(location = 1) in float aSpeed;
 layout(location = 2) in float aPlayer;
+layout(location = 3) in vec2 aVel; // direction × étirement (0..~1.2)
 uniform vec2 uCenter;
 uniform vec2 uViewport; // px CSS
 uniform float uZoom;    // px CSS / unité monde
 uniform float uPointSize; // px du framebuffer champ
 out float vSpeed;
 out float vPlayer;
+out vec2 vDir;
+out float vStretch;
 void main() {
   vec2 clip = (aPos - uCenter) * uZoom / (uViewport * 0.5);
   gl_Position = vec4(clip, 0.0, 1.0);
-  gl_PointSize = uPointSize;
+  float s = length(aVel);
+  // Le sprite est agrandi pour contenir l'ellipse étirée dans le sens du
+  // mouvement — les gouttes rapides deviennent des traînées liquides.
+  gl_PointSize = uPointSize * (1.0 + s);
   vSpeed = aSpeed;
   vPlayer = aPlayer;
+  vDir = s > 1e-4 ? aVel / s : vec2(1.0, 0.0);
+  vStretch = s;
 }`
 
 const SPLAT_FS = `#version 300 es
 precision highp float;
 in float vSpeed;
 in float vPlayer;
+in vec2 vDir;
+in float vStretch;
 uniform float uFieldScale;
 out vec4 outColor;
 void main() {
   vec2 d = gl_PointCoord * 2.0 - 1.0;
-  float r2 = dot(d, d);
+  // Ellipse alignée sur la vitesse : composante parallèle gardée (le sprite
+  // agrandi l'étire), perpendiculaire re-normalisée. gl_PointCoord a l'axe y
+  // inversé par rapport au monde.
+  vec2 dir = vec2(vDir.x, -vDir.y);
+  float dpar = dot(d, dir);
+  vec2 dperp = d - dpar * dir;
+  vec2 e = dir * dpar + dperp * (1.0 + vStretch);
+  float r2 = dot(e, e);
   if (r2 > 1.0) discard;
   float t = 1.0 - r2;
-  float f = t * t * uFieldScale;
+  // Amplitude compensée : l'aire de l'ellipse a grandi de (1 + s)
+  float f = t * t * uFieldScale / (1.0 + vStretch);
   outColor = vec4(f, f * vSpeed, f * vPlayer, f);
 }`
 
@@ -296,19 +314,21 @@ export class Renderer {
       this.uniforms[name] = map
     }
 
-    this.scratch = new Float32Array(capacity * 4)
+    this.scratch = new Float32Array(capacity * 6)
     this.splatVao = gl.createVertexArray()!
     this.splatVbo = gl.createBuffer()!
     gl.bindVertexArray(this.splatVao)
     gl.bindBuffer(gl.ARRAY_BUFFER, this.splatVbo)
     gl.bufferData(gl.ARRAY_BUFFER, this.scratch.byteLength, gl.DYNAMIC_DRAW)
-    const stride = 4 * 4
+    const stride = 6 * 4
     gl.enableVertexAttribArray(0)
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, stride, 0)
     gl.enableVertexAttribArray(1)
     gl.vertexAttribPointer(1, 1, gl.FLOAT, false, stride, 8)
     gl.enableVertexAttribArray(2)
     gl.vertexAttribPointer(2, 1, gl.FLOAT, false, stride, 12)
+    gl.enableVertexAttribArray(3)
+    gl.vertexAttribPointer(3, 2, gl.FLOAT, false, stride, 16)
     gl.bindVertexArray(null)
 
     this.spongeVao = gl.createVertexArray()!
@@ -375,16 +395,29 @@ export class Renderer {
     const n = sim.count
     const data = this.scratch
     const invSpeedScale = 1 / Math.max(1, params.speedColorScale)
+    const invStretchSpeed = 1 / 900 // vitesse (u/s) donnant un étirement ×2
     for (let i = 0; i < n; i++) {
-      const o = i * 4
+      const o = i * 6
       data[o] = sim.posX[i]
       data[o + 1] = sim.posY[i]
-      const speed = Math.hypot(sim.velX[i], sim.velY[i]) * invSpeedScale
+      const vx = sim.velX[i]
+      const vy = sim.velY[i]
+      const v = Math.hypot(vx, vy)
+      const speed = v * invSpeedScale
       data[o + 2] = speed > 1 ? 1 : speed
       data[o + 3] = sim.kind[i] === KIND_PLAYER ? 1 : 0
+      // Étirement selon la vitesse : les gouttes rapides filent en traînées
+      const s = Math.min(v * invStretchSpeed, 1.2)
+      if (v > 1e-3 && s > 1e-3) {
+        data[o + 4] = (vx / v) * s
+        data[o + 5] = (vy / v) * s
+      } else {
+        data[o + 4] = 0
+        data[o + 5] = 0
+      }
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, this.splatVbo)
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, data, 0, n * 4)
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, data, 0, n * 6)
 
     // Passe A — champ
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo)

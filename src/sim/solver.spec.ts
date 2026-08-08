@@ -38,6 +38,23 @@ describe('FluidSim — invariants physiques', () => {
     expect(sim.stats.velX).toBeLessThan(-10)
   })
 
+  it("l'éjection entraîne le liquide voisin : le corps se creuse au départ", () => {
+    const sim = makeSim()
+    sim.spawnDisc(0, 0, 300, KIND_PLAYER)
+    sim.eject(500, 0, 1 / sim.params.ejectRate) // exactement une éjection
+    let maxVx = -Infinity
+    let sumVx = 0
+    for (let i = 0; i < sim.count; i++) {
+      if (sim.kind[i] !== KIND_PLAYER) continue
+      maxVx = Math.max(maxVx, sim.velX[i])
+      sumVx += sim.velX[i]
+    }
+    // les voisines du point de départ filent vers la sortie (creusement)…
+    expect(maxVx).toBeGreaterThan(60)
+    // …tandis que le corps dans son ensemble recule (réaction, §3.3)
+    expect(sumVx).toBeLessThan(0)
+  })
+
   it('éjecter coûte du volume : se déplacer, c’est rétrécir (§1)', () => {
     const sim = makeSim()
     sim.spawnDisc(0, 0, 300, KIND_PLAYER)

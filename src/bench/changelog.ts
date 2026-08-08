@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '08/08/2026 15:55',
+    title: 'Éjection : creusement et jet liquide',
+    notes: [
+      'L’éjection entraîne le liquide voisin du point de départ : le corps se creuse en entonnoir (curseur « entraînement » dans Propulsion).',
+      'Les gouttes rapides s’étirent dans le sens du mouvement : le jet devient un filament liquide au lieu d’un chapelet de boules.',
+    ],
+  },
+  {
     date: '08/08/2026 15:47',
     title: 'Rendu de l’eau, ondes d’éjection, impacts amortis',
     notes: [

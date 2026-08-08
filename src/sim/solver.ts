@@ -239,6 +239,8 @@ export class FluidSim {
       dirX /= len
       dirY /= len
 
+      const departX = this.posX[best]
+      const departY = this.posY[best]
       const newVx = this.stats.velX + dirX * p.ejectSpeed
       const newVy = this.stats.velY + dirY * p.ejectSpeed
       const dvx = newVx - this.velX[best]
@@ -254,8 +256,34 @@ export class FluidSim {
       this.cooldown[best] = p.reabsorbCooldown
       this.playerCount--
 
-      const rx = -dvx / this.playerCount
-      const ry = -dvy / this.playerCount
+      // Entraînement du voisinage : le liquide autour du point de départ est
+      // aspiré vers l'éjection — le corps se creuse en entonnoir au lieu de
+      // perdre des boules isolées, et la surface autour participe au geste.
+      let entrainX = 0
+      let entrainY = 0
+      if (p.ejectEntrain > 0 && this.playerCount > 0) {
+        const R = p.kernelRadius * 1.8
+        const R2 = R * R
+        for (let i = 0; i < this.count; i++) {
+          if (this.kind[i] !== KIND_PLAYER) continue
+          const dx = this.posX[i] - departX
+          const dy = this.posY[i] - departY
+          const d2 = dx * dx + dy * dy
+          if (d2 >= R2) continue
+          const w = 1 - Math.sqrt(d2) / R
+          const ax = dirX * p.ejectSpeed * p.ejectEntrain * w
+          const ay = dirY * p.ejectSpeed * p.ejectEntrain * w
+          this.velX[i] += ax
+          this.velY[i] += ay
+          entrainX += ax
+          entrainY += ay
+        }
+      }
+
+      // Réaction répartie uniformément : conservation exacte, entraînement
+      // compris — le corps recule de tout ce qui part vers l'avant.
+      const rx = -(dvx + entrainX) / this.playerCount
+      const ry = -(dvy + entrainY) / this.playerCount
       for (let i = 0; i < this.count; i++) {
         if (this.kind[i] === KIND_PLAYER) {
           this.velX[i] += rx
