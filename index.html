@@ -630,11 +630,12 @@
         }
       }
       @media (max-width: 700px) {
-        /* au doigt : colonne à droite, sous le pouce, hors du HUD */
+        /* au doigt : colonne à droite, sous le pouce, hors du HUD — la barre
+           tactile peut occuper deux rangées, on remonte d'autant */
         #statebar {
           left: auto;
           right: 10px;
-          bottom: 70px;
+          bottom: 118px;
           transform: none;
           flex-direction: column;
         }
@@ -651,7 +652,10 @@
         bottom: 10px;
         transform: translateX(-50%);
         display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
         gap: 7px;
+        max-width: min(640px, calc(100vw - 12px));
         z-index: 10;
         opacity: 0;
         transition: opacity 0.5s ease 0.2s;
@@ -679,6 +683,26 @@
       #touchbar button.active {
         background: rgba(99, 183, 230, 0.4);
         border-color: var(--specimen);
+      }
+      /* Chips étiquetées (LÉGENDE, ÉTATS, BANC) : mises en évidence, sans
+         rivaliser avec le sélecteur d'état et ses halos */
+      #touchbar button.tb-chip {
+        font-family: var(--font-display);
+        font-size: 9px;
+        letter-spacing: 0.16em;
+        padding: 0 13px;
+        color: var(--specimen);
+        border-color: rgba(99, 183, 230, 0.45);
+        background: rgba(99, 183, 230, 0.08);
+      }
+      #touchbar button.tb-chip:hover {
+        background: rgba(99, 183, 230, 0.18);
+        border-color: var(--specimen);
+      }
+      #touchbar button.tb-chip.active {
+        background: rgba(99, 183, 230, 0.3);
+        border-color: var(--specimen);
+        color: var(--ink);
       }
 
       /* ---- Étiquettes de monde : chaque surface porte son nom, dans la
@@ -712,7 +736,8 @@
       .wl-sas { color: var(--valid); }
 
       /* ---- Légende : la lecture du vaisseau, surface par surface ---- */
-      #legend {
+      #legend,
+      #states {
         position: fixed;
         top: 50%;
         left: 50%;
@@ -729,9 +754,30 @@
         z-index: 30;
         display: none;
       }
-      #legend.visible {
+      #legend.visible,
+      #states.visible {
         display: block;
       }
+      /* Icônes d'état et mots-matériaux colorés du panneau « États » */
+      .st-big {
+        flex: none;
+        width: 36px;
+        font-size: 24px;
+        line-height: 1.3;
+        text-align: center;
+      }
+      #states i {
+        font-style: normal;
+        font-weight: 600;
+      }
+      .m-mur { color: #8ba0b3; }
+      .m-phile { color: #4fc4cf; }
+      .m-phobe { color: #b48ad8; }
+      .m-eponge { color: #d0b26a; }
+      .m-froid { color: #b3dcf8; }
+      .m-grille { color: #8fb3cc; }
+      .m-chaud { color: #ff9c5b; }
+      .m-sas { color: var(--valid); }
       .lg-head {
         display: flex;
         justify-content: space-between;
@@ -745,7 +791,8 @@
         padding-bottom: 10px;
         margin-bottom: 10px;
       }
-      #legend-close {
+      #legend-close,
+      #states-close {
         font-family: var(--font-mono);
         font-size: 14px;
         line-height: 1;
@@ -758,7 +805,8 @@
         cursor: pointer;
         touch-action: manipulation;
       }
-      #legend-close:hover {
+      #legend-close:hover,
+      #states-close:hover {
         color: var(--ink);
         border-color: var(--line-strong);
       }
@@ -837,7 +885,8 @@
         color: var(--ink);
       }
       @media (max-width: 700px) {
-        #legend {
+        #legend,
+        #states {
           top: auto;
           left: 0;
           bottom: 0;
@@ -855,7 +904,7 @@
 
       @media (max-width: 700px) {
         #hud {
-          bottom: 66px;
+          bottom: 112px; /* la barre tactile peut occuper deux rangées */
         }
         .hud-panel {
           min-width: 176px;
@@ -912,27 +961,33 @@
       </div>
       <div class="home-commands cmd-desktop">
         <kbd>maintenir</kbd>éjecter vers le pointeur — le corps part à l'opposé<br />
-        <kbd>F</kbd>se changer en glace : le bloc garde son élan — re-presser dégèle<br />
-        <kbd>G</kbd>se changer en vapeur : le pointeur pilote le nuage, qui s'évapore en avançant<br />
-        <kbd>molette</kbd>zoom manuel
-        <kbd>clic droit maintenu</kbd>déplacer la caméra — ⌖ recadre<br />
+        <kbd>F</kbd>glace : le bloc garde son élan
+        <kbd>G</kbd>vapeur : pilotée au pointeur<br />
+        <kbd>molette</kbd>zoom
+        <kbd>clic droit maintenu</kbd>déplacer la caméra
+        <kbd>⌖</kbd>recadrer<br />
         <kbd>, .</kbd>time warp
         <kbd>espace</kbd>pause
         <kbd>R</kbd>recommencer
-        <kbd>L</kbd>lecture du vaisseau
-        <kbd>échap</kbd>cette fiche
+        <kbd>échap</kbd>cette fiche<br />
+        <kbd>L</kbd>légende des surfaces
+        <kbd>E</kbd>les trois états : qui bloque quoi
+        <kbd>BANC</kbd>banc de réglage
       </div>
       <div class="home-commands cmd-touch">
         <kbd>toucher</kbd>éjecter vers le doigt — le corps part à l'opposé<br />
         <kbd>❄</kbd>glace, re-toucher pour dégeler
         <kbd>💨</kbd>vapeur pilotée au doigt<br />
         <kbd>2 doigts</kbd>pincer : zoom · glisser : déplacer la caméra (⌖ recadre)<br />
-        <kbd>?</kbd>lecture du vaisseau
-        <kbd>≡</kbd>revenir à cette fiche
+        <kbd>LÉGENDE</kbd>les surfaces
+        <kbd>ÉTATS</kbd>qui bloque quoi
+        <kbd>BANC</kbd>réglages
+        <kbd>≡</kbd>cette fiche
       </div>
       <div class="home-foot">
-        Prototype de travail — le banc de réglage (à droite) modifie la physique en direct.
-        Le journal des livraisons y consigne chaque mise à jour.
+        Prototype de travail — le bouton BANC (barre du bas) ouvre le banc de réglage :
+        la physique se modifie en direct, et le journal des livraisons y consigne
+        chaque mise à jour.
       </div>
     </aside>
 
@@ -1006,6 +1061,34 @@
         <b>💧 EAU</b> : pilotable, éjecter pour avancer ·
         <b>❄ GLACE</b> (F) : le bloc garde son élan, re-presser dégèle ·
         <b>💨 VAPEUR</b> (G) : pilotée au pointeur, s'évapore en avançant.</div>
+    </div>
+
+    <div id="states" role="dialog" aria-label="Les trois états : qui bloque quoi">
+      <div class="lg-head"><span>LES TROIS ÉTATS — QUI BLOQUE QUOI</span>
+        <button id="states-close" type="button" title="fermer (E)">✕</button></div>
+      <div class="lg-row"><span class="st-big">💧</span>
+        <span><b>EAU</b> — pilotable : éjecter pour avancer.<br />
+        Bloquée par les <i class="m-mur">parois</i> et les <i class="m-grille">grilles</i> ·
+        absorbée par l'<i class="m-eponge">éponge</i> ·
+        collée par l'<i class="m-phile">hydrophile</i> ·
+        déviée par l'<i class="m-phobe">hydrophobe</i> ·
+        gelée par les <i class="m-froid">plaques froides</i> ·
+        vaporisée par les <i class="m-chaud">radiateurs</i> ·
+        le <i class="m-sas">sas</i> l'aspire.</span></div>
+      <div class="lg-row"><span class="st-big">❄</span>
+        <span><b>GLACE</b> (F) — bloc rigide : garde son élan, plus de propulsion.<br />
+        Rebondit sur les <i class="m-mur">parois</i> et les <i class="m-grille">grilles</i> ·
+        l'<i class="m-eponge">éponge</i> et la chimie des parois n'ont plus prise ·
+        <i class="m-froid">soudée</i> au contact d'une plaque froide ·
+        dégelée par les <i class="m-chaud">radiateurs</i> ·
+        le <i class="m-sas">sas</i> ne l'avale pas — dégeler avant de sortir.</span></div>
+      <div class="lg-row"><span class="st-big">💨</span>
+        <span><b>VAPEUR</b> (G) — pilotée au pointeur, s'évapore en avançant.<br />
+        Traverse les <i class="m-grille">grilles</i> et l'<i class="m-eponge">éponge</i> ·
+        bloquée par les <i class="m-mur">parois</i> ·
+        condensée par le <i class="m-froid">froid</i> ·
+        s'attarder au <i class="m-chaud">radiateur</i> la brûle (perdue) ·
+        le <i class="m-sas">sas</i> l'avale.</span></div>
     </div>
 
     <div id="overlay">

@@ -162,6 +162,9 @@ export class Input {
     )
 
     window.addEventListener('keydown', (e) => {
+      // Ne pas voler les touches des champs de texte (présets du banc)
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
       if (e.key === ' ') {
         this.togglePause()
         e.preventDefault()
