@@ -96,6 +96,11 @@ window.addEventListener('keydown', (e) => {
 })
 
 let sim = createSim(level)
+// Sonde de débogage : accès à la simulation depuis la console du navigateur
+const exposeSim = (): void => {
+  ;(window as unknown as { __sim: FluidSim }).__sim = sim
+}
+exposeSim()
 const camera = new Camera()
 camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, 1)
 const renderer = new Renderer(canvas, CAPACITY)
@@ -119,8 +124,10 @@ let waveCarry = WAVE_EVERY // première salve : onde immédiate
 function restart(): void {
   run.exitTimer = 0
   vortex.timer = 0
+  input.freezeIntent = false
   applyLevel()
   sim = createSim(level)
+  exposeSim()
   loop.reset()
   camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, camera.zoom)
 }
@@ -157,6 +164,9 @@ function touchButton(label: string, title: string, onTap: () => void): HTMLButto
 const btnPause = touchButton('⏸', 'pause (espace)', () => input.togglePause())
 touchButton('‹', 'ralentir le temps (,)', () => input.stepWarp(-1))
 touchButton('›', 'accélérer le temps (.)', () => input.stepWarp(1))
+const btnFreeze = touchButton('❄', 'se changer en glace / dégeler (F)', () => {
+  input.freezeIntent = !input.freezeIntent
+})
 const btnVortex = touchButton('🌀', 'vortex : armer puis toucher l’écran (clic droit)', () => {
   input.vortexArmed = !input.vortexArmed
 })
@@ -216,6 +226,7 @@ function frame(now: number): void {
   const aim = camera.screenToWorld(input.aimClientX, input.aimClientY, vw, vh)
   const tableauDone = run.exitTimer > 0
 
+  sim.freezeIntent = input.freezeIntent
   if (!input.paused && !tableauDone) {
     loop.advance(dtReal, params.timeWarp, params.dt, () => {
       if (input.aimActive && !sim.dispersed) {
@@ -319,6 +330,7 @@ function frame(now: number): void {
   btnPause.classList.toggle('active', input.paused)
   btnVortex.classList.toggle('active', input.vortexArmed)
   btnVortex.style.display = params.vortexEnabled >= 0.5 ? '' : 'none'
+  btnFreeze.classList.toggle('active', input.freezeIntent)
 
   // Instruments de bord
   const fraction = sim.baseVolume > 0 ? sim.playerCount / sim.baseVolume : 0
@@ -334,7 +346,7 @@ function frame(now: number): void {
     if (sim.frozen[i] === 1 && sim.kind[i] === KIND_PLAYER) frozenCount++
   }
   const allFrozen = sim.playerCount > 0 && frozenCount >= sim.playerCount
-  const stateText = sim.dispersed ? 'DISPERSÉ' : allFrozen ? 'GELÉ' : 'liquide'
+  const stateText = sim.dispersed ? 'DISPERSÉ' : allFrozen ? 'GLACE' : 'liquide'
   const gel = !allFrozen && frozenCount > 0 ? ' · gel partiel' : ''
   const suffix = `${gel}${vortex.timer > 0 ? ' · vortex' : ''}${input.paused ? ' · pause' : ''}`
   hudState.textContent = stateText + suffix

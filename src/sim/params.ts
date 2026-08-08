@@ -34,11 +34,15 @@ export interface SimParams {
   vortexDuration: number // durée du vortex après le clic (s)
   vortexWindDown: number // fraction finale de la durée où le courant s'essouffle et dépose l'eau
 
-  // Froid (tableau 2) : les plaques froides gèlent l'eau qui s'y attarde.
-  // Gelée, elle est ancrée au monde — plus de mouvement, plus d'éjection.
+  // Glace : l'eau gelée devient un bloc rigide qui garde son élan (palet
+  // balistique, insensible à la chimie des parois, rebondit au lieu
+  // d'éclabousser). On gèle volontairement (touche F / ❄) ou par exposition
+  // aux plaques froides ; la glace prise au contact d'une plaque s'y soude.
   coldBand: number // portée de l'aura de gel autour des plaques (unités monde)
   freezeTime: number // s d'exposition en pleine aura avant le gel complet
-  thawTime: number // s de dégel une fois à l'écart du froid
+  freezeSelfTime: number // s de prise du gel volontaire (touche F)
+  thawTime: number // s de dégel (intention levée, ou à l'écart du froid)
+  iceRestitution: number // rebond des blocs de glace sur les parois (0..1)
 
   // Sas de sortie : une bouche d'aspiration dans laquelle l'eau s'engouffre
   exitRadius: number // portée de l'aspiration autour de la bouche (unités monde)
@@ -112,7 +116,9 @@ export const DEFAULT_PARAMS: SimParams = {
 
   coldBand: 40,
   freezeTime: 1.2,
-  thawTime: 3.5,
+  freezeSelfTime: 0.45,
+  thawTime: 2.5,
+  iceRestitution: 0.45,
 
   exitRadius: 240,
   exitPull: 300,

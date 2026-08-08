@@ -67,11 +67,23 @@ export class FluidSim {
   kind: Uint8Array
   cooldown: Float32Array
   labels: Int32Array
-  // Froid (§6, tableau 2) : givre 0 → 1, puis gel. Une particule gelée est
-  // ancrée au monde — masse infinie : elle pousse le liquide, rien ne la
-  // pousse. Le dégel rend l'eau à la simulation, sans élan.
+  // Glace (§6) : givre 0 → 1, puis gel. Un amas gelé est un bloc RIGIDE et
+  // BALISTIQUE : il garde son élan (vitesse commune à l'amas), pousse le
+  // liquide (masse infinie), rebondit sur les parois au lieu d'éclabousser,
+  // et ignore la chimie des surfaces. La glace prise au contact d'une plaque
+  // froide s'y soude (vitesse nulle) : c'est l'ancrage. Le dégel rend l'eau
+  // au corps, dans le mouvement où la glace se trouvait.
   frost: Float32Array
   frozen: Uint8Array
+  // Gel volontaire (touche F) : le corps entier se change en glace
+  freezeIntent = false
+  private readonly welded: Uint8Array // gelée au contact d'une plaque : soudée
+  private readonly iceVxSum: Float32Array
+  private readonly iceVySum: Float32Array
+  private readonly iceCnt: Int32Array
+  private readonly iceNxSum: Float32Array
+  private readonly iceNySum: Float32Array
+  private readonly iceWeld: Uint8Array
 
   boxes: ObstacleBox[] = []
   sponges: Sponge[] = []
@@ -136,6 +148,13 @@ export class FluidSim {
     this.labels = new Int32Array(capacity)
     this.frost = new Float32Array(capacity)
     this.frozen = new Uint8Array(capacity)
+    this.welded = new Uint8Array(capacity)
+    this.iceVxSum = new Float32Array(capacity)
+    this.iceVySum = new Float32Array(capacity)
+    this.iceCnt = new Int32Array(capacity)
+    this.iceNxSum = new Float32Array(capacity)
+    this.iceNySum = new Float32Array(capacity)
+    this.iceWeld = new Uint8Array(capacity)
     this.stack = new Int32Array(capacity)
     this.nbStart = new Int32Array(capacity + 1)
     this.nbList = new Int32Array(capacity * MAX_NEIGHBORS)
@@ -204,6 +223,7 @@ export class FluidSim {
       this.contactTime[i] = this.contactTime[last]
       this.frost[i] = this.frost[last]
       this.frozen[i] = this.frozen[last]
+      this.welded[i] = this.welded[last]
     }
     this.count = last
   }
@@ -220,6 +240,7 @@ export class FluidSim {
     this.contactTime[i] = 0
     this.frost[i] = 0
     this.frozen[i] = 0
+    this.welded[i] = 0
     if (kind === KIND_PLAYER) this.playerCount++
     return i
   }
@@ -497,19 +518,12 @@ export class FluidSim {
     const invRho0 = 1 / rho0
     const grid = this.grid
 
-    // 1. Prédiction (apesanteur : pas de force externe). La glace ne bouge
-    // pas : sa prédiction est sa position, sa vitesse est nulle.
+    // 1. Prédiction (apesanteur : pas de force externe). La glace avance
+    // aussi : sa vitesse est celle de son bloc (assignée par icePass).
     const frozen = this.frozen
     for (let i = 0; i < n; i++) {
-      if (frozen[i] === 1) {
-        velX[i] = 0
-        velY[i] = 0
-        prdX[i] = posX[i]
-        prdY[i] = posY[i]
-      } else {
-        prdX[i] = posX[i] + velX[i] * dt
-        prdY[i] = posY[i] + velY[i] * dt
-      }
+      prdX[i] = posX[i] + velX[i] * dt
+      prdY[i] = posY[i] + velY[i] * dt
     }
 
     // sCorr de référence : W(dq · h)
@@ -638,22 +652,42 @@ export class FluidSim {
     // 3. Obstacles solides (parois, cellules d'éponge saturées)
     this.resolveObstacles(dt)
 
-    // 3bis. Bords du monde
+    // 3bis. Bords du monde (contact enregistré pour la glace : elle rebondit)
     const b = this.bounds
     const inset = p.particleSpacing * 0.5
     for (let i = 0; i < n; i++) {
-      if (prdX[i] < b.minX + inset) prdX[i] = b.minX + inset
-      else if (prdX[i] > b.maxX - inset) prdX[i] = b.maxX - inset
-      if (prdY[i] < b.minY + inset) prdY[i] = b.minY + inset
-      else if (prdY[i] > b.maxY - inset) prdY[i] = b.maxY - inset
+      let nx = 0
+      let ny = 0
+      if (prdX[i] < b.minX + inset) {
+        prdX[i] = b.minX + inset
+        nx = 1
+      } else if (prdX[i] > b.maxX - inset) {
+        prdX[i] = b.maxX - inset
+        nx = -1
+      }
+      if (prdY[i] < b.minY + inset) {
+        prdY[i] = b.minY + inset
+        ny = 1
+      } else if (prdY[i] > b.maxY - inset) {
+        prdY[i] = b.maxY - inset
+        ny = -1
+      }
+      if ((nx !== 0 || ny !== 0) && frozen[i] === 1) {
+        const inv = 1 / Math.hypot(nx, ny)
+        this.contactMat[i] = MAT_WALL
+        this.contactNX[i] = nx * inv
+        this.contactNY[i] = ny * inv
+      }
     }
 
     // 4. Vitesses puis viscosité XSPH (antisymétrique : conserve la quantité
-    //    de mouvement)
+    //    de mouvement). La glace garde sa vitesse de bloc : la recalculer des
+    //    positions y injecterait les à-coups de résolution de contact.
     const invDt = 1 / dt
     const maxV = p.maxSpeed
     const maxV2 = maxV * maxV
     for (let i = 0; i < n; i++) {
+      if (frozen[i] === 1) continue
       let vx = (prdX[i] - posX[i]) * invDt
       let vy = (prdY[i] - posY[i]) * invDt
       const v2 = vx * vx + vy * vy
@@ -704,6 +738,9 @@ export class FluidSim {
       }
     }
 
+    // 4ter. Blocs de glace : vitesse commune par amas, rebonds, soudures
+    this.icePass()
+
     // 5. Validation des positions, cooldowns, identité du corps
     for (let i = 0; i < n; i++) {
       posX[i] = prdX[i]
@@ -711,8 +748,8 @@ export class FluidSim {
       if (this.cooldown[i] > 0) this.cooldown[i] -= dt
     }
 
-    // 5bis. Froid : givre, gel, dégel (§6, tableau 2)
-    if (this.hasCold) this.processCold(dt)
+    // 5bis. Froid : givre, gel volontaire (F), dégel
+    this.processCold(dt)
 
     // 5ter. Éponge : traînée, temps de contact, absorption (§6)
     if (this.sponges.length > 0) this.processSponges(dt)
@@ -737,7 +774,6 @@ export class FluidSim {
     if (this.boxes.length === 0 && this.sponges.length === 0) return
 
     for (let i = 0; i < n; i++) {
-      if (this.frozen[i] === 1) continue // la glace ne bouge pas, rien à résoudre
       let x = this.prdX[i]
       let y = this.prdY[i]
 
@@ -905,47 +941,137 @@ export class FluidSim {
     }
   }
 
-  // Le froid (§6, tableau 2). Dans l'aura d'une plaque froide, le givre
-  // monte (d'autant plus vite qu'on est près) ; à 1, la particule gèle et
-  // s'ancre au monde. À l'écart du froid, le givre fond et l'eau redevient
-  // liquide — sous 0,55, pas à 0,99 : l'hystérésis évite le clignotement
-  // gel/dégel des particules posées en bord d'aura.
+  // Le froid et la glace (§6). Deux chemins vers le gel : l'aura des plaques
+  // froides (givre ∝ proximité), et l'intention volontaire (touche F — le
+  // corps entier prend, vite). À 1, la particule gèle EN GARDANT sa vitesse :
+  // la glace est balistique. Gelée au contact d'une plaque, elle s'y soude
+  // (icePass annule la vitesse du bloc). Le dégel — intention levée ET à
+  // l'écart du froid — descend sous 0,55 avant de libérer : l'hystérésis
+  // évite le clignotement en bord d'aura.
   private processCold(dt: number): void {
     const p = this.params
     const band = p.coldBand
     const rp = p.particleSpacing * 0.5
     const freeze = dt / Math.max(0.05, p.freezeTime)
+    const freezeSelf = dt / Math.max(0.05, p.freezeSelfTime)
     const thaw = dt / Math.max(0.1, p.thawTime)
     const cp = this.scratchCP
+    const intent = this.freezeIntent
     for (let i = 0; i < this.count; i++) {
       const x = this.posX[i]
       const y = this.posY[i]
       let exposure = 0
-      for (const b of this.boxes) {
-        if (b.material !== MAT_FROID) continue
-        if (
-          x < b.minX - band - rp ||
-          x > b.maxX + band + rp ||
-          y < b.minY - band - rp ||
-          y > b.maxY + band + rp
-        ) {
-          continue
+      let minSep = Infinity
+      if (this.hasCold) {
+        for (const b of this.boxes) {
+          if (b.material !== MAT_FROID) continue
+          if (
+            x < b.minX - band - rp ||
+            x > b.maxX + band + rp ||
+            y < b.minY - band - rp ||
+            y > b.maxY + band + rp
+          ) {
+            continue
+          }
+          boxContact(x, y, b, cp)
+          const sep = cp.dist - rp
+          if (sep < minSep) minSep = sep
+          const f = 1 - Math.max(0, sep) / band
+          if (f > exposure) exposure = Math.min(1, f)
         }
-        boxContact(x, y, b, cp)
-        const f = 1 - Math.max(0, cp.dist - rp) / band
-        if (f > exposure) exposure = Math.min(1, f)
       }
-      if (exposure > 0) {
-        this.frost[i] = Math.min(1, this.frost[i] + exposure * freeze)
-        if (this.frost[i] >= 1 && this.frozen[i] === 0) {
-          this.frozen[i] = 1
-          this.velX[i] = 0
-          this.velY[i] = 0
-        }
+      this.welded[i] = this.frozen[i] === 1 && minSep <= 1 ? 1 : 0
+      const wanted = intent && this.kind[i] === KIND_PLAYER
+      const rate = Math.max(exposure * freeze, wanted ? freezeSelf : 0)
+      if (rate > 0) {
+        this.frost[i] = Math.min(1, this.frost[i] + rate)
+        if (this.frost[i] >= 1) this.frozen[i] = 1 // la vitesse est conservée
       } else {
         this.frost[i] = Math.max(0, this.frost[i] - thaw)
         if (this.frozen[i] === 1 && this.frost[i] <= 0.55) this.frozen[i] = 0
       }
+    }
+  }
+
+  // Les blocs de glace : chaque amas connexe de particules gelées est un
+  // corps rigide en translation — une seule vitesse pour tout l'amas (la
+  // moyenne), un rebond commun quand l'un de ses points touche une paroi,
+  // l'arrêt complet si l'un d'eux est soudé à une plaque froide.
+  private icePass(): void {
+    const n = this.count
+    const frozen = this.frozen
+    let any = false
+    for (let i = 0; i < n; i++) {
+      if (frozen[i] === 1) {
+        any = true
+        break
+      }
+    }
+    if (!any) return
+    const p = this.params
+    const linkR = p.linkRadiusFactor * p.kernelRadius
+    const linkR2 = linkR * linkR
+    const { prdX, prdY, velX, velY, labels } = this
+    const grid = this.grid
+    const forEachIce = (i: number, cb: (j: number) => void) => {
+      if (frozen[i] === 0) return // le liquide : singletons, hors des blocs
+      const xi = prdX[i]
+      const yi = prdY[i]
+      grid.forEachNeighbor(xi, yi, linkR, (j) => {
+        if (j === i || frozen[j] === 0) return
+        const dx = xi - prdX[j]
+        const dy = yi - prdY[j]
+        if (dx * dx + dy * dy <= linkR2) cb(j)
+      })
+    }
+    const comps = labelComponents(n, labels, forEachIce, this.stack)
+    this.iceVxSum.fill(0, 0, comps)
+    this.iceVySum.fill(0, 0, comps)
+    this.iceCnt.fill(0, 0, comps)
+    this.iceNxSum.fill(0, 0, comps)
+    this.iceNySum.fill(0, 0, comps)
+    this.iceWeld.fill(0, 0, comps)
+    for (let i = 0; i < n; i++) {
+      if (frozen[i] === 0) continue
+      const c = labels[i]
+      this.iceVxSum[c] += velX[i]
+      this.iceVySum[c] += velY[i]
+      this.iceCnt[c]++
+      if (this.contactMat[i] >= 0) {
+        this.iceNxSum[c] += this.contactNX[i]
+        this.iceNySum[c] += this.contactNY[i]
+      }
+      if (this.welded[i] === 1) this.iceWeld[c] = 1
+    }
+    const rest = Math.min(1, Math.max(0, p.iceRestitution))
+    for (let c = 0; c < comps; c++) {
+      const cnt = this.iceCnt[c]
+      if (cnt === 0) continue
+      let vx = this.iceVxSum[c] / cnt
+      let vy = this.iceVySum[c] / cnt
+      if (this.iceWeld[c] === 1) {
+        vx = 0
+        vy = 0
+      } else {
+        const nl = Math.hypot(this.iceNxSum[c], this.iceNySum[c])
+        if (nl > 1e-6) {
+          const nx = this.iceNxSum[c] / nl
+          const ny = this.iceNySum[c] / nl
+          const vn = vx * nx + vy * ny
+          if (vn < 0) {
+            vx -= (1 + rest) * vn * nx
+            vy -= (1 + rest) * vn * ny
+          }
+        }
+      }
+      this.iceVxSum[c] = vx // réutilisé : vitesse finale du bloc
+      this.iceVySum[c] = vy
+    }
+    for (let i = 0; i < n; i++) {
+      if (frozen[i] === 0) continue
+      const c = labels[i]
+      velX[i] = this.iceVxSum[c]
+      velY[i] = this.iceVySum[c]
     }
   }
 

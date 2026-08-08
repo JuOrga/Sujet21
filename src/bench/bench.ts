@@ -353,18 +353,26 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Fraction finale de la durée où le vortex s’essouffle : il freine l’eau et la dépose au lieu de la lâcher en rotation. À 0, la force centrifuge fait éclater le corps à la fin.',
   )
 
-  const fCold = pane.addFolder({ title: 'Froid (tableau 2)', expanded: false })
+  const fCold = pane.addFolder({ title: 'Glace & froid', expanded: false })
   describe(
-    fCold.addBinding(params, 'coldBand', { min: 10, max: 120, step: 1, label: 'aura (u)' }),
-    'Portée de l’aura de gel autour des plaques froides. L’eau y givre d’autant plus vite qu’elle est près de la plaque.',
-  )
-  describe(
-    fCold.addBinding(params, 'freezeTime', { min: 0.2, max: 5, label: 'gel (s)' }),
-    'Temps d’exposition en pleine aura avant le gel complet. Gelée, l’eau est ancrée : elle ne bouge plus et ne peut plus être éjectée.',
+    fCold.addBinding(params, 'freezeSelfTime', { min: 0.1, max: 3, label: 'gel volontaire (s)' }),
+    'Temps de prise quand on se change en glace (F / ❄). Le bloc garde son élan : un palet rigide qui ignore la chimie des parois et rebondit au lieu d’éclabousser.',
   )
   describe(
     fCold.addBinding(params, 'thawTime', { min: 0.5, max: 10, label: 'dégel (s)' }),
-    'Temps de dégel une fois à l’écart du froid. Le dégel rend l’eau au corps, sans élan — s’ancrer se paie en temps.',
+    'Temps de dégel (intention levée, ou à l’écart du froid). L’eau revient au corps dans le mouvement où la glace se trouvait.',
+  )
+  describe(
+    fCold.addBinding(params, 'iceRestitution', { min: 0, max: 1, label: 'rebond glace' }),
+    'Restitution des blocs de glace sur les parois. 1 : rebond parfait. 0 : la glace s’arrête au premier impact.',
+  )
+  describe(
+    fCold.addBinding(params, 'coldBand', { min: 10, max: 120, step: 1, label: 'aura (u)' }),
+    'Portée de l’aura de gel autour des plaques froides (tableau 2). L’eau y givre d’autant plus vite qu’elle est près de la plaque.',
+  )
+  describe(
+    fCold.addBinding(params, 'freezeTime', { min: 0.2, max: 5, label: 'gel plaques (s)' }),
+    'Temps d’exposition en pleine aura avant le gel complet. La glace prise au contact d’une plaque s’y soude : c’est l’ancrage.',
   )
 
   const fExit = pane.addFolder({ title: 'Sas (bouche d’aspiration)', expanded: false })

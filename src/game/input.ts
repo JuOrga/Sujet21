@@ -15,6 +15,7 @@ export class Input {
   aimClientY = 0
   paused = false
   vortexArmed = false // prochain toucher = vortex au lieu d'éjecter
+  freezeIntent = false // F (ou ❄) : le corps se change en glace, re-presser dégèle
   onReset: (() => void) | null = null
   onTimeWarpChange: ((warp: number) => void) | null = null
   onZoom: ((factor: number) => void) | null = null
@@ -114,6 +115,8 @@ export class Input {
         this.stepWarp(-1)
       } else if (e.key === '.' || e.key === '>') {
         this.stepWarp(1)
+      } else if (e.key === 'f' || e.key === 'F') {
+        this.freezeIntent = !this.freezeIntent
       }
     })
   }
