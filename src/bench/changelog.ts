@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '08/08/2026 16:07',
+    title: 'Eau lissée : fini les billes',
+    notes: [
+      'Surface du corps lissée : splats élargis, seuil réajusté, relief limité à la zone de surface (l’intérieur ne grène plus).',
+      'Les gouttes libres sont rendues plus fines que le corps : des gouttelettes, pas des boules.',
+      'Captures d’écran du canvas désormais possibles (retours visuels des testeurs).',
+    ],
+  },
+  {
     date: '08/08/2026 15:55',
     title: 'Éjection : creusement et jet liquide',
     notes: [

@@ -115,9 +115,11 @@ export const DEFAULT_PARAMS: SimParams = {
 
   timeWarp: 1,
 
-  fieldThreshold: 0.55,
-  fieldSoftness: 0.25,
-  particleRenderRadius: 9,
+  // Splats larges + seuil haut : le champ se lisse, les particules
+  // individuelles ne se lisent plus comme des billes
+  fieldThreshold: 0.8,
+  fieldSoftness: 0.3,
+  particleRenderRadius: 13,
   speedColorScale: 220,
   renderDownsample: 2,
 }

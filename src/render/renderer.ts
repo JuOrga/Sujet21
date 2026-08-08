@@ -30,7 +30,9 @@ void main() {
   float s = length(aVel);
   // Le sprite est agrandi pour contenir l'ellipse étirée dans le sens du
   // mouvement — les gouttes rapides deviennent des traînées liquides.
-  gl_PointSize = uPointSize * (1.0 + s);
+  // Les gouttes libres sont plus fines que le corps : des gouttelettes,
+  // pas des boules.
+  gl_PointSize = uPointSize * (1.0 + s) * mix(0.6, 1.0, aPlayer);
   vSpeed = aSpeed;
   vPlayer = aPlayer;
   vDir = s > 1e-4 ? aVel / s : vec2(1.0, 0.0);
@@ -188,13 +190,18 @@ void main() {
   vec3 water = mix(slow, fast, speedT);
   water = mix(water * 0.40, water, clamp(player, 0.0, 1.0)); // eau libre plus sombre
 
-  // Relief : le gradient du champ donne une pseudo-normale — éclairage doux
-  // et reflet spéculaire, l'eau prend du volume au lieu d'être plate.
-  vec2 grad = vec2(dFdx(field2), dFdy(field2)) * uCanvasSize;
-  vec3 nrm = normalize(vec3(-grad * 0.55, 1.0));
+  // Relief : pseudo-normale sur un champ FLOUTÉ (4 prélèvements écartés) —
+  // les dérivées par pixel liraient chaque particule comme une bille.
+  vec2 texel = 2.5 / vec2(textureSize(uField, 0));
+  float fL = texture(uField, uv - vec2(texel.x, 0.0)).r;
+  float fR = texture(uField, uv + vec2(texel.x, 0.0)).r;
+  float fB = texture(uField, uv - vec2(0.0, texel.y)).r;
+  float fT = texture(uField, uv + vec2(0.0, texel.y)).r;
+  vec2 grad = vec2(fR - fL, fT - fB) / uFieldScale;
+  vec3 nrm = normalize(vec3(-grad * 2.2, 1.0));
   vec3 lightDir = normalize(vec3(-0.35, 0.55, 0.75));
   float diffuse = max(dot(nrm, lightDir), 0.0);
-  float specular = pow(max(reflect(-lightDir, nrm).z, 0.0), 28.0);
+  float specular = pow(max(reflect(-lightDir, nrm).z, 0.0), 12.0);
 
   // Cœur plus dense légèrement plus sombre, liseré plus clair
   float core = smoothstep(th * 1.8, th * 3.2, field2);
@@ -206,7 +213,12 @@ void main() {
   float shimmer = sin(world.x * 0.11 + uTime * 1.6) * sin(world.y * 0.09 - uTime * 1.2);
   water *= 1.0 + 0.05 * shimmer * core;
 
-  water = water * (0.78 + 0.30 * diffuse) + vec3(0.85, 0.95, 1.0) * specular * 0.30;
+  // Le relief n'éclaire que la zone de surface : à l'intérieur, les
+  // fluctuations de densité ne sont pas du relief — sans ce masque, l'eau
+  // se couvre de reflets granuleux qui trahissent les particules.
+  float surfaceZone = body * (1.0 - smoothstep(th * 1.4, th * 2.6, field2));
+  water = mix(water, water * (0.55 + 0.75 * diffuse), surfaceZone * 0.55);
+  water += vec3(0.85, 0.95, 1.0) * specular * 0.35 * surfaceZone;
   water += vec3(0.30, 0.55, 0.65) * waveGlow * 0.45;
 
   col = mix(col, water, body);
@@ -290,7 +302,9 @@ export class Renderer {
 
   constructor(canvas: HTMLCanvasElement, capacity: number) {
     this.canvas = canvas
-    const gl = canvas.getContext('webgl2', { antialias: false, alpha: false })
+    // preserveDrawingBuffer : les captures d'écran du canvas fonctionnent
+    // (retours des testeurs, comparaisons de réglages) — surcoût négligeable.
+    const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, preserveDrawingBuffer: true })
     if (!gl) throw new Error('WebGL2 indisponible')
     this.gl = gl
 
