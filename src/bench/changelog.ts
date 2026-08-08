@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '09/08/2026 00:55',
+    title: 'Caméra libre : glisser à deux doigts, clic droit maintenu',
+    notes: [
+      'On peut enfin regarder ailleurs : deux doigts posés glissent la caméra (le pincement zoome en même temps) ; au clavier-souris, clic droit MAINTENU — on « attrape » le monde.',
+      'La caméra tient la position choisie au lieu de suivre le corps ; le bouton ⌖ recadre (zoom et suivi automatiques). Un clic droit bref reste le vortex du bac à sable.',
+      'Commandes de la fiche mises à jour (desktop et tactile).',
+    ],
+  },
+  {
     date: '09/08/2026 00:20',
     title: 'Tableau 4 : la cuve thermique — le radiateur',
     notes: [

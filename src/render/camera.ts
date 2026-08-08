@@ -12,6 +12,7 @@ export class Camera {
   y = 0
   zoom = 1 // pixels CSS par unité monde
   manualZoom: number | null = null // non nul : la molette a pris la main
+  manualPan = false // vrai : la caméra tient la position choisie au lieu de suivre le corps
 
   // Zoom d'ouverture : au début d'un tableau, la caméra le montre en entier
   // puis plonge vers le corps — le niveau se lit d'un coup d'œil, et le
@@ -40,7 +41,18 @@ export class Camera {
     this.introTotal = hold + dive
     this.introTimer = this.introTotal
     this.manualZoom = null
+    this.manualPan = false
     this.snapTo(this.introX, this.introY, this.introZoom)
+  }
+
+  // Déplacement manuel (clic droit maintenu, glissement à deux doigts) : on
+  // « attrape » le monde — le doigt part à droite, la caméra part à gauche.
+  // La caméra tient ensuite la position jusqu'au recadrage (⌖).
+  panBy(dxPx: number, dyPx: number): void {
+    this.introTimer = 0
+    this.manualPan = true
+    this.x -= dxPx / this.zoom
+    this.y += dyPx / this.zoom // l'axe écran descend, l'axe monde monte
   }
 
   cancelIntro(): void {
@@ -51,6 +63,7 @@ export class Camera {
     this.x = x
     this.y = y
     this.zoom = zoom
+    this.manualPan = false
   }
 
   zoomBy(factor: number, p: SimParams): void {
@@ -64,6 +77,7 @@ export class Camera {
 
   resetAutoZoom(): void {
     this.manualZoom = null
+    this.manualPan = false
   }
 
   update(
@@ -94,8 +108,10 @@ export class Camera {
     }
 
     const k = 1 - Math.exp(-p.cameraSmoothing * dtReal)
-    this.x += (targetX - this.x) * k
-    this.y += (targetY - this.y) * k
+    if (!this.manualPan) {
+      this.x += (targetX - this.x) * k
+      this.y += (targetY - this.y) * k
+    }
     this.zoom = Math.exp(Math.log(this.zoom) + (Math.log(targetZoom) - Math.log(this.zoom)) * k)
   }
 
