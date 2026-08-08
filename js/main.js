@@ -13,6 +13,11 @@
   let simTime = 0, timeScale = 1, accum = 0, lastT = 0;
   let winTimer = 0, ejectAccum = 0;
 
+  // État thermique (M1) : le corps gèle sous freezeT (moyenne), dégèle
+  // au-dessus de meltT ; au-dessus de boilT l'éjection devient vapeur.
+  let frozen = false, iceVX = 0, iceVY = 0, meanTemp = 0;
+  const steam = []; // bouffées de vapeur : cosmétiques, le volume est déjà perdu
+
   const cam = { x: 0, y: 0, s: 1 };
   const mouse = { x: 0, y: 0, down: false };
 
@@ -49,6 +54,7 @@
     prevCX = level.spawn.x; prevCY = level.spawn.y;
     cam.x = prevCX; cam.y = prevCY; cam.s = 1;
     state = "play"; simTime = 0; winTimer = 0; ejectAccum = 0; accum = 0;
+    frozen = false; iceVX = 0; iceVY = 0; meanTemp = P.tempAmbient; steam.length = 0;
     overlay.style.display = "none";
     updateCluster();
   }
@@ -115,21 +121,53 @@
     const jitter = (Math.random() - 0.5) * 0.15;
     const c = Math.cos(jitter), s = Math.sin(jitter);
     const ex = dirX * c - dirY * s, ey = dirX * s + dirY * c;
-    Fluid.vx[pick] = bodyVX + ex * P.ejectSpeed;
-    Fluid.vy[pick] = bodyVY + ey * P.ejectSpeed;
-    Fluid.mergeTimer[pick] = P.remergeDelay;
-    Fluid.ballistic[pick] = 0.25;
+    const isSteam = Fluid.temp[pick] >= P.boilT;
+    const speed = P.ejectSpeed * (isSteam ? P.steamBoost : 1);
     playerList.splice(idx, 1);
     playerFlag[pick] = 0;
-    // recul : quantité de mouvement rigoureusement conservée
+    // recul : quantité de mouvement rigoureusement conservée — la vapeur
+    // part plus vite, donc pousse plus fort (§4, « l'énergie »)
     const rem = playerList.length;
     for (const i of playerList) {
-      Fluid.vx[i] -= ex * P.ejectSpeed / rem;
-      Fluid.vy[i] -= ey * P.ejectSpeed / rem;
+      Fluid.vx[i] -= ex * speed / rem;
+      Fluid.vy[i] -= ey * speed / rem;
+    }
+    if (isSteam) {
+      // détente explosive : la bouffée part définitivement, elle ne revient pas
+      steam.push({
+        x: Fluid.x[pick], y: Fluid.y[pick],
+        vx: bodyVX + ex * speed * 0.45, vy: bodyVY + ey * speed * 0.45,
+        r: 7, life: P.steamLife,
+      });
+      removeParticle(pick);
+    } else {
+      Fluid.vx[pick] = bodyVX + ex * speed;
+      Fluid.vy[pick] = bodyVY + ey * speed;
+      Fluid.mergeTimer[pick] = P.remergeDelay;
+      Fluid.ballistic[pick] = 0.25;
+    }
+  }
+
+  // Fluid.remove(i) échange i avec la dernière particule : on remappe
+  // l'indice déplacé dans playerFlag/playerList (valides jusqu'au
+  // prochain updateCluster).
+  function removeParticle(i) {
+    const last = Fluid.n - 1;
+    Fluid.remove(i);
+    if (last !== i) {
+      if (playerFlag[last]) {
+        playerFlag[i] = 1;
+        const li = playerList.indexOf(last);
+        if (li >= 0) playerList[li] = i;
+      } else {
+        playerFlag[i] = 0;
+      }
+      playerFlag[last] = 0;
     }
   }
 
   function handleEject(dt) {
+    if (frozen) { ejectAccum = 0; return; } // gelé : on ne pilote plus (§4)
     if (!mouse.down || playerList.length === 0) { ejectAccum = 0; return; }
     const w = screenToWorld(mouse.x, mouse.y);
     const dx = w.x - centroidX, dy = w.y - centroidY;
@@ -146,23 +184,139 @@
   // ---------- Éponge : gradient de risque, jamais mur binaire (§6) ----------
 
   function spongeUpdate(dt) {
-    const s = level.sponge;
     const toRemove = [];
     const drag = Math.exp(-P.spongeDrag * dt);
     for (let i = 0; i < Fluid.n; i++) {
-      const c = spongeCellAt(s, Fluid.x[i], Fluid.y[i]);
-      if (c >= 0 && s.stored[c] < P.spongeCellCap) {
-        Fluid.vx[i] *= drag; Fluid.vy[i] *= drag;
-        Fluid.spongeT[i] += dt;
-        if (Fluid.spongeT[i] >= P.spongeAbsorbTime) {
-          toRemove.push(i);
-          s.stored[c]++;
+      if (Fluid.frozen[i]) continue; // l'éponge n'a pas prise sur la glace (§4)
+      let held = false;
+      for (const s of level.sponges) {
+        const c = spongeCellAt(s, Fluid.x[i], Fluid.y[i]);
+        if (c >= 0 && s.stored[c] < P.spongeCellCap) {
+          Fluid.vx[i] *= drag; Fluid.vy[i] *= drag;
+          Fluid.spongeT[i] += dt;
+          if (Fluid.spongeT[i] >= P.spongeAbsorbTime) {
+            toRemove.push(i);
+            s.stored[c]++;
+          }
+          held = true;
+          break;
         }
-      } else if (Fluid.spongeT[i] > 0) {
+      }
+      if (!held && Fluid.spongeT[i] > 0) {
         Fluid.spongeT[i] = Math.max(0, Fluid.spongeT[i] - dt * 2);
       }
     }
-    for (let k = toRemove.length - 1; k >= 0; k--) Fluid.remove(toRemove[k]);
+    for (let k = toRemove.length - 1; k >= 0; k--) removeParticle(toRemove[k]);
+  }
+
+  // ---------- Chaleur et changements d'état (M1, §4–§5) ----------
+
+  function zoneAt(wx, wy) {
+    for (const z of level.zones)
+      if (wx > z.x && wx < z.x + z.w && wy > z.y && wy < z.y + z.h) return z;
+    return null;
+  }
+
+  function thermoUpdate(dt) {
+    const T = Fluid.temp, cap = 1 + P.latentHeat;
+    const toFlash = [];
+    for (let i = 0; i < Fluid.n; i++) {
+      const z = zoneAt(Fluid.x[i], Fluid.y[i]);
+      if (z) T[i] += (z.kind === "heat" ? P.heatPower : -P.coldPower) * dt;
+      T[i] += (P.tempAmbient - T[i]) * P.tempRelax * dt;
+      if (T[i] < 0) T[i] = 0;
+      if (T[i] >= cap) {
+        // chaleur latente épuisée : évaporation spontanée, perte définitive
+        if (!Fluid.frozen[i]) toFlash.push(i); else T[i] = cap;
+      }
+    }
+    for (let k = toFlash.length - 1; k >= 0; k--) {
+      const i = toFlash[k];
+      const a = Math.random() * Math.PI * 2;
+      steam.push({
+        x: Fluid.x[i], y: Fluid.y[i],
+        vx: Fluid.vx[i] + Math.cos(a) * 50, vy: Fluid.vy[i] + Math.sin(a) * 50,
+        r: 6, life: P.steamLife,
+      });
+      removeParticle(i);
+    }
+  }
+
+  function stateUpdate() {
+    if (playerList.length === 0) return;
+    let sum = 0;
+    for (const i of playerList) sum += Fluid.temp[i];
+    meanTemp = sum / playerList.length;
+    if (!frozen && meanTemp < P.freezeT) {
+      // geler, c'est parier sur une trajectoire : on fige le corps en bloc
+      frozen = true; iceVX = bodyVX; iceVY = bodyVY;
+      for (const i of playerList) {
+        Fluid.frozen[i] = 1;
+        Fluid.vx[i] = iceVX; Fluid.vy[i] = iceVY;
+      }
+    } else if (frozen && meanTemp > P.meltT) {
+      frozen = false;
+      for (let i = 0; i < Fluid.n; i++) {
+        if (Fluid.frozen[i]) {
+          Fluid.frozen[i] = 0;
+          Fluid.vx[i] = iceVX; Fluid.vy[i] = iceVY;
+        }
+      }
+    }
+  }
+
+  function iceUpdate(dt) {
+    if (!frozen) return;
+    // translation rigide : on glisse, on rebondit, la quantité de
+    // mouvement se conserve (§4, « l'engagement »)
+    const xs = Fluid.x, ys = Fluid.y;
+    for (let i = 0; i < Fluid.n; i++)
+      if (Fluid.frozen[i]) { xs[i] += iceVX * dt; ys[i] += iceVY * dt; }
+    // rebond : plus forte pénétration constatée sur chaque axe
+    const b = level.bounds, m = 4;
+    let pushX = 0, pushY = 0;
+    for (let i = 0; i < Fluid.n; i++) {
+      if (!Fluid.frozen[i]) continue;
+      let ppx = 0, ppy = 0;
+      if (xs[i] < b.x + m) ppx = b.x + m - xs[i];
+      else if (xs[i] > b.x + b.w - m) ppx = b.x + b.w - m - xs[i];
+      if (ys[i] < b.y + m) ppy = b.y + m - ys[i];
+      else if (ys[i] > b.y + b.h - m) ppy = b.y + b.h - m - ys[i];
+      for (const W of level.walls) {
+        if (xs[i] > W.x && xs[i] < W.x + W.w && ys[i] > W.y && ys[i] < W.y + W.h) {
+          const dl = xs[i] - W.x, dr = W.x + W.w - xs[i];
+          const dt2 = ys[i] - W.y, db = W.y + W.h - ys[i];
+          const mn = Math.min(dl, dr, dt2, db);
+          if (mn === dl) ppx = -dl;
+          else if (mn === dr) ppx = dr;
+          else if (mn === dt2) ppy = -dt2;
+          else ppy = db;
+        }
+      }
+      if (Math.abs(ppx) > Math.abs(pushX)) pushX = ppx;
+      if (Math.abs(ppy) > Math.abs(pushY)) pushY = ppy;
+    }
+    if (pushX !== 0) {
+      for (let i = 0; i < Fluid.n; i++) if (Fluid.frozen[i]) xs[i] += pushX;
+      iceVX = -iceVX * P.iceBounce;
+    }
+    if (pushY !== 0) {
+      for (let i = 0; i < Fluid.n; i++) if (Fluid.frozen[i]) ys[i] += pushY;
+      iceVY = -iceVY * P.iceBounce;
+    }
+    for (let i = 0; i < Fluid.n; i++)
+      if (Fluid.frozen[i]) { Fluid.vx[i] = iceVX; Fluid.vy[i] = iceVY; }
+  }
+
+  function steamUpdate(dt) {
+    for (let k = steam.length - 1; k >= 0; k--) {
+      const s = steam[k];
+      s.x += s.vx * dt; s.y += s.vy * dt;
+      s.vx *= 0.97; s.vy *= 0.97;
+      s.r += 26 * dt;
+      s.life -= dt;
+      if (s.life <= 0) steam.splice(k, 1);
+    }
   }
 
   // ---------- Fin de tentative ----------
@@ -224,8 +378,12 @@
     simTime += dt;
     if (state === "play") handleEject(dt);
     Fluid.step(dt, level);
+    iceUpdate(dt);
     spongeUpdate(dt);
+    thermoUpdate(dt);
+    steamUpdate(dt);
     updateCluster();
+    stateUpdate();
     checkEnd(dt);
   }
 
@@ -244,9 +402,18 @@
     const ts = timeScale === 1 ? "×1" : "×" + timeScale;
     const best = Records.best();
     const rec = best ? ` &nbsp; <span style="color:#5c6b7f">record ${fmtS(best.time)}</span>` : "";
-    hud.innerHTML = `<span class="vol">${vol}</span> &nbsp; ${ts} &nbsp; ` +
+    // l'état se lit d'un coup d'œil : mot + couleur + jauge de température
+    const st = frozen ? ["GLACE", "#eaf7ff"]
+      : meanTemp >= P.boilT ? ["VAPEUR", "#ffb37a"]
+      : ["LIQUIDE", "#79d0ff"];
+    const pct = Math.round(Math.min(1, Math.max(0, meanTemp)) * 100);
+    hud.innerHTML = `<span class="vol">${vol}</span> &nbsp; ` +
+      `<span class="state" style="color:${st[1]}">${st[0]}</span> &nbsp; ${ts} &nbsp; ` +
       `<span style="color:#5c6b7f">${simTime.toFixed(1).replace(".", ",")} s &nbsp; ` +
-      `échantillon n°${Records.attempts() + 1}</span>` + rec;
+      `échantillon n°${Records.attempts() + 1}</span>` + rec +
+      `<div id="gauge"><b style="width:${pct}%"></b>` +
+      `<i class="mkF" style="left:${P.freezeT * 100}%"></i>` +
+      `<i class="mkB" style="left:${P.boilT * 100}%"></i></div>`;
   }
 
   function frame(t) {
@@ -262,6 +429,7 @@
     updateCamera(rdt);
     Renderer.drawBackground(level, cam, simTime);
     Renderer.drawFluid(playerFlag, cam);
+    Renderer.drawEffects(steam, cam);
     updateHud();
     requestAnimationFrame(frame);
   }
@@ -279,6 +447,10 @@
     if (scales[e.code]) timeScale = scales[e.code];
     else if (e.code === "KeyR") reset();
     else if (e.code === "KeyT") Tuning.toggle();
+    else if (e.code === "KeyL") {
+      const lg = document.getElementById("legend");
+      lg.style.display = lg.style.display === "none" ? "block" : "none";
+    }
   });
 
   // instrumentation pour les tests automatisés
@@ -289,6 +461,7 @@
         player: playerList.length,
         cx: centroidX, cy: centroidY,
         state, simTime,
+        meanTemp, frozen, steam: steam.length,
       };
     },
     setTimeScale(v) { timeScale = v; },

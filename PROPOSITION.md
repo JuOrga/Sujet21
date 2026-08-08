@@ -46,7 +46,7 @@ se dire en une phrase de physique, conformément au pilier 3.
 | Jalon | Contenu | Critère de sortie |
 |---|---|---|
 | **M0 — Slice liquide** *(fait)* | verbe unique, éponge, un tableau, banc de réglage | on « sent » l'arbitrage gros/petit |
-| **M1 — Chaleur** | carte thermique, radiateurs, cryobaies ; états **glace** (trajectoire engagée) et **vapeur** (poussée explosive, perte définitive) | traverser un même tableau par 3 routes selon l'état |
+| **M1 — Chaleur** *(fait)* | carte thermique, radiateurs, cryobaies ; états **glace** (trajectoire engagée) et **vapeur** (poussée explosive, perte définitive) | traverser un même tableau par 3 routes selon l'état |
 | **M2 — Boucle roguelike** | enchaînement de tableaux, retour à capacité de base, surplus → bonbonnes, recondensation sur parois froides (perte 40–50 %) | une partie complète de 15–20 min |
 | **M3 — Le vaisseau vivant** | refroidissement global, obstacles chimiques restants (hydrophile/phobe, filtres, champs), routes ramifiées | la pression temporelle se lit sans chronomètre |
 | **M4 — Méta & narration** | bonbonnes typées (§8), déblocage des origines (§9.3), registres du labo, son | le contrat « hors protocole = déplacé, pas raccourci » est vérifiable |

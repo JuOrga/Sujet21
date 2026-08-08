@@ -12,6 +12,25 @@
   #hud { position:absolute; top:12px; left:14px; font-size:15px; letter-spacing:.4px;
          text-shadow:0 1px 3px #000; pointer-events:none; }
   #hud .vol { font-size:22px; color:#9fdcff; }
+  #hud .state { font-size:15px; font-weight:600; letter-spacing:1.5px; }
+  #gauge { position:relative; width:130px; height:6px; margin-top:7px;
+           background:#1a2130; border-radius:3px; }
+  #gauge b { display:block; height:100%; border-radius:3px;
+             background:linear-gradient(90deg, #dff4ff, #79d0ff 45%, #ffb37a); }
+  #gauge i { position:absolute; top:-3px; width:2px; height:12px; }
+  #gauge .mkF { background:#9fdcff; }
+  #gauge .mkB { background:#ff9c5b; }
+  #legend { position:absolute; bottom:34px; left:14px; width:300px; font-size:12px;
+            background:rgba(10,14,20,.88); border:1px solid #1d2635; border-radius:6px;
+            padding:10px 12px; line-height:1.45; pointer-events:none; }
+  #legend h3 { margin:0 0 8px; font-size:12px; font-weight:600; color:#cfe8ff;
+               letter-spacing:.6px; }
+  #legend h3 span { color:#5c6b7f; font-weight:400; }
+  #legend .lrow { display:flex; gap:8px; margin:6px 0; color:#8fa3b8; }
+  #legend .lrow i { flex:none; width:12px; height:12px; margin-top:2px; border-radius:3px; }
+  #legend .lrow b { color:#c8d6e5; font-weight:600; }
+  #legend .states { display:block; margin-top:9px; padding-top:8px;
+                    border-top:1px solid #1d2635; }
   #help { position:absolute; bottom:10px; left:0; right:0; text-align:center; font-size:12px;
           color:#5c6b7f; pointer-events:none; }
   #overlay { position:absolute; inset:0; display:none; align-items:center; justify-content:center;
@@ -48,11 +67,29 @@
 
 <canvas id="bg"></canvas>
 <canvas id="fluid"></canvas>
+<canvas id="fx"></canvas>
 
 <div id="hud"></div>
+<div id="legend">
+  <h3>Lecture du vaisseau <span>· L : masquer</span></h3>
+  <div class="lrow"><i style="background:#ff8c46"></i><div><b>Radiateur</b> — chauffe.
+    Liquide : mène à la vapeur, trop longtemps : évaporation (perdue) ·
+    Glace : dégèle</div></div>
+  <div class="lrow"><i style="background:#9fdcff"></i><div><b>Cryobaie</b> — refroidit.
+    Liquide : mène à la glace — trajectoire engagée, plus de pilotage</div></div>
+  <div class="lrow"><i style="background:#a08a4a"></i><div><b>Éponge</b> — absorbe le
+    liquide au contact, se sature cellule par cellule ·
+    Glace : sans prise · la vitesse limite la perte</div></div>
+  <div class="lrow"><i style="background:#50e6a0"></i><div><b>Sas</b> — la sortie :
+    s'y tenir une seconde</div></div>
+  <div class="states">États :
+    <b style="color:#79d0ff">LIQUIDE</b> pilotable ·
+    <b style="color:#eaf7ff">GLACE</b> glisse et rebondit ·
+    <b style="color:#ffb37a">VAPEUR</b> éjections explosives, définitivement perdues</div>
+</div>
 <div id="help">
   Maintenir le clic : éjecter de la matière vers le curseur (le corps part à l'opposé) ·
-  1–5 : dilatation du temps · R : recommencer · T : banc de réglage
+  1–5 : dilatation du temps · R : recommencer · T : banc de réglage · L : légende
 </div>
 <div id="overlay"><h1 id="ovTitle"></h1><p id="ovText"></p><p id="ovRecord"></p>
   <div id="ovLog"></div><p>Appuyez sur R pour recommencer.</p></div>

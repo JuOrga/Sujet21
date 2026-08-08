@@ -24,6 +24,7 @@ npx serve .        # ou : python3 -m http.server
 | **1 – 5** | dilatation du temps (×0,25 à ×4) — le pas physique ne change jamais |
 | **R** | recommencer |
 | **T** | banc de réglage (sliders en direct + export JSON) |
+| **L** | légende : chaque surface, son effet, état par état |
 
 ## Ce que contient cette slice verticale
 
@@ -37,9 +38,24 @@ npx serve .        # ou : python3 -m http.server
 - **L'éponge** (mécanique de référence du doc) : engluement, absorption après
   0,3 s de contact, saturation cellule par cellule — on peut payer un passage
   en volume, ou éjecter des gouttes dedans pour la saturer à distance.
-- **Un tableau fermé** avec deux routes : la barrière d'éponge, ou une fente
-  étroite qui demande de se déformer/scinder. À la sortie, le surplus est
-  « mis en bonbonne ».
+- **La chaleur (jalon M1, §4–§5)** : chaque particule a une température ;
+  le tableau se lit comme une carte thermique (radiateur, cryobaie).
+  - **Glace** : sous le seuil de gel, le corps se fige en bloc rigide —
+    on ne pilote plus, on glisse, on rebondit, l'éponge n'a plus prise.
+    Geler, c'est parier sur une trajectoire.
+  - **Vapeur** : au-dessus du seuil d'ébullition, l'éjection devient une
+    bouffée explosive (poussée multipliée) qui part **définitivement**.
+    Rester trop longtemps sur un radiateur évapore le corps — la chaleur
+    latente donne une fenêtre d'usage avant la perte.
+- **Lisibilité systématique** : chaque surface a une identité visuelle
+  univoque (rayures chaudes animées, givre, cellules d'éponge, sas pulsé),
+  son nom peint dans le décor, et une **légende** (L) qui donne l'effet de
+  chaque surface **état par état**. Le corps lui-même change de couleur avec
+  sa température ; le HUD affiche l'état courant et une jauge à seuils.
+- **Un tableau fermé, trois routes selon l'état** : se faufiler par la fente
+  (liquide), payer la barrière d'éponge en volume — ou la traverser vite en
+  vapeur —, ou geler dans la cryobaie et glisser par le couloir bas tapissé
+  d'éponge. À la sortie, le surplus est « mis en bonbonne ».
 - **Caméra à zoom automatique**, time warp, trame de repère, rendu métaballes.
 - **Banc de réglage** (outil prioritaire du §13) : tous les paramètres de
   ressenti en sliders, export JSON.
@@ -62,5 +78,7 @@ fin de tentative est consignée dans le navigateur (`localStorage`) :
 
 ## Tests
 
-Un test de fumée automatisé (Playwright) vérifie : absence d'erreur JS,
-stabilité du corps au repos, coût et efficacité de la poussée, dérive inertielle.
+Un test de fumée automatisé (Playwright, `npm test`) vérifie : absence
+d'erreur JS, stabilité du corps au repos, coût et efficacité de la poussée,
+dérive inertielle, gel et dégel du corps, éjection vapeur (perte définitive),
+et les registres du labo (consignation, choix du record, départage).
