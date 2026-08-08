@@ -40,6 +40,27 @@ const { chromium } = require("playwright");
   console.log("après dérive ×4:", JSON.stringify(s3));
   await page.screenshot({ path: "test/shot_drift.png" });
 
+  // M1 — gel : corps refroidi de force -> il doit se figer en bloc
+  await page.evaluate(() => { for (let i = 0; i < Fluid.n; i++) Fluid.temp[i] = 0; });
+  await page.waitForTimeout(400);
+  const sIce = await page.evaluate(() => window.__game.stats());
+  console.log("gel forcé:", JSON.stringify(sIce));
+
+  // M1 — dégel : réchauffé au-dessus du seuil, il redevient fluide
+  await page.evaluate(() => { for (let i = 0; i < Fluid.n; i++) Fluid.temp[i] = 0.6; });
+  await page.waitForTimeout(400);
+  const sThaw = await page.evaluate(() => window.__game.stats());
+  console.log("dégel:", JSON.stringify(sThaw));
+
+  // M1 — vapeur : corps chaud + poussée -> bouffées perdues définitivement
+  await page.evaluate(() => { for (let i = 0; i < Fluid.n; i++) Fluid.temp[i] = 0.9; });
+  await page.mouse.move(640 - 250, 360);
+  await page.mouse.down();
+  await page.waitForTimeout(800);
+  await page.mouse.up();
+  const sVap = await page.evaluate(() => window.__game.stats());
+  console.log("poussée vapeur:", JSON.stringify(sVap));
+
   // Registres du labo : consignation, record (temps min, volume départage), persistance
   const rec = await page.evaluate(() => {
     Records.wipe();
@@ -62,6 +83,10 @@ const { chromium } = require("playwright");
   console.log("corps stable au repos:", s1.player >= s0.player - 5 ? "OK" : "ECHEC");
   console.log("coût de la poussée (particules):", s1.player - s2.player);
   console.log("déplacement vers la droite:", (s2.cx - s1.cx).toFixed(1), "px puis", (s3.cx - s2.cx).toFixed(1), "px en dérive");
+  console.log("gel du corps:", sIce.frozen ? "OK" : "ECHEC");
+  console.log("dégel du corps:", !sThaw.frozen ? "OK" : "ECHEC");
+  console.log("éjection vapeur (bouffées, perte définitive):",
+    sVap.steam > 0 && sVap.n < sThaw.n ? "OK" : "ECHEC " + JSON.stringify(sVap));
   const recOK = rec.attempts === 4 && rec.history === 4 &&
     rec.best && rec.best.time === 35.5 && rec.best.no === 3 &&
     String(rec.newBests) === "false,true,true,false";

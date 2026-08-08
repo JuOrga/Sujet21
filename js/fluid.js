@@ -15,6 +15,8 @@ const Fluid = (() => {
   const mergeTimer = new Float32Array(MAX);  // > 0 : goutte fraîchement éjectée
   const ballistic = new Float32Array(MAX);   // > 0 : découplée du fluide (en cours de détachement)
   const spongeT = new Float32Array(MAX);     // temps de contact continu avec l'éponge
+  const temp = new Float32Array(MAX);        // température normalisée (0 = gel, 1 = ébullition)
+  const frozen = new Uint8Array(MAX);        // 1 : particule prise dans le corps gelé (hors solveur)
   let n = 0;
   let rho0 = 1; // calibrée après le spawn
 
@@ -26,6 +28,7 @@ const Fluid = (() => {
     if (n >= MAX) return -1;
     x[n] = ax; y[n] = ay; vx[n] = avx || 0; vy[n] = avy || 0;
     mergeTimer[n] = 0; ballistic[n] = 0; spongeT[n] = 0;
+    temp[n] = P.tempAmbient; frozen[n] = 0;
     return n++;
   }
 
@@ -33,6 +36,7 @@ const Fluid = (() => {
     n--;
     x[i] = x[n]; y[i] = y[n]; vx[i] = vx[n]; vy[i] = vy[n];
     mergeTimer[i] = mergeTimer[n]; ballistic[i] = ballistic[n]; spongeT[i] = spongeT[n];
+    temp[i] = temp[n]; frozen[i] = frozen[n];
   }
 
   function clear() { n = 0; }
@@ -43,10 +47,11 @@ const Fluid = (() => {
     for (let i = 0; i < n; i++) {
       const list = nbr[i];
       list.length = 0;
-      if (ballistic[i] > 0) continue; // en vol libre : aucun couplage fluide
+      // en vol libre ou gelée : aucun couplage fluide (la glace est rigide)
+      if (ballistic[i] > 0 || frozen[i]) continue;
       const xi = px[i], yi = py[i];
       grid.query(xi, yi, h, (j) => {
-        if (j === i || ballistic[j] > 0) return;
+        if (j === i || ballistic[j] > 0 || frozen[j]) return;
         const dx = xi - px[j], dy = yi - py[j];
         if (dx * dx + dy * dy < h2) list.push(j);
       });
@@ -104,6 +109,8 @@ const Fluid = (() => {
   function substep(sdt, level) {
     const h = P.h, h2 = h * h;
     for (let i = 0; i < n; i++) {
+      // les particules gelées sont déplacées en bloc rigide par le jeu
+      if (frozen[i]) { px[i] = x[i]; py[i] = y[i]; continue; }
       px[i] = x[i] + vx[i] * sdt;
       py[i] = y[i] + vy[i] * sdt;
     }
@@ -149,6 +156,7 @@ const Fluid = (() => {
         dpx[i] = sx; dpy[i] = sy;
       }
       for (let i = 0; i < n; i++) {
+        if (frozen[i]) continue;
         px[i] += dpx[i]; py[i] += dpy[i];
         collide(i, level);
       }
@@ -156,6 +164,7 @@ const Fluid = (() => {
 
     // vitesse depuis les positions + viscosité XSPH (symétrique : conserve la q. de mvt)
     for (let i = 0; i < n; i++) {
+      if (frozen[i]) continue; // la vitesse du bloc gelé est gérée par le jeu
       vx[i] = (px[i] - x[i]) / sdt;
       vy[i] = (py[i] - y[i]) / sdt;
     }
@@ -174,6 +183,7 @@ const Fluid = (() => {
     }
     const c = P.viscosity;
     for (let i = 0; i < n; i++) {
+      if (frozen[i]) continue;
       vx[i] += c * nvx[i]; vy[i] += c * nvy[i];
       const sp = Math.hypot(vx[i], vy[i]);
       if (sp > P.maxSpeed) { vx[i] *= P.maxSpeed / sp; vy[i] *= P.maxSpeed / sp; }
@@ -191,7 +201,7 @@ const Fluid = (() => {
   }
 
   return {
-    x, y, vx, vy, mergeTimer, ballistic, spongeT, grid,
+    x, y, vx, vy, mergeTimer, ballistic, spongeT, temp, frozen, grid,
     get n() { return n; },
     add, remove, clear, step, calibrate,
   };
