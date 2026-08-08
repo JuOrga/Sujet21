@@ -211,6 +211,10 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Part de la vitesse d’éjection communiquée au liquide voisin du point de départ : le corps se creuse en entonnoir au lieu de perdre des boules isolées. À 0, ancien comportement.',
   )
   describe(
+    fProp.addBinding(params, 'recoilLocality', { min: 0, max: 1, label: 'recul localisé' }),
+    'Où s’applique le recul : 0 = uniforme, le corps part d’un bloc comme un solide ; 1 = concentré au point d’éjection, l’impulsion se propage par pression et le corps se déforme en accélérant.',
+  )
+  describe(
     fProp.addBinding(params, 'reabsorbCooldown', { min: 0, max: 5, label: 'délai réabsorb. (s)' }),
     'Temps pendant lequel une goutte éjectée ne peut pas être réabsorbée — sinon elle recollerait aussitôt au corps.',
   )

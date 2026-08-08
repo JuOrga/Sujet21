@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '08/08/2026 16:20',
+    title: 'Recul fluide : le corps se déforme en accélérant',
+    notes: [
+      'Le recul de l’éjection n’est plus réparti uniformément (effet « solide ») : il est pondéré vers le point d’éjection et se propage par pression.',
+      'Curseur « recul localisé » dans Propulsion : 0 = bloc rigide (ancien comportement), 1 = déformation maximale. Défaut 0,6.',
+    ],
+  },
+  {
     date: '08/08/2026 16:07',
     title: 'Eau lissée : fini les billes',
     notes: [

@@ -55,6 +55,31 @@ describe('FluidSim — invariants physiques', () => {
     expect(sumVx).toBeLessThan(0)
   })
 
+  it('le recul localisé déforme : le côté éjection recule plus que le côté opposé', () => {
+    // entraînement coupé pour isoler le recul pur
+    const sim = makeSim({ recoilLocality: 1, ejectEntrain: 0 })
+    sim.spawnDisc(0, 0, 300, KIND_PLAYER)
+    sim.eject(500, 0, 1 / sim.params.ejectRate) // une éjection vers +x
+    let nearVx = 0
+    let nearN = 0
+    let farVx = 0
+    let farN = 0
+    for (let i = 0; i < sim.count; i++) {
+      if (sim.kind[i] !== KIND_PLAYER) continue
+      if (sim.posX[i] > 20) {
+        nearVx += sim.velX[i]
+        nearN++
+      } else if (sim.posX[i] < -20) {
+        farVx += sim.velX[i]
+        farN++
+      }
+    }
+    // le côté éjection (près du point de départ) encaisse le recul…
+    expect(nearVx / nearN).toBeLessThan(-10)
+    // …bien plus que le côté opposé : c'est un fluide, pas un solide
+    expect(nearVx / nearN).toBeLessThan((farVx / Math.max(1, farN)) - 10)
+  })
+
   it('éjecter coûte du volume : se déplacer, c’est rétrécir (§1)', () => {
     const sim = makeSim()
     sim.spawnDisc(0, 0, 300, KIND_PLAYER)

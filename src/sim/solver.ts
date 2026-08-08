@@ -280,14 +280,37 @@ export class FluidSim {
         }
       }
 
-      // Réaction répartie uniformément : conservation exacte, entraînement
-      // compris — le corps recule de tout ce qui part vers l'avant.
-      const rx = -(dvx + entrainX) / this.playerCount
-      const ry = -(dvy + entrainY) / this.playerCount
+      // Réaction : conservation exacte, entraînement compris. Le recul est
+      // pondéré vers le point d'éjection (recoilLocality) — à 0 il est
+      // uniforme et le corps part d'un bloc comme un solide ; à 1 il est
+      // concentré à l'émission et se propage par pression : le côté éjection
+      // s'écrase d'abord, le corps se déforme en accélérant.
+      const locality = Math.min(1, Math.max(0, p.recoilLocality))
+      const localR = p.kernelRadius * 3
+      let wSum = 0
+      for (let i = 0; i < this.count; i++) {
+        if (this.kind[i] !== KIND_PLAYER) continue
+        let w = 1 - locality
+        const dx = this.posX[i] - departX
+        const dy = this.posY[i] - departY
+        const d = Math.hypot(dx, dy)
+        if (d < localR) w += locality * (1 - d / localR)
+        this.dvX[i] = w // scratch : poids de recul (dvX est libre hors step)
+        wSum += w
+      }
+      if (wSum < 1e-6) {
+        // corps entier hors du rayon local (improbable) : repli uniforme
+        wSum = this.playerCount
+        for (let i = 0; i < this.count; i++) {
+          if (this.kind[i] === KIND_PLAYER) this.dvX[i] = 1
+        }
+      }
+      const rx = -(dvx + entrainX) / wSum
+      const ry = -(dvy + entrainY) / wSum
       for (let i = 0; i < this.count; i++) {
         if (this.kind[i] === KIND_PLAYER) {
-          this.velX[i] += rx
-          this.velY[i] += ry
+          this.velX[i] += rx * this.dvX[i]
+          this.velY[i] += ry * this.dvX[i]
         }
       }
     }
