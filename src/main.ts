@@ -260,6 +260,7 @@ const pane = createBench(params, monitor, {
 })
 input.onReset = restart
 input.onZoom = (factor) => camera.zoomBy(factor, params)
+input.onPan = (dx, dy) => camera.panBy(dx, dy)
 input.onVortex = (clientX, clientY) => {
   if (params.vortexEnabled < 0.5) return // outil de test, coupé dans le protocole
   const w = camera.screenToWorld(clientX, clientY, window.innerWidth, window.innerHeight)
@@ -296,7 +297,7 @@ stateEau.addEventListener('click', () => {
 })
 stateGlace.addEventListener('click', () => input.toggleFreeze())
 stateVapeur.addEventListener('click', () => input.toggleGas())
-touchButton('⌖', 'zoom auto (après un zoom molette/pincement)', () => camera.resetAutoZoom())
+touchButton('⌖', 'recadrer sur le corps (zoom et caméra auto)', () => camera.resetAutoZoom())
 const btnSound = touchButton('🔊', 'son : couper / activer', () => {
   audio.resume()
   audio.setEnabled(!audio.enabled)
