@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '08/08/2026 21:35',
+    title: 'Zoom d’ouverture',
+    notes: [
+      'Chaque tableau s’ouvre sur un plan large (~1 s) : le niveau entier se lit — parcours, sas — puis la caméra plonge en travelling adouci vers le corps.',
+      'Au premier lancement aussi. Le moindre geste (visée, molette) coupe court et rend la main immédiatement.',
+      'Accessoirement, ça montre que le zoom existe (molette / pincement).',
+    ],
+  },
+  {
     date: '08/08/2026 20:28',
     title: 'La glace devient une capacité : F pour se changer en bloc',
     notes: [

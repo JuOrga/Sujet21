@@ -80,9 +80,15 @@ const homeState = el('home-state')
 // Fiche d'essai : visible au chargement ; « échap » ou ≡ pour y revenir.
 // L'essai continue de dériver derrière la fiche — elle observe, elle ne fige pas.
 const startBtn = document.getElementById('start') as HTMLButtonElement
+let hasPlayed = false
 function closeHome(): void {
   document.body.classList.add('playing')
   startBtn.textContent = "REPRENDRE L'ESSAI"
+  if (!hasPlayed) {
+    // Premier lancement : zoom d'ouverture (les redémarrages ont le leur)
+    hasPlayed = true
+    camera.startIntro(sim.bounds, window.innerWidth, window.innerHeight)
+  }
 }
 function openHome(): void {
   document.body.classList.remove('playing')
@@ -102,6 +108,7 @@ const exposeSim = (): void => {
 }
 exposeSim()
 const camera = new Camera()
+;(window as unknown as { __cam: Camera }).__cam = camera
 camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, 1)
 const renderer = new Renderer(canvas, CAPACITY)
 const loop = new FixedLoop()
@@ -129,7 +136,11 @@ function restart(): void {
   sim = createSim(level)
   exposeSim()
   loop.reset()
-  camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, camera.zoom)
+  if (document.body.classList.contains('playing')) {
+    camera.startIntro(sim.bounds, window.innerWidth, window.innerHeight)
+  } else {
+    camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, camera.zoom)
+  }
 }
 
 const pane = createBench(params, monitor, {
@@ -227,6 +238,7 @@ function frame(now: number): void {
   const tableauDone = run.exitTimer > 0
 
   sim.freezeIntent = input.freezeIntent
+  if (input.aimActive) camera.cancelIntro() // le joueur agit : la caméra suit
   if (!input.paused && !tableauDone) {
     loop.advance(dtReal, params.timeWarp, params.dt, () => {
       if (input.aimActive && !sim.dispersed) {
