@@ -46,7 +46,7 @@ se dire en une phrase de physique, conformément au pilier 3.
 | Jalon | Contenu | Critère de sortie |
 |---|---|---|
 | **M0 — Slice liquide** *(fait)* | verbe unique, éponge, un tableau, banc de réglage | on « sent » l'arbitrage gros/petit |
-| **M1 — Chaleur** | carte thermique, radiateurs, cryobaies ; états **glace** (trajectoire engagée) et **vapeur** (poussée explosive, perte définitive) | traverser un même tableau par 3 routes selon l'état |
+| **M1 — Chaleur** *(fait)* | carte thermique, radiateurs, cryobaies ; états **glace** (trajectoire engagée) et **vapeur** (poussée explosive, perte définitive) | traverser un même tableau par 3 routes selon l'état |
 | **M2 — Boucle roguelike** | enchaînement de tableaux, retour à capacité de base, surplus → bonbonnes, recondensation sur parois froides (perte 40–50 %) | une partie complète de 15–20 min |
 | **M3 — Le vaisseau vivant** | refroidissement global, obstacles chimiques restants (hydrophile/phobe, filtres, champs), routes ramifiées | la pression temporelle se lit sans chronomètre |
 | **M4 — Méta & narration** | bonbonnes typées (§8), déblocage des origines (§9.3), registres du labo, son | le contrat « hors protocole = déplacé, pas raccourci » est vérifiable |
@@ -78,6 +78,9 @@ de recette de chacun.
 
 ## 5. Prochaine étape immédiate
 
-Jouer la slice, trancher la décision n°1 (cohésion) au banc de réglage,
-puis lancer M1 (la chaleur) — c'est elle qui déverrouille les deux autres
-états et donc l'essentiel du level design.
+M1 est en place : le tableau se traverse par trois routes selon l'état
+(liquide, glace, vapeur), et les seuils de gel/ébullition sont au banc de
+réglage. Reste à trancher la décision n°1 (cohésion) manette en main, puis
+lancer **M2 — la boucle roguelike** : enchaînement de tableaux, retour à la
+capacité de base, surplus mis en bonbonne, et la recondensation sur parois
+froides qui donnera un usage à la vapeur perdue.

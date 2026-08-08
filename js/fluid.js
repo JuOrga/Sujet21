@@ -15,6 +15,13 @@ const Fluid = (() => {
   const mergeTimer = new Float32Array(MAX);  // > 0 : goutte fraîchement éjectée
   const ballistic = new Float32Array(MAX);   // > 0 : découplée du fluide (en cours de détachement)
   const spongeT = new Float32Array(MAX);     // temps de contact continu avec l'éponge
+  // M1 — la chaleur : chaque particule porte une température et une phase.
+  const temp = new Float32Array(MAX);        // 0 = gel, 1 = ébullition
+  const phase = new Uint8Array(MAX);         // 0 liquide, 1 glace, 2 vapeur
+  const vaporT = new Float32Array(MAX);      // durée de vie restante de la vapeur
+  const iceBody = new Int32Array(MAX);       // id du corps de glace (-1 sinon)
+  const iceOffX = new Float32Array(MAX);     // offset rigide dans le corps de glace
+  const iceOffY = new Float32Array(MAX);
   let n = 0;
   let rho0 = 1; // calibrée après le spawn
 
@@ -26,6 +33,7 @@ const Fluid = (() => {
     if (n >= MAX) return -1;
     x[n] = ax; y[n] = ay; vx[n] = avx || 0; vy[n] = avy || 0;
     mergeTimer[n] = 0; ballistic[n] = 0; spongeT[n] = 0;
+    temp[n] = P.ambient; phase[n] = 0; vaporT[n] = 0; iceBody[n] = -1;
     return n++;
   }
 
@@ -33,6 +41,8 @@ const Fluid = (() => {
     n--;
     x[i] = x[n]; y[i] = y[n]; vx[i] = vx[n]; vy[i] = vy[n];
     mergeTimer[i] = mergeTimer[n]; ballistic[i] = ballistic[n]; spongeT[i] = spongeT[n];
+    temp[i] = temp[n]; phase[i] = phase[n]; vaporT[i] = vaporT[n];
+    iceBody[i] = iceBody[n]; iceOffX[i] = iceOffX[n]; iceOffY[i] = iceOffY[n];
   }
 
   function clear() { n = 0; }
@@ -43,10 +53,11 @@ const Fluid = (() => {
     for (let i = 0; i < n; i++) {
       const list = nbr[i];
       list.length = 0;
-      if (ballistic[i] > 0) continue; // en vol libre : aucun couplage fluide
+      // en vol libre, gelée ou vaporisée : aucun couplage fluide
+      if (ballistic[i] > 0 || phase[i] !== 0) continue;
       const xi = px[i], yi = py[i];
       grid.query(xi, yi, h, (j) => {
-        if (j === i || ballistic[j] > 0) return;
+        if (j === i || ballistic[j] > 0 || phase[j] !== 0) return;
         const dx = xi - px[j], dy = yi - py[j];
         if (dx * dx + dy * dy < h2) list.push(j);
       });
@@ -104,6 +115,7 @@ const Fluid = (() => {
   function substep(sdt, level) {
     const h = P.h, h2 = h * h;
     for (let i = 0; i < n; i++) {
+      if (phase[i] === 1) { px[i] = x[i]; py[i] = y[i]; continue; } // glace : mouvement rigide géré par Thermal
       px[i] = x[i] + vx[i] * sdt;
       py[i] = y[i] + vy[i] * sdt;
     }
@@ -149,6 +161,7 @@ const Fluid = (() => {
         dpx[i] = sx; dpy[i] = sy;
       }
       for (let i = 0; i < n; i++) {
+        if (phase[i] === 1) continue;
         px[i] += dpx[i]; py[i] += dpy[i];
         collide(i, level);
       }
@@ -156,6 +169,7 @@ const Fluid = (() => {
 
     // vitesse depuis les positions + viscosité XSPH (symétrique : conserve la q. de mvt)
     for (let i = 0; i < n; i++) {
+      if (phase[i] === 1) continue; // la glace garde la vitesse de son corps
       vx[i] = (px[i] - x[i]) / sdt;
       vy[i] = (py[i] - y[i]) / sdt;
     }
@@ -192,6 +206,7 @@ const Fluid = (() => {
 
   return {
     x, y, vx, vy, mergeTimer, ballistic, spongeT, grid,
+    temp, phase, vaporT, iceBody, iceOffX, iceOffY,
     get n() { return n; },
     add, remove, clear, step, calibrate,
   };

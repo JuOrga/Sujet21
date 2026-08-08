@@ -25,7 +25,24 @@ npx serve .        # ou : python3 -m http.server
 | **R** | recommencer |
 | **T** | banc de réglage (sliders en direct + export JSON) |
 
-## Ce que contient cette slice verticale
+## Ce que contient le jalon M1 — la chaleur
+
+- **Carte thermique** (§5) : le tableau se lit en gradients — cryobaie,
+  radiateurs, conduites chaudes. Température par particule, conduction
+  interne, échange surtout en surface : l'inertie thermique d'un gros corps
+  (lent à geler, lent à chauffer) émerge du modèle au lieu d'être scriptée.
+- **Glace** (§4) : sous le seuil, le corps gèle d'un bloc et devient un
+  solide balistique — on ne pilote plus, on glisse, on rebondit ; l'éponge
+  n'a plus prise. Geler, c'est parier sur une trajectoire. La chaleur fait fondre.
+- **Vapeur** (§4) : au contact d'un radiateur, le flanc exposé bout ; chaque
+  bouffée part avec conservation exacte de la quantité de mouvement —
+  poussée explosive, et volume perdu définitivement (recondensation : M2).
+- **Trois routes dans le même tableau** (critère de sortie M1) :
+  couloir central en liquide (éponge à payer, ou fente étroite), couloir
+  haut en glace (le tunnel absorbant est trop long pour être payé — seule
+  la glace le traverse), couloir bas à la catapulte à vapeur.
+
+## Ce que contient la slice M0
 
 - **Solveur PBF 2D** sans gravité : la cohésion du corps (tension de surface)
   est un comportement du modèle, pas une règle. Fusion automatique des masses
@@ -46,5 +63,8 @@ npx serve .        # ou : python3 -m http.server
 
 ## Tests
 
-Un test de fumée automatisé (Playwright) vérifie : absence d'erreur JS,
-stabilité du corps au repos, coût et efficacité de la poussée, dérive inertielle.
+Deux tests automatisés (Playwright — `npm i playwright`, puis
+`node test/smoke.js` et `node test/thermal.js`) vérifient : absence d'erreur
+JS, stabilité du corps au repos, coût et efficacité de la poussée, dérive
+inertielle, gel en cryobaie, fonte au radiateur, ébullition avec perte de
+volume et poussée thermique.
