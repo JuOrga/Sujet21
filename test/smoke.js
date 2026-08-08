@@ -40,10 +40,31 @@ const { chromium } = require("playwright");
   console.log("après dérive ×4:", JSON.stringify(s3));
   await page.screenshot({ path: "test/shot_drift.png" });
 
+  // Registres du labo : consignation, record (temps min, volume départage), persistance
+  const rec = await page.evaluate(() => {
+    Records.wipe();
+    const a = Records.endAttempt({ won: false, time: 12.34, volume: 0.1 });
+    const b = Records.endAttempt({ won: true, time: 40.0, volume: 0.5 });
+    const c = Records.endAttempt({ won: true, time: 35.5, volume: 0.4 });
+    const d = Records.endAttempt({ won: true, time: 60.0, volume: 0.9 });
+    const out = {
+      attempts: Records.attempts(),
+      best: Records.best(),
+      newBests: [a.newBest, b.newBest, c.newBest, d.newBest],
+      history: Records.history().length,
+    };
+    Records.wipe();
+    return out;
+  });
+
   console.log("--- checks ---");
   console.log("erreurs JS:", errors.length ? errors : "aucune");
   console.log("corps stable au repos:", s1.player >= s0.player - 5 ? "OK" : "ECHEC");
   console.log("coût de la poussée (particules):", s1.player - s2.player);
   console.log("déplacement vers la droite:", (s2.cx - s1.cx).toFixed(1), "px puis", (s3.cx - s2.cx).toFixed(1), "px en dérive");
+  const recOK = rec.attempts === 4 && rec.history === 4 &&
+    rec.best && rec.best.time === 35.5 && rec.best.no === 3 &&
+    String(rec.newBests) === "false,true,true,false";
+  console.log("registres du labo:", recOK ? "OK" : "ECHEC " + JSON.stringify(rec));
   await browser.close();
 })();
