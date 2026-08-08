@@ -1,72 +1,153 @@
 # Projet 21 — assets images à générer par IA
 
-Liste des images dont le jeu a besoin pour remplacer/enrichir le décor procédural.
-Chaque entrée donne : taille, format, contraintes, et un prompt de départ (en anglais,
-les générateurs y répondent mieux). Une fois générées, déposez-les dans `public/assets/`
-(ou envoyez-les moi) — j'assure l'intégration WebGL.
+Prompts complets, prêts à copier-coller (en anglais : les générateurs y répondent mieux).
+Une fois générées, déposez les images dans `public/assets/` (ou envoyez-les moi) —
+j'assure l'intégration WebGL (raccords, étirement, animation de l'iris du sas…).
 
-## Direction artistique commune (à ajouter à chaque prompt)
+## Conseils selon le générateur
 
-- Ambiance : laboratoire orbital rétro-futuriste, instrumentation années 70 revisitée, calme, sombre.
-- Palette : fond quasi noir `#030710`, bleu acier `#0a1420`, encre `#d9ecf7`,
-  bleu spécimen `#63b7e6`, halo `#a7ddf5`, vert sas `#3fd69b`, violet hydrophobe `#9e6bc7`, ocre éponge `#4d4226`.
-- Luminosité générale faible (le jeu est sombre) — pas de blanc pur, pas de couleurs saturées criardes.
-- **Aucun texte ni logo dans les images.**
-- Suffixe de prompt utile : `dark sci-fi laboratory style, muted cold palette, game texture, high detail, no text`
+- **Midjourney** : ajoutez `--tile` aux textures répétées, `--ar 1:1` par défaut,
+  `--ar 8:1` pour la bande de coque, `--ar 4:5` pour l'illustration d'accueil.
+- **Stable Diffusion / Flux** : activez l'option *tiling/seamless* pour les textures ;
+  collez la ligne « Négatif » dans le champ *negative prompt*.
+- **DALL·E** : pas d'option tile — demandez « seamless » dans le prompt et vérifiez le
+  raccord (je peux corriger les bords à l'intégration si besoin).
+- La taille exacte importe peu à la génération : générez en carré haute résolution,
+  je recadre/redimensionne. La transparence, elle, doit être demandée explicitement.
 
-## Les assets
+---
 
-### 1. Fond « nuit orbitale » (prioritaire)
-- **2048×2048**, JPG ou WebP (pas de transparence), **seamless / tileable** (répété à l'infini).
-- Champ d'étoiles faible + nébulosité bleu-violet très discrète. Aucun objet saillant (il se répète).
-- Prompt : `seamless tileable dark space starfield texture, tiny dim stars, faint cold blue-violet nebula wisps, near-black background #030710, no planet, no bright object, subtle, game skybox texture`
+## 1. Fond « nuit orbitale » — PRIORITAIRE
+**2048×2048 · JPG/WebP · tileable · pas de transparence**
 
-### 2. Coque du vaisseau — bande de paroi (prioritaire)
-- **2048×256**, PNG, **tileable horizontalement** (elle court le long des 4 parois de la cuve).
-- Métal bleu-acier sombre : panneaux, rivets, conduites fines, un liseré lumineux cyan discret côté intérieur.
-- Prompt : `horizontal seamless spaceship hull wall strip, dark steel blue panels with rivets and thin pipes, subtle cyan glowing trim line, side view, flat orthographic game texture`
+```
+Seamless tileable deep space background texture for a video game. Near-black night
+sky (#030710) with sparse tiny dim stars, very faint cold nebula wisps in desaturated
+blue-violet, extremely dark and subtle, evenly distributed, no planet, no moon, no
+bright light source, uniform edges for perfect tiling, flat 2D texture, high resolution,
+no text, no watermark
+```
+Négatif : `planet, sun, moon, bright stars, lens flare, vignette, borders, text, watermark`
 
-### 3. Coin de coque
-- **512×512**, PNG **transparent**, raccord propre avec la bande n°2 (angle 90°).
-- Prompt : `corner junction piece of dark spaceship hull, steel blue panels with rivets, 90 degree angle, orthographic, transparent background, game sprite`
+## 2. Coque du vaisseau (bande de paroi) — PRIORITAIRE
+**2048×256 · PNG · tileable horizontalement**
 
-### 4. Bouche du sas (prioritaire)
-- **1024×1024**, PNG **transparent**, vue de face, parfaitement circulaire et centrée.
-- Iris mécanique / bouche d'aspiration : anneau lumineux vert `#3fd69b`, lamelles métalliques, centre noir profond. Je l'anime (rotation, pulsation) par-dessus — pas besoin d'effet de mouvement dans l'image.
-- Prompt : `circular sci-fi airlock iris seen from front, mechanical shutter blades, glowing green ring #3fd69b, deep black center hole, dark steel frame, perfectly centered, orthographic, transparent background, game sprite`
+```
+Long horizontal strip of spaceship hull wall, flat orthographic side view, dark
+steel-blue metal panels (#0a1420) with visible seams, small rivets, thin pipes and
+conduits running along the strip, one subtle glowing cyan trim line (#63b7e6) along
+the lower edge, retro-futuristic 1970s orbital laboratory style, muted cold palette,
+low brightness, evenly lit, seamless horizontal tiling with matching left and right
+edges, flat 2D game texture, no perspective, no text
+```
+Négatif : `perspective, depth of field, bright lighting, warm colors, logo, text, watermark`
 
-### 5. Texture mur neutre
-- **512×512**, PNG, **tileable**.
-- Métal brossé sombre, quelques vis/plaques, mat.
-- Prompt : `seamless tileable dark brushed metal panel texture, subtle screws and plate seams, matte, steel blue-grey, game texture`
+## 3. Coin de coque
+**512×512 · PNG transparent**
 
-### 6. Texture paroi hydrophobe
-- **512×512**, PNG, **tileable**.
-- Surface cireuse violet sombre, gouttes qui perlent (l'eau ne l'accroche pas).
-- Prompt : `seamless tileable dark waxy purple surface texture, beading water droplets, hydrophobic coating, subtle sheen, game texture`
+```
+Corner junction piece of a spaceship hull frame, 90 degree L-shape, flat orthographic
+view, dark steel-blue metal panels with rivets and a reinforced corner plate, subtle
+cyan glowing trim on the inner edge, retro-futuristic orbital laboratory style, muted
+cold palette, isolated on transparent background, flat 2D game sprite, no perspective,
+no text
+```
+Négatif : `background, floor, shadow on ground, perspective, text`
 
-### 7. Texture paroi hydrophile
-- **512×512**, PNG, **tileable**.
-- Surface mouillée luisante bleu-vert, film d'eau, reflets doux.
-- Prompt : `seamless tileable wet glossy teal surface texture, thin water film, soft specular streaks, dark background, game texture`
+## 4. Bouche du sas (iris mécanique) — PRIORITAIRE
+**1024×1024 · PNG transparent · parfaitement centré**
 
-### 8. Éponge (2 fichiers)
-- **512×512** chacun, PNG, **tileable** : `eponge-seche` (mousse poreuse ocre) et `eponge-gorgee` (même structure, gorgée d'eau, plus sombre et luisante).
-- Prompt (sèche) : `seamless tileable dry porous sponge foam texture, ochre brown, deep irregular holes, matte, game texture`
-- Prompt (gorgée) : `seamless tileable water-saturated sponge texture, dark wet ochre, glistening pores, game texture`
+```
+Circular sci-fi airlock iris seen perfectly from the front, centered in frame,
+mechanical shutter blades arranged radially like a camera aperture, deep black center
+hole, glowing emerald green ring (#3fd69b) around the opening, dark brushed steel
+outer frame with bolts, retro-futuristic 1970s laboratory style, muted cold palette,
+subtle rim light, symmetrical, orthographic, isolated on transparent background,
+flat 2D game sprite, no text
+```
+Négatif : `perspective, tilt, off-center, motion blur, bright colors, text`
 
-### 9. Illustration d'accueil (optionnel)
-- **1600×2000** (portrait), JPG/WebP.
-- Illustration scientifique rétro d'une masse d'eau sphérique flottant en apesanteur dans une cuve d'essai, instruments autour — pour habiller la fiche d'essai.
-- Prompt : `retro scientific illustration of a wobbling water sphere floating in zero gravity inside an orbital laboratory test chamber, measurement instruments, blueprint style, dark cold palette, cyan and steel blue`
+## 5. Texture mur neutre
+**512×512 · PNG · tileable**
 
-### 10. Écusson de mission (optionnel)
-- **1024×1024**, PNG **transparent**, badge circulaire de mission spatiale (sans texte — j'ajoute « PROJET 21 » en typo par-dessus).
-- Prompt : `circular space mission patch badge, water droplet in zero gravity motif, embroidered style, dark navy and cyan, green accent ring, no text, transparent background`
+```
+Seamless tileable texture of a dark brushed metal wall panel, steel blue-grey
+(#10151c), fine directional brushing, subtle plate seams and small screws, matte
+finish, low contrast, evenly lit, flat 2D game texture, perfect tiling, no text
+```
+Négatif : `rust, warm tones, strong highlights, perspective, text`
+
+## 6. Texture paroi hydrophobe
+**512×512 · PNG · tileable**
+
+```
+Seamless tileable texture of a dark waxy hydrophobic surface, deep muted purple
+(#2a1c33) with soft highlights (#9e6bc7), small water droplets beading on top,
+pearled bumpy micro-relief, soft waxy sheen, low brightness, flat 2D game texture,
+perfect tiling, no text
+```
+Négatif : `wet film, puddles, bright purple, glitter, text`
+
+## 7. Texture paroi hydrophile
+**512×512 · PNG · tileable**
+
+```
+Seamless tileable texture of a wet glossy surface, dark teal (#0d2a30) with soft
+cyan specular streaks (#63b7e6), thin uniform water film, gentle moisture ripples,
+glistening but dark, flat 2D game texture, perfect tiling, no text
+```
+Négatif : `droplets beading, dry areas, warm reflections, text`
+
+## 8a. Éponge sèche
+**512×512 · PNG · tileable**
+
+```
+Seamless tileable texture of dry porous sponge foam, ochre brown (#4d4226), deep
+irregular holes and cavities, matte dusty surface, low brightness, flat 2D game
+texture, perfect tiling, no text
+```
+Négatif : `wet, shiny, kitchen sponge with flat sides, yellow, text`
+
+## 8b. Éponge gorgée d'eau
+**512×512 · PNG · tileable · même structure que 8a**
+
+```
+Seamless tileable texture of a water-saturated sponge, dark wet ochre brown,
+glistening pores filled with water, subtle cold cyan reflections, darker and
+glossier than dry foam, flat 2D game texture, perfect tiling, no text
+```
+Négatif : `dry areas, bright colors, bubbles floating above surface, text`
+
+## 9. Illustration d'accueil (optionnel)
+**1600×2000 portrait · JPG/WebP**
+
+```
+Retro scientific illustration in portrait orientation: a large wobbling sphere of
+water floating in zero gravity inside an orbital laboratory test chamber, surrounded
+by measurement instruments, calibration marks and thin annotation lines without any
+letters, blueprint technical style mixed with soft airbrush shading, dark cold
+palette: near-black background (#030710), steel blue panels, cyan water (#63b7e6)
+with pale highlights (#a7ddf5), one small emerald green indicator light (#3fd69b),
+1970s space program aesthetic, calm and precise mood, no text, no letters, no numbers
+```
+Négatif : `text, letters, numbers, labels, astronaut, faces, warm colors`
+
+## 10. Écusson de mission (optionnel)
+**1024×1024 · PNG transparent · sans texte (je pose « PROJET 21 » en typo par-dessus)**
+
+```
+Circular embroidered space mission patch, a stylized water droplet floating in zero
+gravity at the center, orbital ring motif around it, dark navy and steel blue fabric,
+cyan and pale blue thread details, one emerald green accent ring (#3fd69b), 1970s
+NASA patch style, clean symmetrical composition, isolated on transparent background,
+no text, no letters
+```
+Négatif : `text, letters, numbers, flag, rocket, bright red, white background`
+
+---
 
 ## Ce que je peux faire sans générateur d'images
 
-Je ne génère pas d'images bitmap « peintes », mais je peux produire moi-même :
-vecteurs SVG (logo, cadres, icônes, écusson au trait), et textures procédurales
-en shader (c'est le décor actuel : étoiles, nébulosité, caustiques, métal brossé…).
-Les prompts ci-dessus servent pour Midjourney, DALL·E, Flux, Stable Diffusion, etc.
+Vecteurs SVG (logo, cadres, icônes, écusson au trait) et textures procédurales en
+shader (le décor actuel : étoiles, nébulosité, caustiques, métal brossé…). Les
+prompts ci-dessus visent Midjourney, DALL·E, Flux, Stable Diffusion, etc.
