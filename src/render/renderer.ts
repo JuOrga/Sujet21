@@ -100,6 +100,7 @@ uniform float uBoxMats[MAX_BOXES]; // 0 mur, 1 hydrophile, 2 hydrophobe, 3 sas
 uniform float uTime;
 uniform float uExitRadius; // portée de l'aspiration du sas (halo de courant)
 uniform float uColdBand;   // portée de l'aura de gel des plaques froides
+uniform float uHeatBand;   // portée de l'aura de chaleur des radiateurs
 uniform int uWaveCount;
 uniform vec4 uWaves[MAX_WAVES]; // x, y, instant de départ, amplitude
 // Textures d'habillage (chargées en arrière-plan ; uHas* passe à 1 quand
@@ -267,6 +268,19 @@ void main() {
       }
       col = mix(col, fillCol, fill);
       col = mix(col, edgeCol, edge * 0.9);
+    } else if (mat > 5.5) {
+      // Radiateur (tableau 4) : rayures chaudes qui défilent, arête incandes-
+      // cente, et une aura de chaleur qui tremble — le danger (et la
+      // ressource) se lit avant le contact, comme pour le froid.
+      float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
+      float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
+      float stripe = 0.5 + 0.5 * sin((world.x + world.y - uTime * 46.0) * 0.14);
+      vec3 fillCol = vec3(0.26, 0.11, 0.05) + vec3(0.42, 0.17, 0.04) * smoothstep(0.35, 0.85, stripe);
+      col = mix(col, fillCol, fill);
+      col = mix(col, vec3(1.0, 0.56, 0.24), edge * 0.9);
+      float aura = (1.0 - smoothstep(0.0, uHeatBand, max(d, 0.0))) * step(0.0, d);
+      float shimmer = 0.55 + 0.45 * vnoise(world * 0.06 + vec2(-uTime * 0.16, uTime * 0.24));
+      col += vec3(0.36, 0.15, 0.04) * aura * aura * shimmer;
     } else if (mat > 4.5) {
       // Grille (tableau 3) : panneau perforé — le liquide s'y écrase, la
       // vapeur passe entre les mailles. Les trous laissent voir le fond.
@@ -811,6 +825,7 @@ export class Renderer {
     gl.uniform1f(cu['uTime'], timeSec)
     gl.uniform1f(cu['uExitRadius'], params.exitRadius)
     gl.uniform1f(cu['uColdBand'], params.coldBand)
+    gl.uniform1f(cu['uHeatBand'], params.heatBand)
     gl.uniform1i(cu['uWaveCount'], waveCount)
     gl.uniform4fv(cu['uWaves[0]'], waves)
     const bindTex = (unit: number, tex: WebGLTexture | null, sampler: string, flag: string) => {

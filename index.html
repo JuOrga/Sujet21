@@ -707,6 +707,7 @@
       .wl-phobe { color: #b48ad8; }
       .wl-eponge { color: #d0b26a; }
       .wl-froid { color: #b3dcf8; }
+      .wl-chaud { color: #ff9c5b; }
       .wl-grille { color: #8fb3cc; }
       .wl-sas { color: var(--valid); }
 
@@ -807,6 +808,12 @@
           radial-gradient(circle at 70% 60%, rgba(179, 220, 248, 0.45) 0 2px, transparent 3px),
           linear-gradient(135deg, #26364a, #48627c);
         border-color: #b3dcf8;
+      }
+      .lg-sw.sw-chaud {
+        background:
+          repeating-linear-gradient(45deg, rgba(255, 140, 60, 0.55) 0 5px, transparent 5px 11px),
+          linear-gradient(135deg, #401c0b, #7a3410);
+        border-color: #ff9c5b;
       }
       .lg-sw.sw-grille {
         background:
@@ -983,6 +990,11 @@
         <span><b>Plaque froide</b> — son aura de brume gèle l'eau qui s'attarde.
         <span class="st">Glace</span> au contact : soudée, le bloc s'arrête net.
         <span class="st">Vapeur</span> : condensée, on redevient eau.</span></div>
+      <div class="lg-row"><span class="lg-sw sw-chaud"></span>
+        <span><b>Radiateur</b> — son aura vaporise l'eau, qu'on le veuille ou non :
+        la <span class="st">vapeur</span> gagnée traverse grilles et éponges, mais
+        s'attarder la fait s'évaporer (perdue). Dégèle la
+        <span class="st">glace</span>.</span></div>
       <div class="lg-row"><span class="lg-sw sw-grille"></span>
         <span><b>Grille</b> — arrête l'eau et la glace ; seule la
         <span class="st">vapeur</span> passe entre les mailles.</span></div>
