@@ -15,6 +15,7 @@ import { makeKernels, computeRestDensity, type Kernels } from './kernels'
 import { labelComponents } from './components'
 import { boxContact, Sponge, type ClosestPoint } from './obstacles'
 import {
+  MAT_CHAUD,
   MAT_FROID,
   MAT_GRILLE,
   MAT_HYDROPHILE,
@@ -213,11 +214,39 @@ export class FluidSim {
   }
 
   private hasCold = false
+  private hasHeat = false
+  private heatCarry = 0
 
   setLevel(boxes: ObstacleBox[], sponges: SpongeDef[]): void {
     this.boxes = boxes
     this.sponges = sponges.map((d) => new Sponge(d))
     this.hasCold = boxes.some((b) => b.material === MAT_FROID)
+    this.hasHeat = boxes.some((b) => b.material === MAT_CHAUD)
+  }
+
+  // Exposition à la chaleur en (x, y) : 1 au contact d'un radiateur, 0 au
+  // bord de l'aura. Même géométrie que l'aura de gel des plaques froides.
+  private heatExposureAt(x: number, y: number): number {
+    if (!this.hasHeat) return 0
+    const band = this.params.heatBand
+    const rp = this.params.particleSpacing * 0.5
+    const cp = this.scratchCP
+    let heat = 0
+    for (const b of this.boxes) {
+      if (b.material !== MAT_CHAUD) continue
+      if (
+        x < b.minX - band - rp ||
+        x > b.maxX + band + rp ||
+        y < b.minY - band - rp ||
+        y > b.maxY + band + rp
+      ) {
+        continue
+      }
+      boxContact(x, y, b, cp)
+      const f = 1 - Math.max(0, cp.dist - rp) / band
+      if (f > heat) heat = Math.min(1, f)
+    }
+    return heat
   }
 
   // Retrait par échange avec la dernière particule (absorption éponge).
@@ -1138,11 +1167,16 @@ export class FluidSim {
       }
       this.welded[i] = this.frozen[i] === 1 && minSep <= 1 ? 1 : 0
 
-      // Vapeur : le froid condense en priorité (vite), sinon l'intention (G)
-      // vaporise et son absence condense. Hystérésis comme pour la glace.
+      // Radiateur (tableau 4) : l'aura de chaleur, symétrique de l'aura de gel
+      const heat = this.heatExposureAt(x, y)
+
+      // Vapeur : le froid condense en priorité (vite), puis la chaleur
+      // vaporise qu'on le veuille ou non, sinon l'intention (G) vaporise et
+      // son absence condense. Hystérésis comme pour la glace.
       const wantGas = this.gasIntent && this.kind[i] === KIND_PLAYER && this.frozen[i] === 0
       let dv: number
       if (exposure > 0) dv = -exposure * (dt / 0.25)
+      else if (heat > 0 && this.frozen[i] === 0) dv = heat * (dt / Math.max(0.05, p.boilTime))
       else if (wantGas) dv = dt / Math.max(0.05, p.vaporizeTime)
       else dv = -dt / Math.max(0.05, p.condenseTime)
       const vap = Math.min(1, Math.max(0, this.vapor[i] + dv))
@@ -1150,16 +1184,51 @@ export class FluidSim {
       if (vap >= 1) this.gaseous[i] = 1
       else if (this.gaseous[i] === 1 && vap <= 0.55) this.gaseous[i] = 0
 
-      // Givre : jamais sur la vapeur — le froid doit d'abord la condenser
+      // Givre : jamais sur la vapeur — le froid doit d'abord la condenser.
+      // La chaleur empêche la prise, et dégèle bien plus vite qu'à l'air libre.
       const wanted = intent && this.kind[i] === KIND_PLAYER && this.gaseous[i] === 0
-      const canFrost = this.gaseous[i] === 0 && vap < 0.5
+      const canFrost = this.gaseous[i] === 0 && vap < 0.5 && heat <= 0
       const rate = canFrost ? Math.max(exposure * freeze, wanted ? freezeSelf : 0) : 0
       if (rate > 0) {
         this.frost[i] = Math.min(1, this.frost[i] + rate)
         if (this.frost[i] >= 1) this.frozen[i] = 1 // la vitesse est conservée
       } else {
-        this.frost[i] = Math.max(0, this.frost[i] - thaw)
+        const melt =
+          heat > 0 ? Math.max(thaw, (heat * dt) / Math.max(0.05, p.heatThawTime)) : thaw
+        this.frost[i] = Math.max(0, this.frost[i] - melt)
         if (this.frozen[i] === 1 && this.frost[i] <= 0.55) this.frozen[i] = 0
+      }
+    }
+
+    // La vapeur qui s'attarde dans l'aura d'un radiateur s'évapore : perdue,
+    // pas mise en bonbonne. La plus exposée part en premier.
+    if (this.hasHeat) {
+      let anyHotGas = false
+      for (let i = 0; i < this.count; i++) {
+        if (this.gaseous[i] === 1 && this.heatExposureAt(this.posX[i], this.posY[i]) > 0) {
+          anyHotGas = true
+          break
+        }
+      }
+      if (anyHotGas) {
+        this.heatCarry += p.heatLossRate * dt
+        while (this.heatCarry >= 1) {
+          this.heatCarry -= 1
+          let best = -1
+          let bestHeat = 0
+          for (let i = 0; i < this.count; i++) {
+            if (this.gaseous[i] !== 1) continue
+            const h = this.heatExposureAt(this.posX[i], this.posY[i])
+            if (h > bestHeat) {
+              bestHeat = h
+              best = i
+            }
+          }
+          if (best < 0 || (this.kind[best] === KIND_PLAYER && this.playerCount <= 2)) break
+          this.removeParticle(best)
+        }
+      } else {
+        this.heatCarry = 0
       }
     }
   }

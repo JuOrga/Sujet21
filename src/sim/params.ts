@@ -44,6 +44,15 @@ export interface SimParams {
   thawTime: number // s de dégel (intention levée, ou à l'écart du froid)
   iceRestitution: number // rebond des blocs de glace sur les parois (0..1)
 
+  // Radiateur (tableau 4) : la chaleur, symétrique du froid. Dans l'aura,
+  // l'eau se vaporise qu'on le veuille ou non (danger OU ressource : la
+  // vapeur gagnée traverse grilles et éponges), la glace dégèle, et la
+  // vapeur qui s'attarde s'évapore — définitivement perdue.
+  heatBand: number // portée de l'aura de chaleur autour des radiateurs (unités monde)
+  boilTime: number // s d'exposition en pleine aura avant la vaporisation complète
+  heatThawTime: number // s de dégel forcé en pleine aura (bien plus vite qu'à l'air libre)
+  heatLossRate: number // particules de vapeur perdues / s d'exposition dans l'aura
+
   // Gaz (tableau 3) : se changer en vapeur (touche G) pour se déplacer en
   // continu vers le pointeur — sans recul ni éjection, mais le nuage
   // s'évapore en avançant, et le froid le condense.
@@ -132,6 +141,14 @@ export const DEFAULT_PARAMS: SimParams = {
   freezeSelfTime: 0.45,
   thawTime: 2.5,
   iceRestitution: 0.45,
+
+  // Fenêtre d'usage : ~1,5 s pour gagner la vapeur, puis ~8 particules/s de
+  // perte si on s'attarde — le radiateur est une ressource qui devient un
+  // danger, jamais un mur binaire (§6)
+  heatBand: 44,
+  boilTime: 1.5,
+  heatThawTime: 0.35,
+  heatLossRate: 8,
 
   vaporizeTime: 0.5,
   condenseTime: 0.9,

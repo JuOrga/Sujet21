@@ -10,6 +10,7 @@ export const MAT_HYDROPHOBE = 2
 export const MAT_EXIT = 3 // rendu seulement, pas de physique
 export const MAT_FROID = 4 // plaque froide : gèle l'eau qui s'attarde dans son aura
 export const MAT_GRILLE = 5 // grille : arrête le liquide et la glace, laisse passer la vapeur
+export const MAT_CHAUD = 6 // radiateur : vaporise l'eau dans son aura, dégèle, évapore ce qui s'attarde
 
 export interface ObstacleBox {
   minX: number
@@ -34,7 +35,7 @@ export interface WorldLabel {
   x: number
   y: number
   text: string
-  tone: 'mur' | 'phile' | 'phobe' | 'eponge' | 'froid' | 'grille' | 'sas'
+  tone: 'mur' | 'phile' | 'phobe' | 'eponge' | 'froid' | 'grille' | 'sas' | 'chaud'
 }
 
 export interface LevelDef {
@@ -172,8 +173,51 @@ export const TABLEAU_3: LevelDef = {
   ],
 }
 
+// Tableau 4 — la cuve thermique (le jalon « chaleur » : les trois routes).
+// Le tableau se lit comme une carte de température. Lecture :
+// 1. une cloison neutre percée au centre ;
+// 2. un radiateur en haut, une cryobaie en bas : deux préparations d'état ;
+// 3. une barrière qui combine les trois réponses — fente étroite en haut
+//    (liquide : se faufiler), mur d'éponge au centre (payer en volume, ou
+//    traverser en vapeur gagnée au radiateur), couloir bas tapissé d'éponge
+//    (la glace y glisse : l'éponge n'a pas prise sur elle).
+export const TABLEAU_4: LevelDef = {
+  name: 'La cuve thermique',
+  code: '21-D',
+  journal:
+    'Un radiateur et une cryobaie dans la même cuve : trois chemins, trois états. L’échantillon a pris les trois en trois essais. Ce n’est plus une fuite, c’est une démonstration. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+  boxes: [
+    // 1. cloison neutre, large passage central
+    box(-420, -750, -360, -160, MAT_WALL),
+    box(-420, 160, -360, 750, MAT_WALL),
+    // 2. la carte thermique : radiateur en haut, cryobaie en bas
+    box(-80, 520, 320, 640, MAT_CHAUD),
+    box(-80, -640, 320, -520, MAT_FROID),
+    // 3. barrière : mur au-dessus de la fente (la fente : y = 360..440,
+    //    entre ce segment et le haut du mur d'éponge)
+    box(560, 440, 620, 750, MAT_WALL),
+  ],
+  sponges: [
+    // mur d'éponge central : de la fente au couloir bas (y = -360..360)
+    { minX: 560, minY: -360, cols: 2, rows: 30, cellSize: 24, capacityPerCell: 5 },
+    // couloir bas tapissé : deux lèvres d'éponge, la glace passe entre elles
+    { minX: 660, minY: -420, cols: 10, rows: 2, cellSize: 24, capacityPerCell: 4 },
+    { minX: 660, minY: -750, cols: 10, rows: 2, cellSize: 24, capacityPerCell: 4 },
+  ],
+  labels: [
+    { x: 120, y: 580, text: 'RADIATEUR', tone: 'chaud' },
+    { x: 120, y: -580, text: 'CRYOBAIE', tone: 'froid' },
+    { x: 584, y: 0, text: 'ÉPONGE', tone: 'eponge' },
+    { x: 780, y: -580, text: 'ÉPONGE', tone: 'eponge' },
+    { x: 1110, y: 0, text: 'SAS', tone: 'sas' },
+  ],
+}
+
 // L'ordre de la partie : chaque tableau enseigne une chose, puis on boucle.
-export const TABLEAUX: LevelDef[] = [TABLEAU_1, TABLEAU_2, TABLEAU_3]
+export const TABLEAUX: LevelDef[] = [TABLEAU_1, TABLEAU_2, TABLEAU_3, TABLEAU_4]
 
 export function pointInBox(
   x: number,

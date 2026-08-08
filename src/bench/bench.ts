@@ -387,6 +387,24 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Temps d’exposition en pleine aura avant le gel complet. La glace prise au contact d’une plaque s’y soude : c’est l’ancrage.',
   )
 
+  const fHeat = pane.addFolder({ title: 'Chaleur (tableau 4)', expanded: false })
+  describe(
+    fHeat.addBinding(params, 'heatBand', { min: 10, max: 150, step: 1, label: 'aura (u)' }),
+    'Portée de l’aura de chaleur autour des radiateurs. L’eau s’y vaporise d’autant plus vite qu’elle est près de la plaque — danger ou ressource, selon ce qu’on vient y chercher.',
+  )
+  describe(
+    fHeat.addBinding(params, 'boilTime', { min: 0.3, max: 5, label: 'vaporisation (s)' }),
+    'Temps d’exposition en pleine aura avant que l’eau ne se change en vapeur, qu’on le veuille ou non. La vapeur gagnée traverse grilles et éponges.',
+  )
+  describe(
+    fHeat.addBinding(params, 'heatThawTime', { min: 0.1, max: 3, label: 'dégel forcé (s)' }),
+    'Temps de dégel en pleine aura : le radiateur libère une glace soudée bien plus vite que l’air libre.',
+  )
+  describe(
+    fHeat.addBinding(params, 'heatLossRate', { min: 0, max: 30, step: 0.5, label: 'évaporation /s' }),
+    'Particules de vapeur perdues par seconde d’exposition dans l’aura : s’attarder sur le radiateur brûle du volume, définitivement. C’est la fenêtre d’usage de la chaleur.',
+  )
+
   const fGas = pane.addFolder({ title: 'Gaz (tableau 3)', expanded: false })
   describe(
     fGas.addBinding(params, 'vaporizeTime', { min: 0.1, max: 3, label: 'vaporisation (s)' }),
