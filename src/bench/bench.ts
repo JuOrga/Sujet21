@@ -42,7 +42,9 @@ export interface BenchMonitor {
 const HINT_DEFAULT = 'Survolez un réglage pour voir à quoi il sert.'
 
 export function createBench(params: SimParams, monitor: BenchMonitor, actions: BenchActions): Pane {
-  const pane = new Pane({ title: 'Banc de réglage' })
+  // Sur mobile, le banc démarre replié : l'écran appartient au jeu
+  const compact = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 700
+  const pane = new Pane({ title: 'Banc de réglage', expanded: !compact })
 
   const hint = document.createElement('div')
   hint.className = 'bench-hint'

@@ -2,7 +2,10 @@
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+    />
     <title>Tension de surface — banc de prototype</title>
     <style>
       html,
@@ -44,7 +47,53 @@
         white-space: pre;
         line-height: 1.6;
       }
-      /* Panneau d'explication du banc de réglage : décrit le réglage survolé */
+      /* Le banc ne doit jamais dépasser l'écran : il défile en interne */
+      .tp-dfwv {
+        max-height: calc(100dvh - 16px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+      }
+      /* Barre de commandes tactiles (pause, time warp, vortex, zoom, restart) */
+      #touchbar {
+        position: fixed;
+        left: 50%;
+        bottom: 10px;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 8px;
+        z-index: 10;
+      }
+      #touchbar button {
+        min-width: 44px;
+        min-height: 44px;
+        border: 1px solid rgba(160, 200, 230, 0.25);
+        border-radius: 8px;
+        background: rgba(8, 14, 22, 0.75);
+        color: #cfe6f5;
+        font-family: inherit;
+        font-size: 16px;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+      #touchbar button.active {
+        background: rgba(70, 130, 180, 0.55);
+        border-color: rgba(160, 200, 230, 0.7);
+      }
+      @media (max-width: 700px) {
+        #help {
+          font-size: 9px;
+        }
+        #hud {
+          font-size: 11px;
+          bottom: 66px; /* au-dessus de la barre tactile */
+        }
+      }
+      /* Panneau d'explication du banc de réglage : décrit le réglage survolé.
+         Masqué quand le banc est replié. */
+      .tp-rotv:not(.tp-rotv-expanded) .bench-hint,
+      .tp-rotv:not(.tp-rotv-expanded) ~ .bench-hint {
+        display: none;
+      }
       .bench-hint {
         padding: 8px 10px;
         font-size: 11px;
@@ -81,6 +130,7 @@
     <div id="app"><canvas id="glcanvas"></canvas></div>
     <div id="help"></div>
     <div id="hud"></div>
+    <div id="touchbar"></div>
     <div id="overlay">
       <div id="overlay-title">DISPERSION</div>
       <small id="overlay-sub">La cohésion ne tient plus. Appuyez sur R pour recommencer.</small>

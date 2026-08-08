@@ -48,14 +48,23 @@ const overlay = document.getElementById('overlay') as HTMLDivElement
 const overlayTitle = document.getElementById('overlay-title') as HTMLDivElement
 const overlaySub = document.getElementById('overlay-sub') as HTMLDivElement
 
-help.textContent = [
-  'TENSION DE SURFACE — tableau 1 (jalon 2)',
-  'maintenir le pointeur : éjecter vers ce point (le corps part à l’opposé)',
-  'rejoindre le sas vert — le surplus est mis en bonbonne',
-  'clic droit : vortex de regroupement (rappelle les gouttes autour du point cliqué)',
-  'molette : zoom manuel (bouton « Zoom auto » du banc pour reprendre le suivi)',
-  ', / . : time warp    espace : pause    R : recommencer',
-].join('\n')
+const touchDevice = window.matchMedia('(pointer: coarse)').matches
+help.textContent = (touchDevice
+  ? [
+      'TENSION DE SURFACE — tableau 1 (jalon 2)',
+      'maintenir le doigt : éjecter vers ce point (le corps part à l’opposé)',
+      'rejoindre le sas vert — le surplus est mis en bonbonne',
+      'pincer à 2 doigts : zoom    🌀 puis toucher : vortex de regroupement',
+    ]
+  : [
+      'TENSION DE SURFACE — tableau 1 (jalon 2)',
+      'maintenir le pointeur : éjecter vers ce point (le corps part à l’opposé)',
+      'rejoindre le sas vert — le surplus est mis en bonbonne',
+      'clic droit : vortex de regroupement (rappelle les gouttes autour du point cliqué)',
+      'molette : zoom manuel (bouton « Zoom auto » du banc pour reprendre le suivi)',
+      ', / . : time warp    espace : pause    R : recommencer',
+    ]
+).join('\n')
 
 let sim = createSim(level)
 const camera = new Camera()
@@ -90,6 +99,25 @@ input.onVortex = (clientX, clientY) => {
   vortex.y = w.y
   vortex.timer = params.vortexDuration
 }
+
+// Barre tactile : les commandes clavier/souris accessibles au doigt
+const touchbar = document.getElementById('touchbar') as HTMLDivElement
+function touchButton(label: string, title: string, onTap: () => void): HTMLButtonElement {
+  const b = document.createElement('button')
+  b.textContent = label
+  b.title = title
+  b.addEventListener('click', onTap)
+  touchbar.appendChild(b)
+  return b
+}
+const btnPause = touchButton('⏸', 'pause (espace)', () => input.togglePause())
+touchButton('‹', 'ralentir le temps (,)', () => input.stepWarp(-1))
+touchButton('›', 'accélérer le temps (.)', () => input.stepWarp(1))
+const btnVortex = touchButton('🌀', 'vortex : armer puis toucher l’écran (clic droit)', () => {
+  input.vortexArmed = !input.vortexArmed
+})
+touchButton('⌖', 'zoom auto (après un zoom molette/pincement)', () => camera.resetAutoZoom())
+touchButton('↺', 'recommencer (R)', restart)
 input.onTimeWarpChange = (warp) => {
   params.timeWarp = warp
   pane.refresh()
@@ -166,6 +194,10 @@ function frame(now: number): void {
   monitor.particles = sim.count
   monitor.volume = sim.liters()
   monitor.speed = speed
+
+  btnPause.textContent = input.paused ? '▶' : '⏸'
+  btnPause.classList.toggle('active', input.paused)
+  btnVortex.classList.toggle('active', input.vortexArmed)
 
   hud.textContent = [
     `tableau  n°${run.tableau}   bonbonnes ${run.bonbonneLiters.toFixed(2)} L`,
