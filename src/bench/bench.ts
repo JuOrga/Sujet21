@@ -38,6 +38,9 @@ interface ListApi {
 export interface BenchActions {
   reset(): void
   autoZoom(): void
+  // Saut de tableau : tester un niveau sans rejouer les précédents
+  tableaux: string[]
+  gotoTableau(index: number): void
 }
 
 export interface BenchMonitor {
@@ -236,6 +239,18 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     rebuildList()
     hint.textContent = `Préset « ${title} » supprimé.`
     void deleteSharedPreset(title).catch(() => {})
+  })
+
+  // ---- Tableaux : sauter directement au niveau à tester ----
+  const fTableaux = pane.addFolder({ title: 'Tableaux', expanded: false })
+  actions.tableaux.forEach((name, index) => {
+    describe(
+      fTableaux.addButton({ title: `nº ${index + 1} — ${name}` }),
+      `Relance la partie directement au tableau ${index + 1} (« ${name} »), sans rejouer les précédents. Équivaut à ?tableau=${index + 1} dans l’adresse.`,
+    ).on('click', () => {
+      actions.gotoTableau(index)
+      hint.textContent = `Tableau ${index + 1} — ${name}.`
+    })
   })
 
   const fSolver = pane.addFolder({ title: 'Solveur', expanded: false })

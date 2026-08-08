@@ -28,6 +28,7 @@ export interface SpongeDef {
 }
 
 export interface LevelDef {
+  name: string
   bounds: Bounds
   spawn: { x: number; y: number; n: number }
   exit: { minX: number; minY: number; maxX: number; maxY: number }
@@ -49,6 +50,7 @@ function box(minX: number, minY: number, maxX: number, maxY: number, material: n
 // 4. le sas, en bas à droite — derrière l'éponge : le couloir haut oblige à
 //    redescendre le long de la paroi.
 export const TABLEAU_1: LevelDef = {
+  name: 'Le sas',
   bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
   spawn: { x: -950, y: 0, n: 900 },
   exit: { minX: 1040, minY: -420, maxX: 1180, maxY: -180 },
@@ -84,6 +86,7 @@ export const TABLEAU_1: LevelDef = {
 // 3. une barrière froide devant le sas, percée d'un passage étroit : viser
 //    juste, ou traverser en acceptant un gel partiel.
 export const TABLEAU_2: LevelDef = {
+  name: 'La chambre froide',
   bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
   spawn: { x: -950, y: 0, n: 900 },
   exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },

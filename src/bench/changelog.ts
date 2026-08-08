@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '08/08/2026 20:13',
+    title: 'Saut de tableau depuis le banc',
+    notes: [
+      'Nouveau dossier « Tableaux » : un bouton par niveau (nº 1 — Le sas, nº 2 — La chambre froide) pour relancer directement le tableau à tester, sans rejouer les précédents.',
+      'Équivaut à ?tableau=N dans l’adresse, mais sans recharger la page.',
+    ],
+  },
+  {
     date: '08/08/2026 19:57',
     title: 'Tableau 2 : la chambre froide — l’eau gèle',
     notes: [

@@ -128,6 +128,11 @@ function restart(): void {
 const pane = createBench(params, monitor, {
   reset: restart,
   autoZoom: () => camera.resetAutoZoom(),
+  tableaux: TABLEAUX.map((t) => t.name),
+  gotoTableau: (index) => {
+    levelIndex = index
+    restart()
+  },
 })
 input.onReset = restart
 input.onZoom = (factor) => camera.zoomBy(factor, params)
