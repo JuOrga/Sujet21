@@ -39,6 +39,10 @@ const Tuning = (() => {
     URL.revokeObjectURL(a.href);
   });
 
+  document.getElementById("wipeBtn").addEventListener("click", () => {
+    Records.wipe();
+  });
+
   function toggle() {
     panel.style.display = panel.style.display === "block" ? "none" : "block";
   }

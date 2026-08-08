@@ -43,6 +43,22 @@ npx serve .        # ou : python3 -m http.server
 - **Caméra à zoom automatique**, time warp, trame de repère, rendu métaballes.
 - **Banc de réglage** (outil prioritaire du §13) : tous les paramètres de
   ressenti en sliders, export JSON.
+- **Registres du labo** (§10) : chaque tentative achevée est consignée
+  (dispersion ou sas franchi, durée, volume restant), avec persistance locale.
+
+## Registres du labo et record
+
+Fidèle au §10 du doc — « la progression se lit dans les registres » — chaque
+fin de tentative est consignée dans le navigateur (`localStorage`) :
+
+- **Record du protocole** : le sas franchi le plus vite ; à temps égal, le
+  volume restant le plus grand départage. Rappelé dans le HUD et sur l'écran
+  de fin (« Nouveau record du protocole » le cas échéant).
+- **Registre** : les dernières tentatives (n° d'échantillon, issue, durée,
+  volume) s'affichent en fin de tentative — on y lit l'expérience qui dérape.
+- Le HUD numérote l'échantillon courant ; un reset en cours de route (touche R)
+  n'est pas consigné : seule une fin de tentative compte.
+- Le banc de réglage (T) propose « Effacer les registres du labo ».
 
 ## Tests
 

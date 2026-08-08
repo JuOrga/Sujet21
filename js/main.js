@@ -5,6 +5,8 @@
   const overlay = document.getElementById("overlay");
   const ovTitle = document.getElementById("ovTitle");
   const ovText = document.getElementById("ovText");
+  const ovRecord = document.getElementById("ovRecord");
+  const ovLog = document.getElementById("ovLog");
 
   let level = null;
   let state = "play"; // play | won | lost
@@ -167,13 +169,34 @@
 
   function litres(count) { return count / P.baseCount; }
   function fmtL(v) { return v.toFixed(2).replace(".", ",") + " L"; }
+  function fmtS(v) { return v.toFixed(1).replace(".", ",") + " s"; }
+
+  // Registres du labo (§10) : la fin de tentative est consignée, le record
+  // (sas franchi le plus vite) est rappelé, et le registre raconte la série.
+  function showRegister(rec) {
+    const best = Records.best();
+    if (rec.newBest) {
+      ovRecord.textContent = "Nouveau record du protocole : sas franchi en " + fmtS(best.time) + ".";
+    } else if (best) {
+      ovRecord.textContent = "Record du protocole : " + fmtS(best.time) +
+        " avec " + fmtL(best.volume) + " (échantillon n°" + best.no + ").";
+    } else {
+      ovRecord.textContent = "Aucun échantillon n'a encore franchi le sas.";
+    }
+    const rows = Records.history(5).map((e) =>
+      "n°" + e.no + " — " + (e.won ? "sas franchi, " + fmtS(e.time) + ", " + fmtL(e.volume)
+                                   : "dispersion à " + fmtS(e.time)));
+    ovLog.innerHTML = "<em>Registres du labo</em><br>" + rows.join("<br>");
+  }
 
   function checkEnd(dt) {
     if (state !== "play") return;
     if (playerList.length < P.disperseCount) {
       state = "lost";
+      const rec = Records.endAttempt({ won: false, time: simTime, volume: litres(playerList.length) });
       ovTitle.textContent = "Dispersion";
       ovText.textContent = "La cohésion ne tient plus. Le laboratoire prépare l'échantillon suivant.";
+      showRegister(rec);
       overlay.style.display = "flex";
       return;
     }
@@ -186,9 +209,11 @@
     if (inside > playerList.length * 0.6) winTimer += dt; else winTimer = 0;
     if (winTimer > 1.0) {
       state = "won";
+      const rec = Records.endAttempt({ won: true, time: simTime, volume: litres(playerList.length) });
       ovTitle.textContent = "Sas franchi";
       ovText.textContent = "Surplus mis en bonbonne : " + fmtL(litres(playerList.length)) +
         " — la récompense, c'est ce qu'il vous reste.";
+      showRegister(rec);
       overlay.style.display = "flex";
     }
   }
@@ -217,8 +242,11 @@
   function updateHud() {
     const vol = fmtL(litres(playerList.length));
     const ts = timeScale === 1 ? "×1" : "×" + timeScale;
+    const best = Records.best();
+    const rec = best ? ` &nbsp; <span style="color:#5c6b7f">record ${fmtS(best.time)}</span>` : "";
     hud.innerHTML = `<span class="vol">${vol}</span> &nbsp; ${ts} &nbsp; ` +
-      `<span style="color:#5c6b7f">${simTime.toFixed(1).replace(".", ",")} s</span>`;
+      `<span style="color:#5c6b7f">${simTime.toFixed(1).replace(".", ",")} s &nbsp; ` +
+      `échantillon n°${Records.attempts() + 1}</span>` + rec;
   }
 
   function frame(t) {
@@ -264,6 +292,9 @@
       };
     },
     setTimeScale(v) { timeScale = v; },
+    records() {
+      return { attempts: Records.attempts(), best: Records.best(), history: Records.history() };
+    },
   };
 
   reset();
