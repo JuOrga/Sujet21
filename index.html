@@ -681,6 +681,140 @@
         border-color: var(--specimen);
       }
 
+      /* ---- Légende : la lecture du vaisseau, surface par surface ---- */
+      #legend {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: min(430px, calc(100vw - 24px));
+        max-height: min(560px, calc(100vh - 40px));
+        overflow-y: auto;
+        background: var(--panel);
+        border: 1px solid var(--line-strong);
+        border-left: 2px solid var(--specimen);
+        padding: 14px 16px 16px;
+        box-sizing: border-box;
+        backdrop-filter: blur(6px);
+        z-index: 30;
+        display: none;
+      }
+      #legend.visible {
+        display: block;
+      }
+      .lg-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        font-family: var(--font-display);
+        font-size: 11px;
+        letter-spacing: 0.22em;
+        color: var(--specimen);
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 10px;
+        margin-bottom: 10px;
+      }
+      #legend-close {
+        font-family: var(--font-mono);
+        font-size: 14px;
+        line-height: 1;
+        min-width: 34px;
+        min-height: 34px;
+        color: var(--dim);
+        background: none;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+      #legend-close:hover {
+        color: var(--ink);
+        border-color: var(--line-strong);
+      }
+      .lg-row {
+        display: flex;
+        gap: 11px;
+        align-items: flex-start;
+        padding: 6px 0;
+        font-size: 11.5px;
+        line-height: 1.55;
+        color: var(--dim);
+      }
+      .lg-row b {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .lg-row .st {
+        color: var(--specimen);
+      }
+      .lg-sw {
+        flex: none;
+        width: 36px;
+        height: 36px;
+        margin-top: 2px;
+        border: 1px solid var(--line-strong);
+        background-size: cover;
+        background-position: center;
+      }
+      .lg-sw.sw-mur {
+        background-image: url('/assets/wall.webp');
+      }
+      .lg-sw.sw-phile {
+        background-image: url('/assets/phile.webp');
+        border-color: rgba(51, 166, 179, 0.7);
+      }
+      .lg-sw.sw-phobe {
+        background-image: url('/assets/phobe.webp');
+        border-color: rgba(158, 107, 199, 0.7);
+      }
+      .lg-sw.sw-eponge {
+        background-image: url('/assets/sponge-dry.webp');
+        border-color: rgba(199, 173, 107, 0.7);
+      }
+      .lg-sw.sw-froid {
+        background:
+          radial-gradient(circle at 30% 30%, rgba(179, 220, 248, 0.55) 0 2px, transparent 3px),
+          radial-gradient(circle at 70% 60%, rgba(179, 220, 248, 0.45) 0 2px, transparent 3px),
+          linear-gradient(135deg, #26364a, #48627c);
+        border-color: #b3dcf8;
+      }
+      .lg-sw.sw-grille {
+        background:
+          repeating-linear-gradient(0deg, #2b3642 0 5px, transparent 5px 9px),
+          repeating-linear-gradient(90deg, #2b3642 0 5px, #0a1017 5px 9px);
+        border-color: #7399b3;
+      }
+      .lg-sw.sw-sas {
+        background: radial-gradient(circle, #020c09 0 35%, #145c46 90%);
+        border-color: var(--valid);
+      }
+      .lg-states {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid var(--line);
+        font-size: 11px;
+        line-height: 1.8;
+        color: var(--dim);
+      }
+      .lg-states b {
+        color: var(--ink);
+      }
+      @media (max-width: 700px) {
+        #legend {
+          top: auto;
+          left: 0;
+          bottom: 0;
+          transform: none;
+          width: 100vw;
+          max-height: 78vh;
+          max-height: 78dvh;
+          border-left: none;
+          border-top: 2px solid var(--specimen);
+          padding-bottom: calc(16px + env(safe-area-inset-bottom));
+        }
+      }
+
       /* Le style du banc de réglage vit dans src/bench/bench.css */
 
       @media (max-width: 700px) {
@@ -747,6 +881,7 @@
         <kbd>, .</kbd>time warp<br />
         <kbd>espace</kbd>pause
         <kbd>R</kbd>recommencer
+        <kbd>L</kbd>lecture du vaisseau
         <kbd>échap</kbd>cette fiche
       </div>
       <div class="home-commands cmd-touch">
@@ -754,6 +889,7 @@
         <kbd>❄</kbd>glace, re-toucher pour dégeler
         <kbd>💨</kbd>vapeur pilotée au doigt<br />
         <kbd>2 doigts</kbd>pincer pour zoomer
+        <kbd>?</kbd>lecture du vaisseau
         <kbd>≡</kbd>revenir à cette fiche
       </div>
       <div class="home-foot">
@@ -795,6 +931,38 @@
     <div id="tableau-card" aria-live="polite">
       <div id="card-code"></div>
       <div id="card-log"></div>
+    </div>
+
+    <div id="legend" role="dialog" aria-label="Lecture du vaisseau">
+      <div class="lg-head"><span>LECTURE DU VAISSEAU</span>
+        <button id="legend-close" type="button" title="fermer (L)">✕</button></div>
+      <div class="lg-row"><span class="lg-sw sw-mur"></span>
+        <span><b>Paroi</b> — neutre : bloque tout, dans les trois états.</span></div>
+      <div class="lg-row"><span class="lg-sw sw-phile"></span>
+        <span><b>Surface hydrophile</b> — adhère : l'eau s'y colle et y rampe,
+        s'arracher coûte une impulsion. <span class="st">Glace</span> et
+        <span class="st">vapeur</span> n'accrochent pas.</span></div>
+      <div class="lg-row"><span class="lg-sw sw-phobe"></span>
+        <span><b>Surface hydrophobe</b> — repousse : une bande de répulsion dévie
+        les trajectoires et fait rebondir l'eau.</span></div>
+      <div class="lg-row"><span class="lg-sw sw-eponge"></span>
+        <span><b>Éponge</b> — absorbe l'eau au contact continu ; chaque cellule se
+        sature puis se solidifie. La brèche payée en volume est permanente —
+        la vitesse limite la perte.</span></div>
+      <div class="lg-row"><span class="lg-sw sw-froid"></span>
+        <span><b>Plaque froide</b> — son aura de brume gèle l'eau qui s'attarde.
+        <span class="st">Glace</span> au contact : soudée, le bloc s'arrête net.
+        <span class="st">Vapeur</span> : condensée, on redevient eau.</span></div>
+      <div class="lg-row"><span class="lg-sw sw-grille"></span>
+        <span><b>Grille</b> — arrête l'eau et la glace ; seule la
+        <span class="st">vapeur</span> passe entre les mailles.</span></div>
+      <div class="lg-row"><span class="lg-sw sw-sas"></span>
+        <span><b>Sas</b> — la bouche d'aspiration boit l'échantillon et le met en
+        bonbonne : c'est la sortie.</span></div>
+      <div class="lg-states">ÉTATS —
+        <b>💧 EAU</b> : pilotable, éjecter pour avancer ·
+        <b>❄ GLACE</b> (F) : le bloc garde son élan, re-presser dégèle ·
+        <b>💨 VAPEUR</b> (G) : pilotée au pointeur, s'évapore en avançant.</div>
     </div>
 
     <div id="overlay">

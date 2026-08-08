@@ -146,6 +146,8 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (document.body.classList.contains('playing')) openHome()
     else closeHome()
+  } else if (e.key === 'l' || e.key === 'L') {
+    document.getElementById('legend')!.classList.toggle('visible')
   }
 })
 
@@ -271,6 +273,13 @@ const btnSound = touchButton('🔊', 'son : couper / activer', () => {
   audio.setEnabled(!audio.enabled)
   pane.refresh()
 })
+// Légende : quelle surface fait quoi, état par état — au doigt comme au clavier
+const legend = document.getElementById('legend') as HTMLDivElement
+function toggleLegend(): void {
+  legend.classList.toggle('visible')
+}
+document.getElementById('legend-close')!.addEventListener('click', toggleLegend)
+touchButton('?', 'lecture du vaisseau (L)', toggleLegend)
 touchButton('↺', 'recommencer (R)', restart)
 touchButton('≡', 'fiche d’essai (échap)', openHome)
 input.onTimeWarpChange = (warp) => {
