@@ -9,6 +9,7 @@ export const MAT_HYDROPHILE = 1
 export const MAT_HYDROPHOBE = 2
 export const MAT_EXIT = 3 // rendu seulement, pas de physique
 export const MAT_FROID = 4 // plaque froide : gèle l'eau qui s'attarde dans son aura
+export const MAT_GRILLE = 5 // grille : arrête le liquide et la glace, laisse passer la vapeur
 
 export interface ObstacleBox {
   minX: number
@@ -105,8 +106,34 @@ export const TABLEAU_2: LevelDef = {
   sponges: [],
 }
 
+// Tableau 3 — le conduit (une mécanique : le gaz). Lecture :
+// 1. une grille barre tout le passage : le liquide s'y écrase, la vapeur la
+//    traverse — se changer en gaz (G) est le seul chemin ;
+// 2. un goulet neutre au centre : en vapeur on le franchit sans se mouiller
+//    aux parois, mais le nuage s'évapore pendant qu'on le pilote ;
+// 3. une seconde grille, puis deux portes froides : le froid condense la
+//    vapeur — on redevient liquide avant le sas, qu'on le veuille ou non.
+export const TABLEAU_3: LevelDef = {
+  name: 'Le conduit',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+  boxes: [
+    // 1. première grille, pleine hauteur
+    box(-500, -750, -460, 750, MAT_GRILLE),
+    // 2. goulet neutre
+    box(-80, -750, 0, -100, MAT_WALL),
+    box(-80, 100, 0, 750, MAT_WALL),
+    // 3. seconde grille puis portes condensantes
+    box(400, -750, 440, 750, MAT_GRILLE),
+    box(520, -750, 580, -180, MAT_FROID),
+    box(520, 180, 580, 750, MAT_FROID),
+  ],
+  sponges: [],
+}
+
 // L'ordre de la partie : chaque tableau enseigne une chose, puis on boucle.
-export const TABLEAUX: LevelDef[] = [TABLEAU_1, TABLEAU_2]
+export const TABLEAUX: LevelDef[] = [TABLEAU_1, TABLEAU_2, TABLEAU_3]
 
 export function pointInBox(
   x: number,

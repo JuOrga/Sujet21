@@ -16,7 +16,7 @@ layout(location = 0) in vec2 aPos;
 layout(location = 1) in float aSpeed;
 layout(location = 2) in float aPlayer;
 layout(location = 3) in vec2 aVel; // direction × étirement (0..~1.2)
-layout(location = 4) in float aFrost; // givre 0..1 (tableau 2)
+layout(location = 4) in float aState; // givre (+0..1) ou vapeur (-0..1)
 uniform vec2 uCenter;
 uniform vec2 uViewport; // px CSS
 uniform float uZoom;    // px CSS / unité monde
@@ -25,21 +25,22 @@ out float vSpeed;
 out float vPlayer;
 out vec2 vDir;
 out float vStretch;
-out float vFrost;
+out float vState;
 void main() {
   vec2 clip = (aPos - uCenter) * uZoom / (uViewport * 0.5);
   gl_Position = vec4(clip, 0.0, 1.0);
-  float s = length(aVel);
+  float gas = clamp(-aState, 0.0, 1.0);
+  float s = length(aVel) * (1.0 - gas); // la vapeur ne file pas en traînées
   // Le sprite est agrandi pour contenir l'ellipse étirée dans le sens du
   // mouvement — les gouttes rapides deviennent des traînées liquides.
   // Les gouttes libres sont plus fines que le corps : des gouttelettes,
-  // pas des boules.
-  gl_PointSize = uPointSize * (1.0 + s) * mix(0.6, 1.0, aPlayer);
+  // pas des boules. La vapeur, elle, est plus large et plus diffuse.
+  gl_PointSize = uPointSize * (1.0 + s) * mix(0.6, 1.0, aPlayer) * (1.0 + 0.7 * gas);
   vSpeed = aSpeed;
   vPlayer = aPlayer;
   vDir = s > 1e-4 ? aVel / s : vec2(1.0, 0.0);
   vStretch = s;
-  vFrost = aFrost;
+  vState = aState;
 }`
 
 const SPLAT_FS = `#version 300 es
@@ -48,7 +49,7 @@ in float vSpeed;
 in float vPlayer;
 in vec2 vDir;
 in float vStretch;
-in float vFrost;
+in float vState;
 uniform float uFieldScale;
 out vec4 outColor;
 void main() {
@@ -64,10 +65,12 @@ void main() {
   if (r2 > 1.0) discard;
   float t = 1.0 - r2;
   // Amplitude compensée : l'aire de l'ellipse a grandi de (1 + s)
-  float f = t * t * uFieldScale / (1.0 + vStretch);
-  // Alpha : champ pondéré par le givre — la composition retrouve la part de
-  // glace en le divisant par le champ total (canal R).
-  outColor = vec4(f, f * vSpeed, f * vPlayer, f * vFrost);
+  float gas = clamp(-vState, 0.0, 1.0);
+  float f = t * t * uFieldScale / (1.0 + vStretch) * (1.0 - 0.45 * gas);
+  // Alpha : champ pondéré par l'état — givre en positif, vapeur en négatif.
+  // La composition retrouve la part de chaque état en divisant par le champ
+  // total (canal R) ; les zones mixtes se neutralisent en douceur.
+  outColor = vec4(f, f * vSpeed, f * vPlayer, f * vState);
 }`
 
 const COMPOSE_VS = `#version 300 es
@@ -168,7 +171,9 @@ void main() {
   float field = tex.r / uFieldScale;
   float speed = tex.g / max(tex.r, 1e-5);
   float player = tex.b / max(tex.r, 1e-5);
-  float icy = clamp(tex.a / max(tex.r, 1e-5), 0.0, 1.0); // part de givre locale
+  float stateS = tex.a / max(tex.r, 1e-5); // givre en positif, vapeur en négatif
+  float icy = clamp(stateS, 0.0, 1.0);
+  float vap = clamp(-stateS, 0.0, 1.0);
 
   // Reconstruction monde (repère y vers le haut, cohérent avec la passe A)
   vec2 css = gl_FragCoord.xy / uDpr;
@@ -262,6 +267,16 @@ void main() {
       }
       col = mix(col, fillCol, fill);
       col = mix(col, edgeCol, edge * 0.9);
+    } else if (mat > 4.5) {
+      // Grille (tableau 3) : panneau perforé — le liquide s'y écrase, la
+      // vapeur passe entre les mailles. Les trous laissent voir le fond.
+      float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
+      float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
+      vec2 cellUv = fract(world / 24.0) - 0.5;
+      float hole = 1.0 - smoothstep(0.26, 0.34, max(abs(cellUv.x), abs(cellUv.y)));
+      vec3 barCol = vec3(0.17, 0.21, 0.26) * (0.9 + 0.2 * vnoise(world * 0.15));
+      col = mix(col, barCol, fill * (1.0 - hole * 0.85));
+      col = mix(col, vec3(0.45, 0.60, 0.70), edge * 0.8);
     } else if (mat > 3.5) {
       // Plaque froide (tableau 2) : givre cristallin, arête pâle, et une
       // aura de brume glacée — le danger se lit avant le contact.
@@ -344,6 +359,8 @@ void main() {
   float s = max(th * uSoftness, 1e-4);
   float field2 = field * (1.0 + 0.14 * waveGlow);
   float body = smoothstep(th - s, th + s, field2);
+  // La vapeur est translucide : le décor transparaît à travers le nuage
+  body *= 1.0 - 0.4 * vap;
 
   float speedT = clamp(speed, 0.0, 1.0);
   vec3 slow = vec3(0.07, 0.30, 0.48);
@@ -386,6 +403,9 @@ void main() {
   // sur le corps avant même la prise, la partie gelée devient blême et fixe.
   vec3 iceCol = vec3(0.60, 0.76, 0.88) * (0.72 + 0.45 * diffuse);
   water = mix(water, iceCol, icy * 0.9);
+  // Vapeur (tableau 3) : brume claire et douce, sans reflet ni relief
+  vec3 gasCol = vec3(0.52, 0.72, 0.82) * (0.65 + 0.3 * diffuse);
+  water = mix(water, gasCol, vap * 0.8);
 
   col = mix(col, water, body);
   // L'eau qui recouvre l'œil du sas s'assombrit : elle sombre dans le trou
@@ -721,7 +741,7 @@ export class Renderer {
         data[o + 4] = 0
         data[o + 5] = 0
       }
-      data[o + 6] = sim.frost[i]
+      data[o + 6] = sim.frost[i] - sim.vapor[i] // givre positif, vapeur négative
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, this.splatVbo)
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, data, 0, n * 7)

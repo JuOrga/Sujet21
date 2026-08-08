@@ -132,6 +132,7 @@ function restart(): void {
   run.exitTimer = 0
   vortex.timer = 0
   input.freezeIntent = false
+  input.gasIntent = false
   applyLevel()
   sim = createSim(level)
   exposeSim()
@@ -176,7 +177,10 @@ const btnPause = touchButton('⏸', 'pause (espace)', () => input.togglePause())
 touchButton('‹', 'ralentir le temps (,)', () => input.stepWarp(-1))
 touchButton('›', 'accélérer le temps (.)', () => input.stepWarp(1))
 const btnFreeze = touchButton('❄', 'se changer en glace / dégeler (F)', () => {
-  input.freezeIntent = !input.freezeIntent
+  input.toggleFreeze()
+})
+const btnGas = touchButton('💨', 'se changer en vapeur / condenser (G)', () => {
+  input.toggleGas()
 })
 const btnVortex = touchButton('🌀', 'vortex : armer puis toucher l’écran (clic droit)', () => {
   input.vortexArmed = !input.vortexArmed
@@ -238,11 +242,14 @@ function frame(now: number): void {
   const tableauDone = run.exitTimer > 0
 
   sim.freezeIntent = input.freezeIntent
+  sim.gasIntent = input.gasIntent
   if (input.aimActive) camera.cancelIntro() // le joueur agit : la caméra suit
   if (!input.paused && !tableauDone) {
     loop.advance(dtReal, params.timeWarp, params.dt, () => {
       if (input.aimActive && !sim.dispersed) {
-        sim.eject(aim.x, aim.y, params.dt)
+        // En vapeur, le pointeur pilote le nuage ; sinon il éjecte
+        if (input.gasIntent) sim.applyGasSteer(aim.x, aim.y, params.dt)
+        else sim.eject(aim.x, aim.y, params.dt)
       }
       if (vortex.timer > 0) {
         const life = Math.min(1, vortex.timer / params.vortexDuration)
@@ -282,8 +289,8 @@ function frame(now: number): void {
     }
   }
 
-  // Ondes d'éjection : naissance côté visée, sur le bord du corps
-  if (input.aimActive && !sim.dispersed && !input.paused && !tableauDone) {
+  // Ondes d'éjection : naissance côté visée, sur le bord du corps (pas en vapeur)
+  if (input.aimActive && !input.gasIntent && !sim.dispersed && !input.paused && !tableauDone) {
     waveCarry += dtReal
     if (waveCarry >= WAVE_EVERY) {
       waveCarry = 0
@@ -343,6 +350,7 @@ function frame(now: number): void {
   btnVortex.classList.toggle('active', input.vortexArmed)
   btnVortex.style.display = params.vortexEnabled >= 0.5 ? '' : 'none'
   btnFreeze.classList.toggle('active', input.freezeIntent)
+  btnGas.classList.toggle('active', input.gasIntent)
 
   // Instruments de bord
   const fraction = sim.baseVolume > 0 ? sim.playerCount / sim.baseVolume : 0
@@ -354,13 +362,18 @@ function frame(now: number): void {
   hudSeuil.textContent = `${(params.criticalVolumeFraction * sim.baseVolume * params.litersPerParticle).toFixed(2)} L`
   hudVitesse.textContent = `${speed.toFixed(0)} u/s`
   let frozenCount = 0
+  let gasCount = 0
   for (let i = 0; i < sim.count; i++) {
-    if (sim.frozen[i] === 1 && sim.kind[i] === KIND_PLAYER) frozenCount++
+    if (sim.kind[i] !== KIND_PLAYER) continue
+    if (sim.frozen[i] === 1) frozenCount++
+    else if (sim.gaseous[i] === 1) gasCount++
   }
   const allFrozen = sim.playerCount > 0 && frozenCount >= sim.playerCount
-  const stateText = sim.dispersed ? 'DISPERSÉ' : allFrozen ? 'GLACE' : 'liquide'
+  const allGas = sim.playerCount > 0 && gasCount >= sim.playerCount
+  const stateText = sim.dispersed ? 'DISPERSÉ' : allFrozen ? 'GLACE' : allGas ? 'VAPEUR' : 'liquide'
   const gel = !allFrozen && frozenCount > 0 ? ' · gel partiel' : ''
-  const suffix = `${gel}${vortex.timer > 0 ? ' · vortex' : ''}${input.paused ? ' · pause' : ''}`
+  const vape = !allGas && gasCount > 0 ? ' · vapeur partielle' : ''
+  const suffix = `${gel}${vape}${vortex.timer > 0 ? ' · vortex' : ''}${input.paused ? ' · pause' : ''}`
   hudState.textContent = stateText + suffix
   hudState.classList.toggle('warn', sim.dispersed)
   document.body.classList.toggle('dispersed', sim.dispersed)

@@ -16,6 +16,17 @@ export class Input {
   paused = false
   vortexArmed = false // prochain toucher = vortex au lieu d'éjecter
   freezeIntent = false // F (ou ❄) : le corps se change en glace, re-presser dégèle
+  gasIntent = false // G (ou 💨) : le corps se change en vapeur, re-presser condense
+
+  toggleFreeze(): void {
+    this.freezeIntent = !this.freezeIntent
+    if (this.freezeIntent) this.gasIntent = false // un seul état à la fois
+  }
+
+  toggleGas(): void {
+    this.gasIntent = !this.gasIntent
+    if (this.gasIntent) this.freezeIntent = false
+  }
   onReset: (() => void) | null = null
   onTimeWarpChange: ((warp: number) => void) | null = null
   onZoom: ((factor: number) => void) | null = null
@@ -116,7 +127,9 @@ export class Input {
       } else if (e.key === '.' || e.key === '>') {
         this.stepWarp(1)
       } else if (e.key === 'f' || e.key === 'F') {
-        this.freezeIntent = !this.freezeIntent
+        this.toggleFreeze()
+      } else if (e.key === 'g' || e.key === 'G') {
+        this.toggleGas()
       }
     })
   }

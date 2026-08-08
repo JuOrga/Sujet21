@@ -44,6 +44,18 @@ export interface SimParams {
   thawTime: number // s de dégel (intention levée, ou à l'écart du froid)
   iceRestitution: number // rebond des blocs de glace sur les parois (0..1)
 
+  // Gaz (tableau 3) : se changer en vapeur (touche G) pour se déplacer en
+  // continu vers le pointeur — sans recul ni éjection, mais le nuage
+  // s'évapore en avançant, et le froid le condense.
+  vaporizeTime: number // s de changement d'état vers la vapeur (touche G)
+  condenseTime: number // s de condensation quand l'intention est levée
+  gasThrust: number // accélération de pilotage du nuage vers le pointeur (u/s²)
+  gasMaxSpeed: number // vitesse de croisière maximale du nuage (u/s)
+  gasExpand: number // répulsion interne du nuage (u/s²) : la vapeur s'étale
+  gasDrag: number // flottement : freinage propre du gaz (1/s)
+  gasLossRate: number // particules évaporées / seconde de pilotage (perdues)
+  gasLinkFactor: number // × le rayon d'amas : le nuage distendu reste un seul corps
+
   // Sas de sortie : une bouche d'aspiration dans laquelle l'eau s'engouffre
   exitRadius: number // portée de l'aspiration autour de la bouche (unités monde)
   exitPull: number // vitesse du courant d'aspiration (u/s), renforcée à l'approche du trou
@@ -119,6 +131,15 @@ export const DEFAULT_PARAMS: SimParams = {
   freezeSelfTime: 0.45,
   thawTime: 2.5,
   iceRestitution: 0.45,
+
+  vaporizeTime: 0.5,
+  condenseTime: 0.9,
+  gasThrust: 320,
+  gasMaxSpeed: 220,
+  gasExpand: 260,
+  gasDrag: 1.3,
+  gasLossRate: 5,
+  gasLinkFactor: 3,
 
   exitRadius: 240,
   exitPull: 300,

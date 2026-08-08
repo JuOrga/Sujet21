@@ -375,6 +375,36 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Temps d’exposition en pleine aura avant le gel complet. La glace prise au contact d’une plaque s’y soude : c’est l’ancrage.',
   )
 
+  const fGas = pane.addFolder({ title: 'Gaz (tableau 3)', expanded: false })
+  describe(
+    fGas.addBinding(params, 'vaporizeTime', { min: 0.1, max: 3, label: 'vaporisation (s)' }),
+    'Temps de changement d’état vers la vapeur (G / 💨). En vapeur : le pointeur pilote le nuage, les grilles se traversent, la chimie des parois ne mord plus.',
+  )
+  describe(
+    fGas.addBinding(params, 'condenseTime', { min: 0.2, max: 5, label: 'condensation (s)' }),
+    'Temps de retour à l’état liquide quand l’intention est levée. Le froid condense beaucoup plus vite, qu’on le veuille ou non.',
+  )
+  describe(
+    fGas.addBinding(params, 'gasThrust', { min: 50, max: 1000, step: 10, label: 'poussée (u/s²)' }),
+    'Accélération du nuage vers le pointeur. C’est le moteur du déplacement en gaz — sans recul et sans éjection.',
+  )
+  describe(
+    fGas.addBinding(params, 'gasMaxSpeed', { min: 50, max: 600, step: 10, label: 'vitesse max' }),
+    'Vitesse de croisière maximale du nuage piloté.',
+  )
+  describe(
+    fGas.addBinding(params, 'gasLossRate', { min: 0, max: 30, step: 0.5, label: 'évaporation /s' }),
+    'Particules perdues par seconde de pilotage : se déplacer en gaz se paie en volume, doucement mais sûrement. La traîne du nuage s’évapore en premier.',
+  )
+  describe(
+    fGas.addBinding(params, 'gasExpand', { min: 0, max: 1000, step: 10, label: 'expansion' }),
+    'Répulsion interne du nuage : haut, la vapeur s’étale largement (plus fragile) ; bas, elle reste compacte.',
+  )
+  describe(
+    fGas.addBinding(params, 'gasDrag', { min: 0, max: 5, label: 'flottement' }),
+    'Freinage propre du gaz. Haut : le nuage s’arrête vite quand on relâche. Bas : il dérive longtemps.',
+  )
+
   const fExit = pane.addFolder({ title: 'Sas (bouche d’aspiration)', expanded: false })
   describe(
     fExit.addBinding(params, 'exitRadius', { min: 0, max: 600, step: 5, label: 'rayon' }),

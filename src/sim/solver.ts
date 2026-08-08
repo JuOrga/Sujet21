@@ -16,6 +16,7 @@ import { labelComponents } from './components'
 import { boxContact, Sponge, type ClosestPoint } from './obstacles'
 import {
   MAT_FROID,
+  MAT_GRILLE,
   MAT_HYDROPHILE,
   MAT_HYDROPHOBE,
   MAT_WALL,
@@ -75,8 +76,16 @@ export class FluidSim {
   // au corps, dans le mouvement où la glace se trouvait.
   frost: Float32Array
   frozen: Uint8Array
-  // Gel volontaire (touche F) : le corps entier se change en glace
+  // Vapeur (§6, tableau 3) : hors du solveur de densité (elle ne presse pas
+  // et n'est pas pressée), elle s'étale par répulsion douce, flotte, passe
+  // les grilles, et se PILOTE en continu vers le pointeur — au prix d'une
+  // évaporation. Le froid la condense avant de gérer quoi que ce soit d'autre.
+  vapor: Float32Array
+  gaseous: Uint8Array
+  // Gel volontaire (touche F) / vapeur volontaire (touche G)
   freezeIntent = false
+  gasIntent = false
+  private gasCarry = 0
   private readonly welded: Uint8Array // gelée au contact d'une plaque : soudée
   private readonly iceVxSum: Float32Array
   private readonly iceVySum: Float32Array
@@ -148,6 +157,8 @@ export class FluidSim {
     this.labels = new Int32Array(capacity)
     this.frost = new Float32Array(capacity)
     this.frozen = new Uint8Array(capacity)
+    this.vapor = new Float32Array(capacity)
+    this.gaseous = new Uint8Array(capacity)
     this.welded = new Uint8Array(capacity)
     this.iceVxSum = new Float32Array(capacity)
     this.iceVySum = new Float32Array(capacity)
@@ -223,6 +234,8 @@ export class FluidSim {
       this.contactTime[i] = this.contactTime[last]
       this.frost[i] = this.frost[last]
       this.frozen[i] = this.frozen[last]
+      this.vapor[i] = this.vapor[last]
+      this.gaseous[i] = this.gaseous[last]
       this.welded[i] = this.welded[last]
     }
     this.count = last
@@ -240,6 +253,8 @@ export class FluidSim {
     this.contactTime[i] = 0
     this.frost[i] = 0
     this.frozen[i] = 0
+    this.vapor[i] = 0
+    this.gaseous[i] = 0
     this.welded[i] = 0
     if (kind === KIND_PLAYER) this.playerCount++
     return i
@@ -283,7 +298,7 @@ export class FluidSim {
       let best = -1
       let bestD2 = Infinity
       for (let i = 0; i < this.count; i++) {
-        if (this.kind[i] !== KIND_PLAYER || this.frozen[i] === 1) continue
+        if (this.kind[i] !== KIND_PLAYER || this.frozen[i] === 1 || this.gaseous[i] === 1) continue
         const dx = this.posX[i] - aimX
         const dy = this.posY[i] - aimY
         const d2 = dx * dx + dy * dy
@@ -338,7 +353,7 @@ export class FluidSim {
         const R = p.kernelRadius * 1.8
         const R2 = R * R
         for (let i = 0; i < this.count; i++) {
-          if (this.kind[i] !== KIND_PLAYER || this.frozen[i] === 1) continue
+          if (this.kind[i] !== KIND_PLAYER || this.frozen[i] === 1 || this.gaseous[i] === 1) continue
           const dx = departX - this.posX[i]
           const dy = departY - this.posY[i]
           const d2 = dx * dx + dy * dy
@@ -365,7 +380,7 @@ export class FluidSim {
       let wSum = 0
       let liquid = 0
       for (let i = 0; i < this.count; i++) {
-        if (this.kind[i] !== KIND_PLAYER || this.frozen[i] === 1) continue
+        if (this.kind[i] !== KIND_PLAYER || this.frozen[i] === 1 || this.gaseous[i] === 1) continue
         liquid++
         let w = 1 - locality
         const dx = this.posX[i] - departX
@@ -380,17 +395,67 @@ export class FluidSim {
         // corps entier hors du rayon local (improbable) : repli uniforme
         wSum = liquid
         for (let i = 0; i < this.count; i++) {
-          if (this.kind[i] === KIND_PLAYER && this.frozen[i] === 0) this.dvX[i] = 1
+          if (this.kind[i] === KIND_PLAYER && this.frozen[i] === 0 && this.gaseous[i] === 0) {
+            this.dvX[i] = 1
+          }
         }
       }
       const rx = -(dvx + entrainX) / wSum
       const ry = -(dvy + entrainY) / wSum
       for (let i = 0; i < this.count; i++) {
-        if (this.kind[i] === KIND_PLAYER && this.frozen[i] === 0) {
+        if (this.kind[i] === KIND_PLAYER && this.frozen[i] === 0 && this.gaseous[i] === 0) {
           this.velX[i] += rx * this.dvX[i]
           this.velY[i] += ry * this.dvX[i]
         }
       }
+    }
+  }
+
+  // Se déplacer en gaz (§ tableau 3) : le nuage est piloté en continu vers le
+  // point visé — pas d'éjection, pas de recul, une dérive douce. Le prix est
+  // l'évaporation : tant qu'on pilote, la traîne du nuage se perd (les
+  // particules les plus éloignées de la visée disparaissent, gasLossRate/s).
+  applyGasSteer(aimX: number, aimY: number, dt: number): void {
+    if (this.dispersed) return
+    const p = this.params
+    const cap2 = p.gasMaxSpeed * p.gasMaxSpeed
+    let any = false
+    for (let i = 0; i < this.count; i++) {
+      if (this.kind[i] !== KIND_PLAYER || this.gaseous[i] !== 1) continue
+      any = true
+      let dx = aimX - this.posX[i]
+      let dy = aimY - this.posY[i]
+      const d = Math.hypot(dx, dy)
+      if (d < 1e-3) continue
+      dx /= d
+      dy /= d
+      this.velX[i] += dx * p.gasThrust * dt
+      this.velY[i] += dy * p.gasThrust * dt
+      const v2 = this.velX[i] * this.velX[i] + this.velY[i] * this.velY[i]
+      if (v2 > cap2) {
+        const s = p.gasMaxSpeed / Math.sqrt(v2)
+        this.velX[i] *= s
+        this.velY[i] *= s
+      }
+    }
+    if (!any) return
+    this.gasCarry += p.gasLossRate * dt
+    while (this.gasCarry >= 1 && this.playerCount > 2) {
+      this.gasCarry -= 1
+      let worst = -1
+      let worstD2 = -1
+      for (let i = 0; i < this.count; i++) {
+        if (this.kind[i] !== KIND_PLAYER || this.gaseous[i] !== 1) continue
+        const dx = this.posX[i] - aimX
+        const dy = this.posY[i] - aimY
+        const d2 = dx * dx + dy * dy
+        if (d2 > worstD2) {
+          worstD2 = d2
+          worst = i
+        }
+      }
+      if (worst < 0) break
+      this.removeParticle(worst) // évaporée : perdue, pas mise en bonbonne
     }
   }
 
@@ -555,9 +620,17 @@ export class FluidSim {
     // (Math.pow dans la boucle de paires coûte cher sur petites machines)
     const sCorrNInt = Math.abs(p.sCorrN - Math.round(p.sCorrN)) < 1e-9 ? Math.round(p.sCorrN) : 0
 
-    // 2. Itérations de contrainte de densité
+    // 2. Itérations de contrainte de densité. La vapeur est hors du solveur :
+    // elle ne compte pas dans la densité du liquide et n'est pas corrigée —
+    // un nuage n'appuie pas, et rien ne l'appuie.
+    const gaseous = this.gaseous
     for (let iter = 0; iter < p.solverIterations; iter++) {
       for (let i = 0; i < n; i++) {
+        if (gaseous[i] === 1) {
+          density[i] = selfRho
+          lambda[i] = 0
+          continue
+        }
         const xi = prdX[i]
         const yi = prdY[i]
         let rho = selfRho
@@ -567,6 +640,11 @@ export class FluidSim {
         const end = nbStart[i + 1]
         for (let e = nbStart[i]; e < end; e++) {
           const j = nbList[e]
+          if (gaseous[j] === 1) {
+            pairW[e] = 0
+            pairC[e] = 0
+            continue
+          }
           const dx = xi - prdX[j]
           const dy = yi - prdY[j]
           const r2 = dx * dx + dy * dy
@@ -610,6 +688,11 @@ export class FluidSim {
       const maxPairDp = p.maxDeltaPFactor * h
       const maxPairDp2 = maxPairDp * maxPairDp
       for (let i = 0; i < n; i++) {
+        if (gaseous[i] === 1) {
+          dpX[i] = 0
+          dpY[i] = 0
+          continue
+        }
         const li = lambda[i]
         let dx0 = 0
         let dy0 = 0
@@ -706,7 +789,7 @@ export class FluidSim {
 
     if (p.xsphC > 0) {
       for (let i = 0; i < n; i++) {
-        if (frozen[i] === 1) {
+        if (frozen[i] === 1 || gaseous[i] === 1) {
           dvX[i] = 0
           dvY[i] = 0
           continue
@@ -720,6 +803,7 @@ export class FluidSim {
         const end = nbStart[i + 1]
         for (let e = nbStart[i]; e < end; e++) {
           const j = nbList[e]
+          if (gaseous[j] === 1) continue
           const dx = xi - prdX[j]
           const dy = yi - prdY[j]
           const r2 = dx * dx + dy * dy
@@ -740,6 +824,9 @@ export class FluidSim {
 
     // 4ter. Blocs de glace : vitesse commune par amas, rebonds, soudures
     this.icePass()
+
+    // 4quater. Vapeur : expansion douce et flottement
+    this.applyGasDynamics(dt)
 
     // 5. Validation des positions, cooldowns, identité du corps
     for (let i = 0; i < n; i++) {
@@ -778,6 +865,8 @@ export class FluidSim {
       let y = this.prdY[i]
 
       for (const b of this.boxes) {
+        // La grille arrête le liquide et la glace ; la vapeur la traverse
+        if (b.material === MAT_GRILLE && this.gaseous[i] === 1) continue
         if (x < b.minX - rp || x > b.maxX + rp || y < b.minY - rp || y > b.maxY + rp) {
           continue
         }
@@ -840,7 +929,8 @@ export class FluidSim {
     const philDamp = Math.exp(-p.hydrophileFriction * dt)
 
     for (let i = 0; i < n; i++) {
-      if (this.frozen[i] === 1) continue // la glace ignore les bandes d'influence
+      // La glace et la vapeur ignorent la chimie des surfaces
+      if (this.frozen[i] === 1 || this.gaseous[i] === 1) continue
       const mat = this.contactMat[i]
       if (mat === MAT_HYDROPHOBE) {
         const vnIn = this.contactVn[i]
@@ -912,9 +1002,9 @@ export class FluidSim {
     const drag = Math.exp(-p.spongeDrag * dt)
     let i = 0
     while (i < this.count) {
-      if (this.frozen[i] === 1) {
+      if (this.frozen[i] === 1 || this.gaseous[i] === 1) {
         i++
-        continue // la glace n'est ni engluée ni absorbée
+        continue // ni la glace ni la vapeur ne sont engluées ou absorbées
       }
       let touching = false
       let removed = false
@@ -938,6 +1028,55 @@ export class FluidSim {
       if (removed) continue // l'indice i contient maintenant une autre particule
       if (!touching) this.contactTime[i] = 0
       i++
+    }
+  }
+
+  // La vapeur s'étale (répulsion douce entre particules de gaz, réutilise
+  // les voisinages du pas) et flotte (freinage propre). L'expansion s'arrête
+  // d'elle-même : au-delà de h, plus de répulsion — le nuage trouve son
+  // étendue sans jamais se déchirer (le rayon d'amas du gaz est plus grand).
+  private applyGasDynamics(dt: number): void {
+    const n = this.count
+    const gaseous = this.gaseous
+    let any = false
+    for (let i = 0; i < n; i++) {
+      if (gaseous[i] === 1) {
+        any = true
+        break
+      }
+    }
+    if (!any) return
+    const p = this.params
+    const k = this.kernels
+    const h = k.h
+    const h2 = k.h2
+    const drag = Math.exp(-p.gasDrag * dt)
+    const { prdX, prdY, velX, velY } = this
+    const nbStart = this.nbStart
+    const nbList = this.nbList
+    for (let i = 0; i < n; i++) {
+      if (gaseous[i] !== 1) continue
+      velX[i] *= drag
+      velY[i] *= drag
+      const xi = prdX[i]
+      const yi = prdY[i]
+      let ax = 0
+      let ay = 0
+      const end = nbStart[i + 1]
+      for (let e = nbStart[i]; e < end; e++) {
+        const j = nbList[e]
+        if (gaseous[j] !== 1) continue
+        const dx = xi - prdX[j]
+        const dy = yi - prdY[j]
+        const r2 = dx * dx + dy * dy
+        if (r2 >= h2 || r2 < 1e-6) continue
+        const r = Math.sqrt(r2)
+        const a = (p.gasExpand * (1 - r / h)) / r
+        ax += dx * a
+        ay += dy * a
+      }
+      velX[i] += ax * dt
+      velY[i] += ay * dt
     }
   }
 
@@ -981,8 +1120,23 @@ export class FluidSim {
         }
       }
       this.welded[i] = this.frozen[i] === 1 && minSep <= 1 ? 1 : 0
-      const wanted = intent && this.kind[i] === KIND_PLAYER
-      const rate = Math.max(exposure * freeze, wanted ? freezeSelf : 0)
+
+      // Vapeur : le froid condense en priorité (vite), sinon l'intention (G)
+      // vaporise et son absence condense. Hystérésis comme pour la glace.
+      const wantGas = this.gasIntent && this.kind[i] === KIND_PLAYER && this.frozen[i] === 0
+      let dv: number
+      if (exposure > 0) dv = -exposure * (dt / 0.25)
+      else if (wantGas) dv = dt / Math.max(0.05, p.vaporizeTime)
+      else dv = -dt / Math.max(0.05, p.condenseTime)
+      const vap = Math.min(1, Math.max(0, this.vapor[i] + dv))
+      this.vapor[i] = vap
+      if (vap >= 1) this.gaseous[i] = 1
+      else if (this.gaseous[i] === 1 && vap <= 0.55) this.gaseous[i] = 0
+
+      // Givre : jamais sur la vapeur — le froid doit d'abord la condenser
+      const wanted = intent && this.kind[i] === KIND_PLAYER && this.gaseous[i] === 0
+      const canFrost = this.gaseous[i] === 0 && vap < 0.5
+      const rate = canFrost ? Math.max(exposure * freeze, wanted ? freezeSelf : 0) : 0
       if (rate > 0) {
         this.frost[i] = Math.min(1, this.frost[i] + rate)
         if (this.frost[i] >= 1) this.frozen[i] = 1 // la vitesse est conservée
@@ -1086,18 +1240,24 @@ export class FluidSim {
     const p = this.params
     const linkR = p.linkRadiusFactor * p.kernelRadius
     const linkR2 = linkR * linkR
-    const { posX, posY, labels } = this
+    // Le nuage de vapeur est distendu : son rayon d'adjacence est élargi,
+    // sinon l'expansion du gaz compterait comme une dispersion.
+    const gasLinkR = linkR * Math.max(1, p.gasLinkFactor)
+    const gasLinkR2 = gasLinkR * gasLinkR
+    const { posX, posY, labels, gaseous } = this
     const grid = this.grid
     grid.build(posX, posY, n)
 
     const forEachNeighbor = (i: number, cb: (j: number) => void) => {
       const xi = posX[i]
       const yi = posY[i]
-      grid.forEachNeighbor(xi, yi, linkR, (j) => {
+      grid.forEachNeighbor(xi, yi, gasLinkR, (j) => {
         if (j === i) return
         const dx = xi - posX[j]
         const dy = yi - posY[j]
-        if (dx * dx + dy * dy <= linkR2) cb(j)
+        const r2 = dx * dx + dy * dy
+        const limit = gaseous[i] === 1 || gaseous[j] === 1 ? gasLinkR2 : linkR2
+        if (r2 <= limit) cb(j)
       })
     }
     const componentCount = labelComponents(n, labels, forEachNeighbor, this.stack)
