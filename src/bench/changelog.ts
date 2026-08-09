@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '09/08/2026 10:45',
+    title: 'boizessai2 : le préset boizessai1, ajusté aux nouvelles auras',
+    notes: [
+      'Le préset « boizessai1 » gardait les anciennes portées thermiques. À la première visite après cette livraison, une copie « boizessai2 » est créée automatiquement dans la bibliothèque partagée : mêmes réglages, auras ajustées (chaleur 130, froid 85, ébullition 1,2 s).',
+      'Si boizessai1 était le préset de lancement, boizessai2 le remplace. L’original reste intact dans la bibliothèque.',
+    ],
+  },
+  {
     date: '09/08/2026 10:20',
     title: 'Équilibrage thermique : des auras qui se sentent',
     notes: [
