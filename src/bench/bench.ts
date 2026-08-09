@@ -479,6 +479,14 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Particules perdues par seconde de pilotage : se déplacer en gaz se paie en volume, doucement mais sûrement. La traîne du nuage s’évapore en premier.',
   )
   describe(
+    fGas.addBinding(params, 'gasIdleLossRate', { min: 0, max: 10, step: 0.5, label: 'coût d’état /s' }),
+    'Particules perdues par seconde TANT QU’ON EST vapeur, même immobile : l’état gazeux est un compte à rebours, pas un mode de croisière. C’est le frein principal au tout-vapeur.',
+  )
+  describe(
+    fGas.addBinding(params, 'grilleGasLoss', { min: 0, max: 2, step: 0.05, label: 'péage de grille' }),
+    'Perte par seconde et par particule prise dans la maille d’une grille : traverser essore le nuage. La grille reste franchissable en vapeur — mais plus jamais gratuite.',
+  )
+  describe(
     fGas.addBinding(params, 'gasExpand', { min: 0, max: 1000, step: 10, label: 'expansion' }),
     'Répulsion interne du nuage : haut, la vapeur s’étale largement (plus fragile) ; bas, elle reste compacte.',
   )
@@ -524,6 +532,10 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   )
 
   const fMat = pane.addFolder({ title: 'Matériaux (§6)', expanded: false })
+  describe(
+    fMat.addBinding(params, 'surfaceBite', { min: 0.5, max: 3, step: 0.05, label: 'mordant global' }),
+    'LE curseur de dureté : multiplie l’effet de toutes les surfaces — adhésion et arrachage hydrophiles, répulsion hydrophobe, engluement et absorption de l’éponge, gel d’aura, évaporation au radiateur. S’applique par-dessus les réglages individuels (et les présets).',
+  )
   describe(
     fMat.addBinding(params, 'hydroBand', { min: 4, max: 60, label: 'portée bande' }),
     'Épaisseur de la zone d’influence autour des parois. L’eau y est attirée ou repoussée sans contact.',
