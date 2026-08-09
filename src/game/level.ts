@@ -321,6 +321,51 @@ export const TABLEAU_7: LevelDef = {
   ],
 }
 
+// Tableau 1 bis — la galerie noyée (PROTOTYPE de réfection du secteur A,
+// accessible depuis la fiche d'essai ; il remplacera 21-A s'il convainc).
+// Un tableau « eau seule » : aucun changement d'état requis — on apprend
+// l'éjection, l'inertie et le volume. La géométrie n'est plus une boîte nue :
+// une porte massive, des contreforts, une cascade de dalles en quinconce,
+// une étagère hydrophile pour se poser et viser, une lèvre hydrophobe qui
+// défend la goulotte du sas.
+export const TABLEAU_1BIS: LevelDef = {
+  name: 'La galerie noyée',
+  code: '21-A bis',
+  journal:
+    'Réfection du secteur A : cloisons redessinées, contreforts, une galerie au lieu d’un couloir. L’échantillon n’a besoin d’aucun artifice ici — seulement d’eau, et de retenue. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -300, maxX: 1180, maxY: -60 },
+  boxes: [
+    // la porte d'entrée : deux piliers massifs, ouverture décentrée
+    box(-700, 200, -560, 750, MAT_WALL),
+    box(-700, -750, -560, -260, MAT_WALL),
+    // contreforts : la paroi respire au lieu d'être une boîte nue
+    box(-350, 660, -150, 750, MAT_WALL),
+    box(80, -750, 280, -660, MAT_WALL),
+    box(500, 600, 700, 750, MAT_WALL),
+    box(820, -750, 980, -640, MAT_WALL),
+    // la cascade : trois dalles en quinconce, le courant se faufile
+    box(-380, -80, -40, 20, MAT_WALL),
+    box(-200, -380, 160, -300, MAT_WALL),
+    box(-40, 220, 300, 300, MAT_WALL),
+    // l'étagère hydrophile : se coller, se poser, viser
+    box(340, -140, 620, -40, MAT_HYDROPHILE),
+    // la lèvre hydrophobe qui défend la goulotte du sas
+    box(680, 120, 1020, 220, MAT_HYDROPHOBE),
+    // le pilier bas de la goulotte
+    box(680, -750, 760, -420, MAT_WALL),
+  ],
+  sponges: [],
+  labels: [
+    { x: -630, y: -60, text: 'LA PORTE', tone: 'mur' },
+    { x: -110, y: -30, text: 'LA CASCADE', tone: 'mur' },
+    { x: 480, y: -90, text: 'HYDROPHILE', tone: 'phile' },
+    { x: 850, y: 170, text: 'HYDROPHOBE', tone: 'phobe' },
+    { x: 1110, y: -180, text: 'SAS', tone: 'sas' },
+  ],
+}
+
 // L'ordre de la partie : chaque tableau enseigne une chose, les derniers
 // les combinent, et la dérive conclut sur la maîtrise pure.
 export const TABLEAUX: LevelDef[] = [

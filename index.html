@@ -201,6 +201,23 @@
         background: var(--glow);
         transform: translateY(-1px);
       }
+      /* Le prototype 21-A bis : un essai à part, en retrait du bouton principal */
+      #start-bis {
+        font-family: var(--font-display);
+        font-size: 10.5px;
+        letter-spacing: 0.12em;
+        padding: 10px 16px;
+        margin-top: -6px;
+        color: var(--dim);
+        background: transparent;
+        border: 1px dashed var(--line);
+        cursor: pointer;
+        transition: color 0.2s ease, border-color 0.2s ease;
+      }
+      #start-bis:hover {
+        color: var(--specimen);
+        border-color: var(--specimen);
+      }
       /* Registres du labo : l'écran record de la fiche d'expérience */
       .home-records {
         border: 1px solid var(--line);
@@ -243,6 +260,30 @@
       #rec-name:focus-visible {
         outline: 1px solid var(--valid);
         outline-offset: 1px;
+      }
+      /* Nom obligatoire : la plongée exige un opérateur identifié */
+      #rec-name.need {
+        border-color: var(--alert);
+        animation: nameShake 0.35s ease;
+      }
+      @keyframes nameShake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-4px); }
+        50% { transform: translateX(4px); }
+        75% { transform: translateX(-2px); }
+      }
+      #rec-need {
+        color: var(--alert);
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        margin: 6px 0 2px;
+      }
+      .rec-note {
+        color: var(--dim);
+        font-size: 10px;
+        letter-spacing: 0.05em;
+        margin: 5px 0 3px;
+        opacity: 0.8;
       }
       .rec-row {
         display: flex;
@@ -492,6 +533,108 @@
       #hud-state.warn,
       #hud-coque.warn {
         color: var(--alert);
+      }
+      /* Alerte volume : la jauge prévient avant le seuil (ambre), et sous le
+         seuil elle pulse pendant le délai de grâce, avec compte à rebours */
+      #gauge-fill.warn {
+        background: linear-gradient(90deg, #d9a441, #f2c14e);
+      }
+      #gauge-fill.danger {
+        background: var(--alert);
+        animation: gaugePulse 0.45s ease-in-out infinite alternate;
+      }
+      @keyframes gaugePulse {
+        from { opacity: 1; }
+        to { opacity: 0.4; }
+      }
+      #hud-perte {
+        font-size: 10.5px;
+        color: #f2a98f;
+        letter-spacing: 0.05em;
+        min-height: 15px;
+        line-height: 15px;
+      }
+      #hud-rosee {
+        font-size: 10px;
+        color: #9fd8e8;
+        letter-spacing: 0.05em;
+      }
+      /* La coque : une petite barre qui se remplit à mesure que le vaisseau
+         refroidit — la pression temporelle d'un coup d'œil, pas un chiffre */
+      #coque-bar {
+        flex: 1;
+        max-width: 64px;
+        height: 4px;
+        margin: 0 8px;
+        background: rgba(150, 200, 235, 0.14);
+        align-self: center;
+        overflow: hidden;
+      }
+      #coque-bar b {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: linear-gradient(90deg, #d98d4a, #7fc4de, #a9e2f5);
+        transition: width 0.4s ease;
+      }
+      /* Le compte à rebours de dispersion : impossible à rater */
+      #hud-danger {
+        position: fixed;
+        top: 62px;
+        left: 50%;
+        transform: translateX(-50%) translateY(-8px);
+        background: rgba(46, 12, 14, 0.88);
+        border: 1px solid var(--alert);
+        border-left: 3px solid var(--alert);
+        color: #ffb9ad;
+        font-size: 12px;
+        letter-spacing: 0.1em;
+        padding: 8px 16px;
+        z-index: 13;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease, transform 0.2s ease;
+        backdrop-filter: blur(3px);
+        white-space: nowrap;
+      }
+      #hud-danger.visible {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+        animation: dangerPulse 0.5s ease-in-out infinite alternate;
+      }
+      @keyframes dangerPulse {
+        from { border-color: var(--alert); }
+        to { border-color: #ffd9d0; }
+      }
+      /* La flèche d'objectif : quand le sas est hors champ, elle le pointe
+         depuis le bord de l'écran, avec la distance restante */
+      #obj-arrow {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 9;
+        pointer-events: none;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 1px;
+        color: var(--exit, #35e0a4);
+        text-shadow: 0 0 12px rgba(53, 224, 164, 0.7);
+      }
+      #obj-arrow.visible {
+        display: flex;
+      }
+      #obj-arrow i {
+        font-style: normal;
+        font-size: 20px;
+        line-height: 1;
+        display: block;
+      }
+      #obj-arrow span {
+        font-size: 9px;
+        letter-spacing: 0.1em;
+        color: #7fd8b8;
+        white-space: nowrap;
       }
 
       /* ---- Carton de tableau : l'entrée du journal de bord, à l'ouverture ---- */
@@ -1093,6 +1236,25 @@
         #tableau-card {
           top: 108px;
         }
+        #hud-danger {
+          top: 100px;
+          font-size: 11px;
+          max-width: 94vw;
+          white-space: normal;
+          text-align: center;
+        }
+        #hud-perte {
+          font-size: 9.5px;
+          min-height: 13px;
+          line-height: 13px;
+        }
+        #hud-rosee {
+          display: none; /* la bande mobile va à l'essentiel */
+        }
+        #coque-bar {
+          max-width: 40px;
+          margin: 0 6px;
+        }
       }
 
       @media (prefers-reduced-motion: reduce) {
@@ -1135,11 +1297,14 @@
         <div><dt>ÉTAT</dt><dd id="home-state">en dérive</dd></div>
       </dl>
       <button id="start" type="button">COMMENCER L'ESSAI</button>
+      <button id="start-bis" type="button">TESTER «&nbsp;LA GALERIE NOYÉE&nbsp;» — 21-A BIS, PROTOTYPE</button>
       <div class="home-records" aria-label="Registres du labo">
         <div class="rec-head"><span>REGISTRES DU LABO</span>
-          <input id="rec-name" maxlength="12" placeholder="VOTRE NOM"
-            aria-label="Nom affiché sur les records" autocomplete="nickname" />
+          <input id="rec-name" maxlength="12" placeholder="VOTRE NOM — REQUIS"
+            aria-label="Nom d'opérateur, obligatoire pour plonger" autocomplete="nickname" required />
           <span id="rec-essai"></span></div>
+        <div id="rec-need" hidden>Renseignez votre nom d'opérateur pour plonger — il signera vos records.</div>
+        <div class="rec-note">Records partagés entre tous les opérateurs du protocole.</div>
         <div id="rec-rows"></div>
       </div>
       <details id="cmd-details" open>
@@ -1181,7 +1346,7 @@
       <div class="hud-panel">
         <div class="hud-row"><span class="k">TABLEAU</span><span class="v" id="hud-tableau">nº 1</span></div>
         <div class="hud-row"><span class="k">BONBONNES</span><span class="v" id="hud-bonbonne">0.00 L</span></div>
-        <div class="hud-row"><span class="k">COQUE</span><span class="v" id="hud-coque">+21°</span></div>
+        <div class="hud-row"><span class="k">COQUE</span><i id="coque-bar"><b></b></i><span class="v" id="hud-coque">+21°</span></div>
       </div>
       <div class="hud-panel">
         <div id="hud-volume">— <small>L</small></div>
@@ -1189,6 +1354,8 @@
           <div id="gauge-fill"></div>
           <div id="gauge-threshold"></div>
         </div>
+        <div id="hud-perte"></div>
+        <div id="hud-rosee"></div>
         <div class="hud-row hud-row--extra"><span class="k">SEUIL DISPERSION</span><span class="v" id="hud-seuil">—</span></div>
         <div class="hud-row hud-row--extra"><span class="k">VITESSE</span><span class="v" id="hud-vitesse">0 u/s</span></div>
         <div class="hud-row"><span class="k">ÉTAT</span><span class="v" id="hud-state">liquide</span></div>
@@ -1209,6 +1376,9 @@
     </div>
 
     <div id="tutor" aria-live="polite"></div>
+
+    <div id="hud-danger" aria-live="assertive"></div>
+    <div id="obj-arrow" aria-hidden="true"><i>➤</i><span id="obj-dist"></span></div>
 
     <div id="tableau-card" aria-live="polite">
       <div id="card-code"></div>
