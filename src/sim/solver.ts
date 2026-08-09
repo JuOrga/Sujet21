@@ -225,9 +225,16 @@ export class FluidSim {
   private hasCold = false
   private hasHeat = false
   private hasGrille = false
+  private coldBoxes: ObstacleBox[] = []
   private heatCarry = 0
   private gasIdleCarry = 0
   private grilleCarry = 0
+  // Recondensation (§7.3) : chaque particule de vapeur perdue alimente une
+  // réserve ; les plaques froides la rendent en rosée, avec perte.
+  vaporBank = 0
+  private recondCarry = 0
+  private recondYield = 0
+  private recondSeed = 1
   // Règle de transformation : la dispersion se constate, elle ne se décrète
   // pas — il faut rester sous le seuil critique dispersalGrace secondes
   // d'affilée, le temps qu'un corps qui condense ou dégèle se regroupe.
@@ -240,6 +247,7 @@ export class FluidSim {
     this.hasCold = boxes.some((b) => b.material === MAT_FROID)
     this.hasHeat = boxes.some((b) => b.material === MAT_CHAUD)
     this.hasGrille = boxes.some((b) => b.material === MAT_GRILLE)
+    this.coldBoxes = boxes.filter((b) => b.material === MAT_FROID)
   }
 
   // Exposition à la chaleur en (x, y) : 1 au contact d'un radiateur, 0 au
@@ -508,7 +516,8 @@ export class FluidSim {
         }
       }
       if (worst < 0) break
-      this.removeParticle(worst) // évaporée : perdue, pas mise en bonbonne
+      this.removeParticle(worst) // évaporée : partie… vers les parois froides
+      this.vaporBank++
     }
   }
 
@@ -899,6 +908,10 @@ export class FluidSim {
     // en continu, et les mailles d'une grille essorent le nuage au passage
     this.processGasCosts(dt)
 
+    // 5bis-d. Recondensation (§7.3) : la vapeur perdue perle en rosée près
+    // des plaques froides — son propre corps, à aller rechercher
+    this.processRecondensation(dt)
+
     // 5ter. Éponge : traînée, temps de contact, absorption (§6)
     if (this.sponges.length > 0) this.processSponges(dt)
 
@@ -942,6 +955,7 @@ export class FluidSim {
       }
       if (pick < 0 || (this.kind[pick] === KIND_PLAYER && this.playerCount <= 2)) break
       this.removeParticle(pick)
+      this.vaporBank++
     }
     // évaporation d'état : la traîne du nuage (la plus loin du corps) se perd
     if (anyPlayerGas) this.gasIdleCarry += p.gasIdleLossRate * dt
@@ -962,6 +976,45 @@ export class FluidSim {
       }
       if (worst < 0) break
       this.removeParticle(worst)
+      this.vaporBank++
+    }
+  }
+
+  // La soupape du roguelike (§7.3) : sans eau à ramasser dans les niveaux,
+  // une erreur serait irrattrapable. La physique fournit le rattrapage — la
+  // vapeur perdue se recondense sur les parois froides, avec une perte
+  // importante, et d'autant mieux que le vaisseau refroidit. Ce n'est pas du
+  // butin : c'est son propre corps qu'on va rechercher, au prix d'un détour.
+  private processRecondensation(dt: number): void {
+    const p = this.params
+    if (this.coldBoxes.length === 0 || this.vaporBank < 1 || p.recondRate <= 0) return
+    this.recondCarry += p.recondRate * dt
+    while (this.recondCarry >= 1 && this.vaporBank >= 1 && this.count < this.capacity) {
+      this.recondCarry -= 1
+      this.vaporBank -= 1
+      // rendement : part récupérable, meilleure à vaisseau froid
+      this.recondYield += Math.min(0.85, p.recondFraction + 0.25 * this.chill)
+      if (this.recondYield < 1) continue
+      this.recondYield -= 1
+      // la rosée perle juste au-delà de l'aura de gel, répartie le long de la
+      // plaque — pseudo-aléa déterministe (LCG), la simulation reste rejouable
+      this.recondSeed = (this.recondSeed * 48271) % 2147483647
+      const r1 = this.recondSeed / 2147483647
+      this.recondSeed = (this.recondSeed * 48271) % 2147483647
+      const r2 = this.recondSeed / 2147483647
+      const b = this.coldBoxes[Math.floor(r1 * this.coldBoxes.length) % this.coldBoxes.length]
+      const dist = p.coldBand * (1 + p.chillColdGrowth * this.chill) * 1.12 + p.particleSpacing
+      let x: number
+      let y: number
+      if (b.maxX - b.minX > b.maxY - b.minY) {
+        // plaque horizontale : rosée au-dessus ou en dessous
+        x = b.minX + r2 * (b.maxX - b.minX)
+        y = r1 > 0.5 ? b.maxY + dist : b.minY - dist
+      } else {
+        x = r1 > 0.5 ? b.maxX + dist : b.minX - dist
+        y = b.minY + r2 * (b.maxY - b.minY)
+      }
+      this.addParticle(x, y, KIND_FREE)
     }
   }
 
@@ -1396,6 +1449,7 @@ export class FluidSim {
           }
           if (best < 0 || (this.kind[best] === KIND_PLAYER && this.playerCount <= 2)) break
           this.removeParticle(best)
+          this.vaporBank++
         }
       } else {
         this.heatCarry = 0
