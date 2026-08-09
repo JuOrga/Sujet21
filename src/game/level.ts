@@ -216,8 +216,122 @@ export const TABLEAU_4: LevelDef = {
   ],
 }
 
-// L'ordre de la partie : chaque tableau enseigne une chose, puis on boucle.
-export const TABLEAUX: LevelDef[] = [TABLEAU_1, TABLEAU_2, TABLEAU_3, TABLEAU_4]
+// Tableau 5 — la serre (combinaison : hydrophile + chaleur + éponge).
+// Lecture : des étagères hydrophiles jalonnent la traversée — s'y coller,
+// c'est s'arrêter net pour viser, mais s'en arracher se paie ; le radiateur
+// du haut offre l'autre monnaie (la vapeur passe l'éponge) ; le mur d'éponge
+// ferme la moitié basse.
+export const TABLEAU_5: LevelDef = {
+  name: 'La serre',
+  code: '21-E',
+  journal:
+    'Les parois mouillantes devaient l’immobiliser. Il s’en sert comme de prises d’escalade : il se colle, il vise, il s’arrache. Le protocole lui a appris la patience. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -320, maxX: 1180, maxY: -80 },
+  boxes: [
+    // les étagères : des mouillages successifs pour casser l'inertie
+    box(-560, 80, -240, 200, MAT_HYDROPHILE),
+    box(-80, -420, 240, -300, MAT_HYDROPHILE),
+    // le radiateur du haut : la monnaie vapeur
+    box(120, 520, 520, 640, MAT_CHAUD),
+    // muret neutre au-dessus du couloir de l'éponge
+    box(560, 300, 640, 750, MAT_WALL),
+  ],
+  sponges: [
+    // mur d'éponge : bloque du bas jusqu'au couloir (y = 100..300)
+    { minX: 560, minY: -750, cols: 2, rows: 35, cellSize: 24, capacityPerCell: 5 },
+  ],
+  labels: [
+    { x: -400, y: 140, text: 'HYDROPHILE', tone: 'phile' },
+    { x: 80, y: -360, text: 'HYDROPHILE', tone: 'phile' },
+    { x: 320, y: 580, text: 'RADIATEUR', tone: 'chaud' },
+    { x: 584, y: -200, text: 'ÉPONGE', tone: 'eponge' },
+    { x: 1110, y: -360, text: 'SAS', tone: 'sas' },
+  ],
+}
+
+// Tableau 6 — le dépôt de givre (combinaison : grilles + froid +
+// recondensation). Lecture : deux grilles imposent la vapeur, leurs péages
+// essorent le nuage — mais les plaques froides du dépôt recondensent les
+// pertes en rosée : passer, puis revenir cueillir son propre corps.
+export const TABLEAU_6: LevelDef = {
+  name: 'Le dépôt de givre',
+  code: '21-F',
+  journal:
+    'Le givre des plaques n’est pas du givre. C’est LUI — ce que les grilles lui arrachent perle sur les parois froides, et il revient le boire. Rien ne se perd. Ça m’inquiète. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+  boxes: [
+    // première grille, pleine hauteur : la vapeur est obligatoire
+    box(-460, -750, -420, 750, MAT_GRILLE),
+    // le dépôt : deux plaques froides qui recondensent les pertes
+    box(-220, -750, -160, -280, MAT_FROID),
+    box(-220, 280, -160, 750, MAT_FROID),
+    // chicane hydrophobe au centre
+    box(180, -480, 260, -120, MAT_HYDROPHOBE),
+    box(330, 140, 410, 500, MAT_HYDROPHOBE),
+    // seconde grille, puis une dernière plaque à l'écart du sas
+    box(680, -750, 720, 750, MAT_GRILLE),
+    box(850, -750, 910, -380, MAT_FROID),
+  ],
+  sponges: [],
+  labels: [
+    { x: -440, y: 320, text: 'GRILLE', tone: 'grille' },
+    { x: -190, y: 520, text: 'DÉPÔT DE GIVRE', tone: 'froid' },
+    { x: 220, y: -300, text: 'HYDROPHOBE', tone: 'phobe' },
+    { x: 700, y: 320, text: 'GRILLE', tone: 'grille' },
+    { x: 880, y: -560, text: 'DÉPÔT', tone: 'froid' },
+    { x: 1110, y: 0, text: 'SAS', tone: 'sas' },
+  ],
+}
+
+// Tableau 7 — la dérive (le final : presque pas de murs). Lecture : un
+// grand vide où chaque impulsion se paie ; des plots hydrophobes en guise de
+// bandes de billard, deux mouillages froids pour geler-glisser sans dépenser
+// une goutte. La maîtrise pure de l'inertie et du volume.
+export const TABLEAU_7: LevelDef = {
+  name: 'La dérive',
+  code: '21-G',
+  journal:
+    'Nous avons retiré les cloisons du secteur : sans appui, il devra se dépenser. Il a gelé, ricoché deux fois, et traversé sans perdre une goutte. Le protocole est terminé. Lui non. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -980, y: 0, n: 900 },
+  exit: { minX: 1040, minY: 380, maxX: 1180, maxY: 620 },
+  boxes: [
+    // les bandes du billard
+    box(-520, -260, -400, -140, MAT_HYDROPHOBE),
+    box(-160, 260, -40, 380, MAT_HYDROPHOBE),
+    box(240, -380, 360, -260, MAT_HYDROPHOBE),
+    box(560, 60, 680, 180, MAT_HYDROPHOBE),
+    // deux mouillages froids : geler pour glisser, se souder pour viser
+    box(-360, 420, -240, 520, MAT_FROID),
+    box(300, -700, 420, -600, MAT_FROID),
+    // un unique radiateur, loin de la route directe
+    box(-1060, -640, -860, -560, MAT_CHAUD),
+  ],
+  sponges: [],
+  labels: [
+    { x: -460, y: -100, text: 'HYDROPHOBE', tone: 'phobe' },
+    { x: -300, y: 560, text: 'MOUILLAGE FROID', tone: 'froid' },
+    { x: 360, y: -560, text: 'MOUILLAGE FROID', tone: 'froid' },
+    { x: -960, y: -520, text: 'RADIATEUR', tone: 'chaud' },
+    { x: 1110, y: 340, text: 'SAS', tone: 'sas' },
+  ],
+}
+
+// L'ordre de la partie : chaque tableau enseigne une chose, les derniers
+// les combinent, et la dérive conclut sur la maîtrise pure.
+export const TABLEAUX: LevelDef[] = [
+  TABLEAU_1,
+  TABLEAU_2,
+  TABLEAU_3,
+  TABLEAU_5,
+  TABLEAU_6,
+  TABLEAU_4,
+  TABLEAU_7,
+]
 
 export function pointInBox(
   x: number,

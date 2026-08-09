@@ -69,6 +69,11 @@ export interface SimParams {
   // bouffée part définitivement).
   gasIdleLossRate: number // particules/s évaporées tant que le corps est en vapeur, même immobile
   grilleGasLoss: number // perte /s et par particule dans la maille d'une grille
+  // Recondensation (§7.3) : la vapeur perdue se recondense sur les parois
+  // froides — la rosée perle juste au-delà de l'aura, réabsorbable au prix
+  // d'un détour. Plus le vaisseau refroidit, plus la condensation rend.
+  recondRate: number // gouttes de rosée qui perlent par seconde (si réserve de vapeur perdue)
+  recondFraction: number // part récupérable à vaisseau tiède (+0,25 à froid complet)
   gasLinkFactor: number // × le rayon d'amas : le nuage distendu reste un seul corps
   // Règles de transformation : changer d'état ne doit pas tuer.
   condenseRegroup: number // rappel des gouttelettes qui condensent vers le corps (u/s²)
@@ -193,14 +198,19 @@ export const DEFAULT_PARAMS: SimParams = {
   gasLossRate: 5,
   gasIdleLossRate: 2,
   grilleGasLoss: 0.35,
+  // Perte de 50 % à vaisseau tiède, 25 % à vaisseau glacial : le rattrapage
+  // devient plus généreux quand le jeu devient plus dur — auto-équilibré (§7.3)
+  recondRate: 4,
+  recondFraction: 0.5,
   gasLinkFactor: 3,
   condenseRegroup: 420,
   gasLinkDecay: 2.5,
   dispersalGrace: 2,
 
-  // ~7 min de jeu simulé pour un vaisseau glacial : la vapeur devient rare
-  // (pas impossible) au dernier tiers, le gel guette (§13 de la proposition)
-  chillDuration: 420,
+  // ~10 min de jeu simulé pour un vaisseau glacial (l'expédition fait 7
+  // tableaux) : la vapeur devient rare (pas impossible) au dernier tiers,
+  // le gel guette (§13 de la proposition)
+  chillDuration: 600,
   chillColdGrowth: 0.5,
   chillHeatFade: 0.6,
 

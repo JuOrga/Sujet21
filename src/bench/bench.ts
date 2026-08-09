@@ -495,6 +495,14 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Perte par seconde et par particule prise dans la maille d’une grille : traverser essore le nuage. La grille reste franchissable en vapeur — mais plus jamais gratuite.',
   )
   describe(
+    fGas.addBinding(params, 'recondRate', { min: 0, max: 20, step: 0.5, label: 'recondensation /s' }),
+    'La vapeur perdue se recondense en rosée près des plaques froides (§7.3), à ce débit — récupérable au prix d’un détour. À 0 : les pertes de vapeur sont définitives.',
+  )
+  describe(
+    fGas.addBinding(params, 'recondFraction', { min: 0, max: 0.85, step: 0.05, label: 'rendement' }),
+    'Part de la vapeur perdue qui perle effectivement (le reste est perdu). +0,25 à vaisseau glacial : le rattrapage devient plus généreux quand le jeu devient plus dur.',
+  )
+  describe(
     fGas.addBinding(params, 'gasExpand', { min: 0, max: 1000, step: 10, label: 'expansion' }),
     'Répulsion interne du nuage : haut, la vapeur s’étale largement (plus fragile) ; bas, elle reste compacte.',
   )
