@@ -211,7 +211,10 @@ export const DEFAULT_PARAMS: SimParams = {
   exitPull: 300,
   exitSwirl: 1.1,
 
-  hydroBand: 16,
+  // Portée sentie : à 16 u la chimie ne mordait qu'au ras du mur — invisible
+  // pour un corps de ~110 u de rayon. À 48 u, la déviation hydrophobe se voit
+  // et l'aspiration hydrophile se négocie.
+  hydroBand: 48,
   hydrophilePull: 900,
   hydrophileFriction: 5,
   hydrophobeRepel: 1400,

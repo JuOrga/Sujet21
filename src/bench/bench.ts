@@ -545,7 +545,7 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'LE curseur de dureté : multiplie l’effet de toutes les surfaces — adhésion et arrachage hydrophiles, répulsion hydrophobe, engluement et absorption de l’éponge, gel d’aura, évaporation au radiateur. S’applique par-dessus les réglages individuels (et les présets).',
   )
   describe(
-    fMat.addBinding(params, 'hydroBand', { min: 4, max: 60, label: 'portée bande' }),
+    fMat.addBinding(params, 'hydroBand', { min: 4, max: 150, step: 1, label: 'portée bande' }),
     'Épaisseur de la zone d’influence autour des parois. L’eau y est attirée ou repoussée sans contact.',
   )
   describe(
