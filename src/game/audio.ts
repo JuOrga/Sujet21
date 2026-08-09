@@ -105,8 +105,6 @@ export class AudioFx {
     this.drainG = drain.gain
     this.drainF = drain.filter
 
-    this.startAmbience()
-
     // Le son suit la visibilité de la page : en arrière-plan (autre app,
     // autre onglet, écran verrouillé), le contexte se suspend — sinon le
     // bourdon continue tout seul dans la poche. Au retour, il reprend ;
@@ -140,42 +138,8 @@ export class AudioFx {
     return { gain, filter }
   }
 
-  // Le bourdon de la station : deux oscillateurs graves désaccordés, très bas.
-  // Un haut-parleur de téléphone ne restitue pas 55 Hz — il grésille et fait
-  // vibrer la coque : au doigt, le bourdon monte d'une octave, un peu plus doux.
-  private startAmbience(): void {
-    const ctx = this.ctx!
-    const phone = window.matchMedia('(pointer: coarse)').matches
-    const base = phone ? 110 : 55
-    const lp = ctx.createBiquadFilter()
-    lp.type = 'lowpass'
-    lp.frequency.value = phone ? 320 : 180
-    const g = ctx.createGain()
-    g.gain.value = phone ? 0.032 : 0.045
-    lp.connect(g)
-    g.connect(this.master!)
-    const o1 = ctx.createOscillator()
-    o1.type = 'sine'
-    o1.frequency.value = base
-    const o2 = ctx.createOscillator()
-    o2.type = 'triangle'
-    o2.frequency.value = base * 2 + 0.7 // désaccord : le battement lent du bourdon
-    const g2 = ctx.createGain()
-    g2.gain.value = 0.35
-    o1.connect(lp)
-    o2.connect(g2)
-    g2.connect(lp)
-    o1.start()
-    o2.start()
-    // lente respiration du bourdon
-    const lfo = ctx.createOscillator()
-    lfo.frequency.value = 0.07
-    const lfoG = ctx.createGain()
-    lfoG.gain.value = 0.015
-    lfo.connect(lfoG)
-    lfoG.connect(g.gain)
-    lfo.start()
-  }
+  // Le bourdon de la station a été retiré : le fond est silencieux, seuls
+  // les gestes sonnent (éjection, vapeur, sas, transitions d'état).
 
   private ramp(g: GainNode | null, target: number): void {
     if (!this.ctx || !g) return
