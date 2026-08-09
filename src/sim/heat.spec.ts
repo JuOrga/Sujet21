@@ -61,6 +61,38 @@ describe('FluidSim — le radiateur : la chaleur vaporise, dégèle, évapore', 
     expect(sim.playerCount).toBeGreaterThanOrEqual(2)
   })
 
+  it('le refroidissement du vaisseau affaiblit le radiateur (§5)', () => {
+    // même particule, même durée : tiède elle bout, vaisseau glacial elle non
+    const warm = makeSim({ heatLossRate: 0 })
+    const iw = warm.addParticle(0, 8, KIND_PLAYER)
+    run(warm, DEFAULT_PARAMS.boilTime * 2.5)
+    expect(warm.gaseous[iw]).toBe(1)
+
+    const cold = makeSim({ heatLossRate: 0 })
+    cold.chill = 1
+    const ic = cold.addParticle(0, 8, KIND_PLAYER)
+    run(cold, DEFAULT_PARAMS.boilTime * 2.5)
+    expect(cold.gaseous[ic]).toBe(0)
+  })
+
+  it('le refroidissement étend l’aura des plaques froides', () => {
+    const plate = { minX: -200, minY: -40, maxX: 200, maxY: 0, material: MAT_FROID }
+    // particule posée au-delà de l'aura tiède, mais dans l'aura étendue
+    const y = 8 + DEFAULT_PARAMS.coldBand * 1.1
+    const warm = new FluidSim({ ...DEFAULT_PARAMS }, OPEN, 2048)
+    warm.setLevel([plate], [])
+    const iw = warm.addParticle(0, y, KIND_PLAYER)
+    run(warm, 6)
+    expect(warm.frozen[iw]).toBe(0)
+
+    const cold = new FluidSim({ ...DEFAULT_PARAMS }, OPEN, 2048)
+    cold.setLevel([plate], [])
+    cold.chill = 1
+    const ic = cold.addParticle(0, y, KIND_PLAYER)
+    run(cold, 6)
+    expect(cold.frozen[ic]).toBe(1)
+  })
+
   it('le froid garde la priorité : plaque froide contre radiateur, l’eau ne bout pas', () => {
     const sim = new FluidSim({ ...DEFAULT_PARAMS, heatLossRate: 0 }, OPEN, 2048)
     // radiateur et plaque froide superposés : cas limite, le froid condense

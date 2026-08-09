@@ -91,6 +91,9 @@ export class FluidSim {
   // Gel volontaire (touche F) / vapeur volontaire (touche G)
   freezeIntent = false
   gasIntent = false
+  // Refroidissement du vaisseau (§5), fixé par le jeu : 0 = tiède, 1 = glacial.
+  // Étend les auras froides, durcit gel et dégel, affaiblit les radiateurs.
+  chill = 0
   private gasCarry = 0
   // Vitesse normale du dernier choc de bloc de glace (consommé par l'audio)
   iceImpact = 0
@@ -239,7 +242,9 @@ export class FluidSim {
   // bord de l'aura. Même géométrie que l'aura de gel des plaques froides.
   private heatExposureAt(x: number, y: number): number {
     if (!this.hasHeat) return 0
-    const band = this.params.heatBand
+    // le vaisseau refroidit : l'aura des radiateurs se rétracte
+    const band = this.params.heatBand * (1 - this.params.chillHeatFade * this.chill)
+    if (band <= 1) return 0
     const rp = this.params.particleSpacing * 0.5
     const cp = this.scratchCP
     let heat = 0
@@ -1181,11 +1186,18 @@ export class FluidSim {
   // évite le clignotement en bord d'aura.
   private processCold(dt: number): void {
     const p = this.params
-    const band = p.coldBand
+    // Refroidissement du vaisseau (§5) : les auras froides s'étendent, le gel
+    // prend plus vite, le dégel traîne, la vapeur volontaire se fait chère et
+    // la condensation ambiante s'accélère — le monde devient moins jouable.
+    const chill = this.chill
+    const band = p.coldBand * (1 + p.chillColdGrowth * chill)
     const rp = p.particleSpacing * 0.5
-    const freeze = dt / Math.max(0.05, p.freezeTime)
+    const freeze = dt / Math.max(0.05, p.freezeTime * (1 - 0.5 * chill))
     const freezeSelf = dt / Math.max(0.05, p.freezeSelfTime)
-    const thaw = dt / Math.max(0.1, p.thawTime)
+    const thaw = dt / Math.max(0.1, p.thawTime * (1 + chill))
+    const boilTime = p.boilTime * (1 + 2 * p.chillHeatFade * chill)
+    const vaporizeTime = p.vaporizeTime * (1 + 1.5 * chill)
+    const condenseTime = p.condenseTime * (1 - 0.4 * chill)
     const cp = this.scratchCP
     const intent = this.freezeIntent
     for (let i = 0; i < this.count; i++) {
@@ -1222,9 +1234,9 @@ export class FluidSim {
       const wantGas = this.gasIntent && this.kind[i] === KIND_PLAYER && this.frozen[i] === 0
       let dv: number
       if (exposure > 0) dv = -exposure * (dt / 0.25)
-      else if (heat > 0 && this.frozen[i] === 0) dv = heat * (dt / Math.max(0.05, p.boilTime))
-      else if (wantGas) dv = dt / Math.max(0.05, p.vaporizeTime)
-      else dv = -dt / Math.max(0.05, p.condenseTime)
+      else if (heat > 0 && this.frozen[i] === 0) dv = heat * (dt / Math.max(0.05, boilTime))
+      else if (wantGas) dv = dt / Math.max(0.05, vaporizeTime)
+      else dv = -dt / Math.max(0.05, condenseTime)
       const vap = Math.min(1, Math.max(0, this.vapor[i] + dv))
       this.vapor[i] = vap
       if (vap >= 1) this.gaseous[i] = 1

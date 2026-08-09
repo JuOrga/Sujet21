@@ -17,11 +17,20 @@ const EXIT_LINGER = 2.6 // secondes d'affichage du bilan avant le tableau suivan
 
 const params: SimParams = { ...DEFAULT_PARAMS }
 
-// État de la partie (§7.2) : le surplus de chaque tableau est mis en bonbonne.
+// L'expédition (§7) : les tableaux en séquence, UNE fois. Le surplus de
+// chaque sas part en bonbonne ; la dispersion ou le dernier sas concluent.
+// Pendant ce temps, le vaisseau refroidit (§5) : pas de chronomètre affiché,
+// le monde devient moins jouable — c'est la pression temporelle.
 const run = {
   bonbonneLiters: 0,
   exitTimer: 0, // > 0 : bilan de sortie affiché, tableau suivant imminent
   tableauTime: 0, // secondes simulées depuis l'entrée du tableau (pour les records)
+  runTime: 0, // secondes simulées depuis le début de l'expédition (refroidissement)
+  ended: false, // expédition conclue : bilan affiché, en attente de la suivante
+}
+
+function chillNow(): number {
+  return Math.min(1, run.runTime / Math.max(30, params.chillDuration))
 }
 
 // Registres du labo (§10) : records par tableau et historique des essais.
@@ -105,6 +114,7 @@ const overlaySub = document.getElementById('overlay-sub') as HTMLDivElement
 const el = (id: string) => document.getElementById(id) as HTMLElement
 const hudTableau = el('hud-tableau')
 const hudBonbonne = el('hud-bonbonne')
+const hudCoque = el('hud-coque')
 const hudVolume = el('hud-volume')
 const hudSeuil = el('hud-seuil')
 const hudVitesse = el('hud-vitesse')
@@ -129,6 +139,14 @@ function renderRegistres(): void {
       : '<span class="rec-none">aucune collecte</span>'
     return `<div class="rec-row"><span class="rec-code">${t.code}</span><span class="rec-name">${t.name}</span><span class="rec-val">${val}</span></div>`
   })
+  const exp = records.expedition()
+  if (exp) {
+    const holder = exp.name ? ` · ${exp.name}` : ''
+    rows.unshift(
+      `<div class="rec-row rec-exp"><span class="rec-code">EXPÉDITION</span><span class="rec-name"></span>` +
+        `<span class="rec-val"><b>${exp.tableaux}/${TABLEAUX.length}</b> · ${exp.liters.toFixed(2)} L · ${fmtTime(exp.time)}${holder}</span></div>`,
+    )
+  }
   const hist = records.lastEntries(4)
   if (hist.length > 0) {
     const line = hist
@@ -206,6 +224,7 @@ const exposeSim = (): void => {
 exposeSim()
 const camera = new Camera()
 ;(window as unknown as { __cam: Camera }).__cam = camera
+;(window as unknown as { __params: SimParams }).__params = params
 
 // Effets sonores : le contexte audio naît au premier geste (clic, toucher)
 const audio = new AudioFx(loadAudioPrefs())
@@ -235,6 +254,7 @@ let waveCarry = WAVE_EVERY // première salve : onde immédiate
 function restart(): void {
   run.exitTimer = 0
   run.tableauTime = 0
+  run.ended = false
   vortex.timer = 0
   input.freezeIntent = false
   input.gasIntent = false
@@ -242,6 +262,7 @@ function restart(): void {
   sim = createSim(level)
   exposeSim()
   loop.reset()
+  overlay.classList.remove('visible')
   if (document.body.classList.contains('playing')) {
     camera.startIntro(sim.bounds, window.innerWidth, window.innerHeight)
     showTableauCard()
@@ -250,10 +271,26 @@ function restart(): void {
   }
 }
 
-document.getElementById('overlay-btn')!.addEventListener('click', () => restart())
+// Nouvelle expédition : retour au premier tableau, réserve vidée, vaisseau
+// retiédi. Le protocole recommence avec l'échantillon suivant (§10).
+function newExpedition(): void {
+  levelIndex = 0
+  run.bonbonneLiters = 0
+  run.runTime = 0
+  restart()
+}
+
+// Recommencer un tableau relance l'essai ; une expédition conclue (bilan
+// affiché) ou un échantillon dispersé repart pour une expédition neuve.
+function resetAction(): void {
+  if (run.ended || sim.dispersed) newExpedition()
+  else restart()
+}
+
+document.getElementById('overlay-btn')!.addEventListener('click', resetAction)
 
 const pane = createBench(params, monitor, {
-  reset: restart,
+  reset: resetAction,
   autoZoom: () => camera.resetAutoZoom(),
   tableaux: TABLEAUX.map((t) => t.name),
   gotoTableau: (index) => {
@@ -276,7 +313,7 @@ const pane = createBench(params, monitor, {
     },
   },
 })
-input.onReset = restart
+input.onReset = resetAction
 input.onZoom = (factor) => camera.zoomBy(factor, params)
 input.onPan = (dx, dy) => camera.panBy(dx, dy)
 input.onVortex = (clientX, clientY) => {
@@ -361,18 +398,28 @@ const btnSound = touchButton(
   },
   'tb-snd', // masqué au doigt : la bascule du son reste au banc (dossier Son)
 )
-touchButton('↺', 'recommencer (R)', restart)
+touchButton('↺', 'recommencer (R)', resetAction)
 touchButton('≡', 'fiche d’essai (échap)', openHome)
 input.onTimeWarpChange = (warp) => {
   params.timeWarp = warp
   pane.refresh()
 }
 
-function showOverlay(title: string, sub: string, tone: 'success' | 'danger'): void {
+const overlayBtn = document.getElementById('overlay-btn') as HTMLButtonElement
+function showOverlay(title: string, sub: string, tone: 'success' | 'danger', btn?: string): void {
   overlayTitle.textContent = title
   overlaySub.textContent = sub
-  overlay.classList.remove('success', 'danger')
+  overlay.classList.remove('success', 'danger', 'end')
   overlay.classList.add('visible', tone)
+  if (btn) {
+    overlay.classList.add('end')
+    overlayBtn.textContent = btn
+  }
+}
+
+// Bilan d'expédition : la phrase que le tampon raconte au protocole
+function expeditionSummary(tableauxDone: number): string {
+  return `${tableauxDone}/${TABLEAUX.length} tableaux · réserve ${run.bonbonneLiters.toFixed(2)} L · ${fmtTime(run.runTime)}`
 }
 
 let lastTime = performance.now()
@@ -415,10 +462,11 @@ function frame(now: number): void {
   const dpr = Math.min(window.devicePixelRatio || 1, quality.dprCap)
 
   const aim = camera.screenToWorld(input.aimClientX, input.aimClientY, vw, vh)
-  const tableauDone = run.exitTimer > 0
+  const tableauDone = run.exitTimer > 0 || run.ended
 
   sim.freezeIntent = input.freezeIntent
   sim.gasIntent = input.gasIntent
+  sim.chill = chillNow() // le vaisseau refroidit : la physique suit
   if (input.aimActive) camera.cancelIntro() // le joueur agit : la caméra suit
   if (!input.paused && !tableauDone) {
     loop.advance(dtReal, params.timeWarp, params.dt, () => {
@@ -435,6 +483,7 @@ function frame(now: number): void {
       sim.applyExitSuction(exitMouth.x, exitMouth.y, params.dt)
       sim.step(params.dt)
       run.tableauTime += params.dt // temps simulé : le time warp ne fausse pas les records
+      run.runTime += params.dt // le vaisseau refroidit au fil de l'expédition
     })
   }
 
@@ -450,24 +499,37 @@ function frame(now: number): void {
   if (!tableauDone && !sim.dispersed && (drunk || reached)) {
     const surplus = sim.liters() + sim.swallowed * params.litersPerParticle
     run.bonbonneLiters += surplus
-    run.exitTimer = EXIT_LINGER
     const { newRecord } = records.noteCollection(level.code, surplus, run.tableauTime)
     const recLine = newRecord
       ? ` · NOUVEAU RECORD DU TABLEAU (${surplus.toFixed(2)} L en ${fmtTime(run.tableauTime)})`
       : ` · record du tableau : ${records.tableauRecord(level.code)!.liters.toFixed(2)} L`
-    renderRegistres()
-    showOverlay(
-      'ÉCHANTILLON COLLECTÉ',
-      `${surplus.toFixed(2)} L transférés en bonbonne — réserve du laboratoire : ${run.bonbonneLiters.toFixed(2)} L${recLine} · l'essai continue…`,
-      'success',
-    )
     audio.collect()
+    if (levelIndex + 1 >= TABLEAUX.length) {
+      // Dernier sas : l'expédition est achevée — bilan, et registres à jour
+      run.ended = true
+      const exp = records.noteExpedition(TABLEAUX.length, run.bonbonneLiters, run.runTime)
+      renderRegistres()
+      showOverlay(
+        'EXPÉDITION ACHEVÉE',
+        `${expeditionSummary(TABLEAUX.length)}${exp.newRecord ? ' · MEILLEURE EXPÉDITION DU PROTOCOLE' : ''} — le laboratoire n'a plus d'échantillon. Quelque part dans les conduites, de l'eau se souvient.`,
+        'success',
+        'NOUVELLE EXPÉDITION',
+      )
+    } else {
+      run.exitTimer = EXIT_LINGER
+      renderRegistres()
+      showOverlay(
+        'ÉCHANTILLON COLLECTÉ',
+        `${surplus.toFixed(2)} L transférés en bonbonne — réserve : ${run.bonbonneLiters.toFixed(2)} L${recLine} · tableau suivant…`,
+        'success',
+      )
+    }
   }
   if (run.exitTimer > 0) {
     run.exitTimer -= dtReal
     if (run.exitTimer <= 0) {
       overlay.classList.remove('visible')
-      levelIndex = (levelIndex + 1) % TABLEAUX.length
+      levelIndex = levelIndex + 1
       restart()
     }
   }
@@ -520,6 +582,7 @@ function frame(now: number): void {
     waveScratch,
     waves.length,
     Math.max(params.renderDownsample, quality.down),
+    chillNow(),
   )
 
   const speed = Math.hypot(sim.stats.velX, sim.stats.velY)
@@ -543,7 +606,12 @@ function frame(now: number): void {
 
   // Instruments de bord
   const fraction = sim.baseVolume > 0 ? sim.playerCount / sim.baseVolume : 0
-  hudTableau.textContent = `nº ${levelIndex + 1}`
+  hudTableau.textContent = `nº ${levelIndex + 1}/${TABLEAUX.length}`
+  // La coque refroidit : +21° au départ, −60° à froid complet — la pression
+  // temporelle se lit ici (et dans la physique), jamais sur un chronomètre
+  const coque = Math.round(21 - 81 * chillNow())
+  hudCoque.textContent = `${coque > 0 ? '+' : ''}${coque}°`
+  hudCoque.classList.toggle('warn', chillNow() > 0.75)
   hudBonbonne.textContent = `${run.bonbonneLiters.toFixed(2)} L`
   hudVolume.innerHTML = `${sim.liters().toFixed(2)} <small>L · ${sim.playerCount} part.</small>`
   gaugeFill.style.width = `${Math.min(100, fraction * 100).toFixed(1)}%`
@@ -579,9 +647,10 @@ function frame(now: number): void {
   sfx.allGas = allGas
   if (sim.dispersed && !sfx.dispersed) {
     audio.disperse()
-    // fin de l'échantillon : le registre passe au suivant
+    // fin de l'échantillon ET de l'expédition : les registres consignent tout
     dispersedEssaiNo = records.essaiNumber()
     records.noteDispersion(level.code, run.tableauTime)
+    records.noteExpedition(levelIndex, run.bonbonneLiters, run.runTime)
     renderRegistres()
   }
   sfx.dispersed = sim.dispersed
@@ -610,10 +679,11 @@ function frame(now: number): void {
   if (sim.dispersed && run.exitTimer <= 0) {
     showOverlay(
       'DISPERSION',
-      `La cohésion ne tient plus. Le laboratoire consigne : perte de l’échantillon nº ${dispersedEssaiNo}. Le suivant est prêt.`,
+      `La cohésion ne tient plus. Perte de l’échantillon nº ${dispersedEssaiNo} — expédition : ${expeditionSummary(levelIndex)}. Le suivant est prêt.`,
       'danger',
+      'ÉCHANTILLON SUIVANT',
     )
-  } else if (run.exitTimer <= 0) {
+  } else if (run.exitTimer <= 0 && !run.ended) {
     overlay.classList.remove('visible')
   }
 

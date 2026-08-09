@@ -387,6 +387,20 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Temps d’exposition en pleine aura avant le gel complet. La glace prise au contact d’une plaque s’y soude : c’est l’ancrage.',
   )
 
+  const fChill = pane.addFolder({ title: 'Refroidissement (expédition)', expanded: false })
+  describe(
+    fChill.addBinding(params, 'chillDuration', { min: 60, max: 1200, step: 10, label: 'durée (s)' }),
+    'Temps de jeu simulé pour que le vaisseau devienne glacial. Pas de chronomètre à l’écran : la pression se lit dans la physique (auras qui s’étendent, radiateurs qui faiblissent) et sur la température de coque du HUD.',
+  )
+  describe(
+    fChill.addBinding(params, 'chillColdGrowth', { min: 0, max: 1.5, step: 0.05, label: 'poussée du froid' }),
+    'À froid complet : extension des auras froides (× coldBand), gel plus prompt, dégel plus lent. Le gel subi devient la menace du dernier tiers.',
+  )
+  describe(
+    fChill.addBinding(params, 'chillHeatFade', { min: 0, max: 0.9, step: 0.05, label: 'déclin des radiateurs' }),
+    'À froid complet : rétraction de l’aura des radiateurs et vaporisation plus lente. La vapeur devient rare — pas impossible.',
+  )
+
   const fHeat = pane.addFolder({ title: 'Chaleur (tableau 4)', expanded: false })
   describe(
     fHeat.addBinding(params, 'heatBand', { min: 10, max: 150, step: 1, label: 'aura (u)' }),
