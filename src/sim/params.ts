@@ -149,7 +149,9 @@ export const DEFAULT_PARAMS: SimParams = {
   vortexDuration: 1.6,
   vortexWindDown: 0.35,
 
-  coldBand: 40,
+  // Portée sentie manette en main : le corps fait ~110 u de rayon — une aura
+  // de 40 u n'en mordait qu'une tranche et ne se ressentait pas
+  coldBand: 85,
   freezeTime: 1.2,
   freezeSelfTime: 0.45,
   thawTime: 2.5,
@@ -158,8 +160,8 @@ export const DEFAULT_PARAMS: SimParams = {
   // Fenêtre d'usage : ~1,5 s pour gagner la vapeur, puis ~8 particules/s de
   // perte si on s'attarde — le radiateur est une ressource qui devient un
   // danger, jamais un mur binaire (§6)
-  heatBand: 44,
-  boilTime: 1.5,
+  heatBand: 130,
+  boilTime: 1.2,
   heatThawTime: 0.35,
   heatLossRate: 8,
 
