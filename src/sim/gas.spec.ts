@@ -36,7 +36,7 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
   })
 
   it('le nuage distendu reste un seul corps (pas de fausse dispersion)', () => {
-    const sim = makeSim()
+    const sim = makeSim({ gasIdleLossRate: 0 }) // on mesure la connexité, pas le coût d'état
     sim.setLevel([], [])
     sim.spawnDisc(0, 0, 60, KIND_PLAYER)
     sim.gasIntent = true

@@ -64,6 +64,11 @@ export interface SimParams {
   gasTurb: number // turbulence : le nuage se tord en volutes (u/s²)
   gasDrag: number // flottement : freinage propre du gaz (1/s)
   gasLossRate: number // particules évaporées / seconde de pilotage (perdues)
+  // La vapeur n'est pas un passe-partout : être gaz se paie en continu, et
+  // les mailles d'une grille essorent le nuage au passage (§4 : chaque
+  // bouffée part définitivement).
+  gasIdleLossRate: number // particules/s évaporées tant que le corps est en vapeur, même immobile
+  grilleGasLoss: number // perte /s et par particule dans la maille d'une grille
   gasLinkFactor: number // × le rayon d'amas : le nuage distendu reste un seul corps
   // Règles de transformation : changer d'état ne doit pas tuer.
   condenseRegroup: number // rappel des gouttelettes qui condensent vers le corps (u/s²)
@@ -93,6 +98,12 @@ export interface SimParams {
   spongeDrag: number // traînée dans une cellule absorbante (1/s)
   spongeAbsorbTime: number // temps de contact continu avant absorption (s)
   wallSplashDamp: number // amorti du rebond normal près des murs neutres (0..1) : l'eau épouse la paroi au lieu d'éclater
+  // Mordant global : un seul curseur qui durcit TOUTES les surfaces —
+  // adhésion et arrachage hydrophiles, répulsion hydrophobe, engluement et
+  // absorption de l'éponge, gel d'aura, évaporation au radiateur. Appliqué
+  // par-dessus les réglages individuels, donc aussi aux présets enregistrés
+  // avant son existence.
+  surfaceBite: number // 1 = nominal ; 1.5 = surfaces nettement plus dangereuses
 
   // Corps
   litersPerParticle: number // conversion volume affiché
@@ -173,6 +184,8 @@ export const DEFAULT_PARAMS: SimParams = {
   gasTurb: 120,
   gasDrag: 1.3,
   gasLossRate: 5,
+  gasIdleLossRate: 2,
+  grilleGasLoss: 0.35,
   gasLinkFactor: 3,
   condenseRegroup: 420,
   gasLinkDecay: 2.5,
@@ -196,6 +209,7 @@ export const DEFAULT_PARAMS: SimParams = {
   spongeDrag: 7,
   spongeAbsorbTime: 0.3,
   wallSplashDamp: 0.65,
+  surfaceBite: 1.35,
 
   litersPerParticle: 0.005,
   criticalVolumeFraction: 0.35,

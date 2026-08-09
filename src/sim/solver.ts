@@ -224,7 +224,10 @@ export class FluidSim {
 
   private hasCold = false
   private hasHeat = false
+  private hasGrille = false
   private heatCarry = 0
+  private gasIdleCarry = 0
+  private grilleCarry = 0
   // Règle de transformation : la dispersion se constate, elle ne se décrète
   // pas — il faut rester sous le seuil critique dispersalGrace secondes
   // d'affilée, le temps qu'un corps qui condense ou dégèle se regroupe.
@@ -236,6 +239,7 @@ export class FluidSim {
     this.sponges = sponges.map((d) => new Sponge(d))
     this.hasCold = boxes.some((b) => b.material === MAT_FROID)
     this.hasHeat = boxes.some((b) => b.material === MAT_CHAUD)
+    this.hasGrille = boxes.some((b) => b.material === MAT_GRILLE)
   }
 
   // Exposition à la chaleur en (x, y) : 1 au contact d'un radiateur, 0 au
@@ -891,6 +895,10 @@ export class FluidSim {
     // gouttelettes qui redeviennent eau sont rappelées vers le corps
     this.applyCondenseRegroup(dt)
 
+    // 5bis-c. La vapeur n'est pas un état de croisière : être gaz s'évapore
+    // en continu, et les mailles d'une grille essorent le nuage au passage
+    this.processGasCosts(dt)
+
     // 5ter. Éponge : traînée, temps de contact, absorption (§6)
     if (this.sponges.length > 0) this.processSponges(dt)
 
@@ -906,13 +914,72 @@ export class FluidSim {
     }
   }
 
+  // La vapeur se paie (§4 : chaque bouffée part définitivement) : tant que
+  // le corps est en gaz, sa traîne s'évapore — même immobile — et chaque
+  // particule prise dans la maille d'une grille risque d'y rester. La vapeur
+  // reste le passe-muraille du jeu, mais chaque passage a un prix.
+  private processGasCosts(dt: number): void {
+    const p = this.params
+    let anyPlayerGas = false
+    let inMesh = 0
+    for (let i = 0; i < this.count; i++) {
+      if (this.gaseous[i] !== 1) continue
+      if (this.kind[i] === KIND_PLAYER) anyPlayerGas = true
+      if (this.hasGrille && this.grilleAt(this.posX[i], this.posY[i])) inMesh++
+    }
+    // péage de grille : proportionnel à la présence dans la maille
+    if (inMesh > 0) this.grilleCarry += inMesh * p.grilleGasLoss * dt
+    else this.grilleCarry = 0
+    while (this.grilleCarry >= 1) {
+      this.grilleCarry -= 1
+      let pick = -1
+      for (let i = 0; i < this.count; i++) {
+        if (this.gaseous[i] !== 1) continue
+        if (this.grilleAt(this.posX[i], this.posY[i])) {
+          pick = i
+          break
+        }
+      }
+      if (pick < 0 || (this.kind[pick] === KIND_PLAYER && this.playerCount <= 2)) break
+      this.removeParticle(pick)
+    }
+    // évaporation d'état : la traîne du nuage (la plus loin du corps) se perd
+    if (anyPlayerGas) this.gasIdleCarry += p.gasIdleLossRate * dt
+    else this.gasIdleCarry = 0
+    while (this.gasIdleCarry >= 1 && this.playerCount > 2) {
+      this.gasIdleCarry -= 1
+      let worst = -1
+      let worstD2 = -1
+      for (let i = 0; i < this.count; i++) {
+        if (this.kind[i] !== KIND_PLAYER || this.gaseous[i] !== 1) continue
+        const dx = this.posX[i] - this.stats.centroidX
+        const dy = this.posY[i] - this.stats.centroidY
+        const d2 = dx * dx + dy * dy
+        if (d2 > worstD2) {
+          worstD2 = d2
+          worst = i
+        }
+      }
+      if (worst < 0) break
+      this.removeParticle(worst)
+    }
+  }
+
+  private grilleAt(x: number, y: number): boolean {
+    for (const b of this.boxes) {
+      if (b.material !== MAT_GRILLE) continue
+      if (x > b.minX && x < b.maxX && y > b.minY && y < b.maxY) return true
+    }
+    return false
+  }
+
   // Tant qu'une particule garde de la vapeur résiduelle (le corps est en
   // train de redevenir liquide) et qu'on ne pilote pas le nuage, elle est
   // rappelée vers le corps : redevenir eau ne disperse pas l'échantillon.
   // Physiquement : la condensation nuclée — les gouttelettes retombent.
   private applyCondenseRegroup(dt: number): void {
     const p = this.params
-    if (p.condenseRegroup <= 0) return
+    if (p.condenseRegroup <= 0 || this.playerCount === 0) return // pas de corps : rien vers quoi retomber
     const cx = this.stats.centroidX
     const cy = this.stats.centroidY
     for (let i = 0; i < this.count; i++) {
@@ -923,9 +990,17 @@ export class FluidSim {
       const dy = cy - this.posY[i]
       const d = Math.hypot(dx, dy)
       if (d < 1e-3) continue
-      const a = (p.condenseRegroup * v * dt) / d
-      this.velX[i] += dx * a
-      this.velY[i] += dy * a
+      // Asservissement en vitesse (comme le vortex) : la vitesse d'approche
+      // cible décroît avec la distance — la pluie converge et se pose, sans
+      // jamais s'effondrer sur le corps (une force constante exploserait un
+      // nuage compact)
+      const ux = dx / d
+      const uy = dy / d
+      const vTarget = Math.min(p.condenseRegroup, d * 2.5)
+      const vRadial = this.velX[i] * ux + this.velY[i] * uy
+      const k = Math.min(1, 6 * v * dt)
+      this.velX[i] += (vTarget - vRadial) * ux * k
+      this.velY[i] += (vTarget - vRadial) * uy * k
     }
   }
 
@@ -1008,7 +1083,8 @@ export class FluidSim {
     const rp = p.particleSpacing * 0.5
     const cp = this.scratchCP
     const band = p.hydroBand
-    const philDamp = Math.exp(-p.hydrophileFriction * dt)
+    const bite = p.surfaceBite // mordant global : les surfaces pèsent plus
+    const philDamp = Math.exp(-p.hydrophileFriction * bite * dt)
 
     for (let i = 0; i < n; i++) {
       // La glace et la vapeur ignorent la chimie des surfaces
@@ -1068,7 +1144,8 @@ export class FluidSim {
             }
             continue
           }
-          const a = (b.material === MAT_HYDROPHILE ? -p.hydrophilePull : p.hydrophobeRepel) * f * dt
+          const a =
+            (b.material === MAT_HYDROPHILE ? -p.hydrophilePull : p.hydrophobeRepel) * f * dt * bite
           this.velX[i] += cp.nx * a
           this.velY[i] += cp.ny * a
         }
@@ -1081,7 +1158,8 @@ export class FluidSim {
   // solide — on peut payer un passage en volume (§6).
   private processSponges(dt: number): void {
     const p = this.params
-    const drag = Math.exp(-p.spongeDrag * dt)
+    const drag = Math.exp(-p.spongeDrag * p.surfaceBite * dt)
+    const absorbTime = p.spongeAbsorbTime / Math.max(0.1, p.surfaceBite)
     let i = 0
     while (i < this.count) {
       if (this.frozen[i] === 1 || this.gaseous[i] === 1) {
@@ -1100,7 +1178,7 @@ export class FluidSim {
         this.velX[i] *= drag
         this.velY[i] *= drag
         this.contactTime[i] += dt
-        if (this.contactTime[i] >= p.spongeAbsorbTime) {
+        if (this.contactTime[i] >= absorbTime) {
           sp.absorb(cell)
           this.removeParticle(i)
           removed = true
@@ -1192,7 +1270,7 @@ export class FluidSim {
     const chill = this.chill
     const band = p.coldBand * (1 + p.chillColdGrowth * chill)
     const rp = p.particleSpacing * 0.5
-    const freeze = dt / Math.max(0.05, p.freezeTime * (1 - 0.5 * chill))
+    const freeze = (dt * p.surfaceBite) / Math.max(0.05, p.freezeTime * (1 - 0.5 * chill))
     const freezeSelf = dt / Math.max(0.05, p.freezeSelfTime)
     const thaw = dt / Math.max(0.1, p.thawTime * (1 + chill))
     const boilTime = p.boilTime * (1 + 2 * p.chillHeatFade * chill)
@@ -1275,7 +1353,7 @@ export class FluidSim {
         }
       }
       if (anyHotGas) {
-        this.heatCarry += p.heatLossRate * dt
+        this.heatCarry += p.heatLossRate * p.surfaceBite * dt
         while (this.heatCarry >= 1) {
           this.heatCarry -= 1
           let best = -1

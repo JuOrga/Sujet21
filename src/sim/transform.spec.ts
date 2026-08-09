@@ -16,7 +16,7 @@ function run(sim: FluidSim, seconds: number): void {
 
 describe('Règles de transformation — changer d’état ne tue pas', () => {
   it('vapeur → eau : le nuage étalé condense et se regroupe, sans dispersion', () => {
-    const sim = makeSim()
+    const sim = makeSim({ gasIdleLossRate: 0 }) // on mesure la transformation, pas le coût d'état
     sim.setLevel([], [])
     sim.spawnDisc(0, 0, 60, KIND_PLAYER)
     sim.gasIntent = true
