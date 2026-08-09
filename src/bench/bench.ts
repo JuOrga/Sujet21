@@ -53,6 +53,8 @@ export interface BenchMonitor {
   volume: number
   speed: number
   quality: number
+  physMs: number // coût CPU des pas physiques de l'image (ms, lissé)
+  renderMs: number // coût CPU de la soumission du rendu (ms, lissé)
   overview: boolean
 }
 
@@ -655,9 +657,26 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     fMon.addBinding(monitor, 'quality', {
       readonly: true,
       label: 'qualité rendu',
-      format: (v: number) => ['maximale', 'haute', 'moyenne', 'basse', 'minimale'][Math.round(v)] ?? '?',
+      format: (v: number) =>
+        ['maximale', 'haute', 'moyenne', 'basse', 'minimale', 'secours'][Math.round(v)] ?? '?',
     }),
     'Qualité de rendu choisie automatiquement selon les FPS de la machine. La physique, elle, n’est jamais dégradée.',
+  )
+  describe(
+    fMon.addBinding(monitor, 'physMs', {
+      readonly: true,
+      label: 'physique (ms)',
+      format: (v: number) => v.toFixed(1),
+    }),
+    'Coût CPU des pas de physique par image, lissé. Au-delà de ~10 ms, le jeu passe en léger ralenti plutôt que de saccader.',
+  )
+  describe(
+    fMon.addBinding(monitor, 'renderMs', {
+      readonly: true,
+      label: 'rendu (ms)',
+      format: (v: number) => v.toFixed(1),
+    }),
+    'Coût CPU de la préparation du rendu par image, lissé (le travail GPU s’ajoute par-dessus).',
   )
 
   // ---- Livraisons : le journal de ce qui a été livré, date et heure ----
