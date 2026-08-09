@@ -274,10 +274,12 @@ void main() {
         // L'aura dit la portée : une brume diffuse sur toute la bande
         // d'influence, sur le modèle de la chaleur du radiateur — turquoise
         // qui aspire (hydrophile), violette qui repousse (hydrophobe).
+        // Atténuation LINÉAIRE : la brume emplit toute la bande au lieu de
+        // s'écraser contre le mur — à n'importe quel zoom, le champ se voit
         float aura = (1.0 - smoothstep(0.0, uHydroBand, max(d, 0.0))) * step(0.0, d);
-        float mist = 0.55 + 0.45 * vnoise(world * 0.05 + vec2(uTime * 0.09, -uTime * 0.06));
-        vec3 auraCol = mat < 1.5 ? vec3(0.10, 0.36, 0.38) : vec3(0.32, 0.17, 0.44);
-        col += auraCol * aura * aura * mist;
+        float mist = 0.5 + 0.5 * vnoise(world * 0.045 + vec2(uTime * 0.10, -uTime * 0.07));
+        vec3 auraCol = mat < 1.5 ? vec3(0.12, 0.42, 0.45) : vec3(0.38, 0.20, 0.52);
+        col += auraCol * aura * (0.45 + 0.55 * mist);
       }
     } else if (mat > 5.5) {
       // Radiateur (tableau 4) : rayures chaudes qui défilent, arête incandes-
