@@ -108,14 +108,24 @@ uniform vec4 uWaves[MAX_WAVES]; // x, y, instant de départ, amplitude
 // Textures d'habillage (chargées en arrière-plan ; uHas* passe à 1 quand
 // prêtes — d'ici là, le décor procédural fait l'intérim)
 uniform sampler2D uTexStars;
+uniform sampler2D uTexStarsFar; // lointain orbital : la station à la dérive
 uniform sampler2D uTexTank; // fond de cuve : panneaux, conduites, liserés
 uniform sampler2D uTexWall;
+uniform sampler2D uTexWallA; // seconde paroi : les murs alternent, sans répétition visible
+uniform sampler2D uTexFroid;
+uniform sampler2D uTexChaud;
+uniform sampler2D uTexGrille;
 uniform sampler2D uTexPhobe;
 uniform sampler2D uTexPhile;
 uniform sampler2D uTexIris;
 uniform float uHasStars;
+uniform float uHasStarsFar;
 uniform float uHasTank;
 uniform float uHasWall;
+uniform float uHasWallA;
+uniform float uHasFroid;
+uniform float uHasChaud;
+uniform float uHasGrille;
 uniform float uHasPhobe;
 uniform float uHasPhile;
 uniform float uHasIris;
@@ -197,7 +207,11 @@ void main() {
   if (uHasStars > 0.5) {
     // Atténuée : le vide doit rester plus sombre que la cuve éclairée,
     // sinon la hiérarchie lumineuse s'inverse et la scène se noie.
-    vec3 far_ = texture(uTexStars, (world - uCenter * 0.55) / 3400.0).rgb;
+    // La couche lointaine (station à la dérive) suit à moitié la caméra et
+    // s'échantillonne en miroir : sa répétition ne se lit pas dans le noir.
+    vec3 far_ = uHasStarsFar > 0.5
+      ? texture(uTexStarsFar, (world - uCenter * 0.62) / 5200.0).rgb * 1.35
+      : texture(uTexStars, (world - uCenter * 0.55) / 3400.0).rgb;
     vec3 near_ = texture(uTexStars, world / 1500.0).rgb;
     voidCol = (far_ * 0.4 + near_ * 0.6) * 0.55;
   } else {
@@ -244,9 +258,21 @@ void main() {
 
   // Textures des matériaux : prélevées hors des branches (flux de contrôle
   // uniforme requis par les mipmaps), utilisées dans la boucle d'obstacles.
+  // Les deux parois alternent selon un bruit très basse fréquence : les longs
+  // murs cessent de répéter le même motif d'un bout à l'autre du tableau.
   vec3 texWallC = texture(uTexWall, world / 230.0).rgb;
+  if (uHasWallA > 0.5) {
+    vec3 wallA = texture(uTexWallA, world / 520.0).rgb;
+    float blend = smoothstep(0.35, 0.65, vnoise(world * 0.0011 + 5.3));
+    texWallC = uHasWall > 0.5 ? mix(texWallC, wallA, blend) : wallA;
+  }
   vec3 texPhobeC = texture(uTexPhobe, world / 170.0).rgb;
   vec3 texPhileC = texture(uTexPhile, world / 210.0).rgb;
+  vec3 texFroidC = texture(uTexFroid, world / 460.0).rgb;
+  vec3 texChaudC = texture(uTexChaud, world / 380.0).rgb;
+  // la grille est calée pour que ses perforations fassent ~24 u, comme le
+  // motif procédural qu'elle remplace
+  vec3 texGrilleC = texture(uTexGrille, world / 624.0).rgb;
 
   // Obstacles : remplissage texturé + liseré, couleur par matériau (§6)
   float edgeW = 2.5 / uZoom;
@@ -304,7 +330,13 @@ void main() {
       float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
       float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
       float stripe = 0.5 + 0.5 * sin((world.x + world.y - uTime * 46.0) * 0.14);
-      vec3 fillCol = vec3(0.26, 0.11, 0.05) + vec3(0.42, 0.17, 0.04) * smoothstep(0.35, 0.85, stripe);
+      // Panneau à ailettes texturé quand l'image est là : les rayures animées
+      // deviennent la CHALEUR qui court dessus, pas le panneau lui-même.
+      // L'image est très sombre : sans ce réchauffement, le panneau se lit
+      // comme du métal noir et perd son identité de SOURCE DE CHALEUR.
+      vec3 fillCol = uHasChaud > 0.5
+        ? texChaudC * vec3(2.3, 1.45, 0.95) + vec3(0.30, 0.11, 0.02) * smoothstep(0.4, 0.9, stripe)
+        : vec3(0.26, 0.11, 0.05) + vec3(0.42, 0.17, 0.04) * smoothstep(0.35, 0.85, stripe);
       col = mix(col, fillCol, fill);
       col = mix(col, vec3(1.0, 0.56, 0.24), edge * 0.9);
       float aura = (1.0 - smoothstep(0.0, uHeatBand, max(d, 0.0))) * step(0.0, d);
@@ -315,9 +347,19 @@ void main() {
       // vapeur passe entre les mailles. Les trous laissent voir le fond.
       float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
       float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
-      vec2 cellUv = fract(world / 24.0) - 0.5;
-      float hole = 1.0 - smoothstep(0.26, 0.34, max(abs(cellUv.x), abs(cellUv.y)));
-      vec3 barCol = vec3(0.17, 0.21, 0.26) * (0.9 + 0.2 * vnoise(world * 0.15));
+      // Panneau perforé texturé : les trous de l'image (quasi noirs) servent
+      // eux-mêmes de masque — le fond se voit à travers, comme avant.
+      float hole;
+      vec3 barCol;
+      if (uHasGrille > 0.5) {
+        float lum = dot(texGrilleC, vec3(0.299, 0.587, 0.114));
+        hole = 1.0 - smoothstep(0.020, 0.075, lum);
+        barCol = texGrilleC * 1.5;
+      } else {
+        vec2 cellUv = fract(world / 24.0) - 0.5;
+        hole = 1.0 - smoothstep(0.26, 0.34, max(abs(cellUv.x), abs(cellUv.y)));
+        barCol = vec3(0.17, 0.21, 0.26) * (0.9 + 0.2 * vnoise(world * 0.15));
+      }
       col = mix(col, barCol, fill * (1.0 - hole * 0.85));
       col = mix(col, vec3(0.45, 0.60, 0.70), edge * 0.8);
     } else if (mat > 3.5) {
@@ -326,7 +368,13 @@ void main() {
       float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
       float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
       float sparkle = smoothstep(0.72, 0.94, vnoise(world * 0.22));
-      vec3 fillCol = vec3(0.15, 0.21, 0.29) + vec3(0.26, 0.34, 0.40) * sparkle * 0.55;
+      // Givre texturé quand l'image est là ; le scintillement procédural
+      // reste par-dessus : le gel a l'air vivant, pas imprimé.
+      // Teinte franchement bleue : brute, l'image tire vers le gris béton et
+      // la plaque cesse de se lire comme du GEL au premier coup d'œil.
+      vec3 fillCol = uHasFroid > 0.5
+        ? texFroidC * vec3(0.52, 0.74, 1.02) * (0.60 + 0.28 * sparkle)
+        : vec3(0.15, 0.21, 0.29) + vec3(0.26, 0.34, 0.40) * sparkle * 0.55;
       col = mix(col, fillCol, fill);
       col = mix(col, vec3(0.70, 0.86, 0.97), edge * 0.9);
       float aura = (1.0 - smoothstep(0.0, uColdBand, max(d, 0.0))) * step(0.0, d);
@@ -587,8 +635,13 @@ export class Renderer {
   // Textures d'habillage : null tant que l'image n'est pas chargée — le
   // décor procédural assure l'intérim, l'image prend le relais sans à-coup.
   private texStars: WebGLTexture | null = null
+  private texStarsFar: WebGLTexture | null = null
   private texTank: WebGLTexture | null = null
   private texWall: WebGLTexture | null = null
+  private texWallA: WebGLTexture | null = null
+  private texFroid: WebGLTexture | null = null
+  private texChaud: WebGLTexture | null = null
+  private texGrille: WebGLTexture | null = null
   private texPhobe: WebGLTexture | null = null
   private texPhile: WebGLTexture | null = null
   private texIris: WebGLTexture | null = null
@@ -689,8 +742,15 @@ export class Renderer {
     // L'iris est échantillonné dans une branche non uniforme du shader :
     // pas de mipmaps pour lui (dérivées indéfinies sinon).
     this.loadTexture('/assets/stars.webp', true, true, (t) => (this.texStars = t))
+    // Le lointain n'est pas raccordable : répété en MIROIR, la couture ne se
+    // lit pas dans le noir et la station à la dérive reste unique à l'écran.
+    this.loadTexture('/assets/stars-far.webp', true, true, (t) => (this.texStarsFar = t), true)
     this.loadTexture('/assets/tank-bg.webp', true, true, (t) => (this.texTank = t))
     this.loadTexture('/assets/wall.webp', true, true, (t) => (this.texWall = t))
+    this.loadTexture('/assets/wall-a.webp', true, true, (t) => (this.texWallA = t))
+    this.loadTexture('/assets/froid.webp', true, true, (t) => (this.texFroid = t))
+    this.loadTexture('/assets/chaud.webp', true, true, (t) => (this.texChaud = t))
+    this.loadTexture('/assets/grille.webp', true, true, (t) => (this.texGrille = t))
     this.loadTexture('/assets/phobe.webp', true, true, (t) => (this.texPhobe = t))
     this.loadTexture('/assets/phile.webp', true, true, (t) => (this.texPhile = t))
     this.loadTexture('/assets/iris.webp', false, false, (t) => (this.texIris = t))
@@ -704,6 +764,7 @@ export class Renderer {
     repeat: boolean,
     mips: boolean,
     assign: (t: WebGLTexture) => void,
+    mirrored = false,
   ): void {
     const img = new Image()
     img.onload = () => {
@@ -713,7 +774,7 @@ export class Renderer {
       gl.bindTexture(gl.TEXTURE_2D, tex)
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, img)
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
-      const wrap = repeat ? gl.REPEAT : gl.CLAMP_TO_EDGE
+      const wrap = repeat ? (mirrored ? gl.MIRRORED_REPEAT : gl.REPEAT) : gl.CLAMP_TO_EDGE
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap)
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap)
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
@@ -878,6 +939,11 @@ export class Renderer {
     bindTex(1, this.texStars, 'uTexStars', 'uHasStars')
     bindTex(2, this.texWall, 'uTexWall', 'uHasWall')
     bindTex(6, this.texTank, 'uTexTank', 'uHasTank')
+    bindTex(7, this.texStarsFar, 'uTexStarsFar', 'uHasStarsFar')
+    bindTex(8, this.texWallA, 'uTexWallA', 'uHasWallA')
+    bindTex(9, this.texFroid, 'uTexFroid', 'uHasFroid')
+    bindTex(10, this.texChaud, 'uTexChaud', 'uHasChaud')
+    bindTex(11, this.texGrille, 'uTexGrille', 'uHasGrille')
     bindTex(3, this.texPhobe, 'uTexPhobe', 'uHasPhobe')
     bindTex(4, this.texPhile, 'uTexPhile', 'uHasPhile')
     bindTex(5, this.texIris, 'uTexIris', 'uHasIris')
