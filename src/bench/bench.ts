@@ -41,6 +41,8 @@ export interface BenchActions {
   // Saut de tableau : tester un niveau sans rejouer les précédents
   tableaux: string[]
   gotoTableau(index: number): void
+  // Le prototype hors expédition (21-A bis), aussi accessible depuis la fiche
+  gotoBis(): void
   // Effets sonores (préférences hors présets : chacun règle son volume)
   sound: { actif: boolean; volume: number }
 }
@@ -283,6 +285,13 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
       actions.gotoTableau(index)
       hint.textContent = `Tableau ${index + 1} — ${name}.`
     })
+  })
+  describe(
+    fTableaux.addButton({ title: '21-A BIS — LA GALERIE NOYÉE (PROTO)' }),
+    'Lance le prototype de réfection du secteur A : un tableau « eau seule », hors expédition et hors registres. Aussi accessible depuis la fiche d’essai (bouton sous « Commencer l’essai »).',
+  ).on('click', () => {
+    actions.gotoBis()
+    hint.textContent = 'Prototype 21-A bis — la galerie noyée.'
   })
 
   const fSound = pane.addFolder({ title: 'Son', expanded: false })

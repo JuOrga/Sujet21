@@ -11,6 +11,13 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '09/08/2026 17:30',
+    title: 'Le 21-A bis se trouve aussi au banc',
+    notes: [
+      'Le prototype « La galerie noyée » est désormais listé dans le dossier Tableaux du banc de réglage, en plus du bouton de la fiche d’essai (sous « Commencer l’essai ») — il se lançait mal à trouver.',
+    ],
+  },
+  {
     date: '09/08/2026 17:00',
     title: 'La vie se lit, les records se partagent — et la galerie noyée en essai',
     notes: [
