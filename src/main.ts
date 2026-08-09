@@ -334,7 +334,16 @@ const loop = new FixedLoop()
 const input = new Input()
 input.attach(canvas)
 
-const monitor: BenchMonitor = { fps: 0, particles: 0, volume: 0, speed: 0, quality: 0, overview: false }
+const monitor: BenchMonitor = {
+  fps: 0,
+  particles: 0,
+  volume: 0,
+  speed: 0,
+  quality: 0,
+  physMs: 0,
+  renderMs: 0,
+  overview: false,
+}
 
 // Vortex de regroupement : déclenché au clic droit, actif vortexDuration s
 const vortex = { x: 0, y: 0, timer: 0 }
@@ -669,6 +678,7 @@ const QUALITY_LEVELS = [
   { dprCap: 1.25, down: 3 },
   { dprCap: 1, down: 3 },
   { dprCap: 0.8, down: 4 },
+  { dprCap: 0.65, down: 4 }, // palier de secours : écrans très denses (iPad) qui chauffent
 ]
 let qualityLevel = window.matchMedia('(pointer: coarse)').matches ? 1 : 0
 let qualityTimer = 0
@@ -701,22 +711,34 @@ function frame(now: number): void {
   sim.chill = chillNow() // le vaisseau refroidit : la physique suit
   if (input.aimActive) camera.cancelIntro() // le joueur agit : la caméra suit
   if (!input.paused && !tableauDone) {
-    loop.advance(dtReal, params.timeWarp, params.dt, () => {
-      if (input.aimActive && !sim.dispersed) {
-        // En vapeur, le pointeur pilote le nuage ; sinon il éjecte
-        if (input.gasIntent) sim.applyGasSteer(aim.x, aim.y, params.dt)
-        else sim.eject(aim.x, aim.y, params.dt)
-      }
-      if (vortex.timer > 0) {
-        const life = Math.min(1, vortex.timer / params.vortexDuration)
-        sim.applyVortex(vortex.x, vortex.y, params.dt, life)
-        vortex.timer -= params.dt
-      }
-      sim.applyExitSuction(exitMouth.x, exitMouth.y, params.dt)
-      sim.step(params.dt)
-      run.tableauTime += params.dt // temps simulé : le time warp ne fausse pas les records
-      run.runTime += params.dt // le vaisseau refroidit au fil de l'expédition
-    })
+    // Budget CPU des pas physiques : ~60 % du temps d'image, borné à 5-12 ms.
+    // Sans cette borne, une image en retard impose plus de pas, coûte plus
+    // cher, prend plus de retard — et la machine s'installe à 15-20 fps.
+    const stepBudget = Math.min(12, Math.max(5, dtReal * 1000 * 0.6))
+    const physT0 = performance.now()
+    loop.advance(
+      dtReal,
+      params.timeWarp,
+      params.dt,
+      () => {
+        if (input.aimActive && !sim.dispersed) {
+          // En vapeur, le pointeur pilote le nuage ; sinon il éjecte
+          if (input.gasIntent) sim.applyGasSteer(aim.x, aim.y, params.dt)
+          else sim.eject(aim.x, aim.y, params.dt)
+        }
+        if (vortex.timer > 0) {
+          const life = Math.min(1, vortex.timer / params.vortexDuration)
+          sim.applyVortex(vortex.x, vortex.y, params.dt, life)
+          vortex.timer -= params.dt
+        }
+        sim.applyExitSuction(exitMouth.x, exitMouth.y, params.dt)
+        sim.step(params.dt)
+        run.tableauTime += params.dt // temps simulé : le time warp ne fausse pas les records
+        run.runTime += params.dt // le vaisseau refroidit au fil de l'expédition
+      },
+      stepBudget,
+    )
+    monitor.physMs += (performance.now() - physT0 - monitor.physMs) * 0.08
   }
 
   // Sortie (§7.1-7.2). Sas aspirant : la victoire n'arrive que lorsque le sas
@@ -831,6 +853,7 @@ function frame(now: number): void {
   }
   updateTutor(dtReal)
   updateWorldLabels(vw, vh)
+  const renderT0 = performance.now()
   renderer.render(
     sim,
     camera,
@@ -845,6 +868,7 @@ function frame(now: number): void {
     Math.max(params.renderDownsample, quality.down),
     chillNow(),
   )
+  monitor.renderMs += (performance.now() - renderT0 - monitor.renderMs) * 0.08
 
   const speed = Math.hypot(sim.stats.velX, sim.stats.velY)
   monitor.fps = fpsSmoothed
