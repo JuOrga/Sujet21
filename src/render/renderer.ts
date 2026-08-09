@@ -108,11 +108,13 @@ uniform vec4 uWaves[MAX_WAVES]; // x, y, instant de départ, amplitude
 // Textures d'habillage (chargées en arrière-plan ; uHas* passe à 1 quand
 // prêtes — d'ici là, le décor procédural fait l'intérim)
 uniform sampler2D uTexStars;
+uniform sampler2D uTexTank; // fond de cuve : panneaux, conduites, liserés
 uniform sampler2D uTexWall;
 uniform sampler2D uTexPhobe;
 uniform sampler2D uTexPhile;
 uniform sampler2D uTexIris;
 uniform float uHasStars;
+uniform float uHasTank;
 uniform float uHasWall;
 uniform float uHasPhobe;
 uniform float uHasPhile;
@@ -210,15 +212,22 @@ void main() {
 
   // Dedans : fond de cuve, vignette, caustiques discrètes (la lumière du
   // labo joue dans l'eau de l'essai), trame de mesure, poussières en dérive.
+  // Le fond texturé (panneaux, conduites, liserés) remplace l'aplat procédural
+  // dès qu'il est chargé — échantillonné avec une légère parallaxe : la paroi
+  // est DERRIÈRE l'eau, elle suit un peu la caméra et la profondeur se sent.
   vec2 nuv = uv * 2.0 - 1.0;
   float vign = 1.0 - 0.35 * dot(nuv, nuv);
-  vec3 tank = vec3(0.012, 0.022, 0.040) * vign;
+  vec3 tankTex = texture(uTexTank, (world - uCenter * 0.10) / 900.0).rgb;
+  vec3 tank = uHasTank > 0.5
+    ? tankTex * (0.55 * vign + 0.12)
+    : vec3(0.012, 0.022, 0.040) * vign;
   float caus = vnoise(world * 0.012 + vec2(uTime * 0.05, -uTime * 0.03));
   caus *= vnoise(world * 0.03 - vec2(uTime * 0.02, uTime * 0.04));
   tank += vec3(0.010, 0.028, 0.040) * caus;
   float lw = 1.2 / uZoom;
-  tank += vec3(0.05, 0.09, 0.13) * gridLine(world, 100.0, lw) * 0.30;
-  tank += vec3(0.07, 0.12, 0.17) * gridLine(world, 500.0, lw * 1.6) * 0.45;
+  float gridDim = uHasTank > 0.5 ? 0.5 : 1.0; // la texture a ses propres lignes
+  tank += vec3(0.05, 0.09, 0.13) * gridLine(world, 100.0, lw) * 0.30 * gridDim;
+  tank += vec3(0.07, 0.12, 0.17) * gridLine(world, 500.0, lw * 1.6) * 0.45 * gridDim;
   tank += vec3(0.10, 0.16, 0.20) * specks(world + vec2(uTime * 7.0, uTime * 3.0), 70.0, 0.06, uZoom) * 0.5;
   // halo le long des parois : la cuve est éclairée par sa coque
   tank += vec3(0.020, 0.045, 0.060) * exp(min(0.0, roomD) * 0.02);
@@ -578,6 +587,7 @@ export class Renderer {
   // Textures d'habillage : null tant que l'image n'est pas chargée — le
   // décor procédural assure l'intérim, l'image prend le relais sans à-coup.
   private texStars: WebGLTexture | null = null
+  private texTank: WebGLTexture | null = null
   private texWall: WebGLTexture | null = null
   private texPhobe: WebGLTexture | null = null
   private texPhile: WebGLTexture | null = null
@@ -679,6 +689,7 @@ export class Renderer {
     // L'iris est échantillonné dans une branche non uniforme du shader :
     // pas de mipmaps pour lui (dérivées indéfinies sinon).
     this.loadTexture('/assets/stars.webp', true, true, (t) => (this.texStars = t))
+    this.loadTexture('/assets/tank-bg.webp', true, true, (t) => (this.texTank = t))
     this.loadTexture('/assets/wall.webp', true, true, (t) => (this.texWall = t))
     this.loadTexture('/assets/phobe.webp', true, true, (t) => (this.texPhobe = t))
     this.loadTexture('/assets/phile.webp', true, true, (t) => (this.texPhile = t))
@@ -866,6 +877,7 @@ export class Renderer {
     }
     bindTex(1, this.texStars, 'uTexStars', 'uHasStars')
     bindTex(2, this.texWall, 'uTexWall', 'uHasWall')
+    bindTex(6, this.texTank, 'uTexTank', 'uHasTank')
     bindTex(3, this.texPhobe, 'uTexPhobe', 'uHasPhobe')
     bindTex(4, this.texPhile, 'uTexPhile', 'uHasPhile')
     bindTex(5, this.texIris, 'uTexIris', 'uHasIris')
