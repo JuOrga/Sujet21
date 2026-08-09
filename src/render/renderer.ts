@@ -271,13 +271,16 @@ void main() {
       col = mix(col, fillCol, fill);
       col = mix(col, edgeCol, edge * 0.9);
       if (mat > 0.5) {
-        // L'aura dit la portée : chaque surface chimique montre sa bande
-        // d'influence — brume teintée hydrophile (turquoise) ou hydrophobe
-        // (violette), comme le froid montre son gel et le chaud sa chaleur.
+        // L'aura dit la portée : dégradé teinté dans la bande d'influence,
+        // et un anneau fin À LA LIMITE EXACTE du rayon d'action — largeur
+        // constante à l'écran, pour rester lisible à n'importe quel zoom.
         float aura = (1.0 - smoothstep(0.0, uHydroBand, max(d, 0.0))) * step(0.0, d);
         float mist = 0.55 + 0.45 * vnoise(world * 0.055 + vec2(uTime * 0.07, -uTime * 0.05));
-        vec3 auraCol = mat < 1.5 ? vec3(0.06, 0.24, 0.26) : vec3(0.20, 0.11, 0.28);
-        col += auraCol * aura * aura * mist;
+        vec3 auraCol = mat < 1.5 ? vec3(0.09, 0.30, 0.32) : vec3(0.26, 0.14, 0.36);
+        col += auraCol * aura * (0.4 + 0.6 * mist) * 0.7;
+        float ring = (1.0 - smoothstep(0.0, 2.6 / uZoom, abs(d - uHydroBand))) * step(0.0, d);
+        vec3 ringCol = mat < 1.5 ? vec3(0.18, 0.55, 0.58) : vec3(0.52, 0.30, 0.68);
+        col += ringCol * ring * (0.30 + 0.10 * sin(uTime * 2.2));
       }
     } else if (mat > 5.5) {
       // Radiateur (tableau 4) : rayures chaudes qui défilent, arête incandes-
@@ -292,6 +295,10 @@ void main() {
       float aura = (1.0 - smoothstep(0.0, uHeatBand, max(d, 0.0))) * step(0.0, d);
       float shimmer = 0.55 + 0.45 * vnoise(world * 0.06 + vec2(-uTime * 0.16, uTime * 0.24));
       col += vec3(0.36, 0.15, 0.04) * aura * aura * shimmer;
+      // la limite exacte de la portée — on la voit se rétracter quand le
+      // vaisseau refroidit
+      float ringH = (1.0 - smoothstep(0.0, 2.6 / uZoom, abs(d - uHeatBand))) * step(0.0, d);
+      col += vec3(0.80, 0.42, 0.18) * ringH * (0.30 + 0.10 * sin(uTime * 2.2));
     } else if (mat > 4.5) {
       // Grille (tableau 3) : panneau perforé — le liquide s'y écrase, la
       // vapeur passe entre les mailles. Les trous laissent voir le fond.
@@ -314,6 +321,9 @@ void main() {
       float aura = (1.0 - smoothstep(0.0, uColdBand, max(d, 0.0))) * step(0.0, d);
       float mist = 0.55 + 0.45 * vnoise(world * 0.05 + vec2(uTime * 0.10, -uTime * 0.06));
       col += vec3(0.14, 0.27, 0.40) * aura * aura * mist;
+      // la limite exacte de la portée — on la voit s'étendre avec le froid
+      float ringC = (1.0 - smoothstep(0.0, 2.6 / uZoom, abs(d - uColdBand))) * step(0.0, d);
+      col += vec3(0.38, 0.58, 0.78) * ringC * (0.30 + 0.10 * sin(uTime * 2.2));
     } else {
       // Sas de sortie : une bouche d'aspiration — un trou dans lequel l'eau
       // s'engouffre. Gorge sombre, œil noir, anneau qui respire, et stries
