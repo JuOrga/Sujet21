@@ -110,6 +110,7 @@ export interface SimParams {
   spongeDrag: number // traînée dans une cellule absorbante (1/s)
   spongeAbsorbTime: number // temps de contact continu avant absorption (s)
   wallSplashDamp: number // amorti du rebond normal près des murs neutres (0..1) : l'eau épouse la paroi au lieu d'éclater
+  wallSplashBand: number // portée de cet amorti (unités monde) — effet de CONTACT, sans rapport avec la portée de la chimie
   // Mordant global : un seul curseur qui durcit TOUTES les surfaces —
   // adhésion et arrachage hydrophiles, répulsion hydrophobe, engluement et
   // absorption de l'éponge, gel d'aura, évaporation au radiateur. Appliqué
@@ -233,6 +234,11 @@ export const DEFAULT_PARAMS: SimParams = {
   spongeDrag: 7,
   spongeAbsorbTime: 0.3,
   wallSplashDamp: 0.65,
+  // Deux fois l'espacement des particules : l'amorti d'éclaboussure agit au
+  // ras de la paroi. Il partageait jusqu'ici la portée de la chimie
+  // (hydroBand), passée à 80 u pour les auras — les murs neutres retenaient
+  // alors le corps à distance, comme s'ils collaient.
+  wallSplashBand: 14,
   surfaceBite: 1.35,
 
   litersPerParticle: 0.005,

@@ -588,6 +588,10 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Amortit le rebond de l’eau sur les murs neutres : haut, l’impact s’étale et épouse la paroi ; à 0, l’eau éclate en jaillissant.',
   )
   describe(
+    fMat.addBinding(params, 'wallSplashBand', { min: 4, max: 60, label: 'portée amorti' }),
+    'Distance à laquelle l’amorti d’impact agit autour d’un mur neutre. À garder au ras de la paroi (~2 espacements) : large, les murs semblent RETENIR le corps à distance.',
+  )
+  describe(
     fMat.addBinding(params, 'spongeDrag', { min: 0, max: 30, label: 'traînée éponge' }),
     'Freinage de l’eau qui traverse une éponge : elle s’y englue avant d’être absorbée.',
   )
