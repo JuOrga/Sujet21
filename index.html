@@ -276,6 +276,11 @@
         color: var(--dim);
         opacity: 0.7;
       }
+      .rec-exp {
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 3px;
+        margin-bottom: 3px;
+      }
       .rec-hist {
         margin-top: 7px;
         padding-top: 7px;
@@ -484,7 +489,8 @@
         background: var(--alert);
         color: var(--alert);
       }
-      #hud-state.warn {
+      #hud-state.warn,
+      #hud-coque.warn {
         color: var(--alert);
       }
 
@@ -586,8 +592,12 @@
         border: none;
         cursor: pointer;
       }
-      #overlay.danger #overlay-btn {
+      #overlay.danger #overlay-btn,
+      #overlay.end #overlay-btn {
         display: block;
+      }
+      #overlay.success #overlay-btn {
+        background: var(--valid);
       }
       @keyframes stamp {
         from {
@@ -1118,6 +1128,7 @@
       <div class="hud-panel">
         <div class="hud-row"><span class="k">TABLEAU</span><span class="v" id="hud-tableau">nº 1</span></div>
         <div class="hud-row"><span class="k">BONBONNES</span><span class="v" id="hud-bonbonne">0.00 L</span></div>
+        <div class="hud-row"><span class="k">COQUE</span><span class="v" id="hud-coque">+21°</span></div>
       </div>
       <div class="hud-panel">
         <div id="hud-volume">— <small>L</small></div>

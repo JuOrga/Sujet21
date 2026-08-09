@@ -19,10 +19,21 @@ export interface HistoryEntry {
   time: number
 }
 
+// La meilleure expédition : d'abord la distance (tableaux collectés), puis
+// la réserve mise en bonbonne, puis le temps — dans cet ordre.
+export interface ExpeditionRecord {
+  tableaux: number
+  liters: number
+  time: number
+  essai: number
+  name: string
+}
+
 interface RecordsData {
   essais: number // essais terminés en dispersion (l'échantillon courant est essais + 1)
   operator: string // nom affiché sur les records
   tableaux: Record<string, TableauRecord>
+  expedition: ExpeditionRecord | null
   history: HistoryEntry[]
 }
 
@@ -36,7 +47,7 @@ const KEY = 'projet21.registres.v1'
 const HISTORY_MAX = 40
 
 function blank(): RecordsData {
-  return { essais: 0, operator: '', tableaux: {}, history: [] }
+  return { essais: 0, operator: '', tableaux: {}, expedition: null, history: [] }
 }
 
 function defaultStorage(): StorageLike | null {
@@ -63,6 +74,7 @@ export class Records {
         const d = JSON.parse(raw) as RecordsData
         if (typeof d.essais === 'number' && d.tableaux && Array.isArray(d.history)) {
           if (typeof d.operator !== 'string') d.operator = '' // registres d'avant le nom
+          if (d.expedition === undefined) d.expedition = null // registres d'avant la boucle
           return d
         }
       }
@@ -127,6 +139,34 @@ export class Records {
       }
     }
     this.save()
+    return { newRecord: beats }
+  }
+
+  expedition(): ExpeditionRecord | null {
+    return this.data.expedition
+  }
+
+  /** Fin d'expédition (achevée ou perdue) : la meilleure est retenue. */
+  noteExpedition(tableaux: number, liters: number, time: number): { newRecord: boolean } {
+    if (tableaux === 0 && liters < 0.01) return { newRecord: false } // rien à consigner
+    const entry: ExpeditionRecord = {
+      tableaux,
+      liters: Math.round(liters * 100) / 100,
+      time: Math.round(time * 10) / 10,
+      essai: this.essaiNumber(),
+      name: this.data.operator,
+    }
+    const prev = this.data.expedition
+    const beats =
+      !prev ||
+      entry.tableaux > prev.tableaux ||
+      (entry.tableaux === prev.tableaux &&
+        (entry.liters > prev.liters ||
+          (entry.liters === prev.liters && entry.time < prev.time)))
+    if (beats) {
+      this.data.expedition = entry
+      this.save()
+    }
     return { newRecord: beats }
   }
 

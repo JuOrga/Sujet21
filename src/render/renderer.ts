@@ -101,6 +101,7 @@ uniform float uTime;
 uniform float uExitRadius; // portée de l'aspiration du sas (halo de courant)
 uniform float uColdBand;   // portée de l'aura de gel des plaques froides
 uniform float uHeatBand;   // portée de l'aura de chaleur des radiateurs
+uniform float uChill;      // refroidissement du vaisseau (0 tiède, 1 glacial)
 uniform int uWaveCount;
 uniform vec4 uWaves[MAX_WAVES]; // x, y, instant de départ, amplitude
 // Textures d'habillage (chargées en arrière-plan ; uHas* passe à 1 quand
@@ -435,6 +436,10 @@ void main() {
   col = mix(col, water, body);
   // L'eau qui recouvre l'œil du sas s'assombrit : elle sombre dans le trou
   col *= 1.0 - drainEye * body * 0.55;
+  // Le vaisseau refroidit (§5) : la lumière vire au bleu et faiblit — la
+  // pression temporelle se voit, elle ne se chronomètre pas
+  col = mix(col, col * vec3(0.82, 0.92, 1.10), uChill * 0.6);
+  col *= 1.0 - 0.12 * uChill;
   outColor = vec4(col, 1.0);
 }`
 
@@ -729,6 +734,7 @@ export class Renderer {
     waves: Float32Array, // MAX_WAVES × (x, y, t0, amplitude)
     waveCount: number,
     downsample = params.renderDownsample, // la qualité adaptative peut forcer plus grossier
+    chill = 0, // refroidissement du vaisseau : teinte froide, auras effectives
   ): void {
     const gl = this.gl
     const devW = Math.max(1, Math.round(viewportW * dpr))
@@ -824,8 +830,11 @@ export class Renderer {
     gl.uniform1fv(cu['uBoxMats[0]'], this.matScratch)
     gl.uniform1f(cu['uTime'], timeSec)
     gl.uniform1f(cu['uExitRadius'], params.exitRadius)
-    gl.uniform1f(cu['uColdBand'], params.coldBand)
-    gl.uniform1f(cu['uHeatBand'], params.heatBand)
+    // les auras dessinées suivent la physique refroidie (mêmes formules que
+    // le solveur) : le danger se lit toujours à sa vraie portée
+    gl.uniform1f(cu['uColdBand'], params.coldBand * (1 + params.chillColdGrowth * chill))
+    gl.uniform1f(cu['uHeatBand'], Math.max(0, params.heatBand * (1 - params.chillHeatFade * chill)))
+    gl.uniform1f(cu['uChill'], chill)
     gl.uniform1i(cu['uWaveCount'], waveCount)
     gl.uniform4fv(cu['uWaves[0]'], waves)
     const bindTex = (unit: number, tex: WebGLTexture | null, sampler: string, flag: string) => {

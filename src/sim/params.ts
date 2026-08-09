@@ -70,6 +70,15 @@ export interface SimParams {
   gasLinkDecay: number // s d'extinction de la mémoire de lien du gaz après condensation
   dispersalGrace: number // s continues sous le seuil critique avant de constater la dispersion
 
+  // Refroidissement du vaisseau (§5) : pas un chronomètre affiché — le monde
+  // devient progressivement moins jouable. Le facteur de froid (chill, 0..1,
+  // fixé par le jeu selon le temps d'expédition) étend les auras froides,
+  // durcit gel et dégel, affaiblit les radiateurs et ralentit la vapeur
+  // volontaire.
+  chillDuration: number // s simulées d'expédition pour atteindre le froid complet
+  chillColdGrowth: number // extension des auras froides à froid complet (× coldBand)
+  chillHeatFade: number // affaiblissement des radiateurs à froid complet (0..1)
+
   // Sas de sortie : une bouche d'aspiration dans laquelle l'eau s'engouffre
   exitRadius: number // portée de l'aspiration autour de la bouche (unités monde)
   exitPull: number // vitesse du courant d'aspiration (u/s), renforcée à l'approche du trou
@@ -166,6 +175,12 @@ export const DEFAULT_PARAMS: SimParams = {
   condenseRegroup: 420,
   gasLinkDecay: 2.5,
   dispersalGrace: 2,
+
+  // ~7 min de jeu simulé pour un vaisseau glacial : la vapeur devient rare
+  // (pas impossible) au dernier tiers, le gel guette (§13 de la proposition)
+  chillDuration: 420,
+  chillColdGrowth: 0.5,
+  chillHeatFade: 0.6,
 
   exitRadius: 240,
   exitPull: 300,

@@ -64,6 +64,18 @@ describe('Records — les registres du labo', () => {
     expect(new Records(storage).operator()).toBe('VEGA')
   })
 
+  it('la meilleure expédition : distance, puis réserve, puis temps', () => {
+    const storage = memoryStorage()
+    const r = new Records(storage)
+    expect(r.expedition()).toBeNull()
+    expect(r.noteExpedition(0, 0, 30).newRecord).toBe(false) // rien à consigner
+    expect(r.noteExpedition(2, 4.1, 300).newRecord).toBe(true)
+    expect(r.noteExpedition(1, 9.9, 100).newRecord).toBe(false) // moins loin : non
+    expect(r.noteExpedition(2, 4.5, 400).newRecord).toBe(true) // aussi loin, plus riche
+    expect(r.noteExpedition(4, 3.0, 700).newRecord).toBe(true) // plus loin : oui
+    expect(new Records(storage).expedition()).toMatchObject({ tableaux: 4, liters: 3.0 })
+  })
+
   it('survit à un stockage absent ou corrompu', () => {
     const none = new Records(null)
     expect(none.noteCollection('21-A', 1, 1).newRecord).toBe(true)
