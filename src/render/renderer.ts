@@ -101,6 +101,7 @@ uniform float uTime;
 uniform float uExitRadius; // portée de l'aspiration du sas (halo de courant)
 uniform float uColdBand;   // portée de l'aura de gel des plaques froides
 uniform float uHeatBand;   // portée de l'aura de chaleur des radiateurs
+uniform float uHydroBand;  // portée de la chimie des surfaces (hydrophile/phobe)
 uniform float uChill;      // refroidissement du vaisseau (0 tiède, 1 glacial)
 uniform int uWaveCount;
 uniform vec4 uWaves[MAX_WAVES]; // x, y, instant de départ, amplitude
@@ -269,6 +270,15 @@ void main() {
       }
       col = mix(col, fillCol, fill);
       col = mix(col, edgeCol, edge * 0.9);
+      if (mat > 0.5) {
+        // L'aura dit la portée : chaque surface chimique montre sa bande
+        // d'influence — brume teintée hydrophile (turquoise) ou hydrophobe
+        // (violette), comme le froid montre son gel et le chaud sa chaleur.
+        float aura = (1.0 - smoothstep(0.0, uHydroBand, max(d, 0.0))) * step(0.0, d);
+        float mist = 0.55 + 0.45 * vnoise(world * 0.055 + vec2(uTime * 0.07, -uTime * 0.05));
+        vec3 auraCol = mat < 1.5 ? vec3(0.06, 0.24, 0.26) : vec3(0.20, 0.11, 0.28);
+        col += auraCol * aura * aura * mist;
+      }
     } else if (mat > 5.5) {
       // Radiateur (tableau 4) : rayures chaudes qui défilent, arête incandes-
       // cente, et une aura de chaleur qui tremble — le danger (et la
@@ -835,6 +845,7 @@ export class Renderer {
     // le solveur) : le danger se lit toujours à sa vraie portée
     gl.uniform1f(cu['uColdBand'], params.coldBand * (1 + params.chillColdGrowth * chill))
     gl.uniform1f(cu['uHeatBand'], Math.max(0, params.heatBand * (1 - params.chillHeatFade * chill)))
+    gl.uniform1f(cu['uHydroBand'], params.hydroBand)
     gl.uniform1f(cu['uChill'], chill)
     gl.uniform1i(cu['uWaveCount'], waveCount)
     gl.uniform4fv(cu['uWaves[0]'], waves)
