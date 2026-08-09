@@ -424,14 +424,15 @@ void main() {
   // sur le corps avant même la prise, la partie gelée devient blême et fixe.
   vec3 iceCol = vec3(0.60, 0.76, 0.88) * (0.72 + 0.45 * diffuse);
   water = mix(water, iceCol, icy * 0.9);
-  // Vapeur (tableau 3) : fumée noire — cœur d'encre, volutes qui roulent,
-  // liseré gris qui accroche la lumière sur les bords du nuage.
+  // Vapeur (tableau 3) : vapeur d'opale — cœur turquoise voilé, liseré
+  // nacré qui accroche la lumière sur les bords, ombres lilas dans les plis.
   float smokeEdgeMix = 1.0 - smoothstep(th, th * 3.2, field2);
-  vec3 smokeCore = vec3(0.028, 0.032, 0.046);
-  vec3 smokeEdge = vec3(0.40, 0.44, 0.52);
+  vec3 smokeCore = vec3(0.34, 0.52, 0.62);
+  vec3 smokeEdge = vec3(0.84, 0.94, 1.00);
   vec3 smoke = mix(smokeCore, smokeEdge, smokeEdgeMix * (0.35 + 0.65 * smokeN));
-  smoke += vec3(0.10, 0.12, 0.16) * smokeN * smokeN; // volutes internes qui roulent
-  water = mix(water, smoke, vap * 0.96);
+  smoke += vec3(0.16, 0.22, 0.28) * smokeN * smokeN; // volutes lumineuses qui roulent
+  smoke = mix(smoke, vec3(0.46, 0.42, 0.62), (1.0 - smokeN) * 0.22); // plis lilas
+  water = mix(water, smoke, vap * 0.92);
 
   col = mix(col, water, body);
   // L'eau qui recouvre l'œil du sas s'assombrit : elle sombre dans le trou

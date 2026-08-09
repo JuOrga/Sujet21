@@ -95,6 +95,39 @@ describe('FluidSim — le radiateur : la chaleur vaporise, dégèle, évapore', 
     expect(cold.frozen[ic]).toBe(1)
   })
 
+  it('l’eau qui givre s’engourdit : la vitesse fond avec le givre', () => {
+    const sim = makeSim({ heatLossRate: 0 })
+    sim.setLevel([], [])
+    const slow = sim.addParticle(0, 800, KIND_PLAYER)
+    sim.frost[slow] = 0.9
+    sim.velX[slow] = 200
+    const ref = sim.addParticle(600, 800, KIND_PLAYER)
+    sim.velX[ref] = 200
+    run(sim, 0.5)
+    expect(Math.abs(sim.velX[slow])).toBeLessThan(Math.abs(sim.velX[ref]) * 0.6)
+  })
+
+  it('l’eau qui chauffe frémit : agitation avant l’ébullition', () => {
+    // le frémissement oscille : c'est la vitesse crête qui le mesure
+    const peak = (sim: FluidSim, i: number, seconds: number): number => {
+      const dt = sim.params.dt
+      let vMax = 0
+      for (let s = 0; s < Math.round(seconds / dt); s++) {
+        sim.step(dt)
+        vMax = Math.max(vMax, Math.hypot(sim.velX[i], sim.velY[i]))
+      }
+      return vMax
+    }
+    const calm = makeSim({ heatLossRate: 0, heatAgitation: 0, boilTime: 60 })
+    const ic = calm.addParticle(0, 8, KIND_PLAYER)
+    const vCalm = peak(calm, ic, 1.5)
+
+    const hot = makeSim({ heatLossRate: 0, heatAgitation: 400, boilTime: 60 })
+    const ih = hot.addParticle(0, 8, KIND_PLAYER)
+    const vHot = peak(hot, ih, 1.5)
+    expect(vHot).toBeGreaterThan(vCalm + 15)
+  })
+
   it('le froid garde la priorité : plaque froide contre radiateur, l’eau ne bout pas', () => {
     const sim = new FluidSim({ ...DEFAULT_PARAMS, heatLossRate: 0 }, OPEN, 2048)
     // radiateur et plaque froide superposés : cas limite, le froid condense

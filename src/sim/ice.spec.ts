@@ -55,13 +55,17 @@ describe('FluidSim — la glace : bloc balistique, soudure, dégel', () => {
 
   it('gelée par une plaque SANS la toucher : la glace dérive (pas d’ancre à distance)', () => {
     const sim = makeSim()
-    const i = sim.addParticle(20, -200, KIND_FREE) // aura (40) sans contact
+    const i = sim.addParticle(20, -200, KIND_FREE) // dans l'aura, sans contact
     sim.velY[i] = 30 // longe la plaque
     run(sim, 4)
     expect(sim.frozen[i]).toBe(1)
+    // l'engourdissement a freiné la dérive pendant le givrage, mais l'élan
+    // restant au moment du gel est conservé : la glace glisse, pas d'ancre
+    const vAtFreeze = sim.velY[i]
+    expect(vAtFreeze).toBeGreaterThan(2)
     const y = sim.posY[i]
     run(sim, 0.5)
-    expect(sim.posY[i] - y).toBeGreaterThan(10) // glisse toujours (~30 u/s)
+    expect(sim.posY[i] - y).toBeGreaterThan(vAtFreeze * 0.5 * 0.6)
   })
 
   it('gelée AU CONTACT d’une plaque : soudée, le bloc s’arrête', () => {

@@ -1278,6 +1278,11 @@ export class FluidSim {
     const condenseTime = p.condenseTime * (1 - 0.4 * chill)
     const cp = this.scratchCP
     const intent = this.freezeIntent
+    // Ressenti thermique du liquide : l'eau qui givre s'engourdit, l'eau qui
+    // chauffe frémit — la température se sent avant le changement d'état
+    const time = this.stepIndex * dt
+    const agit = p.heatAgitation * dt
+    const kAgit = 0.06
     for (let i = 0; i < this.count; i++) {
       const x = this.posX[i]
       const y = this.posY[i]
@@ -1339,6 +1344,29 @@ export class FluidSim {
           heat > 0 ? Math.max(thaw, (heat * dt) / Math.max(0.05, p.heatThawTime)) : thaw
         this.frost[i] = Math.max(0, this.frost[i] - melt)
         if (this.frozen[i] === 1 && this.frost[i] <= 0.55) this.frozen[i] = 0
+      }
+
+      // La température se sent dans le liquide lui-même :
+      if (this.frozen[i] === 0 && this.gaseous[i] === 0) {
+        const fr = this.frost[i]
+        // l'eau qui givre s'engourdit — pâteuse, dure à propulser. Le gel
+        // VOLONTAIRE (F) y échappe : « geler, c'est parier sur une
+        // trajectoire » — l'élan choisi est conservé
+        if (fr > 0 && p.frostSluggish > 0 && !(wanted && this.kind[i] === KIND_PLAYER)) {
+          const damp = Math.exp(-p.frostSluggish * fr * dt)
+          this.velX[i] *= damp
+          this.velY[i] *= damp
+        }
+        const warmth = Math.max(this.vapor[i], heat)
+        if (warmth > 0.05 && agit > 0) {
+          // l'eau qui chauffe frémit : un bouillonnement doux, déterministe
+          const xi = this.posX[i]
+          const yi = this.posY[i]
+          const jx = -Math.sin(xi * kAgit + time * 5.1) * Math.sin(yi * kAgit - time * 4.3)
+          const jy = -Math.cos(xi * kAgit + time * 5.1) * Math.cos(yi * kAgit - time * 4.3)
+          this.velX[i] += jx * agit * warmth
+          this.velY[i] += jy * agit * warmth
+        }
       }
     }
 

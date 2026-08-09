@@ -84,6 +84,13 @@ export interface SimParams {
   chillColdGrowth: number // extension des auras froides à froid complet (× coldBand)
   chillHeatFade: number // affaiblissement des radiateurs à froid complet (0..1)
 
+  // Le ressenti thermique du LIQUIDE (avant tout changement d'état) : l'eau
+  // qui givre s'engourdit — pâteuse, dure à propulser — et l'eau qui chauffe
+  // frémit — agitée, vivante. La température se sent dans les mains avant de
+  // se voir dans un état.
+  frostSluggish: number // traînée à pleine givre (1/s) : l'eau engourdie rampe
+  heatAgitation: number // frémissement à pleine chauffe (u/s²) : l'eau chaude bout doucement
+
   // Sas de sortie : une bouche d'aspiration dans laquelle l'eau s'engouffre
   exitRadius: number // portée de l'aspiration autour de la bouche (unités monde)
   exitPull: number // vitesse du courant d'aspiration (u/s), renforcée à l'approche du trou
@@ -196,6 +203,9 @@ export const DEFAULT_PARAMS: SimParams = {
   chillDuration: 420,
   chillColdGrowth: 0.5,
   chillHeatFade: 0.6,
+
+  frostSluggish: 3,
+  heatAgitation: 240,
 
   exitRadius: 240,
   exitPull: 300,

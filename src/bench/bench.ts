@@ -416,6 +416,10 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     fCold.addBinding(params, 'freezeTime', { min: 0.2, max: 5, label: 'gel plaques (s)' }),
     'Temps d’exposition en pleine aura avant le gel complet. La glace prise au contact d’une plaque s’y soude : c’est l’ancrage.',
   )
+  describe(
+    fCold.addBinding(params, 'frostSluggish', { min: 0, max: 10, step: 0.5, label: 'engourdissement' }),
+    'Le froid se sent AVANT le gel : l’eau qui givre devient pâteuse — traînée proportionnelle au givre. À 0, l’eau reste vive jusqu’à l’instant du gel.',
+  )
 
   const fChill = pane.addFolder({ title: 'Refroidissement (expédition)', expanded: false })
   describe(
@@ -447,6 +451,10 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   describe(
     fHeat.addBinding(params, 'heatLossRate', { min: 0, max: 30, step: 0.5, label: 'évaporation /s' }),
     'Particules de vapeur perdues par seconde d’exposition dans l’aura : s’attarder sur le radiateur brûle du volume, définitivement. C’est la fenêtre d’usage de la chaleur.',
+  )
+  describe(
+    fHeat.addBinding(params, 'heatAgitation', { min: 0, max: 800, step: 20, label: 'frémissement' }),
+    'La chaleur se sent AVANT la vapeur : l’eau qui chauffe frémit — un bouillonnement doux, d’autant plus vif qu’elle approche de l’ébullition. À 0, l’eau reste calme jusqu’au changement d’état.',
   )
 
   const fGas = pane.addFolder({ title: 'Gaz (tableau 3)', expanded: false })
