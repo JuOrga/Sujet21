@@ -1137,6 +1137,7 @@ export class FluidSim {
     const rp = p.particleSpacing * 0.5
     const cp = this.scratchCP
     const band = p.hydroBand
+    const wallBand = p.wallSplashBand
     const bite = p.surfaceBite // mordant global : les surfaces pèsent plus
     const philDamp = Math.exp(-p.hydrophileFriction * bite * dt)
 
@@ -1173,26 +1174,31 @@ export class FluidSim {
         if (b.material !== MAT_HYDROPHILE && b.material !== MAT_HYDROPHOBE && b.material !== MAT_WALL) {
           continue
         }
+        // Le mur neutre n'agit qu'au ras de la paroi ; la chimie porte loin.
+        const reach = b.material === MAT_WALL ? wallBand : band
         if (
-          x < b.minX - band - rp ||
-          x > b.maxX + band + rp ||
-          y < b.minY - band - rp ||
-          y > b.maxY + band + rp
+          x < b.minX - reach - rp ||
+          x > b.maxX + reach + rp ||
+          y < b.minY - reach - rp ||
+          y > b.maxY + reach + rp
         ) {
           continue
         }
         boxContact(x, y, b, cp)
         const sep = cp.dist - rp
-        if (sep > 0 && sep < band) {
-          const f = 1 - sep / band
+        if (sep > 0 && sep < reach) {
+          const f = 1 - sep / reach
           if (b.material === MAT_WALL) {
             // Mur neutre : l'éclat d'impact vient du rebond de pression qui
             // projette les particules loin de la paroi. On amortit la vitesse
-            // sortante dans la bande — l'eau s'étale et épouse la forme au
-            // lieu de jaillir ; le glissement tangentiel reste libre.
+            // sortante AU CONTACT — l'eau s'étale et épouse la forme au lieu
+            // de jaillir ; le glissement tangentiel reste libre.
+            // Amorti normalisé par le pas : appliqué tel quel, il se cumulait
+            // à chaque sous-pas (120 fois par seconde) et la paroi retenait
+            // le corps comme un aimant.
             const vn = this.velX[i] * cp.nx + this.velY[i] * cp.ny
             if (vn > 0) {
-              const damp = p.wallSplashDamp * f
+              const damp = 1 - Math.exp(-p.wallSplashDamp * 60 * f * dt)
               this.velX[i] -= cp.nx * vn * damp
               this.velY[i] -= cp.ny * vn * damp
             }

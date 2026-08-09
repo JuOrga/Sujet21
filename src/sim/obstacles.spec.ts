@@ -128,6 +128,37 @@ describe('FluidSim — matériaux (§6)', () => {
     expect(sim.posY[0]).toBeGreaterThan(30)
   })
 
+  it('un mur neutre ne retient pas à distance : on s’en éloigne librement', () => {
+    // Régression : l'amorti d'éclaboussure partageait la portée de la chimie
+    // (hydroBand, 80 u). Une goutte lancée EN S'ÉLOIGNANT du mur, mais encore
+    // dans cette bande, se faisait freiner — les parois semblaient coller.
+    const sim = makeSim()
+    sim.setLevel([{ minX: 100, minY: -200, maxX: 140, maxY: 200, material: MAT_WALL }], [])
+    const i = sim.addParticle(60, 0, KIND_PLAYER) // à 40 u du mur : hors contact, dans l'ancienne bande
+    sim.velX[i] = -300 // elle part à l'opposé du mur
+    sim.baseVolume = 1
+    for (let s = 0; s < 30; s++) sim.step(sim.params.dt)
+    // la vitesse de fuite est conservée pour l'essentiel (gravité nulle ici)
+    expect(sim.velX[0]).toBeLessThan(-250)
+  })
+
+  it('l’amorti d’éclaboussure ne dépend pas du nombre de sous-pas', () => {
+    // Régression : l'amorti n'était pas normalisé par dt, donc il se cumulait
+    // à chaque sous-pas — deux fois plus de pas, deux fois plus collant.
+    const run = (dt: number, steps: number): number => {
+      const sim = makeSim({ dt })
+      sim.setLevel([{ minX: 100, minY: -200, maxX: 140, maxY: 200, material: MAT_WALL }], [])
+      const i = sim.addParticle(96, 0, KIND_PLAYER) // au contact
+      sim.velX[i] = -200 // repart du mur
+      sim.baseVolume = 1
+      for (let s = 0; s < steps; s++) sim.step(dt)
+      return sim.velX[0]
+    }
+    const coarse = run(1 / 120, 12) // 0,1 s
+    const fine = run(1 / 240, 24) // 0,1 s, deux fois plus de pas
+    expect(Math.abs(fine - coarse)).toBeLessThan(Math.abs(coarse) * 0.25)
+  })
+
   it('removeParticle garde le corps cohérent', () => {
     const sim = makeSim()
     sim.spawnDisc(0, 0, 50, KIND_PLAYER)
