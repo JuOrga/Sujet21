@@ -379,7 +379,7 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Restitution des blocs de glace sur les parois. 1 : rebond parfait. 0 : la glace s’arrête au premier impact.',
   )
   describe(
-    fCold.addBinding(params, 'coldBand', { min: 10, max: 120, step: 1, label: 'aura (u)' }),
+    fCold.addBinding(params, 'coldBand', { min: 10, max: 250, step: 1, label: 'aura (u)' }),
     'Portée de l’aura de gel autour des plaques froides (tableau 2). L’eau y givre d’autant plus vite qu’elle est près de la plaque.',
   )
   describe(
@@ -403,7 +403,7 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
 
   const fHeat = pane.addFolder({ title: 'Chaleur (tableau 4)', expanded: false })
   describe(
-    fHeat.addBinding(params, 'heatBand', { min: 10, max: 150, step: 1, label: 'aura (u)' }),
+    fHeat.addBinding(params, 'heatBand', { min: 10, max: 300, step: 1, label: 'aura (u)' }),
     'Portée de l’aura de chaleur autour des radiateurs. L’eau s’y vaporise d’autant plus vite qu’elle est près de la plaque — danger ou ressource, selon ce qu’on vient y chercher.',
   )
   describe(

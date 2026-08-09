@@ -62,16 +62,18 @@ describe('FluidSim — le radiateur : la chaleur vaporise, dégèle, évapore', 
   })
 
   it('le refroidissement du vaisseau affaiblit le radiateur (§5)', () => {
-    // même particule, même durée : tiède elle bout, vaisseau glacial elle non
+    // goutte à mi-aura : tiède elle bout ; vaisseau glacial, l'aura
+    // rétractée ne l'atteint même plus
+    const y = DEFAULT_PARAMS.heatBand * 0.55
     const warm = makeSim({ heatLossRate: 0 })
-    const iw = warm.addParticle(0, 8, KIND_PLAYER)
-    run(warm, DEFAULT_PARAMS.boilTime * 2.5)
+    const iw = warm.addParticle(0, y, KIND_PLAYER)
+    run(warm, DEFAULT_PARAMS.boilTime * 4)
     expect(warm.gaseous[iw]).toBe(1)
 
     const cold = makeSim({ heatLossRate: 0 })
     cold.chill = 1
-    const ic = cold.addParticle(0, 8, KIND_PLAYER)
-    run(cold, DEFAULT_PARAMS.boilTime * 2.5)
+    const ic = cold.addParticle(0, y, KIND_PLAYER)
+    run(cold, DEFAULT_PARAMS.boilTime * 4)
     expect(cold.gaseous[ic]).toBe(0)
   })
 
