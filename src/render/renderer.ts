@@ -246,6 +246,13 @@ void main() {
     if (bi >= uBoxCount) break;
     float d = boxSdf(world, uBoxes[bi]);
     float mat = uBoxMats[bi];
+    // Ombre portée douce autour de chaque solide (sauf le sas) : les blocs
+    // se détachent du fond au lieu de flotter — la cuve prend de la
+    // profondeur, les rectangles cessent d'être des aplats.
+    if (mat < 2.5 || mat > 3.5) {
+      float shade = 1.0 - smoothstep(0.0, 56.0, max(d, 0.0));
+      col = mix(col, col * vec3(0.50, 0.56, 0.70), shade * shade * 0.5);
+    }
     if (mat < 2.5) {
       float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
       float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));

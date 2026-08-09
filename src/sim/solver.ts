@@ -238,8 +238,9 @@ export class FluidSim {
   // Règle de transformation : la dispersion se constate, elle ne se décrète
   // pas — il faut rester sous le seuil critique dispersalGrace secondes
   // d'affilée, le temps qu'un corps qui condense ou dégèle se regroupe.
-  private belowCritical = false
-  private criticalTimer = 0
+  // Publics : le HUD lit le danger pour afficher le compte à rebours.
+  belowCritical = false
+  criticalTimer = 0
 
   setLevel(boxes: ObstacleBox[], sponges: SpongeDef[]): void {
     this.boxes = boxes

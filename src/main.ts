@@ -7,9 +7,23 @@ import { Camera } from './render/camera'
 import { Renderer } from './render/renderer'
 import { FixedLoop } from './game/loop'
 import { Input } from './game/input'
-import { MAT_EXIT, TABLEAUX, pointInBox, type LevelDef, type ObstacleBox } from './game/level'
+import {
+  MAT_EXIT,
+  MAT_FROID,
+  TABLEAU_1BIS,
+  TABLEAUX,
+  pointInBox,
+  type LevelDef,
+  type ObstacleBox,
+} from './game/level'
 import { AudioFx, loadAudioPrefs } from './game/audio'
 import { Records } from './game/records'
+import {
+  fetchSharedBoard,
+  pushExpeditionRecord,
+  pushTableauRecord,
+  type SharedBoard,
+} from './game/netRecords'
 import { createBench, type BenchMonitor } from './bench/bench'
 
 const CAPACITY = 4096
@@ -64,13 +78,18 @@ let levelIndex = 0
     }
   }
 }
+// Le prototype 21-A bis se joue hors expédition : un essai à part, depuis la
+// fiche — s'il convainc, il remplacera 21-A dans la séquence.
+let testLevel: LevelDef | null = null
 let level: LevelDef = TABLEAUX[levelIndex]
 // Les boîtes rendues incluent le sas (rendu seulement, pas de physique solide),
 // et la bouche d'aspiration est le centre du sas du tableau courant.
 let renderBoxes: ObstacleBox[] = []
+let levelHasCold = false // le HUD n'annonce la rosée que si des plaques la rendent
 const exitMouth = { x: 0, y: 0 }
 function applyLevel(): void {
-  level = TABLEAUX[levelIndex]
+  level = testLevel ?? TABLEAUX[levelIndex]
+  levelHasCold = level.boxes.some((b) => b.material === MAT_FROID)
   renderBoxes = [...level.boxes, { ...level.exit, material: MAT_EXIT }]
   exitMouth.x = (level.exit.minX + level.exit.maxX) * 0.5
   exitMouth.y = (level.exit.minY + level.exit.maxY) * 0.5
@@ -122,24 +141,60 @@ const hudState = el('hud-state')
 const hudWarp = el('hud-warp')
 const gaugeFill = el('gauge-fill')
 const gaugeThreshold = el('gauge-threshold')
+const hudPerte = el('hud-perte')
+const hudRosee = el('hud-rosee')
+const hudDanger = el('hud-danger')
+const coqueBar = el('coque-bar').firstElementChild as HTMLElement
+const objArrow = el('obj-arrow')
+const objArrowGlyph = objArrow.firstElementChild as HTMLElement
+const objDist = el('obj-dist')
 const homeVolume = el('home-volume')
 const homeParticles = el('home-particles')
 const homeState = el('home-state')
 const recEssai = el('rec-essai')
 const recRows = el('rec-rows')
 
-// Écran record de la fiche : record par tableau + derniers essais consignés.
+// Le tableau d'honneur partagé (/api/records) : chargé au démarrage, mis à
+// jour à chaque record publié. Hors ligne, les registres locaux suffisent.
+let sharedBoard: SharedBoard | null = null
+fetchSharedBoard().then((b) => {
+  if (b) {
+    sharedBoard = b
+    renderRegistres()
+  }
+})
+
+// Écran record de la fiche : le meilleur du protocole (partagé entre tous les
+// opérateurs) prime sur le registre local — même règle de départage partout.
 function renderRegistres(): void {
   recEssai.textContent = `ÉCHANTILLON Nº ${records.essaiNumber()}`
   const rows: string[] = TABLEAUX.map((t) => {
-    const r = records.tableauRecord(t.code)
-    const holder = r?.name ? ` · ${r.name}` : ''
-    const val = r
-      ? `<b>${r.liters.toFixed(2)} L</b> · ${fmtTime(r.time)} · éch. nº ${r.essai}${holder}`
+    const local = records.tableauRecord(t.code)
+    const shared = sharedBoard?.tableaux[t.code] ?? null
+    const best =
+      shared &&
+      (!local ||
+        shared.liters > local.liters ||
+        (shared.liters === local.liters && shared.time < local.time))
+        ? shared
+        : local
+    const holder = best?.name ? ` · ${best.name}` : ''
+    const val = best
+      ? `<b>${best.liters.toFixed(2)} L</b> · ${fmtTime(best.time)}${holder}`
       : '<span class="rec-none">aucune collecte</span>'
     return `<div class="rec-row"><span class="rec-code">${t.code}</span><span class="rec-name">${t.name}</span><span class="rec-val">${val}</span></div>`
   })
-  const exp = records.expedition()
+  const localExp = records.expedition()
+  const sharedExp = sharedBoard?.expedition ?? null
+  const exp =
+    sharedExp &&
+    (!localExp ||
+      sharedExp.tableaux > localExp.tableaux ||
+      (sharedExp.tableaux === localExp.tableaux &&
+        (sharedExp.liters > localExp.liters ||
+          (sharedExp.liters === localExp.liters && sharedExp.time < localExp.time))))
+      ? sharedExp
+      : localExp
   if (exp) {
     const holder = exp.name ? ` · ${exp.name}` : ''
     rows.unshift(
@@ -158,14 +213,36 @@ function renderRegistres(): void {
 }
 renderRegistres()
 
-// Le nom estampillé sur les records, façon borne d'arcade
+// Le nom estampillé sur les records, façon borne d'arcade — et obligatoire :
+// le protocole n'admet pas d'opérateur anonyme dans la cuve.
 const recName = document.getElementById('rec-name') as HTMLInputElement
+const recNeed = document.getElementById('rec-need') as HTMLDivElement
 recName.value = records.operator()
+recName.addEventListener('input', () => {
+  if (recName.value.trim()) {
+    recName.classList.remove('need')
+    recNeed.hidden = true
+  }
+})
 recName.addEventListener('change', () => {
   records.setOperator(recName.value)
   recName.value = records.operator()
   renderRegistres()
 })
+
+// La plongée exige un nom : on interpelle le champ au lieu d'ouvrir la cuve.
+function requireName(): boolean {
+  // le champ peut être rempli sans avoir encore perdu le focus (pas de change)
+  if (recName.value.trim()) records.setOperator(recName.value)
+  if (records.operator()) return false
+  recNeed.hidden = false
+  recName.classList.remove('need')
+  void recName.offsetWidth // relance l'animation de secousse
+  recName.classList.add('need')
+  recName.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  recName.focus({ preventScroll: true })
+  return true
+}
 const tableauCard = el('tableau-card')
 const cardCode = el('card-code')
 const cardLog = el('card-log')
@@ -184,8 +261,10 @@ function showTableauCard(): void {
 // Fiche d'essai : visible au chargement ; « échap » ou ≡ pour y revenir.
 // L'essai continue de dériver derrière la fiche — elle observe, elle ne fige pas.
 const startBtn = document.getElementById('start') as HTMLButtonElement
+const startBisBtn = document.getElementById('start-bis') as HTMLButtonElement
 let hasPlayed = false
 function closeHome(): void {
+  if (requireName()) return // pas de plongée sans opérateur identifié
   document.body.classList.add('playing')
   startBtn.textContent = "REPRENDRE L'ESSAI"
   if (!hasPlayed) {
@@ -199,6 +278,18 @@ function openHome(): void {
   document.body.classList.remove('playing')
 }
 startBtn.addEventListener('click', closeHome)
+// Le prototype 21-A bis : un essai à part, hors expédition et hors registres
+startBisBtn.addEventListener('click', () => {
+  if (requireName()) return
+  testLevel = TABLEAU_1BIS
+  run.bonbonneLiters = 0
+  run.runTime = 0
+  hasPlayed = true
+  restart()
+  document.body.classList.add('playing')
+  camera.startIntro(sim.bounds, window.innerWidth, window.innerHeight)
+  showTableauCard()
+})
 // Au doigt, la fiche va à l'essentiel : les commandes démarrent repliées
 if (window.matchMedia('(max-width: 700px)').matches) {
   document.getElementById('cmd-details')!.removeAttribute('open')
@@ -256,6 +347,8 @@ function restart(): void {
   run.tableauTime = 0
   run.ended = false
   vortex.timer = 0
+  lossPrevLiters = -1
+  lossRate = 0
   input.freezeIntent = false
   input.gasIntent = false
   applyLevel()
@@ -282,7 +375,20 @@ function newExpedition(): void {
 
 // Recommencer un tableau relance l'essai ; une expédition conclue (bilan
 // affiché) ou un échantillon dispersé repart pour une expédition neuve.
+// En mode prototype (21-A bis) : l'essai conclu ramène au protocole, la
+// dispersion remet l'échantillon en cuve pour un nouvel essai du bis.
 function resetAction(): void {
+  if (testLevel) {
+    if (run.ended) {
+      testLevel = null
+      newExpedition()
+      openHome()
+      return
+    }
+    run.runTime = 0
+    restart()
+    return
+  }
   if (run.ended || sim.dispersed) newExpedition()
   else restart()
 }
@@ -294,6 +400,7 @@ const pane = createBench(params, monitor, {
   autoZoom: () => camera.resetAutoZoom(),
   tableaux: TABLEAUX.map((t) => t.name),
   gotoTableau: (index) => {
+    testLevel = null // le banc navigue dans l'expédition, pas dans le prototype
     levelIndex = index
     restart()
   },
@@ -449,7 +556,14 @@ function tutorPersist(): void {
 }
 
 function updateTutor(dtReal: number): void {
-  if (!tutorActive || levelIndex !== 0 || sim.dispersed || run.ended || tutorStep >= TUTOR_TEXTS.length) {
+  if (
+    !tutorActive ||
+    testLevel !== null ||
+    levelIndex !== 0 ||
+    sim.dispersed ||
+    run.ended ||
+    tutorStep >= TUTOR_TEXTS.length
+  ) {
     if (tutorShown !== '') {
       tutorShown = ''
       tutorEl.classList.remove('visible')
@@ -533,6 +647,11 @@ let lastTime = performance.now()
 let elapsed = 0
 let fpsSmoothed = 60
 let dispersedEssaiNo = 1 // n° affiché sur le tampon DISPERSION
+// Débit de perte lissé (litres par seconde simulée) : ce que l'action en
+// cours coûte au corps — éjection, coût d'état vapeur, éponge, radiateur.
+let lossPrevLiters = -1
+let lossPrevT = 0
+let lossRate = 0
 
 // Qualité adaptative : si la machine ne suit pas, on baisse la résolution de
 // rendu (densité de pixels, puis champ métaballes plus grossier). La physique
@@ -603,10 +722,30 @@ function frame(now: number): void {
   const drunk = sim.swallowed > 0 && sim.playerCount <= Math.max(6, sim.baseVolume * 0.02)
   const reached =
     !drainActive && pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit)
-  if (!tableauDone && !sim.dispersed && (drunk || reached)) {
+  if (!tableauDone && !sim.dispersed && (drunk || reached) && testLevel) {
+    // Prototype 21-A bis : l'essai conclut sans toucher aux registres ni à
+    // l'expédition — on félicite, on ramène au protocole.
+    const surplus = sim.liters() + sim.swallowed * params.litersPerParticle
+    audio.collect()
+    run.ended = true
+    showOverlay(
+      'ESSAI 21-A BIS CONCLU',
+      `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — prototype de réfection du secteur A : vos impressions décideront de son sort.`,
+      'success',
+      'RETOUR AU PROTOCOLE',
+    )
+  } else if (!tableauDone && !sim.dispersed && (drunk || reached)) {
     const surplus = sim.liters() + sim.swallowed * params.litersPerParticle
     run.bonbonneLiters += surplus
     const { newRecord } = records.noteCollection(level.code, surplus, run.tableauTime)
+    // Publication au tableau d'honneur partagé : le serveur ne garde que le
+    // meilleur — la réponse remet les registres affichés à jour.
+    pushTableauRecord(level.code, surplus, run.tableauTime, records.operator()).then((b) => {
+      if (b) {
+        sharedBoard = b
+        renderRegistres()
+      }
+    })
     const recLine = newRecord
       ? ` · NOUVEAU RECORD DU TABLEAU (${surplus.toFixed(2)} L en ${fmtTime(run.tableauTime)})`
       : ` · record du tableau : ${records.tableauRecord(level.code)!.liters.toFixed(2)} L`
@@ -615,6 +754,14 @@ function frame(now: number): void {
       // Dernier sas : l'expédition est achevée — bilan, et registres à jour
       run.ended = true
       const exp = records.noteExpedition(TABLEAUX.length, run.bonbonneLiters, run.runTime)
+      pushExpeditionRecord(TABLEAUX.length, run.bonbonneLiters, run.runTime, records.operator()).then(
+        (b) => {
+          if (b) {
+            sharedBoard = b
+            renderRegistres()
+          }
+        },
+      )
       renderRegistres()
       showOverlay(
         'EXPÉDITION ACHEVÉE',
@@ -714,18 +861,81 @@ function frame(now: number): void {
 
   // Instruments de bord
   const fraction = sim.baseVolume > 0 ? sim.playerCount / sim.baseVolume : 0
-  hudTableau.textContent = `nº ${levelIndex + 1}/${TABLEAUX.length}`
+  hudTableau.textContent = testLevel ? 'BIS' : `nº ${levelIndex + 1}/${TABLEAUX.length}`
   // La coque refroidit : +21° au départ, −60° à froid complet — la pression
-  // temporelle se lit ici (et dans la physique), jamais sur un chronomètre
+  // temporelle se lit ici (chiffre ET barre), jamais sur un chronomètre
   const coque = Math.round(21 - 81 * chillNow())
   hudCoque.textContent = `${coque > 0 ? '+' : ''}${coque}°`
   hudCoque.classList.toggle('warn', chillNow() > 0.75)
+  coqueBar.style.width = `${(chillNow() * 100).toFixed(1)}%`
   hudBonbonne.textContent = `${run.bonbonneLiters.toFixed(2)} L`
   hudVolume.innerHTML = `${sim.liters().toFixed(2)} <small>L · ${sim.playerCount} part.</small>`
   gaugeFill.style.width = `${Math.min(100, fraction * 100).toFixed(1)}%`
   gaugeThreshold.style.left = `${(params.criticalVolumeFraction * 100).toFixed(1)}%`
   hudSeuil.textContent = `${(params.criticalVolumeFraction * sim.baseVolume * params.litersPerParticle).toFixed(2)} L`
   hudVitesse.textContent = `${speed.toFixed(0)} u/s`
+
+  // Débit de perte lissé : combien coûte l'action en cours, et à quoi
+  const nowLiters = sim.liters()
+  const simT = run.tableauTime
+  if (lossPrevLiters >= 0 && simT > lossPrevT) {
+    const inst = (lossPrevLiters - nowLiters) / (simT - lossPrevT)
+    lossRate += (Math.max(0, inst) - lossRate) * Math.min(1, (simT - lossPrevT) * 4)
+  } else if (simT < lossPrevT) {
+    lossRate = 0
+  }
+  lossPrevLiters = nowLiters
+  lossPrevT = simT
+  if (lossRate > 0.02 && !sim.dispersed && !tableauDone) {
+    const cause = input.gasIntent ? 'coût vapeur' : input.aimActive ? 'éjection' : 'surfaces'
+    hudPerte.textContent = `−${lossRate.toFixed(2)} L/s · ${cause}`
+  } else {
+    hudPerte.textContent = ''
+  }
+  // La rosée : ce que la vapeur a perdu et que les plaques froides rendront
+  const roseeL = sim.vaporBank * params.litersPerParticle
+  hudRosee.textContent =
+    levelHasCold && roseeL >= 0.05
+      ? `rosée récupérable aux plaques froides : ${roseeL.toFixed(2)} L`
+      : ''
+
+  // Compte à rebours de dispersion : sous le seuil, le délai de grâce s'égrène
+  const inDanger = sim.belowCritical && !sim.dispersed && !tableauDone
+  if (inDanger) {
+    const left = Math.max(0, params.dispersalGrace - sim.criticalTimer)
+    hudDanger.textContent = `⚠ COHÉSION CRITIQUE — DISPERSION DANS ${left.toFixed(1).replace('.', ',')} s`
+  }
+  hudDanger.classList.toggle(
+    'visible',
+    inDanger && document.body.classList.contains('playing') && !input.paused,
+  )
+  gaugeFill.classList.toggle('danger', inDanger || sim.dispersed)
+  gaugeFill.classList.toggle(
+    'warn',
+    !inDanger && !sim.dispersed && fraction < params.criticalVolumeFraction * 1.6,
+  )
+
+  // L'objectif : quand le sas sort de l'écran, une flèche le pointe depuis le
+  // bord du cadre, avec la distance restante — on sait toujours où aller.
+  const exitSx = vw * 0.5 + (exitMouth.x - camera.x) * camera.zoom
+  const exitSy = vh * 0.5 - (exitMouth.y - camera.y) * camera.zoom
+  const exitOnScreen = exitSx > 30 && exitSx < vw - 30 && exitSy > 92 && exitSy < vh - 140
+  const showArrow =
+    document.body.classList.contains('playing') &&
+    !tableauDone &&
+    !sim.dispersed &&
+    !monitor.overview &&
+    !exitOnScreen
+  if (showArrow) {
+    const ang = Math.atan2(exitSy - vh * 0.5, exitSx - vw * 0.5)
+    const ax = Math.min(vw - 48, Math.max(48, exitSx))
+    const ay = Math.min(vh - 152, Math.max(106, exitSy))
+    objArrow.style.transform = `translate(${ax.toFixed(1)}px, ${ay.toFixed(1)}px) translate(-50%, -50%)`
+    objArrowGlyph.style.transform = `rotate(${((ang * 180) / Math.PI).toFixed(1)}deg)`
+    const dWorld = Math.hypot(exitMouth.x - sim.stats.centroidX, exitMouth.y - sim.stats.centroidY)
+    objDist.textContent = `SAS · ${Math.round(dWorld)} u`
+  }
+  objArrow.classList.toggle('visible', showArrow)
   let frozenCount = 0
   let gasCount = 0
   for (let i = 0; i < sim.count; i++) {
@@ -755,11 +965,23 @@ function frame(now: number): void {
   sfx.allGas = allGas
   if (sim.dispersed && !sfx.dispersed) {
     audio.disperse()
-    // fin de l'échantillon ET de l'expédition : les registres consignent tout
-    dispersedEssaiNo = records.essaiNumber()
-    records.noteDispersion(level.code, run.tableauTime)
-    records.noteExpedition(levelIndex, run.bonbonneLiters, run.runTime)
-    renderRegistres()
+    if (!testLevel) {
+      // fin de l'échantillon ET de l'expédition : les registres consignent tout
+      dispersedEssaiNo = records.essaiNumber()
+      records.noteDispersion(level.code, run.tableauTime)
+      records.noteExpedition(levelIndex, run.bonbonneLiters, run.runTime)
+      if (levelIndex > 0 || run.bonbonneLiters >= 0.01) {
+        pushExpeditionRecord(levelIndex, run.bonbonneLiters, run.runTime, records.operator()).then(
+          (b) => {
+            if (b) {
+              sharedBoard = b
+              renderRegistres()
+            }
+          },
+        )
+      }
+      renderRegistres()
+    }
   }
   sfx.dispersed = sim.dispersed
   if (sim.iceImpact > 60) audio.iceImpact(sim.iceImpact)
@@ -785,12 +1007,21 @@ function frame(now: number): void {
   // cette frame, le tampon SAS ATTEINT doit rester — sinon il serait effacé
   // dans la même frame et le bilan de sortie ne s'afficherait jamais.
   if (sim.dispersed && run.exitTimer <= 0) {
-    showOverlay(
-      'DISPERSION',
-      `La cohésion ne tient plus. Perte de l’échantillon nº ${dispersedEssaiNo} — expédition : ${expeditionSummary(levelIndex)}. Le suivant est prêt.`,
-      'danger',
-      'ÉCHANTILLON SUIVANT',
-    )
+    if (testLevel) {
+      showOverlay(
+        'DISPERSION',
+        'Le prototype a eu raison de l’échantillon — on le remet en cuve, l’essai du bis reprend.',
+        'danger',
+        'REJOUER LE 21-A BIS',
+      )
+    } else {
+      showOverlay(
+        'DISPERSION',
+        `La cohésion ne tient plus. Perte de l’échantillon nº ${dispersedEssaiNo} — expédition : ${expeditionSummary(levelIndex)}. Le suivant est prêt.`,
+        'danger',
+        'ÉCHANTILLON SUIVANT',
+      )
+    }
   } else if (run.exitTimer <= 0 && !run.ended) {
     overlay.classList.remove('visible')
   }
