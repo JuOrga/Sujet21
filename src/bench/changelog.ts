@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '09/08/2026 14:10',
+    title: 'Auras diffuses, façon radiateur — et la chimie porte à 80 u',
+    notes: [
+      'Exit les anneaux fins : les surfaces chimiques dégagent une brume diffuse et animée sur toute leur bande d’influence, sur le modèle de la chaleur du radiateur — turquoise qui aspire (hydrophile), violette qui repousse (hydrophobe).',
+      'La portée physique suit : 48 → 80 u, l’échelle des auras thermiques. La répulsion se négocie de loin — le corps se déforme visiblement en traversant le champ — et l’îlot hydrophile aspire pour de bon.',
+    ],
+  },
+  {
     date: '09/08/2026 13:45',
     title: 'Les auras se voient : un anneau à la limite exacte de la portée',
     notes: [
