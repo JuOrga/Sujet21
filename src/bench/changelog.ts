@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '09/08/2026 13:15',
+    title: 'Le bourdon se tient mieux sur mobile',
+    notes: [
+      'Le son suit la visibilité de la page : en arrière-plan (autre app, autre onglet, écran verrouillé), tout se suspend — fini le bourdon qui continue dans la poche. Au retour, il reprend, et ça remet d’aplomb un contexte cassé par un appel ou une notification.',
+      'Le bourdon de la station montait de 55 Hz — infranchissable pour un haut-parleur de téléphone, qui grésillait au lieu de bourdonner. Au doigt, il monte d’une octave (110 Hz), un peu plus doux : même respiration, sans vibration de coque.',
+    ],
+  },
+  {
     date: '09/08/2026 12:50',
     title: 'Chaque surface montre son aura — et l’hydrophobe mord enfin',
     notes: [

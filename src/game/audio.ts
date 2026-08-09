@@ -106,6 +106,20 @@ export class AudioFx {
     this.drainF = drain.filter
 
     this.startAmbience()
+
+    // Le son suit la visibilité de la page : en arrière-plan (autre app,
+    // autre onglet, écran verrouillé), le contexte se suspend — sinon le
+    // bourdon continue tout seul dans la poche. Au retour, il reprend ;
+    // ça remet aussi d'aplomb un contexte cassé par une interruption
+    // (appel, notification sonore) sur mobile.
+    document.addEventListener('visibilitychange', () => {
+      if (!this.ctx) return
+      if (document.hidden) {
+        void this.ctx.suspend()
+      } else if (this.enabled) {
+        void this.ctx.resume()
+      }
+    })
   }
 
   private noiseLoop(freq: number, q: number): { gain: GainNode; filter: BiquadFilterNode } {
@@ -126,22 +140,26 @@ export class AudioFx {
     return { gain, filter }
   }
 
-  // Le bourdon de la station : deux oscillateurs graves désaccordés, très bas
+  // Le bourdon de la station : deux oscillateurs graves désaccordés, très bas.
+  // Un haut-parleur de téléphone ne restitue pas 55 Hz — il grésille et fait
+  // vibrer la coque : au doigt, le bourdon monte d'une octave, un peu plus doux.
   private startAmbience(): void {
     const ctx = this.ctx!
+    const phone = window.matchMedia('(pointer: coarse)').matches
+    const base = phone ? 110 : 55
     const lp = ctx.createBiquadFilter()
     lp.type = 'lowpass'
-    lp.frequency.value = 180
+    lp.frequency.value = phone ? 320 : 180
     const g = ctx.createGain()
-    g.gain.value = 0.045
+    g.gain.value = phone ? 0.032 : 0.045
     lp.connect(g)
     g.connect(this.master!)
     const o1 = ctx.createOscillator()
     o1.type = 'sine'
-    o1.frequency.value = 55
+    o1.frequency.value = base
     const o2 = ctx.createOscillator()
     o2.type = 'triangle'
-    o2.frequency.value = 110.7
+    o2.frequency.value = base * 2 + 0.7 // désaccord : le battement lent du bourdon
     const g2 = ctx.createGain()
     g2.gain.value = 0.35
     o1.connect(lp)
