@@ -129,6 +129,35 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   }
   rebuildList()
 
+  // Migration ponctuelle (09/08/2026) : l'équilibrage thermique a élargi les
+  // auras — le préset « boizessai1 » d'avant est copié en « boizessai2 »,
+  // ajusté (chaleur 130, froid 85, ébullition 1,2 s), le reste inchangé.
+  // Idempotente : la copie n'est créée que si elle manque à la partagée ;
+  // si boizessai1 était le préset de lancement, la copie le remplace.
+  const migrateBoizessai = (lib: { presets: Preset[]; defaultTitle: string | null }): void => {
+    const src = lib.presets.find((p) => p.title === 'boizessai1')
+    if (!src || lib.presets.some((p) => p.title === 'boizessai2')) return
+    const copy: Preset = {
+      title: 'boizessai2',
+      description:
+        'Copie de boizessai1 ajustée aux nouvelles auras thermiques (chaleur 130, froid 85, ébullition 1,2 s).' +
+        (src.description ? ` — ${src.description}` : ''),
+      savedAt: new Date().toISOString(),
+      params: { ...src.params, coldBand: 85, heatBand: 130, boilTime: 1.2 },
+    }
+    presets = upsertPreset(presets, copy)
+    storePresets(presets)
+    void pushSharedPreset(copy).catch(() => {})
+    if (lib.defaultTitle === 'boizessai1') {
+      defaultTitle = 'boizessai2'
+      storeStoredDefault(defaultTitle)
+      void setSharedDefault('boizessai2').catch(() => {})
+      applyPreset(copy)
+    }
+    rebuildList('boizessai2')
+    hint.textContent = 'Préset « boizessai2 » créé : boizessai1 ajusté aux nouvelles auras.'
+  }
+
   // La bibliothèque partagée se charge en arrière-plan ; sans backend
   // (dev local), le banc reste en mode localStorage sans bruit.
   void fetchSharedPresets()
@@ -147,6 +176,7 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
       } else if (lib.presets.length > 0) {
         hint.textContent = `Bibliothèque partagée synchronisée : ${lib.presets.length} préset(s).`
       }
+      migrateBoizessai(lib)
     })
     .catch(() => {
       hint.textContent = 'Bibliothèque partagée indisponible — présets locaux seulement.'
