@@ -278,9 +278,13 @@ function openHome(): void {
   document.body.classList.remove('playing')
 }
 startBtn.addEventListener('click', closeHome)
-// Le prototype 21-A bis : un essai à part, hors expédition et hors registres
-startBisBtn.addEventListener('click', () => {
-  if (requireName()) return
+// Le prototype 21-A bis : un essai à part, hors expédition et hors registres.
+// Lancé depuis la fiche (bouton dédié) ou depuis le banc (dossier Tableaux).
+function startBisTest(): void {
+  if (requireName()) {
+    openHome() // le champ du nom vit sur la fiche : on la montre pour le remplir
+    return
+  }
   testLevel = TABLEAU_1BIS
   run.bonbonneLiters = 0
   run.runTime = 0
@@ -289,7 +293,8 @@ startBisBtn.addEventListener('click', () => {
   document.body.classList.add('playing')
   camera.startIntro(sim.bounds, window.innerWidth, window.innerHeight)
   showTableauCard()
-})
+}
+startBisBtn.addEventListener('click', startBisTest)
 // Au doigt, la fiche va à l'essentiel : les commandes démarrent repliées
 if (window.matchMedia('(max-width: 700px)').matches) {
   document.getElementById('cmd-details')!.removeAttribute('open')
@@ -404,6 +409,7 @@ const pane = createBench(params, monitor, {
     levelIndex = index
     restart()
   },
+  gotoBis: () => startBisTest(),
   sound: {
     get actif() {
       return audio.enabled
