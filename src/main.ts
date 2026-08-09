@@ -406,6 +406,113 @@ input.onTimeWarpChange = (warp) => {
 }
 
 const overlayBtn = document.getElementById('overlay-btn') as HTMLButtonElement
+// ---- Tutoriel diégétique (tableau 1, première partie seulement) ----
+// Les consignes du protocole apparaissent au bon moment, se valident par le
+// geste qu'elles enseignent, et ne reviennent plus (localStorage). Les deux
+// dernières sont contextuelles : l'éponge à l'approche, le sas à l'arrivée.
+const TUTOR_KEY = 'projet21.tutoriel.v1'
+const tutorEl = el('tutor')
+let tutorActive = true
+try {
+  tutorActive = localStorage.getItem(TUTOR_KEY) !== 'ok'
+} catch {
+  // stockage indisponible : le tutoriel s'affiche à chaque visite, sans gravité
+}
+let tutorStep = 0
+let tutorTimer = 0
+let tutorEjectHeld = 0
+let tutorShown = ''
+
+const TUTOR_TEXTS = [
+  'Maintenez le doigt (ou le pointeur) : la matière est éjectée <em>vers</em> lui — le corps part à l’opposé. Il n’y a pas de frein.',
+  'Chaque goutte éjectée est perdue. La jauge en haut est votre corps : sous le trait rouge, dispersion. <strong>Se déplacer, c’est rétrécir.</strong>',
+  '<kbd>❄ / F</kbd> se changer en glace : l’élan se garde, re-presser dégèle. <kbd>💨 / G</kbd> vapeur : pilotée au pointeur. Essayez l’un des deux.',
+  'L’éponge boit ce qui s’attarde à son contact. Passez vite, payez le passage en volume — ou cherchez la vapeur.',
+  'Le sas aspire l’échantillon : laissez-vous boire. Le surplus part en bonbonne — la récompense, c’est ce qu’il vous reste.',
+]
+
+// Sonde de débogage/test : l'état du tutoriel depuis la console
+;(window as unknown as { __tutor: () => object }).__tutor = () => ({
+  active: tutorActive,
+  step: tutorStep,
+  held: tutorEjectHeld,
+  timer: tutorTimer,
+  aim: input.aimActive,
+})
+
+function tutorPersist(): void {
+  try {
+    localStorage.setItem(TUTOR_KEY, 'ok')
+  } catch {
+    // sans gravité
+  }
+}
+
+function updateTutor(dtReal: number): void {
+  if (!tutorActive || levelIndex !== 0 || sim.dispersed || run.ended || tutorStep >= TUTOR_TEXTS.length) {
+    if (tutorShown !== '') {
+      tutorShown = ''
+      tutorEl.classList.remove('visible')
+    }
+    return
+  }
+  const playing = document.body.classList.contains('playing') && !input.paused
+  const cardVisible = tableauCard.classList.contains('visible')
+  if (playing && input.aimActive) tutorEjectHeld += dtReal
+
+  // conditions de validation de l'étape courante
+  if (tutorStep === 0 && tutorEjectHeld > 1.2) {
+    tutorStep = 1
+    tutorTimer = 0
+  } else if (tutorStep === 2 && (input.freezeIntent || input.gasIntent)) {
+    tutorStep = 3
+    tutorTimer = 0
+    tutorPersist() // le cœur est acquis : plus de tutoriel aux prochaines visites
+  }
+
+  // texte à montrer (les étapes 3 et 4 sont contextuelles)
+  let text = ''
+  if (playing && !cardVisible) {
+    if (tutorStep <= 2) {
+      text = TUTOR_TEXTS[tutorStep]
+    } else if (tutorStep === 3) {
+      // à l'approche du mur d'éponge du tableau 1 (x = 560)
+      if (sim.stats.centroidX > 60 && sim.stats.centroidX < 560) text = TUTOR_TEXTS[3]
+    } else if (tutorStep === 4) {
+      const d = Math.hypot(sim.stats.centroidX - exitMouth.x, sim.stats.centroidY - exitMouth.y)
+      if (d < Math.max(320, params.exitRadius * 1.6)) text = TUTOR_TEXTS[4]
+    }
+  }
+
+  // écoulement du temps sur les étapes à durée
+  if (text !== '') {
+    tutorTimer += dtReal
+    if (tutorStep === 1 && tutorTimer > 6) {
+      tutorStep = 2
+      tutorTimer = 0
+    } else if (tutorStep === 2 && tutorTimer > 22) {
+      tutorStep = 3 // on n'insiste pas : la consigne a été lue
+      tutorTimer = 0
+      tutorPersist()
+    } else if (tutorStep === 3 && tutorTimer > 7) {
+      tutorStep = 4
+      tutorTimer = 0
+    } else if (tutorStep === 4 && tutorTimer > 7) {
+      tutorStep = 5
+    }
+  }
+
+  if (text !== tutorShown) {
+    tutorShown = text
+    if (text !== '') {
+      tutorEl.innerHTML = `<span class="consigne">CONSIGNE DU PROTOCOLE</span>${text}`
+      tutorEl.classList.add('visible')
+    } else {
+      tutorEl.classList.remove('visible')
+    }
+  }
+}
+
 function showOverlay(title: string, sub: string, tone: 'success' | 'danger', btn?: string): void {
   overlayTitle.textContent = title
   overlaySub.textContent = sub
@@ -569,6 +676,7 @@ function frame(now: number): void {
   } else {
     camera.update(dtReal, sim.stats.centroidX, sim.stats.centroidY, sim.stats.rmsRadius, vw, vh, params)
   }
+  updateTutor(dtReal)
   updateWorldLabels(vw, vh)
   renderer.render(
     sim,
