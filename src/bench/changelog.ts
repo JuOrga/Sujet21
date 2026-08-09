@@ -11,6 +11,13 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '09/08/2026 17:50',
+    title: 'Le bourdon de fond se tait',
+    notes: [
+      'Le bourdon continu de la station est retiré : le fond est silencieux. Seuls les gestes sonnent — souffle d’éjection, respiration de la vapeur, aspiration du sas, transitions d’état, impacts de glace.',
+    ],
+  },
+  {
     date: '09/08/2026 17:30',
     title: 'Le 21-A bis se trouve aussi au banc',
     notes: [
