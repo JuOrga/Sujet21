@@ -539,6 +539,59 @@
         }
       }
 
+      /* ---- Tutoriel diégétique : les consignes du protocole (tableau 1,
+             première partie seulement) — chaque consigne se valide par le
+             geste qu'elle enseigne, puis ne revient jamais ---- */
+      #tutor {
+        position: fixed;
+        top: 96px;
+        left: 50%;
+        transform: translateX(-50%) translateY(-6px);
+        max-width: min(560px, 92vw);
+        box-sizing: border-box;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--valid);
+        padding: 10px 16px;
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--ink);
+        backdrop-filter: blur(4px);
+        z-index: 12;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.45s ease, transform 0.45s ease;
+      }
+      #tutor.visible {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+      body:not(.playing) #tutor {
+        opacity: 0;
+      }
+      #tutor .consigne {
+        font-family: var(--font-mono);
+        font-size: 9.5px;
+        letter-spacing: 0.2em;
+        color: var(--valid);
+        display: block;
+        margin-bottom: 3px;
+      }
+      #tutor kbd {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--ink);
+        border: 1px solid var(--line-strong);
+        border-radius: 3px;
+        padding: 0 6px;
+      }
+      @media (max-width: 700px) {
+        #tutor {
+          top: 122px;
+          font-size: 12px;
+        }
+      }
+
       /* ---- Overlays : tampons de protocole ---- */
       #overlay {
         position: fixed;
@@ -1154,6 +1207,8 @@
         <span class="st-ico">💨</span><span class="st-label">VAPEUR</span><kbd>G</kbd>
       </button>
     </div>
+
+    <div id="tutor" aria-live="polite"></div>
 
     <div id="tableau-card" aria-live="polite">
       <div id="card-code"></div>
