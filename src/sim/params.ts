@@ -212,9 +212,10 @@ export const DEFAULT_PARAMS: SimParams = {
   exitSwirl: 1.1,
 
   // Portée sentie : à 16 u la chimie ne mordait qu'au ras du mur — invisible
-  // pour un corps de ~110 u de rayon. À 48 u, la déviation hydrophobe se voit
-  // et l'aspiration hydrophile se négocie.
-  hydroBand: 48,
+  // pour un corps de ~110 u de rayon. À 80 u (l'échelle des auras
+  // thermiques), la déviation hydrophobe se négocie de loin et l'aspiration
+  // hydrophile est un vrai champ.
+  hydroBand: 80,
   hydrophilePull: 900,
   hydrophileFriction: 5,
   hydrophobeRepel: 1400,
