@@ -171,6 +171,66 @@ float specks(vec2 world, float cell, float density, float zoom) {
   return smoothstep(r * 2.5, r * 0.5, d) * (0.4 + 0.6 * hash21(g + 8.9)) * vis;
 }
 
+// ---- La vie du vaisseau : veilleuses, dérive, respiration des machines ----
+// Tout est procédural, calé sur le hash de la cellule : chaque veilleuse a sa
+// place, sa période, sa phase et sa couleur. Le vaisseau doit avoir l'air
+// ALIMENTÉ — quelque chose tourne encore derrière les parois — sans jamais
+// disputer l'attention à l'échantillon.
+vec3 shipLife(vec2 world, float zoom, float t) {
+  vec3 acc = vec3(0.0);
+
+  // 1. Veilleuses de paroi : une par cellule de 300 u, sur un quart d'entre
+  //    elles. Les deux tiers clignotent lentement, le reste reste fixe.
+  float cell = 300.0;
+  float vis = smoothstep(2.5, 9.0, cell * zoom);
+  if (vis > 0.0) {
+    vec2 g = floor(world / cell);
+    float h = hash21(g);
+    if (h < 0.32) {
+      vec2 c = (g + vec2(hash21(g + 3.1), hash21(g + 7.7))) * cell;
+      float d = length(world - c);
+      float r = max(3.4, 2.4 / zoom); // jamais sous-pixel : pas de scintillement
+      float core = smoothstep(r, r * 0.2, d);
+      float halo = exp(-d / (r * 7.0)) * 0.4;
+      float per = 1.8 + 5.5 * hash21(g + 11.3);
+      float ph = hash21(g + 19.1) * per;
+      float blink = hash21(g + 23.7) < 0.66
+        ? 0.35 + 0.65 * pow(0.5 + 0.5 * sin((t + ph) * 6.2831 / per), 2.0)
+        : 0.85;
+      float ch = hash21(g + 31.3);
+      vec3 tint = ch < 0.60 ? vec3(0.22, 1.00, 0.82)  // turquoise : nominal
+                : ch < 0.88 ? vec3(1.00, 0.62, 0.22)  // ambre : en veille
+                            : vec3(1.00, 0.26, 0.20); // rouge : une alarme oubliée
+      acc += tint * (core * 0.95 + halo * 1.3) * blink * vis;
+    }
+  }
+
+  // 2. Panneau qui bégaie : très rares cellules où la lumière stroboscope
+  //    quelques dixièmes de seconde, puis se tait longtemps.
+  float pcell = 900.0;
+  vec2 pg = floor(world / pcell);
+  if (hash21(pg + 41.7) < 0.14) {
+    float period = 9.0 + 11.0 * hash21(pg + 47.3);
+    float phase = fract((t + hash21(pg + 53.9) * period) / period);
+    float burst = step(phase, 0.055) * step(0.6, fract(t * 21.0));
+    vec2 pc = (pg + vec2(hash21(pg + 59.1), hash21(pg + 61.7))) * pcell;
+    float pd = length(world - pc);
+    acc += vec3(0.55, 0.80, 1.00) * burst * exp(-pd / 190.0) * 0.30;
+  }
+
+  // 3. Poussières en dérive, deux profondeurs : les lentes au loin, les
+  //    rapides près de l'œil — le volume de la cuve se sent.
+  acc += vec3(0.10, 0.17, 0.22) * specks(world + vec2(t * 3.0, -t * 1.6), 150.0, 0.05, zoom) * 0.55;
+  acc += vec3(0.14, 0.22, 0.28) * specks(world + vec2(-t * 12.0, t * 5.0), 60.0, 0.05, zoom) * 0.40;
+
+  // 4. Respiration des machines : une houle lumineuse très lente, très large,
+  //    qui parcourt les parois — le vaisseau inspire.
+  float breath = 0.5 + 0.5 * sin(t * 0.33 + vnoise(world * 0.0006) * 6.2831);
+  acc += vec3(0.014, 0.030, 0.042) * breath;
+
+  return acc;
+}
+
 // distance signée à une boîte (négatif à l'intérieur)
 float boxSdf(vec2 world, vec4 b) {
   vec2 c = (b.xy + b.zw) * 0.5;
@@ -242,9 +302,10 @@ void main() {
   float gridDim = uHasTank > 0.5 ? 0.5 : 1.0; // la texture a ses propres lignes
   tank += vec3(0.05, 0.09, 0.13) * gridLine(world, 100.0, lw) * 0.30 * gridDim;
   tank += vec3(0.07, 0.12, 0.17) * gridLine(world, 500.0, lw * 1.6) * 0.45 * gridDim;
-  tank += vec3(0.10, 0.16, 0.20) * specks(world + vec2(uTime * 7.0, uTime * 3.0), 70.0, 0.06, uZoom) * 0.5;
   // halo le long des parois : la cuve est éclairée par sa coque
   tank += vec3(0.020, 0.045, 0.060) * exp(min(0.0, roomD) * 0.02);
+  // la vie du vaisseau : veilleuses, poussières en dérive, respiration
+  tank += shipLife(world, uZoom, uTime);
 
   vec3 col = mix(voidCol, tank, inRoom);
 
