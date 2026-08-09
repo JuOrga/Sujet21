@@ -171,6 +171,15 @@ float specks(vec2 world, float cell, float density, float zoom) {
   return smoothstep(r * 2.5, r * 0.5, d) * (0.4 + 0.6 * hash21(g + 8.9)) * vis;
 }
 
+// Champ doux sans réseau : somme de sinus modulés. Le bruit de valeur, à très
+// basse fréquence, laisse voir son réseau carré (interpolation bilinéaire sur
+// une grille entière) — d'où des PAVÉS de lumière à l'écran. Ceci n'en a pas.
+float smoothField(vec2 p) {
+  float a = sin(p.x + sin(p.y * 0.73) * 1.7);
+  float b = sin(p.y * 0.87 + sin(p.x * 0.61) * 1.3);
+  return 0.5 + 0.25 * (a + b);
+}
+
 // ---- La vie du vaisseau : veilleuses, dérive, respiration des machines ----
 // Tout est procédural, calé sur le hash de la cellule : chaque veilleuse a sa
 // place, sa période, sa phase et sa couleur. Le vaisseau doit avoir l'air
@@ -191,7 +200,11 @@ vec3 shipLife(vec2 world, float zoom, float t) {
       float d = length(world - c);
       float r = max(3.4, 2.4 / zoom); // jamais sous-pixel : pas de scintillement
       float core = smoothstep(r, r * 0.2, d);
-      float halo = exp(-d / (r * 7.0)) * 0.4;
+      // Halo à SUPPORT COMPACT : il atteint zéro avant la frontière de sa
+      // cellule. Une décroissance exponentielle, elle, valait encore ~10 % au
+      // bord — et se faisait trancher net : les lumières paraissaient cubiques.
+      float reach = min(cell * 0.42, r * 16.0);
+      float halo = pow(max(0.0, 1.0 - d / reach), 2.5) * 0.42;
       float per = 1.8 + 5.5 * hash21(g + 11.3);
       float ph = hash21(g + 19.1) * per;
       float blink = hash21(g + 23.7) < 0.66
@@ -215,7 +228,10 @@ vec3 shipLife(vec2 world, float zoom, float t) {
     float burst = step(phase, 0.055) * step(0.6, fract(t * 21.0));
     vec2 pc = (pg + vec2(hash21(pg + 59.1), hash21(pg + 61.7))) * pcell;
     float pd = length(world - pc);
-    acc += vec3(0.55, 0.80, 1.00) * burst * exp(-pd / 190.0) * 0.30;
+    // même règle : la lueur meurt avant le bord de sa cellule, sinon elle s'y
+    // découpe au carré le temps de l'éclat
+    float pr = pcell * 0.40;
+    acc += vec3(0.55, 0.80, 1.00) * burst * pow(max(0.0, 1.0 - pd / pr), 2.0) * 0.34;
   }
 
   // 3. Poussières en dérive, deux profondeurs : les lentes au loin, les
@@ -225,7 +241,7 @@ vec3 shipLife(vec2 world, float zoom, float t) {
 
   // 4. Respiration des machines : une houle lumineuse très lente, très large,
   //    qui parcourt les parois — le vaisseau inspire.
-  float breath = 0.5 + 0.5 * sin(t * 0.33 + vnoise(world * 0.0006) * 6.2831);
+  float breath = 0.5 + 0.5 * sin(t * 0.33 + smoothField(world * 0.0016) * 6.2831);
   acc += vec3(0.014, 0.030, 0.042) * breath;
 
   return acc;
@@ -324,7 +340,7 @@ void main() {
   vec3 texWallC = texture(uTexWall, world / 230.0).rgb;
   if (uHasWallA > 0.5) {
     vec3 wallA = texture(uTexWallA, world / 520.0).rgb;
-    float blend = smoothstep(0.35, 0.65, vnoise(world * 0.0011 + 5.3));
+    float blend = smoothstep(0.35, 0.65, smoothField(world * 0.0023 + 5.3));
     texWallC = uHasWall > 0.5 ? mix(texWallC, wallA, blend) : wallA;
   }
   vec3 texPhobeC = texture(uTexPhobe, world / 170.0).rgb;
