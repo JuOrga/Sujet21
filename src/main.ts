@@ -246,12 +246,21 @@ function requireName(): boolean {
 const tableauCard = el('tableau-card')
 const cardCode = el('card-code')
 const cardLog = el('card-log')
+const cardFig = el('card-fig') as HTMLImageElement
 
 // Carton d'ouverture : l'entrée du journal de bord du tableau, affichée
 // pendant le plan large puis effacée quand la caméra a plongé.
 let cardTimer: number | undefined
 function showTableauCard(): void {
   cardCode.textContent = `ESSAI ${level.code} — ${level.name.toUpperCase()}`
+  // La planche du dossier, quand le tableau en a une
+  if (level.figure) {
+    cardFig.src = level.figure
+    cardFig.hidden = false
+  } else {
+    cardFig.hidden = true
+    cardFig.removeAttribute('src')
+  }
   cardLog.textContent = level.journal
   tableauCard.classList.add('visible')
   window.clearTimeout(cardTimer)
@@ -289,10 +298,11 @@ function startBisTest(): void {
   run.bonbonneLiters = 0
   run.runTime = 0
   hasPlayed = true
-  restart()
+  // « playing » d'abord : restart() se charge alors lui-même du plan large et
+  // du carton de journal — sinon les deux se jouaient en double, en décalé.
   document.body.classList.add('playing')
-  camera.startIntro(sim.bounds, window.innerWidth, window.innerHeight)
-  showTableauCard()
+  startBtn.textContent = "REPRENDRE L'ESSAI"
+  restart()
 }
 startBisBtn.addEventListener('click', startBisTest)
 // Au doigt, la fiche va à l'essentiel : les commandes démarrent repliées
@@ -867,6 +877,7 @@ function frame(now: number): void {
     waves.length,
     Math.max(params.renderDownsample, quality.down),
     chillNow(),
+    level.decals ?? [],
   )
   monitor.renderMs += (performance.now() - renderT0 - monitor.renderMs) * 0.08
 

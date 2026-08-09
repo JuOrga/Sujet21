@@ -6,7 +6,7 @@
 import type { FluidSim } from '../sim/solver'
 import { KIND_PLAYER } from '../sim/solver'
 import type { SimParams } from '../sim/params'
-import type { ObstacleBox } from '../game/level'
+import type { DecalDef, ObstacleBox } from '../game/level'
 import type { Camera } from './camera'
 
 const MAX_BOXES = 24
@@ -658,6 +658,35 @@ void main() {
   outColor = vec4(texture(uTexHull, vUv).rgb, 1.0);
 }`
 
+// Décalques de décor : machinerie posée sur les parois (tuyaux, vannes).
+// Purement décoratifs — aucune physique, aucune lecture de jeu à en tirer :
+// ils sont donc assombris et légèrement bleutés pour rester en arrière-plan
+// derrière les surfaces qui, elles, ont un sens.
+const DECAL_VS = `#version 300 es
+layout(location = 0) in vec2 aPos;
+layout(location = 1) in vec2 aUv;
+uniform vec2 uCenter;
+uniform vec2 uViewport;
+uniform float uZoom;
+out vec2 vUv;
+void main() {
+  vec2 clip = (aPos - uCenter) * uZoom / (uViewport * 0.5);
+  gl_Position = vec4(clip, 0.0, 1.0);
+  vUv = aUv;
+}`
+
+const DECAL_FS = `#version 300 es
+precision highp float;
+in vec2 vUv;
+uniform sampler2D uTexDecal;
+uniform float uFade; // atténuation : le décor ne doit jamais crier
+out vec4 outColor;
+void main() {
+  vec4 t = texture(uTexDecal, vUv);
+  vec3 c = t.rgb * vec3(0.52, 0.62, 0.72); // refroidi, fondu dans la cuve
+  outColor = vec4(c, t.a * uFade);
+}`
+
 function compile(gl: WebGL2RenderingContext, type: number, src: string): WebGLShader {
   const shader = gl.createShader(type)!
   gl.shaderSource(shader, src)
@@ -686,13 +715,19 @@ export class Renderer {
   private readonly composeProgram: WebGLProgram
   private readonly spongeProgram: WebGLProgram
   private readonly hullProgram: WebGLProgram
+  private readonly decalProgram: WebGLProgram
   private readonly splatVao: WebGLVertexArrayObject
   private readonly splatVbo: WebGLBuffer
   private readonly spongeVao: WebGLVertexArrayObject
   private readonly spongeVbo: WebGLBuffer
   private readonly hullVao: WebGLVertexArrayObject
   private readonly hullVbo: WebGLBuffer
+  private readonly decalVao: WebGLVertexArrayObject
+  private readonly decalVbo: WebGLBuffer
   private readonly hullScratch = new Float32Array(6 * 4 * 4) // 4 bandes × 6 sommets × (pos, uv)
+  private readonly decalScratch = new Float32Array(6 * 4) // un quad : 6 sommets × (pos, uv)
+  private texDecalTuyaux: WebGLTexture | null = null
+  private texDecalVanne: WebGLTexture | null = null
   // Textures d'habillage : null tant que l'image n'est pas chargée — le
   // décor procédural assure l'intérim, l'image prend le relais sans à-coup.
   private texStars: WebGLTexture | null = null
@@ -742,11 +777,13 @@ export class Renderer {
     this.composeProgram = link(gl, COMPOSE_VS, COMPOSE_FS)
     this.spongeProgram = link(gl, SPONGE_VS, SPONGE_FS)
     this.hullProgram = link(gl, HULL_VS, HULL_FS)
+    this.decalProgram = link(gl, DECAL_VS, DECAL_FS)
     for (const [name, program] of [
       ['splat', this.splatProgram],
       ['compose', this.composeProgram],
       ['sponge', this.spongeProgram],
       ['hull', this.hullProgram],
+      ['decal', this.decalProgram],
     ] as const) {
       const map: Record<string, WebGLUniformLocation | null> = {}
       const count = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS) as number
@@ -799,6 +836,17 @@ export class Renderer {
     gl.vertexAttribPointer(1, 2, gl.FLOAT, false, hullStride, 8)
     gl.bindVertexArray(null)
 
+    this.decalVao = gl.createVertexArray()!
+    this.decalVbo = gl.createBuffer()!
+    gl.bindVertexArray(this.decalVao)
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.decalVbo)
+    gl.bufferData(gl.ARRAY_BUFFER, this.decalScratch.byteLength, gl.DYNAMIC_DRAW)
+    gl.enableVertexAttribArray(0)
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, hullStride, 0)
+    gl.enableVertexAttribArray(1)
+    gl.vertexAttribPointer(1, 2, gl.FLOAT, false, hullStride, 8)
+    gl.bindVertexArray(null)
+
     // Habillage généré par IA (public/assets) : chargé en arrière-plan.
     // L'iris est échantillonné dans une branche non uniforme du shader :
     // pas de mipmaps pour lui (dérivées indéfinies sinon).
@@ -818,6 +866,9 @@ export class Renderer {
     this.loadTexture('/assets/hull.webp', true, true, (t) => (this.texHull = t))
     this.loadTexture('/assets/sponge-dry.webp', true, true, (t) => (this.texSpongeDry = t))
     this.loadTexture('/assets/sponge-wet.webp', true, true, (t) => (this.texSpongeWet = t))
+    // Décalques : pièces détourées (alpha), donc bord franc — pas de répétition
+    this.loadTexture('/assets/decal-tuyaux.webp', false, true, (t) => (this.texDecalTuyaux = t))
+    this.loadTexture('/assets/decal-vanne.webp', false, true, (t) => (this.texDecalVanne = t))
   }
 
   private loadTexture(
@@ -888,6 +939,7 @@ export class Renderer {
     waveCount: number,
     downsample = params.renderDownsample, // la qualité adaptative peut forcer plus grossier
     chill = 0, // refroidissement du vaisseau : teinte froide, auras effectives
+    decals: DecalDef[] = [], // machinerie de décor, sans physique
   ): void {
     const gl = this.gl
     const devW = Math.max(1, Math.round(viewportW * dpr))
@@ -1015,6 +1067,9 @@ export class Renderer {
     // Passe B bis — coque texturée autour de la cuve
     this.drawHull(sim, camera, viewportW, viewportH)
 
+    // Passe B ter — décalques de décor (tuyaux, vannes)
+    this.drawDecals(decals, camera, viewportW, viewportH)
+
     // Passe C — cellules d'éponge
     this.drawSponges(sim, camera, viewportW, viewportH, dpr)
   }
@@ -1086,6 +1141,65 @@ export class Renderer {
     gl.bindVertexArray(this.hullVao)
     gl.drawArrays(gl.TRIANGLES, 0, 24)
     gl.bindVertexArray(null)
+  }
+
+  // Décalques : un quad par pièce, dessinés en transparence. Le décor n'a pas
+  // de physique — il ne coûte qu'un appel de dessin par pièce, et un tableau
+  // n'en porte qu'une poignée.
+  private drawDecals(
+    decals: DecalDef[],
+    camera: Camera,
+    viewportW: number,
+    viewportH: number,
+  ): void {
+    if (decals.length === 0) return
+    const gl = this.gl
+    const du = this.uniforms['decal']
+    let started = false
+    for (const d of decals) {
+      const tex = d.kind === 'vanne' ? this.texDecalVanne : this.texDecalTuyaux
+      if (!tex) continue
+      if (!started) {
+        started = true
+        gl.useProgram(this.decalProgram)
+        gl.uniform2f(du['uCenter'], camera.x, camera.y)
+        gl.uniform2f(du['uViewport'], viewportW, viewportH)
+        gl.uniform1f(du['uZoom'], camera.zoom)
+        gl.enable(gl.BLEND)
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+        gl.bindVertexArray(this.decalVao)
+      }
+      const hw = d.w * 0.5
+      const hh = d.h * 0.5
+      const u0 = d.flip ? 1 : 0
+      const u1 = d.flip ? 0 : 1
+      // v inversé : les textures sont chargées avec UNPACK_FLIP_Y
+      const q = this.decalScratch
+      let o = 0
+      const put = (x: number, y: number, u: number, v: number): void => {
+        q[o++] = x
+        q[o++] = y
+        q[o++] = u
+        q[o++] = v
+      }
+      put(d.x - hw, d.y - hh, u0, 0)
+      put(d.x + hw, d.y - hh, u1, 0)
+      put(d.x + hw, d.y + hh, u1, 1)
+      put(d.x - hw, d.y - hh, u0, 0)
+      put(d.x + hw, d.y + hh, u1, 1)
+      put(d.x - hw, d.y + hh, u0, 1)
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.decalVbo)
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, q)
+      gl.activeTexture(gl.TEXTURE0)
+      gl.bindTexture(gl.TEXTURE_2D, tex)
+      gl.uniform1i(du['uTexDecal'], 0)
+      gl.uniform1f(du['uFade'], d.fade ?? 0.55)
+      gl.drawArrays(gl.TRIANGLES, 0, 6)
+    }
+    if (started) {
+      gl.bindVertexArray(null)
+      gl.disable(gl.BLEND)
+    }
   }
 
   private drawSponges(sim: FluidSim, camera: Camera, viewportW: number, viewportH: number, dpr: number): void {

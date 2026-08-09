@@ -38,16 +38,31 @@ export interface WorldLabel {
   tone: 'mur' | 'phile' | 'phobe' | 'eponge' | 'froid' | 'grille' | 'sas' | 'chaud'
 }
 
+// Décalque de décor : machinerie plaquée sur la paroi (tuyaux, vanne).
+// Aucune physique, aucune règle — seulement la preuve que quelqu'un a
+// construit cet endroit avant de l'abandonner.
+export interface DecalDef {
+  x: number
+  y: number
+  w: number
+  h: number
+  kind: 'tuyaux' | 'vanne'
+  flip?: boolean // miroir horizontal : la même pièce ne se répète pas telle quelle
+  fade?: number // 0..1, opacité (défaut 0,55)
+}
+
 export interface LevelDef {
   name: string
   code: string // code d'essai du protocole (21-A, 21-B…)
   journal: string // entrée du journal de bord, affichée à l'ouverture du tableau
+  figure?: string // illustration du carton de journal (public/assets)
   bounds: Bounds
   spawn: { x: number; y: number; n: number }
   exit: { minX: number; minY: number; maxX: number; maxY: number }
   boxes: ObstacleBox[]
   sponges: SpongeDef[]
   labels: WorldLabel[]
+  decals?: DecalDef[]
 }
 
 function box(minX: number, minY: number, maxX: number, maxY: number, material: number): ObstacleBox {
@@ -333,6 +348,7 @@ export const TABLEAU_1BIS: LevelDef = {
   code: '21-A bis',
   journal:
     'Réfection du secteur A : cloisons redessinées, contreforts, une galerie au lieu d’un couloir. L’échantillon n’a besoin d’aucun artifice ici — seulement d’eau, et de retenue. — Dr N. Véga',
+  figure: '/assets/card-galerie.webp',
   bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
   spawn: { x: -950, y: 0, n: 900 },
   exit: { minX: 1040, minY: -300, maxX: 1180, maxY: -60 },
@@ -363,6 +379,16 @@ export const TABLEAU_1BIS: LevelDef = {
     { x: 480, y: -90, text: 'HYDROPHILE', tone: 'phile' },
     { x: 850, y: 170, text: 'HYDROPHOBE', tone: 'phobe' },
     { x: 1110, y: -180, text: 'SAS', tone: 'sas' },
+  ],
+  // La machinerie de la galerie : plaquée aux parois, à l'écart des routes —
+  // le lieu a été construit, entretenu, puis laissé.
+  decals: [
+    { x: -1105, y: 230, w: 160, h: 160, kind: 'tuyaux' },
+    { x: -1105, y: -180, w: 150, h: 150, kind: 'tuyaux', flip: true, fade: 0.45 },
+    { x: -520, y: 590, w: 190, h: 285, kind: 'vanne', fade: 0.5 },
+    { x: 300, y: -640, w: 150, h: 225, kind: 'vanne', fade: 0.42 },
+    { x: 1120, y: 520, w: 165, h: 165, kind: 'tuyaux', fade: 0.5 },
+    { x: 60, y: 700, w: 150, h: 150, kind: 'tuyaux', flip: true, fade: 0.4 },
   ],
 }
 
