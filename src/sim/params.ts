@@ -117,7 +117,8 @@ export interface SimParams {
   laserRefractIndex: number
   // Plasma (palier 3) : un faisceau IONISÉ (qui traverse la vapeur du
   // joueur) est capturé par un rail magnétique s'il passe à moins de ce
-  // rayon d'une de ses extrémités. Grand = capture indulgente.
+  // rayon de sa ligne — n'importe où le long du rail. L'arc suit alors le
+  // rail dans le sens du tracé. Grand = capture indulgente.
   plasmaRailRadius: number
 
   // Sas de sortie : une bouche d'aspiration dans laquelle l'eau s'engouffre

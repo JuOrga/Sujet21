@@ -470,27 +470,30 @@ export class LevelEditor {
         return
       }
       if (this.tool.kind === 'rail') {
-        // presser près d'une extrémité PROLONGE ce rail ; ailleurs, un
-        // nouveau rail commence. Le point posé suit le doigt jusqu'au relâcher.
+        // presser près d'une extrémité PROLONGE ce rail — par la fin (aval)
+        // ou par le début (amont), SANS changer le sens de circulation ;
+        // ailleurs, un nouveau rail commence. Le point posé suit le doigt.
         if (!this.level.rails) this.level.rails = []
         const rails = this.level.rails
         const tol = Math.max(14, 16 / this.zoom)
         let index = -1
+        let point = -1
         for (let i = rails.length - 1; i >= 0; i--) {
           const pts = rails[i].points
           if (Math.hypot(pts[pts.length - 1].x - w.x, pts[pts.length - 1].y - w.y) < tol) {
+            pts.push({ x: this.snapped(w.x), y: this.snapped(w.y) })
             index = i
+            point = pts.length - 1
             break
           }
           if (Math.hypot(pts[0].x - w.x, pts[0].y - w.y) < tol) {
-            pts.reverse() // on prolonge toujours par la fin
+            pts.unshift({ x: this.snapped(w.x), y: this.snapped(w.y) })
             index = i
+            point = 0
             break
           }
         }
-        if (index >= 0) {
-          rails[index].points.push({ x: this.snapped(w.x), y: this.snapped(w.y) })
-        } else {
+        if (index < 0) {
           rails.push({
             points: [
               { x: this.snapped(w.x), y: this.snapped(w.y) },
@@ -498,9 +501,10 @@ export class LevelEditor {
             ],
           })
           index = rails.length - 1
+          point = 1
         }
         this.sel = { kind: 'rail', index }
-        this.drag = { mode: 'railpt', index, point: rails[index].points.length - 1 }
+        this.drag = { mode: 'railpt', index, point }
         this.draw()
         return
       }
@@ -616,9 +620,9 @@ export class LevelEditor {
         const r = (this.level.rails ?? [])[d.index]
         if (r) {
           const p = r.points[d.point]
-          const avant = r.points[d.point - 1]
+          const voisin = r.points[d.point - 1] ?? r.points[d.point + 1]
           // un tronçon quasi nul ne compte pas : on retire le point posé
-          if (avant && Math.hypot(p.x - avant.x, p.y - avant.y) < this.grid) {
+          if (voisin && Math.hypot(p.x - voisin.x, p.y - voisin.y) < this.grid) {
             r.points.splice(d.point, 1)
             if (r.points.length < 2) {
               this.level.rails!.splice(d.index, 1)
@@ -629,7 +633,9 @@ export class LevelEditor {
           }
         }
         // l'outil reste actif : reposez sur une extrémité pour prolonger
-        this.commit('Rail tracé — reposez sur une extrémité pour le prolonger, Échap pour finir.')
+        this.commit(
+          'Rail tracé — les chevrons donnent le SENS de l’arc. Reposez sur une extrémité pour prolonger, Échap pour finir.',
+        )
         return
       }
       if (d.mode === 'create') {
@@ -1193,8 +1199,9 @@ export class LevelEditor {
     } else if (s.kind === 'rail') {
       const r = (this.level.rails ?? [])[s.index]
       rows.push(
-        `<p class="ed-empty">Ligne de champ en ${r.points.length} points. Un faisceau IONISÉ (passé dans la vapeur) capturé à une extrémité la suit jusqu’à l’autre bout. Glissez pour déplacer le rail entier ; outil « Rail » sur une extrémité pour le prolonger.</p>`,
+        `<p class="ed-empty">Ligne de champ en ${r.points.length} points. Un faisceau IONISÉ (passé dans la vapeur) qui frôle la ligne — n’importe où — s’y accroche et la suit DANS LE SENS DES CHEVRONS. Glissez pour déplacer le rail entier ; outil « Rail » sur une extrémité pour le prolonger.</p>`,
       )
+      rows.push(`<button type="button" class="ed-btn" id="p-railrev">Inverser le sens</button>`)
     } else if (s.kind === 'label') {
       const l = this.level.labels[s.index]
       rows.push(`<label class="ed-f"><span>Texte</span><input id="p-text" value="${l.text.replace(/"/g, '&quot;')}" /></label>`)
@@ -1236,6 +1243,12 @@ export class LevelEditor {
         : `<button type="button" class="ed-danger" id="p-del">Supprimer</button>`)
 
     host.querySelector('#p-del')?.addEventListener('click', () => this.deleteSel())
+    host.querySelector('#p-railrev')?.addEventListener('click', () => {
+      if (this.sel?.kind === 'rail') {
+        ;(this.level.rails ?? [])[this.sel.index]?.points.reverse()
+        this.commit('Sens du rail inversé — les chevrons montrent la circulation de l’arc.')
+      }
+    })
     for (const input of Array.from(host.querySelectorAll('input, select'))) {
       input.addEventListener('change', () => this.readProps())
     }
@@ -1581,23 +1594,33 @@ export class LevelEditor {
       g.font = '600 10px ui-monospace, monospace'
       g.fillText(`PORTE → CIBLE ${q.cible + 1}`, p.sx + 4, p.sy - 4)
     }
-    // rails magnétiques : la ligne de champ, ses nœuds, et les anneaux de
-    // capture aux extrémités (le rayon vient des réglages par défaut)
+    // rails magnétiques : la bande de capture (l'arc s'accroche n'importe où
+    // le long de la ligne), la ligne, ses nœuds, et les CHEVRONS du sens de
+    // circulation — l'ordre du tracé est le sens de l'arc.
     const rails = this.level.rails ?? []
     for (let i = 0; i < rails.length; i++) {
       const pts = rails[i].points
       if (pts.length < 2) continue
       const selRail = this.sel?.kind === 'rail' && this.sel.index === i
+      const chemin = (): void => {
+        g.beginPath()
+        const p0 = this.toScreen(pts[0].x, pts[0].y)
+        g.moveTo(p0.sx, p0.sy)
+        for (let k = 1; k < pts.length; k++) {
+          const pk = this.toScreen(pts[k].x, pts[k].y)
+          g.lineTo(pk.sx, pk.sy)
+        }
+      }
+      g.strokeStyle = 'rgba(150,120,255,0.09)'
+      g.lineWidth = Math.max(2, DEFAULT_PARAMS.plasmaRailRadius * 2 * this.zoom)
+      g.lineJoin = 'round'
+      g.lineCap = 'round'
+      chemin()
+      g.stroke()
       g.strokeStyle = selRail ? '#cdb4ff' : 'rgba(150,120,255,0.55)'
       g.lineWidth = selRail ? 2.5 : 1.8
       g.setLineDash([3, 8])
-      g.beginPath()
-      const p0 = this.toScreen(pts[0].x, pts[0].y)
-      g.moveTo(p0.sx, p0.sy)
-      for (let k = 1; k < pts.length; k++) {
-        const pk = this.toScreen(pts[k].x, pts[k].y)
-        g.lineTo(pk.sx, pk.sy)
-      }
+      chemin()
       g.stroke()
       g.setLineDash([])
       for (let k = 0; k < pts.length; k++) {
@@ -1607,15 +1630,28 @@ export class LevelEditor {
         g.arc(p.sx, p.sy, k === 0 || k === pts.length - 1 ? 4 : 2.5, 0, Math.PI * 2)
         g.fill()
       }
-      for (const bout of [pts[0], pts[pts.length - 1]]) {
-        const p = this.toScreen(bout.x, bout.y)
-        g.strokeStyle = 'rgba(170,140,255,0.4)'
-        g.lineWidth = 1
-        g.setLineDash([3, 4])
-        g.beginPath()
-        g.arc(p.sx, p.sy, Math.max(4, DEFAULT_PARAMS.plasmaRailRadius * this.zoom), 0, Math.PI * 2)
-        g.stroke()
-        g.setLineDash([])
+      g.strokeStyle = selRail ? '#e6dcff' : 'rgba(190,160,255,0.8)'
+      g.lineWidth = 1.6
+      for (let k = 0; k + 1 < pts.length; k++) {
+        const a = pts[k]
+        const b = pts[k + 1]
+        const len = Math.hypot(b.x - a.x, b.y - a.y)
+        if (len < 1) continue
+        const ux = (b.x - a.x) / len
+        const uy = (b.y - a.y) / len
+        const n = Math.max(1, Math.floor((len * this.zoom) / 34))
+        const taille = 6
+        for (let m = 1; m <= n; m++) {
+          const t = m / (n + 1)
+          const p = this.toScreen(a.x + ux * len * t, a.y + uy * len * t)
+          const ex = ux
+          const ey = -uy // écran : y vers le bas
+          g.beginPath()
+          g.moveTo(p.sx - (ex + ey * 0.6) * taille, p.sy - (ey - ex * 0.6) * taille)
+          g.lineTo(p.sx, p.sy)
+          g.lineTo(p.sx - (ex - ey * 0.6) * taille, p.sy - (ey + ex * 0.6) * taille)
+          g.stroke()
+        }
       }
     }
     // l'aperçu des faisceaux d'abord : les pastilles se dessinent par-dessus

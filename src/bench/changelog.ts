@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 03:50',
+    title: 'Les rails ont un SENS : capture n’importe où le long de la ligne',
+    notes: [
+      'Premier essai en vrai : le nuage était posé au MILIEU du rail, et rien ne se passait — la capture n’acceptait que les extrémités. Corrigé : l’arc ionisé s’accroche N’IMPORTE OÙ le long de la ligne de champ.',
+      'Du coup, le rail a un SENS : capturé en chemin, l’arc circule dans le sens du tracé (du premier point vers le dernier) jusqu’au bout, puis repart tout droit. Des CHEVRONS le montrent, en jeu comme dans l’éditeur — et la bande de capture translucide dit la portée du champ tout du long.',
+      'Dans l’éditeur : bouton « Inverser le sens » au panneau du rail sélectionné ; prolonger un rail par son début ne retourne plus la ligne (le sens est préservé, on prolonge en amont).',
+    ],
+  },
+  {
     date: '11/08/2026 03:20',
     title: 'Laser palier 3 : la vapeur ionise — l’arc de plasma suit les rails',
     notes: [
