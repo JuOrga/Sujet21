@@ -832,7 +832,11 @@
       #statebar {
         position: fixed;
         left: 50%;
-        bottom: 66px;
+        /* La barre du bas peut passer sur deux lignes selon le nombre de
+           boutons : le sélecteur se cale sur sa hauteur RÉELLE (--tb-h,
+           mesurée en direct) au lieu d'une valeur devinée — sinon les deux
+           se chevauchent dès qu'un bouton s'ajoute. */
+        bottom: calc(var(--tb-h, 56px) + 20px);
         transform: translateX(-50%);
         display: flex;
         gap: 9px;
@@ -911,7 +915,7 @@
         #statebar {
           left: auto;
           right: 10px;
-          bottom: 118px;
+          bottom: calc(var(--tb-h, 100px) + 18px);
           transform: none;
           flex-direction: column;
         }
@@ -941,7 +945,9 @@
         flex-wrap: wrap;
         justify-content: center;
         gap: 7px;
-        max-width: 640px;
+        /* assez large pour tenir sur une ligne quand le bouton de retour à
+           l'éditeur s'ajoute ; au doigt, la largeur d'écran commande */
+        max-width: 790px;
         margin: 0 auto;
         pointer-events: none;
         z-index: 10;
@@ -1290,6 +1296,15 @@
         #coque-bar {
           max-width: 40px;
           margin: 0 6px;
+        }
+      }
+
+      /* Hors mobile, le panneau de bord occupe le coin bas gauche : la barre
+         de boutons se centre dans l'espace RESTANT, sinon elle passe dessous
+         sur les écrans étroits (tablette en paysage, fenêtre réduite). */
+      @media (min-width: 701px) {
+        #touchbar {
+          left: 268px;
         }
       }
 
