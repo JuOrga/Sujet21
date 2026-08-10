@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '10/08/2026 23:40',
+    title: 'L’éditeur montre les zones d’effet : auras, aspiration, illustrations, décals',
+    notes: [
+      'Chaque surface montre désormais la portée RÉELLE de son influence, en rectangle arrondi iso-distance : l’aura de gel de la plaque froide (avec, en pointillé long, sa portée à froid complet — elle grandit en cours de partie), l’aura du radiateur (avec, en pointillé court, sa portée réduite à froid), et les bandes d’influence hydrophile et hydrophobe.',
+      'Le sas montre son rayon d’aspiration — le courant qui hale l’eau et la glace commence bien avant son rectangle.',
+      'Les zones dessinent leur illustration (hublot, conduite, rampe) ajustée exactement comme dans le jeu, sous leur lisière ondulée ; les décals (tuyaux, vannes) sont peints à leur place. L’éditeur montre ce que le joueur verra.',
+      'Au passage, un vrai bug : le chargement JSON ne relisait pas les décals — un tableau passé par l’éditeur perdait sa machinerie peinte. Corrigé, avec l’aller-retour testé.',
+    ],
+  },
+  {
     date: '10/08/2026 23:10',
     title: 'Zones : l’illustration entière, la glace en givre blanc, les effets allégés',
     notes: [
