@@ -325,6 +325,7 @@ function startBisTest(): void {
     return
   }
   testLevel = TABLEAU_1BIS
+  fromEditor = false
   run.bonbonneLiters = 0
   run.runTime = 0
   hasPlayed = true
@@ -340,9 +341,13 @@ startBisBtn.addEventListener('click', startBisTest)
 // Il se superpose au jeu ; « Essayer » repasse par le même chemin que le
 // prototype (testLevel), donc un tableau édité se joue avec toutes les
 // mécaniques, sans toucher à l'expédition ni aux registres.
+// « Essayer » vient-il de l'éditeur ? Si oui, on doit pouvoir y retourner
+// d'un geste, à tout instant — y compris depuis l'écran de fin d'essai.
+let fromEditor = false
 const editor = new LevelEditor(el('editor'), {
   play: (lvl) => {
     testLevel = lvl
+    fromEditor = true
     run.bonbonneLiters = 0
     run.runTime = 0
     hasPlayed = true
@@ -352,6 +357,7 @@ const editor = new LevelEditor(el('editor'), {
   },
   quit: () => {
     editor.close()
+    fromEditor = false
     testLevel = null
     openHome()
     restart()
@@ -389,10 +395,12 @@ fetchLibrary().then((lib) => {
 
 // Sonde de débogage/test : le tableau en cours d'édition
 ;(window as unknown as { __editorLevel: () => LevelDef }).__editorLevel = () => editor.currentLevel()
+// L'éditeur possède son document : on le rouvre tel qu'on l'a laissé, sans
+// écraser le travail en cours par le tableau qu'on vient d'essayer.
 function openEditor(): void {
   overlay.classList.remove('visible')
   document.body.classList.remove('playing')
-  editor.open(testLevel ?? undefined)
+  editor.open()
 }
 document.getElementById('start-editor')!.addEventListener('click', () => openEditor())
 if (new URLSearchParams(location.search).has('editeur')) {
@@ -498,6 +506,10 @@ function newExpedition(): void {
 function resetAction(): void {
   if (testLevel) {
     if (run.ended) {
+      if (fromEditor) {
+        openEditor() // l'essai vient de l'éditeur : on y retourne
+        return
+      }
       testLevel = null
       newExpedition()
       openHome()
@@ -519,6 +531,7 @@ const pane = createBench(params, monitor, {
   tableaux: TABLEAUX.map((t) => t.name),
   gotoTableau: (index) => {
     testLevel = null // le banc navigue dans l'expédition, pas dans le prototype
+    fromEditor = false
     levelIndex = index
     restart()
   },
@@ -590,6 +603,14 @@ function toggleBench(): void {
 const chipLegend = touchButton('LÉGENDE', 'légende des surfaces (L)', toggleLegend, 'tb-chip')
 const chipStates = touchButton('ÉTATS', 'les trois états : qui bloque quoi (E)', toggleStates, 'tb-chip')
 const chipBench = touchButton('BANC', 'banc de réglage : la physique en direct', toggleBench, 'tb-chip')
+// Retour à l'éditeur : n'apparaît que pendant l'essai d'un tableau édité
+const chipEditor = touchButton(
+  '↩ ÉDITEUR',
+  'revenir à l’éditeur (le tableau est retrouvé tel qu’il était)',
+  () => openEditor(),
+  'tb-chip tb-editor',
+)
+chipEditor.style.display = 'none'
 {
   // au doigt, les chips ont leur rangée, les glyphes la leur
   const brk = document.createElement('i')
@@ -869,10 +890,12 @@ function frame(now: number): void {
     audio.collect()
     run.ended = true
     showOverlay(
-      'ESSAI 21-A BIS CONCLU',
-      `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — prototype de réfection du secteur A : vos impressions décideront de son sort.`,
+      fromEditor ? 'TABLEAU FRANCHI' : 'ESSAI 21-A BIS CONCLU',
+      fromEditor
+        ? `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — le tableau se termine. Retour à l’éditeur pour l’ajuster.`
+        : `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — prototype de réfection du secteur A : vos impressions décideront de son sort.`,
       'success',
-      'RETOUR AU PROTOCOLE',
+      fromEditor ? 'RETOUR À L’ÉDITEUR' : 'RETOUR AU PROTOCOLE',
     )
   } else if (!tableauDone && !sim.dispersed && (drunk || reached)) {
     const surplus = sim.liters() + sim.swallowed * params.litersPerParticle
@@ -996,6 +1019,7 @@ function frame(now: number): void {
   chipLegend.classList.toggle('active', legend.classList.contains('visible'))
   chipStates.classList.toggle('active', statesPanel.classList.contains('visible'))
   chipBench.classList.toggle('active', benchHost !== null && benchHost.style.display !== 'none')
+  chipEditor.style.display = fromEditor ? '' : 'none'
   btnVortex.classList.toggle('active', input.vortexArmed)
   btnVortex.style.display = params.vortexEnabled >= 0.5 ? '' : 'none'
   stateEau.classList.toggle('active', !input.freezeIntent && !input.gasIntent)
@@ -1168,9 +1192,11 @@ function frame(now: number): void {
     if (testLevel) {
       showOverlay(
         'DISPERSION',
-        'Le prototype a eu raison de l’échantillon — on le remet en cuve, l’essai du bis reprend.',
+        fromEditor
+          ? 'L’échantillon n’a pas tenu. « ↩ Éditeur » pour corriger le tableau, ou rejouer l’essai.'
+          : 'Le prototype a eu raison de l’échantillon — on le remet en cuve, l’essai du bis reprend.',
         'danger',
-        'REJOUER LE 21-A BIS',
+        fromEditor ? 'REJOUER L’ESSAI' : 'REJOUER LE 21-A BIS',
       )
     } else {
       showOverlay(
