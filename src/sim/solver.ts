@@ -248,7 +248,6 @@ export class FluidSim {
   private heatCarry = 0
   private gasIdleCarry = 0
   private gasTollCarry = 0
-  private laserCarry = 0
   private baseBoxes: ObstacleBox[] = []
   private grilleCarry = 0
   // Recondensation (§7.3) : chaque particule de vapeur perdue alimente une
@@ -359,38 +358,6 @@ export class FluidSim {
     const l = Math.hypot(sx, sy)
     if (l < 1e-6) return { nx: 0, ny: 1 } // au cœur du corps : normale arbitraire
     return { nx: sx / l, ny: sy / l }
-  }
-
-  // Le faisceau chauffe l'eau qu'il traverse : chaque particule LIQUIDE dans
-  // le couloir du segment s'évapore à laserEvapRate — perdue vers la réserve
-  // de rosée (elle perlera aux plaques froides). La glace est un miroir, la
-  // vapeur passe : seule l'eau paie de rester dans la lumière.
-  laserHeat(ax: number, ay: number, bx: number, by: number, dt: number): void {
-    const p = this.params
-    if (p.laserEvapRate <= 0) return
-    const hw = p.laserWidth
-    const abx = bx - ax
-    const aby = by - ay
-    const len2 = abx * abx + aby * aby
-    if (len2 < 1e-6) return
-    const doomed: number[] = []
-    for (let i = 0; i < this.count; i++) {
-      if (this.frozen[i] === 1 || this.gaseous[i] === 1) continue
-      const t = Math.max(0, Math.min(1, ((this.posX[i] - ax) * abx + (this.posY[i] - ay) * aby) / len2))
-      const dx = this.posX[i] - (ax + abx * t)
-      const dy = this.posY[i] - (ay + aby * t)
-      if (dx * dx + dy * dy > hw * hw) continue
-      this.laserCarry += p.laserEvapRate * dt
-      doomed.push(i)
-    }
-    // retirées de la fin vers le début : les indices restent valides
-    while (this.laserCarry >= 1 && doomed.length > 0) {
-      this.laserCarry -= 1
-      const i = doomed.pop()!
-      if (this.kind[i] === KIND_PLAYER && this.playerCount <= 2) break
-      this.removeParticle(i)
-      this.vaporBank++
-    }
   }
 
   // Exposition à la chaleur en (x, y) : 1 au contact d'un radiateur, 0 au

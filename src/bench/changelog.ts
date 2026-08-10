@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 02:40',
+    title: 'Le faisceau ne boit plus : traverser la lumière est gratuit',
+    notes: [
+      'La chauffe du laser est SUPPRIMÉE : l’eau qui traverse le faisceau — ou que le faisceau traverse — ne s’évapore plus. La lumière plie le corps (réfraction), le corps plie la lumière (miroir, prisme), mais personne ne paie le passage.',
+      'Servir de prisme ou promener un rayon piégé sous sa surface devient un outil sans contrepartie : la dépense du joueur reste où elle a toujours été — l’éjection, le dash, les éponges, les radiateurs.',
+      'Disparus du banc, du solveur et des paramètres : le couloir de chauffe et son débit d’évaporation.',
+    ],
+  },
+  {
     date: '11/08/2026 02:15',
     title: 'Laser palier 2 : le corps liquide est un prisme vivant',
     notes: [

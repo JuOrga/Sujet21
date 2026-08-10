@@ -65,11 +65,11 @@ export interface DecalDef {
   fade?: number // 0..1, opacité (défaut 0,55)
 }
 
-// ---- Mécanismes laser (palier 1, 2026) ----------------------------------
+// ---- Mécanismes laser (paliers 1-2, 2026) --------------------------------
 // Le faisceau est absorbé par les parois, passe les grilles, se REFLÈTE sur
-// la glace (le corps gelé est un miroir — c'est sa fonction cachée), chauffe
-// l'eau qu'il traverse, et allume des cibles. Une cible allumée ouvre les
-// portes qui lui sont asservies.
+// la glace (le corps gelé est un miroir — c'est sa fonction cachée), se
+// RÉFRACTE dans l'eau (le corps liquide est un prisme), et allume des
+// cibles. Une cible allumée ouvre les portes qui lui sont asservies.
 export interface LaserDef {
   x: number
   y: number

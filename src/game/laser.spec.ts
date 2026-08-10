@@ -184,28 +184,3 @@ describe('traceLaser — les règles optiques du palier 1', () => {
     }
   })
 })
-
-describe('FluidSim.laserHeat — l’eau paie de rester dans la lumière', () => {
-  it('évapore les particules du couloir vers la réserve de rosée, épargne glace et vapeur', () => {
-    const sim = new FluidSim({ ...DEFAULT_PARAMS, laserEvapRate: 40 }, BOUNDS, 2048)
-    sim.spawnDisc(0, 0, 80, KIND_PLAYER)
-    sim.relabel()
-    const gel = sim.addParticle(0, 200, KIND_FREE)
-    sim.frozen[gel] = 1
-    const avant = sim.count
-    const bankAvant = sim.vaporBank
-    for (let s = 0; s < 60; s++) sim.laserHeat(-500, 0, 500, 0, sim.params.dt)
-    expect(sim.count).toBeLessThan(avant) // le faisceau a bu dans le corps
-    expect(sim.vaporBank).toBeGreaterThan(bankAvant) // vers la rosée, pas au néant
-    expect(sim.frozen[gel] === 1 || sim.count < avant).toBe(true)
-  })
-
-  it('ne touche pas l’eau hors du couloir', () => {
-    const sim = new FluidSim({ ...DEFAULT_PARAMS, laserEvapRate: 40 }, BOUNDS, 2048)
-    sim.spawnDisc(0, 300, 60, KIND_PLAYER)
-    sim.relabel()
-    const avant = sim.count
-    for (let s = 0; s < 60; s++) sim.laserHeat(-500, 0, 500, 0, sim.params.dt)
-    expect(sim.count).toBe(avant)
-  })
-})

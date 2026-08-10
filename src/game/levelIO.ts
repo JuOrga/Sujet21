@@ -334,7 +334,7 @@ export function checkLevel(level: LevelDef): Verdict[] {
     v.push({ niveau: 'avertissement', message: 'Le tableau est vide : aucun obstacle.' })
   }
   // Mécanismes laser : chaque porte doit être asservie à une cible réelle,
-  // et un émetteur sans cible n'ouvre rien (il chauffe, c'est tout).
+  // et un émetteur sans cible n'ouvre rien (il éclaire, c'est tout).
   const nCibles = level.cibles?.length ?? 0
   for (const porte of level.portes ?? []) {
     if (porte.cible < 0 || porte.cible >= nCibles) {
@@ -347,7 +347,7 @@ export function checkLevel(level: LevelDef): Verdict[] {
   if ((level.lasers?.length ?? 0) > 0 && nCibles === 0) {
     v.push({
       niveau: 'avertissement',
-      message: 'Un émetteur laser sans cible : le faisceau chauffe, mais n’ouvre rien.',
+      message: 'Un émetteur laser sans cible : le faisceau éclaire, mais n’ouvre rien.',
     })
   }
   if (nCibles > 0 && (level.lasers?.length ?? 0) === 0) {
