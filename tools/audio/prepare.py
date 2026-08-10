@@ -34,6 +34,10 @@ BOUCLES = [
     ('zone-hublot.mp3', 'zone-hublot.mp3', 24.0, 30.0, -24.0, 48),
     ('zone-conduite.mp3', 'zone-conduite.mp3', 24.0, 30.0, -24.0, 48),
     ('zone-chambre.mp3', 'zone-chambre.mp3', 22.0, 30.0, -24.0, 48),
+    # La texture du temps suspendu (visée du dash) : drone sombre ~141 Hz.
+    # La queue silencieuse (10,8 s →) est coupée, le raccord se fait à la
+    # lecture. Cible RMS haute (-19) : elle joue sous un monde étouffé.
+    ('temps-suspendu.mp3', 'temps-suspendu.mp3', 0.0, 10.6, -19.0, 48),
 ]
 
 # Ponctuations : découpées sur une attaque repérée à l'analyse (creux → saut de
