@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 01:10',
+    title: 'Deux corrections : les mécanismes tiennent leur plan, la glace ne goutte plus',
+    notes: [
+      'Sur mobile, faisceaux, émetteurs, cibles et portes dérivaient vers le coin bas-droit et bougeaient avec le zoom, comme décollés du décor : le canevas de superposition n’avait pas de taille CSS explicite, et un canvas sans taille garde sa taille intrinsèque (bitmap × densité d’écran) — invisible sur un écran de densité 1, flagrant à densité 2 ou 3. Corrigé : tout est ancré au plan du monde.',
+      'Le « ploc » d’éjection continuait de goutter quand on maintenait le doigt en GLACE — un palet n’éjecte rien, il n’a pas à goutter. Le son se tait en glace.',
+    ],
+  },
+  {
     date: '11/08/2026 00:45',
     title: 'Le laser entre en scène : le corps gelé est un miroir',
     notes: [
