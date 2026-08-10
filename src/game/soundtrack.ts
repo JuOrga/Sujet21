@@ -137,6 +137,11 @@ export class Soundtrack {
   private ctx: AudioContext | null = null
   private musique: GainNode | null = null
   private effets: GainNode | null = null
+  // Sortie HORS passe-bas du ralenti : la texture du temps suspendu y reste
+  // nette pendant que le reste du monde s'étouffe sous le filtre.
+  private post: GainNode | null = null
+  private suspendu: Voix | null = null
+  private suspenduVoulu = false
   private readonly tampons = new Map<string, AudioBuffer>()
   private readonly encours = new Map<string, Promise<AudioBuffer | null>>()
   private readonly voix = new Map<Piste, Voix>()
@@ -164,6 +169,7 @@ export class Soundtrack {
     this.effets = g.ctx.createGain()
     this.effets.gain.value = 1
     this.effets.connect(g.bus)
+    this.post = g.post
     this.eveille = true
     this.applique()
   }
@@ -237,6 +243,32 @@ export class Soundtrack {
     const voix = new Voix(this.ctx, this.musique, buf)
     this.voix.set(p, voix)
     voix.niveau(cible, XFADE)
+  }
+
+  /** Texture du temps suspendu (visée du dash) : un drone sombre qui monte
+   * vite et retombe vite — il vit HORS du passe-bas, seul à rester net. */
+  setSuspendu(on: boolean): void {
+    if (on === this.suspenduVoulu) return
+    this.suspenduVoulu = on
+    if (!this.eveille) return
+    if (on) {
+      void this.ouvrirSuspendu()
+    } else {
+      this.suspendu?.niveau(0, 0.5)
+    }
+  }
+
+  private async ouvrirSuspendu(): Promise<void> {
+    if (this.suspendu) {
+      if (this.suspenduVoulu) this.suspendu.niveau(0.95, 0.35)
+      return
+    }
+    const buf = await this.charge('temps-suspendu')
+    if (!buf || !this.ctx || !this.post) return
+    if (this.suspendu) return
+    this.suspendu = new Voix(this.ctx, this.post, buf)
+    // le temps du chargement, la visée a pu se relâcher
+    this.suspendu.niveau(this.suspenduVoulu ? 0.95 : 0, 0.35)
   }
 
   // ---- Ponctuations et bruitages ----

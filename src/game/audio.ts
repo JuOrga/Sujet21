@@ -52,6 +52,7 @@ export class AudioFx {
   // monde sonore plonge « sous l'eau » —, un plongeon de hauteur à l'entrée,
   // et deux voix hors filtre pour habiter le temps suspendu.
   private slowLp: BiquadFilterNode | null = null
+  private slowDuck: GainNode | null = null
   // Second maître, HORS passe-bas, pour les voix du temps suspendu : même
   // coupure et même volume que le maître principal (applyMaster règle les
   // deux), mais ses voix restent nettes quand le filtre étouffe le reste.
@@ -90,11 +91,15 @@ export class AudioFx {
     if (this.ctx && this.ctx.state === 'suspended') void this.ctx.resume()
   }
 
-  // Le contexte et le bus maître, pour brancher la bande-son au même endroit :
-  // une seule coupure, un seul volume, une seule mise en veille.
-  graph(): { ctx: AudioContext; bus: GainNode } | null {
+  // Le contexte et les bus, pour brancher la bande-son au même endroit :
+  // une seule coupure, un seul volume, une seule mise en veille. `bus` passe
+  // par le passe-bas du ralenti ; `post` reste net pendant la visée — c'est
+  // là que se branche la texture du temps suspendu.
+  graph(): { ctx: AudioContext; bus: GainNode; post: GainNode } | null {
     if (!this.ctx) this.build()
-    return this.ctx && this.master ? { ctx: this.ctx, bus: this.master } : null
+    return this.ctx && this.master && this.postMaster
+      ? { ctx: this.ctx, bus: this.master, post: this.postMaster }
+      : null
   }
 
   private build(): void {
@@ -113,9 +118,13 @@ export class AudioFx {
     slowLp.type = 'lowpass'
     slowLp.frequency.value = 19500
     slowLp.Q.value = 0.4
+    const slowDuck = ctx.createGain()
+    slowDuck.gain.value = 1
     master.connect(slowLp)
-    slowLp.connect(ctx.destination)
+    slowLp.connect(slowDuck)
+    slowDuck.connect(ctx.destination)
     this.slowLp = slowLp
+    this.slowDuck = slowDuck
     this.master = master
     const postMaster = ctx.createGain()
     postMaster.gain.value = this.enabled ? this.volume : 0
@@ -229,16 +238,20 @@ export class AudioFx {
     const depth = (this.slowSubG as (GainNode & { __depth?: GainNode }) | null)?.__depth ?? null
     if (on) {
       this.slowLp?.frequency.cancelScheduledValues(t)
-      this.slowLp?.frequency.setTargetAtTime(430, t, 0.08)
-      this.blip(320, 54, 0.6, 0.075, 'sine') // le plongeon : la hauteur tombe
-      this.noiseBurst(700, 0.8, 0.45, 0.05, 'lowpass')
-      this.ramp(this.slowShimG, 0.02)
-      this.ramp(this.slowSubG, 0.026)
-      if (depth && this.ctx) depth.gain.setTargetAtTime(0.016, t, 0.25)
+      this.slowLp?.frequency.setTargetAtTime(290, t, 0.08)
+      // le monde s'éloigne : étouffé PAR le filtre, et plus bas de moitié —
+      // sans cette baisse, les basses de la musique masquaient tout l'effet
+      this.slowDuck?.gain.setTargetAtTime(0.45, t, 0.12)
+      this.blip(340, 48, 0.85, 0.13, 'sine') // le plongeon : la hauteur tombe
+      this.noiseBurst(600, 0.8, 0.6, 0.08, 'lowpass')
+      this.ramp(this.slowShimG, 0.03)
+      this.ramp(this.slowSubG, 0.055)
+      if (depth && this.ctx) depth.gain.setTargetAtTime(0.033, t, 0.25)
     } else {
       this.slowLp?.frequency.cancelScheduledValues(t)
       this.slowLp?.frequency.setTargetAtTime(19500, t, 0.04)
-      this.blip(85, 640, 0.22, 0.05, 'sine') // l'air revient d'un trait
+      this.slowDuck?.gain.setTargetAtTime(1, t, 0.05)
+      this.blip(85, 700, 0.24, 0.085, 'sine') // l'air revient d'un trait
       this.ramp(this.slowShimG, 0)
       this.ramp(this.slowSubG, 0)
       if (depth && this.ctx) depth.gain.setTargetAtTime(0, t, 0.1)
