@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 01:45',
+    title: 'Le miroir de glace est poli : le reflet ne tremble plus',
+    notes: [
+      'La surface d’un corps gelé est granuleuse (c’est un empilement de particules), et le faisceau réfléchi partait dans tous les sens à chaque bosse. Les deux rayons sont maintenant séparés : le CONTACT reste détecté au grain près, mais la NORMALE du miroir se moyenne sur une zone large (~4 espacements de particules, pondérée par la proximité) — la facette frappée est plane, le reflet est stable et suit l’orientation générale du bloc.',
+      'Le lissage se règle au banc (« Laser », nouveau dossier) avec la largeur du couloir de chauffe et le débit d’évaporation. La prise du sas sur la glace y gagne aussi son curseur (« Sas »).',
+    ],
+  },
+  {
     date: '11/08/2026 01:10',
     title: 'Deux corrections : les mécanismes tiennent leur plan, la glace ne goutte plus',
     notes: [

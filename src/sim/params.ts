@@ -109,6 +109,10 @@ export interface SimParams {
   // la réserve de rosée, récupérables aux plaques froides.
   laserWidth: number // demi-largeur du couloir de chauffe (unités monde)
   laserEvapRate: number // évaporation (particule/s) pour CHAQUE particule d'eau dans le faisceau
+  // Le miroir de glace est fait de particules : sans lissage, sa normale
+  // épouse chaque bosse et le reflet tremble dans tous les sens. La normale
+  // se moyenne sur ce rayon — grand = facette plane, petit = miroir brut.
+  laserMirrorSmooth: number // rayon (u) de moyennage de la normale du miroir
 
   // Sas de sortie : une bouche d'aspiration dans laquelle l'eau s'engouffre
   exitRadius: number // portée de l'aspiration autour de la bouche (unités monde)
@@ -245,6 +249,7 @@ export const DEFAULT_PARAMS: SimParams = {
 
   laserWidth: 9,
   laserEvapRate: 0.5,
+  laserMirrorSmooth: 30,
 
   exitRadius: 240,
   exitPull: 300,

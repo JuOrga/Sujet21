@@ -284,27 +284,38 @@ export class FluidSim {
     ]
   }
 
-  // Normale de la surface de glace en (x, y) : somme des directions
-  // (point − particule gelée) pondérées par la proximité — c'est le gradient
-  // du champ, calculé sur la grille de voisinage. null : pas de glace ici.
-  // Sert au traceur laser : le corps gelé est un miroir.
-  iceNormalAt(x: number, y: number, r: number): { nx: number; ny: number } | null {
+  // Normale de la surface de glace en (x, y), pour le miroir laser. Deux
+  // rayons distincts : rHit décide s'il y a CONTACT (précis, à l'échelle
+  // d'une particule), rSmooth estime la NORMALE en moyennant sur une zone
+  // bien plus large — sans ce lissage, la normale épouse chaque bosse du
+  // bloc et le faisceau part dans tous les sens à chaque frémissement.
+  // Noyau doux (1 − d/r)², somme des directions (point − particule gelée) :
+  // c'est le gradient du champ, la facette moyenne de la surface.
+  iceNormalAt(x: number, y: number, rHit: number, rSmooth: number): { nx: number; ny: number } | null {
+    let hit = false
+    const rHit2 = rHit * rHit
+    this.grid.forEachNeighbor(x, y, rHit, (j) => {
+      if (this.frozen[j] !== 1) return
+      const dx = x - this.posX[j]
+      const dy = y - this.posY[j]
+      if (dx * dx + dy * dy < rHit2) hit = true
+    })
+    if (!hit) return null
     let sx = 0
     let sy = 0
-    let hit = false
-    const r2 = r * r
-    this.grid.forEachNeighbor(x, y, r, (j) => {
+    const rs = Math.max(rSmooth, rHit)
+    const rs2 = rs * rs
+    this.grid.forEachNeighbor(x, y, rs, (j) => {
       if (this.frozen[j] !== 1) return
       const dx = x - this.posX[j]
       const dy = y - this.posY[j]
       const d2 = dx * dx + dy * dy
-      if (d2 >= r2) return
-      hit = true
-      const w = 1 - Math.sqrt(d2) / r
+      if (d2 >= rs2) return
+      const t = 1 - Math.sqrt(d2) / rs
+      const w = t * t
       sx += dx * w
       sy += dy * w
     })
-    if (!hit) return null
     const l = Math.hypot(sx, sy)
     if (l < 1e-6) return { nx: 0, ny: 1 } // au cœur du bloc : normale arbitraire
     return { nx: sx / l, ny: sy / l }
