@@ -546,12 +546,12 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'La dispersion se constate, elle ne se décrète pas : il faut rester sous le seuil critique aussi longtemps d’affilée. Le temps pour un corps qui condense ou dégèle de se regrouper.',
   )
   describe(
-    fBody.addBinding(params, 'criticalVolumeFraction', { min: 0.02, max: 0.9, label: 'seuil dernière impulsion' }),
-    'Fraction du volume initial sous laquelle la PROCHAINE impulsion est la dernière. Le seuil ne tue plus et ne conclut rien : après elle, le corps se fige et dérive.',
+    fBody.addBinding(params, 'criticalVolumeLiters', { min: 0.05, max: 2, step: 0.05, label: 'seuil dernière impulsion (L)' }),
+    'Volume ABSOLU (litres) sous lequel la PROCHAINE impulsion est la dernière. Le seuil ne tue plus et ne conclut rien : après elle, le corps se fige et dérive. En litres pour ne pas dépendre du volume de départ du tableau.',
   )
   describe(
-    fBody.addBinding(params, 'lastCallFraction', { min: 0.05, max: 0.95, label: 'seuil d’alerte' }),
-    'Fraction sous laquelle le HUD prévient que la dernière impulsion approche. À garder au-dessus du seuil précédent.',
+    fBody.addBinding(params, 'lastCallLiters', { min: 0.1, max: 3, step: 0.05, label: 'seuil d’alerte (L)' }),
+    'Volume (litres) sous lequel le HUD prévient que la dernière impulsion approche. À garder au-dessus du seuil précédent.',
   )
   describe(
     fBody.addBinding(params, 'iceCollectBonus', { min: 0, max: 1, step: 0.05, label: 'prime de glace' }),

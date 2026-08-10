@@ -46,7 +46,9 @@ describe('Règles de transformation — changer d’état ne tue pas', () => {
   })
 
   it('descendre très bas ne tue pas : le seuil annonce, il ne tranche pas', () => {
-    const sim = makeSim({ dispersalGrace: 2, criticalVolumeFraction: 0.5 })
+    // Seuil à 0,25 L (= 50 particules à 0,005 L) : après avoir retiré 70 des
+    // 100 particules, il en reste 30 (0,15 L) — franchement sous le seuil.
+    const sim = makeSim({ dispersalGrace: 2, criticalVolumeLiters: 0.25 })
     sim.setLevel([], [])
     sim.spawnDisc(0, 0, 100, KIND_PLAYER)
     run(sim, 0.1)

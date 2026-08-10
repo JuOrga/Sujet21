@@ -120,12 +120,14 @@ export interface SimParams {
 
   // Corps
   litersPerParticle: number // conversion volume affiché
-  criticalVolumeFraction: number // sous cette fraction : la RÉSERVE est à sec (dernière impulsion)
+  criticalVolumeLiters: number // sous ce volume ABSOLU : la RÉSERVE est à sec (dernière impulsion)
   // Fin de course (refonte 2026) : il n'y a plus de minimum à ramener, ni de
   // mort. Sous le seuil, le corps a droit à une DERNIÈRE impulsion, puis il se
   // fige en glace en gardant son élan — et dérive. Rien ne le freine : le vide
   // ne freine rien, et cette dérive peut encore atteindre le sas.
-  lastCallFraction: number // fraction du volume de base annonçant la dernière impulsion
+  // Seuil en LITRES (pas une fraction) : un tableau à petit volume de départ
+  // ne doit pas déclencher la fin de course plus tôt qu'un grand.
+  lastCallLiters: number // volume absolu (L) annonçant que la dernière impulsion approche
   iceCollectBonus: number // prime de collecte sur la part avalée à l'état de glace
   componentEvery: number // pas entre deux identifications d'amas connexes
   linkRadiusFactor: number // rayon d'adjacence des amas, en fraction de h
@@ -249,9 +251,10 @@ export const DEFAULT_PARAMS: SimParams = {
 
   litersPerParticle: 0.005,
   // Le seuil ne tue plus : il annonce la dernière impulsion. On peut donc
-  // descendre très bas et finir un tableau sur un souffle.
-  criticalVolumeFraction: 0.05,
-  lastCallFraction: 0.12,
+  // descendre très bas et finir un tableau sur un souffle. En LITRES absolus :
+  // on garde la main jusqu'à 300 ml quel que soit le volume de départ.
+  criticalVolumeLiters: 0.3,
+  lastCallLiters: 0.6,
   // Dans le vide, un palet garde son élan pour l'éternité : sans ce freinage,
   // la fin de course ne se conclurait jamais. Il laisse une dernière glissade
   // d'une dizaine de secondes — le temps d'espérer atteindre le sas.
