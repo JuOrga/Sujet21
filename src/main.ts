@@ -477,6 +477,7 @@ exposeSim()
 const camera = new Camera()
 ;(window as unknown as { __cam: Camera }).__cam = camera
 ;(window as unknown as { __params: SimParams }).__params = params
+;(window as unknown as { __audio: AudioFx }).__audio = audio
 
 camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, 1)
 const renderer = new Renderer(canvas, CAPACITY)
@@ -937,6 +938,9 @@ function frame(now: number): void {
   // de recul, pas d'éjection ; la DISTANCE du doigt règle la puissance.
   const vif = !input.paused && !tableauDone && !sim.dispersed && !endgame.spent
   const dashAiming = vif && input.gasIntent && input.aimActive
+  // Le ralenti s'entend : tout le mixage plonge sous un passe-bas, un
+  // battement grave habite le temps suspendu, et l'air revient au dash.
+  audio.setSlowMo(dashAiming)
   if (dash.aiming && !dashAiming) {
     // Relâcher déclenche ; changer d'état ou perdre la main en pleine visée
     // annule sans frais — la visée n'engage à rien tant qu'on n'a pas lâché.
