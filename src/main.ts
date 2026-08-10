@@ -683,13 +683,11 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   }
 }
 
-let lastLaserTime = 0
 function resetLasers(): void {
   laserEtat.vues = []
   laserEtat.litUntil = (level.cibles ?? []).map(() => -1)
   laserEtat.portesOuvertes = (level.portes ?? []).map(() => false)
   laserEtat.doorsKey = ''
-  lastLaserTime = 0
 }
 const dashAimEl = el('dash-aim')
 const dashCostEl = el('dash-cost')
@@ -1159,7 +1157,7 @@ function frame(now: number): void {
     monitor.physMs += (performance.now() - physT0 - monitor.physMs) * 0.08
   }
 
-  // ---- Lasers (palier 1) : traçage, cibles, portes, chauffe ----
+  // ---- Lasers : traçage, cibles, portes ----
   const lasers = level.lasers ?? []
   if (lasers.length > 0) {
     const cibles = level.cibles ?? []
@@ -1202,18 +1200,7 @@ function frame(now: number): void {
       laserEtat.doorsKey = cle
       sim.setDoors(closes)
     }
-    // la chauffe : l'eau dans le faisceau s'évapore, au rythme du temps
-    // simulé réellement avancé cette image (le ralenti de visée compte)
-    const dtSim = Math.max(0, run.tableauTime - lastLaserTime)
-    if (dtSim > 0 && !input.paused && !tableauDone && !sim.dispersed) {
-      for (const t of laserEtat.vues) {
-        for (let k = 0; k + 1 < t.points.length; k++) {
-          sim.laserHeat(t.points[k].x, t.points[k].y, t.points[k + 1].x, t.points[k + 1].y, dtSim)
-        }
-      }
-    }
   }
-  lastLaserTime = run.tableauTime
 
   // Sortie (§7.1-7.2). Sas aspirant : la victoire n'arrive que lorsque le sas
   // a quasi tout bu (≤ 2 % du volume de base) — l'animation d'engloutissement

@@ -104,12 +104,9 @@ export interface SimParams {
   frostSluggish: number // traînée à pleine givre (1/s) : l'eau engourdie rampe
   heatAgitation: number // frémissement à pleine chauffe (u/s²) : l'eau chaude bout doucement
 
-  // Laser : le faisceau chauffe l'eau qu'il traverse — la glace le
-  // réfléchit (miroir, palier 1), l'eau le RÉFRACTE (prisme, palier 2),
-  // la vapeur le laisse passer. Les pertes rejoignent la réserve de rosée,
-  // récupérables aux plaques froides.
-  laserWidth: number // demi-largeur du couloir de chauffe (unités monde)
-  laserEvapRate: number // évaporation (particule/s) pour CHAQUE particule d'eau dans le faisceau
+  // Laser : la glace le réfléchit (miroir, palier 1), l'eau le RÉFRACTE
+  // (prisme, palier 2) sans rien payer — la lumière plie le corps, elle ne
+  // le boit pas —, la vapeur le laisse passer.
   // Le miroir de glace est fait de particules : sans lissage, sa normale
   // épouse chaque bosse et le reflet tremble dans tous les sens. La normale
   // se moyenne sur ce rayon — grand = facette plane, petit = miroir brut.
@@ -252,8 +249,6 @@ export const DEFAULT_PARAMS: SimParams = {
   frostSluggish: 3,
   heatAgitation: 240,
 
-  laserWidth: 9,
-  laserEvapRate: 0.5,
   laserMirrorSmooth: 30,
   laserRefractIndex: 1.33,
 

@@ -552,15 +552,7 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Prise du courant sur un corps GELÉ : le sas attire le bloc entier (sans rotation), pas seulement l’eau libre. 0 : la glace n’est happée qu’au contact.',
   )
 
-  const fLaser = pane.addFolder({ title: 'Laser (palier 1)', expanded: false })
-  describe(
-    fLaser.addBinding(params, 'laserWidth', { min: 2, max: 30, step: 1, label: 'demi-largeur (u)' }),
-    'Demi-largeur du couloir de chauffe autour du faisceau : l’eau qui s’y attarde s’évapore. Ne change pas le tracé optique, seulement la morsure.',
-  )
-  describe(
-    fLaser.addBinding(params, 'laserEvapRate', { min: 0, max: 5, step: 0.05, label: 'évaporation /s' }),
-    'Particules évaporées par seconde pour CHAQUE particule d’eau dans le faisceau. Les pertes partent en rosée (réserve de vapeur), pas au néant. Glace et vapeur sont épargnées.',
-  )
+  const fLaser = pane.addFolder({ title: 'Laser', expanded: false })
   describe(
     fLaser.addBinding(params, 'laserMirrorSmooth', { min: 6, max: 90, step: 2, label: 'lissage du miroir (u)' }),
     'Rayon de moyennage de la normale quand le faisceau frappe la glace : le contact reste précis, mais la facette est lissée sur cette zone — le reflet ne tremble plus à chaque bosse de la surface. Bas : miroir granuleux, reflets chaotiques. Le dioptre de l’eau (réfraction) partage ce lissage.',

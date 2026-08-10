@@ -14,8 +14,8 @@
 //     (indice ≈ 1,33) ; en ressortant trop à plat (au-delà de l'angle
 //     critique, ≈ 49° de la normale), c'est la RÉFLEXION TOTALE INTERNE :
 //     le faisceau reste prisonnier de l'eau et ricoche sous sa surface.
-//     Traverser n'est pas gratuit : la chauffe (laserHeat) évapore l'eau
-//     du couloir — c'est la simulation qui s'en charge, pas le traceur ;
+//     Traverser est GRATUIT : la lumière plie le corps, elle ne le boit
+//     pas — servir de prisme ne coûte rien ;
 //   · la vapeur n'arrête toujours pas le faisceau (le plasma, palier 3).
 
 import { MAT_EXIT, MAT_GRILLE, type LaserDef, type ObstacleBox } from './level'
