@@ -546,8 +546,28 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'La dispersion se constate, elle ne se décrète pas : il faut rester sous le seuil critique aussi longtemps d’affilée. Le temps pour un corps qui condense ou dégèle de se regrouper.',
   )
   describe(
-    fBody.addBinding(params, 'criticalVolumeFraction', { min: 0.05, max: 0.9, label: 'seuil dispersion' }),
-    'Fraction du volume initial sous laquelle le corps se disperse (défaite). Haut : partie plus punitive.',
+    fBody.addBinding(params, 'criticalVolumeFraction', { min: 0.02, max: 0.9, label: 'seuil dernière impulsion' }),
+    'Fraction du volume initial sous laquelle la PROCHAINE impulsion est la dernière. Le seuil ne tue plus : il annonce la fin de course.',
+  )
+  describe(
+    fBody.addBinding(params, 'lastCallFraction', { min: 0.05, max: 0.95, label: 'seuil d’alerte' }),
+    'Fraction sous laquelle le HUD prévient que la dernière impulsion approche. À garder au-dessus du seuil précédent.',
+  )
+  describe(
+    fBody.addBinding(params, 'spentDrag', { min: 0, max: 1.5, step: 0.02, label: 'freinage fin de course' }),
+    'Freinage du corps figé après la dernière impulsion. À 0, il glisserait pour l’éternité et l’essai ne se conclurait jamais.',
+  )
+  describe(
+    fBody.addBinding(params, 'stillSpeed', { min: 2, max: 120, label: 'vitesse d’arrêt (u/s)' }),
+    'Sous cette vitesse, un corps figé est considéré comme arrêté — la fin de course se déclenche.',
+  )
+  describe(
+    fBody.addBinding(params, 'stillTime', { min: 0.2, max: 5, step: 0.1, label: 'délai d’arrêt (s)' }),
+    'Temps passé sous la vitesse d’arrêt avant que l’essai se conclue. Laisse une chance à un palet qui frôle une paroi.',
+  )
+  describe(
+    fBody.addBinding(params, 'iceCollectBonus', { min: 0, max: 1, step: 0.05, label: 'prime de glace' }),
+    'Prime sur la part que le sas avale à l’état de GLACE : entrer solide rapporte plus que se faire boire goutte à goutte.',
   )
   describe(
     fBody.addBinding(params, 'linkRadiusFactor', { min: 0.6, max: 2, label: 'rayon amas (× h)' }),

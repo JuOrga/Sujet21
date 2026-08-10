@@ -21,6 +21,49 @@ function run(sim: FluidSim, seconds: number): void {
 }
 
 describe('FluidSim — la glace : bloc balistique, soudure, dégel', () => {
+  it('un choc excentré fait PIVOTER le bloc, il ne reste pas dans son axe', () => {
+    // Un palet qui heurte une paroi hors de son centre doit prendre du tournis :
+    // l'impulsion s'applique au point de contact, pas au centre de masse.
+    const sim = new FluidSim({ ...DEFAULT_PARAMS }, OPEN, 2048)
+    // paroi verticale à droite ; le bloc arrive dessus, décalé vers le haut
+    sim.setLevel([{ minX: 300, minY: -600, maxX: 400, maxY: 0, material: MAT_WALL }], [])
+    // Le corps arrive EN FRÔLANT LE COIN : seul son bas touche, le reste passe
+    // au-dessus — l'impulsion est donc franchement excentrée.
+    sim.spawnDisc(0, 16, 60, KIND_PLAYER)
+    sim.freezeIntent = true // sinon il dégèle avant d'arriver (thawTime 2,5 s)
+    for (let i = 0; i < sim.count; i++) {
+      sim.frozen[i] = 1
+      sim.frost[i] = 1
+      sim.velX[i] = 420
+    }
+    sim.relabel()
+
+    // vitesse angulaire mesurée sur le champ de vitesses du bloc
+    const spin = (): number => {
+      let cx = 0, cy = 0, vx = 0, vy = 0, n = 0
+      for (let i = 0; i < sim.count; i++) {
+        if (sim.frozen[i] !== 1) continue
+        cx += sim.posX[i]; cy += sim.posY[i]; vx += sim.velX[i]; vy += sim.velY[i]; n++
+      }
+      if (n === 0) return 0
+      cx /= n; cy /= n; vx /= n; vy /= n
+      let L = 0, I = 0
+      for (let i = 0; i < sim.count; i++) {
+        if (sim.frozen[i] !== 1) continue
+        const rx = sim.posX[i] - cx
+        const ry = sim.posY[i] - cy
+        L += rx * (sim.velY[i] - vy) - ry * (sim.velX[i] - vx)
+        I += rx * rx + ry * ry
+      }
+      return I > 1e-6 ? L / I : 0
+    }
+
+    expect(Math.abs(spin())).toBeLessThan(0.05) // il part droit, sans rotation
+    run(sim, 1.5) // le temps d'aller heurter le coin de la paroi
+    expect(Math.abs(spin())).toBeGreaterThan(0.25) // il en repart en tournant
+  })
+
+
   it('gel volontaire (F) : le corps gèle vite et garde son élan', () => {
     const sim = makeSim()
     sim.spawnDisc(800, 0, 30, KIND_PLAYER)

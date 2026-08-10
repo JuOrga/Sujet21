@@ -120,7 +120,15 @@ export interface SimParams {
 
   // Corps
   litersPerParticle: number // conversion volume affiché
-  criticalVolumeFraction: number // sous cette fraction du volume de base : dispersion (§3.1)
+  criticalVolumeFraction: number // sous cette fraction : la RÉSERVE est à sec (dernière impulsion)
+  // Fin de course (refonte 2026) : il n'y a plus de minimum à ramener. Sous le
+  // seuil, le corps a droit à une DERNIÈRE impulsion, puis il se fige en glace
+  // en gardant son élan — et meurt là où il s'arrête.
+  lastCallFraction: number // fraction du volume de base annonçant la dernière impulsion
+  spentDrag: number // freinage (1/s) du corps figé après la dernière impulsion
+  stillSpeed: number // vitesse (u/s) en dessous de laquelle un corps figé est « arrêté »
+  stillTime: number // s à cette vitesse avant de conclure la fin de course
+  iceCollectBonus: number // prime de collecte sur la part avalée à l'état de glace
   componentEvery: number // pas entre deux identifications d'amas connexes
   linkRadiusFactor: number // rayon d'adjacence des amas, en fraction de h
 
@@ -242,7 +250,17 @@ export const DEFAULT_PARAMS: SimParams = {
   surfaceBite: 1.35,
 
   litersPerParticle: 0.005,
-  criticalVolumeFraction: 0.35,
+  // Le seuil ne tue plus : il annonce la dernière impulsion. On peut donc
+  // descendre très bas et finir un tableau sur un souffle.
+  criticalVolumeFraction: 0.12,
+  lastCallFraction: 0.2,
+  // Dans le vide, un palet garde son élan pour l'éternité : sans ce freinage,
+  // la fin de course ne se conclurait jamais. Il laisse une dernière glissade
+  // d'une dizaine de secondes — le temps d'espérer atteindre le sas.
+  spentDrag: 0.18,
+  stillSpeed: 26,
+  stillTime: 1.1,
+  iceCollectBonus: 0.25,
   componentEvery: 5,
   linkRadiusFactor: 1.1,
 

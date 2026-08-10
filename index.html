@@ -610,6 +610,12 @@
         backdrop-filter: blur(3px);
         white-space: nowrap;
       }
+      #hud-danger.spent {
+        background: rgba(12, 30, 46, 0.9);
+        border-color: #8fc8ee;
+        border-left-color: #8fc8ee;
+        color: #cfe8fa;
+      }
       #hud-danger.visible {
         opacity: 1;
         transform: translateX(-50%) translateY(0);
@@ -1749,7 +1755,7 @@
         <label class="ed-f" style="width:auto"><span>Aimant</span>
           <input type="checkbox" id="ed-snap" checked style="width:auto" /></label>
         <button type="button" id="ed-play" class="primary">Essayer</button>
-        <button type="button" id="ed-quit">Quitter</button>
+        <button type="button" id="ed-quit">↩ Accueil</button>
       </div>
 
       <aside class="ed-side">
