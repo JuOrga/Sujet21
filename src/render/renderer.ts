@@ -137,6 +137,15 @@ uniform float uHasPhobe;
 uniform float uHasPhile;
 uniform float uHasIris;
 uniform float uHasHull; // la passe coque texturée remplace la bande procédurale
+// Images de zones : la CAUSE peinte (hublot fendu, conduite rompue, rampe de
+// buses). Chargées sans mipmaps : elles s'échantillonnent dans une branche
+// non uniforme (l'intérieur de la zone), où les dérivées sont indéfinies.
+uniform sampler2D uTexZoneHublot;
+uniform float uHasZoneHublot;
+uniform sampler2D uTexZoneConduite;
+uniform float uHasZoneConduite;
+uniform sampler2D uTexZoneBuses;
+uniform float uHasZoneBuses;
 out vec4 outColor;
 
 float gridLine(vec2 world, float spacing, float widthWorld) {
@@ -267,9 +276,13 @@ float segDist(vec2 p, vec2 a, vec2 b) {
 // Le hublot fendu laisse entrer le vide et tout gèle ; la conduite rompue
 // noie la salle de vapeur ; la chambre pressurisée interdit tout changement
 // de phase. On dessine la cause, le joueur en déduit la règle.
-vec3 zoneDecor(vec2 world, vec2 zc, vec2 zh, float force, float t) {
+// hasTex : 1 quand l'image de la cause est peinte en fond — la géométrie
+// STATIQUE du décor procédural s'efface (l'image la remplace), seuls les
+// effets ANIMÉS restent : souffle glacé, panache, gouttes, voile.
+vec3 zoneDecor(vec2 world, vec2 zc, vec2 zh, float force, float t, float hasTex) {
   vec3 acc = vec3(0.0);
   vec2 q = world - zc;
+  float geo = 1.0 - hasTex;
 
   if (force > 1.5 && force < 2.5) {
     // GLACE — le hublot fendu. Un grand hublot en arrière-plan : cadre
@@ -280,15 +293,15 @@ vec3 zoneDecor(vec2 world, vec2 zc, vec2 zh, float force, float t) {
     float glass = 1.0 - smoothstep(R * 0.94, R, d);
 
     // le vide au-delà de la vitre : plus noir que la cuve, et des étoiles
-    acc -= vec3(0.045, 0.062, 0.082) * glass;
+    acc -= vec3(0.045, 0.062, 0.082) * glass * geo;
     float star = specks(q * 1.7 + vec2(311.0, 57.0), 90.0, 0.07, 1.0);
-    acc += vec3(0.55, 0.70, 0.92) * star * glass * 0.5;
+    acc += vec3(0.55, 0.70, 0.92) * star * glass * 0.5 * geo;
 
     // la monture : un anneau large, métal froid
     float ring = (1.0 - smoothstep(R * 0.055, R * 0.10, abs(d - R * 0.97)));
-    acc += vec3(0.30, 0.42, 0.54) * ring * 0.55;
+    acc += vec3(0.30, 0.42, 0.54) * ring * 0.55 * geo;
     float bolt = 0.5 + 0.5 * sin(atan(q.y, q.x) * 14.0);
-    acc += vec3(0.40, 0.54, 0.66) * ring * smoothstep(0.86, 1.0, bolt) * 0.5;
+    acc += vec3(0.40, 0.54, 0.66) * ring * smoothstep(0.86, 1.0, bolt) * 0.5 * geo;
 
     // les fêlures : cinq éclats depuis un point d'impact décentré
     vec2 hit = vec2(R * 0.26, -R * 0.17);
@@ -302,12 +315,12 @@ vec3 zoneDecor(vec2 world, vec2 zc, vec2 zh, float force, float t) {
     // une fêlure transversale, pour que le réseau ne soit pas une étoile
     crack = max(crack, 1.0 - smoothstep(0.0, R * 0.014,
       segDist(q, hit + vec2(-R * 0.5, R * 0.35), hit + vec2(R * 0.55, R * 0.62))));
-    acc += vec3(0.78, 0.92, 1.00) * crack * glass * 0.55;
+    acc += vec3(0.78, 0.92, 1.00) * crack * glass * 0.55 * geo;
 
     // le givre : depuis la monture vers l'intérieur, en dentelle
     float rim = smoothstep(R * 0.45, R, d) * glass;
     float lace = 0.5 + 0.5 * vnoise(q * 0.12 + vec2(t * 0.02, -t * 0.015));
-    acc += vec3(0.42, 0.62, 0.78) * rim * lace * 0.34;
+    acc += vec3(0.42, 0.62, 0.78) * rim * lace * 0.34 * geo;
     // souffle glacé qui s'échappe de l'impact
     float breath = (1.0 - smoothstep(0.0, R * 1.5, length(q - hit)));
     acc += vec3(0.20, 0.34, 0.46) * breath * breath *
@@ -316,15 +329,18 @@ vec3 zoneDecor(vec2 world, vec2 zc, vec2 zh, float force, float t) {
     // VAPEUR — la conduite rompue. Un gros collecteur traverse la salle ;
     // sa brèche crache un panache qui monte et se tord.
     float pipeR = min(zh.y * 0.34, 90.0);
-    float floorY = -zh.y * 0.66; // le collecteur court au sol de la salle
+    float floorY = -zh.y * 0.66; // sans image : le collecteur court au sol
+    // avec l'image, le collecteur est peint au CENTRE de la zone : le tube
+    // procédural s'efface et le panache part de la brèche de l'image
+    floorY = mix(floorY, 0.0, hasTex);
     float pipe = 1.0 - smoothstep(pipeR * 0.86, pipeR, abs(q.y - floorY));
-    acc += vec3(0.16, 0.19, 0.24) * pipe * 0.9;
+    acc += vec3(0.16, 0.19, 0.24) * pipe * 0.9 * geo;
     // brides régulières le long du tube
     float flange = smoothstep(0.90, 1.0, 0.5 + 0.5 * sin(q.x * 0.035));
-    acc += vec3(0.26, 0.31, 0.38) * pipe * flange * 0.7;
+    acc += vec3(0.26, 0.31, 0.38) * pipe * flange * 0.7 * geo;
     // la brèche, au centre du tube
     float breach = 1.0 - smoothstep(pipeR * 0.5, pipeR * 1.4, length(q - vec2(0.0, floorY)));
-    acc -= vec3(0.05, 0.06, 0.08) * breach;
+    acc -= vec3(0.05, 0.06, 0.08) * breach * geo;
     // le panache : il monte depuis la brèche et se disperse en hauteur
     vec2 pl = q - vec2(0.0, floorY);
     float up = clamp(pl.y / max(zh.y * 1.7, 1.0), 0.0, 1.0);
@@ -336,9 +352,9 @@ vec3 zoneDecor(vec2 world, vec2 zc, vec2 zh, float force, float t) {
     // de condensation, des gouttes qui perlent : ici, rien ne bout ni ne gèle.
     float ceil_ = zh.y * 0.78;
     float rail = 1.0 - smoothstep(10.0, 16.0, abs(q.y - ceil_));
-    acc += vec3(0.20, 0.28, 0.36) * rail * 0.8;
+    acc += vec3(0.20, 0.28, 0.36) * rail * 0.8 * geo;
     float nozzle = smoothstep(0.86, 1.0, 0.5 + 0.5 * sin(q.x * 0.045));
-    acc += vec3(0.30, 0.52, 0.66) * rail * nozzle * 0.9;
+    acc += vec3(0.30, 0.52, 0.66) * rail * nozzle * 0.9 * geo;
     // gouttes : elles descendent lentement sous chaque buse
     float col = sin(q.x * 0.045);
     float fall = fract((ceil_ - q.y) * 0.006 + t * 0.11 + hash21(vec2(floor(q.x * 0.0072), 1.0)));
@@ -454,7 +470,23 @@ void main() {
     if (inZone > 0.5) {
       vec2 zc2 = (uZones[zi].xy + uZones[zi].zw) * 0.5;
       vec2 zh2 = (uZones[zi].zw - uZones[zi].xy) * 0.5;
-      col += zoneDecor(world, zc2, zh2, f, uTime);
+      // l'image de la cause : ajustée dans la zone (contain, centrée), un
+      // peu refroidie pour se fondre dans la cuve — le fluide passera devant
+      float hasZTex = f < 1.5 ? uHasZoneBuses : f < 2.5 ? uHasZoneHublot : uHasZoneConduite;
+      if (hasZTex > 0.5) {
+        float ta = f < 1.5 ? 1.5 : f < 2.5 ? 0.667 : 1.0; // largeur/hauteur des images
+        vec2 zsz = zh2 * 2.0 * 0.94;
+        float sc = min(zsz.x / ta, zsz.y);
+        vec2 fit = vec2(ta, 1.0) * sc;
+        vec2 tuv = (world - zc2) / fit + 0.5;
+        if (tuv.x > 0.0 && tuv.x < 1.0 && tuv.y > 0.0 && tuv.y < 1.0) {
+          vec4 zt = f < 1.5 ? texture(uTexZoneBuses, tuv)
+                  : f < 2.5 ? texture(uTexZoneHublot, tuv)
+                            : texture(uTexZoneConduite, tuv);
+          col = mix(col, zt.rgb * vec3(0.68, 0.76, 0.86), zt.a * 0.92);
+        }
+      }
+      col += zoneDecor(world, zc2, zh2, f, uTime, hasZTex);
     }
     // voile intérieur, plus dense près du bord
     float depth = clamp(-zd / 260.0, 0.0, 1.0);
@@ -839,11 +871,23 @@ precision highp float;
 in vec2 vUv;
 uniform sampler2D uTexDecal;
 uniform float uFade; // atténuation : le décor ne doit jamais crier
+// Le champ de fluide de la passe A : un décal est un élément de DÉCOR, le
+// corps passe DEVANT — là où il y a de l'eau, le décal s'efface. Sans ça,
+// une vanne peinte flottait par-dessus l'échantillon.
+uniform sampler2D uField;
+uniform vec2 uCanvasSize;
+uniform float uThreshold;
+uniform float uSoftness;
+uniform float uFieldScale;
 out vec4 outColor;
 void main() {
   vec4 t = texture(uTexDecal, vUv);
   vec3 c = t.rgb * vec3(0.52, 0.62, 0.72); // refroidi, fondu dans la cuve
-  outColor = vec4(c, t.a * uFade);
+  float field = texture(uField, gl_FragCoord.xy / uCanvasSize).r / uFieldScale;
+  float th = uThreshold;
+  float sfn = max(th * uSoftness, 1e-4);
+  float fluide = smoothstep(th - sfn, th + sfn, field);
+  outColor = vec4(c, t.a * uFade * (1.0 - fluide));
 }`
 
 function compile(gl: WebGL2RenderingContext, type: number, src: string): WebGLShader {
@@ -889,6 +933,9 @@ export class Renderer {
   private readonly zoneForceScratch = new Float32Array(MAX_ZONES)
   private texDecalTuyaux: WebGLTexture | null = null
   private texDecalVanne: WebGLTexture | null = null
+  private texZoneHublot: WebGLTexture | null = null
+  private texZoneConduite: WebGLTexture | null = null
+  private texZoneBuses: WebGLTexture | null = null
   // Textures d'habillage : null tant que l'image n'est pas chargée — le
   // décor procédural assure l'intérim, l'image prend le relais sans à-coup.
   private texStars: WebGLTexture | null = null
@@ -1030,6 +1077,11 @@ export class Renderer {
     // Décalques : pièces détourées (alpha), donc bord franc — pas de répétition
     this.loadTexture('/assets/decal-tuyaux.webp', false, true, (t) => (this.texDecalTuyaux = t))
     this.loadTexture('/assets/decal-vanne.webp', false, true, (t) => (this.texDecalVanne = t))
+    // Images de zones : la cause peinte (voir zoneDecor). Sans mipmaps —
+    // échantillonnées dans une branche non uniforme du shader.
+    this.loadTexture('/assets/zone-hublot.webp', false, false, (t) => (this.texZoneHublot = t))
+    this.loadTexture('/assets/zone-conduite.webp', false, false, (t) => (this.texZoneConduite = t))
+    this.loadTexture('/assets/zone-buses.webp', false, false, (t) => (this.texZoneBuses = t))
   }
 
   private loadTexture(
@@ -1235,6 +1287,9 @@ export class Renderer {
     bindTex(9, this.texFroid, 'uTexFroid', 'uHasFroid')
     bindTex(10, this.texChaud, 'uTexChaud', 'uHasChaud')
     bindTex(11, this.texGrille, 'uTexGrille', 'uHasGrille')
+    bindTex(12, this.texZoneHublot, 'uTexZoneHublot', 'uHasZoneHublot')
+    bindTex(13, this.texZoneConduite, 'uTexZoneConduite', 'uHasZoneConduite')
+    bindTex(14, this.texZoneBuses, 'uTexZoneBuses', 'uHasZoneBuses')
     bindTex(3, this.texPhobe, 'uTexPhobe', 'uHasPhobe')
     bindTex(4, this.texPhile, 'uTexPhile', 'uHasPhile')
     bindTex(5, this.texIris, 'uTexIris', 'uHasIris')
@@ -1245,8 +1300,8 @@ export class Renderer {
     // Passe B bis — coque texturée autour de la cuve
     this.drawHull(sim, camera, viewportW, viewportH)
 
-    // Passe B ter — décalques de décor (tuyaux, vannes)
-    this.drawDecals(decals, camera, viewportW, viewportH)
+    // Passe B ter — décalques de décor (tuyaux, vannes), effacés sous l'eau
+    this.drawDecals(decals, camera, viewportW, viewportH, params)
 
     // Passe C — cellules d'éponge
     this.drawSponges(sim, camera, viewportW, viewportH, dpr)
@@ -1329,6 +1384,7 @@ export class Renderer {
     camera: Camera,
     viewportW: number,
     viewportH: number,
+    params: SimParams,
   ): void {
     if (decals.length === 0) return
     const gl = this.gl
@@ -1343,6 +1399,14 @@ export class Renderer {
         gl.uniform2f(du['uCenter'], camera.x, camera.y)
         gl.uniform2f(du['uViewport'], viewportW, viewportH)
         gl.uniform1f(du['uZoom'], camera.zoom)
+        // le champ de fluide de la passe A : l'eau efface les décals
+        gl.activeTexture(gl.TEXTURE1)
+        gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
+        gl.uniform1i(du['uField'], 1)
+        gl.uniform2f(du['uCanvasSize'], gl.drawingBufferWidth, gl.drawingBufferHeight)
+        gl.uniform1f(du['uThreshold'], params.fieldThreshold)
+        gl.uniform1f(du['uSoftness'], params.fieldSoftness)
+        gl.uniform1f(du['uFieldScale'], this.fieldScale)
         gl.enable(gl.BLEND)
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
         gl.bindVertexArray(this.decalVao)
