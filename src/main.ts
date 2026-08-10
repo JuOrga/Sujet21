@@ -21,6 +21,7 @@ import {
 } from './game/level'
 import { LevelEditor } from './editor/editor'
 import { traceLaser, type TraceResultat } from './game/laser'
+import { BOUTON, Manette } from './game/manette'
 import { fetchLibrary } from './game/netLevels'
 import { AudioFx, loadAudioPrefs } from './game/audio'
 import { Soundtrack, type Bruitage, type Piste } from './game/soundtrack'
@@ -490,6 +491,28 @@ camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, 1)
 const renderer = new Renderer(canvas, CAPACITY)
 const loop = new FixedLoop()
 const input = new Input()
+
+// ---- Manette (Steam Deck, Xbox, DualSense) ----
+// Elle pilote le même pointeur que le doigt : un curseur en orbite autour du
+// corps, la gâchette pour agir. Le tactile garde toujours la priorité.
+const manette = new Manette()
+const manetteCurseur = { x: 0, y: 0 }
+let manetteTenait = false // le « doigt » manette était posé à l'image d'avant
+
+/** A dans les menus : valide le bouton principal visible, s'il y en a un. */
+function clicMenuManette(): boolean {
+  for (const id of ['relance', 'overlay-btn', 'start', 'start-bis']) {
+    const el = document.getElementById(id)
+    if (!el) continue
+    const r = el.getBoundingClientRect()
+    const st = getComputedStyle(el)
+    if (r.width > 0 && r.height > 0 && st.visibility !== 'hidden' && st.pointerEvents !== 'none') {
+      el.click()
+      return true
+    }
+  }
+  return false
+}
 input.attach(canvas)
 
 const monitor: BenchMonitor = {
@@ -749,6 +772,36 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     g.fillStyle = lit ? '#a9ffd6' : '#33424e'
     g.fill()
   }
+}
+
+// Réticule manette : le curseur virtuel en orbite autour du corps — un
+// anneau, un point, et son éclat quand on agit. Dessiné par-dessus les
+// mécanismes, sur le même canevas de superposition.
+function drawReticule(dpr: number): void {
+  const enJeu = document.body.classList.contains('playing')
+  if (!manette.connectee || !manette.active || !enJeu || input.touchCount > 0) return
+  const dprC = Math.min(dpr, 2)
+  const g = fxCtx
+  g.setTransform(dprC, 0, 0, dprC, 0, 0)
+  const x = manetteCurseur.x
+  const y = manetteCurseur.y
+  const r = manette.agit ? 13 : 10
+  g.strokeStyle = manette.agit ? 'rgba(255,255,255,0.95)' : 'rgba(190,225,250,0.7)'
+  g.lineWidth = manette.agit ? 2.2 : 1.6
+  g.beginPath()
+  g.arc(x, y, r, 0, Math.PI * 2)
+  g.stroke()
+  g.fillStyle = manette.agit ? '#ffffff' : 'rgba(190,225,250,0.9)'
+  g.beginPath()
+  g.arc(x, y, 2.2, 0, Math.PI * 2)
+  g.fill()
+  // quatre encoches : un réticule, pas une bulle
+  g.beginPath()
+  for (const [ex, ey] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+    g.moveTo(x + ex * (r + 2), y + ey * (r + 2))
+    g.lineTo(x + ex * (r + 6), y + ey * (r + 6))
+  }
+  g.stroke()
 }
 
 let lastRailTime = 0
@@ -1156,6 +1209,56 @@ function frame(now: number): void {
   const vh = window.innerHeight
   const dpr = Math.min(window.devicePixelRatio || 1, quality.dprCap)
 
+  // ---- Manette : elle écrit dans le même pointeur que le doigt ----
+  manette.poll(performance.now() / 1000)
+  if (manette.connectee) {
+    const enJeu = document.body.classList.contains('playing')
+    // dans les menus (accueil, relance, fin de tableau) : A valide
+    if (manette.edge(BOUTON.A) && clicMenuManette()) {
+      // le clic a consommé le A de cette image
+    } else if (enJeu) {
+      if (manette.edge(BOUTON.START)) input.togglePause()
+      if (manette.edge(BOUTON.SELECT)) input.onReset?.()
+      if (manette.edge(BOUTON.LB)) input.toggleFreeze()
+      if (manette.edge(BOUTON.RB)) input.toggleGas()
+      if (manette.edge(BOUTON.X)) {
+        // retour à l'eau, quel que soit l'état
+        if (input.freezeIntent) input.toggleFreeze()
+        else if (input.gasIntent) input.toggleGas()
+      }
+      if (manette.edge(BOUTON.GAUCHE)) input.stepWarp(-1)
+      if (manette.edge(BOUTON.DROITE)) input.stepWarp(1)
+      if (manette.zoomAvant) camera.zoomBy(Math.pow(1.9, dtReal), params)
+      if (manette.zoomArriere) camera.zoomBy(Math.pow(1.9, -dtReal), params)
+      if (manette.panX !== 0 || manette.panY !== 0) {
+        camera.panBy(manette.panX * 900 * dtReal, manette.panY * 900 * dtReal)
+      }
+      // viser et agir — seulement si aucun doigt réel n'est posé
+      if (input.touchCount === 0) {
+        const scx = vw * 0.5 + (sim.stats.centroidX - camera.x) * camera.zoom
+        const scy = vh * 0.5 - (sim.stats.centroidY - camera.y) * camera.zoom
+        // pleine inclinaison = pleine puissance de dash ; un plancher garde
+        // la direction lisible même stick à peine poussé
+        const rPx = (0.15 + 0.85 * manette.force) * params.gasDashRange * camera.zoom
+        manetteCurseur.x = scx + manette.dirX * rPx
+        manetteCurseur.y = scy + manette.dirY * rPx
+        if (manette.agit) {
+          input.aimActive = true
+          input.aimClientX = manetteCurseur.x
+          input.aimClientY = manetteCurseur.y
+          manetteTenait = true
+        } else if (manetteTenait) {
+          manetteTenait = false
+          input.aimActive = false
+        } else if (manette.active) {
+          // le curseur suit même sans presser : la visée se prépare
+          input.aimClientX = manetteCurseur.x
+          input.aimClientY = manetteCurseur.y
+        }
+      }
+    }
+  }
+
   const aim = camera.screenToWorld(input.aimClientX, input.aimClientY, vw, vh)
   const tableauDone = run.exitTimer > 0 || run.ended
 
@@ -1188,7 +1291,10 @@ function frame(now: number): void {
     // annule sans frais — la visée n'engage à rien tant qu'on n'a pas lâché.
     if (vif && input.gasIntent && !input.aimActive) {
       const spent = sim.gasDash(aim.x, aim.y)
-      if (spent > 0) bande.bruitage('souffle-vapeur', 0.75)
+      if (spent > 0) {
+        bande.bruitage('souffle-vapeur', 0.75)
+        manette.rumble(0.6, 90)
+      }
     }
   }
   dash.aiming = dashAiming
@@ -1419,6 +1525,7 @@ function frame(now: number): void {
   updateTutor(dtReal)
   updateWorldLabels(vw, vh)
   drawMecanismes(vw, vh, dpr)
+  drawReticule(dpr)
   const renderT0 = performance.now()
   renderer.render(
     sim,
@@ -1524,6 +1631,7 @@ function frame(now: number): void {
     if (endgame.spent) {
       input.freezeIntent = true // le froid saisit ce qu'il reste, l'élan est gardé
       input.gasIntent = false
+      manette.rumble(1, 260) // la dernière impulsion se sent dans les mains
     }
   }
   if (endgame.spent && alive) {

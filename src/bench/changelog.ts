@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 05:40',
+    title: 'La manette entre dans la cuve (Steam Deck, Xbox, DualSense)',
+    notes: [
+      'Branchez une manette, elle a la main : le STICK GAUCHE place un réticule en orbite autour du corps (la direction, c’est le stick ; l’inclinaison, c’est la puissance — pleine inclinaison = plein dash), et la GÂCHETTE DROITE (ou A) est le doigt posé : maintenir éjecte en eau ; en vapeur, maintenir vise dans le temps ralenti, relâcher dashe.',
+      'LB : glace · RB : vapeur · X : retour à l’eau. Stick droit : caméra. Croix : zoom (haut/bas) et ralenti/accéléré (gauche/droite). Start : pause · Select : recommencer. Dans les menus, A valide le bouton principal. La manette VIBRE sur le dash et la dernière impulsion.',
+      'Le tactile garde toujours la priorité : un doigt posé, et la manette s’efface. Le réticule ne s’affiche que quand la manette parle.',
+      'Deux limites honnêtes : le nom d’opérateur se tape une fois au clavier ou au tactile (puis reste en mémoire), et le premier son demande un vrai toucher — les navigateurs n’éveillent pas l’audio sur un bouton de manette.',
+    ],
+  },
+  {
     date: '11/08/2026 04:55',
     title: 'Éditeur : sélection multiple, alignement, et l’outil Découpe',
     notes: [
