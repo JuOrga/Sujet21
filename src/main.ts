@@ -478,6 +478,11 @@ const camera = new Camera()
 ;(window as unknown as { __cam: Camera }).__cam = camera
 ;(window as unknown as { __params: SimParams }).__params = params
 ;(window as unknown as { __audio: AudioFx }).__audio = audio
+// Sonde de test : injecter des zones dans le tableau courant sans l'éditeur
+;(window as unknown as { __zones: (z: NonNullable<LevelDef['zones']>) => void }).__zones = (z) => {
+  level.zones = z
+  buildWorldLabels()
+}
 
 camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, 1)
 const renderer = new Renderer(canvas, CAPACITY)
