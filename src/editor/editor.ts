@@ -16,6 +16,7 @@ import {
   MAT_WALL,
   ZONE_CAUSES,
   zoneName,
+  zoneOutline,
   type LevelDef,
   type SpongeDef,
   type WorldLabel,
@@ -1090,18 +1091,33 @@ export class LevelEditor {
     g.lineWidth = 2
     g.strokeRect(a.sx, a.sy, d.sx - a.sx, d.sy - a.sy)
 
-    // zones d'état, sous tout le reste
+    // zones d'état, sous tout le reste. Le rectangle est l'outil de TRAVAIL
+    // (poignées, redimensionnement) ; le rayon d'action RÉEL est la lisière
+    // ondulée, dessinée pleine — la même formule que le jeu (zoneOutline).
     for (const z of this.level.zones ?? []) {
       const p = this.toScreen(z.minX, z.maxY)
       const q = this.toScreen(z.maxX, z.minY)
       const col = ZONE_COLORS[z.force]
-      g.fillStyle = col + '22'
-      g.fillRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
-      g.strokeStyle = col + '99'
-      g.setLineDash([7, 5])
-      g.lineWidth = 1.5
+      // le cadre de travail, discret
+      g.strokeStyle = col + '44'
+      g.setLineDash([4, 6])
+      g.lineWidth = 1
       g.strokeRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
       g.setLineDash([])
+      // la lisière réelle
+      const pts = zoneOutline(z, 64)
+      g.beginPath()
+      for (let i = 0; i < pts.length; i++) {
+        const sp = this.toScreen(pts[i].x, pts[i].y)
+        if (i === 0) g.moveTo(sp.sx, sp.sy)
+        else g.lineTo(sp.sx, sp.sy)
+      }
+      g.closePath()
+      g.fillStyle = col + '26'
+      g.fill()
+      g.strokeStyle = col + 'bb'
+      g.lineWidth = 1.5
+      g.stroke()
       g.fillStyle = col
       g.font = '600 11px ui-monospace, monospace'
       g.fillText(`${zoneName(z)} · ${z.force.toUpperCase()}`, p.sx + 6, p.sy + 15)

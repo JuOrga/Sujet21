@@ -6,6 +6,7 @@
 import type { FluidSim } from '../sim/solver'
 import { KIND_PLAYER } from '../sim/solver'
 import type { SimParams } from '../sim/params'
+import { zonePhases } from '../game/level'
 import type { DecalDef, ObstacleBox, ZoneDef } from '../game/level'
 import type { Camera } from './camera'
 
@@ -111,6 +112,9 @@ uniform vec4 uWaves[MAX_WAVES]; // x, y, instant de départ, amplitude
 // — c'est une règle du tableau, pas une décoration.
 uniform int uZoneCount;
 uniform vec4 uZones[MAX_ZONES];    // minX, minY, maxX, maxY
+// phases d'ondulation de la lisière — calculées CPU par la MÊME fonction que
+// la mécanique (zonePhases) : ce qu'on voit est exactement ce qu'on subit
+uniform vec3 uZonePhase[MAX_ZONES];
 uniform float uZoneForce[MAX_ZONES]; // 1 eau, 2 glace, 3 vapeur, 0 libre
 // Textures d'habillage (chargées en arrière-plan ; uHas* passe à 1 quand
 // prêtes — d'ici là, le décor procédural fait l'intérim)
@@ -464,12 +468,20 @@ void main() {
     vec3 zc = f < 1.5 ? vec3(0.28, 0.62, 0.90)   // eau
             : f < 2.5 ? vec3(0.56, 0.80, 0.95)   // glace
                       : vec3(0.72, 0.56, 0.95);  // vapeur
-    float zd = boxSdf(world, uZones[zi]);
-    float inZone = 1.0 - step(0.0, zd);          // 1 dedans
+    // Forme du rayon d'action : ellipse inscrite, ondulée par trois
+    // harmoniques (mêmes phases que la mécanique). szn < 1 : dedans.
+    vec2 zc2 = (uZones[zi].xy + uZones[zi].zw) * 0.5;
+    vec2 zh2 = max((uZones[zi].zw - uZones[zi].xy) * 0.5, vec2(1e-6));
+    vec2 nq = (world - zc2) / zh2;
+    float dz = length(nq);
+    float thz = atan(nq.y, nq.x);
+    vec3 phz = uZonePhase[zi];
+    float wz = 0.86 + 0.062 * sin(3.0 * thz + phz.x) + 0.043 * sin(5.0 * thz + phz.y)
+             + 0.03 * sin(8.0 * thz + phz.z);
+    float szn = dz / wz;
+    float inZone = 1.0 - step(1.0, szn);         // 1 dedans
     // la cause du régime, peinte en fond de zone (sous le voile)
-    if (inZone > 0.5) {
-      vec2 zc2 = (uZones[zi].xy + uZones[zi].zw) * 0.5;
-      vec2 zh2 = (uZones[zi].zw - uZones[zi].xy) * 0.5;
+    if (szn < 1.0) {
       // l'image de la cause : ajustée dans la zone (contain, centrée), un
       // peu refroidie pour se fondre dans la cuve — le fluide passera devant
       float hasZTex = f < 1.5 ? uHasZoneBuses : f < 2.5 ? uHasZoneHublot : uHasZoneConduite;
@@ -488,24 +500,20 @@ void main() {
       }
       col += zoneDecor(world, zc2, zh2, f, uTime, hasZTex);
     }
-    // voile intérieur, plus dense près du bord
-    float depth = clamp(-zd / 260.0, 0.0, 1.0);
-    float veil = inZone * (0.17 - 0.09 * depth);
-    // chevrons lents : le régime « circule »
-    float bands = 0.5 + 0.5 * sin((world.x + world.y) * 0.012 - uTime * 0.55);
-    veil += inZone * bands * 0.05;
-    col += zc * veil;
-    // bourrelet intérieur : une marge hachurée le long de la frontière, comme
-    // un marquage au sol — c'est ce qui se lit de loin
-    float lip = inZone * (1.0 - smoothstep(0.0, 70.0, -zd));
-    float hatch = 0.5 + 0.5 * sin((world.x - world.y) * 0.09 - uTime * 1.1);
-    col += zc * lip * (0.10 + 0.15 * hatch);
-    // liseré de frontière, épaisseur constante à l'écran
-    float edgeZ = 1.0 - smoothstep(0.0, 4.0 / uZoom, abs(zd));
-    col += zc * edgeZ * 0.95;
+    // Le régime ÉMANE de l'accident : un souffle teinté, dense au foyer,
+    // fondu vers la lisière — plus de rectangle, plus de chevrons.
+    float core = 1.0 - smoothstep(0.0, 1.0, szn);
+    float waft = 0.75 + 0.25 * vnoise(nq * 2.6 + vec2(uTime * 0.06, -uTime * 0.045));
+    col += zc * core * core * 0.16 * waft;
+    // la lisière : un liseré irrégulier qui ondule doucement — vivant, pas
+    // administratif. Son intensité varie le long du bord (bruit sur l'angle).
+    float ripple = 0.02 * sin(thz * 12.0 + uTime * 0.8);
+    float edgeZ = exp(-abs(szn - 1.0 + ripple) * 22.0);
+    float life = 0.55 + 0.45 * vnoise(vec2(thz * 3.1, uTime * 0.22) + zc2 * 0.013);
+    col += zc * edgeZ * 0.60 * life;
     // halo court à l'extérieur : la limite se devine avant d'être franchie
-    float glow = (1.0 - smoothstep(0.0, 70.0, max(zd, 0.0))) * step(0.0, zd);
-    col += zc * glow * glow * 0.30;
+    float glow = exp(-max(szn - 1.0, 0.0) * 8.0) * step(1.0, szn);
+    col += zc * glow * 0.14 * life;
   }
 
   // Textures des matériaux : prélevées hors des branches (flux de contrôle
@@ -931,6 +939,7 @@ export class Renderer {
   private readonly decalScratch = new Float32Array(6 * 4) // un quad : 6 sommets × (pos, uv)
   private readonly zoneScratch = new Float32Array(MAX_ZONES * 4)
   private readonly zoneForceScratch = new Float32Array(MAX_ZONES)
+  private readonly zonePhaseScratch = new Float32Array(MAX_ZONES * 3)
   private texDecalTuyaux: WebGLTexture | null = null
   private texDecalVanne: WebGLTexture | null = null
   private texZoneHublot: WebGLTexture | null = null
@@ -1267,11 +1276,17 @@ export class Renderer {
       this.zoneScratch[i * 4 + 3] = z.maxY
       this.zoneForceScratch[i] =
         z.force === 'eau' ? 1 : z.force === 'glace' ? 2 : z.force === 'vapeur' ? 3 : 0
+      // les phases de la lisière : la même fonction que la mécanique
+      const [p1, p2, p3] = zonePhases(z)
+      this.zonePhaseScratch[i * 3] = p1
+      this.zonePhaseScratch[i * 3 + 1] = p2
+      this.zonePhaseScratch[i * 3 + 2] = p3
     }
     gl.uniform1i(cu['uZoneCount'], zoneCount)
     if (zoneCount > 0) {
       gl.uniform4fv(cu['uZones[0]'], this.zoneScratch)
       gl.uniform1fv(cu['uZoneForce[0]'], this.zoneForceScratch)
+      gl.uniform3fv(cu['uZonePhase[0]'], this.zonePhaseScratch)
     }
     const bindTex = (unit: number, tex: WebGLTexture | null, sampler: string, flag: string) => {
       gl.activeTexture(gl.TEXTURE0 + unit)
