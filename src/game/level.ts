@@ -113,13 +113,67 @@ export function zoneName(z: ZoneDef): string {
 }
 
 /** L'état imposé au point (x, y), ou 'libre' si aucune zone ne l'impose. */
+// ---- Forme du rayon d'action d'une zone (refonte 2026) ------------------
+// Le régime n'emplit plus un rectangle : il ÉMANE de l'accident dessiné au
+// centre (hublot, brèche, rampe). Sa limite est une ellipse inscrite dans le
+// rectangle déclaré, ondulée par trois harmoniques — arrondie, irrégulière,
+// et différente pour chaque zone (les phases dépendent de son centre).
+// La MÊME formule sert la mécanique (ici) et le rendu (les phases sont
+// calculées ici puis passées au shader) : ce qu'on voit est ce qu'on subit.
+
+/** Les trois phases d'ondulation d'une zone — déterministes, par centre. */
+export function zonePhases(z: ZoneDef): [number, number, number] {
+  const cx = (z.minX + z.maxX) * 0.5
+  const cy = (z.minY + z.maxY) * 0.5
+  const ph = (k: number): number => {
+    const t = Math.sin(cx * 0.12898 + cy * 0.78233 + k * 17.17) * 43758.5453
+    return (t - Math.floor(t)) * Math.PI * 2
+  }
+  return [ph(1), ph(2), ph(3)]
+}
+
+/** Distance de forme : < 1 dedans, 1 sur la lisière, > 1 dehors. */
+export function zoneShape(z: ZoneDef, x: number, y: number): number {
+  const hx = Math.max(1e-6, (z.maxX - z.minX) * 0.5)
+  const hy = Math.max(1e-6, (z.maxY - z.minY) * 0.5)
+  const nx = (x - (z.minX + z.maxX) * 0.5) / hx
+  const ny = (y - (z.minY + z.maxY) * 0.5) / hy
+  const d = Math.hypot(nx, ny)
+  const th = Math.atan2(ny, nx)
+  const [p1, p2, p3] = zonePhases(z)
+  // rayon de lisière : 0,86 de la demi-taille, ondulé de ±0,135 — le tout
+  // reste inscrit dans le rectangle déclaré à l'éditeur
+  const w =
+    0.86 + 0.062 * Math.sin(3 * th + p1) + 0.043 * Math.sin(5 * th + p2) + 0.03 * Math.sin(8 * th + p3)
+  return d / w
+}
+
+/** Le contour de la lisière, pour l'éditeur (polygone en coordonnées monde). */
+export function zoneOutline(z: ZoneDef, steps = 64): { x: number; y: number }[] {
+  const cx = (z.minX + z.maxX) * 0.5
+  const cy = (z.minY + z.maxY) * 0.5
+  const hx = (z.maxX - z.minX) * 0.5
+  const hy = (z.maxY - z.minY) * 0.5
+  const [p1, p2, p3] = zonePhases(z)
+  const pts: { x: number; y: number }[] = []
+  for (let i = 0; i < steps; i++) {
+    const th = (i / steps) * Math.PI * 2
+    const w =
+      0.86 + 0.062 * Math.sin(3 * th + p1) + 0.043 * Math.sin(5 * th + p2) + 0.03 * Math.sin(8 * th + p3)
+    pts.push({ x: cx + Math.cos(th) * hx * w, y: cy + Math.sin(th) * hy * w })
+  }
+  return pts
+}
+
 export function zoneForceAt(level: LevelDef, x: number, y: number): ZoneForce {
   const zones = level.zones
   if (!zones) return 'libre'
   // la dernière zone déclarée gagne : on peut superposer une exception
   for (let i = zones.length - 1; i >= 0; i--) {
     const z = zones[i]
-    if (x >= z.minX && x <= z.maxX && y >= z.minY && y <= z.maxY) return z.force
+    // rejet rapide par le rectangle englobant, puis la vraie forme
+    if (x < z.minX || x > z.maxX || y < z.minY || y > z.maxY) continue
+    if (zoneShape(z, x, y) < 1) return z.force
   }
   return 'libre'
 }
