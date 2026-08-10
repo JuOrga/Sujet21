@@ -11,6 +11,13 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '10/08/2026 22:30',
+    title: 'L’éjection maintenue goutte, au lieu de sonner une fois',
+    notes: [
+      'Maintenir l’éjection ne jouait la goutte qu’à l’amorce du geste — trois secondes d’éjection, un seul « ploc ». Elle goutte maintenant tant qu’on maintient : une toutes les 0,24 à 0,42 s, à cadence irrégulière (l’eau n’est pas un métronome), toujours en tirant au sort une des trois prises et un écart de hauteur de ±7 %.',
+    ],
+  },
+  {
     date: '10/08/2026 22:10',
     title: 'Le rayon d’action des zones : un halo qui émane de l’accident',
     notes: [
