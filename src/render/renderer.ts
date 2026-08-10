@@ -481,26 +481,28 @@ void main() {
     float szn = dz / wz;
     float inZone = 1.0 - step(1.0, szn);         // 1 dedans
     float assetA = 0.0; // alpha de l'illustration à ce fragment
-    // la cause du régime, peinte en fond de zone (sous le voile)
-    if (szn < 1.0) {
-      // l'image de la cause : ajustée dans la zone (contain, centrée), un
-      // peu refroidie pour se fondre dans la cuve — le fluide passera devant
-      float hasZTex = f < 1.5 ? uHasZoneBuses : f < 2.5 ? uHasZoneHublot : uHasZoneConduite;
-      if (hasZTex > 0.5) {
-        float ta = f < 1.5 ? 1.5 : f < 2.5 ? 0.667 : 1.0; // largeur/hauteur des images
-        vec2 zsz = zh2 * 2.0 * 0.94;
-        float sc = min(zsz.x / ta, zsz.y);
-        vec2 fit = vec2(ta, 1.0) * sc;
-        vec2 tuv = (world - zc2) / fit + 0.5;
-        if (tuv.x > 0.0 && tuv.x < 1.0 && tuv.y > 0.0 && tuv.y < 1.0) {
-          vec4 zt = f < 1.5 ? texture(uTexZoneBuses, tuv)
-                  : f < 2.5 ? texture(uTexZoneHublot, tuv)
-                            : texture(uTexZoneConduite, tuv);
-          col = mix(col, zt.rgb * vec3(0.68, 0.76, 0.86), zt.a * 0.92);
-          assetA = zt.a;
-        }
+    float hasZTex = f < 1.5 ? uHasZoneBuses : f < 2.5 ? uHasZoneHublot : uHasZoneConduite;
+    // L'illustration de la cause N'EST PAS tronquée par la lisière : c'est
+    // un objet (rampe, conduite, hublot), pas un gaz — elle se dessine
+    // entière dans son cadre, même là où la brume ne va pas.
+    if (hasZTex > 0.5) {
+      float ta = f < 1.5 ? 1.5 : f < 2.5 ? 0.667 : 1.0; // largeur/hauteur des images
+      vec2 zsz = zh2 * 2.0 * 0.94;
+      float sc = min(zsz.x / ta, zsz.y);
+      vec2 fit = vec2(ta, 1.0) * sc;
+      vec2 tuv = (world - zc2) / fit + 0.5;
+      if (tuv.x > 0.0 && tuv.x < 1.0 && tuv.y > 0.0 && tuv.y < 1.0) {
+        vec4 zt = f < 1.5 ? texture(uTexZoneBuses, tuv)
+                : f < 2.5 ? texture(uTexZoneHublot, tuv)
+                          : texture(uTexZoneConduite, tuv);
+        col = mix(col, zt.rgb * vec3(0.68, 0.76, 0.86), zt.a * 0.92);
+        assetA = zt.a;
       }
-      col += zoneDecor(world, zc2, zh2, f, uTime, hasZTex);
+    }
+    // les effets ANIMÉS du décor, allégés sur l'illustration : le panache et
+    // les gouttes vivent autour de l'objet, ils ne le recouvrent pas
+    if (szn < 1.0) {
+      col += zoneDecor(world, zc2, zh2, f, uTime, hasZTex) * (1.0 - 0.6 * assetA);
     }
     // Une BRUME d'accident, pas un contour : dense au foyer, teintée, elle
     // se dissout en lambeaux vers la lisière — le bruit déchire le bord au
@@ -511,11 +513,20 @@ void main() {
     // le bord de la brume suit la forme, déchiqueté par le bruit (±0,13) —
     // les lambeaux meurent SUR la lisière mécanique, jamais au-delà
     float body = smoothstep(1.0, 0.5, szn + (fog - 0.5) * 0.26);
+    // La glace givre en BLANC : du cyan sur une cuve cyan ne se voyait pas.
+    // Sa brume est blanchie et nettement renforcée — les deux autres restent
+    // dans leur teinte (le violet et le bleu contrastent déjà).
+    vec3 fogCol = zc;
+    float fogAmp = 1.0;
+    if (f > 1.5 && f < 2.5) {
+      fogCol = mix(zc, vec3(0.82, 0.93, 1.0), 0.6);
+      fogAmp = 1.9;
+    }
     // plus légère sur l'illustration : la cause reste lisible sous sa brume
-    col += zc * body * (0.05 + 0.15 * fog) * (1.0 - 0.6 * assetA);
+    col += fogCol * body * (0.05 + 0.15 * fog) * fogAmp * (1.0 - 0.72 * assetA);
     // un souffle discret au ras de la lisière, en lambeaux lui aussi — la
     // limite se devine, elle ne se trace pas
-    col += zc * exp(-abs(szn - 1.0) * 26.0) * 0.12 * fog * fog;
+    col += fogCol * exp(-abs(szn - 1.0) * 26.0) * 0.14 * fog * fog * fogAmp;
   }
 
   // Textures des matériaux : prélevées hors des branches (flux de contrôle
