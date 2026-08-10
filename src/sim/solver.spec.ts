@@ -119,7 +119,9 @@ describe('FluidSim — invariants physiques', () => {
     expect(sim.playerCount).toBe(200)
   })
 
-  it('sous le volume critique, le corps se disperse (§3.1)', () => {
+  it('sous le volume critique, le corps est signalé mais NE MEURT PAS (§3.1)', () => {
+    // Refonte 2026 : il n'y a plus de minimum à ramener. Le seuil annonce la
+    // dernière impulsion — c'est le jeu qui conclut, à l'arrêt du corps.
     const sim = makeSim({
       criticalVolumeFraction: 0.5,
       ejectRate: 2000,
@@ -133,11 +135,10 @@ describe('FluidSim — invariants physiques', () => {
     for (let s = 0; s < 10; s++) {
       sim.eject(500, 0, sim.params.dt)
       sim.step(sim.params.dt)
-      if (sim.dispersed) break
     }
-    // le délai de grâce s'écoule : la dispersion est constatée puis tranchée
-    for (let s = 0; s < 30; s++) sim.step(sim.params.dt)
-    expect(sim.dispersed).toBe(true)
+    for (let s = 0; s < 60; s++) sim.step(sim.params.dt)
+    expect(sim.belowCritical).toBe(true) // le manque est constaté…
+    expect(sim.dispersed).toBe(false) // …mais l'essai continue
   })
 
   it('une gouttelette éjectée respecte son délai de réabsorption', () => {

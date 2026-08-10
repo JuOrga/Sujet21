@@ -45,17 +45,17 @@ describe('Règles de transformation — changer d’état ne tue pas', () => {
     expect(sim.playerCount).toBeGreaterThanOrEqual(55)
   })
 
-  it('le délai de grâce : passer brièvement sous le seuil ne conclut pas', () => {
-    const sim = makeSim({ dispersalGrace: 2 })
+  it('descendre très bas ne tue pas : le seuil annonce, il ne tranche pas', () => {
+    const sim = makeSim({ dispersalGrace: 2, criticalVolumeFraction: 0.5 })
     sim.setLevel([], [])
     sim.spawnDisc(0, 0, 100, KIND_PLAYER)
     run(sim, 0.1)
-    // perte brutale : 70 % du volume — sous le seuil critique (35 %)
+    // perte brutale : 70 % du volume — bien sous le seuil critique
     for (let k = 0; k < 70; k++) sim.removeParticle(0)
-    run(sim, 1)
-    expect(sim.dispersed).toBe(false) // constaté, pas encore tranché
-    run(sim, 2)
-    expect(sim.dispersed).toBe(true) // sous le seuil depuis > 2 s : dispersion
+    run(sim, 3)
+    expect(sim.belowCritical).toBe(true) // la réserve est à sec…
+    expect(sim.dispersed).toBe(false) // …et pourtant le corps tient
+    expect(sim.playerCount).toBeGreaterThan(2)
   })
 
   it('sans vapeur résiduelle, le lien d’amas reste le rayon liquide', () => {

@@ -104,6 +104,15 @@ export class FluidSim {
   private readonly iceNxSum: Float32Array
   private readonly iceNySum: Float32Array
   private readonly iceWeld: Uint8Array
+  // Rotation des blocs : centre de masse, point de contact moyen, moment
+  // d'inertie et vitesse angulaire — un palet qui heurte de biais doit PIVOTER.
+  private readonly iceCxSum: Float32Array
+  private readonly iceCySum: Float32Array
+  private readonly icePxSum: Float32Array
+  private readonly icePySum: Float32Array
+  private readonly icePCnt: Int32Array
+  private readonly iceInertia: Float32Array
+  private readonly iceOmega: Float32Array
 
   boxes: ObstacleBox[] = []
   sponges: Sponge[] = []
@@ -119,6 +128,8 @@ export class FluidSim {
   // Eau avalée par le sas : retirée de la simulation, mise en bonbonne à la
   // sortie. Le sas boit — cette eau n'est pas perdue.
   swallowed = 0
+  // Part avalée à l'état de glace : ouvre droit à la prime de collecte
+  swallowedIce = 0
   private mouthX = 0
   private mouthY = 0
   private drainOn = false
@@ -178,6 +189,13 @@ export class FluidSim {
     this.iceNxSum = new Float32Array(capacity)
     this.iceNySum = new Float32Array(capacity)
     this.iceWeld = new Uint8Array(capacity)
+    this.iceCxSum = new Float32Array(capacity)
+    this.iceCySum = new Float32Array(capacity)
+    this.icePxSum = new Float32Array(capacity)
+    this.icePySum = new Float32Array(capacity)
+    this.icePCnt = new Int32Array(capacity)
+    this.iceInertia = new Float32Array(capacity)
+    this.iceOmega = new Float32Array(capacity)
     this.stack = new Int32Array(capacity)
     this.nbStart = new Int32Array(capacity + 1)
     this.nbList = new Int32Array(capacity * MAX_NEIGHBORS)
@@ -547,7 +565,9 @@ export class FluidSim {
     const drag = p.vortexDrag / Math.max(0.15, fade)
     const blend = 1 - Math.exp(-drag * dt)
     for (let i = 0; i < this.count; i++) {
-      if (this.frozen[i] === 1) continue // la glace est ancrée
+      // Le sas aspire les trois états. La glace a plus d'inertie : le courant
+      // a moins de prise sur elle, mais il finit par l'emporter.
+      const grip = this.frozen[i] === 1 ? 0.45 : 1
       const dx = cx - this.posX[i]
       const dy = cy - this.posY[i]
       const d2 = dx * dx + dy * dy
@@ -563,8 +583,8 @@ export class FluidSim {
       const tanScale = Math.min(1, d / (R * 0.5))
       const tx = (ux * vIn * settle - uy * vTan * tanScale) * rim
       const ty = (uy * vIn * settle + ux * vTan * tanScale) * rim
-      this.velX[i] += (tx - this.velX[i]) * blend
-      this.velY[i] += (ty - this.velY[i]) * blend
+      this.velX[i] += (tx - this.velX[i]) * blend * grip
+      this.velY[i] += (ty - this.velY[i]) * blend * grip
     }
   }
 
@@ -623,7 +643,10 @@ export class FluidSim {
     while (i < this.count) {
       const dx = cx - this.posX[i]
       const dy = cy - this.posY[i]
-      if (this.frozen[i] === 0 && dx * dx + dy * dy < swallowR2) {
+      if (dx * dx + dy * dy < swallowR2) {
+        // Avalée gelée : le protocole paie une prime — récupérer un
+        // échantillon SOLIDE vaut mieux que le boire goutte à goutte.
+        if (this.frozen[i] === 1) this.swallowedIce++
         this.removeParticle(i)
         this.swallowed++
         continue // l'indice i contient maintenant une autre particule
@@ -920,9 +943,11 @@ export class FluidSim {
     if (this.stepIndex % Math.max(1, Math.round(p.componentEvery)) === 0) {
       this.relabel()
     }
+    // Le seuil de volume ne tue plus (refonte 2026) : il annonce la dernière
+    // impulsion, et c'est le jeu qui conclut, à l'arrêt du corps. Seule la
+    // perte de cohésion (moins de deux particules) reste une dispersion.
     if (this.belowCritical && !this.dispersed) {
       this.criticalTimer += dt
-      if (this.criticalTimer >= p.dispersalGrace) this.dispersed = true
     } else if (!this.belowCritical) {
       this.criticalTimer = 0
     }
@@ -1502,48 +1527,109 @@ export class FluidSim {
     this.iceNxSum.fill(0, 0, comps)
     this.iceNySum.fill(0, 0, comps)
     this.iceWeld.fill(0, 0, comps)
+    this.iceCxSum.fill(0, 0, comps)
+    this.iceCySum.fill(0, 0, comps)
+    this.icePxSum.fill(0, 0, comps)
+    this.icePySum.fill(0, 0, comps)
+    this.icePCnt.fill(0, 0, comps)
+    this.iceInertia.fill(0, 0, comps)
+    this.iceOmega.fill(0, 0, comps)
+
+    // 1. masse, centre de masse, vitesse moyenne, et point de contact moyen
     for (let i = 0; i < n; i++) {
       if (frozen[i] === 0) continue
       const c = labels[i]
       this.iceVxSum[c] += velX[i]
       this.iceVySum[c] += velY[i]
+      this.iceCxSum[c] += prdX[i]
+      this.iceCySum[c] += prdY[i]
       this.iceCnt[c]++
       if (this.contactMat[i] >= 0) {
         this.iceNxSum[c] += this.contactNX[i]
         this.iceNySum[c] += this.contactNY[i]
+        // le point d'application compte autant que la direction : c'est son
+        // excentrement par rapport au centre qui fait tourner le palet
+        this.icePxSum[c] += prdX[i]
+        this.icePySum[c] += prdY[i]
+        this.icePCnt[c]++
       }
       if (this.welded[i] === 1) this.iceWeld[c] = 1
     }
+
+    // 2. moment cinétique et moment d'inertie, autour du centre de masse
+    //    (masses unitaires : la masse d'un bloc est son nombre de particules)
+    for (let i = 0; i < n; i++) {
+      if (frozen[i] === 0) continue
+      const c = labels[i]
+      const cnt = this.iceCnt[c]
+      if (cnt === 0) continue
+      const rx = prdX[i] - this.iceCxSum[c] / cnt
+      const ry = prdY[i] - this.iceCySum[c] / cnt
+      const dvx = velX[i] - this.iceVxSum[c] / cnt
+      const dvy = velY[i] - this.iceVySum[c] / cnt
+      this.iceOmega[c] += rx * dvy - ry * dvx // moment cinétique, provisoirement
+      this.iceInertia[c] += rx * rx + ry * ry
+    }
+
     const rest = Math.min(1, Math.max(0, p.iceRestitution))
+    const MAX_SPIN = 14 // rad/s : au-delà, un palet devient illisible
     for (let c = 0; c < comps; c++) {
       const cnt = this.iceCnt[c]
       if (cnt === 0) continue
       let vx = this.iceVxSum[c] / cnt
       let vy = this.iceVySum[c] / cnt
+      const cx = this.iceCxSum[c] / cnt
+      const cy = this.iceCySum[c] / cnt
+      const I = this.iceInertia[c]
+      let omega = I > 1e-6 ? this.iceOmega[c] / I : 0
+
       if (this.iceWeld[c] === 1) {
         vx = 0
         vy = 0
-      } else {
+        omega = 0 // soudé à la plaque : plus de translation ni de rotation
+      } else if (this.icePCnt[c] > 0) {
         const nl = Math.hypot(this.iceNxSum[c], this.iceNySum[c])
         if (nl > 1e-6) {
           const nx = this.iceNxSum[c] / nl
           const ny = this.iceNySum[c] / nl
-          const vn = vx * nx + vy * ny
+          // bras de levier : du centre de masse au point de contact
+          const rx = this.icePxSum[c] / this.icePCnt[c] - cx
+          const ry = this.icePySum[c] / this.icePCnt[c] - cy
+          // vitesse du POINT DE CONTACT, rotation comprise
+          const vpx = vx - omega * ry
+          const vpy = vy + omega * rx
+          const vn = vpx * nx + vpy * ny
           if (vn < 0) {
-            vx -= (1 + rest) * vn * nx
-            vy -= (1 + rest) * vn * ny
+            // impulsion de choc d'un corps rigide : le dénominateur mélange
+            // masse et inertie — un choc excentré transfère une part de
+            // l'élan en ROTATION au lieu de tout renvoyer en translation.
+            const rn = rx * ny - ry * nx
+            const denom = 1 / cnt + (I > 1e-6 ? (rn * rn) / I : 0)
+            const j = (-(1 + rest) * vn) / denom
+            vx += (j * nx) / cnt
+            vy += (j * ny) / cnt
+            if (I > 1e-6) omega += (j * rn) / I
             if (-vn > this.iceImpact) this.iceImpact = -vn
           }
         }
       }
-      this.iceVxSum[c] = vx // réutilisé : vitesse finale du bloc
+      if (omega > MAX_SPIN) omega = MAX_SPIN
+      else if (omega < -MAX_SPIN) omega = -MAX_SPIN
+
+      this.iceVxSum[c] = vx // réutilisés : mouvement final du bloc
       this.iceVySum[c] = vy
+      this.iceCxSum[c] = cx
+      this.iceCySum[c] = cy
+      this.iceOmega[c] = omega
     }
+
+    // 3. projection sur un mouvement de corps rigide : translation + rotation
     for (let i = 0; i < n; i++) {
       if (frozen[i] === 0) continue
       const c = labels[i]
-      velX[i] = this.iceVxSum[c]
-      velY[i] = this.iceVySum[c]
+      const w = this.iceOmega[c]
+      velX[i] = this.iceVxSum[c] - w * (prdY[i] - this.iceCySum[c])
+      velY[i] = this.iceVySum[c] + w * (prdX[i] - this.iceCxSum[c])
     }
   }
 

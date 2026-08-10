@@ -69,13 +69,32 @@ describe('FluidSim.applyExitSuction — le sas avale l’eau en entonnoir', () =
     expect(sim.dispersed).toBe(false)
   })
 
-  it('hors de l’emprise du sas, la dispersion reste possible', () => {
+  it('hors de l’emprise du sas, la perte de cohésion reste une dispersion', () => {
     const sim = makeSim({ dispersalGrace: 0.1 })
     sim.spawnDisc(2000, 0, 60, KIND_PLAYER) // loin de la bouche
     sim.applyExitSuction(0, 0, sim.params.dt)
+    // Le volume seul ne tue plus (refonte 2026) : il faut vraiment qu'il ne
+    // reste plus de corps du tout.
     while (sim.playerCount > 15) sim.removeParticle(0)
-    // le délai de grâce s'écoule : la dispersion est constatée puis tranchée
     for (let s = 0; s < 30; s++) sim.step(sim.params.dt)
+    expect(sim.dispersed).toBe(false)
+    while (sim.count > 1) sim.removeParticle(0)
+    sim.relabel() // il ne reste plus de corps : là, c'est bien une dispersion
     expect(sim.dispersed).toBe(true)
+  })
+
+  it('le sas avale aussi la glace, et la compte à part', () => {
+    const sim = makeSim()
+    sim.spawnDisc(0, 0, 40, KIND_PLAYER)
+    for (let i = 0; i < sim.count; i++) sim.frozen[i] = 1
+    sim.relabel()
+    const before = sim.count
+    for (let s = 0; s < 60; s++) {
+      sim.applyExitSuction(0, 0, sim.params.dt)
+      sim.step(sim.params.dt)
+    }
+    expect(sim.swallowed).toBeGreaterThan(0)
+    expect(sim.swallowedIce).toBeGreaterThan(0) // la prime de glace a de quoi s'appliquer
+    expect(sim.count).toBeLessThan(before)
   })
 })

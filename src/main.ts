@@ -468,10 +468,24 @@ const waves: { x: number; y: number; t: number }[] = []
 const waveScratch = new Float32Array(MAX_WAVES * 4)
 let waveCarry = WAVE_EVERY // première salve : onde immédiate
 
+// Fin de course (refonte 2026) : il n'y a plus de minimum à ramener. Sous le
+// seuil, le corps a droit à UNE dernière impulsion ; elle relâchée, il se fige
+// en glace avec l'élan qu'il lui reste, et l'essai s'achève là où il s'arrête.
+const endgame = {
+  lastCall: false, // la prochaine impulsion est la dernière
+  spent: false, // elle a été donnée : le corps se fige
+  stillTimer: 0, // temps passé quasi immobile depuis le gel
+  wasAiming: false, // front de relâchement du pointeur
+}
+
 function restart(): void {
   run.exitTimer = 0
   run.tableauTime = 0
   run.ended = false
+  endgame.lastCall = false
+  endgame.spent = false
+  endgame.stillTimer = 0
+  endgame.wasAiming = false
   vortex.timer = 0
   lossPrevLiters = -1
   lossRate = 0
@@ -868,7 +882,7 @@ function frame(now: number): void {
       params.timeWarp,
       params.dt,
       () => {
-        if (input.aimActive && !sim.dispersed) {
+        if (input.aimActive && !sim.dispersed && !endgame.spent) {
           // En vapeur, le pointeur pilote le nuage ; sinon il éjecte
           if (input.gasIntent) sim.applyGasSteer(aim.x, aim.y, params.dt)
           else sim.eject(aim.x, aim.y, params.dt)
@@ -879,6 +893,16 @@ function frame(now: number): void {
           vortex.timer -= params.dt
         }
         sim.applyExitSuction(exitMouth.x, exitMouth.y, params.dt)
+        // Dernière impulsion donnée : le corps figé perd doucement son élan.
+        // Sans cela il glisserait indéfiniment dans le vide et la fin de
+        // course ne se conclurait jamais.
+        if (endgame.spent && params.spentDrag > 0) {
+          const k = Math.exp(-params.spentDrag * params.dt)
+          for (let i = 0; i < sim.count; i++) {
+            sim.velX[i] *= k
+            sim.velY[i] *= k
+          }
+        }
         sim.step(params.dt)
         run.tableauTime += params.dt // temps simulé : le time warp ne fausse pas les records
         run.runTime += params.dt // le vaisseau refroidit au fil de l'expédition
@@ -912,7 +936,10 @@ function frame(now: number): void {
       fromEditor ? 'RETOUR À L’ÉDITEUR' : 'RETOUR AU PROTOCOLE',
     )
   } else if (!tableauDone && !sim.dispersed && (drunk || reached)) {
-    const surplus = sim.liters() + sim.swallowed * params.litersPerParticle
+    // Prime de glace : ce que le sas a avalé SOLIDE vaut plus cher que ce
+    // qu'il a bu goutte à goutte.
+    const prime = sim.swallowedIce * params.litersPerParticle * params.iceCollectBonus
+    const surplus = sim.liters() + sim.swallowed * params.litersPerParticle + prime
     run.bonbonneLiters += surplus
     const { newRecord } = records.noteCollection(level.code, surplus, run.tableauTime)
     // Publication au tableau d'honneur partagé : le serveur ne garde que le
@@ -923,6 +950,8 @@ function frame(now: number): void {
         renderRegistres()
       }
     })
+    const primeLine =
+      prime >= 0.01 ? ` · prime de glace +${prime.toFixed(2)} L` : ''
     const recLine = newRecord
       ? ` · NOUVEAU RECORD DU TABLEAU (${surplus.toFixed(2)} L en ${fmtTime(run.tableauTime)})`
       : ` · record du tableau : ${records.tableauRecord(level.code)!.liters.toFixed(2)} L`
@@ -951,7 +980,7 @@ function frame(now: number): void {
       renderRegistres()
       showOverlay(
         'ÉCHANTILLON COLLECTÉ',
-        `${surplus.toFixed(2)} L transférés en bonbonne — réserve : ${run.bonbonneLiters.toFixed(2)} L${recLine} · tableau suivant…`,
+        `${surplus.toFixed(2)} L transférés en bonbonne${primeLine} — réserve : ${run.bonbonneLiters.toFixed(2)} L${recLine} · tableau suivant…`,
         'success',
       )
     }
@@ -1088,20 +1117,48 @@ function frame(now: number): void {
       : ''
 
   // Compte à rebours de dispersion : sous le seuil, le délai de grâce s'égrène
-  const inDanger = sim.belowCritical && !sim.dispersed && !tableauDone
+  // ---- Fin de course : dernière impulsion, gel, arrêt ----
+  // Aucun minimum à ramener : on peut finir un tableau sur un souffle. Sous le
+  // seuil, la prochaine impulsion est la dernière ; une fois donnée, le corps
+  // se fige avec son élan et l'essai s'achève à l'arrêt.
+  const alive = !sim.dispersed && !tableauDone && !run.ended
+  if (alive && !endgame.spent) {
+    endgame.lastCall = fraction <= params.criticalVolumeFraction
+    const aiming = input.aimActive && !input.paused
+    // le relâchement du pointeur conclut l'impulsion en cours
+    if (endgame.lastCall && endgame.wasAiming && !aiming) endgame.spent = true
+    // plus rien à éjecter : le gel s'impose sans attendre le relâchement
+    if (sim.playerCount <= 8) endgame.spent = true
+    endgame.wasAiming = aiming
+    if (endgame.spent) {
+      input.freezeIntent = true // le froid saisit ce qu'il reste, l'élan est gardé
+      input.gasIntent = false
+    }
+  }
+  if (endgame.spent && alive) {
+    input.freezeIntent = true
+    input.gasIntent = false
+    if (speed < params.stillSpeed) endgame.stillTimer += dtReal
+    else endgame.stillTimer = 0
+    if (endgame.stillTimer >= params.stillTime) sim.dispersed = true // fin de course
+  }
+
+  const nearLast = alive && !endgame.spent && fraction <= params.lastCallFraction
+  const inDanger = alive && (endgame.spent || endgame.lastCall || nearLast)
   if (inDanger) {
-    const left = Math.max(0, params.dispersalGrace - sim.criticalTimer)
-    hudDanger.textContent = `⚠ COHÉSION CRITIQUE — DISPERSION DANS ${left.toFixed(1).replace('.', ',')} s`
+    hudDanger.textContent = endgame.spent
+      ? '❄ DERNIÈRE IMPULSION DONNÉE — FIN DE COURSE À L’ARRÊT'
+      : endgame.lastCall
+        ? '⚠ RÉSERVE À SEC — LA PROCHAINE IMPULSION EST LA DERNIÈRE'
+        : '⚠ RÉSERVE BASSE — LA DERNIÈRE IMPULSION APPROCHE'
   }
   hudDanger.classList.toggle(
     'visible',
     inDanger && document.body.classList.contains('playing') && !input.paused,
   )
-  gaugeFill.classList.toggle('danger', inDanger || sim.dispersed)
-  gaugeFill.classList.toggle(
-    'warn',
-    !inDanger && !sim.dispersed && fraction < params.criticalVolumeFraction * 1.6,
-  )
+  hudDanger.classList.toggle('spent', endgame.spent)
+  gaugeFill.classList.toggle('danger', (inDanger && endgame.lastCall) || endgame.spent || sim.dispersed)
+  gaugeFill.classList.toggle('warn', nearLast && !endgame.lastCall && !sim.dispersed)
 
   // L'objectif : quand le sas sort de l'écran, une flèche le pointe depuis le
   // bord du cadre, avec la distance restante — on sait toujours où aller.
@@ -1214,8 +1271,10 @@ function frame(now: number): void {
       )
     } else {
       showOverlay(
-        'DISPERSION',
-        `La cohésion ne tient plus. Perte de l’échantillon nº ${dispersedEssaiNo} — expédition : ${expeditionSummary(levelIndex)}. Le suivant est prêt.`,
+        endgame.spent ? 'FIN DE COURSE' : 'DISPERSION',
+        endgame.spent
+          ? `Plus rien à éjecter : l’échantillon nº ${dispersedEssaiNo} s’est figé et s’est arrêté — expédition : ${expeditionSummary(levelIndex)}. Le suivant est prêt.`
+          : `La cohésion ne tient plus. Perte de l’échantillon nº ${dispersedEssaiNo} — expédition : ${expeditionSummary(levelIndex)}. Le suivant est prêt.`,
         'danger',
         'ÉCHANTILLON SUIVANT',
       )
