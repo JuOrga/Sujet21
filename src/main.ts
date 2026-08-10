@@ -20,6 +20,7 @@ import {
   type ZoneForce,
 } from './game/level'
 import { LevelEditor } from './editor/editor'
+import { traceLaser, type TraceResultat } from './game/laser'
 import { fetchLibrary } from './game/netLevels'
 import { AudioFx, loadAudioPrefs } from './game/audio'
 import { Soundtrack, type Bruitage, type Piste } from './game/soundtrack'
@@ -526,6 +527,154 @@ const endgame = {
 // Dash de vapeur : viser fige le temps, relâcher lance le nuage (« air
 // dash »). On ne retient qu'une chose entre deux images : était-on en visée.
 const dash = { aiming: false }
+
+// ---- Mécanismes laser (palier 1) ----
+// Le faisceau se trace une fois par IMAGE (pas par pas physique) : la glace
+// bouge à l'échelle de l'image, pas du sous-pas. Une cible reste « allumée »
+// un court instant après le dernier photon (persistance) : la porte ne
+// clignote pas quand le miroir tremble.
+const fxCanvas = document.getElementById('fx-canvas') as HTMLCanvasElement
+const fxCtx = fxCanvas.getContext('2d')!
+const laserEtat = {
+  vues: [] as TraceResultat[],
+  litUntil: [] as number[], // temps simulé jusqu'auquel chaque cible reste allumée
+  portesOuvertes: [] as boolean[],
+  doorsKey: '', // signature des portes fermées envoyées au solveur
+}
+// La superposition des mécanismes : faisceaux, émetteurs, cibles, portes —
+// dessinée en 2D par-dessus la cuve, avec la même caméra que le rendu WebGL.
+function drawMecanismes(vw: number, vh: number, dpr: number): void {
+  const lasers = level.lasers ?? []
+  const cibles = level.cibles ?? []
+  const portes = level.portes ?? []
+  const actif = lasers.length + cibles.length + portes.length > 0
+  const dprC = Math.min(dpr, 2)
+  if (fxCanvas.width !== Math.round(vw * dprC) || fxCanvas.height !== Math.round(vh * dprC)) {
+    fxCanvas.width = Math.round(vw * dprC)
+    fxCanvas.height = Math.round(vh * dprC)
+  }
+  const g = fxCtx
+  g.setTransform(dprC, 0, 0, dprC, 0, 0)
+  g.clearRect(0, 0, vw, vh)
+  if (!actif || !document.body.classList.contains('playing')) return
+  const S = (x: number, y: number): { sx: number; sy: number } => ({
+    sx: vw * 0.5 + (x - camera.x) * camera.zoom,
+    sy: vh * 0.5 - (y - camera.y) * camera.zoom,
+  })
+  const z = camera.zoom
+
+  // portes : barrières d'énergie — pleines quand closes, un cadre quand ouvertes
+  for (let i = 0; i < portes.length; i++) {
+    const p = portes[i]
+    const a = S(p.minX, p.maxY)
+    const b = S(p.maxX, p.minY)
+    const ouverte = laserEtat.portesOuvertes[i]
+    if (ouverte) {
+      g.strokeStyle = 'rgba(90,220,170,0.45)'
+      g.setLineDash([5, 7])
+      g.lineWidth = 1.5
+      g.strokeRect(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy)
+      g.setLineDash([])
+    } else {
+      const puls = 0.75 + 0.25 * Math.sin(elapsed * 3.1 + i)
+      g.fillStyle = `rgba(255,72,72,${(0.16 * puls).toFixed(3)})`
+      g.fillRect(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy)
+      g.strokeStyle = `rgba(255,96,96,${(0.85 * puls).toFixed(3)})`
+      g.lineWidth = 2
+      g.strokeRect(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy)
+      // barreaux d'énergie
+      g.strokeStyle = `rgba(255,110,110,${(0.35 * puls).toFixed(3)})`
+      g.lineWidth = 1
+      g.beginPath()
+      const pas = Math.max(10, 16 * z)
+      if (b.sx - a.sx > b.sy - a.sy) {
+        for (let x = a.sx + pas; x < b.sx; x += pas) {
+          g.moveTo(x, a.sy)
+          g.lineTo(x, b.sy)
+        }
+      } else {
+        for (let y = a.sy + pas; y < b.sy; y += pas) {
+          g.moveTo(a.sx, y)
+          g.lineTo(b.sx, y)
+        }
+      }
+      g.stroke()
+    }
+  }
+
+  // faisceaux : halo large + cœur fin, en fusion additive
+  g.globalCompositeOperation = 'lighter'
+  for (const t of laserEtat.vues) {
+    if (t.points.length < 2) continue
+    const chemins = t.points.map((pt) => S(pt.x, pt.y))
+    const scint = 0.85 + 0.15 * Math.sin(elapsed * 21)
+    for (const [larg, coul] of [
+      [10 * z, `rgba(255,60,50,${(0.10 * scint).toFixed(3)})`],
+      [4.5 * z, `rgba(255,90,70,${(0.30 * scint).toFixed(3)})`],
+      [1.8 * z, `rgba(255,220,200,${(0.95 * scint).toFixed(3)})`],
+    ] as [number, string][]) {
+      g.strokeStyle = coul
+      g.lineWidth = Math.max(0.8, larg)
+      g.lineJoin = 'round'
+      g.lineCap = 'round'
+      g.beginPath()
+      g.moveTo(chemins[0].sx, chemins[0].sy)
+      for (let k = 1; k < chemins.length; k++) g.lineTo(chemins[k].sx, chemins[k].sy)
+      g.stroke()
+    }
+  }
+  g.globalCompositeOperation = 'source-over'
+
+  // émetteurs : un fût court orienté, une bouche lumineuse
+  for (const em of lasers) {
+    const p = S(em.x, em.y)
+    const a = (-em.angle * Math.PI) / 180 // écran : y vers le bas
+    g.save()
+    g.translate(p.sx, p.sy)
+    g.rotate(a)
+    const L = Math.max(8, 16 * z)
+    g.fillStyle = '#2a3742'
+    g.strokeStyle = '#5c7285'
+    g.lineWidth = 1.5
+    g.beginPath()
+    g.roundRect(-L, -L * 0.45, L * 1.7, L * 0.9, L * 0.2)
+    g.fill()
+    g.stroke()
+    g.fillStyle = '#ff6a5a'
+    g.beginPath()
+    g.arc(L * 0.7, 0, Math.max(2, L * 0.22), 0, Math.PI * 2)
+    g.fill()
+    g.restore()
+  }
+
+  // cibles : pastille éteinte / embrasée
+  for (let c = 0; c < cibles.length; c++) {
+    const t = cibles[c]
+    const p = S(t.x, t.y)
+    const lit = run.tableauTime <= (laserEtat.litUntil[c] ?? -1)
+    const r = Math.max(4, t.r * z)
+    g.beginPath()
+    g.arc(p.sx, p.sy, r, 0, Math.PI * 2)
+    g.fillStyle = lit ? 'rgba(120,255,190,0.30)' : 'rgba(40,56,66,0.6)'
+    g.fill()
+    g.lineWidth = 2
+    g.strokeStyle = lit ? '#6dffb8' : '#5c7285'
+    g.stroke()
+    g.beginPath()
+    g.arc(p.sx, p.sy, r * 0.45, 0, Math.PI * 2)
+    g.fillStyle = lit ? '#a9ffd6' : '#33424e'
+    g.fill()
+  }
+}
+
+let lastLaserTime = 0
+function resetLasers(): void {
+  laserEtat.vues = []
+  laserEtat.litUntil = (level.cibles ?? []).map(() => -1)
+  laserEtat.portesOuvertes = (level.portes ?? []).map(() => false)
+  laserEtat.doorsKey = ''
+  lastLaserTime = 0
+}
 const dashAimEl = el('dash-aim')
 const dashCostEl = el('dash-cost')
 
@@ -544,6 +693,7 @@ function restart(): void {
   applyLevel()
   sim = createSim(level)
   exposeSim()
+  resetLasers()
   loop.reset()
   overlay.classList.remove('visible')
   if (document.body.classList.contains('playing')) {
@@ -993,6 +1143,53 @@ function frame(now: number): void {
     monitor.physMs += (performance.now() - physT0 - monitor.physMs) * 0.08
   }
 
+  // ---- Lasers (palier 1) : traçage, cibles, portes, chauffe ----
+  const lasers = level.lasers ?? []
+  if (lasers.length > 0) {
+    const cibles = level.cibles ?? []
+    const portes = level.portes ?? []
+    if (laserEtat.litUntil.length !== cibles.length) resetLasers()
+    // portes fermées AVANT ce traçage : un faisceau ne traverse pas une porte
+    // encore close — elle s'ouvrira pour l'image suivante
+    const fermees = portes.filter((_, i) => !laserEtat.portesOuvertes[i])
+    const rIce = params.particleSpacing * 1.3
+    laserEtat.vues = lasers.map((em) =>
+      traceLaser(em, {
+        bounds: sim.bounds,
+        boxes: level.boxes,
+        portesFermees: fermees,
+        cibles,
+        iceNormal: (x, y) => sim.iceNormalAt(x, y, rIce),
+      }),
+    )
+    // persistance : chaque cible touchée reste allumée 0,35 s simulées
+    for (const t of laserEtat.vues) {
+      for (const c of t.touchees) laserEtat.litUntil[c] = run.tableauTime + 0.35
+    }
+    laserEtat.portesOuvertes = portes.map((p) => {
+      const t = laserEtat.litUntil[p.cible]
+      return t !== undefined && run.tableauTime <= t
+    })
+    // le solveur ne reçoit que les portes closes — recomposé au changement
+    const closes = portes.filter((_, i) => !laserEtat.portesOuvertes[i])
+    const cle = closes.map((p) => `${p.minX},${p.minY},${p.maxX},${p.maxY}`).join(';')
+    if (cle !== laserEtat.doorsKey) {
+      laserEtat.doorsKey = cle
+      sim.setDoors(closes)
+    }
+    // la chauffe : l'eau dans le faisceau s'évapore, au rythme du temps
+    // simulé réellement avancé cette image (le ralenti de visée compte)
+    const dtSim = Math.max(0, run.tableauTime - lastLaserTime)
+    if (dtSim > 0 && !input.paused && !tableauDone && !sim.dispersed) {
+      for (const t of laserEtat.vues) {
+        for (let k = 0; k + 1 < t.points.length; k++) {
+          sim.laserHeat(t.points[k].x, t.points[k].y, t.points[k + 1].x, t.points[k + 1].y, dtSim)
+        }
+      }
+    }
+  }
+  lastLaserTime = run.tableauTime
+
   // Sortie (§7.1-7.2). Sas aspirant : la victoire n'arrive que lorsque le sas
   // a quasi tout bu (≤ 2 % du volume de base) — l'animation d'engloutissement
   // se joue en entier, le tampon ne coupe plus la spirale. Sas désactivé au
@@ -1116,6 +1313,7 @@ function frame(now: number): void {
   }
   updateTutor(dtReal)
   updateWorldLabels(vw, vh)
+  drawMecanismes(vw, vh, dpr)
   const renderT0 = performance.now()
   renderer.render(
     sim,

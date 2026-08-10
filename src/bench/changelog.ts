@@ -11,6 +11,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 00:45',
+    title: 'Le laser entre en scène : le corps gelé est un miroir',
+    notes: [
+      'Premier palier des mécanismes laser. Un ÉMETTEUR trace son faisceau en continu : absorbé par les parois pleines, il PASSE les grilles (de la lumière entre des mailles), et se RÉFLÉCHIT sur la glace — le corps gelé est un miroir, l’angle du reflet suit l’orientation du bloc, que l’on règle en jouant (la rotation des palets sert enfin à ça).',
+      'L’eau paie de rester dans la lumière : le faisceau l’évapore lentement — vers la réserve de rosée, récupérable aux plaques froides. La vapeur, elle, traverse sans se soucier (le plasma, c’est pour plus tard).',
+      'Une CIBLE touchée s’allume, et les PORTES qui lui sont asservies s’ouvrent — des barrières d’énergie rouges qui bloquent tout, eau, glace, vapeur et lumière, tant que leur cible est éteinte. Une persistance courte évite le clignotement quand le miroir tremble.',
+      'L’éditeur a ses trois outils (MÉCANISMES) : l’émetteur se pose et s’oriente d’un seul glisser, la cible se pose d’un clic, la porte se trace comme une paroi et s’asservit à la cible la plus proche (modifiable). L’aperçu du faisceau est tracé par le MÊME code que le jeu — sans miroir, faute de corps : il montre le trajet à vide.',
+      'Le contrôle veille : porte asservie à une cible fantôme = erreur ; émetteur sans cible ou cible sans émetteur = avertissement.',
+    ],
+  },
+  {
     date: '11/08/2026 00:05',
     title: 'L’éponge gorgée ne bloque plus que le liquide',
     notes: [

@@ -23,6 +23,7 @@ import {
   type ZoneForce,
 } from '../game/level'
 import { checkLevel, parseLevel, serializeLevel } from '../game/levelIO'
+import { traceLaser } from '../game/laser'
 import { DEFAULT_PARAMS } from '../sim/params'
 import { PISTES, PISTE_NOMS, type Piste } from '../game/soundtrack'
 import {
@@ -60,12 +61,18 @@ type Tool =
   | { kind: 'spawn' }
   | { kind: 'exit' }
   | { kind: 'label' }
+  | { kind: 'laser' }
+  | { kind: 'cible' }
+  | { kind: 'porte' }
 
 type Sel =
   | { kind: 'box'; index: number }
   | { kind: 'sponge'; index: number }
   | { kind: 'zone'; index: number }
   | { kind: 'label'; index: number }
+  | { kind: 'laser'; index: number }
+  | { kind: 'cible'; index: number }
+  | { kind: 'porte'; index: number }
   | { kind: 'exit' }
   | { kind: 'spawn' }
   | null
@@ -130,6 +137,7 @@ export class LevelEditor {
     | { mode: 'pan'; sx: number; sy: number; camX: number; camY: number }
     | { mode: 'create'; x0: number; y0: number; x1: number; y1: number }
     | { mode: 'move'; ox: number; oy: number; start: Rect }
+    | { mode: 'aim'; index: number }
     | { mode: 'resize'; edge: string; start: Rect } = null
 
   private hint = ''
@@ -242,6 +250,7 @@ export class LevelEditor {
     if (!s) return null
     if (s.kind === 'box') return this.level.boxes[s.index] ?? null
     if (s.kind === 'zone') return (this.level.zones ?? [])[s.index] ?? null
+    if (s.kind === 'porte') return (this.level.portes ?? [])[s.index] ?? null
     if (s.kind === 'exit') return this.level.exit
     if (s.kind === 'sponge') {
       const sp = this.level.sponges[s.index]
@@ -267,6 +276,7 @@ export class LevelEditor {
     }
     if (s.kind === 'box') Object.assign(this.level.boxes[s.index], norm)
     else if (s.kind === 'zone') Object.assign((this.level.zones ?? [])[s.index], norm)
+    else if (s.kind === 'porte') Object.assign((this.level.portes ?? [])[s.index], norm)
     else if (s.kind === 'exit') Object.assign(this.level.exit, norm)
     else if (s.kind === 'sponge') {
       const sp = this.level.sponges[s.index]
@@ -287,6 +297,22 @@ export class LevelEditor {
       if (Math.abs(l.x - x) < r * 1.6 && Math.abs(l.y - y) < r * 0.5) {
         return { kind: 'label', index: i }
       }
+    }
+    const lasers = this.level.lasers ?? []
+    for (let i = lasers.length - 1; i >= 0; i--) {
+      if (Math.hypot(lasers[i].x - x, lasers[i].y - y) < Math.max(24, 26 / this.zoom)) {
+        return { kind: 'laser', index: i }
+      }
+    }
+    const cibles = this.level.cibles ?? []
+    for (let i = cibles.length - 1; i >= 0; i--) {
+      if (Math.hypot(cibles[i].x - x, cibles[i].y - y) < cibles[i].r + 8) {
+        return { kind: 'cible', index: i }
+      }
+    }
+    const portes = this.level.portes ?? []
+    for (let i = portes.length - 1; i >= 0; i--) {
+      if (inside(portes[i])) return { kind: 'porte', index: i }
     }
     const sr = 70
     if (Math.hypot(this.level.spawn.x - x, this.level.spawn.y - y) < sr) return { kind: 'spawn' }
@@ -366,6 +392,12 @@ export class LevelEditor {
         if (hit) {
           if (hit.kind === 'spawn') {
             this.drag = { mode: 'move', ox: w.x - this.level.spawn.x, oy: w.y - this.level.spawn.y, start: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }
+          } else if (hit.kind === 'laser') {
+            const l = (this.level.lasers ?? [])[hit.index]
+            this.drag = { mode: 'move', ox: w.x - l.x, oy: w.y - l.y, start: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }
+          } else if (hit.kind === 'cible') {
+            const t = (this.level.cibles ?? [])[hit.index]
+            this.drag = { mode: 'move', ox: w.x - t.x, oy: w.y - t.y, start: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }
           } else if (hit.kind === 'label') {
             const l = this.level.labels[hit.index]
             this.drag = { mode: 'move', ox: w.x - l.x, oy: w.y - l.y, start: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }
@@ -384,6 +416,23 @@ export class LevelEditor {
         this.level.spawn.y = this.snapped(w.y)
         this.setTool({ kind: 'select' })
         this.commit('Point de départ déplacé.')
+        return
+      }
+      if (this.tool.kind === 'cible') {
+        if (!this.level.cibles) this.level.cibles = []
+        this.level.cibles.push({ x: this.snapped(w.x), y: this.snapped(w.y), r: 26 })
+        this.sel = { kind: 'cible', index: this.level.cibles.length - 1 }
+        this.setTool({ kind: 'select' })
+        this.commit('Cible posée — un faisceau qui la touche l’allume.')
+        return
+      }
+      if (this.tool.kind === 'laser') {
+        if (!this.level.lasers) this.level.lasers = []
+        this.level.lasers.push({ x: this.snapped(w.x), y: this.snapped(w.y), angle: 0 })
+        const index = this.level.lasers.length - 1
+        this.sel = { kind: 'laser', index }
+        this.drag = { mode: 'aim', index } // glisser pour orienter le fût
+        this.draw()
         return
       }
       if (this.tool.kind === 'label') {
@@ -425,8 +474,22 @@ export class LevelEditor {
       } else if (d.mode === 'create') {
         d.x1 = this.snapped(w.x)
         d.y1 = this.snapped(w.y)
+      } else if (d.mode === 'aim') {
+        const l = (this.level.lasers ?? [])[d.index]
+        if (l) {
+          const a = (Math.atan2(w.y - l.y, w.x - l.x) * 180) / Math.PI
+          l.angle = Math.round(((a % 360) + 360) % 360)
+        }
       } else if (d.mode === 'move') {
-        if (this.sel?.kind === 'spawn') {
+        if (this.sel?.kind === 'laser') {
+          const l = (this.level.lasers ?? [])[this.sel.index]
+          l.x = this.snapped(w.x - d.ox)
+          l.y = this.snapped(w.y - d.oy)
+        } else if (this.sel?.kind === 'cible') {
+          const t = (this.level.cibles ?? [])[this.sel.index]
+          t.x = this.snapped(w.x - d.ox)
+          t.y = this.snapped(w.y - d.oy)
+        } else if (this.sel?.kind === 'spawn') {
           this.level.spawn.x = this.snapped(w.x - d.ox)
           this.level.spawn.y = this.snapped(w.y - d.oy)
         } else if (this.sel?.kind === 'label') {
@@ -458,6 +521,11 @@ export class LevelEditor {
       const d = this.drag
       this.drag = null
       if (!d) return
+      if (d.mode === 'aim') {
+        this.setTool({ kind: 'select' })
+        this.commit('Émetteur posé — glissez depuis lui pour réorienter, ou réglez l’angle à droite.')
+        return
+      }
       if (d.mode === 'create') {
         const minX = Math.min(d.x0, d.x1)
         const maxX = Math.max(d.x0, d.x1)
@@ -546,6 +614,28 @@ export class LevelEditor {
       this.level.zones.push({ ...r, force: t.force })
       this.sel = { kind: 'zone', index: this.level.zones.length - 1 }
       this.commit(`Zone « ${t.force} » posée.`)
+    } else if (t.kind === 'porte') {
+      if (!this.level.portes) this.level.portes = []
+      // asservie à la cible la plus proche — modifiable dans le panneau
+      const cx = (r.minX + r.maxX) / 2
+      const cy = (r.minY + r.maxY) / 2
+      let cible = 0
+      let best = Infinity
+      for (let i = 0; i < (this.level.cibles ?? []).length; i++) {
+        const t2 = this.level.cibles![i]
+        const d2 = Math.hypot(t2.x - cx, t2.y - cy)
+        if (d2 < best) {
+          best = d2
+          cible = i
+        }
+      }
+      this.level.portes.push({ ...r, cible })
+      this.sel = { kind: 'porte', index: this.level.portes.length - 1 }
+      this.commit(
+        (this.level.cibles ?? []).length > 0
+          ? `Porte posée, asservie à la cible nº ${cible + 1}.`
+          : 'Porte posée — posez une cible et asservissez-la dans le panneau.',
+      )
     } else if (t.kind === 'exit') {
       Object.assign(this.level.exit, r)
       this.sel = { kind: 'exit' }
@@ -560,6 +650,16 @@ export class LevelEditor {
     if (s.kind === 'box') this.level.boxes.splice(s.index, 1)
     else if (s.kind === 'sponge') this.level.sponges.splice(s.index, 1)
     else if (s.kind === 'zone') (this.level.zones ?? []).splice(s.index, 1)
+    else if (s.kind === 'laser') (this.level.lasers ?? []).splice(s.index, 1)
+    else if (s.kind === 'porte') (this.level.portes ?? []).splice(s.index, 1)
+    else if (s.kind === 'cible') {
+      ;(this.level.cibles ?? []).splice(s.index, 1)
+      // les portes asservies aux cibles suivantes se décalent d'un cran ;
+      // celles de la cible supprimée restent (le contrôle les signalera)
+      for (const p of this.level.portes ?? []) {
+        if (p.cible > s.index) p.cible--
+      }
+    }
     else if (s.kind === 'label') this.level.labels.splice(s.index, 1)
     else {
       this.commit('Le sas et le point de départ ne se suppriment pas.')
@@ -589,6 +689,18 @@ export class LevelEditor {
       const l = this.level.labels[s.index]
       this.level.labels.push({ ...l, x: l.x + off })
       this.sel = { kind: 'label', index: this.level.labels.length - 1 }
+    } else if (s.kind === 'laser') {
+      const l = (this.level.lasers ?? [])[s.index]
+      this.level.lasers!.push({ ...l, x: l.x + off })
+      this.sel = { kind: 'laser', index: this.level.lasers!.length - 1 }
+    } else if (s.kind === 'cible') {
+      const t = (this.level.cibles ?? [])[s.index]
+      this.level.cibles!.push({ ...t, x: t.x + off })
+      this.sel = { kind: 'cible', index: this.level.cibles!.length - 1 }
+    } else if (s.kind === 'porte') {
+      const q = (this.level.portes ?? [])[s.index]
+      this.level.portes!.push({ ...q, minX: q.minX + off, maxX: q.maxX + off })
+      this.sel = { kind: 'porte', index: this.level.portes!.length - 1 }
     } else return
     this.commit('Dupliqué (D).')
   }
@@ -630,6 +742,9 @@ export class LevelEditor {
         else if (key === 'spawn') this.setTool({ kind: 'spawn' })
         else if (key === 'exit') this.setTool({ kind: 'exit' })
         else if (key === 'label') this.setTool({ kind: 'label' })
+        else if (key === 'laser') this.setTool({ kind: 'laser' })
+        else if (key === 'cible') this.setTool({ kind: 'cible' })
+        else if (key === 'porte') this.setTool({ kind: 'porte' })
         else this.setTool({ kind: 'select' })
       })
     }
@@ -949,6 +1064,20 @@ export class LevelEditor {
     } else if (s.kind === 'spawn') {
       rows.push(numField('X', 'p-sx', this.level.spawn.x), numField('Y', 'p-sy', this.level.spawn.y))
       rows.push(numField('Particules', 'p-sn', this.level.spawn.n, 50))
+    } else if (s.kind === 'laser') {
+      const l = (this.level.lasers ?? [])[s.index]
+      rows.push(numField('X', 'p-lax', l.x), numField('Y', 'p-lay', l.y))
+      rows.push(numField('Angle (°)', 'p-laa', l.angle, 5))
+    } else if (s.kind === 'cible') {
+      const t = (this.level.cibles ?? [])[s.index]
+      rows.push(numField('X', 'p-cx', t.x), numField('Y', 'p-cy', t.y))
+      rows.push(numField('Rayon', 'p-cr', t.r, 2))
+      rows.push(`<p class="ed-empty">Cible nº ${s.index + 1} — les portes s’y asservissent par ce numéro.</p>`)
+    } else if (s.kind === 'porte') {
+      const q = (this.level.portes ?? [])[s.index]
+      rows.push(numField('Cible asservie (nº)', 'p-pc', q.cible + 1, 1))
+      rows.push(numField('X min', 'p-minX', q.minX), numField('X max', 'p-maxX', q.maxX))
+      rows.push(numField('Y min', 'p-minY', q.minY), numField('Y max', 'p-maxY', q.maxY))
     } else if (s.kind === 'label') {
       const l = this.level.labels[s.index]
       rows.push(`<label class="ed-f"><span>Texte</span><input id="p-text" value="${l.text.replace(/"/g, '&quot;')}" /></label>`)
@@ -973,7 +1102,13 @@ export class LevelEditor {
               ? 'Sas'
               : s.kind === 'spawn'
                 ? 'Point de départ'
-                : 'Étiquette'
+                : s.kind === 'laser'
+                  ? 'Émetteur laser'
+                  : s.kind === 'cible'
+                    ? `Cible nº ${s.index + 1}`
+                    : s.kind === 'porte'
+                      ? 'Porte asservie'
+                      : 'Étiquette'
 
     host.innerHTML =
       `<div class="ed-props-head">${kindName}</div><div class="ed-fields">${rows.join('')}</div>` +
@@ -1026,6 +1161,20 @@ export class LevelEditor {
       this.level.spawn.x = val('p-sx')
       this.level.spawn.y = val('p-sy')
       this.level.spawn.n = Math.max(50, Math.min(3000, Math.round(val('p-sn'))))
+    } else if (s.kind === 'laser') {
+      const l = (this.level.lasers ?? [])[s.index]
+      l.x = val('p-lax')
+      l.y = val('p-lay')
+      l.angle = ((val('p-laa') % 360) + 360) % 360
+    } else if (s.kind === 'cible') {
+      const t = (this.level.cibles ?? [])[s.index]
+      t.x = val('p-cx')
+      t.y = val('p-cy')
+      t.r = Math.max(8, val('p-cr'))
+    } else if (s.kind === 'porte') {
+      const q = (this.level.portes ?? [])[s.index]
+      q.cible = Math.max(0, Math.round(val('p-pc')) - 1)
+      Object.assign(q, this.normalized(val('p-minX'), val('p-minY'), val('p-maxX'), val('p-maxY')))
     } else if (s.kind === 'label') {
       const l = this.level.labels[s.index]
       l.text = text('p-text').toUpperCase().slice(0, 40) || l.text
@@ -1291,6 +1440,85 @@ export class LevelEditor {
       } else {
         g.drawImage(im, dp.sx, dp.sy, dw, dh)
       }
+      g.restore()
+    }
+
+    // ---- Mécanismes laser : portes, cibles, émetteurs, et l'APERÇU du
+    // faisceau — le même traceur que le jeu (sans miroir de glace : il n'y a
+    // pas de corps ici, le rayon file droit et montre le trajet à vide).
+    const portes = this.level.portes ?? []
+    const cibles = this.level.cibles ?? []
+    const lasers = this.level.lasers ?? []
+    for (let i = 0; i < portes.length; i++) {
+      const q = portes[i]
+      const p = this.toScreen(q.minX, q.maxY)
+      const r = this.toScreen(q.maxX, q.minY)
+      g.fillStyle = 'rgba(255,90,90,0.16)'
+      g.fillRect(p.sx, p.sy, r.sx - p.sx, r.sy - p.sy)
+      g.strokeStyle = '#ff5a5a'
+      g.lineWidth = 1.5
+      g.strokeRect(p.sx, p.sy, r.sx - p.sx, r.sy - p.sy)
+      g.fillStyle = '#ff9a8a'
+      g.font = '600 10px ui-monospace, monospace'
+      g.fillText(`PORTE → CIBLE ${q.cible + 1}`, p.sx + 4, p.sy - 4)
+    }
+    // l'aperçu des faisceaux d'abord : les pastilles se dessinent par-dessus
+    const touchees = new Set<number>()
+    for (const em of lasers) {
+      const t = traceLaser(em, {
+        bounds: this.level.bounds,
+        boxes: this.level.boxes,
+        portesFermees: portes,
+        cibles,
+        iceNormal: null,
+      })
+      for (const c of t.touchees) touchees.add(c)
+      g.strokeStyle = 'rgba(255,90,70,0.8)'
+      g.lineWidth = 1.5
+      g.setLineDash([8, 6])
+      g.beginPath()
+      const p0 = this.toScreen(t.points[0].x, t.points[0].y)
+      g.moveTo(p0.sx, p0.sy)
+      for (let k = 1; k < t.points.length; k++) {
+        const pk = this.toScreen(t.points[k].x, t.points[k].y)
+        g.lineTo(pk.sx, pk.sy)
+      }
+      g.stroke()
+      g.setLineDash([])
+    }
+    for (let i = 0; i < cibles.length; i++) {
+      const t = cibles[i]
+      const p = this.toScreen(t.x, t.y)
+      const rr = Math.max(5, t.r * this.zoom)
+      g.beginPath()
+      g.arc(p.sx, p.sy, rr, 0, Math.PI * 2)
+      g.fillStyle = touchees.has(i) ? 'rgba(110,255,185,0.30)' : 'rgba(48,64,76,0.7)'
+      g.fill()
+      g.strokeStyle = touchees.has(i) ? '#6dffb8' : '#7b93a8'
+      g.lineWidth = 2
+      g.stroke()
+      g.fillStyle = touchees.has(i) ? '#0c1a14' : '#cfe2ef'
+      g.font = '700 10px ui-monospace, monospace'
+      g.fillText(String(i + 1), p.sx - 3, p.sy + 3.5)
+    }
+    for (const em of lasers) {
+      const p = this.toScreen(em.x, em.y)
+      const a = (-em.angle * Math.PI) / 180
+      g.save()
+      g.translate(p.sx, p.sy)
+      g.rotate(a)
+      const L = Math.max(9, 15 * this.zoom)
+      g.fillStyle = '#2a3742'
+      g.strokeStyle = '#ff8a70'
+      g.lineWidth = 1.5
+      g.beginPath()
+      g.roundRect(-L, -L * 0.45, L * 1.7, L * 0.9, L * 0.2)
+      g.fill()
+      g.stroke()
+      g.fillStyle = '#ff6a5a'
+      g.beginPath()
+      g.arc(L * 0.7, 0, Math.max(2.5, L * 0.22), 0, Math.PI * 2)
+      g.fill()
       g.restore()
     }
 

@@ -104,6 +104,12 @@ export interface SimParams {
   frostSluggish: number // traînée à pleine givre (1/s) : l'eau engourdie rampe
   heatAgitation: number // frémissement à pleine chauffe (u/s²) : l'eau chaude bout doucement
 
+  // Laser (palier 1) : le faisceau chauffe l'eau qu'il traverse — la glace
+  // le réfléchit (miroir), la vapeur le laisse passer. Les pertes rejoignent
+  // la réserve de rosée, récupérables aux plaques froides.
+  laserWidth: number // demi-largeur du couloir de chauffe (unités monde)
+  laserEvapRate: number // évaporation (particule/s) pour CHAQUE particule d'eau dans le faisceau
+
   // Sas de sortie : une bouche d'aspiration dans laquelle l'eau s'engouffre
   exitRadius: number // portée de l'aspiration autour de la bouche (unités monde)
   exitPull: number // vitesse du courant d'aspiration (u/s), renforcée à l'approche du trou
@@ -236,6 +242,9 @@ export const DEFAULT_PARAMS: SimParams = {
 
   frostSluggish: 3,
   heatAgitation: 240,
+
+  laserWidth: 9,
+  laserEvapRate: 0.5,
 
   exitRadius: 240,
   exitPull: 300,
