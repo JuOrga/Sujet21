@@ -686,7 +686,7 @@
         background: #8fc8ee;
         color: var(--void);
       }
-      /* Visée du dash vapeur : le temps est figé, la ligne montre la
+      /* Visée du dash vapeur : le temps est au ralenti, la ligne montre la
          trajectoire depuis le corps jusqu'au pointeur, le coût est annoncé */
       #dash-aim {
         position: fixed;
@@ -1783,7 +1783,7 @@
       <div class="home-commands cmd-desktop">
         <kbd>maintenir</kbd>éjecter vers le pointeur — le corps part à l'opposé<br />
         <kbd>F</kbd>glace : le bloc garde son élan
-        <kbd>G</kbd>vapeur : viser (temps figé), relâcher = dash<br />
+        <kbd>G</kbd>vapeur : viser (temps ralenti), relâcher = dash<br />
         <kbd>molette</kbd>zoom
         <kbd>clic droit maintenu</kbd>déplacer la caméra
         <kbd>⌖</kbd>recadrer<br />
@@ -1841,7 +1841,7 @@
       <button id="state-glace" type="button" title="se changer en glace (F) : le bloc garde son élan">
         <span class="st-ico">❄</span><span class="st-label">GLACE</span><kbd>F</kbd>
       </button>
-      <button id="state-vapeur" type="button" title="se changer en vapeur (G) : visez — le temps se fige — relâchez, le nuage fuse">
+      <button id="state-vapeur" type="button" title="se changer en vapeur (G) : visez — le temps ralentit — relâchez, le nuage fuse ; la distance du doigt fait la puissance">
         <span class="st-ico">💨</span><span class="st-label">VAPEUR</span><kbd>G</kbd>
       </button>
     </div>
@@ -1982,7 +1982,7 @@
       <div class="lg-states">ÉTATS —
         <b>💧 EAU</b> : pilotable, éjecter pour avancer ·
         <b>❄ GLACE</b> (F) : le bloc garde son élan, re-presser dégèle ·
-        <b>💨 VAPEUR</b> (G) : viser fige le temps, relâcher = dash (⅓ du volume).</div>
+        <b>💨 VAPEUR</b> (G) : viser ralentit le temps, relâcher = dash (⅓ du volume, puissance à la distance).</div>
     </div>
 
     <div id="states" role="dialog" aria-label="Les trois états : qui bloque quoi">
@@ -2005,10 +2005,11 @@
         dégelée par les <i class="m-chaud">radiateurs</i> ·
         le <i class="m-sas">sas</i> la hale et l'avale — entrer solide paie une prime.</span></div>
       <div class="lg-row"><span class="st-big">💨</span>
-        <span><b>VAPEUR</b> (G) — viser fige le temps, relâcher lance le nuage
-        d'un trait (dash) : chaque dash évapore un tiers du volume courant,
-        et l'état lui-même s'évapore en continu — un compte à rebours, pas un
-        mode de croisière.<br />
+        <span><b>VAPEUR</b> (G) — viser ralentit fortement le temps, relâcher
+        lance le nuage d'un trait (dash) : la distance du doigt règle la
+        puissance, chaque dash évapore un tiers du volume courant, et l'état
+        lui-même s'évapore en continu — un compte à rebours, pas un mode de
+        croisière.<br />
         Traverse les <i class="m-grille">grilles</i> (qui l'essorent : péage en
         volume) et l'<i class="m-eponge">éponge</i> ·
         bloquée par les <i class="m-mur">parois</i> ·

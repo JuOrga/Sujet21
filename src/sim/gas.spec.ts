@@ -71,6 +71,32 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
     expect(liquides).toBe(0)
   })
 
+  it('la puissance du dash suit la distance du pointeur : à mi-portée, mi-vitesse', () => {
+    const faire = (dist: number): number => {
+      const sim = makeSim()
+      sim.setLevel([], [])
+      sim.spawnDisc(0, 0, 60, KIND_PLAYER)
+      sim.gasIntent = true
+      run(sim, 1.2)
+      sim.updatePlayerStats()
+      sim.gasDash(sim.stats.centroidX + dist, sim.stats.centroidY)
+      sim.updatePlayerStats()
+      return Math.hypot(sim.stats.velX, sim.stats.velY)
+    }
+    const pleine = faire(sim0RangePlus())
+    const moitie = faire(DEFAULT_PARAMS.gasDashRange / 2)
+    expect(pleine).toBeGreaterThan(DEFAULT_PARAMS.gasDashSpeed * 0.85)
+    expect(moitie).toBeGreaterThan(DEFAULT_PARAMS.gasDashSpeed * 0.35)
+    expect(moitie).toBeLessThan(DEFAULT_PARAMS.gasDashSpeed * 0.65)
+    // au-delà de la portée, rien de plus : viser à deux kilomètres est inutile
+    const tresLoin = faire(DEFAULT_PARAMS.gasDashRange * 8)
+    expect(Math.abs(tresLoin - pleine)).toBeLessThan(DEFAULT_PARAMS.gasDashSpeed * 0.1)
+
+    function sim0RangePlus(): number {
+      return DEFAULT_PARAMS.gasDashRange * 1.2
+    }
+  })
+
   it('chaque dash coûte la même FRACTION : le second prélève un tiers du volume restant', () => {
     const sim = makeSim()
     sim.setLevel([], [])

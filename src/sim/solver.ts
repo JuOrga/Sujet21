@@ -514,6 +514,10 @@ export class FluidSim {
     if (d < 1e-3) return 0
     dx /= d
     dy /= d
+    // La distance du pointeur règle la puissance : pleine à gasDashRange,
+    // dégressive en deçà — viser près du corps donne un petit bond, viser
+    // loin donne le dash entier, et au-delà rien de plus.
+    const power = Math.min(1, d / Math.max(1, p.gasDashRange))
     let gasCount = 0
     for (let i = 0; i < this.count; i++) {
       if (this.kind[i] === KIND_PLAYER && this.gaseous[i] === 1) gasCount++
@@ -539,8 +543,8 @@ export class FluidSim {
     }
     for (let i = 0; i < this.count; i++) {
       if (this.kind[i] !== KIND_PLAYER || this.gaseous[i] !== 1) continue
-      this.velX[i] = dx * p.gasDashSpeed
-      this.velY[i] = dy * p.gasDashSpeed
+      this.velX[i] = dx * p.gasDashSpeed * power
+      this.velY[i] = dy * p.gasDashSpeed * power
     }
     return spent
   }
