@@ -480,6 +480,7 @@ void main() {
              + 0.03 * sin(8.0 * thz + phz.z);
     float szn = dz / wz;
     float inZone = 1.0 - step(1.0, szn);         // 1 dedans
+    float assetA = 0.0; // alpha de l'illustration à ce fragment
     // la cause du régime, peinte en fond de zone (sous le voile)
     if (szn < 1.0) {
       // l'image de la cause : ajustée dans la zone (contain, centrée), un
@@ -496,24 +497,25 @@ void main() {
                   : f < 2.5 ? texture(uTexZoneHublot, tuv)
                             : texture(uTexZoneConduite, tuv);
           col = mix(col, zt.rgb * vec3(0.68, 0.76, 0.86), zt.a * 0.92);
+          assetA = zt.a;
         }
       }
       col += zoneDecor(world, zc2, zh2, f, uTime, hasZTex);
     }
-    // Le régime ÉMANE de l'accident : un souffle teinté, dense au foyer,
-    // fondu vers la lisière — plus de rectangle, plus de chevrons.
-    float core = 1.0 - smoothstep(0.0, 1.0, szn);
-    float waft = 0.75 + 0.25 * vnoise(nq * 2.6 + vec2(uTime * 0.06, -uTime * 0.045));
-    col += zc * core * core * 0.16 * waft;
-    // la lisière : un liseré irrégulier qui ondule doucement — vivant, pas
-    // administratif. Son intensité varie le long du bord (bruit sur l'angle).
-    float ripple = 0.02 * sin(thz * 12.0 + uTime * 0.8);
-    float edgeZ = exp(-abs(szn - 1.0 + ripple) * 22.0);
-    float life = 0.55 + 0.45 * vnoise(vec2(thz * 3.1, uTime * 0.22) + zc2 * 0.013);
-    col += zc * edgeZ * 0.60 * life;
-    // halo court à l'extérieur : la limite se devine avant d'être franchie
-    float glow = exp(-max(szn - 1.0, 0.0) * 8.0) * step(1.0, szn);
-    col += zc * glow * 0.14 * life;
+    // Une BRUME d'accident, pas un contour : dense au foyer, teintée, elle
+    // se dissout en lambeaux vers la lisière — le bruit déchire le bord au
+    // lieu de le dessiner. Aucune ligne : une atmosphère qui s'échappe.
+    float n1 = vnoise(world * 0.011 + vec2(uTime * 0.05, -uTime * 0.033) + zc2 * 0.003);
+    float n2 = vnoise(world * 0.031 - vec2(uTime * 0.021, uTime * 0.037));
+    float fog = 0.6 * n1 + 0.4 * n2;
+    // le bord de la brume suit la forme, déchiqueté par le bruit (±0,13) —
+    // les lambeaux meurent SUR la lisière mécanique, jamais au-delà
+    float body = smoothstep(1.0, 0.5, szn + (fog - 0.5) * 0.26);
+    // plus légère sur l'illustration : la cause reste lisible sous sa brume
+    col += zc * body * (0.05 + 0.15 * fog) * (1.0 - 0.6 * assetA);
+    // un souffle discret au ras de la lisière, en lambeaux lui aussi — la
+    // limite se devine, elle ne se trace pas
+    col += zc * exp(-abs(szn - 1.0) * 26.0) * 0.12 * fog * fog;
   }
 
   // Textures des matériaux : prélevées hors des branches (flux de contrôle
