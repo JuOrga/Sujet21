@@ -93,6 +93,21 @@ export const MATERIAL_NAMES: Record<number, string> = {
   [MAT_CHAUD]: 'Radiateur',
 }
 
+// La CAUSE de chaque zone : une zone n'impose pas un état par convention, elle
+// l'impose parce qu'il s'est passé quelque chose ici. Le nom sert d'étiquette
+// par défaut, et le décor de la zone illustre la même cause.
+export const ZONE_CAUSES: Record<ZoneForce, string> = {
+  glace: 'HUBLOT FENDU',
+  vapeur: 'CONDUITE ROMPUE',
+  eau: 'CHAMBRE PRESSURISÉE',
+  libre: 'ZONE LIBRE',
+}
+
+/** Le nom affiché d'une zone : le sien, ou la cause de son régime. */
+export function zoneName(z: ZoneDef): string {
+  return z.label && z.label.trim() ? z.label.trim().toUpperCase() : ZONE_CAUSES[z.force]
+}
+
 /** L'état imposé au point (x, y), ou 'libre' si aucune zone ne l'impose. */
 export function zoneForceAt(level: LevelDef, x: number, y: number): ZoneForce {
   const zones = level.zones

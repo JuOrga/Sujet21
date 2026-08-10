@@ -14,6 +14,7 @@ import {
   TABLEAUX,
   pointInBox,
   zoneForceAt,
+  zoneName,
   type LevelDef,
   type ObstacleBox,
   type ZoneForce,
@@ -133,7 +134,8 @@ function buildWorldLabels(): void {
     if (z.force === 'libre') continue
     const span = document.createElement('span')
     span.className = 'world-label wl-zone'
-    span.textContent = z.label ? `${z.label.toUpperCase()} · ${z.force.toUpperCase()}` : `ZONE ${z.force.toUpperCase()}`
+    // le nom dit la CAUSE (« hublot fendu »), le suffixe dit la règle
+    span.textContent = `${zoneName(z)} · ${z.force.toUpperCase()}`
     span.style.color = ZONE_LABEL_COLORS[z.force] ?? '#7b93a8'
     span.style.borderColor = ZONE_LABEL_COLORS[z.force] ?? '#7b93a8'
     worldLabelsHost.appendChild(span)

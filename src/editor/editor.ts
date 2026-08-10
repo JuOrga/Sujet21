@@ -14,6 +14,8 @@ import {
   MAT_HYDROPHILE,
   MAT_HYDROPHOBE,
   MAT_WALL,
+  ZONE_CAUSES,
+  zoneName,
   type LevelDef,
   type SpongeDef,
   type WorldLabel,
@@ -897,7 +899,8 @@ export class LevelEditor {
           `</select></label>`,
       )
       rows.push(
-        `<label class="ed-f"><span>Nom (facultatif)</span><input id="p-zlabel" value="${(z.label ?? '').replace(/"/g, '&quot;')}" /></label>`,
+        `<label class="ed-f"><span>Cause (le nom du lieu)</span>` +
+          `<input id="p-zlabel" placeholder="${ZONE_CAUSES[z.force]}" value="${(z.label ?? '').replace(/"/g, '&quot;')}" /></label>`,
       )
       rows.push(numField('X min', 'p-minX', z.minX), numField('X max', 'p-maxX', z.maxX))
       rows.push(numField('Y min', 'p-minY', z.minY), numField('Y max', 'p-maxY', z.maxY))
@@ -1087,7 +1090,7 @@ export class LevelEditor {
       g.setLineDash([])
       g.fillStyle = col
       g.font = '600 11px ui-monospace, monospace'
-      g.fillText(`ZONE ${z.force.toUpperCase()}${z.label ? ' · ' + z.label : ''}`, p.sx + 6, p.sy + 15)
+      g.fillText(`${zoneName(z)} · ${z.force.toUpperCase()}`, p.sx + 6, p.sy + 15)
     }
 
     // éponges

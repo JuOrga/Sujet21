@@ -254,6 +254,104 @@ vec3 shipLife(vec2 world, float zoom, float t) {
   return acc;
 }
 
+// Distance d'un point à un segment — sert aux fissures du hublot.
+float segDist(vec2 p, vec2 a, vec2 b) {
+  vec2 pa = p - a;
+  vec2 ba = b - a;
+  float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0);
+  return length(pa - ba * h);
+}
+
+// ---- Le décor des zones : la CAUSE du régime imposé ----------------------
+// Une zone n'impose pas un état par décret : il s'est passé quelque chose ici.
+// Le hublot fendu laisse entrer le vide et tout gèle ; la conduite rompue
+// noie la salle de vapeur ; la chambre pressurisée interdit tout changement
+// de phase. On dessine la cause, le joueur en déduit la règle.
+vec3 zoneDecor(vec2 world, vec2 zc, vec2 zh, float force, float t) {
+  vec3 acc = vec3(0.0);
+  vec2 q = world - zc;
+
+  if (force > 1.5 && force < 2.5) {
+    // GLACE — le hublot fendu. Un grand hublot en arrière-plan : cadre
+    // métallique, verre sur le vide étoilé, fêlures depuis le point d'impact,
+    // et le givre qui gagne depuis la monture.
+    float R = min(zh.x, zh.y) * 0.66;
+    float d = length(q);
+    float glass = 1.0 - smoothstep(R * 0.94, R, d);
+
+    // le vide au-delà de la vitre : plus noir que la cuve, et des étoiles
+    acc -= vec3(0.045, 0.062, 0.082) * glass;
+    float star = specks(q * 1.7 + vec2(311.0, 57.0), 90.0, 0.07, 1.0);
+    acc += vec3(0.55, 0.70, 0.92) * star * glass * 0.5;
+
+    // la monture : un anneau large, métal froid
+    float ring = (1.0 - smoothstep(R * 0.055, R * 0.10, abs(d - R * 0.97)));
+    acc += vec3(0.30, 0.42, 0.54) * ring * 0.55;
+    float bolt = 0.5 + 0.5 * sin(atan(q.y, q.x) * 14.0);
+    acc += vec3(0.40, 0.54, 0.66) * ring * smoothstep(0.86, 1.0, bolt) * 0.5;
+
+    // les fêlures : cinq éclats depuis un point d'impact décentré
+    vec2 hit = vec2(R * 0.26, -R * 0.17);
+    float crack = 0.0;
+    for (int k = 0; k < 5; k++) {
+      float a = float(k) * 1.2566 + 0.5;
+      float len = R * (0.75 + 0.25 * hash21(vec2(float(k), 3.0)));
+      vec2 e = hit + vec2(cos(a), sin(a)) * len;
+      crack = max(crack, 1.0 - smoothstep(0.0, R * 0.018, segDist(q, hit, e)));
+    }
+    // une fêlure transversale, pour que le réseau ne soit pas une étoile
+    crack = max(crack, 1.0 - smoothstep(0.0, R * 0.014,
+      segDist(q, hit + vec2(-R * 0.5, R * 0.35), hit + vec2(R * 0.55, R * 0.62))));
+    acc += vec3(0.78, 0.92, 1.00) * crack * glass * 0.55;
+
+    // le givre : depuis la monture vers l'intérieur, en dentelle
+    float rim = smoothstep(R * 0.45, R, d) * glass;
+    float lace = 0.5 + 0.5 * vnoise(q * 0.12 + vec2(t * 0.02, -t * 0.015));
+    acc += vec3(0.42, 0.62, 0.78) * rim * lace * 0.34;
+    // souffle glacé qui s'échappe de l'impact
+    float breath = (1.0 - smoothstep(0.0, R * 1.5, length(q - hit)));
+    acc += vec3(0.20, 0.34, 0.46) * breath * breath *
+      (0.5 + 0.5 * vnoise(q * 0.05 + vec2(-t * 0.22, t * 0.14))) * 0.30;
+  } else if (force > 2.5) {
+    // VAPEUR — la conduite rompue. Un gros collecteur traverse la salle ;
+    // sa brèche crache un panache qui monte et se tord.
+    float pipeR = min(zh.y * 0.34, 90.0);
+    float floorY = -zh.y * 0.66; // le collecteur court au sol de la salle
+    float pipe = 1.0 - smoothstep(pipeR * 0.86, pipeR, abs(q.y - floorY));
+    acc += vec3(0.16, 0.19, 0.24) * pipe * 0.9;
+    // brides régulières le long du tube
+    float flange = smoothstep(0.90, 1.0, 0.5 + 0.5 * sin(q.x * 0.035));
+    acc += vec3(0.26, 0.31, 0.38) * pipe * flange * 0.7;
+    // la brèche, au centre du tube
+    float breach = 1.0 - smoothstep(pipeR * 0.5, pipeR * 1.4, length(q - vec2(0.0, floorY)));
+    acc -= vec3(0.05, 0.06, 0.08) * breach;
+    // le panache : il monte depuis la brèche et se disperse en hauteur
+    vec2 pl = q - vec2(0.0, floorY);
+    float up = clamp(pl.y / max(zh.y * 1.7, 1.0), 0.0, 1.0);
+    float wide = 1.0 - smoothstep(pipeR * (0.6 + 3.0 * up), pipeR * (1.4 + 5.0 * up), abs(pl.x));
+    float curl = 0.5 + 0.5 * vnoise(vec2(pl.x * 0.03, pl.y * 0.012 - t * 0.5));
+    acc += vec3(0.46, 0.36, 0.58) * wide * curl * (1.0 - 0.75 * up) * 0.52 * step(0.0, pl.y);
+  } else if (force > 0.5) {
+    // EAU — la chambre pressurisée. Des rampes de buses au plafond, un voile
+    // de condensation, des gouttes qui perlent : ici, rien ne bout ni ne gèle.
+    float ceil_ = zh.y * 0.78;
+    float rail = 1.0 - smoothstep(10.0, 16.0, abs(q.y - ceil_));
+    acc += vec3(0.20, 0.28, 0.36) * rail * 0.8;
+    float nozzle = smoothstep(0.86, 1.0, 0.5 + 0.5 * sin(q.x * 0.045));
+    acc += vec3(0.30, 0.52, 0.66) * rail * nozzle * 0.9;
+    // gouttes : elles descendent lentement sous chaque buse
+    float col = sin(q.x * 0.045);
+    float fall = fract((ceil_ - q.y) * 0.006 + t * 0.11 + hash21(vec2(floor(q.x * 0.0072), 1.0)));
+    float drop = smoothstep(0.96, 1.0, 1.0 - fall) * smoothstep(0.86, 1.0, 0.5 + 0.5 * col);
+    acc += vec3(0.30, 0.56, 0.74) * drop * 0.5 * step(0.0, ceil_ - q.y);
+    // voile de condensation, dense en bas
+    float mistY = 1.0 - smoothstep(-zh.y, zh.y * 0.4, q.y);
+    acc += vec3(0.16, 0.30, 0.40) * mistY *
+      (0.4 + 0.6 * vnoise(q * 0.02 + vec2(t * 0.05, 0.0))) * 0.16;
+  }
+  return acc;
+}
+
 // distance signée à une boîte (négatif à l'intérieur)
 float boxSdf(vec2 world, vec4 b) {
   vec2 c = (b.xy + b.zw) * 0.5;
@@ -352,18 +450,24 @@ void main() {
                       : vec3(0.72, 0.56, 0.95);  // vapeur
     float zd = boxSdf(world, uZones[zi]);
     float inZone = 1.0 - step(0.0, zd);          // 1 dedans
+    // la cause du régime, peinte en fond de zone (sous le voile)
+    if (inZone > 0.5) {
+      vec2 zc2 = (uZones[zi].xy + uZones[zi].zw) * 0.5;
+      vec2 zh2 = (uZones[zi].zw - uZones[zi].xy) * 0.5;
+      col += zoneDecor(world, zc2, zh2, f, uTime);
+    }
     // voile intérieur, plus dense près du bord
     float depth = clamp(-zd / 260.0, 0.0, 1.0);
-    float veil = inZone * (0.30 - 0.16 * depth);
+    float veil = inZone * (0.17 - 0.09 * depth);
     // chevrons lents : le régime « circule »
     float bands = 0.5 + 0.5 * sin((world.x + world.y) * 0.012 - uTime * 0.55);
-    veil += inZone * bands * 0.085;
+    veil += inZone * bands * 0.05;
     col += zc * veil;
     // bourrelet intérieur : une marge hachurée le long de la frontière, comme
     // un marquage au sol — c'est ce qui se lit de loin
     float lip = inZone * (1.0 - smoothstep(0.0, 70.0, -zd));
     float hatch = 0.5 + 0.5 * sin((world.x - world.y) * 0.09 - uTime * 1.1);
-    col += zc * lip * (0.16 + 0.22 * hatch);
+    col += zc * lip * (0.10 + 0.15 * hatch);
     // liseré de frontière, épaisseur constante à l'écran
     float edgeZ = 1.0 - smoothstep(0.0, 4.0 / uZoom, abs(zd));
     col += zc * edgeZ * 0.95;
