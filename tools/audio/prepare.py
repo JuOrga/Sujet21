@@ -44,9 +44,19 @@ PONCTUATIONS = [
     ('fin-de-course.mp3', 'fin-de-course.mp3', 107.25, 11.0, 4.0, -19.0, 64),
 ]
 
+# Coups taillés au plus court : nom master, sortie, début (s), durée (s),
+# crête visée (dBFS), débit. L'éjection est une goutte qui tombe dans l'eau —
+# trois prises de hauteurs différentes (562, 604 et 674 Hz de résonance de
+# bulle) tirées au sort à chaque impulsion, pour que la répétition ne
+# s'entende pas. Chacune est coupée juste après l'extinction de la bulle.
+COUPS = [
+    ('ejection-1.mp3', 'ejection-1.mp3', 0.0, 0.55, -3.0, 96),
+    ('ejection-2.mp3', 'ejection-2.mp3', 0.0, 0.42, -3.0, 96),
+    ('ejection-3.mp3', 'ejection-3.mp3', 0.0, 0.75, -3.0, 96),
+]
+
 # Bruitages courts : gardés entiers, juste normalisés en crête et allégés.
 COURTS = [
-    ('ejection.mp3', 'ejection.mp3', -3.0, 80),
     ('gel.mp3', 'gel.mp3', -3.0, 80),
     ('vaporisation.mp3', 'vaporisation.mp3', -3.0, 80),
     ('condensation.mp3', 'condensation.mp3', -4.0, 80),
@@ -119,6 +129,14 @@ def main() -> None:
         taille = os.path.getsize(os.path.join(DST, out))
         total += taille
         print(f'ponctuat. {out:30s} {duree:5.1f} s  {taille/1024:6.0f} ko')
+    for nom, out, t0, duree, cible, debit in COUPS:
+        x, sr = lire_mono(nom)
+        a, b = int(t0 * sr), int((t0 + duree) * sr)
+        seg = cale_crete(fondu(x[a:b], sr, 0.002, 0.05), cible)
+        encode(seg, sr, debit, out)
+        taille = os.path.getsize(os.path.join(DST, out))
+        total += taille
+        print(f'coup      {out:30s} {duree:5.2f} s  {taille/1024:6.0f} ko')
     for nom, out, cible, debit in COURTS:
         x, sr = lire_mono(nom)
         seg = cale_crete(fondu(x, sr, 0.004, 0.03), cible)
