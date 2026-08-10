@@ -6,10 +6,11 @@
 import type { FluidSim } from '../sim/solver'
 import { KIND_PLAYER } from '../sim/solver'
 import type { SimParams } from '../sim/params'
-import type { DecalDef, ObstacleBox } from '../game/level'
+import type { DecalDef, ObstacleBox, ZoneDef } from '../game/level'
 import type { Camera } from './camera'
 
 const MAX_BOXES = 24
+const MAX_ZONES = 8
 
 const SPLAT_VS = `#version 300 es
 layout(location = 0) in vec2 aPos;
@@ -83,6 +84,7 @@ const COMPOSE_FS = `#version 300 es
 precision highp float;
 #define MAX_BOXES 24
 #define MAX_WAVES 8
+#define MAX_ZONES 8
 uniform sampler2D uField;
 uniform vec2 uCanvasSize;  // px device
 uniform float uDpr;
@@ -105,6 +107,11 @@ uniform float uHydroBand;  // portée de la chimie des surfaces (hydrophile/phob
 uniform float uChill;      // refroidissement du vaisseau (0 tiède, 1 glacial)
 uniform int uWaveCount;
 uniform vec4 uWaves[MAX_WAVES]; // x, y, instant de départ, amplitude
+// Zones d'état : régions qui IMPOSENT un état. Elles doivent se voir de loin
+// — c'est une règle du tableau, pas une décoration.
+uniform int uZoneCount;
+uniform vec4 uZones[MAX_ZONES];    // minX, minY, maxX, maxY
+uniform float uZoneForce[MAX_ZONES]; // 1 eau, 2 glace, 3 vapeur, 0 libre
 // Textures d'habillage (chargées en arrière-plan ; uHas* passe à 1 quand
 // prêtes — d'ici là, le décor procédural fait l'intérim)
 uniform sampler2D uTexStars;
@@ -332,6 +339,38 @@ void main() {
   col = mix(col, hullCol, hull * (1.0 - uHasHull));
   float wallLine = 1.0 - smoothstep(0.0, 3.0 / uZoom, abs(roomD));
   col += vec3(0.10, 0.22, 0.30) * wallLine * (1.0 - 0.8 * uHasHull);
+
+  // Zones d'état, sous les surfaces : un voile teinté qui emplit la région,
+  // un liseré net à la frontière, et des chevrons lents qui balaient vers
+  // l'intérieur — on voit qu'on entre dans un régime imposé, pas dans un décor.
+  for (int zi = 0; zi < MAX_ZONES; zi++) {
+    if (zi >= uZoneCount) break;
+    float f = uZoneForce[zi];
+    if (f < 0.5) continue; // zone libre : rien à signaler
+    vec3 zc = f < 1.5 ? vec3(0.28, 0.62, 0.90)   // eau
+            : f < 2.5 ? vec3(0.56, 0.80, 0.95)   // glace
+                      : vec3(0.72, 0.56, 0.95);  // vapeur
+    float zd = boxSdf(world, uZones[zi]);
+    float inZone = 1.0 - step(0.0, zd);          // 1 dedans
+    // voile intérieur, plus dense près du bord
+    float depth = clamp(-zd / 260.0, 0.0, 1.0);
+    float veil = inZone * (0.30 - 0.16 * depth);
+    // chevrons lents : le régime « circule »
+    float bands = 0.5 + 0.5 * sin((world.x + world.y) * 0.012 - uTime * 0.55);
+    veil += inZone * bands * 0.085;
+    col += zc * veil;
+    // bourrelet intérieur : une marge hachurée le long de la frontière, comme
+    // un marquage au sol — c'est ce qui se lit de loin
+    float lip = inZone * (1.0 - smoothstep(0.0, 70.0, -zd));
+    float hatch = 0.5 + 0.5 * sin((world.x - world.y) * 0.09 - uTime * 1.1);
+    col += zc * lip * (0.16 + 0.22 * hatch);
+    // liseré de frontière, épaisseur constante à l'écran
+    float edgeZ = 1.0 - smoothstep(0.0, 4.0 / uZoom, abs(zd));
+    col += zc * edgeZ * 0.95;
+    // halo court à l'extérieur : la limite se devine avant d'être franchie
+    float glow = (1.0 - smoothstep(0.0, 70.0, max(zd, 0.0))) * step(0.0, zd);
+    col += zc * glow * glow * 0.30;
+  }
 
   // Textures des matériaux : prélevées hors des branches (flux de contrôle
   // uniforme requis par les mipmaps), utilisées dans la boucle d'obstacles.
@@ -742,6 +781,8 @@ export class Renderer {
   private readonly decalVbo: WebGLBuffer
   private readonly hullScratch = new Float32Array(6 * 4 * 4) // 4 bandes × 6 sommets × (pos, uv)
   private readonly decalScratch = new Float32Array(6 * 4) // un quad : 6 sommets × (pos, uv)
+  private readonly zoneScratch = new Float32Array(MAX_ZONES * 4)
+  private readonly zoneForceScratch = new Float32Array(MAX_ZONES)
   private texDecalTuyaux: WebGLTexture | null = null
   private texDecalVanne: WebGLTexture | null = null
   // Textures d'habillage : null tant que l'image n'est pas chargée — le
@@ -956,6 +997,7 @@ export class Renderer {
     downsample = params.renderDownsample, // la qualité adaptative peut forcer plus grossier
     chill = 0, // refroidissement du vaisseau : teinte froide, auras effectives
     decals: DecalDef[] = [], // machinerie de décor, sans physique
+    zones: ZoneDef[] = [], // régions qui imposent un état
   ): void {
     const gl = this.gl
     const devW = Math.max(1, Math.round(viewportW * dpr))
@@ -1059,6 +1101,22 @@ export class Renderer {
     gl.uniform1f(cu['uChill'], chill)
     gl.uniform1i(cu['uWaveCount'], waveCount)
     gl.uniform4fv(cu['uWaves[0]'], waves)
+    // Zones d'état : au plus MAX_ZONES par tableau
+    const zoneCount = Math.min(zones.length, MAX_ZONES)
+    for (let i = 0; i < zoneCount; i++) {
+      const z = zones[i]
+      this.zoneScratch[i * 4] = z.minX
+      this.zoneScratch[i * 4 + 1] = z.minY
+      this.zoneScratch[i * 4 + 2] = z.maxX
+      this.zoneScratch[i * 4 + 3] = z.maxY
+      this.zoneForceScratch[i] =
+        z.force === 'eau' ? 1 : z.force === 'glace' ? 2 : z.force === 'vapeur' ? 3 : 0
+    }
+    gl.uniform1i(cu['uZoneCount'], zoneCount)
+    if (zoneCount > 0) {
+      gl.uniform4fv(cu['uZones[0]'], this.zoneScratch)
+      gl.uniform1fv(cu['uZoneForce[0]'], this.zoneForceScratch)
+    }
     const bindTex = (unit: number, tex: WebGLTexture | null, sampler: string, flag: string) => {
       gl.activeTexture(gl.TEXTURE0 + unit)
       gl.bindTexture(gl.TEXTURE_2D, tex)
