@@ -156,7 +156,7 @@ describe('FluidSim — la glace : bloc balistique, soudure, dégel', () => {
     expect(sim.playerCount).toBe(11) // une voisine liquide est partie à sa place
   })
 
-  it('l’aspiration du sas n’a pas de prise sur la glace', () => {
+  it('l’aspiration du sas hale la glace vers la bouche (avec moins de prise que l’eau)', () => {
     const sim = makeSim()
     const i = sim.addParticle(600, 0, KIND_FREE)
     sim.frost[i] = 1
@@ -164,12 +164,26 @@ describe('FluidSim — la glace : bloc balistique, soudure, dégel', () => {
     // 1 s : loin de la plaque le dégel (2,5 s) n'a pas encore libéré
     const dt = sim.params.dt
     for (let s = 0; s < Math.round(1 / dt); s++) {
-      sim.applyExitSuction(600, 40, dt) // bouche à 40 u : dans le rayon d'aspiration
+      sim.applyExitSuction(600, 150, dt) // bouche à 150 u : dans le rayon d'aspiration
       sim.step(dt)
     }
+    // toujours gelée, et NETTEMENT plus près de la bouche qu'au départ —
+    // le sas n'attend plus qu'on lui jette le palet, il le hale
     expect(sim.frozen[i]).toBe(1)
-    expect(sim.swallowed).toBe(0)
-    expect(sim.posX[i]).toBeCloseTo(600, 0)
+    expect(sim.posY[i]).toBeGreaterThan(50)
+  })
+
+  it('la prise du sas sur la glace se règle : à zéro, le palet reste ancré', () => {
+    const sim = makeSim({ exitIceGrip: 0 })
+    const i = sim.addParticle(600, 0, KIND_FREE)
+    sim.frost[i] = 1
+    sim.frozen[i] = 1
+    const dt = sim.params.dt
+    for (let s = 0; s < Math.round(1 / dt); s++) {
+      sim.applyExitSuction(600, 150, dt)
+      sim.step(dt)
+    }
+    expect(sim.posY[i]).toBeLessThan(10)
   })
 
   it('la glace fait obstacle : le liquide ne la traverse pas', () => {

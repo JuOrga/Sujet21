@@ -89,7 +89,6 @@ const sfx = {
   swallowed: 0,
   spongeBites: 0,
   aiming: false,
-  gasAim: false,
   lastCall: false,
   spent: false,
 }
@@ -517,6 +516,11 @@ const endgame = {
   spent: false, // elle a été donnée : le corps se fige et dérive
   wasAiming: false, // front de relâchement du pointeur
 }
+// Dash de vapeur : viser fige le temps, relâcher lance le nuage (« air
+// dash »). On ne retient qu'une chose entre deux images : était-on en visée.
+const dash = { aiming: false }
+const dashAimEl = el('dash-aim')
+const dashCostEl = el('dash-cost')
 
 function restart(): void {
   run.exitTimer = 0
@@ -757,7 +761,7 @@ let tutorShown = ''
 const TUTOR_TEXTS = [
   'Maintenez le doigt (ou le pointeur) : la matière est éjectée <em>vers</em> lui — le corps part à l’opposé. Il n’y a pas de frein.',
   'Chaque goutte éjectée est perdue. La jauge en haut est votre corps : sous le trait rouge, il ne reste qu’une impulsion. <strong>Se déplacer, c’est rétrécir.</strong>',
-  '<kbd>❄ / F</kbd> se changer en glace : l’élan se garde, re-presser dégèle. <kbd>💨 / G</kbd> vapeur : pilotée au pointeur. Essayez l’un des deux.',
+  '<kbd>❄ / F</kbd> se changer en glace : l’élan se garde, re-presser dégèle. <kbd>💨 / G</kbd> vapeur : visez (le temps se fige), relâchez — le nuage fuse. Un tiers du volume par dash. Essayez l’un des deux.',
   'L’éponge boit ce qui s’attarde à son contact. Passez vite, payez le passage en volume — ou cherchez la vapeur.',
   'Le sas aspire l’échantillon : laissez-vous boire. Le surplus part en bonbonne — la récompense, c’est ce qu’il vous reste.',
 ]
@@ -926,7 +930,23 @@ function frame(now: number): void {
   sim.gasIntent = input.gasIntent
   sim.chill = chillNow() // le vaisseau refroidit : la physique suit
   if (input.aimActive) camera.cancelIntro() // le joueur agit : la caméra suit
-  if (!input.paused && !tableauDone) {
+
+  // ---- Dash de vapeur (« air dash ») : viser fige le TEMPS ENTIER (physique,
+  // refroidissement, chrono), relâcher lance tout le nuage vers le point visé.
+  // Une impulsion unique — pas de recul, pas d'éjection, pas de pilotage.
+  const vif = !input.paused && !tableauDone && !sim.dispersed && !endgame.spent
+  const dashAiming = vif && input.gasIntent && input.aimActive
+  if (dash.aiming && !dashAiming) {
+    // Relâcher déclenche ; changer d'état ou perdre la main en pleine visée
+    // annule sans frais — la visée n'engage à rien tant qu'on n'a pas lâché.
+    if (vif && input.gasIntent && !input.aimActive) {
+      const spent = sim.gasDash(aim.x, aim.y)
+      if (spent > 0) bande.bruitage('souffle-vapeur', 0.75)
+    }
+  }
+  dash.aiming = dashAiming
+
+  if (!input.paused && !tableauDone && !dashAiming) {
     // Budget CPU des pas physiques : ~60 % du temps d'image, borné à 5-12 ms.
     // Sans cette borne, une image en retard impose plus de pas, coûte plus
     // cher, prend plus de retard — et la machine s'installe à 15-20 fps.
@@ -937,10 +957,10 @@ function frame(now: number): void {
       params.timeWarp,
       params.dt,
       () => {
-        if (input.aimActive && !sim.dispersed && !endgame.spent) {
-          // En vapeur, le pointeur pilote le nuage ; sinon il éjecte
-          if (input.gasIntent) sim.applyGasSteer(aim.x, aim.y, params.dt)
-          else sim.eject(aim.x, aim.y, params.dt)
+        if (input.aimActive && !input.gasIntent && !sim.dispersed && !endgame.spent) {
+          // En eau, maintenir éjecte ; en vapeur, la visée fige le temps —
+          // le dash part au relâchement (voir plus haut), rien ne se pilote.
+          sim.eject(aim.x, aim.y, params.dt)
         }
         if (vortex.timer > 0) {
           const life = Math.min(1, vortex.timer / params.vortexDuration)
@@ -1246,6 +1266,23 @@ function frame(now: number): void {
     objDist.textContent = `SAS · ${Math.round(dWorld)} u`
   }
   objArrow.classList.toggle('visible', showArrow)
+
+  // Ligne de visée du dash : du corps au pointeur, avec le coût annoncé —
+  // on choisit sa trajectoire en connaissance de cause, le temps attendra.
+  if (dash.aiming) {
+    const sx = vw * 0.5 + (sim.stats.centroidX - camera.x) * camera.zoom
+    const sy = vh * 0.5 - (sim.stats.centroidY - camera.y) * camera.zoom
+    const ex = input.aimClientX
+    const ey = input.aimClientY
+    const len = Math.hypot(ex - sx, ey - sy)
+    const ang = Math.atan2(ey - sy, ex - sx)
+    dashAimEl.style.transform = `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) rotate(${((ang * 180) / Math.PI).toFixed(2)}deg)`
+    dashAimEl.style.width = `${Math.max(0, len - 14).toFixed(1)}px`
+    dashCostEl.style.transform = `translate(${(ex + 18).toFixed(1)}px, ${(ey - 30).toFixed(1)}px)`
+    dashCostEl.textContent = `DASH −${(sim.liters() * params.gasDashCost).toFixed(2)} L`
+  }
+  dashAimEl.classList.toggle('visible', dash.aiming)
+  dashCostEl.classList.toggle('visible', dash.aiming)
   let frozenCount = 0
   let gasCount = 0
   for (let i = 0; i < sim.count; i++) {
@@ -1274,17 +1311,14 @@ function frame(now: number): void {
   // hauteurs différentes tirées au sort, plus un écart de hauteur de ±7 % :
   // le geste revient plusieurs fois par seconde, deux fois le même « bloop »
   // à la même note et l'oreille entend une machine, pas de l'eau.
-  const vise = audible && input.aimActive
+  // En vapeur, la visée est silencieuse (le temps est figé) : le souffle
+  // part au dash, dans le bloc de relâchement plus haut.
+  const vise = audible && input.aimActive && !input.gasIntent
   if (vise && !sfx.aiming) {
-    if (input.gasIntent) bande.bruitage('souffle-vapeur', 0.65)
-    else {
-      const prise = 1 + Math.floor(Math.random() * 3)
-      bande.bruitage(`ejection-${prise}` as Bruitage, 0.7, 0.93 + Math.random() * 0.14)
-    }
+    const prise = 1 + Math.floor(Math.random() * 3)
+    bande.bruitage(`ejection-${prise}` as Bruitage, 0.7, 0.93 + Math.random() * 0.14)
   }
-  else if (vise && input.gasIntent && !sfx.gasAim) bande.bruitage('souffle-vapeur', 0.6)
   sfx.aiming = vise
-  sfx.gasAim = vise && input.gasIntent
   // Une éponge qui boit : on sonne par gorgée, pas par goutte. Le compteur
   // est recopié à chaque image — au changement de tableau il repart à zéro
   // avec la simulation, sans laisser le son muet pour le reste de la partie.

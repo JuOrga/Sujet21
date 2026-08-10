@@ -94,7 +94,6 @@ export class FluidSim {
   // Refroidissement du vaisseau (§5), fixé par le jeu : 0 = tiède, 1 = glacial.
   // Étend les auras froides, durcit gel et dégel, affaiblit les radiateurs.
   chill = 0
-  private gasCarry = 0
   // Vitesse normale du dernier choc de bloc de glace (consommé par l'audio)
   iceImpact = 0
   // Gouttes bues par les éponges depuis le début (consommé par l'audio)
@@ -248,6 +247,7 @@ export class FluidSim {
   private coldBoxes: ObstacleBox[] = []
   private heatCarry = 0
   private gasIdleCarry = 0
+  private gasTollCarry = 0
   private grilleCarry = 0
   // Recondensation (§7.3) : chaque particule de vapeur perdue alimente une
   // réserve ; les plaques froides la rendent en rosée, avec perte.
@@ -493,53 +493,56 @@ export class FluidSim {
     }
   }
 
-  // Se déplacer en gaz (§ tableau 3) : le nuage est piloté en continu vers le
-  // point visé — pas d'éjection, pas de recul, une dérive douce. Le prix est
-  // l'évaporation : tant qu'on pilote, la traîne du nuage se perd (les
-  // particules les plus éloignées de la visée disparaissent, gasLossRate/s).
-  applyGasSteer(aimX: number, aimY: number, dt: number): void {
-    if (this.dispersed) return
+  // Le dash de vapeur (refonte 2026, « air dash » à la Ori) : UNE impulsion
+  // qui envoie tout le nuage vers le point visé — pas de recul, pas
+  // d'éjection, pas de pilotage continu. Le prix se paie d'avance : une
+  // fraction du volume COURANT s'évapore (gasDashCost), prélevée sur la
+  // traîne — les particules les plus en arrière de la direction du dash.
+  // Fraction du courant et non du volume de base : chaque dash emporte le
+  // même tiers, donc propulse pareil (Tsiolkovsky) — un tableau reste
+  // toujours soluble, chaque dash coûte juste plus cher en valeur absolue.
+  // Les pertes rejoignent la réserve de vapeur : elles perleront en rosée
+  // près des plaques froides, récupérables par une bonne trajectoire.
+  // Renvoie le nombre de particules dépensées (0 : pas de dash).
+  gasDash(aimX: number, aimY: number): number {
+    if (this.dispersed) return 0
     const p = this.params
-    const cap2 = p.gasMaxSpeed * p.gasMaxSpeed
-    let any = false
+    this.updatePlayerStats()
+    let dx = aimX - this.stats.centroidX
+    let dy = aimY - this.stats.centroidY
+    const d = Math.hypot(dx, dy)
+    if (d < 1e-3) return 0
+    dx /= d
+    dy /= d
+    let gasCount = 0
     for (let i = 0; i < this.count; i++) {
-      if (this.kind[i] !== KIND_PLAYER || this.gaseous[i] !== 1) continue
-      any = true
-      let dx = aimX - this.posX[i]
-      let dy = aimY - this.posY[i]
-      const d = Math.hypot(dx, dy)
-      if (d < 1e-3) continue
-      dx /= d
-      dy /= d
-      this.velX[i] += dx * p.gasThrust * dt
-      this.velY[i] += dy * p.gasThrust * dt
-      const v2 = this.velX[i] * this.velX[i] + this.velY[i] * this.velY[i]
-      if (v2 > cap2) {
-        const s = p.gasMaxSpeed / Math.sqrt(v2)
-        this.velX[i] *= s
-        this.velY[i] *= s
-      }
+      if (this.kind[i] === KIND_PLAYER && this.gaseous[i] === 1) gasCount++
     }
-    if (!any) return
-    this.gasCarry += p.gasLossRate * dt
-    while (this.gasCarry >= 1 && this.playerCount > 2) {
-      this.gasCarry -= 1
+    if (gasCount < 3) return 0
+    let toll = Math.min(Math.round(gasCount * p.gasDashCost), gasCount - 2)
+    const spent = toll
+    while (toll > 0) {
       let worst = -1
-      let worstD2 = -1
+      let worstProj = Infinity
       for (let i = 0; i < this.count; i++) {
         if (this.kind[i] !== KIND_PLAYER || this.gaseous[i] !== 1) continue
-        const dx = this.posX[i] - aimX
-        const dy = this.posY[i] - aimY
-        const d2 = dx * dx + dy * dy
-        if (d2 > worstD2) {
-          worstD2 = d2
+        const proj = this.posX[i] * dx + this.posY[i] * dy
+        if (proj < worstProj) {
+          worstProj = proj
           worst = i
         }
       }
       if (worst < 0) break
-      this.removeParticle(worst) // évaporée : partie… vers les parois froides
-      this.vaporBank++
+      this.removeParticle(worst)
+      this.vaporBank++ // évaporée : partie… vers les parois froides
+      toll--
     }
+    for (let i = 0; i < this.count; i++) {
+      if (this.kind[i] !== KIND_PLAYER || this.gaseous[i] !== 1) continue
+      this.velX[i] = dx * p.gasDashSpeed
+      this.velY[i] = dy * p.gasDashSpeed
+    }
+    return spent
   }
 
   // Vortex de regroupement (clic droit) : l'eau est entraînée vers un champ
@@ -609,7 +612,6 @@ export class FluidSim {
     // franchement sans qu'un curseur de plus soit nécessaire.
     const blend = 1 - Math.exp(-4 * dt)
     for (let i = 0; i < this.count; i++) {
-      if (this.frozen[i] === 1) continue // la glace est ancrée
       const dx = cx - this.posX[i]
       const dy = cy - this.posY[i]
       const d2 = dx * dx + dy * dy
@@ -618,6 +620,19 @@ export class FluidSim {
       const ux = dx / d
       const uy = dy / d
       const rim = Math.min(1, (1 - d / R) * 2) // fondu au bord du rayon d'action
+      if (this.frozen[i] === 1) {
+        // Le courant a prise sur la glace aussi — moins que sur l'eau (un
+        // bloc a de l'inertie : exitIceGrip), et sans giration : un palet
+        // n'orbite pas, il est hâlé vers la bouche. icePass moyenne ces
+        // tractions par particule en une poussée de bloc — le bloc entier
+        // dérive vers le sas au lieu d'attendre qu'on l'y jette.
+        const boost = 1 + 1.5 * (1 - d / R)
+        const vIn = p.exitPull * inv * boost * rim
+        const grip = 1 - Math.exp(-4 * p.exitIceGrip * dt)
+        this.velX[i] += (ux * vIn - this.velX[i]) * grip
+        this.velY[i] += (uy * vIn - this.velY[i]) * grip
+        continue
+      }
       // La vidange accélère vers le trou — sur le courant rentrant seulement :
       // amplifier aussi la giration élargirait l'orbite d'équilibre au-delà
       // du cœur de Rankine et l'eau tournerait sans jamais entrer.
@@ -1242,16 +1257,41 @@ export class FluidSim {
 
   // Le contact éponge n'est pas mortel : il englue et absorbe après un temps
   // de contact continu. Chaque cellule se sature ; gorgée, elle devient
-  // solide — on peut payer un passage en volume (§6).
+  // solide — on peut payer un passage en volume (§6). La VAPEUR traverse
+  // librement, mais l'éponge l'essore au passage : un petit péage en volume
+  // (spongeGasToll), encaissé par les cellules — cette matière est PERDUE,
+  // elle ne rejoint pas la réserve de rosée.
   private processSponges(dt: number): void {
     const p = this.params
     const drag = Math.exp(-p.spongeDrag * p.surfaceBite * dt)
     const absorbTime = p.spongeAbsorbTime / Math.max(0.1, p.surfaceBite)
     let i = 0
     while (i < this.count) {
-      if (this.frozen[i] === 1 || this.gaseous[i] === 1) {
+      if (this.frozen[i] === 1) {
         i++
-        continue // ni la glace ni la vapeur ne sont engluées ou absorbées
+        continue // la glace n'est pas engluée : un bloc glisse sur l'éponge
+      }
+      if (this.gaseous[i] === 1) {
+        let removed = false
+        const gx = this.posX[i]
+        const gy = this.posY[i]
+        for (const sp of this.sponges) {
+          if (!sp.contains(gx, gy)) continue
+          const cell = sp.cellIndexAt(gx, gy)
+          if (cell < 0 || sp.isSolid(cell)) continue
+          this.gasTollCarry += p.spongeGasToll * dt
+          if (this.gasTollCarry >= 1 && !(this.kind[i] === KIND_PLAYER && this.playerCount <= 2)) {
+            this.gasTollCarry -= 1
+            sp.absorb(cell)
+            this.spongeBites++
+            this.removeParticle(i)
+            removed = true
+          }
+          break
+        }
+        if (removed) continue // l'indice i contient maintenant une autre particule
+        i++
+        continue
       }
       let touching = false
       let removed = false

@@ -486,16 +486,16 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Après la condensation, le nuage compte encore comme UN corps pendant ce temps (le lien élargi s’éteint doucement) — le temps de se regrouper.',
   )
   describe(
-    fGas.addBinding(params, 'gasThrust', { min: 50, max: 1000, step: 10, label: 'poussée (u/s²)' }),
-    'Accélération du nuage vers le pointeur. C’est le moteur du déplacement en gaz — sans recul et sans éjection.',
+    fGas.addBinding(params, 'gasDashSpeed', { min: 200, max: 1400, step: 20, label: 'vitesse de dash (u/s)' }),
+    'Vitesse à laquelle le nuage FUSE au relâchement : viser fige le temps, relâcher lance tout le nuage à cette vitesse — une impulsion, pas un pilotage.',
   )
   describe(
-    fGas.addBinding(params, 'gasMaxSpeed', { min: 50, max: 600, step: 10, label: 'vitesse max' }),
-    'Vitesse de croisière maximale du nuage piloté.',
+    fGas.addBinding(params, 'gasDashCost', { min: 0.1, max: 0.6, step: 0.01, label: 'coût du dash (fraction)' }),
+    'Fraction du volume COURANT évaporée à chaque dash (≈ 1/3). Fraction du courant, pas du volume de base : chaque dash propulse pareil, il coûte juste plus cher. Les pertes perleront en rosée aux plaques froides.',
   )
   describe(
-    fGas.addBinding(params, 'gasLossRate', { min: 0, max: 30, step: 0.5, label: 'évaporation /s' }),
-    'Particules perdues par seconde de pilotage : se déplacer en gaz se paie en volume, doucement mais sûrement. La traîne du nuage s’évapore en premier.',
+    fGas.addBinding(params, 'spongeGasToll', { min: 0, max: 4, step: 0.05, label: 'péage d’éponge /s' }),
+    'La vapeur traverse l’éponge, qui l’essore au passage : perte par seconde et par particule dans l’éponge. Cette matière est PERDUE (l’éponge la garde) — elle ne perle pas en rosée.',
   )
   describe(
     fGas.addBinding(params, 'gasIdleLossRate', { min: 0, max: 10, step: 0.5, label: 'coût d’état /s' }),

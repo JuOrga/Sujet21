@@ -45,21 +45,73 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
     expect(sim.playerCount).toBeGreaterThanOrEqual(59) // au pire une égarée du bord
   })
 
-  it('le pilotage déplace le nuage vers la visée, au prix d’une évaporation', () => {
+  it('le dash propulse tout le nuage vers la visée, sans recul ni éjection', () => {
     const sim = makeSim()
     sim.setLevel([], [])
     sim.spawnDisc(0, 0, 60, KIND_PLAYER)
     sim.gasIntent = true
-    run(sim, 1.2)
-    const dt = sim.params.dt
-    for (let s = 0; s < Math.round(3 / dt); s++) {
-      sim.applyGasSteer(600, 0, dt)
-      sim.step(dt)
-    }
+    run(sim, 1.2) // vaporisation complète
+    const before = sim.playerCount
+    const bankBefore = sim.vaporBank
+    const spent = sim.gasDash(600, 0)
+    // le prix : un tiers du volume COURANT, évaporé vers la réserve de rosée
+    expect(spent).toBeGreaterThan(0)
+    expect(spent).toBe(Math.round(before * sim.params.gasDashCost))
+    expect(sim.playerCount).toBe(before - spent)
+    expect(sim.vaporBank).toBe(bankBefore + spent)
+    // l'impulsion : le nuage fuse — la traîne évaporée ne compte pas ici
+    run(sim, 0.6)
     sim.updatePlayerStats()
-    expect(sim.stats.centroidX).toBeGreaterThan(150) // le nuage a dérivé vers la cible
-    expect(sim.playerCount).toBeLessThan(60) // ~15 particules évaporées (5/s × 3 s)
-    expect(sim.playerCount).toBeGreaterThan(35)
+    expect(sim.stats.centroidX).toBeGreaterThan(120) // parti vers la cible
+    // pas d'éjection : aucune gouttelette liquide relâchée derrière
+    let liquides = 0
+    for (let i = 0; i < sim.count; i++) {
+      if (sim.gaseous[i] === 0 && sim.frozen[i] === 0) liquides++
+    }
+    expect(liquides).toBe(0)
+  })
+
+  it('chaque dash coûte la même FRACTION : le second prélève un tiers du volume restant', () => {
+    const sim = makeSim()
+    sim.setLevel([], [])
+    sim.spawnDisc(0, 0, 90, KIND_PLAYER)
+    sim.gasIntent = true
+    run(sim, 1.2)
+    const n0 = sim.playerCount
+    const c1 = sim.gasDash(600, 0)
+    const n1 = sim.playerCount
+    const c2 = sim.gasDash(600, 0)
+    expect(c1).toBe(Math.round(n0 * sim.params.gasDashCost))
+    expect(c2).toBe(Math.round(n1 * sim.params.gasDashCost))
+    expect(c2).toBeLessThan(c1) // moins de volume → moins cher en absolu
+  })
+
+  it('l’éponge essore la vapeur qui la traverse : petit péage en volume', () => {
+    const sim = makeSim()
+    // éponge de 5×10 cellules de 30 u : un couloir à traverser
+    sim.setLevel(
+      [],
+      [{ minX: 0, minY: -150, cols: 5, rows: 10, cellSize: 30, capacityPerCell: 4 }],
+    )
+    sim.spawnDisc(-120, 0, 50, KIND_PLAYER)
+    sim.gasIntent = true
+    run(sim, 1.2)
+    const before = sim.playerCount
+    const bankBefore = sim.vaporBank
+    // le nuage stationne dans l'éponge : le péage s'accumule
+    for (let i = 0; i < sim.count; i++) {
+      sim.posX[i] = 20 + (i % 4) * 25
+      sim.posY[i] = -100 + Math.floor(i / 4) * 12
+      sim.velX[i] = 0
+      sim.velY[i] = 0
+    }
+    run(sim, 2)
+    // il a payé — sans être englué (la vapeur reste libre de ses mouvements)
+    expect(sim.playerCount).toBeLessThan(before)
+    // la matière essorée est PERDUE (gardée par l'éponge), pas mise en rosée :
+    // seule l'évaporation d'état a pu alimenter la réserve pendant ce temps
+    const idleMax = Math.ceil(2 * sim.params.gasIdleLossRate) + 1
+    expect(sim.vaporBank - bankBefore).toBeLessThanOrEqual(idleMax)
   })
 
   it('la vapeur traverse la grille, le liquide s’y écrase', () => {
