@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 04:55',
+    title: 'Éditeur : sélection multiple, alignement, et l’outil Découpe',
+    notes: [
+      'SÉLECTION MULTIPLE : Maj + clic ajoute (ou retire) un élément — parois, éponges, zones, mécanismes, rails, étiquettes, tout se mélange. Glissez l’un des élus : le groupe entier se déplace, aimanté à la grille. Suppr balaye tout d’un coup. Échap vide la sélection.',
+      'ALIGNEMENT : dès deux éléments sélectionnés, le panneau devient l’atelier — aligner à gauche, à droite, en haut, en bas, ou centrer sur un axe. Fini les blocs qui se chevauchent d’un demi-carreau.',
+      'DÉCOUPE (Surfaces) : la zone tracée est RONGÉE des parois qui la chevauchent — chaque paroi touchée est remplacée par ses restes, quatre morceaux au plus, les éclats balayés. Pour tailler les recouvrements de la map 1 sans tout reposer : on découpe l’excédent, on ne reconstruit pas.',
+    ],
+  },
+  {
     date: '11/08/2026 04:20',
     title: 'Le champ convoie la vapeur : le nuage voyage sur le rail',
     notes: [
