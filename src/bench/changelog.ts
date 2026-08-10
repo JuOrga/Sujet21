@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '10/08/2026 23:10',
+    title: 'Zones : l’illustration entière, la glace en givre blanc, les effets allégés',
+    notes: [
+      'La rampe de buses sortait coupée net : l’illustration n’était dessinée que dans le champ de la brume, et la lisière arrondie tronquait l’objet. Une rampe n’est pas un gaz — l’image se dessine maintenant entière dans son cadre, seule la brume suit la lisière.',
+      'La zone GLACE ne se voyait plus : du cyan sur une cuve cyan. Sa brume givre maintenant en BLANC, nettement renforcée — les deux autres gardent leur teinte, le violet et le bleu contrastent déjà.',
+      'Le panache, les gouttes et la brume s’allègent fortement sur l’illustration elle-même : les effets vivent AUTOUR de l’objet, ils ne le recouvrent plus — la conduite rompue redevient lisible sous sa vapeur.',
+    ],
+  },
+  {
     date: '10/08/2026 22:50',
     title: 'Les zones perdent leur contour : une brume d’accident, pas une bulle',
     notes: [
