@@ -1031,6 +1031,16 @@
       .wl-chaud { color: #ff9c5b; }
       .wl-grille { color: #8fb3cc; }
       .wl-sas { color: var(--valid); }
+      /* Étiquette de zone : encadrée, parce qu'elle énonce une règle du lieu
+         et non le nom d'une surface */
+      .wl-zone {
+        border: 1px solid currentColor;
+        padding: 3px 8px;
+        font-size: 9.5px;
+        letter-spacing: 0.24em;
+        opacity: 0.9;
+        background: rgba(3, 7, 16, 0.45);
+      }
 
       /* ---- Légende : la lecture du vaisseau, surface par surface ---- */
       #legend,
@@ -1496,6 +1506,70 @@
         padding: 5px 8px;
         background: rgba(63, 214, 155, 0.07);
       }
+      /* Bibliothèque : la liste EST la séquence de l'expédition */
+      #ed-lib {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        max-height: 240px;
+        overflow-y: auto;
+      }
+      .ed-lib-row {
+        display: flex;
+        align-items: stretch;
+        gap: 4px;
+        border: 1px solid transparent;
+      }
+      .ed-lib-row.open {
+        border-color: var(--specimen);
+        background: rgba(99, 183, 230, 0.1);
+      }
+      .ed-lib-no {
+        width: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        color: var(--dim);
+        flex: none;
+      }
+      .ed-lib-open {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex !important;
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 1px;
+        text-align: left !important;
+        text-transform: none !important;
+        letter-spacing: 0.04em !important;
+        padding: 5px 8px !important;
+      }
+      .ed-lib-open b {
+        color: var(--specimen);
+        font-weight: 600;
+      }
+      .ed-lib-open small {
+        font-size: 9px;
+        color: var(--dim);
+        letter-spacing: 0.06em;
+      }
+      .ed-lib-ord {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        flex: none;
+      }
+      .ed-lib-ord button {
+        padding: 0 6px !important;
+        min-height: 15px;
+        line-height: 1;
+        font-size: 9px !important;
+      }
+      .ed-lib-ord button:disabled {
+        opacity: 0.3;
+        cursor: default;
+      }
       #ed-io {
         display: none;
         flex-direction: column;
@@ -1558,6 +1632,7 @@
       <button id="start" type="button">COMMENCER L'ESSAI</button>
       <button id="start-bis" type="button">TESTER «&nbsp;LA GALERIE NOYÉE&nbsp;» — 21-A BIS, PROTOTYPE</button>
       <button id="start-editor" type="button">ÉDITEUR DE TABLEAUX — CRÉER OU MODIFIER UN NIVEAU</button>
+      <div id="home-seq" class="rec-note"></div>
       <div class="home-records" aria-label="Registres du labo">
         <div class="rec-head"><span>REGISTRES DU LABO</span>
           <input id="rec-name" maxlength="12" placeholder="VOTRE NOM — REQUIS"
@@ -1639,8 +1714,10 @@
       <div class="ed-bar">
         <span class="ed-title">ÉDITEUR DE TABLEAUX</span>
         <button type="button" id="ed-new">Vierge</button>
+        <button type="button" id="ed-save" class="primary">Enregistrer</button>
+        <button type="button" id="ed-save-as">Enregistrer comme…</button>
         <button type="button" id="ed-fit">Recadrer</button>
-        <button type="button" id="ed-import">Importer / JSON</button>
+        <button type="button" id="ed-import">Fichier / JSON</button>
         <button type="button" id="ed-copy">Copier</button>
         <button type="button" id="ed-export">Exporter</button>
         <span class="sp"></span>
@@ -1693,6 +1770,10 @@
       </div>
 
       <aside class="ed-side ed-side--right">
+        <div class="ed-group">
+          <span class="k">Bibliothèque du protocole — l’ordre est la séquence</span>
+          <div id="ed-lib"></div>
+        </div>
         <div class="ed-group">
           <span class="k">Tableau</span>
           <label class="ed-f"><span>Nom</span><input id="ed-name" /></label>

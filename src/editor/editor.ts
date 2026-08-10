@@ -20,6 +20,13 @@ import {
   type ZoneForce,
 } from '../game/level'
 import { checkLevel, parseLevel, serializeLevel } from '../game/levelIO'
+import {
+  deleteLevel,
+  fetchLibrary,
+  reorderLibrary,
+  saveLevel,
+  type StoredLevel,
+} from '../game/netLevels'
 
 const STORE_KEY = 'projet21.editeur.v1'
 
@@ -72,6 +79,10 @@ export interface EditorHooks {
   play(level: LevelDef): void
   /** Quitter l'éditeur et revenir à la fiche d'essai. */
   quit(): void
+  /** Nom de l'opérateur, estampillé sur les tableaux enregistrés. */
+  operator(): string
+  /** La bibliothèque a changé : le jeu recharge sa séquence. */
+  libraryChanged(levels: StoredLevel[]): void
 }
 
 function blankLevel(): LevelDef {
@@ -118,6 +129,11 @@ export class LevelEditor {
 
   private hint = ''
 
+  // Bibliothèque partagée : la liste, et l'entrée actuellement ouverte
+  private library: StoredLevel[] = []
+  private openId = ''
+  private busy = false
+
   constructor(host: HTMLElement, hooks: EditorHooks) {
     this.host = host
     this.hooks = hooks
@@ -126,6 +142,7 @@ export class LevelEditor {
     this.bindUi()
     this.bindCanvas()
     this.restore()
+    void this.refreshLibrary()
   }
 
   // ——— Ouverture / fermeture ———————————————————————————————
@@ -135,6 +152,7 @@ export class LevelEditor {
     this.fitView()
     this.syncForm()
     this.draw()
+    void this.refreshLibrary()
   }
 
   close(): void {
@@ -621,11 +639,15 @@ export class LevelEditor {
     this.el('ed-new').addEventListener('click', () => {
       if (!confirm('Repartir d’un tableau vierge ? Le brouillon en cours sera perdu.')) return
       this.level = blankLevel()
+      this.openId = ''
       this.sel = null
       this.fitView()
       this.syncForm()
+      this.renderLibrary()
       this.commit('Tableau vierge.')
     })
+    this.el('ed-save').addEventListener('click', () => void this.store(false))
+    this.el('ed-save-as').addEventListener('click', () => void this.store(true))
     this.el('ed-play').addEventListener('click', () => {
       const errs = checkLevel(this.level).filter((v) => v.niveau === 'erreur')
       if (errs.length > 0) {
@@ -670,6 +692,147 @@ export class LevelEditor {
     this.el('ed-load-json').addEventListener('click', () => {
       this.loadJson((this.el('ed-json') as HTMLTextAreaElement).value)
     })
+  }
+
+  // ——— Bibliothèque partagée ————————————————————————————
+  private async refreshLibrary(): Promise<void> {
+    const lib = await fetchLibrary()
+    if (lib) {
+      this.library = lib
+      this.hooks.libraryChanged(lib)
+    }
+    this.renderLibrary(lib === null)
+  }
+
+  private renderLibrary(offline = false): void {
+    const host = this.el('ed-lib')
+    if (offline) {
+      host.innerHTML =
+        '<p class="ed-empty">Bibliothèque injoignable (hors ligne ou serveur local). Le brouillon reste conservé sur cet appareil.</p>'
+      return
+    }
+    if (this.library.length === 0) {
+      host.innerHTML =
+        '<p class="ed-empty">Aucun tableau enregistré. « Enregistrer » publie celui-ci pour tout le monde.</p>'
+      return
+    }
+    host.innerHTML = this.library
+      .map((s, i) => {
+        const errs = checkLevel(s.level).filter((v) => v.niveau === 'erreur').length
+        return (
+          `<div class="ed-lib-row${s.id === this.openId ? ' open' : ''}" data-id="${s.id}">` +
+          `<span class="ed-lib-no">${i + 1}</span>` +
+          `<button type="button" class="ed-lib-open" data-id="${s.id}" title="Ouvrir ce tableau">` +
+          `<b>${s.level.code}</b> ${s.level.name}` +
+          `<small>${s.auteur ? s.auteur + ' · ' : ''}par ${s.level.par ?? '?'}${errs ? ' · ' + errs + ' erreur(s)' : ''}</small>` +
+          `</button>` +
+          `<span class="ed-lib-ord">` +
+          `<button type="button" data-up="${s.id}" title="Jouer plus tôt"${i === 0 ? ' disabled' : ''}>↑</button>` +
+          `<button type="button" data-down="${s.id}" title="Jouer plus tard"${i === this.library.length - 1 ? ' disabled' : ''}>↓</button>` +
+          `<button type="button" data-del="${s.id}" title="Supprimer de la bibliothèque">✕</button>` +
+          `</span></div>`
+        )
+      })
+      .join('')
+
+    for (const b of Array.from(host.querySelectorAll('.ed-lib-open'))) {
+      b.addEventListener('click', () => this.openFromLibrary((b as HTMLElement).dataset.id ?? ''))
+    }
+    for (const b of Array.from(host.querySelectorAll('[data-up]'))) {
+      b.addEventListener('click', () => this.move((b as HTMLElement).dataset.up ?? '', -1))
+    }
+    for (const b of Array.from(host.querySelectorAll('[data-down]'))) {
+      b.addEventListener('click', () => this.move((b as HTMLElement).dataset.down ?? '', 1))
+    }
+    for (const b of Array.from(host.querySelectorAll('[data-del]'))) {
+      b.addEventListener('click', () => void this.removeFromLibrary((b as HTMLElement).dataset.del ?? ''))
+    }
+  }
+
+  private openFromLibrary(id: string): void {
+    const entry = this.library.find((l) => l.id === id)
+    if (!entry) return
+    this.level = structuredClone(entry.level)
+    this.openId = id
+    this.sel = null
+    this.fitView()
+    this.syncForm()
+    this.renderLibrary()
+    this.commit(`« ${entry.level.name} » ouvert.`)
+  }
+
+  private async move(id: string, delta: number): Promise<void> {
+    const i = this.library.findIndex((l) => l.id === id)
+    const j = i + delta
+    if (i < 0 || j < 0 || j >= this.library.length) return
+    const next = [...this.library]
+    ;[next[i], next[j]] = [next[j], next[i]]
+    this.library = next
+    this.renderLibrary()
+    const saved = await reorderLibrary(next.map((l) => l.id))
+    if (saved) {
+      this.library = saved
+      this.hooks.libraryChanged(saved)
+      this.renderLibrary()
+      this.commit('Séquence mise à jour.')
+    } else {
+      this.commit('Réordonnancement refusé : bibliothèque injoignable.')
+      void this.refreshLibrary()
+    }
+  }
+
+  private async removeFromLibrary(id: string): Promise<void> {
+    const entry = this.library.find((l) => l.id === id)
+    if (!entry) return
+    if (!confirm(`Supprimer « ${entry.level.name} » de la bibliothèque ? C’est définitif.`)) return
+    const saved = await deleteLevel(id)
+    if (saved) {
+      this.library = saved
+      if (this.openId === id) this.openId = ''
+      this.hooks.libraryChanged(saved)
+      this.renderLibrary()
+      this.commit('Tableau supprimé.')
+    } else {
+      this.commit('Suppression refusée : bibliothèque injoignable.')
+    }
+  }
+
+  /** Enregistre dans la bibliothèque ; `asNew` crée une entrée à part. */
+  private async store(asNew: boolean): Promise<void> {
+    if (this.busy) return
+    const errs = checkLevel(this.level).filter((v) => v.niveau === 'erreur')
+    if (errs.length > 0) {
+      this.commit('Corrigez les erreurs avant d’enregistrer.')
+      return
+    }
+    let id = asNew ? '' : this.openId
+    if (asNew) {
+      const proposed = prompt(
+        'Nom du nouveau tableau dans la bibliothèque :',
+        this.level.name,
+      )
+      if (proposed === null) return
+      this.level.name = proposed.trim().slice(0, 60) || this.level.name
+      ;(this.el('ed-name') as HTMLInputElement).value = this.level.name
+    }
+    this.busy = true
+    this.commit('Enregistrement…')
+    const saved = await saveLevel(this.level, id, this.hooks.operator())
+    this.busy = false
+    if (!saved) {
+      this.commit('Enregistrement refusé : bibliothèque injoignable.')
+      return
+    }
+    this.library = saved
+    if (!id) {
+      // le serveur a forgé l'identifiant depuis le nom : on retrouve l'entrée
+      const match = saved.find((l) => l.level.name === this.level.name)
+      id = match?.id ?? ''
+    }
+    this.openId = id
+    this.hooks.libraryChanged(saved)
+    this.renderLibrary()
+    this.commit('Enregistré dans la bibliothèque.')
   }
 
   private loadJson(txt: string): void {

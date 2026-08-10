@@ -19,6 +19,7 @@ import {
   type ZoneForce,
 } from './game/level'
 import { LevelEditor } from './editor/editor'
+import { fetchLibrary } from './game/netLevels'
 import { AudioFx, loadAudioPrefs } from './game/audio'
 import { Records } from './game/records'
 import {
@@ -81,6 +82,14 @@ let levelIndex = 0
     }
   }
 }
+// La bibliothèque partagée, quand elle contient des tableaux, devient la
+// séquence jouable : le tableau 1 mène au 2, et ainsi de suite dans l'ordre
+// fixé par l'éditeur. Vide ou injoignable, on joue l'expédition livrée.
+let libraryLevels: LevelDef[] = []
+function playedLevels(): LevelDef[] {
+  return libraryLevels.length > 0 ? libraryLevels : TABLEAUX
+}
+
 // Le prototype 21-A bis se joue hors expédition : un essai à part, depuis la
 // fiche — s'il convainc, il remplacera 21-A dans la séquence.
 let testLevel: LevelDef | null = null
@@ -91,7 +100,7 @@ let renderBoxes: ObstacleBox[] = []
 let levelHasCold = false // le HUD n'annonce la rosée que si des plaques la rendent
 const exitMouth = { x: 0, y: 0 }
 function applyLevel(): void {
-  level = testLevel ?? TABLEAUX[levelIndex]
+  level = testLevel ?? playedLevels()[levelIndex] ?? playedLevels()[0]
   levelHasCold = level.boxes.some((b) => b.material === MAT_FROID)
   renderBoxes = [...level.boxes, { ...level.exit, material: MAT_EXIT }]
   exitMouth.x = (level.exit.minX + level.exit.maxX) * 0.5
@@ -103,6 +112,12 @@ function applyLevel(): void {
 // la lisibilité de la légende, mais dans le décor lui-même.
 const worldLabelsHost = document.getElementById('world-labels') as HTMLDivElement
 let labelEls: { span: HTMLSpanElement; x: number; y: number }[] = []
+const ZONE_LABEL_COLORS: Record<string, string> = {
+  eau: '#63b7e6',
+  glace: '#8fc8ee',
+  vapeur: '#c9a6f2',
+  libre: '#7b93a8',
+}
 function buildWorldLabels(): void {
   worldLabelsHost.innerHTML = ''
   labelEls = level.labels.map((l) => {
@@ -112,6 +127,18 @@ function buildWorldLabels(): void {
     worldLabelsHost.appendChild(span)
     return { span, x: l.x, y: l.y }
   })
+  // Chaque zone d'état porte son nom en haut de son emprise : la règle du
+  // lieu s'annonce, elle ne se découvre pas en la subissant.
+  for (const z of level.zones ?? []) {
+    if (z.force === 'libre') continue
+    const span = document.createElement('span')
+    span.className = 'world-label wl-zone'
+    span.textContent = z.label ? `${z.label.toUpperCase()} · ${z.force.toUpperCase()}` : `ZONE ${z.force.toUpperCase()}`
+    span.style.color = ZONE_LABEL_COLORS[z.force] ?? '#7b93a8'
+    span.style.borderColor = ZONE_LABEL_COLORS[z.force] ?? '#7b93a8'
+    worldLabelsHost.appendChild(span)
+    labelEls.push({ span, x: (z.minX + z.maxX) / 2, y: z.maxY - 40 })
+  }
 }
 
 function updateWorldLabels(vw: number, vh: number): void {
@@ -171,7 +198,7 @@ fetchSharedBoard().then((b) => {
 // opérateurs) prime sur le registre local — même règle de départage partout.
 function renderRegistres(): void {
   recEssai.textContent = `ÉCHANTILLON Nº ${records.essaiNumber()}`
-  const rows: string[] = TABLEAUX.map((t) => {
+  const rows: string[] = playedLevels().map((t) => {
     const local = records.tableauRecord(t.code)
     const shared = sharedBoard?.tableaux[t.code] ?? null
     const best =
@@ -202,7 +229,7 @@ function renderRegistres(): void {
     const holder = exp.name ? ` · ${exp.name}` : ''
     rows.unshift(
       `<div class="rec-row rec-exp"><span class="rec-code">EXPÉDITION</span><span class="rec-name"></span>` +
-        `<span class="rec-val"><b>${exp.tableaux}/${TABLEAUX.length}</b> · ${exp.liters.toFixed(2)} L · ${fmtTime(exp.time)}${holder}</span></div>`,
+        `<span class="rec-val"><b>${exp.tableaux}/${playedLevels().length}</b> · ${exp.liters.toFixed(2)} L · ${fmtTime(exp.time)}${holder}</span></div>`,
     )
   }
   const hist = records.lastEntries(4)
@@ -329,7 +356,37 @@ const editor = new LevelEditor(el('editor'), {
     openHome()
     restart()
   },
+  operator: () => records.operator(),
+  libraryChanged: (levels) => {
+    libraryLevels = levels.map((s) => s.level)
+    renderRegistres()
+    updateLibraryButton()
+  },
 })
+// La fiche annonce quelle séquence sera jouée : celle du labo si la
+// bibliothèque partagée en contient une, sinon l'expédition livrée.
+const homeSeq = el('home-seq')
+function updateLibraryButton(): void {
+  homeSeq.textContent =
+    libraryLevels.length > 0
+      ? `Séquence du labo : ${libraryLevels.length} tableau(x) de la bibliothèque partagée.`
+      : `Expédition livrée : ${TABLEAUX.length} tableaux. La bibliothèque partagée est vide.`
+}
+updateLibraryButton()
+
+// Au démarrage : si la bibliothèque contient une séquence, elle remplace
+// l'expédition livrée — mais jamais au milieu d'une partie en cours.
+fetchLibrary().then((lib) => {
+  if (!lib || lib.length === 0) return
+  libraryLevels = lib.map((s) => s.level)
+  updateLibraryButton()
+  renderRegistres()
+  if (!hasPlayed) {
+    levelIndex = 0
+    restart()
+  }
+})
+
 // Sonde de débogage/test : le tableau en cours d'édition
 ;(window as unknown as { __editorLevel: () => LevelDef }).__editorLevel = () => editor.currentLevel()
 function openEditor(): void {
@@ -702,7 +759,7 @@ function showOverlay(title: string, sub: string, tone: 'success' | 'danger', btn
 
 // Bilan d'expédition : la phrase que le tampon raconte au protocole
 function expeditionSummary(tableauxDone: number): string {
-  return `${tableauxDone}/${TABLEAUX.length} tableaux · réserve ${run.bonbonneLiters.toFixed(2)} L · ${fmtTime(run.runTime)}`
+  return `${tableauxDone}/${playedLevels().length} tableaux · réserve ${run.bonbonneLiters.toFixed(2)} L · ${fmtTime(run.runTime)}`
 }
 
 let lastTime = performance.now()
@@ -833,11 +890,11 @@ function frame(now: number): void {
       ? ` · NOUVEAU RECORD DU TABLEAU (${surplus.toFixed(2)} L en ${fmtTime(run.tableauTime)})`
       : ` · record du tableau : ${records.tableauRecord(level.code)!.liters.toFixed(2)} L`
     audio.collect()
-    if (levelIndex + 1 >= TABLEAUX.length) {
+    if (levelIndex + 1 >= playedLevels().length) {
       // Dernier sas : l'expédition est achevée — bilan, et registres à jour
       run.ended = true
-      const exp = records.noteExpedition(TABLEAUX.length, run.bonbonneLiters, run.runTime)
-      pushExpeditionRecord(TABLEAUX.length, run.bonbonneLiters, run.runTime, records.operator()).then(
+      const exp = records.noteExpedition(playedLevels().length, run.bonbonneLiters, run.runTime)
+      pushExpeditionRecord(playedLevels().length, run.bonbonneLiters, run.runTime, records.operator()).then(
         (b) => {
           if (b) {
             sharedBoard = b
@@ -848,7 +905,7 @@ function frame(now: number): void {
       renderRegistres()
       showOverlay(
         'EXPÉDITION ACHEVÉE',
-        `${expeditionSummary(TABLEAUX.length)}${exp.newRecord ? ' · MEILLEURE EXPÉDITION DU PROTOCOLE' : ''} — le laboratoire n'a plus d'échantillon. Quelque part dans les conduites, de l'eau se souvient.`,
+        `${expeditionSummary(playedLevels().length)}${exp.newRecord ? ' · MEILLEURE EXPÉDITION DU PROTOCOLE' : ''} — le laboratoire n'a plus d'échantillon. Quelque part dans les conduites, de l'eau se souvient.`,
         'success',
         'NOUVELLE EXPÉDITION',
       )
@@ -923,6 +980,7 @@ function frame(now: number): void {
     Math.max(params.renderDownsample, quality.down),
     chillNow(),
     level.decals ?? [],
+    level.zones ?? [],
   )
   monitor.renderMs += (performance.now() - renderT0 - monitor.renderMs) * 0.08
 
@@ -953,7 +1011,7 @@ function frame(now: number): void {
 
   // Instruments de bord
   const fraction = sim.baseVolume > 0 ? sim.playerCount / sim.baseVolume : 0
-  hudTableau.textContent = testLevel ? 'BIS' : `nº ${levelIndex + 1}/${TABLEAUX.length}`
+  hudTableau.textContent = testLevel ? 'BIS' : `nº ${levelIndex + 1}/${playedLevels().length}`
   // La coque refroidit : +21° au départ, −60° à froid complet — la pression
   // temporelle se lit ici (chiffre ET barre), jamais sur un chronomètre
   const coque = Math.round(21 - 81 * chillNow())
@@ -1079,7 +1137,15 @@ function frame(now: number): void {
   if (sim.iceImpact > 60) audio.iceImpact(sim.iceImpact)
   sim.iceImpact = 0
 
-  const stateText = sim.dispersed ? 'DISPERSÉ' : allFrozen ? 'GLACE' : allGas ? 'VAPEUR' : 'liquide'
+  const stateText = sim.dispersed
+    ? 'DISPERSÉ'
+    : locked
+      ? `${zone.toUpperCase()} — IMPOSÉE`
+      : allFrozen
+        ? 'GLACE'
+        : allGas
+          ? 'VAPEUR'
+          : 'liquide'
   const gel = !allFrozen && frozenCount > 0 ? ' · gel partiel' : ''
   const vape = !allGas && gasCount > 0 ? ' · vapeur partielle' : ''
   const suffix = `${gel}${vape}${vortex.timer > 0 ? ' · vortex' : ''}${input.paused ? ' · pause' : ''}`
