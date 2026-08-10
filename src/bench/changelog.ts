@@ -11,6 +11,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 02:15',
+    title: 'Laser palier 2 : le corps liquide est un prisme vivant',
+    notes: [
+      'L’EAU RÉFRACTE. Quand le faisceau traverse le corps liquide, il se plie à chaque surface (Snell-Descartes, indice 1,33 — l’eau réelle) : entrer le rapproche de la normale, sortir l’en écarte. Le corps devient un instrument d’optique que l’on sculpte en jouant — s’étaler, se regrouper, s’étirer change la façon dont la lumière le traverse.',
+      'La RÉFLEXION TOTALE INTERNE est là aussi : un rayon qui tente de sortir trop à plat (au-delà de ~49° de la normale) reste PRISONNIER de l’eau et ricoche sous sa surface — on peut piéger la lumière dans son propre corps et la promener avec soi.',
+      'Traverser n’est pas gratuit : le couloir de chauffe évapore l’eau sur le trajet (vers la rosée, comme toujours). Servir de prisme, c’est fondre un peu.',
+      'La surface liquide utilise le même lissage de normale que le miroir de glace (une surface de particules est encore plus agitée liquide que gelée) ; le tronçon immergé du faisceau se voit — halo élargi et rosé, la lumière diffuse dans le corps.',
+      'Au banc (« Laser ») : curseur d’indice de réfraction — à 1, l’eau redevient transparente ; plus haut, le prisme plie et piège davantage. La glace reste prioritaire : gelé, on est un miroir, pas un prisme.',
+    ],
+  },
+  {
     date: '11/08/2026 01:45',
     title: 'Le miroir de glace est poli : le reflet ne tremble plus',
     notes: [

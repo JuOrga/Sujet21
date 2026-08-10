@@ -563,7 +563,11 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   )
   describe(
     fLaser.addBinding(params, 'laserMirrorSmooth', { min: 6, max: 90, step: 2, label: 'lissage du miroir (u)' }),
-    'Rayon de moyennage de la normale quand le faisceau frappe la glace : le contact reste précis, mais la facette est lissée sur cette zone — le reflet ne tremble plus à chaque bosse de la surface. Bas : miroir granuleux, reflets chaotiques.',
+    'Rayon de moyennage de la normale quand le faisceau frappe la glace : le contact reste précis, mais la facette est lissée sur cette zone — le reflet ne tremble plus à chaque bosse de la surface. Bas : miroir granuleux, reflets chaotiques. Le dioptre de l’eau (réfraction) partage ce lissage.',
+  )
+  describe(
+    fLaser.addBinding(params, 'laserRefractIndex', { min: 1, max: 2.4, step: 0.01, label: 'indice de réfraction' }),
+    'Le corps LIQUIDE est un prisme : le rayon se plie à chaque traversée de surface (Snell-Descartes), et se réfléchit SOUS la surface au-delà de l’angle critique (≈ 49° à 1,33 — l’eau réelle). Plus haut : le prisme plie davantage et piège plus facilement. À 1 : l’eau redevient transparente (palier 1).',
   )
 
   const fBody = pane.addFolder({ title: 'Corps', expanded: false })

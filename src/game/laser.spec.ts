@@ -13,7 +13,17 @@ function monde(sur: Partial<TraceMonde> = {}): TraceMonde {
     portesFermees: [],
     cibles: [],
     iceNormal: null,
+    eau: null,
     ...sur,
+  }
+}
+
+/** Une dalle d'eau synthétique entre deux x : dioptres verticaux. */
+function dalleEau(minX: number, maxX: number): NonNullable<TraceMonde['eau']> {
+  const mid = (minX + maxX) / 2
+  return {
+    dedans: (x) => x >= minX && x <= maxX,
+    normale: (x) => (x < mid ? { nx: -1, ny: 0 } : { nx: 1, ny: 0 }),
   }
 }
 
@@ -89,6 +99,67 @@ describe('traceLaser — les règles optiques du palier 1', () => {
     expect(t.points.length).toBeGreaterThan(2) // rebond constaté
     const fin = t.points[t.points.length - 1]
     expect(fin.x).toBeLessThan(300) // renvoyé du côté d'où il venait
+  })
+
+  it('l’eau RÉFRACTE (palier 2) : une dalle décale le rayon sans changer son cap', () => {
+    // un rayon oblique traversant une dalle à faces parallèles ressort
+    // PARALLÈLE à lui-même, décalé latéralement — la signature du prisme
+    const t = traceLaser(
+      { x: -300, y: 0, angle: 25 },
+      monde({ eau: dalleEau(0, 120) }),
+    )
+    expect(t.points.length).toBeGreaterThanOrEqual(4) // deux dioptres au moins
+    const fin = t.points[t.points.length - 1]
+    const avant = t.points[t.points.length - 2]
+    const l = Math.hypot(fin.x - avant.x, fin.y - avant.y)
+    const dirX = (fin.x - avant.x) / l
+    const dirY = (fin.y - avant.y) / l
+    const a = (25 * Math.PI) / 180
+    // cap de sortie = cap d'entrée (faces parallèles)
+    expect(dirX * Math.cos(a) + dirY * Math.sin(a)).toBeGreaterThan(0.999)
+    // mais décalé : dans la dalle, le rayon a couru plus près de l'axe x
+    // que la ligne droite ne l'aurait fait
+    const yDroit = (fin.x - -300) * Math.tan(a)
+    expect(fin.y).toBeLessThan(yDroit - 5)
+  })
+
+  it('la RÉFLEXION TOTALE INTERNE piège le rayon trop rasant sous la surface', () => {
+    // eau : tout le demi-plan y < 0. Normale de surface : vers le haut.
+    const nappe: NonNullable<TraceMonde['eau']> = {
+      dedans: (_x, y) => y < 0,
+      normale: () => ({ nx: 0, ny: 1 }),
+    }
+    // depuis l'eau, à 20° au-dessus de l'horizontale : incidence 70° > 49°
+    // critique → le rayon ricoche sous la surface, il ne sort JAMAIS
+    const piege = traceLaser({ x: -600, y: -120, angle: 20 }, monde({ eau: nappe }))
+    expect(piege.points.length).toBeGreaterThan(2) // il y a bien eu ricochet
+    for (const p of piege.points.slice(1)) expect(p.y).toBeLessThan(1)
+    // à 60° au-dessus de l'horizontale : incidence 30° < critique → il sort
+    const sorti = traceLaser({ x: -600, y: -120, angle: 60 }, monde({ eau: nappe }))
+    const fin = sorti.points[sorti.points.length - 1]
+    expect(fin.y).toBeGreaterThan(0)
+  })
+
+  it('le corps SIMULÉ plie réellement le faisceau qui le traverse hors d’axe', () => {
+    const sim = new FluidSim({ ...DEFAULT_PARAMS }, BOUNDS, 4096)
+    // ~700 particules ≈ un disque de rayon 85 u — assez épais pour une lentille
+    sim.spawnDisc(0, 0, 700, KIND_PLAYER)
+    sim.relabel()
+    sim.step(sim.params.dt)
+    const rIce = sim.params.particleSpacing * 1.3
+    const t = traceLaser(
+      { x: -600, y: -45, angle: 0 },
+      monde({
+        eau: {
+          dedans: (x, y) => sim.liquidAt(x, y, rIce),
+          normale: (x, y) => sim.liquidNormalAt(x, y, sim.params.laserMirrorSmooth),
+        },
+      }),
+    )
+    expect(t.points.length).toBeGreaterThan(2) // des dioptres ont été franchis
+    const fin = t.points[t.points.length - 1]
+    // en ligne droite il finirait à y = −45 : la lentille l'a dévié
+    expect(Math.abs(fin.y - -45)).toBeGreaterThan(8)
   })
 
   it('la normale du miroir est LISSE le long d’une face plane, malgré le grain des particules', () => {
