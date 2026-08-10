@@ -11,6 +11,13 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '10/08/2026 21:15',
+    title: 'Le temps suspendu monte encore d’un cran',
+    notes: [
+      'Pendant la visée du dash, le monde descend à 30 % de son niveau derrière un passe-bas à 240 Hz ; la texture du temps suspendu monte à 150 % de son niveau nominal, le cœur bat plus fort, le plongeon d’entrée et la remontée de sortie aussi. Le contraste entre le monde étouffé et la voix nette fait tout l’effet.',
+    ],
+  },
+  {
     date: '10/08/2026 20:55',
     title: 'Le ralenti s’accentue, et une vraie texture habite le temps suspendu',
     notes: [

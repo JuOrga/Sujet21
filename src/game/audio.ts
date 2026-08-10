@@ -238,20 +238,20 @@ export class AudioFx {
     const depth = (this.slowSubG as (GainNode & { __depth?: GainNode }) | null)?.__depth ?? null
     if (on) {
       this.slowLp?.frequency.cancelScheduledValues(t)
-      this.slowLp?.frequency.setTargetAtTime(290, t, 0.08)
+      this.slowLp?.frequency.setTargetAtTime(240, t, 0.08)
       // le monde s'éloigne : étouffé PAR le filtre, et plus bas de moitié —
       // sans cette baisse, les basses de la musique masquaient tout l'effet
-      this.slowDuck?.gain.setTargetAtTime(0.45, t, 0.12)
-      this.blip(340, 48, 0.85, 0.13, 'sine') // le plongeon : la hauteur tombe
+      this.slowDuck?.gain.setTargetAtTime(0.3, t, 0.12)
+      this.blip(340, 46, 0.9, 0.17, 'sine') // le plongeon : la hauteur tombe
       this.noiseBurst(600, 0.8, 0.6, 0.08, 'lowpass')
-      this.ramp(this.slowShimG, 0.03)
-      this.ramp(this.slowSubG, 0.055)
-      if (depth && this.ctx) depth.gain.setTargetAtTime(0.033, t, 0.25)
+      this.ramp(this.slowShimG, 0.042)
+      this.ramp(this.slowSubG, 0.075)
+      if (depth && this.ctx) depth.gain.setTargetAtTime(0.045, t, 0.25)
     } else {
       this.slowLp?.frequency.cancelScheduledValues(t)
       this.slowLp?.frequency.setTargetAtTime(19500, t, 0.04)
       this.slowDuck?.gain.setTargetAtTime(1, t, 0.05)
-      this.blip(85, 700, 0.24, 0.085, 'sine') // l'air revient d'un trait
+      this.blip(85, 700, 0.24, 0.11, 'sine') // l'air revient d'un trait
       this.ramp(this.slowShimG, 0)
       this.ramp(this.slowSubG, 0)
       if (depth && this.ctx) depth.gain.setTargetAtTime(0, t, 0.1)
