@@ -1725,8 +1725,7 @@ export class FluidSim {
     // Sous le seuil critique : constaté ici, tranché par le délai de grâce
     // (dispersalGrace, dans step) — un corps en pleine transformation a le
     // temps de se regrouper avant que le protocole ne conclue à la perte.
-    this.belowCritical =
-      this.baseVolume > 0 && count < this.baseVolume * p.criticalVolumeFraction
+    this.belowCritical = count * p.litersPerParticle < p.criticalVolumeLiters
     if (count < 2) this.dispersed = true
   }
 

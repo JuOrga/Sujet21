@@ -1140,8 +1140,12 @@ function frame(now: number): void {
   hudBonbonne.textContent = `${run.bonbonneLiters.toFixed(2)} L`
   hudVolume.innerHTML = `${sim.liters().toFixed(2)} <small>L · ${sim.playerCount} part.</small>`
   gaugeFill.style.width = `${Math.min(100, fraction * 100).toFixed(1)}%`
-  gaugeThreshold.style.left = `${(params.criticalVolumeFraction * 100).toFixed(1)}%`
-  hudSeuil.textContent = `${(params.criticalVolumeFraction * sim.baseVolume * params.litersPerParticle).toFixed(2)} L`
+  // Le seuil est un volume ABSOLU : sa position sur la jauge (graduée en % du
+  // volume de départ) dépend donc du volume de base de ce tableau.
+  const baseLiters = sim.baseVolume * params.litersPerParticle
+  const seuilPct = baseLiters > 0 ? (params.criticalVolumeLiters / baseLiters) * 100 : 0
+  gaugeThreshold.style.left = `${Math.min(100, seuilPct).toFixed(1)}%`
+  hudSeuil.textContent = `${params.criticalVolumeLiters.toFixed(2)} L`
   hudVitesse.textContent = `${speed.toFixed(0)} u/s`
 
   // Débit de perte lissé : combien coûte l'action en cours, et à quoi
@@ -1174,7 +1178,7 @@ function frame(now: number): void {
   // se fige avec son élan et l'essai s'achève à l'arrêt.
   const alive = !sim.dispersed && !tableauDone && !run.ended
   if (alive && !endgame.spent) {
-    endgame.lastCall = fraction <= params.criticalVolumeFraction
+    endgame.lastCall = sim.liters() <= params.criticalVolumeLiters
     const aiming = input.aimActive && !input.paused
     // le relâchement du pointeur conclut l'impulsion en cours
     if (endgame.lastCall && endgame.wasAiming && !aiming) endgame.spent = true
@@ -1204,7 +1208,7 @@ function frame(now: number): void {
       !run.ended,
   )
 
-  const nearLast = alive && !endgame.spent && fraction <= params.lastCallFraction
+  const nearLast = alive && !endgame.spent && sim.liters() <= params.lastCallLiters
   const inDanger = alive && (endgame.spent || endgame.lastCall || nearLast)
   if (inDanger) {
     hudDanger.textContent = endgame.spent
@@ -1254,7 +1258,9 @@ function frame(now: number): void {
 
   // ---- Sons : boucles continues et fronts d'état ----
   const audible = !input.paused && !tableauDone && !sim.dispersed
-  audio.setEjectLevel(audible && input.aimActive && !input.gasIntent ? 1 : 0)
+  // Le souffle continu d'éjection est retiré : l'eau se signale par la goutte
+  // qui « ploc » à chaque impulsion (bande.bruitage), pas par un sifflement.
+  audio.setEjectLevel(0)
   audio.setGasLevel(audible && gasCount > 0 ? (input.aimActive && input.gasIntent ? 1 : 0.35) : 0)
 
   // ---- Bande-son : décor sonore et ponctuations ----

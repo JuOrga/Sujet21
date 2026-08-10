@@ -123,7 +123,7 @@ describe('FluidSim — invariants physiques', () => {
     // Refonte 2026 : il n'y a plus de minimum à ramener. Le seuil annonce la
     // dernière impulsion — c'est le jeu qui conclut, à l'arrêt du corps.
     const sim = makeSim({
-      criticalVolumeFraction: 0.5,
+      criticalVolumeLiters: 0.5, // 100 particules : la moitié des 200 du départ
       ejectRate: 2000,
       reabsorbCooldown: 10,
       dispersalGrace: 0.1,
