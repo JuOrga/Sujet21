@@ -78,6 +78,13 @@ export class AudioFx {
     if (this.ctx && this.ctx.state === 'suspended') void this.ctx.resume()
   }
 
+  // Le contexte et le bus maître, pour brancher la bande-son au même endroit :
+  // une seule coupure, un seul volume, une seule mise en veille.
+  graph(): { ctx: AudioContext; bus: GainNode } | null {
+    if (!this.ctx) this.build()
+    return this.ctx && this.master ? { ctx: this.ctx, bus: this.master } : null
+  }
+
   private build(): void {
     const Ctor =
       window.AudioContext ??

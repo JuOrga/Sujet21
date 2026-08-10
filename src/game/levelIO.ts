@@ -185,6 +185,7 @@ export function parseLevel(input: unknown): { level: LevelDef | null; rejets: st
     labels,
     zones: zones.length > 0 ? zones : undefined,
     par: o.par === undefined ? undefined : Math.max(1, Math.round(num(o.par, 3))),
+    ambiance: str(o.ambiance) || undefined,
   }
   return { level, rejets }
 }
@@ -206,6 +207,7 @@ export function serializeLevel(level: LevelDef): string {
   if (level.zones && level.zones.length > 0) out.zones = level.zones
   if (level.decals && level.decals.length > 0) out.decals = level.decals
   if (level.figure) out.figure = level.figure
+  if (level.ambiance) out.ambiance = level.ambiance
   for (const k of Object.keys(out)) if (out[k] === undefined) delete out[k]
   return JSON.stringify(out, null, 2)
 }

@@ -79,6 +79,10 @@ export interface LevelDef {
   decals?: DecalDef[]
   zones?: ZoneDef[]
   par?: number // budget d'impulsions visé : franchissable en `par`, record en dessous
+  // Lit musical imposé par le tableau. Sans valeur, la cuve suit le
+  // refroidissement de la coque (tiède → glaciale) : c'est le cas général,
+  // les tableaux n'ont pas à choisir une musique pour exister.
+  ambiance?: string
 }
 
 // Nom lisible de chaque matériau — l'éditeur et la légende parlent la même

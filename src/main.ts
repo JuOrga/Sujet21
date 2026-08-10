@@ -22,6 +22,7 @@ import {
 import { LevelEditor } from './editor/editor'
 import { fetchLibrary } from './game/netLevels'
 import { AudioFx, loadAudioPrefs } from './game/audio'
+import { Soundtrack, type Piste } from './game/soundtrack'
 import { Records } from './game/records'
 import {
   fetchSharedBoard,
@@ -50,6 +51,29 @@ const run = {
 
 function chillNow(): number {
   return Math.min(1, run.runTime / Math.max(30, params.chillDuration))
+}
+
+// Effets sonores : le contexte audio naît au premier geste (clic, toucher)
+const audio = new AudioFx(loadAudioPrefs())
+// Bande-son : mêmes réglages, même bus — elle ne s'éveille qu'au premier geste
+// et ne télécharge rien tant que le son est coupé.
+const bande = new Soundtrack(audio)
+function eveilAudio(): void {
+  audio.resume()
+  if (audio.enabled) bande.eveiller()
+}
+window.addEventListener('pointerdown', eveilAudio)
+window.addEventListener('keydown', eveilAudio)
+// Mémoire pour les transitions sonores (fronts d'état)
+const sfx = {
+  allFrozen: false,
+  allGas: false,
+  dispersed: false,
+  swallowed: 0,
+  spongeBites: 0,
+  aiming: false,
+  gasAim: false,
+  lastCall: false,
 }
 
 // Registres du labo (§10) : records par tableau et historique des essais.
@@ -106,6 +130,7 @@ function applyLevel(): void {
   renderBoxes = [...level.boxes, { ...level.exit, material: MAT_EXIT }]
   exitMouth.x = (level.exit.minX + level.exit.maxX) * 0.5
   exitMouth.y = (level.exit.minY + level.exit.maxY) * 0.5
+  bande.setAmbiance((level.ambiance as Piste | undefined) ?? null)
   buildWorldLabels()
 }
 
@@ -436,12 +461,6 @@ const camera = new Camera()
 ;(window as unknown as { __cam: Camera }).__cam = camera
 ;(window as unknown as { __params: SimParams }).__params = params
 
-// Effets sonores : le contexte audio naît au premier geste (clic, toucher)
-const audio = new AudioFx(loadAudioPrefs())
-window.addEventListener('pointerdown', () => audio.resume())
-window.addEventListener('keydown', () => audio.resume())
-// Mémoire pour les transitions sonores (fronts d'état)
-const sfx = { allFrozen: false, allGas: false, dispersed: false, swallowed: 0 }
 camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, 1)
 const renderer = new Renderer(canvas, CAPACITY)
 const loop = new FixedLoop()
@@ -559,6 +578,7 @@ const pane = createBench(params, monitor, {
     set actif(v: boolean) {
       audio.resume()
       audio.setEnabled(v)
+      if (v) bande.eveiller()
     },
     get volume() {
       return audio.volume
@@ -578,6 +598,7 @@ input.onVortex = (clientX, clientY) => {
   vortex.y = w.y
   vortex.timer = params.vortexDuration
   audio.vortex()
+  bande.bruitage('vortex-sas', 0.55)
 }
 
 // Barre tactile : les commandes clavier/souris accessibles au doigt
@@ -671,6 +692,7 @@ const btnSound = touchButton(
   () => {
     audio.resume()
     audio.setEnabled(!audio.enabled)
+    if (audio.enabled) bande.eveiller()
     pane.refresh()
   },
   'tb-snd', // masqué au doigt : la bascule du son reste au banc (dossier Son)
@@ -928,6 +950,7 @@ function frame(now: number): void {
     // l'expédition — on félicite, on ramène au protocole.
     const surplus = sim.liters() + sim.swallowed * params.litersPerParticle
     audio.collect()
+    bande.ponctuation('sting-collecte', 0.85)
     run.ended = true
     showOverlay(
       fromEditor ? 'TABLEAU FRANCHI' : 'ESSAI 21-A BIS CONCLU',
@@ -958,6 +981,9 @@ function frame(now: number): void {
       ? ` · NOUVEAU RECORD DU TABLEAU (${surplus.toFixed(2)} L en ${fmtTime(run.tableauTime)})`
       : ` · record du tableau : ${records.tableauRecord(level.code)!.liters.toFixed(2)} L`
     audio.collect()
+    // Le record a sa propre fanfare : la collecte ordinaire ne doit pas
+    // sonner comme un exploit, sinon plus rien ne sonne comme un exploit.
+    bande.ponctuation(newRecord ? 'sting-record' : 'sting-collecte', 0.85)
     if (levelIndex + 1 >= playedLevels().length) {
       // Dernier sas : l'expédition est achevée — bilan, et registres à jour
       run.ended = true
@@ -1197,6 +1223,29 @@ function frame(now: number): void {
   const audible = !input.paused && !tableauDone && !sim.dispersed
   audio.setEjectLevel(audible && input.aimActive && !input.gasIntent ? 1 : 0)
   audio.setGasLevel(audible && gasCount > 0 ? (input.aimActive && input.gasIntent ? 1 : 0.35) : 0)
+
+  // ---- Bande-son : décor sonore et ponctuations ----
+  const enJeu = document.body.classList.contains('playing')
+  bande.setScene(enJeu ? 'cuve' : 'accueil')
+  bande.setChill(chillNow())
+  bande.setZone(zone)
+  // Le geste d'impulsion : une bouffée à l'amorce, pas un souffle continu —
+  // la boucle procédurale tient déjà la durée.
+  const vise = audible && input.aimActive
+  if (vise && !sfx.aiming) bande.bruitage(input.gasIntent ? 'souffle-vapeur' : 'ejection', 0.65)
+  else if (vise && input.gasIntent && !sfx.gasAim) bande.bruitage('souffle-vapeur', 0.6)
+  sfx.aiming = vise
+  sfx.gasAim = vise && input.gasIntent
+  // Une éponge qui boit : on sonne par gorgée, pas par goutte. Le compteur
+  // est recopié à chaque image — au changement de tableau il repart à zéro
+  // avec la simulation, sans laisser le son muet pour le reste de la partie.
+  if (sim.spongeBites < sfx.spongeBites) sfx.spongeBites = sim.spongeBites // nouveau tableau
+  if (sim.spongeBites - sfx.spongeBites >= 3) {
+    bande.bruitage('eponge', 0.45)
+    sfx.spongeBites = sim.spongeBites
+  }
+  if (endgame.lastCall && !sfx.lastCall) bande.ponctuation('sting-derniere-impulsion', 0.8)
+  sfx.lastCall = endgame.lastCall
   const drainOn = params.exitRadius > 0 && params.exitPull > 0
   const mouthDist = Math.hypot(sim.stats.centroidX - exitMouth.x, sim.stats.centroidY - exitMouth.y)
   audio.setDrainLevel(
@@ -1204,14 +1253,25 @@ function frame(now: number): void {
   )
   if (sim.swallowed > sfx.swallowed) audio.pulseSwallow(sim.swallowed - sfx.swallowed)
   sfx.swallowed = sim.swallowed
-  if (allFrozen && !sfx.allFrozen) audio.freezeOn()
-  else if (!allFrozen && sfx.allFrozen) audio.freezeOff()
+  if (allFrozen && !sfx.allFrozen) {
+    audio.freezeOn()
+    bande.bruitage('gel', 0.7)
+  } else if (!allFrozen && sfx.allFrozen) {
+    audio.freezeOff()
+    bande.bruitage('goutte-rosee', 0.6) // le dégel retombe en gouttes
+  }
   sfx.allFrozen = allFrozen
-  if (allGas && !sfx.allGas) audio.vaporizeOn()
-  else if (!allGas && sfx.allGas) audio.vaporizeOff()
+  if (allGas && !sfx.allGas) {
+    audio.vaporizeOn()
+    bande.bruitage('vaporisation', 0.7)
+  } else if (!allGas && sfx.allGas) {
+    audio.vaporizeOff()
+    bande.bruitage('condensation', 0.7)
+  }
   sfx.allGas = allGas
   if (sim.dispersed && !sfx.dispersed) {
     audio.disperse()
+    bande.ponctuation('fin-de-course', 0.85)
     if (!testLevel) {
       // fin de l'échantillon ET de l'expédition : les registres consignent tout
       dispersedEssaiNo = records.essaiNumber()
@@ -1231,7 +1291,12 @@ function frame(now: number): void {
     }
   }
   sfx.dispersed = sim.dispersed
-  if (sim.iceImpact > 60) audio.iceImpact(sim.iceImpact)
+  if (sim.iceImpact > 60) {
+    audio.iceImpact(sim.iceImpact)
+    // le choc porte : plus il est franc, plus l'échantillon sonne fort et sec
+    const force = Math.min(1, sim.iceImpact / 700)
+    bande.bruitage('impact-glace', 0.25 + 0.55 * force, 0.9 + 0.25 * force)
+  }
   sim.iceImpact = 0
 
   const stateText = sim.dispersed

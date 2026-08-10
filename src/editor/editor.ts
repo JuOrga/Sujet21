@@ -22,6 +22,7 @@ import {
   type ZoneForce,
 } from '../game/level'
 import { checkLevel, parseLevel, serializeLevel } from '../game/levelIO'
+import { PISTES, PISTE_NOMS, type Piste } from '../game/soundtrack'
 import {
   deleteLevel,
   fetchLibrary,
@@ -623,6 +624,18 @@ export class LevelEditor {
       this.draw()
     })
 
+    // Choix du lit musical : « suivre la cuve » reste le cas normal — la
+    // musique suit alors le refroidissement de la coque, comme partout.
+    const selAmb = this.el('ed-ambiance') as HTMLSelectElement
+    selAmb.innerHTML =
+      '<option value="">Suivre la cuve (refroidissement)</option>' +
+      PISTES.map((p) => `<option value="${p}">${PISTE_NOMS[p]}</option>`).join('')
+    selAmb.addEventListener('change', () => {
+      this.level.ambiance = selAmb.value || undefined
+      this.persist()
+      this.commit(selAmb.value ? `Musique : ${PISTE_NOMS[selAmb.value as Piste]}.` : 'Musique : celle de la cuve.')
+    })
+
     for (const id of ['ed-name', 'ed-code', 'ed-par', 'ed-journal'] as const) {
       this.el(id).addEventListener('input', () => {
         this.level.name = (this.el('ed-name') as HTMLInputElement).value || 'Sans titre'
@@ -862,6 +875,7 @@ export class LevelEditor {
     ;(this.el('ed-code') as HTMLInputElement).value = this.level.code
     ;(this.el('ed-par') as HTMLInputElement).value = String(this.level.par ?? 3)
     ;(this.el('ed-journal') as HTMLTextAreaElement).value = this.level.journal
+    ;(this.el('ed-ambiance') as HTMLSelectElement).value = this.level.ambiance ?? ''
     this.syncProps()
     this.validate()
   }
