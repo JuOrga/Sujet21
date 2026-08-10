@@ -164,6 +164,32 @@ describe('traceLaser — les règles optiques du palier 1', () => {
     expect(Math.abs(fin.y - -45)).toBeGreaterThan(8)
   })
 
+  it('la capture se fait N’IMPORTE OÙ le long du rail, et l’arc suit le SENS du tracé', () => {
+    // un rail vertical qui MONTE (sens du tracé : bas → haut), croisé en son
+    // milieu par le faisceau ; le nuage de vapeur est posé sur le croisement
+    const rail = { points: [{ x: 100, y: -300 }, { x: 100, y: 300 }] }
+    const nuage = (x: number, y: number): boolean => Math.hypot(x - 100, y) < 60
+    const monte = traceLaser(
+      { x: -500, y: 0, angle: 0 },
+      monde({
+        vapeur: nuage,
+        rails: [rail],
+        cibles: [{ x: 100, y: 300, r: 26 }, { x: 100, y: -300, r: 26 }],
+      }),
+    )
+    expect(monte.touchees).toEqual([0]) // l'arc est monté — le sens du tracé
+    // le MÊME rail inversé : le même croisement descend
+    const descend = traceLaser(
+      { x: -500, y: 0, angle: 0 },
+      monde({
+        vapeur: nuage,
+        rails: [{ points: [...rail.points].reverse() }],
+        cibles: [{ x: 100, y: 300, r: 26 }, { x: 100, y: -300, r: 26 }],
+      }),
+    )
+    expect(descend.touchees).toEqual([1])
+  })
+
   it('le PLASMA (palier 3) : ionisé dans la vapeur, l’arc suit le rail en équerre', () => {
     // un nuage de vapeur autour de l'origine, un rail en L qui monte : le
     // faisceau horizontal, ionisé dans le nuage, est capturé à (0,0), longe

@@ -603,38 +603,60 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     }
   }
 
-  // rails magnétiques : des lignes de champ posées dans le décor — pointillé
-  // violet discret, anneaux de capture aux extrémités. Le faisceau ordinaire
-  // les ignore ; seul l'arc de plasma s'y accroche.
+  // rails magnétiques : des lignes de champ posées dans le décor — bande de
+  // capture translucide (l'arc s'accroche N'IMPORTE OÙ le long), pointillé
+  // violet, et des CHEVRONS qui donnent le sens de circulation de l'arc.
+  // Le faisceau ordinaire les ignore ; seul le plasma s'y accroche.
   for (const rail of rails) {
     const pts = rail.points
     if (pts.length < 2) continue
-    g.strokeStyle = 'rgba(150,120,255,0.4)'
+    const chemin = (): void => {
+      g.beginPath()
+      const p0 = S(pts[0].x, pts[0].y)
+      g.moveTo(p0.sx, p0.sy)
+      for (let k = 1; k < pts.length; k++) {
+        const pk = S(pts[k].x, pts[k].y)
+        g.lineTo(pk.sx, pk.sy)
+      }
+    }
+    // la bande de capture : la portée du champ, tout du long
+    g.strokeStyle = 'rgba(150,120,255,0.07)'
+    g.lineWidth = Math.max(2, params.plasmaRailRadius * 2 * z)
+    g.lineJoin = 'round'
+    g.lineCap = 'round'
+    chemin()
+    g.stroke()
+    // la ligne elle-même
+    g.strokeStyle = 'rgba(150,120,255,0.45)'
     g.lineWidth = Math.max(1, 2 * z)
     g.setLineDash([2 * z, 9 * z])
-    g.beginPath()
-    const p0 = S(pts[0].x, pts[0].y)
-    g.moveTo(p0.sx, p0.sy)
-    for (let k = 1; k < pts.length; k++) {
-      const pk = S(pts[k].x, pts[k].y)
-      g.lineTo(pk.sx, pk.sy)
-    }
+    chemin()
     g.stroke()
     g.setLineDash([])
-    for (const bout of [pts[0], pts[pts.length - 1]]) {
-      const p = S(bout.x, bout.y)
-      const rr = Math.max(3, params.plasmaRailRadius * z)
-      g.strokeStyle = 'rgba(170,140,255,0.35)'
-      g.lineWidth = 1.2
-      g.setLineDash([3, 5])
-      g.beginPath()
-      g.arc(p.sx, p.sy, rr, 0, Math.PI * 2)
-      g.stroke()
-      g.setLineDash([])
-      g.fillStyle = 'rgba(190,160,255,0.8)'
-      g.beginPath()
-      g.arc(p.sx, p.sy, Math.max(1.6, 3.4 * z), 0, Math.PI * 2)
-      g.fill()
+    // chevrons de sens, à intervalle régulier le long de chaque tronçon
+    g.strokeStyle = 'rgba(190,160,255,0.7)'
+    g.lineWidth = Math.max(1, 1.6 * z)
+    const taille = Math.max(3, 7 * z)
+    for (let k = 0; k + 1 < pts.length; k++) {
+      const a = pts[k]
+      const b = pts[k + 1]
+      const len = Math.hypot(b.x - a.x, b.y - a.y)
+      if (len < 1) continue
+      const ux = (b.x - a.x) / len
+      const uy = (b.y - a.y) / len
+      const n = Math.max(1, Math.floor(len / 70))
+      for (let m = 1; m <= n; m++) {
+        const t = m / (n + 1)
+        const p = S(a.x + ux * len * t, a.y + uy * len * t)
+        // direction en coordonnées écran (y inversé)
+        const ex = ux
+        const ey = -uy
+        g.beginPath()
+        g.moveTo(p.sx - (ex + ey * 0.6) * taille, p.sy - (ey - ex * 0.6) * taille)
+        g.lineTo(p.sx, p.sy)
+        g.lineTo(p.sx - (ex - ey * 0.6) * taille, p.sy - (ey + ex * 0.6) * taille)
+        g.stroke()
+      }
     }
   }
 

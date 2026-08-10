@@ -19,11 +19,12 @@
 //   · la VAPEUR IONISE (palier 3) : le faisceau qui traverse le nuage
 //     devient un arc de PLASMA — et le plasma, extrêmement soumis aux
 //     champs magnétiques, est CAPTURÉ par les rails posés dans le décor :
-//     s'il passe près d'une extrémité de rail en étant ionisé, l'arc suit
-//     la ligne de champ jusqu'à l'autre bout (virages, serpentins), puis
-//     repart tout droit. Le faisceau ordinaire ignore les rails. Le plasma
-//     se PROVOQUE — être vapeur dans la lumière au bon endroit — il ne se
-//     choisit pas : ce n'est pas un quatrième état.
+//     s'il passe près de la ligne (N'IMPORTE OÙ le long du rail) en étant
+//     ionisé, l'arc s'y accroche et la suit DANS LE SENS DU TRACÉ — du
+//     premier point vers le dernier (virages, serpentins) — puis repart
+//     tout droit au bout. Le faisceau ordinaire ignore les rails. Le
+//     plasma se PROVOQUE — être vapeur dans la lumière au bon endroit —
+//     il ne se choisit pas : ce n'est pas un quatrième état.
 
 import { MAT_EXIT, MAT_GRILLE, type LaserDef, type ObstacleBox } from './level'
 import type { Bounds } from '../sim/solver'
@@ -36,8 +37,8 @@ export const LASER_MAX_LENGTH = 9000 // u de course totale : personne ne verra p
 // gouttes sur le trajet en crée facilement une dizaine.
 export const LASER_MAX_REFRACT = 32
 export const LASER_INDICE_EAU = 1.33
-// Rayon de capture par défaut autour des extrémités de rail, et plafond de
-// rails suivis par un même faisceau (contre les allers-retours infinis).
+// Rayon de capture par défaut autour de la LIGNE du rail (tout du long),
+// et plafond de rails suivis par un même faisceau (contre les boucles).
 export const LASER_RAIL_RADIUS = 30
 export const LASER_MAX_RAILS = 6
 
@@ -77,9 +78,10 @@ export interface TraceMonde {
    * faisceau ne s'ionise jamais et les rails restent muets). Appelée à
    * chaque pas — elle doit rester bon marché. */
   vapeur: ((x: number, y: number) => boolean) | null
-  /** Les rails magnétiques du tableau (polylignes, ≥ 2 points chacune). */
+  /** Les rails magnétiques du tableau (polylignes, ≥ 2 points chacune —
+   * l'ORDRE des points est le sens de circulation de l'arc). */
   rails: { points: { x: number; y: number }[] }[]
-  /** Rayon de capture autour des extrémités de rail (défaut LASER_RAIL_RADIUS). */
+  /** Rayon de capture autour de la ligne du rail (défaut LASER_RAIL_RADIUS). */
   railRadius?: number
 }
 
@@ -310,15 +312,36 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
         for (const rail of monde.rails) {
           const pts = rail.points
           if (pts.length < 2) continue
-          let debut = -1
-          if (Math.hypot(pts[0].x - x, pts[0].y - y) <= rr) debut = 0
-          else if (Math.hypot(pts[pts.length - 1].x - x, pts[pts.length - 1].y - y) <= rr) {
-            debut = pts.length - 1
+          // le point de la LIGNE le plus proche du faisceau : la capture se
+          // fait n'importe où le long du rail, pas seulement aux bouts
+          let best = Infinity
+          let bx = 0
+          let by = 0
+          let bseg = -1
+          for (let s = 0; s + 1 < pts.length; s++) {
+            const a = pts[s]
+            const b = pts[s + 1]
+            const abx = b.x - a.x
+            const aby = b.y - a.y
+            const len2 = abx * abx + aby * aby
+            const t =
+              len2 < 1e-9 ? 0 : Math.max(0, Math.min(1, ((x - a.x) * abx + (y - a.y) * aby) / len2))
+            const qx = a.x + abx * t
+            const qy = a.y + aby * t
+            const d = Math.hypot(x - qx, y - qy)
+            if (d < best) {
+              best = d
+              bx = qx
+              by = qy
+              bseg = s
+            }
           }
-          if (debut < 0) continue
+          if (best > rr) continue
           railsPris++
           points.push({ x, y, plasma: true })
-          const ordre = debut === 0 ? pts : [...pts].reverse()
+          // l'arc rejoint la ligne au point de capture, puis la suit dans
+          // le SENS DU TRACÉ — du point de capture vers le dernier point
+          const ordre = [{ x: bx, y: by }, ...pts.slice(bseg + 1)]
           if (suivreRail(ordre)) return { points, touchees }
           // sorti au bout du rail : on repart tout droit, dans le milieu
           // qu'on y trouve — et un court sursis évite de reprendre le
