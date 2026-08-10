@@ -250,6 +250,23 @@ describe('traceLaser — les règles optiques du palier 1', () => {
     expect(t.touchees).toEqual([0]) // capturé dans le vrai nuage, guidé, cible allumée
   })
 
+  it('le champ actif CONVOIE la vapeur le long du rail — l’eau ne sent rien', () => {
+    const sim = new FluidSim({ ...DEFAULT_PARAMS }, BOUNDS, 2048)
+    const gaz = sim.addParticle(105, 0, KIND_FREE)
+    sim.vapor[gaz] = 1
+    sim.gaseous[gaz] = 1
+    const eau = sim.addParticle(112, 10, KIND_FREE) // liquide, dans la bande
+    const loin = sim.addParticle(400, 0, KIND_FREE)
+    sim.vapor[loin] = 1
+    sim.gaseous[loin] = 1 // gazeuse, mais hors bande
+    // rail vertical montant, la particule gazeuse posée dessus
+    const rail = [{ x: 100, y: -300 }, { x: 100, y: 300 }]
+    for (let s = 0; s < 30; s++) sim.railConvoy(rail, 75, 950, 1 / 120)
+    expect(sim.velY[gaz]).toBeGreaterThan(50) // entraînée vers le haut (sens du tracé)
+    expect(Math.abs(sim.velY[eau])).toBeLessThan(1) // le liquide ignore le champ
+    expect(Math.abs(sim.velY[loin])).toBeLessThan(1) // hors bande : rien
+  })
+
   it('la normale du miroir est LISSE le long d’une face plane, malgré le grain des particules', () => {
     const sim = new FluidSim({ ...DEFAULT_PARAMS }, BOUNDS, 2048)
     // un mur de glace vertical, en réseau : sa face gauche est plane
