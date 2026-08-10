@@ -1325,7 +1325,7 @@ function frame(now: number): void {
   // Le geste d'impulsion : une bouffée à l'amorce, pas un souffle continu —
   // la boucle procédurale tient déjà la durée.
   // L'éjection d'eau est une goutte qui tombe dans l'eau — et elle GOUTTE :
-  // une première au contact, puis une toutes les ~0,3 s tant qu'on maintient,
+  // une première au contact, puis une toutes les ~0,17 s tant qu'on maintient,
   // à cadence légèrement irrégulière (l'eau n'est pas un métronome). Trois
   // prises de hauteurs différentes tirées au sort, plus un écart de ±7 % :
   // deux fois le même « bloop » à la même note et l'oreille entend une
@@ -1336,7 +1336,7 @@ function frame(now: number): void {
     if (!sfx.aiming || sfx.dropTimer <= 0) {
       const prise = 1 + Math.floor(Math.random() * 3)
       bande.bruitage(`ejection-${prise}` as Bruitage, 0.65, 0.93 + Math.random() * 0.14)
-      sfx.dropTimer = 0.24 + Math.random() * 0.18
+      sfx.dropTimer = 0.12 + Math.random() * 0.1
     }
   }
   sfx.aiming = vise
