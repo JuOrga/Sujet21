@@ -45,7 +45,9 @@ export type Ponctuation =
   | 'fin-de-course'
 
 export type Bruitage =
-  | 'ejection'
+  | 'ejection-1'
+  | 'ejection-2'
+  | 'ejection-3'
   | 'gel'
   | 'vaporisation'
   | 'condensation'

@@ -22,7 +22,7 @@ import {
 import { LevelEditor } from './editor/editor'
 import { fetchLibrary } from './game/netLevels'
 import { AudioFx, loadAudioPrefs } from './game/audio'
-import { Soundtrack, type Piste } from './game/soundtrack'
+import { Soundtrack, type Bruitage, type Piste } from './game/soundtrack'
 import { Records } from './game/records'
 import {
   fetchSharedBoard,
@@ -1264,8 +1264,18 @@ function frame(now: number): void {
   bande.setZone(zone)
   // Le geste d'impulsion : une bouffée à l'amorce, pas un souffle continu —
   // la boucle procédurale tient déjà la durée.
+  // L'éjection d'eau est une goutte qui tombe dans l'eau. Trois prises de
+  // hauteurs différentes tirées au sort, plus un écart de hauteur de ±7 % :
+  // le geste revient plusieurs fois par seconde, deux fois le même « bloop »
+  // à la même note et l'oreille entend une machine, pas de l'eau.
   const vise = audible && input.aimActive
-  if (vise && !sfx.aiming) bande.bruitage(input.gasIntent ? 'souffle-vapeur' : 'ejection', 0.65)
+  if (vise && !sfx.aiming) {
+    if (input.gasIntent) bande.bruitage('souffle-vapeur', 0.65)
+    else {
+      const prise = 1 + Math.floor(Math.random() * 3)
+      bande.bruitage(`ejection-${prise}` as Bruitage, 0.7, 0.93 + Math.random() * 0.14)
+    }
+  }
   else if (vise && input.gasIntent && !sfx.gasAim) bande.bruitage('souffle-vapeur', 0.6)
   sfx.aiming = vise
   sfx.gasAim = vise && input.gasIntent
