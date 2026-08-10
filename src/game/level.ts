@@ -20,6 +20,29 @@ export interface ObstacleBox {
   material: number
 }
 
+// Ronge une paroi : retire le rectangle `r` de la boîte `b`. Le reste est
+// découpé en 4 morceaux au plus (gauche, droite, dessus, dessous), les
+// éclats de moins d'une unité sont balayés. Outil d'éditeur : quand des
+// blocs se chevauchent mal, on découpe l'excédent au lieu de tout reposer.
+export function subtractBox(
+  b: ObstacleBox,
+  r: { minX: number; minY: number; maxX: number; maxY: number },
+): ObstacleBox[] {
+  // pas de recouvrement : la boîte reste entière
+  if (r.minX >= b.maxX || r.maxX <= b.minX || r.minY >= b.maxY || r.maxY <= b.minY) return [b]
+  const out: ObstacleBox[] = []
+  const garde = (minX: number, minY: number, maxX: number, maxY: number): void => {
+    if (maxX - minX >= 1 && maxY - minY >= 1) out.push({ minX, minY, maxX, maxY, material: b.material })
+  }
+  garde(b.minX, b.minY, Math.min(r.minX, b.maxX), b.maxY) // à gauche de la découpe
+  garde(Math.max(r.maxX, b.minX), b.minY, b.maxX, b.maxY) // à droite
+  const cx0 = Math.max(b.minX, r.minX)
+  const cx1 = Math.min(b.maxX, r.maxX)
+  garde(cx0, b.minY, cx1, Math.min(r.minY, b.maxY)) // dessous
+  garde(cx0, Math.max(r.maxY, b.minY), cx1, b.maxY) // dessus
+  return out
+}
+
 export interface SpongeDef {
   minX: number
   minY: number

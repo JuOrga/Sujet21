@@ -1,5 +1,39 @@
 import { describe, expect, it } from 'vitest'
-import { TABLEAU_1BIS, TABLEAUX } from './level'
+import { MAT_WALL, TABLEAU_1BIS, TABLEAUX, subtractBox } from './level'
+
+describe('subtractBox — la découpe ronge les parois', () => {
+  const boite = { minX: 0, minY: 0, maxX: 100, maxY: 100, material: MAT_WALL }
+
+  it('sans recouvrement, la boîte reste entière (le même objet)', () => {
+    const out = subtractBox(boite, { minX: 200, minY: 0, maxX: 300, maxY: 100 })
+    expect(out).toEqual([boite])
+    expect(out[0]).toBe(boite)
+  })
+
+  it('une découpe au centre laisse 4 morceaux qui recouvrent le reste sans trou', () => {
+    const out = subtractBox(boite, { minX: 30, minY: 30, maxX: 70, maxY: 70 })
+    expect(out.length).toBe(4)
+    const aire = out.reduce((s, b) => s + (b.maxX - b.minX) * (b.maxY - b.minY), 0)
+    expect(aire).toBe(100 * 100 - 40 * 40) // l'aire rongée manque, rien d'autre
+    for (const b of out) expect(b.material).toBe(MAT_WALL)
+  })
+
+  it('une découpe qui traverse de part en part coupe la boîte en deux', () => {
+    const out = subtractBox(boite, { minX: 40, minY: -10, maxX: 60, maxY: 110 })
+    expect(out.length).toBe(2)
+    expect(out[0].maxX).toBe(40)
+    expect(out[1].minX).toBe(60)
+  })
+
+  it('une découpe qui engloutit tout ne laisse rien', () => {
+    expect(subtractBox(boite, { minX: -10, minY: -10, maxX: 110, maxY: 110 })).toEqual([])
+  })
+
+  it('les éclats de moins d’une unité sont balayés', () => {
+    const out = subtractBox(boite, { minX: 0.5, minY: -10, maxX: 110, maxY: 110 })
+    expect(out).toEqual([]) // le ruban de 0,5 u à gauche ne survit pas
+  })
+})
 
 // Garde-fous du level design : chaque tableau doit être un problème fermé
 // bien formé — l'expédition entière en dépend. Le prototype 21-A bis suit

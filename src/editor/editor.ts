@@ -15,9 +15,11 @@ import {
   MAT_HYDROPHOBE,
   MAT_WALL,
   ZONE_CAUSES,
+  subtractBox,
   zoneName,
   zoneOutline,
   type LevelDef,
+  type ObstacleBox,
   type SpongeDef,
   type WorldLabel,
   type ZoneForce,
@@ -65,6 +67,7 @@ type Tool =
   | { kind: 'cible' }
   | { kind: 'porte' }
   | { kind: 'rail' }
+  | { kind: 'cut' }
 
 type Sel =
   | { kind: 'box'; index: number }
@@ -153,9 +156,14 @@ export class LevelEditor {
     | { mode: 'pan'; sx: number; sy: number; camX: number; camY: number }
     | { mode: 'create'; x0: number; y0: number; x1: number; y1: number }
     | { mode: 'move'; ox: number; oy: number; start: Rect; pts?: { x: number; y: number }[] }
+    | { mode: 'multimove'; ox: number; oy: number; prevDx: number; prevDy: number }
     | { mode: 'aim'; index: number }
     | { mode: 'railpt'; index: number; point: number }
     | { mode: 'resize'; edge: string; start: Rect } = null
+
+  // Sélection MULTIPLE (Maj + clic) : déplacée d'un bloc, supprimée d'un
+  // coup, ou passée aux outils d'alignement du panneau.
+  private multi: Sel[] = []
 
   private hint = ''
 
@@ -304,6 +312,122 @@ export class LevelEditor {
     }
   }
 
+  // ——— Sélection multiple : géométrie générique par élément ————————
+  private sameSel(a: Sel, b: Sel): boolean {
+    if (!a || !b || a.kind !== b.kind) return false
+    const ia = 'index' in a ? a.index : -1
+    const ib = 'index' in b ? b.index : -1
+    return ia === ib
+  }
+
+  /** Boîte englobante (monde) de n'importe quel élément sélectionnable. */
+  private boundsOf(s: Sel): Rect | null {
+    if (!s) return null
+    if (s.kind === 'spawn') {
+      const p = this.level.spawn
+      return { minX: p.x, minY: p.y, maxX: p.x, maxY: p.y }
+    }
+    if (s.kind === 'laser') {
+      const l = (this.level.lasers ?? [])[s.index]
+      return l ? { minX: l.x, minY: l.y, maxX: l.x, maxY: l.y } : null
+    }
+    if (s.kind === 'cible') {
+      const t = (this.level.cibles ?? [])[s.index]
+      return t ? { minX: t.x - t.r, minY: t.y - t.r, maxX: t.x + t.r, maxY: t.y + t.r } : null
+    }
+    if (s.kind === 'label') {
+      const l = this.level.labels[s.index]
+      return l ? { minX: l.x, minY: l.y, maxX: l.x, maxY: l.y } : null
+    }
+    if (s.kind === 'rail') {
+      const r = (this.level.rails ?? [])[s.index]
+      if (!r) return null
+      let minX = Infinity
+      let minY = Infinity
+      let maxX = -Infinity
+      let maxY = -Infinity
+      for (const p of r.points) {
+        minX = Math.min(minX, p.x)
+        minY = Math.min(minY, p.y)
+        maxX = Math.max(maxX, p.x)
+        maxY = Math.max(maxY, p.y)
+      }
+      return { minX, minY, maxX, maxY }
+    }
+    const garde = this.sel
+    this.sel = s
+    const r = this.selRect()
+    this.sel = garde
+    return r
+  }
+
+  /** Translate n'importe quel élément de (dx, dy) — la brique des outils
+   * de groupe : déplacement multiple et alignement. */
+  private moveSelBy(s: Sel, dx: number, dy: number): void {
+    if (!s || (dx === 0 && dy === 0)) return
+    if (s.kind === 'spawn') {
+      this.level.spawn.x += dx
+      this.level.spawn.y += dy
+    } else if (s.kind === 'laser') {
+      const l = (this.level.lasers ?? [])[s.index]
+      if (l) {
+        l.x += dx
+        l.y += dy
+      }
+    } else if (s.kind === 'cible') {
+      const t = (this.level.cibles ?? [])[s.index]
+      if (t) {
+        t.x += dx
+        t.y += dy
+      }
+    } else if (s.kind === 'label') {
+      const l = this.level.labels[s.index]
+      if (l) {
+        l.x += dx
+        l.y += dy
+      }
+    } else if (s.kind === 'rail') {
+      const r = (this.level.rails ?? [])[s.index]
+      for (const p of r?.points ?? []) {
+        p.x += dx
+        p.y += dy
+      }
+    } else if (s.kind === 'sponge') {
+      const sp = this.level.sponges[s.index]
+      if (sp) {
+        sp.minX += dx
+        sp.minY += dy
+      }
+    } else {
+      const garde = this.sel
+      this.sel = s
+      const r = this.selRect()
+      if (r) this.applyRect({ minX: r.minX + dx, minY: r.minY + dy, maxX: r.maxX + dx, maxY: r.maxY + dy })
+      this.sel = garde
+    }
+  }
+
+  /** Aligne les éléments de la sélection multiple sur un même bord. */
+  private alignMulti(op: 'gauche' | 'droite' | 'haut' | 'bas' | 'centreH' | 'centreV'): void {
+    const items = this.multi
+      .map((m) => ({ m, b: this.boundsOf(m) }))
+      .filter((x): x is { m: Sel; b: Rect } => x.b !== null)
+    if (items.length < 2) return
+    const minX = Math.min(...items.map((x) => x.b.minX))
+    const maxX = Math.max(...items.map((x) => x.b.maxX))
+    const minY = Math.min(...items.map((x) => x.b.minY))
+    const maxY = Math.max(...items.map((x) => x.b.maxY))
+    for (const { m, b } of items) {
+      if (op === 'gauche') this.moveSelBy(m, minX - b.minX, 0)
+      else if (op === 'droite') this.moveSelBy(m, maxX - b.maxX, 0)
+      else if (op === 'bas') this.moveSelBy(m, 0, minY - b.minY)
+      else if (op === 'haut') this.moveSelBy(m, 0, maxY - b.maxY)
+      else if (op === 'centreH') this.moveSelBy(m, (minX + maxX) / 2 - (b.minX + b.maxX) / 2, 0)
+      else this.moveSelBy(m, 0, (minY + maxY) / 2 - (b.minY + b.maxY) / 2)
+    }
+    this.commit('Alignés.')
+  }
+
   /** Ce qui se trouve sous le point monde, du plus « au-dessus » au plus bas. */
   private pick(x: number, y: number): Sel {
     const inside = (r: Rect): boolean => x >= r.minX && x <= r.maxX && y >= r.minY && y <= r.maxY
@@ -403,6 +527,31 @@ export class LevelEditor {
       }
 
       if (this.tool.kind === 'select') {
+        // Maj + clic : la sélection MULTIPLE — on ajoute ou retire l'élément
+        if (e.shiftKey) {
+          const hit = this.pick(w.x, w.y)
+          if (hit) {
+            if (this.multi.length === 0 && this.sel && !this.sameSel(this.sel, hit)) {
+              this.multi = [this.sel]
+            }
+            const deja = this.multi.findIndex((m) => this.sameSel(m, hit))
+            if (deja >= 0) this.multi.splice(deja, 1)
+            else this.multi.push(hit)
+            this.sel = this.multi[this.multi.length - 1] ?? null
+            this.syncProps()
+            this.draw()
+          }
+          return
+        }
+        // clic sur un élément déjà dans la sélection multiple : tout se déplace
+        if (this.multi.length > 1) {
+          const hit = this.pick(w.x, w.y)
+          if (hit && this.multi.some((m) => this.sameSel(m, hit))) {
+            this.drag = { mode: 'multimove', ox: w.x, oy: w.y, prevDx: 0, prevDy: 0 }
+            return
+          }
+          this.multi = []
+        }
         const edge = this.hitHandle(sx, sy)
         if (edge) {
           const r = this.selRect()
@@ -560,6 +709,13 @@ export class LevelEditor {
           p.x = this.snapped(w.x)
           p.y = this.snapped(w.y)
         }
+      } else if (d.mode === 'multimove') {
+        // délta aimanté à la grille, appliqué en incrément : pas de dérive
+        const ddx = this.snapped(w.x - d.ox)
+        const ddy = this.snapped(w.y - d.oy)
+        for (const m of this.multi) this.moveSelBy(m, ddx - d.prevDx, ddy - d.prevDy)
+        d.prevDx = ddx
+        d.prevDy = ddy
       } else if (d.mode === 'move') {
         if (this.sel?.kind === 'rail' && d.pts) {
           const r = (this.level.rails ?? [])[this.sel.index]
@@ -678,6 +834,7 @@ export class LevelEditor {
         this.deleteSel()
       } else if (e.key === 'Escape') {
         this.sel = null
+        this.multi = []
         this.setTool({ kind: 'select' })
         this.draw()
       } else if (e.key === 'd' || e.key === 'D') {
@@ -704,6 +861,31 @@ export class LevelEditor {
   private createAt(raw: Rect): void {
     const r = this.clampToBounds(raw)
     const t = this.tool
+    if (t.kind === 'cut') {
+      // DÉCOUPE : la zone tracée est RONGÉE des parois qui la chevauchent —
+      // pour tailler les recouvrements sans reposer les blocs. Chaque paroi
+      // touchée est remplacée par ses restes (4 morceaux au plus).
+      const avant = this.level.boxes.length
+      let touchees = 0
+      const suite: ObstacleBox[] = []
+      for (const b of this.level.boxes) {
+        const morceaux = subtractBox(b, r)
+        if (morceaux.length !== 1 || morceaux[0] !== b) touchees++
+        suite.push(...morceaux)
+      }
+      if (touchees === 0) {
+        this.setTool({ kind: 'select' })
+        this.commit('Rien à ronger ici : aucune paroi sous la découpe.')
+        return
+      }
+      this.level.boxes = suite
+      this.sel = null
+      this.setTool({ kind: 'select' })
+      this.commit(
+        `Découpe : ${touchees} paroi${touchees > 1 ? 's' : ''} rongée${touchees > 1 ? 's' : ''} (${avant} → ${this.level.boxes.length} blocs).`,
+      )
+      return
+    }
     if (t.kind === 'box') {
       this.level.boxes.push({ ...r, material: t.material })
       this.sel = { kind: 'box', index: this.level.boxes.length - 1 }
@@ -757,6 +939,29 @@ export class LevelEditor {
   }
 
   private deleteSel(): void {
+    // sélection multiple : tout part d'un coup, indices décroissants pour
+    // que les suppressions ne se décalent pas entre elles
+    if (this.multi.length > 1) {
+      const parKind = new Map<string, number[]>()
+      for (const m of this.multi) {
+        if (!m || !('index' in m)) continue
+        const liste = parKind.get(m.kind) ?? []
+        liste.push(m.index)
+        parKind.set(m.kind, liste)
+      }
+      for (const [kind, indices] of parKind) {
+        indices.sort((a, b) => b - a)
+        for (const i of indices) {
+          this.sel = { kind: kind as 'box', index: i } as Sel
+          this.multi = []
+          this.deleteSel()
+        }
+      }
+      this.sel = null
+      this.multi = []
+      this.commit('Sélection supprimée.')
+      return
+    }
     const s = this.sel
     if (!s) return
     if (s.kind === 'box') this.level.boxes.splice(s.index, 1)
@@ -863,6 +1068,7 @@ export class LevelEditor {
         else if (key === 'cible') this.setTool({ kind: 'cible' })
         else if (key === 'porte') this.setTool({ kind: 'porte' })
         else if (key === 'rail') this.setTool({ kind: 'rail' })
+        else if (key === 'cut') this.setTool({ kind: 'cut' })
         else this.setTool({ kind: 'select' })
       })
     }
@@ -1143,9 +1349,32 @@ export class LevelEditor {
   /** Panneau de propriétés de l'objet sélectionné. */
   private syncProps(): void {
     const host = this.el('ed-props')
+    // sélection multiple : le panneau devient l'atelier d'ALIGNEMENT
+    if (this.multi.length > 1) {
+      host.innerHTML =
+        `<div class="ed-props-head">${this.multi.length} éléments sélectionnés</div>` +
+        `<p class="ed-empty">Maj + clic pour ajouter ou retirer. Glissez l’un d’eux : tout se déplace ensemble.</p>` +
+        `<div class="ed-fields">` +
+        `<button type="button" class="ed-btn" id="p-al-g">Aligner à gauche</button>` +
+        `<button type="button" class="ed-btn" id="p-al-d">Aligner à droite</button>` +
+        `<button type="button" class="ed-btn" id="p-al-h">Aligner en haut</button>` +
+        `<button type="button" class="ed-btn" id="p-al-b">Aligner en bas</button>` +
+        `<button type="button" class="ed-btn" id="p-al-ch">Centrer (vertical)</button>` +
+        `<button type="button" class="ed-btn" id="p-al-cv">Centrer (horizontal)</button>` +
+        `</div>` +
+        `<button type="button" class="ed-danger" id="p-del">Tout supprimer</button>`
+      host.querySelector('#p-al-g')?.addEventListener('click', () => this.alignMulti('gauche'))
+      host.querySelector('#p-al-d')?.addEventListener('click', () => this.alignMulti('droite'))
+      host.querySelector('#p-al-h')?.addEventListener('click', () => this.alignMulti('haut'))
+      host.querySelector('#p-al-b')?.addEventListener('click', () => this.alignMulti('bas'))
+      host.querySelector('#p-al-ch')?.addEventListener('click', () => this.alignMulti('centreH'))
+      host.querySelector('#p-al-cv')?.addEventListener('click', () => this.alignMulti('centreV'))
+      host.querySelector('#p-del')?.addEventListener('click', () => this.deleteSel())
+      return
+    }
     const s = this.sel
     if (!s) {
-      host.innerHTML = '<p class="ed-empty">Rien de sélectionné. Cliquez un élément, ou choisissez un outil et glissez pour en tracer un.</p>'
+      host.innerHTML = '<p class="ed-empty">Rien de sélectionné. Cliquez un élément (Maj + clic : sélection multiple), ou choisissez un outil et glissez pour en tracer un.</p>'
       return
     }
     const rows: string[] = []
@@ -1758,6 +1987,21 @@ export class LevelEditor {
       g.strokeStyle = '#ffffff'
       g.lineWidth = 1
       g.strokeRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
+      g.setLineDash([])
+    }
+
+    // sélection multiple : chaque élément retenu porte son liseré
+    if (this.multi.length > 1) {
+      g.strokeStyle = '#ffd76a'
+      g.lineWidth = 1.5
+      g.setLineDash([5, 4])
+      for (const m of this.multi) {
+        const b = this.boundsOf(m)
+        if (!b) continue
+        const p = this.toScreen(b.minX - 6, b.maxY + 6)
+        const q = this.toScreen(b.maxX + 6, b.minY - 6)
+        g.strokeRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
+      }
       g.setLineDash([])
     }
 
