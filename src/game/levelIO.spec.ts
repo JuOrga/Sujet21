@@ -157,3 +157,20 @@ it('conserve les décals au passage par l’éditeur (aller-retour JSON)', () =>
   expect(l2!.decals).toBeUndefined()
   expect(r2.length).toBe(1)
 })
+
+it('conserve les mécanismes laser (émetteurs, cibles, portes) à l’aller-retour', () => {
+  const src = {
+    ...TABLEAUX[0],
+    lasers: [{ x: -600, y: 200, angle: 315 }],
+    cibles: [{ x: 700, y: -300, r: 30 }],
+    portes: [{ minX: 100, minY: -200, maxX: 140, maxY: 200, cible: 0 }],
+  }
+  const { level, rejets } = parseLevel(JSON.parse(serializeLevel(src)))
+  expect(rejets).toEqual([])
+  expect(level!.lasers).toEqual(src.lasers)
+  expect(level!.cibles).toEqual(src.cibles)
+  expect(level!.portes).toEqual(src.portes)
+  // une porte asservie à une cible fantôme est signalée par le contrôle
+  const verdicts = checkLevel({ ...level!, portes: [{ ...src.portes[0], cible: 4 }] })
+  expect(verdicts.some((v) => v.niveau === 'erreur' && v.message.includes('cible nº 5'))).toBe(true)
+})

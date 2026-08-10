@@ -69,6 +69,14 @@
         height: 100%;
         touch-action: none;
       }
+      /* Superposition des mécanismes (faisceaux laser, émetteurs, cibles,
+         portes) : dessinée en 2D par-dessus la cuve, sous l'interface */
+      #fx-canvas {
+        position: fixed;
+        inset: 0;
+        z-index: 2;
+        pointer-events: none;
+      }
       :focus-visible {
         outline: 2px solid var(--specimen);
         outline-offset: 2px;
@@ -1741,6 +1749,7 @@
   </head>
   <body>
     <div id="app"><canvas id="glcanvas"></canvas></div>
+    <canvas id="fx-canvas"></canvas>
     <div id="world-labels" aria-hidden="true"></div>
 
     <aside id="home" aria-label="Fiche d'essai">
@@ -1886,6 +1895,10 @@
           <button type="button" class="ed-tool" data-tool="zone:glace"><i style="background:#8fc8ee"></i>Impose glace</button>
           <button type="button" class="ed-tool" data-tool="zone:vapeur"><i style="background:#c9a6f2"></i>Impose vapeur</button>
           <button type="button" class="ed-tool" data-tool="zone:libre"><i style="background:#7b93a8"></i>Zone libre</button>
+          <span class="k">Mécanismes</span>
+          <button type="button" class="ed-tool" data-tool="laser"><i style="background:#ff6a5a"></i>Émetteur laser</button>
+          <button type="button" class="ed-tool" data-tool="cible"><i style="background:#6dffb8"></i>Cible</button>
+          <button type="button" class="ed-tool" data-tool="porte"><i style="background:#ff5a5a"></i>Porte asservie</button>
         </div>
         <div class="ed-group">
           <span class="k">Repères</span>

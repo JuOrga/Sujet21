@@ -248,6 +248,8 @@ export class FluidSim {
   private heatCarry = 0
   private gasIdleCarry = 0
   private gasTollCarry = 0
+  private laserCarry = 0
+  private baseBoxes: ObstacleBox[] = []
   private grilleCarry = 0
   // Recondensation (§7.3) : chaque particule de vapeur perdue alimente une
   // réserve ; les plaques froides la rendent en rosée, avec perte.
@@ -263,12 +265,81 @@ export class FluidSim {
   criticalTimer = 0
 
   setLevel(boxes: ObstacleBox[], sponges: SpongeDef[]): void {
+    this.baseBoxes = boxes
     this.boxes = boxes
     this.sponges = sponges.map((d) => new Sponge(d))
     this.hasCold = boxes.some((b) => b.material === MAT_FROID)
     this.hasHeat = boxes.some((b) => b.material === MAT_CHAUD)
     this.hasGrille = boxes.some((b) => b.material === MAT_GRILLE)
     this.coldBoxes = boxes.filter((b) => b.material === MAT_FROID)
+  }
+
+  // Portes asservies aux cibles laser : des parois qui vont et viennent.
+  // Recomposé sans toucher aux éponges (setLevel les reconstruirait et
+  // effacerait leur saturation en pleine partie).
+  setDoors(portes: { minX: number; minY: number; maxX: number; maxY: number }[]): void {
+    this.boxes = [
+      ...this.baseBoxes,
+      ...portes.map((p) => ({ ...p, material: MAT_WALL })),
+    ]
+  }
+
+  // Normale de la surface de glace en (x, y) : somme des directions
+  // (point − particule gelée) pondérées par la proximité — c'est le gradient
+  // du champ, calculé sur la grille de voisinage. null : pas de glace ici.
+  // Sert au traceur laser : le corps gelé est un miroir.
+  iceNormalAt(x: number, y: number, r: number): { nx: number; ny: number } | null {
+    let sx = 0
+    let sy = 0
+    let hit = false
+    const r2 = r * r
+    this.grid.forEachNeighbor(x, y, r, (j) => {
+      if (this.frozen[j] !== 1) return
+      const dx = x - this.posX[j]
+      const dy = y - this.posY[j]
+      const d2 = dx * dx + dy * dy
+      if (d2 >= r2) return
+      hit = true
+      const w = 1 - Math.sqrt(d2) / r
+      sx += dx * w
+      sy += dy * w
+    })
+    if (!hit) return null
+    const l = Math.hypot(sx, sy)
+    if (l < 1e-6) return { nx: 0, ny: 1 } // au cœur du bloc : normale arbitraire
+    return { nx: sx / l, ny: sy / l }
+  }
+
+  // Le faisceau chauffe l'eau qu'il traverse : chaque particule LIQUIDE dans
+  // le couloir du segment s'évapore à laserEvapRate — perdue vers la réserve
+  // de rosée (elle perlera aux plaques froides). La glace est un miroir, la
+  // vapeur passe : seule l'eau paie de rester dans la lumière.
+  laserHeat(ax: number, ay: number, bx: number, by: number, dt: number): void {
+    const p = this.params
+    if (p.laserEvapRate <= 0) return
+    const hw = p.laserWidth
+    const abx = bx - ax
+    const aby = by - ay
+    const len2 = abx * abx + aby * aby
+    if (len2 < 1e-6) return
+    const doomed: number[] = []
+    for (let i = 0; i < this.count; i++) {
+      if (this.frozen[i] === 1 || this.gaseous[i] === 1) continue
+      const t = Math.max(0, Math.min(1, ((this.posX[i] - ax) * abx + (this.posY[i] - ay) * aby) / len2))
+      const dx = this.posX[i] - (ax + abx * t)
+      const dy = this.posY[i] - (ay + aby * t)
+      if (dx * dx + dy * dy > hw * hw) continue
+      this.laserCarry += p.laserEvapRate * dt
+      doomed.push(i)
+    }
+    // retirées de la fin vers le début : les indices restent valides
+    while (this.laserCarry >= 1 && doomed.length > 0) {
+      this.laserCarry -= 1
+      const i = doomed.pop()!
+      if (this.kind[i] === KIND_PLAYER && this.playerCount <= 2) break
+      this.removeParticle(i)
+      this.vaporBank++
+    }
   }
 
   // Exposition à la chaleur en (x, y) : 1 au contact d'un radiateur, 0 au

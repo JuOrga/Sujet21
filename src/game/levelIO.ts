@@ -13,6 +13,9 @@ import {
   type ObstacleBox,
   type SpongeDef,
   type WorldLabel,
+  type CibleDef,
+  type LaserDef,
+  type PorteDef,
   type ZoneDef,
   type ZoneForce,
 } from './level'
@@ -212,6 +215,45 @@ export function parseLevel(input: unknown): { level: LevelDef | null; rejets: st
     })
   }
   if (decals.length > 0) level.decals = decals
+
+  // Mécanismes laser : émetteurs, cibles, portes asservies
+  const lasers: LaserDef[] = []
+  for (const raw of Array.isArray(o.lasers) ? o.lasers : []) {
+    const l = (raw ?? {}) as Record<string, unknown>
+    const angle = num(l.angle, NaN)
+    if (!Number.isFinite(angle)) {
+      rejets.push('un émetteur laser a été écarté (angle manquant)')
+      continue
+    }
+    lasers.push({ x: num(l.x, 0), y: num(l.y, 0), angle: ((angle % 360) + 360) % 360 })
+  }
+  if (lasers.length > 0) level.lasers = lasers
+
+  const cibles: CibleDef[] = []
+  for (const raw of Array.isArray(o.cibles) ? o.cibles : []) {
+    const c = (raw ?? {}) as Record<string, unknown>
+    cibles.push({ x: num(c.x, 0), y: num(c.y, 0), r: Math.max(8, num(c.r, 26)) })
+  }
+  if (cibles.length > 0) level.cibles = cibles
+
+  const portes: PorteDef[] = []
+  for (const raw of Array.isArray(o.portes) ? o.portes : []) {
+    const q = (raw ?? {}) as Record<string, unknown>
+    const porte = {
+      minX: Math.min(num(q.minX), num(q.maxX)),
+      minY: Math.min(num(q.minY), num(q.maxY)),
+      maxX: Math.max(num(q.minX), num(q.maxX)),
+      maxY: Math.max(num(q.minY), num(q.maxY)),
+      cible: Math.max(0, Math.round(num(q.cible, 0))),
+    }
+    if (porte.maxX - porte.minX < 1 || porte.maxY - porte.minY < 1) {
+      rejets.push('une porte a été écartée (taille nulle)')
+      continue
+    }
+    portes.push(porte)
+  }
+  if (portes.length > 0) level.portes = portes
+
   return { level, rejets }
 }
 
@@ -230,6 +272,9 @@ export function serializeLevel(level: LevelDef): string {
     labels: level.labels,
   }
   if (level.zones && level.zones.length > 0) out.zones = level.zones
+  if (level.lasers && level.lasers.length > 0) out.lasers = level.lasers
+  if (level.cibles && level.cibles.length > 0) out.cibles = level.cibles
+  if (level.portes && level.portes.length > 0) out.portes = level.portes
   if (level.decals && level.decals.length > 0) out.decals = level.decals
   if (level.figure) out.figure = level.figure
   if (level.ambiance) out.ambiance = level.ambiance
@@ -287,6 +332,34 @@ export function checkLevel(level: LevelDef): Verdict[] {
 
   if (level.boxes.length + level.sponges.length === 0) {
     v.push({ niveau: 'avertissement', message: 'Le tableau est vide : aucun obstacle.' })
+  }
+  // Mécanismes laser : chaque porte doit être asservie à une cible réelle,
+  // et un émetteur sans cible n'ouvre rien (il chauffe, c'est tout).
+  const nCibles = level.cibles?.length ?? 0
+  for (const porte of level.portes ?? []) {
+    if (porte.cible < 0 || porte.cible >= nCibles) {
+      v.push({
+        niveau: 'erreur',
+        message: `Une porte est asservie à la cible nº ${porte.cible + 1}, qui n'existe pas.`,
+      })
+    }
+  }
+  if ((level.lasers?.length ?? 0) > 0 && nCibles === 0) {
+    v.push({
+      niveau: 'avertissement',
+      message: 'Un émetteur laser sans cible : le faisceau chauffe, mais n’ouvre rien.',
+    })
+  }
+  if (nCibles > 0 && (level.lasers?.length ?? 0) === 0) {
+    v.push({
+      niveau: 'avertissement',
+      message: 'Une cible sans émetteur laser : elle ne s’allumera jamais.',
+    })
+  }
+  for (const l of level.lasers ?? []) {
+    if (!inBounds(l.x, l.y)) {
+      v.push({ niveau: 'erreur', message: 'Un émetteur laser est hors de la cuve.' })
+    }
   }
   if (level.journal.trim().length < 40) {
     v.push({

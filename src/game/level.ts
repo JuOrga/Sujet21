@@ -65,6 +65,33 @@ export interface DecalDef {
   fade?: number // 0..1, opacité (défaut 0,55)
 }
 
+// ---- Mécanismes laser (palier 1, 2026) ----------------------------------
+// Le faisceau est absorbé par les parois, passe les grilles, se REFLÈTE sur
+// la glace (le corps gelé est un miroir — c'est sa fonction cachée), chauffe
+// l'eau qu'il traverse, et allume des cibles. Une cible allumée ouvre les
+// portes qui lui sont asservies.
+export interface LaserDef {
+  x: number
+  y: number
+  angle: number // degrés, 0 = vers +x, sens trigonométrique
+}
+
+export interface CibleDef {
+  x: number
+  y: number
+  r: number // rayon de la pastille réceptrice
+}
+
+// Une porte est une paroi asservie : FERMÉE tant que sa cible est éteinte,
+// ouverte (et traversante) tant qu'elle est allumée.
+export interface PorteDef {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+  cible: number // indice dans `cibles`
+}
+
 export interface LevelDef {
   name: string
   code: string // code d'essai du protocole (21-A, 21-B…)
@@ -78,6 +105,9 @@ export interface LevelDef {
   labels: WorldLabel[]
   decals?: DecalDef[]
   zones?: ZoneDef[]
+  lasers?: LaserDef[]
+  cibles?: CibleDef[]
+  portes?: PorteDef[]
   par?: number // budget d'impulsions visé : franchissable en `par`, record en dessous
   // Lit musical imposé par le tableau. Sans valeur, la cuve suit le
   // refroidissement de la coque (tiède → glaciale) : c'est le cas général,
