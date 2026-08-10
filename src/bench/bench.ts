@@ -547,23 +547,11 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   )
   describe(
     fBody.addBinding(params, 'criticalVolumeFraction', { min: 0.02, max: 0.9, label: 'seuil dernière impulsion' }),
-    'Fraction du volume initial sous laquelle la PROCHAINE impulsion est la dernière. Le seuil ne tue plus : il annonce la fin de course.',
+    'Fraction du volume initial sous laquelle la PROCHAINE impulsion est la dernière. Le seuil ne tue plus et ne conclut rien : après elle, le corps se fige et dérive.',
   )
   describe(
     fBody.addBinding(params, 'lastCallFraction', { min: 0.05, max: 0.95, label: 'seuil d’alerte' }),
     'Fraction sous laquelle le HUD prévient que la dernière impulsion approche. À garder au-dessus du seuil précédent.',
-  )
-  describe(
-    fBody.addBinding(params, 'spentDrag', { min: 0, max: 1.5, step: 0.02, label: 'freinage fin de course' }),
-    'Freinage du corps figé après la dernière impulsion. À 0, il glisserait pour l’éternité et l’essai ne se conclurait jamais.',
-  )
-  describe(
-    fBody.addBinding(params, 'stillSpeed', { min: 2, max: 120, label: 'vitesse d’arrêt (u/s)' }),
-    'Sous cette vitesse, un corps figé est considéré comme arrêté — la fin de course se déclenche.',
-  )
-  describe(
-    fBody.addBinding(params, 'stillTime', { min: 0.2, max: 5, step: 0.1, label: 'délai d’arrêt (s)' }),
-    'Temps passé sous la vitesse d’arrêt avant que l’essai se conclue. Laisse une chance à un palet qui frôle une paroi.',
   )
   describe(
     fBody.addBinding(params, 'iceCollectBonus', { min: 0, max: 1, step: 0.05, label: 'prime de glace' }),

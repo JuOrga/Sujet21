@@ -231,6 +231,31 @@
         cursor: pointer;
         transition: color 0.2s ease, border-color 0.2s ease;
       }
+      /* Le son ne peut pas naître tout seul : le navigateur exige un geste.
+         Plutôt que d'attendre le clic sur COMMENCER — qui ferait entendre
+         l'accueil une demi-seconde avant de basculer en cuve — la fiche
+         propose d'ouvrir le son ici. Le bouton disparaît dès qu'il a servi,
+         ou dès qu'un autre geste a réveillé la bande-son. */
+      #home-son {
+        font-family: var(--font-display);
+        font-size: 10.5px;
+        letter-spacing: 0.12em;
+        padding: 9px 16px;
+        margin-bottom: -4px;
+        color: var(--accent, #63b7e6);
+        background: transparent;
+        border: 1px solid rgba(99, 183, 230, 0.45);
+        border-radius: 5px;
+        cursor: pointer;
+        transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+      }
+      #home-son:hover {
+        background: rgba(99, 183, 230, 0.14);
+        border-color: #63b7e6;
+      }
+      #home-son[hidden] {
+        display: none;
+      }
       /* Registres du labo : l'écran record de la fiche d'expérience */
       .home-records {
         border: 1px solid var(--line);
@@ -516,7 +541,7 @@
         color: var(--dim);
         margin-left: 5px;
       }
-      /* Jauge de volume : le trait vertical marque le seuil de dispersion */
+      /* Jauge de volume : le trait vertical marque le seuil de dernière impulsion */
       .gauge {
         position: relative;
         height: 5px;
@@ -624,6 +649,42 @@
       @keyframes dangerPulse {
         from { border-color: var(--alert); }
         to { border-color: #ffd9d0; }
+      }
+      /* Relance : elle apparaît quand l'échantillon n'a plus rien à éjecter.
+         Elle se range juste au-dessus du sélecteur d'états (lui-même calé sur
+         la hauteur réelle de la barre du bas) : la cuve reste dégagée, la
+         dérive reste visible en entier, et un rebond tardif peut encore mener
+         au sas. */
+      #relance {
+        position: fixed;
+        bottom: calc(var(--tb-h, 56px) + 96px);
+        left: 50%;
+        transform: translateX(-50%) translateY(6px);
+        font-family: var(--font-display);
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        padding: 9px 16px;
+        background: rgba(9, 18, 26, 0.86);
+        border: 1px solid #8fc8ee;
+        border-radius: 6px;
+        color: #cfe8fa;
+        cursor: pointer;
+        z-index: 13;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: opacity 0.25s ease, transform 0.25s ease;
+        backdrop-filter: blur(3px);
+      }
+      #relance.visible {
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(-50%) translateY(0);
+        pointer-events: auto;
+      }
+      #relance:hover {
+        background: #8fc8ee;
+        color: var(--void);
       }
       /* La flèche d'objectif : quand le sas est hors champ, elle le pointe
          depuis le bord de l'écran, avec la distance restante */
@@ -808,7 +869,7 @@
         text-align: center;
         line-height: 1.7;
       }
-      /* Reprise après dispersion : indispensable au doigt (pas de touche R) */
+      /* Reprise depuis un tampon de fin d'expédition : indispensable au doigt */
       #overlay-btn {
         display: none;
         font-family: var(--font-display);
@@ -1658,6 +1719,7 @@
         <div><dt>PARTICULES</dt><dd id="home-particles">—</dd></div>
         <div><dt>ÉTAT</dt><dd id="home-state">en dérive</dd></div>
       </dl>
+      <button id="home-son" type="button" hidden>♪ OUVRIR LE SON DU PROTOCOLE</button>
       <button id="start" type="button">COMMENCER L'ESSAI</button>
       <button id="start-bis" type="button">TESTER «&nbsp;LA GALERIE NOYÉE&nbsp;» — 21-A BIS, PROTOTYPE</button>
       <button id="start-editor" type="button">ÉDITEUR DE TABLEAUX — CRÉER OU MODIFIER UN NIVEAU</button>
@@ -1720,7 +1782,7 @@
         </div>
         <div id="hud-perte"></div>
         <div id="hud-rosee"></div>
-        <div class="hud-row hud-row--extra"><span class="k">SEUIL DISPERSION</span><span class="v" id="hud-seuil">—</span></div>
+        <div class="hud-row hud-row--extra"><span class="k">DERNIÈRE IMPULSION</span><span class="v" id="hud-seuil">—</span></div>
         <div class="hud-row hud-row--extra"><span class="k">VITESSE</span><span class="v" id="hud-vitesse">0 u/s</span></div>
         <div class="hud-row"><span class="k">ÉTAT</span><span class="v" id="hud-state">liquide</span></div>
         <div class="hud-row hud-row--extra"><span class="k">TEMPS</span><span class="v" id="hud-warp">×1</span></div>
@@ -1912,10 +1974,11 @@
     </div>
 
     <div id="overlay">
-      <div id="overlay-title">DISPERSION</div>
-      <div id="overlay-sub">La cohésion ne tient plus. Le laboratoire consigne : perte de l'échantillon.</div>
+      <div id="overlay-title">—</div>
+      <div id="overlay-sub">—</div>
       <button id="overlay-btn" type="button">RECOMMENCER L'ESSAI</button>
     </div>
+    <button id="relance" type="button">RECOMMENCER LE TABLEAU</button>
     <div id="touchbar"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
