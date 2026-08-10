@@ -1293,6 +1293,14 @@
         }
       }
 
+      /* Retour à l'éditeur : présent seulement pendant l'essai d'un tableau
+         édité — il doit se distinguer des chips de lecture */
+      #touchbar button.tb-editor {
+        color: var(--valid);
+        border-color: rgba(63, 214, 155, 0.55);
+        background: rgba(63, 214, 155, 0.1);
+      }
+
       /* Zone d'état : le sélecteur se grise, l'état n'est plus au choix */
       #statebar button:disabled {
         opacity: 0.32;
