@@ -45,6 +45,11 @@ export class Input {
     this.paused = !this.paused
   }
 
+  /** Doigts (ou souris) réellement posés — la manette s'efface devant eux. */
+  get touchCount(): number {
+    return this.pointers.size
+  }
+
   stepWarp(dir: number): void {
     this.warpIndex = Math.min(TIME_WARP_STEPS.length - 1, Math.max(0, this.warpIndex + dir))
     this.onTimeWarpChange?.(TIME_WARP_STEPS[this.warpIndex])
