@@ -100,3 +100,13 @@ describe('levelIO — garde-fous du level design', () => {
     expect(checkLevel(l).some((x) => /grille barre/.test(x.message))).toBe(false)
   })
 })
+
+it('conserve le lit musical choisi pour le tableau', () => {
+  const src = { ...TABLEAUX[0], ambiance: 'zone-hublot' }
+  const { level } = parseLevel(JSON.parse(serializeLevel(src)))
+  expect(level!.ambiance).toBe('zone-hublot')
+  // sans valeur, le tableau suit la cuve : le champ ne doit pas apparaître
+  const nu = parseLevel(JSON.parse(serializeLevel({ ...TABLEAUX[0], ambiance: undefined })))
+  expect(nu.level!.ambiance).toBeUndefined()
+  expect(serializeLevel(TABLEAUX[0])).not.toContain('ambiance')
+})

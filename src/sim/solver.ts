@@ -97,6 +97,8 @@ export class FluidSim {
   private gasCarry = 0
   // Vitesse normale du dernier choc de bloc de glace (consommé par l'audio)
   iceImpact = 0
+  // Gouttes bues par les éponges depuis le début (consommé par l'audio)
+  spongeBites = 0
   private readonly welded: Uint8Array // gelée au contact d'une plaque : soudée
   private readonly iceVxSum: Float32Array
   private readonly iceVySum: Float32Array
@@ -1265,6 +1267,7 @@ export class FluidSim {
         this.contactTime[i] += dt
         if (this.contactTime[i] >= absorbTime) {
           sp.absorb(cell)
+          this.spongeBites++
           this.removeParticle(i)
           removed = true
         }
