@@ -1159,7 +1159,9 @@ function frame(now: number): void {
         boxes: level.boxes,
         portesFermees: fermees,
         cibles,
-        iceNormal: (x, y) => sim.iceNormalAt(x, y, rIce),
+        // contact précis, normale MOYENNÉE large : le miroir est une facette
+        // plane, pas une râpe — le reflet ne tremble plus à chaque bosse
+        iceNormal: (x, y) => sim.iceNormalAt(x, y, rIce, params.laserMirrorSmooth),
       }),
     )
     // persistance : chaque cible touchée reste allumée 0,35 s simulées

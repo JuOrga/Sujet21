@@ -84,11 +84,33 @@ describe('traceLaser — les règles optiques du palier 1', () => {
     const rIce = sim.params.particleSpacing * 1.3
     const t = traceLaser(
       { x: -400, y: 0, angle: 0 },
-      monde({ iceNormal: (x, y) => sim.iceNormalAt(x, y, rIce) }),
+      monde({ iceNormal: (x, y) => sim.iceNormalAt(x, y, rIce, sim.params.laserMirrorSmooth) }),
     )
     expect(t.points.length).toBeGreaterThan(2) // rebond constaté
     const fin = t.points[t.points.length - 1]
     expect(fin.x).toBeLessThan(300) // renvoyé du côté d'où il venait
+  })
+
+  it('la normale du miroir est LISSE le long d’une face plane, malgré le grain des particules', () => {
+    const sim = new FluidSim({ ...DEFAULT_PARAMS }, BOUNDS, 2048)
+    // un mur de glace vertical, en réseau : sa face gauche est plane
+    for (let k = -12; k <= 12; k++) {
+      for (let c = 0; c < 4; c++) {
+        const i = sim.addParticle(300 + c * 6, k * 6, KIND_FREE)
+        sim.frost[i] = 1
+        sim.frozen[i] = 1
+      }
+    }
+    sim.step(sim.params.dt)
+    const rHit = sim.params.particleSpacing * 1.3
+    // échantillonnée en plusieurs points de la face : la normale moyenne doit
+    // pointer franchement vers −x, sans partir dans tous les sens
+    for (const y of [-40, -20, 0, 20, 40]) {
+      const n = sim.iceNormalAt(295, y, rHit, sim.params.laserMirrorSmooth)
+      expect(n).not.toBeNull()
+      expect(n!.nx).toBeLessThan(-0.9)
+      expect(Math.abs(n!.ny)).toBeLessThan(0.45)
+    }
   })
 })
 
