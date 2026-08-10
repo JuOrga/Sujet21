@@ -547,7 +547,8 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   const lasers = level.lasers ?? []
   const cibles = level.cibles ?? []
   const portes = level.portes ?? []
-  const actif = lasers.length + cibles.length + portes.length > 0
+  const rails = level.rails ?? []
+  const actif = lasers.length + cibles.length + portes.length + rails.length > 0
   const dprC = Math.min(dpr, 2)
   if (fxCanvas.width !== Math.round(vw * dprC) || fxCanvas.height !== Math.round(vh * dprC)) {
     fxCanvas.width = Math.round(vw * dprC)
@@ -602,6 +603,41 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     }
   }
 
+  // rails magnétiques : des lignes de champ posées dans le décor — pointillé
+  // violet discret, anneaux de capture aux extrémités. Le faisceau ordinaire
+  // les ignore ; seul l'arc de plasma s'y accroche.
+  for (const rail of rails) {
+    const pts = rail.points
+    if (pts.length < 2) continue
+    g.strokeStyle = 'rgba(150,120,255,0.4)'
+    g.lineWidth = Math.max(1, 2 * z)
+    g.setLineDash([2 * z, 9 * z])
+    g.beginPath()
+    const p0 = S(pts[0].x, pts[0].y)
+    g.moveTo(p0.sx, p0.sy)
+    for (let k = 1; k < pts.length; k++) {
+      const pk = S(pts[k].x, pts[k].y)
+      g.lineTo(pk.sx, pk.sy)
+    }
+    g.stroke()
+    g.setLineDash([])
+    for (const bout of [pts[0], pts[pts.length - 1]]) {
+      const p = S(bout.x, bout.y)
+      const rr = Math.max(3, params.plasmaRailRadius * z)
+      g.strokeStyle = 'rgba(170,140,255,0.35)'
+      g.lineWidth = 1.2
+      g.setLineDash([3, 5])
+      g.beginPath()
+      g.arc(p.sx, p.sy, rr, 0, Math.PI * 2)
+      g.stroke()
+      g.setLineDash([])
+      g.fillStyle = 'rgba(190,160,255,0.8)'
+      g.beginPath()
+      g.arc(p.sx, p.sy, Math.max(1.6, 3.4 * z), 0, Math.PI * 2)
+      g.fill()
+    }
+  }
+
   // faisceaux : halo large + cœur fin, en fusion additive
   g.globalCompositeOperation = 'lighter'
   for (const t of laserEtat.vues) {
@@ -609,7 +645,8 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     const chemins = t.points.map((pt) => S(pt.x, pt.y))
     const scint = 0.85 + 0.15 * Math.sin(elapsed * 21)
     // dans l'air : trait rouge net. Sous l'eau : le halo s'élargit et
-    // rosit — la lumière diffuse dans le corps qu'elle traverse.
+    // rosit — la lumière diffuse dans le corps qu'elle traverse. Ionisé
+    // (vapeur, rail) : un ARC blanc-violet, éblouissant.
     const AIR: [number, string][] = [
       [10 * z, `rgba(255,60,50,${(0.10 * scint).toFixed(3)})`],
       [4.5 * z, `rgba(255,90,70,${(0.30 * scint).toFixed(3)})`],
@@ -620,13 +657,22 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       [6.5 * z, `rgba(255,120,150,${(0.32 * scint).toFixed(3)})`],
       [1.8 * z, `rgba(255,235,225,${(0.88 * scint).toFixed(3)})`],
     ]
-    // tronçons homogènes (air / eau) tracés d'un trait chacun
+    const scintP = 0.7 + 0.3 * Math.sin(elapsed * 37) // l'arc crépite plus vite
+    const PLASMA: [number, string][] = [
+      [18 * z, `rgba(150,90,255,${(0.16 * scintP).toFixed(3)})`],
+      [7.5 * z, `rgba(190,150,255,${(0.42 * scintP).toFixed(3)})`],
+      [2.4 * z, `rgba(250,245,255,${(0.98 * scintP).toFixed(3)})`],
+    ]
+    const palettes = [AIR, EAU, PLASMA]
+    const modeDe = (pt: (typeof t.points)[number]): number =>
+      pt.plasma === true ? 2 : pt.eau === true ? 1 : 0
+    // tronçons homogènes (air / eau / plasma) tracés d'un trait chacun
     let k = 0
     while (k + 1 < chemins.length) {
-      const eau = t.points[k].eau === true
+      const mode = modeDe(t.points[k])
       let e = k + 1
-      while (e + 1 < chemins.length && (t.points[e].eau === true) === eau) e++
-      for (const [larg, coul] of eau ? EAU : AIR) {
+      while (e + 1 < chemins.length && modeDe(t.points[e]) === mode) e++
+      for (const [larg, coul] of palettes[mode]) {
         g.strokeStyle = coul
         g.lineWidth = Math.max(0.8, larg)
         g.lineJoin = 'round'
@@ -1183,6 +1229,11 @@ function frame(now: number): void {
           normale: (x, y) => sim.liquidNormalAt(x, y, params.laserMirrorSmooth),
         },
         indice: params.laserRefractIndex,
+        // palier 3 : la vapeur ionise le faisceau en arc de plasma, que
+        // les rails magnétiques capturent et guident
+        vapeur: (x, y) => sim.gasAt(x, y, rIce),
+        rails: level.rails ?? [],
+        railRadius: params.plasmaRailRadius,
       }),
     )
     // persistance : chaque cible touchée reste allumée 0,35 s simulées

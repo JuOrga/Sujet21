@@ -561,6 +561,10 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     fLaser.addBinding(params, 'laserRefractIndex', { min: 1, max: 2.4, step: 0.01, label: 'indice de réfraction' }),
     'Le corps LIQUIDE est un prisme : le rayon se plie à chaque traversée de surface (Snell-Descartes), et se réfléchit SOUS la surface au-delà de l’angle critique (≈ 49° à 1,33 — l’eau réelle). Plus haut : le prisme plie davantage et piège plus facilement. À 1 : l’eau redevient transparente (palier 1).',
   )
+  describe(
+    fLaser.addBinding(params, 'plasmaRailRadius', { min: 10, max: 90, step: 2, label: 'capture de rail (u)' }),
+    'La VAPEUR ionise le faisceau en arc de plasma ; l’arc qui passe à moins de ce rayon d’une extrémité de rail magnétique est capturé et suit la ligne de champ jusqu’à l’autre bout. Grand : capture indulgente. Le faisceau NON ionisé ignore les rails.',
+  )
 
   const fBody = pane.addFolder({ title: 'Corps', expanded: false })
   describe(

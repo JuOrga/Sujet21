@@ -11,6 +11,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 03:20',
+    title: 'Laser palier 3 : la vapeur ionise — l’arc de plasma suit les rails',
+    notes: [
+      'Le PLASMA est là, et il se PROVOQUE — ce n’est pas un quatrième état. Un faisceau qui traverse le nuage de vapeur du joueur s’IONISE : l’arc, blanc-violet, crépite plus vite que la lumière ordinaire.',
+      'Et le plasma est extrêmement soumis aux champs magnétiques : l’arc ionisé qui passe près d’une extrémité de RAIL MAGNÉTIQUE est capturé, suit la ligne de champ jusqu’à l’autre bout — virages à 90°, serpentins — puis repart tout droit, désionisé. Le faisceau ordinaire ignore superbement les rails : il faut être vapeur dans la lumière, au bon endroit. Une cible inatteignable en ligne droite devient le prix d’un beau placement de nuage.',
+      'L’arc guidé reste de la lumière : cibles, parois pleines et portes fermées l’arrêtent en chemin.',
+      'Dans l’ÉDITEUR : l’outil « Rail magnétique » (MÉCANISMES) trace la ligne de champ tronçon par tronçon — reposez sur une extrémité pour prolonger, Échap pour finir. Sélection, déplacement, duplication, suppression comme le reste. Les anneaux de capture se voient aux extrémités ; le contrôle signale un rail sans émetteur ou hors de la cuve.',
+      'Au banc (« Laser ») : curseur « capture de rail » — le rayon d’indulgence autour des extrémités.',
+    ],
+  },
+  {
     date: '11/08/2026 02:40',
     title: 'Le faisceau ne boit plus : traverser la lumière est gratuit',
     notes: [

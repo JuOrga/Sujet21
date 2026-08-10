@@ -336,6 +336,21 @@ export class FluidSim {
     return hit
   }
 
+  // Le point (x, y) baigne-t-il dans la VAPEUR du joueur ? Test d'ionisation
+  // du traceur laser (palier 3) : un faisceau qui traverse le nuage devient
+  // un arc de plasma, capturable par les rails magnétiques.
+  gasAt(x: number, y: number, r: number): boolean {
+    let hit = false
+    const r2 = r * r
+    this.grid.forEachNeighbor(x, y, r, (j) => {
+      if (this.gaseous[j] !== 1) return
+      const dx = x - this.posX[j]
+      const dy = y - this.posY[j]
+      if (dx * dx + dy * dy < r2) hit = true
+    })
+    return hit
+  }
+
   // Normale de la surface d'EAU en (x, y), pour le dioptre du laser — la
   // même recette que le miroir de glace : moyenne large au noyau (1 − d/r)²,
   // parce qu'une surface de particules est encore plus agitée liquide que

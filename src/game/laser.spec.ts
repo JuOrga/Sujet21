@@ -14,6 +14,8 @@ function monde(sur: Partial<TraceMonde> = {}): TraceMonde {
     cibles: [],
     iceNormal: null,
     eau: null,
+    vapeur: null,
+    rails: [],
     ...sur,
   }
 }
@@ -160,6 +162,66 @@ describe('traceLaser — les règles optiques du palier 1', () => {
     const fin = t.points[t.points.length - 1]
     // en ligne droite il finirait à y = −45 : la lentille l'a dévié
     expect(Math.abs(fin.y - -45)).toBeGreaterThan(8)
+  })
+
+  it('le PLASMA (palier 3) : ionisé dans la vapeur, l’arc suit le rail en équerre', () => {
+    // un nuage de vapeur autour de l'origine, un rail en L qui monte : le
+    // faisceau horizontal, ionisé dans le nuage, est capturé à (0,0), longe
+    // le rail, tourne à 90°, et allume une cible que rien n'atteint droit
+    const rail = { points: [{ x: 0, y: 0 }, { x: 200, y: 0 }, { x: 200, y: 300 }] }
+    const nuage = (x: number, y: number): boolean => Math.hypot(x, y) < 60
+    const avec = traceLaser(
+      { x: -500, y: 0, angle: 0 },
+      monde({ vapeur: nuage, rails: [rail], cibles: [{ x: 200, y: 300, r: 26 }] }),
+    )
+    expect(avec.touchees).toEqual([0])
+    expect(avec.points.some((p) => p.plasma === true)).toBe(true)
+    // sans nuage : pas d'ionisation, le rail est ignoré, la cible reste éteinte
+    const sans = traceLaser(
+      { x: -500, y: 0, angle: 0 },
+      monde({ vapeur: () => false, rails: [rail], cibles: [{ x: 200, y: 300, r: 26 }] }),
+    )
+    expect(sans.touchees).toEqual([])
+  })
+
+  it('l’arc guidé reste de la lumière : une porte fermée sur le rail l’absorbe', () => {
+    const rail = { points: [{ x: 0, y: 0 }, { x: 200, y: 0 }, { x: 200, y: 300 }] }
+    const t = traceLaser(
+      { x: -500, y: 0, angle: 0 },
+      monde({
+        vapeur: (x, y) => Math.hypot(x, y) < 60,
+        rails: [rail],
+        portesFermees: [{ minX: 160, minY: 100, maxX: 240, maxY: 140 }], // en travers du rail
+        cibles: [{ x: 200, y: 300, r: 26 }],
+      }),
+    )
+    expect(t.touchees).toEqual([]) // l'arc s'est éteint sur la porte
+    const fin = t.points[t.points.length - 1]
+    expect(fin.y).toBeGreaterThan(90)
+    expect(fin.y).toBeLessThan(150)
+  })
+
+  it('la VAPEUR simulée ionise réellement le faisceau', () => {
+    const sim = new FluidSim({ ...DEFAULT_PARAMS }, BOUNDS, 2048)
+    // un petit nuage de particules gazeuses posé sur le trajet, près de
+    // l'entrée du rail
+    for (let k = 0; k < 40; k++) {
+      const i = sim.addParticle(-20 + (k % 8) * 7, -14 + Math.floor(k / 8) * 7, KIND_FREE)
+      sim.vapor[i] = 1 // progression de vaporisation pleine : le pas la garde gazeuse
+      sim.gaseous[i] = 1
+    }
+    sim.step(sim.params.dt)
+    const rIce = sim.params.particleSpacing * 1.3
+    const t = traceLaser(
+      { x: -500, y: 0, angle: 0 },
+      monde({
+        vapeur: (x, y) => sim.gasAt(x, y, rIce),
+        rails: [{ points: [{ x: 30, y: 0 }, { x: 30, y: 300 }] }],
+        railRadius: 30,
+        cibles: [{ x: 30, y: 300, r: 26 }],
+      }),
+    )
+    expect(t.touchees).toEqual([0]) // capturé dans le vrai nuage, guidé, cible allumée
   })
 
   it('la normale du miroir est LISSE le long d’une face plane, malgré le grain des particules', () => {
