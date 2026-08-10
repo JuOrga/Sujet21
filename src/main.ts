@@ -13,9 +13,12 @@ import {
   TABLEAU_1BIS,
   TABLEAUX,
   pointInBox,
+  zoneForceAt,
   type LevelDef,
   type ObstacleBox,
+  type ZoneForce,
 } from './game/level'
+import { LevelEditor } from './editor/editor'
 import { AudioFx, loadAudioPrefs } from './game/audio'
 import { Records } from './game/records'
 import {
@@ -305,6 +308,40 @@ function startBisTest(): void {
   restart()
 }
 startBisBtn.addEventListener('click', startBisTest)
+
+// ---- Éditeur de tableaux ----
+// Il se superpose au jeu ; « Essayer » repasse par le même chemin que le
+// prototype (testLevel), donc un tableau édité se joue avec toutes les
+// mécaniques, sans toucher à l'expédition ni aux registres.
+const editor = new LevelEditor(el('editor'), {
+  play: (lvl) => {
+    testLevel = lvl
+    run.bonbonneLiters = 0
+    run.runTime = 0
+    hasPlayed = true
+    editor.close()
+    document.body.classList.add('playing')
+    restart()
+  },
+  quit: () => {
+    editor.close()
+    testLevel = null
+    openHome()
+    restart()
+  },
+})
+// Sonde de débogage/test : le tableau en cours d'édition
+;(window as unknown as { __editorLevel: () => LevelDef }).__editorLevel = () => editor.currentLevel()
+function openEditor(): void {
+  overlay.classList.remove('visible')
+  document.body.classList.remove('playing')
+  editor.open(testLevel ?? undefined)
+}
+document.getElementById('start-editor')!.addEventListener('click', () => openEditor())
+if (new URLSearchParams(location.search).has('editeur')) {
+  hasPlayed = true
+  openEditor()
+}
 // Au doigt, la fiche va à l'essentiel : les commandes démarrent repliées
 if (window.matchMedia('(max-width: 700px)').matches) {
   document.getElementById('cmd-details')!.removeAttribute('open')
@@ -716,6 +753,14 @@ function frame(now: number): void {
   const aim = camera.screenToWorld(input.aimClientX, input.aimClientY, vw, vh)
   const tableauDone = run.exitTimer > 0 || run.ended
 
+  // Zones d'état (refonte 2026) : une zone impose un état et verrouille le
+  // sélecteur tant qu'on y est. L'intention du joueur est écrasée, pas effacée
+  // — en ressortant, il retrouve l'état qu'il avait choisi.
+  const zone: ZoneForce = zoneForceAt(level, sim.stats.centroidX, sim.stats.centroidY)
+  if (zone !== 'libre') {
+    input.freezeIntent = zone === 'glace'
+    input.gasIntent = zone === 'vapeur'
+  }
   sim.freezeIntent = input.freezeIntent
   sim.gasIntent = input.gasIntent
   sim.chill = chillNow() // le vaisseau refroidit : la physique suit
@@ -898,6 +943,12 @@ function frame(now: number): void {
   stateEau.classList.toggle('active', !input.freezeIntent && !input.gasIntent)
   stateGlace.classList.toggle('active', input.freezeIntent)
   stateVapeur.classList.toggle('active', input.gasIntent)
+  // dans une zone imposée, le sélecteur se grise : le choix n'est plus offert
+  const locked = zone !== 'libre'
+  stateEau.disabled = locked
+  stateGlace.disabled = locked
+  stateVapeur.disabled = locked
+  document.body.classList.toggle('state-locked', locked)
   btnSound.textContent = audio.enabled ? '🔊' : '🔇'
 
   // Instruments de bord

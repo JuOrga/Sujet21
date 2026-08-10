@@ -38,6 +38,20 @@ export interface WorldLabel {
   tone: 'mur' | 'phile' | 'phobe' | 'eponge' | 'froid' | 'grille' | 'sas' | 'chaud'
 }
 
+// Zone d'état (refonte 2026) : une région du tableau qui IMPOSE un état et
+// interdit d'en changer, ou qui laisse le choix. Le corps qui y entre est
+// converti ; tant qu'il y est, le sélecteur d'état est verrouillé.
+export type ZoneForce = 'libre' | 'eau' | 'glace' | 'vapeur'
+
+export interface ZoneDef {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+  force: ZoneForce
+  label?: string
+}
+
 // Décalque de décor : machinerie plaquée sur la paroi (tuyaux, vanne).
 // Aucune physique, aucune règle — seulement la preuve que quelqu'un a
 // construit cet endroit avant de l'abandonner.
@@ -63,6 +77,32 @@ export interface LevelDef {
   sponges: SpongeDef[]
   labels: WorldLabel[]
   decals?: DecalDef[]
+  zones?: ZoneDef[]
+  par?: number // budget d'impulsions visé : franchissable en `par`, record en dessous
+}
+
+// Nom lisible de chaque matériau — l'éditeur et la légende parlent la même
+// langue que le code.
+export const MATERIAL_NAMES: Record<number, string> = {
+  [MAT_WALL]: 'Paroi',
+  [MAT_HYDROPHILE]: 'Hydrophile',
+  [MAT_HYDROPHOBE]: 'Hydrophobe',
+  [MAT_EXIT]: 'Sas',
+  [MAT_FROID]: 'Hublot (froid)',
+  [MAT_GRILLE]: 'Grille',
+  [MAT_CHAUD]: 'Radiateur',
+}
+
+/** L'état imposé au point (x, y), ou 'libre' si aucune zone ne l'impose. */
+export function zoneForceAt(level: LevelDef, x: number, y: number): ZoneForce {
+  const zones = level.zones
+  if (!zones) return 'libre'
+  // la dernière zone déclarée gagne : on peut superposer une exception
+  for (let i = zones.length - 1; i >= 0; i--) {
+    const z = zones[i]
+    if (x >= z.minX && x <= z.maxX && y >= z.minY && y <= z.maxY) return z.force
+  }
+  return 'libre'
 }
 
 function box(minX: number, minY: number, maxX: number, maxY: number, material: number): ObstacleBox {

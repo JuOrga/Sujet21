@@ -214,9 +214,22 @@
         cursor: pointer;
         transition: color 0.2s ease, border-color 0.2s ease;
       }
-      #start-bis:hover {
+      #start-bis:hover,
+      #start-editor:hover {
         color: var(--specimen);
         border-color: var(--specimen);
+      }
+      #start-editor {
+        font-family: var(--font-display);
+        font-size: 10.5px;
+        letter-spacing: 0.12em;
+        padding: 10px 16px;
+        margin-top: -10px;
+        color: var(--dim);
+        background: transparent;
+        border: 1px dashed var(--line);
+        cursor: pointer;
+        transition: color 0.2s ease, border-color 0.2s ease;
       }
       /* Registres du labo : l'écran record de la fiche d'expérience */
       .home-records {
@@ -1270,6 +1283,239 @@
         }
       }
 
+      /* Zone d'état : le sélecteur se grise, l'état n'est plus au choix */
+      #statebar button:disabled {
+        opacity: 0.32;
+        cursor: not-allowed;
+      }
+      body.state-locked #statebar {
+        outline: 1px dashed rgba(201, 166, 242, 0.55);
+        outline-offset: 6px;
+      }
+
+      /* ---- Éditeur de tableaux : plan de travail, pas vitrine ---- */
+      #editor {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        display: none;
+        grid-template-columns: 216px 1fr 300px;
+        grid-template-rows: 46px 1fr;
+        background: var(--void);
+        color: var(--ink);
+        font-family: var(--font-mono);
+      }
+      #editor.visible {
+        display: grid;
+      }
+      .ed-bar {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 14px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(9, 18, 30, 0.9);
+        overflow-x: auto;
+      }
+      .ed-bar .ed-title {
+        font-family: var(--font-display);
+        font-size: 11px;
+        letter-spacing: 0.2em;
+        color: var(--specimen);
+        white-space: nowrap;
+      }
+      .ed-bar .sp {
+        flex: 1;
+      }
+      #editor button {
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--ink);
+        background: rgba(99, 183, 230, 0.07);
+        border: 1px solid var(--line);
+        padding: 7px 11px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      #editor button:hover {
+        border-color: var(--specimen);
+      }
+      #editor button.primary {
+        color: var(--void);
+        background: var(--valid);
+        border-color: var(--valid);
+        font-weight: 600;
+      }
+      #editor button.ed-danger {
+        color: var(--alert);
+        border-color: var(--alert);
+        background: transparent;
+        align-self: flex-start;
+      }
+      .ed-side {
+        border-right: 1px solid var(--line);
+        overflow-y: auto;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .ed-side--right {
+        border-right: none;
+        border-left: 1px solid var(--line);
+      }
+      .ed-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .ed-group > .k {
+        font-size: 9.5px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--dim);
+        padding-bottom: 2px;
+      }
+      .ed-tool {
+        text-align: left !important;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .ed-tool i {
+        width: 10px;
+        height: 10px;
+        flex: none;
+        border-radius: 2px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+      }
+      .ed-tool.active {
+        border-color: var(--specimen);
+        background: rgba(99, 183, 230, 0.16);
+      }
+      #ed-stage {
+        position: relative;
+        overflow: hidden;
+      }
+      #ed-canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+        touch-action: none;
+      }
+      #ed-coords,
+      #ed-hint {
+        position: absolute;
+        bottom: 8px;
+        font-size: 10.5px;
+        color: var(--dim);
+        background: rgba(3, 7, 16, 0.8);
+        padding: 4px 8px;
+        pointer-events: none;
+      }
+      #ed-coords {
+        left: 8px;
+      }
+      #ed-hint {
+        right: 8px;
+        color: var(--specimen);
+      }
+      .ed-f {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 10.5px;
+        color: var(--dim);
+      }
+      .ed-f input,
+      .ed-f select,
+      #editor textarea {
+        background: rgba(3, 7, 16, 0.7);
+        border: 1px solid var(--line);
+        color: var(--ink);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        padding: 4px 6px;
+        width: 128px;
+      }
+      #editor textarea {
+        width: 100%;
+        min-height: 70px;
+        resize: vertical;
+      }
+      .ed-fields {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .ed-props-head {
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--specimen);
+        padding-bottom: 6px;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 8px;
+      }
+      #ed-props {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .ed-empty {
+        font-size: 11px;
+        color: var(--dim);
+        line-height: 1.6;
+        margin: 0;
+      }
+      .ed-v {
+        font-size: 10.5px;
+        line-height: 1.5;
+        padding: 5px 8px;
+        border-left: 2px solid;
+        margin-bottom: 5px;
+      }
+      .ed-v.err {
+        color: var(--alert);
+        border-color: var(--alert);
+        background: rgba(255, 107, 94, 0.07);
+      }
+      .ed-v.warn {
+        color: #e8b34a;
+        border-color: #e8b34a;
+        background: rgba(232, 179, 74, 0.06);
+      }
+      .ed-ok {
+        font-size: 10.5px;
+        color: var(--valid);
+        border-left: 2px solid var(--valid);
+        padding: 5px 8px;
+        background: rgba(63, 214, 155, 0.07);
+      }
+      #ed-io {
+        display: none;
+        flex-direction: column;
+        gap: 6px;
+      }
+      #ed-io.open {
+        display: flex;
+      }
+      @media (max-width: 900px) {
+        #editor {
+          grid-template-columns: 150px 1fr;
+          grid-template-rows: 46px 1fr 210px;
+        }
+        .ed-side--right {
+          grid-column: 1 / -1;
+          border-left: none;
+          border-top: 1px solid var(--line);
+        }
+      }
+
       @media (prefers-reduced-motion: reduce) {
         #home,
         #hud,
@@ -1311,6 +1557,7 @@
       </dl>
       <button id="start" type="button">COMMENCER L'ESSAI</button>
       <button id="start-bis" type="button">TESTER «&nbsp;LA GALERIE NOYÉE&nbsp;» — 21-A BIS, PROTOTYPE</button>
+      <button id="start-editor" type="button">ÉDITEUR DE TABLEAUX — CRÉER OU MODIFIER UN NIVEAU</button>
       <div class="home-records" aria-label="Registres du labo">
         <div class="rec-head"><span>REGISTRES DU LABO</span>
           <input id="rec-name" maxlength="12" placeholder="VOTRE NOM — REQUIS"
@@ -1386,6 +1633,88 @@
       <button id="state-vapeur" type="button" title="se changer en vapeur (G) : le pointeur pilote le nuage">
         <span class="st-ico">💨</span><span class="st-label">VAPEUR</span><kbd>G</kbd>
       </button>
+    </div>
+
+    <div id="editor" aria-label="Éditeur de tableaux">
+      <div class="ed-bar">
+        <span class="ed-title">ÉDITEUR DE TABLEAUX</span>
+        <button type="button" id="ed-new">Vierge</button>
+        <button type="button" id="ed-fit">Recadrer</button>
+        <button type="button" id="ed-import">Importer / JSON</button>
+        <button type="button" id="ed-copy">Copier</button>
+        <button type="button" id="ed-export">Exporter</button>
+        <span class="sp"></span>
+        <label class="ed-f" style="width:auto"><span>Grille</span>
+          <input type="number" id="ed-grid" value="20" min="1" step="5" style="width:56px" /></label>
+        <label class="ed-f" style="width:auto"><span>Aimant</span>
+          <input type="checkbox" id="ed-snap" checked style="width:auto" /></label>
+        <button type="button" id="ed-play" class="primary">Essayer</button>
+        <button type="button" id="ed-quit">Quitter</button>
+      </div>
+
+      <aside class="ed-side">
+        <div class="ed-group">
+          <span class="k">Outil</span>
+          <button type="button" class="ed-tool active" data-tool="select"><i style="background:transparent"></i>Sélection</button>
+        </div>
+        <div class="ed-group">
+          <span class="k">Surfaces</span>
+          <button type="button" class="ed-tool" data-tool="box:0"><i style="background:#4a6b80"></i>Paroi</button>
+          <button type="button" class="ed-tool" data-tool="box:1"><i style="background:#2ec6c9"></i>Hydrophile</button>
+          <button type="button" class="ed-tool" data-tool="box:2"><i style="background:#a878e8"></i>Hydrophobe</button>
+          <button type="button" class="ed-tool" data-tool="box:4"><i style="background:#8fc8ee"></i>Hublot froid</button>
+          <button type="button" class="ed-tool" data-tool="box:6"><i style="background:#ff8a3c"></i>Radiateur</button>
+          <button type="button" class="ed-tool" data-tool="box:5"><i style="background:#8fb0c6"></i>Grille</button>
+          <button type="button" class="ed-tool" data-tool="sponge"><i style="background:#d7ad55"></i>Éponge</button>
+        </div>
+        <div class="ed-group">
+          <span class="k">Zones d’état</span>
+          <button type="button" class="ed-tool" data-tool="zone:eau"><i style="background:#63b7e6"></i>Impose eau</button>
+          <button type="button" class="ed-tool" data-tool="zone:glace"><i style="background:#8fc8ee"></i>Impose glace</button>
+          <button type="button" class="ed-tool" data-tool="zone:vapeur"><i style="background:#c9a6f2"></i>Impose vapeur</button>
+          <button type="button" class="ed-tool" data-tool="zone:libre"><i style="background:#7b93a8"></i>Zone libre</button>
+        </div>
+        <div class="ed-group">
+          <span class="k">Repères</span>
+          <button type="button" class="ed-tool" data-tool="spawn"><i style="background:#63b7e6"></i>Départ</button>
+          <button type="button" class="ed-tool" data-tool="exit"><i style="background:#35e0a4"></i>Sas</button>
+          <button type="button" class="ed-tool" data-tool="label"><i style="background:#a9c0d2"></i>Étiquette</button>
+        </div>
+        <p class="ed-empty">
+          Glissez pour tracer · clic droit pour déplacer la vue · molette pour zoomer ·
+          <b>Suppr</b> efface · <b>D</b> duplique · <b>Échap</b> désélectionne.
+        </p>
+      </aside>
+
+      <div id="ed-stage">
+        <canvas id="ed-canvas"></canvas>
+        <div id="ed-coords">x 0 · y 0</div>
+        <div id="ed-hint"></div>
+      </div>
+
+      <aside class="ed-side ed-side--right">
+        <div class="ed-group">
+          <span class="k">Tableau</span>
+          <label class="ed-f"><span>Nom</span><input id="ed-name" /></label>
+          <label class="ed-f"><span>Code</span><input id="ed-code" /></label>
+          <label class="ed-f"><span>Par (impulsions)</span><input type="number" id="ed-par" min="1" step="1" /></label>
+          <textarea id="ed-journal" placeholder="Entrée du journal de bord…"></textarea>
+        </div>
+        <div class="ed-group">
+          <span class="k">Sélection</span>
+          <div id="ed-props"></div>
+        </div>
+        <div class="ed-group">
+          <span class="k">Contrôle</span>
+          <div id="ed-check"></div>
+        </div>
+        <div class="ed-group" id="ed-io">
+          <span class="k">Échange</span>
+          <input type="file" id="ed-file" accept="application/json,.json" />
+          <textarea id="ed-json" spellcheck="false"></textarea>
+          <button type="button" id="ed-load-json">Charger ce JSON</button>
+        </div>
+      </aside>
     </div>
 
     <div id="tutor" aria-live="polite"></div>
