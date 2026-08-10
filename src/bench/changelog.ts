@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '10/08/2026 14:25',
+    title: 'Correctif : les boutons du bas ne se chevauchent plus',
+    notes: [
+      'L’ajout du bouton « ↩ ÉDITEUR » faisait passer la barre sur deux lignes, et le sélecteur d’état, calé à une hauteur devinée, se retrouvait dessous. Le sélecteur se positionne désormais sur la hauteur RÉELLE de la barre, mesurée en direct : quel que soit le nombre de boutons, ils ne se croisent plus.',
+      'Deuxième chevauchement, celui-là préexistant : sur écran étroit (tablette en paysage, fenêtre réduite), la barre passait sous le panneau de bord. Hors mobile, elle se centre maintenant dans l’espace RESTANT à droite du panneau, et s’élargit assez pour tenir sur une seule ligne au bureau.',
+      'Vérifié à quatre largeurs — 1400, 1024, 820 et 412 px — bouton par bouton.',
+    ],
+  },
+  {
     date: '10/08/2026 13:55',
     title: 'Aller-retour éditeur ⇄ essai',
     notes: [

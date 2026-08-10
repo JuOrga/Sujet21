@@ -611,6 +611,20 @@ const chipEditor = touchButton(
   'tb-chip tb-editor',
 )
 chipEditor.style.display = 'none'
+
+// La barre du bas passe sur deux lignes quand elle se remplit (le bouton de
+// retour à l'éditeur, par exemple). On publie sa hauteur réelle en variable
+// CSS : le sélecteur d'état se recale dessus au lieu de la chevaucher.
+function publishTouchbarHeight(): void {
+  const h = Math.round(touchbar.getBoundingClientRect().height)
+  if (h > 0) document.documentElement.style.setProperty('--tb-h', `${h}px`)
+}
+if (typeof ResizeObserver !== 'undefined') {
+  new ResizeObserver(publishTouchbarHeight).observe(touchbar)
+} else {
+  window.addEventListener('resize', publishTouchbarHeight)
+}
+publishTouchbarHeight()
 {
   // au doigt, les chips ont leur rangée, les glyphes la leur
   const brk = document.createElement('i')
