@@ -93,6 +93,9 @@ export interface TraceResultat {
   points: { x: number; y: number; eau?: boolean; plasma?: boolean }[]
   /** Indices des cibles allumées par CE faisceau. */
   touchees: number[]
+  /** Indices des rails PARCOURUS par l'arc — le champ y est actif : la
+   * simulation y convoie la vapeur le long de la ligne. */
+  railsSuivis: number[]
 }
 
 function dansRect(x: number, y: number, r: Rect): boolean {
@@ -110,6 +113,7 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
   let dansEau = refracte && monde.eau!.dedans(em.x, em.y)
   const points: TraceResultat['points'] = [{ x: em.x, y: em.y, eau: dansEau }]
   const touchees: number[] = []
+  const railsSuivis: number[] = []
   const a = (em.angle * Math.PI) / 180
   let dx = Math.cos(a)
   let dy = Math.sin(a)
@@ -184,7 +188,7 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
     // hors de la cuve : le faisceau se perd dans la coque
     if (x < monde.bounds.minX || x > monde.bounds.maxX || y < monde.bounds.minY || y > monde.bounds.maxY) {
       points.push({ x, y })
-      return { points, touchees }
+      return { points, touchees, railsSuivis }
     }
 
     // une cible : elle s'allume et boit le faisceau
@@ -195,7 +199,7 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
       if (ddx * ddx + ddy * ddy <= t.r * t.r) {
         points.push({ x: t.x, y: t.y })
         touchees.push(c)
-        return { points, touchees }
+        return { points, touchees, railsSuivis }
       }
     }
 
@@ -217,7 +221,7 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
     }
     if (stoppe) {
       points.push({ x, y })
-      return { points, touchees }
+      return { points, touchees, railsSuivis }
     }
 
     // la glace : miroir. On réfléchit sur la normale locale, puis on ressort
@@ -226,7 +230,7 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
     if (n) {
       if (bounces >= LASER_MAX_BOUNCES) {
         points.push({ x, y })
-        return { points, touchees }
+        return { points, touchees, railsSuivis }
       }
       bounces++
       points.push({ x, y })
@@ -259,7 +263,7 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
       if (la !== dansEau) {
         if (dioptres >= LASER_MAX_REFRACT) {
           points.push({ x, y })
-          return { points, touchees } // trop de gouttes : le faisceau se diffuse
+          return { points, touchees, railsSuivis } // trop de gouttes : le faisceau se diffuse
         }
         dioptres++
         const n = monde.eau!.normale(x, y)
@@ -309,8 +313,8 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
         points.push({ x, y, eau: dansEau, plasma: dansVapeur })
       }
       if (dansVapeur && capSursis <= 0 && railsPris < LASER_MAX_RAILS) {
-        for (const rail of monde.rails) {
-          const pts = rail.points
+        for (let ri = 0; ri < monde.rails.length; ri++) {
+          const pts = monde.rails[ri].points
           if (pts.length < 2) continue
           // le point de la LIGNE le plus proche du faisceau : la capture se
           // fait n'importe où le long du rail, pas seulement aux bouts
@@ -338,11 +342,12 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
           }
           if (best > rr) continue
           railsPris++
+          if (!railsSuivis.includes(ri)) railsSuivis.push(ri)
           points.push({ x, y, plasma: true })
           // l'arc rejoint la ligne au point de capture, puis la suit dans
           // le SENS DU TRACÉ — du point de capture vers le dernier point
           const ordre = [{ x: bx, y: by }, ...pts.slice(bseg + 1)]
-          if (suivreRail(ordre)) return { points, touchees }
+          if (suivreRail(ordre)) return { points, touchees, railsSuivis }
           // sorti au bout du rail : on repart tout droit, dans le milieu
           // qu'on y trouve — et un court sursis évite de reprendre le
           // même rail par son extrémité de sortie.
@@ -358,5 +363,5 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
     }
   }
   points.push({ x, y })
-  return { points, touchees }
+  return { points, touchees, railsSuivis }
 }

@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 04:20',
+    title: 'Le champ convoie la vapeur : le nuage voyage sur le rail',
+    notes: [
+      'Deuxième retour d’essai : l’arc suivait bien le rail, mais le nuage restait planté. Corrigé — le plasma est soumis au champ, TOUT le plasma : tant qu’un arc circule sur un rail, la vapeur prise dans la bande est ENTRAÎNÉE le long de la ligne, dans le sens des chevrons, avec un recentrage doux qui fait prendre les virages. Le nuage voyage sur la ligne de champ tant que le faisceau l’ionise.',
+      'La bande de convoyage est plus large que la capture : le nuage entier embarque, pas seulement son cœur posé sur la ligne. L’eau et la glace, non ionisables, ne sentent rien.',
+      'Au banc (« Laser ») : curseur « convoyage » — à 0, on retrouve l’arc seul guidé, nuage immobile.',
+      'Et dans l’éditeur : boutons + / − dans la barre, pour zoomer quand la roulette fait des siennes (pavé tactile, mobile). Mêmes bornes que la roulette, centré sur la vue.',
+    ],
+  },
+  {
     date: '11/08/2026 03:50',
     title: 'Les rails ont un SENS : capture n’importe où le long de la ligne',
     notes: [

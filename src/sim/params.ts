@@ -120,6 +120,10 @@ export interface SimParams {
   // rayon de sa ligne — n'importe où le long du rail. L'arc suit alors le
   // rail dans le sens du tracé. Grand = capture indulgente.
   plasmaRailRadius: number
+  // Tant que l'arc circule sur un rail, le champ CONVOIE la vapeur prise
+  // dans la bande : accélération (u/s²) le long de la ligne, sens du tracé.
+  // Le nuage voyage sur la ligne de champ. À 0 : l'arc seul est guidé.
+  plasmaConvoy: number
 
   // Sas de sortie : une bouche d'aspiration dans laquelle l'eau s'engouffre
   exitRadius: number // portée de l'aspiration autour de la bouche (unités monde)
@@ -257,6 +261,7 @@ export const DEFAULT_PARAMS: SimParams = {
   laserMirrorSmooth: 30,
   laserRefractIndex: 1.33,
   plasmaRailRadius: 30,
+  plasmaConvoy: 950,
 
   exitRadius: 240,
   exitPull: 300,

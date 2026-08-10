@@ -751,11 +751,13 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   }
 }
 
+let lastRailTime = 0
 function resetLasers(): void {
   laserEtat.vues = []
   laserEtat.litUntil = (level.cibles ?? []).map(() => -1)
   laserEtat.portesOuvertes = (level.portes ?? []).map(() => false)
   laserEtat.doorsKey = ''
+  lastRailTime = 0
 }
 const dashAimEl = el('dash-aim')
 const dashCostEl = el('dash-cost')
@@ -1273,7 +1275,25 @@ function frame(now: number): void {
       laserEtat.doorsKey = cle
       sim.setDoors(closes)
     }
+    // convoyage : tant qu'un arc circule sur un rail, le champ y est actif
+    // et la vapeur prise dans la bande voyage le long de la ligne — au
+    // rythme du temps simulé réellement avancé (le ralenti de visée compte)
+    const dtRail = Math.max(0, run.tableauTime - lastRailTime)
+    if (dtRail > 0 && !input.paused && !tableauDone && !sim.dispersed) {
+      const railsDuNiveau = level.rails ?? []
+      const actifs = new Set<number>()
+      for (const t of laserEtat.vues) for (const ri of t.railsSuivis) actifs.add(ri)
+      for (const ri of actifs) {
+        const rail = railsDuNiveau[ri]
+        // bande de convoyage plus large que la capture : le nuage ENTIER
+        // embarque, pas seulement son cœur posé sur la ligne
+        if (rail) {
+          sim.railConvoy(rail.points, params.plasmaRailRadius * 2.5, params.plasmaConvoy, dtRail)
+        }
+      }
+    }
   }
+  lastRailTime = run.tableauTime
 
   // Sortie (§7.1-7.2). Sas aspirant : la victoire n'arrive que lorsque le sas
   // a quasi tout bu (≤ 2 % du volume de base) — l'animation d'engloutissement

@@ -902,6 +902,15 @@ export class LevelEditor {
       this.fitView()
       this.draw()
     })
+    // Zoom aux boutons, centré sur la vue — pour quand la roulette fait
+    // défaut (pavé tactile, mobile, roulette capricieuse). Mêmes bornes que
+    // la roulette ; le centre de la vue ne bouge pas.
+    const zoomPar = (facteur: number): void => {
+      this.zoom = Math.max(0.05, Math.min(3, this.zoom * facteur))
+      this.draw()
+    }
+    this.el('ed-zin').addEventListener('click', () => zoomPar(1.3))
+    this.el('ed-zout').addEventListener('click', () => zoomPar(1 / 1.3))
     this.el('ed-new').addEventListener('click', () => {
       if (!confirm('Repartir d’un tableau vierge ? Le brouillon en cours sera perdu.')) return
       this.level = blankLevel()

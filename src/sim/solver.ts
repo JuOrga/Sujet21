@@ -351,6 +351,50 @@ export class FluidSim {
     return hit
   }
 
+  // Convoyage magnétique (palier 3) : tant qu'un arc de plasma circule sur
+  // un rail, le champ y est actif — la VAPEUR prise dans la bande du rail
+  // est entraînée le long de la ligne, dans le sens du tracé, avec un
+  // recentrage doux pour prendre les virages. Le nuage voyage sur la ligne
+  // de champ ; l'eau et la glace, non ionisables, ne sentent rien.
+  railConvoy(pts: { x: number; y: number }[], band: number, accel: number, dt: number): void {
+    if (accel <= 0 || band <= 0 || pts.length < 2) return
+    for (let i = 0; i < this.count; i++) {
+      if (this.gaseous[i] !== 1) continue
+      const px = this.posX[i]
+      const py = this.posY[i]
+      // tronçon de la polyligne le plus proche
+      let best = Infinity
+      let ux = 0
+      let uy = 0
+      let qx = 0
+      let qy = 0
+      for (let s = 0; s + 1 < pts.length; s++) {
+        const a = pts[s]
+        const b = pts[s + 1]
+        const abx = b.x - a.x
+        const aby = b.y - a.y
+        const len2 = abx * abx + aby * aby
+        if (len2 < 1e-9) continue
+        const t = Math.max(0, Math.min(1, ((px - a.x) * abx + (py - a.y) * aby) / len2))
+        const cx = a.x + abx * t
+        const cy = a.y + aby * t
+        const d2 = (px - cx) * (px - cx) + (py - cy) * (py - cy)
+        if (d2 < best) {
+          best = d2
+          const inv = 1 / Math.sqrt(len2)
+          ux = abx * inv
+          uy = aby * inv
+          qx = cx
+          qy = cy
+        }
+      }
+      if (best > band * band) continue
+      // poussée le long du rail + rappel vers la ligne (le virage se prend)
+      this.velX[i] += (ux + ((qx - px) / band) * 0.8) * accel * dt
+      this.velY[i] += (uy + ((qy - py) / band) * 0.8) * accel * dt
+    }
+  }
+
   // Normale de la surface d'EAU en (x, y), pour le dioptre du laser — la
   // même recette que le miroir de glace : moyenne large au noyau (1 − d/r)²,
   // parce qu'une surface de particules est encore plus agitée liquide que

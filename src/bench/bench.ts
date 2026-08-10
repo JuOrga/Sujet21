@@ -565,6 +565,10 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     fLaser.addBinding(params, 'plasmaRailRadius', { min: 10, max: 90, step: 2, label: 'capture de rail (u)' }),
     'La VAPEUR ionise le faisceau en arc de plasma ; l’arc qui passe à moins de ce rayon de la LIGNE d’un rail magnétique — n’importe où le long — est capturé et la suit DANS LE SENS DU TRACÉ (les flèches) jusqu’au bout. Grand : capture indulgente. Le faisceau NON ionisé ignore les rails.',
   )
+  describe(
+    fLaser.addBinding(params, 'plasmaConvoy', { min: 0, max: 3000, step: 50, label: 'convoyage (u/s²)' }),
+    'Tant que l’arc circule sur un rail, le champ est actif : la VAPEUR prise dans la bande est ENTRAÎNÉE le long de la ligne, dans le sens des chevrons — le nuage voyage sur la ligne de champ. À 0 : seul l’arc est guidé, le nuage reste sur place.',
+  )
 
   const fBody = pane.addFolder({ title: 'Corps', expanded: false })
   describe(
