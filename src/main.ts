@@ -608,19 +608,35 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     if (t.points.length < 2) continue
     const chemins = t.points.map((pt) => S(pt.x, pt.y))
     const scint = 0.85 + 0.15 * Math.sin(elapsed * 21)
-    for (const [larg, coul] of [
+    // dans l'air : trait rouge net. Sous l'eau : le halo s'élargit et
+    // rosit — la lumière diffuse dans le corps qu'elle traverse.
+    const AIR: [number, string][] = [
       [10 * z, `rgba(255,60,50,${(0.10 * scint).toFixed(3)})`],
       [4.5 * z, `rgba(255,90,70,${(0.30 * scint).toFixed(3)})`],
       [1.8 * z, `rgba(255,220,200,${(0.95 * scint).toFixed(3)})`],
-    ] as [number, string][]) {
-      g.strokeStyle = coul
-      g.lineWidth = Math.max(0.8, larg)
-      g.lineJoin = 'round'
-      g.lineCap = 'round'
-      g.beginPath()
-      g.moveTo(chemins[0].sx, chemins[0].sy)
-      for (let k = 1; k < chemins.length; k++) g.lineTo(chemins[k].sx, chemins[k].sy)
-      g.stroke()
+    ]
+    const EAU: [number, string][] = [
+      [15 * z, `rgba(255,70,110,${(0.13 * scint).toFixed(3)})`],
+      [6.5 * z, `rgba(255,120,150,${(0.32 * scint).toFixed(3)})`],
+      [1.8 * z, `rgba(255,235,225,${(0.88 * scint).toFixed(3)})`],
+    ]
+    // tronçons homogènes (air / eau) tracés d'un trait chacun
+    let k = 0
+    while (k + 1 < chemins.length) {
+      const eau = t.points[k].eau === true
+      let e = k + 1
+      while (e + 1 < chemins.length && (t.points[e].eau === true) === eau) e++
+      for (const [larg, coul] of eau ? EAU : AIR) {
+        g.strokeStyle = coul
+        g.lineWidth = Math.max(0.8, larg)
+        g.lineJoin = 'round'
+        g.lineCap = 'round'
+        g.beginPath()
+        g.moveTo(chemins[k].sx, chemins[k].sy)
+        for (let m = k + 1; m <= e; m++) g.lineTo(chemins[m].sx, chemins[m].sy)
+        g.stroke()
+      }
+      k = e
     }
   }
   g.globalCompositeOperation = 'source-over'
@@ -1162,6 +1178,13 @@ function frame(now: number): void {
         // contact précis, normale MOYENNÉE large : le miroir est une facette
         // plane, pas une râpe — le reflet ne tremble plus à chaque bosse
         iceNormal: (x, y) => sim.iceNormalAt(x, y, rIce, params.laserMirrorSmooth),
+        // palier 2 : le corps liquide est un prisme — le rayon se plie à
+        // chaque dioptre, et se piège sous la surface au-delà de ~49°
+        eau: {
+          dedans: (x, y) => sim.liquidAt(x, y, rIce),
+          normale: (x, y) => sim.liquidNormalAt(x, y, params.laserMirrorSmooth),
+        },
+        indice: params.laserRefractIndex,
       }),
     )
     // persistance : chaque cible touchée reste allumée 0,35 s simulées

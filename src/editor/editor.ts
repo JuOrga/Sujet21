@@ -1471,6 +1471,7 @@ export class LevelEditor {
         portesFermees: portes,
         cibles,
         iceNormal: null,
+        eau: null, // pas de corps dans l'aperçu : ni miroir, ni prisme
       })
       for (const c of t.touchees) touchees.add(c)
       g.strokeStyle = 'rgba(255,90,70,0.8)'

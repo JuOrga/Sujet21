@@ -321,6 +321,46 @@ export class FluidSim {
     return { nx: sx / l, ny: sy / l }
   }
 
+  // Le point (x, y) baigne-t-il dans l'eau LIQUIDE ? Test de milieu du
+  // traceur laser (palier 2), appelé à chaque pas de marche : rien que le
+  // contact, pas de normale. Glace et vapeur ne comptent pas — la première
+  // est un miroir, la seconde laisse passer.
+  liquidAt(x: number, y: number, r: number): boolean {
+    let hit = false
+    const r2 = r * r
+    this.grid.forEachNeighbor(x, y, r, (j) => {
+      if (this.frozen[j] === 1 || this.gaseous[j] === 1) return
+      const dx = x - this.posX[j]
+      const dy = y - this.posY[j]
+      if (dx * dx + dy * dy < r2) hit = true
+    })
+    return hit
+  }
+
+  // Normale de la surface d'EAU en (x, y), pour le dioptre du laser — la
+  // même recette que le miroir de glace : moyenne large au noyau (1 − d/r)²,
+  // parce qu'une surface de particules est encore plus agitée liquide que
+  // gelée. Appelée seulement au franchissement d'un dioptre.
+  liquidNormalAt(x: number, y: number, rSmooth: number): { nx: number; ny: number } {
+    let sx = 0
+    let sy = 0
+    const rs2 = rSmooth * rSmooth
+    this.grid.forEachNeighbor(x, y, rSmooth, (j) => {
+      if (this.frozen[j] === 1 || this.gaseous[j] === 1) return
+      const dx = x - this.posX[j]
+      const dy = y - this.posY[j]
+      const d2 = dx * dx + dy * dy
+      if (d2 >= rs2) return
+      const t = 1 - Math.sqrt(d2) / rSmooth
+      const w = t * t
+      sx += dx * w
+      sy += dy * w
+    })
+    const l = Math.hypot(sx, sy)
+    if (l < 1e-6) return { nx: 0, ny: 1 } // au cœur du corps : normale arbitraire
+    return { nx: sx / l, ny: sy / l }
+  }
+
   // Le faisceau chauffe l'eau qu'il traverse : chaque particule LIQUIDE dans
   // le couloir du segment s'évapore à laserEvapRate — perdue vers la réserve
   // de rosée (elle perlera aux plaques froides). La glace est un miroir, la
