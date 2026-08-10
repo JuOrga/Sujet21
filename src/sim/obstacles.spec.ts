@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { boxContact, Sponge, type ClosestPoint } from './obstacles'
 import { DEFAULT_PARAMS, type SimParams } from './params'
-import { FluidSim, KIND_PLAYER, type Bounds } from './solver'
+import { FluidSim, KIND_FREE, KIND_PLAYER, type Bounds } from './solver'
 import { MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_WALL, pointInBox } from '../game/level'
 
 const OPEN: Bounds = { minX: -3000, minY: -3000, maxX: 3000, maxY: 3000 }
@@ -175,5 +175,49 @@ describe('pointInBox', () => {
     const exit = { minX: 10, minY: 10, maxX: 20, maxY: 20 }
     expect(pointInBox(15, 15, exit)).toBe(true)
     expect(pointInBox(5, 15, exit)).toBe(false)
+  })
+})
+
+describe('Éponge gorgée — un mur pour le liquide seulement', () => {
+  // Une cellule saturée devient solide, mais une éponge détrempée est molle :
+  // la glace passe au travers, la vapeur entre ses fibres. Seule l'eau bute.
+  function murEponge(): FluidSim {
+    const sim = new FluidSim({ ...DEFAULT_PARAMS }, OPEN, 512)
+    sim.setLevel([], [{ minX: 0, minY: -300, cols: 2, rows: 20, cellSize: 30, capacityPerCell: 2 }])
+    // saturer toutes les cellules : le mur est « mouillé » sur toute sa hauteur
+    const sp = sim.sponges[0]
+    for (let c = 0; c < 2 * 20; c++) {
+      sp.absorb(c)
+      sp.absorb(c)
+    }
+    return sim
+  }
+
+  it('la glace traverse une éponge saturée', () => {
+    const sim = murEponge()
+    const i = sim.addParticle(-80, 0, KIND_FREE)
+    sim.frost[i] = 1
+    sim.frozen[i] = 1
+    sim.velX[i] = 300
+    for (let s = 0; s < 120; s++) sim.step(sim.params.dt)
+    expect(sim.posX[i]).toBeGreaterThan(70) // de l'autre côté du mur
+  })
+
+  it('la vapeur traverse une éponge saturée', () => {
+    const sim = murEponge()
+    const i = sim.addParticle(-80, 0, KIND_FREE)
+    sim.vapor[i] = 1
+    sim.gaseous[i] = 1
+    sim.velX[i] = 300
+    for (let s = 0; s < 120; s++) sim.step(sim.params.dt)
+    expect(sim.posX[i]).toBeGreaterThan(70)
+  })
+
+  it('le liquide, lui, bute toujours dessus', () => {
+    const sim = murEponge()
+    const i = sim.addParticle(-80, 0, KIND_FREE)
+    sim.velX[i] = 300
+    for (let s = 0; s < 120; s++) sim.step(sim.params.dt)
+    expect(sim.posX[i]).toBeLessThan(5) // arrêté devant les cellules pleines
   })
 })

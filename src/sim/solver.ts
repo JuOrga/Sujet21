@@ -1140,9 +1140,13 @@ export class FluidSim {
         }
       }
 
-      // Cellules d'éponge saturées : des murs. La particule peut chevaucher
+      // Cellules d'éponge saturées : des murs POUR LE LIQUIDE seulement.
+      // Une éponge gorgée est molle : la glace la traverse (le palet passe
+      // au travers du feutre détrempé) et la vapeur passe entre ses fibres —
+      // comme le promettait déjà la légende. La particule peut chevaucher
       // jusqu'à 4 cellules — on les résout toutes.
-      for (const sp of this.sponges) {
+      const bloquable = this.frozen[i] !== 1 && this.gaseous[i] !== 1
+      for (const sp of bloquable ? this.sponges : []) {
         const d = sp.def
         if (x < d.minX - rp || x >= sp.maxX + rp || y < d.minY - rp || y >= sp.maxY + rp) continue
         const cx0 = Math.max(0, Math.floor((x - rp - d.minX) / d.cellSize))

@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 00:05',
+    title: 'L’éponge gorgée ne bloque plus que le liquide',
+    notes: [
+      'Une cellule d’éponge saturée devient solide — mais elle bloquait TOUT, glace et vapeur comprises, alors que la légende promettait le contraire. Une éponge détrempée est molle : le palet de glace passe au travers du feutre, la vapeur passe entre les fibres. Seule l’eau bute toujours dessus.',
+      'La vapeur qui traverse paie toujours son péage sur les cellules encore sèches ; les cellules pleines ne peuvent plus rien boire.',
+    ],
+  },
+  {
     date: '10/08/2026 23:40',
     title: 'L’éditeur montre les zones d’effet : auras, aspiration, illustrations, décals',
     notes: [
