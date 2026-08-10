@@ -1528,7 +1528,8 @@ function frame(now: number): void {
   // prises de hauteurs différentes tirées au sort, plus un écart de ±7 % :
   // deux fois le même « bloop » à la même note et l'oreille entend une
   // machine. En vapeur, la visée est silencieuse — le souffle part au dash.
-  const vise = audible && input.aimActive && !input.gasIntent
+  // pas de « ploc » en glace : un palet n'éjecte rien, il n'a pas à goutter
+  const vise = audible && input.aimActive && !input.gasIntent && !input.freezeIntent
   if (vise) {
     sfx.dropTimer -= dtReal
     if (!sfx.aiming || sfx.dropTimer <= 0) {
