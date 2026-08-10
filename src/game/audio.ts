@@ -48,6 +48,17 @@ export class AudioFx {
   private gasG: GainNode | null = null
   private drainG: GainNode | null = null
   private drainF: BiquadFilterNode | null = null
+  // Ralenti de visée (dash vapeur) : un passe-bas sur TOUT le mixage — le
+  // monde sonore plonge « sous l'eau » —, un plongeon de hauteur à l'entrée,
+  // et deux voix hors filtre pour habiter le temps suspendu.
+  private slowLp: BiquadFilterNode | null = null
+  // Second maître, HORS passe-bas, pour les voix du temps suspendu : même
+  // coupure et même volume que le maître principal (applyMaster règle les
+  // deux), mais ses voix restent nettes quand le filtre étouffe le reste.
+  private postMaster: GainNode | null = null
+  private slowShimG: GainNode | null = null
+  private slowSubG: GainNode | null = null
+  private slowActive = false
 
   constructor(prefs: AudioPrefs) {
     this.enabled = prefs.on
@@ -67,9 +78,10 @@ export class AudioFx {
   }
 
   private applyMaster(): void {
-    if (this.ctx && this.master) {
-      this.master.gain.setTargetAtTime(this.enabled ? this.volume : 0, this.ctx.currentTime, 0.05)
-    }
+    if (!this.ctx) return
+    const cible = this.enabled ? this.volume : 0
+    this.master?.gain.setTargetAtTime(cible, this.ctx.currentTime, 0.05)
+    this.postMaster?.gain.setTargetAtTime(cible, this.ctx.currentTime, 0.05)
   }
 
   // À appeler depuis un geste utilisateur ; idempotent.
@@ -95,8 +107,20 @@ export class AudioFx {
 
     const master = ctx.createGain()
     master.gain.value = this.enabled ? this.volume : 0
-    master.connect(ctx.destination)
+    // Tout le mixage traverse ce passe-bas : grand ouvert en temps normal,
+    // il se referme pendant la visée du dash — musique et bruitages compris.
+    const slowLp = ctx.createBiquadFilter()
+    slowLp.type = 'lowpass'
+    slowLp.frequency.value = 19500
+    slowLp.Q.value = 0.4
+    master.connect(slowLp)
+    slowLp.connect(ctx.destination)
+    this.slowLp = slowLp
     this.master = master
+    const postMaster = ctx.createGain()
+    postMaster.gain.value = this.enabled ? this.volume : 0
+    postMaster.connect(ctx.destination)
+    this.postMaster = postMaster
 
     // Bruit blanc partagé par toutes les voix soufflées
     const len = ctx.sampleRate * 2
@@ -111,6 +135,47 @@ export class AudioFx {
     const drain = this.noiseLoop(220, 2.6)
     this.drainG = drain.gain
     this.drainF = drain.filter
+
+    // Voix du temps suspendu, branchées APRÈS le passe-bas (elles doivent
+    // rester nettes quand tout le reste s'étouffe) : un scintillement d'air
+    // très discret, et un battement grave qui pulse comme un cœur au ralenti.
+    {
+      const shim = ctx.createBufferSource()
+      shim.buffer = this.noise
+      shim.loop = true
+      const shimF = ctx.createBiquadFilter()
+      shimF.type = 'bandpass'
+      shimF.frequency.value = 3400
+      shimF.Q.value = 4
+      const shimG = ctx.createGain()
+      shimG.gain.value = 0
+      shim.connect(shimF)
+      shimF.connect(shimG)
+      shimG.connect(postMaster)
+      shim.start()
+      this.slowShimG = shimG
+
+      const sub = ctx.createOscillator()
+      sub.type = 'sine'
+      sub.frequency.value = 52
+      const subG = ctx.createGain()
+      subG.gain.value = 0
+      // le battement : un LFO lent module la voix grave (±60 % de son niveau)
+      const lfo = ctx.createOscillator()
+      lfo.type = 'sine'
+      lfo.frequency.value = 0.85
+      const depth = ctx.createGain()
+      depth.gain.value = 0
+      lfo.connect(depth)
+      depth.connect(subG.gain)
+      sub.connect(subG)
+      subG.connect(postMaster)
+      sub.start()
+      lfo.start()
+      this.slowSubG = subG
+      // la profondeur du LFO suit le gain de base : on la règle dans setSlowMo
+      ;(subG as GainNode & { __depth?: GainNode }).__depth = depth
+    }
 
     // Le son suit la visibilité de la page : en arrière-plan (autre app,
     // autre onglet, écran verrouillé), le contexte se suspend — sinon le
@@ -151,6 +216,33 @@ export class AudioFx {
   private ramp(g: GainNode | null, target: number): void {
     if (!this.ctx || !g) return
     g.gain.setTargetAtTime(target, this.ctx.currentTime, 0.09)
+  }
+
+  // Ralenti de visée : à l'entrée, la hauteur du monde tombe (plongeon) et
+  // le passe-bas se referme — tout s'étouffe, comme une oreille sous l'eau ;
+  // les voix du temps suspendu s'allument, seules à rester nettes. À la
+  // sortie, le filtre rouvre d'un coup sec et une remontée brève rend l'air.
+  setSlowMo(on: boolean): void {
+    if (!this.ctx || on === this.slowActive) return
+    this.slowActive = on
+    const t = this.ctx.currentTime
+    const depth = (this.slowSubG as (GainNode & { __depth?: GainNode }) | null)?.__depth ?? null
+    if (on) {
+      this.slowLp?.frequency.cancelScheduledValues(t)
+      this.slowLp?.frequency.setTargetAtTime(430, t, 0.08)
+      this.blip(320, 54, 0.6, 0.075, 'sine') // le plongeon : la hauteur tombe
+      this.noiseBurst(700, 0.8, 0.45, 0.05, 'lowpass')
+      this.ramp(this.slowShimG, 0.02)
+      this.ramp(this.slowSubG, 0.026)
+      if (depth && this.ctx) depth.gain.setTargetAtTime(0.016, t, 0.25)
+    } else {
+      this.slowLp?.frequency.cancelScheduledValues(t)
+      this.slowLp?.frequency.setTargetAtTime(19500, t, 0.04)
+      this.blip(85, 640, 0.22, 0.05, 'sine') // l'air revient d'un trait
+      this.ramp(this.slowShimG, 0)
+      this.ramp(this.slowSubG, 0)
+      if (depth && this.ctx) depth.gain.setTargetAtTime(0, t, 0.1)
+    }
   }
 
   // ---- Boucles pilotées chaque frame par le jeu (niveaux 0..1) ----
