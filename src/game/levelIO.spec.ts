@@ -138,3 +138,22 @@ it('le rayon d’action d’une zone est arrondi et irrégulier, inscrit dans so
   expect(min).toBeGreaterThan(0.6) // …mais jamais rachitique
   expect(max).toBeLessThanOrEqual(1.0) // et toujours inscrite dans le rectangle
 })
+
+it('conserve les décals au passage par l’éditeur (aller-retour JSON)', () => {
+  const src = {
+    ...TABLEAUX[0],
+    decals: [
+      { x: 500, y: 400, w: 320, h: 200, kind: 'tuyaux' as const },
+      { x: 700, y: -400, w: 180, h: 180, kind: 'vanne' as const, flip: true, fade: 0.7 },
+    ],
+  }
+  const { level, rejets } = parseLevel(JSON.parse(serializeLevel(src)))
+  expect(rejets).toEqual([])
+  expect(level!.decals).toHaveLength(2)
+  expect(level!.decals![0].kind).toBe('tuyaux')
+  expect(level!.decals![1]).toMatchObject({ kind: 'vanne', flip: true, fade: 0.7 })
+  // un décal cassé est écarté sans faire tomber le tableau
+  const { level: l2, rejets: r2 } = parseLevel({ ...src, decals: [{ x: 0, y: 0, w: 0, h: 10, kind: 'tuyaux' }] })
+  expect(l2!.decals).toBeUndefined()
+  expect(r2.length).toBe(1)
+})

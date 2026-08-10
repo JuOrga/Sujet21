@@ -23,6 +23,7 @@ import {
   type ZoneForce,
 } from '../game/level'
 import { checkLevel, parseLevel, serializeLevel } from '../game/levelIO'
+import { DEFAULT_PARAMS } from '../sim/params'
 import { PISTES, PISTE_NOMS, type Piste } from '../game/soundtrack'
 import {
   deleteLevel,
@@ -132,6 +133,22 @@ export class LevelEditor {
     | { mode: 'resize'; edge: string; start: Rect } = null
 
   private hint = ''
+
+  // Images du jeu (illustrations de zones, décals) : chargées à la demande,
+  // le dessin se rafraîchit quand elles arrivent — l'éditeur montre la même
+  // chose que la cuve.
+  private readonly imgs = new Map<string, HTMLImageElement>()
+
+  private img(name: string): HTMLImageElement | null {
+    let im = this.imgs.get(name)
+    if (!im) {
+      im = new Image()
+      im.src = `/assets/${name}.webp`
+      im.onload = () => this.draw()
+      this.imgs.set(name, im)
+    }
+    return im.complete && im.naturalWidth > 0 ? im : null
+  }
 
   // Bibliothèque partagée : la liste, et l'entrée actuellement ouverte
   private library: StoredLevel[] = []
@@ -1104,6 +1121,27 @@ export class LevelEditor {
       g.lineWidth = 1
       g.strokeRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
       g.setLineDash([])
+      // l'illustration de la cause, ajustée comme dans le jeu (contain,
+      // centrée, marge 6 %) — on voit dans l'éditeur ce que verra le joueur
+      const ta = z.force === 'eau' ? 1.5 : z.force === 'glace' ? 0.667 : z.force === 'vapeur' ? 1.0 : 0
+      if (ta > 0) {
+        const name =
+          z.force === 'eau' ? 'zone-buses' : z.force === 'glace' ? 'zone-hublot' : 'zone-conduite'
+        const im = this.img(name)
+        if (im) {
+          const zw = (z.maxX - z.minX) * 0.94
+          const zhh = (z.maxY - z.minY) * 0.94
+          const sc = Math.min(zw / ta, zhh)
+          const fw = ta * sc
+          const fh = sc
+          const cx = (z.minX + z.maxX) / 2
+          const cy = (z.minY + z.maxY) / 2
+          const ip = this.toScreen(cx - fw / 2, cy + fh / 2)
+          g.globalAlpha = 0.8
+          g.drawImage(im, ip.sx, ip.sy, fw * this.zoom, fh * this.zoom)
+          g.globalAlpha = 1
+        }
+      }
       // la lisière réelle
       const pts = zoneOutline(z, 64)
       g.beginPath()
@@ -1149,6 +1187,51 @@ export class LevelEditor {
       }
     }
 
+    // Zones d'effet des surfaces : la portée RÉELLE des auras, aux réglages
+    // par défaut du banc. Le contour iso-distance d'un rectangle est un
+    // rectangle arrondi de rayon = portée — c'est exactement ce qu'on trace.
+    // La plaque froide montre AUSSI sa portée à froid complet (pointillé
+    // long) : le refroidissement du vaisseau étend son emprise en cours de
+    // partie. Le radiateur, lui, rétrécit à froid (pointillé court).
+    const P = DEFAULT_PARAMS
+    for (const box of this.level.boxes) {
+      let band = 0
+      let colA = ''
+      if (box.material === MAT_FROID) {
+        band = P.coldBand
+        colA = '#8fc8ee'
+      } else if (box.material === MAT_CHAUD) {
+        band = P.heatBand
+        colA = '#ff8a3c'
+      } else if (box.material === MAT_HYDROPHILE) {
+        band = P.hydroBand
+        colA = '#2ec6c9'
+      } else if (box.material === MAT_HYDROPHOBE) {
+        band = P.hydroBand
+        colA = '#a878e8'
+      }
+      if (band <= 0) continue
+      const aura = (portee: number, alphaFill: string, alphaLine: string, dash: number[]): void => {
+        const p = this.toScreen(box.minX - portee, box.maxY + portee)
+        const q = this.toScreen(box.maxX + portee, box.minY - portee)
+        const r = Math.min(portee * this.zoom, (q.sx - p.sx) / 2, (q.sy - p.sy) / 2)
+        g.beginPath()
+        g.roundRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy, Math.max(0, r))
+        if (alphaFill) {
+          g.fillStyle = colA + alphaFill
+          g.fill()
+        }
+        g.strokeStyle = colA + alphaLine
+        g.setLineDash(dash)
+        g.lineWidth = 1
+        g.stroke()
+        g.setLineDash([])
+      }
+      aura(band, '10', '55', [5, 4])
+      if (box.material === MAT_FROID) aura(band * (1 + P.chillColdGrowth), '', '2e', [2, 7])
+      if (box.material === MAT_CHAUD) aura(band * (1 - P.chillHeatFade), '', '2e', [2, 7])
+    }
+
     // surfaces
     for (const box of this.level.boxes) {
       const p = this.toScreen(box.minX, box.maxY)
@@ -1174,6 +1257,41 @@ export class LevelEditor {
       g.fillStyle = '#35e0a4'
       g.font = '600 11px ui-monospace, monospace'
       g.fillText('SAS', p.sx + 5, p.sy + 14)
+      // le rayon d'aspiration : la vraie portée du courant qui hale l'eau
+      // (et la glace) vers la bouche — réglage par défaut du banc
+      const mx = (e.minX + e.maxX) / 2
+      const my = (e.minY + e.maxY) / 2
+      const m = this.toScreen(mx, my)
+      g.strokeStyle = 'rgba(53,224,164,0.35)'
+      g.setLineDash([6, 5])
+      g.lineWidth = 1
+      g.beginPath()
+      g.arc(m.sx, m.sy, DEFAULT_PARAMS.exitRadius * this.zoom, 0, Math.PI * 2)
+      g.stroke()
+      g.setLineDash([])
+      g.fillStyle = 'rgba(53,224,164,0.55)'
+      g.font = '600 9px ui-monospace, monospace'
+      g.fillText('ASPIRATION', m.sx - 28, m.sy - DEFAULT_PARAMS.exitRadius * this.zoom - 4)
+    }
+
+    // décals (tuyaux, vannes) : du décor pur, dessiné comme dans la cuve —
+    // un tableau chargé avec ses décals se relit fidèlement ici
+    for (const dcl of this.level.decals ?? []) {
+      const im = this.img(`decal-${dcl.kind}`)
+      if (!im) continue
+      const dp = this.toScreen(dcl.x - dcl.w / 2, dcl.y + dcl.h / 2)
+      const dw = dcl.w * this.zoom
+      const dh = dcl.h * this.zoom
+      g.save()
+      g.globalAlpha = dcl.fade ?? 0.55
+      if (dcl.flip) {
+        g.translate(dp.sx + dw, dp.sy)
+        g.scale(-1, 1)
+        g.drawImage(im, 0, 0, dw, dh)
+      } else {
+        g.drawImage(im, dp.sx, dp.sy, dw, dh)
+      }
+      g.restore()
     }
 
     // départ

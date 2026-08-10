@@ -187,6 +187,31 @@ export function parseLevel(input: unknown): { level: LevelDef | null; rejets: st
     par: o.par === undefined ? undefined : Math.max(1, Math.round(num(o.par, 3))),
     ambiance: str(o.ambiance) || undefined,
   }
+  // Décals (tuyaux, vannes) : du décor pur — relus pour que le passage par
+  // l'éditeur ne dépouille pas un tableau de sa machinerie peinte.
+  const decals: NonNullable<LevelDef['decals']> = []
+  for (const raw of Array.isArray(o.decals) ? o.decals : []) {
+    const d = (raw ?? {}) as Record<string, unknown>
+    const kind = d.kind === 'vanne' ? 'vanne' : d.kind === 'tuyaux' ? 'tuyaux' : null
+    const w = num(d.w, 0)
+    const h = num(d.h, 0)
+    if (!kind || w <= 0 || h <= 0) {
+      rejets.push('un décal a été écarté (sorte inconnue ou taille nulle)')
+      continue
+    }
+    decals.push({
+      x: num(d.x, 0),
+      y: num(d.y, 0),
+      w,
+      h,
+      kind,
+      flip: d.flip === true ? true : undefined,
+      fade: typeof d.fade === 'number' && Number.isFinite(d.fade)
+        ? Math.min(1, Math.max(0, d.fade))
+        : undefined,
+    })
+  }
+  if (decals.length > 0) level.decals = decals
   return { level, rejets }
 }
 
