@@ -260,7 +260,7 @@ export class Soundtrack {
 
   private async ouvrirSuspendu(): Promise<void> {
     if (this.suspendu) {
-      if (this.suspenduVoulu) this.suspendu.niveau(0.95, 0.35)
+      if (this.suspenduVoulu) this.suspendu.niveau(1.5, 0.35)
       return
     }
     const buf = await this.charge('temps-suspendu')
@@ -268,7 +268,7 @@ export class Soundtrack {
     if (this.suspendu) return
     this.suspendu = new Voix(this.ctx, this.post, buf)
     // le temps du chargement, la visée a pu se relâcher
-    this.suspendu.niveau(this.suspenduVoulu ? 0.95 : 0, 0.35)
+    this.suspendu.niveau(this.suspenduVoulu ? 1.5 : 0, 0.35)
   }
 
   // ---- Ponctuations et bruitages ----
