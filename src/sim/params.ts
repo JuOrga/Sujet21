@@ -53,22 +53,25 @@ export interface SimParams {
   heatThawTime: number // s de dégel forcé en pleine aura (bien plus vite qu'à l'air libre)
   heatLossRate: number // particules de vapeur perdues / s d'exposition dans l'aura
 
-  // Gaz (tableau 3) : se changer en vapeur (touche G) pour se déplacer en
-  // continu vers le pointeur — sans recul ni éjection, mais le nuage
-  // s'évapore en avançant, et le froid le condense.
+  // Gaz (refonte 2026, « air dash ») : se changer en vapeur (touche G), viser
+  // — le temps se fige — puis relâcher : le nuage FUSE vers le point visé.
+  // Une impulsion unique, sans recul ni éjection ; le prix est une fraction
+  // du volume COURANT, donc chaque dash propulse pareil (Tsiolkovsky) — on
+  // peut toujours finir le tableau, chaque dash coûte juste plus cher.
   vaporizeTime: number // s de changement d'état vers la vapeur (touche G)
   condenseTime: number // s de condensation quand l'intention est levée
-  gasThrust: number // accélération de pilotage du nuage vers le pointeur (u/s²)
-  gasMaxSpeed: number // vitesse de croisière maximale du nuage (u/s)
+  gasDashSpeed: number // vitesse du dash (u/s), uniforme sur tout le nuage
+  gasDashCost: number // fraction du volume courant évaporée par dash (≈ 1/3)
   gasExpand: number // répulsion interne du nuage (u/s²) : la vapeur s'étale
   gasTurb: number // turbulence : le nuage se tord en volutes (u/s²)
   gasDrag: number // flottement : freinage propre du gaz (1/s)
-  gasLossRate: number // particules évaporées / seconde de pilotage (perdues)
-  // La vapeur n'est pas un passe-partout : être gaz se paie en continu, et
-  // les mailles d'une grille essorent le nuage au passage (§4 : chaque
-  // bouffée part définitivement).
+  // La vapeur n'est pas un passe-partout : être gaz se paie en continu, les
+  // mailles d'une grille essorent le nuage au passage, et l'éponge prélève
+  // son péage sur la vapeur qui la traverse (§4 : chaque bouffée part
+  // définitivement — sauf la rosée, qui perle aux plaques froides).
   gasIdleLossRate: number // particules/s évaporées tant que le corps est en vapeur, même immobile
   grilleGasLoss: number // perte /s et par particule dans la maille d'une grille
+  spongeGasToll: number // péage d'éponge sur la vapeur : perte /s et par particule dans l'éponge
   // Recondensation (§7.3) : la vapeur perdue se recondense sur les parois
   // froides — la rosée perle juste au-delà de l'aura, réabsorbable au prix
   // d'un détour. Plus le vaisseau refroidit, plus la condensation rend.
@@ -100,6 +103,7 @@ export interface SimParams {
   exitRadius: number // portée de l'aspiration autour de la bouche (unités monde)
   exitPull: number // vitesse du courant d'aspiration (u/s), renforcée à l'approche du trou
   exitSwirl: number // part giratoire du courant : l'eau spirale en entonnoir
+  exitIceGrip: number // prise du courant sur la GLACE (0..1) : un bloc a de l'inertie
 
   // Matériaux (§6)
   hydroBand: number // portée des effets de surface (unités monde)
@@ -199,14 +203,14 @@ export const DEFAULT_PARAMS: SimParams = {
 
   vaporizeTime: 0.5,
   condenseTime: 0.9,
-  gasThrust: 320,
-  gasMaxSpeed: 220,
+  gasDashSpeed: 620,
+  gasDashCost: 1 / 3,
   gasExpand: 260,
   gasTurb: 120,
   gasDrag: 1.3,
-  gasLossRate: 5,
   gasIdleLossRate: 2,
   grilleGasLoss: 0.35,
+  spongeGasToll: 1.1,
   // Perte de 50 % à vaisseau tiède, 25 % à vaisseau glacial : le rattrapage
   // devient plus généreux quand le jeu devient plus dur — auto-équilibré (§7.3)
   recondRate: 4,
@@ -229,6 +233,7 @@ export const DEFAULT_PARAMS: SimParams = {
   exitRadius: 240,
   exitPull: 300,
   exitSwirl: 1.1,
+  exitIceGrip: 0.5,
 
   // Portée sentie : à 16 u la chimie ne mordait qu'au ras du mur — invisible
   // pour un corps de ~110 u de rayon. À 80 u (l'échelle des auras

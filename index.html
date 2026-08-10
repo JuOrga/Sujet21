@@ -686,6 +686,51 @@
         background: #8fc8ee;
         color: var(--void);
       }
+      /* Visée du dash vapeur : le temps est figé, la ligne montre la
+         trajectoire depuis le corps jusqu'au pointeur, le coût est annoncé */
+      #dash-aim {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 0;
+        border-top: 2px dashed rgba(201, 166, 242, 0.85);
+        transform-origin: 0 0;
+        z-index: 12;
+        pointer-events: none;
+        display: none;
+        filter: drop-shadow(0 0 6px rgba(201, 166, 242, 0.5));
+      }
+      #dash-aim::after {
+        content: '';
+        position: absolute;
+        right: -12px;
+        top: -7px;
+        border: 6px solid transparent;
+        border-left: 11px solid rgba(201, 166, 242, 0.85);
+      }
+      #dash-aim.visible {
+        display: block;
+      }
+      #dash-cost {
+        position: fixed;
+        top: 0;
+        left: 0;
+        font-family: var(--font-display);
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        color: #c9a6f2;
+        background: rgba(20, 12, 30, 0.82);
+        border: 1px solid rgba(201, 166, 242, 0.5);
+        padding: 5px 9px;
+        border-radius: 4px;
+        z-index: 12;
+        pointer-events: none;
+        display: none;
+        white-space: nowrap;
+      }
+      #dash-cost.visible {
+        display: block;
+      }
       /* La flèche d'objectif : quand le sas est hors champ, elle le pointe
          depuis le bord de l'écran, avec la distance restante */
       #obj-arrow {
@@ -1738,7 +1783,7 @@
       <div class="home-commands cmd-desktop">
         <kbd>maintenir</kbd>éjecter vers le pointeur — le corps part à l'opposé<br />
         <kbd>F</kbd>glace : le bloc garde son élan
-        <kbd>G</kbd>vapeur : pilotée au pointeur<br />
+        <kbd>G</kbd>vapeur : viser (temps figé), relâcher = dash<br />
         <kbd>molette</kbd>zoom
         <kbd>clic droit maintenu</kbd>déplacer la caméra
         <kbd>⌖</kbd>recadrer<br />
@@ -1753,7 +1798,7 @@
       <div class="home-commands cmd-touch">
         <kbd>toucher</kbd>éjecter vers le doigt — le corps part à l'opposé<br />
         <kbd>❄</kbd>glace, re-toucher pour dégeler
-        <kbd>💨</kbd>vapeur pilotée au doigt<br />
+        <kbd>💨</kbd>vapeur : viser puis relâcher = dash<br />
         <kbd>2 doigts</kbd>pincer : zoom · glisser : déplacer la caméra (⌖ recadre)<br />
         <kbd>LÉGENDE</kbd>les surfaces
         <kbd>ÉTATS</kbd>qui bloque quoi
@@ -1796,7 +1841,7 @@
       <button id="state-glace" type="button" title="se changer en glace (F) : le bloc garde son élan">
         <span class="st-ico">❄</span><span class="st-label">GLACE</span><kbd>F</kbd>
       </button>
-      <button id="state-vapeur" type="button" title="se changer en vapeur (G) : le pointeur pilote le nuage">
+      <button id="state-vapeur" type="button" title="se changer en vapeur (G) : visez — le temps se fige — relâchez, le nuage fuse">
         <span class="st-ico">💨</span><span class="st-label">VAPEUR</span><kbd>G</kbd>
       </button>
     </div>
@@ -1937,7 +1982,7 @@
       <div class="lg-states">ÉTATS —
         <b>💧 EAU</b> : pilotable, éjecter pour avancer ·
         <b>❄ GLACE</b> (F) : le bloc garde son élan, re-presser dégèle ·
-        <b>💨 VAPEUR</b> (G) : pilotée au pointeur, s'évapore en avançant.</div>
+        <b>💨 VAPEUR</b> (G) : viser fige le temps, relâcher = dash (⅓ du volume).</div>
     </div>
 
     <div id="states" role="dialog" aria-label="Les trois états : qui bloque quoi">
@@ -1958,10 +2003,12 @@
         l'<i class="m-eponge">éponge</i> et la chimie des parois n'ont plus prise ·
         <i class="m-froid">soudée</i> au contact d'une plaque froide ·
         dégelée par les <i class="m-chaud">radiateurs</i> ·
-        le <i class="m-sas">sas</i> ne l'avale pas — dégeler avant de sortir.</span></div>
+        le <i class="m-sas">sas</i> la hale et l'avale — entrer solide paie une prime.</span></div>
       <div class="lg-row"><span class="st-big">💨</span>
-        <span><b>VAPEUR</b> (G) — pilotée au pointeur ; l'état lui-même
-        s'évapore en continu : un compte à rebours, pas un mode de croisière.<br />
+        <span><b>VAPEUR</b> (G) — viser fige le temps, relâcher lance le nuage
+        d'un trait (dash) : chaque dash évapore un tiers du volume courant,
+        et l'état lui-même s'évapore en continu — un compte à rebours, pas un
+        mode de croisière.<br />
         Traverse les <i class="m-grille">grilles</i> (qui l'essorent : péage en
         volume) et l'<i class="m-eponge">éponge</i> ·
         bloquée par les <i class="m-mur">parois</i> ·
@@ -1978,6 +2025,8 @@
       <div id="overlay-sub">—</div>
       <button id="overlay-btn" type="button">RECOMMENCER L'ESSAI</button>
     </div>
+    <div id="dash-aim"></div>
+    <div id="dash-cost"></div>
     <button id="relance" type="button">RECOMMENCER LE TABLEAU</button>
     <div id="touchbar"></div>
     <script type="module" src="/src/main.ts"></script>
