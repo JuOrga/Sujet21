@@ -487,7 +487,15 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   )
   describe(
     fGas.addBinding(params, 'gasDashSpeed', { min: 200, max: 1400, step: 20, label: 'vitesse de dash (u/s)' }),
-    'Vitesse à laquelle le nuage FUSE au relâchement : viser fige le temps, relâcher lance tout le nuage à cette vitesse — une impulsion, pas un pilotage.',
+    'Vitesse du dash À PLEINE PUISSANCE : viser ralentit le temps, relâcher lance tout le nuage — une impulsion, pas un pilotage. La distance du doigt règle la puissance.',
+  )
+  describe(
+    fGas.addBinding(params, 'gasDashRange', { min: 60, max: 900, step: 10, label: 'portée de pleine puissance (u)' }),
+    'Distance du pointeur au corps où le dash atteint sa pleine puissance. En deçà, la poussée décroît proportionnellement — viser près donne un petit bond précis, pas besoin de viser à deux kilomètres pour le maximum.',
+  )
+  describe(
+    fGas.addBinding(params, 'gasAimSlow', { min: 0.01, max: 0.5, step: 0.01, label: 'ralenti de visée' }),
+    'Facteur de temps pendant la visée du dash : 0,06 = seize fois plus lent. Le monde continue d’avancer — rien n’est figé, on vise dans un monde au ralenti.',
   )
   describe(
     fGas.addBinding(params, 'gasDashCost', { min: 0.1, max: 0.6, step: 0.01, label: 'coût du dash (fraction)' }),

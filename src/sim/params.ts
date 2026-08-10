@@ -54,13 +54,18 @@ export interface SimParams {
   heatLossRate: number // particules de vapeur perdues / s d'exposition dans l'aura
 
   // Gaz (refonte 2026, « air dash ») : se changer en vapeur (touche G), viser
-  // — le temps se fige — puis relâcher : le nuage FUSE vers le point visé.
-  // Une impulsion unique, sans recul ni éjection ; le prix est une fraction
-  // du volume COURANT, donc chaque dash propulse pareil (Tsiolkovsky) — on
-  // peut toujours finir le tableau, chaque dash coûte juste plus cher.
+  // — le temps ralentit fortement, sans se figer — puis relâcher : le nuage
+  // FUSE vers le point visé. Une impulsion unique, sans recul ni éjection ;
+  // le prix est une fraction du volume COURANT, donc chaque dash propulse
+  // pareil (Tsiolkovsky) — on peut toujours finir le tableau, chaque dash
+  // coûte juste plus cher. La DISTANCE du doigt règle la puissance : pleine
+  // à gasDashRange, dégressive en deçà — pas besoin de viser à deux
+  // kilomètres pour avoir le maximum.
   vaporizeTime: number // s de changement d'état vers la vapeur (touche G)
   condenseTime: number // s de condensation quand l'intention est levée
-  gasDashSpeed: number // vitesse du dash (u/s), uniforme sur tout le nuage
+  gasDashSpeed: number // vitesse du dash À PLEINE PUISSANCE (u/s)
+  gasDashRange: number // distance (u) du pointeur au corps où la puissance atteint 1
+  gasAimSlow: number // facteur de temps pendant la visée (0,06 = 16× plus lent)
   gasDashCost: number // fraction du volume courant évaporée par dash (≈ 1/3)
   gasExpand: number // répulsion interne du nuage (u/s²) : la vapeur s'étale
   gasTurb: number // turbulence : le nuage se tord en volutes (u/s²)
@@ -204,6 +209,8 @@ export const DEFAULT_PARAMS: SimParams = {
   vaporizeTime: 0.5,
   condenseTime: 0.9,
   gasDashSpeed: 620,
+  gasDashRange: 300,
+  gasAimSlow: 0.06,
   gasDashCost: 1 / 3,
   gasExpand: 260,
   gasTurb: 120,

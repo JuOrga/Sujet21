@@ -761,7 +761,7 @@ let tutorShown = ''
 const TUTOR_TEXTS = [
   'Maintenez le doigt (ou le pointeur) : la matière est éjectée <em>vers</em> lui — le corps part à l’opposé. Il n’y a pas de frein.',
   'Chaque goutte éjectée est perdue. La jauge en haut est votre corps : sous le trait rouge, il ne reste qu’une impulsion. <strong>Se déplacer, c’est rétrécir.</strong>',
-  '<kbd>❄ / F</kbd> se changer en glace : l’élan se garde, re-presser dégèle. <kbd>💨 / G</kbd> vapeur : visez (le temps se fige), relâchez — le nuage fuse. Un tiers du volume par dash. Essayez l’un des deux.',
+  '<kbd>❄ / F</kbd> se changer en glace : l’élan se garde, re-presser dégèle. <kbd>💨 / G</kbd> vapeur : visez (le temps ralentit), relâchez — le nuage fuse, plus loin le doigt, plus fort le dash. Un tiers du volume à chaque fois. Essayez l’un des deux.',
   'L’éponge boit ce qui s’attarde à son contact. Passez vite, payez le passage en volume — ou cherchez la vapeur.',
   'Le sas aspire l’échantillon : laissez-vous boire. Le surplus part en bonbonne — la récompense, c’est ce qu’il vous reste.',
 ]
@@ -931,9 +931,10 @@ function frame(now: number): void {
   sim.chill = chillNow() // le vaisseau refroidit : la physique suit
   if (input.aimActive) camera.cancelIntro() // le joueur agit : la caméra suit
 
-  // ---- Dash de vapeur (« air dash ») : viser fige le TEMPS ENTIER (physique,
-  // refroidissement, chrono), relâcher lance tout le nuage vers le point visé.
-  // Une impulsion unique — pas de recul, pas d'éjection, pas de pilotage.
+  // ---- Dash de vapeur (« air dash ») : viser RALENTIT fortement le temps
+  // (physique, refroidissement, chrono — tout suit, rien ne se fige),
+  // relâcher lance le nuage vers le point visé. Une impulsion unique — pas
+  // de recul, pas d'éjection ; la DISTANCE du doigt règle la puissance.
   const vif = !input.paused && !tableauDone && !sim.dispersed && !endgame.spent
   const dashAiming = vif && input.gasIntent && input.aimActive
   if (dash.aiming && !dashAiming) {
@@ -946,7 +947,7 @@ function frame(now: number): void {
   }
   dash.aiming = dashAiming
 
-  if (!input.paused && !tableauDone && !dashAiming) {
+  if (!input.paused && !tableauDone) {
     // Budget CPU des pas physiques : ~60 % du temps d'image, borné à 5-12 ms.
     // Sans cette borne, une image en retard impose plus de pas, coûte plus
     // cher, prend plus de retard — et la machine s'installe à 15-20 fps.
@@ -954,7 +955,7 @@ function frame(now: number): void {
     const physT0 = performance.now()
     loop.advance(
       dtReal,
-      params.timeWarp,
+      dashAiming ? params.timeWarp * params.gasAimSlow : params.timeWarp,
       params.dt,
       () => {
         if (input.aimActive && !input.gasIntent && !sim.dispersed && !endgame.spent) {
@@ -1279,7 +1280,11 @@ function frame(now: number): void {
     dashAimEl.style.transform = `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) rotate(${((ang * 180) / Math.PI).toFixed(2)}deg)`
     dashAimEl.style.width = `${Math.max(0, len - 14).toFixed(1)}px`
     dashCostEl.style.transform = `translate(${(ex + 18).toFixed(1)}px, ${(ey - 30).toFixed(1)}px)`
-    dashCostEl.textContent = `DASH −${(sim.liters() * params.gasDashCost).toFixed(2)} L`
+    // La puissance suit la distance du doigt AU CORPS (en unités monde) :
+    // l'étiquette annonce les deux termes du marché — la poussée et le prix.
+    const dMonde = Math.hypot(aim.x - sim.stats.centroidX, aim.y - sim.stats.centroidY)
+    const puissance = Math.min(1, dMonde / Math.max(1, params.gasDashRange))
+    dashCostEl.textContent = `DASH ${Math.round(puissance * 100)} % · −${(sim.liters() * params.gasDashCost).toFixed(2)} L`
   }
   dashAimEl.classList.toggle('visible', dash.aiming)
   dashCostEl.classList.toggle('visible', dash.aiming)
