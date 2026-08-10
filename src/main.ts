@@ -38,7 +38,7 @@ const EXIT_LINGER = 2.6 // secondes d'affichage du bilan avant le tableau suivan
 const params: SimParams = { ...DEFAULT_PARAMS }
 
 // L'expédition (§7) : les tableaux en séquence, UNE fois. Le surplus de
-// chaque sas part en bonbonne ; la dispersion ou le dernier sas concluent.
+// chaque sas part en bonbonne ; seul le dernier sas conclut l'expédition.
 // Pendant ce temps, le vaisseau refroidit (§5) : pas de chronomètre affiché,
 // le monde devient moins jouable — c'est la pression temporelle.
 const run = {
@@ -58,12 +58,29 @@ const audio = new AudioFx(loadAudioPrefs())
 // Bande-son : mêmes réglages, même bus — elle ne s'éveille qu'au premier geste
 // et ne télécharge rien tant que le son est coupé.
 const bande = new Soundtrack(audio)
+let audioEveille = false
 function eveilAudio(): void {
   audio.resume()
-  if (audio.enabled) bande.eveiller()
+  if (audio.enabled) {
+    bande.eveiller()
+    audioEveille = true
+  }
+  majInviteSon()
 }
 window.addEventListener('pointerdown', eveilAudio)
 window.addEventListener('keydown', eveilAudio)
+// Le navigateur n'autorise le son qu'après un geste : sans invitation, le
+// premier geste de la partie est le clic sur COMMENCER, et le thème d'accueil
+// n'aurait jamais l'occasion de se faire entendre. La fiche le propose donc.
+const btnSonAccueil = document.getElementById('home-son') as HTMLButtonElement | null
+function majInviteSon(): void {
+  if (btnSonAccueil) btnSonAccueil.hidden = audioEveille || !audio.enabled
+}
+btnSonAccueil?.addEventListener('click', () => {
+  if (!audio.enabled) audio.setEnabled(true)
+  eveilAudio()
+})
+majInviteSon()
 // Mémoire pour les transitions sonores (fronts d'état)
 const sfx = {
   allFrozen: false,
@@ -74,6 +91,7 @@ const sfx = {
   aiming: false,
   gasAim: false,
   lastCall: false,
+  spent: false,
 }
 
 // Registres du labo (§10) : records par tableau et historique des essais.
@@ -489,13 +507,14 @@ const waves: { x: number; y: number; t: number }[] = []
 const waveScratch = new Float32Array(MAX_WAVES * 4)
 let waveCarry = WAVE_EVERY // première salve : onde immédiate
 
-// Fin de course (refonte 2026) : il n'y a plus de minimum à ramener. Sous le
-// seuil, le corps a droit à UNE dernière impulsion ; elle relâchée, il se fige
-// en glace avec l'élan qu'il lui reste, et l'essai s'achève là où il s'arrête.
+// Fin de course (refonte 2026) : il n'y a plus de minimum à ramener, ni de
+// mort. Sous le seuil, le corps a droit à UNE dernière impulsion ; elle
+// relâchée, il se fige en glace avec l'élan qu'il lui reste et dérive — rien
+// ne le freine. Un rebond peut encore le mener au sas ; sinon le joueur
+// relance quand il le décide, avec un bouton qui ne masque pas la dérive.
 const endgame = {
   lastCall: false, // la prochaine impulsion est la dernière
-  spent: false, // elle a été donnée : le corps se fige
-  stillTimer: 0, // temps passé quasi immobile depuis le gel
+  spent: false, // elle a été donnée : le corps se fige et dérive
   wasAiming: false, // front de relâchement du pointeur
 }
 
@@ -505,7 +524,6 @@ function restart(): void {
   run.ended = false
   endgame.lastCall = false
   endgame.spent = false
-  endgame.stillTimer = 0
   endgame.wasAiming = false
   vortex.timer = 0
   lossPrevLiters = -1
@@ -578,7 +596,11 @@ const pane = createBench(params, monitor, {
     set actif(v: boolean) {
       audio.resume()
       audio.setEnabled(v)
-      if (v) bande.eveiller()
+      if (v) {
+        bande.eveiller()
+        audioEveille = true
+      }
+      majInviteSon()
     },
     get volume() {
       return audio.volume
@@ -692,7 +714,11 @@ const btnSound = touchButton(
   () => {
     audio.resume()
     audio.setEnabled(!audio.enabled)
-    if (audio.enabled) bande.eveiller()
+    if (audio.enabled) {
+      bande.eveiller()
+      audioEveille = true
+    }
+    majInviteSon()
     pane.refresh()
   },
   'tb-snd', // masqué au doigt : la bascule du son reste au banc (dossier Son)
@@ -705,6 +731,12 @@ input.onTimeWarpChange = (warp) => {
 }
 
 const overlayBtn = document.getElementById('overlay-btn') as HTMLButtonElement
+// Relance discrète : elle n'apparaît qu'une fois la dernière impulsion donnée,
+// et ne recouvre rien — on peut la laisser là et regarder la dérive finir.
+const btnRelance = document.getElementById('relance') as HTMLButtonElement
+// Le tableau seul reprend : la réserve déjà en bonbonne et le refroidissement
+// du vaisseau, eux, ne se rembobinent pas — sinon la pression n'existerait plus.
+btnRelance.addEventListener('click', () => restart())
 // ---- Tutoriel diégétique (tableau 1, première partie seulement) ----
 // Les consignes du protocole apparaissent au bon moment, se valident par le
 // geste qu'elles enseignent, et ne reviennent plus (localStorage). Les deux
@@ -724,7 +756,7 @@ let tutorShown = ''
 
 const TUTOR_TEXTS = [
   'Maintenez le doigt (ou le pointeur) : la matière est éjectée <em>vers</em> lui — le corps part à l’opposé. Il n’y a pas de frein.',
-  'Chaque goutte éjectée est perdue. La jauge en haut est votre corps : sous le trait rouge, dispersion. <strong>Se déplacer, c’est rétrécir.</strong>',
+  'Chaque goutte éjectée est perdue. La jauge en haut est votre corps : sous le trait rouge, il ne reste qu’une impulsion. <strong>Se déplacer, c’est rétrécir.</strong>',
   '<kbd>❄ / F</kbd> se changer en glace : l’élan se garde, re-presser dégèle. <kbd>💨 / G</kbd> vapeur : pilotée au pointeur. Essayez l’un des deux.',
   'L’éponge boit ce qui s’attarde à son contact. Passez vite, payez le passage en volume — ou cherchez la vapeur.',
   'Le sas aspire l’échantillon : laissez-vous boire. Le surplus part en bonbonne — la récompense, c’est ce qu’il vous reste.',
@@ -838,7 +870,6 @@ function expeditionSummary(tableauxDone: number): string {
 let lastTime = performance.now()
 let elapsed = 0
 let fpsSmoothed = 60
-let dispersedEssaiNo = 1 // n° affiché sur le tampon DISPERSION
 // Débit de perte lissé (litres par seconde simulée) : ce que l'action en
 // cours coûte au corps — éjection, coût d'état vapeur, éponge, radiateur.
 let lossPrevLiters = -1
@@ -917,16 +948,9 @@ function frame(now: number): void {
           vortex.timer -= params.dt
         }
         sim.applyExitSuction(exitMouth.x, exitMouth.y, params.dt)
-        // Dernière impulsion donnée : le corps figé perd doucement son élan.
-        // Sans cela il glisserait indéfiniment dans le vide et la fin de
-        // course ne se conclurait jamais.
-        if (endgame.spent && params.spentDrag > 0) {
-          const k = Math.exp(-params.spentDrag * params.dt)
-          for (let i = 0; i < sim.count; i++) {
-            sim.velX[i] *= k
-            sim.velY[i] *= k
-          }
-        }
+        // Rien ne freine le corps figé : dans le vide, une dérive reste une
+        // trajectoire. Elle peut encore rencontrer une paroi, rebondir, et
+        // finir dans le sas — c'est au joueur de décider quand y renoncer.
         sim.step(params.dt)
         run.tableauTime += params.dt // temps simulé : le time warp ne fausse pas les records
         run.runTime += params.dt // le vaisseau refroidit au fil de l'expédition
@@ -1144,7 +1168,6 @@ function frame(now: number): void {
       ? `rosée récupérable aux plaques froides : ${roseeL.toFixed(2)} L`
       : ''
 
-  // Compte à rebours de dispersion : sous le seuil, le délai de grâce s'égrène
   // ---- Fin de course : dernière impulsion, gel, arrêt ----
   // Aucun minimum à ramener : on peut finir un tableau sur un souffle. Sous le
   // seuil, la prochaine impulsion est la dernière ; une fois donnée, le corps
@@ -1164,18 +1187,28 @@ function frame(now: number): void {
     }
   }
   if (endgame.spent && alive) {
+    // Le corps reste figé et dérive. Aucun arrêt ne conclut : le vide ne
+    // freine rien, et une paroi peut encore renvoyer le palet vers le sas.
+    // C'est le joueur qui décide d'en rester là — le bouton de relance
+    // apparaît, sans rien masquer de la trajectoire.
     input.freezeIntent = true
     input.gasIntent = false
-    if (speed < params.stillSpeed) endgame.stillTimer += dtReal
-    else endgame.stillTimer = 0
-    if (endgame.stillTimer >= params.stillTime) sim.dispersed = true // fin de course
   }
+
+  // La relance s'offre dès la dernière impulsion donnée, et ne coupe rien.
+  btnRelance.classList.toggle(
+    'visible',
+    (endgame.spent || sim.dispersed) &&
+      document.body.classList.contains('playing') &&
+      !tableauDone &&
+      !run.ended,
+  )
 
   const nearLast = alive && !endgame.spent && fraction <= params.lastCallFraction
   const inDanger = alive && (endgame.spent || endgame.lastCall || nearLast)
   if (inDanger) {
     hudDanger.textContent = endgame.spent
-      ? '❄ DERNIÈRE IMPULSION DONNÉE — FIN DE COURSE À L’ARRÊT'
+      ? '❄ DERNIÈRE IMPULSION DONNÉE — L’ÉCHANTILLON DÉRIVE'
       : endgame.lastCall
         ? '⚠ RÉSERVE À SEC — LA PROCHAINE IMPULSION EST LA DERNIÈRE'
         : '⚠ RÉSERVE BASSE — LA DERNIÈRE IMPULSION APPROCHE'
@@ -1246,6 +1279,8 @@ function frame(now: number): void {
   }
   if (endgame.lastCall && !sfx.lastCall) bande.ponctuation('sting-derniere-impulsion', 0.8)
   sfx.lastCall = endgame.lastCall
+  if (endgame.spent && !sfx.spent) bande.ponctuation('fin-de-course', 0.85)
+  sfx.spent = endgame.spent
   const drainOn = params.exitRadius > 0 && params.exitPull > 0
   const mouthDist = Math.hypot(sim.stats.centroidX - exitMouth.x, sim.stats.centroidY - exitMouth.y)
   audio.setDrainLevel(
@@ -1271,10 +1306,8 @@ function frame(now: number): void {
   sfx.allGas = allGas
   if (sim.dispersed && !sfx.dispersed) {
     audio.disperse()
-    bande.ponctuation('fin-de-course', 0.85)
     if (!testLevel) {
       // fin de l'échantillon ET de l'expédition : les registres consignent tout
-      dispersedEssaiNo = records.essaiNumber()
       records.noteDispersion(level.code, run.tableauTime)
       records.noteExpedition(levelIndex, run.bonbonneLiters, run.runTime)
       if (levelIndex > 0 || run.bonbonneLiters >= 0.01) {
@@ -1323,32 +1356,12 @@ function frame(now: number): void {
     homeState.textContent = sim.dispersed ? 'dispersé' : 'en dérive'
   }
 
-  // Recalculé (pas tableauDone) : si la victoire vient d'être déclenchée dans
-  // cette frame, le tampon SAS ATTEINT doit rester — sinon il serait effacé
-  // dans la même frame et le bilan de sortie ne s'afficherait jamais.
-  if (sim.dispersed && run.exitTimer <= 0) {
-    if (testLevel) {
-      showOverlay(
-        'DISPERSION',
-        fromEditor
-          ? 'L’échantillon n’a pas tenu. « ↩ Éditeur » pour corriger le tableau, ou rejouer l’essai.'
-          : 'Le prototype a eu raison de l’échantillon — on le remet en cuve, l’essai du bis reprend.',
-        'danger',
-        fromEditor ? 'REJOUER L’ESSAI' : 'REJOUER LE 21-A BIS',
-      )
-    } else {
-      showOverlay(
-        endgame.spent ? 'FIN DE COURSE' : 'DISPERSION',
-        endgame.spent
-          ? `Plus rien à éjecter : l’échantillon nº ${dispersedEssaiNo} s’est figé et s’est arrêté — expédition : ${expeditionSummary(levelIndex)}. Le suivant est prêt.`
-          : `La cohésion ne tient plus. Perte de l’échantillon nº ${dispersedEssaiNo} — expédition : ${expeditionSummary(levelIndex)}. Le suivant est prêt.`,
-        'danger',
-        'ÉCHANTILLON SUIVANT',
-      )
-    }
-  } else if (run.exitTimer <= 0 && !run.ended) {
-    overlay.classList.remove('visible')
-  }
+  // Plus d'écran de fin : ni dispersion, ni fin de course. Ce qui reste de
+  // l'échantillon dérive à l'écran, et le bouton de relance attend en bas
+  // sans rien recouvrir. Seuls la victoire et le bilan d'expédition ouvrent
+  // encore un tampon. (Recalculé, pas tableauDone : si la victoire tombe dans
+  // cette image, le tampon SAS ATTEINT ne doit pas être effacé aussitôt.)
+  if (run.exitTimer <= 0 && !run.ended) overlay.classList.remove('visible')
 
   requestAnimationFrame(frame)
 }
