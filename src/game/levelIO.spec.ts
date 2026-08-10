@@ -174,3 +174,22 @@ it('conserve les mécanismes laser (émetteurs, cibles, portes) à l’aller-ret
   const verdicts = checkLevel({ ...level!, portes: [{ ...src.portes[0], cible: 4 }] })
   expect(verdicts.some((v) => v.niveau === 'erreur' && v.message.includes('cible nº 5'))).toBe(true)
 })
+
+it('conserve les rails magnétiques et écarte les moignons', () => {
+  const src = {
+    ...TABLEAUX[0],
+    lasers: [{ x: -600, y: 0, angle: 0 }],
+    cibles: [{ x: 700, y: -300, r: 30 }],
+    rails: [{ points: [{ x: 0, y: 0 }, { x: 200, y: 0 }, { x: 200, y: 300 }] }],
+  }
+  const { level, rejets } = parseLevel(JSON.parse(serializeLevel(src)))
+  expect(rejets).toEqual([])
+  expect(level!.rails).toEqual(src.rails)
+  // un rail d'un seul point est écarté sans faire tomber le tableau
+  const { level: l2, rejets: r2 } = parseLevel({ ...src, rails: [{ points: [{ x: 0, y: 0 }] }] })
+  expect(l2!.rails).toBeUndefined()
+  expect(r2.length).toBe(1)
+  // un rail sans émetteur laser mérite un avertissement
+  const verdicts = checkLevel({ ...level!, lasers: [] })
+  expect(verdicts.some((v) => v.niveau === 'avertissement' && v.message.includes('rail'))).toBe(true)
+})

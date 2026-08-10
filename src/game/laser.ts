@@ -16,7 +16,14 @@
 //     le faisceau reste prisonnier de l'eau et ricoche sous sa surface.
 //     Traverser est GRATUIT : la lumière plie le corps, elle ne le boit
 //     pas — servir de prisme ne coûte rien ;
-//   · la vapeur n'arrête toujours pas le faisceau (le plasma, palier 3).
+//   · la VAPEUR IONISE (palier 3) : le faisceau qui traverse le nuage
+//     devient un arc de PLASMA — et le plasma, extrêmement soumis aux
+//     champs magnétiques, est CAPTURÉ par les rails posés dans le décor :
+//     s'il passe près d'une extrémité de rail en étant ionisé, l'arc suit
+//     la ligne de champ jusqu'à l'autre bout (virages, serpentins), puis
+//     repart tout droit. Le faisceau ordinaire ignore les rails. Le plasma
+//     se PROVOQUE — être vapeur dans la lumière au bon endroit — il ne se
+//     choisit pas : ce n'est pas un quatrième état.
 
 import { MAT_EXIT, MAT_GRILLE, type LaserDef, type ObstacleBox } from './level'
 import type { Bounds } from '../sim/solver'
@@ -29,6 +36,10 @@ export const LASER_MAX_LENGTH = 9000 // u de course totale : personne ne verra p
 // gouttes sur le trajet en crée facilement une dizaine.
 export const LASER_MAX_REFRACT = 32
 export const LASER_INDICE_EAU = 1.33
+// Rayon de capture par défaut autour des extrémités de rail, et plafond de
+// rails suivis par un même faisceau (contre les allers-retours infinis).
+export const LASER_RAIL_RADIUS = 30
+export const LASER_MAX_RAILS = 6
 
 export interface CiblePoint {
   x: number
@@ -62,13 +73,22 @@ export interface TraceMonde {
   /** Indice de réfraction de l'eau (défaut LASER_INDICE_EAU ≈ 1,33).
    * À 1 : l'eau redevient optiquement transparente, comme au palier 1. */
   indice?: number
+  /** La vapeur ionisante (palier 3), ou null (éditeur : pas de nuage, le
+   * faisceau ne s'ionise jamais et les rails restent muets). Appelée à
+   * chaque pas — elle doit rester bon marché. */
+  vapeur: ((x: number, y: number) => boolean) | null
+  /** Les rails magnétiques du tableau (polylignes, ≥ 2 points chacune). */
+  rails: { points: { x: number; y: number }[] }[]
+  /** Rayon de capture autour des extrémités de rail (défaut LASER_RAIL_RADIUS). */
+  railRadius?: number
 }
 
 export interface TraceResultat {
-  /** Polyligne du faisceau : émetteur, dioptres, rebonds, point d'arrêt.
-   * `eau` marque les points d'où le segment SUIVANT court sous l'eau —
-   * le rendu adoucit et élargit le halo de ces tronçons immergés. */
-  points: { x: number; y: number; eau?: boolean }[]
+  /** Polyligne du faisceau : émetteur, dioptres, rebonds, nœuds de rail,
+   * point d'arrêt. `eau` marque les points d'où le segment SUIVANT court
+   * sous l'eau (halo élargi et rosé) ; `plasma` ceux d'où il court ionisé
+   * — dans la vapeur ou guidé le long d'un rail (arc blanc-violet). */
+  points: { x: number; y: number; eau?: boolean; plasma?: boolean }[]
   /** Indices des cibles allumées par CE faisceau. */
   touchees: number[]
 }
@@ -86,7 +106,7 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
   const indice = monde.indice ?? LASER_INDICE_EAU
   const refracte = monde.eau !== null && indice > 1.001
   let dansEau = refracte && monde.eau!.dedans(em.x, em.y)
-  const points: { x: number; y: number; eau?: boolean }[] = [{ x: em.x, y: em.y, eau: dansEau }]
+  const points: TraceResultat['points'] = [{ x: em.x, y: em.y, eau: dansEau }]
   const touchees: number[] = []
   const a = (em.angle * Math.PI) / 180
   let dx = Math.cos(a)
@@ -96,6 +116,61 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
   let bounces = 0
   let dioptres = 0
   let course = 0
+  // ---- plasma (palier 3) ----
+  const rr = monde.railRadius ?? LASER_RAIL_RADIUS
+  let dansVapeur = monde.vapeur !== null && monde.vapeur(em.x, em.y)
+  if (dansVapeur) points[0].plasma = true
+  let railsPris = 0
+  let capSursis = 0 // distance à parcourir avant de pouvoir reprendre un rail
+
+  // Marche GUIDÉE le long d'un rail capturé : l'arc suit la polyligne nœud
+  // par nœud, mais reste de la lumière — cibles, parois et portes fermées
+  // l'arrêtent en chemin. Renvoie true si le faisceau s'est éteint.
+  const suivreRail = (ordre: { x: number; y: number }[]): boolean => {
+    for (const noeud of ordre) {
+      let restant = Math.hypot(noeud.x - x, noeud.y - y)
+      if (restant < 1e-6) continue
+      const ux = (noeud.x - x) / restant
+      const uy = (noeud.y - y) / restant
+      dx = ux
+      dy = uy
+      while (restant > 0) {
+        if (course >= LASER_MAX_LENGTH) {
+          points.push({ x, y, plasma: true })
+          return true
+        }
+        const pas = Math.min(LASER_STEP, restant)
+        x += ux * pas
+        y += uy * pas
+        course += pas
+        restant -= pas
+        for (let c = 0; c < monde.cibles.length; c++) {
+          const t = monde.cibles[c]
+          const ddx = x - t.x
+          const ddy = y - t.y
+          if (ddx * ddx + ddy * ddy <= t.r * t.r) {
+            points.push({ x: t.x, y: t.y })
+            touchees.push(c)
+            return true
+          }
+        }
+        for (const b of monde.boxes) {
+          if (absorbe(b) && dansRect(x, y, b)) {
+            points.push({ x, y })
+            return true
+          }
+        }
+        for (const p of monde.portesFermees) {
+          if (dansRect(x, y, p)) {
+            points.push({ x, y })
+            return true
+          }
+        }
+      }
+      points.push({ x: noeud.x, y: noeud.y, plasma: true })
+    }
+    return false
+  }
 
   while (course < LASER_MAX_LENGTH) {
     const px = x
@@ -166,10 +241,12 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
         y += n.ny * LASER_STEP
         course += LASER_STEP
       }
-      // le dégagement a pu nous déposer dans l'eau (la glace baigne dans le
-      // corps) : on resynchronise le milieu SANS déclencher de dioptre
+      // le dégagement a pu nous déposer dans l'eau ou la vapeur (la glace
+      // baigne dans le corps) : on resynchronise SANS déclencher de dioptre
       if (refracte) dansEau = monde.eau!.dedans(x, y)
+      if (monde.vapeur) dansVapeur = monde.vapeur(x, y)
       points[points.length - 1].eau = dansEau
+      points[points.length - 1].plasma = dansVapeur
       continue
     }
 
@@ -215,6 +292,45 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
         const inv = 1 / Math.max(1e-6, Math.hypot(dx, dy))
         dx *= inv
         dy *= inv
+      }
+    }
+
+    // le plasma : dans la vapeur, le faisceau s'ionise (l'arc se voit) —
+    // et l'arc ionisé qui passe près d'une extrémité de rail est CAPTURÉ
+    // par le champ : il suit la ligne jusqu'à l'autre bout, puis repart
+    // tout droit, désionisé (sauf à ressortir dans un nuage).
+    if (capSursis > 0) capSursis -= LASER_STEP
+    if (monde.vapeur) {
+      const ion = monde.vapeur(x, y)
+      if (ion !== dansVapeur) {
+        dansVapeur = ion
+        points.push({ x, y, eau: dansEau, plasma: dansVapeur })
+      }
+      if (dansVapeur && capSursis <= 0 && railsPris < LASER_MAX_RAILS) {
+        for (const rail of monde.rails) {
+          const pts = rail.points
+          if (pts.length < 2) continue
+          let debut = -1
+          if (Math.hypot(pts[0].x - x, pts[0].y - y) <= rr) debut = 0
+          else if (Math.hypot(pts[pts.length - 1].x - x, pts[pts.length - 1].y - y) <= rr) {
+            debut = pts.length - 1
+          }
+          if (debut < 0) continue
+          railsPris++
+          points.push({ x, y, plasma: true })
+          const ordre = debut === 0 ? pts : [...pts].reverse()
+          if (suivreRail(ordre)) return { points, touchees }
+          // sorti au bout du rail : on repart tout droit, dans le milieu
+          // qu'on y trouve — et un court sursis évite de reprendre le
+          // même rail par son extrémité de sortie.
+          capSursis = rr + LASER_STEP * 2
+          if (refracte) dansEau = monde.eau!.dedans(x, y)
+          dansVapeur = monde.vapeur(x, y)
+          const dernier = points[points.length - 1]
+          dernier.eau = dansEau
+          dernier.plasma = dansVapeur
+          break
+        }
       }
     }
   }

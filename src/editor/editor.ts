@@ -64,6 +64,7 @@ type Tool =
   | { kind: 'laser' }
   | { kind: 'cible' }
   | { kind: 'porte' }
+  | { kind: 'rail' }
 
 type Sel =
   | { kind: 'box'; index: number }
@@ -73,6 +74,7 @@ type Sel =
   | { kind: 'laser'; index: number }
   | { kind: 'cible'; index: number }
   | { kind: 'porte'; index: number }
+  | { kind: 'rail'; index: number }
   | { kind: 'exit' }
   | { kind: 'spawn' }
   | null
@@ -95,6 +97,20 @@ export interface EditorHooks {
   operator(): string
   /** La bibliothèque a changé : le jeu recharge sa séquence. */
   libraryChanged(levels: StoredLevel[]): void
+}
+
+/** Distance d'un point au segment [a, b] — pour attraper un rail au clic. */
+function distSeg(
+  x: number,
+  y: number,
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+): number {
+  const abx = b.x - a.x
+  const aby = b.y - a.y
+  const len2 = abx * abx + aby * aby
+  const t = len2 < 1e-9 ? 0 : Math.max(0, Math.min(1, ((x - a.x) * abx + (y - a.y) * aby) / len2))
+  return Math.hypot(x - (a.x + abx * t), y - (a.y + aby * t))
 }
 
 function blankLevel(): LevelDef {
@@ -136,8 +152,9 @@ export class LevelEditor {
     | null
     | { mode: 'pan'; sx: number; sy: number; camX: number; camY: number }
     | { mode: 'create'; x0: number; y0: number; x1: number; y1: number }
-    | { mode: 'move'; ox: number; oy: number; start: Rect }
+    | { mode: 'move'; ox: number; oy: number; start: Rect; pts?: { x: number; y: number }[] }
     | { mode: 'aim'; index: number }
+    | { mode: 'railpt'; index: number; point: number }
     | { mode: 'resize'; edge: string; start: Rect } = null
 
   private hint = ''
@@ -314,6 +331,14 @@ export class LevelEditor {
     for (let i = portes.length - 1; i >= 0; i--) {
       if (inside(portes[i])) return { kind: 'porte', index: i }
     }
+    const rails = this.level.rails ?? []
+    const tol = Math.max(10, 12 / this.zoom)
+    for (let i = rails.length - 1; i >= 0; i--) {
+      const pts = rails[i].points
+      for (let k = 0; k + 1 < pts.length; k++) {
+        if (distSeg(x, y, pts[k], pts[k + 1]) < tol) return { kind: 'rail', index: i }
+      }
+    }
     const sr = 70
     if (Math.hypot(this.level.spawn.x - x, this.level.spawn.y - y) < sr) return { kind: 'spawn' }
     if (inside(this.level.exit)) return { kind: 'exit' }
@@ -398,6 +423,15 @@ export class LevelEditor {
           } else if (hit.kind === 'cible') {
             const t = (this.level.cibles ?? [])[hit.index]
             this.drag = { mode: 'move', ox: w.x - t.x, oy: w.y - t.y, start: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }
+          } else if (hit.kind === 'rail') {
+            const r = (this.level.rails ?? [])[hit.index]
+            this.drag = {
+              mode: 'move',
+              ox: w.x,
+              oy: w.y,
+              start: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+              pts: r.points.map((p) => ({ ...p })),
+            }
           } else if (hit.kind === 'label') {
             const l = this.level.labels[hit.index]
             this.drag = { mode: 'move', ox: w.x - l.x, oy: w.y - l.y, start: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }
@@ -432,6 +466,41 @@ export class LevelEditor {
         const index = this.level.lasers.length - 1
         this.sel = { kind: 'laser', index }
         this.drag = { mode: 'aim', index } // glisser pour orienter le fût
+        this.draw()
+        return
+      }
+      if (this.tool.kind === 'rail') {
+        // presser près d'une extrémité PROLONGE ce rail ; ailleurs, un
+        // nouveau rail commence. Le point posé suit le doigt jusqu'au relâcher.
+        if (!this.level.rails) this.level.rails = []
+        const rails = this.level.rails
+        const tol = Math.max(14, 16 / this.zoom)
+        let index = -1
+        for (let i = rails.length - 1; i >= 0; i--) {
+          const pts = rails[i].points
+          if (Math.hypot(pts[pts.length - 1].x - w.x, pts[pts.length - 1].y - w.y) < tol) {
+            index = i
+            break
+          }
+          if (Math.hypot(pts[0].x - w.x, pts[0].y - w.y) < tol) {
+            pts.reverse() // on prolonge toujours par la fin
+            index = i
+            break
+          }
+        }
+        if (index >= 0) {
+          rails[index].points.push({ x: this.snapped(w.x), y: this.snapped(w.y) })
+        } else {
+          rails.push({
+            points: [
+              { x: this.snapped(w.x), y: this.snapped(w.y) },
+              { x: this.snapped(w.x), y: this.snapped(w.y) },
+            ],
+          })
+          index = rails.length - 1
+        }
+        this.sel = { kind: 'rail', index }
+        this.drag = { mode: 'railpt', index, point: rails[index].points.length - 1 }
         this.draw()
         return
       }
@@ -480,8 +549,25 @@ export class LevelEditor {
           const a = (Math.atan2(w.y - l.y, w.x - l.x) * 180) / Math.PI
           l.angle = Math.round(((a % 360) + 360) % 360)
         }
+      } else if (d.mode === 'railpt') {
+        const r = (this.level.rails ?? [])[d.index]
+        const p = r?.points[d.point]
+        if (p) {
+          p.x = this.snapped(w.x)
+          p.y = this.snapped(w.y)
+        }
       } else if (d.mode === 'move') {
-        if (this.sel?.kind === 'laser') {
+        if (this.sel?.kind === 'rail' && d.pts) {
+          const r = (this.level.rails ?? [])[this.sel.index]
+          const dxw = w.x - d.ox
+          const dyw = w.y - d.oy
+          if (r) {
+            for (let k = 0; k < r.points.length; k++) {
+              r.points[k].x = this.snapped(d.pts[k].x + dxw)
+              r.points[k].y = this.snapped(d.pts[k].y + dyw)
+            }
+          }
+        } else if (this.sel?.kind === 'laser') {
           const l = (this.level.lasers ?? [])[this.sel.index]
           l.x = this.snapped(w.x - d.ox)
           l.y = this.snapped(w.y - d.oy)
@@ -524,6 +610,26 @@ export class LevelEditor {
       if (d.mode === 'aim') {
         this.setTool({ kind: 'select' })
         this.commit('Émetteur posé — glissez depuis lui pour réorienter, ou réglez l’angle à droite.')
+        return
+      }
+      if (d.mode === 'railpt') {
+        const r = (this.level.rails ?? [])[d.index]
+        if (r) {
+          const p = r.points[d.point]
+          const avant = r.points[d.point - 1]
+          // un tronçon quasi nul ne compte pas : on retire le point posé
+          if (avant && Math.hypot(p.x - avant.x, p.y - avant.y) < this.grid) {
+            r.points.splice(d.point, 1)
+            if (r.points.length < 2) {
+              this.level.rails!.splice(d.index, 1)
+              this.sel = null
+              this.commit('Trop court : glissez pour tracer le tronçon de rail.')
+              return
+            }
+          }
+        }
+        // l'outil reste actif : reposez sur une extrémité pour prolonger
+        this.commit('Rail tracé — reposez sur une extrémité pour le prolonger, Échap pour finir.')
         return
       }
       if (d.mode === 'create') {
@@ -652,6 +758,7 @@ export class LevelEditor {
     else if (s.kind === 'zone') (this.level.zones ?? []).splice(s.index, 1)
     else if (s.kind === 'laser') (this.level.lasers ?? []).splice(s.index, 1)
     else if (s.kind === 'porte') (this.level.portes ?? []).splice(s.index, 1)
+    else if (s.kind === 'rail') (this.level.rails ?? []).splice(s.index, 1)
     else if (s.kind === 'cible') {
       ;(this.level.cibles ?? []).splice(s.index, 1)
       // les portes asservies aux cibles suivantes se décalent d'un cran ;
@@ -701,6 +808,10 @@ export class LevelEditor {
       const q = (this.level.portes ?? [])[s.index]
       this.level.portes!.push({ ...q, minX: q.minX + off, maxX: q.maxX + off })
       this.sel = { kind: 'porte', index: this.level.portes!.length - 1 }
+    } else if (s.kind === 'rail') {
+      const r = (this.level.rails ?? [])[s.index]
+      this.level.rails!.push({ points: r.points.map((p) => ({ x: p.x + off, y: p.y })) })
+      this.sel = { kind: 'rail', index: this.level.rails!.length - 1 }
     } else return
     this.commit('Dupliqué (D).')
   }
@@ -745,6 +856,7 @@ export class LevelEditor {
         else if (key === 'laser') this.setTool({ kind: 'laser' })
         else if (key === 'cible') this.setTool({ kind: 'cible' })
         else if (key === 'porte') this.setTool({ kind: 'porte' })
+        else if (key === 'rail') this.setTool({ kind: 'rail' })
         else this.setTool({ kind: 'select' })
       })
     }
@@ -1078,6 +1190,11 @@ export class LevelEditor {
       rows.push(numField('Cible asservie (nº)', 'p-pc', q.cible + 1, 1))
       rows.push(numField('X min', 'p-minX', q.minX), numField('X max', 'p-maxX', q.maxX))
       rows.push(numField('Y min', 'p-minY', q.minY), numField('Y max', 'p-maxY', q.maxY))
+    } else if (s.kind === 'rail') {
+      const r = (this.level.rails ?? [])[s.index]
+      rows.push(
+        `<p class="ed-empty">Ligne de champ en ${r.points.length} points. Un faisceau IONISÉ (passé dans la vapeur) capturé à une extrémité la suit jusqu’à l’autre bout. Glissez pour déplacer le rail entier ; outil « Rail » sur une extrémité pour le prolonger.</p>`,
+      )
     } else if (s.kind === 'label') {
       const l = this.level.labels[s.index]
       rows.push(`<label class="ed-f"><span>Texte</span><input id="p-text" value="${l.text.replace(/"/g, '&quot;')}" /></label>`)
@@ -1108,7 +1225,9 @@ export class LevelEditor {
                     ? `Cible nº ${s.index + 1}`
                     : s.kind === 'porte'
                       ? 'Porte asservie'
-                      : 'Étiquette'
+                      : s.kind === 'rail'
+                        ? 'Rail magnétique'
+                        : 'Étiquette'
 
     host.innerHTML =
       `<div class="ed-props-head">${kindName}</div><div class="ed-fields">${rows.join('')}</div>` +
@@ -1462,6 +1581,43 @@ export class LevelEditor {
       g.font = '600 10px ui-monospace, monospace'
       g.fillText(`PORTE → CIBLE ${q.cible + 1}`, p.sx + 4, p.sy - 4)
     }
+    // rails magnétiques : la ligne de champ, ses nœuds, et les anneaux de
+    // capture aux extrémités (le rayon vient des réglages par défaut)
+    const rails = this.level.rails ?? []
+    for (let i = 0; i < rails.length; i++) {
+      const pts = rails[i].points
+      if (pts.length < 2) continue
+      const selRail = this.sel?.kind === 'rail' && this.sel.index === i
+      g.strokeStyle = selRail ? '#cdb4ff' : 'rgba(150,120,255,0.55)'
+      g.lineWidth = selRail ? 2.5 : 1.8
+      g.setLineDash([3, 8])
+      g.beginPath()
+      const p0 = this.toScreen(pts[0].x, pts[0].y)
+      g.moveTo(p0.sx, p0.sy)
+      for (let k = 1; k < pts.length; k++) {
+        const pk = this.toScreen(pts[k].x, pts[k].y)
+        g.lineTo(pk.sx, pk.sy)
+      }
+      g.stroke()
+      g.setLineDash([])
+      for (let k = 0; k < pts.length; k++) {
+        const p = this.toScreen(pts[k].x, pts[k].y)
+        g.fillStyle = selRail ? '#e6dcff' : '#b8a0f5'
+        g.beginPath()
+        g.arc(p.sx, p.sy, k === 0 || k === pts.length - 1 ? 4 : 2.5, 0, Math.PI * 2)
+        g.fill()
+      }
+      for (const bout of [pts[0], pts[pts.length - 1]]) {
+        const p = this.toScreen(bout.x, bout.y)
+        g.strokeStyle = 'rgba(170,140,255,0.4)'
+        g.lineWidth = 1
+        g.setLineDash([3, 4])
+        g.beginPath()
+        g.arc(p.sx, p.sy, Math.max(4, DEFAULT_PARAMS.plasmaRailRadius * this.zoom), 0, Math.PI * 2)
+        g.stroke()
+        g.setLineDash([])
+      }
+    }
     // l'aperçu des faisceaux d'abord : les pastilles se dessinent par-dessus
     const touchees = new Set<number>()
     for (const em of lasers) {
@@ -1471,7 +1627,9 @@ export class LevelEditor {
         portesFermees: portes,
         cibles,
         iceNormal: null,
-        eau: null, // pas de corps dans l'aperçu : ni miroir, ni prisme
+        eau: null, // pas de corps dans l'aperçu : ni miroir, ni prisme…
+        vapeur: null, // …ni nuage : les rails restent muets, le trajet est à vide
+        rails: this.level.rails ?? [],
       })
       for (const c of t.touchees) touchees.add(c)
       g.strokeStyle = 'rgba(255,90,70,0.8)'

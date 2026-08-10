@@ -65,11 +65,12 @@ export interface DecalDef {
   fade?: number // 0..1, opacité (défaut 0,55)
 }
 
-// ---- Mécanismes laser (paliers 1-2, 2026) --------------------------------
+// ---- Mécanismes laser (paliers 1-3, 2026) --------------------------------
 // Le faisceau est absorbé par les parois, passe les grilles, se REFLÈTE sur
 // la glace (le corps gelé est un miroir — c'est sa fonction cachée), se
-// RÉFRACTE dans l'eau (le corps liquide est un prisme), et allume des
-// cibles. Une cible allumée ouvre les portes qui lui sont asservies.
+// RÉFRACTE dans l'eau (le corps liquide est un prisme), s'IONISE dans la
+// vapeur (l'arc plasma suit les rails magnétiques), et allume des cibles.
+// Une cible allumée ouvre les portes qui lui sont asservies.
 export interface LaserDef {
   x: number
   y: number
@@ -92,6 +93,15 @@ export interface PorteDef {
   cible: number // indice dans `cibles`
 }
 
+// Un RAIL MAGNÉTIQUE (palier 3) : une ligne de champ posée dans le décor.
+// Le faisceau ordinaire l'ignore ; un faisceau IONISÉ (qui traverse la
+// vapeur du joueur) est capturé s'il passe près d'une extrémité, suit la
+// polyligne jusqu'à l'autre bout, puis repart tout droit. Le plasma se
+// PROVOQUE : être vapeur dans la lumière, au bon endroit.
+export interface RailDef {
+  points: { x: number; y: number }[] // ≥ 2 points, dans l'ordre du tracé
+}
+
 export interface LevelDef {
   name: string
   code: string // code d'essai du protocole (21-A, 21-B…)
@@ -108,6 +118,7 @@ export interface LevelDef {
   lasers?: LaserDef[]
   cibles?: CibleDef[]
   portes?: PorteDef[]
+  rails?: RailDef[]
   par?: number // budget d'impulsions visé : franchissable en `par`, record en dessous
   // Lit musical imposé par le tableau. Sans valeur, la cuve suit le
   // refroidissement de la coque (tiède → glaciale) : c'est le cas général,

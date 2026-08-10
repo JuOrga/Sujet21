@@ -16,6 +16,7 @@ import {
   type CibleDef,
   type LaserDef,
   type PorteDef,
+  type RailDef,
   type ZoneDef,
   type ZoneForce,
 } from './level'
@@ -254,6 +255,23 @@ export function parseLevel(input: unknown): { level: LevelDef | null; rejets: st
   }
   if (portes.length > 0) level.portes = portes
 
+  // Rails magnétiques : des polylignes d'au moins 2 points
+  const rails: RailDef[] = []
+  for (const raw of Array.isArray(o.rails) ? o.rails : []) {
+    const r = (raw ?? {}) as Record<string, unknown>
+    const pts: { x: number; y: number }[] = []
+    for (const p of Array.isArray(r.points) ? r.points : []) {
+      const q = (p ?? {}) as Record<string, unknown>
+      pts.push({ x: num(q.x, 0), y: num(q.y, 0) })
+    }
+    if (pts.length < 2) {
+      rejets.push('un rail magnétique a été écarté (moins de 2 points)')
+      continue
+    }
+    rails.push({ points: pts })
+  }
+  if (rails.length > 0) level.rails = rails
+
   return { level, rejets }
 }
 
@@ -275,6 +293,7 @@ export function serializeLevel(level: LevelDef): string {
   if (level.lasers && level.lasers.length > 0) out.lasers = level.lasers
   if (level.cibles && level.cibles.length > 0) out.cibles = level.cibles
   if (level.portes && level.portes.length > 0) out.portes = level.portes
+  if (level.rails && level.rails.length > 0) out.rails = level.rails
   if (level.decals && level.decals.length > 0) out.decals = level.decals
   if (level.figure) out.figure = level.figure
   if (level.ambiance) out.ambiance = level.ambiance
@@ -359,6 +378,19 @@ export function checkLevel(level: LevelDef): Verdict[] {
   for (const l of level.lasers ?? []) {
     if (!inBounds(l.x, l.y)) {
       v.push({ niveau: 'erreur', message: 'Un émetteur laser est hors de la cuve.' })
+    }
+  }
+  // Rails : un rail sans émetteur ne guidera jamais rien, et un rail hors
+  // cuve est inatteignable.
+  if ((level.rails?.length ?? 0) > 0 && (level.lasers?.length ?? 0) === 0) {
+    v.push({
+      niveau: 'avertissement',
+      message: 'Un rail magnétique sans émetteur laser : aucun arc à guider.',
+    })
+  }
+  for (const r of level.rails ?? []) {
+    if (r.points.some((p) => !inBounds(p.x, p.y))) {
+      v.push({ niveau: 'erreur', message: 'Un rail magnétique sort de la cuve.' })
     }
   }
   if (level.journal.trim().length < 40) {

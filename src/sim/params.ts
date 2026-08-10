@@ -115,6 +115,10 @@ export interface SimParams {
   // Indice de réfraction du corps liquide : 1,33 = eau réelle (angle
   // critique ≈ 49°). À 1 : l'eau redevient transparente comme au palier 1.
   laserRefractIndex: number
+  // Plasma (palier 3) : un faisceau IONISÉ (qui traverse la vapeur du
+  // joueur) est capturé par un rail magnétique s'il passe à moins de ce
+  // rayon d'une de ses extrémités. Grand = capture indulgente.
+  plasmaRailRadius: number
 
   // Sas de sortie : une bouche d'aspiration dans laquelle l'eau s'engouffre
   exitRadius: number // portée de l'aspiration autour de la bouche (unités monde)
@@ -251,6 +255,7 @@ export const DEFAULT_PARAMS: SimParams = {
 
   laserMirrorSmooth: 30,
   laserRefractIndex: 1.33,
+  plasmaRailRadius: 30,
 
   exitRadius: 240,
   exitPull: 300,
