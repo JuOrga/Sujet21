@@ -530,19 +530,50 @@ const manette = new Manette()
 const manetteCurseur = { x: 0, y: 0 }
 let manetteTenait = false // le « doigt » manette était posé à l'image d'avant
 
-/** A dans les menus : valide le bouton principal visible, s'il y en a un. */
+function boutonVisible(el: HTMLElement | null): el is HTMLElement {
+  if (!el || (el as HTMLButtonElement).hidden) return false
+  const r = el.getBoundingClientRect()
+  const st = getComputedStyle(el)
+  return r.width > 0 && r.height > 0 && st.visibility !== 'hidden' && st.pointerEvents !== 'none'
+}
+
+/** A dans les écrans de JEU (relance, fin de tableau) : valide le bouton. */
 function clicMenuManette(): boolean {
-  for (const id of ['relance', 'overlay-btn', 'start', 'start-bis']) {
+  for (const id of ['relance', 'overlay-btn']) {
     const el = document.getElementById(id)
-    if (!el) continue
-    const r = el.getBoundingClientRect()
-    const st = getComputedStyle(el)
-    if (r.width > 0 && r.height > 0 && st.visibility !== 'hidden' && st.pointerEvents !== 'none') {
+    if (boutonVisible(el)) {
       el.click()
       return true
     }
   }
   return false
+}
+
+// ---- Navigation de la FICHE à la manette ----
+// Croix (ou stick) haut/bas : passer d'un bouton à l'autre — A : valider.
+// Le bouton visé porte un liseré (classe pad-focus).
+const FICHE_BOUTONS = ['start', 'home-restart', 'start-bis', 'start-editor', 'home-son']
+let ficheFocus = 0
+let ficheNavPrete = true // anti-répétition du stick
+function ficheNavigue(): void {
+  const visibles = FICHE_BOUTONS.map((id) => document.getElementById(id)).filter(boutonVisible)
+  if (visibles.length === 0) return
+  // le stick fait aussi la navigation : un coup franc vers le haut/bas
+  let delta = 0
+  if (manette.edge(BOUTON.HAUT)) delta = -1
+  else if (manette.edge(BOUTON.BAS)) delta = 1
+  else if (manette.force > 0.55 && Math.abs(manette.dirY) > 0.6) {
+    if (ficheNavPrete) {
+      delta = manette.dirY > 0 ? 1 : -1
+      ficheNavPrete = false
+    }
+  }
+  if (manette.force < 0.3) ficheNavPrete = true
+  ficheFocus = Math.max(0, Math.min(visibles.length - 1, ficheFocus + delta))
+  for (let i = 0; i < visibles.length; i++) {
+    visibles[i].classList.toggle('pad-focus', manette.active && i === ficheFocus)
+  }
+  if (manette.edge(BOUTON.A)) visibles[ficheFocus].click()
 }
 input.attach(canvas)
 
@@ -1288,9 +1319,11 @@ function frame(now: number): void {
   manette.poll(performance.now() / 1000)
   if (manette.connectee) {
     const enJeu = document.body.classList.contains('playing')
-    // dans les menus (accueil, relance, fin de tableau) : A valide
-    if (manette.edge(BOUTON.A) && clicMenuManette()) {
-      // le clic a consommé le A de cette image
+    if (!enJeu) {
+      // la FICHE : croix/stick pour choisir, A pour valider
+      ficheNavigue()
+    } else if (manette.edge(BOUTON.A) && clicMenuManette()) {
+      // écrans de jeu (relance, fin de tableau) : le clic a consommé le A
     } else if (enJeu) {
       if (manette.edge(BOUTON.START)) input.togglePause()
       if (manette.edge(BOUTON.SELECT)) input.onReset?.()

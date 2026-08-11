@@ -119,6 +119,12 @@
         flex-direction: column;
         gap: 22px;
       }
+      /* Le bouton visé à la manette : un liseré net, visible de loin */
+      #home button.pad-focus {
+        outline: 2px solid #63b7e6;
+        outline-offset: 2px;
+        box-shadow: 0 0 14px rgba(99, 183, 230, 0.45);
+      }
       /* La fiche défile si elle déborde, mais sans ascenseur visible :
          sur Steam Deck la barre s'affichait pour trois pixels de trop. */
       #home {
