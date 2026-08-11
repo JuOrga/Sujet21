@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 17:55',
+    title: 'La bande de vie partout, la fiche mobile allégée, et le premier toucher réparé',
+    notes: [
+      'LA BANDE DE VIE, sur toutes les plateformes : une ligne fine en haut — le volume et sa jauge quasi PLEINE LARGEUR (on voit fondre ce qu’on dépense, PC compris), et trois pastilles-icônes à droite (▦ tableau, ⛽ bonbonnes, ❄ coque) : un toucher dit leur nom.',
+      'Au doigt, les boutons du bas passent en COLONNE À GAUCHE (le pouce gauche les tient, le droit vise), les états restent à droite, et les crans de temps se retirent (ils vivent au banc).',
+      'La fiche mobile s’allège : les REGISTRES passent derrière un bouton ◧ RECORDS (un voile les montre, avec le champ du nom) — Commandes, Records et Plein écran tiennent tous au-dessus de la ligne de flottaison. À l’arrivée sur la fiche, le SON et le PLEIN ÉCRAN battent trois fois pour attirer l’œil.',
+      'Et un vieux fantôme est exorcisé : le PREMIER toucher se perdait souvent — masquer le bouton du son au réveil de l’audio re-composait la fiche entre le relâcher du doigt et le clic, qui ratait sa cible. Le bouton se retire désormais après coup : tout répond du premier coup.',
+    ],
+  },
+  {
     date: '11/08/2026 17:10',
     title: 'La victoire se décide : le bouton CONTINUER, et le son au pad',
     notes: [
