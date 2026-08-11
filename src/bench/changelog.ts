@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 17:10',
+    title: 'La victoire se décide : le bouton CONTINUER, et le son au pad',
+    notes: [
+      'Des gouttes égarées traînent presque toujours quelque part : exiger l’aspiration TOTALE bloquait la victoire. Désormais, dès que le sas a bu la MOITIÉ du volume de départ, un bouton CONTINUER — vert, pulsant, au-dessus de la barre — s’offre au joueur : conclure l’essai avec ce qui est en bonbonne, ou aller cueillir les dernières gouttes. L’aspiration complète conclut toujours toute seule. Le bouton répond aussi au A de la manette.',
+      'La navigation manette de la fiche suit maintenant l’ORDRE VISUEL : la croix descend comme l’œil lit — « Activer le son » en premier, puis Commencer, et le reste. (Rappel navigateur : le tout premier déblocage du son exige un vrai toucher ou clic — au Deck, un appui d’écran ou de trackpad suffit, une seule fois.)',
+    ],
+  },
+  {
     date: '11/08/2026 16:45',
     title: 'Réparé : les boutons de la fiche avaient disparu en paysage téléphone',
     notes: [
