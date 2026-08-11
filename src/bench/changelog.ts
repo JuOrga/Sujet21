@@ -11,6 +11,13 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 05:55',
+    title: 'L’éponge boit en silence',
+    notes: [
+      'Le bruit de succion de l’éponge est SUPPRIMÉ — il agaçait plus qu’il n’informait. Le feutre qui se remplit et la jauge de volume disent déjà tout ce qu’il y a à savoir.',
+    ],
+  },
+  {
     date: '11/08/2026 05:40',
     title: 'La manette entre dans la cuve (Steam Deck, Xbox, DualSense)',
     notes: [

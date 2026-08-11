@@ -89,7 +89,6 @@ const sfx = {
   allGas: false,
   dispersed: false,
   swallowed: 0,
-  spongeBites: 0,
   aiming: false,
   dropTimer: 0,
   lastCall: false,
@@ -1752,14 +1751,8 @@ function frame(now: number): void {
     }
   }
   sfx.aiming = vise
-  // Une éponge qui boit : on sonne par gorgée, pas par goutte. Le compteur
-  // est recopié à chaque image — au changement de tableau il repart à zéro
-  // avec la simulation, sans laisser le son muet pour le reste de la partie.
-  if (sim.spongeBites < sfx.spongeBites) sfx.spongeBites = sim.spongeBites // nouveau tableau
-  if (sim.spongeBites - sfx.spongeBites >= 3) {
-    bande.bruitage('eponge', 0.45)
-    sfx.spongeBites = sim.spongeBites
-  }
+  // L'éponge boit en silence : son bruit de succion agaçait plus qu'il
+  // n'informait — la jauge et le feutre qui se remplit suffisent à le dire.
   if (endgame.lastCall && !sfx.lastCall) bande.ponctuation('sting-derniere-impulsion', 0.8)
   sfx.lastCall = endgame.lastCall
   if (endgame.spent && !sfx.spent) bande.ponctuation('fin-de-course', 0.85)
