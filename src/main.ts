@@ -10,7 +10,10 @@ import { Input } from './game/input'
 import {
   MAT_EXIT,
   MAT_FROID,
+  TABLEAU_10,
   TABLEAU_1BIS,
+  TABLEAU_8,
+  TABLEAU_9,
   TABLEAUX,
   pointInBox,
   zoneForceAt,
@@ -134,9 +137,11 @@ function playedLevels(): LevelDef[] {
   return libraryLevels.length > 0 ? libraryLevels : TABLEAUX
 }
 
-// Le prototype 21-A bis se joue hors expédition : un essai à part, depuis la
-// fiche — s'il convainc, il remplacera 21-A dans la séquence.
+// Un essai hors expédition : un tableau à part (prototype, salle laser,
+// tableau d'éditeur), sans toucher aux registres. La FILE enchaîne les
+// tableaux d'essai au sas — la trilogie laser se joue ainsi.
 let testLevel: LevelDef | null = null
+let testQueue: LevelDef[] = []
 let level: LevelDef = TABLEAUX[levelIndex]
 // Les boîtes rendues incluent le sas (rendu seulement, pas de physique solide),
 // et la bouche d'aspiration est le centre du sas du tableau courant.
@@ -363,14 +368,17 @@ function openHome(): void {
   document.body.classList.remove('playing')
 }
 startBtn.addEventListener('click', closeHome)
-// Le prototype 21-A bis : un essai à part, hors expédition et hors registres.
-// Lancé depuis la fiche (bouton dédié) ou depuis le banc (dossier Tableaux).
-function startBisTest(): void {
+// Un essai HORS EXPÉDITION : un tableau (ou une file de tableaux) joué à
+// part, sans toucher aux registres. Sert au prototype 21-A bis (depuis le
+// banc) et aux salles laser (bouton de la fiche) — la file enchaîne les
+// tableaux au sas, comme une mini-expédition d'essai.
+function startTest(niveaux: LevelDef[]): void {
   if (requireName()) {
     openHome() // le champ du nom vit sur la fiche : on la montre pour le remplir
     return
   }
-  testLevel = TABLEAU_1BIS
+  testLevel = niveaux[0]
+  testQueue = niveaux.slice(1)
   fromEditor = false
   run.bonbonneLiters = 0
   run.runTime = 0
@@ -381,7 +389,12 @@ function startBisTest(): void {
   startBtn.textContent = "REPRENDRE L'ESSAI"
   restart()
 }
-startBisBtn.addEventListener('click', startBisTest)
+function startBisTest(): void {
+  startTest([TABLEAU_1BIS])
+}
+// Le bouton de la fiche mène aux salles laser : la trilogie 21-H → 21-J
+// (miroir, prisme, plasma), enchaînée sas après sas.
+startBisBtn.addEventListener('click', () => startTest([TABLEAU_8, TABLEAU_9, TABLEAU_10]))
 
 // ---- Éditeur de tableaux ----
 // Il se superpose au jeu ; « Essayer » repasse par le même chemin que le
@@ -891,6 +904,13 @@ function resetAction(): void {
     if (run.ended) {
       if (fromEditor) {
         openEditor() // l'essai vient de l'éditeur : on y retourne
+        return
+      }
+      // la file d'essai continue : le sas mène à la salle suivante
+      if (testQueue.length > 0) {
+        testLevel = testQueue.shift()!
+        run.runTime = 0
+        restart()
         return
       }
       testLevel = null
