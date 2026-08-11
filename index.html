@@ -125,6 +125,212 @@
         outline-offset: 2px;
         box-shadow: 0 0 14px rgba(99, 183, 230, 0.45);
       }
+
+      /* ---- Téléphone en portrait : le protocole s'observe en paysage ----
+         Un voile plein écran, un téléphone qui pivote, une sortie de secours
+         pour qui a le verrou de rotation. */
+      #tourner {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 60;
+        background: rgba(4, 8, 15, 0.96);
+        backdrop-filter: blur(4px);
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 26px;
+        text-align: center;
+        color: var(--ink);
+      }
+      @media (orientation: portrait) and (pointer: coarse) and (max-width: 700px) {
+        body:not(.portrait-ok) #tourner {
+          display: flex;
+        }
+      }
+      .tourner-tel {
+        width: 46px;
+        height: 82px;
+        border: 2.5px solid #63b7e6;
+        border-radius: 9px;
+        position: relative;
+        animation: tourner-pivote 2.6s ease-in-out infinite;
+        box-shadow: 0 0 22px rgba(99, 183, 230, 0.35);
+      }
+      .tourner-tel::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        bottom: 6px;
+        width: 14px;
+        height: 3px;
+        margin-left: -7px;
+        border-radius: 2px;
+        background: #63b7e6;
+      }
+      @keyframes tourner-pivote {
+        0%, 18% { transform: rotate(0deg); }
+        50%, 78% { transform: rotate(90deg); }
+        100% { transform: rotate(0deg); }
+      }
+      #tourner p {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: 17px;
+        letter-spacing: 0.14em;
+        line-height: 1.9;
+      }
+      #tourner p span {
+        display: block;
+        font-family: inherit;
+        font-size: 11px;
+        letter-spacing: 0.2em;
+        color: var(--dim);
+      }
+      #tourner button {
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        color: var(--dim);
+        background: none;
+        border: 1px dashed var(--line-strong);
+        padding: 8px 14px;
+      }
+
+      /* ---- Onboarding tactile : trois gestes, trois cartes ---- */
+      #onboard {
+        position: fixed;
+        inset: 0;
+        z-index: 55;
+        background: rgba(4, 8, 15, 0.82);
+        backdrop-filter: blur(3px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        text-align: center;
+        color: var(--ink);
+        cursor: pointer;
+      }
+      #onboard[hidden] {
+        display: none;
+      }
+      .ob-etape h3 {
+        margin: 18px 0 8px;
+        font-family: var(--font-display);
+        font-size: 19px;
+        letter-spacing: 0.16em;
+        color: #cfe9ff;
+      }
+      .ob-etape p {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.75;
+        color: var(--dim);
+        max-width: 480px;
+        padding: 0 24px;
+      }
+      .ob-anim {
+        position: relative;
+        width: 150px;
+        height: 110px;
+        margin: 0 auto;
+      }
+      .ob-anim i,
+      .ob-anim b {
+        position: absolute;
+        font-style: normal;
+      }
+      /* 1. le doigt posé : un point, son onde, et la dérive du corps */
+      .ob-doigt i {
+        left: 50%;
+        top: 50%;
+        width: 18px;
+        height: 18px;
+        margin: -9px 0 0 -9px;
+        border-radius: 50%;
+        background: #e8f4ff;
+        box-shadow: 0 0 18px rgba(140, 210, 255, 0.9);
+      }
+      .ob-doigt::before,
+      .ob-doigt::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        border-radius: 50%;
+        border: 2px solid rgba(99, 183, 230, 0.8);
+        width: 18px;
+        height: 18px;
+        margin: -9px 0 0 -9px;
+        animation: ob-onde 1.6s ease-out infinite;
+      }
+      .ob-doigt::after {
+        animation-delay: 0.8s;
+      }
+      @keyframes ob-onde {
+        from { transform: scale(1); opacity: 0.9; }
+        to { transform: scale(3.4); opacity: 0; }
+      }
+      /* 2. les trois états : la frise qui pulse tour à tour */
+      .ob-etats b {
+        top: 32px;
+        font-size: 34px;
+        animation: ob-pulse 2.7s ease-in-out infinite;
+      }
+      .ob-etats b:nth-child(1) { left: 8px; }
+      .ob-etats b:nth-child(2) { left: 58px; animation-delay: 0.9s; }
+      .ob-etats b:nth-child(3) { left: 108px; animation-delay: 1.8s; }
+      @keyframes ob-pulse {
+        0%, 30%, 100% { transform: scale(1); opacity: 0.55; }
+        12% { transform: scale(1.35); opacity: 1; }
+      }
+      /* 3. la pince : deux points qui s'écartent et se resserrent */
+      .ob-pince i {
+        top: 50%;
+        width: 16px;
+        height: 16px;
+        margin-top: -8px;
+        border-radius: 50%;
+        background: #e8f4ff;
+        box-shadow: 0 0 14px rgba(140, 210, 255, 0.8);
+      }
+      .ob-pince i:nth-child(1) { left: 50%; animation: ob-pince-g 2.2s ease-in-out infinite; }
+      .ob-pince i:nth-child(2) { left: 50%; animation: ob-pince-d 2.2s ease-in-out infinite; }
+      @keyframes ob-pince-g {
+        0%, 100% { transform: translateX(-18px); }
+        50% { transform: translateX(-58px); }
+      }
+      @keyframes ob-pince-d {
+        0%, 100% { transform: translateX(2px); }
+        50% { transform: translateX(42px); }
+      }
+      .ob-pied {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        margin-top: 6px;
+      }
+      .ob-points i {
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        margin: 0 4px;
+        border-radius: 50%;
+        background: var(--line-strong);
+      }
+      .ob-points i.on {
+        background: #63b7e6;
+        box-shadow: 0 0 8px rgba(99, 183, 230, 0.8);
+      }
+      .ob-suite {
+        font-size: 10.5px;
+        letter-spacing: 0.22em;
+        color: var(--dim);
+        animation: ob-pulse 2s ease-in-out infinite;
+      }
+
       /* La fiche défile si elle déborde, mais sans ascenseur visible :
          sur Steam Deck la barre s'affichait pour trois pixels de trop. */
       #home {
@@ -158,6 +364,40 @@
         }
         .home-figure img {
           height: clamp(110px, 16vh, 160px);
+        }
+      }
+      /* ---- Paysage bas (téléphone tourné) : la fiche tient à l'écran ---- */
+      @media (max-height: 520px) {
+        #home {
+          width: 100vw;
+          gap: 8px;
+          padding: 10px 22px;
+          border-right: none;
+        }
+        .home-cols {
+          flex-direction: row;
+          gap: 26px;
+        }
+        .home-col {
+          gap: 8px;
+        }
+        .home-figure {
+          display: none;
+        }
+        .home-title {
+          font-size: 20px;
+        }
+        .home-pitch {
+          font-size: 11.5px;
+          line-height: 1.55;
+        }
+        .home-eyebrow {
+          font-size: 9px;
+          padding-bottom: 8px;
+        }
+        .home-badge {
+          width: 34px;
+          height: 34px;
         }
       }
       body.playing #home {
@@ -2046,6 +2286,39 @@
     </div>
 
     <div id="tutor" aria-live="polite"></div>
+
+    <!-- Téléphone en portrait : le protocole s'observe en paysage -->
+    <div id="tourner" aria-label="Tournez l'appareil en paysage">
+      <div class="tourner-tel"></div>
+      <p>TOURNEZ L'APPAREIL<span>le protocole s'observe en paysage</span></p>
+      <button id="tourner-quand-meme" type="button">continuer en portrait</button>
+    </div>
+
+    <!-- Onboarding tactile : trois gestes, trois cartes -->
+    <div id="onboard" hidden aria-label="Prise en main tactile">
+      <div class="ob-etape" data-etape="0">
+        <div class="ob-anim ob-doigt"><i></i></div>
+        <h3>MAINTENEZ LE DOIGT</h3>
+        <p>Vous éjectez de l'eau vers lui — le corps part à l'opposé.
+        Se déplacer, c'est rétrécir : chaque impulsion se paie en volume.</p>
+      </div>
+      <div class="ob-etape" data-etape="1" hidden>
+        <div class="ob-anim ob-etats"><b>💧</b><b>❄</b><b>💨</b></div>
+        <h3>TROIS ÉTATS</h3>
+        <p>❄ la glace garde son élan et réfléchit les lasers ·
+        💨 la vapeur passe les grilles — visez (le temps ralentit), relâchez : dash.</p>
+      </div>
+      <div class="ob-etape" data-etape="2" hidden>
+        <div class="ob-anim ob-pince"><i></i><i></i></div>
+        <h3>DEUX DOIGTS</h3>
+        <p>Pincez : zoom · glissez : caméra · ⌖ recadre sur le corps.
+        La barre du bas garde pause, recommencer et la légende.</p>
+      </div>
+      <div class="ob-pied">
+        <span class="ob-points"><i class="on"></i><i></i><i></i></span>
+        <span class="ob-suite">TOUCHER POUR CONTINUER</span>
+      </div>
+    </div>
 
     <div id="hud-danger" aria-live="assertive"></div>
     <div id="obj-arrow" aria-hidden="true"><i>➤</i><span id="obj-dist"></span></div>
