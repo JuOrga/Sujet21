@@ -856,9 +856,10 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   // capture translucide (l'arc s'accroche N'IMPORTE OÙ le long), pointillé
   // violet, et des CHEVRONS qui donnent le sens de circulation de l'arc.
   // Le faisceau ordinaire les ignore ; seul le plasma s'y accroche.
-  for (const rail of rails) {
+  rails.forEach((rail, railIdx) => {
     const pts = rail.points
-    if (pts.length < 2) continue
+    if (pts.length < 2) return
+    const engage = railsEngages.has(railIdx)
     const chemin = (): void => {
       g.beginPath()
       const p0 = S(pts[0].x, pts[0].y)
@@ -875,13 +876,23 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     g.lineCap = 'round'
     chemin()
     g.stroke()
-    // la ligne elle-même
-    g.strokeStyle = 'rgba(150,120,255,0.45)'
-    g.lineWidth = Math.max(1, 2 * z)
+    // la ligne elle-même — et quand le champ est ENGAGÉ (il porte un nuage,
+    // même rayon éteint), le rail s'embrase : halo + tirets qui défilent
+    // dans le sens du convoyage. Il s'éteint quand l'attirance se relâche.
+    if (engage) {
+      g.strokeStyle = 'rgba(190,160,255,0.30)'
+      g.lineWidth = Math.max(3, 10 * z)
+      chemin()
+      g.stroke()
+    }
+    g.strokeStyle = engage ? 'rgba(215,190,255,0.95)' : 'rgba(150,120,255,0.45)'
+    g.lineWidth = Math.max(1, (engage ? 3 : 2) * z)
     g.setLineDash([2 * z, 9 * z])
+    if (engage) g.lineDashOffset = -((performance.now() * 0.05) % 11) * z
     chemin()
     g.stroke()
     g.setLineDash([])
+    g.lineDashOffset = 0
     // chevrons de sens, à intervalle régulier le long de chaque tronçon
     g.strokeStyle = 'rgba(190,160,255,0.7)'
     g.lineWidth = Math.max(1, 1.6 * z)
@@ -907,7 +918,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
         g.stroke()
       }
     }
-  }
+  })
 
   // faisceaux : halo large + cœur fin, en fusion additive
   g.globalCompositeOperation = 'lighter'
