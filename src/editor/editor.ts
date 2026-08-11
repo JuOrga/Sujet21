@@ -16,6 +16,7 @@ import {
   MAT_WALL,
   TABLEAU_1BIS,
   TABLEAUX,
+  TABLEAUX_ECOLE,
   ZONE_CAUSES,
   subtractBox,
   zoneName,
@@ -1078,7 +1079,7 @@ export class LevelEditor {
     // Tableaux LIVRÉS : une copie s'ouvre comme brouillon — pour étudier la
     // construction des salles (miroirs, prisme, plasma…) ou en repartir.
     const selLivres = this.el<HTMLSelectElement>('ed-livres')
-    const livres = [...TABLEAUX, TABLEAU_1BIS]
+    const livres = [...TABLEAUX_ECOLE, ...TABLEAUX, TABLEAU_1BIS]
     selLivres.innerHTML = livres
       .map((t, i) => `<option value="${i}">${t.code} — ${t.name}</option>`)
       .join('')

@@ -18,6 +18,7 @@ import {
   TABLEAU_8,
   TABLEAU_9,
   TABLEAUX,
+  TABLEAUX_ECOLE,
   pointInBox,
   zoneForceAt,
   zoneName,
@@ -365,6 +366,11 @@ let hasPlayed = false
 // le canvas) et fige l'essai le temps de la lecture.
 const onboardEl = document.getElementById('onboard') as HTMLDivElement
 let obEtape = 0
+// La prise en main se montre PARTOUT : cartes tactiles au doigt, cartes
+// souris/clavier ailleurs — chaque mode a sa propre mémoire (on peut
+// découvrir le jeu au bureau puis sur téléphone, chaque main a sa leçon).
+const obTactile = (): boolean => window.matchMedia('(pointer: coarse)').matches
+const obCle = (): string => (obTactile() ? 'projet21.onboard.v1' : 'projet21.onboard.pc.v1')
 function majOnboard(): void {
   const etapes = Array.from(onboardEl.querySelectorAll<HTMLElement>('.ob-etape'))
   etapes.forEach((e, i) => {
@@ -373,11 +379,14 @@ function majOnboard(): void {
   const points = Array.from(onboardEl.querySelectorAll<HTMLElement>('.ob-points i'))
   points.forEach((p, i) => p.classList.toggle('on', i === obEtape))
   const suite = onboardEl.querySelector<HTMLElement>('.ob-suite')
-  if (suite) suite.textContent = obEtape >= 3 ? 'TOUCHER POUR PLONGER' : 'TOUCHER POUR CONTINUER'
+  if (suite) {
+    const geste = obTactile() ? 'TOUCHER' : 'CLIQUER'
+    suite.textContent = obEtape >= 3 ? `${geste} POUR PLONGER` : `${geste} POUR CONTINUER`
+  }
 }
 function montrerOnboard(): void {
-  if (!window.matchMedia('(pointer: coarse)').matches) return
-  if (localStorage.getItem('projet21.onboard.v1')) return
+  if (localStorage.getItem(obCle())) return
+  onboardEl.dataset.mode = obTactile() ? 'tactile' : 'pc'
   obEtape = 0
   majOnboard()
   onboardEl.hidden = false
@@ -390,7 +399,7 @@ onboardEl.addEventListener('pointerdown', (e) => {
   if (obEtape > 3) {
     onboardEl.hidden = true
     try {
-      localStorage.setItem('projet21.onboard.v1', '1')
+      localStorage.setItem(obCle(), '1')
     } catch {
       // stockage refusé : l'onboarding se remontrera, sans gravité
     }
@@ -499,7 +508,16 @@ function startBisTest(): void {
 // Le bouton de la fiche mène aux salles laser : la trilogie 21-H → 21-J
 // (miroir, prisme, plasma), enchaînée sas après sas.
 startBisBtn.addEventListener('click', () =>
-  startTest([TABLEAU_8, TABLEAU_9, TABLEAU_10, TABLEAU_11, TABLEAU_12, TABLEAU_13]),
+  // l'école d'abord (surfaces, climats, zones), puis les deux trilogies laser
+  startTest([
+    ...TABLEAUX_ECOLE,
+    TABLEAU_8,
+    TABLEAU_9,
+    TABLEAU_10,
+    TABLEAU_11,
+    TABLEAU_12,
+    TABLEAU_13,
+  ]),
 )
 
 // ---- Éditeur de tableaux ----

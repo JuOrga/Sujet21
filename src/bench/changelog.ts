@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 20:40',
+    title: 'L’école des surfaces en tête de file, et l’onboarding partout',
+    notes: [
+      'Trois TABLEAUX-ÉCOLE ouvrent la file du bouton SALLES : 21-S1 « les parois » (absorber, repousser, retenir), 21-S2 « les climats » (froid, chaud, grille, éponge) et 21-S3 « les zones » (hublot fendu qui glace, conduite rompue qui vaporise, zone libre qui rend le choix). Pas d’énigme : on traverse, on comprend, on sort — les étiquettes font la leçon.',
+      'La file d’essai fait désormais NEUF salles : l’école, puis la trilogie des optiques (miroir, prisme, plasma), puis la trilogie des compositions (double verrou, grille, traversée). L’éditeur les propose toutes dans « Tableaux livrés », l’école en tête.',
+      'Et la prise en main se montre PARTOUT : au doigt les cartes tactiles, à la souris de nouvelles cartes clavier/souris (clic maintenu, F et G pour les états, molette et clic droit pour la caméra, Espace/R/Échap — et le rappel manette). Chaque mode a sa propre mémoire : on peut découvrir le jeu au bureau puis sur téléphone, chaque main a sa leçon.',
+    ],
+  },
+  {
     date: '11/08/2026 20:05',
     title: 'Trois nouveaux tableaux : la seconde trilogie compose les optiques',
     notes: [

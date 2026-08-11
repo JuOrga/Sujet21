@@ -340,6 +340,11 @@
         max-width: 480px;
         padding: 0 24px;
       }
+      /* textes selon la prise en main : le voile porte data-mode (pc/tactile) */
+      #onboard[data-mode='pc'] .ob-t,
+      #onboard:not([data-mode='pc']) .ob-p {
+        display: none;
+      }
       .ob-anim {
         position: relative;
         width: 150px;
@@ -2604,33 +2609,41 @@
       <button id="tourner-quand-meme" type="button">continuer en portrait</button>
     </div>
 
-    <!-- Onboarding tactile : trois gestes, trois cartes -->
-    <div id="onboard" hidden aria-label="Prise en main tactile">
+    <!-- Onboarding : quatre cartes, textes selon la prise en main (doigt ou souris) -->
+    <div id="onboard" hidden aria-label="Prise en main">
       <div class="ob-etape" data-etape="0">
         <div class="ob-anim ob-doigt"><i></i></div>
-        <h3>MAINTENEZ LE DOIGT</h3>
-        <p>Vous éjectez de l'eau vers lui — le corps part à l'opposé.
+        <h3><span class="ob-t">MAINTENEZ LE DOIGT</span><span class="ob-p">MAINTENEZ LE CLIC</span></h3>
+        <p class="ob-t">Vous éjectez de l'eau vers lui — le corps part à l'opposé.
+        Se déplacer, c'est rétrécir : chaque impulsion se paie en volume.</p>
+        <p class="ob-p">Vous éjectez de l'eau vers le pointeur — le corps part à l'opposé.
         Se déplacer, c'est rétrécir : chaque impulsion se paie en volume.</p>
       </div>
       <div class="ob-etape" data-etape="1" hidden>
         <div class="ob-anim ob-etats"><b>💧</b><b>❄</b><b>💨</b></div>
         <h3>TROIS ÉTATS</h3>
-        <p>❄ la glace garde son élan et réfléchit les lasers ·
+        <p class="ob-t">❄ la glace garde son élan et réfléchit les lasers ·
         💨 la vapeur passe les grilles — visez (le temps ralentit), relâchez : dash.</p>
+        <p class="ob-p"><b>F</b> la glace : garde son élan, réfléchit les lasers ·
+        <b>G</b> la vapeur : passe les grilles — visez (le temps ralentit), relâchez : dash.</p>
       </div>
       <div class="ob-etape" data-etape="2" hidden>
         <div class="ob-anim ob-pince"><i></i><i></i></div>
-        <h3>DEUX DOIGTS</h3>
-        <p>Pincez : zoom · glissez : déplacez la caméra.
+        <h3><span class="ob-t">DEUX DOIGTS</span><span class="ob-p">LA CAMÉRA</span></h3>
+        <p class="ob-t">Pincez : zoom · glissez : déplacez la caméra.
         Un doigt suffit pour tout le reste.</p>
+        <p class="ob-p">Molette : zoom · clic droit maintenu : déplacer la caméra ·
+        ⌖ recadre. Les touches <b>,</b> et <b>.</b> règlent le temps.</p>
       </div>
       <div class="ob-etape" data-etape="3" hidden>
         <div class="ob-anim ob-barre">
           <i>⏸</i><i>↺</i><i>⌖</i><i>≡</i>
         </div>
         <h3>LA BARRE DE BORD</h3>
-        <p>⏸ pause · ↺ recommencer · ⌖ recadrer · ≡ le menu.
+        <p class="ob-t">⏸ pause · ↺ recommencer · ⌖ recadrer · ≡ le menu.
         À droite : 💧 ❄ 💨 changent d'état — LÉGENDE et ÉTATS expliquent tout.</p>
+        <p class="ob-p"><b>Espace</b> pause · <b>R</b> recommencer · <b>Échap</b> le menu ·
+        <b>L</b> légende · <b>E</b> les états. Manette prise en charge — ☰ ouvre le menu.</p>
       </div>
       <div class="ob-pied">
         <span class="ob-points"><i class="on"></i><i></i><i></i><i></i></span>

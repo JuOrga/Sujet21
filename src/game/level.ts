@@ -895,6 +895,106 @@ export const TABLEAU_13: LevelDef = {
   ],
 }
 
+// ---- L'école des surfaces : trois leçons hors expédition -----------------
+// Trois tableaux didactiques, joués en tête de la file d'essai : chacun ne
+// montre QUE des surfaces et des régimes, sans énigme — on traverse, on
+// comprend, on sort. Les étiquettes font la leçon, le journal la raconte.
+
+// École I — les trois caractères de paroi : absorber, repousser, retenir.
+export const TABLEAU_S1: LevelDef = {
+  name: 'L’école des parois',
+  code: '21-S1',
+  journal:
+    'Première leçon. La PAROI absorbe tout — même la lumière. L’HYDROPHOBE le repousse : il rebondit sans mouiller. L’HYDROPHILE le retient : il s’y colle, y rampe, et paie une impulsion pour s’en arracher. Trois surfaces, trois caractères. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+  boxes: [
+    // la cloison d'entrée : paroi en bas, hydrophobe en haut, passage entre
+    box(-560, -750, -500, -140, MAT_WALL),
+    box(-560, 140, -500, 750, MAT_HYDROPHOBE),
+    // l'îlot hydrophile au centre : le mouillage se sent avant de se lire
+    box(-80, -160, 240, -40, MAT_HYDROPHILE),
+    // un plot hydrophobe isolé : le rebond se teste sans conséquence
+    box(480, 240, 620, 380, MAT_HYDROPHOBE),
+  ],
+  sponges: [],
+  labels: [
+    { x: -640, y: -400, text: 'PAROI — ABSORBE', tone: 'mur' },
+    { x: -640, y: 400, text: 'HYDROPHOBE — REPOUSSE', tone: 'phobe' },
+    { x: 80, y: -230, text: 'HYDROPHILE — RETIENT', tone: 'phile' },
+    { x: 550, y: 440, text: 'HYDROPHOBE', tone: 'phobe' },
+    { x: 1110, y: 160, text: 'SAS', tone: 'sas' },
+  ],
+}
+
+// École II — les climats : le froid fige, le chaud disperse, la grille
+// trie les états, l'éponge boit ce qu'on lui abandonne.
+export const TABLEAU_S2: LevelDef = {
+  name: 'L’école des climats',
+  code: '21-S2',
+  journal:
+    'Deuxième leçon, les climats : le FROID le fige, le CHAUD le disperse, la GRILLE n’arrête que ses formes denses — et l’ÉPONGE boit ce qu’on lui abandonne. Il a passé la grille en vapeur et s’est recomposé sur le dépôt froid, comme s’il lisait les étiquettes. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+  boxes: [
+    // la plaque froide au sol : s'y attarder, c'est geler — et le voir venir
+    box(-240, -520, 40, -460, MAT_FROID),
+    // le radiateur : la vaporisation gratuite, à hauteur de route
+    box(220, -80, 380, -20, MAT_CHAUD),
+    // la grille pleine hauteur : l'eau s'arrête, la vapeur passe
+    box(640, -750, 680, 750, MAT_GRILLE),
+    // le dépôt froid de l'autre côté : se recomposer avant le sas
+    box(780, -320, 920, -260, MAT_FROID),
+  ],
+  sponges: [
+    // l'éponge d'angle : la perte se constate sur un coin, pas sur la route
+    { minX: -620, minY: -750, cols: 2, rows: 20, cellSize: 24, capacityPerCell: 5 },
+  ],
+  labels: [
+    { x: -570, y: -200, text: 'ÉPONGE — BOIT', tone: 'eponge' },
+    { x: -100, y: -580, text: 'PLAQUE FROIDE — FIGE', tone: 'froid' },
+    { x: 300, y: 40, text: 'RADIATEUR — DISPERSE', tone: 'chaud' },
+    { x: 660, y: -420, text: 'GRILLE — SEULE LA VAPEUR PASSE', tone: 'grille' },
+    { x: 850, y: -380, text: 'DÉPÔT FROID', tone: 'froid' },
+    { x: 1110, y: 160, text: 'SAS', tone: 'sas' },
+  ],
+}
+
+// École III — les zones : certaines régions IMPOSENT leur état, d'autres
+// rendent le choix. On entre glace, on sort vapeur, on revient eau.
+export const TABLEAU_S3: LevelDef = {
+  name: 'L’école des zones',
+  code: '21-S3',
+  journal:
+    'Troisième leçon : certaines régions IMPOSENT leur état — un hublot fendu glace tout ce qui passe, une conduite rompue vaporise. Entre les deux, la zone libre lui rend le choix. Il est entré glace, sorti vapeur, revenu eau. Les états ne sont pas des formes : ce sont des langues, et il les parle toutes. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+  boxes: [
+    // le dépôt froid avant le sas : finir le voyage en eau
+    box(800, -300, 940, -240, MAT_FROID),
+  ],
+  sponges: [],
+  zones: [
+    { minX: -560, minY: -750, maxX: -280, maxY: 750, force: 'glace' },
+    { minX: -40, minY: -750, maxX: 200, maxY: 750, force: 'libre', label: 'ZONE LIBRE' },
+    { minX: 420, minY: -750, maxX: 680, maxY: 750, force: 'vapeur' },
+  ],
+  labels: [
+    { x: -420, y: -420, text: 'HUBLOT FENDU — GLACE', tone: 'froid' },
+    { x: 80, y: -420, text: 'ZONE LIBRE — AU CHOIX', tone: 'phile' },
+    { x: 550, y: -420, text: 'CONDUITE ROMPUE — VAPEUR', tone: 'chaud' },
+    { x: 870, y: -360, text: 'DÉPÔT FROID', tone: 'froid' },
+    { x: 1110, y: 160, text: 'SAS', tone: 'sas' },
+  ],
+}
+
+// Les trois leçons, dans l'ordre : parois, climats, zones. En tête de la
+// file d'essai des salles, et proposées à l'éditeur comme tout le reste.
+export const TABLEAUX_ECOLE: LevelDef[] = [TABLEAU_S1, TABLEAU_S2, TABLEAU_S3]
+
 // L'ordre de la partie : chaque tableau enseigne une chose, les derniers
 // les combinent — la trilogie laser révèle la fonction de l'échantillon
 // (miroir, prisme, plasma), la seconde trilogie compose ces fonctions
