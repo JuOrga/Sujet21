@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 11:15',
+    title: 'Le pack d’illustrations Steam, servi par le jeu',
+    notes: [
+      'Sur sujet21.vercel.app/steam/ : jaquette 600×900, bandeau 920×430, bannière héros 1920×620, logo transparent et icône — les formats exacts qu’attend Steam pour habiller l’entrée « jeu non Steam » du Steam Deck. Dessinés dans l’identité du jeu : le corps d’eau, le faisceau qui se plie, le rail magnétique, la cible.',
+      'La page explique la pose en mode Bureau (clic droit → illustration personnalisée). Steam n’autorise aucune application à installer les jaquettes à votre place — c’est l’unique étape manuelle, une seule fois.',
+    ],
+  },
+  {
     date: '11/08/2026 05:55',
     title: 'L’éponge boit en silence',
     notes: [
