@@ -63,12 +63,10 @@ const audio = new AudioFx(loadAudioPrefs())
 // Bande-son : mêmes réglages, même bus — elle ne s'éveille qu'au premier geste
 // et ne télécharge rien tant que le son est coupé.
 const bande = new Soundtrack(audio)
-let audioEveille = false
 function eveilAudio(): void {
   audio.resume()
   if (audio.enabled) {
     bande.eveiller()
-    audioEveille = true
   }
   majInviteSon()
 }
@@ -77,26 +75,16 @@ window.addEventListener('keydown', eveilAudio)
 // Le navigateur n'autorise le son qu'après un geste : sans invitation, le
 // premier geste de la partie est le clic sur COMMENCER, et le thème d'accueil
 // n'aurait jamais l'occasion de se faire entendre. La fiche le propose donc.
-const btnSonAccueil = document.getElementById('home-son') as HTMLButtonElement | null
+// Le son s'éveille au premier geste (toucher, clic, touche) — plus de
+// bouton d'activation. La fiche garde un simple MUTE, comme la barre du jeu.
+const btnMute = document.getElementById('home-mute') as HTMLButtonElement | null
 function majInviteSon(): void {
-  if (!btnSonAccueil) return
-  const cacher = audioEveille || !audio.enabled
-  if (!cacher) {
-    btnSonAccueil.hidden = false
-    return
-  }
-  if (btnSonAccueil.hidden) return
-  // Ne pas voler le geste en cours : masquer le bouton TOUT DE SUITE
-  // re-composait la fiche entre le relâcher du doigt et le clic synthétisé
-  // — la cible bougeait, le premier toucher se perdait (sur n'importe quel
-  // bouton de la fiche). On retire le bouton une fois le clic arrivé.
-  window.setTimeout(() => {
-    btnSonAccueil.hidden = true
-  }, 350)
+  if (btnMute) btnMute.textContent = audio.enabled ? '🔊 SON' : '🔇 MUET'
 }
-btnSonAccueil?.addEventListener('click', () => {
-  if (!audio.enabled) audio.setEnabled(true)
-  eveilAudio()
+btnMute?.addEventListener('click', () => {
+  audio.setEnabled(!audio.enabled)
+  if (audio.enabled) eveilAudio()
+  majInviteSon()
 })
 majInviteSon()
 // Mémoire pour les transitions sonores (fronts d'état)
@@ -435,7 +423,7 @@ recsEl.addEventListener('pointerdown', (e) => {
 // ---- L'appel de l'œil : à l'arrivée sur la fiche, le son et le plein
 // écran battent trois fois — on sait où toucher d'abord.
 function appelOeil(): void {
-  for (const id of ['home-son', 'home-plein']) {
+  for (const id of ['home-mute', 'home-plein']) {
     const b = document.getElementById(id) as HTMLButtonElement | null
     if (!b || b.hidden) continue
     b.classList.remove('appel')
@@ -688,13 +676,13 @@ function clicMenuManette(): boolean {
 // Le bouton visé porte un liseré (classe pad-focus).
 // dans l'ORDRE VISUEL de la fiche : la croix descend comme l'œil lit
 const FICHE_BOUTONS = [
-  'home-son',
   'start',
   'home-restart',
   'start-bis',
   'start-editor',
   'home-cmds',
   'home-recs',
+  'home-mute',
   'home-plein',
 ]
 let ficheFocus = 0
@@ -759,6 +747,7 @@ const endgame = {
   wasAiming: false, // front de relâchement du pointeur
   sasVu: 0, // particules avalées déjà constatées (détection « le sas boit »)
   sasBoitJusqua: -1, // temps simulé jusqu'auquel la fin de course se tait
+  enCollecte: false, // le sas boit en ce moment : alarmes et seuils se taisent
 }
 // Dash de vapeur : viser fige le temps, relâcher lance le nuage (« air
 // dash »). On ne retient qu'une chose entre deux images : était-on en visée.
@@ -1153,7 +1142,6 @@ const pane = createBench(params, monitor, {
       audio.setEnabled(v)
       if (v) {
         bande.eveiller()
-        audioEveille = true
       }
       majInviteSon()
     },
@@ -1276,7 +1264,6 @@ const btnSound = touchButton(
     audio.setEnabled(!audio.enabled)
     if (audio.enabled) {
       bande.eveiller()
-      audioEveille = true
     }
     majInviteSon()
     pane.refresh()
@@ -1583,10 +1570,7 @@ function frame(now: number): void {
     // annule sans frais — la visée n'engage à rien tant qu'on n'a pas lâché.
     if (vif && input.gasIntent && !input.aimActive) {
       const spent = sim.gasDash(aim.x, aim.y)
-      if (spent > 0) {
-        bande.bruitage('souffle-vapeur', 0.75)
-        manette.rumble(0.6, 90)
-      }
+      if (spent > 0) manette.rumble(0.6, 90) // le dash se voit, il ne souffle plus
     }
   }
   dash.aiming = dashAiming
@@ -1937,6 +1921,8 @@ function frame(now: number): void {
     endgame.sasBoitJusqua = run.tableauTime + 1.2
   }
   const sasBoit = run.tableauTime <= endgame.sasBoitJusqua
+  endgame.enCollecte = sasBoit
+  if (sasBoit) endgame.lastCall = false // le sas boit : l'alarme se tait
   const alive = !sim.dispersed && !tableauDone && !run.ended
   if (alive && !endgame.spent && !sasBoit) {
     endgame.lastCall = sim.liters() <= params.criticalVolumeLiters
@@ -1970,7 +1956,8 @@ function frame(now: number): void {
       !run.ended,
   )
 
-  const nearLast = alive && !endgame.spent && sim.liters() <= params.lastCallLiters
+  const nearLast =
+    alive && !endgame.spent && !endgame.enCollecte && sim.liters() <= params.lastCallLiters
   const inDanger = alive && (endgame.spent || endgame.lastCall || nearLast)
   if (inDanger) {
     hudDanger.textContent = endgame.spent
