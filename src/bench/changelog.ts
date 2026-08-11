@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 15:50',
+    title: 'La fiche en une page, le panneau COMMANDES, le plein écran',
+    notes: [
+      'Les COMMANDES quittent la fiche : un bouton « ⌘ COMMANDES » ouvre un panneau à trois onglets — PC, MANETTE, TACTILE — qui s’ouvre sur le bon selon votre façon de jouer. La fiche respire, et en PAYSAGE MOBILE elle tient désormais en UNE page : boutons resserrés, registres qui défilent dans leur cadre, rien ne déborde.',
+      'Bouton « ⛶ PLEIN ÉCRAN » sur la fiche, PC comme mobile (masqué là où le navigateur ne le permet pas, iOS notamment).',
+      'Les TABLEAUX LIVRÉS s’ouvrent dans l’ÉDITEUR : un sélecteur en tête de la colonne de droite charge une copie de n’importe quel tableau de l’expédition — dont les salles laser 21-H/I/J — pour l’étudier ou en repartir. « Enregistrer comme… » pour publier votre variante.',
+      'Le bouton ☰ (Start) de la manette met en PAUSE et affiche la fiche ; re-☰ reprend l’essai. Et « Ouvrir le son » devient « 🔊 ACTIVER LE SON » — plein, lumineux, impossible à rater.',
+    ],
+  },
+  {
     date: '11/08/2026 15:05',
     title: 'Mobile : le paysage demandé, la prise en main tactile en trois gestes',
     notes: [

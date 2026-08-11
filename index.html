@@ -126,6 +126,71 @@
         box-shadow: 0 0 14px rgba(99, 183, 230, 0.45);
       }
 
+      /* ---- Boutons jumeaux de la fiche : commandes + plein écran ---- */
+      .home-duo {
+        display: flex;
+        gap: 10px;
+      }
+      .home-duo button {
+        flex: 1 1 0;
+      }
+
+      /* ---- Le panneau COMMANDES : trois onglets, un seul endroit ---- */
+      #cmds {
+        position: fixed;
+        inset: 0;
+        z-index: 58;
+        background: rgba(4, 8, 15, 0.82);
+        backdrop-filter: blur(3px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+      }
+      #cmds[hidden] {
+        display: none;
+      }
+      .cmds-boite {
+        width: min(680px, 100%);
+        max-height: 88vh;
+        overflow-y: auto;
+        scrollbar-width: none;
+        background: #060d18;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        padding: 14px 18px 18px;
+        box-shadow: 0 0 40px rgba(99, 183, 230, 0.15);
+      }
+      .cmds-boite::-webkit-scrollbar {
+        display: none;
+      }
+      .cmds-onglets {
+        display: flex;
+        gap: 8px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 10px;
+        margin-bottom: 12px;
+      }
+      .cmds-onglets button {
+        font-family: var(--font-display);
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        padding: 8px 14px;
+        background: transparent;
+        color: var(--dim);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .cmds-onglets button.on {
+        color: #06121e;
+        background: #63b7e6;
+        border-color: #63b7e6;
+      }
+      #cmds-fermer {
+        margin-left: auto;
+      }
+
       /* ---- Téléphone en portrait : le protocole s'observe en paysage ----
          Un voile plein écran, un téléphone qui pivote, une sortie de secours
          pour qui a le verrou de rotation. */
@@ -366,38 +431,69 @@
           height: clamp(110px, 16vh, 160px);
         }
       }
-      /* ---- Paysage bas (téléphone tourné) : la fiche tient à l'écran ---- */
+      /* ---- Paysage bas (téléphone tourné) : la fiche tient en UNE page ---- */
       @media (max-height: 520px) {
         #home {
           width: 100vw;
-          gap: 8px;
-          padding: 10px 22px;
+          gap: 6px;
+          padding: calc(8px + env(safe-area-inset-top)) 22px calc(8px + env(safe-area-inset-bottom));
           border-right: none;
+          justify-content: safe center;
         }
         .home-cols {
           flex-direction: row;
-          gap: 26px;
+          gap: 24px;
+          align-items: stretch;
+          flex: 1 1 0;
+          min-height: 0;
+          overflow: hidden;
         }
         .home-col {
-          gap: 8px;
+          gap: 7px;
+          min-height: 0;
         }
         .home-figure {
           display: none;
         }
         .home-title {
-          font-size: 20px;
+          font-size: 19px;
         }
         .home-pitch {
-          font-size: 11.5px;
-          line-height: 1.55;
+          font-size: 11px;
+          line-height: 1.5;
         }
         .home-eyebrow {
-          font-size: 9px;
-          padding-bottom: 8px;
+          font-size: 8.5px;
+          padding-bottom: 6px;
         }
         .home-badge {
-          width: 34px;
-          height: 34px;
+          width: 30px;
+          height: 30px;
+        }
+        /* les boutons se resserrent : cinq tiennent dans la colonne */
+        #home button {
+          padding: 8px 10px;
+          font-size: 10.5px;
+          letter-spacing: 0.1em;
+        }
+        .home-readout {
+          font-size: 11px;
+        }
+        /* les registres défilent DANS leur cadre, la page ne défile pas */
+        .home-records {
+          min-height: 0;
+          max-height: 100%;
+          overflow-y: auto;
+          scrollbar-width: none;
+        }
+        .home-records::-webkit-scrollbar {
+          display: none;
+        }
+        .home-foot {
+          display: none;
+        }
+        #home-seq {
+          display: none;
         }
       }
       body.playing #home {
@@ -546,16 +642,21 @@
          ou dès qu'un autre geste a réveillé la bande-son. */
       #home-son {
         font-family: var(--font-display);
-        font-size: 10.5px;
-        letter-spacing: 0.12em;
-        padding: 9px 16px;
+        font-size: 13px;
+        letter-spacing: 0.14em;
+        padding: 13px 16px;
         margin-bottom: -4px;
-        color: var(--accent, #63b7e6);
-        background: transparent;
-        border: 1px solid rgba(99, 183, 230, 0.45);
+        color: #06121e;
+        background: #63b7e6;
+        border: 1px solid #63b7e6;
         border-radius: 5px;
         cursor: pointer;
         transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+        animation: son-appel 2.2s ease-in-out infinite;
+      }
+      @keyframes son-appel {
+        0%, 100% { box-shadow: 0 0 0 rgba(99, 183, 230, 0); }
+        50% { box-shadow: 0 0 22px rgba(99, 183, 230, 0.65); }
       }
       #home-son:hover {
         background: rgba(99, 183, 230, 0.14);
@@ -2081,11 +2182,15 @@
         <div><dt>PARTICULES</dt><dd id="home-particles">—</dd></div>
         <div><dt>ÉTAT</dt><dd id="home-state">en dérive</dd></div>
       </dl>
-      <button id="home-son" type="button" hidden>♪ OUVRIR LE SON DU PROTOCOLE</button>
+      <button id="home-son" type="button" hidden>🔊 ACTIVER LE SON</button>
       <button id="start" type="button">COMMENCER L'ESSAI</button>
       <button id="home-restart" type="button" hidden>RECOMMENCER LE TABLEAU</button>
       <button id="start-bis" type="button">TESTER LES SALLES LASER — 21-H → 21-J, MIROIR · PRISME · PLASMA</button>
       <button id="start-editor" type="button">ÉDITEUR DE TABLEAUX — CRÉER OU MODIFIER UN NIVEAU</button>
+      <div class="home-duo">
+        <button id="home-cmds" type="button">⌘ COMMANDES</button>
+        <button id="home-plein" type="button">⛶ PLEIN ÉCRAN</button>
+      </div>
       <div id="home-seq" class="rec-note"></div>
       </div>
       <div class="home-col">
@@ -2102,50 +2207,6 @@
         <div class="rec-note">Records partagés entre tous les opérateurs du protocole.</div>
         <div id="rec-rows"></div>
       </div>
-      <details id="cmd-details" open>
-        <summary>COMMANDES</summary>
-      <div class="home-commands cmd-desktop">
-        <kbd>maintenir</kbd>éjecter vers le pointeur — le corps part à l'opposé<br />
-        <kbd>F</kbd>glace : le bloc garde son élan
-        <kbd>G</kbd>vapeur : viser (temps ralenti), relâcher = dash<br />
-        <kbd>molette</kbd>zoom
-        <kbd>clic droit maintenu</kbd>déplacer la caméra
-        <kbd>⌖</kbd>recadrer<br />
-        <kbd>, .</kbd>time warp
-        <kbd>espace</kbd>pause
-        <kbd>R</kbd>recommencer
-        <kbd>échap</kbd>cette fiche<br />
-        <kbd>L</kbd>légende des surfaces
-        <kbd>E</kbd>les trois états : qui bloque quoi
-        <kbd>BANC</kbd>banc de réglage
-      </div>
-      <div class="home-commands cmd-touch">
-        <kbd>toucher</kbd>éjecter vers le doigt — le corps part à l'opposé<br />
-        <kbd>❄</kbd>glace, re-toucher pour dégeler
-        <kbd>💨</kbd>vapeur : viser puis relâcher = dash<br />
-        <kbd>2 doigts</kbd>pincer : zoom · glisser : déplacer la caméra (⌖ recadre)<br />
-        <kbd>LÉGENDE</kbd>les surfaces
-        <kbd>ÉTATS</kbd>qui bloque quoi
-        <kbd>BANC</kbd>réglages
-        <kbd>≡</kbd>cette fiche
-      </div>
-      </details>
-      <details id="pad-details">
-        <summary>COMMANDES MANETTE (Steam Deck, Xbox, DualSense)</summary>
-      <div class="home-commands">
-        <kbd>stick gauche</kbd>le CAP : où aller — l'éjection part toute seule à l'opposé<br />
-        <kbd>A</kbd>agir : maintenir éjecte · en vapeur, viser puis relâcher = dash<br />
-        <kbd>RT / LT</kbd>zoomer / dézoomer (la pression dose)<br />
-        <kbd>LB</kbd>glace
-        <kbd>RB</kbd>vapeur
-        <kbd>X</kbd>retour à l'eau<br />
-        <kbd>stick droit</kbd>déplacer la caméra
-        <kbd>croix ↔</kbd>ralenti / accéléré<br />
-        <kbd>Start</kbd>pause
-        <kbd>Select</kbd>recommencer
-        <kbd>A</kbd>valider dans les menus
-      </div>
-      </details>
       </div>
       </div>
       <div class="home-foot">
@@ -2257,6 +2318,13 @@
 
       <aside class="ed-side ed-side--right">
         <div class="ed-group">
+          <span class="k">Tableaux livrés — ouvrir une copie pour l’étudier ou en repartir</span>
+          <div class="ed-f" style="flex-direction: row; gap: 6px">
+            <select id="ed-livres" style="flex: 1"></select>
+            <button type="button" id="ed-livre-charger">Charger</button>
+          </div>
+        </div>
+        <div class="ed-group">
           <span class="k">Bibliothèque du protocole — l’ordre est la séquence</span>
           <div id="ed-lib"></div>
         </div>
@@ -2286,6 +2354,56 @@
     </div>
 
     <div id="tutor" aria-live="polite"></div>
+
+    <!-- Les commandes : un panneau à trois onglets — PC, manette, tactile -->
+    <div id="cmds" hidden aria-label="Commandes du jeu">
+      <div class="cmds-boite">
+        <div class="cmds-onglets">
+          <button type="button" data-onglet="pc" class="on">PC</button>
+          <button type="button" data-onglet="pad">MANETTE</button>
+          <button type="button" data-onglet="tactile">TACTILE</button>
+          <button type="button" id="cmds-fermer" aria-label="Fermer">✕</button>
+        </div>
+        <div class="cmds-page home-commands" data-page="pc">
+          <kbd>maintenir</kbd>éjecter vers le pointeur — le corps part à l'opposé<br />
+          <kbd>F</kbd>glace : le bloc garde son élan
+          <kbd>G</kbd>vapeur : viser (temps ralenti), relâcher = dash<br />
+          <kbd>molette</kbd>zoom
+          <kbd>clic droit maintenu</kbd>déplacer la caméra
+          <kbd>⌖</kbd>recadrer<br />
+          <kbd>, .</kbd>time warp
+          <kbd>espace</kbd>pause
+          <kbd>R</kbd>recommencer
+          <kbd>échap</kbd>la fiche<br />
+          <kbd>L</kbd>légende des surfaces
+          <kbd>E</kbd>les trois états
+          <kbd>BANC</kbd>banc de réglage
+        </div>
+        <div class="cmds-page home-commands" data-page="pad" hidden>
+          <kbd>stick gauche</kbd>le CAP : où aller — l'éjection part toute seule à l'opposé<br />
+          <kbd>A</kbd>agir : maintenir éjecte · en vapeur, viser puis relâcher = dash<br />
+          <kbd>RT / LT</kbd>zoomer / dézoomer (la pression dose)<br />
+          <kbd>LB</kbd>glace
+          <kbd>RB</kbd>vapeur
+          <kbd>X</kbd>retour à l'eau<br />
+          <kbd>stick droit</kbd>déplacer la caméra
+          <kbd>croix ↔</kbd>ralenti / accéléré<br />
+          <kbd>Start ☰</kbd>pause + la fiche
+          <kbd>Select</kbd>recommencer
+          <kbd>A</kbd>valider dans les menus
+        </div>
+        <div class="cmds-page home-commands" data-page="tactile" hidden>
+          <kbd>toucher</kbd>éjecter vers le doigt — le corps part à l'opposé<br />
+          <kbd>❄</kbd>glace, re-toucher pour dégeler
+          <kbd>💨</kbd>vapeur : viser puis relâcher = dash<br />
+          <kbd>2 doigts</kbd>pincer : zoom · glisser : déplacer la caméra (⌖ recadre)<br />
+          <kbd>LÉGENDE</kbd>les surfaces
+          <kbd>ÉTATS</kbd>qui bloque quoi
+          <kbd>BANC</kbd>réglages
+          <kbd>≡</kbd>la fiche
+        </div>
+      </div>
+    </div>
 
     <!-- Téléphone en portrait : le protocole s'observe en paysage -->
     <div id="tourner" aria-label="Tournez l'appareil en paysage">

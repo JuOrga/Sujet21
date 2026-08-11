@@ -14,6 +14,8 @@ import {
   MAT_HYDROPHILE,
   MAT_HYDROPHOBE,
   MAT_WALL,
+  TABLEAU_1BIS,
+  TABLEAUX,
   ZONE_CAUSES,
   subtractBox,
   zoneName,
@@ -1072,6 +1074,29 @@ export class LevelEditor {
         else this.setTool({ kind: 'select' })
       })
     }
+
+    // Tableaux LIVRÉS : une copie s'ouvre comme brouillon — pour étudier la
+    // construction des salles (miroirs, prisme, plasma…) ou en repartir.
+    const selLivres = this.el<HTMLSelectElement>('ed-livres')
+    const livres = [...TABLEAUX, TABLEAU_1BIS]
+    selLivres.innerHTML = livres
+      .map((t, i) => `<option value="${i}">${t.code} — ${t.name}</option>`)
+      .join('')
+    this.el('ed-livre-charger').addEventListener('click', () => {
+      const lv = livres[Number(selLivres.value) || 0]
+      if (!lv) return
+      if (!confirm(`Ouvrir une copie de « ${lv.code} — ${lv.name} » ? Le brouillon en cours sera remplacé.`)) {
+        return
+      }
+      this.level = structuredClone(lv)
+      this.openId = ''
+      this.sel = null
+      this.multi = []
+      this.fitView()
+      this.syncForm()
+      this.renderLibrary()
+      this.commit(`Copie de ${lv.code} ouverte — « Enregistrer comme… » pour la publier à votre nom.`)
+    })
 
     this.el('ed-snap').addEventListener('change', (e) => {
       this.snap = (e.target as HTMLInputElement).checked

@@ -532,16 +532,53 @@ if (new URLSearchParams(location.search).has('editeur')) {
   hasPlayed = true
   openEditor()
 }
-// Au doigt, la fiche va à l'essentiel : les commandes démarrent repliées.
-// Idem sur écran BAS (Steam Deck : 800 px) — c'est ce qui faisait défiler.
-if (window.matchMedia('(max-width: 700px), (max-height: 840px)').matches) {
-  document.getElementById('cmd-details')!.removeAttribute('open')
+// ---- Le panneau COMMANDES : trois onglets (PC, manette, tactile) ----
+// Les commandes ont quitté la fiche : un bouton, un panneau, trois écrans.
+const cmdsEl = document.getElementById('cmds') as HTMLDivElement
+function ongletCmds(nom: string): void {
+  for (const b of Array.from(cmdsEl.querySelectorAll<HTMLButtonElement>('[data-onglet]'))) {
+    b.classList.toggle('on', b.dataset.onglet === nom)
+  }
+  for (const p of Array.from(cmdsEl.querySelectorAll<HTMLElement>('[data-page]'))) {
+    p.hidden = p.dataset.page !== nom
+  }
+}
+document.getElementById('home-cmds')?.addEventListener('click', () => {
+  // l'onglet d'accueil suit la façon de jouer : tactile au doigt, sinon PC
+  ongletCmds(window.matchMedia('(pointer: coarse)').matches ? 'tactile' : 'pc')
+  cmdsEl.hidden = false
+})
+for (const b of Array.from(cmdsEl.querySelectorAll<HTMLButtonElement>('[data-onglet]'))) {
+  b.addEventListener('click', () => ongletCmds(b.dataset.onglet!))
+}
+document.getElementById('cmds-fermer')?.addEventListener('click', () => {
+  cmdsEl.hidden = true
+})
+cmdsEl.addEventListener('pointerdown', (e) => {
+  if (e.target === cmdsEl) cmdsEl.hidden = true // toucher le voile referme
+})
+
+// ---- Plein écran : PC comme mobile — masqué là où l'API manque (iOS) ----
+const pleinBtn = document.getElementById('home-plein') as HTMLButtonElement | null
+if (pleinBtn) {
+  if (!document.documentElement.requestFullscreen) {
+    pleinBtn.hidden = true
+  } else {
+    pleinBtn.addEventListener('click', () => {
+      if (document.fullscreenElement) void document.exitFullscreen()
+      else void document.documentElement.requestFullscreen().catch(() => {})
+    })
+    document.addEventListener('fullscreenchange', () => {
+      pleinBtn.textContent = document.fullscreenElement ? '⛶ QUITTER LE PLEIN ÉCRAN' : '⛶ PLEIN ÉCRAN'
+    })
+  }
 }
 window.addEventListener('keydown', (e) => {
   const t = e.target as HTMLElement | null
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
   if (e.key === 'Escape') {
-    if (document.body.classList.contains('playing')) openHome()
+    if (!cmdsEl.hidden) cmdsEl.hidden = true // le panneau des commandes d'abord
+    else if (document.body.classList.contains('playing')) openHome()
     else closeHome()
   } else if (e.key === 'l' || e.key === 'L') {
     toggleLegend()
@@ -600,10 +637,23 @@ function clicMenuManette(): boolean {
 // ---- Navigation de la FICHE à la manette ----
 // Croix (ou stick) haut/bas : passer d'un bouton à l'autre — A : valider.
 // Le bouton visé porte un liseré (classe pad-focus).
-const FICHE_BOUTONS = ['start', 'home-restart', 'start-bis', 'start-editor', 'home-son']
+const FICHE_BOUTONS = [
+  'start',
+  'home-restart',
+  'start-bis',
+  'start-editor',
+  'home-cmds',
+  'home-plein',
+  'home-son',
+]
 let ficheFocus = 0
 let ficheNavPrete = true // anti-répétition du stick
 function ficheNavigue(): void {
+  // ☰ (Start) depuis la fiche : reprendre l'essai directement
+  if (manette.edge(BOUTON.START)) {
+    document.getElementById('start')?.click()
+    return
+  }
   const visibles = FICHE_BOUTONS.map((id) => document.getElementById(id)).filter(boutonVisible)
   if (visibles.length === 0) return
   // le stick fait aussi la navigation : un coup franc vers le haut/bas
@@ -1373,7 +1423,8 @@ function frame(now: number): void {
     } else if (manette.edge(BOUTON.A) && clicMenuManette()) {
       // écrans de jeu (relance, fin de tableau) : le clic a consommé le A
     } else if (enJeu) {
-      if (manette.edge(BOUTON.START)) input.togglePause()
+      // ☰ (Start) : pause ET menu — la fiche fige l'essai en s'ouvrant
+      if (manette.edge(BOUTON.START)) openHome()
       if (manette.edge(BOUTON.SELECT)) input.onReset?.()
       if (manette.edge(BOUTON.LB)) input.toggleFreeze()
       if (manette.edge(BOUTON.RB)) input.toggleGas()
