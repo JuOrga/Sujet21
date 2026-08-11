@@ -577,6 +577,8 @@ const endgame = {
   lastCall: false, // la prochaine impulsion est la dernière
   spent: false, // elle a été donnée : le corps se fige et dérive
   wasAiming: false, // front de relâchement du pointeur
+  sasVu: 0, // particules avalées déjà constatées (détection « le sas boit »)
+  sasBoitJusqua: -1, // temps simulé jusqu'auquel la fin de course se tait
 }
 // Dash de vapeur : viser fige le temps, relâcher lance le nuage (« air
 // dash »). On ne retient qu'une chose entre deux images : était-on en visée.
@@ -884,6 +886,8 @@ function restart(): void {
   run.tableauTime = 0
   run.ended = false
   endgame.lastCall = false
+  endgame.sasVu = 0
+  endgame.sasBoitJusqua = -1
   endgame.spent = false
   endgame.wasAiming = false
   vortex.timer = 0
@@ -1301,6 +1305,9 @@ function frame(now: number): void {
       if (manette.edge(BOUTON.DROITE)) input.stepWarp(1)
       if (manette.zoomAvant) camera.zoomBy(Math.pow(1.9, dtReal), params)
       if (manette.zoomArriere) camera.zoomBy(Math.pow(1.9, -dtReal), params)
+      // les grosses gâchettes zooment, la pression dose la vitesse
+      if (manette.rtVal > 0.02) camera.zoomBy(Math.pow(2.2, manette.rtVal * dtReal), params)
+      if (manette.ltVal > 0.02) camera.zoomBy(Math.pow(2.2, -manette.ltVal * dtReal), params)
       if (manette.panX !== 0 || manette.panY !== 0) {
         // pousser à droite REGARDE à droite (le pan de drag est inversé)
         camera.panBy(-manette.panX * 900 * dtReal, -manette.panY * 900 * dtReal)
@@ -1488,7 +1495,10 @@ function frame(now: number): void {
   // banc (rayon ou courant à 0) : règle historique, le centre du corps
   // franchit la boîte. L'eau avalée est mise en bonbonne dans les deux cas.
   const drainActive = params.exitRadius > 0 && params.exitPull > 0
-  const drunk = sim.swallowed > 0 && sim.playerCount <= Math.max(6, sim.baseVolume * 0.02)
+  // La victoire compte TOUT ce qui vit encore — gouttes détachées, palets de
+  // glace, volutes — pas seulement le corps principal : tant qu'il reste de
+  // la matière visible, le sas n'a pas fini de boire.
+  const drunk = sim.swallowed > 0 && sim.count <= Math.max(6, sim.baseVolume * 0.02)
   const reached =
     !drainActive && pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit)
   if (!tableauDone && !sim.dispersed && (drunk || reached) && testLevel) {
@@ -1700,8 +1710,16 @@ function frame(now: number): void {
   // Aucun minimum à ramener : on peut finir un tableau sur un souffle. Sous le
   // seuil, la prochaine impulsion est la dernière ; une fois donnée, le corps
   // se fige avec son élan et l'essai s'achève à l'arrêt.
+  // MAIS : quand le SAS BOIT, le volume fond parce qu'il est COLLECTÉ — la
+  // fin de course n'a rien à y redire. Tant que l'aspiration avale (et une
+  // bonne seconde après), alerte, dernière impulsion et gel se taisent.
+  if (sim.swallowed > endgame.sasVu) {
+    endgame.sasVu = sim.swallowed
+    endgame.sasBoitJusqua = run.tableauTime + 1.2
+  }
+  const sasBoit = run.tableauTime <= endgame.sasBoitJusqua
   const alive = !sim.dispersed && !tableauDone && !run.ended
-  if (alive && !endgame.spent) {
+  if (alive && !endgame.spent && !sasBoit) {
     endgame.lastCall = sim.liters() <= params.criticalVolumeLiters
     const aiming = input.aimActive && !input.paused
     // le relâchement du pointeur conclut l'impulsion en cours

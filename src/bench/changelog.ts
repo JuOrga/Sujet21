@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 14:30',
+    title: 'Gâchettes = zoom, fin de course muette quand le sas boit, nuage qui fait corps',
+    notes: [
+      'MANETTE : les grosses gâchettes zooment — RT rapproche, LT recule, la pression dose la vitesse. AGIR passe sur A seul (éjecter, viser-relâcher le dash). Et la fiche gagne un panneau « COMMANDES MANETTE », bouton par bouton.',
+      'Quand le SAS BOIT, la fin de course se tait : plus d’alerte, plus de sting de dernière impulsion, plus de gel — le volume fond parce qu’il est COLLECTÉ, pas parce qu’il se perd. Et la victoire attend désormais que TOUT soit aspiré : gouttes détachées, palets de glace et volutes comptent — pas seulement le corps principal.',
+      'Le NUAGE FAIT CORPS sur les rails : les retardataires hors de la bande du champ sont rappelés vers le cœur convoyé — les virages ne déchirent plus la vapeur, et quand un seul morceau est capturé, il emmène le reste au lieu de s’en détacher.',
+    ],
+  },
+  {
     date: '11/08/2026 13:55',
     title: 'Vapeur qui respire, fiche qui fige, et le Deck sans ascenseur',
     notes: [
