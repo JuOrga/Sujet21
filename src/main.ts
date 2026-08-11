@@ -337,9 +337,9 @@ const cardCode = el('card-code')
 const cardLog = el('card-log')
 const cardFig = el('card-fig') as HTMLImageElement
 
-// Carton d'ouverture : l'entrée du journal de bord du tableau, affichée
-// pendant le plan large puis effacée quand la caméra a plongé.
-let cardTimer: number | undefined
+// Carton d'ouverture : l'entrée du journal de bord du tableau. Il RESTE
+// affiché tant qu'on ne l'a pas fermé à la croix — lire ne se chronomètre
+// pas (l'effacement automatique partait trop vite).
 function showTableauCard(): void {
   cardCode.textContent = `ESSAI ${level.code} — ${level.name.toUpperCase()}`
   // La planche du dossier, quand le tableau en a une
@@ -352,9 +352,10 @@ function showTableauCard(): void {
   }
   cardLog.textContent = level.journal
   tableauCard.classList.add('visible')
-  window.clearTimeout(cardTimer)
-  cardTimer = window.setTimeout(() => tableauCard.classList.remove('visible'), 6500)
 }
+document.getElementById('card-fermer')?.addEventListener('click', () => {
+  tableauCard.classList.remove('visible')
+})
 
 // Fiche d'essai : visible au chargement ; « échap » ou ≡ pour y revenir.
 // L'essai continue de dériver derrière la fiche — elle observe, elle ne fige pas.
