@@ -13,6 +13,7 @@
 //   LB             glace (bascule)        RB       vapeur (bascule)
 //   X              retour à l'eau
 //   stick droit    caméra                 croix ↕  zoom (aussi)
+//   L3 / R3        recadrer : caméra et zoom automatiques
 //   croix ↔        ralenti / accéléré
 //   Start          pause                  Select   recommencer
 //   A (menus)      valider le bouton principal visible
