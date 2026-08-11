@@ -98,7 +98,23 @@ export interface TraceResultat {
   railsSuivis: number[]
 }
 
-function dansRect(x: number, y: number, r: Rect): boolean {
+function dansRect(x: number, y: number, r: Rect & { angle?: number }): boolean {
+  if (r.angle) {
+    const cx = (r.minX + r.maxX) / 2
+    const cy = (r.minY + r.maxY) / 2
+    const rad = (r.angle * Math.PI) / 180
+    const ca = Math.cos(rad)
+    const sa = Math.sin(rad)
+    const rx = x - cx
+    const ry = y - cy
+    const lx = cx + rx * ca + ry * sa
+    const ly = cy - rx * sa + ry * ca
+    return lx >= r.minX && lx <= r.maxX && ly >= r.minY && ly <= r.maxY
+  }
+  return dansRectAxe(x, y, r)
+}
+
+function dansRectAxe(x: number, y: number, r: Rect): boolean {
   return x >= r.minX && x <= r.maxX && y >= r.minY && y <= r.maxY
 }
 

@@ -64,11 +64,13 @@ function readBox(o: Record<string, unknown>): ObstacleBox | null {
   if (!MATERIALS.includes(material as (typeof MATERIALS)[number])) return null
   // Normaliser AVANT de juger la taille : une boîte tracée de droite à gauche
   // est parfaitement valide, elle est seulement à l'envers.
-  const box = {
+  const angle = num(o.angle, 0)
+  const box: ObstacleBox = {
     minX: Math.min(minX, maxX),
     minY: Math.min(minY, maxY),
     maxX: Math.max(minX, maxX),
     maxY: Math.max(minY, maxY),
+    ...(angle ? { angle: Math.max(-180, Math.min(180, angle)) } : {}),
     material,
   }
   if (box.maxX - box.minX < 1 || box.maxY - box.minY < 1) return null

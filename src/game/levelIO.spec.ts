@@ -193,3 +193,15 @@ it('conserve les rails magnétiques et écarte les moignons', () => {
   const verdicts = checkLevel({ ...level!, lasers: [] })
   expect(verdicts.some((v) => v.niveau === 'avertissement' && v.message.includes('rail'))).toBe(true)
 })
+
+describe('levelIO — boîtes obliques', () => {
+  it('l’angle d’une boîte survit à l’aller-retour JSON', () => {
+    const src = JSON.parse(serializeLevel(TABLEAUX[0])) as Record<string, unknown>
+    ;(src.boxes as Record<string, unknown>[])[0].angle = 30
+    const { level } = parseLevel(src)
+    expect(level?.boxes[0].angle).toBe(30)
+    // et repart tel quel à la sérialisation
+    const rejoue = parseLevel(JSON.parse(serializeLevel(level!)))
+    expect(rejoue.level?.boxes[0].angle).toBe(30)
+  })
+})

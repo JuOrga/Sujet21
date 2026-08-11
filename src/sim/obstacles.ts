@@ -14,6 +14,33 @@ export interface ClosestPoint {
 export function boxContact(
   x: number,
   y: number,
+  b: { minX: number; minY: number; maxX: number; maxY: number; angle?: number },
+  out: ClosestPoint,
+): void {
+  // Boîte OBLIQUE : on passe dans son repère local (rotation inverse autour
+  // du centre), on résout comme une boîte droite, et on ramène la normale
+  // dans le monde. Le chemin droit reste le chemin rapide.
+  if (b.angle) {
+    const cx = (b.minX + b.maxX) / 2
+    const cy = (b.minY + b.maxY) / 2
+    const rad = (b.angle * Math.PI) / 180
+    const ca = Math.cos(rad)
+    const sa = Math.sin(rad)
+    const rx = x - cx
+    const ry = y - cy
+    boxContactAxe(cx + rx * ca + ry * sa, cy - rx * sa + ry * ca, b, out)
+    const nx = out.nx * ca - out.ny * sa
+    const ny = out.nx * sa + out.ny * ca
+    out.nx = nx
+    out.ny = ny
+    return
+  }
+  boxContactAxe(x, y, b, out)
+}
+
+function boxContactAxe(
+  x: number,
+  y: number,
   b: { minX: number; minY: number; maxX: number; maxY: number },
   out: ClosestPoint,
 ): void {

@@ -100,6 +100,7 @@ uniform vec2 uRoomHalf;
 uniform int uBoxCount;
 uniform vec4 uBoxes[MAX_BOXES];   // minX, minY, maxX, maxY
 uniform float uBoxMats[MAX_BOXES]; // 0 mur, 1 hydrophile, 2 hydrophobe, 3 sas
+uniform float uBoxAngs[MAX_BOXES]; // rotation (radians) autour du centre — 0 : boîte droite
 uniform float uTime;
 uniform float uExitRadius; // portée de l'aspiration du sas (halo de courant)
 uniform float uColdBand;   // portée de l'aura de gel des plaques froides
@@ -552,7 +553,18 @@ void main() {
   float drainEye = 0.0; // œil du sas, retenu pour assombrir l'eau qui y coule
   for (int bi = 0; bi < MAX_BOXES; bi++) {
     if (bi >= uBoxCount) break;
-    float d = boxSdf(world, uBoxes[bi]);
+    // boîte oblique : le monde pivote dans le repère local de la boîte —
+    // la distance signée (remplissage, arête, aura) suit la rotation
+    vec2 wb = world;
+    float bAng = uBoxAngs[bi];
+    if (abs(bAng) > 0.0005) {
+      vec2 bc = 0.5 * (uBoxes[bi].xy + uBoxes[bi].zw);
+      vec2 rel = world - bc;
+      float bca = cos(bAng);
+      float bsa = sin(bAng);
+      wb = bc + vec2(bca * rel.x + bsa * rel.y, -bsa * rel.x + bca * rel.y);
+    }
+    float d = boxSdf(wb, uBoxes[bi]);
     float mat = uBoxMats[bi];
     // Ombre portée douce autour de chaque solide (sauf le sas) : les blocs
     // se détachent du fond au lieu de flotter — la cuve prend de la
@@ -1013,6 +1025,7 @@ export class Renderer {
   private readonly scratch: Float32Array
   private readonly boxScratch = new Float32Array(MAX_BOXES * 4)
   private readonly matScratch = new Float32Array(MAX_BOXES)
+  private readonly angScratch = new Float32Array(MAX_BOXES)
   private readonly floatField: boolean
   private fieldScale: number
   private fbo: WebGLFramebuffer | null = null
@@ -1300,10 +1313,12 @@ export class Renderer {
       this.boxScratch[i * 4 + 2] = bx.maxX
       this.boxScratch[i * 4 + 3] = bx.maxY
       this.matScratch[i] = bx.material
+      this.angScratch[i] = ((bx.angle ?? 0) * Math.PI) / 180
     }
     gl.uniform1i(cu['uBoxCount'], boxCount)
     gl.uniform4fv(cu['uBoxes[0]'], this.boxScratch)
     gl.uniform1fv(cu['uBoxMats[0]'], this.matScratch)
+    gl.uniform1fv(cu['uBoxAngs[0]'], this.angScratch)
     gl.uniform1f(cu['uTime'], timeSec)
     gl.uniform1f(cu['uExitRadius'], params.exitRadius)
     // les auras dessinées suivent la physique refroidie (mêmes formules que

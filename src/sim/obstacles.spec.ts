@@ -287,3 +287,37 @@ describe('Membrane et rideau lamellaire — chaque état a sa porte', () => {
     expect(glisse(MAT_HYDROPHILE)).toBeLessThan(glisse(MAT_WALL) * 0.8)
   })
 })
+
+describe('Boîtes obliques — la rotation traverse contact, simulation et optique', () => {
+  it('boxContact sur une boîte à 45° : le coin pointe vers le haut', () => {
+    const b = { minX: -50, minY: -50, maxX: 50, maxY: 50, angle: 45 }
+    const cp: ClosestPoint = { dist: 0, nx: 0, ny: 0 }
+    boxContact(0, 80, b, cp)
+    // droite, la face serait à 30 u ; tournée, le COIN monte à 50·√2 ≈ 70,7
+    expect(cp.dist).toBeCloseTo(80 - 50 * Math.SQRT2, 0)
+    expect(cp.nx).toBeCloseTo(0, 5)
+    expect(cp.ny).toBeCloseTo(1, 5)
+  })
+
+  it('une paroi oblique DÉVIE là où sa version droite laisserait passer', () => {
+    const sim = makeSim()
+    // barre fine tournée à 45° : sa diagonale occupe y ≈ x autour de l'origine
+    sim.setLevel([{ minX: -150, minY: -20, maxX: 150, maxY: 20, material: MAT_WALL, angle: 45 }], [])
+    const i = sim.addParticle(-200, 80, KIND_FREE)
+    sim.velX[i] = 300 // file vers +x à y ≈ 80 : hors de la boîte DROITE
+    let yMax = -Infinity
+    for (let s = 0; s < 240; s++) {
+      sim.step(sim.params.dt)
+      yMax = Math.max(yMax, sim.posY[i])
+    }
+    // la rampe oblique la DÉVIE : elle glisse le long de la diagonale et
+    // remonte nettement — la barre droite ne l'aurait pas touchée
+    expect(yMax).toBeGreaterThan(110)
+    const sim2 = makeSim()
+    sim2.setLevel([{ minX: -150, minY: -20, maxX: 150, maxY: 20, material: MAT_WALL }], [])
+    const j = sim2.addParticle(-200, 80, KIND_FREE)
+    sim2.velX[j] = 300
+    for (let s = 0; s < 240; s++) sim2.step(sim2.params.dt)
+    expect(Math.abs(sim2.posY[j] - 80)).toBeLessThan(5)
+  })
+})

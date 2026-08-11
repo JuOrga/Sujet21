@@ -22,6 +22,7 @@ import {
   MAT_HYDROPHOBE,
   MAT_MEMBRANE,
   MAT_RIDEAU,
+  dansBoite,
   MAT_WALL,
   type ObstacleBox,
   type SpongeDef,
@@ -48,6 +49,24 @@ export interface PlayerStats {
   velX: number
   velY: number
   rmsRadius: number
+}
+
+
+// Rejet rapide d'une boîte : hors de portée « marge » ? Pour une boîte
+// OBLIQUE, on rejette sur son cercle englobant — conservateur mais sûr.
+function horsBoite(
+  b: { minX: number; minY: number; maxX: number; maxY: number; angle?: number },
+  x: number,
+  y: number,
+  marge: number,
+): boolean {
+  if (b.angle) {
+    const r = Math.hypot(b.maxX - b.minX, b.maxY - b.minY) / 2 + marge
+    const cx = (b.minX + b.maxX) / 2
+    const cy = (b.minY + b.maxY) / 2
+    return Math.abs(x - cx) > r || Math.abs(y - cy) > r
+  }
+  return x < b.minX - marge || x > b.maxX + marge || y < b.minY - marge || y > b.maxY + marge
 }
 
 export class FluidSim {
@@ -509,14 +528,7 @@ export class FluidSim {
     let heat = 0
     for (const b of this.boxes) {
       if (b.material !== MAT_CHAUD) continue
-      if (
-        x < b.minX - band - rp ||
-        x > b.maxX + band + rp ||
-        y < b.minY - band - rp ||
-        y > b.maxY + band + rp
-      ) {
-        continue
-      }
+      if (horsBoite(b, x, y, band + rp)) continue
       boxContact(x, y, b, cp)
       const f = 1 - Math.max(0, cp.dist - rp) / band
       if (f > heat) heat = Math.min(1, f)
@@ -1305,7 +1317,7 @@ export class FluidSim {
   private grilleAt(x: number, y: number): boolean {
     for (const b of this.boxes) {
       if (b.material !== MAT_GRILLE) continue
-      if (x > b.minX && x < b.maxX && y > b.minY && y < b.maxY) return true
+      if (dansBoite(b, x, y)) return true
     }
     return false
   }
@@ -1365,9 +1377,7 @@ export class FluidSim {
         if (b.material === MAT_GRILLE && this.gaseous[i] === 1) continue
         if (b.material === MAT_MEMBRANE && this.gaseous[i] !== 1 && this.frozen[i] !== 1) continue
         if (b.material === MAT_RIDEAU && this.frozen[i] === 1) continue
-        if (x < b.minX - rp || x > b.maxX + rp || y < b.minY - rp || y > b.maxY + rp) {
-          continue
-        }
+        if (horsBoite(b, x, y, rp)) continue
         boxContact(x, y, b, cp)
         const sep = cp.dist - rp
         if (sep < 0) {
@@ -1497,14 +1507,7 @@ export class FluidSim {
         // Le mur neutre n'agit qu'au ras de la paroi ; la chimie porte loin,
         // et encore plus loin pour la vapeur (en sourdine).
         const reach = b.material === MAT_WALL ? wallBand : band * porteeGaz
-        if (
-          x < b.minX - reach - rp ||
-          x > b.maxX + reach + rp ||
-          y < b.minY - reach - rp ||
-          y > b.maxY + reach + rp
-        ) {
-          continue
-        }
+        if (horsBoite(b, x, y, reach + rp)) continue
         boxContact(x, y, b, cp)
         const sep = cp.dist - rp
         if (sep > 0 && sep < reach) {
@@ -1681,14 +1684,7 @@ export class FluidSim {
       if (this.hasCold) {
         for (const b of this.boxes) {
           if (b.material !== MAT_FROID) continue
-          if (
-            x < b.minX - band - rp ||
-            x > b.maxX + band + rp ||
-            y < b.minY - band - rp ||
-            y > b.maxY + band + rp
-          ) {
-            continue
-          }
+          if (horsBoite(b, x, y, band + rp)) continue
           boxContact(x, y, b, cp)
           const sep = cp.dist - rp
           if (sep < minSep) minSep = sep

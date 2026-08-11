@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '12/08/2026 02:40',
+    title: 'Parois obliques, chevauchement au clic, et guides façon Canva',
+    notes: [
+      'Les PAROIS PEUVENT PENCHER : un champ « Angle » sur chaque boîte de l’éditeur, et la rotation traverse tout — collision (une rampe dévie vraiment), auras, grilles, laser (le faisceau meurt sur la diagonale), rendu (remplissage, arête, aura pivotent). L’angle voyage dans le JSON des tableaux.',
+      'La DÉCOUPE devient un arbitrage : cliquez la paroi qui PREND LE DESSUS, puis celle qui s’efface — seule la zone où elles se chevauchent est rongée du perdant, le vainqueur reste entier. Échap annule, le vainqueur se surligne en or.',
+      'L’atelier d’alignement gagne MÊME LARGEUR et MÊME HAUTEUR (la première sélection donne la mesure, les autres l’adoptent autour de leur centre) — et pendant tout déplacement, des GUIDES POINTILLÉS magnétiques apparaissent : bords et centres s’aimantent sur ceux des autres parois et du sas, façon Canva.',
+    ],
+  },
+  {
     date: '12/08/2026 01:55',
     title: 'La gare du rail devient une poche, la vapeur sent les parois de loin',
     notes: [
