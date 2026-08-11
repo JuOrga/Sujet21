@@ -11,6 +11,13 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 21:00',
+    title: 'Le journal de bord attend qu’on l’ait lu',
+    notes: [
+      'Le carton d’ouverture (le journal du Dr Véga) s’effaçait tout seul au bout de 6,5 secondes — trop vite pour lire. Il RESTE désormais affiché, et une croix ✕ le ferme quand on a fini. Lire ne se chronomètre pas.',
+    ],
+  },
+  {
     date: '11/08/2026 20:40',
     title: 'L’école des surfaces en tête de file, et l’onboarding partout',
     notes: [

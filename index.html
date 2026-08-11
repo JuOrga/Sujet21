@@ -1292,6 +1292,27 @@
         opacity: 1;
         transform: translateX(-50%) translateY(0);
       }
+      /* la croix de fermeture : le carton reste tant qu'on ne l'a pas lue */
+      #card-fermer {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        width: 30px;
+        height: 30px;
+        border: none;
+        background: transparent;
+        color: var(--dim);
+        font-size: 14px;
+        line-height: 1;
+        cursor: pointer;
+        pointer-events: none;
+      }
+      #tableau-card.visible #card-fermer {
+        pointer-events: auto;
+      }
+      #card-fermer:hover {
+        color: var(--ink);
+      }
       /* Vignette du carton : la planche du dossier d'essai, quand il y en a une */
       #card-fig {
         display: block;
@@ -2655,6 +2676,7 @@
     <div id="obj-arrow" aria-hidden="true"><i>➤</i><span id="obj-dist"></span></div>
 
     <div id="tableau-card" aria-live="polite">
+      <button id="card-fermer" type="button" aria-label="Fermer le journal">✕</button>
       <div id="card-code"></div>
       <img id="card-fig" alt="" hidden />
       <div id="card-log"></div>
