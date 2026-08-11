@@ -86,23 +86,47 @@
         outline-offset: 2px;
       }
 
-      /* ---- Accueil : la fiche d'expérience, en bandeau sur l'essai vivant ---- */
+      /* ---- Accueil : la fiche d'expérience, en dossier LARGE sur l'essai
+         vivant — elle occupe une bonne partie de l'écran, en deux colonnes :
+         le protocole (titre, consigne, boutons) et le dossier (figure,
+         registres, commandes). Sur écran étroit, les colonnes s'empilent. ---- */
       #home {
         position: fixed;
         inset: 0 auto 0 0;
-        width: min(430px, 100vw);
+        width: min(1060px, 100vw);
         display: flex;
         flex-direction: column;
         justify-content: center;
         gap: 22px;
-        padding: 28px clamp(20px, 4vw, 44px);
+        padding: 28px clamp(20px, 4vw, 56px);
         box-sizing: border-box;
-        background: linear-gradient(105deg, rgba(6, 13, 23, 0.94) 78%, rgba(6, 13, 23, 0.55));
+        background: linear-gradient(100deg, rgba(6, 13, 23, 0.96) 72%, rgba(6, 13, 23, 0.62));
         border-right: 1px solid var(--line);
         backdrop-filter: blur(6px);
         overflow-y: auto;
         z-index: 20;
         transition: opacity 0.45s ease, transform 0.45s ease;
+      }
+      .home-cols {
+        display: flex;
+        gap: clamp(26px, 4vw, 52px);
+        align-items: flex-start;
+      }
+      .home-col {
+        flex: 1 1 0;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+      }
+      @media (max-width: 1080px) {
+        #home {
+          width: min(520px, 100vw);
+        }
+        .home-cols {
+          flex-direction: column;
+          align-items: stretch;
+        }
       }
       body.playing #home {
         opacity: 0;
@@ -137,7 +161,7 @@
       .home-figure img {
         display: block;
         width: 100%;
-        height: 170px;
+        height: clamp(170px, 24vh, 240px);
         object-fit: cover;
         object-position: center 30%;
       }
@@ -150,7 +174,7 @@
       }
       .home-title {
         font-family: var(--font-display);
-        font-size: clamp(26px, 5.2vw, 38px);
+        font-size: clamp(26px, 5.2vw, 52px);
         line-height: 1.24;
         letter-spacing: 0.08em;
         margin: 0;
@@ -1767,6 +1791,8 @@
         <span>COMPLEXE ORBITAL MÉDUSE — PROTOCOLE «&nbsp;TENSION DE SURFACE&nbsp;»</span>
         <img class="home-badge" src="/assets/badge.webp" alt="Écusson de la mission Projet 21" />
       </div>
+      <div class="home-cols">
+      <div class="home-col">
       <h1 class="home-title">PROJET <em>21</em></h1>
       <p class="home-pitch">
         Vous êtes un volume d'eau en apesanteur. La seule façon d'avancer&nbsp;:
@@ -1774,10 +1800,6 @@
         Rejoignez le sas avant de vous disperser. Le laboratoire consigne chaque
         essai — personne ne se demande encore pourquoi l'échantillon insiste.
       </p>
-      <figure class="home-figure">
-        <img src="/assets/home.webp" alt="Échantillon d'eau en lévitation dans la cuve d'essai" loading="lazy" />
-        <figcaption>FIG. 1 — ÉCHANTILLON EN SUSPENSION, CUVE D'ESSAI</figcaption>
-      </figure>
       <dl class="home-readout" aria-label="Relevé de l'échantillon">
         <div><dt>ÉCHANTILLON</dt><dd id="home-volume">— L</dd></div>
         <div><dt>PARTICULES</dt><dd id="home-particles">—</dd></div>
@@ -1785,9 +1807,15 @@
       </dl>
       <button id="home-son" type="button" hidden>♪ OUVRIR LE SON DU PROTOCOLE</button>
       <button id="start" type="button">COMMENCER L'ESSAI</button>
-      <button id="start-bis" type="button">TESTER «&nbsp;LA GALERIE NOYÉE&nbsp;» — 21-A BIS, PROTOTYPE</button>
+      <button id="start-bis" type="button">TESTER LES SALLES LASER — 21-H → 21-J, MIROIR · PRISME · PLASMA</button>
       <button id="start-editor" type="button">ÉDITEUR DE TABLEAUX — CRÉER OU MODIFIER UN NIVEAU</button>
       <div id="home-seq" class="rec-note"></div>
+      </div>
+      <div class="home-col">
+      <figure class="home-figure">
+        <img src="/assets/home.webp" alt="Échantillon d'eau en lévitation dans la cuve d'essai" loading="lazy" />
+        <figcaption>FIG. 1 — ÉCHANTILLON EN SUSPENSION, CUVE D'ESSAI</figcaption>
+      </figure>
       <div class="home-records" aria-label="Registres du labo">
         <div class="rec-head"><span>REGISTRES DU LABO</span>
           <input id="rec-name" maxlength="12" placeholder="VOTRE NOM — REQUIS"
@@ -1825,6 +1853,8 @@
         <kbd>≡</kbd>cette fiche
       </div>
       </details>
+      </div>
+      </div>
       <div class="home-foot">
         Prototype de travail — le bouton BANC (barre du bas) ouvre le banc de réglage :
         la physique se modifie en direct, et le journal des livraisons y consigne

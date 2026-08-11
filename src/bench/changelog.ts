@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 13:20',
+    title: 'La fiche d’accueil en grand, et le bouton d’essai mène aux salles laser',
+    notes: [
+      'L’ACCUEIL occupe désormais une bonne partie de l’écran : la fiche passe en deux colonnes (~1060 px) — le protocole à gauche (titre en grand, consigne, relevé, boutons), le dossier à droite (figure, registres, commandes). Sur écran étroit, tout s’empile comme avant.',
+      'Le bouton d’essai de la fiche mène aux SALLES LASER : la trilogie 21-H → 21-J (miroir, prisme, plasma) se joue d’un clic, enchaînée sas après sas, hors expédition et hors registres — même si votre partie suit la séquence de la bibliothèque partagée. Le prototype 21-A bis reste accessible depuis le banc (dossier Tableaux).',
+    ],
+  },
+  {
     date: '11/08/2026 12:50',
     title: 'La trilogie laser entre dans l’expédition : trois nouveaux tableaux',
     notes: [
