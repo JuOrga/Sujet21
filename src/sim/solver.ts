@@ -442,13 +442,19 @@ export class FluidSim {
       const px = this.posX[i]
       const py = this.posY[i]
       if (dansBande[i] && auTerminus[i]) {
-        // arrivée en gare : on freine fort et on masse le nuage sur le
-        // terminus — la livraison est douce, la condensation aussi
+        // arrivée en gare : on freine fort, et on ne RAMÈNE vers le
+        // terminus qu'au-delà d'un rayon mort — comprimer le nuage sur un
+        // point le rendait plus dense que l'eau au repos, et la
+        // condensation EXPLOSAIT sous la pression. La poche le laisse se
+        // garer à densité naturelle.
         const frein = Math.exp(-6 * dt)
         this.velX[i] *= frein
         this.velY[i] *= frein
-        this.velX[i] += ((fin.x - px) / band) * accel * 0.35 * dt
-        this.velY[i] += ((fin.y - py) / band) * accel * 0.35 * dt
+        const dFin = Math.hypot(fin.x - px, fin.y - py)
+        if (dFin > band * 0.6) {
+          this.velX[i] += ((fin.x - px) / dFin) * accel * 0.15 * dt
+          this.velY[i] += ((fin.y - py) / dFin) * accel * 0.15 * dt
+        }
       } else if (dansBande[i]) {
         // poussée le long du rail + rappel vers la ligne (le virage se prend)
         this.velX[i] += (uxA[i] + ((qxA[i] - px) / band) * 0.8) * accel * dt
@@ -1210,9 +1216,9 @@ export class FluidSim {
       if (this.gaseous[i] !== 1) continue
       if (this.kind[i] === KIND_PLAYER) {
         anyPlayerGas = true
-        // Radiateur : la vapeur qui baigne dans son aura RECHARGE UN DASH —
-        // la prochaine impulsion ne coûte rien (tableau des règles)
-        if (!this.dashOffert && this.hasHeat && this.heatExposureAt(this.posX[i], this.posY[i]) > 0.5) {
+        // Radiateur : FRÔLER son aura recharge un dash — pas besoin de s'y
+        // baigner ni de toucher, effleurer le bord du halo suffit
+        if (!this.dashOffert && this.hasHeat && this.heatExposureAt(this.posX[i], this.posY[i]) > 0.15) {
           this.dashOffert = true
         }
       }
@@ -1479,15 +1485,18 @@ export class FluidSim {
 
       const x = this.prdX[i]
       const y = this.prdY[i]
-      // la vapeur sent les bandes en sourdine : attirée par l'hydrophile,
-      // repoussée par l'hydrophobe — un quart de la force, pas d'éclat de mur
-      const poidsBande = gaz ? 0.25 : 1
+      // la vapeur sent les bandes en sourdine mais de LOIN : force réduite,
+      // portée étendue — le nuage s'infléchit bien avant la paroi, sans
+      // jamais être happé ni claqué
+      const poidsBande = gaz ? 0.12 : 1
+      const porteeGaz = gaz ? 2.5 : 1
       for (const b of this.boxes) {
         if (b.material !== MAT_HYDROPHILE && b.material !== MAT_HYDROPHOBE && b.material !== MAT_WALL) {
           continue
         }
-        // Le mur neutre n'agit qu'au ras de la paroi ; la chimie porte loin.
-        const reach = b.material === MAT_WALL ? wallBand : band
+        // Le mur neutre n'agit qu'au ras de la paroi ; la chimie porte loin,
+        // et encore plus loin pour la vapeur (en sourdine).
+        const reach = b.material === MAT_WALL ? wallBand : band * porteeGaz
         if (
           x < b.minX - reach - rp ||
           x > b.maxX + reach + rp ||

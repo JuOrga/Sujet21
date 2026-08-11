@@ -288,6 +288,35 @@ describe('traceLaser — les règles optiques du palier 1', () => {
     expect(sim2.velY[g2]).toBeGreaterThan(50)
   })
 
+  it('condenser au terminus n’explose pas : la poche gare le nuage à densité naturelle', () => {
+    const sim = new FluidSim({ ...DEFAULT_PARAMS }, BOUNDS, 2048)
+    sim.spawnDisc(100, 200, 80, KIND_PLAYER)
+    sim.relabel()
+    for (let i = 0; i < sim.count; i++) {
+      sim.vapor[i] = 1
+      sim.gaseous[i] = 1
+    }
+    const rail = [{ x: 100, y: -300 }, { x: 100, y: 300 }]
+    const dt = sim.params.dt
+    // le champ porte le nuage jusqu'en gare et l'y retient
+    for (let s = 0; s < 240; s++) {
+      sim.railConvoy(rail, 75, 950, dt)
+      sim.step(dt)
+    }
+    // condensation : retour à l'eau, le champ lâche prise
+    for (let i = 0; i < sim.count; i++) {
+      sim.vapor[i] = 0
+      sim.gaseous[i] = 0
+    }
+    for (let s = 0; s < 120; s++) sim.step(dt)
+    expect(sim.dispersed).toBe(false)
+    let vMax = 0
+    for (let i = 0; i < sim.count; i++) {
+      vMax = Math.max(vMax, Math.hypot(sim.velX[i], sim.velY[i]))
+    }
+    expect(vMax).toBeLessThan(500) // pas de giclée : la livraison est douce
+  })
+
   it('le convoyage dit qui reste dans la bande : le champ tient jusqu’à l’arrivée', () => {
     const sim = new FluidSim({ ...DEFAULT_PARAMS }, BOUNDS, 2048)
     const gaz = sim.addParticle(105, 0, KIND_FREE)

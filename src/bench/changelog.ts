@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '12/08/2026 01:55',
+    title: 'La gare du rail devient une poche, la vapeur sent les parois de loin',
+    notes: [
+      'Condenser au bout d’un rail pouvait ENCORE gicler : le champ massait le nuage sur un point, plus dense que l’eau au repos — la condensation explosait sous la pression. Le terminus est désormais une POCHE : freinage partout, mais l’attraction s’arrête à un rayon mort — le nuage se gare à densité naturelle, la condensation est douce (test à l’appui : convoyé, condensé, aucune giclée).',
+      'Les parois chimiques travaillent la vapeur DE LOIN : force encore réduite, mais portée ×2,5 — le nuage s’infléchit bien avant l’hydrophile ou l’hydrophobe, sans jamais être happé ni claqué.',
+      'Et le radiateur n’exige plus le bain : FRÔLER le bord de son halo suffit à recharger un dash.',
+    ],
+  },
+  {
     date: '12/08/2026 01:30',
     title: 'La surface-miroir, le temps aux épaules, les états sous le pouce',
     notes: [
