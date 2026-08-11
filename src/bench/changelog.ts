@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 13:55',
+    title: 'Vapeur qui respire, fiche qui fige, et le Deck sans ascenseur',
+    notes: [
+      'Le bruit de VAPEUR est refait en procédural : fini le sifflement de haute pression — une nappe sombre qui ROULE, dont le filtre ondule et le niveau respire sur deux cadences lentes désynchronisées. Le nuage vit, il ne siffle pas. (Provisoire assumé : un vrai son pourra le remplacer.)',
+      'La FICHE FIGE L’ESSAI : revenir au menu (≡ ou Échap) met la partie en pause — la cuve n’avance plus dans le dos du joueur. Reprendre ou Recommencer relance le temps. Et les commandes de jeu (toucher, F, G, R, espace…) se taisent tant que la fiche est ouverte.',
+      'Nouveau bouton RECOMMENCER LE TABLEAU sur la fiche, visible dès qu’un essai a commencé.',
+      'Steam Deck : plus d’ascenseur sur la fiche — les barres de défilement sont masquées, la mise en page se resserre sous 840 px de haut et le panneau COMMANDES démarre replié. La fiche tient pile dans l’écran.',
+    ],
+  },
+  {
     date: '11/08/2026 13:20',
     title: 'La fiche d’accueil en grand, et le bouton d’essai mène aux salles laser',
     notes: [
