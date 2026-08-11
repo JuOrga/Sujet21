@@ -79,7 +79,20 @@ window.addEventListener('keydown', eveilAudio)
 // n'aurait jamais l'occasion de se faire entendre. La fiche le propose donc.
 const btnSonAccueil = document.getElementById('home-son') as HTMLButtonElement | null
 function majInviteSon(): void {
-  if (btnSonAccueil) btnSonAccueil.hidden = audioEveille || !audio.enabled
+  if (!btnSonAccueil) return
+  const cacher = audioEveille || !audio.enabled
+  if (!cacher) {
+    btnSonAccueil.hidden = false
+    return
+  }
+  if (btnSonAccueil.hidden) return
+  // Ne pas voler le geste en cours : masquer le bouton TOUT DE SUITE
+  // re-composait la fiche entre le relâcher du doigt et le clic synthétisé
+  // — la cible bougeait, le premier toucher se perdait (sur n'importe quel
+  // bouton de la fiche). On retire le bouton une fois le clic arrivé.
+  window.setTimeout(() => {
+    btnSonAccueil.hidden = true
+  }, 350)
 }
 btnSonAccueil?.addEventListener('click', () => {
   if (!audio.enabled) audio.setEnabled(true)
@@ -316,6 +329,9 @@ function requireName(): boolean {
   // le champ peut être rempli sans avoir encore perdu le focus (pas de change)
   if (recName.value.trim()) records.setOperator(recName.value)
   if (records.operator()) return false
+  // sur mobile, les registres (et leur champ de nom) vivent derrière le
+  // bouton RECORDS : on ouvre le voile pour montrer où signer
+  if (recName.offsetParent === null) ouvrirRecs()
   recNeed.hidden = false
   recName.classList.remove('need')
   void recName.offsetWidth // relance l'animation de secousse
@@ -398,6 +414,37 @@ document.getElementById('tourner-quand-meme')?.addEventListener('click', () => {
   document.body.classList.add('portrait-ok')
 })
 
+// ---- Le voile RECORDS (mobile) : les registres se déplacent dedans ----
+const recsEl = document.getElementById('recs') as HTMLDivElement
+const recsBoite = recsEl.querySelector('.recs-boite') as HTMLDivElement
+const recsBloc = document.querySelector('.home-records') as HTMLDivElement
+const recsParent = recsBloc.parentElement as HTMLElement
+function ouvrirRecs(): void {
+  recsBoite.appendChild(recsBloc) // le bloc déménage dans le voile
+  recsEl.hidden = false
+}
+function fermerRecs(): void {
+  recsEl.hidden = true
+  recsParent.appendChild(recsBloc) // et revient à sa place sur la fiche
+}
+document.getElementById('home-recs')?.addEventListener('click', ouvrirRecs)
+recsEl.addEventListener('pointerdown', (e) => {
+  if (e.target === recsEl) fermerRecs()
+})
+
+// ---- L'appel de l'œil : à l'arrivée sur la fiche, le son et le plein
+// écran battent trois fois — on sait où toucher d'abord.
+function appelOeil(): void {
+  for (const id of ['home-son', 'home-plein']) {
+    const b = document.getElementById(id) as HTMLButtonElement | null
+    if (!b || b.hidden) continue
+    b.classList.remove('appel')
+    void b.offsetWidth // relance l'animation
+    b.classList.add('appel')
+  }
+}
+window.setTimeout(appelOeil, 600)
+
 const homeRestartBtn = document.getElementById('home-restart') as HTMLButtonElement
 function closeHome(): void {
   if (requireName()) return // pas de plongée sans opérateur identifié
@@ -416,6 +463,7 @@ function closeHome(): void {
 }
 function openHome(): void {
   document.body.classList.remove('playing')
+  appelOeil()
   // La fiche fige l'essai : revenir au menu, c'est faire une pause — la
   // cuve n'avance plus dans le dos du joueur.
   if (hasPlayed) input.paused = true
@@ -577,7 +625,8 @@ window.addEventListener('keydown', (e) => {
   const t = e.target as HTMLElement | null
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
   if (e.key === 'Escape') {
-    if (!cmdsEl.hidden) cmdsEl.hidden = true // le panneau des commandes d'abord
+    if (!recsEl.hidden) fermerRecs() // les voiles d'abord
+    else if (!cmdsEl.hidden) cmdsEl.hidden = true
     else if (document.body.classList.contains('playing')) openHome()
     else closeHome()
   } else if (e.key === 'l' || e.key === 'L') {
@@ -645,6 +694,7 @@ const FICHE_BOUTONS = [
   'start-bis',
   'start-editor',
   'home-cmds',
+  'home-recs',
   'home-plein',
 ]
 let ficheFocus = 0
@@ -1196,11 +1246,16 @@ publishTouchbarHeight()
   touchbar.appendChild(brk)
 }
 const btnPause = touchButton('⏸', 'pause (espace)', () => input.togglePause())
-touchButton('‹', 'ralentir le temps (,)', () => input.stepWarp(-1))
-touchButton('›', 'accélérer le temps (.)', () => input.stepWarp(1))
-const btnVortex = touchButton('🌀', 'vortex : armer puis toucher l’écran (clic droit)', () => {
-  input.vortexArmed = !input.vortexArmed
-})
+touchButton('‹', 'ralentir le temps (,)', () => input.stepWarp(-1), 'tb-warp')
+touchButton('›', 'accélérer le temps (.)', () => input.stepWarp(1), 'tb-warp')
+const btnVortex = touchButton(
+  '🌀',
+  'vortex : armer puis toucher l’écran (clic droit)',
+  () => {
+    input.vortexArmed = !input.vortexArmed
+  },
+  'tb-vortex',
+)
 
 // Sélecteur d'état (EAU / GLACE / VAPEUR) : la commande centrale du jeu
 const stateEau = document.getElementById('state-eau') as HTMLButtonElement
@@ -1238,6 +1293,14 @@ input.onTimeWarpChange = (warp) => {
 const overlayBtn = document.getElementById('overlay-btn') as HTMLButtonElement
 // Relance discrète : elle n'apparaît qu'une fois la dernière impulsion donnée,
 // et ne recouvre rien — on peut la laisser là et regarder la dérive finir.
+// Pastilles du HUD : un toucher montre le nom de la donnée, brièvement
+for (const chip of Array.from(document.querySelectorAll<HTMLButtonElement>('.hud-chip'))) {
+  chip.addEventListener('click', () => {
+    chip.classList.add('ouvert')
+    window.setTimeout(() => chip.classList.remove('ouvert'), 2400)
+  })
+}
+
 const btnRelance = document.getElementById('relance') as HTMLButtonElement
 // Continuer : le corps principal est bu, le joueur conclut quand il veut
 const btnContinuer = document.getElementById('continuer') as HTMLButtonElement

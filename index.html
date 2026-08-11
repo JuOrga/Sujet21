@@ -126,13 +126,57 @@
         box-shadow: 0 0 14px rgba(99, 183, 230, 0.45);
       }
 
-      /* ---- Boutons jumeaux de la fiche : commandes + plein écran ---- */
+      /* ---- Boutons jumeaux de la fiche : commandes + records + plein écran ---- */
       .home-duo {
         display: flex;
         gap: 10px;
       }
       .home-duo button {
         flex: 1 1 0;
+      }
+      /* le bouton RECORDS n'existe que là où les registres sont cachés */
+      #home-recs {
+        display: none;
+      }
+
+      /* ---- Le voile RECORDS (mobile) : les registres, à la demande ---- */
+      #recs {
+        position: fixed;
+        inset: 0;
+        z-index: 58;
+        background: rgba(4, 8, 15, 0.85);
+        backdrop-filter: blur(3px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+      #recs[hidden] {
+        display: none;
+      }
+      .recs-boite {
+        width: min(640px, 100%);
+        max-height: 88vh;
+        overflow-y: auto;
+        scrollbar-width: none;
+        background: #060d18;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        padding: 16px 18px;
+        box-shadow: 0 0 40px rgba(99, 183, 230, 0.15);
+      }
+      .recs-boite::-webkit-scrollbar {
+        display: none;
+      }
+
+      /* ---- L'appel de l'œil : à l'arrivée sur la fiche, le son et le
+         plein écran se signalent d'un battement ---- */
+      @keyframes appel-oeil {
+        0%, 100% { transform: scale(1); box-shadow: 0 0 0 rgba(99, 183, 230, 0); }
+        50% { transform: scale(1.05); box-shadow: 0 0 24px rgba(99, 183, 230, 0.75); }
+      }
+      #home button.appel {
+        animation: appel-oeil 0.85s ease-in-out 3;
       }
 
 
@@ -803,6 +847,12 @@
         body.playing #home {
           transform: translateY(24px);
         }
+        #home .home-records {
+          display: none; /* derrière le bouton RECORDS */
+        }
+        #home-recs {
+          display: block;
+        }
         .home-eyebrow {
           font-size: 9px;
           letter-spacing: 0.16em;
@@ -851,30 +901,93 @@
         .home-figure {
           display: none; /* petits écrans : la fiche reste lisible sans la planche */
         }
+        /* scopé à la fiche : déplacés dans le voile RECORDS, les
+           registres redeviennent visibles */
+        #home .home-records {
+          display: none; /* derrière le bouton RECORDS : la fiche respire */
+        }
+        #home-recs {
+          display: block;
+        }
       }
 
-      /* ---- HUD : instruments de bord ---- */
+      /* ---- HUD : la bande de vie, sur toutes les plateformes ----
+         Une ligne fine en haut : le volume, sa jauge quasi PLEINE LARGEUR
+         (on voit fondre ce qu'on dépense), et trois pastilles-icônes. */
       #hud {
         position: fixed;
-        left: 14px;
-        bottom: 12px;
+        top: 0;
+        left: 0;
+        right: 0;
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 1px;
+        padding: calc(6px + env(safe-area-inset-top)) 12px 5px;
+        background: rgba(9, 18, 30, 0.85);
+        border-bottom: 1px solid var(--line);
+        backdrop-filter: blur(4px);
         pointer-events: none;
+        z-index: 9;
         opacity: 0;
         transition: opacity 0.5s ease 0.2s;
       }
       body.playing #hud {
         opacity: 1;
       }
-      .hud-panel {
-        background: var(--panel);
+      .hud-vie {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .hud-vie .gauge {
+        flex: 1 1 auto;
+        margin: 0;
+      }
+      .hud-chips {
+        display: flex;
+        gap: 6px;
+        flex: none;
+        pointer-events: auto;
+      }
+      .hud-chip {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 9px;
+        background: transparent;
         border: 1px solid var(--line);
-        border-left: 2px solid var(--specimen);
-        padding: 9px 12px 10px;
-        min-width: 208px;
-        backdrop-filter: blur(4px);
+        border-radius: 4px;
+        color: var(--ink);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        cursor: pointer;
+      }
+      .hud-chip i {
+        font-style: normal;
+        font-size: 12px;
+        opacity: 0.75;
+      }
+      /* le toucher dit le nom : une étiquette éphémère sous la pastille */
+      .hud-chip.ouvert::after {
+        content: attr(data-nom);
+        position: absolute;
+        top: calc(100% + 6px);
+        right: 0;
+        white-space: nowrap;
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        color: var(--ink);
+        background: rgba(9, 18, 30, 0.95);
+        border: 1px solid var(--line-strong);
+        border-radius: 4px;
+        padding: 4px 9px;
+        z-index: 14;
+      }
+      .hud-sous {
+        display: flex;
+        gap: 16px;
+        min-height: 0;
       }
       .hud-row {
         display: flex;
@@ -893,8 +1006,9 @@
         color: var(--ink);
       }
       #hud-volume {
-        font-size: 19px;
+        font-size: 17px;
         color: var(--specimen);
+        flex: none;
       }
       #hud-volume small {
         font-size: 11px;
@@ -1468,6 +1582,13 @@
       body.playing #touchbar {
         opacity: 1;
       }
+      /* hors jeu, les barres invisibles ne doivent VOLER aucun toucher :
+         opacité 0 ne suffit pas, on les retire vraiment */
+      body:not(.playing) #touchbar,
+      body:not(.playing) #statebar,
+      body:not(.playing) #hud {
+        visibility: hidden;
+      }
       #touchbar button {
         min-width: 44px;
         min-height: 44px;
@@ -1718,70 +1839,69 @@
       /* Le style du banc de réglage vit dans src/bench/bench.css */
 
       @media (max-width: 700px), (pointer: coarse) and (max-height: 620px) {
-        /* Au doigt, le bas de l'écran appartient aux commandes : le HUD est
-           une bande fine sur toute la largeur du haut — volume et jauge à
-           gauche (le trait rouge de la jauge marque le seuil), tableau et
-           bonbonnes à droite */
+        /* Au doigt : la bande de vie se fait minuscule, et les commandes
+           passent en COLONNE à gauche — le pouce gauche les tient, le droit
+           vise, les états restent à droite. */
         #hud {
-          top: 0;
-          bottom: auto;
-          left: 0;
-          right: 0;
-          flex-direction: row;
-          gap: 0;
-          padding-top: env(safe-area-inset-top);
-          background: rgba(9, 18, 30, 0.85);
-          border-bottom: 1px solid var(--line);
-          backdrop-filter: blur(4px);
-        }
-        .hud-panel {
-          flex: 1 1 50%;
-          min-width: 0;
-          background: transparent;
-          border: none;
-          backdrop-filter: none;
-          padding: 5px 12px 6px;
-        }
-        .hud-panel + .hud-panel {
-          order: -1; /* le volume d'abord : c'est la donnée vitale */
-          border-right: 1px solid var(--line);
-        }
-        .hud-row {
-          font-size: 10px;
-          line-height: 1.7;
+          padding: calc(3px + env(safe-area-inset-top)) 8px 3px;
         }
         #hud-volume {
-          font-size: 15px;
+          font-size: 14px;
         }
-        .gauge {
-          margin: 4px 0 2px;
-        }
-        .hud-row--extra {
-          display: none;
+        .hud-chip {
+          padding: 2px 7px;
+          font-size: 10px;
         }
         /* la bascule du son reste accessible au banc (dossier Son) */
         #touchbar .tb-snd {
           display: none;
         }
+        /* les crans de temps sont un outil de banc : pas au doigt */
+        #touchbar .tb-warp,
+        #touchbar .tb-vortex {
+          display: none;
+        }
+        #touchbar {
+          left: calc(6px + env(safe-area-inset-left));
+          right: auto;
+          bottom: calc(8px + env(safe-area-inset-bottom));
+          max-width: none;
+          margin: 0;
+          flex-direction: column;
+          align-items: flex-start;
+          justify-content: flex-end;
+          gap: 5px;
+        }
         .tb-break {
-          display: block;
+          display: none;
         }
         #touchbar button.tb-chip {
           font-size: 8.5px;
           letter-spacing: 0.12em;
           padding: 0 10px;
-          min-height: 40px;
+          min-height: 34px;
         }
         #touchbar button {
           min-width: 42px;
           min-height: 42px;
         }
-        /* le carton du journal descend sous le HUD */
+        /* la colonne de gauche ne pousse plus le sélecteur d'états : il
+           s'ancre en bas à droite, à hauteur de pouce */
+        #statebar {
+          bottom: calc(10px + env(safe-area-inset-bottom));
+        }
+        #relance {
+          bottom: 92px;
+        }
+        #continuer {
+          bottom: 146px;
+        }
+        /* le carton du journal descend sous la bande */
         #tableau-card {
-          top: 108px;
+          top: 64px;
         }
         #hud-danger {
-          top: 100px;
+          top: 58px;
           font-size: 11px;
           max-width: 94vw;
           white-space: normal;
@@ -1789,15 +1909,11 @@
         }
         #hud-perte {
           font-size: 9.5px;
-          min-height: 13px;
-          line-height: 13px;
+          min-height: 12px;
+          line-height: 12px;
         }
         #hud-rosee {
           display: none; /* la bande mobile va à l'essentiel */
-        }
-        #coque-bar {
-          max-width: 40px;
-          margin: 0 6px;
         }
       }
 
@@ -2205,15 +2321,13 @@
         .home-readout {
           font-size: 11px;
         }
-        /* les registres défilent DANS leur cadre, la page ne défile pas */
-        .home-records {
-          min-height: 0;
-          max-height: 100%;
-          overflow-y: auto;
-          scrollbar-width: none;
-        }
-        .home-records::-webkit-scrollbar {
+        /* les registres passent derrière le bouton RECORDS : la colonne
+           de droite se retire, la fiche est un menu plein cadre */
+        .home-cols > .home-col:last-child {
           display: none;
+        }
+        #home-recs {
+          display: block;
         }
         .home-foot {
           display: none;
@@ -2255,6 +2369,7 @@
       <button id="start-editor" type="button">ÉDITEUR DE TABLEAUX — CRÉER OU MODIFIER UN NIVEAU</button>
       <div class="home-duo">
         <button id="home-cmds" type="button">⌘ COMMANDES</button>
+        <button id="home-recs" type="button">◧ RECORDS</button>
         <button id="home-plein" type="button">⛶ PLEIN ÉCRAN</button>
       </div>
       <div id="home-seq" class="rec-note"></div>
@@ -2282,24 +2397,28 @@
       </div>
     </aside>
 
+    <!-- La bande de vie : le volume et sa jauge quasi pleine largeur — on
+         VOIT diminuer ce qu'on dépense. À droite, trois pastilles-icônes
+         (tableau, bonbonnes, coque) : un toucher dit leur nom. -->
     <div id="hud">
-      <div class="hud-panel">
-        <div class="hud-row"><span class="k">TABLEAU</span><span class="v" id="hud-tableau">nº 1</span></div>
-        <div class="hud-row"><span class="k">BONBONNES</span><span class="v" id="hud-bonbonne">0.00 L</span></div>
-        <div class="hud-row"><span class="k">COQUE</span><i id="coque-bar"><b></b></i><span class="v" id="hud-coque">+21°</span></div>
-      </div>
-      <div class="hud-panel">
+      <div class="hud-vie">
         <div id="hud-volume">— <small>L</small></div>
         <div class="gauge">
           <div id="gauge-fill"></div>
           <div id="gauge-threshold"></div>
         </div>
-        <div id="hud-perte"></div>
-        <div id="hud-rosee"></div>
-        <div class="hud-row hud-row--extra"><span class="k">DERNIÈRE IMPULSION</span><span class="v" id="hud-seuil">—</span></div>
-        <div class="hud-row hud-row--extra"><span class="k">VITESSE</span><span class="v" id="hud-vitesse">0 u/s</span></div>
-        <div class="hud-row"><span class="k">ÉTAT</span><span class="v" id="hud-state">liquide</span></div>
-        <div class="hud-row hud-row--extra"><span class="k">TEMPS</span><span class="v" id="hud-warp">×1</span></div>
+        <div class="hud-chips">
+          <button type="button" class="hud-chip" data-nom="tableau"><i>▦</i><span class="v" id="hud-tableau">nº 1</span></button>
+          <button type="button" class="hud-chip" data-nom="bonbonnes collectées"><i>⛽</i><span class="v" id="hud-bonbonne">0.00 L</span></button>
+          <button type="button" class="hud-chip" data-nom="coque du vaisseau"><i>❄</i><span class="v" id="hud-coque">+21°</span></button>
+        </div>
+      </div>
+      <div class="hud-sous"><span id="hud-perte"></span><span id="hud-rosee"></span></div>
+      <!-- relevés secondaires : encore alimentés par le jeu, plus affichés -->
+      <div class="hud-restes" hidden>
+        <i id="coque-bar"><b></b></i>
+        <span id="hud-seuil"></span><span id="hud-vitesse"></span>
+        <span id="hud-state"></span><span id="hud-warp"></span>
       </div>
     </div>
 
@@ -2420,6 +2539,11 @@
     </div>
 
     <div id="tutor" aria-live="polite"></div>
+
+    <!-- Les records, en voile (mobile : la fiche va à l'essentiel) -->
+    <div id="recs" hidden aria-label="Registres du labo">
+      <div class="recs-boite"></div>
+    </div>
 
     <!-- Les commandes : un panneau à trois onglets — PC, manette, tactile -->
     <div id="cmds" hidden aria-label="Commandes du jeu">
