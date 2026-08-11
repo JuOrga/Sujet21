@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 11:50',
+    title: 'Manette : le stick montre le CAP, la flèche le dessine',
+    notes: [
+      'Le stick gauche dit désormais où l’on veut ALLER — plus besoin de penser « éjection » : en eau, elle part automatiquement à l’opposé (c’est elle qui pousse), en vapeur le dash file dans la direction du stick. Une même logique : le stick, c’est le cap.',
+      'Le réticule cède la place à une FLÈCHE DE CAP lissée : elle naît dès qu’on effleure le stick, glisse vers le nouveau cap sans à-coup, s’allonge avec l’inclinaison, et s’efface en douceur. En visée de dash, la ligne du dash (avec son coût) prend le relais.',
+      'Souris et manette ne se marchent plus dessus : BOUGER la souris reprend la main immédiatement — la flèche disparaît sans attendre, et une action manette en cours se relâche proprement.',
+      'Le stick droit est INVERSÉ : pousser à droite regarde à droite (c’était le sens du glisser-déplacer, à rebours de l’attente).',
+    ],
+  },
+  {
     date: '11/08/2026 11:15',
     title: 'Le pack d’illustrations Steam, servi par le jeu',
     notes: [

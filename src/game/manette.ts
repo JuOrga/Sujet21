@@ -60,6 +60,11 @@ export class Manette {
   private prec: boolean[] = []
   private derniereVie = -1e9
 
+  /** Dernier signe de vie (s) — comparé au pointeur pour savoir qui a la main. */
+  get lastActivity(): number {
+    return this.derniereVie
+  }
+
   private pad(): Gamepad | null {
     const pads = navigator.getGamepads?.() ?? []
     for (const gp of pads) if (gp?.connected && gp.mapping === 'standard') return gp

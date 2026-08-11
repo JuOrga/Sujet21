@@ -50,6 +50,10 @@ export class Input {
     return this.pointers.size
   }
 
+  /** Dernier signe de vie du pointeur (s) : bouger la souris reprend la
+   * main sur la manette immédiatement, sans attendre un clic. */
+  lastPointerAt = 0
+
   stepWarp(dir: number): void {
     this.warpIndex = Math.min(TIME_WARP_STEPS.length - 1, Math.max(0, this.warpIndex + dir))
     this.onTimeWarpChange?.(TIME_WARP_STEPS[this.warpIndex])
@@ -68,6 +72,11 @@ export class Input {
   }
 
   attach(target: HTMLElement): void {
+    const vie = (): void => {
+      this.lastPointerAt = performance.now() / 1000
+    }
+    target.addEventListener('pointermove', vie)
+    target.addEventListener('pointerdown', vie)
     target.addEventListener('pointerdown', (e) => {
       if (e.button === 2) {
         // Maintenu : déplacement de caméra ; bref : vortex (au relâchement)

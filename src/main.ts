@@ -773,34 +773,67 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   }
 }
 
-// Réticule manette : le curseur virtuel en orbite autour du corps — un
-// anneau, un point, et son éclat quand on agit. Dessiné par-dessus les
-// mécanismes, sur le même canevas de superposition.
-function drawReticule(dpr: number): void {
+// Flèche de cap manette : elle apparaît dès qu'on touche le stick et montre
+// où l'on veut ALLER — l'éjection, elle, part à l'opposé sans qu'on y pense.
+// Tout est lissé (naissance, cap, longueur) : la flèche glisse, elle ne
+// saute pas. En visée de dash, la ligne du dash prend le relais.
+const fleche = { alpha: 0, ang: 0, len: 60 }
+function drawFleche(dtReal: number, dpr: number): void {
   const enJeu = document.body.classList.contains('playing')
-  if (!manette.connectee || !manette.active || !enJeu || input.touchCount > 0) return
+  const aMain =
+    manette.connectee && manette.lastActivity > input.lastPointerAt && input.touchCount === 0
+  const veut = aMain && enJeu && manette.force > 0.03 && !dash.aiming && !input.paused
+  // naissance et extinction en douceur
+  fleche.alpha += ((veut ? 1 : 0) - fleche.alpha) * Math.min(1, dtReal * 9)
+  if (fleche.alpha < 0.02) return
+  // cap : on tourne par le plus court chemin, sans à-coup
+  const cible = Math.atan2(manette.dirY, manette.dirX)
+  let d = cible - fleche.ang
+  while (d > Math.PI) d -= Math.PI * 2
+  while (d < -Math.PI) d += Math.PI * 2
+  fleche.ang += d * Math.min(1, dtReal * 14)
+  const lenCible = (36 + 90 * manette.force) * Math.max(0.5, Math.min(1.6, camera.zoom))
+  fleche.len += (lenCible - fleche.len) * Math.min(1, dtReal * 10)
+
   const dprC = Math.min(dpr, 2)
   const g = fxCtx
   g.setTransform(dprC, 0, 0, dprC, 0, 0)
-  const x = manetteCurseur.x
-  const y = manetteCurseur.y
-  const r = manette.agit ? 13 : 10
-  g.strokeStyle = manette.agit ? 'rgba(255,255,255,0.95)' : 'rgba(190,225,250,0.7)'
-  g.lineWidth = manette.agit ? 2.2 : 1.6
+  const bx = window.innerWidth * 0.5 + (sim.stats.centroidX - camera.x) * camera.zoom
+  const by = window.innerHeight * 0.5 - (sim.stats.centroidY - camera.y) * camera.zoom
+  const r0 = sim.stats.rmsRadius * camera.zoom + 12 // on part du bord du corps
+  const L = fleche.len
+  const puls = 1 + 0.04 * Math.sin(elapsed * 4.2)
+  g.save()
+  g.translate(bx, by)
+  g.rotate(fleche.ang)
+  g.scale(puls, puls)
+  const bout = r0 + L
+  const grad = g.createLinearGradient(r0, 0, bout, 0)
+  grad.addColorStop(0, `rgba(140,210,255,0)`)
+  grad.addColorStop(1, `rgba(215,240,255,${(0.9 * fleche.alpha).toFixed(3)})`)
+  g.lineCap = 'round'
+  g.lineJoin = 'round'
+  // halo doux, puis fût net
+  g.strokeStyle = `rgba(120,190,240,${(0.16 * fleche.alpha).toFixed(3)})`
+  g.lineWidth = 9
   g.beginPath()
-  g.arc(x, y, r, 0, Math.PI * 2)
+  g.moveTo(r0, 0)
+  g.lineTo(bout - 6, 0)
   g.stroke()
-  g.fillStyle = manette.agit ? '#ffffff' : 'rgba(190,225,250,0.9)'
+  g.strokeStyle = grad
+  g.lineWidth = 3.2
   g.beginPath()
-  g.arc(x, y, 2.2, 0, Math.PI * 2)
-  g.fill()
-  // quatre encoches : un réticule, pas une bulle
-  g.beginPath()
-  for (const [ex, ey] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-    g.moveTo(x + ex * (r + 2), y + ey * (r + 2))
-    g.lineTo(x + ex * (r + 6), y + ey * (r + 6))
-  }
+  g.moveTo(r0, 0)
+  g.lineTo(bout - 6, 0)
   g.stroke()
+  // la pointe : un chevron galbé
+  g.strokeStyle = `rgba(230,246,255,${(0.92 * fleche.alpha).toFixed(3)})`
+  g.lineWidth = 3.2
+  g.beginPath()
+  g.moveTo(bout - 13, -8)
+  g.quadraticCurveTo(bout - 3, 0, bout - 13, 8)
+  g.stroke()
+  g.restore()
 }
 
 let lastRailTime = 0
@@ -1230,17 +1263,22 @@ function frame(now: number): void {
       if (manette.zoomAvant) camera.zoomBy(Math.pow(1.9, dtReal), params)
       if (manette.zoomArriere) camera.zoomBy(Math.pow(1.9, -dtReal), params)
       if (manette.panX !== 0 || manette.panY !== 0) {
-        camera.panBy(manette.panX * 900 * dtReal, manette.panY * 900 * dtReal)
+        // pousser à droite REGARDE à droite (le pan de drag est inversé)
+        camera.panBy(-manette.panX * 900 * dtReal, -manette.panY * 900 * dtReal)
       }
-      // viser et agir — seulement si aucun doigt réel n'est posé
-      if (input.touchCount === 0) {
+      // viser et agir — seulement si la manette a parlé plus récemment que
+      // la souris, et qu'aucun doigt n'est posé. Le STICK dit où l'on veut
+      // ALLER : en eau, l'éjection part automatiquement à l'opposé (c'est
+      // elle qui pousse) ; en vapeur, le dash part dans la direction du stick.
+      if (input.touchCount === 0 && manette.lastActivity > input.lastPointerAt) {
         const scx = vw * 0.5 + (sim.stats.centroidX - camera.x) * camera.zoom
         const scy = vh * 0.5 - (sim.stats.centroidY - camera.y) * camera.zoom
         // pleine inclinaison = pleine puissance de dash ; un plancher garde
         // la direction lisible même stick à peine poussé
         const rPx = (0.15 + 0.85 * manette.force) * params.gasDashRange * camera.zoom
-        manetteCurseur.x = scx + manette.dirX * rPx
-        manetteCurseur.y = scy + manette.dirY * rPx
+        const sens = input.gasIntent ? 1 : -1 // eau : le point d'éjection est derrière
+        manetteCurseur.x = scx + manette.dirX * rPx * sens
+        manetteCurseur.y = scy + manette.dirY * rPx * sens
         if (manette.agit) {
           input.aimActive = true
           input.aimClientX = manetteCurseur.x
@@ -1254,6 +1292,10 @@ function frame(now: number): void {
           input.aimClientX = manetteCurseur.x
           input.aimClientY = manetteCurseur.y
         }
+      } else if (manetteTenait) {
+        // la souris a repris la main en pleine action manette : on relâche
+        manetteTenait = false
+        input.aimActive = false
       }
     }
   }
@@ -1524,7 +1566,7 @@ function frame(now: number): void {
   updateTutor(dtReal)
   updateWorldLabels(vw, vh)
   drawMecanismes(vw, vh, dpr)
-  drawReticule(dpr)
+  drawFleche(dtReal, dpr)
   const renderT0 = performance.now()
   renderer.render(
     sim,
