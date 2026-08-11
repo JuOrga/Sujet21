@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 19:10',
+    title: 'Le CONTINUER apparaît vraiment, et la collecte n’agonise plus jamais',
+    notes: [
+      'Le bouton CONTINUER exigeait la MOITIÉ du volume de départ en bonbonne — inatteignable en vraie partie, puisque chaque impulsion éjecte de l’eau en route. Il s’offre désormais dès UN DIXIÈME du volume bu : « un peu d’aspiration », comme convenu, et c’est le joueur qui décide.',
+      'Et la vraie source des alarmes est tarie : 1,2 s après la fin de l’aspiration, le jeu voyait un corps quasi vide et déclarait « dernière impulsion donnée — l’échantillon dérive »… sur un corps COLLECTÉ. Dès qu’un peu d’aspiration a eu lieu, la fin de course funeste (alertes, gel, bouton Recommencer) cède la place au CONTINUER — une seule invite à l’écran.',
+      'Vérifié par une collecte réelle en trois temps : à 15 % bu le bouton est là sans aucune bannière ; corps entièrement bu (3 particules restantes, 5 s d’attente) toujours aucune alarme ; le clic conclut l’essai. L’aspiration TOTALE, elle, conclut toujours toute seule.',
+    ],
+  },
+  {
     date: '11/08/2026 18:45',
     title: 'La colonne de boutons colle enfin au bord gauche du téléphone',
     notes: [

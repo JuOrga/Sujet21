@@ -1689,9 +1689,10 @@ function frame(now: number): void {
   // PRINCIPAL est avalé, un bouton CONTINUER s'offre : c'est le joueur qui
   // décide de conclure, ou d'aller cueillir les dernières gouttes.
   const seuilBu = Math.max(6, sim.baseVolume * 0.02)
-  // « assez d'aspiration » : la moitié du volume de départ est en bonbonne —
-  // le sas a clairement fait son œuvre, le reste est un choix de joueur
-  const aspireAssez = sim.swallowed >= sim.baseVolume * 0.5
+  // « un peu d'aspiration » : un dixième du volume de départ en bonbonne
+  // suffit — la route coûte de l'eau (chaque impulsion éjecte), exiger la
+  // moitié du volume INITIAL rendait le bouton inatteignable en vraie partie
+  const aspireAssez = sim.swallowed >= Math.max(20, sim.baseVolume * 0.1)
   const drunk = (sim.swallowed > 0 && sim.count <= seuilBu) || (aspireAssez && continuerVoulu)
   btnContinuer.classList.toggle(
     'visible',
@@ -1921,10 +1922,15 @@ function frame(now: number): void {
     endgame.sasBoitJusqua = run.tableauTime + 1.2
   }
   const sasBoit = run.tableauTime <= endgame.sasBoitJusqua
-  endgame.enCollecte = sasBoit
-  if (sasBoit) endgame.lastCall = false // le sas boit : l'alarme se tait
+  // Dès qu'un peu d'aspiration a eu lieu, le bouton CONTINUER prend le
+  // relais : la fin de course funeste (alerte, dernière impulsion, gel)
+  // n'a plus voix — un corps qui fond parce qu'il se fait BOIRE n'agonise
+  // pas. Sans cela, 1,2 s après la fin de l'aspiration, « playerCount ≤ 8 »
+  // déclarait « l'échantillon dérive » sur un corps... collecté.
+  endgame.enCollecte = sasBoit || aspireAssez
+  if (endgame.enCollecte) endgame.lastCall = false // le sas boit : l'alarme se tait
   const alive = !sim.dispersed && !tableauDone && !run.ended
-  if (alive && !endgame.spent && !sasBoit) {
+  if (alive && !endgame.spent && !endgame.enCollecte) {
     endgame.lastCall = sim.liters() <= params.criticalVolumeLiters
     const aiming = input.aimActive && !input.paused
     // le relâchement du pointeur conclut l'impulsion en cours
@@ -1951,6 +1957,8 @@ function frame(now: number): void {
   btnRelance.classList.toggle(
     'visible',
     (endgame.spent || sim.dispersed) &&
+      // le CONTINUER offert prime : une seule invite à l'écran
+      !(aspireAssez && !sim.dispersed) &&
       document.body.classList.contains('playing') &&
       !tableauDone &&
       !run.ended,
@@ -1958,7 +1966,9 @@ function frame(now: number): void {
 
   const nearLast =
     alive && !endgame.spent && !endgame.enCollecte && sim.liters() <= params.lastCallLiters
-  const inDanger = alive && (endgame.spent || endgame.lastCall || nearLast)
+  // une fois le CONTINUER offert, plus aucune bannière funeste : le bouton
+  // est l'interface de fin, l'alarme n'a plus rien à dire
+  const inDanger = alive && !aspireAssez && (endgame.spent || endgame.lastCall || nearLast)
   if (inDanger) {
     hudDanger.textContent = endgame.spent
       ? '❄ DERNIÈRE IMPULSION DONNÉE — L’ÉCHANTILLON DÉRIVE'
@@ -1971,7 +1981,10 @@ function frame(now: number): void {
     inDanger && document.body.classList.contains('playing') && !input.paused,
   )
   hudDanger.classList.toggle('spent', endgame.spent)
-  gaugeFill.classList.toggle('danger', (inDanger && endgame.lastCall) || endgame.spent || sim.dispersed)
+  gaugeFill.classList.toggle(
+    'danger',
+    (inDanger && endgame.lastCall) || (endgame.spent && !aspireAssez) || sim.dispersed,
+  )
   gaugeFill.classList.toggle('warn', nearLast && !endgame.lastCall && !sim.dispersed)
 
   // L'objectif : quand le sas sort de l'écran, une flèche le pointe depuis le
