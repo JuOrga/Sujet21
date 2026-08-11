@@ -77,7 +77,11 @@ export class Input {
     }
     target.addEventListener('pointermove', vie)
     target.addEventListener('pointerdown', vie)
+    // La fiche (ou tout autre écran) a la main : les commandes de jeu se
+    // taisent tant que la partie n'est pas au premier plan.
+    const enJeu = (): boolean => document.body.classList.contains('playing')
     target.addEventListener('pointerdown', (e) => {
+      if (!enJeu()) return
       if (e.button === 2) {
         // Maintenu : déplacement de caméra ; bref : vortex (au relâchement)
         this.rightDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0 }
@@ -176,9 +180,11 @@ export class Input {
     )
 
     window.addEventListener('keydown', (e) => {
-      // Ne pas voler les touches des champs de texte (présets du banc)
+      // Ne pas voler les touches des champs de texte (présets du banc),
+      // ni agir quand la partie n'est pas au premier plan (fiche ouverte)
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
+      if (!enJeu()) return
       if (e.key === ' ') {
         this.togglePause()
         e.preventDefault()

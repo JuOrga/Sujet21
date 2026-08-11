@@ -119,6 +119,14 @@
         flex-direction: column;
         gap: 22px;
       }
+      /* La fiche défile si elle déborde, mais sans ascenseur visible :
+         sur Steam Deck la barre s'affichait pour trois pixels de trop. */
+      #home {
+        scrollbar-width: none;
+      }
+      #home::-webkit-scrollbar {
+        display: none;
+      }
       @media (max-width: 1080px) {
         #home {
           width: min(520px, 100vw);
@@ -126,6 +134,24 @@
         .home-cols {
           flex-direction: column;
           align-items: stretch;
+        }
+      }
+      /* Écrans bas (Steam Deck : 1280 × 800) : la fiche se resserre pour
+         tenir sans défiler */
+      @media (max-height: 840px) and (min-width: 700px) {
+        #home {
+          gap: 12px;
+          padding-top: 16px;
+          padding-bottom: 16px;
+        }
+        .home-col {
+          gap: 12px;
+        }
+        .home-title {
+          font-size: clamp(24px, 3.6vw, 38px);
+        }
+        .home-figure img {
+          height: clamp(110px, 16vh, 160px);
         }
       }
       body.playing #home {
@@ -1807,6 +1833,7 @@
       </dl>
       <button id="home-son" type="button" hidden>♪ OUVRIR LE SON DU PROTOCOLE</button>
       <button id="start" type="button">COMMENCER L'ESSAI</button>
+      <button id="home-restart" type="button" hidden>RECOMMENCER LE TABLEAU</button>
       <button id="start-bis" type="button">TESTER LES SALLES LASER — 21-H → 21-J, MIROIR · PRISME · PLASMA</button>
       <button id="start-editor" type="button">ÉDITEUR DE TABLEAUX — CRÉER OU MODIFIER UN NIVEAU</button>
       <div id="home-seq" class="rec-note"></div>

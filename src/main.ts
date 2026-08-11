@@ -353,10 +353,13 @@ function showTableauCard(): void {
 const startBtn = document.getElementById('start') as HTMLButtonElement
 const startBisBtn = document.getElementById('start-bis') as HTMLButtonElement
 let hasPlayed = false
+const homeRestartBtn = document.getElementById('home-restart') as HTMLButtonElement
 function closeHome(): void {
   if (requireName()) return // pas de plongée sans opérateur identifié
   document.body.classList.add('playing')
+  input.paused = false // la fiche figeait l'essai : il repart
   startBtn.textContent = "REPRENDRE L'ESSAI"
+  homeRestartBtn.hidden = false
   if (!hasPlayed) {
     // Premier lancement : zoom d'ouverture (les redémarrages ont le leur)
     hasPlayed = true
@@ -366,8 +369,20 @@ function closeHome(): void {
 }
 function openHome(): void {
   document.body.classList.remove('playing')
+  // La fiche fige l'essai : revenir au menu, c'est faire une pause — la
+  // cuve n'avance plus dans le dos du joueur.
+  if (hasPlayed) input.paused = true
+  homeRestartBtn.hidden = !hasPlayed
 }
 startBtn.addEventListener('click', closeHome)
+// Recommencer depuis la fiche : on referme, on relance le tableau courant
+homeRestartBtn.addEventListener('click', () => {
+  if (requireName()) return
+  document.body.classList.add('playing')
+  input.paused = false
+  startBtn.textContent = "REPRENDRE L'ESSAI"
+  resetAction()
+})
 // Un essai HORS EXPÉDITION : un tableau (ou une file de tableaux) joué à
 // part, sans toucher aux registres. Sert au prototype 21-A bis (depuis le
 // banc) et aux salles laser (bouton de la fiche) — la file enchaîne les
@@ -386,7 +401,9 @@ function startTest(niveaux: LevelDef[]): void {
   // « playing » d'abord : restart() se charge alors lui-même du plan large et
   // du carton de journal — sinon les deux se jouaient en double, en décalé.
   document.body.classList.add('playing')
+  input.paused = false
   startBtn.textContent = "REPRENDRE L'ESSAI"
+  homeRestartBtn.hidden = false
   restart()
 }
 function startBisTest(): void {
@@ -412,6 +429,7 @@ const editor = new LevelEditor(el('editor'), {
     hasPlayed = true
     editor.close()
     document.body.classList.add('playing')
+    input.paused = false
     restart()
   },
   quit: () => {
@@ -466,8 +484,9 @@ if (new URLSearchParams(location.search).has('editeur')) {
   hasPlayed = true
   openEditor()
 }
-// Au doigt, la fiche va à l'essentiel : les commandes démarrent repliées
-if (window.matchMedia('(max-width: 700px)').matches) {
+// Au doigt, la fiche va à l'essentiel : les commandes démarrent repliées.
+// Idem sur écran BAS (Steam Deck : 800 px) — c'est ce qui faisait défiler.
+if (window.matchMedia('(max-width: 700px), (max-height: 840px)').matches) {
   document.getElementById('cmd-details')!.removeAttribute('open')
 }
 window.addEventListener('keydown', (e) => {

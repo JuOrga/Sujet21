@@ -46,6 +46,7 @@ export class AudioFx {
   private noise: AudioBuffer | null = null
   private ejectG: GainNode | null = null
   private gasG: GainNode | null = null
+  private gasDepth: GainNode | null = null // profondeur de la respiration de la nappe
   private drainG: GainNode | null = null
   private drainF: BiquadFilterNode | null = null
   // Ralenti de visée (dash vapeur) : un passe-bas sur TOUT le mixage — le
@@ -140,7 +141,48 @@ export class AudioFx {
 
     // Boucles continues (gain à 0, le jeu les ouvre)
     this.ejectG = this.noiseLoop(1400, 2.2).gain // souffle fin de l'éjection
-    this.gasG = this.noiseLoop(480, 1.1).gain // respiration grave de la fumée
+    // La vapeur : une nappe qui ROULE, pas un jet sous pression. Le bruit
+    // est très assombri (passe-bas serré puis corps grave), et deux LFO
+    // lents et désynchronisés font onduler le filtre et respirer le
+    // niveau — le nuage vit, il ne siffle pas.
+    {
+      const src = ctx.createBufferSource()
+      src.buffer = buf
+      src.loop = true
+      const sombre = ctx.createBiquadFilter()
+      sombre.type = 'lowpass'
+      sombre.frequency.value = 640
+      sombre.Q.value = 0.3
+      const corps = ctx.createBiquadFilter()
+      corps.type = 'bandpass'
+      corps.frequency.value = 260
+      corps.Q.value = 0.8
+      const g = ctx.createGain()
+      g.gain.value = 0
+      src.connect(sombre)
+      sombre.connect(corps)
+      corps.connect(g)
+      g.connect(master)
+      src.start()
+      const lfoF = ctx.createOscillator()
+      lfoF.type = 'sine'
+      lfoF.frequency.value = 0.31 // le roulis du filtre (±90 Hz)
+      const depF = ctx.createGain()
+      depF.gain.value = 90
+      lfoF.connect(depF)
+      depF.connect(corps.frequency)
+      lfoF.start()
+      const lfoA = ctx.createOscillator()
+      lfoA.type = 'sine'
+      lfoA.frequency.value = 0.19 // la respiration du niveau
+      const depA = ctx.createGain()
+      depA.gain.value = 0
+      lfoA.connect(depA)
+      depA.connect(g.gain)
+      lfoA.start()
+      this.gasG = g
+      this.gasDepth = depA
+    }
     const drain = this.noiseLoop(220, 2.6)
     this.drainG = drain.gain
     this.drainF = drain.filter
@@ -265,7 +307,10 @@ export class AudioFx {
   }
 
   setGasLevel(v: number): void {
-    this.ramp(this.gasG, v * 0.05)
+    // la nappe est sombre : un peu plus de niveau, et une respiration
+    // proportionnelle (±30 % du niveau) — jamais de sifflement
+    this.ramp(this.gasG, v * 0.085)
+    this.ramp(this.gasDepth, v * 0.085 * 0.3)
   }
 
   setDrainLevel(v: number): void {
