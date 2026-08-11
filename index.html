@@ -370,6 +370,35 @@
         0%, 100% { transform: translateX(2px); }
         50% { transform: translateX(42px); }
       }
+      /* 4. la barre de bord : les chips s'allument tour à tour */
+      .ob-barre {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        width: auto;
+      }
+      .ob-barre i {
+        position: static;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        border: 1px solid var(--line-strong);
+        border-radius: 6px;
+        background: rgba(13, 26, 42, 0.9);
+        font-size: 19px;
+        color: #cfe9ff;
+        animation: ob-chip 3.2s ease-in-out infinite;
+      }
+      .ob-barre i:nth-child(2) { animation-delay: 0.8s; }
+      .ob-barre i:nth-child(3) { animation-delay: 1.6s; }
+      .ob-barre i:nth-child(4) { animation-delay: 2.4s; }
+      @keyframes ob-chip {
+        0%, 28%, 100% { border-color: var(--line-strong); box-shadow: none; transform: scale(1); }
+        10% { border-color: #63b7e6; box-shadow: 0 0 14px rgba(99, 183, 230, 0.6); transform: scale(1.12); }
+      }
       .ob-pied {
         display: flex;
         flex-direction: column;
@@ -1227,7 +1256,7 @@
         color: var(--ink);
         font-size: 9.5px;
       }
-      @media (max-width: 700px) {
+      @media (max-width: 700px), (pointer: coarse) and (max-height: 620px) {
         #tableau-card {
           top: 12px;
         }
@@ -1279,7 +1308,7 @@
         border-radius: 3px;
         padding: 0 6px;
       }
-      @media (max-width: 700px) {
+      @media (max-width: 700px), (pointer: coarse) and (max-height: 620px) {
         #tutor {
           top: 122px;
           font-size: 12px;
@@ -1434,7 +1463,7 @@
           display: none;
         }
       }
-      @media (max-width: 700px) {
+      @media (max-width: 700px), (pointer: coarse) and (max-height: 620px) {
         /* au doigt : colonne à droite, sous le pouce, hors du HUD — la barre
            tactile peut occuper deux rangées, on remonte d'autant */
         #statebar {
@@ -1722,7 +1751,7 @@
       .lg-states b {
         color: var(--ink);
       }
-      @media (max-width: 700px) {
+      @media (max-width: 700px), (pointer: coarse) and (max-height: 620px) {
         #legend,
         #states {
           top: auto;
@@ -1740,7 +1769,7 @@
 
       /* Le style du banc de réglage vit dans src/bench/bench.css */
 
-      @media (max-width: 700px) {
+      @media (max-width: 700px), (pointer: coarse) and (max-height: 620px) {
         /* Au doigt, le bas de l'écran appartient aux commandes : le HUD est
            une bande fine sur toute la largeur du haut — volume et jauge à
            gauche (le trait rouge de la jauge marque le seuil), tableau et
@@ -2429,11 +2458,19 @@
       <div class="ob-etape" data-etape="2" hidden>
         <div class="ob-anim ob-pince"><i></i><i></i></div>
         <h3>DEUX DOIGTS</h3>
-        <p>Pincez : zoom · glissez : caméra · ⌖ recadre sur le corps.
-        La barre du bas garde pause, recommencer et la légende.</p>
+        <p>Pincez : zoom · glissez : déplacez la caméra.
+        Un doigt suffit pour tout le reste.</p>
+      </div>
+      <div class="ob-etape" data-etape="3" hidden>
+        <div class="ob-anim ob-barre">
+          <i>⏸</i><i>↺</i><i>⌖</i><i>≡</i>
+        </div>
+        <h3>LA BARRE DE BORD</h3>
+        <p>⏸ pause · ↺ recommencer · ⌖ recadrer · ≡ le menu.
+        À droite : 💧 ❄ 💨 changent d'état — LÉGENDE et ÉTATS expliquent tout.</p>
       </div>
       <div class="ob-pied">
-        <span class="ob-points"><i class="on"></i><i></i><i></i></span>
+        <span class="ob-points"><i class="on"></i><i></i><i></i><i></i></span>
         <span class="ob-suite">TOUCHER POUR CONTINUER</span>
       </div>
     </div>

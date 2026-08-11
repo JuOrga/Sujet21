@@ -366,7 +366,7 @@ function majOnboard(): void {
   const points = Array.from(onboardEl.querySelectorAll<HTMLElement>('.ob-points i'))
   points.forEach((p, i) => p.classList.toggle('on', i === obEtape))
   const suite = onboardEl.querySelector<HTMLElement>('.ob-suite')
-  if (suite) suite.textContent = obEtape >= 2 ? 'TOUCHER POUR PLONGER' : 'TOUCHER POUR CONTINUER'
+  if (suite) suite.textContent = obEtape >= 3 ? 'TOUCHER POUR PLONGER' : 'TOUCHER POUR CONTINUER'
 }
 function montrerOnboard(): void {
   if (!window.matchMedia('(pointer: coarse)').matches) return
@@ -380,7 +380,7 @@ onboardEl.addEventListener('pointerdown', (e) => {
   e.stopPropagation()
   e.preventDefault()
   obEtape++
-  if (obEtape > 2) {
+  if (obEtape > 3) {
     onboardEl.hidden = true
     try {
       localStorage.setItem('projet21.onboard.v1', '1')
