@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 12:15',
+    title: 'Pack Steam réparé : les vraies tailles, les bonnes adresses',
+    notes: [
+      'Les images du pack partaient en 404 et, pire, les fichiers commis étaient capturés TROP LARGES (le conteneur pleine page au lieu du visuel seul — 2000 px de large pour la jaquette). Régénérés aux formats exacts : 600×900, 920×430, 1920×620, logo 640×360 vraiment transparent, icône 256.',
+      'Les adresses des images passent en absolu (/steam/…) : la page marche désormais qu’on l’ouvre avec ou sans barre oblique finale.',
+    ],
+  },
+  {
     date: '11/08/2026 11:50',
     title: 'Manette : le stick montre le CAP, la flèche le dessine',
     notes: [
