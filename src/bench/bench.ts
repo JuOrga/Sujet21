@@ -498,8 +498,8 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Facteur de temps pendant la visée du dash : 0,06 = seize fois plus lent. Le monde continue d’avancer — rien n’est figé, on vise dans un monde au ralenti.',
   )
   describe(
-    fGas.addBinding(params, 'gasDashCost', { min: 0.1, max: 0.6, step: 0.01, label: 'coût du dash (fraction)' }),
-    'Fraction du volume COURANT évaporée à chaque dash (≈ 1/3). Fraction du courant, pas du volume de base : chaque dash propulse pareil, il coûte juste plus cher. Les pertes perleront en rosée aux plaques froides.',
+    fGas.addBinding(params, 'gasDashBudget', { min: 0, max: 9, step: 1, label: 'impulsions / écran' }),
+    'Nombre d’impulsions vapeur par ÉCRAN, quel que soit le volume — le dash ne se paie plus en eau, il se COMPTE. Chaque tableau peut fixer le sien dans l’éditeur ; frôler un radiateur offre l’impulsion suivante.',
   )
   describe(
     fGas.addBinding(params, 'gasIdleLossRate', { min: 0, max: 10, step: 0.5, label: 'coût d’état /s' }),

@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '12/08/2026 03:05',
+    title: 'Les impulsions vapeur se comptent — x par écran, réglable par tableau',
+    notes: [
+      'Règle confirmée : en VAPEUR, le dash ne se paie plus en volume — il se COMPTE. Chaque écran offre x impulsions (réglage « impulsions / écran » au banc, et champ « Dashs vapeur / écran » propre à chaque tableau dans l’éditeur). Le LIQUIDE, lui, continue de payer ses éjections en quantité réelle.',
+      'Le viseur du dash annonce le solde (« DASH 80 % · 2 impulsions »), le radiateur frôlé OFFRE l’impulsion suivante sans toucher au budget, et à sec, le viseur le dit : « À SEC — condensez, ou frôlez un radiateur ». L’état vapeur, lui, s’évapore toujours en continu.',
+    ],
+  },
+  {
     date: '12/08/2026 02:40',
     title: 'Parois obliques, chevauchement au clic, et guides façon Canva',
     notes: [

@@ -112,6 +112,9 @@ function fmtTime(s: number): string {
 
 function createSim(level: LevelDef): FluidSim {
   const sim = new FluidSim(params, level.bounds, CAPACITY)
+  // les impulsions vapeur se comptent PAR ÉCRAN : le tableau peut fixer
+  // son propre budget, sinon celui du banc
+  sim.dashBudget = level.dashBudget ?? params.gasDashBudget
   sim.setLevel(level.boxes, level.sponges)
   sim.spawnDisc(level.spawn.x, level.spawn.y, level.spawn.n, KIND_PLAYER)
   sim.relabel()
@@ -2091,7 +2094,9 @@ function frame(now: number): void {
     const puissance = Math.min(1, dMonde / Math.max(1, params.gasDashRange))
     dashCostEl.textContent = sim.dashOffert
       ? `DASH ${Math.round(puissance * 100)} % · OFFERT (radiateur)`
-      : `DASH ${Math.round(puissance * 100)} % · −${(sim.liters() * params.gasDashCost).toFixed(2)} L`
+      : sim.dashBudget > 0
+        ? `DASH ${Math.round(puissance * 100)} % · ${sim.dashBudget} impulsion${sim.dashBudget > 1 ? 's' : ''}`
+        : `À SEC — condensez, ou frôlez un radiateur`
   }
   dashAimEl.classList.toggle('visible', dash.aiming)
   dashCostEl.classList.toggle('visible', dash.aiming)

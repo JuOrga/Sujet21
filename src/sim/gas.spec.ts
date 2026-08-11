@@ -52,13 +52,10 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
     sim.gasIntent = true
     run(sim, 1.2) // vaporisation complète
     const before = sim.playerCount
-    const bankBefore = sim.vaporBank
     const spent = sim.gasDash(600, 0)
-    // le prix : un tiers du volume COURANT, évaporé vers la réserve de rosée
-    expect(spent).toBeGreaterThan(0)
-    expect(spent).toBe(Math.round(before * sim.params.gasDashCost))
-    expect(sim.playerCount).toBe(before - spent)
-    expect(sim.vaporBank).toBe(bankBefore + spent)
+    // le dash se COMPTE (budget d'écran), il n'évapore plus le volume
+    expect(spent).toBe(1)
+    expect(sim.playerCount).toBe(before)
     // l'impulsion : le nuage fuse — la traîne évaporée ne compte pas ici
     run(sim, 0.6)
     sim.updatePlayerStats()
@@ -97,19 +94,19 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
     }
   })
 
-  it('chaque dash coûte la même FRACTION : le second prélève un tiers du volume restant', () => {
+  it('les impulsions sont COMPTÉES par écran : le budget s’épuise, quel que soit le volume', () => {
     const sim = makeSim()
     sim.setLevel([], [])
     sim.spawnDisc(0, 0, 90, KIND_PLAYER)
     sim.gasIntent = true
     run(sim, 1.2)
-    const n0 = sim.playerCount
-    const c1 = sim.gasDash(600, 0)
-    const n1 = sim.playerCount
-    const c2 = sim.gasDash(600, 0)
-    expect(c1).toBe(Math.round(n0 * sim.params.gasDashCost))
-    expect(c2).toBe(Math.round(n1 * sim.params.gasDashCost))
-    expect(c2).toBeLessThan(c1) // moins de volume → moins cher en absolu
+    sim.dashBudget = 2
+    expect(sim.gasDash(600, 0)).toBe(1)
+    expect(sim.dashBudget).toBe(1)
+    expect(sim.gasDash(600, 0)).toBe(1)
+    expect(sim.dashBudget).toBe(0)
+    expect(sim.gasDash(600, 0)).toBe(0) // à sec : plus d'impulsion
+    expect(sim.playerCount).toBeGreaterThan(80) // et le volume n'a rien payé
   })
 
   it('un bain dans l’aura du radiateur RECHARGE UN DASH : le prochain est offert', () => {
@@ -119,13 +116,12 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
     gasify(sim)
     run(sim, 0.5)
     expect(sim.dashOffert).toBe(true)
-    const avant = sim.playerCount
+    sim.dashBudget = 1
     sim.gasDash(400, -140)
-    expect(sim.playerCount).toBe(avant) // aucune particule évaporée : offert
-    expect(sim.dashOffert).toBe(false) // l'offrande est consommée
-    const apres = sim.playerCount
+    expect(sim.dashBudget).toBe(1) // l'offrande a payé : le budget est intact
+    expect(sim.dashOffert).toBe(false) // et elle est consommée
     sim.gasDash(400, -140)
-    expect(sim.playerCount).toBeLessThan(apres) // le suivant se paie
+    expect(sim.dashBudget).toBe(0) // le suivant sort du budget de l'écran
   })
 
   it('la vapeur traverse la grille, le liquide s’y écrase', () => {

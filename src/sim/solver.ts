@@ -155,6 +155,10 @@ export class FluidSim {
   // Un dash « offert » par un radiateur : la vapeur rechargée ne paie pas
   // le prochain péage d'impulsion. Consommé par gasDash.
   dashOffert = false
+  // Impulsions vapeur restantes pour CET écran : le dash ne coûte plus de
+  // volume, il se COMPTE — x par tableau, quel que soit le volume (le
+  // liquide, lui, continue de payer ses éjections en quantité réelle).
+  dashBudget = 3
   private mouthX = 0
   private mouthY = 0
   private drainOn = false
@@ -734,7 +738,7 @@ export class FluidSim {
   // Le dash de vapeur (refonte 2026, « air dash » à la Ori) : UNE impulsion
   // qui envoie tout le nuage vers le point visé — pas de recul, pas
   // d'éjection, pas de pilotage continu. Le prix se paie d'avance : une
-  // fraction du volume COURANT s'évapore (gasDashCost), prélevée sur la
+  // les impulsions sont COMPTÉES par écran (dashBudget), prélevées sur la
   // traîne — les particules les plus en arrière de la direction du dash.
   // Fraction du courant et non du volume de base : chaque dash emporte le
   // même tiers, donc propulse pareil (Tsiolkovsky) — un tableau reste
@@ -761,34 +765,21 @@ export class FluidSim {
       if (this.kind[i] === KIND_PLAYER && this.gaseous[i] === 1) gasCount++
     }
     if (gasCount < 3) return 0
-    let toll = Math.min(Math.round(gasCount * p.gasDashCost), gasCount - 2)
+    // le dash se COMPTE, il ne se paie plus en volume : un radiateur frôlé
+    // offre l'impulsion, sinon elle sort du budget de l'écran
     if (this.dashOffert) {
-      this.dashOffert = false // le radiateur a payé : dash gratuit
-      toll = 0
-    }
-    const spent = toll
-    while (toll > 0) {
-      let worst = -1
-      let worstProj = Infinity
-      for (let i = 0; i < this.count; i++) {
-        if (this.kind[i] !== KIND_PLAYER || this.gaseous[i] !== 1) continue
-        const proj = this.posX[i] * dx + this.posY[i] * dy
-        if (proj < worstProj) {
-          worstProj = proj
-          worst = i
-        }
-      }
-      if (worst < 0) break
-      this.removeParticle(worst)
-      this.vaporBank++ // évaporée : partie… vers les parois froides
-      toll--
+      this.dashOffert = false
+    } else if (this.dashBudget <= 0) {
+      return 0 // plus d'impulsions : condenser, ou trouver un radiateur
+    } else {
+      this.dashBudget--
     }
     for (let i = 0; i < this.count; i++) {
       if (this.kind[i] !== KIND_PLAYER || this.gaseous[i] !== 1) continue
       this.velX[i] = dx * p.gasDashSpeed * power
       this.velY[i] = dy * p.gasDashSpeed * power
     }
-    return spent
+    return 1
   }
 
   // Vortex de regroupement (clic droit) : l'eau est entraînée vers un champ
