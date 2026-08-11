@@ -382,7 +382,7 @@ function majOnboard(): void {
   const suite = onboardEl.querySelector<HTMLElement>('.ob-suite')
   if (suite) {
     const geste = obTactile() ? 'TOUCHER' : 'CLIQUER'
-    suite.textContent = obEtape >= 3 ? `${geste} POUR PLONGER` : `${geste} POUR CONTINUER`
+    suite.textContent = obEtape >= 4 ? `${geste} POUR PLONGER` : `${geste} POUR CONTINUER`
   }
 }
 function montrerOnboard(): void {
@@ -397,7 +397,7 @@ onboardEl.addEventListener('pointerdown', (e) => {
   e.stopPropagation()
   e.preventDefault()
   obEtape++
-  if (obEtape > 3) {
+  if (obEtape > 4) {
     onboardEl.hidden = true
     try {
       localStorage.setItem(obCle(), '1')
@@ -1525,9 +1525,20 @@ function frame(now: number): void {
       // ☰ (Start) : pause ET menu — la fiche fige l'essai en s'ouvrant
       if (manette.edge(BOUTON.START)) openHome()
       if (manette.edge(BOUTON.SELECT)) input.onReset?.()
-      if (manette.edge(BOUTON.LB)) input.toggleFreeze()
-      if (manette.edge(BOUTON.RB)) input.toggleGas()
+      // le temps aux épaules : LB ralentit, RB accélère (la croix ↔ aussi)
+      if (manette.edge(BOUTON.LB)) input.stepWarp(-1)
+      if (manette.edge(BOUTON.RB)) input.stepWarp(1)
+      // les trois états sur les trois boutons restants : X glace, Y vapeur,
+      // B retour à l'eau — A reste la main qui agit
       if (manette.edge(BOUTON.X)) {
+        if (input.gasIntent) input.toggleGas()
+        input.toggleFreeze()
+      }
+      if (manette.edge(BOUTON.Y)) {
+        if (input.freezeIntent) input.toggleFreeze()
+        input.toggleGas()
+      }
+      if (manette.edge(BOUTON.B)) {
         // retour à l'eau, quel que soit l'état
         if (input.freezeIntent) input.toggleFreeze()
         else if (input.gasIntent) input.toggleGas()
