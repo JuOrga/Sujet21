@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 12:50',
+    title: 'La trilogie laser entre dans l’expédition : trois nouveaux tableaux',
+    notes: [
+      'Les CIBLES sont À VERROU : un passage du faisceau suffit, l’activation est acquise et la porte reste ouverte (jusqu’au Recommencer). Plus besoin de tenir le rayon — on allume, puis on voyage.',
+      'La RÉFRACTION est lissée comme le miroir : le milieu liquide devient une isoligne de densité au lieu d’un contact au grain près. Le dioptre ne clignote plus sur le clapot, et une gouttelette isolée ne dévie plus le rayon.',
+      'TROIS NOUVEAUX TABLEAUX, insérés avant la dérive finale — la trilogie qui révèle la fonction de l’échantillon. 21-H « La salle des miroirs » : se figer dans le faisceau sur le berceau froid, le corps devient miroir, le reflet monte au récepteur. 21-I « Le prisme » : se coller à l’étagère hydrophile, le corps liquide plie le rayon vers un récepteur hors de toute ligne droite. 21-J « La voie de plasma » : se vaporiser dans le faisceau au pied du rail — l’arc franchit le mur par le passage haut, allume le récepteur, et le champ convoie le nuage avec lui.',
+      'Chaque énigme est vérifiée par le calcul : rien ne s’allume à vide, et une position raisonnable du corps (gelé, liquide, vapeur) résout chacune — avec de la marge.',
+    ],
+  },
+  {
     date: '11/08/2026 12:15',
     title: 'Pack Steam réparé : les vraies tailles, les bonnes adresses',
     notes: [

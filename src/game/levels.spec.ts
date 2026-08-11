@@ -1,5 +1,94 @@
 import { describe, expect, it } from 'vitest'
-import { MAT_WALL, TABLEAU_1BIS, TABLEAUX, subtractBox } from './level'
+import {
+  MAT_WALL,
+  TABLEAU_10,
+  TABLEAU_1BIS,
+  TABLEAU_8,
+  TABLEAU_9,
+  TABLEAUX,
+  subtractBox,
+  type LevelDef,
+} from './level'
+import { traceLaser, type TraceMonde } from './laser'
+
+// Le monde optique d'un tableau, tel que le jeu le construit — sans corps
+// par défaut, toutes portes closes (rien n'est encore allumé).
+function mondeDe(lv: LevelDef, sur: Partial<TraceMonde> = {}): TraceMonde {
+  return {
+    bounds: lv.bounds,
+    boxes: lv.boxes,
+    portesFermees: lv.portes ?? [],
+    cibles: lv.cibles ?? [],
+    iceNormal: null,
+    eau: null,
+    vapeur: null,
+    rails: lv.rails ?? [],
+    ...sur,
+  }
+}
+
+/** Un palet circulaire analytique : la normale radiale d'un corps gelé. */
+function palet(cx: number, cy: number, r: number) {
+  return (x: number, y: number): { nx: number; ny: number } | null => {
+    const dx = x - cx
+    const dy = y - cy
+    const d = Math.hypot(dx, dy)
+    if (d > r) return null
+    if (d < 1e-6) return { nx: 0, ny: 1 }
+    return { nx: dx / d, ny: dy / d }
+  }
+}
+
+describe('Tableaux laser — les énigmes tiennent leurs promesses', () => {
+  it('aucun tableau laser ne se résout tout seul : à vide, rien ne s’allume', () => {
+    for (const lv of [TABLEAU_8, TABLEAU_9, TABLEAU_10]) {
+      for (const em of lv.lasers ?? []) {
+        expect(traceLaser(em, mondeDe(lv)).touchees).toEqual([])
+      }
+    }
+  })
+
+  it('21-H : un palet gelé posé sur le berceau renvoie le faisceau au récepteur', () => {
+    // corps de 900 particules ≈ rayon 104, posé sur le berceau (dessus à
+    // y = −220) : centre vers (−30, −116). Le joueur règle l'angle en
+    // glissant le long du berceau — on vérifie qu'une position raisonnable
+    // du berceau résout l'énigme.
+    let ok = false
+    for (let cx = -120; cx <= 160 && !ok; cx += 10) {
+      const t = traceLaser(TABLEAU_8.lasers![0], mondeDe(TABLEAU_8, { iceNormal: palet(cx, -116, 104) }))
+      if (t.touchees.includes(0)) ok = true
+    }
+    expect(ok).toBe(true)
+  })
+
+  it('21-I : un corps liquide collé à l’étagère plie le faisceau vers le récepteur', () => {
+    // corps rond posé sur l'étagère (dessus à y = 130) : centre ≈ (x, 234).
+    // La lentille dévie la ligne droite vers le bas — une des positions de
+    // mouillage doit allumer le récepteur.
+    let ok = false
+    for (let cx = 60; cx <= 380 && !ok; cx += 10) {
+      const centre = { x: cx, y: 234 }
+      const eau = {
+        dedans: (x: number, y: number): boolean => Math.hypot(x - centre.x, y - centre.y) < 104,
+        normale: (x: number, y: number): { nx: number; ny: number } => {
+          const d = Math.hypot(x - centre.x, y - centre.y) || 1
+          return { nx: (x - centre.x) / d, ny: (y - centre.y) / d }
+        },
+      }
+      const t = traceLaser(TABLEAU_9.lasers![0], mondeDe(TABLEAU_9, { eau }))
+      if (t.touchees.includes(0)) ok = true
+    }
+    expect(ok).toBe(true)
+  })
+
+  it('21-J : ionisé au pied du rail, l’arc franchit le mur et allume le récepteur', () => {
+    // le nuage de vapeur au pied du rail (là où le faisceau le croise)
+    const nuage = (x: number, y: number): boolean => Math.hypot(x + 240, y - 140) < 90
+    const t = traceLaser(TABLEAU_10.lasers![0], mondeDe(TABLEAU_10, { vapeur: nuage }))
+    expect(t.touchees).toEqual([0])
+    // sans nuage, le faisceau meurt sur le mur : vérifié par le test « à vide »
+  })
+})
 
 describe('subtractBox — la découpe ronge les parois', () => {
   const boite = { minX: 0, minY: 0, maxX: 100, maxY: 100, material: MAT_WALL }
@@ -41,8 +130,8 @@ describe('subtractBox — la découpe ronge les parois', () => {
 const ALL = [...TABLEAUX, TABLEAU_1BIS]
 
 describe('TABLEAUX — validité structurelle', () => {
-  it('l’expédition fait 7 tableaux, aux codes uniques (le bis à part)', () => {
-    expect(TABLEAUX.length).toBe(7)
+  it('l’expédition fait 10 tableaux, aux codes uniques (le bis à part)', () => {
+    expect(TABLEAUX.length).toBe(10)
     const codes = ALL.map((t) => t.code)
     expect(new Set(codes).size).toBe(codes.length)
     expect(TABLEAUX).not.toContain(TABLEAU_1BIS)

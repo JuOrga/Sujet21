@@ -321,19 +321,29 @@ export class FluidSim {
   }
 
   // Le point (x, y) baigne-t-il dans l'eau LIQUIDE ? Test de milieu du
-  // traceur laser (palier 2), appelé à chaque pas de marche : rien que le
-  // contact, pas de normale. Glace et vapeur ne comptent pas — la première
-  // est un miroir, la seconde laisse passer.
+  // traceur laser (palier 2), appelé à chaque pas de marche. LISSÉ comme le
+  // miroir : au lieu d'un contact binaire au grain près (qui faisait
+  // clignoter le dioptre sur le clapot et dévier le rayon sur la moindre
+  // gouttelette), on somme un noyau (1 − d/r)² et on compare à la moitié du
+  // poids d'un intérieur plein — la surface effective est l'isoligne de
+  // densité, plane là où le corps est plan. Une goutte isolée ne pèse pas
+  // assez : elle ne réfracte plus. Glace et vapeur ne comptent pas.
   liquidAt(x: number, y: number, r: number): boolean {
-    let hit = false
+    let somme = 0
     const r2 = r * r
     this.grid.forEachNeighbor(x, y, r, (j) => {
       if (this.frozen[j] === 1 || this.gaseous[j] === 1) return
       const dx = x - this.posX[j]
       const dy = y - this.posY[j]
-      if (dx * dx + dy * dy < r2) hit = true
+      const d2 = dx * dx + dy * dy
+      if (d2 >= r2) return
+      const t = 1 - Math.sqrt(d2) / r
+      somme += t * t
     })
-    return hit
+    // poids d'un intérieur plein (empilement hexagonal de pas h) : n·πr²/6
+    const h = this.params.particleSpacing
+    const plein = (Math.PI * r * r) / (3 * Math.sqrt(3) * h * h)
+    return somme > plein * 0.5
   }
 
   // Le point (x, y) baigne-t-il dans la VAPEUR du joueur ? Test d'ionisation
