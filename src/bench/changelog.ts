@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 18:20',
+    title: 'Le son s’éveille tout seul, le dash se tait, et les alarmes respectent l’aspiration',
+    notes: [
+      'Plus de bouton « Activer le son » : l’audio s’éveille au PREMIER geste, quel qu’il soit — toucher, clic ou touche. Sur la fiche ne reste qu’un bouton MUTE (🔊 SON / 🔇 MUET), comme en jeu, atteignable à la manette.',
+      'Le souffle d’aspiration qui accompagnait chaque impulsion de vapeur est retiré : le dash se voit à l’écran et se sent dans la manette (vibration), il n’a pas besoin de souffler.',
+      'Les alertes « réserve basse » et « dernière impulsion » se taisent VRAIMENT pendant que le sas boit : la garde couvrait le gong final mais pas l’alerte de réserve — les deux passent sous la même garde (enCollecte). Vérifié par une aspiration réelle : zéro alerte pendant la collecte, et le bouton CONTINUER apparaît bien dès la moitié du volume avalée.',
+    ],
+  },
+  {
     date: '11/08/2026 17:55',
     title: 'La bande de vie partout, la fiche mobile allégée, et le premier toucher réparé',
     notes: [
