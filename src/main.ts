@@ -1040,12 +1040,16 @@ function drawFleche(dtReal: number, dpr: number): void {
 }
 
 let lastRailTime = 0
+// rails dont le champ est engagé : allumés par un arc, ils ne se relâchent
+// qu'une fois leur bande vidée (le nuage porté jusqu'à l'arrivée)
+const railsEngages = new Set<number>()
 function resetLasers(): void {
   laserEtat.vues = []
   laserEtat.allumees = (level.cibles ?? []).map(() => false)
   laserEtat.portesOuvertes = (level.portes ?? []).map(() => false)
   laserEtat.doorsKey = ''
   lastRailTime = 0
+  railsEngages.clear()
 }
 const dashAimEl = el('dash-aim')
 const dashCostEl = el('dash-cost')
@@ -1658,21 +1662,33 @@ function frame(now: number): void {
       laserEtat.doorsKey = cle
       sim.setDoors(closes)
     }
-    // convoyage : tant qu'un arc circule sur un rail, le champ y est actif
-    // et la vapeur prise dans la bande voyage le long de la ligne — au
-    // rythme du temps simulé réellement avancé (le ralenti de visée compte)
+    // convoyage : quand un arc circule sur un rail, le champ s'y ENGAGE —
+    // et il reste engagé tant qu'un nuage voyage dans la bande, même si le
+    // rayon ne traverse plus la vapeur : ce qui est pris est porté jusqu'à
+    // l'ARRIVÉE du rail. Le champ ne se relâche que la bande vide (nuage
+    // arrivé, dispersé ou recondensé). Au rythme du temps simulé réellement
+    // avancé (le ralenti de visée compte).
     const dtRail = Math.max(0, run.tableauTime - lastRailTime)
     if (dtRail > 0 && !input.paused && !tableauDone && !sim.dispersed) {
       const railsDuNiveau = level.rails ?? []
       const actifs = new Set<number>()
       for (const t of laserEtat.vues) for (const ri of t.railsSuivis) actifs.add(ri)
-      for (const ri of actifs) {
+      for (const ri of actifs) railsEngages.add(ri)
+      for (const ri of [...railsEngages]) {
         const rail = railsDuNiveau[ri]
+        if (!rail) {
+          railsEngages.delete(ri)
+          continue
+        }
         // bande de convoyage plus large que la capture : le nuage ENTIER
         // embarque, pas seulement son cœur posé sur la ligne
-        if (rail) {
-          sim.railConvoy(rail.points, params.plasmaRailRadius * 2.5, params.plasmaConvoy, dtRail)
-        }
+        const nBande = sim.railConvoy(
+          rail.points,
+          params.plasmaRailRadius * 2.5,
+          params.plasmaConvoy,
+          dtRail,
+        )
+        if (nBande === 0 && !actifs.has(ri)) railsEngages.delete(ri)
       }
     }
   }

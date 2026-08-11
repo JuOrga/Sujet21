@@ -268,6 +268,21 @@ describe('traceLaser — les règles optiques du palier 1', () => {
     expect(sim.velX[loin]).toBeLessThan(-30)
   })
 
+  it('le convoyage dit qui reste dans la bande : le champ tient jusqu’à l’arrivée', () => {
+    const sim = new FluidSim({ ...DEFAULT_PARAMS }, BOUNDS, 2048)
+    const gaz = sim.addParticle(105, 0, KIND_FREE)
+    sim.vapor[gaz] = 1
+    sim.gaseous[gaz] = 1
+    const rail = [{ x: 100, y: -300 }, { x: 100, y: 300 }]
+    // nuage dans la bande : le compte est non nul — l'appelant maintient le
+    // champ engagé même si le rayon ne traverse plus la vapeur
+    expect(sim.railConvoy(rail, 75, 950, 1 / 120)).toBe(1)
+    // nuage arrivé au bout et sorti de la bande : le champ peut se relâcher
+    sim.posX[gaz] = 100
+    sim.posY[gaz] = 500 // au-delà du dernier point, hors bande
+    expect(sim.railConvoy(rail, 75, 950, 1 / 120)).toBe(0)
+  })
+
   it('une goutte isolée ne réfracte plus : le milieu est une isoligne de densité', () => {
     const sim = new FluidSim({ ...DEFAULT_PARAMS }, BOUNDS, 256)
     sim.addParticle(0, 0, KIND_FREE) // une gouttelette égarée sur le trajet
