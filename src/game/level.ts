@@ -20,6 +20,36 @@ export interface ObstacleBox {
   maxX: number
   maxY: number
   material: number
+  // Rotation en DEGRÉS autour du centre de la boîte (sens trigonométrique).
+  // Absente ou nulle : boîte droite — le chemin rapide partout.
+  angle?: number
+}
+
+/** Le point (x, y) ramené dans le repère LOCAL d'une boîte oblique. */
+export function versLocalBoite(
+  b: { minX: number; minY: number; maxX: number; maxY: number; angle?: number },
+  x: number,
+  y: number,
+): { x: number; y: number } {
+  if (!b.angle) return { x, y }
+  const cx = (b.minX + b.maxX) / 2
+  const cy = (b.minY + b.maxY) / 2
+  const rad = (b.angle * Math.PI) / 180
+  const ca = Math.cos(rad)
+  const sa = Math.sin(rad)
+  const rx = x - cx
+  const ry = y - cy
+  return { x: cx + rx * ca + ry * sa, y: cy - rx * sa + ry * ca }
+}
+
+/** Le point (x, y) est-il dans la boîte, rotation comprise ? */
+export function dansBoite(
+  b: { minX: number; minY: number; maxX: number; maxY: number; angle?: number },
+  x: number,
+  y: number,
+): boolean {
+  const p = versLocalBoite(b, x, y)
+  return p.x > b.minX && p.x < b.maxX && p.y > b.minY && p.y < b.maxY
 }
 
 // Ronge une paroi : retire le rectangle `r` de la boîte `b`. Le reste est

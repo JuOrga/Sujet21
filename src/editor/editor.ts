@@ -13,6 +13,7 @@ import {
   MAT_GRILLE,
   MAT_MEMBRANE,
   MAT_RIDEAU,
+  dansBoite,
   MAT_HYDROPHILE,
   MAT_HYDROPHOBE,
   MAT_WALL,
@@ -24,7 +25,6 @@ import {
   zoneName,
   zoneOutline,
   type LevelDef,
-  type ObstacleBox,
   type SpongeDef,
   type WorldLabel,
   type ZoneForce,
@@ -415,6 +415,33 @@ export class LevelEditor {
   }
 
   /** Aligne les éléments de la sélection multiple sur un même bord. */
+  // Même largeur / hauteur : la PREMIÈRE boîte sélectionnée donne la
+  // mesure, les autres l'adoptent autour de leur centre (façon Canva).
+  private memeDimension(quoi: 'largeur' | 'hauteur'): void {
+    const boites = this.multi.filter((m) => m?.kind === 'box') as { kind: 'box'; index: number }[]
+    if (boites.length < 2) {
+      this.status('Même dimension : sélectionnez au moins deux parois (Maj + clic).')
+      return
+    }
+    const ref = this.level.boxes[boites[0].index]
+    const mesure = quoi === 'largeur' ? ref.maxX - ref.minX : ref.maxY - ref.minY
+    for (const m of boites.slice(1)) {
+      const b = this.level.boxes[m.index]
+      if (quoi === 'largeur') {
+        const c = (b.minX + b.maxX) / 2
+        b.minX = c - mesure / 2
+        b.maxX = c + mesure / 2
+      } else {
+        const c = (b.minY + b.maxY) / 2
+        b.minY = c - mesure / 2
+        b.maxY = c + mesure / 2
+      }
+    }
+    this.commit(
+      `${boites.length - 1} paroi${boites.length > 2 ? 's' : ''} à la même ${quoi} que la première (${Math.round(mesure)} u).`,
+    )
+  }
+
   private alignMulti(op: 'gauche' | 'droite' | 'haut' | 'bas' | 'centreH' | 'centreV'): void {
     const items = this.multi
       .map((m) => ({ m, b: this.boundsOf(m) }))
@@ -474,7 +501,7 @@ export class LevelEditor {
     if (Math.hypot(this.level.spawn.x - x, this.level.spawn.y - y) < sr) return { kind: 'spawn' }
     if (inside(this.level.exit)) return { kind: 'exit' }
     for (let i = this.level.boxes.length - 1; i >= 0; i--) {
-      if (inside(this.level.boxes[i])) return { kind: 'box', index: i }
+      if (dansBoite(this.level.boxes[i], x, y)) return { kind: 'box', index: i }
     }
     for (let i = this.level.sponges.length - 1; i >= 0; i--) {
       const sp = this.level.sponges[i]
@@ -497,9 +524,69 @@ export class LevelEditor {
   }
 
   /** Poignée de redimensionnement sous le curseur, s'il y en a une. */
+  // Découpe par chevauchement : la paroi cliquée en premier PREND LE DESSUS
+  private cutWinner: number | null = null
+  // Guides magnétiques pendant un déplacement (façon Canva)
+  private guides: { axe: 'v' | 'h'; pos: number }[] = []
+
+  // Aimante un rectangle en mouvement sur les bords et centres des autres
+  // éléments (parois, sas) — et retourne les repères à dessiner. Façon
+  // Canva : qu'ils se touchent ou non, les alignements se proposent.
+  private aimant(r: Rect): { rect: Rect; guides: { axe: 'v' | 'h'; pos: number }[] } {
+    const TH = 8 / this.zoom
+    const cibles: Rect[] = []
+    this.level.boxes.forEach((b, i) => {
+      if (this.sel?.kind === 'box' && this.sel.index === i) return
+      if (this.multi.some((m) => m?.kind === 'box' && m.index === i)) return
+      if (b.angle) return // les obliques ne proposent pas leurs bords droits
+      cibles.push(b)
+    })
+    cibles.push(this.level.exit)
+    const cand = (t: Rect, axe: 'v' | 'h'): number[] =>
+      axe === 'v' ? [t.minX, t.maxX, (t.minX + t.maxX) / 2] : [t.minY, t.maxY, (t.minY + t.maxY) / 2]
+    const propre = { v: [r.minX, r.maxX, (r.minX + r.maxX) / 2], h: [r.minY, r.maxY, (r.minY + r.maxY) / 2] }
+    let dx = 0
+    let dy = 0
+    let bestX = TH
+    let bestY = TH
+    const guides: { axe: 'v' | 'h'; pos: number }[] = []
+    let gX: number | null = null
+    let gY: number | null = null
+    for (const t of cibles) {
+      for (const c of cand(t, 'v')) {
+        for (const p of propre.v) {
+          const d = Math.abs(c - p)
+          if (d < bestX) {
+            bestX = d
+            dx = c - p
+            gX = c
+          }
+        }
+      }
+      for (const c of cand(t, 'h')) {
+        for (const p of propre.h) {
+          const d = Math.abs(c - p)
+          if (d < bestY) {
+            bestY = d
+            dy = c - p
+            gY = c
+          }
+        }
+      }
+    }
+    if (gX !== null) guides.push({ axe: 'v', pos: gX })
+    if (gY !== null) guides.push({ axe: 'h', pos: gY })
+    return {
+      rect: { minX: r.minX + dx, minY: r.minY + dy, maxX: r.maxX + dx, maxY: r.maxY + dy },
+      guides,
+    }
+  }
+
   private hitHandle(sx: number, sy: number): string | null {
     const r = this.selRect()
     if (!r) return null
+    // une boîte oblique se redimensionne aux champs : les poignées droites mentiraient
+    if (this.sel?.kind === 'box' && this.level.boxes[this.sel.index]?.angle) return null
     const a = this.toScreen(r.minX, r.maxY)
     const b = this.toScreen(r.maxX, r.minY)
     const near = (v: number, t: number): boolean => Math.abs(v - t) <= HANDLE_PX
@@ -597,6 +684,61 @@ export class LevelEditor {
           }
         }
         this.draw()
+        return
+      }
+
+      // DÉCOUPE par chevauchement : cliquer la paroi qui PREND LE DESSUS,
+      // puis celle qui s'efface — seule la zone où elles se chevauchent est
+      // rongée du perdant. Échap annule.
+      if (this.tool.kind === 'cut') {
+        const hit = ((): number => {
+          for (let i = this.level.boxes.length - 1; i >= 0; i--) {
+            if (dansBoite(this.level.boxes[i], w.x, w.y)) return i
+          }
+          return -1
+        })()
+        if (hit < 0) {
+          this.status('Découpe : cliquez une paroi (celle qui prend le dessus).')
+          return
+        }
+        if (this.cutWinner === null) {
+          this.cutWinner = hit
+          this.status(
+            `${MATERIAL_NAMES[this.level.boxes[hit].material]} prend le dessus — cliquez maintenant la paroi à ronger.`,
+          )
+          this.draw()
+          return
+        }
+        if (hit === this.cutWinner) {
+          this.cutWinner = null
+          this.status('Découpe : vainqueur désélectionné.')
+          this.draw()
+          return
+        }
+        const gagnante = this.level.boxes[this.cutWinner]
+        const perdante = this.level.boxes[hit]
+        if (gagnante.angle || perdante.angle) {
+          this.status('Découpe : les parois obliques ne se rongent pas (redressez-les d’abord).')
+          return
+        }
+        const inter = {
+          minX: Math.max(gagnante.minX, perdante.minX),
+          minY: Math.max(gagnante.minY, perdante.minY),
+          maxX: Math.min(gagnante.maxX, perdante.maxX),
+          maxY: Math.min(gagnante.maxY, perdante.maxY),
+        }
+        if (inter.minX >= inter.maxX || inter.minY >= inter.maxY) {
+          this.status('Ces deux parois ne se chevauchent pas — choisissez-en une autre à ronger.')
+          return
+        }
+        const morceaux = subtractBox(perdante, inter)
+        this.level.boxes.splice(hit, 1, ...morceaux)
+        this.cutWinner = null
+        this.sel = null
+        this.setTool({ kind: 'select' })
+        this.commit(
+          `Chevauchement rongé : ${MATERIAL_NAMES[gagnante.material]} garde la zone commune, ${MATERIAL_NAMES[perdante.material]} s'efface dessous (${morceaux.length} morceau${morceaux.length > 1 ? 'x' : ''}).`,
+        )
         return
       }
 
@@ -723,6 +865,22 @@ export class LevelEditor {
         for (const m of this.multi) this.moveSelBy(m, ddx - d.prevDx, ddy - d.prevDy)
         d.prevDx = ddx
         d.prevDy = ddy
+        // repères visuels sur les bords du groupe (sans magnétisme : le
+        // groupe suit la grille, les pointillés montrent les alignements)
+        let bb: Rect | null = null
+        for (const m of this.multi) {
+          const r = this.boundsOf(m)
+          if (!r) continue
+          bb = bb
+            ? {
+                minX: Math.min(bb.minX, r.minX),
+                minY: Math.min(bb.minY, r.minY),
+                maxX: Math.max(bb.maxX, r.maxX),
+                maxY: Math.max(bb.maxY, r.maxY),
+              }
+            : { ...r }
+        }
+        if (bb) this.guides = this.aimant(bb).guides
       } else if (d.mode === 'move') {
         if (this.sel?.kind === 'rail' && d.pts) {
           const r = (this.level.rails ?? [])[this.sel.index]
@@ -752,12 +910,17 @@ export class LevelEditor {
         } else {
           const nx = this.snapped(w.x - d.ox)
           const ny = this.snapped(w.y - d.oy)
-          this.applyRect({
+          const libre = {
             minX: nx,
             minY: ny,
             maxX: nx + (d.start.maxX - d.start.minX),
             maxY: ny + (d.start.maxY - d.start.minY),
-          })
+          }
+          // les guides magnétiques priment sur la grille : l'alignement
+          // exact avec un autre élément se propose en pointillé
+          const colle = this.aimant(libre)
+          this.guides = colle.guides
+          this.applyRect(colle.rect)
         }
       } else if (d.mode === 'resize') {
         const r = { ...d.start }
@@ -773,6 +936,7 @@ export class LevelEditor {
     c.addEventListener('pointerup', () => {
       const d = this.drag
       this.drag = null
+      this.guides = []
       if (!d) return
       if (d.mode === 'aim') {
         this.setTool({ kind: 'select' })
@@ -840,6 +1004,10 @@ export class LevelEditor {
         e.preventDefault()
         this.deleteSel()
       } else if (e.key === 'Escape') {
+        if (this.cutWinner !== null) {
+          this.cutWinner = null
+          this.status('Découpe annulée.')
+        }
         this.sel = null
         this.multi = []
         this.setTool({ kind: 'select' })
@@ -868,31 +1036,6 @@ export class LevelEditor {
   private createAt(raw: Rect): void {
     const r = this.clampToBounds(raw)
     const t = this.tool
-    if (t.kind === 'cut') {
-      // DÉCOUPE : la zone tracée est RONGÉE des parois qui la chevauchent —
-      // pour tailler les recouvrements sans reposer les blocs. Chaque paroi
-      // touchée est remplacée par ses restes (4 morceaux au plus).
-      const avant = this.level.boxes.length
-      let touchees = 0
-      const suite: ObstacleBox[] = []
-      for (const b of this.level.boxes) {
-        const morceaux = subtractBox(b, r)
-        if (morceaux.length !== 1 || morceaux[0] !== b) touchees++
-        suite.push(...morceaux)
-      }
-      if (touchees === 0) {
-        this.setTool({ kind: 'select' })
-        this.commit('Rien à ronger ici : aucune paroi sous la découpe.')
-        return
-      }
-      this.level.boxes = suite
-      this.sel = null
-      this.setTool({ kind: 'select' })
-      this.commit(
-        `Découpe : ${touchees} paroi${touchees > 1 ? 's' : ''} rongée${touchees > 1 ? 's' : ''} (${avant} → ${this.level.boxes.length} blocs).`,
-      )
-      return
-    }
     if (t.kind === 'box') {
       this.level.boxes.push({ ...r, material: t.material })
       this.sel = { kind: 'box', index: this.level.boxes.length - 1 }
@@ -1032,6 +1175,12 @@ export class LevelEditor {
       this.sel = { kind: 'rail', index: this.level.rails!.length - 1 }
     } else return
     this.commit('Dupliqué (D).')
+  }
+
+  // Un message de guidage SANS commit : l'historique ne bouge pas
+  private status(hint: string): void {
+    this.hint = hint
+    this.draw()
   }
 
   private commit(hint: string): void {
@@ -1391,6 +1540,8 @@ export class LevelEditor {
         `<button type="button" class="ed-btn" id="p-al-b">Aligner en bas</button>` +
         `<button type="button" class="ed-btn" id="p-al-ch">Centrer (vertical)</button>` +
         `<button type="button" class="ed-btn" id="p-al-cv">Centrer (horizontal)</button>` +
+        `<button type="button" class="ed-btn" id="p-dim-l">Même largeur (1ʳᵉ sélection)</button>` +
+        `<button type="button" class="ed-btn" id="p-dim-h">Même hauteur (1ʳᵉ sélection)</button>` +
         `</div>` +
         `<button type="button" class="ed-danger" id="p-del">Tout supprimer</button>`
       host.querySelector('#p-al-g')?.addEventListener('click', () => this.alignMulti('gauche'))
@@ -1399,6 +1550,8 @@ export class LevelEditor {
       host.querySelector('#p-al-b')?.addEventListener('click', () => this.alignMulti('bas'))
       host.querySelector('#p-al-ch')?.addEventListener('click', () => this.alignMulti('centreH'))
       host.querySelector('#p-al-cv')?.addEventListener('click', () => this.alignMulti('centreV'))
+      host.querySelector('#p-dim-l')?.addEventListener('click', () => this.memeDimension('largeur'))
+      host.querySelector('#p-dim-h')?.addEventListener('click', () => this.memeDimension('hauteur'))
       host.querySelector('#p-del')?.addEventListener('click', () => this.deleteSel())
       return
     }
@@ -1422,6 +1575,7 @@ export class LevelEditor {
       )
       rows.push(numField('X min', 'p-minX', b.minX), numField('X max', 'p-maxX', b.maxX))
       rows.push(numField('Y min', 'p-minY', b.minY), numField('Y max', 'p-maxY', b.maxY))
+      rows.push(numField('Angle (°)', 'p-ang', b.angle ?? 0))
     } else if (s.kind === 'zone') {
       const z = (this.level.zones ?? [])[s.index]
       rows.push(
@@ -1539,6 +1693,10 @@ export class LevelEditor {
       const b = this.level.boxes[s.index]
       b.material = Number(text('p-mat'))
       Object.assign(b, this.normalized(val('p-minX'), val('p-minY'), val('p-maxX'), val('p-maxY')))
+      // l'oblique : un angle en degrés autour du centre — 0 efface la clé
+      const ang = Math.max(-180, Math.min(180, val('p-ang')))
+      if (ang) b.angle = ang
+      else delete b.angle
     } else if (s.kind === 'zone') {
       const z = (this.level.zones ?? [])[s.index]
       z.force = text('p-force') as ZoneForce
@@ -1781,16 +1939,48 @@ export class LevelEditor {
       if (box.material === MAT_CHAUD) aura(band * (1 - P.chillHeatFade), '', '2e', [2, 7])
     }
 
-    // surfaces
-    for (const box of this.level.boxes) {
+    // surfaces (les obliques pivotent autour de leur centre)
+    this.level.boxes.forEach((box, bi) => {
       const p = this.toScreen(box.minX, box.maxY)
       const q = this.toScreen(box.maxX, box.minY)
       const col = MAT_COLORS[box.material] ?? '#888'
+      const gagnant = this.cutWinner === bi
+      g.save()
+      if (box.angle) {
+        const cx = (p.sx + q.sx) / 2
+        const cy = (p.sy + q.sy) / 2
+        g.translate(cx, cy)
+        g.rotate((-box.angle * Math.PI) / 180)
+        g.translate(-cx, -cy)
+      }
       g.fillStyle = col + '55'
       g.fillRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
-      g.strokeStyle = col
-      g.lineWidth = 1.5
+      g.strokeStyle = gagnant ? '#ffd24a' : col
+      g.lineWidth = gagnant ? 3 : 1.5
       g.strokeRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
+      g.restore()
+    })
+
+    // guides magnétiques : les repères pointillés d'un déplacement en cours
+    if (this.guides.length > 0) {
+      g.save()
+      g.strokeStyle = '#ff5cf0'
+      g.lineWidth = 1
+      g.setLineDash([6, 5])
+      for (const gd of this.guides) {
+        g.beginPath()
+        if (gd.axe === 'v') {
+          const s = this.toScreen(gd.pos, 0)
+          g.moveTo(s.sx, 0)
+          g.lineTo(s.sx, this.canvas.height)
+        } else {
+          const s = this.toScreen(0, gd.pos)
+          g.moveTo(0, s.sy)
+          g.lineTo(this.canvas.width, s.sy)
+        }
+        g.stroke()
+      }
+      g.restore()
     }
 
     // sas

@@ -30,6 +30,21 @@ function dalleEau(minX: number, maxX: number): NonNullable<TraceMonde['eau']> {
 }
 
 describe('traceLaser — les règles optiques du palier 1', () => {
+  it('une paroi OBLIQUE absorbe le faisceau là où sa version droite le laissait passer', () => {
+    const oblique = traceLaser(
+      { x: -900, y: 80, angle: 0 },
+      monde({ boxes: [{ minX: -150, minY: -20, maxX: 150, maxY: 20, material: MAT_WALL, angle: 45 }] }),
+    )
+    const finO = oblique.points[oblique.points.length - 1]
+    expect(finO.x).toBeLessThan(130) // absorbé sur la diagonale
+    const droite = traceLaser(
+      { x: -900, y: 80, angle: 0 },
+      monde({ boxes: [{ minX: -150, minY: -20, maxX: 150, maxY: 20, material: MAT_WALL }] }),
+    )
+    const finD = droite.points[droite.points.length - 1]
+    expect(finD.x).toBeGreaterThan(900) // la barre droite est sous le rayon
+  })
+
   it('file droit et s’arrête sur une paroi pleine', () => {
     const t = traceLaser(
       { x: -900, y: 0, angle: 0 },
