@@ -353,6 +353,51 @@ function showTableauCard(): void {
 const startBtn = document.getElementById('start') as HTMLButtonElement
 const startBisBtn = document.getElementById('start-bis') as HTMLButtonElement
 let hasPlayed = false
+// ---- Onboarding tactile : trois gestes, montrés une fois, au premier
+// lancement sur écran tactile. Le voile intercepte les touchers (il couvre
+// le canvas) et fige l'essai le temps de la lecture.
+const onboardEl = document.getElementById('onboard') as HTMLDivElement
+let obEtape = 0
+function majOnboard(): void {
+  const etapes = Array.from(onboardEl.querySelectorAll<HTMLElement>('.ob-etape'))
+  etapes.forEach((e, i) => {
+    e.hidden = i !== obEtape
+  })
+  const points = Array.from(onboardEl.querySelectorAll<HTMLElement>('.ob-points i'))
+  points.forEach((p, i) => p.classList.toggle('on', i === obEtape))
+  const suite = onboardEl.querySelector<HTMLElement>('.ob-suite')
+  if (suite) suite.textContent = obEtape >= 2 ? 'TOUCHER POUR PLONGER' : 'TOUCHER POUR CONTINUER'
+}
+function montrerOnboard(): void {
+  if (!window.matchMedia('(pointer: coarse)').matches) return
+  if (localStorage.getItem('projet21.onboard.v1')) return
+  obEtape = 0
+  majOnboard()
+  onboardEl.hidden = false
+  input.paused = true
+}
+onboardEl.addEventListener('pointerdown', (e) => {
+  e.stopPropagation()
+  e.preventDefault()
+  obEtape++
+  if (obEtape > 2) {
+    onboardEl.hidden = true
+    try {
+      localStorage.setItem('projet21.onboard.v1', '1')
+    } catch {
+      // stockage refusé : l'onboarding se remontrera, sans gravité
+    }
+    input.paused = false
+  } else {
+    majOnboard()
+  }
+})
+
+// Le verrou de rotation existe : « continuer en portrait » retire le voile
+document.getElementById('tourner-quand-meme')?.addEventListener('click', () => {
+  document.body.classList.add('portrait-ok')
+})
+
 const homeRestartBtn = document.getElementById('home-restart') as HTMLButtonElement
 function closeHome(): void {
   if (requireName()) return // pas de plongée sans opérateur identifié
@@ -361,10 +406,12 @@ function closeHome(): void {
   startBtn.textContent = "REPRENDRE L'ESSAI"
   homeRestartBtn.hidden = false
   if (!hasPlayed) {
-    // Premier lancement : zoom d'ouverture (les redémarrages ont le leur)
+    // Premier lancement : zoom d'ouverture (les redémarrages ont le leur),
+    // et la prise en main tactile pour qui joue au doigt
     hasPlayed = true
     camera.startIntro(sim.bounds, window.innerWidth, window.innerHeight)
     showTableauCard()
+    montrerOnboard()
   }
 }
 function openHome(): void {
@@ -405,6 +452,7 @@ function startTest(niveaux: LevelDef[]): void {
   startBtn.textContent = "REPRENDRE L'ESSAI"
   homeRestartBtn.hidden = false
   restart()
+  montrerOnboard() // premier contact tactile : la prise en main d'abord
 }
 function startBisTest(): void {
   startTest([TABLEAU_1BIS])

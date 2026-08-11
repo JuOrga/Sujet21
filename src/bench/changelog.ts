@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 15:05',
+    title: 'Mobile : le paysage demandé, la prise en main tactile en trois gestes',
+    notes: [
+      'Sur téléphone en PORTRAIT, un voile demande de tourner l’appareil — un téléphone stylisé pivote, « le protocole s’observe en paysage ». Le verrou de rotation a sa sortie de secours (« continuer en portrait »).',
+      'En PAYSAGE, la fiche s’adapte : pleine largeur, deux colonnes, figure retirée, tout tient sans ascenseur visible.',
+      'PRISE EN MAIN TACTILE au premier lancement : trois cartes animées — le doigt posé (l’éjection et son onde), les trois états (💧 ❄ 💨), la pince à deux doigts (zoom, caméra, ⌖). Un toucher passe à la suivante ; montrée une seule fois, l’essai reste figé pendant la lecture.',
+    ],
+  },
+  {
     date: '11/08/2026 14:30',
     title: 'Gâchettes = zoom, fin de course muette quand le sas boit, nuage qui fait corps',
     notes: [
