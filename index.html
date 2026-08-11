@@ -119,6 +119,12 @@
         flex-direction: column;
         gap: 22px;
       }
+      /* Le bouton visé à la manette : un liseré net, visible de loin */
+      #home button.pad-focus {
+        outline: 2px solid #63b7e6;
+        outline-offset: 2px;
+        box-shadow: 0 0 14px rgba(99, 183, 230, 0.45);
+      }
       /* La fiche défile si elle déborde, mais sans ascenseur visible :
          sur Steam Deck la barre s'affichait pour trois pixels de trop. */
       #home {
@@ -434,11 +440,13 @@
 
       /* Commandes repliables : dépliées sur grand écran, repliées au doigt
          (main.ts referme le volet au chargement sur mobile) */
-      #cmd-details {
+      #cmd-details,
+      #pad-details {
         border-top: 1px solid var(--line);
         padding-top: 12px;
       }
-      #cmd-details summary {
+      #cmd-details summary,
+      #pad-details summary {
         cursor: pointer;
         list-style: none;
         font-size: 10px;
@@ -447,11 +455,13 @@
         user-select: none;
         -webkit-user-select: none;
       }
-      #cmd-details summary::before {
+      #cmd-details summary::before,
+      #pad-details summary::before {
         content: '▸ ';
         color: var(--specimen);
       }
-      #cmd-details[open] summary::before {
+      #cmd-details[open] summary::before,
+      #pad-details[open] summary::before {
         content: '▾ ';
       }
       #cmd-details summary::-webkit-details-marker {
@@ -1878,6 +1888,22 @@
         <kbd>ÉTATS</kbd>qui bloque quoi
         <kbd>BANC</kbd>réglages
         <kbd>≡</kbd>cette fiche
+      </div>
+      </details>
+      <details id="pad-details">
+        <summary>COMMANDES MANETTE (Steam Deck, Xbox, DualSense)</summary>
+      <div class="home-commands">
+        <kbd>stick gauche</kbd>le CAP : où aller — l'éjection part toute seule à l'opposé<br />
+        <kbd>A</kbd>agir : maintenir éjecte · en vapeur, viser puis relâcher = dash<br />
+        <kbd>RT / LT</kbd>zoomer / dézoomer (la pression dose)<br />
+        <kbd>LB</kbd>glace
+        <kbd>RB</kbd>vapeur
+        <kbd>X</kbd>retour à l'eau<br />
+        <kbd>stick droit</kbd>déplacer la caméra
+        <kbd>croix ↔</kbd>ralenti / accéléré<br />
+        <kbd>Start</kbd>pause
+        <kbd>Select</kbd>recommencer
+        <kbd>A</kbd>valider dans les menus
       </div>
       </details>
       </div>

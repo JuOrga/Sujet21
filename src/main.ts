@@ -530,19 +530,50 @@ const manette = new Manette()
 const manetteCurseur = { x: 0, y: 0 }
 let manetteTenait = false // le « doigt » manette était posé à l'image d'avant
 
-/** A dans les menus : valide le bouton principal visible, s'il y en a un. */
+function boutonVisible(el: HTMLElement | null): el is HTMLElement {
+  if (!el || (el as HTMLButtonElement).hidden) return false
+  const r = el.getBoundingClientRect()
+  const st = getComputedStyle(el)
+  return r.width > 0 && r.height > 0 && st.visibility !== 'hidden' && st.pointerEvents !== 'none'
+}
+
+/** A dans les écrans de JEU (relance, fin de tableau) : valide le bouton. */
 function clicMenuManette(): boolean {
-  for (const id of ['relance', 'overlay-btn', 'start', 'start-bis']) {
+  for (const id of ['relance', 'overlay-btn']) {
     const el = document.getElementById(id)
-    if (!el) continue
-    const r = el.getBoundingClientRect()
-    const st = getComputedStyle(el)
-    if (r.width > 0 && r.height > 0 && st.visibility !== 'hidden' && st.pointerEvents !== 'none') {
+    if (boutonVisible(el)) {
       el.click()
       return true
     }
   }
   return false
+}
+
+// ---- Navigation de la FICHE à la manette ----
+// Croix (ou stick) haut/bas : passer d'un bouton à l'autre — A : valider.
+// Le bouton visé porte un liseré (classe pad-focus).
+const FICHE_BOUTONS = ['start', 'home-restart', 'start-bis', 'start-editor', 'home-son']
+let ficheFocus = 0
+let ficheNavPrete = true // anti-répétition du stick
+function ficheNavigue(): void {
+  const visibles = FICHE_BOUTONS.map((id) => document.getElementById(id)).filter(boutonVisible)
+  if (visibles.length === 0) return
+  // le stick fait aussi la navigation : un coup franc vers le haut/bas
+  let delta = 0
+  if (manette.edge(BOUTON.HAUT)) delta = -1
+  else if (manette.edge(BOUTON.BAS)) delta = 1
+  else if (manette.force > 0.55 && Math.abs(manette.dirY) > 0.6) {
+    if (ficheNavPrete) {
+      delta = manette.dirY > 0 ? 1 : -1
+      ficheNavPrete = false
+    }
+  }
+  if (manette.force < 0.3) ficheNavPrete = true
+  ficheFocus = Math.max(0, Math.min(visibles.length - 1, ficheFocus + delta))
+  for (let i = 0; i < visibles.length; i++) {
+    visibles[i].classList.toggle('pad-focus', manette.active && i === ficheFocus)
+  }
+  if (manette.edge(BOUTON.A)) visibles[ficheFocus].click()
 }
 input.attach(canvas)
 
@@ -577,6 +608,8 @@ const endgame = {
   lastCall: false, // la prochaine impulsion est la dernière
   spent: false, // elle a été donnée : le corps se fige et dérive
   wasAiming: false, // front de relâchement du pointeur
+  sasVu: 0, // particules avalées déjà constatées (détection « le sas boit »)
+  sasBoitJusqua: -1, // temps simulé jusqu'auquel la fin de course se tait
 }
 // Dash de vapeur : viser fige le temps, relâcher lance le nuage (« air
 // dash »). On ne retient qu'une chose entre deux images : était-on en visée.
@@ -884,6 +917,8 @@ function restart(): void {
   run.tableauTime = 0
   run.ended = false
   endgame.lastCall = false
+  endgame.sasVu = 0
+  endgame.sasBoitJusqua = -1
   endgame.spent = false
   endgame.wasAiming = false
   vortex.timer = 0
@@ -1284,9 +1319,11 @@ function frame(now: number): void {
   manette.poll(performance.now() / 1000)
   if (manette.connectee) {
     const enJeu = document.body.classList.contains('playing')
-    // dans les menus (accueil, relance, fin de tableau) : A valide
-    if (manette.edge(BOUTON.A) && clicMenuManette()) {
-      // le clic a consommé le A de cette image
+    if (!enJeu) {
+      // la FICHE : croix/stick pour choisir, A pour valider
+      ficheNavigue()
+    } else if (manette.edge(BOUTON.A) && clicMenuManette()) {
+      // écrans de jeu (relance, fin de tableau) : le clic a consommé le A
     } else if (enJeu) {
       if (manette.edge(BOUTON.START)) input.togglePause()
       if (manette.edge(BOUTON.SELECT)) input.onReset?.()
@@ -1301,6 +1338,9 @@ function frame(now: number): void {
       if (manette.edge(BOUTON.DROITE)) input.stepWarp(1)
       if (manette.zoomAvant) camera.zoomBy(Math.pow(1.9, dtReal), params)
       if (manette.zoomArriere) camera.zoomBy(Math.pow(1.9, -dtReal), params)
+      // les grosses gâchettes zooment, la pression dose la vitesse
+      if (manette.rtVal > 0.02) camera.zoomBy(Math.pow(2.2, manette.rtVal * dtReal), params)
+      if (manette.ltVal > 0.02) camera.zoomBy(Math.pow(2.2, -manette.ltVal * dtReal), params)
       if (manette.panX !== 0 || manette.panY !== 0) {
         // pousser à droite REGARDE à droite (le pan de drag est inversé)
         camera.panBy(-manette.panX * 900 * dtReal, -manette.panY * 900 * dtReal)
@@ -1488,7 +1528,10 @@ function frame(now: number): void {
   // banc (rayon ou courant à 0) : règle historique, le centre du corps
   // franchit la boîte. L'eau avalée est mise en bonbonne dans les deux cas.
   const drainActive = params.exitRadius > 0 && params.exitPull > 0
-  const drunk = sim.swallowed > 0 && sim.playerCount <= Math.max(6, sim.baseVolume * 0.02)
+  // La victoire compte TOUT ce qui vit encore — gouttes détachées, palets de
+  // glace, volutes — pas seulement le corps principal : tant qu'il reste de
+  // la matière visible, le sas n'a pas fini de boire.
+  const drunk = sim.swallowed > 0 && sim.count <= Math.max(6, sim.baseVolume * 0.02)
   const reached =
     !drainActive && pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit)
   if (!tableauDone && !sim.dispersed && (drunk || reached) && testLevel) {
@@ -1700,8 +1743,16 @@ function frame(now: number): void {
   // Aucun minimum à ramener : on peut finir un tableau sur un souffle. Sous le
   // seuil, la prochaine impulsion est la dernière ; une fois donnée, le corps
   // se fige avec son élan et l'essai s'achève à l'arrêt.
+  // MAIS : quand le SAS BOIT, le volume fond parce qu'il est COLLECTÉ — la
+  // fin de course n'a rien à y redire. Tant que l'aspiration avale (et une
+  // bonne seconde après), alerte, dernière impulsion et gel se taisent.
+  if (sim.swallowed > endgame.sasVu) {
+    endgame.sasVu = sim.swallowed
+    endgame.sasBoitJusqua = run.tableauTime + 1.2
+  }
+  const sasBoit = run.tableauTime <= endgame.sasBoitJusqua
   const alive = !sim.dispersed && !tableauDone && !run.ended
-  if (alive && !endgame.spent) {
+  if (alive && !endgame.spent && !sasBoit) {
     endgame.lastCall = sim.liters() <= params.criticalVolumeLiters
     const aiming = input.aimActive && !input.paused
     // le relâchement du pointeur conclut l'impulsion en cours

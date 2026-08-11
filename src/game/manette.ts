@@ -8,10 +8,11 @@
 //
 // Schéma (disposition standard) :
 //   stick gauche   viser (direction + puissance)
-//   RT ou A        agir : éjecter (eau) · viser puis relâcher = dash (vapeur)
+//   A              agir : éjecter (eau) · viser puis relâcher = dash (vapeur)
+//   RT / LT        zoomer / dézoomer (progressif, à la pression)
 //   LB             glace (bascule)        RB       vapeur (bascule)
 //   X              retour à l'eau
-//   stick droit    caméra                 croix ↕  zoom
+//   stick droit    caméra                 croix ↕  zoom (aussi)
 //   croix ↔        ralenti / accéléré
 //   Start          pause                  Select   recommencer
 //   A (menus)      valider le bouton principal visible
@@ -55,6 +56,9 @@ export class Manette {
   /** Croix ↕ maintenue : zoom continu. */
   zoomAvant = false
   zoomArriere = false
+  /** Gâchettes analogiques : RT zoome, LT dézoome — la pression dose. */
+  rtVal = 0
+  ltVal = 0
 
   private fronts = new Set<number>()
   private prec: boolean[] = []
@@ -127,7 +131,9 @@ export class Manette {
     }
     this.zoomAvant = presse(BOUTON.HAUT)
     this.zoomArriere = presse(BOUTON.BAS)
-    this.agit = presse(BOUTON.RT) || presse(BOUTON.A)
+    this.rtVal = gp.buttons[BOUTON.RT]?.value ?? 0
+    this.ltVal = gp.buttons[BOUTON.LT]?.value ?? 0
+    this.agit = presse(BOUTON.A)
     this.active = now - this.derniereVie < 6
   }
 

@@ -368,7 +368,20 @@ export class FluidSim {
   // de champ ; l'eau et la glace, non ionisables, ne sentent rien.
   railConvoy(pts: { x: number; y: number }[], band: number, accel: number, dt: number): void {
     if (accel <= 0 || band <= 0 || pts.length < 2) return
+    // Premier passage : qui est dans la bande, et où est le cœur convoyé —
+    // les retardataires hors bande seront RAPPELÉS vers lui, pour que le
+    // nuage reste UN nuage dans les virages (et quand seul un morceau est
+    // pris par le champ, il emmène le reste au lieu de s'en détacher).
+    let nBande = 0
+    let cxB = 0
+    let cyB = 0
+    const dansBande: boolean[] = []
+    const uxA: number[] = []
+    const uyA: number[] = []
+    const qxA: number[] = []
+    const qyA: number[] = []
     for (let i = 0; i < this.count; i++) {
+      dansBande[i] = false
       if (this.gaseous[i] !== 1) continue
       const px = this.posX[i]
       const py = this.posY[i]
@@ -399,9 +412,36 @@ export class FluidSim {
         }
       }
       if (best > band * band) continue
-      // poussée le long du rail + rappel vers la ligne (le virage se prend)
-      this.velX[i] += (ux + ((qx - px) / band) * 0.8) * accel * dt
-      this.velY[i] += (uy + ((qy - py) / band) * 0.8) * accel * dt
+      dansBande[i] = true
+      uxA[i] = ux
+      uyA[i] = uy
+      qxA[i] = qx
+      qyA[i] = qy
+      nBande++
+      cxB += px
+      cyB += py
+    }
+    if (nBande === 0) return
+    cxB /= nBande
+    cyB /= nBande
+    for (let i = 0; i < this.count; i++) {
+      if (this.gaseous[i] !== 1) continue
+      const px = this.posX[i]
+      const py = this.posY[i]
+      if (dansBande[i]) {
+        // poussée le long du rail + rappel vers la ligne (le virage se prend)
+        this.velX[i] += (uxA[i] + ((qxA[i] - px) / band) * 0.8) * accel * dt
+        this.velY[i] += (uyA[i] + ((qyA[i] - py) / band) * 0.8) * accel * dt
+      } else {
+        // retardataire : rappelé vers le cœur convoyé — le nuage fait corps
+        const dx = cxB - px
+        const dy = cyB - py
+        const d = Math.hypot(dx, dy)
+        if (d > 1e-6 && d < band * 6) {
+          this.velX[i] += (dx / d) * accel * 0.7 * dt
+          this.velY[i] += (dy / d) * accel * 0.7 * dt
+        }
+      }
     }
   }
 
