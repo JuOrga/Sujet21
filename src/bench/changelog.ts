@@ -11,6 +11,13 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 18:45',
+    title: 'La colonne de boutons colle enfin au bord gauche du téléphone',
+    notes: [
+      'En paysage téléphone, la colonne de boutons flottait à 268px du bord : une règle PC (qui réserve la place du panneau de banc en bas à gauche) s’appliquait aussi au téléphone, car un téléphone couché dépasse ses 701px de large. Elle ne vise plus que les écrans au pointeur fin ou assez hauts — au doigt, la colonne s’ancre au bord gauche (zone d’encoche respectée).',
+    ],
+  },
+  {
     date: '11/08/2026 18:20',
     title: 'Le son s’éveille tout seul, le dash se tait, et les alarmes respectent l’aspiration',
     notes: [

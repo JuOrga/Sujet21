@@ -1919,8 +1919,10 @@
 
       /* Hors mobile, le panneau de bord occupe le coin bas gauche : la barre
          de boutons se centre dans l'espace RESTANT, sinon elle passe dessous
-         sur les écrans étroits (tablette en paysage, fenêtre réduite). */
-      @media (min-width: 701px) {
+         sur les écrans étroits (tablette en paysage, fenêtre réduite).
+         Un téléphone en paysage dépasse 701px : on exclut le mode compact
+         (doigt + écran bas), où la colonne doit coller au bord gauche. */
+      @media (min-width: 701px) and (pointer: fine), (min-width: 701px) and (min-height: 621px) {
         #touchbar {
           left: 268px;
         }
