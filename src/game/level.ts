@@ -702,9 +702,204 @@ export const TABLEAU_10: LevelDef = {
   ],
 }
 
+// Tableau 11 — les deux verrous (composition : MIROIR puis PRISME). La
+// trilogie 21-H/I/J enseignait chaque optique seule ; ici les cibles à
+// VERROU prennent tout leur sens : deux récepteurs, deux portes en série,
+// et un seul corps qui change d'état entre les deux. Lecture :
+// 1. verrou I : le faisceau bas meurt sur l'absorbeur ; gelé sur le berceau,
+//    le corps le renvoie au récepteur I — la porte I se souvient ;
+// 2. verrou II : le faisceau haut file au-dessus de l'étagère ; liquide et
+//    collé à l'étagère, le corps le plie vers le récepteur II ;
+// 3. les deux verrous tenus (dans l'ordre qu'on veut), le couloir s'ouvre.
+export const TABLEAU_11: LevelDef = {
+  name: 'Les deux verrous',
+  code: '21-K',
+  journal:
+    'Deux verrous, deux états. Il s’est figé pour renvoyer le premier faisceau, puis répandu pour plier le second — sans une hésitation entre les deux. Nous pensions tester sa mémoire. C’est lui qui teste notre imagination. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+  boxes: [
+    // l'absorbeur du faisceau bas : la ligne droite ne mène nulle part
+    box(520, -300, 580, 100, MAT_WALL),
+    // le berceau froid du verrou I
+    box(-160, -280, 200, -220, MAT_FROID),
+    // l'étagère hydrophile du verrou II
+    box(40, 260, 400, 330, MAT_HYDROPHILE),
+    // barrière de la porte I
+    box(860, -750, 900, -170, MAT_WALL),
+    box(860, 170, 900, 750, MAT_WALL),
+    // barrière de la porte II — le double sas d'énergie
+    box(950, -750, 990, -160, MAT_WALL),
+    box(950, 160, 990, 750, MAT_WALL),
+    // contrefort de lecture
+    box(-600, 660, -380, 750, MAT_WALL),
+  ],
+  sponges: [],
+  labels: [
+    { x: -700, y: -160, text: 'ÉMETTEUR I', tone: 'chaud' },
+    { x: -900, y: 420, text: 'ÉMETTEUR II', tone: 'chaud' },
+    { x: 20, y: -330, text: 'BERCEAU FROID', tone: 'froid' },
+    { x: 220, y: 210, text: 'HYDROPHILE', tone: 'phile' },
+    { x: -440, y: 350, text: 'RÉCEPTEUR I', tone: 'sas' },
+    { x: 660, y: 380, text: 'RÉCEPTEUR II', tone: 'sas' },
+    { x: 880, y: -80, text: 'PORTE I', tone: 'chaud' },
+    { x: 970, y: 220, text: 'PORTE II', tone: 'chaud' },
+    { x: 1110, y: 160, text: 'SAS', tone: 'sas' },
+  ],
+  lasers: [
+    { x: -700, y: -80, angle: 0 },
+    { x: -900, y: 500, angle: 0 },
+  ],
+  cibles: [
+    { x: -440, y: 260, r: 46 },
+    { x: 660, y: 280, r: 52 },
+  ],
+  portes: [
+    { minX: 860, minY: -170, maxX: 900, maxY: 170, cible: 0 },
+    { minX: 950, minY: -160, maxX: 990, maxY: 160, cible: 1 },
+  ],
+}
+
+// Tableau 12 — à travers la grille (composition : GRILLE + VAPEUR + RAIL).
+// La grille coupe la cuve sur toute sa hauteur : le liquide et la glace
+// s'y arrêtent net — seule la VAPEUR passe. Lecture :
+// 1. se vaporiser dans le faisceau au pied du rail (la colonne chaude aide) ;
+// 2. l'arc s'ionise, le champ le capture — et le rail ENGAGÉ porte le nuage
+//    entier de l'autre côté de la grille, même quand le faisceau ne touche
+//    plus la vapeur : le champ se souvient de lui jusqu'au terminus ;
+// 3. l'arc allume le récepteur au bout de la descente (verrou), la porte
+//    s'ouvre ; le dépôt froid recondense le nuage — on finit en eau.
+export const TABLEAU_12: LevelDef = {
+  name: 'À travers la grille',
+  code: '21-L',
+  journal:
+    'La grille l’arrête net à l’état liquide. Mais en vapeur il la traverse comme une rumeur passe une porte close — et le rail a porté son nuage jusqu’au bout de la ligne, même après que le faisceau l’a perdu. Le champ se souvient de lui. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+  boxes: [
+    // la grille : toute la hauteur — l'eau s'arrête, la vapeur passe
+    box(300, -750, 340, 750, MAT_GRILLE),
+    // la colonne chaude : se vaporiser sans puiser dans les bonbonnes
+    box(-320, -140, -160, -80, MAT_CHAUD),
+    // le dépôt froid : recondenser après le voyage
+    box(560, -360, 720, -300, MAT_FROID),
+    // la barrière de la porte
+    box(900, -750, 940, -160, MAT_WALL),
+    box(900, 160, 940, 750, MAT_WALL),
+    // contrefort de lecture
+    box(-700, 620, -480, 750, MAT_WALL),
+  ],
+  sponges: [],
+  labels: [
+    { x: -700, y: 40, text: 'ÉMETTEUR', tone: 'chaud' },
+    { x: -240, y: -200, text: 'COLONNE CHAUDE', tone: 'chaud' },
+    { x: -260, y: 40, text: 'PIED DU RAIL', tone: 'phobe' },
+    { x: 320, y: -420, text: 'GRILLE', tone: 'grille' },
+    { x: 620, y: 200, text: 'RÉCEPTEUR', tone: 'sas' },
+    { x: 640, y: -420, text: 'DÉPÔT FROID', tone: 'froid' },
+    { x: 920, y: -60, text: 'PORTE', tone: 'chaud' },
+    { x: 1110, y: 160, text: 'SAS', tone: 'sas' },
+  ],
+  lasers: [{ x: -700, y: 100, angle: 0 }],
+  cibles: [{ x: 700, y: 280, r: 46 }],
+  portes: [{ minX: 900, minY: -160, maxX: 940, maxY: 160, cible: 0 }],
+  rails: [
+    {
+      points: [
+        { x: -200, y: 100 },
+        { x: -200, y: 500 },
+        { x: 700, y: 500 },
+        { x: 700, y: 340 },
+      ],
+    },
+  ],
+}
+
+// Tableau 13 — la traversée des états (finale : MIROIR, PRISME, ARC en
+// enfilade). Trois chambres, trois verrous, un état par porte — le gant
+// de l'échantillon. Lecture :
+// 1. chambre du miroir : gelé sur le berceau, renvoyer le faisceau au
+//    récepteur I — la porte I s'ouvre ;
+// 2. chambre du prisme : liquide sur l'étagère, plier le faisceau vers le
+//    récepteur II scellé à la paroi — la porte II s'ouvre ;
+// 3. chambre de l'arc : vapeur dans le faisceau au pied du rail, l'arc
+//    grimpe, franchit, redescend sur le récepteur III ; le dépôt froid
+//    recondense — et le sas attend au bout.
+export const TABLEAU_13: LevelDef = {
+  name: 'La traversée des états',
+  code: '21-M',
+  journal:
+    'Miroir, prisme, arc : trois salles, trois verrous, un seul échantillon. Il a changé d’état à chaque porte, dans l’ordre exact, comme s’il relisait nos plans par-dessus mon épaule. Je signe le rapport : ce n’est plus un échantillon. C’est un équipier. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+  boxes: [
+    // chambre I — le berceau froid du miroir
+    box(-720, -280, -440, -220, MAT_FROID),
+    // cloison I
+    box(-400, -750, -360, -170, MAT_WALL),
+    box(-400, 170, -360, 750, MAT_WALL),
+    // chambre II — l'étagère hydrophile du prisme
+    box(-160, 60, 120, 130, MAT_HYDROPHILE),
+    // cloison II
+    box(300, -750, 340, -170, MAT_WALL),
+    box(300, 170, 340, 750, MAT_WALL),
+    // chambre III — la colonne chaude au pied du rail, le dépôt froid après
+    box(500, -60, 660, 0, MAT_CHAUD),
+    box(700, -420, 860, -360, MAT_FROID),
+    // cloison III — la dernière porte avant le sas
+    box(980, -750, 1020, -160, MAT_WALL),
+    box(980, 160, 1020, 750, MAT_WALL),
+  ],
+  sponges: [],
+  labels: [
+    { x: -1100, y: -160, text: 'ÉMETTEUR I', tone: 'chaud' },
+    { x: -580, y: -330, text: 'BERCEAU FROID', tone: 'froid' },
+    { x: -380, y: 220, text: 'PORTE I', tone: 'chaud' },
+    { x: -330, y: 240, text: 'ÉMETTEUR II', tone: 'chaud' },
+    { x: -20, y: 10, text: 'HYDROPHILE', tone: 'phile' },
+    { x: 320, y: 220, text: 'PORTE II', tone: 'chaud' },
+    { x: 380, y: 80, text: 'ÉMETTEUR III', tone: 'chaud' },
+    { x: 580, y: -110, text: 'COLONNE CHAUDE', tone: 'chaud' },
+    { x: 780, y: -480, text: 'DÉPÔT FROID', tone: 'froid' },
+    { x: 1000, y: 220, text: 'PORTE III', tone: 'chaud' },
+    { x: 1110, y: 160, text: 'SAS', tone: 'sas' },
+  ],
+  lasers: [
+    { x: -1100, y: -80, angle: 0 },
+    { x: -330, y: 300, angle: 0 },
+    { x: 380, y: 140, angle: 0 },
+  ],
+  cibles: [
+    { x: -960, y: 260, r: 46 },
+    // scellé en façade de la porte II : le faisceau plié vient mourir dessus
+    { x: 285, y: 160, r: 46 },
+    { x: 900, y: 260, r: 46 },
+  ],
+  portes: [
+    { minX: -400, minY: -170, maxX: -360, maxY: 170, cible: 0 },
+    { minX: 300, minY: -170, maxX: 340, maxY: 170, cible: 1 },
+    { minX: 980, minY: -160, maxX: 1020, maxY: 160, cible: 2 },
+  ],
+  rails: [
+    {
+      points: [
+        { x: 600, y: 140 },
+        { x: 600, y: 540 },
+        { x: 900, y: 540 },
+        { x: 900, y: 320 },
+      ],
+    },
+  ],
+}
+
 // L'ordre de la partie : chaque tableau enseigne une chose, les derniers
 // les combinent — la trilogie laser révèle la fonction de l'échantillon
-// (miroir, prisme, plasma) — et la dérive conclut sur la maîtrise pure.
+// (miroir, prisme, plasma), la seconde trilogie compose ces fonctions
+// (double verrou, grille, traversée) — et la dérive conclut sur la
+// maîtrise pure.
 export const TABLEAUX: LevelDef[] = [
   TABLEAU_1,
   TABLEAU_2,
@@ -715,6 +910,9 @@ export const TABLEAUX: LevelDef[] = [
   TABLEAU_8,
   TABLEAU_9,
   TABLEAU_10,
+  TABLEAU_11,
+  TABLEAU_12,
+  TABLEAU_13,
   TABLEAU_7,
 ]
 

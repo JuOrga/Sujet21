@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 20:05',
+    title: 'Trois nouveaux tableaux : la seconde trilogie compose les optiques',
+    notes: [
+      '21-K « LES DEUX VERROUS » : deux faisceaux, deux récepteurs, deux portes en série — se figer sur le berceau pour renvoyer le premier, se répandre sur l’étagère pour plier le second. Les cibles à verrou prennent tout leur sens : un seul corps, deux états, dans l’ordre qu’on veut.',
+      '21-L « À TRAVERS LA GRILLE » : une grille barre toute la hauteur de la cuve — l’eau s’arrête net, seule la VAPEUR passe. Se vaporiser dans le faisceau au pied du rail (la colonne chaude aide), et le rail ENGAGÉ porte le nuage de l’autre côté, même quand le faisceau l’a perdu. Le dépôt froid recondense à l’arrivée.',
+      '21-M « LA TRAVERSÉE DES ÉTATS » : la finale-gant — trois chambres, trois verrous, un état par porte : miroir, prisme, arc. Le récepteur du prisme est scellé en façade de sa porte : le faisceau plié vient mourir dessus.',
+      'Chaque énigme est PROUVÉE par le traceur optique (les tests balayent les positions du corps : fenêtres de résolution confortables, et à vide rien ne s’allume). L’expédition passe à 13 tableaux, le bouton SALLES LASER enchaîne les six, et l’éditeur les propose tous dans « Tableaux livrés ».',
+    ],
+  },
+  {
     date: '11/08/2026 19:35',
     title: 'Le rail porte son nuage jusqu’à l’arrivée, même rayon éteint',
     notes: [
