@@ -11,6 +11,13 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 21:15',
+    title: 'Un clic de stick recadre la caméra',
+    notes: [
+      'À la manette, enfoncer un stick (L3 ou R3) remet la caméra en suivi AUTOMATIQUE — cap et zoom : l’équivalent du bouton ⌖. On explore au stick droit, on clique, on retrouve son corps.',
+    ],
+  },
+  {
     date: '11/08/2026 21:00',
     title: 'Le journal de bord attend qu’on l’ait lu',
     notes: [

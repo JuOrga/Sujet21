@@ -1523,6 +1523,8 @@ function frame(now: number): void {
       }
       if (manette.edge(BOUTON.GAUCHE)) input.stepWarp(-1)
       if (manette.edge(BOUTON.DROITE)) input.stepWarp(1)
+      // enfoncer un stick recadre : la caméra revient au suivi automatique
+      if (manette.edge(BOUTON.L3) || manette.edge(BOUTON.R3)) camera.resetAutoZoom()
       if (manette.zoomAvant) camera.zoomBy(Math.pow(1.9, dtReal), params)
       if (manette.zoomArriere) camera.zoomBy(Math.pow(1.9, -dtReal), params)
       // les grosses gâchettes zooment, la pression dose la vitesse
