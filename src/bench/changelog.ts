@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 16:45',
+    title: 'Réparé : les boutons de la fiche avaient disparu en paysage téléphone',
+    notes: [
+      'Les règles compactes du paysage étaient placées AVANT les styles de base dans la feuille : elles perdaient la cascade, et le cadre coupait les boutons au lieu de les resserrer. Les blocs sont déplacés en fin de feuille — la compaction s’applique vraiment.',
+      'Et la fiche du téléphone tourné assume d’être un MENU : le texte de présentation s’efface, tout tient à l’écran — son, Commencer, Salles laser, Éditeur, Commandes, Plein écran, et les registres à droite. Chaque colonne sait défiler dans son cadre si un écran plus petit l’exige.',
+    ],
+  },
+  {
     date: '11/08/2026 16:20',
     title: 'L’interface de jeu compacte en paysage mobile, et la barre de bord expliquée',
     notes: [

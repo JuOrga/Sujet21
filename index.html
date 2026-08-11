@@ -135,6 +135,7 @@
         flex: 1 1 0;
       }
 
+
       /* ---- Le panneau COMMANDES : trois onglets, un seul endroit ---- */
       #cmds {
         position: fixed;
@@ -440,89 +441,6 @@
         .home-cols {
           flex-direction: column;
           align-items: stretch;
-        }
-      }
-      /* Écrans bas (Steam Deck : 1280 × 800) : la fiche se resserre pour
-         tenir sans défiler */
-      @media (max-height: 840px) and (min-width: 700px) {
-        #home {
-          gap: 12px;
-          padding-top: 16px;
-          padding-bottom: 16px;
-        }
-        .home-col {
-          gap: 12px;
-        }
-        .home-title {
-          font-size: clamp(24px, 3.6vw, 38px);
-        }
-        .home-figure img {
-          height: clamp(110px, 16vh, 160px);
-        }
-      }
-      /* ---- Paysage bas (téléphone tourné) : la fiche tient en UNE page ---- */
-      @media (max-height: 520px) {
-        #home {
-          width: 100vw;
-          gap: 6px;
-          padding: calc(8px + env(safe-area-inset-top)) 22px calc(8px + env(safe-area-inset-bottom));
-          border-right: none;
-          justify-content: safe center;
-        }
-        .home-cols {
-          flex-direction: row;
-          gap: 24px;
-          align-items: stretch;
-          flex: 1 1 0;
-          min-height: 0;
-          overflow: hidden;
-        }
-        .home-col {
-          gap: 7px;
-          min-height: 0;
-        }
-        .home-figure {
-          display: none;
-        }
-        .home-title {
-          font-size: 19px;
-        }
-        .home-pitch {
-          font-size: 11px;
-          line-height: 1.5;
-        }
-        .home-eyebrow {
-          font-size: 8.5px;
-          padding-bottom: 6px;
-        }
-        .home-badge {
-          width: 30px;
-          height: 30px;
-        }
-        /* les boutons se resserrent : cinq tiennent dans la colonne */
-        #home button {
-          padding: 8px 10px;
-          font-size: 10.5px;
-          letter-spacing: 0.1em;
-        }
-        .home-readout {
-          font-size: 11px;
-        }
-        /* les registres défilent DANS leur cadre, la page ne défile pas */
-        .home-records {
-          min-height: 0;
-          max-height: 100%;
-          overflow-y: auto;
-          scrollbar-width: none;
-        }
-        .home-records::-webkit-scrollbar {
-          display: none;
-        }
-        .home-foot {
-          display: none;
-        }
-        #home-seq {
-          display: none;
         }
       }
       body.playing #home {
@@ -2183,6 +2101,95 @@
         }
         #overlay-title {
           animation: none;
+        }
+      }
+      /* Écrans bas (Steam Deck : 1280 × 800) : la fiche se resserre pour
+         tenir sans défiler */
+      @media (max-height: 840px) and (min-width: 700px) {
+        #home {
+          gap: 12px;
+          padding-top: 16px;
+          padding-bottom: 16px;
+        }
+        .home-col {
+          gap: 12px;
+        }
+        .home-title {
+          font-size: clamp(24px, 3.6vw, 38px);
+        }
+        .home-figure img {
+          height: clamp(110px, 16vh, 160px);
+        }
+      }
+      /* ---- Paysage bas (téléphone tourné) : la fiche tient en UNE page ---- */
+      @media (max-height: 520px) {
+        #home {
+          width: 100vw;
+          gap: 6px;
+          padding: calc(8px + env(safe-area-inset-top)) 22px calc(8px + env(safe-area-inset-bottom));
+          border-right: none;
+          justify-content: safe center;
+        }
+        .home-cols {
+          flex-direction: row;
+          gap: 24px;
+          align-items: stretch;
+          flex: 1 1 0;
+          min-height: 0;
+          overflow: hidden;
+        }
+        .home-col {
+          gap: 7px;
+          min-height: 0;
+          overflow-y: auto;
+          scrollbar-width: none;
+        }
+        .home-col::-webkit-scrollbar {
+          display: none;
+        }
+        .home-figure {
+          display: none;
+        }
+        .home-title {
+          font-size: 19px;
+        }
+        /* au téléphone tourné, la fiche est un MENU : le texte de
+           présentation cède sa place aux boutons */
+        .home-pitch {
+          display: none;
+        }
+        .home-eyebrow {
+          font-size: 8.5px;
+          padding-bottom: 6px;
+        }
+        .home-badge {
+          width: 30px;
+          height: 30px;
+        }
+        /* les boutons se resserrent : cinq tiennent dans la colonne */
+        #home button {
+          padding: 8px 10px;
+          font-size: 10.5px;
+          letter-spacing: 0.1em;
+        }
+        .home-readout {
+          font-size: 11px;
+        }
+        /* les registres défilent DANS leur cadre, la page ne défile pas */
+        .home-records {
+          min-height: 0;
+          max-height: 100%;
+          overflow-y: auto;
+          scrollbar-width: none;
+        }
+        .home-records::-webkit-scrollbar {
+          display: none;
+        }
+        .home-foot {
+          display: none;
+        }
+        #home-seq {
+          display: none;
         }
       }
     </style>
