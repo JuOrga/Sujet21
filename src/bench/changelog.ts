@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '12/08/2026 01:00',
+    title: 'Le rail livre en gare, et brille tant qu’il porte',
+    notes: [
+      'Au TERMINUS du rail, le champ ne pousse plus : il FREINE et masse le nuage sur le point d’arrivée. Le nuage arrivait comme un boulet — condenser à l’arrivée faisait « exploser » le corps. La livraison est douce, la condensation aussi.',
+      'Et le rail S’EMBRASE tant que son champ est ENGAGÉ : halo violet, ligne vive, tirets qui défilent dans le sens du convoyage — même quand le rayon ne touche plus la vapeur. Il ne s’éteint que quand l’attirance se relâche vraiment : nuage livré, condensé ou dispersé.',
+    ],
+  },
+  {
     date: '12/08/2026 00:40',
     title: 'Membrane, rideau lamellaire — et le tableau des règles fait loi',
     notes: [

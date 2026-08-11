@@ -383,10 +383,12 @@ export class FluidSim {
     let cxB = 0
     let cyB = 0
     const dansBande: boolean[] = []
+    const auTerminus: boolean[] = []
     const uxA: number[] = []
     const uyA: number[] = []
     const qxA: number[] = []
     const qyA: number[] = []
+    const fin = pts[pts.length - 1]
     for (let i = 0; i < this.count; i++) {
       dansBande[i] = false
       if (this.gaseous[i] !== 1) continue
@@ -420,6 +422,10 @@ export class FluidSim {
       }
       if (best > band * band) continue
       dansBande[i] = true
+      // zone de terminus : le point porté est arrivé en bout de ligne — on
+      // n'y pousse plus, on y FREINE (sinon le nuage arrive comme un boulet
+      // et la condensation « explose »)
+      auTerminus[i] = Math.hypot(qx - fin.x, qy - fin.y) < band * 1.2
       uxA[i] = ux
       uyA[i] = uy
       qxA[i] = qx
@@ -435,7 +441,15 @@ export class FluidSim {
       if (this.gaseous[i] !== 1) continue
       const px = this.posX[i]
       const py = this.posY[i]
-      if (dansBande[i]) {
+      if (dansBande[i] && auTerminus[i]) {
+        // arrivée en gare : on freine fort et on masse le nuage sur le
+        // terminus — la livraison est douce, la condensation aussi
+        const frein = Math.exp(-6 * dt)
+        this.velX[i] *= frein
+        this.velY[i] *= frein
+        this.velX[i] += ((fin.x - px) / band) * accel * 0.35 * dt
+        this.velY[i] += ((fin.y - py) / band) * accel * 0.35 * dt
+      } else if (dansBande[i]) {
         // poussée le long du rail + rappel vers la ligne (le virage se prend)
         this.velX[i] += (uxA[i] + ((qxA[i] - px) / band) * 0.8) * accel * dt
         this.velY[i] += (uyA[i] + ((qyA[i] - py) / band) * 0.8) * accel * dt

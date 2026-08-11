@@ -268,6 +268,26 @@ describe('traceLaser — les règles optiques du palier 1', () => {
     expect(sim.velX[loin]).toBeLessThan(-30)
   })
 
+  it('au terminus, le convoyage FREINE : le nuage arrive en gare, pas en boulet', () => {
+    const sim = new FluidSim({ ...DEFAULT_PARAMS }, BOUNDS, 2048)
+    const rail = [{ x: 100, y: -300 }, { x: 100, y: 300 }]
+    // un point du nuage arrive au bout de la ligne, lancé à pleine vitesse
+    const gaz = sim.addParticle(100, 280, KIND_FREE)
+    sim.vapor[gaz] = 1
+    sim.gaseous[gaz] = 1
+    sim.velY[gaz] = 500
+    for (let s = 0; s < 30; s++) sim.railConvoy(rail, 75, 950, 1 / 120)
+    // freiné, pas relancé : la vitesse retombe nettement sous l'arrivée
+    expect(Math.abs(sim.velY[gaz])).toBeLessThan(250)
+    // et loin du terminus, la poussée reste entière
+    const sim2 = new FluidSim({ ...DEFAULT_PARAMS }, BOUNDS, 2048)
+    const g2 = sim2.addParticle(100, 0, KIND_FREE)
+    sim2.vapor[g2] = 1
+    sim2.gaseous[g2] = 1
+    for (let s = 0; s < 30; s++) sim2.railConvoy(rail, 75, 950, 1 / 120)
+    expect(sim2.velY[g2]).toBeGreaterThan(50)
+  })
+
   it('le convoyage dit qui reste dans la bande : le champ tient jusqu’à l’arrivée', () => {
     const sim = new FluidSim({ ...DEFAULT_PARAMS }, BOUNDS, 2048)
     const gaz = sim.addParticle(105, 0, KIND_FREE)
