@@ -1015,6 +1015,36 @@
          la hauteur réelle de la barre du bas) : la cuve reste dégagée, la
          dérive reste visible en entier, et un rebond tardif peut encore mener
          au sas. */
+      /* Continuer : le corps principal est bu, il ne reste que des gouttes
+         égarées — le joueur DÉCIDE de conclure. Voyant, mais il ne masque
+         rien : on peut encore aller cueillir les dernières gouttes. */
+      #continuer {
+        position: fixed;
+        bottom: calc(var(--tb-h, 56px) + 148px);
+        left: 50%;
+        transform: translateX(-50%) translateY(6px);
+        font-family: var(--font-display);
+        font-size: 13px;
+        letter-spacing: 0.18em;
+        padding: 13px 26px;
+        background: #6dffb8;
+        border: 1px solid #6dffb8;
+        border-radius: 6px;
+        color: #06251a;
+        cursor: pointer;
+        z-index: 13;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: opacity 0.25s ease, transform 0.25s ease;
+        animation: son-appel 2.2s ease-in-out infinite;
+      }
+      #continuer.visible {
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(-50%) translateY(0);
+        pointer-events: auto;
+      }
       #relance {
         position: fixed;
         bottom: calc(var(--tb-h, 56px) + 96px);
@@ -2574,6 +2604,7 @@
     <div id="dash-aim"></div>
     <div id="dash-cost"></div>
     <button id="relance" type="button">RECOMMENCER LE TABLEAU</button>
+    <button id="continuer" type="button">CONTINUER — CONCLURE L'ESSAI</button>
     <div id="touchbar"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

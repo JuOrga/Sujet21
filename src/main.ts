@@ -624,7 +624,7 @@ function boutonVisible(el: HTMLElement | null): el is HTMLElement {
 
 /** A dans les écrans de JEU (relance, fin de tableau) : valide le bouton. */
 function clicMenuManette(): boolean {
-  for (const id of ['relance', 'overlay-btn']) {
+  for (const id of ['continuer', 'relance', 'overlay-btn']) {
     const el = document.getElementById(id)
     if (boutonVisible(el)) {
       el.click()
@@ -637,14 +637,15 @@ function clicMenuManette(): boolean {
 // ---- Navigation de la FICHE à la manette ----
 // Croix (ou stick) haut/bas : passer d'un bouton à l'autre — A : valider.
 // Le bouton visé porte un liseré (classe pad-focus).
+// dans l'ORDRE VISUEL de la fiche : la croix descend comme l'œil lit
 const FICHE_BOUTONS = [
+  'home-son',
   'start',
   'home-restart',
   'start-bis',
   'start-editor',
   'home-cmds',
   'home-plein',
-  'home-son',
 ]
 let ficheFocus = 0
 let ficheNavPrete = true // anti-répétition du stick
@@ -1017,6 +1018,8 @@ function restart(): void {
   endgame.lastCall = false
   endgame.sasVu = 0
   endgame.sasBoitJusqua = -1
+  continuerVoulu = false
+  btnContinuer.classList.remove('visible')
   endgame.spent = false
   endgame.wasAiming = false
   vortex.timer = 0
@@ -1236,6 +1239,13 @@ const overlayBtn = document.getElementById('overlay-btn') as HTMLButtonElement
 // Relance discrète : elle n'apparaît qu'une fois la dernière impulsion donnée,
 // et ne recouvre rien — on peut la laisser là et regarder la dérive finir.
 const btnRelance = document.getElementById('relance') as HTMLButtonElement
+// Continuer : le corps principal est bu, le joueur conclut quand il veut
+const btnContinuer = document.getElementById('continuer') as HTMLButtonElement
+let continuerVoulu = false
+btnContinuer.addEventListener('click', () => {
+  continuerVoulu = true
+  btnContinuer.classList.remove('visible')
+})
 // Le tableau seul reprend : la réserve déjà en bonbonne et le refroidissement
 // du vaisseau, eux, ne se rembobinent pas — sinon la pression n'existerait plus.
 btnRelance.addEventListener('click', () => restart())
@@ -1627,10 +1637,24 @@ function frame(now: number): void {
   // banc (rayon ou courant à 0) : règle historique, le centre du corps
   // franchit la boîte. L'eau avalée est mise en bonbonne dans les deux cas.
   const drainActive = params.exitRadius > 0 && params.exitPull > 0
-  // La victoire compte TOUT ce qui vit encore — gouttes détachées, palets de
-  // glace, volutes — pas seulement le corps principal : tant qu'il reste de
-  // la matière visible, le sas n'a pas fini de boire.
-  const drunk = sim.swallowed > 0 && sim.count <= Math.max(6, sim.baseVolume * 0.02)
+  // La victoire : quand TOUT est bu, elle est automatique. Mais des gouttes
+  // égarées traînent presque toujours quelque part — alors dès que le CORPS
+  // PRINCIPAL est avalé, un bouton CONTINUER s'offre : c'est le joueur qui
+  // décide de conclure, ou d'aller cueillir les dernières gouttes.
+  const seuilBu = Math.max(6, sim.baseVolume * 0.02)
+  // « assez d'aspiration » : la moitié du volume de départ est en bonbonne —
+  // le sas a clairement fait son œuvre, le reste est un choix de joueur
+  const aspireAssez = sim.swallowed >= sim.baseVolume * 0.5
+  const drunk = (sim.swallowed > 0 && sim.count <= seuilBu) || (aspireAssez && continuerVoulu)
+  btnContinuer.classList.toggle(
+    'visible',
+    aspireAssez &&
+      !drunk &&
+      !tableauDone &&
+      !sim.dispersed &&
+      !input.paused &&
+      document.body.classList.contains('playing'),
+  )
   const reached =
     !drainActive && pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit)
   if (!tableauDone && !sim.dispersed && (drunk || reached) && testLevel) {
