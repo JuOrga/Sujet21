@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  MAT_GRILLE,
   MAT_WALL,
   TABLEAU_10,
+  TABLEAU_11,
+  TABLEAU_12,
+  TABLEAU_13,
   TABLEAU_1BIS,
   TABLEAU_8,
   TABLEAU_9,
@@ -41,7 +45,7 @@ function palet(cx: number, cy: number, r: number) {
 
 describe('Tableaux laser — les énigmes tiennent leurs promesses', () => {
   it('aucun tableau laser ne se résout tout seul : à vide, rien ne s’allume', () => {
-    for (const lv of [TABLEAU_8, TABLEAU_9, TABLEAU_10]) {
+    for (const lv of [TABLEAU_8, TABLEAU_9, TABLEAU_10, TABLEAU_11, TABLEAU_12, TABLEAU_13]) {
       for (const em of lv.lasers ?? []) {
         expect(traceLaser(em, mondeDe(lv)).touchees).toEqual([])
       }
@@ -88,6 +92,72 @@ describe('Tableaux laser — les énigmes tiennent leurs promesses', () => {
     expect(t.touchees).toEqual([0])
     // sans nuage, le faisceau meurt sur le mur : vérifié par le test « à vide »
   })
+
+  it('21-K : chaque verrou se tient — gelé sur le berceau, puis liquide sur l’étagère', () => {
+    // verrou I : palet gelé sur le berceau (dessus y = −220, centre y = −116)
+    let miroir = false
+    for (let cx = -20; cx <= 100 && !miroir; cx += 10) {
+      const t = traceLaser(TABLEAU_11.lasers![0], mondeDe(TABLEAU_11, { iceNormal: palet(cx, -116, 104) }))
+      if (t.touchees.includes(0)) miroir = true
+    }
+    expect(miroir).toBe(true)
+    // verrou II : corps liquide sur l'étagère (dessus y = 330, centre y = 434)
+    let prisme = false
+    for (let cx = 60; cx <= 220 && !prisme; cx += 10) {
+      const centre = { x: cx, y: 434 }
+      const eau = {
+        dedans: (x: number, y: number): boolean => Math.hypot(x - centre.x, y - centre.y) < 104,
+        normale: (x: number, y: number): { nx: number; ny: number } => {
+          const d = Math.hypot(x - centre.x, y - centre.y) || 1
+          return { nx: (x - centre.x) / d, ny: (y - centre.y) / d }
+        },
+      }
+      const t = traceLaser(TABLEAU_11.lasers![1], mondeDe(TABLEAU_11, { eau }))
+      if (t.touchees.includes(1)) prisme = true
+    }
+    expect(prisme).toBe(true)
+  })
+
+  it('21-L : la grille barre toute la hauteur — et l’arc porte la solution de l’autre côté', () => {
+    // la grille est infranchissable pour l'eau : toute la hauteur de la cuve
+    const grille = TABLEAU_12.boxes.find((b) => b.material === MAT_GRILLE)!
+    expect(grille.minY).toBeLessThanOrEqual(TABLEAU_12.bounds.minY)
+    expect(grille.maxY).toBeGreaterThanOrEqual(TABLEAU_12.bounds.maxY)
+    // vaporisé dans le faisceau au pied du rail : l'arc traverse et allume
+    const nuage = (x: number, y: number): boolean => Math.hypot(x + 200, y - 100) < 90
+    const t = traceLaser(TABLEAU_12.lasers![0], mondeDe(TABLEAU_12, { vapeur: nuage }))
+    expect(t.touchees).toEqual([0])
+  })
+
+  it('21-M : les trois chambres se résolvent, chacune avec son état', () => {
+    // chambre I — miroir : palet gelé sur le berceau (dessus y = −220)
+    let miroir = false
+    for (let cx = -540; cx <= -440 && !miroir; cx += 10) {
+      const t = traceLaser(TABLEAU_13.lasers![0], mondeDe(TABLEAU_13, { iceNormal: palet(cx, -116, 104) }))
+      if (t.touchees.includes(0)) miroir = true
+    }
+    expect(miroir).toBe(true)
+    // chambre II — prisme : corps liquide sur l'étagère (dessus y = 130),
+    // le faisceau plié vient mourir sur le récepteur scellé à la porte
+    let prisme = false
+    for (let cx = -140; cx <= 40 && !prisme; cx += 10) {
+      const centre = { x: cx, y: 234 }
+      const eau = {
+        dedans: (x: number, y: number): boolean => Math.hypot(x - centre.x, y - centre.y) < 104,
+        normale: (x: number, y: number): { nx: number; ny: number } => {
+          const d = Math.hypot(x - centre.x, y - centre.y) || 1
+          return { nx: (x - centre.x) / d, ny: (y - centre.y) / d }
+        },
+      }
+      const t = traceLaser(TABLEAU_13.lasers![1], mondeDe(TABLEAU_13, { eau }))
+      if (t.touchees.includes(1)) prisme = true
+    }
+    expect(prisme).toBe(true)
+    // chambre III — arc : nuage au pied du rail, l'arc grimpe et redescend
+    const nuage = (x: number, y: number): boolean => Math.hypot(x - 600, y - 140) < 90
+    const t = traceLaser(TABLEAU_13.lasers![2], mondeDe(TABLEAU_13, { vapeur: nuage }))
+    expect(t.touchees).toEqual([2])
+  })
 })
 
 describe('subtractBox — la découpe ronge les parois', () => {
@@ -130,8 +200,8 @@ describe('subtractBox — la découpe ronge les parois', () => {
 const ALL = [...TABLEAUX, TABLEAU_1BIS]
 
 describe('TABLEAUX — validité structurelle', () => {
-  it('l’expédition fait 10 tableaux, aux codes uniques (le bis à part)', () => {
-    expect(TABLEAUX.length).toBe(10)
+  it('l’expédition fait 13 tableaux, aux codes uniques (le bis à part)', () => {
+    expect(TABLEAUX.length).toBe(13)
     const codes = ALL.map((t) => t.code)
     expect(new Set(codes).size).toBe(codes.length)
     expect(TABLEAUX).not.toContain(TABLEAU_1BIS)

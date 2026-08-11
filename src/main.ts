@@ -11,6 +11,9 @@ import {
   MAT_EXIT,
   MAT_FROID,
   TABLEAU_10,
+  TABLEAU_11,
+  TABLEAU_12,
+  TABLEAU_13,
   TABLEAU_1BIS,
   TABLEAU_8,
   TABLEAU_9,
@@ -495,7 +498,9 @@ function startBisTest(): void {
 }
 // Le bouton de la fiche mène aux salles laser : la trilogie 21-H → 21-J
 // (miroir, prisme, plasma), enchaînée sas après sas.
-startBisBtn.addEventListener('click', () => startTest([TABLEAU_8, TABLEAU_9, TABLEAU_10]))
+startBisBtn.addEventListener('click', () =>
+  startTest([TABLEAU_8, TABLEAU_9, TABLEAU_10, TABLEAU_11, TABLEAU_12, TABLEAU_13]),
+)
 
 // ---- Éditeur de tableaux ----
 // Il se superpose au jeu ; « Essayer » repasse par le même chemin que le
