@@ -559,7 +559,7 @@ const fxCanvas = document.getElementById('fx-canvas') as HTMLCanvasElement
 const fxCtx = fxCanvas.getContext('2d')!
 const laserEtat = {
   vues: [] as TraceResultat[],
-  litUntil: [] as number[], // temps simulé jusqu'auquel chaque cible reste allumée
+  allumees: [] as boolean[], // cibles À VERROU : un passage du faisceau suffit
   portesOuvertes: [] as boolean[],
   doorsKey: '', // signature des portes fermées envoyées au solveur
 }
@@ -757,7 +757,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   for (let c = 0; c < cibles.length; c++) {
     const t = cibles[c]
     const p = S(t.x, t.y)
-    const lit = run.tableauTime <= (laserEtat.litUntil[c] ?? -1)
+    const lit = laserEtat.allumees[c] === true
     const r = Math.max(4, t.r * z)
     g.beginPath()
     g.arc(p.sx, p.sy, r, 0, Math.PI * 2)
@@ -839,7 +839,7 @@ function drawFleche(dtReal: number, dpr: number): void {
 let lastRailTime = 0
 function resetLasers(): void {
   laserEtat.vues = []
-  laserEtat.litUntil = (level.cibles ?? []).map(() => -1)
+  laserEtat.allumees = (level.cibles ?? []).map(() => false)
   laserEtat.portesOuvertes = (level.portes ?? []).map(() => false)
   laserEtat.doorsKey = ''
   lastRailTime = 0
@@ -1379,7 +1379,7 @@ function frame(now: number): void {
   if (lasers.length > 0) {
     const cibles = level.cibles ?? []
     const portes = level.portes ?? []
-    if (laserEtat.litUntil.length !== cibles.length) resetLasers()
+    if (laserEtat.allumees.length !== cibles.length) resetLasers()
     // portes fermées AVANT ce traçage : un faisceau ne traverse pas une porte
     // encore close — elle s'ouvrira pour l'image suivante
     const fermees = portes.filter((_, i) => !laserEtat.portesOuvertes[i])
@@ -1394,9 +1394,11 @@ function frame(now: number): void {
         // plane, pas une râpe — le reflet ne tremble plus à chaque bosse
         iceNormal: (x, y) => sim.iceNormalAt(x, y, rIce, params.laserMirrorSmooth),
         // palier 2 : le corps liquide est un prisme — le rayon se plie à
-        // chaque dioptre, et se piège sous la surface au-delà de ~49°
+        // chaque dioptre, et se piège sous la surface au-delà de ~49°.
+        // Le milieu est LISSÉ au même rayon que la normale : la surface
+        // effective est l'isoligne de densité, pas le grain des particules.
         eau: {
-          dedans: (x, y) => sim.liquidAt(x, y, rIce),
+          dedans: (x, y) => sim.liquidAt(x, y, params.laserMirrorSmooth * 0.6),
           normale: (x, y) => sim.liquidNormalAt(x, y, params.laserMirrorSmooth),
         },
         indice: params.laserRefractIndex,
@@ -1407,14 +1409,13 @@ function frame(now: number): void {
         railRadius: params.plasmaRailRadius,
       }),
     )
-    // persistance : chaque cible touchée reste allumée 0,35 s simulées
+    // cibles À VERROU : un seul passage du faisceau allume pour de bon —
+    // pas besoin de tenir le rayon, l'activation est acquise (jusqu'au
+    // Recommencer). Les portes asservies restent donc ouvertes.
     for (const t of laserEtat.vues) {
-      for (const c of t.touchees) laserEtat.litUntil[c] = run.tableauTime + 0.35
+      for (const c of t.touchees) laserEtat.allumees[c] = true
     }
-    laserEtat.portesOuvertes = portes.map((p) => {
-      const t = laserEtat.litUntil[p.cible]
-      return t !== undefined && run.tableauTime <= t
-    })
+    laserEtat.portesOuvertes = portes.map((p) => laserEtat.allumees[p.cible] === true)
     // le solveur ne reçoit que les portes closes — recomposé au changement
     const closes = portes.filter((_, i) => !laserEtat.portesOuvertes[i])
     const cle = closes.map((p) => `${p.minX},${p.minY},${p.maxX},${p.maxY}`).join(';')

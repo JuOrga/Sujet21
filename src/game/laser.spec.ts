@@ -148,12 +148,11 @@ describe('traceLaser — les règles optiques du palier 1', () => {
     sim.spawnDisc(0, 0, 700, KIND_PLAYER)
     sim.relabel()
     sim.step(sim.params.dt)
-    const rIce = sim.params.particleSpacing * 1.3
     const t = traceLaser(
       { x: -600, y: -45, angle: 0 },
       monde({
         eau: {
-          dedans: (x, y) => sim.liquidAt(x, y, rIce),
+          dedans: (x, y) => sim.liquidAt(x, y, sim.params.laserMirrorSmooth * 0.6),
           normale: (x, y) => sim.liquidNormalAt(x, y, sim.params.laserMirrorSmooth),
         },
       }),
@@ -265,6 +264,23 @@ describe('traceLaser — les règles optiques du palier 1', () => {
     expect(sim.velY[gaz]).toBeGreaterThan(50) // entraînée vers le haut (sens du tracé)
     expect(Math.abs(sim.velY[eau])).toBeLessThan(1) // le liquide ignore le champ
     expect(Math.abs(sim.velY[loin])).toBeLessThan(1) // hors bande : rien
+  })
+
+  it('une goutte isolée ne réfracte plus : le milieu est une isoligne de densité', () => {
+    const sim = new FluidSim({ ...DEFAULT_PARAMS }, BOUNDS, 256)
+    sim.addParticle(0, 0, KIND_FREE) // une gouttelette égarée sur le trajet
+    sim.step(sim.params.dt)
+    const t = traceLaser(
+      { x: -400, y: 3, angle: 0 },
+      monde({
+        eau: {
+          dedans: (x, y) => sim.liquidAt(x, y, sim.params.laserMirrorSmooth * 0.6),
+          normale: (x, y) => sim.liquidNormalAt(x, y, sim.params.laserMirrorSmooth),
+        },
+      }),
+    )
+    expect(t.points.length).toBe(2) // aucun dioptre : le rayon file droit
+    expect(Math.abs(t.points[1].y - 3)).toBeLessThan(0.5)
   })
 
   it('la normale du miroir est LISSE le long d’une face plane, malgré le grain des particules', () => {

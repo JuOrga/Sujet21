@@ -569,8 +569,142 @@ export const TABLEAU_1BIS: LevelDef = {
   ],
 }
 
+// Tableau 8 — la salle des miroirs (laser, palier 1 : GLACE = MIROIR).
+// Le pivot du scénario : l'échantillon découvre sa fonction. Lecture :
+// 1. un émetteur balaie la salle à hauteur du berceau ; le faisceau meurt
+//    sur un pilier — il n'atteint rien tout seul ;
+// 2. le BERCEAU FROID sous la ligne de tir : s'y poser, c'est gélifier en
+//    travers du faisceau — le corps devient le miroir, le reflet monte vers
+//    la cible. Glisser le long du berceau règle l'angle ;
+// 3. la cible est À VERROU : un reflet suffit, la porte reste ouverte —
+//    on dégèle et on descend au sas par la porte d'énergie éteinte.
+export const TABLEAU_8: LevelDef = {
+  name: 'La salle des miroirs',
+  code: '21-H',
+  journal:
+    'Nous avons monté un émetteur pour cartographier la cuve. L’échantillon s’est figé dans le faisceau — et l’a renvoyé sur le récepteur. Il a recommencé sept fois. Ce n’est pas un réflexe. C’est un miroir. Il l’a toujours été. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+  boxes: [
+    // le pilier qui absorbe le faisceau à droite du berceau
+    box(520, -300, 580, 100, MAT_WALL),
+    // le berceau froid : se poser dessus, c'est se figer dans le faisceau
+    box(-160, -280, 200, -220, MAT_FROID),
+    // la barrière de la porte : seul le sas d'énergie laisse passer
+    box(860, -750, 900, -170, MAT_WALL),
+    box(860, 170, 900, 750, MAT_WALL),
+    // un contrefort pour la lecture de la salle
+    box(-350, 640, -130, 750, MAT_WALL),
+  ],
+  sponges: [],
+  labels: [
+    { x: -700, y: -160, text: 'ÉMETTEUR', tone: 'chaud' },
+    { x: 20, y: -330, text: 'BERCEAU FROID', tone: 'froid' },
+    { x: -440, y: 350, text: 'RÉCEPTEUR', tone: 'sas' },
+    { x: 880, y: -80, text: 'PORTE', tone: 'chaud' },
+    { x: 1110, y: 160, text: 'SAS', tone: 'sas' },
+  ],
+  lasers: [{ x: -700, y: -80, angle: 0 }],
+  cibles: [{ x: -440, y: 260, r: 46 }],
+  portes: [{ minX: 860, minY: -170, maxX: 900, maxY: 170, cible: 0 }],
+}
+
+// Tableau 9 — le prisme (laser, palier 2 : EAU = RÉFRACTION). Lecture :
+// 1. le faisceau file au-dessus de l'étagère hydrophile et meurt sur un
+//    pilier ; le récepteur est en dessous, hors de toute ligne droite ;
+// 2. se coller à l'étagère, c'est placer son corps LIQUIDE dans le rayon :
+//    la lumière se plie en le traversant — s'étaler ou se regrouper règle
+//    la déviation, le corps est la lentille ;
+// 3. cible à verrou, porte ouverte, sas. Le miroir renvoyait ; le prisme
+//    dirige.
+export const TABLEAU_9: LevelDef = {
+  name: 'Le prisme',
+  code: '21-I',
+  journal:
+    'À l’état liquide, il ne renvoie pas la lumière : il la PLIE. Le faisceau ressort de son corps dévié exactement où il le faut. L’optique appellerait ça un prisme vivant. Je ne sais plus lequel de nous deux conçoit les essais. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: -200, n: 900 },
+  exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+  boxes: [
+    // l'étagère hydrophile : le mouillage qui place le corps dans le rayon
+    box(40, 60, 400, 130, MAT_HYDROPHILE),
+    // le pilier qui absorbe la ligne droite
+    box(760, 140, 820, 340, MAT_WALL),
+    // la barrière de la porte
+    box(900, -750, 940, -160, MAT_WALL),
+    box(900, 160, 940, 750, MAT_WALL),
+    // contreforts
+    box(-500, -750, -320, -660, MAT_WALL),
+    box(300, 660, 520, 750, MAT_WALL),
+  ],
+  sponges: [],
+  labels: [
+    { x: -900, y: 380, text: 'ÉMETTEUR', tone: 'chaud' },
+    { x: 220, y: 20, text: 'HYDROPHILE', tone: 'phile' },
+    { x: 660, y: 0, text: 'RÉCEPTEUR', tone: 'sas' },
+    { x: 920, y: -60, text: 'PORTE', tone: 'chaud' },
+    { x: 1110, y: 160, text: 'SAS', tone: 'sas' },
+  ],
+  lasers: [{ x: -900, y: 300, angle: 0 }],
+  cibles: [{ x: 660, y: 80, r: 52 }],
+  portes: [{ minX: 900, minY: -160, maxX: 940, maxY: 160, cible: 0 }],
+}
+
+// Tableau 10 — la voie de plasma (laser, palier 3 : VAPEUR + RAIL). Lecture :
+// 1. un mur coupe la cuve ; le seul passage est tout en haut, hors de portée
+//    de l'eau — et le rail magnétique le franchit ;
+// 2. se vaporiser DANS le faisceau au pied du rail : l'arc s'ionise, le
+//    champ le capture, il grimpe, franchit le passage, redescend — et le
+//    CHAMP CONVOIE LA VAPEUR avec lui : le nuage voyage sur la ligne ;
+// 3. l'arc allume le récepteur au bout du rail (verrou), la porte s'ouvre ;
+//    le dépôt froid recondense le nuage — on finit le voyage en eau.
+export const TABLEAU_10: LevelDef = {
+  name: 'La voie de plasma',
+  code: '21-J',
+  journal:
+    'Dans la vapeur, le faisceau devient un arc — et l’arc suit nos rails de champ comme un courant docile. Il s’est ionisé lui-même, et il a voyagé SUR la ligne, par-dessus le mur. Nous ne le testons plus. Nous l’équipons. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+  boxes: [
+    // le mur : la cuve est coupée, seul le haut est ouvert (y 520..750)
+    box(160, -750, 240, 520, MAT_WALL),
+    // le dépôt froid : recondenser après le voyage, cueillir la rosée
+    box(700, -480, 820, -420, MAT_FROID),
+    // la barrière de la porte
+    box(900, -750, 940, -160, MAT_WALL),
+    box(900, 160, 940, 750, MAT_WALL),
+  ],
+  sponges: [],
+  labels: [
+    { x: -700, y: 60, text: 'ÉMETTEUR', tone: 'chaud' },
+    { x: -240, y: -60, text: 'PIED DU RAIL', tone: 'phobe' },
+    { x: 200, y: 700, text: 'PASSAGE', tone: 'mur' },
+    { x: 620, y: -60, text: 'RÉCEPTEUR', tone: 'sas' },
+    { x: 760, y: -540, text: 'DÉPÔT FROID', tone: 'froid' },
+    { x: 920, y: -60, text: 'PORTE', tone: 'chaud' },
+    { x: 1110, y: 160, text: 'SAS', tone: 'sas' },
+  ],
+  lasers: [{ x: -700, y: 140, angle: 0 }],
+  cibles: [{ x: 620, y: 20, r: 46 }],
+  portes: [{ minX: 900, minY: -160, maxX: 940, maxY: 160, cible: 0 }],
+  rails: [
+    {
+      points: [
+        { x: -240, y: 140 },
+        { x: -240, y: 560 },
+        { x: 200, y: 640 },
+        { x: 620, y: 560 },
+        { x: 620, y: 60 },
+      ],
+    },
+  ],
+}
+
 // L'ordre de la partie : chaque tableau enseigne une chose, les derniers
-// les combinent, et la dérive conclut sur la maîtrise pure.
+// les combinent — la trilogie laser révèle la fonction de l'échantillon
+// (miroir, prisme, plasma) — et la dérive conclut sur la maîtrise pure.
 export const TABLEAUX: LevelDef[] = [
   TABLEAU_1,
   TABLEAU_2,
@@ -578,6 +712,9 @@ export const TABLEAUX: LevelDef[] = [
   TABLEAU_5,
   TABLEAU_6,
   TABLEAU_4,
+  TABLEAU_8,
+  TABLEAU_9,
+  TABLEAU_10,
   TABLEAU_7,
 ]
 
