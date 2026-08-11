@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { boxContact, Sponge, type ClosestPoint } from './obstacles'
 import { DEFAULT_PARAMS, type SimParams } from './params'
 import { FluidSim, KIND_FREE, KIND_PLAYER, type Bounds } from './solver'
-import { MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_WALL, pointInBox } from '../game/level'
+import { MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_MEMBRANE, MAT_RIDEAU, MAT_WALL, pointInBox } from '../game/level'
 
 const OPEN: Bounds = { minX: -3000, minY: -3000, maxX: 3000, maxY: 3000 }
 
@@ -178,9 +178,9 @@ describe('pointInBox', () => {
   })
 })
 
-describe('Éponge gorgée — un mur pour le liquide seulement', () => {
-  // Une cellule saturée devient solide, mais une éponge détrempée est molle :
-  // la glace passe au travers, la vapeur entre ses fibres. Seule l'eau bute.
+describe('Éponge — le feutre bloque la glace et la vapeur (tableau des règles)', () => {
+  // L'eau s'infiltre dans les cellules vivantes (qui l'absorbent) et bute
+  // sur les cellules saturées ; la glace et la vapeur butent PARTOUT.
   function murEponge(): FluidSim {
     const sim = new FluidSim({ ...DEFAULT_PARAMS }, OPEN, 512)
     sim.setLevel([], [{ minX: 0, minY: -300, cols: 2, rows: 20, cellSize: 30, capacityPerCell: 2 }])
@@ -193,24 +193,26 @@ describe('Éponge gorgée — un mur pour le liquide seulement', () => {
     return sim
   }
 
-  it('la glace traverse une éponge saturée', () => {
+  it('la glace bute sur l’éponge, saturée ou non', () => {
     const sim = murEponge()
     const i = sim.addParticle(-80, 0, KIND_FREE)
     sim.frost[i] = 1
     sim.frozen[i] = 1
     sim.velX[i] = 300
     for (let s = 0; s < 120; s++) sim.step(sim.params.dt)
-    expect(sim.posX[i]).toBeGreaterThan(70) // de l'autre côté du mur
+    expect(sim.posX[i]).toBeLessThan(10) // arrêtée au feutre
   })
 
-  it('la vapeur traverse une éponge saturée', () => {
+  it('la vapeur bute sur l’éponge, sans y être essorée', () => {
     const sim = murEponge()
     const i = sim.addParticle(-80, 0, KIND_FREE)
     sim.vapor[i] = 1
     sim.gaseous[i] = 1
     sim.velX[i] = 300
+    const avant = sim.count
     for (let s = 0; s < 120; s++) sim.step(sim.params.dt)
-    expect(sim.posX[i]).toBeGreaterThan(70)
+    expect(sim.posX[i]).toBeLessThan(10)
+    expect(sim.count).toBe(avant) // rien d'essoré : elle n'entre plus
   })
 
   it('le liquide, lui, bute toujours dessus', () => {
@@ -219,5 +221,69 @@ describe('Éponge gorgée — un mur pour le liquide seulement', () => {
     sim.velX[i] = 300
     for (let s = 0; s < 120; s++) sim.step(sim.params.dt)
     expect(sim.posX[i]).toBeLessThan(5) // arrêté devant les cellules pleines
+  })
+})
+
+describe('Membrane et rideau lamellaire — chaque état a sa porte', () => {
+  function mur(mat: number): FluidSim {
+    const sim = makeSim()
+    sim.setLevel([{ minX: 0, minY: -500, maxX: 40, maxY: 500, material: mat }], [])
+    return sim
+  }
+  const lance = (sim: FluidSim, etat: 'eau' | 'glace' | 'vapeur'): number => {
+    const i = sim.addParticle(-80, 0, KIND_FREE)
+    if (etat === 'glace') {
+      sim.frost[i] = 1
+      sim.frozen[i] = 1
+    } else if (etat === 'vapeur') {
+      sim.vapor[i] = 1
+      sim.gaseous[i] = 1
+    }
+    sim.velX[i] = 300
+    for (let s = 0; s < 120; s++) sim.step(sim.params.dt)
+    return sim.posX[i]
+  }
+
+  it('la membrane laisse suinter l’eau, bloque glace et vapeur', () => {
+    expect(lance(mur(MAT_MEMBRANE), 'eau')).toBeGreaterThan(60)
+    expect(lance(mur(MAT_MEMBRANE), 'glace')).toBeLessThan(10)
+    expect(lance(mur(MAT_MEMBRANE), 'vapeur')).toBeLessThan(10)
+  })
+
+  it('le rideau lamellaire s’écarte devant la glace, bloque eau et vapeur', () => {
+    expect(lance(mur(MAT_RIDEAU), 'glace')).toBeGreaterThan(60)
+    expect(lance(mur(MAT_RIDEAU), 'eau')).toBeLessThan(10)
+    expect(lance(mur(MAT_RIDEAU), 'vapeur')).toBeLessThan(10)
+  })
+
+  it('la glace sent la chimie : bumper hydrophobe, freinage hydrophile', () => {
+    // bumper : la glace repart de l'hydrophobe plus vite que d'un mur neutre
+    const rebond = (mat: number): number => {
+      const sim = makeSim()
+      sim.setLevel([{ minX: 100, minY: -500, maxX: 140, maxY: 500, material: mat }], [])
+      const i = sim.addParticle(-40, 0, KIND_FREE)
+      sim.frost[i] = 1
+      sim.frozen[i] = 1
+      sim.velX[i] = 320
+      for (let s = 0; s < 120; s++) sim.step(sim.params.dt)
+      return -sim.velX[i] // vitesse de retour (positive si le bloc repart)
+    }
+    expect(rebond(MAT_HYDROPHOBE)).toBeGreaterThan(rebond(MAT_WALL) + 20)
+    // freinage : pressée contre l'hydrophile, la glace qui glisse s'essouffle
+    // (en apesanteur, on maintient l'appui à chaque pas pour garder contact)
+    const glisse = (mat: number): number => {
+      const sim = makeSim()
+      sim.setLevel([{ minX: -500, minY: -540, maxX: 500, maxY: -500, material: mat }], [])
+      const i = sim.addParticle(-400, -496, KIND_FREE)
+      sim.frost[i] = 1
+      sim.frozen[i] = 1
+      sim.velX[i] = 300
+      for (let s = 0; s < 90; s++) {
+        sim.velY[i] = -60 // l'appui
+        sim.step(sim.params.dt)
+      }
+      return sim.velX[i]
+    }
+    expect(glisse(MAT_HYDROPHILE)).toBeLessThan(glisse(MAT_WALL) * 0.8)
   })
 })

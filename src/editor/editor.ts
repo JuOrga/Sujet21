@@ -11,6 +11,8 @@ import {
   MAT_CHAUD,
   MAT_FROID,
   MAT_GRILLE,
+  MAT_MEMBRANE,
+  MAT_RIDEAU,
   MAT_HYDROPHILE,
   MAT_HYDROPHOBE,
   MAT_WALL,
@@ -50,6 +52,8 @@ const MAT_COLORS: Record<number, string> = {
   [MAT_FROID]: '#8fc8ee',
   [MAT_GRILLE]: '#8fb0c6',
   [MAT_CHAUD]: '#ff8a3c',
+  [MAT_MEMBRANE]: '#35c9a0',
+  [MAT_RIDEAU]: '#9fb9d8',
 }
 const ZONE_COLORS: Record<ZoneForce, string> = {
   libre: '#7b93a8',
@@ -1411,7 +1415,7 @@ export class LevelEditor {
       const b = this.level.boxes[s.index]
       rows.push(
         `<label class="ed-f"><span>Matériau</span><select id="p-mat">` +
-          [MAT_WALL, MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_FROID, MAT_GRILLE, MAT_CHAUD]
+          [MAT_WALL, MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_FROID, MAT_GRILLE, MAT_CHAUD, MAT_MEMBRANE, MAT_RIDEAU]
             .map((m) => `<option value="${m}"${m === b.material ? ' selected' : ''}>${MATERIAL_NAMES[m]}</option>`)
             .join('') +
           `</select></label>`,

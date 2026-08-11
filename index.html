@@ -1831,6 +1831,19 @@
           repeating-linear-gradient(90deg, #2b3642 0 5px, #0a1017 5px 9px);
         border-color: #7399b3;
       }
+      .lg-sw.sw-membrane {
+        background:
+          repeating-linear-gradient(0deg, rgba(53, 201, 160, 0.35) 0 3px, transparent 3px 6px),
+          repeating-linear-gradient(90deg, rgba(53, 201, 160, 0.35) 0 3px, transparent 3px 6px),
+          linear-gradient(135deg, #0b2a24, #14453a);
+        border-color: #35c9a0;
+      }
+      .lg-sw.sw-rideau {
+        background:
+          repeating-linear-gradient(0deg, #46596e 0 4px, #101a26 4px 7px),
+          linear-gradient(135deg, #1a2634, #2c3d50);
+        border-color: #9fc2e0;
+      }
       .lg-sw.sw-sas {
         background: radial-gradient(circle, #020c09 0 35%, #145c46 90%);
         border-color: var(--valid);
@@ -2698,21 +2711,30 @@
       <div class="lg-row"><span class="lg-sw sw-eponge"></span>
         <span><b>Éponge</b> — absorbe l'eau au contact continu ; chaque cellule se
         sature puis se solidifie. La brèche payée en volume est permanente —
-        la vitesse limite la perte.</span></div>
+        la vitesse limite la perte. <span class="st">Glace</span> et
+        <span class="st">vapeur</span> butent sur le feutre.</span></div>
       <div class="lg-row"><span class="lg-sw sw-froid"></span>
         <span><b>Plaque froide</b> — son aura de brume gèle l'eau qui s'attarde.
         <span class="st">Glace</span> au contact : soudée, le bloc s'arrête net.
         <span class="st">Vapeur</span> : condensée, on redevient eau — et la vapeur
         <em>perdue</em> ailleurs vient y perler en rosée, récupérable.</span></div>
       <div class="lg-row"><span class="lg-sw sw-chaud"></span>
-        <span><b>Radiateur</b> — son aura vaporise l'eau, qu'on le veuille ou non :
-        la <span class="st">vapeur</span> gagnée traverse grilles et éponges, mais
-        s'attarder la fait s'évaporer (perdue). Dégèle la
-        <span class="st">glace</span>.</span></div>
+        <span><b>Radiateur</b> — son aura vaporise l'eau, qu'on le veuille ou non ;
+        la <span class="st">vapeur</span> qui s'y baigne RECHARGE UN DASH (la
+        prochaine impulsion est offerte), mais s'attarder l'évapore (perdue).
+        Dégèle la <span class="st">glace</span>.</span></div>
       <div class="lg-row"><span class="lg-sw sw-grille"></span>
         <span><b>Grille</b> — arrête l'eau et la glace ; seule la
         <span class="st">vapeur</span> passe entre les mailles — qui l'essorent :
         une part du nuage se perd au passage.</span></div>
+      <div class="lg-row"><span class="lg-sw sw-membrane"></span>
+        <span><b>Membrane</b> — une trame gorgée d'eau : seule
+        l'<span class="st">eau</span> suinte au travers. Glace et vapeur butent,
+        et elle absorbe la lumière des lasers.</span></div>
+      <div class="lg-row"><span class="lg-sw sw-rideau"></span>
+        <span><b>Rideau lamellaire</b> — des lamelles souples : seule la
+        <span class="st">glace</span>, dense et d'un seul tenant, les écarte.
+        Eau et vapeur butent.</span></div>
       <div class="lg-row"><span class="lg-sw sw-sas"></span>
         <span><b>Sas</b> — la bouche d'aspiration boit l'échantillon et le met en
         bonbonne : c'est la sortie.</span></div>
@@ -2727,7 +2749,9 @@
         <button id="states-close" type="button" title="fermer (E)">✕</button></div>
       <div class="lg-row"><span class="st-big">💧</span>
         <span><b>EAU</b> — pilotable : éjecter pour avancer.<br />
-        Bloquée par les <i class="m-mur">parois</i> et les <i class="m-grille">grilles</i> ·
+        Bloquée par les <i class="m-mur">parois</i>, les <i class="m-grille">grilles</i>
+        et le <i class="m-froid">rideau lamellaire</i> ·
+        seule à passer la <i class="m-phile">membrane</i> ·
         absorbée par l'<i class="m-eponge">éponge</i> ·
         collée par l'<i class="m-phile">hydrophile</i> ·
         déviée par l'<i class="m-phobe">hydrophobe</i> ·
@@ -2736,8 +2760,11 @@
         le <i class="m-sas">sas</i> l'aspire.</span></div>
       <div class="lg-row"><span class="st-big">❄</span>
         <span><b>GLACE</b> (F) — bloc rigide : garde son élan, plus de propulsion.<br />
-        Rebondit sur les <i class="m-mur">parois</i> et les <i class="m-grille">grilles</i> ·
-        l'<i class="m-eponge">éponge</i> et la chimie des parois n'ont plus prise ·
+        Rebondit sur les <i class="m-mur">parois</i> et les <i class="m-grille">grilles</i> —
+        comme un bumper sur l'<i class="m-phobe">hydrophobe</i>, freinée par
+        l'<i class="m-phile">hydrophile</i> ·
+        seule à écarter le <i class="m-froid">rideau lamellaire</i> ·
+        l'<i class="m-eponge">éponge</i> et la <i class="m-phile">membrane</i> la bloquent ·
         <i class="m-froid">soudée</i> au contact d'une plaque froide ·
         dégelée par les <i class="m-chaud">radiateurs</i> ·
         le <i class="m-sas">sas</i> la hale et l'avale — entrer solide paie une prime.</span></div>
@@ -2747,9 +2774,11 @@
         puissance, chaque dash évapore un tiers du volume courant, et l'état
         lui-même s'évapore en continu — un compte à rebours, pas un mode de
         croisière.<br />
-        Traverse les <i class="m-grille">grilles</i> (qui l'essorent : péage en
-        volume) et l'<i class="m-eponge">éponge</i> ·
-        bloquée par les <i class="m-mur">parois</i> ·
+        Seule à traverser les <i class="m-grille">grilles</i> (qui l'essorent :
+        péage en volume) ·
+        bloquée par les <i class="m-mur">parois</i>, l'<i class="m-eponge">éponge</i>,
+        la <i class="m-phile">membrane</i> et le <i class="m-froid">rideau</i> ·
+        un bain dans l'aura d'un <i class="m-chaud">radiateur</i> recharge un dash ·
         condensée par le <i class="m-froid">froid</i> ·
         s'attarder au <i class="m-chaud">radiateur</i> la brûle ·
         le <i class="m-sas">sas</i> l'avale.<br />

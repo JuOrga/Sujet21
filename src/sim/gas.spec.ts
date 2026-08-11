@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PARAMS, type SimParams } from './params'
 import { FluidSim, KIND_FREE, KIND_PLAYER, type Bounds } from './solver'
-import { MAT_FROID, MAT_GRILLE } from '../game/level'
+import { MAT_CHAUD, MAT_FROID, MAT_GRILLE } from '../game/level'
 
 const OPEN: Bounds = { minX: -3000, minY: -3000, maxX: 3000, maxY: 3000 }
 
@@ -112,32 +112,20 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
     expect(c2).toBeLessThan(c1) // moins de volume → moins cher en absolu
   })
 
-  it('l’éponge essore la vapeur qui la traverse : petit péage en volume', () => {
+  it('un bain dans l’aura du radiateur RECHARGE UN DASH : le prochain est offert', () => {
     const sim = makeSim()
-    // éponge de 5×10 cellules de 30 u : un couloir à traverser
-    sim.setLevel(
-      [],
-      [{ minX: 0, minY: -150, cols: 5, rows: 10, cellSize: 30, capacityPerCell: 4 }],
-    )
-    sim.spawnDisc(-120, 0, 50, KIND_PLAYER)
-    sim.gasIntent = true
-    run(sim, 1.2)
-    const before = sim.playerCount
-    const bankBefore = sim.vaporBank
-    // le nuage stationne dans l'éponge : le péage s'accumule
-    for (let i = 0; i < sim.count; i++) {
-      sim.posX[i] = 20 + (i % 4) * 25
-      sim.posY[i] = -100 + Math.floor(i / 4) * 12
-      sim.velX[i] = 0
-      sim.velY[i] = 0
-    }
-    run(sim, 2)
-    // il a payé — sans être englué (la vapeur reste libre de ses mouvements)
-    expect(sim.playerCount).toBeLessThan(before)
-    // la matière essorée est PERDUE (gardée par l'éponge), pas mise en rosée :
-    // seule l'évaporation d'état a pu alimenter la réserve pendant ce temps
-    const idleMax = Math.ceil(2 * sim.params.gasIdleLossRate) + 1
-    expect(sim.vaporBank - bankBefore).toBeLessThanOrEqual(idleMax)
+    sim.setLevel([{ minX: -60, minY: -260, maxX: 60, maxY: -200, material: MAT_CHAUD }], [])
+    sim.spawnDisc(0, -140, 60, KIND_PLAYER) // dans l'aura du radiateur
+    gasify(sim)
+    run(sim, 0.5)
+    expect(sim.dashOffert).toBe(true)
+    const avant = sim.playerCount
+    sim.gasDash(400, -140)
+    expect(sim.playerCount).toBe(avant) // aucune particule évaporée : offert
+    expect(sim.dashOffert).toBe(false) // l'offrande est consommée
+    const apres = sim.playerCount
+    sim.gasDash(400, -140)
+    expect(sim.playerCount).toBeLessThan(apres) // le suivant se paie
   })
 
   it('la vapeur traverse la grille, le liquide s’y écrase', () => {

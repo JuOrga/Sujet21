@@ -11,6 +11,8 @@ export const MAT_EXIT = 3 // rendu seulement, pas de physique
 export const MAT_FROID = 4 // plaque froide : gèle l'eau qui s'attarde dans son aura
 export const MAT_GRILLE = 5 // grille : arrête le liquide et la glace, laisse passer la vapeur
 export const MAT_CHAUD = 6 // radiateur : vaporise l'eau dans son aura, dégèle, évapore ce qui s'attarde
+export const MAT_MEMBRANE = 7 // membrane gorgée d'eau : seule l'EAU la traverse (glace et vapeur butent)
+export const MAT_RIDEAU = 8 // rideau lamellaire : seule la GLACE l'écarte (eau et vapeur butent)
 
 export interface ObstacleBox {
   minX: number
@@ -159,6 +161,8 @@ export const MATERIAL_NAMES: Record<number, string> = {
   [MAT_FROID]: 'Hublot (froid)',
   [MAT_GRILLE]: 'Grille',
   [MAT_CHAUD]: 'Radiateur',
+  [MAT_MEMBRANE]: 'Membrane (eau)',
+  [MAT_RIDEAU]: 'Rideau (glace)',
 }
 
 // La CAUSE de chaque zone : une zone n'impose pas un état par convention, elle
@@ -941,6 +945,10 @@ export const TABLEAU_S2: LevelDef = {
   boxes: [
     // la plaque froide au sol : s'y attarder, c'est geler — et le voir venir
     box(-240, -520, 40, -460, MAT_FROID),
+    // le mur aux trois portes : membrane en bas (l'eau suinte), passage au
+    // centre, rideau en haut (la glace l'écarte) — chaque état a sa porte
+    box(140, -750, 180, -160, MAT_MEMBRANE),
+    box(140, 160, 180, 750, MAT_RIDEAU),
     // le radiateur : la vaporisation gratuite, à hauteur de route
     box(220, -80, 380, -20, MAT_CHAUD),
     // la grille pleine hauteur : l'eau s'arrête, la vapeur passe
@@ -955,6 +963,8 @@ export const TABLEAU_S2: LevelDef = {
   labels: [
     { x: -570, y: -200, text: 'ÉPONGE — BOIT', tone: 'eponge' },
     { x: -100, y: -580, text: 'PLAQUE FROIDE — FIGE', tone: 'froid' },
+    { x: 160, y: -420, text: 'MEMBRANE — SEULE L’EAU PASSE', tone: 'phile' },
+    { x: 160, y: 420, text: 'RIDEAU — SEULE LA GLACE PASSE', tone: 'froid' },
     { x: 300, y: 40, text: 'RADIATEUR — DISPERSE', tone: 'chaud' },
     { x: 660, y: -420, text: 'GRILLE — SEULE LA VAPEUR PASSE', tone: 'grille' },
     { x: 850, y: -380, text: 'DÉPÔT FROID', tone: 'froid' },

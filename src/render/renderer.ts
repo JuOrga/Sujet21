@@ -596,6 +596,29 @@ void main() {
         vec3 auraCol = mat < 1.5 ? vec3(0.12, 0.42, 0.45) : vec3(0.38, 0.20, 0.52);
         col += auraCol * aura * (0.45 + 0.55 * mist);
       }
+    } else if (mat > 7.5) {
+      // Rideau lamellaire : lamelles souples bleu-glace qui ondulent — seule
+      // la GLACE les écarte. Des fentes fines entre lamelles laissent deviner
+      // le fond : c'est un rideau, pas un mur.
+      float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
+      float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
+      float sway = sin(world.y * 0.30 + uTime * 1.1 + world.x * 0.02) * 1.8;
+      float lam = 0.5 + 0.5 * sin((world.y + sway) * 0.55);
+      float fente = smoothstep(0.86, 0.97, lam);
+      vec3 lamCol = vec3(0.34, 0.46, 0.60) * (0.72 + 0.38 * lam);
+      col = mix(col, lamCol, fill * (1.0 - fente * 0.75));
+      col = mix(col, vec3(0.70, 0.85, 0.98), edge * 0.85);
+    } else if (mat > 6.5) {
+      // Membrane gorgée d'eau : trame tissée vert d'eau qui suinte — seule
+      // l'EAU la traverse. Des gouttes descendent le long de la trame.
+      float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
+      float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
+      float weave = 0.5 + 0.5 * sin(world.x * 0.42) * sin(world.y * 0.42);
+      float drip = smoothstep(0.78, 1.0,
+        0.5 + 0.5 * sin(world.y * 0.10 - uTime * 1.6 + vnoise(world * 0.05) * 6.0));
+      vec3 memCol = vec3(0.05, 0.20, 0.17) + vec3(0.04, 0.15, 0.12) * weave;
+      col = mix(col, memCol + vec3(0.03, 0.11, 0.09) * drip, fill);
+      col = mix(col, vec3(0.25, 0.78, 0.62), edge * 0.9);
     } else if (mat > 5.5) {
       // Radiateur (tableau 4) : rayures chaudes qui défilent, arête incandes-
       // cente, et une aura de chaleur qui tremble — le danger (et la

@@ -6,6 +6,8 @@ import {
   MAT_CHAUD,
   MAT_FROID,
   MAT_GRILLE,
+  MAT_MEMBRANE,
+  MAT_RIDEAU,
   MAT_HYDROPHILE,
   MAT_HYDROPHOBE,
   MAT_WALL,
@@ -28,6 +30,8 @@ export const MATERIALS = [
   MAT_FROID,
   MAT_GRILLE,
   MAT_CHAUD,
+  MAT_MEMBRANE,
+  MAT_RIDEAU,
 ] as const
 
 const FORCES: ZoneForce[] = ['libre', 'eau', 'glace', 'vapeur']

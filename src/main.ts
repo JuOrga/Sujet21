@@ -2067,7 +2067,9 @@ function frame(now: number): void {
     // l'étiquette annonce les deux termes du marché — la poussée et le prix.
     const dMonde = Math.hypot(aim.x - sim.stats.centroidX, aim.y - sim.stats.centroidY)
     const puissance = Math.min(1, dMonde / Math.max(1, params.gasDashRange))
-    dashCostEl.textContent = `DASH ${Math.round(puissance * 100)} % · −${(sim.liters() * params.gasDashCost).toFixed(2)} L`
+    dashCostEl.textContent = sim.dashOffert
+      ? `DASH ${Math.round(puissance * 100)} % · OFFERT (radiateur)`
+      : `DASH ${Math.round(puissance * 100)} % · −${(sim.liters() * params.gasDashCost).toFixed(2)} L`
   }
   dashAimEl.classList.toggle('visible', dash.aiming)
   dashCostEl.classList.toggle('visible', dash.aiming)
