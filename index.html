@@ -2559,6 +2559,7 @@
           <label class="ed-f"><span>Nom</span><input id="ed-name" /></label>
           <label class="ed-f"><span>Code</span><input id="ed-code" /></label>
           <label class="ed-f"><span>Par (impulsions)</span><input type="number" id="ed-par" min="1" step="1" /></label>
+          <label class="ed-f"><span>Dashs vapeur / écran</span><input type="number" id="ed-dashs" min="0" step="1" placeholder="banc" /></label>
           <label class="ed-f"><span>Musique</span><select id="ed-ambiance"></select></label>
           <textarea id="ed-journal" placeholder="Entrée du journal de bord…"></textarea>
         </div>
@@ -2751,7 +2752,7 @@
       <div class="lg-states">ÉTATS —
         <b>💧 EAU</b> : pilotable, éjecter pour avancer ·
         <b>❄ GLACE</b> (F) : le bloc garde son élan, re-presser dégèle ·
-        <b>💨 VAPEUR</b> (G) : viser ralentit le temps, relâcher = dash (⅓ du volume, puissance à la distance).</div>
+        <b>💨 VAPEUR</b> (G) : viser ralentit le temps, relâcher = dash — les impulsions se COMPTENT (x par salle), le volume ne paie plus.</div>
     </div>
 
     <div id="states" role="dialog" aria-label="Les trois états : qui bloque quoi">
@@ -2781,8 +2782,9 @@
       <div class="lg-row"><span class="st-big">💨</span>
         <span><b>VAPEUR</b> (G) — viser ralentit fortement le temps, relâcher
         lance le nuage d'un trait (dash) : la distance du doigt règle la
-        puissance, chaque dash évapore un tiers du volume courant, et l'état
-        lui-même s'évapore en continu — un compte à rebours, pas un mode de
+        puissance. Les impulsions sont COMPTÉES — x par salle, quel que soit
+        le volume (frôler un radiateur en offre une) — mais l'état lui-même
+        s'évapore en continu : un compte à rebours, pas un mode de
         croisière.<br />
         Seule à traverser les <i class="m-grille">grilles</i> (qui l'essorent :
         péage en volume) ·

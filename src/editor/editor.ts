@@ -1272,6 +1272,13 @@ export class LevelEditor {
       this.commit(selAmb.value ? `Musique : ${PISTE_NOMS[selAmb.value as Piste]}.` : 'Musique : celle de la cuve.')
     })
 
+    this.el('ed-dashs').addEventListener('input', () => {
+      const raw = (this.el('ed-dashs') as HTMLInputElement).value.trim()
+      // vide : le tableau suit le réglage du banc ; sinon un budget propre
+      this.level.dashBudget = raw === '' ? undefined : Math.max(0, Math.round(Number(raw) || 0))
+      this.persist()
+      this.validate()
+    })
     for (const id of ['ed-name', 'ed-code', 'ed-par', 'ed-journal'] as const) {
       this.el(id).addEventListener('input', () => {
         this.level.name = (this.el('ed-name') as HTMLInputElement).value || 'Sans titre'
@@ -1519,6 +1526,8 @@ export class LevelEditor {
     ;(this.el('ed-name') as HTMLInputElement).value = this.level.name
     ;(this.el('ed-code') as HTMLInputElement).value = this.level.code
     ;(this.el('ed-par') as HTMLInputElement).value = String(this.level.par ?? 3)
+    ;(this.el('ed-dashs') as HTMLInputElement).value =
+      this.level.dashBudget === undefined ? '' : String(this.level.dashBudget)
     ;(this.el('ed-journal') as HTMLTextAreaElement).value = this.level.journal
     ;(this.el('ed-ambiance') as HTMLSelectElement).value = this.level.ambiance ?? ''
     this.syncProps()

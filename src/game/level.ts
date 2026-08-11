@@ -175,6 +175,9 @@ export interface LevelDef {
   portes?: PorteDef[]
   rails?: RailDef[]
   par?: number // budget d'impulsions visé : franchissable en `par`, record en dessous
+  // Impulsions VAPEUR offertes par cet écran (le dash se compte, il ne se
+  // paie plus en volume). Absent : le réglage du banc (gasDashBudget).
+  dashBudget?: number
   // Lit musical imposé par le tableau. Sans valeur, la cuve suit le
   // refroidissement de la coque (tiède → glaciale) : c'est le cas général,
   // les tableaux n'ont pas à choisir une musique pour exister.
