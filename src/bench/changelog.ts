@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/08/2026 19:35',
+    title: 'Le rail porte son nuage jusqu’à l’arrivée, même rayon éteint',
+    notes: [
+      'Le champ d’un rail ne vivait que tant que l’ARC y circulait : dès que la vapeur quittait le trajet du rayon, le plasma s’éteignait — et le nuage restait en rade au milieu de la ligne. Désormais le rail s’ENGAGE : une fois allumé par un arc, son champ tient tant qu’un nuage voyage dans sa bande, et ne se relâche qu’une fois la bande vide — nuage arrivé au bout, recondensé ou dispersé.',
+      'Ce qui est pris est porté : il suffit d’un passage du rayon dans la vapeur pour confier tout le nuage au rail jusqu’à son terminus.',
+    ],
+  },
+  {
     date: '11/08/2026 19:10',
     title: 'Le CONTINUER apparaît vraiment, et la collecte n’agonise plus jamais',
     notes: [

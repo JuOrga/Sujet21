@@ -366,8 +366,11 @@ export class FluidSim {
   // est entraînée le long de la ligne, dans le sens du tracé, avec un
   // recentrage doux pour prendre les virages. Le nuage voyage sur la ligne
   // de champ ; l'eau et la glace, non ionisables, ne sentent rien.
-  railConvoy(pts: { x: number; y: number }[], band: number, accel: number, dt: number): void {
-    if (accel <= 0 || band <= 0 || pts.length < 2) return
+  // Renvoie le nombre de particules gazeuses encore DANS la bande : tant
+  // qu'il est non nul, un nuage voyage sur le rail — l'appelant s'en sert
+  // pour maintenir le champ jusqu'à l'arrivée, même rayon éteint.
+  railConvoy(pts: { x: number; y: number }[], band: number, accel: number, dt: number): number {
+    if (accel <= 0 || band <= 0 || pts.length < 2) return 0
     // Premier passage : qui est dans la bande, et où est le cœur convoyé —
     // les retardataires hors bande seront RAPPELÉS vers lui, pour que le
     // nuage reste UN nuage dans les virages (et quand seul un morceau est
@@ -421,7 +424,7 @@ export class FluidSim {
       cxB += px
       cyB += py
     }
-    if (nBande === 0) return
+    if (nBande === 0) return 0
     cxB /= nBande
     cyB /= nBande
     for (let i = 0; i < this.count; i++) {
@@ -443,6 +446,7 @@ export class FluidSim {
         }
       }
     }
+    return nBande
   }
 
   // Normale de la surface d'EAU en (x, y), pour le dioptre du laser — la
