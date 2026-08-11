@@ -790,6 +790,18 @@ void main() {
   float surfaceZone = body * (1.0 - smoothstep(th * 1.4, th * 2.6, field2));
   water = mix(water, water * (0.55 + 0.75 * diffuse), surfaceZone * 0.55);
   water += vec3(0.85, 0.95, 1.0) * specular * 0.35 * surfaceZone * (1.0 - vap);
+  // Le miroir vivant (lore) : l'échantillon REFLÈTE la lumière. Trois
+  // couches sur la seule zone de surface — un éclat spéculaire dur (le
+  // reflet net d'une source), un voile de fresnel froid aux incidences
+  // rasantes (le poli du métal liquide), et un semis d'étincelles qui
+  // GLISSE avec la courbure : la surface a l'air de renvoyer la salle.
+  float miroir = surfaceZone * (1.0 - vap);
+  float specDur = pow(max(reflect(-lightDir, nrm).z, 0.0), 42.0);
+  float fres = pow(1.0 - clamp(nrm.z, 0.0, 1.0), 2.0);
+  float etincelles = specks(world + nrm.xy * 55.0 + vec2(uTime * 7.0, -uTime * 4.0), 48.0, 0.10, uZoom);
+  water += vec3(0.95, 0.99, 1.0) * specDur * 0.80 * miroir;
+  water += vec3(0.50, 0.68, 0.85) * fres * 0.40 * miroir;
+  water += vec3(0.90, 0.97, 1.0) * etincelles * (0.25 + specDur) * 0.55 * miroir;
   water += vec3(0.30, 0.55, 0.65) * waveGlow * 0.45 * (1.0 - icy) * (1.0 - vap);
 
   // Gel (tableau 2) : la teinte pâlit vers la glace mate — le givre se lit

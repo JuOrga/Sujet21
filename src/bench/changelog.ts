@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '12/08/2026 01:30',
+    title: 'La surface-miroir, le temps aux épaules, les états sous le pouce',
+    notes: [
+      'La surface du liquide REFLÈTE enfin comme le veut le lore : éclat spéculaire dur (le reflet net d’une source), voile de fresnel froid aux incidences rasantes — le poli d’un métal liquide — et un semis d’étincelles qui glisse avec la courbure. L’échantillon a toujours été un miroir ; maintenant ça se voit à l’état liquide aussi.',
+      'MANETTE, nouveau plan de commandes : LB RALENTIT le temps, RB l’ACCÉLÈRE (la croix ↔ aussi) ; les trois transformations passent sur les boutons restants — X glace, Y vapeur, B retour à l’eau — et A reste la main qui agit. L’onglet Commandes est à jour.',
+      'L’onboarding s’étoffe d’une CINQUIÈME carte : « LE TEMPS VOUS OBÉIT » — viser en vapeur ralentit déjà le monde, virgule/point (PC) ou LB/RB (manette) règlent le tempo, Espace met en pause.',
+    ],
+  },
+  {
     date: '12/08/2026 01:00',
     title: 'Le rail livre en gare, et brille tant qu’il porte',
     notes: [

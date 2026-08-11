@@ -9,12 +9,13 @@
 // Schéma (disposition standard) :
 //   stick gauche   viser (direction + puissance)
 //   A              agir : éjecter (eau) · viser puis relâcher = dash (vapeur)
+//   X              glace (bascule)        Y        vapeur (bascule)
+//   B              retour à l'eau
+//   LB / RB        ralentir / accélérer le temps
 //   RT / LT        zoomer / dézoomer (progressif, à la pression)
-//   LB             glace (bascule)        RB       vapeur (bascule)
-//   X              retour à l'eau
 //   stick droit    caméra                 croix ↕  zoom (aussi)
 //   L3 / R3        recadrer : caméra et zoom automatiques
-//   croix ↔        ralenti / accéléré
+//   croix ↔        ralenti / accéléré (aussi)
 //   Start          pause                  Select   recommencer
 //   A (menus)      valider le bouton principal visible
 
