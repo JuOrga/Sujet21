@@ -20,6 +20,8 @@ import {
   MAT_GRILLE,
   MAT_HYDROPHILE,
   MAT_HYDROPHOBE,
+  MAT_MEMBRANE,
+  MAT_RIDEAU,
   MAT_WALL,
   type ObstacleBox,
   type SpongeDef,
@@ -131,6 +133,9 @@ export class FluidSim {
   swallowed = 0
   // Part avalée à l'état de glace : ouvre droit à la prime de collecte
   swallowedIce = 0
+  // Un dash « offert » par un radiateur : la vapeur rechargée ne paie pas
+  // le prochain péage d'impulsion. Consommé par gasDash.
+  dashOffert = false
   private mouthX = 0
   private mouthY = 0
   private drainOn = false
@@ -247,7 +252,6 @@ export class FluidSim {
   private coldBoxes: ObstacleBox[] = []
   private heatCarry = 0
   private gasIdleCarry = 0
-  private gasTollCarry = 0
   private baseBoxes: ObstacleBox[] = []
   private grilleCarry = 0
   // Recondensation (§7.3) : chaque particule de vapeur perdue alimente une
@@ -726,6 +730,10 @@ export class FluidSim {
     }
     if (gasCount < 3) return 0
     let toll = Math.min(Math.round(gasCount * p.gasDashCost), gasCount - 2)
+    if (this.dashOffert) {
+      this.dashOffert = false // le radiateur a payé : dash gratuit
+      toll = 0
+    }
     const spent = toll
     while (toll > 0) {
       let worst = -1
@@ -1186,7 +1194,14 @@ export class FluidSim {
     let inMesh = 0
     for (let i = 0; i < this.count; i++) {
       if (this.gaseous[i] !== 1) continue
-      if (this.kind[i] === KIND_PLAYER) anyPlayerGas = true
+      if (this.kind[i] === KIND_PLAYER) {
+        anyPlayerGas = true
+        // Radiateur : la vapeur qui baigne dans son aura RECHARGE UN DASH —
+        // la prochaine impulsion ne coûte rien (tableau des règles)
+        if (!this.dashOffert && this.hasHeat && this.heatExposureAt(this.posX[i], this.posY[i]) > 0.5) {
+          this.dashOffert = true
+        }
+      }
       if (this.hasGrille && this.grilleAt(this.posX[i], this.posY[i])) inMesh++
     }
     // péage de grille : proportionnel à la présence dans la maille
@@ -1324,8 +1339,12 @@ export class FluidSim {
       let y = this.prdY[i]
 
       for (const b of this.boxes) {
-        // La grille arrête le liquide et la glace ; la vapeur la traverse
+        // Chaque état a sa porte : la grille laisse passer la VAPEUR, la
+        // membrane gorgée d'eau laisse suinter l'EAU, le rideau lamellaire
+        // s'écarte devant la GLACE — tout le reste bute.
         if (b.material === MAT_GRILLE && this.gaseous[i] === 1) continue
+        if (b.material === MAT_MEMBRANE && this.gaseous[i] !== 1 && this.frozen[i] !== 1) continue
+        if (b.material === MAT_RIDEAU && this.frozen[i] === 1) continue
         if (x < b.minX - rp || x > b.maxX + rp || y < b.minY - rp || y > b.maxY + rp) {
           continue
         }
@@ -1342,13 +1361,13 @@ export class FluidSim {
         }
       }
 
-      // Cellules d'éponge saturées : des murs POUR LE LIQUIDE seulement.
-      // Une éponge gorgée est molle : la glace la traverse (le palet passe
-      // au travers du feutre détrempé) et la vapeur passe entre ses fibres —
-      // comme le promettait déjà la légende. La particule peut chevaucher
-      // jusqu'à 4 cellules — on les résout toutes.
-      const bloquable = this.frozen[i] !== 1 && this.gaseous[i] !== 1
-      for (const sp of bloquable ? this.sponges : []) {
+      // Éponge : un feutre continu. La GLACE et la VAPEUR butent sur toutes
+      // ses cellules (le palet ne défonce pas le feutre, le nuage ne passe
+      // pas ses fibres) ; le LIQUIDE s'infiltre dans les cellules vivantes
+      // (qui l'absorbent) et ne bute que sur les cellules SATURÉES, devenues
+      // solides. La particule peut chevaucher jusqu'à 4 cellules.
+      const etatLiquide = this.frozen[i] !== 1 && this.gaseous[i] !== 1
+      for (const sp of this.sponges) {
         const d = sp.def
         if (x < d.minX - rp || x >= sp.maxX + rp || y < d.minY - rp || y >= sp.maxY + rp) continue
         const cx0 = Math.max(0, Math.floor((x - rp - d.minX) / d.cellSize))
@@ -1358,7 +1377,7 @@ export class FluidSim {
         for (let cy = cy0; cy <= cy1; cy++) {
           for (let cx = cx0; cx <= cx1; cx++) {
             const cell = cy * d.cols + cx
-            if (!sp.isSolid(cell)) continue
+            if (etatLiquide && !sp.isSolid(cell)) continue
             const cb = sp.cellBounds(cell)
             boxContact(x, y, cb, cp)
             const sep = cp.dist - rp
@@ -1394,10 +1413,34 @@ export class FluidSim {
     const philDamp = Math.exp(-p.hydrophileFriction * bite * dt)
 
     for (let i = 0; i < n; i++) {
-      // La glace et la vapeur ignorent la chimie des surfaces
-      if (this.frozen[i] === 1 || this.gaseous[i] === 1) continue
+      const gel = this.frozen[i] === 1
+      const gaz = this.gaseous[i] === 1
+      // La GLACE sent la chimie AU CONTACT (tableau des règles) : bumper
+      // hydrophobe, freinage hydrophile — mais aucune bande à distance.
+      if (gel) {
+        const matG = this.contactMat[i]
+        if (matG === MAT_HYDROPHOBE) {
+          const vnIn = this.contactVn[i]
+          if (vnIn < 0) {
+            const nx = this.contactNX[i]
+            const ny = this.contactNY[i]
+            const vn = this.velX[i] * nx + this.velY[i] * ny
+            const target = -vnIn * p.hydrophobeRestitution
+            this.velX[i] += (target - vn) * nx
+            this.velY[i] += (target - vn) * ny
+          }
+        } else if (matG === MAT_HYDROPHILE) {
+          // le mouillage freine le bloc qui glisse dessus
+          this.velX[i] *= philDamp
+          this.velY[i] *= philDamp
+        }
+        continue
+      }
       const mat = this.contactMat[i]
-      if (mat === MAT_HYDROPHOBE) {
+      if (gaz) {
+        // la vapeur ne colle ni ne rebondit — mais les bandes la travaillent
+        // légèrement (voir plus bas)
+      } else if (mat === MAT_HYDROPHOBE) {
         const vnIn = this.contactVn[i]
         if (vnIn < 0) {
           const nx = this.contactNX[i]
@@ -1422,6 +1465,9 @@ export class FluidSim {
 
       const x = this.prdX[i]
       const y = this.prdY[i]
+      // la vapeur sent les bandes en sourdine : attirée par l'hydrophile,
+      // repoussée par l'hydrophobe — un quart de la force, pas d'éclat de mur
+      const poidsBande = gaz ? 0.25 : 1
       for (const b of this.boxes) {
         if (b.material !== MAT_HYDROPHILE && b.material !== MAT_HYDROPHOBE && b.material !== MAT_WALL) {
           continue
@@ -1441,6 +1487,7 @@ export class FluidSim {
         if (sep > 0 && sep < reach) {
           const f = 1 - sep / reach
           if (b.material === MAT_WALL) {
+            if (gaz) continue // l'éclat d'impact est une affaire de liquide
             // Mur neutre : l'éclat d'impact vient du rebond de pression qui
             // projette les particules loin de la paroi. On amortit la vitesse
             // sortante AU CONTACT — l'eau s'étale et épouse la forme au lieu
@@ -1457,7 +1504,8 @@ export class FluidSim {
             continue
           }
           const a =
-            (b.material === MAT_HYDROPHILE ? -p.hydrophilePull : p.hydrophobeRepel) * f * dt * bite
+            (b.material === MAT_HYDROPHILE ? -p.hydrophilePull : p.hydrophobeRepel) *
+            f * dt * bite * poidsBande
           this.velX[i] += cp.nx * a
           this.velY[i] += cp.ny * a
         }
@@ -1467,10 +1515,9 @@ export class FluidSim {
 
   // Le contact éponge n'est pas mortel : il englue et absorbe après un temps
   // de contact continu. Chaque cellule se sature ; gorgée, elle devient
-  // solide — on peut payer un passage en volume (§6). La VAPEUR traverse
-  // librement, mais l'éponge l'essore au passage : un petit péage en volume
-  // (spongeGasToll), encaissé par les cellules — cette matière est PERDUE,
-  // elle ne rejoint pas la réserve de rosée.
+  // solide — on peut payer un passage en volume (§6). La GLACE et la VAPEUR
+  // ne traversent plus (le feutre les bloque, voir la collision) : seul le
+  // liquide s'y risque.
   private processSponges(dt: number): void {
     const p = this.params
     const drag = Math.exp(-p.spongeDrag * p.surfaceBite * dt)
@@ -1482,26 +1529,8 @@ export class FluidSim {
         continue // la glace n'est pas engluée : un bloc glisse sur l'éponge
       }
       if (this.gaseous[i] === 1) {
-        let removed = false
-        const gx = this.posX[i]
-        const gy = this.posY[i]
-        for (const sp of this.sponges) {
-          if (!sp.contains(gx, gy)) continue
-          const cell = sp.cellIndexAt(gx, gy)
-          if (cell < 0 || sp.isSolid(cell)) continue
-          this.gasTollCarry += p.spongeGasToll * dt
-          if (this.gasTollCarry >= 1 && !(this.kind[i] === KIND_PLAYER && this.playerCount <= 2)) {
-            this.gasTollCarry -= 1
-            sp.absorb(cell)
-            this.spongeBites++
-            this.removeParticle(i)
-            removed = true
-          }
-          break
-        }
-        if (removed) continue // l'indice i contient maintenant une autre particule
         i++
-        continue
+        continue // la vapeur bute sur le feutre : rien à essorer
       }
       let touching = false
       let removed = false

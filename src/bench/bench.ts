@@ -502,10 +502,6 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Fraction du volume COURANT évaporée à chaque dash (≈ 1/3). Fraction du courant, pas du volume de base : chaque dash propulse pareil, il coûte juste plus cher. Les pertes perleront en rosée aux plaques froides.',
   )
   describe(
-    fGas.addBinding(params, 'spongeGasToll', { min: 0, max: 4, step: 0.05, label: 'péage d’éponge /s' }),
-    'La vapeur traverse l’éponge, qui l’essore au passage : perte par seconde et par particule dans l’éponge. Cette matière est PERDUE (l’éponge la garde) — elle ne perle pas en rosée.',
-  )
-  describe(
     fGas.addBinding(params, 'gasIdleLossRate', { min: 0, max: 10, step: 0.5, label: 'coût d’état /s' }),
     'Particules perdues par seconde TANT QU’ON EST vapeur, même immobile : l’état gazeux est un compte à rebours, pas un mode de croisière. C’est le frein principal au tout-vapeur.',
   )

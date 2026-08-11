@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '12/08/2026 00:40',
+    title: 'Membrane, rideau lamellaire — et le tableau des règles fait loi',
+    notes: [
+      'Deux parois nouvelles : la MEMBRANE gorgée d’eau (seule l’EAU suinte au travers ; glace et vapeur butent, la lumière est absorbée) et le RIDEAU LAMELLAIRE (seule la GLACE, dense et d’un seul tenant, écarte les lamelles). Avec la grille, chaque état a désormais SA porte.',
+      'Le tableau des règles fourni fait loi, et la simulation s’y est rangée : l’ÉPONGE bloque désormais la glace ET la vapeur (fini le passage essoré) ; la GLACE sent la chimie des parois — bumper sur l’hydrophobe, freinée sur l’hydrophile ; la VAPEUR est légèrement attirée par l’hydrophile et repoussée par l’hydrophobe ; et un bain dans l’aura d’un RADIATEUR recharge un dash — la prochaine impulsion est OFFERTE (le viseur l’affiche).',
+      'Partout où les surfaces se racontent : légende, panneau des états, éditeur (palette et propriétés), et l’école 21-S2 gagne un MUR AUX TROIS PORTES — membrane en bas, passage au centre, rideau en haut.',
+      'Sept tests neufs ou réécrits couvrent chaque règle (portes d’état, éponge-feutre, bumper, freinage, dash offert).',
+    ],
+  },
+  {
     date: '11/08/2026 21:15',
     title: 'Un clic de stick recadre la caméra',
     notes: [

@@ -76,7 +76,6 @@ export interface SimParams {
   // définitivement — sauf la rosée, qui perle aux plaques froides).
   gasIdleLossRate: number // particules/s évaporées tant que le corps est en vapeur, même immobile
   grilleGasLoss: number // perte /s et par particule dans la maille d'une grille
-  spongeGasToll: number // péage d'éponge sur la vapeur : perte /s et par particule dans l'éponge
   // Recondensation (§7.3) : la vapeur perdue se recondense sur les parois
   // froides — la rosée perle juste au-delà de l'aura, réabsorbable au prix
   // d'un détour. Plus le vaisseau refroidit, plus la condensation rend.
@@ -238,7 +237,6 @@ export const DEFAULT_PARAMS: SimParams = {
   gasDrag: 1.3,
   gasIdleLossRate: 2,
   grilleGasLoss: 0.35,
-  spongeGasToll: 1.1,
   // Perte de 50 % à vaisseau tiède, 25 % à vaisseau glacial : le rattrapage
   // devient plus généreux quand le jeu devient plus dur — auto-équilibré (§7.3)
   recondRate: 4,
