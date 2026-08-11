@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   MAT_GRILLE,
   MAT_WALL,
+  TABLEAUX_ECOLE,
   TABLEAU_10,
   TABLEAU_11,
   TABLEAU_12,
@@ -197,7 +198,7 @@ describe('subtractBox — la découpe ronge les parois', () => {
 // Garde-fous du level design : chaque tableau doit être un problème fermé
 // bien formé — l'expédition entière en dépend. Le prototype 21-A bis suit
 // les mêmes règles, même hors expédition.
-const ALL = [...TABLEAUX, TABLEAU_1BIS]
+const ALL = [...TABLEAUX, TABLEAU_1BIS, ...TABLEAUX_ECOLE]
 
 describe('TABLEAUX — validité structurelle', () => {
   it('l’expédition fait 13 tableaux, aux codes uniques (le bis à part)', () => {
@@ -205,6 +206,20 @@ describe('TABLEAUX — validité structurelle', () => {
     const codes = ALL.map((t) => t.code)
     expect(new Set(codes).size).toBe(codes.length)
     expect(TABLEAUX).not.toContain(TABLEAU_1BIS)
+  })
+
+  it('l’école fait trois leçons : sans laser, sans porte — on traverse, on comprend', () => {
+    expect(TABLEAUX_ECOLE.length).toBe(3)
+    for (const t of TABLEAUX_ECOLE) {
+      expect(t.lasers ?? []).toHaveLength(0)
+      expect(t.portes ?? []).toHaveLength(0)
+      expect(TABLEAUX).not.toContain(t) // hors expédition : c'est une école
+    }
+    // la troisième leçon enseigne les zones imposées ET la zone libre
+    const forces = (TABLEAUX_ECOLE[2].zones ?? []).map((z) => z.force)
+    expect(forces).toContain('glace')
+    expect(forces).toContain('vapeur')
+    expect(forces).toContain('libre')
   })
 
   it('le prototype 21-A bis est un tableau « eau seule » : ni froid, ni chaud, ni grille, ni éponge', () => {
