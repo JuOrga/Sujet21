@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '12/08/2026 10:20',
+    title: 'Les records refondus : deux par salle, et un bilan clair à chaque sas',
+    notes: [
+      'Chaque salle tient désormais DEUX records indépendants : 💧 le VOLUME (le plus de litres en bonbonne) et ⏱ le CHRONO (la collecte la plus rapide, quel que soit le volume). Vos anciens registres migrent tout seuls.',
+      'À CHAQUE fin de tableau, le bilan s’affiche en clair : vos deux mesures, face aux records — et « NOUVEAU RECORD ✦ » qui bat quand l’un tombe (la fanfare sonne pour l’un comme pour l’autre). En essai libre, les records de la salle s’affichent en lecture seule.',
+      'L’écran REGISTRES parle enfin : colonnes titrées (SALLE · 💧 VOLUME · ⏱ CHRONO), le détenteur signe chaque record (en vert quand c’est vous), la meilleure EXPÉDITION trône en tête (salles · litres · durée en minutes), et les litres portent la virgule française.',
+      'Le record de VOLUME confronte toujours le tableau d’honneur partagé entre opérateurs ; les CHRONOS sont les vôtres, en local.',
+    ],
+  },
+  {
     date: '12/08/2026 03:25',
     title: 'Le bouton SALLES : charger n’importe quel tableau depuis la fiche',
     notes: [

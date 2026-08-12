@@ -110,6 +110,19 @@ function fmtTime(s: number): string {
   return `${s.toFixed(1).replace('.', ',')} s`
 }
 
+// Les litres à la française : la virgule, pas le point
+function fmtL(l: number): string {
+  return `${l.toFixed(2).replace('.', ',')} L`
+}
+
+// Les durées d'expédition se lisent en minutes : « 13:32 » plutôt que 812 s
+function fmtDuree(s: number): string {
+  if (s < 120) return fmtTime(s)
+  const mn = Math.floor(s / 60)
+  const sec = Math.round(s % 60)
+  return `${mn}:${String(sec).padStart(2, '0')}`
+}
+
 function createSim(level: LevelDef): FluidSim {
   const sim = new FluidSim(params, level.bounds, CAPACITY)
   // les impulsions vapeur se comptent PAR ÉCRAN : le tableau peut fixer
@@ -253,26 +266,39 @@ fetchSharedBoard().then((b) => {
   }
 })
 
-// Écran record de la fiche : le meilleur du protocole (partagé entre tous les
-// opérateurs) prime sur le registre local — même règle de départage partout.
+// Écran record de la fiche : DEUX colonnes par salle — 💧 VOLUME (le
+// meilleur du protocole partagé prime sur le local) et ⏱ CHRONO (vos
+// meilleurs temps, tenus en local). Le détenteur signe chaque record.
 function renderRegistres(): void {
   recEssai.textContent = `ÉCHANTILLON Nº ${records.essaiNumber()}`
+  const moi = records.operator()
+  const signe = (name: string): string =>
+    name ? `<i class="rec-qui${name === moi ? ' rec-moi' : ''}">${htmlSafe(name)}</i>` : ''
   const rows: string[] = playedLevels().map((t) => {
     const local = records.tableauRecord(t.code)
     const shared = sharedBoard?.tableaux[t.code] ?? null
-    const best =
-      shared &&
-      (!local ||
-        shared.liters > local.liters ||
-        (shared.liters === local.liters && shared.time < local.time))
+    // colonne VOLUME : le partagé prime s'il fait mieux (même départage)
+    const lv = local?.volume ?? null
+    const vol =
+      shared && (!lv || shared.liters > lv.liters || (shared.liters === lv.liters && shared.time < lv.time))
         ? shared
-        : local
-    const holder = best?.name ? ` · ${best.name}` : ''
-    const val = best
-      ? `<b>${best.liters.toFixed(2)} L</b> · ${fmtTime(best.time)}${holder}`
-      : '<span class="rec-none">aucune collecte</span>'
-    return `<div class="rec-row"><span class="rec-code">${t.code}</span><span class="rec-name">${t.name}</span><span class="rec-val">${val}</span></div>`
+        : lv
+    const volTxt = vol
+      ? `<b>${fmtL(vol.liters)}</b> <small>· ${fmtTime(vol.time)}</small> ${signe(vol.name)}`
+      : '<span class="rec-none">—</span>'
+    const chr = local?.chrono ?? null
+    const chrTxt = chr
+      ? `<b>${fmtTime(chr.time)}</b> <small>· ${fmtL(chr.liters)}</small> ${signe(chr.name)}`
+      : '<span class="rec-none">—</span>'
+    return (
+      `<div class="rec-row"><span class="rec-code">${t.code}</span><span class="rec-name">${t.name}</span>` +
+      `<span class="rec-val rec-vol">${volTxt}</span><span class="rec-val rec-chr">${chrTxt}</span></div>`
+    )
   })
+  rows.unshift(
+    `<div class="rec-row rec-titres"><span class="rec-code"></span><span class="rec-name">SALLE</span>` +
+      `<span class="rec-val rec-vol">💧 VOLUME</span><span class="rec-val rec-chr">⏱ CHRONO (vous)</span></div>`,
+  )
   const localExp = records.expedition()
   const sharedExp = sharedBoard?.expedition ?? null
   const exp =
@@ -285,16 +311,17 @@ function renderRegistres(): void {
       ? sharedExp
       : localExp
   if (exp) {
-    const holder = exp.name ? ` · ${exp.name}` : ''
     rows.unshift(
       `<div class="rec-row rec-exp"><span class="rec-code">EXPÉDITION</span><span class="rec-name"></span>` +
-        `<span class="rec-val"><b>${exp.tableaux}/${playedLevels().length}</b> · ${exp.liters.toFixed(2)} L · ${fmtTime(exp.time)}${holder}</span></div>`,
+        `<span class="rec-val" style="grid-column: span 2"><b>${exp.tableaux}/${playedLevels().length} salles</b> · 💧 ${fmtL(exp.liters)} · ⏱ ${fmtDuree(exp.time)} ${
+          exp.name ? `<i class="rec-qui${exp.name === moi ? ' rec-moi' : ''}">${htmlSafe(exp.name)}</i>` : ''
+        }</span></div>`,
     )
   }
   const hist = records.lastEntries(4)
   if (hist.length > 0) {
     const line = hist
-      .map((e) => `nº ${e.no} ${e.code} ${e.won ? `✓ ${e.liters.toFixed(2)} L` : '✕ dispersé'}`)
+      .map((e) => `nº ${e.no} ${e.code} ${e.won ? `✓ ${fmtL(e.liters)}` : '✕ dispersé'}`)
       .join(' &nbsp;·&nbsp; ')
     rows.push(`<div class="rec-hist">${line}</div>`)
   }
@@ -1482,9 +1509,13 @@ function updateTutor(dtReal: number): void {
   }
 }
 
+function htmlSafe(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
 function showOverlay(title: string, sub: string, tone: 'success' | 'danger', btn?: string): void {
   overlayTitle.textContent = title
-  overlaySub.textContent = sub
+  overlaySub.innerHTML = sub
   overlay.classList.remove('success', 'danger', 'end')
   overlay.classList.add('visible', tone)
   if (btn) {
@@ -1495,7 +1526,7 @@ function showOverlay(title: string, sub: string, tone: 'success' | 'danger', btn
 
 // Bilan d'expédition : la phrase que le tampon raconte au protocole
 function expeditionSummary(tableauxDone: number): string {
-  return `${tableauxDone}/${playedLevels().length} tableaux · réserve ${run.bonbonneLiters.toFixed(2)} L · ${fmtTime(run.runTime)}`
+  return `${tableauxDone}/${playedLevels().length} salles · 💧 ${fmtL(run.bonbonneLiters)} · ⏱ ${fmtDuree(run.runTime)}`
 }
 
 let lastTime = performance.now()
@@ -1806,11 +1837,15 @@ function frame(now: number): void {
     audio.collect()
     bande.ponctuation('sting-collecte', 0.85)
     run.ended = true
+    const bestsLibre = records.tableauRecord(level.code)
+    const refRecords = bestsLibre
+      ? ` Records de la salle : 💧 ${fmtL(bestsLibre.volume.liters)} · ⏱ ${fmtTime(bestsLibre.chrono.time)}.`
+      : ''
     showOverlay(
       fromEditor ? 'TABLEAU FRANCHI' : `ESSAI ${level.code} CONCLU`,
       fromEditor
         ? `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — le tableau se termine. Retour à l’éditeur pour l’ajuster.`
-        : `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — essai hors expédition : les registres ne bougent pas.`,
+        : `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — essai hors expédition : les registres ne bougent pas.${refRecords}`,
       'success',
       fromEditor ? 'RETOUR À L’ÉDITEUR' : testQueue.length > 0 ? 'SALLE SUIVANTE' : 'RETOUR AU PROTOCOLE',
     )
@@ -1820,7 +1855,7 @@ function frame(now: number): void {
     const prime = sim.swallowedIce * params.litersPerParticle * params.iceCollectBonus
     const surplus = sim.liters() + sim.swallowed * params.litersPerParticle + prime
     run.bonbonneLiters += surplus
-    const { newRecord } = records.noteCollection(level.code, surplus, run.tableauTime)
+    const { newVolume, newChrono } = records.noteCollection(level.code, surplus, run.tableauTime)
     // Publication au tableau d'honneur partagé : le serveur ne garde que le
     // meilleur — la réponse remet les registres affichés à jour.
     pushTableauRecord(level.code, surplus, run.tableauTime, records.operator()).then((b) => {
@@ -1829,15 +1864,31 @@ function frame(now: number): void {
         renderRegistres()
       }
     })
-    const primeLine =
-      prime >= 0.01 ? ` · prime de glace +${prime.toFixed(2)} L` : ''
-    const recLine = newRecord
-      ? ` · NOUVEAU RECORD DU TABLEAU (${surplus.toFixed(2)} L en ${fmtTime(run.tableauTime)})`
-      : ` · record du tableau : ${records.tableauRecord(level.code)!.liters.toFixed(2)} L`
+    const bests = records.tableauRecord(level.code)!
+    const primeLine = prime >= 0.01 ? ` · prime de glace +${prime.toFixed(2)} L` : ''
+    const ligne = (icone: string, valeur: string, neuf: boolean, record: string): string =>
+      `<span class="bilan-l">${icone} <b>${valeur}</b> — ${
+        neuf ? '<em class="bilan-neuf">NOUVEAU RECORD ✦</em>' : `record : ${record}`
+      }</span>`
+    const bilan =
+      `<span class="bilan">` +
+      ligne(
+        '💧',
+        fmtL(surplus),
+        newVolume,
+        `${fmtL(bests.volume.liters)}${bests.volume.name ? ' · ' + htmlSafe(bests.volume.name) : ''}`,
+      ) +
+      ligne(
+        '⏱',
+        fmtTime(run.tableauTime),
+        newChrono,
+        `${fmtTime(bests.chrono.time)}${bests.chrono.name ? ' · ' + htmlSafe(bests.chrono.name) : ''}`,
+      ) +
+      `</span>`
     audio.collect()
     // Le record a sa propre fanfare : la collecte ordinaire ne doit pas
     // sonner comme un exploit, sinon plus rien ne sonne comme un exploit.
-    bande.ponctuation(newRecord ? 'sting-record' : 'sting-collecte', 0.85)
+    bande.ponctuation(newVolume || newChrono ? 'sting-record' : 'sting-collecte', 0.85)
     if (levelIndex + 1 >= playedLevels().length) {
       // Dernier sas : l'expédition est achevée — bilan, et registres à jour
       run.ended = true
@@ -1853,7 +1904,9 @@ function frame(now: number): void {
       renderRegistres()
       showOverlay(
         'EXPÉDITION ACHEVÉE',
-        `${expeditionSummary(playedLevels().length)}${exp.newRecord ? ' · MEILLEURE EXPÉDITION DU PROTOCOLE' : ''} — le laboratoire n'a plus d'échantillon. Quelque part dans les conduites, de l'eau se souvient.`,
+        `<span class="bilan"><span class="bilan-l">${expeditionSummary(playedLevels().length)}${
+          exp.newRecord ? ' — <em class="bilan-neuf">MEILLEURE EXPÉDITION ✦</em>' : ''
+        }</span></span>Le laboratoire n'a plus d'échantillon. Quelque part dans les conduites, de l'eau se souvient.`,
         'success',
         'NOUVELLE EXPÉDITION',
       )
@@ -1862,7 +1915,7 @@ function frame(now: number): void {
       renderRegistres()
       showOverlay(
         'ÉCHANTILLON COLLECTÉ',
-        `${surplus.toFixed(2)} L transférés en bonbonne${primeLine} — réserve : ${run.bonbonneLiters.toFixed(2)} L${recLine} · tableau suivant…`,
+        `${bilan}${surplus.toFixed(2)} L transférés en bonbonne${primeLine} — réserve : ${run.bonbonneLiters.toFixed(2)} L · tableau suivant…`,
         'success',
       )
     }
