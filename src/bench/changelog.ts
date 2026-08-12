@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '12/08/2026 03:25',
+    title: 'Le bouton SALLES : charger n’importe quel tableau depuis la fiche',
+    notes: [
+      'Un bouton ▦ SALLES sur la fiche ouvre un voile listant TOUS les tableaux — l’école, l’expédition, les salles laser et le 21-A bis (17 salles) : un toucher charge la salle à l’essai, hors expédition, sans toucher aux registres.',
+      'Et la fin d’essai parle enfin juste : « ESSAI 21-K CONCLU » au lieu du texte du prototype, et « SALLE SUIVANTE » quand une file continue.',
+    ],
+  },
+  {
     date: '12/08/2026 03:05',
     title: 'Les impulsions vapeur se comptent — x par écran, réglable par tableau',
     notes: [
