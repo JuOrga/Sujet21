@@ -152,6 +152,11 @@ export class FluidSim {
   swallowed = 0
   // Part avalée à l'état de glace : ouvre droit à la prime de collecte
   swallowedIce = 0
+  // Fraction du corps ACTIF (particules joueur) baignant dans une aura de
+  // chauffe — le déclencheur de la transformation à 95 % (main.ts). Mise à
+  // jour à chaque pas par processCold.
+  chauffeFrac = 0
+
   // Un dash « offert » par un radiateur : la vapeur rechargée ne paie pas
   // le prochain péage d'impulsion. Consommé par gasDash.
   dashOffert = false
@@ -1667,6 +1672,7 @@ export class FluidSim {
     const time = this.stepIndex * dt
     const agit = p.heatAgitation * dt
     const kAgit = 0.06
+    let joueursEnChauffe = 0
     for (let i = 0; i < this.count; i++) {
       const x = this.posX[i]
       const y = this.posY[i]
@@ -1687,6 +1693,7 @@ export class FluidSim {
 
       // Radiateur (tableau 4) : l'aura de chaleur, symétrique de l'aura de gel
       const heat = this.heatExposureAt(x, y)
+      if (heat > 0 && this.kind[i] === KIND_PLAYER) joueursEnChauffe++
 
       // Vapeur : le froid condense en priorité (vite), puis la chaleur
       // vaporise qu'on le veuille ou non, sinon l'intention (G) vaporise et
@@ -1697,7 +1704,14 @@ export class FluidSim {
       else if (heat > 0 && this.frozen[i] === 0) dv = heat * (dt / Math.max(0.05, boilTime))
       else if (wantGas) dv = dt / Math.max(0.05, vaporizeTime)
       else dv = -dt / Math.max(0.05, condenseTime)
-      const vap = Math.min(1, Math.max(0, this.vapor[i] + dv))
+      let vap = Math.min(1, Math.max(0, this.vapor[i] + dv))
+      // L'échauffement du CORPS par un bloc est un effet VISUEL : sans
+      // intention, une particule du joueur chauffe (frémit, fume) mais ne
+      // bascule plus seule — la transformation se décide au niveau du corps
+      // (95 % de la surface active dans la zone d'effet, voir main.ts).
+      if (heat > 0 && !this.gasIntent && this.kind[i] === KIND_PLAYER && this.gaseous[i] === 0) {
+        vap = Math.min(vap, 0.98)
+      }
       this.vapor[i] = vap
       if (vap >= 1) this.gaseous[i] = 1
       else if (this.gaseous[i] === 1 && vap <= 0.55) this.gaseous[i] = 0
@@ -1751,6 +1765,8 @@ export class FluidSim {
         }
       }
     }
+
+    this.chauffeFrac = this.playerCount > 0 ? joueursEnChauffe / this.playerCount : 0
 
     // La vapeur qui s'attarde dans l'aura d'un radiateur s'évapore : perdue,
     // pas mise en bonbonne. La plus exposée part en premier.

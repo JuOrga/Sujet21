@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '12/08/2026 15:10',
+    title: 'La transformation à 95 % : l’échauffement devient un pur effet visuel',
+    notes: [
+      'Nouvelle règle : à l’approche d’un élément, PLUS AUCUNE particule du corps ne se vaporise seule — l’eau chauffe, frémit et fume (effet visuel), c’est tout. La TRANSFORMATION se décide au niveau du corps : quand 95 % de la SURFACE ACTIVE (le corps principal — les gouttes éjectées ne comptent pas) baigne dans la zone d’effet, tout bascule d’un coup.',
+      'La règle vaut pour les BLOCS (la chaudière : présence à 95 % dans l’aura → état gazeux, réarmement en ressortant) ET pour les ZONES FORCÉES (déclenchement à 95 % du corps dedans, tenue jusqu’à 85 % — fini le déclenchement au simple passage du centre). L’état persiste toujours à la sortie.',
+      'Les gouttes égarées, elles, continuent de s’évaporer aux abords des chaudières : le décor vit, seul le CORPS est protégé du morcellement.',
+    ],
+  },
+  {
     date: '12/08/2026 14:20',
     title: 'La grille devient L’ÉVENT',
     notes: [

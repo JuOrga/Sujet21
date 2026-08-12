@@ -21,12 +21,27 @@ function run(sim: FluidSim, seconds: number): void {
 }
 
 describe('FluidSim — le radiateur : la chaleur vaporise, dégèle, évapore', () => {
-  it("l'eau dans l'aura se change en vapeur sans intention (danger ou ressource)", () => {
+  it("l'échauffement du corps est un effet VISUEL : il chauffe, il ne bascule pas seul", () => {
     const sim = makeSim({ heatLossRate: 0 }) // pas de perte : on isole la vaporisation
     const i = sim.addParticle(0, 8, KIND_PLAYER)
     expect(sim.gaseous[i]).toBe(0)
     run(sim, DEFAULT_PARAMS.boilTime * 2.5)
+    // la particule fume et frémit (vapeur ≈ 0,98)… mais reste au corps :
+    // la transformation se décide à 95 % de présence, côté jeu
+    expect(sim.vapor[i]).toBeGreaterThan(0.9)
+    expect(sim.gaseous[i]).toBe(0)
+    // le jeu déclenche : l'intention posée, la bascule est immédiate
+    sim.gasIntent = true
+    run(sim, 0.2)
     expect(sim.gaseous[i]).toBe(1)
+  })
+
+  it('chauffeFrac mesure la PRÉSENCE du corps actif dans l’aura', () => {
+    const sim = makeSim()
+    sim.addParticle(0, 8, KIND_PLAYER) // dans l'aura
+    sim.addParticle(0, 1200, KIND_PLAYER) // à l'abri
+    sim.step(sim.params.dt)
+    expect(sim.chauffeFrac).toBeCloseTo(0.5, 1)
   })
 
   it("l'eau loin de l'aura reste liquide", () => {
@@ -68,13 +83,13 @@ describe('FluidSim — le radiateur : la chaleur vaporise, dégèle, évapore', 
     const warm = makeSim({ heatLossRate: 0 })
     const iw = warm.addParticle(0, y, KIND_PLAYER)
     run(warm, DEFAULT_PARAMS.boilTime * 4)
-    expect(warm.gaseous[iw]).toBe(1)
+    expect(warm.vapor[iw]).toBeGreaterThan(0.9) // tiède : elle bout (visuel)
 
     const cold = makeSim({ heatLossRate: 0 })
     cold.chill = 1
     const ic = cold.addParticle(0, y, KIND_PLAYER)
     run(cold, DEFAULT_PARAMS.boilTime * 4)
-    expect(cold.gaseous[ic]).toBe(0)
+    expect(cold.vapor[ic]).toBeLessThan(0.3) // glacial : l'aura ne l'atteint plus
   })
 
   it('le refroidissement étend l’aura des plaques froides', () => {
