@@ -11,6 +11,13 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '12/08/2026 13:55',
+    title: 'Membrane et rideau lamellaire dans la barre d’outils de l’éditeur',
+    notes: [
+      'Les deux parois à porte d’état se posaient seulement en changeant le matériau d’une boîte existante — elles ont maintenant leurs BOUTONS dans la barre d’outils (avec infobulle : qui passe, qui bute).',
+    ],
+  },
+  {
     date: '12/08/2026 13:35',
     title: 'Le dash a du punch',
     notes: [
