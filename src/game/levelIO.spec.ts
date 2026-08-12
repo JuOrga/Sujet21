@@ -111,32 +111,38 @@ it('conserve le lit musical choisi pour le tableau', () => {
   expect(serializeLevel(TABLEAUX[0])).not.toContain('ambiance')
 })
 
-it('le rayon d’action d’une zone est arrondi et irrégulier, inscrit dans son rectangle', () => {
+it('le rayon d’action d’une zone épouse tout son rectangle, coins adoucis', () => {
   const z = { minX: -300, minY: -200, maxX: 300, maxY: 200, force: 'glace' as const }
   const lvl: LevelDef = {
     ...TABLEAUX[0],
     zones: [z],
   }
-  // le centre est dedans, les COINS du rectangle sont dehors : la forme est
-  // une lisière arrondie, pas le rectangle lui-même
+  // toute la zone répond : le centre, mais aussi le voisinage des bords —
+  // passer devant le hublot ou à côté, c'est pareil tant qu'on est dedans
   expect(zoneForceAt(lvl, 0, 0)).toBe('glace')
-  expect(zoneForceAt(lvl, -295, -195)).toBe('libre')
-  expect(zoneForceAt(lvl, 295, 195)).toBe('libre')
+  expect(zoneForceAt(lvl, 270, 0)).toBe('glace')
+  expect(zoneForceAt(lvl, -270, 0)).toBe('glace')
+  expect(zoneForceAt(lvl, 0, 178)).toBe('glace')
+  expect(zoneForceAt(lvl, 0, -178)).toBe('glace')
+  // seuls les COINS exacts sont adoucis, et rien ne déborde du rectangle
+  expect(zoneForceAt(lvl, -298, -198)).toBe('libre')
+  expect(zoneForceAt(lvl, 298, 198)).toBe('libre')
+  expect(zoneForceAt(lvl, 305, 0)).toBe('libre')
+  expect(zoneForceAt(lvl, 0, 205)).toBe('libre')
   // la lisière ondule : le rayon effectif varie selon la direction
   const rayon = (angle: number): number => {
-    for (let r = 0; r < 1.4; r += 0.004) {
+    for (let r = 0; r < 1.6; r += 0.004) {
       const x = Math.cos(angle) * r * 300
       const y = Math.sin(angle) * r * 200
       if (zoneForceAt(lvl, x, y) === 'libre') return r
     }
-    return 1.4
+    return 1.6
   }
   const rayons = [0, 0.8, 1.6, 2.4, 3.2, 4.0, 4.8].map(rayon)
   const min = Math.min(...rayons)
   const max = Math.max(...rayons)
   expect(max - min).toBeGreaterThan(0.04) // irrégulière…
-  expect(min).toBeGreaterThan(0.6) // …mais jamais rachitique
-  expect(max).toBeLessThanOrEqual(1.0) // et toujours inscrite dans le rectangle
+  expect(min).toBeGreaterThan(0.85) // …et jamais rachitique : le bord est proche du rectangle
 })
 
 it('conserve les décals au passage par l’éditeur (aller-retour JSON)', () => {

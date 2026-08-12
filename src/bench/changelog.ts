@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '12/08/2026 23:55',
+    title: 'La zone forcée répond partout — et le sas ne disparaît plus des grands tableaux',
+    notes: [
+      'Le rayon d’action d’une zone était une ellipse inscrite : sur une zone haute et étroite (l’école des zones), il fallait passer PILE devant le hublot pour se faire geler. La lisière épouse désormais tout le rectangle défini dans l’éditeur (coins à peine adoucis, toujours ondulée) : devant le hublot ou à côté, tant qu’on est dans la zone, la règle s’applique. Le dessin suit la même formule — ce qu’on voit reste ce qu’on subit.',
+      'Le décor ne dessinait que 24 boîtes par tableau : dans un tableau chargé, le SAS (ajouté en dernier) et les derniers blocs posés devenaient des murs invisibles — la physique les voyait, pas l’œil. Budget porté à 40 boîtes et 12 zones, le sas garde sa place quoi qu’il arrive, et le panneau CONTRÔLE de l’éditeur refuse désormais un tableau qui déborde (« murs invisibles ») au lieu de le laisser casser en silence.',
+    ],
+  },
+  {
     date: '12/08/2026 15:10',
     title: 'La transformation à 95 % : l’échauffement devient un pur effet visuel',
     notes: [
