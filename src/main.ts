@@ -436,6 +436,31 @@ recsEl.addEventListener('pointerdown', (e) => {
   if (e.target === recsEl) fermerRecs()
 })
 
+// ---- Le voile SALLES : charger n'importe quel tableau, à l'essai ----
+const sallesEl = document.getElementById('salles') as HTMLDivElement
+{
+  const liste = document.getElementById('salles-liste') as HTMLDivElement
+  for (const lv of [...TABLEAUX_ECOLE, ...TABLEAUX, TABLEAU_1BIS]) {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.innerHTML = `<b>${lv.code}</b>${lv.name}`
+    b.addEventListener('click', () => {
+      sallesEl.hidden = true
+      startTest([lv])
+    })
+    liste.appendChild(b)
+  }
+}
+document.getElementById('home-salles')?.addEventListener('click', () => {
+  sallesEl.hidden = false
+})
+document.getElementById('salles-fermer')?.addEventListener('click', () => {
+  sallesEl.hidden = true
+})
+sallesEl.addEventListener('pointerdown', (e) => {
+  if (e.target === sallesEl) sallesEl.hidden = true
+})
+
 // ---- L'appel de l'œil : à l'arrivée sur la fiche, le son et le plein
 // écran battent trois fois — on sait où toucher d'abord.
 function appelOeil(): void {
@@ -642,6 +667,7 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (!recsEl.hidden) fermerRecs() // les voiles d'abord
     else if (!cmdsEl.hidden) cmdsEl.hidden = true
+    else if (!sallesEl.hidden) sallesEl.hidden = true
     else if (document.body.classList.contains('playing')) openHome()
     else closeHome()
   } else if (e.key === 'l' || e.key === 'L') {
@@ -707,6 +733,7 @@ const FICHE_BOUTONS = [
   'home-restart',
   'start-bis',
   'start-editor',
+  'home-salles',
   'home-cmds',
   'home-recs',
   'home-mute',
@@ -1780,12 +1807,12 @@ function frame(now: number): void {
     bande.ponctuation('sting-collecte', 0.85)
     run.ended = true
     showOverlay(
-      fromEditor ? 'TABLEAU FRANCHI' : 'ESSAI 21-A BIS CONCLU',
+      fromEditor ? 'TABLEAU FRANCHI' : `ESSAI ${level.code} CONCLU`,
       fromEditor
         ? `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — le tableau se termine. Retour à l’éditeur pour l’ajuster.`
-        : `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — prototype de réfection du secteur A : vos impressions décideront de son sort.`,
+        : `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — essai hors expédition : les registres ne bougent pas.`,
       'success',
-      fromEditor ? 'RETOUR À L’ÉDITEUR' : 'RETOUR AU PROTOCOLE',
+      fromEditor ? 'RETOUR À L’ÉDITEUR' : testQueue.length > 0 ? 'SALLE SUIVANTE' : 'RETOUR AU PROTOCOLE',
     )
   } else if (!tableauDone && !sim.dispersed && (drunk || reached)) {
     // Prime de glace : ce que le sas a avalé SOLIDE vaut plus cher que ce

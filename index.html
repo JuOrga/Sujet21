@@ -192,6 +192,76 @@
         justify-content: center;
         padding: 18px;
       }
+      #salles {
+        position: fixed;
+        inset: 0;
+        z-index: 58;
+        background: rgba(4, 8, 15, 0.82);
+        backdrop-filter: blur(3px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+      }
+      #salles[hidden] {
+        display: none;
+      }
+      .salles-boite {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        max-width: 680px;
+        width: 100%;
+        max-height: 82vh;
+        display: flex;
+        flex-direction: column;
+      }
+      .salles-tete {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 8px 10px 14px;
+        border-bottom: 1px solid var(--line);
+        font-family: var(--font-display);
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        color: var(--dim);
+      }
+      .salles-tete button {
+        border: none;
+        background: transparent;
+        color: var(--dim);
+        font-size: 15px;
+        cursor: pointer;
+        min-width: 34px;
+        min-height: 34px;
+      }
+      #salles-liste {
+        overflow-y: auto;
+        padding: 10px;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 7px;
+      }
+      #salles-liste button {
+        text-align: left;
+        padding: 9px 12px;
+        background: rgba(20, 32, 46, 0.75);
+        border: 1px solid var(--line);
+        color: var(--ink);
+        font-size: 12.5px;
+        cursor: pointer;
+      }
+      #salles-liste button:hover {
+        border-color: var(--specimen);
+      }
+      #salles-liste button b {
+        color: var(--specimen);
+        font-family: var(--font-display);
+        font-size: 10.5px;
+        letter-spacing: 0.14em;
+        margin-right: 8px;
+      }
       #cmds[hidden] {
         display: none;
       }
@@ -2408,6 +2478,7 @@
       <button id="start-bis" type="button">PARCOURS TEST — L'ÉCOLE, PUIS LES SALLES LASER</button>
       <button id="start-editor" type="button">ÉDITEUR DE TABLEAUX — CRÉER OU MODIFIER UN NIVEAU</button>
       <div class="home-duo">
+        <button id="home-salles" type="button">▦ SALLES</button>
         <button id="home-cmds" type="button">⌘ COMMANDES</button>
         <button id="home-recs" type="button">◧ RECORDS</button>
         <button id="home-mute" type="button">🔊 SON</button>
@@ -2636,6 +2707,15 @@
           <kbd>BANC</kbd>réglages
           <kbd>≡</kbd>la fiche
         </div>
+      </div>
+    </div>
+
+    <!-- Charger une salle : tous les tableaux, jouables à l'essai -->
+    <div id="salles" hidden aria-label="Charger une salle">
+      <div class="salles-boite">
+        <div class="salles-tete"><span>CHARGER UNE SALLE — essai hors expédition</span>
+          <button type="button" id="salles-fermer" aria-label="Fermer">✕</button></div>
+        <div id="salles-liste"></div>
       </div>
     </div>
 
