@@ -11,21 +11,49 @@ function memoryStorage(): StorageLike {
 }
 
 describe('Records — les registres du labo', () => {
-  it('consigne les collectes et retient le record par tableau', () => {
+  it('deux records par salle, indépendants : le volume et le chrono', () => {
     const r = new Records(memoryStorage())
     expect(r.tableauRecord('21-A')).toBeNull()
-    expect(r.noteCollection('21-A', 3.1, 80).newRecord).toBe(true)
-    expect(r.noteCollection('21-A', 2.5, 40).newRecord).toBe(false)
-    expect(r.noteCollection('21-A', 3.4, 120).newRecord).toBe(true)
-    expect(r.tableauRecord('21-A')).toMatchObject({ liters: 3.4, time: 120 })
+    // première collecte : les deux records naissent
+    let n = r.noteCollection('21-A', 3.1, 80)
+    expect(n).toMatchObject({ newVolume: true, newChrono: true })
+    // plus rapide mais moins volumineuse : seul le CHRONO tombe
+    n = r.noteCollection('21-A', 2.5, 40)
+    expect(n).toMatchObject({ newVolume: false, newChrono: true })
+    // plus volumineuse mais plus lente : seul le VOLUME tombe
+    n = r.noteCollection('21-A', 3.4, 120)
+    expect(n).toMatchObject({ newVolume: true, newChrono: false })
+    const bests = r.tableauRecord('21-A')!
+    expect(bests.volume).toMatchObject({ liters: 3.4, time: 120 })
+    expect(bests.chrono).toMatchObject({ liters: 2.5, time: 40 })
   })
 
-  it('à volume égal, le temps le plus court départage', () => {
+  it('à volume égal, le temps départage le record de volume (et inversement)', () => {
     const r = new Records(memoryStorage())
     r.noteCollection('21-B', 3.0, 90)
-    expect(r.noteCollection('21-B', 3.0, 70).newRecord).toBe(true)
-    expect(r.noteCollection('21-B', 3.0, 95).newRecord).toBe(false)
-    expect(r.tableauRecord('21-B')).toMatchObject({ liters: 3.0, time: 70 })
+    expect(r.noteCollection('21-B', 3.0, 70).newVolume).toBe(true)
+    expect(r.noteCollection('21-B', 3.0, 95).newVolume).toBe(false)
+    expect(r.tableauRecord('21-B')!.volume).toMatchObject({ liters: 3.0, time: 70 })
+    expect(r.noteCollection('21-B', 3.6, 70).newChrono).toBe(true) // même chrono, plus de litres
+    expect(r.tableauRecord('21-B')!.chrono).toMatchObject({ liters: 3.6, time: 70 })
+  })
+
+  it('migration : un registre d’avant la refonte sème ses deux records', () => {
+    const st = memoryStorage()
+    st.setItem(
+      'projet21.registres.v1',
+      JSON.stringify({
+        essais: 2,
+        operator: 'REX',
+        tableaux: { '21-A': { liters: 4.2, time: 66, essai: 1, name: 'REX' } },
+        expedition: null,
+        history: [],
+      }),
+    )
+    const r = new Records(st)
+    const bests = r.tableauRecord('21-A')!
+    expect(bests.volume).toMatchObject({ liters: 4.2, time: 66, name: 'REX' })
+    expect(bests.chrono).toMatchObject({ liters: 4.2, time: 66 })
   })
 
   it('la dispersion clôt l’essai : le n° d’échantillon avance', () => {
@@ -45,7 +73,7 @@ describe('Records — les registres du labo', () => {
     a.noteDispersion('21-A', 10)
     const b = new Records(storage)
     expect(b.essaiNumber()).toBe(2)
-    expect(b.tableauRecord('21-A')).toMatchObject({ liters: 3.2, time: 55, essai: 1 })
+    expect(b.tableauRecord('21-A')!.volume).toMatchObject({ liters: 3.2, time: 55, essai: 1 })
     b.wipe()
     expect(new Records(storage).essaiNumber()).toBe(1)
   })
@@ -56,11 +84,11 @@ describe('Records — les registres du labo', () => {
     r.setOperator('  julien du 21  ')
     expect(r.operator()).toBe('JULIEN DU 21')
     r.noteCollection('21-A', 3.0, 60)
-    expect(r.tableauRecord('21-A')).toMatchObject({ name: 'JULIEN DU 21' })
+    expect(r.tableauRecord('21-A')!.volume).toMatchObject({ name: 'JULIEN DU 21' })
     // un record battu porte le nom du nouvel opérateur
     r.setOperator('vega')
     r.noteCollection('21-A', 3.5, 60)
-    expect(r.tableauRecord('21-A')).toMatchObject({ name: 'VEGA' })
+    expect(r.tableauRecord('21-A')!.volume).toMatchObject({ name: 'VEGA' })
     expect(new Records(storage).operator()).toBe('VEGA')
   })
 
@@ -78,7 +106,7 @@ describe('Records — les registres du labo', () => {
 
   it('survit à un stockage absent ou corrompu', () => {
     const none = new Records(null)
-    expect(none.noteCollection('21-A', 1, 1).newRecord).toBe(true)
+    expect(none.noteCollection('21-A', 1, 1).newVolume).toBe(true)
     const storage = memoryStorage()
     storage.setItem('projet21.registres.v1', '{pas du json')
     expect(new Records(storage).essaiNumber()).toBe(1)
