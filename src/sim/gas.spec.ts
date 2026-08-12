@@ -124,7 +124,7 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
     expect(sim.dashBudget).toBe(0) // le suivant sort du budget de l'écran
   })
 
-  it('la vapeur traverse la grille, le liquide s’y écrase', () => {
+  it('la vapeur traverse l’évent, le liquide s’y écrase', () => {
     const sim = makeSim()
     sim.setLevel([{ minX: 0, minY: -500, maxX: 40, maxY: 500, material: MAT_GRILLE }], [])
     const liq = sim.addParticle(-30, 100, KIND_FREE)

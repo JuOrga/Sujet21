@@ -441,7 +441,7 @@ export function checkLevel(level: LevelDef): Verdict[] {
   if (grilleSansVapeur) {
     v.push({
       niveau: 'avertissement',
-      message: 'Une grille barre la route sans radiateur ni zone vapeur pour la franchir.',
+      message: 'Un évent barre la route sans radiateur ni zone vapeur pour le franchir.',
     })
   }
 

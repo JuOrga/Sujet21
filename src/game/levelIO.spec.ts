@@ -91,13 +91,13 @@ describe('levelIO — garde-fous du level design', () => {
     expect(checkLevel(l2).some((x) => /800 u/.test(x.message))).toBe(true)
   })
 
-  it('signale une grille sans moyen de la franchir', () => {
+  it('signale un évent sans moyen de le franchir', () => {
     const l = base()
     l.boxes.push({ minX: 0, minY: -750, maxX: 40, maxY: 750, material: 5 })
-    expect(checkLevel(l).some((x) => /grille barre/.test(x.message))).toBe(true)
+    expect(checkLevel(l).some((x) => /évent barre/.test(x.message))).toBe(true)
     // avec une zone vapeur, l'avertissement disparaît
     l.zones = [{ minX: -400, minY: -300, maxX: -200, maxY: 300, force: 'vapeur' }]
-    expect(checkLevel(l).some((x) => /grille barre/.test(x.message))).toBe(false)
+    expect(checkLevel(l).some((x) => /évent barre/.test(x.message))).toBe(false)
   })
 })
 

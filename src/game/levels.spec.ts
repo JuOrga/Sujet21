@@ -119,11 +119,11 @@ describe('Tableaux laser — les énigmes tiennent leurs promesses', () => {
     expect(prisme).toBe(true)
   })
 
-  it('21-L : la grille barre toute la hauteur — et l’arc porte la solution de l’autre côté', () => {
-    // la grille est infranchissable pour l'eau : toute la hauteur de la cuve
-    const grille = TABLEAU_12.boxes.find((b) => b.material === MAT_GRILLE)!
-    expect(grille.minY).toBeLessThanOrEqual(TABLEAU_12.bounds.minY)
-    expect(grille.maxY).toBeGreaterThanOrEqual(TABLEAU_12.bounds.maxY)
+  it('21-L : l’évent barre toute la hauteur — et l’arc porte la solution de l’autre côté', () => {
+    // l'évent est infranchissable pour l'eau : toute la hauteur de la cuve
+    const event = TABLEAU_12.boxes.find((b) => b.material === MAT_GRILLE)!
+    expect(event.minY).toBeLessThanOrEqual(TABLEAU_12.bounds.minY)
+    expect(event.maxY).toBeGreaterThanOrEqual(TABLEAU_12.bounds.maxY)
     // vaporisé dans le faisceau au pied du rail : l'arc traverse et allume
     const nuage = (x: number, y: number): boolean => Math.hypot(x + 200, y - 100) < 90
     const t = traceLaser(TABLEAU_12.lasers![0], mondeDe(TABLEAU_12, { vapeur: nuage }))
