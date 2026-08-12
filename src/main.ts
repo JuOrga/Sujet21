@@ -2193,14 +2193,14 @@ function frame(now: number): void {
   const allFrozen = sim.playerCount > 0 && frozenCount >= sim.playerCount
   const allGas = sim.playerCount > 0 && gasCount >= sim.playerCount
   // Radiateur : vaporisé malgré soi, on PASSE vraiment à l'état gazeux —
-  // dès 70 % du corps en vapeur, l'intention suit (dash, sélecteur, sons).
+  // dès 50 % du corps en vapeur, l'intention suit (dash, sélecteur, sons).
   // Armement : ne se redéclenche pas si le joueur revient à l'eau dans
-  // l'aura — il faut que le corps soit redescendu sous 50 % de vapeur.
+  // l'aura — il faut que le corps soit redescendu sous 30 % de vapeur.
   const fracGaz = sim.playerCount > 0 ? gasCount / sim.playerCount : 0
-  if (fracGaz < 0.5) autoGazArme = true
+  if (fracGaz < 0.3) autoGazArme = true
   if (
     autoGazArme &&
-    fracGaz >= 0.7 &&
+    fracGaz >= 0.5 &&
     !input.gasIntent &&
     !tableauDone &&
     !sim.dispersed &&
