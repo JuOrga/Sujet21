@@ -9,7 +9,7 @@ export const MAT_HYDROPHILE = 1
 export const MAT_HYDROPHOBE = 2
 export const MAT_EXIT = 3 // rendu seulement, pas de physique
 export const MAT_FROID = 4 // plaque froide : gèle l'eau qui s'attarde dans son aura
-export const MAT_GRILLE = 5 // grille : arrête le liquide et la glace, laisse passer la vapeur
+export const MAT_GRILLE = 5 // évent : arrête le liquide et la glace, laisse passer la vapeur
 export const MAT_CHAUD = 6 // radiateur : vaporise l'eau dans son aura, dégèle, évapore ce qui s'attarde
 export const MAT_MEMBRANE = 7 // membrane gorgée d'eau : seule l'EAU la traverse (glace et vapeur butent)
 export const MAT_RIDEAU = 8 // rideau lamellaire : seule la GLACE l'écarte (eau et vapeur butent)
@@ -121,7 +121,7 @@ export interface DecalDef {
 }
 
 // ---- Mécanismes laser (paliers 1-3, 2026) --------------------------------
-// Le faisceau est absorbé par les parois, passe les grilles, se REFLÈTE sur
+// Le faisceau est absorbé par les parois, passe les évents, se REFLÈTE sur
 // la glace (le corps gelé est un miroir — c'est sa fonction cachée), se
 // RÉFRACTE dans l'eau (le corps liquide est un prisme), s'IONISE dans la
 // vapeur (l'arc plasma suit les rails magnétiques), et allume des cibles.
@@ -192,7 +192,7 @@ export const MATERIAL_NAMES: Record<number, string> = {
   [MAT_HYDROPHOBE]: 'Hydrophobe',
   [MAT_EXIT]: 'Sas',
   [MAT_FROID]: 'Hublot (froid)',
-  [MAT_GRILLE]: 'Grille',
+  [MAT_GRILLE]: 'Évent',
   [MAT_CHAUD]: 'Radiateur',
   [MAT_MEMBRANE]: 'Membrane (eau)',
   [MAT_RIDEAU]: 'Rideau (glace)',
@@ -378,7 +378,7 @@ export const TABLEAU_3: LevelDef = {
   name: 'Le conduit',
   code: '21-C',
   journal:
-    'Les grilles retiennent l’eau et la glace. Ce matin, l’échantillon a traversé la première à l’état de vapeur. Je demande le passage en confinement de niveau 3. — Dr N. Véga',
+    'Les évents retiennent l’eau et la glace. Ce matin, l’échantillon a traversé le premier à l’état de vapeur. Je demande le passage en confinement de niveau 3. — Dr N. Véga',
   bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
   spawn: { x: -950, y: 0, n: 900 },
   exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
@@ -395,8 +395,8 @@ export const TABLEAU_3: LevelDef = {
   ],
   sponges: [],
   labels: [
-    { x: -480, y: 320, text: 'GRILLE', tone: 'grille' },
-    { x: 420, y: 320, text: 'GRILLE', tone: 'grille' },
+    { x: -480, y: 320, text: 'ÉVENT', tone: 'grille' },
+    { x: 420, y: 320, text: 'ÉVENT', tone: 'grille' },
     { x: 550, y: 440, text: 'PLAQUE FROIDE', tone: 'froid' },
     { x: 1110, y: 0, text: 'SAS', tone: 'sas' },
   ],
@@ -480,15 +480,15 @@ export const TABLEAU_5: LevelDef = {
   ],
 }
 
-// Tableau 6 — le dépôt de givre (combinaison : grilles + froid +
-// recondensation). Lecture : deux grilles imposent la vapeur, leurs péages
+// Tableau 6 — le dépôt de givre (combinaison : évents + froid +
+// recondensation). Lecture : deux évents imposent la vapeur, leurs péages
 // essorent le nuage — mais les plaques froides du dépôt recondensent les
 // pertes en rosée : passer, puis revenir cueillir son propre corps.
 export const TABLEAU_6: LevelDef = {
   name: 'Le dépôt de givre',
   code: '21-F',
   journal:
-    'Le givre des plaques n’est pas du givre. C’est LUI — ce que les grilles lui arrachent perle sur les parois froides, et il revient le boire. Rien ne se perd. Ça m’inquiète. — Dr N. Véga',
+    'Le givre des plaques n’est pas du givre. C’est LUI — ce que les évents lui arrachent perle sur les parois froides, et il revient le boire. Rien ne se perd. Ça m’inquiète. — Dr N. Véga',
   bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
   spawn: { x: -950, y: 0, n: 900 },
   exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
@@ -507,10 +507,10 @@ export const TABLEAU_6: LevelDef = {
   ],
   sponges: [],
   labels: [
-    { x: -440, y: 320, text: 'GRILLE', tone: 'grille' },
+    { x: -440, y: 320, text: 'ÉVENT', tone: 'grille' },
     { x: -190, y: 520, text: 'DÉPÔT DE GIVRE', tone: 'froid' },
     { x: 220, y: -300, text: 'HYDROPHOBE', tone: 'phobe' },
-    { x: 700, y: 320, text: 'GRILLE', tone: 'grille' },
+    { x: 700, y: 320, text: 'ÉVENT', tone: 'grille' },
     { x: 880, y: -560, text: 'DÉPÔT', tone: 'froid' },
     { x: 1110, y: 0, text: 'SAS', tone: 'sas' },
   ],
@@ -798,7 +798,7 @@ export const TABLEAU_11: LevelDef = {
   ],
 }
 
-// Tableau 12 — à travers la grille (composition : GRILLE + VAPEUR + RAIL).
+// Tableau 12 — à travers l'évent (composition : ÉVENT + VAPEUR + RAIL).
 // La grille coupe la cuve sur toute sa hauteur : le liquide et la glace
 // s'y arrêtent net — seule la VAPEUR passe. Lecture :
 // 1. se vaporiser dans le faisceau au pied du rail (la colonne chaude aide) ;
@@ -808,15 +808,15 @@ export const TABLEAU_11: LevelDef = {
 // 3. l'arc allume le récepteur au bout de la descente (verrou), la porte
 //    s'ouvre ; le dépôt froid recondense le nuage — on finit en eau.
 export const TABLEAU_12: LevelDef = {
-  name: 'À travers la grille',
+  name: 'À travers l’évent',
   code: '21-L',
   journal:
-    'La grille l’arrête net à l’état liquide. Mais en vapeur il la traverse comme une rumeur passe une porte close — et le rail a porté son nuage jusqu’au bout de la ligne, même après que le faisceau l’a perdu. Le champ se souvient de lui. — Dr N. Véga',
+    'L’évent l’arrête net à l’état liquide. Mais en vapeur il le traverse comme une rumeur passe une porte close — et le rail a porté son nuage jusqu’au bout de la ligne, même après que le faisceau l’a perdu. Le champ se souvient de lui. — Dr N. Véga',
   bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
   spawn: { x: -950, y: 0, n: 900 },
   exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
   boxes: [
-    // la grille : toute la hauteur — l'eau s'arrête, la vapeur passe
+    // l'évent : toute la hauteur — l'eau s'arrête, la vapeur passe
     box(300, -750, 340, 750, MAT_GRILLE),
     // la colonne chaude : se vaporiser sans puiser dans les bonbonnes
     box(-320, -140, -160, -80, MAT_CHAUD),
@@ -833,7 +833,7 @@ export const TABLEAU_12: LevelDef = {
     { x: -700, y: 40, text: 'ÉMETTEUR', tone: 'chaud' },
     { x: -240, y: -200, text: 'COLONNE CHAUDE', tone: 'chaud' },
     { x: -260, y: 40, text: 'PIED DU RAIL', tone: 'phobe' },
-    { x: 320, y: -420, text: 'GRILLE', tone: 'grille' },
+    { x: 320, y: -420, text: 'ÉVENT', tone: 'grille' },
     { x: 620, y: 200, text: 'RÉCEPTEUR', tone: 'sas' },
     { x: 640, y: -420, text: 'DÉPÔT FROID', tone: 'froid' },
     { x: 920, y: -60, text: 'PORTE', tone: 'chaud' },
@@ -971,7 +971,7 @@ export const TABLEAU_S2: LevelDef = {
   name: 'L’école des climats',
   code: '21-S2',
   journal:
-    'Deuxième leçon, les climats : le FROID le fige, le CHAUD le disperse, la GRILLE n’arrête que ses formes denses — et l’ÉPONGE boit ce qu’on lui abandonne. Il a passé la grille en vapeur et s’est recomposé sur le dépôt froid, comme s’il lisait les étiquettes. — Dr N. Véga',
+    'Deuxième leçon, les climats : le FROID le fige, le CHAUD le disperse, l’ÉVENT n’arrête que ses formes denses — et l’ÉPONGE boit ce qu’on lui abandonne. Il a passé l’évent en vapeur et s’est recomposé sur le dépôt froid, comme s’il lisait les étiquettes. — Dr N. Véga',
   bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
   spawn: { x: -950, y: 0, n: 900 },
   exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
@@ -984,7 +984,7 @@ export const TABLEAU_S2: LevelDef = {
     box(140, 160, 180, 750, MAT_RIDEAU),
     // le radiateur : la vaporisation gratuite, à hauteur de route
     box(220, -80, 380, -20, MAT_CHAUD),
-    // la grille pleine hauteur : l'eau s'arrête, la vapeur passe
+    // l'évent pleine hauteur : l'eau s'arrête, la vapeur passe
     box(640, -750, 680, 750, MAT_GRILLE),
     // le dépôt froid de l'autre côté : se recomposer avant le sas
     box(780, -320, 920, -260, MAT_FROID),
@@ -999,7 +999,7 @@ export const TABLEAU_S2: LevelDef = {
     { x: 160, y: -420, text: 'MEMBRANE — SEULE L’EAU PASSE', tone: 'phile' },
     { x: 160, y: 420, text: 'RIDEAU — SEULE LA GLACE PASSE', tone: 'froid' },
     { x: 300, y: 40, text: 'RADIATEUR — DISPERSE', tone: 'chaud' },
-    { x: 660, y: -420, text: 'GRILLE — SEULE LA VAPEUR PASSE', tone: 'grille' },
+    { x: 660, y: -420, text: 'ÉVENT — SEULE LA VAPEUR PASSE', tone: 'grille' },
     { x: 850, y: -380, text: 'DÉPÔT FROID', tone: 'froid' },
     { x: 1110, y: 160, text: 'SAS', tone: 'sas' },
   ],

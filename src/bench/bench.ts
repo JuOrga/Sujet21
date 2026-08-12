@@ -453,7 +453,7 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   )
   describe(
     fHeat.addBinding(params, 'boilTime', { min: 0.3, max: 5, label: 'vaporisation (s)' }),
-    'Temps d’exposition en pleine aura avant que l’eau ne se change en vapeur, qu’on le veuille ou non. La vapeur gagnée traverse grilles et éponges.',
+    'Temps d’exposition en pleine aura avant que l’eau ne se change en vapeur, qu’on le veuille ou non. La vapeur gagnée traverse les évents.',
   )
   describe(
     fHeat.addBinding(params, 'heatThawTime', { min: 0.1, max: 3, label: 'dégel forcé (s)' }),
@@ -471,7 +471,7 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   const fGas = pane.addFolder({ title: 'Gaz (tableau 3)', expanded: false })
   describe(
     fGas.addBinding(params, 'vaporizeTime', { min: 0.1, max: 3, label: 'vaporisation (s)' }),
-    'Temps de changement d’état vers la vapeur (G / 💨). En vapeur : le pointeur pilote le nuage, les grilles se traversent, la chimie des parois ne mord plus.',
+    'Temps de changement d’état vers la vapeur (G / 💨). En vapeur : le pointeur pilote le nuage, les évents se traversent, la chimie des parois ne mord plus.',
   )
   describe(
     fGas.addBinding(params, 'condenseTime', { min: 0.2, max: 5, label: 'condensation (s)' }),
@@ -506,8 +506,8 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Particules perdues par seconde TANT QU’ON EST vapeur, même immobile : l’état gazeux est un compte à rebours, pas un mode de croisière. C’est le frein principal au tout-vapeur.',
   )
   describe(
-    fGas.addBinding(params, 'grilleGasLoss', { min: 0, max: 2, step: 0.05, label: 'péage de grille' }),
-    'Perte par seconde et par particule prise dans la maille d’une grille : traverser essore le nuage. La grille reste franchissable en vapeur — mais plus jamais gratuite.',
+    fGas.addBinding(params, 'grilleGasLoss', { min: 0, max: 2, step: 0.05, label: 'péage d’évent' }),
+    'Perte par seconde et par particule prise dans la maille d’un évent : traverser essore le nuage. L’évent reste franchissable en vapeur — mais plus jamais gratuit.',
   )
   describe(
     fGas.addBinding(params, 'recondRate', { min: 0, max: 20, step: 0.5, label: 'recondensation /s' }),

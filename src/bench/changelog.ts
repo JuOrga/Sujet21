@@ -11,6 +11,13 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '12/08/2026 14:20',
+    title: 'La grille devient L’ÉVENT',
+    notes: [
+      'Renommage complet : la paroi qui ne laisse passer que la vapeur s’appelle désormais L’ÉVENT — la bouche par laquelle le vaisseau respire (une vraie grille laisserait passer l’eau…). Rien ne change dans la mécanique : étiquettes des tableaux, légende, panneau des états, onboarding, banc, éditeur et le nom du tableau 21-L (« À travers l’évent ») parlent tous le nouveau mot. Le trio des portes d’état est complet : la MEMBRANE (eau), le RIDEAU LAMELLAIRE (glace), L’ÉVENT (vapeur).',
+    ],
+  },
+  {
     date: '12/08/2026 13:55',
     title: 'Membrane et rideau lamellaire dans la barre d’outils de l’éditeur',
     notes: [
