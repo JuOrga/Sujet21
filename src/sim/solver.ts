@@ -1736,13 +1736,18 @@ export class FluidSim {
         }
         const warmth = Math.max(this.vapor[i], heat)
         if (warmth > 0.05 && agit > 0) {
-          // l'eau qui chauffe frémit : un bouillonnement doux, déterministe
+          // l'eau qui chauffe frémit : un bouillonnement doux, déterministe.
+          // Le SIGNE ALTERNE d'une particule à l'autre : un bruit dont
+          // l'amplitude suit la chaleur dérive sinon vers le froid — le
+          // radiateur semblait REPOUSSER le corps. Alterné, la dérive
+          // collective s'annule, le bouillonnement reste.
           const xi = this.posX[i]
           const yi = this.posY[i]
+          const sg = (i & 1) === 0 ? 1 : -1
           const jx = -Math.sin(xi * kAgit + time * 5.1) * Math.sin(yi * kAgit - time * 4.3)
           const jy = -Math.cos(xi * kAgit + time * 5.1) * Math.cos(yi * kAgit - time * 4.3)
-          this.velX[i] += jx * agit * warmth
-          this.velY[i] += jy * agit * warmth
+          this.velX[i] += jx * agit * warmth * sg
+          this.velY[i] += jy * agit * warmth * sg
         }
       }
     }
