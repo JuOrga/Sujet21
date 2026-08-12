@@ -1388,6 +1388,9 @@ const btnRelance = document.getElementById('relance') as HTMLButtonElement
 // Continuer : le corps principal est bu, le joueur conclut quand il veut
 const btnContinuer = document.getElementById('continuer') as HTMLButtonElement
 let continuerVoulu = false
+// le passage auto à l'état gazeux (radiateur) : armé tant que le corps
+// n'est pas déjà majoritairement vapeur
+let autoGazArme = true
 btnContinuer.addEventListener('click', () => {
   continuerVoulu = true
   btnContinuer.classList.remove('visible')
@@ -2189,6 +2192,24 @@ function frame(now: number): void {
   }
   const allFrozen = sim.playerCount > 0 && frozenCount >= sim.playerCount
   const allGas = sim.playerCount > 0 && gasCount >= sim.playerCount
+  // Radiateur : vaporisé malgré soi, on PASSE vraiment à l'état gazeux —
+  // dès 70 % du corps en vapeur, l'intention suit (dash, sélecteur, sons).
+  // Armement : ne se redéclenche pas si le joueur revient à l'eau dans
+  // l'aura — il faut que le corps soit redescendu sous 50 % de vapeur.
+  const fracGaz = sim.playerCount > 0 ? gasCount / sim.playerCount : 0
+  if (fracGaz < 0.5) autoGazArme = true
+  if (
+    autoGazArme &&
+    fracGaz >= 0.7 &&
+    !input.gasIntent &&
+    !tableauDone &&
+    !sim.dispersed &&
+    !input.paused
+  ) {
+    autoGazArme = false
+    if (input.freezeIntent) input.toggleFreeze()
+    input.toggleGas() // le même chemin que la touche G : sons et UI suivent
+  }
 
   // ---- Sons : boucles continues et fronts d'état ----
   const audible = !input.paused && !tableauDone && !sim.dispersed

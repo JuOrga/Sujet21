@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '12/08/2026 11:05',
+    title: 'Le radiateur fait vraiment passer à l’état gazeux — et ne repousse plus',
+    notes: [
+      'Vaporisé malgré soi par un radiateur, on PASSE désormais vraiment à l’état gazeux : dès 70 % du corps en vapeur, l’intention suit — dash, sélecteur, sons, comme si on avait pressé G. Le déclencheur se réarme seulement une fois le corps redescendu sous 50 % : revenir à l’eau dans l’aura ne lutte pas contre la machine.',
+      'Et le radiateur ne REPOUSSE plus : le frémissement de l’eau qui chauffe était un bruit dont l’amplitude suivait la chaleur — un tel bruit dérive vers le froid, d’où la poussée fantôme. Le signe du bouillonnement alterne maintenant d’une particule à l’autre : la dérive collective s’annule, le frémissement reste.',
+    ],
+  },
+  {
     date: '12/08/2026 10:20',
     title: 'Les records refondus : deux par salle, et un bilan clair à chaque sas',
     notes: [
