@@ -20,8 +20,8 @@ import {
   TABLEAUX,
   TABLEAUX_ECOLE,
   pointInBox,
-  zoneForceAt,
   zoneName,
+  zoneShape,
   type LevelDef,
   type ObstacleBox,
   type ZoneForce,
@@ -1388,9 +1388,12 @@ const btnRelance = document.getElementById('relance') as HTMLButtonElement
 // Continuer : le corps principal est bu, le joueur conclut quand il veut
 const btnContinuer = document.getElementById('continuer') as HTMLButtonElement
 let continuerVoulu = false
-// le passage auto à l'état gazeux (radiateur) : armé tant que le corps
-// n'est pas déjà majoritairement vapeur
+// le passage auto à l'état gazeux (chaudière) : armé tant que le corps
+// n'a pas déjà déclenché — réarmé quand il ressort de l'aura
 let autoGazArme = true
+// la zone forcée actuellement TENUE par le corps (déclenchée à 95 %,
+// relâchée sous 85 %) — l'état, lui, persiste à la sortie
+let zoneTenue: number | null = null
 btnContinuer.addEventListener('click', () => {
   continuerVoulu = true
   btnContinuer.classList.remove('visible')
@@ -1660,10 +1663,39 @@ function frame(now: number): void {
   // Zones d'état (refonte 2026) : une zone impose un état et verrouille le
   // sélecteur tant qu'on y est. L'intention du joueur est écrasée, pas effacée
   // — en ressortant, il retrouve l'état qu'il avait choisi.
-  const zone: ZoneForce = zoneForceAt(level, sim.stats.centroidX, sim.stats.centroidY)
-  if (zone !== 'libre') {
-    input.freezeIntent = zone === 'glace'
-    input.gasIntent = zone === 'vapeur'
+  // Règle du 12/08 : une zone n'impose son état que lorsque 95 % du CORPS
+  // ACTIF (les particules joueur — les gouttes éjectées ne comptent pas)
+  // est dedans ; elle le tient ensuite jusqu'à retomber sous 85 %.
+  const zonesForcees = (level.zones ?? []).map((z, i) => ({ z, i })).filter((e) => e.z.force !== 'libre')
+  let zoneActive: ZoneForce = 'libre'
+  if (zonesForcees.length > 0 && sim.playerCount > 0) {
+    let bestFrac = 0
+    let bestI = -1
+    for (const e of zonesForcees) {
+      let dedans = 0
+      for (let i = 0; i < sim.count; i++) {
+        if (sim.kind[i] !== KIND_PLAYER) continue
+        if (zoneShape(e.z, sim.posX[i], sim.posY[i]) < 1) dedans++
+      }
+      const f = dedans / sim.playerCount
+      if (f > bestFrac) {
+        bestFrac = f
+        bestI = e.i
+      }
+    }
+    const seuil = zoneTenue === bestI ? 0.85 : 0.95
+    if (bestI >= 0 && bestFrac >= seuil) {
+      zoneTenue = bestI
+      zoneActive = (level.zones ?? [])[bestI].force
+    } else {
+      zoneTenue = null
+    }
+  } else {
+    zoneTenue = null
+  }
+  if (zoneActive !== 'libre') {
+    input.freezeIntent = zoneActive === 'glace'
+    input.gasIntent = zoneActive === 'vapeur'
   }
   sim.freezeIntent = input.freezeIntent
   sim.gasIntent = input.gasIntent
@@ -2009,7 +2041,7 @@ function frame(now: number): void {
   stateGlace.classList.toggle('active', input.freezeIntent)
   stateVapeur.classList.toggle('active', input.gasIntent)
   // dans une zone imposée, le sélecteur se grise : le choix n'est plus offert
-  const locked = zone !== 'libre'
+  const locked = zoneActive !== 'libre'
   stateEau.disabled = locked
   stateGlace.disabled = locked
   stateVapeur.disabled = locked
@@ -2192,15 +2224,14 @@ function frame(now: number): void {
   }
   const allFrozen = sim.playerCount > 0 && frozenCount >= sim.playerCount
   const allGas = sim.playerCount > 0 && gasCount >= sim.playerCount
-  // Radiateur : vaporisé malgré soi, on PASSE vraiment à l'état gazeux —
-  // dès 50 % du corps en vapeur, l'intention suit (dash, sélecteur, sons).
-  // Armement : ne se redéclenche pas si le joueur revient à l'eau dans
-  // l'aura — il faut que le corps soit redescendu sous 30 % de vapeur.
-  const fracGaz = sim.playerCount > 0 ? gasCount / sim.playerCount : 0
-  if (fracGaz < 0.3) autoGazArme = true
+  // Chaudière (règle du 12/08) : l'échauffement n'est qu'un effet visuel —
+  // la TRANSFORMATION se déclenche quand 95 % du corps actif baigne dans
+  // l'aura. Réarmement quand le corps en ressort (présence sous 50 %) :
+  // revenir à l'eau dans l'aura ne déclenche pas de lutte.
+  if (sim.chauffeFrac < 0.5) autoGazArme = true
   if (
     autoGazArme &&
-    fracGaz >= 0.5 &&
+    sim.chauffeFrac >= 0.95 &&
     !input.gasIntent &&
     !tableauDone &&
     !sim.dispersed &&
@@ -2222,7 +2253,7 @@ function frame(now: number): void {
   const enJeu = document.body.classList.contains('playing')
   bande.setScene(enJeu ? 'cuve' : 'accueil')
   bande.setChill(chillNow())
-  bande.setZone(zone)
+  bande.setZone(zoneActive)
   // Le geste d'impulsion : une bouffée à l'amorce, pas un souffle continu —
   // la boucle procédurale tient déjà la durée.
   // L'éjection d'eau est une goutte qui tombe dans l'eau — et elle GOUTTE :
@@ -2302,7 +2333,7 @@ function frame(now: number): void {
   const stateText = sim.dispersed
     ? 'DISPERSÉ'
     : locked
-      ? `${zone.toUpperCase()} — IMPOSÉE`
+      ? `${zoneActive.toUpperCase()} — IMPOSÉE`
       : allFrozen
         ? 'GLACE'
         : allGas
