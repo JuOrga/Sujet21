@@ -228,8 +228,8 @@ export const DEFAULT_PARAMS: SimParams = {
 
   vaporizeTime: 0.5,
   condenseTime: 0.9,
-  gasDashSpeed: 620,
-  gasDashRange: 300,
+  gasDashSpeed: 820,
+  gasDashRange: 380,
   gasAimSlow: 0.06,
   gasDashBudget: 3,
   gasExpand: 260,

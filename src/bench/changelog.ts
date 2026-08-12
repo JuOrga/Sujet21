@@ -11,6 +11,13 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '12/08/2026 13:35',
+    title: 'Le dash a du punch',
+    notes: [
+      'Le dash vapeur frappe plus fort et porte plus loin : vitesse 620 → 820 u/s, portée de pleine puissance 300 → 380 u. Le FREIN reste sec (flottement inchangé) : le nuage fuse, puis s’arrête vite — c’est cet arrêt franc qui fait le bon ressenti, il ne bouge pas.',
+    ],
+  },
+  {
     date: '12/08/2026 11:30',
     title: 'Radiateur : le passage à l’état gazeux se fait à 50 %',
     notes: [
