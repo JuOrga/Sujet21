@@ -11,6 +11,13 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '12/08/2026 11:30',
+    title: 'Radiateur : le passage à l’état gazeux se fait à 50 %',
+    notes: [
+      'Réglage : la bascule automatique à l’état gazeux se déclenche dès 50 % du corps vaporisé (au lieu de 70), et se réarme sous 30 %. Le document des règles (docs/) est à jour.',
+    ],
+  },
+  {
     date: '12/08/2026 11:05',
     title: 'Le radiateur fait vraiment passer à l’état gazeux — et ne repousse plus',
     notes: [
