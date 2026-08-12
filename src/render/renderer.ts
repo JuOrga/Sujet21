@@ -10,8 +10,12 @@ import { zonePhases } from '../game/level'
 import type { DecalDef, ObstacleBox, ZoneDef } from '../game/level'
 import type { Camera } from './camera'
 
-const MAX_BOXES = 24
-const MAX_ZONES = 8
+// Budgets de rendu : au-delà, les éléments excédentaires ne sont plus
+// dessinés (la physique, elle, les voit tous) — l'éditeur avertit quand un
+// tableau les dépasse, et le sas reste toujours dessiné (il garde sa place
+// dans le budget quoi qu'il arrive).
+export const MAX_BOXES = 40
+export const MAX_ZONES = 12
 
 const SPLAT_VS = `#version 300 es
 layout(location = 0) in vec2 aPos;
@@ -83,9 +87,9 @@ void main() {
 
 const COMPOSE_FS = `#version 300 es
 precision highp float;
-#define MAX_BOXES 24
+#define MAX_BOXES 40
 #define MAX_WAVES 8
-#define MAX_ZONES 8
+#define MAX_ZONES 12
 uniform sampler2D uField;
 uniform vec2 uCanvasSize;  // px device
 uniform float uDpr;
@@ -99,8 +103,10 @@ uniform vec2 uRoomCenter;
 uniform vec2 uRoomHalf;
 uniform int uBoxCount;
 uniform vec4 uBoxes[MAX_BOXES];   // minX, minY, maxX, maxY
-uniform float uBoxMats[MAX_BOXES]; // 0 mur, 1 hydrophile, 2 hydrophobe, 3 sas
-uniform float uBoxAngs[MAX_BOXES]; // rotation (radians) autour du centre — 0 : boîte droite
+// x : matériau (0 mur, 1 hydrophile, 2 hydrophobe, 3 sas…) ; y : rotation
+// (radians) autour du centre — 0 : boîte droite. Empaquetés à deux par
+// uniforme pour tenir dans le budget des GPU mobiles.
+uniform vec2 uBoxAux[MAX_BOXES];
 uniform float uTime;
 uniform float uExitRadius; // portée de l'aspiration du sas (halo de courant)
 uniform float uColdBand;   // portée de l'aura de gel des plaques froides
@@ -469,16 +475,18 @@ void main() {
     vec3 zc = f < 1.5 ? vec3(0.28, 0.62, 0.90)   // eau
             : f < 2.5 ? vec3(0.56, 0.80, 0.95)   // glace
                       : vec3(0.72, 0.56, 0.95);  // vapeur
-    // Forme du rayon d'action : ellipse inscrite, ondulée par trois
-    // harmoniques (mêmes phases que la mécanique). szn < 1 : dedans.
+    // Forme du rayon d'action : superellipse qui épouse le rectangle (coins
+    // adoucis), ondulée par trois harmoniques (mêmes phases que la
+    // mécanique). szn < 1 : dedans.
     vec2 zc2 = (uZones[zi].xy + uZones[zi].zw) * 0.5;
     vec2 zh2 = max((uZones[zi].zw - uZones[zi].xy) * 0.5, vec2(1e-6));
     vec2 nq = (world - zc2) / zh2;
-    float dz = length(nq);
+    vec2 aq = abs(nq);
+    float dz = pow(pow(aq.x, 8.0) + pow(aq.y, 8.0), 0.125);
     float thz = atan(nq.y, nq.x);
     vec3 phz = uZonePhase[zi];
-    float wz = 0.86 + 0.062 * sin(3.0 * thz + phz.x) + 0.043 * sin(5.0 * thz + phz.y)
-             + 0.03 * sin(8.0 * thz + phz.z);
+    float wz = 0.955 + 0.02 * sin(3.0 * thz + phz.x) + 0.012 * sin(5.0 * thz + phz.y)
+             + 0.008 * sin(8.0 * thz + phz.z);
     float szn = dz / wz;
     float inZone = 1.0 - step(1.0, szn);         // 1 dedans
     float assetA = 0.0; // alpha de l'illustration à ce fragment
@@ -556,7 +564,7 @@ void main() {
     // boîte oblique : le monde pivote dans le repère local de la boîte —
     // la distance signée (remplissage, arête, aura) suit la rotation
     vec2 wb = world;
-    float bAng = uBoxAngs[bi];
+    float bAng = uBoxAux[bi].y;
     if (abs(bAng) > 0.0005) {
       vec2 bc = 0.5 * (uBoxes[bi].xy + uBoxes[bi].zw);
       vec2 rel = world - bc;
@@ -565,7 +573,7 @@ void main() {
       wb = bc + vec2(bca * rel.x + bsa * rel.y, -bsa * rel.x + bca * rel.y);
     }
     float d = boxSdf(wb, uBoxes[bi]);
-    float mat = uBoxMats[bi];
+    float mat = uBoxAux[bi].x;
     // Ombre portée douce autour de chaque solide (sauf le sas) : les blocs
     // se détachent du fond au lieu de flotter — la cuve prend de la
     // profondeur, les rectangles cessent d'être des aplats.
@@ -1024,8 +1032,7 @@ export class Renderer {
   private spongeScratch = new Float32Array(0)
   private readonly scratch: Float32Array
   private readonly boxScratch = new Float32Array(MAX_BOXES * 4)
-  private readonly matScratch = new Float32Array(MAX_BOXES)
-  private readonly angScratch = new Float32Array(MAX_BOXES)
+  private readonly auxScratch = new Float32Array(MAX_BOXES * 2) // matériau, angle
   private readonly floatField: boolean
   private fieldScale: number
   private fbo: WebGLFramebuffer | null = null
@@ -1312,13 +1319,12 @@ export class Renderer {
       this.boxScratch[i * 4 + 1] = bx.minY
       this.boxScratch[i * 4 + 2] = bx.maxX
       this.boxScratch[i * 4 + 3] = bx.maxY
-      this.matScratch[i] = bx.material
-      this.angScratch[i] = ((bx.angle ?? 0) * Math.PI) / 180
+      this.auxScratch[i * 2] = bx.material
+      this.auxScratch[i * 2 + 1] = ((bx.angle ?? 0) * Math.PI) / 180
     }
     gl.uniform1i(cu['uBoxCount'], boxCount)
     gl.uniform4fv(cu['uBoxes[0]'], this.boxScratch)
-    gl.uniform1fv(cu['uBoxMats[0]'], this.matScratch)
-    gl.uniform1fv(cu['uBoxAngs[0]'], this.angScratch)
+    gl.uniform2fv(cu['uBoxAux[0]'], this.auxScratch)
     gl.uniform1f(cu['uTime'], timeSec)
     gl.uniform1f(cu['uExitRadius'], params.exitRadius)
     // les auras dessinées suivent la physique refroidie (mêmes formules que

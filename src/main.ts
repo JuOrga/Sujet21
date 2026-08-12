@@ -4,7 +4,7 @@ import '@fontsource/ibm-plex-mono/600.css'
 import { DEFAULT_PARAMS, type SimParams } from './sim/params'
 import { FluidSim, KIND_PLAYER } from './sim/solver'
 import { Camera } from './render/camera'
-import { Renderer } from './render/renderer'
+import { MAX_BOXES, Renderer } from './render/renderer'
 import { FixedLoop } from './game/loop'
 import { Input } from './game/input'
 import {
@@ -172,7 +172,9 @@ const exitMouth = { x: 0, y: 0 }
 function applyLevel(): void {
   level = testLevel ?? playedLevels()[levelIndex] ?? playedLevels()[0]
   levelHasCold = level.boxes.some((b) => b.material === MAT_FROID)
-  renderBoxes = [...level.boxes, { ...level.exit, material: MAT_EXIT }]
+  // le sas garde sa place dans le budget de rendu : un tableau trop chargé
+  // perd ses derniers blocs de décor, jamais sa sortie
+  renderBoxes = [...level.boxes.slice(0, MAX_BOXES - 1), { ...level.exit, material: MAT_EXIT }]
   exitMouth.x = (level.exit.minX + level.exit.maxX) * 0.5
   exitMouth.y = (level.exit.minY + level.exit.maxY) * 0.5
   bande.setAmbiance((level.ambiance as Piste | undefined) ?? null)

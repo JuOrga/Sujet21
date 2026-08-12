@@ -22,6 +22,7 @@ import {
   type ZoneDef,
   type ZoneForce,
 } from './level'
+import { MAX_BOXES, MAX_ZONES } from '../render/renderer'
 
 export const MATERIALS = [
   MAT_WALL,
@@ -360,6 +361,21 @@ export function checkLevel(level: LevelDef): Verdict[] {
 
   if (level.boxes.length + level.sponges.length === 0) {
     v.push({ niveau: 'avertissement', message: 'Le tableau est vide : aucun obstacle.' })
+  }
+  // Budgets de rendu : la physique voit tous les éléments, mais le décor n'en
+  // dessine qu'un nombre borné — au-delà, des blocs (ou zones) deviennent des
+  // murs invisibles. Le sas garde sa place quoi qu'il arrive.
+  if (level.boxes.length > MAX_BOXES - 1) {
+    v.push({
+      niveau: 'erreur',
+      message: `Trop de blocs : ${level.boxes.length} posés, ${MAX_BOXES - 1} dessinés au plus — les derniers seraient des murs invisibles.`,
+    })
+  }
+  if ((level.zones?.length ?? 0) > MAX_ZONES) {
+    v.push({
+      niveau: 'erreur',
+      message: `Trop de zones d'état : ${level.zones?.length} posées, ${MAX_ZONES} dessinées au plus — les suivantes agiraient sans se voir.`,
+    })
   }
   // Mécanismes laser : chaque porte doit être asservie à une cible réelle,
   // et un émetteur sans cible n'ouvre rien (il éclaire, c'est tout).

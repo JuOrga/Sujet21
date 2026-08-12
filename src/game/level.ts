@@ -215,9 +215,10 @@ export function zoneName(z: ZoneDef): string {
 
 /** L'état imposé au point (x, y), ou 'libre' si aucune zone ne l'impose. */
 // ---- Forme du rayon d'action d'une zone (refonte 2026) ------------------
-// Le régime n'emplit plus un rectangle : il ÉMANE de l'accident dessiné au
-// centre (hublot, brèche, rampe). Sa limite est une ellipse inscrite dans le
-// rectangle déclaré, ondulée par trois harmoniques — arrondie, irrégulière,
+// Le régime couvre TOUT le rectangle déclaré à l'éditeur : passer devant
+// l'accident dessiné (hublot, brèche, rampe) ou à côté, c'est pareil, tant
+// qu'on est dans la zone. Sa limite est une superellipse qui épouse le
+// rectangle (coins adoucis), ondulée par trois harmoniques — irrégulière,
 // et différente pour chaque zone (les phases dépendent de son centre).
 // La MÊME formule sert la mécanique (ici) et le rendu (les phases sont
 // calculées ici puis passées au shader) : ce qu'on voit est ce qu'on subit.
@@ -239,13 +240,15 @@ export function zoneShape(z: ZoneDef, x: number, y: number): number {
   const hy = Math.max(1e-6, (z.maxY - z.minY) * 0.5)
   const nx = (x - (z.minX + z.maxX) * 0.5) / hx
   const ny = (y - (z.minY + z.maxY) * 0.5) / hy
-  const d = Math.hypot(nx, ny)
+  // norme d'ordre 8 : un rectangle aux coins adoucis, pas une ellipse — une
+  // zone étroite et haute reste pleine sur toute sa hauteur
+  const d = Math.pow(nx ** 8 + ny ** 8, 0.125)
   const th = Math.atan2(ny, nx)
   const [p1, p2, p3] = zonePhases(z)
-  // rayon de lisière : 0,86 de la demi-taille, ondulé de ±0,135 — le tout
-  // reste inscrit dans le rectangle déclaré à l'éditeur
+  // lisière à 0,955 de la demi-taille, ondulée de ±0,04 — le tout reste
+  // inscrit dans le rectangle déclaré à l'éditeur
   const w =
-    0.86 + 0.062 * Math.sin(3 * th + p1) + 0.043 * Math.sin(5 * th + p2) + 0.03 * Math.sin(8 * th + p3)
+    0.955 + 0.02 * Math.sin(3 * th + p1) + 0.012 * Math.sin(5 * th + p2) + 0.008 * Math.sin(8 * th + p3)
   return d / w
 }
 
@@ -260,8 +263,13 @@ export function zoneOutline(z: ZoneDef, steps = 64): { x: number; y: number }[] 
   for (let i = 0; i < steps; i++) {
     const th = (i / steps) * Math.PI * 2
     const w =
-      0.86 + 0.062 * Math.sin(3 * th + p1) + 0.043 * Math.sin(5 * th + p2) + 0.03 * Math.sin(8 * th + p3)
-    pts.push({ x: cx + Math.cos(th) * hx * w, y: cy + Math.sin(th) * hy * w })
+      0.955 + 0.02 * Math.sin(3 * th + p1) + 0.012 * Math.sin(5 * th + p2) + 0.008 * Math.sin(8 * th + p3)
+    // rayon où la norme d'ordre 8 vaut w dans la direction th : le contour
+    // suit la même superellipse que la mécanique
+    const c = Math.cos(th)
+    const s = Math.sin(th)
+    const r = w / Math.pow(c ** 8 + s ** 8, 0.125)
+    pts.push({ x: cx + c * hx * r, y: cy + s * hy * r })
   }
   return pts
 }
