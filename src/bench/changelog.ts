@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '13/08/2026 22:55',
+    title: 'L’oblique à la poignée : les boîtes se tournent au glisser',
+    notes: [
+      'Les surfaces obliques existaient de bout en bout (collision, rendu, laser, tests) mais restaient invisibles : aucun tableau livré n’en use, et l’éditeur les cachait derrière un champ numérique. Une boîte sélectionnée porte désormais une POIGNÉE DE ROTATION — un bras au bord haut, dans le repère de la boîte : elle tourne avec elle.',
+      'Glisser tourne autour du centre, AIMANTÉ AUX 15° (Alt : au degré près) ; l’angle s’affiche au bout du bras et revenir à 0° remet la boîte droite (la clé disparaît du fichier). Le champ « Angle (°) » du panneau reste là pour la précision.',
+      'Rampes qui dévient, couloirs en biais, lèvres hydrophobes inclinées façon flipper (le bumper de glace s’y prête) : l’oblique est enfin un outil de premier geste.',
+    ],
+  },
+  {
     date: '13/08/2026 22:20',
     title: 'Le voile PARAMÈTRES — et le verrou de fréquence anti yo-yo',
     notes: [
