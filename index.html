@@ -252,6 +252,18 @@
         font-size: 12.5px;
         cursor: pointer;
       }
+      /* intercalaires du voile : la bibliothèque du labo au-dessus de
+         l'expédition livrée — l'intercalaire occupe toute la largeur */
+      .salles-sec {
+        grid-column: 1 / -1;
+        margin-top: 4px;
+        padding: 4px 2px 1px;
+        font-family: var(--font-display);
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        color: var(--dim);
+        border-bottom: 1px solid var(--line);
+      }
       #salles-liste button:hover {
         border-color: var(--specimen);
       }
