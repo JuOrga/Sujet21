@@ -203,12 +203,78 @@ export class LevelEditor {
     this.bindUi()
     this.bindCanvas()
     this.restore()
+    this.lastSnap = serializeLevel(this.level)
+    this.majBoutonsHistoire()
     void this.refreshLibrary()
+  }
+
+  // ——— Annuler / Rétablir (Ctrl+Z / Ctrl+Y) ————————————————
+  // L'historique retient des instantanés JSON du tableau : chaque commit qui
+  // CHANGE le tableau en pousse un (les messages sans changement ne comptent
+  // pas). Annuler remonte, rétablir redescend — toute action nouvelle coupe
+  // la branche du futur, comme partout ailleurs.
+  private past: string[] = []
+  private future: string[] = []
+  private lastSnap = ''
+
+  private histoire(): void {
+    const snap = serializeLevel(this.level)
+    if (snap === this.lastSnap) return
+    this.past.push(this.lastSnap)
+    if (this.past.length > 100) this.past.shift()
+    this.future.length = 0
+    this.lastSnap = snap
+    this.majBoutonsHistoire()
+  }
+
+  private undo(): void {
+    const snap = this.past.pop()
+    if (snap === undefined) {
+      this.status('Rien à annuler.')
+      return
+    }
+    this.future.push(this.lastSnap)
+    this.appliqueSnap(snap, 'Annulé.')
+  }
+
+  private redo(): void {
+    const snap = this.future.pop()
+    if (snap === undefined) {
+      this.status('Rien à rétablir.')
+      return
+    }
+    this.past.push(this.lastSnap)
+    this.appliqueSnap(snap, 'Rétabli.')
+  }
+
+  private appliqueSnap(snap: string, msg: string): void {
+    const { level } = parseLevel(JSON.parse(snap))
+    if (!level) return // un instantané vient de serializeLevel : toujours lisible
+    this.level = level
+    this.lastSnap = snap
+    this.sel = null
+    this.multi = []
+    this.cutWinner = null
+    this.persist()
+    this.syncForm()
+    this.majBoutonsHistoire()
+    this.hint = msg
+    this.draw()
+  }
+
+  private majBoutonsHistoire(): void {
+    const u = this.host.querySelector('#ed-undo') as HTMLButtonElement | null
+    const r = this.host.querySelector('#ed-redo') as HTMLButtonElement | null
+    if (u) u.disabled = this.past.length === 0
+    if (r) r.disabled = this.future.length === 0
   }
 
   // ——— Ouverture / fermeture ———————————————————————————————
   open(level?: LevelDef): void {
-    if (level) this.level = structuredClone(level)
+    if (level) {
+      this.level = structuredClone(level)
+      this.histoire() // l'ouverture remplace le brouillon : elle s'annule aussi
+    }
     this.host.classList.add('visible')
     this.fitView()
     this.syncForm()
@@ -999,7 +1065,19 @@ export class LevelEditor {
     window.addEventListener('keydown', (e) => {
       if (!this.host.classList.contains('visible')) return
       const t = e.target as HTMLElement | null
+      // dans un champ, le Ctrl+Z natif du champ garde la main
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault()
+        if (e.shiftKey) this.redo()
+        else this.undo()
+        return
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
+        e.preventDefault()
+        this.redo()
+        return
+      }
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault()
         this.deleteSel()
@@ -1184,6 +1262,7 @@ export class LevelEditor {
   }
 
   private commit(hint: string): void {
+    this.histoire() // un instantané si (et seulement si) le tableau a changé
     this.hint = hint
     this.persist()
     this.syncProps()
@@ -1252,6 +1331,9 @@ export class LevelEditor {
       this.commit(`Copie de ${lv.code} ouverte — « Enregistrer comme… » pour la publier à votre nom.`)
     })
 
+    this.el('ed-undo').addEventListener('click', () => this.undo())
+    this.el('ed-redo').addEventListener('click', () => this.redo())
+
     this.el('ed-snap').addEventListener('change', (e) => {
       this.snap = (e.target as HTMLInputElement).checked
     })
@@ -1279,6 +1361,9 @@ export class LevelEditor {
       this.persist()
       this.validate()
     })
+    // la frappe ne pousse pas d'instantané à chaque touche : c'est la sortie
+    // du champ (change) qui grave l'étape dans l'historique
+    this.el('ed-dashs').addEventListener('change', () => this.histoire())
     for (const id of ['ed-name', 'ed-code', 'ed-par', 'ed-journal'] as const) {
       this.el(id).addEventListener('input', () => {
         this.level.name = (this.el('ed-name') as HTMLInputElement).value || 'Sans titre'
@@ -1288,6 +1373,7 @@ export class LevelEditor {
         this.persist()
         this.validate()
       })
+      this.el(id).addEventListener('change', () => this.histoire())
     }
 
     this.el('ed-fit').addEventListener('click', () => {

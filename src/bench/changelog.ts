@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '13/08/2026 13:05',
+    title: 'Annuler / Rétablir dans l’éditeur (Ctrl+Z / Ctrl+Y)',
+    notes: [
+      'L’éditeur gagne un vrai historique : Ctrl+Z annule, Ctrl+Y (ou Ctrl+Maj+Z) rétablit — et deux boutons ↶ ↷ dans la barre pour la souris et le tactile. Tout y passe : pose, déplacement, redimensionnement, suppression, duplication, découpe, alignements, propriétés, champs de la fiche (à la sortie du champ), ouverture d’un tableau livré, tableau vierge.',
+      'Cent étapes retenues ; toute action nouvelle après un retour en arrière coupe la branche du futur, comme partout ailleurs. Dans un champ texte, le Ctrl+Z natif du champ garde la main.',
+    ],
+  },
+  {
     date: '13/08/2026 12:00',
     title: 'L’impulsion sans direction rassemble le corps',
     notes: [

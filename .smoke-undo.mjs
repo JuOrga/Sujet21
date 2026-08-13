@@ -1,0 +1,53 @@
+import { chromium } from 'playwright'
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
+const page = await browser.newPage({ viewport: { width: 1280, height: 800 } })
+page.on('pageerror', (e) => console.log('PAGE ERR:', e.message))
+await page.addInitScript(() => {
+  localStorage.setItem('projet21.registres.v1', JSON.stringify({ essais: 0, operator: 'TESTEUR', tableaux: {}, expedition: null, history: [] }))
+  localStorage.setItem('projet21.onboard.v1', '1')
+  localStorage.setItem('projet21.onboard.pc.v1', '1')
+})
+await page.goto('http://localhost:5199/')
+await page.waitForTimeout(1200)
+await page.click('#start-editor')
+await page.waitForSelector('#ed-canvas', { state: 'visible' })
+await page.waitForTimeout(400)
+const n = () => page.evaluate(() => window.__editorLevel().boxes.length)
+console.log('boites depart:', await n())
+// tracer deux parois
+await page.click('[data-tool="box:0"]')
+const c = await page.$('#ed-canvas')
+const bb = await c.boundingBox()
+const drag = async (x1, y1, x2, y2) => {
+  await page.mouse.move(bb.x + x1, bb.y + y1)
+  await page.mouse.down()
+  await page.mouse.move(bb.x + x2, bb.y + y2, { steps: 5 })
+  await page.mouse.up()
+  await page.waitForTimeout(150)
+}
+await drag(300, 200, 420, 280)
+await drag(500, 300, 620, 380)
+console.log('apres 2 traces:', await n())
+const btns = () => page.evaluate(() => ({
+  undo: document.getElementById('ed-undo').disabled,
+  redo: document.getElementById('ed-redo').disabled,
+}))
+console.log('boutons:', JSON.stringify(await btns()))
+await page.keyboard.press('Control+z')
+await page.waitForTimeout(120)
+console.log('apres Ctrl+Z:', await n(), JSON.stringify(await btns()))
+await page.keyboard.press('Control+z')
+await page.waitForTimeout(120)
+console.log('apres 2e Ctrl+Z:', await n(), JSON.stringify(await btns()))
+await page.keyboard.press('Control+y')
+await page.waitForTimeout(120)
+console.log('apres Ctrl+Y:', await n(), JSON.stringify(await btns()))
+await page.click('#ed-redo')
+await page.waitForTimeout(120)
+console.log('apres bouton redo:', await n(), JSON.stringify(await btns()))
+// nouvelle action apres un undo : le futur se coupe
+await page.keyboard.press('Control+z')
+await drag(700, 500, 780, 560)
+await page.waitForTimeout(120)
+console.log('undo puis nouveau trace:', await n(), JSON.stringify(await btns()))
+await browser.close()
