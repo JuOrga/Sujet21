@@ -10,9 +10,10 @@ export const MAT_HYDROPHOBE = 2
 export const MAT_EXIT = 3 // rendu seulement, pas de physique
 export const MAT_FROID = 4 // plaque froide : gèle l'eau qui s'attarde dans son aura
 export const MAT_GRILLE = 5 // évent : arrête le liquide et la glace, laisse passer la vapeur
-export const MAT_CHAUD = 6 // radiateur : vaporise l'eau dans son aura, dégèle, évapore ce qui s'attarde
+export const MAT_CHAUD = 6 // chaudière : transforme en gaz à 95 % de présence dans son aura, dégèle — jamais désactivée
 export const MAT_MEMBRANE = 7 // membrane gorgée d'eau : seule l'EAU la traverse (glace et vapeur butent)
 export const MAT_RIDEAU = 8 // rideau lamellaire : seule la GLACE l'écarte (eau et vapeur butent)
+export const MAT_SURCHAUFFEUR = 9 // surchauffeur : mur pour eau et glace ; frôlé en VAPEUR, il rend UN dash — une seule fois
 
 export interface ObstacleBox {
   minX: number
@@ -23,6 +24,9 @@ export interface ObstacleBox {
   // Rotation en DEGRÉS autour du centre de la boîte (sens trigonométrique).
   // Absente ou nulle : boîte droite — le chemin rapide partout.
   angle?: number
+  // CHAUDIÈRE seulement : multiplicateur de la portée de son aura de chauffe
+  // (1 = réglage du banc). Permet un gros bloc à petite aura, et l'inverse.
+  aura?: number
 }
 
 /** Le point (x, y) ramené dans le repère LOCAL d'une boîte oblique. */
@@ -175,8 +179,9 @@ export interface LevelDef {
   portes?: PorteDef[]
   rails?: RailDef[]
   par?: number // budget d'impulsions visé : franchissable en `par`, record en dessous
-  // Impulsions VAPEUR offertes par cet écran (le dash se compte, il ne se
-  // paie plus en volume). Absent : le réglage du banc (gasDashBudget).
+  // Dashs rendus à CHAQUE transformation en vapeur (règle d'or : 3 par
+  // bascule, quel que soit le volume). Absent : le réglage du banc
+  // (gasDashBudget).
   dashBudget?: number
   // Lit musical imposé par le tableau. Sans valeur, la cuve suit le
   // refroidissement de la coque (tiède → glaciale) : c'est le cas général,
@@ -193,9 +198,10 @@ export const MATERIAL_NAMES: Record<number, string> = {
   [MAT_EXIT]: 'Sas',
   [MAT_FROID]: 'Hublot (froid)',
   [MAT_GRILLE]: 'Évent',
-  [MAT_CHAUD]: 'Radiateur',
+  [MAT_CHAUD]: 'Chaudière',
   [MAT_MEMBRANE]: 'Membrane (eau)',
   [MAT_RIDEAU]: 'Rideau (glace)',
+  [MAT_SURCHAUFFEUR]: 'Surchauffeur',
 }
 
 // La CAUSE de chaque zone : une zone n'impose pas un état par convention, elle
@@ -422,7 +428,7 @@ export const TABLEAU_4: LevelDef = {
   name: 'La cuve thermique',
   code: '21-D',
   journal:
-    'Un radiateur et une cryobaie dans la même cuve : trois chemins, trois états. L’échantillon a pris les trois en trois essais. Ce n’est plus une fuite, c’est une démonstration. — Dr N. Véga',
+    'Une chaudière et une cryobaie dans la même cuve : trois chemins, trois états. L’échantillon a pris les trois en trois essais. Ce n’est plus une fuite, c’est une démonstration. — Dr N. Véga',
   bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
   spawn: { x: -950, y: 0, n: 900 },
   exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
@@ -445,7 +451,7 @@ export const TABLEAU_4: LevelDef = {
     { minX: 660, minY: -750, cols: 10, rows: 2, cellSize: 24, capacityPerCell: 4 },
   ],
   labels: [
-    { x: 120, y: 580, text: 'RADIATEUR', tone: 'chaud' },
+    { x: 120, y: 580, text: 'CHAUDIÈRE', tone: 'chaud' },
     { x: 120, y: -580, text: 'CRYOBAIE', tone: 'froid' },
     { x: 584, y: 0, text: 'ÉPONGE', tone: 'eponge' },
     { x: 780, y: -580, text: 'ÉPONGE', tone: 'eponge' },
@@ -482,7 +488,7 @@ export const TABLEAU_5: LevelDef = {
   labels: [
     { x: -400, y: 140, text: 'HYDROPHILE', tone: 'phile' },
     { x: 80, y: -360, text: 'HYDROPHILE', tone: 'phile' },
-    { x: 320, y: 580, text: 'RADIATEUR', tone: 'chaud' },
+    { x: 320, y: 580, text: 'CHAUDIÈRE', tone: 'chaud' },
     { x: 584, y: -200, text: 'ÉPONGE', tone: 'eponge' },
     { x: 1110, y: -360, text: 'SAS', tone: 'sas' },
   ],
@@ -553,7 +559,7 @@ export const TABLEAU_7: LevelDef = {
     { x: -460, y: -100, text: 'HYDROPHOBE', tone: 'phobe' },
     { x: -300, y: 560, text: 'MOUILLAGE FROID', tone: 'froid' },
     { x: 360, y: -560, text: 'MOUILLAGE FROID', tone: 'froid' },
-    { x: -960, y: -520, text: 'RADIATEUR', tone: 'chaud' },
+    { x: -960, y: -520, text: 'CHAUDIÈRE', tone: 'chaud' },
     { x: 1110, y: 340, text: 'SAS', tone: 'sas' },
   ],
 }
@@ -1006,7 +1012,7 @@ export const TABLEAU_S2: LevelDef = {
     { x: -100, y: -580, text: 'PLAQUE FROIDE — FIGE', tone: 'froid' },
     { x: 160, y: -420, text: 'MEMBRANE — SEULE L’EAU PASSE', tone: 'phile' },
     { x: 160, y: 420, text: 'RIDEAU — SEULE LA GLACE PASSE', tone: 'froid' },
-    { x: 300, y: 40, text: 'RADIATEUR — DISPERSE', tone: 'chaud' },
+    { x: 300, y: 40, text: 'CHAUDIÈRE — DISPERSE', tone: 'chaud' },
     { x: 660, y: -420, text: 'ÉVENT — SEULE LA VAPEUR PASSE', tone: 'grille' },
     { x: 850, y: -380, text: 'DÉPÔT FROID', tone: 'froid' },
     { x: 1110, y: 160, text: 'SAS', tone: 'sas' },

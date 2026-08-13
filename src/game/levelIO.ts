@@ -8,6 +8,7 @@ import {
   MAT_GRILLE,
   MAT_MEMBRANE,
   MAT_RIDEAU,
+  MAT_SURCHAUFFEUR,
   MAT_HYDROPHILE,
   MAT_HYDROPHOBE,
   MAT_WALL,
@@ -33,6 +34,7 @@ export const MATERIALS = [
   MAT_CHAUD,
   MAT_MEMBRANE,
   MAT_RIDEAU,
+  MAT_SURCHAUFFEUR,
 ] as const
 
 const FORCES: ZoneForce[] = ['libre', 'eau', 'glace', 'vapeur']
@@ -66,12 +68,15 @@ function readBox(o: Record<string, unknown>): ObstacleBox | null {
   // Normaliser AVANT de juger la taille : une boîte tracée de droite à gauche
   // est parfaitement valide, elle est seulement à l'envers.
   const angle = num(o.angle, 0)
+  // aura : portée de chauffe propre à une chaudière (multiplicateur borné)
+  const aura = num(o.aura, 1)
   const box: ObstacleBox = {
     minX: Math.min(minX, maxX),
     minY: Math.min(minY, maxY),
     maxX: Math.max(minX, maxX),
     maxY: Math.max(minY, maxY),
     ...(angle ? { angle: Math.max(-180, Math.min(180, angle)) } : {}),
+    ...(aura !== 1 && material === MAT_CHAUD ? { aura: Math.max(0.25, Math.min(4, aura)) } : {}),
     material,
   }
   if (box.maxX - box.minX < 1 || box.maxY - box.minY < 1) return null

@@ -104,9 +104,10 @@ uniform vec2 uRoomHalf;
 uniform int uBoxCount;
 uniform vec4 uBoxes[MAX_BOXES];   // minX, minY, maxX, maxY
 // x : matériau (0 mur, 1 hydrophile, 2 hydrophobe, 3 sas…) ; y : rotation
-// (radians) autour du centre — 0 : boîte droite. Empaquetés à deux par
-// uniforme pour tenir dans le budget des GPU mobiles.
-uniform vec2 uBoxAux[MAX_BOXES];
+// (radians) autour du centre — 0 : boîte droite ; z : charge (surchauffeur :
+// 1 plein, 0 déchargé) ; w : portée d'aura propre (chaudière, 1 = banc).
+// Empaquetés par boîte pour tenir dans le budget des GPU mobiles.
+uniform vec4 uBoxAux[MAX_BOXES];
 uniform float uTime;
 uniform float uExitRadius; // portée de l'aspiration du sas (halo de courant)
 uniform float uColdBand;   // portée de l'aura de gel des plaques froides
@@ -616,6 +617,23 @@ void main() {
         vec3 auraCol = mat < 1.5 ? vec3(0.12, 0.42, 0.45) : vec3(0.38, 0.20, 0.52);
         col += auraCol * aura * (0.45 + 0.55 * mist);
       }
+    } else if (mat > 8.5) {
+      // SURCHAUFFEUR : serpentin cyan sous verre — la borne de recharge du
+      // dash. Chargé (aux.z = 1), le serpentin pulse ; déchargé, il s'éteint
+      // et le panneau redevient un mur gris — le manomètre est la lumière.
+      float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
+      float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
+      float charge = uBoxAux[bi].z;
+      float coil = 0.5 + 0.5 * sin(world.x * 0.30 + sin(world.y * 0.24) * 2.2);
+      float tube = smoothstep(0.55, 0.9, coil);
+      float pulse = 0.7 + 0.3 * sin(uTime * 3.1 + world.y * 0.05);
+      vec3 metal = vec3(0.10, 0.13, 0.17) * (0.9 + 0.2 * vnoise(world * 0.14));
+      vec3 lueur = mix(vec3(0.16, 0.22, 0.26), vec3(0.16, 0.85, 1.0) * pulse, charge);
+      col = mix(col, metal + lueur * tube * 0.85, fill);
+      col = mix(col, mix(vec3(0.35, 0.44, 0.50), vec3(0.45, 0.95, 1.0), charge), edge * 0.9);
+      // le halo dit « approchez en vapeur » : il meurt avec la charge
+      float aura = (1.0 - smoothstep(0.0, 60.0, max(d, 0.0))) * step(0.0, d);
+      col += vec3(0.05, 0.30, 0.36) * aura * aura * charge;
     } else if (mat > 7.5) {
       // Rideau lamellaire : lamelles souples bleu-glace qui ondulent — seule
       // la GLACE les écarte. Des fentes fines entre lamelles laissent deviner
@@ -655,7 +673,9 @@ void main() {
         : vec3(0.26, 0.11, 0.05) + vec3(0.42, 0.17, 0.04) * smoothstep(0.35, 0.85, stripe);
       col = mix(col, fillCol, fill);
       col = mix(col, vec3(1.0, 0.56, 0.24), edge * 0.9);
-      float aura = (1.0 - smoothstep(0.0, uHeatBand, max(d, 0.0))) * step(0.0, d);
+      // chaque chaudière porte sa propre portée d'aura (aux.w) : le halo
+      // dessiné est exactement la portée mécanique
+      float aura = (1.0 - smoothstep(0.0, uHeatBand * max(uBoxAux[bi].w, 0.001), max(d, 0.0))) * step(0.0, d);
       float shimmer = 0.55 + 0.45 * vnoise(world * 0.06 + vec2(-uTime * 0.16, uTime * 0.24));
       col += vec3(0.36, 0.15, 0.04) * aura * aura * shimmer;
     } else if (mat > 4.5) {
@@ -1032,7 +1052,7 @@ export class Renderer {
   private spongeScratch = new Float32Array(0)
   private readonly scratch: Float32Array
   private readonly boxScratch = new Float32Array(MAX_BOXES * 4)
-  private readonly auxScratch = new Float32Array(MAX_BOXES * 2) // matériau, angle
+  private readonly auxScratch = new Float32Array(MAX_BOXES * 4) // matériau, angle, charge, aura
   private readonly floatField: boolean
   private fieldScale: number
   private fbo: WebGLFramebuffer | null = null
@@ -1319,12 +1339,15 @@ export class Renderer {
       this.boxScratch[i * 4 + 1] = bx.minY
       this.boxScratch[i * 4 + 2] = bx.maxX
       this.boxScratch[i * 4 + 3] = bx.maxY
-      this.auxScratch[i * 2] = bx.material
-      this.auxScratch[i * 2 + 1] = ((bx.angle ?? 0) * Math.PI) / 180
+      this.auxScratch[i * 4] = bx.material
+      this.auxScratch[i * 4 + 1] = ((bx.angle ?? 0) * Math.PI) / 180
+      // surchauffeur : le solveur dit lesquels sont déchargés (mêmes index)
+      this.auxScratch[i * 4 + 2] = sim.surchauffesVides.has(i) ? 0 : 1
+      this.auxScratch[i * 4 + 3] = bx.aura ?? 1
     }
     gl.uniform1i(cu['uBoxCount'], boxCount)
     gl.uniform4fv(cu['uBoxes[0]'], this.boxScratch)
-    gl.uniform2fv(cu['uBoxAux[0]'], this.auxScratch)
+    gl.uniform4fv(cu['uBoxAux[0]'], this.auxScratch)
     gl.uniform1f(cu['uTime'], timeSec)
     gl.uniform1f(cu['uExitRadius'], params.exitRadius)
     // les auras dessinées suivent la physique refroidie (mêmes formules que

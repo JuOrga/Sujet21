@@ -22,6 +22,7 @@ import {
   MAT_HYDROPHOBE,
   MAT_MEMBRANE,
   MAT_RIDEAU,
+  MAT_SURCHAUFFEUR,
   dansBoite,
   MAT_WALL,
   type ObstacleBox,
@@ -157,13 +158,15 @@ export class FluidSim {
   // jour à chaque pas par processCold.
   chauffeFrac = 0
 
-  // Un dash « offert » par un radiateur : la vapeur rechargée ne paie pas
-  // le prochain péage d'impulsion. Consommé par gasDash.
-  dashOffert = false
-  // Impulsions vapeur restantes pour CET écran : le dash ne coûte plus de
-  // volume, il se COMPTE — x par tableau, quel que soit le volume (le
-  // liquide, lui, continue de payer ses éjections en quantité réelle).
-  dashBudget = 3
+  // Impulsions vapeur restantes : le compteur se REMPLIT à chaque
+  // TRANSFORMATION en vapeur (règle d'or : N par bascule, quel que soit le
+  // volume restant — se retransformer redonne ses dashs, mais repaie le
+  // péage). Le SURCHAUFFEUR frôlé en gaz en rend UNE, une seule fois.
+  dashBudget = 0
+  dashBudgetParTransfo = 3
+  // Surchauffeurs déjà déchargés (indices de boîtes) — remis à neuf au
+  // chargement du tableau. Le rendu lit ce même état pour le manomètre.
+  readonly surchauffesVides = new Set<number>()
   private mouthX = 0
   private mouthY = 0
   private drainOn = false
@@ -277,6 +280,7 @@ export class FluidSim {
   private hasCold = false
   private hasHeat = false
   private hasGrille = false
+  private hasSurchauffeur = false
   private coldBoxes: ObstacleBox[] = []
   private heatCarry = 0
   private gasIdleCarry = 0
@@ -302,7 +306,9 @@ export class FluidSim {
     this.hasCold = boxes.some((b) => b.material === MAT_FROID)
     this.hasHeat = boxes.some((b) => b.material === MAT_CHAUD)
     this.hasGrille = boxes.some((b) => b.material === MAT_GRILLE)
+    this.hasSurchauffeur = boxes.some((b) => b.material === MAT_SURCHAUFFEUR)
     this.coldBoxes = boxes.filter((b) => b.material === MAT_FROID)
+    this.surchauffesVides.clear()
   }
 
   // Portes asservies aux cibles laser : des parois qui vont et viennent.
@@ -525,11 +531,11 @@ export class FluidSim {
     return { nx: sx / l, ny: sy / l }
   }
 
-  // Exposition à la chaleur en (x, y) : 1 au contact d'un radiateur, 0 au
+  // Exposition à la chaleur en (x, y) : 1 au contact d'une chaudière, 0 au
   // bord de l'aura. Même géométrie que l'aura de gel des plaques froides.
   private heatExposureAt(x: number, y: number): number {
     if (!this.hasHeat) return 0
-    // le vaisseau refroidit : l'aura des radiateurs se rétracte
+    // le vaisseau refroidit : l'aura des chaudières se rétracte
     const band = this.params.heatBand * (1 - this.params.chillHeatFade * this.chill)
     if (band <= 1) return 0
     const rp = this.params.particleSpacing * 0.5
@@ -537,12 +543,32 @@ export class FluidSim {
     let heat = 0
     for (const b of this.boxes) {
       if (b.material !== MAT_CHAUD) continue
-      if (horsBoite(b, x, y, band + rp)) continue
+      // chaque chaudière règle la portée de sa propre aura (éditeur) :
+      // un gros bloc à petite aura, un petit bloc qui chauffe loin
+      const bandB = band * (b.aura ?? 1)
+      if (bandB <= 1) continue
+      if (horsBoite(b, x, y, bandB + rp)) continue
       boxContact(x, y, b, cp)
-      const f = 1 - Math.max(0, cp.dist - rp) / band
+      const f = 1 - Math.max(0, cp.dist - rp) / bandB
       if (f > heat) heat = Math.min(1, f)
     }
     return heat
+  }
+
+  // Le SURCHAUFFEUR le plus proche que ce point frôle ou touche (index de
+  // boîte), ou -1. « Frôler » : à moins de deux espacements de particule de
+  // la paroi — pas besoin de s'écraser dessus.
+  private surchauffeurFrole(x: number, y: number): number {
+    const reach = this.params.particleSpacing * 2
+    const cp = this.scratchCP
+    for (let bi = 0; bi < this.boxes.length; bi++) {
+      const b = this.boxes[bi]
+      if (b.material !== MAT_SURCHAUFFEUR) continue
+      if (horsBoite(b, x, y, reach)) continue
+      boxContact(x, y, b, cp)
+      if (cp.dist <= reach) return bi
+    }
+    return -1
   }
 
   // Retrait par échange avec la dernière particule (absorption éponge).
@@ -809,17 +835,85 @@ export class FluidSim {
     }
   }
 
-  // Le dash de vapeur (refonte 2026, « air dash » à la Ori) : UNE impulsion
-  // qui envoie tout le nuage vers le point visé — pas de recul, pas
-  // d'éjection, pas de pilotage continu. Le prix se paie d'avance : une
-  // les impulsions sont COMPTÉES par écran (dashBudget), prélevées sur la
-  // traîne — les particules les plus en arrière de la direction du dash.
-  // Fraction du courant et non du volume de base : chaque dash emporte le
-  // même tiers, donc propulse pareil (Tsiolkovsky) — un tableau reste
-  // toujours soluble, chaque dash coûte juste plus cher en valeur absolue.
-  // Les pertes rejoignent la réserve de vapeur : elles perleront en rosée
-  // près des plaques froides, récupérables par une bonne trajectoire.
-  // Renvoie le nombre de particules dépensées (0 : pas de dash).
+  // Le dash de vapeur (« air dash » à la Ori) : UNE impulsion qui envoie
+  // tout le nuage vers le point visé — pas de recul, pas d'éjection, pas de
+  // pilotage continu. Les impulsions sont COMPTÉES : le compteur se remplit
+  // à chaque TRANSFORMATION en vapeur (dashBudgetParTransfo), et un
+  // surchauffeur frôlé en rend une. Renvoie 1 si le dash part, 0 sinon.
+  // La TRANSFORMATION en vapeur — touche, chaudière à 95 %, zone forcée :
+  // toute cause confondue — se paie à l'instant du basculement : une
+  // fraction du volume actif (vaporTollFrac, 20 %) part en gouttes éjectées
+  // à grande vitesse dans TOUTES les directions. C'est la même matière que
+  // la propulsion : récupérable, elle perlera aussi en rosée au froid. Et
+  // chaque bascule rend ses dashs — N par transformation, quel que soit le
+  // volume restant (se retransformer sans compter mène au game over : c'est
+  // le jeu). La quantité de mouvement d'ensemble est conservée exactement.
+  transfoVapeur(): void {
+    if (this.dispersed) return
+    const p = this.params
+    this.dashBudget = this.dashBudgetParTransfo
+    this.updatePlayerStats()
+    const toll = Math.floor(this.playerCount * p.vaporTollFrac)
+    if (toll <= 0) return
+    const cx = this.stats.centroidX
+    const cy = this.stats.centroidY
+    // la ponction se répartit dans tout le corps (une particule sur k) :
+    // la gerbe part en étoile, pas d'un seul flanc
+    const stride = Math.max(1, Math.floor(this.playerCount / toll))
+    const v = p.ejectSpeed * 0.85
+    let dvxSum = 0
+    let dvySum = 0
+    let pris = 0
+    let vus = 0
+    for (let i = 0; i < this.count && pris < toll; i++) {
+      if (this.kind[i] !== KIND_PLAYER || this.frozen[i] === 1) continue
+      vus++
+      if (vus % stride !== 0) continue
+      let ux = this.posX[i] - cx
+      let uy = this.posY[i] - cy
+      const d = Math.hypot(ux, uy)
+      if (d < 1e-6) {
+        const a = (i * 2.399963) % (Math.PI * 2) // angle d'or : gerbe régulière
+        ux = Math.cos(a)
+        uy = Math.sin(a)
+      } else {
+        ux /= d
+        uy /= d
+      }
+      const dvx = this.stats.velX + ux * v - this.velX[i]
+      const dvy = this.stats.velY + uy * v - this.velY[i]
+      this.velX[i] += dvx
+      this.velY[i] += dvy
+      // décoller hors de la couche de surface, comme l'éjection (§3.3)
+      this.posX[i] += ux * p.kernelRadius * 0.8
+      this.posY[i] += uy * p.kernelRadius * 0.8
+      this.kind[i] = KIND_FREE
+      this.cooldown[i] = p.reabsorbCooldown
+      this.playerCount--
+      dvxSum += dvx
+      dvySum += dvy
+      pris++
+    }
+    // réaction répartie sur le corps restant : la gerbe est quasi symétrique,
+    // le solde est faible — on le rend quand même (conservation exacte)
+    if (pris > 0 && this.playerCount > 0) {
+      let libres = 0
+      for (let i = 0; i < this.count; i++) {
+        if (this.kind[i] === KIND_PLAYER && this.frozen[i] === 0) libres++
+      }
+      if (libres > 0) {
+        const rx = -dvxSum / libres
+        const ry = -dvySum / libres
+        for (let i = 0; i < this.count; i++) {
+          if (this.kind[i] === KIND_PLAYER && this.frozen[i] === 0) {
+            this.velX[i] += rx
+            this.velY[i] += ry
+          }
+        }
+      }
+    }
+  }
+
   gasDash(aimX: number, aimY: number): number {
     if (this.dispersed) return 0
     const p = this.params
@@ -839,15 +933,12 @@ export class FluidSim {
       if (this.kind[i] === KIND_PLAYER && this.gaseous[i] === 1) gasCount++
     }
     if (gasCount < 3) return 0
-    // le dash se COMPTE, il ne se paie plus en volume : un radiateur frôlé
-    // offre l'impulsion, sinon elle sort du budget de l'écran
-    if (this.dashOffert) {
-      this.dashOffert = false
-    } else if (this.dashBudget <= 0) {
-      return 0 // plus d'impulsions : condenser, ou trouver un radiateur
-    } else {
-      this.dashBudget--
+    // le dash se COMPTE, il ne se paie pas en volume : le prix a été payé à
+    // la transformation (péage de vaporisation)
+    if (this.dashBudget <= 0) {
+      return 0 // à sec : condenser et se retransformer, ou un surchauffeur
     }
+    this.dashBudget--
     for (let i = 0; i < this.count; i++) {
       if (this.kind[i] !== KIND_PLAYER || this.gaseous[i] !== 1) continue
       this.velX[i] = dx * p.gasDashSpeed * power
@@ -1293,10 +1384,16 @@ export class FluidSim {
       if (this.gaseous[i] !== 1) continue
       if (this.kind[i] === KIND_PLAYER) {
         anyPlayerGas = true
-        // Radiateur : FRÔLER son aura recharge un dash — pas besoin de s'y
-        // baigner ni de toucher, effleurer le bord du halo suffit
-        if (!this.dashOffert && this.hasHeat && this.heatExposureAt(this.posX[i], this.posY[i]) > 0.15) {
-          this.dashOffert = true
+        // SURCHAUFFEUR : seul le gaz interagit avec lui — le frôler ou le
+        // toucher rend UN dash, une seule fois par appareil (le manomètre
+        // tombe à zéro). La chaudière, elle, ne recharge plus : elle
+        // transforme.
+        if (this.hasSurchauffeur) {
+          const bi = this.surchauffeurFrole(this.posX[i], this.posY[i])
+          if (bi >= 0 && !this.surchauffesVides.has(bi)) {
+            this.surchauffesVides.add(bi)
+            this.dashBudget++
+          }
         }
       }
       if (this.hasGrille && this.grilleAt(this.posX[i], this.posY[i])) inMesh++

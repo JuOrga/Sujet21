@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PARAMS, type SimParams } from './params'
 import { FluidSim, KIND_FREE, KIND_PLAYER, type Bounds } from './solver'
-import { MAT_CHAUD, MAT_FROID, MAT_GRILLE } from '../game/level'
+import { MAT_CHAUD, MAT_FROID, MAT_GRILLE, MAT_SURCHAUFFEUR } from '../game/level'
 
 const OPEN: Bounds = { minX: -3000, minY: -3000, maxX: 3000, maxY: 3000 }
 
@@ -51,6 +51,7 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
     sim.spawnDisc(0, 0, 60, KIND_PLAYER)
     sim.gasIntent = true
     run(sim, 1.2) // vaporisation complète
+    sim.dashBudget = 3 // la bascule a rendu ses dashs (transfoVapeur)
     const before = sim.playerCount
     const spent = sim.gasDash(600, 0)
     // le dash se COMPTE (budget d'écran), il n'évapore plus le volume
@@ -75,6 +76,7 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
       sim.spawnDisc(0, 0, 60, KIND_PLAYER)
       sim.gasIntent = true
       run(sim, 1.2)
+      sim.dashBudget = 9
       sim.updatePlayerStats()
       sim.gasDash(sim.stats.centroidX + dist, sim.stats.centroidY)
       sim.updatePlayerStats()
@@ -94,7 +96,7 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
     }
   })
 
-  it('les impulsions sont COMPTÉES par écran : le budget s’épuise, quel que soit le volume', () => {
+  it('les dashs sont COMPTÉS : le budget s’épuise, quel que soit le volume', () => {
     const sim = makeSim()
     sim.setLevel([], [])
     sim.spawnDisc(0, 0, 90, KIND_PLAYER)
@@ -109,19 +111,61 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
     expect(sim.playerCount).toBeGreaterThan(80) // et le volume n'a rien payé
   })
 
-  it('un bain dans l’aura du radiateur RECHARGE UN DASH : le prochain est offert', () => {
+  it('la TRANSFORMATION en vapeur : péage de 20 % en gouttes, et le compteur de dashs se remplit', () => {
     const sim = makeSim()
-    sim.setLevel([{ minX: -60, minY: -260, maxX: 60, maxY: -200, material: MAT_CHAUD }], [])
-    sim.spawnDisc(0, -140, 60, KIND_PLAYER) // dans l'aura du radiateur
+    sim.setLevel([], [])
+    sim.spawnDisc(0, 0, 300, KIND_PLAYER)
+    sim.relabel()
+    sim.dashBudgetParTransfo = 3
+    const before = sim.playerCount
+    const avant = sim.totalMomentum()
+    sim.transfoVapeur()
+    // 20 % du corps part en gouttes LIBRES, éjectées en étoile…
+    expect(sim.playerCount).toBe(before - Math.floor(before * sim.params.vaporTollFrac))
+    // …récupérables : elles existent toujours, sous délai de réabsorption
+    let libres = 0
+    let rapides = 0
+    for (let i = 0; i < sim.count; i++) {
+      if (sim.kind[i] !== KIND_FREE) continue
+      libres++
+      if (Math.hypot(sim.velX[i], sim.velY[i]) > sim.params.ejectSpeed * 0.5) rapides++
+    }
+    expect(libres).toBe(before - sim.playerCount)
+    expect(rapides).toBe(libres) // la gerbe part à grande vitesse
+    // le compteur de dashs est rendu, et la quantité de mouvement conservée
+    expect(sim.dashBudget).toBe(3)
+    const apres = sim.totalMomentum()
+    expect(Math.abs(apres.px - avant.px)).toBeLessThan(5)
+    expect(Math.abs(apres.py - avant.py)).toBeLessThan(5)
+    // se RE-transformer repaie le péage et re-rend les dashs — jusqu'au
+    // game over si on en abuse : c'est le jeu
+    sim.dashBudget = 0
+    const encore = sim.playerCount
+    sim.transfoVapeur()
+    expect(sim.playerCount).toBeLessThan(encore)
+    expect(sim.dashBudget).toBe(3)
+  })
+
+  it('le SURCHAUFFEUR frôlé en vapeur rend UN dash — une seule fois par appareil', () => {
+    const sim = makeSim()
+    sim.setLevel(
+      [
+        { minX: -400, minY: -60, maxX: -340, maxY: 60, material: MAT_SURCHAUFFEUR },
+        { minX: 340, minY: -60, maxX: 400, maxY: 60, material: MAT_SURCHAUFFEUR },
+      ],
+      [],
+    )
+    sim.spawnDisc(-320, 0, 60, KIND_PLAYER) // au contact du premier
     gasify(sim)
-    run(sim, 0.5)
-    expect(sim.dashOffert).toBe(true)
-    sim.dashBudget = 1
-    sim.gasDash(400, -140)
-    expect(sim.dashBudget).toBe(1) // l'offrande a payé : le budget est intact
-    expect(sim.dashOffert).toBe(false) // et elle est consommée
-    sim.gasDash(400, -140)
-    expect(sim.dashBudget).toBe(0) // le suivant sort du budget de l'écran
+    sim.dashBudget = 0
+    run(sim, 0.3)
+    expect(sim.dashBudget).toBe(1) // le serpentin a rendu son dash
+    expect(sim.surchauffesVides.size).toBe(1)
+    run(sim, 0.5) // rester collé n'en rend pas un deuxième
+    expect(sim.dashBudget).toBe(1)
+    // l'eau, elle, n'interagit pas : le second surchauffeur reste plein
+    expect(sim.surchauffesVides.has(0)).toBe(true)
+    expect(sim.surchauffesVides.has(1)).toBe(false)
   })
 
   it('la vapeur traverse l’évent, le liquide s’y écrase', () => {

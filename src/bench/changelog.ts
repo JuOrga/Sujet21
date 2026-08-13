@@ -11,6 +11,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '13/08/2026 17:15',
+    title: 'La règle d’or v4 : péage de vaporisation, dashs par transformation, SURCHAUFFEUR',
+    notes: [
+      'La VAPORISATION se paie : 20 % du volume actif part en gouttes à CHAQUE bascule en vapeur — touche G, chaudière à 95 %, zone forcée, toute cause confondue. La gerbe part en étoile à grande vitesse : c’est la même matière que la propulsion, récupérable (et elle perlera en rosée au froid). Réglable au banc (« péage de vaporisation »).',
+      'Les dashs ne se comptent plus PAR ÉCRAN mais PAR TRANSFORMATION : chaque bascule en vapeur rend ses 3 dashs (réglable au banc et par tableau dans l’éditeur), même si le volume a fondu — se retransformer sans compter mène au game over, c’est le jeu.',
+      'Nouveau bloc : le SURCHAUFFEUR — un mur pour l’eau et la glace ; frôlé en VAPEUR, son serpentin cyan rend UN dash, une seule fois par appareil, puis s’éteint (le manomètre, c’est la lumière). Dans l’éditeur, la légende et le panneau des états.',
+      'Le radiateur devient la CHAUDIÈRE, partout — et elle ne recharge plus les dashs (c’était le rôle provisoire du frôlement) : elle transforme, le surchauffeur recharge. Chaque chaudière règle désormais la PORTÉE DE SA PROPRE AURA (champ « Aura » de l’éditeur) : gros bloc à petite aura, petit bloc qui chauffe loin — le halo dessiné suit exactement la mécanique.',
+      'Les deux documents de référence (« La règle d’or », « Transformations d’état » v4) sont archivés dans docs/ — la suite du chantier (récompenses de fin de niveau, douche de décontamination, glissade, bonus de surfaces) suivra ce cap.',
+    ],
+  },
+  {
     date: '13/08/2026 13:50',
     title: 'Le time warp fonctionne à nouveau — l’accélération se paie en images, pas en mensonge',
     notes: [
