@@ -515,6 +515,49 @@ sallesEl.addEventListener('pointerdown', (e) => {
   if (e.target === sallesEl) sallesEl.hidden = true
 })
 
+// ---- Le voile PARAMÈTRES : les réglages du joueur (le banc règle la physique) ----
+// Premier réglage : le VERROU DE FRÉQUENCE, anti yo-yo. Le joueur choisit
+// une cadence plafond ; la boucle saute les images d'avance. Sur un écran
+// rapide (90/120 Hz), verrouiller à 60 échange le « parfois 90, parfois
+// 55 » contre un 60 régulier — c'est la stabilité qui se sent, pas la
+// pointe. La qualité adaptative vise la cadence choisie (bornée à 60).
+const FPS_CHOIX = [30, 50, 60, 90, 120, 240]
+let fpsCap = ((): number => {
+  const v = Number(localStorage.getItem('sujet21-fps-cap'))
+  return FPS_CHOIX.includes(v) ? v : 60
+})()
+let fpsCapPrecedent = 0 // horloge du limiteur (dernière image RENDUE)
+const paramsEl = document.getElementById('params') as HTMLDivElement
+{
+  const choix = document.getElementById('params-fps') as HTMLDivElement
+  const renderFps = (): void => {
+    choix.innerHTML = ''
+    for (const hz of FPS_CHOIX) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = `${hz}`
+      b.className = hz === fpsCap ? 'actif' : ''
+      b.addEventListener('click', () => {
+        fpsCap = hz
+        localStorage.setItem('sujet21-fps-cap', String(hz))
+        fpsCapPrecedent = 0 // la prochaine image passe tout de suite
+        renderFps()
+      })
+      choix.appendChild(b)
+    }
+  }
+  renderFps()
+}
+document.getElementById('home-params')?.addEventListener('click', () => {
+  paramsEl.hidden = false
+})
+document.getElementById('params-fermer')?.addEventListener('click', () => {
+  paramsEl.hidden = true
+})
+paramsEl.addEventListener('pointerdown', (e) => {
+  if (e.target === paramsEl) paramsEl.hidden = true
+})
+
 // ---- L'appel de l'œil : à l'arrivée sur la fiche, le son et le plein
 // écran battent trois fois — on sait où toucher d'abord.
 function appelOeil(): void {
@@ -792,6 +835,7 @@ const FICHE_BOUTONS = [
   'home-salles',
   'home-cmds',
   'home-recs',
+  'home-params',
   'home-mute',
   'home-plein',
 ]
@@ -1642,10 +1686,14 @@ let qualityLevel = window.matchMedia('(pointer: coarse)').matches ? 1 : 0
 let qualitySous = 0 // s passées sous l'objectif
 let qualitySur = 0 // s passées avec de la marge
 function updateQuality(dtReal: number): void {
-  if (fpsSmoothed < 55) {
+  // La qualité vise la cadence VERROUILLÉE (bornée à 60 : le rendu est
+  // taillé pour 60 — au-delà, l'écran rapide profite du surplus sans que
+  // la qualité ne se sacrifie pour courir après 120).
+  const cible = Math.min(fpsCap, 60)
+  if (fpsSmoothed < cible * (55 / 60)) {
     qualitySous += dtReal
     qualitySur = 0
-  } else if (fpsSmoothed > 58.5) {
+  } else if (fpsSmoothed > cible * (58.5 / 60)) {
     qualitySur += dtReal
     qualitySous = 0
   } else {
@@ -1662,6 +1710,14 @@ function updateQuality(dtReal: number): void {
 }
 
 function frame(now: number): void {
+  // Verrou de fréquence : l'image d'avance est SAUTÉE (rien n'est simulé ni
+  // rendu — dtReal la rattrapera). Marge d'une demi-période de rAF 240 Hz :
+  // les rappels n'arrivent jamais pile sur la cadence demandée.
+  if (now - fpsCapPrecedent < 1000 / fpsCap - 2.1) {
+    requestAnimationFrame(frame)
+    return
+  }
+  fpsCapPrecedent = now
   const dtReal = Math.min((now - lastTime) / 1000, 0.1)
   lastTime = now
   elapsed += dtReal
