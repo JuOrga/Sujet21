@@ -1976,6 +1976,12 @@
           linear-gradient(135deg, #1a2634, #2c3d50);
         border-color: #9fc2e0;
       }
+      .lg-sw.sw-surchauffeur {
+        background:
+          repeating-linear-gradient(0deg, rgba(41, 216, 255, 0.55) 0 3px, transparent 3px 7px),
+          linear-gradient(135deg, #0a1a20, #113642);
+        border-color: #29d8ff;
+      }
       .lg-sw.sw-sas {
         background: radial-gradient(circle, #020c09 0 35%, #145c46 90%);
         border-color: var(--valid);
@@ -2642,10 +2648,11 @@
           <button type="button" class="ed-tool" data-tool="box:1"><i style="background:#2ec6c9"></i>Hydrophile</button>
           <button type="button" class="ed-tool" data-tool="box:2"><i style="background:#a878e8"></i>Hydrophobe</button>
           <button type="button" class="ed-tool" data-tool="box:4"><i style="background:#8fc8ee"></i>Hublot froid</button>
-          <button type="button" class="ed-tool" data-tool="box:6"><i style="background:#ff8a3c"></i>Radiateur</button>
+          <button type="button" class="ed-tool" data-tool="box:6" title="Transforme en GAZ à 95 % de présence dans son aura, dégèle — jamais désactivée. Aura réglable par bloc (champ Aura)."><i style="background:#ff8a3c"></i>Chaudière</button>
           <button type="button" class="ed-tool" data-tool="box:5" title="Seule la VAPEUR passe entre les lamelles — l'eau et la glace butent, la lumière passe"><i style="background:#8fb0c6"></i>Évent</button>
           <button type="button" class="ed-tool" data-tool="box:7" title="Seule l'EAU la traverse — glace et vapeur butent, le laser est absorbé"><i style="background:#35c9a0"></i>Membrane</button>
           <button type="button" class="ed-tool" data-tool="box:8" title="Seule la GLACE l'écarte — eau et vapeur butent, le laser est absorbé"><i style="background:#9fb9d8"></i>Rideau lamellaire</button>
+          <button type="button" class="ed-tool" data-tool="box:9" title="Mur pour l'eau et la glace. Frôlé en VAPEUR : rend UN dash — une seule fois, puis le serpentin s'éteint."><i style="background:#29d8ff"></i>Surchauffeur</button>
           <button type="button" class="ed-tool" data-tool="sponge"><i style="background:#d7ad55"></i>Éponge</button>
           <button type="button" class="ed-tool" data-tool="cut" title="Chevauchement : cliquez la paroi qui prend le dessus, puis celle qui s'efface — seule la zone commune est rongée"><i style="background:#e86a6a"></i>Découpe</button>
         </div>
@@ -2879,10 +2886,14 @@
         <span class="st">Vapeur</span> : condensée, on redevient eau — et la vapeur
         <em>perdue</em> ailleurs vient y perler en rosée, récupérable.</span></div>
       <div class="lg-row"><span class="lg-sw sw-chaud"></span>
-        <span><b>Radiateur</b> — son aura vaporise l'eau, qu'on le veuille ou non ;
-        la <span class="st">vapeur</span> qui s'y baigne RECHARGE UN DASH (la
-        prochaine impulsion est offerte), mais s'attarder l'évapore (perdue).
-        Dégèle la <span class="st">glace</span>.</span></div>
+        <span><b>Chaudière</b> — quand 95 % du corps baigne dans son aura, tout
+        bascule en <span class="st">vapeur</span> (l'échauffement d'avant n'est
+        que visuel). Dégèle la <span class="st">glace</span>. Jamais désactivée,
+        et chaque chaudière règle la portée de sa propre aura.</span></div>
+      <div class="lg-row"><span class="lg-sw sw-surchauffeur"></span>
+        <span><b>Surchauffeur</b> — mur pour l'eau et la glace ; frôlé en
+        <span class="st">vapeur</span>, son serpentin rend UN dash — une seule
+        fois, puis il s'éteint.</span></div>
       <div class="lg-row"><span class="lg-sw sw-grille"></span>
         <span><b>Évent</b> — la bouche par laquelle le vaisseau respire :
         arrête l'eau et la glace ; seule la <span class="st">vapeur</span> s'y
@@ -2901,7 +2912,7 @@
       <div class="lg-states">ÉTATS —
         <b>💧 EAU</b> : pilotable, éjecter pour avancer ·
         <b>❄ GLACE</b> (F) : le bloc garde son élan, re-presser dégèle ·
-        <b>💨 VAPEUR</b> (G) : viser ralentit le temps, relâcher = dash — les impulsions se COMPTENT (x par salle), le volume ne paie plus.</div>
+        <b>💨 VAPEUR</b> (G) : la bascule coûte 20 % du volume (gouttes récupérables) et rend 3 dashs — viser ralentit le temps, relâcher = dash.</div>
     </div>
 
     <div id="states" role="dialog" aria-label="Les trois états : qui bloque quoi">
@@ -2916,7 +2927,7 @@
         collée par l'<i class="m-phile">hydrophile</i> ·
         déviée par l'<i class="m-phobe">hydrophobe</i> ·
         gelée par les <i class="m-froid">plaques froides</i> ·
-        vaporisée par les <i class="m-chaud">radiateurs</i> ·
+        vaporisée par les <i class="m-chaud">chaudières</i> (à 95 % de présence) ·
         le <i class="m-sas">sas</i> l'aspire.</span></div>
       <div class="lg-row"><span class="st-big">❄</span>
         <span><b>GLACE</b> (F) — bloc rigide : garde son élan, plus de propulsion.<br />
@@ -2926,22 +2937,22 @@
         seule à écarter le <i class="m-froid">rideau lamellaire</i> ·
         l'<i class="m-eponge">éponge</i> et la <i class="m-phile">membrane</i> la bloquent ·
         <i class="m-froid">soudée</i> au contact d'une plaque froide ·
-        dégelée par les <i class="m-chaud">radiateurs</i> ·
+        dégelée par les <i class="m-chaud">chaudières</i> ·
         le <i class="m-sas">sas</i> la hale et l'avale — entrer solide paie une prime.</span></div>
       <div class="lg-row"><span class="st-big">💨</span>
         <span><b>VAPEUR</b> (G) — viser ralentit fortement le temps, relâcher
         lance le nuage d'un trait (dash) : la distance du doigt règle la
-        puissance. Les impulsions sont COMPTÉES — x par salle, quel que soit
-        le volume (frôler un radiateur en offre une) — mais l'état lui-même
-        s'évapore en continu : un compte à rebours, pas un mode de
-        croisière.<br />
+        puissance. La BASCULE en vapeur coûte 20 % du volume (une gerbe de
+        gouttes récupérables) et rend 3 dashs — se retransformer les rend à
+        nouveau, au même prix — et l'état lui-même s'évapore en continu :
+        un compte à rebours, pas un mode de croisière.<br />
         Seule à traverser les <i class="m-grille">évents</i> (qui l'essorent :
         péage en volume) ·
         bloquée par les <i class="m-mur">parois</i>, l'<i class="m-eponge">éponge</i>,
         la <i class="m-phile">membrane</i> et le <i class="m-froid">rideau</i> ·
-        un bain dans l'aura d'un <i class="m-chaud">radiateur</i> recharge un dash ·
+        frôler un <i class="m-phile">surchauffeur</i> rend UN dash (une seule fois par appareil) ·
         condensée par le <i class="m-froid">froid</i> ·
-        s'attarder au <i class="m-chaud">radiateur</i> la brûle ·
+        s'attarder à la <i class="m-chaud">chaudière</i> la brûle ·
         le <i class="m-sas">sas</i> l'avale.<br />
         Ses pertes ne sont pas toutes définitives : elles <i class="m-froid">perlent
         en rosée</i> près des plaques froides — son propre corps, à aller

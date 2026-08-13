@@ -443,21 +443,21 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   const fChill = pane.addFolder({ title: 'Refroidissement (expédition)', expanded: false })
   describe(
     fChill.addBinding(params, 'chillDuration', { min: 60, max: 1200, step: 10, label: 'durée (s)' }),
-    'Temps de jeu simulé pour que le vaisseau devienne glacial. Pas de chronomètre à l’écran : la pression se lit dans la physique (auras qui s’étendent, radiateurs qui faiblissent) et sur la température de coque du HUD.',
+    'Temps de jeu simulé pour que le vaisseau devienne glacial. Pas de chronomètre à l’écran : la pression se lit dans la physique (auras qui s’étendent, chaudières qui faiblissent) et sur la température de coque du HUD.',
   )
   describe(
     fChill.addBinding(params, 'chillColdGrowth', { min: 0, max: 1.5, step: 0.05, label: 'poussée du froid' }),
     'À froid complet : extension des auras froides (× coldBand), gel plus prompt, dégel plus lent. Le gel subi devient la menace du dernier tiers.',
   )
   describe(
-    fChill.addBinding(params, 'chillHeatFade', { min: 0, max: 0.9, step: 0.05, label: 'déclin des radiateurs' }),
-    'À froid complet : rétraction de l’aura des radiateurs et vaporisation plus lente. La vapeur devient rare — pas impossible.',
+    fChill.addBinding(params, 'chillHeatFade', { min: 0, max: 0.9, step: 0.05, label: 'déclin des chaudières' }),
+    'À froid complet : rétraction de l’aura des chaudières et vaporisation plus lente. La vapeur devient rare — pas impossible.',
   )
 
   const fHeat = pane.addFolder({ title: 'Chaleur (tableau 4)', expanded: false })
   describe(
     fHeat.addBinding(params, 'heatBand', { min: 10, max: 300, step: 1, label: 'aura (u)' }),
-    'Portée de l’aura de chaleur autour des radiateurs. L’eau s’y vaporise d’autant plus vite qu’elle est près de la plaque — danger ou ressource, selon ce qu’on vient y chercher.',
+    'Portée de l’aura de chaleur autour des chaudières (chaque chaudière peut la multiplier dans l’éditeur). L’eau s’y vaporise d’autant plus vite qu’elle est près de la plaque — danger ou ressource, selon ce qu’on vient y chercher.',
   )
   describe(
     fHeat.addBinding(params, 'boilTime', { min: 0.3, max: 5, label: 'vaporisation (s)' }),
@@ -465,11 +465,11 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   )
   describe(
     fHeat.addBinding(params, 'heatThawTime', { min: 0.1, max: 3, label: 'dégel forcé (s)' }),
-    'Temps de dégel en pleine aura : le radiateur libère une glace soudée bien plus vite que l’air libre.',
+    'Temps de dégel en pleine aura : la chaudière libère une glace soudée bien plus vite que l’air libre.',
   )
   describe(
     fHeat.addBinding(params, 'heatLossRate', { min: 0, max: 30, step: 0.5, label: 'évaporation /s' }),
-    'Particules de vapeur perdues par seconde d’exposition dans l’aura : s’attarder sur le radiateur brûle du volume, définitivement. C’est la fenêtre d’usage de la chaleur.',
+    'Particules de vapeur perdues par seconde d’exposition dans l’aura : s’attarder sur la chaudière brûle du volume, définitivement. C’est la fenêtre d’usage de la chaleur.',
   )
   describe(
     fHeat.addBinding(params, 'heatAgitation', { min: 0, max: 800, step: 20, label: 'frémissement' }),
@@ -506,8 +506,12 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Facteur de temps pendant la visée du dash : 0,06 = seize fois plus lent. Le monde continue d’avancer — rien n’est figé, on vise dans un monde au ralenti.',
   )
   describe(
-    fGas.addBinding(params, 'gasDashBudget', { min: 0, max: 9, step: 1, label: 'impulsions / écran' }),
-    'Nombre d’impulsions vapeur par ÉCRAN, quel que soit le volume — le dash ne se paie plus en eau, il se COMPTE. Chaque tableau peut fixer le sien dans l’éditeur ; frôler un radiateur offre l’impulsion suivante.',
+    fGas.addBinding(params, 'gasDashBudget', { min: 0, max: 9, step: 1, label: 'dashs / transformation' }),
+    'Dashs rendus à CHAQUE transformation en vapeur (règle d’or) : se retransformer les rend à nouveau — mais repaie le péage de vaporisation. Chaque tableau peut fixer le sien dans l’éditeur ; un surchauffeur frôlé en rend un.',
+  )
+  describe(
+    fGas.addBinding(params, 'vaporTollFrac', { min: 0, max: 0.5, step: 0.01, label: 'péage de vaporisation' }),
+    'Fraction du volume actif éjectée en gouttes à CHAQUE bascule en vapeur — touche, chaudière ou zone forcée, toute cause confondue. La gerbe part en étoile à grande vitesse : récupérable, comme la matière de propulsion.',
   )
   describe(
     fGas.addBinding(params, 'gasIdleLossRate', { min: 0, max: 10, step: 0.5, label: 'coût d’état /s' }),
@@ -603,7 +607,7 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   const fMat = pane.addFolder({ title: 'Matériaux (§6)', expanded: false })
   describe(
     fMat.addBinding(params, 'surfaceBite', { min: 0.5, max: 3, step: 0.05, label: 'mordant global' }),
-    'LE curseur de dureté : multiplie l’effet de toutes les surfaces — adhésion et arrachage hydrophiles, répulsion hydrophobe, engluement et absorption de l’éponge, gel d’aura, évaporation au radiateur. S’applique par-dessus les réglages individuels (et les présets).',
+    'LE curseur de dureté : multiplie l’effet de toutes les surfaces — adhésion et arrachage hydrophiles, répulsion hydrophobe, engluement et absorption de l’éponge, gel d’aura, évaporation à la chaudière. S’applique par-dessus les réglages individuels (et les présets).',
   )
   describe(
     fMat.addBinding(params, 'hydroBand', { min: 4, max: 150, step: 1, label: 'portée bande' }),

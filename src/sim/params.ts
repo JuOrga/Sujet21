@@ -70,7 +70,8 @@ export interface SimParams {
   gasDashSpeed: number // vitesse du dash À PLEINE PUISSANCE (u/s)
   gasDashRange: number // distance (u) du pointeur au corps où la puissance atteint 1
   gasAimSlow: number // facteur de temps pendant la visée (0,06 = 16× plus lent)
-  gasDashBudget: number // impulsions vapeur par ÉCRAN, quel que soit le volume (l'éditeur peut le régler par tableau)
+  gasDashBudget: number // dashs rendus à CHAQUE transformation en vapeur (l'éditeur peut le régler par tableau)
+  vaporTollFrac: number // péage de vaporisation : fraction du volume actif éjectée en gouttes à la bascule (toute cause)
   gasExpand: number // répulsion interne du nuage (u/s²) : la vapeur s'étale
   gasTurb: number // turbulence : le nuage se tord en volutes (u/s²)
   gasDrag: number // flottement : freinage propre du gaz (1/s)
@@ -239,6 +240,7 @@ export const DEFAULT_PARAMS: SimParams = {
   gasDashRange: 380,
   gasAimSlow: 0.06,
   gasDashBudget: 3,
+  vaporTollFrac: 0.2,
   gasExpand: 260,
   gasTurb: 120,
   gasDrag: 1.3,

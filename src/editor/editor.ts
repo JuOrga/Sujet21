@@ -13,6 +13,7 @@ import {
   MAT_GRILLE,
   MAT_MEMBRANE,
   MAT_RIDEAU,
+  MAT_SURCHAUFFEUR,
   dansBoite,
   MAT_HYDROPHILE,
   MAT_HYDROPHOBE,
@@ -54,6 +55,7 @@ const MAT_COLORS: Record<number, string> = {
   [MAT_CHAUD]: '#ff8a3c',
   [MAT_MEMBRANE]: '#35c9a0',
   [MAT_RIDEAU]: '#9fb9d8',
+  [MAT_SURCHAUFFEUR]: '#29d8ff',
 }
 const ZONE_COLORS: Record<ZoneForce, string> = {
   libre: '#7b93a8',
@@ -1663,7 +1665,7 @@ export class LevelEditor {
       const b = this.level.boxes[s.index]
       rows.push(
         `<label class="ed-f"><span>Matériau</span><select id="p-mat">` +
-          [MAT_WALL, MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_FROID, MAT_GRILLE, MAT_CHAUD, MAT_MEMBRANE, MAT_RIDEAU]
+          [MAT_WALL, MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_FROID, MAT_GRILLE, MAT_CHAUD, MAT_MEMBRANE, MAT_RIDEAU, MAT_SURCHAUFFEUR]
             .map((m) => `<option value="${m}"${m === b.material ? ' selected' : ''}>${MATERIAL_NAMES[m]}</option>`)
             .join('') +
           `</select></label>`,
@@ -1671,6 +1673,10 @@ export class LevelEditor {
       rows.push(numField('X min', 'p-minX', b.minX), numField('X max', 'p-maxX', b.maxX))
       rows.push(numField('Y min', 'p-minY', b.minY), numField('Y max', 'p-maxY', b.maxY))
       rows.push(numField('Angle (°)', 'p-ang', b.angle ?? 0))
+      if (b.material === MAT_CHAUD) {
+        // chaque chaudière règle sa portée d'aura : gros bloc à petite aura…
+        rows.push(numField('Aura (× portée)', 'p-aura', b.aura ?? 1, 0.25))
+      }
     } else if (s.kind === 'zone') {
       const z = (this.level.zones ?? [])[s.index]
       rows.push(
@@ -1792,6 +1798,14 @@ export class LevelEditor {
       const ang = Math.max(-180, Math.min(180, val('p-ang')))
       if (ang) b.angle = ang
       else delete b.angle
+      // portée d'aura propre (chaudière) : 1 (ou vide) efface la clé
+      if (b.material === MAT_CHAUD) {
+        const aura = Math.max(0.25, Math.min(4, val('p-aura') || 1))
+        if (aura !== 1) b.aura = aura
+        else delete b.aura
+      } else {
+        delete b.aura
+      }
     } else if (s.kind === 'zone') {
       const z = (this.level.zones ?? [])[s.index]
       z.force = text('p-force') as ZoneForce
@@ -2003,7 +2017,8 @@ export class LevelEditor {
         band = P.coldBand
         colA = '#8fc8ee'
       } else if (box.material === MAT_CHAUD) {
-        band = P.heatBand
+        // chaque chaudière porte sa propre portée d'aura (champ Aura)
+        band = P.heatBand * (box.aura ?? 1)
         colA = '#ff8a3c'
       } else if (box.material === MAT_HYDROPHILE) {
         band = P.hydroBand

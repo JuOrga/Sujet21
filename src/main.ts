@@ -125,9 +125,11 @@ function fmtDuree(s: number): string {
 
 function createSim(level: LevelDef): FluidSim {
   const sim = new FluidSim(params, level.bounds, CAPACITY)
-  // les impulsions vapeur se comptent PAR ÉCRAN : le tableau peut fixer
-  // son propre budget, sinon celui du banc
-  sim.dashBudget = level.dashBudget ?? params.gasDashBudget
+  // les dashs se rendent à CHAQUE transformation en vapeur : le tableau peut
+  // fixer son propre nombre, sinon celui du banc — et on part à sec, la
+  // première bascule remplira le compteur
+  sim.dashBudgetParTransfo = level.dashBudget ?? params.gasDashBudget
+  sim.dashBudget = 0
   sim.setLevel(level.boxes, level.sponges)
   sim.spawnDisc(level.spawn.x, level.spawn.y, level.spawn.n, KIND_PLAYER)
   sim.relabel()
@@ -850,6 +852,9 @@ const endgame = {
 // Dash de vapeur : viser fige le temps, relâcher lance le nuage (« air
 // dash »). On ne retient qu'une chose entre deux images : était-on en visée.
 const dash = { aiming: false }
+// Front montant de l'intention vapeur : la TRANSFORMATION (péage + dashs)
+// se paie au basculement, quelle qu'en soit la cause.
+let gasIntentAvant = false
 
 // ---- Mécanismes laser (palier 1) ----
 // Le faisceau se trace une fois par IMAGE (pas par pas physique) : la glace
@@ -1716,6 +1721,11 @@ function frame(now: number): void {
   }
   sim.freezeIntent = input.freezeIntent
   sim.gasIntent = input.gasIntent
+  // La BASCULE en vapeur — G, chaudière à 95 %, zone forcée : toute cause —
+  // se règle à l'instant du basculement : péage de 20 % du volume actif
+  // (gerbe de gouttes récupérables) et compteur de dashs rendu.
+  if (input.gasIntent && !gasIntentAvant && !tableauDone && !input.paused) sim.transfoVapeur()
+  gasIntentAvant = input.gasIntent
   sim.chill = chillNow() // le vaisseau refroidit : la physique suit
   if (input.aimActive) camera.cancelIntro() // le joueur agit : la caméra suit
 
@@ -2246,11 +2256,10 @@ function frame(now: number): void {
     // l'étiquette annonce les deux termes du marché — la poussée et le prix.
     const dMonde = Math.hypot(aim.x - sim.stats.centroidX, aim.y - sim.stats.centroidY)
     const puissance = Math.min(1, dMonde / Math.max(1, params.gasDashRange))
-    dashCostEl.textContent = sim.dashOffert
-      ? `DASH ${Math.round(puissance * 100)} % · OFFERT (radiateur)`
-      : sim.dashBudget > 0
-        ? `DASH ${Math.round(puissance * 100)} % · ${sim.dashBudget} impulsion${sim.dashBudget > 1 ? 's' : ''}`
-        : `À SEC — condensez, ou frôlez un radiateur`
+    dashCostEl.textContent =
+      sim.dashBudget > 0
+        ? `DASH ${Math.round(puissance * 100)} % · ${sim.dashBudget} dash${sim.dashBudget > 1 ? 's' : ''}`
+        : `À SEC — retransformez-vous, ou frôlez un surchauffeur`
   }
   dashAimEl.classList.toggle('visible', dash.aiming)
   dashCostEl.classList.toggle('visible', dash.aiming)
