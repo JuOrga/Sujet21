@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '13/08/2026 12:00',
+    title: 'L’impulsion sans direction rassemble le corps',
+    notes: [
+      'Nouveau geste anti-dispersion : une impulsion SANS direction — stick de la manette au neutre, ou doigt/pointeur posé SUR le volume lui-même — ne part plus au petit bonheur : elle se retourne vers l’intérieur et RASSEMBLE le corps autour de son centre. Chaque particule est rappelée, la vitesse qui fuit le centre est amortie, et les gouttes libres du voisinage immédiat (fragments détachés, hors délai de réabsorption) reviennent au bercail : le volume se REFORME.',
+      'C’est GRATUIT : rien ne part, rien ne se paie — et ce maintien-là ne consomme pas la dernière impulsion de la fin de course. La dérive d’ensemble est conservée exactement (le rappel est interne) : se rassembler ne freine pas la trajectoire. L’onde à l’écran part du centre (un battement, pas une salve), le « ploc » d’éjection se tait.',
+      'Deux curseurs au banc (Propulsion) : « rappel (rassembler) » et « amorti (rassembler) ». Les panneaux de commandes (souris, manette, tactile) documentent le geste.',
+    ],
+  },
+  {
     date: '12/08/2026 23:55',
     title: 'La zone forcée répond partout — et le sas ne disparaît plus des grands tableaux',
     notes: [

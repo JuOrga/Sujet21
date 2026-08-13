@@ -141,6 +141,38 @@ describe('FluidSim — invariants physiques', () => {
     expect(sim.dispersed).toBe(false) // …mais l'essai continue
   })
 
+  it('se rassembler resserre un corps étalé, gratuitement et sans le pousser', () => {
+    const sim = makeSim()
+    sim.spawnDisc(0, 0, 300, KIND_PLAYER)
+    // on étale le corps : chaque particule reçoit une vitesse de fuite radiale
+    for (let i = 0; i < sim.count; i++) {
+      const d = Math.hypot(sim.posX[i], sim.posY[i]) || 1
+      sim.velX[i] = (sim.posX[i] / d) * 220
+      sim.velY[i] = (sim.posY[i] / d) * 220
+    }
+    for (let s = 0; s < 60; s++) sim.step(sim.params.dt) // un demi-seconde d'étalement
+    sim.updatePlayerStats()
+    const rEtale = sim.stats.rmsRadius
+    const before = sim.playerCount
+    const avant = sim.totalMomentum()
+    // une seconde de rassemblement maintenu
+    for (let s = 0; s < 120; s++) {
+      sim.rassemble(sim.params.dt)
+      sim.step(sim.params.dt)
+    }
+    sim.updatePlayerStats()
+    // le corps s'est resserré…
+    expect(sim.stats.rmsRadius).toBeLessThan(rEtale * 0.75)
+    // …sans payer une seule goutte — au contraire, des gouttes détachées par
+    // l'étalement peuvent revenir au corps qui se recompose…
+    expect(sim.playerCount).toBeGreaterThanOrEqual(before)
+    // …et sans se faire pousser : le rappel est interne, la quantité de
+    // mouvement d'ensemble est celle d'avant (la dérive reste une trajectoire)
+    const apres = sim.totalMomentum()
+    expect(Math.abs(apres.px - avant.px)).toBeLessThan(5)
+    expect(Math.abs(apres.py - avant.py)).toBeLessThan(5)
+  })
+
   it('une gouttelette éjectée respecte son délai de réabsorption', () => {
     const sim = makeSim({ reabsorbCooldown: 60 })
     sim.spawnDisc(0, 0, 200, KIND_PLAYER)
