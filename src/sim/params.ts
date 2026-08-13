@@ -24,6 +24,10 @@ export interface SimParams {
   recoilLocality: number // 0 : recul uniforme (corps rigide) ; 1 : recul concentré au point d'éjection, propagé par pression (le corps se déforme)
   reabsorbCooldown: number // délai avant qu'une gouttelette éjectée soit réabsorbable (s)
 
+  // Rassemblement (impulsion sans direction) : le corps se reforme sur place
+  regroupAccel: number // rappel vers le centre (unités monde / s²)
+  regroupDamp: number // amortissement /s de la vitesse radiale qui fuit le centre
+
   // Vortex de regroupement (clic droit) — outil de test : il annule le coût
   // de la perte d'eau, donc coupé par défaut dans le protocole
   vortexEnabled: number // 0 : coupé ; 1 : actif (sandbox)
@@ -201,6 +205,9 @@ export const DEFAULT_PARAMS: SimParams = {
   ejectEntrain: 0.16,
   recoilLocality: 0.6,
   reabsorbCooldown: 1.2,
+
+  regroupAccel: 700,
+  regroupDamp: 6,
 
   vortexEnabled: 0,
   vortexRadius: 260,

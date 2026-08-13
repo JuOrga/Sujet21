@@ -367,6 +367,14 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     fProp.addBinding(params, 'reabsorbCooldown', { min: 0, max: 5, label: 'réabsorption' }),
     'Temps pendant lequel une goutte éjectée ne peut pas être réabsorbée — sinon elle recollerait aussitôt au corps.',
   )
+  describe(
+    fProp.addBinding(params, 'regroupAccel', { min: 0, max: 2400, step: 10, label: 'rappel (rassembler)' }),
+    'Impulsion sans direction (stick au neutre, pointeur sur le corps) : rappel de chaque particule vers le centre, en unités/s². Gratuit — rien ne part.',
+  )
+  describe(
+    fProp.addBinding(params, 'regroupDamp', { min: 0, max: 20, label: 'amorti (rassembler)' }),
+    'Pendant le rassemblement, la vitesse qui FUIT le centre est amortie (par seconde) : l’étalement cesse, l’élan d’ensemble du corps est conservé.',
+  )
 
   const fVortex = pane.addFolder({ title: 'Vortex (outil de test)', expanded: false })
   const vortexToggle = {

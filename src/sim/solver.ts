@@ -740,6 +740,75 @@ export class FluidSim {
     }
   }
 
+  // L'impulsion SANS direction (stick au neutre, doigt posé sur le corps)
+  // se retourne vers l'intérieur : le corps se RASSEMBLE autour de son
+  // centre au lieu d'éjecter. Rien ne part, rien ne se paie — chaque
+  // particule du corps est rappelée vers le centre, sa fuite radiale est
+  // amortie, et les gouttes LIBRES du voisinage immédiat (hors délai de
+  // réabsorption) sont ramenées avec lui : le volume se REFORME, fragments
+  // compris. Le rappel est interne : la quantité de mouvement d'ensemble est
+  // préservée exactement (la dérive du corps reste une trajectoire).
+  rassemble(dt: number): void {
+    if (this.dispersed) return
+    const p = this.params
+    const cx = this.stats.centroidX
+    const cy = this.stats.centroidY
+    const rappel = p.regroupAccel * dt
+    const keep = Math.exp(-p.regroupDamp * dt)
+    // Rayon de capture des gouttes LIBRES : le voisinage immédiat du corps.
+    // Un fragment que la contraction vient de détacher est ramené au bercail ;
+    // une goutte d'éjection encore sous délai de réabsorption reste perdue —
+    // l'économie de la propulsion ne change pas.
+    const capture = Math.max(this.stats.rmsRadius * 2.5, p.kernelRadius * 6)
+    const capture2 = capture * capture
+    let sumX = 0
+    let sumY = 0
+    let n = 0
+    for (let i = 0; i < this.count; i++) {
+      this.dvX[i] = 0 // scratch : 1 = rappelée ce pas-ci (dvX est libre hors step)
+      if (this.frozen[i] === 1 || this.gaseous[i] === 1) continue
+      if (this.kind[i] !== KIND_PLAYER) {
+        if (this.kind[i] !== KIND_FREE || this.cooldown[i] > 0) continue
+        const fx = cx - this.posX[i]
+        const fy = cy - this.posY[i]
+        if (fx * fx + fy * fy > capture2) continue
+      }
+      this.dvX[i] = 1
+      n++
+      const dx = cx - this.posX[i]
+      const dy = cy - this.posY[i]
+      const d = Math.hypot(dx, dy)
+      if (d < 1e-6) continue
+      const ux = dx / d
+      const uy = dy / d
+      // rappel proportionné à l'éloignement : doux au cœur (le corps ne
+      // s'écrase pas sur lui-même), plein au-delà de trois rayons de noyau
+      const g = Math.min(1, d / (p.kernelRadius * 3))
+      let ivx = ux * rappel * g
+      let ivy = uy * rappel * g
+      // la composante de vitesse qui FUIT le centre est amortie : c'est elle
+      // qui étale le corps — la composante rentrante et l'élan commun restent
+      const vr = this.velX[i] * ux + this.velY[i] * uy // < 0 : s'éloigne
+      if (vr < 0) {
+        const cut = -vr * (1 - keep)
+        ivx += ux * cut
+        ivy += uy * cut
+      }
+      this.velX[i] += ivx
+      this.velY[i] += ivy
+      sumX += ivx
+      sumY += ivy
+    }
+    if (n === 0) return
+    const mx = sumX / n
+    const my = sumY / n
+    for (let i = 0; i < this.count; i++) {
+      if (this.dvX[i] !== 1) continue
+      this.velX[i] -= mx
+      this.velY[i] -= my
+    }
+  }
+
   // Le dash de vapeur (refonte 2026, « air dash » à la Ori) : UNE impulsion
   // qui envoie tout le nuage vers le point visé — pas de recul, pas
   // d'éjection, pas de pilotage continu. Le prix se paie d'avance : une

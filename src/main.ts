@@ -811,6 +811,21 @@ const monitor: BenchMonitor = {
 // Vortex de regroupement : déclenché au clic droit, actif vortexDuration s
 const vortex = { x: 0, y: 0, timer: 0 }
 
+// Le pointeur est-il posé SUR le corps ? (à un rayon de noyau et des
+// poussières près : la surface visible dépasse un peu les centres de
+// particules). Sert à retourner l'impulsion : sur soi, on se rassemble.
+function corpsSousLePointeur(x: number, y: number): boolean {
+  const r = params.kernelRadius * 1.6
+  const r2 = r * r
+  for (let i = 0; i < sim.count; i++) {
+    if (sim.kind[i] !== KIND_PLAYER || sim.gaseous[i] === 1) continue
+    const dx = sim.posX[i] - x
+    const dy = sim.posY[i] - y
+    if (dx * dx + dy * dy < r2) return true
+  }
+  return false
+}
+
 // Ondes d'éjection (rendu seulement) : une onde traverse le corps à chaque
 // salve d'éjection, depuis le point de sortie de la matière
 const MAX_WAVES = 8
@@ -1725,6 +1740,17 @@ function frame(now: number): void {
   }
   dash.aiming = dashAiming
 
+  // ---- Impulsion SANS direction : le geste se retourne vers soi ----
+  // Stick au neutre (manette), ou doigt/pointeur posé SUR le corps : au lieu
+  // d'éjecter au petit bonheur, le corps se RASSEMBLE autour de son centre —
+  // l'anti-dispersion, gratuite (rien ne part, rien ne se paie).
+  const rassembler =
+    input.aimActive &&
+    !input.gasIntent &&
+    !sim.dispersed &&
+    ((manetteTenait && manette.force < 0.02) || corpsSousLePointeur(aim.x, aim.y))
+  ;(window as unknown as { __rass: boolean }).__rass = rassembler // sonde de test
+
   if (!input.paused && !tableauDone) {
     // Budget CPU des pas physiques : ~60 % du temps d'image, borné à 5-12 ms.
     // Sans cette borne, une image en retard impose plus de pas, coûte plus
@@ -1739,7 +1765,9 @@ function frame(now: number): void {
         if (input.aimActive && !input.gasIntent && !sim.dispersed && !endgame.spent) {
           // En eau, maintenir éjecte ; en vapeur, la visée fige le temps —
           // le dash part au relâchement (voir plus haut), rien ne se pilote.
-          sim.eject(aim.x, aim.y, params.dt)
+          // Sans direction (stick neutre, doigt sur le corps) : on se reforme.
+          if (rassembler) sim.rassemble(params.dt)
+          else sim.eject(aim.x, aim.y, params.dt)
         }
         if (vortex.timer > 0) {
           const life = Math.min(1, vortex.timer / params.vortexDuration)
@@ -1975,9 +2003,11 @@ function frame(now: number): void {
       const dy = aim.y - sim.stats.centroidY
       const len = Math.hypot(dx, dy) || 1
       const r = sim.stats.rmsRadius * 1.1
+      // en rassemblement, l'onde part du CENTRE : le battement d'un cœur qui
+      // se reforme, pas une salve qui sort
       waves.push({
-        x: sim.stats.centroidX + (dx / len) * r,
-        y: sim.stats.centroidY + (dy / len) * r,
+        x: rassembler ? sim.stats.centroidX : sim.stats.centroidX + (dx / len) * r,
+        y: rassembler ? sim.stats.centroidY : sim.stats.centroidY + (dy / len) * r,
         t: elapsed,
       })
       if (waves.length > MAX_WAVES) waves.shift()
@@ -2116,7 +2146,9 @@ function frame(now: number): void {
   const alive = !sim.dispersed && !tableauDone && !run.ended
   if (alive && !endgame.spent && !endgame.enCollecte) {
     endgame.lastCall = sim.liters() <= params.criticalVolumeLiters
-    const aiming = input.aimActive && !input.paused
+    // se rassembler ne dépense rien : ce maintien-là n'est pas une impulsion,
+    // il ne consomme pas la dernière
+    const aiming = input.aimActive && !input.paused && !rassembler
     // le relâchement du pointeur conclut l'impulsion en cours
     if (endgame.lastCall && endgame.wasAiming && !aiming) endgame.spent = true
     // plus rien à éjecter : le gel s'impose sans attendre le relâchement
@@ -2264,8 +2296,9 @@ function frame(now: number): void {
   // prises de hauteurs différentes tirées au sort, plus un écart de ±7 % :
   // deux fois le même « bloop » à la même note et l'oreille entend une
   // machine. En vapeur, la visée est silencieuse — le souffle part au dash.
-  // pas de « ploc » en glace : un palet n'éjecte rien, il n'a pas à goutter
-  const vise = audible && input.aimActive && !input.gasIntent && !input.freezeIntent
+  // pas de « ploc » en glace : un palet n'éjecte rien, il n'a pas à goutter —
+  // ni en rassemblement : rien ne sort, rien ne goutte
+  const vise = audible && input.aimActive && !input.gasIntent && !input.freezeIntent && !rassembler
   if (vise) {
     sfx.dropTimer -= dtReal
     if (!sfx.aiming || sfx.dropTimer <= 0) {
