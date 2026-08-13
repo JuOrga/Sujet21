@@ -1635,14 +1635,30 @@ const QUALITY_LEVELS = [
   { dprCap: 0.65, down: 4 }, // palier de secours : écrans très denses (iPad) qui chauffent
 ]
 let qualityLevel = window.matchMedia('(pointer: coarse)').matches ? 1 : 0
-let qualityTimer = 0
-
+// L'objectif est 60 CONSTANT, pas « au-dessus de 42 » : sous 55 fps, la
+// qualité descend vite (1,2 s de confirmation) ; elle ne remonte qu'après
+// 5 s bien au-dessus de l'objectif — l'asymétrie évite le clignotement
+// qualité haute ↔ basse autour du seuil.
+let qualitySous = 0 // s passées sous l'objectif
+let qualitySur = 0 // s passées avec de la marge
 function updateQuality(dtReal: number): void {
-  qualityTimer += dtReal
-  if (qualityTimer < 1.5) return
-  qualityTimer = 0
-  if (fpsSmoothed < 42 && qualityLevel < QUALITY_LEVELS.length - 1) qualityLevel++
-  else if (fpsSmoothed > 56 && qualityLevel > 0) qualityLevel--
+  if (fpsSmoothed < 55) {
+    qualitySous += dtReal
+    qualitySur = 0
+  } else if (fpsSmoothed > 58.5) {
+    qualitySur += dtReal
+    qualitySous = 0
+  } else {
+    qualitySous = 0
+    qualitySur = 0
+  }
+  if (qualitySous > 1.2 && qualityLevel < QUALITY_LEVELS.length - 1) {
+    qualityLevel++
+    qualitySous = 0
+  } else if (qualitySur > 5 && qualityLevel > 0) {
+    qualityLevel--
+    qualitySur = 0
+  }
 }
 
 function frame(now: number): void {

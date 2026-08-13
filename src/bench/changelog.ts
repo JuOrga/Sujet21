@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '13/08/2026 21:50',
+    title: 'Cap sur le 60 fps constant : la mémoire re-rangée, la qualité exigeante',
+    notes: [
+      'Les à-coups « en cas de séparation » sont diagnostiqués au profileur : après une gerbe ou une éclaboussure, des particules voisines dans l’ESPACE se retrouvent éparpillées dans les TABLEAUX mémoire — chaque accès de paire devient un défaut de cache et toutes les passes ralentissent d’un coup (jusqu’à ×9 sur un pas, mesuré). Le solveur re-range désormais ses particules dans l’ordre des cellules 4 fois par seconde : physique inchangée, localité restaurée — pas médian −20 %, régime dispersé −23 %.',
+      'La collecte de voisins s’arrête net une fois sa liste pleine : dans un empilement dense (gouttes qui retombent en tas), elle testait encore la distance de centaines de particules sans plus rien retenir.',
+      'La qualité adaptative visait « au-dessus de 42 fps » — elle était satisfaite de 50. Elle vise maintenant 60 CONSTANT : sous 55 fps, la résolution descend en 1,2 s ; elle ne remonte qu’après 5 s de marge franche (l’asymétrie évite le clignotement). La physique n’est jamais dégradée, comme avant.',
+      'À retester sur Pixel 8 Pro : le jeu devrait tenir 60 en acceptant, dans les moments chargés, un rendu un cran moins fin — c’est le compromis demandé.',
+    ],
+  },
+  {
     date: '13/08/2026 19:05',
     title: 'Le voile SALLES connaît enfin la bibliothèque du labo',
     notes: [

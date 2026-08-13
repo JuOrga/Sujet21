@@ -95,14 +95,30 @@ export class SpatialGrid {
         const end = this.starts[c + 1]
         for (let e = this.starts[c]; e < end; e++) {
           const j = this.entries[e]
-          if (j === self || cursor >= cap) continue
+          if (j === self) continue
           const dx = x - posX[j]
           const dy = y - posY[j]
-          if (dx * dx + dy * dy < r2max) out[cursor++] = j
+          if (dx * dx + dy * dy < r2max) {
+            out[cursor++] = j
+            // Liste pleine : on ARRÊTE le balayage. L'ancien code continuait
+            // à tester la distance de toutes les particules restantes des
+            // cellules sans plus rien retenir — dans un empilement dense
+            // (gouttes qui retombent en tas après une séparation), c'était
+            // des centaines de tests par particule, et LE pic de la frame.
+            // Le résultat est identique : les mêmes `max` premiers voisins.
+            if (cursor >= cap) return cursor
+          }
         }
       }
     }
     return cursor
+  }
+
+  /** Copie l'ordre cellule par cellule (après build) : les indices de
+   * particules triés par cellule de grille — l'ordre mémoire spatial. */
+  copyOrder(out: Int32Array): number {
+    out.set(this.entries.subarray(0, this.count))
+    return this.count
   }
 
   forEachNeighbor(x: number, y: number, radius: number, cb: (j: number) => void): void {
