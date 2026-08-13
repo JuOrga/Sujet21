@@ -27,7 +27,13 @@ import {
   type ZoneForce,
 } from './game/level'
 import { LevelEditor } from './editor/editor'
-import { traceLaser, type TraceResultat } from './game/laser'
+import {
+  traceLaser,
+  creerEtatRecepteurs,
+  avancerRecepteurs,
+  cibleActive,
+  type TraceResultat,
+} from './game/laser'
 import { BOUTON, Manette } from './game/manette'
 import { fetchLibrary } from './game/netLevels'
 import { AudioFx, loadAudioPrefs } from './game/audio'
@@ -865,7 +871,9 @@ const fxCanvas = document.getElementById('fx-canvas') as HTMLCanvasElement
 const fxCtx = fxCanvas.getContext('2d')!
 const laserEtat = {
   vues: [] as TraceResultat[],
-  allumees: [] as boolean[], // cibles À VERROU : un passage du faisceau suffit
+  // La mémoire des récepteurs (TOR : verrou ouvrant · NOR : maintien, la
+  // première coupure scelle) — machine à états pure, voir laser.ts
+  recepteurs: creerEtatRecepteurs(0),
   portesOuvertes: [] as boolean[],
   doorsKey: '', // signature des portes fermées envoyées au solveur
 }
@@ -1070,23 +1078,52 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     g.restore()
   }
 
-  // cibles : pastille éteinte / embrasée
+  // cibles : pastille éteinte / embrasée — et pour le NOR, l'anneau ambré
+  // dit « à maintien », la pastille GRILLÉE dit que la coupure est passée
+  const nowCibles = performance.now() / 1000
   for (let c = 0; c < cibles.length; c++) {
     const t = cibles[c]
     const p = S(t.x, t.y)
-    const lit = laserEtat.allumees[c] === true
+    const nor = t.mode === 'nor'
+    const scellee = nor && laserEtat.recepteurs.scellees[c] === true
+    const lit = !scellee && cibleActive(t, laserEtat.recepteurs, c, nowCibles)
     const r = Math.max(4, t.r * z)
     g.beginPath()
     g.arc(p.sx, p.sy, r, 0, Math.PI * 2)
-    g.fillStyle = lit ? 'rgba(120,255,190,0.30)' : 'rgba(40,56,66,0.6)'
+    g.fillStyle = scellee
+      ? 'rgba(48,32,30,0.75)'
+      : lit
+        ? 'rgba(120,255,190,0.30)'
+        : 'rgba(40,56,66,0.6)'
     g.fill()
     g.lineWidth = 2
-    g.strokeStyle = lit ? '#6dffb8' : '#5c7285'
+    g.strokeStyle = scellee ? '#6b4a42' : lit ? '#6dffb8' : nor ? '#c99a4e' : '#5c7285'
     g.stroke()
+    if (nor && !scellee) {
+      // l'anneau pointillé ambré : ce récepteur veut le faisceau MAINTENU
+      g.beginPath()
+      g.setLineDash([3, 5])
+      g.arc(p.sx, p.sy, r * 0.72, 0, Math.PI * 2)
+      g.strokeStyle = lit ? '#ffd98a' : '#a67c3f'
+      g.lineWidth = 1.5
+      g.stroke()
+      g.setLineDash([])
+    }
     g.beginPath()
     g.arc(p.sx, p.sy, r * 0.45, 0, Math.PI * 2)
-    g.fillStyle = lit ? '#a9ffd6' : '#33424e'
+    g.fillStyle = scellee ? '#241b19' : lit ? '#a9ffd6' : '#33424e'
     g.fill()
+    if (scellee) {
+      // la fêlure : la pastille a brûlé, plus rien n'y passera
+      g.beginPath()
+      g.moveTo(p.sx - r * 0.5, p.sy + r * 0.42)
+      g.lineTo(p.sx - r * 0.1, p.sy - r * 0.05)
+      g.lineTo(p.sx + r * 0.18, p.sy + r * 0.2)
+      g.lineTo(p.sx + r * 0.52, p.sy - r * 0.4)
+      g.strokeStyle = '#8a5a50'
+      g.lineWidth = 1.5
+      g.stroke()
+    }
   }
 }
 
@@ -1159,7 +1196,7 @@ let lastRailTime = 0
 const railsEngages = new Set<number>()
 function resetLasers(): void {
   laserEtat.vues = []
-  laserEtat.allumees = (level.cibles ?? []).map(() => false)
+  laserEtat.recepteurs = creerEtatRecepteurs((level.cibles ?? []).length)
   laserEtat.portesOuvertes = (level.portes ?? []).map(() => false)
   laserEtat.doorsKey = ''
   lastRailTime = 0
@@ -1807,7 +1844,7 @@ function frame(now: number): void {
   if (lasers.length > 0) {
     const cibles = level.cibles ?? []
     const portes = level.portes ?? []
-    if (laserEtat.allumees.length !== cibles.length) resetLasers()
+    if (laserEtat.recepteurs.vues.length !== cibles.length) resetLasers()
     // portes fermées AVANT ce traçage : un faisceau ne traverse pas une porte
     // encore close — elle s'ouvrira pour l'image suivante
     const fermees = portes.filter((_, i) => !laserEtat.portesOuvertes[i])
@@ -1837,13 +1874,17 @@ function frame(now: number): void {
         railRadius: params.plasmaRailRadius,
       }),
     )
-    // cibles À VERROU : un seul passage du faisceau allume pour de bon —
-    // pas besoin de tenir le rayon, l'activation est acquise (jusqu'au
-    // Recommencer). Les portes asservies restent donc ouvertes.
-    for (const t of laserEtat.vues) {
-      for (const c of t.touchees) laserEtat.allumees[c] = true
-    }
-    laserEtat.portesOuvertes = portes.map((p) => laserEtat.allumees[p.cible] === true)
+    // Récepteurs : TOR à verrou (un passage allume pour de bon), NOR à
+    // maintien (ouvert sous le faisceau ; la première coupure scelle la
+    // porte fermée, définitivement) — machine à états dans laser.ts.
+    const nowRecepteurs = performance.now() / 1000
+    const toucheesImage: number[] = []
+    for (const t of laserEtat.vues) for (const c of t.touchees) toucheesImage.push(c)
+    avancerRecepteurs(cibles, toucheesImage, laserEtat.recepteurs, nowRecepteurs)
+    laserEtat.portesOuvertes = portes.map((p) =>
+      cibles[p.cible] !== undefined &&
+      cibleActive(cibles[p.cible], laserEtat.recepteurs, p.cible, nowRecepteurs),
+    )
     // le solveur ne reçoit que les portes closes — recomposé au changement
     const closes = portes.filter((_, i) => !laserEtat.portesOuvertes[i])
     const cle = closes.map((p) => `${p.minX},${p.minY},${p.maxX},${p.maxY}`).join(';')

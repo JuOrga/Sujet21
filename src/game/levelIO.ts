@@ -247,7 +247,10 @@ export function parseLevel(input: unknown): { level: LevelDef | null; rejets: st
   const cibles: CibleDef[] = []
   for (const raw of Array.isArray(o.cibles) ? o.cibles : []) {
     const c = (raw ?? {}) as Record<string, unknown>
-    cibles.push({ x: num(c.x, 0), y: num(c.y, 0), r: Math.max(8, num(c.r, 26)) })
+    const cible: CibleDef = { x: num(c.x, 0), y: num(c.y, 0), r: Math.max(8, num(c.r, 26)) }
+    // récepteur NOR (à maintien, la coupure scelle) — tout le reste est TOR
+    if (c.mode === 'nor') cible.mode = 'nor'
+    cibles.push(cible)
   }
   if (cibles.length > 0) level.cibles = cibles
 

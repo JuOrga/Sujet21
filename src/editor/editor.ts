@@ -1713,7 +1713,17 @@ export class LevelEditor {
       const t = (this.level.cibles ?? [])[s.index]
       rows.push(numField('X', 'p-cx', t.x), numField('Y', 'p-cy', t.y))
       rows.push(numField('Rayon', 'p-cr', t.r, 2))
-      rows.push(`<p class="ed-empty">Cible nº ${s.index + 1} — les portes s’y asservissent par ce numéro.</p>`)
+      rows.push(
+        `<label class="ed-f"><span>Récepteur</span><select id="p-cmode">` +
+          `<option value="tor"${t.mode !== 'nor' ? ' selected' : ''}>TOR — un passage verrouille OUVERT</option>` +
+          `<option value="nor"${t.mode === 'nor' ? ' selected' : ''}>NOR — maintien : la coupure SCELLE</option>` +
+          `</select></label>`,
+      )
+      rows.push(
+        t.mode === 'nor'
+          ? `<p class="ed-empty">Cible nº ${s.index + 1} — la porte n’est ouverte que FAISCEAU TENU ; à la première coupure, la pastille grille et la porte se scelle pour de bon.</p>`
+          : `<p class="ed-empty">Cible nº ${s.index + 1} — un seul passage du faisceau l’allume pour de bon ; les portes s’y asservissent par ce numéro.</p>`,
+      )
     } else if (s.kind === 'porte') {
       const q = (this.level.portes ?? [])[s.index]
       rows.push(numField('Cible asservie (nº)', 'p-pc', q.cible + 1, 1))
@@ -1838,6 +1848,9 @@ export class LevelEditor {
       t.x = val('p-cx')
       t.y = val('p-cy')
       t.r = Math.max(8, val('p-cr'))
+      // TOR reste implicite (clé absente) : les fichiers existants ne changent pas
+      if (text('p-cmode') === 'nor') t.mode = 'nor'
+      else delete t.mode
     } else if (s.kind === 'porte') {
       const q = (this.level.portes ?? [])[s.index]
       q.cible = Math.max(0, Math.round(val('p-pc')) - 1)
@@ -2257,9 +2270,20 @@ export class LevelEditor {
       g.arc(p.sx, p.sy, rr, 0, Math.PI * 2)
       g.fillStyle = touchees.has(i) ? 'rgba(110,255,185,0.30)' : 'rgba(48,64,76,0.7)'
       g.fill()
-      g.strokeStyle = touchees.has(i) ? '#6dffb8' : '#7b93a8'
+      g.strokeStyle = touchees.has(i) ? '#6dffb8' : t.mode === 'nor' ? '#c99a4e' : '#7b93a8'
       g.lineWidth = 2
       g.stroke()
+      if (t.mode === 'nor') {
+        // l'anneau pointillé ambré du récepteur À MAINTIEN (même langage
+        // visuel qu'en jeu) : la porte veut le faisceau TENU
+        g.beginPath()
+        g.setLineDash([3, 5])
+        g.arc(p.sx, p.sy, rr * 0.72, 0, Math.PI * 2)
+        g.strokeStyle = '#a67c3f'
+        g.lineWidth = 1.5
+        g.stroke()
+        g.setLineDash([])
+      }
       g.fillStyle = touchees.has(i) ? '#0c1a14' : '#cfe2ef'
       g.font = '700 10px ui-monospace, monospace'
       g.fillText(String(i + 1), p.sx - 3, p.sy + 3.5)

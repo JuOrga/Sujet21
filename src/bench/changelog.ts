@@ -11,6 +11,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '13/08/2026 18:35',
+    title: 'Récepteurs laser TOR et NOR : le verrou qui ouvre, le maintien qui scelle',
+    notes: [
+      'Deux familles de récepteurs, chacune à transition UNIQUE — une fois basculé, plus jamais de retour. TOR (l’existant, désormais nommé) : un seul passage du faisceau allume la pastille pour de bon, la porte asservie s’ouvre et le reste.',
+      'NOR (nouveau) : la porte n’est ouverte que TANT QUE le faisceau tient la cible — et à la PREMIÈRE coupure, la pastille grille : la porte se referme et se scelle définitivement. Traverser se joue faisceau maintenu (miroir de glace posé, prisme du corps, arc sur rail…) ; lâcher le rayon au mauvais moment condamne le passage.',
+      'Une persistance courte (0,12 s) absorbe le tremblement d’une image — le miroir qui frémit ne scelle pas la porte par accident.',
+      'Lecture en jeu : la pastille NOR porte un anneau pointillé AMBRÉ (« faisceau à maintenir ») ; grillée, elle vire au brûlé avec sa fêlure — l’état se lit d’un coup d’œil, avant et après.',
+      'Éditeur : le panneau de la cible propose le choix TOR / NOR (avec la règle écrite en toutes lettres), l’anneau ambré s’affiche dans l’aperçu, et le mode voyage dans les fichiers de tableaux — les tableaux existants ne changent pas d’un octet (TOR implicite).',
+      'La mémoire des récepteurs est une machine à états pure et testée (laser.ts) : verrou TOR, maintien NOR, scellage à la coupure, persistance, cohabitation des deux familles — 5 tests neufs, aller-retour de sérialisation compris.',
+    ],
+  },
+  {
     date: '13/08/2026 18:05',
     title: 'La glace et la vapeur sentent enfin la chimie — et la frame respire',
     notes: [

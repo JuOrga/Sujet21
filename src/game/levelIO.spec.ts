@@ -211,3 +211,27 @@ describe('levelIO — boîtes obliques', () => {
     expect(rejoue.level?.boxes[0].angle).toBe(30)
   })
 })
+
+describe('levelIO — mode des récepteurs (TOR/NOR)', () => {
+  it('le mode nor survit à l’aller-retour, le TOR reste implicite', () => {
+    const src = {
+      bounds: { minX: -100, minY: -100, maxX: 100, maxY: 100 },
+      spawn: { x: 0, y: 0, n: 100 },
+      exit: { minX: 50, minY: -20, maxX: 90, maxY: 20 },
+      boxes: [],
+      lasers: [{ x: -90, y: 0, angle: 0 }],
+      cibles: [
+        { x: 0, y: 0, r: 26 },
+        { x: 40, y: 0, r: 26, mode: 'nor' },
+      ],
+      portes: [{ minX: 10, minY: -30, maxX: 14, maxY: 30, cible: 1 }],
+    }
+    const { level } = parseLevel(src)
+    expect(level).not.toBeNull()
+    expect(level!.cibles![0].mode).toBeUndefined()
+    expect(level!.cibles![1].mode).toBe('nor')
+    const again = parseLevel(JSON.parse(serializeLevel(level!))).level
+    expect(again!.cibles![0].mode).toBeUndefined()
+    expect(again!.cibles![1].mode).toBe('nor')
+  })
+})
