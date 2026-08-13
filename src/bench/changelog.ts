@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '13/08/2026 22:20',
+    title: 'Le voile PARAMÈTRES — et le verrou de fréquence anti yo-yo',
+    notes: [
+      'Nouveau bouton ⚙ PARAMÈTRES sur la fiche (navigable à la manette comme le reste) : les réglages du JOUEUR, là où le banc règle la physique.',
+      'Premier réglage : le VERROU DE FRÉQUENCE — 30 · 50 · 60 · 90 · 120 · 240. La boucle saute les images d’avance : la cuve se cale sur la cadence choisie et n’essaie jamais d’aller plus vite. Sur un écran rapide, verrouiller à 60 échange le « parfois 90, parfois 55 » contre un 60 régulier — c’est la stabilité qui se sent, pas la pointe.',
+      'La qualité adaptative vise la cadence verrouillée (bornée à 60, le rendu est taillé pour) : verrouillé à 30, elle ne bradera pas la finesse pour courir après un 60 qu’on ne demande plus. La physique n’est jamais dégradée.',
+      'Le choix est mémorisé sur l’appareil (60 par défaut).',
+    ],
+  },
+  {
     date: '13/08/2026 21:50',
     title: 'Cap sur le 60 fps constant : la mémoire re-rangée, la qualité exigeante',
     notes: [

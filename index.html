@@ -192,7 +192,8 @@
         justify-content: center;
         padding: 18px;
       }
-      #salles {
+      #salles,
+      #params {
         position: fixed;
         inset: 0;
         z-index: 58;
@@ -203,8 +204,50 @@
         justify-content: center;
         padding: 18px;
       }
-      #salles[hidden] {
+      #salles[hidden],
+      #params[hidden] {
         display: none;
+      }
+      /* ---- Le voile PARAMÈTRES : les réglages du joueur, hors banc ---- */
+      .params-corps {
+        padding: 14px;
+        overflow-y: auto;
+      }
+      .params-nom {
+        font-family: var(--font-display);
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        color: var(--ink);
+      }
+      .params-desc {
+        margin: 6px 0 10px;
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--dim);
+      }
+      .params-choix {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+      }
+      .params-choix button {
+        min-width: 64px;
+        padding: 9px 12px;
+        background: rgba(20, 32, 46, 0.75);
+        border: 1px solid var(--line);
+        color: var(--ink);
+        font-family: var(--font-display);
+        font-size: 12px;
+        letter-spacing: 0.1em;
+        cursor: pointer;
+      }
+      .params-choix button:hover {
+        border-color: var(--specimen);
+      }
+      .params-choix button.actif {
+        border-color: var(--specimen);
+        background: rgba(56, 130, 160, 0.3);
+        color: #cfeffb;
       }
       .salles-boite {
         background: var(--panel);
@@ -2561,6 +2604,7 @@
         <button id="home-salles" type="button">▦ SALLES</button>
         <button id="home-cmds" type="button">⌘ COMMANDES</button>
         <button id="home-recs" type="button">◧ RECORDS</button>
+        <button id="home-params" type="button">⚙ PARAMÈTRES</button>
         <button id="home-mute" type="button">🔊 SON</button>
         <button id="home-plein" type="button">⛶ PLEIN ÉCRAN</button>
       </div>
@@ -2804,6 +2848,24 @@
         <div class="salles-tete"><span>CHARGER UNE SALLE — essai hors expédition</span>
           <button type="button" id="salles-fermer" aria-label="Fermer">✕</button></div>
         <div id="salles-liste"></div>
+      </div>
+    </div>
+
+    <!-- Le voile PARAMÈTRES : les réglages du joueur — le banc, lui, règle la physique -->
+    <div id="params" hidden aria-label="Paramètres">
+      <div class="salles-boite">
+        <div class="salles-tete"><span>PARAMÈTRES</span>
+          <button type="button" id="params-fermer" aria-label="Fermer">✕</button></div>
+        <div class="params-corps">
+          <div class="params-nom">FRÉQUENCE D'IMAGES — VERROUILLER POUR ÉVITER LE YO-YO</div>
+          <div class="params-desc">
+            La cuve se cale sur cette cadence et n'essaie jamais d'aller plus vite :
+            une fréquence stable vaut mieux qu'une fréquence qui oscille. La qualité
+            de rendu s'ajuste d'elle-même pour la tenir — la physique, elle, n'est
+            jamais dégradée.
+          </div>
+          <div id="params-fps" class="params-choix" role="group" aria-label="Fréquence d'images"></div>
+        </div>
       </div>
     </div>
 
