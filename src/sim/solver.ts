@@ -142,6 +142,8 @@ export class FluidSim {
   private readonly icePhile: Int32Array
   private readonly compScratch: Int32Array // compteur par composante (relabel)
   private readonly relabelScratch: Int32Array // candidats voisins (relabel/icePass), collectés sans rappel
+  private readonly reorderPerm: Int32Array // permutation du re-tri spatial
+  private readonly reorderScratch: Float32Array // tampon de permutation (sert à tous les types)
 
   boxes: ObstacleBox[] = []
   sponges: Sponge[] = []
@@ -243,6 +245,8 @@ export class FluidSim {
     this.icePhile = new Int32Array(capacity)
     this.compScratch = new Int32Array(capacity)
     this.relabelScratch = new Int32Array(2048)
+    this.reorderPerm = new Int32Array(capacity)
+    this.reorderScratch = new Float32Array(capacity)
     this.stack = new Int32Array(capacity)
     this.nbStart = new Int32Array(capacity + 1)
     this.nbList = new Int32Array(capacity * MAX_NEIGHBORS)
@@ -1105,11 +1109,62 @@ export class FluidSim {
     }
   }
 
+  // Re-tri spatial périodique : après une séparation (gerbe, éclaboussure),
+  // des particules voisines dans l'ESPACE se retrouvent éparpillées dans les
+  // TABLEAUX — chaque accès de paire devient un défaut de cache et TOUTES
+  // les passes ralentissent d'un coup (mesuré : jusqu'à ×9 sur un pas, les
+  // fameux à-coups en retombée). Re-ranger les particules dans l'ordre des
+  // cellules restaure la localité. La physique est inchangée : seule la
+  // numérotation interne bouge, et aucun indice de particule ne vit d'une
+  // frame à l'autre hors de ces tableaux.
+  private reorderByCell(): void {
+    const n = this.count
+    const perm = this.reorderPerm
+    this.grid.build(this.posX, this.posY, n)
+    this.grid.copyOrder(perm)
+    const f = this.reorderScratch
+    const permuteF = (a: Float32Array): void => {
+      for (let i = 0; i < n; i++) f[i] = a[perm[i]]
+      a.set(f.subarray(0, n))
+    }
+    // le tampon flottant transporte aussi les entiers (valeurs petites :
+    // matériaux, drapeaux, étiquettes — toutes exactes en float32)
+    const permuteI = (a: Uint8Array | Int8Array | Int32Array): void => {
+      for (let i = 0; i < n; i++) f[i] = a[perm[i]]
+      for (let i = 0; i < n; i++) a[i] = f[i]
+    }
+    permuteF(this.posX)
+    permuteF(this.posY)
+    permuteF(this.prdX)
+    permuteF(this.prdY)
+    permuteF(this.velX)
+    permuteF(this.velY)
+    permuteF(this.cooldown)
+    permuteF(this.frost)
+    permuteF(this.vapor)
+    permuteF(this.gasLink)
+    permuteF(this.contactTime)
+    permuteF(this.contactNX)
+    permuteF(this.contactNY)
+    permuteF(this.contactVn)
+    permuteI(this.kind)
+    permuteI(this.frozen)
+    permuteI(this.gaseous)
+    permuteI(this.welded)
+    permuteI(this.labels)
+    permuteI(this.contactMat)
+    // lambda, dp, dv, density, nb*, pair* : réécrits de zéro à chaque pas,
+    // avant toute lecture — inutile de les transporter
+  }
+
   step(dt: number): void {
     this.refreshDerived()
     const p = this.params
     const n = this.count
     if (n === 0) return
+    // Le re-tri ne concerne que les vraies scènes (les rigs de test suivent
+    // des particules par indice) ; cadence 0,25 s — coût ~0,05 ms.
+    if (n >= 128 && this.stepIndex % 30 === 0) this.reorderByCell()
 
     const { posX, posY, prdX, prdY, velX, velY, lambda, dpX, dpY, dvX, dvY, density } = this
     const k = this.kernels
