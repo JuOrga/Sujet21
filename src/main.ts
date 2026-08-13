@@ -1755,11 +1755,16 @@ function frame(now: number): void {
     // Budget CPU des pas physiques : ~60 % du temps d'image, borné à 5-12 ms.
     // Sans cette borne, une image en retard impose plus de pas, coûte plus
     // cher, prend plus de retard — et la machine s'installe à 15-20 fps.
-    const stepBudget = Math.min(12, Math.max(5, dtReal * 1000 * 0.6))
+    // ACCÉLÉRER étend le budget d'autant : le joueur qui met ×4 achète des
+    // pas de simulation contre des images par seconde — sans cela, sur une
+    // machine au taquet, le HUD affichait ×4 et la cuve restait à ×1.
+    const warpNow = dashAiming ? params.timeWarp * params.gasAimSlow : params.timeWarp
+    const boost = Math.max(1, warpNow)
+    const stepBudget = Math.min(12 * boost, Math.max(5, dtReal * 1000 * 0.6 * boost))
     const physT0 = performance.now()
     loop.advance(
       dtReal,
-      dashAiming ? params.timeWarp * params.gasAimSlow : params.timeWarp,
+      warpNow,
       params.dt,
       () => {
         if (input.aimActive && !input.gasIntent && !sim.dispersed && !endgame.spent) {
