@@ -474,10 +474,20 @@ recsEl.addEventListener('pointerdown', (e) => {
 })
 
 // ---- Le voile SALLES : charger n'importe quel tableau, à l'essai ----
+// La liste se RECONSTRUIT à chaque changement de bibliothèque : les salles
+// de l'éditeur (dans l'ordre fixé là-bas) s'affichent en tête quand la
+// bibliothèque partagée en contient, au-dessus de l'expédition livrée.
 const sallesEl = document.getElementById('salles') as HTMLDivElement
-{
+function renderSalles(): void {
   const liste = document.getElementById('salles-liste') as HTMLDivElement
-  for (const lv of [...TABLEAUX_ECOLE, ...TABLEAUX, TABLEAU_1BIS]) {
+  liste.innerHTML = ''
+  const section = (titre: string): void => {
+    const h = document.createElement('div')
+    h.className = 'salles-sec'
+    h.textContent = titre
+    liste.appendChild(h)
+  }
+  const salle = (lv: LevelDef): void => {
     const b = document.createElement('button')
     b.type = 'button'
     b.innerHTML = `<b>${lv.code}</b>${lv.name}`
@@ -487,7 +497,14 @@ const sallesEl = document.getElementById('salles') as HTMLDivElement
     })
     liste.appendChild(b)
   }
+  if (libraryLevels.length > 0) {
+    section('BIBLIOTHÈQUE DU LABO — la séquence jouée, dans l’ordre de l’éditeur')
+    for (const lv of libraryLevels) salle(lv)
+    section('EXPÉDITION LIVRÉE — hors séquence, à l’essai')
+  }
+  for (const lv of [...TABLEAUX_ECOLE, ...TABLEAUX, TABLEAU_1BIS]) salle(lv)
 }
+renderSalles()
 document.getElementById('home-salles')?.addEventListener('click', () => {
   sallesEl.hidden = false
 })
@@ -617,6 +634,7 @@ const editor = new LevelEditor(el('editor'), {
     libraryLevels = levels.map((s) => s.level)
     renderRegistres()
     updateLibraryButton()
+    renderSalles()
   },
 })
 // La fiche annonce quelle séquence sera jouée : celle du labo si la
@@ -637,6 +655,7 @@ fetchLibrary().then((lib) => {
   libraryLevels = lib.map((s) => s.level)
   updateLibraryButton()
   renderRegistres()
+  renderSalles()
   if (!hasPlayed) {
     levelIndex = 0
     restart()

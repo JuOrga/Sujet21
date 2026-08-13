@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '13/08/2026 19:05',
+    title: 'Le voile SALLES connaît enfin la bibliothèque du labo',
+    notes: [
+      'Les salles de l’éditeur (la bibliothèque partagée, dans l’ordre fixé là-bas) manquaient au voile SALLES : la liste était construite une fois au démarrage, avec les seuls tableaux livrés. Elle se reconstruit désormais à chaque changement de bibliothèque — chargement au démarrage, sauvegarde, réordonnancement ou suppression depuis l’éditeur.',
+      'Deux intercalaires la structurent : « BIBLIOTHÈQUE DU LABO — la séquence jouée, dans l’ordre de l’éditeur » en tête, puis « EXPÉDITION LIVRÉE — hors séquence, à l’essai » ; bibliothèque vide, le voile reste tel qu’avant.',
+    ],
+  },
+  {
     date: '13/08/2026 18:35',
     title: 'Récepteurs laser TOR et NOR : le verrou qui ouvre, le maintien qui scelle',
     notes: [
