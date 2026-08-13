@@ -141,6 +141,14 @@ export interface SimParams {
   hydrophileFriction: number // amortissement tangentiel au contact (1/s)
   hydrophobeRepel: number // accélération de répulsion dans la bande (u/s²)
   hydrophobeRestitution: number // rebond au contact (0..1)
+  // La chimie vue par les AUTRES états (tableau des règles) : la GLACE
+  // rebondit sur l'hydrophobe comme un bumper et se fait retenir par
+  // l'hydrophile ; la VAPEUR sent les deux en sourdine mais de loin.
+  hydrophobeIceRestitution: number // rebond du PALET sur l'hydrophobe (>1 : le bumper rend plus qu'il ne reçoit)
+  hydrophobeIceKick: number // vitesse d'éjection minimale du palet (u/s) — la pichenette du bumper
+  hydrophileIceDrag: number // freinage du palet au contact hydrophile (1/s)
+  hydroGasWeight: number // poids des bandes chimiques sur la vapeur (fraction de l'effet plein)
+  hydroGasReach: number // portée des bandes pour la vapeur (multiple de hydroBand)
   spongeDrag: number // traînée dans une cellule absorbante (1/s)
   spongeAbsorbTime: number // temps de contact continu avant absorption (s)
   wallSplashDamp: number // amorti du rebond normal près des murs neutres (0..1) : l'eau épouse la paroi au lieu d'éclater
@@ -284,6 +292,19 @@ export const DEFAULT_PARAMS: SimParams = {
   hydrophileFriction: 5,
   hydrophobeRepel: 1400,
   hydrophobeRestitution: 0.55,
+  // Le bumper rend un peu plus qu'il ne reçoit (1.15) et garantit une
+  // pichenette plancher : même un palet qui dérive lentement repart d'un
+  // coup sec — c'est ce qui fait « flipper » et non « mur élastique ».
+  hydrophobeIceRestitution: 1.15,
+  hydrophobeIceKick: 260,
+  // Le mouillage retient : ~moitié de la vitesse perdue en 0,3 s de glisse
+  // (avec le mordant global 1.35) — le palet s'essouffle visiblement.
+  hydrophileIceDrag: 1.8,
+  // La vapeur sent les bandes en sourdine (35 % de l'effet plein) mais de
+  // LOIN (2,5 × la portée) : le nuage s'infléchit comme sous une gravité
+  // légère, sans jamais être happé ni claqué.
+  hydroGasWeight: 0.35,
+  hydroGasReach: 2.5,
   spongeDrag: 7,
   spongeAbsorbTime: 0.3,
   wallSplashDamp: 0.65,
