@@ -136,10 +136,19 @@ export interface LaserDef {
   angle: number // degrés, 0 = vers +x, sens trigonométrique
 }
 
+// Deux familles de récepteurs, chacune à transition UNIQUE (pas de va-et-vient) :
+//   · TOR (défaut) : un seul passage du faisceau l'allume POUR DE BON — la
+//     porte asservie s'ouvre et reste ouverte, pas besoin de tenir le rayon ;
+//   · NOR : la porte n'est ouverte que TANT QUE le faisceau tient la cible —
+//     et à la PREMIÈRE coupure, la pastille grille : la porte se referme et
+//     se scelle définitivement. Traverser se joue faisceau maintenu.
+export type CibleMode = 'tor' | 'nor'
+
 export interface CibleDef {
   x: number
   y: number
   r: number // rayon de la pastille réceptrice
+  mode?: CibleMode // absent : 'tor'
 }
 
 // Une porte est une paroi asservie : FERMÉE tant que sa cible est éteinte,

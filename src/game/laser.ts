@@ -381,3 +381,64 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
   points.push({ x, y })
   return { points, touchees, railsSuivis }
 }
+
+// ---- Les récepteurs (TOR / NOR) : la mémoire des cibles, pure et testable ----
+// Deux familles, chacune à transition UNIQUE :
+//   · TOR : un passage du faisceau allume POUR DE BON — la porte asservie
+//     s'ouvre et le reste (l'activation est acquise jusqu'au Recommencer) ;
+//   · NOR : active TANT QUE le faisceau la tient — à la PREMIÈRE coupure,
+//     la pastille grille : scellée, la porte se referme définitivement.
+// La persistance absorbe le tremblement d'une image (miroir de glace qui
+// frémit, porte qui s'ouvre et déplace le trajet à l'image suivante) : une
+// micro-coupure sous ce délai ne scelle pas.
+export const CIBLE_PERSISTANCE = 0.12 // s
+
+export interface EtatRecepteurs {
+  vues: boolean[] // touchée au moins une fois depuis le début (TOR : verrou)
+  dernierPhoton: number[] // date du dernier photon reçu, en secondes
+  scellees: boolean[] // NOR : la coupure est passée par là — plus rien ne bouge
+}
+
+export function creerEtatRecepteurs(n: number): EtatRecepteurs {
+  return {
+    vues: Array.from({ length: n }, () => false),
+    dernierPhoton: Array.from({ length: n }, () => -Infinity),
+    scellees: Array.from({ length: n }, () => false),
+  }
+}
+
+/** Avancé une fois par image, APRÈS le traçage : consigne les photons reçus
+ * puis scelle les NOR dont le faisceau vient de se couper. */
+export function avancerRecepteurs(
+  cibles: { mode?: 'tor' | 'nor' }[],
+  touchees: number[],
+  etat: EtatRecepteurs,
+  now: number,
+): void {
+  for (const c of touchees) {
+    if (c < 0 || c >= cibles.length) continue
+    etat.vues[c] = true
+    etat.dernierPhoton[c] = now
+  }
+  for (let c = 0; c < cibles.length; c++) {
+    if ((cibles[c].mode ?? 'tor') !== 'nor') continue
+    if (etat.vues[c] && !etat.scellees[c] && now - etat.dernierPhoton[c] > CIBLE_PERSISTANCE) {
+      etat.scellees[c] = true
+    }
+  }
+}
+
+/** Une cible alimente-t-elle ses portes en cet instant ?
+ * TOR : oui dès qu'elle a été vue. NOR : oui sous le faisceau (persistance
+ * comprise), plus jamais une fois scellée. */
+export function cibleActive(
+  cible: { mode?: 'tor' | 'nor' },
+  etat: EtatRecepteurs,
+  c: number,
+  now: number,
+): boolean {
+  if ((cible.mode ?? 'tor') === 'nor') {
+    return etat.vues[c] && !etat.scellees[c] && now - etat.dernierPhoton[c] <= CIBLE_PERSISTANCE
+  }
+  return etat.vues[c] === true
+}

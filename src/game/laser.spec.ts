@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { traceLaser, type TraceMonde } from './laser'
+import {
+  traceLaser,
+  creerEtatRecepteurs,
+  avancerRecepteurs,
+  cibleActive,
+  CIBLE_PERSISTANCE,
+  type TraceMonde,
+} from './laser'
 import { MAT_GRILLE, MAT_WALL } from './level'
 import { DEFAULT_PARAMS } from '../sim/params'
 import { FluidSim, KIND_FREE, KIND_PLAYER, type Bounds } from '../sim/solver'
@@ -384,5 +391,63 @@ describe('traceLaser — les règles optiques du palier 1', () => {
       expect(n!.nx).toBeLessThan(-0.9)
       expect(Math.abs(n!.ny)).toBeLessThan(0.45)
     }
+  })
+})
+
+describe('Récepteurs TOR / NOR — la mémoire des cibles', () => {
+  const P = CIBLE_PERSISTANCE
+
+  it('TOR : un passage du faisceau verrouille OUVERT, pour toujours', () => {
+    const cibles = [{}] // mode absent : TOR
+    const etat = creerEtatRecepteurs(1)
+    expect(cibleActive(cibles[0], etat, 0, 0)).toBe(false)
+    avancerRecepteurs(cibles, [0], etat, 1.0) // touché une fois
+    expect(cibleActive(cibles[0], etat, 0, 1.0)).toBe(true)
+    // longtemps après, sans plus aucun photon : toujours actif
+    avancerRecepteurs(cibles, [], etat, 60)
+    expect(cibleActive(cibles[0], etat, 0, 60)).toBe(true)
+  })
+
+  it('NOR : ouvert faisceau tenu, la première coupure scelle définitivement', () => {
+    const cibles = [{ mode: 'nor' as const }]
+    const etat = creerEtatRecepteurs(1)
+    // jamais touché : fermé, pas scellé
+    avancerRecepteurs(cibles, [], etat, 1)
+    expect(cibleActive(cibles[0], etat, 0, 1)).toBe(false)
+    expect(etat.scellees[0]).toBe(false)
+    // faisceau tenu : actif image après image
+    for (let t = 1; t < 2; t += 1 / 60) avancerRecepteurs(cibles, [0], etat, t)
+    expect(cibleActive(cibles[0], etat, 0, 2)).toBe(true)
+    // coupure franche : au-delà de la persistance, la pastille grille
+    avancerRecepteurs(cibles, [], etat, 2 + P + 0.05)
+    expect(etat.scellees[0]).toBe(true)
+    expect(cibleActive(cibles[0], etat, 0, 2 + P + 0.05)).toBe(false)
+    // re-toucher ne rouvre JAMAIS
+    avancerRecepteurs(cibles, [0], etat, 3)
+    expect(cibleActive(cibles[0], etat, 0, 3)).toBe(false)
+  })
+
+  it('NOR : un tremblement d’une image ne scelle pas (persistance)', () => {
+    const cibles = [{ mode: 'nor' as const }]
+    const etat = creerEtatRecepteurs(1)
+    avancerRecepteurs(cibles, [0], etat, 1.0)
+    // une image sans photon, bien sous la persistance : toujours actif
+    avancerRecepteurs(cibles, [], etat, 1.0 + 1 / 60)
+    expect(etat.scellees[0]).toBe(false)
+    expect(cibleActive(cibles[0], etat, 0, 1.0 + 1 / 60)).toBe(true)
+    // le faisceau revient : la vie continue
+    avancerRecepteurs(cibles, [0], etat, 1.05)
+    expect(cibleActive(cibles[0], etat, 0, 1.05)).toBe(true)
+  })
+
+  it('TOR et NOR cohabitent : chacun sa règle', () => {
+    const cibles = [{}, { mode: 'nor' as const }]
+    const etat = creerEtatRecepteurs(2)
+    avancerRecepteurs(cibles, [0, 1], etat, 1)
+    expect(cibleActive(cibles[0], etat, 0, 1)).toBe(true)
+    expect(cibleActive(cibles[1], etat, 1, 1)).toBe(true)
+    avancerRecepteurs(cibles, [], etat, 1 + P + 0.05)
+    expect(cibleActive(cibles[0], etat, 0, 1 + P + 0.05)).toBe(true) // TOR tient
+    expect(cibleActive(cibles[1], etat, 1, 1 + P + 0.05)).toBe(false) // NOR scellé
   })
 })
