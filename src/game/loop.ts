@@ -5,9 +5,11 @@ export class FixedLoop {
   private accumulator = 0
   private readonly maxStepsPerFrame: number
 
-  // Plafond bas : sur machine lente, mieux vaut un jeu qui ralentit doucement
-  // qu'une spirale de rattrapage où chaque image en retard en impose plus.
-  constructor(maxStepsPerFrame = 6) {
+  // Le plafond n'est qu'un garde-fou grossier : le vrai frein anti-spirale
+  // est budgetMs (le temps CPU réellement dépensé). Il doit rester assez haut
+  // pour que le time warp s'exprime — à 60 images/s, ×6 demande 12 pas par
+  // image ; un plafond à 6 muselait l'accélération en silence.
+  constructor(maxStepsPerFrame = 24) {
     this.maxStepsPerFrame = maxStepsPerFrame
   }
 

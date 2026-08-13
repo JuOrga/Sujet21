@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '13/08/2026 13:50',
+    title: 'Le time warp fonctionne à nouveau — l’accélération se paie en images, pas en mensonge',
+    notes: [
+      'Accélérer le temps (›, RB, la croix) ne faisait plus rien de visible sur les tableaux devenus lourds : la boucle physique plafonnait à 6 pas par image et son budget CPU fixe (12 ms) jetait le surplus — le HUD affichait ×4, la cuve restait à ×1. Les commandes, elles, marchaient : c’est la simulation qui n’encaissait pas.',
+      'Deux correctifs : le plafond de pas passe à 24 (le vrai frein anti-spirale reste le budget CPU), et le budget s’ÉTEND proportionnellement au warp — mettre ×4, c’est acheter des pas de simulation contre des images par seconde. Sur machine étranglée, ×4 donne désormais ×3,4 réels (avant : ×1) ; sur machine saine, le ×2/×4/×6 est exact. Le ralenti (‹, LB) reste précis dès que la machine tient le ×1.',
+    ],
+  },
+  {
     date: '13/08/2026 13:05',
     title: 'Annuler / Rétablir dans l’éditeur (Ctrl+Z / Ctrl+Y)',
     notes: [
