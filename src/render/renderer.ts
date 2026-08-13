@@ -575,6 +575,19 @@ void main() {
     }
     float d = boxSdf(wb, uBoxes[bi]);
     float mat = uBoxAux[bi].x;
+    // Court-circuit : au-delà de toute influence visuelle (ombre 56 u, arête,
+    // aura selon le matériau), la boîte ne peut plus teinter ce pixel — on
+    // saute remplissage, bruit et mélanges. Sur un tableau à 30-40 boîtes,
+    // chaque pixel n'en paie plus que les 1-2 qui le concernent. Le SAS garde
+    // son grand rayon d'aspiration : jamais coupé.
+    if (mat < 2.5 || mat > 3.5) {
+      float reachMax = 56.0;
+      if (mat > 0.5 && mat < 2.5) reachMax = max(reachMax, uHydroBand);
+      else if (mat > 5.5 && mat < 6.5) reachMax = max(reachMax, uHeatBand * uBoxAux[bi].w);
+      else if (mat > 3.5 && mat < 4.5) reachMax = max(reachMax, uColdBand);
+      else if (mat > 8.5) reachMax = max(reachMax, 60.0);
+      if (d > reachMax + edgeW) continue;
+    }
     // Ombre portée douce autour de chaque solide (sauf le sas) : les blocs
     // se détachent du fond au lieu de flotter — la cuve prend de la
     // profondeur, les rectangles cessent d'être des aplats.

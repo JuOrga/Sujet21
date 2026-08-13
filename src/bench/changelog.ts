@@ -11,6 +11,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '13/08/2026 18:05',
+    title: 'La glace et la vapeur sentent enfin la chimie — et la frame respire',
+    notes: [
+      'CORRECTIF DE CONFORMITÉ (tableau des règles) : le PALET de glace rebondit vraiment sur l’hydrophobe — restitution propre (le bumper rend PLUS qu’il ne reçoit) et pichenette plancher : même en dérive lente, il repart d’un coup sec. Sur l’hydrophile, le mouillage le retient : translation et rotation s’essoufflent. La réponse était écrite par particule : la moyenne de l’amas la diluait, puis l’impulsion rigide l’écrasait — un vrai bloc se comportait comme sur un mur neutre (seule une particule isolée sentait la chimie, et c’est ce que testait la suite). La chimie vit désormais dans la passe rigide elle-même, à l’échelle du bloc.',
+      'La VAPEUR sent les bandes pour de bon : poids remonté (12 % → 35 % de l’effet plein, réglable au banc avec la portée) — l’hydrophile attire le nuage de loin comme une gravité légère, l’hydrophobe le repousse comme un champ. Trois nouveaux curseurs (Matériaux) : bumper glace, pichenette glace, freinage glace — plus poids et portée vapeur.',
+      'L’éditeur était à jour (palette, couleurs, bandes d’influence) : le bug était dans la simulation, donc partout — il est corrigé partout, ses parties d’essai comprises. La légende du jeu et le panneau des états disent maintenant les vraies règles pour les trois états.',
+      'OPTIMISATION (chasse aux chutes d’images) : le pic périodique de la frame — l’étiquetage des amas — coûtait 3× trop cher : il cherchait toujours au rayon vapeur (×3, ~60 cellules par particule) même sans vapeur ; le rayon suit désormais la vapeur réellement présente (même connexité, 9 cellules au régime courant). Les passes d’aura (froid, chaudière, chimie, grille) ne balaient plus TOUTES les boîtes par particule mais des listes par famille, précalculées au chargement.',
+      'Le GPU aussi : le shader du décor payait les 40 boîtes du tableau À CHAQUE PIXEL (textures, bruit, mélanges) ; au-delà de toute influence visuelle (ombre, arête, aura), la boîte est désormais court-circuitée — chaque pixel ne paie plus que les 1-2 boîtes qui le concernent. Et plus une seule allocation par pas dans la grille spatiale ni l’étiquetage : le ramasse-miettes n’a plus de rafales à faire pendant la partie.',
+      'Mesuré au profileur (900 particules, tableau chargé) : ~13 % de pas physique en moins dans les trois états, et le pic d’étiquetage divisé par 3 — les à-coups en accéléré (×4-6, jusqu’à 24 pas par image) s’adoucissent d’autant.',
+    ],
+  },
+  {
     date: '13/08/2026 17:15',
     title: 'La règle d’or v4 : péage de vaporisation, dashs par transformation, SURCHAUFFEUR',
     notes: [

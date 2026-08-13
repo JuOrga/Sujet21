@@ -256,35 +256,71 @@ describe('Membrane et rideau lamellaire — chaque état a sa porte', () => {
     expect(lance(mur(MAT_RIDEAU), 'vapeur')).toBeLessThan(10)
   })
 
-  it('la glace sent la chimie : bumper hydrophobe, freinage hydrophile', () => {
-    // bumper : la glace repart de l'hydrophobe plus vite que d'un mur neutre
+  // Un VRAI palet : la réponse chimique doit survivre au moyennage de l'amas
+  // et à l'impulsion rigide d'icePass. (Régression : avec une réponse par
+  // particule, un bloc multi-particules se comportait comme sur un mur
+  // neutre — seule une particule isolée sentait la chimie.)
+  const geleBloc = (sim: FluidSim, cx: number, cy: number, vx: number, vy: number): void => {
+    const e = DEFAULT_PARAMS.particleSpacing
+    for (let gy = 0; gy < 4; gy++) {
+      for (let gx = 0; gx < 4; gx++) {
+        const i = sim.addParticle(cx + gx * e, cy + gy * e, KIND_FREE)
+        sim.frost[i] = 1
+        sim.frozen[i] = 1
+        sim.velX[i] = vx
+        sim.velY[i] = vy
+      }
+    }
+  }
+
+  it('un PALET de glace rebondit sur l’hydrophobe comme un bumper', () => {
     const rebond = (mat: number): number => {
       const sim = makeSim()
-      sim.setLevel([{ minX: 100, minY: -500, maxX: 140, maxY: 500, material: mat }], [])
-      const i = sim.addParticle(-40, 0, KIND_FREE)
-      sim.frost[i] = 1
-      sim.frozen[i] = 1
-      sim.velX[i] = 320
-      for (let s = 0; s < 120; s++) sim.step(sim.params.dt)
-      return -sim.velX[i] // vitesse de retour (positive si le bloc repart)
+      sim.setLevel([{ minX: 200, minY: -500, maxX: 240, maxY: 500, material: mat }], [])
+      geleBloc(sim, -60, 0, 320, 0)
+      for (let s = 0; s < 150; s++) sim.step(sim.params.dt)
+      let vx = 0
+      for (let i = 0; i < sim.count; i++) vx += sim.velX[i]
+      return -vx / sim.count // vitesse de retour du bloc
     }
-    expect(rebond(MAT_HYDROPHOBE)).toBeGreaterThan(rebond(MAT_WALL) + 20)
-    // freinage : pressée contre l'hydrophile, la glace qui glisse s'essouffle
-    // (en apesanteur, on maintient l'appui à chaque pas pour garder contact)
+    const neutre = rebond(MAT_WALL)
+    const bumper = rebond(MAT_HYDROPHOBE)
+    // le bumper rend PLUS qu'un mur neutre, et au moins la pichenette plancher
+    expect(bumper).toBeGreaterThan(neutre + 50)
+    expect(bumper).toBeGreaterThan(DEFAULT_PARAMS.hydrophobeIceKick * 0.8)
+  })
+
+  it('un PALET de glace est retenu par l’hydrophile (« ralentis »)', () => {
     const glisse = (mat: number): number => {
       const sim = makeSim()
       sim.setLevel([{ minX: -500, minY: -540, maxX: 500, maxY: -500, material: mat }], [])
-      const i = sim.addParticle(-400, -496, KIND_FREE)
-      sim.frost[i] = 1
-      sim.frozen[i] = 1
-      sim.velX[i] = 300
+      geleBloc(sim, -400, -498, 300, 0)
       for (let s = 0; s < 90; s++) {
-        sim.velY[i] = -60 // l'appui
+        for (let i = 0; i < sim.count; i++) sim.velY[i] = -60 // l'appui
         sim.step(sim.params.dt)
       }
-      return sim.velX[i]
+      let vx = 0
+      for (let i = 0; i < sim.count; i++) vx += sim.velX[i]
+      return vx / sim.count
     }
     expect(glisse(MAT_HYDROPHILE)).toBeLessThan(glisse(MAT_WALL) * 0.8)
+  })
+
+  it('la VAPEUR sent les bandes de loin : attirée par l’hydrophile, repoussée par l’hydrophobe', () => {
+    const derive = (mat: number): number => {
+      const sim = makeSim()
+      sim.setLevel([{ minX: 200, minY: -500, maxX: 240, maxY: 500, material: mat }], [])
+      // dans la bande étendue (hydroBand × portée vapeur), hors bande liquide
+      const i = sim.addParticle(60, 0, KIND_FREE)
+      sim.gaseous[i] = 1
+      sim.vapor[i] = 1
+      for (let s = 0; s < 60; s++) sim.step(sim.params.dt)
+      return sim.velX[i] // >0 : attirée vers la paroi ; <0 : repoussée
+    }
+    expect(derive(MAT_HYDROPHILE)).toBeGreaterThan(10)
+    expect(derive(MAT_HYDROPHOBE)).toBeLessThan(-10)
+    // un mur neutre ne fait rien à cette distance
+    expect(Math.abs(derive(MAT_WALL))).toBeLessThan(5)
   })
 })
 

@@ -136,6 +136,12 @@ export class FluidSim {
   private readonly icePCnt: Int32Array
   private readonly iceInertia: Float32Array
   private readonly iceOmega: Float32Array
+  // Chimie du contact par bloc : nombre de particules touchant l'hydrophobe
+  // et l'hydrophile — le tableau des règles se joue à l'échelle du PALET.
+  private readonly icePhobe: Int32Array
+  private readonly icePhile: Int32Array
+  private readonly compScratch: Int32Array // compteur par composante (relabel)
+  private readonly relabelScratch: Int32Array // candidats voisins (relabel/icePass), collectés sans rappel
 
   boxes: ObstacleBox[] = []
   sponges: Sponge[] = []
@@ -233,6 +239,10 @@ export class FluidSim {
     this.icePCnt = new Int32Array(capacity)
     this.iceInertia = new Float32Array(capacity)
     this.iceOmega = new Float32Array(capacity)
+    this.icePhobe = new Int32Array(capacity)
+    this.icePhile = new Int32Array(capacity)
+    this.compScratch = new Int32Array(capacity)
+    this.relabelScratch = new Int32Array(2048)
     this.stack = new Int32Array(capacity)
     this.nbStart = new Int32Array(capacity + 1)
     this.nbList = new Int32Array(capacity * MAX_NEIGHBORS)
@@ -282,6 +292,10 @@ export class FluidSim {
   private hasGrille = false
   private hasSurchauffeur = false
   private coldBoxes: ObstacleBox[] = []
+  private heatBoxes: ObstacleBox[] = []
+  private grilleBoxes: ObstacleBox[] = []
+  private chemBoxes: ObstacleBox[] = [] // parois neutres + hydrophile/phobe (bandes et amortis)
+  private surchIdx: number[] = [] // indices des surchauffeurs dans boxes
   private heatCarry = 0
   private gasIdleCarry = 0
   private baseBoxes: ObstacleBox[] = []
@@ -303,12 +317,30 @@ export class FluidSim {
     this.baseBoxes = boxes
     this.boxes = boxes
     this.sponges = sponges.map((d) => new Sponge(d))
+    this.refreshBoxCaches()
+    this.surchauffesVides.clear()
+  }
+
+  // Listes de boîtes par famille, recalculées quand le niveau change (jamais
+  // par pas) : les passes d'aura et de chimie balayaient TOUTES les boîtes
+  // pour CHAQUE particule à CHAQUE pas — sur un tableau chargé, l'essentiel
+  // du parcours ne concernait pas le matériau cherché.
+  private refreshBoxCaches(): void {
+    const boxes = this.boxes
     this.hasCold = boxes.some((b) => b.material === MAT_FROID)
     this.hasHeat = boxes.some((b) => b.material === MAT_CHAUD)
     this.hasGrille = boxes.some((b) => b.material === MAT_GRILLE)
     this.hasSurchauffeur = boxes.some((b) => b.material === MAT_SURCHAUFFEUR)
     this.coldBoxes = boxes.filter((b) => b.material === MAT_FROID)
-    this.surchauffesVides.clear()
+    this.heatBoxes = boxes.filter((b) => b.material === MAT_CHAUD)
+    this.grilleBoxes = boxes.filter((b) => b.material === MAT_GRILLE)
+    this.chemBoxes = boxes.filter(
+      (b) => b.material === MAT_WALL || b.material === MAT_HYDROPHILE || b.material === MAT_HYDROPHOBE,
+    )
+    this.surchIdx = []
+    for (let bi = 0; bi < boxes.length; bi++) {
+      if (boxes[bi].material === MAT_SURCHAUFFEUR) this.surchIdx.push(bi)
+    }
   }
 
   // Portes asservies aux cibles laser : des parois qui vont et viennent.
@@ -319,6 +351,7 @@ export class FluidSim {
       ...this.baseBoxes,
       ...portes.map((p) => ({ ...p, material: MAT_WALL })),
     ]
+    this.refreshBoxCaches()
   }
 
   // Normale de la surface de glace en (x, y), pour le miroir laser. Deux
@@ -541,8 +574,7 @@ export class FluidSim {
     const rp = this.params.particleSpacing * 0.5
     const cp = this.scratchCP
     let heat = 0
-    for (const b of this.boxes) {
-      if (b.material !== MAT_CHAUD) continue
+    for (const b of this.heatBoxes) {
       // chaque chaudière règle la portée de sa propre aura (éditeur) :
       // un gros bloc à petite aura, un petit bloc qui chauffe loin
       const bandB = band * (b.aura ?? 1)
@@ -561,9 +593,8 @@ export class FluidSim {
   private surchauffeurFrole(x: number, y: number): number {
     const reach = this.params.particleSpacing * 2
     const cp = this.scratchCP
-    for (let bi = 0; bi < this.boxes.length; bi++) {
+    for (const bi of this.surchIdx) {
       const b = this.boxes[bi]
-      if (b.material !== MAT_SURCHAUFFEUR) continue
       if (horsBoite(b, x, y, reach)) continue
       boxContact(x, y, b, cp)
       if (cp.dist <= reach) return bi
@@ -1328,7 +1359,7 @@ export class FluidSim {
     }
 
     // 4ter. Blocs de glace : vitesse commune par amas, rebonds, soudures
-    this.icePass()
+    this.icePass(dt)
 
     // 4quater. Vapeur : expansion douce et flottement
     this.applyGasDynamics(dt)
@@ -1477,8 +1508,7 @@ export class FluidSim {
   }
 
   private grilleAt(x: number, y: number): boolean {
-    for (const b of this.boxes) {
-      if (b.material !== MAT_GRILLE) continue
+    for (const b of this.grilleBoxes) {
       if (dansBoite(b, x, y)) return true
     }
     return false
@@ -1608,26 +1638,11 @@ export class FluidSim {
       const gel = this.frozen[i] === 1
       const gaz = this.gaseous[i] === 1
       // La GLACE sent la chimie AU CONTACT (tableau des règles) : bumper
-      // hydrophobe, freinage hydrophile — mais aucune bande à distance.
-      if (gel) {
-        const matG = this.contactMat[i]
-        if (matG === MAT_HYDROPHOBE) {
-          const vnIn = this.contactVn[i]
-          if (vnIn < 0) {
-            const nx = this.contactNX[i]
-            const ny = this.contactNY[i]
-            const vn = this.velX[i] * nx + this.velY[i] * ny
-            const target = -vnIn * p.hydrophobeRestitution
-            this.velX[i] += (target - vn) * nx
-            this.velY[i] += (target - vn) * ny
-          }
-        } else if (matG === MAT_HYDROPHILE) {
-          // le mouillage freine le bloc qui glisse dessus
-          this.velX[i] *= philDamp
-          this.velY[i] *= philDamp
-        }
-        continue
-      }
+      // hydrophobe, freinage hydrophile — mais c'est le PALET entier qui
+      // répond, pas la particule : la réponse vit dans icePass, où le bloc
+      // rigide encaisse ses chocs. (Une réponse par particule serait diluée
+      // par la moyenne de l'amas puis écrasée par l'impulsion rigide.)
+      if (gel) continue
       const mat = this.contactMat[i]
       if (gaz) {
         // la vapeur ne colle ni ne rebondit — mais les bandes la travaillent
@@ -1660,12 +1675,9 @@ export class FluidSim {
       // la vapeur sent les bandes en sourdine mais de LOIN : force réduite,
       // portée étendue — le nuage s'infléchit bien avant la paroi, sans
       // jamais être happé ni claqué
-      const poidsBande = gaz ? 0.12 : 1
-      const porteeGaz = gaz ? 2.5 : 1
-      for (const b of this.boxes) {
-        if (b.material !== MAT_HYDROPHILE && b.material !== MAT_HYDROPHOBE && b.material !== MAT_WALL) {
-          continue
-        }
+      const poidsBande = gaz ? p.hydroGasWeight : 1
+      const porteeGaz = gaz ? p.hydroGasReach : 1
+      for (const b of this.chemBoxes) {
         // Le mur neutre n'agit qu'au ras de la paroi ; la chimie porte loin,
         // et encore plus loin pour la vapeur (en sourdine).
         const reach = b.material === MAT_WALL ? wallBand : band * porteeGaz
@@ -1845,8 +1857,7 @@ export class FluidSim {
       let exposure = 0
       let minSep = Infinity
       if (this.hasCold) {
-        for (const b of this.boxes) {
-          if (b.material !== MAT_FROID) continue
+        for (const b of this.coldBoxes) {
           if (horsBoite(b, x, y, band + rp)) continue
           boxContact(x, y, b, cp)
           const sep = cp.dist - rp
@@ -1972,7 +1983,7 @@ export class FluidSim {
   // corps rigide en translation — une seule vitesse pour tout l'amas (la
   // moyenne), un rebond commun quand l'un de ses points touche une paroi,
   // l'arrêt complet si l'un d'eux est soudé à une plaque froide.
-  private icePass(): void {
+  private icePass(dt: number): void {
     const n = this.count
     const frozen = this.frozen
     let any = false
@@ -1988,16 +1999,19 @@ export class FluidSim {
     const linkR2 = linkR * linkR
     const { prdX, prdY, velX, velY, labels } = this
     const grid = this.grid
+    const scratch = this.relabelScratch
     const forEachIce = (i: number, cb: (j: number) => void) => {
       if (frozen[i] === 0) return // le liquide : singletons, hors des blocs
       const xi = prdX[i]
       const yi = prdY[i]
-      grid.forEachNeighbor(xi, yi, linkR, (j) => {
-        if (j === i || frozen[j] === 0) return
+      const end = grid.collect(prdX, prdY, xi, yi, linkR, i, scratch, 0, scratch.length)
+      for (let e = 0; e < end; e++) {
+        const j = scratch[e]
+        if (frozen[j] === 0) continue
         const dx = xi - prdX[j]
         const dy = yi - prdY[j]
         if (dx * dx + dy * dy <= linkR2) cb(j)
-      })
+      }
     }
     const comps = labelComponents(n, labels, forEachIce, this.stack)
     this.iceVxSum.fill(0, 0, comps)
@@ -2013,6 +2027,8 @@ export class FluidSim {
     this.icePCnt.fill(0, 0, comps)
     this.iceInertia.fill(0, 0, comps)
     this.iceOmega.fill(0, 0, comps)
+    this.icePhobe.fill(0, 0, comps)
+    this.icePhile.fill(0, 0, comps)
 
     // 1. masse, centre de masse, vitesse moyenne, et point de contact moyen
     for (let i = 0; i < n; i++) {
@@ -2024,6 +2040,8 @@ export class FluidSim {
       this.iceCySum[c] += prdY[i]
       this.iceCnt[c]++
       if (this.contactMat[i] >= 0) {
+        if (this.contactMat[i] === MAT_HYDROPHOBE) this.icePhobe[c]++
+        else if (this.contactMat[i] === MAT_HYDROPHILE) this.icePhile[c]++
         this.iceNxSum[c] += this.contactNX[i]
         this.iceNySum[c] += this.contactNY[i]
         // le point d'application compte autant que la direction : c'est son
@@ -2067,6 +2085,11 @@ export class FluidSim {
         vy = 0
         omega = 0 // soudé à la plaque : plus de translation ni de rotation
       } else if (this.icePCnt[c] > 0) {
+        // La chimie se lit à l'échelle du palet : la surface qui touche le
+        // plus de particules dicte la réponse du bloc (tableau des règles —
+        // bumper hydrophobe, mouillage hydrophile).
+        const surPhobe = this.icePhobe[c] > 0 && this.icePhobe[c] >= this.icePhile[c]
+        const surPhile = !surPhobe && this.icePhile[c] > 0
         const nl = Math.hypot(this.iceNxSum[c], this.iceNySum[c])
         if (nl > 1e-6) {
           const nx = this.iceNxSum[c] / nl
@@ -2082,14 +2105,26 @@ export class FluidSim {
             // impulsion de choc d'un corps rigide : le dénominateur mélange
             // masse et inertie — un choc excentré transfère une part de
             // l'élan en ROTATION au lieu de tout renvoyer en translation.
+            // Le bumper hydrophobe REND PLUS qu'il ne reçoit (restitution
+            // propre + plancher d'éjection) ; l'hydrophile absorbe le choc.
             const rn = rx * ny - ry * nx
             const denom = 1 / cnt + (I > 1e-6 ? (rn * rn) / I : 0)
-            const j = (-(1 + rest) * vn) / denom
+            let vnOut = -vn * (surPhobe ? p.hydrophobeIceRestitution : surPhile ? 0 : rest)
+            if (surPhobe && vnOut < p.hydrophobeIceKick) vnOut = p.hydrophobeIceKick
+            const j = (vnOut - vn) / denom
             vx += (j * nx) / cnt
             vy += (j * ny) / cnt
             if (I > 1e-6) omega += (j * rn) / I
             if (-vn > this.iceImpact) this.iceImpact = -vn
           }
+        }
+        if (surPhile) {
+          // le mouillage retient : le palet qui glisse sur l'hydrophile
+          // s'essouffle, translation et rotation comprises
+          const damp = Math.exp(-p.hydrophileIceDrag * p.surfaceBite * dt)
+          vx *= damp
+          vy *= damp
+          omega *= damp
         }
       }
       if (omega > MAX_SPIN) omega = MAX_SPIN
@@ -2128,33 +2163,51 @@ export class FluidSim {
     // suit la vapeur RÉSIDUELLE (continue), pas l'étiquette gazeuse : en
     // condensant, le lien se resserre au rythme où le corps se regroupe,
     // au lieu de tomber d'un coup — redevenir eau ne scinde pas l'amas.
-    const gasLinkR = linkR * Math.max(1, p.gasLinkFactor)
     const gasSpan = Math.max(1, p.gasLinkFactor) - 1
     const { posX, posY, labels, gasLink } = this
+    // Rayon de recherche asservi à la vapeur RÉELLEMENT présente : le rayon
+    // par paire vaut linkR·(1 + span·max(gi, gj)) ≤ linkR·(1 + span·gmax) —
+    // chercher à gmax couvre donc exactement les mêmes liens. Sans vapeur
+    // (gmax = 0, le régime courant), on balaie 9 cellules par particule au
+    // lieu de ~60 : relabel était le pic CPU périodique de la frame.
+    let gmax = 0
+    for (let i = 0; i < n; i++) if (gasLink[i] > gmax) gmax = gasLink[i]
+    const gasLinkR = linkR * (1 + gasSpan * gmax)
     const grid = this.grid
     grid.build(posX, posY, n)
 
+    // Chemin sans rappel par voisin : les candidats sont collectés d'un bloc
+    // dans un tampon (grid.collect, zéro allocation), puis filtrés en place —
+    // le parcours en profondeur ne paie plus deux couches de fermetures par
+    // particule visitée (relabel était le pic CPU périodique de la frame).
+    const scratch = this.relabelScratch
     const forEachNeighbor = (i: number, cb: (j: number) => void) => {
       const xi = posX[i]
       const yi = posY[i]
-      grid.forEachNeighbor(xi, yi, gasLinkR, (j) => {
-        if (j === i) return
-        const dx = xi - posX[j]
-        const dy = yi - posY[j]
-        const r2 = dx * dx + dy * dy
-        const v = Math.max(gasLink[i], gasLink[j])
+      const gi = gasLink[i]
+      const end = grid.collect(posX, posY, xi, yi, gasLinkR, i, scratch, 0, scratch.length)
+      for (let e = 0; e < end; e++) {
+        const j = scratch[e]
+        const v = gi > gasLink[j] ? gi : gasLink[j]
         if (v > 0) {
+          const dx = xi - posX[j]
+          const dy = yi - posY[j]
           const lr = linkR * (1 + gasSpan * v)
-          if (r2 <= lr * lr) cb(j)
-        } else if (r2 <= linkR2) {
-          cb(j)
+          if (dx * dx + dy * dy <= lr * lr) cb(j)
+        } else {
+          const dx = xi - posX[j]
+          const dy = yi - posY[j]
+          if (dx * dx + dy * dy <= linkR2) cb(j)
         }
-      })
+      }
     }
     const componentCount = labelComponents(n, labels, forEachNeighbor, this.stack)
 
     // Composante contenant le plus de particules de l'ancien corps
-    const playerPerLabel = new Int32Array(componentCount)
+    // (tampon réutilisé : relabel tourne à chaque frame, une allocation ici
+    // devient une rafale de passages du ramasse-miettes)
+    const playerPerLabel = this.compScratch
+    playerPerLabel.fill(0, 0, componentCount)
     for (let i = 0; i < n; i++) {
       if (this.kind[i] === KIND_PLAYER) playerPerLabel[labels[i]]++
     }

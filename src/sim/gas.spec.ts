@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PARAMS, type SimParams } from './params'
 import { FluidSim, KIND_FREE, KIND_PLAYER, type Bounds } from './solver'
-import { MAT_CHAUD, MAT_FROID, MAT_GRILLE, MAT_SURCHAUFFEUR } from '../game/level'
+import { MAT_FROID, MAT_GRILLE, MAT_SURCHAUFFEUR } from '../game/level'
 
 const OPEN: Bounds = { minX: -3000, minY: -3000, maxX: 3000, maxY: 3000 }
 

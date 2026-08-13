@@ -71,12 +71,22 @@ export class SpatialGrid {
   ): number {
     if (this.count === 0) return offset
     const r2max = radius * radius
-    const clampX = (c: number) => (c < 0 ? 0 : c >= this.nx ? this.nx - 1 : c)
-    const clampY = (c: number) => (c < 0 ? 0 : c >= this.ny ? this.ny - 1 : c)
-    const cx0 = clampX(Math.floor((x - radius - this.minX) / this.cellSize))
-    const cy0 = clampY(Math.floor((y - radius - this.minY) / this.cellSize))
-    const cx1 = clampX(Math.floor((x + radius - this.minX) / this.cellSize))
-    const cy1 = clampY(Math.floor((y + radius - this.minY) / this.cellSize))
+    // bornes inlinées : ce chemin est appelé une fois PAR PARTICULE et PAR
+    // PAS — une fermeture allouée ici devient un torrent pour le GC
+    const nx1 = this.nx - 1
+    const ny1 = this.ny - 1
+    let cx0 = Math.floor((x - radius - this.minX) / this.cellSize)
+    let cy0 = Math.floor((y - radius - this.minY) / this.cellSize)
+    let cx1 = Math.floor((x + radius - this.minX) / this.cellSize)
+    let cy1 = Math.floor((y + radius - this.minY) / this.cellSize)
+    if (cx0 < 0) cx0 = 0
+    else if (cx0 > nx1) cx0 = nx1
+    if (cy0 < 0) cy0 = 0
+    else if (cy0 > ny1) cy0 = ny1
+    if (cx1 < 0) cx1 = 0
+    else if (cx1 > nx1) cx1 = nx1
+    if (cy1 < 0) cy1 = 0
+    else if (cy1 > ny1) cy1 = ny1
     let cursor = offset
     const cap = offset + max
     for (let cy = cy0; cy <= cy1; cy++) {
@@ -97,14 +107,23 @@ export class SpatialGrid {
 
   forEachNeighbor(x: number, y: number, radius: number, cb: (j: number) => void): void {
     if (this.count === 0) return
-    // Clamp complet des deux bornes : une requête hors grille retombe sur les
-    // cellules de bord, où les particules hors bornes sont rangées par build().
-    const clampX = (c: number) => (c < 0 ? 0 : c >= this.nx ? this.nx - 1 : c)
-    const clampY = (c: number) => (c < 0 ? 0 : c >= this.ny ? this.ny - 1 : c)
-    const cx0 = clampX(Math.floor((x - radius - this.minX) / this.cellSize))
-    const cy0 = clampY(Math.floor((y - radius - this.minY) / this.cellSize))
-    const cx1 = clampX(Math.floor((x + radius - this.minX) / this.cellSize))
-    const cy1 = clampY(Math.floor((y + radius - this.minY) / this.cellSize))
+    // Clamp complet des deux bornes (inliné, comme collect) : une requête
+    // hors grille retombe sur les cellules de bord, où les particules hors
+    // bornes sont rangées par build().
+    const nx1 = this.nx - 1
+    const ny1 = this.ny - 1
+    let cx0 = Math.floor((x - radius - this.minX) / this.cellSize)
+    let cy0 = Math.floor((y - radius - this.minY) / this.cellSize)
+    let cx1 = Math.floor((x + radius - this.minX) / this.cellSize)
+    let cy1 = Math.floor((y + radius - this.minY) / this.cellSize)
+    if (cx0 < 0) cx0 = 0
+    else if (cx0 > nx1) cx0 = nx1
+    if (cy0 < 0) cy0 = 0
+    else if (cy0 > ny1) cy0 = ny1
+    if (cx1 < 0) cx1 = 0
+    else if (cx1 > nx1) cx1 = nx1
+    if (cy1 < 0) cy1 = 0
+    else if (cy1 > ny1) cy1 = ny1
     for (let cy = cy0; cy <= cy1; cy++) {
       for (let cx = cx0; cx <= cx1; cx++) {
         const c = cy * this.nx + cx

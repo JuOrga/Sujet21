@@ -630,6 +630,26 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Restitution des chocs sur parois hydrophobes. 1 : rebond parfait. 0 : l’eau s’écrase sans rebondir.',
   )
   describe(
+    fMat.addBinding(params, 'hydrophobeIceRestitution', { min: 0, max: 2, step: 0.05, label: 'bumper glace' }),
+    'Restitution du PALET de glace sur l’hydrophobe. Au-delà de 1, le bumper rend plus qu’il ne reçoit — l’effet flipper du tableau des règles.',
+  )
+  describe(
+    fMat.addBinding(params, 'hydrophobeIceKick', { min: 0, max: 800, step: 10, label: 'pichenette glace' }),
+    'Vitesse d’éjection minimale d’un palet qui touche l’hydrophobe : même en dérive lente, il repart d’un coup sec.',
+  )
+  describe(
+    fMat.addBinding(params, 'hydrophileIceDrag', { min: 0, max: 8, step: 0.1, label: 'freinage glace' }),
+    'Le mouillage retient le palet qui glisse sur l’hydrophile : translation et rotation s’essoufflent (« ralentis » du tableau des règles).',
+  )
+  describe(
+    fMat.addBinding(params, 'hydroGasWeight', { min: 0, max: 1, step: 0.05, label: 'poids vapeur' }),
+    'Force des bandes chimiques sur la VAPEUR, en fraction de l’effet plein : l’hydrophile attire le nuage, l’hydrophobe le repousse — légèrement, comme une gravité.',
+  )
+  describe(
+    fMat.addBinding(params, 'hydroGasReach', { min: 1, max: 5, step: 0.1, label: 'portée vapeur' }),
+    'Portée des bandes pour la vapeur, en multiple de la portée de bande : le nuage s’infléchit bien avant la paroi.',
+  )
+  describe(
     fMat.addBinding(params, 'wallSplashDamp', { min: 0, max: 1, label: 'amorti impact' }),
     'Amortit le rebond de l’eau sur les murs neutres : haut, l’impact s’étale et épouse la paroi ; à 0, l’eau éclate en jaillissant.',
   )
