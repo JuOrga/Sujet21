@@ -168,7 +168,8 @@ export class LevelEditor {
     | { mode: 'multimove'; ox: number; oy: number; prevDx: number; prevDy: number }
     | { mode: 'aim'; index: number }
     | { mode: 'railpt'; index: number; point: number }
-    | { mode: 'resize'; edge: string; start: Rect } = null
+    | { mode: 'resize'; edge: string; start: Rect }
+    | { mode: 'rotate'; index: number } = null
 
   // Sélection MULTIPLE (Maj + clic) : déplacée d'un bloc, supprimée d'un
   // coup, ou passée aux outils d'alignement du panneau.
@@ -650,6 +651,26 @@ export class LevelEditor {
     }
   }
 
+  // La poignée de ROTATION d'une boîte sélectionnée : au bout d'un bras qui
+  // part du milieu du bord haut, DANS LE REPÈRE DE LA BOÎTE — elle tourne
+  // avec elle, on sait toujours où la reprendre.
+  private rotateHandlePos(): { sx: number; sy: number } | null {
+    if (this.sel?.kind !== 'box') return null
+    const b = this.level.boxes[this.sel.index]
+    if (!b) return null
+    const cx = (b.minX + b.maxX) / 2
+    const cy = (b.minY + b.maxY) / 2
+    const rad = ((b.angle ?? 0) * Math.PI) / 180
+    const bras = (b.maxY - b.minY) / 2 + 30 / this.zoom
+    return this.toScreen(cx - Math.sin(rad) * bras, cy + Math.cos(rad) * bras)
+  }
+
+  private hitRotateHandle(sx: number, sy: number): boolean {
+    const h = this.rotateHandlePos()
+    if (!h) return false
+    return Math.hypot(sx - h.sx, sy - h.sy) <= HANDLE_PX + 2
+  }
+
   private hitHandle(sx: number, sy: number): string | null {
     const r = this.selRect()
     if (!r) return null
@@ -713,6 +734,12 @@ export class LevelEditor {
             return
           }
           this.multi = []
+        }
+        // la poignée de rotation prime : elle vit hors du rectangle, aucun
+        // conflit avec les poignées d'angle
+        if (this.sel?.kind === 'box' && this.hitRotateHandle(sx, sy)) {
+          this.drag = { mode: 'rotate', index: this.sel.index }
+          return
         }
         const edge = this.hitHandle(sx, sy)
         if (edge) {
@@ -903,10 +930,33 @@ export class LevelEditor {
 
       if (!this.drag) {
         c.style.cursor =
-          this.tool.kind === 'select' ? (this.hitHandle(sx, sy) ? 'nwse-resize' : 'default') : 'crosshair'
+          this.tool.kind === 'select'
+            ? this.sel?.kind === 'box' && this.hitRotateHandle(sx, sy)
+              ? 'grab'
+              : this.hitHandle(sx, sy)
+                ? 'nwse-resize'
+                : 'default'
+            : 'crosshair'
         return
       }
       const d = this.drag
+      if (d.mode === 'rotate') {
+        const b = this.level.boxes[d.index]
+        if (b) {
+          const cx = (b.minX + b.maxX) / 2
+          const cy = (b.minY + b.maxY) / 2
+          // le bras de la poignée pointe vers +90° quand l'angle est nul
+          let a = (Math.atan2(w.y - cy, w.x - cx) * 180) / Math.PI - 90
+          a = ((a + 540) % 360) - 180 // ramené dans (-180, 180]
+          // aimanté aux 15° — Alt pour l'angle libre (au degré près)
+          const cran = e.altKey ? 1 : 15
+          const ang = Math.round(a / cran) * cran
+          if (ang) b.angle = ang
+          else delete b.angle
+        }
+        this.draw()
+        return
+      }
       if (d.mode === 'pan') {
         this.camX = d.camX - (sx - d.sx) / this.zoom
         this.camY = d.camY + (sy - d.sy) / this.zoom
@@ -1009,6 +1059,15 @@ export class LevelEditor {
       if (d.mode === 'aim') {
         this.setTool({ kind: 'select' })
         this.commit('Émetteur posé — glissez depuis lui pour réorienter, ou réglez l’angle à droite.')
+        return
+      }
+      if (d.mode === 'rotate') {
+        const b = this.level.boxes[d.index]
+        this.commit(
+          b?.angle
+            ? `Boîte tournée à ${b.angle}° — aimantée aux 15° (Alt : au degré près).`
+            : 'Boîte remise droite (0°).',
+        )
         return
       }
       if (d.mode === 'railpt') {
@@ -2381,6 +2440,38 @@ export class LevelEditor {
       g.fillStyle = '#a9c0d2'
       g.font = '11px ui-monospace, monospace'
       g.fillText(`${Math.round(r.maxX - r.minX)} × ${Math.round(r.maxY - r.minY)}`, p.sx, q.sy + 15)
+      // poignée de ROTATION (boîtes) : un bras qui part du bord haut — dans
+      // le repère de la boîte — et un anneau à saisir. Aimantée aux 15°.
+      const h = this.rotateHandlePos()
+      if (h && this.sel?.kind === 'box') {
+        const b = this.level.boxes[this.sel.index]
+        const cx = (b.minX + b.maxX) / 2
+        const cy = (b.minY + b.maxY) / 2
+        const rad = ((b.angle ?? 0) * Math.PI) / 180
+        const demiH = (b.maxY - b.minY) / 2
+        const bord = this.toScreen(cx - Math.sin(rad) * demiH, cy + Math.cos(rad) * demiH)
+        g.strokeStyle = '#ffffff'
+        g.lineWidth = 1.2
+        g.beginPath()
+        g.moveTo(bord.sx, bord.sy)
+        g.lineTo(h.sx, h.sy)
+        g.stroke()
+        g.beginPath()
+        g.arc(h.sx, h.sy, 6.5, 0, Math.PI * 2)
+        g.fillStyle = '#12202c'
+        g.fill()
+        g.strokeStyle = '#ffffff'
+        g.stroke()
+        g.beginPath()
+        g.arc(h.sx, h.sy, 2.2, 0, Math.PI * 2)
+        g.fillStyle = '#ffffff'
+        g.fill()
+        if (b.angle) {
+          g.fillStyle = '#a9c0d2'
+          g.font = '11px ui-monospace, monospace'
+          g.fillText(`${b.angle}°`, h.sx + 10, h.sy + 4)
+        }
+      }
     } else if (this.sel?.kind === 'label' || this.sel?.kind === 'spawn') {
       const pt =
         this.sel.kind === 'label'
