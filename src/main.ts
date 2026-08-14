@@ -532,6 +532,12 @@ let fpsCapPrecedent = 0 // horloge du limiteur (dernière image RENDUE)
 // borderline, la qualité qui descendait « pour tenir 60 » se voyait plus
 // que les images perdues. Qui veut l'adaptatif (mobile) l'active au voile.
 let resDynamique = localStorage.getItem('sujet21-res-dyn') === '1'
+// Graphismes du décor : RICHE par défaut (bruit procédural complet), SOBRE
+// pour débrancher le décoratif dans le shader de composition — mêmes formes,
+// mêmes auras, moins de calcul par pixel. C'est l'instrument du test A/B :
+// deux rapports de performance, mêmes conditions, seul ce réglage change —
+// l'écart chiffre le coût réel des graphismes sur la machine du joueur.
+let decorRiche = localStorage.getItem('sujet21-decor') !== 'sobre'
 const paramsEl = document.getElementById('params') as HTMLDivElement
 {
   const choix = document.getElementById('params-fps') as HTMLDivElement
@@ -574,6 +580,27 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     }
   }
   renderRes()
+
+  const choixDecor = document.getElementById('params-decor') as HTMLDivElement
+  const renderDecor = (): void => {
+    choixDecor.innerHTML = ''
+    for (const [riche, label] of [
+      [true, 'RICHES'],
+      [false, 'SOBRES'],
+    ] as const) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = label
+      b.className = decorRiche === riche ? 'actif' : ''
+      b.addEventListener('click', () => {
+        decorRiche = riche
+        localStorage.setItem('sujet21-decor', riche ? 'riche' : 'sobre')
+        renderDecor()
+      })
+      choixDecor.appendChild(b)
+    }
+  }
+  renderDecor()
 }
 
 // ---- Rapport de performance : mesurer la VRAIE machine, analyser à distance ----
@@ -598,6 +625,7 @@ function rapportPerf(): Record<string, unknown> {
     config: {
       fpsCap,
       resolutionDynamique: resDynamique,
+      graphismes: decorRiche ? 'riches' : 'sobres',
       palierQualite: qualityLevel,
       timeWarp: params.timeWarp,
       downsampleChamp: params.renderDownsample,
@@ -2355,6 +2383,7 @@ function frame(now: number): void {
     chillNow(),
     level.decals ?? [],
     level.zones ?? [],
+    decorRiche ? 1 : 0,
   )
   const rendRaw = performance.now() - renderT0
   monitor.renderMs += (rendRaw - monitor.renderMs) * 0.08
