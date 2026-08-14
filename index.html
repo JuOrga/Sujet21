@@ -2918,15 +2918,17 @@
             jamais dégradée.
           </div>
           <div id="params-fps" class="params-choix" role="group" aria-label="Fréquence d'images"></div>
-          <div class="params-nom" style="margin-top: 16px">RÉSOLUTION DYNAMIQUE</div>
+          <div class="params-nom" style="margin-top: 16px">RÉSOLUTION DE RENDU</div>
           <div class="params-desc">
-            Désactivée (défaut), le rendu reste en résolution native, constante :
-            à la machine d'encaisser. Activée, la résolution baisse quand la
-            machine ne tient pas la cadence et remonte dès qu'elle respire — utile
-            sur mobile si ça chauffe. La physique n'est jamais dégradée, dans les
-            deux cas.
+            Élevée (défaut) : la cuve se dessine en résolution native. Moyenne et
+            faible : la cuve se dessine plus petite puis s'étire — la carte
+            graphique calcule 56 % ou 25 % des pixels, un allègement massif et
+            CONSTANT, sans yo-yo (un téléphone pousse jusqu'à 4 fois plus de
+            pixels qu'un Steam Deck : c'est LE réglage qui égalise). Dynamique :
+            la résolution s'ajuste seule à la cadence. L'interface et les textes
+            restent nets dans tous les cas ; la physique n'est jamais dégradée.
           </div>
-          <div id="params-resdyn" class="params-choix" role="group" aria-label="Résolution dynamique"></div>
+          <div id="params-resdyn" class="params-choix" role="group" aria-label="Résolution de rendu"></div>
           <div class="params-nom" style="margin-top: 16px">GRAPHISMES DU DÉCOR</div>
           <div class="params-desc">
             Riches (défaut) : le décor vit — veilleuses, caustiques, brumes

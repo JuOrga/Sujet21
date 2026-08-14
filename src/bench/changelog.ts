@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '14/08/2026 23:36',
+    title: 'Résolution de rendu au choix : élevée, moyenne, faible — ou dynamique',
+    notes: [
+      'Intuition joueur, validée par les chiffres : le Pixel pousse ~4,2 millions de pixels par image quand le Steam Deck en pousse ~1 — et le shader de composition coûte PAR PIXEL. À réglages égaux, le téléphone paie 4 fois plus de carte graphique : c’est l’écart entre les deux machines.',
+      'La section RÉSOLUTION DYNAMIQUE devient RÉSOLUTION DE RENDU, quatre choix : ÉLEVÉE (native, défaut — rien ne change), MOYENNE (échelle ×0,75 : la carte graphique calcule 56 % des pixels), FAIBLE (×0,5 : 25 % des pixels), DYNAMIQUE (l’adaptatif historique, qui s’ajuste seul à la cadence). Moyenne et faible sont CONSTANTES : l’allègement sans le yo-yo qui avait fait rejeter l’adaptatif sur PC.',
+      'Seule la cuve est mise à l’échelle : l’interface, les textes et les jauges HTML restent à la netteté native de l’écran. La physique n’est jamais dégradée. Choix mémorisé (sujet21-res, migration de l’ancien interrupteur), fenêtre de mesure vidée au changement, et le rapport consigne le choix (config.resolution).',
+      'Sur le Pixel, MOYENNE est le premier réglage à essayer : ~2× moins de pixels que le natif, une différence visuelle discrète sur un écran aussi dense — et le GPU respire d’autant.',
+    ],
+  },
+  {
     date: '14/08/2026 23:16',
     title: 'Anti-domino débranché, verrou 45 (Steam Deck), rapports A/B propres',
     notes: [
