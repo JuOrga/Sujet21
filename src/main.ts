@@ -548,7 +548,21 @@ let fpsCapPrecedent = 0 // horloge du limiteur (dernière image RENDUE)
 // résolution native constante, aucune surprise visuelle. Sur une machine
 // borderline, la qualité qui descendait « pour tenir 60 » se voyait plus
 // que les images perdues. Qui veut l'adaptatif (mobile) l'active au voile.
-let resDynamique = localStorage.getItem('sujet21-res-dyn') === '1'
+// Résolution de rendu : FIXE au choix (élevée = native, moyenne ×0,75,
+// faible ×0,5) ou DYNAMIQUE (l'adaptatif historique). Constat qui l'a
+// motivée : à réglages égaux, le Pixel pousse ~4,2 Mpx quand le Steam Deck
+// en pousse ~1 — le shader de composition coûte PAR PIXEL, le téléphone
+// paie 4×. Moyenne = 56 % des pixels, faible = 25 % : un allègement GPU
+// massif et CONSTANT (pas de yo-yo), l'interface HTML restant nette.
+type ResChoix = 'elevee' | 'moyenne' | 'faible' | 'dyn'
+const RES_ECHELLES: Record<ResChoix, number> = { elevee: 1, moyenne: 0.75, faible: 0.5, dyn: 1 }
+let resChoix: ResChoix = ((): ResChoix => {
+  const v = localStorage.getItem('sujet21-res')
+  if (v === 'elevee' || v === 'moyenne' || v === 'faible' || v === 'dyn') return v
+  // migration : l'ancien interrupteur résolution dynamique
+  return localStorage.getItem('sujet21-res-dyn') === '1' ? 'dyn' : 'elevee'
+})()
+const resDynamique = (): boolean => resChoix === 'dyn'
 // rendu de la section MOTEUR PHYSIQUE — paresseux : `sim` n'existe pas
 // encore quand le voile se câble, il se dessine à l'ouverture
 let majMoteurUI: () => void = () => {}
@@ -589,18 +603,20 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
   const choixRes = document.getElementById('params-resdyn') as HTMLDivElement
   const renderRes = (): void => {
     choixRes.innerHTML = ''
-    for (const [actif, label] of [
-      [false, 'DÉSACTIVÉE'],
-      [true, 'ACTIVÉE'],
+    for (const [mode, label] of [
+      ['elevee', 'ÉLEVÉE'],
+      ['moyenne', 'MOYENNE'],
+      ['faible', 'FAIBLE'],
+      ['dyn', 'DYNAMIQUE'],
     ] as const) {
       const b = document.createElement('button')
       b.type = 'button'
       b.textContent = label
-      b.className = resDynamique === actif ? 'actif' : ''
+      b.className = resChoix === mode ? 'actif' : ''
       b.addEventListener('click', () => {
-        resDynamique = actif
-        localStorage.setItem('sujet21-res-dyn', actif ? '1' : '0')
-        if (!actif) qualityLevel = 0 // retour immédiat à la résolution native
+        resChoix = mode
+        localStorage.setItem('sujet21-res', mode)
+        if (mode !== 'dyn') qualityLevel = 0 // les paliers adaptatifs se rangent
         perf.reset()
         renderRes()
       })
@@ -707,7 +723,8 @@ function rapportPerf(): Record<string, unknown> {
   return perf.rapport({
     config: {
       fpsCap,
-      resolutionDynamique: resDynamique,
+      resolution: resChoix,
+      resolutionDynamique: resDynamique(),
       graphismes: decorRiche ? 'riches' : 'sobres',
       liquide: eauRiche ? 'riche' : 'sobre',
       moteur: sim.moteurWasm ? 'wasm' : noyauxWasm ? 'javascript' : 'javascript (wasm non chargé)',
@@ -1950,9 +1967,9 @@ let qualityLevel = window.matchMedia('(pointer: coarse)').matches ? 1 : 0
 let qualitySous = 0 // s passées sous l'objectif
 let qualitySur = 0 // s passées avec de la marge
 function updateQuality(dtReal: number): void {
-  // Résolution dynamique coupée (voile PARAMÈTRES) : résolution native,
-  // constante — aucun palier ne s'applique, à la machine d'encaisser.
-  if (!resDynamique) {
+  // Résolution FIXE choisie (voile PARAMÈTRES) : l'échelle est constante,
+  // aucun palier adaptatif ne s'applique — pas de yo-yo visuel.
+  if (!resDynamique()) {
     qualityLevel = 0
     return
   }
@@ -2010,7 +2027,9 @@ function frame(now: number): void {
   const quality = QUALITY_LEVELS[qualityLevel]
   const vw = window.innerWidth
   const vh = window.innerHeight
-  const dpr = Math.min(window.devicePixelRatio || 1, quality.dprCap)
+  // l'échelle fixe choisie s'applique ici : seul le canvas est mis à
+  // l'échelle, l'interface HTML reste à la netteté native
+  const dpr = Math.min(window.devicePixelRatio || 1, quality.dprCap) * RES_ECHELLES[resChoix]
   // mesures brutes de CETTE image, pour le collecteur de performance
   let physRaw = 0
   let stepsFaits = 0
