@@ -14,7 +14,8 @@ export interface PerfResume {
 }
 
 export class PerfCollector {
-  private readonly dt = new Float32Array(CAP) // ms entre images RENDUES
+  private readonly dt = new Float32Array(CAP) // ms entre images RENDUES (non plafonné)
+  private readonly cpu = new Float32Array(CAP) // ms CPU TOTAL de la frame (tout le rappel)
   private readonly phys = new Float32Array(CAP) // ms de pas physiques dans l'image
   private readonly rend = new Float32Array(CAP) // ms de soumission du rendu (CPU)
   private readonly steps = new Uint8Array(CAP) // pas physiques consommés
@@ -23,9 +24,18 @@ export class PerfCollector {
   private total = 0 // images notées depuis le début
   private cursor = 0
 
-  note(dtMs: number, physMs: number, rendMs: number, steps: number, particles: number, quality: number): void {
+  note(
+    dtMs: number,
+    cpuMs: number,
+    physMs: number,
+    rendMs: number,
+    steps: number,
+    particles: number,
+    quality: number,
+  ): void {
     const i = this.cursor
     this.dt[i] = dtMs
+    this.cpu[i] = cpuMs
     this.phys[i] = physMs
     this.rend[i] = rendMs
     this.steps[i] = Math.min(255, steps)
@@ -64,15 +74,33 @@ export class PerfCollector {
     const n = this.taille()
     const tri = this.dtTries()
     const pc = (q: number): number => (n > 0 ? tri[Math.min(n - 1, Math.floor(n * q))] : 0)
-    // les 10 pires images, avec leur contexte : c'est là que les à-coups parlent
-    const pires: { dtMs: number; physMs: number; rendMs: number; pas: number; particules: number; qualite: number }[] = []
+    // Les 10 pires images, avec leur contexte : c'est là que les à-coups
+    // parlent. `horsCpuMs` = dt − cpu total : du temps où NOTRE code ne
+    // tourne pas — file GPU pleine, compositeur, gel du système. `autreJsMs`
+    // = cpu − physique − rendu : notre code HORS des deux gros postes
+    // (laser, étiquettes DOM, panneau 2D, HUD…).
+    const pires: {
+      dtMs: number
+      cpuMs: number
+      physMs: number
+      rendMs: number
+      autreJsMs: number
+      horsCpuMs: number
+      pas: number
+      particules: number
+      qualite: number
+    }[] = []
     for (let k = 0; k < n; k++) {
       const d = this.dt[k]
       if (pires.length < 10 || d > pires[pires.length - 1].dtMs) {
+        const cpu = this.cpu[k]
         pires.push({
           dtMs: Math.round(d * 100) / 100,
+          cpuMs: Math.round(cpu * 100) / 100,
           physMs: Math.round(this.phys[k] * 100) / 100,
           rendMs: Math.round(this.rend[k] * 100) / 100,
+          autreJsMs: Math.round((cpu - this.phys[k] - this.rend[k]) * 100) / 100,
+          horsCpuMs: Math.round((d - cpu) * 100) / 100,
           pas: this.steps[k],
           particules: this.parts[k],
           qualite: this.qual[k],
@@ -83,12 +111,14 @@ export class PerfCollector {
     }
     let physSum = 0
     let rendSum = 0
+    let cpuSum = 0
     let sup20 = 0
     let sup33 = 0
     let sup50 = 0
     for (let k = 0; k < n; k++) {
       physSum += this.phys[k]
       rendSum += this.rend[k]
+      cpuSum += this.cpu[k]
       if (this.dt[k] > 20) sup20++
       if (this.dt[k] > 33.4) sup33++
       if (this.dt[k] > 50) sup50++
@@ -97,7 +127,7 @@ export class PerfCollector {
     const perfMem = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory
     return {
       quoi: 'sujet21-rapport-perf',
-      version: 1,
+      version: 2,
       quand: new Date().toISOString(),
       appareil: {
         userAgent: navigator.userAgent,
@@ -123,6 +153,8 @@ export class PerfCollector {
         moyennes: {
           physMs: Math.round((physSum / Math.max(1, n)) * 100) / 100,
           renduCpuMs: Math.round((rendSum / Math.max(1, n)) * 100) / 100,
+          cpuTotalMs: Math.round((cpuSum / Math.max(1, n)) * 100) / 100,
+          autreJsMs: Math.round(((cpuSum - physSum - rendSum) / Math.max(1, n)) * 100) / 100,
         },
         memoireJsMo: perfMem ? Math.round(perfMem.usedJSHeapSize / 1048576) : null,
       },
