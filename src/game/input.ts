@@ -30,8 +30,12 @@ export class Input {
   }
   onReset: (() => void) | null = null
   onTimeWarpChange: ((warp: number) => void) | null = null
-  onZoom: ((factor: number) => void) | null = null
+  // le zoom porte son ANCRE (centre du pincement, curseur de la molette) :
+  // le point du monde sous les doigts doit rester sous les doigts
+  onZoom: ((factor: number, clientX: number, clientY: number) => void) | null = null
   onPan: ((dxPx: number, dyPx: number) => void) | null = null
+  // fin de glissement, avec l'élan du geste (px/s) : la carte continue
+  onPanEnd: ((vxPx: number, vyPx: number) => void) | null = null
   onVortex: ((clientX: number, clientY: number) => void) | null = null
   private warpIndex = 2
   private readonly pointers = new Map<number, { x: number; y: number }>()
@@ -40,6 +44,30 @@ export class Input {
   // Clic droit maintenu : déplacement de caméra ; relâché sans avoir bougé,
   // c'est le vortex (l'outil sandbox garde son geste historique)
   private rightDrag: { id: number; x: number; y: number; moved: number } | null = null
+  // élan du glissement en cours (px/s, moyenne mobile) — sert au lancer
+  private panVx = 0
+  private panVy = 0
+  private panLastT = 0
+
+  private lanceElan(): void {
+    const age = performance.now() / 1000 - this.panLastT
+    // un geste qui s'était arrêté avant le relâcher ne lance rien
+    if (age < 0.09 && Math.hypot(this.panVx, this.panVy) > 60) {
+      this.onPanEnd?.(this.panVx, this.panVy)
+    }
+    this.panVx = 0
+    this.panVy = 0
+  }
+
+  private suitElan(dx: number, dy: number): void {
+    const now = performance.now() / 1000
+    const dt = now - this.panLastT
+    this.panLastT = now
+    if (dt <= 0 || dt > 0.1) return // premier point ou geste interrompu
+    const a = Math.min(1, dt * 12) // moyenne mobile ~80 ms
+    this.panVx += (dx / dt - this.panVx) * a
+    this.panVy += (dy / dt - this.panVy) * a
+  }
 
   togglePause(): void {
     this.paused = !this.paused
@@ -85,6 +113,9 @@ export class Input {
       if (e.button === 2) {
         // Maintenu : déplacement de caméra ; bref : vortex (au relâchement)
         this.rightDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0 }
+        this.panVx = 0
+        this.panVy = 0
+        this.panLastT = performance.now() / 1000
         try {
           target.setPointerCapture(e.pointerId)
         } catch {
@@ -105,6 +136,9 @@ export class Input {
         this.aimActive = false
         this.pinchDist = this.pinchDistance()
         this.pinchCenter = this.pinchCentroid()
+        this.panVx = 0
+        this.panVy = 0
+        this.panLastT = performance.now() / 1000
         return
       }
       if (this.vortexArmed) {
@@ -124,7 +158,10 @@ export class Input {
         this.rightDrag.x = e.clientX
         this.rightDrag.y = e.clientY
         this.rightDrag.moved += Math.abs(dx) + Math.abs(dy)
-        if (dx !== 0 || dy !== 0) this.onPan?.(dx, dy)
+        if (dx !== 0 || dy !== 0) {
+          this.onPan?.(dx, dy)
+          this.suitElan(dx, dy)
+        }
         return
       }
       const p = this.pointers.get(e.pointerId)
@@ -133,17 +170,21 @@ export class Input {
         p.y = e.clientY
       }
       if (this.pinchDist !== null) {
-        // Deux doigts : l'écart zoome, le centre déplace la caméra
+        // Deux doigts : l'écart zoome (ancré au centre du pincement — le
+        // monde reste collé aux doigts), le centre déplace la caméra
         const d = this.pinchDistance()
-        if (d !== null && this.pinchDist > 1e-3) {
-          this.onZoom?.(d / this.pinchDist)
+        const c = this.pinchCentroid()
+        if (d !== null && c !== null && this.pinchDist > 1e-3) {
+          this.onZoom?.(d / this.pinchDist, c.x, c.y)
           this.pinchDist = d
         }
-        const c = this.pinchCentroid()
         if (c !== null && this.pinchCenter !== null) {
           const dx = c.x - this.pinchCenter.x
           const dy = c.y - this.pinchCenter.y
-          if (dx !== 0 || dy !== 0) this.onPan?.(dx, dy)
+          if (dx !== 0 || dy !== 0) {
+            this.onPan?.(dx, dy)
+            this.suitElan(dx, dy)
+          }
         }
         this.pinchCenter = c
         return
@@ -156,13 +197,15 @@ export class Input {
       if (this.rightDrag && e.pointerId === this.rightDrag.id) {
         // Relâché sans avoir (presque) bougé : c'était un clic, donc le vortex
         if (this.rightDrag.moved < 6) this.onVortex?.(e.clientX, e.clientY)
+        else this.lanceElan()
         this.rightDrag = null
         return
       }
       this.pointers.delete(e.pointerId)
-      if (this.pointers.size < 2) {
+      if (this.pointers.size < 2 && this.pinchDist !== null) {
         this.pinchDist = null
         this.pinchCenter = null
+        this.lanceElan() // les doigts partent en mouvement : la carte suit l'élan
       }
       this.aimActive = false
     }
@@ -174,7 +217,8 @@ export class Input {
       'wheel',
       (e) => {
         e.preventDefault()
-        this.onZoom?.(Math.pow(1.1, -e.deltaY / 100))
+        // ancré au curseur : on zoome VERS ce qu'on regarde
+        this.onZoom?.(Math.pow(1.1, -e.deltaY / 100), e.clientX, e.clientY)
       },
       { passive: false },
     )
