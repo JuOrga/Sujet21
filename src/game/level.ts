@@ -79,6 +79,56 @@ export function subtractBox(
   return out
 }
 
+// Ronge une paroi OBLIQUE : la soustraction exacte entre rectangles n'existe
+// qu'à ANGLES ÉGAUX — on passe dans le repère de la perdante (où elle est
+// droite), la gagnante y est droite aussi, on découpe au couteau axial, puis
+// chaque morceau repart dans le monde avec l'angle d'origine (la rotation
+// d'une boîte étant définie autour de SON centre, les morceaux se posent
+// exactement sur la paroi d'origine). Angles différents : null — les
+// morceaux ne seraient plus des rectangles.
+export function subtractBoxOblique(perdante: ObstacleBox, gagnante: ObstacleBox): ObstacleBox[] | null {
+  const a = perdante.angle ?? 0
+  const b = gagnante.angle ?? 0
+  const delta = Math.abs((((a - b) % 360) + 540) % 360 - 180) // écart à 180 ↔ 0/360
+  if (Math.abs(delta - 180) > 0.5 && delta > 0.5) return null
+  if (!a) return subtractBox(perdante, gagnante)
+  const pcx = (perdante.minX + perdante.maxX) / 2
+  const pcy = (perdante.minY + perdante.maxY) / 2
+  const gcx = (gagnante.minX + gagnante.maxX) / 2
+  const gcy = (gagnante.minY + gagnante.maxY) / 2
+  // le centre de la gagnante, dépivoté autour du centre de la perdante
+  const rad = (-a * Math.PI) / 180
+  const c = Math.cos(rad)
+  const s = Math.sin(rad)
+  const dx = gcx - pcx
+  const dy = gcy - pcy
+  const lx = pcx + c * dx - s * dy
+  const ly = pcy + s * dx + c * dy
+  const ghx = (gagnante.maxX - gagnante.minX) / 2
+  const ghy = (gagnante.maxY - gagnante.minY) / 2
+  // à 180° d'écart, les demi-côtés de la gagnante sont simplement inversés —
+  // même empreinte : rien à échanger
+  const morceaux = subtractBox(
+    { ...perdante, angle: undefined },
+    { minX: lx - ghx, minY: ly - ghy, maxX: lx + ghx, maxY: ly + ghy },
+  )
+  // chaque morceau re-pivote : son centre orbite autour du centre d'origine
+  const rad2 = (a * Math.PI) / 180
+  const c2 = Math.cos(rad2)
+  const s2 = Math.sin(rad2)
+  return morceaux.map((m) => {
+    const mcx = (m.minX + m.maxX) / 2
+    const mcy = (m.minY + m.maxY) / 2
+    const ox = mcx - pcx
+    const oy = mcy - pcy
+    const wx = pcx + c2 * ox - s2 * oy
+    const wy = pcy + s2 * ox + c2 * oy
+    const hx = (m.maxX - m.minX) / 2
+    const hy = (m.maxY - m.minY) / 2
+    return { minX: wx - hx, minY: wy - hy, maxX: wx + hx, maxY: wy + hy, material: m.material, angle: a }
+  })
+}
+
 export interface SpongeDef {
   minX: number
   minY: number
