@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '14/08/2026 12:10',
+    title: 'Le verrou de fréquence tient sa cadence exacte sur tout écran',
+    notes: [
+      'Le limiteur calait sur des sous-multiples de l’écran : sa marge fixe faisait qu’un verrou à 60 sur un écran 144 Hz rendait 48 im/s réelles, et les crans hauts s’arrondissaient au petit bonheur. Cadencement refait à DETTE CONSERVÉE : l’horloge avance d’une période exacte par image rendue — la cadence moyenne colle au verrou choisi, quel que soit le taux de l’écran (dette bornée à une période : revenir sur l’onglet ne déclenche pas de rafale).',
+      'À savoir : au-delà du verrou, c’est la MACHINE qui décide — en résolution native (le nouveau défaut), une carte moyenne plafonne d’elle-même (~100 im/s sur un grand écran). Le compteur du banc (Mesures) fait foi ; réactiver la résolution dynamique ou baisser le verrou rend la marge.',
+    ],
+  },
+  {
     date: '14/08/2026 11:45',
     title: 'Résolution dynamique : désactivée par défaut',
     notes: [
