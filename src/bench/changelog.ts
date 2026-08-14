@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '14/08/2026 19:05',
+    title: 'Le rapport ignore les suspensions — et le 3e rapport du Pixel confirme',
+    notes: [
+      'Le collecteur n’enregistre plus les « images » de plus d’1,5 s : onglet endormi, écran éteint, appli en arrière-plan — le navigateur avait suspendu le rappel, ce n’était pas une image (constaté : un dt de 172 secondes dans un rapport réel, qui polluait durée, percentiles et pires images).',
+      'Bilan des trois rapports du Pixel 8 Pro, même tableau : images lentes (>20 ms) 31 % → 26,6 % → 11,8 % ; p75 40 → 40 → 60 im/s ; physique moyenne divisée par deux par la phase palet (8,9 → 4,1 ms) ; et la qualité adaptative, qui s’écrasait au palier plancher, se tient désormais au palier 1. Le reste de la traîne est fait de rafales système (throttling), devenues rares.',
+    ],
+  },
+  {
     date: '14/08/2026 18:10',
     title: 'La phase palet ne chauffe plus : un corps gelé coûte 2,6× moins que l’eau',
     notes: [

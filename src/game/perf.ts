@@ -33,6 +33,11 @@ export class PerfCollector {
     particles: number,
     quality: number,
   ): void {
+    // Une « image » de plus d'1,5 s n'est pas une image : c'est un onglet
+    // endormi, un écran éteint, une appli passée derrière — le navigateur
+    // avait suspendu le rappel. La consigner polluerait durée, percentiles
+    // et pires images (constaté : un dt de 172 s dans un rapport réel).
+    if (dtMs > 1500) return
     const i = this.cursor
     this.dt[i] = dtMs
     this.cpu[i] = cpuMs
