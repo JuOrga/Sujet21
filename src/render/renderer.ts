@@ -114,6 +114,12 @@ uniform float uColdBand;   // portée de l'aura de gel des plaques froides
 uniform float uHeatBand;   // portée de l'aura de chaleur des radiateurs
 uniform float uHydroBand;  // portée de la chimie des surfaces (hydrophile/phobe)
 uniform float uChill;      // refroidissement du vaisseau (0 tiède, 1 glacial)
+// Décor procédural : 1 riche (défaut), 0 sobre. Le mode sobre débranche le
+// bruit DÉCORATIF (vie du vaisseau, caustiques, brumes texturées, volutes)
+// en gardant tout ce qui se lit : corps d'eau, auras à intensité constante,
+// lisières de zones. C'est l'instrument de mesure du coût GPU du décor —
+// et un réglage de secours pour les machines modestes.
+uniform float uDecor;
 uniform int uWaveCount;
 uniform vec4 uWaves[MAX_WAVES]; // x, y, instant de départ, amplitude
 // Zones d'état : régions qui IMPOSENT un état. Elles doivent se voir de loin
@@ -182,6 +188,13 @@ float vnoise(vec2 p) {
   float c = hash21(i + vec2(0.0, 1.0));
   float d = hash21(i + vec2(1.0, 1.0));
   return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+// Bruit DÉCORATIF : en mode sobre il rend sa moyenne — la brume garde son
+// intensité, elle perd sa texture. La branche est dynamiquement uniforme :
+// le GPU saute réellement le calcul, c'est bien du coût en moins.
+float dnoise(vec2 p) {
+  return uDecor > 0.5 ? vnoise(p) : 0.5;
 }
 
 // Points épars (étoiles, poussières) : au plus un par cellule de grille,
@@ -425,12 +438,14 @@ void main() {
     voidCol = (far_ * 0.4 + near_ * 0.6) * 0.55;
   } else {
     voidCol = vec3(0.004, 0.007, 0.014);
-    float neb = vnoise(world * 0.0016 + vec2(3.7, 1.3));
-    neb = neb * 0.6 + 0.4 * vnoise(world * 0.004 - vec2(1.1, 7.7));
-    voidCol += vec3(0.010, 0.018, 0.038) * neb;
-    voidCol += vec3(0.022, 0.010, 0.034) * vnoise(world * 0.0009 + 21.0);
-    voidCol += vec3(0.50, 0.60, 0.75) * specks(world + uCenter * 0.5, 130.0, 0.10, uZoom) * 0.55;
-    voidCol += vec3(0.75, 0.82, 0.95) * specks(world + 500.0, 200.0, 0.08, uZoom) * 0.85;
+    if (uDecor > 0.5) {
+      float neb = vnoise(world * 0.0016 + vec2(3.7, 1.3));
+      neb = neb * 0.6 + 0.4 * vnoise(world * 0.004 - vec2(1.1, 7.7));
+      voidCol += vec3(0.010, 0.018, 0.038) * neb;
+      voidCol += vec3(0.022, 0.010, 0.034) * vnoise(world * 0.0009 + 21.0);
+      voidCol += vec3(0.50, 0.60, 0.75) * specks(world + uCenter * 0.5, 130.0, 0.10, uZoom) * 0.55;
+      voidCol += vec3(0.75, 0.82, 0.95) * specks(world + 500.0, 200.0, 0.08, uZoom) * 0.85;
+    }
   }
 
   // Dedans : fond de cuve, vignette, caustiques discrètes (la lumière du
@@ -444,9 +459,11 @@ void main() {
   vec3 tank = uHasTank > 0.5
     ? tankTex * (0.55 * vign + 0.12)
     : vec3(0.012, 0.022, 0.040) * vign;
-  float caus = vnoise(world * 0.012 + vec2(uTime * 0.05, -uTime * 0.03));
-  caus *= vnoise(world * 0.03 - vec2(uTime * 0.02, uTime * 0.04));
-  tank += vec3(0.010, 0.028, 0.040) * caus;
+  if (uDecor > 0.5) {
+    float caus = vnoise(world * 0.012 + vec2(uTime * 0.05, -uTime * 0.03));
+    caus *= vnoise(world * 0.03 - vec2(uTime * 0.02, uTime * 0.04));
+    tank += vec3(0.010, 0.028, 0.040) * caus;
+  }
   float lw = 1.2 / uZoom;
   float gridDim = uHasTank > 0.5 ? 0.5 : 1.0; // la texture a ses propres lignes
   tank += vec3(0.05, 0.09, 0.13) * gridLine(world, 100.0, lw) * 0.30 * gridDim;
@@ -454,7 +471,7 @@ void main() {
   // halo le long des parois : la cuve est éclairée par sa coque
   tank += vec3(0.020, 0.045, 0.060) * exp(min(0.0, roomD) * 0.02);
   // la vie du vaisseau : veilleuses, poussières en dérive, respiration
-  tank += shipLife(world, uZoom, uTime);
+  if (uDecor > 0.5) tank += shipLife(world, uZoom, uTime);
 
   vec3 col = mix(voidCol, tank, inRoom);
 
@@ -511,14 +528,14 @@ void main() {
     }
     // les effets ANIMÉS du décor, allégés sur l'illustration : le panache et
     // les gouttes vivent autour de l'objet, ils ne le recouvrent pas
-    if (szn < 1.0) {
+    if (szn < 1.0 && uDecor > 0.5) {
       col += zoneDecor(world, zc2, zh2, f, uTime, hasZTex) * (1.0 - 0.6 * assetA);
     }
     // Une BRUME d'accident, pas un contour : dense au foyer, teintée, elle
     // se dissout en lambeaux vers la lisière — le bruit déchire le bord au
     // lieu de le dessiner. Aucune ligne : une atmosphère qui s'échappe.
-    float n1 = vnoise(world * 0.011 + vec2(uTime * 0.05, -uTime * 0.033) + zc2 * 0.003);
-    float n2 = vnoise(world * 0.031 - vec2(uTime * 0.021, uTime * 0.037));
+    float n1 = dnoise(world * 0.011 + vec2(uTime * 0.05, -uTime * 0.033) + zc2 * 0.003);
+    float n2 = dnoise(world * 0.031 - vec2(uTime * 0.021, uTime * 0.037));
     float fog = 0.6 * n1 + 0.4 * n2;
     // le bord de la brume suit la forme, déchiqueté par le bruit (±0,13) —
     // les lambeaux meurent SUR la lisière mécanique, jamais au-delà
@@ -546,7 +563,7 @@ void main() {
   vec3 texWallC = texture(uTexWall, world / 230.0).rgb;
   if (uHasWallA > 0.5) {
     vec3 wallA = texture(uTexWallA, world / 520.0).rgb;
-    float blend = smoothstep(0.35, 0.65, smoothField(world * 0.0023 + 5.3));
+    float blend = uDecor > 0.5 ? smoothstep(0.35, 0.65, smoothField(world * 0.0023 + 5.3)) : 0.5;
     texWallC = uHasWall > 0.5 ? mix(texWallC, wallA, blend) : wallA;
   }
   vec3 texPhobeC = texture(uTexPhobe, world / 170.0).rgb;
@@ -602,7 +619,7 @@ void main() {
       if (mat < 0.5) {        // mur neutre : métal brossé
         fillCol = uHasWall > 0.5
           ? texWallC * 0.95
-          : vec3(0.10, 0.13, 0.17) * (0.88 + 0.24 * vnoise(world * vec2(0.03, 0.30)));
+          : vec3(0.10, 0.13, 0.17) * (0.88 + 0.24 * dnoise(world * vec2(0.03, 0.30)));
         edgeCol = vec3(0.30, 0.38, 0.46);
       } else if (mat < 1.5) { // hydrophile : mouillé, brillant, reflet qui glisse
         float sheen = 0.5 + 0.5 * sin(world.x * 0.045 + world.y * 0.10 + uTime * 0.7);
@@ -611,7 +628,7 @@ void main() {
           : vec3(0.05, 0.16, 0.20) + vec3(0.015, 0.055, 0.065) * sheen;
         edgeCol = vec3(0.20, 0.65, 0.70);
       } else {                // hydrophobe : cireux, grain perlé qui repousse
-        float wax = smoothstep(0.72, 0.95, vnoise(world * 0.12));
+        float wax = smoothstep(0.72, 0.95, dnoise(world * 0.12));
         fillCol = uHasPhobe > 0.5
           ? texPhobeC * 0.75
           : vec3(0.16, 0.11, 0.20) + vec3(0.07, 0.035, 0.10) * wax;
@@ -626,7 +643,7 @@ void main() {
         // Atténuation LINÉAIRE : la brume emplit toute la bande au lieu de
         // s'écraser contre le mur — à n'importe quel zoom, le champ se voit
         float aura = (1.0 - smoothstep(0.0, uHydroBand, max(d, 0.0))) * step(0.0, d);
-        float mist = 0.5 + 0.5 * vnoise(world * 0.045 + vec2(uTime * 0.10, -uTime * 0.07));
+        float mist = 0.5 + 0.5 * dnoise(world * 0.045 + vec2(uTime * 0.10, -uTime * 0.07));
         vec3 auraCol = mat < 1.5 ? vec3(0.12, 0.42, 0.45) : vec3(0.38, 0.20, 0.52);
         col += auraCol * aura * (0.45 + 0.55 * mist);
       }
@@ -640,7 +657,7 @@ void main() {
       float coil = 0.5 + 0.5 * sin(world.x * 0.30 + sin(world.y * 0.24) * 2.2);
       float tube = smoothstep(0.55, 0.9, coil);
       float pulse = 0.7 + 0.3 * sin(uTime * 3.1 + world.y * 0.05);
-      vec3 metal = vec3(0.10, 0.13, 0.17) * (0.9 + 0.2 * vnoise(world * 0.14));
+      vec3 metal = vec3(0.10, 0.13, 0.17) * (0.9 + 0.2 * dnoise(world * 0.14));
       vec3 lueur = mix(vec3(0.16, 0.22, 0.26), vec3(0.16, 0.85, 1.0) * pulse, charge);
       col = mix(col, metal + lueur * tube * 0.85, fill);
       col = mix(col, mix(vec3(0.35, 0.44, 0.50), vec3(0.45, 0.95, 1.0), charge), edge * 0.9);
@@ -666,7 +683,7 @@ void main() {
       float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
       float weave = 0.5 + 0.5 * sin(world.x * 0.42) * sin(world.y * 0.42);
       float drip = smoothstep(0.78, 1.0,
-        0.5 + 0.5 * sin(world.y * 0.10 - uTime * 1.6 + vnoise(world * 0.05) * 6.0));
+        0.5 + 0.5 * sin(world.y * 0.10 - uTime * 1.6 + dnoise(world * 0.05) * 6.0));
       vec3 memCol = vec3(0.05, 0.20, 0.17) + vec3(0.04, 0.15, 0.12) * weave;
       col = mix(col, memCol + vec3(0.03, 0.11, 0.09) * drip, fill);
       col = mix(col, vec3(0.25, 0.78, 0.62), edge * 0.9);
@@ -689,7 +706,7 @@ void main() {
       // chaque chaudière porte sa propre portée d'aura (aux.w) : le halo
       // dessiné est exactement la portée mécanique
       float aura = (1.0 - smoothstep(0.0, uHeatBand * max(uBoxAux[bi].w, 0.001), max(d, 0.0))) * step(0.0, d);
-      float shimmer = 0.55 + 0.45 * vnoise(world * 0.06 + vec2(-uTime * 0.16, uTime * 0.24));
+      float shimmer = 0.55 + 0.45 * dnoise(world * 0.06 + vec2(-uTime * 0.16, uTime * 0.24));
       col += vec3(0.36, 0.15, 0.04) * aura * aura * shimmer;
     } else if (mat > 4.5) {
       // Grille (tableau 3) : panneau perforé — le liquide s'y écrase, la
@@ -707,7 +724,7 @@ void main() {
       } else {
         vec2 cellUv = fract(world / 24.0) - 0.5;
         hole = 1.0 - smoothstep(0.26, 0.34, max(abs(cellUv.x), abs(cellUv.y)));
-        barCol = vec3(0.17, 0.21, 0.26) * (0.9 + 0.2 * vnoise(world * 0.15));
+        barCol = vec3(0.17, 0.21, 0.26) * (0.9 + 0.2 * dnoise(world * 0.15));
       }
       col = mix(col, barCol, fill * (1.0 - hole * 0.85));
       col = mix(col, vec3(0.45, 0.60, 0.70), edge * 0.8);
@@ -716,7 +733,7 @@ void main() {
       // aura de brume glacée — le danger se lit avant le contact.
       float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
       float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
-      float sparkle = smoothstep(0.72, 0.94, vnoise(world * 0.22));
+      float sparkle = smoothstep(0.72, 0.94, dnoise(world * 0.22));
       // Givre texturé quand l'image est là ; le scintillement procédural
       // reste par-dessus : le gel a l'air vivant, pas imprimé.
       // Teinte franchement bleue : brute, l'image tire vers le gris béton et
@@ -727,7 +744,7 @@ void main() {
       col = mix(col, fillCol, fill);
       col = mix(col, vec3(0.70, 0.86, 0.97), edge * 0.9);
       float aura = (1.0 - smoothstep(0.0, uColdBand, max(d, 0.0))) * step(0.0, d);
-      float mist = 0.55 + 0.45 * vnoise(world * 0.05 + vec2(uTime * 0.10, -uTime * 0.06));
+      float mist = 0.55 + 0.45 * dnoise(world * 0.05 + vec2(uTime * 0.10, -uTime * 0.06));
       col += vec3(0.14, 0.27, 0.40) * aura * aura * mist;
     } else {
       // Sas de sortie : une bouche d'aspiration — un trou dans lequel l'eau
@@ -797,9 +814,11 @@ void main() {
   // Eau : seuillage du champ (l'onde déforme la surface)
   float th = uThreshold;
   float s = max(th * uSoftness, 1e-4);
-  // Fumée : bruit advecté à deux octaves — volutes internes et bords rongés
+  // Fumée : bruit advecté à deux octaves — volutes internes et bords rongés.
+  // La première octave FAÇONNE le nuage (mécanique lisible) : elle reste en
+  // mode sobre ; seule la seconde, purement texturante, se débranche.
   float smokeN = vnoise(world * 0.045 + vec2(uTime * 0.22, -uTime * 0.15));
-  smokeN = 0.62 * smokeN + 0.38 * vnoise(world * 0.11 - vec2(uTime * 0.31, -uTime * 0.24));
+  smokeN = 0.62 * smokeN + 0.38 * dnoise(world * 0.11 - vec2(uTime * 0.31, -uTime * 0.24));
 
   float field2 = field * (1.0 + 0.14 * waveGlow);
   // Les bords du nuage bouillonnent : le bruit ronge et gonfle la surface
@@ -851,7 +870,9 @@ void main() {
   float miroir = surfaceZone * (1.0 - vap);
   float specDur = pow(max(reflect(-lightDir, nrm).z, 0.0), 42.0);
   float fres = pow(1.0 - clamp(nrm.z, 0.0, 1.0), 2.0);
-  float etincelles = specks(world + nrm.xy * 55.0 + vec2(uTime * 7.0, -uTime * 4.0), 48.0, 0.10, uZoom);
+  float etincelles = uDecor > 0.5
+    ? specks(world + nrm.xy * 55.0 + vec2(uTime * 7.0, -uTime * 4.0), 48.0, 0.10, uZoom)
+    : 0.0;
   water += vec3(0.95, 0.99, 1.0) * specDur * 0.80 * miroir;
   water += vec3(0.50, 0.68, 0.85) * fres * 0.40 * miroir;
   water += vec3(0.90, 0.97, 1.0) * etincelles * (0.25 + specDur) * 0.55 * miroir;
@@ -1264,6 +1285,7 @@ export class Renderer {
     chill = 0, // refroidissement du vaisseau : teinte froide, auras effectives
     decals: DecalDef[] = [], // machinerie de décor, sans physique
     zones: ZoneDef[] = [], // régions qui imposent un état
+    decor = 1, // 1 décor riche, 0 sobre (bruit décoratif débranché)
   ): void {
     const gl = this.gl
     const devW = Math.max(1, Math.round(viewportW * dpr))
@@ -1369,6 +1391,7 @@ export class Renderer {
     gl.uniform1f(cu['uHeatBand'], Math.max(0, params.heatBand * (1 - params.chillHeatFade * chill)))
     gl.uniform1f(cu['uHydroBand'], params.hydroBand)
     gl.uniform1f(cu['uChill'], chill)
+    gl.uniform1f(cu['uDecor'], decor)
     gl.uniform1i(cu['uWaveCount'], waveCount)
     gl.uniform4fv(cu['uWaves[0]'], waves)
     // Zones d'état : au plus MAX_ZONES par tableau

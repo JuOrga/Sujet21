@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '14/08/2026 21:03',
+    title: 'Graphismes RICHES / SOBRES : l’instrument qui chiffre le coût du décor',
+    notes: [
+      'Hypothèse en cours d’examen : les graphismes (liquide + décor) seraient le vrai goulot — les pires images des rapports du Pixel montrent un CPU minuscule dans une frame longue, signature d’une carte graphique saturée. Pour trancher, il fallait pouvoir ÉTEINDRE le décor sans rien changer d’autre.',
+      'Nouveau réglage GRAPHISMES DU DÉCOR au voile PARAMÈTRES : RICHES (défaut, inchangé) ou SOBRES — le shader de composition débranche tout le bruit procédural décoratif : vie du vaisseau (veilleuses, poussières, respiration), caustiques, nébulosité du vide, illustrations de zones, textures de brume (auras hydro/froid/chaud, cire, gouttes de membrane, scintillement du givre), étincelles du miroir, seconde octave des volutes de vapeur.',
+      'La LISIBILITÉ ne bouge pas : mêmes formes, mêmes lisières de zones, et chaque aura garde exactement sa portée et son intensité moyenne — elle perd sa texture, pas son sens. La première octave de la fumée reste : elle façonne le nuage, c’est de la mécanique.',
+      'Le rapport de performance consigne le mode (config.graphismes) : deux rapports du même tableau, un par mode, et l’écart CHIFFRE le coût réel du décor sur la machine du joueur — c’est le test A/B demandé par l’analyse. Réglage mémorisé (sujet21-decor), et un secours immédiat pour les machines modestes si l’hypothèse se confirme.',
+    ],
+  },
+  {
     date: '14/08/2026 19:05',
     title: 'Le rapport ignore les suspensions — et le 3e rapport du Pixel confirme',
     notes: [
