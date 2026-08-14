@@ -1775,13 +1775,19 @@ function updateQuality(dtReal: number): void {
 
 function frame(now: number): void {
   // Verrou de fréquence : l'image d'avance est SAUTÉE (rien n'est simulé ni
-  // rendu — dtReal la rattrapera). Marge d'une demi-période de rAF 240 Hz :
-  // les rappels n'arrivent jamais pile sur la cadence demandée.
-  if (now - fpsCapPrecedent < 1000 / fpsCap - 2.1) {
+  // rendu — dtReal la rattrapera). Cadencement à DETTE CONSERVÉE : l'horloge
+  // avance d'une période exacte, pas jusqu'à `now` — sinon le verrou cale
+  // sur un sous-multiple de l'écran (60 demandés sur un 144 Hz donnaient
+  // 48 im/s : chaque image « en avance » repoussait toute la grille).
+  const periode = 1000 / fpsCap
+  if (now - fpsCapPrecedent < periode - 1) {
     requestAnimationFrame(frame)
     return
   }
-  fpsCapPrecedent = now
+  fpsCapPrecedent += periode
+  // jamais plus d'une période de dette : une pause (onglet caché) ne
+  // déclenche pas une rafale de rattrapage
+  if (now - fpsCapPrecedent > periode) fpsCapPrecedent = now
   const dtReal = Math.min((now - lastTime) / 1000, 0.1)
   lastTime = now
   elapsed += dtReal
