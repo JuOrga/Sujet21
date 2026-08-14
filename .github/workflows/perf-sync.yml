@@ -1,9 +1,14 @@
 # Rapatrie les rapports de performance de l'API vers le dépôt : l'analyse à
 # distance passe par GitHub, toujours joignable depuis l'environnement
 # d'analyse — sans dépendre d'un connecteur Vercel de session.
-# Déclenchement manuel (workflow_dispatch) : on tire les rapports à la demande.
+# Déclenchement : un push sur la branche perf-sync-go (la « gâchette » — le
+# dispatch manuel est aussi là pour l'interface GitHub). L'environnement
+# d'analyse pousse un commit vide sur la gâchette, le workflow tire.
 name: perf-sync
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+  push:
+    branches: [perf-sync-go]
 
 permissions:
   contents: write
