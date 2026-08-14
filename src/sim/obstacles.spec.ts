@@ -2,7 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { boxContact, Sponge, type ClosestPoint } from './obstacles'
 import { DEFAULT_PARAMS, type SimParams } from './params'
 import { FluidSim, KIND_FREE, KIND_PLAYER, type Bounds } from './solver'
-import { MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_MEMBRANE, MAT_RIDEAU, MAT_WALL, pointInBox } from '../game/level'
+import {
+  MAT_HYDROPHILE,
+  MAT_HYDROPHOBE,
+  MAT_MEMBRANE,
+  MAT_RIDEAU,
+  MAT_WALL,
+  pointInBox,
+  dansBoite,
+  subtractBoxOblique,
+} from '../game/level'
 
 const OPEN: Bounds = { minX: -3000, minY: -3000, maxX: 3000, maxY: 3000 }
 
@@ -355,5 +364,68 @@ describe('Boîtes obliques — la rotation traverse contact, simulation et optiq
     sim2.velX[j] = 300
     for (let s = 0; s < 240; s++) sim2.step(sim2.params.dt)
     expect(Math.abs(sim2.posY[j] - 80)).toBeLessThan(5)
+  })
+})
+
+describe('subtractBoxOblique — ronger à angles égaux', () => {
+  const MUR = { material: MAT_WALL }
+
+  it('à angles ÉGAUX, l’entaille est exacte : dedans disparu, dehors conservé', () => {
+    // deux parois à 30° : la gagnante mord le flanc droit de la perdante
+    const perdante = { minX: -200, minY: -50, maxX: 200, maxY: 50, angle: 30, ...MUR }
+    const gagnante = { minX: 100, minY: -80, maxX: 320, maxY: 80, angle: 30, ...MUR }
+    const morceaux = subtractBoxOblique(perdante, gagnante)!
+    expect(morceaux).not.toBeNull()
+    expect(morceaux.length).toBeGreaterThan(0)
+    for (const m of morceaux) expect(m.angle).toBe(30)
+    const couvert = (x: number, y: number): boolean => morceaux.some((m) => dansBoite(m, x, y))
+    // témoin au cœur de l'entaille (dans les deux) : disparu des morceaux
+    const rad = (30 * Math.PI) / 180
+    const tourne = (x: number, y: number, cx: number, cy: number) => ({
+      x: cx + Math.cos(rad) * (x - cx) - Math.sin(rad) * (y - cy),
+      y: cy + Math.sin(rad) * (x - cx) + Math.cos(rad) * (y - cy),
+    })
+    // points exprimés dans le repère de la perdante (centre 0,0) puis pivotés.
+    // La gagnante pivote autour de SON centre (210, 0) : dépivotée autour de
+    // (0,0), son empreinte locale est centrée en R(−30°)·(210,0) ≈ (182, −105)
+    // — l'entaille dans la perdante vit en x ∈ [72, 200], y ∈ [−50, −25].
+    const dedans = tourne(150, -40, 0, 0)
+    expect(dansBoite(perdante, dedans.x, dedans.y)).toBe(true)
+    expect(dansBoite(gagnante, dedans.x, dedans.y)).toBe(true)
+    expect(couvert(dedans.x, dedans.y)).toBe(false)
+    // témoin côté épargné (hors gagnante) : toujours couvert
+    const dehors = tourne(-150, 0, 0, 0)
+    expect(dansBoite(perdante, dehors.x, dehors.y)).toBe(true)
+    expect(couvert(dehors.x, dehors.y)).toBe(true)
+  })
+
+  it('angles différents : refus (null), la découpe exacte n’existe pas', () => {
+    const perdante = { minX: -100, minY: -50, maxX: 100, maxY: 50, angle: 30, ...MUR }
+    const gagnante = { minX: -50, minY: -80, maxX: 50, maxY: 80, ...MUR }
+    expect(subtractBoxOblique(perdante, gagnante)).toBeNull()
+    expect(subtractBoxOblique(gagnante, perdante)).toBeNull()
+  })
+
+  it('à 180° d’écart, même empreinte : la découpe passe', () => {
+    const perdante = { minX: -100, minY: -50, maxX: 100, maxY: 50, angle: 45, ...MUR }
+    const gagnante = { minX: 0, minY: -60, maxX: 160, maxY: 60, angle: -135, ...MUR }
+    const morceaux = subtractBoxOblique(perdante, gagnante)
+    expect(morceaux).not.toBeNull()
+  })
+
+  it('sans chevauchement, la paroi reste entière ; à plat, chemin axial intact', () => {
+    const perdante = { minX: -100, minY: -50, maxX: 100, maxY: 50, angle: 15, ...MUR }
+    const loin = { minX: 500, minY: 500, maxX: 600, maxY: 600, angle: 15, ...MUR }
+    const seul = subtractBoxOblique(perdante, loin)!
+    expect(seul.length).toBe(1)
+    expect(seul[0].minX).toBeCloseTo(perdante.minX, 3)
+    expect(seul[0].maxY).toBeCloseTo(perdante.maxY, 3)
+    // angle nul : même découpe qu'avant (délégué à subtractBox)
+    const droite = { minX: -100, minY: -50, maxX: 100, maxY: 50, ...MUR }
+    const morsure = { minX: 50, minY: -60, maxX: 150, maxY: 60, ...MUR }
+    const morceaux = subtractBoxOblique(droite, morsure)!
+    expect(morceaux.every((m) => !m.angle)).toBe(true)
+    expect(morceaux.some((m) => dansBoite(m, 75, 0))).toBe(false)
+    expect(morceaux.some((m) => dansBoite(m, -75, 0))).toBe(true)
   })
 })

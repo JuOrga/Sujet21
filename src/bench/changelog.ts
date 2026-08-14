@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '14/08/2026 09:05',
+    title: 'Les obliques, citoyennes de plein droit : découpe et poignées de coins',
+    notes: [
+      'Une paroi oblique se REDIMENSIONNE désormais à la poignée : ses 4 coins portent des prises PIVOTÉES avec elle — saisir un coin cloue le coin opposé au monde, et la boîte s’étire dans SON repère (l’angle ne bouge pas). Le contour de sélection suit enfin la vraie silhouette : fini le rectangle droit menteur autour d’une boîte penchée.',
+      'La DÉCOUPE ronge maintenant les obliques — à ANGLES ÉGAUX : tout se passe dans le repère de la perdante (où tout est droit), puis chaque morceau repart dans le monde avec son angle, posé exactement sur la paroi d’origine. Deux rampes à 45° se rongent comme deux parois droites. Angles différents : refus motivé (les morceaux ne seraient plus des rectangles) — alignez les angles d’abord.',
+      'Géométrie testée : entaille exacte (témoins dedans/dehors), refus à angles différents, écart de 180° accepté (même empreinte), chemin droit inchangé — 4 tests neufs.',
+    ],
+  },
+  {
     date: '13/08/2026 22:55',
     title: 'L’oblique à la poignée : les boîtes se tournent au glisser',
     notes: [
