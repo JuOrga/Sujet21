@@ -527,11 +527,11 @@ let fpsCap = ((): number => {
   return FPS_CHOIX.includes(v) ? v : 60
 })()
 let fpsCapPrecedent = 0 // horloge du limiteur (dernière image RENDUE)
-// Résolution dynamique : activée par défaut (le mobile en a besoin) ;
-// désactivée, le rendu reste en résolution NATIVE constante — sur un PC
-// borderline, la qualité qui descend « pour tenir 60 » se voyait plus que
-// les images perdues.
-let resDynamique = localStorage.getItem('sujet21-res-dyn') !== '0'
+// Résolution dynamique : DÉSACTIVÉE par défaut — le rendu reste en
+// résolution native constante, aucune surprise visuelle. Sur une machine
+// borderline, la qualité qui descendait « pour tenir 60 » se voyait plus
+// que les images perdues. Qui veut l'adaptatif (mobile) l'active au voile.
+let resDynamique = localStorage.getItem('sujet21-res-dyn') === '1'
 const paramsEl = document.getElementById('params') as HTMLDivElement
 {
   const choix = document.getElementById('params-fps') as HTMLDivElement
@@ -557,8 +557,8 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
   const renderRes = (): void => {
     choixRes.innerHTML = ''
     for (const [actif, label] of [
-      [true, 'ACTIVÉE'],
       [false, 'DÉSACTIVÉE'],
+      [true, 'ACTIVÉE'],
     ] as const) {
       const b = document.createElement('button')
       b.type = 'button'

@@ -11,6 +11,13 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '14/08/2026 11:45',
+    title: 'Résolution dynamique : désactivée par défaut',
+    notes: [
+      'La résolution NATIVE constante devient le défaut, partout : aucune surprise visuelle, à la machine d’encaisser. L’adaptatif reste disponible au voile PARAMÈTRES pour qui en veut (mobile qui chauffe, machine modeste) — le choix reste mémorisé par appareil.',
+    ],
+  },
+  {
     date: '14/08/2026 11:20',
     title: 'La résolution dynamique devient un choix',
     notes: [
