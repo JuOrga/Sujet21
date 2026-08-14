@@ -1904,7 +1904,12 @@ function updateQuality(dtReal: number): void {
   }
 }
 
+let tickPrecedent = 0
 function frame(now: number): void {
+  // chaque rappel rAF, rendu OU sauté, date l'horloge de l'écran : le
+  // collecteur en tire le Hz réel du panneau (adaptatif sur mobile)
+  if (tickPrecedent > 0) perf.tick(now - tickPrecedent)
+  tickPrecedent = now
   // Verrou de fréquence : l'image d'avance est SAUTÉE (rien n'est simulé ni
   // rendu — dtReal la rattrapera). Cadencement à DETTE CONSERVÉE : l'horloge
   // avance d'une période exacte, pas jusqu'à `now` — sinon le verrou cale

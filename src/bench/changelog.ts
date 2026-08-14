@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '14/08/2026 21:40',
+    title: 'Rapport v3 : qui casse le « 60 constant » — bandes, cadence, Hz réel de l’écran',
+    notes: [
+      'Verdict du test A/B graphismes : décor ET liquide en sobre, les à-coups n’ont pas bougé (12,5 % → 11,3 % → 15,7 % d’images lentes sur les trois rapports du Pixel) — le shader est INNOCENTÉ, les graphismes riches peuvent rester. Mais le joueur a raison : même téléphone froid, ~12 % d’images au-dessus de 20 ms, ce n’est pas un 60 constant — et les 10 pires images (trous système) ne disent rien de cette masse-là.',
+      'Le rapport v3 fait parler la masse : BANDES de lenteur (20-33, 33-50, 50+ ms) avec, par bande, les moyennes des postes et le POSTE DOMINANT image par image (physique, rendu, autre JS, hors CPU) — on saura enfin si les images à 22 ms sont de la physique qui déborde ou des trous.',
+      'HYPOTHÈSE À VÉRIFIER : l’écran du Pixel 8 Pro est adaptatif (LTPO, 60/90/120 Hz selon l’activité). Un verrou à 60 sur une grille d’écran à 90 Hz fabrique MÉCANIQUEMENT des images de 22 ms — sans que rien ne rame. Le rapport mesure désormais le Hz RÉEL du panneau (cadence brute des rappels rAF, rendus ou sautés) et l’histogramme des durées d’images rendues : une quantification s’y lirait en pics nets à 17/22/25 ms.',
+      'Au passage : un dt négatif (horloges rAF/performance.now qui divergent au premier rappel) n’entre plus dans la fenêtre.',
+    ],
+  },
+  {
     date: '14/08/2026 21:17',
     title: 'Graphismes du LIQUIDE riche/sobre — et l’eau ne se paie plus que là où elle est',
     notes: [
