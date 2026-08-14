@@ -21,7 +21,6 @@ import {
   TABLEAUX_ECOLE,
   pointInBox,
   zoneName,
-  zoneShape,
   type LevelDef,
   type ObstacleBox,
   type ZoneForce,
@@ -1895,7 +1894,13 @@ function frame(now: number): void {
       let dedans = 0
       for (let i = 0; i < sim.count; i++) {
         if (sim.kind[i] !== KIND_PLAYER) continue
-        if (zoneShape(e.z, sim.posX[i], sim.posY[i]) < 1) dedans++
+        // TOUT le rectangle déclaré compte : la lisière ondulée n'est que le
+        // dessin (inscrite, sa bande morte au ras des parois posées en bord
+        // de zone rendait les 95 % inatteignables — l'eau plaquée contre le
+        // mur était « dehors » sans que rien ne le montre)
+        const x = sim.posX[i]
+        const y = sim.posY[i]
+        if (x >= e.z.minX && x <= e.z.maxX && y >= e.z.minY && y <= e.z.maxY) dedans++
       }
       const f = dedans / sim.playerCount
       if (f > bestFrac) {

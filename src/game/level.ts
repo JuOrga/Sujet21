@@ -342,12 +342,15 @@ export function zoneOutline(z: ZoneDef, steps = 64): { x: number; y: number }[] 
 export function zoneForceAt(level: LevelDef, x: number, y: number): ZoneForce {
   const zones = level.zones
   if (!zones) return 'libre'
-  // la dernière zone déclarée gagne : on peut superposer une exception
+  // la dernière zone déclarée gagne : on peut superposer une exception.
+  // La MÉCANIQUE couvre tout le rectangle déclaré à l'éditeur : la lisière
+  // ondulée (zoneShape) est le DESSIN de la frontière, légèrement inscrite —
+  // comptée mécaniquement, sa bande morte rendait le seuil des 95 %
+  // inatteignable quand le corps s'écrasait contre une paroi posée au bord
+  // de la zone. Rien de visuellement « dedans » n'est jamais exclu.
   for (let i = zones.length - 1; i >= 0; i--) {
     const z = zones[i]
-    // rejet rapide par le rectangle englobant, puis la vraie forme
-    if (x < z.minX || x > z.maxX || y < z.minY || y > z.maxY) continue
-    if (zoneShape(z, x, y) < 1) return z.force
+    if (x >= z.minX && x <= z.maxX && y >= z.minY && y <= z.maxY) return z.force
   }
   return 'libre'
 }
