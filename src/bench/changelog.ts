@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 00:27',
+    title: 'La bibliothèque s’enchaîne à l’expédition — elle ne l’ampute plus',
+    notes: [
+      'Constat du joueur : avec un tableau dans la bibliothèque partagée, l’expédition se réduisait à… ce seul tableau. La bibliothèque REMPLAÇAIT la séquence livrée au lieu de s’y enchaîner — les 13 tableaux construits disparaissaient de la partie.',
+      'Nouvelle séquence : les tableaux de la bibliothèque d’abord (dans l’ordre fixé par l’éditeur), puis TOUS les tableaux livrés, dans l’ordre choisi de l’expédition. Et si un tableau de bibliothèque porte le CODE d’un tableau livré (une variante de 21-A), il prend sa place : pas de doublon, la version de l’éditeur prime.',
+      'La fiche d’essai annonce le total réel (« X tableaux de la bibliothèque, puis l’expédition livrée — N salles en tout »), le compteur de salles du HUD et le bilan d’expédition suivent, et le voile SALLES dit désormais que l’expédition s’enchaîne à la suite. Séquence memoïsée : le HUD l’interroge à chaque image.',
+    ],
+  },
+  {
     date: '15/08/2026 00:05',
     title: 'Accélérer le temps ne casse plus la cadence',
     notes: [

@@ -171,12 +171,25 @@ let levelIndex = 0
     }
   }
 }
-// La bibliothèque partagée, quand elle contient des tableaux, devient la
-// séquence jouable : le tableau 1 mène au 2, et ainsi de suite dans l'ordre
-// fixé par l'éditeur. Vide ou injoignable, on joue l'expédition livrée.
+// La séquence jouable : les tableaux de la bibliothèque partagée d'abord
+// (dans l'ordre fixé par l'éditeur), puis TOUS les tableaux livrés, dans
+// l'ordre choisi de l'expédition. La bibliothèque ne REMPLACE plus
+// l'expédition — elle s'y enchaîne (avant : un seul tableau d'éditeur
+// amputait les 13 livrés). Un tableau de bibliothèque qui porte le CODE
+// d'un livré (une variante de 21-A) prend sa place : pas de doublon, la
+// version de l'éditeur prime. Memoïsé : le HUD interroge chaque image.
 let libraryLevels: LevelDef[] = []
+let sequenceCache: { source: LevelDef[]; seq: LevelDef[] } | null = null
 function playedLevels(): LevelDef[] {
-  return libraryLevels.length > 0 ? libraryLevels : TABLEAUX
+  if (libraryLevels.length === 0) return TABLEAUX
+  if (sequenceCache?.source !== libraryLevels) {
+    const codes = new Set(libraryLevels.map((l) => l.code))
+    sequenceCache = {
+      source: libraryLevels,
+      seq: [...libraryLevels, ...TABLEAUX.filter((t) => !codes.has(t.code))],
+    }
+  }
+  return sequenceCache.seq
 }
 
 // Un essai hors expédition : un tableau à part (prototype, salle laser,
@@ -511,9 +524,9 @@ function renderSalles(): void {
     liste.appendChild(b)
   }
   if (libraryLevels.length > 0) {
-    section('BIBLIOTHÈQUE DU LABO — la séquence jouée, dans l’ordre de l’éditeur')
+    section('BIBLIOTHÈQUE DU LABO — en tête de séquence, dans l’ordre de l’éditeur')
     for (const lv of libraryLevels) salle(lv)
-    section('EXPÉDITION LIVRÉE — hors séquence, à l’essai')
+    section('EXPÉDITION LIVRÉE — elle s’enchaîne à la suite')
   }
   for (const lv of [...TABLEAUX_ECOLE, ...TABLEAUX, TABLEAU_1BIS]) salle(lv)
 }
@@ -915,19 +928,19 @@ const editor = new LevelEditor(el('editor'), {
     renderSalles()
   },
 })
-// La fiche annonce quelle séquence sera jouée : celle du labo si la
-// bibliothèque partagée en contient une, sinon l'expédition livrée.
+// La fiche annonce la séquence jouée : bibliothèque partagée en tête
+// (si elle en contient), puis l'expédition livrée à la suite.
 const homeSeq = el('home-seq')
 function updateLibraryButton(): void {
   homeSeq.textContent =
     libraryLevels.length > 0
-      ? `Séquence du labo : ${libraryLevels.length} tableau(x) de la bibliothèque partagée.`
+      ? `Séquence : ${libraryLevels.length} tableau(x) de la bibliothèque, puis l'expédition livrée — ${playedLevels().length} salles en tout.`
       : `Expédition livrée : ${TABLEAUX.length} tableaux. La bibliothèque partagée est vide.`
 }
 updateLibraryButton()
 
-// Au démarrage : si la bibliothèque contient une séquence, elle remplace
-// l'expédition livrée — mais jamais au milieu d'une partie en cours.
+// Au démarrage : si la bibliothèque contient une séquence, elle passe en
+// tête de l'expédition — mais jamais au milieu d'une partie en cours.
 fetchLibrary().then((lib) => {
   if (!lib || lib.length === 0) return
   libraryLevels = lib.map((s) => s.level)
