@@ -120,6 +120,12 @@ uniform float uChill;      // refroidissement du vaisseau (0 tiède, 1 glacial)
 // lisières de zones. C'est l'instrument de mesure du coût GPU du décor —
 // et un réglage de secours pour les machines modestes.
 uniform float uDecor;
+// Rendu du LIQUIDE : 1 riche (défaut), 0 sobre. Le sobre débranche tout
+// l'éclairage de l'eau — relief (4 prélèvements de champ), spéculaire,
+// miroir vivant, scintillement — en gardant la silhouette, les couleurs de
+// vitesse et les teintes d'état (givre, vapeur). Deuxième instrument A/B :
+// il isole le coût du liquide lui-même, indépendamment du décor.
+uniform float uEau;
 uniform int uWaveCount;
 uniform vec4 uWaves[MAX_WAVES]; // x, y, instant de départ, amplitude
 // Zones d'état : régions qui IMPOSENT un état. Elles doivent se voir de loin
@@ -817,8 +823,13 @@ void main() {
   // Fumée : bruit advecté à deux octaves — volutes internes et bords rongés.
   // La première octave FAÇONNE le nuage (mécanique lisible) : elle reste en
   // mode sobre ; seule la seconde, purement texturante, se débranche.
-  float smokeN = vnoise(world * 0.045 + vec2(uTime * 0.22, -uTime * 0.15));
-  smokeN = 0.62 * smokeN + 0.38 * dnoise(world * 0.11 - vec2(uTime * 0.31, -uTime * 0.24));
+  // Calculée SEULEMENT là où il y a de la vapeur : ailleurs, elle ne pèse
+  // dans aucun terme (tout est multiplié par vap).
+  float smokeN = 0.5;
+  if (vap > 0.001) {
+    smokeN = vnoise(world * 0.045 + vec2(uTime * 0.22, -uTime * 0.15));
+    smokeN = 0.62 * smokeN + 0.38 * dnoise(world * 0.11 - vec2(uTime * 0.31, -uTime * 0.24));
+  }
 
   float field2 = field * (1.0 + 0.14 * waveGlow);
   // Les bords du nuage bouillonnent : le bruit ronge et gonfle la surface
@@ -827,74 +838,88 @@ void main() {
   // La fumée est trouée et translucide par endroits
   body *= 1.0 - vap * (0.2 + 0.4 * smokeN);
 
-  float speedT = clamp(speed, 0.0, 1.0);
-  vec3 slow = vec3(0.07, 0.30, 0.48);
-  vec3 fast = vec3(0.55, 0.85, 0.95);
-  vec3 water = mix(slow, fast, speedT);
-  water = mix(water * 0.40, water, clamp(player, 0.0, 1.0)); // eau libre plus sombre
+  // Tout l'habillage de l'eau ne se calcule que LÀ OÙ IL Y A DE L'EAU : le
+  // liquide couvre une fraction de l'écran, le reste des pixels sortait déjà
+  // avec body = 0 — mais payait quand même relief, miroir et teintes. La
+  // branche est cohérente par blocs de pixels : le GPU la saute vraiment.
+  if (body > 0.001) {
+    float speedT = clamp(speed, 0.0, 1.0);
+    vec3 slow = vec3(0.07, 0.30, 0.48);
+    vec3 fast = vec3(0.55, 0.85, 0.95);
+    vec3 water = mix(slow, fast, speedT);
+    water = mix(water * 0.40, water, clamp(player, 0.0, 1.0)); // eau libre plus sombre
 
-  // Relief : pseudo-normale sur un champ FLOUTÉ (4 prélèvements écartés) —
-  // les dérivées par pixel liraient chaque particule comme une bille.
-  vec2 texel = 2.5 / vec2(textureSize(uField, 0));
-  float fL = texture(uField, uv - vec2(texel.x, 0.0)).r;
-  float fR = texture(uField, uv + vec2(texel.x, 0.0)).r;
-  float fB = texture(uField, uv - vec2(0.0, texel.y)).r;
-  float fT = texture(uField, uv + vec2(0.0, texel.y)).r;
-  vec2 grad = vec2(fR - fL, fT - fB) / uFieldScale;
-  vec3 nrm = normalize(vec3(-grad * 2.2, 1.0));
-  vec3 lightDir = normalize(vec3(-0.35, 0.55, 0.75));
-  float diffuse = max(dot(nrm, lightDir), 0.0);
-  float specular = pow(max(reflect(-lightDir, nrm).z, 0.0), 12.0);
+    // Relief : pseudo-normale sur un champ FLOUTÉ (4 prélèvements écartés) —
+    // les dérivées par pixel liraient chaque particule comme une bille.
+    // En liquide SOBRE, pas de relief : normale plate, éclairage constant —
+    // les 4 prélèvements et les puissances du miroir sont économisés.
+    vec3 lightDir = normalize(vec3(-0.35, 0.55, 0.75));
+    vec3 nrm = vec3(0.0, 0.0, 1.0);
+    float diffuse = 0.55;
+    float specular = 0.0;
+    if (uEau > 0.5) {
+      vec2 texel = 2.5 / vec2(textureSize(uField, 0));
+      float fL = texture(uField, uv - vec2(texel.x, 0.0)).r;
+      float fR = texture(uField, uv + vec2(texel.x, 0.0)).r;
+      float fB = texture(uField, uv - vec2(0.0, texel.y)).r;
+      float fT = texture(uField, uv + vec2(0.0, texel.y)).r;
+      vec2 grad = vec2(fR - fL, fT - fB) / uFieldScale;
+      nrm = normalize(vec3(-grad * 2.2, 1.0));
+      diffuse = max(dot(nrm, lightDir), 0.0);
+      specular = pow(max(reflect(-lightDir, nrm).z, 0.0), 12.0);
+    }
 
-  // Cœur plus dense légèrement plus sombre, liseré plus clair
-  float core = smoothstep(th * 1.8, th * 3.2, field2);
-  water = mix(water, water * 0.75, core * 0.5);
-  float rim = body * (1.0 - smoothstep(th + s, th * 1.9, field2));
-  water += vec3(0.20, 0.45, 0.55) * rim * 0.55 * (1.0 - vap);
+    // Cœur plus dense légèrement plus sombre, liseré plus clair
+    float core = smoothstep(th * 1.8, th * 3.2, field2);
+    water = mix(water, water * 0.75, core * 0.5);
+    float rim = body * (1.0 - smoothstep(th + s, th * 1.9, field2));
+    water += vec3(0.20, 0.45, 0.55) * rim * 0.55 * (1.0 - vap);
 
-  // Scintillement interne discret : l'eau vit même au repos
-  float shimmer = sin(world.x * 0.11 + uTime * 1.6) * sin(world.y * 0.09 - uTime * 1.2);
-  water *= 1.0 + 0.05 * shimmer * core;
+    // Le relief n'éclaire que la zone de surface : à l'intérieur, les
+    // fluctuations de densité ne sont pas du relief — sans ce masque, l'eau
+    // se couvre de reflets granuleux qui trahissent les particules.
+    float surfaceZone = body * (1.0 - smoothstep(th * 1.4, th * 2.6, field2));
+    if (uEau > 0.5) {
+      // Scintillement interne discret : l'eau vit même au repos
+      float shimmer = sin(world.x * 0.11 + uTime * 1.6) * sin(world.y * 0.09 - uTime * 1.2);
+      water *= 1.0 + 0.05 * shimmer * core;
+      water = mix(water, water * (0.55 + 0.75 * diffuse), surfaceZone * 0.55);
+      water += vec3(0.85, 0.95, 1.0) * specular * 0.35 * surfaceZone * (1.0 - vap);
+      // Le miroir vivant (lore) : l'échantillon REFLÈTE la lumière. Trois
+      // couches sur la seule zone de surface — un éclat spéculaire dur (le
+      // reflet net d'une source), un voile de fresnel froid aux incidences
+      // rasantes (le poli du métal liquide), et un semis d'étincelles qui
+      // GLISSE avec la courbure : la surface a l'air de renvoyer la salle.
+      float miroir = surfaceZone * (1.0 - vap);
+      float specDur = pow(max(reflect(-lightDir, nrm).z, 0.0), 42.0);
+      float fres = pow(1.0 - clamp(nrm.z, 0.0, 1.0), 2.0);
+      float etincelles = uDecor > 0.5
+        ? specks(world + nrm.xy * 55.0 + vec2(uTime * 7.0, -uTime * 4.0), 48.0, 0.10, uZoom)
+        : 0.0;
+      water += vec3(0.95, 0.99, 1.0) * specDur * 0.80 * miroir;
+      water += vec3(0.50, 0.68, 0.85) * fres * 0.40 * miroir;
+      water += vec3(0.90, 0.97, 1.0) * etincelles * (0.25 + specDur) * 0.55 * miroir;
+    }
+    water += vec3(0.30, 0.55, 0.65) * waveGlow * 0.45 * (1.0 - icy) * (1.0 - vap);
 
-  // Le relief n'éclaire que la zone de surface : à l'intérieur, les
-  // fluctuations de densité ne sont pas du relief — sans ce masque, l'eau
-  // se couvre de reflets granuleux qui trahissent les particules.
-  float surfaceZone = body * (1.0 - smoothstep(th * 1.4, th * 2.6, field2));
-  water = mix(water, water * (0.55 + 0.75 * diffuse), surfaceZone * 0.55);
-  water += vec3(0.85, 0.95, 1.0) * specular * 0.35 * surfaceZone * (1.0 - vap);
-  // Le miroir vivant (lore) : l'échantillon REFLÈTE la lumière. Trois
-  // couches sur la seule zone de surface — un éclat spéculaire dur (le
-  // reflet net d'une source), un voile de fresnel froid aux incidences
-  // rasantes (le poli du métal liquide), et un semis d'étincelles qui
-  // GLISSE avec la courbure : la surface a l'air de renvoyer la salle.
-  float miroir = surfaceZone * (1.0 - vap);
-  float specDur = pow(max(reflect(-lightDir, nrm).z, 0.0), 42.0);
-  float fres = pow(1.0 - clamp(nrm.z, 0.0, 1.0), 2.0);
-  float etincelles = uDecor > 0.5
-    ? specks(world + nrm.xy * 55.0 + vec2(uTime * 7.0, -uTime * 4.0), 48.0, 0.10, uZoom)
-    : 0.0;
-  water += vec3(0.95, 0.99, 1.0) * specDur * 0.80 * miroir;
-  water += vec3(0.50, 0.68, 0.85) * fres * 0.40 * miroir;
-  water += vec3(0.90, 0.97, 1.0) * etincelles * (0.25 + specDur) * 0.55 * miroir;
-  water += vec3(0.30, 0.55, 0.65) * waveGlow * 0.45 * (1.0 - icy) * (1.0 - vap);
+    // Gel (tableau 2) : la teinte pâlit vers la glace mate — le givre se lit
+    // sur le corps avant même la prise, la partie gelée devient blême et fixe.
+    vec3 iceCol = vec3(0.60, 0.76, 0.88) * (0.72 + 0.45 * diffuse);
+    water = mix(water, iceCol, icy * 0.9);
+    // Vapeur (tableau 3) : vapeur d'opale — cœur turquoise voilé, liseré
+    // nacré qui accroche la lumière sur les bords, ombres lilas dans les plis.
+    float smokeEdgeMix = 1.0 - smoothstep(th, th * 3.2, field2);
+    vec3 smokeCore = vec3(0.34, 0.52, 0.62);
+    vec3 smokeEdge = vec3(0.84, 0.94, 1.00);
+    vec3 smoke = mix(smokeCore, smokeEdge, smokeEdgeMix * (0.35 + 0.65 * smokeN));
+    smoke += vec3(0.16, 0.22, 0.28) * smokeN * smokeN; // volutes lumineuses qui roulent
+    smoke = mix(smoke, vec3(0.46, 0.42, 0.62), (1.0 - smokeN) * 0.22); // plis lilas
+    water = mix(water, smoke, vap * 0.92);
 
-  // Gel (tableau 2) : la teinte pâlit vers la glace mate — le givre se lit
-  // sur le corps avant même la prise, la partie gelée devient blême et fixe.
-  vec3 iceCol = vec3(0.60, 0.76, 0.88) * (0.72 + 0.45 * diffuse);
-  water = mix(water, iceCol, icy * 0.9);
-  // Vapeur (tableau 3) : vapeur d'opale — cœur turquoise voilé, liseré
-  // nacré qui accroche la lumière sur les bords, ombres lilas dans les plis.
-  float smokeEdgeMix = 1.0 - smoothstep(th, th * 3.2, field2);
-  vec3 smokeCore = vec3(0.34, 0.52, 0.62);
-  vec3 smokeEdge = vec3(0.84, 0.94, 1.00);
-  vec3 smoke = mix(smokeCore, smokeEdge, smokeEdgeMix * (0.35 + 0.65 * smokeN));
-  smoke += vec3(0.16, 0.22, 0.28) * smokeN * smokeN; // volutes lumineuses qui roulent
-  smoke = mix(smoke, vec3(0.46, 0.42, 0.62), (1.0 - smokeN) * 0.22); // plis lilas
-  water = mix(water, smoke, vap * 0.92);
-
-  col = mix(col, water, body);
-  // L'eau qui recouvre l'œil du sas s'assombrit : elle sombre dans le trou
-  col *= 1.0 - drainEye * body * 0.55;
+    col = mix(col, water, body);
+    // L'eau qui recouvre l'œil du sas s'assombrit : elle sombre dans le trou
+    col *= 1.0 - drainEye * body * 0.55;
+  }
   // Le vaisseau refroidit (§5) : la lumière vire au bleu et faiblit — la
   // pression temporelle se voit, elle ne se chronomètre pas
   col = mix(col, col * vec3(0.82, 0.92, 1.10), uChill * 0.6);
@@ -1286,6 +1311,7 @@ export class Renderer {
     decals: DecalDef[] = [], // machinerie de décor, sans physique
     zones: ZoneDef[] = [], // régions qui imposent un état
     decor = 1, // 1 décor riche, 0 sobre (bruit décoratif débranché)
+    eau = 1, // 1 liquide riche, 0 sobre (relief/miroir de l'eau débranchés)
   ): void {
     const gl = this.gl
     const devW = Math.max(1, Math.round(viewportW * dpr))
@@ -1392,6 +1418,7 @@ export class Renderer {
     gl.uniform1f(cu['uHydroBand'], params.hydroBand)
     gl.uniform1f(cu['uChill'], chill)
     gl.uniform1f(cu['uDecor'], decor)
+    gl.uniform1f(cu['uEau'], eau)
     gl.uniform1i(cu['uWaveCount'], waveCount)
     gl.uniform4fv(cu['uWaves[0]'], waves)
     // Zones d'état : au plus MAX_ZONES par tableau

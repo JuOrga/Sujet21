@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '14/08/2026 21:17',
+    title: 'Graphismes du LIQUIDE riche/sobre — et l’eau ne se paie plus que là où elle est',
+    notes: [
+      'Retour joueur : le doute porte sur le rendu du LIQUIDE lui-même, pas sur le décor — et le réglage décor ne semblait pas changer grand-chose. Le liquide a donc son propre interrupteur, séparé.',
+      'Nouveau réglage GRAPHISMES DU LIQUIDE au voile PARAMÈTRES : RICHE (défaut, inchangé) ou SOBRE — le shader débranche tout l’éclairage de l’eau : relief (4 prélèvements de champ par pixel), reflet spéculaire, miroir vivant (éclat dur, fresnel, étincelles), scintillement. La silhouette, les couleurs de vitesse et les états (givre, vapeur) restent exactement les mêmes : l’eau devient plate, pas différente.',
+      'Optimisation pour TOUS les modes au passage : l’habillage de l’eau (relief, miroir, teintes d’état) se calculait sur TOUT l’écran, même les pixels sans eau — il est désormais derrière un test « y a-t-il de l’eau ici ? », et le bruit de fumée ne se calcule que là où il y a de la vapeur. Le liquide couvre une fraction de l’écran : le reste ne le paie plus.',
+      'Le rapport de performance consigne les deux modes (config.graphismes pour le décor, config.liquide pour l’eau) : quatre combinaisons possibles, chaque rapport dit la sienne — le test A/B peut isoler le décor, le liquide, ou les deux.',
+    ],
+  },
+  {
     date: '14/08/2026 21:03',
     title: 'Graphismes RICHES / SOBRES : l’instrument qui chiffre le coût du décor',
     notes: [

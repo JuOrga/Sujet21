@@ -538,6 +538,12 @@ let resDynamique = localStorage.getItem('sujet21-res-dyn') === '1'
 // deux rapports de performance, mêmes conditions, seul ce réglage change —
 // l'écart chiffre le coût réel des graphismes sur la machine du joueur.
 let decorRiche = localStorage.getItem('sujet21-decor') !== 'sobre'
+// Graphismes du LIQUIDE, séparés du décor : SOBRE débranche l'éclairage de
+// l'eau (relief, spéculaire, miroir, scintillement) dans le shader — la
+// silhouette, les couleurs de vitesse et les états restent. C'est le second
+// bras du test A/B : si c'est le rendu du liquide qui pèse, c'est CE
+// réglage qui fera bouger les chiffres, pas celui du décor.
+let eauRiche = localStorage.getItem('sujet21-eau') !== 'sobre'
 const paramsEl = document.getElementById('params') as HTMLDivElement
 {
   const choix = document.getElementById('params-fps') as HTMLDivElement
@@ -601,6 +607,27 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     }
   }
   renderDecor()
+
+  const choixEau = document.getElementById('params-eau') as HTMLDivElement
+  const renderEau = (): void => {
+    choixEau.innerHTML = ''
+    for (const [riche, label] of [
+      [true, 'RICHE'],
+      [false, 'SOBRE'],
+    ] as const) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = label
+      b.className = eauRiche === riche ? 'actif' : ''
+      b.addEventListener('click', () => {
+        eauRiche = riche
+        localStorage.setItem('sujet21-eau', riche ? 'riche' : 'sobre')
+        renderEau()
+      })
+      choixEau.appendChild(b)
+    }
+  }
+  renderEau()
 }
 
 // ---- Rapport de performance : mesurer la VRAIE machine, analyser à distance ----
@@ -626,6 +653,7 @@ function rapportPerf(): Record<string, unknown> {
       fpsCap,
       resolutionDynamique: resDynamique,
       graphismes: decorRiche ? 'riches' : 'sobres',
+      liquide: eauRiche ? 'riche' : 'sobre',
       palierQualite: qualityLevel,
       timeWarp: params.timeWarp,
       downsampleChamp: params.renderDownsample,
@@ -2384,6 +2412,7 @@ function frame(now: number): void {
     level.decals ?? [],
     level.zones ?? [],
     decorRiche ? 1 : 0,
+    eauRiche ? 1 : 0,
   )
   const rendRaw = performance.now() - renderT0
   monitor.renderMs += (rendRaw - monitor.renderMs) * 0.08
