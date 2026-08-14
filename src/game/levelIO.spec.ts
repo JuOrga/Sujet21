@@ -111,38 +111,28 @@ it('conserve le lit musical choisi pour le tableau', () => {
   expect(serializeLevel(TABLEAUX[0])).not.toContain('ambiance')
 })
 
-it('le rayon d’action d’une zone épouse tout son rectangle, coins adoucis', () => {
+it('le rayon d’action d’une zone couvre TOUT son rectangle — murs et coins compris', () => {
   const z = { minX: -300, minY: -200, maxX: 300, maxY: 200, force: 'glace' as const }
   const lvl: LevelDef = {
     ...TABLEAUX[0],
     zones: [z],
   }
-  // toute la zone répond : le centre, mais aussi le voisinage des bords —
-  // passer devant le hublot ou à côté, c'est pareil tant qu'on est dedans
+  // toute la zone répond : le centre, les bords ET les coins — l'eau
+  // plaquée contre une paroi posée au ras de la zone compte comme dedans
+  // (régression : la lisière ondulée inscrite laissait une bande morte le
+  // long des murs, et le seuil des 95 % devenait inatteignable)
   expect(zoneForceAt(lvl, 0, 0)).toBe('glace')
   expect(zoneForceAt(lvl, 270, 0)).toBe('glace')
   expect(zoneForceAt(lvl, -270, 0)).toBe('glace')
   expect(zoneForceAt(lvl, 0, 178)).toBe('glace')
   expect(zoneForceAt(lvl, 0, -178)).toBe('glace')
-  // seuls les COINS exacts sont adoucis, et rien ne déborde du rectangle
-  expect(zoneForceAt(lvl, -298, -198)).toBe('libre')
-  expect(zoneForceAt(lvl, 298, 198)).toBe('libre')
+  expect(zoneForceAt(lvl, -298, -198)).toBe('glace') // coin : plus de bande morte
+  expect(zoneForceAt(lvl, 298, 198)).toBe('glace')
+  expect(zoneForceAt(lvl, 299.9, 0)).toBe('glace') // au ras du mur : dedans
+  // et rien ne déborde du rectangle déclaré
   expect(zoneForceAt(lvl, 305, 0)).toBe('libre')
   expect(zoneForceAt(lvl, 0, 205)).toBe('libre')
-  // la lisière ondule : le rayon effectif varie selon la direction
-  const rayon = (angle: number): number => {
-    for (let r = 0; r < 1.6; r += 0.004) {
-      const x = Math.cos(angle) * r * 300
-      const y = Math.sin(angle) * r * 200
-      if (zoneForceAt(lvl, x, y) === 'libre') return r
-    }
-    return 1.6
-  }
-  const rayons = [0, 0.8, 1.6, 2.4, 3.2, 4.0, 4.8].map(rayon)
-  const min = Math.min(...rayons)
-  const max = Math.max(...rayons)
-  expect(max - min).toBeGreaterThan(0.04) // irrégulière…
-  expect(min).toBeGreaterThan(0.85) // …et jamais rachitique : le bord est proche du rectangle
+  expect(zoneForceAt(lvl, -301, -201)).toBe('libre')
 })
 
 it('conserve les décals au passage par l’éditeur (aller-retour JSON)', () => {

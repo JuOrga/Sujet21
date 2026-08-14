@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '14/08/2026 12:40',
+    title: 'Zones forcées : l’eau au mur compte — la bande morte est comblée',
+    notes: [
+      'Dans une zone forcée bordée d’une paroi, le corps écrasé contre le mur ne déclenchait pas la transformation : la mécanique comptait les particules dans la LISIÈRE ONDULÉE (inscrite à ~0,955 du rectangle, coins adoucis) — l’eau plaquée au bord tombait dans la bande morte, invisible, et les 95 % restaient inatteignables.',
+      'La MÉCANIQUE couvre désormais TOUT le rectangle déclaré à l’éditeur, murs et coins compris ; la lisière ondulée reste le DESSIN de la frontière. L’écart est dans le sens qui pardonne : rien de visuellement « dedans » n’est jamais exclu.',
+      'Test de régression : un point au ras du mur et dans les coins compte comme dedans, et rien ne déborde du rectangle déclaré.',
+    ],
+  },
+  {
     date: '14/08/2026 12:10',
     title: 'Le verrou de fréquence tient sa cadence exacte sur tout écran',
     notes: [
