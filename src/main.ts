@@ -606,6 +606,18 @@ function rapportPerf(): Record<string, unknown> {
       tableau: `${level.code} — ${level.name}`,
       particules: sim.count,
       volumeL: Math.round(sim.liters() * 100) / 100,
+      // la composition dit ce que le tableau coûte : boîtes (rendu par
+      // pixel + collisions), lasers (traçage par image), zones, éponges
+      composition: {
+        boites: level.boxes.length,
+        lasers: (level.lasers ?? []).length,
+        cibles: (level.cibles ?? []).length,
+        zones: (level.zones ?? []).length,
+        rails: (level.rails ?? []).length,
+        cellulesEponge: (level.sponges ?? []).reduce((a, s) => a + s.cols * s.rows, 0),
+        etiquettes: level.labels.length,
+      },
+      enPause: input.paused,
     },
   })
 }
@@ -1851,6 +1863,8 @@ function frame(now: number): void {
   // jamais plus d'une période de dette : une pause (onglet caché) ne
   // déclenche pas une rafale de rattrapage
   if (now - fpsCapPrecedent > periode) fpsCapPrecedent = now
+  const dtBrutMs = now - lastTime // non plafonné : la VRAIE durée, pour le rapport
+  const frameT0 = performance.now() // départ du CPU de cette frame (collecteur)
   const dtReal = Math.min((now - lastTime) / 1000, 0.1)
   lastTime = now
   elapsed += dtReal
@@ -2344,8 +2358,10 @@ function frame(now: number): void {
   )
   const rendRaw = performance.now() - renderT0
   monitor.renderMs += (rendRaw - monitor.renderMs) * 0.08
-  // le collecteur note CHAQUE image rendue — c'est la matière du rapport
-  perf.note(dtReal * 1000, physRaw, rendRaw, stepsFaits, sim.count, qualityLevel)
+  // le collecteur note CHAQUE image rendue — c'est la matière du rapport.
+  // Le CPU total inclut tout le rappel jusqu'ici : laser, étiquettes,
+  // panneau 2D, HUD — ce que « autreJsMs » isole dans le rapport.
+  perf.note(dtBrutMs, performance.now() - frameT0, physRaw, rendRaw, stepsFaits, sim.count, qualityLevel)
   majPerfVif()
 
   const speed = Math.hypot(sim.stats.velX, sim.stats.velY)

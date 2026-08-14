@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '14/08/2026 17:20',
+    title: 'Rapport de performance v2 : le temps manquant a désormais un nom',
+    notes: [
+      'Le premier rapport réel (Pixel 8 Pro) a montré des images de 100 ms où le CPU mesuré n’en expliquait que 13 — le collecteur v2 comble le trou : temps CPU TOTAL de la frame, d’où deux nouveaux postes par image : « autreJsMs » (notre code hors physique/rendu — laser, étiquettes, panneau 2D, HUD) et « horsCpuMs » (le temps où notre code ne tourne PAS : file GPU pleine, compositeur, gel système). GPU ou CPU caché : le rapport tranche.',
+      'La durée d’image n’est plus plafonnée à 100 ms (on voyait « 100 », c’était « au moins 100 ») ; le rapport embarque la COMPOSITION du tableau joué (boîtes, lasers, cibles, zones, rails, cellules d’éponge, étiquettes) et l’état de pause — un tableau d’éditeur chargé se lit dans les chiffres.',
+      'Diagnostic du premier rapport, en attendant la v2 : médiane à 60 mais 30 % des images au-dessus de 20 ms — et résolution dynamique DÉSACTIVÉE sur un rendu ~1,7 Mpx : sur téléphone, l’ACTIVER est le premier geste (réglage par appareil).',
+    ],
+  },
+  {
     date: '14/08/2026 13:30',
     title: 'Le rapport de performance : la vraie machine, analysée à distance',
     notes: [
