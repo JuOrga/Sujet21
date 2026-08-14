@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '14/08/2026 23:16',
+    title: 'Anti-domino débranché, verrou 45 (Steam Deck), rapports A/B propres',
+    notes: [
+      'L’ANTI-DOMINO EST DÉBRANCHÉ, sur retour joueur. Les rapports confirment qu’il faisait ce qu’il promettait — les images lentes ne sont plus dominées par la physique (97 % « hors CPU » désormais) — mais sur un téléphone où les accrocs système sont NOMBREUX, abandonner du temps simulé à chaque accroc se ressent plus que la deuxième image lente évitée. Le rattrapage historique reprend ; la capacité reste dans la boucle, testée, si on y revient.',
+      'VERROU 45 ajouté aux fréquences : le Steam Deck cadencé à 45 Hz (réglage SteamOS) y trouve un verrou qui épouse exactement la grille de son écran — et le jeu y tourne bien. Sur un téléphone à écran 60 Hz, 45 ne divise pas 60 : la cadence alternerait 17/25 ms, un tressautement mécanique — préférer 60 (ou 30) sur mobile.',
+      'RAPPORTS A/B PROPRES : la fenêtre de mesure se VIDE à chaque changement de réglage (moteur, graphismes, verrou, résolution). Constaté sur les deux rapports « un par moteur » : envoyés à 37 s d’écart, leurs fenêtres de 2 minutes se recouvraient — le rapport « javascript » contenait surtout des images jouées en WASM. Désormais un rapport = une configuration, sans contamination.',
+      'Premier indice moteur (à confirmer sur fenêtres propres) : léger avantage WASM sur le Pixel — 27,7 % d’images >20 ms contre 35,0 %, et 1,7 % >50 ms contre 4,4 %.',
+    ],
+  },
+  {
     date: '14/08/2026 23:00',
     title: 'Moteur physique WASM — avec retour arrière instantané',
     notes: [
