@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '14/08/2026 13:30',
+    title: 'Le rapport de performance : la vraie machine, analysée à distance',
+    notes: [
+      'Le jeu mesure désormais CHAQUE image rendue (fenêtre glissante de ~2 minutes, coût négligeable) : cadence en percentiles (médiane, p95, p99, pire), temps de physique et de rendu, à-coups classés avec leur contexte (pas simulés, particules, palier de qualité), fiche de l’appareil (écran, densité, cœurs, mémoire) et configuration active.',
+      'Troisième section du voile PARAMÈTRES : un aperçu EN DIRECT (médiane et plancher p5), COPIER (le rapport JSON dans le presse-papier) et ENVOYER AU LABO — le rapport part sur l’API (les 20 derniers sont conservés) et l’analyse se fait à distance, sur les chiffres réels d’un Steam Deck ou d’un téléphone plutôt qu’au banc du développeur.',
+      'Des chiffres de machine, rien de personnel. Et pour la question posée : NON, le réseau ne joue pas sur les performances en jeu — physique et rendu sont 100 % locaux ; le réseau ne sert qu’au chargement, à la bibliothèque et aux records de fin de tableau.',
+    ],
+  },
+  {
     date: '14/08/2026 12:40',
     title: 'Zones forcées : l’eau au mur compte — la bande morte est comblée',
     notes: [
