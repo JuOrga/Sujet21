@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 00:05',
+    title: 'Accélérer le temps ne casse plus la cadence',
+    notes: [
+      'Retour joueur : « en accélérant le temps il y a des chutes drastiques de fps ». Mécanique en cause : ×4 demande 4 fois plus de pas de physique par image (8 au lieu de 2 à 60 im/s) — et le budget s’ÉTENDAIT avec l’accélération (le choix historique : « ×4 achète des pas contre des images »). Sur téléphone, ~28 ms de physique par image : la cadence s’effondrait, littéralement comme annoncé.',
+      'Nouvelle borne, prioritaire : la physique ne dépasse jamais ~70 % de la période du verrou de fréquence, accélérée ou pas. Machine rapide : ×4 tient dans la borne, plein régime inchangé. Machine juste : l’accélération PLAFONNE d’elle-même — le temps avance aussi vite que la machine le permet sans casser la fluidité, au lieu d’afficher ×4 dans un diaporama. Le plancher de 5 ms garantit toujours le pas minimal.',
+    ],
+  },
+  {
     date: '14/08/2026 23:49',
     title: 'Éditeur : le cercle d’aspiration du sas suit la valeur du banc',
     notes: [
