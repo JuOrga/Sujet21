@@ -1,0 +1,30 @@
+# Rapatrie les rapports de performance de l'API vers le dépôt : l'analyse à
+# distance passe par GitHub, toujours joignable depuis l'environnement
+# d'analyse — sans dépendre d'un connecteur Vercel de session.
+# Déclenchement manuel (workflow_dispatch) : on tire les rapports à la demande.
+name: perf-sync
+on: workflow_dispatch
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer les rapports
+        run: |
+          curl -sS --fail "https://sujet21.vercel.app/api/perf" -o rapports.json
+          head -c 300 rapports.json; echo
+      - name: Publier sur la branche perf-rapports
+        run: |
+          git init -b perf-rapports sync
+          cd sync
+          mv ../rapports.json .
+          git config user.name "perf-sync"
+          git config user.email "actions@users.noreply.github.com"
+          git add rapports.json
+          git commit -m "rapports de performance — $(date -u +%FT%TZ)"
+          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}" perf-rapports
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
