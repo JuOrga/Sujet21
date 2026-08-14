@@ -11,6 +11,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '14/08/2026 23:49',
+    title: 'Éditeur : le cercle d’aspiration du sas suit la valeur du banc',
+    notes: [
+      'Le pointillé vert autour du sas (la portée d’aspiration) était dessiné avec la valeur PAR DÉFAUT, figée — changer « portée d’aspiration » au banc de réglage ne bougeait pas le cercle de l’éditeur, alors que le jeu, lui, suivait. Signalé par le joueur, corrigé.',
+      'L’éditeur lit désormais les paramètres VIFS du banc pour toutes les portées dessinées : aspiration du sas, bandes d’aura (plaque froide, chaudière, hydrophile/hydrophobe) et épaisseur des rails magnétiques — ce que l’éditeur montre est ce que la cuve fera, avec les réglages du moment.',
+    ],
+  },
+  {
     date: '14/08/2026 23:36',
     title: 'Résolution de rendu au choix : élevée, moyenne, faible — ou dynamique',
     notes: [
