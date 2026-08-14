@@ -2211,7 +2211,14 @@ function frame(now: number): void {
     // machine au taquet, le HUD affichait ×4 et la cuve restait à ×1.
     const warpNow = dashAiming ? params.timeWarp * params.gasAimSlow : params.timeWarp
     const boost = Math.max(1, warpNow)
-    const stepBudget = Math.min(12 * boost, Math.max(5, dtReal * 1000 * 0.6 * boost))
+    // Troisième borne (retour joueur : « en accélérant, chutes drastiques ») :
+    // la physique ne dépasse JAMAIS ~70 % de la période du verrou, même
+    // accélérée. Machine rapide : ×4 tient en 6-8 ms, plein régime inchangé.
+    // Machine juste : l'accélération plafonne d'elle-même — le temps avance
+    // aussi vite que la machine le permet SANS casser la cadence, au lieu
+    // d'afficher ×4 à 25 im/s. Le plancher 5 ms garantit le pas minimal.
+    const bornePeriode = Math.max(5, (1000 / fpsCap) * 0.7)
+    const stepBudget = Math.min(12 * boost, Math.max(5, dtReal * 1000 * 0.6 * boost), bornePeriode)
     // L'anti-domino (plafond de pas au régime de croisière) a été ESSAYÉ
     // puis débranché : au ressenti sur machine réelle, l'abandon du temps
     // simulé après chaque accroc se voyait plus que la deuxième image lente
