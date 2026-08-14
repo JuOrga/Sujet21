@@ -23,6 +23,31 @@ export class PerfCollector {
   private readonly qual = new Uint8Array(CAP) // palier de qualité actif
   private total = 0 // images notées depuis le début
   private cursor = 0
+  // Cadence BRUTE des rappels rAF (rendus ou sautés) : c'est l'horloge de
+  // l'écran. Sur un panneau adaptatif (LTPO : 60/90/120 Hz qui changent en
+  // cours de partie), elle explique un verrou qui « ne tient pas » : viser
+  // 60 sur une grille de 90 fabrique des images de 22 ms sans que rien ne
+  // rame. Histogramme au ms, à décroissance (≈ fenêtre glissante).
+  private readonly ticks = new Map<number, number>()
+  private ticksTotal = 0
+
+  tick(dtMs: number): void {
+    if (dtMs <= 0 || dtMs > 250) return
+    const c = Math.round(dtMs)
+    this.ticks.set(c, (this.ticks.get(c) ?? 0) + 1)
+    if (++this.ticksTotal > 20000) {
+      let reste = 0
+      for (const [k, v] of this.ticks) {
+        const nv = v >> 1
+        if (nv === 0) this.ticks.delete(k)
+        else {
+          this.ticks.set(k, nv)
+          reste += nv
+        }
+      }
+      this.ticksTotal = reste
+    }
+  }
 
   note(
     dtMs: number,
@@ -37,7 +62,9 @@ export class PerfCollector {
     // endormi, un écran éteint, une appli passée derrière — le navigateur
     // avait suspendu le rappel. La consigner polluerait durée, percentiles
     // et pires images (constaté : un dt de 172 s dans un rapport réel).
-    if (dtMs > 1500) return
+    // Un dt négatif ou nul n'est pas une image non plus (horloges rAF et
+    // performance.now() qui divergent au premier rappel — constaté au banc).
+    if (dtMs <= 0 || dtMs > 1500) return
     const i = this.cursor
     this.dt[i] = dtMs
     this.cpu[i] = cpuMs
@@ -128,11 +155,71 @@ export class PerfCollector {
       if (this.dt[k] > 33.4) sup33++
       if (this.dt[k] > 50) sup50++
     }
+    // Les BANDES de lenteur : les 10 pires images (trous système) ne disent
+    // rien de la MASSE des images moyennement lentes — celles qui cassent un
+    // « 60 constant ». Par bande : moyennes des postes et POSTE DOMINANT par
+    // image (physique, rendu, autre JS, hors CPU) — qui casse la cadence ?
+    const bandes = [
+      { plage: '20-33ms', min: 20, max: 33.4 },
+      { plage: '33-50ms', min: 33.4, max: 50 },
+      { plage: '50ms+', min: 50, max: Infinity },
+    ].map((b) => {
+      let images = 0
+      let sp = 0
+      let sr = 0
+      let sa = 0
+      let sh = 0
+      const dominante = { physique: 0, rendu: 0, autreJs: 0, horsCpu: 0 }
+      for (let k = 0; k < n; k++) {
+        const d = this.dt[k]
+        if (d <= b.min || d > b.max) continue
+        const phys = this.phys[k]
+        const rend = this.rend[k]
+        const autre = Math.max(0, this.cpu[k] - phys - rend)
+        const hors = Math.max(0, d - this.cpu[k])
+        images++
+        sp += phys
+        sr += rend
+        sa += autre
+        sh += hors
+        const m = Math.max(phys, rend, autre, hors)
+        if (m === hors) dominante.horsCpu++
+        else if (m === phys) dominante.physique++
+        else if (m === rend) dominante.rendu++
+        else dominante.autreJs++
+      }
+      const r = (v: number): number => (images > 0 ? Math.round((v / images) * 100) / 100 : 0)
+      return {
+        plage: b.plage,
+        images,
+        moyennes: { physMs: r(sp), renduCpuMs: r(sr), autreJsMs: r(sa), horsCpuMs: r(sh) },
+        dominante,
+      }
+    })
+    // Histogramme des durées d'images RENDUES : la grille de l'écran s'y lit
+    // (des pics à 17/22/25 ms trahissent une quantification, pas une charge).
+    const imgHist = new Map<number, number>()
+    for (let k = 0; k < n; k++) {
+      const c = Math.round(this.dt[k])
+      imgHist.set(c, (imgHist.get(c) ?? 0) + 1)
+    }
+    const cadenceImages = [...imgHist.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([ms, cnt]) => ({ ms, n: cnt }))
+    const cadenceTicks = [...this.ticks.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([ms, cnt]) => ({ ms, n: cnt }))
+    const hzEcranEstime =
+      cadenceTicks.length > 0 && cadenceTicks[0].ms > 0
+        ? Math.round(1000 / cadenceTicks[0].ms)
+        : null
     const nav = navigator as Navigator & { deviceMemory?: number }
     const perfMem = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory
     return {
       quoi: 'sujet21-rapport-perf',
-      version: 2,
+      version: 3,
       quand: new Date().toISOString(),
       appareil: {
         userAgent: navigator.userAgent,
@@ -155,6 +242,8 @@ export class PerfCollector {
           pire: n > 0 ? Math.round(1000 / tri[n - 1]) : 0,
         },
         imagesLentes: { sup20ms: sup20, sup33ms: sup33, sup50ms: sup50 },
+        bandesLentes: bandes,
+        cadenceImages,
         moyennes: {
           physMs: Math.round((physSum / Math.max(1, n)) * 100) / 100,
           renduCpuMs: Math.round((rendSum / Math.max(1, n)) * 100) / 100,
@@ -163,6 +252,9 @@ export class PerfCollector {
         },
         memoireJsMo: perfMem ? Math.round(perfMem.usedJSHeapSize / 1048576) : null,
       },
+      // L'horloge de l'écran, mesurée sur les rappels rAF bruts (rendus ou
+      // sautés) : le Hz RÉEL du panneau au moment du jeu — pas sa fiche.
+      cadenceEcran: { hzEstime: hzEcranEstime, ticks: cadenceTicks },
       piresImages: pires,
     }
   }
