@@ -525,6 +525,74 @@ renderSalles()
 document.getElementById('home-salles')?.addEventListener('click', () => {
   sallesEl.hidden = false
 })
+// ---- Le voile RECORDS : le palmarès partagé, trois podiums par salle ----
+// La NOTE (cL × 60 / (60 + s)) est calculée serveur ET client — même
+// formule des deux côtés, l'affichage recalcule pour les vieux rapports.
+const recordsEl = document.getElementById('records') as HTMLDivElement
+const recordsCorps = document.getElementById('records-corps') as HTMLDivElement
+function renderRecordsVoile(): void {
+  recordsCorps.innerHTML = '<div class="rec-vide">Chargement du palmarès…</div>'
+  void fetchSharedBoard().then((board) => {
+    if (!board) {
+      recordsCorps.innerHTML =
+        '<div class="rec-vide">Palmarès injoignable (hors ligne ou serveur local).</div>'
+      return
+    }
+    const moi = records.operator()
+    const esc = (t: string): string => t.replace(/</g, '&lt;')
+    const podium = (
+      titre: string,
+      liste: { name: string; note: number; liters: number; time: number }[],
+      fmt: (e: { note: number; liters: number; time: number }) => string,
+      brut: (e: { note: number; liters: number; time: number }) => number,
+      desc: boolean,
+    ): string => {
+      const meilleurs = liste.slice(0, 5)
+      const medailles = ['①', '②', '③', '4.', '5.']
+      let h = `<div class="rec-pod"><h4>${titre}</h4>`
+      for (let i = 0; i < meilleurs.length; i++) {
+        const e = meilleurs[i]
+        h += `<div class="rec-ligne${e.name === moi ? ' moi' : ''}"><span class="rg">${medailles[i]}</span><span class="nm">${esc(e.name)}</span><span class="vl">${fmt(e)}</span></div>`
+      }
+      // l'aiguillon : l'écart de MA ligne au rang au-dessus
+      const r = meilleurs.findIndex((e) => e.name === moi)
+      if (r > 0) {
+        const d = Math.abs(brut(meilleurs[r - 1]) - brut(meilleurs[r]))
+        const unite = titre === 'CHRONO' ? 's' : titre === 'VOLUME' ? 'cL' : 'pts'
+        const v = titre === 'VOLUME' ? Math.max(1, Math.round(d * 100)) : Math.ceil(d * 10) / 10
+        h += `<div class="rec-ecart">à ${v} ${unite} du rang ${r}${desc ? '' : ''}</div>`
+      }
+      return h + '</div>'
+    }
+    let html = ''
+    const tops = board.tops ?? {}
+    for (const lv of playedLevels()) {
+      const t = tops[lv.code]
+      html += `<div class="rec-salle">${esc(lv.code)} — ${esc(lv.name)}</div>`
+      if (!t || t.note.length === 0) {
+        html += '<div class="rec-vide">Aucune collecte enregistrée — le palmarès est à prendre.</div>'
+        continue
+      }
+      html += '<div class="rec-grille">'
+      html += podium('NOTE', t.note, (e) => `${e.note} pts`, (e) => e.note, true)
+      html += podium('VOLUME', t.volume, (e) => fmtL(e.liters), (e) => e.liters, true)
+      html += podium('CHRONO', t.chrono, (e) => fmtDuree(e.time), (e) => e.time, false)
+      html += '</div>'
+    }
+    recordsCorps.innerHTML = html || '<div class="rec-vide">Aucune salle.</div>'
+  })
+}
+document.getElementById('home-records')?.addEventListener('click', () => {
+  recordsEl.hidden = false
+  renderRecordsVoile()
+})
+document.getElementById('records-fermer')?.addEventListener('click', () => {
+  recordsEl.hidden = true
+})
+recordsEl.addEventListener('pointerdown', (e) => {
+  if (e.target === recordsEl) recordsEl.hidden = true
+})
+
 document.getElementById('salles-fermer')?.addEventListener('click', () => {
   sallesEl.hidden = true
 })

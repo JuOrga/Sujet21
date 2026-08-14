@@ -317,6 +317,37 @@
         letter-spacing: 0.14em;
         margin-right: 8px;
       }
+      #records[hidden] { display: none; }
+      #records {
+        position: fixed; inset: 0; z-index: 40;
+        background: rgba(2, 6, 12, 0.72);
+        display: flex; align-items: center; justify-content: center;
+        padding: 18px;
+      }
+      #records .salles-boite { max-height: 86vh; overflow: auto; width: min(980px, 96vw); }
+      #records-corps { padding: 6px 12px 14px; }
+      .rec-salle {
+        margin-top: 12px; padding-top: 6px;
+        font-family: var(--font-display); font-size: 11px; letter-spacing: 0.16em;
+        color: var(--specimen); border-top: 1px solid var(--line);
+      }
+      .rec-grille { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 6px; }
+      @media (max-width: 760px) { .rec-grille { grid-template-columns: 1fr; } }
+      .rec-pod { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+      .rec-pod h4 {
+        margin: 0 0 4px; font-family: var(--font-display); font-size: 9.5px;
+        letter-spacing: 0.18em; color: var(--dim);
+      }
+      .rec-ligne {
+        display: flex; gap: 8px; align-items: baseline;
+        font-family: var(--font-mono); font-size: 12px; padding: 2px 4px; border-radius: 3px;
+      }
+      .rec-ligne .rg { width: 18px; color: var(--dim); flex: none; }
+      .rec-ligne .nm { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .rec-ligne .vl { flex: none; color: var(--specimen); }
+      .rec-ligne.moi { background: rgba(46, 198, 201, 0.14); outline: 1px solid rgba(46, 198, 201, 0.35); }
+      .rec-ecart { margin-top: 4px; font-size: 11px; color: var(--dim); font-style: italic; }
+      .rec-vide { padding: 6px 4px; font-size: 12px; color: var(--dim); font-style: italic; }
       #cmds[hidden] {
         display: none;
       }
@@ -2655,6 +2686,7 @@
       <button id="start-editor" type="button">ÉDITEUR DE TABLEAUX — CRÉER OU MODIFIER UN NIVEAU</button>
       <div class="home-duo">
         <button id="home-salles" type="button">▦ SALLES</button>
+        <button id="home-records" type="button">🏆 RECORDS</button>
         <button id="home-cmds" type="button">⌘ COMMANDES</button>
         <button id="home-recs" type="button">◧ RECORDS</button>
         <button id="home-params" type="button">⚙ PARAMÈTRES</button>
@@ -2901,6 +2933,20 @@
         <div class="salles-tete"><span>CHARGER UNE SALLE — essai hors expédition</span>
           <button type="button" id="salles-fermer" aria-label="Fermer">✕</button></div>
         <div id="salles-liste"></div>
+      </div>
+    </div>
+
+    <!-- Le voile RECORDS : le palmarès partagé — trois podiums par salle -->
+    <div id="records" hidden aria-label="Records">
+      <div class="salles-boite">
+        <div class="salles-tete"><span>RECORDS DU PROTOCOLE — le palmarès des opérateurs</span>
+          <button type="button" id="records-fermer" aria-label="Fermer">✕</button></div>
+        <div class="params-desc" style="padding: 8px 12px 0">
+          La NOTE combine tout : centilitres sauvés × 60 / (60 + secondes). Arriver
+          gros compte d'abord, arriver vite amplifie — la ligne de crête entre les
+          deux fait les grandes notes. Votre ligne est surlignée.
+        </div>
+        <div id="records-corps"></div>
       </div>
     </div>
 
