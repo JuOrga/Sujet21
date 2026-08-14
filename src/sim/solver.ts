@@ -140,6 +140,15 @@ export class FluidSim {
   // et l'hydrophile — le tableau des règles se joue à l'échelle du PALET.
   private readonly icePhobe: Int32Array
   private readonly icePhile: Int32Array
+  // Étiquettes des amas de GLACE, en CACHE : la structure d'un bloc rigide
+  // ne change que sur un événement (gel, dégel, retrait) ou une fusion de
+  // blocs — refaire le parcours en profondeur à chaque pas était LE poste
+  // dominant de la phase palet. Tableau dédié : relabel() écrase `labels`
+  // pour la détection du corps, il ne doit pas corrompre ce cache.
+  private readonly iceLabels: Int32Array
+  private iceComps = 0 // composantes du dernier étiquetage
+  private iceLabelTtl = 0 // pas restants avant rafraîchissement de sécurité
+  private iceDirty = true // un gel/dégel/retrait vient d'avoir lieu
   private readonly compScratch: Int32Array // compteur par composante (relabel)
   private readonly relabelScratch: Int32Array // candidats voisins (relabel/icePass), collectés sans rappel
   private readonly reorderPerm: Int32Array // permutation du re-tri spatial
@@ -243,6 +252,7 @@ export class FluidSim {
     this.iceOmega = new Float32Array(capacity)
     this.icePhobe = new Int32Array(capacity)
     this.icePhile = new Int32Array(capacity)
+    this.iceLabels = new Int32Array(capacity)
     this.compScratch = new Int32Array(capacity)
     this.relabelScratch = new Int32Array(2048)
     this.reorderPerm = new Int32Array(capacity)
@@ -609,6 +619,7 @@ export class FluidSim {
   // Retrait par échange avec la dernière particule (absorption éponge).
   removeParticle(i: number): void {
     if (this.kind[i] === KIND_PLAYER) this.playerCount--
+    this.iceDirty = true // l'échange d'indices invalide le cache d'amas
     const last = this.count - 1
     if (i !== last) {
       this.posX[i] = this.posX[last]
@@ -1152,7 +1163,9 @@ export class FluidSim {
     permuteI(this.gaseous)
     permuteI(this.welded)
     permuteI(this.labels)
+    permuteI(this.iceLabels)
     permuteI(this.contactMat)
+    this.iceDirty = true // par prudence : les indices viennent de bouger
     // lambda, dp, dv, density, nb*, pair* : réécrits de zéro à chaque pas,
     // avant toute lecture — inutile de les transporter
   }
@@ -1182,6 +1195,21 @@ export class FluidSim {
       prdY[i] = posY[i] + velY[i] * dt
     }
 
+    // Recensement des états : un corps SANS liquide n'a ni pression ni
+    // viscosité — les 3 itérations de densité, la collecte de voisins du
+    // solveur et le XSPH seraient du travail pour rien. C'est la PHASE
+    // PALET (fréquente dans les tableaux de glace) : la sauter divise le
+    // pas par ~3, à trajectoires STRICTEMENT identiques (les corrections ne
+    // s'appliquaient déjà jamais au gel, et lambda/densité du gel ne sont
+    // lus par personne) — et un téléphone qui calcule moins chauffe moins.
+    let liquides = 0
+    let gazeux = 0
+    for (let i = 0; i < n; i++) {
+      if (this.gaseous[i] === 1) gazeux++
+      else if (frozen[i] === 0) liquides++
+    }
+    const phasePalet = liquides === 0
+
     // sCorr de référence : W(dq · h)
     const dq = p.sCorrDq * h
     const wDq = k.w(dq * dq)
@@ -1197,7 +1225,9 @@ export class FluidSim {
     const pairDy = this.pairDy
     const pairW = this.pairW
     const pairC = this.pairC
-    {
+    // Sans liquide NI gaz, personne ne lira les listes de voisins (la glace
+    // passe par la grille directement dans icePass) : la collecte se saute.
+    if (!phasePalet || gazeux > 0) {
       let cursor = 0
       const reach = h * 1.15 // marge : les itérations déplacent un peu les particules
       for (let i = 0; i < n; i++) {
@@ -1215,7 +1245,7 @@ export class FluidSim {
     // elle ne compte pas dans la densité du liquide et n'est pas corrigée —
     // un nuage n'appuie pas, et rien ne l'appuie.
     const gaseous = this.gaseous
-    for (let iter = 0; iter < p.solverIterations; iter++) {
+    for (let iter = 0; iter < (phasePalet ? 0 : p.solverIterations); iter++) {
       for (let i = 0; i < n; i++) {
         if (gaseous[i] === 1) {
           density[i] = selfRho
@@ -1378,7 +1408,7 @@ export class FluidSim {
     // bandes d'influence (§6)
     this.applyMaterialVelocities(dt)
 
-    if (p.xsphC > 0) {
+    if (p.xsphC > 0 && !phasePalet) {
       for (let i = 0; i < n; i++) {
         if (frozen[i] === 1 || gaseous[i] === 1) {
           dvX[i] = 0
@@ -1961,12 +1991,18 @@ export class FluidSim {
       const rate = canFrost ? Math.max(exposure * freeze, wanted ? freezeSelf : 0) : 0
       if (rate > 0) {
         this.frost[i] = Math.min(1, this.frost[i] + rate)
-        if (this.frost[i] >= 1) this.frozen[i] = 1 // la vitesse est conservée
+        if (this.frost[i] >= 1 && this.frozen[i] === 0) {
+          this.frozen[i] = 1 // la vitesse est conservée
+          this.iceDirty = true // la structure des amas vient de changer
+        }
       } else {
         const melt =
           heat > 0 ? Math.max(thaw, (heat * dt) / Math.max(0.05, p.heatThawTime)) : thaw
         this.frost[i] = Math.max(0, this.frost[i] - melt)
-        if (this.frozen[i] === 1 && this.frost[i] <= 0.55) this.frozen[i] = 0
+        if (this.frozen[i] === 1 && this.frost[i] <= 0.55) {
+          this.frozen[i] = 0
+          this.iceDirty = true // un bloc vient de perdre une particule
+        }
       }
 
       // La température se sent dans le liquide lui-même :
@@ -2052,23 +2088,38 @@ export class FluidSim {
     const p = this.params
     const linkR = p.linkRadiusFactor * p.kernelRadius
     const linkR2 = linkR * linkR
-    const { prdX, prdY, velX, velY, labels } = this
+    const { prdX, prdY, velX, velY } = this
+    const labels = this.iceLabels
     const grid = this.grid
     const scratch = this.relabelScratch
-    const forEachIce = (i: number, cb: (j: number) => void) => {
-      if (frozen[i] === 0) return // le liquide : singletons, hors des blocs
-      const xi = prdX[i]
-      const yi = prdY[i]
-      const end = grid.collect(prdX, prdY, xi, yi, linkR, i, scratch, 0, scratch.length)
-      for (let e = 0; e < end; e++) {
-        const j = scratch[e]
-        if (frozen[j] === 0) continue
-        const dx = xi - prdX[j]
-        const dy = yi - prdY[j]
-        if (dx * dx + dy * dy <= linkR2) cb(j)
+    // L'étiquetage des amas est en CACHE : il ne se refait que sur un
+    // événement de structure (gel, dégel, retrait — voir iceDirty) ou au
+    // plus tard toutes les 6 pas (50 ms), le temps de latence accepté pour
+    // qu'une FUSION de deux blocs qui se touchent soit constatée. Le bloc
+    // étant rigide, sa connexité ne change jamais entre deux événements —
+    // c'était LE poste dominant de la phase palet (~1,6 ms/pas à 900).
+    let comps: number
+    if (this.iceDirty || --this.iceLabelTtl <= 0) {
+      const forEachIce = (i: number, cb: (j: number) => void) => {
+        if (frozen[i] === 0) return // le liquide : singletons, hors des blocs
+        const xi = prdX[i]
+        const yi = prdY[i]
+        const end = grid.collect(prdX, prdY, xi, yi, linkR, i, scratch, 0, scratch.length)
+        for (let e = 0; e < end; e++) {
+          const j = scratch[e]
+          if (frozen[j] === 0) continue
+          const dx = xi - prdX[j]
+          const dy = yi - prdY[j]
+          if (dx * dx + dy * dy <= linkR2) cb(j)
+        }
       }
+      comps = labelComponents(n, labels, forEachIce, this.stack)
+      this.iceComps = comps
+      this.iceDirty = false
+      this.iceLabelTtl = 6
+    } else {
+      comps = this.iceComps
     }
-    const comps = labelComponents(n, labels, forEachIce, this.stack)
     this.iceVxSum.fill(0, 0, comps)
     this.iceVySum.fill(0, 0, comps)
     this.iceCnt.fill(0, 0, comps)
