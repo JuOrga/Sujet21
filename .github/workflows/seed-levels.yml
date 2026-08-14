@@ -1,0 +1,17 @@
+# Semis de la bibliothèque partagée : copies modifiables des tableaux
+# livrés, dans l'ordre choisi, insérées après le premier tableau du joueur.
+# Même mécanique de gâchette que perf-sync : l'environnement d'analyse ne
+# joint pas l'API, GitHub Actions si — un push sur seed-levels-go tire.
+name: seed-levels
+on:
+  workflow_dispatch:
+  push:
+    branches: [seed-levels-go]
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Semer la bibliothèque
+        run: node ops/seed-levels.mjs
