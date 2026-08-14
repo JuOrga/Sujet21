@@ -11,6 +11,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '14/08/2026 10:45',
+    title: 'La carte dans la main : pincement ancré, élan, et le temps lisible partout',
+    notes: [
+      'Le PINCEMENT est enfin de la manipulation directe : le point du monde sous les doigts RESTE sous les doigts (zoom ancré au centre du pincement, immédiat), et la molette zoome vers le curseur. Avant, tout zoomait vers le centre de l’écran — la carte fuyait sous le geste.',
+      'L’ÉLAN du geste : les doigts quittent l’écran en mouvement, la carte continue et s’amortit en douceur (~0,4 s) — le glisser des cartes qu’on a dans la main. Le clic droit maintenu en profite aussi.',
+      'Le zoom AUTOMATIQUE ne pompe plus au rythme des éclats : le cadrage suit un rayon de corps LISSÉ (3/s) — une gerbe de vaporisation ne fait plus sursauter la caméra, elle la fait respirer.',
+      'La barre du bas se lit enfin sur 7 pouces : glyphes 16 → 20 px (24 au doigt — téléphone, Steam Deck), fonds plus opaques, chips LÉGENDE/ÉTATS/BANC 9 → 11 px (12 au doigt). Sur mobile, les chips passent de 8,5 à 10,5 px.',
+      'Le TEMPS en un seul bloc : ‹ ×N › — la vitesse courante s’affiche EN PERMANENCE entre ses deux boutons, en ambre dès qu’on quitte ×1 (le HUD aussi). Et le bloc revient sur MOBILE : les crans de temps n’étaient « pas au doigt » — ils le sont désormais.',
+    ],
+  },
+  {
     date: '14/08/2026 09:05',
     title: 'Les obliques, citoyennes de plein droit : découpe et poignées de coins',
     notes: [

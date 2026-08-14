@@ -1372,8 +1372,10 @@ const pane = createBench(params, monitor, {
   },
 })
 input.onReset = resetAction
-input.onZoom = (factor) => camera.zoomBy(factor, params)
+input.onZoom = (factor, cx, cy) =>
+  camera.zoomAt(factor, cx, cy, window.innerWidth, window.innerHeight, params)
 input.onPan = (dx, dy) => camera.panBy(dx, dy)
+input.onPanEnd = (vx, vy) => camera.flingBy(vx, vy)
 input.onVortex = (clientX, clientY) => {
   if (params.vortexEnabled < 0.5) return // outil de test, coupé dans le protocole
   const w = camera.screenToWorld(clientX, clientY, window.innerWidth, window.innerHeight)
@@ -1452,8 +1454,28 @@ publishTouchbarHeight()
   touchbar.appendChild(brk)
 }
 const btnPause = touchButton('⏸', 'pause (espace)', () => input.togglePause())
-touchButton('‹', 'ralentir le temps (,)', () => input.stepWarp(-1), 'tb-warp')
-touchButton('›', 'accélérer le temps (.)', () => input.stepWarp(1), 'tb-warp')
+// Le TEMPS en un seul bloc : ralentir · la vitesse courante · accélérer.
+// La vitesse est une INFO permanente (elle s'allume dès qu'on quitte ×1),
+// et le groupe reste au doigt — savoir à quelle vitesse on joue n'est pas
+// un réglage de banc.
+const tbTime = document.createElement('div')
+tbTime.id = 'tb-time'
+touchbar.appendChild(tbTime)
+const timeButton = (label: string, title: string, onTap: () => void): HTMLButtonElement => {
+  const b = document.createElement('button')
+  b.textContent = label
+  b.title = title
+  b.addEventListener('click', onTap)
+  tbTime.appendChild(b)
+  return b
+}
+timeButton('‹', 'ralentir le temps (,)', () => input.stepWarp(-1))
+const tbSpeed = document.createElement('span')
+tbSpeed.id = 'tb-speed'
+tbSpeed.textContent = '×1'
+tbSpeed.title = 'vitesse du temps simulé'
+tbTime.appendChild(tbSpeed)
+timeButton('›', 'accélérer le temps (.)', () => input.stepWarp(1))
 const btnVortex = touchButton(
   '🌀',
   'vortex : armer puis toucher l’écran (clic droit)',
@@ -1492,7 +1514,16 @@ touchButton('↺', 'recommencer (R)', resetAction)
 touchButton('≡', 'fiche d’essai (échap)', openHome)
 input.onTimeWarpChange = (warp) => {
   params.timeWarp = warp
+  majVitesse()
   pane.refresh()
+}
+// La vitesse affichée (barre + HUD) : mise à jour au changement ET à chaque
+// image (le banc peut aussi changer timeWarp par ses curseurs)
+function majVitesse(): void {
+  const w = params.timeWarp
+  const txt = `×${w}`
+  if (tbSpeed.textContent !== txt) tbSpeed.textContent = txt
+  tbSpeed.classList.toggle('actif', w !== 1)
 }
 
 const overlayBtn = document.getElementById('overlay-btn') as HTMLButtonElement
@@ -2527,6 +2558,8 @@ function frame(now: number): void {
   hudState.classList.toggle('warn', sim.dispersed)
   document.body.classList.toggle('dispersed', sim.dispersed)
   hudWarp.textContent = `×${params.timeWarp}`
+  hudWarp.classList.toggle('warn', params.timeWarp !== 1)
+  majVitesse()
 
   // Relevé vivant de la fiche d'essai
   if (!document.body.classList.contains('playing')) {

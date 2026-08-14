@@ -51,8 +51,46 @@ export class Camera {
   panBy(dxPx: number, dyPx: number): void {
     this.introTimer = 0
     this.manualPan = true
+    this.glideVx = 0 // la main posée arrête toute glissade en cours
+    this.glideVy = 0
     this.x -= dxPx / this.zoom
     this.y += dyPx / this.zoom // l'axe écran descend, l'axe monde monte
+  }
+
+  // Inertie de glissement : les doigts quittent l'écran en mouvement, la
+  // carte continue sur son élan et s'amortit — le geste des cartes qu'on a
+  // dans la main. Vitesse en px écran/s, amortie exponentiellement.
+  private glideVx = 0
+  private glideVy = 0
+  flingBy(vxPx: number, vyPx: number): void {
+    if (!this.manualPan) return // pas de glissade si on n'a pas attrapé la carte
+    this.glideVx = vxPx
+    this.glideVy = vyPx
+  }
+
+  // Zoom ANCRÉ (pincement, molette) : le point du monde sous les doigts
+  // reste sous les doigts — manipulation directe, immédiate. C'est la
+  // différence entre « zoomer la carte » et « écarter le monde ».
+  zoomAt(
+    factor: number,
+    clientX: number,
+    clientY: number,
+    viewportW: number,
+    viewportH: number,
+    p: SimParams,
+  ): void {
+    this.introTimer = 0
+    const avant = this.screenToWorld(clientX, clientY, viewportW, viewportH)
+    const base = this.manualZoom ?? this.zoom
+    const z = Math.min(
+      p.cameraMaxZoom * MANUAL_MAX_FACTOR,
+      Math.max(p.cameraMinZoom * MANUAL_MIN_FACTOR, base * factor),
+    )
+    this.manualZoom = z
+    this.zoom = z
+    this.manualPan = true // ancrer fige aussi le suivi du corps
+    this.x = avant.x - (clientX - viewportW * 0.5) / z
+    this.y = avant.y + (clientY - viewportH * 0.5) / z
   }
 
   cancelIntro(): void {
@@ -78,7 +116,14 @@ export class Camera {
   resetAutoZoom(): void {
     this.manualZoom = null
     this.manualPan = false
+    this.glideVx = 0
+    this.glideVy = 0
   }
+
+  // Rayon apparent LISSÉ : le rayon RMS saute quand le corps éclate (gerbe,
+  // éclaboussure) et le zoom automatique pompait au rythme des éclats. Le
+  // cadrage suit une version amortie — la caméra respire, elle ne sursaute pas.
+  private radiusSmoothed = 0
 
   update(
     dtReal: number,
@@ -89,8 +134,13 @@ export class Camera {
     viewportH: number,
     p: SimParams,
   ): void {
-    // le rayon RMS sous-estime l'étendue visuelle : facteur empirique 1.8
-    const apparentDiameter = Math.max(bodyRmsRadius * 1.8 * 2, 24)
+    // le rayon RMS sous-estime l'étendue visuelle : facteur empirique 1.8.
+    // Lissé à 3/s : les sauts d'étendue (gerbe de vaporisation, éclats)
+    // n'imposent plus leurs à-coups au zoom automatique.
+    if (this.radiusSmoothed <= 0) this.radiusSmoothed = bodyRmsRadius
+    const kR = 1 - Math.exp(-3 * dtReal)
+    this.radiusSmoothed += (bodyRmsRadius - this.radiusSmoothed) * kR
+    const apparentDiameter = Math.max(this.radiusSmoothed * 1.8 * 2, 24)
     let targetZoom = (p.cameraFraction * Math.min(viewportW, viewportH)) / apparentDiameter
     targetZoom = Math.min(p.cameraMaxZoom, Math.max(p.cameraMinZoom, targetZoom))
     if (this.manualZoom !== null) targetZoom = this.manualZoom
@@ -111,6 +161,17 @@ export class Camera {
     if (!this.manualPan) {
       this.x += (targetX - this.x) * k
       this.y += (targetY - this.y) * k
+    } else if (this.glideVx !== 0 || this.glideVy !== 0) {
+      // la glissade : l'élan du geste, amorti en ~0,4 s
+      this.x -= (this.glideVx * dtReal) / this.zoom
+      this.y += (this.glideVy * dtReal) / this.zoom
+      const damp = Math.exp(-5 * dtReal)
+      this.glideVx *= damp
+      this.glideVy *= damp
+      if (Math.hypot(this.glideVx, this.glideVy) < 10) {
+        this.glideVx = 0
+        this.glideVy = 0
+      }
     }
     this.zoom = Math.exp(Math.log(this.zoom) + (Math.log(targetZoom) - Math.log(this.zoom)) * k)
   }
