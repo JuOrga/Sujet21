@@ -33,10 +33,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   if (req.method === 'GET') {
     const { blobs } = await list({ prefix: PREFIX })
-    const rapports = [...blobs]
-      .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
-      .map((b) => ({ url: b.url, envoyeAt: b.uploadedAt, nom: b.pathname.slice(PREFIX.length) }))
-    res.status(200).json({ rapports })
+    const tri = [...blobs].sort(
+      (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
+    )
+    const rapports = tri.map((b) => ({
+      url: b.url,
+      envoyeAt: b.uploadedAt,
+      nom: b.pathname.slice(PREFIX.length),
+    }))
+    // Les 3 plus récents, CONTENU INCLUS : l'analyse à distance n'a besoin
+    // que de cet endpoint — le domaine du stockage blob n'est pas joignable
+    // depuis tous les environnements d'analyse.
+    const derniers = await Promise.all(
+      tri.slice(0, 3).map(async (b) => {
+        const r = await fetch(b.url, { cache: 'no-store' })
+        return {
+          nom: b.pathname.slice(PREFIX.length),
+          envoyeAt: b.uploadedAt,
+          contenu: r.ok ? await r.json().catch(() => null) : null,
+        }
+      }),
+    )
+    res.status(200).json({ rapports, derniers })
     return
   }
 
