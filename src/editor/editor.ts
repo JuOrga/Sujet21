@@ -1819,6 +1819,17 @@ export class LevelEditor {
         // chaque chaudière règle sa portée d'aura : gros bloc à petite aura…
         rows.push(numField('Aura (× portée)', 'p-aura', b.aura ?? 1, 0.25))
       }
+      if (b.material === MAT_WALL) {
+        // habillage : pur décor, la physique reste celle d'une paroi neutre
+        const skins = ['Standard', 'Caissons', 'Conduites', 'Poutrelle', 'Blindage']
+        rows.push(
+          `<label class="ed-f"><span>Habillage (décor)</span><select id="p-skin">` +
+            skins
+              .map((n, i) => `<option value="${i}"${i === (b.skin ?? 0) ? ' selected' : ''}>${n}</option>`)
+              .join('') +
+            `</select></label>`,
+        )
+      }
     } else if (s.kind === 'zone') {
       const z = (this.level.zones ?? [])[s.index]
       rows.push(
@@ -1957,6 +1968,14 @@ export class LevelEditor {
         else delete b.aura
       } else {
         delete b.aura
+      }
+      // habillage d'une paroi neutre : 0 (standard) efface la clé
+      if (b.material === MAT_WALL) {
+        const skin = Math.max(0, Math.min(4, Math.round(val('p-skin'))))
+        if (skin > 0) b.skin = skin
+        else delete b.skin
+      } else {
+        delete b.skin
       }
     } else if (s.kind === 'zone') {
       const z = (this.level.zones ?? [])[s.index]

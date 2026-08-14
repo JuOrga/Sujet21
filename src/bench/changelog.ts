@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 00:45',
+    title: 'Grandes cartes, habillages de parois, SALLE X/N — et plus aucun popup',
+    notes: [
+      'GRANDES CARTES : les budgets de rendu passent de 40 à 96 boîtes et de 12 à 16 zones — de quoi composer une carte de 3-4 tableaux d’un seul tenant. Le dézoom manuel (pincement/molette) couvrait déjà très largement de telles étendues : dézoom total sur l’ensemble, zoom sur chaque salle. Le court-circuit par boîte du shader fait que chaque pixel ne paie que les boîtes qui le concernent, pas les 96.',
+      'HABILLAGES DE PAROIS — quatre décors neutres, physique strictement inchangée (c’est une paroi) : CAISSONS (panneaux empilés, joints sombres), CONDUITES (faisceau de tubes couchés, brides), POUTRELLE (croisillons rivetés), BLINDAGE (plaque lourde, chevrons d’avertissement au bord). Sélecteur « Habillage (décor) » dans l’éditeur sur toute paroi ; les motifs pivotent avec les boîtes obliques.',
+      'L’indicateur de progression devient explicite et PERMANENT : la puce du bord haut affiche « SALLE 3/24 » en continu pendant le jeu.',
+      'PLUS AUCUN POPUP : le carton de journal signé Dr N. Véga (à fermer à chaque tableau) et les bandeaux CONSIGNE DU PROTOCOLE du tutoriel sont supprimés — retour joueur, pas ergonomiques. Les textes de journal restent dans les tableaux (champ de l’éditeur). La prise en main gestuelle du tout premier lancement est conservée : elle ne se montre qu’une fois.',
+    ],
+  },
+  {
     date: '15/08/2026 00:35',
     title: 'Tous les tableaux livrés entrent dans la bibliothèque — modifiables',
     notes: [

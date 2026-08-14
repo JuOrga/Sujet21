@@ -70,6 +70,8 @@ function readBox(o: Record<string, unknown>): ObstacleBox | null {
   const angle = num(o.angle, 0)
   // aura : portée de chauffe propre à une chaudière (multiplicateur borné)
   const aura = num(o.aura, 1)
+  // skin : habillage d'une paroi neutre (décor pur, physique inchangée)
+  const skin = Math.round(num(o.skin, 0))
   const box: ObstacleBox = {
     minX: Math.min(minX, maxX),
     minY: Math.min(minY, maxY),
@@ -77,6 +79,7 @@ function readBox(o: Record<string, unknown>): ObstacleBox | null {
     maxY: Math.max(minY, maxY),
     ...(angle ? { angle: Math.max(-180, Math.min(180, angle)) } : {}),
     ...(aura !== 1 && material === MAT_CHAUD ? { aura: Math.max(0.25, Math.min(4, aura)) } : {}),
+    ...(skin > 0 && material === MAT_WALL ? { skin: Math.min(4, skin) } : {}),
     material,
   }
   if (box.maxX - box.minX < 1 || box.maxY - box.minY < 1) return null

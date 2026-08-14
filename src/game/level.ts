@@ -27,6 +27,9 @@ export interface ObstacleBox {
   // CHAUDIÈRE seulement : multiplicateur de la portée de son aura de chauffe
   // (1 = réglage du banc). Permet un gros bloc à petite aura, et l'inverse.
   aura?: number
+  // Habillage d'une PAROI neutre (décor pur, physique inchangée) :
+  // 0/absent standard, 1 caissons, 2 conduites, 3 poutrelle, 4 blindage
+  skin?: number
 }
 
 /** Le point (x, y) ramené dans le repère LOCAL d'une boîte oblique. */

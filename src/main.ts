@@ -399,25 +399,16 @@ function requireName(): boolean {
   return true
 }
 const tableauCard = el('tableau-card')
-const cardCode = el('card-code')
-const cardLog = el('card-log')
-const cardFig = el('card-fig') as HTMLImageElement
 
 // Carton d'ouverture : l'entrée du journal de bord du tableau. Il RESTE
 // affiché tant qu'on ne l'a pas fermé à la croix — lire ne se chronomètre
 // pas (l'effacement automatique partait trop vite).
+// Le carton de journal (signé Dr N. Véga) ne s'affiche PLUS : retour
+// joueur — un popup à fermer à chaque tableau n'est pas ergonomique. Le
+// texte reste dans les tableaux (éditeur, champ journal) si on veut le
+// réutiliser autrement un jour.
 function showTableauCard(): void {
-  cardCode.textContent = `ESSAI ${level.code} — ${level.name.toUpperCase()}`
-  // La planche du dossier, quand le tableau en a une
-  if (level.figure) {
-    cardFig.src = level.figure
-    cardFig.hidden = false
-  } else {
-    cardFig.hidden = true
-    cardFig.removeAttribute('src')
-  }
-  cardLog.textContent = level.journal
-  tableauCard.classList.add('visible')
+  // volontairement vide — aucun carton ne s'affiche
 }
 document.getElementById('card-fermer')?.addEventListener('click', () => {
   tableauCard.classList.remove('visible')
@@ -1862,6 +1853,13 @@ function tutorPersist(): void {
 }
 
 function updateTutor(dtReal: number): void {
+  // Bandeaux CONSIGNE DU PROTOCOLE désactivés (même retour joueur que le
+  // carton) : l'onboarding gestuel du premier lancement suffit.
+  if (tutorShown !== '') {
+    tutorShown = ''
+    tutorEl.classList.remove('visible')
+  }
+  if (true) return
   if (
     !tutorActive ||
     testLevel !== null ||
@@ -2576,7 +2574,7 @@ function frame(now: number): void {
 
   // Instruments de bord
   const fraction = sim.baseVolume > 0 ? sim.playerCount / sim.baseVolume : 0
-  hudTableau.textContent = testLevel ? 'BIS' : `nº ${levelIndex + 1}/${playedLevels().length}`
+  hudTableau.textContent = testLevel ? 'BIS' : `SALLE ${levelIndex + 1}/${playedLevels().length}`
   // La coque refroidit : +21° au départ, −60° à froid complet — la pression
   // temporelle se lit ici (chiffre ET barre), jamais sur un chronomètre
   const coque = Math.round(21 - 81 * chillNow())

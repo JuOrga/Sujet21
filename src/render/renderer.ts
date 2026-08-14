@@ -14,8 +14,12 @@ import type { Camera } from './camera'
 // dessinés (la physique, elle, les voit tous) — l'éditeur avertit quand un
 // tableau les dépasse, et le sas reste toujours dessiné (il garde sa place
 // dans le budget quoi qu'il arrive).
-export const MAX_BOXES = 40
-export const MAX_ZONES = 12
+// Élargis pour les GRANDES CARTES (3-4 tableaux en une) : le court-circuit
+// par boîte dans le shader (reachMax) fait que seules les 1-2 boîtes qui
+// concernent un pixel se paient vraiment — le plafond peut monter sans que
+// chaque pixel paie les 96.
+export const MAX_BOXES = 96
+export const MAX_ZONES = 16
 
 const SPLAT_VS = `#version 300 es
 layout(location = 0) in vec2 aPos;
@@ -87,9 +91,9 @@ void main() {
 
 const COMPOSE_FS = `#version 300 es
 precision highp float;
-#define MAX_BOXES 40
+#define MAX_BOXES 96
 #define MAX_WAVES 8
-#define MAX_ZONES 12
+#define MAX_ZONES 16
 uniform sampler2D uField;
 uniform vec2 uCanvasSize;  // px device
 uniform float uDpr;
@@ -622,11 +626,48 @@ void main() {
       float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
       float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
       vec3 fillCol; vec3 edgeCol;
-      if (mat < 0.5) {        // mur neutre : métal brossé
-        fillCol = uHasWall > 0.5
-          ? texWallC * 0.95
-          : vec3(0.10, 0.13, 0.17) * (0.88 + 0.24 * dnoise(world * vec2(0.03, 0.30)));
+      if (mat < 0.5) {        // mur neutre : métal brossé — ou un HABILLAGE
+        // (aux.z : 1 caissons, 2 conduites, 3 poutrelle, 4 blindage). Pur
+        // décor : la physique reste celle d'une paroi neutre. Motifs dans le
+        // repère LOCAL de la boîte (wb) : ils pivotent avec elle.
+        float skin = uBoxAux[bi].z;
         edgeCol = vec3(0.30, 0.38, 0.46);
+        if (skin > 3.5) {
+          // BLINDAGE : plaque lourde mate, chevrons d'avertissement au bord
+          float pl = 0.9 + 0.2 * dnoise(wb * 0.05);
+          fillCol = vec3(0.13, 0.15, 0.19) * pl;
+          float bord = smoothstep(26.0, 12.0, -d);
+          float chev = smoothstep(0.55, 0.85, 0.5 + 0.5 * sin((wb.x + wb.y) * 0.28));
+          fillCol = mix(fillCol, vec3(0.62, 0.52, 0.13), bord * chev * 0.5);
+          edgeCol = vec3(0.55, 0.50, 0.26);
+        } else if (skin > 2.5) {
+          // POUTRELLE : âme métallique et croisillons rivetés
+          float croix = min(abs(fract((wb.x + wb.y) * 0.014) - 0.5), abs(fract((wb.x - wb.y) * 0.014) - 0.5));
+          float brace = 1.0 - smoothstep(0.05, 0.10, croix);
+          float riv = smoothstep(0.90, 0.98, cos(wb.x * 0.11) * cos(wb.y * 0.11));
+          fillCol = vec3(0.09, 0.11, 0.145) + vec3(0.07, 0.08, 0.10) * brace + vec3(0.12) * riv;
+          edgeCol = vec3(0.36, 0.42, 0.50);
+        } else if (skin > 1.5) {
+          // CONDUITES : faisceau de tubes couchés, brides régulières
+          float ph = fract(wb.y / 46.0) - 0.5;
+          float tube = sqrt(max(0.0, 1.0 - ph * ph * 4.0));
+          float bride = smoothstep(0.92, 1.0, 0.5 + 0.5 * sin(wb.x * 0.045));
+          fillCol = vec3(0.10, 0.125, 0.16) * (0.55 + 0.65 * tube) + vec3(0.05, 0.06, 0.075) * bride;
+          edgeCol = vec3(0.34, 0.42, 0.50);
+        } else if (skin > 0.5) {
+          // CAISSONS : panneaux empilés, joints sombres, teinte par caisson
+          vec2 cel = floor(wb / vec2(84.0, 56.0));
+          vec2 cuvC = fract(wb / vec2(84.0, 56.0));
+          float joint = min(min(cuvC.x, 1.0 - cuvC.x), min(cuvC.y, 1.0 - cuvC.y));
+          float bordC = smoothstep(0.02, 0.10, joint);
+          float teinte = 0.85 + 0.3 * hash21(cel + 7.7);
+          fillCol = vec3(0.105, 0.125, 0.155) * teinte * (0.55 + 0.45 * bordC);
+          edgeCol = vec3(0.32, 0.39, 0.46);
+        } else {
+          fillCol = uHasWall > 0.5
+            ? texWallC * 0.95
+            : vec3(0.10, 0.13, 0.17) * (0.88 + 0.24 * dnoise(world * vec2(0.03, 0.30)));
+        }
       } else if (mat < 1.5) { // hydrophile : mouillé, brillant, reflet qui glisse
         float sheen = 0.5 + 0.5 * sin(world.x * 0.045 + world.y * 0.10 + uTime * 0.7);
         fillCol = uHasPhile > 0.5
@@ -1402,8 +1443,10 @@ export class Renderer {
       this.boxScratch[i * 4 + 3] = bx.maxY
       this.auxScratch[i * 4] = bx.material
       this.auxScratch[i * 4 + 1] = ((bx.angle ?? 0) * Math.PI) / 180
-      // surchauffeur : le solveur dit lesquels sont déchargés (mêmes index)
-      this.auxScratch[i * 4 + 2] = sim.surchauffesVides.has(i) ? 0 : 1
+      // aux.z : charge du surchauffeur (le solveur dit lesquels sont vides)
+      // — ou HABILLAGE d'une paroi neutre (1-4), pur décor
+      this.auxScratch[i * 4 + 2] =
+        bx.material === 0 ? (bx.skin ?? 0) : sim.surchauffesVides.has(i) ? 0 : 1
       this.auxScratch[i * 4 + 3] = bx.aura ?? 1
     }
     gl.uniform1i(cu['uBoxCount'], boxCount)
