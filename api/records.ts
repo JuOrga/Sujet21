@@ -28,6 +28,35 @@ interface SharedExpeditionRecord {
 interface Board {
   tableaux: Record<string, SharedTableauRecord>
   expedition: SharedExpeditionRecord | null
+  // Palmarès (écran RECORDS) : top 10 par tableau, par catégorie. La NOTE
+  // combine volume et temps : cL × 60 / (60 + s) — le volume domine, le
+  // temps module ; imbattable en bâclant l'un des deux.
+  tops?: Record<string, { volume: TopEntry[]; chrono: TopEntry[]; note: TopEntry[] }>
+}
+
+interface TopEntry {
+  liters: number
+  time: number
+  name: string
+  note: number
+  quand: string
+}
+
+const TOP_N = 10
+
+function noteDe(liters: number, time: number): number {
+  return Math.round((liters * 100 * 60) / (60 + Math.max(0, time)))
+}
+
+// Insère dans un top trié ; garde TOP_N ; une seule entrée par opérateur
+// (la meilleure) pour que le palmarès respire au lieu d'être monopolisé.
+function insere(top: TopEntry[], e: TopEntry, cle: (x: TopEntry) => number, desc: boolean): TopEntry[] {
+  const sans = top.filter((x) => x.name !== e.name)
+  const mien = top.find((x) => x.name === e.name)
+  const garde = mien && (desc ? cle(mien) >= cle(e) : cle(mien) <= cle(e)) ? mien : e
+  sans.push(garde)
+  sans.sort((a, b) => (desc ? cle(b) - cle(a) : cle(a) - cle(b)))
+  return sans.slice(0, TOP_N)
 }
 
 function cleanName(v: unknown): string {
@@ -68,7 +97,7 @@ async function readBoard(): Promise<Board> {
   if (!r.ok) return empty
   const data = (await r.json().catch(() => null)) as Board | null
   if (data === null || typeof data !== 'object' || typeof data.tableaux !== 'object') return empty
-  return { tableaux: data.tableaux ?? {}, expedition: data.expedition ?? null }
+  return { tableaux: data.tableaux ?? {}, expedition: data.expedition ?? null, tops: data.tops ?? {} }
 }
 
 async function writeBoard(board: Board): Promise<void> {
@@ -112,6 +141,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           board.tableaux[code] = entry
           improved = true
         }
+        // le palmarès s'alimente à CHAQUE collecte : les tops volume,
+        // chrono et note vivent indépendamment du record single
+        board.tops ??= {}
+        const t = (board.tops[code] ??= { volume: [], chrono: [], note: [] })
+        const te: TopEntry = { ...entry, note: noteDe(entry.liters, entry.time), quand: new Date().toISOString() }
+        t.volume = insere(t.volume, te, (x) => x.liters * 1e6 - x.time, true)
+        t.chrono = insere(t.chrono, te, (x) => x.time, false)
+        t.note = insere(t.note, te, (x) => x.note, true)
       } else if (body.kind === 'expedition') {
         const tableaux = num(body.tableaux)
         if (tableaux === null) {

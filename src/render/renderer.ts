@@ -153,6 +153,11 @@ uniform sampler2D uTexGrille;
 uniform sampler2D uTexPhobe;
 uniform sampler2D uTexPhile;
 uniform sampler2D uTexIris;
+// atlas des habillages de parois : 8 tuiles de 1024 px en grille 4×2
+// (caissons, conduites, poutrelle, blindage, aération, hublot, écrans,
+// câbles — les assets du joueur) ; le procédural reste le secours
+uniform sampler2D uTexParoi;
+uniform float uHasParoi;
 uniform float uHasStars;
 uniform float uHasStarsFar;
 uniform float uHasTank;
@@ -632,7 +637,17 @@ void main() {
         // repère LOCAL de la boîte (wb) : ils pivotent avec elle.
         float skin = uBoxAux[bi].z;
         edgeCol = vec3(0.30, 0.38, 0.46);
-        if (skin > 3.5) {
+        if (skin > 0.5 && uHasParoi > 0.5) {
+          // habillage TEXTURÉ : tuile (skin-1) de l'atlas, répétée dans le
+          // repère local — les motifs pivotent avec la boîte. Les tuiles
+          // étant elles-mêmes sans couture, le léger saignement de mip aux
+          // bords se fond dans le motif.
+          float si = skin - 1.0;
+          vec2 tuile = vec2(mod(si, 4.0), floor(si / 4.0 + 0.001));
+          vec2 uvp = (tuile + fract(wb / 420.0)) * vec2(0.25, 0.5);
+          fillCol = texture(uTexParoi, uvp).rgb * 0.92;
+          edgeCol = vec3(0.32, 0.40, 0.48);
+        } else if (skin > 3.5) {
           // BLINDAGE : plaque lourde mate, chevrons d'avertissement au bord
           float pl = 0.9 + 0.2 * dnoise(wb * 0.05);
           fillCol = vec3(0.13, 0.15, 0.19) * pl;
@@ -1141,6 +1156,7 @@ export class Renderer {
   private texWall: WebGLTexture | null = null
   private texWallA: WebGLTexture | null = null
   private texFroid: WebGLTexture | null = null
+  private texParoi: WebGLTexture | null = null
   private texChaud: WebGLTexture | null = null
   private texGrille: WebGLTexture | null = null
   private texPhobe: WebGLTexture | null = null
@@ -1263,6 +1279,8 @@ export class Renderer {
     this.loadTexture('/assets/wall.webp', true, true, (t) => (this.texWall = t))
     this.loadTexture('/assets/wall-a.webp', true, true, (t) => (this.texWallA = t))
     this.loadTexture('/assets/froid.webp', true, true, (t) => (this.texFroid = t))
+    // atlas des habillages de parois (8 tuiles de 1024 en grille 4×2)
+    this.loadTexture('/assets/paroi-atlas.webp', true, true, (t) => (this.texParoi = t))
     this.loadTexture('/assets/chaud.webp', true, true, (t) => (this.texChaud = t))
     this.loadTexture('/assets/grille.webp', true, true, (t) => (this.texGrille = t))
     this.loadTexture('/assets/phobe.webp', true, true, (t) => (this.texPhobe = t))
@@ -1506,6 +1524,7 @@ export class Renderer {
     bindTex(3, this.texPhobe, 'uTexPhobe', 'uHasPhobe')
     bindTex(4, this.texPhile, 'uTexPhile', 'uHasPhile')
     bindTex(5, this.texIris, 'uTexIris', 'uHasIris')
+    bindTex(15, this.texParoi, 'uTexParoi', 'uHasParoi')
     gl.uniform1f(cu['uHasHull'], this.texHull ? 1 : 0)
     gl.activeTexture(gl.TEXTURE0)
     gl.drawArrays(gl.TRIANGLES, 0, 3)

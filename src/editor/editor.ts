@@ -1821,7 +1821,7 @@ export class LevelEditor {
       }
       if (b.material === MAT_WALL) {
         // habillage : pur décor, la physique reste celle d'une paroi neutre
-        const skins = ['Standard', 'Caissons', 'Conduites', 'Poutrelle', 'Blindage']
+        const skins = ['Standard', 'Caissons', 'Conduites', 'Poutrelle', 'Blindage', 'Aération', 'Hublots', 'Écrans', 'Câbles']
         rows.push(
           `<label class="ed-f"><span>Habillage (décor)</span><select id="p-skin">` +
             skins
@@ -1971,7 +1971,7 @@ export class LevelEditor {
       }
       // habillage d'une paroi neutre : 0 (standard) efface la clé
       if (b.material === MAT_WALL) {
-        const skin = Math.max(0, Math.min(4, Math.round(val('p-skin'))))
+        const skin = Math.max(0, Math.min(8, Math.round(val('p-skin'))))
         if (skin > 0) b.skin = skin
         else delete b.skin
       } else {
