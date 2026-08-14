@@ -79,7 +79,7 @@ function readBox(o: Record<string, unknown>): ObstacleBox | null {
     maxY: Math.max(minY, maxY),
     ...(angle ? { angle: Math.max(-180, Math.min(180, angle)) } : {}),
     ...(aura !== 1 && material === MAT_CHAUD ? { aura: Math.max(0.25, Math.min(4, aura)) } : {}),
-    ...(skin > 0 && material === MAT_WALL ? { skin: Math.min(4, skin) } : {}),
+    ...(skin > 0 && material === MAT_WALL ? { skin: Math.min(8, skin) } : {}),
     material,
   }
   if (box.maxX - box.minX < 1 || box.maxY - box.minY < 1) return null

@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 01:25',
+    title: 'Les habillages de parois passent aux ASSETS du joueur — 8 textures',
+    notes: [
+      'Les huit habillages générés par le joueur (caissons, conduites, poutrelle, blindage, aération, hublots condamnés, écrans morts, câblage) remplacent les motifs procéduraux — qui restent le secours si l’image ne charge pas. Physique de paroi neutre inchangée, motifs répétés dans le repère local (ils pivotent avec les obliques).',
+      'Un seul ATLAS 4096×2048 (8 tuiles de 1024) : le shader de composition utilisait déjà 15 des 16 unités de texture garanties par WebGL2 — l’atlas n’en prend qu’une pour les huit. La texture de la PLAQUE FROIDE est aussi remplacée par la version du joueur (panneau cryogénique à ailettes givrées).',
+      'Le sélecteur « Habillage (décor) » de l’éditeur propose les 9 choix (Standard + 8).',
+    ],
+  },
+  {
     date: '15/08/2026 00:45',
     title: 'Grandes cartes, habillages de parois, SALLE X/N — et plus aucun popup',
     notes: [
