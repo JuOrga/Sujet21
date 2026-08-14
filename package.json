@@ -3,7 +3,9 @@
   "private": true,
   "description": "Prototype « Tension de surface » — le jeu s'ouvre sans build (index.html) ; Playwright ne sert qu'au test de fumée.",
   "scripts": {
-    "test": "node test/smoke.js"
+    "test": "node test/smoke.js",
+    "test:parity": "node test/parity.js",
+    "build:wasm": "sh wasm/build.sh"
   },
   "devDependencies": {
     "playwright": "^1.62.1"

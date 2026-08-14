@@ -62,6 +62,27 @@ npx serve .        # ou : python3 -m http.server
 - **Registres du labo** (§10) : chaque tentative achevée est consignée
   (dispersion ou sas franchi, durée, volume restant), avec persistance locale.
 
+## Solveur WebAssembly
+
+Le cœur du volume — le solveur PBF (voisinage, contrainte de densité,
+corrections, viscosité XSPH) — est porté en C ([`wasm/fluid.c`](wasm/fluid.c))
+et compilé en WebAssembly : **~15× plus rapide** que la version JavaScript,
+ce qui laisse la marge pour des corps bien plus gros. La logique de jeu
+(éjection, amas joueur, éponge, chaleur) reste en JavaScript et lit/écrit
+directement les tableaux du module (mémoire partagée, zéro copie).
+
+- Le module compilé est **embarqué en base64** dans `js/fluid.wasm.js`
+  (committé) : le jeu continue de s'ouvrir sans serveur, sans réseau et
+  sans outillage — rien ne change pour jouer.
+- La version JavaScript d'origine est conservée dans `js/fluid.js` comme
+  référence et **repli automatique** si WebAssembly est indisponible.
+  `Fluid.backend` dit lequel tourne.
+- Recompiler (nécessite clang avec la cible wasm32, et node) :
+  `npm run build:wasm`.
+- Parité des deux implémentations : `npm run test:parity` (Node seul) —
+  spawn et premier pas identiques, trajectoires superposées au repos et
+  en dérive poussée, gel hors solveur.
+
 ## Registres du labo et record
 
 Fidèle au §10 du doc — « la progression se lit dans les registres » — chaque
@@ -82,3 +103,7 @@ Un test de fumée automatisé (Playwright, `npm test`) vérifie : absence
 d'erreur JS, stabilité du corps au repos, coût et efficacité de la poussée,
 dérive inertielle, gel et dégel du corps, éjection vapeur (perte définitive),
 et les registres du labo (consignation, choix du record, départage).
+
+Un test de parité (`npm run test:parity`, Node seul, sans navigateur)
+compare pas à pas le solveur WebAssembly à la version JavaScript de
+référence sur les mêmes entrées.

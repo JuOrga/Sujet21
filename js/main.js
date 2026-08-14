@@ -466,6 +466,7 @@
         cx: centroidX, cy: centroidY,
         state, simTime,
         meanTemp, frozen, steam: steam.length,
+        backend: Fluid.backend,
       };
     },
     setTimeScale(v) { timeScale = v; },
@@ -474,6 +475,10 @@
     },
   };
 
-  reset();
-  requestAnimationFrame(frame);
+  // On attend que le solveur ait choisi son implémentation (WASM ou repli
+  // JS) avant le premier spawn : le choix est ainsi fait une fois pour toutes.
+  Fluid.ready.then(() => {
+    reset();
+    requestAnimationFrame(frame);
+  });
 })();
