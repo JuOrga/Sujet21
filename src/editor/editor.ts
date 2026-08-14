@@ -33,7 +33,7 @@ import {
 } from '../game/level'
 import { checkLevel, parseLevel, serializeLevel } from '../game/levelIO'
 import { traceLaser } from '../game/laser'
-import { DEFAULT_PARAMS } from '../sim/params'
+import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
 import { PISTES, PISTE_NOMS, type Piste } from '../game/soundtrack'
 import {
   deleteLevel,
@@ -110,6 +110,10 @@ export interface EditorHooks {
   operator(): string
   /** La bibliothèque a changé : le jeu recharge sa séquence. */
   libraryChanged(levels: StoredLevel[]): void
+  /** Les paramètres VIFS du banc de réglage — pas les défauts figés. Les
+   * portées dessinées (aspiration du sas, auras, rails) suivent ainsi la
+   * valeur renseignée, en direct. Absent : les défauts font l'affaire. */
+  params?(): SimParams
 }
 
 /** Distance d'un point au segment [a, b] — pour attraper un rail au clic. */
@@ -2160,7 +2164,7 @@ export class LevelEditor {
     // La plaque froide montre AUSSI sa portée à froid complet (pointillé
     // long) : le refroidissement du vaisseau étend son emprise en cours de
     // partie. Le radiateur, lui, rétrécit à froid (pointillé court).
-    const P = DEFAULT_PARAMS
+    const P = this.hooks.params?.() ?? DEFAULT_PARAMS
     for (const box of this.level.boxes) {
       let band = 0
       let colA = ''
@@ -2266,12 +2270,12 @@ export class LevelEditor {
       g.setLineDash([6, 5])
       g.lineWidth = 1
       g.beginPath()
-      g.arc(m.sx, m.sy, DEFAULT_PARAMS.exitRadius * this.zoom, 0, Math.PI * 2)
+      g.arc(m.sx, m.sy, P.exitRadius * this.zoom, 0, Math.PI * 2)
       g.stroke()
       g.setLineDash([])
       g.fillStyle = 'rgba(53,224,164,0.55)'
       g.font = '600 9px ui-monospace, monospace'
-      g.fillText('ASPIRATION', m.sx - 28, m.sy - DEFAULT_PARAMS.exitRadius * this.zoom - 4)
+      g.fillText('ASPIRATION', m.sx - 28, m.sy - P.exitRadius * this.zoom - 4)
     }
 
     // décals (tuyaux, vannes) : du décor pur, dessiné comme dans la cuve —
@@ -2331,7 +2335,7 @@ export class LevelEditor {
         }
       }
       g.strokeStyle = 'rgba(150,120,255,0.09)'
-      g.lineWidth = Math.max(2, DEFAULT_PARAMS.plasmaRailRadius * 2 * this.zoom)
+      g.lineWidth = Math.max(2, P.plasmaRailRadius * 2 * this.zoom)
       g.lineJoin = 'round'
       g.lineCap = 'round'
       chemin()

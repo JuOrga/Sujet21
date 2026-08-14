@@ -887,6 +887,8 @@ startBisBtn.addEventListener('click', () =>
 // d'un geste, à tout instant — y compris depuis l'écran de fin d'essai.
 let fromEditor = false
 const editor = new LevelEditor(el('editor'), {
+  // les portées dessinées (aspiration du sas, auras, rails) suivent le banc
+  params: () => params,
   play: (lvl) => {
     testLevel = lvl
     fromEditor = true
