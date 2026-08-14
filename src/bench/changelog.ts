@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '14/08/2026 22:41',
+    title: 'Anti-domino : un accroc système ne se paie plus qu’une fois',
+    notes: [
+      'Les deux rapports v3 du Pixel ont tranché. L’écran tournait à 60 Hz (pic net à 17 ms sur 5 118 rappels) : la grille adaptative est innocentée. Et la bande 20-33 ms a livré son coupable : 966 images, POSTE DOMINANT = LA PHYSIQUE dans 57 % des cas (12 ms au lieu de 6,7 en moyenne).',
+      'Le mécanisme, un effet domino : une image accroche 25 ms (compositeur, système — hors de notre contrôle) → la boucle RATTRAPAIT le temps perdu en exécutant 3 pas de simulation au lieu de 2 (~13 ms de physique) → cette image-là ratait AUSSI le rendez-vous des 16,7 ms. Chaque accroc se payait deux ou trois fois.',
+      'Correctif : le plafond de pas par image est désormais le RÉGIME DE CROISIÈRE de la cadence réelle (fps lissé, borné par le verrou de fréquence) — après un accroc, on abandonne ~8 ms de temps simulé (invisible) au lieu de fabriquer une deuxième image lente. Le time warp garde tous ses pas (plafond ×6 à ×6), et une machine durablement sous la cadence garde son vrai régime : pas de ralenti permanent.',
+      'Le test de contrôle attendu sur le Pixel : la bande 20-33 ms doit fondre de moitié environ (la part « physique » disparaît, la part « hors CPU » — les accrocs eux-mêmes — reste). Quatre tests neufs sur le contrat de la boucle.',
+    ],
+  },
+  {
     date: '14/08/2026 21:40',
     title: 'Rapport v3 : qui casse le « 60 constant » — bandes, cadence, Hz réel de l’écran',
     notes: [

@@ -20,17 +20,26 @@ export class FixedLoop {
   // de pas, donc coûte plus cher, donc prend plus de retard — et la machine
   // s'installe à 15-20 fps alors qu'elle en vaut 60. Avec lui, le jeu passe
   // en léger ralenti le temps que la machine respire, puis rattrape.
+  // maxSteps peut resserrer le plafond POUR CETTE IMAGE : le régime de
+  // croisière de la cadence visée, sans rafale de rattrapage. Mesuré sur
+  // Pixel 8 Pro (rapport v3) : après une image accrochée à 25 ms, le
+  // rattrapage exécutait 3 pas au lieu de 2 (~13 ms de physique) — l'image
+  // suivante ratait donc AUSSI son rendez-vous. Chaque accroc système se
+  // payait deux ou trois fois. Mieux vaut perdre 8 ms de temps simulé
+  // (invisible) qu'une image de plus.
   advance(
     frameDtReal: number,
     timeWarp: number,
     dtFixed: number,
     stepFn: () => void,
     budgetMs = Infinity,
+    maxSteps = this.maxStepsPerFrame,
   ): number {
     this.accumulator += frameDtReal * timeWarp
     let steps = 0
+    const plafond = Math.min(maxSteps, this.maxStepsPerFrame)
     const t0 = performance.now()
-    while (this.accumulator >= dtFixed && steps < this.maxStepsPerFrame) {
+    while (this.accumulator >= dtFixed && steps < plafond) {
       stepFn()
       this.accumulator -= dtFixed
       steps++

@@ -2116,6 +2116,23 @@ function frame(now: number): void {
     const warpNow = dashAiming ? params.timeWarp * params.gasAimSlow : params.timeWarp
     const boost = Math.max(1, warpNow)
     const stepBudget = Math.min(12 * boost, Math.max(5, dtReal * 1000 * 0.6 * boost))
+    // Anti-domino (rapport v3 du Pixel) : après une image accrochée à 25 ms,
+    // le rattrapage exécutait un pas DE PLUS (3 au lieu de 2, ~13 ms de
+    // physique) — et l'image suivante ratait aussi son rendez-vous. Le
+    // plafond de pas est celui du RÉGIME DE CROISIÈRE : la cadence réelle
+    // LISSÉE (pas la dernière image, sinon l'accroc rouvre la rafale),
+    // bornée par le verrou de fréquence. Le retard d'un accroc est abandonné
+    // (~8 ms de temps simulé, invisible) au lieu de coûter une image lente.
+    // Une machine durablement sous la cadence garde son vrai régime (le fps
+    // lissé le reflète) : elle ne tombe pas en ralenti permanent.
+    const periodeCroisiere = Math.min(
+      50,
+      Math.max(1000 / fpsCap, fpsSmoothed > 1 ? 1000 / fpsSmoothed : 1000 / 60),
+    )
+    const plafondPas = Math.max(
+      1,
+      Math.ceil(((periodeCroisiere / 1000) * warpNow) / params.dt - 0.05),
+    )
     const physT0 = performance.now()
     stepsFaits = loop.advance(
       dtReal,
@@ -2143,6 +2160,7 @@ function frame(now: number): void {
         run.runTime += params.dt // le vaisseau refroidit au fil de l'expédition
       },
       stepBudget,
+      plafondPas,
     )
     physRaw = performance.now() - physT0
     monitor.physMs += (physRaw - monitor.physMs) * 0.08
