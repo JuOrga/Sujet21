@@ -16,9 +16,27 @@ export interface SharedExpeditionRecord {
   name: string
 }
 
+// Palmarès (écran RECORDS) : top 10 par tableau et par catégorie. La NOTE
+// combine volume et temps — cL × 60 / (60 + s) : le volume domine, le
+// temps module, imbattable en bâclant l'un des deux.
+export interface TopEntry {
+  liters: number
+  time: number
+  name: string
+  note: number
+  quand: string
+}
+
+export interface TableauTops {
+  volume: TopEntry[]
+  chrono: TopEntry[]
+  note: TopEntry[]
+}
+
 export interface SharedBoard {
   tableaux: Record<string, SharedTableauRecord>
   expedition: SharedExpeditionRecord | null
+  tops?: Record<string, TableauTops>
 }
 
 const ENDPOINT = '/api/records'
@@ -29,7 +47,7 @@ export async function fetchSharedBoard(): Promise<SharedBoard | null> {
     if (!r.ok) return null
     const data = (await r.json()) as SharedBoard
     if (typeof data !== 'object' || data === null || typeof data.tableaux !== 'object') return null
-    return { tableaux: data.tableaux ?? {}, expedition: data.expedition ?? null }
+    return { tableaux: data.tableaux ?? {}, expedition: data.expedition ?? null, tops: data.tops ?? {} }
   } catch {
     return null
   }

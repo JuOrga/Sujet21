@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 01:55',
+    title: 'L’écran RECORDS : trois podiums par salle, et la NOTE qui fait rejouer',
+    notes: [
+      'Nouveau bouton 🏆 RECORDS sur la fiche d’essai : le palmarès partagé de tous les opérateurs, salle par salle — trois podiums côte à côte : NOTE, VOLUME, CHRONO (top 5, médailles ①②③).',
+      'La NOTE est le nouveau record combiné : centilitres sauvés × 60 / (60 + secondes). Arriver GROS compte d’abord, arriver VITE amplifie — foncer en se vidant donne une petite note, tout garder en traînant aussi : c’est la ligne de crête entre les deux qui fait les grandes notes. Calculée serveur et client, même formule.',
+      'Votre ligne est SURLIGNÉE, et sous chaque podium où vous figurez, l’aiguillon : « à 12 cL du rang 2 » — l’écart exact au rang au-dessus, la raison de relancer. Une salle sans collecte s’affiche « le palmarès est à prendre ».',
+      'Le serveur conserve désormais un TOP 10 par salle et par catégorie (une entrée par opérateur — le palmarès respire au lieu d’être monopolisé), alimenté à CHAQUE collecte, pas seulement aux records battus.',
+    ],
+  },
+  {
     date: '15/08/2026 01:25',
     title: 'Les habillages de parois passent aux ASSETS du joueur — 8 textures',
     notes: [
