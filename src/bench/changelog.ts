@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '14/08/2026 23:00',
+    title: 'Moteur physique WASM — avec retour arrière instantané',
+    notes: [
+      'Le cœur du solveur tourne désormais en noyaux compilés (WebAssembly) : grille spatiale, collecte de voisins, itérations de densité et viscosité XSPH — les chemins chauds du pas. Portage LIGNE À LIGNE (mêmes formules, même ordre d’opérations, arithmétique f64 sur tableaux f32 comme le JS) : le test de parité fait tourner les deux moteurs côte à côte 120 pas — mêmes trajectoires, gel et dégel compris. Glace, gaz, matériaux et obstacles restent en JavaScript, sur les mêmes tableaux.',
+      'RETOUR ARRIÈRE demandé et livré : section MOTEUR PHYSIQUE au voile PARAMÈTRES — WASM (défaut) ou JAVASCRIPT, bascule À CHAUD même en pleine partie (le pas suivant change de moteur). Si le module ne charge pas, le jeu reste en JS sans bruit. Choix mémorisé, et le rapport de performance consigne le moteur actif (config.moteur) : les comparaisons se font sur des chiffres.',
+      'Au banc (Node, 900 particules) les deux moteurs sont au coude à coude — le JIT de bureau est déjà quasi natif sur ces boucles. Le verdict qui compte est celui du TÉLÉPHONE : les JIT mobiles sont moins constants (paliers, désoptimisations, GC) là où le WASM garde un rythme fixe. Deux rapports du Pixel, un par moteur, trancheront — c’est exactement ce que l’interrupteur permet.',
+      'Chaîne de compilation : AssemblyScript (pnpm asbuild → public/noyaux.wasm, 10,5 Ko, committé — le déploiement n’a pas besoin du compilateur). 175 tests, dont 3 de parité JS/WASM.',
+    ],
+  },
+  {
     date: '14/08/2026 22:41',
     title: 'Anti-domino : un accroc système ne se paie plus qu’une fois',
     notes: [

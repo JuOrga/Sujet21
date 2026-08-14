@@ -3,6 +3,7 @@ import '@fontsource/ibm-plex-mono/400.css'
 import '@fontsource/ibm-plex-mono/600.css'
 import { DEFAULT_PARAMS, type SimParams } from './sim/params'
 import { FluidSim, KIND_PLAYER } from './sim/solver'
+import { NoyauxWasm } from './sim/wasm'
 import { Camera } from './render/camera'
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { FixedLoop } from './game/loop'
@@ -129,8 +130,20 @@ function fmtDuree(s: number): string {
   return `${mn}:${String(sec).padStart(2, '0')}`
 }
 
+// ---- Moteur physique : les noyaux WASM (public/noyaux.wasm), chargés en
+// arrière-plan. Choix mémorisé (sujet21-moteur) : WASM par défaut quand le
+// module charge, JAVASCRIPT sinon ou sur demande — le retour arrière est
+// instantané, même en pleine partie (le solveur bascule au pas suivant).
+let noyauxWasm: NoyauxWasm | null = null
+let moteurChoisi = localStorage.getItem('sujet21-moteur') ?? 'wasm'
+function appliqueMoteur(s: FluidSim): void {
+  s.noyauxWasm = noyauxWasm
+  s.moteurWasm = noyauxWasm !== null && moteurChoisi === 'wasm'
+}
+
 function createSim(level: LevelDef): FluidSim {
   const sim = new FluidSim(params, level.bounds, CAPACITY)
+  appliqueMoteur(sim)
   // les dashs se rendent à CHAQUE transformation en vapeur : le tableau peut
   // fixer son propre nombre, sinon celui du banc — et on part à sec, la
   // première bascule remplira le compteur
@@ -532,6 +545,9 @@ let fpsCapPrecedent = 0 // horloge du limiteur (dernière image RENDUE)
 // borderline, la qualité qui descendait « pour tenir 60 » se voyait plus
 // que les images perdues. Qui veut l'adaptatif (mobile) l'active au voile.
 let resDynamique = localStorage.getItem('sujet21-res-dyn') === '1'
+// rendu de la section MOTEUR PHYSIQUE — paresseux : `sim` n'existe pas
+// encore quand le voile se câble, il se dessine à l'ouverture
+let majMoteurUI: () => void = () => {}
 // Graphismes du décor : RICHE par défaut (bruit procédural complet), SOBRE
 // pour débrancher le décoratif dans le shader de composition — mêmes formes,
 // mêmes auras, moins de calcul par pixel. C'est l'instrument du test A/B :
@@ -608,6 +624,37 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
   }
   renderDecor()
 
+  const choixMoteur = document.getElementById('params-moteur') as HTMLDivElement
+  const etatMoteur = document.getElementById('params-moteur-etat') as HTMLDivElement
+  const renderMoteur = (): void => {
+    choixMoteur.innerHTML = ''
+    for (const [mode, label] of [
+      ['wasm', 'WASM'],
+      ['js', 'JAVASCRIPT'],
+    ] as const) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = label
+      const actif = mode === 'wasm' ? sim.moteurWasm : !sim.moteurWasm
+      b.className = actif ? 'actif' : ''
+      if (mode === 'wasm' && noyauxWasm === null) b.disabled = true
+      b.addEventListener('click', () => {
+        moteurChoisi = mode
+        localStorage.setItem('sujet21-moteur', mode)
+        appliqueMoteur(sim)
+        renderMoteur()
+      })
+      choixMoteur.appendChild(b)
+    }
+    etatMoteur.textContent =
+      noyauxWasm === null
+        ? 'Module WASM en cours de chargement — JavaScript en attendant.'
+        : sim.moteurWasm
+          ? 'Noyaux compilés actifs (grille, voisins, densité, viscosité).'
+          : 'Moteur JavaScript historique actif.'
+  }
+  majMoteurUI = renderMoteur
+
   const choixEau = document.getElementById('params-eau') as HTMLDivElement
   const renderEau = (): void => {
     choixEau.innerHTML = ''
@@ -654,6 +701,7 @@ function rapportPerf(): Record<string, unknown> {
       resolutionDynamique: resDynamique,
       graphismes: decorRiche ? 'riches' : 'sobres',
       liquide: eauRiche ? 'riche' : 'sobre',
+      moteur: sim.moteurWasm ? 'wasm' : noyauxWasm ? 'javascript' : 'javascript (wasm non chargé)',
       palierQualite: qualityLevel,
       timeWarp: params.timeWarp,
       downsampleChamp: params.renderDownsample,
@@ -708,6 +756,7 @@ document.getElementById('perf-envoyer')?.addEventListener('click', () => {
 document.getElementById('home-params')?.addEventListener('click', () => {
   paramsEl.hidden = false
   majPerfVifForce() // l'aperçu s'affiche tout de suite, pas 30 images plus tard
+  majMoteurUI() // la section moteur reflète l'état réel (module chargé ou non)
 })
 document.getElementById('params-fermer')?.addEventListener('click', () => {
   paramsEl.hidden = true
@@ -951,6 +1000,23 @@ const camera = new Camera()
 }
 
 camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, 1)
+
+// Chargement des noyaux WASM, en arrière-plan : le jeu démarre sur le
+// moteur JS et bascule dès que le module est prêt (sauf choix contraire au
+// voile PARAMÈTRES). Échec de chargement = on reste en JS, sans bruit.
+fetch('/noyaux.wasm')
+  .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+  .then((buf) => NoyauxWasm.charge(buf))
+  .then((n) => {
+    noyauxWasm = n
+    appliqueMoteur(sim)
+    majMoteurUI()
+  })
+  .catch(() => {
+    noyauxWasm = null
+    majMoteurUI()
+  })
+
 const renderer = new Renderer(canvas, CAPACITY)
 const loop = new FixedLoop()
 const input = new Input()

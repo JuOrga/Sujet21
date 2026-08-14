@@ -2946,6 +2946,16 @@
             envoyez un rapport dans chaque mode.
           </div>
           <div id="params-eau" class="params-choix" role="group" aria-label="Graphismes du liquide"></div>
+          <div class="params-nom" style="margin-top: 16px">MOTEUR PHYSIQUE</div>
+          <div class="params-desc">
+            WASM (défaut) : le cœur de la simulation tourne en noyaux compilés —
+            mêmes trajectoires, vérifiées au test près. JAVASCRIPT : le moteur
+            historique, à tout moment, même en pleine partie — c'est le retour
+            arrière si quelque chose semble différent. Le rapport de performance
+            consigne le moteur actif.
+          </div>
+          <div id="params-moteur" class="params-choix" role="group" aria-label="Moteur physique"></div>
+          <div id="params-moteur-etat" class="params-desc" style="margin: 8px 0 0"></div>
           <div class="params-nom" style="margin-top: 16px">RAPPORT DE PERFORMANCE</div>
           <div class="params-desc">
             Le jeu mesure ses deux dernières minutes d'images : cadence (médiane,
