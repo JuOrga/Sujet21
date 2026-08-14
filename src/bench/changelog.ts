@@ -11,6 +11,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '14/08/2026 18:10',
+    title: 'La phase palet ne chauffe plus : un corps gelé coûte 2,6× moins que l’eau',
+    notes: [
+      'Optimisation mobile ciblée, guidée par les rapports du Pixel (« ça rame après plusieurs niveaux » = throttling thermique — moins calculer, c’est moins chauffer). Deux découvertes au profileur :',
+      'UN CORPS SANS LIQUIDE payait tout le solveur pour rien : les 3 itérations de densité, la collecte de voisins et le XSPH tournaient sur un palet rigide qui n’a ni pression ni viscosité. En PHASE PALET, ces passes se sautent — trajectoires strictement identiques (les corrections ne s’appliquaient déjà jamais au gel).',
+      'L’ÉTIQUETAGE DES AMAS de glace (quel bloc est d’un seul tenant) se refaisait à CHAQUE pas — c’était devenu LE poste dominant (~1,6 ms). Il est en cache : rafraîchi sur événement (gel, dégel, retrait de particule) et toutes les 6 pas par sécurité — le temps de constater la fusion de deux blocs qui se touchent. Un tableau d’étiquettes dédié évite tout conflit avec la détection du corps.',
+      'Mesuré à 900 particules : icePass 0,94 → 0,17 ms/pas (÷5,4), pas complet en phase glace ~2,0 → 0,76 ms (÷2,6). Les tableaux de glace — ceux du tryptique — sont ceux qui chauffaient : ils respirent d’autant.',
+    ],
+  },
+  {
     date: '14/08/2026 17:20',
     title: 'Rapport de performance v2 : le temps manquant a désormais un nom',
     notes: [
