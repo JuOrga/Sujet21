@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 00:35',
+    title: 'Tous les tableaux livrés entrent dans la bibliothèque — modifiables',
+    notes: [
+      'Demande du joueur : voir dans l’éditeur (et son ordre des tableaux) le premier tableau conservé, puis TOUS les tableaux construits — modifiables — puis le reste des essais du labo. La bibliothèque partagée reçoit donc une copie ÉDITABLE de chaque tableau livré : l’école (21-S1 à S3), l’expédition complète dans l’ordre choisi (21-A → 21-G), et le tableau 1 bis.',
+      'Mécanique : un semis par workflow GitHub (ops/seed-levels.mjs + gâchette seed-levels-go, sur le modèle de perf-sync — l’API n’est joignable que de là). Ré-exécutable sans danger : un code déjà présent dans la bibliothèque n’est JAMAIS resemé — la version du joueur prime, toujours.',
+      'Ordre final posé par le semis : le premier tableau du joueur reste premier, les livrés s’insèrent ensuite, les autres essais du labo ferment la marche. Tout se réordonne ensuite librement dans l’éditeur — et grâce au dédoublonnage par code de la séquence, chaque copie modifiée REMPLACE l’original livré dans l’expédition.',
+    ],
+  },
+  {
     date: '15/08/2026 00:27',
     title: 'La bibliothèque s’enchaîne à l’expédition — elle ne l’ampute plus',
     notes: [
