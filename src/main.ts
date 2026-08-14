@@ -34,6 +34,7 @@ import {
   type TraceResultat,
 } from './game/laser'
 import { BOUTON, Manette } from './game/manette'
+import { PerfCollector } from './game/perf'
 import { fetchLibrary } from './game/netLevels'
 import { AudioFx, loadAudioPrefs } from './game/audio'
 import { Soundtrack, type Bruitage, type Piste } from './game/soundtrack'
@@ -574,8 +575,71 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
   }
   renderRes()
 }
+
+// ---- Rapport de performance : mesurer la VRAIE machine, analyser à distance ----
+const perf = new PerfCollector()
+const perfVif = document.getElementById('perf-vif') as HTMLDivElement
+const perfEtat = document.getElementById('perf-etat') as HTMLDivElement
+let perfVifCompte = 0
+function majPerfVifForce(): void {
+  const r = perf.resume()
+  perfVif.textContent =
+    r.images < 30
+      ? 'Mesure en cours — jouez quelques secondes, le voile ouvert ou fermé.'
+      : `En direct : ${r.p50.toFixed(0)} im/s en médiane · plancher (p5) ${r.p95.toFixed(0)} im/s · fenêtre de ${r.images} images.`
+}
+function majPerfVif(): void {
+  if (paramsEl.hidden) return
+  if (++perfVifCompte % 30 !== 0) return // rafraîchi ~2 fois par seconde
+  majPerfVifForce()
+}
+function rapportPerf(): Record<string, unknown> {
+  return perf.rapport({
+    config: {
+      fpsCap,
+      resolutionDynamique: resDynamique,
+      palierQualite: qualityLevel,
+      timeWarp: params.timeWarp,
+      downsampleChamp: params.renderDownsample,
+    },
+    session: {
+      tableau: `${level.code} — ${level.name}`,
+      particules: sim.count,
+      volumeL: Math.round(sim.liters() * 100) / 100,
+    },
+  })
+}
+document.getElementById('perf-copier')?.addEventListener('click', () => {
+  const texte = JSON.stringify(rapportPerf(), null, 2)
+  navigator.clipboard
+    ?.writeText(texte)
+    .then(() => {
+      perfEtat.textContent = 'Rapport copié — collez-le dans la conversation d’analyse.'
+    })
+    .catch(() => {
+      perfEtat.textContent = 'Presse-papier refusé — le rapport est dans la console (F12).'
+      console.log(texte)
+    })
+})
+document.getElementById('perf-envoyer')?.addEventListener('click', () => {
+  perfEtat.textContent = 'Envoi…'
+  fetch('/api/perf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ auteur: records.operator() || 'anonyme', rapport: rapportPerf() }),
+  })
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+    .then(() => {
+      perfEtat.textContent = 'Envoyé au labo ✓ — signalez-le, l’analyse peut commencer.'
+    })
+    .catch(() => {
+      perfEtat.textContent = 'Envoi impossible (hors ligne ou serveur local) — utilisez COPIER.'
+    })
+})
+
 document.getElementById('home-params')?.addEventListener('click', () => {
   paramsEl.hidden = false
+  majPerfVifForce() // l'aperçu s'affiche tout de suite, pas 30 images plus tard
 })
 document.getElementById('params-fermer')?.addEventListener('click', () => {
   paramsEl.hidden = true
@@ -1797,6 +1861,9 @@ function frame(now: number): void {
   const vw = window.innerWidth
   const vh = window.innerHeight
   const dpr = Math.min(window.devicePixelRatio || 1, quality.dprCap)
+  // mesures brutes de CETTE image, pour le collecteur de performance
+  let physRaw = 0
+  let stepsFaits = 0
 
   // ---- Manette : elle écrit dans le même pointeur que le doigt ----
   manette.poll(performance.now() / 1000)
@@ -1975,7 +2042,7 @@ function frame(now: number): void {
     const boost = Math.max(1, warpNow)
     const stepBudget = Math.min(12 * boost, Math.max(5, dtReal * 1000 * 0.6 * boost))
     const physT0 = performance.now()
-    loop.advance(
+    stepsFaits = loop.advance(
       dtReal,
       warpNow,
       params.dt,
@@ -2002,7 +2069,8 @@ function frame(now: number): void {
       },
       stepBudget,
     )
-    monitor.physMs += (performance.now() - physT0 - monitor.physMs) * 0.08
+    physRaw = performance.now() - physT0
+    monitor.physMs += (physRaw - monitor.physMs) * 0.08
   }
 
   // ---- Lasers : traçage, cibles, portes ----
@@ -2274,7 +2342,11 @@ function frame(now: number): void {
     level.decals ?? [],
     level.zones ?? [],
   )
-  monitor.renderMs += (performance.now() - renderT0 - monitor.renderMs) * 0.08
+  const rendRaw = performance.now() - renderT0
+  monitor.renderMs += (rendRaw - monitor.renderMs) * 0.08
+  // le collecteur note CHAQUE image rendue — c'est la matière du rapport
+  perf.note(dtReal * 1000, physRaw, rendRaw, stepsFaits, sim.count, qualityLevel)
+  majPerfVif()
 
   const speed = Math.hypot(sim.stats.velX, sim.stats.velY)
   monitor.fps = fpsSmoothed
