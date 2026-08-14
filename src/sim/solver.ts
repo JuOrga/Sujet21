@@ -10,6 +10,7 @@
 //   quantité de mouvement est conservée exactement, l'éjection comprise (§3.3).
 
 import type { SimParams } from './params'
+import type { NoyauxWasm } from './wasm'
 import { SpatialGrid } from './grid'
 import { makeKernels, computeRestDensity, type Kernels } from './kernels'
 import { labelComponents } from './components'
@@ -210,6 +211,12 @@ export class FluidSim {
   private readonly pairDy: Float32Array
   private readonly pairW: Float32Array
   private readonly pairC: Float32Array
+  // Moteur WASM : les noyaux chauds compilés (grille interne, voisins,
+  // densité, XSPH) — branchés par main.ts quand public/noyaux.wasm charge.
+  // moteurWasm bascule à chaud (voile PARAMÈTRES) : à false, ou sans module,
+  // le pas s'exécute sur le moteur JavaScript historique, inchangé.
+  noyauxWasm: NoyauxWasm | null = null
+  moteurWasm = false
 
   constructor(params: SimParams, bounds: Bounds, capacity = 4096) {
     this.params = params
@@ -1227,9 +1234,23 @@ export class FluidSim {
     const pairC = this.pairC
     // Sans liquide NI gaz, personne ne lira les listes de voisins (la glace
     // passe par la grille directement dans icePass) : la collecte se saute.
-    if (!phasePalet || gazeux > 0) {
+    const besoinVoisins = !phasePalet || gazeux > 0
+    const reach = h * 1.15 // marge : les itérations déplacent un peu les particules
+    // Moteur WASM : grille interne, voisins, densité et XSPH partent dans
+    // les noyaux compilés (asm/noyaux.ts) — mêmes formules, même ordre
+    // d'opérations, vérifié par le test de parité. Le reste du pas (glace,
+    // gaz, matériaux, obstacles) continue en JS sur les mêmes tableaux.
+    const wasm = this.moteurWasm && besoinVoisins ? this.noyauxWasm : null
+    if (wasm) {
+      wasm.assure(this.capacity, grid.nx * grid.ny)
+      wasm.prdX.set(prdX.subarray(0, n))
+      wasm.prdY.set(prdY.subarray(0, n))
+      wasm.gas.set(this.gaseous.subarray(0, n))
+      wasm.fro.set(frozen.subarray(0, n))
+      wasm.buildGrid(n, grid.minX, grid.minY, grid.cellSize, grid.nx, grid.ny)
+      wasm.collectAll(n, reach, grid.minX, grid.minY, grid.cellSize, grid.nx, grid.ny)
+    } else if (besoinVoisins) {
       let cursor = 0
-      const reach = h * 1.15 // marge : les itérations déplacent un peu les particules
       for (let i = 0; i < n; i++) {
         nbStart[i] = cursor
         cursor = grid.collect(prdX, prdY, prdX[i], prdY[i], reach, i, nbList, cursor, MAX_NEIGHBORS)
@@ -1245,7 +1266,28 @@ export class FluidSim {
     // elle ne compte pas dans la densité du liquide et n'est pas corrigée —
     // un nuage n'appuie pas, et rien ne l'appuie.
     const gaseous = this.gaseous
-    for (let iter = 0; iter < (phasePalet ? 0 : p.solverIterations); iter++) {
+    if (wasm && !phasePalet) {
+      wasm.densityIterations(
+        n,
+        p.solverIterations,
+        h,
+        h2,
+        k.poly6Coeff,
+        k.spikyGradCoeff,
+        selfRho,
+        invRho0,
+        p.epsilonLambda,
+        p.sCorrK,
+        p.sCorrN,
+        sCorrNInt,
+        invWDq,
+        p.maxDeltaPFactor * h,
+      )
+      prdX.set(wasm.prdX.subarray(0, n))
+      prdY.set(wasm.prdY.subarray(0, n))
+      density.set(wasm.density.subarray(0, n))
+    }
+    for (let iter = 0; iter < (phasePalet || wasm ? 0 : p.solverIterations); iter++) {
       for (let i = 0; i < n; i++) {
         if (gaseous[i] === 1) {
           density[i] = selfRho
@@ -1408,7 +1450,18 @@ export class FluidSim {
     // bandes d'influence (§6)
     this.applyMaterialVelocities(dt)
 
-    if (p.xsphC > 0 && !phasePalet) {
+    if (p.xsphC > 0 && !phasePalet && wasm) {
+      // les obstacles et les bords ont bougé prd, les matériaux ont changé
+      // vel : on recopie l'état courant avant le noyau (comme le JS qui lit
+      // les tableaux à jour), et on relit les vitesses lissées
+      wasm.prdX.set(prdX.subarray(0, n))
+      wasm.prdY.set(prdY.subarray(0, n))
+      wasm.velX.set(velX.subarray(0, n))
+      wasm.velY.set(velY.subarray(0, n))
+      wasm.xsph(n, h2, k.poly6Coeff, p.xsphC, invRho0)
+      velX.set(wasm.velX.subarray(0, n))
+      velY.set(wasm.velY.subarray(0, n))
+    } else if (p.xsphC > 0 && !phasePalet) {
       for (let i = 0; i < n; i++) {
         if (frozen[i] === 1 || gaseous[i] === 1) {
           dvX[i] = 0
