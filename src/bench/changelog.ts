@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '14/08/2026 11:20',
+    title: 'La résolution dynamique devient un choix',
+    notes: [
+      'Sur un PC à la limite du 60, la qualité adaptative recalée hier sacrifiait la résolution pour tenir la cadence — et la baisse de finesse se voyait plus que les images perdues. Le voile PARAMÈTRES gagne son deuxième réglage : RÉSOLUTION DYNAMIQUE, activée ou désactivée.',
+      'ACTIVÉE (défaut, recommandé sur mobile) : la résolution baisse quand la machine ne tient pas la cadence et remonte dès qu’elle respire — le comportement d’hier. DÉSACTIVÉE : rendu en résolution NATIVE, constante — à la machine d’encaisser, aucune surprise visuelle.',
+      'Application immédiate (retour à la pleine résolution dès le clic), choix mémorisé sur l’appareil. La physique n’est jamais dégradée, dans les deux cas.',
+    ],
+  },
+  {
     date: '14/08/2026 10:45',
     title: 'La carte dans la main : pincement ancré, élan, et le temps lisible partout',
     notes: [

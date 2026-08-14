@@ -527,6 +527,11 @@ let fpsCap = ((): number => {
   return FPS_CHOIX.includes(v) ? v : 60
 })()
 let fpsCapPrecedent = 0 // horloge du limiteur (dernière image RENDUE)
+// Résolution dynamique : activée par défaut (le mobile en a besoin) ;
+// désactivée, le rendu reste en résolution NATIVE constante — sur un PC
+// borderline, la qualité qui descend « pour tenir 60 » se voyait plus que
+// les images perdues.
+let resDynamique = localStorage.getItem('sujet21-res-dyn') !== '0'
 const paramsEl = document.getElementById('params') as HTMLDivElement
 {
   const choix = document.getElementById('params-fps') as HTMLDivElement
@@ -547,6 +552,28 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     }
   }
   renderFps()
+
+  const choixRes = document.getElementById('params-resdyn') as HTMLDivElement
+  const renderRes = (): void => {
+    choixRes.innerHTML = ''
+    for (const [actif, label] of [
+      [true, 'ACTIVÉE'],
+      [false, 'DÉSACTIVÉE'],
+    ] as const) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = label
+      b.className = resDynamique === actif ? 'actif' : ''
+      b.addEventListener('click', () => {
+        resDynamique = actif
+        localStorage.setItem('sujet21-res-dyn', actif ? '1' : '0')
+        if (!actif) qualityLevel = 0 // retour immédiat à la résolution native
+        renderRes()
+      })
+      choixRes.appendChild(b)
+    }
+  }
+  renderRes()
 }
 document.getElementById('home-params')?.addEventListener('click', () => {
   paramsEl.hidden = false
@@ -1717,6 +1744,12 @@ let qualityLevel = window.matchMedia('(pointer: coarse)').matches ? 1 : 0
 let qualitySous = 0 // s passées sous l'objectif
 let qualitySur = 0 // s passées avec de la marge
 function updateQuality(dtReal: number): void {
+  // Résolution dynamique coupée (voile PARAMÈTRES) : résolution native,
+  // constante — aucun palier ne s'applique, à la machine d'encaisser.
+  if (!resDynamique) {
+    qualityLevel = 0
+    return
+  }
   // La qualité vise la cadence VERROUILLÉE (bornée à 60 : le rendu est
   // taillé pour 60 — au-delà, l'écran rapide profite du surplus sans que
   // la qualité ne se sacrifie pour courir après 120).
