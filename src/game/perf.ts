@@ -81,6 +81,18 @@ export class PerfCollector {
     return Math.min(this.total, CAP)
   }
 
+  /** Vide la fenêtre. Appelé à chaque changement de réglage (moteur,
+   * graphismes, verrou…) : un rapport ne mélange JAMAIS deux
+   * configurations — sans quoi les A/B envoyés coup sur coup se
+   * contaminent (constaté : deux rapports à 37 s d'écart, fenêtres
+   * quasi identiques, comparaison sans valeur). */
+  reset(): void {
+    this.total = 0
+    this.cursor = 0
+    this.ticks.clear()
+    this.ticksTotal = 0
+  }
+
   /** Les dt de la fenêtre, triés croissants (copie). */
   private dtTries(): Float32Array {
     const n = this.taille()
