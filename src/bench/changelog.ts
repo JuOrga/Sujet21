@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 19:45',
+    title: 'Éditeur : le brouillon rattrape la bibliothèque — fini le vieux triptyque',
+    notes: [
+      'Le bug signalé : l’éditeur s’ouvrait sur un VIEUX brouillon local du tableau (sans les derniers éléments), alors qu’un clic dans la séquence chargeait bien la dernière version. Cause : le brouillon vit sur l’appareil, la bibliothèque sur le serveur — et rien ne les confrontait (typique après une édition depuis un autre appareil).',
+      'Désormais l’éditeur retient À QUELLE entrée son brouillon est lié et ce qu’elle contenait à la dernière synchro. À chaque ouverture, trois cas : brouillon identique → rien ; brouillon SANS travail local et bibliothèque plus récente → il se met à jour TOUT SEUL (le cas du bug) ; brouillon avec du travail non enregistré → rien n’est écrasé, un avertissement propose de cliquer la séquence (charger la dernière version) ou d’ENREGISTRER (publier la vôtre).',
+      'Les vieux brouillons d’avant ce lien sont retrouvés par le CODE du tableau — au premier clic dans la séquence, le lien se noue et tout se synchronise ensuite tout seul.',
+    ],
+  },
+  {
     date: '15/08/2026 19:15',
     title: 'L’éveil se rejoue pour tout le monde (clé passée en v2)',
     notes: [
