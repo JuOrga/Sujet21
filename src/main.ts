@@ -1250,6 +1250,14 @@ window.setTimeout(appelOeil, 600)
 const homeRestartBtn = document.getElementById('home-restart') as HTMLButtonElement
 function closeHome(): void {
   if (requireName()) return // pas de plongée sans opérateur identifié
+  // Une expédition SAUVÉE attend et rien n'a encore été joué : le bouton
+  // principal EST la reprise (au début de sa salle) — aucune fausse
+  // manœuvre ne peut repartir de la salle 1 par réflexe.
+  const save = runSauvee()
+  if (!hasPlayed && save) {
+    reprendreRun(save)
+    return
+  }
   document.body.classList.add('playing')
   input.paused = false // la fiche figeait l'essai : il repart
   startBtn.textContent = "REPRENDRE L'ESSAI"
@@ -1271,8 +1279,114 @@ function openHome(): void {
   // cuve n'avance plus dans le dos du joueur.
   if (hasPlayed) input.paused = true
   homeRestartBtn.hidden = !hasPlayed
+  majBoutonsRun()
 }
 startBtn.addEventListener('click', closeHome)
+
+// ---- L'EXPÉDITION SE SOUVIENT : la progression (salle atteinte, réserve,
+// chrono) s'écrit au DÉBUT de chaque salle du parcours PRINCIPAL. On peut
+// retourner au menu, fermer le jeu, revenir — et reprendre au début de la
+// salle où on était. La RUN SECONDAIRE joue le même parcours (records
+// comptés) sans JAMAIS toucher à cette sauvegarde : l'expédition
+// principale reste à l'abri.
+const CLE_RUN = 'sujet21-run-v1'
+let runSecondaire = false
+interface RunSauvee {
+  index: number
+  liters: number
+  time: number
+}
+function runSauvee(): RunSauvee | null {
+  try {
+    const d = JSON.parse(localStorage.getItem(CLE_RUN) ?? 'null') as RunSauvee | null
+    if (!d || typeof d.index !== 'number' || d.index < 1) return null
+    return { index: Math.floor(d.index), liters: Number(d.liters) || 0, time: Number(d.time) || 0 }
+  } catch {
+    return null
+  }
+}
+function sauveRun(): void {
+  // seule l'expédition PRINCIPALE s'écrit — et seulement passée la salle 1
+  // (une partie à peine commencée n'a rien à sauver ; y revenir efface)
+  if (testLevel || runSecondaire) return
+  try {
+    if (levelIndex < 1) localStorage.removeItem(CLE_RUN)
+    else
+      localStorage.setItem(
+        CLE_RUN,
+        JSON.stringify({ index: levelIndex, liters: run.bonbonneLiters, time: run.runTime }),
+      )
+  } catch {
+    // stockage indisponible : la reprise attendra
+  }
+  majBoutonsRun()
+}
+function effaceRun(): void {
+  try {
+    localStorage.removeItem(CLE_RUN)
+  } catch {
+    // sans gravité
+  }
+  majBoutonsRun()
+}
+function reprendreRun(save: RunSauvee): void {
+  runSecondaire = false
+  testLevel = null
+  fromEditor = false
+  levelIndex = Math.min(save.index, playedLevels().length - 1)
+  run.bonbonneLiters = save.liters
+  run.runTime = save.time
+  hasPlayed = true
+  document.body.classList.add('playing')
+  input.paused = false
+  startBtn.textContent = "REPRENDRE L'ESSAI"
+  homeRestartBtn.hidden = false
+  restart()
+  lanceEveil()
+  majBoutonsRun()
+}
+function majBoutonsRun(): void {
+  const save = runSauvee()
+  const total = playedLevels().length
+  const btnSec = document.getElementById('start-secondaire') as HTMLButtonElement | null
+  const btnRep = document.getElementById('start-reprendre') as HTMLButtonElement | null
+  if (btnRep) {
+    // visible seulement DEPUIS une run secondaire : le chemin du retour
+    btnRep.hidden = !(save && runSecondaire)
+    if (save) btnRep.textContent = `REPRENDRE L'EXPÉDITION — SALLE ${save.index + 1}/${total}`
+  }
+  if (btnSec) btnSec.hidden = !save || runSecondaire
+  if (!hasPlayed && save) {
+    startBtn.textContent = `REPRENDRE L'EXPÉDITION — SALLE ${save.index + 1}/${total}`
+  }
+}
+document.getElementById('start-secondaire')?.addEventListener('click', () => {
+  if (requireName()) return
+  // une run À PART : même parcours, records comptés — la sauvegarde de
+  // l'expédition principale n'est jamais touchée
+  runSecondaire = true
+  testLevel = null
+  fromEditor = false
+  levelIndex = 0
+  run.bonbonneLiters = 0
+  run.runTime = 0
+  hasPlayed = true
+  document.body.classList.add('playing')
+  input.paused = false
+  startBtn.textContent = "REPRENDRE L'ESSAI"
+  homeRestartBtn.hidden = false
+  restart()
+  lanceEveil()
+  majBoutonsRun()
+})
+document.getElementById('start-reprendre')?.addEventListener('click', () => {
+  if (requireName()) return
+  const save = runSauvee()
+  if (save) reprendreRun(save)
+})
+// au chargement, la fiche est déjà à l'écran : les boutons disent tout de
+// suite s'il y a une expédition à reprendre
+majBoutonsRun()
 // Recommencer depuis la fiche : on referme, on relance le tableau courant
 homeRestartBtn.addEventListener('click', () => {
   if (requireName()) return
@@ -1533,6 +1647,8 @@ function clicMenuManette(): boolean {
 const FICHE_BOUTONS = [
   'start',
   'home-restart',
+  'start-reprendre',
+  'start-secondaire',
   'start-bis',
   'start-editor',
   'home-salles',
@@ -1990,6 +2106,8 @@ function restart(): void {
   input.gasIntent = false
   // un éveil en cours reprend du début : la cryostase ressaisit l'échantillon
   if (eveil.etape !== 'off') lanceEveil()
+  // chaque début de salle grave la progression de l'expédition principale
+  sauveRun()
   applyLevel()
   sim = createSim(level)
   exposeSim()
@@ -3087,6 +3205,8 @@ function frame(now: number): void {
         },
       )
       renderRegistres()
+      // l'expédition principale conclue n'a plus rien à reprendre
+      if (!testLevel && !runSecondaire) effaceRun()
       showOverlay(
         'EXPÉDITION ACHEVÉE',
         `<span class="bilan"><span class="bilan-l">${expeditionSummary(playedLevels().length)}${
@@ -3213,7 +3333,9 @@ function frame(now: number): void {
 
   // Instruments de bord
   const fraction = sim.baseVolume > 0 ? sim.playerCount / sim.baseVolume : 0
-  hudTableau.textContent = testLevel ? 'BIS' : `SALLE ${levelIndex + 1}/${playedLevels().length}`
+  hudTableau.textContent = testLevel
+    ? 'BIS'
+    : `${runSecondaire ? '2ᵉ RUN · ' : ''}SALLE ${levelIndex + 1}/${playedLevels().length}`
   // La coque refroidit : +21° au départ, −60° à froid complet — la pression
   // temporelle se lit ici (chiffre ET barre), jamais sur un chronomètre
   const coque = Math.round(21 - 81 * chillNow())

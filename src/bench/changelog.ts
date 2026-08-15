@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 21:45',
+    title: 'L’expédition se souvient : reprise à la salle en cours + RUN SECONDAIRE',
+    notes: [
+      'La progression de l’expédition PRINCIPALE (salle atteinte, réserve, chrono) s’écrit au début de chaque salle. On peut retourner au menu, FERMER le jeu, revenir : le bouton principal devient « REPRENDRE L’EXPÉDITION — SALLE X/N » et la reprend au début de sa salle — aucune fausse manœuvre ne peut repartir de la salle 1 par réflexe. Une expédition conclue (ou dispersée) libère la sauvegarde.',
+      'Et quand une expédition attend, un nouveau bouton propose une RUN SECONDAIRE : le même parcours, salle 1, records comptés — mais la sauvegarde de l’expédition principale n’est JAMAIS touchée. Le HUD l’affiche (« 2ᵉ RUN · SALLE X/N »), et depuis la fiche, « REPRENDRE L’EXPÉDITION » ramène à la principale à tout moment. Parfait pour chasser un record de salle sans risquer sa progression.',
+    ],
+  },
+  {
     date: '15/08/2026 21:15',
     title: 'Le FLUIDE SPÉCULAIRE : l’« eau » quitte le vocabulaire du jeu',
     notes: [
