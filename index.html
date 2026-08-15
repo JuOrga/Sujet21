@@ -1113,6 +1113,30 @@
         background: var(--glow);
         transform: translateY(-1px);
       }
+      /* Abandonner la run : le geste qui arrête tout et renvoie au labo.
+         Ton danger, en retrait — il ne rivalise pas avec REPRENDRE. */
+      #start-abandon {
+        font-family: var(--font-display);
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        padding: 11px 16px;
+        color: #e8927c;
+        background: rgba(232, 146, 124, 0.07);
+        border: 1px solid rgba(232, 146, 124, 0.4);
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background 0.2s ease, border-color 0.2s ease;
+      }
+      #start-abandon:hover {
+        background: rgba(232, 146, 124, 0.16);
+        border-color: #e8927c;
+      }
+      #start-abandon.arme {
+        color: #06121e;
+        background: #e8927c;
+        border-color: #e8927c;
+      }
+
       /* L'éditeur et le parcours test vivent dans la grille d'outils de la
          console (mêmes tuiles que SALLES/RECORDS) : des outils, pas des
          actions de jeu — fini les boutons pointillés qui faisaient tache. */
@@ -2278,7 +2302,12 @@
         font-family: var(--font-display);
         font-size: 12px;
         letter-spacing: 0.26em;
+        /* pas de retour à la ligne AUTOMATIQUE (l'étiquette ne se replie
+           pas au gré du zoom) — mais les sauts de ligne VOULUS, saisis dans
+           l'éditeur, en font de vrais <br> : ils passent */
         white-space: nowrap;
+        text-align: center;
+        line-height: 1.35;
         opacity: 0.88;
         text-shadow: 0 1px 5px rgba(0, 0, 0, 0.9);
         will-change: transform;
@@ -2814,6 +2843,18 @@
         min-height: 70px;
         resize: vertical;
       }
+      /* Champ TEXTE d'une étiquette : la zone passe sous son intitulé —
+         une saisie sur plusieurs lignes a besoin de toute la largeur */
+      .ed-f-txt {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+      }
+      .ed-f-txt textarea {
+        min-height: 54px;
+        letter-spacing: 0.06em;
+      }
       .ed-fields {
         display: flex;
         flex-direction: column;
@@ -3078,6 +3119,7 @@
       <button id="home-restart" type="button" hidden>RECOMMENCER LE TABLEAU</button>
       <button id="start-reprendre" type="button" hidden></button>
       <button id="start-secondaire" type="button" hidden>RUN SECONDAIRE — SALLE 1 (L'EXPÉDITION EN COURS EST CONSERVÉE)</button>
+      <button id="start-abandon" type="button" hidden>ABANDONNER LA RUN — RETOUR AU LABO</button>
       <div class="home-duo" role="group" aria-label="Outils du protocole">
         <button id="start-editor" type="button" title="Créer ou modifier un tableau"><i>✎</i><span>ÉDITEUR</span></button>
         <button id="start-bis" type="button" title="L'école, puis les salles laser"><i>⚗&#xFE0E;</i><span>PARCOURS TEST</span></button>

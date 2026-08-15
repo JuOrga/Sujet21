@@ -170,6 +170,13 @@ export class LevelEditor {
   private camY = 0
   private zoom = 0.3
 
+  // Doigts posés sur la carte : à DEUX, on pince — l'écart zoome la CARTE
+  // (pas la page : sur iPad, le pincement du navigateur emportait tout
+  // l'écran, interface comprise) et le centre déplace la vue.
+  private readonly doigts = new Map<number, { x: number; y: number }>()
+  private pinceEcart: number | null = null
+  private pinceCentre: { x: number; y: number } | null = null
+
   // geste en cours
   private drag:
     | null
@@ -226,6 +233,8 @@ export class LevelEditor {
     this.lastSnap = serializeLevel(this.level)
     this.majBoutonsHistoire()
     void this.refreshLibrary()
+    // Sonde de test : l'éditeur depuis la console (comme __sim, __run, __fin)
+    ;(window as unknown as { __editeur: LevelEditor }).__editeur = this
   }
 
   // ——— Annuler / Rétablir (Ctrl+Z / Ctrl+Y) ————————————————
@@ -345,6 +354,20 @@ export class LevelEditor {
       sx: w * 0.5 + (x - this.camX) * this.zoom,
       sy: h * 0.5 - (y - this.camY) * this.zoom,
     }
+  }
+
+  /** Écart entre les deux premiers doigts posés (null en dessous de deux). */
+  private ecartDoigts(): number | null {
+    if (this.doigts.size < 2) return null
+    const [a, b] = [...this.doigts.values()]
+    return Math.hypot(b.x - a.x, b.y - a.y)
+  }
+
+  /** Milieu du pincement — le point du monde qui doit rester sous les doigts. */
+  private centreDoigts(): { x: number; y: number } | null {
+    if (this.doigts.size < 2) return null
+    const [a, b] = [...this.doigts.values()]
+    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
   }
 
   private toWorld(sx: number, sy: number): { x: number; y: number } {
@@ -751,11 +774,29 @@ export class LevelEditor {
     c.addEventListener('contextmenu', (e) => e.preventDefault())
 
     c.addEventListener('pointerdown', (e) => {
-      c.setPointerCapture(e.pointerId)
+      try {
+        c.setPointerCapture(e.pointerId)
+      } catch {
+        // pointeur déjà disparu (le second doigt d'un pincement qui se
+        // relève, un événement synthétique) : sans gravité — mais la
+        // capture ne doit JAMAIS emporter le reste du geste avec elle
+      }
       const rect = c.getBoundingClientRect()
       const sx = e.clientX - rect.left
       const sy = e.clientY - rect.top
       const w = this.toWorld(sx, sy)
+
+      this.doigts.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (this.doigts.size >= 2) {
+        // deuxième doigt : on passe au pincement — le geste en cours est
+        // abandonné (on ne veut pas déplacer une paroi en zoomant)
+        this.drag = null
+        this.guides = []
+        this.pinceEcart = this.ecartDoigts()
+        this.pinceCentre = this.centreDoigts()
+        this.draw()
+        return
+      }
 
       // clic droit ou milieu : déplacer la vue
       if (e.button === 2 || e.button === 1) {
@@ -818,8 +859,22 @@ export class LevelEditor {
           }
         }
         const hit = this.pick(w.x, w.y)
+        // AU DOIGT ET AU STYLET, on sélectionne d'abord, on déplace ensuite :
+        // le premier appui ne fait que désigner l'élément. Sans cela, la
+        // moindre dérive de la pointe (inévitable sur iPad) déplaçait ce
+        // qu'on voulait seulement choisir. À la souris, rien ne change :
+        // le pointeur est précis, le glisser direct reste le geste juste.
+        const auDoigt = e.pointerType !== 'mouse'
+        const dejaVise = hit !== null && this.sel !== null && this.sameSel(this.sel, hit)
         this.sel = hit
         this.syncProps()
+        if (auDoigt && hit && !dejaVise) {
+          this.status(
+            'Élément sélectionné — reposez le doigt dessus pour le déplacer (les poignées redimensionnent).',
+          )
+          this.draw()
+          return
+        }
         if (hit) {
           if (hit.kind === 'spawn') {
             this.drag = { mode: 'move', ox: w.x - this.level.spawn.x, oy: w.y - this.level.spawn.y, start: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }
@@ -1000,6 +1055,33 @@ export class LevelEditor {
       const w = this.toWorld(sx, sy)
       this.showCoords(w.x, w.y)
 
+      const doigt = this.doigts.get(e.pointerId)
+      if (doigt) {
+        doigt.x = e.clientX
+        doigt.y = e.clientY
+      }
+      if (this.pinceEcart !== null) {
+        // Deux doigts : l'écart zoome (ancré au centre du pincement — la
+        // carte reste collée aux doigts), le centre déplace la vue.
+        const d = this.ecartDoigts()
+        const ctr = this.centreDoigts()
+        if (d !== null && ctr !== null && this.pinceEcart > 1e-3) {
+          const avant = this.toWorld(ctr.x - rect.left, ctr.y - rect.top)
+          this.zoom = Math.max(0.05, Math.min(3, this.zoom * (d / this.pinceEcart)))
+          const apres = this.toWorld(ctr.x - rect.left, ctr.y - rect.top)
+          this.camX += avant.x - apres.x
+          this.camY += avant.y - apres.y
+          this.pinceEcart = d
+        }
+        if (ctr !== null && this.pinceCentre !== null) {
+          this.camX -= (ctr.x - this.pinceCentre.x) / this.zoom
+          this.camY += (ctr.y - this.pinceCentre.y) / this.zoom
+        }
+        this.pinceCentre = ctr
+        this.draw()
+        return
+      }
+
       if (!this.drag) {
         c.style.cursor =
           this.tool.kind === 'select'
@@ -1151,7 +1233,18 @@ export class LevelEditor {
       this.draw()
     })
 
-    c.addEventListener('pointerup', () => {
+    const doigtParti = (e: PointerEvent): void => {
+      this.doigts.delete(e.pointerId)
+      if (this.doigts.size < 2) {
+        this.pinceEcart = null
+        this.pinceCentre = null
+      }
+    }
+    c.addEventListener('pointercancel', doigtParti)
+    c.addEventListener('pointerup', (e) => {
+      const pincait = this.pinceEcart !== null
+      doigtParti(e)
+      if (pincait) return // le pincement ne pose ni ne déplace rien
       const d = this.drag
       this.drag = null
       this.guides = []
@@ -1206,6 +1299,16 @@ export class LevelEditor {
       }
       this.commit('')
     })
+
+    // iPad : Safari IGNORE « user-scalable=no » depuis iOS 10 — le
+    // pincement zoomait la PAGE (interface comprise) au lieu de la carte.
+    // Ses événements de geste propriétaires sont donc étouffés sur la
+    // scène : le pincement appartient à la carte, et à elle seule.
+    const scene = c.parentElement
+    for (const nom of ['gesturestart', 'gesturechange', 'gestureend']) {
+      c.addEventListener(nom, (e) => e.preventDefault())
+      scene?.addEventListener(nom, (e) => e.preventDefault())
+    }
 
     c.addEventListener(
       'wheel',
@@ -1999,7 +2102,14 @@ export class LevelEditor {
       rows.push(`<button type="button" class="ed-btn" id="p-railrev">Inverser le sens</button>`)
     } else if (s.kind === 'label') {
       const l = this.level.labels[s.index]
-      rows.push(`<label class="ed-f"><span>Texte</span><input id="p-text" value="${l.text.replace(/"/g, '&quot;')}" /></label>`)
+      // zone de texte (et non ligne unique) : ENTRÉE fait un vrai saut de
+      // ligne, et « | » ouvre toujours la plaque (sur-titre puis titre)
+      rows.push(
+        `<label class="ed-f ed-f-txt"><span>Texte</span><textarea id="p-text" rows="3" spellcheck="false">${l.text
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')}</textarea></label>`,
+        `<p class="ed-empty">ENTRÉE saute une ligne. « SUR-TITRE|TITRE » dessine une plaque de signalétique.</p>`,
+      )
       rows.push(
         `<label class="ed-f"><span>Couleur</span><select id="p-tone">` +
           (['mur', 'phile', 'phobe', 'eponge', 'froid', 'grille', 'sas', 'chaud'] as WorldLabel['tone'][])
@@ -2044,7 +2154,7 @@ export class LevelEditor {
         this.commit('Sens du rail inversé — les chevrons montrent la circulation de l’arc.')
       }
     })
-    for (const input of Array.from(host.querySelectorAll('input, select'))) {
+    for (const input of Array.from(host.querySelectorAll('input, select, textarea'))) {
       input.addEventListener('change', () => this.readProps())
     }
   }
@@ -2127,7 +2237,17 @@ export class LevelEditor {
       Object.assign(q, this.normalized(val('p-minX'), val('p-minY'), val('p-maxX'), val('p-maxY')))
     } else if (s.kind === 'label') {
       const l = this.level.labels[s.index]
-      l.text = text('p-text').toUpperCase().slice(0, 40) || l.text
+      // les sauts de ligne SURVIVENT (ils sont le geste demandé) ; le reste
+      // est normalisé, et la limite s'élargit puisqu'un texte tient sur
+      // plusieurs lignes désormais
+      l.text =
+        text('p-text')
+          .toUpperCase()
+          .replace(/\r\n?/g, '\n')
+          .replace(/[ \t]+/g, ' ')
+          .replace(/\n{3,}/g, '\n\n')
+          .slice(0, 120)
+          .trim() || l.text
       l.tone = text('p-tone') as WorldLabel['tone']
       l.x = val('p-lx')
       l.y = val('p-ly')
