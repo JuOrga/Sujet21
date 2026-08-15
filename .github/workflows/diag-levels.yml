@@ -45,3 +45,17 @@ jobs:
           except Exception as e:
             print('illisible :', e)
           EOF
+          echo "== /api/records =="
+          curl -sS "https://sujet21.vercel.app/api/records" -o records.json -w "HTTP %{http_code}\n" || true
+          python3 - <<'EOF'
+          import json
+          try:
+            d = json.load(open('records.json'))
+            if 'error' in d:
+              print('ERREUR API :', d.get('error'), '|', d.get('detail'))
+            print('records tableaux :', len(d.get('tableaux') or {}))
+            print('tops :', len(d.get('tops') or {}))
+            print('expedition :', 'oui' if d.get('expedition') else 'non')
+          except Exception as e:
+            print('illisible :', e)
+          EOF
