@@ -283,7 +283,20 @@ function buildWorldLabels(): void {
   labelEls = level.labels.map((l) => {
     const span = document.createElement('span')
     span.className = `world-label wl-${l.tone}`
-    span.textContent = l.text
+    // « SUR-TITRE|TITRE » : l'étiquette devient une PLAQUE de signalétique
+    // sur deux lignes (petit sur-titre mono, titre en capitales), avec fond
+    // et liseré teinté — la lisibilité d'un panneau, plus un texte qui flotte
+    if (l.text.includes('|')) {
+      const [sur, titre] = l.text.split('|')
+      span.classList.add('plaque')
+      const i = document.createElement('i')
+      i.textContent = sur.trim()
+      const b = document.createElement('b')
+      b.textContent = titre.trim()
+      span.append(i, b)
+    } else {
+      span.textContent = l.text
+    }
     worldLabelsHost.appendChild(span)
     return { span, x: l.x, y: l.y }
   })

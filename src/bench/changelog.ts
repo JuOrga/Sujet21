@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 01:20',
+    title: 'Habillages RACCORDÉS aux boîtes + la signalétique du hub en PLAQUES',
+    notes: [
+      'Deux remarques du joueur. UN — les textures étaient mal raccordées : le motif était calé sur la grille du MONDE et chaque boîte le tranchait n’importe où. Il se cale désormais sur la BOÎTE : un nombre ENTIER de tuiles (légèrement étirées pour tomber JUSTE aux deux bords) sur les axes assez grands, motif CENTRÉ sur les axes étroits — les caissons finissent en caisson, les hublots en hublot.',
+      'DEUX — les écritures du hub, refondues en PLAQUES DE SIGNALÉTIQUE : deux lignes (petit sur-titre mono qui situe — secteur, autorité, nom de la surface — et titre en capitales), fond sombre, liseré teinté, barrette d’accroche. Le placard y gagne un double sens : « HYDROPHILE / CE QUI AIME RETIENT » — le mot ET la poésie d’un coup. Format ouvert à tous les tableaux : un « | » dans le texte d’une étiquette de l’éditeur fait une plaque.',
+    ],
+  },
+  {
     date: '16/08/2026 00:50',
     title: 'Étiquettes monde : taille de lecture garantie, même dézoomé',
     notes: [

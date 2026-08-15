@@ -644,7 +644,18 @@ void main() {
           // bords se fond dans le motif.
           float si = skin - 1.0;
           vec2 tuile = vec2(mod(si, 4.0), floor(si / 4.0 + 0.001));
-          vec2 uvp = (tuile + fract(wb / 420.0)) * vec2(0.25, 0.5);
+          // RACCORD : le motif se cale sur la BOÎTE, plus sur la grille du
+          // monde (qui tranchait les caissons et hublots n'importe où).
+          // Axe assez grand : un nombre ENTIER de tuiles, légèrement
+          // étirées pour tomber JUSTE aux deux bords. Axe étroit : échelle
+          // native, motif CENTRÉ — le rognage devient symétrique.
+          vec2 bmin = uBoxes[bi].xy;
+          vec2 bsize = max(uBoxes[bi].zw - bmin, vec2(1.0));
+          vec2 rep = floor(bsize / 420.0 + 0.5);
+          vec2 grand = step(1.0, rep);
+          vec2 pas = mix(vec2(420.0), bsize / max(rep, vec2(1.0)), grand);
+          vec2 origine = mix(bmin + 0.5 * bsize - 210.0, bmin, grand);
+          vec2 uvp = (tuile + fract((wb - origine) / pas)) * vec2(0.25, 0.5);
           // l'atlas est téléversé avec UNPACK_FLIP_Y : le V se lit depuis le
           // BAS — sans cette inversion, chaque habillage affichait la tuile
           // de l'AUTRE rangée (caissons devenait aération, écrans poutrelle…)
