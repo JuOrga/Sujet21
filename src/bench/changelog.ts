@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 22:50',
+    title: 'Une seule vie — les autres se farment : le CONDENSAT arrive',
+    notes: [
+      'Décision du joueur, façon Hadès : UNE vie, toujours — les échantillons de secours supplémentaires ne se gagnent plus en route (le +1 toutes les trois salles est retiré). Ils se FARMERONT au futur banc d’étalonnage du hub, en sacrifiant des runs.',
+      'Et pour que farmer ait un sens dès maintenant : le CONDENSAT, la monnaie méta. Chaque centilitre livré au sas est conservé par le labo, toutes runs confondues — y compris la dernière salle, y compris les runs perdues ensuite. Le bilan de collecte l’affiche (« condensat +212 cL ») et la fiche montre le total. C’est lui qui paiera les améliorations permanentes du banc d’étalonnage.',
+    ],
+  },
+  {
     date: '15/08/2026 22:30',
     title: 'Cap roguelike, acte I : les ÉCHANTILLONS DE SECOURS (vies) + raccourcis préparés',
     notes: [

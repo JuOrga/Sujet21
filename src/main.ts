@@ -65,18 +65,48 @@ const run = {
   tableauTime: 0, // secondes simulées depuis l'entrée du tableau (pour les records)
   runTime: 0, // secondes simulées depuis le début de l'expédition (refroidissement)
   ended: false, // expédition conclue : bilan affiché, en attente de la suivante
-  // Les VIES du roguelike : des ÉCHANTILLONS DE SECOURS que le labo tient en
-  // réserve. On part avec UN seul ; une dispersion en consomme un et renvoie
-  // à la première goutte du tableau ; le dernier perdu, c'est la fin de la
-  // run — retour au labo. On en gagne au fil de l'aventure (une salle
-  // conclue sur trois), plafonnés à 3.
+  // Les VIES du roguelike : des ÉCHANTILLONS DE SECOURS. On part avec UN
+  // seul — toujours. Une dispersion en consomme un et renvoie à la première
+  // goutte du tableau ; le dernier perdu, c'est la fin de la run — retour
+  // au labo. Les échantillons SUPPLÉMENTAIRES ne se gagnent pas en route :
+  // ils se FARMENT (façon Hadès) — futur banc d'étalonnage (permanent,
+  // payé en condensat) et instruments embarqués (par run).
   vies: 1,
-  conclues: 0, // salles conclues cette run (rythme le gain d'échantillons)
+  conclues: 0, // salles conclues cette run (statistique, et futur farm)
 }
-const VIES_MAX = 3
-const VIES_CADENCE = 3 // une salle conclue sur N rapporte un échantillon
+const VIES_MAX = 3 // plafond, étalonnage et instruments compris
 // Sonde de test : l'état de la run depuis la console (comme __sim, __cam)
 ;(window as unknown as { __run: typeof run }).__run = run
+
+// ---- LE CONDENSAT : la monnaie méta du roguelike. Chaque centilitre livré
+// au sas est CONSERVÉ par le labo, toutes runs confondues — c'est lui qui
+// paiera le banc d'étalonnage (améliorations permanentes, dont les
+// échantillons de secours supplémentaires). Farmer, sacrifier des runs :
+// rien de ce qu'on livre n'est perdu.
+const CLE_CONDENSAT = 'sujet21-condensat-v1'
+let condensat = (() => {
+  try {
+    const v = Math.floor(Number(localStorage.getItem(CLE_CONDENSAT)))
+    return Number.isFinite(v) && v > 0 ? v : 0
+  } catch {
+    return 0
+  }
+})()
+function gagneCondensat(cl: number): void {
+  if (cl <= 0) return
+  condensat += Math.round(cl)
+  try {
+    localStorage.setItem(CLE_CONDENSAT, String(condensat))
+  } catch {
+    // stockage indisponible : le condensat vivra le temps de la session
+  }
+  majCondensatUI()
+}
+function majCondensatUI(): void {
+  const dd = document.getElementById('home-condensat')
+  if (dd) dd.textContent = `${condensat} cL`
+}
+majCondensatUI()
 
 function chillNow(): number {
   return Math.min(1, run.runTime / Math.max(30, params.chillDuration))
@@ -3231,6 +3261,9 @@ function frame(now: number): void {
     const prime = sim.swallowedIce * params.litersPerParticle * params.iceCollectBonus
     const surplus = sim.liters() + sim.swallowed * params.litersPerParticle + prime
     run.bonbonneLiters += surplus
+    // chaque centilitre livré nourrit le CONDENSAT (méta) — y compris sur la
+    // dernière salle : rien de ce qui atteint le sas n'est jamais perdu
+    gagneCondensat(surplus * 100)
     // Trophées de collecte : « Sans une goutte » (≥ 95 % du volume de
     // départ livré) et « Opérateur de nuit » (21 collectes cumulées)
     if (surplus >= 0.95 * level.spawn.n * params.litersPerParticle) trophees.debloque('sans-une-goutte')
@@ -3299,17 +3332,10 @@ function frame(now: number): void {
     } else {
       run.exitTimer = EXIT_LINGER
       renderRegistres()
-      // le rythme des vies : une salle conclue sur trois condense un
-      // échantillon de secours (plafonné) — la run récompense l'endurance
       run.conclues += 1
-      let vieLigne = ''
-      if (run.conclues % VIES_CADENCE === 0 && run.vies < VIES_MAX) {
-        run.vies += 1
-        vieLigne = ` · <em class="bilan-neuf">+1 ÉCHANTILLON DE SECOURS (💠×${run.vies})</em>`
-      }
       showOverlay(
         'ÉCHANTILLON COLLECTÉ',
-        `${bilan}${surplus.toFixed(2)} L transférés en bonbonne${primeLine}${vieLigne} — réserve : ${run.bonbonneLiters.toFixed(2)} L · tableau suivant…`,
+        `${bilan}${surplus.toFixed(2)} L transférés en bonbonne${primeLine} · <em class="bilan-neuf">condensat +${Math.round(surplus * 100)} cL</em> — réserve : ${run.bonbonneLiters.toFixed(2)} L · tableau suivant…`,
         'success',
       )
     }
