@@ -5,7 +5,7 @@
 // d'opérateur, des litres et des secondes.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { del, list, put } from '@vercel/blob'
+import { ecritDocument, litDocument } from './_magasin'
 
 // Chaque écriture crée un blob à URL unique (suffixe aléatoire) et supprime
 // les versions précédentes : écraser au même chemin garderait la même URL,
@@ -86,51 +86,23 @@ function beatsExpedition(
   )
 }
 
-// Même durcissement que la bibliothèque : un ÉCHEC de lecture n'est pas un
-// tableau d'honneur vide — on LÈVE (l'écriture avorte en 500) au lieu de
-// repartir de zéro et d'écraser les records de tout le monde.
-async function readBoard(): Promise<Board> {
-  const { blobs } = await list({ prefix: PREFIX })
-  if (blobs.length === 0) return { tableaux: {}, expedition: null }
-  const parDate = [...blobs].sort(
-    (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
+// Lecture/écriture via le magasin partagé (_magasin.ts) : lecture sans
+// opération SDK (pointeur + cache), écriture avec historique de 4 versions,
+// échec de lecture ≠ registres vides. `frais` sur le chemin d'écriture.
+function valideBoard(data: unknown): boolean {
+  return (
+    data !== null && typeof data === 'object' && typeof (data as Board).tableaux === 'object'
   )
-  // REPLI : même logique que la bibliothèque — un blob listé mais illisible
-  // (403/404, corruption) ne condamne pas la lecture, on remonte l'historique
-  let derniere = 'aucun blob lisible'
-  for (const b of parDate) {
-    try {
-      const r = await fetch(b.url, { cache: 'no-store' })
-      if (!r.ok) {
-        derniere = `lecture registres : HTTP ${r.status} (${b.pathname})`
-        continue
-      }
-      const data = (await r.json()) as Board
-      if (data === null || typeof data !== 'object' || typeof data.tableaux !== 'object') {
-        derniere = `registres illisibles (${b.pathname})`
-        continue
-      }
-      return { tableaux: data.tableaux ?? {}, expedition: data.expedition ?? null, tops: data.tops ?? {} }
-    } catch (e) {
-      derniere = String(e)
-    }
-  }
-  throw new Error(derniere)
+}
+
+async function readBoard(opts?: { frais?: boolean }): Promise<Board> {
+  const data = (await litDocument(PREFIX, valideBoard, opts)) as Board | null
+  if (data === null) return { tableaux: {}, expedition: null }
+  return { tableaux: data.tableaux ?? {}, expedition: data.expedition ?? null, tops: data.tops ?? {} }
 }
 
 async function writeBoard(board: Board): Promise<void> {
-  await put(`${PREFIX}v.json`, JSON.stringify(board), {
-    access: 'public',
-    addRandomSuffix: true,
-    contentType: 'application/json',
-  })
-  // historique de secours : les 4 versions les plus récentes restent
-  const { blobs } = await list({ prefix: PREFIX })
-  const parDate = [...blobs].sort(
-    (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
-  )
-  const perimes = parDate.slice(4)
-  if (perimes.length > 0) await del(perimes.map((b) => b.url)).catch(() => {})
+  await ecritDocument(PREFIX, board)
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -149,7 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         res.status(400).json({ error: 'record invalide : nom, litres et temps requis' })
         return
       }
-      const board = await readBoard()
+      const board = await readBoard({ frais: true })
       let improved = false
       // le palmarès peut changer SANS que le record simple soit battu : la
       // persistance doit suivre l'un COMME l'autre (sinon le POST renvoie un
