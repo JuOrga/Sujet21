@@ -228,15 +228,26 @@ let levelIndex = 0
 let libraryLevels: LevelDef[] = []
 let sequenceCache: { source: LevelDef[]; seq: LevelDef[] } | null = null
 function playedLevels(): LevelDef[] {
-  if (libraryLevels.length === 0) return TABLEAUX
   if (sequenceCache?.source !== libraryLevels) {
-    const codes = new Set(libraryLevels.map((l) => l.code))
+    // le HUB (code « HUB ») vit dans la bibliothèque comme salle spéciale :
+    // éditable comme les autres, mais jamais dans la séquence de l'expédition
+    const jouables = libraryLevels.filter((l) => l.code !== 'HUB')
+    const codes = new Set(jouables.map((l) => l.code))
     sequenceCache = {
       source: libraryLevels,
-      seq: [...libraryLevels, ...TABLEAUX.filter((t) => !codes.has(t.code))],
+      seq:
+        jouables.length === 0
+          ? TABLEAUX
+          : [...jouables, ...TABLEAUX.filter((t) => !codes.has(t.code))],
     }
   }
   return sequenceCache.seq
+}
+
+// Le hub joué : la version publiée dans la bibliothèque (code « HUB ») prime
+// sur celle du code — le laboratoire se remodèle depuis l'éditeur.
+function hubLevel(): LevelDef {
+  return libraryLevels.find((l) => l.code === 'HUB') ?? TABLEAU_HUB
 }
 
 // Un essai hors expédition : un tableau à part (prototype, salle laser,
@@ -257,7 +268,7 @@ const exitMouth = { x: 0, y: 0 }
 // d'entraînement (sauf navigation directe ?tableau=N, outil de conception).
 let auHub = !new URLSearchParams(location.search).has('tableau')
 function applyLevel(): void {
-  level = testLevel ?? (auHub ? TABLEAU_HUB : playedLevels()[levelIndex] ?? playedLevels()[0])
+  level = testLevel ?? (auHub ? hubLevel() : playedLevels()[levelIndex] ?? playedLevels()[0])
   levelHasCold = level.boxes.some((b) => b.material === MAT_FROID)
   // le sas garde sa place dans le budget de rendu : un tableau trop chargé
   // perd ses derniers blocs de décor, jamais sa sortie
@@ -671,9 +682,10 @@ function renderSalles(): void {
     })
     liste.appendChild(b)
   }
-  if (libraryLevels.length > 0) {
+  const enSequence = libraryLevels.filter((l) => l.code !== 'HUB')
+  if (enSequence.length > 0) {
     section('BIBLIOTHÈQUE DU LABO — en tête de séquence, dans l’ordre de l’éditeur')
-    for (const lv of libraryLevels) salle(lv)
+    for (const lv of enSequence) salle(lv)
     section('EXPÉDITION LIVRÉE — elle s’enchaîne à la suite')
   }
   for (const lv of [...TABLEAUX_ECOLE, ...TABLEAUX, TABLEAU_1BIS]) salle(lv)
@@ -1580,9 +1592,10 @@ const editor = new LevelEditor(el('editor'), {
 // (si elle en contient), puis l'expédition livrée à la suite.
 const homeSeq = el('home-seq')
 function updateLibraryButton(): void {
+  const nb = libraryLevels.filter((l) => l.code !== 'HUB').length
   homeSeq.textContent =
-    libraryLevels.length > 0
-      ? `Séquence : ${libraryLevels.length} tableau(x) de la bibliothèque, puis l'expédition livrée — ${playedLevels().length} salles en tout.`
+    nb > 0
+      ? `Séquence : ${nb} tableau(x) de la bibliothèque, puis l'expédition livrée — ${playedLevels().length} salles en tout.`
       : `Expédition livrée : ${TABLEAUX.length} tableaux. La bibliothèque partagée est vide.`
 }
 updateLibraryButton()

@@ -31,6 +31,7 @@ import {
   type WorldLabel,
   type ZoneForce,
 } from '../game/level'
+import { TABLEAU_HUB } from '../game/hub'
 import { checkLevel, parseLevel, serializeLevel } from '../game/levelIO'
 import { traceLaser } from '../game/laser'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
@@ -1479,7 +1480,9 @@ export class LevelEditor {
     // Tableaux LIVRÉS : une copie s'ouvre comme brouillon — pour étudier la
     // construction des salles (miroirs, prisme, plasma…) ou en repartir.
     const selLivres = this.el<HTMLSelectElement>('ed-livres')
-    const livres = [...TABLEAUX_ECOLE, ...TABLEAUX, TABLEAU_1BIS]
+    // le HUB en tête : publié dans la bibliothèque (code « HUB »), il
+    // REMPLACE le laboratoire joué — sans jamais entrer dans la séquence
+    const livres = [TABLEAU_HUB, ...TABLEAUX_ECOLE, ...TABLEAUX, TABLEAU_1BIS]
     selLivres.innerHTML = livres
       .map((t, i) => `<option value="${i}">${t.code} — ${t.name}</option>`)
       .join('')
