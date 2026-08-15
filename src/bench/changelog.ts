@@ -14,6 +14,13 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 19:15',
+    title: 'L’éveil se rejoue pour tout le monde (clé passée en v2)',
+    notes: [
+      'L’éveil est maintenant complet — cryostase, bouton CONTINUER, dizaine d’impulsions, ralenti et fondus. La clé versionnée passe en v2 : TOUS les joueurs le (re)vivront une fois à la prochaine plongée, y compris ceux qui avaient vu les premières moutures. Rien d’autre ne bouge : records, trophées et réglages intacts.',
+    ],
+  },
+  {
     date: '15/08/2026 19:00',
     title: 'Éveil : le monde décélère, la carte fond à l’écran — fini l’apparition brutale',
     notes: [
