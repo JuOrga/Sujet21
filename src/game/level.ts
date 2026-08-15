@@ -261,7 +261,7 @@ export const MATERIAL_NAMES: Record<number, string> = {
   [MAT_FROID]: 'Hublot (froid)',
   [MAT_GRILLE]: 'Évent',
   [MAT_CHAUD]: 'Chaudière',
-  [MAT_MEMBRANE]: 'Membrane (eau)',
+  [MAT_MEMBRANE]: 'Membrane (liquide)',
   [MAT_RIDEAU]: 'Rideau (glace)',
   [MAT_SURCHAUFFEUR]: 'Surchauffeur',
 }
@@ -640,7 +640,7 @@ export const TABLEAU_1BIS: LevelDef = {
   name: 'La galerie noyée',
   code: '21-A bis',
   journal:
-    'Réfection du secteur A : cloisons redessinées, contreforts, une galerie au lieu d’un couloir. L’échantillon n’a besoin d’aucun artifice ici — seulement d’eau, et de retenue. — Dr N. Véga',
+    'Réfection du secteur A : cloisons redessinées, contreforts, une galerie au lieu d’un couloir. L’échantillon n’a besoin d’aucun artifice ici — seulement de fluide, et de retenue. — Dr N. Véga',
   figure: '/assets/card-galerie.webp',
   bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
   spawn: { x: -950, y: 0, n: 900 },
@@ -1075,7 +1075,7 @@ export const TABLEAU_S2: LevelDef = {
   labels: [
     { x: -570, y: -200, text: 'ÉPONGE — BOIT', tone: 'eponge' },
     { x: -100, y: -580, text: 'PLAQUE FROIDE — FIGE', tone: 'froid' },
-    { x: 160, y: -420, text: 'MEMBRANE — SEULE L’EAU PASSE', tone: 'phile' },
+    { x: 160, y: -420, text: 'MEMBRANE — SEUL LE LIQUIDE PASSE', tone: 'phile' },
     { x: 160, y: 420, text: 'RIDEAU — SEULE LA GLACE PASSE', tone: 'froid' },
     { x: 300, y: 40, text: 'CHAUDIÈRE — DISPERSE', tone: 'chaud' },
     { x: 660, y: -420, text: 'ÉVENT — SEULE LA VAPEUR PASSE', tone: 'grille' },
@@ -1090,7 +1090,7 @@ export const TABLEAU_S3: LevelDef = {
   name: 'L’école des zones',
   code: '21-S3',
   journal:
-    'Troisième leçon : certaines régions IMPOSENT leur état — un hublot fendu glace tout ce qui passe, une conduite rompue vaporise. Entre les deux, la zone libre lui rend le choix. Il est entré glace, sorti vapeur, revenu eau. Les états ne sont pas des formes : ce sont des langues, et il les parle toutes. — Dr N. Véga',
+    'Troisième leçon : certaines régions IMPOSENT leur état — un hublot fendu glace tout ce qui passe, une conduite rompue vaporise. Entre les deux, la zone libre lui rend le choix. Il est entré glace, sorti vapeur, revenu liquide. Les états ne sont pas des formes : ce sont des langues, et il les parle toutes. — Dr N. Véga',
   bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
   spawn: { x: -950, y: 0, n: 900 },
   exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },

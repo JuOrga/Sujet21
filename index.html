@@ -3027,7 +3027,7 @@
       <h1 class="home-title">SUJET <em>21</em></h1>
       <div id="version-jeu" aria-label="Version du jeu"></div>
       <p class="home-pitch">
-        Vous êtes un volume d'eau en apesanteur. La seule façon d'avancer&nbsp;:
+        Vous êtes un volume de fluide spéculaire en apesanteur. La seule façon d'avancer&nbsp;:
         éjecter une partie de vous-même. <strong>Se déplacer, c'est rétrécir.</strong>
         Rejoignez le sas avant de vous disperser. Le laboratoire consigne chaque
         essai — personne ne se demande encore pourquoi l'échantillon insiste.
@@ -3054,7 +3054,7 @@
       </div>
       <div class="home-col">
       <figure class="home-figure">
-        <img src="/assets/home.webp" alt="Échantillon d'eau en lévitation dans la cuve d'essai" loading="lazy" />
+        <img src="/assets/home.webp" alt="Échantillon de fluide spéculaire en lévitation dans la cuve d'essai" loading="lazy" />
         <figcaption>FIG. 1 — ÉCHANTILLON EN SUSPENSION, CUVE D'ESSAI</figcaption>
       </figure>
       <div class="home-records" aria-label="Registres du labo">
@@ -3102,7 +3102,7 @@
 
     <div id="statebar" aria-label="État de l'échantillon">
       <button id="state-eau" type="button" title="redevenir liquide">
-        <span class="st-ico">💧</span><span class="st-label">EAU</span>
+        <span class="st-ico">💧</span><span class="st-label">LIQUIDE</span>
       </button>
       <button id="state-glace" type="button" title="se changer en glace (F) : le bloc garde son élan">
         <span class="st-ico">❄</span><span class="st-label">GLACE</span><kbd>F</kbd>
@@ -3147,16 +3147,16 @@
           <button type="button" class="ed-tool" data-tool="box:2"><i style="background:#a878e8"></i>Hydrophobe</button>
           <button type="button" class="ed-tool" data-tool="box:4"><i style="background:#8fc8ee"></i>Hublot froid</button>
           <button type="button" class="ed-tool" data-tool="box:6" title="Transforme en GAZ à 95 % de présence dans son aura, dégèle — jamais désactivée. Aura réglable par bloc (champ Aura)."><i style="background:#ff8a3c"></i>Chaudière</button>
-          <button type="button" class="ed-tool" data-tool="box:5" title="Seule la VAPEUR passe entre les lamelles — l'eau et la glace butent, la lumière passe"><i style="background:#8fb0c6"></i>Évent</button>
+          <button type="button" class="ed-tool" data-tool="box:5" title="Seule la VAPEUR passe entre les lamelles — le liquide et la glace butent, la lumière passe"><i style="background:#8fb0c6"></i>Évent</button>
           <button type="button" class="ed-tool" data-tool="box:7" title="Seule l'EAU la traverse — glace et vapeur butent, le laser est absorbé"><i style="background:#35c9a0"></i>Membrane</button>
           <button type="button" class="ed-tool" data-tool="box:8" title="Seule la GLACE l'écarte — eau et vapeur butent, le laser est absorbé"><i style="background:#9fb9d8"></i>Rideau lamellaire</button>
-          <button type="button" class="ed-tool" data-tool="box:9" title="Mur pour l'eau et la glace. Frôlé en VAPEUR : rend UN dash — une seule fois, puis le serpentin s'éteint."><i style="background:#29d8ff"></i>Surchauffeur</button>
+          <button type="button" class="ed-tool" data-tool="box:9" title="Mur pour le liquide et la glace. Frôlé en VAPEUR : rend UN dash — une seule fois, puis le serpentin s'éteint."><i style="background:#29d8ff"></i>Surchauffeur</button>
           <button type="button" class="ed-tool" data-tool="sponge"><i style="background:#d7ad55"></i>Éponge</button>
           <button type="button" class="ed-tool" data-tool="cut" title="Chevauchement : cliquez la paroi qui prend le dessus, puis celle qui s'efface — seule la zone commune est rongée"><i style="background:#e86a6a"></i>Découpe</button>
         </div>
         <div class="ed-group">
           <span class="k">Zones d’état</span>
-          <button type="button" class="ed-tool" data-tool="zone:eau"><i style="background:#63b7e6"></i>Impose eau</button>
+          <button type="button" class="ed-tool" data-tool="zone:eau"><i style="background:#63b7e6"></i>Impose liquide</button>
           <button type="button" class="ed-tool" data-tool="zone:glace"><i style="background:#8fc8ee"></i>Impose glace</button>
           <button type="button" class="ed-tool" data-tool="zone:vapeur"><i style="background:#c9a6f2"></i>Impose vapeur</button>
           <button type="button" class="ed-tool" data-tool="zone:libre"><i style="background:#7b93a8"></i>Zone libre</button>
@@ -3257,11 +3257,11 @@
         <div class="cmds-page home-commands" data-page="pad" hidden>
           <kbd>stick gauche</kbd>le CAP : où aller — l'éjection part toute seule à l'opposé<br />
           <kbd>A</kbd>agir : maintenir éjecte · en vapeur, viser puis relâcher = dash<br />
-          <kbd>A · stick neutre</kbd>en eau : se rassembler (gratuit, anti-dispersion)<br />
+          <kbd>A · stick neutre</kbd>en liquide : se rassembler (gratuit, anti-dispersion)<br />
           <kbd>RT / LT</kbd>zoomer / dézoomer (la pression dose)<br />
           <kbd>X</kbd>glace
           <kbd>Y</kbd>vapeur
-          <kbd>B</kbd>retour à l'eau<br />
+          <kbd>B</kbd>retour au liquide<br />
           <kbd>LB / RB</kbd>ralentir / accélérer le temps<br />
           <kbd>stick droit</kbd>déplacer la caméra
           <kbd>clic stick</kbd>recadrer (caméra auto)
@@ -3362,9 +3362,9 @@
           <div class="params-nom" style="margin-top: 16px">GRAPHISMES DU LIQUIDE</div>
           <div class="params-desc">
             Riche (défaut) : l'échantillon a du relief — reflets, miroir vivant,
-            scintillement. Sobre : l'eau devient plate ; sa forme, ses couleurs
+            scintillement. Sobre : le fluide devient plat ; sa forme, ses couleurs
             de vitesse et ses états (givre, vapeur) restent exactement les mêmes,
-            mais chaque pixel d'eau coûte bien moins cher. Si le jeu rame quand
+            mais chaque pixel de fluide coûte bien moins cher. Si le jeu rame quand
             l'échantillon est gros ou éclaté, c'est CE réglage qui le dira —
             envoyez un rapport dans chaque mode.
           </div>
@@ -3380,7 +3380,7 @@
             120 Hz (défaut) : la physique de référence, deux pas par image.
             60 Hz : un pas par image — moitié moins de calcul, donc moitié
             moins de chauffe : sur téléphone, c'est LE levier contre le
-            ralentissement des longues sessions. Le comportement de l'eau
+            ralentissement des longues sessions. Le comportement du fluide
             diffère légèrement (pas plus grands) — à juger en jouant.
           </div>
           <div id="params-simhz" class="params-choix" role="group" aria-label="Cadence de simulation"></div>
@@ -3461,9 +3461,9 @@
       <div class="ob-etape" data-etape="0">
         <div class="ob-anim ob-doigt"><i></i></div>
         <h3><span class="ob-t">MAINTENEZ LE DOIGT</span><span class="ob-p">MAINTENEZ LE CLIC</span></h3>
-        <p class="ob-t">Vous éjectez de l'eau vers lui — le corps part à l'opposé.
+        <p class="ob-t">Vous éjectez du fluide vers lui — le corps part à l'opposé.
         Se déplacer, c'est rétrécir : chaque impulsion se paie en volume.</p>
-        <p class="ob-p">Vous éjectez de l'eau vers le pointeur — le corps part à l'opposé.
+        <p class="ob-p">Vous éjectez du fluide vers le pointeur — le corps part à l'opposé.
         Se déplacer, c'est rétrécir : chaque impulsion se paie en volume.</p>
       </div>
       <div class="ob-etape" data-etape="1" hidden>
@@ -3520,12 +3520,12 @@
       <button class="ev-continuer" type="button">CONTINUER</button>
     </div>
     <div id="eveil2" class="eveil-voile" hidden aria-label="Éveil — le volume">
-      <div class="ev-sur">PREMIÈRE ANALYSE — LE CORPS D'EAU</div>
+      <div class="ev-sur">PREMIÈRE ANALYSE — LE FLUIDE SPÉCULAIRE</div>
       <div class="ev-icone">💧</div>
       <h3 class="ev-titre">VOUS ÊTES CE QUI RESTE</h3>
       <p class="ev-texte">Vous l'avez senti : chaque impulsion éjecte un peu de vous.
       Se déplacer, c'est rétrécir — le volume est à la fois votre vie, votre monnaie
-      et votre note. L'eau épouse, la glace file, la vapeur s'élève : trois états,
+      et votre note. Le liquide épouse, la glace file, la vapeur s'élève : trois états,
       un seul corps.</p>
       <p class="ev-texte ev-accent">Le reste — évents, lasers, plaques froides — s'apprend en salle.</p>
       <button class="ev-continuer" type="button">PLONGER</button>
@@ -3552,24 +3552,24 @@
       <div class="lg-row"><span class="lg-sw sw-mur"></span>
         <span><b>Paroi</b> — neutre : bloque tout, dans les trois états.</span></div>
       <div class="lg-row"><span class="lg-sw sw-phile"></span>
-        <span><b>Surface hydrophile</b> — adhère : l'eau s'y colle et y rampe,
+        <span><b>Surface hydrophile</b> — adhère : le fluide s'y colle et y rampe,
         s'arracher coûte une impulsion. La <span class="st">glace</span> qui
         glisse dessus est retenue ; la <span class="st">vapeur</span> est
         légèrement attirée, de loin — comme une gravité.</span></div>
       <div class="lg-row"><span class="lg-sw sw-phobe"></span>
         <span><b>Surface hydrophobe</b> — repousse : une bande de répulsion dévie
-        les trajectoires et fait rebondir l'eau. La <span class="st">glace</span>
+        les trajectoires et fait rebondir le fluide. La <span class="st">glace</span>
         y rebondit comme sur un bumper ; la <span class="st">vapeur</span> est
         légèrement repoussée, de loin — comme un champ magnétique.</span></div>
       <div class="lg-row"><span class="lg-sw sw-eponge"></span>
-        <span><b>Éponge</b> — absorbe l'eau au contact continu ; chaque cellule se
+        <span><b>Éponge</b> — absorbe le fluide au contact continu ; chaque cellule se
         sature puis se solidifie. La brèche payée en volume est permanente —
         la vitesse limite la perte. <span class="st">Glace</span> et
         <span class="st">vapeur</span> butent sur le feutre.</span></div>
       <div class="lg-row"><span class="lg-sw sw-froid"></span>
-        <span><b>Plaque froide</b> — son aura de brume gèle l'eau qui s'attarde.
+        <span><b>Plaque froide</b> — son aura de brume gèle le fluide qui s'attarde.
         <span class="st">Glace</span> au contact : soudée, le bloc s'arrête net.
-        <span class="st">Vapeur</span> : condensée, on redevient eau — et la vapeur
+        <span class="st">Vapeur</span> : condensée, on redevient liquide — et la vapeur
         <em>perdue</em> ailleurs vient y perler en rosée, récupérable.</span></div>
       <div class="lg-row"><span class="lg-sw sw-chaud"></span>
         <span><b>Chaudière</b> — quand 95 % du corps baigne dans son aura, tout
@@ -3577,16 +3577,16 @@
         que visuel). Dégèle la <span class="st">glace</span>. Jamais désactivée,
         et chaque chaudière règle la portée de sa propre aura.</span></div>
       <div class="lg-row"><span class="lg-sw sw-surchauffeur"></span>
-        <span><b>Surchauffeur</b> — mur pour l'eau et la glace ; frôlé en
+        <span><b>Surchauffeur</b> — mur pour le liquide et la glace ; frôlé en
         <span class="st">vapeur</span>, son serpentin rend UN dash — une seule
         fois, puis il s'éteint.</span></div>
       <div class="lg-row"><span class="lg-sw sw-grille"></span>
         <span><b>Évent</b> — la bouche par laquelle le vaisseau respire :
-        arrête l'eau et la glace ; seule la <span class="st">vapeur</span> s'y
+        arrête le liquide et la glace ; seule la <span class="st">vapeur</span> s'y
         faufile — et s'y essore : une part du nuage se perd au passage.</span></div>
       <div class="lg-row"><span class="lg-sw sw-membrane"></span>
-        <span><b>Membrane</b> — une trame gorgée d'eau : seule
-        l'<span class="st">eau</span> suinte au travers. Glace et vapeur butent,
+        <span><b>Membrane</b> — une trame gorgée de fluide : seul
+        le <span class="st">liquide</span> suinte au travers. Glace et vapeur butent,
         et elle absorbe la lumière des lasers.</span></div>
       <div class="lg-row"><span class="lg-sw sw-rideau"></span>
         <span><b>Rideau lamellaire</b> — des lamelles souples : seule la
@@ -3596,7 +3596,7 @@
         <span><b>Sas</b> — la bouche d'aspiration boit l'échantillon et le met en
         bonbonne : c'est la sortie.</span></div>
       <div class="lg-states">ÉTATS —
-        <b>💧 EAU</b> : pilotable, éjecter pour avancer ·
+        <b>💧 LIQUIDE</b> : pilotable, éjecter pour avancer ·
         <b>❄ GLACE</b> (F) : le bloc garde son élan, re-presser dégèle ·
         <b>💨 VAPEUR</b> (G) : la bascule coûte 20 % du volume (gouttes récupérables) et rend 3 dashs — viser ralentit le temps, relâcher = dash.</div>
     </div>
@@ -3605,15 +3605,15 @@
       <div class="lg-head"><span>LES TROIS ÉTATS — QUI BLOQUE QUOI</span>
         <button id="states-close" type="button" title="fermer (E)">✕</button></div>
       <div class="lg-row"><span class="st-big">💧</span>
-        <span><b>EAU</b> — pilotable : éjecter pour avancer.<br />
-        Bloquée par les <i class="m-mur">parois</i>, les <i class="m-grille">évents</i>
+        <span><b>LIQUIDE</b> — pilotable : éjecter pour avancer.<br />
+        Bloqué par les <i class="m-mur">parois</i>, les <i class="m-grille">évents</i>
         et le <i class="m-froid">rideau lamellaire</i> ·
-        seule à passer la <i class="m-phile">membrane</i> ·
-        absorbée par l'<i class="m-eponge">éponge</i> ·
-        collée par l'<i class="m-phile">hydrophile</i> ·
-        déviée par l'<i class="m-phobe">hydrophobe</i> ·
-        gelée par les <i class="m-froid">plaques froides</i> ·
-        vaporisée par les <i class="m-chaud">chaudières</i> (à 95 % de présence) ·
+        seul à passer la <i class="m-phile">membrane</i> ·
+        absorbé par l'<i class="m-eponge">éponge</i> ·
+        collé par l'<i class="m-phile">hydrophile</i> ·
+        dévié par l'<i class="m-phobe">hydrophobe</i> ·
+        gelé par les <i class="m-froid">plaques froides</i> ·
+        vaporisé par les <i class="m-chaud">chaudières</i> (à 95 % de présence) ·
         le <i class="m-sas">sas</i> l'aspire.</span></div>
       <div class="lg-row"><span class="st-big">❄</span>
         <span><b>GLACE</b> (F) — bloc rigide : garde son élan, plus de propulsion.<br />

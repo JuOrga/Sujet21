@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 21:15',
+    title: 'Le FLUIDE SPÉCULAIRE : l’« eau » quitte le vocabulaire du jeu',
+    notes: [
+      'Décision de lore : l’échantillon n’est pas de l’eau — c’est un FLUIDE SPÉCULAIRE, destiné à un miroir télescopique. Tout le vocabulaire joueur suit, en deux registres : le registre MÉCANIQUE garde les mots sensoriels (LIQUIDE / GLACE / VAPEUR — le bouton d’état EAU devient LIQUIDE, « l’eau épouse » devient « le liquide épouse ») ; le registre LORE nomme la substance (le pitch de la fiche, la carte d’analyse de l’éveil).',
+      'Renommés : pitch et figure de la fiche, cartes de l’éveil et anciennes cartes gestuelles, panneaux LÉGENDE et ÉTATS (accords au masculin compris), descriptions des PARAMÈTRES, outils et zones de l’éditeur (« Impose liquide »), trophée « Trois états », étiquette monde de la membrane, journaux du Dr Véga. Les identifiants internes et les sauvegardes ne bougent pas — rien à re-signer, rien à perdre.',
+    ],
+  },
+  {
     date: '15/08/2026 20:45',
     title: 'Zoom à la molette : toutes les souris à la même vitesse',
     notes: [
