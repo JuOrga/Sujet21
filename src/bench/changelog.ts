@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 02:30',
+    title: 'Bibliothèque perdue côté serveur : blindage du stockage + re-semage',
+    notes: [
+      'Signalement du joueur : plus aucun tableau dans la séquence de l’éditeur ni dans SALLES. Diagnostic (via CI, l’API interrogée en direct) : la bibliothèque partagée était VIDE côté serveur. La faiblesse : une lecture du stockage qui échouait passait pour « bibliothèque vide », et la première écriture suivante repartait de ce vide en supprimant les anciennes versions.',
+      'Blindage (bibliothèque ET registres) : un échec de lecture LÈVE désormais une erreur — l’écriture avorte proprement au lieu d’écraser ; et chaque écriture conserve un HISTORIQUE des 4 versions les plus récentes du document — une écriture destructrice reste rattrapable. Puis la bibliothèque a été RE-SEMÉE (17 tableaux, l’état du dernier semis). Les modifications enregistrées APRÈS ce semis sont perdues côté serveur — le brouillon local de chaque appareil garde toutefois sa dernière version (l’éditeur proposera de la republier).',
+    ],
+  },
+  {
     date: '16/08/2026 01:50',
     title: 'Hub v2 : un ÉTAGE de laboratoire — et l’éditeur met le jeu en pause',
     notes: [

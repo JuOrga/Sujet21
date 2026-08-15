@@ -34,6 +34,11 @@ function slug(s: string): string {
   )
 }
 
+// Un ÉCHEC de lecture n'est pas une bibliothèque vide : traiter l'un comme
+// l'autre a déjà coûté la bibliothèque entière (une lecture ratée, puis la
+// première écriture repartait de « vide » et supprimait les anciens blobs).
+// Désormais : seul un préfixe réellement sans blob est « vide » — tout le
+// reste LÈVE, l'écriture avorte en 500, rien n'est perdu.
 async function readLib(): Promise<Library> {
   const { blobs } = await list({ prefix: PREFIX })
   if (blobs.length === 0) return { levels: [] }
@@ -41,20 +46,26 @@ async function readLib(): Promise<Library> {
     (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
   )[0]
   const r = await fetch(latest.url, { cache: 'no-store' })
-  if (!r.ok) return { levels: [] }
-  const data = (await r.json().catch(() => null)) as Library | null
-  if (!data || !Array.isArray(data.levels)) return { levels: [] }
+  if (!r.ok) throw new Error(`lecture bibliothèque : HTTP ${r.status}`)
+  const data = (await r.json()) as Library
+  if (!data || !Array.isArray(data.levels)) throw new Error('bibliothèque illisible')
   return { levels: data.levels.filter((l) => l && typeof l.id === 'string' && l.level) }
 }
 
 async function writeLib(lib: Library): Promise<void> {
-  const { blobs } = await list({ prefix: PREFIX })
   await put(`${PREFIX}v.json`, JSON.stringify(lib), {
     access: 'public',
     addRandomSuffix: true,
     contentType: 'application/json',
   })
-  if (blobs.length > 0) await del(blobs.map((b) => b.url)).catch(() => {})
+  // HISTORIQUE de secours : on garde les 4 versions les plus récentes au
+  // lieu de tout supprimer — une écriture destructrice reste rattrapable
+  const { blobs } = await list({ prefix: PREFIX })
+  const parDate = [...blobs].sort(
+    (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
+  )
+  const perimes = parDate.slice(4)
+  if (perimes.length > 0) await del(perimes.map((b) => b.url)).catch(() => {})
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
