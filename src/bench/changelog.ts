@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 16:15',
+    title: 'La prise en main gèle TOUTES les commandes — clavier, manette, tactile',
+    notes: [
+      'Pendant les cartes de prise en main, le voile bloquait les clics — mais le CLAVIER passait (F gelait le corps, R relançait, espace mettait en pause…), la MANETTE aussi, et un second doigt pouvait toucher la cuve. Toutes les commandes de jeu sont désormais GELÉES tant que les cartes sont à l’écran : clavier, pointeurs/tactile (gelés à la source, dans les gestionnaires), et manette — dont le bouton A avance maintenant les cartes, comme un clic.',
+      'Le gel se lève à la dernière carte, d’un seul geste — rien à réarmer.',
+    ],
+  },
+  {
     date: '15/08/2026 15:50',
     title: 'Le voile de signature : le nom et le son, au premier lancement',
     notes: [
