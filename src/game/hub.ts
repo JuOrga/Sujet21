@@ -30,63 +30,84 @@ function box(
   return skin ? { minX, minY, maxX, maxY, material, skin } : { minX, minY, maxX, maxY, material }
 }
 
+// Le plan, d'ouest en est — un ÉTAGE de laboratoire, pas une salle unique :
+//   CUVE D'ENTRAÎNEMENT → porte centrale → HALL (dessert la SALLE
+//   D'OBSERVATION au nord et le PLACARD D'ENTRETIEN au sud) → porte HAUTE →
+//   SALLE D'ÉTALONNAGE (machines, banc) → porte BASSE → CONDUIT DE
+//   VENTILATION en chicanes (par-dessus, par-dessous) → SAS DE LANCEMENT.
+// Les portes alternées (centre, haut, bas) font le trajet serpentin : on
+// TRAVERSE un lieu construit par des humains, on ne glisse pas dans un couloir.
 export const TABLEAU_HUB: LevelDef = {
   name: 'Le module Méduse',
   code: 'HUB',
   journal:
-    'Module d’accueil. Entre deux protocoles, le sujet est libre dans la cuve d’entraînement — « libre » au sens où nous consignons tout. Il passe de longues minutes devant le placard d’entretien. Il lit, je crois. — Dr N. Véga',
+    'Module d’accueil. Entre deux protocoles, le sujet est libre de circuler — « libre » au sens où nous consignons tout. Il connaît l’étage mieux que nous : il prend les chicanes du conduit sans jamais se tromper. Il passe de longues minutes devant le placard d’entretien. Il lit, je crois. — Dr N. Véga',
   par: 3,
-  bounds: { minX: -1600, minY: -750, maxX: 1600, maxY: 750 },
-  spawn: { x: -1000, y: 0, n: 900 },
-  // le sas de LANCEMENT, au bout du conduit de ventilation, à droite
-  exit: { minX: 1450, minY: -140, maxX: 1590, maxY: 140 },
+  bounds: { minX: -2400, minY: -1100, maxX: 2400, maxY: 1100 },
+  spawn: { x: -1800, y: 0, n: 900 },
+  // le sas de LANCEMENT, tout à l'est, au bout des chicanes
+  exit: { minX: 2260, minY: -120, maxX: 2390, maxY: 120 },
   boxes: [
-    // ---- la cloison cuve / hall central : hublots en haut (on vous
-    // observe), caissons en bas — une large ouverture au milieu
-    box(-420, 220, -340, 750, MAT_WALL, 6),
-    box(-420, -750, -340, -220, MAT_WALL, 1),
-    // ---- la cuve d'entraînement : deux agrès, pour sentir les surfaces
-    box(-820, -120, -640, -50, MAT_HYDROPHILE),
-    box(-780, 260, -600, 330, MAT_HYDROPHOBE),
-    // ---- la salle d'observation (plafond du hall) : écrans des Créateurs
-    box(-160, 640, 500, 750, MAT_WALL, 7),
-    // ---- le placard d'entretien (plancher du hall) : un échantillon de
-    // chaque surface, étiquettes énigmatiques au-dessus
-    box(-160, -700, 0, -620, MAT_HYDROPHILE),
-    box(120, -700, 280, -620, MAT_HYDROPHOBE),
-    box(400, -700, 560, -620, MAT_FROID),
-    box(680, -700, 840, -620, MAT_GRILLE),
-    // ---- le banc d'étalonnage (hors service — chantier méta) : un îlot
-    // blindé posé SUR le trajet cuve → sas — on le contourne, on le voit
-    box(300, -40, 620, 60, MAT_WALL, 4),
-    // ---- le conduit de ventilation vers le sas : parois d'aération
-    box(1080, 160, 1160, 750, MAT_WALL, 5),
-    box(1080, -750, 1160, -160, MAT_WALL, 5),
+    // ---- CUVE D'ENTRAÎNEMENT (ouest) : deux agrès pour sentir les surfaces
+    box(-2050, -150, -1850, -80, MAT_HYDROPHILE),
+    box(-1980, 350, -1780, 420, MAT_HYDROPHOBE),
+    // ---- cloison cuve | hall : hublots en haut (on vous observe),
+    // caissons en bas — porte CENTRALE (y −150..150)
+    box(-1200, 150, -1120, 1100, MAT_WALL, 6),
+    box(-1200, -1100, -1120, -150, MAT_WALL, 1),
+    // ---- HALL : mur nord (porte vers l'observation, x −800..−560)
+    box(-1120, 400, -800, 480, MAT_WALL, 2),
+    box(-560, 400, 0, 480, MAT_WALL, 2),
+    // ---- SALLE D'OBSERVATION (nord) : la baie d'écrans des Créateurs
+    box(-900, 950, -150, 1100, MAT_WALL, 7),
+    // ---- HALL : mur sud (porte vers le placard, x −300..−60)
+    box(-1120, -480, -300, -400, MAT_WALL, 1),
+    box(-60, -480, 0, -400, MAT_WALL, 1),
+    // ---- PLACARD D'ENTRETIEN (sud) : un casier par surface
+    box(-1000, -1050, -840, -970, MAT_HYDROPHILE),
+    box(-760, -1050, -600, -970, MAT_HYDROPHOBE),
+    box(-520, -1050, -360, -970, MAT_FROID),
+    box(-280, -1050, -120, -970, MAT_GRILLE),
+    // ---- cloison hall | salle d'étalonnage : porte HAUTE (y 250..500)
+    box(0, 500, 80, 1100, MAT_WALL, 4),
+    box(0, -1100, 80, 250, MAT_WALL, 4),
+    // ---- SALLE D'ÉTALONNAGE : machines, et le banc sur le chemin
+    box(400, -200, 900, -80, MAT_WALL, 2),
+    box(500, 400, 640, 800, MAT_WALL, 8),
+    box(700, 60, 1020, 160, MAT_WALL, 4),
+    // ---- cloison étalonnage | conduit : porte BASSE (y −500..−250)
+    box(1200, -250, 1280, 1100, MAT_WALL, 5),
+    box(1200, -1100, 1280, -500, MAT_WALL, 5),
+    // ---- CONDUIT DE VENTILATION : deux chicanes — par-dessus la première,
+    // par-dessous la seconde, puis remonter au sas
+    box(1600, -1100, 1680, 600, MAT_WALL, 5),
+    box(1960, -600, 2040, 1100, MAT_WALL, 5),
   ],
   sponges: [
     // le dernier casier du placard : l'éponge — elle boit, elle ne rend rien
-    { minX: 940, minY: -700, cols: 3, rows: 3, cellSize: 26, capacityPerCell: 5 },
+    { minX: 0, minY: -1050, cols: 3, rows: 3, cellSize: 26, capacityPerCell: 5 },
   ],
   labels: [
     // Toute la signalétique du module est en PLAQUES (« SUR-TITRE|TITRE ») :
     // le petit sur-titre situe (secteur, autorité), le titre nomme.
     // la cuve
-    { x: -1000, y: 500, text: 'MODULE MÉDUSE — SECTEUR 01|CUVE D’ENTRAÎNEMENT', tone: 'mur' },
-    { x: -1000, y: -500, text: 'NOTE DE SERVICE|LES CRÉATEURS OBSERVENT', tone: 'froid' },
-    // l'observation et le banc (les deux machines des chantiers méta)
-    { x: 170, y: 520, text: 'ACCÈS CRÉATEURS|SALLE D’OBSERVATION', tone: 'mur' },
-    { x: 640, y: 520, text: 'ÉCRAN DE CONTRÔLE|HORS TENSION', tone: 'grille' },
-    { x: 460, y: 150, text: 'BANC D’ÉTALONNAGE|HORS SERVICE', tone: 'chaud' },
-    // le placard : chaque casier porte le NOM de sa surface en sur-titre
-    // et son énigme en titre — on apprend le mot et la poésie d'un coup
-    { x: 400, y: -330, text: 'SECTEUR 02|PLACARD D’ENTRETIEN', tone: 'mur' },
-    { x: -80, y: -540, text: 'HYDROPHILE|CE QUI AIME RETIENT', tone: 'phile' },
-    { x: 200, y: -430, text: 'HYDROPHOBE|CE QUI REPOUSSE PROPULSE', tone: 'phobe' },
-    { x: 480, y: -540, text: 'PLAQUE FROIDE|LE FROID FIGE, LE FIGÉ FILE', tone: 'froid' },
-    { x: 760, y: -430, text: 'ÉVENT|SEUL LE SOUFFLE PASSE', tone: 'grille' },
-    { x: 1000, y: -540, text: 'ÉPONGE|ELLE BOIT, NE REND RIEN', tone: 'eponge' },
-    // le départ
-    { x: 1120, y: 340, text: 'SECTEUR 03|CONDUIT DE VENTILATION', tone: 'grille' },
-    { x: 1330, y: -220, text: 'PROTOCOLE 21|SAS DE LANCEMENT', tone: 'sas' },
+    { x: -1800, y: 800, text: 'MODULE MÉDUSE — SECTEUR 01|CUVE D’ENTRAÎNEMENT', tone: 'mur' },
+    { x: -1800, y: -800, text: 'NOTE DE SERVICE|LES CRÉATEURS OBSERVENT', tone: 'froid' },
+    // l'observation (nord du hall)
+    { x: -750, y: 840, text: 'ACCÈS CRÉATEURS|SALLE D’OBSERVATION', tone: 'mur' },
+    { x: -320, y: 700, text: 'ÉCRAN DE CONTRÔLE|HORS TENSION', tone: 'grille' },
+    // le placard (sud du hall) : le NOM de la surface, puis son énigme
+    { x: -560, y: -620, text: 'SECTEUR 02|PLACARD D’ENTRETIEN', tone: 'mur' },
+    { x: -920, y: -880, text: 'HYDROPHILE|CE QUI AIME RETIENT', tone: 'phile' },
+    { x: -680, y: -760, text: 'HYDROPHOBE|CE QUI REPOUSSE PROPULSE', tone: 'phobe' },
+    { x: -440, y: -880, text: 'PLAQUE FROIDE|LE FROID FIGE, LE FIGÉ FILE', tone: 'froid' },
+    { x: -200, y: -760, text: 'ÉVENT|SEUL LE SOUFFLE PASSE', tone: 'grille' },
+    { x: 40, y: -880, text: 'ÉPONGE|ELLE BOIT, NE REND RIEN', tone: 'eponge' },
+    // la salle d'étalonnage
+    { x: 640, y: 940, text: 'SECTEUR 03|SALLE D’ÉTALONNAGE', tone: 'mur' },
+    { x: 860, y: 260, text: 'BANC D’ÉTALONNAGE|HORS SERVICE', tone: 'chaud' },
+    // le conduit et le départ
+    { x: 1440, y: 700, text: 'SECTEUR 04|CONDUIT DE VENTILATION', tone: 'grille' },
+    { x: 2120, y: 320, text: 'PROTOCOLE 21|SAS DE LANCEMENT', tone: 'sas' },
   ],
 }

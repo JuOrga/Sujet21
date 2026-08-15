@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 01:50',
+    title: 'Hub v2 : un ÉTAGE de laboratoire — et l’éditeur met le jeu en pause',
+    notes: [
+      'Le module Méduse passe de 3200×1500 à 4800×2200 et devient un VRAI étage de labo humain, labyrinthique : la CUVE D’ENTRAÎNEMENT (ouest) → porte centrale → le HALL qui dessert la SALLE D’OBSERVATION (nord) et le PLACARD D’ENTRETIEN (sud, sa propre pièce) → porte HAUTE → la SALLE D’ÉTALONNAGE (machines, banc sur le chemin) → porte BASSE → le CONDUIT DE VENTILATION en chicanes (par-dessus la première, par-dessous la seconde) → SAS DE LANCEMENT. Les portes alternées font le trajet serpentin — on traverse un lieu, on ne glisse pas dans un couloir.',
+      'Et l’éditeur met désormais le jeu en PAUSE derrière lui : la physique ne tourne plus dans son dos (batterie et chauffe épargnées) — « Essayer » relance, quitter rend la fiche.',
+    ],
+  },
+  {
     date: '16/08/2026 01:20',
     title: 'Habillages RACCORDÉS aux boîtes + la signalétique du hub en PLAQUES',
     notes: [
