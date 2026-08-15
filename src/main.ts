@@ -504,6 +504,14 @@ let obEtape = 0
 // découvrir le jeu au bureau puis sur téléphone, chaque main a sa leçon).
 const obTactile = (): boolean => window.matchMedia('(pointer: coarse)').matches
 const obCle = (): string => (obTactile() ? 'projet21.onboard.v1' : 'projet21.onboard.pc.v1')
+// L'ÉVEIL (la prise en main scénarisée) a sa propre clé — versionnée : en
+// changer la version rejouerait l'éveil à tout le monde. Déclarée ici car
+// le chargement (plus bas) doit savoir s'il faut geler l'échantillon.
+const CLE_EVEIL = 'sujet21-eveil-v1'
+// Cartes gestuelles MISES DE CÔTÉ : l'ÉVEIL les remplace au premier
+// lancement. Le code et les cartes restent entiers au cas où — remettre
+// ce drapeau à true les rendrait au premier plan.
+const CARTES_GESTES: boolean = false
 function majOnboard(): void {
   const etapes = Array.from(onboardEl.querySelectorAll<HTMLElement>('.ob-etape'))
   etapes.forEach((e, i) => {
@@ -518,6 +526,7 @@ function majOnboard(): void {
   }
 }
 function montrerOnboard(): void {
+  if (!CARTES_GESTES) return
   if (localStorage.getItem(obCle())) return
   onboardEl.dataset.mode = obTactile() ? 'tactile' : 'pc'
   obEtape = 0
@@ -1163,6 +1172,53 @@ document.getElementById('home-params')?.addEventListener('click', () => {
 document.getElementById('params-fermer')?.addEventListener('click', () => {
   paramsEl.hidden = true
 })
+// ---- PROTOCOLE : rejouer l'éveil, réinitialiser l'opérateur ----
+document.getElementById('proto-rejouer')?.addEventListener('click', () => {
+  try {
+    localStorage.removeItem(CLE_EVEIL)
+  } catch {
+    // sans gravité : lanceEveil rejouera quand même cette session
+  }
+  paramsEl.hidden = true
+  if (requireName()) return
+  // l'éveil se rejoue SUR le tableau en cours : plan large, cryostase, cartes
+  document.body.classList.add('playing')
+  input.paused = false
+  hasPlayed = true
+  startBtn.textContent = "REPRENDRE L'ESSAI"
+  homeRestartBtn.hidden = false
+  restart()
+  lanceEveil()
+})
+// Réinitialiser l'opérateur : destructif, donc DEUX clics — le premier arme
+// le bouton (libellé rouge explicite), le second efface nom + registres
+// locaux et recharge : le voile de signature revient, vierge. Les trophées
+// et les réglages restent (seuls les RECORDS sont annoncés perdus).
+const protoReset = document.getElementById('proto-reset-nom') as HTMLButtonElement | null
+let protoResetArme = 0
+protoReset?.addEventListener('click', () => {
+  const now = performance.now()
+  if (now - protoResetArme > 6000) {
+    protoResetArme = now
+    protoReset.classList.add('danger')
+    protoReset.textContent = 'EFFACER NOM + RECORDS — CONFIRMER'
+    window.setTimeout(() => {
+      // non confirmé à temps : le bouton se désarme, rien n'est perdu
+      if (performance.now() - protoResetArme >= 5900) {
+        protoReset.classList.remove('danger')
+        protoReset.textContent = 'RÉINITIALISER L’OPÉRATEUR'
+      }
+    }, 6000)
+    return
+  }
+  try {
+    localStorage.removeItem('projet21.registres.v1')
+    localStorage.removeItem('sujet21-signature-v1')
+  } catch {
+    // stockage indisponible : rien à effacer non plus
+  }
+  location.reload()
+})
 paramsEl.addEventListener('pointerdown', (e) => {
   if (e.target === paramsEl) paramsEl.hidden = true
 })
@@ -1194,6 +1250,7 @@ function closeHome(): void {
     camera.startIntro(sim.bounds, window.innerWidth, window.innerHeight)
     showTableauCard()
     montrerOnboard()
+    lanceEveil() // cryostase, plan large, puis les cartes de l'éveil
   }
 }
 function openHome(): void {
@@ -1236,6 +1293,7 @@ function startTest(niveaux: LevelDef[]): void {
   homeRestartBtn.hidden = false
   restart()
   montrerOnboard() // premier contact tactile : la prise en main d'abord
+  lanceEveil() // premier contact tout court : l'éveil d'abord
 }
 function startBisTest(): void {
   startTest([TABLEAU_1BIS])
@@ -1426,6 +1484,10 @@ fetch('/noyaux.wasm')
 const renderer = new Renderer(canvas, CAPACITY)
 const loop = new FixedLoop()
 const input = new Input()
+// CRYOSTASE : tant que l'éveil n'a pas été joué, l'échantillon attend GELÉ
+// dès le premier pixel — même en dérive derrière la fiche. Le premier
+// contact visuel avec le sujet 21, c'est un bloc de glace.
+if (!localStorage.getItem(CLE_EVEIL)) input.freezeIntent = true
 
 // ---- Manette (Steam Deck, Xbox, DualSense) ----
 // Elle pilote le même pointeur que le doigt : un curseur en orbite autour du
@@ -1915,6 +1977,8 @@ function restart(): void {
   lossRate = 0
   input.freezeIntent = false
   input.gasIntent = false
+  // un éveil en cours reprend du début : la cryostase ressaisit l'échantillon
+  if (eveil.etape !== 'off') lanceEveil()
   applyLevel()
   sim = createSim(level)
   exposeSim()
@@ -2126,6 +2190,110 @@ stateEau.addEventListener('click', () => {
 })
 stateGlace.addEventListener('click', () => input.toggleFreeze())
 stateVapeur.addEventListener('click', () => input.toggleGas())
+
+// ---- L'ÉVEIL : la prise en main scénarisée ------------------------------
+// Trois temps, diégétiques. (1) Sortie de cryostase : le corps est GLACE
+// depuis le chargement, le plan large se joue, puis une carte pose l'état —
+// pas de direction, l'élan se conserve, et un mystère qui donne envie.
+// (2) L'invite plane au-dessus du corps : redevenir liquide (💧 / F), le
+// bouton d'interface pulse — le DÉGEL est la réponse, pas un clic de plus.
+// (3) Deux impulsions données (appui puis relâcher), une carte scelle la
+// leçon du VOLUME. La clé CLE_EVEIL mémorise le passage ; PARAMÈTRES →
+// REFAIRE LA PRISE EN MAIN la rejoue sur le tableau en cours.
+const eveil1El = document.getElementById('eveil1') as HTMLDivElement
+const eveil2El = document.getElementById('eveil2') as HTMLDivElement
+const eveilInviteEl = document.getElementById('eveil-invite') as HTMLDivElement
+type EveilEtape = 'off' | 'zoom' | 'glace' | 'invite' | 'gestes' | 'volume'
+const eveil = { etape: 'off' as EveilEtape, gestes: 0, visePrec: false }
+function lanceEveil(): void {
+  if (localStorage.getItem(CLE_EVEIL)) return
+  // relance propre (restart en plein éveil) : tout voile retombe d'abord
+  eveil1El.hidden = true
+  eveil2El.hidden = true
+  eveilInviteEl.hidden = true
+  stateEau.classList.remove('eveil-appel')
+  input.gelees = false
+  eveil.etape = 'zoom'
+  eveil.gestes = 0
+  // la cryostase tient l'échantillon : GLACE, quel que soit l'état d'avant
+  input.freezeIntent = true
+  input.gasIntent = false
+}
+function carteEveil(carte: HTMLDivElement, montrer: boolean): void {
+  carte.dataset.mode = obTactile() ? 'tactile' : 'pc'
+  carte.hidden = !montrer
+  // les cartes figent tout, comme la prise en main : lecture au calme
+  input.paused = montrer
+  input.gelees = montrer
+}
+function avanceEveil(): void {
+  if (eveil.etape === 'glace') {
+    carteEveil(eveil1El, false)
+    eveil.etape = 'invite'
+    eveilInviteEl.dataset.mode = obTactile() ? 'tactile' : 'pc'
+    eveilInviteEl.hidden = false
+    stateEau.classList.add('eveil-appel')
+  } else if (eveil.etape === 'volume') {
+    carteEveil(eveil2El, false)
+    eveil.etape = 'off'
+    try {
+      localStorage.setItem(CLE_EVEIL, '1')
+    } catch {
+      // stockage refusé : l'éveil se rejouera, sans gravité
+    }
+  }
+}
+for (const carte of [eveil1El, eveil2El]) {
+  carte.addEventListener('pointerdown', (e) => {
+    e.stopPropagation()
+    e.preventDefault()
+    avanceEveil()
+  })
+}
+// Appelé chaque image (après la caméra) : fait avancer l'éveil au rythme
+// de ce que fait réellement le joueur — pas de minuteries arbitraires.
+function majEveil(): void {
+  if (eveil.etape === 'off' || !document.body.classList.contains('playing')) return
+  if (eveil.etape === 'zoom') {
+    // le plan large d'abord — la salle se lit — puis la carte de cryostase
+    if (!camera.introEnCours) {
+      eveil.etape = 'glace'
+      carteEveil(eveil1El, true)
+    }
+  } else if (eveil.etape === 'invite') {
+    // l'invite plane au-dessus du corps et suit sa dérive
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const sx = vw * 0.5 + (sim.stats.centroidX - camera.x) * camera.zoom
+    const sy =
+      vh * 0.5 -
+      (sim.stats.centroidY - camera.y) * camera.zoom -
+      sim.stats.rmsRadius * camera.zoom -
+      14
+    const ax = Math.min(vw - 30, Math.max(30, sx))
+    const ay = Math.min(vh - 120, Math.max(96, sy))
+    eveilInviteEl.style.transform = `translate(${ax.toFixed(1)}px, ${ay.toFixed(1)}px) translate(-50%, -100%)`
+    if (!input.freezeIntent) {
+      // le dégel EST la réponse : l'invite s'efface, place aux impulsions
+      eveilInviteEl.hidden = true
+      stateEau.classList.remove('eveil-appel')
+      eveil.etape = 'gestes'
+      eveil.gestes = 0
+      eveil.visePrec = input.aimActive
+    }
+  } else if (eveil.etape === 'gestes') {
+    // deux impulsions COMPLÈTES (appui puis relâcher) : on laisse sentir
+    // le volume qui part, puis la carte vient nommer ce qu'on vient de vivre
+    if (eveil.visePrec && !input.aimActive) {
+      eveil.gestes++
+      if (eveil.gestes >= 2) {
+        eveil.etape = 'volume'
+        carteEveil(eveil2El, true)
+      }
+    }
+    eveil.visePrec = input.aimActive
+  }
+}
 touchButton('⌖', 'recadrer sur le corps (zoom et caméra auto)', () => camera.resetAutoZoom())
 const btnSound = touchButton(
   '🔊',
@@ -2429,6 +2597,9 @@ function frame(now: number): void {
     if (!onboardEl.hidden) {
       // prise en main à l'écran : A avance les cartes, rien d'autre ne passe
       if (manette.edge(BOUTON.A)) avanceOnboard()
+    } else if (!eveil1El.hidden || !eveil2El.hidden) {
+      // cartes de l'éveil : A tourne la page, rien d'autre ne passe
+      if (manette.edge(BOUTON.A)) avanceEveil()
     } else if (!enJeu) {
       // la FICHE : croix/stick pour choisir, A pour valider
       ficheNavigue()
@@ -2911,6 +3082,7 @@ function frame(now: number): void {
     camera.snapTo((b.minX + b.maxX) * 0.5, (b.minY + b.maxY) * 0.5, fitZoom)
   } else {
     camera.update(dtReal, sim.stats.centroidX, sim.stats.centroidY, sim.stats.rmsRadius, vw, vh, params)
+  majEveil() // l'éveil suit la caméra : ses repères (invite) sont à jour
   }
   updateTutor(dtReal)
   updateTrophees(dtReal)
