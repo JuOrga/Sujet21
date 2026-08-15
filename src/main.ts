@@ -325,6 +325,7 @@ const el = (id: string) => document.getElementById(id) as HTMLElement
 const hudTableau = el('hud-tableau')
 const hudVies = el('hud-vies')
 const hudViesChip = el('hud-vies-chip') as HTMLButtonElement
+const hudBonbonneChip = el('hud-bonbonne-chip') as HTMLButtonElement
 const hudBonbonne = el('hud-bonbonne')
 const hudCoque = el('hud-coque')
 const hudVolume = el('hud-volume')
@@ -3502,9 +3503,10 @@ function frame(now: number): void {
     : auHub
       ? 'LABO'
       : `${runSecondaire ? '2ᵉ RUN · ' : ''}SALLE ${levelIndex + 1}/${playedLevels().length}`
-  // les échantillons de secours (vies) : en run seulement — au labo comme
-  // aux essais, rien ne se paie
+  // les échantillons de secours (vies) et la bonbonne : en run seulement —
+  // au labo comme aux essais, rien ne se paie et rien ne se collecte
   hudViesChip.hidden = !!testLevel || auHub
+  hudBonbonneChip.hidden = !!testLevel || auHub
   hudVies.textContent = `×${run.vies}`
   // La coque refroidit : +21° au départ, −60° à froid complet — la pression
   // temporelle se lit ici (chiffre ET barre), jamais sur un chronomètre

@@ -645,6 +645,10 @@ void main() {
           float si = skin - 1.0;
           vec2 tuile = vec2(mod(si, 4.0), floor(si / 4.0 + 0.001));
           vec2 uvp = (tuile + fract(wb / 420.0)) * vec2(0.25, 0.5);
+          // l'atlas est téléversé avec UNPACK_FLIP_Y : le V se lit depuis le
+          // BAS — sans cette inversion, chaque habillage affichait la tuile
+          // de l'AUTRE rangée (caissons devenait aération, écrans poutrelle…)
+          uvp.y = 1.0 - uvp.y;
           fillCol = texture(uTexParoi, uvp).rgb * 0.92;
           edgeCol = vec3(0.32, 0.40, 0.48);
         } else if (skin > 3.5) {
