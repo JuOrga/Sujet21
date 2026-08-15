@@ -207,6 +207,7 @@ export function parseLevel(input: unknown): { level: LevelDef | null; rejets: st
     dashBudget:
       o.dashBudget === undefined ? undefined : Math.max(0, Math.round(num(o.dashBudget, 3))),
     ambiance: str(o.ambiance) || undefined,
+    raccourciVers: str(o.raccourciVers).slice(0, 16) || undefined,
   }
   // Décals (tuyaux, vannes) : du décor pur — relus pour que le passage par
   // l'éditeur ne dépouille pas un tableau de sa machinerie peinte.
@@ -318,6 +319,7 @@ export function serializeLevel(level: LevelDef): string {
   if (level.decals && level.decals.length > 0) out.decals = level.decals
   if (level.figure) out.figure = level.figure
   if (level.ambiance) out.ambiance = level.ambiance
+  if (level.raccourciVers) out.raccourciVers = level.raccourciVers
   for (const k of Object.keys(out)) if (out[k] === undefined) delete out[k]
   return JSON.stringify(out, null, 2)
 }

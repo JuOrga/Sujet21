@@ -65,7 +65,18 @@ const run = {
   tableauTime: 0, // secondes simulées depuis l'entrée du tableau (pour les records)
   runTime: 0, // secondes simulées depuis le début de l'expédition (refroidissement)
   ended: false, // expédition conclue : bilan affiché, en attente de la suivante
+  // Les VIES du roguelike : des ÉCHANTILLONS DE SECOURS que le labo tient en
+  // réserve. On part avec UN seul ; une dispersion en consomme un et renvoie
+  // à la première goutte du tableau ; le dernier perdu, c'est la fin de la
+  // run — retour au labo. On en gagne au fil de l'aventure (une salle
+  // conclue sur trois), plafonnés à 3.
+  vies: 1,
+  conclues: 0, // salles conclues cette run (rythme le gain d'échantillons)
 }
+const VIES_MAX = 3
+const VIES_CADENCE = 3 // une salle conclue sur N rapporte un échantillon
+// Sonde de test : l'état de la run depuis la console (comme __sim, __cam)
+;(window as unknown as { __run: typeof run }).__run = run
 
 function chillNow(): number {
   return Math.min(1, run.runTime / Math.max(30, params.chillDuration))
@@ -275,6 +286,8 @@ const overlaySub = document.getElementById('overlay-sub') as HTMLDivElement
 
 const el = (id: string) => document.getElementById(id) as HTMLElement
 const hudTableau = el('hud-tableau')
+const hudVies = el('hud-vies')
+const hudViesChip = el('hud-vies-chip') as HTMLButtonElement
 const hudBonbonne = el('hud-bonbonne')
 const hudCoque = el('hud-coque')
 const hudVolume = el('hud-volume')
@@ -1295,12 +1308,21 @@ interface RunSauvee {
   index: number
   liters: number
   time: number
+  vies: number
+  conclues: number
 }
 function runSauvee(): RunSauvee | null {
   try {
     const d = JSON.parse(localStorage.getItem(CLE_RUN) ?? 'null') as RunSauvee | null
     if (!d || typeof d.index !== 'number' || d.index < 1) return null
-    return { index: Math.floor(d.index), liters: Number(d.liters) || 0, time: Number(d.time) || 0 }
+    return {
+      index: Math.floor(d.index),
+      liters: Number(d.liters) || 0,
+      time: Number(d.time) || 0,
+      // sauvegardes d'avant les vies : on reprend avec l'échantillon unique
+      vies: Math.max(1, Math.min(VIES_MAX, Math.floor(Number(d.vies) || 1))),
+      conclues: Math.max(0, Math.floor(Number(d.conclues) || 0)),
+    }
   } catch {
     return null
   }
@@ -1314,7 +1336,13 @@ function sauveRun(): void {
     else
       localStorage.setItem(
         CLE_RUN,
-        JSON.stringify({ index: levelIndex, liters: run.bonbonneLiters, time: run.runTime }),
+        JSON.stringify({
+          index: levelIndex,
+          liters: run.bonbonneLiters,
+          time: run.runTime,
+          vies: run.vies,
+          conclues: run.conclues,
+        }),
       )
   } catch {
     // stockage indisponible : la reprise attendra
@@ -1336,6 +1364,8 @@ function reprendreRun(save: RunSauvee): void {
   levelIndex = Math.min(save.index, playedLevels().length - 1)
   run.bonbonneLiters = save.liters
   run.runTime = save.time
+  run.vies = save.vies
+  run.conclues = save.conclues
   hasPlayed = true
   document.body.classList.add('playing')
   input.paused = false
@@ -1370,6 +1400,8 @@ document.getElementById('start-secondaire')?.addEventListener('click', () => {
   levelIndex = 0
   run.bonbonneLiters = 0
   run.runTime = 0
+  run.vies = 1
+  run.conclues = 0
   hasPlayed = true
   document.body.classList.add('playing')
   input.paused = false
@@ -2128,8 +2160,25 @@ function newExpedition(): void {
   levelIndex = 0
   run.bonbonneLiters = 0
   run.runTime = 0
+  run.vies = 1
+  run.conclues = 0
   restart()
 }
+
+// Fin de run (dernier échantillon dispersé) : le laboratoire rappelle —
+// retour au labo (la fiche, en attendant le HUB), la salle 1 en coulisse.
+function retourAuLabo(): void {
+  levelIndex = 0
+  run.bonbonneLiters = 0
+  run.runTime = 0
+  run.vies = 1
+  run.conclues = 0
+  runSecondaire = false
+  openHome()
+  restart()
+  majBoutonsRun()
+}
+let gameOverAffiche = false
 
 // Recommencer un tableau relance l'essai ; une expédition conclue (bilan
 // affiché) ou un échantillon dispersé repart pour une expédition neuve.
@@ -2158,8 +2207,40 @@ function resetAction(): void {
     restart()
     return
   }
-  if (run.ended || sim.dispersed) newExpedition()
-  else restart()
+  if (gameOverAffiche) {
+    // l'écran de fin de run est à l'écran : le clic ramène au labo
+    gameOverAffiche = false
+    overlay.classList.remove('visible')
+    retourAuLabo()
+    return
+  }
+  if (run.ended) {
+    newExpedition()
+    return
+  }
+  if (sim.dispersed) {
+    if (run.vies > 1) {
+      // un échantillon de secours prend le relais : retour à la première
+      // goutte du tableau — la run continue
+      run.vies -= 1
+      restart()
+      return
+    }
+    // dernier échantillon dispersé : GAME OVER — la sauvegarde de la
+    // principale s'efface (la run est perdue), la secondaire n'y touche pas
+    gameOverAffiche = true
+    if (!runSecondaire) effaceRun()
+    showOverlay(
+      'ÉCHANTILLON PERDU — FIN DE LA RUN',
+      `La dispersion a eu raison du dernier échantillon.${
+        runSecondaire ? ' La run secondaire s’efface — l’expédition principale attend toujours.' : ''
+      } Le laboratoire vous rappelle.`,
+      'danger',
+      'RETOUR AU LABO',
+    )
+    return
+  }
+  restart()
 }
 
 document.getElementById('overlay-btn')!.addEventListener('click', resetAction)
@@ -3218,9 +3299,17 @@ function frame(now: number): void {
     } else {
       run.exitTimer = EXIT_LINGER
       renderRegistres()
+      // le rythme des vies : une salle conclue sur trois condense un
+      // échantillon de secours (plafonné) — la run récompense l'endurance
+      run.conclues += 1
+      let vieLigne = ''
+      if (run.conclues % VIES_CADENCE === 0 && run.vies < VIES_MAX) {
+        run.vies += 1
+        vieLigne = ` · <em class="bilan-neuf">+1 ÉCHANTILLON DE SECOURS (💠×${run.vies})</em>`
+      }
       showOverlay(
         'ÉCHANTILLON COLLECTÉ',
-        `${bilan}${surplus.toFixed(2)} L transférés en bonbonne${primeLine} — réserve : ${run.bonbonneLiters.toFixed(2)} L · tableau suivant…`,
+        `${bilan}${surplus.toFixed(2)} L transférés en bonbonne${primeLine}${vieLigne} — réserve : ${run.bonbonneLiters.toFixed(2)} L · tableau suivant…`,
         'success',
       )
     }
@@ -3229,7 +3318,13 @@ function frame(now: number): void {
     run.exitTimer -= dtReal
     if (run.exitTimer <= 0) {
       overlay.classList.remove('visible')
-      levelIndex = levelIndex + 1
+      // RACCOURCI (mécanique roguelike, préparée) : un tableau peut déclarer
+      // `raccourciVers` — son sas envoie alors directement à la salle codée,
+      // en SAUTANT les intermédiaires. Vers l'avant uniquement (pas de boucle).
+      const cible = level.raccourciVers
+        ? playedLevels().findIndex((t) => t.code === level.raccourciVers)
+        : -1
+      levelIndex = cible > levelIndex ? cible : levelIndex + 1
       restart()
     }
   }
@@ -3336,6 +3431,9 @@ function frame(now: number): void {
   hudTableau.textContent = testLevel
     ? 'BIS'
     : `${runSecondaire ? '2ᵉ RUN · ' : ''}SALLE ${levelIndex + 1}/${playedLevels().length}`
+  // les échantillons de secours (vies) : hors des essais, toujours visibles
+  hudViesChip.hidden = !!testLevel
+  hudVies.textContent = `×${run.vies}`
   // La coque refroidit : +21° au départ, −60° à froid complet — la pression
   // temporelle se lit ici (chiffre ET barre), jamais sur un chronomètre
   const coque = Math.round(21 - 81 * chillNow())
@@ -3648,7 +3746,7 @@ function frame(now: number): void {
   // sans rien recouvrir. Seuls la victoire et le bilan d'expédition ouvrent
   // encore un tampon. (Recalculé, pas tableauDone : si la victoire tombe dans
   // cette image, le tampon SAS ATTEINT ne doit pas être effacé aussitôt.)
-  if (run.exitTimer <= 0 && !run.ended) overlay.classList.remove('visible')
+  if (run.exitTimer <= 0 && !run.ended && !gameOverAffiche) overlay.classList.remove('visible')
 
   requestAnimationFrame(frame)
 }

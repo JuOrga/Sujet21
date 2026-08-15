@@ -249,6 +249,11 @@ export interface LevelDef {
   // refroidissement de la coque (tiède → glaciale) : c'est le cas général,
   // les tableaux n'ont pas à choisir une musique pour exister.
   ambiance?: string
+  // RACCOURCI (roguelike) : si présent, le sas de CE tableau envoie
+  // directement à la salle portant ce code — en sautant les intermédiaires
+  // (vers l'avant uniquement ; un code inconnu retombe sur salle+1). Permet
+  // des salles-raccourcis secrètes qui accélèrent les runs déjà maîtrisées.
+  raccourciVers?: string
 }
 
 // Nom lisible de chaque matériau — l'éditeur et la légende parlent la même
