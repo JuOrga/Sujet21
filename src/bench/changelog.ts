@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 15:20',
+    title: 'La fiche condense le palmarès — sans bouton REGISTRES ni défilement',
+    notes: [
+      'Le bouton REGISTRES disparaît (le voile reste en coulisse : la saisie du nom sur mobile s’en sert). Le panneau de droite devient le CONDENSÉ de l’écran RECORDS : rang 1 de chaque podium (★ note, 💧 volume, ⏱ chrono) par salle — seules les salles qui ONT un palmarès s’affichent, bornées à neuf : la fiche tient SANS DÉFILEMENT (les anciennes lignes vides « — — — » sur 24 salles forçaient à défiler). Le détail complet vit derrière le bouton RECORDS. Les vieux records d’avant le palmarès ne s’affichent plus, comme demandé.',
+      'Et la page ne SAUTE plus vers le bas au chargement : le navigateur restaurait le défilement de la visite précédente une demi-seconde après l’affichage — le titre devenait inaccessible. La fiche s’ouvre désormais toujours en haut.',
+    ],
+  },
+  {
     date: '15/08/2026 14:45',
     title: 'SUJET 21 — et la fiche a enfin une console digne du labo',
     notes: [
