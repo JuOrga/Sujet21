@@ -1608,6 +1608,9 @@ fetchLibrary().then((lib) => {
 function openEditor(): void {
   overlay.classList.remove('visible')
   document.body.classList.remove('playing')
+  // l'éditeur a la main : le jeu se met en PAUSE derrière lui — la physique
+  // ne tourne plus dans son dos (« Essayer » relance, quitter rend la fiche)
+  input.paused = true
   editor.open()
 }
 document.getElementById('start-editor')!.addEventListener('click', () => openEditor())
