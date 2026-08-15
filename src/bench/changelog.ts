@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 03:40',
+    title: 'Le HUB s’édite : le laboratoire se remodèle depuis l’éditeur',
+    notes: [
+      'Le module Méduse quitte le code : dans l’éditeur, menu « Tableaux livrés » → « HUB — Le module Méduse » ouvre une copie du laboratoire, à remodeler comme n’importe quel tableau (murs, habillages, plaques de signalétique, éponges, cuve, tout). « Enregistrer comme… » la publie dans la bibliothèque partagée — et dès lors, c’est CETTE version que le jeu joue au réveil, au retour de game over et derrière la fiche d’essai.',
+      'La salle spéciale (code HUB) n’entre jamais dans la séquence de l’expédition : elle vit dans la bibliothèque sans compter parmi les salles jouées, et la version codée reste le filet si elle disparaît. Vérifié au banc : les 13 contrôles du hub passent (réveil, sas, vies, game over, reprise).',
+    ],
+  },
+  {
     date: '16/08/2026 03:00',
     title: 'L’API au RÉGIME : le quota qui a bloqué le magasin ne sera plus jamais atteint',
     notes: [
