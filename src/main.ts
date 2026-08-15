@@ -505,9 +505,11 @@ let obEtape = 0
 const obTactile = (): boolean => window.matchMedia('(pointer: coarse)').matches
 const obCle = (): string => (obTactile() ? 'projet21.onboard.v1' : 'projet21.onboard.pc.v1')
 // L'ÉVEIL (la prise en main scénarisée) a sa propre clé — versionnée : en
-// changer la version rejouerait l'éveil à tout le monde. Déclarée ici car
+// changer la version rejoue l'éveil à tout le monde. Déclarée ici car
 // le chargement (plus bas) doit savoir s'il faut geler l'échantillon.
-const CLE_EVEIL = 'sujet21-eveil-v1'
+// v2 : l'éveil finalisé (bouton CONTINUER, dizaine d'impulsions, ralenti
+// + fondus) se rejoue une fois pour tous — même les premiers testeurs.
+const CLE_EVEIL = 'sujet21-eveil-v2'
 // Cartes gestuelles MISES DE CÔTÉ : l'ÉVEIL les remplace au premier
 // lancement. Le code et les cartes restent entiers au cas où — remettre
 // ce drapeau à true les rendrait au premier plan.
