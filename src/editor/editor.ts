@@ -1212,8 +1212,16 @@ export class LevelEditor {
         e.preventDefault()
         const rect = c.getBoundingClientRect()
         const before = this.toWorld(e.clientX - rect.left, e.clientY - rect.top)
-        const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12
-        this.zoom = Math.max(0.05, Math.min(3, this.zoom * factor))
+        // Molette NORMALISÉE : pixels (mode 0), lignes (1, Firefox), pages
+        // (2) — puis bornée. Un cran standard (±100 px) = un pas de ×1.12 ;
+        // les molettes haute résolution (rafales de petits deltas) et les
+        // molettes libres (gros deltas) convergent vers la même vitesse —
+        // avant, chaque événement valait UN cran plein, quel que soit son
+        // delta : certaines souris zoomaient d'un extrême à l'autre.
+        const brut = e.deltaY * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 400 : 1)
+        if (brut === 0) return
+        const pas = Math.max(-3, Math.min(3, brut / 100))
+        this.zoom = Math.max(0.05, Math.min(3, this.zoom * Math.pow(1.12, -pas)))
         const after = this.toWorld(e.clientX - rect.left, e.clientY - rect.top)
         this.camX += before.x - after.x
         this.camY += before.y - after.y
