@@ -4,7 +4,7 @@
 // un prototype semi-privé, les présets ne contiennent que des réglages.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { ecritDocument, litDocument } from './_magasin'
+import { ecritDocument, litDocument } from './_magasin.js'
 
 const PREFIX = 'presets/'
 const MAX_PRESETS = 200

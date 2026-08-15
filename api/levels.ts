@@ -7,7 +7,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { list } from '@vercel/blob'
-import { ecritDocument, litDocument } from './_magasin'
+import { ecritDocument, litDocument } from './_magasin.js'
 
 const PREFIX = 'levels/'
 const MAX_LEVELS = 60

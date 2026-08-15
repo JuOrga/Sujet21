@@ -5,7 +5,7 @@
 // d'opérateur, des litres et des secondes.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { ecritDocument, litDocument } from './_magasin'
+import { ecritDocument, litDocument } from './_magasin.js'
 
 // Chaque écriture crée un blob à URL unique (suffixe aléatoire) et supprime
 // les versions précédentes : écraser au même chemin garderait la même URL,
