@@ -3286,7 +3286,12 @@ function frame(now: number): void {
   )
   const reached =
     !drainActive && pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit)
-  if (!tableauDone && !sim.dispersed && (drunk || reached) && auHub) {
+  // au HUB, pas d'engloutissement à attendre : dès que le CORPS est dans la
+  // bouche du sas, la run part — le sas de lancement est une porte, pas un
+  // collecteur
+  const rejointSasHub =
+    auHub && pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit)
+  if (!tableauDone && !sim.dispersed && (drunk || reached || rejointSasHub) && auHub) {
     // LE SAS DE LANCEMENT : au hub, le sas ne collecte rien — il LANCE la
     // run. Reprise de l'expédition sauvée s'il y en a une, salle 1 sinon.
     auHub = false
