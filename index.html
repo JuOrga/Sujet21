@@ -2310,6 +2310,46 @@
         text-shadow: 0 1px 5px rgba(0, 0, 0, 0.9);
         will-change: transform;
       }
+      /* Plaque de signalétique (texte « SUR-TITRE|TITRE ») : deux lignes,
+         fond sombre, liseré teinté par le ton — un panneau du labo, pas un
+         texte qui flotte. La couleur vient des classes wl-*. */
+      .world-label.plaque {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        padding: 7px 14px 8px;
+        background: rgba(5, 12, 21, 0.82);
+        border: 1px solid currentColor;
+        border-radius: 4px;
+        box-shadow:
+          0 0 0 1px rgba(0, 0, 0, 0.55),
+          0 2px 14px rgba(0, 0, 0, 0.45);
+        opacity: 0.96;
+        text-shadow: none;
+      }
+      .world-label.plaque::before {
+        /* le liseré haut : une barrette d'accroche, comme vissée au mur */
+        content: '';
+        width: 26px;
+        height: 2px;
+        background: currentColor;
+        opacity: 0.8;
+        border-radius: 1px;
+      }
+      .world-label.plaque i {
+        font-style: normal;
+        font-family: var(--font-mono);
+        font-size: 8.5px;
+        letter-spacing: 0.34em;
+        opacity: 0.62;
+        color: var(--ink);
+      }
+      .world-label.plaque b {
+        font-weight: normal;
+        font-size: 12.5px;
+        letter-spacing: 0.2em;
+      }
       .wl-mur { color: #7f92a3; }
       .wl-phile { color: #4fc4cf; }
       .wl-phobe { color: #b48ad8; }

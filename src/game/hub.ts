@@ -68,23 +68,25 @@ export const TABLEAU_HUB: LevelDef = {
     { minX: 940, minY: -700, cols: 3, rows: 3, cellSize: 26, capacityPerCell: 5 },
   ],
   labels: [
+    // Toute la signalétique du module est en PLAQUES (« SUR-TITRE|TITRE ») :
+    // le petit sur-titre situe (secteur, autorité), le titre nomme.
     // la cuve
-    { x: -1000, y: 500, text: 'CUVE D’ENTRAÎNEMENT', tone: 'mur' },
-    { x: -1000, y: -500, text: 'LES CRÉATEURS OBSERVENT', tone: 'froid' },
+    { x: -1000, y: 500, text: 'MODULE MÉDUSE — SECTEUR 01|CUVE D’ENTRAÎNEMENT', tone: 'mur' },
+    { x: -1000, y: -500, text: 'NOTE DE SERVICE|LES CRÉATEURS OBSERVENT', tone: 'froid' },
     // l'observation et le banc (les deux machines des chantiers méta)
-    { x: 170, y: 560, text: 'SALLE D’OBSERVATION — ACCÈS CRÉATEURS', tone: 'mur' },
-    { x: 170, y: 470, text: 'ÉCRAN DE CONTRÔLE : ÉTEINT', tone: 'grille' },
-    { x: 460, y: 140, text: 'BANC D’ÉTALONNAGE — HORS SERVICE', tone: 'chaud' },
-    // le placard : les surfaces en énigmes — étiquettes ÉTAGÉES sur deux
-    // hauteurs et raccourcies, pour qu'aucune ne morde sur sa voisine
-    { x: 400, y: -330, text: 'PLACARD D’ENTRETIEN', tone: 'mur' },
-    { x: -80, y: -560, text: 'CE QUI AIME RETIENT', tone: 'phile' },
-    { x: 200, y: -460, text: 'CE QUI REPOUSSE PROPULSE', tone: 'phobe' },
-    { x: 480, y: -560, text: 'LE FROID FIGE, LE FIGÉ FILE', tone: 'froid' },
-    { x: 760, y: -460, text: 'SEUL LE SOUFFLE PASSE', tone: 'grille' },
-    { x: 1000, y: -560, text: 'ELLE BOIT, NE REND RIEN', tone: 'eponge' },
-    // le départ — deux étiquettes séparées en hauteur, plus de chevauchement
-    { x: 1120, y: 340, text: 'CONDUIT DE VENTILATION', tone: 'grille' },
-    { x: 1330, y: -220, text: 'SAS DE LANCEMENT — PROTOCOLE 21', tone: 'sas' },
+    { x: 170, y: 520, text: 'ACCÈS CRÉATEURS|SALLE D’OBSERVATION', tone: 'mur' },
+    { x: 640, y: 520, text: 'ÉCRAN DE CONTRÔLE|HORS TENSION', tone: 'grille' },
+    { x: 460, y: 150, text: 'BANC D’ÉTALONNAGE|HORS SERVICE', tone: 'chaud' },
+    // le placard : chaque casier porte le NOM de sa surface en sur-titre
+    // et son énigme en titre — on apprend le mot et la poésie d'un coup
+    { x: 400, y: -330, text: 'SECTEUR 02|PLACARD D’ENTRETIEN', tone: 'mur' },
+    { x: -80, y: -540, text: 'HYDROPHILE|CE QUI AIME RETIENT', tone: 'phile' },
+    { x: 200, y: -430, text: 'HYDROPHOBE|CE QUI REPOUSSE PROPULSE', tone: 'phobe' },
+    { x: 480, y: -540, text: 'PLAQUE FROIDE|LE FROID FIGE, LE FIGÉ FILE', tone: 'froid' },
+    { x: 760, y: -430, text: 'ÉVENT|SEUL LE SOUFFLE PASSE', tone: 'grille' },
+    { x: 1000, y: -540, text: 'ÉPONGE|ELLE BOIT, NE REND RIEN', tone: 'eponge' },
+    // le départ
+    { x: 1120, y: 340, text: 'SECTEUR 03|CONDUIT DE VENTILATION', tone: 'grille' },
+    { x: 1330, y: -220, text: 'PROTOCOLE 21|SAS DE LANCEMENT', tone: 'sas' },
   ],
 }
