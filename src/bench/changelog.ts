@@ -7,9 +7,21 @@ export interface Delivery {
   date: string // JJ/MM/AAAA HH:MM (heure de Paris)
   title: string
   notes: string[]
+  // illustration optionnelle (capture, schéma) : chemin sous /assets/,
+  // affichée dans l'écran LIVRAISONS au-dessus des notes
+  figure?: string
 }
 
 export const DELIVERIES: Delivery[] = [
+  {
+    date: '15/08/2026 02:50',
+    title: 'Les notes de livraison ont leur écran — et un compteur de FPS permanent',
+    notes: [
+      'Le journal des livraisons quitte le banc de réglage : nouveau bouton 📜 LIVRAISONS sur la fiche d’essai — les 160 entrées du chantier, lisibles, avec un bouton TÉLÉCHARGER qui exporte tout en Markdown (hors ligne compris). Les entrées peuvent désormais porter une illustration (capture, schéma) : les prochaines livraisons visuelles en profiteront.',
+      'Le banc y gagne un DOM plus léger. Réponse à la question « le banc consomme-t-il ? » : fermé, son coût est faible mais réel — ses moniteurs se rafraîchissent ~5 fois par seconde en continu ; l’essentiel de son poids était ce journal, désormais sorti.',
+      'COMPTEUR D’IMAGES PAR SECONDE au voile PARAMÈTRES : AFFICHÉ, la cadence mesurée reste en permanence dans le coin bas-gauche de l’écran, discrète (mise à jour 4 fois par seconde) — surveiller sans ouvrir de rapport. Mémorisé par appareil.',
+    ],
+  },
   {
     date: '15/08/2026 02:20',
     title: 'Huit trophées du protocole — prêts pour Steam',

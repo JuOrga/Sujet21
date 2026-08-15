@@ -7,7 +7,6 @@
 
 import { Pane } from 'tweakpane'
 import type { SimParams } from '../sim/params'
-import { DELIVERIES } from './changelog'
 import './bench.css'
 import {
   copyParams,
@@ -749,30 +748,9 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Coût CPU de la préparation du rendu par image, lissé (le travail GPU s’ajoute par-dessus).',
   )
 
-  // ---- Livraisons : le journal de ce qui a été livré, date et heure ----
-  const fLog = pane.addFolder({ title: 'Livraisons', expanded: false })
-  const log = document.createElement('div')
-  log.className = 'bench-log'
-  for (const d of DELIVERIES) {
-    const entry = document.createElement('div')
-    const head = document.createElement('div')
-    head.className = 'bench-log-head'
-    head.textContent = `${d.date} — ${d.title}`
-    entry.appendChild(head)
-    const ul = document.createElement('ul')
-    for (const note of d.notes) {
-      const li = document.createElement('li')
-      li.textContent = note
-      ul.appendChild(li)
-    }
-    entry.appendChild(ul)
-    log.appendChild(entry)
-  }
-  // Dans le conteneur repliable du dossier, pour suivre son état ouvert/fermé.
-  // La classe bench-log-folder neutralise la hauteur calculée par tweakpane
-  // (qui ignore ce div étranger et le clipperait).
-  fLog.element.classList.add('bench-log-folder')
-  ;(fLog.element.querySelector('.tp-fldv_c') ?? fLog.element).appendChild(log)
+  // Le journal des livraisons a quitté le banc : il vit dans son propre
+  // écran (bouton LIVRAISONS de la fiche), téléchargeable — et le banc
+  // porte un DOM d'autant plus léger.
 
   describe(pane.addButton({ title: 'Recommencer (R)' }), 'Relance le tableau depuis le début.').on(
     'click',
