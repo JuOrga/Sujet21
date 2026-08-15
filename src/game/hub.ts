@@ -48,9 +48,11 @@ export const TABLEAU_HUB: LevelDef = {
   // le sas de LANCEMENT, tout à l'est, au bout des chicanes
   exit: { minX: 2260, minY: -120, maxX: 2390, maxY: 120 },
   boxes: [
-    // ---- CUVE D'ENTRAÎNEMENT (ouest) : deux agrès pour sentir les surfaces
-    box(-2050, -150, -1850, -80, MAT_HYDROPHILE),
-    box(-1980, 350, -1780, 420, MAT_HYDROPHOBE),
+    // ---- CUVE D'ENTRAÎNEMENT (ouest) : deux agrès pour sentir les
+    // surfaces — aux BORDS de la cuve, jamais sous le point de réveil
+    // (l'échantillon naissait collé à l'hydrophile : réveil neutre désormais)
+    box(-2320, -720, -2120, -650, MAT_HYDROPHILE),
+    box(-1520, 580, -1320, 650, MAT_HYDROPHOBE),
     // ---- cloison cuve | hall : hublots en haut (on vous observe),
     // caissons en bas — porte CENTRALE (y −150..150)
     box(-1200, 150, -1120, 1100, MAT_WALL, 6),
@@ -63,11 +65,12 @@ export const TABLEAU_HUB: LevelDef = {
     // ---- HALL : mur sud (porte vers le placard, x −300..−60)
     box(-1120, -480, -300, -400, MAT_WALL, 1),
     box(-60, -480, 0, -400, MAT_WALL, 1),
-    // ---- PLACARD D'ENTRETIEN (sud) : un casier par surface
-    box(-1000, -1050, -840, -970, MAT_HYDROPHILE),
-    box(-760, -1050, -600, -970, MAT_HYDROPHOBE),
-    box(-520, -1050, -360, -970, MAT_FROID),
-    box(-280, -1050, -120, -970, MAT_GRILLE),
+    // ---- PLACARD D'ENTRETIEN (sud) : un casier par surface, étalés sur
+    // toute la largeur de la pièce pour que chaque pancarte respire
+    box(-1060, -1050, -900, -970, MAT_HYDROPHILE),
+    box(-844, -1050, -684, -970, MAT_HYDROPHOBE),
+    box(-628, -1050, -468, -970, MAT_FROID),
+    box(-412, -1050, -252, -970, MAT_GRILLE),
     // ---- cloison hall | salle d'étalonnage : porte HAUTE (y 250..500)
     box(0, 500, 80, 1100, MAT_WALL, 4),
     box(0, -1100, 80, 250, MAT_WALL, 4),
@@ -85,7 +88,7 @@ export const TABLEAU_HUB: LevelDef = {
   ],
   sponges: [
     // le dernier casier du placard : l'éponge — elle boit, elle ne rend rien
-    { minX: 0, minY: -1050, cols: 3, rows: 3, cellSize: 26, capacityPerCell: 5 },
+    { minX: -155, minY: -1050, cols: 3, rows: 3, cellSize: 26, capacityPerCell: 5 },
   ],
   labels: [
     // Toute la signalétique du module est en PLAQUES (« SUR-TITRE|TITRE ») :
@@ -94,15 +97,17 @@ export const TABLEAU_HUB: LevelDef = {
     { x: -1800, y: 800, text: 'MODULE MÉDUSE — SECTEUR 01|CUVE D’ENTRAÎNEMENT', tone: 'mur' },
     { x: -1800, y: -800, text: 'NOTE DE SERVICE|LES CRÉATEURS OBSERVENT', tone: 'froid' },
     // l'observation (nord du hall)
-    { x: -750, y: 840, text: 'ACCÈS CRÉATEURS|SALLE D’OBSERVATION', tone: 'mur' },
-    { x: -320, y: 700, text: 'ÉCRAN DE CONTRÔLE|HORS TENSION', tone: 'grille' },
-    // le placard (sud du hall) : le NOM de la surface, puis son énigme
-    { x: -560, y: -620, text: 'SECTEUR 02|PLACARD D’ENTRETIEN', tone: 'mur' },
-    { x: -920, y: -880, text: 'HYDROPHILE|CE QUI AIME RETIENT', tone: 'phile' },
-    { x: -680, y: -760, text: 'HYDROPHOBE|CE QUI REPOUSSE PROPULSE', tone: 'phobe' },
-    { x: -440, y: -880, text: 'PLAQUE FROIDE|LE FROID FIGE, LE FIGÉ FILE', tone: 'froid' },
-    { x: -200, y: -760, text: 'ÉVENT|SEUL LE SOUFFLE PASSE', tone: 'grille' },
-    { x: 40, y: -880, text: 'ÉPONGE|ELLE BOIT, NE REND RIEN', tone: 'eponge' },
+    { x: -800, y: 780, text: 'ACCÈS CRÉATEURS|SALLE D’OBSERVATION', tone: 'mur' },
+    { x: -250, y: 620, text: 'ÉCRAN DE CONTRÔLE|HORS TENSION', tone: 'grille' },
+    // le placard (sud du hall) : la pancarte de secteur reste dans le hall,
+    // près de la porte ; à l'intérieur, chaque casier a la sienne — TROIS
+    // hauteurs en quinconce, pour que rien ne se chevauche même dézoomé
+    { x: -450, y: -300, text: 'SECTEUR 02|PLACARD D’ENTRETIEN', tone: 'mur' },
+    { x: -980, y: -880, text: 'HYDROPHILE|CE QUI AIME RETIENT', tone: 'phile' },
+    { x: -764, y: -740, text: 'HYDROPHOBE|CE QUI REPOUSSE PROPULSE', tone: 'phobe' },
+    { x: -548, y: -600, text: 'PLAQUE FROIDE|LE FROID FIGE, LE FIGÉ FILE', tone: 'froid' },
+    { x: -332, y: -880, text: 'ÉVENT|SEUL LE SOUFFLE PASSE', tone: 'grille' },
+    { x: -116, y: -740, text: 'ÉPONGE|ELLE BOIT, NE REND RIEN', tone: 'eponge' },
     // la salle d'étalonnage
     { x: 640, y: 940, text: 'SECTEUR 03|SALLE D’ÉTALONNAGE', tone: 'mur' },
     { x: 860, y: 260, text: 'BANC D’ÉTALONNAGE|HORS SERVICE', tone: 'chaud' },

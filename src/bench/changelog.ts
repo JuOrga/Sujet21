@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 04:15',
+    title: 'Pancartes de station, réveil neutre — et la fiche sans boutons pointillés',
+    notes: [
+      'Trois remarques du joueur. UN — les deux boutons pointillés de la fiche (parcours test, éditeur) faisaient tache : ils rejoignent la GRILLE D’OUTILS de la console, tuiles ÉDITEUR et PARCOURS TEST au même style que SALLES et RECORDS — des outils, pas des actions de jeu.',
+      'DEUX — la signalétique du hub devient de vraies PANCARTES de station-labo : tôle sombre en dégradé, rail de fixation vissé pleine largeur, titre rétroéclairé par la teinte de la surface, et une bande de danger hachurée sous la seule pancarte du SAS DE LANCEMENT. Le placard s’étale sur toute la largeur de sa pièce, ses pancartes en quinconce sur TROIS hauteurs — plus rien ne se chevauche, même dézoomé ; la pancarte de secteur attend dans le hall, près de la porte.',
+      'TROIS — l’échantillon naissait posé sur l’agrès hydrophile de la cuve : réveil NEUTRE désormais, les deux agrès (hydrophile, hydrophobe) reculent aux bords de la cuve — on les rejoint pour sentir les surfaces, ils ne vous collent plus au réveil. Les 13 contrôles du banc hub passent.',
+    ],
+  },
+  {
     date: '16/08/2026 03:40',
     title: 'Le HUB s’édite : le laboratoire se remodèle depuis l’éditeur',
     notes: [
