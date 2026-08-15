@@ -137,7 +137,10 @@ function fmtDuree(s: number): string {
 // module charge, JAVASCRIPT sinon ou sur demande — le retour arrière est
 // instantané, même en pleine partie (le solveur bascule au pas suivant).
 let noyauxWasm: NoyauxWasm | null = null
-let moteurChoisi = localStorage.getItem('sujet21-moteur') ?? 'wasm'
+// Défaut : JAVASCRIPT — verdict des rapports du Pixel (A/B propre du
+// 15/08) : le JIT mobile bat les noyaux WASM de ~40 % sur ces boucles.
+// Le WASM reste en option : c'est un instrument de mesure, pas un dogme.
+let moteurChoisi = localStorage.getItem('sujet21-moteur') ?? 'js'
 function appliqueMoteur(s: FluidSim): void {
   s.noyauxWasm = noyauxWasm
   s.moteurWasm = noyauxWasm !== null && moteurChoisi === 'wasm'
@@ -781,6 +784,13 @@ const resDynamique = (): boolean => resChoix === 'dyn'
 // rendu de la section MOTEUR PHYSIQUE — paresseux : `sim` n'existe pas
 // encore quand le voile se câble, il se dessine à l'ouverture
 let majMoteurUI: () => void = () => {}
+// Rattrapage après un accroc : TEMPS RÉEL (historique — la simulation
+// rattrape le temps perdu, quitte à allonger l'image suivante) ou
+// FLUIDITÉ (anti-domino : jamais plus de pas que le régime de croisière,
+// le retard est abandonné). Les rapports montrent que 80-90 % des images
+// lentes du téléphone sont des rafales de rattrapage — mais le ressenti
+// appartient au joueur : c'est un réglage.
+let rattrapageFluide = localStorage.getItem('sujet21-rattrapage') === 'fluide'
 // Graphismes du décor : RICHE par défaut (bruit procédural complet), SOBRE
 // pour débrancher le décoratif dans le shader de composition — mêmes formes,
 // mêmes auras, moins de calcul par pixel. C'est l'instrument du test A/B :
@@ -884,6 +894,28 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
   }
   renderFpsAff()
 
+  const choixRatt = document.getElementById('params-rattrapage') as HTMLDivElement
+  const renderRatt = (): void => {
+    choixRatt.innerHTML = ''
+    for (const [fluide, label] of [
+      [false, 'TEMPS RÉEL'],
+      [true, 'FLUIDITÉ'],
+    ] as const) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = label
+      b.className = rattrapageFluide === fluide ? 'actif' : ''
+      b.addEventListener('click', () => {
+        rattrapageFluide = fluide
+        localStorage.setItem('sujet21-rattrapage', fluide ? 'fluide' : 'reel')
+        perf.reset()
+        renderRatt()
+      })
+      choixRatt.appendChild(b)
+    }
+  }
+  renderRatt()
+
   const choixMoteur = document.getElementById('params-moteur') as HTMLDivElement
   const etatMoteur = document.getElementById('params-moteur-etat') as HTMLDivElement
   const renderMoteur = (): void => {
@@ -965,6 +997,7 @@ function rapportPerf(): Record<string, unknown> {
       graphismes: decorRiche ? 'riches' : 'sobres',
       liquide: eauRiche ? 'riche' : 'sobre',
       moteur: sim.moteurWasm ? 'wasm' : noyauxWasm ? 'javascript' : 'javascript (wasm non chargé)',
+      rattrapage: rattrapageFluide ? 'fluidite' : 'temps-reel',
       palierQualite: qualityLevel,
       timeWarp: params.timeWarp,
       downsampleChamp: params.renderDownsample,
@@ -2463,6 +2496,16 @@ function frame(now: number): void {
     // d'afficher ×4 à 25 im/s. Le plancher 5 ms garantit le pas minimal.
     const bornePeriode = Math.max(5, (1000 / fpsCap) * 0.7)
     const stepBudget = Math.min(12 * boost, Math.max(5, dtReal * 1000 * 0.6 * boost), bornePeriode)
+    // FLUIDITÉ : plafond de pas au régime de croisière (cadence lissée,
+    // bornée par le verrou) — l'accroc ne se paie qu'une fois. TEMPS RÉEL :
+    // pas de plafond (le budget CPU reste seul juge), comportement historique.
+    const periodeCroisiere = Math.min(
+      50,
+      Math.max(1000 / fpsCap, fpsSmoothed > 1 ? 1000 / fpsSmoothed : 1000 / 60),
+    )
+    const plafondPas = rattrapageFluide
+      ? Math.max(1, Math.ceil(((periodeCroisiere / 1000) * warpNow) / params.dt - 0.05))
+      : Number.POSITIVE_INFINITY
     // L'anti-domino (plafond de pas au régime de croisière) a été ESSAYÉ
     // puis débranché : au ressenti sur machine réelle, l'abandon du temps
     // simulé après chaque accroc se voyait plus que la deuxième image lente
@@ -2495,6 +2538,7 @@ function frame(now: number): void {
         run.runTime += params.dt // le vaisseau refroidit au fil de l'expédition
       },
       stepBudget,
+      plafondPas,
     )
     physRaw = performance.now() - physT0
     monitor.physMs += (physRaw - monitor.physMs) * 0.08

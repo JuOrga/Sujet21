@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 13:45',
+    title: 'Verdict moteur : le JavaScript redevient le défaut — et le rattrapage devient un réglage',
+    notes: [
+      'A/B propre sur le Pixel (fenêtres vidées, mêmes conditions, à 4 minutes d’écart) : physique moyenne 5,6 ms en JavaScript contre 8,1 ms en WASM (+44 %), images lentes 36 % contre 44 %. Le JIT mobile bat nos noyaux compilés sur ces boucles : le JAVASCRIPT redevient le moteur PAR DÉFAUT, le WASM reste en option — c’est un instrument de mesure, pas un dogme. Les mesures ont tranché, dans le sens inverse de l’intuition : c’est exactement à ça qu’elles servent.',
+      'Les deux rapports du matin confirment l’autre coupable : 81 à 92 % des images lentes sont des RAFALES DE RATTRAPAGE (3 pas de simulation au lieu de 2, ~14-15 ms de physique, après chaque accroc système). L’anti-domino revient donc — en RÉGLAGE cette fois : RATTRAPAGE APRÈS UN ACCROC, « temps réel » (défaut, historique) ou « fluidité » (l’accroc ne se paie qu’une fois, quelques millisecondes de temps simulé abandonnées). Le premier essai de l’anti-domino avait été jugé au ressenti dans de mauvaises conditions (résolution dynamique au palier 5) — cette fois, le joueur juge proprement, et le rapport consigne le mode (config.rattrapage).',
+    ],
+  },
+  {
     date: '15/08/2026 02:50',
     title: 'Les notes de livraison ont leur écran — et un compteur de FPS permanent',
     notes: [

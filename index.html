@@ -3074,13 +3074,23 @@
             l'écran, discrète — pour surveiller sans ouvrir de rapport.
           </div>
           <div id="params-fpsaff" class="params-choix" role="group" aria-label="Compteur de FPS"></div>
+          <div class="params-nom" style="margin-top: 16px">RATTRAPAGE APRÈS UN ACCROC</div>
+          <div class="params-desc">
+            Quand le système vole une image (c'est lui, pas le jeu), deux écoles :
+            TEMPS RÉEL — la simulation rattrape le temps perdu, quitte à allonger
+            l'image suivante (défaut). FLUIDITÉ — l'accroc ne se paie qu'une fois,
+            la simulation abandonne quelques millisecondes de temps simulé,
+            invisible mais la cadence ne cascade jamais. Sur téléphone, FLUIDITÉ
+            supprime l'essentiel des images lentes mesurées — jugez au ressenti.
+          </div>
+          <div id="params-rattrapage" class="params-choix" role="group" aria-label="Rattrapage"></div>
           <div class="params-nom" style="margin-top: 16px">MOTEUR PHYSIQUE</div>
           <div class="params-desc">
-            WASM (défaut) : le cœur de la simulation tourne en noyaux compilés —
-            mêmes trajectoires, vérifiées au test près. JAVASCRIPT : le moteur
-            historique, à tout moment, même en pleine partie — c'est le retour
-            arrière si quelque chose semble différent. Le rapport de performance
-            consigne le moteur actif.
+            JAVASCRIPT (défaut) : le moteur historique — sur téléphone, les
+            mesures le donnent plus rapide. WASM : les mêmes calculs en noyaux
+            compilés (trajectoires identiques, vérifiées au test près) — un
+            instrument de comparaison, à tout moment, même en pleine partie.
+            Le rapport de performance consigne le moteur actif.
           </div>
           <div id="params-moteur" class="params-choix" role="group" aria-label="Moteur physique"></div>
           <div id="params-moteur-etat" class="params-desc" style="margin: 8px 0 0"></div>
