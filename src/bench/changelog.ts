@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 18:15',
+    title: 'Éveil : « sous forme de glace », et un vrai bouton CONTINUER',
+    notes: [
+      'La carte de cryostase dit désormais « VOUS ÊTES SOUS FORME DE GLACE » — la glace est un état du sujet, pas son identité (formulation du joueur).',
+      'Les cartes de l’éveil ne se ferment plus d’un toucher n’importe où : chacune porte un VRAI bouton (CONTINUER, puis PLONGER). Plus aucune carte sautée par un clic malheureux — le voile écrante toujours tout le reste, et le bouton A de la manette tourne toujours les pages.',
+    ],
+  },
+  {
     date: '15/08/2026 17:55',
     title: 'Le jeu a une version : NOTES DE VERSION remplace LIVRAISONS',
     notes: [

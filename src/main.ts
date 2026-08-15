@@ -2253,11 +2253,11 @@ function avanceEveil(): void {
   }
 }
 for (const carte of [eveil1El, eveil2El]) {
-  carte.addEventListener('pointerdown', (e) => {
-    e.stopPropagation()
-    e.preventDefault()
-    avanceEveil()
-  })
+  // le voile ÉCRANTE (rien ne traverse vers le jeu) mais n'avance pas :
+  // seul le bouton CONTINUER / PLONGER tourne la page — pas de carte
+  // sautée par un clic malheureux (à la manette, A reste le bouton)
+  carte.addEventListener('pointerdown', (e) => e.stopPropagation())
+  carte.querySelector('.ev-continuer')?.addEventListener('click', avanceEveil)
 }
 // Appelé chaque image (après la caméra) : fait avancer l'éveil au rythme
 // de ce que fait réellement le joueur — pas de minuteries arbitraires.

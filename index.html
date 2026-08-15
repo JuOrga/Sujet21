@@ -835,7 +835,23 @@
         gap: 14px;
         text-align: center;
         color: var(--ink);
+      }
+      /* le seul chemin est le BOUTON : pas de « toucher n'importe où » qui
+         ferait sauter la carte d'un clic malheureux */
+      .eveil-voile .ev-continuer {
+        margin-top: 6px;
+        padding: 12px 38px;
+        background: var(--specimen);
+        border: none;
+        border-radius: 6px;
+        color: #04121c;
+        font-family: var(--font-display);
+        font-size: 12px;
+        letter-spacing: 0.18em;
         cursor: pointer;
+      }
+      .eveil-voile .ev-continuer:hover {
+        filter: brightness(1.12);
       }
       .eveil-voile[hidden] {
         display: none;
@@ -3463,14 +3479,13 @@
     <div id="eveil1" class="eveil-voile" hidden aria-label="Éveil — sortie de cryostase">
       <div class="ev-sur">COMPLEXE ORBITAL MÉDUSE — SORTIE DE CRYOSTASE</div>
       <div class="ev-icone">❄</div>
-      <h3 class="ev-titre">VOUS ÊTES LA GLACE</h3>
+      <h3 class="ev-titre">VOUS ÊTES SOUS FORME DE GLACE</h3>
       <p class="ev-texte">La cryostase s'achève, sujet 21 : vous dérivez, gelé, dans la
       cuve d'essai. Sous cette forme, nul moyen de vous diriger — mais rien ne se
       perd : l'élan vous porte, les parois vous renvoient, entier. La glace garde
       d'autres talents… chaque salle vous en révélera un.</p>
       <p class="ev-texte ev-accent">D'abord : redevenez liquide.</p>
-      <div class="ob-pied"><span class="ob-suite ev-t">TOUCHER POUR OUVRIR LES YEUX</span><span
-        class="ob-suite ev-p">CLIQUER POUR OUVRIR LES YEUX</span></div>
+      <button class="ev-continuer" type="button">CONTINUER</button>
     </div>
     <div id="eveil2" class="eveil-voile" hidden aria-label="Éveil — le volume">
       <div class="ev-sur">PREMIÈRE ANALYSE — LE CORPS D'EAU</div>
@@ -3481,8 +3496,7 @@
       et votre note. L'eau épouse, la glace file, la vapeur s'élève : trois états,
       un seul corps.</p>
       <p class="ev-texte ev-accent">Le reste — évents, lasers, plaques froides — s'apprend en salle.</p>
-      <div class="ob-pied"><span class="ob-suite ev-t">TOUCHER POUR PLONGER</span><span
-        class="ob-suite ev-p">CLIQUER POUR PLONGER</span></div>
+      <button class="ev-continuer" type="button">PLONGER</button>
     </div>
     <div id="eveil-invite" hidden aria-hidden="true">
       <span class="ei-boite"><span class="ei-t">TOUCHEZ <b>💧</b> — REDEVENEZ LIQUIDE</span><span
