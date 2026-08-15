@@ -812,6 +812,124 @@
         animation: ob-pulse 2s ease-in-out infinite;
       }
 
+      /* ---- L'ÉVEIL : cartes scénarisées + invite au-dessus du corps ---- */
+      .eveil-voile {
+        position: fixed;
+        inset: 0;
+        z-index: 55;
+        background: rgba(4, 8, 15, 0.82);
+        backdrop-filter: blur(3px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        text-align: center;
+        color: var(--ink);
+        cursor: pointer;
+      }
+      .eveil-voile[hidden] {
+        display: none;
+      }
+      /* textes selon la prise en main : le voile porte data-mode (pc/tactile) */
+      .eveil-voile[data-mode='pc'] .ev-t,
+      .eveil-voile:not([data-mode='pc']) .ev-p {
+        display: none;
+      }
+      .ev-sur {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.3em;
+        color: var(--specimen);
+        opacity: 0.85;
+      }
+      .ev-icone {
+        font-size: 46px;
+        line-height: 1;
+        animation: ob-pulse 2.7s ease-in-out infinite;
+        filter: drop-shadow(0 0 18px rgba(140, 210, 255, 0.7));
+      }
+      .ev-titre {
+        margin: 4px 0 0;
+        font-family: var(--font-display);
+        font-size: 21px;
+        letter-spacing: 0.18em;
+        color: #cfe9ff;
+      }
+      .ev-texte {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.8;
+        color: var(--dim);
+        max-width: 500px;
+        padding: 0 24px;
+      }
+      .ev-accent {
+        color: #dff2ff;
+        font-size: 13.5px;
+        letter-spacing: 0.04em;
+      }
+      /* l'invite : une consigne qui PLANE au-dessus du corps et suit sa
+         dérive (positionnée chaque image par le jeu), flèche vers le bas */
+      #eveil-invite {
+        position: fixed;
+        left: 0;
+        top: 0;
+        z-index: 40;
+        pointer-events: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1px;
+        font-family: var(--font-display);
+        font-size: 12.5px;
+        letter-spacing: 0.14em;
+        color: #dff2ff;
+        white-space: nowrap;
+      }
+      #eveil-invite[hidden] {
+        display: none;
+      }
+      #eveil-invite[data-mode='pc'] .ei-t,
+      #eveil-invite:not([data-mode='pc']) .ei-p {
+        display: none;
+      }
+      #eveil-invite .ei-boite {
+        padding: 10px 16px;
+        border: 1px solid rgba(99, 183, 230, 0.75);
+        border-radius: 8px;
+        background: rgba(6, 16, 28, 0.9);
+        animation: ei-pulse 1.8s ease-in-out infinite;
+      }
+      #eveil-invite .ei-boite b {
+        color: #8fd2ff;
+        font-weight: normal;
+      }
+      #eveil-invite .ei-fleche {
+        color: #63b7e6;
+        font-size: 13px;
+        text-shadow: 0 0 10px rgba(99, 183, 230, 0.9);
+      }
+      @keyframes ei-pulse {
+        0%, 100% { box-shadow: 0 0 8px rgba(99, 183, 230, 0.25); }
+        50% { box-shadow: 0 0 26px rgba(99, 183, 230, 0.65); }
+      }
+      /* le bouton 💧 appelé : il pulse tant que l'invite est à l'écran */
+      .eveil-appel {
+        animation: eveil-appel 1.1s ease-in-out infinite !important;
+        border-color: #8fd2ff !important;
+      }
+      @keyframes eveil-appel {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(143, 210, 255, 0); transform: scale(1); }
+        50% { box-shadow: 0 0 18px 4px rgba(143, 210, 255, 0.7); transform: scale(1.1); }
+      }
+      /* le bouton de réinitialisation ARMÉ : rouge, impossible à confondre */
+      #proto-reset-nom.danger {
+        border-color: #ff7a6a !important;
+        color: #ffb3a8 !important;
+        box-shadow: 0 0 12px rgba(255, 122, 106, 0.4);
+      }
+
       /* La fiche défile si elle déborde, mais sans ascenseur visible :
          sur Steam Deck la barre s'affichait pour trois pixels de trop. */
       #home {
@@ -3228,6 +3346,19 @@
           </div>
           <div id="params-moteur" class="params-choix" role="group" aria-label="Moteur physique"></div>
           <div id="params-moteur-etat" class="params-desc" style="margin: 8px 0 0"></div>
+          <div class="params-nom" style="margin-top: 16px">PROTOCOLE — PRISE EN MAIN &amp; OPÉRATEUR</div>
+          <div class="params-desc">
+            REFAIRE LA PRISE EN MAIN rejoue l'éveil de l'échantillon (cryostase,
+            dégel, premières impulsions) sur le tableau en cours — rien d'autre
+            ne bouge. RÉINITIALISER L'OPÉRATEUR efface le nom ET les registres
+            locaux (records, historique d'expédition), puis redemande une
+            signature — les trophées et les réglages restent. Deux clics pour
+            confirmer : l'effacement est définitif.
+          </div>
+          <div class="params-choix">
+            <button id="proto-rejouer" type="button">REFAIRE LA PRISE EN MAIN</button>
+            <button id="proto-reset-nom" type="button">RÉINITIALISER L'OPÉRATEUR</button>
+          </div>
           <div class="params-nom" style="margin-top: 16px">RAPPORT DE PERFORMANCE</div>
           <div class="params-desc">
             Le jeu mesure ses deux dernières minutes d'images : cadence (médiane,
@@ -3316,6 +3447,37 @@
         <span class="ob-points"><i class="on"></i><i></i><i></i><i></i><i></i></span>
         <span class="ob-suite">TOUCHER POUR CONTINUER</span>
       </div>
+    </div>
+
+    <!-- L'ÉVEIL : la prise en main scénarisée — cryostase, dégel, volume -->
+    <div id="eveil1" class="eveil-voile" hidden aria-label="Éveil — sortie de cryostase">
+      <div class="ev-sur">COMPLEXE ORBITAL MÉDUSE — SORTIE DE CRYOSTASE</div>
+      <div class="ev-icone">❄</div>
+      <h3 class="ev-titre">VOUS ÊTES LA GLACE</h3>
+      <p class="ev-texte">La cryostase s'achève, sujet 21 : vous dérivez, gelé, dans la
+      cuve d'essai. Sous cette forme, nul moyen de vous diriger — mais rien ne se
+      perd : l'élan vous porte, les parois vous renvoient, entier. La glace garde
+      d'autres talents… chaque salle vous en révélera un.</p>
+      <p class="ev-texte ev-accent">D'abord : redevenez liquide.</p>
+      <div class="ob-pied"><span class="ob-suite ev-t">TOUCHER POUR OUVRIR LES YEUX</span><span
+        class="ob-suite ev-p">CLIQUER POUR OUVRIR LES YEUX</span></div>
+    </div>
+    <div id="eveil2" class="eveil-voile" hidden aria-label="Éveil — le volume">
+      <div class="ev-sur">PREMIÈRE ANALYSE — LE CORPS D'EAU</div>
+      <div class="ev-icone">💧</div>
+      <h3 class="ev-titre">VOUS ÊTES CE QUI RESTE</h3>
+      <p class="ev-texte">Vous l'avez senti : chaque impulsion éjecte un peu de vous.
+      Se déplacer, c'est rétrécir — le volume est à la fois votre vie, votre monnaie
+      et votre note. L'eau épouse, la glace file, la vapeur s'élève : trois états,
+      un seul corps.</p>
+      <p class="ev-texte ev-accent">Le reste — évents, lasers, plaques froides — s'apprend en salle.</p>
+      <div class="ob-pied"><span class="ob-suite ev-t">TOUCHER POUR PLONGER</span><span
+        class="ob-suite ev-p">CLIQUER POUR PLONGER</span></div>
+    </div>
+    <div id="eveil-invite" hidden aria-hidden="true">
+      <span class="ei-boite"><span class="ei-t">TOUCHEZ <b>💧</b> — REDEVENEZ LIQUIDE</span><span
+        class="ei-p"><b>F</b> OU <b>💧</b> — REDEVENEZ LIQUIDE</span></span>
+      <span class="ei-fleche">▼</span>
     </div>
 
     <div id="hud-danger" aria-live="assertive"></div>

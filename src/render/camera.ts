@@ -97,6 +97,11 @@ export class Camera {
     this.introTimer = 0
   }
 
+  /** Le plan large d'ouverture joue encore ? (l'éveil attend sa fin) */
+  get introEnCours(): boolean {
+    return this.introTimer > 0
+  }
+
   snapTo(x: number, y: number, zoom: number): void {
     this.x = x
     this.y = y

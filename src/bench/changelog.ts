@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 17:30',
+    title: 'L’ÉVEIL : la prise en main devient une scène — et deux boutons PROTOCOLE',
+    notes: [
+      'Fini les cinq cartes de gestes (mises de côté dans le code, au cas où) : la prise en main est désormais SCÉNARISÉE. Au chargement, l’échantillon attend en CRYOSTASE — le premier contact visuel avec le sujet 21 est un bloc de glace qui dérive. À la plongée, le plan large se joue, puis une carte pose l’état : « VOUS ÊTES LA GLACE » — nul moyen de se diriger, mais rien ne se perd, l’élan vous porte… et « la glace garde d’autres talents » : on tease, on ne déballe pas.',
+      'La carte fermée, une INVITE lumineuse plane au-dessus du corps et suit sa dérive : « TOUCHEZ 💧 — REDEVENEZ LIQUIDE » (F ou 💧 au clavier), pendant que le bouton 💧 de la barre PULSE. Pas de « cliquez pour continuer » : le DÉGEL est la réponse. Puis deux impulsions données — on sent le volume qui part — et une dernière carte nomme ce qu’on vient de vivre : « VOUS ÊTES CE QUI RESTE ». Trois temps, zéro liste de commandes.',
+      'PARAMÈTRES gagne une section PROTOCOLE : REFAIRE LA PRISE EN MAIN rejoue l’éveil sur le tableau en cours (rien d’autre ne bouge) ; RÉINITIALISER L’OPÉRATEUR efface nom + registres locaux et redemande une signature vierge — DEUX clics pour confirmer (le bouton s’arme en rouge), trophées et réglages conservés. À la manette, A tourne les cartes de l’éveil.',
+    ],
+  },
+  {
     date: '15/08/2026 16:40',
     title: 'Les joueurs d’avant le voile signent aussi — une fois, sans rien perdre',
     notes: [
