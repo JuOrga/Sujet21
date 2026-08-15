@@ -3,6 +3,8 @@
 name: diag-levels
 on:
   workflow_dispatch:
+  push:
+    branches: [diag-levels-go]
 
 jobs:
   lire:
