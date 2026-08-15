@@ -92,7 +92,7 @@ window.addEventListener('keydown', eveilAudio)
 // bouton d'activation. La fiche garde un simple MUTE, comme la barre du jeu.
 const btnMute = document.getElementById('home-mute') as HTMLButtonElement | null
 function majInviteSon(): void {
-  if (btnMute) btnMute.textContent = audio.enabled ? '🔊 SON' : '🔇 MUET'
+  if (btnMute) btnMute.innerHTML = audio.enabled ? '<i>♪</i><span>SON</span>' : '<i>⊘</i><span>MUET</span>'
 }
 btnMute?.addEventListener('click', () => {
   audio.setEnabled(!audio.enabled)
@@ -316,29 +316,39 @@ function renderRegistres(): void {
   const signe = (name: string): string =>
     name ? `<i class="rec-qui${name === moi ? ' rec-moi' : ''}">${htmlSafe(name)}</i>` : ''
   const rows: string[] = playedLevels().map((t) => {
+    // Le PALMARÈS (tops note/volume/chrono) prime : c'est le nouveau
+    // système de records. Les anciens records « simples » (locaux et
+    // partagés) servent de secours pour les salles jouées avant lui.
+    const tops = sharedBoard?.tops?.[t.code]
     const local = records.tableauRecord(t.code)
     const shared = sharedBoard?.tableaux[t.code] ?? null
-    // colonne VOLUME : le partagé prime s'il fait mieux (même départage)
+    const meilleurNote = tops?.note?.[0] ?? null
+    const noteTxt = meilleurNote
+      ? `<b>${meilleurNote.note} pts</b> ${signe(meilleurNote.name)}`
+      : '<span class="rec-none">—</span>'
     const lv = local?.volume ?? null
     const vol =
-      shared && (!lv || shared.liters > lv.liters || (shared.liters === lv.liters && shared.time < lv.time))
+      tops?.volume?.[0] ??
+      (shared && (!lv || shared.liters > lv.liters || (shared.liters === lv.liters && shared.time < lv.time))
         ? shared
-        : lv
+        : lv)
     const volTxt = vol
-      ? `<b>${fmtL(vol.liters)}</b> <small>· ${fmtTime(vol.time)}</small> ${signe(vol.name)}`
+      ? `<b>${fmtL(vol.liters)}</b> ${signe(vol.name)}`
       : '<span class="rec-none">—</span>'
-    const chr = local?.chrono ?? null
+    const chr = tops?.chrono?.[0] ?? local?.chrono ?? null
     const chrTxt = chr
-      ? `<b>${fmtTime(chr.time)}</b> <small>· ${fmtL(chr.liters)}</small> ${signe(chr.name)}`
+      ? `<b>${fmtTime(chr.time)}</b> ${signe(chr.name)}`
       : '<span class="rec-none">—</span>'
     return (
       `<div class="rec-row"><span class="rec-code">${t.code}</span><span class="rec-name">${t.name}</span>` +
+      `<span class="rec-val rec-note">${noteTxt}</span>` +
       `<span class="rec-val rec-vol">${volTxt}</span><span class="rec-val rec-chr">${chrTxt}</span></div>`
     )
   })
   rows.unshift(
     `<div class="rec-row rec-titres"><span class="rec-code"></span><span class="rec-name">SALLE</span>` +
-      `<span class="rec-val rec-vol">💧 VOLUME</span><span class="rec-val rec-chr">⏱ CHRONO (vous)</span></div>`,
+      `<span class="rec-val rec-note">★ NOTE</span>` +
+      `<span class="rec-val rec-vol">💧 VOLUME</span><span class="rec-val rec-chr">⏱ CHRONO</span></div>`,
   )
   const localExp = records.expedition()
   const sharedExp = sharedBoard?.expedition ?? null
@@ -560,14 +570,14 @@ const livraisonsEl = document.getElementById('livraisons') as HTMLDivElement
   })
   document.getElementById('livraisons-dl')?.addEventListener('click', () => {
     const md =
-      '# Projet 21 — notes de livraison\n\n' +
+      '# Sujet 21 — notes de livraison\n\n' +
       DELIVERIES.map(
         (d) => `## ${d.date} — ${d.title}\n\n${d.notes.map((n) => `- ${n}`).join('\n')}\n`,
       ).join('\n')
     const url = URL.createObjectURL(new Blob([md], { type: 'text/markdown' }))
     const a = document.createElement('a')
     a.href = url
-    a.download = 'projet21-livraisons.md'
+    a.download = 'sujet21-livraisons.md'
     a.click()
     URL.revokeObjectURL(url)
   })
@@ -1293,7 +1303,9 @@ if (pleinBtn) {
       else void document.documentElement.requestFullscreen().catch(() => {})
     })
     document.addEventListener('fullscreenchange', () => {
-      pleinBtn.textContent = document.fullscreenElement ? '⛶ QUITTER LE PLEIN ÉCRAN' : '⛶ PLEIN ÉCRAN'
+      pleinBtn.innerHTML = document.fullscreenElement
+        ? '<i>⛶</i><span>QUITTER</span>'
+        : '<i>⛶</i><span>PLEIN ÉCRAN</span>'
     })
   }
 }
@@ -1387,6 +1399,8 @@ const FICHE_BOUTONS = [
   'start-bis',
   'start-editor',
   'home-salles',
+  'home-records',
+  'home-livraisons',
   'home-cmds',
   'home-recs',
   'home-params',

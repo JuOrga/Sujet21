@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
     />
-    <title>Projet 21</title>
+    <title>Sujet 21</title>
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%23030710'/%3E%3Ccircle cx='16' cy='17' r='9' fill='%2363b7e6'/%3E%3Ccircle cx='13' cy='14' r='3' fill='%23a7ddf5'/%3E%3C/svg%3E"
@@ -127,12 +127,57 @@
       }
 
       /* ---- Boutons jumeaux de la fiche : commandes + records + plein écran ---- */
+      /* La rangée d'outils : une CONSOLE — chips uniformes, grille qui
+         s'adapte seule (1 rangée sur grand écran, 2-3 colonnes sur téléphone),
+         cibles tactiles généreuses. Le glyphe est tinté échantillon : la
+         rangée appartient au labo, pas au navigateur. */
       .home-duo {
-        display: flex;
-        gap: 10px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+        gap: 8px;
+        margin-top: 14px;
       }
-      .home-duo button {
-        flex: 1 1 0;
+      #home .home-duo button {
+        appearance: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        min-height: 54px;
+        padding: 8px 4px;
+        background: linear-gradient(180deg, rgba(18, 32, 50, 0.72), rgba(8, 16, 28, 0.88));
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--ink);
+        font-family: var(--font-display);
+        font-size: 9px;
+        letter-spacing: 0.13em;
+        line-height: 1.15;
+        cursor: pointer;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.08s ease;
+      }
+      #home .home-duo button i {
+        font-style: normal;
+        font-size: 17px;
+        line-height: 1;
+        color: var(--specimen);
+        text-shadow: 0 0 10px rgba(46, 198, 201, 0.35);
+      }
+      #home .home-duo button span { text-align: center; }
+      #home .home-duo button:hover {
+        border-color: var(--specimen);
+        box-shadow: 0 0 14px rgba(46, 198, 201, 0.16), inset 0 0 18px rgba(46, 198, 201, 0.05);
+      }
+      #home .home-duo button:active { transform: translateY(1px); }
+      #home .home-duo button:focus-visible {
+        outline: 2px solid var(--specimen);
+        outline-offset: 2px;
+      }
+      @media (pointer: coarse) {
+        #home .home-duo { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
+        #home #home .home-duo button { min-height: 62px; font-size: 9.5px; }
+        #home #home .home-duo button i { font-size: 20px; }
       }
       /* le bouton RECORDS n'existe que là où les registres sont cachés */
       #home-recs {
@@ -2719,11 +2764,11 @@
     <aside id="home" aria-label="Fiche d'essai">
       <div class="home-eyebrow">
         <span>COMPLEXE ORBITAL MÉDUSE — PROTOCOLE «&nbsp;TENSION DE SURFACE&nbsp;»</span>
-        <img class="home-badge" src="/assets/badge.webp" alt="Écusson de la mission Projet 21" />
+        <img class="home-badge" src="/assets/badge.webp" alt="Écusson de la mission Sujet 21" />
       </div>
       <div class="home-cols">
       <div class="home-col">
-      <h1 class="home-title">PROJET <em>21</em></h1>
+      <h1 class="home-title">SUJET <em>21</em></h1>
       <p class="home-pitch">
         Vous êtes un volume d'eau en apesanteur. La seule façon d'avancer&nbsp;:
         éjecter une partie de vous-même. <strong>Se déplacer, c'est rétrécir.</strong>
@@ -2739,15 +2784,15 @@
       <button id="home-restart" type="button" hidden>RECOMMENCER LE TABLEAU</button>
       <button id="start-bis" type="button">PARCOURS TEST — L'ÉCOLE, PUIS LES SALLES LASER</button>
       <button id="start-editor" type="button">ÉDITEUR DE TABLEAUX — CRÉER OU MODIFIER UN NIVEAU</button>
-      <div class="home-duo">
-        <button id="home-salles" type="button">▦ SALLES</button>
-        <button id="home-records" type="button">🏆 RECORDS</button>
-        <button id="home-livraisons" type="button">📜 LIVRAISONS</button>
-        <button id="home-cmds" type="button">⌘ COMMANDES</button>
-        <button id="home-recs" type="button">◧ RECORDS</button>
-        <button id="home-params" type="button">⚙ PARAMÈTRES</button>
-        <button id="home-mute" type="button">🔊 SON</button>
-        <button id="home-plein" type="button">⛶ PLEIN ÉCRAN</button>
+      <div class="home-duo" role="group" aria-label="Outils du protocole">
+        <button id="home-salles" type="button"><i>▦</i><span>SALLES</span></button>
+        <button id="home-records" type="button"><i>✦</i><span>RECORDS</span></button>
+        <button id="home-livraisons" type="button"><i>◈</i><span>LIVRAISONS</span></button>
+        <button id="home-cmds" type="button"><i>⌘</i><span>COMMANDES</span></button>
+        <button id="home-recs" type="button"><i>◧</i><span>REGISTRES</span></button>
+        <button id="home-params" type="button"><i>⚙&#xFE0E;</i><span>PARAMÈTRES</span></button>
+        <button id="home-mute" type="button"><i>♪</i><span>SON</span></button>
+        <button id="home-plein" type="button"><i>⛶</i><span>PLEIN ÉCRAN</span></button>
       </div>
       <div id="home-seq" class="rec-note"></div>
       </div>

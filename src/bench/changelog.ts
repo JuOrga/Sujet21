@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 14:45',
+    title: 'SUJET 21 — et la fiche a enfin une console digne du labo',
+    notes: [
+      'Le jeu s’appelle SUJET 21 : titre, écusson et exports renommés (les données locales des joueurs ne bougent pas).',
+      'La rangée d’outils de la fiche était restée en boutons BRUTS du navigateur — blancs, débordants, avec deux boutons RECORDS en doublon. Elle devient une CONSOLE : huit chips uniformes (glyphe tinté échantillon + libellé), grille qui s’adapte seule du grand écran au téléphone (une rangée large, ou 2-3 colonnes), cibles tactiles généreuses en tactile, survol lumineux, focus visible. L’ancien doublon devient REGISTRES (il ouvre les registres sur mobile, où la colonne de droite se replie).',
+      'La MANETTE atteint désormais RECORDS et LIVRAISONS depuis la fiche (ils manquaient à la navigation au stick). Et le panneau REGISTRES DU LABO bascule sur le NOUVEAU système de records : colonne ★ NOTE en tête (le rang 1 du palmarès partagé), volume et chrono tirés des podiums — l’ancien record simple ne sert plus que de secours pour les salles jouées avant le palmarès.',
+    ],
+  },
+  {
     date: '15/08/2026 14:10',
     title: 'Cadence de simulation 120/60 Hz : le levier contre la chauffe',
     notes: [
