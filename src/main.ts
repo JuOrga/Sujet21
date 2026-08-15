@@ -5,7 +5,7 @@ import { DEFAULT_PARAMS, type SimParams } from './sim/params'
 import { FluidSim, KIND_PLAYER } from './sim/solver'
 import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
-import { DELIVERIES } from './bench/changelog'
+import { DELIVERIES, VERSION, versionDe } from './bench/changelog'
 import { Camera } from './render/camera'
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { FixedLoop } from './game/loop'
@@ -613,11 +613,18 @@ renderSalles()
 document.getElementById('home-salles')?.addEventListener('click', () => {
   sallesEl.hidden = false
 })
-// ---- Le voile LIVRAISONS : le journal du chantier, sorti du banc ----
-// Chaque entrée peut porter une illustration (champ figure) ; le bouton
-// TÉLÉCHARGER exporte tout le journal en Markdown, hors ligne compris.
+// ---- Le voile NOTES DE VERSION : le journal du chantier, sorti du banc ----
+// Chaque entrée peut porter une illustration (champ figure) et affiche la
+// version qu'elle a inaugurée ; le bouton TÉLÉCHARGER exporte tout le
+// journal en Markdown, hors ligne compris.
 const livraisonsEl = document.getElementById('livraisons') as HTMLDivElement
 {
+  // la version, affichée partout depuis la même source : sous le titre de
+  // la fiche (en petit) et dans l'en-tête du voile
+  const versionJeu = document.getElementById('version-jeu')
+  if (versionJeu) versionJeu.textContent = `v${VERSION} — prototype`
+  const livVersion = document.getElementById('liv-version')
+  if (livVersion) livVersion.textContent = `le jeu est en v${VERSION}`
   const corps = document.getElementById('livraisons-corps') as HTMLDivElement
   let rendu = false
   const renderLivraisons = (): void => {
@@ -625,8 +632,9 @@ const livraisonsEl = document.getElementById('livraisons') as HTMLDivElement
     rendu = true
     const esc = (t: string): string => t.replace(/</g, '&lt;')
     corps.innerHTML = DELIVERIES.map(
-      (d) =>
-        `<div class="liv-e"><h3>${esc(d.title)}</h3><time>${esc(d.date)}</time>` +
+      (d, i) =>
+        `<div class="liv-e"><h3>${esc(d.title)}</h3>` +
+        `<time>v${versionDe(i)} · ${esc(d.date)}</time>` +
         (d.figure ? `<img src="${d.figure}" alt="" loading="lazy" />` : '') +
         `<ul>${d.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul></div>`,
     ).join('')
@@ -643,14 +651,15 @@ const livraisonsEl = document.getElementById('livraisons') as HTMLDivElement
   })
   document.getElementById('livraisons-dl')?.addEventListener('click', () => {
     const md =
-      '# Sujet 21 — notes de livraison\n\n' +
+      `# Sujet 21 — notes de version (v${VERSION})\n\n` +
       DELIVERIES.map(
-        (d) => `## ${d.date} — ${d.title}\n\n${d.notes.map((n) => `- ${n}`).join('\n')}\n`,
+        (d, i) =>
+          `## v${versionDe(i)} — ${d.date} — ${d.title}\n\n${d.notes.map((n) => `- ${n}`).join('\n')}\n`,
       ).join('\n')
     const url = URL.createObjectURL(new Blob([md], { type: 'text/markdown' }))
     const a = document.createElement('a')
     a.href = url
-    a.download = 'sujet21-livraisons.md'
+    a.download = 'sujet21-notes-de-version.md'
     a.click()
     URL.revokeObjectURL(url)
   })

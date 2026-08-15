@@ -406,6 +406,15 @@
         border: 1px solid var(--specimen); border-radius: 4px; cursor: pointer;
       }
       #livraisons-corps { padding: 4px 14px 16px; }
+      #liv-version { font-family: var(--font-mono); letter-spacing: 0.06em; color: var(--dim); text-transform: none; }
+      /* la version du jeu, en petit sous le titre — discrète mais toujours là */
+      #version-jeu {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.22em;
+        color: var(--dim);
+        margin: -8px 0 10px;
+      }
       .liv-e { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 8px; }
       .liv-e h3 {
         margin: 0; font-family: var(--font-display); font-size: 11.5px;
@@ -2968,6 +2977,7 @@
       <div class="home-cols">
       <div class="home-col">
       <h1 class="home-title">SUJET <em>21</em></h1>
+      <div id="version-jeu" aria-label="Version du jeu"></div>
       <p class="home-pitch">
         Vous êtes un volume d'eau en apesanteur. La seule façon d'avancer&nbsp;:
         éjecter une partie de vous-même. <strong>Se déplacer, c'est rétrécir.</strong>
@@ -2986,7 +2996,7 @@
       <div class="home-duo" role="group" aria-label="Outils du protocole">
         <button id="home-salles" type="button"><i>▦</i><span>SALLES</span></button>
         <button id="home-records" type="button"><i>✦</i><span>RECORDS</span></button>
-        <button id="home-livraisons" type="button"><i>◈</i><span>LIVRAISONS</span></button>
+        <button id="home-livraisons" type="button"><i>◈</i><span>NOTES DE VERSION</span></button>
         <button id="home-cmds" type="button"><i>⌘</i><span>COMMANDES</span></button>
         <button id="home-params" type="button"><i>⚙&#xFE0E;</i><span>PARAMÈTRES</span></button>
         <button id="home-mute" type="button"><i>♪</i><span>SON</span></button>
@@ -3012,7 +3022,7 @@
       </div>
       <div class="home-foot">
         Prototype de travail — le bouton BANC (barre du bas) ouvre le banc de réglage :
-        la physique se modifie en direct, et le journal des livraisons y consigne
+        la physique se modifie en direct, et les NOTES DE VERSION consignent
         chaque mise à jour.
       </div>
     </aside>
@@ -3249,10 +3259,10 @@
       </div>
     </div>
 
-    <!-- Le voile LIVRAISONS : le journal du chantier, sorti du banc -->
-    <div id="livraisons" hidden aria-label="Notes de livraison">
+    <!-- Le voile NOTES DE VERSION : le journal du chantier, sorti du banc -->
+    <div id="livraisons" hidden aria-label="Notes de version">
       <div class="salles-boite">
-        <div class="salles-tete"><span>NOTES DE LIVRAISON — le journal du chantier</span>
+        <div class="salles-tete"><span>NOTES DE VERSION — <span id="liv-version"></span></span>
           <span style="display:flex; gap:8px">
             <button type="button" id="livraisons-dl">TÉLÉCHARGER</button>
             <button type="button" id="livraisons-fermer" aria-label="Fermer">✕</button>

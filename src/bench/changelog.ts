@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 17:55',
+    title: 'Le jeu a une version : NOTES DE VERSION remplace LIVRAISONS',
+    notes: [
+      'Le jeu est désormais VERSIONNÉ : 0.21.N — « 21 » pour le sujet, N avance tout seul à chaque livraison consignée dans ce journal (une seule source de vérité, aucun numéro à penser à bumper). La version courante s’affiche EN PETIT sous le titre de la fiche, discrète mais toujours là.',
+      'Le bouton LIVRAISONS devient NOTES DE VERSION. L’écran affiche la version courante dans son en-tête, et chaque entrée du journal porte le numéro qu’elle a inauguré (v0.21.169, v0.21.168…). L’export Markdown téléchargeable reprend le tout, versions comprises.',
+    ],
+  },
+  {
     date: '15/08/2026 17:30',
     title: 'L’ÉVEIL : la prise en main devient une scène — et deux boutons PROTOCOLE',
     notes: [
@@ -1525,3 +1533,13 @@ export const DELIVERIES: Delivery[] = [
     notes: ['Matériaux (hydrophile, hydrophobe), éponge à saturation, sas de sortie et bonbonnes.'],
   },
 ]
+
+// La version du jeu, dérivée du journal : 0.21.N — « 21 » pour le sujet,
+// N avance TOUT SEUL à chaque livraison consignée ici (pas de numéro à
+// penser à bumper). Une seule source de vérité : la fiche, l'écran
+// NOTES DE VERSION et l'export Markdown l'affichent tous depuis ici.
+export const VERSION = `0.21.${DELIVERIES.length}`
+
+/** La version qu'avait le jeu à une entrée du journal (0 = la plus
+ * récente) : chaque livraison a incrémenté le petit numéro de un. */
+export const versionDe = (index: number): string => `0.21.${DELIVERIES.length - index}`
