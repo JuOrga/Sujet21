@@ -15,6 +15,9 @@ export class Input {
   aimClientX = 0
   aimClientY = 0
   paused = false
+  // commandes gelées : la prise en main (onboarding) fige TOUTES les
+  // commandes de jeu — clavier ici, manette et pointeurs côté main
+  gelees = false
   vortexArmed = false // prochain toucher = vortex au lieu d'éjecter
   freezeIntent = false // F (ou ❄) : le corps se change en glace, re-presser dégèle
   gasIntent = false // G (ou 💨) : le corps se change en vapeur, re-presser condense
@@ -109,7 +112,7 @@ export class Input {
     // taisent tant que la partie n'est pas au premier plan.
     const enJeu = (): boolean => document.body.classList.contains('playing')
     target.addEventListener('pointerdown', (e) => {
-      if (!enJeu()) return
+      if (!enJeu() || this.gelees) return
       if (e.button === 2) {
         // Maintenu : déplacement de caméra ; bref : vortex (au relâchement)
         this.rightDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0 }
@@ -152,6 +155,7 @@ export class Input {
     })
 
     target.addEventListener('pointermove', (e) => {
+      if (this.gelees) return
       if (this.rightDrag && e.pointerId === this.rightDrag.id) {
         const dx = e.clientX - this.rightDrag.x
         const dy = e.clientY - this.rightDrag.y
@@ -229,6 +233,9 @@ export class Input {
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
       if (!enJeu()) return
+      // commandes gelées (prise en main à l'écran) : aucune touche de jeu
+      // ne passe — le voile bloque les pointeurs, ceci bloque le clavier
+      if (this.gelees) return
       if (e.key === ' ') {
         this.togglePause()
         e.preventDefault()

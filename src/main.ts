@@ -513,10 +513,9 @@ function montrerOnboard(): void {
   majOnboard()
   onboardEl.hidden = false
   input.paused = true
+  input.gelees = true // AUCUNE commande de jeu pendant la prise en main
 }
-onboardEl.addEventListener('pointerdown', (e) => {
-  e.stopPropagation()
-  e.preventDefault()
+function avanceOnboard(): void {
   obEtape++
   if (obEtape > 4) {
     onboardEl.hidden = true
@@ -526,9 +525,15 @@ onboardEl.addEventListener('pointerdown', (e) => {
       // stockage refusé : l'onboarding se remontrera, sans gravité
     }
     input.paused = false
+    input.gelees = false
   } else {
     majOnboard()
   }
+}
+onboardEl.addEventListener('pointerdown', (e) => {
+  e.stopPropagation()
+  e.preventDefault()
+  avanceOnboard()
 })
 
 // Le verrou de rotation existe : « continuer en portrait » retire le voile
@@ -2410,7 +2415,10 @@ function frame(now: number): void {
   manette.poll(performance.now() / 1000)
   if (manette.connectee) {
     const enJeu = document.body.classList.contains('playing')
-    if (!enJeu) {
+    if (!onboardEl.hidden) {
+      // prise en main à l'écran : A avance les cartes, rien d'autre ne passe
+      if (manette.edge(BOUTON.A)) avanceOnboard()
+    } else if (!enJeu) {
       // la FICHE : croix/stick pour choisir, A pour valider
       ficheNavigue()
     } else if (manette.edge(BOUTON.A) && clicMenuManette()) {
