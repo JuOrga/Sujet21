@@ -28,7 +28,7 @@ export const TROPHEES: TropheeDef[] = [
   {
     id: 'trois-etats',
     nom: 'Trois états',
-    desc: 'Eau, glace et vapeur dans la même salle, en moins de 15 secondes.',
+    desc: 'Liquide, glace et vapeur dans la même salle, en moins de 15 secondes.',
     icone: '☯',
   },
   {

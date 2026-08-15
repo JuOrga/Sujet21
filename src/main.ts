@@ -3091,7 +3091,7 @@ function frame(now: number): void {
         'EXPÉDITION ACHEVÉE',
         `<span class="bilan"><span class="bilan-l">${expeditionSummary(playedLevels().length)}${
           exp.newRecord ? ' — <em class="bilan-neuf">MEILLEURE EXPÉDITION ✦</em>' : ''
-        }</span></span>Le laboratoire n'a plus d'échantillon. Quelque part dans les conduites, de l'eau se souvient.`,
+        }</span></span>Le laboratoire n'a plus d'échantillon. Quelque part dans les conduites, le fluide se souvient.`,
         'success',
         'NOUVELLE EXPÉDITION',
       )

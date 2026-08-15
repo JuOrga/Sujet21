@@ -1910,7 +1910,7 @@ export class LevelEditor {
       rows.push(
         `<label class="ed-f"><span>État imposé</span><select id="p-force">` +
           (['libre', 'eau', 'glace', 'vapeur'] as ZoneForce[])
-            .map((f) => `<option value="${f}"${f === z.force ? ' selected' : ''}>${f}</option>`)
+            .map((f) => `<option value="${f}"${f === z.force ? ' selected' : ''}>${f === 'eau' ? 'liquide' : f}</option>`)
             .join('') +
           `</select></label>`,
       )
