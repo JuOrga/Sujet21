@@ -18,6 +18,19 @@ jobs:
           wc -c reponse.json || true
           echo "== corps brut (début) =="
           head -c 600 reponse.json; echo
+          echo "== /api/levels?debug=1 (état du magasin) =="
+          curl -sS "https://sujet21.vercel.app/api/levels?debug=1" -o debug.json -w "HTTP %{http_code}\n" || true
+          python3 - <<'EOF'
+          import json
+          try:
+            d = json.load(open('debug.json'))
+            print('nb blobs :', d.get('nb'))
+            for b in d.get('etat', []):
+              print('-', b.get('pathname'), '|', b.get('taille'), 'o |', b.get('uploadedAt'), '| HTTP', b.get('statut'))
+              print('  extrait :', (b.get('extrait') or '')[:120])
+          except Exception as e:
+            print('debug illisible :', e)
+          EOF
           echo "== aperçu (ids et noms) =="
           python3 - <<'EOF'
           import json

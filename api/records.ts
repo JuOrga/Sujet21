@@ -92,16 +92,30 @@ function beatsExpedition(
 async function readBoard(): Promise<Board> {
   const { blobs } = await list({ prefix: PREFIX })
   if (blobs.length === 0) return { tableaux: {}, expedition: null }
-  const latest = [...blobs].sort(
+  const parDate = [...blobs].sort(
     (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
-  )[0]
-  const r = await fetch(latest.url, { cache: 'no-store' })
-  if (!r.ok) throw new Error(`lecture registres : HTTP ${r.status}`)
-  const data = (await r.json()) as Board
-  if (data === null || typeof data !== 'object' || typeof data.tableaux !== 'object') {
-    throw new Error('registres illisibles')
+  )
+  // REPLI : même logique que la bibliothèque — un blob listé mais illisible
+  // (403/404, corruption) ne condamne pas la lecture, on remonte l'historique
+  let derniere = 'aucun blob lisible'
+  for (const b of parDate) {
+    try {
+      const r = await fetch(b.url, { cache: 'no-store' })
+      if (!r.ok) {
+        derniere = `lecture registres : HTTP ${r.status} (${b.pathname})`
+        continue
+      }
+      const data = (await r.json()) as Board
+      if (data === null || typeof data !== 'object' || typeof data.tableaux !== 'object') {
+        derniere = `registres illisibles (${b.pathname})`
+        continue
+      }
+      return { tableaux: data.tableaux ?? {}, expedition: data.expedition ?? null, tops: data.tops ?? {} }
+    } catch (e) {
+      derniere = String(e)
+    }
   }
-  return { tableaux: data.tableaux ?? {}, expedition: data.expedition ?? null, tops: data.tops ?? {} }
+  throw new Error(derniere)
 }
 
 async function writeBoard(board: Board): Promise<void> {

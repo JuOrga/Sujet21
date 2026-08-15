@@ -42,14 +42,32 @@ function slug(s: string): string {
 async function readLib(): Promise<Library> {
   const { blobs } = await list({ prefix: PREFIX })
   if (blobs.length === 0) return { levels: [] }
-  const latest = [...blobs].sort(
+  const parDate = [...blobs].sort(
     (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
-  )[0]
-  const r = await fetch(latest.url, { cache: 'no-store' })
-  if (!r.ok) throw new Error(`lecture bibliothèque : HTTP ${r.status}`)
-  const data = (await r.json()) as Library
-  if (!data || !Array.isArray(data.levels)) throw new Error('bibliothèque illisible')
-  return { levels: data.levels.filter((l) => l && typeof l.id === 'string' && l.level) }
+  )
+  // REPLI : la liste peut mentionner un blob dont l'URL ne répond plus
+  // (403/404 après suppression, corruption) — on essaie chaque version, de
+  // la plus récente à la plus ancienne, et seul un magasin ENTIÈREMENT
+  // illisible fait échouer la lecture.
+  let derniere = 'aucun blob lisible'
+  for (const b of parDate) {
+    try {
+      const r = await fetch(b.url, { cache: 'no-store' })
+      if (!r.ok) {
+        derniere = `lecture bibliothèque : HTTP ${r.status} (${b.pathname})`
+        continue
+      }
+      const data = (await r.json()) as Library
+      if (!data || !Array.isArray(data.levels)) {
+        derniere = `bibliothèque illisible (${b.pathname})`
+        continue
+      }
+      return { levels: data.levels.filter((l) => l && typeof l.id === 'string' && l.level) }
+    } catch (e) {
+      derniere = String(e)
+    }
+  }
+  throw new Error(derniere)
 }
 
 async function writeLib(lib: Library): Promise<void> {
@@ -72,6 +90,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   res.setHeader('Cache-Control', 'no-store')
   try {
     if (req.method === 'GET') {
+      // ?debug=1 : l'état du magasin, blob par blob — chemin, taille, date,
+      // statut HTTP du téléchargement et extrait du contenu. Rien de secret
+      // (les URL des blobs sont publiques par construction).
+      if (req.query.debug) {
+        const { blobs } = await list({ prefix: PREFIX })
+        const etat = []
+        for (const b of [...blobs].sort(
+          (x, y) => new Date(y.uploadedAt).getTime() - new Date(x.uploadedAt).getTime(),
+        )) {
+          let statut = 0
+          let extrait = ''
+          try {
+            const r = await fetch(b.url, { cache: 'no-store' })
+            statut = r.status
+            extrait = (await r.text()).slice(0, 120)
+          } catch (e) {
+            extrait = String(e)
+          }
+          etat.push({ pathname: b.pathname, taille: b.size, uploadedAt: b.uploadedAt, url: b.url, statut, extrait })
+        }
+        res.status(200).json({ debug: true, nb: blobs.length, etat })
+        return
+      }
       res.status(200).json(await readLib())
       return
     }
