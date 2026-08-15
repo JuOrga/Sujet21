@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 20:15',
+    title: 'Records qui s’évaporaient + « Enregistrer sous » qui écrasait l’original',
+    notes: [
+      'Record visible sur l’accueil mais absent de l’écran RECORDS : trouvé. Le serveur mettait le palmarès à jour à chaque collecte… mais ne l’ÉCRIVAIT que si le vieux record simple (volume d’abord) était battu. L’accueil affichait la réponse du moment ; l’écran RECORDS relisait un document jamais sauvé — la collecte s’évaporait. Le palmarès est maintenant PERSISTÉ dès qu’il change, record simple battu ou non. (Le record perdu se réinscrira à la prochaine collecte de la salle.)',
+      'Et oui, le soupçon était fondé : « Enregistrer sous » forgeait l’identifiant depuis le NOM du tableau — en gardant le nom proposé, la copie prenait l’identifiant de l’original et l’ÉCRASAIT. Le serveur forge désormais un identifiant UNIQUE (suffixé si le nom est déjà pris) et l’éditeur adopte l’identifiant renvoyé : l’original est intangible, la copie vit sa vie.',
+    ],
+  },
+  {
     date: '15/08/2026 19:45',
     title: 'Éditeur : le brouillon rattrape la bibliothèque — fini le vieux triptyque',
     notes: [

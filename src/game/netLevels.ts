@@ -45,7 +45,7 @@ export async function fetchLibrary(): Promise<StoredLevel[] | null> {
   }
 }
 
-async function post(body: object): Promise<StoredLevel[] | null> {
+async function post(body: object): Promise<{ levels: StoredLevel[]; id: string } | null> {
   try {
     const r = await fetch(ENDPOINT, {
       method: 'POST',
@@ -53,24 +53,32 @@ async function post(body: object): Promise<StoredLevel[] | null> {
       body: JSON.stringify(body),
     })
     if (!r.ok) return null
-    return readList(await r.json())
+    const data = await r.json()
+    return {
+      levels: readList(data),
+      // l'identifiant que le serveur a retenu (créé ou confirmé) : la seule
+      // source fiable — le deviner par le nom se trompe dès deux homonymes
+      id: typeof (data as { id?: unknown }).id === 'string' ? (data as { id: string }).id : '',
+    }
   } catch {
     return null
   }
 }
 
-/** Enregistre un tableau ; `id` vide crée une entrée nouvelle. */
+/** Enregistre un tableau ; `id` vide crée une entrée nouvelle (id unique
+ * forgé par le serveur — jamais d'écrasement d'homonyme). */
 export function saveLevel(
   level: LevelDef,
   id: string,
   auteur: string,
-): Promise<StoredLevel[] | null> {
+): Promise<{ levels: StoredLevel[]; id: string } | null> {
   return post({ level, id, auteur })
 }
 
 /** Fixe la séquence de l'expédition, du premier au dernier. */
-export function reorderLibrary(order: string[]): Promise<StoredLevel[] | null> {
-  return post({ order })
+export async function reorderLibrary(order: string[]): Promise<StoredLevel[] | null> {
+  const r = await post({ order })
+  return r?.levels ?? null
 }
 
 export async function deleteLevel(id: string): Promise<StoredLevel[] | null> {
