@@ -2212,25 +2212,55 @@ stateVapeur.addEventListener('click', () => input.toggleGas())
 const eveil1El = document.getElementById('eveil1') as HTMLDivElement
 const eveil2El = document.getElementById('eveil2') as HTMLDivElement
 const eveilInviteEl = document.getElementById('eveil-invite') as HTMLDivElement
-type EveilEtape = 'off' | 'zoom' | 'glace' | 'invite' | 'gestes' | 'volume'
-const eveil = { etape: 'off' as EveilEtape, gestes: 0, visePrec: false }
+type EveilEtape =
+  | 'off'
+  | 'zoom'
+  | 'annonce1' // le monde décélère : la carte de cryostase s'annonce
+  | 'glace'
+  | 'invite'
+  | 'gestes'
+  | 'annonce2' // idem avant la carte du volume — jamais d'apparition sèche
+  | 'volume'
+// ralenti : le facteur de temps de l'éveil (1 = temps normal). Quand une
+// carte s'annonce, la CIBLE descend vers ~0 et le monde décélère en douceur
+// (même levier que le slow-mo de visée vapeur) ; la carte ne paraît qu'une
+// fois le monde presque figé, en fondu. À la fermeture, la cible remonte :
+// le monde se réveille progressivement au lieu de repartir d'un coup.
+const eveil = { etape: 'off' as EveilEtape, gestes: 0, visePrec: false, ralenti: 1, cible: 1 }
+// Sonde de test : suivre l'éveil depuis la console (comme __sim, __cam)
+;(window as unknown as { __eveil: typeof eveil }).__eveil = eveil
 function lanceEveil(): void {
   if (localStorage.getItem(CLE_EVEIL)) return
   // relance propre (restart en plein éveil) : tout voile retombe d'abord
-  eveil1El.hidden = true
-  eveil2El.hidden = true
+  for (const carte of [eveil1El, eveil2El]) {
+    carte.hidden = true
+    carte.classList.remove('montre')
+  }
   eveilInviteEl.hidden = true
   stateEau.classList.remove('eveil-appel')
   input.gelees = false
   eveil.etape = 'zoom'
   eveil.gestes = 0
+  eveil.ralenti = 1
+  eveil.cible = 1
   // la cryostase tient l'échantillon : GLACE, quel que soit l'état d'avant
   input.freezeIntent = true
   input.gasIntent = false
 }
 function carteEveil(carte: HTMLDivElement, montrer: boolean): void {
-  carte.dataset.mode = obTactile() ? 'tactile' : 'pc'
-  carte.hidden = !montrer
+  if (montrer) {
+    carte.dataset.mode = obTactile() ? 'tactile' : 'pc'
+    // fondu d'entrée : le voile paraît transparent, la classe « montre »
+    // (posée à l'image suivante) lance la transition — jamais d'apparition sèche
+    carte.hidden = false
+    requestAnimationFrame(() => carte.classList.add('montre'))
+  } else {
+    // fondu de sortie : la classe s'en va, le voile s'efface, puis se cache
+    carte.classList.remove('montre')
+    window.setTimeout(() => {
+      carte.hidden = true
+    }, 600)
+  }
   // les cartes figent tout, comme la prise en main : lecture au calme
   input.paused = montrer
   input.gelees = montrer
@@ -2238,12 +2268,14 @@ function carteEveil(carte: HTMLDivElement, montrer: boolean): void {
 function avanceEveil(): void {
   if (eveil.etape === 'glace') {
     carteEveil(eveil1El, false)
+    eveil.cible = 1 // le monde se réveille en douceur derrière le fondu
     eveil.etape = 'invite'
     eveilInviteEl.dataset.mode = obTactile() ? 'tactile' : 'pc'
     eveilInviteEl.hidden = false
     stateEau.classList.add('eveil-appel')
   } else if (eveil.etape === 'volume') {
     carteEveil(eveil2El, false)
+    eveil.cible = 1
     eveil.etape = 'off'
     try {
       localStorage.setItem(CLE_EVEIL, '1')
@@ -2261,11 +2293,26 @@ for (const carte of [eveil1El, eveil2El]) {
 }
 // Appelé chaque image (après la caméra) : fait avancer l'éveil au rythme
 // de ce que fait réellement le joueur — pas de minuteries arbitraires.
-function majEveil(): void {
+function majEveil(dtReal: number): void {
+  // le facteur de temps poursuit sa cible même hors éveil (le réveil du
+  // monde après la dernière carte doit finir sa rampe) — descente vive
+  // (~0,5 s), remontée plus paresseuse (~1 s) : on se réveille, on ne sursaute pas
+  if (eveil.ralenti !== eveil.cible) {
+    const k = 1 - Math.exp(-dtReal * (eveil.cible < eveil.ralenti ? 5 : 2.5))
+    eveil.ralenti += (eveil.cible - eveil.ralenti) * k
+    if (Math.abs(eveil.ralenti - eveil.cible) < 0.005) eveil.ralenti = eveil.cible
+  }
   if (eveil.etape === 'off' || !document.body.classList.contains('playing')) return
   if (eveil.etape === 'zoom') {
-    // le plan large d'abord — la salle se lit — puis la carte de cryostase
+    // le plan large d'abord — la salle se lit — puis le monde décélère
     if (!camera.introEnCours) {
+      eveil.etape = 'annonce1'
+      eveil.cible = 0.04
+    }
+  } else if (eveil.etape === 'annonce1') {
+    // la carte ne paraît qu'une fois le monde presque figé : le ralenti
+    // EST l'annonce — l'œil comprend qu'il se passe quelque chose
+    if (eveil.ralenti < 0.09) {
       eveil.etape = 'glace'
       carteEveil(eveil1El, true)
     }
@@ -2297,11 +2344,16 @@ function majEveil(): void {
     if (eveil.visePrec && !input.aimActive) {
       eveil.gestes++
       if (eveil.gestes >= 10) {
-        eveil.etape = 'volume'
-        carteEveil(eveil2El, true)
+        eveil.etape = 'annonce2'
+        eveil.cible = 0.04
       }
     }
     eveil.visePrec = input.aimActive
+  } else if (eveil.etape === 'annonce2') {
+    if (eveil.ralenti < 0.09) {
+      eveil.etape = 'volume'
+      carteEveil(eveil2El, true)
+    }
   }
 }
 touchButton('⌖', 'recadrer sur le corps (zoom et caméra auto)', () => camera.resetAutoZoom())
@@ -2749,8 +2801,9 @@ function frame(now: number): void {
   // Le ralenti s'entend : tout le mixage plonge sous un passe-bas (et
   // baisse de moitié), un cœur au ralenti bat, la texture du temps suspendu
   // s'ouvre — seule à rester nette —, et l'air revient au dash.
-  audio.setSlowMo(dashAiming)
-  bande.setSuspendu(dashAiming)
+  // (le ralenti d'annonce de l'éveil s'entend aussi : même texture suspendue)
+  audio.setSlowMo(dashAiming || eveil.ralenti < 0.7)
+  bande.setSuspendu(dashAiming || eveil.ralenti < 0.7)
   if (dash.aiming && !dashAiming) {
     // Relâcher déclenche ; changer d'état ou perdre la main en pleine visée
     // annule sans frais — la visée n'engage à rien tant qu'on n'a pas lâché.
@@ -2779,7 +2832,10 @@ function frame(now: number): void {
     // ACCÉLÉRER étend le budget d'autant : le joueur qui met ×4 achète des
     // pas de simulation contre des images par seconde — sans cela, sur une
     // machine au taquet, le HUD affichait ×4 et la cuve restait à ×1.
-    const warpNow = dashAiming ? params.timeWarp * params.gasAimSlow : params.timeWarp
+    // le ralenti d'annonce de l'éveil multiplie le temps comme le slow-mo
+    // de visée : physique, chrono, refroidissement — tout décélère ensemble
+    const warpNow =
+      (dashAiming ? params.timeWarp * params.gasAimSlow : params.timeWarp) * eveil.ralenti
     const boost = Math.max(1, warpNow)
     // Troisième borne (retour joueur : « en accélérant, chutes drastiques ») :
     // la physique ne dépasse JAMAIS ~70 % de la période du verrou, même
@@ -3092,7 +3148,7 @@ function frame(now: number): void {
     camera.snapTo((b.minX + b.maxX) * 0.5, (b.minY + b.maxY) * 0.5, fitZoom)
   } else {
     camera.update(dtReal, sim.stats.centroidX, sim.stats.centroidY, sim.stats.rmsRadius, vw, vh, params)
-  majEveil() // l'éveil suit la caméra : ses repères (invite) sont à jour
+  majEveil(dtReal) // l'éveil suit la caméra : ses repères (invite) sont à jour
   }
   updateTutor(dtReal)
   updateTrophees(dtReal)

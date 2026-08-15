@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 19:00',
+    title: 'Éveil : le monde décélère, la carte fond à l’écran — fini l’apparition brutale',
+    notes: [
+      'Les cartes de l’éveil APPARAISSAIENT d’un coup, plein écran, en pleine action — brutal. Désormais elles S’ANNONCENT : le monde DÉCÉLÈRE en douceur (~½ seconde, même levier que le slow-mo de visée vapeur — physique, chrono, refroidissement, tout ralentit ensemble, et ça s’ENTEND : le mixage plonge sous le passe-bas du temps suspendu), puis la carte fond à l’écran, ses éléments montant en scène légèrement étagés.',
+      'À la fermeture, l’inverse : la carte s’efface en fondu et le monde se RÉVEILLE progressivement (~1 seconde) au lieu de repartir d’un claquement de doigts. Le ralenti est l’annonce : l’œil comprend qu’il se passe quelque chose avant même que la carte ne paraisse. L’invite « redevenez liquide » arrive elle aussi en fondu.',
+    ],
+  },
+  {
     date: '15/08/2026 18:30',
     title: 'Éveil : la carte du volume attend une dizaine d’impulsions',
     notes: [

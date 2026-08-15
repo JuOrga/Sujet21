@@ -835,7 +835,31 @@
         gap: 14px;
         text-align: center;
         color: var(--ink);
+        /* jamais d'apparition sèche : le monde a déjà décéléré, le voile
+           FOND à l'écran (classe « montre »), et s'efface de même */
+        opacity: 0;
+        transition: opacity 0.55s ease;
       }
+      .eveil-voile.montre {
+        opacity: 1;
+      }
+      /* les éléments de la carte montent en scène, légèrement étagés */
+      .eveil-voile > * {
+        opacity: 0;
+        transform: translateY(14px);
+        transition:
+          opacity 0.5s ease,
+          transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .eveil-voile.montre > * {
+        opacity: 1;
+        transform: none;
+      }
+      .eveil-voile.montre > *:nth-child(2) { transition-delay: 0.08s; }
+      .eveil-voile.montre > *:nth-child(3) { transition-delay: 0.16s; }
+      .eveil-voile.montre > *:nth-child(4) { transition-delay: 0.24s; }
+      .eveil-voile.montre > *:nth-child(5) { transition-delay: 0.34s; }
+      .eveil-voile.montre > *:nth-child(6) { transition-delay: 0.5s; }
       /* le seul chemin est le BOUTON : pas de « toucher n'importe où » qui
          ferait sauter la carte d'un clic malheureux */
       .eveil-voile .ev-continuer {
@@ -914,6 +938,14 @@
       }
       #eveil-invite[hidden] {
         display: none;
+      }
+      /* l'invite aussi arrive en douceur (fondu + petite montée) */
+      #eveil-invite:not([hidden]) {
+        animation: ei-entree 0.55s ease both;
+      }
+      @keyframes ei-entree {
+        from { opacity: 0; margin-top: 10px; }
+        to { opacity: 1; margin-top: 0; }
       }
       #eveil-invite[data-mode='pc'] .ei-t,
       #eveil-invite:not([data-mode='pc']) .ei-p {
