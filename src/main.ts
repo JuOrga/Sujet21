@@ -791,6 +791,17 @@ let majMoteurUI: () => void = () => {}
 // lentes du téléphone sont des rafales de rattrapage — mais le ressenti
 // appartient au joueur : c'est un réglage.
 let rattrapageFluide = localStorage.getItem('sujet21-rattrapage') === 'fluide'
+// Cadence de SIMULATION (expérimental) : 120 Hz (précision, défaut) ou
+// 60 Hz (économie — un pas par image à 60 im/s : CPU et CHAUFFE divisés
+// par deux). Verdict des rapports Pixel : le coût d'un pas TRIPLE au fil
+// d'une session (throttling thermique) — le seul remède est de calculer
+// moins par seconde. Le comportement physique diffère légèrement à 60 Hz
+// (pas deux fois plus grands) : c'est un réglage assumé, pas un défaut.
+let simHz: 60 | 120 = localStorage.getItem('sujet21-simhz') === '60' ? 60 : 120
+function appliqueSimHz(): void {
+  params.dt = 1 / simHz
+}
+appliqueSimHz()
 // Graphismes du décor : RICHE par défaut (bruit procédural complet), SOBRE
 // pour débrancher le décoratif dans le shader de composition — mêmes formes,
 // mêmes auras, moins de calcul par pixel. C'est l'instrument du test A/B :
@@ -893,6 +904,26 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     }
   }
   renderFpsAff()
+
+  const choixSim = document.getElementById('params-simhz') as HTMLDivElement
+  const renderSimHz = (): void => {
+    choixSim.innerHTML = ''
+    for (const hz of [120, 60] as const) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = hz === 120 ? '120 — PRÉCISION' : '60 — ÉCONOMIE'
+      b.className = simHz === hz ? 'actif' : ''
+      b.addEventListener('click', () => {
+        simHz = hz
+        localStorage.setItem('sujet21-simhz', String(hz))
+        appliqueSimHz()
+        perf.reset()
+        renderSimHz()
+      })
+      choixSim.appendChild(b)
+    }
+  }
+  renderSimHz()
 
   const choixRatt = document.getElementById('params-rattrapage') as HTMLDivElement
   const renderRatt = (): void => {
@@ -998,6 +1029,7 @@ function rapportPerf(): Record<string, unknown> {
       liquide: eauRiche ? 'riche' : 'sobre',
       moteur: sim.moteurWasm ? 'wasm' : noyauxWasm ? 'javascript' : 'javascript (wasm non chargé)',
       rattrapage: rattrapageFluide ? 'fluidite' : 'temps-reel',
+      simHz,
       palierQualite: qualityLevel,
       timeWarp: params.timeWarp,
       downsampleChamp: params.renderDownsample,
