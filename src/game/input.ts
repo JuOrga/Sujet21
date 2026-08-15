@@ -221,8 +221,13 @@ export class Input {
       'wheel',
       (e) => {
         e.preventDefault()
-        // ancré au curseur : on zoome VERS ce qu'on regarde
-        this.onZoom?.(Math.pow(1.1, -e.deltaY / 100), e.clientX, e.clientY)
+        // ancré au curseur : on zoome VERS ce qu'on regarde. Delta normalisé
+        // (lignes/pages → pixels) et borné : Firefox en mode « lignes »
+        // envoyait ±3 — un zoom quasi immobile ; les molettes libres, des
+        // rafales géantes — un zoom qui saute.
+        const brut = e.deltaY * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 400 : 1)
+        const pas = Math.max(-3, Math.min(3, brut / 100))
+        if (pas !== 0) this.onZoom?.(Math.pow(1.1, -pas), e.clientX, e.clientY)
       },
       { passive: false },
     )

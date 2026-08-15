@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 20:45',
+    title: 'Zoom à la molette : toutes les souris à la même vitesse',
+    notes: [
+      'Signalement d’un testeur : le zoom de l’éditeur se comportait mal avec sa molette. Cause : chaque événement de molette valait UN cran plein de zoom, quel que soit son delta — les souris « haute résolution » (rafales de petits crans) zoomaient d’un extrême à l’autre, et Firefox en mode « lignes » rendait le zoom du JEU quasi immobile (delta ±3 divisé par 100).',
+      'La molette est désormais NORMALISÉE (pixels, lignes, pages) puis bornée, dans l’éditeur ET dans le jeu : un cran standard = un pas de zoom, les rafales convergent vers la même vitesse, et les boutons − / + de l’éditeur restent là si une molette fait défaut.',
+      'Au passage, la question mémoire : ~700 Mo dans le gestionnaire des tâches, c’est l’empreinte NAVIGATEUR (processus GPU, compositeur, tampons d’affichage) — le jeu lui-même tient dans ~10-20 Mo de tas JS, stable après relances répétées (mesuré). Rien d’anormal pour un onglet WebGL.',
+    ],
+  },
+  {
     date: '15/08/2026 20:15',
     title: 'Records qui s’évaporaient + « Enregistrer sous » qui écrasait l’original',
     notes: [
