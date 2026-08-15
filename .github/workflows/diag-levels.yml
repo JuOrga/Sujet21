@@ -16,16 +16,19 @@ jobs:
           curl -sS "https://sujet21.vercel.app/api/levels" -o reponse.json -w "HTTP %{http_code}\n" || true
           echo "== taille =="
           wc -c reponse.json || true
+          echo "== corps brut (début) =="
+          head -c 600 reponse.json; echo
           echo "== aperçu (ids et noms) =="
           python3 - <<'EOF'
           import json
           try:
             d = json.load(open('reponse.json'))
+            if 'error' in d:
+              print('ERREUR API :', d.get('error'), '|', d.get('detail'))
             lv = d.get('levels', [])
             print('nb tableaux :', len(lv))
             for l in lv:
               print('-', l.get('id'), '|', (l.get('level') or {}).get('code'), '|', (l.get('level') or {}).get('name'), '| maj', l.get('majAt'))
           except Exception as e:
             print('illisible :', e)
-            print(open('reponse.json', errors='replace').read()[:1500])
           EOF
