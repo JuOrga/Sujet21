@@ -130,6 +130,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }
       const board = await readBoard()
       let improved = false
+      // le palmarès peut changer SANS que le record simple soit battu : la
+      // persistance doit suivre l'un COMME l'autre (sinon le POST renvoie un
+      // board à jour — l'accueil l'affiche — mais le GET suivant relit un
+      // blob jamais écrit, et l'écran RECORDS ignore la collecte)
+      let persister = false
       if (body.kind === 'tableau' && typeof body.code === 'string' && body.code.trim()) {
         const code = body.code.trim().slice(0, 16)
         const entry: SharedTableauRecord = {
@@ -145,10 +150,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         // chrono et note vivent indépendamment du record single
         board.tops ??= {}
         const t = (board.tops[code] ??= { volume: [], chrono: [], note: [] })
+        const avantTops = JSON.stringify(t)
         const te: TopEntry = { ...entry, note: noteDe(entry.liters, entry.time), quand: new Date().toISOString() }
         t.volume = insere(t.volume, te, (x) => x.liters * 1e6 - x.time, true)
         t.chrono = insere(t.chrono, te, (x) => x.time, false)
         t.note = insere(t.note, te, (x) => x.note, true)
+        if (JSON.stringify(t) !== avantTops) persister = true
       } else if (body.kind === 'expedition') {
         const tableaux = num(body.tableaux)
         if (tableaux === null) {
@@ -169,7 +176,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         res.status(400).json({ error: 'record invalide : kind tableau ou expedition requis' })
         return
       }
-      if (improved) await writeBoard(board)
+      if (improved || persister) await writeBoard(board)
       res.status(200).json({ ok: true, improved, board })
       return
     }

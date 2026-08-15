@@ -97,11 +97,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const name = typeof (level as Record<string, unknown>).name === 'string'
         ? ((level as Record<string, unknown>).name as string)
         : 'tableau'
-      const id = typeof body.id === 'string' && body.id.trim() ? body.id.trim().slice(0, 64) : slug(name)
       const auteur =
         typeof body.auteur === 'string' ? body.auteur.trim().toUpperCase().slice(0, 12) : ''
 
       const lib = await readLib()
+      let id = typeof body.id === 'string' && body.id.trim() ? body.id.trim().slice(0, 64) : ''
+      if (!id) {
+        // CRÉATION (« Enregistrer sous ») : jamais écraser un homonyme — si
+        // le slug du nom est déjà pris (même tableau rebaptisé pareil, ou
+        // deux tableaux au même nom), on suffixe jusqu'à un id libre
+        const base = slug(name)
+        let candidat = base
+        let n = 2
+        while (lib.levels.some((l) => l.id === candidat)) candidat = `${base}-${n++}`.slice(0, 64)
+        id = candidat
+      }
       const entry: StoredLevel = {
         id,
         auteur,

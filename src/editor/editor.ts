@@ -1788,15 +1788,13 @@ export class LevelEditor {
       this.commit('Enregistrement refusé : bibliothèque injoignable.')
       return
     }
-    this.library = saved
-    if (!id) {
-      // le serveur a forgé l'identifiant depuis le nom : on retrouve l'entrée
-      const match = saved.find((l) => l.level.name === this.level.name)
-      id = match?.id ?? ''
-    }
+    this.library = saved.levels
+    // l'identifiant retenu vient du SERVEUR (unique, jamais un homonyme
+    // écrasé) — plus de devinette par le nom
+    if (saved.id) id = saved.id
     this.openId = id
     this.base = serializeLevel(this.level) // le brouillon EST la version publiée
-    this.hooks.libraryChanged(saved)
+    this.hooks.libraryChanged(saved.levels)
     this.renderLibrary()
     this.commit('Enregistré dans la bibliothèque.')
   }
