@@ -189,7 +189,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
     res.setHeader('Allow', 'GET, POST')
     res.status(405).json({ error: 'méthode non autorisée' })
-  } catch {
-    res.status(500).json({ error: 'stockage indisponible' })
+  } catch (e) {
+    // le DÉTAIL est précieux : c'est lui qui distingue « blob illisible »
+    // de « jeton manquant » — des chiffres de machine, rien de personnel
+    res.status(500).json({ error: 'stockage indisponible', detail: String(e) })
   }
 }
