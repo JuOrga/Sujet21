@@ -406,6 +406,46 @@ requestAnimationFrame(() => {
   if (homeEl) homeEl.scrollTop = 0
 })
 
+// ---- Voile de SIGNATURE (premier lancement) : le nom, et le geste qui
+// éveille l'audio. Il couvre tout : aucun clic inopiné ne part vers la
+// fiche ou la cuve tant qu'on n'a pas signé. Ne se montre qu'une fois —
+// dès qu'un nom d'opérateur existe, il ne revient jamais.
+{
+  const sigEl = document.getElementById('signature') as HTMLDivElement
+  const sigNom = document.getElementById('sig-nom') as HTMLInputElement
+  const signer = (): void => {
+    const nom = sigNom.value.trim()
+    if (!nom) {
+      sigNom.classList.remove('need')
+      void sigNom.offsetWidth
+      sigNom.classList.add('need')
+      sigNom.focus()
+      return
+    }
+    records.setOperator(nom)
+    recName.value = records.operator()
+    // le clic de signature EST le geste utilisateur : l'audio s'éveille là
+    audio.resume()
+    bande.eveiller()
+    majInviteSon()
+    renderRegistres()
+    sigEl.hidden = true
+  }
+  document.getElementById('sig-valider')?.addEventListener('click', signer)
+  sigNom.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') signer()
+  })
+  // les clics sur le voile ne traversent jamais (pas de fermeture au fond :
+  // signer est le seul chemin — c'est un portail, pas un popup)
+  sigEl.addEventListener('pointerdown', (e) => e.stopPropagation())
+  if (!records.operator()) {
+    sigEl.hidden = false
+    // le focus attend une image : le champ existe et la fiche est posée —
+    // pas de défilement parasite ni de clavier mobile ouvert sur du vide
+    requestAnimationFrame(() => sigNom.focus({ preventScroll: true }))
+  }
+}
+
 // La plongée exige un nom : on interpelle le champ au lieu d'ouvrir la cuve.
 function requireName(): boolean {
   // le champ peut être rempli sans avoir encore perdu le focus (pas de change)

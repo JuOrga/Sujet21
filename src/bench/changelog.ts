@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 15:50',
+    title: 'Le voile de signature : le nom et le son, au premier lancement',
+    notes: [
+      'Idée du joueur, livrée : au tout premier lancement, un voile plein écran demande le nom d’opérateur — « SIGNEZ LE PROTOCOLE », façon borne d’arcade. Le clic de signature est aussi le GESTE que le navigateur exige pour éveiller l’audio : le nom et le son se règlent d’un seul geste, avant même de toucher la fiche.',
+      'Pas de clic inopiné possible : le voile couvre tout et ne se ferme QUE par la signature (pas de fermeture au fond — c’est un portail, pas un popup). Dès qu’un nom existe, il ne se montre plus jamais ; le champ de la fiche reste le moyen d’en changer.',
+    ],
+  },
+  {
     date: '15/08/2026 15:20',
     title: 'La fiche condense le palmarès — sans bouton REGISTRES ni défilement',
     notes: [

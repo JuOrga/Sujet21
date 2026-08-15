@@ -563,6 +563,87 @@
       }
 
       /* ---- Onboarding tactile : trois gestes, trois cartes ---- */
+      #signature[hidden] { display: none; }
+      #signature {
+        position: fixed;
+        inset: 0;
+        z-index: 56; /* au-dessus de la fiche ET de l'onboarding : on signe d'abord */
+        background: rgba(3, 7, 13, 0.9);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+      .sig-boite {
+        width: min(420px, 92vw);
+        border: 1px solid var(--specimen);
+        border-radius: 8px;
+        background: rgba(6, 14, 24, 0.96);
+        padding: 22px 24px;
+        text-align: center;
+        box-shadow: 0 0 40px rgba(46, 198, 201, 0.12);
+      }
+      .sig-sur {
+        font-family: var(--font-display);
+        font-size: 8.5px;
+        letter-spacing: 0.22em;
+        color: var(--dim);
+      }
+      .sig-boite h3 {
+        margin: 10px 0 8px;
+        font-family: var(--font-display);
+        font-size: 16px;
+        letter-spacing: 0.14em;
+        color: var(--specimen);
+      }
+      .sig-boite p {
+        margin: 0 0 14px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        line-height: 1.55;
+        color: var(--ink);
+      }
+      #sig-nom {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 11px 12px;
+        background: rgba(10, 20, 34, 0.9);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        color: var(--specimen);
+        font-family: var(--font-display);
+        font-size: 15px;
+        letter-spacing: 0.2em;
+        text-align: center;
+        text-transform: uppercase;
+      }
+      #sig-nom:focus { outline: none; border-color: var(--specimen); }
+      #sig-nom.need { animation: sig-secousse 0.3s; border-color: #ff7a6a; }
+      @keyframes sig-secousse {
+        25% { transform: translateX(-5px); }
+        75% { transform: translateX(5px); }
+      }
+      #sig-valider {
+        margin-top: 12px;
+        width: 100%;
+        padding: 12px;
+        background: var(--specimen);
+        border: none;
+        border-radius: 6px;
+        color: #04121c;
+        font-family: var(--font-display);
+        font-size: 12px;
+        letter-spacing: 0.16em;
+        cursor: pointer;
+      }
+      #sig-valider:hover { filter: brightness(1.12); }
+      #sig-note {
+        margin-top: 10px;
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        color: var(--dim);
+      }
       #onboard {
         position: fixed;
         inset: 0;
@@ -3173,6 +3254,20 @@
     </div>
 
     <!-- Onboarding : quatre cartes, textes selon la prise en main (doigt ou souris) -->
+    <!-- Voile de SIGNATURE (premier lancement) : le nom d'opérateur, et le
+         geste qui éveille l'audio — il bloque tout clic vers le jeu derrière. -->
+    <div id="signature" hidden aria-label="Signature du protocole">
+      <div class="sig-boite">
+        <div class="sig-sur">COMPLEXE ORBITAL MÉDUSE — REGISTRES DU LABO</div>
+        <h3>SIGNEZ LE PROTOCOLE</h3>
+        <p>Chaque essai est consigné au palmarès partagé. Votre nom d'opérateur,
+        façon borne d'arcade — il estampillera records et trophées.</p>
+        <input id="sig-nom" maxlength="12" autocomplete="off" spellcheck="false" placeholder="VOTRE NOM" aria-label="Nom d'opérateur" />
+        <button id="sig-valider" type="button">SIGNER ET ENTRER</button>
+        <div id="sig-note">Le son du labo s'éveillera avec votre signature.</div>
+      </div>
+    </div>
+
     <div id="onboard" hidden aria-label="Prise en main">
       <div class="ob-etape" data-etape="0">
         <div class="ob-anim ob-doigt"><i></i></div>
