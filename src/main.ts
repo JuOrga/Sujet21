@@ -315,41 +315,46 @@ function renderRegistres(): void {
   const moi = records.operator()
   const signe = (name: string): string =>
     name ? `<i class="rec-qui${name === moi ? ' rec-moi' : ''}">${htmlSafe(name)}</i>` : ''
-  const rows: string[] = playedLevels().map((t) => {
-    // Le PALMARÈS (tops note/volume/chrono) prime : c'est le nouveau
-    // système de records. Les anciens records « simples » (locaux et
-    // partagés) servent de secours pour les salles jouées avant lui.
-    const tops = sharedBoard?.tops?.[t.code]
-    const local = records.tableauRecord(t.code)
-    const shared = sharedBoard?.tableaux[t.code] ?? null
-    const meilleurNote = tops?.note?.[0] ?? null
-    const noteTxt = meilleurNote
-      ? `<b>${meilleurNote.note} pts</b> ${signe(meilleurNote.name)}`
-      : '<span class="rec-none">—</span>'
-    const lv = local?.volume ?? null
-    const vol =
-      tops?.volume?.[0] ??
-      (shared && (!lv || shared.liters > lv.liters || (shared.liters === lv.liters && shared.time < lv.time))
-        ? shared
-        : lv)
-    const volTxt = vol
-      ? `<b>${fmtL(vol.liters)}</b> ${signe(vol.name)}`
-      : '<span class="rec-none">—</span>'
-    const chr = tops?.chrono?.[0] ?? local?.chrono ?? null
-    const chrTxt = chr
-      ? `<b>${fmtTime(chr.time)}</b> ${signe(chr.name)}`
-      : '<span class="rec-none">—</span>'
-    return (
+  // Le panneau est le CONDENSÉ de l'écran RECORDS : le palmarès partagé
+  // (note, volume, chrono — rang 1 de chaque podium), seules les salles
+  // qui ONT un palmarès s'affichent, bornées pour tenir SANS défilement.
+  // Le détail (top 5, trophées) vit derrière le bouton RECORDS.
+  const rows: string[] = []
+  const tops = sharedBoard?.tops ?? {}
+  let affichees = 0
+  let cachees = 0
+  for (const t of playedLevels()) {
+    const top = tops[t.code]
+    if (!top || top.note.length === 0) continue
+    if (affichees >= 9) {
+      cachees++
+      continue
+    }
+    affichees++
+    const n0 = top.note[0]
+    const v0 = top.volume[0]
+    const c0 = top.chrono[0]
+    rows.push(
       `<div class="rec-row"><span class="rec-code">${t.code}</span><span class="rec-name">${t.name}</span>` +
-      `<span class="rec-val rec-note">${noteTxt}</span>` +
-      `<span class="rec-val rec-vol">${volTxt}</span><span class="rec-val rec-chr">${chrTxt}</span></div>`
+        `<span class="rec-val rec-note"><b>${n0.note} pts</b> ${signe(n0.name)}</span>` +
+        `<span class="rec-val rec-vol"><b>${fmtL(v0?.liters ?? 0)}</b> ${signe(v0?.name ?? '')}</span>` +
+        `<span class="rec-val rec-chr"><b>${fmtTime(c0?.time ?? 0)}</b> ${signe(c0?.name ?? '')}</span></div>`,
     )
-  })
-  rows.unshift(
-    `<div class="rec-row rec-titres"><span class="rec-code"></span><span class="rec-name">SALLE</span>` +
-      `<span class="rec-val rec-note">★ NOTE</span>` +
-      `<span class="rec-val rec-vol">💧 VOLUME</span><span class="rec-val rec-chr">⏱ CHRONO</span></div>`,
-  )
+  }
+  if (rows.length > 0) {
+    rows.unshift(
+      `<div class="rec-row rec-titres"><span class="rec-code"></span><span class="rec-name">SALLE</span>` +
+        `<span class="rec-val rec-note">★ NOTE</span>` +
+        `<span class="rec-val rec-vol">💧 VOLUME</span><span class="rec-val rec-chr">⏱ CHRONO</span></div>`,
+    )
+  } else {
+    rows.push(
+      '<div class="rec-hist">Le palmarès est à prendre : chaque collecte y inscrit sa note, son volume et son chrono.</div>',
+    )
+  }
+  if (cachees > 0) {
+    rows.push(`<div class="rec-hist">+ ${cachees} autre(s) salle(s) au palmarès — bouton RECORDS.</div>`)
+  }
   const localExp = records.expedition()
   const sharedExp = sharedBoard?.expedition ?? null
   const exp =
@@ -368,13 +373,6 @@ function renderRegistres(): void {
           exp.name ? `<i class="rec-qui${exp.name === moi ? ' rec-moi' : ''}">${htmlSafe(exp.name)}</i>` : ''
         }</span></div>`,
     )
-  }
-  const hist = records.lastEntries(4)
-  if (hist.length > 0) {
-    const line = hist
-      .map((e) => `nº ${e.no} ${e.code} ${e.won ? `✓ ${fmtL(e.liters)}` : '✕ dispersé'}`)
-      .join(' &nbsp;·&nbsp; ')
-    rows.push(`<div class="rec-hist">${line}</div>`)
   }
   recRows.innerHTML = rows.join('')
 }
@@ -395,6 +393,17 @@ recName.addEventListener('change', () => {
   records.setOperator(recName.value)
   recName.value = records.operator()
   renderRegistres()
+})
+
+// La fiche s'ouvre EN HAUT, toujours : le navigateur restaure sinon le
+// défilement de la visite précédente une demi-seconde après l'affichage —
+// le titre devenait inaccessible sans remonter à la main (constaté).
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual'
+window.scrollTo(0, 0)
+requestAnimationFrame(() => {
+  window.scrollTo(0, 0)
+  const homeEl = document.getElementById('home')
+  if (homeEl) homeEl.scrollTop = 0
 })
 
 // La plongée exige un nom : on interpelle le champ au lieu d'ouvrir la cuve.
@@ -500,7 +509,6 @@ function fermerRecs(): void {
   recsEl.hidden = true
   recsParent.appendChild(recsBloc) // et revient à sa place sur la fiche
 }
-document.getElementById('home-recs')?.addEventListener('click', ouvrirRecs)
 recsEl.addEventListener('pointerdown', (e) => {
   if (e.target === recsEl) fermerRecs()
 })
@@ -1402,7 +1410,6 @@ const FICHE_BOUTONS = [
   'home-records',
   'home-livraisons',
   'home-cmds',
-  'home-recs',
   'home-params',
   'home-mute',
   'home-plein',
