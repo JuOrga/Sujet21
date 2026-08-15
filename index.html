@@ -1113,36 +1113,9 @@
         background: var(--glow);
         transform: translateY(-1px);
       }
-      /* Le prototype 21-A bis : un essai à part, en retrait du bouton principal */
-      #start-bis {
-        font-family: var(--font-display);
-        font-size: 10.5px;
-        letter-spacing: 0.12em;
-        padding: 10px 16px;
-        margin-top: -6px;
-        color: var(--dim);
-        background: transparent;
-        border: 1px dashed var(--line);
-        cursor: pointer;
-        transition: color 0.2s ease, border-color 0.2s ease;
-      }
-      #start-bis:hover,
-      #start-editor:hover {
-        color: var(--specimen);
-        border-color: var(--specimen);
-      }
-      #start-editor {
-        font-family: var(--font-display);
-        font-size: 10.5px;
-        letter-spacing: 0.12em;
-        padding: 10px 16px;
-        margin-top: -10px;
-        color: var(--dim);
-        background: transparent;
-        border: 1px dashed var(--line);
-        cursor: pointer;
-        transition: color 0.2s ease, border-color 0.2s ease;
-      }
+      /* L'éditeur et le parcours test vivent dans la grille d'outils de la
+         console (mêmes tuiles que SALLES/RECORDS) : des outils, pas des
+         actions de jeu — fini les boutons pointillés qui faisaient tache. */
       /* Le son ne peut pas naître tout seul : le navigateur exige un geste.
          Plutôt que d'attendre le clic sur COMMENCER — qui ferait entendre
          l'accueil une demi-seconde avant de basculer en cuve — la fiche
@@ -2310,45 +2283,63 @@
         text-shadow: 0 1px 5px rgba(0, 0, 0, 0.9);
         will-change: transform;
       }
-      /* Plaque de signalétique (texte « SUR-TITRE|TITRE ») : deux lignes,
-         fond sombre, liseré teinté par le ton — un panneau du labo, pas un
-         texte qui flotte. La couleur vient des classes wl-*. */
+      /* Pancarte de signalétique (texte « SUR-TITRE|TITRE ») : un panneau
+         de station-labo — tôle sombre en dégradé, rail de fixation vissé,
+         titre rétroéclairé par le ton (classes wl-*), bande de danger sous
+         le sas. Un objet monté au mur, pas un texte qui flotte. */
       .world-label.plaque {
         display: inline-flex;
         flex-direction: column;
         align-items: center;
-        gap: 3px;
-        padding: 7px 14px 8px;
-        background: rgba(5, 12, 21, 0.82);
-        border: 1px solid currentColor;
-        border-radius: 4px;
+        gap: 4px;
+        padding: 8px 16px 9px;
+        background: linear-gradient(180deg, rgba(17, 29, 43, 0.94), rgba(6, 13, 22, 0.94));
+        border: 1px solid color-mix(in srgb, currentColor 60%, transparent);
+        border-radius: 3px;
         box-shadow:
-          0 0 0 1px rgba(0, 0, 0, 0.55),
-          0 2px 14px rgba(0, 0, 0, 0.45);
-        opacity: 0.96;
+          inset 0 0 0 1px rgba(255, 255, 255, 0.045),
+          inset 0 14px 22px -16px currentColor,
+          0 0 0 1px rgba(0, 0, 0, 0.6),
+          0 3px 16px rgba(0, 0, 0, 0.5);
+        opacity: 0.97;
         text-shadow: none;
       }
       .world-label.plaque::before {
-        /* le liseré haut : une barrette d'accroche, comme vissée au mur */
+        /* le rail de fixation : une barre pleine largeur, deux vis aux bouts */
         content: '';
-        width: 26px;
-        height: 2px;
-        background: currentColor;
-        opacity: 0.8;
-        border-radius: 1px;
+        align-self: stretch;
+        height: 4px;
+        margin: -2px -6px 1px;
+        background:
+          radial-gradient(circle at 5px 50%, rgba(255, 255, 255, 0.55) 0 1.3px, transparent 2.6px),
+          radial-gradient(circle at calc(100% - 5px) 50%, rgba(255, 255, 255, 0.55) 0 1.3px, transparent 2.6px),
+          linear-gradient(90deg, transparent, color-mix(in srgb, currentColor 75%, transparent) 18%, color-mix(in srgb, currentColor 75%, transparent) 82%, transparent);
+        border-radius: 2px;
+        opacity: 0.9;
       }
       .world-label.plaque i {
         font-style: normal;
         font-family: var(--font-mono);
         font-size: 8.5px;
         letter-spacing: 0.34em;
-        opacity: 0.62;
+        opacity: 0.6;
         color: var(--ink);
       }
       .world-label.plaque b {
         font-weight: normal;
         font-size: 12.5px;
         letter-spacing: 0.2em;
+        filter: drop-shadow(0 0 6px color-mix(in srgb, currentColor 55%, transparent));
+      }
+      /* le sas : la seule pancarte à porter une bande de danger */
+      .world-label.plaque.wl-sas::after {
+        content: '';
+        align-self: stretch;
+        height: 5px;
+        margin: 2px -10px -5px;
+        background: repeating-linear-gradient(-45deg, currentColor 0 6px, transparent 6px 12px);
+        border-radius: 0 0 2px 2px;
+        opacity: 0.5;
       }
       .wl-mur { color: #7f92a3; }
       .wl-phile { color: #4fc4cf; }
@@ -3087,9 +3078,9 @@
       <button id="home-restart" type="button" hidden>RECOMMENCER LE TABLEAU</button>
       <button id="start-reprendre" type="button" hidden></button>
       <button id="start-secondaire" type="button" hidden>RUN SECONDAIRE — SALLE 1 (L'EXPÉDITION EN COURS EST CONSERVÉE)</button>
-      <button id="start-bis" type="button">PARCOURS TEST — L'ÉCOLE, PUIS LES SALLES LASER</button>
-      <button id="start-editor" type="button">ÉDITEUR DE TABLEAUX — CRÉER OU MODIFIER UN NIVEAU</button>
       <div class="home-duo" role="group" aria-label="Outils du protocole">
+        <button id="start-editor" type="button" title="Créer ou modifier un tableau"><i>✎</i><span>ÉDITEUR</span></button>
+        <button id="start-bis" type="button" title="L'école, puis les salles laser"><i>⚗&#xFE0E;</i><span>PARCOURS TEST</span></button>
         <button id="home-salles" type="button"><i>▦</i><span>SALLES</span></button>
         <button id="home-records" type="button"><i>✦</i><span>RECORDS</span></button>
         <button id="home-livraisons" type="button"><i>◈</i><span>NOTES DE VERSION</span></button>
