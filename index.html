@@ -348,6 +348,35 @@
       .rec-ligne.moi { background: rgba(46, 198, 201, 0.14); outline: 1px solid rgba(46, 198, 201, 0.35); }
       .rec-ecart { margin-top: 4px; font-size: 11px; color: var(--dim); font-style: italic; }
       .rec-vide { padding: 6px 4px; font-size: 12px; color: var(--dim); font-style: italic; }
+      #livraisons[hidden] { display: none; }
+      #livraisons {
+        position: fixed; inset: 0; z-index: 40;
+        background: rgba(2, 6, 12, 0.72);
+        display: flex; align-items: center; justify-content: center; padding: 18px;
+      }
+      #livraisons .salles-boite { max-height: 86vh; overflow: auto; width: min(880px, 96vw); }
+      #livraisons-dl {
+        font-family: var(--font-display); font-size: 9.5px; letter-spacing: 0.14em;
+        padding: 4px 10px; background: transparent; color: var(--specimen);
+        border: 1px solid var(--specimen); border-radius: 4px; cursor: pointer;
+      }
+      #livraisons-corps { padding: 4px 14px 16px; }
+      .liv-e { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 8px; }
+      .liv-e h3 {
+        margin: 0; font-family: var(--font-display); font-size: 11.5px;
+        letter-spacing: 0.12em; color: var(--specimen);
+      }
+      .liv-e time { font-family: var(--font-mono); font-size: 10.5px; color: var(--dim); }
+      .liv-e img { max-width: 100%; border-radius: 6px; border: 1px solid var(--line); margin: 8px 0 2px; }
+      .liv-e ul { margin: 6px 0 0; padding-left: 18px; }
+      .liv-e li { font-family: var(--font-mono); font-size: 12px; color: var(--ink); margin-top: 4px; line-height: 1.45; }
+      #fps-coin[hidden] { display: none; }
+      #fps-coin {
+        position: fixed; left: 10px; bottom: 10px; z-index: 30;
+        font-family: var(--font-mono); font-size: 12px; color: var(--specimen);
+        background: rgba(4, 10, 18, 0.55); padding: 2px 7px; border-radius: 4px;
+        pointer-events: none;
+      }
       #trophee-toast {
         position: fixed; top: 64px; right: 14px; z-index: 60;
         display: flex; gap: 10px; align-items: center;
@@ -2713,6 +2742,7 @@
       <div class="home-duo">
         <button id="home-salles" type="button">▦ SALLES</button>
         <button id="home-records" type="button">🏆 RECORDS</button>
+        <button id="home-livraisons" type="button">📜 LIVRAISONS</button>
         <button id="home-cmds" type="button">⌘ COMMANDES</button>
         <button id="home-recs" type="button">◧ RECORDS</button>
         <button id="home-params" type="button">⚙ PARAMÈTRES</button>
@@ -2976,6 +3006,21 @@
       </div>
     </div>
 
+    <!-- Le voile LIVRAISONS : le journal du chantier, sorti du banc -->
+    <div id="livraisons" hidden aria-label="Notes de livraison">
+      <div class="salles-boite">
+        <div class="salles-tete"><span>NOTES DE LIVRAISON — le journal du chantier</span>
+          <span style="display:flex; gap:8px">
+            <button type="button" id="livraisons-dl">TÉLÉCHARGER</button>
+            <button type="button" id="livraisons-fermer" aria-label="Fermer">✕</button>
+          </span></div>
+        <div id="livraisons-corps"></div>
+      </div>
+    </div>
+
+    <!-- Compteur FPS permanent (réglage AFFICHER LES FPS du voile PARAMÈTRES) -->
+    <div id="fps-coin" hidden></div>
+
     <!-- Toast de trophée : la petite fanfare qui glisse depuis le bord -->
     <div id="trophee-toast" aria-live="polite"></div>
 
@@ -3023,6 +3068,12 @@
             envoyez un rapport dans chaque mode.
           </div>
           <div id="params-eau" class="params-choix" role="group" aria-label="Graphismes du liquide"></div>
+          <div class="params-nom" style="margin-top: 16px">COMPTEUR D'IMAGES PAR SECONDE</div>
+          <div class="params-desc">
+            Affiché : la cadence mesurée reste en permanence dans le coin de
+            l'écran, discrète — pour surveiller sans ouvrir de rapport.
+          </div>
+          <div id="params-fpsaff" class="params-choix" role="group" aria-label="Compteur de FPS"></div>
           <div class="params-nom" style="margin-top: 16px">MOTEUR PHYSIQUE</div>
           <div class="params-desc">
             WASM (défaut) : le cœur de la simulation tourne en noyaux compilés —

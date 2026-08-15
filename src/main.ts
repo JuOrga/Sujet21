@@ -5,6 +5,7 @@ import { DEFAULT_PARAMS, type SimParams } from './sim/params'
 import { FluidSim, KIND_PLAYER } from './sim/solver'
 import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
+import { DELIVERIES } from './bench/changelog'
 import { Camera } from './render/camera'
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { FixedLoop } from './game/loop'
@@ -526,6 +527,62 @@ renderSalles()
 document.getElementById('home-salles')?.addEventListener('click', () => {
   sallesEl.hidden = false
 })
+// ---- Le voile LIVRAISONS : le journal du chantier, sorti du banc ----
+// Chaque entrée peut porter une illustration (champ figure) ; le bouton
+// TÉLÉCHARGER exporte tout le journal en Markdown, hors ligne compris.
+const livraisonsEl = document.getElementById('livraisons') as HTMLDivElement
+{
+  const corps = document.getElementById('livraisons-corps') as HTMLDivElement
+  let rendu = false
+  const renderLivraisons = (): void => {
+    if (rendu) return
+    rendu = true
+    const esc = (t: string): string => t.replace(/</g, '&lt;')
+    corps.innerHTML = DELIVERIES.map(
+      (d) =>
+        `<div class="liv-e"><h3>${esc(d.title)}</h3><time>${esc(d.date)}</time>` +
+        (d.figure ? `<img src="${d.figure}" alt="" loading="lazy" />` : '') +
+        `<ul>${d.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul></div>`,
+    ).join('')
+  }
+  document.getElementById('home-livraisons')?.addEventListener('click', () => {
+    renderLivraisons()
+    livraisonsEl.hidden = false
+  })
+  document.getElementById('livraisons-fermer')?.addEventListener('click', () => {
+    livraisonsEl.hidden = true
+  })
+  livraisonsEl.addEventListener('pointerdown', (e) => {
+    if (e.target === livraisonsEl) livraisonsEl.hidden = true
+  })
+  document.getElementById('livraisons-dl')?.addEventListener('click', () => {
+    const md =
+      '# Projet 21 — notes de livraison\n\n' +
+      DELIVERIES.map(
+        (d) => `## ${d.date} — ${d.title}\n\n${d.notes.map((n) => `- ${n}`).join('\n')}\n`,
+      ).join('\n')
+    const url = URL.createObjectURL(new Blob([md], { type: 'text/markdown' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'projet21-livraisons.md'
+    a.click()
+    URL.revokeObjectURL(url)
+  })
+}
+
+// ---- Compteur de FPS permanent (réglage du voile PARAMÈTRES) ----
+const fpsCoin = document.getElementById('fps-coin') as HTMLDivElement
+let fpsAffiche = localStorage.getItem('sujet21-fps-aff') === '1'
+fpsCoin.hidden = !fpsAffiche
+let fpsCoinTimer = 0
+function majFpsCoin(dtReal: number): void {
+  if (!fpsAffiche) return
+  fpsCoinTimer += dtReal
+  if (fpsCoinTimer < 0.25) return
+  fpsCoinTimer = 0
+  fpsCoin.textContent = `${Math.round(fpsSmoothed)} im/s`
+}
+
 // ---- Trophées du protocole : succès internes, prêts pour Steam ----
 // Les déblocages passent par un toast (la petite fanfare) ; la page vit
 // dans le voile RECORDS. Détection par échantillonnage léger (4 Hz).
@@ -804,6 +861,28 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     }
   }
   renderDecor()
+
+  const choixFpsAff = document.getElementById('params-fpsaff') as HTMLDivElement
+  const renderFpsAff = (): void => {
+    choixFpsAff.innerHTML = ''
+    for (const [on, label] of [
+      [false, 'MASQUÉ'],
+      [true, 'AFFICHÉ'],
+    ] as const) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = label
+      b.className = fpsAffiche === on ? 'actif' : ''
+      b.addEventListener('click', () => {
+        fpsAffiche = on
+        localStorage.setItem('sujet21-fps-aff', on ? '1' : '0')
+        fpsCoin.hidden = !on
+        renderFpsAff()
+      })
+      choixFpsAff.appendChild(b)
+    }
+  }
+  renderFpsAff()
 
   const choixMoteur = document.getElementById('params-moteur') as HTMLDivElement
   const etatMoteur = document.getElementById('params-moteur-etat') as HTMLDivElement
@@ -2679,6 +2758,7 @@ function frame(now: number): void {
   }
   updateTutor(dtReal)
   updateTrophees(dtReal)
+  majFpsCoin(dtReal)
   updateWorldLabels(vw, vh)
   drawMecanismes(vw, vh, dpr)
   drawFleche(dtReal, dpr)
