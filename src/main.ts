@@ -5,6 +5,7 @@ import { DEFAULT_PARAMS, type SimParams } from './sim/params'
 import { FluidSim, KIND_PLAYER } from './sim/solver'
 import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
+import { TABLEAU_HUB } from './game/hub'
 import { DELIVERIES, VERSION, versionDe } from './bench/changelog'
 import { Camera } from './render/camera'
 import { MAX_BOXES, Renderer } from './render/renderer'
@@ -249,8 +250,14 @@ let level: LevelDef = TABLEAUX[levelIndex]
 let renderBoxes: ObstacleBox[] = []
 let levelHasCold = false // le HUD n'annonce la rosée que si des plaques la rendent
 const exitMouth = { x: 0, y: 0 }
+// LE HUB : le module d'accueil (src/game/hub.ts) — la zone de départ du
+// roguelike. Prioritaire derrière les essais (testLevel) : l'éditeur et les
+// parcours d'essai passent toujours devant. C'est aussi le décor du
+// CHARGEMENT : derrière la fiche, l'échantillon dérive déjà dans la cuve
+// d'entraînement (sauf navigation directe ?tableau=N, outil de conception).
+let auHub = !new URLSearchParams(location.search).has('tableau')
 function applyLevel(): void {
-  level = testLevel ?? playedLevels()[levelIndex] ?? playedLevels()[0]
+  level = testLevel ?? (auHub ? TABLEAU_HUB : playedLevels()[levelIndex] ?? playedLevels()[0])
   levelHasCold = level.boxes.some((b) => b.material === MAT_FROID)
   // le sas garde sa place dans le budget de rendu : un tableau trop chargé
   // perd ses derniers blocs de décor, jamais sa sortie
@@ -1301,19 +1308,32 @@ function closeHome(): void {
     reprendreRun(save)
     return
   }
+  if (!hasPlayed) {
+    // Premier plongeon : le jeu COMMENCE AU HUB — la cuve d'entraînement
+    // du module Méduse, sous l'œil des Créateurs. L'éveil s'y joue.
+    entrerHub()
+    return
+  }
   document.body.classList.add('playing')
   input.paused = false // la fiche figeait l'essai : il repart
   startBtn.textContent = "REPRENDRE L'ESSAI"
   homeRestartBtn.hidden = false
-  if (!hasPlayed) {
-    // Premier lancement : zoom d'ouverture (les redémarrages ont le leur),
-    // et la prise en main tactile pour qui joue au doigt
-    hasPlayed = true
-    camera.startIntro(sim.bounds, window.innerWidth, window.innerHeight)
-    showTableauCard()
-    montrerOnboard()
-    lanceEveil() // cryostase, plan large, puis les cartes de l'éveil
-  }
+}
+
+// Entrer au hub : le module d'accueil, joué SANS enjeu (pas de records,
+// pas d'échantillon consommé). Son sas lance la run.
+function entrerHub(): void {
+  auHub = true
+  testLevel = null
+  fromEditor = false
+  hasPlayed = true
+  document.body.classList.add('playing')
+  input.paused = false
+  startBtn.textContent = "REPRENDRE L'ESSAI"
+  homeRestartBtn.hidden = false
+  restart()
+  montrerOnboard()
+  lanceEveil() // la cryostase s'éveille dans la cuve d'entraînement
 }
 function openHome(): void {
   document.body.classList.remove('playing')
@@ -1359,8 +1379,9 @@ function runSauvee(): RunSauvee | null {
 }
 function sauveRun(): void {
   // seule l'expédition PRINCIPALE s'écrit — et seulement passée la salle 1
-  // (une partie à peine commencée n'a rien à sauver ; y revenir efface)
-  if (testLevel || runSecondaire) return
+  // (une partie à peine commencée n'a rien à sauver ; y revenir efface).
+  // Le hub, hors run, ne touche jamais à la sauvegarde.
+  if (testLevel || runSecondaire || auHub) return
   try {
     if (levelIndex < 1) localStorage.removeItem(CLE_RUN)
     else
@@ -1389,6 +1410,7 @@ function effaceRun(): void {
 }
 function reprendreRun(save: RunSauvee): void {
   runSecondaire = false
+  auHub = false
   testLevel = null
   fromEditor = false
   levelIndex = Math.min(save.index, playedLevels().length - 1)
@@ -1425,6 +1447,7 @@ document.getElementById('start-secondaire')?.addEventListener('click', () => {
   // une run À PART : même parcours, records comptés — la sauvegarde de
   // l'expédition principale n'est jamais touchée
   runSecondaire = true
+  auHub = false
   testLevel = null
   fromEditor = false
   levelIndex = 0
@@ -2195,17 +2218,17 @@ function newExpedition(): void {
   restart()
 }
 
-// Fin de run (dernier échantillon dispersé) : le laboratoire rappelle —
-// retour au labo (la fiche, en attendant le HUB), la salle 1 en coulisse.
+// Fin de run (dernier échantillon dispersé, ou expédition conclue) : le
+// laboratoire rappelle — on se réveille AU HUB, prêt à relancer par le sas.
 function retourAuLabo(): void {
   levelIndex = 0
   run.bonbonneLiters = 0
   run.runTime = 0
   run.vies = 1
   run.conclues = 0
+  run.ended = false
   runSecondaire = false
-  openHome()
-  restart()
+  entrerHub()
   majBoutonsRun()
 }
 let gameOverAffiche = false
@@ -2244,8 +2267,14 @@ function resetAction(): void {
     retourAuLabo()
     return
   }
+  if (auHub) {
+    // au hub, rien ne se paie : la dispersion recompose, R recommence
+    restart()
+    return
+  }
   if (run.ended) {
-    newExpedition()
+    // expédition conclue : le bilan ramène au labo — le sas relancera
+    retourAuLabo()
     return
   }
   if (sim.dispersed) {
@@ -2281,6 +2310,7 @@ const pane = createBench(params, monitor, {
   tableaux: TABLEAUX.map((t) => t.name),
   gotoTableau: (index) => {
     testLevel = null // le banc navigue dans l'expédition, pas dans le prototype
+    auHub = false
     fromEditor = false
     levelIndex = index
     restart()
@@ -3236,7 +3266,20 @@ function frame(now: number): void {
   )
   const reached =
     !drainActive && pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit)
-  if (!tableauDone && !sim.dispersed && (drunk || reached) && testLevel) {
+  if (!tableauDone && !sim.dispersed && (drunk || reached) && auHub) {
+    // LE SAS DE LANCEMENT : au hub, le sas ne collecte rien — il LANCE la
+    // run. Reprise de l'expédition sauvée s'il y en a une, salle 1 sinon.
+    auHub = false
+    audio.collect()
+    bande.ponctuation('sting-collecte', 0.85)
+    const save = runSauvee()
+    if (save) {
+      reprendreRun(save)
+    } else {
+      runSecondaire = false
+      newExpedition()
+    }
+  } else if (!tableauDone && !sim.dispersed && (drunk || reached) && testLevel) {
     // Prototype 21-A bis : l'essai conclut sans toucher aux registres ni à
     // l'expédition — on félicite, on ramène au protocole.
     const surplus = sim.liters() + sim.swallowed * params.litersPerParticle
@@ -3327,7 +3370,7 @@ function frame(now: number): void {
           exp.newRecord ? ' — <em class="bilan-neuf">MEILLEURE EXPÉDITION ✦</em>' : ''
         }</span></span>Le laboratoire n'a plus d'échantillon. Quelque part dans les conduites, le fluide se souvient.`,
         'success',
-        'NOUVELLE EXPÉDITION',
+        'RETOUR AU LABO',
       )
     } else {
       run.exitTimer = EXIT_LINGER
@@ -3456,9 +3499,12 @@ function frame(now: number): void {
   const fraction = sim.baseVolume > 0 ? sim.playerCount / sim.baseVolume : 0
   hudTableau.textContent = testLevel
     ? 'BIS'
-    : `${runSecondaire ? '2ᵉ RUN · ' : ''}SALLE ${levelIndex + 1}/${playedLevels().length}`
-  // les échantillons de secours (vies) : hors des essais, toujours visibles
-  hudViesChip.hidden = !!testLevel
+    : auHub
+      ? 'LABO'
+      : `${runSecondaire ? '2ᵉ RUN · ' : ''}SALLE ${levelIndex + 1}/${playedLevels().length}`
+  // les échantillons de secours (vies) : en run seulement — au labo comme
+  // aux essais, rien ne se paie
+  hudViesChip.hidden = !!testLevel || auHub
   hudVies.textContent = `×${run.vies}`
   // La coque refroidit : +21° au départ, −60° à froid complet — la pression
   // temporelle se lit ici (chiffre ET barre), jamais sur un chronomètre
