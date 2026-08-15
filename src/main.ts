@@ -2206,7 +2206,7 @@ stateVapeur.addEventListener('click', () => input.toggleGas())
 // pas de direction, l'élan se conserve, et un mystère qui donne envie.
 // (2) L'invite plane au-dessus du corps : redevenir liquide (💧 / F), le
 // bouton d'interface pulse — le DÉGEL est la réponse, pas un clic de plus.
-// (3) Deux impulsions données (appui puis relâcher), une carte scelle la
+// (3) Une dizaine d'impulsions données (appui puis relâcher), une carte scelle la
 // leçon du VOLUME. La clé CLE_EVEIL mémorise le passage ; PARAMÈTRES →
 // REFAIRE LA PRISE EN MAIN la rejoue sur le tableau en cours.
 const eveil1El = document.getElementById('eveil1') as HTMLDivElement
@@ -2291,11 +2291,12 @@ function majEveil(): void {
       eveil.visePrec = input.aimActive
     }
   } else if (eveil.etape === 'gestes') {
-    // deux impulsions COMPLÈTES (appui puis relâcher) : on laisse sentir
-    // le volume qui part, puis la carte vient nommer ce qu'on vient de vivre
+    // une DIZAINE d'impulsions complètes (appui puis relâcher) : on laisse
+    // vraiment jouer — sentir le volume qui part, essayer, se tromper —
+    // puis la carte vient nommer ce qu'on vient de vivre
     if (eveil.visePrec && !input.aimActive) {
       eveil.gestes++
-      if (eveil.gestes >= 2) {
+      if (eveil.gestes >= 10) {
         eveil.etape = 'volume'
         carteEveil(eveil2El, true)
       }
