@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 00:30',
+    title: 'Hub : étiquettes lisibles, habillages ENFIN fidèles, pastilles à leur place',
+    notes: [
+      'Autocritique sur capture, quatre corrections. UN — les énigmes du placard se chevauchaient en bouillie : raccourcies et ÉTAGÉES sur deux hauteurs (« CE QUI AIME RETIENT », « LE FROID FIGE, LE FIGÉ FILE »…), idem pour conduit/sas de lancement. DEUX — le banc d’étalonnage rejoint le TRAJET cuve → sas : un îlot blindé qu’on contourne, au lieu d’un recoin qu’on ignore.',
+      'TROIS — les HABILLAGES de parois affichaient la tuile de l’AUTRE rangée depuis leur intégration (caissons ↔ aération, hublots ↔ conduites, écrans ↔ poutrelle…) : l’atlas est téléversé retourné (FLIP_Y) et le shader lisait les rangées à l’endroit. Corrigé d’une ligne — TOUS les tableaux montrent désormais l’habillage réellement choisi à l’éditeur.',
+      'QUATRE — masquer une pastille du HUD ne faisait rien (le display:flex du style écrasait l’attribut hidden) : réglé — au labo, les pastilles vies et bonbonne disparaissent vraiment. Et le « −0,35 L/s » observé dans la cuve a été mesuré : simple tassement d’après-spawn, le volume est STABLE au repos (vérifié à 4,500 L constants en temps accéléré).',
+    ],
+  },
+  {
     date: '15/08/2026 23:59',
     title: 'LE HUB : le module Méduse — le jeu commence dans la cuve d’entraînement',
     notes: [

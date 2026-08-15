@@ -56,8 +56,9 @@ export const TABLEAU_HUB: LevelDef = {
     box(120, -700, 280, -620, MAT_HYDROPHOBE),
     box(400, -700, 560, -620, MAT_FROID),
     box(680, -700, 840, -620, MAT_GRILLE),
-    // ---- le banc d'étalonnage (hors service — chantier méta) : blindage
-    box(620, 240, 920, 340, MAT_WALL, 4),
+    // ---- le banc d'étalonnage (hors service — chantier méta) : un îlot
+    // blindé posé SUR le trajet cuve → sas — on le contourne, on le voit
+    box(300, -40, 620, 60, MAT_WALL, 4),
     // ---- le conduit de ventilation vers le sas : parois d'aération
     box(1080, 160, 1160, 750, MAT_WALL, 5),
     box(1080, -750, 1160, -160, MAT_WALL, 5),
@@ -70,19 +71,20 @@ export const TABLEAU_HUB: LevelDef = {
     // la cuve
     { x: -1000, y: 500, text: 'CUVE D’ENTRAÎNEMENT', tone: 'mur' },
     { x: -1000, y: -500, text: 'LES CRÉATEURS OBSERVENT', tone: 'froid' },
-    // l'observation et les chantiers à venir
+    // l'observation et le banc (les deux machines des chantiers méta)
     { x: 170, y: 560, text: 'SALLE D’OBSERVATION — ACCÈS CRÉATEURS', tone: 'mur' },
     { x: 170, y: 470, text: 'ÉCRAN DE CONTRÔLE : ÉTEINT', tone: 'grille' },
-    { x: 770, y: 420, text: 'BANC D’ÉTALONNAGE — HORS SERVICE', tone: 'chaud' },
-    // le placard : les surfaces en énigmes
-    { x: 400, y: -450, text: 'PLACARD D’ENTRETIEN — LISEZ LES ÉTIQUETTES', tone: 'mur' },
-    { x: -80, y: -560, text: 'CE QUI VOUS AIME VOUS RETIENT', tone: 'phile' },
-    { x: 200, y: -560, text: 'CE QUI VOUS REPOUSSE VOUS PROPULSE', tone: 'phobe' },
-    { x: 480, y: -560, text: 'LE FROID FIGE — LE FIGÉ FILE', tone: 'froid' },
-    { x: 760, y: -560, text: 'SEUL LE SOUFFLE RESPIRE ICI', tone: 'grille' },
-    { x: 980, y: -560, text: 'ELLE BOIT, NE REND RIEN', tone: 'eponge' },
-    // le départ
-    { x: 1120, y: 240, text: 'CONDUIT DE VENTILATION', tone: 'grille' },
-    { x: 1330, y: 220, text: 'SAS DE LANCEMENT — PROTOCOLE 21', tone: 'sas' },
+    { x: 460, y: 140, text: 'BANC D’ÉTALONNAGE — HORS SERVICE', tone: 'chaud' },
+    // le placard : les surfaces en énigmes — étiquettes ÉTAGÉES sur deux
+    // hauteurs et raccourcies, pour qu'aucune ne morde sur sa voisine
+    { x: 400, y: -330, text: 'PLACARD D’ENTRETIEN', tone: 'mur' },
+    { x: -80, y: -560, text: 'CE QUI AIME RETIENT', tone: 'phile' },
+    { x: 200, y: -460, text: 'CE QUI REPOUSSE PROPULSE', tone: 'phobe' },
+    { x: 480, y: -560, text: 'LE FROID FIGE, LE FIGÉ FILE', tone: 'froid' },
+    { x: 760, y: -460, text: 'SEUL LE SOUFFLE PASSE', tone: 'grille' },
+    { x: 1000, y: -560, text: 'ELLE BOIT, NE REND RIEN', tone: 'eponge' },
+    // le départ — deux étiquettes séparées en hauteur, plus de chevauchement
+    { x: 1120, y: 340, text: 'CONDUIT DE VENTILATION', tone: 'grille' },
+    { x: 1330, y: -220, text: 'SAS DE LANCEMENT — PROTOCOLE 21', tone: 'sas' },
   ],
 }
