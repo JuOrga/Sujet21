@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 22:30',
+    title: 'Cap roguelike, acte I : les ÉCHANTILLONS DE SECOURS (vies) + raccourcis préparés',
+    notes: [
+      'Le jeu prend son virage roguelike. Premier acte : les VIES, diégétiques — des ÉCHANTILLONS DE SECOURS que le labo tient en réserve. On part avec UN seul (pastille 💠 au HUD) ; une dispersion en consomme un et renvoie à la PREMIÈRE GOUTTE du tableau ; le dernier perdu, c’est la fin de la run — écran « ÉCHANTILLON PERDU », retour au labo (la fiche, en attendant le vrai HUB), sauvegarde d’expédition effacée. Une run secondaire perdue n’efface JAMAIS l’expédition principale.',
+      'On en gagne au fil de l’aventure : une salle conclue sur trois condense un échantillon de secours (annoncé au bilan de collecte, plafonné à 3). Les vies voyagent avec la sauvegarde de reprise.',
+      'Et la mécanique des RACCOURCIS est préparée : un tableau peut déclarer `raccourciVers` — son sas envoie alors directement à la salle codée, en sautant les intermédiaires (vers l’avant uniquement). Inutile avec la séquence actuelle, prêt pour les salles-raccourcis secrètes qui écourteront les débuts de run déjà maîtrisés.',
+    ],
+  },
+  {
     date: '15/08/2026 21:45',
     title: 'L’expédition se souvient : reprise à la salle en cours + RUN SECONDAIRE',
     notes: [
