@@ -11,6 +11,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 02:20',
+    title: 'Huit trophées du protocole — prêts pour Steam',
+    notes: [
+      'Le système de succès interne, conçu pour se brancher 1:1 sur Steamworks le jour d’une sortie Steam (mêmes identifiants, même événement de déblocage — il ne manquera que l’appel à l’API). Là où les records récompensent l’optimisation, les trophées récompensent l’EXPLORATION des mécaniques.',
+      'Les huit : SANS UNE GOUTTE (≥ 95 % du volume livré), PALET PARFAIT (30 s gelé d’affilée), TROIS ÉTATS (eau, glace, vapeur en 15 s), LA LIGNE DE CRÊTE (rang 1 en NOTE au palmarès), MIROIR VIVANT (réfléchir un laser avec son corps gelé), RECONDENSÉ (cinq gouttes de rosée perlées), L’INTÉGRALE (l’expédition en une session), OPÉRATEUR DE NUIT (21 collectes cumulées — le clin d’œil au Projet).',
+      'Le TOAST de déblocage glisse depuis le bord (avec sa ponctuation sonore), la page TROPHÉES ouvre le voile RECORDS (cartes verrouillées estompées, date de déblocage), tout persiste en local. Détection légère (échantillonnage 4 Hz), le traçage laser expose désormais ses rebonds sur la glace, et le solveur compte la rosée perlée. Quatre tests sur le contrat du module (179 au total).',
+    ],
+  },
+  {
     date: '15/08/2026 01:55',
     title: 'L’écran RECORDS : trois podiums par salle, et la NOTE qui fait rejouer',
     notes: [
