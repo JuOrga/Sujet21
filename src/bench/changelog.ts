@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 23:15',
+    title: 'Éditeur : les DIMENSIONS DE LA CUVE — les grandes cartes à portée de main',
+    notes: [
+      'Question du joueur : « comment faire les grandes maps ? » — réponse honnête : on ne pouvait pas depuis l’éditeur (le triptyque avait ses dimensions définies en code). C’est corrigé : une section DIMENSIONS DE LA CUVE (X min/max, Y min/max) dans le panneau Tableau. Le standard fait 2400 × 1500 ; élargissez X à ~4800 pour un diptyque, ~7200 pour un triptyque — dézoom total puis zoom salle par salle en jeu, budgets 96 boîtes / 16 zones.',
+      'Garde-fous : écart minimal de 400 (pas de cuve dégénérée), affichage renormalisé à la sortie du champ, Ctrl+Z annule, le brouillon retient les dimensions comme le reste.',
+    ],
+  },
+  {
     date: '15/08/2026 22:50',
     title: 'Une seule vie — les autres se farment : le CONDENSAT arrive',
     notes: [
