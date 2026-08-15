@@ -44,6 +44,11 @@ import {
 } from '../game/netLevels'
 
 const STORE_KEY = 'projet21.editeur.v1'
+// À côté du brouillon : le LIEN avec la bibliothèque — quelle entrée est
+// ouverte (openId) et le contenu qu'elle avait à la dernière synchro (base).
+// C'est ce qui permet, à l'ouverture, de détecter qu'un autre appareil a
+// enregistré une version plus récente du même tableau.
+const META_KEY = 'projet21.editeur.meta.v1'
 
 // Couleurs des matériaux : celles de la légende du jeu, pour qu'on reconnaisse
 // une surface d'un écran à l'autre.
@@ -203,6 +208,10 @@ export class LevelEditor {
   // Bibliothèque partagée : la liste, et l'entrée actuellement ouverte
   private library: StoredLevel[] = []
   private openId = ''
+  // le contenu de l'entrée ouverte à la DERNIÈRE synchro (ouverture depuis
+  // la séquence, ou enregistrement) : si le brouillon lui est identique,
+  // c'est qu'aucun travail local n'attend — la bibliothèque peut rattraper
+  private base = ''
   private busy = false
 
   constructor(host: HTMLElement, hooks: EditorHooks) {
@@ -304,6 +313,7 @@ export class LevelEditor {
   private persist(): void {
     try {
       localStorage.setItem(STORE_KEY, serializeLevel(this.level))
+      localStorage.setItem(META_KEY, JSON.stringify({ openId: this.openId, base: this.base }))
     } catch {
       // stockage indisponible : l'édition continue, sans reprise après coup
     }
@@ -315,6 +325,12 @@ export class LevelEditor {
       if (!raw) return
       const { level } = parseLevel(JSON.parse(raw))
       if (level) this.level = level
+      const meta = JSON.parse(localStorage.getItem(META_KEY) ?? '{}') as {
+        openId?: string
+        base?: string
+      }
+      this.openId = typeof meta.openId === 'string' ? meta.openId : ''
+      this.base = typeof meta.base === 'string' ? meta.base : ''
     } catch {
       // brouillon illisible : on repart d'un tableau vierge
     }
@@ -1467,6 +1483,7 @@ export class LevelEditor {
       }
       this.level = structuredClone(lv)
       this.openId = ''
+      this.base = ''
       this.sel = null
       this.multi = []
       this.fitView()
@@ -1537,6 +1554,7 @@ export class LevelEditor {
       if (!confirm('Repartir d’un tableau vierge ? Le brouillon en cours sera perdu.')) return
       this.level = blankLevel()
       this.openId = ''
+      this.base = ''
       this.sel = null
       this.fitView()
       this.syncForm()
@@ -1599,6 +1617,9 @@ export class LevelEditor {
       this.hooks.libraryChanged(lib)
     }
     this.renderLibrary(lib === null)
+    // le brouillon restauré peut dater d'une autre session : on le confronte
+    // à la bibliothèque fraîchement chargée
+    if (lib) this.rattrapeBibliotheque()
   }
 
   private renderLibrary(offline = false): void {
@@ -1651,11 +1672,55 @@ export class LevelEditor {
     if (!entry) return
     this.level = structuredClone(entry.level)
     this.openId = id
+    this.base = serializeLevel(entry.level)
     this.sel = null
     this.fitView()
     this.syncForm()
     this.renderLibrary()
     this.commit(`« ${entry.level.name} » ouvert.`)
+  }
+
+  // La bibliothèque a-t-elle avancé pendant qu'on avait le dos tourné (un
+  // autre appareil, une autre session) ? Trois cas, à chaque ouverture :
+  // — le brouillon est identique à l'entrée : rien à faire ;
+  // — le brouillon n'a AUCUN travail local depuis la dernière synchro :
+  //   l'entrée est simplement plus récente → on la recharge, silencieusement
+  //   (c'était le bug du « vieux triptyque » à l'ouverture de l'éditeur) ;
+  // — le brouillon diverge : on n'écrase rien — on PRÉVIENT, et le clic
+  //   dans la séquence reste le geste qui charge la dernière version.
+  private rattrapeBibliotheque(): void {
+    const entry = this.openId
+      ? this.library.find((l) => l.id === this.openId)
+      : // vieux brouillons d'avant le lien persistant : on retrouve l'entrée
+        // par le CODE du tableau — au pire, l'avertissement sera de trop
+        this.library.find((l) => l.level.code === this.level.code)
+    if (!entry) return
+    const enLib = serializeLevel(entry.level)
+    const ici = serializeLevel(this.level)
+    if (enLib === ici) {
+      // à jour : on (re)noue simplement le lien
+      this.openId = entry.id
+      this.base = enLib
+      this.persist()
+      return
+    }
+    if (this.base === ici) {
+      this.level = structuredClone(entry.level)
+      this.openId = entry.id
+      this.base = enLib
+      this.sel = null
+      this.multi = []
+      this.fitView()
+      this.syncForm()
+      this.renderLibrary()
+      this.commit(`« ${entry.level.name} » mis à jour : la bibliothèque avait une version plus récente.`)
+      return
+    }
+    this.commit(
+      `⚠ La bibliothèque a une autre version de « ${entry.level.code} » — votre brouillon local en diffère. ` +
+        `Cliquez le tableau dans la séquence pour charger la dernière version (le brouillon sera remplacé), ` +
+        `ou ENREGISTRER pour publier la vôtre.`,
+    )
   }
 
   private async move(id: string, delta: number): Promise<void> {
@@ -1685,7 +1750,10 @@ export class LevelEditor {
     const saved = await deleteLevel(id)
     if (saved) {
       this.library = saved
-      if (this.openId === id) this.openId = ''
+      if (this.openId === id) {
+        this.openId = ''
+        this.base = ''
+      }
       this.hooks.libraryChanged(saved)
       this.renderLibrary()
       this.commit('Tableau supprimé.')
@@ -1727,6 +1795,7 @@ export class LevelEditor {
       id = match?.id ?? ''
     }
     this.openId = id
+    this.base = serializeLevel(this.level) // le brouillon EST la version publiée
     this.hooks.libraryChanged(saved)
     this.renderLibrary()
     this.commit('Enregistré dans la bibliothèque.')
