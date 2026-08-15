@@ -119,7 +119,13 @@ function readZone(o: Record<string, unknown>): ZoneDef | null {
 }
 
 function readLabel(o: Record<string, unknown>): WorldLabel | null {
-  const text = str(o.text).slice(0, 40)
+  // les SAUTS DE LIGNE font partie du texte (une étiquette se compose sur
+  // plusieurs lignes) ; les autres caractères de contrôle, non
+  const text = str(o.text)
+    .replace(/\r\n?/g, '\n')
+    .replace(/[\u0000-\u0009\u000B-\u001F\u007F]/g, '')
+    .slice(0, 120)
+    .trim()
   if (!text) return null
   const tone = str(o.tone, 'mur') as WorldLabel['tone']
   return {

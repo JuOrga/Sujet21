@@ -289,6 +289,17 @@ const ZONE_LABEL_COLORS: Record<string, string> = {
   vapeur: '#c9a6f2',
   libre: '#7b93a8',
 }
+// Une étiquette peut se composer sur PLUSIEURS LIGNES : le saut de ligne
+// saisi dans l'éditeur en devient un à l'écran (jamais de HTML injecté —
+// on assemble des nœuds de texte et des <br>).
+function poseLignes(hote: HTMLElement, texte: string): void {
+  const lignes = texte.trim().split('\n')
+  lignes.forEach((ligne, i) => {
+    if (i > 0) hote.appendChild(document.createElement('br'))
+    hote.appendChild(document.createTextNode(ligne.trim()))
+  })
+}
+
 function buildWorldLabels(): void {
   worldLabelsHost.innerHTML = ''
   labelEls = level.labels.map((l) => {
@@ -301,12 +312,12 @@ function buildWorldLabels(): void {
       const [sur, titre] = l.text.split('|')
       span.classList.add('plaque')
       const i = document.createElement('i')
-      i.textContent = sur.trim()
+      poseLignes(i, sur)
       const b = document.createElement('b')
-      b.textContent = titre.trim()
+      poseLignes(b, titre)
       span.append(i, b)
     } else {
-      span.textContent = l.text
+      poseLignes(span, l.text)
     }
     worldLabelsHost.appendChild(span)
     return { span, x: l.x, y: l.y }
@@ -1467,10 +1478,36 @@ function majBoutonsRun(): void {
     if (save) btnRep.textContent = `REPRENDRE L'EXPÉDITION — SALLE ${save.index + 1}/${total}`
   }
   if (btnSec) btnSec.hidden = !save || runSecondaire
+  const btnAband = document.getElementById('start-abandon') as HTMLButtonElement | null
+  if (btnAband) {
+    // seulement quand une run est EN COURS : au labo il n'y a rien à quitter,
+    // et un essai d'éditeur se referme par son propre chemin
+    btnAband.hidden = auHub || !!testLevel || !hasPlayed
+    if (btnAband.hidden) {
+      btnAband.classList.remove('arme')
+      btnAband.textContent = 'ABANDONNER LA RUN — RETOUR AU LABO'
+    }
+  }
   if (!hasPlayed && save) {
     startBtn.textContent = `REPRENDRE L'EXPÉDITION — SALLE ${save.index + 1}/${total}`
   }
 }
+// Abandonner : en DEUX temps (l'expédition en cours se perd — un clic de
+// travers ne doit pas l'emporter). Le second clic renvoie au labo.
+document.getElementById('start-abandon')?.addEventListener('click', (e) => {
+  const b = e.currentTarget as HTMLButtonElement
+  if (!b.classList.contains('arme')) {
+    b.classList.add('arme')
+    b.textContent = 'CONFIRMER — LA RUN EN COURS SERA PERDUE'
+    return
+  }
+  b.classList.remove('arme')
+  b.textContent = 'ABANDONNER LA RUN — RETOUR AU LABO'
+  // entrerHub() rend la main au jeu et réveille dans la cuve : la fiche
+  // se referme d'elle-même, comme à l'arrivée dans le jeu
+  document.body.classList.remove('playing')
+  abandonneRun()
+})
 document.getElementById('start-secondaire')?.addEventListener('click', () => {
   if (requireName()) return
   // une run À PART : même parcours, records comptés — la sauvegarde de
@@ -1767,6 +1804,7 @@ const FICHE_BOUTONS = [
   'home-restart',
   'start-reprendre',
   'start-secondaire',
+  'start-abandon',
   'start-bis',
   'start-editor',
   'home-salles',
@@ -2210,6 +2248,8 @@ function restart(): void {
   run.exitTimer = 0
   run.tableauTime = 0
   run.ended = false
+  ecranDispersion = 'aucun'
+  dispersionDelai = 0
   endgame.lastCall = false
   endgame.sasVu = 0
   endgame.sasBoitJusqua = -1
@@ -2264,7 +2304,55 @@ function retourAuLabo(): void {
   entrerHub()
   majBoutonsRun()
 }
-let gameOverAffiche = false
+// L'ÉCRAN DE DISPERSION paraît TOUT SEUL, une seconde après la perte du
+// corps — le temps de voir le nuage se défaire. Avant, il fallait deviner
+// qu'il fallait presser R : la run semblait sans fin, le game over
+// « ne fonctionnait pas ». Deux visages selon la réserve d'échantillons :
+// « RELANCE » (il en reste) ou « FIN » (c'était le dernier).
+let ecranDispersion: 'aucun' | 'relance' | 'fin' = 'aucun'
+let dispersionDelai = 0
+const DELAI_DISPERSION = 1.1
+
+// Sonde de test : l'état de la fin de run depuis la console (comme __run)
+const sondeFin = { get ecran() { return ecranDispersion }, get delai() { return dispersionDelai }, get hub() { return auHub } }
+;(window as unknown as { __fin: typeof sondeFin }).__fin = sondeFin
+
+function afficheDispersion(): void {
+  if (ecranDispersion !== 'aucun') return
+  dispersionDelai = 0
+  if (run.vies > 1) {
+    ecranDispersion = 'relance'
+    showOverlay(
+      'ÉCHANTILLON DISPERSÉ',
+      `Le laboratoire engage un échantillon de secours — il en restera ${run.vies - 1}. Reprise à la première goutte de la salle.`,
+      'danger',
+      `REPRENDRE — SALLE ${levelIndex + 1}`,
+    )
+    return
+  }
+  // dernier échantillon : GAME OVER — la sauvegarde de la principale
+  // s'efface (la run est perdue), la secondaire n'y touche pas
+  ecranDispersion = 'fin'
+  if (!runSecondaire) effaceRun()
+  showOverlay(
+    'ÉCHANTILLON PERDU — FIN DE LA RUN',
+    `La dispersion a eu raison du dernier échantillon.${
+      runSecondaire ? ' La run secondaire s’efface — l’expédition principale attend toujours.' : ''
+    } Le laboratoire vous rappelle.`,
+    'danger',
+    'RETOUR AU LABO',
+  )
+}
+
+// Abandonner : la run s'arrête là où elle en est et l'on se réveille au
+// labo, comme à l'arrivée dans le jeu. L'expédition en cours est perdue
+// (c'est un abandon, pas une pause : la fiche sait mettre en pause).
+function abandonneRun(): void {
+  if (!runSecondaire) effaceRun()
+  ecranDispersion = 'aucun'
+  overlay.classList.remove('visible')
+  retourAuLabo()
+}
 
 // Recommencer un tableau relance l'essai ; une expédition conclue (bilan
 // affiché) ou un échantillon dispersé repart pour une expédition neuve.
@@ -2293,11 +2381,19 @@ function resetAction(): void {
     restart()
     return
   }
-  if (gameOverAffiche) {
-    // l'écran de fin de run est à l'écran : le clic ramène au labo
-    gameOverAffiche = false
+  if (ecranDispersion !== 'aucun') {
+    // l'écran de dispersion est à l'écran : le bouton fait ce qu'il annonce
+    const quoi = ecranDispersion
+    ecranDispersion = 'aucun'
     overlay.classList.remove('visible')
-    retourAuLabo()
+    if (quoi === 'fin') {
+      retourAuLabo()
+      return
+    }
+    // un échantillon de secours prend le relais : retour à la première
+    // goutte du tableau — la run continue
+    run.vies -= 1
+    restart()
     return
   }
   if (auHub) {
@@ -2311,25 +2407,8 @@ function resetAction(): void {
     return
   }
   if (sim.dispersed) {
-    if (run.vies > 1) {
-      // un échantillon de secours prend le relais : retour à la première
-      // goutte du tableau — la run continue
-      run.vies -= 1
-      restart()
-      return
-    }
-    // dernier échantillon dispersé : GAME OVER — la sauvegarde de la
-    // principale s'efface (la run est perdue), la secondaire n'y touche pas
-    gameOverAffiche = true
-    if (!runSecondaire) effaceRun()
-    showOverlay(
-      'ÉCHANTILLON PERDU — FIN DE LA RUN',
-      `La dispersion a eu raison du dernier échantillon.${
-        runSecondaire ? ' La run secondaire s’efface — l’expédition principale attend toujours.' : ''
-      } Le laboratoire vous rappelle.`,
-      'danger',
-      'RETOUR AU LABO',
-    )
+    // R pressé avant la fin du battement : l'écran paraît tout de suite
+    afficheDispersion()
     return
   }
   restart()
@@ -3800,6 +3879,8 @@ function frame(now: number): void {
   sfx.allGas = allGas
   if (sim.dispersed && !sfx.dispersed) {
     audio.disperse()
+    // le battement avant l'écran de fin : on voit le corps se défaire
+    if (!testLevel && !auHub && !run.ended) dispersionDelai = DELAI_DISPERSION
     if (!testLevel) {
       // fin de l'échantillon ET de l'expédition : les registres consignent tout
       records.noteDispersion(level.code, run.tableauTime)
@@ -3852,12 +3933,24 @@ function frame(now: number): void {
     homeState.textContent = sim.dispersed ? 'dispersé' : 'en dérive'
   }
 
+  // Le battement d'après-dispersion : quand il s'achève, l'écran de fin
+  // paraît de lui-même — la run ne reste jamais suspendue sans réponse.
+  if (dispersionDelai > 0) {
+    if (!sim.dispersed || auHub || testLevel) dispersionDelai = 0
+    else {
+      dispersionDelai -= dtReal
+      if (dispersionDelai <= 0) afficheDispersion()
+    }
+  }
+
   // Plus d'écran de fin : ni dispersion, ni fin de course. Ce qui reste de
   // l'échantillon dérive à l'écran, et le bouton de relance attend en bas
   // sans rien recouvrir. Seuls la victoire et le bilan d'expédition ouvrent
   // encore un tampon. (Recalculé, pas tableauDone : si la victoire tombe dans
   // cette image, le tampon SAS ATTEINT ne doit pas être effacé aussitôt.)
-  if (run.exitTimer <= 0 && !run.ended && !gameOverAffiche) overlay.classList.remove('visible')
+  if (run.exitTimer <= 0 && !run.ended && ecranDispersion === 'aucun') {
+    overlay.classList.remove('visible')
+  }
 
   requestAnimationFrame(frame)
 }

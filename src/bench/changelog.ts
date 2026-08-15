@@ -14,6 +14,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 05:10',
+    title: 'La fin de run s’annonce toute seule, on peut abandonner — et l’éditeur se laisse faire à l’iPad',
+    notes: [
+      'LE GAME OVER MARCHE ENFIN. Il fonctionnait, mais il ne se MONTRAIT pas : la dispersion laissait l’écran muet et il fallait deviner qu’il fallait presser R pour voir le verdict. Désormais, une seconde après la perte du corps — le temps de le voir se défaire — l’écran paraît de lui-même : « ÉCHANTILLON DISPERSÉ » et le bouton REPRENDRE tant qu’il reste un échantillon de secours, « ÉCHANTILLON PERDU — FIN DE LA RUN » et le RETOUR AU LABO quand c’était le dernier.',
+      'ABANDONNER UNE RUN : nouveau bouton sur la fiche d’essai (menu ≡ en jeu) — il arrête la run en cours et réveille au labo, exactement comme à l’arrivée dans le jeu. En DEUX temps (le second clic confirme) : une expédition ne se perd pas d’un clic de travers.',
+      'L’ÉDITEUR AU STYLET (iPad). Trois corrections. UN — le pincement zoome la CARTE et non la page : les gestes propriétaires de Safari sont étouffés sur la scène (« user-scalable=no » ne suffit pas depuis iOS 10, l’interface partait à l’échelle avec le décor). DEUX — au doigt et au stylet, on SÉLECTIONNE d’abord, on déplace ensuite : le premier appui ne fait que désigner, la moindre dérive de la pointe ne déplace plus ce qu’on voulait seulement choisir (à la souris, le glisser direct reste inchangé). TROIS — une capture de pointeur non protégée pouvait emporter tout le geste : elle ne peut plus rien casser.',
+      'ÉTIQUETTES SUR PLUSIEURS LIGNES : le champ Texte devient une vraie zone de saisie — ENTRÉE fait un saut de ligne, conservé de l’éditeur jusqu’au décor (et « SUR-TITRE|TITRE » dessine toujours une pancarte). Vérifié au banc : 18 contrôles sur la fin de run et l’abandon, 10 sur l’éditeur tactile, 179 tests unitaires.',
+    ],
+  },
+  {
     date: '16/08/2026 04:15',
     title: 'Pancartes de station, réveil neutre — et la fiche sans boutons pointillés',
     notes: [
