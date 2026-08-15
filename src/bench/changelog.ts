@@ -14,6 +14,13 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 18:30',
+    title: 'Éveil : la carte du volume attend une dizaine d’impulsions',
+    notes: [
+      'La carte « VOUS ÊTES CE QUI RESTE » arrivait après deux impulsions — trop tôt pour avoir vraiment senti le volume qui part. Elle attend désormais une DIZAINE d’impulsions complètes : on joue, on essaie, on se trompe… et la carte vient nommer ce qu’on a réellement vécu.',
+    ],
+  },
+  {
     date: '15/08/2026 18:15',
     title: 'Éveil : « sous forme de glace », et un vrai bouton CONTINUER',
     notes: [
