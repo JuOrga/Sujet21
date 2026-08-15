@@ -15,10 +15,10 @@ export interface Delivery {
 export const DELIVERIES: Delivery[] = [
   {
     date: '16/08/2026 02:30',
-    title: 'Bibliothèque perdue côté serveur : blindage du stockage + re-semage',
+    title: 'Bibliothèque injoignable : le magasin est BLOQUÉ par l’hébergeur',
     notes: [
-      'Signalement du joueur : plus aucun tableau dans la séquence de l’éditeur ni dans SALLES. Diagnostic (via CI, l’API interrogée en direct) : la bibliothèque partagée était VIDE côté serveur. La faiblesse : une lecture du stockage qui échouait passait pour « bibliothèque vide », et la première écriture suivante repartait de ce vide en supprimant les anciennes versions.',
-      'Blindage (bibliothèque ET registres) : un échec de lecture LÈVE désormais une erreur — l’écriture avorte proprement au lieu d’écraser ; et chaque écriture conserve un HISTORIQUE des 4 versions les plus récentes du document — une écriture destructrice reste rattrapable. Puis la bibliothèque a été RE-SEMÉE (17 tableaux, l’état du dernier semis). Les modifications enregistrées APRÈS ce semis sont perdues côté serveur — le brouillon local de chaque appareil garde toutefois sa dernière version (l’éditeur proposera de la republier).',
+      'Signalement du joueur : plus aucun tableau dans la séquence de l’éditeur ni dans SALLES. Enquête menée depuis la CI (trois livraisons d’instrumentation : détail des erreurs 500, état du magasin blob par blob) — verdict sans ambiguïté : le magasin de stockage Vercel Blob est BLOQUÉ par l’hébergeur (« Your store is blocked ») : chaque téléchargement répond 403. Les tableaux ne sont pas revenus car RIEN ne peut être lu ni re-semé tant que le blocage tient — c’est une action sur le tableau de bord Vercel (quota du plan gratuit dépassé, très probablement), pas une ligne de code.',
+      'Le code en a profité pour se blinder trois fois (bibliothèque ET registres) : un échec de lecture LÈVE une erreur au lieu de passer pour « vide » (c’est ce mensonge qui a coûté la bibliothèque : une écriture est repartie du vide et a supprimé l’historique) ; chaque écriture conserve les 4 versions les plus récentes ; et la lecture REMONTE cet historique si la version la plus récente ne répond plus. Dès le déblocage du magasin : re-semage des 17 tableaux, prêt à partir d’un seul geste.',
     ],
   },
   {
