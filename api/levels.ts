@@ -6,7 +6,8 @@
 // suffisant pour deux personnes qui se parlent.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { del, list, put } from '@vercel/blob'
+import { list } from '@vercel/blob'
+import { ecritDocument, litDocument } from './_magasin'
 
 const PREFIX = 'levels/'
 const MAX_LEVELS = 60
@@ -34,56 +35,22 @@ function slug(s: string): string {
   )
 }
 
-// Un ÉCHEC de lecture n'est pas une bibliothèque vide : traiter l'un comme
-// l'autre a déjà coûté la bibliothèque entière (une lecture ratée, puis la
-// première écriture repartait de « vide » et supprimait les anciens blobs).
-// Désormais : seul un préfixe réellement sans blob est « vide » — tout le
-// reste LÈVE, l'écriture avorte en 500, rien n'est perdu.
-async function readLib(): Promise<Library> {
-  const { blobs } = await list({ prefix: PREFIX })
-  if (blobs.length === 0) return { levels: [] }
-  const parDate = [...blobs].sort(
-    (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
-  )
-  // REPLI : la liste peut mentionner un blob dont l'URL ne répond plus
-  // (403/404 après suppression, corruption) — on essaie chaque version, de
-  // la plus récente à la plus ancienne, et seul un magasin ENTIÈREMENT
-  // illisible fait échouer la lecture.
-  let derniere = 'aucun blob lisible'
-  for (const b of parDate) {
-    try {
-      const r = await fetch(b.url, { cache: 'no-store' })
-      if (!r.ok) {
-        derniere = `lecture bibliothèque : HTTP ${r.status} (${b.pathname})`
-        continue
-      }
-      const data = (await r.json()) as Library
-      if (!data || !Array.isArray(data.levels)) {
-        derniere = `bibliothèque illisible (${b.pathname})`
-        continue
-      }
-      return { levels: data.levels.filter((l) => l && typeof l.id === 'string' && l.level) }
-    } catch (e) {
-      derniere = String(e)
-    }
-  }
-  throw new Error(derniere)
+// Lecture/écriture via le magasin partagé (_magasin.ts) : lecture sans
+// opération SDK (pointeur + cache), écriture avec historique de 4 versions,
+// échec de lecture ≠ bibliothèque vide (ça a déjà coûté la bibliothèque).
+// `frais` sur le chemin d'écriture : relecture list() authentique.
+function valideLib(data: unknown): boolean {
+  return !!data && Array.isArray((data as Library).levels)
+}
+
+async function readLib(opts?: { frais?: boolean }): Promise<Library> {
+  const data = (await litDocument(PREFIX, valideLib, opts)) as Library | null
+  if (data === null) return { levels: [] }
+  return { levels: data.levels.filter((l) => l && typeof l.id === 'string' && l.level) }
 }
 
 async function writeLib(lib: Library): Promise<void> {
-  await put(`${PREFIX}v.json`, JSON.stringify(lib), {
-    access: 'public',
-    addRandomSuffix: true,
-    contentType: 'application/json',
-  })
-  // HISTORIQUE de secours : on garde les 4 versions les plus récentes au
-  // lieu de tout supprimer — une écriture destructrice reste rattrapable
-  const { blobs } = await list({ prefix: PREFIX })
-  const parDate = [...blobs].sort(
-    (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
-  )
-  const perimes = parDate.slice(4)
-  if (perimes.length > 0) await del(perimes.map((b) => b.url)).catch(() => {})
+  await ecritDocument(PREFIX, lib)
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -123,7 +90,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       // Réordonner : la séquence de l'expédition, du premier au dernier
       if (Array.isArray(body.order)) {
         const order = (body.order as unknown[]).filter((x) => typeof x === 'string') as string[]
-        const lib = await readLib()
+        const lib = await readLib({ frais: true })
         const byId = new Map(lib.levels.map((l) => [l.id, l]))
         const next: StoredLevel[] = []
         for (const id of order) {
@@ -152,7 +119,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const auteur =
         typeof body.auteur === 'string' ? body.auteur.trim().toUpperCase().slice(0, 12) : ''
 
-      const lib = await readLib()
+      const lib = await readLib({ frais: true })
       let id = typeof body.id === 'string' && body.id.trim() ? body.id.trim().slice(0, 64) : ''
       if (!id) {
         // CRÉATION (« Enregistrer sous ») : jamais écraser un homonyme — si
@@ -188,7 +155,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         res.status(400).json({ error: 'identifiant manquant' })
         return
       }
-      const lib = await readLib()
+      const lib = await readLib({ frais: true })
       lib.levels = lib.levels.filter((l) => l.id !== id)
       await writeLib(lib)
       res.status(200).json({ ok: true, levels: lib.levels })

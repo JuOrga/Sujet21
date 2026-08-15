@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 03:00',
+    title: 'L’API au RÉGIME : le quota qui a bloqué le magasin ne sera plus jamais atteint',
+    notes: [
+      'Le tableau de bord de l’hébergeur a désigné le coupable exact : 2 100 « opérations avancées » sur les 2 000 mensuelles du plan gratuit — l’API en consommait UNE PAR LECTURE (bibliothèque, registres, présets), pour chaque joueur, à chaque chargement du jeu. Stockage et transfert, eux, étaient à 2 % des limites : c’est bien l’architecture qui gaspillait, pas le trafic.',
+      'Refonte du magasin partagé : la lecture ne coûte plus AUCUNE opération — un pointeur à chemin fixe donne l’URL du document courant, deux téléchargements publics suffisent (du simple transfert de données, budgété 4 000 fois plus large), plus un cache mémoire de 15 secondes. Le décompte ne bouge plus qu’aux écritures — rares : 3 opérations par sauvegarde. Là où un mois de jeu brûlait tout le quota, il en consommera désormais quelques dizaines.',
+    ],
+  },
+  {
     date: '16/08/2026 02:30',
     title: 'Bibliothèque injoignable : le magasin est BLOQUÉ par l’hébergeur',
     notes: [

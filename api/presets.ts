@@ -4,11 +4,8 @@
 // un prototype semi-privé, les présets ne contiennent que des réglages.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { del, list, put } from '@vercel/blob'
+import { ecritDocument, litDocument } from './_magasin'
 
-// Chaque écriture crée un blob à URL unique (suffixe aléatoire) et supprime
-// les versions précédentes : écraser un blob au même chemin garderait la même
-// URL, que le CDN continuerait de servir en cache pendant au moins une minute.
 const PREFIX = 'presets/'
 const MAX_PRESETS = 200
 
@@ -42,41 +39,29 @@ interface Library {
 }
 
 // Accepte le document courant { presets, defaultTitle } et, pour
-// compatibilité, l'ancien format « tableau de présets ».
-async function readAll(): Promise<Library> {
-  const empty: Library = { presets: [], defaultTitle: null }
-  const { blobs } = await list({ prefix: PREFIX })
-  if (blobs.length === 0) return empty
-  const latest = [...blobs].sort(
-    (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
-  )[0]
-  const r = await fetch(latest.url, { cache: 'no-store' })
-  if (!r.ok) return empty
-  const data = (await r.json().catch(() => null)) as unknown
+// compatibilité, l'ancien format « tableau de présets ». Lecture/écriture
+// via le magasin partagé (_magasin.ts) : pointeur + cache en lecture,
+// historique de 4 versions en écriture, échec de lecture ≠ vide.
+function validePresets(data: unknown): boolean {
+  return Array.isArray(data) || (data !== null && typeof data === 'object' && Array.isArray((data as Library).presets))
+}
+
+async function readAll(opts?: { frais?: boolean }): Promise<Library> {
+  const data = (await litDocument(PREFIX, validePresets, opts)) as unknown
+  if (data === null) return { presets: [], defaultTitle: null }
   if (Array.isArray(data)) {
     return { presets: data.filter((p) => sanitize(p) !== null) as SharedPreset[], defaultTitle: null }
   }
-  if (data !== null && typeof data === 'object' && Array.isArray((data as Library).presets)) {
-    const lib = data as { presets: unknown[]; defaultTitle?: unknown }
-    return {
-      presets: lib.presets.filter((p) => sanitize(p) !== null) as SharedPreset[],
-      defaultTitle:
-        typeof lib.defaultTitle === 'string' && lib.defaultTitle ? lib.defaultTitle : null,
-    }
+  const lib = data as { presets: unknown[]; defaultTitle?: unknown }
+  return {
+    presets: lib.presets.filter((p) => sanitize(p) !== null) as SharedPreset[],
+    defaultTitle:
+      typeof lib.defaultTitle === 'string' && lib.defaultTitle ? lib.defaultTitle : null,
   }
-  return empty
 }
 
 async function writeAll(library: Library): Promise<void> {
-  const { blobs } = await list({ prefix: PREFIX })
-  await put(`${PREFIX}v.json`, JSON.stringify(library), {
-    access: 'public',
-    addRandomSuffix: true,
-    contentType: 'application/json',
-  })
-  if (blobs.length > 0) {
-    await del(blobs.map((b) => b.url)).catch(() => {})
-  }
+  await ecritDocument(PREFIX, library)
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -92,7 +77,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       // ou publier un préset (body préset complet avec params).
       if (body !== null && typeof body === 'object' && 'defaultTitle' in body && !('params' in body)) {
         const dt = body.defaultTitle
-        const lib = await readAll()
+        const lib = await readAll({ frais: true })
         if (dt === null || dt === '') {
           lib.defaultTitle = null
         } else if (typeof dt === 'string' && lib.presets.some((q) => q.title === dt)) {
@@ -110,7 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         res.status(400).json({ error: 'préset invalide : il faut un titre et des paramètres' })
         return
       }
-      const lib = await readAll()
+      const lib = await readAll({ frais: true })
       lib.presets = lib.presets.filter((q) => q.title !== preset.title)
       lib.presets.push(preset)
       lib.presets.sort((a, b) => a.title.localeCompare(b.title, 'fr'))
@@ -125,7 +110,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         res.status(400).json({ error: 'titre manquant' })
         return
       }
-      const lib = await readAll()
+      const lib = await readAll({ frais: true })
       lib.presets = lib.presets.filter((q) => q.title !== title)
       if (lib.defaultTitle === title) lib.defaultTitle = null // le défaut suit le préset
       await writeAll(lib)
@@ -134,7 +119,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
     res.setHeader('Allow', 'GET, POST, DELETE')
     res.status(405).json({ error: 'méthode non autorisée' })
-  } catch {
-    res.status(500).json({ error: 'stockage indisponible' })
+  } catch (e) {
+    res.status(500).json({ error: 'stockage indisponible', detail: String(e) })
   }
 }
