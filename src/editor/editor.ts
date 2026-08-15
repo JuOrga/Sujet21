@@ -1545,6 +1545,33 @@ export class LevelEditor {
       this.el(id).addEventListener('change', () => this.histoire())
     }
 
+    // Dimensions de la cuve : LE réglage des grandes cartes — élargir X fait
+    // un diptyque (~4800) ou un triptyque (~7200). La frappe applique tout de
+    // suite (avec un écart minimal de 400 pour ne jamais créer une cuve
+    // dégénérée) ; la sortie du champ renormalise l'affichage et grave
+    // l'étape dans l'historique.
+    const majBounds = (): void => {
+      const lit = (id: string, def: number): number => {
+        const v = Number((this.el(id) as HTMLInputElement).value)
+        return Number.isFinite(v) ? Math.max(-20000, Math.min(20000, v)) : def
+      }
+      const b = this.level.bounds
+      b.minX = lit('ed-bxmin', b.minX)
+      b.maxX = Math.max(b.minX + 400, lit('ed-bxmax', b.maxX))
+      b.minY = lit('ed-bymin', b.minY)
+      b.maxY = Math.max(b.minY + 400, lit('ed-bymax', b.maxY))
+      this.persist()
+      this.validate()
+      this.draw()
+    }
+    for (const id of ['ed-bxmin', 'ed-bxmax', 'ed-bymin', 'ed-bymax']) {
+      this.el(id).addEventListener('input', majBounds)
+      this.el(id).addEventListener('change', () => {
+        this.syncForm()
+        this.histoire()
+      })
+    }
+
     this.el('ed-fit').addEventListener('click', () => {
       this.fitView()
       this.draw()
@@ -1831,6 +1858,10 @@ export class LevelEditor {
     ;(this.el('ed-name') as HTMLInputElement).value = this.level.name
     ;(this.el('ed-code') as HTMLInputElement).value = this.level.code
     ;(this.el('ed-par') as HTMLInputElement).value = String(this.level.par ?? 3)
+    ;(this.el('ed-bxmin') as HTMLInputElement).value = String(this.level.bounds.minX)
+    ;(this.el('ed-bxmax') as HTMLInputElement).value = String(this.level.bounds.maxX)
+    ;(this.el('ed-bymin') as HTMLInputElement).value = String(this.level.bounds.minY)
+    ;(this.el('ed-bymax') as HTMLInputElement).value = String(this.level.bounds.maxY)
     ;(this.el('ed-dashs') as HTMLInputElement).value =
       this.level.dashBudget === undefined ? '' : String(this.level.dashBudget)
     ;(this.el('ed-journal') as HTMLTextAreaElement).value = this.level.journal
