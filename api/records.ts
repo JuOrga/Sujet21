@@ -86,30 +86,37 @@ function beatsExpedition(
   )
 }
 
+// Même durcissement que la bibliothèque : un ÉCHEC de lecture n'est pas un
+// tableau d'honneur vide — on LÈVE (l'écriture avorte en 500) au lieu de
+// repartir de zéro et d'écraser les records de tout le monde.
 async function readBoard(): Promise<Board> {
-  const empty: Board = { tableaux: {}, expedition: null }
   const { blobs } = await list({ prefix: PREFIX })
-  if (blobs.length === 0) return empty
+  if (blobs.length === 0) return { tableaux: {}, expedition: null }
   const latest = [...blobs].sort(
     (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
   )[0]
   const r = await fetch(latest.url, { cache: 'no-store' })
-  if (!r.ok) return empty
-  const data = (await r.json().catch(() => null)) as Board | null
-  if (data === null || typeof data !== 'object' || typeof data.tableaux !== 'object') return empty
+  if (!r.ok) throw new Error(`lecture registres : HTTP ${r.status}`)
+  const data = (await r.json()) as Board
+  if (data === null || typeof data !== 'object' || typeof data.tableaux !== 'object') {
+    throw new Error('registres illisibles')
+  }
   return { tableaux: data.tableaux ?? {}, expedition: data.expedition ?? null, tops: data.tops ?? {} }
 }
 
 async function writeBoard(board: Board): Promise<void> {
-  const { blobs } = await list({ prefix: PREFIX })
   await put(`${PREFIX}v.json`, JSON.stringify(board), {
     access: 'public',
     addRandomSuffix: true,
     contentType: 'application/json',
   })
-  if (blobs.length > 0) {
-    await del(blobs.map((b) => b.url)).catch(() => {})
-  }
+  // historique de secours : les 4 versions les plus récentes restent
+  const { blobs } = await list({ prefix: PREFIX })
+  const parDate = [...blobs].sort(
+    (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime(),
+  )
+  const perimes = parDate.slice(4)
+  if (perimes.length > 0) await del(perimes.map((b) => b.url)).catch(() => {})
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
