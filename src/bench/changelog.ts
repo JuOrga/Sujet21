@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 14:10',
+    title: 'Cadence de simulation 120/60 Hz : le levier contre la chauffe',
+    notes: [
+      'Les derniers rapports ont montré le VRAI mur : le coût d’UN pas de physique TRIPLE au fil d’une session sur téléphone (1,5 ms à froid → 13 ms après 30 minutes) — c’est le throttling thermique, et aucun réglage de cadencement n’y peut rien. La seule sortie : calculer moins par seconde, donc chauffer moins.',
+      'Nouveau réglage CADENCE DE SIMULATION (expérimental) : 120 Hz — la physique de référence, deux pas par image (défaut) ; 60 Hz — UN pas par image : CPU et chauffe divisés par deux, immédiatement et durablement. Le comportement de l’eau diffère légèrement (pas deux fois plus grands) : c’est un réglage assumé, à juger en jouant — vérifié stable au banc (corps cohésif, pas de fuite à travers les parois).',
+      'Mémorisé (sujet21-simhz), fenêtre de mesure vidée au changement, consigné dans le rapport (config.simHz). Sur le Pixel, la combinaison à essayer pour les longues sessions : simulation 60 · résolution faible · rattrapage fluidité.',
+    ],
+  },
+  {
     date: '15/08/2026 13:45',
     title: 'Verdict moteur : le JavaScript redevient le défaut — et le rattrapage devient un réglage',
     notes: [
