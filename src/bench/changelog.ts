@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 23:59',
+    title: 'LE HUB : le module Méduse — le jeu commence dans la cuve d’entraînement',
+    notes: [
+      'Le cœur du roguelike prend forme : le MODULE MÉDUSE, zone de départ. Un labo D’HUMAINS — « les Créateurs », dans la bouche du sujet — pas un espace à soi : on y est observé. Le jeu COMMENCE dans la CUVE D’ENTRAÎNEMENT (l’éveil s’y joue désormais), avec deux agrès pour sentir les surfaces ; le PLACARD D’ENTRETIEN présente chaque surface en énigme (« CE QUI VOUS AIME VOUS RETIENT », « LE FROID FIGE — LE FIGÉ FILE »…) ; la SALLE D’OBSERVATION (écran de contrôle : éteint) et le BANC D’ÉTALONNAGE (hors service) attendent leurs chantiers de méta-progression.',
+      'À droite, le CONDUIT DE VENTILATION mène au SAS DE LANCEMENT : ce sas ne collecte rien — il LANCE la run (reprise de l’expédition sauvée s’il y en a une, salle 1 sinon). Au hub, rien ne se paie : pas de records, pas de chrono, pas d’échantillon consommé — la dispersion recompose, simplement. Le HUD y dit LABO.',
+      'La boucle roguelike se referme : game over → réveil au hub ; expédition achevée → RETOUR AU LABO ; le sas relance. La fiche reste le méta-menu (records, paramètres, reprise directe et run secondaire y gardent leurs raccourcis) — et derrière elle, au chargement, c’est déjà la cuve du module qui dérive.',
+    ],
+  },
+  {
     date: '15/08/2026 23:15',
     title: 'Éditeur : les DIMENSIONS DE LA CUVE — les grandes cartes à portée de main',
     notes: [
