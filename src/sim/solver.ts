@@ -324,6 +324,7 @@ export class FluidSim {
   // Recondensation (§7.3) : chaque particule de vapeur perdue alimente une
   // réserve ; les plaques froides la rendent en rosée, avec perte.
   vaporBank = 0
+  roseePerlee = 0 // gouttes de rosée effectivement perlées (trophée)
   private recondCarry = 0
   private recondYield = 0
   private recondSeed = 1
@@ -1642,6 +1643,7 @@ export class FluidSim {
         y = b.minY + r2 * (b.maxY - b.minY)
       }
       this.addParticle(x, y, KIND_FREE)
+      this.roseePerlee++
     }
   }
 

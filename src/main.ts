@@ -4,6 +4,7 @@ import '@fontsource/ibm-plex-mono/600.css'
 import { DEFAULT_PARAMS, type SimParams } from './sim/params'
 import { FluidSim, KIND_PLAYER } from './sim/solver'
 import { NoyauxWasm } from './sim/wasm'
+import { TROPHEES, Trophees } from './game/trophees'
 import { Camera } from './render/camera'
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { FixedLoop } from './game/loop'
@@ -525,6 +526,85 @@ renderSalles()
 document.getElementById('home-salles')?.addEventListener('click', () => {
   sallesEl.hidden = false
 })
+// ---- Trophées du protocole : succès internes, prêts pour Steam ----
+// Les déblocages passent par un toast (la petite fanfare) ; la page vit
+// dans le voile RECORDS. Détection par échantillonnage léger (4 Hz).
+const trophees = new Trophees()
+const tropheeToast = document.getElementById('trophee-toast') as HTMLDivElement
+const toastFile: { nom: string; icone: string }[] = []
+let toastTimer = 0
+trophees.onDebloque = (t) => {
+  toastFile.push({ nom: t.nom, icone: t.icone })
+  audio.collect()
+}
+function majToast(dtReal: number): void {
+  if (toastTimer > 0) {
+    toastTimer -= dtReal
+    if (toastTimer <= 0) tropheeToast.classList.remove('visible')
+    return
+  }
+  const t = toastFile.shift()
+  if (!t) return
+  tropheeToast.innerHTML = `<i>${t.icone}</i><div><b>TROPHÉE DÉBLOQUÉ</b>${t.nom}</div>`
+  tropheeToast.classList.add('visible')
+  toastTimer = 3.8
+}
+// état de détection par salle — remis à zéro quand la salle change
+let tropheeNiveauRef: unknown = null
+let gelContinu = 0
+let vuEau = -1
+let vuGel = -1
+let vuVapeur = -1
+let tropheeEchant = 0
+function updateTrophees(dtReal: number): void {
+  majToast(dtReal)
+  if (tropheeNiveauRef !== level) {
+    tropheeNiveauRef = level
+    gelContinu = 0
+    vuEau = -1
+    vuGel = -1
+    vuVapeur = -1
+  }
+  if (input.paused || run.ended || sim.dispersed) return
+  tropheeEchant += dtReal
+  if (tropheeEchant < 0.25) return
+  const pas = tropheeEchant
+  tropheeEchant = 0
+  const n = sim.count
+  if (n === 0) return
+  let gels = 0
+  let gaz = 0
+  for (let i = 0; i < n; i++) {
+    if (sim.frozen[i] === 1) gels++
+    else if (sim.gaseous[i] === 1) gaz++
+  }
+  // « Palet parfait » : gelé en continu (≥ 80 % du corps) pendant 30 s
+  if (gels / n >= 0.8) {
+    gelContinu += pas
+    if (gelContinu >= 30) trophees.debloque('palet-parfait')
+  } else {
+    gelContinu = 0
+  }
+  // « Trois états » : les trois régimes vus dans une fenêtre de 15 s
+  if (gels / n >= 0.5) vuGel = elapsed
+  else if (gaz / n >= 0.5) vuVapeur = elapsed
+  else vuEau = elapsed
+  if (vuEau >= 0 && vuGel >= 0 && vuVapeur >= 0) {
+    if (elapsed - Math.min(vuEau, vuGel, vuVapeur) < 15) trophees.debloque('trois-etats')
+  }
+  // « Miroir vivant » : un faisceau réfléchi par le corps gelé
+  if (!trophees.gagne('miroir-vivant')) {
+    for (const vue of laserEtat.vues) {
+      if ((vue.rebondsGlace ?? 0) > 0) {
+        trophees.debloque('miroir-vivant')
+        break
+      }
+    }
+  }
+  // « Recondensé » : cinq gouttes de rosée perlées sur cette salle
+  if (sim.roseePerlee >= 5) trophees.debloque('recondense')
+}
+
 // ---- Le voile RECORDS : le palmarès partagé, trois podiums par salle ----
 // La NOTE (cL × 60 / (60 + s)) est calculée serveur ET client — même
 // formule des deux côtés, l'affichage recalcule pour les vieux rapports.
@@ -564,7 +644,13 @@ function renderRecordsVoile(): void {
       }
       return h + '</div>'
     }
-    let html = ''
+    let html = '<div class="rec-salle">TROPHÉES DU PROTOCOLE</div><div class="tro-grille">'
+    for (const t of TROPHEES) {
+      const ok = trophees.gagne(t.id)
+      const date = ok ? new Date(trophees.quand(t.id)).toLocaleDateString('fr-FR') : ''
+      html += `<div class="tro-carte${ok ? '' : ' verrou'}"><i>${t.icone}</i><div><b>${t.nom}</b><span>${t.desc}</span>${ok ? `<em>débloqué le ${date}</em>` : ''}</div></div>`
+    }
+    html += '</div>'
     const tops = board.tops ?? {}
     for (const lv of playedLevels()) {
       const t = tops[lv.code]
@@ -2472,6 +2558,10 @@ function frame(now: number): void {
     const prime = sim.swallowedIce * params.litersPerParticle * params.iceCollectBonus
     const surplus = sim.liters() + sim.swallowed * params.litersPerParticle + prime
     run.bonbonneLiters += surplus
+    // Trophées de collecte : « Sans une goutte » (≥ 95 % du volume de
+    // départ livré) et « Opérateur de nuit » (21 collectes cumulées)
+    if (surplus >= 0.95 * level.spawn.n * params.litersPerParticle) trophees.debloque('sans-une-goutte')
+    if (trophees.compte('collectes') >= 21) trophees.debloque('operateur-de-nuit')
     const { newVolume, newChrono } = records.noteCollection(level.code, surplus, run.tableauTime)
     // Publication au tableau d'honneur partagé : le serveur ne garde que le
     // meilleur — la réponse remet les registres affichés à jour.
@@ -2479,6 +2569,9 @@ function frame(now: number): void {
       if (b) {
         sharedBoard = b
         renderRegistres()
+        // « La ligne de crête » : le rang 1 en NOTE vient de tomber ?
+        const top = b.tops?.[level.code]?.note?.[0]
+        if (top && top.name === records.operator()) trophees.debloque('ligne-de-crete')
       }
     })
     const bests = records.tableauRecord(level.code)!
@@ -2509,6 +2602,7 @@ function frame(now: number): void {
     if (levelIndex + 1 >= playedLevels().length) {
       // Dernier sas : l'expédition est achevée — bilan, et registres à jour
       run.ended = true
+      trophees.debloque('integrale')
       const exp = records.noteExpedition(playedLevels().length, run.bonbonneLiters, run.runTime)
       pushExpeditionRecord(playedLevels().length, run.bonbonneLiters, run.runTime, records.operator()).then(
         (b) => {
@@ -2584,6 +2678,7 @@ function frame(now: number): void {
     camera.update(dtReal, sim.stats.centroidX, sim.stats.centroidY, sim.stats.rmsRadius, vw, vh, params)
   }
   updateTutor(dtReal)
+  updateTrophees(dtReal)
   updateWorldLabels(vw, vh)
   drawMecanismes(vw, vh, dpr)
   drawFleche(dtReal, dpr)

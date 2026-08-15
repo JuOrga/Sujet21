@@ -86,6 +86,9 @@ export interface TraceMonde {
 }
 
 export interface TraceResultat {
+  /** Rebonds sur la glace (miroir vivant) : 0 si le faisceau n'a jamais
+   * été réfléchi par un corps gelé. */
+  rebondsGlace?: number
   /** Polyligne du faisceau : émetteur, dioptres, rebonds, nœuds de rail,
    * point d'arrêt. `eau` marque les points d'où le segment SUIVANT court
    * sous l'eau (halo élargi et rosé) ; `plasma` ceux d'où il court ionisé
@@ -204,7 +207,7 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
     // hors de la cuve : le faisceau se perd dans la coque
     if (x < monde.bounds.minX || x > monde.bounds.maxX || y < monde.bounds.minY || y > monde.bounds.maxY) {
       points.push({ x, y })
-      return { points, touchees, railsSuivis }
+      return { points, touchees, railsSuivis, rebondsGlace: bounces }
     }
 
     // une cible : elle s'allume et boit le faisceau
@@ -215,7 +218,7 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
       if (ddx * ddx + ddy * ddy <= t.r * t.r) {
         points.push({ x: t.x, y: t.y })
         touchees.push(c)
-        return { points, touchees, railsSuivis }
+        return { points, touchees, railsSuivis, rebondsGlace: bounces }
       }
     }
 
@@ -237,7 +240,7 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
     }
     if (stoppe) {
       points.push({ x, y })
-      return { points, touchees, railsSuivis }
+      return { points, touchees, railsSuivis, rebondsGlace: bounces }
     }
 
     // la glace : miroir. On réfléchit sur la normale locale, puis on ressort
@@ -246,7 +249,7 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
     if (n) {
       if (bounces >= LASER_MAX_BOUNCES) {
         points.push({ x, y })
-        return { points, touchees, railsSuivis }
+        return { points, touchees, railsSuivis, rebondsGlace: bounces }
       }
       bounces++
       points.push({ x, y })
@@ -279,7 +282,7 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
       if (la !== dansEau) {
         if (dioptres >= LASER_MAX_REFRACT) {
           points.push({ x, y })
-          return { points, touchees, railsSuivis } // trop de gouttes : le faisceau se diffuse
+          return { points, touchees, railsSuivis, rebondsGlace: bounces } // trop de gouttes : le faisceau se diffuse
         }
         dioptres++
         const n = monde.eau!.normale(x, y)
@@ -363,7 +366,7 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
           // l'arc rejoint la ligne au point de capture, puis la suit dans
           // le SENS DU TRACÉ — du point de capture vers le dernier point
           const ordre = [{ x: bx, y: by }, ...pts.slice(bseg + 1)]
-          if (suivreRail(ordre)) return { points, touchees, railsSuivis }
+          if (suivreRail(ordre)) return { points, touchees, railsSuivis, rebondsGlace: bounces }
           // sorti au bout du rail : on repart tout droit, dans le milieu
           // qu'on y trouve — et un court sursis évite de reprendre le
           // même rail par son extrémité de sortie.
@@ -379,7 +382,7 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
     }
   }
   points.push({ x, y })
-  return { points, touchees, railsSuivis }
+  return { points, touchees, railsSuivis, rebondsGlace: bounces }
 }
 
 // ---- Les récepteurs (TOR / NOR) : la mémoire des cibles, pure et testable ----
