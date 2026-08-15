@@ -14,6 +14,13 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 00:50',
+    title: 'Étiquettes monde : taille de lecture garantie, même dézoomé',
+    notes: [
+      'Remarque du joueur : tout était écrit bien trop petit. Les étiquettes du décor rétrécissaient avec le zoom jusqu’à 60 % d’une base de 10 px — environ 6 px sur le hub dézoommé, illisible. Désormais elles ne descendent JAMAIS sous leur taille de base (portée à 12 px, opacité relevée) — comme les noms sur un plan : le zoom rapproche le décor, pas la lecture.',
+    ],
+  },
+  {
     date: '16/08/2026 00:30',
     title: 'Hub : étiquettes lisibles, habillages ENFIN fidèles, pastilles à leur place',
     notes: [

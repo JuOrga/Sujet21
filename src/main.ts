@@ -303,7 +303,10 @@ function buildWorldLabels(): void {
 }
 
 function updateWorldLabels(vw: number, vh: number): void {
-  const scale = Math.max(0.6, Math.min(1.2, Math.sqrt(camera.zoom)))
+  // JAMAIS sous la taille de base : au dézoom d'une grande carte, les
+  // étiquettes restent à taille de lecture (comme les noms sur un plan) —
+  // l'ancien plancher 0,6 les rendait illisibles sur le hub dézoommé
+  const scale = Math.max(1, Math.min(1.3, Math.sqrt(camera.zoom)))
   for (const l of labelEls) {
     const sx = vw * 0.5 + (l.x - camera.x) * camera.zoom
     const sy = vh * 0.5 - (l.y - camera.y) * camera.zoom
