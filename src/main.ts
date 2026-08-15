@@ -408,8 +408,8 @@ requestAnimationFrame(() => {
 
 // ---- Voile de SIGNATURE (premier lancement) : le nom, et le geste qui
 // éveille l'audio. Il couvre tout : aucun clic inopiné ne part vers la
-// fiche ou la cuve tant qu'on n'a pas signé. Ne se montre qu'une fois —
-// dès qu'un nom d'opérateur existe, il ne revient jamais.
+// fiche ou la cuve tant qu'on n'a pas signé. La clé versionnée le montre
+// UNE fois par version — y compris aux joueurs d'avant le voile.
 {
   const sigEl = document.getElementById('signature') as HTMLDivElement
   const sigNom = document.getElementById('sig-nom') as HTMLInputElement
@@ -429,6 +429,11 @@ requestAnimationFrame(() => {
     bande.eveiller()
     majInviteSon()
     renderRegistres()
+    try {
+      localStorage.setItem('sujet21-signature-v1', '1')
+    } catch {
+      // sans gravité : le voile se remontrerait, simple re-clic
+    }
     sigEl.hidden = true
   }
   document.getElementById('sig-valider')?.addEventListener('click', signer)
@@ -438,7 +443,13 @@ requestAnimationFrame(() => {
   // les clics sur le voile ne traversent jamais (pas de fermeture au fond :
   // signer est le seul chemin — c'est un portail, pas un popup)
   sigEl.addEventListener('pointerdown', (e) => e.stopPropagation())
-  if (!records.operator()) {
+  // Le voile se montre au premier lancement — ET une fois aux joueurs qui
+  // ont un nom d'AVANT le voile : ils re-signent (champ PRÉ-REMPLI, un
+  // clic suffit) et le son s'éveille par la même occasion. La clé versionnée
+  // garantit « une fois » ; la re-signature n'efface aucun record.
+  const CLE_SIGNATURE = 'sujet21-signature-v1'
+  if (!records.operator() || !localStorage.getItem(CLE_SIGNATURE)) {
+    sigNom.value = records.operator()
     sigEl.hidden = false
     // le focus attend une image : le champ existe et la fiche est posée —
     // pas de défilement parasite ni de clavier mobile ouvert sur du vide

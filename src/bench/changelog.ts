@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/08/2026 16:40',
+    title: 'Les joueurs d’avant le voile signent aussi — une fois, sans rien perdre',
+    notes: [
+      'Le voile de signature ne se montrait qu’aux NOUVEAUX venus : un nom déjà enregistré le court-circuitait. Or les joueurs existants n’ont jamais fait le geste — leur audio restait muet au lancement. Le voile se montre désormais UNE fois à eux aussi, avec leur nom PRÉ-REMPLI : un seul clic confirme (ou corrige) le nom, éveille le son, et c’est réglé.',
+      'Rien n’est effacé : records, trophées et réglages restent intacts — seule une clé versionnée (sujet21-signature-v1) marque « ce joueur a signé ». Une future refonte du voile pourra le remontrer en changeant simplement la version de la clé.',
+    ],
+  },
+  {
     date: '15/08/2026 16:15',
     title: 'La prise en main gèle TOUTES les commandes — clavier, manette, tactile',
     notes: [
