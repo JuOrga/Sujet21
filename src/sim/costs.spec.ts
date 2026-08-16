@@ -100,22 +100,32 @@ describe('La goutte d’éjection — perdue seulement si elle SORT vraiment', (
     sim.step(DEFAULT_PARAMS.dt)
   }
 
-  it('bloquée par un mur au départ : rendue au corps à l’échéance — un PRÊT, pas une perte', () => {
-    // L'éjection part désormais TOUJOURS de la surface : la goutte qui « ne
-    // sort pas » est celle qu'un mur tout proche renvoie dans la flaque.
+  it('LA RÈGLE DE LA VIE : n’est perdu que ce qui SORT du volume', () => {
+    // La goutte qu'un mur tout proche renvoie dans la flaque n'est JAMAIS
+    // sortie : la vie ne bouge pas — ni pendant le délai, ni après.
     const sim = arme(500)
     sim.setLevel([{ minX: 48, minY: -500, maxX: 100, maxY: 500, material: 0 }], [])
     for (let s = 0; s < 30; s++) sim.step(DEFAULT_PARAMS.dt)
-    const avant = sim.playerCount
+    const vieAvant = sim.aliveCount()
     sim.eject(sim.stats.centroidX + 400, sim.stats.centroidY, DEFAULT_PARAMS.dt * 4)
-    expect(sim.playerCount).toBe(avant - 1)
-    // pendant le délai : renvoyée par le mur, elle compte EN RETOUR
+    // pendant le délai : renvoyée dans le volume, la goutte est EN PRÊT —
+    // la vie la compte toujours (le temps d'un relabel, tous les 5 pas)
     for (let s = 0; s < Math.round(0.6 / DEFAULT_PARAMS.dt); s++) pas(sim)
-    expect(sim.returningCount()).toBe(1)
-    // à l'échéance : le rappel la ramène, bilan intact
+    expect(sim.aliveCount()).toBe(vieAvant)
+    expect(sim.returningCount()).toBe(0) // pas « en retour » : jamais partie
+    // à l'échéance : le corps la reprend, bilan intact
     for (let s = 0; s < Math.round(2.5 / DEFAULT_PARAMS.dt); s++) pas(sim)
-    expect(sim.playerCount).toBe(avant)
-    expect(sim.returningCount()).toBe(0)
+    expect(sim.playerCount).toBe(vieAvant)
+    expect(sim.enPretCount).toBe(0)
+  })
+
+  it('et ce qui SORT compte perdu, dès la sortie', () => {
+    const sim = arme(1400) // tir franc, rien pour le retenir
+    for (let s = 0; s < 30; s++) sim.step(DEFAULT_PARAMS.dt)
+    const vieAvant = sim.aliveCount()
+    sim.eject(sim.stats.centroidX + 400, sim.stats.centroidY, DEFAULT_PARAMS.dt * 4)
+    for (let s = 0; s < Math.round(0.3 / DEFAULT_PARAMS.dt); s++) pas(sim)
+    expect(sim.aliveCount()).toBe(vieAvant - 1) // sortie du volume : perdue
   })
 
   it('réellement partie : perdue — et jamais annoncée en retour', () => {

@@ -349,6 +349,13 @@ export class FluidSim {
   // d'affilée, le temps qu'un corps qui condense ou dégèle se regroupe.
   // Publics : le HUD lit le danger pour afficher le compte à rebours.
   belowCritical = false
+  // GOUTTES EN PRÊT : tirées (délai de réabsorption en cours) mais encore
+  // DANS le volume du corps — même composante connexe. La règle de la vie :
+  // n'est perdu que ce qui SORT du volume. Tant que la goutte n'a pas
+  // traversé la surface, elle compte : la jauge ne bouge pas pour un tir
+  // qu'un mur renvoie, elle baisse à l'instant précis où la goutte sort.
+  enPretCount = 0
+  private playerLabelCourant = -1
   criticalTimer = 0
 
   setLevel(boxes: ObstacleBox[], sponges: SpongeDef[]): void {
@@ -654,6 +661,8 @@ export class FluidSim {
     for (let i = 0; i < this.count; i++) {
       if (this.kind[i] !== KIND_FREE || this.duCorps[i] !== 1) continue
       if (this.frozen[i] === 1 || this.gaseous[i] === 1) continue
+      // encore dans le volume : elle est VIVANTE (en prêt), pas en retour
+      if (this.playerLabelCourant >= 0 && this.labels[i] === this.playerLabelCourant) continue
       const dx = this.posX[i] - this.stats.centroidX
       const dy = this.posY[i] - this.stats.centroidY
       if (dx * dx + dy * dy <= c2) n++
@@ -2591,9 +2600,12 @@ export class FluidSim {
 
     if (playerLabel < 0) {
       this.playerCount = 0
+      this.enPretCount = 0
+      this.playerLabelCourant = -1
       if (!inDrainGrip) this.dispersed = true
       return
     }
+    this.playerLabelCourant = playerLabel
 
     let count = 0
     for (let i = 0; i < n; i++) {
@@ -2609,6 +2621,29 @@ export class FluidSim {
       }
     }
     this.playerCount = count
+
+    // EN PRÊT : marquée du corps, délai en cours, et ANCRÉE dans la masse —
+    // au moins trois particules du CORPS à un rayon de lien. La connexité
+    // seule ne suffit pas : elle est transitive, et un jet de gouttes qui se
+    // touchent resterait « dans le volume » jusqu'au bout du chapelet. Être
+    // dans le volume, c'est toucher la masse, pas être enchaîné à elle.
+    let prets = 0
+    for (let i = 0; i < n; i++) {
+      if (this.kind[i] !== KIND_FREE || this.duCorps[i] !== 1) continue
+      if (this.frozen[i] === 1 || this.gaseous[i] === 1) continue
+      if (labels[i] !== playerLabel) continue
+      const end = grid.collect(posX, posY, posX[i], posY[i], linkR, i, scratch, 0, scratch.length)
+      let ancres = 0
+      for (let e = 0; e < end && ancres < 3; e++) {
+        const j = scratch[e]
+        if (this.kind[j] !== KIND_PLAYER) continue
+        const dx = posX[i] - posX[j]
+        const dy = posY[i] - posY[j]
+        if (dx * dx + dy * dy <= linkR2) ancres++
+      }
+      if (ancres >= 3) prets++
+    }
+    this.enPretCount = prets
     this.updatePlayerStats()
 
     if (inDrainGrip) {
@@ -2618,7 +2653,7 @@ export class FluidSim {
     // Sous le seuil critique : constaté ici, tranché par le délai de grâce
     // (dispersalGrace, dans step) — un corps en pleine transformation a le
     // temps de se regrouper avant que le protocole ne conclue à la perte.
-    this.belowCritical = count * p.litersPerParticle < p.criticalVolumeLiters
+    this.belowCritical = (count + prets) * p.litersPerParticle < p.criticalVolumeLiters
     if (count < 2) this.dispersed = true
   }
 
@@ -2667,7 +2702,13 @@ export class FluidSim {
     return { px, py }
   }
 
+  // La matière VIVANTE : le corps, plus les gouttes en prêt encore dans le
+  // volume. La règle : n'est perdu que ce qui SORT.
+  aliveCount(): number {
+    return this.playerCount + this.enPretCount
+  }
+
   liters(): number {
-    return this.playerCount * this.params.litersPerParticle
+    return this.aliveCount() * this.params.litersPerParticle
   }
 }

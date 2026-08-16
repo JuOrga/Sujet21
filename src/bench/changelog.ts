@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 19:30',
+    title: 'LA RÈGLE DE LA VIE : n’est perdu que ce qui SORT du volume',
+    notes: [
+      'La règle demandée au banc, gravée telle quelle dans la comptabilité : une goutte d’éjection ne compte perdue qu’à l’instant où elle SORT du volume. Tirée mais renvoyée dans la flaque par un mur ? La vie ne bouge pas — la goutte est EN PRÊT : marquée du corps, délai de réabsorption en cours, mais toujours dans la masse. Elle redevient pilotable à l’échéance, et la jauge n’aura jamais cillé. La vie affichée = le corps + les prêts ; le seuil critique (dernière impulsion) juge la même somme.',
+      'Être « dans le volume » a une définition précise : ANCRÉE dans la masse — au moins trois particules du corps à un rayon de lien. La connexité seule ne suffisait pas : elle est transitive, et un jet de gouttes qui se touchent aurait compté « vivant » jusqu’au bout du chapelet — la réserve ne se vidait plus en tir continu avec les présets mous. Toucher la masse, pas être enchaîné à elle.',
+      'Le ⟳ du HUD se recentre : il ne montre plus que la matière SORTIE mais à portée, que le rappel ramène — les prêts, eux, sont dans le chiffre principal, là où est leur place. Trois tests du contrat : bloquée au mur = la vie ne bouge pas (ni pendant, ni après) ; sortie = perdue dès la sortie ; et le compte de particules du HUD suit la matière vivante. 188 tests au vert, smokes hub, fin de run et game over réel.',
+    ],
+  },
+  {
     date: '16/08/2026 18:45',
     title: 'L’éjection part TOUJOURS de la surface : fini le tir qui laboure son propre corps',
     notes: [
