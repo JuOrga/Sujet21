@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/08/2026 00:00',
+    title: 'Pancartes : le paysage mobile les interdisait TOUTES (la colonne prise pour une barre)',
+    notes: [
+      'Les captures d’écran du testeur ont donné la cause en une image : sur téléphone et tablette en PAYSAGE, la barre tactile devient une COLONNE à gauche (et le sélecteur d’état une colonne à droite). Or la « bande basse interdite » — la zone où une pancarte s’efface pour ne pas passer sous les boutons — se calculait depuis le SOMMET de ces barres. Une colonne qui commence à 76 pixels du haut : la zone interdite couvrait 85 % de l’écran, et TOUTES les pancartes étaient effacées avant même l’attribution. Sur un poste avec les barres en bas (l’environnement de test d’hier), tout allait bien — d’où le dialogue de sourds.',
+      'La règle devient géométrique : seule une vraie barre POSÉE EN BAS définit la bande interdite — large (plus large que haute, et au moins 35 % de l’écran) et dans la moitié basse. Les colonnes latérales ne comptent plus. Rejoué dans la géométrie exacte des captures (écran 999×449, DPR 2, tactile) : ZÉRO pancarte avant, SEPT après — salle d’entraînement, salle d’observation, banc hors service, sas de lancement, toutes à leur place, y compris près du bord bas.',
+    ],
+  },
+  {
     date: '16/08/2026 23:00',
     title: 'Les pancartes du plan large sont de retour : la carte annotée respire',
     notes: [
