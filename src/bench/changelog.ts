@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/08/2026 02:40',
+    title: 'Les veilleuses assagies : le vaisseau respire, il ne clignote plus comme un sapin',
+    notes: [
+      'Le retour de test : « beaucoup trop de LED de couleur, ça fait sapin de Noël ». La recette des veilleuses de paroi mettait une lumière sur UN TIERS des cellules de 300 unités, dont 40 % en orange et rouge à plein gain — une centaine de LED bariolées sur le plan du hub, qui disputaient l’attention aux mécanismes.',
+      'Passe de sobriété : une veilleuse sur SEPT cellules (moitié moins que d’avant), le turquoise discret domine largement (82 %), l’ambre est rare (14 %), le rouge exceptionnel (4 % — une alarme oubliée doit rester un ÉVÉNEMENT qu’on remarque), et le gain global baisse d’un tiers. Les poussières en dérive et la respiration des machines ne bougent pas : le vaisseau a toujours l’air alimenté — il a juste cessé de le crier. Vérifié sur le plan du hub : les portes, le sas et les pancartes redeviennent ce qui accroche l’œil.',
+    ],
+  },
+  {
     date: '17/08/2026 02:00',
     title: 'LUMIÈRE GÉNÉRALE réglable à l’éditeur : le noir total existe enfin',
     notes: [

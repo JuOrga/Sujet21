@@ -352,7 +352,9 @@ vec3 shipLife(vec2 world, float zoom, float t) {
   if (vis > 0.0) {
     vec2 g = floor(world / cell);
     float h = hash21(g);
-    if (h < 0.32) {
+    // Sobriété (retour de test : « sapin de Noël ») : une veilleuse sur
+    // SEPT cellules, pas une sur trois — des repères épars, pas une guirlande.
+    if (h < 0.14) {
       vec2 c = (g + vec2(hash21(g + 3.1), hash21(g + 7.7))) * cell;
       float d = length(world - c);
       float r = max(3.4, 2.4 / zoom); // jamais sous-pixel : pas de scintillement
@@ -368,10 +370,13 @@ vec3 shipLife(vec2 world, float zoom, float t) {
         ? 0.35 + 0.65 * pow(0.5 + 0.5 * sin((t + ph) * 6.2831 / per), 2.0)
         : 0.85;
       float ch = hash21(g + 31.3);
-      vec3 tint = ch < 0.60 ? vec3(0.22, 1.00, 0.82)  // turquoise : nominal
-                : ch < 0.88 ? vec3(1.00, 0.62, 0.22)  // ambre : en veille
-                            : vec3(1.00, 0.26, 0.20); // rouge : une alarme oubliée
-      acc += tint * (core * 0.95 + halo * 1.3) * blink * vis;
+      // Palette assagie : le turquoise discret domine largement, l'ambre est
+      // rare, le rouge exceptionnel (une alarme oubliée doit rester un
+      // ÉVÉNEMENT) — et le gain global baisse : des veilleuses, pas des LED.
+      vec3 tint = ch < 0.82 ? vec3(0.24, 0.78, 0.66)  // turquoise : nominal
+                : ch < 0.96 ? vec3(0.90, 0.55, 0.20)  // ambre : en veille
+                            : vec3(0.95, 0.24, 0.18); // rouge : une alarme oubliée
+      acc += tint * (core * 0.60 + halo * 0.80) * blink * vis;
     }
   }
 
