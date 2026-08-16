@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/08/2026 01:00',
+    title: 'Premier asset du hub : l’écran de contrôle prend le mur de l’observation',
+    notes: [
+      'Le concepteur a généré le premier asset de la série hub — l’écran de contrôle, DEUX ÉTATS au châssis identique (éteint / allumé) dans une seule image, exactement le langage visuel du jeu. L’image livrée sur fond opaque a été détourée par GÉOMÉTRIE : la photométrie ne pouvait rien (le fond et l’écran éteint ont la même luminosité moyenne, 33 contre 32) — graines sur le métal éclairé, fermeture de la silhouette, remplissage des trous enclavés (l’écran), boucle de tuyaux basse récupérée, et recadrage COMMUN aux deux états pour un calage au pixel le jour de l’allumage.',
+      'L’écran ÉTEINT est monté en salle d’observation, sous sa pancarte HORS TENSION — vérifié en jeu, capture à l’appui. L’état ALLUMÉ est chargé et prêt : il attend le chantier méta-progression (tableau des runs). Le pipeline des décalques accepte désormais ecran-off / ecran-on ; les six prompts restants de la série (banc, casiers, berceau, porte de sas, hublot, armoire) sont entre les mains du concepteur.',
+    ],
+  },
+  {
     date: '17/08/2026 00:00',
     title: 'Pancartes : le paysage mobile les interdisait TOUTES (la colonne prise pour une barre)',
     notes: [
