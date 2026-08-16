@@ -679,6 +679,9 @@ export class LevelEditor {
 
   /** Poignée de redimensionnement sous le curseur, s'il y en a une. */
   // Découpe par chevauchement : la paroi cliquée en premier PREND LE DESSUS
+  // La matière du prochain tracé : choisie dans « Surfaces », elle habille
+  // aussi les outils de FORME (un disque de glace, un arc de chaudière…).
+  private matiereCourante = MAT_WALL
   private cutWinner: number | null = null
   // Guides magnétiques pendant un déplacement (façon Canva)
   private guides: { axe: 'v' | 'h'; pos: number }[] = []
@@ -1636,9 +1639,23 @@ export class LevelEditor {
   }
 
   private toolKey(t: Tool): string {
-    if (t.kind === 'box') return t.forme ? `box:${t.material}:${t.forme}` : `box:${t.material}`
+    // les outils de FORME sont indépendants de la matière : leur clé ne
+    // porte que la forme (la matière vient du dernier outil de surface)
+    if (t.kind === 'box') return t.forme ? `forme:${t.forme}` : `box:${t.material}`
     if (t.kind === 'zone') return `zone:${t.force}`
     return t.kind
+  }
+
+  /** Peint les pastilles des outils de forme à la couleur de la matière
+   *  courante : « disque » n'est pas une matière, c'est un moule. */
+  private majPastillesFormes(): void {
+    const col = MAT_COLORS[this.matiereCourante] ?? '#4a6b80'
+    for (const b of Array.from(this.host.querySelectorAll('.ed-tool[data-tool^="forme:"] i'))) {
+      ;(b as HTMLElement).style.background = (b as HTMLElement).dataset.creux === '1' ? 'transparent' : col
+      ;(b as HTMLElement).style.borderColor = col
+    }
+    const nom = this.el('ed-forme-matiere')
+    if (nom) nom.textContent = MATERIAL_NAMES[this.matiereCourante] ?? ''
   }
 
   private bindUi(): void {
@@ -1646,9 +1663,16 @@ export class LevelEditor {
       b.addEventListener('click', () => {
         const key = (b as HTMLElement).dataset.tool ?? 'select'
         if (key.startsWith('box:')) {
-          // « box:matériau » ou « box:matériau:forme » (disque, capsule…)
-          const [mat, forme] = key.slice(4).split(':').map(Number)
-          this.setTool({ kind: 'box', material: mat || 0, ...(forme ? { forme } : {}) })
+          // choisir une SURFACE fixe la matière courante — les moules
+          // (disque, capsule…) s'y couleront ensuite
+          const mat = Number(key.slice(4)) || 0
+          this.matiereCourante = mat
+          this.majPastillesFormes()
+          this.setTool({ kind: 'box', material: mat })
+        } else if (key.startsWith('forme:')) {
+          // une FORME se pose dans la matière courante : glace, chaudière,
+          // hydrophobe… tout matériau prend n'importe quel moule
+          this.setTool({ kind: 'box', material: this.matiereCourante, forme: Number(key.slice(6)) || 0 })
         }
         else if (key.startsWith('zone:')) this.setTool({ kind: 'zone', force: key.slice(5) as ZoneForce })
         else if (key === 'sponge') this.setTool({ kind: 'sponge' })
@@ -1664,6 +1688,7 @@ export class LevelEditor {
         else this.setTool({ kind: 'select' })
       })
     }
+    this.majPastillesFormes() // les moules portent la couleur de la matière
 
     // Tableaux LIVRÉS : une copie s'ouvre comme brouillon — pour étudier la
     // construction des salles (miroirs, prisme, plasma…) ou en repartir.

@@ -2927,6 +2927,13 @@
       /* Champ à CURSEUR (tactile) : intitulé et nombre en tête, la glissière
          prend toute la largeur en dessous — le doigt a de la place, le
          clavier n'est plus obligatoire pour régler une valeur */
+      .ed-astuce {
+        font-size: 9.5px;
+        line-height: 1.4;
+        color: var(--dim);
+        margin: 0 0 4px;
+        opacity: 0.8;
+      }
       .ed-fr {
         flex-wrap: wrap;
         row-gap: 2px;
@@ -3338,11 +3345,12 @@
           <button type="button" class="ed-tool" data-tool="cut" title="Chevauchement : cliquez la paroi qui prend le dessus, puis celle qui s'efface — seule la zone commune est rongée (rectangles droits ou de même angle seulement)"><i style="background:#e86a6a"></i>Découpe</button>
         </div>
         <div class="ed-group">
-          <span class="k">Formes</span>
-          <button type="button" class="ed-tool" data-tool="box:0:1" title="Ellipse inscrite dans la boîte tracée (cercle si carrée). Le matériau se change ensuite dans le panneau — hublot rond, plot gelé, bulle chauffante…"><i style="border-radius:50%;background:#4a6b80"></i>Disque</button>
-          <button type="button" class="ed-tool" data-tool="box:0:2" title="Pilule aux bouts ronds, couchée sur le grand axe de la boîte. Matériau au choix dans le panneau."><i style="border-radius:6px;background:#4a6b80"></i>Capsule</button>
-          <button type="button" class="ed-tool" data-tool="box:0:3" title="Triangle rectangle : la moitié de la boîte, coupée sur la diagonale — une rampe, un chanfrein. Le coin de l'angle droit se choisit dans le panneau."><i style="background:linear-gradient(45deg,#4a6b80 50%,transparent 50%)"></i>Coin</button>
-          <button type="button" class="ed-tool" data-tool="box:0:4" title="Arc d'anneau aux bouts ronds — conduite courbe, alcôve, déflecteur. Épaisseur et ouverture dans le panneau ; à 100 % d'épaisseur : un camembert. La rotation l'oriente."><i style="border-radius:50%;background:transparent;border:3px solid #4a6b80"></i>Arc</button>
+          <span class="k">Formes — en <b id="ed-forme-matiere">Paroi</b></span>
+          <p class="ed-astuce">Un moule, pas une matière : choisissez d'abord une surface ci-dessus (hublot froid, chaudière, hydrophobe…), la forme s'y coule. Le matériau se change aussi après coup dans le panneau.</p>
+          <button type="button" class="ed-tool" data-tool="forme:1" title="Ellipse inscrite dans la boîte tracée (cercle si carrée) — hublot rond, plot gelé, bulle chauffante."><i style="border-radius:50%;background:#4a6b80"></i>Disque</button>
+          <button type="button" class="ed-tool" data-tool="forme:2" title="Pilule aux bouts ronds, couchée sur le grand axe de la boîte."><i style="border-radius:6px;background:#4a6b80"></i>Capsule</button>
+          <button type="button" class="ed-tool" data-tool="forme:3" title="Triangle rectangle : la moitié de la boîte, coupée sur la diagonale — une rampe, un chanfrein. Le coin de l'angle droit se choisit dans le panneau."><i style="border-radius:2px;background:#4a6b80"></i>Coin</button>
+          <button type="button" class="ed-tool" data-tool="forme:4" title="Arc d'anneau aux bouts ronds — conduite courbe, alcôve, déflecteur. Épaisseur et ouverture dans le panneau ; à 100 % d'épaisseur : un camembert. La rotation l'oriente."><i data-creux="1" style="border-radius:50%;background:transparent;border:3px solid #4a6b80"></i>Arc</button>
         </div>
         <div class="ed-group">
           <span class="k">Zones d’état</span>
