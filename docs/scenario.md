@@ -1,10 +1,11 @@
-# Projet 21 — bible narrative (v3)
+# Projet 21 — bible narrative (v3.1)
 
-> v3 — 17/08/2026 : le personnage du Dr N. Véga et toute la narration par
-> journal de bord (inventions des sessions précédentes, jamais validées)
-> sont SUPPRIMÉS. Ce document sépare désormais strictement LE CANON (la
-> ligne de conduite du concepteur) des PROPOSITIONS héritées, qui attendent
-> un verdict. La voix narrative du jeu est À DÉFINIR par le concepteur.
+> v3.1 — 17/08/2026 : verdicts du concepteur rendus sur les héritages de la
+> v1 — le twist narratif du « collecteur » est ÉCARTÉ (la mécanique des
+> bonbonnes reste, sans récit de moisson) ; l'acte final d'évasion est
+> ÉCARTÉ (la masse se récupère simplement au début de chaque tableau).
+> Tout ce document est désormais du CANON VALIDÉ, hors section « À définir ».
+> Le Dr N. Véga et sa narration restent supprimés (v3).
 
 # LE CANON (ligne de conduite du concepteur)
 
@@ -108,17 +109,14 @@ Dans la démo (par ordre de chantier) :
 Hors démo (fondations posées) : révélation complète, libération des
 semblables, douche/mutations.
 
-# PROPOSITIONS héritées de la v1 — à valider ou à jeter
+## Verdicts rendus sur les héritages v1
 
-> Ces éléments viennent des sessions précédentes et n'ont PAS été validés
-> par le concepteur. Ils ne contredisent pas le canon mais n'en font pas
-> partie tant qu'un verdict n'est pas rendu.
-
-- **Le twist du collecteur** : le sas de fin de tableau n'est pas une
-  sortie mais un collecteur — chaque « réussite » du joueur est une
-  récolte pour le laboratoire ; les bonbonnes sont la moisson du labo.
-- **Un acte final d'évasion** : reprendre sa masse collectée, percer la
-  coque, finir en bloc de glace dérivant vers la Terre.
+- **Bonbonnes** : la MÉCANIQUE est conservée (réserve collectée au fil des
+  tableaux) — mais SANS le récit de « moisson du laboratoire » : le sas de
+  fin de tableau n'est pas un twist narratif, c'est la fin du tableau.
+- **Pas d'acte final d'évasion** : la masse collectée se récupère
+  simplement **au début de chaque tableau** — c'est une mécanique de
+  boucle, pas une fin de jeu.
 
 # À DÉFINIR (décisions du concepteur en attente)
 
@@ -128,3 +126,5 @@ semblables, douche/mutations.
   à purger/remplacer quand la nouvelle voix sera choisie.)
 - Les textes système (fin de tableau, défaite) dans la nouvelle voix.
 - Le nombre de runs avant la révélation du miroir spatial.
+- La fin du jeu (l'acte d'évasion hérité de la v1 est écarté ; rien ne le
+  remplace encore).
