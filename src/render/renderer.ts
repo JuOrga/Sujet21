@@ -263,6 +263,10 @@ uniform vec3 uHasZones; // x buses (eau), y hublot (glace), z conduite (vapeur)
 // le coût par image se réduit à une lecture de texture. uLumiere la
 // débranche entièrement (bouton PARAMÈTRES, comme uDecor/uEau).
 uniform float uLumiere;
+// Lumière GÉNÉRALE du tableau (réglée à l'éditeur) : la part d'éclat que la
+// pièce garde là où aucune lampe ne porte. 0,52 = niveau historique ;
+// 0 = noir total hors des lampes.
+uniform float uAmbiante;
 // Éclairage du VOLUME (le corps d'eau, la glace, la vapeur) : 1 branché —
 // le corps baigne dans la même carte de lumière que la pièce, les ombres
 // portées le traversent, le reflet suit la lampe dominante. 0 : l'eau garde
@@ -607,7 +611,7 @@ void main() {
     vec2 luv = (world - uLightMapMin) * uLightMapInvSize;
     // la carte est COLORÉE : chaque lampe y a versé sa teinte × visibilité
     vec3 lm = texture(uLightMap, clamp(luv, 0.0, 1.0)).rgb;
-    tank *= 0.52 + 0.95 * lm;
+    tank *= uAmbiante + 0.95 * lm;
     // un léger surcroît dans les pleins feux — la teinte suit les lampes
     tank += lm * lm * 0.06;
     // la monture de chaque lampe : un point de sa couleur au plafond —
@@ -1087,7 +1091,7 @@ void main() {
     if (uLumiereEau > 0.5) {
       vec2 luvEau = (world - uLightMapMin) * uLightMapInvSize;
       lmEau = texture(uLightMap, clamp(luvEau, 0.0, 1.0)).rgb;
-      lumSpec = 0.30 + 0.90 * lmEau;
+      lumSpec = vec3(uAmbiante * 0.577) + 0.90 * lmEau;
     }
     vec3 nrm = vec3(0.0, 0.0, 1.0);
     float diffuse = 0.55;
@@ -1866,6 +1870,7 @@ export class Renderer {
     lumiere = 1, // 1 éclairage de la pièce (carte d'ombres), 0 débranché
     lumieres: LumiereDef[] = [], // lampes du tableau ; vide : lampe par défaut
     lumiereEau = 1, // 1 le VOLUME baigne dans la lumière de la pièce, 0 non
+    ambiante = 0.52, // lumière générale du tableau (plancher hors lampes)
   ): void {
     const gl = this.gl
     const devW = Math.max(1, Math.round(viewportW * dpr))
@@ -1993,6 +1998,7 @@ export class Renderer {
     // Éclairage de la pièce : la carte cuite + les lampes (le biseau des
     // arêtes et les montures en ont besoin par pixel)
     gl.uniform1f(cu['uLumiere'], lumiere > 0.5 && this.lightTex ? 1 : 0)
+    gl.uniform1f(cu['uAmbiante'], ambiante)
     // le volume n'a de lumière à recevoir que si la pièce en a une
     gl.uniform1f(cu['uLumiereEau'], lumiere > 0.5 && lumiereEau > 0.5 && this.lightTex ? 1 : 0)
     this.remplitLampes(lampes)

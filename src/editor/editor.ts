@@ -1724,6 +1724,19 @@ export class LevelEditor {
     // la frappe ne pousse pas d'instantané à chaque touche : c'est la sortie
     // du champ (change) qui grave l'étape dans l'historique
     this.el('ed-dashs').addEventListener('change', () => this.histoire())
+    // Lumière générale : champ optionnel — vide, le tableau garde le niveau
+    // historique (52 %). La frappe applique tout de suite (le banc d'essai
+    // montre la pénombre en direct), la sortie du champ grave l'historique.
+    this.el('ed-lum-generale').addEventListener('input', () => {
+      const brut = (this.el('ed-lum-generale') as HTMLInputElement).value.trim()
+      if (brut === '') delete this.level.ambiante
+      else {
+        const v = Number(brut)
+        if (Number.isFinite(v)) this.level.ambiante = Math.max(0, Math.min(1, v / 100))
+      }
+      this.persist()
+    })
+    this.el('ed-lum-generale').addEventListener('change', () => this.histoire())
     for (const id of ['ed-name', 'ed-code', 'ed-par', 'ed-journal'] as const) {
       this.el(id).addEventListener('input', () => {
         this.level.name = (this.el('ed-name') as HTMLInputElement).value || 'Sans titre'
@@ -2055,6 +2068,8 @@ export class LevelEditor {
     ;(this.el('ed-bymax') as HTMLInputElement).value = String(this.level.bounds.maxY)
     ;(this.el('ed-dashs') as HTMLInputElement).value =
       this.level.dashBudget === undefined ? '' : String(this.level.dashBudget)
+    ;(this.el('ed-lum-generale') as HTMLInputElement).value =
+      this.level.ambiante === undefined ? '' : String(Math.round(this.level.ambiante * 100))
     ;(this.el('ed-journal') as HTMLTextAreaElement).value = this.level.journal
     ;(this.el('ed-ambiance') as HTMLSelectElement).value = this.level.ambiance ?? ''
     this.syncProps()

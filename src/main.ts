@@ -28,6 +28,7 @@ import {
   type LevelDef,
   type ObstacleBox,
   type ZoneForce,
+  AMBIANTE_DEFAUT,
 } from './game/level'
 import { LevelEditor } from './editor/editor'
 import {
@@ -1912,6 +1913,10 @@ const camera = new Camera()
   level.zones = z
   buildWorldLabels()
 }
+// Sonde de test : régler la lumière générale du tableau courant en direct
+;(window as unknown as { __ambiante: (v: number) => void }).__ambiante = (v) => {
+  level.ambiante = Math.max(0, Math.min(1, v))
+}
 
 camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, 1)
 
@@ -3787,6 +3792,7 @@ function frame(now: number): void {
     lumiereActive ? 1 : 0,
     level.lumieres ?? [],
     lumiereEauActive ? 1 : 0,
+    level.ambiante ?? AMBIANTE_DEFAUT,
   )
   const rendRaw = performance.now() - renderT0
   monitor.renderMs += (rendRaw - monitor.renderMs) * 0.08

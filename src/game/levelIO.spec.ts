@@ -283,4 +283,25 @@ describe('levelIO — mode des récepteurs (TOR/NOR)', () => {
     expect(again!.cibles![0].mode).toBeUndefined()
     expect(again!.cibles![1].mode).toBe('nor')
   })
+
+  it('lumière générale : sérialisée, relue, bornée à 0..1', () => {
+    const base = (): LevelDef => ({
+      name: 'Essai',
+      code: '21-Z',
+      journal: 'Une entrée de journal suffisamment longue pour passer le seuil des quarante signes.',
+      bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+      spawn: { x: -950, y: 0, n: 900 },
+      exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+      boxes: [],
+      sponges: [],
+      labels: [],
+    })
+    const relit = (l: unknown): LevelDef => parseLevel(l as object).level as LevelDef
+    const lvl = relit(JSON.parse(serializeLevel({ ...base(), ambiante: 0.06 })))
+    expect(lvl.ambiante).toBeCloseTo(0.06)
+    // absente : elle le reste (le tableau garde le niveau historique)
+    expect(relit(JSON.parse(serializeLevel(base()))).ambiante).toBeUndefined()
+    // bornée : un fichier étranger ne peut pas injecter n'importe quoi
+    expect(relit({ ...JSON.parse(serializeLevel(base())), ambiante: 7 }).ambiante).toBe(1)
+  })
 })

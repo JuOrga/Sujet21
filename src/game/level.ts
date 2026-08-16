@@ -209,6 +209,13 @@ export interface LumiereDef {
   couleur?: string // '#rrggbb' ; absente : blanc neutre
 }
 
+// LUMIÈRE GÉNÉRALE du tableau : le plancher d'ambiance — la part de
+// lumière que la pièce garde LÀ OÙ AUCUNE LAMPE ne porte. 0,52 est le
+// niveau historique (les tableaux existants ne bougent pas) ; 0 éteint
+// tout hors des lampes — le noir total existe enfin, et les lampes
+// deviennent une mécanique de conception à part entière.
+export const AMBIANTE_DEFAUT = 0.52
+
 export const LAMPE_HAUTEUR_DEFAUT = 420
 export const LAMPE_HAUTEUR_MIN = 80
 export const LAMPE_HAUTEUR_MAX = 2000
@@ -290,6 +297,8 @@ export interface LevelDef {
   // Lampes posées à l'éditeur (au plus MAX_LUMIERES allumées). Absentes :
   // la lampe par défaut de la cuve fait l'éclairage.
   lumieres?: LumiereDef[]
+  ambiante?: number // lumière générale 0..1 ; absente : AMBIANTE_DEFAUT
+
   par?: number // budget d'impulsions visé : franchissable en `par`, record en dessous
   // Dashs rendus à CHAQUE transformation en vapeur (règle d'or : 3 par
   // bascule, quel que soit le volume). Absent : le réglage du banc
