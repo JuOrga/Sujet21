@@ -282,7 +282,17 @@ function applyLevel(): void {
 // Étiquettes de monde : le nom de chaque surface, projeté par la caméra —
 // la lisibilité de la légende, mais dans le décor lui-même.
 const worldLabelsHost = document.getElementById('world-labels') as HTMLDivElement
-let labelEls: { span: HTMLSpanElement; x: number; y: number }[] = []
+// Chaque pancarte connaît sa taille (mesurée UNE fois, à la construction :
+// le zoom ne fait que la mettre à l'échelle) et sa portée — de quoi décider,
+// à chaque image, qui a le droit d'occuper la place.
+let labelEls: {
+  span: HTMLSpanElement
+  x: number
+  y: number
+  w: number
+  h: number
+  secteur: boolean
+}[] = []
 const ZONE_LABEL_COLORS: Record<string, string> = {
   eau: '#63b7e6',
   glace: '#8fc8ee',
@@ -320,7 +330,7 @@ function buildWorldLabels(): void {
       poseLignes(span, l.text)
     }
     worldLabelsHost.appendChild(span)
-    return { span, x: l.x, y: l.y }
+    return { span, x: l.x, y: l.y, w: 0, h: 0, secteur: l.rang === 'secteur' }
   })
   // Chaque zone d'état porte son nom en haut de son emprise : la règle du
   // lieu s'annonce, elle ne se découvre pas en la subissant.
@@ -333,23 +343,95 @@ function buildWorldLabels(): void {
     span.style.color = ZONE_LABEL_COLORS[z.force] ?? '#7b93a8'
     span.style.borderColor = ZONE_LABEL_COLORS[z.force] ?? '#7b93a8'
     worldLabelsHost.appendChild(span)
-    labelEls.push({ span, x: (z.minX + z.maxX) / 2, y: z.maxY - 40 })
+    labelEls.push({ span, x: (z.minX + z.maxX) / 2, y: z.maxY - 40, w: 0, h: 0, secteur: false })
+  }
+  // Mesure unique : la taille d'une pancarte ne dépend que de son texte —
+  // le zoom ne fait que l'échelonner. Une seule lecture de mise en page par
+  // tableau chargé, jamais par image.
+  for (const l of labelEls) {
+    l.w = l.span.offsetWidth
+    l.h = l.span.offsetHeight
   }
 }
 
+// Marge de respiration entre deux pancartes, en pixels d'écran : elles ne
+// doivent pas seulement NE PAS se toucher, elles doivent se laisser lire.
+const MARGE_PANCARTE = 10
+// Bandes réservées à l'interface : le relevé en haut, le sélecteur d'état
+// et la barre tactile en bas. Une pancarte qui s'y glisserait passerait
+// DERRIÈRE les boutons — elle s'efface plutôt.
+const BANDE_HAUTE = 46
+let bandeBasse = 150 // recalculée sur la vraie hauteur des barres
+let bandeMesuree = 0
+
+// Hauteur d'écran interdite en bas : le sélecteur d'état et la barre
+// tactile. Relue quatre fois par seconde — les barres apparaissent avec la
+// partie, changent de hauteur en tournant l'écran, et une lecture de mise
+// en page par image ne se justifie pas pour ça.
+function majBandeBasse(t: number): void {
+  if (t - bandeMesuree < 250) return
+  bandeMesuree = t
+  let haut = window.innerHeight
+  for (const el of [document.getElementById('statebar'), document.getElementById('touchbar')]) {
+    const r = el?.getBoundingClientRect()
+    if (r && r.height > 0 && r.top < haut) haut = r.top
+  }
+  bandeBasse = Math.max(0, window.innerHeight - haut) + 10
+}
+
+// Les pancartes gardent une taille de LECTURE quel que soit le zoom (comme
+// les noms sur un plan) — d'où le risque de les voir s'empiler quand la
+// carte se resserre. La place est donc ATTRIBUÉE, à chaque image : les
+// plaques de secteur (les lieux) servies d'abord, puis les détails du plus
+// proche du regard au plus lointain ; ce qui ne rentre plus s'efface en
+// fondu. Résultat : jamais deux textes l'un sur l'autre, à aucun zoom, et
+// le plan large se lit comme une carte — les lieux, sans le bavardage.
 function updateWorldLabels(vw: number, vh: number): void {
-  // JAMAIS sous la taille de base : au dézoom d'une grande carte, les
-  // étiquettes restent à taille de lecture (comme les noms sur un plan) —
-  // l'ancien plancher 0,6 les rendait illisibles sur le hub dézoommé
+  majBandeBasse(performance.now())
   const scale = Math.max(1, Math.min(1.3, Math.sqrt(camera.zoom)))
+  const cx = vw * 0.5
+  const cy = vh * 0.5
+  const candidats: {
+    l: (typeof labelEls)[number]
+    sx: number
+    sy: number
+    hw: number
+    hh: number
+    cle: number
+  }[] = []
   for (const l of labelEls) {
-    const sx = vw * 0.5 + (l.x - camera.x) * camera.zoom
-    const sy = vh * 0.5 - (l.y - camera.y) * camera.zoom
-    const visible = sx > -160 && sx < vw + 160 && sy > -40 && sy < vh + 40
-    l.span.style.display = visible ? '' : 'none'
-    if (visible) {
-      l.span.style.transform = `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) translate(-50%, -50%) scale(${scale.toFixed(3)})`
+    const sx = cx + (l.x - camera.x) * camera.zoom
+    const sy = cy - (l.y - camera.y) * camera.zoom
+    const hw = (l.w * scale) / 2 + MARGE_PANCARTE
+    const hh = (l.h * scale) / 2 + MARGE_PANCARTE
+    // hors champ : rien à dessiner, et surtout aucune place à réserver
+    if (sx + hw < 0 || sx - hw > vw || sy + hh < 0 || sy - hh > vh) {
+      l.span.style.display = 'none'
+      continue
     }
+    // sous les barres d'interface : la pancarte serait masquée à moitié —
+    // qu'elle s'efface franchement plutôt que de dépasser d'un bouton
+    if (sy - hh < BANDE_HAUTE || sy + hh > vh - bandeBasse) {
+      l.span.style.display = ''
+      l.span.style.transform = `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) translate(-50%, -50%) scale(${scale.toFixed(3)})`
+      l.span.classList.add('efface')
+      continue
+    }
+    l.span.style.display = ''
+    l.span.style.transform = `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) translate(-50%, -50%) scale(${scale.toFixed(3)})`
+    // clé de service : les secteurs d'abord (rang 0), puis les détails
+    // (rang 1) du plus proche du centre de l'écran au plus lointain
+    const d = Math.hypot(sx - cx, sy - cy)
+    candidats.push({ l, sx, sy, hw, hh, cle: (l.secteur ? 0 : 1e7) + d })
+  }
+  candidats.sort((a, b) => a.cle - b.cle)
+  const places: typeof candidats = []
+  for (const c of candidats) {
+    const gene = places.some(
+      (p) => Math.abs(p.sx - c.sx) < p.hw + c.hw && Math.abs(p.sy - c.sy) < p.hh + c.hh,
+    )
+    c.l.span.classList.toggle('efface', gene)
+    if (!gene) places.push(c)
   }
 }
 applyLevel()

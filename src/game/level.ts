@@ -148,6 +148,11 @@ export interface WorldLabel {
   y: number
   text: string
   tone: 'mur' | 'phile' | 'phobe' | 'eponge' | 'froid' | 'grille' | 'sas' | 'chaud'
+  // PORTÉE de la pancarte, quand la place manque à l'écran : « secteur »
+  // nomme un LIEU (elle survit au dézoom — c'est la légende du plan),
+  // « detail » commente un objet (elle s'efface dès qu'elle gênerait).
+  // Deux pancartes ne se chevauchent JAMAIS : celle de moindre portée cède.
+  rang?: 'secteur' | 'detail'
 }
 
 // Zone d'état (refonte 2026) : une région du tableau qui IMPOSE un état et

@@ -133,6 +133,7 @@ function readLabel(o: Record<string, unknown>): WorldLabel | null {
     y: num(o.y),
     text,
     tone: TONES.includes(tone) ? tone : 'mur',
+    rang: str(o.rang) === 'secteur' ? 'secteur' : undefined,
   }
 }
 
