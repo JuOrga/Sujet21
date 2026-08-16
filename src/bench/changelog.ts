@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 23:00',
+    title: 'Les pancartes du plan large sont de retour : la carte annotée respire',
+    notes: [
+      'Le retour de test : « je ne vois plus les panneaux, et l’apparition progressive au zoom a un problème — dommage, très bonne idée ». Mesuré au hub : au plan large, DEUX plaques géantes masquaient la carte entière et 9 pancartes sur 14 étaient effacées. Cause : les pancartes gardaient leur taille de lecture (jamais sous ×1) pendant que la carte rétrécissait sous elles — plus on dézoomait, moins il restait de place, et l’attribution en supprimait presque tout.',
+      'Deux corrections. UNE — au plan large, les pancartes RÉTRÉCISSENT avec la carte (plancher ×0,45) : la signalétique redevient une carte annotée — 12 pancartes sur 14 lisibles au plan du hub, et elles grossissent naturellement en zoomant. DEUX — l’attribution gagne une MÉMOIRE : une pancarte affichée garde sa place tant qu’elle tient (les titulaires passent avant les prétendants, et tolèrent un léger chevauchement — hystérésis), au lieu de la perdre parce qu’une voisine s’est approchée du centre du regard. L’apparition progressive au zoom redevient ce qu’elle devait être : des plaques qui entrent et sortent une fois, en fondu, sans va-et-vient.',
+    ],
+  },
+  {
     date: '16/08/2026 22:15',
     title: 'Le tir rapproché retrouve son caractère : les DÉFORMATIONS sont de retour',
     notes: [

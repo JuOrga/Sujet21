@@ -292,6 +292,7 @@ let labelEls: {
   w: number
   h: number
   secteur: boolean
+  place: boolean // avait sa place à l'image précédente (mémoire anti-papillotement)
 }[] = []
 const ZONE_LABEL_COLORS: Record<string, string> = {
   eau: '#63b7e6',
@@ -330,7 +331,7 @@ function buildWorldLabels(): void {
       poseLignes(span, l.text)
     }
     worldLabelsHost.appendChild(span)
-    return { span, x: l.x, y: l.y, w: 0, h: 0, secteur: l.rang === 'secteur' }
+    return { span, x: l.x, y: l.y, w: 0, h: 0, secteur: l.rang === 'secteur', place: false }
   })
   // Chaque zone d'état porte son nom en haut de son emprise : la règle du
   // lieu s'annonce, elle ne se découvre pas en la subissant.
@@ -343,7 +344,15 @@ function buildWorldLabels(): void {
     span.style.color = ZONE_LABEL_COLORS[z.force] ?? '#7b93a8'
     span.style.borderColor = ZONE_LABEL_COLORS[z.force] ?? '#7b93a8'
     worldLabelsHost.appendChild(span)
-    labelEls.push({ span, x: (z.minX + z.maxX) / 2, y: z.maxY - 40, w: 0, h: 0, secteur: false })
+    labelEls.push({
+      span,
+      x: (z.minX + z.maxX) / 2,
+      y: z.maxY - 40,
+      w: 0,
+      h: 0,
+      secteur: false,
+      place: false,
+    })
   }
   // Mesure unique : la taille d'une pancarte ne dépend que de son texte —
   // le zoom ne fait que l'échelonner. Une seule lecture de mise en page par
@@ -388,7 +397,11 @@ function majBandeBasse(t: number): void {
 // le plan large se lit comme une carte — les lieux, sans le bavardage.
 function updateWorldLabels(vw: number, vh: number): void {
   majBandeBasse(performance.now())
-  const scale = Math.max(1, Math.min(1.3, Math.sqrt(camera.zoom)))
+  // Au plan large, les pancartes RÉTRÉCISSENT avec la carte (plancher 0,45)
+  // au lieu de garder leur taille de lecture : deux plaques géantes
+  // masquaient la carte entière et effaçaient toutes les autres — la
+  // signalétique redevient une carte annotée, et grossit en zoomant.
+  const scale = Math.max(0.45, Math.min(1.3, Math.sqrt(camera.zoom)))
   const cx = vw * 0.5
   const cy = vh * 0.5
   const candidats: {
@@ -407,6 +420,7 @@ function updateWorldLabels(vw: number, vh: number): void {
     // hors champ : rien à dessiner, et surtout aucune place à réserver
     if (sx + hw < 0 || sx - hw > vw || sy + hh < 0 || sy - hh > vh) {
       l.span.style.display = 'none'
+      l.place = false
       continue
     }
     // sous les barres d'interface : la pancarte serait masquée à moitié —
@@ -415,22 +429,31 @@ function updateWorldLabels(vw: number, vh: number): void {
       l.span.style.display = ''
       l.span.style.transform = `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) translate(-50%, -50%) scale(${scale.toFixed(3)})`
       l.span.classList.add('efface')
+      l.place = false
       continue
     }
     l.span.style.display = ''
     l.span.style.transform = `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) translate(-50%, -50%) scale(${scale.toFixed(3)})`
-    // clé de service : les secteurs d'abord (rang 0), puis les détails
-    // (rang 1) du plus proche du centre de l'écran au plus lointain
+    // clé de service : les secteurs d'abord (rang 0), puis — À RANG ÉGAL —
+    // les TITULAIRES avant les prétendants (mémoire d'image en image : une
+    // pancarte affichée garde sa place tant qu'elle tient, au lieu de la
+    // perdre parce qu'une voisine s'est approchée du centre du regard),
+    // enfin du plus proche du centre de l'écran au plus lointain
     const d = Math.hypot(sx - cx, sy - cy)
-    candidats.push({ l, sx, sy, hw, hh, cle: (l.secteur ? 0 : 1e7) + d })
+    candidats.push({ l, sx, sy, hw, hh, cle: (l.secteur ? 0 : 1e7) + (l.place ? 0 : 5e6) + d })
   }
   candidats.sort((a, b) => a.cle - b.cle)
   const places: typeof candidats = []
   for (const c of candidats) {
+    // Hystérésis : un titulaire tolère un léger chevauchement (le zoom
+    // respire sans faire clignoter la plaque) ; un prétendant doit entrer
+    // avec la marge pleine. L'apparition reste progressive, sans va-et-vient.
+    const marge = c.l.place ? -8 : 0
     const gene = places.some(
-      (p) => Math.abs(p.sx - c.sx) < p.hw + c.hw && Math.abs(p.sy - c.sy) < p.hh + c.hh,
+      (p) => Math.abs(p.sx - c.sx) < p.hw + c.hw + marge && Math.abs(p.sy - c.sy) < p.hh + c.hh + marge,
     )
     c.l.span.classList.toggle('efface', gene)
+    c.l.place = !gene
     if (!gene) places.push(c)
   }
 }
