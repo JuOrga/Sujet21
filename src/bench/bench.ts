@@ -9,9 +9,11 @@ import { Pane } from 'tweakpane'
 import type { SimParams } from '../sim/params'
 import './bench.css'
 import {
+  builtinPresets,
   copyParams,
   deleteSharedPreset,
   fetchSharedPresets,
+  hideBuiltin,
   loadStoredDefault,
   loadStoredPresets,
   mergePresets,
@@ -83,7 +85,10 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   }
 
   // ---- Présets : enregistrer / modifier / charger des jeux de réglages ----
-  let presets = loadStoredPresets()
+  // Les présets LIVRÉS d'abord : un préset enregistré sous le même titre les
+  // remplace (savedAt vide = le livré perd la fusion), un livré supprimé
+  // reste masqué sur l'appareil (voir hideBuiltin).
+  let presets = mergePresets(builtinPresets(), loadStoredPresets())
   // Préset appliqué automatiquement au lancement (commun aux testeurs) :
   // le cache local répond tout de suite, la bibliothèque partagée corrige.
   let defaultTitle = loadStoredDefault()
@@ -266,6 +271,7 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     }
     presets = removePreset(presets, title)
     storePresets(presets)
+    hideBuiltin(title) // un préset livré supprimé ne renaît pas au prochain lancement
     if (defaultTitle === title) {
       // le défaut suit le préset supprimé (le serveur fait de même)
       defaultTitle = null
