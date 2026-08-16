@@ -112,6 +112,13 @@ export const TABLEAU_HUB: LevelDef = {
     // le dernier casier du placard : l'éponge — elle boit, elle ne rend rien
     { minX: 60, minY: -1700, cols: 3, rows: 3, cellSize: 30, capacityPerCell: 5 },
   ],
+  decals: [
+    // L'ÉCRAN DE CONTRÔLE de la salle d'observation (asset du concepteur,
+    // détouré en deux états au châssis identique). HORS TENSION tant que la
+    // méta-progression n'est pas branchée : le jour venu, 'ecran-on'.
+    // Ratio du fichier : 938/753 ≈ 1,246 — respecté pour ne pas l'écraser.
+    { x: -1350, y: 1150, w: 380, h: 473, kind: 'ecran-off', fade: 0.95 },
+  ],
   labels: [
     // Toute la signalétique est en PLAQUES (« SUR-TITRE|TITRE »). Le RANG
     // départage quand la place manque : « secteur » nomme un LIEU et
