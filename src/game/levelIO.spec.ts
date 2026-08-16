@@ -73,16 +73,20 @@ describe('levelIO — aller-retour JSON', () => {
       boxes: [],
       lumieres: [
         { x: 0, y: 100 }, // tout au défaut
-        { x: -300, y: 0, h: 150, portee: 900, intensite: 1.4 },
-        { x: 300, y: 0, h: 9999, intensite: 99 }, // hors bornes
+        { x: -300, y: 0, h: 150, portee: 900, intensite: 1.4, couleur: '#FF8A3C' },
+        { x: 300, y: 0, h: 9999, intensite: 99, couleur: 'rouge' }, // hors bornes
+        { x: 0, y: -100, couleur: '#ffffff' }, // le blanc neutre s'efface
       ],
     })
     expect(rejets).toEqual([])
     const lm = level!.lumieres!
     expect(lm[0]).toEqual({ x: 0, y: 100 })
-    expect(lm[1]).toEqual({ x: -300, y: 0, h: 150, portee: 900, intensite: 1.4 })
+    // la couleur se normalise en minuscules ; une couleur illisible s'efface
+    expect(lm[1]).toEqual({ x: -300, y: 0, h: 150, portee: 900, intensite: 1.4, couleur: '#ff8a3c' })
     expect(lm[2].h).toBe(2000)
     expect(lm[2].intensite).toBe(2)
+    expect(lm[2].couleur).toBeUndefined()
+    expect(lm[3]).toEqual({ x: 0, y: -100 })
     const again = parseLevel(JSON.parse(serializeLevel(level!)))
     expect(again.level!.lumieres).toEqual(lm)
   })

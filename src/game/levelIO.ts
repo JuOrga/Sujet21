@@ -12,9 +12,11 @@ import {
   MAT_HYDROPHILE,
   MAT_HYDROPHOBE,
   MAT_WALL,
+  LAMPE_COULEUR_DEFAUT,
   LAMPE_HAUTEUR_DEFAUT,
   LAMPE_HAUTEUR_MAX,
   LAMPE_HAUTEUR_MIN,
+  lampeCouleurRVB,
   type LevelDef,
   type LumiereDef,
   type ObstacleBox,
@@ -328,6 +330,7 @@ export function parseLevel(input: unknown): { level: LevelDef | null; rejets: st
     const h = num(l.h, LAMPE_HAUTEUR_DEFAUT)
     const portee = num(l.portee, 0)
     const intensite = num(l.intensite, 1)
+    const couleur = str(l.couleur, '').toLowerCase()
     lumieres.push({
       x: num(l.x, 0),
       y: num(l.y, 0),
@@ -336,6 +339,7 @@ export function parseLevel(input: unknown): { level: LevelDef | null; rejets: st
         : {}),
       ...(portee > 0 ? { portee: Math.max(200, Math.min(8000, portee)) } : {}),
       ...(intensite !== 1 ? { intensite: Math.max(0.2, Math.min(2, intensite)) } : {}),
+      ...(lampeCouleurRVB(couleur) && couleur !== LAMPE_COULEUR_DEFAUT ? { couleur } : {}),
     })
   }
   if (lumieres.length > 0) level.lumieres = lumieres

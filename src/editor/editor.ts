@@ -7,6 +7,7 @@
 // construire un niveau — l'aperçu réel, c'est le bouton ESSAYER.
 
 import {
+  LAMPE_COULEUR_DEFAUT,
   LAMPE_HAUTEUR_DEFAUT,
   LAMPE_HAUTEUR_MAX,
   LAMPE_HAUTEUR_MIN,
@@ -2190,6 +2191,10 @@ export class LevelEditor {
       rows.push(numField('Portée (0 = auto)', 'p-lmp', l.portee ?? 0, 100))
       rows.push(numField('Intensité', 'p-lmi', l.intensite ?? 1, 0.1))
       rows.push(
+        `<label class="ed-f"><span>Couleur</span>` +
+          `<input type="color" id="p-lmc" value="${l.couleur ?? LAMPE_COULEUR_DEFAUT}" /></label>`,
+      )
+      rows.push(
         `<p class="ed-empty">La HAUTEUR sculpte l'ombre : haute (≥ ${LAMPE_HAUTEUR_DEFAUT}), la lampe enjambe les blocs — ombres courtes et douces ; basse (~${LAMPE_HAUTEUR_MIN}-200), elle rase le sol — ombres longues et dramatiques. Portée 0 : proportionnelle à la cuve. Au plus ${MAX_LUMIERES} lampes par tableau ; sans lampe posée, la cuve garde sa lampe par défaut. Aperçu réel : ESSAYER.</p>`,
       )
     } else if (s.kind === 'cible') {
@@ -2378,6 +2383,9 @@ export class LevelEditor {
       const intensite = Math.max(0.2, Math.min(2, val('p-lmi') || 1))
       if (intensite !== 1) l.intensite = intensite
       else delete l.intensite
+      const couleur = text('p-lmc').toLowerCase()
+      if (/^#[0-9a-f]{6}$/.test(couleur) && couleur !== LAMPE_COULEUR_DEFAUT) l.couleur = couleur
+      else delete l.couleur
     } else if (s.kind === 'cible') {
       const t = (this.level.cibles ?? [])[s.index]
       t.x = val('p-cx')
@@ -2752,7 +2760,9 @@ export class LevelEditor {
       const s = this.toScreen(l.x, l.y)
       const selLampe = this.sel?.kind === 'lumiere' && this.sel.index === i
       const eteinte = i >= MAX_LUMIERES // au-delà du plafond : elle n'éclaire pas
-      const col = eteinte ? '#7b93a8' : '#ffd977'
+      // le pictogramme prend la couleur de la lampe (le blanc neutre garde
+      // le jaune d'interface : un soleil blanc disparaîtrait sur la cuve)
+      const col = eteinte ? '#7b93a8' : l.couleur && l.couleur !== '#ffffff' ? l.couleur : '#ffd977'
       g.save()
       // rayons
       g.strokeStyle = col + (selLampe ? 'ff' : 'aa')

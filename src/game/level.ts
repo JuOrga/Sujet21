@@ -206,11 +206,23 @@ export interface LumiereDef {
   h?: number // hauteur au-dessus du plan (unités monde) ; absente : 420
   portee?: number // rayon de retombée ; absente : proportionnelle à la cuve
   intensite?: number // 0,2..2 ; absente : 1
+  couleur?: string // '#rrggbb' ; absente : blanc neutre
 }
 
 export const LAMPE_HAUTEUR_DEFAUT = 420
 export const LAMPE_HAUTEUR_MIN = 80
 export const LAMPE_HAUTEUR_MAX = 2000
+export const LAMPE_COULEUR_DEFAUT = '#ffffff'
+
+/** '#rrggbb' → [r, g, b] dans 0..1 — null si la chaîne n'est pas une couleur. */
+export function lampeCouleurRVB(c: string | undefined): [number, number, number] | null {
+  if (!c || !/^#[0-9a-fA-F]{6}$/.test(c)) return null
+  return [
+    parseInt(c.slice(1, 3), 16) / 255,
+    parseInt(c.slice(3, 5), 16) / 255,
+    parseInt(c.slice(5, 7), 16) / 255,
+  ]
+}
 
 // ---- Mécanismes laser (paliers 1-3, 2026) --------------------------------
 // Le faisceau est absorbé par les parois, passe les évents, se REFLÈTE sur
