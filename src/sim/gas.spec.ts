@@ -45,7 +45,7 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
     expect(sim.playerCount).toBeGreaterThanOrEqual(59) // au pire une égarée du bord
   })
 
-  it('le dash propulse tout le nuage vers la visée, sans recul ni éjection', () => {
+  it('le dash SOUFFLE sa charge : le nuage fuse, sa queue part en arrière', () => {
     const sim = makeSim()
     sim.setLevel([], [])
     sim.spawnDisc(0, 0, 60, KIND_PLAYER)
@@ -54,19 +54,40 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
     sim.dashBudget = 3 // la bascule a rendu ses dashs (transfoVapeur)
     const before = sim.playerCount
     const spent = sim.gasDash(600, 0)
-    // le dash se COMPTE (budget d'écran), il n'évapore plus le volume
     expect(spent).toBe(1)
-    expect(sim.playerCount).toBe(before)
-    // l'impulsion : le nuage fuse — la traîne évaporée ne compte pas ici
+    // On avance parce qu'on REJETTE : une part du nuage cesse d'appartenir
+    // au corps (elle ne compte plus dans playerCount) et part vers l'arrière.
+    expect(sim.playerCount).toBeLessThan(before)
+    expect(sim.playerCount).toBeGreaterThan(before * 0.7) // jamais dissous
+    let souffleArriere = 0
+    for (let i = 0; i < sim.count; i++) {
+      if (sim.kind[i] !== KIND_PLAYER && sim.gaseous[i] === 1 && sim.velX[i] < 0) souffleArriere++
+    }
+    expect(souffleArriere).toBeGreaterThan(0)
+    // l'impulsion : le nuage fuse vers la cible
     run(sim, 0.6)
     sim.updatePlayerStats()
-    expect(sim.stats.centroidX).toBeGreaterThan(120) // parti vers la cible
-    // pas d'éjection : aucune gouttelette liquide relâchée derrière
-    let liquides = 0
+    expect(sim.stats.centroidX).toBeGreaterThan(120)
+  })
+
+  it('le souffle PERLE sur la première paroi touchée (et n’est pas repris)', () => {
+    const sim = makeSim()
+    // un mur DERRIÈRE le corps : le souffle du dash va s'y déposer
+    sim.setLevel([{ minX: -400, minY: -600, maxX: -340, maxY: 600, material: 0 }], [])
+    sim.spawnDisc(0, 0, 60, KIND_PLAYER)
+    sim.gasIntent = true
+    run(sim, 1.2)
+    sim.dashBudget = 3
+    expect(sim.gasDash(600, 0)).toBe(1) // on vise à DROITE : le souffle part à gauche
+    run(sim, 1.4) // le temps que le souffle atteigne le mur
+    let rosee = 0
     for (let i = 0; i < sim.count; i++) {
-      if (sim.gaseous[i] === 0 && sim.frozen[i] === 0) liquides++
+      // une goutte : plus gazeuse, plus au corps, et posée près du mur
+      if (sim.kind[i] !== KIND_PLAYER && sim.gaseous[i] === 0 && sim.frozen[i] === 0 && sim.posX[i] < -300) {
+        rosee++
+      }
     }
-    expect(liquides).toBe(0)
+    expect(rosee).toBeGreaterThan(0) // la vapeur qui n'est plus à vous s'est condensée
   })
 
   it('la puissance du dash suit la distance du pointeur : à mi-portée, mi-vitesse', () => {
@@ -108,7 +129,10 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
     expect(sim.gasDash(600, 0)).toBe(1)
     expect(sim.dashBudget).toBe(0)
     expect(sim.gasDash(600, 0)).toBe(0) // à sec : plus d'impulsion
-    expect(sim.playerCount).toBeGreaterThan(80) // et le volume n'a rien payé
+    // le budget reste la limite DURE (deux dashs, pas trois) — et chaque
+    // dash a soufflé sa charge : le corps a maigri sans se dissoudre
+    expect(sim.playerCount).toBeLessThan(90)
+    expect(sim.playerCount).toBeGreaterThan(40)
   })
 
   it('la TRANSFORMATION en vapeur : péage de 20 % en gouttes, et le compteur de dashs se remplit', () => {

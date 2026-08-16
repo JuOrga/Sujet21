@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 14:30',
+    title: 'Le dash de vapeur SOUFFLE sa charge — et ce souffle perle sur les parois',
+    notes: [
+      'On avance parce qu’on REJETTE : chaque dash de vapeur chasse désormais la queue du nuage vers l’arrière, en éventail. Cette part cesse de vous appartenir — elle file, touche une paroi, et y PERLE en gouttes qui restent au mur. À aller rechercher au prix d’un détour, ou à laisser derrière soi : la vapeur n’est plus un déplacement gratuit, c’est un carburant qu’on brûle et qui laisse une trace.',
+      'Il a fallu deux garde-fous pour que ce soit vrai. UN — le souffle reste GAZ le temps du voyage : sans cela il se condensait en plein vol et le rappel de condensation le ramenait aussitôt au corps (c’était exactement le « tout est récupéré immédiatement »). Un compte à rebours de 4 secondes l’empêche de flotter indéfiniment : à bout de course, il perle sur place. DEUX — ni le rappel de condensation ni le rassemblement ne reprennent une goutte qui vient d’être soufflée.',
+      'La MEMBRANE fait exception : elle est faite pour arrêter la vapeur, y perler la ferait franchir sous forme de goutte — l’outil de conception perdrait son sens. Le souffle rebondit et perlera ailleurs. Deux réglages au banc : la part du nuage chassée (16 % par défaut) et la vitesse du souffle. Un test du contrat vérifie le dépôt sur la paroi (180 tests au total).',
+    ],
+  },
+  {
     date: '16/08/2026 13:20',
     title: 'LE GAME OVER, pour de bon : la run se conclut quand la réserve est à sec',
     notes: [

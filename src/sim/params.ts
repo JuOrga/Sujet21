@@ -71,6 +71,13 @@ export interface SimParams {
   gasDashRange: number // distance (u) du pointeur au corps où la puissance atteint 1
   gasAimSlow: number // facteur de temps pendant la visée (0,06 = 16× plus lent)
   gasDashBudget: number // dashs rendus à CHAQUE transformation en vapeur (l'éditeur peut le régler par tableau)
+  // LE SOUFFLE DU DASH : un dash de vapeur n'est plus gratuit en matière. La
+  // queue du nuage est CHASSÉE vers l'arrière (troisième loi : on avance
+  // parce qu'on rejette). Ce souffle ne vous appartient plus — il se
+  // disperse, et la vapeur qui n'est plus à vous PERLE sur la première paroi
+  // touchée : des gouttes à aller rechercher, ou à laisser derrière soi.
+  gasDashExhaust: number // fraction du nuage chassée à chaque dash (0 = ancien dash gratuit)
+  gasDashExhaustSpeed: number // vitesse du souffle, en fraction de la vitesse du dash
   vaporTollFrac: number // péage de vaporisation : fraction du volume actif éjectée en gouttes à la bascule (toute cause)
   gasExpand: number // répulsion interne du nuage (u/s²) : la vapeur s'étale
   gasTurb: number // turbulence : le nuage se tord en volutes (u/s²)
@@ -246,6 +253,8 @@ export const DEFAULT_PARAMS: SimParams = {
   condenseTime: 0.9,
   gasDashSpeed: 820,
   gasDashRange: 380,
+  gasDashExhaust: 0.16,
+  gasDashExhaustSpeed: 0.85,
   gasAimSlow: 0.06,
   gasDashBudget: 3,
   vaporTollFrac: 0.2,
