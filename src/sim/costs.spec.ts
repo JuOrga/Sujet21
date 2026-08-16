@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PARAMS, type SimParams } from './params'
-import { FluidSim, KIND_PLAYER, type Bounds } from './solver'
+import { FluidSim, KIND_FREE, KIND_PLAYER, type Bounds } from './solver'
 import { MAT_GRILLE } from '../game/level'
 
 const OPEN: Bounds = { minX: -3000, minY: -3000, maxX: 3000, maxY: 3000 }
@@ -121,5 +121,44 @@ describe('La goutte d’éjection — perdue seulement si elle SORT vraiment', (
     for (let s = 0; s < Math.round(2 / DEFAULT_PARAMS.dt); s++) pas(sim)
     expect(sim.playerCount).toBe(avant - 1)
     expect(sim.returningCount()).toBe(0) // loin du corps : pas de faux espoir
+  })
+})
+
+describe('Le retour des égarées — la vie ne baisse pas pour une goutte encore là', () => {
+  it('le remous d’un tir détache des voisines : elles reviennent d’elles-mêmes', () => {
+    // La scène du rapport de test : un tir vers un mur proche. La goutte
+    // s'écrase au mur (vraiment partie), mais le remous détache des voisines
+    // qui gisent À DEUX DOIGTS du corps. Avant le rappel : 7 perdues pour un
+    // seul tir. Après : seule la goutte réellement partie manque.
+    const sim = new FluidSim(
+      { ...DEFAULT_PARAMS },
+      { minX: -900, minY: -500, maxX: 900, maxY: 500 },
+    )
+    sim.setLevel([{ minX: 100, minY: -500, maxX: 160, maxY: 500, material: 0 }], [])
+    sim.spawnDisc(0, 0, 90, KIND_PLAYER)
+    for (let s = 0; s < 60; s++) sim.step(DEFAULT_PARAMS.dt)
+    const avant = sim.playerCount
+    sim.eject(90, 0, DEFAULT_PARAMS.dt * 4)
+    for (let s = 0; s < Math.round(5 / DEFAULT_PARAMS.dt); s++) sim.step(DEFAULT_PARAMS.dt)
+    // les fragments détachés par le remous sont revenus ; au plus la goutte
+    // écrasée au mur (hors rayon de capture) manque à l'appel
+    expect(sim.playerCount).toBeGreaterThanOrEqual(avant - 2)
+  })
+
+  it('les gouttes SEMÉES par le tableau ne sont pas aspirées : contact obligatoire', () => {
+    const sim = new FluidSim(
+      { ...DEFAULT_PARAMS },
+      { minX: -900, minY: -500, maxX: 900, maxY: 500 },
+    )
+    sim.setLevel([], [])
+    sim.spawnDisc(0, 0, 90, KIND_PLAYER)
+    for (let s = 0; s < 60; s++) sim.step(DEFAULT_PARAMS.dt)
+    // une collectable posée dans le rayon de capture mais SANS contact
+    const g = sim.addParticle(sim.stats.centroidX + 70, sim.stats.centroidY, KIND_FREE)
+    const avant = sim.playerCount
+    for (let s = 0; s < Math.round(2 / DEFAULT_PARAMS.dt); s++) sim.step(DEFAULT_PARAMS.dt)
+    const d = Math.hypot(sim.posX[g] - sim.stats.centroidX, sim.posY[g] - sim.stats.centroidY)
+    expect(sim.playerCount).toBe(avant) // pas gobée à distance
+    expect(d).toBeGreaterThan(45) // et pas non plus attirée vers le corps
   })
 })
