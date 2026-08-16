@@ -79,3 +79,47 @@ describe('Les coûts de la vapeur — pas un passe-partout', () => {
     expect(hard.count).toBe(0) // absorbée : le seuil est divisé par le mordant
   })
 })
+
+describe('La goutte d’éjection — perdue seulement si elle SORT vraiment', () => {
+  const arme = (ejectSpeed: number): FluidSim => {
+    const sim = new FluidSim(
+      { ...DEFAULT_PARAMS, ejectSpeed },
+      { minX: -5000, minY: -3000, maxX: 5000, maxY: 3000 },
+    )
+    sim.setLevel([], [])
+    sim.spawnDisc(0, 0, 90, KIND_PLAYER)
+    for (let s = 0; s < 60; s++) sim.step(DEFAULT_PARAMS.dt)
+    return sim
+  }
+  // un pas amorti : on saigne l'élan global pour que le corps reste sur place
+  const pas = (sim: FluidSim): void => {
+    for (let i = 0; i < sim.count; i++) {
+      sim.velX[i] *= 0.98
+      sim.velY[i] *= 0.98
+    }
+    sim.step(DEFAULT_PARAMS.dt)
+  }
+
+  it('restée dans la flaque : rendue au corps à l’échéance du délai — un PRÊT, pas une perte', () => {
+    const sim = arme(500) // tir mou, visé dans la masse : la goutte ne perce pas
+    const avant = sim.playerCount
+    sim.eject(sim.stats.centroidX + 10, sim.stats.centroidY, DEFAULT_PARAMS.dt * 4)
+    expect(sim.playerCount).toBe(avant - 1)
+    // pendant le délai : elle compte EN RETOUR (le HUD la montre à part)
+    for (let s = 0; s < Math.round(0.5 / DEFAULT_PARAMS.dt); s++) pas(sim)
+    expect(sim.returningCount()).toBe(1)
+    // à l'échéance : le corps la reprend, bilan intact
+    for (let s = 0; s < Math.round(1.5 / DEFAULT_PARAMS.dt); s++) pas(sim)
+    expect(sim.playerCount).toBe(avant)
+    expect(sim.returningCount()).toBe(0)
+  })
+
+  it('réellement partie : perdue — et jamais annoncée en retour', () => {
+    const sim = arme(1400) // plein régime : la goutte transperce et s'échappe
+    const avant = sim.playerCount
+    sim.eject(sim.stats.centroidX + 10, sim.stats.centroidY, DEFAULT_PARAMS.dt * 4)
+    for (let s = 0; s < Math.round(2 / DEFAULT_PARAMS.dt); s++) pas(sim)
+    expect(sim.playerCount).toBe(avant - 1)
+    expect(sim.returningCount()).toBe(0) // loin du corps : pas de faux espoir
+  })
+})

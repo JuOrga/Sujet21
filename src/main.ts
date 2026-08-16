@@ -3743,7 +3743,13 @@ function frame(now: number): void {
   hudCoque.classList.toggle('warn', chillNow() > 0.75)
   coqueBar.style.width = `${(chillNow() * 100).toFixed(1)}%`
   hudBonbonne.textContent = `${run.bonbonneLiters.toFixed(2)} L`
-  hudVolume.innerHTML = `${sim.liters().toFixed(2)} <small>L · ${sim.playerCount} part.</small>`
+  // La part EN RETOUR : gouttes éjectées retombées dans le corps, encore
+  // sous délai de réabsorption. Sans ce chiffre, la baisse passagère de la
+  // jauge se lit comme une perte définitive — alors que c'est un prêt.
+  const enRetour = sim.returningCount() * params.litersPerParticle
+  hudVolume.innerHTML = `${sim.liters().toFixed(2)} <small>L · ${sim.playerCount} part.${
+    enRetour >= 0.005 ? ` <span class="retour">⟳ +${enRetour.toFixed(2)}</span>` : ''
+  }</small>`
   gaugeFill.style.width = `${Math.min(100, fraction * 100).toFixed(1)}%`
   // Le seuil est un volume ABSOLU : sa position sur la jauge (graduée en % du
   // volume de départ) dépend donc du volume de base de ce tableau.

@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 16:10',
+    title: 'La goutte d’éjection : perdue seulement si elle SORT — et le HUD montre ce qui revient',
+    notes: [
+      'La question posée au banc : selon les présets, une goutte d’éjection qui ne sort pas du volume est-elle perdue ? Mesuré, goutte par goutte : le jeu tranche déjà, et bien. À pleine puissance (1400), la goutte visée dans la masse TRANSPERCE le corps et s’échappe — perdue, légitimement : elle est partie. Avec un préset mou (500), elle retombe dans la flaque, compte perdue pendant le délai de réabsorption (1,2 s)… puis le corps la REPREND à l’échéance. Bilan 90/90 : rien n’était perdu. Les deux mécaniques coexistent depuis le début — perdue si sortie, prêtée sinon.',
+      'Le vrai défaut était la LISIBILITÉ : pendant le délai, la jauge baisse sans dire que ça va revenir — et en tir rapide, les baisses se chevauchent au point de se lire comme une perte sèche. Le HUD montre désormais la part EN RETOUR (⟳ +0,04 L, teinte eau, à côté du volume) : les gouttes retombées dans le rayon de capture du corps, que le délai rendra dans un instant. Un prêt affiché comme un prêt. Le souffle d’un dash n’y figure jamais : lui ne revient pas.',
+      'Le curseur de cette mécanique reste au banc : reabsorbCooldown (1,2 s). L’allonger rend chaque tir maladroit plus cher ; le raccourcir rend le pilotage plus pardonnant. Deux tests du contrat gardent la règle : restée = rendue, partie = perdue (182 tests).',
+    ],
+  },
+  {
     date: '16/08/2026 15:05',
     title: 'La barre d’outils de l’éditeur était COUPÉE sur iPad — ESSAYER et ACCUEIL hors champ',
     notes: [
