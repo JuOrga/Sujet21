@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/08/2026 05:00',
+    title: 'LE HUB COMPACT (chantier démo) : pictogrammes d’état, en parallèle de l’actuel',
+    notes: [
+      'Premier chantier de la démo Steam fest (bible v3.1). Un nouveau module d’accueil COMPACT (3500×1600, contre 8000×3600 pour l’actuel), parcellisé à l’ISS : la CUVE à l’ouest, le POSTE DE GESTION au centre, l’alcôve de CONSERVATION au nord (trois niches — les fioles des semblables y prendront place dès que l’asset sera généré), et le SAS DE LANCEMENT à l’est derrière une chicane courte. L’écran de contrôle veille au mur, trois lampes teintées (froide sur la cuve, neutre au poste, verte au sas), lumière générale à 42 %.',
+      'LES PICTOGRAMMES D’ÉTAT, tels que spécifiés : un rectangle à la couleur du matériau, trois rangées de points EAU/GLACE/VAPEUR notées 0..3 (0 inefficace · 1 confine · 2 efficace · 3 l’outil idéal) — SANS UN MOT, volontairement énigmatique. Sept panneaux au-dessus de l’établi, aux notes tirées des VRAIES règles du jeu : éponge 3/1/1, plaque froide 3/1/2, chaudière 2/3/0, évent 1/1/0, membrane 0/1/1, rideau 1/0/1, surchauffeur 1/1/0. Le format voyage avec les tableaux (sérialisé, borné) : l’éditeur pourra en poser partout.',
+      'EN PARALLÈLE, comme demandé : le hub actuel reste le hub joué — le compact se visite par le bouton HUB COMPACT de la fiche d’essai (un essai hors expédition, sans toucher aux registres). La bascule attendra la validation du module.',
+    ],
+  },
+  {
     date: '17/08/2026 03:30',
     title: 'RELIEF 2.5D des parois (expérimental) : les flancs se révèlent en se déplaçant',
     notes: [

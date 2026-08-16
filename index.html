@@ -2320,6 +2320,47 @@
         will-change: transform;
         transition: opacity 0.18s ease;
       }
+      /* Pictogramme d'état (bible v3.1) : rectangle couleur matériau +
+         trois rangées de points EAU/GLACE/VAPEUR (0..3). Une indication
+         pour les HUMAINS — sans texte, énigmatique. */
+      .world-label.wl-picto {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        padding: 7px 9px 6px;
+        background: linear-gradient(180deg, rgba(16, 26, 40, 0.92), rgba(9, 16, 26, 0.94));
+        border: 1px solid rgba(120, 150, 175, 0.35);
+        border-radius: 3px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+      }
+      .world-label.wl-picto .picto-swatch {
+        display: block;
+        width: 34px;
+        height: 14px;
+        border-radius: 2px;
+        opacity: 0.92;
+        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+      }
+      .world-label.wl-picto .picto-rangee {
+        display: flex;
+        gap: 4px;
+        text-decoration: none;
+      }
+      .world-label.wl-picto .picto-rangee b {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+      }
+      .world-label.wl-picto .picto-rangee b.plein {
+        background: currentColor;
+        box-shadow: 0 0 5px currentColor;
+      }
+      .world-label.wl-picto .picto-rangee b.vide {
+        background: transparent;
+        box-shadow: inset 0 0 0 1px currentColor;
+        opacity: 0.35;
+      }
       /* la pancarte à qui la place a été refusée (une autre l'occupait) :
          elle s'efface en fondu, et revient dès qu'on zoome. Sélecteur
          plus précis que .plaque : c'est un ÉTAT, il prime sur le style. */
@@ -3182,6 +3223,7 @@
       <div class="home-duo" role="group" aria-label="Outils du protocole">
         <button id="start-editor" type="button" title="Créer ou modifier un tableau"><i>✎</i><span>ÉDITEUR</span></button>
         <button id="start-bis" type="button" title="L'école, puis les salles laser"><i>⚗&#xFE0E;</i><span>PARCOURS TEST</span></button>
+        <button id="start-hub2" type="button" title="Le chantier de refonte du hub : module compact, pictogrammes d'état, alcôve des fioles — en parallèle du hub actuel"><i>◐</i><span>HUB COMPACT</span></button>
         <button id="home-salles" type="button"><i>▦</i><span>SALLES</span></button>
         <button id="home-records" type="button"><i>✦</i><span>RECORDS</span></button>
         <button id="home-livraisons" type="button"><i>◈</i><span>NOTES DE VERSION</span></button>

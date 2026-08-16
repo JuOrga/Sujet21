@@ -148,7 +148,15 @@ function readLabel(o: Record<string, unknown>): WorldLabel | null {
     .replace(/[\u0000-\u0009\u000B-\u001F\u007F]/g, '')
     .slice(0, 120)
     .trim()
-  if (!text) return null
+  // Pictogramme d'état (bible v3.1) : sans texte, mais jamais sans rien —
+  // une étiquette est soit un texte, soit un pictogramme, soit les deux
+  const p = (o.picto ?? null) as Record<string, unknown> | null
+  const note = (v: unknown): number => Math.max(0, Math.min(3, Math.round(num(v, 0))))
+  const picto =
+    p && /^#[0-9a-fA-F]{6}$/.test(str(p.couleur))
+      ? { couleur: str(p.couleur), eau: note(p.eau), glace: note(p.glace), vapeur: note(p.vapeur) }
+      : undefined
+  if (!text && !picto) return null
   const tone = str(o.tone, 'mur') as WorldLabel['tone']
   return {
     x: num(o.x),
@@ -156,6 +164,7 @@ function readLabel(o: Record<string, unknown>): WorldLabel | null {
     text,
     tone: TONES.includes(tone) ? tone : 'mur',
     rang: str(o.rang) === 'secteur' ? 'secteur' : undefined,
+    picto,
   }
 }
 
