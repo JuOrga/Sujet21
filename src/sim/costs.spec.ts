@@ -108,13 +108,16 @@ describe('La goutte d’éjection — perdue seulement si elle SORT vraiment', (
     for (let s = 0; s < 30; s++) sim.step(DEFAULT_PARAMS.dt)
     const vieAvant = sim.aliveCount()
     sim.eject(sim.stats.centroidX + 400, sim.stats.centroidY, DEFAULT_PARAMS.dt * 4)
-    // pendant le délai : renvoyée dans le volume, la goutte est EN PRÊT —
-    // la vie la compte toujours (le temps d'un relabel, tous les 5 pas)
-    for (let s = 0; s < Math.round(0.6 / DEFAULT_PARAMS.dt); s++) pas(sim)
-    expect(sim.aliveCount()).toBe(vieAvant)
-    expect(sim.returningCount()).toBe(0) // pas « en retour » : jamais partie
-    // à l'échéance : le corps la reprend, bilan intact
-    for (let s = 0; s < Math.round(2.5 / DEFAULT_PARAMS.dt); s++) pas(sim)
+    // LA JAUGE NE CILLE PAS D'UNE SEULE IMAGE : créditée vivante à l'instant
+    // du tir, la goutte bloquée reste dans le halo jusqu'à sa reprise — on
+    // échantillonne CHAQUE pas, le moindre creux ferait clignoter l'ambre
+    let creux = vieAvant
+    for (let s = 0; s < Math.round(2.8 / DEFAULT_PARAMS.dt); s++) {
+      pas(sim)
+      if (sim.aliveCount() < creux) creux = sim.aliveCount()
+    }
+    expect(creux).toBe(vieAvant)
+    // et à l'échéance : le corps l'a reprise, bilan intact
     expect(sim.playerCount).toBe(vieAvant)
     expect(sim.enPretCount).toBe(0)
   })
@@ -134,7 +137,7 @@ describe('La goutte d’éjection — perdue seulement si elle SORT vraiment', (
     sim.eject(sim.stats.centroidX + 10, sim.stats.centroidY, DEFAULT_PARAMS.dt * 4)
     for (let s = 0; s < Math.round(2 / DEFAULT_PARAMS.dt); s++) pas(sim)
     expect(sim.playerCount).toBe(avant - 1)
-    expect(sim.returningCount()).toBe(0) // loin du corps : pas de faux espoir
+    expect(sim.enPretCount).toBe(0) // loin du corps : pas de faux espoir
   })
 })
 

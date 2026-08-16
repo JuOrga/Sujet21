@@ -135,6 +135,8 @@ export class FluidSim {
   // la vie ne baisse pas pour une goutte qui n'est jamais vraiment partie.
   // (Les gouttes SEMÉES par le tableau n'ont pas la marque : les
   // collectables s'attrapent au contact, pas à l'aimant.)
+  // Valeurs : 0 = sans marque · 1 = du corps, SORTIE du halo (perdue, mais
+  // reprise si on repasse à portée) · 2 = du corps, DANS le halo (vivante).
   private readonly duCorps: Uint8Array
   private readonly iceVxSum: Float32Array
   private readonly iceVySum: Float32Array
@@ -355,7 +357,6 @@ export class FluidSim {
   // traversé la surface, elle compte : la jauge ne bouge pas pour un tir
   // qu'un mur renvoie, elle baisse à l'instant précis où la goutte sort.
   enPretCount = 0
-  private playerLabelCourant = -1
   criticalTimer = 0
 
   setLevel(boxes: ObstacleBox[], sponges: SpongeDef[]): void {
@@ -647,32 +648,12 @@ export class FluidSim {
     return -1
   }
 
-  // La matière EN RETOUR : gouttes libres, liquides, encore sous délai de
-  // réabsorption mais restées dans le rayon de capture du corps — elles lui
-  // reviendront à l'échéance du délai. Le HUD les montre à part : sans cela,
-  // la baisse passagère de la jauge se lit comme une perte définitive alors
-  // que c'est un prêt. (Le souffle d'un dash, gazeux en vol, n'y figure
-  // jamais : lui ne revient pas.)
-  returningCount(): number {
-    if (this.playerCount === 0) return 0
-    const capture = this.captureRadius()
-    const c2 = capture * capture
-    let n = 0
-    for (let i = 0; i < this.count; i++) {
-      if (this.kind[i] !== KIND_FREE || this.duCorps[i] !== 1) continue
-      if (this.frozen[i] === 1 || this.gaseous[i] === 1) continue
-      // encore dans le volume : elle est VIVANTE (en prêt), pas en retour
-      if (this.playerLabelCourant >= 0 && this.labels[i] === this.playerLabelCourant) continue
-      const dx = this.posX[i] - this.stats.centroidX
-      const dy = this.posY[i] - this.stats.centroidY
-      if (dx * dx + dy * dy <= c2) n++
-    }
-    return n
-  }
-
   // Retrait par échange avec la dernière particule (absorption éponge).
   removeParticle(i: number): void {
     if (this.kind[i] === KIND_PLAYER) this.playerCount--
+    // une goutte en prêt avalée (éponge, balayage) quitte la vie sur-le-champ :
+    // sans ce décrément, liters() reste gonflé jusqu'au prochain relabel
+    if (this.duCorps[i] === 2) this.enPretCount = Math.max(0, this.enPretCount - 1)
     this.iceDirty = true // l'échange d'indices invalide le cache d'amas
     const last = this.count - 1
     if (i !== last) {
@@ -800,7 +781,11 @@ export class FluidSim {
       this.posY[best] += dirY * p.kernelRadius * 0.8
       this.kind[best] = KIND_FREE
       this.cooldown[best] = p.reabsorbCooldown
-      this.duCorps[best] = 1
+      // créditée VIVANTE à l'instant même du tir : elle part de la surface,
+      // donc du halo — la jauge ne cille pas d'une image, elle ne baissera
+      // qu'à la SORTIE réelle (constatée au relabel suivant)
+      this.duCorps[best] = 2
+      this.enPretCount++
       this.playerCount--
 
       // Entraînement du voisinage : le liquide voisin CONVERGE vers le point
@@ -995,7 +980,8 @@ export class FluidSim {
       this.posY[i] += uy * p.kernelRadius * 0.8
       this.kind[i] = KIND_FREE
       this.cooldown[i] = p.reabsorbCooldown
-      this.duCorps[i] = 1 // gerbe de péage : votre matière, elle peut revenir
+      this.duCorps[i] = 2 // gerbe de péage : part du halo, vivante jusqu'à la sortie
+      this.enPretCount++
       this.playerCount--
       dvxSum += dvx
       dvySum += dvy
@@ -1815,7 +1801,7 @@ export class FluidSim {
     let impX = 0
     let impY = 0
     for (let i = 0; i < this.count; i++) {
-      if (this.duCorps[i] !== 1 || this.kind[i] === KIND_PLAYER) continue
+      if (this.duCorps[i] === 0 || this.kind[i] === KIND_PLAYER) continue
       if (this.cooldown[i] > 0 || this.frozen[i] === 1 || this.gaseous[i] === 1) continue
       const dx = cx - this.posX[i]
       const dy = cy - this.posY[i]
@@ -2601,11 +2587,9 @@ export class FluidSim {
     if (playerLabel < 0) {
       this.playerCount = 0
       this.enPretCount = 0
-      this.playerLabelCourant = -1
       if (!inDrainGrip) this.dispersed = true
       return
     }
-    this.playerLabelCourant = playerLabel
 
     let count = 0
     for (let i = 0; i < n; i++) {
@@ -2622,29 +2606,40 @@ export class FluidSim {
     }
     this.playerCount = count
 
-    // EN PRÊT : marquée du corps, délai en cours, et ANCRÉE dans la masse —
-    // au moins trois particules du CORPS à un rayon de lien. La connexité
-    // seule ne suffit pas : elle est transitive, et un jet de gouttes qui se
-    // touchent resterait « dans le volume » jusqu'au bout du chapelet. Être
-    // dans le volume, c'est toucher la masse, pas être enchaîné à elle.
+    // EN PRÊT : marquée du corps et encore dans le HALO du corps (le rayon
+    // de capture, celui du rappel). Tout ce qui reste dans le halo REVIENDRA
+    // (le rappel des égarées s'en charge) : le compter vivant est donc la
+    // stricte vérité — et la jauge ne cille plus au rythme des tirs. La
+    // sortie du halo se juge avec hystérésis (15 % plus loin que l'entrée) :
+    // une goutte qui danse à la frontière ne fait pas clignoter la vie.
+    this.updatePlayerStats()
+    const capture = this.captureRadius()
+    const cIn2 = capture * capture
+    const cOut = capture * 1.15
+    const cOut2 = cOut * cOut
+    const cx2 = this.stats.centroidX
+    const cy2 = this.stats.centroidY
+    // Pendant que le SAS BOIT, le halo s'éteint : le corps aspiré ne peut
+    // plus aller rechercher quoi que ce soit, et compter ses miettes
+    // vivantes empêchait la fin de run de conclure (la vie ne tombait
+    // jamais à zéro — le sursis se réarmait en boucle).
+    const haloActif = !this.drainOn
     let prets = 0
     for (let i = 0; i < n; i++) {
-      if (this.kind[i] !== KIND_FREE || this.duCorps[i] !== 1) continue
-      if (this.frozen[i] === 1 || this.gaseous[i] === 1) continue
-      if (labels[i] !== playerLabel) continue
-      const end = grid.collect(posX, posY, posX[i], posY[i], linkR, i, scratch, 0, scratch.length)
-      let ancres = 0
-      for (let e = 0; e < end && ancres < 3; e++) {
-        const j = scratch[e]
-        if (this.kind[j] !== KIND_PLAYER) continue
-        const dx = posX[i] - posX[j]
-        const dy = posY[i] - posY[j]
-        if (dx * dx + dy * dy <= linkR2) ancres++
+      if (this.duCorps[i] === 0 || this.kind[i] !== KIND_FREE) continue
+      if (this.frozen[i] === 1 || this.gaseous[i] === 1) {
+        this.duCorps[i] = 1 // gelée ou gazeuse : plus pilotable, plus vivante
+        continue
       }
-      if (ancres >= 3) prets++
+      const dx = posX[i] - cx2
+      const dy = posY[i] - cy2
+      const d2 = dx * dx + dy * dy
+      const dedans = haloActif && (this.duCorps[i] === 2 ? d2 <= cOut2 : d2 <= cIn2)
+      this.duCorps[i] = dedans ? 2 : 1
+      if (dedans) prets++
     }
     this.enPretCount = prets
-    this.updatePlayerStats()
+    // (les stats sont déjà à jour : recalculées juste avant la passe du halo)
 
     if (inDrainGrip) {
       this.belowCritical = false
