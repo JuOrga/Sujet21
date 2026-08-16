@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 17:00',
+    title: 'Sept présets LIVRÉS avec le banc — sept manières de sentir le même fluide',
+    notes: [
+      'Le banc s’ouvre désormais avec une bibliothèque de sept présets d’usine (marqués ⚙), chacun une INTENTION de jeu et pas un simple jeu de curseurs. ⚙ TEMPO NERVEUX — le ressenti du ×2 sans accélérer le temps : attentes divisées par deux, corps prompt, caméra vive, éjection à 1800 (le plafond mesuré au mur mince). ⚙ SIROP DE CUVE — l’eau épaisse et pensive, pour les casse-têtes. ⚙ CHAMPAGNE — tout pétille, transformations éclair, réabsorption qui pardonne. ⚙ PROTOCOLE D’AUSTÉRITÉ — chaque goutte compte double, pour finir un tableau à la goutte près. ⚙ BALLET ORBITAL — tout glisse et orbite, la lenteur par les forces, pas par l’horloge. ⚙ PALET DE MATCH — la glace reine, rebonds de flipper. ⚙ GEYSER — la vapeur voie royale, l’inverse de l’austérité.',
+      'Ils cohabitent proprement avec les vôtres : enregistrer un préset sous le même titre REMPLACE le livré (votre version gagne la fusion), et un livré supprimé reste supprimé sur l’appareil — il ne renaît pas au lancement suivant. Chaque livré passe au tourment en test : clés vérifiées contre les paramètres réels (pas de curseur fantôme), puis une séance condensée — une seconde de tirs contre un mur, bascule vapeur, dash, retour — sans une seule valeur folle ni cuve vidée (176 tests).',
+    ],
+  },
+  {
     date: '16/08/2026 16:10',
     title: 'La goutte d’éjection : perdue seulement si elle SORT — et le HUD montre ce qui revient',
     notes: [
