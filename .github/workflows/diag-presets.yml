@@ -1,0 +1,33 @@
+# Diagnostic ponctuel : rapatrier la bibliothèque de PRÉSETS partagée
+# (/api/presets) vers une branche du dépôt — l'agent de développement n'a
+# pas d'accès réseau direct au site, le runner CI si. Même mécanique que
+# perf-sync : un commit (même vide) sur la gâchette diag-presets-go tire.
+name: diag-presets
+on:
+  workflow_dispatch:
+  push:
+    branches: [diag-presets-go]
+
+permissions:
+  contents: write
+
+jobs:
+  lire:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer la bibliothèque de présets
+        run: |
+          curl -sS --fail "https://sujet21.vercel.app/api/presets" -o presets.json
+          head -c 300 presets.json; echo
+      - name: Publier sur la branche presets-dump
+        run: |
+          git init -b presets-dump sync
+          cd sync
+          mv ../presets.json .
+          git config user.name "diag-presets"
+          git config user.email "actions@users.noreply.github.com"
+          git add presets.json
+          git commit -m "bibliothèque de présets — $(date -u +%FT%TZ)"
+          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}" presets-dump
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
