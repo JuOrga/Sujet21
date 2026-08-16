@@ -3743,11 +3743,11 @@ function frame(now: number): void {
   hudCoque.classList.toggle('warn', chillNow() > 0.75)
   coqueBar.style.width = `${(chillNow() * 100).toFixed(1)}%`
   hudBonbonne.textContent = `${run.bonbonneLiters.toFixed(2)} L`
-  // La part EN RETOUR : gouttes éjectées retombées dans le corps, encore
-  // sous délai de réabsorption. Sans ce chiffre, la baisse passagère de la
-  // jauge se lit comme une perte définitive — alors que c'est un prêt.
+  // La vie compte la matière VIVANTE : le corps plus les gouttes en prêt
+  // encore dans le volume (la règle : n'est perdu que ce qui SORT). La part
+  // EN RETOUR (⟳) : matière sortie mais à portée, que le rappel ramène.
   const enRetour = sim.returningCount() * params.litersPerParticle
-  hudVolume.innerHTML = `${sim.liters().toFixed(2)} <small>L · ${sim.playerCount} part.${
+  hudVolume.innerHTML = `${sim.liters().toFixed(2)} <small>L · ${sim.aliveCount()} part.${
     enRetour >= 0.005 ? ` <span class="retour">⟳ +${enRetour.toFixed(2)}</span>` : ''
   }</small>`
   gaugeFill.style.width = `${Math.min(100, fraction * 100).toFixed(1)}%`
