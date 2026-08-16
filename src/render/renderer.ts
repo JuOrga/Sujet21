@@ -267,6 +267,12 @@ uniform float uLumiere;
 // pièce garde là où aucune lampe ne porte. 0,52 = niveau historique ;
 // 0 = noir total hors des lampes.
 uniform float uAmbiante;
+// RELIEF 2.5D : les parois ont une hauteur — leur sommet fuit le centre de
+// la caméra (perspective), et la face latérale se révèle du côté qui
+// regarde le centre. En se déplaçant, on « aperçoit » les flancs des
+// éléments qu'on aborde. 0 : débranché. L'effet s'estompe au dézoom
+// (caméra lointaine = vue orthographique — le plan large reste une carte).
+uniform float uRelief;
 // Éclairage du VOLUME (le corps d'eau, la glace, la vapeur) : 1 branché —
 // le corps baigne dans la même carte de lumière que la pièce, les ombres
 // portées le traversent, le reflet suit la lampe dominante. 0 : l'eau garde
@@ -734,6 +740,9 @@ void main() {
 
   // Obstacles : remplissage texturé + liseré, couleur par matériau (§6)
   float edgeW = 2.5 / uZoom;
+  // relief : décalage du sommet des parois, proportionnel à l'écart au
+  // centre (en écran), fondu sous le zoom de carte
+  vec2 relDisp = (world - uCenter) * (uRelief * clamp(uZoom * 1.2, 0.0, 1.0));
   float drainEye = 0.0; // œil du sas, retenu pour assombrir l'eau qui y coule
   for (int bi = 0; bi < MAX_BOXES; bi++) {
     if (bi >= uBoxCount) break;
@@ -763,11 +772,54 @@ void main() {
       else if (mat > 5.5 && mat < 6.5) reachMax = max(reachMax, uHeatBand * uBoxAux[bi].w);
       else if (mat > 3.5 && mat < 4.5) reachMax = max(reachMax, uColdBand);
       else if (mat > 8.5) reachMax = max(reachMax, 60.0);
-      if (d > reachMax + edgeW) continue;
+      if (d > reachMax + edgeW + (uRelief > 0.0 ? length(relDisp) : 0.0)) continue;
     }
     // FORME de la pièce : la distance se raffine après le rejet grossier —
     // remplissage, arête, ombre et auras suivent la vraie silhouette
     if (dec.y > 0.5) d = formeSdf(wb, uBoxes[bi], dec.y, dec.z, dec.w);
+
+    // ——— RELIEF 2.5D (murs, hydrophile, hydrophobe) ————————————————
+    // dV / wbV : la géométrie du SOMMET (déplacé) — le remplissage et les
+    // habillages la suivent. d reste LA BASE : ombres portées, auras et
+    // physique y demeurent ancrées. Entre les deux : le FLANC, échantillonné
+    // à deux hauteurs intermédiaires (les parois minces ne laissent pas de
+    // trou quand le sommet glisse au-delà de leur épaisseur).
+    float dV = d;
+    vec2 wbV = wb;
+    float flanc = 0.0;
+    if (uRelief > 0.0 && mat < 2.5) {
+      vec2 wT = world - relDisp;
+      vec2 wbT = wT;
+      float bAngR = uBoxAux[bi].y;
+      float caR = 1.0;
+      float saR = 0.0;
+      vec2 bcR = vec2(0.0);
+      if (abs(bAngR) > 0.0005) {
+        bcR = 0.5 * (uBoxes[bi].xy + uBoxes[bi].zw);
+        caR = cos(bAngR);
+        saR = sin(bAngR);
+        vec2 relT = wT - bcR;
+        wbT = bcR + vec2(caR * relT.x + saR * relT.y, -saR * relT.x + caR * relT.y);
+      }
+      dV = dec.y > 0.5 ? formeSdf(wbT, uBoxes[bi], dec.y, dec.z, dec.w) : boxSdf(wbT, uBoxes[bi]);
+      wbV = wbT;
+      if (dV > 0.0) {
+        if (d <= 0.0) {
+          flanc = 1.0; // sur la base, sous le vide : pleine tranche
+        } else {
+          for (int fs = 1; fs <= 2; fs++) {
+            vec2 wM = world - relDisp * (float(fs) / 3.0);
+            vec2 wbM = wM;
+            if (abs(bAngR) > 0.0005) {
+              vec2 relM = wM - bcR;
+              wbM = bcR + vec2(caR * relM.x + saR * relM.y, -saR * relM.x + caR * relM.y);
+            }
+            float dM = dec.y > 0.5 ? formeSdf(wbM, uBoxes[bi], dec.y, dec.z, dec.w) : boxSdf(wbM, uBoxes[bi]);
+            flanc = max(flanc, 1.0 - smoothstep(-1.0, 1.5, dM));
+          }
+        }
+      }
+    }
     // Ombre portée douce autour de chaque solide (sauf le sas) : les blocs
     // se détachent du fond au lieu de flotter — la cuve prend de la
     // profondeur, les rectangles cessent d'être des aplats.
@@ -776,8 +828,8 @@ void main() {
       col = mix(col, col * vec3(0.50, 0.56, 0.70), shade * shade * 0.5);
     }
     if (mat < 2.5) {
-      float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
-      float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
+      float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
+      float edge = 1.0 - smoothstep(0.0, edgeW, abs(dV));
       vec3 fillCol; vec3 edgeCol;
       if (mat < 0.5) {        // mur neutre : métal brossé — ou un HABILLAGE
         // (aux.z : 1 caissons, 2 conduites, 3 poutrelle, 4 blindage). Pur
@@ -803,7 +855,7 @@ void main() {
           vec2 grand = step(1.0, rep);
           vec2 pas = mix(vec2(420.0), bsize / max(rep, vec2(1.0)), grand);
           vec2 origine = mix(bmin + 0.5 * bsize - 210.0, bmin, grand);
-          vec2 uvp = (tuile + fract((wb - origine) / pas)) * vec2(0.25, 0.5);
+          vec2 uvp = (tuile + fract((wbV - origine) / pas)) * vec2(0.25, 0.5);
           // l'atlas est téléversé avec UNPACK_FLIP_Y : le V se lit depuis le
           // BAS — sans cette inversion, chaque habillage affichait la tuile
           // de l'AUTRE rangée (caissons devenait aération, écrans poutrelle…)
@@ -812,30 +864,30 @@ void main() {
           edgeCol = vec3(0.32, 0.40, 0.48);
         } else if (skin > 3.5) {
           // BLINDAGE : plaque lourde mate, chevrons d'avertissement au bord
-          float pl = 0.9 + 0.2 * dnoise(wb * 0.05);
+          float pl = 0.9 + 0.2 * dnoise(wbV * 0.05);
           fillCol = vec3(0.13, 0.15, 0.19) * pl;
-          float bord = smoothstep(26.0, 12.0, -d);
-          float chev = smoothstep(0.55, 0.85, 0.5 + 0.5 * sin((wb.x + wb.y) * 0.28));
+          float bord = smoothstep(26.0, 12.0, -dV);
+          float chev = smoothstep(0.55, 0.85, 0.5 + 0.5 * sin((wbV.x + wbV.y) * 0.28));
           fillCol = mix(fillCol, vec3(0.62, 0.52, 0.13), bord * chev * 0.5);
           edgeCol = vec3(0.55, 0.50, 0.26);
         } else if (skin > 2.5) {
           // POUTRELLE : âme métallique et croisillons rivetés
-          float croix = min(abs(fract((wb.x + wb.y) * 0.014) - 0.5), abs(fract((wb.x - wb.y) * 0.014) - 0.5));
+          float croix = min(abs(fract((wbV.x + wbV.y) * 0.014) - 0.5), abs(fract((wbV.x - wbV.y) * 0.014) - 0.5));
           float brace = 1.0 - smoothstep(0.05, 0.10, croix);
-          float riv = smoothstep(0.90, 0.98, cos(wb.x * 0.11) * cos(wb.y * 0.11));
+          float riv = smoothstep(0.90, 0.98, cos(wbV.x * 0.11) * cos(wbV.y * 0.11));
           fillCol = vec3(0.09, 0.11, 0.145) + vec3(0.07, 0.08, 0.10) * brace + vec3(0.12) * riv;
           edgeCol = vec3(0.36, 0.42, 0.50);
         } else if (skin > 1.5) {
           // CONDUITES : faisceau de tubes couchés, brides régulières
-          float ph = fract(wb.y / 46.0) - 0.5;
+          float ph = fract(wbV.y / 46.0) - 0.5;
           float tube = sqrt(max(0.0, 1.0 - ph * ph * 4.0));
-          float bride = smoothstep(0.92, 1.0, 0.5 + 0.5 * sin(wb.x * 0.045));
+          float bride = smoothstep(0.92, 1.0, 0.5 + 0.5 * sin(wbV.x * 0.045));
           fillCol = vec3(0.10, 0.125, 0.16) * (0.55 + 0.65 * tube) + vec3(0.05, 0.06, 0.075) * bride;
           edgeCol = vec3(0.34, 0.42, 0.50);
         } else if (skin > 0.5) {
           // CAISSONS : panneaux empilés, joints sombres, teinte par caisson
-          vec2 cel = floor(wb / vec2(84.0, 56.0));
-          vec2 cuvC = fract(wb / vec2(84.0, 56.0));
+          vec2 cel = floor(wbV / vec2(84.0, 56.0));
+          vec2 cuvC = fract(wbV / vec2(84.0, 56.0));
           float joint = min(min(cuvC.x, 1.0 - cuvC.x), min(cuvC.y, 1.0 - cuvC.y));
           float bordC = smoothstep(0.02, 0.10, joint);
           float teinte = 0.85 + 0.3 * hash21(cel + 7.7);
@@ -859,6 +911,11 @@ void main() {
           : vec3(0.16, 0.11, 0.20) + vec3(0.07, 0.035, 0.10) * wax;
         edgeCol = vec3(0.62, 0.42, 0.78);
       }
+      // LE FLANC : la tranche du mur, sombre et teintée matériau — c'est
+      // elle qu'on « aperçoit » en se déplaçant, du côté qui regarde le
+      // centre. Peinte sous le remplissage du sommet.
+      vec3 flancCol = mix(vec3(0.045, 0.058, 0.075), edgeCol, 0.20);
+      col = mix(col, flancCol, flanc * (1.0 - fill));
       col = mix(col, fillCol, fill);
       col = mix(col, edgeCol, edge * 0.9);
       if (mat > 0.5) {
@@ -1876,6 +1933,7 @@ export class Renderer {
     lumieres: LumiereDef[] = [], // lampes du tableau ; vide : lampe par défaut
     lumiereEau = 1, // 1 le VOLUME baigne dans la lumière de la pièce, 0 non
     ambiante = 0.52, // lumière générale du tableau (plancher hors lampes)
+    relief = 0, // relief 2.5D des parois (0 débranché ; ~0,035 léger)
   ): void {
     const gl = this.gl
     const devW = Math.max(1, Math.round(viewportW * dpr))
@@ -2004,6 +2062,7 @@ export class Renderer {
     // arêtes et les montures en ont besoin par pixel)
     gl.uniform1f(cu['uLumiere'], lumiere > 0.5 && this.lightTex ? 1 : 0)
     gl.uniform1f(cu['uAmbiante'], ambiante)
+    gl.uniform1f(cu['uRelief'], relief)
     // le volume n'a de lumière à recevoir que si la pièce en a une
     gl.uniform1f(cu['uLumiereEau'], lumiere > 0.5 && lumiereEau > 0.5 && this.lightTex ? 1 : 0)
     this.remplitLampes(lampes)

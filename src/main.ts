@@ -1122,6 +1122,12 @@ let lumiereActive = localStorage.getItem('sujet21-lumiere') !== 'off'
 // lumière que la pièce — ombres portées comprises, reflet vers la lampe.
 // Débranchable séparément ; sans éclairage de pièce, il n'a rien à recevoir.
 let lumiereEauActive = localStorage.getItem('sujet21-lumiere-eau') !== 'off'
+// RELIEF 2.5D des parois : leur sommet fuit le centre de la caméra, la face
+// latérale se révèle du côté qui regarde le centre — en se déplaçant, on
+// aperçoit les flancs des éléments qu'on aborde. EXPÉRIMENTAL : OFF par
+// défaut le temps de la validation à la manette ; LÉGER puis FORT à l'essai.
+let reliefChoix = (localStorage.getItem('sujet21-relief') ?? 'off') as 'off' | 'leger' | 'fort'
+const RELIEF_K = { off: 0, leger: 0.035, fort: 0.07 } as const
 const paramsEl = document.getElementById('params') as HTMLDivElement
 {
   const choix = document.getElementById('params-fps') as HTMLDivElement
@@ -1190,6 +1196,29 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     }
   }
   renderDecor()
+
+  const choixRelief = document.getElementById('params-relief') as HTMLDivElement
+  const renderRelief = (): void => {
+    choixRelief.innerHTML = ''
+    for (const [mode, label] of [
+      ['off', 'OFF'],
+      ['leger', 'LÉGER'],
+      ['fort', 'FORT'],
+    ] as const) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = label
+      b.className = reliefChoix === mode ? 'actif' : ''
+      b.addEventListener('click', () => {
+        reliefChoix = mode
+        localStorage.setItem('sujet21-relief', mode)
+        perf.reset()
+        renderRelief()
+      })
+      choixRelief.appendChild(b)
+    }
+  }
+  renderRelief()
 
   const choixFpsAff = document.getElementById('params-fpsaff') as HTMLDivElement
   const renderFpsAff = (): void => {
@@ -3793,6 +3822,7 @@ function frame(now: number): void {
     level.lumieres ?? [],
     lumiereEauActive ? 1 : 0,
     level.ambiante ?? AMBIANTE_DEFAUT,
+    RELIEF_K[reliefChoix],
   )
   const rendRaw = performance.now() - renderT0
   monitor.renderMs += (rendRaw - monitor.renderMs) * 0.08

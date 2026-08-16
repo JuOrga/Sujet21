@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/08/2026 03:30',
+    title: 'RELIEF 2.5D des parois (expérimental) : les flancs se révèlent en se déplaçant',
+    notes: [
+      'La demande du concepteur : « si je déplace la caméra à gauche, j’apercevrai les faces droites des éléments ». C’est la perspective des jeux vus de dessus (Hotline Miami) : chaque paroi a une HAUTEUR, son sommet fuit le centre de la caméra, et sa face latérale apparaît du côté qui regarde le centre — celui qu’on aborde en se déplaçant. Implémenté dans le shader pour les murs, l’hydrophile et l’hydrophobe : le remplissage et les habillages suivent le SOMMET déplacé, le flanc (sombre, teinté matériau) se peint entre base et sommet, échantillonné à deux hauteurs pour que les parois minces ne laissent pas de trou.',
+      'Trois ancrages garantis : la PHYSIQUE, les ombres portées et les auras restent à la BASE (l’empreinte réelle ne bouge pas d’une unité) ; l’effet S’ESTOMPE au dézoom (caméra lointaine = vue orthographique — le plan large reste une carte) ; et il est DÉBRANCHABLE. Réglage dans PARAMÈTRES → RELIEF DES PAROIS : off (défaut, le temps de la validation à la manette), léger, fort. Le coût shader n’existe que branché, et seulement sur les pixels proches des parois. À valider sur appareil réel : activez LÉGER et déplacez-vous le long d’un couloir.',
+    ],
+  },
+  {
     date: '17/08/2026 02:40',
     title: 'Les veilleuses assagies : le vaisseau respire, il ne clignote plus comme un sapin',
     notes: [
