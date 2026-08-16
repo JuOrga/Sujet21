@@ -176,6 +176,10 @@ export class LevelEditor {
   private readonly doigts = new Map<number, { x: number; y: number }>()
   private pinceEcart: number | null = null
   private pinceCentre: { x: number; y: number } | null = null
+  // Le dernier pointeur qui a parlé : une poignée de 9 px se vise à la
+  // souris, jamais au doigt ni au stylet — sa ZONE SENSIBLE s'élargit donc
+  // (le dessin, lui, ne bouge pas : viser large sans alourdir l'écran).
+  private pointeur: 'mouse' | 'tactile' = 'mouse'
 
   // geste en cours
   private drag:
@@ -715,7 +719,7 @@ export class LevelEditor {
   private hitRotateHandle(sx: number, sy: number): boolean {
     const h = this.rotateHandlePos()
     if (!h) return false
-    return Math.hypot(sx - h.sx, sy - h.sy) <= HANDLE_PX + 2
+    return Math.hypot(sx - h.sx, sy - h.sy) <= this.prise + 2
   }
 
   /** Le coin (ox, oy) d'une boîte oblique, en coordonnées MONDE — offsets
@@ -737,9 +741,15 @@ export class LevelEditor {
     ['SE', 1, -1],
   ]
 
+  /** Rayon sensible d'une poignée : large au doigt et au stylet. */
+  private get prise(): number {
+    return this.pointeur === 'mouse' ? HANDLE_PX : HANDLE_PX * 2.4
+  }
+
   private hitHandle(sx: number, sy: number): string | null {
     const r = this.selRect()
     if (!r) return null
+    const p = this.prise
     // une boîte OBLIQUE se redimensionne par ses 4 coins PIVOTÉS : le coin
     // opposé reste cloué, tout se joue dans le repère de la boîte
     if (this.sel?.kind === 'box' && this.level.boxes[this.sel.index]?.angle) {
@@ -748,16 +758,16 @@ export class LevelEditor {
       const hy = (b.maxY - b.minY) / 2
       for (const [code, ux, uy] of LevelEditor.COINS) {
         const c = this.coinOblique(b, ux * hx, uy * hy)
-        const p = this.toScreen(c.x, c.y)
-        if (Math.hypot(sx - p.sx, sy - p.sy) <= HANDLE_PX) return code
+        const ecran = this.toScreen(c.x, c.y)
+        if (Math.hypot(sx - ecran.sx, sy - ecran.sy) <= p) return code
       }
       return null
     }
     const a = this.toScreen(r.minX, r.maxY)
     const b = this.toScreen(r.maxX, r.minY)
-    const near = (v: number, t: number): boolean => Math.abs(v - t) <= HANDLE_PX
-    const withinX = sx >= a.sx - HANDLE_PX && sx <= b.sx + HANDLE_PX
-    const withinY = sy >= a.sy - HANDLE_PX && sy <= b.sy + HANDLE_PX
+    const near = (v: number, t: number): boolean => Math.abs(v - t) <= p
+    const withinX = sx >= a.sx - p && sx <= b.sx + p
+    const withinY = sy >= a.sy - p && sy <= b.sy + p
     if (!withinX || !withinY) return null
     let edge = ''
     if (near(sy, a.sy)) edge += 'N'
@@ -781,6 +791,7 @@ export class LevelEditor {
         // relève, un événement synthétique) : sans gravité — mais la
         // capture ne doit JAMAIS emporter le reste du geste avec elle
       }
+      this.pointeur = e.pointerType === 'mouse' ? 'mouse' : 'tactile'
       const rect = c.getBoundingClientRect()
       const sx = e.clientX - rect.left
       const sy = e.clientY - rect.top
