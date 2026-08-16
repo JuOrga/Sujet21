@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 15:05',
+    title: 'La barre d’outils de l’éditeur était COUPÉE sur iPad — ESSAYER et ACCUEIL hors champ',
+    notes: [
+      'Mesuré, enfin : la barre du haut de l’éditeur réclame 1572 pixels de large. Sur un iPad elle n’en a que 1194 (834 en portrait) — sa partie droite passait tout simplement hors de l’écran, sans défilement ni indice. Les boutons perdus : ESSAYER et ↩ ACCUEIL en paysage ; en portrait s’y ajoutaient FICHIER / JSON, COPIER, EXPORTER, la grille et l’aimant. Elle s’ENROULE désormais sur plusieurs lignes : tout est là, tout de suite, sans rien à deviner.',
+      'La palette de gauche, elle, mesure 1080 pixels dans une colonne de 620 : la moitié des outils (dont l’étiquette et les rails) vit sous la ligne de flottaison. Elle défilait déjà — mais RIEN ne le disait. Des ombres de défilement paraissent maintenant en haut ou en bas de la colonne, seulement quand il reste quelque chose à voir de ce côté.',
+      'Au passage, la réponse à la question : le CLIC DROIT n’ouvre aucune barre d’outils. En jeu il arme le VORTEX (au doigt : le bouton 🌀 de la barre du bas) ; dans l’éditeur il déplace la vue (au doigt : deux doigts).',
+    ],
+  },
+  {
     date: '16/08/2026 14:30',
     title: 'Le dash de vapeur SOUFFLE sa charge — et ce souffle perle sur les parois',
     notes: [
