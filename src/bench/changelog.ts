@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 18:00',
+    title: 'Le retour des égarées : la vie ne baisse plus pour une goutte encore là',
+    notes: [
+      'Le retour de test avait raison, et ma mesure d’hier était trop propre : en conditions réelles, UN SEUL TIR coûtait jusqu’à 7 particules. La goutte tirée s’écrase au mur (perdue, légitimement)… mais le REMOUS du tir détache des voisines qui gisent à deux doigts du corps — et la réabsorption passait par la seule connexité : une goutte à quinze unités du bord ne se reconnectait JAMAIS. La vie baissait pour de la matière encore là, sous vos yeux.',
+      'Le remède : la matière DU CORPS porte désormais une marque — goutte d’éjection, gerbe de péage de vaporisation, fragment arraché par le remous. Son délai de réabsorption purgé, si elle traîne dans le rayon de capture du corps, elle est RAPPELÉE d’elle-même : elle converge, se pose, le corps la reprend. Trop loin ? Perdue là où elle gît — mais la marque reste : passez à portée et elle vous rejoint. Le rappel est antisymétrique (§3.3) : le corps encaisse l’opposé de ce qu’il donne, aucune propulsion gratuite. Pendant que le sas boit, le rappel s’efface devant lui.',
+      'Trois exclusions qui font la règle : le souffle d’un dash n’a pas la marque (chassé = plus à vous, c’est son sens), sa rosée non plus, et les gouttes SEMÉES par le tableau s’attrapent toujours au contact — pas d’aimant à collectables. Le ⟳ du HUD suit la marque : il affiche exactement ce qui reviendra, ni plus ni moins. Deux tests de contrat en plus (le remous rend ses fragments ; les semées restent à leur place) — 187 au vert, et les invariants de quantité de mouvement avec.',
+    ],
+  },
+  {
     date: '16/08/2026 17:00',
     title: 'Sept présets LIVRÉS avec le banc — sept manières de sentir le même fluide',
     notes: [

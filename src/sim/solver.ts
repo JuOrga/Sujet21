@@ -129,6 +129,13 @@ export class FluidSim {
   // rebours l'empêche de flotter indéfiniment : à bout de course, elle perle
   // sur place.
   private readonly souffle: Float32Array // > 0 : secondes de vol restantes
+  // MATIÈRE DU CORPS égarée : goutte éjectée, gerbe de péage, ou fragment
+  // que le remous d'un tir a détaché. Elle reste À VOUS : une fois son délai
+  // purgé, si elle traîne à portée du corps, elle est rappelée d'elle-même —
+  // la vie ne baisse pas pour une goutte qui n'est jamais vraiment partie.
+  // (Les gouttes SEMÉES par le tableau n'ont pas la marque : les
+  // collectables s'attrapent au contact, pas à l'aimant.)
+  private readonly duCorps: Uint8Array
   private readonly iceVxSum: Float32Array
   private readonly iceVySum: Float32Array
   private readonly iceCnt: Int32Array
@@ -252,6 +259,7 @@ export class FluidSim {
     this.gaseous = new Uint8Array(capacity)
     this.welded = new Uint8Array(capacity)
     this.souffle = new Float32Array(capacity)
+    this.duCorps = new Uint8Array(capacity)
     this.iceVxSum = new Float32Array(capacity)
     this.iceVySum = new Float32Array(capacity)
     this.iceCnt = new Int32Array(capacity)
@@ -640,12 +648,11 @@ export class FluidSim {
   // jamais : lui ne revient pas.)
   returningCount(): number {
     if (this.playerCount === 0) return 0
-    const p = this.params
-    const capture = Math.max(this.stats.rmsRadius * 2.5, p.kernelRadius * 6)
+    const capture = this.captureRadius()
     const c2 = capture * capture
     let n = 0
     for (let i = 0; i < this.count; i++) {
-      if (this.kind[i] !== KIND_FREE || this.cooldown[i] <= 0) continue
+      if (this.kind[i] !== KIND_FREE || this.duCorps[i] !== 1) continue
       if (this.frozen[i] === 1 || this.gaseous[i] === 1) continue
       const dx = this.posX[i] - this.stats.centroidX
       const dy = this.posY[i] - this.stats.centroidY
@@ -676,6 +683,7 @@ export class FluidSim {
       this.gasLink[i] = this.gasLink[last]
       this.welded[i] = this.welded[last]
       this.souffle[i] = this.souffle[last]
+      this.duCorps[i] = this.duCorps[last]
     }
     this.count = last
   }
@@ -697,6 +705,7 @@ export class FluidSim {
     this.gasLink[i] = 0
     this.welded[i] = 0
     this.souffle[i] = 0
+    this.duCorps[i] = 0
     if (kind === KIND_PLAYER) this.playerCount++
     return i
   }
@@ -781,6 +790,7 @@ export class FluidSim {
       this.posY[best] += dirY * p.kernelRadius * 0.8
       this.kind[best] = KIND_FREE
       this.cooldown[best] = p.reabsorbCooldown
+      this.duCorps[best] = 1
       this.playerCount--
 
       // Entraînement du voisinage : le liquide voisin CONVERGE vers le point
@@ -975,6 +985,7 @@ export class FluidSim {
       this.posY[i] += uy * p.kernelRadius * 0.8
       this.kind[i] = KIND_FREE
       this.cooldown[i] = p.reabsorbCooldown
+      this.duCorps[i] = 1 // gerbe de péage : votre matière, elle peut revenir
       this.playerCount--
       dvxSum += dvx
       dvySum += dvy
@@ -1059,6 +1070,7 @@ export class FluidSim {
         this.velY[i] = ey * vSouffle
         this.kind[i] = KIND_FREE
         this.cooldown[i] = p.reabsorbCooldown
+        this.duCorps[i] = 0 // chassé : ce souffle ne vous appartient plus
         this.souffle[i] = 4 // 4 s de vol : le temps de traverser une salle
         this.playerCount--
       }
@@ -1243,6 +1255,7 @@ export class FluidSim {
     permuteI(this.gaseous)
     permuteI(this.welded)
     permuteF(this.souffle)
+    permuteI(this.duCorps)
     permuteI(this.labels)
     permuteI(this.iceLabels)
     permuteI(this.contactMat)
@@ -1590,6 +1603,10 @@ export class FluidSim {
     // gouttelettes qui redeviennent eau sont rappelées vers le corps
     this.applyCondenseRegroup(dt)
 
+    // 5bis-b2. Le retour des égarées : la matière du corps encore à portée
+    // revient d'elle-même une fois son délai purgé
+    this.applyStrayRecall(dt)
+
     // 5bis-c. La vapeur n'est pas un état de croisière : être gaz s'évapore
     // en continu, et les mailles d'une grille essorent le nuage au passage
     this.processGasCosts(dt)
@@ -1761,6 +1778,75 @@ export class FluidSim {
     }
   }
 
+  // Rayon de capture du corps : le voisinage où la matière égarée compte
+  // encore comme « à portée » — le même pour le rappel et pour le HUD (⟳),
+  // pour que la promesse d'affichage soit exactement la portée du retour.
+  private captureRadius(): number {
+    const p = this.params
+    return Math.max(this.stats.rmsRadius * 2.5, p.kernelRadius * 6)
+  }
+
+  // LE RETOUR DES ÉGARÉES. Une goutte d'éjection qui n'est jamais vraiment
+  // partie, une gerbe de péage retombée sur place, un fragment détaché par
+  // le remous d'un tir : cette matière est marquée DU CORPS. Son délai
+  // purgé, si elle traîne dans le rayon de capture, elle est rappelée
+  // d'elle-même — la réabsorption par simple connexité laissait des gouttes
+  // gésir à deux doigts du corps, jamais reprises, et la vie baissait pour
+  // une matière encore là. Les gouttes SEMÉES par le tableau n'ont pas la
+  // marque : les collectables s'attrapent au contact, comme avant. Pendant
+  // que le sas boit, le rappel s'efface devant lui.
+  private applyStrayRecall(dt: number): void {
+    const p = this.params
+    if (this.playerCount === 0 || this.drainOn) return
+    const cx = this.stats.centroidX
+    const cy = this.stats.centroidY
+    const capture = this.captureRadius()
+    const c2 = capture * capture
+    let impX = 0
+    let impY = 0
+    for (let i = 0; i < this.count; i++) {
+      if (this.duCorps[i] !== 1 || this.kind[i] === KIND_PLAYER) continue
+      if (this.cooldown[i] > 0 || this.frozen[i] === 1 || this.gaseous[i] === 1) continue
+      const dx = cx - this.posX[i]
+      const dy = cy - this.posY[i]
+      const d2 = dx * dx + dy * dy
+      if (d2 > c2) continue // trop loin : perdue là où elle gît — allez la chercher
+      const d = Math.sqrt(d2)
+      if (d < 1e-3) continue
+      // même asservissement en vitesse que le rappel de condensation : la
+      // goutte converge et se pose, sans être catapultée
+      const ux = dx / d
+      const uy = dy / d
+      const vTarget = Math.min(p.condenseRegroup, d * 2.5)
+      const vRadial = this.velX[i] * ux + this.velY[i] * uy
+      const k = Math.min(1, 5 * dt)
+      const ivx = (vTarget - vRadial) * ux * k
+      const ivy = (vTarget - vRadial) * uy * k
+      this.velX[i] += ivx
+      this.velY[i] += ivy
+      impX += ivx
+      impY += ivy
+    }
+    // Antisymétrie (§3.3) : le corps encaisse l'opposé de ce qu'il donne aux
+    // égarées — la quantité de mouvement d'ensemble est conservée exactement,
+    // le rappel n'est pas une propulsion gratuite.
+    if (impX !== 0 || impY !== 0) {
+      let libres = 0
+      for (let i = 0; i < this.count; i++) {
+        if (this.kind[i] === KIND_PLAYER && this.frozen[i] === 0) libres++
+      }
+      if (libres > 0) {
+        const rx = -impX / libres
+        const ry = -impY / libres
+        for (let i = 0; i < this.count; i++) {
+          if (this.kind[i] !== KIND_PLAYER || this.frozen[i] === 1) continue
+          this.velX[i] += rx
+          this.velY[i] += ry
+        }
+      }
+    }
+  }
+
   private readonly scratchCP: ClosestPoint = { dist: 0, nx: 0, ny: 0 }
 
   // Pousse les particules hors des solides et enregistre le contact (normale,
@@ -1871,6 +1957,7 @@ export class FluidSim {
       if (gaz && mat >= 0 && mat !== MAT_MEMBRANE && this.kind[i] !== KIND_PLAYER) {
         this.gaseous[i] = 0
         this.souffle[i] = 0
+        this.duCorps[i] = 0 // la rosée du souffle s'attrape au contact, pas à l'aimant
         this.vapor[i] = 0
         // la trace « était vapeur » est effacée : sans cela le rappel de
         // condensation (condenseRegroup) ramènerait la goutte vers le corps
@@ -2511,8 +2598,12 @@ export class FluidSim {
     for (let i = 0; i < n; i++) {
       if (labels[i] === playerLabel && this.cooldown[i] <= 0) {
         this.kind[i] = KIND_PLAYER
+        this.duCorps[i] = 0 // reprise : la marque d'égarement s'efface
         count++
       } else {
+        // un fragment que le remous vient de DÉTACHER reste du corps : sans
+        // la marque, la vie baisse pour une matière qui gît à deux doigts
+        if (this.kind[i] === KIND_PLAYER) this.duCorps[i] = 1
         this.kind[i] = KIND_FREE
       }
     }
