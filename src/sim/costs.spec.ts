@@ -100,16 +100,20 @@ describe('La goutte d’éjection — perdue seulement si elle SORT vraiment', (
     sim.step(DEFAULT_PARAMS.dt)
   }
 
-  it('restée dans la flaque : rendue au corps à l’échéance du délai — un PRÊT, pas une perte', () => {
-    const sim = arme(500) // tir mou, visé dans la masse : la goutte ne perce pas
+  it('bloquée par un mur au départ : rendue au corps à l’échéance — un PRÊT, pas une perte', () => {
+    // L'éjection part désormais TOUJOURS de la surface : la goutte qui « ne
+    // sort pas » est celle qu'un mur tout proche renvoie dans la flaque.
+    const sim = arme(500)
+    sim.setLevel([{ minX: 48, minY: -500, maxX: 100, maxY: 500, material: 0 }], [])
+    for (let s = 0; s < 30; s++) sim.step(DEFAULT_PARAMS.dt)
     const avant = sim.playerCount
-    sim.eject(sim.stats.centroidX + 10, sim.stats.centroidY, DEFAULT_PARAMS.dt * 4)
+    sim.eject(sim.stats.centroidX + 400, sim.stats.centroidY, DEFAULT_PARAMS.dt * 4)
     expect(sim.playerCount).toBe(avant - 1)
-    // pendant le délai : elle compte EN RETOUR (le HUD la montre à part)
-    for (let s = 0; s < Math.round(0.5 / DEFAULT_PARAMS.dt); s++) pas(sim)
+    // pendant le délai : renvoyée par le mur, elle compte EN RETOUR
+    for (let s = 0; s < Math.round(0.6 / DEFAULT_PARAMS.dt); s++) pas(sim)
     expect(sim.returningCount()).toBe(1)
-    // à l'échéance : le corps la reprend, bilan intact
-    for (let s = 0; s < Math.round(1.5 / DEFAULT_PARAMS.dt); s++) pas(sim)
+    // à l'échéance : le rappel la ramène, bilan intact
+    for (let s = 0; s < Math.round(2.5 / DEFAULT_PARAMS.dt); s++) pas(sim)
     expect(sim.playerCount).toBe(avant)
     expect(sim.returningCount()).toBe(0)
   })
