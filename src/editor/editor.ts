@@ -32,6 +32,17 @@ import {
   type ZoneForce,
 } from '../game/level'
 import { TABLEAU_HUB } from '../game/hub'
+import {
+  ARC_EPAISSEUR_DEFAUT,
+  ARC_OUVERTURE_DEFAUT,
+  FORME_ARC,
+  FORME_CAPSULE,
+  FORME_COIN,
+  FORME_DISQUE,
+  FORME_NAMES,
+  FORME_RECT,
+  formeOutline,
+} from '../game/formes'
 import { checkLevel, parseLevel, serializeLevel } from '../game/levelIO'
 import { traceLaser } from '../game/laser'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
@@ -73,7 +84,7 @@ const ZONE_COLORS: Record<ZoneForce, string> = {
 
 type Tool =
   | { kind: 'select' }
-  | { kind: 'box'; material: number }
+  | { kind: 'box'; material: number; forme?: number }
   | { kind: 'sponge' }
   | { kind: 'zone'; force: ZoneForce }
   | { kind: 'spawn' }
@@ -951,7 +962,9 @@ export class LevelEditor {
         const morceaux = subtractBoxOblique(perdante, gagnante)
         if (!morceaux) {
           this.status(
-            `Découpe : angles différents (${gagnante.angle ?? 0}° / ${perdante.angle ?? 0}°) — alignez les angles, la découpe exacte n’existe qu’entre parois de même angle.`,
+            perdante.forme || gagnante.forme
+              ? 'Découpe : une des deux pièces est une FORME (disque, capsule, coin, arc) — la découpe exacte n’existe qu’entre rectangles.'
+              : `Découpe : angles différents (${gagnante.angle ?? 0}° / ${perdante.angle ?? 0}°) — alignez les angles, la découpe exacte n’existe qu’entre parois de même angle.`,
           )
           return
         }
@@ -1398,9 +1411,14 @@ export class LevelEditor {
     const r = this.clampToBounds(raw)
     const t = this.tool
     if (t.kind === 'box') {
-      this.level.boxes.push({ ...r, material: t.material })
+      // une FORME éventuelle (disque, capsule, coin, arc) naît avec ses
+      // défauts — orientation et paramètres se règlent dans le panneau
+      this.level.boxes.push({ ...r, material: t.material, ...(t.forme ? { forme: t.forme } : {}) })
       this.sel = { kind: 'box', index: this.level.boxes.length - 1 }
-      this.commit(`${MATERIAL_NAMES[t.material]} posée.`)
+      const nom = t.forme
+        ? `${FORME_NAMES[t.forme]} (${MATERIAL_NAMES[t.material]})`
+        : MATERIAL_NAMES[t.material]
+      this.commit(`${nom} posé(e). Le matériau se change dans le panneau.`)
     } else if (t.kind === 'sponge') {
       const cell = 24
       const sp: SpongeDef = {
@@ -1567,7 +1585,7 @@ export class LevelEditor {
   }
 
   private toolKey(t: Tool): string {
-    if (t.kind === 'box') return `box:${t.material}`
+    if (t.kind === 'box') return t.forme ? `box:${t.material}:${t.forme}` : `box:${t.material}`
     if (t.kind === 'zone') return `zone:${t.force}`
     return t.kind
   }
@@ -1576,7 +1594,11 @@ export class LevelEditor {
     for (const b of Array.from(this.host.querySelectorAll('.ed-tool'))) {
       b.addEventListener('click', () => {
         const key = (b as HTMLElement).dataset.tool ?? 'select'
-        if (key.startsWith('box:')) this.setTool({ kind: 'box', material: Number(key.slice(4)) })
+        if (key.startsWith('box:')) {
+          // « box:matériau » ou « box:matériau:forme » (disque, capsule…)
+          const [mat, forme] = key.slice(4).split(':').map(Number)
+          this.setTool({ kind: 'box', material: mat || 0, ...(forme ? { forme } : {}) })
+        }
         else if (key.startsWith('zone:')) this.setTool({ kind: 'zone', force: key.slice(5) as ZoneForce })
         else if (key === 'sponge') this.setTool({ kind: 'sponge' })
         else if (key === 'spawn') this.setTool({ kind: 'spawn' })
@@ -2035,15 +2057,40 @@ export class LevelEditor {
             .join('') +
           `</select></label>`,
       )
+      // la FORME de la pièce : tout matériau se coule dans tout moule —
+      // la boîte min/max reste la boîte englobante de la forme
+      rows.push(
+        `<label class="ed-f"><span>Forme</span><select id="p-forme">` +
+          [FORME_RECT, FORME_DISQUE, FORME_CAPSULE, FORME_COIN, FORME_ARC]
+            .map((f) => `<option value="${f}"${f === (b.forme ?? 0) ? ' selected' : ''}>${FORME_NAMES[f]}</option>`)
+            .join('') +
+          `</select></label>`,
+      )
       rows.push(numField('X min', 'p-minX', b.minX), numField('X max', 'p-maxX', b.maxX))
       rows.push(numField('Y min', 'p-minY', b.minY), numField('Y max', 'p-maxY', b.maxY))
       rows.push(numField('Angle (°)', 'p-ang', b.angle ?? 0))
+      if ((b.forme ?? 0) === FORME_COIN) {
+        // le coin qui porte l'angle droit : l'hypoténuse regarde à l'opposé
+        const coins = ['Bas-gauche', 'Bas-droit', 'Haut-droit', 'Haut-gauche']
+        rows.push(
+          `<label class="ed-f"><span>Angle droit au coin</span><select id="p-fq0">` +
+            coins
+              .map((n, i) => `<option value="${i}"${i === (((Math.round(b.p0 ?? 0) % 4) + 4) % 4) ? ' selected' : ''}>${n}</option>`)
+              .join('') +
+            `</select></label>`,
+        )
+      }
+      if ((b.forme ?? 0) === FORME_ARC) {
+        rows.push(numField('Épaisseur (%)', 'p-fep', Math.round((b.p0 ?? ARC_EPAISSEUR_DEFAUT) * 100), 1))
+        rows.push(numField('Demi-ouverture (°)', 'p-fouv', b.p1 ?? ARC_OUVERTURE_DEFAUT, 5))
+      }
       if (b.material === MAT_CHAUD) {
         // chaque chaudière règle sa portée d'aura : gros bloc à petite aura…
         rows.push(numField('Aura (× portée)', 'p-aura', b.aura ?? 1, 0.25))
       }
-      if (b.material === MAT_WALL) {
+      if (b.material === MAT_WALL && !(b.forme ?? 0)) {
         // habillage : pur décor, la physique reste celle d'une paroi neutre
+        // (motifs calés sur la boîte : réservé aux rectangles)
         const skins = ['Standard', 'Caissons', 'Conduites', 'Poutrelle', 'Blindage', 'Aération', 'Hublots', 'Écrans', 'Câbles']
         rows.push(
           `<label class="ed-f"><span>Habillage (décor)</span><select id="p-skin">` +
@@ -2133,7 +2180,10 @@ export class LevelEditor {
 
     const kindName =
       s.kind === 'box'
-        ? MATERIAL_NAMES[this.level.boxes[s.index].material]
+        ? MATERIAL_NAMES[this.level.boxes[s.index].material] +
+          ((this.level.boxes[s.index].forme ?? 0) > 0
+            ? ` — ${FORME_NAMES[this.level.boxes[s.index].forme!]}`
+            : '')
         : s.kind === 'zone'
           ? 'Zone d’état'
           : s.kind === 'sponge'
@@ -2191,6 +2241,23 @@ export class LevelEditor {
       const ang = Math.max(-180, Math.min(180, val('p-ang')))
       if (ang) b.angle = ang
       else delete b.angle
+      // la forme : rectangle (0) efface la clé, comme angle/aura/skin ; les
+      // paramètres ne survivent que pour la forme qu'ils décrivent
+      const forme = Math.max(0, Math.min(FORME_ARC, Math.round(val('p-forme'))))
+      const ancienne = b.forme ?? 0
+      if (forme) b.forme = forme
+      else delete b.forme
+      delete b.p0
+      delete b.p1
+      if (forme === FORME_COIN) {
+        const q0 = ((Math.round(forme === ancienne ? val('p-fq0') : 0) % 4) + 4) % 4
+        if (q0) b.p0 = q0
+      } else if (forme === FORME_ARC && forme === ancienne) {
+        const ep = Math.max(0.08, Math.min(1, (val('p-fep') || ARC_EPAISSEUR_DEFAUT * 100) / 100))
+        const ouv = Math.max(15, Math.min(180, val('p-fouv') || ARC_OUVERTURE_DEFAUT))
+        if (ep !== ARC_EPAISSEUR_DEFAUT) b.p0 = ep
+        if (ouv !== ARC_OUVERTURE_DEFAUT) b.p1 = ouv
+      }
       // portée d'aura propre (chaudière) : 1 (ou vide) efface la clé
       if (b.material === MAT_CHAUD) {
         const aura = Math.max(0.25, Math.min(4, val('p-aura') || 1))
@@ -2199,8 +2266,9 @@ export class LevelEditor {
       } else {
         delete b.aura
       }
-      // habillage d'une paroi neutre : 0 (standard) efface la clé
-      if (b.material === MAT_WALL) {
+      // habillage d'une paroi neutre : 0 (standard) efface la clé — et les
+      // motifs étant calés sur la boîte, une forme n'en porte pas
+      if (b.material === MAT_WALL && !(b.forme ?? 0)) {
         const skin = Math.max(0, Math.min(8, Math.round(val('p-skin'))))
         if (skin > 0) b.skin = skin
         else delete b.skin
@@ -2463,13 +2531,51 @@ export class LevelEditor {
       if (box.material === MAT_CHAUD) aura(band * (1 - P.chillHeatFade), '', '2e', [2, 7])
     }
 
-    // surfaces (les obliques pivotent autour de leur centre)
+    // surfaces (les obliques pivotent autour de leur centre) — une FORME se
+    // trace par son contour partagé (formeOutline) : ce que l'éditeur montre
+    // est la silhouette que le shader et la physique évaluent en SDF
     this.level.boxes.forEach((box, bi) => {
-      const p = this.toScreen(box.minX, box.maxY)
-      const q = this.toScreen(box.maxX, box.minY)
       const col = MAT_COLORS[box.material] ?? '#888'
       const gagnant = this.cutWinner === bi
       g.save()
+      if (box.forme) {
+        const pts = formeOutline(box, 64)
+        g.beginPath()
+        for (let i = 0; i < pts.length; i++) {
+          const s = this.toScreen(pts[i].x, pts[i].y)
+          if (i === 0) g.moveTo(s.sx, s.sy)
+          else g.lineTo(s.sx, s.sy)
+        }
+        g.closePath()
+        g.fillStyle = col + '55'
+        g.fill()
+        g.strokeStyle = gagnant ? '#ffd24a' : col
+        g.lineWidth = gagnant ? 3 : 1.5
+        g.stroke()
+        // la boîte englobante en filigrane quand la pièce est sélectionnée :
+        // c'est elle que tiennent les poignées
+        const sel = this.sel
+        if (sel?.kind === 'box' && sel.index === bi) {
+          const p = this.toScreen(box.minX, box.maxY)
+          const q = this.toScreen(box.maxX, box.minY)
+          g.strokeStyle = col + '44'
+          g.lineWidth = 1
+          g.setLineDash([4, 4])
+          if (box.angle) {
+            const cx = (p.sx + q.sx) / 2
+            const cy = (p.sy + q.sy) / 2
+            g.translate(cx, cy)
+            g.rotate((-box.angle * Math.PI) / 180)
+            g.translate(-cx, -cy)
+          }
+          g.strokeRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
+          g.setLineDash([])
+        }
+        g.restore()
+        return
+      }
+      const p = this.toScreen(box.minX, box.maxY)
+      const q = this.toScreen(box.maxX, box.minY)
       if (box.angle) {
         const cx = (p.sx + q.sx) / 2
         const cy = (p.sy + q.sy) / 2

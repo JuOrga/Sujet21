@@ -32,6 +32,40 @@ describe('levelIO — aller-retour JSON', () => {
     expect(rejets).toHaveLength(2)
   })
 
+  it('les formes survivent à l’aller-retour, bornées, défauts effacés', () => {
+    const { level, rejets } = parseLevel({
+      name: 'Formes',
+      bounds: { minX: -1000, minY: -600, maxX: 1000, maxY: 600 },
+      boxes: [
+        { minX: 0, minY: 0, maxX: 100, maxY: 100, material: 0, forme: 1 }, // disque
+        { minX: 0, minY: 0, maxX: 100, maxY: 100, material: 4, forme: 4, p0: 0.5, p1: 120 }, // arc réglé
+        { minX: 0, minY: 0, maxX: 100, maxY: 100, material: 2, forme: 3, p0: 2 }, // coin orienté
+        { minX: 0, minY: 0, maxX: 100, maxY: 100, material: 0, forme: 4, p0: 0.35, p1: 90 }, // arc aux défauts
+        { minX: 0, minY: 0, maxX: 100, maxY: 100, material: 0, forme: 99, p0: 7 }, // forme inconnue
+        { minX: 0, minY: 0, maxX: 100, maxY: 100, material: 0, forme: 2, skin: 3 }, // le skin est rect-only
+      ],
+    })
+    expect(rejets).toEqual([])
+    const bx = level!.boxes
+    expect(bx[0]).toMatchObject({ forme: 1 })
+    expect(bx[0].p0).toBeUndefined()
+    expect(bx[1]).toMatchObject({ forme: 4, p0: 0.5, p1: 120 })
+    expect(bx[2]).toMatchObject({ forme: 3, p0: 2 })
+    // les défauts d'arc n'encombrent pas le fichier
+    expect(bx[3].forme).toBe(4)
+    expect(bx[3].p0).toBeUndefined()
+    expect(bx[3].p1).toBeUndefined()
+    // forme inconnue : retour au rectangle, paramètres balayés
+    expect(bx[4].forme).toBeUndefined()
+    expect(bx[4].p0).toBeUndefined()
+    // l'habillage est calé sur la boîte : une forme n'en porte pas
+    expect(bx[5].forme).toBe(2)
+    expect(bx[5].skin).toBeUndefined()
+    // et l'aller-retour est stable
+    const again = parseLevel(JSON.parse(serializeLevel(level!)))
+    expect(again.level!.boxes).toEqual(bx)
+  })
+
   it('refuse un document qui n’est pas un tableau', () => {
     expect(parseLevel('bonjour').level).toBeNull()
     expect(parseLevel({ bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 } }).level).toBeNull()

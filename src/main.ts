@@ -1112,6 +1112,11 @@ let decorRiche = localStorage.getItem('sujet21-decor') !== 'sobre'
 // bras du test A/B : si c'est le rendu du liquide qui pèse, c'est CE
 // réglage qui fera bouger les chiffres, pas celui du décor.
 let eauRiche = localStorage.getItem('sujet21-eau') !== 'sobre'
+// Éclairage de la PIÈCE : une lampe par cuve, des ombres portées cuites dans
+// une carte de lumière (recalculée seulement au changement de décor) et un
+// biseau directionnel sur les arêtes — du relief pour presque rien. ACTIF
+// par défaut, débranchable ici même ; l'éclairage du volume viendra après.
+let lumiereActive = localStorage.getItem('sujet21-lumiere') !== 'off'
 const paramsEl = document.getElementById('params') as HTMLDivElement
 {
   const choix = document.getElementById('params-fps') as HTMLDivElement
@@ -1298,6 +1303,30 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     }
   }
   renderEau()
+
+  const choixLumiere = document.getElementById('params-lumiere') as HTMLDivElement | null
+  if (choixLumiere) {
+    const renderLumiere = (): void => {
+      choixLumiere.innerHTML = ''
+      for (const [on, label] of [
+        [true, 'ACTIF'],
+        [false, 'COUPÉ'],
+      ] as const) {
+        const b = document.createElement('button')
+        b.type = 'button'
+        b.textContent = label
+        b.className = lumiereActive === on ? 'actif' : ''
+        b.addEventListener('click', () => {
+          lumiereActive = on
+          localStorage.setItem('sujet21-lumiere', on ? 'on' : 'off')
+          perf.reset()
+          renderLumiere()
+        })
+        choixLumiere.appendChild(b)
+      }
+    }
+    renderLumiere()
+  }
 }
 
 // ---- Rapport de performance : mesurer la VRAIE machine, analyser à distance ----
@@ -1325,6 +1354,7 @@ function rapportPerf(): Record<string, unknown> {
       resolutionDynamique: resDynamique(),
       graphismes: decorRiche ? 'riches' : 'sobres',
       liquide: eauRiche ? 'riche' : 'sobre',
+      eclairage: lumiereActive ? 'actif' : 'coupe',
       moteur: sim.moteurWasm ? 'wasm' : noyauxWasm ? 'javascript' : 'javascript (wasm non chargé)',
       rattrapage: rattrapageFluide ? 'fluidite' : 'temps-reel',
       simHz,
@@ -1778,10 +1808,6 @@ function openEditor(): void {
   editor.open()
 }
 document.getElementById('start-editor')!.addEventListener('click', () => openEditor())
-if (new URLSearchParams(location.search).has('editeur')) {
-  hasPlayed = true
-  openEditor()
-}
 // ---- Le panneau COMMANDES : trois onglets (PC, manette, tactile) ----
 // Les commandes ont quitté la fiche : un bouton, un panneau, trois écrans.
 const cmdsEl = document.getElementById('cmds') as HTMLDivElement
@@ -1878,6 +1904,13 @@ fetch('/noyaux.wasm')
 const renderer = new Renderer(canvas, CAPACITY)
 const loop = new FixedLoop()
 const input = new Input()
+// Ouverture directe par ?editeur — APRÈS la naissance d'input : openEditor
+// met le jeu en pause via input, l'appeler plus haut plantait tout le
+// module au premier lancement (TDZ) et laissait une page à moitié câblée.
+if (new URLSearchParams(location.search).has('editeur')) {
+  hasPlayed = true
+  openEditor()
+}
 // CRYOSTASE : tant que l'éveil n'a pas été joué, l'échantillon attend GELÉ
 // dès le premier pixel — même en dérive derrière la fiche. Le premier
 // contact visuel avec le sujet 21, c'est un bloc de glace.
@@ -3721,6 +3754,7 @@ function frame(now: number): void {
     level.zones ?? [],
     decorRiche ? 1 : 0,
     eauRiche ? 1 : 0,
+    lumiereActive ? 1 : 0,
   )
   const rendRaw = performance.now() - renderT0
   monitor.renderMs += (rendRaw - monitor.renderMs) * 0.08

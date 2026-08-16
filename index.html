@@ -3274,7 +3274,14 @@
           <button type="button" class="ed-tool" data-tool="box:8" title="Seule la GLACE l'écarte — eau et vapeur butent, le laser est absorbé"><i style="background:#9fb9d8"></i>Rideau lamellaire</button>
           <button type="button" class="ed-tool" data-tool="box:9" title="Mur pour le liquide et la glace. Frôlé en VAPEUR : rend UN dash — une seule fois, puis le serpentin s'éteint."><i style="background:#29d8ff"></i>Surchauffeur</button>
           <button type="button" class="ed-tool" data-tool="sponge"><i style="background:#d7ad55"></i>Éponge</button>
-          <button type="button" class="ed-tool" data-tool="cut" title="Chevauchement : cliquez la paroi qui prend le dessus, puis celle qui s'efface — seule la zone commune est rongée"><i style="background:#e86a6a"></i>Découpe</button>
+          <button type="button" class="ed-tool" data-tool="cut" title="Chevauchement : cliquez la paroi qui prend le dessus, puis celle qui s'efface — seule la zone commune est rongée (rectangles droits ou de même angle seulement)"><i style="background:#e86a6a"></i>Découpe</button>
+        </div>
+        <div class="ed-group">
+          <span class="k">Formes</span>
+          <button type="button" class="ed-tool" data-tool="box:0:1" title="Ellipse inscrite dans la boîte tracée (cercle si carrée). Le matériau se change ensuite dans le panneau — hublot rond, plot gelé, bulle chauffante…"><i style="border-radius:50%;background:#4a6b80"></i>Disque</button>
+          <button type="button" class="ed-tool" data-tool="box:0:2" title="Pilule aux bouts ronds, couchée sur le grand axe de la boîte. Matériau au choix dans le panneau."><i style="border-radius:6px;background:#4a6b80"></i>Capsule</button>
+          <button type="button" class="ed-tool" data-tool="box:0:3" title="Triangle rectangle : la moitié de la boîte, coupée sur la diagonale — une rampe, un chanfrein. Le coin de l'angle droit se choisit dans le panneau."><i style="background:linear-gradient(45deg,#4a6b80 50%,transparent 50%)"></i>Coin</button>
+          <button type="button" class="ed-tool" data-tool="box:0:4" title="Arc d'anneau aux bouts ronds — conduite courbe, alcôve, déflecteur. Épaisseur et ouverture dans le panneau ; à 100 % d'épaisseur : un camembert. La rotation l'oriente."><i style="border-radius:50%;background:transparent;border:3px solid #4a6b80"></i>Arc</button>
         </div>
         <div class="ed-group">
           <span class="k">Zones d’état</span>
@@ -3501,6 +3508,15 @@
             envoyez un rapport dans chaque mode.
           </div>
           <div id="params-eau" class="params-choix" role="group" aria-label="Graphismes du liquide"></div>
+          <div class="params-nom" style="margin-top: 16px">ÉCLAIRAGE DE LA PIÈCE</div>
+          <div class="params-desc">
+            Actif (défaut) : une lampe éclaire la cuve, les obstacles portent des
+            ombres douces et leurs arêtes prennent du relief. Les ombres sont
+            précalculées une fois par tableau : le coût par image est minime.
+            Coupé : l'éclairage disparaît entièrement — le réglage de secours
+            des machines les plus modestes.
+          </div>
+          <div id="params-lumiere" class="params-choix" role="group" aria-label="Éclairage de la pièce"></div>
           <div class="params-nom" style="margin-top: 16px">COMPTEUR D'IMAGES PAR SECONDE</div>
           <div class="params-desc">
             Affiché : la cadence mesurée reste en permanence dans le coin de

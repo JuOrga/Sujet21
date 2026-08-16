@@ -8,6 +8,7 @@ import { KIND_PLAYER } from '../sim/solver'
 import type { SimParams } from '../sim/params'
 import { zonePhases } from '../game/level'
 import type { DecalDef, ObstacleBox, ZoneDef } from '../game/level'
+import { ARC_EPAISSEUR_DEFAUT, ARC_OUVERTURE_DEFAUT, FORME_ARC, FORME_COIN, FORME_RECT } from '../game/formes'
 import type { Camera } from './camera'
 
 // Budgets de rendu : au-delà, les éléments excédentaires ne sont plus
@@ -96,6 +97,74 @@ void main() {
   gl_Position = vec4(pos, 0.0, 1.0);
 }`
 
+// ---- Formes d'obstacle, côté GPU (le miroir GLSL de src/game/formes.ts) ----
+// La forme et ses paramètres voyagent EMPAQUETÉS dans le slot matériau
+// (uBoxAux.x) : code = mat + 16·forme + 128·q0 + 16384·q1 — des entiers
+// exacts en float32, zéro uniforme de plus (le budget mobile est déjà plein).
+// q0 : orientation du coin (0..3) ou épaisseur d'arc ×100 ; q1 : demi-
+// ouverture d'arc en degrés.
+const FORMES_GLSL = `
+vec4 decodeAux(float code) { // (matériau, forme, q0, q1)
+  float q1 = floor(code / 16384.0);
+  code -= q1 * 16384.0;
+  float q0 = floor(code / 128.0);
+  code -= q0 * 128.0;
+  float forme = floor(code / 16.0);
+  return vec4(code - forme * 16.0, forme, q0, q1);
+}
+
+// distance signée à une forme (négatif dedans), dans le repère LOCAL de la
+// boîte (déjà dépivotée) — les mêmes formules que formes.ts, à l'identique
+float formeSdf(vec2 w, vec4 b, float forme, float q0, float q1) {
+  vec2 c = (b.xy + b.zw) * 0.5;
+  vec2 half_ = max((b.zw - b.xy) * 0.5, vec2(1e-6));
+  vec2 p = w - c;
+  if (forme < 0.5) { // rectangle
+    vec2 q = abs(p) - half_;
+    return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+  }
+  if (forme < 1.5) { // disque : ellipse inscrite (SDF approché, cercle exact)
+    float k0 = length(p / half_);
+    if (k0 < 1e-6) return -min(half_.x, half_.y);
+    float k1 = length(p / (half_ * half_));
+    return k0 * (k0 - 1.0) / k1;
+  }
+  if (forme < 2.5) { // capsule : segment sur le grand axe, bouts ronds
+    float r = min(half_.x, half_.y);
+    vec2 a = max(half_ - vec2(r), 0.0);
+    return length(p - clamp(p, -a, a)) - r;
+  }
+  if (forme < 3.5) { // coin : la moitié triangulaire de la boîte (q0 = 0..3)
+    vec2 A; vec2 B; vec2 C;
+    if (q0 < 0.5)      { A = vec2(-half_.x, -half_.y); B = vec2( half_.x, -half_.y); C = vec2(-half_.x,  half_.y); }
+    else if (q0 < 1.5) { A = vec2( half_.x, -half_.y); B = vec2( half_.x,  half_.y); C = vec2(-half_.x, -half_.y); }
+    else if (q0 < 2.5) { A = vec2( half_.x,  half_.y); B = vec2(-half_.x,  half_.y); C = vec2( half_.x, -half_.y); }
+    else               { A = vec2(-half_.x,  half_.y); B = vec2(-half_.x, -half_.y); C = vec2( half_.x,  half_.y); }
+    vec2 e0 = B - A; vec2 v0 = p - A;
+    vec2 e1 = C - B; vec2 v1 = p - B;
+    vec2 e2 = A - C; vec2 v2 = p - C;
+    vec2 pq0 = v0 - e0 * clamp(dot(v0, e0) / dot(e0, e0), 0.0, 1.0);
+    vec2 pq1 = v1 - e1 * clamp(dot(v1, e1) / dot(e1, e1), 0.0, 1.0);
+    vec2 pq2 = v2 - e2 * clamp(dot(v2, e2) / dot(e2, e2), 0.0, 1.0);
+    float s = sign(e0.x * e2.y - e0.y * e2.x);
+    vec2 dd = min(min(vec2(dot(pq0, pq0), s * (v0.x * e0.y - v0.y * e0.x)),
+                      vec2(dot(pq1, pq1), s * (v1.x * e1.y - v1.y * e1.x))),
+                      vec2(dot(pq2, pq2), s * (v2.x * e2.y - v2.y * e2.x)));
+    return -sqrt(dd.x) * sign(dd.y);
+  }
+  // arc d'anneau aux bouts ronds : rayon = le petit demi-côté, épaisseur
+  // q0/100, demi-ouverture q1 (°) autour de +x — à épaisseur 1 : camembert
+  float R = min(half_.x, half_.y);
+  float ep = clamp(q0 / 100.0, 0.08, 1.0);
+  float rm = R * (1.0 - ep * 0.5);
+  float ht = R * ep * 0.5;
+  float ouv = radians(q1);
+  float th = atan(p.y, p.x);
+  if (abs(th) <= ouv) return abs(length(p) - rm) - ht;
+  vec2 e = rm * vec2(cos(ouv), sin(ouv) * sign(th));
+  return length(p - e) - ht;
+}`
+
 const COMPOSE_FS = `#version 300 es
 precision highp float;
 #define MAX_BOXES 96
@@ -178,14 +247,22 @@ uniform float uHasPhile;
 uniform float uHasIris;
 uniform float uHasHull; // la passe coque texturée remplace la bande procédurale
 // Images de zones : la CAUSE peinte (hublot fendu, conduite rompue, rampe de
-// buses). Chargées sans mipmaps : elles s'échantillonnent dans une branche
-// non uniforme (l'intérieur de la zone), où les dérivées sont indéfinies.
-uniform sampler2D uTexZoneHublot;
-uniform float uHasZoneHublot;
-uniform sampler2D uTexZoneConduite;
-uniform float uHasZoneConduite;
-uniform sampler2D uTexZoneBuses;
-uniform float uHasZoneBuses;
+// buses). Sans mipmaps : elles s'échantillonnent dans une branche non
+// uniforme (l'intérieur de la zone), où les dérivées sont indéfinies.
+// TABLEAU de textures (calques : 0 buses/eau, 1 hublot/glace, 2 conduite/
+// vapeur) : une seule unité au lieu de trois — les 16 unités garanties
+// étaient toutes prises, la carte de lumière avait besoin de la place.
+uniform mediump sampler2DArray uTexZones;
+uniform vec3 uHasZones; // x buses (eau), y hublot (glace), z conduite (vapeur)
+// Éclairage de la pièce : carte de lumière PRÉCALCULÉE en espace monde
+// (visibilité × retombée, recalculée au changement de décor seulement) —
+// le coût par image se réduit à une lecture de texture. uLumiere la
+// débranche entièrement (bouton PARAMÈTRES, comme uDecor/uEau).
+uniform float uLumiere;
+uniform vec2 uLightPos;
+uniform vec2 uLightMapMin;     // coin bas-gauche de la carte (monde)
+uniform vec2 uLightMapInvSize; // 1 / taille monde de la carte
+uniform sampler2D uLightMap;
 out vec4 outColor;
 
 float gridLine(vec2 world, float spacing, float widthWorld) {
@@ -422,6 +499,7 @@ float boxSdf(vec2 world, vec4 b) {
   vec2 q = abs(world - c) - half_;
   return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
 }
+${FORMES_GLSL}
 
 void main() {
   vec2 uv = gl_FragCoord.xy / uCanvasSize;
@@ -492,6 +570,19 @@ void main() {
   tank += vec3(0.07, 0.12, 0.17) * gridLine(world, 500.0, lw * 1.6) * 0.45 * gridDim;
   // halo le long des parois : la cuve est éclairée par sa coque
   tank += vec3(0.020, 0.045, 0.060) * exp(min(0.0, roomD) * 0.02);
+  // Éclairage de la pièce : la carte précalculée (visibilité × retombée)
+  // module le FOND — les ombres portées se couchent sur la cuve, les blocs
+  // eux-mêmes restent éclairés (leur relief vient du biseau directionnel).
+  // Appliqué AVANT la vie du vaisseau : les veilleuses sont des lumières,
+  // elles n'ont pas à subir l'ombre de la lampe principale.
+  if (uLumiere > 0.5) {
+    vec2 luv = (world - uLightMapMin) * uLightMapInvSize;
+    float lm = texture(uLightMap, clamp(luv, 0.0, 1.0)).r;
+    // léger voile chaud côté lumière, bleu d'ombre à l'opposé : la teinte
+    // suit la retombée, la hiérarchie (vide < cuve) reste intacte
+    tank *= 0.52 + 0.95 * lm;
+    tank += vec3(0.028, 0.030, 0.022) * lm * lm;
+  }
   // la vie du vaisseau : veilleuses, poussières en dérive, respiration
   if (uDecor > 0.5) tank += shipLife(world, uZoom, uTime);
 
@@ -530,7 +621,7 @@ void main() {
     float szn = dz / wz;
     float inZone = 1.0 - step(1.0, szn);         // 1 dedans
     float assetA = 0.0; // alpha de l'illustration à ce fragment
-    float hasZTex = f < 1.5 ? uHasZoneBuses : f < 2.5 ? uHasZoneHublot : uHasZoneConduite;
+    float hasZTex = f < 1.5 ? uHasZones.x : f < 2.5 ? uHasZones.y : uHasZones.z;
     // L'illustration de la cause N'EST PAS tronquée par la lisière : c'est
     // un objet (rampe, conduite, hublot), pas un gaz — elle se dessine
     // entière dans son cadre, même là où la brume ne va pas.
@@ -541,9 +632,8 @@ void main() {
       vec2 fit = vec2(ta, 1.0) * sc;
       vec2 tuv = (world - zc2) / fit + 0.5;
       if (tuv.x > 0.0 && tuv.x < 1.0 && tuv.y > 0.0 && tuv.y < 1.0) {
-        vec4 zt = f < 1.5 ? texture(uTexZoneBuses, tuv)
-                : f < 2.5 ? texture(uTexZoneHublot, tuv)
-                          : texture(uTexZoneConduite, tuv);
+        // calque du tableau de zones : 0 buses (eau), 1 hublot, 2 conduite
+        vec4 zt = texture(uTexZones, vec3(tuv, f - 1.0));
         col = mix(col, zt.rgb * vec3(0.68, 0.76, 0.86), zt.a * 0.92);
         assetA = zt.a;
       }
@@ -613,12 +703,14 @@ void main() {
       wb = bc + vec2(bca * rel.x + bsa * rel.y, -bsa * rel.x + bca * rel.y);
     }
     float d = boxSdf(wb, uBoxes[bi]);
-    float mat = uBoxAux[bi].x;
+    vec4 dec = decodeAux(uBoxAux[bi].x);
+    float mat = dec.x;
     // Court-circuit : au-delà de toute influence visuelle (ombre 56 u, arête,
     // aura selon le matériau), la boîte ne peut plus teinter ce pixel — on
     // saute remplissage, bruit et mélanges. Sur un tableau à 30-40 boîtes,
     // chaque pixel n'en paie plus que les 1-2 qui le concernent. Le SAS garde
-    // son grand rayon d'aspiration : jamais coupé.
+    // son grand rayon d'aspiration : jamais coupé. Le rejet se fait sur la
+    // BOÎTE englobante : toute forme y est inscrite, il reste conservateur.
     if (mat < 2.5 || mat > 3.5) {
       float reachMax = 56.0;
       if (mat > 0.5 && mat < 2.5) reachMax = max(reachMax, uHydroBand);
@@ -627,6 +719,9 @@ void main() {
       else if (mat > 8.5) reachMax = max(reachMax, 60.0);
       if (d > reachMax + edgeW) continue;
     }
+    // FORME de la pièce : la distance se raffine après le rejet grossier —
+    // remplissage, arête, ombre et auras suivent la vraie silhouette
+    if (dec.y > 0.5) d = formeSdf(wb, uBoxes[bi], dec.y, dec.z, dec.w);
     // Ombre portée douce autour de chaque solide (sauf le sas) : les blocs
     // se détachent du fond au lieu de flotter — la cuve prend de la
     // profondeur, les rectangles cessent d'être des aplats.
@@ -878,6 +973,19 @@ void main() {
         col += vec3(0.15, 0.75, 0.55) * ring * pulse * 0.8;
       }
     }
+    // Relief d'éclairage : un biseau directionnel sur l'arête de chaque
+    // solide — la face tournée vers la lampe s'éclaire, l'opposée plonge.
+    // Le gradient du SDF vient des dérivées d'écran : gratuit, et il suit
+    // n'importe quelle forme. (Le sas, une bouche, ne se biseaute pas.)
+    if (uLumiere > 0.5 && (mat < 2.5 || mat > 3.5)) {
+      vec2 gd = vec2(dFdx(d), dFdy(d));
+      float gn = length(gd);
+      if (gn > 1e-6) {
+        float facing = dot(gd / gn, normalize(uLightPos - world));
+        float bevel = 1.0 - smoothstep(0.0, 30.0, abs(d));
+        col += col * (facing * bevel * 0.30);
+      }
+    }
   }
 
   // Ondes d'éjection : anneaux qui traversent le volume depuis le point
@@ -1003,6 +1111,68 @@ void main() {
   col = mix(col, col * vec3(0.82, 0.92, 1.10), uChill * 0.6);
   col *= 1.0 - 0.12 * uChill;
   outColor = vec4(col, 1.0);
+}`
+
+// Carte de lumière de la pièce : cuite en espace MONDE, à basse résolution,
+// seulement quand le décor change (les obstacles d'un tableau sont figés).
+// Chaque texel marche le long de son rayon vers la lampe (sphere tracing sur
+// le SDF de la scène) : la pénombre vient du passage au ras des solides. La
+// grille et le sas laissent passer la lumière — la même règle que le laser.
+// Par image, le coût retombe à UNE lecture de texture dans la composition.
+const LIGHT_FS = `#version 300 es
+precision highp float;
+#define MAX_BOXES 96
+uniform int uBoxCount;
+uniform vec4 uBoxes[MAX_BOXES];
+uniform vec4 uBoxAux[MAX_BOXES];
+uniform vec2 uMapMin;   // coin bas-gauche de la carte (monde)
+uniform vec2 uMapSize;  // taille de la carte (monde)
+uniform vec2 uMapPx;    // résolution de la carte (texels)
+uniform vec2 uLightPos;
+uniform float uLightReach;
+out vec4 outColor;
+${FORMES_GLSL}
+
+float sceneSdf(vec2 p) {
+  float d = 1e9;
+  for (int i = 0; i < MAX_BOXES; i++) {
+    if (i >= uBoxCount) break;
+    vec4 dec = decodeAux(uBoxAux[i].x);
+    if (dec.x > 2.5 && dec.x < 3.5) continue; // sas : une bouche, pas un mur
+    if (dec.x > 4.5 && dec.x < 5.5) continue; // évent : la lumière passe
+    vec2 wb = p;
+    float ang = uBoxAux[i].y;
+    if (abs(ang) > 0.0005) {
+      vec2 bc = 0.5 * (uBoxes[i].xy + uBoxes[i].zw);
+      vec2 rel = p - bc;
+      float ca = cos(ang);
+      float sa = sin(ang);
+      wb = bc + vec2(ca * rel.x + sa * rel.y, -sa * rel.x + ca * rel.y);
+    }
+    d = min(d, formeSdf(wb, uBoxes[i], dec.y, dec.z, dec.w));
+  }
+  return d;
+}
+
+void main() {
+  vec2 p = uMapMin + (gl_FragCoord.xy / uMapPx) * uMapSize;
+  vec2 toL = uLightPos - p;
+  float distL = max(length(toL), 1e-4);
+  vec2 dir = toL / distL;
+  // ombre douce : le min de k·h/t le long de la marche vers la lampe
+  float res = 1.0;
+  float t = 4.0;
+  for (int k = 0; k < 40; k++) {
+    if (t >= distL || res < 0.004) break;
+    float h = sceneSdf(p + dir * t);
+    res = min(res, 10.0 * h / t);
+    t += clamp(h, 8.0, 200.0);
+  }
+  res = clamp(res, 0.0, 1.0);
+  // retombée douce, à support large : la lampe porte loin, les coins de la
+  // cuve restent lisibles — l'ambiance de la composition fait le plancher
+  float fall = 1.0 - 0.55 * smoothstep(0.0, uLightReach, distL);
+  outColor = vec4(res * fall, 0.0, 0.0, 1.0);
 }`
 
 // Cellules d'éponge : carrés pleins, couleur par état (sèche → gorgée →
@@ -1152,6 +1322,7 @@ export class Renderer {
   private readonly spongeProgram: WebGLProgram
   private readonly hullProgram: WebGLProgram
   private readonly decalProgram: WebGLProgram
+  private readonly lightProgram: WebGLProgram
   private readonly splatVao: WebGLVertexArrayObject
   private readonly splatVbo: WebGLBuffer
   private readonly spongeVao: WebGLVertexArrayObject
@@ -1167,9 +1338,10 @@ export class Renderer {
   private readonly zonePhaseScratch = new Float32Array(MAX_ZONES * 3)
   private texDecalTuyaux: WebGLTexture | null = null
   private texDecalVanne: WebGLTexture | null = null
-  private texZoneHublot: WebGLTexture | null = null
-  private texZoneConduite: WebGLTexture | null = null
-  private texZoneBuses: WebGLTexture | null = null
+  // Tableau de textures des zones (calques : 0 buses/eau, 1 hublot/glace,
+  // 2 conduite/vapeur) : une seule unité de texture pour les trois images.
+  private texZones: WebGLTexture | null = null
+  private readonly hasZones = new Float32Array(3)
   // Textures d'habillage : null tant que l'image n'est pas chargée — le
   // décor procédural assure l'intérim, l'image prend le relais sans à-coup.
   private texStars: WebGLTexture | null = null
@@ -1197,6 +1369,17 @@ export class Renderer {
   private fieldTex: WebGLTexture | null = null
   private fboW = 0
   private fboH = 0
+  // Carte de lumière : cible fixe basse résolution, cuite seulement quand le
+  // décor change — la clé résume boîtes, bornes et lampe.
+  private lightFbo: WebGLFramebuffer | null = null
+  private lightTex: WebGLTexture | null = null
+  private lightW = 0
+  private lightH = 0
+  private lightKey = ''
+  private lightMapMinX = 0
+  private lightMapMinY = 0
+  private lightMapSizeX = 1
+  private lightMapSizeY = 1
   private uniforms: Record<string, Record<string, WebGLUniformLocation | null>> = {}
 
   constructor(canvas: HTMLCanvasElement, capacity: number) {
@@ -1221,12 +1404,14 @@ export class Renderer {
     this.spongeProgram = link(gl, SPONGE_VS, SPONGE_FS)
     this.hullProgram = link(gl, HULL_VS, HULL_FS)
     this.decalProgram = link(gl, DECAL_VS, DECAL_FS)
+    this.lightProgram = link(gl, COMPOSE_VS, LIGHT_FS)
     for (const [name, program] of [
       ['splat', this.splatProgram],
       ['compose', this.composeProgram],
       ['sponge', this.spongeProgram],
       ['hull', this.hullProgram],
       ['decal', this.decalProgram],
+      ['light', this.lightProgram],
     ] as const) {
       const map: Record<string, WebGLUniformLocation | null> = {}
       const count = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS) as number
@@ -1315,10 +1500,44 @@ export class Renderer {
     this.loadTexture('/assets/decal-tuyaux.webp', false, true, (t) => (this.texDecalTuyaux = t))
     this.loadTexture('/assets/decal-vanne.webp', false, true, (t) => (this.texDecalVanne = t))
     // Images de zones : la cause peinte (voir zoneDecor). Sans mipmaps —
-    // échantillonnées dans une branche non uniforme du shader.
-    this.loadTexture('/assets/zone-hublot.webp', false, false, (t) => (this.texZoneHublot = t))
-    this.loadTexture('/assets/zone-conduite.webp', false, false, (t) => (this.texZoneConduite = t))
-    this.loadTexture('/assets/zone-buses.webp', false, false, (t) => (this.texZoneBuses = t))
+    // échantillonnées dans une branche non uniforme du shader. En calques
+    // d'un même tableau de textures : une seule unité pour les trois.
+    this.loadZoneLayer('/assets/zone-buses.webp', 0)
+    this.loadZoneLayer('/assets/zone-hublot.webp', 1)
+    this.loadZoneLayer('/assets/zone-conduite.webp', 2)
+  }
+
+  // Charge une image de zone dans SON calque du tableau de textures. Le
+  // redimensionnement en 1024² passe par un canvas, qui fait aussi le
+  // retournement vertical (UNPACK_FLIP_Y est interdit sur les entrées 3D).
+  private loadZoneLayer(url: string, layer: number): void {
+    const img = new Image()
+    img.onload = () => {
+      const gl = this.gl
+      const cv = document.createElement('canvas')
+      cv.width = 1024
+      cv.height = 1024
+      const c2 = cv.getContext('2d')
+      if (!c2) return
+      c2.translate(0, 1024)
+      c2.scale(1, -1)
+      c2.drawImage(img, 0, 0, 1024, 1024)
+      if (!this.texZones) {
+        this.texZones = gl.createTexture()!
+        gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texZones)
+        gl.texStorage3D(gl.TEXTURE_2D_ARRAY, 1, gl.RGBA8, 1024, 1024, 3)
+        gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+        gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+        gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+        gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+      } else {
+        gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texZones)
+      }
+      gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, layer, 1024, 1024, 1, gl.RGBA, gl.UNSIGNED_BYTE, cv)
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, null)
+      this.hasZones[layer] = 1
+    }
+    img.src = url
   }
 
   private loadTexture(
@@ -1376,6 +1595,86 @@ export class Renderer {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   }
 
+  private ensureLightTarget(w: number, h: number): void {
+    if (w === this.lightW && h === this.lightH && this.lightFbo) return
+    const gl = this.gl
+    if (this.lightTex) gl.deleteTexture(this.lightTex)
+    if (this.lightFbo) gl.deleteFramebuffer(this.lightFbo)
+    this.lightW = w
+    this.lightH = h
+    this.lightTex = gl.createTexture()!
+    gl.bindTexture(gl.TEXTURE_2D, this.lightTex)
+    gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, w, h)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    this.lightFbo = gl.createFramebuffer()!
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.lightFbo)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.lightTex, 0)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+    this.lightKey = '' // nouvelle cible : la carte doit recuire
+  }
+
+  // La lampe de la pièce : au centre, un peu vers le haut de la cuve — assez
+  // haute pour coucher les ombres, assez centrale pour éclairer les routes.
+  private lightPos(bounds: { minX: number; minY: number; maxX: number; maxY: number }): {
+    x: number
+    y: number
+    reach: number
+  } {
+    return {
+      x: (bounds.minX + bounds.maxX) / 2,
+      y: bounds.minY + (bounds.maxY - bounds.minY) * 0.7,
+      reach: Math.hypot(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) * 0.62,
+    }
+  }
+
+  // Cuit la carte de lumière si le décor a changé — les scratchs de boîtes
+  // doivent déjà être remplis. Quelques dizaines de milliers de texels, une
+  // fois par tableau : le prix d'une image, pas d'un régime.
+  private bakeLight(
+    bounds: { minX: number; minY: number; maxX: number; maxY: number },
+    boxes: ObstacleBox[],
+    boxCount: number,
+  ): void {
+    const gl = this.gl
+    const marge = 80
+    const minX = bounds.minX - marge
+    const minY = bounds.minY - marge
+    const sizeX = bounds.maxX - bounds.minX + marge * 2
+    const sizeY = bounds.maxY - bounds.minY + marge * 2
+    const w = 320
+    const h = Math.max(32, Math.min(320, Math.round((w * sizeY) / sizeX)))
+    this.ensureLightTarget(w, h)
+    let key = `${boxCount};${minX},${minY},${sizeX},${sizeY}`
+    for (let i = 0; i < boxCount; i++) {
+      const bx = boxes[i]
+      key += `;${bx.minX},${bx.minY},${bx.maxX},${bx.maxY},${bx.angle ?? 0},${bx.material},${bx.forme ?? 0},${bx.p0 ?? 0},${bx.p1 ?? 0}`
+    }
+    if (key === this.lightKey) return
+    this.lightKey = key
+    this.lightMapMinX = minX
+    this.lightMapMinY = minY
+    this.lightMapSizeX = sizeX
+    this.lightMapSizeY = sizeY
+    const lampe = this.lightPos(bounds)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.lightFbo)
+    gl.viewport(0, 0, w, h)
+    gl.useProgram(this.lightProgram)
+    const lu = this.uniforms['light']
+    gl.uniform1i(lu['uBoxCount'], boxCount)
+    gl.uniform4fv(lu['uBoxes[0]'], this.boxScratch)
+    gl.uniform4fv(lu['uBoxAux[0]'], this.auxScratch)
+    gl.uniform2f(lu['uMapMin'], minX, minY)
+    gl.uniform2f(lu['uMapSize'], sizeX, sizeY)
+    gl.uniform2f(lu['uMapPx'], w, h)
+    gl.uniform2f(lu['uLightPos'], lampe.x, lampe.y)
+    gl.uniform1f(lu['uLightReach'], lampe.reach)
+    gl.drawArrays(gl.TRIANGLES, 0, 3)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+  }
+
   render(
     sim: FluidSim,
     camera: Camera,
@@ -1393,6 +1692,7 @@ export class Renderer {
     zones: ZoneDef[] = [], // régions qui imposent un état
     decor = 1, // 1 décor riche, 0 sobre (bruit décoratif débranché)
     eau = 1, // 1 liquide riche, 0 sobre (relief/miroir de l'eau débranchés)
+    lumiere = 1, // 1 éclairage de la pièce (carte d'ombres), 0 débranché
   ): void {
     const gl = this.gl
     const devW = Math.max(1, Math.round(viewportW * dpr))
@@ -1405,6 +1705,35 @@ export class Renderer {
     const fboW = Math.max(1, Math.round(devW / down))
     const fboH = Math.max(1, Math.round(devH / down))
     this.ensureFieldTarget(fboW, fboH)
+
+    // Boîtes → scratchs, partagés par la composition ET la carte de lumière.
+    // aux.x empaquette matériau + forme + paramètres (voir FORMES_GLSL) :
+    // des entiers exacts en float32, aucun uniforme de plus.
+    const boxCount = Math.min(boxes.length, MAX_BOXES)
+    for (let i = 0; i < boxCount; i++) {
+      const bx = boxes[i]
+      this.boxScratch[i * 4] = bx.minX
+      this.boxScratch[i * 4 + 1] = bx.minY
+      this.boxScratch[i * 4 + 2] = bx.maxX
+      this.boxScratch[i * 4 + 3] = bx.maxY
+      const forme = bx.forme ?? FORME_RECT
+      let q0 = 0
+      let q1 = 0
+      if (forme === FORME_COIN) q0 = ((Math.round(bx.p0 ?? 0) % 4) + 4) % 4
+      else if (forme === FORME_ARC) {
+        q0 = Math.round(Math.min(1, Math.max(0.08, bx.p0 ?? ARC_EPAISSEUR_DEFAUT)) * 100)
+        q1 = Math.round(Math.min(180, Math.max(15, bx.p1 ?? ARC_OUVERTURE_DEFAUT)))
+      }
+      this.auxScratch[i * 4] = bx.material + forme * 16 + q0 * 128 + q1 * 16384
+      this.auxScratch[i * 4 + 1] = ((bx.angle ?? 0) * Math.PI) / 180
+      // aux.z : charge du surchauffeur (le solveur dit lesquels sont vides)
+      // — ou HABILLAGE d'une paroi neutre (1-4), pur décor
+      this.auxScratch[i * 4 + 2] =
+        bx.material === 0 ? (bx.skin ?? 0) : sim.surchauffesVides.has(i) ? 0 : 1
+      this.auxScratch[i * 4 + 3] = bx.aura ?? 1
+    }
+    // La carte de lumière recuit si le décor a changé (sinon : rien)
+    if (lumiere > 0.5) this.bakeLight(sim.bounds, boxes, boxCount)
 
     // Remplissage du buffer de splats
     const n = sim.count
@@ -1474,21 +1803,6 @@ export class Renderer {
     const b = sim.bounds
     gl.uniform2f(cu['uRoomCenter'], (b.minX + b.maxX) * 0.5, (b.minY + b.maxY) * 0.5)
     gl.uniform2f(cu['uRoomHalf'], (b.maxX - b.minX) * 0.5, (b.maxY - b.minY) * 0.5)
-    const boxCount = Math.min(boxes.length, MAX_BOXES)
-    for (let i = 0; i < boxCount; i++) {
-      const bx = boxes[i]
-      this.boxScratch[i * 4] = bx.minX
-      this.boxScratch[i * 4 + 1] = bx.minY
-      this.boxScratch[i * 4 + 2] = bx.maxX
-      this.boxScratch[i * 4 + 3] = bx.maxY
-      this.auxScratch[i * 4] = bx.material
-      this.auxScratch[i * 4 + 1] = ((bx.angle ?? 0) * Math.PI) / 180
-      // aux.z : charge du surchauffeur (le solveur dit lesquels sont vides)
-      // — ou HABILLAGE d'une paroi neutre (1-4), pur décor
-      this.auxScratch[i * 4 + 2] =
-        bx.material === 0 ? (bx.skin ?? 0) : sim.surchauffesVides.has(i) ? 0 : 1
-      this.auxScratch[i * 4 + 3] = bx.aura ?? 1
-    }
     gl.uniform1i(cu['uBoxCount'], boxCount)
     gl.uniform4fv(cu['uBoxes[0]'], this.boxScratch)
     gl.uniform4fv(cu['uBoxAux[0]'], this.auxScratch)
@@ -1502,6 +1816,13 @@ export class Renderer {
     gl.uniform1f(cu['uChill'], chill)
     gl.uniform1f(cu['uDecor'], decor)
     gl.uniform1f(cu['uEau'], eau)
+    // Éclairage de la pièce : la carte cuite + la position de la lampe (le
+    // biseau directionnel des arêtes en a besoin par pixel)
+    gl.uniform1f(cu['uLumiere'], lumiere > 0.5 && this.lightTex ? 1 : 0)
+    const lampe = this.lightPos(sim.bounds)
+    gl.uniform2f(cu['uLightPos'], lampe.x, lampe.y)
+    gl.uniform2f(cu['uLightMapMin'], this.lightMapMinX, this.lightMapMinY)
+    gl.uniform2f(cu['uLightMapInvSize'], 1 / this.lightMapSizeX, 1 / this.lightMapSizeY)
     gl.uniform1i(cu['uWaveCount'], waveCount)
     gl.uniform4fv(cu['uWaves[0]'], waves)
     // Zones d'état : au plus MAX_ZONES par tableau
@@ -1540,9 +1861,15 @@ export class Renderer {
     bindTex(9, this.texFroid, 'uTexFroid', 'uHasFroid')
     bindTex(10, this.texChaud, 'uTexChaud', 'uHasChaud')
     bindTex(11, this.texGrille, 'uTexGrille', 'uHasGrille')
-    bindTex(12, this.texZoneHublot, 'uTexZoneHublot', 'uHasZoneHublot')
-    bindTex(13, this.texZoneConduite, 'uTexZoneConduite', 'uHasZoneConduite')
-    bindTex(14, this.texZoneBuses, 'uTexZoneBuses', 'uHasZoneBuses')
+    // le tableau des zones (12) et la carte de lumière (13) : les unités
+    // libérées par la fusion des trois images de zones en un seul tableau
+    gl.activeTexture(gl.TEXTURE0 + 12)
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texZones)
+    gl.uniform1i(cu['uTexZones'], 12)
+    gl.uniform3f(cu['uHasZones'], this.hasZones[0], this.hasZones[1], this.hasZones[2])
+    gl.activeTexture(gl.TEXTURE0 + 13)
+    gl.bindTexture(gl.TEXTURE_2D, this.lightTex)
+    gl.uniform1i(cu['uLightMap'], 13)
     bindTex(3, this.texPhobe, 'uTexPhobe', 'uHasPhobe')
     bindTex(4, this.texPhile, 'uTexPhile', 'uHasPhile')
     bindTex(5, this.texIris, 'uTexIris', 'uHasIris')
