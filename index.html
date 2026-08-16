@@ -2697,7 +2697,8 @@
         z-index: 40;
         display: none;
         grid-template-columns: 216px 1fr 300px;
-        grid-template-rows: 46px 1fr;
+        /* la barre prend la hauteur qu'il lui faut (elle s'enroule) */
+        grid-template-rows: auto 1fr;
         background: var(--void);
         color: var(--ink);
         font-family: var(--font-mono);
@@ -2705,15 +2706,27 @@
       #editor.visible {
         display: grid;
       }
+      /* La barre d'outils s'ENROULE au lieu de se faire couper. Elle mesure
+         ~1570 px : sur un iPad (1194, et 834 en portrait) sa droite passait
+         hors champ — ESSAYER et ↩ ACCUEIL devenaient introuvables, et un
+         défilement horizontal muet ne s'invente pas. Sur plusieurs lignes,
+         tout est là, tout de suite. */
       .ed-bar {
         grid-column: 1 / -1;
         display: flex;
+        flex-wrap: wrap;
+        align-content: center;
         align-items: center;
-        gap: 10px;
-        padding: 0 14px;
+        gap: 8px 10px;
+        padding: 7px 14px;
         border-bottom: 1px solid var(--line);
         background: rgba(9, 18, 30, 0.9);
-        overflow-x: auto;
+      }
+      /* l'espaceur ne pousse plus rien hors champ quand la barre s'enroule */
+      @media (max-width: 1320px) {
+        .ed-bar .sp {
+          flex: 0 0 0;
+        }
       }
       .ed-bar .ed-title {
         font-family: var(--font-display);
@@ -2758,13 +2771,26 @@
         background: transparent;
         align-self: flex-start;
       }
+      /* La palette mesure ~1080 px : sur un écran court (iPad), la moitié
+         des outils vit sous la ligne de flottaison. La colonne défilait
+         déjà — mais RIEN ne le disait. Ombres de défilement (CSS pur) :
+         un voile paraît en haut ou en bas seulement quand il reste quelque
+         chose à voir de ce côté. On sait qu'il y a une suite. */
       .ed-side {
         border-right: 1px solid var(--line);
         overflow-y: auto;
+        overscroll-behavior: contain;
         padding: 12px;
         display: flex;
         flex-direction: column;
         gap: 14px;
+        background:
+          linear-gradient(var(--void) 30%, rgba(3, 7, 16, 0)) top / 100% 26px local no-repeat,
+          linear-gradient(rgba(3, 7, 16, 0), var(--void) 70%) bottom / 100% 26px local no-repeat,
+          radial-gradient(farthest-side at 50% 0, rgba(99, 183, 230, 0.32), rgba(99, 183, 230, 0))
+            top / 100% 14px scroll no-repeat,
+          radial-gradient(farthest-side at 50% 100%, rgba(99, 183, 230, 0.32), rgba(99, 183, 230, 0))
+            bottom / 100% 14px scroll no-repeat;
       }
       .ed-side--right {
         border-right: none;
