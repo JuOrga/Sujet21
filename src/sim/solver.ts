@@ -632,6 +632,28 @@ export class FluidSim {
     return -1
   }
 
+  // La matière EN RETOUR : gouttes libres, liquides, encore sous délai de
+  // réabsorption mais restées dans le rayon de capture du corps — elles lui
+  // reviendront à l'échéance du délai. Le HUD les montre à part : sans cela,
+  // la baisse passagère de la jauge se lit comme une perte définitive alors
+  // que c'est un prêt. (Le souffle d'un dash, gazeux en vol, n'y figure
+  // jamais : lui ne revient pas.)
+  returningCount(): number {
+    if (this.playerCount === 0) return 0
+    const p = this.params
+    const capture = Math.max(this.stats.rmsRadius * 2.5, p.kernelRadius * 6)
+    const c2 = capture * capture
+    let n = 0
+    for (let i = 0; i < this.count; i++) {
+      if (this.kind[i] !== KIND_FREE || this.cooldown[i] <= 0) continue
+      if (this.frozen[i] === 1 || this.gaseous[i] === 1) continue
+      const dx = this.posX[i] - this.stats.centroidX
+      const dy = this.posY[i] - this.stats.centroidY
+      if (dx * dx + dy * dy <= c2) n++
+    }
+    return n
+  }
+
   // Retrait par échange avec la dernière particule (absorption éponge).
   removeParticle(i: number): void {
     if (this.kind[i] === KIND_PLAYER) this.playerCount--
