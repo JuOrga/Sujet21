@@ -55,9 +55,10 @@ export interface PlayerStats {
 
 
 // Rejet rapide d'une boîte : hors de portée « marge » ? Pour une boîte
-// OBLIQUE, on rejette sur son cercle englobant — conservateur mais sûr.
+// OBLIQUE ou une FORME (toujours inscrite dans sa boîte englobante), on
+// rejette sur le cercle englobant — conservateur mais sûr.
 function horsBoite(
-  b: { minX: number; minY: number; maxX: number; maxY: number; angle?: number },
+  b: { minX: number; minY: number; maxX: number; maxY: number; angle?: number; forme?: number },
   x: number,
   y: number,
   marge: number,
@@ -1730,7 +1731,23 @@ export class FluidSim {
       const dist = p.coldBand * (1 + p.chillColdGrowth * this.chill) * 1.12 + p.particleSpacing
       let x: number
       let y: number
-      if (b.maxX - b.minX > b.maxY - b.minY) {
+      if (b.angle || b.forme) {
+        // plaque oblique ou FORME : la rosée perle sur l'iso-distance du
+        // champ — on part du cercle englobant dans une direction tirée au
+        // sort, puis on marche le long du gradient (Newton sur le SDF)
+        const cx = (b.minX + b.maxX) / 2
+        const cy = (b.minY + b.maxY) / 2
+        const th = r2 * Math.PI * 2
+        const rayon = Math.hypot(b.maxX - b.minX, b.maxY - b.minY) / 2 + dist
+        x = cx + rayon * Math.cos(th)
+        y = cy + rayon * Math.sin(th)
+        const cp = this.scratchCP
+        for (let k = 0; k < 3; k++) {
+          boxContact(x, y, b, cp)
+          x += cp.nx * (dist - cp.dist)
+          y += cp.ny * (dist - cp.dist)
+        }
+      } else if (b.maxX - b.minX > b.maxY - b.minY) {
         // plaque horizontale : rosée au-dessus ou en dessous
         x = b.minX + r2 * (b.maxX - b.minX)
         y = r1 > 0.5 ? b.maxY + dist : b.minY - dist

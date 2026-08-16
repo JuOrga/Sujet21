@@ -27,6 +27,7 @@
 //     il ne se choisit pas : ce n'est pas un quatrième état.
 
 import { MAT_EXIT, MAT_GRILLE, type LaserDef, type ObstacleBox } from './level'
+import { dansForme } from './formes'
 import type { Bounds } from '../sim/solver'
 
 export const LASER_STEP = 5 // u par pas de marche — sous le rayon de glace
@@ -101,7 +102,10 @@ export interface TraceResultat {
   railsSuivis: number[]
 }
 
-function dansRect(x: number, y: number, r: Rect & { angle?: number }): boolean {
+function dansRect(x: number, y: number, r: Rect & { angle?: number; forme?: number; p0?: number; p1?: number }): boolean {
+  // une FORME (disque, capsule, coin, arc) : le signe de son champ — la
+  // marche par pas de 5 u fait le reste, comme pour les rectangles
+  if (r.forme) return dansForme(r, x, y)
   if (r.angle) {
     const cx = (r.minX + r.maxX) / 2
     const cy = (r.minY + r.maxY) / 2

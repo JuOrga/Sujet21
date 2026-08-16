@@ -24,6 +24,7 @@ import {
   type ZoneForce,
 } from './level'
 import { MAX_BOXES, MAX_ZONES } from '../render/renderer'
+import { ARC_EPAISSEUR_DEFAUT, ARC_OUVERTURE_DEFAUT, FORME_ARC, FORME_COIN, FORME_RECT } from './formes'
 
 export const MATERIALS = [
   MAT_WALL,
@@ -72,6 +73,11 @@ function readBox(o: Record<string, unknown>): ObstacleBox | null {
   const aura = num(o.aura, 1)
   // skin : habillage d'une paroi neutre (décor pur, physique inchangée)
   const skin = Math.round(num(o.skin, 0))
+  // forme : rectangle si absente (formes.ts) — clé effacée au défaut, comme
+  // angle/aura/skin ; les paramètres ne survivent que pour la forme concernée
+  const forme = Math.round(num(o.forme, FORME_RECT))
+  const p0 = num(o.p0, forme === FORME_ARC ? ARC_EPAISSEUR_DEFAUT : 0)
+  const p1 = num(o.p1, ARC_OUVERTURE_DEFAUT)
   const box: ObstacleBox = {
     minX: Math.min(minX, maxX),
     minY: Math.min(minY, maxY),
@@ -79,7 +85,17 @@ function readBox(o: Record<string, unknown>): ObstacleBox | null {
     maxY: Math.max(minY, maxY),
     ...(angle ? { angle: Math.max(-180, Math.min(180, angle)) } : {}),
     ...(aura !== 1 && material === MAT_CHAUD ? { aura: Math.max(0.25, Math.min(4, aura)) } : {}),
-    ...(skin > 0 && material === MAT_WALL ? { skin: Math.min(8, skin) } : {}),
+    ...(skin > 0 && material === MAT_WALL && forme === FORME_RECT ? { skin: Math.min(8, skin) } : {}),
+    ...(forme > FORME_RECT && forme <= FORME_ARC ? { forme } : {}),
+    ...(forme === FORME_COIN && Math.round(p0) !== 0
+      ? { p0: ((Math.round(p0) % 4) + 4) % 4 }
+      : {}),
+    ...(forme === FORME_ARC && p0 !== ARC_EPAISSEUR_DEFAUT
+      ? { p0: Math.max(0.08, Math.min(1, p0)) }
+      : {}),
+    ...(forme === FORME_ARC && p1 !== ARC_OUVERTURE_DEFAUT
+      ? { p1: Math.max(15, Math.min(180, p1)) }
+      : {}),
     material,
   }
   if (box.maxX - box.minX < 1 || box.maxY - box.minY < 1) return null

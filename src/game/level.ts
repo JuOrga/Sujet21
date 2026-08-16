@@ -3,6 +3,7 @@
 // Les obstacles sont de la chimie, pas de la géométrie (§6).
 
 import type { Bounds } from '../sim/solver'
+import { dansForme } from './formes'
 
 export const MAT_WALL = 0
 export const MAT_HYDROPHILE = 1
@@ -30,6 +31,13 @@ export interface ObstacleBox {
   // Habillage d'une PAROI neutre (décor pur, physique inchangée) :
   // 0/absent standard, 1 caissons, 2 conduites, 3 poutrelle, 4 blindage
   skin?: number
+  // FORME de la pièce (formes.ts) : absent/0 rectangle — le chemin rapide.
+  // 1 disque (ellipse inscrite), 2 capsule, 3 coin (triangle), 4 arc.
+  // La boîte min/max reste la boîte englobante : budget, picking et
+  // sérialisation ne changent pas.
+  forme?: number
+  p0?: number // COIN : orientation 0..3 · ARC : épaisseur relative 0..1
+  p1?: number // ARC : demi-ouverture en degrés
 }
 
 /** Le point (x, y) ramené dans le repère LOCAL d'une boîte oblique. */
@@ -49,14 +57,13 @@ export function versLocalBoite(
   return { x: cx + rx * ca + ry * sa, y: cy - rx * sa + ry * ca }
 }
 
-/** Le point (x, y) est-il dans la boîte, rotation comprise ? */
+/** Le point (x, y) est-il dans la pièce, rotation et FORME comprises ? */
 export function dansBoite(
-  b: { minX: number; minY: number; maxX: number; maxY: number; angle?: number },
+  b: { minX: number; minY: number; maxX: number; maxY: number; angle?: number; forme?: number; p0?: number; p1?: number },
   x: number,
   y: number,
 ): boolean {
-  const p = versLocalBoite(b, x, y)
-  return p.x > b.minX && p.x < b.maxX && p.y > b.minY && p.y < b.maxY
+  return dansForme(b, x, y)
 }
 
 // Ronge une paroi : retire le rectangle `r` de la boîte `b`. Le reste est
@@ -67,6 +74,8 @@ export function subtractBox(
   b: ObstacleBox,
   r: { minX: number; minY: number; maxX: number; maxY: number },
 ): ObstacleBox[] {
+  // une forme non rectangulaire ne se découpe pas au couteau axial
+  if (b.forme) return [b]
   // pas de recouvrement : la boîte reste entière
   if (r.minX >= b.maxX || r.maxX <= b.minX || r.minY >= b.maxY || r.maxY <= b.minY) return [b]
   const out: ObstacleBox[] = []
@@ -90,6 +99,9 @@ export function subtractBox(
 // exactement sur la paroi d'origine). Angles différents : null — les
 // morceaux ne seraient plus des rectangles.
 export function subtractBoxOblique(perdante: ObstacleBox, gagnante: ObstacleBox): ObstacleBox[] | null {
+  // la soustraction exacte n'existe qu'entre rectangles : une FORME dans le
+  // duel, et l'on refuse — comme pour des angles différents
+  if (perdante.forme || gagnante.forme) return null
   const a = perdante.angle ?? 0
   const b = gagnante.angle ?? 0
   const delta = Math.abs((((a - b) % 360) + 540) % 360 - 180) // écart à 180 ↔ 0/360
