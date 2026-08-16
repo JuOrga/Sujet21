@@ -2332,6 +2332,7 @@ function restart(): void {
   run.ended = false
   ecranDispersion = 'aucun'
   dispersionDelai = 0
+  perduAvant = false
   endgame.lastCall = false
   endgame.sasVu = 0
   endgame.sasBoitJusqua = -1
@@ -2393,10 +2394,29 @@ function retourAuLabo(): void {
 // « RELANCE » (il en reste) ou « FIN » (c'était le dernier).
 let ecranDispersion: 'aucun' | 'relance' | 'fin' = 'aucun'
 let dispersionDelai = 0
+let perduAvant = false
+// Battement avant l'écran, selon CE QUI a été perdu :
+// — le corps s'est défait (dispersed) : une seconde, on l'a vu partir ;
+// — la RÉSERVE est à sec (endgame.spent) : le corps gelé dérive encore et
+//   une paroi peut le renvoyer au sas. On lui laisse ce sursis, puis le
+//   protocole conclut. Sans lui, la run ne se terminait JAMAIS : le palet
+//   dérivait sans fin et « ÉCHANTILLON PERDU » n'arrivait pas — c'était le
+//   game over qui « ne fonctionnait pas ».
 const DELAI_DISPERSION = 1.1
+const SURSIS_EPUISE = 6
 
 // Sonde de test : l'état de la fin de run depuis la console (comme __run)
-const sondeFin = { get ecran() { return ecranDispersion }, get delai() { return dispersionDelai }, get hub() { return auHub } }
+const sondeFin = {
+  get ecran() { return ecranDispersion },
+  get delai() { return dispersionDelai },
+  get hub() { return auHub },
+  get spent() { return endgame.spent },
+  get lastCall() { return endgame.lastCall },
+  get vise() { return input.aimActive },
+  get collecte() { return endgame.enCollecte },
+  get sortie() { return run.exitTimer },
+  get finie() { return run.ended },
+}
 ;(window as unknown as { __fin: typeof sondeFin }).__fin = sondeFin
 
 function afficheDispersion(): void {
@@ -2869,7 +2889,17 @@ btnContinuer.addEventListener('click', () => {
 })
 // Le tableau seul reprend : la réserve déjà en bonbonne et le refroidissement
 // du vaisseau, eux, ne se rembobinent pas — sinon la pression n'existerait plus.
-btnRelance.addEventListener('click', () => restart())
+// « J'en reste là » : en RUN, ce bouton ne rejoue pas la salle gratuitement
+// (les échantillons de secours n'auraient plus de sens) — il conclut, et
+// l'écran de fin décide : un secours engagé, ou la fin de la run. Au labo,
+// dans un essai ou un tableau d'éditeur, il relance simplement.
+btnRelance.addEventListener('click', () => {
+  if (!testLevel && !auHub && !run.ended) {
+    afficheDispersion()
+    return
+  }
+  restart()
+})
 // ---- Tutoriel diégétique (tableau 1, première partie seulement) ----
 // Les consignes du protocole apparaissent au bon moment, se valident par le
 // geste qu'elles enseignent, et ne reviennent plus (localStorage). Les deux
@@ -3793,6 +3823,10 @@ function frame(now: number): void {
   }
 
   // La relance s'offre dès la dernière impulsion donnée, et ne coupe rien.
+  // Son LIBELLÉ dit la vérité du moment : en run, elle conclut (le sursis
+  // court, le sas peut encore boire) ; ailleurs, elle rejoue la salle.
+  btnRelance.textContent =
+    !testLevel && !auHub && !run.ended ? 'EN RESTER LÀ — CONCLURE LA SALLE' : 'RECOMMENCER LE TABLEAU'
   btnRelance.classList.toggle(
     'visible',
     (endgame.spent || sim.dispersed) &&
@@ -3961,8 +3995,6 @@ function frame(now: number): void {
   sfx.allGas = allGas
   if (sim.dispersed && !sfx.dispersed) {
     audio.disperse()
-    // le battement avant l'écran de fin : on voit le corps se défaire
-    if (!testLevel && !auHub && !run.ended) dispersionDelai = DELAI_DISPERSION
     if (!testLevel) {
       // fin de l'échantillon ET de l'expédition : les registres consignent tout
       records.noteDispersion(level.code, run.tableauTime)
@@ -4015,11 +4047,28 @@ function frame(now: number): void {
     homeState.textContent = sim.dispersed ? 'dispersé' : 'en dérive'
   }
 
-  // Le battement d'après-dispersion : quand il s'achève, l'écran de fin
-  // paraît de lui-même — la run ne reste jamais suspendue sans réponse.
-  if (dispersionDelai > 0) {
-    if (!sim.dispersed || auHub || testLevel) dispersionDelai = 0
-    else {
+  // ---- LA RUN SE CONCLUT D'ELLE-MÊME ------------------------------------
+  // Deux façons de perdre le corps : il se DÉFAIT (dispersed), ou sa RÉSERVE
+  // est à SEC (endgame.spent — la dernière impulsion a été donnée, il se
+  // fige et dérive). Le second cas était sans issue : rien ne concluait, le
+  // palet dérivait indéfiniment. Il conclut maintenant, après un sursis
+  // pendant lequel le sas peut encore le boire.
+  {
+    const horsRun = !!testLevel || auHub || run.ended || tableauDone
+    const perdu = !horsRun && (sim.dispersed || endgame.spent)
+    // Le sas qui AVALE suspend le sursis (la salle peut encore se conclure)
+    // — mais la simple PROXIMITÉ du sas ne suffit pas : un palet gelé qui
+    // stationne dans le rayon d'aspiration sans jamais être bu gelait la run
+    // pour de bon (enCollecte restait vrai à jamais). Seule une gorgée
+    // récente compte, et si elle s'arrête, le compte repart ENTIER.
+    const sasAvale = run.tableauTime <= endgame.sasBoitJusqua
+    const enSursis = perdu && !sasAvale
+    if (enSursis && !perduAvant) {
+      dispersionDelai = sim.dispersed ? DELAI_DISPERSION : SURSIS_EPUISE
+    }
+    perduAvant = enSursis
+    if (!enSursis) dispersionDelai = 0
+    else if (!input.paused) {
       dispersionDelai -= dtReal
       if (dispersionDelai <= 0) afficheDispersion()
     }
