@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 13:20',
+    title: 'LE GAME OVER, pour de bon : la run se conclut quand la réserve est à sec',
+    notes: [
+      'La correction précédente était juste… et branchée au mauvais endroit. L’écran de fin guettait la DISPERSION du corps — un état qui n’arrive quasiment jamais en jouant (il faut tomber sous deux particules). La vraie perte, celle que tout le monde vit, c’est la RÉSERVE À SEC : la dernière impulsion donnée, le corps se fige et dérive. Et là, rien ne concluait : le palet dérivait indéfiniment. Voilà pourquoi le game over « ne fonctionnait toujours pas ».',
+      'Désormais la run se conclut sur les DEUX pertes. Réserve à sec : un SURSIS de 6 secondes pendant lequel une paroi peut encore renvoyer le palet au sas — puis l’écran paraît. Corps défait : une seconde. Le sas qui AVALE suspend le sursis (la salle peut encore se conclure) et, s’il s’arrête, le compte repart entier — la simple proximité du sas ne suffit pas : un palet qui stationne dans le rayon d’aspiration sans être bu gelait la run pour de bon.',
+      'Le bouton de fin de course dit enfin la vérité : en run c’est « EN RESTER LÀ — CONCLURE LA SALLE » (il ne rejoue plus la salle gratuitement — les échantillons de secours n’auraient aucun sens) ; au labo, dans un essai ou un tableau d’éditeur, il relance comme avant. Vérifié en JOUANT, sans forcer aucun drapeau : la réserve vidée par de vraies impulsions, la dernière donnée au pointeur, puis l’attente — l’écran vient seul et le RETOUR AU LABO fonctionne.',
+    ],
+  },
+  {
     date: '16/08/2026 12:10',
     title: 'Deux pancartes ne se chevauchent plus JAMAIS — et le hub double de taille',
     notes: [
