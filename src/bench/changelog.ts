@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 21:30',
+    title: 'La goutte qui part se VOIT partir — elle était mathématiquement invisible',
+    notes: [
+      'La question du retour de test — « est-ce que tu utilises bien le préset par défaut ? » — a tout débloqué. La bibliothèque partagée a été rapatriée (nouvelle gâchette CI diag-presets), et la scène rejouée avec boizcohesioncontrole1, le préset appliqué chez tous les testeurs. Verdict : la comptabilité était JUSTE — les gouttes d’éjection sortent bel et bien, 6 à 7 par impulsion brève, projetées à l’autre bout de la cuve. Ce qui mentait, c’était l’IMAGE.',
+      'La preuve est dans le shader : une goutte isolée culmine à 1,0 de champ, et l’amplitude est divisée par (1 + étirement) pour conserver l’encre des traînées. À pleine vitesse : 1,0 ÷ 2,2 = 0,45 — SOUS le seuil de dessin de 0,8. La goutte d’éjection n’était JAMAIS dessinée : ni goutte, ni traînée, rien. Le joueur payait un carburant que l’image ne montrait pas — « le volume se déforme, aucune goutte ne sort, et pourtant la vie baisse ». Depuis toujours.',
+      'Correctif : les gouttes LIBRES gardent leur encre (compensation d’étirement douce, ×0,25) et brillent un peu plus que le corps (×1,6) — chaque goutte qui part se voit partir, en traînée liquide, vérifié capture à l’appui. Le corps, lui, est rendu exactement comme avant. Et le banc gagne la gâchette diag-presets : un commit sur diag-presets-go rapatrie la bibliothèque de présets partagée dans le dépôt — les prochains retours de test seront rejoués avec VOS réglages, plus jamais avec ceux d’usine.',
+    ],
+  },
+  {
     date: '16/08/2026 20:30',
     title: 'La jauge ne cille plus : vivante = dans le HALO, créditée dès le tir, avec hystérésis',
     notes: [

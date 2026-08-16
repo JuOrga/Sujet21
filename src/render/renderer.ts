@@ -74,9 +74,16 @@ void main() {
   float r2 = dot(e, e);
   if (r2 > 1.0) discard;
   float t = 1.0 - r2;
-  // Amplitude compensée : l'aire de l'ellipse a grandi de (1 + s)
+  // Amplitude compensée : l'aire de l'ellipse a grandi de (1 + s).
+  // MAIS pas pour les gouttes LIBRES : une goutte isolée culmine à 1,0 de
+  // champ — compensée à pleine vitesse elle tombait à 0,45, SOUS le seuil
+  // de 0,8, et n'était JAMAIS dessinée. Le joueur payait un carburant que
+  // l'image ne montrait pas (« aucune goutte ne sort, mais la vie baisse »).
+  // Les libres gardent leur encre (compensation douce) et brillent un peu
+  // plus : chaque goutte qui part se VOIT partir, en traînée liquide.
   float gas = clamp(-vState, 0.0, 1.0);
-  float f = t * t * uFieldScale / (1.0 + vStretch) * (1.0 - 0.25 * gas);
+  float comp = 1.0 + vStretch * mix(0.25, 1.0, vPlayer);
+  float f = t * t * uFieldScale * mix(1.6, 1.0, vPlayer) / comp * (1.0 - 0.25 * gas);
   // Alpha : champ pondéré par l'état — givre en positif, vapeur en négatif.
   // La composition retrouve la part de chaque état en divisant par le champ
   // total (canal R) ; les zones mixtes se neutralisent en douceur.
