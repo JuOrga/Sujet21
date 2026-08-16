@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 18:45',
+    title: 'L’éjection part TOUJOURS de la surface : fini le tir qui laboure son propre corps',
+    notes: [
+      'Le retour de test persistait — « une éjection sur trois ne sort pas du volume mais compte perdue » — et la mesure a fini par montrer pourquoi. L’ancienne règle élisait la particule LA PLUS PROCHE DU DOIGT : un doigt posé SUR la flaque (geste naturel au tactile) élisait une particule au CŒUR de la masse, tirée à pleine vitesse dans une direction quasi aléatoire. Elle labourait le corps de l’intérieur, la houle arrachait des voisines projetées au loin — ~5 particules par tir, pour une goutte qui ne SEMBLAIT jamais partir. Le rappel des égarées d’hier n’y pouvait rien : ces éclats volaient hors de portée.',
+      'La règle est désormais géométrique et constante : la poussée se lit du CENTRE du corps vers le doigt, et c’est la particule du bord CÔTÉ VISÉE qui décolle. L’éjection sort proprement de la surface, où que le doigt se pose — sur la flaque, à son bord, à l’autre bout de l’écran : même geste, même coût, une goutte. Mesuré sur la scène du rapport (20 tirs posés sur la flaque) : 97 particules perdues avant, 26 après — dont les 20 départs légitimes. Le parasitage passe de ~4 par tir à ~0,3.',
+      'Le test du contrat du « prêt » suit la nouvelle réalité : la goutte qui ne sort pas est celle qu’un MUR tout proche renvoie dans la flaque — renvoyée, comptée en retour (⟳), rendue à l’échéance. 187 tests au vert, les invariants de quantité de mouvement inchangés, et les quatre smokes (hub, fin, game over réel, éditeur tactile) avec.',
+    ],
+  },
+  {
     date: '16/08/2026 18:00',
     title: 'Le retour des égarées : la vie ne baisse plus pour une goutte encore là',
     notes: [
