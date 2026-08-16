@@ -14,6 +14,13 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 05:35',
+    title: 'Rogner au stylet : les poignées se laissent enfin attraper',
+    notes: [
+      'Deux façons de rogner une paroi, et toutes deux marchent désormais à l’iPad. L’OUTIL DÉCOUPE (vraie soustraction) ne demandait déjà aucune précision : on touche la paroi qui prend le dessus, puis celle qui s’efface — seule la zone commune est rongée. Les POIGNÉES, elles, étaient inattrapables : leur zone sensible faisait 9 pixels, taillée pour une souris. Elle s’élargit à 22 pixels dès qu’un doigt ou un stylet touche la carte (le dessin, lui, ne change pas : viser large sans alourdir l’écran), et la tolérance fine revient d’elle-même à la souris.',
+    ],
+  },
+  {
     date: '16/08/2026 05:10',
     title: 'La fin de run s’annonce toute seule, on peut abandonner — et l’éditeur se laisse faire à l’iPad',
     notes: [
