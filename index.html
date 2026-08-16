@@ -2311,6 +2311,13 @@
         opacity: 0.88;
         text-shadow: 0 1px 5px rgba(0, 0, 0, 0.9);
         will-change: transform;
+        transition: opacity 0.18s ease;
+      }
+      /* la pancarte à qui la place a été refusée (une autre l'occupait) :
+         elle s'efface en fondu, et revient dès qu'on zoome. Sélecteur
+         plus précis que .plaque : c'est un ÉTAT, il prime sur le style. */
+      #world-labels .world-label.efface {
+        opacity: 0;
       }
       /* Pancarte de signalétique (texte « SUR-TITRE|TITRE ») : un panneau
          de station-labo — tôle sombre en dégradé, rail de fixation vissé,

@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 12:10',
+    title: 'Deux pancartes ne se chevauchent plus JAMAIS — et le hub double de taille',
+    notes: [
+      'Le design des pancartes plaisait, leur empilement au dézoom non : elles gardent une taille de LECTURE quel que soit le zoom (comme les noms sur un plan), et se marchaient donc dessus dès que la carte se resserrait. La place est désormais ATTRIBUÉE, à chaque image : les plaques de SECTEUR (les lieux) servies d’abord, puis les pancartes de détail, de la plus proche du regard à la plus lointaine ; ce qui ne rentre plus s’efface en fondu et revient dès qu’on zoome. Résultat garanti par la mesure : ZÉRO chevauchement, à tous les zooms — et le plan large se lit comme une carte, les lieux sans le bavardage. Les barres d’interface (sélecteur d’état, barre tactile, relevé du haut) sont également interdites de séjour : plus une pancarte à moitié cachée derrière un bouton.',
+      'Chaque étiquette porte donc une PORTÉE, réglable dans l’éditeur pour vos propres tableaux : « secteur » nomme un lieu et survit au dézoom, sans mention elle commente un objet et cède la place.',
+      'Et le module Méduse double de surface : 8000 × 3600 (contre 4800 × 2200). Chaque fonction a SA pièce, assez vaste pour se reconnaître de loin — la cuve d’entraînement, le hall carrefour, l’observation au nord, le placard au sud dont les cinq casiers s’étalent maintenant sur 2400 unités, la salle d’étalonnage, le conduit en chicanes, le sas. Le trajet reste serpentin : on traverse des lieux, on ne glisse pas dans un couloir.',
+    ],
+  },
+  {
     date: '16/08/2026 05:35',
     title: 'Rogner au stylet : les poignées se laissent enfin attraper',
     notes: [
