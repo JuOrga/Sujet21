@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/08/2026 02:00',
+    title: 'LUMIÈRE GÉNÉRALE réglable à l’éditeur : le noir total existe enfin',
+    notes: [
+      'Le système de lampes éclairait — mais même sans aucune lampe, la pièce gardait 52 % de sa lumière : un plancher d’ambiance codé en dur dans le shader. Il devient un réglage DU TABLEAU : « Lumière générale (%) », dans la fiche de l’éditeur (à côté de la musique et des dashs). 52 % = le niveau historique (les tableaux existants ne bougent pas d’un photon) ; 0 % = noir total hors des lampes — elles deviennent la seule source, et une vraie mécanique de conception : couloir plongé dans le noir, salle éclairée par une unique lampe rouge, chemin de lumière à suivre.',
+      'Le volume suit : l’eau, la glace et la vapeur voient leur plancher d’éclairage suivre la même ambiance (0,52 → 0,30, la calibration d’origine, proportionnelle en dessous). Le réglage voyage avec le tableau (sérialisé, relu, borné 0..1 — un fichier étranger ne peut rien injecter), la frappe s’applique en direct à l’essai. Vérifié en capture A/B à 52 % contre 6 % — la pénombre tombe, les lampes tiennent leur rond de lumière. 206 tests.',
+    ],
+  },
+  {
     date: '17/08/2026 01:00',
     title: 'Premier asset du hub : l’écran de contrôle prend le mur de l’observation',
     notes: [

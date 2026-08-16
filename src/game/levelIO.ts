@@ -233,6 +233,7 @@ export function parseLevel(input: unknown): { level: LevelDef | null; rejets: st
     labels,
     zones: zones.length > 0 ? zones : undefined,
     par: o.par === undefined ? undefined : Math.max(1, Math.round(num(o.par, 3))),
+    ambiante: o.ambiante === undefined ? undefined : Math.max(0, Math.min(1, num(o.ambiante, 0.52))),
     dashBudget:
       o.dashBudget === undefined ? undefined : Math.max(0, Math.round(num(o.dashBudget, 3))),
     ambiance: str(o.ambiance) || undefined,
@@ -354,6 +355,7 @@ export function serializeLevel(level: LevelDef): string {
     code: level.code,
     journal: level.journal,
     par: level.par,
+    ambiante: level.ambiante,
     dashBudget: level.dashBudget,
     bounds: level.bounds,
     spawn: level.spawn,
