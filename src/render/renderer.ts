@@ -1198,7 +1198,7 @@ float sceneSdf(vec2 p) {
     if (i >= uBoxCount) break;
     vec4 dec = decodeAux(uBoxAux[i].x);
     if (dec.x > 2.5 && dec.x < 3.5) continue; // sas : une bouche, pas un mur
-    if (dec.x > 4.5 && dec.x < 5.5) continue; // évent : la lumière passe
+    if (dec.x > 4.5 && dec.x < 5.5) continue; // évent : tamisé à part (grilleTrans)
     vec2 wb = p;
     float ang = uBoxAux[i].y;
     if (abs(ang) > 0.0005) {
@@ -1211,6 +1211,54 @@ float sceneSdf(vec2 p) {
     d = min(d, formeSdf(wb, uBoxes[i], dec.y, dec.z, dec.w));
   }
   return d;
+}
+
+// L'OMBRE DE LA GRILLE : les barreaux bloquent, les trous laissent passer —
+// derrière un évent, la lumière se couche en BANDES claires et sombres, la
+// projection du damier de 24 u qui dessine l'évent lui-même (mêmes trous,
+// même calage monde : ce qu'on voit sur le panneau est ce qui s'imprime au
+// sol). Loin derrière, le motif se fond en tamis uniforme — la pénombre
+// d'une source réelle. Les formes d'évent ne projettent que là où le rayon
+// traverse vraiment leur silhouette (SDF au point de passage).
+float grilleTrans(vec2 p, vec2 dir, float tMax) {
+  float trans = 1.0;
+  for (int i = 0; i < MAX_BOXES; i++) {
+    if (i >= uBoxCount) break;
+    vec4 dec = decodeAux(uBoxAux[i].x);
+    if (dec.x < 4.5 || dec.x > 5.5) continue; // seuls les évents
+    vec2 lp = p;
+    vec2 ld = dir;
+    float ang = uBoxAux[i].y;
+    if (abs(ang) > 0.0005) {
+      vec2 bc = 0.5 * (uBoxes[i].xy + uBoxes[i].zw);
+      float ca = cos(ang);
+      float sa = sin(ang);
+      vec2 rel = p - bc;
+      lp = bc + vec2(ca * rel.x + sa * rel.y, -sa * rel.x + ca * rel.y);
+      ld = vec2(ca * dir.x + sa * dir.y, -sa * dir.x + ca * dir.y);
+    }
+    // la tranche [t0, t1] du rayon dans la boîte englobante (slabs)
+    vec2 safe = vec2(abs(ld.x) < 1e-6 ? 1e-6 : ld.x, abs(ld.y) < 1e-6 ? 1e-6 : ld.y);
+    vec2 ta = (uBoxes[i].xy - lp) / safe;
+    vec2 tb = (uBoxes[i].zw - lp) / safe;
+    float t0 = max(max(min(ta.x, tb.x), min(ta.y, tb.y)), 0.0);
+    float t1 = min(min(max(ta.x, tb.x), max(ta.y, tb.y)), tMax);
+    if (t1 <= t0) continue;
+    float tmid = 0.5 * (t0 + t1);
+    // évent en FORME : hors de la silhouette, pas d'ombre
+    if (dec.y > 0.5 && formeSdf(lp + ld * tmid, uBoxes[i], dec.y, dec.z, dec.w) >= 0.0) continue;
+    // le point de passage, en coordonnées MONDE : les trous du damier de
+    // l'évent sont calés sur le monde, comme son dessin
+    vec2 pc = p + dir * tmid;
+    vec2 cellUv = fract(pc / 24.0) - 0.5;
+    float trous = 1.0 - smoothstep(0.20, 0.34, max(abs(cellUv.x), abs(cellUv.y)));
+    // p est à t0 unités DERRIÈRE la grille : plus on s'éloigne, plus les
+    // bandes se fondent vers la transmission moyenne du panneau (~0,45)
+    float flou = clamp(t0 * 0.0009, 0.0, 1.0);
+    float ouvert = mix(trous, 0.45, flou);
+    trans *= mix(0.06, 1.0, ouvert);
+  }
+  return trans;
 }
 
 void main() {
@@ -1239,6 +1287,8 @@ void main() {
       t += clamp(h, 8.0, 200.0);
     }
     res = clamp(res, 0.0, 1.0);
+    // les évents tamisent ce qui reste : la lumière passe entre les barreaux
+    res *= grilleTrans(p, dir, min(distL, tLim));
     // retombée douce, à support large : la lampe porte loin, les coins de
     // la cuve restent lisibles — l'ambiance de la composition fait le
     // plancher
@@ -1738,8 +1788,11 @@ export class Renderer {
     const minY = bounds.minY - marge
     const sizeX = bounds.maxX - bounds.minX + marge * 2
     const sizeY = bounds.maxY - bounds.minY + marge * 2
-    const w = 320
-    const h = Math.max(32, Math.min(320, Math.round((w * sizeY) / sizeX)))
+    // Assez fin pour résoudre l'ombre des barreaux d'évent (damier de 24 u :
+    // ~4-5 texels par période sur une cuve standard) — cuite une fois, la
+    // résolution ne pèse pas sur l'image.
+    const w = 480
+    const h = Math.max(48, Math.min(480, Math.round((w * sizeY) / sizeX)))
     this.ensureLightTarget(w, h)
     let key = `${boxCount};${minX},${minY},${sizeX},${sizeY}`
     for (const l of lampes) key += `;L${l.x},${l.y},${l.h},${l.portee},${l.intensite},${l.rvb.join('/')}`

@@ -2883,6 +2883,25 @@
         min-height: 70px;
         resize: vertical;
       }
+      /* Champ à CURSEUR (tactile) : intitulé et nombre en tête, la glissière
+         prend toute la largeur en dessous — le doigt a de la place, le
+         clavier n'est plus obligatoire pour régler une valeur */
+      .ed-fr {
+        flex-wrap: wrap;
+        row-gap: 2px;
+      }
+      .ed-fr input[type='number'] {
+        width: 72px;
+      }
+      .ed-fr input[type='range'] {
+        flex-basis: 100%;
+        width: 100%;
+        height: 28px;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        accent-color: var(--specimen, #35e0a4);
+      }
       /* Champ TEXTE d'une étiquette : la zone passe sous son intitulé —
          une saisie sur plusieurs lignes a besoin de toute la largeur */
       .ed-f-txt {
@@ -3269,7 +3288,7 @@
           <button type="button" class="ed-tool" data-tool="box:2"><i style="background:#a878e8"></i>Hydrophobe</button>
           <button type="button" class="ed-tool" data-tool="box:4"><i style="background:#8fc8ee"></i>Hublot froid</button>
           <button type="button" class="ed-tool" data-tool="box:6" title="Transforme en GAZ à 95 % de présence dans son aura, dégèle — jamais désactivée. Aura réglable par bloc (champ Aura)."><i style="background:#ff8a3c"></i>Chaudière</button>
-          <button type="button" class="ed-tool" data-tool="box:5" title="Seule la VAPEUR passe entre les lamelles — le liquide et la glace butent, la lumière passe"><i style="background:#8fb0c6"></i>Évent</button>
+          <button type="button" class="ed-tool" data-tool="box:5" title="Seule la VAPEUR passe entre les lamelles — le liquide et la glace butent ; la lumière et le laser passent entre les barreaux (la lumière en ressort tamisée)"><i style="background:#8fb0c6"></i>Évent</button>
           <button type="button" class="ed-tool" data-tool="box:7" title="Seule l'EAU la traverse — glace et vapeur butent, le laser est absorbé"><i style="background:#35c9a0"></i>Membrane</button>
           <button type="button" class="ed-tool" data-tool="box:8" title="Seule la GLACE l'écarte — eau et vapeur butent, le laser est absorbé"><i style="background:#9fb9d8"></i>Rideau lamellaire</button>
           <button type="button" class="ed-tool" data-tool="box:9" title="Mur pour le liquide et la glace. Frôlé en VAPEUR : rend UN dash — une seule fois, puis le serpentin s'éteint."><i style="background:#29d8ff"></i>Surchauffeur</button>

@@ -2097,8 +2097,31 @@ export class LevelEditor {
       return
     }
     const rows: string[] = []
+    // L'arrondi d'affichage respecte les DÉCIMALES : arrondi à l'entier, il
+    // écrasait toute valeur fine (intensité 0,5 → 1) au premier
+    // rafraîchissement du panneau.
     const numField = (label: string, id: string, value: number, step = 10): string =>
-      `<label class="ed-f"><span>${label}</span><input type="number" step="${step}" id="${id}" value="${Math.round(value)}" /></label>`
+      `<label class="ed-f"><span>${label}</span><input type="number" step="${step}" id="${id}" value="${+value.toFixed(3)}" /></label>`
+
+    // Champ à CURSEUR, pour le tactile : la glissière (le doigt) et le nombre
+    // (la précision) pilotent la même valeur — glisser applique en direct,
+    // relâcher committe (un seul cran d'historique).
+    const rangeField = (
+      label: string,
+      id: string,
+      value: number,
+      min: number,
+      max: number,
+      step: number,
+    ): string => {
+      const v = +Math.max(min, Math.min(max, value)).toFixed(3)
+      return (
+        `<label class="ed-f ed-fr"><span>${label}</span>` +
+        `<input type="number" id="${id}" min="${min}" max="${max}" step="${step}" value="${v}" />` +
+        `<input type="range" id="${id}-r" min="${min}" max="${max}" step="${step}" value="${v}" />` +
+        `</label>`
+      )
+    }
 
     if (s.kind === 'box') {
       const b = this.level.boxes[s.index]
@@ -2120,7 +2143,7 @@ export class LevelEditor {
       )
       rows.push(numField('X min', 'p-minX', b.minX), numField('X max', 'p-maxX', b.maxX))
       rows.push(numField('Y min', 'p-minY', b.minY), numField('Y max', 'p-maxY', b.maxY))
-      rows.push(numField('Angle (°)', 'p-ang', b.angle ?? 0))
+      rows.push(rangeField('Angle (°)', 'p-ang', b.angle ?? 0, -180, 180, 1))
       if ((b.forme ?? 0) === FORME_COIN) {
         // le coin qui porte l'angle droit : l'hypoténuse regarde à l'opposé
         const coins = ['Bas-gauche', 'Bas-droit', 'Haut-droit', 'Haut-gauche']
@@ -2133,12 +2156,12 @@ export class LevelEditor {
         )
       }
       if ((b.forme ?? 0) === FORME_ARC) {
-        rows.push(numField('Épaisseur (%)', 'p-fep', Math.round((b.p0 ?? ARC_EPAISSEUR_DEFAUT) * 100), 1))
-        rows.push(numField('Demi-ouverture (°)', 'p-fouv', b.p1 ?? ARC_OUVERTURE_DEFAUT, 5))
+        rows.push(rangeField('Épaisseur (%)', 'p-fep', Math.round((b.p0 ?? ARC_EPAISSEUR_DEFAUT) * 100), 8, 100, 1))
+        rows.push(rangeField('Demi-ouverture (°)', 'p-fouv', b.p1 ?? ARC_OUVERTURE_DEFAUT, 15, 180, 5))
       }
       if (b.material === MAT_CHAUD) {
         // chaque chaudière règle sa portée d'aura : gros bloc à petite aura…
-        rows.push(numField('Aura (× portée)', 'p-aura', b.aura ?? 1, 0.25))
+        rows.push(rangeField('Aura (× portée)', 'p-aura', b.aura ?? 1, 0.25, 4, 0.05))
       }
       if (b.material === MAT_WALL && !(b.forme ?? 0)) {
         // habillage : pur décor, la physique reste celle d'une paroi neutre
@@ -2187,9 +2210,9 @@ export class LevelEditor {
     } else if (s.kind === 'lumiere') {
       const l = (this.level.lumieres ?? [])[s.index]
       rows.push(numField('X', 'p-lmx', l.x), numField('Y', 'p-lmy', l.y))
-      rows.push(numField('Hauteur', 'p-lmh', l.h ?? LAMPE_HAUTEUR_DEFAUT, 20))
-      rows.push(numField('Portée (0 = auto)', 'p-lmp', l.portee ?? 0, 100))
-      rows.push(numField('Intensité', 'p-lmi', l.intensite ?? 1, 0.1))
+      rows.push(rangeField('Hauteur', 'p-lmh', l.h ?? LAMPE_HAUTEUR_DEFAUT, LAMPE_HAUTEUR_MIN, LAMPE_HAUTEUR_MAX, 10))
+      rows.push(rangeField('Portée (0 = auto)', 'p-lmp', l.portee ?? 0, 0, 4000, 50))
+      rows.push(rangeField('Intensité', 'p-lmi', l.intensite ?? 1, 0.2, 2, 0.05))
       rows.push(
         `<label class="ed-f"><span>Couleur</span>` +
           `<input type="color" id="p-lmc" value="${l.couleur ?? LAMPE_COULEUR_DEFAUT}" /></label>`,
@@ -2285,10 +2308,30 @@ export class LevelEditor {
     for (const input of Array.from(host.querySelectorAll('input, select, textarea'))) {
       input.addEventListener('change', () => this.readProps())
     }
+    // Curseurs : la glissière applique EN DIRECT (le tableau suit le doigt),
+    // le relâcher passe par le change générique — un seul cran d'historique.
+    // Le nombre jumeau se synchronise dans les deux sens.
+    for (const r of Array.from(host.querySelectorAll<HTMLInputElement>('input[type="range"]'))) {
+      const num = host.querySelector<HTMLInputElement>('#' + r.id.replace(/-r$/, ''))
+      r.addEventListener('input', () => {
+        if (num) num.value = r.value
+        this.appliqueProps()
+        this.draw()
+      })
+      num?.addEventListener('input', () => {
+        r.value = num.value
+      })
+    }
   }
 
-  /** Relit le panneau et applique les valeurs saisies. */
+  /** Relit le panneau, applique, et committe un cran d'historique. */
   private readProps(): void {
+    this.appliqueProps()
+    this.commit('')
+  }
+
+  /** Relit le panneau et applique les valeurs saisies (sans commit). */
+  private appliqueProps(): void {
     const s = this.sel
     if (!s) return
     const val = (id: string): number => {
@@ -2415,7 +2458,6 @@ export class LevelEditor {
       l.x = val('p-lx')
       l.y = val('p-ly')
     }
-    this.commit('')
   }
 
   private normalized(minX: number, minY: number, maxX: number, maxY: number): Rect {
