@@ -735,36 +735,46 @@ export class FluidSim {
         this.dispersed = true
         return
       }
-      // LA GOUTTE PART TOUJOURS DE LA SURFACE. L'ancienne règle prenait la
-      // particule la plus proche du doigt : un doigt posé SUR la flaque
-      // (geste courant au tactile) élisait une particule au CŒUR de la
-      // masse, tirée à pleine vitesse dans une direction quasi aléatoire —
-      // elle labourait le corps, la houle arrachait des voisines projetées
-      // au loin, et la vie fondait sans qu'aucune goutte ne SEMBLE partir
-      // (~5 particules par tir, mesuré). La poussée se lit désormais du
-      // CENTRE vers le doigt, et c'est la particule du bord CÔTÉ VISÉE qui
-      // décolle : l'éjection sort proprement, où que le doigt se pose.
-      let dirX = aimX - this.stats.centroidX
-      let dirY = aimY - this.stats.centroidY
-      let len = Math.hypot(dirX, dirY)
-      if (len < 1e-6) {
-        dirX = 1
-        dirY = 0
-        len = 1
-      }
-      dirX /= len
-      dirY /= len
+      // L'ÉLECTION HISTORIQUE, restaurée à la demande du concepteur : la
+      // particule LA PLUS PROCHE DU DOIGT part vers le doigt. Un tir posé
+      // sur la flaque élit une particule au cœur de la masse et la propulse
+      // à travers elle : le volume est LABOURÉ, malaxé — c'est brutal, et
+      // c'est exactement le caractère voulu (« je préfère avec les
+      // déformations »). Une élection « propre depuis la surface » a été
+      // essayée puis retirée : elle assagissait le tir rapproché. Ce qui
+      // rendait l'ancienne règle infernale n'était pas sa physique mais son
+      // INVISIBILITÉ — depuis, les gouttes libres se dessinent (traînées),
+      // la vie compte le halo, et le rappel ramène les éclats restés à
+      // portée : le labour se voit et se paie au juste prix, rien de plus.
       let best = -1
-      let bestProj = -Infinity
+      let bestD2 = Infinity
       for (let i = 0; i < this.count; i++) {
         if (this.kind[i] !== KIND_PLAYER || this.frozen[i] === 1 || this.gaseous[i] === 1) continue
-        const proj = this.posX[i] * dirX + this.posY[i] * dirY
-        if (proj > bestProj) {
-          bestProj = proj
+        const dx = this.posX[i] - aimX
+        const dy = this.posY[i] - aimY
+        const d2 = dx * dx + dy * dy
+        if (d2 < bestD2) {
+          bestD2 = d2
           best = i
         }
       }
       if (best < 0) return // tout le corps est gelé : temps mort, rien à éjecter
+
+      let dirX = aimX - this.posX[best]
+      let dirY = aimY - this.posY[best]
+      let len = Math.hypot(dirX, dirY)
+      if (len < 1e-6) {
+        dirX = aimX - this.stats.centroidX
+        dirY = aimY - this.stats.centroidY
+        len = Math.hypot(dirX, dirY)
+        if (len < 1e-6) {
+          dirX = 1
+          dirY = 0
+          len = 1
+        }
+      }
+      dirX /= len
+      dirY /= len
 
       const departX = this.posX[best]
       const departY = this.posY[best]

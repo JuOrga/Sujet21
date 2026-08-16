@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 22:15',
+    title: 'Le tir rapproché retrouve son caractère : les DÉFORMATIONS sont de retour',
+    notes: [
+      'Verdict du concepteur après essai : « je préfère avant, avec les déformations ». L’élection historique de la goutte est restaurée : la particule LA PLUS PROCHE DU DOIGT part vers le doigt — un tir posé sur la flaque élit une particule au cœur de la masse et la propulse à travers elle. Le volume est labouré, malaxé, la houle projette des éclats : c’est brutal, organique, et c’est le caractère voulu. L’élection « propre depuis la surface » de cet après-midi assagissait trop le geste ; elle est retirée.',
+      'Ce retour n’est PAS un retour au problème d’origine. Ce qui rendait l’ancienne règle infernale n’était pas sa physique, c’était son invisibilité — on payait sans voir. Depuis : les gouttes libres se DESSINENT (traînées liquides), la vie compte le HALO (n’est perdu que ce qui s’en éloigne), et le rappel ramène les éclats restés à portée. Le labour se voit et se paie au juste prix, rien de plus. Les 188 tests passent sans retouche : les contrats (prêt au mur, sortie comptée à la sortie, semées jamais aspirées) visent loin du corps, où les deux élections coïncident.',
+    ],
+  },
+  {
     date: '16/08/2026 21:30',
     title: 'La goutte qui part se VOIT partir — elle était mathématiquement invisible',
     notes: [
