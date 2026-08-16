@@ -1461,6 +1461,8 @@ export class Renderer {
   private readonly zonePhaseScratch = new Float32Array(MAX_ZONES * 3)
   private texDecalTuyaux: WebGLTexture | null = null
   private texDecalVanne: WebGLTexture | null = null
+  private texDecalEcranOff: WebGLTexture | null = null
+  private texDecalEcranOn: WebGLTexture | null = null
   // Tableau de textures des zones (calques : 0 buses/eau, 1 hublot/glace,
   // 2 conduite/vapeur) : une seule unité de texture pour les trois images.
   private texZones: WebGLTexture | null = null
@@ -1625,6 +1627,10 @@ export class Renderer {
     // Décalques : pièces détourées (alpha), donc bord franc — pas de répétition
     this.loadTexture('/assets/decal-tuyaux.webp', false, true, (t) => (this.texDecalTuyaux = t))
     this.loadTexture('/assets/decal-vanne.webp', false, true, (t) => (this.texDecalVanne = t))
+    // L'écran de contrôle de la salle d'observation : éteint aujourd'hui
+    // (HORS TENSION), allumé quand la méta-progression prendra ses quartiers
+    this.loadTexture('/assets/decal-ecran-off.webp', false, true, (t) => (this.texDecalEcranOff = t))
+    this.loadTexture('/assets/decal-ecran-on.webp', false, true, (t) => (this.texDecalEcranOn = t))
     // Images de zones : la cause peinte (voir zoneDecor). Sans mipmaps —
     // échantillonnées dans une branche non uniforme du shader. En calques
     // d'un même tableau de textures : une seule unité pour les trois.
@@ -2145,7 +2151,14 @@ export class Renderer {
     const du = this.uniforms['decal']
     let started = false
     for (const d of decals) {
-      const tex = d.kind === 'vanne' ? this.texDecalVanne : this.texDecalTuyaux
+      const tex =
+        d.kind === 'vanne'
+          ? this.texDecalVanne
+          : d.kind === 'ecran-off'
+            ? this.texDecalEcranOff
+            : d.kind === 'ecran-on'
+              ? this.texDecalEcranOn
+              : this.texDecalTuyaux
       if (!tex) continue
       if (!started) {
         started = true
