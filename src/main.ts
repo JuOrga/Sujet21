@@ -3743,13 +3743,10 @@ function frame(now: number): void {
   hudCoque.classList.toggle('warn', chillNow() > 0.75)
   coqueBar.style.width = `${(chillNow() * 100).toFixed(1)}%`
   hudBonbonne.textContent = `${run.bonbonneLiters.toFixed(2)} L`
-  // La vie compte la matière VIVANTE : le corps plus les gouttes en prêt
-  // encore dans le volume (la règle : n'est perdu que ce qui SORT). La part
-  // EN RETOUR (⟳) : matière sortie mais à portée, que le rappel ramène.
-  const enRetour = sim.returningCount() * params.litersPerParticle
-  hudVolume.innerHTML = `${sim.liters().toFixed(2)} <small>L · ${sim.aliveCount()} part.${
-    enRetour >= 0.005 ? ` <span class="retour">⟳ +${enRetour.toFixed(2)}</span>` : ''
-  }</small>`
+  // La vie compte la matière VIVANTE : le corps plus les gouttes marquées
+  // encore dans son halo (la règle : n'est perdu que ce qui en SORT — et
+  // tout ce qui reste dans le halo revient, le rappel s'en charge).
+  hudVolume.innerHTML = `${sim.liters().toFixed(2)} <small>L · ${sim.aliveCount()} part.</small>`
   gaugeFill.style.width = `${Math.min(100, fraction * 100).toFixed(1)}%`
   // Le seuil est un volume ABSOLU : sa position sur la jauge (graduée en % du
   // volume de départ) dépend donc du volume de base de ce tableau.

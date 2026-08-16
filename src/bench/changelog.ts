@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '16/08/2026 20:30',
+    title: 'La jauge ne cille plus : vivante = dans le HALO, créditée dès le tir, avec hystérésis',
+    notes: [
+      'Le retour de test tenait toujours : la jauge (et son ambre d’alerte) CLIGNOTAIT — la goutte alternait entre « éjectée » (décomptée) et « à la surface » (recomptée), au rythme des relabels. Deux causes : le décompte au tir précédait le recompte d’un relabel (jusqu’à 5 pas d’écart), et l’ancrage « 3 voisines du corps » oscillait à la frontière, image après image.',
+      'La définition devient stable à l’œil. VIVANTE = marquée du corps et dans son HALO (le rayon de capture, celui du rappel — tout ce qui y reste REVIENDRA, le compter vivant est la stricte vérité). Créditée à l’instant même du tir : la goutte part de la surface, donc du halo — la jauge ne cille pas d’une image. La sortie du halo se juge avec HYSTÉRÉSIS (15 % plus loin que l’entrée) : une goutte qui danse à la frontière ne fait pas clignoter la vie. Le ⟳ disparaît : le halo est dans le chiffre principal, à sa place.',
+      'Deux règles de bonne fin découvertes en smoke : une goutte en prêt avalée (éponge, sas) quitte la vie sur-le-champ (le compte ne reste pas gonflé jusqu’au relabel suivant), et pendant que le SAS BOIT le halo s’éteint — le corps aspiré ne peut plus rien récupérer, et compter ses miettes empêchait la fin de run de conclure (le sursis se réarmait en boucle, constaté à la trace). Le test anti-clignotement échantillonne CHAQUE pas : le moindre creux d’une image ferait échouer la suite. 188 tests, smokes hub, fin et game over réel (deux passes).',
+    ],
+  },
+  {
     date: '16/08/2026 19:30',
     title: 'LA RÈGLE DE LA VIE : n’est perdu que ce qui SORT du volume',
     notes: [
