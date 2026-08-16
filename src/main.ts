@@ -1374,6 +1374,7 @@ function rapportPerf(): Record<string, unknown> {
         cibles: (level.cibles ?? []).length,
         zones: (level.zones ?? []).length,
         rails: (level.rails ?? []).length,
+        lumieres: (level.lumieres ?? []).length,
         cellulesEponge: (level.sponges ?? []).reduce((a, s) => a + s.cols * s.rows, 0),
         etiquettes: level.labels.length,
       },
@@ -3755,6 +3756,7 @@ function frame(now: number): void {
     decorRiche ? 1 : 0,
     eauRiche ? 1 : 0,
     lumiereActive ? 1 : 0,
+    level.lumieres ?? [],
   )
   const rendRaw = performance.now() - renderT0
   monitor.renderMs += (rendRaw - monitor.renderMs) * 0.08

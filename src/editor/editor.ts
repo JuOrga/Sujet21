@@ -7,6 +7,9 @@
 // construire un niveau — l'aperçu réel, c'est le bouton ESSAYER.
 
 import {
+  LAMPE_HAUTEUR_DEFAUT,
+  LAMPE_HAUTEUR_MAX,
+  LAMPE_HAUTEUR_MIN,
   MATERIAL_NAMES,
   MAT_CHAUD,
   MAT_FROID,
@@ -44,6 +47,7 @@ import {
   formeOutline,
 } from '../game/formes'
 import { checkLevel, parseLevel, serializeLevel } from '../game/levelIO'
+import { MAX_LUMIERES } from '../render/renderer'
 import { traceLaser } from '../game/laser'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
 import { PISTES, PISTE_NOMS, type Piste } from '../game/soundtrack'
@@ -94,6 +98,7 @@ type Tool =
   | { kind: 'cible' }
   | { kind: 'porte' }
   | { kind: 'rail' }
+  | { kind: 'lumiere' }
   | { kind: 'cut' }
 
 type Sel =
@@ -105,6 +110,7 @@ type Sel =
   | { kind: 'cible'; index: number }
   | { kind: 'porte'; index: number }
   | { kind: 'rail'; index: number }
+  | { kind: 'lumiere'; index: number }
   | { kind: 'exit' }
   | { kind: 'spawn' }
   | null
@@ -469,6 +475,10 @@ export class LevelEditor {
       const l = (this.level.lasers ?? [])[s.index]
       return l ? { minX: l.x, minY: l.y, maxX: l.x, maxY: l.y } : null
     }
+    if (s.kind === 'lumiere') {
+      const l = (this.level.lumieres ?? [])[s.index]
+      return l ? { minX: l.x, minY: l.y, maxX: l.x, maxY: l.y } : null
+    }
     if (s.kind === 'cible') {
       const t = (this.level.cibles ?? [])[s.index]
       return t ? { minX: t.x - t.r, minY: t.y - t.r, maxX: t.x + t.r, maxY: t.y + t.r } : null
@@ -508,6 +518,12 @@ export class LevelEditor {
       this.level.spawn.y += dy
     } else if (s.kind === 'laser') {
       const l = (this.level.lasers ?? [])[s.index]
+      if (l) {
+        l.x += dx
+        l.y += dy
+      }
+    } else if (s.kind === 'lumiere') {
+      const l = (this.level.lumieres ?? [])[s.index]
       if (l) {
         l.x += dx
         l.y += dy
@@ -602,6 +618,12 @@ export class LevelEditor {
       const r = 60 / this.zoom
       if (Math.abs(l.x - x) < r * 1.6 && Math.abs(l.y - y) < r * 0.5) {
         return { kind: 'label', index: i }
+      }
+    }
+    const lumieres = this.level.lumieres ?? []
+    for (let i = lumieres.length - 1; i >= 0; i--) {
+      if (Math.hypot(lumieres[i].x - x, lumieres[i].y - y) < Math.max(26, 28 / this.zoom)) {
+        return { kind: 'lumiere', index: i }
       }
     }
     const lasers = this.level.lasers ?? []
@@ -1004,6 +1026,21 @@ export class LevelEditor {
         this.commit('Cible posée — un faisceau qui la touche l’allume.')
         return
       }
+      if (this.tool.kind === 'lumiere') {
+        if (!this.level.lumieres) this.level.lumieres = []
+        if (this.level.lumieres.length >= MAX_LUMIERES) {
+          this.status(`Déjà ${MAX_LUMIERES} lampes : c'est le plafond — supprimez-en une d'abord.`)
+          this.setTool({ kind: 'select' })
+          return
+        }
+        this.level.lumieres.push({ x: this.snapped(w.x), y: this.snapped(w.y) })
+        this.sel = { kind: 'lumiere', index: this.level.lumieres.length - 1 }
+        this.setTool({ kind: 'select' })
+        this.commit(
+          'Lampe posée — hauteur, portée et intensité à droite. Haute : ombres courtes et douces ; basse : ombres longues.',
+        )
+        return
+      }
       if (this.tool.kind === 'laser') {
         if (!this.level.lasers) this.level.lasers = []
         this.level.lasers.push({ x: this.snapped(w.x), y: this.snapped(w.y), angle: 0 })
@@ -1190,6 +1227,10 @@ export class LevelEditor {
           }
         } else if (this.sel?.kind === 'laser') {
           const l = (this.level.lasers ?? [])[this.sel.index]
+          l.x = this.snapped(w.x - d.ox)
+          l.y = this.snapped(w.y - d.oy)
+        } else if (this.sel?.kind === 'lumiere') {
+          const l = (this.level.lumieres ?? [])[this.sel.index]
           l.x = this.snapped(w.x - d.ox)
           l.y = this.snapped(w.y - d.oy)
         } else if (this.sel?.kind === 'cible') {
@@ -1497,6 +1538,7 @@ export class LevelEditor {
     else if (s.kind === 'sponge') this.level.sponges.splice(s.index, 1)
     else if (s.kind === 'zone') (this.level.zones ?? []).splice(s.index, 1)
     else if (s.kind === 'laser') (this.level.lasers ?? []).splice(s.index, 1)
+    else if (s.kind === 'lumiere') (this.level.lumieres ?? []).splice(s.index, 1)
     else if (s.kind === 'porte') (this.level.portes ?? []).splice(s.index, 1)
     else if (s.kind === 'rail') (this.level.rails ?? []).splice(s.index, 1)
     else if (s.kind === 'cible') {
@@ -1540,6 +1582,14 @@ export class LevelEditor {
       const l = (this.level.lasers ?? [])[s.index]
       this.level.lasers!.push({ ...l, x: l.x + off })
       this.sel = { kind: 'laser', index: this.level.lasers!.length - 1 }
+    } else if (s.kind === 'lumiere') {
+      if ((this.level.lumieres ?? []).length >= MAX_LUMIERES) {
+        this.status(`Déjà ${MAX_LUMIERES} lampes : c'est le plafond.`)
+        return
+      }
+      const l = (this.level.lumieres ?? [])[s.index]
+      this.level.lumieres!.push({ ...l, x: l.x + off })
+      this.sel = { kind: 'lumiere', index: this.level.lumieres!.length - 1 }
     } else if (s.kind === 'cible') {
       const t = (this.level.cibles ?? [])[s.index]
       this.level.cibles!.push({ ...t, x: t.x + off })
@@ -1608,6 +1658,7 @@ export class LevelEditor {
         else if (key === 'cible') this.setTool({ kind: 'cible' })
         else if (key === 'porte') this.setTool({ kind: 'porte' })
         else if (key === 'rail') this.setTool({ kind: 'rail' })
+        else if (key === 'lumiere') this.setTool({ kind: 'lumiere' })
         else if (key === 'cut') this.setTool({ kind: 'cut' })
         else this.setTool({ kind: 'select' })
       })
@@ -2132,6 +2183,15 @@ export class LevelEditor {
       const l = (this.level.lasers ?? [])[s.index]
       rows.push(numField('X', 'p-lax', l.x), numField('Y', 'p-lay', l.y))
       rows.push(numField('Angle (°)', 'p-laa', l.angle, 5))
+    } else if (s.kind === 'lumiere') {
+      const l = (this.level.lumieres ?? [])[s.index]
+      rows.push(numField('X', 'p-lmx', l.x), numField('Y', 'p-lmy', l.y))
+      rows.push(numField('Hauteur', 'p-lmh', l.h ?? LAMPE_HAUTEUR_DEFAUT, 20))
+      rows.push(numField('Portée (0 = auto)', 'p-lmp', l.portee ?? 0, 100))
+      rows.push(numField('Intensité', 'p-lmi', l.intensite ?? 1, 0.1))
+      rows.push(
+        `<p class="ed-empty">La HAUTEUR sculpte l'ombre : haute (≥ ${LAMPE_HAUTEUR_DEFAUT}), la lampe enjambe les blocs — ombres courtes et douces ; basse (~${LAMPE_HAUTEUR_MIN}-200), elle rase le sol — ombres longues et dramatiques. Portée 0 : proportionnelle à la cuve. Au plus ${MAX_LUMIERES} lampes par tableau ; sans lampe posée, la cuve garde sa lampe par défaut. Aperçu réel : ESSAYER.</p>`,
+      )
     } else if (s.kind === 'cible') {
       const t = (this.level.cibles ?? [])[s.index]
       rows.push(numField('X', 'p-cx', t.x), numField('Y', 'p-cy', t.y))
@@ -2194,7 +2254,9 @@ export class LevelEditor {
                 ? 'Point de départ'
                 : s.kind === 'laser'
                   ? 'Émetteur laser'
-                  : s.kind === 'cible'
+                  : s.kind === 'lumiere'
+                    ? `Lampe nº ${s.index + 1}`
+                    : s.kind === 'cible'
                     ? `Cible nº ${s.index + 1}`
                     : s.kind === 'porte'
                       ? 'Porte asservie'
@@ -2302,6 +2364,20 @@ export class LevelEditor {
       l.x = val('p-lax')
       l.y = val('p-lay')
       l.angle = ((val('p-laa') % 360) + 360) % 360
+    } else if (s.kind === 'lumiere') {
+      const l = (this.level.lumieres ?? [])[s.index]
+      l.x = val('p-lmx')
+      l.y = val('p-lmy')
+      // les défauts effacent la clé : le fichier reste minimal
+      const h = Math.max(LAMPE_HAUTEUR_MIN, Math.min(LAMPE_HAUTEUR_MAX, val('p-lmh') || LAMPE_HAUTEUR_DEFAUT))
+      if (h !== LAMPE_HAUTEUR_DEFAUT) l.h = h
+      else delete l.h
+      const portee = val('p-lmp')
+      if (portee > 0) l.portee = Math.max(200, Math.min(8000, portee))
+      else delete l.portee
+      const intensite = Math.max(0.2, Math.min(2, val('p-lmi') || 1))
+      if (intensite !== 1) l.intensite = intensite
+      else delete l.intensite
     } else if (s.kind === 'cible') {
       const t = (this.level.cibles ?? [])[s.index]
       t.x = val('p-cx')
@@ -2659,6 +2735,62 @@ export class LevelEditor {
         g.drawImage(im, 0, 0, dw, dh)
       } else {
         g.drawImage(im, dp.sx, dp.sy, dw, dh)
+      }
+      g.restore()
+    }
+
+    // ---- Lampes : la monture (soleil à rayons), la hauteur en toutes
+    // lettres, et — sur la lampe sélectionnée — sa portée réelle en
+    // pointillé. L'ombre elle-même se juge au bouton ESSAYER.
+    const lumieres = this.level.lumieres ?? []
+    const diagCuve = Math.hypot(
+      this.level.bounds.maxX - this.level.bounds.minX,
+      this.level.bounds.maxY - this.level.bounds.minY,
+    )
+    for (let i = 0; i < lumieres.length; i++) {
+      const l = lumieres[i]
+      const s = this.toScreen(l.x, l.y)
+      const selLampe = this.sel?.kind === 'lumiere' && this.sel.index === i
+      const eteinte = i >= MAX_LUMIERES // au-delà du plafond : elle n'éclaire pas
+      const col = eteinte ? '#7b93a8' : '#ffd977'
+      g.save()
+      // rayons
+      g.strokeStyle = col + (selLampe ? 'ff' : 'aa')
+      g.lineWidth = selLampe ? 2 : 1.5
+      g.beginPath()
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2
+        g.moveTo(s.sx + Math.cos(a) * 9, s.sy + Math.sin(a) * 9)
+        g.lineTo(s.sx + Math.cos(a) * 15, s.sy + Math.sin(a) * 15)
+      }
+      g.stroke()
+      // la monture
+      g.fillStyle = col
+      g.beginPath()
+      g.arc(s.sx, s.sy, 6, 0, Math.PI * 2)
+      g.fill()
+      g.strokeStyle = '#0a1420'
+      g.lineWidth = 1
+      g.stroke()
+      // hauteur en toutes lettres : c'est le réglage qui sculpte l'ombre
+      g.fillStyle = col + 'cc'
+      g.font = '600 9px ui-monospace, monospace'
+      g.fillText(
+        eteinte ? `LAMPE ${i + 1} — ÉTEINTE (plafond)` : `LAMPE ${i + 1} · h ${l.h ?? LAMPE_HAUTEUR_DEFAUT}`,
+        s.sx + 18,
+        s.sy - 6,
+      )
+      if (selLampe) {
+        const portee = l.portee && l.portee > 0 ? l.portee : diagCuve * 0.62
+        g.strokeStyle = col + '55'
+        g.setLineDash([6, 5])
+        g.lineWidth = 1
+        g.beginPath()
+        g.arc(s.sx, s.sy, portee * this.zoom, 0, Math.PI * 2)
+        g.stroke()
+        g.setLineDash([])
+        g.fillStyle = col + '88'
+        g.fillText('PORTÉE', s.sx + portee * this.zoom * 0.707 + 4, s.sy - portee * this.zoom * 0.707 - 4)
       }
       g.restore()
     }

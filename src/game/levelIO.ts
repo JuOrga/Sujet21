@@ -12,7 +12,11 @@ import {
   MAT_HYDROPHILE,
   MAT_HYDROPHOBE,
   MAT_WALL,
+  LAMPE_HAUTEUR_DEFAUT,
+  LAMPE_HAUTEUR_MAX,
+  LAMPE_HAUTEUR_MIN,
   type LevelDef,
+  type LumiereDef,
   type ObstacleBox,
   type SpongeDef,
   type WorldLabel,
@@ -23,7 +27,7 @@ import {
   type ZoneDef,
   type ZoneForce,
 } from './level'
-import { MAX_BOXES, MAX_ZONES } from '../render/renderer'
+import { MAX_BOXES, MAX_LUMIERES, MAX_ZONES } from '../render/renderer'
 import { ARC_EPAISSEUR_DEFAUT, ARC_OUVERTURE_DEFAUT, FORME_ARC, FORME_COIN, FORME_RECT } from './formes'
 
 export const MATERIALS = [
@@ -316,6 +320,26 @@ export function parseLevel(input: unknown): { level: LevelDef | null; rejets: st
   }
   if (rails.length > 0) level.rails = rails
 
+  // Lampes : x, y obligatoires ; hauteur/portée/intensité bornées, clés
+  // effacées au défaut (le fichier reste minimal)
+  const lumieres: LumiereDef[] = []
+  for (const raw of Array.isArray(o.lumieres) ? o.lumieres : []) {
+    const l = (raw ?? {}) as Record<string, unknown>
+    const h = num(l.h, LAMPE_HAUTEUR_DEFAUT)
+    const portee = num(l.portee, 0)
+    const intensite = num(l.intensite, 1)
+    lumieres.push({
+      x: num(l.x, 0),
+      y: num(l.y, 0),
+      ...(h !== LAMPE_HAUTEUR_DEFAUT
+        ? { h: Math.max(LAMPE_HAUTEUR_MIN, Math.min(LAMPE_HAUTEUR_MAX, h)) }
+        : {}),
+      ...(portee > 0 ? { portee: Math.max(200, Math.min(8000, portee)) } : {}),
+      ...(intensite !== 1 ? { intensite: Math.max(0.2, Math.min(2, intensite)) } : {}),
+    })
+  }
+  if (lumieres.length > 0) level.lumieres = lumieres
+
   return { level, rejets }
 }
 
@@ -339,6 +363,7 @@ export function serializeLevel(level: LevelDef): string {
   if (level.cibles && level.cibles.length > 0) out.cibles = level.cibles
   if (level.portes && level.portes.length > 0) out.portes = level.portes
   if (level.rails && level.rails.length > 0) out.rails = level.rails
+  if (level.lumieres && level.lumieres.length > 0) out.lumieres = level.lumieres
   if (level.decals && level.decals.length > 0) out.decals = level.decals
   if (level.figure) out.figure = level.figure
   if (level.ambiance) out.ambiance = level.ambiance
@@ -412,6 +437,18 @@ export function checkLevel(level: LevelDef): Verdict[] {
       niveau: 'erreur',
       message: `Trop de zones d'état : ${level.zones?.length} posées, ${MAX_ZONES} dessinées au plus — les suivantes agiraient sans se voir.`,
     })
+  }
+  if ((level.lumieres?.length ?? 0) > MAX_LUMIERES) {
+    v.push({
+      niveau: 'avertissement',
+      message: `Trop de lampes : ${level.lumieres?.length} posées, ${MAX_LUMIERES} allumées au plus — les suivantes resteraient éteintes.`,
+    })
+  }
+  for (const lum of level.lumieres ?? []) {
+    if (!inBounds(lum.x, lum.y)) {
+      v.push({ niveau: 'avertissement', message: 'Une lampe est hors de la cuve : elle éclairera depuis le vide.' })
+      break
+    }
   }
   // Mécanismes laser : chaque porte doit être asservie à une cible réelle,
   // et un émetteur sans cible n'ouvre rien (il éclaire, c'est tout).

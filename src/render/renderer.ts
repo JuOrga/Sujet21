@@ -6,8 +6,8 @@
 import type { FluidSim } from '../sim/solver'
 import { KIND_PLAYER } from '../sim/solver'
 import type { SimParams } from '../sim/params'
-import { zonePhases } from '../game/level'
-import type { DecalDef, ObstacleBox, ZoneDef } from '../game/level'
+import { LAMPE_HAUTEUR_DEFAUT, LAMPE_HAUTEUR_MAX, LAMPE_HAUTEUR_MIN, zonePhases } from '../game/level'
+import type { DecalDef, LumiereDef, ObstacleBox, ZoneDef } from '../game/level'
 import { ARC_EPAISSEUR_DEFAUT, ARC_OUVERTURE_DEFAUT, FORME_ARC, FORME_COIN, FORME_RECT } from '../game/formes'
 import type { Camera } from './camera'
 
@@ -21,6 +21,10 @@ import type { Camera } from './camera'
 // chaque pixel paie les 96.
 export const MAX_BOXES = 96
 export const MAX_ZONES = 16
+// Lampes par tableau : au-delà, les excédentaires ne s'allument pas —
+// l'éditeur avertit (même contrat que MAX_BOXES). La hauteur des blocs pour
+// le calcul d'ombre est HAUTEUR_BLOCS (140 u), définie dans le shader.
+export const MAX_LUMIERES = 4
 
 const SPLAT_VS = `#version 300 es
 layout(location = 0) in vec2 aPos;
@@ -259,7 +263,10 @@ uniform vec3 uHasZones; // x buses (eau), y hublot (glace), z conduite (vapeur)
 // le coût par image se réduit à une lecture de texture. uLumiere la
 // débranche entièrement (bouton PARAMÈTRES, comme uDecor/uEau).
 uniform float uLumiere;
-uniform vec2 uLightPos;
+#define MAX_LUMIERES 4
+uniform int uLampeCount;
+uniform vec4 uLampes[MAX_LUMIERES]; // x, y, hauteur, portée
+uniform float uLampesInt[MAX_LUMIERES]; // intensité
 uniform vec2 uLightMapMin;     // coin bas-gauche de la carte (monde)
 uniform vec2 uLightMapInvSize; // 1 / taille monde de la carte
 uniform sampler2D uLightMap;
@@ -575,6 +582,21 @@ void main() {
   // eux-mêmes restent éclairés (leur relief vient du biseau directionnel).
   // Appliqué AVANT la vie du vaisseau : les veilleuses sont des lumières,
   // elles n'ont pas à subir l'ombre de la lampe principale.
+  // La direction de lumière dominante ICI (pour le biseau des arêtes) : la
+  // somme des lampes, pondérée par intensité et retombée.
+  vec2 lampeDir = vec2(0.0, 1.0);
+  if (uLumiere > 0.5) {
+    vec2 acc = vec2(0.0);
+    for (int li = 0; li < MAX_LUMIERES; li++) {
+      if (li >= uLampeCount) break;
+      vec2 dl = uLampes[li].xy - world;
+      float dn = max(length(dl), 1.0);
+      float w = uLampesInt[li] * (1.0 - 0.55 * smoothstep(0.0, uLampes[li].w, dn));
+      acc += (dl / dn) * w;
+    }
+    float an = length(acc);
+    if (an > 1e-5) lampeDir = acc / an;
+  }
   if (uLumiere > 0.5) {
     vec2 luv = (world - uLightMapMin) * uLightMapInvSize;
     float lm = texture(uLightMap, clamp(luv, 0.0, 1.0)).r;
@@ -582,6 +604,15 @@ void main() {
     // suit la retombée, la hiérarchie (vide < cuve) reste intacte
     tank *= 0.52 + 0.95 * lm;
     tank += vec3(0.028, 0.030, 0.022) * lm * lm;
+    // la monture de chaque lampe : un point chaud discret au plafond —
+    // large et doux quand elle est haute, serré quand elle rase le sol
+    for (int li = 0; li < MAX_LUMIERES; li++) {
+      if (li >= uLampeCount) break;
+      float dl = length(world - uLampes[li].xy);
+      float rayon = 26.0 + uLampes[li].z * 0.05;
+      float halo = pow(max(0.0, 1.0 - dl / rayon), 2.0);
+      tank += vec3(0.55, 0.50, 0.34) * halo * 0.5 * uLampesInt[li];
+    }
   }
   // la vie du vaisseau : veilleuses, poussières en dérive, respiration
   if (uDecor > 0.5) tank += shipLife(world, uZoom, uTime);
@@ -981,7 +1012,7 @@ void main() {
       vec2 gd = vec2(dFdx(d), dFdy(d));
       float gn = length(gd);
       if (gn > 1e-6) {
-        float facing = dot(gd / gn, normalize(uLightPos - world));
+        float facing = dot(gd / gn, lampeDir);
         float bevel = 1.0 - smoothstep(0.0, 30.0, abs(d));
         col += col * (facing * bevel * 0.30);
       }
@@ -1122,14 +1153,17 @@ void main() {
 const LIGHT_FS = `#version 300 es
 precision highp float;
 #define MAX_BOXES 96
+#define MAX_LUMIERES 4
+#define HAUTEUR_BLOCS 140.0
 uniform int uBoxCount;
 uniform vec4 uBoxes[MAX_BOXES];
 uniform vec4 uBoxAux[MAX_BOXES];
 uniform vec2 uMapMin;   // coin bas-gauche de la carte (monde)
 uniform vec2 uMapSize;  // taille de la carte (monde)
 uniform vec2 uMapPx;    // résolution de la carte (texels)
-uniform vec2 uLightPos;
-uniform float uLightReach;
+uniform int uLampeCount;
+uniform vec4 uLampes[MAX_LUMIERES]; // x, y, hauteur, portée
+uniform float uLampesInt[MAX_LUMIERES]; // intensité
 out vec4 outColor;
 ${FORMES_GLSL}
 
@@ -1156,23 +1190,37 @@ float sceneSdf(vec2 p) {
 
 void main() {
   vec2 p = uMapMin + (gl_FragCoord.xy / uMapPx) * uMapSize;
-  vec2 toL = uLightPos - p;
-  float distL = max(length(toL), 1e-4);
-  vec2 dir = toL / distL;
-  // ombre douce : le min de k·h/t le long de la marche vers la lampe
-  float res = 1.0;
-  float t = 4.0;
-  for (int k = 0; k < 40; k++) {
-    if (t >= distL || res < 0.004) break;
-    float h = sceneSdf(p + dir * t);
-    res = min(res, 10.0 * h / t);
-    t += clamp(h, 8.0, 200.0);
+  float total = 0.0;
+  for (int li = 0; li < MAX_LUMIERES; li++) {
+    if (li >= uLampeCount) break;
+    vec2 toL = uLampes[li].xy - p;
+    float hL = uLampes[li].z;
+    float distL = max(length(toL), 1e-4);
+    vec2 dir = toL / distL;
+    // La HAUTEUR borne l'ombre : le rayon qui grimpe du sol vers la lampe
+    // passe au-dessus des blocs dès que son altitude dépasse la leur — seuls
+    // les obstacles rencontrés avant t·hLampe/distL = HAUTEUR_BLOCS comptent.
+    // Lampe haute : ombres courtes et douces ; lampe basse : ombres longues.
+    float tLim = min(distL, distL * HAUTEUR_BLOCS / max(hL, HAUTEUR_BLOCS + 1.0));
+    // ombre douce : le min de k·h/t le long de la marche vers la lampe —
+    // la pénombre s'élargit avec la hauteur (une lampe haute diffuse)
+    float pen = 6.0 + hL * 0.012;
+    float res = 1.0;
+    float t = 4.0;
+    for (int k = 0; k < 40; k++) {
+      if (t >= tLim || res < 0.004) break;
+      float h = sceneSdf(p + dir * t);
+      res = min(res, pen * h / t);
+      t += clamp(h, 8.0, 200.0);
+    }
+    res = clamp(res, 0.0, 1.0);
+    // retombée douce, à support large : la lampe porte loin, les coins de
+    // la cuve restent lisibles — l'ambiance de la composition fait le
+    // plancher
+    float fall = 1.0 - 0.55 * smoothstep(0.0, uLampes[li].w, distL);
+    total += res * fall * uLampesInt[li];
   }
-  res = clamp(res, 0.0, 1.0);
-  // retombée douce, à support large : la lampe porte loin, les coins de la
-  // cuve restent lisibles — l'ambiance de la composition fait le plancher
-  float fall = 1.0 - 0.55 * smoothstep(0.0, uLightReach, distL);
-  outColor = vec4(res * fall, 0.0, 0.0, 1.0);
+  outColor = vec4(clamp(total, 0.0, 1.0), 0.0, 0.0, 1.0);
 }`
 
 // Cellules d'éponge : carrés pleins, couleur par état (sèche → gorgée →
@@ -1380,6 +1428,8 @@ export class Renderer {
   private lightMapMinY = 0
   private lightMapSizeX = 1
   private lightMapSizeY = 1
+  private readonly lampScratch = new Float32Array(MAX_LUMIERES * 4) // x, y, hauteur, portée
+  private readonly lampIntScratch = new Float32Array(MAX_LUMIERES)
   private uniforms: Record<string, Record<string, WebGLUniformLocation | null>> = {}
 
   constructor(canvas: HTMLCanvasElement, capacity: number) {
@@ -1616,27 +1666,43 @@ export class Renderer {
     this.lightKey = '' // nouvelle cible : la carte doit recuire
   }
 
-  // La lampe de la pièce : au centre, un peu vers le haut de la cuve — assez
-  // haute pour coucher les ombres, assez centrale pour éclairer les routes.
-  private lightPos(bounds: { minX: number; minY: number; maxX: number; maxY: number }): {
-    x: number
-    y: number
-    reach: number
-  } {
-    return {
-      x: (bounds.minX + bounds.maxX) / 2,
-      y: bounds.minY + (bounds.maxY - bounds.minY) * 0.7,
-      reach: Math.hypot(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) * 0.62,
+  // Les lampes effectives d'un tableau : celles posées à l'éditeur (bornées
+  // à MAX_LUMIERES, valeurs assainies), ou — quand aucune n'est déclarée —
+  // la lampe par défaut de la cuve : au centre, un peu vers le haut, assez
+  // haute pour coucher les ombres sans les étirer.
+  private lampesEffectives(
+    bounds: { minX: number; minY: number; maxX: number; maxY: number },
+    lumieres: LumiereDef[],
+  ): { x: number; y: number; h: number; portee: number; intensite: number }[] {
+    const diag = Math.hypot(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY)
+    if (lumieres.length === 0) {
+      return [
+        {
+          x: (bounds.minX + bounds.maxX) / 2,
+          y: bounds.minY + (bounds.maxY - bounds.minY) * 0.7,
+          h: LAMPE_HAUTEUR_DEFAUT,
+          portee: diag * 0.62,
+          intensite: 1,
+        },
+      ]
     }
+    return lumieres.slice(0, MAX_LUMIERES).map((l) => ({
+      x: l.x,
+      y: l.y,
+      h: Math.max(LAMPE_HAUTEUR_MIN, Math.min(LAMPE_HAUTEUR_MAX, l.h ?? LAMPE_HAUTEUR_DEFAUT)),
+      portee: l.portee && l.portee > 0 ? l.portee : diag * 0.62,
+      intensite: Math.max(0.2, Math.min(2, l.intensite ?? 1)),
+    }))
   }
 
-  // Cuit la carte de lumière si le décor a changé — les scratchs de boîtes
-  // doivent déjà être remplis. Quelques dizaines de milliers de texels, une
-  // fois par tableau : le prix d'une image, pas d'un régime.
+  // Cuit la carte de lumière si le décor OU les lampes ont changé — les
+  // scratchs de boîtes doivent déjà être remplis. Quelques dizaines de
+  // milliers de texels, une fois par tableau : le prix d'une image.
   private bakeLight(
     bounds: { minX: number; minY: number; maxX: number; maxY: number },
     boxes: ObstacleBox[],
     boxCount: number,
+    lampes: { x: number; y: number; h: number; portee: number; intensite: number }[],
   ): void {
     const gl = this.gl
     const marge = 80
@@ -1648,6 +1714,7 @@ export class Renderer {
     const h = Math.max(32, Math.min(320, Math.round((w * sizeY) / sizeX)))
     this.ensureLightTarget(w, h)
     let key = `${boxCount};${minX},${minY},${sizeX},${sizeY}`
+    for (const l of lampes) key += `;L${l.x},${l.y},${l.h},${l.portee},${l.intensite}`
     for (let i = 0; i < boxCount; i++) {
       const bx = boxes[i]
       key += `;${bx.minX},${bx.minY},${bx.maxX},${bx.maxY},${bx.angle ?? 0},${bx.material},${bx.forme ?? 0},${bx.p0 ?? 0},${bx.p1 ?? 0}`
@@ -1658,7 +1725,6 @@ export class Renderer {
     this.lightMapMinY = minY
     this.lightMapSizeX = sizeX
     this.lightMapSizeY = sizeY
-    const lampe = this.lightPos(bounds)
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.lightFbo)
     gl.viewport(0, 0, w, h)
     gl.useProgram(this.lightProgram)
@@ -1669,10 +1735,24 @@ export class Renderer {
     gl.uniform2f(lu['uMapMin'], minX, minY)
     gl.uniform2f(lu['uMapSize'], sizeX, sizeY)
     gl.uniform2f(lu['uMapPx'], w, h)
-    gl.uniform2f(lu['uLightPos'], lampe.x, lampe.y)
-    gl.uniform1f(lu['uLightReach'], lampe.reach)
+    this.remplitLampes(lampes)
+    gl.uniform1i(lu['uLampeCount'], lampes.length)
+    gl.uniform4fv(lu['uLampes[0]'], this.lampScratch)
+    gl.uniform1fv(lu['uLampesInt[0]'], this.lampIntScratch)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+  }
+
+  private remplitLampes(
+    lampes: { x: number; y: number; h: number; portee: number; intensite: number }[],
+  ): void {
+    for (let i = 0; i < lampes.length && i < MAX_LUMIERES; i++) {
+      this.lampScratch[i * 4] = lampes[i].x
+      this.lampScratch[i * 4 + 1] = lampes[i].y
+      this.lampScratch[i * 4 + 2] = lampes[i].h
+      this.lampScratch[i * 4 + 3] = lampes[i].portee
+      this.lampIntScratch[i] = lampes[i].intensite
+    }
   }
 
   render(
@@ -1693,6 +1773,7 @@ export class Renderer {
     decor = 1, // 1 décor riche, 0 sobre (bruit décoratif débranché)
     eau = 1, // 1 liquide riche, 0 sobre (relief/miroir de l'eau débranchés)
     lumiere = 1, // 1 éclairage de la pièce (carte d'ombres), 0 débranché
+    lumieres: LumiereDef[] = [], // lampes du tableau ; vide : lampe par défaut
   ): void {
     const gl = this.gl
     const devW = Math.max(1, Math.round(viewportW * dpr))
@@ -1732,8 +1813,9 @@ export class Renderer {
         bx.material === 0 ? (bx.skin ?? 0) : sim.surchauffesVides.has(i) ? 0 : 1
       this.auxScratch[i * 4 + 3] = bx.aura ?? 1
     }
-    // La carte de lumière recuit si le décor a changé (sinon : rien)
-    if (lumiere > 0.5) this.bakeLight(sim.bounds, boxes, boxCount)
+    // La carte de lumière recuit si le décor ou les lampes ont changé
+    const lampes = this.lampesEffectives(sim.bounds, lumieres)
+    if (lumiere > 0.5) this.bakeLight(sim.bounds, boxes, boxCount, lampes)
 
     // Remplissage du buffer de splats
     const n = sim.count
@@ -1816,11 +1898,13 @@ export class Renderer {
     gl.uniform1f(cu['uChill'], chill)
     gl.uniform1f(cu['uDecor'], decor)
     gl.uniform1f(cu['uEau'], eau)
-    // Éclairage de la pièce : la carte cuite + la position de la lampe (le
-    // biseau directionnel des arêtes en a besoin par pixel)
+    // Éclairage de la pièce : la carte cuite + les lampes (le biseau des
+    // arêtes et les montures en ont besoin par pixel)
     gl.uniform1f(cu['uLumiere'], lumiere > 0.5 && this.lightTex ? 1 : 0)
-    const lampe = this.lightPos(sim.bounds)
-    gl.uniform2f(cu['uLightPos'], lampe.x, lampe.y)
+    this.remplitLampes(lampes)
+    gl.uniform1i(cu['uLampeCount'], lampes.length)
+    gl.uniform4fv(cu['uLampes[0]'], this.lampScratch)
+    gl.uniform1fv(cu['uLampesInt[0]'], this.lampIntScratch)
     gl.uniform2f(cu['uLightMapMin'], this.lightMapMinX, this.lightMapMinY)
     gl.uniform2f(cu['uLightMapInvSize'], 1 / this.lightMapSizeX, 1 / this.lightMapSizeY)
     gl.uniform1i(cu['uWaveCount'], waveCount)

@@ -66,6 +66,27 @@ describe('levelIO — aller-retour JSON', () => {
     expect(again.level!.boxes).toEqual(bx)
   })
 
+  it('les lampes survivent à l’aller-retour, bornées, défauts effacés', () => {
+    const { level, rejets } = parseLevel({
+      name: 'Lampes',
+      bounds: { minX: -1000, minY: -600, maxX: 1000, maxY: 600 },
+      boxes: [],
+      lumieres: [
+        { x: 0, y: 100 }, // tout au défaut
+        { x: -300, y: 0, h: 150, portee: 900, intensite: 1.4 },
+        { x: 300, y: 0, h: 9999, intensite: 99 }, // hors bornes
+      ],
+    })
+    expect(rejets).toEqual([])
+    const lm = level!.lumieres!
+    expect(lm[0]).toEqual({ x: 0, y: 100 })
+    expect(lm[1]).toEqual({ x: -300, y: 0, h: 150, portee: 900, intensite: 1.4 })
+    expect(lm[2].h).toBe(2000)
+    expect(lm[2].intensite).toBe(2)
+    const again = parseLevel(JSON.parse(serializeLevel(level!)))
+    expect(again.level!.lumieres).toEqual(lm)
+  })
+
   it('refuse un document qui n’est pas un tableau', () => {
     expect(parseLevel('bonjour').level).toBeNull()
     expect(parseLevel({ bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 } }).level).toBeNull()

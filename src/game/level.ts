@@ -194,6 +194,24 @@ export interface DecalDef {
   fade?: number // 0..1, opacité (défaut 0,55)
 }
 
+// ---- Lampes (éclairage de la pièce, 2026) --------------------------------
+// Une lampe éclaire la cuve et couche les ombres portées du décor. La
+// HAUTEUR est la troisième dimension du réglage : un rayon qui grimpe vers
+// une lampe HAUTE passe au-dessus des blocs — ombres courtes et douces ;
+// une lampe BASSE rase le sol — ombres longues et dramatiques. Sans lampe
+// déclarée, le tableau garde sa lampe par défaut (centre, un peu haut).
+export interface LumiereDef {
+  x: number
+  y: number
+  h?: number // hauteur au-dessus du plan (unités monde) ; absente : 420
+  portee?: number // rayon de retombée ; absente : proportionnelle à la cuve
+  intensite?: number // 0,2..2 ; absente : 1
+}
+
+export const LAMPE_HAUTEUR_DEFAUT = 420
+export const LAMPE_HAUTEUR_MIN = 80
+export const LAMPE_HAUTEUR_MAX = 2000
+
 // ---- Mécanismes laser (paliers 1-3, 2026) --------------------------------
 // Le faisceau est absorbé par les parois, passe les évents, se REFLÈTE sur
 // la glace (le corps gelé est un miroir — c'est sa fonction cachée), se
@@ -257,6 +275,9 @@ export interface LevelDef {
   cibles?: CibleDef[]
   portes?: PorteDef[]
   rails?: RailDef[]
+  // Lampes posées à l'éditeur (au plus MAX_LUMIERES allumées). Absentes :
+  // la lampe par défaut de la cuve fait l'éclairage.
+  lumieres?: LumiereDef[]
   par?: number // budget d'impulsions visé : franchissable en `par`, record en dessous
   // Dashs rendus à CHAQUE transformation en vapeur (règle d'or : 3 par
   // bascule, quel que soit le volume). Absent : le réglage du banc
