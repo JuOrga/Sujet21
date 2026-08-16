@@ -146,3 +146,84 @@ export const TABLEAU_HUB: LevelDef = {
     { x: 3600, y: 600, text: 'PROTOCOLE 21|SAS DE LANCEMENT', tone: 'sas', rang: 'secteur' },
   ],
 }
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// LE HUB COMPACT (bible v3.1, chantier DÉMO 2) — construit EN PARALLÈLE du
+// hub actuel, accessible par le bouton « HUB COMPACT » de la fiche d'essai.
+// Un petit module, parcellisé à l'ISS : trois chambres de travail reliées
+// par des portes alternées. La CUVE à l'ouest, le POSTE DE GESTION au
+// centre — ses pictogrammes d'état décrivent comment les HUMAINS gèrent la
+// substance (aucun impact joueur, volontairement énigmatique) —, l'alcôve
+// de CONSERVATION au nord (les fioles des semblables, assets à venir), et
+// le SAS DE LANCEMENT à l'est. La bascule remplacera le hub actuel quand
+// le module sera validé.
+//
+// Les notes des pictogrammes sont les VRAIES règles du jeu (0 inefficace ·
+// 1 confine · 2 efficace · 3 outil idéal) :
+//   ÉPONGE       eau 3 (elle boit)      glace 1        vapeur 1
+//   PLAQUE FROIDE eau 3 (elle fige)     glace 1        vapeur 2 (rosée)
+//   CHAUDIÈRE    eau 2 (elle vaporise)  glace 3 (dégel) vapeur 0
+//   ÉVENT        eau 1                  glace 1        vapeur 0 (traverse)
+//   MEMBRANE     eau 0 (traverse)       glace 1        vapeur 1
+//   RIDEAU       eau 1                  glace 0 (écarte) vapeur 1
+//   SURCHAUFFEUR eau 1                  glace 1        vapeur 0 (le frôle)
+export const TABLEAU_HUB_COMPACT: LevelDef = {
+  name: 'Le module Méduse — compact',
+  code: 'HUB2',
+  journal:
+    'Module d’accueil, configuration compacte (chantier de refonte). Le poste de gestion affiche les procédures de contention par état.',
+  par: 3,
+  ambiante: 0.42,
+  bounds: { minX: -1750, minY: -800, maxX: 1750, maxY: 800 },
+  spawn: { x: -1400, y: 0, n: 900 },
+  exit: { minX: 1560, minY: -120, maxX: 1700, maxY: 120 },
+  boxes: [
+    // ═══ LA CUVE (ouest, −1750..−900) : la chambre de naissance ════════
+    // cloison cuve | poste — porte BASSE (y −420..−80)
+    box(-900, -80, -900 + CLOISON, 800, MAT_WALL, 6),
+    box(-900, -800, -900 + CLOISON, -420, MAT_WALL, 1),
+
+    // ═══ LE POSTE DE GESTION (centre, −900..700) ═══════════════════════
+    // l'alcôve de CONSERVATION au nord : trois niches à fioles
+    box(-620, 520, -560, 800, MAT_WALL, 3),
+    box(-180, 520, -120, 800, MAT_WALL, 3),
+    box(260, 520, 320, 800, MAT_WALL, 3),
+    // l'établi bas du poste (un plan de travail, on passe au-dessus)
+    box(-500, -800, 400, -700, MAT_WALL, 2),
+
+    // cloison poste | sas — porte HAUTE (y 140..480)
+    box(700, 480, 700 + CLOISON, 800, MAT_WALL, 4),
+    box(700, -800, 700 + CLOISON, 140, MAT_WALL, 4),
+
+    // ═══ LE SAS (est, 700..1750) : une chicane courte puis la sortie ═══
+    box(1150, -800, 1220, 300, MAT_WALL, 5),
+  ],
+  sponges: [],
+  lumieres: [
+    { x: -1350, y: 250, h: 520, intensite: 0.9, couleur: '#9fd4ee' }, // la cuve : froide
+    { x: -100, y: 100, h: 620, intensite: 1.05 }, // le poste : neutre, large
+    { x: 1450, y: 250, h: 380, intensite: 0.95, couleur: '#8fe6b0' }, // le sas : verte
+  ],
+  decals: [
+    // l'écran de contrôle veille sur le poste de gestion
+    { x: -700, y: 340, w: 300, h: 374, kind: 'ecran-off', fade: 0.95 },
+  ],
+  labels: [
+    // ─── les lieux (plan large)
+    { x: -1350, y: 620, text: 'MODULE MÉDUSE|LA CUVE', tone: 'mur', rang: 'secteur' },
+    { x: -100, y: -260, text: 'POSTE DE GESTION|PROCÉDURES DE CONTENTION', tone: 'mur', rang: 'secteur' },
+    { x: 1450, y: 560, text: 'PROTOCOLE 21|SAS DE LANCEMENT', tone: 'sas', rang: 'secteur' },
+    // ─── l'alcôve des fioles (assets à venir — la place est réservée)
+    { x: -150, y: 700, text: 'CONSERVATION|NE PAS RÉVEILLER', tone: 'froid' },
+    // ─── LES PICTOGRAMMES D'ÉTAT, alignés au-dessus de l'établi :
+    // sept moyens de contention, notés par état — sans un mot
+    { x: -660, y: -580, text: '', tone: 'eponge', picto: { couleur: '#d9a441', eau: 3, glace: 1, vapeur: 1 } },
+    { x: -440, y: -580, text: '', tone: 'froid', picto: { couleur: '#8fc8ee', eau: 3, glace: 1, vapeur: 2 } },
+    { x: -220, y: -580, text: '', tone: 'chaud', picto: { couleur: '#e8843c', eau: 2, glace: 3, vapeur: 0 } },
+    { x: 0, y: -580, text: '', tone: 'grille', picto: { couleur: '#7fae9e', eau: 1, glace: 1, vapeur: 0 } },
+    { x: 220, y: -580, text: '', tone: 'phile', picto: { couleur: '#3fae9c', eau: 0, glace: 1, vapeur: 1 } },
+    { x: 440, y: -580, text: '', tone: 'mur', picto: { couleur: '#5b7ba6', eau: 1, glace: 0, vapeur: 1 } },
+    { x: 660, y: -580, text: '', tone: 'grille', picto: { couleur: '#39c8d8', eau: 1, glace: 1, vapeur: 0 } },
+  ],
+}

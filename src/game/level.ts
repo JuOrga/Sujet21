@@ -165,6 +165,12 @@ export interface WorldLabel {
   // « detail » commente un objet (elle s'efface dès qu'elle gênerait).
   // Deux pancartes ne se chevauchent JAMAIS : celle de moindre portée cède.
   rang?: 'secteur' | 'detail'
+  // PICTOGRAMME D'ÉTAT (bible v3.1, hub compact) : une indication pour les
+  // HUMAINS — aucun impact joueur. Un rectangle à la couleur du matériau,
+  // et trois rangées de points (EAU, GLACE, VAPEUR) notées 0..3 :
+  // 0 totalement inefficace · 1 ça confine · 2 c'est efficace · 3 l'outil
+  // idéal pour gérer l'état. Sans texte — volontairement énigmatique.
+  picto?: { couleur: string; eau: number; glace: number; vapeur: number }
 }
 
 // Zone d'état (refonte 2026) : une région du tableau qui IMPOSE un état et

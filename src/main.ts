@@ -5,7 +5,7 @@ import { DEFAULT_PARAMS, type SimParams } from './sim/params'
 import { FluidSim, KIND_PLAYER } from './sim/solver'
 import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
-import { TABLEAU_HUB } from './game/hub'
+import { TABLEAU_HUB, TABLEAU_HUB_COMPACT } from './game/hub'
 import { DELIVERIES, VERSION, versionDe } from './bench/changelog'
 import { Camera } from './render/camera'
 import { MAX_BOXES, Renderer } from './render/renderer'
@@ -317,6 +317,36 @@ function buildWorldLabels(): void {
   labelEls = level.labels.map((l) => {
     const span = document.createElement('span')
     span.className = `world-label wl-${l.tone}`
+    // PICTOGRAMME D'ÉTAT (bible v3.1) : un rectangle à la couleur du
+    // matériau, trois rangées de points EAU/GLACE/VAPEUR notées 0..3.
+    // Aucun texte : une indication pour les HUMAINS, énigmatique pour le
+    // joueur — la grille de lecture se gagne.
+    if (l.picto) {
+      span.classList.add('wl-picto')
+      const swatch = document.createElement('i')
+      swatch.className = 'picto-swatch'
+      swatch.style.background = l.picto.couleur
+      span.appendChild(swatch)
+      const ETATS: ['eau' | 'glace' | 'vapeur', string][] = [
+        ['eau', '#63b7e6'],
+        ['glace', '#8fc8ee'],
+        ['vapeur', '#c9a6f2'],
+      ]
+      for (const [etat, couleur] of ETATS) {
+        const rangee = document.createElement('u')
+        rangee.className = 'picto-rangee'
+        const note = l.picto[etat]
+        for (let d = 0; d < 3; d++) {
+          const point = document.createElement('b')
+          point.className = d < note ? 'plein' : 'vide'
+          point.style.color = couleur
+          rangee.appendChild(point)
+        }
+        span.appendChild(rangee)
+      }
+      worldLabelsHost.appendChild(span)
+      return { span, x: l.x, y: l.y, w: 0, h: 0, secteur: false, place: false }
+    }
     // « SUR-TITRE|TITRE » : l'étiquette devient une PLAQUE de signalétique
     // sur deux lignes (petit sur-titre mono, titre en capitales), avec fond
     // et liseré teinté — la lisibilité d'un panneau, plus un texte qui flotte
@@ -1778,6 +1808,11 @@ function startTest(niveaux: LevelDef[]): void {
 function startBisTest(): void {
   startTest([TABLEAU_1BIS])
 }
+// Le HUB COMPACT (chantier DÉMO 2) : visitable en essai hors expédition,
+// en PARALLÈLE du hub actuel — la bascule attend la validation du module.
+document.getElementById('start-hub2')?.addEventListener('click', () => {
+  startTest([TABLEAU_HUB_COMPACT])
+})
 // Le bouton de la fiche mène aux salles laser : la trilogie 21-H → 21-J
 // (miroir, prisme, plasma), enchaînée sas après sas.
 startBisBtn.addEventListener('click', () =>
