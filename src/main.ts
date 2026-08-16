@@ -383,7 +383,16 @@ function majBandeBasse(t: number): void {
   let haut = window.innerHeight
   for (const el of [document.getElementById('statebar'), document.getElementById('touchbar')]) {
     const r = el?.getBoundingClientRect()
-    if (r && r.height > 0 && r.top < haut) haut = r.top
+    if (!r || r.height <= 0) continue
+    // Seule une vraie barre POSÉE EN BAS définit la bande interdite : LARGE
+    // (pas une colonne) et dans la moitié basse. En paysage mobile, ces
+    // barres deviennent des COLONNES latérales dont le sommet est presque
+    // en haut de l'écran : les prendre pour des barres basses interdisait
+    // TOUT l'écran aux pancartes — plus une seule visible sur téléphone
+    // ou tablette en paysage.
+    if (r.width < r.height || r.width < window.innerWidth * 0.35) continue
+    if (r.top < window.innerHeight * 0.55) continue
+    if (r.top < haut) haut = r.top
   }
   bandeBasse = Math.max(0, window.innerHeight - haut) + 10
 }
