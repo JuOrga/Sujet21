@@ -122,6 +122,13 @@ export class FluidSim {
   // Gouttes bues par les éponges depuis le début (consommé par l'audio)
   spongeBites = 0
   private readonly welded: Uint8Array // gelée au contact d'une plaque : soudée
+  // LE SOUFFLE EN VOL : vapeur chassée par un dash, qui ne vous appartient
+  // plus. Elle reste GAZ le temps du voyage (sinon elle se condense en l'air
+  // et le rappel de condensation la ramène au corps — « tout est récupéré
+  // immédiatement ») et perle sur la première paroi touchée. Un compte à
+  // rebours l'empêche de flotter indéfiniment : à bout de course, elle perle
+  // sur place.
+  private readonly souffle: Float32Array // > 0 : secondes de vol restantes
   private readonly iceVxSum: Float32Array
   private readonly iceVySum: Float32Array
   private readonly iceCnt: Int32Array
@@ -244,6 +251,7 @@ export class FluidSim {
     this.gasLink = new Float32Array(capacity)
     this.gaseous = new Uint8Array(capacity)
     this.welded = new Uint8Array(capacity)
+    this.souffle = new Float32Array(capacity)
     this.iceVxSum = new Float32Array(capacity)
     this.iceVySum = new Float32Array(capacity)
     this.iceCnt = new Int32Array(capacity)
@@ -645,6 +653,7 @@ export class FluidSim {
       this.gaseous[i] = this.gaseous[last]
       this.gasLink[i] = this.gasLink[last]
       this.welded[i] = this.welded[last]
+      this.souffle[i] = this.souffle[last]
     }
     this.count = last
   }
@@ -665,6 +674,7 @@ export class FluidSim {
     this.gaseous[i] = 0
     this.gasLink[i] = 0
     this.welded[i] = 0
+    this.souffle[i] = 0
     if (kind === KIND_PLAYER) this.playerCount++
     return i
   }
@@ -993,6 +1003,46 @@ export class FluidSim {
       return 0 // à sec : condenser et se retransformer, ou un surchauffeur
     }
     this.dashBudget--
+
+    // ——— LE SOUFFLE : on avance parce qu'on REJETTE ————————————————
+    // La queue du nuage (le plus loin DERRIÈRE, dans l'axe du dash) est
+    // chassée vers l'arrière et cesse de vous appartenir. Elle se disperse,
+    // et la vapeur qui n'est plus à vous perle sur la première paroi
+    // touchée : des gouttes à aller rechercher — ou à laisser derrière soi.
+    const part = Math.max(0, Math.min(0.5, p.gasDashExhaust))
+    // jamais au point de dissoudre le corps : un plancher de nuage reste
+    const chassables = Math.max(0, gasCount - 12)
+    const souffle = Math.min(chassables, Math.round(gasCount * part))
+    if (souffle > 0) {
+      // les candidats, triés par projection sur l'ARRIÈRE du dash
+      const queue: { i: number; d: number }[] = []
+      for (let i = 0; i < this.count; i++) {
+        if (this.kind[i] !== KIND_PLAYER || this.gaseous[i] !== 1) continue
+        const rx = this.posX[i] - this.stats.centroidX
+        const ry = this.posY[i] - this.stats.centroidY
+        queue.push({ i, d: -(rx * dx + ry * dy) }) // grand = bien en arrière
+      }
+      queue.sort((a, b) => b.d - a.d)
+      const vSouffle = p.gasDashSpeed * power * Math.max(0, p.gasDashExhaustSpeed)
+      for (let k = 0; k < souffle && k < queue.length; k++) {
+        const i = queue[k].i
+        // évantail : le souffle s'ouvre au lieu de partir en trait
+        this.recondSeed = (this.recondSeed * 48271) % 2147483647
+        const ecart = (this.recondSeed / 2147483647 - 0.5) * 0.7
+        const co = Math.cos(ecart)
+        const si = Math.sin(ecart)
+        const ex = -dx * co - -dy * si
+        const ey = -dx * si + -dy * co
+        this.velX[i] = ex * vSouffle
+        this.velY[i] = ey * vSouffle
+        this.kind[i] = KIND_FREE
+        this.cooldown[i] = p.reabsorbCooldown
+        this.souffle[i] = 4 // 4 s de vol : le temps de traverser une salle
+        this.playerCount--
+      }
+      this.updatePlayerStats()
+    }
+
     for (let i = 0; i < this.count; i++) {
       if (this.kind[i] !== KIND_PLAYER || this.gaseous[i] !== 1) continue
       this.velX[i] = dx * p.gasDashSpeed * power
@@ -1170,6 +1220,7 @@ export class FluidSim {
     permuteI(this.frozen)
     permuteI(this.gaseous)
     permuteI(this.welded)
+    permuteF(this.souffle)
     permuteI(this.labels)
     permuteI(this.iceLabels)
     permuteI(this.contactMat)
@@ -1667,6 +1718,9 @@ export class FluidSim {
       const v = Math.max(this.vapor[i], this.gasLink[i])
       if (v <= 0.02 || this.frozen[i] === 1) continue
       if (this.gasIntent && this.kind[i] === KIND_PLAYER) continue // le pilotage garde la main
+      // le souffle d'un dash n'est plus à vous : ni en vol, ni fraîchement
+      // perlé — sinon la propulsion en vapeur ne coûterait rien
+      if (this.kind[i] !== KIND_PLAYER && (this.souffle[i] > 0 || this.cooldown[i] > 0)) continue
       const dx = cx - this.posX[i]
       const dy = cy - this.posY[i]
       const d = Math.hypot(dx, dy)
@@ -1784,6 +1838,28 @@ export class FluidSim {
       // par la moyenne de l'amas puis écrasée par l'impulsion rigide.)
       if (gel) continue
       const mat = this.contactMat[i]
+      // LA VAPEUR QUI N'EST PLUS À VOUS PERLE OÙ ELLE TOUCHE. Le souffle du
+      // dash (et toute vapeur détachée du corps) se condense à la première
+      // paroi : elle redevient goutte, s'y pose, et attend qu'on vienne la
+      // chercher. La vapeur DU CORPS traverse comme avant — le passe-muraille
+      // reste intact, c'est seulement l'échappement qui se dépose.
+      // (pas sur une MEMBRANE : elle est faite pour ARRÊTER la vapeur — y
+      // perler la ferait franchir sous forme de goutte, l'outil de
+      // conception perdrait son sens. Le souffle rebondit et perlera ailleurs.)
+      if (gaz && mat >= 0 && mat !== MAT_MEMBRANE && this.kind[i] !== KIND_PLAYER) {
+        this.gaseous[i] = 0
+        this.souffle[i] = 0
+        this.vapor[i] = 0
+        // la trace « était vapeur » est effacée : sans cela le rappel de
+        // condensation (condenseRegroup) ramènerait la goutte vers le corps
+        // — c'est précisément ce qu'on veut empêcher, elle reste au mur
+        this.gasLink[i] = 0
+        // elle se pose : l'élan retombe, la goutte reste au mur
+        this.velX[i] *= 0.12
+        this.velY[i] *= 0.12
+        this.roseePerlee++
+        continue
+      }
       if (gaz) {
         // la vapeur ne colle ni ne rebondit — mais les bandes la travaillent
         // légèrement (voir plus bas)
@@ -2015,6 +2091,19 @@ export class FluidSim {
       // Vapeur : le froid condense en priorité (vite), puis la chaleur
       // vaporise qu'on le veuille ou non, sinon l'intention (G) vaporise et
       // son absence condense. Hystérésis comme pour la glace.
+      // LE SOUFFLE EN VOL reste GAZ jusqu'à ce qu'il touche : sans cela il se
+      // condense en plein vol, et le rappel de condensation le ramène au
+      // corps — la propulsion redeviendrait gratuite. Son compte à rebours
+      // s'épuise : à bout de course, il perle sur place.
+      if (this.souffle[i] > 0) {
+        this.souffle[i] = Math.max(0, this.souffle[i] - dt)
+        if (this.souffle[i] > 0) {
+          this.vapor[i] = 1
+          this.gaseous[i] = 1
+          this.gasLink[i] = 1
+          continue
+        }
+      }
       const wantGas = this.gasIntent && this.kind[i] === KIND_PLAYER && this.frozen[i] === 0
       let dv: number
       if (exposure > 0) dv = -exposure * (dt / 0.25)
