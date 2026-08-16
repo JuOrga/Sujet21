@@ -1117,6 +1117,10 @@ let eauRiche = localStorage.getItem('sujet21-eau') !== 'sobre'
 // biseau directionnel sur les arêtes — du relief pour presque rien. ACTIF
 // par défaut, débranchable ici même ; l'éclairage du volume viendra après.
 let lumiereActive = localStorage.getItem('sujet21-lumiere') !== 'off'
+// Éclairage du VOLUME : le corps (eau, glace, vapeur) baigne dans la même
+// lumière que la pièce — ombres portées comprises, reflet vers la lampe.
+// Débranchable séparément ; sans éclairage de pièce, il n'a rien à recevoir.
+let lumiereEauActive = localStorage.getItem('sujet21-lumiere-eau') !== 'off'
 const paramsEl = document.getElementById('params') as HTMLDivElement
 {
   const choix = document.getElementById('params-fps') as HTMLDivElement
@@ -1327,6 +1331,30 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     }
     renderLumiere()
   }
+
+  const choixLumEau = document.getElementById('params-lumeau') as HTMLDivElement | null
+  if (choixLumEau) {
+    const renderLumEau = (): void => {
+      choixLumEau.innerHTML = ''
+      for (const [on, label] of [
+        [true, 'ACTIF'],
+        [false, 'COUPÉ'],
+      ] as const) {
+        const b = document.createElement('button')
+        b.type = 'button'
+        b.textContent = label
+        b.className = lumiereEauActive === on ? 'actif' : ''
+        b.addEventListener('click', () => {
+          lumiereEauActive = on
+          localStorage.setItem('sujet21-lumiere-eau', on ? 'on' : 'off')
+          perf.reset()
+          renderLumEau()
+        })
+        choixLumEau.appendChild(b)
+      }
+    }
+    renderLumEau()
+  }
 }
 
 // ---- Rapport de performance : mesurer la VRAIE machine, analyser à distance ----
@@ -1355,6 +1383,7 @@ function rapportPerf(): Record<string, unknown> {
       graphismes: decorRiche ? 'riches' : 'sobres',
       liquide: eauRiche ? 'riche' : 'sobre',
       eclairage: lumiereActive ? 'actif' : 'coupe',
+      eclairageVolume: lumiereActive && lumiereEauActive ? 'actif' : 'coupe',
       moteur: sim.moteurWasm ? 'wasm' : noyauxWasm ? 'javascript' : 'javascript (wasm non chargé)',
       rattrapage: rattrapageFluide ? 'fluidite' : 'temps-reel',
       simHz,
@@ -3757,6 +3786,7 @@ function frame(now: number): void {
     eauRiche ? 1 : 0,
     lumiereActive ? 1 : 0,
     level.lumieres ?? [],
+    lumiereEauActive ? 1 : 0,
   )
   const rendRaw = performance.now() - renderT0
   monitor.renderMs += (rendRaw - monitor.renderMs) * 0.08

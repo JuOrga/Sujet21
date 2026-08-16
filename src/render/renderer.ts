@@ -263,6 +263,11 @@ uniform vec3 uHasZones; // x buses (eau), y hublot (glace), z conduite (vapeur)
 // le coût par image se réduit à une lecture de texture. uLumiere la
 // débranche entièrement (bouton PARAMÈTRES, comme uDecor/uEau).
 uniform float uLumiere;
+// Éclairage du VOLUME (le corps d'eau, la glace, la vapeur) : 1 branché —
+// le corps baigne dans la même carte de lumière que la pièce, les ombres
+// portées le traversent, le reflet suit la lampe dominante. 0 : l'eau garde
+// son éclairage fixe historique. Débranchable séparément de la pièce.
+uniform float uLumiereEau;
 #define MAX_LUMIERES 4
 uniform int uLampeCount;
 uniform vec4 uLampes[MAX_LUMIERES]; // x, y, hauteur, portée
@@ -1071,7 +1076,19 @@ void main() {
     // les dérivées par pixel liraient chaque particule comme une bille.
     // En liquide SOBRE, pas de relief : normale plate, éclairage constant —
     // les 4 prélèvements et les puissances du miroir sont économisés.
-    vec3 lightDir = normalize(vec3(-0.35, 0.55, 0.75));
+    // Éclairage du VOLUME : la lampe dominante du pixel donne la direction
+    // du relief — l'eau et la pièce vivent dans la même lumière. La carte
+    // (sans mipmaps) se lit aussi ici : pas de lumière, pas de reflet.
+    vec3 lightDir = uLumiereEau > 0.5
+      ? normalize(vec3(lampeDir * 0.62, 0.78))
+      : normalize(vec3(-0.35, 0.55, 0.75));
+    vec3 lmEau = vec3(1.0);
+    vec3 lumSpec = vec3(1.0);
+    if (uLumiereEau > 0.5) {
+      vec2 luvEau = (world - uLightMapMin) * uLightMapInvSize;
+      lmEau = texture(uLightMap, clamp(luvEau, 0.0, 1.0)).rgb;
+      lumSpec = 0.30 + 0.90 * lmEau;
+    }
     vec3 nrm = vec3(0.0, 0.0, 1.0);
     float diffuse = 0.55;
     float specular = 0.0;
@@ -1102,7 +1119,7 @@ void main() {
       float shimmer = sin(world.x * 0.11 + uTime * 1.6) * sin(world.y * 0.09 - uTime * 1.2);
       water *= 1.0 + 0.05 * shimmer * core;
       water = mix(water, water * (0.55 + 0.75 * diffuse), surfaceZone * 0.55);
-      water += vec3(0.85, 0.95, 1.0) * specular * 0.35 * surfaceZone * (1.0 - vap);
+      water += vec3(0.85, 0.95, 1.0) * lumSpec * specular * 0.35 * surfaceZone * (1.0 - vap);
       // Le miroir vivant (lore) : l'échantillon REFLÈTE la lumière. Trois
       // couches sur la seule zone de surface — un éclat spéculaire dur (le
       // reflet net d'une source), un voile de fresnel froid aux incidences
@@ -1114,9 +1131,9 @@ void main() {
       float etincelles = uDecor > 0.5
         ? specks(world + nrm.xy * 55.0 + vec2(uTime * 7.0, -uTime * 4.0), 48.0, 0.10, uZoom)
         : 0.0;
-      water += vec3(0.95, 0.99, 1.0) * specDur * 0.80 * miroir;
-      water += vec3(0.50, 0.68, 0.85) * fres * 0.40 * miroir;
-      water += vec3(0.90, 0.97, 1.0) * etincelles * (0.25 + specDur) * 0.55 * miroir;
+      water += vec3(0.95, 0.99, 1.0) * lumSpec * specDur * 0.80 * miroir;
+      water += vec3(0.50, 0.68, 0.85) * lumSpec * fres * 0.40 * miroir;
+      water += vec3(0.90, 0.97, 1.0) * lumSpec * etincelles * (0.25 + specDur) * 0.55 * miroir;
     }
     water += vec3(0.30, 0.55, 0.65) * waveGlow * 0.45 * (1.0 - icy) * (1.0 - vap);
 
@@ -1133,6 +1150,12 @@ void main() {
     smoke += vec3(0.16, 0.22, 0.28) * smokeN * smokeN; // volutes lumineuses qui roulent
     smoke = mix(smoke, vec3(0.46, 0.42, 0.62), (1.0 - smokeN) * 0.22); // plis lilas
     water = mix(water, smoke, vap * 0.92);
+
+    // Le corps baigne dans la lumière de la pièce : les ombres portées le
+    // traversent, la teinte des lampes le colore — liquide, glace et vapeur
+    // pareillement. Plage COMPRESSÉE : la silhouette est la jauge de vie du
+    // joueur, elle reste lisible au plus noir de l'ombre.
+    if (uLumiereEau > 0.5) water *= 0.70 + 0.55 * lmEau;
 
     col = mix(col, water, body);
     // L'eau qui recouvre l'œil du sas s'assombrit : elle sombre dans le trou
@@ -1783,6 +1806,7 @@ export class Renderer {
     eau = 1, // 1 liquide riche, 0 sobre (relief/miroir de l'eau débranchés)
     lumiere = 1, // 1 éclairage de la pièce (carte d'ombres), 0 débranché
     lumieres: LumiereDef[] = [], // lampes du tableau ; vide : lampe par défaut
+    lumiereEau = 1, // 1 le VOLUME baigne dans la lumière de la pièce, 0 non
   ): void {
     const gl = this.gl
     const devW = Math.max(1, Math.round(viewportW * dpr))
@@ -1910,6 +1934,8 @@ export class Renderer {
     // Éclairage de la pièce : la carte cuite + les lampes (le biseau des
     // arêtes et les montures en ont besoin par pixel)
     gl.uniform1f(cu['uLumiere'], lumiere > 0.5 && this.lightTex ? 1 : 0)
+    // le volume n'a de lumière à recevoir que si la pièce en a une
+    gl.uniform1f(cu['uLumiereEau'], lumiere > 0.5 && lumiereEau > 0.5 && this.lightTex ? 1 : 0)
     this.remplitLampes(lampes)
     gl.uniform1i(cu['uLampeCount'], lampes.length)
     gl.uniform4fv(cu['uLampes[0]'], this.lampScratch)
