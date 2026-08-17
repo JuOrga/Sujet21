@@ -529,6 +529,50 @@ float boxSdf(vec2 world, vec4 b) {
 }
 ${FORMES_GLSL}
 
+// ---- L'OMBRE PORTÉE DU VOLUME (dynamique) --------------------------------
+// La carte de lumière est CUITE : elle ne connaît que les obstacles, qui ne
+// bougent pas. Le corps, lui, se déplace à chaque image — il ne peut pas y
+// entrer. On marche donc, depuis ce pixel, vers chaque lampe, en lisant le
+// CHAMP de particules (la texture même qui dessine la silhouette) : ce que
+// l'eau intercepte en chemin, elle l'ombre. Le nuage, la glace et les
+// gouttes libres portent tous leur ombre, sans une ligne de plus.
+// Marche en ESPACE ÉCRAN : hors du cadre, l'occulteur n'est pas dessiné, la
+// marche s'arrête — l'ombre ne coûte que ce qui se voit.
+#define HAUTEUR_CORPS 95.0
+float ombreVolume(vec2 world, float dansEau) {
+  if (uLumiereEau < 0.5) return 0.0;
+  float occ = 0.0;
+  for (int li = 0; li < MAX_LUMIERES; li++) {
+    if (li >= uLampeCount) break;
+    vec2 toL = uLampes[li].xy - world;
+    float dl = length(toL);
+    if (dl < 1.0) continue;
+    vec2 dir = toL / dl;
+    // La HAUTEUR de la lampe règle la LONGUEUR de l'ombre, comme pour les
+    // blocs : une lampe rasante l'étire loin derrière le corps, une lampe
+    // zénithale la ramène à ses pieds. Un plancher de 170 u garantit
+    // toujours l'ombre de contact — sans elle, le corps flotte au-dessus du
+    // décor au lieu d'y appartenir.
+    float port = clamp(dl * HAUTEUR_CORPS / max(uLampes[li].z, HAUTEUR_CORPS), 170.0, 1400.0);
+    port = min(port, dl);
+    float acc = 0.0;
+    for (int k = 1; k <= 8; k++) {
+      float t = port * float(k) / 8.0;
+      vec2 pw = world + dir * t;
+      vec2 fuv = ((pw - uCenter) * uZoom + uViewport * 0.5) / uViewport;
+      if (fuv.x < 0.0 || fuv.x > 1.0 || fuv.y < 0.0 || fuv.y > 1.0) break;
+      float f = texture(uField, fuv).r / uFieldScale;
+      // occulteur d'autant plus net qu'il est PRÈS : l'ombre s'adoucit en
+      // s'éloignant de ce qui la porte (pénombre d'une source étendue)
+      float dur = 1.0 - 0.55 * (t / max(port, 1.0));
+      acc = max(acc, smoothstep(uThreshold * 0.75, uThreshold * 1.7, f) * dur);
+    }
+    occ = max(occ, acc * clamp(uLampesInt[li], 0.0, 1.5));
+  }
+  // sous le corps lui-même, pas d'ombre : il est éclairé, pas assombri
+  return clamp(occ, 0.0, 1.0) * (1.0 - dansEau);
+}
+
 void main() {
   vec2 uv = gl_FragCoord.xy / uCanvasSize;
   vec4 tex = texture(uField, uv);
@@ -1089,6 +1133,15 @@ void main() {
         col += col * (facing * bevel * 0.30);
       }
     }
+  }
+
+  // L'ombre du CORPS se couche sur tout ce qui est déjà peint — fond de
+  // cuve, zones, parois : le volume existe dans la lumière, il l'intercepte.
+  // Teintée vers le bleu d'ombre, comme celle des blocs.
+  if (uLumiere > 0.5 && uLumiereEau > 0.5) {
+    float dansEau = smoothstep(uThreshold * 0.8, uThreshold * 1.4, field);
+    float ombre = ombreVolume(world, dansEau);
+    col = mix(col, col * vec3(0.44, 0.51, 0.66), ombre * 0.72);
   }
 
   // Ondes d'éjection : anneaux qui traversent le volume depuis le point
