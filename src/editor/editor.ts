@@ -47,7 +47,7 @@ import {
   FORME_RECT,
   formeOutline,
 } from '../game/formes'
-import { checkLevel, parseLevel, serializeLevel } from '../game/levelIO'
+import { CODE_HUB, checkLevel, codeCanon, parseLevel, serializeLevel } from '../game/levelIO'
 import { MAX_LUMIERES } from '../render/renderer'
 import { traceLaser } from '../game/laser'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
@@ -1809,7 +1809,9 @@ export class LevelEditor {
     for (const id of ['ed-name', 'ed-code', 'ed-par', 'ed-journal'] as const) {
       this.el(id).addEventListener('input', () => {
         this.level.name = (this.el('ed-name') as HTMLInputElement).value || 'Sans titre'
-        this.level.code = (this.el('ed-code') as HTMLInputElement).value || '21-?'
+        // « hub » en minuscules désigne le hub tout autant : on canonise ici,
+        // sinon le tableau partait dans l'expédition sans que rien ne le dise
+        this.level.code = codeCanon((this.el('ed-code') as HTMLInputElement).value) || '21-?'
         this.level.par = Math.max(1, Number((this.el('ed-par') as HTMLInputElement).value) || 3)
         this.level.journal = (this.el('ed-journal') as HTMLTextAreaElement).value
         this.persist()
@@ -1948,8 +1950,13 @@ export class LevelEditor {
         return (
           `<div class="ed-lib-row${s.id === this.openId ? ' open' : ''}" data-id="${s.id}">` +
           `<span class="ed-lib-no">${i + 1}</span>` +
-          `<button type="button" class="ed-lib-open" data-id="${s.id}" title="Ouvrir ce tableau">` +
+          `<button type="button" class="ed-lib-open" data-id="${s.id}" title="${
+            s.level.code === CODE_HUB
+              ? 'Le LABORATOIRE : ce tableau remplace le hub et ne compte pas dans la séquence'
+              : 'Ouvrir ce tableau'
+          }">` +
           `<b>${s.level.code}</b> ${s.level.name}` +
+          (s.level.code === CODE_HUB ? `<em class="ed-lib-hub">LABORATOIRE</em>` : '') +
           `<small>${s.auteur ? s.auteur + ' · ' : ''}par ${s.level.par ?? '?'}${errs ? ' · ' + errs + ' erreur(s)' : ''}</small>` +
           `</button>` +
           `<span class="ed-lib-ord">` +

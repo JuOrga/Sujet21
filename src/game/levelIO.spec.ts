@@ -339,3 +339,21 @@ describe('levelIO — mode des récepteurs (TOR/NOR)', () => {
     expect(long.cineAvant).toHaveLength(24)
   })
 })
+
+describe('le code HUB : un mot-clé, pas une casse à deviner', () => {
+  const nu = (code: string) => ({
+    name: 'H',
+    code,
+    bounds: { minX: -1000, minY: -600, maxX: 1000, maxY: 600 },
+    boxes: [],
+  })
+  it('canonise « hub », « Hub », «  HUB  » vers HUB', () => {
+    for (const forme of ['hub', 'Hub', 'HUB', '  hUb  ']) {
+      expect(parseLevel(nu(forme)).level!.code).toBe('HUB')
+    }
+  })
+  it('ne touche pas aux autres codes', () => {
+    expect(parseLevel(nu('21-A bis')).level!.code).toBe('21-A bis')
+    expect(parseLevel(nu('21-hub')).level!.code).toBe('21-hub')
+  })
+})

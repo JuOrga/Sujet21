@@ -3453,6 +3453,18 @@
       /* Champ à CURSEUR (tactile) : intitulé et nombre en tête, la glissière
          prend toute la largeur en dessous — le doigt a de la place, le
          clavier n'est plus obligatoire pour régler une valeur */
+      .ed-lib-hub {
+        display: inline-block;
+        margin-left: 6px;
+        padding: 0 5px;
+        border: 1px solid #35e0a4;
+        border-radius: 4px;
+        color: #35e0a4;
+        font-style: normal;
+        font-size: 9px;
+        letter-spacing: 0.12em;
+        vertical-align: 1px;
+      }
       .ed-astuce {
         font-size: 9.5px;
         line-height: 1.4;
@@ -3931,6 +3943,7 @@
           <span class="k">Tableau</span>
           <label class="ed-f"><span>Nom</span><input id="ed-name" /></label>
           <label class="ed-f"><span>Code</span><input id="ed-code" /></label>
+          <p class="ed-astuce">Le code identifie la salle (21-A, 21-B…). Un seul est réservé : <b>HUB</b> — le tableau qui le porte devient le LABORATOIRE (le hub), remplace celui du jeu et sort de la séquence de l'expédition. Tous les autres codes s'enchaînent dans l'ordre de la bibliothèque.</p>
           <label class="ed-f"><span>Par (impulsions)</span><input type="number" id="ed-par" min="1" step="1" /></label>
           <label class="ed-f"><span>Dashs vapeur / écran</span><input type="number" id="ed-dashs" min="0" step="1" placeholder="banc" /></label>
           <label class="ed-f"><span>Musique</span><select id="ed-ambiance"></select></label>

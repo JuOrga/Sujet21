@@ -64,6 +64,16 @@ function str(v: unknown, fallback = ''): string {
   return typeof v === 'string' ? v : fallback
 }
 
+/** Le CODE DU HUB, en majuscules : le tableau qui porte ce code remplace le
+ *  laboratoire et ne compte pas dans la séquence de l'expédition. */
+export const CODE_HUB = 'HUB'
+
+/** Canonise le code : « hub », « Hub », «  HUB  » désignent tous le hub. */
+export function codeCanon(code: string): string {
+  const nu = code.trim()
+  return nu.toUpperCase() === CODE_HUB ? CODE_HUB : nu
+}
+
 /** Boîte normalisée : min toujours inférieur à max, matériau connu. */
 function readBox(o: Record<string, unknown>): ObstacleBox | null {
   const minX = num(o.minX)
@@ -225,7 +235,10 @@ export function parseLevel(input: unknown): { level: LevelDef | null; rejets: st
 
   const level: LevelDef = {
     name: str(o.name, 'Sans titre').slice(0, 60),
-    code: str(o.code, '21-?').slice(0, 16),
+    // Le code « HUB » est un MOT-CLÉ (il désigne le laboratoire, hors
+    // séquence) : on le canonise, sans quoi « hub » ou « Hub » échouait en
+    // silence — le tableau finissait dans l'expédition sans rien dire.
+    code: codeCanon(str(o.code, '21-?').slice(0, 16)),
     journal: str(o.journal, ''),
     figure: str(o.figure) || undefined,
     bounds,
