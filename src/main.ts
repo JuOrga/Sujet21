@@ -42,7 +42,10 @@ import { BOUTON, Manette } from './game/manette'
 import { PerfCollector } from './game/perf'
 import { fetchLibrary } from './game/netLevels'
 import { AudioFx, loadAudioPrefs } from './game/audio'
-import { Soundtrack, type Bruitage, type Piste } from './game/soundtrack'
+import { Soundtrack, type Bruitage, type Piste, type Ponctuation } from './game/soundtrack'
+import { CINEMATIQUE_ESSAI, type CinematiqueDef } from './game/cinematique'
+import { LecteurCinematique } from './game/cinelecteur'
+import { TableMontage } from './game/montage'
 import { Records } from './game/records'
 import {
   fetchSharedBoard,
@@ -255,7 +258,8 @@ function hubLevel(): LevelDef {
 // tableau d'éditeur), sans toucher aux registres. La FILE enchaîne les
 // tableaux d'essai au sas — la trilogie laser se joue ainsi.
 let testLevel: LevelDef | null = null
-let testQueue: LevelDef[] = []
+// La file d'essai est mixte : tableaux et cinématiques s'y enchaînent.
+let testQueue: (LevelDef | CinematiqueDef)[] = []
 let level: LevelDef = TABLEAUX[levelIndex]
 // Les boîtes rendues incluent le sas (rendu seulement, pas de physique solide),
 // et la bouche d'aspiration est le centre du sas du tableau courant.
@@ -1784,13 +1788,43 @@ homeRestartBtn.addEventListener('click', () => {
 // part, sans toucher aux registres. Sert au prototype 21-A bis (depuis le
 // banc) et aux salles laser (bouton de la fiche) — la file enchaîne les
 // tableaux au sas, comme une mini-expédition d'essai.
-function startTest(niveaux: LevelDef[]): void {
+// ---- Les cinématiques : le lecteur plein écran, branché sur la bande-son.
+// La file d'essai est MIXTE : une étape est un tableau OU une cinématique —
+// l'ouverture jouable enchaînera exactement ainsi (planches, puis la cuve).
+const lecteurCine = new LecteurCinematique(el('cine'), {
+  bruitage: (n) => bande.bruitage(n as Bruitage),
+  ponctuation: (n) => bande.ponctuation(n as Ponctuation),
+  // null : la cinématique rend la main — le lit du tableau courant reprend
+  piste: (n) =>
+    bande.setAmbiance(n === null ? ((level.ambiance as Piste | undefined) ?? null) : (n as Piste)),
+})
+function lireCine(cine: CinematiqueDef): Promise<void> {
+  const pause = input.paused
+  input.paused = true // aucun geste de jeu ne traverse l'écran de cinématique
+  return lecteurCine.joue(cine).then(() => {
+    input.paused = pause
+  })
+}
+function estCine(e: LevelDef | CinematiqueDef): e is CinematiqueDef {
+  return 'planches' in e
+}
+// Joue les cinématiques en tête de file (il peut y en avoir plusieurs à la
+// suite), puis rend la main au tableau qui suit.
+function joueCinesEnTete(puis: () => void): void {
+  const tete = testQueue[0]
+  if (tete && estCine(tete)) {
+    testQueue.shift()
+    void lireCine(tete).then(() => joueCinesEnTete(puis))
+    return
+  }
+  puis()
+}
+function startTest(etapes: (LevelDef | CinematiqueDef)[]): void {
   if (requireName()) {
     openHome() // le champ du nom vit sur la fiche : on la montre pour le remplir
     return
   }
-  testLevel = niveaux[0]
-  testQueue = niveaux.slice(1)
+  testQueue = etapes.slice()
   fromEditor = false
   run.bonbonneLiters = 0
   run.runTime = 0
@@ -1801,9 +1835,19 @@ function startTest(niveaux: LevelDef[]): void {
   input.paused = false
   startBtn.textContent = "REPRENDRE L'ESSAI"
   homeRestartBtn.hidden = false
-  restart()
-  montrerOnboard() // premier contact tactile : la prise en main d'abord
-  lanceEveil() // premier contact tout court : l'éveil d'abord
+  joueCinesEnTete(() => {
+    const lv = testQueue.shift()
+    if (!lv || estCine(lv)) {
+      // la file ne contenait que des cinématiques : retour à la fiche
+      testLevel = null
+      openHome()
+      return
+    }
+    testLevel = lv
+    restart()
+    montrerOnboard() // premier contact tactile : la prise en main d'abord
+    lanceEveil() // premier contact tout court : l'éveil d'abord
+  })
 }
 function startBisTest(): void {
   startTest([TABLEAU_1BIS])
@@ -1813,6 +1857,17 @@ function startBisTest(): void {
 document.getElementById('start-hub2')?.addEventListener('click', () => {
   startTest([TABLEAU_HUB_COMPACT])
 })
+// La table de montage des cinématiques : l'écran où le concepteur a la
+// main — planches, effets, sons, lecture immédiate, export/import.
+const montage = new TableMontage(el('montage'), {
+  livrees: [CINEMATIQUE_ESSAI],
+  lire: (c) => lireCine(c),
+})
+document.getElementById('open-montage')?.addEventListener('click', () => montage.open())
+// Sondes de conception/test : jouer une cinématique arbitraire, lire l'état
+;(window as unknown as { __lireCine: (c: unknown) => Promise<void> }).__lireCine = (c) =>
+  lireCine(c as CinematiqueDef)
+;(window as unknown as { __cineActif: () => boolean }).__cineActif = () => lecteurCine.actif
 // Le bouton de la fiche mène aux salles laser : la trilogie 21-H → 21-J
 // (miroir, prisme, plasma), enchaînée sas après sas.
 startBisBtn.addEventListener('click', () =>
@@ -1950,9 +2005,11 @@ window.addEventListener('keydown', (e) => {
   const t = e.target as HTMLElement | null
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
   if (e.key === 'Escape') {
+    if (lecteurCine.actif) return // le lecteur gère lui-même son Échap (sauter)
     if (!recsEl.hidden) fermerRecs() // les voiles d'abord
     else if (!cmdsEl.hidden) cmdsEl.hidden = true
     else if (!sallesEl.hidden) sallesEl.hidden = true
+    else if (el('montage').classList.contains('visible')) montage.close()
     else if (document.body.classList.contains('playing')) openHome()
     else closeHome()
   } else if (e.key === 'l' || e.key === 'L') {
@@ -2631,11 +2688,22 @@ function resetAction(): void {
         openEditor() // l'essai vient de l'éditeur : on y retourne
         return
       }
-      // la file d'essai continue : le sas mène à la salle suivante
+      // la file d'essai continue : le sas mène à la salle suivante —
+      // en jouant d'abord les cinématiques qui la précèdent
       if (testQueue.length > 0) {
-        testLevel = testQueue.shift()!
-        run.runTime = 0
-        restart()
+        joueCinesEnTete(() => {
+          const lv = testQueue.shift()
+          if (!lv || estCine(lv)) {
+            // il ne restait que des cinématiques : la file est finie
+            testLevel = null
+            newExpedition()
+            openHome()
+            return
+          }
+          testLevel = lv
+          run.runTime = 0
+          restart()
+        })
         return
       }
       testLevel = null

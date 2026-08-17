@@ -57,6 +57,28 @@ export type Bruitage =
   | 'souffle-vapeur'
   | 'vortex-sas'
 
+// Listes canoniques (validation des données : cinématiques, éditeur) — à
+// tenir en phase avec les unions ci-dessus.
+export const PONCTUATIONS: Ponctuation[] = [
+  'sting-collecte',
+  'sting-record',
+  'sting-derniere-impulsion',
+  'fin-de-course',
+]
+export const BRUITAGES: Bruitage[] = [
+  'ejection-1',
+  'ejection-2',
+  'ejection-3',
+  'gel',
+  'vaporisation',
+  'condensation',
+  'impact-glace',
+  'goutte-rosee',
+  'eponge',
+  'souffle-vapeur',
+  'vortex-sas',
+]
+
 export type Scene = 'accueil' | 'cuve' | 'muet'
 
 const XFADE = 2 // s de croisement au raccord de boucle et entre deux lits
