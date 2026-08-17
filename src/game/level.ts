@@ -195,7 +195,7 @@ export interface DecalDef {
   y: number
   w: number
   h: number
-  kind: 'tuyaux' | 'vanne' | 'ecran-off' | 'ecran-on'
+  kind: 'tuyaux' | 'vanne' | 'ecran-off' | 'ecran-on' | 'fiole-pleine' | 'fiole-vide'
   flip?: boolean // miroir horizontal : la même pièce ne se répète pas telle quelle
   fade?: number // 0..1, opacité (défaut 0,55)
 }

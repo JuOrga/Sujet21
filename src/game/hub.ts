@@ -155,8 +155,8 @@ export const TABLEAU_HUB: LevelDef = {
 // par des portes alternées. La CUVE à l'ouest, le POSTE DE GESTION au
 // centre — ses pictogrammes d'état décrivent comment les HUMAINS gèrent la
 // substance (aucun impact joueur, volontairement énigmatique) —, l'alcôve
-// de CONSERVATION au nord (les fioles des semblables, assets à venir), et
-// le SAS DE LANCEMENT à l'est. La bascule remplacera le hub actuel quand
+// de CONSERVATION au nord (les fioles des semblables — asset du
+// concepteur, deux occupées et une vide), et le SAS DE LANCEMENT à l'est. La bascule remplacera le hub actuel quand
 // le module sera validé.
 //
 // Les notes des pictogrammes sont les VRAIES règles du jeu (0 inefficace ·
@@ -208,13 +208,19 @@ export const TABLEAU_HUB_COMPACT: LevelDef = {
   decals: [
     // l'écran de contrôle veille sur le poste de gestion
     { x: -700, y: 340, w: 300, h: 374, kind: 'ecran-off', fade: 0.95 },
+    // l'alcôve de CONSERVATION : les fioles des semblables, une par niche.
+    // Deux occupées, une VIDE au centre — sous « NE PAS RÉVEILLER », la
+    // question s'impose d'elle-même : où est passé celui-là ?
+    { x: -370, y: 610, w: 75, h: 380, kind: 'fiole-pleine', fade: 0.98 },
+    { x: 70, y: 610, w: 75, h: 380, kind: 'fiole-vide', fade: 0.98 },
+    { x: 510, y: 610, w: 75, h: 380, kind: 'fiole-pleine', fade: 0.98, flip: true },
   ],
   labels: [
     // ─── les lieux (plan large)
     { x: -1350, y: 620, text: 'MODULE MÉDUSE|LA CUVE', tone: 'mur', rang: 'secteur' },
     { x: -100, y: -260, text: 'POSTE DE GESTION|PROCÉDURES DE CONTENTION', tone: 'mur', rang: 'secteur' },
     { x: 1450, y: 560, text: 'PROTOCOLE 21|SAS DE LANCEMENT', tone: 'sas', rang: 'secteur' },
-    // ─── l'alcôve des fioles (assets à venir — la place est réservée)
+    // ─── l'alcôve des fioles (les semblables, asset du concepteur)
     { x: -150, y: 700, text: 'CONSERVATION|NE PAS RÉVEILLER', tone: 'froid' },
     // ─── LES PICTOGRAMMES D'ÉTAT, alignés au-dessus de l'établi :
     // sept moyens de contention, notés par état — sans un mot
