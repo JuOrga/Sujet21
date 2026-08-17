@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/08/2026 14:30',
+    title: 'LES SÉQUENCES IN-MAP : la mise en scène agit sur le tableau lui-même',
+    notes: [
+      'Une cinématique montre des planches PAR-DESSUS le jeu ; une séquence agit DANS le jeu, sans l’interrompre. Nouvel onglet SÉQUENCES au montage : une liste d’étapes jouées dans l’ordre, chacune durant son temps. NEUF ACTIONS : attendre · teinter les lampes (couleur + intensité) · bruitage · ponctuation · changer la musique · OUVRIR UNE PORTE (la brèche) · afficher une carte · secouer l’écran · jouer une cinématique (la séquence attend sa fin). Le champ pertinent seul s’affiche : une couleur pour les lampes, un n° de porte pour la brèche, la liste des sons pour les bruitages.',
+      'LA BRÈCHE réutilise la machinerie éprouvée des portes laser : une porte dont la cible est NÉGATIVE est désormais une porte SCÉNARISÉE — une paroi pleine, solide au solveur, qu’aucun faisceau n’ouvre et que seule une séquence peut crever. Vérifié en jeu : la paroi barre le passage, l’alerte vire au rouge, l’écran tremble, la porte disparaît du solveur et le fluide passe. Une brèche ouverte ne se referme jamais (c’est un événement, pas un interrupteur) ; un R remet le tableau à neuf, paroi comprise.',
+      'DEUX DÉCLENCHEURS, dans l’éditeur : le champ SÉQUENCE du tableau (elle démarre à chaque essai) et le champ SÉQUENCE d’une zone (elle attend que le corps y entre, une fois par essai) — même grammaire que les cinématiques. La mise en scène avance au TEMPS DE JEU : une pause la suspend, elle ne triche pas avec le chrono. Et elle ne touche JAMAIS aux données du tableau : les lampes sont teintées sur une copie de rendu, l’original est intact. La séquence ALERTE est livrée comme gabarit (à DUPLIQUER).',
+    ],
+  },
+  {
     date: '17/08/2026 13:00',
     title: 'LE SCÉNARIO : les cinématiques hors tableau, sous conditions (le fil du roguelike)',
     notes: [

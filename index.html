@@ -1088,6 +1088,42 @@
       #cine .cn-jauge.cn-remplit i { animation: cn-remplit var(--cn-maintien, 650ms) linear forwards; }
       @keyframes cn-remplit { from { width: 0; } to { width: 100%; } }
 
+      /* ---- La mise en scène in-map : carte et secousse ---- */
+      #carte-seq {
+        position: fixed;
+        left: 50%;
+        bottom: 16vh;
+        transform: translateX(-50%) translateY(10px);
+        z-index: 38; /* au-dessus du jeu, sous les voiles */
+        max-width: min(80vw, 760px);
+        padding: 12px 22px;
+        border: 1px solid rgba(99, 183, 230, 0.45);
+        border-radius: 10px;
+        background: rgba(6, 14, 22, 0.86);
+        color: #dceaf2;
+        font-family: var(--font-mono);
+        font-size: clamp(13px, 2vmin, 18px);
+        line-height: 1.5;
+        text-align: center;
+        text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.5s ease, transform 0.5s ease;
+      }
+      #carte-seq.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+      /* la secousse : c'est la CUVE qui tremble, pas l'interface */
+      body.secousse #app,
+      body.secousse #fx-canvas {
+        animation: seq-secousse 0.4s linear infinite;
+      }
+      @keyframes seq-secousse {
+        0%, 100% { transform: translate(0, 0); }
+        20% { transform: translate(-5px, 3px); }
+        40% { transform: translate(4px, -4px); }
+        60% { transform: translate(-3px, -5px); }
+        80% { transform: translate(5px, 4px); }
+      }
+
       /* ---- La bibliothèque d'images ---- */
       #imagerie {
         position: fixed;
@@ -1283,6 +1319,32 @@
       #montage .mt-regle .mt-si-trophee { display: none; }
       #montage .mt-regle.mt-avec-valeur .mt-si-valeur,
       #montage .mt-regle.mt-avec-trophee .mt-si-trophee { display: flex; }
+      /* séquences : texte et nombre ne paraissent que si l'action s'en sert */
+      #montage .mt-regle .mt-sq-texte,
+      #montage .mt-regle .mt-sq-valeur { display: none; }
+      #montage .mt-regle.mt-avec-texte .mt-sq-texte,
+      #montage .mt-regle.mt-avec-nombre .mt-sq-valeur { display: flex; }
+      #montage .mt-btn-seq {
+        align-self: flex-end;
+        background: #0a141d;
+        color: var(--ink);
+        border: 1px solid rgba(99, 183, 230, 0.4);
+        border-radius: 6px;
+        padding: 5px 10px;
+        font: inherit;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        cursor: pointer;
+      }
+      #montage .mt-fiche select {
+        background: #0a141d;
+        color: var(--ink);
+        border: 1px solid rgba(99, 183, 230, 0.3);
+        border-radius: 4px;
+        padding: 4px 6px;
+        font: inherit;
+        font-size: 12px;
+      }
       #montage .mt-case { flex-direction: row !important; align-items: center; gap: 6px !important; }
       #montage .mt-case input { width: auto; }
       #montage .mt-pied-scenario { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -3827,6 +3889,7 @@
           <label class="ed-f" title="La part de lumière que la pièce garde LÀ OÙ AUCUNE LAMPE ne porte. 52 % = niveau historique ; 0 % = noir total hors des lampes — elles deviennent la seule source."><span>Lumière générale (%)</span><input type="number" id="ed-lum-generale" min="0" max="100" step="5" placeholder="52" /></label>
           <label class="ed-f" title="Le code d'une cinématique (table de montage) jouée à l'ENTRÉE dans le tableau — pas au simple recommencer. Vide : aucune."><span>Ciné à l'entrée (code)</span><input id="ed-cine-avant" placeholder="aucune" /></label>
           <label class="ed-f" title="Le code d'une cinématique (table de montage) jouée à la CONCLUSION du tableau, par-dessus le bilan. Pour un déclencheur EN COURS de tableau : posez une zone (libre) et donnez-lui un code. Vide : aucune."><span>Ciné en sortie (code)</span><input id="ed-cine-apres" placeholder="aucune" /></label>
+          <label class="ed-f" title="Le code d'une SÉQUENCE in-map (onglet SÉQUENCES du montage) : la mise en scène qui agit sur le tableau lui-même — lampes qui virent, sirène, secousse, brèche qui s'ouvre. Elle démarre à chaque essai du tableau. Vide : aucune."><span>Séquence in-map (code)</span><input id="ed-sequence" placeholder="aucune" /></label>
           <textarea id="ed-journal" placeholder="Entrée du journal de bord…"></textarea>
         </div>
         <div class="ed-group">
@@ -4202,6 +4265,8 @@
     <div id="montage" aria-label="Table de montage des cinématiques"></div>
     <div id="imagerie" aria-label="Bibliothèque d'images"></div>
 
+    <!-- La carte d'une séquence in-map : un bandeau qui n'arrête pas le jeu -->
+    <div id="carte-seq" aria-live="polite"></div>
     <div id="hud-danger" aria-live="assertive"></div>
     <div id="obj-arrow" aria-hidden="true"><i>➤</i><span id="obj-dist"></span></div>
 
