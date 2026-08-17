@@ -1,0 +1,46 @@
+# Diagnostic ponctuel : vérifier les bibliothèques PARTAGÉES de cinématiques
+# (/api/cinematiques) et d'images (/api/images) — l'agent de développement
+# n'a pas d'accès réseau direct au site, le runner CI si. Même mécanique que
+# diag-presets : un commit (même vide) sur la gâchette diag-cines-go tire.
+# Le POST d'essai crée puis supprime une cinématique-sonde : la lecture,
+# l'écriture et l'effacement font l'aller-retour complet.
+name: diag-cines
+on:
+  workflow_dispatch:
+  push:
+    branches: [diag-cines-go]
+
+permissions:
+  contents: write
+
+jobs:
+  lire:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aller-retour cinématiques (GET, POST sonde, DELETE sonde)
+        run: |
+          curl -sS --fail "https://sujet21.vercel.app/api/cinematiques" -o cines-avant.json
+          head -c 300 cines-avant.json; echo
+          curl -sS --fail -X POST "https://sujet21.vercel.app/api/cinematiques" \
+            -H 'Content-Type: application/json' \
+            -d '{"cine":{"code":"SONDE-CI","titre":"Sonde du pont CI","planches":[{"image":"/assets/cine/ouverture-1.webp","texte":"sonde","duree":2,"effet":"fixe","fondu":"aucun","bruitage":"","ponctuation":"","piste":""}]},"auteur":"CI"}' \
+            -o cines-apres-post.json
+          grep -q 'SONDE-CI' cines-apres-post.json && echo "POST OK"
+          curl -sS --fail -X DELETE "https://sujet21.vercel.app/api/cinematiques?code=SONDE-CI" -o cines-apres-del.json
+          grep -q 'SONDE-CI' cines-apres-del.json && echo "DELETE RATÉ" || echo "DELETE OK"
+      - name: Lire le catalogue d'images
+        run: |
+          curl -sS --fail "https://sujet21.vercel.app/api/images" -o images.json
+          head -c 300 images.json; echo
+      - name: Publier sur la branche cines-dump
+        run: |
+          git init -b cines-dump sync
+          cd sync
+          mv ../cines-avant.json ../cines-apres-post.json ../cines-apres-del.json ../images.json .
+          git config user.name "diag-cines"
+          git config user.email "actions@users.noreply.github.com"
+          git add .
+          git commit -m "bibliothèques cinématiques + images — $(date -u +%FT%TZ)"
+          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}" cines-dump
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

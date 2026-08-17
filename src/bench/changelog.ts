@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/08/2026 12:00',
+    title: 'Le travail à deux : cinématiques PARTAGÉES et bibliothèque d’IMAGES importables',
+    notes: [
+      'La table de montage a maintenant trois rayons : les LIVRÉES (avec le jeu), le POSTE (votre navigateur), et les PARTAGÉES (◇) — la bibliothèque en ligne commune. Le bouton ⇪ PARTAGER publie la cinématique sélectionnée : elle devient visible ET jouable par son code sur tous les postes (les ancrages des tableaux la trouvent : livrées → poste → partagées). Re-partager le même code remplace la version pour tout le monde ; SUPPRIMER sur une partagée la retire de la bibliothèque. Une partagée se retouche en la DUPLIQUANT, puis en re-partageant.',
+      'LA BIBLIOTHÈQUE D’IMAGES (bouton 🖼 Images de l’éditeur) : importez vos visuels directement — recompressés en WebP (≤ 1600 px) côté client avant l’envoi, hébergés en ligne, visibles de tous. Chaque vignette donne son LIEN (copié au presse-papier) et se retire d’un ✕. Dans le montage, le bouton ▣ à côté du champ IMAGE ouvre la bibliothèque en SÉLECTEUR : cliquer une vignette branche l’image sur la planche. Plus besoin de passer par le dépôt pour les planches d’une cinématique.',
+      'Garde-fous : hors ligne, tout le partage échoue proprement (statut affiché, rien de perdu — le poste reste intact) ; les cinématiques partagées ne transportent que des RÉFÉRENCES d’images (jamais le pixel : le serveur les refuse) ; un pont CI de diagnostic (diag-cines) vérifie l’aller-retour complet des deux API depuis un poste qui, lui, voit le site.',
+    ],
+  },
+  {
     date: '17/08/2026 11:00',
     title: 'Les cinématiques s’ancrent aux tableaux : à l’entrée, en sortie, ou sur une zone',
     notes: [

@@ -19,12 +19,20 @@ import {
   serializeCinematique,
 } from './cinematique'
 import { BRUITAGES, PISTE_NOMS, PISTES, PONCTUATIONS } from './soundtrack'
+import { deleteCine, fetchCines, pushCine, type SharedCine } from './netCines'
 
 export interface MontageOptions {
   /** Les cinématiques livrées avec le jeu (lecture seule). */
   livrees: CinematiqueDef[]
   /** Jouer une cinématique (le lecteur plein écran). */
   lire: (cine: CinematiqueDef) => Promise<void>
+  /** Le nom d'opérateur — signe les partages. */
+  auteur: () => string
+  /** Ouvrir la bibliothèque d'images en sélecteur (rend l'URL choisie). */
+  choisirImage?: (rend: (url: string) => void) => void
+  /** Les partagées viennent d'arriver/de changer : le jeu met à jour sa
+   *  résolution par code. */
+  surPartagees?: (cines: CinematiqueDef[]) => void
 }
 
 function copie(c: CinematiqueDef): CinematiqueDef {
@@ -44,8 +52,11 @@ function optionsHTML(
 
 export class TableMontage {
   private cines: CinematiqueDef[] = []
+  private partagees: SharedCine[] = []
   private courante: CinematiqueDef | null = null
-  private livree = false // la sélection est-elle une livrée (lecture seule) ?
+  // d'où vient la sélection : seul le POSTE s'édite — livrées et partagées
+  // se dupliquent (et une partagée se remplace en re-PARTAGEANT son code)
+  private source: 'livree' | 'poste' | 'partagee' = 'livree'
   private readonly selectEl: HTMLSelectElement
   private readonly corpsEl: HTMLDivElement
   private readonly fichierEl: HTMLInputElement
@@ -63,6 +74,8 @@ export class TableMontage {
         <button type="button" data-mt="supprimer">SUPPRIMER</button>
         <button type="button" data-mt="exporter">EXPORTER</button>
         <button type="button" data-mt="importer">IMPORTER</button>
+        <button type="button" data-mt="partager" title="Publier dans la bibliothèque partagée : visible et jouable (par son code) sur tous les postes — un partage du même code remplace le précédent">⇪ PARTAGER</button>
+        <span class="mt-statut"></span>
         <span class="mt-souffle"></span>
         <button type="button" class="mt-lire" data-mt="lire">▶ LIRE</button>
         <button type="button" data-mt="fermer">FERMER</button>
@@ -91,6 +104,13 @@ export class TableMontage {
       this.choisit(`livree:${this.opts.livrees[0]?.code ?? ''}`)
     else this.rafraichitListe()
     this.root.classList.add('visible')
+    // la bibliothèque partagée, en arrière-plan : la liste se complète
+    void fetchCines().then((liste) => {
+      if (!liste) return
+      this.partagees = liste
+      this.opts.surPartagees?.(liste.map((s) => s.cine))
+      this.rafraichitListe()
+    })
   }
 
   close(): void {
@@ -120,10 +140,38 @@ export class TableMontage {
       this.persiste()
       this.choisit(`poste:${c.code}`)
     } else if (quoi === 'supprimer') {
-      if (!this.courante || this.livree) return
-      this.cines = this.cines.filter((c) => c !== this.courante)
-      this.persiste()
-      this.choisit(`livree:${this.opts.livrees[0]?.code ?? ''}`)
+      if (!this.courante) return
+      if (this.source === 'poste') {
+        this.cines = this.cines.filter((c) => c !== this.courante)
+        this.persiste()
+        this.choisit(`livree:${this.opts.livrees[0]?.code ?? ''}`)
+      } else if (this.source === 'partagee') {
+        // retirer de la bibliothèque partagée — pour tout le monde
+        this.statut('retrait du partage…')
+        void deleteCine(this.courante.code).then((liste) => {
+          if (!liste) {
+            this.statut('retrait impossible (hors ligne ?)')
+            return
+          }
+          this.partagees = liste
+          this.opts.surPartagees?.(liste.map((s) => s.cine))
+          this.statut('')
+          this.choisit(`livree:${this.opts.livrees[0]?.code ?? ''}`)
+        })
+      }
+    } else if (quoi === 'partager') {
+      if (!this.courante) return
+      this.statut('partage…')
+      void pushCine(this.courante, this.opts.auteur()).then((liste) => {
+        if (!liste) {
+          this.statut('partage impossible (hors ligne ?)')
+          return
+        }
+        this.partagees = liste
+        this.opts.surPartagees?.(liste.map((s) => s.cine))
+        this.statut(`« ${this.courante!.code} » partagée — visible sur tous les postes`)
+        this.rafraichitListe()
+      })
     } else if (quoi === 'exporter') {
       if (!this.courante) return
       const blob = new Blob([serializeCinematique(this.courante)], {
@@ -174,10 +222,13 @@ export class TableMontage {
     sauveCinematiques(this.cines)
   }
 
+  private statut(txt: string): void {
+    const el = this.root.querySelector('.mt-statut') as HTMLSpanElement | null
+    if (el) el.textContent = txt
+  }
+
   private rafraichitListe(): void {
-    const cle = this.livree
-      ? `livree:${this.courante?.code}`
-      : `poste:${this.courante?.code}`
+    const cle = `${this.source}:${this.courante?.code}`
     this.selectEl.innerHTML = [
       ...this.opts.livrees.map(
         (c) =>
@@ -186,6 +237,12 @@ export class TableMontage {
       ...this.cines.map(
         (c) =>
           `<option value="poste:${c.code}">${c.titre} [${c.code}]</option>`,
+      ),
+      ...this.partagees.map(
+        (s) =>
+          `<option value="partagee:${s.cine.code}">◇ ${s.cine.titre} [${s.cine.code}]${
+            s.auteur ? ' — ' + s.auteur : ''
+          } (partagée)</option>`,
       ),
     ].join('')
     this.selectEl.value = cle
@@ -196,10 +253,13 @@ export class TableMontage {
     const code = reste.join(':')
     if (ou === 'poste') {
       this.courante = this.cines.find((c) => c.code === code) ?? null
-      this.livree = false
+      this.source = 'poste'
+    } else if (ou === 'partagee') {
+      this.courante = this.partagees.find((s) => s.cine.code === code)?.cine ?? null
+      this.source = 'partagee'
     } else {
       this.courante = this.opts.livrees.find((c) => c.code === code) ?? null
-      this.livree = true
+      this.source = 'livree'
     }
     this.rafraichitListe()
     this.dessine()
@@ -208,7 +268,7 @@ export class TableMontage {
   // Toute édition écrit immédiatement (localStorage) : la table n'a pas de
   // bouton « enregistrer » à oublier.
   private edite(fait: () => void): void {
-    if (!this.courante || this.livree) return
+    if (!this.courante || this.source !== 'poste') return
     fait()
     this.persiste()
   }
@@ -217,11 +277,13 @@ export class TableMontage {
     const c = this.courante
     this.corpsEl.innerHTML = ''
     if (!c) return
-    const gel = this.livree
+    const gel = this.source !== 'poste'
     const tete = document.createElement('div')
     tete.className = 'mt-fiche'
     tete.innerHTML = gel
-      ? `<em>Cinématique livrée avec le jeu — en lecture seule. DUPLIQUER pour la retoucher.</em>`
+      ? this.source === 'partagee'
+        ? `<em>Cinématique partagée — DUPLIQUER pour la retoucher, puis ⇪ PARTAGER : le même code remplace cette version pour tout le monde.</em>`
+        : `<em>Cinématique livrée avec le jeu — en lecture seule. DUPLIQUER pour la retoucher.</em>`
       : `<label>CODE <input data-ch="code" maxlength="24" /></label>
          <label>TITRE <input data-ch="titre" maxlength="80" /></label>`
     this.corpsEl.appendChild(tete)
@@ -252,7 +314,7 @@ export class TableMontage {
       row.innerHTML = `
         <div class="mt-vignette"><img alt="" draggable="false" /><span>${i + 1}</span></div>
         <div class="mt-champs">
-          <label class="mt-large">IMAGE <input data-ch="image" placeholder="/assets/cine/… ou URL" ${gel ? 'disabled' : ''} /></label>
+          <label class="mt-large">IMAGE <span class="mt-image"><input data-ch="image" placeholder="/assets/cine/… ou URL" ${gel ? 'disabled' : ''} /><button type="button" data-op="biblio" title="Choisir dans la bibliothèque d'images" ${gel || !this.opts.choisirImage ? 'disabled' : ''}>▣</button></span></label>
           <label class="mt-large">TEXTE <textarea data-ch="texte" rows="2" ${gel ? 'disabled' : ''}></textarea></label>
           <label>DURÉE (s) <input data-ch="duree" type="number" min="${DUREE_MIN}" max="${DUREE_MAX}" step="0.5" ${gel ? 'disabled' : ''} /></label>
           <label>EFFET <select data-ch="effet" ${gel ? 'disabled' : ''}>${EFFETS.map((e) => `<option value="${e}">${EFFET_NOMS[e]}</option>`).join('')}</select></label>
@@ -269,6 +331,16 @@ export class TableMontage {
       const img = row.querySelector('.mt-vignette img') as HTMLImageElement
       if (p.image) img.src = p.image
       img.addEventListener('error', () => img.removeAttribute('src'))
+      // ▣ : la bibliothèque d'images s'ouvre en sélecteur par-dessus la table
+      row.querySelector('[data-op=biblio]')?.addEventListener('click', () => {
+        this.opts.choisirImage?.((url) => {
+          this.edite(() => {
+            p.image = url
+            ;(row.querySelector('[data-ch=image]') as HTMLInputElement).value = url
+            img.src = url
+          })
+        })
+      })
       const champ = <
         T extends HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
       >(
