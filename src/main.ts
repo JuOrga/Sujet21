@@ -45,7 +45,7 @@ import { PerfCollector } from './game/perf'
 import { fetchLibrary } from './game/netLevels'
 import { AudioFx, loadAudioPrefs } from './game/audio'
 import { Soundtrack, type Bruitage, type Piste, type Ponctuation } from './game/soundtrack'
-import { CINEMATIQUE_ESSAI, chargeCinematiques, type CinematiqueDef } from './game/cinematique'
+import { CINEMATIQUES_LIVREES, chargeCinematiques, type CinematiqueDef } from './game/cinematique'
 import { LecteurCinematique } from './game/cinelecteur'
 import { TableMontage } from './game/montage'
 import { Imagerie } from './game/imagerie'
@@ -1848,7 +1848,7 @@ fetchBibliotheque().then((biblio) => {
 })
 function lireCineParCode(code: string): Promise<void> {
   const cible = code.trim().toLowerCase()
-  const cine = [CINEMATIQUE_ESSAI, ...chargeCinematiques(), ...cinesPartagees].find(
+  const cine = [...CINEMATIQUES_LIVREES, ...chargeCinematiques(), ...cinesPartagees].find(
     (c) => c.code.trim().toLowerCase() === cible,
   )
   return cine ? lireCine(cine) : Promise.resolve()
@@ -1987,7 +1987,7 @@ document.getElementById('ed-images')?.addEventListener('click', () => imagerie.o
 // La table de montage des cinématiques : l'écran où le concepteur a la
 // main — planches, effets, sons, lecture immédiate, export/import, partage.
 const montage = new TableMontage(el('montage'), {
-  livrees: [CINEMATIQUE_ESSAI],
+  livrees: CINEMATIQUES_LIVREES,
   lire: (c) => lireCine(c),
   auteur: () => records.operator(),
   choisirImage: (rend) => imagerie.open(rend),

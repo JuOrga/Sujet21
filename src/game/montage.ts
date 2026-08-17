@@ -359,13 +359,41 @@ export class TableMontage {
     this.opts.surScenario?.(this.scenario)
   }
 
-  /** Tous les codes proposables : livrées, poste, partagées. */
-  private codesConnus(): string[] {
-    return [
-      ...this.opts.livrees.map((c) => c.code),
-      ...this.cines.map((c) => c.code),
-      ...this.partagees.map((s) => s.cine.code),
-    ].filter((c, i, t) => t.indexOf(c) === i)
+  /** Toutes les cinématiques proposables : livrées, poste, partagées —
+   *  par leur TITRE, qui est ce que le concepteur reconnaît. */
+  private cinesConnues(): { code: string; titre: string }[] {
+    const vues = new Set<string>()
+    const out: { code: string; titre: string }[] = []
+    for (const c of [
+      ...this.opts.livrees,
+      ...this.cines,
+      ...this.partagees.map((s) => s.cine),
+    ]) {
+      if (vues.has(c.code)) continue
+      vues.add(c.code)
+      out.push({ code: c.code, titre: c.titre })
+    }
+    return out
+  }
+
+  /** Un menu déroulant des cinématiques. Un code inconnu (cinématique pas
+   *  encore composée, ou partagée pas encore arrivée) reste proposé : on ne
+   *  perd jamais le réglage d'un tableau parce que la liste est incomplète. */
+  private selectCine(courant: string, attr: string, gel: boolean): string {
+    const connues = this.cinesConnues()
+    const orphelin = courant && !connues.some((c) => c.code === courant)
+    return (
+      `<select data-${attr} ${gel ? 'disabled' : ''}>` +
+      `<option value="">— aucune —</option>` +
+      connues
+        .map(
+          (c) =>
+            `<option value="${c.code}"${c.code === courant ? ' selected' : ''}>${c.titre} [${c.code}]</option>`,
+        )
+        .join('') +
+      (orphelin ? `<option value="${courant}" selected>${courant} (introuvable)</option>` : '') +
+      `</select>`
+    )
   }
 
   private dessineScenario(): void {
@@ -379,7 +407,6 @@ export class TableMontage {
       `l’ouverture de se rejouer à chaque run. ⇪ PARTAGER publie ce scénario pour tous.</em>`
     this.corpsEl.appendChild(intro)
 
-    const codes = this.codesConnus()
     const trophees = this.opts.trophees ?? []
     this.scenario.regles.forEach((r, i) => {
       const row = document.createElement('div')
@@ -397,7 +424,7 @@ export class TableMontage {
           <label class="mt-si-trophee">TROPHÉE <select data-sc="trophee"><option value="">— aucun —</option>${trophees
             .map((t) => `<option value="${t.id}">${t.nom}</option>`)
             .join('')}</select></label>
-          <label>CINÉMATIQUE <input data-sc="cine" list="mt-codes" placeholder="code" /></label>
+          <label>CINÉMATIQUE ${this.selectCine(r.cine, 'sc="cine"', false)}</label>
           <label class="mt-case">UNE SEULE FOIS <input data-sc="uneFois" type="checkbox" /></label>
           <label class="mt-case">ACTIVE <input data-sc="actif" type="checkbox" /></label>
         </div>
@@ -414,7 +441,6 @@ export class TableMontage {
       ch<HTMLSelectElement>('condition').value = r.condition
       ch<HTMLInputElement>('valeur').value = String(r.valeur)
       ch<HTMLSelectElement>('trophee').value = r.trophee
-      ch<HTMLInputElement>('cine').value = r.cine
       ch<HTMLInputElement>('uneFois').checked = r.uneFois
       ch<HTMLInputElement>('actif').checked = r.actif
       // seuil et trophée ne s'affichent que si la condition les emploie
@@ -436,7 +462,7 @@ export class TableMontage {
             r.valeur = Number.isFinite(v) ? Math.max(0, Math.min(999, Math.round(v))) : r.valeur
             ch<HTMLInputElement>('valeur').value = String(r.valeur)
           } else if (nom === 'trophee') r.trophee = ch<HTMLSelectElement>('trophee').value
-          else if (nom === 'cine') r.cine = ch<HTMLInputElement>('cine').value.trim().slice(0, 24)
+          else if (nom === 'cine') r.cine = ch<HTMLSelectElement>('cine').value
           else if (nom === 'uneFois') r.uneFois = ch<HTMLInputElement>('uneFois').checked
           else if (nom === 'actif') r.actif = ch<HTMLInputElement>('actif').checked
         })
@@ -454,12 +480,6 @@ export class TableMontage {
       })
       this.corpsEl.appendChild(row)
     })
-
-    // la liste des codes proposés à la frappe
-    const datalist = document.createElement('datalist')
-    datalist.id = 'mt-codes'
-    datalist.innerHTML = codes.map((c) => `<option value="${c}"></option>`).join('')
-    this.corpsEl.appendChild(datalist)
 
     const pied = document.createElement('div')
     pied.className = 'mt-pied-scenario'
@@ -597,9 +617,11 @@ export class TableMontage {
                 ? `<select data-sq="texte" ${gel ? 'disabled' : ''}>${optionsHTML(PONCTUATIONS, null, '— aucune —')}</select>`
                 : champTexte(e.action) === 'piste'
                   ? `<select data-sq="texte" ${gel ? 'disabled' : ''}>${optionsHTML(PISTES, PISTE_NOMS, '— inchangée —')}</select>`
-                  : `<input data-sq="texte" placeholder="${
-                      champTexte(e.action) === 'couleur' ? '#e8433c (vide = leur couleur)' : ''
-                    }" ${gel ? 'disabled' : ''} />`
+                  : champTexte(e.action) === 'code'
+                    ? this.selectCine(e.texte, 'sq="texte"', gel)
+                    : `<input data-sq="texte" placeholder="${
+                        champTexte(e.action) === 'couleur' ? '#e8433c (vide = leur couleur)' : ''
+                      }" ${gel ? 'disabled' : ''} />`
           }</label>
           <label class="mt-sq-valeur">${e.action === 'breche' ? 'N° DE PORTE' : 'INTENSITÉ (%)'} <input data-sq="valeur" type="number" min="0" max="400" step="1" ${gel ? 'disabled' : ''} /></label>
           <label>DURÉE (s) <input data-sq="duree" type="number" min="0" max="60" step="0.5" ${gel ? 'disabled' : ''} /></label>
