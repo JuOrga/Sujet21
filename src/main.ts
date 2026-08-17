@@ -48,7 +48,17 @@ import { CINEMATIQUE_ESSAI, chargeCinematiques, type CinematiqueDef } from './ga
 import { LecteurCinematique } from './game/cinelecteur'
 import { TableMontage } from './game/montage'
 import { Imagerie } from './game/imagerie'
-import { fetchCines } from './game/netCines'
+import { fetchBibliotheque } from './game/netCines'
+import {
+  type EtatScenario,
+  type MomentScenario,
+  type ScenarioDef,
+  chargeScenario,
+  chargeVues,
+  choisitRegle,
+  noteVue,
+  sauveScenario,
+} from './game/scenario'
 import { Records } from './game/records'
 import {
   fetchSharedBoard,
@@ -1615,6 +1625,10 @@ function entrerHub(): void {
   restart()
   montrerOnboard()
   lanceEveil() // la cryostase s'éveille dans la cuve d'entraînement
+  // LE SCÉNARIO : l'ouverture froide (une seule fois dans la vie du
+  // joueur) puis l'arrivée au hub — elles s'enchaînent si les deux
+  // s'appliquent. C'est ici que vit le fil narratif du roguelike.
+  void joueMoment('premier-lancement').then(() => joueMoment('avant-hub'))
 }
 function openHome(): void {
   document.body.classList.remove('playing')
@@ -1813,8 +1827,17 @@ function lireCine(cine: CinematiqueDef): Promise<void> {
 // cinématiques du poste (montage), puis la bibliothèque PARTAGÉE — un code
 // inconnu est ignoré sans bruit.
 let cinesPartagees: CinematiqueDef[] = []
-fetchCines().then((liste) => {
-  if (liste) cinesPartagees = liste.map((s) => s.cine)
+// LE SCÉNARIO : le fil narratif hors tableaux (avant le hub, au lancement
+// d'une run, à la défaite…). Le poste garde le dernier connu ; la version
+// PARTAGÉE fait foi dès qu'elle arrive.
+let scenario: ScenarioDef = chargeScenario()
+fetchBibliotheque().then((biblio) => {
+  if (!biblio) return
+  cinesPartagees = biblio.cines.map((s) => s.cine)
+  if (biblio.scenario) {
+    scenario = biblio.scenario
+    sauveScenario(scenario) // hors ligne la prochaine fois, il est là
+  }
 })
 function lireCineParCode(code: string): Promise<void> {
   const cible = code.trim().toLowerCase()
@@ -1823,6 +1846,28 @@ function lireCineParCode(code: string): Promise<void> {
   )
   return cine ? lireCine(cine) : Promise.resolve()
 }
+// L'état du jeu que les conditions du scénario interrogent — tout existe
+// déjà ailleurs, on ne fait que le présenter.
+function etatScenario(): EtatScenario {
+  return {
+    runs: Math.max(0, records.essaiNumber() - 1),
+    salleMax: records.expedition()?.tableaux ?? 0,
+    condensat,
+    trophee: (id) => trophees.gagne(id),
+  }
+}
+/**
+ * Joue la cinématique que le scénario retient pour ce moment, s'il y en a
+ * une. Premier match gagne ; une règle « une seule fois » est mémorisée
+ * DÈS le déclenchement (sauter la cinématique ne la fait pas revenir).
+ */
+function joueMoment(moment: MomentScenario): Promise<void> {
+  const regle = choisitRegle(scenario, moment, etatScenario(), chargeVues())
+  if (!regle) return Promise.resolve()
+  if (regle.uneFois) noteVue(regle.id)
+  return lireCineParCode(regle.cine)
+}
+
 // Déclencheurs déjà joués dans l'essai en cours (réarmés par restart)
 const cinesVues = new Set<string>()
 // Le tableau dont la cinématique d'entrée a été jouée : un R sur place ne
@@ -1894,6 +1939,10 @@ const montage = new TableMontage(el('montage'), {
   surPartagees: (liste) => {
     cinesPartagees = liste
   },
+  surScenario: (s) => {
+    scenario = s
+  },
+  trophees: TROPHEES.map((t) => ({ id: t.id, nom: t.nom })),
 })
 document.getElementById('open-montage')?.addEventListener('click', () => montage.open())
 // …et depuis l'éditeur aussi : la table s'ouvre PAR-DESSUS lui (z-index),
@@ -2701,6 +2750,8 @@ function afficheDispersion(): void {
   // s'efface (la run est perdue), la secondaire n'y touche pas
   ecranDispersion = 'fin'
   if (!runSecondaire) effaceRun()
+  // LE SCÉNARIO : la cinématique de défaite, par-dessus l'écran de fin
+  void joueMoment('run-perdue')
   showOverlay(
     'ÉCHANTILLON PERDU — FIN DE LA RUN',
     `La dispersion a eu raison du dernier échantillon.${
@@ -3801,13 +3852,17 @@ function frame(now: number): void {
     auHub = false
     audio.collect()
     bande.ponctuation('sting-collecte', 0.85)
-    const save = runSauvee()
-    if (save) {
-      reprendreRun(save)
-    } else {
-      runSecondaire = false
-      newExpedition()
-    }
+    // LE SCÉNARIO : la cinématique du départ, s'il y en a une — la run
+    // attend qu'elle finisse (la simulation est en pause pendant ce temps)
+    void joueMoment('lancement-run').then(() => {
+      const save = runSauvee()
+      if (save) {
+        reprendreRun(save)
+      } else {
+        runSecondaire = false
+        newExpedition()
+      }
+    })
   } else if (!tableauDone && !sim.dispersed && (drunk || reached) && testLevel) {
     // Prototype 21-A bis : l'essai conclut sans toucher aux registres ni à
     // l'expédition — on félicite, on ramène au protocole.
@@ -3895,6 +3950,8 @@ function frame(now: number): void {
       renderRegistres()
       // l'expédition principale conclue n'a plus rien à reprendre
       if (!testLevel && !runSecondaire) effaceRun()
+      // LE SCÉNARIO : la cinématique de fin d'expédition, sur le bilan
+      void joueMoment('expedition-achevee')
       showOverlay(
         'EXPÉDITION ACHEVÉE',
         `<span class="bilan"><span class="bilan-l">${expeditionSummary(playedLevels().length)}${

@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/08/2026 13:00',
+    title: 'LE SCÉNARIO : les cinématiques hors tableau, sous conditions (le fil du roguelike)',
+    notes: [
+      'Le hub n’est pas un tableau — il n’a donc pas de fiche où poser une cinématique. Et une run n’est pas un tableau non plus. Nouvel onglet SCÉNARIO dans la table de montage (menu ET éditeur) : UN seul scénario, global au jeu, une LISTE DE RÈGLES qui se lit de haut en bas — la PREMIÈRE qui correspond gagne. Rangez le particulier au-dessus du général, comme un aiguillage.',
+      'CINQ MOMENTS : au tout premier lancement, à l’arrivée au hub, au lancement de la run (le sas du hub — il n’était branché nulle part, c’est fait), quand la run est perdue, quand l’expédition est achevée. SIX CONDITIONS, toutes puisées dans ce que le jeu mémorise déjà : toujours · première partie · runs finies ≥ N · meilleure salle atteinte ≥ N · trophée débloqué · condensat ≥ N. Et la case décisive, UNE SEULE FOIS : la règle est retenue pour toujours — c’est elle qui empêche l’ouverture de se rejouer au deuxième run. Un bouton ↺ efface cette mémoire pour retester comme un joueur neuf.',
+      'Exemple vérifié en sonde : « arrivée au hub / première partie → OUVERTURE (une fois) » puis « arrivée au hub / runs ≥ 3 → MIROIR (une fois) ». Première partie : l’ouverture. Runs 1 et 2 : rien. Run 3 : la révélation. Run 4 et au-delà : plus rien — jamais deux fois. Le scénario se partage comme les cinématiques (⇪ PARTAGER dans l’onglet) : il fait alors foi sur tous les postes, et le jeu le garde hors ligne.',
+    ],
+  },
+  {
     date: '17/08/2026 12:00',
     title: 'Le travail à deux : cinématiques PARTAGÉES et bibliothèque d’IMAGES importables',
     notes: [

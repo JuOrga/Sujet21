@@ -19,7 +19,29 @@ import {
   serializeCinematique,
 } from './cinematique'
 import { BRUITAGES, PISTE_NOMS, PISTES, PONCTUATIONS } from './soundtrack'
-import { deleteCine, fetchCines, pushCine, type SharedCine } from './netCines'
+import {
+  deleteCine,
+  fetchBibliotheque,
+  pushCine,
+  pushScenario,
+  type SharedCine,
+} from './netCines'
+import {
+  CONDITION_NOMS,
+  CONDITIONS,
+  MOMENT_NOMS,
+  MOMENTS,
+  type ConditionScenario,
+  type MomentScenario,
+  type ScenarioDef,
+  chargeScenario,
+  chargeVues,
+  conditionAValeur,
+  idLibre,
+  oublieVues,
+  regleVierge,
+  sauveScenario,
+} from './scenario'
 
 export interface MontageOptions {
   /** Les cinématiques livrées avec le jeu (lecture seule). */
@@ -33,6 +55,10 @@ export interface MontageOptions {
   /** Les partagées viennent d'arriver/de changer : le jeu met à jour sa
    *  résolution par code. */
   surPartagees?: (cines: CinematiqueDef[]) => void
+  /** Le scénario a changé : le jeu joue désormais celui-là. */
+  surScenario?: (s: ScenarioDef) => void
+  /** Les trophées connus, pour la condition « trophée débloqué ». */
+  trophees?: { id: string; nom: string }[]
 }
 
 function copie(c: CinematiqueDef): CinematiqueDef {
@@ -53,6 +79,8 @@ function optionsHTML(
 export class TableMontage {
   private cines: CinematiqueDef[] = []
   private partagees: SharedCine[] = []
+  private scenario: ScenarioDef = { regles: [] }
+  private onglet: 'cines' | 'scenario' = 'cines'
   private courante: CinematiqueDef | null = null
   // d'où vient la sélection : seul le POSTE s'édite — livrées et partagées
   // se dupliquent (et une partagée se remplace en re-PARTAGEANT son code)
@@ -80,12 +108,27 @@ export class TableMontage {
         <button type="button" class="mt-lire" data-mt="lire">▶ LIRE</button>
         <button type="button" data-mt="fermer">FERMER</button>
       </div>
+      <div class="mt-onglets">
+        <button type="button" class="mt-ong actif" data-ong="cines">CINÉMATIQUES</button>
+        <button type="button" class="mt-ong" data-ong="scenario" title="Les cinématiques hors tableau : avant le hub, au lancement d'une run, à la défaite — sous conditions">SCÉNARIO</button>
+      </div>
       <div class="mt-corps"></div>
       <input type="file" accept="application/json,.json" hidden />`
     this.selectEl = root.querySelector('.mt-choix') as HTMLSelectElement
     this.corpsEl = root.querySelector('.mt-corps') as HTMLDivElement
     this.fichierEl = root.querySelector('input[type=file]') as HTMLInputElement
 
+    root.querySelector('.mt-onglets')!.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest('.mt-ong') as HTMLButtonElement | null
+      if (!btn) return
+      this.onglet = btn.dataset.ong === 'scenario' ? 'scenario' : 'cines'
+      for (const b of root.querySelectorAll('.mt-ong')) {
+        b.classList.toggle('actif', (b as HTMLElement).dataset.ong === this.onglet)
+      }
+      // le rayon des cinématiques n'a pas de sens dans l'onglet scénario
+      root.classList.toggle('mt-en-scenario', this.onglet === 'scenario')
+      this.dessine()
+    })
     this.selectEl.addEventListener('change', () =>
       this.choisit(this.selectEl.value),
     )
@@ -100,15 +143,17 @@ export class TableMontage {
 
   open(): void {
     this.cines = chargeCinematiques()
+    this.scenario = chargeScenario()
     if (!this.courante)
       this.choisit(`livree:${this.opts.livrees[0]?.code ?? ''}`)
     else this.rafraichitListe()
     this.root.classList.add('visible')
+    if (this.onglet === 'scenario') this.dessine()
     // la bibliothèque partagée, en arrière-plan : la liste se complète
-    void fetchCines().then((liste) => {
-      if (!liste) return
-      this.partagees = liste
-      this.opts.surPartagees?.(liste.map((s) => s.cine))
+    void fetchBibliotheque().then((biblio) => {
+      if (!biblio) return
+      this.partagees = biblio.cines
+      this.opts.surPartagees?.(biblio.cines.map((s) => s.cine))
       this.rafraichitListe()
     })
   }
@@ -160,6 +205,22 @@ export class TableMontage {
         })
       }
     } else if (quoi === 'partager') {
+      // dans l'onglet SCÉNARIO, PARTAGER publie LE scénario (il n'y en a
+      // qu'un : il remplace le précédent pour tout le monde)
+      if (this.onglet === 'scenario') {
+        this.statut('partage du scénario…')
+        void pushScenario(this.scenario, this.opts.auteur()).then((s) => {
+          if (!s) {
+            this.statut('partage impossible (hors ligne ?)')
+            return
+          }
+          this.scenario = s
+          sauveScenario(s)
+          this.opts.surScenario?.(s)
+          this.statut('scénario partagé — il fait foi sur tous les postes')
+        })
+        return
+      }
       if (!this.courante) return
       this.statut('partage…')
       void pushCine(this.courante, this.opts.auteur()).then((liste) => {
@@ -273,7 +334,143 @@ export class TableMontage {
     this.persiste()
   }
 
+  // ---- L'onglet SCÉNARIO : la liste de règles, premier match gagne.
+
+  private editeScenario(fait: () => void): void {
+    fait()
+    sauveScenario(this.scenario)
+    this.opts.surScenario?.(this.scenario)
+  }
+
+  /** Tous les codes proposables : livrées, poste, partagées. */
+  private codesConnus(): string[] {
+    return [
+      ...this.opts.livrees.map((c) => c.code),
+      ...this.cines.map((c) => c.code),
+      ...this.partagees.map((s) => s.cine.code),
+    ].filter((c, i, t) => t.indexOf(c) === i)
+  }
+
+  private dessineScenario(): void {
+    this.corpsEl.innerHTML = ''
+    const intro = document.createElement('div')
+    intro.className = 'mt-fiche'
+    intro.innerHTML =
+      `<em>Les cinématiques HORS TABLEAU. La liste se lit de haut en bas et la ` +
+      `PREMIÈRE règle qui correspond gagne : rangez le particulier au-dessus du général. ` +
+      `« Une seule fois » retient la règle pour toujours — c’est elle qui empêche ` +
+      `l’ouverture de se rejouer à chaque run. ⇪ PARTAGER publie ce scénario pour tous.</em>`
+    this.corpsEl.appendChild(intro)
+
+    const codes = this.codesConnus()
+    const trophees = this.opts.trophees ?? []
+    this.scenario.regles.forEach((r, i) => {
+      const row = document.createElement('div')
+      row.className = 'mt-regle'
+      row.innerHTML = `
+        <span class="mt-rang">${i + 1}</span>
+        <div class="mt-champs">
+          <label>QUAND <select data-sc="moment">${MOMENTS.map(
+            (m) => `<option value="${m}">${MOMENT_NOMS[m]}</option>`,
+          ).join('')}</select></label>
+          <label>SI <select data-sc="condition">${CONDITIONS.map(
+            (c) => `<option value="${c}">${CONDITION_NOMS[c]}</option>`,
+          ).join('')}</select></label>
+          <label class="mt-si-valeur">N <input data-sc="valeur" type="number" min="0" max="999" step="1" /></label>
+          <label class="mt-si-trophee">TROPHÉE <select data-sc="trophee"><option value="">— aucun —</option>${trophees
+            .map((t) => `<option value="${t.id}">${t.nom}</option>`)
+            .join('')}</select></label>
+          <label>CINÉMATIQUE <input data-sc="cine" list="mt-codes" placeholder="code" /></label>
+          <label class="mt-case">UNE SEULE FOIS <input data-sc="uneFois" type="checkbox" /></label>
+          <label class="mt-case">ACTIVE <input data-sc="actif" type="checkbox" /></label>
+        </div>
+        <div class="mt-outils">
+          <button type="button" data-op="monte" title="Monter (plus prioritaire)" ${i === 0 ? 'disabled' : ''}>▲</button>
+          <button type="button" data-op="descend" title="Descendre" ${
+            i === this.scenario.regles.length - 1 ? 'disabled' : ''
+          }>▼</button>
+          <button type="button" data-op="retire" title="Retirer la règle">✕</button>
+        </div>`
+      const ch = <T extends HTMLInputElement | HTMLSelectElement>(nom: string) =>
+        row.querySelector(`[data-sc=${nom}]`) as T
+      ch<HTMLSelectElement>('moment').value = r.moment
+      ch<HTMLSelectElement>('condition').value = r.condition
+      ch<HTMLInputElement>('valeur').value = String(r.valeur)
+      ch<HTMLSelectElement>('trophee').value = r.trophee
+      ch<HTMLInputElement>('cine').value = r.cine
+      ch<HTMLInputElement>('uneFois').checked = r.uneFois
+      ch<HTMLInputElement>('actif').checked = r.actif
+      // seuil et trophée ne s'affichent que si la condition les emploie
+      const majPertinence = (): void => {
+        row.classList.toggle('mt-avec-valeur', conditionAValeur(r.condition))
+        row.classList.toggle('mt-avec-trophee', r.condition === 'trophee')
+      }
+      majPertinence()
+      row.addEventListener('change', (e) => {
+        const nom = (e.target as HTMLElement).dataset.sc
+        if (!nom) return
+        this.editeScenario(() => {
+          if (nom === 'moment') r.moment = ch<HTMLSelectElement>('moment').value as MomentScenario
+          else if (nom === 'condition') {
+            r.condition = ch<HTMLSelectElement>('condition').value as ConditionScenario
+            majPertinence()
+          } else if (nom === 'valeur') {
+            const v = Number(ch<HTMLInputElement>('valeur').value)
+            r.valeur = Number.isFinite(v) ? Math.max(0, Math.min(999, Math.round(v))) : r.valeur
+            ch<HTMLInputElement>('valeur').value = String(r.valeur)
+          } else if (nom === 'trophee') r.trophee = ch<HTMLSelectElement>('trophee').value
+          else if (nom === 'cine') r.cine = ch<HTMLInputElement>('cine').value.trim().slice(0, 24)
+          else if (nom === 'uneFois') r.uneFois = ch<HTMLInputElement>('uneFois').checked
+          else if (nom === 'actif') r.actif = ch<HTMLInputElement>('actif').checked
+        })
+      })
+      row.querySelector('.mt-outils')!.addEventListener('click', (e) => {
+        const btn = (e.target as HTMLElement).closest('button[data-op]') as HTMLButtonElement | null
+        if (!btn || btn.disabled) return
+        this.editeScenario(() => {
+          const t = this.scenario.regles
+          if (btn.dataset.op === 'monte') [t[i - 1], t[i]] = [t[i], t[i - 1]]
+          else if (btn.dataset.op === 'descend') [t[i], t[i + 1]] = [t[i + 1], t[i]]
+          else t.splice(i, 1)
+        })
+        this.dessineScenario()
+      })
+      this.corpsEl.appendChild(row)
+    })
+
+    // la liste des codes proposés à la frappe
+    const datalist = document.createElement('datalist')
+    datalist.id = 'mt-codes'
+    datalist.innerHTML = codes.map((c) => `<option value="${c}"></option>`).join('')
+    this.corpsEl.appendChild(datalist)
+
+    const pied = document.createElement('div')
+    pied.className = 'mt-pied-scenario'
+    pied.innerHTML = `
+      <button type="button" class="mt-ajout" data-sc-op="ajoute">+ AJOUTER UNE RÈGLE</button>
+      <button type="button" class="mt-oubli" data-sc-op="oublie" title="Effacer la mémoire des règles « une seule fois » : elles se rejoueront comme pour un nouveau joueur — pour tester l'ouverture, par exemple">↺ OUBLIER LES RÈGLES DÉJÀ VUES (${
+        chargeVues().size
+      })</button>`
+    pied.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest('button[data-sc-op]') as HTMLButtonElement | null
+      if (!btn) return
+      if (btn.dataset.scOp === 'ajoute') {
+        this.editeScenario(() => this.scenario.regles.push(regleVierge(idLibre(this.scenario))))
+        this.dessineScenario()
+      } else {
+        oublieVues()
+        this.statut('mémoire effacée : les cinématiques « une seule fois » se rejoueront')
+        this.dessineScenario()
+      }
+    })
+    this.corpsEl.appendChild(pied)
+  }
+
   private dessine(): void {
+    if (this.onglet === 'scenario') {
+      this.dessineScenario()
+      return
+    }
     const c = this.courante
     this.corpsEl.innerHTML = ''
     if (!c) return

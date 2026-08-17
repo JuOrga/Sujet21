@@ -1230,6 +1230,74 @@
       }
       #montage .mt-tete button:hover { border-color: #63b7e6; }
       #montage .mt-tete .mt-lire { border-color: #63b7e6; color: #8fd2ff; }
+      #montage .mt-onglets {
+        display: flex;
+        gap: 6px;
+        padding: 8px 14px 0;
+      }
+      #montage .mt-ong {
+        background: transparent;
+        color: #9db4c4;
+        border: 1px solid transparent;
+        border-bottom: none;
+        border-radius: 6px 6px 0 0;
+        padding: 6px 14px;
+        font: inherit;
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        cursor: pointer;
+      }
+      #montage .mt-ong.actif {
+        color: #8fd2ff;
+        border-color: rgba(99, 183, 230, 0.4);
+        background: rgba(10, 20, 29, 0.8);
+      }
+      /* dans l'onglet SCÉNARIO, le rayon des cinématiques n'a rien à dire */
+      #montage.mt-en-scenario .mt-choix,
+      #montage.mt-en-scenario [data-mt='nouvelle'],
+      #montage.mt-en-scenario [data-mt='dupliquer'],
+      #montage.mt-en-scenario [data-mt='supprimer'],
+      #montage.mt-en-scenario [data-mt='exporter'],
+      #montage.mt-en-scenario [data-mt='importer'],
+      #montage.mt-en-scenario .mt-lire {
+        display: none;
+      }
+      #montage .mt-regle {
+        display: grid;
+        grid-template-columns: 28px 1fr auto;
+        gap: 12px;
+        align-items: start;
+        padding: 10px;
+        border: 1px solid rgba(99, 183, 230, 0.18);
+        border-radius: 8px;
+        background: rgba(10, 20, 29, 0.6);
+      }
+      #montage .mt-rang {
+        color: #63b7e6;
+        font-size: 13px;
+        text-align: center;
+        padding-top: 14px;
+      }
+      /* seuil et trophée ne paraissent que si la condition les emploie */
+      #montage .mt-regle .mt-si-valeur,
+      #montage .mt-regle .mt-si-trophee { display: none; }
+      #montage .mt-regle.mt-avec-valeur .mt-si-valeur,
+      #montage .mt-regle.mt-avec-trophee .mt-si-trophee { display: flex; }
+      #montage .mt-case { flex-direction: row !important; align-items: center; gap: 6px !important; }
+      #montage .mt-case input { width: auto; }
+      #montage .mt-pied-scenario { display: flex; flex-wrap: wrap; gap: 10px; }
+      #montage .mt-oubli {
+        align-self: flex-start;
+        background: #0a141d;
+        color: #9db4c4;
+        border: 1px solid rgba(99, 183, 230, 0.3);
+        border-radius: 8px;
+        padding: 8px 14px;
+        font: inherit;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        cursor: pointer;
+      }
       #montage .mt-corps {
         flex: 1;
         overflow-y: auto;

@@ -23,8 +23,40 @@ interface SharedCine {
   majAt: string
 }
 
+// LE SCÉNARIO : un seul, global au jeu (décision du concepteur) — il voyage
+// donc dans le MÊME document que les cinématiques qu'il orchestre.
 interface Library {
   cines: SharedCine[]
+  scenario?: { regles: Record<string, unknown>[] }
+  scenarioPar?: string // qui l'a publié en dernier
+  scenarioAt?: string
+}
+
+const MAX_REGLES = 60
+
+function sanitizeScenario(input: unknown): { regles: Record<string, unknown>[] } | null {
+  if (typeof input !== 'object' || input === null) return null
+  const s = input as Record<string, unknown>
+  if (!Array.isArray(s.regles)) return null
+  const regles: Record<string, unknown>[] = []
+  for (const raw of s.regles.slice(0, MAX_REGLES)) {
+    if (typeof raw !== 'object' || raw === null) continue
+    const r = raw as Record<string, unknown>
+    regles.push({
+      id: borne(r.id, 24),
+      moment: borne(r.moment, 32),
+      condition: borne(r.condition, 32),
+      valeur:
+        typeof r.valeur === 'number' && Number.isFinite(r.valeur)
+          ? Math.max(0, Math.min(999, Math.round(r.valeur)))
+          : 0,
+      trophee: borne(r.trophee, 32),
+      cine: borne(r.cine, 24),
+      uneFois: r.uneFois !== false,
+      actif: r.actif !== false,
+    })
+  }
+  return { regles }
 }
 
 function borne(v: unknown, max: number): string {
@@ -73,7 +105,16 @@ function valideLib(data: unknown): boolean {
 async function readLib(opts?: { frais?: boolean }): Promise<Library> {
   const data = (await litDocument(PREFIX, valideLib, opts)) as Library | null
   if (data === null) return { cines: [] }
-  return { cines: data.cines.filter((c) => c && typeof c.code === 'string' && Array.isArray(c.planches)) }
+  const lib: Library = {
+    cines: data.cines.filter((c) => c && typeof c.code === 'string' && Array.isArray(c.planches)),
+  }
+  const scenario = sanitizeScenario(data.scenario)
+  if (scenario) {
+    lib.scenario = scenario
+    if (typeof data.scenarioPar === 'string') lib.scenarioPar = data.scenarioPar
+    if (typeof data.scenarioAt === 'string') lib.scenarioAt = data.scenarioAt
+  }
+  return lib
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -84,8 +125,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
     if (req.method === 'POST') {
-      const body = (req.body ?? {}) as { cine?: unknown; auteur?: unknown }
-      const cine = sanitize(body.cine, typeof body.auteur === 'string' ? body.auteur : '')
+      const body = (req.body ?? {}) as { cine?: unknown; scenario?: unknown; auteur?: unknown }
+      const auteur = typeof body.auteur === 'string' ? body.auteur.slice(0, 12) : ''
+      // publier LE scénario (il n'y en a qu'un : il remplace le précédent)
+      if (body.scenario !== undefined) {
+        const scenario = sanitizeScenario(body.scenario)
+        if (!scenario) {
+          res.status(400).json({ error: 'scénario illisible' })
+          return
+        }
+        const lib = await readLib({ frais: true })
+        lib.scenario = scenario
+        lib.scenarioPar = auteur
+        lib.scenarioAt = new Date().toISOString()
+        await ecritDocument(PREFIX, lib)
+        res.status(200).json(lib)
+        return
+      }
+      const cine = sanitize(body.cine, auteur)
       if (!cine) {
         res.status(400).json({ error: 'cinématique illisible' })
         return
