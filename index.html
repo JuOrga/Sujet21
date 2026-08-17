@@ -1159,12 +1159,44 @@
         cursor: pointer;
       }
       #imagerie .im-tete .im-importer { border-color: #63b7e6; color: #8fd2ff; }
+      #imagerie .im-filtre {
+        background: rgba(3, 7, 16, 0.7);
+        border: 1px solid #24405a;
+        color: var(--ink);
+        font-family: var(--font-mono);
+        font-size: 12px;
+        padding: 5px 9px;
+        min-width: 180px;
+      }
+      /* Un intertitre par rubrique : la bibliothèque se lit comme un rayon
+         de magasin — importées d'abord, puis surfaces, zones, machinerie… */
+      #imagerie .im-section {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 6px 0 -2px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #1d3448;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #7fb2d8;
+      }
+      #imagerie .im-section i { font-style: normal; color: #5d7f99; font-size: 10px; }
+      #imagerie .im-vide { grid-column: 1 / -1; color: #9db4c4; font-size: 12px; }
+      /* Les LIVRÉES portent un liseré discret : elles ne se suppriment pas */
+      #imagerie .im-livree .im-vue { border-bottom: 1px solid #2b4a63; }
+      #imagerie .im-livree .im-pied span { color: #6f93ad; font-style: italic; }
       #imagerie .im-grille {
         flex: 1;
         overflow-y: auto;
         padding: 14px;
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        /* max-content : chaque rangée prend la hauteur de ses cartes —
+           sans ça, les rangées se tassent et le pied (nom, LIEN) est rogné */
+        grid-auto-rows: max-content;
         gap: 12px;
         align-content: start;
       }
@@ -1177,6 +1209,9 @@
         flex-direction: column;
       }
       #imagerie .im-vue {
+        /* flex: 0 0 : la vignette ne se laisse PAS comprimer par la carte —
+           sans ça, la rangée se tasse et l'image disparaît */
+        flex: 0 0 110px;
         height: 110px;
         background: #05090d;
         overflow: hidden;
@@ -1192,7 +1227,20 @@
         font-size: 11px;
         color: #9db4c4;
       }
-      #imagerie .im-pied b { color: var(--ink); font-weight: normal; word-break: break-all; }
+      /* Le nom tient sur deux lignes au plus : au-delà il était rogné par la
+         carte et emportait le bouton LIEN avec lui */
+      #imagerie .im-pied b {
+        color: var(--ink);
+        font-weight: normal;
+        overflow-wrap: anywhere;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+      #imagerie .im-pied { min-height: 44px; }
+      #imagerie .im-outils { margin-top: auto; }
       #imagerie .im-outils {
         display: flex;
         gap: 6px;
