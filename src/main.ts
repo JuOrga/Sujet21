@@ -47,6 +47,8 @@ import { Soundtrack, type Bruitage, type Piste, type Ponctuation } from './game/
 import { CINEMATIQUE_ESSAI, chargeCinematiques, type CinematiqueDef } from './game/cinematique'
 import { LecteurCinematique } from './game/cinelecteur'
 import { TableMontage } from './game/montage'
+import { Imagerie } from './game/imagerie'
+import { fetchCines } from './game/netCines'
 import { Records } from './game/records'
 import {
   fetchSharedBoard,
@@ -1807,11 +1809,16 @@ function lireCine(cine: CinematiqueDef): Promise<void> {
   })
 }
 // Les cinématiques ANCRÉES aux tableaux (cineAvant/cineApres, zones
-// déclencheuses) référencent un CODE : cherché parmi les livrées puis les
-// cinématiques du poste (montage) — un code inconnu est ignoré sans bruit.
+// déclencheuses) référencent un CODE : cherché parmi les livrées, puis les
+// cinématiques du poste (montage), puis la bibliothèque PARTAGÉE — un code
+// inconnu est ignoré sans bruit.
+let cinesPartagees: CinematiqueDef[] = []
+fetchCines().then((liste) => {
+  if (liste) cinesPartagees = liste.map((s) => s.cine)
+})
 function lireCineParCode(code: string): Promise<void> {
   const cible = code.trim().toLowerCase()
-  const cine = [CINEMATIQUE_ESSAI, ...chargeCinematiques()].find(
+  const cine = [CINEMATIQUE_ESSAI, ...chargeCinematiques(), ...cinesPartagees].find(
     (c) => c.code.trim().toLowerCase() === cible,
   )
   return cine ? lireCine(cine) : Promise.resolve()
@@ -1873,11 +1880,20 @@ function startBisTest(): void {
 document.getElementById('start-hub2')?.addEventListener('click', () => {
   startTest([TABLEAU_HUB_COMPACT])
 })
+// La bibliothèque d'images : import (recompressé WebP), catalogue partagé,
+// sélecteur pour les planches — accessible de l'éditeur et du montage
+const imagerie = new Imagerie(el('imagerie'), { auteur: () => records.operator() })
+document.getElementById('ed-images')?.addEventListener('click', () => imagerie.open())
 // La table de montage des cinématiques : l'écran où le concepteur a la
-// main — planches, effets, sons, lecture immédiate, export/import.
+// main — planches, effets, sons, lecture immédiate, export/import, partage.
 const montage = new TableMontage(el('montage'), {
   livrees: [CINEMATIQUE_ESSAI],
   lire: (c) => lireCine(c),
+  auteur: () => records.operator(),
+  choisirImage: (rend) => imagerie.open(rend),
+  surPartagees: (liste) => {
+    cinesPartagees = liste
+  },
 })
 document.getElementById('open-montage')?.addEventListener('click', () => montage.open())
 // …et depuis l'éditeur aussi : la table s'ouvre PAR-DESSUS lui (z-index),
@@ -2028,6 +2044,7 @@ window.addEventListener('keydown', (e) => {
     if (!recsEl.hidden) fermerRecs() // les voiles d'abord
     else if (!cmdsEl.hidden) cmdsEl.hidden = true
     else if (!sallesEl.hidden) sallesEl.hidden = true
+    else if (imagerie.visible) imagerie.close()
     else if (el('montage').classList.contains('visible')) montage.close()
     else if (document.body.classList.contains('playing')) openHome()
     else closeHome()
