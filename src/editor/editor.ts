@@ -709,7 +709,8 @@ export class LevelEditor {
   }
 
   /** Poignée de redimensionnement sous le curseur, s'il y en a une. */
-  // Découpe par chevauchement : la paroi cliquée en premier PREND LE DESSUS
+  // Superposition : la paroi cliquée en premier PREND LE DESSUS, la seconde
+  // cède la zone commune (la GOMME, elle, efface librement une zone tracée)
   // La matière du prochain tracé : choisie dans « Surfaces », elle habille
   // aussi les outils de FORME (un disque de glace, un arc de chaudière…).
   private matiereCourante = MAT_WALL
@@ -989,26 +990,40 @@ export class LevelEditor {
       // rongée du perdant. Échap annule.
       if (this.tool.kind === 'cut') {
         const hit = ((): number => {
+          // Une fois le dessus choisi, on cherche d'abord une AUTRE paroi
+          // sous le curseur : cliquer deux fois dans la zone commune est le
+          // geste naturel (« enlève-moi ce chevauchement ») — il doit ronger,
+          // pas re-désigner la même paroi et tout annuler.
+          let leGagnant = -1
           for (let i = this.level.boxes.length - 1; i >= 0; i--) {
-            if (dansBoite(this.level.boxes[i], w.x, w.y)) return i
+            if (!dansBoite(this.level.boxes[i], w.x, w.y)) continue
+            if (this.cutWinner !== null && i === this.cutWinner) {
+              leGagnant = i
+              continue
+            }
+            return i
           }
-          return -1
+          return leGagnant
         })()
         if (hit < 0) {
-          this.status('Découpe : cliquez une paroi (celle qui prend le dessus).')
+          this.status(
+            this.cutWinner === null
+              ? 'Superposition : cliquez la paroi qui prend le dessus (celle qui garde la matière).'
+              : 'Superposition : cliquez l’autre paroi — celle qui doit s’effacer sous la première.',
+          )
           return
         }
         if (this.cutWinner === null) {
           this.cutWinner = hit
           this.status(
-            `${MATERIAL_NAMES[this.level.boxes[hit].material]} prend le dessus — cliquez maintenant la paroi à ronger.`,
+            `${MATERIAL_NAMES[this.level.boxes[hit].material]} prend le dessus (liseré doré) — cliquez maintenant l’autre paroi, ou le chevauchement lui-même.`,
           )
           this.draw()
           return
         }
         if (hit === this.cutWinner) {
           this.cutWinner = null
-          this.status('Découpe : vainqueur désélectionné.')
+          this.status('Superposition : le dessus est désélectionné — cliquez une paroi pour recommencer.')
           this.draw()
           return
         }
@@ -1020,8 +1035,8 @@ export class LevelEditor {
         if (!morceaux) {
           this.status(
             perdante.forme || gagnante.forme
-              ? 'Découpe : une des deux pièces est une FORME (disque, capsule, coin, arc) — la découpe exacte n’existe qu’entre rectangles.'
-              : `Découpe : angles différents (${gagnante.angle ?? 0}° / ${perdante.angle ?? 0}°) — alignez les angles, la découpe exacte n’existe qu’entre parois de même angle.`,
+              ? 'Superposition : une des deux pièces est une FORME (disque, capsule, coin, arc) — le rognage exact n’existe qu’entre rectangles. Utilisez la GOMME pour effacer librement.'
+              : `Superposition : angles différents (${gagnante.angle ?? 0}° / ${perdante.angle ?? 0}°) — le rognage exact n’existe qu’entre parois de même angle. Utilisez la GOMME pour effacer librement.`,
           )
           return
         }
@@ -1032,15 +1047,20 @@ export class LevelEditor {
           Math.abs(morceaux[0].maxX - perdante.maxX) < 0.01 &&
           Math.abs(morceaux[0].maxY - perdante.maxY) < 0.01
         if (intacte) {
-          this.status('Ces deux parois ne se chevauchent pas — choisissez-en une autre à ronger.')
+          this.status('Ces deux parois ne se chevauchent pas : il n’y a rien à ronger. Choisissez-en une autre.')
           return
         }
+        const matPerdante = MATERIAL_NAMES[perdante.material]
         this.level.boxes.splice(hit, 1, ...morceaux)
         this.cutWinner = null
-        this.sel = null
+        // la pièce rognée reste SÉLECTIONNÉE : le rognage se joue sous
+        // l'autre paroi, il ne se verrait pas autrement
+        this.sel = morceaux.length > 0 ? { kind: 'box', index: hit } : null
         this.setTool({ kind: 'select' })
         this.commit(
-          `Chevauchement rongé : ${MATERIAL_NAMES[gagnante.material]} garde la zone commune, ${MATERIAL_NAMES[perdante.material]} s'efface dessous (${morceaux.length} morceau${morceaux.length > 1 ? 'x' : ''}).`,
+          morceaux.length === 0
+            ? `${matPerdante} était entièrement sous ${MATERIAL_NAMES[gagnante.material]} : elle a disparu.`
+            : `Chevauchement rongé : ${MATERIAL_NAMES[gagnante.material]} garde la zone commune, ${matPerdante} s'efface dessous (${morceaux.length} morceau${morceaux.length > 1 ? 'x' : ''}, sélectionné${morceaux.length > 1 ? 's' : ''}).`,
         )
         return
       }
@@ -1456,7 +1476,7 @@ export class LevelEditor {
       } else if (e.key === 'Escape') {
         if (this.cutWinner !== null) {
           this.cutWinner = null
-          this.status('Découpe annulée.')
+          this.status('Superposition annulée.')
         }
         this.sel = null
         this.multi = []
