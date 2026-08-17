@@ -1767,6 +1767,7 @@ export class LevelEditor {
     for (const [id, champ] of [
       ['ed-cine-avant', 'cineAvant'],
       ['ed-cine-apres', 'cineApres'],
+      ['ed-sequence', 'sequence'],
     ] as const) {
       this.el(id).addEventListener('input', () => {
         const brut = (this.el(id) as HTMLInputElement).value.trim().slice(0, 24)
@@ -2111,6 +2112,7 @@ export class LevelEditor {
       this.level.ambiante === undefined ? '' : String(Math.round(this.level.ambiante * 100))
     ;(this.el('ed-cine-avant') as HTMLInputElement).value = this.level.cineAvant ?? ''
     ;(this.el('ed-cine-apres') as HTMLInputElement).value = this.level.cineApres ?? ''
+    ;(this.el('ed-sequence') as HTMLInputElement).value = this.level.sequence ?? ''
     ;(this.el('ed-journal') as HTMLTextAreaElement).value = this.level.journal
     ;(this.el('ed-ambiance') as HTMLSelectElement).value = this.level.ambiance ?? ''
     this.syncProps()
@@ -2247,6 +2249,10 @@ export class LevelEditor {
       rows.push(
         `<label class="ed-f" title="Le code d'une cinématique (table de montage) : elle se joue quand le corps entre dans la zone, une fois par essai. Une zone « libre » avec un code est un pur déclencheur, sans effet d'état."><span>Cinématique (code)</span>` +
           `<input id="p-zcine" placeholder="aucune" value="${(z.cine ?? '').replace(/"/g, '&quot;')}" /></label>`,
+      )
+      rows.push(
+        `<label class="ed-f" title="Le code d'une SÉQUENCE in-map : elle démarre quand le corps entre dans la zone, une fois par essai. C'est ainsi qu'on déclenche l'alerte au bon endroit."><span>Séquence (code)</span>` +
+          `<input id="p-zseq" placeholder="aucune" value="${(z.sequence ?? '').replace(/"/g, '&quot;')}" /></label>`,
       )
       rows.push(numField('X min', 'p-minX', z.minX), numField('X max', 'p-maxX', z.maxX))
       rows.push(numField('Y min', 'p-minY', z.minY), numField('Y max', 'p-maxY', z.maxY))
@@ -2452,6 +2458,9 @@ export class LevelEditor {
       const zcine = text('p-zcine').trim().slice(0, 24)
       if (zcine) z.cine = zcine
       else delete z.cine
+      const zseq = text('p-zseq').trim().slice(0, 24)
+      if (zseq) z.sequence = zseq
+      else delete z.sequence
       Object.assign(z, this.normalized(val('p-minX'), val('p-minY'), val('p-maxX'), val('p-maxY')))
     } else if (s.kind === 'sponge') {
       const sp = this.level.sponges[s.index]

@@ -27,6 +27,18 @@ import {
   type SharedCine,
 } from './netCines'
 import {
+  ACTION_NOMS,
+  ACTIONS,
+  SEQUENCE_ALERTE,
+  type ActionSeq,
+  type SequenceDef,
+  champTexte,
+  champValeur,
+  chargeSequences,
+  etapeVierge,
+  sauveSequences,
+} from './sequence'
+import {
   CONDITION_NOMS,
   CONDITIONS,
   MOMENT_NOMS,
@@ -80,7 +92,9 @@ export class TableMontage {
   private cines: CinematiqueDef[] = []
   private partagees: SharedCine[] = []
   private scenario: ScenarioDef = { regles: [] }
-  private onglet: 'cines' | 'scenario' = 'cines'
+  private sequences: SequenceDef[] = []
+  private seqCourante: SequenceDef | null = null
+  private onglet: 'cines' | 'scenario' | 'sequences' = 'cines'
   private courante: CinematiqueDef | null = null
   // d'où vient la sélection : seul le POSTE s'édite — livrées et partagées
   // se dupliquent (et une partagée se remplace en re-PARTAGEANT son code)
@@ -111,6 +125,7 @@ export class TableMontage {
       <div class="mt-onglets">
         <button type="button" class="mt-ong actif" data-ong="cines">CINÉMATIQUES</button>
         <button type="button" class="mt-ong" data-ong="scenario" title="Les cinématiques hors tableau : avant le hub, au lancement d'une run, à la défaite — sous conditions">SCÉNARIO</button>
+        <button type="button" class="mt-ong" data-ong="sequences" title="La mise en scène DANS le tableau : lampes qui virent, sirène, secousse, brèche qui s'ouvre">SÉQUENCES</button>
       </div>
       <div class="mt-corps"></div>
       <input type="file" accept="application/json,.json" hidden />`
@@ -121,12 +136,13 @@ export class TableMontage {
     root.querySelector('.mt-onglets')!.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('.mt-ong') as HTMLButtonElement | null
       if (!btn) return
-      this.onglet = btn.dataset.ong === 'scenario' ? 'scenario' : 'cines'
+      const o = btn.dataset.ong
+      this.onglet = o === 'scenario' ? 'scenario' : o === 'sequences' ? 'sequences' : 'cines'
       for (const b of root.querySelectorAll('.mt-ong')) {
         b.classList.toggle('actif', (b as HTMLElement).dataset.ong === this.onglet)
       }
       // le rayon des cinématiques n'a pas de sens dans l'onglet scénario
-      root.classList.toggle('mt-en-scenario', this.onglet === 'scenario')
+      root.classList.toggle('mt-en-scenario', this.onglet !== 'cines')
       this.dessine()
     })
     this.selectEl.addEventListener('change', () =>
@@ -144,11 +160,12 @@ export class TableMontage {
   open(): void {
     this.cines = chargeCinematiques()
     this.scenario = chargeScenario()
+    this.sequences = chargeSequences()
     if (!this.courante)
       this.choisit(`livree:${this.opts.livrees[0]?.code ?? ''}`)
     else this.rafraichitListe()
     this.root.classList.add('visible')
-    if (this.onglet === 'scenario') this.dessine()
+    if (this.onglet !== 'cines') this.dessine()
     // la bibliothèque partagée, en arrière-plan : la liste se complète
     void fetchBibliotheque().then((biblio) => {
       if (!biblio) return
@@ -466,7 +483,193 @@ export class TableMontage {
     this.corpsEl.appendChild(pied)
   }
 
+  // ---- L'onglet SÉQUENCES : la mise en scène DANS le tableau.
+
+  private editeSeqs(fait: () => void): void {
+    fait()
+    sauveSequences(this.sequences)
+  }
+
+  private dessineSequences(): void {
+    this.corpsEl.innerHTML = ''
+    const intro = document.createElement('div')
+    intro.className = 'mt-fiche'
+    intro.innerHTML =
+      `<em>La mise en scène DANS le tableau : les étapes se jouent dans l’ordre, ` +
+      `chacune durant son temps. Le code de la séquence se branche dans l’éditeur — ` +
+      `champ SÉQUENCE du tableau (elle démarre à l’essai) ou d’une zone (elle attend le corps).</em>` +
+      `<label>SÉQUENCE <select class="mt-seq-choix"></select></label>` +
+      `<button type="button" class="mt-btn-seq" data-sq-op="nouvelle">NOUVELLE</button>` +
+      `<button type="button" class="mt-btn-seq" data-sq-op="dupliquer">DUPLIQUER</button>` +
+      `<button type="button" class="mt-btn-seq" data-sq-op="supprimer">SUPPRIMER</button>`
+    this.corpsEl.appendChild(intro)
+
+    const livrees = [SEQUENCE_ALERTE]
+    const toutes = [...livrees, ...this.sequences]
+    if (!this.seqCourante || !toutes.includes(this.seqCourante)) this.seqCourante = toutes[0] ?? null
+    const choix = intro.querySelector('.mt-seq-choix') as HTMLSelectElement
+    choix.innerHTML = toutes
+      .map(
+        (s, i) =>
+          `<option value="${i}"${s === this.seqCourante ? ' selected' : ''}>${
+            i < livrees.length ? '◆ ' : ''
+          }${s.titre} [${s.code}]</option>`,
+      )
+      .join('')
+    choix.addEventListener('change', () => {
+      this.seqCourante = toutes[Number(choix.value)] ?? null
+      this.dessineSequences()
+    })
+    intro.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest('button[data-sq-op]') as HTMLButtonElement | null
+      if (!btn) return
+      const op = btn.dataset.sqOp
+      if (op === 'nouvelle' || op === 'dupliquer') {
+        const source = op === 'dupliquer' && this.seqCourante ? this.seqCourante : null
+        const pris = new Set(toutes.map((s) => s.code))
+        let code = source ? source.code : 'SEQ'
+        let n = 2
+        while (pris.has(code)) code = `${source ? source.code : 'SEQ'}-${n++}`
+        const neuve: SequenceDef = source
+          ? { ...JSON.parse(JSON.stringify(source)), code, titre: `${source.titre} (copie)` }
+          : { code, titre: 'Sans titre', etapes: [etapeVierge()] }
+        this.editeSeqs(() => this.sequences.push(neuve))
+        this.seqCourante = neuve
+      } else if (op === 'supprimer') {
+        if (!this.seqCourante || livrees.includes(this.seqCourante)) return
+        this.editeSeqs(() => {
+          this.sequences = this.sequences.filter((s) => s !== this.seqCourante)
+        })
+        this.seqCourante = null
+      }
+      this.dessineSequences()
+    })
+
+    const s = this.seqCourante
+    if (!s) return
+    const gel = livrees.includes(s)
+    const fiche = document.createElement('div')
+    fiche.className = 'mt-fiche'
+    fiche.innerHTML = gel
+      ? `<em>Séquence livrée avec le jeu — en lecture seule. DUPLIQUER pour la retoucher.</em>`
+      : `<label>CODE <input data-sq="code" maxlength="24" /></label>
+         <label>TITRE <input data-sq="titre" maxlength="80" /></label>`
+    this.corpsEl.appendChild(fiche)
+    if (!gel) {
+      const code = fiche.querySelector('[data-sq=code]') as HTMLInputElement
+      const titre = fiche.querySelector('[data-sq=titre]') as HTMLInputElement
+      code.value = s.code
+      titre.value = s.titre
+      code.addEventListener('change', () =>
+        this.editeSeqs(() => {
+          s.code = code.value.trim().slice(0, 24) || s.code
+          code.value = s.code
+        }),
+      )
+      titre.addEventListener('change', () =>
+        this.editeSeqs(() => {
+          s.titre = titre.value.trim() || s.code
+        }),
+      )
+    }
+
+    s.etapes.forEach((e, i) => {
+      const row = document.createElement('div')
+      row.className = 'mt-regle'
+      row.innerHTML = `
+        <span class="mt-rang">${i + 1}</span>
+        <div class="mt-champs">
+          <label>ACTION <select data-sq="action" ${gel ? 'disabled' : ''}>${ACTIONS.map(
+            (a) => `<option value="${a}">${ACTION_NOMS[a]}</option>`,
+          ).join('')}</select></label>
+          <label class="mt-sq-texte">${
+            champTexte(e.action) === 'couleur'
+              ? 'COULEUR'
+              : champTexte(e.action) === 'libre'
+                ? 'TEXTE'
+                : champTexte(e.action) === 'code'
+                  ? 'CODE'
+                  : 'NOM'
+          } ${
+            champTexte(e.action) === 'bruitage'
+              ? `<select data-sq="texte" ${gel ? 'disabled' : ''}>${optionsHTML(BRUITAGES, null, '— aucun —')}</select>`
+              : champTexte(e.action) === 'ponctuation'
+                ? `<select data-sq="texte" ${gel ? 'disabled' : ''}>${optionsHTML(PONCTUATIONS, null, '— aucune —')}</select>`
+                : champTexte(e.action) === 'piste'
+                  ? `<select data-sq="texte" ${gel ? 'disabled' : ''}>${optionsHTML(PISTES, PISTE_NOMS, '— inchangée —')}</select>`
+                  : `<input data-sq="texte" placeholder="${
+                      champTexte(e.action) === 'couleur' ? '#e8433c (vide = leur couleur)' : ''
+                    }" ${gel ? 'disabled' : ''} />`
+          }</label>
+          <label class="mt-sq-valeur">${e.action === 'breche' ? 'N° DE PORTE' : 'INTENSITÉ (%)'} <input data-sq="valeur" type="number" min="0" max="400" step="1" ${gel ? 'disabled' : ''} /></label>
+          <label>DURÉE (s) <input data-sq="duree" type="number" min="0" max="60" step="0.5" ${gel ? 'disabled' : ''} /></label>
+        </div>
+        <div class="mt-outils">
+          <button type="button" data-op="monte" title="Monter" ${gel || i === 0 ? 'disabled' : ''}>▲</button>
+          <button type="button" data-op="descend" title="Descendre" ${gel || i === s.etapes.length - 1 ? 'disabled' : ''}>▼</button>
+          <button type="button" data-op="retire" title="Retirer l'étape" ${gel || s.etapes.length <= 1 ? 'disabled' : ''}>✕</button>
+        </div>`
+      const ch = <T extends HTMLInputElement | HTMLSelectElement>(n: string) =>
+        row.querySelector(`[data-sq=${n}]`) as T
+      ch<HTMLSelectElement>('action').value = e.action
+      ch<HTMLInputElement>('texte').value = e.texte
+      ch<HTMLInputElement>('valeur').value = String(e.valeur)
+      ch<HTMLInputElement>('duree').value = String(e.duree)
+      row.classList.toggle('mt-avec-texte', champTexte(e.action) !== 'aucun')
+      row.classList.toggle('mt-avec-nombre', champValeur(e.action))
+      row.addEventListener('change', (ev) => {
+        const nom = (ev.target as HTMLElement).dataset.sq
+        if (!nom || gel) return
+        this.editeSeqs(() => {
+          if (nom === 'action') {
+            e.action = ch<HTMLSelectElement>('action').value as ActionSeq
+            this.dessineSequences() // les champs pertinents changent
+            return
+          }
+          if (nom === 'texte') e.texte = ch<HTMLInputElement>('texte').value.slice(0, 300)
+          else if (nom === 'valeur') {
+            const v = Number(ch<HTMLInputElement>('valeur').value)
+            e.valeur = Number.isFinite(v) ? Math.max(0, Math.min(400, Math.round(v))) : e.valeur
+            ch<HTMLInputElement>('valeur').value = String(e.valeur)
+          } else if (nom === 'duree') {
+            const v = Number(ch<HTMLInputElement>('duree').value)
+            e.duree = Number.isFinite(v) ? Math.max(0, Math.min(60, v)) : e.duree
+            ch<HTMLInputElement>('duree').value = String(e.duree)
+          }
+        })
+      })
+      row.querySelector('.mt-outils')!.addEventListener('click', (ev) => {
+        const btn = (ev.target as HTMLElement).closest('button[data-op]') as HTMLButtonElement | null
+        if (!btn || btn.disabled) return
+        this.editeSeqs(() => {
+          const t = s.etapes
+          if (btn.dataset.op === 'monte') [t[i - 1], t[i]] = [t[i], t[i - 1]]
+          else if (btn.dataset.op === 'descend') [t[i], t[i + 1]] = [t[i + 1], t[i]]
+          else t.splice(i, 1)
+        })
+        this.dessineSequences()
+      })
+      this.corpsEl.appendChild(row)
+    })
+
+    if (!gel) {
+      const ajout = document.createElement('button')
+      ajout.type = 'button'
+      ajout.className = 'mt-ajout'
+      ajout.textContent = '+ AJOUTER UNE ÉTAPE'
+      ajout.addEventListener('click', () => {
+        this.editeSeqs(() => s.etapes.push(etapeVierge()))
+        this.dessineSequences()
+      })
+      this.corpsEl.appendChild(ajout)
+    }
+  }
+
   private dessine(): void {
+    if (this.onglet === 'sequences') {
+      this.dessineSequences()
+      return
+    }
     if (this.onglet === 'scenario') {
       this.dessineScenario()
       return

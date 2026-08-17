@@ -189,6 +189,9 @@ export interface ZoneDef {
   // quand le corps ENTRE dans la zone — une fois par essai. Une zone
   // « libre » avec un code est un pur déclencheur, sans effet d'état.
   cine?: string
+  // Déclencheur de SÉQUENCE in-map (lampes, sirène, brèche…) : même règle,
+  // une fois par essai, à l'entrée du corps dans la zone.
+  sequence?: string
 }
 
 // Décalque de décor : machinerie plaquée sur la paroi (tuyaux, vanne).
@@ -275,7 +278,10 @@ export interface PorteDef {
   minY: number
   maxX: number
   maxY: number
-  cible: number // indice dans `cibles`
+  // Indice dans `cibles` — le récepteur laser qui commande cette porte.
+  // NÉGATIF : porte SCÉNARISÉE, qu'aucun faisceau n'ouvre. Elle reste une
+  // paroi pleine jusqu'à ce qu'une séquence in-map la crève (la brèche).
+  cible: number
 }
 
 // Un RAIL MAGNÉTIQUE (palier 3) : une ligne de champ posée dans le décor.
@@ -330,6 +336,9 @@ export interface LevelDef {
   // sur le poste est simplement ignoré.
   cineAvant?: string
   cineApres?: string
+  // SÉQUENCE in-map jouée dès l'entrée dans le tableau : la mise en scène
+  // qui agit sur le monde (lampes, sons, brèche, secousse, cartes).
+  sequence?: string
 }
 
 // Nom lisible de chaque matériau — l'éditeur et la légende parlent la même

@@ -135,8 +135,9 @@ function readZone(o: Record<string, unknown>): ZoneDef | null {
     maxY: Math.max(minY, maxY),
     force: FORCES.includes(force) ? force : 'libre',
     label: str(o.label) || undefined,
-    // déclencheur de cinématique : un code du montage, jouée à l'entrée
+    // déclencheurs à l'entrée du corps : cinématique et/ou séquence in-map
     cine: str(o.cine).trim().slice(0, 24) || undefined,
+    sequence: str(o.sequence).trim().slice(0, 24) || undefined,
   }
   if (zone.maxX - zone.minX < 1 || zone.maxY - zone.minY < 1) return null
   return zone
@@ -251,6 +252,7 @@ export function parseLevel(input: unknown): { level: LevelDef | null; rejets: st
     raccourciVers: str(o.raccourciVers).slice(0, 16) || undefined,
     cineAvant: str(o.cineAvant).trim().slice(0, 24) || undefined,
     cineApres: str(o.cineApres).trim().slice(0, 24) || undefined,
+    sequence: str(o.sequence).trim().slice(0, 24) || undefined,
   }
   // Décals (tuyaux, vannes) : du décor pur — relus pour que le passage par
   // l'éditeur ne dépouille pas un tableau de sa machinerie peinte.
@@ -317,7 +319,9 @@ export function parseLevel(input: unknown): { level: LevelDef | null; rejets: st
       minY: Math.min(num(q.minY), num(q.maxY)),
       maxX: Math.max(num(q.minX), num(q.maxX)),
       maxY: Math.max(num(q.minY), num(q.maxY)),
-      cible: Math.max(0, Math.round(num(q.cible, 0))),
+      // négatif conservé : c'est le contrat d'une porte SCÉNARISÉE, que
+      // seule une séquence in-map ouvre (voir PorteDef)
+      cible: Math.max(-1, Math.round(num(q.cible, 0))),
     }
     if (porte.maxX - porte.minX < 1 || porte.maxY - porte.minY < 1) {
       rejets.push('une porte a été écartée (taille nulle)')
@@ -397,6 +401,7 @@ export function serializeLevel(level: LevelDef): string {
   if (level.raccourciVers) out.raccourciVers = level.raccourciVers
   if (level.cineAvant) out.cineAvant = level.cineAvant
   if (level.cineApres) out.cineApres = level.cineApres
+  if (level.sequence) out.sequence = level.sequence
   for (const k of Object.keys(out)) if (out[k] === undefined) delete out[k]
   return JSON.stringify(out, null, 2)
 }
@@ -479,11 +484,13 @@ export function checkLevel(level: LevelDef): Verdict[] {
       break
     }
   }
-  // Mécanismes laser : chaque porte doit être asservie à une cible réelle,
+  // Mécanismes laser : une porte asservie doit l'être à une cible réelle,
   // et un émetteur sans cible n'ouvre rien (il éclaire, c'est tout).
+  // Une cible NÉGATIVE est le contrat des portes SCÉNARISÉES : aucun laser
+  // ne les ouvre — seule une séquence in-map le fait (la brèche).
   const nCibles = level.cibles?.length ?? 0
   for (const porte of level.portes ?? []) {
-    if (porte.cible < 0 || porte.cible >= nCibles) {
+    if (porte.cible >= 0 && porte.cible >= nCibles) {
       v.push({
         niveau: 'erreur',
         message: `Une porte est asservie à la cible nº ${porte.cible + 1}, qui n'existe pas.`,

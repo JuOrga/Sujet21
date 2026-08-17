@@ -27,6 +27,7 @@ import {
   zoneName,
   zoneShape,
   type LevelDef,
+  type LumiereDef,
   type ObstacleBox,
   type ZoneForce,
   AMBIANTE_DEFAUT,
@@ -49,6 +50,12 @@ import { LecteurCinematique } from './game/cinelecteur'
 import { TableMontage } from './game/montage'
 import { Imagerie } from './game/imagerie'
 import { fetchBibliotheque } from './game/netCines'
+import {
+  SEQUENCE_ALERTE,
+  Sequenceur,
+  chargeSequences,
+  type SequenceDef,
+} from './game/sequence'
 import {
   type EtatScenario,
   type MomentScenario,
@@ -1868,6 +1875,54 @@ function joueMoment(moment: MomentScenario): Promise<void> {
   return lireCineParCode(regle.cine)
 }
 
+// ---- LES SÉQUENCES IN-MAP : la mise en scène DANS le tableau. Le
+// séquenceur dit ce qui doit être vrai (teinte des lampes, secousse,
+// carte, brèches ouvertes) ; le jeu applique, ici et à chaque image.
+const sequenceur = new Sequenceur({
+  bruitage: (n) => bande.bruitage(n as Bruitage),
+  ponctuation: (n) => bande.ponctuation(n as Ponctuation),
+  piste: (n) => bande.setAmbiance(n as Piste),
+  cinematique: (code) => lireCineParCode(code),
+})
+;(window as unknown as { __seq: Sequenceur }).__seq = sequenceur
+/** Une séquence par son code : livrée, puis celles du poste. */
+function trouveSequence(code: string): SequenceDef | null {
+  const cible = code.trim().toLowerCase()
+  return (
+    [SEQUENCE_ALERTE, ...chargeSequences()].find(
+      (s) => s.code.trim().toLowerCase() === cible,
+    ) ?? null
+  )
+}
+function demarreSequence(code: string): void {
+  const seq = trouveSequence(code)
+  if (seq) sequenceur.demarre(seq)
+}
+// La carte de séquence : un bandeau discret, dans le monde du jeu
+const carteSeqEl = el('carte-seq')
+let carteSeqTexte = ''
+/** Applique à l'écran ce que le séquenceur tient pour vrai. */
+function appliqueSequence(): void {
+  if (sequenceur.etat.carte !== carteSeqTexte) {
+    carteSeqTexte = sequenceur.etat.carte
+    carteSeqEl.textContent = carteSeqTexte
+    carteSeqEl.classList.toggle('visible', !!carteSeqTexte)
+  }
+  document.body.classList.toggle('secousse', sequenceur.etat.secousse)
+}
+/** Les lampes du tableau, teintées par la séquence s'il y a lieu. On ne
+ *  touche JAMAIS aux données du tableau : c'est une copie de rendu. */
+function lumieresVives(): LumiereDef[] {
+  const base = level.lumieres ?? []
+  const { teinte, gain } = sequenceur.etat
+  if (!teinte && gain === 1) return base
+  return base.map((l) => ({
+    ...l,
+    couleur: teinte ?? l.couleur,
+    intensite: (l.intensite ?? 1) * gain,
+  }))
+}
+
 // Déclencheurs déjà joués dans l'essai en cours (réarmés par restart)
 const cinesVues = new Set<string>()
 // Le tableau dont la cinématique d'entrée a été jouée : un R sur place ne
@@ -2661,8 +2716,11 @@ function restart(): void {
   resetLasers()
   loop.reset()
   overlay.classList.remove('visible')
-  // les déclencheurs de cinématique se réarment à chaque essai du tableau
+  // les déclencheurs (cinématiques, séquences) se réarment à chaque essai
   cinesVues.clear()
+  // la mise en scène repart de zéro : lampes rendues, brèches refermées
+  sequenceur.reinitialise()
+  appliqueSequence()
   if (document.body.classList.contains('playing')) {
     camera.startIntro(sim.bounds, window.innerWidth, window.innerHeight)
     showTableauCard()
@@ -2672,6 +2730,9 @@ function restart(): void {
       cineNiveauVu = level
       if (level.cineAvant) void lireCineParCode(level.cineAvant)
     }
+    // la SÉQUENCE du tableau démarre à chaque essai : elle fait partie du
+    // tableau, pas de l'arrivée — la rejouer après un R est le bon geste
+    if (level.sequence) demarreSequence(level.sequence)
   } else {
     camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, camera.zoom)
   }
@@ -3705,12 +3766,38 @@ function frame(now: number): void {
         sim.step(params.dt)
         run.tableauTime += params.dt // temps simulé : le time warp ne fausse pas les records
         run.runTime += params.dt // le vaisseau refroidit au fil de l'expédition
+        // la mise en scène avance au TEMPS DE JEU : une pause la suspend,
+        // une cinématique aussi (la boucle physique ne tourne plus)
+        sequenceur.avance(params.dt)
       },
       stepBudget,
       plafondPas,
     )
     physRaw = performance.now() - physT0
     monitor.physMs += (physRaw - monitor.physMs) * 0.08
+  }
+
+  // ---- LES PORTES vers le solveur. HORS du bloc des lasers : un tableau
+  // peut n'avoir que des portes SCÉNARISÉES (la brèche de l'ouverture),
+  // sans le moindre émetteur — leur paroi doit tout de même être solide
+  // jusqu'à l'instant où le récit la crève.
+  {
+    const portes = level.portes ?? []
+    if (portes.length > 0) {
+      if (laserEtat.portesOuvertes.length !== portes.length) {
+        laserEtat.portesOuvertes = portes.map(() => false)
+      }
+      for (let i = 0; i < portes.length; i++) {
+        if (sequenceur.etat.brechesOuvertes.has(i)) laserEtat.portesOuvertes[i] = true
+      }
+      // le solveur ne reçoit que les portes closes — recomposé au changement
+      const closes = portes.filter((_, i) => !laserEtat.portesOuvertes[i])
+      const cle = closes.map((p) => `${p.minX},${p.minY},${p.maxX},${p.maxY}`).join(';')
+      if (cle !== laserEtat.doorsKey) {
+        laserEtat.doorsKey = cle
+        sim.setDoors(closes)
+      }
+    }
   }
 
   // ---- Lasers : traçage, cibles, portes ----
@@ -3755,17 +3842,14 @@ function frame(now: number): void {
     const toucheesImage: number[] = []
     for (const t of laserEtat.vues) for (const c of t.touchees) toucheesImage.push(c)
     avancerRecepteurs(cibles, toucheesImage, laserEtat.recepteurs, nowRecepteurs)
-    laserEtat.portesOuvertes = portes.map((p) =>
-      cibles[p.cible] !== undefined &&
-      cibleActive(cibles[p.cible], laserEtat.recepteurs, p.cible, nowRecepteurs),
+    // une porte s'ouvre par son laser… ou par une SÉQUENCE (la brèche) —
+    // une porte sans cible valide est une paroi que seul le récit ouvre
+    laserEtat.portesOuvertes = portes.map(
+      (p, i) =>
+        sequenceur.etat.brechesOuvertes.has(i) ||
+        (cibles[p.cible] !== undefined &&
+          cibleActive(cibles[p.cible], laserEtat.recepteurs, p.cible, nowRecepteurs)),
     )
-    // le solveur ne reçoit que les portes closes — recomposé au changement
-    const closes = portes.filter((_, i) => !laserEtat.portesOuvertes[i])
-    const cle = closes.map((p) => `${p.minX},${p.minY},${p.maxX},${p.maxY}`).join(';')
-    if (cle !== laserEtat.doorsKey) {
-      laserEtat.doorsKey = cle
-      sim.setDoors(closes)
-    }
     // convoyage : quand un arc circule sur un rail, le champ s'y ENGAGE —
     // et il reste engagé tant qu'un nuage voyage dans la bande, même si le
     // rayon ne traverse plus la vapeur : ce qui est pris est porté jusqu'à
@@ -3834,13 +3918,18 @@ function frame(now: number): void {
   if (!lecteurCine.actif && !run.ended && !sim.dispersed) {
     const zs = level.zones ?? []
     for (let i = 0; i < zs.length; i++) {
+      const dedans = (): boolean =>
+        zoneShape(zs[i], sim.stats.centroidX, sim.stats.centroidY) <= 1
       const code = zs[i].cine
-      if (!code) continue
-      const cle = `${i}:${code}`
-      if (cinesVues.has(cle)) continue
-      if (zoneShape(zs[i], sim.stats.centroidX, sim.stats.centroidY) <= 1) {
-        cinesVues.add(cle)
+      if (code && !cinesVues.has(`${i}:${code}`) && dedans()) {
+        cinesVues.add(`${i}:${code}`)
         void lireCineParCode(code)
+      }
+      // …et la SÉQUENCE in-map, même règle : une fois par essai
+      const seq = zs[i].sequence
+      if (seq && !cinesVues.has(`s${i}:${seq}`) && dedans()) {
+        cinesVues.add(`s${i}:${seq}`)
+        demarreSequence(seq)
       }
     }
   }
@@ -4031,6 +4120,7 @@ function frame(now: number): void {
   updateTrophees(dtReal)
   majFpsCoin(dtReal)
   updateWorldLabels(vw, vh)
+  appliqueSequence() // carte et secousse de la mise en scène
   drawMecanismes(vw, vh, dpr)
   drawFleche(dtReal, dpr)
   const renderT0 = performance.now()
@@ -4052,7 +4142,7 @@ function frame(now: number): void {
     decorRiche ? 1 : 0,
     eauRiche ? 1 : 0,
     lumiereActive ? 1 : 0,
-    level.lumieres ?? [],
+    lumieresVives(),
     lumiereEauActive ? 1 : 0,
     level.ambiante ?? AMBIANTE_DEFAUT,
     RELIEF_K[reliefChoix],
