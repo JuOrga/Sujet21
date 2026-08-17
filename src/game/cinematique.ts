@@ -205,17 +205,20 @@ export function sauveCinematiques(cines: CinematiqueDef[]): void {
   }
 }
 
-// ---- La cinématique d'essai : l'esquisse de l'ouverture, sur les
-// planches générées par le concepteur (les SVG essai-*.svg restent en
-// place pour les copies déjà dupliquées sur les postes).
+// ---- L'OUVERTURE : la cinématique livrée, sur les planches générées par
+// le concepteur. Sept temps — naissance, regard, alerte, fuite, brèche —
+// où la même planche peut servir DEUX battements (nouveau cadrage, nouvelle
+// réplique) : c'est du montage, pas du gaspillage d'images.
+// Les SVG essai-*.svg restent en place : ils servent de planches
+// provisoires aux cinématiques qui attendent leurs images.
 
 export const CINEMATIQUE_ESSAI: CinematiqueDef = {
   code: 'ESSAI',
-  titre: "Essai — esquisse de l'ouverture",
+  titre: "L'ouverture — la cuve, l'alerte, la brèche",
   planches: [
     {
       image: '/assets/cine/ouverture-1.webp',
-      texte: 'Module Méduse. Une cuve, une substance. Vingt échecs avant elle.',
+      texte: 'Module Méduse. Une cuve, une substance.',
       duree: 6,
       effet: 'zoom-avant',
       fondu: 'noir',
@@ -224,12 +227,34 @@ export const CINEMATIQUE_ESSAI: CinematiqueDef = {
       piste: 'cuve-tiede',
     },
     {
+      // le même plan, resserré : vingt échecs avant elle, et puis elle
+      image: '/assets/cine/ouverture-1.webp',
+      texte: 'Vingt tentatives. Vingt échecs. Puis vous.',
+      duree: 4.5,
+      effet: 'pan-haut',
+      fondu: 'aucun',
+      bruitage: 'goutte-rosee',
+      ponctuation: '',
+      piste: '',
+    },
+    {
       image: '/assets/cine/ouverture-2.webp',
       texte: 'Qui êtes-vous ? Où êtes-vous ?',
       duree: 5,
       effet: 'pan-droite',
       fondu: 'aucun',
       bruitage: 'condensation',
+      ponctuation: '',
+      piste: '',
+    },
+    {
+      // le regard s'attarde : ils ne vous regardent pas, ils vous relèvent
+      image: '/assets/cine/ouverture-2.webp',
+      texte: 'Ils ne vous regardent pas. Ils vous relèvent.',
+      duree: 4,
+      effet: 'zoom-avant',
+      fondu: 'aucun',
+      bruitage: '',
       ponctuation: '',
       piste: '',
     },
@@ -244,9 +269,20 @@ export const CINEMATIQUE_ESSAI: CinematiqueDef = {
       piste: '',
     },
     {
+      // ils partent — et personne ne vient chercher l'expérience ratée
+      image: '/assets/cine/ouverture-3.webp',
+      texte: 'Ils partent. Personne ne vient vous chercher.',
+      duree: 4,
+      effet: 'pan-gauche',
+      fondu: 'aucun',
+      bruitage: '',
+      ponctuation: '',
+      piste: '',
+    },
+    {
       image: '/assets/cine/ouverture-4.webp',
       texte: 'Le confinement cède.',
-      duree: 4,
+      duree: 4.5,
       effet: 'tremblement',
       fondu: 'aucun',
       bruitage: 'impact-glace',
@@ -255,3 +291,48 @@ export const CINEMATIQUE_ESSAI: CinematiqueDef = {
     },
   ],
 }
+
+// ---- LE DÉPART : la seconde cinématique livrée — le sas de lancement,
+// l'unique issue. Elle attend ses images : ses planches sont pour l'instant
+// les esquisses géométriques (SVG), à remplacer dès que les visuels
+// arrivent. Se branche au moment « lancement-run » du scénario.
+
+export const CINEMATIQUE_DEPART: CinematiqueDef = {
+  code: 'DEPART',
+  titre: 'Le départ — le sas de lancement (planches provisoires)',
+  planches: [
+    {
+      image: '/assets/cine/essai-4.svg',
+      texte: 'Le module est vide. Les portes ne se rouvriront pas.',
+      duree: 5,
+      effet: 'zoom-arriere',
+      fondu: 'noir',
+      bruitage: '',
+      ponctuation: '',
+      piste: 'cuve-glaciale',
+    },
+    {
+      image: '/assets/cine/essai-2.svg',
+      texte: 'Une seule ouverture, au bout du couloir. Elle aspire.',
+      duree: 5,
+      effet: 'pan-droite',
+      fondu: 'aucun',
+      bruitage: 'vortex-sas',
+      ponctuation: '',
+      piste: '',
+    },
+    {
+      image: '/assets/cine/essai-1.svg',
+      texte: 'Rien ne se perd. Tout ce qui passe compte.',
+      duree: 4,
+      effet: 'zoom-avant',
+      fondu: 'aucun',
+      bruitage: '',
+      ponctuation: 'sting-collecte',
+      piste: '',
+    },
+  ],
+}
+
+/** Les cinématiques livrées avec le jeu (lecture seule à la table). */
+export const CINEMATIQUES_LIVREES: CinematiqueDef[] = [CINEMATIQUE_ESSAI, CINEMATIQUE_DEPART]

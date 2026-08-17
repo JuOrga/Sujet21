@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  CINEMATIQUES_LIVREES,
   CINEMATIQUE_ESSAI,
   DUREE_MAX,
   DUREE_MIN,
@@ -93,7 +94,19 @@ describe('cinématiques — le format de données', () => {
     expect(r.rejets).toHaveLength(2)
   })
 
-  it("la cinématique d'essai livrée est valide, planche par planche", () => {
+  it('chaque cinématique LIVRÉE est valide, planche par planche', () => {
+    for (const livree of CINEMATIQUES_LIVREES) {
+      const relu = parseCinematique(JSON.parse(serializeCinematique(livree)))
+      expect(relu, livree.code).not.toBeNull()
+      expect(relu!.rejets, livree.code).toEqual([])
+      expect(relu!.cine).toEqual(livree)
+    }
+    // les codes des livrées sont uniques : la résolution par code en dépend
+    const codes = CINEMATIQUES_LIVREES.map((c) => c.code)
+    expect(new Set(codes).size).toBe(codes.length)
+  })
+
+  it("la cinématique d'ouverture est valide, planche par planche", () => {
     const r = parseCinematique(
       JSON.parse(serializeCinematique(CINEMATIQUE_ESSAI)),
     )

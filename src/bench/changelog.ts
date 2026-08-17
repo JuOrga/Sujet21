@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/08/2026 15:30',
+    title: 'Le champ CINÉMATIQUE propose enfin les titres · l’ouverture s’étoffe · une deuxième livrée',
+    notes: [
+      'CORRECTIF signalé par le concepteur : dans le scénario (et dans l’action « jouer une cinématique » d’une séquence), le champ CINÉMATIQUE ne proposait rien — il fallait taper le code de mémoire. C’est désormais un MENU DÉROULANT qui liste toutes les cinématiques connues PAR LEUR TITRE (livrées, poste, partagées), avec leur code entre crochets. Un code branché mais introuvable (cinématique pas encore composée, ou partagée pas encore arrivée) reste affiché « (introuvable) » et n’est JAMAIS perdu : un tableau ne se dérègle pas parce que la liste est incomplète.',
+      'L’OUVERTURE passe de quatre à SEPT planches. Trois battements ajoutés, sans une image de plus : la même planche resservie avec un autre cadrage et une autre réplique — c’est du montage. « Vingt tentatives. Vingt échecs. Puis vous. » sur la cuve qui monte ; « Ils ne vous regardent pas. Ils vous relèvent. » sur les Créateurs ; « Ils partent. Personne ne vient vous chercher. » sur l’alerte qui s’éloigne.',
+      'UNE DEUXIÈME CINÉMATIQUE LIVRÉE : LE DÉPART (code DEPART) — le module vide, l’unique ouverture au bout du couloir, ce qui passe compte. Elle se branche au moment « lancement-run » du scénario (le sas du hub). Ses planches sont pour l’instant les esquisses géométriques provisoires : elles attendent leurs images.',
+    ],
+  },
+  {
     date: '17/08/2026 14:30',
     title: 'LES SÉQUENCES IN-MAP : la mise en scène agit sur le tableau lui-même',
     notes: [
