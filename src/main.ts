@@ -2051,6 +2051,16 @@ const editor = new LevelEditor(el('editor'), {
     restart()
   },
   operator: () => records.operator(),
+  // les menus déroulants de l'éditeur : les VRAIES cinématiques et séquences
+  // connues du poste — livrées, composées ici, et partagées en ligne
+  cines: () =>
+    [...CINEMATIQUES_LIVREES, ...chargeCinematiques(), ...cinesPartagees]
+      .filter((c, i, t) => t.findIndex((o) => o.code === c.code) === i)
+      .map((c) => ({ code: c.code, titre: c.titre })),
+  sequences: () =>
+    [SEQUENCE_ALERTE, ...chargeSequences()]
+      .filter((s, i, t) => t.findIndex((o) => o.code === s.code) === i)
+      .map((s) => ({ code: s.code, titre: s.titre })),
   libraryChanged: (levels) => {
     libraryLevels = levels.map((s) => s.level)
     renderRegistres()

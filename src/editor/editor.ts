@@ -138,6 +138,35 @@ export interface EditorHooks {
    * portées dessinées (aspiration du sas, auras, rails) suivent ainsi la
    * valeur renseignée, en direct. Absent : les défauts font l'affaire. */
   params?(): SimParams
+  /** Les cinématiques connues (livrées, poste, partagées) — l'éditeur en
+   * fait des menus déroulants : on choisit un TITRE, jamais un code de
+   * mémoire. Absent : les champs restent des saisies libres. */
+  cines?(): { code: string; titre: string }[]
+  /** Les séquences in-map connues, même usage. */
+  sequences?(): { code: string; titre: string }[]
+}
+
+/**
+ * Un menu déroulant de codes (cinématiques, séquences). Le code COURANT est
+ * conservé même s'il ne figure pas dans la liste — une cinématique pas
+ * encore composée, ou une partagée pas encore arrivée, ne doit jamais
+ * effacer le réglage d'un tableau.
+ */
+function optionsCodes(
+  liste: { code: string; titre: string }[],
+  courant: string,
+): string {
+  const orphelin = courant && !liste.some((c) => c.code === courant)
+  return (
+    `<option value="">— aucune —</option>` +
+    liste
+      .map(
+        (c) =>
+          `<option value="${c.code}"${c.code === courant ? ' selected' : ''}>${c.titre} [${c.code}]</option>`,
+      )
+      .join('') +
+    (orphelin ? `<option value="${courant}" selected>${courant} (introuvable)</option>` : '')
+  )
 }
 
 /** Distance d'un point au segment [a, b] — pour attraper un rail au clic. */
@@ -2110,9 +2139,13 @@ export class LevelEditor {
       this.level.dashBudget === undefined ? '' : String(this.level.dashBudget)
     ;(this.el('ed-lum-generale') as HTMLInputElement).value =
       this.level.ambiante === undefined ? '' : String(Math.round(this.level.ambiante * 100))
-    ;(this.el('ed-cine-avant') as HTMLInputElement).value = this.level.cineAvant ?? ''
-    ;(this.el('ed-cine-apres') as HTMLInputElement).value = this.level.cineApres ?? ''
-    ;(this.el('ed-sequence') as HTMLInputElement).value = this.level.sequence ?? ''
+    // les menus se REMPLISSENT à chaque synchro : une cinématique composée
+    // au montage pendant qu'on édite apparaît dès le retour au tableau
+    const cines = this.hooks.cines?.() ?? []
+    const seqs = this.hooks.sequences?.() ?? []
+    this.el('ed-cine-avant').innerHTML = optionsCodes(cines, this.level.cineAvant ?? '')
+    this.el('ed-cine-apres').innerHTML = optionsCodes(cines, this.level.cineApres ?? '')
+    this.el('ed-sequence').innerHTML = optionsCodes(seqs, this.level.sequence ?? '')
     ;(this.el('ed-journal') as HTMLTextAreaElement).value = this.level.journal
     ;(this.el('ed-ambiance') as HTMLSelectElement).value = this.level.ambiance ?? ''
     this.syncProps()
@@ -2247,12 +2280,12 @@ export class LevelEditor {
           `<input id="p-zlabel" placeholder="${ZONE_CAUSES[z.force]}" value="${(z.label ?? '').replace(/"/g, '&quot;')}" /></label>`,
       )
       rows.push(
-        `<label class="ed-f" title="Le code d'une cinématique (table de montage) : elle se joue quand le corps entre dans la zone, une fois par essai. Une zone « libre » avec un code est un pur déclencheur, sans effet d'état."><span>Cinématique (code)</span>` +
-          `<input id="p-zcine" placeholder="aucune" value="${(z.cine ?? '').replace(/"/g, '&quot;')}" /></label>`,
+        `<label class="ed-f" title="La cinématique (table de montage) jouée quand le corps entre dans la zone, une fois par essai. Une zone « libre » qui en porte une est un pur déclencheur, sans effet d'état."><span>Cinématique</span>` +
+          `<select id="p-zcine">${optionsCodes(this.hooks.cines?.() ?? [], z.cine ?? '')}</select></label>`,
       )
       rows.push(
-        `<label class="ed-f" title="Le code d'une SÉQUENCE in-map : elle démarre quand le corps entre dans la zone, une fois par essai. C'est ainsi qu'on déclenche l'alerte au bon endroit."><span>Séquence (code)</span>` +
-          `<input id="p-zseq" placeholder="aucune" value="${(z.sequence ?? '').replace(/"/g, '&quot;')}" /></label>`,
+        `<label class="ed-f" title="La SÉQUENCE in-map qui démarre quand le corps entre dans la zone, une fois par essai. C'est ainsi qu'on déclenche l'alerte au bon endroit."><span>Séquence</span>` +
+          `<select id="p-zseq">${optionsCodes(this.hooks.sequences?.() ?? [], z.sequence ?? '')}</select></label>`,
       )
       rows.push(numField('X min', 'p-minX', z.minX), numField('X max', 'p-maxX', z.maxX))
       rows.push(numField('Y min', 'p-minY', z.minY), numField('Y max', 'p-maxY', z.maxY))
