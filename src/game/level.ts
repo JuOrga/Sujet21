@@ -185,6 +185,10 @@ export interface ZoneDef {
   maxY: number
   force: ZoneForce
   label?: string
+  // Déclencheur de cinématique : le code d'une cinématique (montage) jouée
+  // quand le corps ENTRE dans la zone — une fois par essai. Une zone
+  // « libre » avec un code est un pur déclencheur, sans effet d'état.
+  cine?: string
 }
 
 // Décalque de décor : machinerie plaquée sur la paroi (tuyaux, vanne).
@@ -319,6 +323,13 @@ export interface LevelDef {
   // (vers l'avant uniquement ; un code inconnu retombe sur salle+1). Permet
   // des salles-raccourcis secrètes qui accélèrent les runs déjà maîtrisées.
   raccourciVers?: string
+  // CINÉMATIQUES ancrées au tableau (codes du montage) : `cineAvant` se joue
+  // à l'ENTRÉE dans le tableau (pas au simple R), `cineApres` à sa
+  // CONCLUSION (le sas bu), par-dessus le bilan. Le déclencheur EN COURS de
+  // tableau est une zone portant un code (ZoneDef.cine). Un code inconnu
+  // sur le poste est simplement ignoré.
+  cineAvant?: string
+  cineApres?: string
 }
 
 // Nom lisible de chaque matériau — l'éditeur et la légende parlent la même

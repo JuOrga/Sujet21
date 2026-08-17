@@ -25,6 +25,7 @@ import {
   TABLEAUX_ECOLE,
   pointInBox,
   zoneName,
+  zoneShape,
   type LevelDef,
   type ObstacleBox,
   type ZoneForce,
@@ -43,7 +44,7 @@ import { PerfCollector } from './game/perf'
 import { fetchLibrary } from './game/netLevels'
 import { AudioFx, loadAudioPrefs } from './game/audio'
 import { Soundtrack, type Bruitage, type Piste, type Ponctuation } from './game/soundtrack'
-import { CINEMATIQUE_ESSAI, type CinematiqueDef } from './game/cinematique'
+import { CINEMATIQUE_ESSAI, chargeCinematiques, type CinematiqueDef } from './game/cinematique'
 import { LecteurCinematique } from './game/cinelecteur'
 import { TableMontage } from './game/montage'
 import { Records } from './game/records'
@@ -1805,6 +1806,21 @@ function lireCine(cine: CinematiqueDef): Promise<void> {
     input.paused = pause
   })
 }
+// Les cinématiques ANCRÉES aux tableaux (cineAvant/cineApres, zones
+// déclencheuses) référencent un CODE : cherché parmi les livrées puis les
+// cinématiques du poste (montage) — un code inconnu est ignoré sans bruit.
+function lireCineParCode(code: string): Promise<void> {
+  const cible = code.trim().toLowerCase()
+  const cine = [CINEMATIQUE_ESSAI, ...chargeCinematiques()].find(
+    (c) => c.code.trim().toLowerCase() === cible,
+  )
+  return cine ? lireCine(cine) : Promise.resolve()
+}
+// Déclencheurs déjà joués dans l'essai en cours (réarmés par restart)
+const cinesVues = new Set<string>()
+// Le tableau dont la cinématique d'entrée a été jouée : un R sur place ne
+// doit pas la rejouer, seule l'ARRIVÉE dans un autre tableau la relance.
+let cineNiveauVu: LevelDef | null = null
 function estCine(e: LevelDef | CinematiqueDef): e is CinematiqueDef {
   return 'planches' in e
 }
@@ -1864,6 +1880,9 @@ const montage = new TableMontage(el('montage'), {
   lire: (c) => lireCine(c),
 })
 document.getElementById('open-montage')?.addEventListener('click', () => montage.open())
+// …et depuis l'éditeur aussi : la table s'ouvre PAR-DESSUS lui (z-index),
+// on compose la cinématique puis on branche son code dans le tableau
+document.getElementById('ed-montage')?.addEventListener('click', () => montage.open())
 // Sondes de conception/test : jouer une cinématique arbitraire, lire l'état
 ;(window as unknown as { __lireCine: (c: unknown) => Promise<void> }).__lireCine = (c) =>
   lireCine(c as CinematiqueDef)
@@ -2576,9 +2595,17 @@ function restart(): void {
   resetLasers()
   loop.reset()
   overlay.classList.remove('visible')
+  // les déclencheurs de cinématique se réarment à chaque essai du tableau
+  cinesVues.clear()
   if (document.body.classList.contains('playing')) {
     camera.startIntro(sim.bounds, window.innerWidth, window.innerHeight)
     showTableauCard()
+    // la cinématique d'ENTRÉE du tableau : à l'arrivée seulement — un R sur
+    // place ne la rejoue pas (et MAINTENIR la saute de toute façon)
+    if (level !== cineNiveauVu) {
+      cineNiveauVu = level
+      if (level.cineAvant) void lireCineParCode(level.cineAvant)
+    }
   } else {
     camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, camera.zoom)
   }
@@ -3733,6 +3760,22 @@ function frame(now: number): void {
   // au HUB, pas d'engloutissement à attendre : dès que le CORPS est dans la
   // bouche du sas, la run part — le sas de lancement est une porte, pas un
   // collecteur
+  // Zones déclencheuses de cinématique : le corps (son centre) entre dans
+  // la zone → la cinématique codée se joue, UNE fois par essai. La lecture
+  // met la simulation en pause ; au retour, rien n'a bougé.
+  if (!lecteurCine.actif && !run.ended && !sim.dispersed) {
+    const zs = level.zones ?? []
+    for (let i = 0; i < zs.length; i++) {
+      const code = zs[i].cine
+      if (!code) continue
+      const cle = `${i}:${code}`
+      if (cinesVues.has(cle)) continue
+      if (zoneShape(zs[i], sim.stats.centroidX, sim.stats.centroidY) <= 1) {
+        cinesVues.add(cle)
+        void lireCineParCode(code)
+      }
+    }
+  }
   const rejointSasHub =
     auHub && pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit)
   if (!tableauDone && !sim.dispersed && (drunk || reached || rejointSasHub) && auHub) {
@@ -3767,6 +3810,8 @@ function frame(now: number): void {
       'success',
       fromEditor ? 'RETOUR À L’ÉDITEUR' : testQueue.length > 0 ? 'SALLE SUIVANTE' : 'RETOUR AU PROTOCOLE',
     )
+    // la cinématique de CONCLUSION : par-dessus le bilan, qui l'attend derrière
+    if (level.cineApres) void lireCineParCode(level.cineApres)
   } else if (!tableauDone && !sim.dispersed && (drunk || reached)) {
     // Prime de glace : ce que le sas a avalé SOLIDE vaut plus cher que ce
     // qu'il a bu goutte à goutte.
@@ -3851,6 +3896,9 @@ function frame(now: number): void {
         'success',
       )
     }
+    // la cinématique de CONCLUSION du tableau : par-dessus le bilan — la
+    // pause de lecture retient aussi le passage automatique à la suite
+    if (level.cineApres) void lireCineParCode(level.cineApres)
   }
   if (run.exitTimer > 0) {
     run.exitTimer -= dtReal

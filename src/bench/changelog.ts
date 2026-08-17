@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/08/2026 11:00',
+    title: 'Les cinématiques s’ancrent aux tableaux : à l’entrée, en sortie, ou sur une zone',
+    notes: [
+      'Un tableau peut maintenant DÉCLARER ses cinématiques, par leur code de la table de montage. Trois ancrages : CINÉ À L’ENTRÉE (jouée à l’arrivée dans le tableau — pas au simple « recommencer », et MAINTENIR la saute toujours), CINÉ EN SORTIE (jouée à la conclusion, par-dessus le bilan qui l’attend derrière), et le DÉCLENCHEUR EN COURS DE TABLEAU : n’importe quelle zone peut porter un code — quand le corps y entre, la cinématique se joue, une fois par essai. Une zone « libre » avec un code est un pur déclencheur, invisible et sans effet d’état ; une zone d’état avec un code fait les deux.',
+      'Tout se règle DANS L’ÉDITEUR : deux champs sur la fiche du tableau (Ciné à l’entrée / Ciné en sortie), un champ Cinématique sur chaque zone sélectionnée — et le bouton ▤ MONTAGE dans la barre de l’éditeur ouvre la table par-dessus, pour composer puis brancher sans quitter son tableau. Le bouton MONTAGE de la fiche d’accueil reste. Les trois ancrages voyagent avec le tableau (sérialisés, bornés à 24 signes, testés) ; un code inconnu est ignoré sans bruit.',
+      'Pendant une lecture, la simulation est EN PAUSE : rien ne bouge, rien ne se perd — au retour, le tableau est exactement où on l’a laissé. Vérifié en sonde navigateur : entrée jouée à ESSAYER, saut par Échap, zone déclenchée à l’instant où le corps y pénètre, et pas de rejeu dans le même essai.',
+    ],
+  },
+  {
     date: '17/08/2026 10:00',
     title: 'Les assets du concepteur : les fioles des semblables, et l’ouverture en vraies planches',
     notes: [
