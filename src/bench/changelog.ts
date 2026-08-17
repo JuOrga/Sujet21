@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/08/2026 09:30',
+    title: 'LES CINÉMATIQUES : des planches illustrées entre les tableaux, et une table de montage',
+    notes: [
+      'La troisième famille d’écrans, entre le menu et le tableau jouable — le socle de l’OUVERTURE de la démo. Une cinématique est une DONNÉE, comme un tableau : une suite de PLANCHES (image plein écran, texte, durée), chacune animée par un vocabulaire fermé d’effets — zoom avant/arrière, panoramique (4 sens), tremblement, ALERTE (battement rouge) — avec fondu d’entrée (noir/blanc), et le son par planche : un bruitage, une ponctuation, une piste musicale imposée. Règles de confort câblées d’office : TOUCHER passe à la planche suivante, MAINTENIR saute toute la cinématique (une jauge l’annonce), Échap aussi — en roguelike, on ne subit jamais deux fois l’ouverture.',
+      'LA TABLE DE MONTAGE (bouton MONTAGE de la fiche) : le concepteur a la main — planches réordonnables, tous les champs éditables avec vignette, lecture immédiate (▶ LIRE), NOUVELLE/DUPLIQUER/SUPPRIMER, EXPORTER/IMPORTER en JSON. Toute édition s’enregistre sur le poste à l’instant même. Une cinématique d’ESSAI est livrée en images provisoires (l’esquisse de l’ouverture : la cuve, les Créateurs, l’alerte, la brèche) — en lecture seule, à DUPLIQUER pour s’en servir de gabarit.',
+      'Sous le capot, la file d’essai est devenue MIXTE : tableaux et cinématiques s’y enchaînent librement — l’ouverture jouable branchera exactement là (planches, puis la cuve, sans un raccord de code). Le format est borné et tolérant (durées 1..30 s, vocabulaire vérifié, une planche corrompue est écartée sans jeter le reste), et le tout est couvert par des tests.',
+    ],
+  },
+  {
     date: '17/08/2026 05:00',
     title: 'LE HUB COMPACT (chantier démo) : pictogrammes d’état, en parallèle de l’actuel',
     notes: [

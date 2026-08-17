@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="fond2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b1119"/><stop offset="1" stop-color="#05080c"/>
+    </linearGradient>
+    <radialGradient id="lueur2" cx="0.32" cy="0.42" r="0.45">
+      <stop offset="0" stop-color="#8fc8ee" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#0b1119" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#fond2)"/>
+  <ellipse cx="512" cy="380" rx="520" ry="360" fill="url(#lueur2)"/>
+  <g fill="#101922" stroke="#243444" stroke-width="3">
+    <rect x="180" y="250" width="640" height="360" rx="14"/>
+  </g>
+  <g stroke="#39c8d8" stroke-width="3" opacity="0.55" fill="none">
+    <path d="M230 340 h180 M230 390 h240 M230 440 h150"/>
+    <path d="M560 320 q60 40 0 80 q-60 40 0 80" />
+    <circle cx="700" cy="420" r="46"/>
+    <path d="M676 420 a24 24 0 0 1 48 0" />
+  </g>
+  <g fill="#050e14">
+    <path d="M1030 900 v-430 q0 -70 62 -70 q66 0 66 70 v60 h44 v370 z"/>
+    <circle cx="1096" cy="330" r="64"/>
+  </g>
+  <path d="M1030 560 q-90 -30 -160 -96" stroke="#050e14" stroke-width="52" fill="none" stroke-linecap="round"/>
+  <rect x="1060" y="288" width="72" height="52" rx="18" fill="#8fc8ee" opacity="0.28"/>
+  <g stroke="#1c2833" stroke-width="3" opacity="0.8">
+    <line x1="0" y1="120" x2="1600" y2="120"/><line x1="0" y1="800" x2="1600" y2="800"/>
+  </g>
+  <text x="1560" y="866" text-anchor="end" font-family="monospace" font-size="26" fill="#3a4a58" opacity="0.5">PLANCHE PROVISOIRE — 2</text>
+</svg>

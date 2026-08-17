@@ -980,6 +980,256 @@
         0%, 100% { box-shadow: 0 0 0 0 rgba(143, 210, 255, 0); transform: scale(1); }
         50% { box-shadow: 0 0 18px 4px rgba(143, 210, 255, 0.7); transform: scale(1.1); }
       }
+      /* ---- LES CINÉMATIQUES : le lecteur plein écran ---- */
+      #cine {
+        position: fixed;
+        inset: 0;
+        z-index: 70; /* au-dessus de tout : aucune simulation derrière */
+        background: #000;
+        overflow: hidden;
+        cursor: pointer;
+        user-select: none;
+        -webkit-user-select: none;
+        touch-action: none;
+      }
+      #cine .cn-scene {
+        position: absolute;
+        inset: -6%; /* marge de sécurité : les pans/zooms ne montrent jamais le bord */
+        will-change: transform;
+      }
+      #cine .cn-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      #cine .cn-scene { --cn-duree: 5s; }
+      .cn-effet-zoom-avant { animation: cn-zoom-avant var(--cn-duree) ease-out forwards; }
+      .cn-effet-zoom-arriere { animation: cn-zoom-arriere var(--cn-duree) ease-out forwards; }
+      .cn-effet-pan-gauche { animation: cn-pan-gauche var(--cn-duree) linear forwards; }
+      .cn-effet-pan-droite { animation: cn-pan-droite var(--cn-duree) linear forwards; }
+      .cn-effet-pan-haut { animation: cn-pan-haut var(--cn-duree) linear forwards; }
+      .cn-effet-pan-bas { animation: cn-pan-bas var(--cn-duree) linear forwards; }
+      .cn-effet-tremblement { animation: cn-tremblement 0.45s linear infinite; }
+      .cn-effet-battement-rouge { animation: cn-zoom-avant var(--cn-duree) ease-out forwards; }
+      @keyframes cn-zoom-avant { from { transform: scale(1); } to { transform: scale(1.1); } }
+      @keyframes cn-zoom-arriere { from { transform: scale(1.1); } to { transform: scale(1); } }
+      @keyframes cn-pan-gauche { from { transform: translateX(2.5%); } to { transform: translateX(-2.5%); } }
+      @keyframes cn-pan-droite { from { transform: translateX(-2.5%); } to { transform: translateX(2.5%); } }
+      @keyframes cn-pan-haut { from { transform: translateY(2.5%); } to { transform: translateY(-2.5%); } }
+      @keyframes cn-pan-bas { from { transform: translateY(-2.5%); } to { transform: translateY(2.5%); } }
+      @keyframes cn-tremblement {
+        0%, 100% { transform: translate(0, 0); }
+        20% { transform: translate(-0.7%, 0.4%); }
+        40% { transform: translate(0.6%, -0.5%); }
+        60% { transform: translate(-0.4%, -0.6%); }
+        80% { transform: translate(0.5%, 0.5%); }
+      }
+      #cine .cn-rouge {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse at 50% 30%, rgba(232, 67, 60, 0.5), rgba(120, 15, 15, 0.15) 70%);
+        opacity: 0;
+        pointer-events: none;
+      }
+      #cine .cn-rouge.cn-alerte { animation: cn-alerte 0.9s ease-in-out infinite; }
+      @keyframes cn-alerte { 0%, 100% { opacity: 0.12; } 50% { opacity: 0.75; } }
+      #cine .cn-voile {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        pointer-events: none;
+      }
+      #cine .cn-voile.cn-fondu-noir { background: #000; animation: cn-fondu 0.9s ease-out forwards; }
+      #cine .cn-voile.cn-fondu-blanc { background: #eaf6fa; animation: cn-fondu 0.9s ease-out forwards; }
+      @keyframes cn-fondu { from { opacity: 1; } to { opacity: 0; } }
+      #cine .cn-texte {
+        position: absolute;
+        left: 50%;
+        bottom: clamp(56px, 12vh, 120px);
+        transform: translateX(-50%);
+        max-width: min(78vw, 900px);
+        margin: 0;
+        text-align: center;
+        font-family: var(--font-mono);
+        font-size: clamp(15px, 2.4vmin, 24px);
+        line-height: 1.55;
+        color: #dceaf2;
+        text-shadow: 0 2px 14px rgba(0, 0, 0, 0.95), 0 0 4px rgba(0, 0, 0, 0.9);
+        opacity: 0;
+      }
+      #cine .cn-texte.cn-parait { animation: cn-parait 1.4s ease-out 0.35s forwards; }
+      @keyframes cn-parait { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+      #cine .cn-pied {
+        position: absolute;
+        right: 18px;
+        bottom: 12px;
+        display: flex;
+        gap: 18px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        color: rgba(150, 175, 192, 0.55);
+      }
+      #cine .cn-pied b { font-weight: normal; color: rgba(150, 175, 192, 0.8); }
+      #cine .cn-jauge {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        height: 3px;
+        pointer-events: none;
+      }
+      #cine .cn-jauge i {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: #63b7e6;
+      }
+      #cine .cn-jauge.cn-remplit i { animation: cn-remplit var(--cn-maintien, 650ms) linear forwards; }
+      @keyframes cn-remplit { from { width: 0; } to { width: 100%; } }
+
+      /* ---- La table de montage ---- */
+      #montage {
+        position: fixed;
+        inset: 0;
+        z-index: 62; /* au-dessus de la fiche, sous le lecteur (LIRE le recouvre) */
+        display: none;
+        flex-direction: column;
+        background: var(--void);
+        color: var(--ink);
+        font-family: var(--font-mono);
+      }
+      #montage.visible { display: flex; }
+      #montage .mt-tete {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-bottom: 1px solid rgba(99, 183, 230, 0.25);
+      }
+      #montage .mt-titre { letter-spacing: 0.2em; color: #63b7e6; margin-right: 6px; }
+      #montage .mt-souffle { flex: 1; }
+      #montage .mt-choix {
+        max-width: min(46vw, 420px);
+        background: #0a141d;
+        color: var(--ink);
+        border: 1px solid rgba(99, 183, 230, 0.4);
+        border-radius: 6px;
+        padding: 6px 8px;
+        font: inherit;
+      }
+      #montage .mt-tete button {
+        background: #0a141d;
+        color: var(--ink);
+        border: 1px solid rgba(99, 183, 230, 0.4);
+        border-radius: 6px;
+        padding: 6px 10px;
+        font: inherit;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        cursor: pointer;
+      }
+      #montage .mt-tete button:hover { border-color: #63b7e6; }
+      #montage .mt-tete .mt-lire { border-color: #63b7e6; color: #8fd2ff; }
+      #montage .mt-corps {
+        flex: 1;
+        overflow-y: auto;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      #montage .mt-fiche {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        font-size: 12px;
+        color: #9db4c4;
+      }
+      #montage .mt-fiche em { opacity: 0.8; }
+      #montage .mt-planche {
+        display: grid;
+        grid-template-columns: 128px 1fr auto;
+        gap: 12px;
+        padding: 10px;
+        border: 1px solid rgba(99, 183, 230, 0.18);
+        border-radius: 8px;
+        background: rgba(10, 20, 29, 0.6);
+      }
+      #montage .mt-vignette {
+        position: relative;
+        width: 128px;
+        height: 72px;
+        border: 1px solid rgba(99, 183, 230, 0.3);
+        border-radius: 4px;
+        overflow: hidden;
+        background: #05090d;
+      }
+      #montage .mt-vignette img { width: 100%; height: 100%; object-fit: cover; }
+      #montage .mt-vignette span {
+        position: absolute;
+        left: 4px;
+        top: 2px;
+        font-size: 11px;
+        color: #63b7e6;
+        text-shadow: 0 1px 3px #000;
+      }
+      #montage .mt-champs {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 6px 10px;
+        font-size: 11px;
+        color: #9db4c4;
+      }
+      #montage .mt-champs label { display: flex; flex-direction: column; gap: 3px; letter-spacing: 0.08em; }
+      #montage .mt-champs .mt-large { grid-column: 1 / -1; }
+      #montage .mt-champs input,
+      #montage .mt-champs textarea,
+      #montage .mt-champs select {
+        background: #0a141d;
+        color: var(--ink);
+        border: 1px solid rgba(99, 183, 230, 0.3);
+        border-radius: 4px;
+        padding: 4px 6px;
+        font: inherit;
+        font-size: 12px;
+      }
+      #montage .mt-champs textarea { resize: vertical; }
+      #montage .mt-outils { display: flex; flex-direction: column; gap: 6px; }
+      #montage .mt-outils button {
+        width: 30px;
+        height: 30px;
+        background: #0a141d;
+        color: var(--ink);
+        border: 1px solid rgba(99, 183, 230, 0.3);
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      #montage .mt-outils button:disabled { opacity: 0.3; cursor: default; }
+      #montage .mt-fiche label { display: flex; flex-direction: column; gap: 3px; letter-spacing: 0.08em; }
+      #montage .mt-fiche input {
+        background: #0a141d;
+        color: var(--ink);
+        border: 1px solid rgba(99, 183, 230, 0.3);
+        border-radius: 4px;
+        padding: 4px 6px;
+        font: inherit;
+        font-size: 12px;
+      }
+      #montage .mt-ajout {
+        align-self: flex-start;
+        background: #0a141d;
+        color: #8fd2ff;
+        border: 1px dashed rgba(99, 183, 230, 0.5);
+        border-radius: 8px;
+        padding: 8px 14px;
+        font: inherit;
+        font-size: 12px;
+        letter-spacing: 0.1em;
+        cursor: pointer;
+      }
+
       /* le bouton de réinitialisation ARMÉ : rouge, impossible à confondre */
       #proto-reset-nom.danger {
         border-color: #ff7a6a !important;
@@ -3231,6 +3481,7 @@
         <button id="start-editor" type="button" title="Créer ou modifier un tableau"><i>✎</i><span>ÉDITEUR</span></button>
         <button id="start-bis" type="button" title="L'école, puis les salles laser"><i>⚗&#xFE0E;</i><span>PARCOURS TEST</span></button>
         <button id="start-hub2" type="button" title="Le chantier de refonte du hub : module compact, pictogrammes d'état, alcôve des fioles — en parallèle du hub actuel"><i>◐</i><span>HUB COMPACT</span></button>
+        <button id="open-montage" type="button" title="La table de montage des cinématiques : planches, effets, sons — et lecture immédiate"><i>▤</i><span>MONTAGE</span></button>
         <button id="home-salles" type="button"><i>▦</i><span>SALLES</span></button>
         <button id="home-records" type="button"><i>✦</i><span>RECORDS</span></button>
         <button id="home-livraisons" type="button"><i>◈</i><span>NOTES DE VERSION</span></button>
@@ -3774,6 +4025,11 @@
         class="ei-p"><b>F</b> OU <b>💧</b> — REDEVENEZ LIQUIDE</span></span>
       <span class="ei-fleche">▼</span>
     </div>
+
+    <!-- LES CINÉMATIQUES : le lecteur plein écran (cinelecteur.ts remplit)
+         et la table de montage (montage.ts remplit) -->
+    <div id="cine" hidden aria-label="Cinématique"></div>
+    <div id="montage" aria-label="Table de montage des cinématiques"></div>
 
     <div id="hud-danger" aria-live="assertive"></div>
     <div id="obj-arrow" aria-hidden="true"><i>➤</i><span id="obj-dist"></span></div>
