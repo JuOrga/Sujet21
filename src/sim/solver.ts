@@ -950,10 +950,13 @@ export class FluidSim {
   // chaque bascule rend ses dashs — N par transformation, quel que soit le
   // volume restant (se retransformer sans compter mène au game over : c'est
   // le jeu). La quantité de mouvement d'ensemble est conservée exactement.
-  transfoVapeur(): void {
+  // `rendDashs` : une bascule DÉCIDÉE (touche G) ou provoquée par une
+  // chaudière remplit le compteur ; une ZONE qui impose la vapeur convertit
+  // sans rien rendre — sinon elle vaudrait borne de recharge gratuite.
+  transfoVapeur(rendDashs = true): void {
     if (this.dispersed) return
     const p = this.params
-    this.dashBudget = this.dashBudgetParTransfo
+    if (rendDashs) this.dashBudget = this.dashBudgetParTransfo
     this.updatePlayerStats()
     const toll = Math.floor(this.playerCount * p.vaporTollFrac)
     if (toll <= 0) return

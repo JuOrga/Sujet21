@@ -26,6 +26,7 @@ import {
   TABLEAUX,
   TABLEAUX_ECOLE,
   ZONE_CAUSES,
+  subtractBox,
   subtractBoxOblique,
   zoneName,
   zoneOutline,
@@ -101,6 +102,7 @@ type Tool =
   | { kind: 'rail' }
   | { kind: 'lumiere' }
   | { kind: 'cut' }
+  | { kind: 'gomme' }
 
 type Sel =
   | { kind: 'box'; index: number }
@@ -1481,9 +1483,79 @@ export class LevelEditor {
     }
   }
 
+  // ——— La GOMME : effacer la matière dans le rectangle tracé —————————
+  // Le geste est celui d'un gommage : on trace une zone, tout ce qui s'y
+  // trouve disparaît. Une paroi droite entièrement dedans s'efface ; à
+  // cheval, elle est ROGNÉE (le reste survit en morceaux) ; une pièce
+  // oblique ou une forme (disque, arc…) ne se découpe pas au couteau
+  // axial — elle s'efface entière si son centre est dans la zone, sinon
+  // elle est épargnée et on le dit.
+  private gomme(r: Rect): void {
+    if (r.maxX - r.minX < 2 || r.maxY - r.minY < 2) {
+      this.status('Gomme : tracez une zone (glissez) — tout ce qu\'elle couvre est effacé.')
+      return
+    }
+    const dansZone = (x: number, y: number): boolean =>
+      x >= r.minX && x <= r.maxX && y >= r.minY && y <= r.maxY
+    const restantes: ObstacleBox[] = []
+    let effacees = 0
+    let rognees = 0
+    for (const b of this.level.boxes) {
+      const chevauche = !(r.minX >= b.maxX || r.maxX <= b.minX || r.minY >= b.maxY || r.maxY <= b.minY)
+      if (!chevauche) {
+        restantes.push(b)
+        continue
+      }
+      const entiere = r.minX <= b.minX && r.maxX >= b.maxX && r.minY <= b.minY && r.maxY >= b.maxY
+      if (entiere) {
+        effacees++
+        continue
+      }
+      if (b.forme || b.angle) {
+        // pas de découpe exacte : c'est tout ou rien, selon le centre
+        if (dansZone((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2)) effacees++
+        else restantes.push(b)
+        continue
+      }
+      const morceaux = subtractBox(b, r)
+      if (morceaux.length === 1 && morceaux[0] === b) restantes.push(b)
+      else {
+        rognees++
+        // les morceaux gardent tout l'habillage de la paroi d'origine
+        for (const m of morceaux) restantes.push({ ...b, ...m })
+      }
+    }
+    // les ÉPONGES entièrement couvertes partent aussi : elles sont de la
+    // matière, elles ne feraient pas exception sous la gomme
+    const spAvant = this.level.sponges.length
+    this.level.sponges = this.level.sponges.filter((sp) => {
+      const maxX = sp.minX + sp.cols * sp.cellSize
+      const maxY = sp.minY + sp.rows * sp.cellSize
+      return !(r.minX <= sp.minX && r.maxX >= maxX && r.minY <= sp.minY && r.maxY >= maxY)
+    })
+    const eponges = spAvant - this.level.sponges.length
+    if (effacees === 0 && rognees === 0 && eponges === 0) {
+      this.status('Gomme : rien à effacer dans cette zone.')
+      return
+    }
+    this.level.boxes = restantes
+    this.sel = null
+    this.multi = []
+    this.setTool({ kind: 'gomme' }) // la gomme RESTE en main : on gomme en série
+    const bouts: string[] = []
+    if (effacees > 0) bouts.push(`${effacees} surface${effacees > 1 ? 's' : ''} effacée${effacees > 1 ? 's' : ''}`)
+    if (rognees > 0) bouts.push(`${rognees} rognée${rognees > 1 ? 's' : ''}`)
+    if (eponges > 0) bouts.push(`${eponges} éponge${eponges > 1 ? 's' : ''}`)
+    this.commit(`Gomme : ${bouts.join(', ')}.`)
+  }
+
   private createAt(raw: Rect): void {
     const r = this.clampToBounds(raw)
     const t = this.tool
+    if (t.kind === 'gomme') {
+      this.gomme(r)
+      return
+    }
     if (t.kind === 'box') {
       // une FORME éventuelle (disque, capsule, coin, arc) naît avec ses
       // défauts — orientation et paramètres se règlent dans le panneau
@@ -1714,6 +1786,7 @@ export class LevelEditor {
         else if (key === 'rail') this.setTool({ kind: 'rail' })
         else if (key === 'lumiere') this.setTool({ kind: 'lumiere' })
         else if (key === 'cut') this.setTool({ kind: 'cut' })
+        else if (key === 'gomme') this.setTool({ kind: 'gomme' })
         else this.setTool({ kind: 'select' })
       })
     }
@@ -3136,13 +3209,19 @@ export class LevelEditor {
       g.fillText(l.text, p.sx - g.measureText(l.text).width / 2, p.sy + 4)
     }
 
-    // rectangle en cours de tracé
+    // rectangle en cours de tracé — la GOMME se peint en jaune barré : on
+    // voit qu'on efface, pas qu'on pose
     if (this.drag?.mode === 'create') {
       const p = this.toScreen(Math.min(this.drag.x0, this.drag.x1), Math.max(this.drag.y0, this.drag.y1))
       const q = this.toScreen(Math.max(this.drag.x0, this.drag.x1), Math.min(this.drag.y0, this.drag.y1))
+      const efface = this.tool.kind === 'gomme'
+      if (efface) {
+        g.fillStyle = 'rgba(255,210,74,0.12)'
+        g.fillRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
+      }
       g.setLineDash([5, 4])
-      g.strokeStyle = '#ffffff'
-      g.lineWidth = 1
+      g.strokeStyle = efface ? '#ffd24a' : '#ffffff'
+      g.lineWidth = efface ? 1.5 : 1
       g.strokeRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
       g.setLineDash([])
     }

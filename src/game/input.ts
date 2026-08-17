@@ -21,6 +21,9 @@ export class Input {
   vortexArmed = false // prochain toucher = vortex au lieu d'éjecter
   freezeIntent = false // F (ou ❄) : le corps se change en glace, re-presser dégèle
   gasIntent = false // G (ou 💨) : le corps se change en vapeur, re-presser condense
+  /** La visée en cours a été ANNULÉE (second doigt posé pour pincer) : elle
+   *  ne doit rien déclencher en la quittant — ni dash, ni éjection. */
+  aimAnnulee = false
 
   toggleFreeze(): void {
     this.freezeIntent = !this.freezeIntent
@@ -136,6 +139,9 @@ export class Input {
 
       if (this.pointers.size >= 2) {
         // Deuxième doigt : on passe en pincement/glissement, l'éjection s'arrête
+        // — et la visée en cours est ANNULÉE, pas relâchée : sans ce drapeau,
+        // poser le second doigt pour dézoomer lâchait le dash de vapeur.
+        if (this.aimActive) this.aimAnnulee = true
         this.aimActive = false
         this.pinchDist = this.pinchDistance()
         this.pinchCenter = this.pinchCentroid()
@@ -150,6 +156,7 @@ export class Input {
         return
       }
       this.aimActive = true
+      this.aimAnnulee = false // une visée neuve : elle pourra conclure
       this.aimClientX = e.clientX
       this.aimClientY = e.clientY
     })

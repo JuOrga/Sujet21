@@ -3670,15 +3670,15 @@ function frame(now: number): void {
   // La BASCULE en vapeur — G, chaudière à 95 %, zone forcée : toute cause —
   // se règle à l'instant du basculement : péage de 20 % du volume actif
   // (gerbe de gouttes récupérables) et compteur de dashs rendu.
-  if (input.gasIntent && !gasIntentAvant && !tableauDone && !input.paused) sim.transfoVapeur()
+  // Une ZONE qui impose la vapeur n'est pas une chaudière : elle convertit,
+  // elle ne RECHARGE PAS. Entrer en zone avec un seul dash en poche, c'est
+  // ressortir avec un seul dash — le compteur ne se remplit qu'aux bascules
+  // qu'on décide (touche G) ou qu'une chaudière provoque.
+  if (input.gasIntent && !gasIntentAvant && !tableauDone && !input.paused) {
+    sim.transfoVapeur(zoneActive !== 'vapeur')
+  }
   gasIntentAvant = input.gasIntent
-  // ZONE FORCÉE VAPEUR : le sélecteur y est VERROUILLÉ — on ne peut pas
-  // condenser pour se retransformer, donc la bascule (et ses dashs) ne se
-  // rejoue jamais. Les trois premiers dashs épuisés, le nuage restait sans
-  // aucune mobilité : la zone était un piège. C'est la ZONE qui entretient
-  // la transformation — quand on redemande un dash à sec, elle re-vaporise
-  // au prix habituel (le péage), et le dash part.
-  const zoneVapeur = zoneActive === 'vapeur'
+
   sim.chill = chillNow() // le vaisseau refroidit : la physique suit
   if (input.aimActive) camera.cancelIntro() // le joueur agit : la caméra suit
 
@@ -3697,8 +3697,9 @@ function frame(now: number): void {
   if (dash.aiming && !dashAiming) {
     // Relâcher déclenche ; changer d'état ou perdre la main en pleine visée
     // annule sans frais — la visée n'engage à rien tant qu'on n'a pas lâché.
-    if (vif && input.gasIntent && !input.aimActive) {
-      if (sim.dashBudget <= 0 && zoneVapeur) sim.transfoVapeur() // la zone re-vaporise
+    // Un second doigt posé (pincement pour zoomer) ANNULE la visée : elle ne
+    // conclut pas. Sans ça, dézoomer en vapeur lâchait le dash.
+    if (vif && input.gasIntent && !input.aimActive && !input.aimAnnulee) {
       const spent = sim.gasDash(aim.x, aim.y)
       if (spent > 0) manette.rumble(0.6, 90) // le dash se voit, il ne souffle plus
     }
@@ -4368,14 +4369,13 @@ function frame(now: number): void {
     // l'étiquette annonce les deux termes du marché — la poussée et le prix.
     const dMonde = Math.hypot(aim.x - sim.stats.centroidX, aim.y - sim.stats.centroidY)
     const puissance = Math.min(1, dMonde / Math.max(1, params.gasDashRange))
-    // À sec DANS une zone qui impose la vapeur : le sélecteur est verrouillé,
-    // c'est la zone qui re-vaporise — l'étiquette annonce le prix, pas une
-    // impasse.
+    // À sec DANS une zone qui impose la vapeur : le sélecteur est verrouillé
+    // et la zone ne recharge pas — l'étiquette dit où trouver un dash.
     dashCostEl.textContent =
       sim.dashBudget > 0
         ? `DASH ${Math.round(puissance * 100)} % · ${sim.dashBudget} dash${sim.dashBudget > 1 ? 's' : ''}`
         : zoneActive === 'vapeur'
-          ? `DASH ${Math.round(puissance * 100)} % · la zone vous re-vaporise (péage)`
+          ? `À SEC — la zone impose la vapeur, elle ne recharge pas : un surchauffeur`
           : `À SEC — retransformez-vous, ou frôlez un surchauffeur`
   }
   dashAimEl.classList.toggle('visible', dash.aiming)

@@ -268,3 +268,29 @@ describe('TABLEAUX — validité structurelle', () => {
     }
   })
 })
+
+describe('la gomme : effacer la matière d’une zone', () => {
+  // La gomme s'appuie sur subtractBox — on vérifie ici le contrat qu'elle
+  // utilise : couverture totale, rognage partiel, et refus des formes.
+  const paroi = () => ({ minX: 0, minY: 0, maxX: 100, maxY: 100, material: 0 })
+
+  it('une paroi entièrement couverte ne laisse aucun morceau', () => {
+    expect(subtractBox(paroi(), { minX: -10, minY: -10, maxX: 110, maxY: 110 })).toEqual([])
+  })
+
+  it('une paroi à cheval est rognée, le reste survit', () => {
+    const morceaux = subtractBox(paroi(), { minX: 60, minY: -10, maxX: 200, maxY: 200 })
+    expect(morceaux).toHaveLength(1)
+    expect(morceaux[0]).toMatchObject({ minX: 0, maxX: 60, minY: 0, maxY: 100 })
+  })
+
+  it('une zone qui ne touche pas la paroi la laisse entière', () => {
+    const b = paroi()
+    expect(subtractBox(b, { minX: 300, minY: 300, maxX: 400, maxY: 400 })).toEqual([b])
+  })
+
+  it('une FORME ne se découpe pas : la gomme l’efface entière ou l’épargne', () => {
+    const disque = { ...paroi(), forme: 1 }
+    expect(subtractBox(disque, { minX: 40, minY: 40, maxX: 200, maxY: 200 })).toEqual([disque])
+  })
+})
