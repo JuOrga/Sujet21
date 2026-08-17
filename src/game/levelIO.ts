@@ -253,7 +253,15 @@ export function parseLevel(input: unknown): { level: LevelDef | null; rejets: st
   const decals: NonNullable<LevelDef['decals']> = []
   for (const raw of Array.isArray(o.decals) ? o.decals : []) {
     const d = (raw ?? {}) as Record<string, unknown>
-    const kind = d.kind === 'vanne' ? 'vanne' : d.kind === 'tuyaux' ? 'tuyaux' : null
+    const SORTES = [
+      'tuyaux',
+      'vanne',
+      'ecran-off',
+      'ecran-on',
+      'fiole-pleine',
+      'fiole-vide',
+    ] as const
+    const kind = SORTES.find((s) => s === d.kind) ?? null
     const w = num(d.w, 0)
     const h = num(d.h, 0)
     if (!kind || w <= 0 || h <= 0) {

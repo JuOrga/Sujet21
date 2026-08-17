@@ -205,15 +205,16 @@ export function sauveCinematiques(cines: CinematiqueDef[]): void {
   }
 }
 
-// ---- La cinématique d'essai (images provisoires) : l'esquisse de
-// l'ouverture, en attendant les planches générées par le concepteur.
+// ---- La cinématique d'essai : l'esquisse de l'ouverture, sur les
+// planches générées par le concepteur (les SVG essai-*.svg restent en
+// place pour les copies déjà dupliquées sur les postes).
 
 export const CINEMATIQUE_ESSAI: CinematiqueDef = {
   code: 'ESSAI',
   titre: "Essai — esquisse de l'ouverture",
   planches: [
     {
-      image: '/assets/cine/essai-1.svg',
+      image: '/assets/cine/ouverture-1.webp',
       texte: 'Module Méduse. Une cuve, une substance. Vingt échecs avant elle.',
       duree: 6,
       effet: 'zoom-avant',
@@ -223,7 +224,7 @@ export const CINEMATIQUE_ESSAI: CinematiqueDef = {
       piste: 'cuve-tiede',
     },
     {
-      image: '/assets/cine/essai-2.svg',
+      image: '/assets/cine/ouverture-2.webp',
       texte: 'Qui êtes-vous ? Où êtes-vous ?',
       duree: 5,
       effet: 'pan-droite',
@@ -233,7 +234,7 @@ export const CINEMATIQUE_ESSAI: CinematiqueDef = {
       piste: '',
     },
     {
-      image: '/assets/cine/essai-3.svg',
+      image: '/assets/cine/ouverture-3.webp',
       texte: 'Pas le temps de philosopher.',
       duree: 4,
       effet: 'battement-rouge',
@@ -243,7 +244,7 @@ export const CINEMATIQUE_ESSAI: CinematiqueDef = {
       piste: '',
     },
     {
-      image: '/assets/cine/essai-4.svg',
+      image: '/assets/cine/ouverture-4.webp',
       texte: 'Le confinement cède.',
       duree: 4,
       effet: 'tremblement',

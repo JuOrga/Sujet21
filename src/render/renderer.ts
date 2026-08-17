@@ -1582,6 +1582,8 @@ export class Renderer {
   private texDecalVanne: WebGLTexture | null = null
   private texDecalEcranOff: WebGLTexture | null = null
   private texDecalEcranOn: WebGLTexture | null = null
+  private texDecalFiolePleine: WebGLTexture | null = null
+  private texDecalFioleVide: WebGLTexture | null = null
   // Tableau de textures des zones (calques : 0 buses/eau, 1 hublot/glace,
   // 2 conduite/vapeur) : une seule unité de texture pour les trois images.
   private texZones: WebGLTexture | null = null
@@ -1750,6 +1752,8 @@ export class Renderer {
     // (HORS TENSION), allumé quand la méta-progression prendra ses quartiers
     this.loadTexture('/assets/decal-ecran-off.webp', false, true, (t) => (this.texDecalEcranOff = t))
     this.loadTexture('/assets/decal-ecran-on.webp', false, true, (t) => (this.texDecalEcranOn = t))
+    this.loadTexture('/assets/fiole-pleine.webp', false, true, (t) => (this.texDecalFiolePleine = t))
+    this.loadTexture('/assets/fiole-vide.webp', false, true, (t) => (this.texDecalFioleVide = t))
     // Images de zones : la cause peinte (voir zoneDecor). Sans mipmaps —
     // échantillonnées dans une branche non uniforme du shader. En calques
     // d'un même tableau de textures : une seule unité pour les trois.
@@ -2281,7 +2285,11 @@ export class Renderer {
             ? this.texDecalEcranOff
             : d.kind === 'ecran-on'
               ? this.texDecalEcranOn
-              : this.texDecalTuyaux
+              : d.kind === 'fiole-pleine'
+                ? this.texDecalFiolePleine
+                : d.kind === 'fiole-vide'
+                  ? this.texDecalFioleVide
+                  : this.texDecalTuyaux
       if (!tex) continue
       if (!started) {
         started = true

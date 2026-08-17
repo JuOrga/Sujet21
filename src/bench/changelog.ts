@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/08/2026 10:00',
+    title: 'Les assets du concepteur : les fioles des semblables, et l’ouverture en vraies planches',
+    notes: [
+      'LA CINÉMATIQUE D’OUVERTURE a ses vraies images : les quatre planches générées par le concepteur remplacent les esquisses SVG — la cuve dans le laboratoire endormi, les Créateurs vus DEPUIS la cuve (le point de vue de la substance), l’alerte rouge où ils s’enfuient, et la brèche étoilée d’où perlent les premières gouttes. La continuité du regard, de l’intérieur du verre, porte toute la séquence. À voir : MONTAGE → ▶ LIRE.',
+      'L’asset du concepteur (une fiole de confinement cryogénique, deux états) est détouré et intégré : deux sortes de décals — FIOLE OCCUPÉE (la masse bleu-sarcelle en suspension) et FIOLE VIDE (verre embué, voyant rouge au socle). Dans le hub compact, les trois niches de l’alcôve nord en portent chacune une : deux occupées… et la VIDE au centre, juste sous « NE PAS RÉVEILLER ». La question s’impose d’elle-même.',
+      'Techniquement : même pipeline que l’écran de contrôle (détourage géométrique, deux états recadrés au pixel près dans le même cadre — l’échange occupée→vide, le jour de la libération des semblables, ne bougera pas d’un cheveu), et les deux sortes voyagent avec les tableaux : l’éditeur peut en poser partout, la sérialisation les garde.',
+    ],
+  },
+  {
     date: '17/08/2026 09:30',
     title: 'LES CINÉMATIQUES : des planches illustrées entre les tableaux, et une table de montage',
     notes: [
