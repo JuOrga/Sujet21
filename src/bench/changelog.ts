@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/08/2026 16:15',
+    title: 'L’ÉDITEUR aussi : plus un seul code à taper de mémoire',
+    notes: [
+      'Suite du correctif précédent, signalé par le concepteur : dans la fiche du tableau, CINÉ À L’ENTRÉE, CINÉ EN SORTIE et SÉQUENCE IN-MAP réclamaient un code au clavier, sans rien proposer. Ce sont désormais des MENUS DÉROULANTS alimentés par les vrais éléments : toutes les cinématiques connues (livrées, composées sur le poste, partagées en ligne) et toutes les séquences, par leur TITRE, code entre crochets. Idem sur le panneau d’une ZONE sélectionnée : ses champs Cinématique et Séquence sont des menus.',
+      'Les listes se remplissent à CHAQUE ouverture de l’éditeur : composez une cinématique au montage, revenez au tableau, elle est déjà dans le menu. Et comme au montage, un code branché mais introuvable reste affiché « (introuvable) » plutôt que d’être effacé en silence — un tableau ne perd jamais son réglage parce que la bibliothèque partagée n’est pas encore arrivée, ou parce qu’un ami n’a pas encore publié sa cinématique.',
+    ],
+  },
+  {
     date: '17/08/2026 15:30',
     title: 'Le champ CINÉMATIQUE propose enfin les titres · l’ouverture s’étoffe · une deuxième livrée',
     notes: [
