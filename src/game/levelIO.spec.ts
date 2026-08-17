@@ -304,4 +304,38 @@ describe('levelIO — mode des récepteurs (TOR/NOR)', () => {
     // bornée : un fichier étranger ne peut pas injecter n'importe quoi
     expect(relit({ ...JSON.parse(serializeLevel(base())), ambiante: 7 }).ambiante).toBe(1)
   })
+
+  it('cinématiques ancrées : avant/après et zone déclencheuse font le voyage', () => {
+    const base = (): LevelDef => ({
+      name: 'Essai',
+      code: '21-Z',
+      journal: 'Une entrée de journal suffisamment longue pour passer le seuil des quarante signes.',
+      bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+      spawn: { x: -950, y: 0, n: 900 },
+      exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+      boxes: [],
+      sponges: [],
+      labels: [],
+    })
+    const relit = (l: unknown): LevelDef => parseLevel(l as object).level as LevelDef
+    const lvl = relit(
+      JSON.parse(
+        serializeLevel({
+          ...base(),
+          cineAvant: 'OUVERTURE',
+          cineApres: 'FIN-21Z',
+          zones: [{ minX: 0, minY: 0, maxX: 300, maxY: 200, force: 'libre', cine: 'SURPRISE' }],
+        }),
+      ),
+    )
+    expect(lvl.cineAvant).toBe('OUVERTURE')
+    expect(lvl.cineApres).toBe('FIN-21Z')
+    expect(lvl.zones![0].cine).toBe('SURPRISE')
+    // absents : ils le restent — et un code démesuré est tronqué, pas gardé
+    const nu = relit(JSON.parse(serializeLevel(base())))
+    expect(nu.cineAvant).toBeUndefined()
+    expect(nu.cineApres).toBeUndefined()
+    const long = relit({ ...JSON.parse(serializeLevel(base())), cineAvant: 'X'.repeat(60) })
+    expect(long.cineAvant).toHaveLength(24)
+  })
 })

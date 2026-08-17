@@ -3567,6 +3567,7 @@
         <button type="button" id="ed-import">Fichier / JSON</button>
         <button type="button" id="ed-copy">Copier</button>
         <button type="button" id="ed-export">Exporter</button>
+        <button type="button" id="ed-montage" title="La table de montage des cinématiques — leurs codes se branchent ici : champs CINÉ du tableau, ou champ Cinématique d'une zone">▤ Montage</button>
         <span class="sp"></span>
         <label class="ed-f" style="width:auto"><span>Grille</span>
           <input type="number" id="ed-grid" value="20" min="1" step="5" style="width:56px" /></label>
@@ -3657,6 +3658,8 @@
           <label class="ed-f"><span>Dashs vapeur / écran</span><input type="number" id="ed-dashs" min="0" step="1" placeholder="banc" /></label>
           <label class="ed-f"><span>Musique</span><select id="ed-ambiance"></select></label>
           <label class="ed-f" title="La part de lumière que la pièce garde LÀ OÙ AUCUNE LAMPE ne porte. 52 % = niveau historique ; 0 % = noir total hors des lampes — elles deviennent la seule source."><span>Lumière générale (%)</span><input type="number" id="ed-lum-generale" min="0" max="100" step="5" placeholder="52" /></label>
+          <label class="ed-f" title="Le code d'une cinématique (table de montage) jouée à l'ENTRÉE dans le tableau — pas au simple recommencer. Vide : aucune."><span>Ciné à l'entrée (code)</span><input id="ed-cine-avant" placeholder="aucune" /></label>
+          <label class="ed-f" title="Le code d'une cinématique (table de montage) jouée à la CONCLUSION du tableau, par-dessus le bilan. Pour un déclencheur EN COURS de tableau : posez une zone (libre) et donnez-lui un code. Vide : aucune."><span>Ciné en sortie (code)</span><input id="ed-cine-apres" placeholder="aucune" /></label>
           <textarea id="ed-journal" placeholder="Entrée du journal de bord…"></textarea>
         </div>
         <div class="ed-group">

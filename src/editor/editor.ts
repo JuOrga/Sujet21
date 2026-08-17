@@ -1762,6 +1762,20 @@ export class LevelEditor {
       this.persist()
     })
     this.el('ed-lum-generale').addEventListener('change', () => this.histoire())
+    // Cinématiques ancrées : le code (table de montage) joué à l'entrée du
+    // tableau, et celui joué à sa conclusion — vide = aucune
+    for (const [id, champ] of [
+      ['ed-cine-avant', 'cineAvant'],
+      ['ed-cine-apres', 'cineApres'],
+    ] as const) {
+      this.el(id).addEventListener('input', () => {
+        const brut = (this.el(id) as HTMLInputElement).value.trim().slice(0, 24)
+        if (brut) this.level[champ] = brut
+        else delete this.level[champ]
+        this.persist()
+      })
+      this.el(id).addEventListener('change', () => this.histoire())
+    }
     for (const id of ['ed-name', 'ed-code', 'ed-par', 'ed-journal'] as const) {
       this.el(id).addEventListener('input', () => {
         this.level.name = (this.el('ed-name') as HTMLInputElement).value || 'Sans titre'
@@ -2095,6 +2109,8 @@ export class LevelEditor {
       this.level.dashBudget === undefined ? '' : String(this.level.dashBudget)
     ;(this.el('ed-lum-generale') as HTMLInputElement).value =
       this.level.ambiante === undefined ? '' : String(Math.round(this.level.ambiante * 100))
+    ;(this.el('ed-cine-avant') as HTMLInputElement).value = this.level.cineAvant ?? ''
+    ;(this.el('ed-cine-apres') as HTMLInputElement).value = this.level.cineApres ?? ''
     ;(this.el('ed-journal') as HTMLTextAreaElement).value = this.level.journal
     ;(this.el('ed-ambiance') as HTMLSelectElement).value = this.level.ambiance ?? ''
     this.syncProps()
@@ -2227,6 +2243,10 @@ export class LevelEditor {
       rows.push(
         `<label class="ed-f"><span>Cause (le nom du lieu)</span>` +
           `<input id="p-zlabel" placeholder="${ZONE_CAUSES[z.force]}" value="${(z.label ?? '').replace(/"/g, '&quot;')}" /></label>`,
+      )
+      rows.push(
+        `<label class="ed-f" title="Le code d'une cinématique (table de montage) : elle se joue quand le corps entre dans la zone, une fois par essai. Une zone « libre » avec un code est un pur déclencheur, sans effet d'état."><span>Cinématique (code)</span>` +
+          `<input id="p-zcine" placeholder="aucune" value="${(z.cine ?? '').replace(/"/g, '&quot;')}" /></label>`,
       )
       rows.push(numField('X min', 'p-minX', z.minX), numField('X max', 'p-maxX', z.maxX))
       rows.push(numField('Y min', 'p-minY', z.minY), numField('Y max', 'p-maxY', z.maxY))
@@ -2429,6 +2449,9 @@ export class LevelEditor {
       const z = (this.level.zones ?? [])[s.index]
       z.force = text('p-force') as ZoneForce
       z.label = text('p-zlabel').trim() || undefined
+      const zcine = text('p-zcine').trim().slice(0, 24)
+      if (zcine) z.cine = zcine
+      else delete z.cine
       Object.assign(z, this.normalized(val('p-minX'), val('p-minY'), val('p-maxX'), val('p-maxY')))
     } else if (s.kind === 'sponge') {
       const sp = this.level.sponges[s.index]
