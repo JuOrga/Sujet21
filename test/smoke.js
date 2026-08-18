@@ -78,8 +78,42 @@ const { chromium } = require("playwright");
     return out;
   });
 
+  // Réserve (pool) : amorce facile sans transfo, plafond qui monte, tirage
+  // déterministe et sans répétition immédiate. Le tirage prend un rnd (0..1).
+  const pool = await page.evaluate(() => {
+    const easy = (l) => l.difficulty === 1 && l.transforms.length === 0;
+    // Chaque tableau du catalogue doit se construire sans erreur, avec une
+    // géométrie complète (parois, bornes, sas, entrée).
+    const builtAll = Run.catalog().every((l) => {
+      const g = l.build();
+      return g.walls.length > 0 && g.bounds && g.exit && g.spawn &&
+        Array.isArray(g.zones) && Array.isArray(g.sponges);
+    });
+    const intro0 = Run.poolFor(0), intro1 = Run.poolFor(1), deep = Run.poolFor(6);
+    const introPicks = [0, 0.25, 0.5, 0.75, 0.99].map((r) => Run.pick(0, null, r));
+    // Une run déterministe : les deux premiers tableaux doivent différer
+    // (le pool d'amorce compte au moins deux tableaux).
+    Run.start(0);
+    const seq = [Run.current().id];
+    for (let i = 0; i < 6; i++) { Run.advance(0.5, (i % 5) / 5); seq.push(Run.current().id); }
+    return {
+      introOnlyEasy: intro0.length >= 2 && intro0.every(easy) && intro1.every(easy),
+      introPicksEasy: introPicks.every(easy),
+      ceil: [0, 2, 4].map((d) => Run.ceilingAt(d)),
+      deepHasT3: deep.some((l) => l.difficulty === 3),
+      deepNoT1: deep.every((l) => l.difficulty >= 2),
+      firstTwoDiffer: seq[0] !== seq[1],
+      banked: Run.banked(),
+      builtAll,
+    };
+  });
+
   console.log("--- checks ---");
   console.log("erreurs JS:", errors.length ? errors : "aucune");
+  const poolOK = pool.introOnlyEasy && pool.introPicksEasy &&
+    String(pool.ceil) === "1,2,3" && pool.deepHasT3 && pool.deepNoT1 &&
+    pool.firstTwoDiffer && Math.abs(pool.banked - 3) < 1e-9 && pool.builtAll;
+  console.log("réserve (pool) :", poolOK ? "OK" : "ECHEC " + JSON.stringify(pool));
   console.log("corps stable au repos:", s1.player >= s0.player - 5 ? "OK" : "ECHEC");
   console.log("coût de la poussée (particules):", s1.player - s2.player);
   console.log("déplacement vers la droite:", (s2.cx - s1.cx).toFixed(1), "px puis", (s3.cx - s2.cx).toFixed(1), "px en dérive");

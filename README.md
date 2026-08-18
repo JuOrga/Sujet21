@@ -22,7 +22,8 @@ npx serve .        # ou : python3 -m http.server
 |---|---|
 | **Clic maintenu** | éjecte de la matière **vers** le curseur ; le corps part à l'opposé |
 | **1 – 5** | dilatation du temps (×0,25 à ×4) — le pas physique ne change jamais |
-| **R** | recommencer |
+| **Espace / Entrée** | tableau suivant (une fois le sas franchi) |
+| **R** | nouvelle run |
 | **T** | banc de réglage (sliders en direct + export JSON) |
 | **L** ou bouton « Légende » | légende : chaque surface, son effet, état par état — le bouton sert aussi au tactile |
 
@@ -62,6 +63,31 @@ npx serve .        # ou : python3 -m http.server
 - **Registres du labo** (§10) : chaque tentative achevée est consignée
   (dispersion ou sas franchi, durée, volume restant), avec persistance locale.
 
+## Boucle roguelike : la réserve de tableaux (jalon M2)
+
+Fidèle au §7 du doc — « chaque tableau est un problème fermé » — une tentative
+n'enchaîne plus un tableau unique, mais tire ses tableaux dans une **réserve
+(pool)** dont la difficulté monte avec la profondeur :
+
+- Les **premiers tableaux** sont tirés **au hasard** uniquement parmi les plus
+  faciles **et sans transfo** (résolubles en pur liquide) — `ANTICHAMBRE`,
+  `CHICANE`.
+- Plus la run s'enfonce, plus le **plafond de difficulté** monte : les paliers 2
+  (`LE DÉTROIT`, `LA DIGUE`, `LA BANQUISE`) puis 3 (`CHAMBRE THERMIQUE`,
+  `LE DOUBLE SAS`) entrent dans la réserve, et les tableaux qui exigent la glace
+  ou la vapeur apparaissent. Les plus faciles finissent par en sortir.
+- Le tableau précédent n'est jamais retiré deux fois de suite tant qu'une
+  alternative existe.
+
+Chaque **sas franchi** remet le corps à la capacité de base et met le surplus en
+bonbonne (le total de la run s'affiche au HUD) ; **Espace** enchaîne le tableau
+suivant. Une **dispersion** termine la run ; **R** en relance une, réserve
+remise à la phase d'amorce.
+
+Chaque tableau est étiqueté `difficulty` (◆ à ◆◆◆) et `transforms` (états
+attendus) dans `js/level.js` ; la composition de la réserve et le tirage vivent
+dans `js/run.js`.
+
 ## Registres du labo et record
 
 Fidèle au §10 du doc — « la progression se lit dans les registres » — chaque
@@ -81,4 +107,6 @@ fin de tentative est consignée dans le navigateur (`localStorage`) :
 Un test de fumée automatisé (Playwright, `npm test`) vérifie : absence
 d'erreur JS, stabilité du corps au repos, coût et efficacité de la poussée,
 dérive inertielle, gel et dégel du corps, éjection vapeur (perte définitive),
-et les registres du labo (consignation, choix du record, départage).
+les registres du labo (consignation, choix du record, départage), et la
+**réserve de tableaux** (amorce facile sans transfo, plafond de difficulté qui
+monte, tirage sans répétition immédiate).

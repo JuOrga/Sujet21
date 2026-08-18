@@ -7,11 +7,12 @@
   const ovText = document.getElementById("ovText");
   const ovRecord = document.getElementById("ovRecord");
   const ovLog = document.getElementById("ovLog");
+  const ovPrompt = document.getElementById("ovPrompt");
 
-  let level = null;
-  let state = "play"; // play | won | lost
+  let level = null, levelMeta = null;
+  let state = "play"; // play | cleared | lost
   let simTime = 0, timeScale = 1, accum = 0, lastT = 0;
-  let winTimer = 0, ejectAccum = 0;
+  let winTimer = 0, ejectAccum = 0, pendingSurplus = 0;
 
   // État thermique (M1) : le corps gèle sous freezeT (moyenne), dégèle
   // au-dessus de meltT ; au-dessus de boilT l'éjection devient vapeur.
@@ -46,9 +47,11 @@
     }
   }
 
-  function reset() {
+  // Charge un tableau tiré dans la réserve à sa capacité de base (§7.1).
+  function loadLevel(meta) {
+    levelMeta = meta;
     Fluid.clear();
-    level = makeLevel();
+    level = meta.build();
     spawnBlob(level.spawn.x, level.spawn.y, P.baseCount);
     Fluid.calibrate();
     prevCX = level.spawn.x; prevCY = level.spawn.y;
@@ -57,6 +60,21 @@
     frozen = false; iceVX = 0; iceVY = 0; meanTemp = P.tempAmbient; steam.length = 0;
     overlay.style.display = "none";
     updateCluster();
+  }
+
+  // Nouvelle run : la réserve repart à la phase d'amorce (tableaux faciles,
+  // sans transfo), tirés au hasard.
+  function newRun() {
+    pendingSurplus = 0;
+    loadLevel(Run.start());
+  }
+
+  // Tableau suivant : le surplus est mis en bonbonne, la réserve avance d'un
+  // cran (plafond de difficulté plus haut).
+  function nextTableau() {
+    const meta = Run.advance(pendingSurplus);
+    pendingSurplus = 0;
+    loadLevel(meta);
   }
 
   // ---------- Amas joueur ----------
@@ -324,10 +342,20 @@
   function litres(count) { return count / P.baseCount; }
   function fmtL(v) { return v.toFixed(2).replace(".", ",") + " L"; }
   function fmtS(v) { return v.toFixed(1).replace(".", ",") + " s"; }
+  // Difficulté d'un tableau en pastilles : ◆◆◇ sur MAX_TIER.
+  function pips(diff) {
+    const max = Run.maxTier();
+    return "◆".repeat(diff) + "◇".repeat(max - diff);
+  }
+  function transfoTag(meta) {
+    const names = { ice: "glace", steam: "vapeur" };
+    if (!meta.transforms.length) return "pur liquide";
+    return meta.transforms.map((t) => names[t] || t).join(" + ");
+  }
 
   // Registres du labo (§10) : la fin de tentative est consignée, le record
   // (sas franchi le plus vite) est rappelé, et le registre raconte la série.
-  function showRegister(rec) {
+  function showRegister(rec, mode) {
     const best = Records.best();
     if (rec.newBest) {
       ovRecord.textContent = "Nouveau record du protocole : sas franchi en " + fmtS(best.time) + ".";
@@ -341,16 +369,23 @@
       "n°" + e.no + " — " + (e.won ? "sas franchi, " + fmtS(e.time) + ", " + fmtL(e.volume)
                                    : "dispersion à " + fmtS(e.time)));
     ovLog.innerHTML = "<em>Registres du labo</em><br>" + rows.join("<br>");
+    if (ovPrompt) {
+      ovPrompt.textContent = mode === "next"
+        ? "Espace : tableau suivant · R : nouvelle run"
+        : "R : nouvelle run";
+    }
   }
 
   function checkEnd(dt) {
     if (state !== "play") return;
     if (playerList.length < P.disperseCount) {
+      // Dispersion : la run s'achève ici (§10).
       state = "lost";
       const rec = Records.endAttempt({ won: false, time: simTime, volume: litres(playerList.length) });
       ovTitle.textContent = "Dispersion";
-      ovText.textContent = "La cohésion ne tient plus. Le laboratoire prépare l'échantillon suivant.";
-      showRegister(rec);
+      ovText.textContent = "La cohésion ne tient plus au tableau n°" + (Run.depth() + 1) +
+        " (" + levelMeta.name + "). Le laboratoire prépare l'échantillon suivant.";
+      showRegister(rec, "run");
       overlay.style.display = "flex";
       return;
     }
@@ -362,12 +397,14 @@
     }
     if (inside > playerList.length * 0.6) winTimer += dt; else winTimer = 0;
     if (winTimer > 1.0) {
-      state = "won";
-      const rec = Records.endAttempt({ won: true, time: simTime, volume: litres(playerList.length) });
+      // Sas franchi : le surplus part en bonbonne, on tient prêt le tableau suivant.
+      state = "cleared";
+      pendingSurplus = litres(playerList.length);
+      const rec = Records.endAttempt({ won: true, time: simTime, volume: pendingSurplus });
       ovTitle.textContent = "Sas franchi";
-      ovText.textContent = "Surplus mis en bonbonne : " + fmtL(litres(playerList.length)) +
-        " — la récompense, c'est ce qu'il vous reste.";
-      showRegister(rec);
+      ovText.textContent = levelMeta.name + " — surplus en bonbonne : " + fmtL(pendingSurplus) +
+        ". Bonbonnes de la run : " + fmtL(Run.banked() + pendingSurplus) + ".";
+      showRegister(rec, "next");
       overlay.style.display = "flex";
     }
   }
@@ -407,10 +444,16 @@
       : meanTemp >= P.boilT ? ["VAPEUR", "#ffb37a"]
       : ["LIQUIDE", "#79d0ff"];
     const pct = Math.round(Math.min(1, Math.max(0, meanTemp)) * 100);
+    const banked = Run.banked() + (state === "cleared" ? pendingSurplus : 0);
+    const tab = levelMeta
+      ? `<span style="color:#8fa3b8">tableau n°${Run.depth() + 1} · ${levelMeta.name} ` +
+        `<span style="color:#c9a24a">${pips(levelMeta.difficulty)}</span></span>`
+      : "";
     hud.innerHTML = `<span class="vol">${vol}</span> &nbsp; ` +
       `<span class="state" style="color:${st[1]}">${st[0]}</span> &nbsp; ${ts} &nbsp; ` +
-      `<span style="color:#5c6b7f">${simTime.toFixed(1).replace(".", ",")} s &nbsp; ` +
-      `échantillon n°${Records.attempts() + 1}</span>` + rec +
+      `<span style="color:#5c6b7f">${simTime.toFixed(1).replace(".", ",")} s</span>` + rec +
+      `<div style="margin-top:4px">${tab}</div>` +
+      `<div style="color:#5c6b7f;margin-top:2px">bonbonnes ${fmtL(banked)}</div>` +
       `<div id="gauge"><b style="width:${pct}%"></b>` +
       `<i class="mkF" style="left:${P.freezeT * 100}%"></i>` +
       `<i class="mkB" style="left:${P.boilT * 100}%"></i></div>`;
@@ -452,7 +495,11 @@
   window.addEventListener("keydown", (e) => {
     const scales = { Digit1: 0.25, Digit2: 0.5, Digit3: 1, Digit4: 2, Digit5: 4 };
     if (scales[e.code]) timeScale = scales[e.code];
-    else if (e.code === "KeyR") reset();
+    else if (e.code === "KeyR") newRun();
+    else if ((e.code === "Space" || e.code === "Enter") && state === "cleared") {
+      e.preventDefault();
+      nextTableau();
+    }
     else if (e.code === "KeyT") Tuning.toggle();
     else if (e.code === "KeyL") toggleLegend();
   });
@@ -472,8 +519,11 @@
     records() {
       return { attempts: Records.attempts(), best: Records.best(), history: Records.history() };
     },
+    run() {
+      return { depth: Run.depth(), banked: Run.banked(), level: levelMeta && levelMeta.id, state };
+    },
   };
 
-  reset();
+  newRun();
   requestAnimationFrame(frame);
 })();
