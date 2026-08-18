@@ -24,6 +24,7 @@ import {
   TABLEAUX,
   TABLEAUX_ECOLE,
   pointInBox,
+  zoneForceAt,
   zoneName,
   zoneShape,
   type LevelDef,
@@ -217,11 +218,20 @@ function createSim(level: LevelDef): FluidSim {
   appliqueMoteur(sim)
   // les dashs se rendent à CHAQUE transformation en vapeur : le tableau peut
   // fixer son propre nombre, sinon celui du banc — et on part à sec, la
-  // première bascule remplira le compteur
+  // première bascule remplira le compteur.
+  // SAUF si le tableau COMMENCE en vapeur (le départ est posé dans une zone
+  // qui l'impose) : la bascule a eu lieu avant le premier pas, il n'y a plus
+  // rien à provoquer, et sans dash le nuage naîtrait sans aucune mobilité —
+  // l'éjection est coupée en vapeur. On entre donc avec le compteur plein.
   sim.dashBudgetParTransfo = level.dashBudget ?? params.gasDashBudget
-  sim.dashBudget = 0
+  const naitVapeur = zoneForceAt(level, level.spawn.x, level.spawn.y) === 'vapeur'
+  sim.dashBudget = naitVapeur ? sim.dashBudgetParTransfo : 0
   sim.setLevel(level.boxes, level.sponges)
   sim.spawnDisc(level.spawn.x, level.spawn.y, level.spawn.n, KIND_PLAYER)
+  // né dans une zone qui impose la vapeur : le corps EST un nuage dès la
+  // première image — sinon le compteur annonce des dashs qui ne partent pas,
+  // le temps que la vaporisation progressive s'achève
+  if (naitVapeur) sim.naitEnVapeur()
   sim.relabel()
   return sim
 }
@@ -292,6 +302,11 @@ const exitMouth = { x: 0, y: 0 }
 // CHARGEMENT : derrière la fiche, l'échantillon dérive déjà dans la cuve
 // d'entraînement (sauf navigation directe ?tableau=N, outil de conception).
 let auHub = !new URLSearchParams(location.search).has('tableau')
+// Le tableau COMMENCE-t-il en vapeur (départ posé dans une zone qui
+// l'impose) ? Alors la vapeur est l'ÉTAT INITIAL, pas une bascule : elle ne
+// se paie pas. Le drapeau se consomme au premier basculement de l'image.
+let departEnVapeur = false
+
 function applyLevel(): void {
   level = testLevel ?? (auHub ? hubLevel() : playedLevels()[levelIndex] ?? playedLevels()[0])
   levelHasCold = level.boxes.some((b) => b.material === MAT_FROID)
@@ -301,6 +316,7 @@ function applyLevel(): void {
   exitMouth.x = (level.exit.minX + level.exit.maxX) * 0.5
   exitMouth.y = (level.exit.minY + level.exit.maxY) * 0.5
   bande.setAmbiance((level.ambiance as Piste | undefined) ?? null)
+  departEnVapeur = zoneForceAt(level, level.spawn.x, level.spawn.y) === 'vapeur'
   buildWorldLabels()
 }
 
@@ -3674,8 +3690,16 @@ function frame(now: number): void {
   // elle ne RECHARGE PAS. Entrer en zone avec un seul dash en poche, c'est
   // ressortir avec un seul dash — le compteur ne se remplit qu'aux bascules
   // qu'on décide (touche G) ou qu'une chaudière provoque.
+  // Et un tableau qui COMMENCE en vapeur ne bascule pas : c'est son état de
+  // départ. Ni péage, ni événement — le corps naît nuage, avec ses dashs
+  // (createSim les a comptés), sans qu'on lui prenne un cinquième de lui-même.
   if (input.gasIntent && !gasIntentAvant && !tableauDone && !input.paused) {
-    sim.transfoVapeur(zoneActive !== 'vapeur')
+    // l'état de départ, c'est la PREMIÈRE prise de la zone, au tout début du
+    // tableau : une bascule décidée plus tard (touche G) se paie et rend ses
+    // dashs normalement, même dans un tableau né en vapeur
+    const etatDeDepart = departEnVapeur && zoneActive === 'vapeur' && run.tableauTime < 3
+    departEnVapeur = false
+    if (!etatDeDepart) sim.transfoVapeur(zoneActive !== 'vapeur')
   }
   gasIntentAvant = input.gasIntent
 

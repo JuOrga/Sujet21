@@ -953,6 +953,21 @@ export class FluidSim {
   // `rendDashs` : une bascule DÉCIDÉE (touche G) ou provoquée par une
   // chaudière remplit le compteur ; une ZONE qui impose la vapeur convertit
   // sans rien rendre — sinon elle vaudrait borne de recharge gratuite.
+  /** Le corps NAÎT nuage. Un tableau qui commence en vapeur n'a pas à
+   *  attendre la vaporisation progressive : sans cela, le compteur annonce
+   *  ses dashs pendant que le corps est encore liquide — et aucun ne part
+   *  (le dash exige de la vapeur). L'état est la condition de départ. */
+  naitEnVapeur(): void {
+    for (let i = 0; i < this.count; i++) {
+      if (this.kind[i] !== KIND_PLAYER) continue
+      this.vapor[i] = 1
+      this.gaseous[i] = 1
+      this.gasLink[i] = 1
+      this.frost[i] = 0
+      this.frozen[i] = 0
+    }
+  }
+
   transfoVapeur(rendDashs = true): void {
     if (this.dispersed) return
     const p = this.params
