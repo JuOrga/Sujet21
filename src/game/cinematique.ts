@@ -293,18 +293,18 @@ export const CINEMATIQUE_ESSAI: CinematiqueDef = {
 }
 
 // ---- LE DÉPART : la seconde cinématique livrée — le sas de lancement,
-// l'unique issue. Elle attend ses images : ses planches sont pour l'instant
-// les esquisses géométriques (SVG), à remplacer dès que les visuels
-// arrivent. Se branche au moment « lancement-run » du scénario.
+// l'unique issue. Se branche au moment « lancement-run » du scénario.
+// Cinq temps sur trois planches : le module vide, le couloir qui aspire,
+// le seuil franchi.
 
 export const CINEMATIQUE_DEPART: CinematiqueDef = {
   code: 'DEPART',
-  titre: 'Le départ — le sas de lancement (planches provisoires)',
+  titre: 'Le départ — le sas de lancement',
   planches: [
     {
-      image: '/assets/cine/essai-4.svg',
+      image: '/assets/cine/depart-1.webp',
       texte: 'Le module est vide. Les portes ne se rouvriront pas.',
-      duree: 5,
+      duree: 5.5,
       effet: 'zoom-arriere',
       fondu: 'noir',
       bruitage: '',
@@ -312,19 +312,30 @@ export const CINEMATIQUE_DEPART: CinematiqueDef = {
       piste: 'cuve-glaciale',
     },
     {
-      image: '/assets/cine/essai-2.svg',
-      texte: 'Une seule ouverture, au bout du couloir. Elle aspire.',
-      duree: 5,
+      // la cuve crevée au premier plan : ce qu'on laisse derrière soi
+      image: '/assets/cine/depart-1.webp',
+      texte: 'Personne ne reviendra chercher l’expérience ratée.',
+      duree: 4,
       effet: 'pan-droite',
+      fondu: 'aucun',
+      bruitage: 'goutte-rosee',
+      ponctuation: '',
+      piste: '',
+    },
+    {
+      image: '/assets/cine/depart-2.webp',
+      texte: 'Une seule ouverture, au bout du couloir. Elle aspire.',
+      duree: 5.5,
+      effet: 'zoom-avant',
       fondu: 'aucun',
       bruitage: 'vortex-sas',
       ponctuation: '',
       piste: '',
     },
     {
-      image: '/assets/cine/essai-1.svg',
+      image: '/assets/cine/depart-3.webp',
       texte: 'Rien ne se perd. Tout ce qui passe compte.',
-      duree: 4,
+      duree: 5,
       effet: 'zoom-avant',
       fondu: 'aucun',
       bruitage: '',
@@ -335,4 +346,7 @@ export const CINEMATIQUE_DEPART: CinematiqueDef = {
 }
 
 /** Les cinématiques livrées avec le jeu (lecture seule à la table). */
-export const CINEMATIQUES_LIVREES: CinematiqueDef[] = [CINEMATIQUE_ESSAI, CINEMATIQUE_DEPART]
+export const CINEMATIQUES_LIVREES: CinematiqueDef[] = [
+  CINEMATIQUE_ESSAI,
+  CINEMATIQUE_DEPART,
+]

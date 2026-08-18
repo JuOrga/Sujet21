@@ -146,6 +146,32 @@ Négatif : `text, letters, numbers, flag, rocket, bright red, white background`
 
 ---
 
+## 11. Planches de cinématique — format imposé
+
+**1600×900 · 16:9 PAYSAGE · WebP** (`--ar 16:9` chez Midjourney). Le jeu force le
+mode paysage sur mobile : une planche portrait serait rognée de moitié. Le lecteur
+étire la planche en `cover` et lui applique un lent mouvement (zoom, panoramique) —
+prévoyez donc **un peu de marge sur les bords**, rien d'essentiel dans les 5 % du
+cadre. Les images sont recompressées à l'intégration (qualité 84, ~160-250 Ko).
+
+Aucun texte dans l'image : les répliques sont posées par le lecteur, réglables à la
+table de montage. Une même planche sert souvent DEUX battements (autre cadrage,
+autre réplique) : c'est du montage, pas du gaspillage.
+
+Planches livrées, dans `public/assets/cine/` :
+
+| Fichier | Plan | Cinématique |
+| --- | --- | --- |
+| `ouverture-1.webp` | la cuve, le sujet dans le liquide | L'OUVERTURE |
+| `ouverture-2.webp` | les Créateurs derrière la vitre | L'OUVERTURE |
+| `ouverture-3.webp` | l'alerte, le module en rouge | L'OUVERTURE |
+| `ouverture-4.webp` | la brèche, le confinement qui cède | L'OUVERTURE |
+| `depart-1.webp` | le module vide, la cuve crevée | LE DÉPART |
+| `depart-2.webp` | le couloir vert vers le sas | LE DÉPART |
+| `depart-3.webp` | le seuil du sas, l'aspiration cyan | LE DÉPART |
+
+---
+
 ## Ce que je peux faire sans générateur d'images
 
 Vecteurs SVG (logo, cadres, icônes, écusson au trait) et textures procédurales en
