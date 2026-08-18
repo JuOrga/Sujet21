@@ -28,6 +28,7 @@ import {
   ZONE_CAUSES,
   subtractBox,
   subtractBoxOblique,
+  subtractSponge,
   zoneName,
   zoneOutline,
   type LevelDef,
@@ -117,6 +118,10 @@ type Sel =
   | { kind: 'exit' }
   | { kind: 'spawn' }
   | null
+
+/** Ce que l'outil Superposition peut désigner : une paroi ou une éponge —
+ *  l'une comme l'autre est de la matière qui peut prendre le dessus. */
+type CutCible = { kind: 'box' | 'sponge'; index: number }
 
 interface Rect {
   minX: number
@@ -641,6 +646,29 @@ export class LevelEditor {
     this.commit('Alignés.')
   }
 
+  /** Le nom d'une pièce désignée par la Superposition. */
+  private nomCible(c: CutCible): string {
+    return c.kind === 'sponge' ? 'Éponge' : MATERIAL_NAMES[this.level.boxes[c.index].material]
+  }
+
+  /** L'empreinte RECTANGULAIRE d'une pièce — ce qu'elle retire au perdant.
+   *  Une paroi oblique ou en forme n'en a pas : on refuse plutôt que de
+   *  ronger à côté (la Gomme, elle, efface librement). */
+  private empreinteCible(c: CutCible): Rect | null {
+    if (c.kind === 'sponge') {
+      const sp = this.level.sponges[c.index]
+      return {
+        minX: sp.minX,
+        minY: sp.minY,
+        maxX: sp.minX + sp.cols * sp.cellSize,
+        maxY: sp.minY + sp.rows * sp.cellSize,
+      }
+    }
+    const b = this.level.boxes[c.index]
+    if (b.angle || b.forme) return null
+    return { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY }
+  }
+
   /** Ce qui se trouve sous le point monde, du plus « au-dessus » au plus bas. */
   private pick(x: number, y: number): Sel {
     const inside = (r: Rect): boolean => x >= r.minX && x <= r.maxX && y >= r.minY && y <= r.maxY
@@ -714,7 +742,7 @@ export class LevelEditor {
   // La matière du prochain tracé : choisie dans « Surfaces », elle habille
   // aussi les outils de FORME (un disque de glace, un arc de chaudière…).
   private matiereCourante = MAT_WALL
-  private cutWinner: number | null = null
+  private cutWinner: CutCible | null = null
   // Guides magnétiques pendant un déplacement (façon Canva)
   private guides: { axe: 'v' | 'h'; pos: number }[] = []
 
@@ -989,23 +1017,35 @@ export class LevelEditor {
       // puis celle qui s'efface — seule la zone où elles se chevauchent est
       // rongée du perdant. Échap annule.
       if (this.tool.kind === 'cut') {
-        const hit = ((): number => {
-          // Une fois le dessus choisi, on cherche d'abord une AUTRE paroi
+        // Une ÉPONGE est de la matière comme une paroi : elle peut prendre le
+        // dessus, et elle peut se faire ronger (sa grille perd les cellules
+        // couvertes). Sans ça, l'outil ne « voyait » pas les éponges du tout.
+        const cible = ((): CutCible | null => {
+          // Une fois le dessus choisi, on cherche d'abord une AUTRE pièce
           // sous le curseur : cliquer deux fois dans la zone commune est le
           // geste naturel (« enlève-moi ce chevauchement ») — il doit ronger,
-          // pas re-désigner la même paroi et tout annuler.
-          let leGagnant = -1
+          // pas re-désigner la même pièce et tout annuler.
+          let leGagnant: CutCible | null = null
+          const memeQueGagnant = (c: CutCible): boolean =>
+            this.cutWinner !== null && this.cutWinner.kind === c.kind && this.cutWinner.index === c.index
           for (let i = this.level.boxes.length - 1; i >= 0; i--) {
             if (!dansBoite(this.level.boxes[i], w.x, w.y)) continue
-            if (this.cutWinner !== null && i === this.cutWinner) {
-              leGagnant = i
-              continue
-            }
-            return i
+            const c: CutCible = { kind: 'box', index: i }
+            if (memeQueGagnant(c)) leGagnant = c
+            else return c
+          }
+          for (let i = this.level.sponges.length - 1; i >= 0; i--) {
+            const sp = this.level.sponges[i]
+            const mx = sp.minX + sp.cols * sp.cellSize
+            const my = sp.minY + sp.rows * sp.cellSize
+            if (w.x < sp.minX || w.x > mx || w.y < sp.minY || w.y > my) continue
+            const c: CutCible = { kind: 'sponge', index: i }
+            if (memeQueGagnant(c)) leGagnant = c
+            else return c
           }
           return leGagnant
         })()
-        if (hit < 0) {
+        if (!cible) {
           this.status(
             this.cutWinner === null
               ? 'Superposition : cliquez la paroi qui prend le dessus (celle qui garde la matière).'
@@ -1014,29 +1054,67 @@ export class LevelEditor {
           return
         }
         if (this.cutWinner === null) {
-          this.cutWinner = hit
+          this.cutWinner = cible
           this.status(
-            `${MATERIAL_NAMES[this.level.boxes[hit].material]} prend le dessus (liseré doré) — cliquez maintenant l’autre paroi, ou le chevauchement lui-même.`,
+            `${this.nomCible(cible)} prend le dessus (liseré doré) — cliquez maintenant l’autre pièce, ou le chevauchement lui-même.`,
           )
           this.draw()
           return
         }
-        if (hit === this.cutWinner) {
+        if (cible.kind === this.cutWinner.kind && cible.index === this.cutWinner.index) {
           this.cutWinner = null
-          this.status('Superposition : le dessus est désélectionné — cliquez une paroi pour recommencer.')
+          this.status('Superposition : le dessus est désélectionné — cliquez une pièce pour recommencer.')
           this.draw()
           return
         }
-        const gagnante = this.level.boxes[this.cutWinner]
-        const perdante = this.level.boxes[hit]
-        // La découpe exacte n'existe qu'à ANGLES ÉGAUX (les morceaux restent
-        // des rectangles) : tout se passe dans le repère de la perdante.
-        const morceaux = subtractBoxOblique(perdante, gagnante)
+        const gagnant = this.cutWinner
+        const nomG = this.nomCible(gagnant)
+        const nomP = this.nomCible(cible)
+        // L'empreinte du GAGNANT : le rectangle qu'il retire au perdant. Une
+        // paroi oblique ou en forme n'a pas d'empreinte rectangulaire — on
+        // refuse plutôt que de ronger à côté.
+        const empreinte = this.empreinteCible(gagnant)
+        if (!empreinte) {
+          this.status(
+            'Superposition : la pièce du dessus est oblique ou en forme — son empreinte n’est pas un rectangle. Utilisez la GOMME pour effacer librement.',
+          )
+          return
+        }
+
+        if (cible.kind === 'sponge') {
+          // ÉPONGE rongée : sa grille perd les cellules couvertes
+          const sp = this.level.sponges[cible.index]
+          const morceaux = subtractSponge(sp, empreinte)
+          if (morceaux.length === 1 && morceaux[0] === sp) {
+            this.status(`${nomG} et ${nomP} ne se chevauchent pas : il n’y a rien à ronger.`)
+            return
+          }
+          this.level.sponges.splice(cible.index, 1, ...morceaux)
+          this.cutWinner = null
+          this.sel = morceaux.length > 0 ? { kind: 'sponge', index: cible.index } : null
+          this.setTool({ kind: 'select' })
+          this.commit(
+            morceaux.length === 0
+              ? `${nomP} était entièrement sous ${nomG} : elle a disparu.`
+              : `Chevauchement rongé : ${nomG} garde la zone commune, ${nomP} y perd ses cellules (${morceaux.length} morceau${morceaux.length > 1 ? 'x' : ''}).`,
+          )
+          return
+        }
+
+        // PAROI rongée : la découpe exacte n'existe qu'à ANGLES ÉGAUX (les
+        // morceaux restent des rectangles) — tout se passe dans son repère.
+        const perdante = this.level.boxes[cible.index]
+        const morceaux =
+          gagnant.kind === 'box'
+            ? subtractBoxOblique(perdante, this.level.boxes[gagnant.index])
+            : perdante.angle || perdante.forme
+              ? null
+              : subtractBox(perdante, empreinte)
         if (!morceaux) {
           this.status(
-            perdante.forme || gagnante.forme
+            perdante.forme || (gagnant.kind === 'box' && this.level.boxes[gagnant.index].forme)
               ? 'Superposition : une des deux pièces est une FORME (disque, capsule, coin, arc) — le rognage exact n’existe qu’entre rectangles. Utilisez la GOMME pour effacer librement.'
-              : `Superposition : angles différents (${gagnante.angle ?? 0}° / ${perdante.angle ?? 0}°) — le rognage exact n’existe qu’entre parois de même angle. Utilisez la GOMME pour effacer librement.`,
+              : 'Superposition : angles différents — le rognage exact n’existe qu’entre parois de même angle. Utilisez la GOMME pour effacer librement.',
           )
           return
         }
@@ -1047,20 +1125,19 @@ export class LevelEditor {
           Math.abs(morceaux[0].maxX - perdante.maxX) < 0.01 &&
           Math.abs(morceaux[0].maxY - perdante.maxY) < 0.01
         if (intacte) {
-          this.status('Ces deux parois ne se chevauchent pas : il n’y a rien à ronger. Choisissez-en une autre.')
+          this.status(`${nomG} et ${nomP} ne se chevauchent pas : il n’y a rien à ronger.`)
           return
         }
-        const matPerdante = MATERIAL_NAMES[perdante.material]
-        this.level.boxes.splice(hit, 1, ...morceaux)
+        this.level.boxes.splice(cible.index, 1, ...morceaux)
         this.cutWinner = null
         // la pièce rognée reste SÉLECTIONNÉE : le rognage se joue sous
-        // l'autre paroi, il ne se verrait pas autrement
-        this.sel = morceaux.length > 0 ? { kind: 'box', index: hit } : null
+        // l'autre pièce, il ne se verrait pas autrement
+        this.sel = morceaux.length > 0 ? { kind: 'box', index: cible.index } : null
         this.setTool({ kind: 'select' })
         this.commit(
           morceaux.length === 0
-            ? `${matPerdante} était entièrement sous ${MATERIAL_NAMES[gagnante.material]} : elle a disparu.`
-            : `Chevauchement rongé : ${MATERIAL_NAMES[gagnante.material]} garde la zone commune, ${matPerdante} s'efface dessous (${morceaux.length} morceau${morceaux.length > 1 ? 'x' : ''}, sélectionné${morceaux.length > 1 ? 's' : ''}).`,
+            ? `${nomP} était entièrement sous ${nomG} : elle a disparu.`
+            : `Chevauchement rongé : ${nomG} garde la zone commune, ${nomP} s'efface dessous (${morceaux.length} morceau${morceaux.length > 1 ? 'x' : ''}, sélectionné${morceaux.length > 1 ? 's' : ''}).`,
         )
         return
       }
@@ -1545,19 +1622,29 @@ export class LevelEditor {
         for (const m of morceaux) restantes.push({ ...b, ...m })
       }
     }
-    // les ÉPONGES entièrement couvertes partent aussi : elles sont de la
-    // matière, elles ne feraient pas exception sous la gomme
-    const spAvant = this.level.sponges.length
-    this.level.sponges = this.level.sponges.filter((sp) => {
-      const maxX = sp.minX + sp.cols * sp.cellSize
-      const maxY = sp.minY + sp.rows * sp.cellSize
-      return !(r.minX <= sp.minX && r.maxX >= maxX && r.minY <= sp.minY && r.maxY >= maxY)
-    })
-    const eponges = spAvant - this.level.sponges.length
-    if (effacees === 0 && rognees === 0 && eponges === 0) {
+    // les ÉPONGES sont de la matière comme le reste : la gomme leur retire
+    // les cellules couvertes (la grille se redit en morceaux calés sur la
+    // même trame), et celles qui ne gardent plus rien disparaissent. Rien
+    // n'est écrit avant le verdict : sans quoi un gommage « sans effet »
+    // laissait quand même les éponges entamées, hors historique.
+    let epEffacees = 0
+    let epRognees = 0
+    const spRestantes: SpongeDef[] = []
+    for (const sp of this.level.sponges) {
+      const morceaux = subtractSponge(sp, r)
+      if (morceaux.length === 1 && morceaux[0] === sp) {
+        spRestantes.push(sp)
+        continue
+      }
+      if (morceaux.length === 0) epEffacees++
+      else epRognees++
+      spRestantes.push(...morceaux)
+    }
+    if (effacees === 0 && rognees === 0 && epEffacees === 0 && epRognees === 0) {
       this.status('Gomme : rien à effacer dans cette zone.')
       return
     }
+    this.level.sponges = spRestantes
     this.level.boxes = restantes
     this.sel = null
     this.multi = []
@@ -1565,7 +1652,8 @@ export class LevelEditor {
     const bouts: string[] = []
     if (effacees > 0) bouts.push(`${effacees} surface${effacees > 1 ? 's' : ''} effacée${effacees > 1 ? 's' : ''}`)
     if (rognees > 0) bouts.push(`${rognees} rognée${rognees > 1 ? 's' : ''}`)
-    if (eponges > 0) bouts.push(`${eponges} éponge${eponges > 1 ? 's' : ''}`)
+    if (epEffacees > 0) bouts.push(`${epEffacees} éponge${epEffacees > 1 ? 's' : ''} effacée${epEffacees > 1 ? 's' : ''}`)
+    if (epRognees > 0) bouts.push(`${epRognees} éponge${epRognees > 1 ? 's' : ''} entamée${epRognees > 1 ? 's' : ''}`)
     this.commit(`Gomme : ${bouts.join(', ')}.`)
   }
 
@@ -2791,13 +2879,16 @@ export class LevelEditor {
     }
 
     // éponges
-    for (const sp of this.level.sponges) {
+    this.level.sponges.forEach((sp, si) => {
       const p = this.toScreen(sp.minX, sp.minY + sp.rows * sp.cellSize)
       const q = this.toScreen(sp.minX + sp.cols * sp.cellSize, sp.minY)
+      // une éponge peut prendre le dessus dans la Superposition : elle porte
+      // alors le même liseré doré que les parois
+      const gagnante = this.cutWinner?.kind === 'sponge' && this.cutWinner.index === si
       g.fillStyle = 'rgba(215,173,85,0.30)'
       g.fillRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
-      g.strokeStyle = '#d7ad55'
-      g.lineWidth = 1
+      g.strokeStyle = gagnante ? '#ffd24a' : '#d7ad55'
+      g.lineWidth = gagnante ? 3 : 1
       g.strokeRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
       if (sp.cellSize * this.zoom > 6) {
         g.strokeStyle = 'rgba(215,173,85,0.35)'
@@ -2814,7 +2905,7 @@ export class LevelEditor {
         }
         g.stroke()
       }
-    }
+    })
 
     // Zones d'effet des surfaces : la portée RÉELLE des auras, aux réglages
     // par défaut du banc. Le contour iso-distance d'un rectangle est un
@@ -2867,7 +2958,7 @@ export class LevelEditor {
     // est la silhouette que le shader et la physique évaluent en SDF
     this.level.boxes.forEach((box, bi) => {
       const col = MAT_COLORS[box.material] ?? '#888'
-      const gagnant = this.cutWinner === bi
+      const gagnant = this.cutWinner?.kind === 'box' && this.cutWinner.index === bi
       g.save()
       if (box.forme) {
         const pts = formeOutline(box, 64)

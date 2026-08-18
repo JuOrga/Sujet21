@@ -144,6 +144,42 @@ export function subtractBoxOblique(perdante: ObstacleBox, gagnante: ObstacleBox)
   })
 }
 
+// Ronge une ÉPONGE : retire le rectangle `r` de sa grille. Une éponge est
+// une GRILLE de cellules — on ne peut pas la découper n'importe où : on
+// retire les cellules dont le CENTRE tombe dans le rectangle, et ce qui
+// reste se redit en 4 éponges au plus (gauche, droite, dessous, dessus),
+// toutes calées sur la même trame. Le pendant de subtractBox, en cellules.
+export function subtractSponge(sp: SpongeDef, r: { minX: number; minY: number; maxX: number; maxY: number }): SpongeDef[] {
+  const cs = sp.cellSize
+  const maxX = sp.minX + sp.cols * cs
+  const maxY = sp.minY + sp.rows * cs
+  // pas de recouvrement : l'éponge reste entière
+  if (r.minX >= maxX || r.maxX <= sp.minX || r.minY >= maxY || r.maxY <= sp.minY) return [sp]
+  // les colonnes et rangées dont le centre est pris dans le rectangle
+  const c0 = Math.max(0, Math.ceil((r.minX - sp.minX) / cs - 0.5))
+  const c1 = Math.min(sp.cols - 1, Math.floor((r.maxX - sp.minX) / cs - 0.5))
+  const l0 = Math.max(0, Math.ceil((r.minY - sp.minY) / cs - 0.5))
+  const l1 = Math.min(sp.rows - 1, Math.floor((r.maxY - sp.minY) / cs - 0.5))
+  if (c0 > c1 || l0 > l1) return [sp] // le rectangle passe entre les centres
+  const out: SpongeDef[] = []
+  const garde = (cA: number, lA: number, nc: number, nl: number): void => {
+    if (nc < 1 || nl < 1) return
+    out.push({
+      minX: sp.minX + cA * cs,
+      minY: sp.minY + lA * cs,
+      cols: nc,
+      rows: nl,
+      cellSize: cs,
+      capacityPerCell: sp.capacityPerCell,
+    })
+  }
+  garde(0, 0, c0, sp.rows) // à gauche de la découpe
+  garde(c1 + 1, 0, sp.cols - 1 - c1, sp.rows) // à droite
+  garde(c0, 0, c1 - c0 + 1, l0) // dessous
+  garde(c0, l1 + 1, c1 - c0 + 1, sp.rows - 1 - l1) // dessus
+  return out
+}
+
 export interface SpongeDef {
   minX: number
   minY: number

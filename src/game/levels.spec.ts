@@ -12,6 +12,8 @@ import {
   TABLEAU_9,
   TABLEAUX,
   subtractBox,
+  subtractSponge,
+  type SpongeDef,
   type LevelDef,
 } from './level'
 import { traceLaser, type TraceMonde } from './laser'
@@ -292,5 +294,46 @@ describe('la gomme : effacer la matière d’une zone', () => {
   it('une FORME ne se découpe pas : la gomme l’efface entière ou l’épargne', () => {
     const disque = { ...paroi(), forme: 1 }
     expect(subtractBox(disque, { minX: 40, minY: 40, maxX: 200, maxY: 200 })).toEqual([disque])
+  })
+})
+
+describe('subtractSponge — ronger une éponge, cellule par cellule', () => {
+  // une éponge 10 × 4 de cellules de 24 u, coin bas-gauche à (0, 0)
+  const ep = (): SpongeDef => ({ minX: 0, minY: 0, cols: 10, rows: 4, cellSize: 24, capacityPerCell: 5 })
+
+  it('un rectangle qui ne la touche pas la laisse entière', () => {
+    const sp = ep()
+    expect(subtractSponge(sp, { minX: 500, minY: 500, maxX: 600, maxY: 600 })).toEqual([sp])
+  })
+
+  it('entièrement couverte, il ne reste rien', () => {
+    expect(subtractSponge(ep(), { minX: -50, minY: -50, maxX: 500, maxY: 500 })).toEqual([])
+  })
+
+  it('rognée par la droite : les colonnes restantes sont calées sur la trame', () => {
+    // on retire à partir de x = 120 (la colonne 5 commence à 120)
+    const out = subtractSponge(ep(), { minX: 120, minY: -10, maxX: 400, maxY: 400 })
+    expect(out).toHaveLength(1)
+    expect(out[0]).toMatchObject({ minX: 0, minY: 0, cols: 5, rows: 4, cellSize: 24 })
+  })
+
+  it('mordue en plein milieu : elle se redit en plusieurs morceaux', () => {
+    const out = subtractSponge(ep(), { minX: 72, minY: 24, maxX: 168, maxY: 72 })
+    // gauche (3 colonnes), droite (3 colonnes), dessous et dessus du trou
+    expect(out.length).toBeGreaterThanOrEqual(3)
+    const cellules = out.reduce((a, s) => a + s.cols * s.rows, 0)
+    expect(cellules).toBeLessThan(40) // des cellules ont bien disparu
+    expect(cellules).toBeGreaterThan(20)
+    for (const s of out) {
+      // toutes les pièces restent sur la trame d'origine
+      expect((s.minX - 0) % 24).toBe(0)
+      expect((s.minY - 0) % 24).toBe(0)
+      expect(s.capacityPerCell).toBe(5)
+    }
+  })
+
+  it('un rectangle trop fin, passé entre deux centres, ne retire rien', () => {
+    const sp = ep()
+    expect(subtractSponge(sp, { minX: 47, minY: -10, maxX: 49, maxY: 400 })).toEqual([sp])
   })
 })
