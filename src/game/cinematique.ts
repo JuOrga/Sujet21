@@ -205,16 +205,17 @@ export function sauveCinematiques(cines: CinematiqueDef[]): void {
   }
 }
 
-// ---- L'OUVERTURE : la cinématique livrée, sur les planches générées par
-// le concepteur. Sept temps — naissance, regard, alerte, fuite, brèche —
-// où la même planche peut servir DEUX battements (nouveau cadrage, nouvelle
-// réplique) : c'est du montage, pas du gaspillage d'images.
+// ---- L'OUVERTURE : la cinématique livrée, sur les SEPT planches générées
+// par le concepteur — l'acte 0 d'une traite. Onze temps : naissance, regard,
+// alerte, fuite, brèche, module vide, couloir, seuil du sas. La même planche
+// sert souvent DEUX battements (nouveau cadrage, nouvelle réplique) : c'est
+// du montage, pas du gaspillage d'images.
 // Les SVG essai-*.svg restent en place : ils servent de planches
 // provisoires aux cinématiques qui attendent leurs images.
 
 export const CINEMATIQUE_ESSAI: CinematiqueDef = {
   code: 'ESSAI',
-  titre: "L'ouverture — la cuve, l'alerte, la brèche",
+  titre: "L'ouverture — la cuve, l'alerte, la brèche, le sas",
   planches: [
     {
       image: '/assets/cine/ouverture-1.webp',
@@ -289,13 +290,58 @@ export const CINEMATIQUE_ESSAI: CinematiqueDef = {
       ponctuation: '',
       piste: '',
     },
+    {
+      // le module après eux : la coupure au noir sépare les deux moitiés,
+      // et la piste bascule du tiède au glacial — le module s'est refroidi
+      image: '/assets/cine/depart-1.webp',
+      texte: 'Le module est vide. Les portes ne se rouvriront pas.',
+      duree: 5.5,
+      effet: 'zoom-arriere',
+      fondu: 'noir',
+      bruitage: '',
+      ponctuation: '',
+      piste: 'cuve-glaciale',
+    },
+    {
+      // le même plan, glissé sur la cuve crevée : ce qu'on laisse derrière soi
+      image: '/assets/cine/depart-1.webp',
+      texte: 'Personne ne reviendra chercher l’expérience ratée.',
+      duree: 4,
+      effet: 'pan-droite',
+      fondu: 'aucun',
+      bruitage: 'goutte-rosee',
+      ponctuation: '',
+      piste: '',
+    },
+    {
+      image: '/assets/cine/depart-2.webp',
+      texte: 'Une seule ouverture, au bout du couloir. Elle aspire.',
+      duree: 5.5,
+      effet: 'zoom-avant',
+      fondu: 'aucun',
+      bruitage: 'vortex-sas',
+      ponctuation: '',
+      piste: '',
+    },
+    {
+      // le seuil : la dernière planche pose la règle du jeu entier
+      image: '/assets/cine/depart-3.webp',
+      texte: 'Rien ne se perd. Tout ce qui passe compte.',
+      duree: 5,
+      effet: 'zoom-avant',
+      fondu: 'aucun',
+      bruitage: '',
+      ponctuation: 'sting-collecte',
+      piste: '',
+    },
   ],
 }
 
-// ---- LE DÉPART : la seconde cinématique livrée — le sas de lancement,
-// l'unique issue. Se branche au moment « lancement-run » du scénario.
-// Cinq temps sur trois planches : le module vide, le couloir qui aspire,
-// le seuil franchi.
+// ---- LE DÉPART : la reprise courte, pour le moment « lancement-run » du
+// scénario — celui qui se rejoue à CHAQUE run, quand l'ouverture, elle, ne
+// passe qu'une fois. Ce sont les quatre derniers battements de l'ouverture,
+// sur les mêmes trois planches : le joueur qui repart reconnaît le couloir
+// sans se retaper la naissance.
 
 export const CINEMATIQUE_DEPART: CinematiqueDef = {
   code: 'DEPART',
