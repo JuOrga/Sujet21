@@ -3821,6 +3821,8 @@ function frame(now: number): void {
     // encore close — elle s'ouvrira pour l'image suivante
     const fermees = portes.filter((_, i) => !laserEtat.portesOuvertes[i])
     const rIce = params.particleSpacing * 1.3
+    // le rayon du champ qui DÉFINIT la surface du liquide (dioptres)
+    const rEau = params.laserMirrorSmooth * 0.6
     laserEtat.vues = lasers.map((em) =>
       traceLaser(em, {
         bounds: sim.bounds,
@@ -3834,9 +3836,15 @@ function frame(now: number): void {
         // chaque dioptre, et se piège sous la surface au-delà de ~49°.
         // Le milieu est LISSÉ au même rayon que la normale : la surface
         // effective est l'isoligne de densité, pas le grain des particules.
+        // Le dioptre : la surface traversée et la normale qui plie le rayon
+        // doivent décrire LA MÊME surface. Elles se calculaient sur deux
+        // champs de rayons différents (0,6× pour l'appartenance, 1× pour la
+        // normale) : la normale n'était pas perpendiculaire au dioptre
+        // franchi — 4,7° d'écart en moyenne, jusqu'à 14,6°, doublés par les
+        // deux interfaces. L'angle de sortie était faux.
         eau: {
-          dedans: (x, y) => sim.liquidAt(x, y, params.laserMirrorSmooth * 0.6),
-          normale: (x, y) => sim.liquidNormalAt(x, y, params.laserMirrorSmooth),
+          dedans: (x, y) => sim.liquidAt(x, y, rEau),
+          normale: (x, y) => sim.liquidNormalAt(x, y, rEau),
         },
         indice: params.laserRefractIndex,
         // palier 3 : la vapeur ionise le faisceau en arc de plasma, que

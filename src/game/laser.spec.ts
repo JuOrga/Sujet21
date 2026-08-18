@@ -175,7 +175,7 @@ describe('traceLaser — les règles optiques du palier 1', () => {
       monde({
         eau: {
           dedans: (x, y) => sim.liquidAt(x, y, sim.params.laserMirrorSmooth * 0.6),
-          normale: (x, y) => sim.liquidNormalAt(x, y, sim.params.laserMirrorSmooth),
+          normale: (x, y) => sim.liquidNormalAt(x, y, sim.params.laserMirrorSmooth * 0.6),
         },
       }),
     )
@@ -363,7 +363,7 @@ describe('traceLaser — les règles optiques du palier 1', () => {
       monde({
         eau: {
           dedans: (x, y) => sim.liquidAt(x, y, sim.params.laserMirrorSmooth * 0.6),
-          normale: (x, y) => sim.liquidNormalAt(x, y, sim.params.laserMirrorSmooth),
+          normale: (x, y) => sim.liquidNormalAt(x, y, sim.params.laserMirrorSmooth * 0.6),
         },
       }),
     )
