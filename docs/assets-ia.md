@@ -158,6 +158,10 @@ Aucun texte dans l'image : les répliques sont posées par le lecteur, réglable
 table de montage. Une même planche sert souvent DEUX battements (autre cadrage,
 autre réplique) : c'est du montage, pas du gaspillage.
 
+L'OUVERTURE porte l'acte 0 d'une traite : ses onze battements passent par les
+sept planches. LE DÉPART en reprend les quatre derniers — c'est la version
+courte, celle qui se rejoue à chaque run.
+
 Planches livrées, dans `public/assets/cine/` :
 
 | Fichier | Plan | Cinématique |
@@ -166,9 +170,9 @@ Planches livrées, dans `public/assets/cine/` :
 | `ouverture-2.webp` | les Créateurs derrière la vitre | L'OUVERTURE |
 | `ouverture-3.webp` | l'alerte, le module en rouge | L'OUVERTURE |
 | `ouverture-4.webp` | la brèche, le confinement qui cède | L'OUVERTURE |
-| `depart-1.webp` | le module vide, la cuve crevée | LE DÉPART |
-| `depart-2.webp` | le couloir vert vers le sas | LE DÉPART |
-| `depart-3.webp` | le seuil du sas, l'aspiration cyan | LE DÉPART |
+| `depart-1.webp` | le module vide, la cuve crevée | L'OUVERTURE + LE DÉPART |
+| `depart-2.webp` | le couloir vert vers le sas | L'OUVERTURE + LE DÉPART |
+| `depart-3.webp` | le seuil du sas, l'aspiration cyan | L'OUVERTURE + LE DÉPART |
 
 ---
 
