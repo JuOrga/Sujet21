@@ -1,5 +1,7 @@
-// Effets sonores procéduraux (Web Audio) : aucun fichier — tout est
-// synthétisé. Trois boucles continues pilotées par le jeu (souffle
+// Effets sonores procéduraux (Web Audio) : presque tout est synthétisé —
+// seule la nappe de vapeur est un enregistrement (public/sound/vapeur-nappe.mp3),
+// parce qu'aucun filtrage de bruit blanc ne donne autre chose qu'un
+// sifflement. Trois boucles continues pilotées par le jeu (souffle
 // d'éjection, respiration de la fumée, tourbillon du sas), des one-shots
 // (gel, dégel, vaporisation, impacts de glace, avalement, tampons), et le
 // bourdon discret de la station. Le contexte audio ne peut naître que d'un
@@ -141,47 +143,16 @@ export class AudioFx {
 
     // Boucles continues (gain à 0, le jeu les ouvre)
     this.ejectG = this.noiseLoop(1400, 2.2).gain // souffle fin de l'éjection
-    // La vapeur : une nappe qui ROULE, pas un jet sous pression. Le bruit
-    // est très assombri (passe-bas serré puis corps grave), et deux LFO
-    // lents et désynchronisés font onduler le filtre et respirer le
-    // niveau — le nuage vit, il ne siffle pas.
+    // La vapeur : une nappe ENREGISTRÉE qui roule (vapeur-nappe.mp3), pas
+    // un jet sous pression. Du bruit blanc filtré reste un sifflement quoi
+    // qu'on lui fasse ; le fichier, lui, n'a rien au-dessus de 800 Hz et
+    // respire tout seul. Le jeu ne pilote plus que son niveau.
     {
-      const src = ctx.createBufferSource()
-      src.buffer = buf
-      src.loop = true
-      const sombre = ctx.createBiquadFilter()
-      sombre.type = 'lowpass'
-      sombre.frequency.value = 640
-      sombre.Q.value = 0.3
-      const corps = ctx.createBiquadFilter()
-      corps.type = 'bandpass'
-      corps.frequency.value = 260
-      corps.Q.value = 0.8
       const g = ctx.createGain()
       g.gain.value = 0
-      src.connect(sombre)
-      sombre.connect(corps)
-      corps.connect(g)
       g.connect(master)
-      src.start()
-      const lfoF = ctx.createOscillator()
-      lfoF.type = 'sine'
-      lfoF.frequency.value = 0.31 // le roulis du filtre (±90 Hz)
-      const depF = ctx.createGain()
-      depF.gain.value = 90
-      lfoF.connect(depF)
-      depF.connect(corps.frequency)
-      lfoF.start()
-      const lfoA = ctx.createOscillator()
-      lfoA.type = 'sine'
-      lfoA.frequency.value = 0.19 // la respiration du niveau
-      const depA = ctx.createGain()
-      depA.gain.value = 0
-      lfoA.connect(depA)
-      depA.connect(g.gain)
-      lfoA.start()
       this.gasG = g
-      this.gasDepth = depA
+      void this.chargeNappe(ctx, g)
     }
     const drain = this.noiseLoop(220, 2.6)
     this.drainG = drain.gain
@@ -241,6 +212,67 @@ export class AudioFx {
         void this.ctx.resume()
       }
     })
+  }
+
+  // Va chercher la nappe de vapeur et la met à tourner dans le gain déjà
+  // câblé. Le rebouclage se fait à 0,12 s des bords : le MP3 se décode avec
+  // quelques millisecondes de silence en tête et prepare.py fond les deux
+  // extrémités — en bouclant à l'intérieur, la couture tombe en pleine
+  // matière et ne s'entend pas.
+  // Si le fichier manque (hors ligne, décodage refusé), on retombe sur
+  // l'ancienne voix de synthèse : une nappe sommaire vaut mieux qu'un
+  // silence là où le joueur attend un retour de son geste.
+  private async chargeNappe(ctx: AudioContext, sortie: GainNode): Promise<void> {
+    try {
+      const rep = await fetch('/sound/vapeur-nappe.mp3')
+      if (!rep.ok) throw new Error(String(rep.status))
+      const buf = await ctx.decodeAudioData(await rep.arrayBuffer())
+      const src = ctx.createBufferSource()
+      src.buffer = buf
+      src.loop = true
+      src.loopStart = Math.min(0.12, buf.duration / 4)
+      src.loopEnd = Math.max(buf.duration - 0.12, buf.duration * 0.75)
+      src.connect(sortie)
+      src.start()
+    } catch {
+      this.nappeDeSecours(ctx, sortie)
+    }
+  }
+
+  private nappeDeSecours(ctx: AudioContext, sortie: GainNode): void {
+    if (!this.noise) return
+    const src = ctx.createBufferSource()
+    src.buffer = this.noise
+    src.loop = true
+    const sombre = ctx.createBiquadFilter()
+    sombre.type = 'lowpass'
+    sombre.frequency.value = 640
+    sombre.Q.value = 0.3
+    const corps = ctx.createBiquadFilter()
+    corps.type = 'bandpass'
+    corps.frequency.value = 260
+    corps.Q.value = 0.8
+    src.connect(sombre)
+    sombre.connect(corps)
+    corps.connect(sortie)
+    src.start()
+    const lfoF = ctx.createOscillator()
+    lfoF.type = 'sine'
+    lfoF.frequency.value = 0.31 // le roulis du filtre (±90 Hz)
+    const depF = ctx.createGain()
+    depF.gain.value = 90
+    lfoF.connect(depF)
+    depF.connect(corps.frequency)
+    lfoF.start()
+    const lfoA = ctx.createOscillator()
+    lfoA.type = 'sine'
+    lfoA.frequency.value = 0.19 // la respiration du niveau
+    const depA = ctx.createGain()
+    depA.gain.value = 0
+    lfoA.connect(depA)
+    depA.connect(sortie.gain)
+    lfoA.start()
+    this.gasDepth = depA
   }
 
   private noiseLoop(freq: number, q: number): { gain: GainNode; filter: BiquadFilterNode } {
@@ -307,9 +339,13 @@ export class AudioFx {
   }
 
   setGasLevel(v: number): void {
-    // la nappe est sombre : un peu plus de niveau, et une respiration
-    // proportionnelle (±30 % du niveau) — jamais de sifflement
-    this.ramp(this.gasG, v * 0.085)
+    // Le fichier est calé à -20 dBFS RMS : × 0,6 le pose une paire de dB
+    // au-dessus des lits musicaux (eux à -23 × 0,72), assez pour qu'on
+    // sente le nuage sans qu'il couvre le tableau. C'est LA ligne à
+    // toucher si la vapeur est trop forte ou trop timide.
+    this.ramp(this.gasG, v * 0.6)
+    // la respiration LFO n'existe que sur la nappe de secours : le fichier,
+    // lui, ondule déjà de lui-même
     this.ramp(this.gasDepth, v * 0.085 * 0.3)
   }
 
