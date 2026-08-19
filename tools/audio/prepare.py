@@ -70,16 +70,16 @@ COUPS = [
 # les .mp3 restants viennent de Suno. Les versions écartées sont archivées sous
 # *-v1-aigu.mp3 / *-v1-jet.mp3, plus référencées.
 COURTS = [
-    ('gel.mp3', 'gel.mp3', -3.0, 80),
+    ('gel.wav', 'gel.mp3', -3.0, 80),
     # la floraison chaude qui remplace le jet sous pression (l'ancien master
     # est conservé sous vaporisation-v1-jet.mp3, plus référencé)
     ('vaporisation.wav', 'vaporisation.mp3', -3.0, 80),
     ('condensation.wav', 'condensation.mp3', -4.0, 80),
     ('impact-glace.mp3', 'impact-glace.mp3', -3.0, 80),
     ('goutte-rosee.wav', 'goutte-rosee.mp3', -6.0, 80),
-    ('eponge.mp3', 'eponge.mp3', -5.0, 80),
+    ('eponge.wav', 'eponge.mp3', -5.0, 80),
     ('souffle-vapeur.wav', 'souffle-vapeur.mp3', -6.0, 80),
-    ('vortex-sas.mp3', 'vortex-sas.mp3', -5.0, 80),
+    ('vortex-sas.wav', 'vortex-sas.mp3', -5.0, 80),
     ('sting-derniere-impulsion.mp3', 'sting-derniere-impulsion.mp3', -3.0, 80),
 ]
 
