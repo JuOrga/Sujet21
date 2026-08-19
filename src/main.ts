@@ -39,6 +39,7 @@ import {
   creerEtatRecepteurs,
   avancerRecepteurs,
   cibleActive,
+  canalActif,
   type TraceResultat,
 } from './game/laser'
 import { BOUTON, Manette } from './game/manette'
@@ -2385,6 +2386,8 @@ const laserEtat = {
   portesOuvertes: [] as boolean[],
   doorsKey: '', // signature des portes fermées envoyées au solveur
 }
+// Sonde de test : l'état des portes/récepteurs depuis la console (comme __sim)
+;(window as unknown as { __laserEtat: typeof laserEtat }).__laserEtat = laserEtat
 // La superposition des mécanismes : faisceaux, émetteurs, cibles, portes —
 // dessinée en 2D par-dessus la cuve, avec la même caméra que le rendu WebGL.
 function drawMecanismes(vw: number, vh: number, dpr: number): void {
@@ -3885,13 +3888,14 @@ function frame(now: number): void {
     const toucheesImage: number[] = []
     for (const t of laserEtat.vues) for (const c of t.touchees) toucheesImage.push(c)
     avancerRecepteurs(cibles, toucheesImage, laserEtat.recepteurs, nowRecepteurs)
-    // une porte s'ouvre par son laser… ou par une SÉQUENCE (la brèche) —
-    // une porte sans cible valide est une paroi que seul le récit ouvre
+    // une porte s'ouvre par son laser… ou par une SÉQUENCE (la brèche).
+    // Elle vise un CANAL (le n° des pastilles) avec sa règle : OU (défaut,
+    // une pastille active suffit) ou ET (toutes en même temps) — une porte
+    // sans canal valide est une paroi que seul le récit ouvre.
     laserEtat.portesOuvertes = portes.map(
       (p, i) =>
         sequenceur.etat.brechesOuvertes.has(i) ||
-        (cibles[p.cible] !== undefined &&
-          cibleActive(cibles[p.cible], laserEtat.recepteurs, p.cible, nowRecepteurs)),
+        canalActif(cibles, p.canal, p.regle, laserEtat.recepteurs, nowRecepteurs),
     )
     // convoyage : quand un arc circule sur un rail, le champ s'y ENGAGE —
     // et il reste engagé tant qu'un nuage voyage dans la bande, même si le

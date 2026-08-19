@@ -305,6 +305,11 @@ export interface CibleDef {
   y: number
   r: number // rayon de la pastille réceptrice
   mode?: CibleMode // absent : 'tor'
+  // N° LOGIQUE du récepteur — celui que les portes visent. Absent : sa
+  // position dans la liste (indice + 1). Plusieurs pastilles peuvent porter
+  // le même numéro : elles forment un CANAL, et chaque porte choisit sa
+  // règle (une seule suffit, ou toutes à la fois).
+  canal?: number
 }
 
 // Une porte est une paroi asservie : FERMÉE tant que sa cible est éteinte,
@@ -314,10 +319,14 @@ export interface PorteDef {
   minY: number
   maxX: number
   maxY: number
-  // Indice dans `cibles` — le récepteur laser qui commande cette porte.
-  // NÉGATIF : porte SCÉNARISÉE, qu'aucun faisceau n'ouvre. Elle reste une
-  // paroi pleine jusqu'à ce qu'une séquence in-map la crève (la brèche).
-  cible: number
+  // N° de CANAL — le numéro affiché sur les pastilles qui commandent cette
+  // porte (CibleDef.canal). NÉGATIF : porte SCÉNARISÉE, qu'aucun faisceau
+  // n'ouvre. Elle reste une paroi pleine jusqu'à ce qu'une séquence in-map
+  // la crève (la brèche).
+  canal: number
+  // Quand PLUSIEURS pastilles portent ce numéro : 'et' exige qu'elles
+  // soient TOUTES actives en même temps ; absente ('ou'), une seule suffit.
+  regle?: 'et'
 }
 
 // Un RAIL MAGNÉTIQUE (palier 3) : une ligne de champ posée dans le décor.
@@ -849,7 +858,7 @@ export const TABLEAU_8: LevelDef = {
   ],
   lasers: [{ x: -700, y: -80, angle: 0 }],
   cibles: [{ x: -440, y: 260, r: 46 }],
-  portes: [{ minX: 860, minY: -170, maxX: 900, maxY: 170, cible: 0 }],
+  portes: [{ minX: 860, minY: -170, maxX: 900, maxY: 170, canal: 1 }],
 }
 
 // Tableau 9 — le prisme (laser, palier 2 : EAU = RÉFRACTION). Lecture :
@@ -890,7 +899,7 @@ export const TABLEAU_9: LevelDef = {
   ],
   lasers: [{ x: -900, y: 300, angle: 0 }],
   cibles: [{ x: 660, y: 80, r: 52 }],
-  portes: [{ minX: 900, minY: -160, maxX: 940, maxY: 160, cible: 0 }],
+  portes: [{ minX: 900, minY: -160, maxX: 940, maxY: 160, canal: 1 }],
 }
 
 // Tableau 10 — la voie de plasma (laser, palier 3 : VAPEUR + RAIL). Lecture :
@@ -930,7 +939,7 @@ export const TABLEAU_10: LevelDef = {
   ],
   lasers: [{ x: -700, y: 140, angle: 0 }],
   cibles: [{ x: 620, y: 20, r: 46 }],
-  portes: [{ minX: 900, minY: -160, maxX: 940, maxY: 160, cible: 0 }],
+  portes: [{ minX: 900, minY: -160, maxX: 940, maxY: 160, canal: 1 }],
   rails: [
     {
       points: [
@@ -998,8 +1007,8 @@ export const TABLEAU_11: LevelDef = {
     { x: 660, y: 280, r: 52 },
   ],
   portes: [
-    { minX: 860, minY: -170, maxX: 900, maxY: 170, cible: 0 },
-    { minX: 950, minY: -160, maxX: 990, maxY: 160, cible: 1 },
+    { minX: 860, minY: -170, maxX: 900, maxY: 170, canal: 1 },
+    { minX: 950, minY: -160, maxX: 990, maxY: 160, canal: 2 },
   ],
 }
 
@@ -1046,7 +1055,7 @@ export const TABLEAU_12: LevelDef = {
   ],
   lasers: [{ x: -700, y: 100, angle: 0 }],
   cibles: [{ x: 700, y: 280, r: 46 }],
-  portes: [{ minX: 900, minY: -160, maxX: 940, maxY: 160, cible: 0 }],
+  portes: [{ minX: 900, minY: -160, maxX: 940, maxY: 160, canal: 1 }],
   rails: [
     {
       points: [
@@ -1121,9 +1130,9 @@ export const TABLEAU_13: LevelDef = {
     { x: 900, y: 260, r: 46 },
   ],
   portes: [
-    { minX: -400, minY: -170, maxX: -360, maxY: 170, cible: 0 },
-    { minX: 300, minY: -170, maxX: 340, maxY: 170, cible: 1 },
-    { minX: 980, minY: -160, maxX: 1020, maxY: 160, cible: 2 },
+    { minX: -400, minY: -170, maxX: -360, maxY: 170, canal: 1 },
+    { minX: 300, minY: -170, maxX: 340, maxY: 170, canal: 2 },
+    { minX: 980, minY: -160, maxX: 1020, maxY: 160, canal: 3 },
   ],
   rails: [
     {

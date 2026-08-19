@@ -51,7 +51,7 @@ import {
 } from '../game/formes'
 import { CODE_HUB, checkLevel, codeCanon, parseLevel, serializeLevel } from '../game/levelIO'
 import { MAX_LUMIERES } from '../render/renderer'
-import { traceLaser } from '../game/laser'
+import { canalDeCible, traceLaser } from '../game/laser'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
 import { PISTES, PISTE_NOMS, type Piste } from '../game/soundtrack'
 import {
@@ -1693,24 +1693,24 @@ export class LevelEditor {
       this.commit(`Zone « ${t.force} » posée.`)
     } else if (t.kind === 'porte') {
       if (!this.level.portes) this.level.portes = []
-      // asservie à la cible la plus proche — modifiable dans le panneau
+      // asservie au canal de la cible la plus proche — modifiable au panneau
       const cx = (r.minX + r.maxX) / 2
       const cy = (r.minY + r.maxY) / 2
-      let cible = 0
+      let canal = 1
       let best = Infinity
       for (let i = 0; i < (this.level.cibles ?? []).length; i++) {
         const t2 = this.level.cibles![i]
         const d2 = Math.hypot(t2.x - cx, t2.y - cy)
         if (d2 < best) {
           best = d2
-          cible = i
+          canal = canalDeCible(this.level.cibles!, i)
         }
       }
-      this.level.portes.push({ ...r, cible })
+      this.level.portes.push({ ...r, canal })
       this.sel = { kind: 'porte', index: this.level.portes.length - 1 }
       this.commit(
         (this.level.cibles ?? []).length > 0
-          ? `Porte posée, asservie à la cible nº ${cible + 1}.`
+          ? `Porte posée, asservie au canal nº ${canal}.`
           : 'Porte posée — posez une cible et asservissez-la dans le panneau.',
       )
     } else if (t.kind === 'exit') {
@@ -1755,12 +1755,13 @@ export class LevelEditor {
     else if (s.kind === 'porte') (this.level.portes ?? []).splice(s.index, 1)
     else if (s.kind === 'rail') (this.level.rails ?? []).splice(s.index, 1)
     else if (s.kind === 'cible') {
-      ;(this.level.cibles ?? []).splice(s.index, 1)
-      // les portes asservies aux cibles suivantes se décalent d'un cran ;
-      // celles de la cible supprimée restent (le contrôle les signalera)
-      for (const p of this.level.portes ?? []) {
-        if (p.cible > s.index) p.cible--
-      }
+      // les numéros sont LOGIQUES : avant de retirer la pastille, chaque
+      // survivante fige le sien — rien ne se renumérote, les portes tiennent
+      const cs = this.level.cibles ?? []
+      cs.forEach((c, i) => {
+        if (c.canal === undefined) c.canal = i + 1
+      })
+      cs.splice(s.index, 1)
     }
     else if (s.kind === 'label') this.level.labels.splice(s.index, 1)
     else {
@@ -1805,7 +1806,9 @@ export class LevelEditor {
       this.sel = { kind: 'lumiere', index: this.level.lumieres!.length - 1 }
     } else if (s.kind === 'cible') {
       const t = (this.level.cibles ?? [])[s.index]
-      this.level.cibles!.push({ ...t, x: t.x + off })
+      // la copie garde le NUMÉRO de l'originale : dupliquer une « cible 1 »
+      // fait une seconde cible 1 — elles partagent le canal
+      this.level.cibles!.push({ ...t, canal: canalDeCible(this.level.cibles!, s.index), x: t.x + off })
       this.sel = { kind: 'cible', index: this.level.cibles!.length - 1 }
     } else if (s.kind === 'porte') {
       const q = (this.level.portes ?? [])[s.index]
@@ -2509,6 +2512,8 @@ export class LevelEditor {
       )
     } else if (s.kind === 'cible') {
       const t = (this.level.cibles ?? [])[s.index]
+      const canal = canalDeCible(this.level.cibles ?? [], s.index)
+      rows.push(numField('N° (canal)', 'p-ccanal', canal, 1))
       rows.push(numField('X', 'p-cx', t.x), numField('Y', 'p-cy', t.y))
       rows.push(numField('Rayon', 'p-cr', t.r, 2))
       rows.push(
@@ -2519,14 +2524,26 @@ export class LevelEditor {
       )
       rows.push(
         t.mode === 'nor'
-          ? `<p class="ed-empty">Cible nº ${s.index + 1} — la porte n’est ouverte que FAISCEAU TENU ; à la première coupure, la pastille grille et la porte se scelle pour de bon.</p>`
-          : `<p class="ed-empty">Cible nº ${s.index + 1} — un seul passage du faisceau l’allume pour de bon ; les portes s’y asservissent par ce numéro.</p>`,
+          ? `<p class="ed-empty">Cible nº ${canal} — la porte n’est ouverte que FAISCEAU TENU ; à la première coupure, la pastille grille et la porte se scelle pour de bon.</p>`
+          : `<p class="ed-empty">Cible nº ${canal} — un seul passage du faisceau l’allume pour de bon ; les portes s’y asservissent par ce numéro.</p>`,
+      )
+      rows.push(
+        `<p class="ed-empty">Le N° se choisit librement : plusieurs pastilles peuvent porter le même — la porte décide alors si UNE suffit (OU) ou s’il les faut TOUTES (ET).</p>`,
       )
     } else if (s.kind === 'porte') {
       const q = (this.level.portes ?? [])[s.index]
-      rows.push(numField('Cible asservie (nº)', 'p-pc', q.cible + 1, 1))
+      rows.push(numField('Canal visé (nº de cible)', 'p-pc', q.canal))
+      rows.push(
+        `<label class="ed-f"><span>Règle</span><select id="p-pregle">` +
+          `<option value="ou"${q.regle !== 'et' ? ' selected' : ''}>OU — une cible du canal suffit</option>` +
+          `<option value="et"${q.regle === 'et' ? ' selected' : ''}>ET — toutes les cibles du canal</option>` +
+          `</select></label>`,
+      )
       rows.push(numField('X min', 'p-minX', q.minX), numField('X max', 'p-maxX', q.maxX))
       rows.push(numField('Y min', 'p-minY', q.minY), numField('Y max', 'p-maxY', q.maxY))
+      rows.push(
+        `<p class="ed-empty">La porte s’ouvre par le canal : le N° affiché sur les pastilles. La règle ne joue que si plusieurs pastilles portent ce numéro. Canal −1 : porte SCÉNARISÉE, qu’aucun faisceau n’ouvre.</p>`,
+      )
     } else if (s.kind === 'rail') {
       const r = (this.level.rails ?? [])[s.index]
       rows.push(
@@ -2572,7 +2589,7 @@ export class LevelEditor {
                   : s.kind === 'lumiere'
                     ? `Lampe nº ${s.index + 1}`
                     : s.kind === 'cible'
-                    ? `Cible nº ${s.index + 1}`
+                    ? `Cible nº ${canalDeCible(this.level.cibles ?? [], s.index)}`
                     : s.kind === 'porte'
                       ? 'Porte asservie'
                       : s.kind === 'rail'
@@ -2724,6 +2741,9 @@ export class LevelEditor {
       else delete l.couleur
     } else if (s.kind === 'cible') {
       const t = (this.level.cibles ?? [])[s.index]
+      // le n° est LOGIQUE : il se pose sur la pastille et les portes le
+      // visent — deux pastilles peuvent porter le même (un canal)
+      t.canal = Math.max(1, Math.round(val('p-ccanal') || s.index + 1))
       t.x = val('p-cx')
       t.y = val('p-cy')
       t.r = Math.max(8, val('p-cr'))
@@ -2732,7 +2752,10 @@ export class LevelEditor {
       else delete t.mode
     } else if (s.kind === 'porte') {
       const q = (this.level.portes ?? [])[s.index]
-      q.cible = Math.max(0, Math.round(val('p-pc')) - 1)
+      const canal = Math.round(val('p-pc'))
+      q.canal = canal >= 1 ? canal : -1
+      if (text('p-pregle') === 'et') q.regle = 'et'
+      else delete q.regle
       Object.assign(q, this.normalized(val('p-minX'), val('p-minY'), val('p-maxX'), val('p-maxY')))
     } else if (s.kind === 'label') {
       const l = this.level.labels[s.index]
@@ -3160,7 +3183,13 @@ export class LevelEditor {
       g.strokeRect(p.sx, p.sy, r.sx - p.sx, r.sy - p.sy)
       g.fillStyle = '#ff9a8a'
       g.font = '600 10px ui-monospace, monospace'
-      g.fillText(`PORTE → CIBLE ${q.cible + 1}`, p.sx + 4, p.sy - 4)
+      g.fillText(
+        q.canal < 0
+          ? 'PORTE SCÉNARISÉE'
+          : `PORTE → CANAL ${q.canal}${q.regle === 'et' ? ' (ET)' : ''}`,
+        p.sx + 4,
+        p.sy - 4,
+      )
     }
     // rails magnétiques : la bande de capture (l'arc s'accroche n'importe où
     // le long de la ligne), la ligne, ses nœuds, et les CHEVRONS du sens de
@@ -3273,7 +3302,8 @@ export class LevelEditor {
       }
       g.fillStyle = touchees.has(i) ? '#0c1a14' : '#cfe2ef'
       g.font = '700 10px ui-monospace, monospace'
-      g.fillText(String(i + 1), p.sx - 3, p.sy + 3.5)
+      const num = String(canalDeCible(cibles, i))
+      g.fillText(num, p.sx - 3 * num.length, p.sy + 3.5)
     }
     for (const em of lasers) {
       const p = this.toScreen(em.x, em.y)

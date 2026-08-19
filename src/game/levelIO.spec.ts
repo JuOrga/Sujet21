@@ -218,16 +218,55 @@ it('conserve les mécanismes laser (émetteurs, cibles, portes) à l’aller-ret
     ...TABLEAUX[0],
     lasers: [{ x: -600, y: 200, angle: 315 }],
     cibles: [{ x: 700, y: -300, r: 30 }],
-    portes: [{ minX: 100, minY: -200, maxX: 140, maxY: 200, cible: 0 }],
+    portes: [{ minX: 100, minY: -200, maxX: 140, maxY: 200, canal: 1 }],
   }
   const { level, rejets } = parseLevel(JSON.parse(serializeLevel(src)))
   expect(rejets).toEqual([])
   expect(level!.lasers).toEqual(src.lasers)
   expect(level!.cibles).toEqual(src.cibles)
   expect(level!.portes).toEqual(src.portes)
-  // une porte asservie à une cible fantôme est signalée par le contrôle
-  const verdicts = checkLevel({ ...level!, portes: [{ ...src.portes[0], cible: 4 }] })
-  expect(verdicts.some((v) => v.niveau === 'erreur' && v.message.includes('cible nº 5'))).toBe(true)
+  // une porte asservie à un canal fantôme est signalée par le contrôle
+  const verdicts = checkLevel({ ...level!, portes: [{ ...src.portes[0], canal: 5 }] })
+  expect(verdicts.some((v) => v.niveau === 'erreur' && v.message.includes('canal nº 5'))).toBe(true)
+})
+
+it('canaux : le n° d’une cible survit, l’héritage porte.cible (indice) se traduit', () => {
+  const src = {
+    ...TABLEAUX[0],
+    lasers: [{ x: -600, y: 200, angle: 315 }],
+    // deux pastilles qui PARTAGENT le n° 1, une troisième à son propre n°
+    cibles: [
+      { x: 700, y: -300, r: 30 },
+      { x: 700, y: 300, r: 30, canal: 1 },
+      { x: 500, y: 0, r: 26, canal: 7 },
+    ],
+    portes: [
+      { minX: 100, minY: -200, maxX: 140, maxY: 200, canal: 1, regle: 'et' as const },
+      { minX: 200, minY: -200, maxX: 240, maxY: 200, canal: 7 },
+    ],
+  }
+  const again = parseLevel(JSON.parse(serializeLevel(src)))
+  expect(again.rejets).toEqual([])
+  expect(again.level!.cibles).toEqual(src.cibles)
+  expect(again.level!.portes).toEqual(src.portes)
+  // un canal égal à la position reste implicite dans le fichier
+  const brut = JSON.parse(serializeLevel(src)) as { cibles: Record<string, unknown>[] }
+  expect(brut.cibles[0].canal).toBeUndefined()
+  expect(brut.cibles[1].canal).toBe(1)
+  // héritage : un vieux fichier où `cible` était un INDICE — la porte se
+  // rattache au n° logique de la pastille désignée
+  const vieux = parseLevel({
+    ...JSON.parse(serializeLevel(TABLEAUX[0])),
+    cibles: [{ x: 0, y: 0, r: 26 }, { x: 40, y: 0, r: 26, canal: 5 }],
+    portes: [
+      { minX: 10, minY: -30, maxX: 14, maxY: 30, cible: 1 },
+      { minX: 20, minY: -30, maxX: 24, maxY: 30, cible: -1 },
+    ],
+  })
+  expect(vieux.level!.portes![0].canal).toBe(5)
+  expect(vieux.level!.portes![1].canal).toBe(-1) // scénarisée, conservée
+  // le contrôle accepte un canal partagé et une porte scénarisée
+  expect(checkLevel(vieux.level!).some((v) => v.message.includes('canal'))).toBe(false)
 })
 
 it('conserve les rails magnétiques et écarte les moignons', () => {
@@ -273,7 +312,7 @@ describe('levelIO — mode des récepteurs (TOR/NOR)', () => {
         { x: 0, y: 0, r: 26 },
         { x: 40, y: 0, r: 26, mode: 'nor' },
       ],
-      portes: [{ minX: 10, minY: -30, maxX: 14, maxY: 30, cible: 1 }],
+      portes: [{ minX: 10, minY: -30, maxX: 14, maxY: 30, canal: 2 }],
     }
     const { level } = parseLevel(src)
     expect(level).not.toBeNull()

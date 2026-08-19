@@ -5,6 +5,8 @@ import {
   avancerRecepteurs,
   cibleActive,
   CIBLE_PERSISTANCE,
+  canalDeCible,
+  canalActif,
   type TraceMonde,
 } from './laser'
 import { MAT_GRILLE, MAT_WALL } from './level'
@@ -449,5 +451,50 @@ describe('Récepteurs TOR / NOR — la mémoire des cibles', () => {
     avancerRecepteurs(cibles, [], etat, 1 + P + 0.05)
     expect(cibleActive(cibles[0], etat, 0, 1 + P + 0.05)).toBe(true) // TOR tient
     expect(cibleActive(cibles[1], etat, 1, 1 + P + 0.05)).toBe(false) // NOR scellé
+  })
+})
+
+describe('Canaux — le n° d’une pastille est logique, la porte choisit sa règle', () => {
+  it('sans n° explicite, une pastille vaut sa position (indice + 1)', () => {
+    expect(canalDeCible([{}, { canal: 1 }, {}], 0)).toBe(1)
+    expect(canalDeCible([{}, { canal: 1 }, {}], 1)).toBe(1) // une seconde « cible 1 »
+    expect(canalDeCible([{}, { canal: 1 }, {}], 2)).toBe(3)
+  })
+
+  it('OU (défaut) : une seule pastille active du canal ouvre la porte', () => {
+    const cibles = [{}, { canal: 1 }] // deux pastilles sur le canal 1
+    const etat = creerEtatRecepteurs(2)
+    expect(canalActif(cibles, 1, undefined, etat, 0)).toBe(false)
+    avancerRecepteurs(cibles, [1], etat, 1) // la seconde seulement
+    expect(canalActif(cibles, 1, undefined, etat, 1)).toBe(true)
+  })
+
+  it('ET : la porte exige TOUTES les pastilles du canal en même temps', () => {
+    const cibles = [{}, { canal: 1 }]
+    const etat = creerEtatRecepteurs(2)
+    avancerRecepteurs(cibles, [1], etat, 1)
+    expect(canalActif(cibles, 1, 'et', etat, 1)).toBe(false) // il en manque une
+    avancerRecepteurs(cibles, [0], etat, 2)
+    expect(canalActif(cibles, 1, 'et', etat, 2)).toBe(true) // les deux (TOR : acquis)
+  })
+
+  it('ET avec un NOR : la coupure scellée referme le canal pour de bon', () => {
+    const P = CIBLE_PERSISTANCE
+    const cibles = [{}, { canal: 1, mode: 'nor' as const }]
+    const etat = creerEtatRecepteurs(2)
+    avancerRecepteurs(cibles, [0, 1], etat, 1)
+    expect(canalActif(cibles, 1, 'et', etat, 1)).toBe(true)
+    avancerRecepteurs(cibles, [], etat, 1 + P + 0.05) // le NOR grille
+    expect(canalActif(cibles, 1, 'et', etat, 1 + P + 0.05)).toBe(false)
+    expect(canalActif(cibles, 1, undefined, etat, 1 + P + 0.05)).toBe(true) // OU : le TOR tient
+  })
+
+  it('canal négatif (porte scénarisée) ou sans pastille : jamais ouvert', () => {
+    const cibles = [{}]
+    const etat = creerEtatRecepteurs(1)
+    avancerRecepteurs(cibles, [0], etat, 1)
+    expect(canalActif(cibles, -1, undefined, etat, 1)).toBe(false)
+    expect(canalActif(cibles, 9, undefined, etat, 1)).toBe(false)
+    expect(canalActif(cibles, 9, 'et', etat, 1)).toBe(false) // ET sur canal vide : non
   })
 })

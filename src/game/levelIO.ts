@@ -31,6 +31,7 @@ import {
 } from './level'
 import { MAX_BOXES, MAX_LUMIERES, MAX_ZONES } from '../render/renderer'
 import { ARC_EPAISSEUR_DEFAUT, ARC_OUVERTURE_DEFAUT, FORME_ARC, FORME_COIN, FORME_RECT } from './formes'
+import { canalDeCible } from './laser'
 
 export const MATERIALS = [
   MAT_WALL,
@@ -320,6 +321,10 @@ export function parseLevel(input: unknown): { level: LevelDef | null; rejets: st
     const cible: CibleDef = { x: num(c.x, 0), y: num(c.y, 0), r: Math.max(8, num(c.r, 26)) }
     // récepteur NOR (à maintien, la coupure scelle) — tout le reste est TOR
     if (c.mode === 'nor') cible.mode = 'nor'
+    // le n° logique (canal) : conservé s'il est explicite et valable ;
+    // absent, la pastille vaut sa position (indice + 1)
+    const canal = Math.round(num(c.canal, 0))
+    if (canal >= 1) cible.canal = canal
     cibles.push(cible)
   }
   if (cibles.length > 0) level.cibles = cibles
@@ -327,15 +332,26 @@ export function parseLevel(input: unknown): { level: LevelDef | null; rejets: st
   const portes: PorteDef[] = []
   for (const raw of Array.isArray(o.portes) ? o.portes : []) {
     const q = (raw ?? {}) as Record<string, unknown>
-    const porte = {
+    // le canal visé : soit explicite (`canal`), soit HÉRITÉ des anciens
+    // fichiers où `cible` était un INDICE dans la liste — on le traduit en
+    // n° logique via la pastille qu'il désignait. Négatif conservé : c'est
+    // le contrat d'une porte SCÉNARISÉE, que seule une séquence ouvre.
+    let canal: number
+    if (q.canal !== undefined) {
+      const brut = Math.round(num(q.canal, 1))
+      canal = brut >= 1 ? brut : -1
+    } else {
+      const idx = Math.round(num(q.cible, 0))
+      canal = idx < 0 ? -1 : (cibles[idx]?.canal ?? idx + 1)
+    }
+    const porte: PorteDef = {
       minX: Math.min(num(q.minX), num(q.maxX)),
       minY: Math.min(num(q.minY), num(q.maxY)),
       maxX: Math.max(num(q.minX), num(q.maxX)),
       maxY: Math.max(num(q.minY), num(q.maxY)),
-      // négatif conservé : c'est le contrat d'une porte SCÉNARISÉE, que
-      // seule une séquence in-map ouvre (voir PorteDef)
-      cible: Math.max(-1, Math.round(num(q.cible, 0))),
+      canal,
     }
+    if (q.regle === 'et') porte.regle = 'et'
     if (porte.maxX - porte.minX < 1 || porte.maxY - porte.minY < 1) {
       rejets.push('une porte a été écartée (taille nulle)')
       continue
@@ -404,7 +420,17 @@ export function serializeLevel(level: LevelDef): string {
   }
   if (level.zones && level.zones.length > 0) out.zones = level.zones
   if (level.lasers && level.lasers.length > 0) out.lasers = level.lasers
-  if (level.cibles && level.cibles.length > 0) out.cibles = level.cibles
+  if (level.cibles && level.cibles.length > 0) {
+    // canal égal à la position : implicite, la clé disparaît du fichier
+    out.cibles = level.cibles.map((c, i) => {
+      if (c.canal === i + 1) {
+        const copie = { ...c }
+        delete copie.canal
+        return copie
+      }
+      return c
+    })
+  }
   if (level.portes && level.portes.length > 0) out.portes = level.portes
   if (level.rails && level.rails.length > 0) out.rails = level.rails
   if (level.lumieres && level.lumieres.length > 0) out.lumieres = level.lumieres
@@ -497,16 +523,18 @@ export function checkLevel(level: LevelDef): Verdict[] {
       break
     }
   }
-  // Mécanismes laser : une porte asservie doit l'être à une cible réelle,
-  // et un émetteur sans cible n'ouvre rien (il éclaire, c'est tout).
-  // Une cible NÉGATIVE est le contrat des portes SCÉNARISÉES : aucun laser
+  // Mécanismes laser : une porte asservie doit viser un canal qu'une
+  // pastille porte vraiment, et un émetteur sans cible n'ouvre rien.
+  // Un canal NÉGATIF est le contrat des portes SCÉNARISÉES : aucun laser
   // ne les ouvre — seule une séquence in-map le fait (la brèche).
   const nCibles = level.cibles?.length ?? 0
+  const canaux = new Set<number>()
+  for (let c = 0; c < nCibles; c++) canaux.add(canalDeCible(level.cibles!, c))
   for (const porte of level.portes ?? []) {
-    if (porte.cible >= 0 && porte.cible >= nCibles) {
+    if (porte.canal >= 0 && !canaux.has(porte.canal)) {
       v.push({
         niveau: 'erreur',
-        message: `Une porte est asservie à la cible nº ${porte.cible + 1}, qui n'existe pas.`,
+        message: `Une porte est asservie au canal nº ${porte.canal} — aucune cible ne porte ce numéro.`,
       })
     }
   }

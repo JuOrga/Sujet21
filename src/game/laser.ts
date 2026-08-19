@@ -417,7 +417,7 @@ export function creerEtatRecepteurs(n: number): EtatRecepteurs {
 /** Avancé une fois par image, APRÈS le traçage : consigne les photons reçus
  * puis scelle les NOR dont le faisceau vient de se couper. */
 export function avancerRecepteurs(
-  cibles: { mode?: 'tor' | 'nor' }[],
+  cibles: { mode?: 'tor' | 'nor'; canal?: number }[],
   touchees: number[],
   etat: EtatRecepteurs,
   now: number,
@@ -439,7 +439,7 @@ export function avancerRecepteurs(
  * TOR : oui dès qu'elle a été vue. NOR : oui sous le faisceau (persistance
  * comprise), plus jamais une fois scellée. */
 export function cibleActive(
-  cible: { mode?: 'tor' | 'nor' },
+  cible: { mode?: 'tor' | 'nor'; canal?: number },
   etat: EtatRecepteurs,
   c: number,
   now: number,
@@ -448,4 +448,38 @@ export function cibleActive(
     return etat.vues[c] && !etat.scellees[c] && now - etat.dernierPhoton[c] <= CIBLE_PERSISTANCE
   }
   return etat.vues[c] === true
+}
+
+// ---- Les CANAUX : le numéro d'une pastille est logique, pas positionnel ----
+// Plusieurs pastilles peuvent porter le même numéro ; une porte vise ce
+// numéro et choisit sa règle : OU (défaut) — une pastille active du canal
+// suffit ; ET — il les faut toutes en même temps.
+
+/** Le numéro affiché sur une pastille : le sien, sinon sa position. */
+export function canalDeCible(cibles: { canal?: number }[], c: number): number {
+  return cibles[c]?.canal ?? c + 1
+}
+
+/** Le canal d'une porte l'alimente-t-il en cet instant ?
+ * Négatif (porte scénarisée) ou sans pastille : jamais. */
+export function canalActif(
+  cibles: { mode?: 'tor' | 'nor'; canal?: number }[],
+  canal: number,
+  regle: 'et' | undefined,
+  etat: EtatRecepteurs,
+  now: number,
+): boolean {
+  if (canal < 0) return false
+  let pastilles = 0
+  for (let c = 0; c < cibles.length; c++) {
+    if (canalDeCible(cibles, c) !== canal) continue
+    pastilles++
+    const active = cibleActive(cibles[c], etat, c, now)
+    if (regle === 'et') {
+      if (!active) return false
+    } else if (active) {
+      return true
+    }
+  }
+  return regle === 'et' && pastilles > 0
 }
