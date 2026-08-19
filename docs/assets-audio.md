@@ -26,12 +26,13 @@ Les sons qui « faisaient mal » avaient tous le même défaut, mesurable : leur
 
 | Son | énergie > 3 kHz | verdict |
 | --- | --- | --- |
-| `goutte-rosee` | 99 % | à refaire |
-| `condensation` | 76 % | à refaire |
-| `souffle-vapeur` | 73 % | à refaire |
-| `eponge` | 21 % | à revoir |
-| `impact-glace` | 2 % | bon |
-| `gel`, `vortex-sas`, `ejection-*` | 0 % | bons |
+| `goutte-rosee` | 99 % | **refait — 0 %** |
+| `condensation` | 76 % | **refait — 0 %** |
+| `souffle-vapeur` | 73 % | **refait — 0 %** |
+| `eponge` | 21 % | **refait — 0 %** |
+| `impact-glace` | 2 % | gardé (1,8 % après chaîne) |
+| `gel`, `vortex-sas` | 0 % | **refaits plus graves** |
+| `ejection-*` | 0 % | gardés |
 | `vapeur-nappe`, `vaporisation` (livrés) | 0 % | la référence |
 
 **Le jeu se passe dans un module spatial de 1970, pas dans un studio.** Tout doit
@@ -53,10 +54,10 @@ no sizzle, no bright transient, recorded in a small padded metal room
 Onze sons courts, joués tels quels par le jeu ET disponibles dans la table de
 montage des cinématiques. Ceux marqués **[CINÉ]** sont utilisés par l'ouverture.
 
-## 1. `goutte-rosee.wav` — **[CINÉ]** · 2 s
+## 1. `goutte-rosee.wav` — **[CINÉ]** · 2,6 s — **LIVRÉ**
 
-Une goutte qui se forme et se détache. Le plus urgent : l'actuel est à 99 %
-d'aigus, c'est un tintement de verre là où il faut de l'eau.
+Une goutte qui se forme et se détache. Mesuré à la livraison : **0 % d'énergie
+au-dessus de 3 kHz** (l'ancien était à 99 %). Le prompt reste ici pour la trace.
 
 ```
 A single fat drop of water forming, swelling and detaching from a cold metal
@@ -67,9 +68,10 @@ close in a small padded metal room, single event, silence after 2 seconds
 ```
 Négatif : `tinkle, bell, glass, chime, sparkle, splash, spray, hiss, reverb tail, music`
 
-## 2. `condensation.wav` — **[CINÉ]** · 2 s
+## 2. `condensation.wav` — **[CINÉ]** · 2 s — **LIVRÉ**
 
-La vapeur qui perle sur une paroi froide.
+La vapeur qui perle sur une paroi froide. Mesuré : **0 %** au-dessus de 3 kHz
+(l'ancien : 76 %).
 
 ```
 Fine moisture condensing on a cold metal wall, a soft dense micro-crackle of
@@ -80,10 +82,11 @@ shimmer, dark warm timbre, all energy below 3 kHz, gentle fade into silence,
 ```
 Négatif : `sizzling, frying, static, white noise, hiss, sparkle, crackling fire, music`
 
-## 3. `souffle-vapeur.wav` — **[CINÉ]** · 3 s
+## 3. `souffle-vapeur.wav` — **[CINÉ]** · 4,2 s — **LIVRÉ**
 
 Le souffle de la planche « Pas le temps de philosopher », dans l'alerte.
-Une **expiration**, pas une soupape.
+Une **expiration**, pas une soupape. Mesuré : **0 %** au-dessus de 3 kHz
+(l'ancien : 73 %).
 
 ```
 A long warm exhale of steam escaping slowly from a wide vent in a space station
@@ -107,10 +110,10 @@ all energy below 3 kHz, tight decay, silence after 2 seconds
 ```
 Négatif : `glass shatter, debris, sharp crack, bright transient, reverb tail, music`
 
-## 5. `vortex-sas.wav` — **[CINÉ]** · 6,5 s
+## 5. `vortex-sas.wav` — **[CINÉ]** · 7 s — **LIVRÉ**
 
 L'aspiration du sas — planche « Une seule ouverture. Elle aspire. »
-L'actuel est bon ; ce prompt sert à en faire une variante plus longue.
+Mesuré : **93 % de l'énergie sous 200 Hz**, rien au-dessus de 3 kHz.
 
 ```
 Deep slow suction of air being drawn through a circular airlock iris, a wide
@@ -121,9 +124,11 @@ then abrupt clean stop
 ```
 Négatif : `whistle, wind gust, jet, storm, hiss, screech, music`
 
-## 6. `gel.wav` · 2 s
+## 6. `gel.wav` · 2,5 s — **LIVRÉ**
 
 L'eau qui se resserre en glace (transformation du joueur).
+Mesuré : **89 % sous 200 Hz**. Les douze éclats cristallins de synthèse qui
+doublaient ce son ont été retirés en même temps.
 
 ```
 Water tightening and locking into solid ice, a slow low creaking crystallization
@@ -138,9 +143,12 @@ Négatif : `ice cubes, drink, glass, bright crackle, sparkle, music`
 Déjà généré et intégré (`warm steam bloom`). Gardé ici comme référence de ce qui
 marche : 0 % d'énergie au-dessus de 3 kHz, 62 % sous 200 Hz.
 
-## 8. `eponge.wav` · 2 s
+## 8. `eponge.wav` · 2,5 s — **LIVRÉ**
 
-L'éponge qui boit le fluide.
+L'éponge qui boit le fluide. Mesuré : **73 % sous 200 Hz**, 0 % d'aigus.
+Attention : le jeu ne le joue PAS pour l'instant — la succion avait été coupée
+parce qu'elle agaçait plus qu'elle n'informait. Le fichier est dans la palette
+(table de montage) ; une ligne suffit à le remettre en jeu si vous le voulez.
 
 ```
 Wet porous foam absorbing water, a thick slow squelch as liquid soaks into

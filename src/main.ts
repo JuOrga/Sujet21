@@ -4445,9 +4445,8 @@ function frame(now: number): void {
 
   // ---- Sons : boucles continues et fronts d'état ----
   const audible = !input.paused && !tableauDone && !sim.dispersed
-  // Le souffle continu d'éjection est retiré : l'eau se signale par la goutte
-  // qui « ploc » à chaque impulsion (bande.bruitage), pas par un sifflement.
-  audio.setEjectLevel(0)
+  // Le souffle continu d'éjection est retiré (la voix elle-même n'existe
+  // plus) : l'eau se signale par la goutte qui « ploc » à chaque impulsion.
   audio.setGasLevel(audible && gasCount > 0 ? (input.aimActive && input.gasIntent ? 1 : 0.35) : 0)
 
   // ---- Bande-son : décor sonore et ponctuations ----
