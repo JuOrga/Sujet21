@@ -34,6 +34,12 @@ BOUCLES = [
     ('zone-hublot.mp3', 'zone-hublot.mp3', 24.0, 30.0, -24.0, 48),
     ('zone-conduite.mp3', 'zone-conduite.mp3', 24.0, 30.0, -24.0, 48),
     ('zone-chambre.mp3', 'zone-chambre.mp3', 22.0, 30.0, -24.0, 48),
+    # La nappe de vapeur : la seule boucle pilotée à la frame par le jeu
+    # (setGasLevel). Tout son contenu tient sous 800 Hz — pas un souffle
+    # d'aigu — donc 48 kbps suffisent largement. Elle est livrée déjà bouclée
+    # et calibrée ; on la garde entière, la lecture reboucle en son milieu
+    # (loopStart/loopEnd dans audio.ts) pour éviter les bords fondus.
+    ('vapeur-nappe.wav', 'vapeur-nappe.mp3', 0.0, 30.0, -20.0, 48),
     # La texture du temps suspendu (visée du dash) : drone sombre ~141 Hz.
     # La queue silencieuse (10,8 s →) est coupée, le raccord se fait à la
     # lecture. Cible RMS haute (-19) : elle joue sous un monde étouffé.
@@ -62,7 +68,9 @@ COUPS = [
 # Bruitages courts : gardés entiers, juste normalisés en crête et allégés.
 COURTS = [
     ('gel.mp3', 'gel.mp3', -3.0, 80),
-    ('vaporisation.mp3', 'vaporisation.mp3', -3.0, 80),
+    # la floraison chaude qui remplace le jet sous pression (l'ancien master
+    # est conservé sous vaporisation-v1-jet.mp3, plus référencé)
+    ('vaporisation.wav', 'vaporisation.mp3', -3.0, 80),
     ('condensation.mp3', 'condensation.mp3', -4.0, 80),
     ('impact-glace.mp3', 'impact-glace.mp3', -3.0, 80),
     ('goutte-rosee.mp3', 'goutte-rosee.mp3', -6.0, 80),
