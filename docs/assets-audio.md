@@ -26,9 +26,9 @@ Les sons qui « faisaient mal » avaient tous le même défaut, mesurable : leur
 
 | Son | énergie > 3 kHz | verdict |
 | --- | --- | --- |
-| `goutte-rosee` | 99 % | à refaire |
-| `condensation` | 76 % | à refaire |
-| `souffle-vapeur` | 73 % | à refaire |
+| `goutte-rosee` | 99 % | **refait — 0 %** |
+| `condensation` | 76 % | **refait — 0 %** |
+| `souffle-vapeur` | 73 % | **refait — 0 %** |
 | `eponge` | 21 % | à revoir |
 | `impact-glace` | 2 % | bon |
 | `gel`, `vortex-sas`, `ejection-*` | 0 % | bons |
@@ -53,10 +53,10 @@ no sizzle, no bright transient, recorded in a small padded metal room
 Onze sons courts, joués tels quels par le jeu ET disponibles dans la table de
 montage des cinématiques. Ceux marqués **[CINÉ]** sont utilisés par l'ouverture.
 
-## 1. `goutte-rosee.wav` — **[CINÉ]** · 2 s
+## 1. `goutte-rosee.wav` — **[CINÉ]** · 2,6 s — **LIVRÉ**
 
-Une goutte qui se forme et se détache. Le plus urgent : l'actuel est à 99 %
-d'aigus, c'est un tintement de verre là où il faut de l'eau.
+Une goutte qui se forme et se détache. Mesuré à la livraison : **0 % d'énergie
+au-dessus de 3 kHz** (l'ancien était à 99 %). Le prompt reste ici pour la trace.
 
 ```
 A single fat drop of water forming, swelling and detaching from a cold metal
@@ -67,9 +67,10 @@ close in a small padded metal room, single event, silence after 2 seconds
 ```
 Négatif : `tinkle, bell, glass, chime, sparkle, splash, spray, hiss, reverb tail, music`
 
-## 2. `condensation.wav` — **[CINÉ]** · 2 s
+## 2. `condensation.wav` — **[CINÉ]** · 2 s — **LIVRÉ**
 
-La vapeur qui perle sur une paroi froide.
+La vapeur qui perle sur une paroi froide. Mesuré : **0 %** au-dessus de 3 kHz
+(l'ancien : 76 %).
 
 ```
 Fine moisture condensing on a cold metal wall, a soft dense micro-crackle of
@@ -80,10 +81,11 @@ shimmer, dark warm timbre, all energy below 3 kHz, gentle fade into silence,
 ```
 Négatif : `sizzling, frying, static, white noise, hiss, sparkle, crackling fire, music`
 
-## 3. `souffle-vapeur.wav` — **[CINÉ]** · 3 s
+## 3. `souffle-vapeur.wav` — **[CINÉ]** · 4,2 s — **LIVRÉ**
 
 Le souffle de la planche « Pas le temps de philosopher », dans l'alerte.
-Une **expiration**, pas une soupape.
+Une **expiration**, pas une soupape. Mesuré : **0 %** au-dessus de 3 kHz
+(l'ancien : 73 %).
 
 ```
 A long warm exhale of steam escaping slowly from a wide vent in a space station

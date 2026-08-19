@@ -1,8 +1,8 @@
 // Effets sonores procéduraux (Web Audio) : presque tout est synthétisé —
 // seule la nappe de vapeur est un enregistrement (public/sound/vapeur-nappe.mp3),
 // parce qu'aucun filtrage de bruit blanc ne donne autre chose qu'un
-// sifflement. Trois boucles continues pilotées par le jeu (souffle
-// d'éjection, respiration de la fumée, tourbillon du sas), des one-shots
+// sifflement. Deux boucles continues pilotées par le jeu (la nappe de vapeur
+// et l'aspiration du sas), des one-shots
 // (gel, dégel, vaporisation, impacts de glace, avalement, tampons), et le
 // bourdon discret de la station. Le contexte audio ne peut naître que d'un
 // geste utilisateur (politique navigateur) : resume() est appelé au premier
@@ -46,7 +46,6 @@ export class AudioFx {
   private ctx: AudioContext | null = null
   private master: GainNode | null = null
   private noise: AudioBuffer | null = null
-  private ejectG: GainNode | null = null
   private gasG: GainNode | null = null
   private gasDepth: GainNode | null = null // profondeur de la respiration de la nappe
   private drainG: GainNode | null = null
@@ -60,7 +59,6 @@ export class AudioFx {
   // coupure et même volume que le maître principal (applyMaster règle les
   // deux), mais ses voix restent nettes quand le filtre étouffe le reste.
   private postMaster: GainNode | null = null
-  private slowShimG: GainNode | null = null
   private slowSubG: GainNode | null = null
   private slowActive = false
 
@@ -142,7 +140,9 @@ export class AudioFx {
     this.noise = buf
 
     // Boucles continues (gain à 0, le jeu les ouvre)
-    this.ejectG = this.noiseLoop(1400, 2.2).gain // souffle fin de l'éjection
+    // Le souffle d'éjection a disparu : c'était du bruit blanc à 1400 Hz,
+    // un sifflement de fuite d'air. Le jeu le laissait déjà à zéro — la
+    // goutte qui « ploc » à chaque impulsion dit tout. La voix est retirée.
     // La vapeur : une nappe ENREGISTRÉE qui roule (vapeur-nappe.mp3), pas
     // un jet sous pression. Du bruit blanc filtré reste un sifflement quoi
     // qu'on lui fasse ; le fichier, lui, n'a rien au-dessus de 800 Hz et
@@ -158,25 +158,12 @@ export class AudioFx {
     this.drainG = drain.gain
     this.drainF = drain.filter
 
-    // Voix du temps suspendu, branchées APRÈS le passe-bas (elles doivent
-    // rester nettes quand tout le reste s'étouffe) : un scintillement d'air
-    // très discret, et un battement grave qui pulse comme un cœur au ralenti.
+    // Voix du temps suspendu, branchée APRÈS le passe-bas (elle doit rester
+    // nette quand tout le reste s'étouffe) : un battement grave qui pulse
+    // comme un cœur au ralenti. Le scintillement d'air qui l'accompagnait
+    // était du bruit blanc à 3400 Hz — un sifflement à chaque visée de dash,
+    // le geste le plus fréquent du jeu. Il est retiré.
     {
-      const shim = ctx.createBufferSource()
-      shim.buffer = this.noise
-      shim.loop = true
-      const shimF = ctx.createBiquadFilter()
-      shimF.type = 'bandpass'
-      shimF.frequency.value = 3400
-      shimF.Q.value = 4
-      const shimG = ctx.createGain()
-      shimG.gain.value = 0
-      shim.connect(shimF)
-      shimF.connect(shimG)
-      shimG.connect(postMaster)
-      shim.start()
-      this.slowShimG = shimG
-
       const sub = ctx.createOscillator()
       sub.type = 'sine'
       sub.frequency.value = 52
@@ -318,7 +305,6 @@ export class AudioFx {
       this.slowDuck?.gain.setTargetAtTime(0.3, t, 0.12)
       this.blip(340, 46, 0.9, 0.17, 'sine') // le plongeon : la hauteur tombe
       this.noiseBurst(600, 0.8, 0.6, 0.08, 'lowpass')
-      this.ramp(this.slowShimG, 0.042)
       this.ramp(this.slowSubG, 0.075)
       if (depth && this.ctx) depth.gain.setTargetAtTime(0.045, t, 0.25)
     } else {
@@ -326,17 +312,12 @@ export class AudioFx {
       this.slowLp?.frequency.setTargetAtTime(19500, t, 0.04)
       this.slowDuck?.gain.setTargetAtTime(1, t, 0.05)
       this.blip(85, 700, 0.24, 0.11, 'sine') // l'air revient d'un trait
-      this.ramp(this.slowShimG, 0)
       this.ramp(this.slowSubG, 0)
       if (depth && this.ctx) depth.gain.setTargetAtTime(0, t, 0.1)
     }
   }
 
   // ---- Boucles pilotées chaque frame par le jeu (niveaux 0..1) ----
-
-  setEjectLevel(v: number): void {
-    this.ramp(this.ejectG, v * 0.055)
-  }
 
   setGasLevel(v: number): void {
     // Le fichier est calé à -20 dBFS RMS : × 0,6 le pose une paire de dB
@@ -398,12 +379,12 @@ export class AudioFx {
     src.stop(t + dur + 0.05)
   }
 
-  // Gel : craquements cristallins qui se propagent, puis un shimmer froid
+  // Gel : l'eau qui se RESSERRE. Les douze éclats cristallins (2600-5100 Hz)
+  // et le shimmer qui les suivait sont retirés : c'était la chose la plus
+  // aiguë du jeu, un bris de verre à chaque transformation. Reste une note
+  // grave qui descend — la masse qui se noue —, et gel.mp3 par-dessus.
   freezeOn(): void {
-    for (let i = 0; i < 12; i++) {
-      this.noiseBurst(2600 + Math.random() * 2500, 8, 0.05, 0.05, 'bandpass', Math.random() * 0.5)
-    }
-    this.blip(1900, 2600, 0.7, 0.02)
+    this.blip(210, 96, 0.45, 0.05, 'sine')
   }
 
   // Dégel : quelques gouttes qui retombent
@@ -413,14 +394,15 @@ export class AudioFx {
     }
   }
 
-  // Vaporisation : le souffle monte ; condensation : il retombe
+  // Vaporisation : la hauteur monte ; condensation : elle retombe. Les deux
+  // bouffées de bruit blanc qui doublaient ces glissandos sont retirées —
+  // c'est ce « pschhh » qu'on entendait à chaque transformation. Les
+  // fichiers (vaporisation.mp3, la floraison chaude) portent le corps.
   vaporizeOn(): void {
-    this.noiseBurst(700, 1.2, 0.55, 0.09, 'bandpass')
     this.blip(300, 900, 0.5, 0.02, 'sine')
   }
 
   vaporizeOff(): void {
-    this.noiseBurst(500, 1.2, 0.45, 0.07, 'bandpass')
     this.blip(800, 260, 0.45, 0.025, 'sine')
   }
 
