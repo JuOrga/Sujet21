@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '20/08/2026 18:30',
+    title:
+      'L’ombre criblée des éponges, et le cône de lumière enfin visible au sol',
+    notes: [
+      'LES ÉPONGES laissaient passer la lumière comme si elles n’existaient pas. Elles sont désormais de FINES COUCHES PERCÉES : la lumière traverse leurs pores — un trou par cellule (ou pas), décentré, de taille variable, accroché à la grille des cellules — et l’ombre portée est criblée de points de lumière : la projection des pores sur le sol. Hors des trous, la couche laisse filtrer 12 %.',
+      'LE CÔNE DE LUMIÈRE se voit enfin : la retombée était si plate qu’on ne lisait qu’un liseré autour des luminaires. Chaque lampe frappe maintenant le sol d’une FLAQUE nettement plus claire — un cercle pour un plafonnier, un couloir pour une bande — dont le rayon suit la HAUTEUR de la lampe (haute : large et douce ; rasante : serrée). La flaque vit dans la carte de lumière : elle respecte les ombres des blocs, des grilles et des éponges, et porte la couleur de sa lampe.',
+    ],
+  },
+  {
     date: '20/08/2026 17:30',
     title:
       'D’où vient la lumière ? La lampe par défaut devient visible, et l’intensité 0 existe',
