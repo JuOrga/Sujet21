@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '20/08/2026 22:30',
+    title:
+      'L’ombre du corps respecte enfin les murs : une lampe murée ne projette plus rien',
+    notes: [
+      'Signalé : dans une pièce à UNE lampe, on voyait les ombres du corps projetées par les lampes des AUTRES pièces, à travers les parois. Cause structurelle : l’ombre dynamique du corps visait chaque lampe du tableau sans jamais vérifier qu’un mur la bloque — la carte de lumière cuite connaissait l’occlusion, l’ombre du corps l’ignorait.',
+      'La cuisson produit désormais une SECONDE carte : la visibilité PAR LAMPE (quatre lampes, quatre canaux), murs, grilles et éponges compris. L’ombre du corps s’y pèse au pixel près : une lampe que les murs bloquent n’a pas de lumière à intercepter — son ombre ne se dessine pas ; une lampe à demi masquée projette une demi-ombre. Coût par image : UNE lecture de texture de plus.',
+    ],
+  },
+  {
     date: '20/08/2026 21:45',
     title:
       'Les luminaires générés sont intégrés : plafonnier et bande en vrai métal',
