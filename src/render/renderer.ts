@@ -283,6 +283,7 @@ uniform int uLampeCount;
 uniform vec4 uLampes[MAX_LUMIERES]; // x, y, hauteur, portée
 uniform float uLampesInt[MAX_LUMIERES]; // intensité
 uniform vec3 uLampesCol[MAX_LUMIERES]; // couleur
+uniform float uLampeFixtures; // 1 : lampes déclarées → luminaires dessinés
 uniform vec2 uLightMapMin;     // coin bas-gauche de la carte (monde)
 uniform vec2 uLightMapInvSize; // 1 / taille monde de la carte
 uniform sampler2D uLightMap;
@@ -1291,6 +1292,57 @@ void main() {
     // L'eau qui recouvre l'œil du sas s'assombrit : elle sombre dans le trou
     col *= 1.0 - drainEye * body * 0.55;
   }
+
+  // ---- LE PLAFONNIER : la source se VOIT. Un luminaire de station vu du
+  // dessus — verre teinté à trois barreaux de grille, monture d'acier à
+  // quatre pattes — dessiné PAR-DESSUS l'eau : il est au plafond, le fluide
+  // passe dessous, et l'ombre du corps ne l'atteint pas. Il n'éclaire rien
+  // de plus (tout l'éclairage vient de la carte cuite) : c'est l'objet, pas
+  // la lumière. Seules les lampes DÉCLARÉES ont un corps — la lampe par
+  // défaut des tableaux sans lumière reste invisible, comme avant.
+  if (uLumiere > 0.5 && uLampeFixtures > 0.5) {
+    for (int li = 0; li < MAX_LUMIERES; li++) {
+      if (li >= uLampeCount) break;
+      vec2 rel = world - uLampes[li].xy;
+      // plus la lampe est HAUTE, plus elle est proche de la caméra : le
+      // luminaire grossit un peu avec la hauteur (14 u à 420, la valeur
+      // par défaut ; 11 en rasante, 26 au plafond le plus haut)
+      float R = clamp(9.0 + uLampes[li].z * 0.012, 11.0, 26.0);
+      float dl = length(rel);
+      if (dl > R * 2.4) continue;
+      float px = 1.4 / uZoom; // adoucissement ~1 px, stable au zoom
+      float lint = clamp(uLampesInt[li], 0.2, 2.0);
+      vec3 teinte = uLampesCol[li];
+      float ang = atan(rel.y, rel.x);
+
+      // le verre : disque émissif, blanc au cœur, couleur de lampe au bord
+      float verre = 1.0 - smoothstep(R * 0.64 - px, R * 0.64 + px, dl);
+      vec3 lens = mix(teinte, vec3(1.0), 0.72 * (1.0 - smoothstep(0.0, R * 0.5, dl)));
+      lens *= 0.55 + 0.50 * lint;
+      // la grille 70's : trois barreaux radiaux sombres posés sur le verre
+      float barre = (1.0 - smoothstep(0.10, 0.22, abs(sin(ang * 1.5))))
+        * smoothstep(R * 0.16, R * 0.26, dl);
+      lens *= 1.0 - 0.42 * barre;
+
+      // la monture : anneau d'acier sombre, quatre pattes de fixation qui
+      // débordent, un point de vis à chacune
+      float anneau = smoothstep(R * 0.64 - px, R * 0.64 + px, dl)
+        * (1.0 - smoothstep(R - px, R + px, dl));
+      float pattes = smoothstep(0.86, 0.97, cos(ang * 4.0 + 0.7854))
+        * smoothstep(R * 1.24 + px, R * 1.02, dl) * step(R * 0.9, dl);
+      vec3 metal = vec3(0.15, 0.19, 0.24) * (0.8 + 0.5 * smoothstep(R * 0.64, R, dl))
+        + teinte * 0.06 * lint;
+
+      float corps = max(max(verre, anneau), pattes);
+      col = mix(col, metal, max(anneau, pattes));
+      col = mix(col, lens, verre);
+      // un halo serré autour du verre — cosmétique, pour que la source
+      // accroche l'œil sans rien éclairer de plus
+      float aura = pow(max(0.0, 1.0 - (dl - R) / (R * 1.1)), 3.0) * (1.0 - corps);
+      col += teinte * aura * 0.20 * lint;
+    }
+  }
+
   // Le vaisseau refroidit (§5) : la lumière vire au bleu et faiblit — la
   // pression temporelle se voit, elle ne se chronomètre pas
   col = mix(col, col * vec3(0.82, 0.92, 1.10), uChill * 0.6);
@@ -2138,6 +2190,9 @@ export class Renderer {
     gl.uniform4fv(cu['uLampes[0]'], this.lampScratch)
     gl.uniform1fv(cu['uLampesInt[0]'], this.lampIntScratch)
     gl.uniform3fv(cu['uLampesCol[0]'], this.lampColScratch)
+    // le luminaire ne se dessine que pour les lampes posées à l'éditeur —
+    // la lampe par défaut n'a pas de corps, elle est l'éclairage de la cuve
+    gl.uniform1f(cu['uLampeFixtures'], lumieres.length > 0 ? 1 : 0)
     gl.uniform2f(cu['uLightMapMin'], this.lightMapMinX, this.lightMapMinY)
     gl.uniform2f(cu['uLightMapInvSize'], 1 / this.lightMapSizeX, 1 / this.lightMapSizeY)
     gl.uniform1i(cu['uWaveCount'], waveCount)
