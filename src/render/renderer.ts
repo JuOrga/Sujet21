@@ -1436,8 +1436,55 @@ uniform vec4 uLampes[MAX_LUMIERES]; // x, y, hauteur, portée
 uniform float uLampesInt[MAX_LUMIERES]; // intensité
 uniform vec3 uLampesCol[MAX_LUMIERES]; // couleur
 uniform vec4 uLampesFix[MAX_LUMIERES]; // taille, bandeau, demi-longueur, angle
+#define MAX_SPONGES 8
+uniform int uSpongeCount;
+uniform vec4 uSponges[MAX_SPONGES]; // minX, minY, maxX, maxY
+uniform float uSpongeCell[MAX_SPONGES]; // taille de cellule
 out vec4 outColor;
 ${FORMES_GLSL}
+
+float hashEp(vec2 p) {
+  p = fract(p * vec2(127.1, 311.7));
+  p += dot(p, p + 34.5);
+  return fract(p.x * p.y);
+}
+
+// L'OMBRE DE L'ÉPONGE : une FINE COUCHE percée, pas un mur. Le rayon qui
+// traverse le rectangle est tamisé par un motif de trous accroché à la
+// grille des cellules (un trou par cellule, ou pas, décentré, de taille
+// variable) : l'ombre portée est criblée de points de lumière — la
+// projection des pores. Hors des trous, la couche laisse filtrer 12 %.
+float epongeTrans(vec2 p, vec2 dir, float tMax) {
+  float trans = 1.0;
+  for (int i = 0; i < MAX_SPONGES; i++) {
+    if (i >= uSpongeCount) break;
+    vec4 r = uSponges[i];
+    vec2 sd = vec2(
+      abs(dir.x) < 1e-5 ? 1e-5 : dir.x,
+      abs(dir.y) < 1e-5 ? 1e-5 : dir.y
+    );
+    vec2 t1 = (r.xy - p) / sd;
+    vec2 t2 = (r.zw - p) / sd;
+    vec2 tn = min(t1, t2);
+    vec2 tf = max(t1, t2);
+    float t0 = max(max(tn.x, tn.y), 0.0);
+    float t3 = min(min(tf.x, tf.y), tMax);
+    if (t3 <= t0) continue;
+    // le point de traversée : c'est LÀ que le rayon passe (ou non) par un
+    // pore — l'ombre projette le motif de la couche
+    vec2 q = p + dir * ((t0 + t3) * 0.5);
+    vec2 cel = (q - r.xy) / max(uSpongeCell[i], 1.0);
+    vec2 id = floor(cel);
+    vec2 f = fract(cel) - 0.5;
+    float g = hashEp(id);
+    // 60 % des cellules percées ; le pore est décentré et de rayon variable
+    vec2 off = (vec2(hashEp(id + 7.3), hashEp(id + 3.1)) - 0.5) * 0.34;
+    float pore = 1.0 - smoothstep(0.10 + 0.14 * g, 0.30 + 0.10 * g, length(f - off));
+    pore *= step(0.4, g);
+    trans *= mix(0.12, 1.0, pore);
+  }
+  return trans;
+}
 
 // Un BANDEAU éclaire sur toute sa longueur : chaque texel voit le point du
 // segment le plus proche de lui — la retombée, l'ombre et la hauteur se
@@ -1547,10 +1594,17 @@ void main() {
     res = clamp(res, 0.0, 1.0);
     // les évents tamisent ce qui reste : la lumière passe entre les barreaux
     res *= grilleTrans(p, dir, min(distL, tLim));
+    // ...et les éponges aussi : une couche percée, l'ombre criblée de pores
+    res *= epongeTrans(p, dir, min(distL, tLim));
     // retombée douce, à support large : la lampe porte loin, les coins de
     // la cuve restent lisibles — l'ambiance de la composition fait le
     // plancher
     float fall = 1.0 - 0.55 * smoothstep(0.0, uLampes[li].w, distL);
+    // LA FLAQUE : le cône de la lampe frappe le sol — un cercle (un couloir
+    // pour un bandeau) nettement plus clair, de rayon proportionnel à la
+    // HAUTEUR. C'est lui qui rend la source lisible vue du dessus : avant,
+    // la retombée était si plate qu'on ne voyait qu'un liseré au luminaire.
+    fall += 0.85 * pow(max(0.0, 1.0 - distL / (hL * 0.55 + 60.0)), 1.6);
     total += uLampesCol[li] * (res * fall * uLampesInt[li]);
   }
   outColor = vec4(clamp(total, 0.0, 1.0), 1.0);
@@ -2235,6 +2289,13 @@ export class Renderer {
     bounds: { minX: number; minY: number; maxX: number; maxY: number },
     boxes: ObstacleBox[],
     boxCount: number,
+    sponges: {
+      minX: number
+      minY: number
+      maxX: number
+      maxY: number
+      cell: number
+    }[],
     lampes: {
       x: number
       y: number
@@ -2289,6 +2350,22 @@ export class Renderer {
     gl.uniform1fv(lu['uLampesInt[0]'], this.lampIntScratch)
     gl.uniform3fv(lu['uLampesCol[0]'], this.lampColScratch)
     gl.uniform4fv(lu['uLampesFix[0]'], this.lampFixScratch)
+    // les éponges : de fines couches percées que la lumière traverse par
+    // leurs pores — bornées à MAX_SPONGES (8), les suivantes sont pleines
+    // de lumière plutôt que de bloquer à tort
+    const nSp = Math.min(sponges.length, 8)
+    const spRect = new Float32Array(8 * 4)
+    const spCell = new Float32Array(8)
+    for (let i = 0; i < nSp; i++) {
+      spRect[i * 4] = sponges[i].minX
+      spRect[i * 4 + 1] = sponges[i].minY
+      spRect[i * 4 + 2] = sponges[i].maxX
+      spRect[i * 4 + 3] = sponges[i].maxY
+      spCell[i] = sponges[i].cell
+    }
+    gl.uniform1i(lu['uSpongeCount'], nSp)
+    gl.uniform4fv(lu['uSponges[0]'], spRect)
+    gl.uniform1fv(lu['uSpongeCell[0]'], spCell)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   }
@@ -2390,7 +2467,20 @@ export class Renderer {
     }
     // La carte de lumière recuit si le décor ou les lampes ont changé
     const lampes = this.lampesEffectives(sim.bounds, lumieres)
-    if (lumiere > 0.5) this.bakeLight(sim.bounds, boxes, boxCount, lampes)
+    if (lumiere > 0.5)
+      this.bakeLight(
+        sim.bounds,
+        boxes,
+        boxCount,
+        sim.sponges.map((sp) => ({
+          minX: sp.def.minX,
+          minY: sp.def.minY,
+          maxX: sp.maxX,
+          maxY: sp.maxY,
+          cell: sp.def.cellSize,
+        })),
+        lampes,
+      )
 
     // Remplissage du buffer de splats
     const n = sim.count
