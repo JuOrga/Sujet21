@@ -310,6 +310,7 @@ vec2 pointLampe(int li, vec2 p) {
 uniform vec2 uLightMapMin;     // coin bas-gauche de la carte (monde)
 uniform vec2 uLightMapInvSize; // 1 / taille monde de la carte
 uniform sampler2D uLightMap;
+uniform sampler2D uLightVis; // visibilité par lampe (canal = lampe)
 out vec4 outColor;
 
 float gridLine(vec2 world, float spacing, float widthWorld) {
@@ -566,8 +567,16 @@ ${FORMES_GLSL}
 float ombreVolume(vec2 world, float dansEau) {
   if (uLumiereEau < 0.5) return 0.0;
   float occ = 0.0;
+  // La visibilité de chaque lampe ICI, lue dans la carte cuite : une lampe
+  // que les murs bloquent déjà (l'autre pièce, derrière une paroi) n'a pas
+  // de lumière à intercepter — son ombre ne se dessine pas. C'était le
+  // trou signalé : une seule lampe dans la pièce, mais les ombres de
+  // toutes les lampes du tableau.
+  vec4 visL = texture(uLightVis, clamp((world - uLightMapMin) * uLightMapInvSize, 0.0, 1.0));
   for (int li = 0; li < MAX_LUMIERES; li++) {
     if (li >= uLampeCount) break;
+    float poids = smoothstep(0.03, 0.30, visL[li]);
+    if (poids < 0.01) continue;
     vec2 toL = pointLampe(li, world) - world;
     float dl = length(toL);
     if (dl < 1.0) continue;
@@ -632,7 +641,7 @@ float ombreVolume(vec2 world, float dansEau) {
     // plusieurs prélèvements, une goutte sur UN seul. À couverture 1 l'ombre
     // est à moitié ; à 2+ elle est pleine.
     acc *= clamp(couvre * 0.5, 0.0, 1.0);
-    occ = max(occ, acc * clamp(uLampesInt[li], 0.0, 1.5));
+    occ = max(occ, acc * poids * clamp(uLampesInt[li], 0.0, 1.5));
   }
   // sous le corps lui-même, pas d'ombre : il est éclairé, pas assombri
   return clamp(occ, 0.0, 1.0) * (1.0 - dansEau);
@@ -1477,7 +1486,8 @@ uniform vec4 uLampesFix[MAX_LUMIERES]; // taille, bandeau, demi-longueur, angle
 uniform int uSpongeCount;
 uniform vec4 uSponges[MAX_SPONGES]; // minX, minY, maxX, maxY
 uniform float uSpongeCell[MAX_SPONGES]; // taille de cellule
-out vec4 outColor;
+layout(location = 0) out vec4 outColor;
+layout(location = 1) out vec4 outVis; // visibilité par lampe (canal = lampe)
 ${FORMES_GLSL}
 
 float hashEp(vec2 p) {
@@ -1606,6 +1616,7 @@ float grilleTrans(vec2 p, vec2 dir, float tMax) {
 void main() {
   vec2 p = uMapMin + (gl_FragCoord.xy / uMapPx) * uMapSize;
   vec3 total = vec3(0.0);
+  vec4 vis = vec4(0.0);
   for (int li = 0; li < MAX_LUMIERES; li++) {
     if (li >= uLampeCount) break;
     vec2 toL = pointLampe(li, p) - p;
@@ -1629,15 +1640,19 @@ void main() {
       t += clamp(h, 8.0, 200.0);
     }
     res = clamp(res, 0.0, 1.0);
+    float tamis = grilleTrans(p, dir, min(distL, tLim))
+      * epongeTrans(p, dir, min(distL, tLim));
+    // la VISIBILITÉ de cette lampe depuis ce texel, SANS le rebond : c'est
+    // elle qui dit si la lampe éclaire vraiment ici — l'ombre dynamique du
+    // corps s'y pèse, pour ne pas projeter l'ombre d'une lampe murée
+    vis[li] = clamp(res * tamis, 0.0, 1.0);
     // la lumière REBONDIT : une ombre portée n'est jamais noire dans une
     // pièce claire — 14 % de la lampe y parviennent par les parois. Depuis
     // la flaque (le cône au sol), le contraste ombre/lumière avait doublé :
     // les bandes d'ombre des colonnes viraient au noir dur, signalé.
     res = 0.14 + 0.86 * res;
-    // les évents tamisent ce qui reste : la lumière passe entre les barreaux
-    res *= grilleTrans(p, dir, min(distL, tLim));
-    // ...et les éponges aussi : une couche percée, l'ombre criblée de pores
-    res *= epongeTrans(p, dir, min(distL, tLim));
+    // les évents et éponges tamisent ce qui reste
+    res *= tamis;
     // retombée douce, à support large : la lampe porte loin, les coins de
     // la cuve restent lisibles — l'ambiance de la composition fait le
     // plancher
@@ -1650,6 +1665,7 @@ void main() {
     total += uLampesCol[li] * (res * fall * uLampesInt[li]);
   }
   outColor = vec4(clamp(total, 0.0, 1.0), 1.0);
+  outVis = vis;
 }`
 
 // Cellules d'éponge : carrés pleins, couleur par état (sèche → gorgée →
@@ -1867,6 +1883,9 @@ export class Renderer {
   // décor change — la clé résume boîtes, bornes et lampe.
   private lightFbo: WebGLFramebuffer | null = null
   private lightTex: WebGLTexture | null = null
+  // visibilité PAR LAMPE (un canal chacune) : l'ombre dynamique du corps la
+  // lit pour ne pas projeter l'ombre d'une lampe qu'un mur bloque déjà
+  private lightVisTex: WebGLTexture | null = null
   private lightW = 0
   private lightH = 0
   private lightKey = ''
@@ -2260,16 +2279,22 @@ export class Renderer {
     if (w === this.lightW && h === this.lightH && this.lightFbo) return
     const gl = this.gl
     if (this.lightTex) gl.deleteTexture(this.lightTex)
+    if (this.lightVisTex) gl.deleteTexture(this.lightVisTex)
     if (this.lightFbo) gl.deleteFramebuffer(this.lightFbo)
     this.lightW = w
     this.lightH = h
-    this.lightTex = gl.createTexture()!
-    gl.bindTexture(gl.TEXTURE_2D, this.lightTex)
-    gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, w, h)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+    const cible = (): WebGLTexture => {
+      const t = gl.createTexture()!
+      gl.bindTexture(gl.TEXTURE_2D, t)
+      gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, w, h)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+      return t
+    }
+    this.lightTex = cible()
+    this.lightVisTex = cible()
     this.lightFbo = gl.createFramebuffer()!
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.lightFbo)
     gl.framebufferTexture2D(
@@ -2279,6 +2304,14 @@ export class Renderer {
       this.lightTex,
       0,
     )
+    gl.framebufferTexture2D(
+      gl.FRAMEBUFFER,
+      gl.COLOR_ATTACHMENT1,
+      gl.TEXTURE_2D,
+      this.lightVisTex,
+      0,
+    )
+    gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1])
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
     this.lightKey = '' // nouvelle cible : la carte doit recuire
   }
@@ -2728,6 +2761,9 @@ export class Renderer {
     gl.activeTexture(gl.TEXTURE0 + 13)
     gl.bindTexture(gl.TEXTURE_2D, this.lightTex)
     gl.uniform1i(cu['uLightMap'], 13)
+    gl.activeTexture(gl.TEXTURE0 + 14)
+    gl.bindTexture(gl.TEXTURE_2D, this.lightVisTex)
+    gl.uniform1i(cu['uLightVis'], 14)
     bindTex(3, this.texPhobe, 'uTexPhobe', 'uHasPhobe')
     bindTex(4, this.texPhile, 'uTexPhile', 'uHasPhile')
     bindTex(5, this.texIris, 'uTexIris', 'uHasIris')
