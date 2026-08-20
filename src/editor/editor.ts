@@ -109,6 +109,7 @@ type Tool =
   | { kind: 'porte' }
   | { kind: 'rail' }
   | { kind: 'lumiere' }
+  | { kind: 'bande' }
   | { kind: 'cut' }
   | { kind: 'gomme' }
 
@@ -1291,7 +1292,7 @@ export class LevelEditor {
         this.commit('Cible posée — un faisceau qui la touche l’allume.')
         return
       }
-      if (this.tool.kind === 'lumiere') {
+      if (this.tool.kind === 'lumiere' || this.tool.kind === 'bande') {
         if (!this.level.lumieres) this.level.lumieres = []
         if (this.level.lumieres.length >= MAX_LUMIERES) {
           this.status(
@@ -1300,11 +1301,17 @@ export class LevelEditor {
           this.setTool({ kind: 'select' })
           return
         }
-        this.level.lumieres.push({ x: this.snapped(w.x), y: this.snapped(w.y) })
+        this.level.lumieres.push(
+          this.tool.kind === 'bande'
+            ? { x: this.snapped(w.x), y: this.snapped(w.y), forme: 'bandeau' }
+            : { x: this.snapped(w.x), y: this.snapped(w.y) },
+        )
         this.sel = { kind: 'lumiere', index: this.level.lumieres.length - 1 }
         this.setTool({ kind: 'select' })
         this.commit(
-          'Lampe posée — hauteur, portée et intensité à droite. Haute : ombres courtes et douces ; basse : ombres longues.',
+          this.level.lumieres.at(-1)?.forme === 'bandeau'
+            ? 'Bande lumineuse posée — longueur, angle et taille à droite. Elle éclaire sur toute sa longueur.'
+            : 'Lampe posée — hauteur, portée et intensité à droite. Haute : ombres courtes et douces ; basse : ombres longues.',
         )
         return
       }
@@ -2110,6 +2117,7 @@ export class LevelEditor {
         else if (key === 'porte') this.setTool({ kind: 'porte' })
         else if (key === 'rail') this.setTool({ kind: 'rail' })
         else if (key === 'lumiere') this.setTool({ kind: 'lumiere' })
+        else if (key === 'bande') this.setTool({ kind: 'bande' })
         else if (key === 'cut') this.setTool({ kind: 'cut' })
         else if (key === 'gomme') this.setTool({ kind: 'gomme' })
         else this.setTool({ kind: 'select' })
@@ -3695,6 +3703,20 @@ export class LevelEditor {
           ? l.couleur
           : '#ffd977'
       g.save()
+      // le bandeau se dessine en SEGMENT à sa vraie longueur : on voit d'un
+      // coup d'œil ce qu'il couvre, et l'angle se lit sans ouvrir la fiche
+      if (l.forme === 'bandeau') {
+        const demi = ((l.longueur ?? 260) / 2) * this.zoom
+        const a = (((l.angle ?? 0) % 360) * Math.PI) / 180
+        const dx = Math.cos(a) * demi
+        const dy = -Math.sin(a) * demi // écran : y vers le bas
+        g.strokeStyle = col + (selLampe ? 'ff' : 'aa')
+        g.lineWidth = selLampe ? 5 : 4
+        g.beginPath()
+        g.moveTo(s.sx - dx, s.sy - dy)
+        g.lineTo(s.sx + dx, s.sy + dy)
+        g.stroke()
+      }
       // rayons
       g.strokeStyle = col + (selLampe ? 'ff' : 'aa')
       g.lineWidth = selLampe ? 2 : 1.5
@@ -3719,7 +3741,7 @@ export class LevelEditor {
       g.fillText(
         eteinte
           ? `LAMPE ${i + 1} — ÉTEINTE (plafond)`
-          : `LAMPE ${i + 1} · h ${l.h ?? LAMPE_HAUTEUR_DEFAUT}`,
+          : `${l.forme === 'bandeau' ? 'BANDE' : 'LAMPE'} ${i + 1} · h ${l.h ?? LAMPE_HAUTEUR_DEFAUT}`,
         s.sx + 18,
         s.sy - 6,
       )

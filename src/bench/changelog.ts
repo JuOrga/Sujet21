@@ -14,6 +14,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '20/08/2026 15:30',
+    title:
+      'La bande lumineuse, la vraie : un élément à poser, qui éclaire sur toute sa longueur',
+    notes: [
+      'CORRECTIF de la livraison précédente, sur le retour du concepteur : le bandeau n’était pas une réglette qui brille — même principe que le plafonnier : on voit un RAIL DE MÉTAL (capot allongé, pattes de fixation tous les 150 unités), et la lumière ne s’échappe qu’en COURONNE tout autour. L’éclipse, allongée.',
+      'Et surtout la bande ÉCLAIRE SUR TOUTE SA LONGUEUR : ce n’est plus une lampe ronde déguisée. Chaque point de la cuve voit le point de la bande le plus proche de lui — la retombée, les ombres portées du décor, l’ombre du corps et le biseau des arêtes se mesurent depuis LÀ. Une bande de 800 unités fait un couloir de lumière, pas un rond.',
+      'NOUVEL OUTIL dans la palette de l’éditeur, sous la lampe : BANDE. Un clic la pose, la fiche règle longueur (80 à 1600), angle (crans de 15°), hauteur, portée, intensité, couleur, taille — et l’éditeur la dessine en segment à sa vraie longueur, angle lisible d’un coup d’œil. Elle compte dans les 4 lampes du tableau.',
+      'Réponse à la question posée : OUI, l’intensité baisse avec la distance — de 100 % au contact à 45 % à la distance « portée », puis l’ambiance générale du tableau fait le plancher (réglable, 0 = noir total hors des lampes). C’est une retombée volontairement douce : les coins restent lisibles. Pour une lumière plus dramatique : baisser l’ambiance générale du tableau et resserrer la portée de chaque lampe.',
+    ],
+  },
+  {
     date: '20/08/2026 14:00',
     title:
       'L’ombre réancrée au contact · la taille des luminaires · les bandeaux lumineux',

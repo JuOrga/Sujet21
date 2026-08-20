@@ -296,6 +296,14 @@ uniform vec4 uLampes[MAX_LUMIERES]; // x, y, hauteur, portée
 uniform float uLampesInt[MAX_LUMIERES]; // intensité
 uniform vec3 uLampesCol[MAX_LUMIERES]; // couleur
 uniform vec4 uLampesFix[MAX_LUMIERES]; // taille, bandeau, demi-longueur, angle
+// le point du bandeau le plus proche (une lampe ronde renvoie son centre) —
+// ombre du volume, biseau et halo de monture éclairent depuis LÀ
+vec2 pointLampe(int li, vec2 p) {
+  vec2 c = uLampes[li].xy;
+  if (uLampesFix[li].y < 0.5) return c;
+  vec2 axe = vec2(cos(uLampesFix[li].w), sin(uLampesFix[li].w));
+  return c + axe * clamp(dot(p - c, axe), -uLampesFix[li].z, uLampesFix[li].z);
+}
 uniform vec2 uLightMapMin;     // coin bas-gauche de la carte (monde)
 uniform vec2 uLightMapInvSize; // 1 / taille monde de la carte
 uniform sampler2D uLightMap;
@@ -557,7 +565,7 @@ float ombreVolume(vec2 world, float dansEau) {
   float occ = 0.0;
   for (int li = 0; li < MAX_LUMIERES; li++) {
     if (li >= uLampeCount) break;
-    vec2 toL = uLampes[li].xy - world;
+    vec2 toL = pointLampe(li, world) - world;
     float dl = length(toL);
     if (dl < 1.0) continue;
     vec2 dir = toL / dl;
@@ -703,7 +711,7 @@ void main() {
     vec2 acc = vec2(0.0);
     for (int li = 0; li < MAX_LUMIERES; li++) {
       if (li >= uLampeCount) break;
-      vec2 dl = uLampes[li].xy - world;
+      vec2 dl = pointLampe(li, world) - world;
       float dn = max(length(dl), 1.0);
       float w = uLampesInt[li] * (1.0 - 0.55 * smoothstep(0.0, uLampes[li].w, dn));
       acc += (dl / dn) * w;
@@ -722,7 +730,7 @@ void main() {
     // large et doux quand elle est haute, serré quand elle rase le sol
     for (int li = 0; li < MAX_LUMIERES; li++) {
       if (li >= uLampeCount) break;
-      float dl = length(world - uLampes[li].xy);
+      float dl = length(world - pointLampe(li, world));
       float rayon = 26.0 + uLampes[li].z * 0.05;
       float halo = pow(max(0.0, 1.0 - dl / rayon), 2.0);
       tank += (uLampesCol[li] * 0.5 + vec3(0.1, 0.09, 0.06)) * halo * 0.55 * uLampesInt[li];
@@ -1366,28 +1374,12 @@ void main() {
       float lint = clamp(uLampesInt[li], 0.2, 2.0);
       vec3 teinte = uLampesCol[li];
 
-      if (fx.y > 0.5) {
-        // LE BANDEAU LUMINEUX : un tube émissif (lui, on le voit briller —
-        // c'est une réglette, pas un plafonnier), deux rails de métal le
-        // long des bords, des cellules discrètes pour le look fluorescent.
-        float Rb = R * 0.5; // demi-épaisseur du tube
-        float tube = 1.0 - smoothstep(Rb - px, Rb + px, dl);
-        vec3 lum = mix(vec3(1.0), teinte, clamp(dl / max(Rb, 1.0), 0.0, 1.0))
-          * (0.55 + 0.50 * lint);
-        lum *= 0.90 + 0.10 * cos(lp.x * 3.14159 / max(fx.z * 0.25, 40.0));
-        float rail = smoothstep(Rb - px, Rb + px, dl)
-          * (1.0 - smoothstep(Rb * 1.55 - px, Rb * 1.55 + px, dl));
-        vec3 metalB = vec3(0.13, 0.165, 0.21) + teinte * 0.05 * lint;
-        float corpsB = max(tube, rail);
-        col = mix(col, metalB, rail);
-        col = mix(col, lum, tube);
-        float auraB = pow(max(0.0, 1.0 - (dl - Rb) / (R * 1.4)), 3.0) * (1.0 - corpsB);
-        col += teinte * auraB * 0.22 * lint;
-        continue;
-      }
       float ang = atan(rel.y, rel.x);
 
-      // L'ÉCLIPSE : vu du dessus, on regarde le DOS du luminaire — un capot
+      // L'ÉCLIPSE — ronde OU allongée : dl est la distance au disque pour
+      // un plafonnier, au SEGMENT pour un bandeau. Capot, couronne et halo
+      // suivent donc la forme sans une ligne de plus ; seules les pattes
+      // diffèrent (angulaires sur le rond, réparties le long du bandeau). : vu du dessus, on regarde le DOS du luminaire — un capot
       // de métal plein, pas une vitre. La lumière ne s'échappe qu'en
       // couronne, autour du capot, comme un disque qui masque sa source.
       // le capot : acier sombre, brossage concentrique discret, un moyeu
@@ -1407,9 +1399,14 @@ void main() {
       vec3 fuite = mix(vec3(1.0), teinte, smoothstep(R * 0.78, R, dl))
         * (0.55 + 0.50 * lint);
 
-      // quatre pattes de fixation, en métal, par-dessus la couronne — elles
-      // la découpent, ce qui vend l'objet mieux qu'un anneau parfait
-      float pattes = smoothstep(0.86, 0.97, cos(ang * 4.0 + 0.7854))
+      // les pattes de fixation, en métal, par-dessus la couronne — elles
+      // la découpent, ce qui vend l'objet mieux qu'un anneau parfait.
+      // Bandeau : une patte tous les ~150 u le long du rail ; rond : quatre
+      // pattes en croix.
+      float motifPattes = fx.y > 0.5
+        ? cos(lp.x * 6.2832 / 150.0)
+        : cos(ang * 4.0 + 0.7854);
+      float pattes = smoothstep(0.86, 0.97, motifPattes)
         * smoothstep(R * 1.24 + px, R * 1.02, dl) * step(R * 0.72, dl);
 
       float corps = max(max(capot, couronne), pattes);
@@ -1450,8 +1447,20 @@ uniform int uLampeCount;
 uniform vec4 uLampes[MAX_LUMIERES]; // x, y, hauteur, portée
 uniform float uLampesInt[MAX_LUMIERES]; // intensité
 uniform vec3 uLampesCol[MAX_LUMIERES]; // couleur
+uniform vec4 uLampesFix[MAX_LUMIERES]; // taille, bandeau, demi-longueur, angle
 out vec4 outColor;
 ${FORMES_GLSL}
+
+// Un BANDEAU éclaire sur toute sa longueur : chaque texel voit le point du
+// segment le plus proche de lui — la retombée, l'ombre et la hauteur se
+// mesurent depuis LÀ, pas depuis le centre. Une lampe ronde renvoie son
+// centre, inchangée.
+vec2 pointLampe(int li, vec2 p) {
+  vec2 c = uLampes[li].xy;
+  if (uLampesFix[li].y < 0.5) return c;
+  vec2 axe = vec2(cos(uLampesFix[li].w), sin(uLampesFix[li].w));
+  return c + axe * clamp(dot(p - c, axe), -uLampesFix[li].z, uLampesFix[li].z);
+}
 
 float sceneSdf(vec2 p) {
   float d = 1e9;
@@ -1527,7 +1536,7 @@ void main() {
   vec3 total = vec3(0.0);
   for (int li = 0; li < MAX_LUMIERES; li++) {
     if (li >= uLampeCount) break;
-    vec2 toL = uLampes[li].xy - p;
+    vec2 toL = pointLampe(li, p) - p;
     float hL = uLampes[li].z;
     float distL = max(length(toL), 1e-4);
     vec2 dir = toL / distL;
@@ -2291,6 +2300,7 @@ export class Renderer {
     gl.uniform4fv(lu['uLampes[0]'], this.lampScratch)
     gl.uniform1fv(lu['uLampesInt[0]'], this.lampIntScratch)
     gl.uniform3fv(lu['uLampesCol[0]'], this.lampColScratch)
+    gl.uniform4fv(lu['uLampesFix[0]'], this.lampFixScratch)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   }
