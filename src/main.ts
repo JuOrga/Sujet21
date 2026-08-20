@@ -6,6 +6,7 @@ import { FluidSim, KIND_PLAYER } from './sim/solver'
 import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
 import { TABLEAU_HUB, TABLEAU_HUB_COMPACT } from './game/hub'
+import { estCodeHub } from './game/levelIO'
 import { DELIVERIES, VERSION, versionDe } from './bench/changelog'
 import { Camera } from './render/camera'
 import { MAX_BOXES, Renderer } from './render/renderer'
@@ -265,8 +266,10 @@ let sequenceCache: { source: LevelDef[]; seq: LevelDef[] } | null = null
 function playedLevels(): LevelDef[] {
   if (sequenceCache?.source !== libraryLevels) {
     // le HUB (code « HUB ») vit dans la bibliothèque comme salle spéciale :
-    // éditable comme les autres, mais jamais dans la séquence de l'expédition
-    const jouables = libraryLevels.filter((l) => l.code !== 'HUB')
+    // éditable comme les autres, mais jamais dans la séquence de l'expédition.
+    // TOUTE la famille est écartée (HUB2, les chantiers…) : une copie du hub
+    // publiée deviendrait la « salle 1 » et le sas semblerait y renvoyer.
+    const jouables = libraryLevels.filter((l) => !estCodeHub(l.code))
     const codes = new Set(jouables.map((l) => l.code))
     sequenceCache = {
       source: libraryLevels,
@@ -879,7 +882,7 @@ function renderSalles(): void {
     })
     liste.appendChild(b)
   }
-  const enSequence = libraryLevels.filter((l) => l.code !== 'HUB')
+  const enSequence = libraryLevels.filter((l) => !estCodeHub(l.code))
   if (enSequence.length > 0) {
     section('BIBLIOTHÈQUE DU LABO — en tête de séquence, dans l’ordre de l’éditeur')
     for (const lv of enSequence) salle(lv)
@@ -2089,7 +2092,7 @@ const editor = new LevelEditor(el('editor'), {
 // (si elle en contient), puis l'expédition livrée à la suite.
 const homeSeq = el('home-seq')
 function updateLibraryButton(): void {
-  const nb = libraryLevels.filter((l) => l.code !== 'HUB').length
+  const nb = libraryLevels.filter((l) => !estCodeHub(l.code)).length
   homeSeq.textContent =
     nb > 0
       ? `Séquence : ${nb} tableau(x) de la bibliothèque, puis l'expédition livrée — ${playedLevels().length} salles en tout.`

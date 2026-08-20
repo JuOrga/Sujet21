@@ -75,10 +75,19 @@ function str(v: unknown, fallback = ''): string {
  *  laboratoire et ne compte pas dans la séquence de l'expédition. */
 export const CODE_HUB = 'HUB'
 
-/** Canonise le code : « hub », « Hub », «  HUB  » désignent tous le hub. */
+/** Canonise le code : « hub », « Hub », «  HUB  » désignent tous le hub —
+ * et ses chantiers (« hub2 »…) s'écrivent en majuscules eux aussi. */
 export function codeCanon(code: string): string {
   const nu = code.trim()
-  return nu.toUpperCase() === CODE_HUB ? CODE_HUB : nu
+  return /^hub\d*$/i.test(nu) ? nu.toUpperCase() : nu
+}
+
+/** La FAMILLE du laboratoire : HUB (celui qui se joue) et ses chantiers
+ * (HUB2…). Aucun d'eux n'entre dans la séquence de l'expédition — sans ce
+ * garde-fou, une copie du hub publiée en bibliothèque devenait la
+ * « salle 1 » et le sas de lancement semblait renvoyer au hub. */
+export function estCodeHub(code: string): boolean {
+  return /^hub\d*$/i.test(code.trim())
 }
 
 /** Boîte normalisée : min toujours inférieur à max, matériau connu. */

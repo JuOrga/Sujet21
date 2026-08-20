@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { checkLevel, parseLevel, serializeLevel } from './levelIO'
+import { checkLevel, estCodeHub, parseLevel, serializeLevel } from './levelIO'
 import { TABLEAU_1BIS, TABLEAUX, zoneForceAt, type LevelDef } from './level'
 
 describe('levelIO — aller-retour JSON', () => {
@@ -394,5 +394,18 @@ describe('le code HUB : un mot-clé, pas une casse à deviner', () => {
   it('ne touche pas aux autres codes', () => {
     expect(parseLevel(nu('21-A bis')).level!.code).toBe('21-A bis')
     expect(parseLevel(nu('21-hub')).level!.code).toBe('21-hub')
+  })
+  it('la famille des chantiers (hub2…) se canonise aussi', () => {
+    expect(parseLevel(nu('hub2')).level!.code).toBe('HUB2')
+    expect(parseLevel(nu(' Hub2 ')).level!.code).toBe('HUB2')
+  })
+  it('estCodeHub reconnaît toute la famille — et elle seule', () => {
+    for (const oui of ['HUB', 'hub', ' Hub ', 'HUB2', 'hub2', 'HUB13']) {
+      expect(estCodeHub(oui)).toBe(true)
+    }
+    // le hublot n'est pas un hub, ni les codes de salle ordinaires
+    for (const non of ['HUBLOT', '21-A', '21-hub', 'HUB-2', '']) {
+      expect(estCodeHub(non)).toBe(false)
+    }
   })
 })

@@ -53,6 +53,7 @@ import {
   CODE_HUB,
   checkLevel,
   codeCanon,
+  estCodeHub,
   parseLevel,
   serializeLevel,
 } from '../game/levelIO'
@@ -2391,12 +2392,16 @@ export class LevelEditor {
           `<button type="button" class="ed-lib-open" data-id="${s.id}" title="${
             s.level.code === CODE_HUB
               ? 'Le LABORATOIRE : ce tableau remplace le hub et ne compte pas dans la séquence'
-              : 'Ouvrir ce tableau'
+              : estCodeHub(s.level.code)
+                ? 'Un chantier de hub : hors séquence — publiez-le sous le code HUB pour qu’il devienne le laboratoire joué'
+                : 'Ouvrir ce tableau'
           }">` +
           `<b>${s.level.code}</b> ${s.level.name}` +
           (s.level.code === CODE_HUB
             ? `<em class="ed-lib-hub">LABORATOIRE</em>`
-            : '') +
+            : estCodeHub(s.level.code)
+              ? `<em class="ed-lib-hub">HORS SÉQUENCE</em>`
+              : '') +
           `<small>${s.auteur ? s.auteur + ' · ' : ''}par ${s.level.par ?? '?'}${errs ? ' · ' + errs + ' erreur(s)' : ''}</small>` +
           `</button>` +
           `<span class="ed-lib-ord">` +
