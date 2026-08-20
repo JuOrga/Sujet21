@@ -731,7 +731,9 @@ void main() {
     for (int li = 0; li < MAX_LUMIERES; li++) {
       if (li >= uLampeCount) break;
       float dl = length(world - pointLampe(li, world));
-      float rayon = 26.0 + uLampes[li].z * 0.05;
+      // le halo au sol suit la taille du luminaire : un grand capot doit
+      // baigner dans une flaque plus large que lui, jamais l'inverse
+      float rayon = (26.0 + uLampes[li].z * 0.05) * max(1.0, uLampesFix[li].x);
       float halo = pow(max(0.0, 1.0 - dl / rayon), 2.0);
       tank += (uLampesCol[li] * 0.5 + vec3(0.1, 0.09, 0.06)) * halo * 0.55 * uLampesInt[li];
     }
@@ -1376,46 +1378,32 @@ void main() {
 
       float ang = atan(rel.y, rel.x);
 
-      // L'ÉCLIPSE — ronde OU allongée : dl est la distance au disque pour
-      // un plafonnier, au SEGMENT pour un bandeau. Capot, couronne et halo
-      // suivent donc la forme sans une ligne de plus ; seules les pattes
-      // diffèrent (angulaires sur le rond, réparties le long du bandeau). : vu du dessus, on regarde le DOS du luminaire — un capot
-      // de métal plein, pas une vitre. La lumière ne s'échappe qu'en
-      // couronne, autour du capot, comme un disque qui masque sa source.
+      // LE LUMINAIRE, sobre : vu du dessus, on regarde le DOS de la lampe —
+      // du métal, rien d'autre. Pas d'anneau lumineux dessiné : la lumière
+      // qu'on voit autour est l'ÉCLAIRAGE RÉEL — la flaque de la carte de
+      // lumière et le halo au pied de la lampe, déjà posés sur le sol sous
+      // l'objet. dl est la distance au disque (plafonnier) ou au segment
+      // (bandeau) : le même dessin sert aux deux formes.
       // le capot : acier sombre, brossage concentrique discret, un moyeu
       // central un peu plus clair (le boulon de fixation)
-      float capot = 1.0 - smoothstep(R * 0.78 - px, R * 0.78 + px, dl);
+      float capot = 1.0 - smoothstep(R - px, R + px, dl);
       vec3 metal = vec3(0.13, 0.165, 0.21)
         * (0.85 + 0.10 * sin(dl * 2.2))
-        + vec3(0.05, 0.06, 0.08) * (1.0 - smoothstep(0.0, R * 0.22, dl));
-      // le capot n'est pas émissif : il reçoit juste un soupçon de la teinte
-      // par la tranche, la lumière remonte à peine dessus
-      metal += teinte * 0.04 * lint * smoothstep(R * 0.45, R * 0.78, dl);
+        + vec3(0.05, 0.06, 0.08) * (1.0 - smoothstep(0.0, R * 0.28, dl));
+      // le bord du capot accroche un peu de la lumière qui remonte du sol —
+      // un liseré discret, teinté lampe : l'objet reste métal, pas vitrine
+      metal += teinte * (0.10 + 0.08 * lint) * smoothstep(R * 0.55, R, dl);
 
-      // la couronne : l'anneau de lumière qui fuit sous le capot — blanc
-      // près du bord du capot, couleur de lampe vers l'extérieur
-      float couronne = smoothstep(R * 0.78 - px, R * 0.78 + px, dl)
-        * (1.0 - smoothstep(R - px, R + px, dl));
-      vec3 fuite = mix(vec3(1.0), teinte, smoothstep(R * 0.78, R, dl))
-        * (0.55 + 0.50 * lint);
-
-      // les pattes de fixation, en métal, par-dessus la couronne — elles
-      // la découpent, ce qui vend l'objet mieux qu'un anneau parfait.
+      // les pattes de fixation, en métal, qui débordent du capot.
       // Bandeau : une patte tous les ~150 u le long du rail ; rond : quatre
       // pattes en croix.
       float motifPattes = fx.y > 0.5
         ? cos(lp.x * 6.2832 / 150.0)
         : cos(ang * 4.0 + 0.7854);
       float pattes = smoothstep(0.86, 0.97, motifPattes)
-        * smoothstep(R * 1.24 + px, R * 1.02, dl) * step(R * 0.72, dl);
+        * smoothstep(R * 1.28 + px, R * 1.04, dl) * step(R * 0.8, dl);
 
-      float corps = max(max(capot, couronne), pattes);
-      col = mix(col, fuite, couronne);
       col = mix(col, metal, max(capot, pattes));
-      // un halo serré autour de la couronne — cosmétique, pour que la
-      // source accroche l'œil sans rien éclairer de plus
-      float aura = pow(max(0.0, 1.0 - (dl - R) / (R * 1.1)), 3.0) * (1.0 - corps);
-      col += teinte * aura * 0.22 * lint;
     }
   }
 

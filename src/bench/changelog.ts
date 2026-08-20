@@ -14,6 +14,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '20/08/2026 16:30',
+    title:
+      'Les luminaires, sobres : du métal, et la lumière qu’on voit est la vraie',
+    notes: [
+      'L’« éclipse » n’était qu’une image pour expliquer le principe — pas un design. L’anneau de lumière dessiné autour du capot est SUPPRIMÉ, sur le plafonnier comme sur la bande : vu du dessus, on regarde le dos de la lampe — du métal (capot brossé, moyeu, pattes de fixation), rien d’autre.',
+      'La lumière qu’on voit autour de l’objet est désormais UNIQUEMENT l’éclairage réel : la flaque que la lampe pose au sol (carte de lumière + halo au pied, qui suivent déjà la forme — ronde ou allongée — et la couleur). Le bord du capot garde un liseré discret de lumière remontée du sol, pour que l’objet ne se lise pas comme un trou noir.',
+      'Le halo au sol suit maintenant la TAILLE du luminaire : un grand capot baigne dans une flaque plus large que lui, jamais l’inverse.',
+    ],
+  },
+  {
     date: '20/08/2026 15:30',
     title:
       'La bande lumineuse, la vraie : un élément à poser, qui éclaire sur toute sa longueur',
