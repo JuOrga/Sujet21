@@ -308,7 +308,7 @@ export interface LumiereDef {
   y: number
   h?: number // hauteur au-dessus du plan (unités monde) ; absente : 420
   portee?: number // rayon de retombée ; absente : proportionnelle à la cuve
-  intensite?: number // 0,2..2 ; absente : 1
+  intensite?: number // 0..2 ; absente : 1 — 0 : lampe éteinte (le corps reste)
   couleur?: string // '#rrggbb' ; absente : blanc neutre
   // Le LUMINAIRE (l'objet visible, qui n'éclaire rien de plus) :
   taille?: number // échelle 0..3 ; absente : 1 — 0 : aucun luminaire dessiné
