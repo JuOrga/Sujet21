@@ -2931,7 +2931,14 @@ export class LevelEditor {
         rangeField('Portée (0 = auto)', 'p-lmp', l.portee ?? 0, 0, 4000, 50),
       )
       rows.push(
-        rangeField('Intensité', 'p-lmi', l.intensite ?? 1, 0.2, 2, 0.05),
+        rangeField(
+          'Intensité (0 = éteinte)',
+          'p-lmi',
+          l.intensite ?? 1,
+          0,
+          2,
+          0.05,
+        ),
       )
       rows.push(
         `<label class="ed-f"><span>Couleur</span>` +
@@ -3247,7 +3254,10 @@ export class LevelEditor {
       const portee = val('p-lmp')
       if (portee > 0) l.portee = Math.max(200, Math.min(8000, portee))
       else delete l.portee
-      const intensite = Math.max(0.2, Math.min(2, val('p-lmi') || 1))
+      const brutInt =
+        (this.host.querySelector('#p-lmi') as HTMLInputElement | null)?.value ??
+        '1'
+      const intensite = Math.max(0, Math.min(2, Number(brutInt) || 0))
       if (intensite !== 1) l.intensite = intensite
       else delete l.intensite
       const couleur = text('p-lmc').toLowerCase()
@@ -3690,6 +3700,37 @@ export class LevelEditor {
       this.level.bounds.maxX - this.level.bounds.minX,
       this.level.bounds.maxY - this.level.bounds.minY,
     )
+    // Sans lampe posée, la cuve garde sa LAMPE PAR DÉFAUT — invisible en
+    // jeu, mais elle éclaire : c'est elle qui explique qu'un tableau reste
+    // lumineux à éclairage général 0. On la montre ici en fantôme, sinon le
+    // modèle est incompréhensible (« d'où vient cette lumière ? »).
+    if (lumieres.length === 0) {
+      const b = this.level.bounds
+      const s0 = this.toScreen(
+        (b.minX + b.maxX) / 2,
+        b.minY + (b.maxY - b.minY) * 0.7,
+      )
+      g.save()
+      g.setLineDash([4, 4])
+      g.strokeStyle = '#ffd97788'
+      g.lineWidth = 1.5
+      g.beginPath()
+      g.arc(s0.sx, s0.sy, 10, 0, Math.PI * 2)
+      g.stroke()
+      g.beginPath()
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2
+        g.moveTo(s0.sx + Math.cos(a) * 13, s0.sy + Math.sin(a) * 13)
+        g.lineTo(s0.sx + Math.cos(a) * 18, s0.sy + Math.sin(a) * 18)
+      }
+      g.stroke()
+      g.setLineDash([])
+      g.fillStyle = '#ffd977aa'
+      g.font = '600 9px ui-monospace, monospace'
+      g.fillText('LAMPE PAR DÉFAUT — invisible en jeu', s0.sx + 22, s0.sy - 6)
+      g.fillText('posez une lampe pour la remplacer', s0.sx + 22, s0.sy + 6)
+      g.restore()
+    }
     for (let i = 0; i < lumieres.length; i++) {
       const l = lumieres[i]
       const s = this.toScreen(l.x, l.y)

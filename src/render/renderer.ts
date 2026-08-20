@@ -1373,7 +1373,7 @@ void main() {
       }
       if (dl > R * 2.4) continue;
       float px = 1.4 / uZoom; // adoucissement ~1 px, stable au zoom
-      float lint = clamp(uLampesInt[li], 0.2, 2.0);
+      float lint = clamp(uLampesInt[li], 0.0, 2.0);
       vec3 teinte = uLampesCol[li];
 
       float ang = atan(rel.y, rel.x);
@@ -2219,7 +2219,7 @@ export class Renderer {
         Math.min(LAMPE_HAUTEUR_MAX, l.h ?? LAMPE_HAUTEUR_DEFAUT),
       ),
       portee: l.portee && l.portee > 0 ? l.portee : diag * 0.62,
-      intensite: Math.max(0.2, Math.min(2, l.intensite ?? 1)),
+      intensite: Math.max(0, Math.min(2, l.intensite ?? 1)),
       rvb: lampeCouleurRVB(l.couleur) ?? [1, 1, 1],
       taille: Math.max(0, Math.min(3, l.taille ?? 1)),
       bandeau: l.forme === 'bandeau',

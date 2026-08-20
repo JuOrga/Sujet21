@@ -14,6 +14,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '20/08/2026 17:30',
+    title:
+      'D’où vient la lumière ? La lampe par défaut devient visible, et l’intensité 0 existe',
+    notes: [
+      'Le mystère signalé — « le sas n’a pas de lumière, et à éclairage général 0 il y a encore de l’éclairage » — s’explique : 21-A n’a AUCUNE lampe posée, donc la cuve garde sa LAMPE PAR DÉFAUT (au centre, un peu vers le haut), qui est invisible en jeu par principe (un luminaire n’existe que pour les lampes posées). Et l’« éclairage général » n’est que le PLANCHER — la part de lumière là où aucune lampe ne porte : à 0, la lampe par défaut continue d’éclairer presque toute la cuve.',
+      'Pour que le modèle se COMPRENNE : l’éditeur dessine désormais la lampe par défaut en FANTÔME (pointillés jaunes, au centre) avec son étiquette — « invisible en jeu · posez une lampe pour la remplacer ». Plus de lumière sans source visible sur le plan.',
+      'Et l’INTENSITÉ d’une lampe peut descendre à 0 (le plancher était 0,2) : une lampe posée à 0 n’éclaire plus du tout — son luminaire reste, objet mort au plafond. Le NOIR COMPLET devient atteignable : poser une lampe (la lampe par défaut disparaît), intensité 0, éclairage général 0. L’infobulle du réglage « Lumière générale » explique tout ça.',
+    ],
+  },
+  {
     date: '20/08/2026 16:30',
     title:
       'Les luminaires, sobres : du métal, et la lumière qu’on voit est la vraie',
