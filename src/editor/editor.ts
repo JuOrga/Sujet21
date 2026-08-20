@@ -2925,6 +2925,24 @@ export class LevelEditor {
           `<input type="color" id="p-lmc" value="${l.couleur ?? LAMPE_COULEUR_DEFAUT}" /></label>`,
       )
       rows.push(
+        `<label class="ed-f"><span>Luminaire</span><select id="p-lmf">` +
+          `<option value=""${l.forme !== 'bandeau' ? ' selected' : ''}>Plafonnier (éclipse)</option>` +
+          `<option value="bandeau"${l.forme === 'bandeau' ? ' selected' : ''}>Bandeau lumineux</option>` +
+          `</select></label>`,
+      )
+      rows.push(
+        rangeField('Taille (0 = invisible)', 'p-lmt', l.taille ?? 1, 0, 3, 0.1),
+      )
+      if (l.forme === 'bandeau') {
+        rows.push(
+          rangeField('Longueur', 'p-lml', l.longueur ?? 260, 80, 1600, 20),
+        )
+        rows.push(rangeField('Angle (°)', 'p-lmg', l.angle ?? 0, 0, 345, 15))
+      }
+      rows.push(
+        `<p class="ed-empty">Le LUMINAIRE est l'objet visible à la position de la lampe — il n'éclaire rien de plus, l'éclairage vient des réglages du dessus. Taille 0 : la lampe éclaire sans qu'on la voie.</p>`,
+      )
+      rows.push(
         `<p class="ed-empty">La HAUTEUR sculpte l'ombre : haute (≥ ${LAMPE_HAUTEUR_DEFAUT}), la lampe enjambe les blocs — ombres courtes et douces ; basse (~${LAMPE_HAUTEUR_MIN}-200), elle rase le sol — ombres longues et dramatiques. Portée 0 : proportionnelle à la cuve. Au plus ${MAX_LUMIERES} lampes par tableau ; sans lampe posée, la cuve garde sa lampe par défaut. Aperçu réel : ESSAYER.</p>`,
       )
     } else if (s.kind === 'cible') {
@@ -3223,6 +3241,23 @@ export class LevelEditor {
       if (/^#[0-9a-f]{6}$/.test(couleur) && couleur !== LAMPE_COULEUR_DEFAUT)
         l.couleur = couleur
       else delete l.couleur
+      // le luminaire : mêmes règles d'effacement au défaut
+      const taille = Math.max(0, Math.min(3, val('p-lmt')))
+      if (taille !== 1) l.taille = taille
+      else delete l.taille
+      if (text('p-lmf') === 'bandeau') {
+        l.forme = 'bandeau'
+        const longueur = Math.max(80, Math.min(1600, val('p-lml') || 260))
+        if (longueur !== 260) l.longueur = longueur
+        else delete l.longueur
+        const angle = ((Math.round(val('p-lmg')) % 360) + 360) % 360
+        if (angle !== 0) l.angle = angle
+        else delete l.angle
+      } else {
+        delete l.forme
+        delete l.longueur
+        delete l.angle
+      }
     } else if (s.kind === 'cible') {
       const t = (this.level.cibles ?? [])[s.index]
       // le n° est LOGIQUE : il se pose sur la pastille et les portes le

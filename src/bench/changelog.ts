@@ -14,6 +14,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '20/08/2026 14:00',
+    title:
+      'L’ombre réancrée au contact · la taille des luminaires · les bandeaux lumineux',
+    notes: [
+      'L’OMBRE, troisième passe, sur deux constats en capture : les gouttes éjectées n’avaient PLUS d’ombre du tout, et l’ombre du corps se décollait de sa silhouette — on lisait plusieurs ombres détachées. Cause : le test de largeur s’appliquait dès le contact, et les rayons qui rasent le bord du corps y échouaient. Il ne s’applique plus qu’AU LOIN : sous 40 unités l’ombre est acquise (le contact ancre les gouttes comme le corps au sol), l’exigence monte jusqu’à 130 unités — là où naissaient les pastilles. Les gouttes retrouvent une petite ombre de contact, le corps une ombre d’un seul tenant, les pastilles lointaines restent mortes.',
+      'LA TAILLE DU LUMINAIRE se règle par lampe dans l’éditeur (curseur 0 à 3) : 0 la rend invisible — la lampe éclaire sans qu’on la voie —, 3 en fait une grosse pièce de plafond. Le réglage ne touche que l’objet, jamais l’éclairage.',
+      'LES BANDEAUX LUMINEUX : nouvelle forme de luminaire, au choix dans la fiche de la lampe (Plafonnier / Bandeau). Une réglette émissive — elle, on la voit briller, c’est une réglette, pas un capot — avec ses rails de métal le long des bords et ses cellules discrètes façon tube fluorescent. LONGUEUR (80 à 1600 unités) et ANGLE (par crans de 15°) se règlent dans la fiche. L’éclairage reste celui de la lampe : le bandeau est le corps visible, pas une nouvelle source.',
+    ],
+  },
+  {
     date: '20/08/2026 12:30',
     title:
       'Retouches signalées : l’ombre des gouttes (bis), le luminaire-éclipse, le hub compact dans l’éditeur',
