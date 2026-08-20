@@ -280,6 +280,8 @@ uniform float uLumiere;
 // 0 = noir total hors des lampes.
 uniform float uAmbiante;
 uniform float uBrume; // 0..1 : densité de la brume d'ambiance du tableau
+uniform float uLampeSpriteRond; // 1 : un asset dessine les plafonniers
+uniform float uLampeSpriteBande; // 1 : un asset dessine les bandes
 // RELIEF 2.5D : les parois ont une hauteur — leur sommet fuit le centre de
 // la caméra (perspective), et la face latérale se révèle du côté qui
 // regarde le centre. En se déplaçant, on « aperçoit » les flancs des
@@ -579,8 +581,13 @@ float ombreVolume(vec2 world, float dansEau) {
     port = min(port, dl);
     float acc = 0.0;
     float couvre = 0.0;
+    // Décalage PAR PIXEL des prélèvements : sans lui, les huit pas discrets
+    // impriment des ÉCHOS du corps dans son ombre (la même silhouette
+    // répétée en escalier — constaté en capture). Le bruit remplace les
+    // marches par un grain doux qui se lit comme une pénombre.
+    float jit = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
     for (int k = 1; k <= 8; k++) {
-      float t = port * float(k) / 8.0;
+      float t = port * (float(k) - jit) / 8.0;
       vec2 pw = world + dir * t;
       vec2 fuv = ((pw - uCenter) * uZoom + uViewport * 0.5) / uViewport;
       if (fuv.x < 0.0 || fuv.x > 1.0 || fuv.y < 0.0 || fuv.y > 1.0) break;
@@ -1381,6 +1388,9 @@ void main() {
       // taille 0 : la lampe éclaire sans corps (c'est aussi le cas de la
       // lampe par défaut des tableaux sans lumière déclarée)
       if (fx.x < 0.02) continue;
+      // un sprite généré remplace le dessin procédural, forme par forme
+      if (fx.y < 0.5 && uLampeSpriteRond > 0.5) continue;
+      if (fx.y > 0.5 && uLampeSpriteBande > 0.5) continue;
       vec2 rel = world - uLampes[li].xy;
       // plus la lampe est HAUTE, plus elle est proche de la caméra : le
       // luminaire grossit un peu avec la hauteur (14 u à 420, la valeur
@@ -1609,7 +1619,7 @@ void main() {
     float tLim = min(distL, distL * HAUTEUR_BLOCS / max(hL, HAUTEUR_BLOCS + 1.0));
     // ombre douce : le min de k·h/t le long de la marche vers la lampe —
     // la pénombre s'élargit avec la hauteur (une lampe haute diffuse)
-    float pen = 6.0 + hL * 0.012;
+    float pen = 4.0 + hL * 0.008;
     float res = 1.0;
     float t = 4.0;
     for (int k = 0; k < 40; k++) {
@@ -1619,6 +1629,11 @@ void main() {
       t += clamp(h, 8.0, 200.0);
     }
     res = clamp(res, 0.0, 1.0);
+    // la lumière REBONDIT : une ombre portée n'est jamais noire dans une
+    // pièce claire — 14 % de la lampe y parviennent par les parois. Depuis
+    // la flaque (le cône au sol), le contraste ombre/lumière avait doublé :
+    // les bandes d'ombre des colonnes viraient au noir dur, signalé.
+    res = 0.14 + 0.86 * res;
     // les évents tamisent ce qui reste : la lumière passe entre les barreaux
     res *= grilleTrans(p, dir, min(distL, tLim));
     // ...et les éponges aussi : une couche percée, l'ombre criblée de pores
@@ -1736,6 +1751,7 @@ precision highp float;
 in vec2 vUv;
 uniform sampler2D uTexDecal;
 uniform float uFade; // atténuation : le décor ne doit jamais crier
+uniform float uEfface; // 1 : l'eau efface (décor au sol) — 0 : plafond
 // Le champ de fluide de la passe A : un décal est un élément de DÉCOR, le
 // corps passe DEVANT — là où il y a de l'eau, le décal s'efface. Sans ça,
 // une vanne peinte flottait par-dessus l'échantillon.
@@ -1751,7 +1767,7 @@ void main() {
   float field = texture(uField, gl_FragCoord.xy / uCanvasSize).r / uFieldScale;
   float th = uThreshold;
   float sfn = max(th * uSoftness, 1e-4);
-  float fluide = smoothstep(th - sfn, th + sfn, field);
+  float fluide = smoothstep(th - sfn, th + sfn, field) * uEfface;
   outColor = vec4(c, t.a * uFade * (1.0 - fluide));
 }`
 
@@ -1808,6 +1824,10 @@ export class Renderer {
   private readonly zonePhaseScratch = new Float32Array(MAX_ZONES * 3)
   private texDecalTuyaux: WebGLTexture | null = null
   private texDecalVanne: WebGLTexture | null = null
+  // sprites de luminaires (optionnels : tant que les fichiers n'existent
+  // pas, le dessin procédural du shader reste en place)
+  private texLampeRonde: WebGLTexture | null = null
+  private texLampeBande: WebGLTexture | null = null
   private texDecalEcranOff: WebGLTexture | null = null
   private texDecalEcranOn: WebGLTexture | null = null
   private texDecalFiolePleine: WebGLTexture | null = null
@@ -2061,6 +2081,18 @@ export class Renderer {
       false,
       true,
       (t) => (this.texDecalTuyaux = t),
+    )
+    this.loadTexture(
+      '/assets/lampe-plafonnier.webp',
+      false,
+      true,
+      (t) => (this.texLampeRonde = t),
+    )
+    this.loadTexture(
+      '/assets/lampe-bande.webp',
+      false,
+      true,
+      (t) => (this.texLampeBande = t),
     )
     this.loadTexture(
       '/assets/decal-vanne.webp',
@@ -2611,6 +2643,8 @@ export class Renderer {
     gl.uniform1f(cu['uLumiere'], lumiere > 0.5 && this.lightTex ? 1 : 0)
     gl.uniform1f(cu['uAmbiante'], ambiante)
     gl.uniform1f(cu['uBrume'], brume)
+    gl.uniform1f(cu['uLampeSpriteRond'], this.texLampeRonde ? 1 : 0)
+    gl.uniform1f(cu['uLampeSpriteBande'], this.texLampeBande ? 1 : 0)
     gl.uniform1f(cu['uRelief'], relief)
     // le volume n'a de lumière à recevoir que si la pièce en a une
     gl.uniform1f(
@@ -2707,6 +2741,7 @@ export class Renderer {
 
     // Passe B ter — décalques de décor (tuyaux, vannes), effacés sous l'eau
     this.drawDecals(decals, camera, viewportW, viewportH, params)
+    this.drawLampes(lampes, camera, viewportW, viewportH, params)
 
     // Passe C — cellules d'éponge
     this.drawSponges(sim, camera, viewportW, viewportH, dpr)
@@ -2939,6 +2974,90 @@ export class Renderer {
       gl.bindTexture(gl.TEXTURE_2D, tex)
       gl.uniform1i(du['uTexDecal'], 0)
       gl.uniform1f(du['uFade'], d.fade ?? 0.55)
+      gl.uniform1f(du['uEfface'], 1)
+      gl.drawArrays(gl.TRIANGLES, 0, 6)
+    }
+    if (started) {
+      gl.bindVertexArray(null)
+      gl.disable(gl.BLEND)
+    }
+  }
+
+  // Les SPRITES de luminaires : des assets générés, dessinés au-dessus de
+  // l'eau (l'eau ne les efface pas — ils sont au plafond) à la position de
+  // chaque lampe posée. Le quad est pivoté pour les bandes. Tant que les
+  // fichiers /assets/lampe-*.webp n'existent pas, cette passe ne dessine
+  // rien et le shader garde son dessin procédural.
+  private drawLampes(
+    lampes: {
+      x: number
+      y: number
+      h: number
+      taille: number
+      bandeau: boolean
+      demiLong: number
+      angleRad: number
+    }[],
+    camera: Camera,
+    viewportW: number,
+    viewportH: number,
+    params: SimParams,
+  ): void {
+    const gl = this.gl
+    const du = this.uniforms['decal']
+    let started = false
+    for (const l of lampes) {
+      if (l.taille < 0.02) continue
+      const tex = l.bandeau ? this.texLampeBande : this.texLampeRonde
+      if (!tex) continue
+      if (!started) {
+        started = true
+        gl.useProgram(this.decalProgram)
+        gl.uniform2f(du['uCenter'], camera.x, camera.y)
+        gl.uniform2f(du['uViewport'], viewportW, viewportH)
+        gl.uniform1f(du['uZoom'], camera.zoom)
+        gl.activeTexture(gl.TEXTURE1)
+        gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
+        gl.uniform1i(du['uField'], 1)
+        gl.uniform2f(
+          du['uCanvasSize'],
+          gl.drawingBufferWidth,
+          gl.drawingBufferHeight,
+        )
+        gl.uniform1f(du['uThreshold'], params.fieldThreshold)
+        gl.uniform1f(du['uSoftness'], params.fieldSoftness)
+        gl.uniform1f(du['uFieldScale'], this.fieldScale)
+        gl.enable(gl.BLEND)
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+        gl.bindVertexArray(this.decalVao)
+      }
+      // même rayon que le dessin procédural, marge des pattes comprise
+      const R = Math.min(26, Math.max(11, 9 + l.h * 0.012)) * l.taille * 1.35
+      const hw = l.bandeau ? l.demiLong + R : R
+      const hh = R
+      const ca = Math.cos(l.angleRad)
+      const sa = Math.sin(l.angleRad)
+      const q = this.decalScratch
+      let o = 0
+      const put = (dx: number, dy: number, u: number, v: number): void => {
+        q[o++] = l.x + dx * ca - dy * sa
+        q[o++] = l.y + dx * sa + dy * ca
+        q[o++] = u
+        q[o++] = v
+      }
+      put(-hw, -hh, 0, 0)
+      put(hw, -hh, 1, 0)
+      put(hw, hh, 1, 1)
+      put(-hw, -hh, 0, 0)
+      put(hw, hh, 1, 1)
+      put(-hw, hh, 0, 1)
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.decalVbo)
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, q)
+      gl.activeTexture(gl.TEXTURE0)
+      gl.bindTexture(gl.TEXTURE_2D, tex)
+      gl.uniform1i(du['uTexDecal'], 0)
+      gl.uniform1f(du['uFade'], 0.92)
+      gl.uniform1f(du['uEfface'], 0)
       gl.drawArrays(gl.TRIANGLES, 0, 6)
     }
     if (started) {

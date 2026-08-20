@@ -176,6 +176,49 @@ Planches livrées, dans `public/assets/cine/` :
 
 ---
 
+## 12. Luminaires (vus du dessus) — remplacent le dessin procédural
+
+Déposez les fichiers dans `public/assets/` sous CES noms exacts : dès qu'ils
+existent, le jeu les dessine à la place du luminaire procédural, à la position
+de chaque lampe posée (taille et rotation automatiques). Tant qu'ils n'existent
+pas, le dessin procédural reste en place — aucun risque.
+
+### 12a. `lampe-plafonnier.webp`
+**512×512 · WebP/PNG TRANSPARENT · parfaitement centré · vu du DESSUS**
+
+On voit le DOS de la lampe (du métal), jamais sa vitre — la lumière du jeu,
+elle, est ajoutée par le moteur autour de l'objet.
+
+```
+Top-down view of a circular industrial ceiling light fixture seen from directly
+above, we see the METAL BACK of the housing: dark brushed steel dome, concentric
+panel lines, a central bolt, four small mounting brackets extending outward at
+the rim, thin darker seams, 1970s space station engineering style, muted cold
+palette (steel blue-grey #10151c to #2a3542), perfectly centered, orthographic,
+no perspective, no visible light glow, no lens, isolated on transparent
+background, flat 2D game sprite, no text
+```
+Négatif : `glowing, light rays, lens flare, emissive, perspective, tilt, shadow on ground, background, text`
+
+### 12b. `lampe-bande.webp`
+**1024×256 · WebP/PNG TRANSPARENT · barre HORIZONTALE centrée · vu du DESSUS**
+
+Le jeu l'étire à la longueur réglée et la pivote : dessinez-la horizontale.
+Prévoir ~40 px de marge transparente à chaque extrémité (embouts compris).
+
+```
+Top-down view of a long horizontal industrial light strip housing seen from
+directly above, we see the METAL BACK: a narrow brushed steel rail with panel
+seams, small mounting tabs every fifth of its length, rounded end caps with
+bolts, 1970s space station engineering style, muted cold palette (steel
+blue-grey #10151c to #2a3542), perfectly centered horizontal bar, orthographic,
+no perspective, no visible light glow, isolated on transparent background,
+flat 2D game sprite, no text
+```
+Négatif : `glowing, light rays, emissive, perspective, tilt, vertical, shadow, background, text`
+
+---
+
 ## Ce que je peux faire sans générateur d'images
 
 Vecteurs SVG (logo, cadres, icônes, écusson au trait) et textures procédurales en

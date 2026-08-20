@@ -14,6 +14,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '20/08/2026 20:45',
+    title:
+      'Les échos d’ombre effacés, les ombres cuites adoucies, et des sprites pour les luminaires',
+    notes: [
+      'LES RÉPÉTITIONS D’OMBRE (la silhouette du corps répétée en escalier sur sa gauche, constatée en capture) : l’ombre du volume marche en huit pas discrets vers chaque lampe, et ces pas imprimaient des échos. Les prélèvements sont désormais décalés PAR PIXEL (bruit) : les marches deviennent un grain doux qui se lit comme une pénombre.',
+      'LES DEUX BANDES VERTICALES près de la colonne n’étaient pas un bug : DEUX lampes (le poste et la cuve) projettent chacune l’ombre de la même colonne — deux directions, deux bandes. Ce qui clochait, c’est leur DURETÉ : depuis la flaque du cône, le contraste avait doublé et les ombres viraient au noir dur. Deux adoucissements : la pénombre des ombres cuites est plus large, et la lumière REBONDIT — 14 % de la lampe parviennent dans l’ombre par les parois. Plus d’ombre noire dans une pièce claire.',
+      'LE RENDU DU LUMINAIRE peut désormais venir d’ASSETS GÉNÉRÉS : déposez lampe-plafonnier.webp (512×512, transparent) et lampe-bande.webp (1024×256) dans public/assets/ — prompts complets dans docs/assets-ia.md §12 — et le jeu les dessine à la place du dessin procédural, à la position de chaque lampe, taille et rotation automatiques, au-dessus de l’eau. Tant que les fichiers n’existent pas, rien ne change.',
+    ],
+  },
+  {
     date: '20/08/2026 19:30',
     title:
       'La brume d’ambiance (réglable par tableau) et le corps qui respecte enfin le noir',
