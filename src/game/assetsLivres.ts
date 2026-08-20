@@ -47,6 +47,8 @@ const NOMS: Record<string, string> = {
   'decal-vanne.webp': 'Décalque — vanne',
   'decal-ecran-on.webp': 'Décalque — écran de contrôle (allumé)',
   'decal-ecran-off.webp': 'Décalque — écran de contrôle (éteint)',
+  'lampe-plafonnier.webp': 'Luminaire — plafonnier (vu du dessus)',
+  'lampe-bande.webp': 'Luminaire — bande lumineuse (vu du dessus)',
   'iris.webp': 'Sas — iris mécanique',
   'hull.webp': 'Coque de la cuve',
   'tank-bg.webp': 'Fond de cuve',
@@ -64,9 +66,11 @@ const NOMS: Record<string, string> = {
 function rubriqueDe(url: string): string {
   const f = url.slice(url.lastIndexOf('/') + 1)
   if (url.includes('/cine/')) return 'Cinématiques — planches'
-  if (/^(wall|paroi|phile|phobe|froid|chaud|grille|sponge)/.test(f)) return 'Surfaces & matériaux'
+  if (/^(wall|paroi|phile|phobe|froid|chaud|grille|sponge)/.test(f))
+    return 'Surfaces & matériaux'
   if (f.startsWith('zone-')) return 'Zones d’état'
-  if (f.startsWith('decal-') || f.startsWith('iris')) return 'Machinerie & décalques'
+  if (f.startsWith('decal-') || f.startsWith('iris') || f.startsWith('lampe-'))
+    return 'Machinerie & décalques'
   if (/^(hull|tank-bg|stars|home|card-)/.test(f)) return 'Coque & fonds'
   if (/^(fiole|badge)/.test(f)) return 'Objets & emblèmes'
   return 'Autres'
@@ -83,7 +87,9 @@ function nomDe(url: string): string {
 
 // Les clés du glob suffisent : Vite les résout à la compilation, sans
 // importer une seule image (elles sont servies depuis public/).
-const FICHIERS = import.meta.glob('../../public/assets/**/*.{webp,png,jpg,jpeg,avif,svg,gif}')
+const FICHIERS = import.meta.glob(
+  '../../public/assets/**/*.{webp,png,jpg,jpeg,avif,svg,gif}',
+)
 
 /** Toutes les images livrées, classées par rubrique puis par nom. */
 export function assetsLivres(): AssetLivre[] {
@@ -98,6 +104,7 @@ export function assetsLivres(): AssetLivre[] {
     return i < 0 ? RUBRIQUES.length : i
   }
   return out.sort(
-    (a, b) => rang(a.rubrique) - rang(b.rubrique) || a.nom.localeCompare(b.nom, 'fr'),
+    (a, b) =>
+      rang(a.rubrique) - rang(b.rubrique) || a.nom.localeCompare(b.nom, 'fr'),
   )
 }
