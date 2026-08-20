@@ -571,13 +571,28 @@ float ombreVolume(vec2 world, float dansEau) {
       // silhouette : l'intérieur du corps empile des dizaines de noyaux et
       // sature, une gouttelette isolée dépasse à peine le seuil — son ombre
       // reste diaphane au lieu de faire une pastille noire.
-      acc = max(acc, smoothstep(uThreshold * 0.85, uThreshold * 2.4, f) * dur);
-      couvre += step(uThreshold * 0.85, f);
+      float w = smoothstep(uThreshold * 0.85, uThreshold * 2.4, f);
+      // Le test de LARGEUR, le vrai discriminant : une goutte fait ~26 u de
+      // large (rayon de splat 13), le corps plusieurs centaines. Deux
+      // prélèvements PERPENDICULAIRES au rayon, à ±45 u : le corps les
+      // remplit tous les deux, une goutte — ou une traînée fine alignée sur
+      // le rayon — n'y arrive jamais. C'est lui qui a éteint le chapelet de
+      // pastilles que le max seul laissait passer (une goutte sur UN
+      // prélèvement ombrait comme le corps entier).
+      if (w > 0.003) {
+        vec2 perp = vec2(-dir.y, dir.x) * 45.0;
+        vec2 fuvA = ((pw + perp - uCenter) * uZoom + uViewport * 0.5) / uViewport;
+        vec2 fuvB = ((pw - perp - uCenter) * uZoom + uViewport * 0.5) / uViewport;
+        float fA = texture(uField, clamp(fuvA, 0.0, 1.0)).r / uFieldScale;
+        float fB = texture(uField, clamp(fuvB, 0.0, 1.0)).r / uFieldScale;
+        w = min(w, smoothstep(uThreshold * 0.55, uThreshold * 1.2, min(fA, fB)));
+      }
+      acc = max(acc, w * dur);
+      couvre += step(0.02, w);
     }
     // Second garde-fou, géométrique : un corps intercepte le rayon sur
     // plusieurs prélèvements, une goutte sur UN seul. À couverture 1 l'ombre
-    // est à moitié ; à 2+ elle est pleine — le chapelet de boules d'ombre
-    // que semaient les traînées de gouttelettes disparaît.
+    // est à moitié ; à 2+ elle est pleine.
     acc *= clamp(couvre * 0.5, 0.0, 1.0);
     occ = max(occ, acc * clamp(uLampesInt[li], 0.0, 1.5));
   }
@@ -1315,31 +1330,38 @@ void main() {
       vec3 teinte = uLampesCol[li];
       float ang = atan(rel.y, rel.x);
 
-      // le verre : disque émissif, blanc au cœur, couleur de lampe au bord
-      float verre = 1.0 - smoothstep(R * 0.64 - px, R * 0.64 + px, dl);
-      vec3 lens = mix(teinte, vec3(1.0), 0.72 * (1.0 - smoothstep(0.0, R * 0.5, dl)));
-      lens *= 0.55 + 0.50 * lint;
-      // la grille 70's : trois barreaux radiaux sombres posés sur le verre
-      float barre = (1.0 - smoothstep(0.10, 0.22, abs(sin(ang * 1.5))))
-        * smoothstep(R * 0.16, R * 0.26, dl);
-      lens *= 1.0 - 0.42 * barre;
+      // L'ÉCLIPSE : vu du dessus, on regarde le DOS du luminaire — un capot
+      // de métal plein, pas une vitre. La lumière ne s'échappe qu'en
+      // couronne, autour du capot, comme un disque qui masque sa source.
+      // le capot : acier sombre, brossage concentrique discret, un moyeu
+      // central un peu plus clair (le boulon de fixation)
+      float capot = 1.0 - smoothstep(R * 0.78 - px, R * 0.78 + px, dl);
+      vec3 metal = vec3(0.13, 0.165, 0.21)
+        * (0.85 + 0.10 * sin(dl * 2.2))
+        + vec3(0.05, 0.06, 0.08) * (1.0 - smoothstep(0.0, R * 0.22, dl));
+      // le capot n'est pas émissif : il reçoit juste un soupçon de la teinte
+      // par la tranche, la lumière remonte à peine dessus
+      metal += teinte * 0.04 * lint * smoothstep(R * 0.45, R * 0.78, dl);
 
-      // la monture : anneau d'acier sombre, quatre pattes de fixation qui
-      // débordent, un point de vis à chacune
-      float anneau = smoothstep(R * 0.64 - px, R * 0.64 + px, dl)
+      // la couronne : l'anneau de lumière qui fuit sous le capot — blanc
+      // près du bord du capot, couleur de lampe vers l'extérieur
+      float couronne = smoothstep(R * 0.78 - px, R * 0.78 + px, dl)
         * (1.0 - smoothstep(R - px, R + px, dl));
-      float pattes = smoothstep(0.86, 0.97, cos(ang * 4.0 + 0.7854))
-        * smoothstep(R * 1.24 + px, R * 1.02, dl) * step(R * 0.9, dl);
-      vec3 metal = vec3(0.15, 0.19, 0.24) * (0.8 + 0.5 * smoothstep(R * 0.64, R, dl))
-        + teinte * 0.06 * lint;
+      vec3 fuite = mix(vec3(1.0), teinte, smoothstep(R * 0.78, R, dl))
+        * (0.55 + 0.50 * lint);
 
-      float corps = max(max(verre, anneau), pattes);
-      col = mix(col, metal, max(anneau, pattes));
-      col = mix(col, lens, verre);
-      // un halo serré autour du verre — cosmétique, pour que la source
-      // accroche l'œil sans rien éclairer de plus
+      // quatre pattes de fixation, en métal, par-dessus la couronne — elles
+      // la découpent, ce qui vend l'objet mieux qu'un anneau parfait
+      float pattes = smoothstep(0.86, 0.97, cos(ang * 4.0 + 0.7854))
+        * smoothstep(R * 1.24 + px, R * 1.02, dl) * step(R * 0.72, dl);
+
+      float corps = max(max(capot, couronne), pattes);
+      col = mix(col, fuite, couronne);
+      col = mix(col, metal, max(capot, pattes));
+      // un halo serré autour de la couronne — cosmétique, pour que la
+      // source accroche l'œil sans rien éclairer de plus
       float aura = pow(max(0.0, 1.0 - (dl - R) / (R * 1.1)), 3.0) * (1.0 - corps);
-      col += teinte * aura * 0.20 * lint;
+      col += teinte * aura * 0.22 * lint;
     }
   }
 
