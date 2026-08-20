@@ -556,6 +556,7 @@ float ombreVolume(vec2 world, float dansEau) {
     float port = clamp(dl * HAUTEUR_CORPS / max(uLampes[li].z, HAUTEUR_CORPS), 170.0, 1400.0);
     port = min(port, dl);
     float acc = 0.0;
+    float couvre = 0.0;
     for (int k = 1; k <= 8; k++) {
       float t = port * float(k) / 8.0;
       vec2 pw = world + dir * t;
@@ -565,8 +566,18 @@ float ombreVolume(vec2 world, float dansEau) {
       // occulteur d'autant plus net qu'il est PRÈS : l'ombre s'adoucit en
       // s'éloignant de ce qui la porte (pénombre d'une source étendue)
       float dur = 1.0 - 0.55 * (t / max(port, 1.0));
-      acc = max(acc, smoothstep(uThreshold * 0.75, uThreshold * 1.7, f) * dur);
+      // La densité borne haute (2.4×seuil) sépare la MATIÈRE de la
+      // silhouette : l'intérieur du corps empile des dizaines de noyaux et
+      // sature, une gouttelette isolée dépasse à peine le seuil — son ombre
+      // reste diaphane au lieu de faire une pastille noire.
+      acc = max(acc, smoothstep(uThreshold * 0.85, uThreshold * 2.4, f) * dur);
+      couvre += step(uThreshold * 0.85, f);
     }
+    // Second garde-fou, géométrique : un corps intercepte le rayon sur
+    // plusieurs prélèvements, une goutte sur UN seul. À couverture 1 l'ombre
+    // est à moitié ; à 2+ elle est pleine — le chapelet de boules d'ombre
+    // que semaient les traînées de gouttelettes disparaît.
+    acc *= clamp(couvre * 0.5, 0.0, 1.0);
     occ = max(occ, acc * clamp(uLampesInt[li], 0.0, 1.5));
   }
   // sous le corps lui-même, pas d'ombre : il est éclairé, pas assombri
