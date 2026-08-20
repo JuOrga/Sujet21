@@ -37,7 +37,7 @@ import {
   type WorldLabel,
   type ZoneForce,
 } from '../game/level'
-import { TABLEAU_HUB } from '../game/hub'
+import { TABLEAU_HUB, TABLEAU_HUB_COMPACT } from '../game/hub'
 import {
   ARC_EPAISSEUR_DEFAUT,
   ARC_OUVERTURE_DEFAUT,
@@ -49,7 +49,13 @@ import {
   FORME_RECT,
   formeOutline,
 } from '../game/formes'
-import { CODE_HUB, checkLevel, codeCanon, parseLevel, serializeLevel } from '../game/levelIO'
+import {
+  CODE_HUB,
+  checkLevel,
+  codeCanon,
+  parseLevel,
+  serializeLevel,
+} from '../game/levelIO'
 import { MAX_LUMIERES } from '../render/renderer'
 import { canalDeCible, traceLaser } from '../game/laser'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
@@ -172,7 +178,9 @@ function optionsCodes(
           `<option value="${c.code}"${c.code === courant ? ' selected' : ''}>${c.titre} [${c.code}]</option>`,
       )
       .join('') +
-    (orphelin ? `<option value="${courant}" selected>${courant} (introuvable)</option>` : '')
+    (orphelin
+      ? `<option value="${courant}" selected>${courant} (introuvable)</option>`
+      : '')
   )
 }
 
@@ -186,7 +194,10 @@ function distSeg(
   const abx = b.x - a.x
   const aby = b.y - a.y
   const len2 = abx * abx + aby * aby
-  const t = len2 < 1e-9 ? 0 : Math.max(0, Math.min(1, ((x - a.x) * abx + (y - a.y) * aby) / len2))
+  const t =
+    len2 < 1e-9
+      ? 0
+      : Math.max(0, Math.min(1, ((x - a.x) * abx + (y - a.y) * aby) / len2))
   return Math.hypot(x - (a.x + abx * t), y - (a.y + aby * t))
 }
 
@@ -240,13 +251,30 @@ export class LevelEditor {
     | null
     | { mode: 'pan'; sx: number; sy: number; camX: number; camY: number }
     | { mode: 'create'; x0: number; y0: number; x1: number; y1: number }
-    | { mode: 'move'; ox: number; oy: number; start: Rect; pts?: { x: number; y: number }[] }
-    | { mode: 'multimove'; ox: number; oy: number; prevDx: number; prevDy: number }
+    | {
+        mode: 'move'
+        ox: number
+        oy: number
+        start: Rect
+        pts?: { x: number; y: number }[]
+      }
+    | {
+        mode: 'multimove'
+        ox: number
+        oy: number
+        prevDx: number
+        prevDy: number
+      }
     | { mode: 'aim'; index: number }
     | { mode: 'railpt'; index: number; point: number }
     // pivot : le coin OPPOSÉ d'une boîte oblique — il reste cloué au monde,
     // le redimensionnement se calcule dans le repère local de la boîte
-    | { mode: 'resize'; edge: string; start: Rect; pivot?: { x: number; y: number; angle: number } }
+    | {
+        mode: 'resize'
+        edge: string
+        start: Rect
+        pivot?: { x: number; y: number; angle: number }
+      }
     | { mode: 'rotate'; index: number } = null
 
   // Sélection MULTIPLE (Maj + clic) : déplacée d'un bloc, supprimée d'un
@@ -381,7 +409,10 @@ export class LevelEditor {
   private persist(): void {
     try {
       localStorage.setItem(STORE_KEY, serializeLevel(this.level))
-      localStorage.setItem(META_KEY, JSON.stringify({ openId: this.openId, base: this.base }))
+      localStorage.setItem(
+        META_KEY,
+        JSON.stringify({ openId: this.openId, base: this.base }),
+      )
     } catch {
       // stockage indisponible : l'édition continue, sans reprise après coup
     }
@@ -481,8 +512,10 @@ export class LevelEditor {
       maxY: Math.max(r.minY, r.maxY),
     }
     if (s.kind === 'box') Object.assign(this.level.boxes[s.index], norm)
-    else if (s.kind === 'zone') Object.assign((this.level.zones ?? [])[s.index], norm)
-    else if (s.kind === 'porte') Object.assign((this.level.portes ?? [])[s.index], norm)
+    else if (s.kind === 'zone')
+      Object.assign((this.level.zones ?? [])[s.index], norm)
+    else if (s.kind === 'porte')
+      Object.assign((this.level.portes ?? [])[s.index], norm)
     else if (s.kind === 'exit') Object.assign(this.level.exit, norm)
     else if (s.kind === 'sponge') {
       const sp = this.level.sponges[s.index]
@@ -518,7 +551,9 @@ export class LevelEditor {
     }
     if (s.kind === 'cible') {
       const t = (this.level.cibles ?? [])[s.index]
-      return t ? { minX: t.x - t.r, minY: t.y - t.r, maxX: t.x + t.r, maxY: t.y + t.r } : null
+      return t
+        ? { minX: t.x - t.r, minY: t.y - t.r, maxX: t.x + t.r, maxY: t.y + t.r }
+        : null
     }
     if (s.kind === 'label') {
       const l = this.level.labels[s.index]
@@ -593,7 +628,13 @@ export class LevelEditor {
       const garde = this.sel
       this.sel = s
       const r = this.selRect()
-      if (r) this.applyRect({ minX: r.minX + dx, minY: r.minY + dy, maxX: r.maxX + dx, maxY: r.maxY + dy })
+      if (r)
+        this.applyRect({
+          minX: r.minX + dx,
+          minY: r.minY + dy,
+          maxX: r.maxX + dx,
+          maxY: r.maxY + dy,
+        })
       this.sel = garde
     }
   }
@@ -602,13 +643,19 @@ export class LevelEditor {
   // Même largeur / hauteur : la PREMIÈRE boîte sélectionnée donne la
   // mesure, les autres l'adoptent autour de leur centre (façon Canva).
   private memeDimension(quoi: 'largeur' | 'hauteur'): void {
-    const boites = this.multi.filter((m) => m?.kind === 'box') as { kind: 'box'; index: number }[]
+    const boites = this.multi.filter((m) => m?.kind === 'box') as {
+      kind: 'box'
+      index: number
+    }[]
     if (boites.length < 2) {
-      this.status('Même dimension : sélectionnez au moins deux parois (Maj + clic).')
+      this.status(
+        'Même dimension : sélectionnez au moins deux parois (Maj + clic).',
+      )
       return
     }
     const ref = this.level.boxes[boites[0].index]
-    const mesure = quoi === 'largeur' ? ref.maxX - ref.minX : ref.maxY - ref.minY
+    const mesure =
+      quoi === 'largeur' ? ref.maxX - ref.minX : ref.maxY - ref.minY
     for (const m of boites.slice(1)) {
       const b = this.level.boxes[m.index]
       if (quoi === 'largeur') {
@@ -626,7 +673,9 @@ export class LevelEditor {
     )
   }
 
-  private alignMulti(op: 'gauche' | 'droite' | 'haut' | 'bas' | 'centreH' | 'centreV'): void {
+  private alignMulti(
+    op: 'gauche' | 'droite' | 'haut' | 'bas' | 'centreH' | 'centreV',
+  ): void {
     const items = this.multi
       .map((m) => ({ m, b: this.boundsOf(m) }))
       .filter((x): x is { m: Sel; b: Rect } => x.b !== null)
@@ -640,7 +689,8 @@ export class LevelEditor {
       else if (op === 'droite') this.moveSelBy(m, maxX - b.maxX, 0)
       else if (op === 'bas') this.moveSelBy(m, 0, minY - b.minY)
       else if (op === 'haut') this.moveSelBy(m, 0, maxY - b.maxY)
-      else if (op === 'centreH') this.moveSelBy(m, (minX + maxX) / 2 - (b.minX + b.maxX) / 2, 0)
+      else if (op === 'centreH')
+        this.moveSelBy(m, (minX + maxX) / 2 - (b.minX + b.maxX) / 2, 0)
       else this.moveSelBy(m, 0, (minY + maxY) / 2 - (b.minY + b.maxY) / 2)
     }
     this.commit('Alignés.')
@@ -648,7 +698,9 @@ export class LevelEditor {
 
   /** Le nom d'une pièce désignée par la Superposition. */
   private nomCible(c: CutCible): string {
-    return c.kind === 'sponge' ? 'Éponge' : MATERIAL_NAMES[this.level.boxes[c.index].material]
+    return c.kind === 'sponge'
+      ? 'Éponge'
+      : MATERIAL_NAMES[this.level.boxes[c.index].material]
   }
 
   /** L'empreinte RECTANGULAIRE d'une pièce — ce qu'elle retire au perdant.
@@ -671,7 +723,8 @@ export class LevelEditor {
 
   /** Ce qui se trouve sous le point monde, du plus « au-dessus » au plus bas. */
   private pick(x: number, y: number): Sel {
-    const inside = (r: Rect): boolean => x >= r.minX && x <= r.maxX && y >= r.minY && y <= r.maxY
+    const inside = (r: Rect): boolean =>
+      x >= r.minX && x <= r.maxX && y >= r.minY && y <= r.maxY
     const labels = this.level.labels
     for (let i = labels.length - 1; i >= 0; i--) {
       const l = labels[i]
@@ -682,13 +735,19 @@ export class LevelEditor {
     }
     const lumieres = this.level.lumieres ?? []
     for (let i = lumieres.length - 1; i >= 0; i--) {
-      if (Math.hypot(lumieres[i].x - x, lumieres[i].y - y) < Math.max(26, 28 / this.zoom)) {
+      if (
+        Math.hypot(lumieres[i].x - x, lumieres[i].y - y) <
+        Math.max(26, 28 / this.zoom)
+      ) {
         return { kind: 'lumiere', index: i }
       }
     }
     const lasers = this.level.lasers ?? []
     for (let i = lasers.length - 1; i >= 0; i--) {
-      if (Math.hypot(lasers[i].x - x, lasers[i].y - y) < Math.max(24, 26 / this.zoom)) {
+      if (
+        Math.hypot(lasers[i].x - x, lasers[i].y - y) <
+        Math.max(24, 26 / this.zoom)
+      ) {
         return { kind: 'laser', index: i }
       }
     }
@@ -707,11 +766,13 @@ export class LevelEditor {
     for (let i = rails.length - 1; i >= 0; i--) {
       const pts = rails[i].points
       for (let k = 0; k + 1 < pts.length; k++) {
-        if (distSeg(x, y, pts[k], pts[k + 1]) < tol) return { kind: 'rail', index: i }
+        if (distSeg(x, y, pts[k], pts[k + 1]) < tol)
+          return { kind: 'rail', index: i }
       }
     }
     const sr = 70
-    if (Math.hypot(this.level.spawn.x - x, this.level.spawn.y - y) < sr) return { kind: 'spawn' }
+    if (Math.hypot(this.level.spawn.x - x, this.level.spawn.y - y) < sr)
+      return { kind: 'spawn' }
     if (inside(this.level.exit)) return { kind: 'exit' }
     for (let i = this.level.boxes.length - 1; i >= 0; i--) {
       if (dansBoite(this.level.boxes[i], x, y)) return { kind: 'box', index: i }
@@ -749,7 +810,10 @@ export class LevelEditor {
   // Aimante un rectangle en mouvement sur les bords et centres des autres
   // éléments (parois, sas) — et retourne les repères à dessiner. Façon
   // Canva : qu'ils se touchent ou non, les alignements se proposent.
-  private aimant(r: Rect): { rect: Rect; guides: { axe: 'v' | 'h'; pos: number }[] } {
+  private aimant(r: Rect): {
+    rect: Rect
+    guides: { axe: 'v' | 'h'; pos: number }[]
+  } {
     const TH = 8 / this.zoom
     const cibles: Rect[] = []
     this.level.boxes.forEach((b, i) => {
@@ -760,8 +824,13 @@ export class LevelEditor {
     })
     cibles.push(this.level.exit)
     const cand = (t: Rect, axe: 'v' | 'h'): number[] =>
-      axe === 'v' ? [t.minX, t.maxX, (t.minX + t.maxX) / 2] : [t.minY, t.maxY, (t.minY + t.maxY) / 2]
-    const propre = { v: [r.minX, r.maxX, (r.minX + r.maxX) / 2], h: [r.minY, r.maxY, (r.minY + r.maxY) / 2] }
+      axe === 'v'
+        ? [t.minX, t.maxX, (t.minX + t.maxX) / 2]
+        : [t.minY, t.maxY, (t.minY + t.maxY) / 2]
+    const propre = {
+      v: [r.minX, r.maxX, (r.minX + r.maxX) / 2],
+      h: [r.minY, r.maxY, (r.minY + r.maxY) / 2],
+    }
     let dx = 0
     let dy = 0
     let bestX = TH
@@ -794,7 +863,12 @@ export class LevelEditor {
     if (gX !== null) guides.push({ axe: 'v', pos: gX })
     if (gY !== null) guides.push({ axe: 'h', pos: gY })
     return {
-      rect: { minX: r.minX + dx, minY: r.minY + dy, maxX: r.maxX + dx, maxY: r.maxY + dy },
+      rect: {
+        minX: r.minX + dx,
+        minY: r.minY + dy,
+        maxX: r.maxX + dx,
+        maxY: r.maxY + dy,
+      },
       guides,
     }
   }
@@ -821,7 +895,11 @@ export class LevelEditor {
 
   /** Le coin (ox, oy) d'une boîte oblique, en coordonnées MONDE — offsets
    * dans le repère local (±demi-largeur, ±demi-hauteur). */
-  private coinOblique(b: ObstacleBox, ox: number, oy: number): { x: number; y: number } {
+  private coinOblique(
+    b: ObstacleBox,
+    ox: number,
+    oy: number,
+  ): { x: number; y: number } {
     const rad = ((b.angle ?? 0) * Math.PI) / 180
     const co = Math.cos(rad)
     const si = Math.sin(rad)
@@ -917,7 +995,11 @@ export class LevelEditor {
         if (e.shiftKey) {
           const hit = this.pick(w.x, w.y)
           if (hit) {
-            if (this.multi.length === 0 && this.sel && !this.sameSel(this.sel, hit)) {
+            if (
+              this.multi.length === 0 &&
+              this.sel &&
+              !this.sameSel(this.sel, hit)
+            ) {
               this.multi = [this.sel]
             }
             const deja = this.multi.findIndex((m) => this.sameSel(m, hit))
@@ -933,7 +1015,13 @@ export class LevelEditor {
         if (this.multi.length > 1) {
           const hit = this.pick(w.x, w.y)
           if (hit && this.multi.some((m) => this.sameSel(m, hit))) {
-            this.drag = { mode: 'multimove', ox: w.x, oy: w.y, prevDx: 0, prevDy: 0 }
+            this.drag = {
+              mode: 'multimove',
+              ox: w.x,
+              oy: w.y,
+              prevDx: 0,
+              prevDy: 0,
+            }
             return
           }
           this.multi = []
@@ -973,7 +1061,8 @@ export class LevelEditor {
         // qu'on voulait seulement choisir. À la souris, rien ne change :
         // le pointeur est précis, le glisser direct reste le geste juste.
         const auDoigt = e.pointerType !== 'mouse'
-        const dejaVise = hit !== null && this.sel !== null && this.sameSel(this.sel, hit)
+        const dejaVise =
+          hit !== null && this.sel !== null && this.sameSel(this.sel, hit)
         this.sel = hit
         this.syncProps()
         if (auDoigt && hit && !dejaVise) {
@@ -985,13 +1074,28 @@ export class LevelEditor {
         }
         if (hit) {
           if (hit.kind === 'spawn') {
-            this.drag = { mode: 'move', ox: w.x - this.level.spawn.x, oy: w.y - this.level.spawn.y, start: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }
+            this.drag = {
+              mode: 'move',
+              ox: w.x - this.level.spawn.x,
+              oy: w.y - this.level.spawn.y,
+              start: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+            }
           } else if (hit.kind === 'laser') {
             const l = (this.level.lasers ?? [])[hit.index]
-            this.drag = { mode: 'move', ox: w.x - l.x, oy: w.y - l.y, start: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }
+            this.drag = {
+              mode: 'move',
+              ox: w.x - l.x,
+              oy: w.y - l.y,
+              start: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+            }
           } else if (hit.kind === 'cible') {
             const t = (this.level.cibles ?? [])[hit.index]
-            this.drag = { mode: 'move', ox: w.x - t.x, oy: w.y - t.y, start: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }
+            this.drag = {
+              mode: 'move',
+              ox: w.x - t.x,
+              oy: w.y - t.y,
+              start: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+            }
           } else if (hit.kind === 'rail') {
             const r = (this.level.rails ?? [])[hit.index]
             this.drag = {
@@ -1003,10 +1107,20 @@ export class LevelEditor {
             }
           } else if (hit.kind === 'label') {
             const l = this.level.labels[hit.index]
-            this.drag = { mode: 'move', ox: w.x - l.x, oy: w.y - l.y, start: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }
+            this.drag = {
+              mode: 'move',
+              ox: w.x - l.x,
+              oy: w.y - l.y,
+              start: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+            }
           } else {
             const r = this.selRect()!
-            this.drag = { mode: 'move', ox: w.x - r.minX, oy: w.y - r.minY, start: { ...r } }
+            this.drag = {
+              mode: 'move',
+              ox: w.x - r.minX,
+              oy: w.y - r.minY,
+              start: { ...r },
+            }
           }
         }
         this.draw()
@@ -1027,7 +1141,9 @@ export class LevelEditor {
           // pas re-désigner la même pièce et tout annuler.
           let leGagnant: CutCible | null = null
           const memeQueGagnant = (c: CutCible): boolean =>
-            this.cutWinner !== null && this.cutWinner.kind === c.kind && this.cutWinner.index === c.index
+            this.cutWinner !== null &&
+            this.cutWinner.kind === c.kind &&
+            this.cutWinner.index === c.index
           for (let i = this.level.boxes.length - 1; i >= 0; i--) {
             if (!dansBoite(this.level.boxes[i], w.x, w.y)) continue
             const c: CutCible = { kind: 'box', index: i }
@@ -1061,9 +1177,14 @@ export class LevelEditor {
           this.draw()
           return
         }
-        if (cible.kind === this.cutWinner.kind && cible.index === this.cutWinner.index) {
+        if (
+          cible.kind === this.cutWinner.kind &&
+          cible.index === this.cutWinner.index
+        ) {
           this.cutWinner = null
-          this.status('Superposition : le dessus est désélectionné — cliquez une pièce pour recommencer.')
+          this.status(
+            'Superposition : le dessus est désélectionné — cliquez une pièce pour recommencer.',
+          )
           this.draw()
           return
         }
@@ -1086,12 +1207,15 @@ export class LevelEditor {
           const sp = this.level.sponges[cible.index]
           const morceaux = subtractSponge(sp, empreinte)
           if (morceaux.length === 1 && morceaux[0] === sp) {
-            this.status(`${nomG} et ${nomP} ne se chevauchent pas : il n’y a rien à ronger.`)
+            this.status(
+              `${nomG} et ${nomP} ne se chevauchent pas : il n’y a rien à ronger.`,
+            )
             return
           }
           this.level.sponges.splice(cible.index, 1, ...morceaux)
           this.cutWinner = null
-          this.sel = morceaux.length > 0 ? { kind: 'sponge', index: cible.index } : null
+          this.sel =
+            morceaux.length > 0 ? { kind: 'sponge', index: cible.index } : null
           this.setTool({ kind: 'select' })
           this.commit(
             morceaux.length === 0
@@ -1112,7 +1236,8 @@ export class LevelEditor {
               : subtractBox(perdante, empreinte)
         if (!morceaux) {
           this.status(
-            perdante.forme || (gagnant.kind === 'box' && this.level.boxes[gagnant.index].forme)
+            perdante.forme ||
+              (gagnant.kind === 'box' && this.level.boxes[gagnant.index].forme)
               ? 'Superposition : une des deux pièces est une FORME (disque, capsule, coin, arc) — le rognage exact n’existe qu’entre rectangles. Utilisez la GOMME pour effacer librement.'
               : 'Superposition : angles différents — le rognage exact n’existe qu’entre parois de même angle. Utilisez la GOMME pour effacer librement.',
           )
@@ -1125,14 +1250,17 @@ export class LevelEditor {
           Math.abs(morceaux[0].maxX - perdante.maxX) < 0.01 &&
           Math.abs(morceaux[0].maxY - perdante.maxY) < 0.01
         if (intacte) {
-          this.status(`${nomG} et ${nomP} ne se chevauchent pas : il n’y a rien à ronger.`)
+          this.status(
+            `${nomG} et ${nomP} ne se chevauchent pas : il n’y a rien à ronger.`,
+          )
           return
         }
         this.level.boxes.splice(cible.index, 1, ...morceaux)
         this.cutWinner = null
         // la pièce rognée reste SÉLECTIONNÉE : le rognage se joue sous
         // l'autre pièce, il ne se verrait pas autrement
-        this.sel = morceaux.length > 0 ? { kind: 'box', index: cible.index } : null
+        this.sel =
+          morceaux.length > 0 ? { kind: 'box', index: cible.index } : null
         this.setTool({ kind: 'select' })
         this.commit(
           morceaux.length === 0
@@ -1152,7 +1280,11 @@ export class LevelEditor {
       }
       if (this.tool.kind === 'cible') {
         if (!this.level.cibles) this.level.cibles = []
-        this.level.cibles.push({ x: this.snapped(w.x), y: this.snapped(w.y), r: 26 })
+        this.level.cibles.push({
+          x: this.snapped(w.x),
+          y: this.snapped(w.y),
+          r: 26,
+        })
         this.sel = { kind: 'cible', index: this.level.cibles.length - 1 }
         this.setTool({ kind: 'select' })
         this.commit('Cible posée — un faisceau qui la touche l’allume.')
@@ -1161,7 +1293,9 @@ export class LevelEditor {
       if (this.tool.kind === 'lumiere') {
         if (!this.level.lumieres) this.level.lumieres = []
         if (this.level.lumieres.length >= MAX_LUMIERES) {
-          this.status(`Déjà ${MAX_LUMIERES} lampes : c'est le plafond — supprimez-en une d'abord.`)
+          this.status(
+            `Déjà ${MAX_LUMIERES} lampes : c'est le plafond — supprimez-en une d'abord.`,
+          )
           this.setTool({ kind: 'select' })
           return
         }
@@ -1175,7 +1309,11 @@ export class LevelEditor {
       }
       if (this.tool.kind === 'laser') {
         if (!this.level.lasers) this.level.lasers = []
-        this.level.lasers.push({ x: this.snapped(w.x), y: this.snapped(w.y), angle: 0 })
+        this.level.lasers.push({
+          x: this.snapped(w.x),
+          y: this.snapped(w.y),
+          angle: 0,
+        })
         const index = this.level.lasers.length - 1
         this.sel = { kind: 'laser', index }
         this.drag = { mode: 'aim', index } // glisser pour orienter le fût
@@ -1193,7 +1331,12 @@ export class LevelEditor {
         let point = -1
         for (let i = rails.length - 1; i >= 0; i--) {
           const pts = rails[i].points
-          if (Math.hypot(pts[pts.length - 1].x - w.x, pts[pts.length - 1].y - w.y) < tol) {
+          if (
+            Math.hypot(
+              pts[pts.length - 1].x - w.x,
+              pts[pts.length - 1].y - w.y,
+            ) < tol
+          ) {
             pts.push({ x: this.snapped(w.x), y: this.snapped(w.y) })
             index = i
             point = pts.length - 1
@@ -1222,7 +1365,10 @@ export class LevelEditor {
         return
       }
       if (this.tool.kind === 'label') {
-        const text = prompt('Texte de l’étiquette (elle sera peinte dans le décor) :', 'PAROI')
+        const text = prompt(
+          'Texte de l’étiquette (elle sera peinte dans le décor) :',
+          'PAROI',
+        )
         if (text && text.trim()) {
           this.level.labels.push({
             x: this.snapped(w.x),
@@ -1260,7 +1406,10 @@ export class LevelEditor {
         const ctr = this.centreDoigts()
         if (d !== null && ctr !== null && this.pinceEcart > 1e-3) {
           const avant = this.toWorld(ctr.x - rect.left, ctr.y - rect.top)
-          this.zoom = Math.max(0.05, Math.min(3, this.zoom * (d / this.pinceEcart)))
+          this.zoom = Math.max(
+            0.05,
+            Math.min(3, this.zoom * (d / this.pinceEcart)),
+          )
           const apres = this.toWorld(ctr.x - rect.left, ctr.y - rect.top)
           this.camX += avant.x - apres.x
           this.camY += avant.y - apres.y
@@ -1327,7 +1476,8 @@ export class LevelEditor {
         // délta aimanté à la grille, appliqué en incrément : pas de dérive
         const ddx = this.snapped(w.x - d.ox)
         const ddy = this.snapped(w.y - d.oy)
-        for (const m of this.multi) this.moveSelBy(m, ddx - d.prevDx, ddy - d.prevDy)
+        for (const m of this.multi)
+          this.moveSelBy(m, ddx - d.prevDx, ddy - d.prevDy)
         d.prevDx = ddx
         d.prevDy = ddy
         // repères visuels sur les bords du groupe (sans magnétisme : le
@@ -1448,7 +1598,9 @@ export class LevelEditor {
       if (!d) return
       if (d.mode === 'aim') {
         this.setTool({ kind: 'select' })
-        this.commit('Émetteur posé — glissez depuis lui pour réorienter, ou réglez l’angle à droite.')
+        this.commit(
+          'Émetteur posé — glissez depuis lui pour réorienter, ou réglez l’angle à droite.',
+        )
         return
       }
       if (d.mode === 'rotate') {
@@ -1466,12 +1618,17 @@ export class LevelEditor {
           const p = r.points[d.point]
           const voisin = r.points[d.point - 1] ?? r.points[d.point + 1]
           // un tronçon quasi nul ne compte pas : on retire le point posé
-          if (voisin && Math.hypot(p.x - voisin.x, p.y - voisin.y) < this.grid) {
+          if (
+            voisin &&
+            Math.hypot(p.x - voisin.x, p.y - voisin.y) < this.grid
+          ) {
             r.points.splice(d.point, 1)
             if (r.points.length < 2) {
               this.level.rails!.splice(d.index, 1)
               this.sel = null
-              this.commit('Trop court : glissez pour tracer le tronçon de rail.')
+              this.commit(
+                'Trop court : glissez pour tracer le tronçon de rail.',
+              )
               return
             }
           }
@@ -1519,10 +1676,14 @@ export class LevelEditor {
         // molettes libres (gros deltas) convergent vers la même vitesse —
         // avant, chaque événement valait UN cran plein, quel que soit son
         // delta : certaines souris zoomaient d'un extrême à l'autre.
-        const brut = e.deltaY * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 400 : 1)
+        const brut =
+          e.deltaY * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 400 : 1)
         if (brut === 0) return
         const pas = Math.max(-3, Math.min(3, brut / 100))
-        this.zoom = Math.max(0.05, Math.min(3, this.zoom * Math.pow(1.12, -pas)))
+        this.zoom = Math.max(
+          0.05,
+          Math.min(3, this.zoom * Math.pow(1.12, -pas)),
+        )
         const after = this.toWorld(e.clientX - rect.left, e.clientY - rect.top)
         this.camX += before.x - after.x
         this.camY += before.y - after.y
@@ -1535,7 +1696,13 @@ export class LevelEditor {
       if (!this.host.classList.contains('visible')) return
       const t = e.target as HTMLElement | null
       // dans un champ, le Ctrl+Z natif du champ garde la main
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return
+      if (
+        t &&
+        (t.tagName === 'INPUT' ||
+          t.tagName === 'TEXTAREA' ||
+          t.tagName === 'SELECT')
+      )
+        return
       if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
         e.preventDefault()
         if (e.shiftKey) this.redo()
@@ -1589,7 +1756,9 @@ export class LevelEditor {
   // elle est épargnée et on le dit.
   private gomme(r: Rect): void {
     if (r.maxX - r.minX < 2 || r.maxY - r.minY < 2) {
-      this.status('Gomme : tracez une zone (glissez) — tout ce qu\'elle couvre est effacé.')
+      this.status(
+        "Gomme : tracez une zone (glissez) — tout ce qu'elle couvre est effacé.",
+      )
       return
     }
     const dansZone = (x: number, y: number): boolean =>
@@ -1598,12 +1767,21 @@ export class LevelEditor {
     let effacees = 0
     let rognees = 0
     for (const b of this.level.boxes) {
-      const chevauche = !(r.minX >= b.maxX || r.maxX <= b.minX || r.minY >= b.maxY || r.maxY <= b.minY)
+      const chevauche = !(
+        r.minX >= b.maxX ||
+        r.maxX <= b.minX ||
+        r.minY >= b.maxY ||
+        r.maxY <= b.minY
+      )
       if (!chevauche) {
         restantes.push(b)
         continue
       }
-      const entiere = r.minX <= b.minX && r.maxX >= b.maxX && r.minY <= b.minY && r.maxY >= b.maxY
+      const entiere =
+        r.minX <= b.minX &&
+        r.maxX >= b.maxX &&
+        r.minY <= b.minY &&
+        r.maxY >= b.maxY
       if (entiere) {
         effacees++
         continue
@@ -1640,7 +1818,12 @@ export class LevelEditor {
       else epRognees++
       spRestantes.push(...morceaux)
     }
-    if (effacees === 0 && rognees === 0 && epEffacees === 0 && epRognees === 0) {
+    if (
+      effacees === 0 &&
+      rognees === 0 &&
+      epEffacees === 0 &&
+      epRognees === 0
+    ) {
       this.status('Gomme : rien à effacer dans cette zone.')
       return
     }
@@ -1650,10 +1833,19 @@ export class LevelEditor {
     this.multi = []
     this.setTool({ kind: 'gomme' }) // la gomme RESTE en main : on gomme en série
     const bouts: string[] = []
-    if (effacees > 0) bouts.push(`${effacees} surface${effacees > 1 ? 's' : ''} effacée${effacees > 1 ? 's' : ''}`)
+    if (effacees > 0)
+      bouts.push(
+        `${effacees} surface${effacees > 1 ? 's' : ''} effacée${effacees > 1 ? 's' : ''}`,
+      )
     if (rognees > 0) bouts.push(`${rognees} rognée${rognees > 1 ? 's' : ''}`)
-    if (epEffacees > 0) bouts.push(`${epEffacees} éponge${epEffacees > 1 ? 's' : ''} effacée${epEffacees > 1 ? 's' : ''}`)
-    if (epRognees > 0) bouts.push(`${epRognees} éponge${epRognees > 1 ? 's' : ''} entamée${epRognees > 1 ? 's' : ''}`)
+    if (epEffacees > 0)
+      bouts.push(
+        `${epEffacees} éponge${epEffacees > 1 ? 's' : ''} effacée${epEffacees > 1 ? 's' : ''}`,
+      )
+    if (epRognees > 0)
+      bouts.push(
+        `${epRognees} éponge${epRognees > 1 ? 's' : ''} entamée${epRognees > 1 ? 's' : ''}`,
+      )
     this.commit(`Gomme : ${bouts.join(', ')}.`)
   }
 
@@ -1667,7 +1859,11 @@ export class LevelEditor {
     if (t.kind === 'box') {
       // une FORME éventuelle (disque, capsule, coin, arc) naît avec ses
       // défauts — orientation et paramètres se règlent dans le panneau
-      this.level.boxes.push({ ...r, material: t.material, ...(t.forme ? { forme: t.forme } : {}) })
+      this.level.boxes.push({
+        ...r,
+        material: t.material,
+        ...(t.forme ? { forme: t.forme } : {}),
+      })
       this.sel = { kind: 'box', index: this.level.boxes.length - 1 }
       const nom = t.forme
         ? `${FORME_NAMES[t.forme]} (${MATERIAL_NAMES[t.material]})`
@@ -1751,7 +1947,8 @@ export class LevelEditor {
     else if (s.kind === 'sponge') this.level.sponges.splice(s.index, 1)
     else if (s.kind === 'zone') (this.level.zones ?? []).splice(s.index, 1)
     else if (s.kind === 'laser') (this.level.lasers ?? []).splice(s.index, 1)
-    else if (s.kind === 'lumiere') (this.level.lumieres ?? []).splice(s.index, 1)
+    else if (s.kind === 'lumiere')
+      (this.level.lumieres ?? []).splice(s.index, 1)
     else if (s.kind === 'porte') (this.level.portes ?? []).splice(s.index, 1)
     else if (s.kind === 'rail') (this.level.rails ?? []).splice(s.index, 1)
     else if (s.kind === 'cible') {
@@ -1762,8 +1959,7 @@ export class LevelEditor {
         if (c.canal === undefined) c.canal = i + 1
       })
       cs.splice(s.index, 1)
-    }
-    else if (s.kind === 'label') this.level.labels.splice(s.index, 1)
+    } else if (s.kind === 'label') this.level.labels.splice(s.index, 1)
     else {
       this.commit('Le sas et le point de départ ne se suppriment pas.')
       return
@@ -1808,7 +2004,11 @@ export class LevelEditor {
       const t = (this.level.cibles ?? [])[s.index]
       // la copie garde le NUMÉRO de l'originale : dupliquer une « cible 1 »
       // fait une seconde cible 1 — elles partagent le canal
-      this.level.cibles!.push({ ...t, canal: canalDeCible(this.level.cibles!, s.index), x: t.x + off })
+      this.level.cibles!.push({
+        ...t,
+        canal: canalDeCible(this.level.cibles!, s.index),
+        x: t.x + off,
+      })
       this.sel = { kind: 'cible', index: this.level.cibles!.length - 1 }
     } else if (s.kind === 'porte') {
       const q = (this.level.portes ?? [])[s.index]
@@ -1816,7 +2016,9 @@ export class LevelEditor {
       this.sel = { kind: 'porte', index: this.level.portes!.length - 1 }
     } else if (s.kind === 'rail') {
       const r = (this.level.rails ?? [])[s.index]
-      this.level.rails!.push({ points: r.points.map((p) => ({ x: p.x + off, y: p.y })) })
+      this.level.rails!.push({
+        points: r.points.map((p) => ({ x: p.x + off, y: p.y })),
+      })
       this.sel = { kind: 'rail', index: this.level.rails!.length - 1 }
     } else return
     this.commit('Dupliqué (D).')
@@ -1845,7 +2047,10 @@ export class LevelEditor {
   private setTool(t: Tool): void {
     this.tool = t
     for (const b of Array.from(this.host.querySelectorAll('.ed-tool'))) {
-      b.classList.toggle('active', (b as HTMLElement).dataset.tool === this.toolKey(t))
+      b.classList.toggle(
+        'active',
+        (b as HTMLElement).dataset.tool === this.toolKey(t),
+      )
     }
     this.canvas.style.cursor = t.kind === 'select' ? 'default' : 'crosshair'
   }
@@ -1853,7 +2058,8 @@ export class LevelEditor {
   private toolKey(t: Tool): string {
     // les outils de FORME sont indépendants de la matière : leur clé ne
     // porte que la forme (la matière vient du dernier outil de surface)
-    if (t.kind === 'box') return t.forme ? `forme:${t.forme}` : `box:${t.material}`
+    if (t.kind === 'box')
+      return t.forme ? `forme:${t.forme}` : `box:${t.material}`
     if (t.kind === 'zone') return `zone:${t.force}`
     return t.kind
   }
@@ -1862,8 +2068,11 @@ export class LevelEditor {
    *  courante : « disque » n'est pas une matière, c'est un moule. */
   private majPastillesFormes(): void {
     const col = MAT_COLORS[this.matiereCourante] ?? '#4a6b80'
-    for (const b of Array.from(this.host.querySelectorAll('.ed-tool[data-tool^="forme:"] i'))) {
-      ;(b as HTMLElement).style.background = (b as HTMLElement).dataset.creux === '1' ? 'transparent' : col
+    for (const b of Array.from(
+      this.host.querySelectorAll('.ed-tool[data-tool^="forme:"] i'),
+    )) {
+      ;(b as HTMLElement).style.background =
+        (b as HTMLElement).dataset.creux === '1' ? 'transparent' : col
       ;(b as HTMLElement).style.borderColor = col
     }
     const nom = this.el('ed-forme-matiere')
@@ -1884,9 +2093,13 @@ export class LevelEditor {
         } else if (key.startsWith('forme:')) {
           // une FORME se pose dans la matière courante : glace, chaudière,
           // hydrophobe… tout matériau prend n'importe quel moule
-          this.setTool({ kind: 'box', material: this.matiereCourante, forme: Number(key.slice(6)) || 0 })
-        }
-        else if (key.startsWith('zone:')) this.setTool({ kind: 'zone', force: key.slice(5) as ZoneForce })
+          this.setTool({
+            kind: 'box',
+            material: this.matiereCourante,
+            forme: Number(key.slice(6)) || 0,
+          })
+        } else if (key.startsWith('zone:'))
+          this.setTool({ kind: 'zone', force: key.slice(5) as ZoneForce })
         else if (key === 'sponge') this.setTool({ kind: 'sponge' })
         else if (key === 'spawn') this.setTool({ kind: 'spawn' })
         else if (key === 'exit') this.setTool({ kind: 'exit' })
@@ -1907,15 +2120,27 @@ export class LevelEditor {
     // construction des salles (miroirs, prisme, plasma…) ou en repartir.
     const selLivres = this.el<HTMLSelectElement>('ed-livres')
     // le HUB en tête : publié dans la bibliothèque (code « HUB »), il
-    // REMPLACE le laboratoire joué — sans jamais entrer dans la séquence
-    const livres = [TABLEAU_HUB, ...TABLEAUX_ECOLE, ...TABLEAUX, TABLEAU_1BIS]
+    // REMPLACE le laboratoire joué — sans jamais entrer dans la séquence.
+    // Le hub COMPACT (chantier, code HUB2) s'étudie et se copie ici aussi ;
+    // pour qu'il devienne LE laboratoire, renommer sa copie en HUB.
+    const livres = [
+      TABLEAU_HUB,
+      TABLEAU_HUB_COMPACT,
+      ...TABLEAUX_ECOLE,
+      ...TABLEAUX,
+      TABLEAU_1BIS,
+    ]
     selLivres.innerHTML = livres
       .map((t, i) => `<option value="${i}">${t.code} — ${t.name}</option>`)
       .join('')
     this.el('ed-livre-charger').addEventListener('click', () => {
       const lv = livres[Number(selLivres.value) || 0]
       if (!lv) return
-      if (!confirm(`Ouvrir une copie de « ${lv.code} — ${lv.name} » ? Le brouillon en cours sera remplacé.`)) {
+      if (
+        !confirm(
+          `Ouvrir une copie de « ${lv.code} — ${lv.name} » ? Le brouillon en cours sera remplacé.`,
+        )
+      ) {
         return
       }
       this.level = structuredClone(lv)
@@ -1926,7 +2151,9 @@ export class LevelEditor {
       this.fitView()
       this.syncForm()
       this.renderLibrary()
-      this.commit(`Copie de ${lv.code} ouverte — « Enregistrer comme… » pour la publier à votre nom.`)
+      this.commit(
+        `Copie de ${lv.code} ouverte — « Enregistrer comme… » pour la publier à votre nom.`,
+      )
     })
 
     this.el('ed-undo').addEventListener('click', () => this.undo())
@@ -1936,7 +2163,10 @@ export class LevelEditor {
       this.snap = (e.target as HTMLInputElement).checked
     })
     this.el('ed-grid').addEventListener('change', (e) => {
-      this.grid = Math.max(1, Number((e.target as HTMLInputElement).value) || 20)
+      this.grid = Math.max(
+        1,
+        Number((e.target as HTMLInputElement).value) || 20,
+      )
       this.draw()
     })
 
@@ -1945,17 +2175,24 @@ export class LevelEditor {
     const selAmb = this.el('ed-ambiance') as HTMLSelectElement
     selAmb.innerHTML =
       '<option value="">Suivre la cuve (refroidissement)</option>' +
-      PISTES.map((p) => `<option value="${p}">${PISTE_NOMS[p]}</option>`).join('')
+      PISTES.map((p) => `<option value="${p}">${PISTE_NOMS[p]}</option>`).join(
+        '',
+      )
     selAmb.addEventListener('change', () => {
       this.level.ambiance = selAmb.value || undefined
       this.persist()
-      this.commit(selAmb.value ? `Musique : ${PISTE_NOMS[selAmb.value as Piste]}.` : 'Musique : celle de la cuve.')
+      this.commit(
+        selAmb.value
+          ? `Musique : ${PISTE_NOMS[selAmb.value as Piste]}.`
+          : 'Musique : celle de la cuve.',
+      )
     })
 
     this.el('ed-dashs').addEventListener('input', () => {
       const raw = (this.el('ed-dashs') as HTMLInputElement).value.trim()
       // vide : le tableau suit le réglage du banc ; sinon un budget propre
-      this.level.dashBudget = raw === '' ? undefined : Math.max(0, Math.round(Number(raw) || 0))
+      this.level.dashBudget =
+        raw === '' ? undefined : Math.max(0, Math.round(Number(raw) || 0))
       this.persist()
       this.validate()
     })
@@ -1970,7 +2207,8 @@ export class LevelEditor {
       if (brut === '') delete this.level.ambiante
       else {
         const v = Number(brut)
-        if (Number.isFinite(v)) this.level.ambiante = Math.max(0, Math.min(1, v / 100))
+        if (Number.isFinite(v))
+          this.level.ambiante = Math.max(0, Math.min(1, v / 100))
       }
       this.persist()
     })
@@ -1992,12 +2230,19 @@ export class LevelEditor {
     }
     for (const id of ['ed-name', 'ed-code', 'ed-par', 'ed-journal'] as const) {
       this.el(id).addEventListener('input', () => {
-        this.level.name = (this.el('ed-name') as HTMLInputElement).value || 'Sans titre'
+        this.level.name =
+          (this.el('ed-name') as HTMLInputElement).value || 'Sans titre'
         // « hub » en minuscules désigne le hub tout autant : on canonise ici,
         // sinon le tableau partait dans l'expédition sans que rien ne le dise
-        this.level.code = codeCanon((this.el('ed-code') as HTMLInputElement).value) || '21-?'
-        this.level.par = Math.max(1, Number((this.el('ed-par') as HTMLInputElement).value) || 3)
-        this.level.journal = (this.el('ed-journal') as HTMLTextAreaElement).value
+        this.level.code =
+          codeCanon((this.el('ed-code') as HTMLInputElement).value) || '21-?'
+        this.level.par = Math.max(
+          1,
+          Number((this.el('ed-par') as HTMLInputElement).value) || 3,
+        )
+        this.level.journal = (
+          this.el('ed-journal') as HTMLTextAreaElement
+        ).value
         this.persist()
         this.validate()
       })
@@ -2045,7 +2290,12 @@ export class LevelEditor {
     this.el('ed-zin').addEventListener('click', () => zoomPar(1.3))
     this.el('ed-zout').addEventListener('click', () => zoomPar(1 / 1.3))
     this.el('ed-new').addEventListener('click', () => {
-      if (!confirm('Repartir d’un tableau vierge ? Le brouillon en cours sera perdu.')) return
+      if (
+        !confirm(
+          'Repartir d’un tableau vierge ? Le brouillon en cours sera perdu.',
+        )
+      )
+        return
       this.level = blankLevel()
       this.openId = ''
       this.base = ''
@@ -2091,7 +2341,9 @@ export class LevelEditor {
     })
     this.el('ed-import').addEventListener('click', () => {
       this.el('ed-io').classList.toggle('open')
-      ;(this.el('ed-json') as HTMLTextAreaElement).value = serializeLevel(this.level)
+      ;(this.el('ed-json') as HTMLTextAreaElement).value = serializeLevel(
+        this.level,
+      )
     })
     this.el('ed-file').addEventListener('change', (e) => {
       const f = (e.target as HTMLInputElement).files?.[0]
@@ -2130,7 +2382,9 @@ export class LevelEditor {
     }
     host.innerHTML = this.library
       .map((s, i) => {
-        const errs = checkLevel(s.level).filter((v) => v.niveau === 'erreur').length
+        const errs = checkLevel(s.level).filter(
+          (v) => v.niveau === 'erreur',
+        ).length
         return (
           `<div class="ed-lib-row${s.id === this.openId ? ' open' : ''}" data-id="${s.id}">` +
           `<span class="ed-lib-no">${i + 1}</span>` +
@@ -2140,7 +2394,9 @@ export class LevelEditor {
               : 'Ouvrir ce tableau'
           }">` +
           `<b>${s.level.code}</b> ${s.level.name}` +
-          (s.level.code === CODE_HUB ? `<em class="ed-lib-hub">LABORATOIRE</em>` : '') +
+          (s.level.code === CODE_HUB
+            ? `<em class="ed-lib-hub">LABORATOIRE</em>`
+            : '') +
           `<small>${s.auteur ? s.auteur + ' · ' : ''}par ${s.level.par ?? '?'}${errs ? ' · ' + errs + ' erreur(s)' : ''}</small>` +
           `</button>` +
           `<span class="ed-lib-ord">` +
@@ -2153,16 +2409,25 @@ export class LevelEditor {
       .join('')
 
     for (const b of Array.from(host.querySelectorAll('.ed-lib-open'))) {
-      b.addEventListener('click', () => this.openFromLibrary((b as HTMLElement).dataset.id ?? ''))
+      b.addEventListener('click', () =>
+        this.openFromLibrary((b as HTMLElement).dataset.id ?? ''),
+      )
     }
     for (const b of Array.from(host.querySelectorAll('[data-up]'))) {
-      b.addEventListener('click', () => this.move((b as HTMLElement).dataset.up ?? '', -1))
+      b.addEventListener('click', () =>
+        this.move((b as HTMLElement).dataset.up ?? '', -1),
+      )
     }
     for (const b of Array.from(host.querySelectorAll('[data-down]'))) {
-      b.addEventListener('click', () => this.move((b as HTMLElement).dataset.down ?? '', 1))
+      b.addEventListener('click', () =>
+        this.move((b as HTMLElement).dataset.down ?? '', 1),
+      )
     }
     for (const b of Array.from(host.querySelectorAll('[data-del]'))) {
-      b.addEventListener('click', () => void this.removeFromLibrary((b as HTMLElement).dataset.del ?? ''))
+      b.addEventListener(
+        'click',
+        () => void this.removeFromLibrary((b as HTMLElement).dataset.del ?? ''),
+      )
     }
   }
 
@@ -2212,7 +2477,9 @@ export class LevelEditor {
       this.fitView()
       this.syncForm()
       this.renderLibrary()
-      this.commit(`« ${entry.level.name} » mis à jour : la bibliothèque avait une version plus récente.`)
+      this.commit(
+        `« ${entry.level.name} » mis à jour : la bibliothèque avait une version plus récente.`,
+      )
       return
     }
     this.commit(
@@ -2245,7 +2512,12 @@ export class LevelEditor {
   private async removeFromLibrary(id: string): Promise<void> {
     const entry = this.library.find((l) => l.id === id)
     if (!entry) return
-    if (!confirm(`Supprimer « ${entry.level.name} » de la bibliothèque ? C’est définitif.`)) return
+    if (
+      !confirm(
+        `Supprimer « ${entry.level.name} » de la bibliothèque ? C’est définitif.`,
+      )
+    )
+      return
     const saved = await deleteLevel(id)
     if (saved) {
       this.library = saved
@@ -2315,30 +2587,54 @@ export class LevelEditor {
     this.sel = null
     this.fitView()
     this.syncForm()
-    this.commit(rejets.length ? `Chargé, ${rejets.length} pièce(s) écartée(s).` : 'Tableau chargé.')
+    this.commit(
+      rejets.length
+        ? `Chargé, ${rejets.length} pièce(s) écartée(s).`
+        : 'Tableau chargé.',
+    )
   }
 
   private syncForm(): void {
     ;(this.el('ed-name') as HTMLInputElement).value = this.level.name
     ;(this.el('ed-code') as HTMLInputElement).value = this.level.code
     ;(this.el('ed-par') as HTMLInputElement).value = String(this.level.par ?? 3)
-    ;(this.el('ed-bxmin') as HTMLInputElement).value = String(this.level.bounds.minX)
-    ;(this.el('ed-bxmax') as HTMLInputElement).value = String(this.level.bounds.maxX)
-    ;(this.el('ed-bymin') as HTMLInputElement).value = String(this.level.bounds.minY)
-    ;(this.el('ed-bymax') as HTMLInputElement).value = String(this.level.bounds.maxY)
+    ;(this.el('ed-bxmin') as HTMLInputElement).value = String(
+      this.level.bounds.minX,
+    )
+    ;(this.el('ed-bxmax') as HTMLInputElement).value = String(
+      this.level.bounds.maxX,
+    )
+    ;(this.el('ed-bymin') as HTMLInputElement).value = String(
+      this.level.bounds.minY,
+    )
+    ;(this.el('ed-bymax') as HTMLInputElement).value = String(
+      this.level.bounds.maxY,
+    )
     ;(this.el('ed-dashs') as HTMLInputElement).value =
       this.level.dashBudget === undefined ? '' : String(this.level.dashBudget)
     ;(this.el('ed-lum-generale') as HTMLInputElement).value =
-      this.level.ambiante === undefined ? '' : String(Math.round(this.level.ambiante * 100))
+      this.level.ambiante === undefined
+        ? ''
+        : String(Math.round(this.level.ambiante * 100))
     // les menus se REMPLISSENT à chaque synchro : une cinématique composée
     // au montage pendant qu'on édite apparaît dès le retour au tableau
     const cines = this.hooks.cines?.() ?? []
     const seqs = this.hooks.sequences?.() ?? []
-    this.el('ed-cine-avant').innerHTML = optionsCodes(cines, this.level.cineAvant ?? '')
-    this.el('ed-cine-apres').innerHTML = optionsCodes(cines, this.level.cineApres ?? '')
-    this.el('ed-sequence').innerHTML = optionsCodes(seqs, this.level.sequence ?? '')
+    this.el('ed-cine-avant').innerHTML = optionsCodes(
+      cines,
+      this.level.cineAvant ?? '',
+    )
+    this.el('ed-cine-apres').innerHTML = optionsCodes(
+      cines,
+      this.level.cineApres ?? '',
+    )
+    this.el('ed-sequence').innerHTML = optionsCodes(
+      seqs,
+      this.level.sequence ?? '',
+    )
     ;(this.el('ed-journal') as HTMLTextAreaElement).value = this.level.journal
-    ;(this.el('ed-ambiance') as HTMLSelectElement).value = this.level.ambiance ?? ''
+    ;(this.el('ed-ambiance') as HTMLSelectElement).value =
+      this.level.ambiance ?? ''
     this.syncProps()
     this.validate()
   }
@@ -2362,27 +2658,51 @@ export class LevelEditor {
         `<button type="button" class="ed-btn" id="p-dim-h">Même hauteur (1ʳᵉ sélection)</button>` +
         `</div>` +
         `<button type="button" class="ed-danger" id="p-del">Tout supprimer</button>`
-      host.querySelector('#p-al-g')?.addEventListener('click', () => this.alignMulti('gauche'))
-      host.querySelector('#p-al-d')?.addEventListener('click', () => this.alignMulti('droite'))
-      host.querySelector('#p-al-h')?.addEventListener('click', () => this.alignMulti('haut'))
-      host.querySelector('#p-al-b')?.addEventListener('click', () => this.alignMulti('bas'))
-      host.querySelector('#p-al-ch')?.addEventListener('click', () => this.alignMulti('centreH'))
-      host.querySelector('#p-al-cv')?.addEventListener('click', () => this.alignMulti('centreV'))
-      host.querySelector('#p-dim-l')?.addEventListener('click', () => this.memeDimension('largeur'))
-      host.querySelector('#p-dim-h')?.addEventListener('click', () => this.memeDimension('hauteur'))
-      host.querySelector('#p-del')?.addEventListener('click', () => this.deleteSel())
+      host
+        .querySelector('#p-al-g')
+        ?.addEventListener('click', () => this.alignMulti('gauche'))
+      host
+        .querySelector('#p-al-d')
+        ?.addEventListener('click', () => this.alignMulti('droite'))
+      host
+        .querySelector('#p-al-h')
+        ?.addEventListener('click', () => this.alignMulti('haut'))
+      host
+        .querySelector('#p-al-b')
+        ?.addEventListener('click', () => this.alignMulti('bas'))
+      host
+        .querySelector('#p-al-ch')
+        ?.addEventListener('click', () => this.alignMulti('centreH'))
+      host
+        .querySelector('#p-al-cv')
+        ?.addEventListener('click', () => this.alignMulti('centreV'))
+      host
+        .querySelector('#p-dim-l')
+        ?.addEventListener('click', () => this.memeDimension('largeur'))
+      host
+        .querySelector('#p-dim-h')
+        ?.addEventListener('click', () => this.memeDimension('hauteur'))
+      host
+        .querySelector('#p-del')
+        ?.addEventListener('click', () => this.deleteSel())
       return
     }
     const s = this.sel
     if (!s) {
-      host.innerHTML = '<p class="ed-empty">Rien de sélectionné. Cliquez un élément (Maj + clic : sélection multiple), ou choisissez un outil et glissez pour en tracer un.</p>'
+      host.innerHTML =
+        '<p class="ed-empty">Rien de sélectionné. Cliquez un élément (Maj + clic : sélection multiple), ou choisissez un outil et glissez pour en tracer un.</p>'
       return
     }
     const rows: string[] = []
     // L'arrondi d'affichage respecte les DÉCIMALES : arrondi à l'entier, il
     // écrasait toute valeur fine (intensité 0,5 → 1) au premier
     // rafraîchissement du panneau.
-    const numField = (label: string, id: string, value: number, step = 10): string =>
+    const numField = (
+      label: string,
+      id: string,
+      value: number,
+      step = 10,
+    ): string =>
       `<label class="ed-f"><span>${label}</span><input type="number" step="${step}" id="${id}" value="${+value.toFixed(3)}" /></label>`
 
     // Champ à CURSEUR, pour le tactile : la glissière (le doigt) et le nombre
@@ -2409,8 +2729,21 @@ export class LevelEditor {
       const b = this.level.boxes[s.index]
       rows.push(
         `<label class="ed-f"><span>Matériau</span><select id="p-mat">` +
-          [MAT_WALL, MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_FROID, MAT_GRILLE, MAT_CHAUD, MAT_MEMBRANE, MAT_RIDEAU, MAT_SURCHAUFFEUR]
-            .map((m) => `<option value="${m}"${m === b.material ? ' selected' : ''}>${MATERIAL_NAMES[m]}</option>`)
+          [
+            MAT_WALL,
+            MAT_HYDROPHILE,
+            MAT_HYDROPHOBE,
+            MAT_FROID,
+            MAT_GRILLE,
+            MAT_CHAUD,
+            MAT_MEMBRANE,
+            MAT_RIDEAU,
+            MAT_SURCHAUFFEUR,
+          ]
+            .map(
+              (m) =>
+                `<option value="${m}"${m === b.material ? ' selected' : ''}>${MATERIAL_NAMES[m]}</option>`,
+            )
             .join('') +
           `</select></label>`,
       )
@@ -2419,12 +2752,21 @@ export class LevelEditor {
       rows.push(
         `<label class="ed-f"><span>Forme</span><select id="p-forme">` +
           [FORME_RECT, FORME_DISQUE, FORME_CAPSULE, FORME_COIN, FORME_ARC]
-            .map((f) => `<option value="${f}"${f === (b.forme ?? 0) ? ' selected' : ''}>${FORME_NAMES[f]}</option>`)
+            .map(
+              (f) =>
+                `<option value="${f}"${f === (b.forme ?? 0) ? ' selected' : ''}>${FORME_NAMES[f]}</option>`,
+            )
             .join('') +
           `</select></label>`,
       )
-      rows.push(numField('X min', 'p-minX', b.minX), numField('X max', 'p-maxX', b.maxX))
-      rows.push(numField('Y min', 'p-minY', b.minY), numField('Y max', 'p-maxY', b.maxY))
+      rows.push(
+        numField('X min', 'p-minX', b.minX),
+        numField('X max', 'p-maxX', b.maxX),
+      )
+      rows.push(
+        numField('Y min', 'p-minY', b.minY),
+        numField('Y max', 'p-maxY', b.maxY),
+      )
       rows.push(rangeField('Angle (°)', 'p-ang', b.angle ?? 0, -180, 180, 1))
       if ((b.forme ?? 0) === FORME_COIN) {
         // le coin qui porte l'angle droit : l'hypoténuse regarde à l'opposé
@@ -2432,27 +2774,63 @@ export class LevelEditor {
         rows.push(
           `<label class="ed-f"><span>Angle droit au coin</span><select id="p-fq0">` +
             coins
-              .map((n, i) => `<option value="${i}"${i === (((Math.round(b.p0 ?? 0) % 4) + 4) % 4) ? ' selected' : ''}>${n}</option>`)
+              .map(
+                (n, i) =>
+                  `<option value="${i}"${i === ((Math.round(b.p0 ?? 0) % 4) + 4) % 4 ? ' selected' : ''}>${n}</option>`,
+              )
               .join('') +
             `</select></label>`,
         )
       }
       if ((b.forme ?? 0) === FORME_ARC) {
-        rows.push(rangeField('Épaisseur (%)', 'p-fep', Math.round((b.p0 ?? ARC_EPAISSEUR_DEFAUT) * 100), 8, 100, 1))
-        rows.push(rangeField('Demi-ouverture (°)', 'p-fouv', b.p1 ?? ARC_OUVERTURE_DEFAUT, 15, 180, 5))
+        rows.push(
+          rangeField(
+            'Épaisseur (%)',
+            'p-fep',
+            Math.round((b.p0 ?? ARC_EPAISSEUR_DEFAUT) * 100),
+            8,
+            100,
+            1,
+          ),
+        )
+        rows.push(
+          rangeField(
+            'Demi-ouverture (°)',
+            'p-fouv',
+            b.p1 ?? ARC_OUVERTURE_DEFAUT,
+            15,
+            180,
+            5,
+          ),
+        )
       }
       if (b.material === MAT_CHAUD) {
         // chaque chaudière règle sa portée d'aura : gros bloc à petite aura…
-        rows.push(rangeField('Aura (× portée)', 'p-aura', b.aura ?? 1, 0.25, 4, 0.05))
+        rows.push(
+          rangeField('Aura (× portée)', 'p-aura', b.aura ?? 1, 0.25, 4, 0.05),
+        )
       }
       if (b.material === MAT_WALL && !(b.forme ?? 0)) {
         // habillage : pur décor, la physique reste celle d'une paroi neutre
         // (motifs calés sur la boîte : réservé aux rectangles)
-        const skins = ['Standard', 'Caissons', 'Conduites', 'Poutrelle', 'Blindage', 'Aération', 'Hublots', 'Écrans', 'Câbles']
+        const skins = [
+          'Standard',
+          'Caissons',
+          'Conduites',
+          'Poutrelle',
+          'Blindage',
+          'Aération',
+          'Hublots',
+          'Écrans',
+          'Câbles',
+        ]
         rows.push(
           `<label class="ed-f"><span>Habillage (décor)</span><select id="p-skin">` +
             skins
-              .map((n, i) => `<option value="${i}"${i === (b.skin ?? 0) ? ' selected' : ''}>${n}</option>`)
+              .map(
+                (n, i) =>
+                  `<option value="${i}"${i === (b.skin ?? 0) ? ' selected' : ''}>${n}</option>`,
+              )
               .join('') +
             `</select></label>`,
         )
@@ -2462,7 +2840,10 @@ export class LevelEditor {
       rows.push(
         `<label class="ed-f"><span>État imposé</span><select id="p-force">` +
           (['libre', 'eau', 'glace', 'vapeur'] as ZoneForce[])
-            .map((f) => `<option value="${f}"${f === z.force ? ' selected' : ''}>${f === 'eau' ? 'liquide' : f}</option>`)
+            .map(
+              (f) =>
+                `<option value="${f}"${f === z.force ? ' selected' : ''}>${f === 'eau' ? 'liquide' : f}</option>`,
+            )
             .join('') +
           `</select></label>`,
       )
@@ -2478,20 +2859,43 @@ export class LevelEditor {
         `<label class="ed-f" title="La SÉQUENCE in-map qui démarre quand le corps entre dans la zone, une fois par essai. C'est ainsi qu'on déclenche l'alerte au bon endroit."><span>Séquence</span>` +
           `<select id="p-zseq">${optionsCodes(this.hooks.sequences?.() ?? [], z.sequence ?? '')}</select></label>`,
       )
-      rows.push(numField('X min', 'p-minX', z.minX), numField('X max', 'p-maxX', z.maxX))
-      rows.push(numField('Y min', 'p-minY', z.minY), numField('Y max', 'p-maxY', z.maxY))
+      rows.push(
+        numField('X min', 'p-minX', z.minX),
+        numField('X max', 'p-maxX', z.maxX),
+      )
+      rows.push(
+        numField('Y min', 'p-minY', z.minY),
+        numField('Y max', 'p-maxY', z.maxY),
+      )
     } else if (s.kind === 'sponge') {
       const sp = this.level.sponges[s.index]
-      rows.push(numField('X min', 'p-minX', sp.minX), numField('Y min', 'p-minY', sp.minY))
-      rows.push(numField('Colonnes', 'p-cols', sp.cols, 1), numField('Rangées', 'p-rows', sp.rows, 1))
+      rows.push(
+        numField('X min', 'p-minX', sp.minX),
+        numField('Y min', 'p-minY', sp.minY),
+      )
+      rows.push(
+        numField('Colonnes', 'p-cols', sp.cols, 1),
+        numField('Rangées', 'p-rows', sp.rows, 1),
+      )
       rows.push(numField('Taille de cellule', 'p-cell', sp.cellSize, 2))
-      rows.push(numField('Capacité par cellule', 'p-cap', sp.capacityPerCell, 1))
+      rows.push(
+        numField('Capacité par cellule', 'p-cap', sp.capacityPerCell, 1),
+      )
     } else if (s.kind === 'exit') {
       const e = this.level.exit
-      rows.push(numField('X min', 'p-minX', e.minX), numField('X max', 'p-maxX', e.maxX))
-      rows.push(numField('Y min', 'p-minY', e.minY), numField('Y max', 'p-maxY', e.maxY))
+      rows.push(
+        numField('X min', 'p-minX', e.minX),
+        numField('X max', 'p-maxX', e.maxX),
+      )
+      rows.push(
+        numField('Y min', 'p-minY', e.minY),
+        numField('Y max', 'p-maxY', e.maxY),
+      )
     } else if (s.kind === 'spawn') {
-      rows.push(numField('X', 'p-sx', this.level.spawn.x), numField('Y', 'p-sy', this.level.spawn.y))
+      rows.push(
+        numField('X', 'p-sx', this.level.spawn.x),
+        numField('Y', 'p-sy', this.level.spawn.y),
+      )
       rows.push(numField('Particules', 'p-sn', this.level.spawn.n, 50))
     } else if (s.kind === 'laser') {
       const l = (this.level.lasers ?? [])[s.index]
@@ -2500,9 +2904,22 @@ export class LevelEditor {
     } else if (s.kind === 'lumiere') {
       const l = (this.level.lumieres ?? [])[s.index]
       rows.push(numField('X', 'p-lmx', l.x), numField('Y', 'p-lmy', l.y))
-      rows.push(rangeField('Hauteur', 'p-lmh', l.h ?? LAMPE_HAUTEUR_DEFAUT, LAMPE_HAUTEUR_MIN, LAMPE_HAUTEUR_MAX, 10))
-      rows.push(rangeField('Portée (0 = auto)', 'p-lmp', l.portee ?? 0, 0, 4000, 50))
-      rows.push(rangeField('Intensité', 'p-lmi', l.intensite ?? 1, 0.2, 2, 0.05))
+      rows.push(
+        rangeField(
+          'Hauteur',
+          'p-lmh',
+          l.h ?? LAMPE_HAUTEUR_DEFAUT,
+          LAMPE_HAUTEUR_MIN,
+          LAMPE_HAUTEUR_MAX,
+          10,
+        ),
+      )
+      rows.push(
+        rangeField('Portée (0 = auto)', 'p-lmp', l.portee ?? 0, 0, 4000, 50),
+      )
+      rows.push(
+        rangeField('Intensité', 'p-lmi', l.intensite ?? 1, 0.2, 2, 0.05),
+      )
       rows.push(
         `<label class="ed-f"><span>Couleur</span>` +
           `<input type="color" id="p-lmc" value="${l.couleur ?? LAMPE_COULEUR_DEFAUT}" /></label>`,
@@ -2539,8 +2956,14 @@ export class LevelEditor {
           `<option value="et"${q.regle === 'et' ? ' selected' : ''}>ET — toutes les cibles du canal</option>` +
           `</select></label>`,
       )
-      rows.push(numField('X min', 'p-minX', q.minX), numField('X max', 'p-maxX', q.maxX))
-      rows.push(numField('Y min', 'p-minY', q.minY), numField('Y max', 'p-maxY', q.maxY))
+      rows.push(
+        numField('X min', 'p-minX', q.minX),
+        numField('X max', 'p-maxX', q.maxX),
+      )
+      rows.push(
+        numField('Y min', 'p-minY', q.minY),
+        numField('Y max', 'p-maxY', q.maxY),
+      )
       rows.push(
         `<p class="ed-empty">La porte s’ouvre par le canal : le N° affiché sur les pastilles. La règle ne joue que si plusieurs pastilles portent ce numéro. Canal −1 : porte SCÉNARISÉE, qu’aucun faisceau n’ouvre.</p>`,
       )
@@ -2549,7 +2972,9 @@ export class LevelEditor {
       rows.push(
         `<p class="ed-empty">Ligne de champ en ${r.points.length} points. Un faisceau IONISÉ (passé dans la vapeur) qui frôle la ligne — n’importe où — s’y accroche et la suit DANS LE SENS DES CHEVRONS. Glissez pour déplacer le rail entier ; outil « Rail » sur une extrémité pour le prolonger.</p>`,
       )
-      rows.push(`<button type="button" class="ed-btn" id="p-railrev">Inverser le sens</button>`)
+      rows.push(
+        `<button type="button" class="ed-btn" id="p-railrev">Inverser le sens</button>`,
+      )
     } else if (s.kind === 'label') {
       const l = this.level.labels[s.index]
       // zone de texte (et non ligne unique) : ENTRÉE fait un vrai saut de
@@ -2562,8 +2987,22 @@ export class LevelEditor {
       )
       rows.push(
         `<label class="ed-f"><span>Couleur</span><select id="p-tone">` +
-          (['mur', 'phile', 'phobe', 'eponge', 'froid', 'grille', 'sas', 'chaud'] as WorldLabel['tone'][])
-            .map((t) => `<option value="${t}"${t === l.tone ? ' selected' : ''}>${t}</option>`)
+          (
+            [
+              'mur',
+              'phile',
+              'phobe',
+              'eponge',
+              'froid',
+              'grille',
+              'sas',
+              'chaud',
+            ] as WorldLabel['tone'][]
+          )
+            .map(
+              (t) =>
+                `<option value="${t}"${t === l.tone ? ' selected' : ''}>${t}</option>`,
+            )
             .join('') +
           `</select></label>`,
       )
@@ -2589,12 +3028,12 @@ export class LevelEditor {
                   : s.kind === 'lumiere'
                     ? `Lampe nº ${s.index + 1}`
                     : s.kind === 'cible'
-                    ? `Cible nº ${canalDeCible(this.level.cibles ?? [], s.index)}`
-                    : s.kind === 'porte'
-                      ? 'Porte asservie'
-                      : s.kind === 'rail'
-                        ? 'Rail magnétique'
-                        : 'Étiquette'
+                      ? `Cible nº ${canalDeCible(this.level.cibles ?? [], s.index)}`
+                      : s.kind === 'porte'
+                        ? 'Porte asservie'
+                        : s.kind === 'rail'
+                          ? 'Rail magnétique'
+                          : 'Étiquette'
 
     host.innerHTML =
       `<div class="ed-props-head">${kindName}</div><div class="ed-fields">${rows.join('')}</div>` +
@@ -2602,21 +3041,31 @@ export class LevelEditor {
         ? ''
         : `<button type="button" class="ed-danger" id="p-del">Supprimer</button>`)
 
-    host.querySelector('#p-del')?.addEventListener('click', () => this.deleteSel())
+    host
+      .querySelector('#p-del')
+      ?.addEventListener('click', () => this.deleteSel())
     host.querySelector('#p-railrev')?.addEventListener('click', () => {
       if (this.sel?.kind === 'rail') {
         ;(this.level.rails ?? [])[this.sel.index]?.points.reverse()
-        this.commit('Sens du rail inversé — les chevrons montrent la circulation de l’arc.')
+        this.commit(
+          'Sens du rail inversé — les chevrons montrent la circulation de l’arc.',
+        )
       }
     })
-    for (const input of Array.from(host.querySelectorAll('input, select, textarea'))) {
+    for (const input of Array.from(
+      host.querySelectorAll('input, select, textarea'),
+    )) {
       input.addEventListener('change', () => this.readProps())
     }
     // Curseurs : la glissière applique EN DIRECT (le tableau suit le doigt),
     // le relâcher passe par le change générique — un seul cran d'historique.
     // Le nombre jumeau se synchronise dans les deux sens.
-    for (const r of Array.from(host.querySelectorAll<HTMLInputElement>('input[type="range"]'))) {
-      const num = host.querySelector<HTMLInputElement>('#' + r.id.replace(/-r$/, ''))
+    for (const r of Array.from(
+      host.querySelectorAll<HTMLInputElement>('input[type="range"]'),
+    )) {
+      const num = host.querySelector<HTMLInputElement>(
+        '#' + r.id.replace(/-r$/, ''),
+      )
       r.addEventListener('input', () => {
         if (num) num.value = r.value
         this.appliqueProps()
@@ -2643,14 +3092,25 @@ export class LevelEditor {
       return e ? Number(e.value) || 0 : 0
     }
     const text = (id: string): string => {
-      const e = this.host.querySelector('#' + id) as HTMLInputElement | HTMLSelectElement | null
+      const e = this.host.querySelector('#' + id) as
+        | HTMLInputElement
+        | HTMLSelectElement
+        | null
       return e ? e.value : ''
     }
 
     if (s.kind === 'box') {
       const b = this.level.boxes[s.index]
       b.material = Number(text('p-mat'))
-      Object.assign(b, this.normalized(val('p-minX'), val('p-minY'), val('p-maxX'), val('p-maxY')))
+      Object.assign(
+        b,
+        this.normalized(
+          val('p-minX'),
+          val('p-minY'),
+          val('p-maxX'),
+          val('p-maxY'),
+        ),
+      )
       // l'oblique : un angle en degrés autour du centre — 0 efface la clé
       const ang = Math.max(-180, Math.min(180, val('p-ang')))
       if (ang) b.angle = ang
@@ -2664,11 +3124,18 @@ export class LevelEditor {
       delete b.p0
       delete b.p1
       if (forme === FORME_COIN) {
-        const q0 = ((Math.round(forme === ancienne ? val('p-fq0') : 0) % 4) + 4) % 4
+        const q0 =
+          ((Math.round(forme === ancienne ? val('p-fq0') : 0) % 4) + 4) % 4
         if (q0) b.p0 = q0
       } else if (forme === FORME_ARC && forme === ancienne) {
-        const ep = Math.max(0.08, Math.min(1, (val('p-fep') || ARC_EPAISSEUR_DEFAUT * 100) / 100))
-        const ouv = Math.max(15, Math.min(180, val('p-fouv') || ARC_OUVERTURE_DEFAUT))
+        const ep = Math.max(
+          0.08,
+          Math.min(1, (val('p-fep') || ARC_EPAISSEUR_DEFAUT * 100) / 100),
+        )
+        const ouv = Math.max(
+          15,
+          Math.min(180, val('p-fouv') || ARC_OUVERTURE_DEFAUT),
+        )
         if (ep !== ARC_EPAISSEUR_DEFAUT) b.p0 = ep
         if (ouv !== ARC_OUVERTURE_DEFAUT) b.p1 = ouv
       }
@@ -2699,7 +3166,15 @@ export class LevelEditor {
       const zseq = text('p-zseq').trim().slice(0, 24)
       if (zseq) z.sequence = zseq
       else delete z.sequence
-      Object.assign(z, this.normalized(val('p-minX'), val('p-minY'), val('p-maxX'), val('p-maxY')))
+      Object.assign(
+        z,
+        this.normalized(
+          val('p-minX'),
+          val('p-minY'),
+          val('p-maxX'),
+          val('p-maxY'),
+        ),
+      )
     } else if (s.kind === 'sponge') {
       const sp = this.level.sponges[s.index]
       sp.minX = val('p-minX')
@@ -2711,7 +3186,12 @@ export class LevelEditor {
     } else if (s.kind === 'exit') {
       Object.assign(
         this.level.exit,
-        this.normalized(val('p-minX'), val('p-minY'), val('p-maxX'), val('p-maxY')),
+        this.normalized(
+          val('p-minX'),
+          val('p-minY'),
+          val('p-maxX'),
+          val('p-maxY'),
+        ),
       )
     } else if (s.kind === 'spawn') {
       this.level.spawn.x = val('p-sx')
@@ -2727,7 +3207,10 @@ export class LevelEditor {
       l.x = val('p-lmx')
       l.y = val('p-lmy')
       // les défauts effacent la clé : le fichier reste minimal
-      const h = Math.max(LAMPE_HAUTEUR_MIN, Math.min(LAMPE_HAUTEUR_MAX, val('p-lmh') || LAMPE_HAUTEUR_DEFAUT))
+      const h = Math.max(
+        LAMPE_HAUTEUR_MIN,
+        Math.min(LAMPE_HAUTEUR_MAX, val('p-lmh') || LAMPE_HAUTEUR_DEFAUT),
+      )
       if (h !== LAMPE_HAUTEUR_DEFAUT) l.h = h
       else delete l.h
       const portee = val('p-lmp')
@@ -2737,7 +3220,8 @@ export class LevelEditor {
       if (intensite !== 1) l.intensite = intensite
       else delete l.intensite
       const couleur = text('p-lmc').toLowerCase()
-      if (/^#[0-9a-f]{6}$/.test(couleur) && couleur !== LAMPE_COULEUR_DEFAUT) l.couleur = couleur
+      if (/^#[0-9a-f]{6}$/.test(couleur) && couleur !== LAMPE_COULEUR_DEFAUT)
+        l.couleur = couleur
       else delete l.couleur
     } else if (s.kind === 'cible') {
       const t = (this.level.cibles ?? [])[s.index]
@@ -2756,7 +3240,15 @@ export class LevelEditor {
       q.canal = canal >= 1 ? canal : -1
       if (text('p-pregle') === 'et') q.regle = 'et'
       else delete q.regle
-      Object.assign(q, this.normalized(val('p-minX'), val('p-minY'), val('p-maxX'), val('p-maxY')))
+      Object.assign(
+        q,
+        this.normalized(
+          val('p-minX'),
+          val('p-minY'),
+          val('p-maxX'),
+          val('p-maxY'),
+        ),
+      )
     } else if (s.kind === 'label') {
       const l = this.level.labels[s.index]
       // les sauts de ligne SURVIVENT (ils sont le geste demandé) ; le reste
@@ -2776,7 +3268,12 @@ export class LevelEditor {
     }
   }
 
-  private normalized(minX: number, minY: number, maxX: number, maxY: number): Rect {
+  private normalized(
+    minX: number,
+    minY: number,
+    maxX: number,
+    maxY: number,
+  ): Rect {
     return {
       minX: Math.min(minX, maxX),
       minY: Math.min(minY, maxY),
@@ -2789,7 +3286,8 @@ export class LevelEditor {
     const host = this.el('ed-check')
     const v = checkLevel(this.level)
     if (v.length === 0) {
-      host.innerHTML = '<div class="ed-ok">Tableau valide — prêt à essayer.</div>'
+      host.innerHTML =
+        '<div class="ed-ok">Tableau valide — prêt à essayer.</div>'
       return
     }
     host.innerHTML = v
@@ -2863,10 +3361,21 @@ export class LevelEditor {
       g.setLineDash([])
       // l'illustration de la cause, ajustée comme dans le jeu (contain,
       // centrée, marge 6 %) — on voit dans l'éditeur ce que verra le joueur
-      const ta = z.force === 'eau' ? 1.5 : z.force === 'glace' ? 0.667 : z.force === 'vapeur' ? 1.0 : 0
+      const ta =
+        z.force === 'eau'
+          ? 1.5
+          : z.force === 'glace'
+            ? 0.667
+            : z.force === 'vapeur'
+              ? 1.0
+              : 0
       if (ta > 0) {
         const name =
-          z.force === 'eau' ? 'zone-buses' : z.force === 'glace' ? 'zone-hublot' : 'zone-conduite'
+          z.force === 'eau'
+            ? 'zone-buses'
+            : z.force === 'glace'
+              ? 'zone-hublot'
+              : 'zone-conduite'
         const im = this.img(name)
         if (im) {
           const zw = (z.maxX - z.minX) * 0.94
@@ -2898,7 +3407,11 @@ export class LevelEditor {
       g.stroke()
       g.fillStyle = col
       g.font = '600 11px ui-monospace, monospace'
-      g.fillText(`${zoneName(z)} · ${z.force.toUpperCase()}`, p.sx + 6, p.sy + 15)
+      g.fillText(
+        `${zoneName(z)} · ${z.force.toUpperCase()}`,
+        p.sx + 6,
+        p.sy + 15,
+      )
     }
 
     // éponges
@@ -2907,7 +3420,8 @@ export class LevelEditor {
       const q = this.toScreen(sp.minX + sp.cols * sp.cellSize, sp.minY)
       // une éponge peut prendre le dessus dans la Superposition : elle porte
       // alors le même liseré doré que les parois
-      const gagnante = this.cutWinner?.kind === 'sponge' && this.cutWinner.index === si
+      const gagnante =
+        this.cutWinner?.kind === 'sponge' && this.cutWinner.index === si
       g.fillStyle = 'rgba(215,173,85,0.30)'
       g.fillRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
       g.strokeStyle = gagnante ? '#ffd24a' : '#d7ad55'
@@ -2955,10 +3469,19 @@ export class LevelEditor {
         colA = '#a878e8'
       }
       if (band <= 0) continue
-      const aura = (portee: number, alphaFill: string, alphaLine: string, dash: number[]): void => {
+      const aura = (
+        portee: number,
+        alphaFill: string,
+        alphaLine: string,
+        dash: number[],
+      ): void => {
         const p = this.toScreen(box.minX - portee, box.maxY + portee)
         const q = this.toScreen(box.maxX + portee, box.minY - portee)
-        const r = Math.min(portee * this.zoom, (q.sx - p.sx) / 2, (q.sy - p.sy) / 2)
+        const r = Math.min(
+          portee * this.zoom,
+          (q.sx - p.sx) / 2,
+          (q.sy - p.sy) / 2,
+        )
         g.beginPath()
         g.roundRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy, Math.max(0, r))
         if (alphaFill) {
@@ -2972,8 +3495,10 @@ export class LevelEditor {
         g.setLineDash([])
       }
       aura(band, '10', '55', [5, 4])
-      if (box.material === MAT_FROID) aura(band * (1 + P.chillColdGrowth), '', '2e', [2, 7])
-      if (box.material === MAT_CHAUD) aura(band * (1 - P.chillHeatFade), '', '2e', [2, 7])
+      if (box.material === MAT_FROID)
+        aura(band * (1 + P.chillColdGrowth), '', '2e', [2, 7])
+      if (box.material === MAT_CHAUD)
+        aura(band * (1 - P.chillHeatFade), '', '2e', [2, 7])
     }
 
     // surfaces (les obliques pivotent autour de leur centre) — une FORME se
@@ -2981,7 +3506,8 @@ export class LevelEditor {
     // est la silhouette que le shader et la physique évaluent en SDF
     this.level.boxes.forEach((box, bi) => {
       const col = MAT_COLORS[box.material] ?? '#888'
-      const gagnant = this.cutWinner?.kind === 'box' && this.cutWinner.index === bi
+      const gagnant =
+        this.cutWinner?.kind === 'box' && this.cutWinner.index === bi
       g.save()
       if (box.forme) {
         const pts = formeOutline(box, 64)
@@ -3123,7 +3649,11 @@ export class LevelEditor {
       const eteinte = i >= MAX_LUMIERES // au-delà du plafond : elle n'éclaire pas
       // le pictogramme prend la couleur de la lampe (le blanc neutre garde
       // le jaune d'interface : un soleil blanc disparaîtrait sur la cuve)
-      const col = eteinte ? '#7b93a8' : l.couleur && l.couleur !== '#ffffff' ? l.couleur : '#ffd977'
+      const col = eteinte
+        ? '#7b93a8'
+        : l.couleur && l.couleur !== '#ffffff'
+          ? l.couleur
+          : '#ffd977'
       g.save()
       // rayons
       g.strokeStyle = col + (selLampe ? 'ff' : 'aa')
@@ -3147,7 +3677,9 @@ export class LevelEditor {
       g.fillStyle = col + 'cc'
       g.font = '600 9px ui-monospace, monospace'
       g.fillText(
-        eteinte ? `LAMPE ${i + 1} — ÉTEINTE (plafond)` : `LAMPE ${i + 1} · h ${l.h ?? LAMPE_HAUTEUR_DEFAUT}`,
+        eteinte
+          ? `LAMPE ${i + 1} — ÉTEINTE (plafond)`
+          : `LAMPE ${i + 1} · h ${l.h ?? LAMPE_HAUTEUR_DEFAUT}`,
         s.sx + 18,
         s.sy - 6,
       )
@@ -3161,7 +3693,11 @@ export class LevelEditor {
         g.stroke()
         g.setLineDash([])
         g.fillStyle = col + '88'
-        g.fillText('PORTÉE', s.sx + portee * this.zoom * 0.707 + 4, s.sy - portee * this.zoom * 0.707 - 4)
+        g.fillText(
+          'PORTÉE',
+          s.sx + portee * this.zoom * 0.707 + 4,
+          s.sy - portee * this.zoom * 0.707 - 4,
+        )
       }
       g.restore()
     }
@@ -3224,7 +3760,13 @@ export class LevelEditor {
         const p = this.toScreen(pts[k].x, pts[k].y)
         g.fillStyle = selRail ? '#e6dcff' : '#b8a0f5'
         g.beginPath()
-        g.arc(p.sx, p.sy, k === 0 || k === pts.length - 1 ? 4 : 2.5, 0, Math.PI * 2)
+        g.arc(
+          p.sx,
+          p.sy,
+          k === 0 || k === pts.length - 1 ? 4 : 2.5,
+          0,
+          Math.PI * 2,
+        )
         g.fill()
       }
       g.strokeStyle = selRail ? '#e6dcff' : 'rgba(190,160,255,0.8)'
@@ -3244,9 +3786,15 @@ export class LevelEditor {
           const ex = ux
           const ey = -uy // écran : y vers le bas
           g.beginPath()
-          g.moveTo(p.sx - (ex + ey * 0.6) * taille, p.sy - (ey - ex * 0.6) * taille)
+          g.moveTo(
+            p.sx - (ex + ey * 0.6) * taille,
+            p.sy - (ey - ex * 0.6) * taille,
+          )
           g.lineTo(p.sx, p.sy)
-          g.lineTo(p.sx - (ex - ey * 0.6) * taille, p.sy - (ey + ex * 0.6) * taille)
+          g.lineTo(
+            p.sx - (ex - ey * 0.6) * taille,
+            p.sy - (ey + ex * 0.6) * taille,
+          )
           g.stroke()
         }
       }
@@ -3284,9 +3832,15 @@ export class LevelEditor {
       const rr = Math.max(5, t.r * this.zoom)
       g.beginPath()
       g.arc(p.sx, p.sy, rr, 0, Math.PI * 2)
-      g.fillStyle = touchees.has(i) ? 'rgba(110,255,185,0.30)' : 'rgba(48,64,76,0.7)'
+      g.fillStyle = touchees.has(i)
+        ? 'rgba(110,255,185,0.30)'
+        : 'rgba(48,64,76,0.7)'
       g.fill()
-      g.strokeStyle = touchees.has(i) ? '#6dffb8' : t.mode === 'nor' ? '#c99a4e' : '#7b93a8'
+      g.strokeStyle = touchees.has(i)
+        ? '#6dffb8'
+        : t.mode === 'nor'
+          ? '#c99a4e'
+          : '#7b93a8'
       g.lineWidth = 2
       g.stroke()
       if (t.mode === 'nor') {
@@ -3353,8 +3907,14 @@ export class LevelEditor {
     // rectangle en cours de tracé — la GOMME se peint en jaune barré : on
     // voit qu'on efface, pas qu'on pose
     if (this.drag?.mode === 'create') {
-      const p = this.toScreen(Math.min(this.drag.x0, this.drag.x1), Math.max(this.drag.y0, this.drag.y1))
-      const q = this.toScreen(Math.max(this.drag.x0, this.drag.x1), Math.min(this.drag.y0, this.drag.y1))
+      const p = this.toScreen(
+        Math.min(this.drag.x0, this.drag.x1),
+        Math.max(this.drag.y0, this.drag.y1),
+      )
+      const q = this.toScreen(
+        Math.max(this.drag.x0, this.drag.x1),
+        Math.min(this.drag.y0, this.drag.y1),
+      )
       const efface = this.tool.kind === 'gomme'
       if (efface) {
         g.fillStyle = 'rgba(255,210,74,0.12)'
@@ -3384,7 +3944,8 @@ export class LevelEditor {
 
     // sélection et poignées
     const r = this.selRect()
-    const boxSel = this.sel?.kind === 'box' ? this.level.boxes[this.sel.index] : null
+    const boxSel =
+      this.sel?.kind === 'box' ? this.level.boxes[this.sel.index] : null
     if (r && boxSel?.angle) {
       // boîte OBLIQUE : contour et poignées aux VRAIS coins, pivotés — les
       // poignées droites mentiraient
@@ -3411,7 +3972,11 @@ export class LevelEditor {
       g.fillStyle = '#a9c0d2'
       g.font = '11px ui-monospace, monospace'
       const bas = coins.reduce((a, c) => (c.sy > a.sy ? c : a))
-      g.fillText(`${Math.round(hx * 2)} × ${Math.round(hy * 2)}`, bas.sx + 8, bas.sy + 15)
+      g.fillText(
+        `${Math.round(hx * 2)} × ${Math.round(hy * 2)}`,
+        bas.sx + 8,
+        bas.sy + 15,
+      )
     } else if (r) {
       const p = this.toScreen(r.minX, r.maxY)
       const q = this.toScreen(r.maxX, r.minY)
@@ -3431,7 +3996,11 @@ export class LevelEditor {
       }
       g.fillStyle = '#a9c0d2'
       g.font = '11px ui-monospace, monospace'
-      g.fillText(`${Math.round(r.maxX - r.minX)} × ${Math.round(r.maxY - r.minY)}`, p.sx, q.sy + 15)
+      g.fillText(
+        `${Math.round(r.maxX - r.minX)} × ${Math.round(r.maxY - r.minY)}`,
+        p.sx,
+        q.sy + 15,
+      )
     } else if (this.sel?.kind === 'label' || this.sel?.kind === 'spawn') {
       const pt =
         this.sel.kind === 'label'
@@ -3454,7 +4023,10 @@ export class LevelEditor {
       const cy = (b.minY + b.maxY) / 2
       const rad = ((b.angle ?? 0) * Math.PI) / 180
       const demiH = (b.maxY - b.minY) / 2
-      const bord = this.toScreen(cx - Math.sin(rad) * demiH, cy + Math.cos(rad) * demiH)
+      const bord = this.toScreen(
+        cx - Math.sin(rad) * demiH,
+        cy + Math.cos(rad) * demiH,
+      )
       g.strokeStyle = '#ffffff'
       g.lineWidth = 1.2
       g.beginPath()

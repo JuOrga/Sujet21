@@ -14,6 +14,65 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '20/08/2026 12:30',
+    title:
+      'Retouches signalées : l’ombre des gouttes (bis), le luminaire-éclipse, le hub compact dans l’éditeur',
+    notes: [
+      'L’OMBRE DES GOUTTELETTES, deuxième passe — la première ne suffisait pas. Le vrai discriminant est désormais un TEST DE LARGEUR : à chaque point où le rayon d’ombre rencontre de la matière, deux prélèvements perpendiculaires à ±45 unités vérifient qu’elle est LARGE. Le corps (plusieurs centaines d’unités) les remplit toujours ; une goutte (~26 unités) jamais — son ombre s’éteint, quelle que soit sa densité. Les traînées d’éjection ne sèment plus de pastilles noires sur les parois.',
+      'LE LUMINAIRE devient une ÉCLIPSE, comme demandé : vu du dessus on regarde le DOS de la lampe — un capot de métal plein, pas une vitre lumineuse. La lumière ne s’échappe plus qu’en COURONNE autour du capot (blanche au ras du métal, couleur de lampe vers l’extérieur), découpée par les quatre pattes de fixation. Le capot garde son moyeu central et un brossage concentrique discret.',
+      'LE HUB COMPACT (HUB2) apparaît dans la liste des tableaux livrés de l’éditeur, juste sous le hub actuel : il s’étudie et se copie comme les autres. Pour qu’une copie retravaillée devienne LE laboratoire joué, la publier sous le code HUB.',
+      'Et ces NOTES DE VERSION rattrapent leur retard : les cinq livraisons depuis le 17/08 (ci-dessous) étaient bien en ligne mais n’avaient pas été consignées — d’où le doute légitime du concepteur. Le journal est de nouveau la source de vérité.',
+    ],
+  },
+  {
+    date: '20/08/2026 10:15',
+    title: 'Les lampes ont un corps : le plafonnier de station',
+    notes: [
+      'Chaque lampe posée à l’éditeur dessine désormais SON LUMINAIRE à sa position — jusqu’ici la lumière tombait de nulle part. Il est dessiné PAR-DESSUS l’eau (il est au plafond : le fluide passe dessous, l’ombre du corps ne l’atteint pas) et n’éclaire RIEN de plus : tout l’éclairage vient toujours de la carte de lumière — c’est l’objet, pas la lampe.',
+      'Sa taille suit la HAUTEUR de la lampe (plus haute = plus proche de la caméra) : 14 unités à la hauteur par défaut, 11 en rasante, 26 au plafond maximal. Sa teinte et sa brillance suivent la couleur et l’intensité réglées à l’éditeur.',
+      'Seules les lampes DÉCLARÉES ont un corps : la lampe par défaut des tableaux sans lumière reste invisible — elle est l’éclairage ambiant de la cuve, pas un objet du décor. Les tableaux existants ne changent donc pas.',
+    ],
+  },
+  {
+    date: '20/08/2026 09:45',
+    title:
+      'Les gouttelettes ne sèment plus de pastilles d’ombre (première passe)',
+    notes: [
+      'Signalé sur mobile : les traînées de gouttelettes projetaient un chapelet de boules d’ombre sur les parois. Cause : l’ombre du volume marche du pixel vers chaque lampe en huit prélèvements du champ et prenait le MAX — une gouttelette qui interceptait UN prélèvement ombrait autant que le corps entier.',
+      'Deux garde-fous posés : la densité (l’intérieur du corps sature le champ, une goutte isolée dépasse à peine le seuil) et la couverture (un prélèvement touché → ombre à moitié, deux et plus → pleine). Insuffisant en pratique — renforcé le jour même par le test de largeur (entrée du dessus).',
+    ],
+  },
+  {
+    date: '19/08/2026 20:30',
+    title:
+      'Plus un sifflement : voix de bruit blanc retirées, six bruitages refaits sombres',
+    notes: [
+      'Les sons qui faisaient mal avaient tous le même défaut, MESURABLE : leur énergie au-dessus de 3 kHz. goutte-rosee : 99 % (un tintement de verre pour une goutte d’eau) ; condensation : 76 % ; souffle-vapeur : 73 %. Les six pires fichiers sont remplacés par les enregistrements du concepteur — goutte-rosee, condensation, souffle-vapeur, eponge, gel, vortex-sas — tous à 0 % d’aigus, calés sous 200-800 Hz.',
+      'Quatre voix de SYNTHÈSE sifflaient encore, fabriquées en direct dans le code (du bruit blanc filtré) : la bouffée qui doublait CHAQUE vaporisation (le fameux « pschhh » de transformation), celle de la condensation, les douze éclats cristallins du gel (2600-5100 Hz — la chose la plus aiguë du jeu), et le scintillement de la visée du dash (3400 Hz sur le geste le plus fréquent du jeu). Toutes retirées ; chaque geste garde sa voix grave et son fichier.',
+      'Verdict, mesuré sur les douze bruitages embarqués : onze à 0,0 % d’énergie au-dessus de 3 kHz, un à 1,8 % (impact-glace — c’est un choc de glace, il a le droit). Les anciens masters sont archivés en -v1, la chaîne tools/audio/prepare.py reste reproductible d’une commande. docs/assets-audio.md consigne les quinze prompts de la palette, mesures comprises.',
+    ],
+  },
+  {
+    date: '19/08/2026 19:15',
+    title:
+      'La vapeur ne siffle plus : une nappe enregistrée à la place du bruit blanc',
+    notes: [
+      'Le son d’état de la vapeur n’était pas un fichier : du bruit blanc filtré en boucle, généré en direct — et un bruit blanc reste un sifflement, deux filtres et deux LFO y étaient déjà passés. Il est remplacé par la nappe enregistrée du concepteur (30 s, rien au-dessus de 800 Hz, elle respire d’elle-même), pilotée à la frame par la quantité de vapeur comme avant.',
+      'Le rebouclage se fait à 0,12 s des bords du fichier : la couture tombe en pleine matière, pas sur les fondus — aucun « toc » toutes les 30 secondes. Si le fichier ne se charge pas (hors ligne), l’ancienne voix de synthèse reprend la main : une nappe sommaire vaut mieux qu’un silence.',
+      'La FLORAISON remplace le jet : vaporisation.mp3 n’est plus un « pschhh » sous pression mais l’épanouissement chaud livré par le concepteur (4 s, 62 % de l’énergie sous 200 Hz). L’ancien master est archivé, plus référencé.',
+    ],
+  },
+  {
+    date: '18/08/2026 11:45',
+    title:
+      'L’acte 0 d’une traite : onze battements sur les sept planches paysage',
+    notes: [
+      'Les SEPT images 16:9 du concepteur sont intégrées (1600×900, WebP) : les quatre planches de l’ouverture — jusqu’ici portrait, rognées de moitié sur mobile où le jeu force le paysage — et les trois nouvelles du départ. Plus aucun SVG provisoire dans les cinématiques livrées.',
+      'L’OUVERTURE devient l’acte 0 COMPLET : onze battements qui traversent les sept planches, de la cuve au seuil du sas. Quatre battements ajoutés après « Le confinement cède » : le module vide (fondu au noir, la musique bascule du tiède au glacial — le module s’est refroidi), la cuve crevée, le couloir qui aspire, et le seuil — « Rien ne se perd. Tout ce qui passe compte. »',
+      'LE DÉPART reste à côté, en version courte : les quatre mêmes derniers battements. La logique roguelike : l’ouverture complète ne passe qu’au tout premier lancement, le départ se rejoue à chaque run — le joueur qui repart reconnaît le couloir sans se retaper la naissance.',
+    ],
+  },
+  {
     date: '17/08/2026 16:15',
     title: 'L’ÉDITEUR aussi : plus un seul code à taper de mémoire',
     notes: [
@@ -23,7 +82,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '17/08/2026 15:30',
-    title: 'Le champ CINÉMATIQUE propose enfin les titres · l’ouverture s’étoffe · une deuxième livrée',
+    title:
+      'Le champ CINÉMATIQUE propose enfin les titres · l’ouverture s’étoffe · une deuxième livrée',
     notes: [
       'CORRECTIF signalé par le concepteur : dans le scénario (et dans l’action « jouer une cinématique » d’une séquence), le champ CINÉMATIQUE ne proposait rien — il fallait taper le code de mémoire. C’est désormais un MENU DÉROULANT qui liste toutes les cinématiques connues PAR LEUR TITRE (livrées, poste, partagées), avec leur code entre crochets. Un code branché mais introuvable (cinématique pas encore composée, ou partagée pas encore arrivée) reste affiché « (introuvable) » et n’est JAMAIS perdu : un tableau ne se dérègle pas parce que la liste est incomplète.',
       'L’OUVERTURE passe de quatre à SEPT planches. Trois battements ajoutés, sans une image de plus : la même planche resservie avec un autre cadrage et une autre réplique — c’est du montage. « Vingt tentatives. Vingt échecs. Puis vous. » sur la cuve qui monte ; « Ils ne vous regardent pas. Ils vous relèvent. » sur les Créateurs ; « Ils partent. Personne ne vient vous chercher. » sur l’alerte qui s’éloigne.',
@@ -32,7 +92,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '17/08/2026 14:30',
-    title: 'LES SÉQUENCES IN-MAP : la mise en scène agit sur le tableau lui-même',
+    title:
+      'LES SÉQUENCES IN-MAP : la mise en scène agit sur le tableau lui-même',
     notes: [
       'Une cinématique montre des planches PAR-DESSUS le jeu ; une séquence agit DANS le jeu, sans l’interrompre. Nouvel onglet SÉQUENCES au montage : une liste d’étapes jouées dans l’ordre, chacune durant son temps. NEUF ACTIONS : attendre · teinter les lampes (couleur + intensité) · bruitage · ponctuation · changer la musique · OUVRIR UNE PORTE (la brèche) · afficher une carte · secouer l’écran · jouer une cinématique (la séquence attend sa fin). Le champ pertinent seul s’affiche : une couleur pour les lampes, un n° de porte pour la brèche, la liste des sons pour les bruitages.',
       'LA BRÈCHE réutilise la machinerie éprouvée des portes laser : une porte dont la cible est NÉGATIVE est désormais une porte SCÉNARISÉE — une paroi pleine, solide au solveur, qu’aucun faisceau n’ouvre et que seule une séquence peut crever. Vérifié en jeu : la paroi barre le passage, l’alerte vire au rouge, l’écran tremble, la porte disparaît du solveur et le fluide passe. Une brèche ouverte ne se referme jamais (c’est un événement, pas un interrupteur) ; un R remet le tableau à neuf, paroi comprise.',
@@ -41,7 +102,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '17/08/2026 13:00',
-    title: 'LE SCÉNARIO : les cinématiques hors tableau, sous conditions (le fil du roguelike)',
+    title:
+      'LE SCÉNARIO : les cinématiques hors tableau, sous conditions (le fil du roguelike)',
     notes: [
       'Le hub n’est pas un tableau — il n’a donc pas de fiche où poser une cinématique. Et une run n’est pas un tableau non plus. Nouvel onglet SCÉNARIO dans la table de montage (menu ET éditeur) : UN seul scénario, global au jeu, une LISTE DE RÈGLES qui se lit de haut en bas — la PREMIÈRE qui correspond gagne. Rangez le particulier au-dessus du général, comme un aiguillage.',
       'CINQ MOMENTS : au tout premier lancement, à l’arrivée au hub, au lancement de la run (le sas du hub — il n’était branché nulle part, c’est fait), quand la run est perdue, quand l’expédition est achevée. SIX CONDITIONS, toutes puisées dans ce que le jeu mémorise déjà : toujours · première partie · runs finies ≥ N · meilleure salle atteinte ≥ N · trophée débloqué · condensat ≥ N. Et la case décisive, UNE SEULE FOIS : la règle est retenue pour toujours — c’est elle qui empêche l’ouverture de se rejouer au deuxième run. Un bouton ↺ efface cette mémoire pour retester comme un joueur neuf.',
@@ -50,7 +112,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '17/08/2026 12:00',
-    title: 'Le travail à deux : cinématiques PARTAGÉES et bibliothèque d’IMAGES importables',
+    title:
+      'Le travail à deux : cinématiques PARTAGÉES et bibliothèque d’IMAGES importables',
     notes: [
       'La table de montage a maintenant trois rayons : les LIVRÉES (avec le jeu), le POSTE (votre navigateur), et les PARTAGÉES (◇) — la bibliothèque en ligne commune. Le bouton ⇪ PARTAGER publie la cinématique sélectionnée : elle devient visible ET jouable par son code sur tous les postes (les ancrages des tableaux la trouvent : livrées → poste → partagées). Re-partager le même code remplace la version pour tout le monde ; SUPPRIMER sur une partagée la retire de la bibliothèque. Une partagée se retouche en la DUPLIQUANT, puis en re-partageant.',
       'LA BIBLIOTHÈQUE D’IMAGES (bouton 🖼 Images de l’éditeur) : importez vos visuels directement — recompressés en WebP (≤ 1600 px) côté client avant l’envoi, hébergés en ligne, visibles de tous. Chaque vignette donne son LIEN (copié au presse-papier) et se retire d’un ✕. Dans le montage, le bouton ▣ à côté du champ IMAGE ouvre la bibliothèque en SÉLECTEUR : cliquer une vignette branche l’image sur la planche. Plus besoin de passer par le dépôt pour les planches d’une cinématique.',
@@ -59,7 +122,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '17/08/2026 11:00',
-    title: 'Les cinématiques s’ancrent aux tableaux : à l’entrée, en sortie, ou sur une zone',
+    title:
+      'Les cinématiques s’ancrent aux tableaux : à l’entrée, en sortie, ou sur une zone',
     notes: [
       'Un tableau peut maintenant DÉCLARER ses cinématiques, par leur code de la table de montage. Trois ancrages : CINÉ À L’ENTRÉE (jouée à l’arrivée dans le tableau — pas au simple « recommencer », et MAINTENIR la saute toujours), CINÉ EN SORTIE (jouée à la conclusion, par-dessus le bilan qui l’attend derrière), et le DÉCLENCHEUR EN COURS DE TABLEAU : n’importe quelle zone peut porter un code — quand le corps y entre, la cinématique se joue, une fois par essai. Une zone « libre » avec un code est un pur déclencheur, invisible et sans effet d’état ; une zone d’état avec un code fait les deux.',
       'Tout se règle DANS L’ÉDITEUR : deux champs sur la fiche du tableau (Ciné à l’entrée / Ciné en sortie), un champ Cinématique sur chaque zone sélectionnée — et le bouton ▤ MONTAGE dans la barre de l’éditeur ouvre la table par-dessus, pour composer puis brancher sans quitter son tableau. Le bouton MONTAGE de la fiche d’accueil reste. Les trois ancrages voyagent avec le tableau (sérialisés, bornés à 24 signes, testés) ; un code inconnu est ignoré sans bruit.',
@@ -68,7 +132,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '17/08/2026 10:00',
-    title: 'Les assets du concepteur : les fioles des semblables, et l’ouverture en vraies planches',
+    title:
+      'Les assets du concepteur : les fioles des semblables, et l’ouverture en vraies planches',
     notes: [
       'LA CINÉMATIQUE D’OUVERTURE a ses vraies images : les quatre planches générées par le concepteur remplacent les esquisses SVG — la cuve dans le laboratoire endormi, les Créateurs vus DEPUIS la cuve (le point de vue de la substance), l’alerte rouge où ils s’enfuient, et la brèche étoilée d’où perlent les premières gouttes. La continuité du regard, de l’intérieur du verre, porte toute la séquence. À voir : MONTAGE → ▶ LIRE.',
       'L’asset du concepteur (une fiole de confinement cryogénique, deux états) est détouré et intégré : deux sortes de décals — FIOLE OCCUPÉE (la masse bleu-sarcelle en suspension) et FIOLE VIDE (verre embué, voyant rouge au socle). Dans le hub compact, les trois niches de l’alcôve nord en portent chacune une : deux occupées… et la VIDE au centre, juste sous « NE PAS RÉVEILLER ». La question s’impose d’elle-même.',
@@ -77,7 +142,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '17/08/2026 09:30',
-    title: 'LES CINÉMATIQUES : des planches illustrées entre les tableaux, et une table de montage',
+    title:
+      'LES CINÉMATIQUES : des planches illustrées entre les tableaux, et une table de montage',
     notes: [
       'La troisième famille d’écrans, entre le menu et le tableau jouable — le socle de l’OUVERTURE de la démo. Une cinématique est une DONNÉE, comme un tableau : une suite de PLANCHES (image plein écran, texte, durée), chacune animée par un vocabulaire fermé d’effets — zoom avant/arrière, panoramique (4 sens), tremblement, ALERTE (battement rouge) — avec fondu d’entrée (noir/blanc), et le son par planche : un bruitage, une ponctuation, une piste musicale imposée. Règles de confort câblées d’office : TOUCHER passe à la planche suivante, MAINTENIR saute toute la cinématique (une jauge l’annonce), Échap aussi — en roguelike, on ne subit jamais deux fois l’ouverture.',
       'LA TABLE DE MONTAGE (bouton MONTAGE de la fiche) : le concepteur a la main — planches réordonnables, tous les champs éditables avec vignette, lecture immédiate (▶ LIRE), NOUVELLE/DUPLIQUER/SUPPRIMER, EXPORTER/IMPORTER en JSON. Toute édition s’enregistre sur le poste à l’instant même. Une cinématique d’ESSAI est livrée en images provisoires (l’esquisse de l’ouverture : la cuve, les Créateurs, l’alerte, la brèche) — en lecture seule, à DUPLIQUER pour s’en servir de gabarit.',
@@ -86,7 +152,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '17/08/2026 05:00',
-    title: 'LE HUB COMPACT (chantier démo) : pictogrammes d’état, en parallèle de l’actuel',
+    title:
+      'LE HUB COMPACT (chantier démo) : pictogrammes d’état, en parallèle de l’actuel',
     notes: [
       'Premier chantier de la démo Steam fest (bible v3.1). Un nouveau module d’accueil COMPACT (3500×1600, contre 8000×3600 pour l’actuel), parcellisé à l’ISS : la CUVE à l’ouest, le POSTE DE GESTION au centre, l’alcôve de CONSERVATION au nord (trois niches — les fioles des semblables y prendront place dès que l’asset sera généré), et le SAS DE LANCEMENT à l’est derrière une chicane courte. L’écran de contrôle veille au mur, trois lampes teintées (froide sur la cuve, neutre au poste, verte au sas), lumière générale à 42 %.',
       'LES PICTOGRAMMES D’ÉTAT, tels que spécifiés : un rectangle à la couleur du matériau, trois rangées de points EAU/GLACE/VAPEUR notées 0..3 (0 inefficace · 1 confine · 2 efficace · 3 l’outil idéal) — SANS UN MOT, volontairement énigmatique. Sept panneaux au-dessus de l’établi, aux notes tirées des VRAIES règles du jeu : éponge 3/1/1, plaque froide 3/1/2, chaudière 2/3/0, évent 1/1/0, membrane 0/1/1, rideau 1/0/1, surchauffeur 1/1/0. Le format voyage avec les tableaux (sérialisé, borné) : l’éditeur pourra en poser partout.',
@@ -95,7 +162,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '17/08/2026 03:30',
-    title: 'RELIEF 2.5D des parois (expérimental) : les flancs se révèlent en se déplaçant',
+    title:
+      'RELIEF 2.5D des parois (expérimental) : les flancs se révèlent en se déplaçant',
     notes: [
       'La demande du concepteur : « si je déplace la caméra à gauche, j’apercevrai les faces droites des éléments ». C’est la perspective des jeux vus de dessus (Hotline Miami) : chaque paroi a une HAUTEUR, son sommet fuit le centre de la caméra, et sa face latérale apparaît du côté qui regarde le centre — celui qu’on aborde en se déplaçant. Implémenté dans le shader pour les murs, l’hydrophile et l’hydrophobe : le remplissage et les habillages suivent le SOMMET déplacé, le flanc (sombre, teinté matériau) se peint entre base et sommet, échantillonné à deux hauteurs pour que les parois minces ne laissent pas de trou.',
       'Trois ancrages garantis : la PHYSIQUE, les ombres portées et les auras restent à la BASE (l’empreinte réelle ne bouge pas d’une unité) ; l’effet S’ESTOMPE au dézoom (caméra lointaine = vue orthographique — le plan large reste une carte) ; et il est DÉBRANCHABLE. Réglage dans PARAMÈTRES → RELIEF DES PAROIS : off (défaut, le temps de la validation à la manette), léger, fort. Le coût shader n’existe que branché, et seulement sur les pixels proches des parois. À valider sur appareil réel : activez LÉGER et déplacez-vous le long d’un couloir.',
@@ -103,7 +171,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '17/08/2026 02:40',
-    title: 'Les veilleuses assagies : le vaisseau respire, il ne clignote plus comme un sapin',
+    title:
+      'Les veilleuses assagies : le vaisseau respire, il ne clignote plus comme un sapin',
     notes: [
       'Le retour de test : « beaucoup trop de LED de couleur, ça fait sapin de Noël ». La recette des veilleuses de paroi mettait une lumière sur UN TIERS des cellules de 300 unités, dont 40 % en orange et rouge à plein gain — une centaine de LED bariolées sur le plan du hub, qui disputaient l’attention aux mécanismes.',
       'Passe de sobriété : une veilleuse sur SEPT cellules (moitié moins que d’avant), le turquoise discret domine largement (82 %), l’ambre est rare (14 %), le rouge exceptionnel (4 % — une alarme oubliée doit rester un ÉVÉNEMENT qu’on remarque), et le gain global baisse d’un tiers. Les poussières en dérive et la respiration des machines ne bougent pas : le vaisseau a toujours l’air alimenté — il a juste cessé de le crier. Vérifié sur le plan du hub : les portes, le sas et les pancartes redeviennent ce qui accroche l’œil.',
@@ -119,7 +188,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '17/08/2026 01:00',
-    title: 'Premier asset du hub : l’écran de contrôle prend le mur de l’observation',
+    title:
+      'Premier asset du hub : l’écran de contrôle prend le mur de l’observation',
     notes: [
       'Le concepteur a généré le premier asset de la série hub — l’écran de contrôle, DEUX ÉTATS au châssis identique (éteint / allumé) dans une seule image, exactement le langage visuel du jeu. L’image livrée sur fond opaque a été détourée par GÉOMÉTRIE : la photométrie ne pouvait rien (le fond et l’écran éteint ont la même luminosité moyenne, 33 contre 32) — graines sur le métal éclairé, fermeture de la silhouette, remplissage des trous enclavés (l’écran), boucle de tuyaux basse récupérée, et recadrage COMMUN aux deux états pour un calage au pixel le jour de l’allumage.',
       'L’écran ÉTEINT est monté en salle d’observation, sous sa pancarte HORS TENSION — vérifié en jeu, capture à l’appui. L’état ALLUMÉ est chargé et prêt : il attend le chantier méta-progression (tableau des runs). Le pipeline des décalques accepte désormais ecran-off / ecran-on ; les six prompts restants de la série (banc, casiers, berceau, porte de sas, hublot, armoire) sont entre les mains du concepteur.',
@@ -127,7 +197,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '17/08/2026 00:00',
-    title: 'Pancartes : le paysage mobile les interdisait TOUTES (la colonne prise pour une barre)',
+    title:
+      'Pancartes : le paysage mobile les interdisait TOUTES (la colonne prise pour une barre)',
     notes: [
       'Les captures d’écran du testeur ont donné la cause en une image : sur téléphone et tablette en PAYSAGE, la barre tactile devient une COLONNE à gauche (et le sélecteur d’état une colonne à droite). Or la « bande basse interdite » — la zone où une pancarte s’efface pour ne pas passer sous les boutons — se calculait depuis le SOMMET de ces barres. Une colonne qui commence à 76 pixels du haut : la zone interdite couvrait 85 % de l’écran, et TOUTES les pancartes étaient effacées avant même l’attribution. Sur un poste avec les barres en bas (l’environnement de test d’hier), tout allait bien — d’où le dialogue de sourds.',
       'La règle devient géométrique : seule une vraie barre POSÉE EN BAS définit la bande interdite — large (plus large que haute, et au moins 35 % de l’écran) et dans la moitié basse. Les colonnes latérales ne comptent plus. Rejoué dans la géométrie exacte des captures (écran 999×449, DPR 2, tactile) : ZÉRO pancarte avant, SEPT après — salle d’entraînement, salle d’observation, banc hors service, sas de lancement, toutes à leur place, y compris près du bord bas.',
@@ -135,7 +206,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '16/08/2026 23:00',
-    title: 'Les pancartes du plan large sont de retour : la carte annotée respire',
+    title:
+      'Les pancartes du plan large sont de retour : la carte annotée respire',
     notes: [
       'Le retour de test : « je ne vois plus les panneaux, et l’apparition progressive au zoom a un problème — dommage, très bonne idée ». Mesuré au hub : au plan large, DEUX plaques géantes masquaient la carte entière et 9 pancartes sur 14 étaient effacées. Cause : les pancartes gardaient leur taille de lecture (jamais sous ×1) pendant que la carte rétrécissait sous elles — plus on dézoomait, moins il restait de place, et l’attribution en supprimait presque tout.',
       'Deux corrections. UNE — au plan large, les pancartes RÉTRÉCISSENT avec la carte (plancher ×0,45) : la signalétique redevient une carte annotée — 12 pancartes sur 14 lisibles au plan du hub, et elles grossissent naturellement en zoomant. DEUX — l’attribution gagne une MÉMOIRE : une pancarte affichée garde sa place tant qu’elle tient (les titulaires passent avant les prétendants, et tolèrent un léger chevauchement — hystérésis), au lieu de la perdre parce qu’une voisine s’est approchée du centre du regard. L’apparition progressive au zoom redevient ce qu’elle devait être : des plaques qui entrent et sortent une fois, en fondu, sans va-et-vient.',
@@ -143,7 +215,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '16/08/2026 22:15',
-    title: 'Le tir rapproché retrouve son caractère : les DÉFORMATIONS sont de retour',
+    title:
+      'Le tir rapproché retrouve son caractère : les DÉFORMATIONS sont de retour',
     notes: [
       'Verdict du concepteur après essai : « je préfère avant, avec les déformations ». L’élection historique de la goutte est restaurée : la particule LA PLUS PROCHE DU DOIGT part vers le doigt — un tir posé sur la flaque élit une particule au cœur de la masse et la propulse à travers elle. Le volume est labouré, malaxé, la houle projette des éclats : c’est brutal, organique, et c’est le caractère voulu. L’élection « propre depuis la surface » de cet après-midi assagissait trop le geste ; elle est retirée.',
       'Ce retour n’est PAS un retour au problème d’origine. Ce qui rendait l’ancienne règle infernale n’était pas sa physique, c’était son invisibilité — on payait sans voir. Depuis : les gouttes libres se DESSINENT (traînées liquides), la vie compte le HALO (n’est perdu que ce qui s’en éloigne), et le rappel ramène les éclats restés à portée. Le labour se voit et se paie au juste prix, rien de plus. Les 188 tests passent sans retouche : les contrats (prêt au mur, sortie comptée à la sortie, semées jamais aspirées) visent loin du corps, où les deux élections coïncident.',
@@ -151,7 +224,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '16/08/2026 21:30',
-    title: 'La goutte qui part se VOIT partir — elle était mathématiquement invisible',
+    title:
+      'La goutte qui part se VOIT partir — elle était mathématiquement invisible',
     notes: [
       'La question du retour de test — « est-ce que tu utilises bien le préset par défaut ? » — a tout débloqué. La bibliothèque partagée a été rapatriée (nouvelle gâchette CI diag-presets), et la scène rejouée avec boizcohesioncontrole1, le préset appliqué chez tous les testeurs. Verdict : la comptabilité était JUSTE — les gouttes d’éjection sortent bel et bien, 6 à 7 par impulsion brève, projetées à l’autre bout de la cuve. Ce qui mentait, c’était l’IMAGE.',
       'La preuve est dans le shader : une goutte isolée culmine à 1,0 de champ, et l’amplitude est divisée par (1 + étirement) pour conserver l’encre des traînées. À pleine vitesse : 1,0 ÷ 2,2 = 0,45 — SOUS le seuil de dessin de 0,8. La goutte d’éjection n’était JAMAIS dessinée : ni goutte, ni traînée, rien. Le joueur payait un carburant que l’image ne montrait pas — « le volume se déforme, aucune goutte ne sort, et pourtant la vie baisse ». Depuis toujours.',
@@ -160,7 +234,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '16/08/2026 20:30',
-    title: 'La jauge ne cille plus : vivante = dans le HALO, créditée dès le tir, avec hystérésis',
+    title:
+      'La jauge ne cille plus : vivante = dans le HALO, créditée dès le tir, avec hystérésis',
     notes: [
       'Le retour de test tenait toujours : la jauge (et son ambre d’alerte) CLIGNOTAIT — la goutte alternait entre « éjectée » (décomptée) et « à la surface » (recomptée), au rythme des relabels. Deux causes : le décompte au tir précédait le recompte d’un relabel (jusqu’à 5 pas d’écart), et l’ancrage « 3 voisines du corps » oscillait à la frontière, image après image.',
       'La définition devient stable à l’œil. VIVANTE = marquée du corps et dans son HALO (le rayon de capture, celui du rappel — tout ce qui y reste REVIENDRA, le compter vivant est la stricte vérité). Créditée à l’instant même du tir : la goutte part de la surface, donc du halo — la jauge ne cille pas d’une image. La sortie du halo se juge avec HYSTÉRÉSIS (15 % plus loin que l’entrée) : une goutte qui danse à la frontière ne fait pas clignoter la vie. Le ⟳ disparaît : le halo est dans le chiffre principal, à sa place.',
@@ -178,7 +253,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '16/08/2026 18:45',
-    title: 'L’éjection part TOUJOURS de la surface : fini le tir qui laboure son propre corps',
+    title:
+      'L’éjection part TOUJOURS de la surface : fini le tir qui laboure son propre corps',
     notes: [
       'Le retour de test persistait — « une éjection sur trois ne sort pas du volume mais compte perdue » — et la mesure a fini par montrer pourquoi. L’ancienne règle élisait la particule LA PLUS PROCHE DU DOIGT : un doigt posé SUR la flaque (geste naturel au tactile) élisait une particule au CŒUR de la masse, tirée à pleine vitesse dans une direction quasi aléatoire. Elle labourait le corps de l’intérieur, la houle arrachait des voisines projetées au loin — ~5 particules par tir, pour une goutte qui ne SEMBLAIT jamais partir. Le rappel des égarées d’hier n’y pouvait rien : ces éclats volaient hors de portée.',
       'La règle est désormais géométrique et constante : la poussée se lit du CENTRE du corps vers le doigt, et c’est la particule du bord CÔTÉ VISÉE qui décolle. L’éjection sort proprement de la surface, où que le doigt se pose — sur la flaque, à son bord, à l’autre bout de l’écran : même geste, même coût, une goutte. Mesuré sur la scène du rapport (20 tirs posés sur la flaque) : 97 particules perdues avant, 26 après — dont les 20 départs légitimes. Le parasitage passe de ~4 par tir à ~0,3.',
@@ -187,7 +263,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '16/08/2026 18:00',
-    title: 'Le retour des égarées : la vie ne baisse plus pour une goutte encore là',
+    title:
+      'Le retour des égarées : la vie ne baisse plus pour une goutte encore là',
     notes: [
       'Le retour de test avait raison, et ma mesure d’hier était trop propre : en conditions réelles, UN SEUL TIR coûtait jusqu’à 7 particules. La goutte tirée s’écrase au mur (perdue, légitimement)… mais le REMOUS du tir détache des voisines qui gisent à deux doigts du corps — et la réabsorption passait par la seule connexité : une goutte à quinze unités du bord ne se reconnectait JAMAIS. La vie baissait pour de la matière encore là, sous vos yeux.',
       'Le remède : la matière DU CORPS porte désormais une marque — goutte d’éjection, gerbe de péage de vaporisation, fragment arraché par le remous. Son délai de réabsorption purgé, si elle traîne dans le rayon de capture du corps, elle est RAPPELÉE d’elle-même : elle converge, se pose, le corps la reprend. Trop loin ? Perdue là où elle gît — mais la marque reste : passez à portée et elle vous rejoint. Le rappel est antisymétrique (§3.3) : le corps encaisse l’opposé de ce qu’il donne, aucune propulsion gratuite. Pendant que le sas boit, le rappel s’efface devant lui.',
@@ -196,7 +273,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '16/08/2026 17:00',
-    title: 'Sept présets LIVRÉS avec le banc — sept manières de sentir le même fluide',
+    title:
+      'Sept présets LIVRÉS avec le banc — sept manières de sentir le même fluide',
     notes: [
       'Le banc s’ouvre désormais avec une bibliothèque de sept présets d’usine (marqués ⚙), chacun une INTENTION de jeu et pas un simple jeu de curseurs. ⚙ TEMPO NERVEUX — le ressenti du ×2 sans accélérer le temps : attentes divisées par deux, corps prompt, caméra vive, éjection à 1800 (le plafond mesuré au mur mince). ⚙ SIROP DE CUVE — l’eau épaisse et pensive, pour les casse-têtes. ⚙ CHAMPAGNE — tout pétille, transformations éclair, réabsorption qui pardonne. ⚙ PROTOCOLE D’AUSTÉRITÉ — chaque goutte compte double, pour finir un tableau à la goutte près. ⚙ BALLET ORBITAL — tout glisse et orbite, la lenteur par les forces, pas par l’horloge. ⚙ PALET DE MATCH — la glace reine, rebonds de flipper. ⚙ GEYSER — la vapeur voie royale, l’inverse de l’austérité.',
       'Ils cohabitent proprement avec les vôtres : enregistrer un préset sous le même titre REMPLACE le livré (votre version gagne la fusion), et un livré supprimé reste supprimé sur l’appareil — il ne renaît pas au lancement suivant. Chaque livré passe au tourment en test : clés vérifiées contre les paramètres réels (pas de curseur fantôme), puis une séance condensée — une seconde de tirs contre un mur, bascule vapeur, dash, retour — sans une seule valeur folle ni cuve vidée (185 tests).',
@@ -204,7 +282,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '16/08/2026 16:10',
-    title: 'La goutte d’éjection : perdue seulement si elle SORT — et le HUD montre ce qui revient',
+    title:
+      'La goutte d’éjection : perdue seulement si elle SORT — et le HUD montre ce qui revient',
     notes: [
       'La question posée au banc : selon les présets, une goutte d’éjection qui ne sort pas du volume est-elle perdue ? Mesuré, goutte par goutte : le jeu tranche déjà, et bien. À pleine puissance (1400), la goutte visée dans la masse TRANSPERCE le corps et s’échappe — perdue, légitimement : elle est partie. Avec un préset mou (500), elle retombe dans la flaque, compte perdue pendant le délai de réabsorption (1,2 s)… puis le corps la REPREND à l’échéance. Bilan 90/90 : rien n’était perdu. Les deux mécaniques coexistent depuis le début — perdue si sortie, prêtée sinon.',
       'Le vrai défaut était la LISIBILITÉ : pendant le délai, la jauge baisse sans dire que ça va revenir — et en tir rapide, les baisses se chevauchent au point de se lire comme une perte sèche. Le HUD montre désormais la part EN RETOUR (⟳ +0,04 L, teinte eau, à côté du volume) : les gouttes retombées dans le rayon de capture du corps, que le délai rendra dans un instant. Un prêt affiché comme un prêt. Le souffle d’un dash n’y figure jamais : lui ne revient pas.',
@@ -213,7 +292,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '16/08/2026 15:05',
-    title: 'La barre d’outils de l’éditeur était COUPÉE sur iPad — ESSAYER et ACCUEIL hors champ',
+    title:
+      'La barre d’outils de l’éditeur était COUPÉE sur iPad — ESSAYER et ACCUEIL hors champ',
     notes: [
       'Mesuré, enfin : la barre du haut de l’éditeur réclame 1572 pixels de large. Sur un iPad elle n’en a que 1194 (834 en portrait) — sa partie droite passait tout simplement hors de l’écran, sans défilement ni indice. Les boutons perdus : ESSAYER et ↩ ACCUEIL en paysage ; en portrait s’y ajoutaient FICHIER / JSON, COPIER, EXPORTER, la grille et l’aimant. Elle s’ENROULE désormais sur plusieurs lignes : tout est là, tout de suite, sans rien à deviner.',
       'La palette de gauche, elle, mesure 1080 pixels dans une colonne de 620 : la moitié des outils (dont l’étiquette et les rails) vit sous la ligne de flottaison. Elle défilait déjà — mais RIEN ne le disait. Des ombres de défilement paraissent maintenant en haut ou en bas de la colonne, seulement quand il reste quelque chose à voir de ce côté.',
@@ -222,7 +302,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '16/08/2026 14:30',
-    title: 'Le dash de vapeur SOUFFLE sa charge — et ce souffle perle sur les parois',
+    title:
+      'Le dash de vapeur SOUFFLE sa charge — et ce souffle perle sur les parois',
     notes: [
       'On avance parce qu’on REJETTE : chaque dash de vapeur chasse désormais la queue du nuage vers l’arrière, en éventail. Cette part cesse de vous appartenir — elle file, touche une paroi, et y PERLE en gouttes qui restent au mur. À aller rechercher au prix d’un détour, ou à laisser derrière soi : la vapeur n’est plus un déplacement gratuit, c’est un carburant qu’on brûle et qui laisse une trace.',
       'Il a fallu deux garde-fous pour que ce soit vrai. UN — le souffle reste GAZ le temps du voyage : sans cela il se condensait en plein vol et le rappel de condensation le ramenait aussitôt au corps (c’était exactement le « tout est récupéré immédiatement »). Un compte à rebours de 4 secondes l’empêche de flotter indéfiniment : à bout de course, il perle sur place. DEUX — ni le rappel de condensation ni le rassemblement ne reprennent une goutte qui vient d’être soufflée.',
@@ -231,7 +312,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '16/08/2026 13:20',
-    title: 'LE GAME OVER, pour de bon : la run se conclut quand la réserve est à sec',
+    title:
+      'LE GAME OVER, pour de bon : la run se conclut quand la réserve est à sec',
     notes: [
       'La correction précédente était juste… et branchée au mauvais endroit. L’écran de fin guettait la DISPERSION du corps — un état qui n’arrive quasiment jamais en jouant (il faut tomber sous deux particules). La vraie perte, celle que tout le monde vit, c’est la RÉSERVE À SEC : la dernière impulsion donnée, le corps se fige et dérive. Et là, rien ne concluait : le palet dérivait indéfiniment. Voilà pourquoi le game over « ne fonctionnait toujours pas ».',
       'Désormais la run se conclut sur les DEUX pertes. Réserve à sec : un SURSIS de 6 secondes pendant lequel une paroi peut encore renvoyer le palet au sas — puis l’écran paraît. Corps défait : une seconde. Le sas qui AVALE suspend le sursis (la salle peut encore se conclure) et, s’il s’arrête, le compte repart entier — la simple proximité du sas ne suffit pas : un palet qui stationne dans le rayon d’aspiration sans être bu gelait la run pour de bon.',
@@ -240,7 +322,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '16/08/2026 12:10',
-    title: 'Deux pancartes ne se chevauchent plus JAMAIS — et le hub double de taille',
+    title:
+      'Deux pancartes ne se chevauchent plus JAMAIS — et le hub double de taille',
     notes: [
       'Le design des pancartes plaisait, leur empilement au dézoom non : elles gardent une taille de LECTURE quel que soit le zoom (comme les noms sur un plan), et se marchaient donc dessus dès que la carte se resserrait. La place est désormais ATTRIBUÉE, à chaque image : les plaques de SECTEUR (les lieux) servies d’abord, puis les pancartes de détail, de la plus proche du regard à la plus lointaine ; ce qui ne rentre plus s’efface en fondu et revient dès qu’on zoome. Résultat garanti par la mesure : ZÉRO chevauchement, à tous les zooms — et le plan large se lit comme une carte, les lieux sans le bavardage. Les barres d’interface (sélecteur d’état, barre tactile, relevé du haut) sont également interdites de séjour : plus une pancarte à moitié cachée derrière un bouton.',
       'Chaque étiquette porte donc une PORTÉE, réglable dans l’éditeur pour vos propres tableaux : « secteur » nomme un lieu et survit au dézoom, sans mention elle commente un objet et cède la place.',
@@ -256,7 +339,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '16/08/2026 05:10',
-    title: 'La fin de run s’annonce toute seule, on peut abandonner — et l’éditeur se laisse faire à l’iPad',
+    title:
+      'La fin de run s’annonce toute seule, on peut abandonner — et l’éditeur se laisse faire à l’iPad',
     notes: [
       'LE GAME OVER MARCHE ENFIN. Il fonctionnait, mais il ne se MONTRAIT pas : la dispersion laissait l’écran muet et il fallait deviner qu’il fallait presser R pour voir le verdict. Désormais, une seconde après la perte du corps — le temps de le voir se défaire — l’écran paraît de lui-même : « ÉCHANTILLON DISPERSÉ » et le bouton REPRENDRE tant qu’il reste un échantillon de secours, « ÉCHANTILLON PERDU — FIN DE LA RUN » et le RETOUR AU LABO quand c’était le dernier.',
       'ABANDONNER UNE RUN : nouveau bouton sur la fiche d’essai (menu ≡ en jeu) — il arrête la run en cours et réveille au labo, exactement comme à l’arrivée dans le jeu. En DEUX temps (le second clic confirme) : une expédition ne se perd pas d’un clic de travers.',
@@ -266,7 +350,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '16/08/2026 04:15',
-    title: 'Pancartes de station, réveil neutre — et la fiche sans boutons pointillés',
+    title:
+      'Pancartes de station, réveil neutre — et la fiche sans boutons pointillés',
     notes: [
       'Trois remarques du joueur. UN — les deux boutons pointillés de la fiche (parcours test, éditeur) faisaient tache : ils rejoignent la GRILLE D’OUTILS de la console, tuiles ÉDITEUR et PARCOURS TEST au même style que SALLES et RECORDS — des outils, pas des actions de jeu.',
       'DEUX — la signalétique du hub devient de vraies PANCARTES de station-labo : tôle sombre en dégradé, rail de fixation vissé pleine largeur, titre rétroéclairé par la teinte de la surface, et une bande de danger hachurée sous la seule pancarte du SAS DE LANCEMENT. Le placard s’étale sur toute la largeur de sa pièce, ses pancartes en quinconce sur TROIS hauteurs — plus rien ne se chevauche, même dézoomé ; la pancarte de secteur attend dans le hall, près de la porte.',
@@ -283,7 +368,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '16/08/2026 03:00',
-    title: 'L’API au RÉGIME : le quota qui a bloqué le magasin ne sera plus jamais atteint',
+    title:
+      'L’API au RÉGIME : le quota qui a bloqué le magasin ne sera plus jamais atteint',
     notes: [
       'Le tableau de bord de l’hébergeur a désigné le coupable exact : 2 100 « opérations avancées » sur les 2 000 mensuelles du plan gratuit — l’API en consommait UNE PAR LECTURE (bibliothèque, registres, présets), pour chaque joueur, à chaque chargement du jeu. Stockage et transfert, eux, étaient à 2 % des limites : c’est bien l’architecture qui gaspillait, pas le trafic.',
       'Refonte du magasin partagé : la lecture ne coûte plus AUCUNE opération — un pointeur à chemin fixe donne l’URL du document courant, deux téléchargements publics suffisent (du simple transfert de données, budgété 4 000 fois plus large), plus un cache mémoire de 15 secondes. Le décompte ne bouge plus qu’aux écritures — rares : 3 opérations par sauvegarde. Là où un mois de jeu brûlait tout le quota, il en consommera désormais quelques dizaines.',
@@ -299,7 +385,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '16/08/2026 01:50',
-    title: 'Hub v2 : un ÉTAGE de laboratoire — et l’éditeur met le jeu en pause',
+    title:
+      'Hub v2 : un ÉTAGE de laboratoire — et l’éditeur met le jeu en pause',
     notes: [
       'Le module Méduse passe de 3200×1500 à 4800×2200 et devient un VRAI étage de labo humain, labyrinthique : la CUVE D’ENTRAÎNEMENT (ouest) → porte centrale → le HALL qui dessert la SALLE D’OBSERVATION (nord) et le PLACARD D’ENTRETIEN (sud, sa propre pièce) → porte HAUTE → la SALLE D’ÉTALONNAGE (machines, banc sur le chemin) → porte BASSE → le CONDUIT DE VENTILATION en chicanes (par-dessus la première, par-dessous la seconde) → SAS DE LANCEMENT. Les portes alternées font le trajet serpentin — on traverse un lieu, on ne glisse pas dans un couloir.',
       'Et l’éditeur met désormais le jeu en PAUSE derrière lui : la physique ne tourne plus dans son dos (batterie et chauffe épargnées) — « Essayer » relance, quitter rend la fiche.',
@@ -307,7 +394,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '16/08/2026 01:20',
-    title: 'Habillages RACCORDÉS aux boîtes + la signalétique du hub en PLAQUES',
+    title:
+      'Habillages RACCORDÉS aux boîtes + la signalétique du hub en PLAQUES',
     notes: [
       'Deux remarques du joueur. UN — les textures étaient mal raccordées : le motif était calé sur la grille du MONDE et chaque boîte le tranchait n’importe où. Il se cale désormais sur la BOÎTE : un nombre ENTIER de tuiles (légèrement étirées pour tomber JUSTE aux deux bords) sur les axes assez grands, motif CENTRÉ sur les axes étroits — les caissons finissent en caisson, les hublots en hublot.',
       'DEUX — les écritures du hub, refondues en PLAQUES DE SIGNALÉTIQUE : deux lignes (petit sur-titre mono qui situe — secteur, autorité, nom de la surface — et titre en capitales), fond sombre, liseré teinté, barrette d’accroche. Le placard y gagne un double sens : « HYDROPHILE / CE QUI AIME RETIENT » — le mot ET la poésie d’un coup. Format ouvert à tous les tableaux : un « | » dans le texte d’une étiquette de l’éditeur fait une plaque.',
@@ -322,7 +410,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '16/08/2026 00:30',
-    title: 'Hub : étiquettes lisibles, habillages ENFIN fidèles, pastilles à leur place',
+    title:
+      'Hub : étiquettes lisibles, habillages ENFIN fidèles, pastilles à leur place',
     notes: [
       'Autocritique sur capture, quatre corrections. UN — les énigmes du placard se chevauchaient en bouillie : raccourcies et ÉTAGÉES sur deux hauteurs (« CE QUI AIME RETIENT », « LE FROID FIGE, LE FIGÉ FILE »…), idem pour conduit/sas de lancement. DEUX — le banc d’étalonnage rejoint le TRAJET cuve → sas : un îlot blindé qu’on contourne, au lieu d’un recoin qu’on ignore.',
       'TROIS — les HABILLAGES de parois affichaient la tuile de l’AUTRE rangée depuis leur intégration (caissons ↔ aération, hublots ↔ conduites, écrans ↔ poutrelle…) : l’atlas est téléversé retourné (FLIP_Y) et le shader lisait les rangées à l’endroit. Corrigé d’une ligne — TOUS les tableaux montrent désormais l’habillage réellement choisi à l’éditeur.',
@@ -331,7 +420,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '15/08/2026 23:59',
-    title: 'LE HUB : le module Méduse — le jeu commence dans la cuve d’entraînement',
+    title:
+      'LE HUB : le module Méduse — le jeu commence dans la cuve d’entraînement',
     notes: [
       'Le cœur du roguelike prend forme : le MODULE MÉDUSE, zone de départ. Un labo D’HUMAINS — « les Créateurs », dans la bouche du sujet — pas un espace à soi : on y est observé. Le jeu COMMENCE dans la CUVE D’ENTRAÎNEMENT (l’éveil s’y joue désormais), avec deux agrès pour sentir les surfaces ; le PLACARD D’ENTRETIEN présente chaque surface en énigme (« CE QUI VOUS AIME VOUS RETIENT », « LE FROID FIGE — LE FIGÉ FILE »…) ; la SALLE D’OBSERVATION (écran de contrôle : éteint) et le BANC D’ÉTALONNAGE (hors service) attendent leurs chantiers de méta-progression.',
       'À droite, le CONDUIT DE VENTILATION mène au SAS DE LANCEMENT : ce sas ne collecte rien — il LANCE la run (reprise de l’expédition sauvée s’il y en a une, salle 1 sinon). Au hub, rien ne se paie : pas de records, pas de chrono, pas d’échantillon consommé — la dispersion recompose, simplement. Le HUD y dit LABO.',
@@ -340,7 +430,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '15/08/2026 23:15',
-    title: 'Éditeur : les DIMENSIONS DE LA CUVE — les grandes cartes à portée de main',
+    title:
+      'Éditeur : les DIMENSIONS DE LA CUVE — les grandes cartes à portée de main',
     notes: [
       'Question du joueur : « comment faire les grandes maps ? » — réponse honnête : on ne pouvait pas depuis l’éditeur (le triptyque avait ses dimensions définies en code). C’est corrigé : une section DIMENSIONS DE LA CUVE (X min/max, Y min/max) dans le panneau Tableau. Le standard fait 2400 × 1500 ; élargissez X à ~4800 pour un diptyque, ~7200 pour un triptyque — dézoom total puis zoom salle par salle en jeu, budgets 96 boîtes / 16 zones.',
       'Garde-fous : écart minimal de 400 (pas de cuve dégénérée), affichage renormalisé à la sortie du champ, Ctrl+Z annule, le brouillon retient les dimensions comme le reste.',
@@ -356,7 +447,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '15/08/2026 22:30',
-    title: 'Cap roguelike, acte I : les ÉCHANTILLONS DE SECOURS (vies) + raccourcis préparés',
+    title:
+      'Cap roguelike, acte I : les ÉCHANTILLONS DE SECOURS (vies) + raccourcis préparés',
     notes: [
       'Le jeu prend son virage roguelike. Premier acte : les VIES, diégétiques — des ÉCHANTILLONS DE SECOURS que le labo tient en réserve. On part avec UN seul (pastille 💠 au HUD) ; une dispersion en consomme un et renvoie à la PREMIÈRE GOUTTE du tableau ; le dernier perdu, c’est la fin de la run — écran « ÉCHANTILLON PERDU », retour au labo (la fiche, en attendant le vrai HUB), sauvegarde d’expédition effacée. Une run secondaire perdue n’efface JAMAIS l’expédition principale.',
       'On en gagne au fil de l’aventure : une salle conclue sur trois condense un échantillon de secours (annoncé au bilan de collecte, plafonné à 3). Les vies voyagent avec la sauvegarde de reprise.',
@@ -365,7 +457,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '15/08/2026 21:45',
-    title: 'L’expédition se souvient : reprise à la salle en cours + RUN SECONDAIRE',
+    title:
+      'L’expédition se souvient : reprise à la salle en cours + RUN SECONDAIRE',
     notes: [
       'La progression de l’expédition PRINCIPALE (salle atteinte, réserve, chrono) s’écrit au début de chaque salle. On peut retourner au menu, FERMER le jeu, revenir : le bouton principal devient « REPRENDRE L’EXPÉDITION — SALLE X/N » et la reprend au début de sa salle — aucune fausse manœuvre ne peut repartir de la salle 1 par réflexe. Une expédition conclue (ou dispersée) libère la sauvegarde.',
       'Et quand une expédition attend, un nouveau bouton propose une RUN SECONDAIRE : le même parcours, salle 1, records comptés — mais la sauvegarde de l’expédition principale n’est JAMAIS touchée. Le HUD l’affiche (« 2ᵉ RUN · SALLE X/N »), et depuis la fiche, « REPRENDRE L’EXPÉDITION » ramène à la principale à tout moment. Parfait pour chasser un record de salle sans risquer sa progression.',
@@ -390,7 +483,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '15/08/2026 20:15',
-    title: 'Records qui s’évaporaient + « Enregistrer sous » qui écrasait l’original',
+    title:
+      'Records qui s’évaporaient + « Enregistrer sous » qui écrasait l’original',
     notes: [
       'Record visible sur l’accueil mais absent de l’écran RECORDS : trouvé. Le serveur mettait le palmarès à jour à chaque collecte… mais ne l’ÉCRIVAIT que si le vieux record simple (volume d’abord) était battu. L’accueil affichait la réponse du moment ; l’écran RECORDS relisait un document jamais sauvé — la collecte s’évaporait. Le palmarès est maintenant PERSISTÉ dès qu’il change, record simple battu ou non. (Le record perdu se réinscrira à la prochaine collecte de la salle.)',
       'Et oui, le soupçon était fondé : « Enregistrer sous » forgeait l’identifiant depuis le NOM du tableau — en gardant le nom proposé, la copie prenait l’identifiant de l’original et l’ÉCRASAIT. Le serveur forge désormais un identifiant UNIQUE (suffixé si le nom est déjà pris) et l’éditeur adopte l’identifiant renvoyé : l’original est intangible, la copie vit sa vie.',
@@ -398,7 +492,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '15/08/2026 19:45',
-    title: 'Éditeur : le brouillon rattrape la bibliothèque — fini le vieux triptyque',
+    title:
+      'Éditeur : le brouillon rattrape la bibliothèque — fini le vieux triptyque',
     notes: [
       'Le bug signalé : l’éditeur s’ouvrait sur un VIEUX brouillon local du tableau (sans les derniers éléments), alors qu’un clic dans la séquence chargeait bien la dernière version. Cause : le brouillon vit sur l’appareil, la bibliothèque sur le serveur — et rien ne les confrontait (typique après une édition depuis un autre appareil).',
       'Désormais l’éditeur retient À QUELLE entrée son brouillon est lié et ce qu’elle contenait à la dernière synchro. À chaque ouverture, trois cas : brouillon identique → rien ; brouillon SANS travail local et bibliothèque plus récente → il se met à jour TOUT SEUL (le cas du bug) ; brouillon avec du travail non enregistré → rien n’est écrasé, un avertissement propose de cliquer la séquence (charger la dernière version) ou d’ENREGISTRER (publier la vôtre).',
@@ -414,7 +509,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '15/08/2026 19:00',
-    title: 'Éveil : le monde décélère, la carte fond à l’écran — fini l’apparition brutale',
+    title:
+      'Éveil : le monde décélère, la carte fond à l’écran — fini l’apparition brutale',
     notes: [
       'Les cartes de l’éveil APPARAISSAIENT d’un coup, plein écran, en pleine action — brutal. Désormais elles S’ANNONCENT : le monde DÉCÉLÈRE en douceur (~½ seconde, même levier que le slow-mo de visée vapeur — physique, chrono, refroidissement, tout ralentit ensemble, et ça s’ENTEND : le mixage plonge sous le passe-bas du temps suspendu), puis la carte fond à l’écran, ses éléments montant en scène légèrement étagés.',
       'À la fermeture, l’inverse : la carte s’efface en fondu et le monde se RÉVEILLE progressivement (~1 seconde) au lieu de repartir d’un claquement de doigts. Le ralenti est l’annonce : l’œil comprend qu’il se passe quelque chose avant même que la carte ne paraisse. L’invite « redevenez liquide » arrive elle aussi en fondu.',
@@ -445,7 +541,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '15/08/2026 17:30',
-    title: 'L’ÉVEIL : la prise en main devient une scène — et deux boutons PROTOCOLE',
+    title:
+      'L’ÉVEIL : la prise en main devient une scène — et deux boutons PROTOCOLE',
     notes: [
       'Fini les cinq cartes de gestes (mises de côté dans le code, au cas où) : la prise en main est désormais SCÉNARISÉE. Au chargement, l’échantillon attend en CRYOSTASE — le premier contact visuel avec le sujet 21 est un bloc de glace qui dérive. À la plongée, le plan large se joue, puis une carte pose l’état : « VOUS ÊTES LA GLACE » — nul moyen de se diriger, mais rien ne se perd, l’élan vous porte… et « la glace garde d’autres talents » : on tease, on ne déballe pas.',
       'La carte fermée, une INVITE lumineuse plane au-dessus du corps et suit sa dérive : « TOUCHEZ 💧 — REDEVENEZ LIQUIDE » (F ou 💧 au clavier), pendant que le bouton 💧 de la barre PULSE. Pas de « cliquez pour continuer » : le DÉGEL est la réponse. Puis deux impulsions données — on sent le volume qui part — et une dernière carte nomme ce qu’on vient de vivre : « VOUS ÊTES CE QUI RESTE ». Trois temps, zéro liste de commandes.',
@@ -454,7 +551,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '15/08/2026 16:40',
-    title: 'Les joueurs d’avant le voile signent aussi — une fois, sans rien perdre',
+    title:
+      'Les joueurs d’avant le voile signent aussi — une fois, sans rien perdre',
     notes: [
       'Le voile de signature ne se montrait qu’aux NOUVEAUX venus : un nom déjà enregistré le court-circuitait. Or les joueurs existants n’ont jamais fait le geste — leur audio restait muet au lancement. Le voile se montre désormais UNE fois à eux aussi, avec leur nom PRÉ-REMPLI : un seul clic confirme (ou corrige) le nom, éveille le son, et c’est réglé.',
       'Rien n’est effacé : records, trophées et réglages restent intacts — seule une clé versionnée (sujet21-signature-v1) marque « ce joueur a signé ». Une future refonte du voile pourra le remontrer en changeant simplement la version de la clé.',
@@ -462,7 +560,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '15/08/2026 16:15',
-    title: 'La prise en main gèle TOUTES les commandes — clavier, manette, tactile',
+    title:
+      'La prise en main gèle TOUTES les commandes — clavier, manette, tactile',
     notes: [
       'Pendant les cartes de prise en main, le voile bloquait les clics — mais le CLAVIER passait (F gelait le corps, R relançait, espace mettait en pause…), la MANETTE aussi, et un second doigt pouvait toucher la cuve. Toutes les commandes de jeu sont désormais GELÉES tant que les cartes sont à l’écran : clavier, pointeurs/tactile (gelés à la source, dans les gestionnaires), et manette — dont le bouton A avance maintenant les cartes, comme un clic.',
       'Le gel se lève à la dernière carte, d’un seul geste — rien à réarmer.',
@@ -478,7 +577,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '15/08/2026 15:20',
-    title: 'La fiche condense le palmarès — sans bouton REGISTRES ni défilement',
+    title:
+      'La fiche condense le palmarès — sans bouton REGISTRES ni défilement',
     notes: [
       'Le bouton REGISTRES disparaît (le voile reste en coulisse : la saisie du nom sur mobile s’en sert). Le panneau de droite devient le CONDENSÉ de l’écran RECORDS : rang 1 de chaque podium (★ note, 💧 volume, ⏱ chrono) par salle — seules les salles qui ONT un palmarès s’affichent, bornées à neuf : la fiche tient SANS DÉFILEMENT (les anciennes lignes vides « — — — » sur 24 salles forçaient à défiler). Le détail complet vit derrière le bouton RECORDS. Les vieux records d’avant le palmarès ne s’affichent plus, comme demandé.',
       'Et la page ne SAUTE plus vers le bas au chargement : le navigateur restaurait le défilement de la visite précédente une demi-seconde après l’affichage — le titre devenait inaccessible. La fiche s’ouvre désormais toujours en haut.',
@@ -504,7 +604,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '15/08/2026 13:45',
-    title: 'Verdict moteur : le JavaScript redevient le défaut — et le rattrapage devient un réglage',
+    title:
+      'Verdict moteur : le JavaScript redevient le défaut — et le rattrapage devient un réglage',
     notes: [
       'A/B propre sur le Pixel (fenêtres vidées, mêmes conditions, à 4 minutes d’écart) : physique moyenne 5,6 ms en JavaScript contre 8,1 ms en WASM (+44 %), images lentes 36 % contre 44 %. Le JIT mobile bat nos noyaux compilés sur ces boucles : le JAVASCRIPT redevient le moteur PAR DÉFAUT, le WASM reste en option — c’est un instrument de mesure, pas un dogme. Les mesures ont tranché, dans le sens inverse de l’intuition : c’est exactement à ça qu’elles servent.',
       'Les deux rapports du matin confirment l’autre coupable : 81 à 92 % des images lentes sont des RAFALES DE RATTRAPAGE (3 pas de simulation au lieu de 2, ~14-15 ms de physique, après chaque accroc système). L’anti-domino revient donc — en RÉGLAGE cette fois : RATTRAPAGE APRÈS UN ACCROC, « temps réel » (défaut, historique) ou « fluidité » (l’accroc ne se paie qu’une fois, quelques millisecondes de temps simulé abandonnées). Le premier essai de l’anti-domino avait été jugé au ressenti dans de mauvaises conditions (résolution dynamique au palier 5) — cette fois, le joueur juge proprement, et le rapport consigne le mode (config.rattrapage).',
@@ -512,7 +613,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '15/08/2026 02:50',
-    title: 'Les notes de livraison ont leur écran — et un compteur de FPS permanent',
+    title:
+      'Les notes de livraison ont leur écran — et un compteur de FPS permanent',
     notes: [
       'Le journal des livraisons quitte le banc de réglage : nouveau bouton 📜 LIVRAISONS sur la fiche d’essai — les 160 entrées du chantier, lisibles, avec un bouton TÉLÉCHARGER qui exporte tout en Markdown (hors ligne compris). Les entrées peuvent désormais porter une illustration (capture, schéma) : les prochaines livraisons visuelles en profiteront.',
       'Le banc y gagne un DOM plus léger. Réponse à la question « le banc consomme-t-il ? » : fermé, son coût est faible mais réel — ses moniteurs se rafraîchissent ~5 fois par seconde en continu ; l’essentiel de son poids était ce journal, désormais sorti.',
@@ -530,7 +632,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '15/08/2026 01:55',
-    title: 'L’écran RECORDS : trois podiums par salle, et la NOTE qui fait rejouer',
+    title:
+      'L’écran RECORDS : trois podiums par salle, et la NOTE qui fait rejouer',
     notes: [
       'Nouveau bouton 🏆 RECORDS sur la fiche d’essai : le palmarès partagé de tous les opérateurs, salle par salle — trois podiums côte à côte : NOTE, VOLUME, CHRONO (top 5, médailles ①②③).',
       'La NOTE est le nouveau record combiné : centilitres sauvés × 60 / (60 + secondes). Arriver GROS compte d’abord, arriver VITE amplifie — foncer en se vidant donne une petite note, tout garder en traînant aussi : c’est la ligne de crête entre les deux qui fait les grandes notes. Calculée serveur et client, même formule.',
@@ -549,7 +652,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '15/08/2026 00:45',
-    title: 'Grandes cartes, habillages de parois, SALLE X/N — et plus aucun popup',
+    title:
+      'Grandes cartes, habillages de parois, SALLE X/N — et plus aucun popup',
     notes: [
       'GRANDES CARTES : les budgets de rendu passent de 40 à 96 boîtes et de 12 à 16 zones — de quoi composer une carte de 3-4 tableaux d’un seul tenant. Le dézoom manuel (pincement/molette) couvrait déjà très largement de telles étendues : dézoom total sur l’ensemble, zoom sur chaque salle. Le court-circuit par boîte du shader fait que chaque pixel ne paie que les boîtes qui le concernent, pas les 96.',
       'HABILLAGES DE PAROIS — quatre décors neutres, physique strictement inchangée (c’est une paroi) : CAISSONS (panneaux empilés, joints sombres), CONDUITES (faisceau de tubes couchés, brides), POUTRELLE (croisillons rivetés), BLINDAGE (plaque lourde, chevrons d’avertissement au bord). Sélecteur « Habillage (décor) » dans l’éditeur sur toute paroi ; les motifs pivotent avec les boîtes obliques.',
@@ -559,7 +663,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '15/08/2026 00:35',
-    title: 'Tous les tableaux livrés entrent dans la bibliothèque — modifiables',
+    title:
+      'Tous les tableaux livrés entrent dans la bibliothèque — modifiables',
     notes: [
       'Demande du joueur : voir dans l’éditeur (et son ordre des tableaux) le premier tableau conservé, puis TOUS les tableaux construits — modifiables — puis le reste des essais du labo. La bibliothèque partagée reçoit donc une copie ÉDITABLE de chaque tableau livré : l’école (21-S1 à S3), l’expédition complète dans l’ordre choisi (21-A → 21-G), et le tableau 1 bis.',
       'Mécanique : un semis par workflow GitHub (ops/seed-levels.mjs + gâchette seed-levels-go, sur le modèle de perf-sync — l’API n’est joignable que de là). Ré-exécutable sans danger : un code déjà présent dans la bibliothèque n’est JAMAIS resemé — la version du joueur prime, toujours.',
@@ -593,7 +698,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '14/08/2026 23:36',
-    title: 'Résolution de rendu au choix : élevée, moyenne, faible — ou dynamique',
+    title:
+      'Résolution de rendu au choix : élevée, moyenne, faible — ou dynamique',
     notes: [
       'Intuition joueur, validée par les chiffres : le Pixel pousse ~4,2 millions de pixels par image quand le Steam Deck en pousse ~1 — et le shader de composition coûte PAR PIXEL. À réglages égaux, le téléphone paie 4 fois plus de carte graphique : c’est l’écart entre les deux machines.',
       'La section RÉSOLUTION DYNAMIQUE devient RÉSOLUTION DE RENDU, quatre choix : ÉLEVÉE (native, défaut — rien ne change), MOYENNE (échelle ×0,75 : la carte graphique calcule 56 % des pixels), FAIBLE (×0,5 : 25 % des pixels), DYNAMIQUE (l’adaptatif historique, qui s’ajuste seul à la cadence). Moyenne et faible sont CONSTANTES : l’allègement sans le yo-yo qui avait fait rejeter l’adaptatif sur PC.',
@@ -603,7 +709,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '14/08/2026 23:16',
-    title: 'Anti-domino débranché, verrou 45 (Steam Deck), rapports A/B propres',
+    title:
+      'Anti-domino débranché, verrou 45 (Steam Deck), rapports A/B propres',
     notes: [
       'L’ANTI-DOMINO EST DÉBRANCHÉ, sur retour joueur. Les rapports confirment qu’il faisait ce qu’il promettait — les images lentes ne sont plus dominées par la physique (97 % « hors CPU » désormais) — mais sur un téléphone où les accrocs système sont NOMBREUX, abandonner du temps simulé à chaque accroc se ressent plus que la deuxième image lente évitée. Le rattrapage historique reprend ; la capacité reste dans la boucle, testée, si on y revient.',
       'VERROU 45 ajouté aux fréquences : le Steam Deck cadencé à 45 Hz (réglage SteamOS) y trouve un verrou qui épouse exactement la grille de son écran — et le jeu y tourne bien. Sur un téléphone à écran 60 Hz, 45 ne divise pas 60 : la cadence alternerait 17/25 ms, un tressautement mécanique — préférer 60 (ou 30) sur mobile.',
@@ -633,7 +740,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '14/08/2026 21:40',
-    title: 'Rapport v3 : qui casse le « 60 constant » — bandes, cadence, Hz réel de l’écran',
+    title:
+      'Rapport v3 : qui casse le « 60 constant » — bandes, cadence, Hz réel de l’écran',
     notes: [
       'Verdict du test A/B graphismes : décor ET liquide en sobre, les à-coups n’ont pas bougé (12,5 % → 11,3 % → 15,7 % d’images lentes sur les trois rapports du Pixel) — le shader est INNOCENTÉ, les graphismes riches peuvent rester. Mais le joueur a raison : même téléphone froid, ~12 % d’images au-dessus de 20 ms, ce n’est pas un 60 constant — et les 10 pires images (trous système) ne disent rien de cette masse-là.',
       'Le rapport v3 fait parler la masse : BANDES de lenteur (20-33, 33-50, 50+ ms) avec, par bande, les moyennes des postes et le POSTE DOMINANT image par image (physique, rendu, autre JS, hors CPU) — on saura enfin si les images à 22 ms sont de la physique qui déborde ou des trous.',
@@ -643,7 +751,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '14/08/2026 21:17',
-    title: 'Graphismes du LIQUIDE riche/sobre — et l’eau ne se paie plus que là où elle est',
+    title:
+      'Graphismes du LIQUIDE riche/sobre — et l’eau ne se paie plus que là où elle est',
     notes: [
       'Retour joueur : le doute porte sur le rendu du LIQUIDE lui-même, pas sur le décor — et le réglage décor ne semblait pas changer grand-chose. Le liquide a donc son propre interrupteur, séparé.',
       'Nouveau réglage GRAPHISMES DU LIQUIDE au voile PARAMÈTRES : RICHE (défaut, inchangé) ou SOBRE — le shader débranche tout l’éclairage de l’eau : relief (4 prélèvements de champ par pixel), reflet spéculaire, miroir vivant (éclat dur, fresnel, étincelles), scintillement. La silhouette, les couleurs de vitesse et les états (givre, vapeur) restent exactement les mêmes : l’eau devient plate, pas différente.',
@@ -653,7 +762,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '14/08/2026 21:03',
-    title: 'Graphismes RICHES / SOBRES : l’instrument qui chiffre le coût du décor',
+    title:
+      'Graphismes RICHES / SOBRES : l’instrument qui chiffre le coût du décor',
     notes: [
       'Hypothèse en cours d’examen : les graphismes (liquide + décor) seraient le vrai goulot — les pires images des rapports du Pixel montrent un CPU minuscule dans une frame longue, signature d’une carte graphique saturée. Pour trancher, il fallait pouvoir ÉTEINDRE le décor sans rien changer d’autre.',
       'Nouveau réglage GRAPHISMES DU DÉCOR au voile PARAMÈTRES : RICHES (défaut, inchangé) ou SOBRES — le shader de composition débranche tout le bruit procédural décoratif : vie du vaisseau (veilleuses, poussières, respiration), caustiques, nébulosité du vide, illustrations de zones, textures de brume (auras hydro/froid/chaud, cire, gouttes de membrane, scintillement du givre), étincelles du miroir, seconde octave des volutes de vapeur.',
@@ -663,7 +773,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '14/08/2026 19:05',
-    title: 'Le rapport ignore les suspensions — et le 3e rapport du Pixel confirme',
+    title:
+      'Le rapport ignore les suspensions — et le 3e rapport du Pixel confirme',
     notes: [
       'Le collecteur n’enregistre plus les « images » de plus d’1,5 s : onglet endormi, écran éteint, appli en arrière-plan — le navigateur avait suspendu le rappel, ce n’était pas une image (constaté : un dt de 172 secondes dans un rapport réel, qui polluait durée, percentiles et pires images).',
       'Bilan des trois rapports du Pixel 8 Pro, même tableau : images lentes (>20 ms) 31 % → 26,6 % → 11,8 % ; p75 40 → 40 → 60 im/s ; physique moyenne divisée par deux par la phase palet (8,9 → 4,1 ms) ; et la qualité adaptative, qui s’écrasait au palier plancher, se tient désormais au palier 1. Le reste de la traîne est fait de rafales système (throttling), devenues rares.',
@@ -671,7 +782,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '14/08/2026 18:10',
-    title: 'La phase palet ne chauffe plus : un corps gelé coûte 2,6× moins que l’eau',
+    title:
+      'La phase palet ne chauffe plus : un corps gelé coûte 2,6× moins que l’eau',
     notes: [
       'Optimisation mobile ciblée, guidée par les rapports du Pixel (« ça rame après plusieurs niveaux » = throttling thermique — moins calculer, c’est moins chauffer). Deux découvertes au profileur :',
       'UN CORPS SANS LIQUIDE payait tout le solveur pour rien : les 3 itérations de densité, la collecte de voisins et le XSPH tournaient sur un palet rigide qui n’a ni pression ni viscosité. En PHASE PALET, ces passes se sautent — trajectoires strictement identiques (les corrections ne s’appliquaient déjà jamais au gel).',
@@ -732,7 +844,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '14/08/2026 10:45',
-    title: 'La carte dans la main : pincement ancré, élan, et le temps lisible partout',
+    title:
+      'La carte dans la main : pincement ancré, élan, et le temps lisible partout',
     notes: [
       'Le PINCEMENT est enfin de la manipulation directe : le point du monde sous les doigts RESTE sous les doigts (zoom ancré au centre du pincement, immédiat), et la molette zoome vers le curseur. Avant, tout zoomait vers le centre de l’écran — la carte fuyait sous le geste.',
       'L’ÉLAN du geste : les doigts quittent l’écran en mouvement, la carte continue et s’amortit en douceur (~0,4 s) — le glisser des cartes qu’on a dans la main. Le clic droit maintenu en profite aussi.',
@@ -743,7 +856,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '14/08/2026 09:05',
-    title: 'Les obliques, citoyennes de plein droit : découpe et poignées de coins',
+    title:
+      'Les obliques, citoyennes de plein droit : découpe et poignées de coins',
     notes: [
       'Une paroi oblique se REDIMENSIONNE désormais à la poignée : ses 4 coins portent des prises PIVOTÉES avec elle — saisir un coin cloue le coin opposé au monde, et la boîte s’étire dans SON repère (l’angle ne bouge pas). Le contour de sélection suit enfin la vraie silhouette : fini le rectangle droit menteur autour d’une boîte penchée.',
       'La DÉCOUPE ronge maintenant les obliques — à ANGLES ÉGAUX : tout se passe dans le repère de la perdante (où tout est droit), puis chaque morceau repart dans le monde avec son angle, posé exactement sur la paroi d’origine. Deux rampes à 45° se rongent comme deux parois droites. Angles différents : refus motivé (les morceaux ne seraient plus des rectangles) — alignez les angles d’abord.',
@@ -771,7 +885,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '13/08/2026 21:50',
-    title: 'Cap sur le 60 fps constant : la mémoire re-rangée, la qualité exigeante',
+    title:
+      'Cap sur le 60 fps constant : la mémoire re-rangée, la qualité exigeante',
     notes: [
       'Les à-coups « en cas de séparation » sont diagnostiqués au profileur : après une gerbe ou une éclaboussure, des particules voisines dans l’ESPACE se retrouvent éparpillées dans les TABLEAUX mémoire — chaque accès de paire devient un défaut de cache et toutes les passes ralentissent d’un coup (jusqu’à ×9 sur un pas, mesuré). Le solveur re-range désormais ses particules dans l’ordre des cellules 4 fois par seconde : physique inchangée, localité restaurée — pas médian −20 %, régime dispersé −23 %.',
       'La collecte de voisins s’arrête net une fois sa liste pleine : dans un empilement dense (gouttes qui retombent en tas), elle testait encore la distance de centaines de particules sans plus rien retenir.',
@@ -789,7 +904,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '13/08/2026 18:35',
-    title: 'Récepteurs laser TOR et NOR : le verrou qui ouvre, le maintien qui scelle',
+    title:
+      'Récepteurs laser TOR et NOR : le verrou qui ouvre, le maintien qui scelle',
     notes: [
       'Deux familles de récepteurs, chacune à transition UNIQUE — une fois basculé, plus jamais de retour. TOR (l’existant, désormais nommé) : un seul passage du faisceau allume la pastille pour de bon, la porte asservie s’ouvre et le reste.',
       'NOR (nouveau) : la porte n’est ouverte que TANT QUE le faisceau tient la cible — et à la PREMIÈRE coupure, la pastille grille : la porte se referme et se scelle définitivement. Traverser se joue faisceau maintenu (miroir de glace posé, prisme du corps, arc sur rail…) ; lâcher le rayon au mauvais moment condamne le passage.',
@@ -801,7 +917,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '13/08/2026 18:05',
-    title: 'La glace et la vapeur sentent enfin la chimie — et la frame respire',
+    title:
+      'La glace et la vapeur sentent enfin la chimie — et la frame respire',
     notes: [
       'CORRECTIF DE CONFORMITÉ (tableau des règles) : le PALET de glace rebondit vraiment sur l’hydrophobe — restitution propre (le bumper rend PLUS qu’il ne reçoit) et pichenette plancher : même en dérive lente, il repart d’un coup sec. Sur l’hydrophile, le mouillage le retient : translation et rotation s’essoufflent. La réponse était écrite par particule : la moyenne de l’amas la diluait, puis l’impulsion rigide l’écrasait — un vrai bloc se comportait comme sur un mur neutre (seule une particule isolée sentait la chimie, et c’est ce que testait la suite). La chimie vit désormais dans la passe rigide elle-même, à l’échelle du bloc.',
       'La VAPEUR sent les bandes pour de bon : poids remonté (12 % → 35 % de l’effet plein, réglable au banc avec la portée) — l’hydrophile attire le nuage de loin comme une gravité légère, l’hydrophobe le repousse comme un champ. Trois nouveaux curseurs (Matériaux) : bumper glace, pichenette glace, freinage glace — plus poids et portée vapeur.',
@@ -813,7 +930,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '13/08/2026 17:15',
-    title: 'La règle d’or v4 : péage de vaporisation, dashs par transformation, SURCHAUFFEUR',
+    title:
+      'La règle d’or v4 : péage de vaporisation, dashs par transformation, SURCHAUFFEUR',
     notes: [
       'La VAPORISATION se paie : 20 % du volume actif part en gouttes à CHAQUE bascule en vapeur — touche G, chaudière à 95 %, zone forcée, toute cause confondue. La gerbe part en étoile à grande vitesse : c’est la même matière que la propulsion, récupérable (et elle perlera en rosée au froid). Réglable au banc (« péage de vaporisation »).',
       'Les dashs ne se comptent plus PAR ÉCRAN mais PAR TRANSFORMATION : chaque bascule en vapeur rend ses 3 dashs (réglable au banc et par tableau dans l’éditeur), même si le volume a fondu — se retransformer sans compter mène au game over, c’est le jeu.',
@@ -824,7 +942,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '13/08/2026 13:50',
-    title: 'Le time warp fonctionne à nouveau — l’accélération se paie en images, pas en mensonge',
+    title:
+      'Le time warp fonctionne à nouveau — l’accélération se paie en images, pas en mensonge',
     notes: [
       'Accélérer le temps (›, RB, la croix) ne faisait plus rien de visible sur les tableaux devenus lourds : la boucle physique plafonnait à 6 pas par image et son budget CPU fixe (12 ms) jetait le surplus — le HUD affichait ×4, la cuve restait à ×1. Les commandes, elles, marchaient : c’est la simulation qui n’encaissait pas.',
       'Deux correctifs : le plafond de pas passe à 24 (le vrai frein anti-spirale reste le budget CPU), et le budget s’ÉTEND proportionnellement au warp — mettre ×4, c’est acheter des pas de simulation contre des images par seconde. Sur machine étranglée, ×4 donne désormais ×3,4 réels (avant : ×1) ; sur machine saine, le ×2/×4/×6 est exact. Le ralenti (‹, LB) reste précis dès que la machine tient le ×1.',
@@ -849,7 +968,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '12/08/2026 23:55',
-    title: 'La zone forcée répond partout — et le sas ne disparaît plus des grands tableaux',
+    title:
+      'La zone forcée répond partout — et le sas ne disparaît plus des grands tableaux',
     notes: [
       'Le rayon d’action d’une zone était une ellipse inscrite : sur une zone haute et étroite (l’école des zones), il fallait passer PILE devant le hublot pour se faire geler. La lisière épouse désormais tout le rectangle défini dans l’éditeur (coins à peine adoucis, toujours ondulée) : devant le hublot ou à côté, tant qu’on est dans la zone, la règle s’applique. Le dessin suit la même formule — ce qu’on voit reste ce qu’on subit.',
       'Le décor ne dessinait que 24 boîtes par tableau : dans un tableau chargé, le SAS (ajouté en dernier) et les derniers blocs posés devenaient des murs invisibles — la physique les voyait, pas l’œil. Budget porté à 40 boîtes et 12 zones, le sas garde sa place quoi qu’il arrive, et le panneau CONTRÔLE de l’éditeur refuse désormais un tableau qui déborde (« murs invisibles ») au lieu de le laisser casser en silence.',
@@ -857,7 +977,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '12/08/2026 15:10',
-    title: 'La transformation à 95 % : l’échauffement devient un pur effet visuel',
+    title:
+      'La transformation à 95 % : l’échauffement devient un pur effet visuel',
     notes: [
       'Nouvelle règle : à l’approche d’un élément, PLUS AUCUNE particule du corps ne se vaporise seule — l’eau chauffe, frémit et fume (effet visuel), c’est tout. La TRANSFORMATION se décide au niveau du corps : quand 95 % de la SURFACE ACTIVE (le corps principal — les gouttes éjectées ne comptent pas) baigne dans la zone d’effet, tout bascule d’un coup.',
       'La règle vaut pour les BLOCS (la chaudière : présence à 95 % dans l’aura → état gazeux, réarmement en ressortant) ET pour les ZONES FORCÉES (déclenchement à 95 % du corps dedans, tenue jusqu’à 85 % — fini le déclenchement au simple passage du centre). L’état persiste toujours à la sortie.',
@@ -894,7 +1015,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '12/08/2026 11:05',
-    title: 'Le radiateur fait vraiment passer à l’état gazeux — et ne repousse plus',
+    title:
+      'Le radiateur fait vraiment passer à l’état gazeux — et ne repousse plus',
     notes: [
       'Vaporisé malgré soi par un radiateur, on PASSE désormais vraiment à l’état gazeux : dès 70 % du corps en vapeur, l’intention suit — dash, sélecteur, sons, comme si on avait pressé G. Le déclencheur se réarme seulement une fois le corps redescendu sous 50 % : revenir à l’eau dans l’aura ne lutte pas contre la machine.',
       'Et le radiateur ne REPOUSSE plus : le frémissement de l’eau qui chauffe était un bruit dont l’amplitude suivait la chaleur — un tel bruit dérive vers le froid, d’où la poussée fantôme. Le signe du bouillonnement alterne maintenant d’une particule à l’autre : la dérive collective s’annule, le frémissement reste.',
@@ -902,7 +1024,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '12/08/2026 10:20',
-    title: 'Les records refondus : deux par salle, et un bilan clair à chaque sas',
+    title:
+      'Les records refondus : deux par salle, et un bilan clair à chaque sas',
     notes: [
       'Chaque salle tient désormais DEUX records indépendants : 💧 le VOLUME (le plus de litres en bonbonne) et ⏱ le CHRONO (la collecte la plus rapide, quel que soit le volume). Vos anciens registres migrent tout seuls.',
       'À CHAQUE fin de tableau, le bilan s’affiche en clair : vos deux mesures, face aux records — et « NOUVEAU RECORD ✦ » qui bat quand l’un tombe (la fanfare sonne pour l’un comme pour l’autre). En essai libre, les records de la salle s’affichent en lecture seule.',
@@ -920,7 +1043,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '12/08/2026 03:05',
-    title: 'Les impulsions vapeur se comptent — x par écran, réglable par tableau',
+    title:
+      'Les impulsions vapeur se comptent — x par écran, réglable par tableau',
     notes: [
       'Règle confirmée : en VAPEUR, le dash ne se paie plus en volume — il se COMPTE. Chaque écran offre x impulsions (réglage « impulsions / écran » au banc, et champ « Dashs vapeur / écran » propre à chaque tableau dans l’éditeur). Le LIQUIDE, lui, continue de payer ses éjections en quantité réelle.',
       'Le viseur du dash annonce le solde (« DASH 80 % · 2 impulsions »), le radiateur frôlé OFFRE l’impulsion suivante sans toucher au budget, et à sec, le viseur le dit : « À SEC — condensez, ou frôlez un radiateur ». L’état vapeur, lui, s’évapore toujours en continu.',
@@ -937,7 +1061,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '12/08/2026 01:55',
-    title: 'La gare du rail devient une poche, la vapeur sent les parois de loin',
+    title:
+      'La gare du rail devient une poche, la vapeur sent les parois de loin',
     notes: [
       'Condenser au bout d’un rail pouvait ENCORE gicler : le champ massait le nuage sur un point, plus dense que l’eau au repos — la condensation explosait sous la pression. Le terminus est désormais une POCHE : freinage partout, mais l’attraction s’arrête à un rayon mort — le nuage se gare à densité naturelle, la condensation est douce (test à l’appui : convoyé, condensé, aucune giclée).',
       'Les parois chimiques travaillent la vapeur DE LOIN : force encore réduite, mais portée ×2,5 — le nuage s’infléchit bien avant l’hydrophile ou l’hydrophobe, sans jamais être happé ni claqué.',
@@ -1014,7 +1139,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '11/08/2026 19:10',
-    title: 'Le CONTINUER apparaît vraiment, et la collecte n’agonise plus jamais',
+    title:
+      'Le CONTINUER apparaît vraiment, et la collecte n’agonise plus jamais',
     notes: [
       'Le bouton CONTINUER exigeait la MOITIÉ du volume de départ en bonbonne — inatteignable en vraie partie, puisque chaque impulsion éjecte de l’eau en route. Il s’offre désormais dès UN DIXIÈME du volume bu : « un peu d’aspiration », comme convenu, et c’est le joueur qui décide.',
       'Et la vraie source des alarmes est tarie : 1,2 s après la fin de l’aspiration, le jeu voyait un corps quasi vide et déclarait « dernière impulsion donnée — l’échantillon dérive »… sur un corps COLLECTÉ. Dès qu’un peu d’aspiration a eu lieu, la fin de course funeste (alertes, gel, bouton Recommencer) cède la place au CONTINUER — une seule invite à l’écran.',
@@ -1030,7 +1156,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '11/08/2026 18:20',
-    title: 'Le son s’éveille tout seul, le dash se tait, et les alarmes respectent l’aspiration',
+    title:
+      'Le son s’éveille tout seul, le dash se tait, et les alarmes respectent l’aspiration',
     notes: [
       'Plus de bouton « Activer le son » : l’audio s’éveille au PREMIER geste, quel qu’il soit — toucher, clic ou touche. Sur la fiche ne reste qu’un bouton MUTE (🔊 SON / 🔇 MUET), comme en jeu, atteignable à la manette.',
       'Le souffle d’aspiration qui accompagnait chaque impulsion de vapeur est retiré : le dash se voit à l’écran et se sent dans la manette (vibration), il n’a pas besoin de souffler.',
@@ -1039,7 +1166,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '11/08/2026 17:55',
-    title: 'La bande de vie partout, la fiche mobile allégée, et le premier toucher réparé',
+    title:
+      'La bande de vie partout, la fiche mobile allégée, et le premier toucher réparé',
     notes: [
       'LA BANDE DE VIE, sur toutes les plateformes : une ligne fine en haut — le volume et sa jauge quasi PLEINE LARGEUR (on voit fondre ce qu’on dépense, PC compris), et trois pastilles-icônes à droite (▦ tableau, ⛽ bonbonnes, ❄ coque) : un toucher dit leur nom.',
       'Au doigt, les boutons du bas passent en COLONNE À GAUCHE (le pouce gauche les tient, le droit vise), les états restent à droite, et les crans de temps se retirent (ils vivent au banc).',
@@ -1057,7 +1185,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '11/08/2026 16:45',
-    title: 'Réparé : les boutons de la fiche avaient disparu en paysage téléphone',
+    title:
+      'Réparé : les boutons de la fiche avaient disparu en paysage téléphone',
     notes: [
       'Les règles compactes du paysage étaient placées AVANT les styles de base dans la feuille : elles perdaient la cascade, et le cadre coupait les boutons au lieu de les resserrer. Les blocs sont déplacés en fin de feuille — la compaction s’applique vraiment.',
       'Et la fiche du téléphone tourné assume d’être un MENU : le texte de présentation s’efface, tout tient à l’écran — son, Commencer, Salles laser, Éditeur, Commandes, Plein écran, et les registres à droite. Chaque colonne sait défiler dans son cadre si un écran plus petit l’exige.',
@@ -1065,7 +1194,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '11/08/2026 16:20',
-    title: 'L’interface de jeu compacte en paysage mobile, et la barre de bord expliquée',
+    title:
+      'L’interface de jeu compacte en paysage mobile, et la barre de bord expliquée',
     notes: [
       'En PAYSAGE téléphone, l’interface de jeu passait en habits de bureau : gros panneaux, grosses cartes d’état, boutons géants. Toute la mise en page compacte du portrait s’applique désormais aussi au tactile en paysage — HUD en bande fine tout en haut, états 💧 ❄ 💨 en colonne d’icônes sous le pouce droit, barre tactile resserrée. L’écran appartient à la cuve.',
       'L’ONBOARDING gagne une quatrième carte : LA BARRE DE BORD — ⏸ pause, ↺ recommencer, ⌖ recadrer, ≡ le menu, et les états à droite — les chips s’allument tour à tour, dix secondes et tout est dit.',
@@ -1083,7 +1213,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '11/08/2026 15:05',
-    title: 'Mobile : le paysage demandé, la prise en main tactile en trois gestes',
+    title:
+      'Mobile : le paysage demandé, la prise en main tactile en trois gestes',
     notes: [
       'Sur téléphone en PORTRAIT, un voile demande de tourner l’appareil — un téléphone stylisé pivote, « le protocole s’observe en paysage ». Le verrou de rotation a sa sortie de secours (« continuer en portrait »).',
       'En PAYSAGE, la fiche s’adapte : pleine largeur, deux colonnes, figure retirée, tout tient sans ascenseur visible.',
@@ -1092,7 +1223,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '11/08/2026 14:30',
-    title: 'Gâchettes = zoom, fin de course muette quand le sas boit, nuage qui fait corps',
+    title:
+      'Gâchettes = zoom, fin de course muette quand le sas boit, nuage qui fait corps',
     notes: [
       'MANETTE : les grosses gâchettes zooment — RT rapproche, LT recule, la pression dose la vitesse. AGIR passe sur A seul (éjecter, viser-relâcher le dash). Et la fiche gagne un panneau « COMMANDES MANETTE », bouton par bouton.',
       'Quand le SAS BOIT, la fin de course se tait : plus d’alerte, plus de sting de dernière impulsion, plus de gel — le volume fond parce qu’il est COLLECTÉ, pas parce qu’il se perd. Et la victoire attend désormais que TOUT soit aspiré : gouttes détachées, palets de glace et volutes comptent — pas seulement le corps principal.',
@@ -1112,7 +1244,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '11/08/2026 13:20',
-    title: 'La fiche d’accueil en grand, et le bouton d’essai mène aux salles laser',
+    title:
+      'La fiche d’accueil en grand, et le bouton d’essai mène aux salles laser',
     notes: [
       'L’ACCUEIL occupe désormais une bonne partie de l’écran : la fiche passe en deux colonnes (~1060 px) — le protocole à gauche (titre en grand, consigne, relevé, boutons), le dossier à droite (figure, registres, commandes). Sur écran étroit, tout s’empile comme avant.',
       'Le bouton d’essai de la fiche mène aux SALLES LASER : la trilogie 21-H → 21-J (miroir, prisme, plasma) se joue d’un clic, enchaînée sas après sas, hors expédition et hors registres — même si votre partie suit la séquence de la bibliothèque partagée. Le prototype 21-A bis reste accessible depuis le banc (dossier Tableaux).',
@@ -1120,7 +1253,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '11/08/2026 12:50',
-    title: 'La trilogie laser entre dans l’expédition : trois nouveaux tableaux',
+    title:
+      'La trilogie laser entre dans l’expédition : trois nouveaux tableaux',
     notes: [
       'Les CIBLES sont À VERROU : un passage du faisceau suffit, l’activation est acquise et la porte reste ouverte (jusqu’au Recommencer). Plus besoin de tenir le rayon — on allume, puis on voyage.',
       'La RÉFRACTION est lissée comme le miroir : le milieu liquide devient une isoligne de densité au lieu d’un contact au grain près. Le dioptre ne clignote plus sur le clapot, et une gouttelette isolée ne dévie plus le rayon.',
@@ -1240,7 +1374,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '11/08/2026 01:10',
-    title: 'Deux corrections : les mécanismes tiennent leur plan, la glace ne goutte plus',
+    title:
+      'Deux corrections : les mécanismes tiennent leur plan, la glace ne goutte plus',
     notes: [
       'Sur mobile, faisceaux, émetteurs, cibles et portes dérivaient vers le coin bas-droit et bougeaient avec le zoom, comme décollés du décor : le canevas de superposition n’avait pas de taille CSS explicite, et un canvas sans taille garde sa taille intrinsèque (bitmap × densité d’écran) — invisible sur un écran de densité 1, flagrant à densité 2 ou 3. Corrigé : tout est ancré au plan du monde.',
       'Le « ploc » d’éjection continuait de goutter quand on maintenait le doigt en GLACE — un palet n’éjecte rien, il n’a pas à goutter. Le son se tait en glace.',
@@ -1267,7 +1402,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '10/08/2026 23:40',
-    title: 'L’éditeur montre les zones d’effet : auras, aspiration, illustrations, décals',
+    title:
+      'L’éditeur montre les zones d’effet : auras, aspiration, illustrations, décals',
     notes: [
       'Chaque surface montre désormais la portée RÉELLE de son influence, en rectangle arrondi iso-distance : l’aura de gel de la plaque froide (avec, en pointillé long, sa portée à froid complet — elle grandit en cours de partie), l’aura du radiateur (avec, en pointillé court, sa portée réduite à froid), et les bandes d’influence hydrophile et hydrophobe.',
       'Le sas montre son rayon d’aspiration — le courant qui hale l’eau et la glace commence bien avant son rectangle.',
@@ -1277,7 +1413,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '10/08/2026 23:10',
-    title: 'Zones : l’illustration entière, la glace en givre blanc, les effets allégés',
+    title:
+      'Zones : l’illustration entière, la glace en givre blanc, les effets allégés',
     notes: [
       'La rampe de buses sortait coupée net : l’illustration n’était dessinée que dans le champ de la brume, et la lisière arrondie tronquait l’objet. Une rampe n’est pas un gaz — l’image se dessine maintenant entière dans son cadre, seule la brume suit la lisière.',
       'La zone GLACE ne se voyait plus : du cyan sur une cuve cyan. Sa brume givre maintenant en BLANC, nettement renforcée — les deux autres gardent leur teinte, le violet et le bleu contrastent déjà.',
@@ -1286,7 +1423,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '10/08/2026 22:50',
-    title: 'Les zones perdent leur contour : une brume d’accident, pas une bulle',
+    title:
+      'Les zones perdent leur contour : une brume d’accident, pas une bulle',
     notes: [
       'Le liseré lumineux qui suivait la lisière faisait bulle de savon posée sur le décor. Il disparaît : à la place, une BRUME teintée — dense au foyer, elle se dissout en lambeaux irréguliers vers la lisière, déchirée par le bruit au lieu d’être dessinée. Une atmosphère qui s’échappe de l’accident, pas un marquage.',
       'Les lambeaux meurent SUR la lisière mécanique, jamais au-delà : la forme du rayon d’action n’a pas bougé, seul son habit a changé. Et la brume s’allège sur l’illustration elle-même — le hublot, la conduite et les buses restent lisibles sous leur nappe.',
@@ -1311,7 +1449,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '10/08/2026 21:45',
-    title: 'Les zones ont leurs vraies images, et l’eau passe enfin devant le décor',
+    title:
+      'Les zones ont leurs vraies images, et l’eau passe enfin devant le décor',
     notes: [
       'Trois illustrations remplacent la géométrie schématique des zones : le hublot fendu (verre étoilé sur le vide, givre en dentelle), la conduite rompue (collecteur éventré, fumée à la brèche) et la rampe de buses (jets de brume, gouttes qui perlent). Chacune s’ajuste dans sa zone, refroidie pour se fondre dans la cuve.',
       'Le décor procédural ne disparaît pas : ses parties ANIMÉES continuent par-dessus l’image — souffle glacé du hublot, panache qui monte de la brèche, gouttes qui tombent des buses, voile de condensation. L’image porte la matière, l’animation porte la vie. Sans image chargée, l’ancien dessin revient tel quel.',
@@ -1328,7 +1467,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '10/08/2026 20:55',
-    title: 'Le ralenti s’accentue, et une vraie texture habite le temps suspendu',
+    title:
+      'Le ralenti s’accentue, et une vraie texture habite le temps suspendu',
     notes: [
       'Le premier réglage était trop timide : les basses de la musique passaient sous le filtre et masquaient tout. Le monde plonge maintenant plus bas (passe-bas à 290 Hz au lieu de 430) ET baisse de moitié en niveau — l’effet « sous l’eau » ne se devine plus, il s’impose.',
       'Le plongeon d’entrée et la remontée de sortie sont nettement plus francs, et le cœur au ralenti bat deux fois plus fort.',
@@ -1366,7 +1506,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '10/08/2026 19:15',
-    title: 'Le seuil de dernière impulsion passe en litres, et le souffle d’éjection s’efface',
+    title:
+      'Le seuil de dernière impulsion passe en litres, et le souffle d’éjection s’efface',
     notes: [
       'Le seuil était une FRACTION du volume de départ (5 %). Sur un tableau à petite réserve, 5 % tombait très haut en litres : l’alerte pouvait se déclencher dès 1,15 L, alors qu’il restait de quoi manœuvrer. Il est désormais un volume ABSOLU — 300 ml — quel que soit le volume de départ. On garde donc la main jusqu’à 0,30 L, puis la prochaine impulsion est la dernière ; l’alerte « réserve basse » prévient à 0,60 L.',
       'Le souffle continu qui accompagnait l’éjection d’eau est retiré : l’eau se signale par la goutte qui « ploc » à chaque impulsion, plus par un sifflement. La vapeur, elle, garde sa respiration.',
@@ -1422,7 +1563,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '10/08/2026 16:30',
-    title: 'Les zones ont une CAUSE : on dessine l’accident, le joueur en déduit la règle',
+    title:
+      'Les zones ont une CAUSE : on dessine l’accident, le joueur en déduit la règle',
     notes: [
       'Une zone n’impose plus un état par décret : il s’est passé quelque chose ici. GLACE = HUBLOT FENDU — un grand hublot en arrière-plan, monture boulonnée, verre sur le vide étoilé, fêlures rayonnant depuis le point d’impact, givre en dentelle depuis la monture et souffle glacé qui s’échappe de la brèche.',
       'VAPEUR = CONDUITE ROMPUE : un collecteur court au sol de la salle, brides régulières, et sa brèche crache un panache qui monte et se tord sur toute la hauteur. EAU = CHAMBRE PRESSURISÉE : rampes de buses au plafond, gouttes qui perlent et descendent, voile de condensation dense en bas — ici rien ne bout ni ne gèle.',
@@ -1432,7 +1574,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '10/08/2026 15:40',
-    title: 'La glace PIVOTE, le sas l’avale, et la fin de course remplace le seuil',
+    title:
+      'La glace PIVOTE, le sas l’avale, et la fin de course remplace le seuil',
     notes: [
       'ROTATION DES BLOCS : un palet ne restait bloqué dans son axe parce que le choc s’appliquait au centre de masse. L’impulsion s’applique désormais au POINT DE CONTACT, avec le moment d’inertie du bloc : un choc excentré transfère une part de l’élan en rotation, et le palet repart en tournant, dévié. C’est la formule d’impulsion d’un corps rigide, pas un effet cosmétique.',
       'LE SAS AVALE LA GLACE : il n’avait aucune prise sur elle, ni pour l’aspirer ni pour la boire. Il l’aspire maintenant (avec moins de prise qu’un liquide : un bloc a de l’inertie) et l’avale. Entrer SOLIDE rapporte une PRIME DE COLLECTE de 25 %, annoncée au bilan.',
@@ -1460,7 +1603,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '10/08/2026 13:20',
-    title: 'Les zones d’état se voient, et les tableaux s’enregistrent en bibliothèque',
+    title:
+      'Les zones d’état se voient, et les tableaux s’enregistrent en bibliothèque',
     notes: [
       'ZONES VISIBLES : une zone qui impose un état n’existait que dans l’éditeur — elle se subissait sans se voir. Elle est désormais peinte dans le jeu : voile teinté à sa couleur d’état, marge hachurée qui court le long de la frontière, liseré lumineux, halo court à l’extérieur pour la deviner avant de la franchir, et une étiquette encadrée qui annonce la règle du lieu. Le HUD affiche « VAPEUR — IMPOSÉE » et le sélecteur d’état se grise.',
       'BIBLIOTHÈQUE PARTAGÉE : fini l’échange de fichiers. Les tableaux s’ENREGISTRENT sur le serveur (/api/levels) et la liste est visible dans l’éditeur — on ouvre d’un clic, on enregistre, on enregistre sous un autre nom, on supprime.',
@@ -1470,7 +1614,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '10/08/2026 11:30',
-    title: 'Éditeur de tableaux : créer et modifier un niveau sans toucher au code',
+    title:
+      'Éditeur de tableaux : créer et modifier un niveau sans toucher au code',
     notes: [
       'Un ÉDITEUR complet, accessible depuis la fiche d’essai ou par l’adresse ?editeur. On trace les surfaces au glisser (paroi, hydrophile, hydrophobe, hublot froid, radiateur, grille, éponge), on place le départ, le sas et les étiquettes, on déplace et redimensionne à la poignée, avec grille aimantée réglable. Suppr efface, D duplique, Échap désélectionne, clic droit déplace la vue, molette zoome.',
       'ZONES D’ÉTAT (nouveau modèle) : on peut délimiter des régions qui IMPOSENT un état — eau, glace ou vapeur — et verrouillent le sélecteur tant qu’on y est, ou des zones libres. Le jeu les applique déjà : en entrant, l’état est converti et les boutons se grisent ; en sortant, le joueur retrouve le choix qu’il avait fait.',
@@ -1480,7 +1625,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '09/08/2026 21:10',
-    title: 'Les murs neutres ne collent plus : l’amorti redevient un effet de contact',
+    title:
+      'Les murs neutres ne collent plus : l’amorti redevient un effet de contact',
     notes: [
       'Défaut signalé sur la galerie noyée : les parois semblaient ATTIRER et retenir le corps. L’amorti d’éclaboussure (qui fait épouser la paroi au lieu de jaillir) partageait la portée de la chimie — passée de 16 à 80 u pour rendre les auras visibles. Chaque mur neutre traînait donc un champ collant de 80 unités, et le tableau bis en est plein. L’amorti a désormais SA portée (14 u, deux espacements de particule), réglable au banc.',
       'Second défaut au même endroit : l’amorti n’était pas normalisé par le pas de temps, donc il se cumulait à chaque sous-pas — 120 fois par seconde. Il est maintenant exponentiel en dt : identique quel que soit le nombre de sous-pas.',
@@ -1516,7 +1662,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '09/08/2026 19:20',
-    title: 'Cinq textures de plus : froid, chaud, grille, seconde paroi, lointain',
+    title:
+      'Cinq textures de plus : froid, chaud, grille, seconde paroi, lointain',
     notes: [
       'PLAQUE FROIDE : vrai givre cristallin, teinté franchement bleu (l’image brute tirait vers le gris béton) — le scintillement procédural reste par-dessus, le gel a l’air vivant. RADIATEUR : panneau à ailettes réchauffé, les rayures animées deviennent la chaleur qui court dessus. GRILLE : panneau perforé dont les trous servent eux-mêmes de masque — le fond se voit à travers.',
       'SECONDE PAROI : les murs neutres alternent entre deux textures selon un bruit très basse fréquence — un long mur ne répète plus le même motif d’un bout à l’autre du tableau.',
@@ -1556,7 +1703,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '09/08/2026 17:00',
-    title: 'La vie se lit, les records se partagent — et la galerie noyée en essai',
+    title:
+      'La vie se lit, les records se partagent — et la galerie noyée en essai',
     notes: [
       'VIE LISIBLE : la jauge passe à l’ambre à l’approche du seuil et pulse en rouge dessous, avec un bandeau « COHÉSION CRITIQUE — dispersion dans X s » qui égrène le délai de grâce. Le débit de perte s’affiche en direct (−0,42 L/s · coût vapeur / éjection / surfaces), la rosée récupérable aux plaques froides aussi. La coque gagne une barre de refroidissement à côté du chiffre. Et quand le sas sort de l’écran, une FLÈCHE D’OBJECTIF le pointe depuis le bord, distance à l’appui.',
       'RECORDS PARTAGÉS : le tableau d’honneur vit maintenant sur le serveur (/api/records) — les registres de la fiche montrent le meilleur de TOUS les opérateurs, nom à l’appui, même règle de départage qu’en local. Et le protocole n’admet plus d’anonyme : le NOM D’OPÉRATEUR est obligatoire pour plonger — le champ se signale si on l’oublie.',
@@ -1565,7 +1713,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '09/08/2026 16:05',
-    title: 'Tutoriel diégétique : le protocole du Dr Véga guide la première plongée',
+    title:
+      'Tutoriel diégétique : le protocole du Dr Véga guide la première plongée',
     notes: [
       'Au tableau 21-A, des CONSIGNES DU PROTOCOLE apparaissent une à une, au bon moment : éjecter pour se déplacer, surveiller la jauge de volume, changer d’état (F / G), puis deux consignes contextuelles — l’éponge quand on s’en approche, le sas quand il est en vue.',
       'Chaque consigne se valide par le GESTE, pas par un clic « OK » : maintenir l’éjection la valide, presser F ou G la valide, s’approcher de l’éponge ou du sas déclenche la suivante. Aucune fenêtre modale, aucun arrêt du jeu.',
@@ -1574,7 +1723,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '09/08/2026 15:10',
-    title: 'L’expédition passe à 7 tableaux — et la vapeur perdue se recondense',
+    title:
+      'L’expédition passe à 7 tableaux — et la vapeur perdue se recondense',
     notes: [
       'Recondensation (§7.3) : la vapeur perdue (pilotage, coût d’état, péage de grille, brûlure de radiateur) n’est plus toute définitive — elle PERLE EN ROSÉE juste au-delà de l’aura des plaques froides, récupérable au prix d’un détour. Rendement 50 % à vaisseau tiède, 75 % à vaisseau glacial : le rattrapage devient plus généreux quand le jeu devient plus dur. Curseurs « recondensation /s » et « rendement » (Gaz).',
       'Trois tableaux neufs, qui COMBINENT les mécaniques : 21-E « La serre » (étagères hydrophiles pour viser, radiateur pour s’arracher, mur d’éponge), 21-F « Le dépôt de givre » (deux grilles qui essorent, des plaques froides qui rendent la rosée — passer, puis revenir boire ses pertes), 21-G « La dérive » (presque pas de murs : plots hydrophobes en bandes de billard, mouillages froids pour geler-glisser — la maîtrise pure, en final).',
@@ -1937,7 +2087,9 @@ export const DELIVERIES: Delivery[] = [
   {
     date: '08/08/2026 15:24',
     title: 'Auto-déploiement',
-    notes: ['Chaque mise à jour est en ligne sur sujet21.vercel.app une à deux minutes après livraison.'],
+    notes: [
+      'Chaque mise à jour est en ligne sur sujet21.vercel.app une à deux minutes après livraison.',
+    ],
   },
   {
     date: '08/08/2026 15:09',
@@ -1952,7 +2104,9 @@ export const DELIVERIES: Delivery[] = [
   {
     date: '08/08/2026 11:00',
     title: 'Jalon 2 — premier tableau',
-    notes: ['Matériaux (hydrophile, hydrophobe), éponge à saturation, sas de sortie et bonbonnes.'],
+    notes: [
+      'Matériaux (hydrophile, hydrophobe), éponge à saturation, sas de sortie et bonbonnes.',
+    ],
   },
 ]
 
@@ -1964,4 +2118,5 @@ export const VERSION = `0.21.${DELIVERIES.length}`
 
 /** La version qu'avait le jeu à une entrée du journal (0 = la plus
  * récente) : chaque livraison a incrémenté le petit numéro de un. */
-export const versionDe = (index: number): string => `0.21.${DELIVERIES.length - index}`
+export const versionDe = (index: number): string =>
+  `0.21.${DELIVERIES.length - index}`
