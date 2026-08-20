@@ -47,8 +47,17 @@ import { BOUTON, Manette } from './game/manette'
 import { PerfCollector } from './game/perf'
 import { fetchLibrary } from './game/netLevels'
 import { AudioFx, loadAudioPrefs } from './game/audio'
-import { Soundtrack, type Bruitage, type Piste, type Ponctuation } from './game/soundtrack'
-import { CINEMATIQUES_LIVREES, chargeCinematiques, type CinematiqueDef } from './game/cinematique'
+import {
+  Soundtrack,
+  type Bruitage,
+  type Piste,
+  type Ponctuation,
+} from './game/soundtrack'
+import {
+  CINEMATIQUES_LIVREES,
+  chargeCinematiques,
+  type CinematiqueDef,
+} from './game/cinematique'
 import { LecteurCinematique } from './game/cinelecteur'
 import { TableMontage } from './game/montage'
 import { Imagerie } from './game/imagerie'
@@ -161,7 +170,10 @@ window.addEventListener('keydown', eveilAudio)
 // bouton d'activation. La fiche garde un simple MUTE, comme la barre du jeu.
 const btnMute = document.getElementById('home-mute') as HTMLButtonElement | null
 function majInviteSon(): void {
-  if (btnMute) btnMute.innerHTML = audio.enabled ? '<i>♪</i><span>SON</span>' : '<i>⊘</i><span>MUET</span>'
+  if (btnMute)
+    btnMute.innerHTML = audio.enabled
+      ? '<i>♪</i><span>SON</span>'
+      : '<i>⊘</i><span>MUET</span>'
 }
 btnMute?.addEventListener('click', () => {
   audio.setEnabled(!audio.enabled)
@@ -226,7 +238,8 @@ function createSim(level: LevelDef): FluidSim {
   // rien à provoquer, et sans dash le nuage naîtrait sans aucune mobilité —
   // l'éjection est coupée en vapeur. On entre donc avec le compteur plein.
   sim.dashBudgetParTransfo = level.dashBudget ?? params.gasDashBudget
-  const naitVapeur = zoneForceAt(level, level.spawn.x, level.spawn.y) === 'vapeur'
+  const naitVapeur =
+    zoneForceAt(level, level.spawn.x, level.spawn.y) === 'vapeur'
   sim.dashBudget = naitVapeur ? sim.dashBudgetParTransfo : 0
   sim.setLevel(level.boxes, level.sponges)
   sim.spawnDisc(level.spawn.x, level.spawn.y, level.spawn.n, KIND_PLAYER)
@@ -312,11 +325,16 @@ let auHub = !new URLSearchParams(location.search).has('tableau')
 let departEnVapeur = false
 
 function applyLevel(): void {
-  level = testLevel ?? (auHub ? hubLevel() : playedLevels()[levelIndex] ?? playedLevels()[0])
+  level =
+    testLevel ??
+    (auHub ? hubLevel() : (playedLevels()[levelIndex] ?? playedLevels()[0]))
   levelHasCold = level.boxes.some((b) => b.material === MAT_FROID)
   // le sas garde sa place dans le budget de rendu : un tableau trop chargé
   // perd ses derniers blocs de décor, jamais sa sortie
-  renderBoxes = [...level.boxes.slice(0, MAX_BOXES - 1), { ...level.exit, material: MAT_EXIT }]
+  renderBoxes = [
+    ...level.boxes.slice(0, MAX_BOXES - 1),
+    { ...level.exit, material: MAT_EXIT },
+  ]
   exitMouth.x = (level.exit.minX + level.exit.maxX) * 0.5
   exitMouth.y = (level.exit.minY + level.exit.maxY) * 0.5
   bande.setAmbiance((level.ambiance as Piste | undefined) ?? null)
@@ -326,7 +344,9 @@ function applyLevel(): void {
 
 // Étiquettes de monde : le nom de chaque surface, projeté par la caméra —
 // la lisibilité de la légende, mais dans le décor lui-même.
-const worldLabelsHost = document.getElementById('world-labels') as HTMLDivElement
+const worldLabelsHost = document.getElementById(
+  'world-labels',
+) as HTMLDivElement
 // Chaque pancarte connaît sa taille (mesurée UNE fois, à la construction :
 // le zoom ne fait que la mettre à l'échelle) et sa portée — de quoi décider,
 // à chaque image, qui a le droit d'occuper la place.
@@ -406,7 +426,15 @@ function buildWorldLabels(): void {
       poseLignes(span, l.text)
     }
     worldLabelsHost.appendChild(span)
-    return { span, x: l.x, y: l.y, w: 0, h: 0, secteur: l.rang === 'secteur', place: false }
+    return {
+      span,
+      x: l.x,
+      y: l.y,
+      w: 0,
+      h: 0,
+      secteur: l.rang === 'secteur',
+      place: false,
+    }
   })
   // Chaque zone d'état porte son nom en haut de son emprise : la règle du
   // lieu s'annonce, elle ne se découvre pas en la subissant.
@@ -456,7 +484,10 @@ function majBandeBasse(t: number): void {
   if (t - bandeMesuree < 250) return
   bandeMesuree = t
   let haut = window.innerHeight
-  for (const el of [document.getElementById('statebar'), document.getElementById('touchbar')]) {
+  for (const el of [
+    document.getElementById('statebar'),
+    document.getElementById('touchbar'),
+  ]) {
     const r = el?.getBoundingClientRect()
     if (!r || r.height <= 0) continue
     // Seule une vraie barre POSÉE EN BAS définit la bande interdite : LARGE
@@ -524,7 +555,14 @@ function updateWorldLabels(vw: number, vh: number): void {
     // perdre parce qu'une voisine s'est approchée du centre du regard),
     // enfin du plus proche du centre de l'écran au plus lointain
     const d = Math.hypot(sx - cx, sy - cy)
-    candidats.push({ l, sx, sy, hw, hh, cle: (l.secteur ? 0 : 1e7) + (l.place ? 0 : 5e6) + d })
+    candidats.push({
+      l,
+      sx,
+      sy,
+      hw,
+      hh,
+      cle: (l.secteur ? 0 : 1e7) + (l.place ? 0 : 5e6) + d,
+    })
   }
   candidats.sort((a, b) => a.cle - b.cle)
   const places: typeof candidats = []
@@ -534,7 +572,9 @@ function updateWorldLabels(vw: number, vh: number): void {
     // avec la marge pleine. L'apparition reste progressive, sans va-et-vient.
     const marge = c.l.place ? -8 : 0
     const gene = places.some(
-      (p) => Math.abs(p.sx - c.sx) < p.hw + c.hw + marge && Math.abs(p.sy - c.sy) < p.hh + c.hh + marge,
+      (p) =>
+        Math.abs(p.sx - c.sx) < p.hw + c.hw + marge &&
+        Math.abs(p.sy - c.sy) < p.hh + c.hh + marge,
     )
     c.l.span.classList.toggle('efface', gene)
     c.l.place = !gene
@@ -592,7 +632,9 @@ function renderRegistres(): void {
   recEssai.textContent = `ÉCHANTILLON Nº ${records.essaiNumber()}`
   const moi = records.operator()
   const signe = (name: string): string =>
-    name ? `<i class="rec-qui${name === moi ? ' rec-moi' : ''}">${htmlSafe(name)}</i>` : ''
+    name
+      ? `<i class="rec-qui${name === moi ? ' rec-moi' : ''}">${htmlSafe(name)}</i>`
+      : ''
   // Le panneau est le CONDENSÉ de l'écran RECORDS : le palmarès partagé
   // (note, volume, chrono — rang 1 de chaque podium), seules les salles
   // qui ONT un palmarès s'affichent, bornées pour tenir SANS défilement.
@@ -631,7 +673,9 @@ function renderRegistres(): void {
     )
   }
   if (cachees > 0) {
-    rows.push(`<div class="rec-hist">+ ${cachees} autre(s) salle(s) au palmarès — bouton RECORDS.</div>`)
+    rows.push(
+      `<div class="rec-hist">+ ${cachees} autre(s) salle(s) au palmarès — bouton RECORDS.</div>`,
+    )
   }
   const localExp = records.expedition()
   const sharedExp = sharedBoard?.expedition ?? null
@@ -641,14 +685,17 @@ function renderRegistres(): void {
       sharedExp.tableaux > localExp.tableaux ||
       (sharedExp.tableaux === localExp.tableaux &&
         (sharedExp.liters > localExp.liters ||
-          (sharedExp.liters === localExp.liters && sharedExp.time < localExp.time))))
+          (sharedExp.liters === localExp.liters &&
+            sharedExp.time < localExp.time))))
       ? sharedExp
       : localExp
   if (exp) {
     rows.unshift(
       `<div class="rec-row rec-exp"><span class="rec-code">EXPÉDITION</span><span class="rec-name"></span>` +
         `<span class="rec-val" style="grid-column: span 2"><b>${exp.tableaux}/${playedLevels().length} salles</b> · 💧 ${fmtL(exp.liters)} · ⏱ ${fmtDuree(exp.time)} ${
-          exp.name ? `<i class="rec-qui${exp.name === moi ? ' rec-moi' : ''}">${htmlSafe(exp.name)}</i>` : ''
+          exp.name
+            ? `<i class="rec-qui${exp.name === moi ? ' rec-moi' : ''}">${htmlSafe(exp.name)}</i>`
+            : ''
         }</span></div>`,
     )
   }
@@ -781,7 +828,8 @@ let obEtape = 0
 // souris/clavier ailleurs — chaque mode a sa propre mémoire (on peut
 // découvrir le jeu au bureau puis sur téléphone, chaque main a sa leçon).
 const obTactile = (): boolean => window.matchMedia('(pointer: coarse)').matches
-const obCle = (): string => (obTactile() ? 'projet21.onboard.v1' : 'projet21.onboard.pc.v1')
+const obCle = (): string =>
+  obTactile() ? 'projet21.onboard.v1' : 'projet21.onboard.pc.v1'
 // L'ÉVEIL (la prise en main scénarisée) a sa propre clé — versionnée : en
 // changer la version rejoue l'éveil à tout le monde. Déclarée ici car
 // le chargement (plus bas) doit savoir s'il faut geler l'échantillon.
@@ -793,16 +841,21 @@ const CLE_EVEIL = 'sujet21-eveil-v2'
 // ce drapeau à true les rendrait au premier plan.
 const CARTES_GESTES: boolean = false
 function majOnboard(): void {
-  const etapes = Array.from(onboardEl.querySelectorAll<HTMLElement>('.ob-etape'))
+  const etapes = Array.from(
+    onboardEl.querySelectorAll<HTMLElement>('.ob-etape'),
+  )
   etapes.forEach((e, i) => {
     e.hidden = i !== obEtape
   })
-  const points = Array.from(onboardEl.querySelectorAll<HTMLElement>('.ob-points i'))
+  const points = Array.from(
+    onboardEl.querySelectorAll<HTMLElement>('.ob-points i'),
+  )
   points.forEach((p, i) => p.classList.toggle('on', i === obEtape))
   const suite = onboardEl.querySelector<HTMLElement>('.ob-suite')
   if (suite) {
     const geste = obTactile() ? 'TOUCHER' : 'CLIQUER'
-    suite.textContent = obEtape >= 4 ? `${geste} POUR PLONGER` : `${geste} POUR CONTINUER`
+    suite.textContent =
+      obEtape >= 4 ? `${geste} POUR PLONGER` : `${geste} POUR CONTINUER`
   }
 }
 function montrerOnboard(): void {
@@ -884,7 +937,9 @@ function renderSalles(): void {
   }
   const enSequence = libraryLevels.filter((l) => !estCodeHub(l.code))
   if (enSequence.length > 0) {
-    section('BIBLIOTHÈQUE DU LABO — en tête de séquence, dans l’ordre de l’éditeur')
+    section(
+      'BIBLIOTHÈQUE DU LABO — en tête de séquence, dans l’ordre de l’éditeur',
+    )
     for (const lv of enSequence) salle(lv)
     section('EXPÉDITION LIVRÉE — elle s’enchaîne à la suite')
   }
@@ -924,9 +979,11 @@ const livraisonsEl = document.getElementById('livraisons') as HTMLDivElement
     renderLivraisons()
     livraisonsEl.hidden = false
   })
-  document.getElementById('livraisons-fermer')?.addEventListener('click', () => {
-    livraisonsEl.hidden = true
-  })
+  document
+    .getElementById('livraisons-fermer')
+    ?.addEventListener('click', () => {
+      livraisonsEl.hidden = true
+    })
   livraisonsEl.addEventListener('pointerdown', (e) => {
     if (e.target === livraisonsEl) livraisonsEl.hidden = true
   })
@@ -1023,7 +1080,8 @@ function updateTrophees(dtReal: number): void {
   else if (gaz / n >= 0.5) vuVapeur = elapsed
   else vuEau = elapsed
   if (vuEau >= 0 && vuGel >= 0 && vuVapeur >= 0) {
-    if (elapsed - Math.min(vuEau, vuGel, vuVapeur) < 15) trophees.debloque('trois-etats')
+    if (elapsed - Math.min(vuEau, vuGel, vuVapeur) < 15)
+      trophees.debloque('trois-etats')
   }
   // « Miroir vivant » : un faisceau réfléchi par le corps gelé
   if (!trophees.gagne('miroir-vivant')) {
@@ -1071,16 +1129,23 @@ function renderRecordsVoile(): void {
       const r = meilleurs.findIndex((e) => e.name === moi)
       if (r > 0) {
         const d = Math.abs(brut(meilleurs[r - 1]) - brut(meilleurs[r]))
-        const unite = titre === 'CHRONO' ? 's' : titre === 'VOLUME' ? 'cL' : 'pts'
-        const v = titre === 'VOLUME' ? Math.max(1, Math.round(d * 100)) : Math.ceil(d * 10) / 10
+        const unite =
+          titre === 'CHRONO' ? 's' : titre === 'VOLUME' ? 'cL' : 'pts'
+        const v =
+          titre === 'VOLUME'
+            ? Math.max(1, Math.round(d * 100))
+            : Math.ceil(d * 10) / 10
         h += `<div class="rec-ecart">à ${v} ${unite} du rang ${r}${desc ? '' : ''}</div>`
       }
       return h + '</div>'
     }
-    let html = '<div class="rec-salle">TROPHÉES DU PROTOCOLE</div><div class="tro-grille">'
+    let html =
+      '<div class="rec-salle">TROPHÉES DU PROTOCOLE</div><div class="tro-grille">'
     for (const t of TROPHEES) {
       const ok = trophees.gagne(t.id)
-      const date = ok ? new Date(trophees.quand(t.id)).toLocaleDateString('fr-FR') : ''
+      const date = ok
+        ? new Date(trophees.quand(t.id)).toLocaleDateString('fr-FR')
+        : ''
       html += `<div class="tro-carte${ok ? '' : ' verrou'}"><i>${t.icone}</i><div><b>${t.nom}</b><span>${t.desc}</span>${ok ? `<em>débloqué le ${date}</em>` : ''}</div></div>`
     }
     html += '</div>'
@@ -1089,13 +1154,32 @@ function renderRecordsVoile(): void {
       const t = tops[lv.code]
       html += `<div class="rec-salle">${esc(lv.code)} — ${esc(lv.name)}</div>`
       if (!t || t.note.length === 0) {
-        html += '<div class="rec-vide">Aucune collecte enregistrée — le palmarès est à prendre.</div>'
+        html +=
+          '<div class="rec-vide">Aucune collecte enregistrée — le palmarès est à prendre.</div>'
         continue
       }
       html += '<div class="rec-grille">'
-      html += podium('NOTE', t.note, (e) => `${e.note} pts`, (e) => e.note, true)
-      html += podium('VOLUME', t.volume, (e) => fmtL(e.liters), (e) => e.liters, true)
-      html += podium('CHRONO', t.chrono, (e) => fmtDuree(e.time), (e) => e.time, false)
+      html += podium(
+        'NOTE',
+        t.note,
+        (e) => `${e.note} pts`,
+        (e) => e.note,
+        true,
+      )
+      html += podium(
+        'VOLUME',
+        t.volume,
+        (e) => fmtL(e.liters),
+        (e) => e.liters,
+        true,
+      )
+      html += podium(
+        'CHRONO',
+        t.chrono,
+        (e) => fmtDuree(e.time),
+        (e) => e.time,
+        false,
+      )
       html += '</div>'
     }
     recordsCorps.innerHTML = html || '<div class="rec-vide">Aucune salle.</div>'
@@ -1146,10 +1230,16 @@ let fpsCapPrecedent = 0 // horloge du limiteur (dernière image RENDUE)
 // paie 4×. Moyenne = 56 % des pixels, faible = 25 % : un allègement GPU
 // massif et CONSTANT (pas de yo-yo), l'interface HTML restant nette.
 type ResChoix = 'elevee' | 'moyenne' | 'faible' | 'dyn'
-const RES_ECHELLES: Record<ResChoix, number> = { elevee: 1, moyenne: 0.75, faible: 0.5, dyn: 1 }
+const RES_ECHELLES: Record<ResChoix, number> = {
+  elevee: 1,
+  moyenne: 0.75,
+  faible: 0.5,
+  dyn: 1,
+}
 let resChoix: ResChoix = ((): ResChoix => {
   const v = localStorage.getItem('sujet21-res')
-  if (v === 'elevee' || v === 'moyenne' || v === 'faible' || v === 'dyn') return v
+  if (v === 'elevee' || v === 'moyenne' || v === 'faible' || v === 'dyn')
+    return v
   // migration : l'ancien interrupteur résolution dynamique
   return localStorage.getItem('sujet21-res-dyn') === '1' ? 'dyn' : 'elevee'
 })()
@@ -1200,7 +1290,10 @@ let lumiereEauActive = localStorage.getItem('sujet21-lumiere-eau') !== 'off'
 // latérale se révèle du côté qui regarde le centre — en se déplaçant, on
 // aperçoit les flancs des éléments qu'on aborde. EXPÉRIMENTAL : OFF par
 // défaut le temps de la validation à la manette ; LÉGER puis FORT à l'essai.
-let reliefChoix = (localStorage.getItem('sujet21-relief') ?? 'off') as 'off' | 'leger' | 'fort'
+let reliefChoix = (localStorage.getItem('sujet21-relief') ?? 'off') as
+  | 'off'
+  | 'leger'
+  | 'fort'
 const RELIEF_K = { off: 0, leger: 0.035, fort: 0.07 } as const
 const paramsEl = document.getElementById('params') as HTMLDivElement
 {
@@ -1336,7 +1429,9 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
   }
   renderSimHz()
 
-  const choixRatt = document.getElementById('params-rattrapage') as HTMLDivElement
+  const choixRatt = document.getElementById(
+    'params-rattrapage',
+  ) as HTMLDivElement
   const renderRatt = (): void => {
     choixRatt.innerHTML = ''
     for (const [fluide, label] of [
@@ -1359,7 +1454,9 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
   renderRatt()
 
   const choixMoteur = document.getElementById('params-moteur') as HTMLDivElement
-  const etatMoteur = document.getElementById('params-moteur-etat') as HTMLDivElement
+  const etatMoteur = document.getElementById(
+    'params-moteur-etat',
+  ) as HTMLDivElement
   const renderMoteur = (): void => {
     choixMoteur.innerHTML = ''
     for (const [mode, label] of [
@@ -1412,7 +1509,9 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
   }
   renderEau()
 
-  const choixLumiere = document.getElementById('params-lumiere') as HTMLDivElement | null
+  const choixLumiere = document.getElementById(
+    'params-lumiere',
+  ) as HTMLDivElement | null
   if (choixLumiere) {
     const renderLumiere = (): void => {
       choixLumiere.innerHTML = ''
@@ -1436,7 +1535,9 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     renderLumiere()
   }
 
-  const choixLumEau = document.getElementById('params-lumeau') as HTMLDivElement | null
+  const choixLumEau = document.getElementById(
+    'params-lumeau',
+  ) as HTMLDivElement | null
   if (choixLumEau) {
     const renderLumEau = (): void => {
       choixLumEau.innerHTML = ''
@@ -1488,7 +1589,11 @@ function rapportPerf(): Record<string, unknown> {
       liquide: eauRiche ? 'riche' : 'sobre',
       eclairage: lumiereActive ? 'actif' : 'coupe',
       eclairageVolume: lumiereActive && lumiereEauActive ? 'actif' : 'coupe',
-      moteur: sim.moteurWasm ? 'wasm' : noyauxWasm ? 'javascript' : 'javascript (wasm non chargé)',
+      moteur: sim.moteurWasm
+        ? 'wasm'
+        : noyauxWasm
+          ? 'javascript'
+          : 'javascript (wasm non chargé)',
       rattrapage: rattrapageFluide ? 'fluidite' : 'temps-reel',
       simHz,
       palierQualite: qualityLevel,
@@ -1508,7 +1613,10 @@ function rapportPerf(): Record<string, unknown> {
         zones: (level.zones ?? []).length,
         rails: (level.rails ?? []).length,
         lumieres: (level.lumieres ?? []).length,
-        cellulesEponge: (level.sponges ?? []).reduce((a, s) => a + s.cols * s.rows, 0),
+        cellulesEponge: (level.sponges ?? []).reduce(
+          (a, s) => a + s.cols * s.rows,
+          0,
+        ),
         etiquettes: level.labels.length,
       },
       enPause: input.paused,
@@ -1520,10 +1628,12 @@ document.getElementById('perf-copier')?.addEventListener('click', () => {
   navigator.clipboard
     ?.writeText(texte)
     .then(() => {
-      perfEtat.textContent = 'Rapport copié — collez-le dans la conversation d’analyse.'
+      perfEtat.textContent =
+        'Rapport copié — collez-le dans la conversation d’analyse.'
     })
     .catch(() => {
-      perfEtat.textContent = 'Presse-papier refusé — le rapport est dans la console (F12).'
+      perfEtat.textContent =
+        'Presse-papier refusé — le rapport est dans la console (F12).'
       console.log(texte)
     })
 })
@@ -1532,14 +1642,21 @@ document.getElementById('perf-envoyer')?.addEventListener('click', () => {
   fetch('/api/perf', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ auteur: records.operator() || 'anonyme', rapport: rapportPerf() }),
+    body: JSON.stringify({
+      auteur: records.operator() || 'anonyme',
+      rapport: rapportPerf(),
+    }),
   })
-    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+    .then((r) =>
+      r.ok ? r.json() : Promise.reject(new Error(String(r.status))),
+    )
     .then(() => {
-      perfEtat.textContent = 'Envoyé au labo ✓ — signalez-le, l’analyse peut commencer.'
+      perfEtat.textContent =
+        'Envoyé au labo ✓ — signalez-le, l’analyse peut commencer.'
     })
     .catch(() => {
-      perfEtat.textContent = 'Envoi impossible (hors ligne ou serveur local) — utilisez COPIER.'
+      perfEtat.textContent =
+        'Envoi impossible (hors ligne ou serveur local) — utilisez COPIER.'
     })
 })
 
@@ -1573,7 +1690,9 @@ document.getElementById('proto-rejouer')?.addEventListener('click', () => {
 // le bouton (libellé rouge explicite), le second efface nom + registres
 // locaux et recharge : le voile de signature revient, vierge. Les trophées
 // et les réglages restent (seuls les RECORDS sont annoncés perdus).
-const protoReset = document.getElementById('proto-reset-nom') as HTMLButtonElement | null
+const protoReset = document.getElementById(
+  'proto-reset-nom',
+) as HTMLButtonElement | null
 let protoResetArme = 0
 protoReset?.addEventListener('click', () => {
   const now = performance.now()
@@ -1615,7 +1734,9 @@ function appelOeil(): void {
 }
 window.setTimeout(appelOeil, 600)
 
-const homeRestartBtn = document.getElementById('home-restart') as HTMLButtonElement
+const homeRestartBtn = document.getElementById(
+  'home-restart',
+) as HTMLButtonElement
 function closeHome(): void {
   if (requireName()) return // pas de plongée sans opérateur identifié
   // Une expédition SAUVÉE attend et rien n'a encore été joué : le bouton
@@ -1685,7 +1806,9 @@ interface RunSauvee {
 }
 function runSauvee(): RunSauvee | null {
   try {
-    const d = JSON.parse(localStorage.getItem(CLE_RUN) ?? 'null') as RunSauvee | null
+    const d = JSON.parse(
+      localStorage.getItem(CLE_RUN) ?? 'null',
+    ) as RunSauvee | null
     if (!d || typeof d.index !== 'number' || d.index < 1) return null
     return {
       index: Math.floor(d.index),
@@ -1752,15 +1875,22 @@ function reprendreRun(save: RunSauvee): void {
 function majBoutonsRun(): void {
   const save = runSauvee()
   const total = playedLevels().length
-  const btnSec = document.getElementById('start-secondaire') as HTMLButtonElement | null
-  const btnRep = document.getElementById('start-reprendre') as HTMLButtonElement | null
+  const btnSec = document.getElementById(
+    'start-secondaire',
+  ) as HTMLButtonElement | null
+  const btnRep = document.getElementById(
+    'start-reprendre',
+  ) as HTMLButtonElement | null
   if (btnRep) {
     // visible seulement DEPUIS une run secondaire : le chemin du retour
     btnRep.hidden = !(save && runSecondaire)
-    if (save) btnRep.textContent = `REPRENDRE L'EXPÉDITION — SALLE ${save.index + 1}/${total}`
+    if (save)
+      btnRep.textContent = `REPRENDRE L'EXPÉDITION — SALLE ${save.index + 1}/${total}`
   }
   if (btnSec) btnSec.hidden = !save || runSecondaire
-  const btnAband = document.getElementById('start-abandon') as HTMLButtonElement | null
+  const btnAband = document.getElementById(
+    'start-abandon',
+  ) as HTMLButtonElement | null
   if (btnAband) {
     // seulement quand une run est EN COURS : au labo il n'y a rien à quitter,
     // et un essai d'éditeur se referme par son propre chemin
@@ -1840,7 +1970,11 @@ const lecteurCine = new LecteurCinematique(el('cine'), {
   ponctuation: (n) => bande.ponctuation(n as Ponctuation),
   // null : la cinématique rend la main — le lit du tableau courant reprend
   piste: (n) =>
-    bande.setAmbiance(n === null ? ((level.ambiance as Piste | undefined) ?? null) : (n as Piste)),
+    bande.setAmbiance(
+      n === null
+        ? ((level.ambiance as Piste | undefined) ?? null)
+        : (n as Piste),
+    ),
 })
 function lireCine(cine: CinematiqueDef): Promise<void> {
   const pause = input.paused
@@ -1868,9 +2002,11 @@ fetchBibliotheque().then((biblio) => {
 })
 function lireCineParCode(code: string): Promise<void> {
   const cible = code.trim().toLowerCase()
-  const cine = [...CINEMATIQUES_LIVREES, ...chargeCinematiques(), ...cinesPartagees].find(
-    (c) => c.code.trim().toLowerCase() === cible,
-  )
+  const cine = [
+    ...CINEMATIQUES_LIVREES,
+    ...chargeCinematiques(),
+    ...cinesPartagees,
+  ].find((c) => c.code.trim().toLowerCase() === cible)
   return cine ? lireCine(cine) : Promise.resolve()
 }
 // L'état du jeu que les conditions du scénario interrogent — tout existe
@@ -2002,8 +2138,12 @@ document.getElementById('start-hub2')?.addEventListener('click', () => {
 })
 // La bibliothèque d'images : import (recompressé WebP), catalogue partagé,
 // sélecteur pour les planches — accessible de l'éditeur et du montage
-const imagerie = new Imagerie(el('imagerie'), { auteur: () => records.operator() })
-document.getElementById('ed-images')?.addEventListener('click', () => imagerie.open())
+const imagerie = new Imagerie(el('imagerie'), {
+  auteur: () => records.operator(),
+})
+document
+  .getElementById('ed-images')
+  ?.addEventListener('click', () => imagerie.open())
 // La table de montage des cinématiques : l'écran où le concepteur a la
 // main — planches, effets, sons, lecture immédiate, export/import, partage.
 const montage = new TableMontage(el('montage'), {
@@ -2019,14 +2159,20 @@ const montage = new TableMontage(el('montage'), {
   },
   trophees: TROPHEES.map((t) => ({ id: t.id, nom: t.nom })),
 })
-document.getElementById('open-montage')?.addEventListener('click', () => montage.open())
+document
+  .getElementById('open-montage')
+  ?.addEventListener('click', () => montage.open())
 // …et depuis l'éditeur aussi : la table s'ouvre PAR-DESSUS lui (z-index),
 // on compose la cinématique puis on branche son code dans le tableau
-document.getElementById('ed-montage')?.addEventListener('click', () => montage.open())
+document
+  .getElementById('ed-montage')
+  ?.addEventListener('click', () => montage.open())
 // Sondes de conception/test : jouer une cinématique arbitraire, lire l'état
-;(window as unknown as { __lireCine: (c: unknown) => Promise<void> }).__lireCine = (c) =>
-  lireCine(c as CinematiqueDef)
-;(window as unknown as { __cineActif: () => boolean }).__cineActif = () => lecteurCine.actif
+;(
+  window as unknown as { __lireCine: (c: unknown) => Promise<void> }
+).__lireCine = (c) => lireCine(c as CinematiqueDef)
+;(window as unknown as { __cineActif: () => boolean }).__cineActif = () =>
+  lecteurCine.actif
 // Le bouton de la fiche mène aux salles laser : la trilogie 21-H → 21-J
 // (miroir, prisme, plasma), enchaînée sas après sas.
 startBisBtn.addEventListener('click', () =>
@@ -2115,7 +2261,8 @@ fetchLibrary().then((lib) => {
 })
 
 // Sonde de débogage/test : le tableau en cours d'édition
-;(window as unknown as { __editorLevel: () => LevelDef }).__editorLevel = () => editor.currentLevel()
+;(window as unknown as { __editorLevel: () => LevelDef }).__editorLevel = () =>
+  editor.currentLevel()
 // L'éditeur possède son document : on le rouvre tel qu'on l'a laissé, sans
 // écraser le travail en cours par le tableau qu'on vient d'essayer.
 function openEditor(): void {
@@ -2126,15 +2273,21 @@ function openEditor(): void {
   input.paused = true
   editor.open()
 }
-document.getElementById('start-editor')!.addEventListener('click', () => openEditor())
+document
+  .getElementById('start-editor')!
+  .addEventListener('click', () => openEditor())
 // ---- Le panneau COMMANDES : trois onglets (PC, manette, tactile) ----
 // Les commandes ont quitté la fiche : un bouton, un panneau, trois écrans.
 const cmdsEl = document.getElementById('cmds') as HTMLDivElement
 function ongletCmds(nom: string): void {
-  for (const b of Array.from(cmdsEl.querySelectorAll<HTMLButtonElement>('[data-onglet]'))) {
+  for (const b of Array.from(
+    cmdsEl.querySelectorAll<HTMLButtonElement>('[data-onglet]'),
+  )) {
     b.classList.toggle('on', b.dataset.onglet === nom)
   }
-  for (const p of Array.from(cmdsEl.querySelectorAll<HTMLElement>('[data-page]'))) {
+  for (const p of Array.from(
+    cmdsEl.querySelectorAll<HTMLElement>('[data-page]'),
+  )) {
     p.hidden = p.dataset.page !== nom
   }
 }
@@ -2143,7 +2296,9 @@ document.getElementById('home-cmds')?.addEventListener('click', () => {
   ongletCmds(window.matchMedia('(pointer: coarse)').matches ? 'tactile' : 'pc')
   cmdsEl.hidden = false
 })
-for (const b of Array.from(cmdsEl.querySelectorAll<HTMLButtonElement>('[data-onglet]'))) {
+for (const b of Array.from(
+  cmdsEl.querySelectorAll<HTMLButtonElement>('[data-onglet]'),
+)) {
   b.addEventListener('click', () => ongletCmds(b.dataset.onglet!))
 }
 document.getElementById('cmds-fermer')?.addEventListener('click', () => {
@@ -2154,7 +2309,9 @@ cmdsEl.addEventListener('pointerdown', (e) => {
 })
 
 // ---- Plein écran : PC comme mobile — masqué là où l'API manque (iOS) ----
-const pleinBtn = document.getElementById('home-plein') as HTMLButtonElement | null
+const pleinBtn = document.getElementById(
+  'home-plein',
+) as HTMLButtonElement | null
 if (pleinBtn) {
   if (!document.documentElement.requestFullscreen) {
     pleinBtn.hidden = true
@@ -2175,7 +2332,8 @@ window.addEventListener('keydown', (e) => {
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
   if (e.key === 'Escape') {
     if (lecteurCine.actif) return // le lecteur gère lui-même son Échap (sauter)
-    if (!recsEl.hidden) fermerRecs() // les voiles d'abord
+    if (!recsEl.hidden)
+      fermerRecs() // les voiles d'abord
     else if (!cmdsEl.hidden) cmdsEl.hidden = true
     else if (!sallesEl.hidden) sallesEl.hidden = true
     else if (imagerie.visible) imagerie.close()
@@ -2200,12 +2358,16 @@ const camera = new Camera()
 ;(window as unknown as { __params: SimParams }).__params = params
 ;(window as unknown as { __audio: AudioFx }).__audio = audio
 // Sonde de test : injecter des zones dans le tableau courant sans l'éditeur
-;(window as unknown as { __zones: (z: NonNullable<LevelDef['zones']>) => void }).__zones = (z) => {
+;(
+  window as unknown as { __zones: (z: NonNullable<LevelDef['zones']>) => void }
+).__zones = (z) => {
   level.zones = z
   buildWorldLabels()
 }
 // Sonde de test : régler la lumière générale du tableau courant en direct
-;(window as unknown as { __ambiante: (v: number) => void }).__ambiante = (v) => {
+;(window as unknown as { __ambiante: (v: number) => void }).__ambiante = (
+  v,
+) => {
   level.ambiante = Math.max(0, Math.min(1, v))
 }
 
@@ -2215,7 +2377,9 @@ camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, 1)
 // moteur JS et bascule dès que le module est prêt (sauf choix contraire au
 // voile PARAMÈTRES). Échec de chargement = on reste en JS, sans bruit.
 fetch('/noyaux.wasm')
-  .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+  .then((r) =>
+    r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status))),
+  )
   .then((buf) => NoyauxWasm.charge(buf))
   .then((n) => {
     noyauxWasm = n
@@ -2253,7 +2417,12 @@ function boutonVisible(el: HTMLElement | null): el is HTMLElement {
   if (!el || (el as HTMLButtonElement).hidden) return false
   const r = el.getBoundingClientRect()
   const st = getComputedStyle(el)
-  return r.width > 0 && r.height > 0 && st.visibility !== 'hidden' && st.pointerEvents !== 'none'
+  return (
+    r.width > 0 &&
+    r.height > 0 &&
+    st.visibility !== 'hidden' &&
+    st.pointerEvents !== 'none'
+  )
 }
 
 /** A dans les écrans de JEU (relance, fin de tableau) : valide le bouton. */
@@ -2296,7 +2465,9 @@ function ficheNavigue(): void {
     document.getElementById('start')?.click()
     return
   }
-  const visibles = FICHE_BOUTONS.map((id) => document.getElementById(id)).filter(boutonVisible)
+  const visibles = FICHE_BOUTONS.map((id) =>
+    document.getElementById(id),
+  ).filter(boutonVisible)
   if (visibles.length === 0) return
   // le stick fait aussi la navigation : un coup franc vers le haut/bas
   let delta = 0
@@ -2311,7 +2482,10 @@ function ficheNavigue(): void {
   if (manette.force < 0.3) ficheNavPrete = true
   ficheFocus = Math.max(0, Math.min(visibles.length - 1, ficheFocus + delta))
   for (let i = 0; i < visibles.length; i++) {
-    visibles[i].classList.toggle('pad-focus', manette.active && i === ficheFocus)
+    visibles[i].classList.toggle(
+      'pad-focus',
+      manette.active && i === ficheFocus,
+    )
   }
   if (manette.edge(BOUTON.A)) visibles[ficheFocus].click()
 }
@@ -2390,7 +2564,8 @@ const laserEtat = {
   doorsKey: '', // signature des portes fermées envoyées au solveur
 }
 // Sonde de test : l'état des portes/récepteurs depuis la console (comme __sim)
-;(window as unknown as { __laserEtat: typeof laserEtat }).__laserEtat = laserEtat
+;(window as unknown as { __laserEtat: typeof laserEtat }).__laserEtat =
+  laserEtat
 // La superposition des mécanismes : faisceaux, émetteurs, cibles, portes —
 // dessinée en 2D par-dessus la cuve, avec la même caméra que le rendu WebGL.
 function drawMecanismes(vw: number, vh: number, dpr: number): void {
@@ -2400,7 +2575,10 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   const rails = level.rails ?? []
   const actif = lasers.length + cibles.length + portes.length + rails.length > 0
   const dprC = Math.min(dpr, 2)
-  if (fxCanvas.width !== Math.round(vw * dprC) || fxCanvas.height !== Math.round(vh * dprC)) {
+  if (
+    fxCanvas.width !== Math.round(vw * dprC) ||
+    fxCanvas.height !== Math.round(vh * dprC)
+  ) {
     fxCanvas.width = Math.round(vw * dprC)
     fxCanvas.height = Math.round(vh * dprC)
   }
@@ -2513,9 +2691,15 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
         const ex = ux
         const ey = -uy
         g.beginPath()
-        g.moveTo(p.sx - (ex + ey * 0.6) * taille, p.sy - (ey - ex * 0.6) * taille)
+        g.moveTo(
+          p.sx - (ex + ey * 0.6) * taille,
+          p.sy - (ey - ex * 0.6) * taille,
+        )
         g.lineTo(p.sx, p.sy)
-        g.lineTo(p.sx - (ex - ey * 0.6) * taille, p.sy - (ey + ex * 0.6) * taille)
+        g.lineTo(
+          p.sx - (ex - ey * 0.6) * taille,
+          p.sy - (ey + ex * 0.6) * taille,
+        )
         g.stroke()
       }
     }
@@ -2531,8 +2715,8 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     // rosit — la lumière diffuse dans le corps qu'elle traverse. Ionisé
     // (vapeur, rail) : un ARC blanc-violet, éblouissant.
     const AIR: [number, string][] = [
-      [10 * z, `rgba(255,60,50,${(0.10 * scint).toFixed(3)})`],
-      [4.5 * z, `rgba(255,90,70,${(0.30 * scint).toFixed(3)})`],
+      [10 * z, `rgba(255,60,50,${(0.1 * scint).toFixed(3)})`],
+      [4.5 * z, `rgba(255,90,70,${(0.3 * scint).toFixed(3)})`],
       [1.8 * z, `rgba(255,220,200,${(0.95 * scint).toFixed(3)})`],
     ]
     const EAU: [number, string][] = [
@@ -2611,7 +2795,13 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
         : 'rgba(40,56,66,0.6)'
     g.fill()
     g.lineWidth = 2
-    g.strokeStyle = scellee ? '#6b4a42' : lit ? '#6dffb8' : nor ? '#c99a4e' : '#5c7285'
+    g.strokeStyle = scellee
+      ? '#6b4a42'
+      : lit
+        ? '#6dffb8'
+        : nor
+          ? '#c99a4e'
+          : '#5c7285'
     g.stroke()
     if (nor && !scellee) {
       // l'anneau pointillé ambré : ce récepteur veut le faisceau MAINTENU
@@ -2649,8 +2839,11 @@ const fleche = { alpha: 0, ang: 0, len: 60 }
 function drawFleche(dtReal: number, dpr: number): void {
   const enJeu = document.body.classList.contains('playing')
   const aMain =
-    manette.connectee && manette.lastActivity > input.lastPointerAt && input.touchCount === 0
-  const veut = aMain && enJeu && manette.force > 0.03 && !dash.aiming && !input.paused
+    manette.connectee &&
+    manette.lastActivity > input.lastPointerAt &&
+    input.touchCount === 0
+  const veut =
+    aMain && enJeu && manette.force > 0.03 && !dash.aiming && !input.paused
   // naissance et extinction en douceur
   fleche.alpha += ((veut ? 1 : 0) - fleche.alpha) * Math.min(1, dtReal * 9)
   if (fleche.alpha < 0.02) return
@@ -2660,14 +2853,17 @@ function drawFleche(dtReal: number, dpr: number): void {
   while (d > Math.PI) d -= Math.PI * 2
   while (d < -Math.PI) d += Math.PI * 2
   fleche.ang += d * Math.min(1, dtReal * 14)
-  const lenCible = (36 + 90 * manette.force) * Math.max(0.5, Math.min(1.6, camera.zoom))
+  const lenCible =
+    (36 + 90 * manette.force) * Math.max(0.5, Math.min(1.6, camera.zoom))
   fleche.len += (lenCible - fleche.len) * Math.min(1, dtReal * 10)
 
   const dprC = Math.min(dpr, 2)
   const g = fxCtx
   g.setTransform(dprC, 0, 0, dprC, 0, 0)
-  const bx = window.innerWidth * 0.5 + (sim.stats.centroidX - camera.x) * camera.zoom
-  const by = window.innerHeight * 0.5 - (sim.stats.centroidY - camera.y) * camera.zoom
+  const bx =
+    window.innerWidth * 0.5 + (sim.stats.centroidX - camera.x) * camera.zoom
+  const by =
+    window.innerHeight * 0.5 - (sim.stats.centroidY - camera.y) * camera.zoom
   const r0 = sim.stats.rmsRadius * camera.zoom + 12 // on part du bord du corps
   const L = fleche.len
   const puls = 1 + 0.04 * Math.sin(elapsed * 4.2)
@@ -2814,15 +3010,33 @@ const SURSIS_EPUISE = 6
 
 // Sonde de test : l'état de la fin de run depuis la console (comme __run)
 const sondeFin = {
-  get ecran() { return ecranDispersion },
-  get delai() { return dispersionDelai },
-  get hub() { return auHub },
-  get spent() { return endgame.spent },
-  get lastCall() { return endgame.lastCall },
-  get vise() { return input.aimActive },
-  get collecte() { return endgame.enCollecte },
-  get sortie() { return run.exitTimer },
-  get finie() { return run.ended },
+  get ecran() {
+    return ecranDispersion
+  },
+  get delai() {
+    return dispersionDelai
+  },
+  get hub() {
+    return auHub
+  },
+  get spent() {
+    return endgame.spent
+  },
+  get lastCall() {
+    return endgame.lastCall
+  },
+  get vise() {
+    return input.aimActive
+  },
+  get collecte() {
+    return endgame.enCollecte
+  },
+  get sortie() {
+    return run.exitTimer
+  },
+  get finie() {
+    return run.ended
+  },
 }
 ;(window as unknown as { __fin: typeof sondeFin }).__fin = sondeFin
 
@@ -2848,7 +3062,9 @@ function afficheDispersion(): void {
   showOverlay(
     'ÉCHANTILLON PERDU — FIN DE LA RUN',
     `La dispersion a eu raison du dernier échantillon.${
-      runSecondaire ? ' La run secondaire s’efface — l’expédition principale attend toujours.' : ''
+      runSecondaire
+        ? ' La run secondaire s’efface — l’expédition principale attend toujours.'
+        : ''
     } Le laboratoire vous rappelle.`,
     'danger',
     'RETOUR AU LABO',
@@ -2977,7 +3193,12 @@ input.onPan = (dx, dy) => camera.panBy(dx, dy)
 input.onPanEnd = (vx, vy) => camera.flingBy(vx, vy)
 input.onVortex = (clientX, clientY) => {
   if (params.vortexEnabled < 0.5) return // outil de test, coupé dans le protocole
-  const w = camera.screenToWorld(clientX, clientY, window.innerWidth, window.innerHeight)
+  const w = camera.screenToWorld(
+    clientX,
+    clientY,
+    window.innerWidth,
+    window.innerHeight,
+  )
   vortex.x = w.x
   vortex.y = w.y
   vortex.timer = params.vortexDuration
@@ -2987,7 +3208,12 @@ input.onVortex = (clientX, clientY) => {
 
 // Barre tactile : les commandes clavier/souris accessibles au doigt
 const touchbar = document.getElementById('touchbar') as HTMLDivElement
-function touchButton(label: string, title: string, onTap: () => void, cls = ''): HTMLButtonElement {
+function touchButton(
+  label: string,
+  title: string,
+  onTap: () => void,
+  cls = '',
+): HTMLButtonElement {
   const b = document.createElement('button')
   b.textContent = label
   b.title = title
@@ -3021,9 +3247,24 @@ function toggleBench(): void {
   benchHost.style.display = benchHost.style.display === 'none' ? '' : 'none'
 }
 
-const chipLegend = touchButton('LÉGENDE', 'légende des surfaces (L)', toggleLegend, 'tb-chip')
-const chipStates = touchButton('ÉTATS', 'les trois états : qui bloque quoi (E)', toggleStates, 'tb-chip')
-const chipBench = touchButton('BANC', 'banc de réglage : la physique en direct', toggleBench, 'tb-chip')
+const chipLegend = touchButton(
+  'LÉGENDE',
+  'légende des surfaces (L)',
+  toggleLegend,
+  'tb-chip',
+)
+const chipStates = touchButton(
+  'ÉTATS',
+  'les trois états : qui bloque quoi (E)',
+  toggleStates,
+  'tb-chip',
+)
+const chipBench = touchButton(
+  'BANC',
+  'banc de réglage : la physique en direct',
+  toggleBench,
+  'tb-chip',
+)
 // Retour à l'éditeur : n'apparaît que pendant l'essai d'un tableau édité
 const chipEditor = touchButton(
   '↩ ÉDITEUR',
@@ -3060,7 +3301,11 @@ const btnPause = touchButton('⏸', 'pause (espace)', () => input.togglePause())
 const tbTime = document.createElement('div')
 tbTime.id = 'tb-time'
 touchbar.appendChild(tbTime)
-const timeButton = (label: string, title: string, onTap: () => void): HTMLButtonElement => {
+const timeButton = (
+  label: string,
+  title: string,
+  onTap: () => void,
+): HTMLButtonElement => {
   const b = document.createElement('button')
   b.textContent = label
   b.title = title
@@ -3121,7 +3366,13 @@ type EveilEtape =
 // (même levier que le slow-mo de visée vapeur) ; la carte ne paraît qu'une
 // fois le monde presque figé, en fondu. À la fermeture, la cible remonte :
 // le monde se réveille progressivement au lieu de repartir d'un coup.
-const eveil = { etape: 'off' as EveilEtape, gestes: 0, visePrec: false, ralenti: 1, cible: 1 }
+const eveil = {
+  etape: 'off' as EveilEtape,
+  gestes: 0,
+  visePrec: false,
+  ralenti: 1,
+  cible: 1,
+}
 // Sonde de test : suivre l'éveil depuis la console (comme __sim, __cam)
 ;(window as unknown as { __eveil: typeof eveil }).__eveil = eveil
 function lanceEveil(): void {
@@ -3195,9 +3446,11 @@ function majEveil(dtReal: number): void {
   if (eveil.ralenti !== eveil.cible) {
     const k = 1 - Math.exp(-dtReal * (eveil.cible < eveil.ralenti ? 5 : 2.5))
     eveil.ralenti += (eveil.cible - eveil.ralenti) * k
-    if (Math.abs(eveil.ralenti - eveil.cible) < 0.005) eveil.ralenti = eveil.cible
+    if (Math.abs(eveil.ralenti - eveil.cible) < 0.005)
+      eveil.ralenti = eveil.cible
   }
-  if (eveil.etape === 'off' || !document.body.classList.contains('playing')) return
+  if (eveil.etape === 'off' || !document.body.classList.contains('playing'))
+    return
   if (eveil.etape === 'zoom') {
     // le plan large d'abord — la salle se lit — puis le monde décélère
     if (!camera.introEnCours) {
@@ -3251,7 +3504,9 @@ function majEveil(dtReal: number): void {
     }
   }
 }
-touchButton('⌖', 'recadrer sur le corps (zoom et caméra auto)', () => camera.resetAutoZoom())
+touchButton('⌖', 'recadrer sur le corps (zoom et caméra auto)', () =>
+  camera.resetAutoZoom(),
+)
 const btnSound = touchButton(
   '🔊',
   'son : couper / activer',
@@ -3286,7 +3541,9 @@ const overlayBtn = document.getElementById('overlay-btn') as HTMLButtonElement
 // Relance discrète : elle n'apparaît qu'une fois la dernière impulsion donnée,
 // et ne recouvre rien — on peut la laisser là et regarder la dérive finir.
 // Pastilles du HUD : un toucher montre le nom de la donnée, brièvement
-for (const chip of Array.from(document.querySelectorAll<HTMLButtonElement>('.hud-chip'))) {
+for (const chip of Array.from(
+  document.querySelectorAll<HTMLButtonElement>('.hud-chip'),
+)) {
   chip.addEventListener('click', () => {
     chip.classList.add('ouvert')
     window.setTimeout(() => chip.classList.remove('ouvert'), 2400)
@@ -3405,9 +3662,13 @@ function updateTutor(dtReal: number): void {
       text = TUTOR_TEXTS[tutorStep]
     } else if (tutorStep === 3) {
       // à l'approche du mur d'éponge du tableau 1 (x = 560)
-      if (sim.stats.centroidX > 60 && sim.stats.centroidX < 560) text = TUTOR_TEXTS[3]
+      if (sim.stats.centroidX > 60 && sim.stats.centroidX < 560)
+        text = TUTOR_TEXTS[3]
     } else if (tutorStep === 4) {
-      const d = Math.hypot(sim.stats.centroidX - exitMouth.x, sim.stats.centroidY - exitMouth.y)
+      const d = Math.hypot(
+        sim.stats.centroidX - exitMouth.x,
+        sim.stats.centroidY - exitMouth.y,
+      )
       if (d < Math.max(320, params.exitRadius * 1.6)) text = TUTOR_TEXTS[4]
     }
   }
@@ -3445,7 +3706,12 @@ function htmlSafe(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-function showOverlay(title: string, sub: string, tone: 'success' | 'danger', btn?: string): void {
+function showOverlay(
+  title: string,
+  sub: string,
+  tone: 'success' | 'danger',
+  btn?: string,
+): void {
   overlayTitle.textContent = title
   overlaySub.innerHTML = sub
   overlay.classList.remove('success', 'danger', 'end')
@@ -3552,7 +3818,9 @@ function frame(now: number): void {
   const vh = window.innerHeight
   // l'échelle fixe choisie s'applique ici : seul le canvas est mis à
   // l'échelle, l'interface HTML reste à la netteté native
-  const dpr = Math.min(window.devicePixelRatio || 1, quality.dprCap) * RES_ECHELLES[resChoix]
+  const dpr =
+    Math.min(window.devicePixelRatio || 1, quality.dprCap) *
+    RES_ECHELLES[resChoix]
   // mesures brutes de CETTE image, pour le collecteur de performance
   let physRaw = 0
   let stepsFaits = 0
@@ -3597,12 +3865,15 @@ function frame(now: number): void {
       if (manette.edge(BOUTON.GAUCHE)) input.stepWarp(-1)
       if (manette.edge(BOUTON.DROITE)) input.stepWarp(1)
       // enfoncer un stick recadre : la caméra revient au suivi automatique
-      if (manette.edge(BOUTON.L3) || manette.edge(BOUTON.R3)) camera.resetAutoZoom()
+      if (manette.edge(BOUTON.L3) || manette.edge(BOUTON.R3))
+        camera.resetAutoZoom()
       if (manette.zoomAvant) camera.zoomBy(Math.pow(1.9, dtReal), params)
       if (manette.zoomArriere) camera.zoomBy(Math.pow(1.9, -dtReal), params)
       // les grosses gâchettes zooment, la pression dose la vitesse
-      if (manette.rtVal > 0.02) camera.zoomBy(Math.pow(2.2, manette.rtVal * dtReal), params)
-      if (manette.ltVal > 0.02) camera.zoomBy(Math.pow(2.2, -manette.ltVal * dtReal), params)
+      if (manette.rtVal > 0.02)
+        camera.zoomBy(Math.pow(2.2, manette.rtVal * dtReal), params)
+      if (manette.ltVal > 0.02)
+        camera.zoomBy(Math.pow(2.2, -manette.ltVal * dtReal), params)
       if (manette.panX !== 0 || manette.panY !== 0) {
         // pousser à droite REGARDE à droite (le pan de drag est inversé)
         camera.panBy(-manette.panX * 900 * dtReal, -manette.panY * 900 * dtReal)
@@ -3611,12 +3882,16 @@ function frame(now: number): void {
       // la souris, et qu'aucun doigt n'est posé. Le STICK dit où l'on veut
       // ALLER : en eau, l'éjection part automatiquement à l'opposé (c'est
       // elle qui pousse) ; en vapeur, le dash part dans la direction du stick.
-      if (input.touchCount === 0 && manette.lastActivity > input.lastPointerAt) {
+      if (
+        input.touchCount === 0 &&
+        manette.lastActivity > input.lastPointerAt
+      ) {
         const scx = vw * 0.5 + (sim.stats.centroidX - camera.x) * camera.zoom
         const scy = vh * 0.5 - (sim.stats.centroidY - camera.y) * camera.zoom
         // pleine inclinaison = pleine puissance de dash ; un plancher garde
         // la direction lisible même stick à peine poussé
-        const rPx = (0.15 + 0.85 * manette.force) * params.gasDashRange * camera.zoom
+        const rPx =
+          (0.15 + 0.85 * manette.force) * params.gasDashRange * camera.zoom
         const sens = input.gasIntent ? 1 : -1 // eau : le point d'éjection est derrière
         manetteCurseur.x = scx + manette.dirX * rPx * sens
         manetteCurseur.y = scy + manette.dirY * rPx * sens
@@ -3650,7 +3925,9 @@ function frame(now: number): void {
   // Règle du 12/08 : une zone n'impose son état que lorsque 95 % du CORPS
   // ACTIF (les particules joueur — les gouttes éjectées ne comptent pas)
   // est dedans ; elle le tient ensuite jusqu'à retomber sous 85 %.
-  const zonesForcees = (level.zones ?? []).map((z, i) => ({ z, i })).filter((e) => e.z.force !== 'libre')
+  const zonesForcees = (level.zones ?? [])
+    .map((z, i) => ({ z, i }))
+    .filter((e) => e.z.force !== 'libre')
   let zoneActive: ZoneForce = 'libre'
   if (zonesForcees.length > 0 && sim.playerCount > 0) {
     let bestFrac = 0
@@ -3665,7 +3942,8 @@ function frame(now: number): void {
         // mur était « dehors » sans que rien ne le montre)
         const x = sim.posX[i]
         const y = sim.posY[i]
-        if (x >= e.z.minX && x <= e.z.maxX && y >= e.z.minY && y <= e.z.maxY) dedans++
+        if (x >= e.z.minX && x <= e.z.maxX && y >= e.z.minY && y <= e.z.maxY)
+          dedans++
       }
       const f = dedans / sim.playerCount
       if (f > bestFrac) {
@@ -3703,7 +3981,8 @@ function frame(now: number): void {
     // l'état de départ, c'est la PREMIÈRE prise de la zone, au tout début du
     // tableau : une bascule décidée plus tard (touche G) se paie et rend ses
     // dashs normalement, même dans un tableau né en vapeur
-    const etatDeDepart = departEnVapeur && zoneActive === 'vapeur' && run.tableauTime < 3
+    const etatDeDepart =
+      departEnVapeur && zoneActive === 'vapeur' && run.tableauTime < 3
     departEnVapeur = false
     if (!etatDeDepart) sim.transfoVapeur(zoneActive !== 'vapeur')
   }
@@ -3744,7 +4023,8 @@ function frame(now: number): void {
     input.aimActive &&
     !input.gasIntent &&
     !sim.dispersed &&
-    ((manetteTenait && manette.force < 0.02) || corpsSousLePointeur(aim.x, aim.y))
+    ((manetteTenait && manette.force < 0.02) ||
+      corpsSousLePointeur(aim.x, aim.y))
   ;(window as unknown as { __rass: boolean }).__rass = rassembler // sonde de test
 
   if (!input.paused && !tableauDone) {
@@ -3757,7 +4037,8 @@ function frame(now: number): void {
     // le ralenti d'annonce de l'éveil multiplie le temps comme le slow-mo
     // de visée : physique, chrono, refroidissement — tout décélère ensemble
     const warpNow =
-      (dashAiming ? params.timeWarp * params.gasAimSlow : params.timeWarp) * eveil.ralenti
+      (dashAiming ? params.timeWarp * params.gasAimSlow : params.timeWarp) *
+      eveil.ralenti
     const boost = Math.max(1, warpNow)
     // Troisième borne (retour joueur : « en accélérant, chutes drastiques ») :
     // la physique ne dépasse JAMAIS ~70 % de la période du verrou, même
@@ -3766,7 +4047,11 @@ function frame(now: number): void {
     // aussi vite que la machine le permet SANS casser la cadence, au lieu
     // d'afficher ×4 à 25 im/s. Le plancher 5 ms garantit le pas minimal.
     const bornePeriode = Math.max(5, (1000 / fpsCap) * 0.7)
-    const stepBudget = Math.min(12 * boost, Math.max(5, dtReal * 1000 * 0.6 * boost), bornePeriode)
+    const stepBudget = Math.min(
+      12 * boost,
+      Math.max(5, dtReal * 1000 * 0.6 * boost),
+      bornePeriode,
+    )
     // FLUIDITÉ : plafond de pas au régime de croisière (cadence lissée,
     // bornée par le verrou) — l'accroc ne se paie qu'une fois. TEMPS RÉEL :
     // pas de plafond (le budget CPU reste seul juge), comportement historique.
@@ -3775,7 +4060,10 @@ function frame(now: number): void {
       Math.max(1000 / fpsCap, fpsSmoothed > 1 ? 1000 / fpsSmoothed : 1000 / 60),
     )
     const plafondPas = rattrapageFluide
-      ? Math.max(1, Math.ceil(((periodeCroisiere / 1000) * warpNow) / params.dt - 0.05))
+      ? Math.max(
+          1,
+          Math.ceil(((periodeCroisiere / 1000) * warpNow) / params.dt - 0.05),
+        )
       : Number.POSITIVE_INFINITY
     // L'anti-domino (plafond de pas au régime de croisière) a été ESSAYÉ
     // puis débranché : au ressenti sur machine réelle, l'abandon du temps
@@ -3788,7 +4076,12 @@ function frame(now: number): void {
       warpNow,
       params.dt,
       () => {
-        if (input.aimActive && !input.gasIntent && !sim.dispersed && !endgame.spent) {
+        if (
+          input.aimActive &&
+          !input.gasIntent &&
+          !sim.dispersed &&
+          !endgame.spent
+        ) {
           // En eau, maintenir éjecte ; en vapeur, la visée fige le temps —
           // le dash part au relâchement (voir plus haut), rien ne se pilote.
           // Sans direction (stick neutre, doigt sur le corps) : on se reforme.
@@ -3829,11 +4122,14 @@ function frame(now: number): void {
         laserEtat.portesOuvertes = portes.map(() => false)
       }
       for (let i = 0; i < portes.length; i++) {
-        if (sequenceur.etat.brechesOuvertes.has(i)) laserEtat.portesOuvertes[i] = true
+        if (sequenceur.etat.brechesOuvertes.has(i))
+          laserEtat.portesOuvertes[i] = true
       }
       // le solveur ne reçoit que les portes closes — recomposé au changement
       const closes = portes.filter((_, i) => !laserEtat.portesOuvertes[i])
-      const cle = closes.map((p) => `${p.minX},${p.minY},${p.maxX},${p.maxY}`).join(';')
+      const cle = closes
+        .map((p) => `${p.minX},${p.minY},${p.maxX},${p.maxY}`)
+        .join(';')
       if (cle !== laserEtat.doorsKey) {
         laserEtat.doorsKey = cle
         sim.setDoors(closes)
@@ -3861,7 +4157,8 @@ function frame(now: number): void {
         cibles,
         // contact précis, normale MOYENNÉE large : le miroir est une facette
         // plane, pas une râpe — le reflet ne tremble plus à chaque bosse
-        iceNormal: (x, y) => sim.iceNormalAt(x, y, rIce, params.laserMirrorSmooth),
+        iceNormal: (x, y) =>
+          sim.iceNormalAt(x, y, rIce, params.laserMirrorSmooth),
         // palier 2 : le corps liquide est un prisme — le rayon se plie à
         // chaque dioptre, et se piège sous la surface au-delà de ~49°.
         // Le milieu est LISSÉ au même rayon que la normale : la surface
@@ -3889,8 +4186,14 @@ function frame(now: number): void {
     // porte fermée, définitivement) — machine à états dans laser.ts.
     const nowRecepteurs = performance.now() / 1000
     const toucheesImage: number[] = []
-    for (const t of laserEtat.vues) for (const c of t.touchees) toucheesImage.push(c)
-    avancerRecepteurs(cibles, toucheesImage, laserEtat.recepteurs, nowRecepteurs)
+    for (const t of laserEtat.vues)
+      for (const c of t.touchees) toucheesImage.push(c)
+    avancerRecepteurs(
+      cibles,
+      toucheesImage,
+      laserEtat.recepteurs,
+      nowRecepteurs,
+    )
     // une porte s'ouvre par son laser… ou par une SÉQUENCE (la brèche).
     // Elle vise un CANAL (le n° des pastilles) avec sa règle : OU (défaut,
     // une pastille active suffit) ou ET (toutes en même temps) — une porte
@@ -3898,7 +4201,13 @@ function frame(now: number): void {
     laserEtat.portesOuvertes = portes.map(
       (p, i) =>
         sequenceur.etat.brechesOuvertes.has(i) ||
-        canalActif(cibles, p.canal, p.regle, laserEtat.recepteurs, nowRecepteurs),
+        canalActif(
+          cibles,
+          p.canal,
+          p.regle,
+          laserEtat.recepteurs,
+          nowRecepteurs,
+        ),
     )
     // convoyage : quand un arc circule sur un rail, le champ s'y ENGAGE —
     // et il reste engagé tant qu'un nuage voyage dans la bande, même si le
@@ -3910,7 +4219,8 @@ function frame(now: number): void {
     if (dtRail > 0 && !input.paused && !tableauDone && !sim.dispersed) {
       const railsDuNiveau = level.rails ?? []
       const actifs = new Set<number>()
-      for (const t of laserEtat.vues) for (const ri of t.railsSuivis) actifs.add(ri)
+      for (const t of laserEtat.vues)
+        for (const ri of t.railsSuivis) actifs.add(ri)
       for (const ri of actifs) railsEngages.add(ri)
       for (const ri of [...railsEngages]) {
         const rail = railsDuNiveau[ri]
@@ -3947,7 +4257,9 @@ function frame(now: number): void {
   // suffit — la route coûte de l'eau (chaque impulsion éjecte), exiger la
   // moitié du volume INITIAL rendait le bouton inatteignable en vraie partie
   const aspireAssez = sim.swallowed >= Math.max(20, sim.baseVolume * 0.1)
-  const drunk = (sim.swallowed > 0 && sim.count <= seuilBu) || (aspireAssez && continuerVoulu)
+  const drunk =
+    (sim.swallowed > 0 && sim.count <= seuilBu) ||
+    (aspireAssez && continuerVoulu)
   btnContinuer.classList.toggle(
     'visible',
     aspireAssez &&
@@ -3958,7 +4270,8 @@ function frame(now: number): void {
       document.body.classList.contains('playing'),
   )
   const reached =
-    !drainActive && pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit)
+    !drainActive &&
+    pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit)
   // au HUB, pas d'engloutissement à attendre : dès que le CORPS est dans la
   // bouche du sas, la run part — le sas de lancement est une porte, pas un
   // collecteur
@@ -3985,7 +4298,12 @@ function frame(now: number): void {
   }
   const rejointSasHub =
     auHub && pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit)
-  if (!tableauDone && !sim.dispersed && (drunk || reached || rejointSasHub) && auHub) {
+  if (
+    !tableauDone &&
+    !sim.dispersed &&
+    (drunk || reached || rejointSasHub) &&
+    auHub
+  ) {
     // LE SAS DE LANCEMENT : au hub, le sas ne collecte rien — il LANCE la
     // run. Reprise de l'expédition sauvée s'il y en a une, salle 1 sinon.
     auHub = false
@@ -4002,7 +4320,12 @@ function frame(now: number): void {
         newExpedition()
       }
     })
-  } else if (!tableauDone && !sim.dispersed && (drunk || reached) && testLevel) {
+  } else if (
+    !tableauDone &&
+    !sim.dispersed &&
+    (drunk || reached) &&
+    testLevel
+  ) {
     // Prototype 21-A bis : l'essai conclut sans toucher aux registres ni à
     // l'expédition — on félicite, on ramène au protocole.
     const surplus = sim.liters() + sim.swallowed * params.litersPerParticle
@@ -4019,40 +4342,66 @@ function frame(now: number): void {
         ? `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — le tableau se termine. Retour à l’éditeur pour l’ajuster.`
         : `${surplus.toFixed(2)} L collectés en ${fmtTime(run.tableauTime)} — essai hors expédition : les registres ne bougent pas.${refRecords}`,
       'success',
-      fromEditor ? 'RETOUR À L’ÉDITEUR' : testQueue.length > 0 ? 'SALLE SUIVANTE' : 'RETOUR AU PROTOCOLE',
+      fromEditor
+        ? 'RETOUR À L’ÉDITEUR'
+        : testQueue.length > 0
+          ? 'SALLE SUIVANTE'
+          : 'RETOUR AU PROTOCOLE',
     )
     // la cinématique de CONCLUSION : par-dessus le bilan, qui l'attend derrière
     if (level.cineApres) void lireCineParCode(level.cineApres)
   } else if (!tableauDone && !sim.dispersed && (drunk || reached)) {
     // Prime de glace : ce que le sas a avalé SOLIDE vaut plus cher que ce
     // qu'il a bu goutte à goutte.
-    const prime = sim.swallowedIce * params.litersPerParticle * params.iceCollectBonus
-    const surplus = sim.liters() + sim.swallowed * params.litersPerParticle + prime
+    const prime =
+      sim.swallowedIce * params.litersPerParticle * params.iceCollectBonus
+    const surplus =
+      sim.liters() + sim.swallowed * params.litersPerParticle + prime
     run.bonbonneLiters += surplus
     // chaque centilitre livré nourrit le CONDENSAT (méta) — y compris sur la
     // dernière salle : rien de ce qui atteint le sas n'est jamais perdu
     gagneCondensat(surplus * 100)
     // Trophées de collecte : « Sans une goutte » (≥ 95 % du volume de
     // départ livré) et « Opérateur de nuit » (21 collectes cumulées)
-    if (surplus >= 0.95 * level.spawn.n * params.litersPerParticle) trophees.debloque('sans-une-goutte')
-    if (trophees.compte('collectes') >= 21) trophees.debloque('operateur-de-nuit')
-    const { newVolume, newChrono } = records.noteCollection(level.code, surplus, run.tableauTime)
+    if (surplus >= 0.95 * level.spawn.n * params.litersPerParticle)
+      trophees.debloque('sans-une-goutte')
+    if (trophees.compte('collectes') >= 21)
+      trophees.debloque('operateur-de-nuit')
+    const { newVolume, newChrono } = records.noteCollection(
+      level.code,
+      surplus,
+      run.tableauTime,
+    )
     // Publication au tableau d'honneur partagé : le serveur ne garde que le
     // meilleur — la réponse remet les registres affichés à jour.
-    pushTableauRecord(level.code, surplus, run.tableauTime, records.operator()).then((b) => {
+    pushTableauRecord(
+      level.code,
+      surplus,
+      run.tableauTime,
+      records.operator(),
+    ).then((b) => {
       if (b) {
         sharedBoard = b
         renderRegistres()
         // « La ligne de crête » : le rang 1 en NOTE vient de tomber ?
         const top = b.tops?.[level.code]?.note?.[0]
-        if (top && top.name === records.operator()) trophees.debloque('ligne-de-crete')
+        if (top && top.name === records.operator())
+          trophees.debloque('ligne-de-crete')
       }
     })
     const bests = records.tableauRecord(level.code)!
-    const primeLine = prime >= 0.01 ? ` · prime de glace +${prime.toFixed(2)} L` : ''
-    const ligne = (icone: string, valeur: string, neuf: boolean, record: string): string =>
+    const primeLine =
+      prime >= 0.01 ? ` · prime de glace +${prime.toFixed(2)} L` : ''
+    const ligne = (
+      icone: string,
+      valeur: string,
+      neuf: boolean,
+      record: string,
+    ): string =>
       `<span class="bilan-l">${icone} <b>${valeur}</b> — ${
-        neuf ? '<em class="bilan-neuf">NOUVEAU RECORD ✦</em>' : `record : ${record}`
+        neuf
+          ? '<em class="bilan-neuf">NOUVEAU RECORD ✦</em>'
+          : `record : ${record}`
       }</span>`
     const bilan =
       `<span class="bilan">` +
@@ -4072,20 +4421,30 @@ function frame(now: number): void {
     audio.collect()
     // Le record a sa propre fanfare : la collecte ordinaire ne doit pas
     // sonner comme un exploit, sinon plus rien ne sonne comme un exploit.
-    bande.ponctuation(newVolume || newChrono ? 'sting-record' : 'sting-collecte', 0.85)
+    bande.ponctuation(
+      newVolume || newChrono ? 'sting-record' : 'sting-collecte',
+      0.85,
+    )
     if (levelIndex + 1 >= playedLevels().length) {
       // Dernier sas : l'expédition est achevée — bilan, et registres à jour
       run.ended = true
       trophees.debloque('integrale')
-      const exp = records.noteExpedition(playedLevels().length, run.bonbonneLiters, run.runTime)
-      pushExpeditionRecord(playedLevels().length, run.bonbonneLiters, run.runTime, records.operator()).then(
-        (b) => {
-          if (b) {
-            sharedBoard = b
-            renderRegistres()
-          }
-        },
+      const exp = records.noteExpedition(
+        playedLevels().length,
+        run.bonbonneLiters,
+        run.runTime,
       )
+      pushExpeditionRecord(
+        playedLevels().length,
+        run.bonbonneLiters,
+        run.runTime,
+        records.operator(),
+      ).then((b) => {
+        if (b) {
+          sharedBoard = b
+          renderRegistres()
+        }
+      })
       renderRegistres()
       // l'expédition principale conclue n'a plus rien à reprendre
       if (!testLevel && !runSecondaire) effaceRun()
@@ -4094,7 +4453,9 @@ function frame(now: number): void {
       showOverlay(
         'EXPÉDITION ACHEVÉE',
         `<span class="bilan"><span class="bilan-l">${expeditionSummary(playedLevels().length)}${
-          exp.newRecord ? ' — <em class="bilan-neuf">MEILLEURE EXPÉDITION ✦</em>' : ''
+          exp.newRecord
+            ? ' — <em class="bilan-neuf">MEILLEURE EXPÉDITION ✦</em>'
+            : ''
         }</span></span>Le laboratoire n'a plus d'échantillon. Quelque part dans les conduites, le fluide se souvient.`,
         'success',
         'RETOUR AU LABO',
@@ -4129,7 +4490,13 @@ function frame(now: number): void {
   }
 
   // Ondes d'éjection : naissance côté visée, sur le bord du corps (pas en vapeur)
-  if (input.aimActive && !input.gasIntent && !sim.dispersed && !input.paused && !tableauDone) {
+  if (
+    input.aimActive &&
+    !input.gasIntent &&
+    !sim.dispersed &&
+    !input.paused &&
+    !tableauDone
+  ) {
     waveCarry += dtReal
     if (waveCarry >= WAVE_EVERY) {
       waveCarry = 0
@@ -4140,8 +4507,12 @@ function frame(now: number): void {
       // en rassemblement, l'onde part du CENTRE : le battement d'un cœur qui
       // se reforme, pas une salve qui sort
       waves.push({
-        x: rassembler ? sim.stats.centroidX : sim.stats.centroidX + (dx / len) * r,
-        y: rassembler ? sim.stats.centroidY : sim.stats.centroidY + (dy / len) * r,
+        x: rassembler
+          ? sim.stats.centroidX
+          : sim.stats.centroidX + (dx / len) * r,
+        y: rassembler
+          ? sim.stats.centroidY
+          : sim.stats.centroidY + (dy / len) * r,
         t: elapsed,
       })
       if (waves.length > MAX_WAVES) waves.shift()
@@ -4160,11 +4531,20 @@ function frame(now: number): void {
   // Caméra : suivi du corps, ou vue d'ensemble du tableau depuis le banc
   if (monitor.overview) {
     const b = sim.bounds
-    const fitZoom = Math.min(vw / (b.maxX - b.minX), vh / (b.maxY - b.minY)) * 0.94
+    const fitZoom =
+      Math.min(vw / (b.maxX - b.minX), vh / (b.maxY - b.minY)) * 0.94
     camera.snapTo((b.minX + b.maxX) * 0.5, (b.minY + b.maxY) * 0.5, fitZoom)
   } else {
-    camera.update(dtReal, sim.stats.centroidX, sim.stats.centroidY, sim.stats.rmsRadius, vw, vh, params)
-  majEveil(dtReal) // l'éveil suit la caméra : ses repères (invite) sont à jour
+    camera.update(
+      dtReal,
+      sim.stats.centroidX,
+      sim.stats.centroidY,
+      sim.stats.rmsRadius,
+      vw,
+      vh,
+      params,
+    )
+    majEveil(dtReal) // l'éveil suit la caméra : ses repères (invite) sont à jour
   }
   updateTutor(dtReal)
   updateTrophees(dtReal)
@@ -4196,13 +4576,22 @@ function frame(now: number): void {
     lumiereEauActive ? 1 : 0,
     level.ambiante ?? AMBIANTE_DEFAUT,
     RELIEF_K[reliefChoix],
+    level.brume ?? 0,
   )
   const rendRaw = performance.now() - renderT0
   monitor.renderMs += (rendRaw - monitor.renderMs) * 0.08
   // le collecteur note CHAQUE image rendue — c'est la matière du rapport.
   // Le CPU total inclut tout le rappel jusqu'ici : laser, étiquettes,
   // panneau 2D, HUD — ce que « autreJsMs » isole dans le rapport.
-  perf.note(dtBrutMs, performance.now() - frameT0, physRaw, rendRaw, stepsFaits, sim.count, qualityLevel)
+  perf.note(
+    dtBrutMs,
+    performance.now() - frameT0,
+    physRaw,
+    rendRaw,
+    stepsFaits,
+    sim.count,
+    qualityLevel,
+  )
   majPerfVif()
 
   const speed = Math.hypot(sim.stats.velX, sim.stats.velY)
@@ -4215,8 +4604,14 @@ function frame(now: number): void {
   btnPause.textContent = input.paused ? '▶' : '⏸'
   btnPause.classList.toggle('active', input.paused)
   chipLegend.classList.toggle('active', legend.classList.contains('visible'))
-  chipStates.classList.toggle('active', statesPanel.classList.contains('visible'))
-  chipBench.classList.toggle('active', benchHost !== null && benchHost.style.display !== 'none')
+  chipStates.classList.toggle(
+    'active',
+    statesPanel.classList.contains('visible'),
+  )
+  chipBench.classList.toggle(
+    'active',
+    benchHost !== null && benchHost.style.display !== 'none',
+  )
   chipEditor.style.display = fromEditor ? '' : 'none'
   btnVortex.classList.toggle('active', input.vortexArmed)
   btnVortex.style.display = params.vortexEnabled >= 0.5 ? '' : 'none'
@@ -4258,7 +4653,8 @@ function frame(now: number): void {
   // Le seuil est un volume ABSOLU : sa position sur la jauge (graduée en % du
   // volume de départ) dépend donc du volume de base de ce tableau.
   const baseLiters = sim.baseVolume * params.litersPerParticle
-  const seuilPct = baseLiters > 0 ? (params.criticalVolumeLiters / baseLiters) * 100 : 0
+  const seuilPct =
+    baseLiters > 0 ? (params.criticalVolumeLiters / baseLiters) * 100 : 0
   gaugeThreshold.style.left = `${Math.min(100, seuilPct).toFixed(1)}%`
   hudSeuil.textContent = `${params.criticalVolumeLiters.toFixed(2)} L`
   hudVitesse.textContent = `${speed.toFixed(0)} u/s`
@@ -4268,14 +4664,19 @@ function frame(now: number): void {
   const simT = run.tableauTime
   if (lossPrevLiters >= 0 && simT > lossPrevT) {
     const inst = (lossPrevLiters - nowLiters) / (simT - lossPrevT)
-    lossRate += (Math.max(0, inst) - lossRate) * Math.min(1, (simT - lossPrevT) * 4)
+    lossRate +=
+      (Math.max(0, inst) - lossRate) * Math.min(1, (simT - lossPrevT) * 4)
   } else if (simT < lossPrevT) {
     lossRate = 0
   }
   lossPrevLiters = nowLiters
   lossPrevT = simT
   if (lossRate > 0.02 && !sim.dispersed && !tableauDone) {
-    const cause = input.gasIntent ? 'coût vapeur' : input.aimActive ? 'éjection' : 'surfaces'
+    const cause = input.gasIntent
+      ? 'coût vapeur'
+      : input.aimActive
+        ? 'éjection'
+        : 'surfaces'
     hudPerte.textContent = `−${lossRate.toFixed(2)} L/s · ${cause}`
   } else {
     hudPerte.textContent = ''
@@ -4336,7 +4737,9 @@ function frame(now: number): void {
   // Son LIBELLÉ dit la vérité du moment : en run, elle conclut (le sursis
   // court, le sas peut encore boire) ; ailleurs, elle rejoue la salle.
   btnRelance.textContent =
-    !testLevel && !auHub && !run.ended ? 'EN RESTER LÀ — CONCLURE LA SALLE' : 'RECOMMENCER LE TABLEAU'
+    !testLevel && !auHub && !run.ended
+      ? 'EN RESTER LÀ — CONCLURE LA SALLE'
+      : 'RECOMMENCER LE TABLEAU'
   btnRelance.classList.toggle(
     'visible',
     (endgame.spent || sim.dispersed) &&
@@ -4348,10 +4751,14 @@ function frame(now: number): void {
   )
 
   const nearLast =
-    alive && !endgame.spent && !endgame.enCollecte && sim.liters() <= params.lastCallLiters
+    alive &&
+    !endgame.spent &&
+    !endgame.enCollecte &&
+    sim.liters() <= params.lastCallLiters
   // une fois le CONTINUER offert, plus aucune bannière funeste : le bouton
   // est l'interface de fin, l'alarme n'a plus rien à dire
-  const inDanger = alive && !aspireAssez && (endgame.spent || endgame.lastCall || nearLast)
+  const inDanger =
+    alive && !aspireAssez && (endgame.spent || endgame.lastCall || nearLast)
   if (inDanger) {
     hudDanger.textContent = endgame.spent
       ? '❄ DERNIÈRE IMPULSION DONNÉE — L’ÉCHANTILLON DÉRIVE'
@@ -4366,15 +4773,21 @@ function frame(now: number): void {
   hudDanger.classList.toggle('spent', endgame.spent)
   gaugeFill.classList.toggle(
     'danger',
-    (inDanger && endgame.lastCall) || (endgame.spent && !aspireAssez) || sim.dispersed,
+    (inDanger && endgame.lastCall) ||
+      (endgame.spent && !aspireAssez) ||
+      sim.dispersed,
   )
-  gaugeFill.classList.toggle('warn', nearLast && !endgame.lastCall && !sim.dispersed)
+  gaugeFill.classList.toggle(
+    'warn',
+    nearLast && !endgame.lastCall && !sim.dispersed,
+  )
 
   // L'objectif : quand le sas sort de l'écran, une flèche le pointe depuis le
   // bord du cadre, avec la distance restante — on sait toujours où aller.
   const exitSx = vw * 0.5 + (exitMouth.x - camera.x) * camera.zoom
   const exitSy = vh * 0.5 - (exitMouth.y - camera.y) * camera.zoom
-  const exitOnScreen = exitSx > 30 && exitSx < vw - 30 && exitSy > 92 && exitSy < vh - 140
+  const exitOnScreen =
+    exitSx > 30 && exitSx < vw - 30 && exitSy > 92 && exitSy < vh - 140
   const showArrow =
     document.body.classList.contains('playing') &&
     !tableauDone &&
@@ -4387,7 +4800,10 @@ function frame(now: number): void {
     const ay = Math.min(vh - 152, Math.max(106, exitSy))
     objArrow.style.transform = `translate(${ax.toFixed(1)}px, ${ay.toFixed(1)}px) translate(-50%, -50%)`
     objArrowGlyph.style.transform = `rotate(${((ang * 180) / Math.PI).toFixed(1)}deg)`
-    const dWorld = Math.hypot(exitMouth.x - sim.stats.centroidX, exitMouth.y - sim.stats.centroidY)
+    const dWorld = Math.hypot(
+      exitMouth.x - sim.stats.centroidX,
+      exitMouth.y - sim.stats.centroidY,
+    )
     objDist.textContent = `SAS · ${Math.round(dWorld)} u`
   }
   objArrow.classList.toggle('visible', showArrow)
@@ -4406,7 +4822,10 @@ function frame(now: number): void {
     dashCostEl.style.transform = `translate(${(ex + 18).toFixed(1)}px, ${(ey - 30).toFixed(1)}px)`
     // La puissance suit la distance du doigt AU CORPS (en unités monde) :
     // l'étiquette annonce les deux termes du marché — la poussée et le prix.
-    const dMonde = Math.hypot(aim.x - sim.stats.centroidX, aim.y - sim.stats.centroidY)
+    const dMonde = Math.hypot(
+      aim.x - sim.stats.centroidX,
+      aim.y - sim.stats.centroidY,
+    )
     const puissance = Math.min(1, dMonde / Math.max(1, params.gasDashRange))
     // À sec DANS une zone qui impose la vapeur : le sélecteur est verrouillé
     // et la zone ne recharge pas — l'étiquette dit où trouver un dash.
@@ -4450,7 +4869,13 @@ function frame(now: number): void {
   const audible = !input.paused && !tableauDone && !sim.dispersed
   // Le souffle continu d'éjection est retiré (la voix elle-même n'existe
   // plus) : l'eau se signale par la goutte qui « ploc » à chaque impulsion.
-  audio.setGasLevel(audible && gasCount > 0 ? (input.aimActive && input.gasIntent ? 1 : 0.35) : 0)
+  audio.setGasLevel(
+    audible && gasCount > 0
+      ? input.aimActive && input.gasIntent
+        ? 1
+        : 0.35
+      : 0,
+  )
 
   // ---- Bande-son : décor sonore et ponctuations ----
   const enJeu = document.body.classList.contains('playing')
@@ -4467,28 +4892,44 @@ function frame(now: number): void {
   // machine. En vapeur, la visée est silencieuse — le souffle part au dash.
   // pas de « ploc » en glace : un palet n'éjecte rien, il n'a pas à goutter —
   // ni en rassemblement : rien ne sort, rien ne goutte
-  const vise = audible && input.aimActive && !input.gasIntent && !input.freezeIntent && !rassembler
+  const vise =
+    audible &&
+    input.aimActive &&
+    !input.gasIntent &&
+    !input.freezeIntent &&
+    !rassembler
   if (vise) {
     sfx.dropTimer -= dtReal
     if (!sfx.aiming || sfx.dropTimer <= 0) {
       const prise = 1 + Math.floor(Math.random() * 3)
-      bande.bruitage(`ejection-${prise}` as Bruitage, 0.65, 0.93 + Math.random() * 0.14)
+      bande.bruitage(
+        `ejection-${prise}` as Bruitage,
+        0.65,
+        0.93 + Math.random() * 0.14,
+      )
       sfx.dropTimer = 0.12 + Math.random() * 0.1
     }
   }
   sfx.aiming = vise
   // L'éponge boit en silence : son bruit de succion agaçait plus qu'il
   // n'informait — la jauge et le feutre qui se remplit suffisent à le dire.
-  if (endgame.lastCall && !sfx.lastCall) bande.ponctuation('sting-derniere-impulsion', 0.8)
+  if (endgame.lastCall && !sfx.lastCall)
+    bande.ponctuation('sting-derniere-impulsion', 0.8)
   sfx.lastCall = endgame.lastCall
   if (endgame.spent && !sfx.spent) bande.ponctuation('fin-de-course', 0.85)
   sfx.spent = endgame.spent
   const drainOn = params.exitRadius > 0 && params.exitPull > 0
-  const mouthDist = Math.hypot(sim.stats.centroidX - exitMouth.x, sim.stats.centroidY - exitMouth.y)
-  audio.setDrainLevel(
-    audible && drainOn ? Math.max(0, 1 - mouthDist / Math.max(1, params.exitRadius)) : 0,
+  const mouthDist = Math.hypot(
+    sim.stats.centroidX - exitMouth.x,
+    sim.stats.centroidY - exitMouth.y,
   )
-  if (sim.swallowed > sfx.swallowed) audio.pulseSwallow(sim.swallowed - sfx.swallowed)
+  audio.setDrainLevel(
+    audible && drainOn
+      ? Math.max(0, 1 - mouthDist / Math.max(1, params.exitRadius))
+      : 0,
+  )
+  if (sim.swallowed > sfx.swallowed)
+    audio.pulseSwallow(sim.swallowed - sfx.swallowed)
   sfx.swallowed = sim.swallowed
   if (allFrozen && !sfx.allFrozen) {
     audio.freezeOn()
@@ -4513,14 +4954,17 @@ function frame(now: number): void {
       records.noteDispersion(level.code, run.tableauTime)
       records.noteExpedition(levelIndex, run.bonbonneLiters, run.runTime)
       if (levelIndex > 0 || run.bonbonneLiters >= 0.01) {
-        pushExpeditionRecord(levelIndex, run.bonbonneLiters, run.runTime, records.operator()).then(
-          (b) => {
-            if (b) {
-              sharedBoard = b
-              renderRegistres()
-            }
-          },
-        )
+        pushExpeditionRecord(
+          levelIndex,
+          run.bonbonneLiters,
+          run.runTime,
+          records.operator(),
+        ).then((b) => {
+          if (b) {
+            sharedBoard = b
+            renderRegistres()
+          }
+        })
       }
       renderRegistres()
     }

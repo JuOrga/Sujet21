@@ -279,6 +279,7 @@ uniform float uLumiere;
 // pièce garde là où aucune lampe ne porte. 0,52 = niveau historique ;
 // 0 = noir total hors des lampes.
 uniform float uAmbiante;
+uniform float uBrume; // 0..1 : densité de la brume d'ambiance du tableau
 // RELIEF 2.5D : les parois ont une hauteur — leur sommet fuit le centre de
 // la caméra (perspective), et la face latérale se révèle du côté qui
 // regarde le centre. En se déplaçant, on « aperçoit » les flancs des
@@ -1331,13 +1332,39 @@ void main() {
 
     // Le corps baigne dans la lumière de la pièce : les ombres portées le
     // traversent, la teinte des lampes le colore — liquide, glace et vapeur
-    // pareillement. Plage COMPRESSÉE : la silhouette est la jauge de vie du
-    // joueur, elle reste lisible au plus noir de l'ombre.
-    if (uLumiereEau > 0.5) water *= 0.70 + 0.55 * lmEau;
+    // pareillement. La formule est celle du DÉCOR (ambiance + lampes) : le
+    // corps n'est plus sur-éclairé par rapport à sa pièce — dans le noir
+    // complet (ambiance 0, hors de toute lampe) il devient un spectre à
+    // 10 %, à peine deviné. L'ancien plancher fixe de 0,70 le laissait
+    // parfaitement visible dans une pièce éteinte : peu naturel, signalé.
+    if (uLumiereEau > 0.5)
+      water *= clamp(vec3(uAmbiante * 1.15) + 1.05 * lmEau, vec3(0.10), vec3(1.0));
 
     col = mix(col, water, body);
     // L'eau qui recouvre l'œil du sas s'assombrit : elle sombre dans le trou
     col *= 1.0 - drainEye * body * 0.55;
+  }
+
+  // ---- LA BRUME D'AMBIANCE : des nappes qui dérivent lentement dans la
+  // pièce, réglées par tableau (éditeur, « Brume »). Deux octaves de bruit
+  // en espace monde, poussées en biais — et la brume N'EXISTE QUE DANS LA
+  // LUMIÈRE : éclairée elle se voit, dans le noir elle disparaît (c'est la
+  // lumière qu'on voit, pas la fumée). Elle voile aussi le corps : il passe
+  // DANS les nappes.
+  if (uBrume > 0.003 && uDecor > 0.5) {
+    vec2 bp = world * 0.0042 + vec2(uTime * 0.011, -uTime * 0.007);
+    float b = vnoise(bp) * 0.62
+      + vnoise(bp * 2.6 + vec2(31.7, 7.3) + uTime * 0.004) * 0.38;
+    b = smoothstep(0.34, 0.86, b);
+    float eclB = uAmbiante;
+    if (uLumiere > 0.5) {
+      vec2 luvB = (world - uLightMapMin) * uLightMapInvSize;
+      eclB += dot(texture(uLightMap, clamp(luvB, 0.0, 1.0)).rgb, vec3(0.3333));
+    } else {
+      eclB = max(eclB, 0.55);
+    }
+    float voile = b * uBrume * 0.30 * clamp(eclB, 0.0, 1.0) * inRoom;
+    col = mix(col, vec3(0.60, 0.70, 0.78), voile);
   }
 
   // ---- LE PLAFONNIER : la source se VOIT. Un luminaire de station vu du
@@ -2422,6 +2449,7 @@ export class Renderer {
     lumiereEau = 1, // 1 le VOLUME baigne dans la lumière de la pièce, 0 non
     ambiante = 0.52, // lumière générale du tableau (plancher hors lampes)
     relief = 0, // relief 2.5D des parois (0 débranché ; ~0,035 léger)
+    brume = 0, // brume d'ambiance du tableau (0 : aucune)
   ): void {
     const gl = this.gl
     const devW = Math.max(1, Math.round(viewportW * dpr))
@@ -2582,6 +2610,7 @@ export class Renderer {
     // arêtes et les montures en ont besoin par pixel)
     gl.uniform1f(cu['uLumiere'], lumiere > 0.5 && this.lightTex ? 1 : 0)
     gl.uniform1f(cu['uAmbiante'], ambiante)
+    gl.uniform1f(cu['uBrume'], brume)
     gl.uniform1f(cu['uRelief'], relief)
     // le volume n'a de lumière à recevoir que si la pièce en a une
     gl.uniform1f(

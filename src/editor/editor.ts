@@ -2222,6 +2222,16 @@ export class LevelEditor {
       this.persist()
     })
     this.el('ed-lum-generale').addEventListener('change', () => this.histoire())
+    this.el('ed-brume').addEventListener('input', () => {
+      const brut = (this.el('ed-brume') as HTMLInputElement).value.trim()
+      if (brut === '') delete this.level.brume
+      else {
+        const v = Number(brut)
+        if (Number.isFinite(v))
+          this.level.brume = Math.max(0, Math.min(1, v / 100))
+      }
+    })
+    this.el('ed-brume').addEventListener('change', () => this.histoire())
     // Cinématiques ancrées : le code (table de montage) joué à l'entrée du
     // tableau, et celui joué à sa conclusion — vide = aucune
     for (const [id, champ] of [
@@ -2625,6 +2635,10 @@ export class LevelEditor {
     )
     ;(this.el('ed-dashs') as HTMLInputElement).value =
       this.level.dashBudget === undefined ? '' : String(this.level.dashBudget)
+    ;(this.el('ed-brume') as HTMLInputElement).value =
+      this.level.brume === undefined || this.level.brume === 0
+        ? ''
+        : String(Math.round(this.level.brume * 100))
     ;(this.el('ed-lum-generale') as HTMLInputElement).value =
       this.level.ambiante === undefined
         ? ''

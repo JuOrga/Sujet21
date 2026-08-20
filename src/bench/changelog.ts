@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '20/08/2026 19:30',
+    title:
+      'La brume d’ambiance (réglable par tableau) et le corps qui respecte enfin le noir',
+    notes: [
+      'LA BRUME : un nouveau réglage du tableau dans l’éditeur, à côté de la lumière générale — « Brume (%) », 0 par défaut. Des nappes qui dérivent lentement en biais dans la pièce, sur deux octaves de bruit. Détail qui fait tout : la brume N’EXISTE QUE DANS LA LUMIÈRE — éclairée elle se voit, dans le noir elle disparaît (c’est la lumière qu’on voit, pas la fumée). Elle voile aussi le corps : il passe DANS les nappes. Réglage par tableau, sauvegardé et partagé avec lui.',
+      'LE CORPS RESPECTE LE NOIR : signalé — « quand je mets le noir complet, je le vois encore très bien ». L’ancien éclairage du volume avait un plancher fixe à 70 % : même pièce éteinte, la silhouette restait pleine. Le corps suit désormais LA MÊME formule que le décor (ambiance + lampes) : dans une pièce à moitié éclairée, rien ne change visiblement ; dans le noir complet il devient un spectre à 10 %, à peine deviné. Les lampes redeviennent le vrai moyen de le voir — et le cacher devient une mécanique possible.',
+    ],
+  },
+  {
     date: '20/08/2026 18:30',
     title:
       'L’ombre criblée des éponges, et le cône de lumière enfin visible au sol',

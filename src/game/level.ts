@@ -420,6 +420,7 @@ export interface LevelDef {
   // la lampe par défaut de la cuve fait l'éclairage.
   lumieres?: LumiereDef[]
   ambiante?: number // lumière générale 0..1 ; absente : AMBIANTE_DEFAUT
+  brume?: number // brume d'ambiance 0..1 ; absente : 0 — des nappes qui dérivent
 
   par?: number // budget d'impulsions visé : franchissable en `par`, record en dessous
   // Dashs rendus à CHAQUE transformation en vapeur (règle d'or : 3 par
