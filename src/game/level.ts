@@ -59,7 +59,16 @@ export function versLocalBoite(
 
 /** Le point (x, y) est-il dans la pièce, rotation et FORME comprises ? */
 export function dansBoite(
-  b: { minX: number; minY: number; maxX: number; maxY: number; angle?: number; forme?: number; p0?: number; p1?: number },
+  b: {
+    minX: number
+    minY: number
+    maxX: number
+    maxY: number
+    angle?: number
+    forme?: number
+    p0?: number
+    p1?: number
+  },
   x: number,
   y: number,
 ): boolean {
@@ -77,10 +86,22 @@ export function subtractBox(
   // une forme non rectangulaire ne se découpe pas au couteau axial
   if (b.forme) return [b]
   // pas de recouvrement : la boîte reste entière
-  if (r.minX >= b.maxX || r.maxX <= b.minX || r.minY >= b.maxY || r.maxY <= b.minY) return [b]
+  if (
+    r.minX >= b.maxX ||
+    r.maxX <= b.minX ||
+    r.minY >= b.maxY ||
+    r.maxY <= b.minY
+  )
+    return [b]
   const out: ObstacleBox[] = []
-  const garde = (minX: number, minY: number, maxX: number, maxY: number): void => {
-    if (maxX - minX >= 1 && maxY - minY >= 1) out.push({ minX, minY, maxX, maxY, material: b.material })
+  const garde = (
+    minX: number,
+    minY: number,
+    maxX: number,
+    maxY: number,
+  ): void => {
+    if (maxX - minX >= 1 && maxY - minY >= 1)
+      out.push({ minX, minY, maxX, maxY, material: b.material })
   }
   garde(b.minX, b.minY, Math.min(r.minX, b.maxX), b.maxY) // à gauche de la découpe
   garde(Math.max(r.maxX, b.minX), b.minY, b.maxX, b.maxY) // à droite
@@ -98,13 +119,16 @@ export function subtractBox(
 // d'une boîte étant définie autour de SON centre, les morceaux se posent
 // exactement sur la paroi d'origine). Angles différents : null — les
 // morceaux ne seraient plus des rectangles.
-export function subtractBoxOblique(perdante: ObstacleBox, gagnante: ObstacleBox): ObstacleBox[] | null {
+export function subtractBoxOblique(
+  perdante: ObstacleBox,
+  gagnante: ObstacleBox,
+): ObstacleBox[] | null {
   // la soustraction exacte n'existe qu'entre rectangles : une FORME dans le
   // duel, et l'on refuse — comme pour des angles différents
   if (perdante.forme || gagnante.forme) return null
   const a = perdante.angle ?? 0
   const b = gagnante.angle ?? 0
-  const delta = Math.abs((((a - b) % 360) + 540) % 360 - 180) // écart à 180 ↔ 0/360
+  const delta = Math.abs(((((a - b) % 360) + 540) % 360) - 180) // écart à 180 ↔ 0/360
   if (Math.abs(delta - 180) > 0.5 && delta > 0.5) return null
   if (!a) return subtractBox(perdante, gagnante)
   const pcx = (perdante.minX + perdante.maxX) / 2
@@ -140,7 +164,14 @@ export function subtractBoxOblique(perdante: ObstacleBox, gagnante: ObstacleBox)
     const wy = pcy + s2 * ox + c2 * oy
     const hx = (m.maxX - m.minX) / 2
     const hy = (m.maxY - m.minY) / 2
-    return { minX: wx - hx, minY: wy - hy, maxX: wx + hx, maxY: wy + hy, material: m.material, angle: a }
+    return {
+      minX: wx - hx,
+      minY: wy - hy,
+      maxX: wx + hx,
+      maxY: wy + hy,
+      material: m.material,
+      angle: a,
+    }
   })
 }
 
@@ -149,12 +180,21 @@ export function subtractBoxOblique(perdante: ObstacleBox, gagnante: ObstacleBox)
 // retire les cellules dont le CENTRE tombe dans le rectangle, et ce qui
 // reste se redit en 4 éponges au plus (gauche, droite, dessous, dessus),
 // toutes calées sur la même trame. Le pendant de subtractBox, en cellules.
-export function subtractSponge(sp: SpongeDef, r: { minX: number; minY: number; maxX: number; maxY: number }): SpongeDef[] {
+export function subtractSponge(
+  sp: SpongeDef,
+  r: { minX: number; minY: number; maxX: number; maxY: number },
+): SpongeDef[] {
   const cs = sp.cellSize
   const maxX = sp.minX + sp.cols * cs
   const maxY = sp.minY + sp.rows * cs
   // pas de recouvrement : l'éponge reste entière
-  if (r.minX >= maxX || r.maxX <= sp.minX || r.minY >= maxY || r.maxY <= sp.minY) return [sp]
+  if (
+    r.minX >= maxX ||
+    r.maxX <= sp.minX ||
+    r.minY >= maxY ||
+    r.maxY <= sp.minY
+  )
+    return [sp]
   // les colonnes et rangées dont le centre est pris dans le rectangle
   const c0 = Math.max(0, Math.ceil((r.minX - sp.minX) / cs - 0.5))
   const c1 = Math.min(sp.cols - 1, Math.floor((r.maxX - sp.minX) / cs - 0.5))
@@ -195,7 +235,15 @@ export interface WorldLabel {
   x: number
   y: number
   text: string
-  tone: 'mur' | 'phile' | 'phobe' | 'eponge' | 'froid' | 'grille' | 'sas' | 'chaud'
+  tone:
+    | 'mur'
+    | 'phile'
+    | 'phobe'
+    | 'eponge'
+    | 'froid'
+    | 'grille'
+    | 'sas'
+    | 'chaud'
   // PORTÉE de la pancarte, quand la place manque à l'écran : « secteur »
   // nomme un LIEU (elle survit au dézoom — c'est la légende du plan),
   // « detail » commente un objet (elle s'efface dès qu'elle gênerait).
@@ -238,7 +286,13 @@ export interface DecalDef {
   y: number
   w: number
   h: number
-  kind: 'tuyaux' | 'vanne' | 'ecran-off' | 'ecran-on' | 'fiole-pleine' | 'fiole-vide'
+  kind:
+    | 'tuyaux'
+    | 'vanne'
+    | 'ecran-off'
+    | 'ecran-on'
+    | 'fiole-pleine'
+    | 'fiole-vide'
   flip?: boolean // miroir horizontal : la même pièce ne se répète pas telle quelle
   fade?: number // 0..1, opacité (défaut 0,55)
 }
@@ -256,6 +310,11 @@ export interface LumiereDef {
   portee?: number // rayon de retombée ; absente : proportionnelle à la cuve
   intensite?: number // 0,2..2 ; absente : 1
   couleur?: string // '#rrggbb' ; absente : blanc neutre
+  // Le LUMINAIRE (l'objet visible, qui n'éclaire rien de plus) :
+  taille?: number // échelle 0..3 ; absente : 1 — 0 : aucun luminaire dessiné
+  forme?: 'bandeau' // absente : plafonnier rond (l'éclipse)
+  longueur?: number // bandeau seulement : longueur totale (u monde) ; absente : 260
+  angle?: number // bandeau seulement : degrés ; absente : 0 (horizontal)
 }
 
 // LUMIÈRE GÉNÉRALE du tableau : le plancher d'ambiance — la part de
@@ -271,7 +330,9 @@ export const LAMPE_HAUTEUR_MAX = 2000
 export const LAMPE_COULEUR_DEFAUT = '#ffffff'
 
 /** '#rrggbb' → [r, g, b] dans 0..1 — null si la chaîne n'est pas une couleur. */
-export function lampeCouleurRVB(c: string | undefined): [number, number, number] | null {
+export function lampeCouleurRVB(
+  c: string | undefined,
+): [number, number, number] | null {
   if (!c || !/^#[0-9a-fA-F]{6}$/.test(c)) return null
   return [
     parseInt(c.slice(1, 3), 16) / 255,
@@ -413,7 +474,9 @@ export const ZONE_CAUSES: Record<ZoneForce, string> = {
 
 /** Le nom affiché d'une zone : le sien, ou la cause de son régime. */
 export function zoneName(z: ZoneDef): string {
-  return z.label && z.label.trim() ? z.label.trim().toUpperCase() : ZONE_CAUSES[z.force]
+  return z.label && z.label.trim()
+    ? z.label.trim().toUpperCase()
+    : ZONE_CAUSES[z.force]
 }
 
 /** L'état imposé au point (x, y), ou 'libre' si aucune zone ne l'impose. */
@@ -451,12 +514,18 @@ export function zoneShape(z: ZoneDef, x: number, y: number): number {
   // lisière à 0,955 de la demi-taille, ondulée de ±0,04 — le tout reste
   // inscrit dans le rectangle déclaré à l'éditeur
   const w =
-    0.955 + 0.02 * Math.sin(3 * th + p1) + 0.012 * Math.sin(5 * th + p2) + 0.008 * Math.sin(8 * th + p3)
+    0.955 +
+    0.02 * Math.sin(3 * th + p1) +
+    0.012 * Math.sin(5 * th + p2) +
+    0.008 * Math.sin(8 * th + p3)
   return d / w
 }
 
 /** Le contour de la lisière, pour l'éditeur (polygone en coordonnées monde). */
-export function zoneOutline(z: ZoneDef, steps = 64): { x: number; y: number }[] {
+export function zoneOutline(
+  z: ZoneDef,
+  steps = 64,
+): { x: number; y: number }[] {
   const cx = (z.minX + z.maxX) * 0.5
   const cy = (z.minY + z.maxY) * 0.5
   const hx = (z.maxX - z.minX) * 0.5
@@ -466,7 +535,10 @@ export function zoneOutline(z: ZoneDef, steps = 64): { x: number; y: number }[] 
   for (let i = 0; i < steps; i++) {
     const th = (i / steps) * Math.PI * 2
     const w =
-      0.955 + 0.02 * Math.sin(3 * th + p1) + 0.012 * Math.sin(5 * th + p2) + 0.008 * Math.sin(8 * th + p3)
+      0.955 +
+      0.02 * Math.sin(3 * th + p1) +
+      0.012 * Math.sin(5 * th + p2) +
+      0.008 * Math.sin(8 * th + p3)
     // rayon où la norme d'ordre 8 vaut w dans la direction th : le contour
     // suit la même superellipse que la mécanique
     const c = Math.cos(th)
@@ -493,7 +565,13 @@ export function zoneForceAt(level: LevelDef, x: number, y: number): ZoneForce {
   return 'libre'
 }
 
-function box(minX: number, minY: number, maxX: number, maxY: number, material: number): ObstacleBox {
+function box(
+  minX: number,
+  minY: number,
+  maxX: number,
+  maxY: number,
+  material: number,
+): ObstacleBox {
   return { minX, minY, maxX, maxY, material }
 }
 
@@ -645,10 +723,31 @@ export const TABLEAU_4: LevelDef = {
   ],
   sponges: [
     // mur d'éponge central : de la fente au couloir bas (y = -360..360)
-    { minX: 560, minY: -360, cols: 2, rows: 30, cellSize: 24, capacityPerCell: 5 },
+    {
+      minX: 560,
+      minY: -360,
+      cols: 2,
+      rows: 30,
+      cellSize: 24,
+      capacityPerCell: 5,
+    },
     // couloir bas tapissé : deux lèvres d'éponge, la glace passe entre elles
-    { minX: 660, minY: -420, cols: 10, rows: 2, cellSize: 24, capacityPerCell: 4 },
-    { minX: 660, minY: -750, cols: 10, rows: 2, cellSize: 24, capacityPerCell: 4 },
+    {
+      minX: 660,
+      minY: -420,
+      cols: 10,
+      rows: 2,
+      cellSize: 24,
+      capacityPerCell: 4,
+    },
+    {
+      minX: 660,
+      minY: -750,
+      cols: 10,
+      rows: 2,
+      cellSize: 24,
+      capacityPerCell: 4,
+    },
   ],
   labels: [
     { x: 120, y: 580, text: 'CHAUDIÈRE', tone: 'chaud' },
@@ -683,7 +782,14 @@ export const TABLEAU_5: LevelDef = {
   ],
   sponges: [
     // mur d'éponge : bloque du bas jusqu'au couloir (y = 100..300)
-    { minX: 560, minY: -750, cols: 2, rows: 35, cellSize: 24, capacityPerCell: 5 },
+    {
+      minX: 560,
+      minY: -750,
+      cols: 2,
+      rows: 35,
+      cellSize: 24,
+      capacityPerCell: 5,
+    },
   ],
   labels: [
     { x: -400, y: 140, text: 'HYDROPHILE', tone: 'phile' },
@@ -812,7 +918,15 @@ export const TABLEAU_1BIS: LevelDef = {
   // le lieu a été construit, entretenu, puis laissé.
   decals: [
     { x: -1105, y: 230, w: 160, h: 160, kind: 'tuyaux' },
-    { x: -1105, y: -180, w: 150, h: 150, kind: 'tuyaux', flip: true, fade: 0.45 },
+    {
+      x: -1105,
+      y: -180,
+      w: 150,
+      h: 150,
+      kind: 'tuyaux',
+      flip: true,
+      fade: 0.45,
+    },
     { x: -520, y: 590, w: 190, h: 285, kind: 'vanne', fade: 0.5 },
     { x: 300, y: -640, w: 150, h: 225, kind: 'vanne', fade: 0.42 },
     { x: 1120, y: 520, w: 165, h: 165, kind: 'tuyaux', fade: 0.5 },
@@ -1205,12 +1319,24 @@ export const TABLEAU_S2: LevelDef = {
   ],
   sponges: [
     // l'éponge d'angle : la perte se constate sur un coin, pas sur la route
-    { minX: -620, minY: -750, cols: 2, rows: 20, cellSize: 24, capacityPerCell: 5 },
+    {
+      minX: -620,
+      minY: -750,
+      cols: 2,
+      rows: 20,
+      cellSize: 24,
+      capacityPerCell: 5,
+    },
   ],
   labels: [
     { x: -570, y: -200, text: 'ÉPONGE — BOIT', tone: 'eponge' },
     { x: -100, y: -580, text: 'PLAQUE FROIDE — FIGE', tone: 'froid' },
-    { x: 160, y: -420, text: 'MEMBRANE — SEUL LE LIQUIDE PASSE', tone: 'phile' },
+    {
+      x: 160,
+      y: -420,
+      text: 'MEMBRANE — SEUL LE LIQUIDE PASSE',
+      tone: 'phile',
+    },
     { x: 160, y: 420, text: 'RIDEAU — SEULE LA GLACE PASSE', tone: 'froid' },
     { x: 300, y: 40, text: 'CHAUDIÈRE — DISPERSE', tone: 'chaud' },
     { x: 660, y: -420, text: 'ÉVENT — SEULE LA VAPEUR PASSE', tone: 'grille' },
@@ -1236,7 +1362,14 @@ export const TABLEAU_S3: LevelDef = {
   sponges: [],
   zones: [
     { minX: -560, minY: -750, maxX: -280, maxY: 750, force: 'glace' },
-    { minX: -40, minY: -750, maxX: 200, maxY: 750, force: 'libre', label: 'ZONE LIBRE' },
+    {
+      minX: -40,
+      minY: -750,
+      maxX: 200,
+      maxY: 750,
+      force: 'libre',
+      label: 'ZONE LIBRE',
+    },
     { minX: 420, minY: -750, maxX: 680, maxY: 750, force: 'vapeur' },
   ],
   labels: [

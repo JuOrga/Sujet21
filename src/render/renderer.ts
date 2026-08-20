@@ -6,9 +6,21 @@
 import type { FluidSim } from '../sim/solver'
 import { KIND_PLAYER } from '../sim/solver'
 import type { SimParams } from '../sim/params'
-import { LAMPE_HAUTEUR_DEFAUT, LAMPE_HAUTEUR_MAX, LAMPE_HAUTEUR_MIN, lampeCouleurRVB, zonePhases } from '../game/level'
+import {
+  LAMPE_HAUTEUR_DEFAUT,
+  LAMPE_HAUTEUR_MAX,
+  LAMPE_HAUTEUR_MIN,
+  lampeCouleurRVB,
+  zonePhases,
+} from '../game/level'
 import type { DecalDef, LumiereDef, ObstacleBox, ZoneDef } from '../game/level'
-import { ARC_EPAISSEUR_DEFAUT, ARC_OUVERTURE_DEFAUT, FORME_ARC, FORME_COIN, FORME_RECT } from '../game/formes'
+import {
+  ARC_EPAISSEUR_DEFAUT,
+  ARC_OUVERTURE_DEFAUT,
+  FORME_ARC,
+  FORME_COIN,
+  FORME_RECT,
+} from '../game/formes'
 import type { Camera } from './camera'
 
 // Budgets de rendu : au-delà, les éléments excédentaires ne sont plus
@@ -283,7 +295,7 @@ uniform int uLampeCount;
 uniform vec4 uLampes[MAX_LUMIERES]; // x, y, hauteur, portée
 uniform float uLampesInt[MAX_LUMIERES]; // intensité
 uniform vec3 uLampesCol[MAX_LUMIERES]; // couleur
-uniform float uLampeFixtures; // 1 : lampes déclarées → luminaires dessinés
+uniform vec4 uLampesFix[MAX_LUMIERES]; // taille, bandeau, demi-longueur, angle
 uniform vec2 uLightMapMin;     // coin bas-gauche de la carte (monde)
 uniform vec2 uLightMapInvSize; // 1 / taille monde de la carte
 uniform sampler2D uLightMap;
@@ -579,13 +591,23 @@ float ombreVolume(vec2 world, float dansEau) {
       // le rayon — n'y arrive jamais. C'est lui qui a éteint le chapelet de
       // pastilles que le max seul laissait passer (une goutte sur UN
       // prélèvement ombrait comme le corps entier).
-      if (w > 0.003) {
+      // …mais seulement AU LOIN. Exiger la largeur dès le contact avait
+      // deux effets pervers, constatés en jeu : les gouttes perdaient
+      // jusqu'à leur ombre de contact (elles flottaient), et l'ombre du
+      // corps se décollait de sa silhouette (les rayons qui rasent le bord
+      // échouaient au test) — elle se lisait comme PLUSIEURS ombres
+      // détachées. Sous 40 u l'ombre est acquise (le contact ancre tout au
+      // sol) ; l'exigence monte ensuite jusqu'à 130 u, là où naissaient
+      // les pastilles.
+      float exig = smoothstep(40.0, 130.0, t);
+      if (w > 0.003 && exig > 0.001) {
         vec2 perp = vec2(-dir.y, dir.x) * 45.0;
         vec2 fuvA = ((pw + perp - uCenter) * uZoom + uViewport * 0.5) / uViewport;
         vec2 fuvB = ((pw - perp - uCenter) * uZoom + uViewport * 0.5) / uViewport;
         float fA = texture(uField, clamp(fuvA, 0.0, 1.0)).r / uFieldScale;
         float fB = texture(uField, clamp(fuvB, 0.0, 1.0)).r / uFieldScale;
-        w = min(w, smoothstep(uThreshold * 0.55, uThreshold * 1.2, min(fA, fB)));
+        float large = smoothstep(uThreshold * 0.55, uThreshold * 1.2, min(fA, fB));
+        w = min(w, mix(1.0, large, exig));
       }
       acc = max(acc, w * dur);
       couvre += step(0.02, w);
@@ -1315,19 +1337,54 @@ void main() {
   // de plus (tout l'éclairage vient de la carte cuite) : c'est l'objet, pas
   // la lumière. Seules les lampes DÉCLARÉES ont un corps — la lampe par
   // défaut des tableaux sans lumière reste invisible, comme avant.
-  if (uLumiere > 0.5 && uLampeFixtures > 0.5) {
+  if (uLumiere > 0.5) {
     for (int li = 0; li < MAX_LUMIERES; li++) {
       if (li >= uLampeCount) break;
+      vec4 fx = uLampesFix[li];
+      // taille 0 : la lampe éclaire sans corps (c'est aussi le cas de la
+      // lampe par défaut des tableaux sans lumière déclarée)
+      if (fx.x < 0.02) continue;
       vec2 rel = world - uLampes[li].xy;
       // plus la lampe est HAUTE, plus elle est proche de la caméra : le
       // luminaire grossit un peu avec la hauteur (14 u à 420, la valeur
-      // par défaut ; 11 en rasante, 26 au plafond le plus haut)
-      float R = clamp(9.0 + uLampes[li].z * 0.012, 11.0, 26.0);
-      float dl = length(rel);
+      // par défaut) — puis la TAILLE réglée à l'éditeur multiplie tout
+      float R = clamp(9.0 + uLampes[li].z * 0.012, 11.0, 26.0) * fx.x;
+      // en bandeau, la distance de référence est celle au SEGMENT : tout le
+      // dessin (couronne, halo) suit alors la forme allongée
+      vec2 lp = rel;
+      float dl;
+      if (fx.y > 0.5) {
+        float ca = cos(fx.w);
+        float sa = sin(fx.w);
+        lp = vec2(ca * rel.x + sa * rel.y, -sa * rel.x + ca * rel.y);
+        dl = length(vec2(max(abs(lp.x) - fx.z, 0.0), lp.y));
+      } else {
+        dl = length(rel);
+      }
       if (dl > R * 2.4) continue;
       float px = 1.4 / uZoom; // adoucissement ~1 px, stable au zoom
       float lint = clamp(uLampesInt[li], 0.2, 2.0);
       vec3 teinte = uLampesCol[li];
+
+      if (fx.y > 0.5) {
+        // LE BANDEAU LUMINEUX : un tube émissif (lui, on le voit briller —
+        // c'est une réglette, pas un plafonnier), deux rails de métal le
+        // long des bords, des cellules discrètes pour le look fluorescent.
+        float Rb = R * 0.5; // demi-épaisseur du tube
+        float tube = 1.0 - smoothstep(Rb - px, Rb + px, dl);
+        vec3 lum = mix(vec3(1.0), teinte, clamp(dl / max(Rb, 1.0), 0.0, 1.0))
+          * (0.55 + 0.50 * lint);
+        lum *= 0.90 + 0.10 * cos(lp.x * 3.14159 / max(fx.z * 0.25, 40.0));
+        float rail = smoothstep(Rb - px, Rb + px, dl)
+          * (1.0 - smoothstep(Rb * 1.55 - px, Rb * 1.55 + px, dl));
+        vec3 metalB = vec3(0.13, 0.165, 0.21) + teinte * 0.05 * lint;
+        float corpsB = max(tube, rail);
+        col = mix(col, metalB, rail);
+        col = mix(col, lum, tube);
+        float auraB = pow(max(0.0, 1.0 - (dl - Rb) / (R * 1.4)), 3.0) * (1.0 - corpsB);
+        col += teinte * auraB * 0.22 * lint;
+        continue;
+      }
       float ang = atan(rel.y, rel.x);
 
       // L'ÉCLIPSE : vu du dessus, on regarde le DOS du luminaire — un capot
@@ -1620,7 +1677,11 @@ void main() {
   outColor = vec4(c, t.a * uFade * (1.0 - fluide));
 }`
 
-function compile(gl: WebGL2RenderingContext, type: number, src: string): WebGLShader {
+function compile(
+  gl: WebGL2RenderingContext,
+  type: number,
+  src: string,
+): WebGLShader {
   const shader = gl.createShader(type)!
   gl.shaderSource(shader, src)
   gl.compileShader(shader)
@@ -1630,7 +1691,11 @@ function compile(gl: WebGL2RenderingContext, type: number, src: string): WebGLSh
   return shader
 }
 
-function link(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgram {
+function link(
+  gl: WebGL2RenderingContext,
+  vs: string,
+  fs: string,
+): WebGLProgram {
   const program = gl.createProgram()!
   gl.attachShader(program, compile(gl, gl.VERTEX_SHADER, vs))
   gl.attachShader(program, compile(gl, gl.FRAGMENT_SHADER, fs))
@@ -1714,13 +1779,22 @@ export class Renderer {
   private readonly lampScratch = new Float32Array(MAX_LUMIERES * 4) // x, y, hauteur, portée
   private readonly lampIntScratch = new Float32Array(MAX_LUMIERES)
   private readonly lampColScratch = new Float32Array(MAX_LUMIERES * 3)
-  private uniforms: Record<string, Record<string, WebGLUniformLocation | null>> = {}
+  // le luminaire : taille, bandeau (0/1), demi-longueur, angle (rad)
+  private readonly lampFixScratch = new Float32Array(MAX_LUMIERES * 4)
+  private uniforms: Record<
+    string,
+    Record<string, WebGLUniformLocation | null>
+  > = {}
 
   constructor(canvas: HTMLCanvasElement, capacity: number) {
     this.canvas = canvas
     // preserveDrawingBuffer : les captures d'écran du canvas fonctionnent
     // (retours des testeurs, comparaisons de réglages) — surcoût négligeable.
-    const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, preserveDrawingBuffer: true })
+    const gl = canvas.getContext('webgl2', {
+      antialias: false,
+      alpha: false,
+      preserveDrawingBuffer: true,
+    })
     if (!gl) throw new Error('WebGL2 indisponible')
     this.gl = gl
     // Perte de contexte (pilote, veille, onglet gourmand) : un canvas noir est
@@ -1748,7 +1822,10 @@ export class Renderer {
       ['light', this.lightProgram],
     ] as const) {
       const map: Record<string, WebGLUniformLocation | null> = {}
-      const count = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS) as number
+      const count = gl.getProgramParameter(
+        program,
+        gl.ACTIVE_UNIFORMS,
+      ) as number
       for (let i = 0; i < count; i++) {
         const info = gl.getActiveUniform(program, i)
         if (info) map[info.name] = gl.getUniformLocation(program, info.name)
@@ -1802,7 +1879,11 @@ export class Renderer {
     this.decalVbo = gl.createBuffer()!
     gl.bindVertexArray(this.decalVao)
     gl.bindBuffer(gl.ARRAY_BUFFER, this.decalVbo)
-    gl.bufferData(gl.ARRAY_BUFFER, this.decalScratch.byteLength, gl.DYNAMIC_DRAW)
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      this.decalScratch.byteLength,
+      gl.DYNAMIC_DRAW,
+    )
     gl.enableVertexAttribArray(0)
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, hullStride, 0)
     gl.enableVertexAttribArray(1)
@@ -1812,33 +1893,129 @@ export class Renderer {
     // Habillage généré par IA (public/assets) : chargé en arrière-plan.
     // L'iris est échantillonné dans une branche non uniforme du shader :
     // pas de mipmaps pour lui (dérivées indéfinies sinon).
-    this.loadTexture('/assets/stars.webp', true, true, (t) => (this.texStars = t))
+    this.loadTexture(
+      '/assets/stars.webp',
+      true,
+      true,
+      (t) => (this.texStars = t),
+    )
     // Le lointain n'est pas raccordable : répété en MIROIR, la couture ne se
     // lit pas dans le noir et la station à la dérive reste unique à l'écran.
-    this.loadTexture('/assets/stars-far.webp', true, true, (t) => (this.texStarsFar = t), true)
-    this.loadTexture('/assets/tank-bg.webp', true, true, (t) => (this.texTank = t))
+    this.loadTexture(
+      '/assets/stars-far.webp',
+      true,
+      true,
+      (t) => (this.texStarsFar = t),
+      true,
+    )
+    this.loadTexture(
+      '/assets/tank-bg.webp',
+      true,
+      true,
+      (t) => (this.texTank = t),
+    )
     this.loadTexture('/assets/wall.webp', true, true, (t) => (this.texWall = t))
-    this.loadTexture('/assets/wall-a.webp', true, true, (t) => (this.texWallA = t))
-    this.loadTexture('/assets/froid.webp', true, true, (t) => (this.texFroid = t))
+    this.loadTexture(
+      '/assets/wall-a.webp',
+      true,
+      true,
+      (t) => (this.texWallA = t),
+    )
+    this.loadTexture(
+      '/assets/froid.webp',
+      true,
+      true,
+      (t) => (this.texFroid = t),
+    )
     // atlas des habillages de parois (8 tuiles de 1024 en grille 4×2)
-    this.loadTexture('/assets/paroi-atlas.webp', true, true, (t) => (this.texParoi = t))
-    this.loadTexture('/assets/chaud.webp', true, true, (t) => (this.texChaud = t))
-    this.loadTexture('/assets/grille.webp', true, true, (t) => (this.texGrille = t))
-    this.loadTexture('/assets/phobe.webp', true, true, (t) => (this.texPhobe = t))
-    this.loadTexture('/assets/phile.webp', true, true, (t) => (this.texPhile = t))
-    this.loadTexture('/assets/iris.webp', false, false, (t) => (this.texIris = t))
+    this.loadTexture(
+      '/assets/paroi-atlas.webp',
+      true,
+      true,
+      (t) => (this.texParoi = t),
+    )
+    this.loadTexture(
+      '/assets/chaud.webp',
+      true,
+      true,
+      (t) => (this.texChaud = t),
+    )
+    this.loadTexture(
+      '/assets/grille.webp',
+      true,
+      true,
+      (t) => (this.texGrille = t),
+    )
+    this.loadTexture(
+      '/assets/phobe.webp',
+      true,
+      true,
+      (t) => (this.texPhobe = t),
+    )
+    this.loadTexture(
+      '/assets/phile.webp',
+      true,
+      true,
+      (t) => (this.texPhile = t),
+    )
+    this.loadTexture(
+      '/assets/iris.webp',
+      false,
+      false,
+      (t) => (this.texIris = t),
+    )
     this.loadTexture('/assets/hull.webp', true, true, (t) => (this.texHull = t))
-    this.loadTexture('/assets/sponge-dry.webp', true, true, (t) => (this.texSpongeDry = t))
-    this.loadTexture('/assets/sponge-wet.webp', true, true, (t) => (this.texSpongeWet = t))
+    this.loadTexture(
+      '/assets/sponge-dry.webp',
+      true,
+      true,
+      (t) => (this.texSpongeDry = t),
+    )
+    this.loadTexture(
+      '/assets/sponge-wet.webp',
+      true,
+      true,
+      (t) => (this.texSpongeWet = t),
+    )
     // Décalques : pièces détourées (alpha), donc bord franc — pas de répétition
-    this.loadTexture('/assets/decal-tuyaux.webp', false, true, (t) => (this.texDecalTuyaux = t))
-    this.loadTexture('/assets/decal-vanne.webp', false, true, (t) => (this.texDecalVanne = t))
+    this.loadTexture(
+      '/assets/decal-tuyaux.webp',
+      false,
+      true,
+      (t) => (this.texDecalTuyaux = t),
+    )
+    this.loadTexture(
+      '/assets/decal-vanne.webp',
+      false,
+      true,
+      (t) => (this.texDecalVanne = t),
+    )
     // L'écran de contrôle de la salle d'observation : éteint aujourd'hui
     // (HORS TENSION), allumé quand la méta-progression prendra ses quartiers
-    this.loadTexture('/assets/decal-ecran-off.webp', false, true, (t) => (this.texDecalEcranOff = t))
-    this.loadTexture('/assets/decal-ecran-on.webp', false, true, (t) => (this.texDecalEcranOn = t))
-    this.loadTexture('/assets/fiole-pleine.webp', false, true, (t) => (this.texDecalFiolePleine = t))
-    this.loadTexture('/assets/fiole-vide.webp', false, true, (t) => (this.texDecalFioleVide = t))
+    this.loadTexture(
+      '/assets/decal-ecran-off.webp',
+      false,
+      true,
+      (t) => (this.texDecalEcranOff = t),
+    )
+    this.loadTexture(
+      '/assets/decal-ecran-on.webp',
+      false,
+      true,
+      (t) => (this.texDecalEcranOn = t),
+    )
+    this.loadTexture(
+      '/assets/fiole-pleine.webp',
+      false,
+      true,
+      (t) => (this.texDecalFiolePleine = t),
+    )
+    this.loadTexture(
+      '/assets/fiole-vide.webp',
+      false,
+      true,
+      (t) => (this.texDecalFioleVide = t),
+    )
     // Images de zones : la cause peinte (voir zoneDecor). Sans mipmaps —
     // échantillonnées dans une branche non uniforme du shader. En calques
     // d'un même tableau de textures : une seule unité pour les trois.
@@ -1868,12 +2045,32 @@ export class Renderer {
         gl.texStorage3D(gl.TEXTURE_2D_ARRAY, 1, gl.RGBA8, 1024, 1024, 3)
         gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
         gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-        gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-        gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+        gl.texParameteri(
+          gl.TEXTURE_2D_ARRAY,
+          gl.TEXTURE_WRAP_S,
+          gl.CLAMP_TO_EDGE,
+        )
+        gl.texParameteri(
+          gl.TEXTURE_2D_ARRAY,
+          gl.TEXTURE_WRAP_T,
+          gl.CLAMP_TO_EDGE,
+        )
       } else {
         gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texZones)
       }
-      gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, layer, 1024, 1024, 1, gl.RGBA, gl.UNSIGNED_BYTE, cv)
+      gl.texSubImage3D(
+        gl.TEXTURE_2D_ARRAY,
+        0,
+        0,
+        0,
+        layer,
+        1024,
+        1024,
+        1,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        cv,
+      )
       gl.bindTexture(gl.TEXTURE_2D_ARRAY, null)
       this.hasZones[layer] = 1
     }
@@ -1895,13 +2092,21 @@ export class Renderer {
       gl.bindTexture(gl.TEXTURE_2D, tex)
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, img)
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
-      const wrap = repeat ? (mirrored ? gl.MIRRORED_REPEAT : gl.REPEAT) : gl.CLAMP_TO_EDGE
+      const wrap = repeat
+        ? mirrored
+          ? gl.MIRRORED_REPEAT
+          : gl.REPEAT
+        : gl.CLAMP_TO_EDGE
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap)
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap)
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
       if (mips) {
         gl.generateMipmap(gl.TEXTURE_2D)
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
+        gl.texParameteri(
+          gl.TEXTURE_2D,
+          gl.TEXTURE_MIN_FILTER,
+          gl.LINEAR_MIPMAP_LINEAR,
+        )
       } else {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
       }
@@ -1931,7 +2136,13 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
     this.fbo = gl.createFramebuffer()!
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo)
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.fieldTex, 0)
+    gl.framebufferTexture2D(
+      gl.FRAMEBUFFER,
+      gl.COLOR_ATTACHMENT0,
+      gl.TEXTURE_2D,
+      this.fieldTex,
+      0,
+    )
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   }
 
@@ -1951,7 +2162,13 @@ export class Renderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
     this.lightFbo = gl.createFramebuffer()!
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.lightFbo)
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.lightTex, 0)
+    gl.framebufferTexture2D(
+      gl.FRAMEBUFFER,
+      gl.COLOR_ATTACHMENT0,
+      gl.TEXTURE_2D,
+      this.lightTex,
+      0,
+    )
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
     this.lightKey = '' // nouvelle cible : la carte doit recuire
   }
@@ -1963,8 +2180,22 @@ export class Renderer {
   private lampesEffectives(
     bounds: { minX: number; minY: number; maxX: number; maxY: number },
     lumieres: LumiereDef[],
-  ): { x: number; y: number; h: number; portee: number; intensite: number; rvb: [number, number, number] }[] {
-    const diag = Math.hypot(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY)
+  ): {
+    x: number
+    y: number
+    h: number
+    portee: number
+    intensite: number
+    rvb: [number, number, number]
+    taille: number
+    bandeau: boolean
+    demiLong: number
+    angleRad: number
+  }[] {
+    const diag = Math.hypot(
+      bounds.maxX - bounds.minX,
+      bounds.maxY - bounds.minY,
+    )
     if (lumieres.length === 0) {
       return [
         {
@@ -1974,16 +2205,29 @@ export class Renderer {
           portee: diag * 0.62,
           intensite: 1,
           rvb: [1, 1, 1],
+          // la lampe par défaut n'a pas de corps (taille 0) : elle est
+          // l'éclairage de la cuve, pas un objet du décor
+          taille: 0,
+          bandeau: false,
+          demiLong: 0,
+          angleRad: 0,
         },
       ]
     }
     return lumieres.slice(0, MAX_LUMIERES).map((l) => ({
       x: l.x,
       y: l.y,
-      h: Math.max(LAMPE_HAUTEUR_MIN, Math.min(LAMPE_HAUTEUR_MAX, l.h ?? LAMPE_HAUTEUR_DEFAUT)),
+      h: Math.max(
+        LAMPE_HAUTEUR_MIN,
+        Math.min(LAMPE_HAUTEUR_MAX, l.h ?? LAMPE_HAUTEUR_DEFAUT),
+      ),
       portee: l.portee && l.portee > 0 ? l.portee : diag * 0.62,
       intensite: Math.max(0.2, Math.min(2, l.intensite ?? 1)),
       rvb: lampeCouleurRVB(l.couleur) ?? [1, 1, 1],
+      taille: Math.max(0, Math.min(3, l.taille ?? 1)),
+      bandeau: l.forme === 'bandeau',
+      demiLong: Math.max(40, Math.min(800, (l.longueur ?? 260) / 2)),
+      angleRad: (((l.angle ?? 0) % 360) * Math.PI) / 180,
     }))
   }
 
@@ -1994,7 +2238,18 @@ export class Renderer {
     bounds: { minX: number; minY: number; maxX: number; maxY: number },
     boxes: ObstacleBox[],
     boxCount: number,
-    lampes: { x: number; y: number; h: number; portee: number; intensite: number; rvb: [number, number, number] }[],
+    lampes: {
+      x: number
+      y: number
+      h: number
+      portee: number
+      intensite: number
+      rvb: [number, number, number]
+      taille: number
+      bandeau: boolean
+      demiLong: number
+      angleRad: number
+    }[],
   ): void {
     const gl = this.gl
     const marge = 80
@@ -2009,7 +2264,8 @@ export class Renderer {
     const h = Math.max(48, Math.min(480, Math.round((w * sizeY) / sizeX)))
     this.ensureLightTarget(w, h)
     let key = `${boxCount};${minX},${minY},${sizeX},${sizeY}`
-    for (const l of lampes) key += `;L${l.x},${l.y},${l.h},${l.portee},${l.intensite},${l.rvb.join('/')}`
+    for (const l of lampes)
+      key += `;L${l.x},${l.y},${l.h},${l.portee},${l.intensite},${l.rvb.join('/')}`
     for (let i = 0; i < boxCount; i++) {
       const bx = boxes[i]
       key += `;${bx.minX},${bx.minY},${bx.maxX},${bx.maxY},${bx.angle ?? 0},${bx.material},${bx.forme ?? 0},${bx.p0 ?? 0},${bx.p1 ?? 0}`
@@ -2040,7 +2296,18 @@ export class Renderer {
   }
 
   private remplitLampes(
-    lampes: { x: number; y: number; h: number; portee: number; intensite: number; rvb: [number, number, number] }[],
+    lampes: {
+      x: number
+      y: number
+      h: number
+      portee: number
+      intensite: number
+      rvb: [number, number, number]
+      taille: number
+      bandeau: boolean
+      demiLong: number
+      angleRad: number
+    }[],
   ): void {
     for (let i = 0; i < lampes.length && i < MAX_LUMIERES; i++) {
       this.lampScratch[i * 4] = lampes[i].x
@@ -2051,6 +2318,10 @@ export class Renderer {
       this.lampColScratch[i * 3] = lampes[i].rvb[0]
       this.lampColScratch[i * 3 + 1] = lampes[i].rvb[1]
       this.lampColScratch[i * 3 + 2] = lampes[i].rvb[2]
+      this.lampFixScratch[i * 4] = lampes[i].taille
+      this.lampFixScratch[i * 4 + 1] = lampes[i].bandeau ? 1 : 0
+      this.lampFixScratch[i * 4 + 2] = lampes[i].demiLong
+      this.lampFixScratch[i * 4 + 3] = lampes[i].angleRad
     }
   }
 
@@ -2104,8 +2375,12 @@ export class Renderer {
       let q1 = 0
       if (forme === FORME_COIN) q0 = ((Math.round(bx.p0 ?? 0) % 4) + 4) % 4
       else if (forme === FORME_ARC) {
-        q0 = Math.round(Math.min(1, Math.max(0.08, bx.p0 ?? ARC_EPAISSEUR_DEFAUT)) * 100)
-        q1 = Math.round(Math.min(180, Math.max(15, bx.p1 ?? ARC_OUVERTURE_DEFAUT)))
+        q0 = Math.round(
+          Math.min(1, Math.max(0.08, bx.p0 ?? ARC_EPAISSEUR_DEFAUT)) * 100,
+        )
+        q1 = Math.round(
+          Math.min(180, Math.max(15, bx.p1 ?? ARC_OUVERTURE_DEFAUT)),
+        )
       }
       this.auxScratch[i * 4] = bx.material + forme * 16 + q0 * 128 + q1 * 16384
       this.auxScratch[i * 4 + 1] = ((bx.angle ?? 0) * Math.PI) / 180
@@ -2160,7 +2435,8 @@ export class Renderer {
     gl.uniform2f(su['uCenter'], camera.x, camera.y)
     gl.uniform2f(su['uViewport'], viewportW, viewportH)
     gl.uniform1f(su['uZoom'], camera.zoom)
-    const pointSize = ((params.particleRenderRadius * 2 * camera.zoom * dpr) / down) * 1.0
+    const pointSize =
+      ((params.particleRenderRadius * 2 * camera.zoom * dpr) / down) * 1.0
     gl.uniform1f(su['uPointSize'], Math.max(1, pointSize))
     gl.uniform1f(su['uFieldScale'], this.fieldScale)
     gl.bindVertexArray(this.splatVao)
@@ -2185,8 +2461,16 @@ export class Renderer {
     gl.uniform1f(cu['uSoftness'], params.fieldSoftness)
     gl.uniform1f(cu['uFieldScale'], this.fieldScale)
     const b = sim.bounds
-    gl.uniform2f(cu['uRoomCenter'], (b.minX + b.maxX) * 0.5, (b.minY + b.maxY) * 0.5)
-    gl.uniform2f(cu['uRoomHalf'], (b.maxX - b.minX) * 0.5, (b.maxY - b.minY) * 0.5)
+    gl.uniform2f(
+      cu['uRoomCenter'],
+      (b.minX + b.maxX) * 0.5,
+      (b.minY + b.maxY) * 0.5,
+    )
+    gl.uniform2f(
+      cu['uRoomHalf'],
+      (b.maxX - b.minX) * 0.5,
+      (b.maxY - b.minY) * 0.5,
+    )
     gl.uniform1i(cu['uBoxCount'], boxCount)
     gl.uniform4fv(cu['uBoxes[0]'], this.boxScratch)
     gl.uniform4fv(cu['uBoxAux[0]'], this.auxScratch)
@@ -2194,8 +2478,14 @@ export class Renderer {
     gl.uniform1f(cu['uExitRadius'], params.exitRadius)
     // les auras dessinées suivent la physique refroidie (mêmes formules que
     // le solveur) : le danger se lit toujours à sa vraie portée
-    gl.uniform1f(cu['uColdBand'], params.coldBand * (1 + params.chillColdGrowth * chill))
-    gl.uniform1f(cu['uHeatBand'], Math.max(0, params.heatBand * (1 - params.chillHeatFade * chill)))
+    gl.uniform1f(
+      cu['uColdBand'],
+      params.coldBand * (1 + params.chillColdGrowth * chill),
+    )
+    gl.uniform1f(
+      cu['uHeatBand'],
+      Math.max(0, params.heatBand * (1 - params.chillHeatFade * chill)),
+    )
     gl.uniform1f(cu['uHydroBand'], params.hydroBand)
     gl.uniform1f(cu['uChill'], chill)
     gl.uniform1f(cu['uDecor'], decor)
@@ -2206,17 +2496,24 @@ export class Renderer {
     gl.uniform1f(cu['uAmbiante'], ambiante)
     gl.uniform1f(cu['uRelief'], relief)
     // le volume n'a de lumière à recevoir que si la pièce en a une
-    gl.uniform1f(cu['uLumiereEau'], lumiere > 0.5 && lumiereEau > 0.5 && this.lightTex ? 1 : 0)
+    gl.uniform1f(
+      cu['uLumiereEau'],
+      lumiere > 0.5 && lumiereEau > 0.5 && this.lightTex ? 1 : 0,
+    )
     this.remplitLampes(lampes)
     gl.uniform1i(cu['uLampeCount'], lampes.length)
     gl.uniform4fv(cu['uLampes[0]'], this.lampScratch)
     gl.uniform1fv(cu['uLampesInt[0]'], this.lampIntScratch)
     gl.uniform3fv(cu['uLampesCol[0]'], this.lampColScratch)
-    // le luminaire ne se dessine que pour les lampes posées à l'éditeur —
-    // la lampe par défaut n'a pas de corps, elle est l'éclairage de la cuve
-    gl.uniform1f(cu['uLampeFixtures'], lumieres.length > 0 ? 1 : 0)
+    // le luminaire par lampe : taille (0 : aucun corps — c'est le cas de la
+    // lampe par défaut), forme bandeau, demi-longueur, angle
+    gl.uniform4fv(cu['uLampesFix[0]'], this.lampFixScratch)
     gl.uniform2f(cu['uLightMapMin'], this.lightMapMinX, this.lightMapMinY)
-    gl.uniform2f(cu['uLightMapInvSize'], 1 / this.lightMapSizeX, 1 / this.lightMapSizeY)
+    gl.uniform2f(
+      cu['uLightMapInvSize'],
+      1 / this.lightMapSizeX,
+      1 / this.lightMapSizeY,
+    )
     gl.uniform1i(cu['uWaveCount'], waveCount)
     gl.uniform4fv(cu['uWaves[0]'], waves)
     // Zones d'état : au plus MAX_ZONES par tableau
@@ -2228,7 +2525,13 @@ export class Renderer {
       this.zoneScratch[i * 4 + 2] = z.maxX
       this.zoneScratch[i * 4 + 3] = z.maxY
       this.zoneForceScratch[i] =
-        z.force === 'eau' ? 1 : z.force === 'glace' ? 2 : z.force === 'vapeur' ? 3 : 0
+        z.force === 'eau'
+          ? 1
+          : z.force === 'glace'
+            ? 2
+            : z.force === 'vapeur'
+              ? 3
+              : 0
       // les phases de la lisière : la même fonction que la mécanique
       const [p1, p2, p3] = zonePhases(z)
       this.zonePhaseScratch[i * 3] = p1
@@ -2241,7 +2544,12 @@ export class Renderer {
       gl.uniform1fv(cu['uZoneForce[0]'], this.zoneForceScratch)
       gl.uniform3fv(cu['uZonePhase[0]'], this.zonePhaseScratch)
     }
-    const bindTex = (unit: number, tex: WebGLTexture | null, sampler: string, flag: string) => {
+    const bindTex = (
+      unit: number,
+      tex: WebGLTexture | null,
+      sampler: string,
+      flag: string,
+    ) => {
       gl.activeTexture(gl.TEXTURE0 + unit)
       gl.bindTexture(gl.TEXTURE_2D, tex)
       gl.uniform1i(cu[sampler], unit)
@@ -2260,7 +2568,12 @@ export class Renderer {
     gl.activeTexture(gl.TEXTURE0 + 12)
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texZones)
     gl.uniform1i(cu['uTexZones'], 12)
-    gl.uniform3f(cu['uHasZones'], this.hasZones[0], this.hasZones[1], this.hasZones[2])
+    gl.uniform3f(
+      cu['uHasZones'],
+      this.hasZones[0],
+      this.hasZones[1],
+      this.hasZones[2],
+    )
     gl.activeTexture(gl.TEXTURE0 + 13)
     gl.bindTexture(gl.TEXTURE_2D, this.lightTex)
     gl.uniform1i(cu['uLightMap'], 13)
@@ -2285,7 +2598,12 @@ export class Renderer {
   // Quatre bandes de coque autour de la cuve, tube lumineux (bas de l'image,
   // v = 0 avec le flip) tourné vers l'intérieur. Les horizontales débordent
   // de l'épaisseur aux deux bouts et couvrent les angles.
-  private drawHull(sim: FluidSim, camera: Camera, viewportW: number, viewportH: number): void {
+  private drawHull(
+    sim: FluidSim,
+    camera: Camera,
+    viewportW: number,
+    viewportH: number,
+  ): void {
     if (!this.texHull) return
     const gl = this.gl
     const b = sim.bounds
@@ -2295,46 +2613,124 @@ export class Renderer {
     let o = 0
     // x0..x1 le long de la bande, « in » = bord intérieur (tube), « out » = bord extérieur
     const quad = (
-      ax: number, ay: number, au: number, av: number,
-      bx: number, by: number, bu: number, bv: number,
-      cx: number, cy: number, cu2: number, cv: number,
-      dx: number, dy: number, du: number, dv: number,
+      ax: number,
+      ay: number,
+      au: number,
+      av: number,
+      bx: number,
+      by: number,
+      bu: number,
+      bv: number,
+      cx: number,
+      cy: number,
+      cu2: number,
+      cv: number,
+      dx: number,
+      dy: number,
+      du: number,
+      dv: number,
     ) => {
-      data[o++] = ax; data[o++] = ay; data[o++] = au; data[o++] = av
-      data[o++] = bx; data[o++] = by; data[o++] = bu; data[o++] = bv
-      data[o++] = cx; data[o++] = cy; data[o++] = cu2; data[o++] = cv
-      data[o++] = ax; data[o++] = ay; data[o++] = au; data[o++] = av
-      data[o++] = cx; data[o++] = cy; data[o++] = cu2; data[o++] = cv
-      data[o++] = dx; data[o++] = dy; data[o++] = du; data[o++] = dv
+      data[o++] = ax
+      data[o++] = ay
+      data[o++] = au
+      data[o++] = av
+      data[o++] = bx
+      data[o++] = by
+      data[o++] = bu
+      data[o++] = bv
+      data[o++] = cx
+      data[o++] = cy
+      data[o++] = cu2
+      data[o++] = cv
+      data[o++] = ax
+      data[o++] = ay
+      data[o++] = au
+      data[o++] = av
+      data[o++] = cx
+      data[o++] = cy
+      data[o++] = cu2
+      data[o++] = cv
+      data[o++] = dx
+      data[o++] = dy
+      data[o++] = du
+      data[o++] = dv
     }
     const uLen = (len: number) => len / REP
     // haut : tube en y = maxY (v 0), extérieur en maxY + T (v 1)
     quad(
-      b.minX - T, b.maxY, 0, 0,
-      b.maxX + T, b.maxY, uLen(b.maxX - b.minX + 2 * T), 0,
-      b.maxX + T, b.maxY + T, uLen(b.maxX - b.minX + 2 * T), 1,
-      b.minX - T, b.maxY + T, 0, 1,
+      b.minX - T,
+      b.maxY,
+      0,
+      0,
+      b.maxX + T,
+      b.maxY,
+      uLen(b.maxX - b.minX + 2 * T),
+      0,
+      b.maxX + T,
+      b.maxY + T,
+      uLen(b.maxX - b.minX + 2 * T),
+      1,
+      b.minX - T,
+      b.maxY + T,
+      0,
+      1,
     )
     // bas : tube en y = minY
     quad(
-      b.minX - T, b.minY, 0, 0,
-      b.maxX + T, b.minY, uLen(b.maxX - b.minX + 2 * T), 0,
-      b.maxX + T, b.minY - T, uLen(b.maxX - b.minX + 2 * T), 1,
-      b.minX - T, b.minY - T, 0, 1,
+      b.minX - T,
+      b.minY,
+      0,
+      0,
+      b.maxX + T,
+      b.minY,
+      uLen(b.maxX - b.minX + 2 * T),
+      0,
+      b.maxX + T,
+      b.minY - T,
+      uLen(b.maxX - b.minX + 2 * T),
+      1,
+      b.minX - T,
+      b.minY - T,
+      0,
+      1,
     )
     // gauche : tube en x = minX
     quad(
-      b.minX, b.minY, 0, 0,
-      b.minX, b.maxY, uLen(b.maxY - b.minY), 0,
-      b.minX - T, b.maxY, uLen(b.maxY - b.minY), 1,
-      b.minX - T, b.minY, 0, 1,
+      b.minX,
+      b.minY,
+      0,
+      0,
+      b.minX,
+      b.maxY,
+      uLen(b.maxY - b.minY),
+      0,
+      b.minX - T,
+      b.maxY,
+      uLen(b.maxY - b.minY),
+      1,
+      b.minX - T,
+      b.minY,
+      0,
+      1,
     )
     // droite : tube en x = maxX
     quad(
-      b.maxX, b.minY, 0, 0,
-      b.maxX, b.maxY, uLen(b.maxY - b.minY), 0,
-      b.maxX + T, b.maxY, uLen(b.maxY - b.minY), 1,
-      b.maxX + T, b.minY, 0, 1,
+      b.maxX,
+      b.minY,
+      0,
+      0,
+      b.maxX,
+      b.maxY,
+      uLen(b.maxY - b.minY),
+      0,
+      b.maxX + T,
+      b.maxY,
+      uLen(b.maxY - b.minY),
+      1,
+      b.maxX + T,
+      b.minY,
+      0,
+      1,
     )
     gl.bindBuffer(gl.ARRAY_BUFFER, this.hullVbo)
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, data)
@@ -2389,7 +2785,11 @@ export class Renderer {
         gl.activeTexture(gl.TEXTURE1)
         gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
         gl.uniform1i(du['uField'], 1)
-        gl.uniform2f(du['uCanvasSize'], gl.drawingBufferWidth, gl.drawingBufferHeight)
+        gl.uniform2f(
+          du['uCanvasSize'],
+          gl.drawingBufferWidth,
+          gl.drawingBufferHeight,
+        )
         gl.uniform1f(du['uThreshold'], params.fieldThreshold)
         gl.uniform1f(du['uSoftness'], params.fieldSoftness)
         gl.uniform1f(du['uFieldScale'], this.fieldScale)
@@ -2430,7 +2830,13 @@ export class Renderer {
     }
   }
 
-  private drawSponges(sim: FluidSim, camera: Camera, viewportW: number, viewportH: number, dpr: number): void {
+  private drawSponges(
+    sim: FluidSim,
+    camera: Camera,
+    viewportW: number,
+    viewportH: number,
+    dpr: number,
+  ): void {
     let totalCells = 0
     for (const sp of sim.sponges) totalCells += sp.saturation.length
     if (totalCells === 0) return
@@ -2453,7 +2859,11 @@ export class Renderer {
       }
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, this.spongeVbo)
-    gl.bufferData(gl.ARRAY_BUFFER, data.subarray(0, totalCells * 3), gl.DYNAMIC_DRAW)
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      data.subarray(0, totalCells * 3),
+      gl.DYNAMIC_DRAW,
+    )
     gl.useProgram(this.spongeProgram)
     const su = this.uniforms['sponge']
     gl.uniform2f(su['uCenter'], camera.x, camera.y)

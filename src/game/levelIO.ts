@@ -30,7 +30,13 @@ import {
   type ZoneForce,
 } from './level'
 import { MAX_BOXES, MAX_LUMIERES, MAX_ZONES } from '../render/renderer'
-import { ARC_EPAISSEUR_DEFAUT, ARC_OUVERTURE_DEFAUT, FORME_ARC, FORME_COIN, FORME_RECT } from './formes'
+import {
+  ARC_EPAISSEUR_DEFAUT,
+  ARC_OUVERTURE_DEFAUT,
+  FORME_ARC,
+  FORME_COIN,
+  FORME_RECT,
+} from './formes'
 import { canalDeCible } from './laser'
 
 export const MATERIALS = [
@@ -101,8 +107,12 @@ function readBox(o: Record<string, unknown>): ObstacleBox | null {
     maxX: Math.max(minX, maxX),
     maxY: Math.max(minY, maxY),
     ...(angle ? { angle: Math.max(-180, Math.min(180, angle)) } : {}),
-    ...(aura !== 1 && material === MAT_CHAUD ? { aura: Math.max(0.25, Math.min(4, aura)) } : {}),
-    ...(skin > 0 && material === MAT_WALL && forme === FORME_RECT ? { skin: Math.min(8, skin) } : {}),
+    ...(aura !== 1 && material === MAT_CHAUD
+      ? { aura: Math.max(0.25, Math.min(4, aura)) }
+      : {}),
+    ...(skin > 0 && material === MAT_WALL && forme === FORME_RECT
+      ? { skin: Math.min(8, skin) }
+      : {}),
     ...(forme > FORME_RECT && forme <= FORME_ARC ? { forme } : {}),
     ...(forme === FORME_COIN && Math.round(p0) !== 0
       ? { p0: ((Math.round(p0) % 4) + 4) % 4 }
@@ -165,10 +175,16 @@ function readLabel(o: Record<string, unknown>): WorldLabel | null {
   // Pictogramme d'état (bible v3.1) : sans texte, mais jamais sans rien —
   // une étiquette est soit un texte, soit un pictogramme, soit les deux
   const p = (o.picto ?? null) as Record<string, unknown> | null
-  const note = (v: unknown): number => Math.max(0, Math.min(3, Math.round(num(v, 0))))
+  const note = (v: unknown): number =>
+    Math.max(0, Math.min(3, Math.round(num(v, 0))))
   const picto =
     p && /^#[0-9a-fA-F]{6}$/.test(str(p.couleur))
-      ? { couleur: str(p.couleur), eau: note(p.eau), glace: note(p.glace), vapeur: note(p.vapeur) }
+      ? {
+          couleur: str(p.couleur),
+          eau: note(p.eau),
+          glace: note(p.glace),
+          vapeur: note(p.vapeur),
+        }
       : undefined
   if (!text && !picto) return null
   const tone = str(o.tone, 'mur') as WorldLabel['tone']
@@ -186,7 +202,10 @@ function readLabel(o: Record<string, unknown>): WorldLabel | null {
  * Relit un tableau depuis du JSON. Renvoie le tableau et la liste des rejets
  * (une pièce mal formée est écartée, elle n'empêche pas de charger le reste).
  */
-export function parseLevel(input: unknown): { level: LevelDef | null; rejets: string[] } {
+export function parseLevel(input: unknown): {
+  level: LevelDef | null
+  rejets: string[]
+} {
   const rejets: string[] = []
   if (typeof input !== 'object' || input === null) {
     return { level: null, rejets: ['le document n’est pas un objet JSON'] }
@@ -200,7 +219,10 @@ export function parseLevel(input: unknown): { level: LevelDef | null; rejets: st
     maxY: num(b.maxY, 750),
   }
   if (bounds.maxX - bounds.minX < 200 || bounds.maxY - bounds.minY < 200) {
-    return { level: null, rejets: ['la cuve est trop petite (200 u minimum de côté)'] }
+    return {
+      level: null,
+      rejets: ['la cuve est trop petite (200 u minimum de côté)'],
+    }
   }
 
   const sp = (o.spawn ?? {}) as Record<string, unknown>
@@ -210,7 +232,10 @@ export function parseLevel(input: unknown): { level: LevelDef | null; rejets: st
   for (const raw of Array.isArray(o.boxes) ? o.boxes : []) {
     const box = readBox((raw ?? {}) as Record<string, unknown>)
     if (box) boxes.push(box)
-    else rejets.push('une surface a été écartée (matériau inconnu ou taille nulle)')
+    else
+      rejets.push(
+        'une surface a été écartée (matériau inconnu ou taille nulle)',
+      )
   }
 
   const sponges: SpongeDef[] = []
@@ -258,10 +283,16 @@ export function parseLevel(input: unknown): { level: LevelDef | null; rejets: st
     sponges,
     labels,
     zones: zones.length > 0 ? zones : undefined,
-    par: o.par === undefined ? undefined : Math.max(1, Math.round(num(o.par, 3))),
-    ambiante: o.ambiante === undefined ? undefined : Math.max(0, Math.min(1, num(o.ambiante, 0.52))),
+    par:
+      o.par === undefined ? undefined : Math.max(1, Math.round(num(o.par, 3))),
+    ambiante:
+      o.ambiante === undefined
+        ? undefined
+        : Math.max(0, Math.min(1, num(o.ambiante, 0.52))),
     dashBudget:
-      o.dashBudget === undefined ? undefined : Math.max(0, Math.round(num(o.dashBudget, 3))),
+      o.dashBudget === undefined
+        ? undefined
+        : Math.max(0, Math.round(num(o.dashBudget, 3))),
     ambiance: str(o.ambiance) || undefined,
     raccourciVers: str(o.raccourciVers).slice(0, 16) || undefined,
     cineAvant: str(o.cineAvant).trim().slice(0, 24) || undefined,
@@ -295,9 +326,10 @@ export function parseLevel(input: unknown): { level: LevelDef | null; rejets: st
       h,
       kind,
       flip: d.flip === true ? true : undefined,
-      fade: typeof d.fade === 'number' && Number.isFinite(d.fade)
-        ? Math.min(1, Math.max(0, d.fade))
-        : undefined,
+      fade:
+        typeof d.fade === 'number' && Number.isFinite(d.fade)
+          ? Math.min(1, Math.max(0, d.fade))
+          : undefined,
     })
   }
   if (decals.length > 0) level.decals = decals
@@ -311,14 +343,22 @@ export function parseLevel(input: unknown): { level: LevelDef | null; rejets: st
       rejets.push('un émetteur laser a été écarté (angle manquant)')
       continue
     }
-    lasers.push({ x: num(l.x, 0), y: num(l.y, 0), angle: ((angle % 360) + 360) % 360 })
+    lasers.push({
+      x: num(l.x, 0),
+      y: num(l.y, 0),
+      angle: ((angle % 360) + 360) % 360,
+    })
   }
   if (lasers.length > 0) level.lasers = lasers
 
   const cibles: CibleDef[] = []
   for (const raw of Array.isArray(o.cibles) ? o.cibles : []) {
     const c = (raw ?? {}) as Record<string, unknown>
-    const cible: CibleDef = { x: num(c.x, 0), y: num(c.y, 0), r: Math.max(8, num(c.r, 26)) }
+    const cible: CibleDef = {
+      x: num(c.x, 0),
+      y: num(c.y, 0),
+      r: Math.max(8, num(c.r, 26)),
+    }
     // récepteur NOR (à maintien, la coupure scelle) — tout le reste est TOR
     if (c.mode === 'nor') cible.mode = 'nor'
     // le n° logique (canal) : conservé s'il est explicite et valable ;
@@ -393,8 +433,23 @@ export function parseLevel(input: unknown): { level: LevelDef | null; rejets: st
         ? { h: Math.max(LAMPE_HAUTEUR_MIN, Math.min(LAMPE_HAUTEUR_MAX, h)) }
         : {}),
       ...(portee > 0 ? { portee: Math.max(200, Math.min(8000, portee)) } : {}),
-      ...(intensite !== 1 ? { intensite: Math.max(0.2, Math.min(2, intensite)) } : {}),
-      ...(lampeCouleurRVB(couleur) && couleur !== LAMPE_COULEUR_DEFAUT ? { couleur } : {}),
+      ...(intensite !== 1
+        ? { intensite: Math.max(0.2, Math.min(2, intensite)) }
+        : {}),
+      ...(lampeCouleurRVB(couleur) && couleur !== LAMPE_COULEUR_DEFAUT
+        ? { couleur }
+        : {}),
+      // le luminaire (l'objet visible) : mêmes règles — le défaut efface la clé
+      ...(num(l.taille, 1) !== 1
+        ? { taille: Math.max(0, Math.min(3, num(l.taille, 1))) }
+        : {}),
+      ...(str(l.forme, '') === 'bandeau' ? { forme: 'bandeau' as const } : {}),
+      ...(str(l.forme, '') === 'bandeau' && num(l.longueur, 260) !== 260
+        ? { longueur: Math.max(80, Math.min(1600, num(l.longueur, 260))) }
+        : {}),
+      ...(str(l.forme, '') === 'bandeau' && num(l.angle, 0) !== 0
+        ? { angle: ((num(l.angle, 0) % 360) + 360) % 360 }
+        : {}),
     })
   }
   if (lumieres.length > 0) level.lumieres = lumieres
@@ -461,7 +516,10 @@ export function checkLevel(level: LevelDef): Verdict[] {
     x > b.minX && x < b.maxX && y > b.minY && y < b.maxY
 
   if (!inBounds(level.spawn.x, level.spawn.y)) {
-    v.push({ niveau: 'erreur', message: 'Le point de départ est hors de la cuve.' })
+    v.push({
+      niveau: 'erreur',
+      message: 'Le point de départ est hors de la cuve.',
+    })
   }
   for (const box of level.boxes) {
     const near =
@@ -472,29 +530,42 @@ export function checkLevel(level: LevelDef): Verdict[] {
     if (near) {
       v.push({
         niveau: 'erreur',
-        message: 'Le point de départ naît dans une surface (120 u de dégagement exigés).',
+        message:
+          'Le point de départ naît dans une surface (120 u de dégagement exigés).',
       })
       break
     }
   }
 
   const ex = level.exit
-  if (ex.minX < b.minX || ex.maxX > b.maxX || ex.minY < b.minY || ex.maxY > b.maxY) {
+  if (
+    ex.minX < b.minX ||
+    ex.maxX > b.maxX ||
+    ex.minY < b.minY ||
+    ex.maxY > b.maxY
+  ) {
     v.push({ niveau: 'erreur', message: 'Le sas déborde de la cuve.' })
   }
   if (ex.maxX - ex.minX < 40 || ex.maxY - ex.minY < 40) {
-    v.push({ niveau: 'erreur', message: 'Le sas est trop petit (40 u minimum).' })
+    v.push({
+      niveau: 'erreur',
+      message: 'Le sas est trop petit (40 u minimum).',
+    })
   }
   const cx = (ex.minX + ex.maxX) / 2
   if (Math.abs(cx - level.spawn.x) < 800) {
     v.push({
       niveau: 'avertissement',
-      message: 'Le sas est à moins de 800 u du départ : il n’y a presque pas de traversée.',
+      message:
+        'Le sas est à moins de 800 u du départ : il n’y a presque pas de traversée.',
     })
   }
 
   if (level.boxes.length + level.sponges.length === 0) {
-    v.push({ niveau: 'avertissement', message: 'Le tableau est vide : aucun obstacle.' })
+    v.push({
+      niveau: 'avertissement',
+      message: 'Le tableau est vide : aucun obstacle.',
+    })
   }
   // Budgets de rendu : la physique voit tous les éléments, mais le décor n'en
   // dessine qu'un nombre borné — au-delà, des blocs (ou zones) deviennent des
@@ -519,7 +590,11 @@ export function checkLevel(level: LevelDef): Verdict[] {
   }
   for (const lum of level.lumieres ?? []) {
     if (!inBounds(lum.x, lum.y)) {
-      v.push({ niveau: 'avertissement', message: 'Une lampe est hors de la cuve : elle éclairera depuis le vide.' })
+      v.push({
+        niveau: 'avertissement',
+        message:
+          'Une lampe est hors de la cuve : elle éclairera depuis le vide.',
+      })
       break
     }
   }
@@ -541,7 +616,8 @@ export function checkLevel(level: LevelDef): Verdict[] {
   if ((level.lasers?.length ?? 0) > 0 && nCibles === 0) {
     v.push({
       niveau: 'avertissement',
-      message: 'Un émetteur laser sans cible : le faisceau éclaire, mais n’ouvre rien.',
+      message:
+        'Un émetteur laser sans cible : le faisceau éclaire, mais n’ouvre rien.',
     })
   }
   if (nCibles > 0 && (level.lasers?.length ?? 0) === 0) {
@@ -552,7 +628,10 @@ export function checkLevel(level: LevelDef): Verdict[] {
   }
   for (const l of level.lasers ?? []) {
     if (!inBounds(l.x, l.y)) {
-      v.push({ niveau: 'erreur', message: 'Un émetteur laser est hors de la cuve.' })
+      v.push({
+        niveau: 'erreur',
+        message: 'Un émetteur laser est hors de la cuve.',
+      })
     }
   }
   // Rails : un rail sans émetteur ne guidera jamais rien, et un rail hors
@@ -565,7 +644,10 @@ export function checkLevel(level: LevelDef): Verdict[] {
   }
   for (const r of level.rails ?? []) {
     if (r.points.some((p) => !inBounds(p.x, p.y))) {
-      v.push({ niveau: 'erreur', message: 'Un rail magnétique sort de la cuve.' })
+      v.push({
+        niveau: 'erreur',
+        message: 'Un rail magnétique sort de la cuve.',
+      })
     }
   }
   if (level.journal.trim().length < 40) {
@@ -575,7 +657,10 @@ export function checkLevel(level: LevelDef): Verdict[] {
     })
   }
   if (!level.labels.some((l) => l.tone === 'sas')) {
-    v.push({ niveau: 'avertissement', message: 'Aucune étiquette ne désigne le sas.' })
+    v.push({
+      niveau: 'avertissement',
+      message: 'Aucune étiquette ne désigne le sas.',
+    })
   }
 
   // Une zone qui impose la vapeur sans radiateur, ou la glace sans hublot,
@@ -586,7 +671,8 @@ export function checkLevel(level: LevelDef): Verdict[] {
     if (z.force === 'vapeur' && !hasChaud) {
       v.push({
         niveau: 'avertissement',
-        message: 'Une zone impose la vapeur alors qu’aucun radiateur n’en fournit.',
+        message:
+          'Une zone impose la vapeur alors qu’aucun radiateur n’en fournit.',
       })
       break
     }
@@ -595,19 +681,22 @@ export function checkLevel(level: LevelDef): Verdict[] {
     if (z.force === 'glace' && !hasFroid) {
       v.push({
         niveau: 'avertissement',
-        message: 'Une zone impose la glace alors qu’aucun hublot froid n’en donne.',
+        message:
+          'Une zone impose la glace alors qu’aucun hublot froid n’en donne.',
       })
       break
     }
   }
 
   const grilleSansVapeur =
-    level.boxes.some((x) => x.material === MAT_GRILLE) && !hasChaud &&
+    level.boxes.some((x) => x.material === MAT_GRILLE) &&
+    !hasChaud &&
     !(level.zones ?? []).some((z) => z.force === 'vapeur')
   if (grilleSansVapeur) {
     v.push({
       niveau: 'avertissement',
-      message: 'Un évent barre la route sans radiateur ni zone vapeur pour le franchir.',
+      message:
+        'Un évent barre la route sans radiateur ni zone vapeur pour le franchir.',
     })
   }
 
@@ -617,7 +706,8 @@ export function checkLevel(level: LevelDef): Verdict[] {
   if (!chimie && level.sponges.length === 0 && level.boxes.length > 0) {
     v.push({
       niveau: 'avertissement',
-      message: 'Aucune chimie ni éponge : les obstacles ne sont que de la géométrie.',
+      message:
+        'Aucune chimie ni éponge : les obstacles ne sont que de la géométrie.',
     })
   }
 
