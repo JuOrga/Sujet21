@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '20/08/2026 21:45',
+    title:
+      'Les luminaires générés sont intégrés : plafonnier et bande en vrai métal',
+    notes: [
+      'Les deux assets du concepteur sont en place : lampe-plafonnier.webp (512×512) et lampe-bande.webp (1024×256), recadrés au contenu et normalisés. Le jeu les dessine à la position de chaque lampe posée — taille et rotation automatiques, au-dessus de l’eau — à la place du dessin procédural, qui disparaît.',
+      'Le principe voulu est respecté : on voit le DOS métallique de la lampe (dôme à boulon central pour le plafonnier, rail à pattes et embouts pour la bande), et la lumière visible autour est l’éclairage réel — la flaque au sol, le couloir de la bande. Vérifié en capture sur le hub compact.',
+    ],
+  },
+  {
     date: '20/08/2026 20:45',
     title:
       'Les échos d’ombre effacés, les ombres cuites adoucies, et des sprites pour les luminaires',
