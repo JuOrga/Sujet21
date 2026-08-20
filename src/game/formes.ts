@@ -204,7 +204,10 @@ function coinContactAxe(
   const arete = (x0: number, y0: number, x1: number, y1: number): void => {
     const ex = x1 - x0
     const ey = y1 - y0
-    const t = Math.min(1, Math.max(0, ((x - x0) * ex + (y - y0) * ey) / (ex * ex + ey * ey || 1)))
+    const t = Math.min(
+      1,
+      Math.max(0, ((x - x0) * ex + (y - y0) * ey) / (ex * ex + ey * ey || 1)),
+    )
     const px = x0 + t * ex
     const py = y0 + t * ey
     const d2 = (x - px) * (x - px) + (y - py) * (y - py)
@@ -229,8 +232,11 @@ function coinContactAxe(
   }
 }
 
-/** Les rayons de l'arc : centre = centre de boîte, rayon extérieur = le plus
- *  petit demi-côté (l'arc reste circulaire, la boîte peut le déborder). */
+/** L'arc en géométrie UNITAIRE (rayon extérieur 1) + les ÉCHELLES qui le
+ *  font remplir la boîte : la boîte est la boîte englobante EXACTE de
+ *  l'arc — étiré en ellipse s'il le faut, comme le disque. Fini la moitié
+ *  de boîte vide au-dessus d'un demi-anneau (signalé : les coins de la
+ *  boîte collent désormais à l'arc, petit ou grand). */
 export function arcRayons(b: {
   minX: number
   minY: number
@@ -238,63 +244,100 @@ export function arcRayons(b: {
   maxY: number
   p0?: number
   p1?: number
-}): { rm: number; ht: number; ouverture: number } {
-  const R = Math.max(1e-6, Math.min((b.maxX - b.minX) / 2, (b.maxY - b.minY) / 2))
+}): {
+  rm: number
+  ht: number
+  ouverture: number
+  cu: number
+  sx: number
+  sy: number
+} {
   const t = Math.min(1, Math.max(0.08, b.p0 ?? ARC_EPAISSEUR_DEFAUT))
-  const ri = R * (1 - t)
+  const ouverture =
+    (Math.min(180, Math.max(15, b.p1 ?? ARC_OUVERTURE_DEFAUT)) * Math.PI) / 180
+  const rm = 1 - t / 2
+  const ht = t / 2
+  // la boîte englobante de l'arc unitaire : [xmin..1] × [-ymax..ymax]
+  const xmin = rm * Math.cos(ouverture) - ht // la calotte déborde toujours
+  const ymax = ouverture < Math.PI / 2 ? rm * Math.sin(ouverture) + ht : 1
   return {
-    rm: (R + ri) / 2,
-    ht: (R - ri) / 2,
-    ouverture: (Math.min(180, Math.max(15, b.p1 ?? ARC_OUVERTURE_DEFAUT)) * Math.PI) / 180,
+    rm,
+    ht,
+    ouverture,
+    cu: (xmin + 1) / 2, // centre x de cette boîte unitaire
+    sx: Math.max(1e-6, (b.maxX - b.minX) / (1 - xmin)),
+    sy: Math.max(1e-6, (b.maxY - b.minY) / (2 * ymax)),
   }
 }
 
 // Arc d'anneau aux bouts ronds : bande radiale sur ±ouverture autour de +x
-// (la rotation de la boîte oriente l'arc), calottes circulaires aux deux
-// extrémités. À épaisseur 1, l'anneau se referme sur son centre : camembert.
+// (la rotation de la boîte oriente l'arc), calottes aux extrémités. Évalué
+// en espace UNITAIRE puis remis à l'échelle de la boîte — même approche (et
+// même approximation de distance) que l'ellipse : le gradient est exact, la
+// distance légèrement compressée sur les arcs très étirés.
 function arcContactAxe(
   x: number,
   y: number,
-  b: { minX: number; minY: number; maxX: number; maxY: number; p0?: number; p1?: number },
+  b: {
+    minX: number
+    minY: number
+    maxX: number
+    maxY: number
+    p0?: number
+    p1?: number
+  },
   out: FormeContact,
 ): void {
-  const { rm, ht, ouverture } = arcRayons(b)
-  const px = x - (b.minX + b.maxX) / 2
-  const py = y - (b.minY + b.maxY) / 2
-  const L = Math.hypot(px, py)
-  const th = Math.atan2(py, px)
+  const { rm, ht, ouverture, cu, sx, sy } = arcRayons(b)
+  const qx = (x - (b.minX + b.maxX) / 2) / sx + cu
+  const qy = (y - (b.minY + b.maxY) / 2) / sy
+  const L = Math.hypot(qx, qy)
+  const th = Math.atan2(qy, qx)
+  let dU: number
+  let nx: number
+  let ny: number
   if (Math.abs(th) <= ouverture) {
     const dr = L - rm
-    out.dist = Math.abs(dr) - ht
+    dU = Math.abs(dr) - ht
     if (L > 1e-9) {
-      const s = dr >= 0 ? 1 : -1
-      out.nx = (s * px) / L
-      out.ny = (s * py) / L
+      const sgn = dr >= 0 ? 1 : -1
+      nx = (sgn * qx) / L
+      ny = (sgn * qy) / L
     } else {
-      out.nx = 0
-      out.ny = 1
+      nx = 0
+      ny = 1
     }
-    return
-  }
-  const ca = th >= 0 ? ouverture : -ouverture
-  const ex = rm * Math.cos(ca)
-  const ey = rm * Math.sin(ca)
-  const dx = px - ex
-  const dy = py - ey
-  const d = Math.hypot(dx, dy)
-  out.dist = d - ht
-  if (d > 1e-9) {
-    out.nx = dx / d
-    out.ny = dy / d
   } else {
-    out.nx = 0
-    out.ny = 1
+    const ca = th >= 0 ? ouverture : -ouverture
+    const dx = qx - rm * Math.cos(ca)
+    const dy = qy - rm * Math.sin(ca)
+    const d = Math.hypot(dx, dy)
+    dU = d - ht
+    if (d > 1e-9) {
+      nx = dx / d
+      ny = dy / d
+    } else {
+      nx = 0
+      ny = 1
+    }
   }
+  // retour au monde : gradient transformé par l'inverse des échelles
+  const gx = nx / sx
+  const gy = ny / sy
+  const gl = Math.hypot(gx, gy) || 1e-9
+  out.dist = dU / gl
+  out.nx = gx / gl
+  out.ny = gy / gl
 }
 
 // ---- Le dispatch : dépivoter, résoudre en local, repivoter la normale ------
 
-function formeContactAxe(x: number, y: number, b: FormeBox, out: FormeContact): void {
+function formeContactAxe(
+  x: number,
+  y: number,
+  b: FormeBox,
+  out: FormeContact,
+): void {
   switch (b.forme ?? FORME_RECT) {
     case FORME_DISQUE:
       disqueContactAxe(x, y, b, out)
@@ -315,7 +358,12 @@ function formeContactAxe(x: number, y: number, b: FormeBox, out: FormeContact): 
 
 /** Contact signé contre n'importe quelle forme, rotation comprise — le même
  *  contrat que le boxContact historique. */
-export function formeContact(x: number, y: number, b: FormeBox, out: FormeContact): void {
+export function formeContact(
+  x: number,
+  y: number,
+  b: FormeBox,
+  out: FormeContact,
+): void {
   if (b.angle) {
     const cx = (b.minX + b.maxX) / 2
     const cy = (b.minY + b.maxY) / 2
@@ -360,7 +408,10 @@ export function dansForme(b: FormeBox, x: number, y: number): boolean {
 
 /** Le contour de la forme en coordonnées MONDE (rotation comprise) : ce que
  *  l'éditeur trace en lineTo est ce que le shader évalue en SDF. */
-export function formeOutline(b: FormeBox, steps = 48): { x: number; y: number }[] {
+export function formeOutline(
+  b: FormeBox,
+  steps = 48,
+): { x: number; y: number }[] {
   const cx = (b.minX + b.maxX) / 2
   const cy = (b.minY + b.maxY) / 2
   const pts: { x: number; y: number }[] = []
@@ -396,31 +447,31 @@ export function formeOutline(b: FormeBox, steps = 48): { x: number; y: number }[
     const [ax, ay, bx, by, cx2, cy2] = coinSommets(b)
     pts.push({ x: ax, y: ay }, { x: bx, y: by }, { x: cx2, y: cy2 })
   } else if (f === FORME_ARC) {
-    const { rm, ht, ouverture } = arcRayons(b)
+    const { rm, ht, ouverture, cu, sx, sy } = arcRayons(b)
+    const monde = (ux: number, uy: number): { x: number; y: number } => ({
+      x: cx + (ux - cu) * sx,
+      y: cy + uy * sy,
+    })
     const n = Math.max(8, Math.floor(steps / 2))
     const ro = rm + ht
     const ri = Math.max(0, rm - ht)
-    // rayon extérieur de -ouverture à +ouverture
     for (let i = 0; i <= n; i++) {
       const t = -ouverture + (i / n) * 2 * ouverture
-      pts.push({ x: cx + ro * Math.cos(t), y: cy + ro * Math.sin(t) })
+      pts.push(monde(ro * Math.cos(t), ro * Math.sin(t)))
     }
-    // calotte du bout +ouverture : demi-cercle du bord extérieur au bord
-    // intérieur, bombé vers l'extérieur de l'arc (tangente +90°)
     const capN = 6
     const cap = (phi: number, depart: number): void => {
-      const ex = cx + rm * Math.cos(phi)
-      const ey = cy + rm * Math.sin(phi)
+      const ex = rm * Math.cos(phi)
+      const ey = rm * Math.sin(phi)
       for (let i = 1; i < capN; i++) {
         const t = depart + (i / capN) * Math.PI
-        pts.push({ x: ex + ht * Math.cos(t), y: ey + ht * Math.sin(t) })
+        pts.push(monde(ex + ht * Math.cos(t), ey + ht * Math.sin(t)))
       }
     }
     cap(ouverture, ouverture)
-    // rayon intérieur, au retour
     for (let i = n; i >= 0; i--) {
       const t = -ouverture + (i / n) * 2 * ouverture
-      pts.push({ x: cx + ri * Math.cos(t), y: cy + ri * Math.sin(t) })
+      pts.push(monde(ri * Math.cos(t), ri * Math.sin(t)))
     }
     cap(-ouverture, -ouverture + Math.PI)
   } else {

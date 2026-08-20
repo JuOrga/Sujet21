@@ -1193,13 +1193,39 @@ export class LevelEditor {
         const gagnant = this.cutWinner
         const nomG = this.nomCible(gagnant)
         const nomP = this.nomCible(cible)
+        // Quand le rognage exact n'existe pas (forme, oblique, angles
+        // différents), la Superposition fait ce qu'elle promet AUTREMENT :
+        // le gagnant passe au PREMIER PLAN — dessiné par-dessus le perdant,
+        // matière des deux intacte. C'est le rendu qu'on cherchait en
+        // rognant, sans mutiler la géométrie.
+        const premierPlan = (): void => {
+          if (gagnant.kind !== 'box' || cible.kind !== 'box') return
+          const gi = gagnant.index
+          const ci = cible.index
+          if (gi < ci) {
+            const [g] = this.level.boxes.splice(gi, 1)
+            this.level.boxes.splice(ci, 0, g) // ci a reculé d'un cran : g atterrit APRÈS le perdant
+            this.sel = { kind: 'box', index: ci }
+          } else {
+            this.sel = { kind: 'box', index: gi }
+          }
+          this.cutWinner = null
+          this.setTool({ kind: 'select' })
+          this.commit(
+            `Rognage exact impossible entre ces pièces — ${nomG} passe au PREMIER PLAN (dessinée par-dessus ${nomP}), la matière des deux reste intacte.`,
+          )
+        }
         // L'empreinte du GAGNANT : le rectangle qu'il retire au perdant. Une
         // paroi oblique ou en forme n'a pas d'empreinte rectangulaire — on
         // refuse plutôt que de ronger à côté.
         const empreinte = this.empreinteCible(gagnant)
         if (!empreinte) {
+          if (gagnant.kind === 'box' && cible.kind === 'box') {
+            premierPlan()
+            return
+          }
           this.status(
-            'Superposition : la pièce du dessus est oblique ou en forme — son empreinte n’est pas un rectangle. Utilisez la GOMME pour effacer librement.',
+            'Superposition : la pièce du dessus est oblique ou en forme, et une éponge ne peut pas passer dessous. Utilisez la GOMME pour effacer librement.',
           )
           return
         }
@@ -1237,12 +1263,7 @@ export class LevelEditor {
               ? null
               : subtractBox(perdante, empreinte)
         if (!morceaux) {
-          this.status(
-            perdante.forme ||
-              (gagnant.kind === 'box' && this.level.boxes[gagnant.index].forme)
-              ? 'Superposition : une des deux pièces est une FORME (disque, capsule, coin, arc) — le rognage exact n’existe qu’entre rectangles. Utilisez la GOMME pour effacer librement.'
-              : 'Superposition : angles différents — le rognage exact n’existe qu’entre parois de même angle. Utilisez la GOMME pour effacer librement.',
-          )
+          premierPlan()
           return
         }
         const intacte =
