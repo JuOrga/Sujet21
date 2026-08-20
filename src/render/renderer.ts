@@ -168,17 +168,35 @@ float formeSdf(vec2 w, vec4 b, float forme, float q0, float q1) {
                       vec2(dot(pq2, pq2), s * (v2.x * e2.y - v2.y * e2.x)));
     return -sqrt(dd.x) * sign(dd.y);
   }
-  // arc d'anneau aux bouts ronds : rayon = le petit demi-côté, épaisseur
-  // q0/100, demi-ouverture q1 (°) autour de +x — à épaisseur 1 : camembert
-  float R = min(half_.x, half_.y);
+  // arc d'anneau aux bouts ronds — la boîte est sa boîte englobante EXACTE :
+  // l'arc s'étire en ellipse pour la remplir (miroir de arcRayons/
+  // arcContactAxe, même approximation de distance que l'ellipse).
   float ep = clamp(q0 / 100.0, 0.08, 1.0);
-  float rm = R * (1.0 - ep * 0.5);
-  float ht = R * ep * 0.5;
   float ouv = radians(q1);
-  float th = atan(p.y, p.x);
-  if (abs(th) <= ouv) return abs(length(p) - rm) - ht;
-  vec2 e = rm * vec2(cos(ouv), sin(ouv) * sign(th));
-  return length(p - e) - ht;
+  float rm = 1.0 - ep * 0.5;
+  float ht = ep * 0.5;
+  float xminU = rm * cos(ouv) - ht;
+  float ymaxU = ouv < 1.5707963 ? rm * sin(ouv) + ht : 1.0;
+  float cu = (xminU + 1.0) * 0.5;
+  vec2 sxy = vec2(2.0 * half_.x / (1.0 - xminU), half_.y / ymaxU);
+  vec2 q = p / sxy + vec2(cu, 0.0);
+  float L = length(q);
+  float th = atan(q.y, q.x);
+  float dU;
+  vec2 nU;
+  if (abs(th) <= ouv) {
+    float dr = L - rm;
+    dU = abs(dr) - ht;
+    nU = L > 1e-9 ? sign(dr) * q / L : vec2(0.0, 1.0);
+  } else {
+    vec2 e = rm * vec2(cos(ouv), sin(ouv) * sign(th));
+    vec2 dv = q - e;
+    float d = length(dv);
+    dU = d - ht;
+    nU = d > 1e-9 ? dv / d : vec2(0.0, 1.0);
+  }
+  vec2 g = nU / sxy;
+  return dU / max(length(g), 1e-9);
 }`
 
 const COMPOSE_FS = `#version 300 es

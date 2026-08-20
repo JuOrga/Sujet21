@@ -14,6 +14,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '20/08/2026 23:30',
+    title:
+      'L’arc remplit enfin sa boîte, et la Superposition ne refuse plus les formes',
+    notes: [
+      'L’ARC laissait la moitié de sa boîte vide (signalé en capture : un demi-anneau blotti en bas, tout le haut mort — et les poignées de sélection à des kilomètres de la matière). La boîte est désormais sa boîte englobante EXACTE : l’arc s’étire en ellipse pour la remplir, comme le disque — petit, grand, étiré, les quatre bords touchent la matière. Redimensionner la boîte sculpte l’arc directement. ATTENTION : les arcs déjà posés dans des tableaux changent de silhouette — ils grossissent pour remplir leur boîte ; un coup d’œil aux tableaux qui en utilisent s’impose.',
+      'LA SUPERPOSITION ne refuse plus les formes et les obliques : quand le rognage exact n’existe pas (disque, capsule, coin, arc, angles différents — le modèle de données ne sait découper que des rectangles), le gagnant passe au PREMIER PLAN — dessiné par-dessus le perdant, matière des deux intacte. C’est le rendu qu’on cherchait en rognant, sans mutiler la géométrie. Entre rectangles de même angle, le vrai rognage reste.',
+      'LA GOMME EN FORME (arc, cercle, capsule…) reste à faire : effacer une découpe courbe dans une paroi exige de la géométrie soustractive dans tout le moteur (solveur, lumière, laser, rendu) — c’est un chantier à part, noté. Aujourd’hui la gomme rectangulaire ronge les rectangles et efface les formes qu’elle couvre en entier.',
+    ],
+  },
+  {
     date: '20/08/2026 22:30',
     title:
       'L’ombre du corps respecte enfin les murs : une lampe murée ne projette plus rien',
