@@ -1386,12 +1386,405 @@ export const TABLEAU_S3: LevelDef = {
 // file d'essai des salles, et proposées à l'éditeur comme tout le reste.
 export const TABLEAUX_ECOLE: LevelDef[] = [TABLEAU_S1, TABLEAU_S2, TABLEAU_S3]
 
-// L'ordre de la partie : chaque tableau enseigne une chose, les derniers
-// les combinent — la trilogie laser révèle la fonction de l'échantillon
-// (miroir, prisme, plasma), la seconde trilogie compose ces fonctions
-// (double verrou, grille, traversée) — et la dérive conclut sur la
-// maîtrise pure.
+// ---- LA GAMME : les cellules d'étalonnage, en sortie du hub --------------
+// Cinq tableaux courts joués EN TÊTE de l'expédition. La règle d'or de la
+// courbe de difficulté : UNE nouveauté par salle, jamais deux — et chaque
+// nouveauté s'apprend en trois temps dans la même salle (kata) :
+//   1. SANS DANGER : la surface se touche hors de la route, pour voir ;
+//   2. SUR LA ROUTE : il faut composer avec ;
+//   3. RETOURNÉE : la surface devient l'outil qui fait gagner.
+// La lecture reste honnête (pancartes + pictogrammes à la première
+// rencontre, jamais deux auras qui se chevauchent) ; le plafond de maîtrise
+// vient du `par` et des records, pas de la lecture. La lumière fait partie
+// de la leçon : chaque surface nouvelle est éclairée à sa couleur, le sas
+// porte toujours sa balise verte — l'œil apprend le langage avant la tête.
+
+// Gamme 1 — le corps seul : l'inertie, le coût des impulsions, le sas.
+export const TABLEAU_G1: LevelDef = {
+  name: 'Le berceau',
+  code: '21-01',
+  journal:
+    'Étalonnage, cellule 1. Première dérive libre : chaque impulsion éjecte une part de lui-même — il l’a compris au deuxième essai, et depuis il économise ses gouttes comme un vieux pilote son carburant. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+  par: 5,
+  boxes: [
+    // la porte du berceau : deux piliers, ouverture impossible à manquer
+    box(-560, -750, -480, -320, MAT_WALL),
+    box(-560, 320, -480, 750, MAT_WALL),
+    // l'îlot rond au centre : contourner, c'est piloter
+    {
+      minX: -40,
+      minY: -140,
+      maxX: 240,
+      maxY: 140,
+      material: MAT_WALL,
+      forme: 1,
+    },
+    // l'entonnoir du sas : la sortie se présente toute seule
+    box(760, -750, 840, -340, MAT_WALL),
+    box(760, 340, 840, 750, MAT_WALL),
+  ],
+  sponges: [],
+  labels: [
+    {
+      x: -520,
+      y: 260,
+      text: 'PAROI — ABSORBE',
+      tone: 'mur',
+      picto: { couleur: '#5b7ba6', eau: 1, glace: 0, vapeur: 1 },
+    },
+    {
+      x: 100,
+      y: 240,
+      text: 'CHAQUE IMPULSION COÛTE UNE GOUTTE',
+      tone: 'mur',
+      rang: 'secteur',
+    },
+    { x: 1110, y: 180, text: 'SAS — LE COLLECTEUR', tone: 'sas' },
+  ],
+  decals: [
+    { x: -1080, y: 420, w: 160, h: 160, kind: 'tuyaux', fade: 0.45 },
+    { x: 460, y: -640, w: 150, h: 225, kind: 'vanne', fade: 0.4 },
+  ],
+  // Lumière : une lampe HAUTE et centrale (ombres courtes et douces — rien
+  // de dramatique dans la première salle), et la balise verte du sas qui
+  // tire l'œil vers l'objectif dès l'entrée.
+  lumieres: [
+    { x: -150, y: 0, h: 980, portee: 1500, intensite: 1.05, taille: 2 },
+    {
+      x: 1110,
+      y: 0,
+      h: 380,
+      portee: 520,
+      intensite: 0.9,
+      couleur: '#3fd69b',
+      taille: 1,
+    },
+  ],
+  ambiante: 0.5,
+}
+
+// Gamme 2 — le rebond : l'hydrophobe repousse sans prendre une goutte.
+export const TABLEAU_G2: LevelDef = {
+  name: 'Le rebond',
+  code: '21-02',
+  journal:
+    'Cellule 2, revêtement répulsif. Il a touché la paroi une fois, par curiosité — repoussé sans une goutte perdue. Au troisième passage il jouait au billard avec nos cloisons. Le rebond ne lui coûte rien : c’est nous qu’il use. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: 260, maxX: 1180, maxY: 500 },
+  par: 6,
+  boxes: [
+    // 1. le plot d'essai, hors de la route : toucher pour voir
+    box(-700, -420, -560, -280, MAT_HYDROPHOBE),
+    // 2. la chicane : deux pans décalés, la ligne droite est fermée mais
+    //    les ouvertures sont larges — on slalome, ou on rebondit
+    box(-180, -750, -100, 120, MAT_HYDROPHOBE),
+    box(220, -120, 300, 750, MAT_HYDROPHOBE),
+    // 3. la bande de billard : un rebond dessus dépose au sas — la route
+    //    à une impulsion, pour ceux qui ont compris
+    box(640, 420, 860, 540, MAT_HYDROPHOBE),
+    // la lèvre neutre sous le sas : on grimpe, on ne rase pas le sol
+    box(880, -750, 960, 60, MAT_WALL),
+  ],
+  sponges: [],
+  labels: [
+    {
+      x: -630,
+      y: -200,
+      text: 'HYDROPHOBE — REPOUSSE',
+      tone: 'phobe',
+      picto: { couleur: '#9e6bc7', eau: 2, glace: 1, vapeur: 1 },
+    },
+    { x: 60, y: 400, text: 'LA CHICANE', tone: 'phobe', rang: 'secteur' },
+    { x: 750, y: 600, text: 'BANDE DE BILLARD', tone: 'phobe' },
+    { x: 1110, y: 560, text: 'SAS', tone: 'sas' },
+  ],
+  decals: [{ x: -1080, y: -500, w: 150, h: 150, kind: 'tuyaux', fade: 0.4 }],
+  // Lumière : la teinte violette de l'hydrophobe baigne le plot d'essai —
+  // la couleur de la légende devient la couleur de la pièce ; la lampe
+  // principale reste haute et neutre, la balise du sas guide en haut.
+  lumieres: [
+    { x: 60, y: 0, h: 900, portee: 1400, intensite: 1, taille: 2 },
+    {
+      x: -630,
+      y: -350,
+      h: 320,
+      portee: 460,
+      intensite: 0.85,
+      couleur: '#9e6bc7',
+      taille: 1,
+    },
+    {
+      x: 1110,
+      y: 380,
+      h: 380,
+      portee: 500,
+      intensite: 0.9,
+      couleur: '#3fd69b',
+      taille: 1,
+    },
+  ],
+  ambiante: 0.48,
+}
+
+// Gamme 3 — l'ancrage : l'hydrophile retient ; s'arracher coûte, viser paie.
+export const TABLEAU_G3: LevelDef = {
+  name: 'L’ancrage',
+  code: '21-03',
+  journal:
+    'Cellule 3, revêtement mouillant. La surface le retient — il s’y colle, y rampe, s’y repose. S’en arracher lui coûte une impulsion : il ne s’arrache donc que lorsqu’il a fini de viser. Nous lui avons offert des ancres ; il en a fait des affûts. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+  par: 6,
+  boxes: [
+    // 1. le tapis d'accueil, posé SUR la dérive naturelle : la leçon vous
+    //    arrive dessus — la surface attrape, et il faut payer pour partir
+    box(-660, -80, -460, 40, MAT_HYDROPHILE),
+    // 2. le virage : un pilier force à passer par-dessus, et son sommet
+    //    porte une étagère mouillante — l'ancre qui casse l'élan au virage
+    box(-160, -750, -80, 240, MAT_WALL),
+    box(-180, 240, -60, 320, MAT_HYDROPHILE),
+    // 3. l'affût : la fenêtre est étroite, mais le perchoir est en face —
+    //    s'ancrer, viser, une seule impulsion la traverse
+    box(480, -60, 660, 40, MAT_HYDROPHILE),
+    box(760, -750, 840, -80, MAT_WALL),
+    box(760, 160, 840, 750, MAT_WALL),
+  ],
+  sponges: [],
+  labels: [
+    {
+      x: -560,
+      y: -160,
+      text: 'HYDROPHILE — RETIENT',
+      tone: 'phile',
+      picto: { couleur: '#3fae9c', eau: 0, glace: 1, vapeur: 1 },
+    },
+    {
+      x: -120,
+      y: 400,
+      text: 'S’ARRACHER COÛTE UNE IMPULSION',
+      tone: 'phile',
+      rang: 'secteur',
+    },
+    { x: 570, y: 120, text: 'L’AFFÛT', tone: 'phile' },
+    { x: 800, y: 240, text: 'LA FENÊTRE', tone: 'mur' },
+    { x: 1110, y: 180, text: 'SAS', tone: 'sas' },
+  ],
+  decals: [{ x: 1080, y: 560, w: 165, h: 165, kind: 'tuyaux', fade: 0.45 }],
+  // Lumière : le cyan de l'eau calme sur les ancres, la principale haute,
+  // la balise du sas visible à travers la fenêtre — on vise une lumière.
+  lumieres: [
+    { x: 150, y: 60, h: 950, portee: 1400, intensite: 1, taille: 2 },
+    {
+      x: -560,
+      y: 100,
+      h: 340,
+      portee: 460,
+      intensite: 0.85,
+      couleur: '#63b7e6',
+      taille: 1,
+    },
+    {
+      x: 1110,
+      y: 0,
+      h: 380,
+      portee: 500,
+      intensite: 0.9,
+      couleur: '#3fd69b',
+      taille: 1,
+    },
+  ],
+  ambiante: 0.48,
+}
+
+// Gamme 4 — le premier gel : le froid fige, et le palet gelé glisse.
+export const TABLEAU_G4: LevelDef = {
+  name: 'Le premier gel',
+  code: '21-04',
+  journal:
+    'Cellule 4, plaques cryogéniques. Le froid devait être une punition. Il s’est figé volontairement sur la plaque, a visé le couloir, et s’est laissé glisser d’un bout à l’autre sans dépenser une goutte : gelé, rien ne s’éjecte. Il a fait du châtiment un véhicule. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+  par: 6,
+  boxes: [
+    // 1. le plot d'essai, hors de la route : l'aura se voit avant de mordre
+    box(-620, -360, -520, -260, MAT_FROID),
+    // 2. la porte de givre : passer au centre, ou raser et payer en gel —
+    //    inoffensif, le dégel vient tout seul
+    box(-140, -750, -60, -220, MAT_FROID),
+    box(-140, 220, -60, 750, MAT_FROID),
+    // 3. le mouillage : se figer ici, viser la glissière, et se laisser
+    //    porter — gelé, l'inertie est gratuite
+    box(240, -140, 420, -60, MAT_FROID),
+    box(480, 140, 940, 220, MAT_WALL),
+    box(480, -220, 940, -140, MAT_WALL),
+  ],
+  sponges: [],
+  labels: [
+    {
+      x: -570,
+      y: -440,
+      text: 'PLAQUE FROIDE — FIGE',
+      tone: 'froid',
+      picto: { couleur: '#8fc8ee', eau: 3, glace: 1, vapeur: 2 },
+    },
+    { x: -100, y: 60, text: 'PORTE DE GIVRE', tone: 'froid', rang: 'secteur' },
+    { x: 330, y: 20, text: 'GELER, PUIS GLISSER', tone: 'froid' },
+    { x: 710, y: 300, text: 'LA GLISSIÈRE', tone: 'mur' },
+    { x: 1110, y: 180, text: 'SAS', tone: 'sas' },
+  ],
+  decals: [{ x: -1080, y: 560, w: 190, h: 285, kind: 'vanne', fade: 0.42 }],
+  // Lumière : plus froide et plus basse que les cellules précédentes — la
+  // lampe de la glissière rase (h 240) et couche des ombres longues le long
+  // de la glisse : la vitesse se LIT dans la lumière. L'ambiance descend
+  // d'un cran (0,42) : le froid se voit avant de se toucher.
+  lumieres: [
+    {
+      x: -300,
+      y: 100,
+      h: 850,
+      portee: 1300,
+      intensite: 1,
+      couleur: '#cfe4ff',
+      taille: 2,
+    },
+    {
+      x: 700,
+      y: 0,
+      h: 240,
+      portee: 620,
+      intensite: 0.8,
+      couleur: '#8fc8ee',
+      taille: 1,
+    },
+    {
+      x: 1110,
+      y: 0,
+      h: 380,
+      portee: 500,
+      intensite: 0.9,
+      couleur: '#3fd69b',
+      taille: 1,
+    },
+  ],
+  ambiante: 0.42,
+}
+
+// Gamme 5 — le premier souffle : la vapeur, gagnée à la chaudière, passe
+// l'évent — et ce qu'elle perd se reboit au dépôt froid. C'est ICI que le
+// gameplay vapeur s'introduit : juste avant 21-A, pour que « Le conduit »
+// (21-C) ne soit plus jamais une première fois.
+export const TABLEAU_G5: LevelDef = {
+  name: 'Le premier souffle',
+  code: '21-05',
+  journal:
+    'Cellule 5, conduite d’air. Il a léché la chaudière, s’est défait en vapeur, et l’évent l’a laissé passer comme une rumeur. Ce que le souffle a semé en route a perlé sur le dépôt froid — et il est revenu le boire. Rien ne se perd. Nous devrions graver cette phrase. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+  par: 7,
+  boxes: [
+    // 1. la chaudière, hors de la route : s'en approcher, c'est goûter la
+    //    vapeur — et repartir avec ses dashs
+    box(-660, -520, -420, -440, MAT_CHAUD),
+    // 2. le choix : un évent aux trois quarts — la vapeur passe tout droit,
+    //    le liquide fait le tour par le haut ; les deux routes sont vraies
+    box(60, -750, 100, 220, MAT_GRILLE),
+    // 3. l'obligé : l'évent plein — seule la vapeur traverse ; le dépôt
+    //    froid recompose le nuage de l'autre côté, la rosée se reboit
+    box(620, -750, 660, 750, MAT_GRILLE),
+    box(760, -360, 900, -300, MAT_FROID),
+  ],
+  sponges: [],
+  labels: [
+    {
+      x: -540,
+      y: -600,
+      text: 'CHAUDIÈRE — DISPERSE',
+      tone: 'chaud',
+      picto: { couleur: '#e8843c', eau: 2, glace: 3, vapeur: 0 },
+    },
+    {
+      x: 80,
+      y: -420,
+      text: 'ÉVENT — SEULE LA VAPEUR PASSE',
+      tone: 'grille',
+      picto: { couleur: '#7fae9e', eau: 1, glace: 1, vapeur: 0 },
+    },
+    { x: 640, y: 420, text: 'ÉVENT', tone: 'grille' },
+    {
+      x: 830,
+      y: -440,
+      text: 'DÉPÔT FROID — LA ROSÉE SE REBOIT',
+      tone: 'froid',
+    },
+    { x: 1110, y: 180, text: 'SAS', tone: 'sas' },
+  ],
+  decals: [
+    { x: -1080, y: -560, w: 150, h: 225, kind: 'vanne', fade: 0.42 },
+    { x: 400, y: 640, w: 160, h: 160, kind: 'tuyaux', fade: 0.4 },
+  ],
+  // Lumière : l'ambre de la chaudière d'un côté, le bleu du dépôt de
+  // l'autre — la salle raconte chaud → froid dans son éclairage. Et la
+  // PREMIÈRE BRUME du jeu (légère) : la vapeur est le sujet de la salle,
+  // l'atmosphère l'annonce.
+  lumieres: [
+    { x: 150, y: 100, h: 900, portee: 1350, intensite: 1, taille: 2 },
+    {
+      x: -540,
+      y: -320,
+      h: 420,
+      portee: 560,
+      intensite: 1,
+      couleur: '#e8a05a',
+      taille: 1,
+    },
+    {
+      x: 830,
+      y: -160,
+      h: 360,
+      portee: 480,
+      intensite: 0.8,
+      couleur: '#8fc8ee',
+      taille: 1,
+    },
+    {
+      x: 1110,
+      y: 0,
+      h: 380,
+      portee: 480,
+      intensite: 0.9,
+      couleur: '#3fd69b',
+      taille: 1,
+    },
+  ],
+  ambiante: 0.46,
+  brume: 0.14,
+}
+
+// La gamme, dans l'ordre d'apprentissage : le corps, le rebond, l'ancrage,
+// le gel, le souffle. Jouée en tête de l'expédition — en sortie du hub.
+export const TABLEAUX_GAMME: LevelDef[] = [
+  TABLEAU_G1,
+  TABLEAU_G2,
+  TABLEAU_G3,
+  TABLEAU_G4,
+  TABLEAU_G5,
+]
+
+// L'ordre de la partie : LA GAMME d'abord (cinq cellules d'étalonnage, une
+// nouveauté chacune — en sortie du hub), puis chaque tableau enseigne une
+// chose et les derniers les combinent — la trilogie laser révèle la
+// fonction de l'échantillon (miroir, prisme, plasma), la seconde trilogie
+// compose ces fonctions (double verrou, grille, traversée) — et la dérive
+// conclut sur la maîtrise pure.
 export const TABLEAUX: LevelDef[] = [
+  ...TABLEAUX_GAMME,
   TABLEAU_1,
   TABLEAU_2,
   TABLEAU_3,
