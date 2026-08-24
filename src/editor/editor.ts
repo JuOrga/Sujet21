@@ -2408,6 +2408,13 @@ export class LevelEditor {
     if (lib) this.rattrapeBibliotheque()
   }
 
+  /** Les tableaux LIVRÉS absents de la bibliothèque : tant qu'ils n'y sont
+   *  pas, ils se jouent en FIN de séquence et ne se réordonnent pas. */
+  private livresManquants(): LevelDef[] {
+    const codes = new Set(this.library.map((s) => s.level.code))
+    return TABLEAUX.filter((t) => !codes.has(t.code))
+  }
+
   private renderLibrary(offline = false): void {
     const host = this.el('ed-lib')
     if (offline) {
@@ -2415,43 +2422,64 @@ export class LevelEditor {
         '<p class="ed-empty">Bibliothèque injoignable (hors ligne ou serveur local). Le brouillon reste conservé sur cet appareil.</p>'
       return
     }
+    // Les livrés absents : un bouton les sème à leur place voulue — sans
+    // lui, ils se jouent quand même, mais en fin de séquence, invisibles ici.
+    const manquants = this.livresManquants()
+    const semeur =
+      manquants.length > 0 && this.library.length > 0
+        ? `<button type="button" id="ed-lib-semer" title="Chaque tableau livré absent de la liste est ajouté À SA PLACE prévue dans la séquence (copie modifiable, votre ordre existant est conservé)">SEMER LES ${manquants.length} LIVRÉS MANQUANTS</button>` +
+          `<p class="ed-astuce">Sans semis, les livrés absents se jouent quand même — mais EN FIN de séquence et sans réglage d'ordre possible ici.</p>`
+        : ''
     if (this.library.length === 0) {
       host.innerHTML =
-        '<p class="ed-empty">Aucun tableau enregistré. « Enregistrer » publie celui-ci pour tout le monde.</p>'
+        '<p class="ed-empty">Aucun tableau enregistré : l’expédition livrée se joue telle quelle, dans son ordre conçu. « Enregistrer » publie le brouillon ; le semis ci-dessous copie tous les livrés ici pour les réordonner.</p>' +
+        (manquants.length > 0
+          ? `<button type="button" id="ed-lib-semer">SEMER LES ${manquants.length} TABLEAUX LIVRÉS</button>`
+          : '')
+      this.el('ed-lib-semer')?.addEventListener(
+        'click',
+        () => void this.semerManquants(),
+      )
       return
     }
-    host.innerHTML = this.library
-      .map((s, i) => {
-        const errs = checkLevel(s.level).filter(
-          (v) => v.niveau === 'erreur',
-        ).length
-        return (
-          `<div class="ed-lib-row${s.id === this.openId ? ' open' : ''}" data-id="${s.id}">` +
-          `<span class="ed-lib-no">${i + 1}</span>` +
-          `<button type="button" class="ed-lib-open" data-id="${s.id}" title="${
-            s.level.code === CODE_HUB
-              ? 'Le LABORATOIRE : ce tableau remplace le hub et ne compte pas dans la séquence'
+    host.innerHTML =
+      semeur +
+      this.library
+        .map((s, i) => {
+          const errs = checkLevel(s.level).filter(
+            (v) => v.niveau === 'erreur',
+          ).length
+          return (
+            `<div class="ed-lib-row${s.id === this.openId ? ' open' : ''}" data-id="${s.id}" draggable="true">` +
+            `<input class="ed-lib-no" data-pos="${s.id}" type="number" min="1" max="${this.library.length}" value="${i + 1}" title="Position dans la séquence — tapez la position visée puis Entrée" />` +
+            `<button type="button" class="ed-lib-open" data-id="${s.id}" title="${
+              s.level.code === CODE_HUB
+                ? 'Le LABORATOIRE : ce tableau remplace le hub et ne compte pas dans la séquence'
+                : estCodeHub(s.level.code)
+                  ? 'Un chantier de hub : hors séquence — publiez-le sous le code HUB pour qu’il devienne le laboratoire joué'
+                  : 'Ouvrir ce tableau (glisser la ligne pour la déplacer)'
+            }">` +
+            `<b>${s.level.code}</b> ${s.level.name}` +
+            (s.level.code === CODE_HUB
+              ? `<em class="ed-lib-hub">LABORATOIRE</em>`
               : estCodeHub(s.level.code)
-                ? 'Un chantier de hub : hors séquence — publiez-le sous le code HUB pour qu’il devienne le laboratoire joué'
-                : 'Ouvrir ce tableau'
-          }">` +
-          `<b>${s.level.code}</b> ${s.level.name}` +
-          (s.level.code === CODE_HUB
-            ? `<em class="ed-lib-hub">LABORATOIRE</em>`
-            : estCodeHub(s.level.code)
-              ? `<em class="ed-lib-hub">HORS SÉQUENCE</em>`
-              : '') +
-          `<small>${s.auteur ? s.auteur + ' · ' : ''}par ${s.level.par ?? '?'}${errs ? ' · ' + errs + ' erreur(s)' : ''}</small>` +
-          `</button>` +
-          `<span class="ed-lib-ord">` +
-          `<button type="button" data-up="${s.id}" title="Jouer plus tôt"${i === 0 ? ' disabled' : ''}>↑</button>` +
-          `<button type="button" data-down="${s.id}" title="Jouer plus tard"${i === this.library.length - 1 ? ' disabled' : ''}>↓</button>` +
-          `<button type="button" data-del="${s.id}" title="Supprimer de la bibliothèque">✕</button>` +
-          `</span></div>`
-        )
-      })
-      .join('')
+                ? `<em class="ed-lib-hub">HORS SÉQUENCE</em>`
+                : '') +
+            `<small>${s.auteur ? s.auteur + ' · ' : ''}par ${s.level.par ?? '?'}${errs ? ' · ' + errs + ' erreur(s)' : ''}</small>` +
+            `</button>` +
+            `<span class="ed-lib-ord">` +
+            `<button type="button" data-up="${s.id}" title="Jouer plus tôt"${i === 0 ? ' disabled' : ''}>↑</button>` +
+            `<button type="button" data-down="${s.id}" title="Jouer plus tard"${i === this.library.length - 1 ? ' disabled' : ''}>↓</button>` +
+            `<button type="button" data-del="${s.id}" title="Supprimer de la bibliothèque">✕</button>` +
+            `</span></div>`
+          )
+        })
+        .join('')
 
+    this.el('ed-lib-semer')?.addEventListener(
+      'click',
+      () => void this.semerManquants(),
+    )
     for (const b of Array.from(host.querySelectorAll('.ed-lib-open'))) {
       b.addEventListener('click', () =>
         this.openFromLibrary((b as HTMLElement).dataset.id ?? ''),
@@ -2472,6 +2500,133 @@ export class LevelEditor {
         'click',
         () => void this.removeFromLibrary((b as HTMLElement).dataset.del ?? ''),
       )
+    }
+    // Le saut direct : taper la position visée dans le numéro, Entrée (ou
+    // sortir du champ) — la ligne y va d'un coup, sans échelle de ↑.
+    for (const inp of Array.from(
+      host.querySelectorAll<HTMLInputElement>('input[data-pos]'),
+    )) {
+      const applique = (): void => {
+        const id = inp.dataset.pos ?? ''
+        const i = this.library.findIndex((l) => l.id === id)
+        const cible = Math.round(Number(inp.value)) - 1
+        if (i < 0 || !Number.isFinite(cible) || cible === i) {
+          inp.value = String(i + 1)
+          return
+        }
+        void this.moveTo(id, cible)
+      }
+      inp.addEventListener('change', applique)
+      inp.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          applique()
+        }
+        e.stopPropagation() // les chiffres ne déclenchent pas les raccourcis
+      })
+      inp.addEventListener('click', (e) => e.stopPropagation())
+    }
+    // Le glisser-déposer : attraper une ligne, la lâcher sur une autre — la
+    // ligne prend cette place. Les grands déplacements en UN geste.
+    for (const row of Array.from(
+      host.querySelectorAll<HTMLElement>('.ed-lib-row'),
+    )) {
+      row.addEventListener('dragstart', (e) => {
+        const cible = e.target as HTMLElement
+        // un champ ou un bouton n'entame pas un glissement
+        if (cible.closest('input, .ed-lib-ord')) {
+          e.preventDefault()
+          return
+        }
+        e.dataTransfer?.setData('text/plain', row.dataset.id ?? '')
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
+        row.classList.add('dragging')
+      })
+      row.addEventListener('dragend', () => {
+        row.classList.remove('dragging')
+        for (const r of Array.from(host.querySelectorAll('.drag-over')))
+          r.classList.remove('drag-over')
+      })
+      row.addEventListener('dragover', (e) => {
+        e.preventDefault()
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+        row.classList.add('drag-over')
+      })
+      row.addEventListener('dragleave', () => row.classList.remove('drag-over'))
+      row.addEventListener('drop', (e) => {
+        e.preventDefault()
+        row.classList.remove('drag-over')
+        const id = e.dataTransfer?.getData('text/plain') ?? ''
+        const j = this.library.findIndex((l) => l.id === row.dataset.id)
+        if (id && j >= 0) void this.moveTo(id, j)
+      })
+    }
+  }
+
+  /** Sème les tableaux livrés absents : chaque copie s'insère À SA PLACE
+   *  prévue dans la séquence (l'ordre existant du joueur est conservé — les
+   *  leçons se glissent devant le tableau livré qui les suit). */
+  private async semerManquants(): Promise<void> {
+    if (this.busy) return
+    const manquants = this.livresManquants()
+    if (manquants.length === 0) return
+    this.busy = true
+    this.commit(`Semis de ${manquants.length} tableau(x) livré(s)…`)
+    try {
+      const neufs = new Set<string>()
+      for (const t of manquants) {
+        const r = await saveLevel(structuredClone(t), '', 'expédition livrée')
+        if (!r) {
+          this.commit(
+            `Semis interrompu à « ${t.code} » : bibliothèque injoignable. Les tableaux déjà semés restent.`,
+          )
+          void this.refreshLibrary()
+          return
+        }
+        this.library = r.levels
+        neufs.add(r.id)
+      }
+      // l'ordre : les entrées EXISTANTES gardent leur ordre ; chaque semé
+      // s'insère devant la première entrée livrée qui le SUIT dans l'ordre
+      // de conception (TABLEAUX) — la leçon précède son exigence
+      const posD = new Map(TABLEAUX.map((t, i) => [t.code, i]))
+      const attente = this.library
+        .filter((s) => neufs.has(s.id))
+        .sort(
+          (a, b) =>
+            (posD.get(a.level.code) ?? 999) - (posD.get(b.level.code) ?? 999),
+        )
+      const ordre: string[] = []
+      for (const s of this.library) {
+        if (neufs.has(s.id)) continue
+        const p = posD.get(s.level.code)
+        if (p !== undefined) {
+          while (
+            attente.length > 0 &&
+            (posD.get(attente[0].level.code) ?? 999) < p
+          ) {
+            ordre.push(attente.shift()!.id)
+          }
+        }
+        ordre.push(s.id)
+      }
+      for (const s of attente) ordre.push(s.id)
+      const saved = await reorderLibrary(ordre)
+      if (saved) {
+        this.library = saved
+        this.hooks.libraryChanged(saved)
+        this.commit(
+          `${manquants.length} tableau(x) semé(s) à leur place dans la séquence — réordonnez-les librement.`,
+        )
+      } else {
+        this.commit(
+          'Tableaux semés, mais réordonnancement refusé : ils sont en fin de liste — replacez-les à la main.',
+        )
+        void this.refreshLibrary()
+      }
+      this.renderLibrary()
+    } finally {
+      this.busy = false
     }
   }
 
@@ -2533,12 +2688,23 @@ export class LevelEditor {
     )
   }
 
-  private async move(id: string, delta: number): Promise<void> {
+  private move(id: string, delta: number): Promise<void> {
     const i = this.library.findIndex((l) => l.id === id)
-    const j = i + delta
-    if (i < 0 || j < 0 || j >= this.library.length) return
+    return this.moveTo(id, i + delta)
+  }
+
+  /** Déplace une entrée À une position (0-based) : le geste commun du ↑↓,
+   *  du numéro tapé et du glisser-déposer. */
+  private async moveTo(id: string, cible: number): Promise<void> {
+    const i = this.library.findIndex((l) => l.id === id)
+    const j = Math.max(0, Math.min(this.library.length - 1, cible))
+    if (i < 0 || j === i) {
+      this.renderLibrary()
+      return
+    }
     const next = [...this.library]
-    ;[next[i], next[j]] = [next[j], next[i]]
+    const [e] = next.splice(i, 1)
+    next.splice(j, 0, e)
     this.library = next
     this.renderLibrary()
     const saved = await reorderLibrary(next.map((l) => l.id))

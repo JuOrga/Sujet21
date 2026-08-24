@@ -14,6 +14,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '24/08/2026 11:50',
+    title:
+      'La séquence se règle enfin d’une main : semis des livrés manquants, saut par numéro, glisser-déposer',
+    notes: [
+      'SIGNALÉ : les nouveaux tableaux livrés (la gamme, les paliers) n’apparaissaient pas dans la liste d’ordonnancement. Cause : cette liste ne montre que la BIBLIOTHÈQUE partagée — semée une fois, avant ces livraisons. Les absents se jouaient quand même, mais EN FIN de séquence, sans réglage possible. Nouveau bouton dans la liste : « SEMER LES N LIVRÉS MANQUANTS » — chaque tableau absent est copié dans la bibliothèque et inséré À SA PLACE prévue (la leçon se glisse devant le tableau livré qui la suit), VOTRE ordre existant et vos tableaux du labo conservés tels quels. Le bouton reparaîtra à chaque future livraison de tableaux : un clic, et la séquence est complète.',
+      'SIGNALÉ AUSSI : déplacer un tableau de la fin vers le début à coups de ↑ était laborieux. Deux gestes nouveaux, en plus des flèches : le NUMÉRO de chaque ligne est désormais un champ — tapez la position visée, Entrée, la ligne y va d’un coup ; et le GLISSER-DÉPOSER — attrapez une ligne, lâchez-la sur une autre, elle prend cette place. Les flèches restent pour les petits ajustements.',
+      'Vérifié en conditions réelles simulées : une bibliothèque de 3 entrées (21-A, un essai du labo, 21-C) + semis → les 22 manquants s’insèrent exactement selon la dent de scie (gamme et buveuse avant 21-A, l’essai du labo garde sa place, membrane avant le conduit…), et le saut par numéro envoie la dernière ligne en tête d’un seul geste.',
+    ],
+  },
+  {
     date: '24/08/2026 10:15',
     title:
       'LES PALIERS : six salles tissées dans l’expédition — la dent de scie',
