@@ -1277,6 +1277,9 @@ let decorRiche = localStorage.getItem('sujet21-decor') !== 'sobre'
 // bras du test A/B : si c'est le rendu du liquide qui pèse, c'est CE
 // réglage qui fera bouger les chiffres, pas celui du décor.
 let eauRiche = localStorage.getItem('sujet21-eau') !== 'sobre'
+// Surface du fluide : MIROITANTE (défaut — elle reflète les alentours) ou
+// CLASSIQUE (l'ancien rendu, au pixel près) — le retour est à un clic.
+let eauMiroir = localStorage.getItem('sujet21-miroir') !== 'classique'
 // Éclairage de la PIÈCE : une lampe par cuve, des ombres portées cuites dans
 // une carte de lumière (recalculée seulement au changement de décor) et un
 // biseau directionnel sur les arêtes — du relief pour presque rien. ACTIF
@@ -1508,6 +1511,35 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     }
   }
   renderEau()
+
+  const choixMiroir = document.getElementById(
+    'params-miroir',
+  ) as HTMLDivElement | null
+  if (choixMiroir) {
+    const renderMiroir = (): void => {
+      choixMiroir.innerHTML = ''
+      for (const [miroir, label] of [
+        [true, 'MIROITANTE'],
+        [false, 'CLASSIQUE'],
+      ] as const) {
+        const b = document.createElement('button')
+        b.type = 'button'
+        b.textContent = label
+        b.className = eauMiroir === miroir ? 'actif' : ''
+        b.addEventListener('click', () => {
+          eauMiroir = miroir
+          localStorage.setItem(
+            'sujet21-miroir',
+            miroir ? 'miroir' : 'classique',
+          )
+          perf.reset()
+          renderMiroir()
+        })
+        choixMiroir.appendChild(b)
+      }
+    }
+    renderMiroir()
+  }
 
   const choixLumiere = document.getElementById(
     'params-lumiere',
@@ -4577,6 +4609,7 @@ function frame(now: number): void {
     level.ambiante ?? AMBIANTE_DEFAUT,
     RELIEF_K[reliefChoix],
     level.brume ?? 0,
+    eauMiroir ? 1 : 0,
   )
   const rendRaw = performance.now() - renderT0
   monitor.renderMs += (rendRaw - monitor.renderMs) * 0.08
