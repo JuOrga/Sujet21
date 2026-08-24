@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '24/08/2026 20:40',
+    title:
+      'La variante « planete » est livrée : un hublot ouvert sur l’espace dans le reflet',
+    notes: [
+      'L’asset du concepteur (plafond de vaisseau-laboratoire : grand hublot à croisillons, planète gazeuse bleutée, bras articulés et conduites dans la pénombre) est intégré en plafond-planete.webp (1024², 81 Ko). Dans l’éditeur, taper « planete » dans le champ PLAFOND DU REFLET suffit : la salle reflète alors le hublot et sa planète au lieu des verrières.',
+      'Vérifié en jeu : salle configurée dans l’éditeur puis ESSAYER — le hublot lumineux et le disque de la planète apparaissent bien dans la masse du fluide, avec la parallaxe inversée du plafond. Aucune salle livrée n’est encore basculée : le choix des salles « côté coque » revient au concepteur, champ par champ.',
+    ],
+  },
+  {
     date: '24/08/2026 20:00',
     title:
       'Un plafond PAR SALLE : chaque tableau choisit ce que son reflet raconte',
