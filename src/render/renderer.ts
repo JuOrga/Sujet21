@@ -303,6 +303,10 @@ uniform float uBrume; // 0..1 : densité de la brume d'ambiance du tableau
 // renvoie les alentours (carte de lumière et décor, échantillonnés le
 // long de la normale) ; 0, le rendu classique, inchangé au pixel près.
 uniform float uMiroirEau;
+// Le mode MERCURE (uMiroirEau = 2) organise son reflet autour du CORPS :
+// centre et rayon efficace lus dans les stats de la simulation.
+uniform vec2 uCentroide;
+uniform float uRayonCorps;
 uniform float uLampeSpriteRond; // 1 : un asset dessine les plafonniers
 uniform float uLampeSpriteBande; // 1 : un asset dessine les bandes
 // RELIEF 2.5D : les parois ont une hauteur — leur sommet fuit le centre de
@@ -1352,14 +1356,67 @@ void main() {
       water += vec3(0.95, 0.99, 1.0) * lumSpec * specDur * 0.80 * miroir;
       water += vec3(0.50, 0.68, 0.85) * lumSpec * fres * 0.40 * miroir;
       water += vec3(0.90, 0.97, 1.0) * lumSpec * etincelles * (0.25 + specDur) * 0.55 * miroir;
-      // SURFACE MIROITANTE (réglage PARAMÈTRES) : la surface renvoie
+      // SURFACE MIROITANT MERCURE (réglage PARAMÈTRES, mode 2) : un reflet
+      // D'UN SEUL TENANT. La normale est RADIALE depuis le centroïde du
+      // corps et la portée croît du centre au bord (stats de la simulation,
+      // aucune lecture du champ — bosselé à l'échelle des gouttes, il
+      // émiette le reflet en bouillie). Le cœur mire le PLAFOND (la
+      // machinerie juste au-dessus, calque 3 des zones quand il est là),
+      // le bord BALAIE la salle alentour : grille, lampes et murs se
+      // reconnaissent, courbés autour du corps comme sur une goutte de
+      // mercure, et glissent d'un bloc avec une houle lente. Le reflet est
+      // teinté par l'eau (un miroir d'eau n'est pas du chrome) et sa
+      // pré-compensation d'éclairage est plafonnée (plancher 0,32 : plus
+      // bas, le liseré s'embrasait en anneau blanc dans l'ombre).
+      if (uMiroirEau > 1.5) {
+        vec2 rad = world - uCentroide;
+        float rC = length(rad);
+        vec2 Nw = rad / max(rC, 1.0);
+        // une houle LENTE et LARGE incline le miroir d'un seul bloc
+        float houle = vnoise(world * 0.006 + vec2(uTime * 0.10, -uTime * 0.07)) - 0.5;
+        float ca = cos(houle * 0.55);
+        float sa = sin(houle * 0.55);
+        Nw = vec2(Nw.x * ca - Nw.y * sa, Nw.x * sa + Nw.y * ca);
+        float profil = smoothstep(0.08, 1.0, rC / max(uRayonCorps, 1.0));
+        vec2 reflPos = world + Nw * (30.0 * profil + 330.0 * profil * profil);
+        vec3 envL = vec3(uAmbiante);
+        if (uLumiereEau > 0.5) {
+          vec2 luvR = clamp((reflPos - uLightMapMin) * uLightMapInvSize, vec2(0.0), vec2(1.0));
+          envL += 1.35 * texture(uLightMap, luvR).rgb;
+        }
+        vec3 envT = uHasTank > 0.5
+          ? textureLod(uTexTank, (reflPos - uCenter * 0.10) / 900.0, 2.0).rgb
+          : vec3(0.10, 0.16, 0.22);
+        vec3 env = envT * envL * vec3(0.80, 1.00, 1.20) + envL * envL * vec3(0.30, 0.38, 0.46);
+        // le plafond dans le cœur : là où la flaque regarde vers le haut
+        if (uHasPlafond > 0.5) {
+          vec2 puv0 = (reflPos + uCenter * 0.22) / 1000.0;
+          vec2 puv = abs(fract(puv0 * 0.5) * 2.0 - vec2(1.0));
+          vec3 pt = texture(uTexZones, vec3(puv, 3.0)).rgb;
+          float lumP = dot(pt, vec3(0.299, 0.587, 0.114));
+          float verriere = smoothstep(0.40, 0.72, lumP);
+          vec3 plafond = pt * (0.35 + 1.05 * envL) + pt * verriere * 2.3;
+          env = mix(env, plafond * vec3(0.85, 0.97, 1.12), 0.72 * (1.0 - 0.55 * profil));
+        }
+        if (uLumiereEau > 0.5) {
+          env /= clamp(vec3(uAmbiante * 1.15) + 1.05 * lmEau, vec3(0.32), vec3(1.0));
+        }
+        env = min(env * vec3(0.42, 0.55, 0.68), vec3(1.1));
+        // couverture CONTINUE : pleine au bord (incidence rasante), plus
+        // discrète au cœur — l'eau profonde montre sa propre couleur
+        float bord = smoothstep(0.40, 0.98, rC / max(uRayonCorps, 1.0));
+        float corps = body * (1.0 - vap) * (1.0 - icy * 0.7);
+        float force = corps * clamp(0.24 + 0.50 * bord, 0.0, 0.74);
+        water = mix(water, env, force);
+      }
+      // SURFACE MIROITANTE (réglage PARAMÈTRES, mode 1) : la surface renvoie
       // VRAIMENT les alentours — la pièce est échantillonnée à distance le
       // long d'une normale de houle ANIMÉE, sur TOUT le corps liquide. Le
       // reflet est PRÉ-COMPENSÉ de la lumière locale : un miroir montre la
       // source qu'il reflète, pas l'ombre dans laquelle il baigne — sans
       // cette division, l'effet disparaissait dans les salles sombres.
       // textureLod : LOD explicite (flux non uniforme) et flou doux voulu.
-      if (uMiroirEau > 0.5) {
+      else if (uMiroirEau > 0.5) {
         float ond = vnoise(world * 0.02 + vec2(uTime * 0.33, -uTime * 0.26));
         float ond2 = vnoise(world * 0.047 - vec2(uTime * 0.21, uTime * 0.16));
         vec2 nDir = normalize(nrm.xy * 1.6 + (vec2(ond, ond2) - 0.5) * 1.3);
@@ -2598,7 +2655,7 @@ export class Renderer {
     ambiante = 0.52, // lumière générale du tableau (plancher hors lampes)
     relief = 0, // relief 2.5D des parois (0 débranché ; ~0,035 léger)
     brume = 0, // brume d'ambiance du tableau (0 : aucune)
-    miroirEau = 1, // 1 la surface du fluide MIROITE (reflet des alentours), 0 classique
+    miroirEau = 1, // 1 surface MIROITANTE (reflet par houle), 2 MIROITANT MERCURE (reflet d'un seul tenant autour du corps), 0 classique
   ): void {
     const gl = this.gl
     const devW = Math.max(1, Math.round(viewportW * dpr))
@@ -2761,6 +2818,10 @@ export class Renderer {
     gl.uniform1f(cu['uAmbiante'], ambiante)
     gl.uniform1f(cu['uBrume'], brume)
     gl.uniform1f(cu['uMiroirEau'], miroirEau)
+    // le miroir MERCURE s'enroule autour du corps : centre + rayon de
+    // silhouette (rms → contour, facteur constaté ~1.9)
+    gl.uniform2f(cu['uCentroide'], sim.stats.centroidX, sim.stats.centroidY)
+    gl.uniform1f(cu['uRayonCorps'], Math.max(40, sim.stats.rmsRadius * 1.9))
     gl.uniform1f(cu['uLampeSpriteRond'], this.texLampeRonde ? 1 : 0)
     gl.uniform1f(cu['uLampeSpriteBande'], this.texLampeBande ? 1 : 0)
     gl.uniform1f(cu['uRelief'], relief)

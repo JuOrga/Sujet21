@@ -1277,9 +1277,18 @@ let decorRiche = localStorage.getItem('sujet21-decor') !== 'sobre'
 // bras du test A/B : si c'est le rendu du liquide qui pèse, c'est CE
 // réglage qui fera bouger les chiffres, pas celui du décor.
 let eauRiche = localStorage.getItem('sujet21-eau') !== 'sobre'
-// Surface du fluide : MIROITANTE (défaut — elle reflète les alentours) ou
-// CLASSIQUE (l'ancien rendu, au pixel près) — le retour est à un clic.
-let eauMiroir = localStorage.getItem('sujet21-miroir') !== 'classique'
+// Surface du fluide, TROIS rendus au choix : MIROITANTE (défaut — reflet
+// des alentours et du plafond, par la houle de chaque goutte), MIROITANT
+// MERCURE (le reflet s'enroule d'un seul tenant autour du corps, comme une
+// bille de mercure : le cœur mire le plafond, le bord balaie la salle) ou
+// CLASSIQUE (l'ancien rendu, au pixel près). Valeur passée telle quelle au
+// shader : 0 classique, 1 miroitante, 2 mercure.
+let eauMiroir =
+  localStorage.getItem('sujet21-miroir') === 'classique'
+    ? 0
+    : localStorage.getItem('sujet21-miroir') === 'mercure'
+      ? 2
+      : 1
 // Éclairage de la PIÈCE : une lampe par cuve, des ombres portées cuites dans
 // une carte de lumière (recalculée seulement au changement de décor) et un
 // biseau directionnel sur les arêtes — du relief pour presque rien. ACTIF
@@ -1518,9 +1527,10 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
   if (choixMiroir) {
     const renderMiroir = (): void => {
       choixMiroir.innerHTML = ''
-      for (const [miroir, label] of [
-        [true, 'MIROITANTE'],
-        [false, 'CLASSIQUE'],
+      for (const [miroir, cle, label] of [
+        [1, 'miroir', 'MIROITANTE'],
+        [2, 'mercure', 'MIROITANT MERCURE'],
+        [0, 'classique', 'CLASSIQUE'],
       ] as const) {
         const b = document.createElement('button')
         b.type = 'button'
@@ -1528,10 +1538,7 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
         b.className = eauMiroir === miroir ? 'actif' : ''
         b.addEventListener('click', () => {
           eauMiroir = miroir
-          localStorage.setItem(
-            'sujet21-miroir',
-            miroir ? 'miroir' : 'classique',
-          )
+          localStorage.setItem('sujet21-miroir', cle)
           perf.reset()
           renderMiroir()
         })
@@ -4609,7 +4616,7 @@ function frame(now: number): void {
     level.ambiante ?? AMBIANTE_DEFAUT,
     RELIEF_K[reliefChoix],
     level.brume ?? 0,
-    eauMiroir ? 1 : 0,
+    eauMiroir,
   )
   const rendRaw = performance.now() - renderT0
   monitor.renderMs += (rendRaw - monitor.renderMs) * 0.08
