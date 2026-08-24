@@ -1276,10 +1276,56 @@ void main() {
     smokeN = 0.62 * smokeN + 0.38 * dnoise(world * 0.11 - vec2(uTime * 0.31, -uTime * 0.24));
   }
 
-  float field2 = field * (1.0 + 0.14 * waveGlow);
+  // LE CRISTAL DÉCOUPE LA SILHOUETTE (mercure) : un front de gel n'avance
+  // pas en lobes ronds de liquide — il pousse en PANS. Chaque facette du
+  // Voronoï (ancré sur le corps : le motif dérive avec lui) contracte son
+  // échantillonnage du champ vers son centre : le contour se brise en
+  // segments qui se rejoignent en ANGLES aux arêtes des facettes — une
+  // silhouette de cristal taillé. Le même Voronoï sert plus bas aux
+  // nuances des facettes et à leurs liserés d'arêtes.
+  float facette = 0.0; // nuance propre de la cellule (-1..1)
+  float aretes = 0.0; // liseré des arêtes entre cellules
+  float fieldCristal = field;
+  if (uMiroirEau > 1.5 && icy > 0.001) {
+    vec2 rel = (world - uCentroide) / 95.0;
+    vec2 ip = floor(rel);
+    vec2 fp = fract(rel);
+    float f1 = 8.0;
+    float f2 = 8.0;
+    vec2 idBest = vec2(0.0);
+    vec2 oBest = vec2(0.0);
+    for (int gy = -1; gy <= 1; gy++) {
+      for (int gx = -1; gx <= 1; gx++) {
+        vec2 g = vec2(float(gx), float(gy));
+        vec2 cell = ip + g;
+        vec2 o = vec2(hash21(cell), hash21(cell + 41.7));
+        vec2 d = g + o * 0.85 - fp;
+        float dd = dot(d, d);
+        if (dd < f1) {
+          f2 = f1;
+          f1 = dd;
+          idBest = cell;
+          oBest = o;
+        } else if (dd < f2) {
+          f2 = dd;
+        }
+      }
+    }
+    facette = hash21(idBest + 7.3) * 2.0 - 1.0;
+    aretes = 1.0 - smoothstep(0.02, 0.16, f2 - f1);
+    vec2 centreCell = uCentroide + (idBest + oBest * 0.85) * 95.0;
+    vec2 pGel = mix(world, centreCell, 0.22);
+    vec2 fuvG = ((pGel - uCenter) * uZoom + uViewport * 0.5) / uViewport;
+    float fGel = texture(uField, clamp(fuvG, vec2(0.0), vec2(1.0))).r / uFieldScale;
+    fieldCristal = mix(field, fGel, icy);
+  }
+  float field2 = fieldCristal * (1.0 + 0.14 * waveGlow);
+  // la contraction comprime le gradient du champ : la bande de seuillage
+  // s'élargit d'autant sur la glace, sinon le bord crénelle (texels grossis)
+  float sCristal = 1.0 + 0.8 * icy * step(1.5, uMiroirEau);
   // Les bords du nuage bouillonnent : le bruit ronge et gonfle la surface
   field2 *= 1.0 + vap * (smokeN - 0.5) * 1.1;
-  float body = smoothstep(th - s, th + s, field2);
+  float body = smoothstep(th - s * sCristal, th + s * sCristal, field2);
   // La fumée est trouée et translucide par endroits
   body *= 1.0 - vap * (0.2 + 0.4 * smokeN);
 
@@ -1502,39 +1548,10 @@ void main() {
     // est lisse : éclairage quasi plat, c'est le reflet qui sculpte. Les
     // modes MIROITANTE et CLASSIQUE gardent leur glace au pixel près.
     float diffuseGel = uMiroirEau > 1.5 ? mix(diffuse, 0.58, 0.85) : diffuse;
-    // FACETTES CRISTALLINES (mercure) : le bloc poli se taille en GRANDES
-    // cellules plates — un Voronoï ancré sur le corps (les facettes suivent
-    // le bloc qui dérive), chaque cellule avec sa propre nuance, et les
-    // arêtes entre cellules en fins liserés qui accrochent la lumière.
+    // FACETTES CRISTALLINES (mercure) : chaque cellule du Voronoï calculé
+    // au seuillage (il découpe aussi la silhouette) porte sa propre nuance,
+    // et les arêtes entre cellules tiennent un fin liseré de lumière.
     // La modulation reste douce : le blanc garde le dessus.
-    float facette = 0.0; // nuance propre de la cellule (-1..1)
-    float aretes = 0.0; // liseré des arêtes entre cellules
-    if (icy > 0.001 && uMiroirEau > 1.5) {
-      vec2 rel = (world - uCentroide) / 95.0;
-      vec2 ip = floor(rel);
-      vec2 fp = fract(rel);
-      float f1 = 8.0;
-      float f2 = 8.0;
-      vec2 idBest = vec2(0.0);
-      for (int gy = -1; gy <= 1; gy++) {
-        for (int gx = -1; gx <= 1; gx++) {
-          vec2 g = vec2(float(gx), float(gy));
-          vec2 cell = ip + g;
-          vec2 o = vec2(hash21(cell), hash21(cell + 41.7));
-          vec2 d = g + o * 0.85 - fp;
-          float dd = dot(d, d);
-          if (dd < f1) {
-            f2 = f1;
-            f1 = dd;
-            idBest = cell;
-          } else if (dd < f2) {
-            f2 = dd;
-          }
-        }
-      }
-      facette = hash21(idBest + 7.3) * 2.0 - 1.0;
-      aretes = 1.0 - smoothstep(0.02, 0.16, f2 - f1);
-    }
     vec3 iceCol = vec3(0.60, 0.76, 0.88) * (0.72 + 0.45 * diffuseGel);
     iceCol = mix(iceCol, gelMiroir, gelForce);
     // chaque facette a sa nuance, les arêtes tiennent un fil de lumière
