@@ -14,6 +14,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '24/08/2026 10:15',
+    title:
+      'LES PALIERS : six salles tissées dans l’expédition — la dent de scie',
+    notes: [
+      'Le deuxième étage de la courbe de difficulté : six salles TISSÉES entre les tableaux livrés, chacune placée juste avant le tableau qui exige sa leçon. 21-06 LA BUVEUSE (l’éponge — enfin enseignée AVANT que « Le sas » ne l’exige ; sa fine colonne se sature en trois gorgées : la brèche permanente s’achète une seule fois). 21-07 LA MEMBRANE et 21-08 LE RIDEAU (les portes d’état, jamais enseignées dans la run jusqu’ici — l’une après la chambre froide pour le contraste gelé/liquide, l’autre après le conduit ; LA CHARGE : se figer au mouillage, se lancer, claquer la porte battante).',
+      '21-09 LES RÉGIMES (les zones imposées entrent dans l’expédition : hublot fendu = armure de glace gratuite, conduite rompue = souffle gratuit — l’évent posé AU CŒUR du régime vapeur donne exactement l’état qu’il faut pour le passer). 21-10 LA HALTE (le surchauffeur, enseigné nulle part jusqu’ici : chaque borne frôlée en vapeur rend UN dash, une fois — la route se lit de borne en borne, placée avant le dépôt de givre, le tableau le plus gourmand en souffle). 21-11 LA VOIE LUMINEUSE (la respiration avant les salles laser, et la leçon d’atmosphère : salle éteinte à 15 %, quatre flaques de lumière en pierres de gué — blanche, cyan, cyan, verte — la lumière EST la carte).',
+      'L’ORDRE COMPLET de l’expédition (24 salles) est désormais VERROUILLÉ par un test qui documente la stratégie : gamme → buveuse → Le sas (premier examen) → chambre froide → membrane → conduit → rideau → régimes → serre → halte → dépôt de givre → cuve thermique (l’examen des trois routes) → voie lumineuse → les six salles laser → la dérive. Chaque leçon précède son exigence, chaque pic a sa respiration. Aucun tableau existant modifié.',
+      'Même contrat que la gamme, testé : vocabulaire fermé par salle (une nouveauté, plus l’acquis), kata en trois temps (sans danger, sur la route, retournée en outil), pictogramme à chaque matière neuve, balise verte du sas partout, quatre lampes au plus. Les six salles sont dans l’éditeur, l’écran SALLES et les RECORDS, copiables et repositionnables via la bibliothèque.',
+    ],
+  },
+  {
     date: '24/08/2026 00:45',
     title:
       'LA GAMME : cinq cellules d’étalonnage en sortie du hub — la courbe de difficulté commence',

@@ -1777,20 +1777,508 @@ export const TABLEAUX_GAMME: LevelDef[] = [
   TABLEAU_G5,
 ]
 
-// L'ordre de la partie : LA GAMME d'abord (cinq cellules d'étalonnage, une
-// nouveauté chacune — en sortie du hub), puis chaque tableau enseigne une
-// chose et les derniers les combinent — la trilogie laser révèle la
-// fonction de l'échantillon (miroir, prisme, plasma), la seconde trilogie
-// compose ces fonctions (double verrou, grille, traversée) — et la dérive
-// conclut sur la maîtrise pure.
+// ---- LES PALIERS : le deuxième étage de la courbe -----------------------
+// Six salles TISSÉES dans l'expédition (la dent de scie : chaque leçon se
+// place juste avant le tableau livré qui l'exige, chaque pic est suivi
+// d'une respiration). Même kata que la gamme — sans danger, sur la route,
+// retournée en outil — et même contrat de lisibilité. Elles comblent les
+// trous du vocabulaire : l'éponge n'était jamais enseignée avant que
+// « Le sas » l'exige ; la membrane, le rideau, les zones imposées et le
+// surchauffeur n'étaient enseignés nulle part dans la run.
+
+// Palier 1 — l'éponge : elle boit ce qu'on lui abandonne… et un mur mince
+// se SATURE — la brèche permanente s'achète une seule fois.
+export const TABLEAU_G6: LevelDef = {
+  name: 'La buveuse',
+  code: '21-06',
+  journal:
+    'Cellule 6, mousse absorbante. Il a nourri l’éponge du bout d’une goutte, a regardé les pores se gorger et durcir, puis a choisi le plus mince des murs et l’a saturé d’un coup : une brèche permanente, payée une seule fois. Il ne subit pas le péage. Il l’achète. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+  par: 6,
+  boxes: [
+    // le muret au-dessus du couloir du grand mur d'éponge
+    box(-20, 240, 28, 750, MAT_WALL),
+    // le canal de la fine éponge : au-dessus et en dessous, du plein
+    box(680, -750, 750, -180, MAT_WALL),
+    box(680, 156, 750, 750, MAT_WALL),
+  ],
+  sponges: [
+    // 1. le bloc d'essai, hors de la route : nourrir, regarder durcir
+    {
+      minX: -660,
+      minY: 320,
+      cols: 3,
+      rows: 3,
+      cellSize: 24,
+      capacityPerCell: 4,
+    },
+    // 2. le grand mur : payer le passage en volume, ou grimper au couloir
+    {
+      minX: -20,
+      minY: -750,
+      cols: 2,
+      rows: 33,
+      cellSize: 24,
+      capacityPerCell: 5,
+    },
+    // 3. la FINE : une colonne, capacité minuscule — la saturer coûte trois
+    //    gorgées et ouvre la brèche pour toujours
+    {
+      minX: 700,
+      minY: -180,
+      cols: 1,
+      rows: 14,
+      cellSize: 24,
+      capacityPerCell: 2,
+    },
+  ],
+  labels: [
+    {
+      x: -600,
+      y: 240,
+      text: 'ÉPONGE — BOIT',
+      tone: 'eponge',
+      picto: { couleur: '#d9a441', eau: 3, glace: 1, vapeur: 1 },
+    },
+    { x: 4, y: -60, text: 'LE PÉAGE', tone: 'eponge', rang: 'secteur' },
+    { x: 715, y: 240, text: 'LA FINE — SATURER, PASSER', tone: 'eponge' },
+    { x: 1110, y: 180, text: 'SAS', tone: 'sas' },
+  ],
+  decals: [{ x: -1080, y: -520, w: 160, h: 160, kind: 'tuyaux', fade: 0.42 }],
+  // Lumière : l'ocre de l'éponge sur le bloc d'essai, la principale haute,
+  // la balise verte — et la fine reste bien éclairée : c'est ELLE la leçon.
+  lumieres: [
+    { x: 150, y: 0, h: 950, portee: 1450, intensite: 1, taille: 2 },
+    {
+      x: -600,
+      y: 420,
+      h: 340,
+      portee: 460,
+      intensite: 0.85,
+      couleur: '#d9a441',
+      taille: 1,
+    },
+    {
+      x: 1110,
+      y: 0,
+      h: 380,
+      portee: 500,
+      intensite: 0.9,
+      couleur: '#3fd69b',
+      taille: 1,
+    },
+  ],
+  ambiante: 0.48,
+}
+
+// Palier 2 — la membrane : la première paroi qui donne un ordre. Seul le
+// LIQUIDE passe ; gelé, on frappe une porte close.
+export const TABLEAU_G7: LevelDef = {
+  name: 'La membrane',
+  code: '21-07',
+  journal:
+    'Cellule 7, cloison osmotique. Gelé, il a heurté la membrane comme un poing frappe une porte. Redevenu liquide, il l’a traversée comme si elle n’existait pas. La cloison choisit son état à sa place — c’est la première paroi qui lui donne un ordre, et il a obéi en trois secondes. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+  par: 6,
+  boxes: [
+    // 1. le carreau d'essai, hors de la route — et le plot froid à côté :
+    //    se geler, frapper, comprendre ; dégeler, traverser
+    box(-620, 280, -580, 520, MAT_MEMBRANE),
+    box(-700, -400, -600, -300, MAT_FROID),
+    // 2. sur la route : la grande membrane, pleine hauteur — on y arrive
+    //    comme on veut, on la passe LIQUIDE
+    box(-40, -750, 0, 750, MAT_MEMBRANE),
+    // 3. l'unique passage de la barrière est une membrane : l'eau se
+    //    faufile là où aucun autre état n'a de porte
+    box(560, -750, 640, 180, MAT_WALL),
+    box(560, 180, 640, 420, MAT_MEMBRANE),
+    box(560, 420, 640, 750, MAT_WALL),
+  ],
+  sponges: [],
+  labels: [
+    {
+      x: -600,
+      y: 600,
+      text: 'MEMBRANE — SEUL LE LIQUIDE PASSE',
+      tone: 'phile',
+      picto: { couleur: '#4fae8e', eau: 3, glace: 0, vapeur: 0 },
+    },
+    { x: -650, y: -480, text: 'PLAQUE FROIDE', tone: 'froid' },
+    { x: 600, y: 500, text: 'LA PORTE D’EAU', tone: 'phile', rang: 'secteur' },
+    { x: 1110, y: 180, text: 'SAS', tone: 'sas' },
+  ],
+  decals: [{ x: 1090, y: -560, w: 150, h: 225, kind: 'vanne', fade: 0.42 }],
+  // Lumière : vert d'eau sur la grande membrane (sa couleur devient celle
+  // de la pièce), accent froid discret sur le plot, balise verte du sas.
+  lumieres: [
+    { x: -260, y: 0, h: 900, portee: 1350, intensite: 1, taille: 2 },
+    {
+      x: -20,
+      y: 420,
+      h: 360,
+      portee: 480,
+      intensite: 0.85,
+      couleur: '#4fae8e',
+      taille: 1,
+    },
+    {
+      x: 1110,
+      y: 0,
+      h: 380,
+      portee: 500,
+      intensite: 0.9,
+      couleur: '#3fd69b',
+      taille: 1,
+    },
+  ],
+  ambiante: 0.46,
+}
+
+// Palier 3 — le rideau : le miroir de la membrane. Seule la GLACE l'écarte,
+// et un palet lancé le traverse comme une épaule ouvre une porte battante.
+export const TABLEAU_G8: LevelDef = {
+  name: 'Le rideau',
+  code: '21-08',
+  journal:
+    'Cellule 8, rideau lamellaire. L’eau s’y écrase, la vapeur s’y émiette — mais un bloc lancé l’écarte comme une épaule ouvre une porte battante. Il s’est gelé, s’est jeté, et le rideau a claqué derrière lui. Nous avons entendu le claquement depuis la salle d’observation. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+  par: 6,
+  boxes: [
+    // 1. le carreau d'essai, hors de la route — le mouillage froid juste là
+    box(-620, -520, -580, -280, MAT_RIDEAU),
+    box(-720, -160, -620, -60, MAT_FROID),
+    // 2. sur la route : le grand rideau, pleine hauteur — se geler au
+    //    mouillage, garder l'élan, l'épauler
+    box(0, -750, 40, 750, MAT_RIDEAU),
+    // 3. LA CHARGE : un second mouillage aligné sur un rideau étroit — se
+    //    figer, se lancer, claquer la porte battante jusqu'au bassin du sas
+    box(360, -120, 520, -40, MAT_FROID),
+    box(700, -750, 740, -200, MAT_WALL),
+    box(700, -200, 740, 240, MAT_RIDEAU),
+    box(700, 240, 740, 750, MAT_WALL),
+  ],
+  sponges: [],
+  labels: [
+    {
+      x: -600,
+      y: -600,
+      text: 'RIDEAU — SEULE LA GLACE PASSE',
+      tone: 'froid',
+      picto: { couleur: '#8fb4d8', eau: 0, glace: 3, vapeur: 0 },
+    },
+    { x: -670, y: -240, text: 'MOUILLAGE FROID', tone: 'froid' },
+    { x: 440, y: 40, text: 'LA CHARGE', tone: 'froid', rang: 'secteur' },
+    { x: 1110, y: 180, text: 'SAS', tone: 'sas' },
+  ],
+  decals: [{ x: -1080, y: 520, w: 190, h: 285, kind: 'vanne', fade: 0.4 }],
+  // Lumière : bleu d'acier sur le grand rideau, lampe basse sur la ligne de
+  // charge (l'élan se lit dans les ombres longues), balise verte du sas.
+  lumieres: [
+    { x: -300, y: 60, h: 900, portee: 1350, intensite: 1, taille: 2 },
+    {
+      x: 440,
+      y: 120,
+      h: 260,
+      portee: 560,
+      intensite: 0.8,
+      couleur: '#8fb4d8',
+      taille: 1,
+    },
+    {
+      x: 1110,
+      y: 0,
+      h: 380,
+      portee: 500,
+      intensite: 0.9,
+      couleur: '#3fd69b',
+      taille: 1,
+    },
+  ],
+  ambiante: 0.44,
+}
+
+// Palier 4 — les régimes : certaines régions IMPOSENT leur état. On ne
+// lutte pas contre un régime — on s'en sert : armure de glace gratuite ici,
+// souffle gratuit là.
+export const TABLEAU_G9: LevelDef = {
+  name: 'Les régimes',
+  code: '21-09',
+  journal:
+    'Cellule 9, régimes imposés. Un hublot fendu glace tout ce qui passe devant ; une conduite rompue vaporise. Il n’a pas lutté contre les régimes : il les a utilisés — armure de glace gratuite ici, souffle gratuit là. Les accidents de la station sont devenus ses outils de travail. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+  par: 7,
+  boxes: [
+    // l'évent AU CŒUR de la conduite rompue : le régime vapeur donne
+    // exactement l'état qu'il faut pour le passer
+    box(100, -750, 140, 750, MAT_GRILLE),
+    // la glissière du retour : le régime glace offre le palet, les parois
+    // font le couloir — la glisse est gratuite
+    box(740, 140, 980, 200, MAT_WALL),
+    box(740, -200, 980, -140, MAT_WALL),
+  ],
+  sponges: [],
+  zones: [
+    // 1. le hublot fendu, hors de la route : entrer, se sentir geler,
+    //    ressortir — le régime se comprend sur la peau
+    { minX: -700, minY: 300, maxX: -380, maxY: 700, force: 'glace' },
+    // 2. la conduite rompue barre la route : le régime impose la vapeur —
+    //    et l'évent qu'elle contient devient traversable
+    { minX: -80, minY: -750, maxX: 320, maxY: 750, force: 'vapeur' },
+    // 3. le second hublot : l'armure gratuite, alignée sur la glissière
+    { minX: 440, minY: -160, maxX: 720, maxY: 160, force: 'glace' },
+  ],
+  labels: [
+    { x: -540, y: 220, text: 'HUBLOT FENDU — IMPOSE LA GLACE', tone: 'froid' },
+    {
+      x: 120,
+      y: -420,
+      text: 'CONDUITE ROMPUE — IMPOSE LA VAPEUR',
+      tone: 'chaud',
+    },
+    { x: 120, y: 320, text: 'ÉVENT', tone: 'grille' },
+    { x: 580, y: 240, text: 'L’ARMURE GRATUITE', tone: 'froid' },
+    { x: 1110, y: 180, text: 'SAS', tone: 'sas' },
+  ],
+  decals: [{ x: -1080, y: -540, w: 160, h: 160, kind: 'tuyaux', fade: 0.4 }],
+  // Lumière : chaque régime éclairé à sa couleur — bleu glacé sur les
+  // hublots, ambre sur la conduite — le sol raconte la carte des états.
+  lumieres: [
+    {
+      x: -540,
+      y: 500,
+      h: 420,
+      portee: 520,
+      intensite: 0.85,
+      couleur: '#8fc8ee',
+      taille: 1,
+    },
+    {
+      x: 120,
+      y: 0,
+      h: 800,
+      portee: 900,
+      intensite: 1,
+      couleur: '#e8a05a',
+      taille: 2,
+    },
+    {
+      x: 580,
+      y: 0,
+      h: 360,
+      portee: 480,
+      intensite: 0.8,
+      couleur: '#8fc8ee',
+      taille: 1,
+    },
+    {
+      x: 1110,
+      y: 0,
+      h: 380,
+      portee: 480,
+      intensite: 0.9,
+      couleur: '#3fd69b',
+      taille: 1,
+    },
+  ],
+  ambiante: 0.46,
+}
+
+// Palier 5 — la halte : les bornes de surchauffe. Frôlée en VAPEUR, une
+// borne rend UNE impulsion de nuage — une seule. La route se lit de borne
+// en borne, comme un pilote lit ses balises.
+export const TABLEAU_G10: LevelDef = {
+  name: 'La halte',
+  code: '21-10',
+  journal:
+    'Cellule 10, bornes de surchauffe. Chaque borne frôlée en vapeur rend UNE impulsion de nuage — une seule, puis elle s’éteint. Il a tracé sa route de borne en borne comme un pilote lit ses balises, et il est arrivé au dépôt avec de la réserve. Nous appelions ça une halte. Lui, un ravitaillement. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+  par: 8,
+  boxes: [
+    // 1. la chaudière d'essai (la vapeur gratuite) et la première borne,
+    //    hors de la route : frôler, sentir le dash rendu
+    box(-700, -500, -500, -420, MAT_CHAUD),
+    box(-660, 120, -600, 320, MAT_SURCHAUFFEUR),
+    // 2. la ligne de ravitaillement : deux bornes en quinconce sur la
+    //    grande traversée
+    box(-80, -260, -20, -60, MAT_SURCHAUFFEUR),
+    box(320, 60, 380, 260, MAT_SURCHAUFFEUR),
+    // 3. la route haute : le barrage force à grimper — la troisième borne
+    //    paie la montée, le dépôt froid recompose avant le sas
+    box(640, -750, 700, 420, MAT_WALL),
+    box(560, 480, 620, 680, MAT_SURCHAUFFEUR),
+    box(760, -200, 900, -140, MAT_FROID),
+  ],
+  sponges: [],
+  labels: [
+    {
+      x: -630,
+      y: 400,
+      text: 'BORNE — UN DASH, UNE FOIS',
+      tone: 'chaud',
+      picto: { couleur: '#e86a3c', eau: 0, glace: 0, vapeur: 3 },
+    },
+    { x: -600, y: -580, text: 'CHAUDIÈRE', tone: 'chaud' },
+    { x: 150, y: -360, text: 'LA LIGNE DE RAVITAILLEMENT', tone: 'chaud' },
+    { x: 830, y: -280, text: 'DÉPÔT FROID', tone: 'froid' },
+    { x: 1110, y: 180, text: 'SAS', tone: 'sas' },
+  ],
+  decals: [{ x: 1090, y: 560, w: 165, h: 165, kind: 'tuyaux', fade: 0.42 }],
+  // Lumière : les oranges chauds balisent la ligne de bornes, le dépôt
+  // reste bleu — chaud pour avancer, froid pour se refaire. Une brume
+  // légère : la salle respire la vapeur.
+  lumieres: [
+    { x: -100, y: 0, h: 920, portee: 1400, intensite: 1, taille: 2 },
+    {
+      x: 130,
+      y: -20,
+      h: 420,
+      portee: 640,
+      intensite: 0.9,
+      couleur: '#e8a05a',
+      taille: 1,
+    },
+    {
+      x: 830,
+      y: 0,
+      h: 360,
+      portee: 460,
+      intensite: 0.8,
+      couleur: '#8fc8ee',
+      taille: 1,
+    },
+    {
+      x: 1110,
+      y: 0,
+      h: 380,
+      portee: 480,
+      intensite: 0.9,
+      couleur: '#3fd69b',
+      taille: 1,
+    },
+  ],
+  ambiante: 0.46,
+  brume: 0.1,
+}
+
+// Palier 6 — la voie lumineuse : la respiration avant les salles laser, et
+// la leçon d'atmosphère. La salle est éteinte ; quatre flaques de lumière
+// tracent le chemin comme des pierres de gué — la lumière EST la carte.
+export const TABLEAU_G11: LevelDef = {
+  name: 'La voie lumineuse',
+  code: '21-11',
+  journal:
+    'Cellule 11, éclairage réduit. Nous avons éteint la salle pour mesurer sa dépendance au visuel. Il a suivi les flaques de lumière comme des pierres de gué, s’est posé dans chacune, et n’a jamais dévié dans le noir. La lumière n’est pas un décor. C’est une carte, et il la lit. — Dr N. Véga',
+  bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
+  spawn: { x: -950, y: 0, n: 900 },
+  exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
+  par: 6,
+  boxes: [
+    // des contreforts posés juste HORS des flaques : le noir n'est pas
+    // vide, il faut suivre le gué
+    box(-400, -300, -280, -120, MAT_WALL),
+    box(-100, 200, 60, 340, MAT_WALL),
+    box(400, -350, 520, -200, MAT_WALL),
+    box(660, 300, 780, 460, MAT_WALL),
+    // les deux perchoirs : s'ancrer DANS la lumière, viser la suivante
+    box(-160, -120, 0, -60, MAT_HYDROPHILE),
+    box(340, 80, 500, 160, MAT_HYDROPHILE),
+  ],
+  sponges: [],
+  labels: [
+    {
+      x: -800,
+      y: 200,
+      text: 'SUIVRE LA LUMIÈRE',
+      tone: 'mur',
+      rang: 'secteur',
+    },
+    {
+      x: -80,
+      y: -200,
+      text: 'HYDROPHILE — SE POSER DANS LA LUMIÈRE',
+      tone: 'phile',
+    },
+    { x: 1110, y: 180, text: 'SAS', tone: 'sas' },
+  ],
+  // Lumière : QUATRE lampes, et presque rien d'autre (ambiante 0,15).
+  // Blanche à l'entrée, cyan sur chaque perchoir, verte au sas — le regard
+  // saute de flaque en flaque, la brume rend les faisceaux visibles.
+  lumieres: [
+    { x: -820, y: 0, h: 520, portee: 620, intensite: 1.05, taille: 1 },
+    {
+      x: -80,
+      y: -40,
+      h: 420,
+      portee: 560,
+      intensite: 1,
+      couleur: '#63b7e6',
+      taille: 1,
+    },
+    {
+      x: 420,
+      y: 160,
+      h: 420,
+      portee: 560,
+      intensite: 1,
+      couleur: '#63b7e6',
+      taille: 1,
+    },
+    {
+      x: 1110,
+      y: 0,
+      h: 400,
+      portee: 620,
+      intensite: 1.1,
+      couleur: '#3fd69b',
+      taille: 1,
+    },
+  ],
+  ambiante: 0.15,
+  brume: 0.1,
+}
+
+// Les six paliers, pour l'éditeur et les tests.
+export const TABLEAUX_PALIERS: LevelDef[] = [
+  TABLEAU_G6,
+  TABLEAU_G7,
+  TABLEAU_G8,
+  TABLEAU_G9,
+  TABLEAU_G10,
+  TABLEAU_G11,
+]
+
+// L'ordre de la partie — LA DENT DE SCIE. La gamme d'abord (cinq cellules,
+// une nouveauté chacune — en sortie du hub), puis chaque leçon des paliers
+// se place JUSTE AVANT le tableau livré qui l'exige : l'éponge avant
+// « Le sas », la membrane après la chambre froide (le contraste), le rideau
+// après le conduit, les régimes avant la serre, la halte avant le dépôt de
+// givre, et la voie lumineuse en respiration avant les salles laser. Les
+// trilogies laser révèlent puis composent la fonction de l'échantillon, et
+// la dérive conclut sur la maîtrise pure.
 export const TABLEAUX: LevelDef[] = [
   ...TABLEAUX_GAMME,
+  TABLEAU_G6,
   TABLEAU_1,
   TABLEAU_2,
+  TABLEAU_G7,
   TABLEAU_3,
+  TABLEAU_G8,
+  TABLEAU_G9,
   TABLEAU_5,
+  TABLEAU_G10,
   TABLEAU_6,
   TABLEAU_4,
+  TABLEAU_G11,
   TABLEAU_8,
   TABLEAU_9,
   TABLEAU_10,
