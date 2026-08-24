@@ -2430,13 +2430,22 @@ export class LevelEditor {
     return level ? serializeLevel(level) : serializeLevel(t)
   }
 
+  /** Cette entrée est-elle une SEMENCE (copie livrée jamais retravaillée) ?
+   *  Le serveur normalise l'auteur — majuscules, tronqué à 12 caractères :
+   *  « expédition livrée » y devient « EXPÉDITION L ». Un test d'égalité
+   *  stricte ne trouvait donc jamais rien (bouton invisible, signalé) —
+   *  on reconnaît le préfixe, insensible à la casse. */
+  private estSemence(auteur: string): boolean {
+    return /^exp[eé]dition/i.test(auteur.trim())
+  }
+
   private livresDepasses(): { entry: StoredLevel; livre: LevelDef }[] {
     const parCode = new Map(TABLEAUX.map((t) => [t.code, t]))
     const out: { entry: StoredLevel; livre: LevelDef }[] = []
     for (const s of this.library) {
       const livre = parCode.get(s.level.code)
       if (!livre) continue
-      if (s.auteur !== 'expédition livrée') continue
+      if (!this.estSemence(s.auteur)) continue
       if (serializeLevel(s.level) === this.canonLivre(livre)) continue
       out.push({ entry: s, livre })
     }
@@ -2450,7 +2459,7 @@ export class LevelEditor {
     let n = 0
     for (const s of this.library) {
       const livre = parCode.get(s.level.code)
-      if (!livre || s.auteur === 'expédition livrée') continue
+      if (!livre || this.estSemence(s.auteur)) continue
       if (serializeLevel(s.level) !== this.canonLivre(livre)) n++
     }
     return n
