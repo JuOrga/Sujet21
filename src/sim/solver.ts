@@ -199,6 +199,9 @@ export class FluidSim {
   // péage). Le SURCHAUFFEUR frôlé en gaz en rend UNE, une seule fois.
   dashBudget = 0
   dashBudgetParTransfo = 3
+  // Bonus de rendement de recondensation (instrument « aimant à rosée ») —
+  // posé par le jeu au début de la run, remis à zéro avec la simulation
+  recondBonus = 0
   // Surchauffeurs déjà déchargés (indices de boîtes) — remis à neuf au
   // chargement du tableau. Le rendu lit ce même état pour le manomètre.
   readonly surchauffesVides = new Set<number>()
@@ -1735,8 +1738,12 @@ export class FluidSim {
     while (this.recondCarry >= 1 && this.vaporBank >= 1 && this.count < this.capacity) {
       this.recondCarry -= 1
       this.vaporBank -= 1
-      // rendement : part récupérable, meilleure à vaisseau froid
-      this.recondYield += Math.min(0.85, p.recondFraction + 0.25 * this.chill)
+      // rendement : part récupérable, meilleure à vaisseau froid — et
+      // l'AIMANT À ROSÉE (instrument embarqué) le bonifie pour la run
+      this.recondYield += Math.min(
+        0.92,
+        p.recondFraction + 0.25 * this.chill + this.recondBonus,
+      )
       if (this.recondYield < 1) continue
       this.recondYield -= 1
       // la rosée perle juste au-delà de l'aura de gel, répartie le long de la

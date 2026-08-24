@@ -7,6 +7,7 @@ import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
 import { TABLEAU_HUB, TABLEAU_HUB_COMPACT } from './game/hub'
 import { estCodeHub } from './game/levelIO'
+import { instrumentDef, tirageInstruments } from './game/instruments'
 import { dansForme, formeOutline } from './game/formes'
 import { DELIVERIES, VERSION, versionDe } from './bench/changelog'
 import { Camera } from './render/camera'
@@ -90,7 +91,8 @@ import {
 import { createBench, type BenchMonitor } from './bench/bench'
 
 const CAPACITY = 4096
-const EXIT_LINGER = 2.6 // secondes d'affichage du bilan avant le tableau suivant
+// (l'ancien délai d'affichage du bilan a cédé la place à la MISE EN
+// BONBONNE : c'est le choix d'instrument qui mène au tableau suivant)
 
 const params: SimParams = { ...DEFAULT_PARAMS }
 
@@ -112,6 +114,9 @@ const run = {
   // payé en condensat) et instruments embarqués (par run).
   vies: 1,
   conclues: 0, // salles conclues cette run (statistique, et futur farm)
+  // Les INSTRUMENTS EMBARQUÉS : les cartes emportées aux mises en bonbonne
+  // de cette run — des avantages latéraux, perdus à la fin de la run.
+  instruments: [] as string[],
 }
 const VIES_MAX = 3 // plafond, étalonnage et instruments compris
 // Sonde de test : l'état de la run depuis la console (comme __sim, __cam)
@@ -141,6 +146,20 @@ function gagneCondensat(cl: number): void {
   }
   majCondensatUI()
 }
+/** Débite la réserve si elle suffit — la première dépense du condensat
+ * (cartes payantes de la mise en bonbonne). */
+function depenseCondensat(cl: number): boolean {
+  if (cl <= 0) return true
+  if (condensat < cl) return false
+  condensat -= cl
+  try {
+    localStorage.setItem(CLE_CONDENSAT, String(condensat))
+  } catch {
+    // stockage indisponible : la dépense vivra le temps de la session
+  }
+  majCondensatUI()
+  return true
+}
 function majCondensatUI(): void {
   const dd = document.getElementById('home-condensat')
   if (dd) dd.textContent = `${condensat} cL`
@@ -148,7 +167,9 @@ function majCondensatUI(): void {
 majCondensatUI()
 
 function chillNow(): number {
-  return Math.min(1, run.runTime / Math.max(30, params.chillDuration))
+  // la gaine isolante (instrument embarqué) ralentit le refroidissement
+  const gaine = run.instruments.includes('gaine-isolante') ? 1.5 : 1
+  return Math.min(1, run.runTime / (Math.max(30, params.chillDuration) * gaine))
 }
 
 // Effets sonores : le contexte audio naît au premier geste (clic, toucher)
@@ -240,6 +261,10 @@ function createSim(level: LevelDef): FluidSim {
   // rien à provoquer, et sans dash le nuage naîtrait sans aucune mobilité —
   // l'éjection est coupée en vapeur. On entre donc avec le compteur plein.
   sim.dashBudgetParTransfo = level.dashBudget ?? params.gasDashBudget
+  // Instruments embarqués : la buse calibrée offre un dash de plus par
+  // transformation, l'aimant à rosée bonifie la recondensation
+  if (run.instruments.includes('buse-calibree')) sim.dashBudgetParTransfo += 1
+  if (run.instruments.includes('aimant-rosee')) sim.recondBonus = 0.35
   const naitVapeur =
     zoneForceAt(level, level.spawn.x, level.spawn.y) === 'vapeur'
   sim.dashBudget = naitVapeur ? sim.dashBudgetParTransfo : 0
@@ -1846,6 +1871,7 @@ interface RunSauvee {
   time: number
   vies: number
   conclues: number
+  instruments: string[]
 }
 function runSauvee(): RunSauvee | null {
   try {
@@ -1860,6 +1886,9 @@ function runSauvee(): RunSauvee | null {
       // sauvegardes d'avant les vies : on reprend avec l'échantillon unique
       vies: Math.max(1, Math.min(VIES_MAX, Math.floor(Number(d.vies) || 1))),
       conclues: Math.max(0, Math.floor(Number(d.conclues) || 0)),
+      instruments: Array.isArray(d.instruments)
+        ? d.instruments.filter((x): x is string => typeof x === 'string')
+        : [],
     }
   } catch {
     return null
@@ -1881,6 +1910,7 @@ function sauveRun(): void {
           time: run.runTime,
           vies: run.vies,
           conclues: run.conclues,
+          instruments: run.instruments,
         }),
       )
   } catch {
@@ -1906,6 +1936,7 @@ function reprendreRun(save: RunSauvee): void {
   run.runTime = save.time
   run.vies = save.vies
   run.conclues = save.conclues
+  run.instruments = save.instruments.slice()
   hasPlayed = true
   document.body.classList.add('playing')
   input.paused = false
@@ -1976,6 +2007,7 @@ document.getElementById('start-secondaire')?.addEventListener('click', () => {
   run.runTime = 0
   run.vies = 1
   run.conclues = 0
+  run.instruments = []
   hasPlayed = true
   document.body.classList.add('playing')
   input.paused = false
@@ -3085,6 +3117,216 @@ function resetLasers(): void {
   cachesLevee = (level.caches ?? []).map(() => Infinity)
   rebuildRenderBoxes() // les parois factices reprennent leur poste
 }
+
+// ---- LA MISE EN BONBONNE : l'écran de récompense de fin de salle ----
+// Quatre temps : la compression (le surplus coule dans la bonbonne), la
+// lecture du protocole (les lignes tombent, les records se tamponnent), le
+// condensat (les centilitres s'égrènent vers la réserve méta), et LE CHOIX
+// (trois cartes d'instruments, on en emporte une — certaines payantes en
+// condensat). Un toucher saute aux cartes ; le choix, lui, ne se saute pas.
+let miseEnBonbonne = false
+const mbVeil = document.getElementById('mb-veil') as HTMLDivElement
+const mbTimers: number[] = []
+let mbPhaseChoix = false
+let mbBilanCourant: BilanSalle | null = null
+
+/** Le sas mène à la salle suivante (raccourci éventuel compris). */
+function avanceSalle(): void {
+  overlay.classList.remove('visible')
+  // RACCOURCI (mécanique roguelike, préparée) : un tableau peut déclarer
+  // `raccourciVers` — son sas envoie alors directement à la salle codée,
+  // en SAUTANT les intermédiaires. Vers l'avant uniquement (pas de boucle).
+  const cible = level.raccourciVers
+    ? playedLevels().findIndex((t) => t.code === level.raccourciVers)
+    : -1
+  levelIndex = cible > levelIndex ? cible : levelIndex + 1
+  restart()
+}
+
+interface BilanSalle {
+  surplus: number
+  prime: number
+  pct: number // part du volume de départ livrée (0..1+)
+  temps: number
+  newVolume: boolean
+  newChrono: boolean
+  recVol: string
+  recChr: string
+  note: number
+  gainCl: number
+  totalCl: number // réserve APRÈS le gain
+}
+
+function mbEl(id: string): HTMLElement {
+  return mbVeil.querySelector('#' + id) as HTMLElement
+}
+
+function fermeMiseEnBonbonne(): void {
+  for (const t of mbTimers) clearTimeout(t)
+  mbTimers.length = 0
+  mbVeil.hidden = true
+  miseEnBonbonne = false
+  mbBilanCourant = null
+}
+
+/** Les cartes du choix (phase 4) : tirées, affichées, câblées. */
+function mbMontreChoix(): void {
+  if (mbPhaseChoix) return
+  mbPhaseChoix = true
+  for (const t of mbTimers) clearTimeout(t)
+  mbTimers.length = 0
+  // toutes les phases passent à leur état final (au cas où l'on a sauté)
+  const b = mbBilanCourant
+  if (b) {
+    mbEl('mb-eau').style.height = `${Math.min(100, b.pct * 100).toFixed(0)}%`
+    mbEl('mb-l').textContent = `${b.surplus.toFixed(2)} L`
+    if (b.prime >= 0.01) {
+      const pr = mbEl('mb-prime')
+      pr.hidden = false
+      pr.textContent = `+${b.prime.toFixed(2)} L — PRIME DE GLACE`
+      mbEl('mb-glace').hidden = false
+    }
+    for (const l of Array.from(mbVeil.querySelectorAll('.mb-ligne'))) {
+      l.classList.add('mb-on')
+    }
+    const cond = mbEl('mb-cond')
+    cond.hidden = false
+    cond.classList.add('mb-on')
+    mbEl('mb-cond-n').textContent = String(b.totalCl)
+  }
+  mbEl('mb-passer').hidden = true
+  const bloc = mbEl('mb-choix')
+  bloc.hidden = false
+  const cartes = tirageInstruments(
+    Math.random,
+    run.instruments,
+    run.vies,
+    VIES_MAX,
+  )
+  const host = mbEl('mb-cartes')
+  host.innerHTML = ''
+  if (cartes.length === 0) {
+    // plus rien au bassin (tout emporté, réserve pleine) : on file
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'mb-continuer'
+    btn.textContent = 'INSTRUMENTS AU COMPLET — CONTINUER'
+    btn.addEventListener('click', () => {
+      fermeMiseEnBonbonne()
+      avanceSalle()
+    })
+    host.appendChild(btn)
+    return
+  }
+  for (const carte of cartes) {
+    const def = instrumentDef(carte.id)
+    if (!def) continue
+    const payable = carte.prix === 0 || condensat >= carte.prix
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'mb-carte' + (payable ? '' : ' mb-pauvre')
+    btn.disabled = !payable
+    btn.innerHTML =
+      `<span class="mb-ico">${def.icone}</span>` +
+      `<b>${def.nom}</b><small>${def.desc}</small>` +
+      (carte.prix > 0
+        ? `<em class="mb-prix">${carte.prix} cL</em>`
+        : `<em class="mb-prix mb-offert">offert</em>`)
+    btn.addEventListener('click', () => {
+      if (!depenseCondensat(carte.prix)) return
+      if (carte.id === 'echantillon-secours') {
+        run.vies = Math.min(VIES_MAX, run.vies + 1)
+        majBoutonsRun()
+      } else {
+        run.instruments.push(carte.id)
+      }
+      bande.ponctuation('sting-collecte', 0.7)
+      fermeMiseEnBonbonne()
+      avanceSalle()
+    })
+    host.appendChild(btn)
+  }
+}
+
+function montreMiseEnBonbonne(b: BilanSalle): void {
+  miseEnBonbonne = true
+  mbPhaseChoix = false
+  mbBilanCourant = b
+  mbVeil.hidden = false
+  // état de départ
+  mbEl('mb-eau').style.height = '0%'
+  mbEl('mb-l').textContent = '0,00 L'
+  mbEl('mb-prime').hidden = true
+  mbEl('mb-glace').hidden = true
+  mbEl('mb-choix').hidden = true
+  mbEl('mb-cond').hidden = true
+  mbEl('mb-cond').classList.remove('mb-on')
+  mbEl('mb-passer').hidden = false
+  const apres = (ms: number, fn: () => void): void => {
+    mbTimers.push(window.setTimeout(fn, ms))
+  }
+  // Temps 1 — la COMPRESSION : le niveau monte, le compteur égrène
+  apres(150, () => {
+    mbEl('mb-eau').style.height = `${Math.min(100, b.pct * 100).toFixed(0)}%`
+  })
+  const t0 = performance.now() + 150
+  const litres = (): void => {
+    const t = Math.min(1, (performance.now() - t0) / 1300)
+    const e = 1 - (1 - t) * (1 - t) // sortie douce
+    mbEl('mb-l').textContent = `${(b.surplus * e).toFixed(2)} L`
+    if (t < 1 && !mbPhaseChoix) requestAnimationFrame(litres)
+  }
+  requestAnimationFrame(litres)
+  if (b.prime >= 0.01) {
+    apres(1550, () => {
+      const pr = mbEl('mb-prime')
+      pr.hidden = false
+      pr.textContent = `+${b.prime.toFixed(2)} L — PRIME DE GLACE`
+      mbEl('mb-glace').hidden = false
+      audio.iceImpact(1)
+    })
+  }
+  // Temps 2 — la LECTURE DU PROTOCOLE : les lignes tombent une à une
+  const tampon = (neuf: boolean): string =>
+    neuf ? `<em class="mb-record">RECORD DU PROTOCOLE</em>` : ''
+  const lignes = [
+    `<span>💧 <b>${b.surplus.toFixed(2)} L</b> · ${Math.round(b.pct * 100)} % du volume de départ</span>${tampon(b.newVolume)}${b.newVolume ? '' : `<small>record : ${b.recVol}</small>`}`,
+    `<span>⏱ <b>${fmtTime(b.temps)}</b></span>${tampon(b.newChrono)}${b.newChrono ? '' : `<small>record : ${b.recChr}</small>`}`,
+    `<span>◈ NOTE <b>${b.note}</b></span>`,
+  ]
+  const hostLignes = mbEl('mb-lignes')
+  hostLignes.innerHTML = lignes
+    .map((l) => `<div class="mb-ligne">${l}</div>`)
+    .join('')
+  Array.from(hostLignes.children).forEach((el2, i) => {
+    apres(2000 + i * 260, () => el2.classList.add('mb-on'))
+  })
+  // Temps 3 — le CONDENSAT : les centilitres s'égrènent vers la réserve
+  apres(2950, () => {
+    const cond = mbEl('mb-cond')
+    cond.hidden = false
+    cond.classList.add('mb-on')
+    mbEl('mb-cond-gain').textContent = `+${b.gainCl} cL`
+    const c0 = performance.now()
+    const roule = (): void => {
+      const t = Math.min(1, (performance.now() - c0) / 1100)
+      const e = 1 - (1 - t) * (1 - t)
+      mbEl('mb-cond-n').textContent = String(
+        Math.round(b.totalCl - b.gainCl * (1 - e)),
+      )
+      if (t < 1 && !mbPhaseChoix) requestAnimationFrame(roule)
+    }
+    requestAnimationFrame(roule)
+  })
+  // Temps 4 — LE CHOIX
+  apres(4300, mbMontreChoix)
+}
+// un toucher pendant les temps 1-3 saute aux cartes ; jamais l'inverse
+mbVeil?.addEventListener('pointerdown', (e) => {
+  if (!mbPhaseChoix && (e.target as HTMLElement).closest('.mb-carte') === null) {
+    mbMontreChoix()
+  }
+})
 const dashAimEl = el('dash-aim')
 const dashCostEl = el('dash-cost')
 
@@ -3147,6 +3389,7 @@ function newExpedition(): void {
   run.runTime = 0
   run.vies = 1
   run.conclues = 0
+  run.instruments = []
   restart()
 }
 
@@ -3158,6 +3401,7 @@ function retourAuLabo(): void {
   run.runTime = 0
   run.vies = 1
   run.conclues = 0
+  run.instruments = []
   run.ended = false
   runSecondaire = false
   entrerHub()
@@ -3259,6 +3503,7 @@ function abandonneRun(): void {
 // En mode prototype (21-A bis) : l'essai conclu ramène au protocole, la
 // dispersion remet l'échantillon en cuve pour un nouvel essai du bis.
 function resetAction(): void {
+  if (miseEnBonbonne) return // la mise en bonbonne se conclut par une carte
   if (testLevel) {
     if (run.ended) {
       if (fromEditor) {
@@ -4090,7 +4335,7 @@ function frame(now: number): void {
   }
 
   const aim = camera.screenToWorld(input.aimClientX, input.aimClientY, vw, vh)
-  const tableauDone = run.exitTimer > 0 || run.ended
+  const tableauDone = run.exitTimer > 0 || run.ended || miseEnBonbonne
 
   // Zones d'état (refonte 2026) : une zone impose un état et verrouille le
   // sélecteur tant qu'on y est. L'intention du joueur est écrasée, pas effacée
@@ -4563,34 +4808,6 @@ function frame(now: number): void {
       }
     })
     const bests = records.tableauRecord(level.code)!
-    const primeLine =
-      prime >= 0.01 ? ` · prime de glace +${prime.toFixed(2)} L` : ''
-    const ligne = (
-      icone: string,
-      valeur: string,
-      neuf: boolean,
-      record: string,
-    ): string =>
-      `<span class="bilan-l">${icone} <b>${valeur}</b> — ${
-        neuf
-          ? '<em class="bilan-neuf">NOUVEAU RECORD ✦</em>'
-          : `record : ${record}`
-      }</span>`
-    const bilan =
-      `<span class="bilan">` +
-      ligne(
-        '💧',
-        fmtL(surplus),
-        newVolume,
-        `${fmtL(bests.volume.liters)}${bests.volume.name ? ' · ' + htmlSafe(bests.volume.name) : ''}`,
-      ) +
-      ligne(
-        '⏱',
-        fmtTime(run.tableauTime),
-        newChrono,
-        `${fmtTime(bests.chrono.time)}${bests.chrono.name ? ' · ' + htmlSafe(bests.chrono.name) : ''}`,
-      ) +
-      `</span>`
     audio.collect()
     // Le record a sa propre fanfare : la collecte ordinaire ne doit pas
     // sonner comme un exploit, sinon plus rien ne sonne comme un exploit.
@@ -4634,14 +4851,25 @@ function frame(now: number): void {
         'RETOUR AU LABO',
       )
     } else {
-      run.exitTimer = EXIT_LINGER
       renderRegistres()
       run.conclues += 1
-      showOverlay(
-        'ÉCHANTILLON COLLECTÉ',
-        `${bilan}${surplus.toFixed(2)} L transférés en bonbonne${primeLine} · <em class="bilan-neuf">condensat +${Math.round(surplus * 100)} cL</em> — réserve : ${run.bonbonneLiters.toFixed(2)} L · tableau suivant…`,
-        'success',
-      )
+      // LA MISE EN BONBONNE : la cérémonie remplace le bandeau — elle tient
+      // l'essai en suspens jusqu'au choix d'instrument, qui mène à la suite
+      montreMiseEnBonbonne({
+        surplus,
+        prime,
+        pct:
+          surplus /
+          Math.max(0.01, level.spawn.n * params.litersPerParticle),
+        temps: run.tableauTime,
+        newVolume,
+        newChrono,
+        recVol: `${fmtL(bests.volume.liters)}${bests.volume.name ? ' · ' + htmlSafe(bests.volume.name) : ''}`,
+        recChr: `${fmtTime(bests.chrono.time)}${bests.chrono.name ? ' · ' + htmlSafe(bests.chrono.name) : ''}`,
+        note: Math.round((surplus * 100 * 60) / (60 + run.tableauTime)),
+        gainCl: Math.round(surplus * 100),
+        totalCl: condensat,
+      })
     }
     // la cinématique de CONCLUSION du tableau : par-dessus le bilan — la
     // pause de lecture retient aussi le passage automatique à la suite
@@ -4649,17 +4877,7 @@ function frame(now: number): void {
   }
   if (run.exitTimer > 0) {
     run.exitTimer -= dtReal
-    if (run.exitTimer <= 0) {
-      overlay.classList.remove('visible')
-      // RACCOURCI (mécanique roguelike, préparée) : un tableau peut déclarer
-      // `raccourciVers` — son sas envoie alors directement à la salle codée,
-      // en SAUTANT les intermédiaires. Vers l'avant uniquement (pas de boucle).
-      const cible = level.raccourciVers
-        ? playedLevels().findIndex((t) => t.code === level.raccourciVers)
-        : -1
-      levelIndex = cible > levelIndex ? cible : levelIndex + 1
-      restart()
-    }
+    if (run.exitTimer <= 0) avanceSalle()
   }
 
   // Ondes d'éjection : naissance côté visée, sur le bord du corps (pas en vapeur)

@@ -3765,6 +3765,120 @@
           display: none;
         }
       }
+    
+      /* ---- La MISE EN BONBONNE : l'écran de récompense de fin de salle ---- */
+      #mb-veil {
+        position: fixed; inset: 0; z-index: 50;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(4, 8, 14, 0.72);
+        backdrop-filter: blur(3px);
+        -webkit-backdrop-filter: blur(3px);
+      }
+      #mb-veil[hidden] { display: none; }
+      .mb-panneau {
+        width: min(480px, 92vw);
+        background: linear-gradient(180deg, #0d141f, #0a0f18);
+        border: 1px solid #27405a; border-radius: 12px;
+        padding: 18px 20px 16px;
+        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6);
+        font-family: 'IBM Plex Mono', ui-monospace, monospace;
+        color: #cfe2ef;
+      }
+      .mb-titre {
+        margin: 0 0 12px; font-family: Michroma, ui-monospace, monospace;
+        font-size: 13px; letter-spacing: 0.24em; color: #8fd8c8;
+      }
+      .mb-haut { display: flex; align-items: center; gap: 16px; }
+      .mb-flacon {
+        position: relative; width: 54px; height: 96px; flex: 0 0 54px;
+        border: 2px solid #3d5a78; border-top-width: 8px; border-radius: 10px 10px 14px 14px;
+        background: rgba(18, 28, 42, 0.6); overflow: hidden;
+      }
+      .mb-eau {
+        position: absolute; left: 0; right: 0; bottom: 0; height: 0%;
+        background: linear-gradient(180deg, #4fa8d8, #1d5f8c);
+        transition: height 1.3s cubic-bezier(0.2, 0.7, 0.3, 1);
+      }
+      .mb-glace {
+        position: absolute; left: 0; right: 0; top: 4px; text-align: center;
+        font-size: 15px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));
+        animation: mb-plonge 0.5s ease-out;
+      }
+      @keyframes mb-plonge {
+        from { transform: translateY(-26px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
+      .mb-litres { font-size: 24px; }
+      .mb-litres b { color: #eaf6ff; }
+      .mb-prime {
+        display: block; margin-top: 6px; font-size: 11px; color: #a8d8f0;
+        animation: mb-plonge 0.4s ease-out;
+      }
+      .mb-lignes { margin-top: 14px; display: grid; gap: 7px; }
+      .mb-ligne {
+        display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+        font-size: 13px; opacity: 0; transform: translateY(7px);
+        transition: opacity 0.28s ease, transform 0.28s ease;
+      }
+      .mb-ligne.mb-on { opacity: 1; transform: none; }
+      .mb-ligne small { color: #7b93a8; font-size: 11px; }
+      .mb-record {
+        font-style: normal; font-size: 10px; letter-spacing: 0.12em;
+        color: #ffd977; border: 1px solid #ffd977; border-radius: 3px;
+        padding: 2px 6px; transform: rotate(-3deg);
+        animation: mb-tampon 0.35s cubic-bezier(0.2, 2.2, 0.4, 1);
+      }
+      @keyframes mb-tampon {
+        from { transform: rotate(-3deg) scale(2.1); opacity: 0; }
+        to { transform: rotate(-3deg) scale(1); opacity: 1; }
+      }
+      .mb-cond {
+        margin-top: 14px; padding-top: 12px; border-top: 1px solid #1d2c3e;
+        font-size: 13px; letter-spacing: 0.08em; color: #9fd8c8;
+        opacity: 0; transition: opacity 0.3s ease;
+      }
+      .mb-cond.mb-on { opacity: 1; }
+      .mb-cond b { font-size: 17px; color: #d5f3e8; }
+      .mb-cond-gain { margin-left: 8px; color: #6dffb8; font-size: 12px; }
+      .mb-choix { margin-top: 16px; }
+      .mb-choix-titre {
+        margin: 0 0 10px; font-size: 11px; letter-spacing: 0.2em; color: #8ea2bd;
+      }
+      .mb-cartes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+      .mb-carte {
+        display: flex; flex-direction: column; align-items: center; gap: 5px;
+        padding: 12px 8px 10px; min-height: 122px;
+        background: linear-gradient(180deg, #14202f, #101825);
+        border: 1px solid #2d4258; border-radius: 9px; color: #cfe2ef;
+        font: inherit; font-size: 11px; cursor: pointer; text-align: center;
+        animation: mb-plonge 0.35s ease-out backwards;
+        transition: transform 0.12s ease, border-color 0.12s ease;
+      }
+      .mb-carte:nth-child(2) { animation-delay: 0.08s; }
+      .mb-carte:nth-child(3) { animation-delay: 0.16s; }
+      .mb-carte:hover:not(:disabled) { transform: translateY(-3px); border-color: #6dffb8; }
+      .mb-carte b { font-size: 11px; line-height: 1.25; }
+      .mb-carte small { color: #7b93a8; font-size: 10px; line-height: 1.3; }
+      .mb-ico { font-size: 22px; }
+      .mb-prix {
+        margin-top: auto; font-style: normal; font-size: 10px;
+        color: #ffd977; letter-spacing: 0.08em;
+      }
+      .mb-prix.mb-offert { color: #6dffb8; }
+      .mb-carte.mb-pauvre { opacity: 0.45; cursor: not-allowed; }
+      .mb-continuer {
+        grid-column: 1 / -1; padding: 12px; font: inherit; font-size: 12px;
+        background: #14202f; border: 1px solid #2d4258; border-radius: 9px;
+        color: #cfe2ef; cursor: pointer; letter-spacing: 0.08em;
+      }
+      .mb-passer {
+        margin: 12px 0 0; text-align: center; font-size: 10px;
+        letter-spacing: 0.14em; color: #55708c;
+      }
+      @media (max-width: 560px) {
+        .mb-cartes { grid-template-columns: 1fr; }
+        .mb-carte { min-height: 0; flex-direction: row; text-align: left; flex-wrap: wrap; }
+      }
     </style>
   </head>
   <body>
@@ -4369,6 +4483,22 @@
 
     <!-- LES CINÉMATIQUES : le lecteur plein écran (cinelecteur.ts remplit)
          et la table de montage (montage.ts remplit) -->
+    <div id="mb-veil" hidden aria-label="Mise en bonbonne">
+      <div class="mb-panneau">
+        <h3 class="mb-titre">MISE EN BONBONNE</h3>
+        <div class="mb-haut">
+          <div class="mb-flacon"><div class="mb-eau" id="mb-eau"></div><div class="mb-glace" id="mb-glace" hidden>🧊</div></div>
+          <div class="mb-litres"><b id="mb-l">0,00 L</b><span class="mb-prime" id="mb-prime" hidden></span></div>
+        </div>
+        <div class="mb-lignes" id="mb-lignes"></div>
+        <div class="mb-cond" id="mb-cond" hidden>CONDENSAT <b id="mb-cond-n">0</b> cL<span class="mb-cond-gain" id="mb-cond-gain"></span></div>
+        <div class="mb-choix" id="mb-choix" hidden>
+          <p class="mb-choix-titre">EMPORTEZ UN INSTRUMENT — il vaut pour toute la run</p>
+          <div class="mb-cartes" id="mb-cartes"></div>
+        </div>
+        <p class="mb-passer" id="mb-passer">toucher pour passer</p>
+      </div>
+    </div>
     <div id="cine" hidden aria-label="Cinématique"></div>
     <div id="montage" aria-label="Table de montage des cinématiques"></div>
     <div id="imagerie" aria-label="Bibliothèque d'images"></div>
