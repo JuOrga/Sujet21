@@ -1351,30 +1351,38 @@ void main() {
       water += vec3(0.95, 0.99, 1.0) * lumSpec * specDur * 0.80 * miroir;
       water += vec3(0.50, 0.68, 0.85) * lumSpec * fres * 0.40 * miroir;
       water += vec3(0.90, 0.97, 1.0) * lumSpec * etincelles * (0.25 + specDur) * 0.55 * miroir;
-      // SURFACE MIROITANTE (réglage PARAMÈTRES) : la surface incurvée
-      // renvoie VRAIMENT les alentours — la pièce est échantillonnée à
-      // distance le long de la normale : les flaques des lampes, les rails
-      // des bandes, les ombres des murs et le décor du fond s'y mirent et
-      // GLISSENT avec la houle. Le cœur garde son bleu profond ; le reflet
-      // vit sur la zone de surface, surtout aux incidences rasantes.
-      // textureLod : LOD explicite — dans ce flux non uniforme, les
-      // dérivées des mipmaps seraient fausses, et le flou doux est voulu.
+      // SURFACE MIROITANTE (réglage PARAMÈTRES) : la surface renvoie
+      // VRAIMENT les alentours — la pièce est échantillonnée à distance le
+      // long d'une normale de houle ANIMÉE, sur TOUT le corps liquide. Le
+      // reflet est PRÉ-COMPENSÉ de la lumière locale : un miroir montre la
+      // source qu'il reflète, pas l'ombre dans laquelle il baigne — sans
+      // cette division, l'effet disparaissait dans les salles sombres.
+      // textureLod : LOD explicite (flux non uniforme) et flou doux voulu.
       if (uMiroirEau > 0.5) {
-        vec2 reflPos = world + nrm.xy * (110.0 + 220.0 * fres) +
-          vec2(sin(uTime * 0.9 + world.y * 0.02), cos(uTime * 0.7 + world.x * 0.02)) * 9.0;
+        float ond = vnoise(world * 0.02 + vec2(uTime * 0.33, -uTime * 0.26));
+        float ond2 = vnoise(world * 0.047 - vec2(uTime * 0.21, uTime * 0.16));
+        vec2 nDir = normalize(nrm.xy * 1.6 + (vec2(ond, ond2) - 0.5) * 1.3);
+        float distR = 70.0 + 240.0 * fres + 160.0 * ond;
+        vec2 reflPos = world + nDir * distR;
         vec3 envL = vec3(uAmbiante);
         if (uLumiereEau > 0.5) {
           vec2 luvR = clamp((reflPos - uLightMapMin) * uLightMapInvSize, vec2(0.0), vec2(1.0));
-          envL += 1.15 * texture(uLightMap, luvR).rgb;
+          envL += 1.35 * texture(uLightMap, luvR).rgb;
         }
         vec3 envT = uHasTank > 0.5
           ? textureLod(uTexTank, (reflPos - uCenter * 0.10) / 900.0, 2.0).rgb
           : vec3(0.10, 0.16, 0.22);
-        // teinte froide : le miroir reste un métal liquide BLEU
-        vec3 env = envT * envL * vec3(0.72, 0.92, 1.12);
-        float force = miroir * (0.30 + 0.50 * fres);
-        water = mix(water, env, clamp(force, 0.0, 0.85));
-        water += vec3(0.85, 0.95, 1.05) * envL * specDur * 0.35 * miroir;
+        // le punch du miroir : les hautes lumières réfléchies CLAQUENT
+        vec3 env = envT * envL * vec3(0.80, 1.00, 1.20) + envL * envL * vec3(0.30, 0.38, 0.46);
+        // pré-compensation de l'éclairage du volume (appliqué plus bas) :
+        // le reflet traverse l'ombre locale au lieu d'y mourir
+        if (uLumiereEau > 0.5) {
+          env /= clamp(vec3(uAmbiante * 1.15) + 1.05 * lmEau, vec3(0.10), vec3(1.0));
+        }
+        env = min(env, vec3(1.8));
+        float corps = body * (1.0 - vap) * (1.0 - icy * 0.7);
+        float force = corps * clamp(0.42 + 0.45 * fres + 0.30 * ond2 * core, 0.0, 0.92);
+        water = mix(water, env, force);
       }
     }
     water += vec3(0.30, 0.55, 0.65) * waveGlow * 0.45 * (1.0 - icy) * (1.0 - vap);

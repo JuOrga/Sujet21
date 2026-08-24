@@ -14,6 +14,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '24/08/2026 14:45',
+    title:
+      'Le miroir, le vrai : le reflet couvre tout le corps et traverse l’ombre — et l’icône 💨 passe à l’ambre',
+    notes: [
+      'SIGNALÉ, à raison : la première surface « miroitante » ne se voyait pas. Deux causes trouvées et corrigées. UN — le reflet était confiné au fin liseré de surface : il couvre désormais TOUT le corps liquide, porté par une houle de normale ANIMÉE (le chatoiement bouge même à l’arrêt). DEUX — le reflet était re-multiplié par la lumière locale du corps : un miroir posé dans l’ombre montrait… de l’ombre. Il est maintenant PRÉ-COMPENSÉ : le miroir montre la source qu’il reflète, pas la pénombre dans laquelle il baigne — c’est ce qui le faisait disparaître dans les salles sombres de la gamme.',
+      'Et les hautes lumières réfléchies CLAQUENT (terme quadratique) : une bande lumineuse se lit dans le corps comme un néon sur une flaque, les panneaux du décor ondulent dans la masse, les bords accrochent en fresnel. Vérifié par captures comparées : la différence MIROITANTE / CLASSIQUE est désormais indiscutable — chrome liquide contre aplat bleu. Le retour reste à un clic (PARAMÈTRES → Surface du fluide) et le rendu classique est inchangé au pixel près. Si c’est maintenant TROP miroir à votre goût, le dosage est un coefficient — dites-le.',
+      'Et l’icône 💨 du HUD (bouton VAPEUR) est teintée AMBRE DORÉ par filtre, active ou non — l’emoji gris rejoint le langage de couleur des états.',
+    ],
+  },
+  {
     date: '24/08/2026 14:15',
     title:
       'La surface MIROITANTE : le fluide reflète les alentours — et l’ancien rendu reste à un clic',
