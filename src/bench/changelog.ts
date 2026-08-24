@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '24/08/2026 17:25',
+    title:
+      'Le plafond du concepteur est intégré : les verrières vivent dans le reflet',
+    notes: [
+      'La planche livrée (structure d’acier vue du dessous, conduites à brides, verrières à croisillons et hublots ronds éclairés blanc froid — exactement le cahier des charges du §13) remplace le plafond de substitution. Recadrée en 1024² (la taille du calque), 103 Ko. En jeu, les verrières scintillent dans toute la masse du fluide et glissent avec la houle et la parallaxe — le miroir vivant du lore, avec le VRAI plafond de la station dedans.',
+      'Rien d’autre à toucher : le fichier public/assets/plafond.webp est la seule pièce — pour une future variante, le remplacer suffit.',
+    ],
+  },
+  {
     date: '24/08/2026 16:55',
     title:
       'Le reflet montre LE PLAFOND : la machinerie au-dessus de la cuve, visible nulle part ailleurs',
