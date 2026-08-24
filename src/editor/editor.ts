@@ -3224,7 +3224,23 @@ export class LevelEditor {
     } else if (s.kind === 'cache') {
       const c = (this.level.caches ?? [])[s.index]
       rows.push(
-        `<p class="ed-empty">En jeu, ce pan est VOILÉ d’un brouillard « non cartographié » : parois, mécanismes et fluide y sont invisibles jusqu’à ce que le corps y ENTRE — le voile se lève alors pour l’essai (Recommencer re-voile). La physique ne change pas : ce qui est caché fonctionne.</p>`,
+        `<p class="ed-empty">En jeu, ce pan est VOILÉ jusqu’à ce que le corps y ENTRE — le voile se lève alors pour l’essai (Recommencer re-voile). La physique ne change pas : ce qui est caché fonctionne.</p>`,
+      )
+      rows.push(
+        `<label class="ed-f" title="BROUILLARD : un voile « non cartographié », assumé. PAROI FACTICE : le pan se rend comme une VRAIE paroi (ombres portées comprises) et se dissout à l'entrée — le passage secret classique."><span>Style</span><select id="p-kstyle">` +
+          `<option value="brume"${c.style !== 'paroi' ? ' selected' : ''}>Brouillard</option>` +
+          `<option value="paroi"${c.style === 'paroi' ? ' selected' : ''}>Paroi factice</option>` +
+          `</select></label>`,
+      )
+      rows.push(
+        `<label class="ed-f"><span>Forme</span><select id="p-kforme">` +
+          [FORME_RECT, FORME_DISQUE, FORME_CAPSULE, FORME_COIN, FORME_ARC]
+            .map(
+              (f) =>
+                `<option value="${f}"${f === (c.forme ?? 0) ? ' selected' : ''}>${FORME_NAMES[f]}</option>`,
+            )
+            .join('') +
+          `</select></label>`,
       )
       rows.push(
         numField('X min', 'p-minX', c.minX),
@@ -3234,6 +3250,42 @@ export class LevelEditor {
         numField('Y min', 'p-minY', c.minY),
         numField('Y max', 'p-maxY', c.maxY),
       )
+      rows.push(rangeField('Angle (°)', 'p-kang', c.angle ?? 0, -180, 180, 1))
+      if ((c.forme ?? 0) === FORME_COIN) {
+        const coins = ['Bas-gauche', 'Bas-droit', 'Haut-droit', 'Haut-gauche']
+        rows.push(
+          `<label class="ed-f"><span>Angle droit au coin</span><select id="p-kq0">` +
+            coins
+              .map(
+                (n, i) =>
+                  `<option value="${i}"${i === ((Math.round(c.p0 ?? 0) % 4) + 4) % 4 ? ' selected' : ''}>${n}</option>`,
+              )
+              .join('') +
+            `</select></label>`,
+        )
+      }
+      if ((c.forme ?? 0) === FORME_ARC) {
+        rows.push(
+          rangeField(
+            'Épaisseur (%)',
+            'p-kep',
+            Math.round((c.p0 ?? ARC_EPAISSEUR_DEFAUT) * 100),
+            8,
+            100,
+            1,
+          ),
+        )
+        rows.push(
+          rangeField(
+            'Demi-ouverture (°)',
+            'p-kouv',
+            c.p1 ?? ARC_OUVERTURE_DEFAUT,
+            15,
+            180,
+            1,
+          ),
+        )
+      }
     } else if (s.kind === 'sponge') {
       const sp = this.level.sponges[s.index]
       rows.push(
@@ -3580,6 +3632,30 @@ export class LevelEditor {
           val('p-maxY'),
         ),
       )
+      if (text('p-kstyle') === 'paroi') c.style = 'paroi'
+      else delete c.style
+      const kforme = Math.max(0, Math.min(FORME_ARC, Math.round(val('p-kforme'))))
+      if (kforme > 0) c.forme = kforme
+      else delete c.forme
+      const kang = Math.max(-180, Math.min(180, val('p-kang')))
+      if (kang) c.angle = kang
+      else delete c.angle
+      if (kforme === FORME_COIN) {
+        const q0 = ((Math.round(val('p-kq0')) % 4) + 4) % 4
+        if (q0) c.p0 = q0
+        else delete c.p0
+        delete c.p1
+      } else if (kforme === FORME_ARC) {
+        const ep = Math.max(0.08, Math.min(1, val('p-kep') / 100))
+        if (ep !== ARC_EPAISSEUR_DEFAUT) c.p0 = ep
+        else delete c.p0
+        const ouv = Math.max(15, Math.min(180, val('p-kouv')))
+        if (ouv !== ARC_OUVERTURE_DEFAUT) c.p1 = ouv
+        else delete c.p1
+      } else {
+        delete c.p0
+        delete c.p1
+      }
     } else if (s.kind === 'sponge') {
       const sp = this.level.sponges[s.index]
       sp.minX = val('p-minX')
@@ -3840,18 +3916,29 @@ export class LevelEditor {
     }
 
     // cachettes : hachures sombres + étiquette — bien visibles À L'ÉDITEUR
-    // (le concepteur doit les voir), voilées seulement en jeu
+    // (le concepteur doit les voir), voilées seulement en jeu. Le chemin
+    // épouse la FORME (disque, capsule, coin, arc, rotation…).
     for (let ci = 0; ci < (this.level.caches ?? []).length; ci++) {
       const c = this.level.caches![ci]
       const p = this.toScreen(c.minX, c.maxY)
       const q = this.toScreen(c.maxX, c.minY)
       const w = q.sx - p.sx
       const h = q.sy - p.sy
+      const chemin = (): void => {
+        const pts = formeOutline(c, 56)
+        g.beginPath()
+        for (let k = 0; k < pts.length; k++) {
+          const sp = this.toScreen(pts[k].x, pts[k].y)
+          if (k === 0) g.moveTo(sp.sx, sp.sy)
+          else g.lineTo(sp.sx, sp.sy)
+        }
+        g.closePath()
+      }
       g.save()
-      g.beginPath()
-      g.rect(p.sx, p.sy, w, h)
+      chemin()
       g.clip()
-      g.fillStyle = 'rgba(20,28,40,0.45)'
+      g.fillStyle =
+        c.style === 'paroi' ? 'rgba(58,68,80,0.50)' : 'rgba(20,28,40,0.45)'
       g.fillRect(p.sx, p.sy, w, h)
       g.strokeStyle = 'rgba(120,140,170,0.30)'
       g.lineWidth = 1
@@ -3866,11 +3953,18 @@ export class LevelEditor {
       g.strokeStyle = '#8ea2bd'
       g.setLineDash([6, 5])
       g.lineWidth = 1.5
-      g.strokeRect(p.sx, p.sy, w, h)
+      chemin()
+      g.stroke()
       g.setLineDash([])
       g.fillStyle = '#aebfd8'
       g.font = '600 11px ui-monospace, monospace'
-      g.fillText('CACHETTE — voilée en jeu', p.sx + 6, p.sy + 15)
+      g.fillText(
+        c.style === 'paroi'
+          ? 'CACHETTE — paroi factice'
+          : 'CACHETTE — voilée en jeu',
+        p.sx + 6,
+        p.sy + 15,
+      )
     }
 
     // éponges

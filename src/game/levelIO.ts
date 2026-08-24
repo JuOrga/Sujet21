@@ -415,15 +415,32 @@ export function parseLevel(input: unknown): {
   }
   if (portes.length > 0) level.portes = portes
 
-  // Cachettes : des pans voilés de brouillard, levés à l'entrée du corps
+  // Cachettes : des pans voilés (brouillard ou paroi factice), levés à
+  // l'entrée du corps. Formes et rotation : les mêmes règles que les boîtes.
   const caches: CacheDef[] = []
   for (const raw of Array.isArray(o.caches) ? o.caches : []) {
     const c = (raw ?? {}) as Record<string, unknown>
+    const angle = num(c.angle, 0)
+    const forme = Math.round(num(c.forme, FORME_RECT))
+    const p0 = num(c.p0, forme === FORME_ARC ? ARC_EPAISSEUR_DEFAUT : 0)
+    const p1 = num(c.p1, ARC_OUVERTURE_DEFAUT)
     const cache: CacheDef = {
       minX: Math.min(num(c.minX), num(c.maxX)),
       minY: Math.min(num(c.minY), num(c.maxY)),
       maxX: Math.max(num(c.minX), num(c.maxX)),
       maxY: Math.max(num(c.minY), num(c.maxY)),
+      ...(angle ? { angle: Math.max(-180, Math.min(180, angle)) } : {}),
+      ...(forme > FORME_RECT && forme <= FORME_ARC ? { forme } : {}),
+      ...(forme === FORME_COIN && Math.round(p0) !== 0
+        ? { p0: ((Math.round(p0) % 4) + 4) % 4 }
+        : {}),
+      ...(forme === FORME_ARC && p0 !== ARC_EPAISSEUR_DEFAUT
+        ? { p0: Math.max(0.08, Math.min(1, p0)) }
+        : {}),
+      ...(forme === FORME_ARC && p1 !== ARC_OUVERTURE_DEFAUT
+        ? { p1: Math.max(15, Math.min(180, p1)) }
+        : {}),
+      ...(c.style === 'paroi' ? { style: 'paroi' as const } : {}),
     }
     if (cache.maxX - cache.minX < 1 || cache.maxY - cache.minY < 1) {
       rejets.push('une cachette a été écartée (taille nulle)')

@@ -7,6 +7,7 @@ import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
 import { TABLEAU_HUB, TABLEAU_HUB_COMPACT } from './game/hub'
 import { estCodeHub } from './game/levelIO'
+import { dansForme, formeOutline } from './game/formes'
 import { DELIVERIES, VERSION, versionDe } from './bench/changelog'
 import { Camera } from './render/camera'
 import { MAX_BOXES, Renderer } from './render/renderer'
@@ -24,6 +25,7 @@ import {
   TABLEAU_9,
   TABLEAUX,
   TABLEAUX_ECOLE,
+  MAT_WALL,
   pointInBox,
   zoneForceAt,
   zoneName,
@@ -329,12 +331,7 @@ function applyLevel(): void {
     testLevel ??
     (auHub ? hubLevel() : (playedLevels()[levelIndex] ?? playedLevels()[0]))
   levelHasCold = level.boxes.some((b) => b.material === MAT_FROID)
-  // le sas garde sa place dans le budget de rendu : un tableau trop chargé
-  // perd ses derniers blocs de décor, jamais sa sortie
-  renderBoxes = [
-    ...level.boxes.slice(0, MAX_BOXES - 1),
-    { ...level.exit, material: MAT_EXIT },
-  ]
+  rebuildRenderBoxes()
   exitMouth.x = (level.exit.minX + level.exit.maxX) * 0.5
   exitMouth.y = (level.exit.minY + level.exit.maxY) * 0.5
   bande.setAmbiance((level.ambiance as Piste | undefined) ?? null)
@@ -2643,6 +2640,9 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   // portes : barrières d'énergie — pleines quand closes, un cadre quand ouvertes
   for (let i = 0; i < portes.length; i++) {
     const p = portes[i]
+    // sous un voile de cachette : la porte se tait (elle flotterait
+    // au-dessus d'une paroi factice et vendrait le secret)
+    if (dansCacheVoilee((p.minX + p.maxX) / 2, (p.minY + p.maxY) / 2)) continue
     const a = S(p.minX, p.maxY)
     const b = S(p.maxX, p.minY)
     const ouverte = laserEtat.portesOuvertes[i]
@@ -2686,6 +2686,9 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   rails.forEach((rail, railIdx) => {
     const pts = rail.points
     if (pts.length < 2) return
+    // un rail entièrement sous voile se tait ; un rail qui en sort reste
+    // dessiné (le voile brume le couvre, et couper une polyligne la fausse)
+    if (pts.every((p) => dansCacheVoilee(p.x, p.y))) return
     const engage = railsEngages.has(railIdx)
     const chemin = (): void => {
       g.beginPath()
@@ -2804,6 +2807,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
 
   // émetteurs : un fût court orienté, une bouche lumineuse
   for (const em of lasers) {
+    if (dansCacheVoilee(em.x, em.y)) continue
     const p = S(em.x, em.y)
     const a = (-em.angle * Math.PI) / 180 // écran : y vers le bas
     g.save()
@@ -2829,6 +2833,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   const nowCibles = performance.now() / 1000
   for (let c = 0; c < cibles.length; c++) {
     const t = cibles[c]
+    if (dansCacheVoilee(t.x, t.y)) continue
     const p = S(t.x, t.y)
     const nor = t.mode === 'nor'
     const scellee = nor && laserEtat.recepteurs.scellees[c] === true
@@ -2892,9 +2897,12 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     if (
       cachesLevee[i] === Infinity &&
       !sim.dispersed &&
-      pointInBox(sim.stats.centroidX, sim.stats.centroidY, c)
+      dansForme(c, sim.stats.centroidX, sim.stats.centroidY)
     ) {
       cachesLevee[i] = elapsed
+      // la PAROI FACTICE sort du décor à l'instant de la révélation — la
+      // dissolution 2D ci-dessous couvre la transition
+      if (c.style === 'paroi') rebuildRenderBoxes()
     }
     const alpha =
       cachesLevee[i] === Infinity
@@ -2906,9 +2914,38 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     const w = b.sx - a.sx
     const h = b.sy - a.sy
     if (b.sx < 0 || a.sx > vw || b.sy < 0 || a.sy > vh) continue
+    // le chemin ÉPOUSE la forme de la cachette (disque, capsule, coin,
+    // arc, rotation…) — le rectangle n'est qu'un cas particulier
+    const chemin = (): void => {
+      const pts = formeOutline(c, 56)
+      g.beginPath()
+      for (let k = 0; k < pts.length; k++) {
+        const sp = S(pts[k].x, pts[k].y)
+        if (k === 0) g.moveTo(sp.sx, sp.sy)
+        else g.lineTo(sp.sx, sp.sy)
+      }
+      g.closePath()
+    }
+    if (c.style === 'paroi') {
+      // PAROI FACTICE : voilée, c'est le MOTEUR qui la rend (vraie paroi,
+      // vraies ombres) — ici on ne dessine que sa DISSOLUTION une fois
+      // révélée : la teinte de paroi s'évapore du contour exact
+      if (cachesLevee[i] === Infinity) continue
+      g.save()
+      chemin()
+      g.clip()
+      g.globalAlpha = alpha * 0.92
+      g.fillStyle = '#3a4450'
+      g.fillRect(a.sx, a.sy, w, h)
+      g.globalAlpha = alpha * 0.5
+      g.fillStyle = '#232b36'
+      g.fillRect(a.sx, a.sy, w, h * 0.5)
+      g.restore()
+      g.globalAlpha = 1
+      continue
+    }
     g.save()
-    g.beginPath()
-    g.rect(a.sx, a.sy, w, h)
+    chemin()
     g.clip()
     g.globalAlpha = alpha
     g.fillStyle = '#0d1320'
@@ -2924,12 +2961,13 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       g.fillStyle = grad
       g.fillRect(a.sx, a.sy, w, h)
     }
+    g.restore()
     // le liseré, à peine plus clair : le pan se devine sans se trahir
     g.globalAlpha = alpha * 0.45
     g.strokeStyle = 'rgba(74,94,120,0.55)'
     g.lineWidth = 1
-    g.strokeRect(a.sx + 0.5, a.sy + 0.5, w - 1, h - 1)
-    g.restore()
+    chemin()
+    g.stroke()
     g.globalAlpha = 1
   }
 }
@@ -3011,13 +3049,31 @@ const railsEngages = new Set<number>()
 // (Infinity : encore voilé). Le corps qui entre lève le voile — et
 // Recommencer re-voile tout : la découverte se rejoue à chaque essai.
 let cachesLevee: number[] = []
-/** Ce point est-il sous un voile encore fermé ? (masque les étiquettes) */
+/** Ce point est-il sous un voile encore fermé ? (masque étiquettes et
+ * mécanismes — la cachette a la forme qu'on lui a donnée). */
 function dansCacheVoilee(x: number, y: number): boolean {
   const caches = level.caches ?? []
   for (let i = 0; i < caches.length; i++) {
-    if ((cachesLevee[i] ?? Infinity) === Infinity && pointInBox(x, y, caches[i])) return true
+    if ((cachesLevee[i] ?? Infinity) === Infinity && dansForme(caches[i], x, y)) return true
   }
   return false
+}
+// Le décor rendu : les parois du tableau, PLUS les PAROIS FACTICES des
+// cachettes voilées (style « paroi ») — le moteur les rend comme de vraies
+// parois, ombres portées comprises. À la révélation, la factice sort du
+// décor (et la carte de lumière se recuit une fois, sans elle).
+function rebuildRenderBoxes(): void {
+  const factices: ObstacleBox[] = (level.caches ?? [])
+    .filter(
+      (c, i) =>
+        c.style === 'paroi' && (cachesLevee[i] ?? Infinity) === Infinity,
+    )
+    .map(({ style: _style, ...reste }) => ({ ...reste, material: MAT_WALL }))
+  renderBoxes = [
+    ...level.boxes.slice(0, Math.max(1, MAX_BOXES - 1 - factices.length)),
+    ...factices,
+    { ...level.exit, material: MAT_EXIT },
+  ]
 }
 function resetLasers(): void {
   laserEtat.vues = []
@@ -3027,6 +3083,7 @@ function resetLasers(): void {
   lastRailTime = 0
   railsEngages.clear()
   cachesLevee = (level.caches ?? []).map(() => Infinity)
+  rebuildRenderBoxes() // les parois factices reprennent leur poste
 }
 const dashAimEl = el('dash-aim')
 const dashCostEl = el('dash-cost')

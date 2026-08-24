@@ -394,16 +394,25 @@ export interface PorteDef {
   regle?: 'et'
 }
 
-// Une CACHETTE : un pan de la carte voilé d'un brouillard « non
-// cartographié » tant que l'échantillon n'y est pas entré — le voile se
-// dissipe à l'entrée du corps et reste levé pour l'essai (Recommencer
-// re-voile). Purement visuel : la physique du tableau ne change pas, ce
-// qui est caché existe et fonctionne — on ne le VOIT simplement pas.
+// Une CACHETTE : un pan de la carte voilé tant que l'échantillon n'y est
+// pas entré — le voile se dissipe à l'entrée du corps et reste levé pour
+// l'essai (Recommencer re-voile). Purement visuel : la physique du tableau
+// ne change pas, ce qui est caché existe et fonctionne — on ne le VOIT
+// simplement pas. Deux styles de voile : le BROUILLARD « non cartographié »
+// (défaut) et la PAROI FACTICE — rendue comme une vraie paroi par le
+// moteur, ombres portées comprises, qui se dissout à l'entrée. La cachette
+// prend toutes les FORMES des obstacles (disque, capsule, coin, arc) et
+// leur rotation : c'est une FormeBox, comme les parois.
 export interface CacheDef {
   minX: number
   minY: number
   maxX: number
   maxY: number
+  angle?: number // degrés, rotation autour du centre
+  forme?: number // formes.ts — absent : rectangle
+  p0?: number // COIN : orientation 0..3 · ARC : épaisseur relative
+  p1?: number // ARC : demi-ouverture en degrés
+  style?: 'paroi' // absent : brouillard
 }
 
 // Un RAIL MAGNÉTIQUE (palier 3) : une ligne de champ posée dans le décor.

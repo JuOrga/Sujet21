@@ -289,6 +289,26 @@ it('conserve les cachettes (pans voilés) et écarte celles de taille nulle', ()
   expect(tordu.rejets.length).toBe(1)
 })
 
+it('cachettes : style paroi, formes et rotation survivent à l’aller-retour', () => {
+  const src = {
+    ...TABLEAUX[0],
+    caches: [
+      { minX: 0, minY: 0, maxX: 200, maxY: 150, style: 'paroi' as const },
+      { minX: -300, minY: -200, maxX: -100, maxY: 0, forme: 1, angle: 30 },
+      { minX: 300, minY: 0, maxX: 500, maxY: 200, forme: 4, p0: 0.5, p1: 60 },
+    ],
+  }
+  const { level, rejets } = parseLevel(JSON.parse(serializeLevel(src)))
+  expect(rejets).toEqual([])
+  expect(level!.caches).toEqual(src.caches)
+  // un style inconnu ou une forme hors bornes s'effacent sans casser
+  const brut = parseLevel({
+    ...JSON.parse(serializeLevel(TABLEAUX[0])),
+    caches: [{ minX: 0, minY: 0, maxX: 100, maxY: 100, style: 'x', forme: 9 }],
+  })
+  expect(brut.level!.caches).toEqual([{ minX: 0, minY: 0, maxX: 100, maxY: 100 }])
+})
+
 it('conserve les rails magnétiques et écarte les moignons', () => {
   const src = {
     ...TABLEAUX[0],
