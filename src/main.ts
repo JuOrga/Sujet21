@@ -1277,18 +1277,18 @@ let decorRiche = localStorage.getItem('sujet21-decor') !== 'sobre'
 // bras du test A/B : si c'est le rendu du liquide qui pèse, c'est CE
 // réglage qui fera bouger les chiffres, pas celui du décor.
 let eauRiche = localStorage.getItem('sujet21-eau') !== 'sobre'
-// Surface du fluide, TROIS rendus au choix : MIROITANTE (défaut — reflet
-// des alentours et du plafond, par la houle de chaque goutte), MIROITANT
-// MERCURE (le reflet s'enroule d'un seul tenant autour du corps, comme une
-// bille de mercure : le cœur mire le plafond, le bord balaie la salle) ou
-// CLASSIQUE (l'ancien rendu, au pixel près). Valeur passée telle quelle au
-// shader : 0 classique, 1 miroitante, 2 mercure.
+// Surface du fluide, TROIS rendus au choix : MIROITANT MERCURE (défaut —
+// le reflet s'enroule d'un seul tenant autour du corps, comme une bille de
+// mercure : le cœur mire le plafond, le bord balaie la salle, les lampes
+// s'y mirent), MIROITANTE (reflet des alentours par la houle de chaque
+// goutte) ou CLASSIQUE (l'ancien rendu, au pixel près). Valeur passée
+// telle quelle au shader : 0 classique, 1 miroitante, 2 mercure.
 let eauMiroir =
   localStorage.getItem('sujet21-miroir') === 'classique'
     ? 0
-    : localStorage.getItem('sujet21-miroir') === 'mercure'
-      ? 2
-      : 1
+    : localStorage.getItem('sujet21-miroir') === 'miroir'
+      ? 1
+      : 2
 // Éclairage de la PIÈCE : une lampe par cuve, des ombres portées cuites dans
 // une carte de lumière (recalculée seulement au changement de décor) et un
 // biseau directionnel sur les arêtes — du relief pour presque rien. ACTIF
@@ -1528,8 +1528,8 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     const renderMiroir = (): void => {
       choixMiroir.innerHTML = ''
       for (const [miroir, cle, label] of [
-        [1, 'miroir', 'MIROITANTE'],
         [2, 'mercure', 'MIROITANT MERCURE'],
+        [1, 'miroir', 'MIROITANTE'],
         [0, 'classique', 'CLASSIQUE'],
       ] as const) {
         const b = document.createElement('button')

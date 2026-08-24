@@ -1402,6 +1402,20 @@ void main() {
           env /= clamp(vec3(uAmbiante * 1.15) + 1.05 * lmEau, vec3(0.32), vec3(1.0));
         }
         env = min(env * vec3(0.42, 0.55, 0.68), vec3(1.1));
+        // LES VRAIES LAMPES dans le miroir : chaque luminaire se mire en
+        // un éclat de SA couleur au point du reflet qui le regarde — une
+        // lampe ronde fait un point, un bandeau une traînée (point le plus
+        // proche du luminaire). Plus la lampe est haute, plus son image
+        // est large et douce. Ajouté APRÈS la teinte de l'eau : un néon
+        // sur une flaque garde sa couleur, il ne verdit pas.
+        for (int li = 0; li < MAX_LUMIERES; li++) {
+          if (li >= uLampeCount) break;
+          float dLamp = distance(reflPos, pointLampe(li, reflPos));
+          float taille = 26.0 + uLampes[li].z * 0.09;
+          float glint = exp(-dLamp * dLamp / (2.0 * taille * taille));
+          env += uLampesCol[li] * (clamp(uLampesInt[li], 0.0, 2.0) * glint * 1.5);
+        }
+        env = min(env, vec3(1.7));
         // couverture CONTINUE : pleine au bord (incidence rasante), plus
         // discrète au cœur — l'eau profonde montre sa propre couleur
         float bord = smoothstep(0.40, 0.98, rC / max(uRayonCorps, 1.0));
