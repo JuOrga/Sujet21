@@ -1,14 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import {
+  AMBIANTE_DEFAUT,
   MAT_CHAUD,
   MAT_FROID,
   MAT_GRILLE,
   MAT_HYDROPHILE,
   MAT_HYDROPHOBE,
+  MAT_MEMBRANE,
+  MAT_RIDEAU,
+  MAT_SURCHAUFFEUR,
   MAT_WALL,
   TABLEAUX_ECOLE,
   TABLEAUX_GAMME,
+  TABLEAUX_PALIERS,
   TABLEAU_G5,
+  TABLEAU_G6,
+  TABLEAU_G7,
+  TABLEAU_G8,
+  TABLEAU_G9,
+  TABLEAU_G10,
+  TABLEAU_G11,
   TABLEAU_10,
   TABLEAU_11,
   TABLEAU_12,
@@ -260,11 +271,42 @@ describe('subtractBox — la découpe ronge les parois', () => {
 const ALL = [...TABLEAUX, TABLEAU_1BIS, ...TABLEAUX_ECOLE]
 
 describe('TABLEAUX — validité structurelle', () => {
-  it('l’expédition fait 18 tableaux (la gamme en tête), aux codes uniques (le bis à part)', () => {
-    expect(TABLEAUX.length).toBe(18)
+  it('l’expédition fait 24 tableaux, aux codes uniques (le bis à part)', () => {
+    expect(TABLEAUX.length).toBe(24)
     const codes = ALL.map((t) => t.code)
     expect(new Set(codes).size).toBe(codes.length)
     expect(TABLEAUX).not.toContain(TABLEAU_1BIS)
+  })
+
+  it('la dent de scie : chaque leçon se place juste avant le tableau qui l’exige', () => {
+    // l'ordre COMPLET de l'expédition est un choix de conception — le
+    // verrouiller documente la stratégie et empêche un remaniement muet
+    expect(TABLEAUX.map((t) => t.code)).toEqual([
+      '21-01', // le corps seul
+      '21-02', // le rebond (hydrophobe)
+      '21-03', // l'ancrage (hydrophile)
+      '21-04', // le premier gel (froid)
+      '21-05', // le premier souffle (vapeur)
+      '21-06', // l'éponge — juste avant que Le sas l'exige
+      '21-A', // le premier examen : tout le vocabulaire de la gamme
+      '21-B', // la chambre froide
+      '21-07', // la membrane — le contraste après tant de gel
+      '21-C', // le conduit (vapeur obligatoire)
+      '21-08', // le rideau — le contraste après la vapeur
+      '21-09', // les régimes imposés
+      '21-E', // la serre (composition)
+      '21-10', // la halte (bornes) — avant le tableau le plus gourmand en dashs
+      '21-F', // le dépôt de givre
+      '21-D', // la cuve thermique : l'examen des trois routes
+      '21-11', // la voie lumineuse — la respiration avant les lasers
+      '21-H',
+      '21-I',
+      '21-J',
+      '21-K',
+      '21-L',
+      '21-M',
+      '21-G', // la dérive : la maîtrise pure
+    ])
   })
 
   it('la gamme ouvre l’expédition : cinq cellules, en sortie du hub, dans l’ordre', () => {
@@ -328,6 +370,71 @@ describe('TABLEAUX — validité structurelle', () => {
     for (const t of TABLEAUX_GAMME.slice(0, 4)) {
       expect(t.brume ?? 0).toBe(0)
     }
+  })
+
+  it('les paliers gardent la règle d’or : le vocabulaire de chaque salle est fermé', () => {
+    // même contrat que la gamme : chaque palier n'utilise que sa nouveauté
+    // et ce qui a déjà été enseigné avant lui dans l'expédition
+    const autorisesPaliers: [LevelDef, number[]][] = [
+      [TABLEAU_G6, [MAT_WALL]], // l'éponge vit dans `sponges`, pas dans `boxes`
+      [TABLEAU_G7, [MAT_WALL, MAT_MEMBRANE, MAT_FROID]],
+      [TABLEAU_G8, [MAT_WALL, MAT_RIDEAU, MAT_FROID]],
+      [TABLEAU_G9, [MAT_WALL, MAT_GRILLE]],
+      [TABLEAU_G10, [MAT_WALL, MAT_CHAUD, MAT_SURCHAUFFEUR, MAT_FROID]],
+      [TABLEAU_G11, [MAT_WALL, MAT_HYDROPHILE]],
+    ]
+    for (const [t, mats] of autorisesPaliers) {
+      for (const b of t.boxes) {
+        expect(
+          mats,
+          `${t.code} : matériau ${b.material} hors vocabulaire`,
+        ).toContain(b.material)
+      }
+      // pas de laser ni de porte : l'optique reste le chapitre suivant
+      expect(t.lasers ?? []).toHaveLength(0)
+      expect(t.portes ?? []).toHaveLength(0)
+    }
+    // la buveuse enseigne l'éponge : le bloc d'essai, le péage, la fine
+    expect(TABLEAU_G6.sponges.length).toBe(3)
+    // les régimes enseignent les zones : glace, vapeur — et rien d'autre avant
+    const forces = (TABLEAU_G9.zones ?? []).map((z) => z.force)
+    expect(forces).toContain('glace')
+    expect(forces).toContain('vapeur')
+    for (const t of [
+      TABLEAU_G6,
+      TABLEAU_G7,
+      TABLEAU_G8,
+      TABLEAU_G10,
+      TABLEAU_G11,
+    ]) {
+      expect(t.zones ?? []).toHaveLength(0)
+    }
+  })
+
+  it('les paliers sont lisibles et éclairés : picto neuf, balise verte, par', () => {
+    for (const t of TABLEAUX_PALIERS) {
+      expect(t.par, `${t.code} : par manquant`).toBeGreaterThan(0)
+      expect(t.lumieres?.length ?? 0, `${t.code} : lampes`).toBeGreaterThan(1)
+      expect((t.lumieres?.length ?? 0) <= 4, `${t.code} : trop de lampes`).toBe(
+        true,
+      )
+      expect(
+        t.lumieres?.some((l) => l.couleur === '#3fd69b'),
+        `${t.code} : balise verte du sas`,
+      ).toBe(true)
+    }
+    // chaque surface NOUVELLE porte son pictogramme (les régimes, eux,
+    // s'annoncent par leurs zones nommées — pas de matière neuve à picto)
+    for (const t of [TABLEAU_G6, TABLEAU_G7, TABLEAU_G8, TABLEAU_G10]) {
+      expect(
+        t.labels.some((l) => l.picto),
+        `${t.code} : pictogramme manquant`,
+      ).toBe(true)
+    }
+    // la voie lumineuse est la leçon d'atmosphère : la salle est éteinte,
+    // les quatre lampes font le chemin
+    expect(TABLEAU_G11.ambiante ?? AMBIANTE_DEFAUT).toBeLessThan(0.3)
+    expect(TABLEAU_G11.lumieres?.length).toBe(4)
   })
 
   it('l’école fait trois leçons : sans laser, sans porte — on traverse, on comprend', () => {
