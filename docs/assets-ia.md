@@ -233,6 +233,12 @@ substitution (généré, sommaire) est en place : déposez votre image sous
 reflet » du tableau : tapez le nom (`planete`). Vide = le plafond par
 défaut ; variante absente = repli sur le défaut, sans trou.
 
+Variantes livrées (suggérées par le champ) : `planete` (hublot sur une
+planète gazeuse), `givre` (cryo, néons et stalactites), `observatoire`
+(dôme vitré plein ciel), `breche` (coque déchirée sur les étoiles, néon
+d'alerte rouge), `chaufferie` (grilles ambrées `#f2c98e`, lecture VAPEUR),
+`helice` (ventilateur géant à contre-jour).
+
 Ce qui fait l'effet : des VERRIÈRES et hublots ÉCLAIRÉS (blanc froid) sur
 une machinerie sombre — ce sont eux qui brillent dans le corps, comme des
 néons sur une flaque. La répétition se fait en miroir à l'affichage :

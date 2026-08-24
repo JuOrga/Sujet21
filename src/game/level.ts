@@ -326,7 +326,14 @@ export const AMBIANTE_DEFAUT = 0.52
 
 // Les variantes de plafond LIVRÉES (suggestions de l'éditeur) : le champ
 // reste libre — toute variante nommée « x » cherche plafond-x.webp.
-export const PLAFONDS_CONNUS: string[] = ['planete']
+export const PLAFONDS_CONNUS: string[] = [
+  'planete',
+  'givre',
+  'observatoire',
+  'breche',
+  'chaufferie',
+  'helice',
+]
 
 export const LAMPE_HAUTEUR_DEFAUT = 420
 export const LAMPE_HAUTEUR_MIN = 80
