@@ -1448,22 +1448,45 @@ export const TABLEAU_G1: LevelDef = {
     { x: -1080, y: 420, w: 160, h: 160, kind: 'tuyaux', fade: 0.45 },
     { x: 460, y: -640, w: 150, h: 225, kind: 'vanne', fade: 0.4 },
   ],
-  // Lumière : une lampe HAUTE et centrale (ombres courtes et douces — rien
-  // de dramatique dans la première salle), et la balise verte du sas qui
-  // tire l'œil vers l'objectif dès l'entrée.
+  // Lumière (refonte contraste) : AMBIANTE NULLE — toute la lumière vient
+  // des lampes. Des BANDES posées BAS le long des parois neutres (h 140-190) :
+  // les ombres s'allongent, nettes, et sculptent la salle. La balise verte
+  // du sas reste le repère commun.
   lumieres: [
-    { x: -150, y: 0, h: 980, portee: 1500, intensite: 1.05, taille: 2 },
+    {
+      x: -450,
+      y: 0,
+      forme: 'bandeau',
+      longueur: 620,
+      angle: 90,
+      h: 170,
+      portee: 850,
+      intensite: 1.15,
+      taille: 1,
+    },
+    {
+      x: 700,
+      y: 0,
+      forme: 'bandeau',
+      longueur: 520,
+      angle: 90,
+      h: 150,
+      portee: 700,
+      intensite: 1.0,
+      couleur: '#dfe8f2',
+      taille: 1,
+    },
     {
       x: 1110,
       y: 0,
-      h: 380,
+      h: 300,
       portee: 520,
-      intensite: 0.9,
+      intensite: 1.0,
       couleur: '#3fd69b',
       taille: 1,
     },
   ],
-  ambiante: 0.5,
+  ambiante: 0,
 }
 
 // Gamme 2 — le rebond : l'hydrophobe repousse sans prendre une goutte.
@@ -1503,31 +1526,54 @@ export const TABLEAU_G2: LevelDef = {
     { x: 1110, y: 560, text: 'SAS', tone: 'sas' },
   ],
   decals: [{ x: -1080, y: -500, w: 150, h: 150, kind: 'tuyaux', fade: 0.4 }],
-  // Lumière : la teinte violette de l'hydrophobe baigne le plot d'essai —
-  // la couleur de la légende devient la couleur de la pièce ; la lampe
-  // principale reste haute et neutre, la balise du sas guide en haut.
+  // Lumière (refonte contraste) : AMBIANTE NULLE — toute la lumière vient
+  // des lampes. Des BANDES posées BAS le long des parois neutres (h 140-190) :
+  // les ombres s'allongent, nettes, et sculptent la salle. La balise verte
+  // du sas reste le repère commun.
   lumieres: [
-    { x: 60, y: 0, h: 900, portee: 1400, intensite: 1, taille: 2 },
     {
-      x: -630,
+      x: -100,
+      y: -680,
+      forme: 'bandeau',
+      longueur: 1200,
+      angle: 0,
+      h: 180,
+      portee: 820,
+      intensite: 1.15,
+      taille: 1,
+    },
+    {
+      x: -740,
       y: -350,
-      h: 320,
-      portee: 460,
-      intensite: 0.85,
+      forme: 'bandeau',
+      longueur: 380,
+      angle: 90,
+      h: 140,
+      portee: 520,
+      intensite: 0.95,
       couleur: '#9e6bc7',
+      taille: 1,
+    },
+    {
+      x: 750,
+      y: 600,
+      h: 240,
+      portee: 460,
+      intensite: 0.95,
+      couleur: '#cfd8e6',
       taille: 1,
     },
     {
       x: 1110,
       y: 380,
-      h: 380,
+      h: 300,
       portee: 500,
-      intensite: 0.9,
+      intensite: 1.0,
       couleur: '#3fd69b',
       taille: 1,
     },
   ],
-  ambiante: 0.48,
+  ambiante: 0,
 }
 
 // Gamme 3 — l'ancrage : l'hydrophile retient ; s'arracher coûte, viser paie.
@@ -1575,30 +1621,45 @@ export const TABLEAU_G3: LevelDef = {
     { x: 1110, y: 180, text: 'SAS', tone: 'sas' },
   ],
   decals: [{ x: 1080, y: 560, w: 165, h: 165, kind: 'tuyaux', fade: 0.45 }],
-  // Lumière : le cyan de l'eau calme sur les ancres, la principale haute,
-  // la balise du sas visible à travers la fenêtre — on vise une lumière.
+  // Lumière (refonte contraste) : AMBIANTE NULLE — toute la lumière vient
+  // des lampes. Des BANDES posées BAS le long des parois neutres (h 140-190) :
+  // les ombres s'allongent, nettes, et sculptent la salle. La balise verte
+  // du sas reste le repère commun.
   lumieres: [
-    { x: 150, y: 60, h: 950, portee: 1400, intensite: 1, taille: 2 },
     {
-      x: -560,
-      y: 100,
-      h: 340,
-      portee: 460,
-      intensite: 0.85,
+      x: -220,
+      y: -160,
+      forme: 'bandeau',
+      longueur: 760,
+      angle: 90,
+      h: 160,
+      portee: 850,
+      intensite: 1.15,
       couleur: '#63b7e6',
+      taille: 1,
+    },
+    {
+      x: 730,
+      y: 30,
+      forme: 'bandeau',
+      longueur: 520,
+      angle: 90,
+      h: 150,
+      portee: 640,
+      intensite: 1.0,
       taille: 1,
     },
     {
       x: 1110,
       y: 0,
-      h: 380,
+      h: 300,
       portee: 500,
-      intensite: 0.9,
+      intensite: 1.0,
       couleur: '#3fd69b',
       taille: 1,
     },
   ],
-  ambiante: 0.48,
+  ambiante: 0,
 }
 
 // Gamme 4 — le premier gel : le froid fige, et le gel AMARRE. La physique
@@ -1651,40 +1712,46 @@ export const TABLEAU_G4: LevelDef = {
     { x: 1110, y: 180, text: 'SAS', tone: 'sas' },
   ],
   decals: [{ x: -1080, y: 560, w: 190, h: 285, kind: 'vanne', fade: 0.42 }],
-  // Lumière : plus froide que les cellules précédentes, et la lampe basse
-  // éclaire l'AMARRE et la fenêtre dans la même flaque — on voit d'où l'on
-  // vise et où l'on va. L'ambiance descend d'un cran (0,42) : le froid se
-  // voit avant de se toucher.
+  // Lumière (refonte contraste) : AMBIANTE NULLE — toute la lumière vient
+  // des lampes. Des BANDES posées BAS le long des parois neutres (h 140-190) :
+  // les ombres s'allongent, nettes, et sculptent la salle. La balise verte
+  // du sas reste le repère commun.
   lumieres: [
     {
-      x: -300,
-      y: 100,
-      h: 850,
-      portee: 1300,
-      intensite: 1,
-      couleur: '#cfe4ff',
-      taille: 2,
+      x: -190,
+      y: 0,
+      forme: 'bandeau',
+      longueur: 820,
+      angle: 90,
+      h: 150,
+      portee: 880,
+      intensite: 1.15,
+      couleur: '#bfe0ff',
+      taille: 1,
     },
     {
-      x: 690,
+      x: 740,
       y: 0,
-      h: 300,
-      portee: 560,
-      intensite: 0.8,
+      forme: 'bandeau',
+      longueur: 560,
+      angle: 90,
+      h: 150,
+      portee: 620,
+      intensite: 0.95,
       couleur: '#8fc8ee',
       taille: 1,
     },
     {
       x: 1110,
       y: 0,
-      h: 380,
+      h: 300,
       portee: 500,
-      intensite: 0.9,
+      intensite: 1.0,
       couleur: '#3fd69b',
       taille: 1,
     },
   ],
-  ambiante: 0.42,
+  ambiante: 0,
 }
 
 // Gamme 5 — le premier souffle : la vapeur, gagnée à la chaudière, passe
@@ -1741,41 +1808,57 @@ export const TABLEAU_G5: LevelDef = {
     { x: -1080, y: -560, w: 150, h: 225, kind: 'vanne', fade: 0.42 },
     { x: 400, y: 640, w: 160, h: 160, kind: 'tuyaux', fade: 0.4 },
   ],
-  // Lumière : l'ambre de la chaudière d'un côté, le bleu du dépôt de
-  // l'autre — la salle raconte chaud → froid dans son éclairage. Et la
-  // PREMIÈRE BRUME du jeu (légère) : la vapeur est le sujet de la salle,
-  // l'atmosphère l'annonce.
+  // Lumière (refonte contraste) : AMBIANTE NULLE — toute la lumière vient
+  // des lampes. Des BANDES posées BAS le long des parois neutres (h 140-190) :
+  // les ombres s'allongent, nettes, et sculptent la salle. La balise verte
+  // du sas reste le repère commun.
   lumieres: [
-    { x: 150, y: 100, h: 900, portee: 1350, intensite: 1, taille: 2 },
     {
       x: -540,
-      y: -320,
-      h: 420,
-      portee: 560,
-      intensite: 1,
+      y: -570,
+      forme: 'bandeau',
+      longueur: 520,
+      angle: 0,
+      h: 160,
+      portee: 820,
+      intensite: 1.1,
       couleur: '#e8a05a',
       taille: 1,
     },
     {
+      x: 20,
+      y: -80,
+      forme: 'bandeau',
+      longueur: 900,
+      angle: 90,
+      h: 170,
+      portee: 760,
+      intensite: 1.05,
+      taille: 1,
+    },
+    {
       x: 830,
-      y: -160,
-      h: 360,
-      portee: 480,
-      intensite: 0.8,
+      y: -240,
+      forme: 'bandeau',
+      longueur: 300,
+      angle: 0,
+      h: 150,
+      portee: 520,
+      intensite: 0.9,
       couleur: '#8fc8ee',
       taille: 1,
     },
     {
       x: 1110,
       y: 0,
-      h: 380,
+      h: 300,
       portee: 480,
-      intensite: 0.9,
+      intensite: 1.0,
       couleur: '#3fd69b',
       taille: 1,
     },
   ],
-  ambiante: 0.46,
+  ambiante: 0,
   brume: 0.14,
 }
 
@@ -1859,32 +1942,56 @@ export const TABLEAU_G6: LevelDef = {
     { x: 1110, y: 180, text: 'SAS', tone: 'sas' },
   ],
   decals: [{ x: -1080, y: -520, w: 160, h: 160, kind: 'tuyaux', fade: 0.42 }],
-  // Lumière : la principale haute, la balise verte — et sur le bloc d'essai
-  // un halo ocre DOUX, centré sur lui et venu de haut. (La première version,
-  // basse et saturée, étalait une flaque olive sur le sol : signalée en
-  // capture comme une texture cassée — c'était la lampe.)
+  // Lumière (refonte contraste) : AMBIANTE NULLE — toute la lumière vient
+  // des lampes. Des BANDES posées BAS le long des parois neutres (h 140-190) :
+  // les ombres s'allongent, nettes, et sculptent la salle. La balise verte
+  // du sas reste le repère commun.
   lumieres: [
-    { x: 150, y: 0, h: 950, portee: 1450, intensite: 1, taille: 2 },
+    {
+      x: -120,
+      y: 140,
+      forme: 'bandeau',
+      longueur: 700,
+      angle: 90,
+      h: 170,
+      portee: 900,
+      intensite: 1.15,
+      taille: 1,
+    },
     {
       x: -624,
-      y: 356,
-      h: 540,
-      portee: 340,
-      intensite: 0.6,
+      y: 470,
+      forme: 'bandeau',
+      longueur: 300,
+      angle: 0,
+      h: 200,
+      portee: 420,
+      intensite: 0.7,
       couleur: '#e6c08a',
+      taille: 1,
+    },
+    {
+      x: 660,
+      y: -12,
+      forme: 'bandeau',
+      longueur: 420,
+      angle: 90,
+      h: 150,
+      portee: 560,
+      intensite: 1.0,
       taille: 1,
     },
     {
       x: 1110,
       y: 0,
-      h: 380,
-      portee: 500,
-      intensite: 0.9,
+      h: 300,
+      portee: 480,
+      intensite: 1.0,
       couleur: '#3fd69b',
       taille: 1,
     },
   ],
-  ambiante: 0.48,
+  ambiante: 0,
 }
 
 // Palier 2 — la membrane : la première paroi qui donne un ordre. Seul le
@@ -1926,30 +2033,45 @@ export const TABLEAU_G7: LevelDef = {
     { x: 1110, y: 180, text: 'SAS', tone: 'sas' },
   ],
   decals: [{ x: 1090, y: -560, w: 150, h: 225, kind: 'vanne', fade: 0.42 }],
-  // Lumière : vert d'eau sur la grande membrane (sa couleur devient celle
-  // de la pièce), accent froid discret sur le plot, balise verte du sas.
+  // Lumière (refonte contraste) : AMBIANTE NULLE — toute la lumière vient
+  // des lampes. Des BANDES posées BAS le long des parois neutres (h 140-190) :
+  // les ombres s'allongent, nettes, et sculptent la salle. La balise verte
+  // du sas reste le repère commun.
   lumieres: [
-    { x: -260, y: 0, h: 900, portee: 1350, intensite: 1, taille: 2 },
     {
-      x: -20,
-      y: 420,
-      h: 360,
-      portee: 480,
-      intensite: 0.85,
+      x: -100,
+      y: 0,
+      forme: 'bandeau',
+      longueur: 940,
+      angle: 90,
+      h: 160,
+      portee: 880,
+      intensite: 1.1,
       couleur: '#4fae8e',
+      taille: 1,
+    },
+    {
+      x: 520,
+      y: 300,
+      forme: 'bandeau',
+      longueur: 480,
+      angle: 90,
+      h: 150,
+      portee: 620,
+      intensite: 1.0,
       taille: 1,
     },
     {
       x: 1110,
       y: 0,
-      h: 380,
+      h: 300,
       portee: 500,
-      intensite: 0.9,
+      intensite: 1.0,
       couleur: '#3fd69b',
       taille: 1,
     },
   ],
-  ambiante: 0.46,
+  ambiante: 0,
 }
 
 // Palier 3 — le rideau : le miroir de la membrane. Seule la GLACE l'écarte,
@@ -1991,30 +2113,45 @@ export const TABLEAU_G8: LevelDef = {
     { x: 1110, y: 180, text: 'SAS', tone: 'sas' },
   ],
   decals: [{ x: -1080, y: 520, w: 190, h: 285, kind: 'vanne', fade: 0.4 }],
-  // Lumière : bleu d'acier sur le grand rideau, lampe basse sur la ligne de
-  // charge (l'élan se lit dans les ombres longues), balise verte du sas.
+  // Lumière (refonte contraste) : AMBIANTE NULLE — toute la lumière vient
+  // des lampes. Des BANDES posées BAS le long des parois neutres (h 140-190) :
+  // les ombres s'allongent, nettes, et sculptent la salle. La balise verte
+  // du sas reste le repère commun.
   lumieres: [
-    { x: -300, y: 60, h: 900, portee: 1350, intensite: 1, taille: 2 },
     {
-      x: 440,
-      y: 120,
-      h: 260,
-      portee: 560,
-      intensite: 0.8,
+      x: -70,
+      y: 0,
+      forme: 'bandeau',
+      longueur: 940,
+      angle: 90,
+      h: 160,
+      portee: 900,
+      intensite: 1.1,
       couleur: '#8fb4d8',
+      taille: 1,
+    },
+    {
+      x: 560,
+      y: 200,
+      forme: 'bandeau',
+      longueur: 520,
+      angle: 0,
+      h: 140,
+      portee: 620,
+      intensite: 1.0,
       taille: 1,
     },
     {
       x: 1110,
       y: 0,
-      h: 380,
+      h: 300,
       portee: 500,
-      intensite: 0.9,
+      intensite: 1.0,
       couleur: '#3fd69b',
       taille: 1,
     },
   ],
-  ambiante: 0.44,
+  ambiante: 0,
 }
 
 // Palier 4 — les régimes : certaines régions IMPOSENT leur état. On ne
@@ -2062,47 +2199,57 @@ export const TABLEAU_G9: LevelDef = {
     { x: 1110, y: 180, text: 'SAS', tone: 'sas' },
   ],
   decals: [{ x: -1080, y: -540, w: 160, h: 160, kind: 'tuyaux', fade: 0.4 }],
-  // Lumière : chaque régime éclairé à sa couleur — bleu glacé sur les
-  // hublots, ambre sur la conduite — le sol raconte la carte des états.
+  // Lumière (refonte contraste) : AMBIANTE NULLE — toute la lumière vient
+  // des lampes. Des BANDES posées BAS le long des parois neutres (h 140-190) :
+  // les ombres s'allongent, nettes, et sculptent la salle. La balise verte
+  // du sas reste le repère commun.
   lumieres: [
     {
-      x: -540,
-      y: 500,
-      h: 420,
-      portee: 520,
-      intensite: 0.85,
-      couleur: '#8fc8ee',
+      x: -700,
+      y: 60,
+      forme: 'bandeau',
+      longueur: 680,
+      angle: 90,
+      h: 170,
+      portee: 720,
+      intensite: 1.05,
       taille: 1,
     },
     {
-      x: 120,
+      x: 200,
       y: 0,
-      h: 800,
-      portee: 900,
-      intensite: 1,
+      forme: 'bandeau',
+      longueur: 1000,
+      angle: 90,
+      h: 190,
+      portee: 720,
+      intensite: 1.05,
       couleur: '#e8a05a',
-      taille: 2,
+      taille: 1,
     },
     {
       x: 580,
-      y: 0,
-      h: 360,
+      y: 220,
+      forme: 'bandeau',
+      longueur: 300,
+      angle: 0,
+      h: 160,
       portee: 480,
-      intensite: 0.8,
+      intensite: 0.9,
       couleur: '#8fc8ee',
       taille: 1,
     },
     {
       x: 1110,
       y: 0,
-      h: 380,
+      h: 300,
       portee: 480,
-      intensite: 0.9,
+      intensite: 1.0,
       couleur: '#3fd69b',
       taille: 1,
     },
   ],
-  ambiante: 0.46,
+  ambiante: 0,
 }
 
 // Palier 5 — la halte : les bornes de surchauffe. Frôlée en VAPEUR, une
@@ -2147,40 +2294,57 @@ export const TABLEAU_G10: LevelDef = {
     { x: 1110, y: 180, text: 'SAS', tone: 'sas' },
   ],
   decals: [{ x: 1090, y: 560, w: 165, h: 165, kind: 'tuyaux', fade: 0.42 }],
-  // Lumière : les oranges chauds balisent la ligne de bornes, le dépôt
-  // reste bleu — chaud pour avancer, froid pour se refaire. Une brume
-  // légère : la salle respire la vapeur.
+  // Lumière (refonte contraste) : AMBIANTE NULLE — toute la lumière vient
+  // des lampes. Des BANDES posées BAS le long des parois neutres (h 140-190) :
+  // les ombres s'allongent, nettes, et sculptent la salle. La balise verte
+  // du sas reste le repère commun.
   lumieres: [
-    { x: -100, y: 0, h: 920, portee: 1400, intensite: 1, taille: 2 },
     {
-      x: 130,
-      y: -20,
-      h: 420,
-      portee: 640,
-      intensite: 0.9,
+      x: -600,
+      y: -560,
+      forme: 'bandeau',
+      longueur: 420,
+      angle: 0,
+      h: 160,
+      portee: 780,
+      intensite: 1.05,
       couleur: '#e8a05a',
       taille: 1,
     },
     {
-      x: 830,
+      x: 150,
       y: 0,
-      h: 360,
-      portee: 460,
-      intensite: 0.8,
+      forme: 'bandeau',
+      longueur: 920,
+      angle: 90,
+      h: 190,
+      portee: 820,
+      intensite: 1.1,
+      taille: 1,
+    },
+    {
+      x: 830,
+      y: -240,
+      forme: 'bandeau',
+      longueur: 280,
+      angle: 0,
+      h: 150,
+      portee: 480,
+      intensite: 0.9,
       couleur: '#8fc8ee',
       taille: 1,
     },
     {
       x: 1110,
       y: 0,
-      h: 380,
+      h: 300,
       portee: 480,
-      intensite: 0.9,
+      intensite: 1.0,
       couleur: '#3fd69b',
       taille: 1,
     },
   ],
-  ambiante: 0.46,
+  ambiante: 0,
   brume: 0.1,
 }
 
@@ -2224,40 +2388,51 @@ export const TABLEAU_G11: LevelDef = {
     },
     { x: 1110, y: 180, text: 'SAS', tone: 'sas' },
   ],
-  // Lumière : QUATRE lampes, et presque rien d'autre (ambiante 0,15).
-  // Blanche à l'entrée, cyan sur chaque perchoir, verte au sas — le regard
-  // saute de flaque en flaque, la brume rend les faisceaux visibles.
+  // Lumière (refonte contraste) : AMBIANTE NULLE — toute la lumière vient
+  // des lampes. Des BANDES posées BAS le long des parois neutres (h 140-190) :
+  // les ombres s'allongent, nettes, et sculptent la salle. La balise verte
+  // du sas reste le repère commun.
   lumieres: [
-    { x: -820, y: 0, h: 520, portee: 620, intensite: 1.05, taille: 1 },
+    {
+      x: -840,
+      y: 0,
+      forme: 'bandeau',
+      longueur: 480,
+      angle: 90,
+      h: 180,
+      portee: 620,
+      intensite: 1.1,
+      taille: 1,
+    },
     {
       x: -80,
       y: -40,
-      h: 420,
-      portee: 560,
-      intensite: 1,
+      h: 240,
+      portee: 480,
+      intensite: 1.05,
       couleur: '#63b7e6',
       taille: 1,
     },
     {
       x: 420,
       y: 160,
-      h: 420,
-      portee: 560,
-      intensite: 1,
+      h: 240,
+      portee: 480,
+      intensite: 1.05,
       couleur: '#63b7e6',
       taille: 1,
     },
     {
       x: 1110,
       y: 0,
-      h: 400,
+      h: 320,
       portee: 620,
-      intensite: 1.1,
+      intensite: 1.15,
       couleur: '#3fd69b',
       taille: 1,
     },
   ],
-  ambiante: 0.15,
+  ambiante: 0,
   brume: 0.1,
 }
 

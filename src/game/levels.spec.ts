@@ -356,6 +356,13 @@ describe('TABLEAUX — validité structurelle', () => {
         t.lumieres?.some((l) => l.couleur === '#3fd69b'),
         `${t.code} : balise verte du sas`,
       ).toBe(true)
+      // refonte contraste : ambiante NULLE (tout vient des lampes) et au
+      // moins une BANDE posée bas le long d'une paroi
+      expect(t.ambiante, `${t.code} : ambiante non nulle`).toBe(0)
+      expect(
+        t.lumieres?.some((l) => l.forme === 'bandeau' && (l.h ?? 420) < 220),
+        `${t.code} : aucune bande basse`,
+      ).toBe(true)
     }
     // chaque surface nouvelle porte son pictogramme d'état (rangées
     // EAU/GLACE/VAPEUR) sur l'étiquette de première rencontre
@@ -421,6 +428,11 @@ describe('TABLEAUX — validité structurelle', () => {
       expect(
         t.lumieres?.some((l) => l.couleur === '#3fd69b'),
         `${t.code} : balise verte du sas`,
+      ).toBe(true)
+      expect(t.ambiante, `${t.code} : ambiante non nulle`).toBe(0)
+      expect(
+        t.lumieres?.some((l) => l.forme === 'bandeau' && (l.h ?? 420) < 220),
+        `${t.code} : aucune bande basse`,
       ).toBe(true)
     }
     // chaque surface NOUVELLE porte son pictogramme (les régimes, eux,
