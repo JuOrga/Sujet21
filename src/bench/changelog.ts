@@ -14,6 +14,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '24/08/2026 15:00',
+    title:
+      'Le mystère des « lampes à 9 m » résolu : METTRE À JOUR LES LIVRÉS DÉPASSÉS',
+    notes: [
+      'SIGNALÉ : aucune différence d’éclairage visible, et l’éditeur montrait encore les anciennes lampes hautes — « pourtant j’ai bien la bonne version ». La version était bonne ; le coupable, c’est le SEMIS : chaque copie semée fige le tableau AU MOMENT du clic, et la bibliothèque PRIME sur les livrés (« la version du joueur prime, toujours »). Toutes les refontes livrées APRÈS votre semis — bandes basses, ambiante nulle, le frein de 21-04 — étaient donc masquées par vos copies. (Le miroir et l’ambre, eux, sont du code, pas des données de tableau : c’est pour ça qu’ils se voyaient.)',
+      'Nouveau bouton dans la liste de séquence : « METTRE À JOUR N LIVRÉ(S) DÉPASSÉ(S) ». Il remet chaque copie semée JAMAIS MODIFIÉE (reconnue à son auteur « expédition livrée ») au niveau du tableau livré actuel — même entrée, même place dans votre ordre. Vos copies retravaillées ne sont JAMAIS touchées (un compteur vous dit combien divergent aussi, pour information). Le bouton reparaîtra de lui-même à chaque future livraison qui fait avancer un tableau : un clic, et le poste est à niveau.',
+      'DONC, pour voir enfin les nouveaux éclairages : ÉDITEUR → liste « Bibliothèque du protocole » → METTRE À JOUR. Vérifié en conditions simulées : une copie semée à l’ancien éclairage passe aux bandes basses et à l’ambiante nulle, la copie modifiée du joueur reste intacte, et le bouton disparaît une fois le poste à niveau.',
+    ],
+  },
+  {
     date: '24/08/2026 14:45',
     title:
       'Le miroir, le vrai : le reflet couvre tout le corps et traverse l’ombre — et l’icône 💨 passe à l’ambre',

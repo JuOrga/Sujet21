@@ -2415,6 +2415,81 @@ export class LevelEditor {
     return TABLEAUX.filter((t) => !codes.has(t.code))
   }
 
+  /** Les copies semées DÉPASSÉES par une livraison plus récente : la copie
+   *  du semis fige le tableau au moment du clic, et la bibliothèque PRIME
+   *  sur les livrés — sans remise à jour, une refonte livrée (éclairage,
+   *  géométrie…) reste invisible pour ce poste. Seules les copies JAMAIS
+   *  modifiées (auteur « expédition livrée ») sont concernées : une copie
+   *  retravaillée par le joueur n'est jamais touchée. */
+  /** La forme CANONIQUE d'un livré : le même aller-retour de parseur que
+   *  subit toute entrée de bibliothèque — sans quoi un simple ordre de clés
+   *  différent entre l'objet du code et sa copie re-parsée ferait croire à
+   *  une divergence éternelle. */
+  private canonLivre(t: LevelDef): string {
+    const { level } = parseLevel(structuredClone(t) as unknown)
+    return level ? serializeLevel(level) : serializeLevel(t)
+  }
+
+  private livresDepasses(): { entry: StoredLevel; livre: LevelDef }[] {
+    const parCode = new Map(TABLEAUX.map((t) => [t.code, t]))
+    const out: { entry: StoredLevel; livre: LevelDef }[] = []
+    for (const s of this.library) {
+      const livre = parCode.get(s.level.code)
+      if (!livre) continue
+      if (s.auteur !== 'expédition livrée') continue
+      if (serializeLevel(s.level) === this.canonLivre(livre)) continue
+      out.push({ entry: s, livre })
+    }
+    return out
+  }
+
+  /** Les copies MODIFIÉES par le joueur dont le livré a avancé depuis : on
+   *  ne les touche pas, mais on prévient — leur silhouette diverge. */
+  private modifiesDivergents(): number {
+    const parCode = new Map(TABLEAUX.map((t) => [t.code, t]))
+    let n = 0
+    for (const s of this.library) {
+      const livre = parCode.get(s.level.code)
+      if (!livre || s.auteur === 'expédition livrée') continue
+      if (serializeLevel(s.level) !== this.canonLivre(livre)) n++
+    }
+    return n
+  }
+
+  /** Remet chaque copie semée non modifiée au niveau du tableau livré du
+   *  moment — même entrée, même place dans la séquence, contenu rafraîchi. */
+  private async majLivres(): Promise<void> {
+    if (this.busy) return
+    const depasses = this.livresDepasses()
+    if (depasses.length === 0) return
+    this.busy = true
+    this.commit(`Mise à jour de ${depasses.length} tableau(x) livré(s)…`)
+    try {
+      for (const { entry, livre } of depasses) {
+        const r = await saveLevel(
+          structuredClone(livre),
+          entry.id,
+          'expédition livrée',
+        )
+        if (!r) {
+          this.commit(
+            `Mise à jour interrompue à « ${livre.code} » : bibliothèque injoignable. Les tableaux déjà à jour le restent.`,
+          )
+          void this.refreshLibrary()
+          return
+        }
+        this.library = r.levels
+      }
+      this.hooks.libraryChanged(this.library)
+      this.commit(
+        `${depasses.length} tableau(x) livré(s) remis à jour — l'ordre n'a pas bougé, vos copies modifiées non plus.`,
+      )
+      this.renderLibrary()
+    } finally {
+      this.busy = false
+    }
+  }
+
   private renderLibrary(offline = false): void {
     const host = this.el('ed-lib')
     if (offline) {
@@ -2430,6 +2505,20 @@ export class LevelEditor {
         ? `<button type="button" id="ed-lib-semer" title="Chaque tableau livré absent de la liste est ajouté À SA PLACE prévue dans la séquence (copie modifiable, votre ordre existant est conservé)">SEMER LES ${manquants.length} LIVRÉS MANQUANTS</button>` +
           `<p class="ed-astuce">Sans semis, les livrés absents se jouent quand même — mais EN FIN de séquence et sans réglage d'ordre possible ici.</p>`
         : ''
+    // Les copies semées dépassées par une livraison : LA BIBLIOTHÈQUE PRIME
+    // sur les livrés — sans ce bouton, une refonte livrée après le semis
+    // (éclairage, géométrie…) resterait invisible sur ce poste.
+    const depasses = this.livresDepasses()
+    const divergents = this.modifiesDivergents()
+    const majeur =
+      depasses.length > 0
+        ? `<button type="button" id="ed-lib-maj" title="Chaque copie semée JAMAIS modifiée (auteur « expédition livrée ») est remise au niveau du tableau livré actuel — même place dans la séquence. Vos copies retravaillées ne sont pas touchées.">METTRE À JOUR ${depasses.length} LIVRÉ(S) DÉPASSÉ(S)</button>` +
+          `<p class="ed-astuce">Vos copies priment sur les livrés : sans mise à jour, les refontes livrées après votre semis (éclairage, tableaux revus…) ne se voient pas ici.${
+            divergents > 0
+              ? ` ${divergents} copie(s) modifiée(s) par vous divergent aussi du livré — elles ne sont jamais touchées.`
+              : ''
+          }</p>`
+        : ''
     if (this.library.length === 0) {
       host.innerHTML =
         '<p class="ed-empty">Aucun tableau enregistré : l’expédition livrée se joue telle quelle, dans son ordre conçu. « Enregistrer » publie le brouillon ; le semis ci-dessous copie tous les livrés ici pour les réordonner.</p>' +
@@ -2443,6 +2532,7 @@ export class LevelEditor {
       return
     }
     host.innerHTML =
+      majeur +
       semeur +
       this.library
         .map((s, i) => {
@@ -2479,6 +2569,10 @@ export class LevelEditor {
     this.el('ed-lib-semer')?.addEventListener(
       'click',
       () => void this.semerManquants(),
+    )
+    this.el('ed-lib-maj')?.addEventListener(
+      'click',
+      () => void this.majLivres(),
     )
     for (const b of Array.from(host.querySelectorAll('.ed-lib-open'))) {
       b.addEventListener('click', () =>
