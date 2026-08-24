@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { INSTRUMENTS, PRIX_CARTE, tirageInstruments } from './instruments'
+import {
+  BONBONNE_CAP,
+  INSTRUMENTS,
+  PALIERS_XP,
+  PRIX_CARTE,
+  paliersAtteints,
+  prochainPalier,
+  tirageInstruments,
+} from './instruments'
 
 // Générateur déterministe (LCG) : le tirage se rejoue à l'identique
 function lcg(seed: number): () => number {
@@ -49,5 +57,20 @@ describe('Instruments — le tirage de fin de salle', () => {
       payantes += tirageInstruments(lcg(seed), [], 1, 3).filter((c) => c.prix > 0).length
     }
     expect(payantes).toBeGreaterThan(50)
+  })
+})
+
+describe('Bonbonne et XP d’étalonnage', () => {
+  it('les paliers se comptent et s’annoncent', () => {
+    expect(paliersAtteints(0)).toBe(0)
+    expect(paliersAtteints(3)).toBe(1)
+    expect(paliersAtteints(9.9)).toBe(2)
+    expect(paliersAtteints(10)).toBe(3)
+    expect(prochainPalier(0)).toBe(3)
+    expect(prochainPalier(3)).toBe(6)
+    expect(prochainPalier(PALIERS_XP[PALIERS_XP.length - 1])).toBe(null)
+  })
+  it('la capacité de la bonbonne est bien posée', () => {
+    expect(BONBONNE_CAP).toBeGreaterThan(0)
   })
 })
