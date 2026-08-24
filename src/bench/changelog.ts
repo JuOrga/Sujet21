@@ -14,6 +14,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '24/08/2026 20:00',
+    title:
+      'Un plafond PAR SALLE : chaque tableau choisit ce que son reflet raconte',
+    notes: [
+      'Demandé : un système de plafond par salle. Nouveau champ du tableau dans l’éditeur — « PLAFOND DU REFLET », à côté de la brume. Vide : le plafond par défaut (les verrières). Tapez un nom de variante (« planete ») et la salle reflète plafond-planete.webp — déposez simplement le fichier dans les assets sous ce nom. Variante absente : repli sur le défaut, sans trou. Le champ suggère les variantes livrées, mais reste libre : toute variante « x » cherche plafond-x.webp.',
+      'Sous le capot : un seul calque de texture est RÉUTILISÉ — au changement de salle, la nouvelle variante est téléversée une fois (1024²) et le reflet suit ; aucune limite au nombre de variantes, aucun coût par image. Le choix voyage avec le tableau (sauvegarde, bibliothèque partagée, export). Vérifié de bout en bout : une variante-témoin nommée dans l’éditeur puis ESSAYER — le corps reflète bien LE plafond de cette salle et non le défaut.',
+      'Idée d’usage : les verrières pour les modules intérieurs, la planète au hublot pour les salles « proche de la coque » — le reflet devient un outil de narration d’ambiance, salle par salle. Le prompt de la variante planète est prêt (§13 du document des assets).',
+    ],
+  },
+  {
     date: '24/08/2026 17:25',
     title:
       'Le plafond du concepteur est intégré : les verrières vivent dans le reflet',

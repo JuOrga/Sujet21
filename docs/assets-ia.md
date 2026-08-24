@@ -228,6 +228,11 @@ QUE dans le reflet de la surface miroitante du fluide. Un plafond de
 substitution (généré, sommaire) est en place : déposez votre image sous
 `public/assets/plafond.webp` et elle le remplace, sans autre geste.
 
+**Un plafond PAR SALLE** : déposez des variantes sous `plafond-<nom>.webp`
+(ex. `plafond-planete.webp`), puis dans l'éditeur, champ « Plafond du
+reflet » du tableau : tapez le nom (`planete`). Vide = le plafond par
+défaut ; variante absente = repli sur le défaut, sans trou.
+
 Ce qui fait l'effet : des VERRIÈRES et hublots ÉCLAIRÉS (blanc froid) sur
 une machinerie sombre — ce sont eux qui brillent dans le corps, comme des
 néons sur une flaque. La répétition se fait en miroir à l'affichage :

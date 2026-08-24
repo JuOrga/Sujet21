@@ -324,6 +324,10 @@ export interface LumiereDef {
 // deviennent une mécanique de conception à part entière.
 export const AMBIANTE_DEFAUT = 0.52
 
+// Les variantes de plafond LIVRÉES (suggestions de l'éditeur) : le champ
+// reste libre — toute variante nommée « x » cherche plafond-x.webp.
+export const PLAFONDS_CONNUS: string[] = ['planete']
+
 export const LAMPE_HAUTEUR_DEFAUT = 420
 export const LAMPE_HAUTEUR_MIN = 80
 export const LAMPE_HAUTEUR_MAX = 2000
@@ -421,6 +425,10 @@ export interface LevelDef {
   lumieres?: LumiereDef[]
   ambiante?: number // lumière générale 0..1 ; absente : AMBIANTE_DEFAUT
   brume?: number // brume d'ambiance 0..1 ; absente : 0 — des nappes qui dérivent
+  // PLAFOND DU REFLET : la variante que la surface MIROITANTE renvoie.
+  // Absente : plafond.webp (les verrières). « planete » charge
+  // plafond-planete.webp — déposer le fichier, nommer la variante ici.
+  plafond?: string
 
   par?: number // budget d'impulsions visé : franchissable en `par`, record en dessous
   // Dashs rendus à CHAQUE transformation en vapeur (règle d'or : 3 par

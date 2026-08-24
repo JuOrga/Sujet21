@@ -18,6 +18,7 @@ import {
   MAT_MEMBRANE,
   MAT_RIDEAU,
   MAT_SURCHAUFFEUR,
+  PLAFONDS_CONNUS,
   dansBoite,
   MAT_HYDROPHILE,
   MAT_HYDROPHOBE,
@@ -2253,6 +2254,20 @@ export class LevelEditor {
       }
     })
     this.el('ed-brume').addEventListener('change', () => this.histoire())
+    // le plafond du reflet : une variante par salle, champ libre + suggestions
+    const dlPlafonds = this.el('ed-plafonds')
+    if (dlPlafonds)
+      dlPlafonds.innerHTML = PLAFONDS_CONNUS.map(
+        (n) => `<option value="${n}"></option>`,
+      ).join('')
+    this.el('ed-plafond').addEventListener('input', () => {
+      const v = (this.el('ed-plafond') as HTMLInputElement).value
+        .trim()
+        .slice(0, 24)
+      if (v === '') delete this.level.plafond
+      else this.level.plafond = v
+    })
+    this.el('ed-plafond').addEventListener('change', () => this.histoire())
     // Cinématiques ancrées : le code (table de montage) joué à l'entrée du
     // tableau, et celui joué à sa conclusion — vide = aucune
     for (const [id, champ] of [
@@ -2925,6 +2940,8 @@ export class LevelEditor {
     )
     ;(this.el('ed-dashs') as HTMLInputElement).value =
       this.level.dashBudget === undefined ? '' : String(this.level.dashBudget)
+    ;(this.el('ed-plafond') as HTMLInputElement).value =
+      this.level.plafond ?? ''
     ;(this.el('ed-brume') as HTMLInputElement).value =
       this.level.brume === undefined || this.level.brume === 0
         ? ''

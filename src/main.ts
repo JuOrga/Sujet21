@@ -4617,6 +4617,7 @@ function frame(now: number): void {
     RELIEF_K[reliefChoix],
     level.brume ?? 0,
     eauMiroir,
+    level.plafond ?? '',
   )
   const rendRaw = performance.now() - renderT0
   monitor.renderMs += (rendRaw - monitor.renderMs) * 0.08
