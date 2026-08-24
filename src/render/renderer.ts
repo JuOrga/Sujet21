@@ -1336,6 +1336,10 @@ void main() {
     // fluctuations de densité ne sont pas du relief — sans ce masque, l'eau
     // se couvre de reflets granuleux qui trahissent les particules.
     float surfaceZone = body * (1.0 - smoothstep(th * 1.4, th * 2.6, field2));
+    // Le reflet du GEL (mode mercure) : calculé dans le bloc miroir, appliqué
+    // plus bas dans la teinte de la glace — nul dans les autres modes.
+    vec3 gelMiroir = vec3(0.0);
+    float gelForce = 0.0;
     if (uEau > 0.5) {
       // Scintillement interne discret : l'eau vit même au repos
       float shimmer = sin(world.x * 0.11 + uTime * 1.6) * sin(world.y * 0.09 - uTime * 1.2);
@@ -1401,6 +1405,8 @@ void main() {
         if (uLumiereEau > 0.5) {
           env /= clamp(vec3(uAmbiante * 1.15) + 1.05 * lmEau, vec3(0.32), vec3(1.0));
         }
+        // l'image NUE, avant la teinte de l'eau : le gel la reprendra
+        vec3 envNu = env;
         env = min(env * vec3(0.42, 0.55, 0.68), vec3(1.1));
         // LES VRAIES LAMPES dans le miroir : chaque luminaire se mire en
         // un éclat de SA couleur au point du reflet qui le regarde — une
@@ -1408,20 +1414,32 @@ void main() {
         // proche du luminaire). Plus la lampe est haute, plus son image
         // est large et douce. Ajouté APRÈS la teinte de l'eau : un néon
         // sur une flaque garde sa couleur, il ne verdit pas.
+        vec3 eclats = vec3(0.0);
         for (int li = 0; li < MAX_LUMIERES; li++) {
           if (li >= uLampeCount) break;
           float dLamp = distance(reflPos, pointLampe(li, reflPos));
           float taille = 26.0 + uLampes[li].z * 0.09;
           float glint = exp(-dLamp * dLamp / (2.0 * taille * taille));
-          env += uLampesCol[li] * (clamp(uLampesInt[li], 0.0, 2.0) * glint * 1.5);
+          eclats += uLampesCol[li] * (clamp(uLampesInt[li], 0.0, 2.0) * glint);
         }
-        env = min(env, vec3(1.7));
+        env = min(env + eclats * 1.5, vec3(1.7));
         // couverture CONTINUE : pleine au bord (incidence rasante), plus
         // discrète au cœur — l'eau profonde montre sa propre couleur
         float bord = smoothstep(0.40, 0.98, rC / max(uRayonCorps, 1.0));
-        float corps = body * (1.0 - vap) * (1.0 - icy * 0.7);
+        float corps = body * (1.0 - vap) * (1.0 - icy);
         float force = corps * clamp(0.24 + 0.50 * bord, 0.0, 0.74);
         water = mix(water, env, force);
+        // LE GEL POLI : la glace est le miroir du lore (elle renvoie le
+        // laser) — elle mire donc la salle du même reflet d'un seul
+        // tenant, mais GIVRÉ : l'image est désaturée (le BLANC reste
+        // maître), les éclats des lampes y sont plus francs (surface
+        // dure), et le tout se fond plus bas dans la teinte blême du gel.
+        if (icy > 0.001) {
+          float lumR = dot(envNu, vec3(0.299, 0.587, 0.114));
+          vec3 givre = mix(vec3(lumR), envNu, 0.30) * vec3(0.94, 0.98, 1.04);
+          gelMiroir = min(givre * 0.80 + eclats * 1.25, vec3(1.6));
+          gelForce = clamp(0.20 + 0.42 * bord, 0.0, 0.60);
+        }
       }
       // SURFACE MIROITANTE (réglage PARAMÈTRES, mode 1) : la surface renvoie
       // VRAIMENT les alentours — la pièce est échantillonnée à distance le
@@ -1476,7 +1494,10 @@ void main() {
 
     // Gel (tableau 2) : la teinte pâlit vers la glace mate — le givre se lit
     // sur le corps avant même la prise, la partie gelée devient blême et fixe.
+    // En MERCURE, le gel poli MIRE la salle : le reflet givré (désaturé,
+    // blanc maître) et les éclats des lampes affleurent sous la teinte.
     vec3 iceCol = vec3(0.60, 0.76, 0.88) * (0.72 + 0.45 * diffuse);
+    iceCol = mix(iceCol, gelMiroir, gelForce);
     water = mix(water, iceCol, icy * 0.9);
     // Vapeur (tableau 3) : vapeur d'opale — cœur turquoise voilé, liseré
     // nacré qui accroche la lumière sur les bords, ombres lilas dans les plis.
