@@ -1502,8 +1502,44 @@ void main() {
     // est lisse : éclairage quasi plat, c'est le reflet qui sculpte. Les
     // modes MIROITANTE et CLASSIQUE gardent leur glace au pixel près.
     float diffuseGel = uMiroirEau > 1.5 ? mix(diffuse, 0.58, 0.85) : diffuse;
+    // FACETTES CRISTALLINES (mercure) : le bloc poli se taille en GRANDES
+    // cellules plates — un Voronoï ancré sur le corps (les facettes suivent
+    // le bloc qui dérive), chaque cellule avec sa propre nuance, et les
+    // arêtes entre cellules en fins liserés qui accrochent la lumière.
+    // La modulation reste douce : le blanc garde le dessus.
+    float facette = 0.0; // nuance propre de la cellule (-1..1)
+    float aretes = 0.0; // liseré des arêtes entre cellules
+    if (icy > 0.001 && uMiroirEau > 1.5) {
+      vec2 rel = (world - uCentroide) / 95.0;
+      vec2 ip = floor(rel);
+      vec2 fp = fract(rel);
+      float f1 = 8.0;
+      float f2 = 8.0;
+      vec2 idBest = vec2(0.0);
+      for (int gy = -1; gy <= 1; gy++) {
+        for (int gx = -1; gx <= 1; gx++) {
+          vec2 g = vec2(float(gx), float(gy));
+          vec2 cell = ip + g;
+          vec2 o = vec2(hash21(cell), hash21(cell + 41.7));
+          vec2 d = g + o * 0.85 - fp;
+          float dd = dot(d, d);
+          if (dd < f1) {
+            f2 = f1;
+            f1 = dd;
+            idBest = cell;
+          } else if (dd < f2) {
+            f2 = dd;
+          }
+        }
+      }
+      facette = hash21(idBest + 7.3) * 2.0 - 1.0;
+      aretes = 1.0 - smoothstep(0.02, 0.16, f2 - f1);
+    }
     vec3 iceCol = vec3(0.60, 0.76, 0.88) * (0.72 + 0.45 * diffuseGel);
     iceCol = mix(iceCol, gelMiroir, gelForce);
+    // chaque facette a sa nuance, les arêtes tiennent un fil de lumière
+    iceCol *= 1.0 + 0.07 * facette;
+    iceCol += vec3(0.88, 0.95, 1.05) * aretes * 0.12;
     water = mix(water, iceCol, icy * 0.9);
     // Vapeur (tableau 3) : vapeur d'opale — cœur turquoise voilé, liseré
     // nacré qui accroche la lumière sur les bords, ombres lilas dans les plis.
