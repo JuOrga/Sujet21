@@ -219,6 +219,34 @@ Négatif : `glowing, light rays, emissive, perspective, tilt, vertical, shadow, 
 
 ---
 
+## 13. Le plafond du reflet — `plafond.webp`
+
+**1024×1024 (ou 2048²) · WebP · sombre · vu du DESSOUS**
+
+Le plafond de la station n'est jamais visible vu du dessus — il n'existe
+QUE dans le reflet de la surface miroitante du fluide. Un plafond de
+substitution (généré, sommaire) est en place : déposez votre image sous
+`public/assets/plafond.webp` et elle le remplace, sans autre geste.
+
+Ce qui fait l'effet : des VERRIÈRES et hublots ÉCLAIRÉS (blanc froid) sur
+une machinerie sombre — ce sont eux qui brillent dans le corps, comme des
+néons sur une flaque. La répétition se fait en miroir à l'affichage :
+pas besoin d'un raccord parfait.
+
+```
+Looking straight UP at the ceiling of a retro-futuristic 1970s orbital
+laboratory, orthographic view from below: dark steel structure with
+crossing support beams, thick pipes with flanges, cable trays, catwalk
+grating — and several GLOWING SKYLIGHTS and round portholes (cold white
+light #d6e8f5, glass with thin mullions) cut into the dark structure,
+muted cold palette (steel blue-grey #10151c to #2a3542), the lit windows
+clearly brighter than everything else, flat 2D game texture, no
+perspective distortion, no text
+```
+Négatif : `floor, furniture, people, warm colors, lens flare, perspective, text, watermark`
+
+---
+
 ## Ce que je peux faire sans générateur d'images
 
 Vecteurs SVG (logo, cadres, icônes, écusson au trait) et textures procédurales en

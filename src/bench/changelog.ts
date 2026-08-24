@@ -14,6 +14,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '24/08/2026 16:55',
+    title:
+      'Le reflet montre LE PLAFOND : la machinerie au-dessus de la cuve, visible nulle part ailleurs',
+    notes: [
+      'L’idée du concepteur, maquette à l’appui : la surface miroitante doit refléter LE PLAFOND — invisible vu du dessus, il n’existe QUE dans le reflet. C’est fait : une image « plafond vu du dessous » (poutrelles, conduites, passerelles… et des VERRIÈRES ÉCLAIRÉES) est échantillonnée dans le reflet du corps, avec une PARALLAXE INVERSÉE (le plafond est au-dessus du plan : il glisse à contre-sens de la caméra — la hauteur se sent). Les verrières restent lumineuses même dans une salle sombre : ce sont elles qu’on voit briller dans la masse, comme les fenêtres de la maquette.',
+      'Un plafond DE SUBSTITUTION (généré, sommaire) est en place pour que l’effet soit visible dès maintenant. Pour le vôtre : déposez public/assets/plafond.webp — prompt complet dans docs/assets-ia.md §13 (le point clé : des verrières et hublots éclairés blanc froid sur une machinerie sombre). Remplacement automatique, aucun autre geste.',
+      'Technique : le plafond loge dans un 4ᵉ calque du tableau de textures des zones — AUCUNE unité de texture supplémentaire (les 16 garanties étaient toutes prises), répétition en miroir faite dans le shader, zéro coût hors des pixels d’eau en mode miroitant. Le mode CLASSIQUE reste inchangé au pixel près.',
+    ],
+  },
+  {
     date: '24/08/2026 15:35',
     title:
       'Le bouton de mise à jour existait… mais ne se montrait jamais : trouvé et corrigé',
