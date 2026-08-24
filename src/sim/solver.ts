@@ -1801,6 +1801,17 @@ export class FluidSim {
       // le souffle d'un dash n'est plus à vous : ni en vol, ni fraîchement
       // perlé — sinon la propulsion en vapeur ne coûterait rien
       if (this.kind[i] !== KIND_PLAYER && (this.souffle[i] > 0 || this.cooldown[i] > 0)) continue
+      // dans l'aura d'une chaudière, une particule ne CONDENSE pas : elle
+      // BOUT. Sans cette garde, le bord du corps qui chauffait (vapeur
+      // montante) était happé vers le centre en continu — la chaudière
+      // semblait REPOUSSER le corps liquide, impossible de l'approcher
+      // pour se faire vaporiser.
+      if (
+        this.hasHeat &&
+        this.gaseous[i] === 0 &&
+        this.heatExposureAt(this.posX[i], this.posY[i]) > 0
+      )
+        continue
       const dx = cx - this.posX[i]
       const dy = cy - this.posY[i]
       const d = Math.hypot(dx, dy)

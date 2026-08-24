@@ -21,6 +21,34 @@ function run(sim: FluidSim, seconds: number): void {
 }
 
 describe('FluidSim — le radiateur : la chaleur vaporise, dégèle, évapore', () => {
+  it("un corps LIQUIDE qui glisse vers la chaudière y RESTE — plus de catapulte du rappel de condensation", () => {
+    // Le bogue signalé : « impossible de s'approcher d'une chaudière en
+    // liquide ». Le bord du corps qui chauffait (vapeur montante ~0,98 sans
+    // intention) était happé vers le centre par le rappel de condensation ;
+    // le front comprimé se détendait d'un coup et la chaudière CATAPULTAIT
+    // le corps à travers la cuve (constaté : centroïde éjecté à −900 u).
+    // Dans l'aura, on BOUT, on ne condense pas : le corps doit pouvoir
+    // venir au contact, y rester, et se faire vaporiser.
+    const sim = makeSim({ heatLossRate: 0 })
+    sim.setLevel(
+      [{ minX: 300, minY: -260, maxX: 360, maxY: 260, material: MAT_CHAUD }],
+      [],
+    )
+    // 300 particules : la catapulte ne mordait qu'à partir d'un corps
+    // charnu — un petit disque de test passait sans encombre
+    sim.spawnDisc(60, 0, 300, KIND_PLAYER)
+    // un élan modéré vers la chaudière — le geste du joueur — puis on glisse
+    for (let i = 0; i < sim.count; i++) {
+      if (sim.kind[i] === KIND_PLAYER) sim.velX[i] = 150
+    }
+    run(sim, 3)
+    expect(sim.chauffeFrac).toBeGreaterThan(0.9) // arrivé au contact
+    run(sim, 3)
+    // trois secondes plus tard il y est ENCORE (avant : catapulté, 0 %)
+    expect(sim.chauffeFrac).toBeGreaterThan(0.7)
+    expect(sim.stats.centroidX).toBeGreaterThan(180)
+  })
+
   it("l'échauffement du corps est un effet VISUEL : il chauffe, il ne bascule pas seul", () => {
     const sim = makeSim({ heatLossRate: 0 }) // pas de perte : on isole la vaporisation
     const i = sim.addParticle(0, 8, KIND_PLAYER)
