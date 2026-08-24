@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '24/08/2026 15:35',
+    title:
+      'Le bouton de mise à jour existait… mais ne se montrait jamais : trouvé et corrigé',
+    notes: [
+      'SIGNALÉ : « je ne trouve pas le bouton ». Diagnostic mené sur la VRAIE bibliothèque en ligne (via le workflow de diagnostic — l’atelier n’a pas d’accès direct au site) : le serveur NORMALISE l’auteur des entrées — majuscules, tronqué à 12 caractères. Les copies semées portent donc « EXPÉDITION L », et le détecteur du bouton exigeait exactement « expédition livrée » : il ne reconnaissait jamais rien, bouton invisible. La reconnaissance passe au préfixe insensible à la casse — vérifié avec l’auteur exactement tel que le serveur le stocke.',
+      'Au passage, le diagnostic confirme l’état de votre poste : DIX copies semées sont figées à l’ancien éclairage (21-01 à 21-04 et 21-06 à 21-11) — et 21-05, que vous avez re-semée à la main, est déjà à neuf (bandes basses, ambiante nulle). Après cette mise à jour du site (rechargez la page !), ÉDITEUR → « METTRE À JOUR 10 LIVRÉ(S) DÉPASSÉ(S) » — un clic, et tout l’éclairage refondu apparaît enfin, en jeu comme dans l’éditeur.',
+    ],
+  },
+  {
     date: '24/08/2026 15:00',
     title:
       'Le mystère des « lampes à 9 m » résolu : METTRE À JOUR LES LIVRÉS DÉPASSÉS',
