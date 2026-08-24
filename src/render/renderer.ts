@@ -1495,8 +1495,14 @@ void main() {
     // Gel (tableau 2) : la teinte pâlit vers la glace mate — le givre se lit
     // sur le corps avant même la prise, la partie gelée devient blême et fixe.
     // En MERCURE, le gel poli MIRE la salle : le reflet givré (désaturé,
-    // blanc maître) et les éclats des lampes affleurent sous la teinte.
-    vec3 iceCol = vec3(0.60, 0.76, 0.88) * (0.72 + 0.45 * diffuse);
+    // blanc maître) et les éclats des lampes affleurent sous la teinte — et
+    // le relief par-goutte s'EFFACE : figé, il dessinait des « vagues »
+    // vermiculées sur le bloc (les bosses du champ des particules gelées ne
+    // bougent plus, elles se lisaient comme une tôle ondulée). Le gel poli
+    // est lisse : éclairage quasi plat, c'est le reflet qui sculpte. Les
+    // modes MIROITANTE et CLASSIQUE gardent leur glace au pixel près.
+    float diffuseGel = uMiroirEau > 1.5 ? mix(diffuse, 0.58, 0.85) : diffuse;
+    vec3 iceCol = vec3(0.60, 0.76, 0.88) * (0.72 + 0.45 * diffuseGel);
     iceCol = mix(iceCol, gelMiroir, gelForce);
     water = mix(water, iceCol, icy * 0.9);
     // Vapeur (tableau 3) : vapeur d'opale — cœur turquoise voilé, liseré
