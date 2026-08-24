@@ -2650,6 +2650,11 @@
         background: rgba(167, 221, 245, 0.18);
         box-shadow: 0 0 16px rgba(167, 221, 245, 0.35);
       }
+      /* l'icône 💨 est teintée AMBRE (la couleur de la vapeur) : l'emoji
+         gris passe au doré par filtre — actif ou non, l'état s'identifie */
+      #state-vapeur .st-ico {
+        filter: sepia(1) saturate(2.6) hue-rotate(-14deg) brightness(1.15);
+      }
       #state-vapeur.active {
         border-color: #f2c98e;
         background: rgba(242, 201, 142, 0.18);
