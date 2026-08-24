@@ -3568,13 +3568,37 @@
         background: rgba(99, 183, 230, 0.1);
       }
       .ed-lib-no {
-        width: 18px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        width: 30px;
+        flex: none;
+        text-align: center;
         font-size: 10px;
         color: var(--dim);
-        flex: none;
+        background: rgba(99, 183, 230, 0.06);
+        border: 1px solid rgba(99, 183, 230, 0.18);
+        border-radius: 3px;
+        -moz-appearance: textfield;
+        appearance: textfield;
+      }
+      .ed-lib-no::-webkit-outer-spin-button,
+      .ed-lib-no::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      .ed-lib-no:focus {
+        color: var(--specimen);
+        border-color: var(--specimen);
+        outline: none;
+      }
+      .ed-lib-row.dragging {
+        opacity: 0.35;
+      }
+      .ed-lib-row.drag-over {
+        border-color: var(--vert, #3fd69b);
+        background: rgba(63, 214, 155, 0.08);
+      }
+      #ed-lib-semer {
+        width: 100%;
+        margin-bottom: 2px;
       }
       .ed-lib-open {
         flex: 1 1 auto;
