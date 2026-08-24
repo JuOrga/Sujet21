@@ -14,6 +14,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '24/08/2026 12:40',
+    title:
+      'Refonte lumière des onze cellules : bandes basses, ambiante nulle, vraies ombres',
+    notes: [
+      'SIGNALÉ : les lumières des nouvelles cellules manquaient de contraste. Refonte complète des onze salles (21-01 à 21-11) sur trois principes demandés : la LUMIÈRE GÉNÉRALE EST NULLE (tout vient des lampes — le noir existe vraiment, les coins s’éteignent), les plafonniers cèdent la place à des BANDES LUMINEUSES posées le long des parois neutres, et ces bandes sont BASSES (h 140-190) — les ombres s’allongent, nettes, et sculptent chaque salle.',
+      'Le langage de couleur est conservé et renforcé : la bande violette lave la chicane hydrophobe, la cyan longe le pilier des ancres, la bleu-glacé la porte de givre, l’ambre la chaudière et la conduite rompue, le vert d’eau la grande membrane — et la BALISE VERTE du sas reste le repère commun de toutes les cellules. La voie lumineuse (21-11) garde ses pierres de gué, désormais dans un noir franc.',
+      'Le contrat est VERROUILLÉ par les tests : chaque cellule doit avoir une ambiante nulle, au moins une bande posée bas, et sa balise verte — un remaniement muet casserait la suite de tests. Les autres tableaux (21-A à 21-M, l’école, le hub) gardent leur éclairage historique. Tout reste réglable salle par salle dans l’éditeur si un dosage vous semble à revoir.',
+    ],
+  },
+  {
     date: '24/08/2026 12:10',
     title:
       'Le premier gel assume l’amarre, la buveuse perd sa tache, et le fond se raccorde enfin',
