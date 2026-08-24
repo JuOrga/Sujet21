@@ -22,6 +22,7 @@ import {
   type ObstacleBox,
   type SpongeDef,
   type WorldLabel,
+  type CacheDef,
   type CibleDef,
   type LaserDef,
   type PorteDef,
@@ -414,6 +415,24 @@ export function parseLevel(input: unknown): {
   }
   if (portes.length > 0) level.portes = portes
 
+  // Cachettes : des pans voilés de brouillard, levés à l'entrée du corps
+  const caches: CacheDef[] = []
+  for (const raw of Array.isArray(o.caches) ? o.caches : []) {
+    const c = (raw ?? {}) as Record<string, unknown>
+    const cache: CacheDef = {
+      minX: Math.min(num(c.minX), num(c.maxX)),
+      minY: Math.min(num(c.minY), num(c.maxY)),
+      maxX: Math.max(num(c.minX), num(c.maxX)),
+      maxY: Math.max(num(c.minY), num(c.maxY)),
+    }
+    if (cache.maxX - cache.minX < 1 || cache.maxY - cache.minY < 1) {
+      rejets.push('une cachette a été écartée (taille nulle)')
+      continue
+    }
+    caches.push(cache)
+  }
+  if (caches.length > 0) level.caches = caches
+
   // Rails magnétiques : des polylignes d'au moins 2 points
   const rails: RailDef[] = []
   for (const raw of Array.isArray(o.rails) ? o.rails : []) {
@@ -504,6 +523,7 @@ export function serializeLevel(level: LevelDef): string {
   }
   if (level.portes && level.portes.length > 0) out.portes = level.portes
   if (level.rails && level.rails.length > 0) out.rails = level.rails
+  if (level.caches && level.caches.length > 0) out.caches = level.caches
   if (level.lumieres && level.lumieres.length > 0) out.lumieres = level.lumieres
   if (level.decals && level.decals.length > 0) out.decals = level.decals
   if (level.figure) out.figure = level.figure

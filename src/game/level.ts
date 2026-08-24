@@ -394,6 +394,18 @@ export interface PorteDef {
   regle?: 'et'
 }
 
+// Une CACHETTE : un pan de la carte voilé d'un brouillard « non
+// cartographié » tant que l'échantillon n'y est pas entré — le voile se
+// dissipe à l'entrée du corps et reste levé pour l'essai (Recommencer
+// re-voile). Purement visuel : la physique du tableau ne change pas, ce
+// qui est caché existe et fonctionne — on ne le VOIT simplement pas.
+export interface CacheDef {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+}
+
 // Un RAIL MAGNÉTIQUE (palier 3) : une ligne de champ posée dans le décor.
 // Le faisceau ordinaire l'ignore ; un faisceau IONISÉ (qui traverse la
 // vapeur du joueur) est capturé s'il passe près d'une extrémité, suit la
@@ -420,6 +432,7 @@ export interface LevelDef {
   cibles?: CibleDef[]
   portes?: PorteDef[]
   rails?: RailDef[]
+  caches?: CacheDef[] // cachettes voilées (brouillard levé à l'entrée du corps)
   // Lampes posées à l'éditeur (au plus MAX_LUMIERES allumées). Absentes :
   // la lampe par défaut de la cuve fait l'éclairage.
   lumieres?: LumiereDef[]

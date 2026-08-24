@@ -269,6 +269,26 @@ it('canaux : le n° d’une cible survit, l’héritage porte.cible (indice) se 
   expect(checkLevel(vieux.level!).some((v) => v.message.includes('canal'))).toBe(false)
 })
 
+it('conserve les cachettes (pans voilés) et écarte celles de taille nulle', () => {
+  const src = {
+    ...TABLEAUX[0],
+    caches: [{ minX: 100, minY: -200, maxX: 400, maxY: 100 }],
+  }
+  const { level, rejets } = parseLevel(JSON.parse(serializeLevel(src)))
+  expect(rejets).toEqual([])
+  expect(level!.caches).toEqual(src.caches)
+  // bornes inversées : normalisées ; taille nulle : écartée avec un rejet
+  const tordu = parseLevel({
+    ...JSON.parse(serializeLevel(TABLEAUX[0])),
+    caches: [
+      { minX: 400, minY: 100, maxX: 100, maxY: -200 },
+      { minX: 0, minY: 0, maxX: 0, maxY: 50 },
+    ],
+  })
+  expect(tordu.level!.caches).toEqual([{ minX: 100, minY: -200, maxX: 400, maxY: 100 }])
+  expect(tordu.rejets.length).toBe(1)
+})
+
 it('conserve les rails magnétiques et écarte les moignons', () => {
   const src = {
     ...TABLEAUX[0],

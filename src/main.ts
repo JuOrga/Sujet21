@@ -528,6 +528,13 @@ function updateWorldLabels(vw: number, vh: number): void {
     cle: number
   }[] = []
   for (const l of labelEls) {
+    // sous un voile de cachette encore fermé : la pancarte flotterait
+    // AU-DESSUS du brouillard et vendrait le secret — elle se tait
+    if (dansCacheVoilee(l.x, l.y)) {
+      l.span.style.display = 'none'
+      l.place = false
+      continue
+    }
     const sx = cx + (l.x - camera.x) * camera.zoom
     const sy = cy - (l.y - camera.y) * camera.zoom
     const hw = (l.w * scale) / 2 + MARGE_PANCARTE
@@ -2612,7 +2619,9 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   const cibles = level.cibles ?? []
   const portes = level.portes ?? []
   const rails = level.rails ?? []
-  const actif = lasers.length + cibles.length + portes.length + rails.length > 0
+  const caches = level.caches ?? []
+  const actif =
+    lasers.length + cibles.length + portes.length + rails.length + caches.length > 0
   const dprC = Math.min(dpr, 2)
   if (
     fxCanvas.width !== Math.round(vw * dprC) ||
@@ -2868,6 +2877,61 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       g.stroke()
     }
   }
+
+  // LES CACHETTES, EN DERNIER : le brouillard « non cartographié » couvre
+  // TOUT — parois, fluide, mécanismes, décor. Le centre du corps qui entre
+  // lève le voile en fondu ; il reste levé pour l'essai (Recommencer
+  // re-voile, la découverte se rejoue). Des nappes de brume dérivent
+  // lentement dans le voile pour qu'il se lise comme du brouillard, pas
+  // comme un rectangle mort.
+  if (cachesLevee.length !== caches.length) {
+    cachesLevee = caches.map(() => Infinity)
+  }
+  for (let i = 0; i < caches.length; i++) {
+    const c = caches[i]
+    if (
+      cachesLevee[i] === Infinity &&
+      !sim.dispersed &&
+      pointInBox(sim.stats.centroidX, sim.stats.centroidY, c)
+    ) {
+      cachesLevee[i] = elapsed
+    }
+    const alpha =
+      cachesLevee[i] === Infinity
+        ? 1
+        : Math.max(0, 1 - (elapsed - cachesLevee[i]) / 0.9)
+    if (alpha <= 0) continue
+    const a = S(c.minX, c.maxY)
+    const b = S(c.maxX, c.minY)
+    const w = b.sx - a.sx
+    const h = b.sy - a.sy
+    if (b.sx < 0 || a.sx > vw || b.sy < 0 || a.sy > vh) continue
+    g.save()
+    g.beginPath()
+    g.rect(a.sx, a.sy, w, h)
+    g.clip()
+    g.globalAlpha = alpha
+    g.fillStyle = '#0d1320'
+    g.fillRect(a.sx, a.sy, w, h)
+    for (let k = 0; k < 4; k++) {
+      const ph = i * 7.3 + k * 2.1
+      const nx = a.sx + w * (0.5 + 0.42 * Math.sin(elapsed * 0.11 + ph * 1.7))
+      const ny = a.sy + h * (0.5 + 0.42 * Math.cos(elapsed * 0.089 + ph))
+      const r = Math.max(w, h) * (0.30 + 0.10 * Math.sin(ph * 3.7))
+      const grad = g.createRadialGradient(nx, ny, 0, nx, ny, Math.max(8, r))
+      grad.addColorStop(0, 'rgba(52,68,92,0.24)')
+      grad.addColorStop(1, 'rgba(52,68,92,0)')
+      g.fillStyle = grad
+      g.fillRect(a.sx, a.sy, w, h)
+    }
+    // le liseré, à peine plus clair : le pan se devine sans se trahir
+    g.globalAlpha = alpha * 0.45
+    g.strokeStyle = 'rgba(74,94,120,0.55)'
+    g.lineWidth = 1
+    g.strokeRect(a.sx + 0.5, a.sy + 0.5, w - 1, h - 1)
+    g.restore()
+    g.globalAlpha = 1
+  }
 }
 
 // Flèche de cap manette : elle apparaît dès qu'on touche le stick et montre
@@ -2943,6 +3007,18 @@ let lastRailTime = 0
 // rails dont le champ est engagé : allumés par un arc, ils ne se relâchent
 // qu'une fois leur bande vidée (le nuage porté jusqu'à l'arrivée)
 const railsEngages = new Set<number>()
+// LES CACHETTES : l'instant où le voile de chaque pan s'est levé
+// (Infinity : encore voilé). Le corps qui entre lève le voile — et
+// Recommencer re-voile tout : la découverte se rejoue à chaque essai.
+let cachesLevee: number[] = []
+/** Ce point est-il sous un voile encore fermé ? (masque les étiquettes) */
+function dansCacheVoilee(x: number, y: number): boolean {
+  const caches = level.caches ?? []
+  for (let i = 0; i < caches.length; i++) {
+    if ((cachesLevee[i] ?? Infinity) === Infinity && pointInBox(x, y, caches[i])) return true
+  }
+  return false
+}
 function resetLasers(): void {
   laserEtat.vues = []
   laserEtat.recepteurs = creerEtatRecepteurs((level.cibles ?? []).length)
@@ -2950,6 +3026,7 @@ function resetLasers(): void {
   laserEtat.doorsKey = ''
   lastRailTime = 0
   railsEngages.clear()
+  cachesLevee = (level.caches ?? []).map(() => Infinity)
 }
 const dashAimEl = el('dash-aim')
 const dashCostEl = el('dash-cost')

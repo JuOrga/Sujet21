@@ -102,6 +102,7 @@ type Tool =
   | { kind: 'box'; material: number; forme?: number }
   | { kind: 'sponge' }
   | { kind: 'zone'; force: ZoneForce }
+  | { kind: 'cache' }
   | { kind: 'spawn' }
   | { kind: 'exit' }
   | { kind: 'label' }
@@ -118,6 +119,7 @@ type Sel =
   | { kind: 'box'; index: number }
   | { kind: 'sponge'; index: number }
   | { kind: 'zone'; index: number }
+  | { kind: 'cache'; index: number }
   | { kind: 'label'; index: number }
   | { kind: 'laser'; index: number }
   | { kind: 'cible'; index: number }
@@ -490,6 +492,7 @@ export class LevelEditor {
     if (!s) return null
     if (s.kind === 'box') return this.level.boxes[s.index] ?? null
     if (s.kind === 'zone') return (this.level.zones ?? [])[s.index] ?? null
+    if (s.kind === 'cache') return (this.level.caches ?? [])[s.index] ?? null
     if (s.kind === 'porte') return (this.level.portes ?? [])[s.index] ?? null
     if (s.kind === 'exit') return this.level.exit
     if (s.kind === 'sponge') {
@@ -517,6 +520,8 @@ export class LevelEditor {
     if (s.kind === 'box') Object.assign(this.level.boxes[s.index], norm)
     else if (s.kind === 'zone')
       Object.assign((this.level.zones ?? [])[s.index], norm)
+    else if (s.kind === 'cache')
+      Object.assign((this.level.caches ?? [])[s.index], norm)
     else if (s.kind === 'porte')
       Object.assign((this.level.portes ?? [])[s.index], norm)
     else if (s.kind === 'exit') Object.assign(this.level.exit, norm)
@@ -792,6 +797,10 @@ export class LevelEditor {
       ) {
         return { kind: 'sponge', index: i }
       }
+    }
+    const caches = this.level.caches ?? []
+    for (let i = caches.length - 1; i >= 0; i--) {
+      if (inside(caches[i])) return { kind: 'cache', index: i }
     }
     const zones = this.level.zones ?? []
     for (let i = zones.length - 1; i >= 0; i--) {
@@ -1917,6 +1926,11 @@ export class LevelEditor {
       this.level.zones.push({ ...r, force: t.force })
       this.sel = { kind: 'zone', index: this.level.zones.length - 1 }
       this.commit(`Zone « ${t.force} » posée.`)
+    } else if (t.kind === 'cache') {
+      if (!this.level.caches) this.level.caches = []
+      this.level.caches.push({ ...r })
+      this.sel = { kind: 'cache', index: this.level.caches.length - 1 }
+      this.commit('Cachette posée — voilée en jeu, révélée quand le corps y entre.')
     } else if (t.kind === 'porte') {
       if (!this.level.portes) this.level.portes = []
       // asservie au canal de la cible la plus proche — modifiable au panneau
@@ -1976,6 +1990,7 @@ export class LevelEditor {
     if (s.kind === 'box') this.level.boxes.splice(s.index, 1)
     else if (s.kind === 'sponge') this.level.sponges.splice(s.index, 1)
     else if (s.kind === 'zone') (this.level.zones ?? []).splice(s.index, 1)
+    else if (s.kind === 'cache') (this.level.caches ?? []).splice(s.index, 1)
     else if (s.kind === 'laser') (this.level.lasers ?? []).splice(s.index, 1)
     else if (s.kind === 'lumiere')
       (this.level.lumieres ?? []).splice(s.index, 1)
@@ -2014,6 +2029,10 @@ export class LevelEditor {
       const z = (this.level.zones ?? [])[s.index]
       this.level.zones!.push({ ...z, minX: z.minX + off, maxX: z.maxX + off })
       this.sel = { kind: 'zone', index: this.level.zones!.length - 1 }
+    } else if (s.kind === 'cache') {
+      const c = (this.level.caches ?? [])[s.index]
+      this.level.caches!.push({ ...c, minX: c.minX + off, maxX: c.maxX + off })
+      this.sel = { kind: 'cache', index: this.level.caches!.length - 1 }
     } else if (s.kind === 'label') {
       const l = this.level.labels[s.index]
       this.level.labels.push({ ...l, x: l.x + off })
@@ -2137,6 +2156,7 @@ export class LevelEditor {
         else if (key === 'laser') this.setTool({ kind: 'laser' })
         else if (key === 'cible') this.setTool({ kind: 'cible' })
         else if (key === 'porte') this.setTool({ kind: 'porte' })
+        else if (key === 'cache') this.setTool({ kind: 'cache' })
         else if (key === 'rail') this.setTool({ kind: 'rail' })
         else if (key === 'lumiere') this.setTool({ kind: 'lumiere' })
         else if (key === 'bande') this.setTool({ kind: 'bande' })
@@ -3201,6 +3221,19 @@ export class LevelEditor {
         numField('Y min', 'p-minY', z.minY),
         numField('Y max', 'p-maxY', z.maxY),
       )
+    } else if (s.kind === 'cache') {
+      const c = (this.level.caches ?? [])[s.index]
+      rows.push(
+        `<p class="ed-empty">En jeu, ce pan est VOILÉ d’un brouillard « non cartographié » : parois, mécanismes et fluide y sont invisibles jusqu’à ce que le corps y ENTRE — le voile se lève alors pour l’essai (Recommencer re-voile). La physique ne change pas : ce qui est caché fonctionne.</p>`,
+      )
+      rows.push(
+        numField('X min', 'p-minX', c.minX),
+        numField('X max', 'p-maxX', c.maxX),
+      )
+      rows.push(
+        numField('Y min', 'p-minY', c.minY),
+        numField('Y max', 'p-maxY', c.maxY),
+      )
     } else if (s.kind === 'sponge') {
       const sp = this.level.sponges[s.index]
       rows.push(
@@ -3376,6 +3409,8 @@ export class LevelEditor {
             : '')
         : s.kind === 'zone'
           ? 'Zone d’état'
+          : s.kind === 'cache'
+            ? 'Cachette (pan voilé)'
           : s.kind === 'sponge'
             ? 'Éponge'
             : s.kind === 'exit'
@@ -3527,6 +3562,17 @@ export class LevelEditor {
       else delete z.sequence
       Object.assign(
         z,
+        this.normalized(
+          val('p-minX'),
+          val('p-minY'),
+          val('p-maxX'),
+          val('p-maxY'),
+        ),
+      )
+    } else if (s.kind === 'cache') {
+      const c = (this.level.caches ?? [])[s.index]
+      Object.assign(
+        c,
         this.normalized(
           val('p-minX'),
           val('p-minY'),
@@ -3791,6 +3837,40 @@ export class LevelEditor {
         p.sx + 6,
         p.sy + 15,
       )
+    }
+
+    // cachettes : hachures sombres + étiquette — bien visibles À L'ÉDITEUR
+    // (le concepteur doit les voir), voilées seulement en jeu
+    for (let ci = 0; ci < (this.level.caches ?? []).length; ci++) {
+      const c = this.level.caches![ci]
+      const p = this.toScreen(c.minX, c.maxY)
+      const q = this.toScreen(c.maxX, c.minY)
+      const w = q.sx - p.sx
+      const h = q.sy - p.sy
+      g.save()
+      g.beginPath()
+      g.rect(p.sx, p.sy, w, h)
+      g.clip()
+      g.fillStyle = 'rgba(20,28,40,0.45)'
+      g.fillRect(p.sx, p.sy, w, h)
+      g.strokeStyle = 'rgba(120,140,170,0.30)'
+      g.lineWidth = 1
+      g.beginPath()
+      const pas = 14
+      for (let x = -h; x < w; x += pas) {
+        g.moveTo(p.sx + x, p.sy + h)
+        g.lineTo(p.sx + x + h, p.sy)
+      }
+      g.stroke()
+      g.restore()
+      g.strokeStyle = '#8ea2bd'
+      g.setLineDash([6, 5])
+      g.lineWidth = 1.5
+      g.strokeRect(p.sx, p.sy, w, h)
+      g.setLineDash([])
+      g.fillStyle = '#aebfd8'
+      g.font = '600 11px ui-monospace, monospace'
+      g.fillText('CACHETTE — voilée en jeu', p.sx + 6, p.sy + 15)
     }
 
     // éponges
