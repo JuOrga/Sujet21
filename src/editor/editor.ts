@@ -93,7 +93,7 @@ const ZONE_COLORS: Record<ZoneForce, string> = {
   libre: '#7b93a8',
   eau: '#63b7e6',
   glace: '#8fc8ee',
-  vapeur: '#c9a6f2',
+  vapeur: '#f2c98e',
 }
 
 type Tool =

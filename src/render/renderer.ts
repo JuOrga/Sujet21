@@ -541,7 +541,7 @@ vec3 zoneDecor(vec2 world, vec2 zc, vec2 zh, float force, float t, float hasTex)
     float up = clamp(pl.y / max(zh.y * 1.7, 1.0), 0.0, 1.0);
     float wide = 1.0 - smoothstep(pipeR * (0.6 + 3.0 * up), pipeR * (1.4 + 5.0 * up), abs(pl.x));
     float curl = 0.5 + 0.5 * vnoise(vec2(pl.x * 0.03, pl.y * 0.012 - t * 0.5));
-    acc += vec3(0.46, 0.36, 0.58) * wide * curl * (1.0 - 0.75 * up) * 0.52 * step(0.0, pl.y);
+    acc += vec3(0.60, 0.48, 0.30) * wide * curl * (1.0 - 0.75 * up) * 0.52 * step(0.0, pl.y);
   } else if (force > 0.5) {
     // EAU — la chambre pressurisée. Des rampes de buses au plafond, un voile
     // de condensation, des gouttes qui perlent : ici, rien ne bout ni ne gèle.
@@ -795,7 +795,7 @@ void main() {
     if (f < 0.5) continue; // zone libre : rien à signaler
     vec3 zc = f < 1.5 ? vec3(0.28, 0.62, 0.90)   // eau
             : f < 2.5 ? vec3(0.56, 0.80, 0.95)   // glace
-                      : vec3(0.72, 0.56, 0.95);  // vapeur
+                      : vec3(0.95, 0.78, 0.50); // vapeur — l'ambre dore
     // Forme du rayon d'action : superellipse qui épouse le rectangle (coins
     // adoucis), ondulée par trois harmoniques (mêmes phases que la
     // mécanique). szn < 1 : dedans.
@@ -1068,7 +1068,7 @@ void main() {
         col += auraCol * aura * (0.45 + 0.55 * mist);
       }
     } else if (mat > 8.5) {
-      // SURCHAUFFEUR : serpentin cyan sous verre — la borne de recharge du
+      // SURCHAUFFEUR : serpentin AMBRE sous verre (la couleur de la vapeur) — la borne de recharge du
       // dash. Chargé (aux.z = 1), le serpentin pulse ; déchargé, il s'éteint
       // et le panneau redevient un mur gris — le manomètre est la lumière.
       float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
@@ -1078,12 +1078,12 @@ void main() {
       float tube = smoothstep(0.55, 0.9, coil);
       float pulse = 0.7 + 0.3 * sin(uTime * 3.1 + world.y * 0.05);
       vec3 metal = vec3(0.10, 0.13, 0.17) * (0.9 + 0.2 * dnoise(world * 0.14));
-      vec3 lueur = mix(vec3(0.16, 0.22, 0.26), vec3(0.16, 0.85, 1.0) * pulse, charge);
+      vec3 lueur = mix(vec3(0.24, 0.20, 0.14), vec3(1.00, 0.76, 0.38) * pulse, charge);
       col = mix(col, metal + lueur * tube * 0.85, fill);
-      col = mix(col, mix(vec3(0.35, 0.44, 0.50), vec3(0.45, 0.95, 1.0), charge), edge * 0.9);
+      col = mix(col, mix(vec3(0.42, 0.40, 0.35), vec3(1.00, 0.85, 0.55), charge), edge * 0.9);
       // le halo dit « approchez en vapeur » : il meurt avec la charge
       float aura = (1.0 - smoothstep(0.0, 60.0, max(d, 0.0))) * step(0.0, d);
-      col += vec3(0.05, 0.30, 0.36) * aura * aura * charge;
+      col += vec3(0.34, 0.24, 0.09) * aura * aura * charge;
     } else if (mat > 7.5) {
       // Rideau lamellaire : lamelles souples bleu-glace qui ondulent — seule
       // la GLACE les écarte. Des fentes fines entre lamelles laissent deviner
@@ -1357,11 +1357,11 @@ void main() {
     // Vapeur (tableau 3) : vapeur d'opale — cœur turquoise voilé, liseré
     // nacré qui accroche la lumière sur les bords, ombres lilas dans les plis.
     float smokeEdgeMix = 1.0 - smoothstep(th, th * 3.2, field2);
-    vec3 smokeCore = vec3(0.34, 0.52, 0.62);
-    vec3 smokeEdge = vec3(0.84, 0.94, 1.00);
+    vec3 smokeCore = vec3(0.55, 0.47, 0.34);
+    vec3 smokeEdge = vec3(1.00, 0.92, 0.74);
     vec3 smoke = mix(smokeCore, smokeEdge, smokeEdgeMix * (0.35 + 0.65 * smokeN));
-    smoke += vec3(0.16, 0.22, 0.28) * smokeN * smokeN; // volutes lumineuses qui roulent
-    smoke = mix(smoke, vec3(0.46, 0.42, 0.62), (1.0 - smokeN) * 0.22); // plis lilas
+    smoke += vec3(0.28, 0.22, 0.13) * smokeN * smokeN; // volutes lumineuses qui roulent
+    smoke = mix(smoke, vec3(0.50, 0.40, 0.26), (1.0 - smokeN) * 0.22); // plis ambres
     water = mix(water, smoke, vap * 0.92);
 
     // Le corps baigne dans la lumière de la pièce : les ombres portées le
