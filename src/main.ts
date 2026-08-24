@@ -362,7 +362,7 @@ let labelEls: {
 const ZONE_LABEL_COLORS: Record<string, string> = {
   eau: '#63b7e6',
   glace: '#8fc8ee',
-  vapeur: '#c9a6f2',
+  vapeur: '#f2c98e',
   libre: '#7b93a8',
 }
 // Une étiquette peut se composer sur PLUSIEURS LIGNES : le saut de ligne
@@ -394,7 +394,7 @@ function buildWorldLabels(): void {
       const ETATS: ['eau' | 'glace' | 'vapeur', string][] = [
         ['eau', '#63b7e6'],
         ['glace', '#8fc8ee'],
-        ['vapeur', '#c9a6f2'],
+        ['vapeur', '#f2c98e'],
       ]
       for (const [etat, couleur] of ETATS) {
         const rangee = document.createElement('u')

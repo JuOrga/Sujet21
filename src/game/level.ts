@@ -2286,7 +2286,7 @@ export const TABLEAU_G10: LevelDef = {
       y: 400,
       text: 'BORNE — UN DASH, UNE FOIS',
       tone: 'chaud',
-      picto: { couleur: '#e86a3c', eau: 0, glace: 0, vapeur: 3 },
+      picto: { couleur: '#f2c98e', eau: 0, glace: 0, vapeur: 3 },
     },
     { x: -600, y: -580, text: 'CHAUDIÈRE', tone: 'chaud' },
     { x: 150, y: -360, text: 'LA LIGNE DE RAVITAILLEMENT', tone: 'chaud' },

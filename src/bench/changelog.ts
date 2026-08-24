@@ -14,6 +14,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '24/08/2026 13:10',
+    title:
+      'La vapeur a sa couleur : l’ambre doré, partout où l’état gazeux se montre',
+    notes: [
+      'Demandé par le concepteur : la vapeur était le seul état sans identité visuelle — et pire, son halo tirait vers le violet, la couleur de l’hydrophobe. Elle est désormais AMBRE DORÉ (#f2c98e), sur la même logique que la glace : chaque état hérite de la couleur de ce qui le fabrique — la glace du bleu des plaques froides, la vapeur de l’ambre de la chaudière. Les trois états se lisent d’un coup d’œil : EAU cyan, GLACE bleu glacé, VAPEUR ambre.',
+      'Appliqué partout où l’état gazeux se montre : le NUAGE du joueur (cœur fumée chaude, liseré doré, plis ambrés — fini l’opale turquoise), le halo et la brume des zones « CONDUITE ROMPUE » (fini le violet ambigu), la VISÉE DU DASH (ligne, flèche et coût), le verrou d’état, le bouton VAPEUR de la barre d’état, la rangée VAPEUR des pictogrammes, l’outil « Impose vapeur » de l’éditeur — et le SURCHAUFFEUR : son serpentin cyan passe au doré, la borne annonce sa couleur (« approchez en vapeur » se dit maintenant en ambre).',
+      'Vérifié en jeu par captures : les bornes de la halte brillent dorées, la conduite rompue baigne dans sa brume ambre face aux hublots bleus, le bouton VAPEUR s’encadre d’ambre à l’appui sur G. Point de vigilance assumé : l’ambre est cousin de l’ocre mate de l’éponge — la valeur (lueur contre matière sombre) les sépare ; si une confusion apparaît en jeu, on foncera l’éponge d’un cran.',
+    ],
+  },
+  {
     date: '24/08/2026 12:40',
     title:
       'Refonte lumière des onze cellules : bandes basses, ambiante nulle, vraies ombres',

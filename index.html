@@ -2311,12 +2311,12 @@
         top: 0;
         left: 0;
         height: 0;
-        border-top: 2px dashed rgba(201, 166, 242, 0.85);
+        border-top: 2px dashed rgba(242, 201, 142, 0.85);
         transform-origin: 0 0;
         z-index: 12;
         pointer-events: none;
         display: none;
-        filter: drop-shadow(0 0 6px rgba(201, 166, 242, 0.5));
+        filter: drop-shadow(0 0 6px rgba(242, 201, 142, 0.5));
       }
       #dash-aim::after {
         content: '';
@@ -2324,7 +2324,7 @@
         right: -12px;
         top: -7px;
         border: 6px solid transparent;
-        border-left: 11px solid rgba(201, 166, 242, 0.85);
+        border-left: 11px solid rgba(242, 201, 142, 0.85);
       }
       #dash-aim.visible {
         display: block;
@@ -2336,9 +2336,9 @@
         font-family: var(--font-display);
         font-size: 11px;
         letter-spacing: 0.12em;
-        color: #c9a6f2;
+        color: #f2c98e;
         background: rgba(20, 12, 30, 0.82);
-        border: 1px solid rgba(201, 166, 242, 0.5);
+        border: 1px solid rgba(242, 201, 142, 0.5);
         padding: 5px 9px;
         border-radius: 4px;
         z-index: 12;
@@ -2651,9 +2651,9 @@
         box-shadow: 0 0 16px rgba(167, 221, 245, 0.35);
       }
       #state-vapeur.active {
-        border-color: #93a3b4;
-        background: rgba(147, 163, 180, 0.18);
-        box-shadow: 0 0 16px rgba(147, 163, 180, 0.35);
+        border-color: #f2c98e;
+        background: rgba(242, 201, 142, 0.18);
+        box-shadow: 0 0 16px rgba(242, 201, 142, 0.35);
       }
       @media (pointer: coarse) {
         #statebar kbd {
@@ -3260,7 +3260,7 @@
         cursor: not-allowed;
       }
       body.state-locked #statebar {
-        outline: 1px dashed rgba(201, 166, 242, 0.55);
+        outline: 1px dashed rgba(242, 201, 142, 0.55);
         outline-offset: 6px;
       }
 
@@ -3922,7 +3922,7 @@
           <span class="k">Zones d’état</span>
           <button type="button" class="ed-tool" data-tool="zone:eau"><i style="background:#63b7e6"></i>Impose liquide</button>
           <button type="button" class="ed-tool" data-tool="zone:glace"><i style="background:#8fc8ee"></i>Impose glace</button>
-          <button type="button" class="ed-tool" data-tool="zone:vapeur"><i style="background:#c9a6f2"></i>Impose vapeur</button>
+          <button type="button" class="ed-tool" data-tool="zone:vapeur"><i style="background:#f2c98e"></i>Impose vapeur</button>
           <button type="button" class="ed-tool" data-tool="zone:libre"><i style="background:#7b93a8"></i>Zone libre</button>
           <span class="k">Mécanismes</span>
           <button type="button" class="ed-tool" data-tool="laser"><i style="background:#ff6a5a"></i>Émetteur laser</button>
