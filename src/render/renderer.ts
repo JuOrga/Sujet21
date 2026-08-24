@@ -954,8 +954,8 @@ void main() {
         if (d <= 0.0) {
           flanc = 1.0; // sur la base, sous le vide : pleine tranche
         } else {
-          for (int fs = 1; fs <= 2; fs++) {
-            vec2 wM = world - relDisp * (float(fs) / 3.0);
+          for (int fs = 1; fs <= 3; fs++) {
+            vec2 wM = world - relDisp * (float(fs) / 4.0);
             vec2 wbM = wM;
             if (abs(bAngR) > 0.0005) {
               vec2 relM = wM - bcR;
@@ -1058,11 +1058,61 @@ void main() {
           : vec3(0.16, 0.11, 0.20) + vec3(0.07, 0.035, 0.10) * wax;
         edgeCol = vec3(0.62, 0.42, 0.78);
       }
-      // LE FLANC : la tranche du mur, sombre et teintée matériau — c'est
-      // elle qu'on « aperçoit » en se déplaçant, du côté qui regarde le
-      // centre. Peinte sous le remplissage du sommet.
-      vec3 flancCol = mix(vec3(0.045, 0.058, 0.075), edgeCol, 0.20);
-      col = mix(col, flancCol, flanc * (1.0 - fill));
+      // LE FLANC : la tranche du mur — c'est elle qu'on « aperçoit » en se
+      // déplaçant, du côté qui regarde le centre. Peinte sous le remplissage
+      // du sommet : ombre de contact au pied, panneaux rivetés à joints
+      // réguliers, chant clair sous le sommet — et sur les murs neutres, par
+      // endroits, un ÉCRAN DE SERVICE allumé (relevés qui vivent), un détail
+      // qui n'existe QUE dans la perspective. Tout est procédural : les 16
+      // unités de texture sont prises, et le motif suit n'importe quel zoom.
+      if (flanc > 0.003) {
+        vec2 gB = vec2(dFdx(d), dFdy(d));
+        float gn2 = max(length(gB), 1e-5);
+        vec2 nrm = gB / gn2;
+        // hauteur révélée le long de la normale, et coordonnées de tranche :
+        // ht monte du pied (0) au sommet (1), u court le long de la paroi
+        float spanN = max(dot(relDisp, nrm), 6.0);
+        float ht = clamp(d / spanN, 0.0, 1.0);
+        float u = dot(wbV, vec2(-nrm.y, nrm.x));
+        vec3 fc = mix(vec3(0.052, 0.066, 0.086),
+                      mix(vec3(0.125, 0.150, 0.185), edgeCol, 0.32), ht);
+        fc *= 0.90 + 0.20 * dnoise(vec2(u * 0.12, ht * 3.0));
+        float ju = fract(u / 96.0);
+        float joint = 1.0 - smoothstep(0.015, 0.05, min(ju, 1.0 - ju));
+        fc *= 1.0 - 0.38 * joint;
+        float riv = smoothstep(0.93, 0.99, cos(u * 0.196)) *
+                    smoothstep(0.10, 0.22, abs(ht - 0.5));
+        fc += vec3(0.05, 0.06, 0.07) * riv;
+        fc += (edgeCol * 0.35 + vec3(0.04)) * smoothstep(0.80, 0.97, ht);
+        if (mat < 0.5) {
+          // une cellule sur trois environ porte un écran — seulement quand la
+          // tranche est assez large à l'écran (sinon fourmillement de loin)
+          float lisible = smoothstep(7.0, 20.0, spanN * uZoom);
+          float cel = floor(u / 96.0);
+          float hsc = hash21(vec2(cel * 0.731, float(bi) + 3.7));
+          if (hsc > 0.64 && lisible > 0.001) {
+            vec2 suv = vec2(ju, ht) - vec2(0.5, 0.52);
+            vec2 dctr = abs(suv) / vec2(0.34, 0.30);
+            float boite = max(dctr.x, dctr.y);
+            float scr = 1.0 - smoothstep(0.80, 0.95, boite);
+            float cadre = smoothstep(0.78, 0.92, boite) *
+                          (1.0 - smoothstep(1.0, 1.15, boite));
+            float ty = fract(hsc * 9.17);
+            vec3 scol = ty < 0.38 ? vec3(0.16, 0.75, 0.55)
+                      : ty < 0.66 ? vec3(0.95, 0.72, 0.38)
+                                  : vec3(0.36, 0.62, 0.95);
+            // le contenu vit : balayage lent + colonnes de relevés qui
+            // basculent — l'écran travaille, il ne décore pas
+            float scan = 0.72 + 0.28 * sin(ht * 46.0 + uTime * 1.7 + cel * 2.1);
+            float dat = step(0.55, hash21(vec2(floor(u / 9.0),
+              floor(ht * 7.0) + floor(uTime * 1.3 + hsc * 11.0))));
+            float vie = 0.85 + 0.15 * sin(uTime * (0.7 + hsc) + cel * 5.0);
+            fc = mix(fc, vec3(0.015, 0.02, 0.03), (scr + cadre * 0.8) * lisible);
+            fc += scol * 1.15 * (0.55 + 0.45 * dat) * scan * vie * scr * lisible;
+          }
+        }
+        col = mix(col, fc, flanc * (1.0 - fill));
+      }
       col = mix(col, fillCol, fill);
       col = mix(col, edgeCol, edge * 0.9);
       if (mat > 0.5) {
