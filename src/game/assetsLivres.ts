@@ -49,6 +49,7 @@ const NOMS: Record<string, string> = {
   'decal-ecran-off.webp': 'Décalque — écran de contrôle (éteint)',
   'lampe-plafonnier.webp': 'Luminaire — plafonnier (vu du dessus)',
   'lampe-bande.webp': 'Luminaire — bande lumineuse (vu du dessus)',
+  'plafond.webp': 'Plafond du reflet (vu du dessous)',
   'iris.webp': 'Sas — iris mécanique',
   'hull.webp': 'Coque de la cuve',
   'tank-bg.webp': 'Fond de cuve',
@@ -69,7 +70,12 @@ function rubriqueDe(url: string): string {
   if (/^(wall|paroi|phile|phobe|froid|chaud|grille|sponge)/.test(f))
     return 'Surfaces & matériaux'
   if (f.startsWith('zone-')) return 'Zones d’état'
-  if (f.startsWith('decal-') || f.startsWith('iris') || f.startsWith('lampe-'))
+  if (
+    f.startsWith('decal-') ||
+    f.startsWith('iris') ||
+    f.startsWith('lampe-') ||
+    f.startsWith('plafond')
+  )
     return 'Machinerie & décalques'
   if (/^(hull|tank-bg|stars|home|card-)/.test(f)) return 'Coque & fonds'
   if (/^(fiole|badge)/.test(f)) return 'Objets & emblèmes'

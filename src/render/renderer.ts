@@ -288,6 +288,7 @@ uniform float uHasHull; // la passe coque texturée remplace la bande procédura
 // étaient toutes prises, la carte de lumière avait besoin de la place.
 uniform mediump sampler2DArray uTexZones;
 uniform vec3 uHasZones; // x buses (eau), y hublot (glace), z conduite (vapeur)
+uniform float uHasPlafond; // calque 3 du tableau de zones : le plafond du reflet
 // Éclairage de la pièce : carte de lumière PRÉCALCULÉE en espace monde
 // (visibilité × retombée, recalculée au changement de décor seulement) —
 // le coût par image se réduit à une lecture de texture. uLumiere la
@@ -1374,6 +1375,21 @@ void main() {
           : vec3(0.10, 0.16, 0.22);
         // le punch du miroir : les hautes lumières réfléchies CLAQUENT
         vec3 env = envT * envL * vec3(0.80, 1.00, 1.20) + envL * envL * vec3(0.30, 0.38, 0.46);
+        // LE PLAFOND : invisible vu du dessus, il n'existe QUE dans le
+        // reflet — la machinerie au-dessus de la cuve se lit dans le corps.
+        // Parallaxe INVERSÉE (il est au-dessus du plan de jeu), repli
+        // miroir manuel (le tableau de zones est en CLAMP pour ses
+        // placards), et ses VERRIÈRES éclairées restent lumineuses même
+        // dans une salle sombre — c'est elles qu'on voit briller.
+        if (uHasPlafond > 0.5) {
+          vec2 puv0 = (reflPos + uCenter * 0.22) / 1000.0;
+          vec2 puv = abs(fract(puv0 * 0.5) * 2.0 - vec2(1.0));
+          vec3 pt = texture(uTexZones, vec3(puv, 3.0)).rgb;
+          float lumP = dot(pt, vec3(0.299, 0.587, 0.114));
+          float verriere = smoothstep(0.40, 0.72, lumP);
+          vec3 plafond = pt * (0.35 + 1.05 * envL) + pt * verriere * 2.3;
+          env = mix(env, plafond * vec3(0.85, 0.97, 1.12), 0.72);
+        }
         // pré-compensation de l'éclairage du volume (appliqué plus bas) :
         // le reflet traverse l'ombre locale au lieu d'y mourir
         if (uLumiereEau > 0.5) {
@@ -1906,7 +1922,9 @@ export class Renderer {
   // Tableau de textures des zones (calques : 0 buses/eau, 1 hublot/glace,
   // 2 conduite/vapeur) : une seule unité de texture pour les trois images.
   private texZones: WebGLTexture | null = null
-  private readonly hasZones = new Float32Array(3)
+  // + calque 3 : LE PLAFOND — la machinerie au-dessus de la cuve,
+  // invisible vue du dessus, qui n'existe QUE dans le reflet du fluide
+  private readonly hasZones = new Float32Array(4)
   // Textures d'habillage : null tant que l'image n'est pas chargée — le
   // décor procédural assure l'intérim, l'image prend le relais sans à-coup.
   private texStars: WebGLTexture | null = null
@@ -2212,6 +2230,10 @@ export class Renderer {
     this.loadZoneLayer('/assets/zone-buses.webp', 0)
     this.loadZoneLayer('/assets/zone-hublot.webp', 1)
     this.loadZoneLayer('/assets/zone-conduite.webp', 2)
+    // le plafond (calque 3) : vu du DESSOUS, il ne se voit que réfléchi
+    // par la surface miroitante du fluide — poutrelles, conduites, et des
+    // verrières éclairées qui font les reflets lumineux
+    this.loadZoneLayer('/assets/plafond.webp', 3)
   }
 
   // Charge une image de zone dans SON calque du tableau de textures. Le
@@ -2232,7 +2254,7 @@ export class Renderer {
       if (!this.texZones) {
         this.texZones = gl.createTexture()!
         gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texZones)
-        gl.texStorage3D(gl.TEXTURE_2D_ARRAY, 1, gl.RGBA8, 1024, 1024, 3)
+        gl.texStorage3D(gl.TEXTURE_2D_ARRAY, 1, gl.RGBA8, 1024, 1024, 4)
         gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
         gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
         gl.texParameteri(
@@ -2815,6 +2837,7 @@ export class Renderer {
     gl.activeTexture(gl.TEXTURE0 + 12)
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texZones)
     gl.uniform1i(cu['uTexZones'], 12)
+    gl.uniform1f(cu['uHasPlafond'], this.hasZones[3])
     gl.uniform3f(
       cu['uHasZones'],
       this.hasZones[0],
