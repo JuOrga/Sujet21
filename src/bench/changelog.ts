@@ -14,6 +14,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '24/08/2026 12:10',
+    title:
+      'Le premier gel assume l’amarre, la buveuse perd sa tache, et le fond se raccorde enfin',
+    notes: [
+      'SIGNALÉ, et c’était juste : dans 21-04, « geler puis glisser » contredisait la physique — la glace S’AMARRE à la plaque froide (et l’eau gèle à l’approche), un palet soudé ne glisse pas en partant d’elle. Le tableau est refait autour de la vraie leçon : LE FREIN. La plaque est posée sur la ligne d’élan, face à une fenêtre étroite — s’y écraser à pleine vitesse gèle et amarre (arrêt net, zéro goutte), on vise depuis l’amarre, on dégèle, une impulsion traverse. Le châtiment devient un frein de précision. La glisse gratuite du palet, elle, exige une ZONE qui impose la glace en plein vol — c’est la leçon de 21-09, pas celle-ci (et une salle de glisse dédiée pourra venir après elle, quand vous le déciderez).',
+      'LA TACHE OLIVE de 21-06 (signalée en capture comme une texture cassée) n’était pas une texture : c’était la lampe ocre du bloc d’essai, basse et saturée, qui étalait sa flaque sur le sol bleu-vert. Elle est recentrée sur le bloc, montée et adoucie — un halo, plus une flaque.',
+      'LE VRAI DÉFAUT DE TEXTURE, lui, est corrigé : le fond de cuve (tank-bg) n’est PAS raccordable — mesuré : un écart de bord trois fois supérieur à la variation interne. En répétition simple, chaque frontière de tuile (toutes les 900 unités) coupait les conduites net et désalignait les caissons — le décalage entouré en capture. La répétition passe EN MIROIR : les bords coïncident par construction, les conduites font demi-tour au lieu de disparaître, les caissons se répondent en symétrie. Aucun asset à refaire.',
+    ],
+  },
+  {
     date: '24/08/2026 11:50',
     title:
       'La séquence se règle enfin d’une main : semis des livrés manquants, saut par numéro, glisser-déposer',

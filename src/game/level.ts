@@ -1601,12 +1601,18 @@ export const TABLEAU_G3: LevelDef = {
   ambiante: 0.48,
 }
 
-// Gamme 4 — le premier gel : le froid fige, et le palet gelé glisse.
+// Gamme 4 — le premier gel : le froid fige, et le gel AMARRE. La physique
+// est franche : un corps gelé sur une plaque y est soudé — il ne glisse
+// pas EN PARTANT d'elle, il s'y arrête. Le retournement enseigné est donc
+// l'AMARRE : la plaque devient un frein de précision — s'y écraser à
+// pleine vitesse coûte zéro goutte, on vise depuis l'amarre, on dégèle,
+// une impulsion. (La glisse gratuite du palet existe, mais elle demande
+// une ZONE qui impose la glace en plein vol — elle s'apprend en 21-09.)
 export const TABLEAU_G4: LevelDef = {
   name: 'Le premier gel',
   code: '21-04',
   journal:
-    'Cellule 4, plaques cryogéniques. Le froid devait être une punition. Il s’est figé volontairement sur la plaque, a visé le couloir, et s’est laissé glisser d’un bout à l’autre sans dépenser une goutte : gelé, rien ne s’éjecte. Il a fait du châtiment un véhicule. — Dr N. Véga',
+    'Cellule 4, plaques cryogéniques. Le froid devait être une punition : tout ce qui s’attarde se fige, et tout ce qui se fige s’amarre. Il a foncé sur la plaque à pleine vitesse — arrêt net, pas une goutte perdue — a visé la fenêtre depuis son amarre, s’est dégelé, et l’a passée d’une seule impulsion. Le châtiment est devenu son frein de précision. — Dr N. Véga',
   bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
   spawn: { x: -950, y: 0, n: 900 },
   exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
@@ -1618,11 +1624,12 @@ export const TABLEAU_G4: LevelDef = {
     //    inoffensif, le dégel vient tout seul
     box(-140, -750, -60, -220, MAT_FROID),
     box(-140, 220, -60, 750, MAT_FROID),
-    // 3. le mouillage : se figer ici, viser la glissière, et se laisser
-    //    porter — gelé, l'inertie est gratuite
-    box(240, -140, 420, -60, MAT_FROID),
-    box(480, 140, 940, 220, MAT_WALL),
-    box(480, -220, 940, -140, MAT_WALL),
+    // 3. LE FREIN : la plaque posée SUR la ligne d'élan, face à la fenêtre —
+    //    s'y écraser gèle et amarre (arrêt net gratuit), viser, dégeler,
+    //    une impulsion traverse
+    box(540, -70, 680, 70, MAT_FROID),
+    box(780, -750, 860, -100, MAT_WALL),
+    box(780, 100, 860, 750, MAT_WALL),
   ],
   sponges: [],
   labels: [
@@ -1634,15 +1641,20 @@ export const TABLEAU_G4: LevelDef = {
       picto: { couleur: '#8fc8ee', eau: 3, glace: 1, vapeur: 2 },
     },
     { x: -100, y: 60, text: 'PORTE DE GIVRE', tone: 'froid', rang: 'secteur' },
-    { x: 330, y: 20, text: 'GELER, PUIS GLISSER', tone: 'froid' },
-    { x: 710, y: 300, text: 'LA GLISSIÈRE', tone: 'mur' },
+    {
+      x: 610,
+      y: 160,
+      text: 'LE FREIN — S’ÉCRASER, C’EST S’AMARRER',
+      tone: 'froid',
+    },
+    { x: 820, y: 200, text: 'LA FENÊTRE', tone: 'mur' },
     { x: 1110, y: 180, text: 'SAS', tone: 'sas' },
   ],
   decals: [{ x: -1080, y: 560, w: 190, h: 285, kind: 'vanne', fade: 0.42 }],
-  // Lumière : plus froide et plus basse que les cellules précédentes — la
-  // lampe de la glissière rase (h 240) et couche des ombres longues le long
-  // de la glisse : la vitesse se LIT dans la lumière. L'ambiance descend
-  // d'un cran (0,42) : le froid se voit avant de se toucher.
+  // Lumière : plus froide que les cellules précédentes, et la lampe basse
+  // éclaire l'AMARRE et la fenêtre dans la même flaque — on voit d'où l'on
+  // vise et où l'on va. L'ambiance descend d'un cran (0,42) : le froid se
+  // voit avant de se toucher.
   lumieres: [
     {
       x: -300,
@@ -1654,10 +1666,10 @@ export const TABLEAU_G4: LevelDef = {
       taille: 2,
     },
     {
-      x: 700,
+      x: 690,
       y: 0,
-      h: 240,
-      portee: 620,
+      h: 300,
+      portee: 560,
       intensite: 0.8,
       couleur: '#8fc8ee',
       taille: 1,
@@ -1847,17 +1859,19 @@ export const TABLEAU_G6: LevelDef = {
     { x: 1110, y: 180, text: 'SAS', tone: 'sas' },
   ],
   decals: [{ x: -1080, y: -520, w: 160, h: 160, kind: 'tuyaux', fade: 0.42 }],
-  // Lumière : l'ocre de l'éponge sur le bloc d'essai, la principale haute,
-  // la balise verte — et la fine reste bien éclairée : c'est ELLE la leçon.
+  // Lumière : la principale haute, la balise verte — et sur le bloc d'essai
+  // un halo ocre DOUX, centré sur lui et venu de haut. (La première version,
+  // basse et saturée, étalait une flaque olive sur le sol : signalée en
+  // capture comme une texture cassée — c'était la lampe.)
   lumieres: [
     { x: 150, y: 0, h: 950, portee: 1450, intensite: 1, taille: 2 },
     {
-      x: -600,
-      y: 420,
-      h: 340,
-      portee: 460,
-      intensite: 0.85,
-      couleur: '#d9a441',
+      x: -624,
+      y: 356,
+      h: 540,
+      portee: 340,
+      intensite: 0.6,
+      couleur: '#e6c08a',
       taille: 1,
     },
     {

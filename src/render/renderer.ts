@@ -2043,11 +2043,17 @@ export class Renderer {
       (t) => (this.texStarsFar = t),
       true,
     )
+    // Le fond de cuve n'est PAS raccordable (mesuré : écart de bord ~5 contre
+    // 1,5 en interne) — en répétition simple, chaque frontière de tuile
+    // coupait les conduites net et désalignait les caissons. La répétition
+    // EN MIROIR raccorde par construction : les bords coïncident, les
+    // conduites font demi-tour au lieu de disparaître.
     this.loadTexture(
       '/assets/tank-bg.webp',
       true,
       true,
       (t) => (this.texTank = t),
+      true,
     )
     this.loadTexture('/assets/wall.webp', true, true, (t) => (this.texWall = t))
     this.loadTexture(
