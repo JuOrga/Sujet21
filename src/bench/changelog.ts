@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '24/08/2026 21:30',
+    title:
+      'CINQ plafonds d’un coup : givre, observatoire, brèche, chaufferie, hélice',
+    notes: [
+      'Le concepteur a livré cinq planches d’après les prompts — toutes intégrées (1024², WebP) : « givre » (néons glacés et stalactites, pour les salles froides), « observatoire » (dôme vitré plein ciel étoilé — le reflet le plus spectaculaire), « breche » (coque déchirée sur la Voie lactée, néon d’alerte rouge — taillée pour l’acte 0), « chaufferie » (grilles et hublots ambrés #f2c98e — renforce la lecture VAPEUR), « helice » (ventilateur géant à contre-jour, lumière hachée par les pales).',
+      'Les six variantes (avec « planete ») sont désormais suggérées par le champ PLAFOND DU REFLET de l’éditeur — tapez le nom, la salle change de ciel. Vérifié en jeu variante par variante : chacune charge son fichier et s’affiche dans le reflet du corps.',
+    ],
+  },
+  {
     date: '24/08/2026 20:40',
     title:
       'La variante « planete » est livrée : un hublot ouvert sur l’espace dans le reflet',
