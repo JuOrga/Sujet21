@@ -14,6 +14,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '24/08/2026 14:15',
+    title:
+      'La surface MIROITANTE : le fluide reflète les alentours — et l’ancien rendu reste à un clic',
+    notes: [
+      'Demandé : une refonte visuelle du fluide, toujours bleu, mais avec une surface miroitante qui REFLÈTE les éléments autour. C’est fait, et sans passe de rendu supplémentaire : pour chaque pixel de surface, la pièce est échantillonnée À DISTANCE le long de la normale de la houle — les flaques des lampes, les rails des bandes lumineuses, les ombres des murs et le décor du fond viennent se mirer dans le corps et GLISSENT avec ses vagues. Le cœur garde son bleu profond ; le miroitement vit sur la zone de surface, surtout aux incidences rasantes (fresnel) — le métal liquide du lore, enfin visible.',
+      'RETOUR À UN CLIC, comme demandé : PARAMÈTRES → « SURFACE DU FLUIDE » — MIROITANTE (nouveau défaut) ou CLASSIQUE (l’ancien rendu, au pixel près : le commutateur débranche tout le calcul du reflet). Le choix est mémorisé sur l’appareil.',
+      'Coût : deux lectures de texture de plus par pixel D’EAU seulement (la carte de lumière, sans mipmaps, et le fond en LOD fixe — pas de dérivées, pas d’artefacts de bord). Vérifié par captures comparées sur la même salle : en classique, le rendu historique ; en miroitante, les panneaux du décor et la lumière de la bande se lisent DANS le corps. Si le reflet vous semble trop discret ou trop présent en jouant, son dosage est un seul coefficient — dites-le.',
+    ],
+  },
+  {
     date: '24/08/2026 13:10',
     title:
       'La vapeur a sa couleur : l’ambre doré, partout où l’état gazeux se montre',

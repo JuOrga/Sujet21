@@ -298,6 +298,10 @@ uniform float uLumiere;
 // 0 = noir total hors des lampes.
 uniform float uAmbiante;
 uniform float uBrume; // 0..1 : densité de la brume d'ambiance du tableau
+// SURFACE DU FLUIDE (réglage PARAMÈTRES) : 1, la surface MIROITE — elle
+// renvoie les alentours (carte de lumière et décor, échantillonnés le
+// long de la normale) ; 0, le rendu classique, inchangé au pixel près.
+uniform float uMiroirEau;
 uniform float uLampeSpriteRond; // 1 : un asset dessine les plafonniers
 uniform float uLampeSpriteBande; // 1 : un asset dessine les bandes
 // RELIEF 2.5D : les parois ont une hauteur — leur sommet fuit le centre de
@@ -1347,6 +1351,31 @@ void main() {
       water += vec3(0.95, 0.99, 1.0) * lumSpec * specDur * 0.80 * miroir;
       water += vec3(0.50, 0.68, 0.85) * lumSpec * fres * 0.40 * miroir;
       water += vec3(0.90, 0.97, 1.0) * lumSpec * etincelles * (0.25 + specDur) * 0.55 * miroir;
+      // SURFACE MIROITANTE (réglage PARAMÈTRES) : la surface incurvée
+      // renvoie VRAIMENT les alentours — la pièce est échantillonnée à
+      // distance le long de la normale : les flaques des lampes, les rails
+      // des bandes, les ombres des murs et le décor du fond s'y mirent et
+      // GLISSENT avec la houle. Le cœur garde son bleu profond ; le reflet
+      // vit sur la zone de surface, surtout aux incidences rasantes.
+      // textureLod : LOD explicite — dans ce flux non uniforme, les
+      // dérivées des mipmaps seraient fausses, et le flou doux est voulu.
+      if (uMiroirEau > 0.5) {
+        vec2 reflPos = world + nrm.xy * (110.0 + 220.0 * fres) +
+          vec2(sin(uTime * 0.9 + world.y * 0.02), cos(uTime * 0.7 + world.x * 0.02)) * 9.0;
+        vec3 envL = vec3(uAmbiante);
+        if (uLumiereEau > 0.5) {
+          vec2 luvR = clamp((reflPos - uLightMapMin) * uLightMapInvSize, vec2(0.0), vec2(1.0));
+          envL += 1.15 * texture(uLightMap, luvR).rgb;
+        }
+        vec3 envT = uHasTank > 0.5
+          ? textureLod(uTexTank, (reflPos - uCenter * 0.10) / 900.0, 2.0).rgb
+          : vec3(0.10, 0.16, 0.22);
+        // teinte froide : le miroir reste un métal liquide BLEU
+        vec3 env = envT * envL * vec3(0.72, 0.92, 1.12);
+        float force = miroir * (0.30 + 0.50 * fres);
+        water = mix(water, env, clamp(force, 0.0, 0.85));
+        water += vec3(0.85, 0.95, 1.05) * envL * specDur * 0.35 * miroir;
+      }
     }
     water += vec3(0.30, 0.55, 0.65) * waveGlow * 0.45 * (1.0 - icy) * (1.0 - vap);
 
@@ -2539,6 +2568,7 @@ export class Renderer {
     ambiante = 0.52, // lumière générale du tableau (plancher hors lampes)
     relief = 0, // relief 2.5D des parois (0 débranché ; ~0,035 léger)
     brume = 0, // brume d'ambiance du tableau (0 : aucune)
+    miroirEau = 1, // 1 la surface du fluide MIROITE (reflet des alentours), 0 classique
   ): void {
     const gl = this.gl
     const devW = Math.max(1, Math.round(viewportW * dpr))
@@ -2700,6 +2730,7 @@ export class Renderer {
     gl.uniform1f(cu['uLumiere'], lumiere > 0.5 && this.lightTex ? 1 : 0)
     gl.uniform1f(cu['uAmbiante'], ambiante)
     gl.uniform1f(cu['uBrume'], brume)
+    gl.uniform1f(cu['uMiroirEau'], miroirEau)
     gl.uniform1f(cu['uLampeSpriteRond'], this.texLampeRonde ? 1 : 0)
     gl.uniform1f(cu['uLampeSpriteBande'], this.texLampeBande ? 1 : 0)
     gl.uniform1f(cu['uRelief'], relief)
