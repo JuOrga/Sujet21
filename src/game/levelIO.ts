@@ -302,6 +302,7 @@ export function parseLevel(input: unknown): {
       o.brume === undefined
         ? undefined
         : Math.max(0, Math.min(1, num(o.brume, 0))),
+    plafond: str(o.plafond).trim().slice(0, 24) || undefined,
     dashBudget:
       o.dashBudget === undefined
         ? undefined
@@ -479,6 +480,7 @@ export function serializeLevel(level: LevelDef): string {
     par: level.par,
     ambiante: level.ambiante,
     brume: level.brume,
+    plafond: level.plafond,
     dashBudget: level.dashBudget,
     bounds: level.bounds,
     spawn: level.spawn,

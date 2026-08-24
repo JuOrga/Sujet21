@@ -2375,7 +2375,13 @@ export class Renderer {
   // retournement vertical (UNPACK_FLIP_Y est interdit sur les entrées 3D).
   private loadZoneLayer(url: string, layer: number): void {
     const img = new Image()
-    img.onload = () => {
+    img.onload = () => this.uploadZoneLayer(img, layer)
+    img.src = url
+  }
+
+  /** Téléverse une image dans SON calque du tableau de textures. */
+  private uploadZoneLayer(img: HTMLImageElement, layer: number): void {
+    {
       const gl = this.gl
       const cv = document.createElement('canvas')
       cv.width = 1024
@@ -2420,7 +2426,34 @@ export class Renderer {
       gl.bindTexture(gl.TEXTURE_2D_ARRAY, null)
       this.hasZones[layer] = 1
     }
-    img.src = url
+  }
+
+  // ---- PLAFOND PAR SALLE : la variante que le reflet renvoie ------------
+  // Chaque tableau choisit sa variante (LevelDef.plafond) : '' charge
+  // plafond.webp (les verrières), « x » charge plafond-x.webp. Le calque 3
+  // est RÉUTILISÉ (un seul téléversement de 1024² au changement de salle) ;
+  // une variante absente retombe sur le plafond par défaut, sans trou.
+  private plafondActuel = ''
+  private plafondJeton = 0
+
+  setPlafond(nom: string): void {
+    const v = nom.trim()
+    if (v === this.plafondActuel) return
+    this.plafondActuel = v
+    const jeton = ++this.plafondJeton
+    const img = new Image()
+    img.onload = () => {
+      if (jeton === this.plafondJeton) this.uploadZoneLayer(img, 3)
+    }
+    img.onerror = () => {
+      if (jeton !== this.plafondJeton || v === '') return
+      const defaut = new Image()
+      defaut.onload = () => {
+        if (jeton === this.plafondJeton) this.uploadZoneLayer(defaut, 3)
+      }
+      defaut.src = '/assets/plafond.webp'
+    }
+    img.src = v ? `/assets/plafond-${v}.webp` : '/assets/plafond.webp'
   }
 
   private loadTexture(
@@ -2733,6 +2766,7 @@ export class Renderer {
     relief = 0, // relief 2.5D des parois (0 débranché ; ~0,035 léger)
     brume = 0, // brume d'ambiance du tableau (0 : aucune)
     miroirEau = 1, // 1 surface MIROITANTE (reflet par houle), 2 MIROITANT MERCURE (reflet d'un seul tenant autour du corps), 0 classique
+    plafond = '', // variante de plafond du tableau ('' : plafond.webp)
   ): void {
     const gl = this.gl
     const devW = Math.max(1, Math.round(viewportW * dpr))
@@ -2899,6 +2933,7 @@ export class Renderer {
     // silhouette (rms → contour, facteur constaté ~1.9)
     gl.uniform2f(cu['uCentroide'], sim.stats.centroidX, sim.stats.centroidY)
     gl.uniform1f(cu['uRayonCorps'], Math.max(40, sim.stats.rmsRadius * 1.9))
+    this.setPlafond(plafond)
     gl.uniform1f(cu['uLampeSpriteRond'], this.texLampeRonde ? 1 : 0)
     gl.uniform1f(cu['uLampeSpriteBande'], this.texLampeBande ? 1 : 0)
     gl.uniform1f(cu['uRelief'], relief)
