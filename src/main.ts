@@ -5,6 +5,7 @@ import { DEFAULT_PARAMS, type SimParams } from './sim/params'
 import { FluidSim, KIND_PLAYER } from './sim/solver'
 import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
+import { CODEX, Codex, type CodexGroupe } from './game/codex'
 import { TABLEAU_HUB, TABLEAU_HUB_COMPACT } from './game/hub'
 import {
   MECANIQUE_NOMS,
@@ -1033,12 +1034,19 @@ function renderSalles(): void {
       chip('fm', null, 'TOUT', sallesFiltreMeca === null) +
       mecas
         .map((m) =>
-          chip('fm', m, MECANIQUE_NOMS[m].toUpperCase(), sallesFiltreMeca === m),
+          chip(
+            'fm',
+            m,
+            MECANIQUE_NOMS[m].toUpperCase(),
+            sallesFiltreMeca === m,
+          ),
         )
         .join('') +
       `<span style="margin-left:8px">DIFFICULTÉ</span>` +
       chip('fd', null, 'TOUT', sallesFiltreDiff === null) +
-      diffs.map((d) => chip('fd', d, String(d), sallesFiltreDiff === d)).join('')
+      diffs
+        .map((d) => chip('fd', d, String(d), sallesFiltreDiff === d))
+        .join('')
     for (const b of Array.from(filtres.querySelectorAll('button'))) {
       b.addEventListener('click', () => {
         if (b.dataset.fm !== undefined) {
@@ -1252,11 +1260,23 @@ function majFpsCoin(dtReal: number): void {
 // dans le voile RECORDS. Détection par échantillonnage léger (4 Hz).
 const trophees = new Trophees()
 const tropheeToast = document.getElementById('trophee-toast') as HTMLDivElement
-const toastFile: { nom: string; icone: string }[] = []
+const toastFile: { nom: string; icone: string; sur?: string }[] = []
 let toastTimer = 0
 trophees.onDebloque = (t) => {
   toastFile.push({ nom: t.nom, icone: t.icone })
   audio.collect()
+}
+// Le CODEX partage la fanfare des trophées : même toast, autre étiquette —
+// et sa page (fiche d'essai, bouton CODEX) se remplit au fil des découvertes
+const codex = new Codex()
+codex.onDecouverte = (d) => {
+  toastFile.push({
+    nom: d.titre,
+    icone: d.icone,
+    sur: 'CODEX — NOUVELLE FICHE',
+  })
+  audio.collect()
+  renderCodexVoile()
 }
 function majToast(dtReal: number): void {
   if (toastTimer > 0) {
@@ -1266,7 +1286,7 @@ function majToast(dtReal: number): void {
   }
   const t = toastFile.shift()
   if (!t) return
-  tropheeToast.innerHTML = `<i>${t.icone}</i><div><b>TROPHÉE DÉBLOQUÉ</b>${t.nom}</div>`
+  tropheeToast.innerHTML = `<i>${t.icone}</i><div><b>${t.sur ?? 'TROPHÉE DÉBLOQUÉ'}</b>${t.nom}</div>`
   tropheeToast.classList.add('visible')
   toastTimer = 3.8
 }
@@ -1325,6 +1345,37 @@ function updateTrophees(dtReal: number): void {
   }
   // « Recondensé » : cinq gouttes de rosée perlées sur cette salle
   if (sim.roseePerlee >= 5) trophees.debloque('recondense')
+
+  // ---- CODEX : les découvertes de la salle, au même échantillonnage ----
+  // Les combinaisons état × matériau viennent du solveur (contacts et
+  // passages consignés au vol) ; les phénomènes se lisent ici.
+  codex.litContacts(sim.codexContacts)
+  if (sim.roseePerlee > 0) codex.marque('rosee')
+  if (!codex.connu('laser-glace')) {
+    for (const vue of laserEtat.vues) {
+      if ((vue.rebondsGlace ?? 0) > 0) {
+        codex.marque('laser-glace')
+        break
+      }
+    }
+  }
+  if (!codex.connu('eponge')) {
+    for (const sp of sim.sponges) {
+      let bu = false
+      for (let c = 0; c < sp.saturation.length; c++)
+        if (sp.saturation[c] > 0) {
+          bu = true
+          break
+        }
+      if (bu) {
+        codex.marque('eponge')
+        break
+      }
+    }
+  }
+  const forceIci = zoneForceAt(level, sim.stats.centroidX, sim.stats.centroidY)
+  if (forceIci === 'glace' && gels / n >= 0.5) codex.marque('zone-glace')
+  if (forceIci === 'vapeur' && gaz / n >= 0.5) codex.marque('zone-vapeur')
 }
 
 // ---- Le voile RECORDS : le palmarès partagé, trois podiums par salle ----
@@ -1425,6 +1476,51 @@ document.getElementById('records-fermer')?.addEventListener('click', () => {
 })
 recordsEl.addEventListener('pointerdown', (e) => {
   if (e.target === recordsEl) recordsEl.hidden = true
+})
+
+// ---- Le voile CODEX : le manuel écrit par la partie elle-même ----------
+// Chaque fiche se débloque en VIVANT l'interaction (toucher une surface
+// hydrophile en liquide, écarter un rideau en glace…). Verrouillée, une
+// fiche n'affiche qu'un « ? » : la question donne envie d'aller essayer.
+const codexEl = document.getElementById('codex') as HTMLDivElement
+const codexCorps = document.getElementById('codex-corps') as HTMLDivElement
+const codexCompte = document.getElementById('codex-compte') as HTMLSpanElement
+function renderCodexVoile(): void {
+  if (!codexCorps) return
+  const groupes: { cle: CodexGroupe; nom: string; icone: string }[] = [
+    { cle: 'eau', nom: 'LIQUIDE', icone: '💧' },
+    { cle: 'glace', nom: 'GLACE', icone: '❄' },
+    { cle: 'vapeur', nom: 'VAPEUR', icone: '💨' },
+    { cle: 'phenomenes', nom: 'PHÉNOMÈNES', icone: '✦' },
+  ]
+  let html = ''
+  for (const g of groupes) {
+    const fiches = CODEX.filter((d) => d.groupe === g.cle)
+    const connues = fiches.filter((d) => codex.connu(d.id)).length
+    html += `<div class="cdx-groupe"><span>${g.icone} ${g.nom}</span><i>${connues}/${fiches.length}</i></div>`
+    html += '<div class="cdx-grille">'
+    for (const d of fiches) {
+      if (codex.connu(d.id)) {
+        html += `<div class="cdx-carte"><i>${d.icone}</i><div><b>${d.titre}</b><span>${d.texte}</span></div></div>`
+      } else {
+        html += `<div class="cdx-carte cdx-verrou"><i>?</i><div><b>FICHE À DÉCOUVRIR</b><span>Une interaction du protocole reste à vivre…</span></div></div>`
+      }
+    }
+    html += '</div>'
+  }
+  codexCorps.innerHTML = html
+  if (codexCompte)
+    codexCompte.textContent = `${codex.compte()}/${CODEX.length} fiches consignées`
+}
+document.getElementById('home-codex')?.addEventListener('click', () => {
+  codexEl.hidden = false
+  renderCodexVoile()
+})
+document.getElementById('codex-fermer')?.addEventListener('click', () => {
+  codexEl.hidden = true
+})
+codexEl.addEventListener('pointerdown', (e) => {
+  if (e.target === codexEl) codexEl.hidden = true
 })
 
 document.getElementById('salles-fermer')?.addEventListener('click', () => {
@@ -2738,6 +2834,7 @@ const FICHE_BOUTONS = [
   'start-editor',
   'home-salles',
   'home-records',
+  'home-codex',
   'home-livraisons',
   'home-cmds',
   'home-params',
@@ -2862,7 +2959,12 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   const rails = level.rails ?? []
   const caches = level.caches ?? []
   const actif =
-    lasers.length + cibles.length + portes.length + rails.length + caches.length > 0
+    lasers.length +
+      cibles.length +
+      portes.length +
+      rails.length +
+      caches.length >
+    0
   const dprC = Math.min(dpr, 2)
   if (
     fxCanvas.width !== Math.round(vw * dprC) ||
@@ -3198,7 +3300,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       const ph = i * 7.3 + k * 2.1
       const nx = a.sx + w * (0.5 + 0.42 * Math.sin(elapsed * 0.11 + ph * 1.7))
       const ny = a.sy + h * (0.5 + 0.42 * Math.cos(elapsed * 0.089 + ph))
-      const r = Math.max(w, h) * (0.30 + 0.10 * Math.sin(ph * 3.7))
+      const r = Math.max(w, h) * (0.3 + 0.1 * Math.sin(ph * 3.7))
       const grad = g.createRadialGradient(nx, ny, 0, nx, ny, Math.max(8, r))
       grad.addColorStop(0, 'rgba(52,68,92,0.24)')
       grad.addColorStop(1, 'rgba(52,68,92,0)')
@@ -3298,7 +3400,8 @@ let cachesLevee: number[] = []
 function dansCacheVoilee(x: number, y: number): boolean {
   const caches = level.caches ?? []
   for (let i = 0; i < caches.length; i++) {
-    if ((cachesLevee[i] ?? Infinity) === Infinity && dansForme(caches[i], x, y)) return true
+    if ((cachesLevee[i] ?? Infinity) === Infinity && dansForme(caches[i], x, y))
+      return true
   }
   return false
 }
@@ -3320,7 +3423,9 @@ function rebuildRenderBoxes(): void {
   ]
 }
 // ---- HUD : les instruments emportés, et la bonbonne qui se VERSE ----
-const hudInstrChip = document.getElementById('hud-instr-chip') as HTMLButtonElement
+const hudInstrChip = document.getElementById(
+  'hud-instr-chip',
+) as HTMLButtonElement
 const hudInstr = document.getElementById('hud-instr') as HTMLElement
 const instrPanel = document.getElementById('instr-panel') as HTMLDivElement
 /** La pastille montre les icônes emportées ; le panneau donne le détail. */
@@ -3329,7 +3434,8 @@ function majInstrumentsUI(): void {
   const defs = run.instruments
     .map((id) => instrumentDef(id))
     .filter((d): d is NonNullable<typeof d> => d !== null)
-  hudInstr.textContent = defs.length > 0 ? defs.map((d) => d.icone).join('') : '—'
+  hudInstr.textContent =
+    defs.length > 0 ? defs.map((d) => d.icone).join('') : '—'
   if (instrPanel) {
     instrPanel.innerHTML =
       `<h4>INSTRUMENTS EMBARQUÉS</h4>` +
@@ -5172,6 +5278,7 @@ function frame(now: number): void {
       trophees.debloque('sans-une-goutte')
     if (trophees.compte('collectes') >= 21)
       trophees.debloque('operateur-de-nuit')
+    codex.marque('sas') // le codex consigne la première mise en bonbonne
     const { newVolume, newChrono } = records.noteCollection(
       level.code,
       surplus,
@@ -5245,9 +5352,7 @@ function frame(now: number): void {
       montreMiseEnBonbonne({
         surplus,
         prime,
-        pct:
-          surplus /
-          Math.max(0.01, level.spawn.n * params.litersPerParticle),
+        pct: surplus / Math.max(0.01, level.spawn.n * params.litersPerParticle),
         temps: run.tableauTime,
         newVolume,
         newChrono,

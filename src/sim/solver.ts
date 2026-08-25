@@ -53,12 +53,18 @@ export interface PlayerStats {
   rmsRadius: number
 }
 
-
 // Rejet rapide d'une boîte : hors de portée « marge » ? Pour une boîte
 // OBLIQUE ou une FORME (toujours inscrite dans sa boîte englobante), on
 // rejette sur le cercle englobant — conservateur mais sûr.
 function horsBoite(
-  b: { minX: number; minY: number; maxX: number; maxY: number; angle?: number; forme?: number },
+  b: {
+    minX: number
+    minY: number
+    maxX: number
+    maxY: number
+    angle?: number
+    forme?: number
+  },
   x: number,
   y: number,
   marge: number,
@@ -69,7 +75,12 @@ function horsBoite(
     const cy = (b.minY + b.maxY) / 2
     return Math.abs(x - cx) > r || Math.abs(y - cy) > r
   }
-  return x < b.minX - marge || x > b.maxX + marge || y < b.minY - marge || y > b.maxY + marge
+  return (
+    x < b.minX - marge ||
+    x > b.maxX + marge ||
+    y < b.minY - marge ||
+    y > b.maxY + marge
+  )
 }
 
 export class FluidSim {
@@ -179,6 +190,11 @@ export class FluidSim {
   private contactNX: Float32Array
   private contactNY: Float32Array
   private contactVn: Float32Array // vitesse normale entrante avant résolution
+  // CODEX : combinaisons matériau × état vues par le CORPS depuis le début
+  // du tableau (indice = matériau × 3 + état ; état 0 eau, 1 glace,
+  // 2 vapeur). Les « passages » (vapeur/évent, eau/membrane, glace/rideau)
+  // s'y consignent aussi — même indice, jamais de contact pour eux.
+  readonly codexContacts = new Uint8Array(30)
 
   baseVolume = 0
   playerCount = 0
@@ -208,7 +224,14 @@ export class FluidSim {
   private mouthX = 0
   private mouthY = 0
   private drainOn = false
-  stats: PlayerStats = { count: 0, centroidX: 0, centroidY: 0, velX: 0, velY: 0, rmsRadius: 1 }
+  stats: PlayerStats = {
+    count: 0,
+    centroidX: 0,
+    centroidY: 0,
+    velX: 0,
+    velY: 0,
+    rmsRadius: 1,
+  }
 
   private grid: SpatialGrid
   private kernels: Kernels
@@ -302,7 +325,10 @@ export class FluidSim {
     this.lastKernelRadius = params.kernelRadius
     this.lastSpacing = params.particleSpacing
     this.kernels = makeKernels(params.kernelRadius)
-    this.restDensity = computeRestDensity(params.kernelRadius, params.particleSpacing)
+    this.restDensity = computeRestDensity(
+      params.kernelRadius,
+      params.particleSpacing,
+    )
     this.grid = this.makeGrid()
   }
 
@@ -321,7 +347,10 @@ export class FluidSim {
 
   private refreshDerived(): void {
     const p = this.params
-    if (p.kernelRadius !== this.lastKernelRadius || p.particleSpacing !== this.lastSpacing) {
+    if (
+      p.kernelRadius !== this.lastKernelRadius ||
+      p.particleSpacing !== this.lastSpacing
+    ) {
       this.lastKernelRadius = p.kernelRadius
       this.lastSpacing = p.particleSpacing
       this.kernels = makeKernels(p.kernelRadius)
@@ -369,6 +398,7 @@ export class FluidSim {
     this.sponges = sponges.map((d) => new Sponge(d))
     this.refreshBoxCaches()
     this.surchauffesVides.clear()
+    this.codexContacts.fill(0)
   }
 
   // Listes de boîtes par famille, recalculées quand le niveau change (jamais
@@ -385,7 +415,10 @@ export class FluidSim {
     this.heatBoxes = boxes.filter((b) => b.material === MAT_CHAUD)
     this.grilleBoxes = boxes.filter((b) => b.material === MAT_GRILLE)
     this.chemBoxes = boxes.filter(
-      (b) => b.material === MAT_WALL || b.material === MAT_HYDROPHILE || b.material === MAT_HYDROPHOBE,
+      (b) =>
+        b.material === MAT_WALL ||
+        b.material === MAT_HYDROPHILE ||
+        b.material === MAT_HYDROPHOBE,
     )
     this.surchIdx = []
     for (let bi = 0; bi < boxes.length; bi++) {
@@ -396,7 +429,9 @@ export class FluidSim {
   // Portes asservies aux cibles laser : des parois qui vont et viennent.
   // Recomposé sans toucher aux éponges (setLevel les reconstruirait et
   // effacerait leur saturation en pleine partie).
-  setDoors(portes: { minX: number; minY: number; maxX: number; maxY: number }[]): void {
+  setDoors(
+    portes: { minX: number; minY: number; maxX: number; maxY: number }[],
+  ): void {
     this.boxes = [
       ...this.baseBoxes,
       ...portes.map((p) => ({ ...p, material: MAT_WALL })),
@@ -411,7 +446,12 @@ export class FluidSim {
   // bloc et le faisceau part dans tous les sens à chaque frémissement.
   // Noyau doux (1 − d/r)², somme des directions (point − particule gelée) :
   // c'est le gradient du champ, la facette moyenne de la surface.
-  iceNormalAt(x: number, y: number, rHit: number, rSmooth: number): { nx: number; ny: number } | null {
+  iceNormalAt(
+    x: number,
+    y: number,
+    rHit: number,
+    rSmooth: number,
+  ): { nx: number; ny: number } | null {
     let hit = false
     const rHit2 = rHit * rHit
     this.grid.forEachNeighbor(x, y, rHit, (j) => {
@@ -490,7 +530,12 @@ export class FluidSim {
   // Renvoie le nombre de particules gazeuses encore DANS la bande : tant
   // qu'il est non nul, un nuage voyage sur le rail — l'appelant s'en sert
   // pour maintenir le champ jusqu'à l'arrivée, même rayon éteint.
-  railConvoy(pts: { x: number; y: number }[], band: number, accel: number, dt: number): number {
+  railConvoy(
+    pts: { x: number; y: number }[],
+    band: number,
+    accel: number,
+    dt: number,
+  ): number {
     if (accel <= 0 || band <= 0 || pts.length < 2) return 0
     // Premier passage : qui est dans la bande, et où est le cœur convoyé —
     // les retardataires hors bande seront RAPPELÉS vers lui, pour que le
@@ -524,7 +569,10 @@ export class FluidSim {
         const aby = b.y - a.y
         const len2 = abx * abx + aby * aby
         if (len2 < 1e-9) continue
-        const t = Math.max(0, Math.min(1, ((px - a.x) * abx + (py - a.y) * aby) / len2))
+        const t = Math.max(
+          0,
+          Math.min(1, ((px - a.x) * abx + (py - a.y) * aby) / len2),
+        )
         const cx = a.x + abx * t
         const cy = a.y + aby * t
         const d2 = (px - cx) * (px - cx) + (py - cy) * (py - cy)
@@ -594,7 +642,11 @@ export class FluidSim {
   // même recette que le miroir de glace : moyenne large au noyau (1 − d/r)²,
   // parce qu'une surface de particules est encore plus agitée liquide que
   // gelée. Appelée seulement au franchissement d'un dioptre.
-  liquidNormalAt(x: number, y: number, rSmooth: number): { nx: number; ny: number } {
+  liquidNormalAt(
+    x: number,
+    y: number,
+    rSmooth: number,
+  ): { nx: number; ny: number } {
     let sx = 0
     let sy = 0
     const rs2 = rSmooth * rSmooth
@@ -619,7 +671,8 @@ export class FluidSim {
   private heatExposureAt(x: number, y: number): number {
     if (!this.hasHeat) return 0
     // le vaisseau refroidit : l'aura des chaudières se rétracte
-    const band = this.params.heatBand * (1 - this.params.chillHeatFade * this.chill)
+    const band =
+      this.params.heatBand * (1 - this.params.chillHeatFade * this.chill)
     if (band <= 1) return 0
     const rp = this.params.particleSpacing * 0.5
     const cp = this.scratchCP
@@ -657,7 +710,8 @@ export class FluidSim {
     if (this.kind[i] === KIND_PLAYER) this.playerCount--
     // une goutte en prêt avalée (éponge, balayage) quitte la vie sur-le-champ :
     // sans ce décrément, liters() reste gonflé jusqu'au prochain relabel
-    if (this.duCorps[i] === 2) this.enPretCount = Math.max(0, this.enPretCount - 1)
+    if (this.duCorps[i] === 2)
+      this.enPretCount = Math.max(0, this.enPretCount - 1)
     this.iceDirty = true // l'échange d'indices invalide le cache d'amas
     const last = this.count - 1
     if (i !== last) {
@@ -830,7 +884,12 @@ export class FluidSim {
       let best = -1
       let bestD2 = Infinity
       for (let i = 0; i < this.count; i++) {
-        if (this.kind[i] !== KIND_PLAYER || this.frozen[i] === 1 || this.gaseous[i] === 1) continue
+        if (
+          this.kind[i] !== KIND_PLAYER ||
+          this.frozen[i] === 1 ||
+          this.gaseous[i] === 1
+        )
+          continue
         const dx = this.posX[i] - aimX
         const dy = this.posY[i] - aimY
         const d2 = dx * dx + dy * dy
@@ -890,7 +949,12 @@ export class FluidSim {
         const R = p.kernelRadius * 1.8
         const R2 = R * R
         for (let i = 0; i < this.count; i++) {
-          if (this.kind[i] !== KIND_PLAYER || this.frozen[i] === 1 || this.gaseous[i] === 1) continue
+          if (
+            this.kind[i] !== KIND_PLAYER ||
+            this.frozen[i] === 1 ||
+            this.gaseous[i] === 1
+          )
+            continue
           const dx = departX - this.posX[i]
           const dy = departY - this.posY[i]
           const d2 = dx * dx + dy * dy
@@ -917,7 +981,12 @@ export class FluidSim {
       let wSum = 0
       let liquid = 0
       for (let i = 0; i < this.count; i++) {
-        if (this.kind[i] !== KIND_PLAYER || this.frozen[i] === 1 || this.gaseous[i] === 1) continue
+        if (
+          this.kind[i] !== KIND_PLAYER ||
+          this.frozen[i] === 1 ||
+          this.gaseous[i] === 1
+        )
+          continue
         liquid++
         let w = 1 - locality
         const dx = this.posX[i] - departX
@@ -932,7 +1001,11 @@ export class FluidSim {
         // corps entier hors du rayon local (improbable) : repli uniforme
         wSum = liquid
         for (let i = 0; i < this.count; i++) {
-          if (this.kind[i] === KIND_PLAYER && this.frozen[i] === 0 && this.gaseous[i] === 0) {
+          if (
+            this.kind[i] === KIND_PLAYER &&
+            this.frozen[i] === 0 &&
+            this.gaseous[i] === 0
+          ) {
             this.dvX[i] = 1
           }
         }
@@ -940,7 +1013,11 @@ export class FluidSim {
       const rx = -(dvx + entrainX) / wSum
       const ry = -(dvy + entrainY) / wSum
       for (let i = 0; i < this.count; i++) {
-        if (this.kind[i] === KIND_PLAYER && this.frozen[i] === 0 && this.gaseous[i] === 0) {
+        if (
+          this.kind[i] === KIND_PLAYER &&
+          this.frozen[i] === 0 &&
+          this.gaseous[i] === 0
+        ) {
           this.velX[i] += rx * this.dvX[i]
           this.velY[i] += ry * this.dvX[i]
         }
@@ -1161,7 +1238,8 @@ export class FluidSim {
         queue.push({ i, d: -(rx * dx + ry * dy) }) // grand = bien en arrière
       }
       queue.sort((a, b) => b.d - a.d)
-      const vSouffle = p.gasDashSpeed * power * Math.max(0, p.gasDashExhaustSpeed)
+      const vSouffle =
+        p.gasDashSpeed * power * Math.max(0, p.gasDashExhaustSpeed)
       for (let k = 0; k < souffle && k < queue.length; k++) {
         const i = queue[k].i
         // évantail : le souffle s'ouvre au lieu de partir en trait
@@ -1284,7 +1362,8 @@ export class FluidSim {
       // Le second terme est la gorgée finale : tout près de la bouche, le
       // courant plonge franchement — les dernières gouttes, même plaquées
       // contre la paroi voisine, sont bues au lieu de tourner en rond.
-      const boost = 1 + 1.5 * (1 - d / R) + 1.5 * (1 - Math.min(1, d / (R * 0.3)))
+      const boost =
+        1 + 1.5 * (1 - d / R) + 1.5 * (1 - Math.min(1, d / (R * 0.3)))
       const vIn = p.exitPull * inv * boost
       const vTan = p.exitPull * p.exitSwirl * inv
       // Cœur en rotation « corps solide » (Rankine), durci au carré : la
@@ -1378,7 +1457,20 @@ export class FluidSim {
     // des particules par indice) ; cadence 0,25 s — coût ~0,05 ms.
     if (n >= 128 && this.stepIndex % 30 === 0) this.reorderByCell()
 
-    const { posX, posY, prdX, prdY, velX, velY, lambda, dpX, dpY, dvX, dvY, density } = this
+    const {
+      posX,
+      posY,
+      prdX,
+      prdY,
+      velX,
+      velY,
+      lambda,
+      dpX,
+      dpY,
+      dvX,
+      dvY,
+      density,
+    } = this
     const k = this.kernels
     const h = k.h
     const h2 = k.h2
@@ -1440,19 +1532,40 @@ export class FluidSim {
       wasm.gas.set(this.gaseous.subarray(0, n))
       wasm.fro.set(frozen.subarray(0, n))
       wasm.buildGrid(n, grid.minX, grid.minY, grid.cellSize, grid.nx, grid.ny)
-      wasm.collectAll(n, reach, grid.minX, grid.minY, grid.cellSize, grid.nx, grid.ny)
+      wasm.collectAll(
+        n,
+        reach,
+        grid.minX,
+        grid.minY,
+        grid.cellSize,
+        grid.nx,
+        grid.ny,
+      )
     } else if (besoinVoisins) {
       let cursor = 0
       for (let i = 0; i < n; i++) {
         nbStart[i] = cursor
-        cursor = grid.collect(prdX, prdY, prdX[i], prdY[i], reach, i, nbList, cursor, MAX_NEIGHBORS)
+        cursor = grid.collect(
+          prdX,
+          prdY,
+          prdX[i],
+          prdY[i],
+          reach,
+          i,
+          nbList,
+          cursor,
+          MAX_NEIGHBORS,
+        )
       }
       nbStart[n] = cursor
     }
     const selfRho = k.poly6Coeff * h2 * h2 * h2
     // Exposant de cohésion : puissance entière déroulée quand c'est possible
     // (Math.pow dans la boucle de paires coûte cher sur petites machines)
-    const sCorrNInt = Math.abs(p.sCorrN - Math.round(p.sCorrN)) < 1e-9 ? Math.round(p.sCorrN) : 0
+    const sCorrNInt =
+      Math.abs(p.sCorrN - Math.round(p.sCorrN)) < 1e-9
+        ? Math.round(p.sCorrN)
+        : 0
 
     // 2. Itérations de contrainte de densité. La vapeur est hors du solveur :
     // elle ne compte pas dans la densité du liquide et n'est pas corrigée —
@@ -1479,7 +1592,11 @@ export class FluidSim {
       prdY.set(wasm.prdY.subarray(0, n))
       density.set(wasm.density.subarray(0, n))
     }
-    for (let iter = 0; iter < (phasePalet || wasm ? 0 : p.solverIterations); iter++) {
+    for (
+      let iter = 0;
+      iter < (phasePalet || wasm ? 0 : p.solverIterations);
+      iter++
+    ) {
       for (let i = 0; i < n; i++) {
         if (gaseous[i] === 1) {
           density[i] = selfRho
@@ -1532,7 +1649,8 @@ export class FluidSim {
         }
         density[i] = rho
         const C = rho * invRho0 - 1
-        const denom = sumGrad2 + sumGradX * sumGradX + sumGradY * sumGradY + p.epsilonLambda
+        const denom =
+          sumGrad2 + sumGradX * sumGradX + sumGradY * sumGradY + p.epsilonLambda
         lambda[i] = -C / denom
       }
 
@@ -1776,7 +1894,11 @@ export class FluidSim {
           break
         }
       }
-      if (pick < 0 || (this.kind[pick] === KIND_PLAYER && this.playerCount <= 2)) break
+      if (
+        pick < 0 ||
+        (this.kind[pick] === KIND_PLAYER && this.playerCount <= 2)
+      )
+        break
       this.removeParticle(pick)
       this.vaporBank++
     }
@@ -1810,9 +1932,14 @@ export class FluidSim {
   // butin : c'est son propre corps qu'on va rechercher, au prix d'un détour.
   private processRecondensation(dt: number): void {
     const p = this.params
-    if (this.coldBoxes.length === 0 || this.vaporBank < 1 || p.recondRate <= 0) return
+    if (this.coldBoxes.length === 0 || this.vaporBank < 1 || p.recondRate <= 0)
+      return
     this.recondCarry += p.recondRate * dt
-    while (this.recondCarry >= 1 && this.vaporBank >= 1 && this.count < this.capacity) {
+    while (
+      this.recondCarry >= 1 &&
+      this.vaporBank >= 1 &&
+      this.count < this.capacity
+    ) {
       this.recondCarry -= 1
       this.vaporBank -= 1
       // rendement : part récupérable, meilleure à vaisseau froid — et
@@ -1829,8 +1956,13 @@ export class FluidSim {
       const r1 = this.recondSeed / 2147483647
       this.recondSeed = (this.recondSeed * 48271) % 2147483647
       const r2 = this.recondSeed / 2147483647
-      const b = this.coldBoxes[Math.floor(r1 * this.coldBoxes.length) % this.coldBoxes.length]
-      const dist = p.coldBand * (1 + p.chillColdGrowth * this.chill) * 1.12 + p.particleSpacing
+      const b =
+        this.coldBoxes[
+          Math.floor(r1 * this.coldBoxes.length) % this.coldBoxes.length
+        ]
+      const dist =
+        p.coldBand * (1 + p.chillColdGrowth * this.chill) * 1.12 +
+        p.particleSpacing
       let x: number
       let y: number
       if (b.angle || b.forme) {
@@ -1884,7 +2016,11 @@ export class FluidSim {
       if (this.gasIntent && this.kind[i] === KIND_PLAYER) continue // le pilotage garde la main
       // le souffle d'un dash n'est plus à vous : ni en vol, ni fraîchement
       // perlé — sinon la propulsion en vapeur ne coûterait rien
-      if (this.kind[i] !== KIND_PLAYER && (this.souffle[i] > 0 || this.cooldown[i] > 0)) continue
+      if (
+        this.kind[i] !== KIND_PLAYER &&
+        (this.souffle[i] > 0 || this.cooldown[i] > 0)
+      )
+        continue
       // dans l'aura d'une chaudière, une particule ne CONDENSE pas : elle
       // BOUT. Sans cette garde, le bord du corps qui chauffait (vapeur
       // montante) était happé vers le centre en continu — la chaudière
@@ -1942,7 +2078,8 @@ export class FluidSim {
     let impY = 0
     for (let i = 0; i < this.count; i++) {
       if (this.duCorps[i] === 0 || this.kind[i] === KIND_PLAYER) continue
-      if (this.cooldown[i] > 0 || this.frozen[i] === 1 || this.gaseous[i] === 1) continue
+      if (this.cooldown[i] > 0 || this.frozen[i] === 1 || this.gaseous[i] === 1)
+        continue
       const dx = cx - this.posX[i]
       const dy = cy - this.posY[i]
       const d2 = dx * dx + dy * dy
@@ -2004,14 +2141,54 @@ export class FluidSim {
         // Chaque état a sa porte : la grille laisse passer la VAPEUR, la
         // membrane gorgée d'eau laisse suinter l'EAU, le rideau lamellaire
         // s'écarte devant la GLACE — tout le reste bute.
-        if (b.material === MAT_GRILLE && this.gaseous[i] === 1) continue
-        if (b.material === MAT_MEMBRANE && this.gaseous[i] !== 1 && this.frozen[i] !== 1) continue
-        if (b.material === MAT_RIDEAU && this.frozen[i] === 1) continue
+        if (b.material === MAT_GRILLE && this.gaseous[i] === 1) {
+          // CODEX : le passage EST l'interaction — consigné quand une
+          // particule du corps est réellement DANS la boîte (l'AABB suffit)
+          if (
+            this.codexContacts[MAT_GRILLE * 3 + 2] === 0 &&
+            this.kind[i] === KIND_PLAYER &&
+            x > b.minX &&
+            x < b.maxX &&
+            y > b.minY &&
+            y < b.maxY
+          )
+            this.codexContacts[MAT_GRILLE * 3 + 2] = 1
+          continue
+        }
+        if (
+          b.material === MAT_MEMBRANE &&
+          this.gaseous[i] !== 1 &&
+          this.frozen[i] !== 1
+        ) {
+          if (
+            this.codexContacts[MAT_MEMBRANE * 3] === 0 &&
+            this.kind[i] === KIND_PLAYER &&
+            x > b.minX &&
+            x < b.maxX &&
+            y > b.minY &&
+            y < b.maxY
+          )
+            this.codexContacts[MAT_MEMBRANE * 3] = 1
+          continue
+        }
+        if (b.material === MAT_RIDEAU && this.frozen[i] === 1) {
+          if (
+            this.codexContacts[MAT_RIDEAU * 3 + 1] === 0 &&
+            this.kind[i] === KIND_PLAYER &&
+            x > b.minX &&
+            x < b.maxX &&
+            y > b.minY &&
+            y < b.maxY
+          )
+            this.codexContacts[MAT_RIDEAU * 3 + 1] = 1
+          continue
+        }
         if (horsBoite(b, x, y, rp)) continue
         boxContact(x, y, b, cp)
         const sep = cp.dist - rp
         if (sep < 0) {
-          const vn = ((x - this.posX[i]) * cp.nx + (y - this.posY[i]) * cp.ny) * invDt
+          const vn =
+            ((x - this.posX[i]) * cp.nx + (y - this.posY[i]) * cp.ny) * invDt
           x -= cp.nx * sep
           y -= cp.ny * sep
           this.contactMat[i] = b.material
@@ -2029,11 +2206,23 @@ export class FluidSim {
       const etatLiquide = this.frozen[i] !== 1 && this.gaseous[i] !== 1
       for (const sp of this.sponges) {
         const d = sp.def
-        if (x < d.minX - rp || x >= sp.maxX + rp || y < d.minY - rp || y >= sp.maxY + rp) continue
+        if (
+          x < d.minX - rp ||
+          x >= sp.maxX + rp ||
+          y < d.minY - rp ||
+          y >= sp.maxY + rp
+        )
+          continue
         const cx0 = Math.max(0, Math.floor((x - rp - d.minX) / d.cellSize))
         const cy0 = Math.max(0, Math.floor((y - rp - d.minY) / d.cellSize))
-        const cx1 = Math.min(d.cols - 1, Math.floor((x + rp - d.minX) / d.cellSize))
-        const cy1 = Math.min(d.rows - 1, Math.floor((y + rp - d.minY) / d.cellSize))
+        const cx1 = Math.min(
+          d.cols - 1,
+          Math.floor((x + rp - d.minX) / d.cellSize),
+        )
+        const cy1 = Math.min(
+          d.rows - 1,
+          Math.floor((y + rp - d.minY) / d.cellSize),
+        )
         for (let cy = cy0; cy <= cy1; cy++) {
           for (let cx = cx0; cx <= cx1; cx++) {
             const cell = cy * d.cols + cx
@@ -2082,6 +2271,9 @@ export class FluidSim {
       // par la moyenne de l'amas puis écrasée par l'impulsion rigide.)
       if (gel) continue
       const mat = this.contactMat[i]
+      // CODEX : chaque contact du corps consigne sa combinaison état × matériau
+      if (mat >= 0 && this.kind[i] === KIND_PLAYER)
+        this.codexContacts[mat * 3 + (gaz ? 2 : 0)] = 1
       // LA VAPEUR QUI N'EST PLUS À VOUS PERLE OÙ ELLE TOUCHE. Le souffle du
       // dash (et toute vapeur détachée du corps) se condense à la première
       // paroi : elle redevient goutte, s'y pose, et attend qu'on vienne la
@@ -2090,7 +2282,12 @@ export class FluidSim {
       // (pas sur une MEMBRANE : elle est faite pour ARRÊTER la vapeur — y
       // perler la ferait franchir sous forme de goutte, l'outil de
       // conception perdrait son sens. Le souffle rebondit et perlera ailleurs.)
-      if (gaz && mat >= 0 && mat !== MAT_MEMBRANE && this.kind[i] !== KIND_PLAYER) {
+      if (
+        gaz &&
+        mat >= 0 &&
+        mat !== MAT_MEMBRANE &&
+        this.kind[i] !== KIND_PLAYER
+      ) {
         this.gaseous[i] = 0
         this.souffle[i] = 0
         this.duCorps[i] = 0 // la rosée du souffle s'attrape au contact, pas à l'aimant
@@ -2165,8 +2362,13 @@ export class FluidSim {
             continue
           }
           const a =
-            (b.material === MAT_HYDROPHILE ? -p.hydrophilePull : p.hydrophobeRepel) *
-            f * dt * bite * poidsBande
+            (b.material === MAT_HYDROPHILE
+              ? -p.hydrophilePull
+              : p.hydrophobeRepel) *
+            f *
+            dt *
+            bite *
+            poidsBande
           this.velX[i] += cp.nx * a
           this.velY[i] += cp.ny * a
         }
@@ -2256,10 +2458,14 @@ export class FluidSim {
       const xi = prdX[i]
       const yi = prdY[i]
       if (turb > 0) {
-        const c1x = -Math.sin(xi * k1 + time * 0.8) * Math.sin(yi * k1 - time * 0.6)
-        const c1y = -Math.cos(xi * k1 + time * 0.8) * Math.cos(yi * k1 - time * 0.6)
-        const c2x = -Math.sin(xi * k2 - time * 1.3) * Math.sin(yi * k2 + time * 1.1)
-        const c2y = -Math.cos(xi * k2 - time * 1.3) * Math.cos(yi * k2 + time * 1.1)
+        const c1x =
+          -Math.sin(xi * k1 + time * 0.8) * Math.sin(yi * k1 - time * 0.6)
+        const c1y =
+          -Math.cos(xi * k1 + time * 0.8) * Math.cos(yi * k1 - time * 0.6)
+        const c2x =
+          -Math.sin(xi * k2 - time * 1.3) * Math.sin(yi * k2 + time * 1.1)
+        const c2y =
+          -Math.cos(xi * k2 - time * 1.3) * Math.cos(yi * k2 + time * 1.1)
         velX[i] += (c1x * 0.65 + c2x * 0.35) * turb
         velY[i] += (c1y * 0.65 + c2y * 0.35) * turb
       }
@@ -2298,7 +2504,8 @@ export class FluidSim {
     const chill = this.chill
     const band = p.coldBand * (1 + p.chillColdGrowth * chill)
     const rp = p.particleSpacing * 0.5
-    const freeze = (dt * p.surfaceBite) / Math.max(0.05, p.freezeTime * (1 - 0.5 * chill))
+    const freeze =
+      (dt * p.surfaceBite) / Math.max(0.05, p.freezeTime * (1 - 0.5 * chill))
     const freezeSelf = dt / Math.max(0.05, p.freezeSelfTime)
     const thaw = dt / Math.max(0.1, p.thawTime * (1 + chill))
     const boilTime = p.boilTime * (1 + 2 * p.chillHeatFade * chill)
@@ -2349,10 +2556,12 @@ export class FluidSim {
           continue
         }
       }
-      const wantGas = this.gasIntent && this.kind[i] === KIND_PLAYER && this.frozen[i] === 0
+      const wantGas =
+        this.gasIntent && this.kind[i] === KIND_PLAYER && this.frozen[i] === 0
       let dv: number
       if (exposure > 0) dv = -exposure * (dt / 0.25)
-      else if (heat > 0 && this.frozen[i] === 0) dv = heat * (dt / Math.max(0.05, boilTime))
+      else if (heat > 0 && this.frozen[i] === 0)
+        dv = heat * (dt / Math.max(0.05, boilTime))
       else if (wantGas) dv = dt / Math.max(0.05, vaporizeTime)
       else dv = -dt / Math.max(0.05, condenseTime)
       let vap = Math.min(1, Math.max(0, this.vapor[i] + dv))
@@ -2360,7 +2569,12 @@ export class FluidSim {
       // intention, une particule du joueur chauffe (frémit, fume) mais ne
       // bascule plus seule — la transformation se décide au niveau du corps
       // (95 % de la surface active dans la zone d'effet, voir main.ts).
-      if (heat > 0 && !this.gasIntent && this.kind[i] === KIND_PLAYER && this.gaseous[i] === 0) {
+      if (
+        heat > 0 &&
+        !this.gasIntent &&
+        this.kind[i] === KIND_PLAYER &&
+        this.gaseous[i] === 0
+      ) {
         vap = Math.min(vap, 0.98)
       }
       this.vapor[i] = vap
@@ -2371,13 +2585,19 @@ export class FluidSim {
       // le temps que le nuage condensé retombe sur le corps
       if (this.gaseous[i] === 1) this.gasLink[i] = 1
       else if (this.gasLink[i] > 0)
-        this.gasLink[i] = Math.max(0, this.gasLink[i] - dt / Math.max(0.2, p.gasLinkDecay))
+        this.gasLink[i] = Math.max(
+          0,
+          this.gasLink[i] - dt / Math.max(0.2, p.gasLinkDecay),
+        )
 
       // Givre : jamais sur la vapeur — le froid doit d'abord la condenser.
       // La chaleur empêche la prise, et dégèle bien plus vite qu'à l'air libre.
-      const wanted = intent && this.kind[i] === KIND_PLAYER && this.gaseous[i] === 0
+      const wanted =
+        intent && this.kind[i] === KIND_PLAYER && this.gaseous[i] === 0
       const canFrost = this.gaseous[i] === 0 && vap < 0.5 && heat <= 0
-      const rate = canFrost ? Math.max(exposure * freeze, wanted ? freezeSelf : 0) : 0
+      const rate = canFrost
+        ? Math.max(exposure * freeze, wanted ? freezeSelf : 0)
+        : 0
       if (rate > 0) {
         this.frost[i] = Math.min(1, this.frost[i] + rate)
         if (this.frost[i] >= 1 && this.frozen[i] === 0) {
@@ -2386,7 +2606,9 @@ export class FluidSim {
         }
       } else {
         const melt =
-          heat > 0 ? Math.max(thaw, (heat * dt) / Math.max(0.05, p.heatThawTime)) : thaw
+          heat > 0
+            ? Math.max(thaw, (heat * dt) / Math.max(0.05, p.heatThawTime))
+            : thaw
         this.frost[i] = Math.max(0, this.frost[i] - melt)
         if (this.frozen[i] === 1 && this.frost[i] <= 0.55) {
           this.frozen[i] = 0
@@ -2400,7 +2622,11 @@ export class FluidSim {
         // l'eau qui givre s'engourdit — pâteuse, dure à propulser. Le gel
         // VOLONTAIRE (F) y échappe : « geler, c'est parier sur une
         // trajectoire » — l'élan choisi est conservé
-        if (fr > 0 && p.frostSluggish > 0 && !(wanted && this.kind[i] === KIND_PLAYER)) {
+        if (
+          fr > 0 &&
+          p.frostSluggish > 0 &&
+          !(wanted && this.kind[i] === KIND_PLAYER)
+        ) {
           const damp = Math.exp(-p.frostSluggish * fr * dt)
           this.velX[i] *= damp
           this.velY[i] *= damp
@@ -2415,22 +2641,30 @@ export class FluidSim {
           const xi = this.posX[i]
           const yi = this.posY[i]
           const sg = (i & 1) === 0 ? 1 : -1
-          const jx = -Math.sin(xi * kAgit + time * 5.1) * Math.sin(yi * kAgit - time * 4.3)
-          const jy = -Math.cos(xi * kAgit + time * 5.1) * Math.cos(yi * kAgit - time * 4.3)
+          const jx =
+            -Math.sin(xi * kAgit + time * 5.1) *
+            Math.sin(yi * kAgit - time * 4.3)
+          const jy =
+            -Math.cos(xi * kAgit + time * 5.1) *
+            Math.cos(yi * kAgit - time * 4.3)
           this.velX[i] += jx * agit * warmth * sg
           this.velY[i] += jy * agit * warmth * sg
         }
       }
     }
 
-    this.chauffeFrac = this.playerCount > 0 ? joueursEnChauffe / this.playerCount : 0
+    this.chauffeFrac =
+      this.playerCount > 0 ? joueursEnChauffe / this.playerCount : 0
 
     // La vapeur qui s'attarde dans l'aura d'un radiateur s'évapore : perdue,
     // pas mise en bonbonne. La plus exposée part en premier.
     if (this.hasHeat) {
       let anyHotGas = false
       for (let i = 0; i < this.count; i++) {
-        if (this.gaseous[i] === 1 && this.heatExposureAt(this.posX[i], this.posY[i]) > 0) {
+        if (
+          this.gaseous[i] === 1 &&
+          this.heatExposureAt(this.posX[i], this.posY[i]) > 0
+        ) {
           anyHotGas = true
           break
         }
@@ -2449,7 +2683,11 @@ export class FluidSim {
               best = i
             }
           }
-          if (best < 0 || (this.kind[best] === KIND_PLAYER && this.playerCount <= 2)) break
+          if (
+            best < 0 ||
+            (this.kind[best] === KIND_PLAYER && this.playerCount <= 2)
+          )
+            break
           this.removeParticle(best)
           this.vaporBank++
         }
@@ -2493,7 +2731,17 @@ export class FluidSim {
         if (frozen[i] === 0) return // le liquide : singletons, hors des blocs
         const xi = prdX[i]
         const yi = prdY[i]
-        const end = grid.collect(prdX, prdY, xi, yi, linkR, i, scratch, 0, scratch.length)
+        const end = grid.collect(
+          prdX,
+          prdY,
+          xi,
+          yi,
+          linkR,
+          i,
+          scratch,
+          0,
+          scratch.length,
+        )
         for (let e = 0; e < end; e++) {
           const j = scratch[e]
           if (frozen[j] === 0) continue
@@ -2535,6 +2783,8 @@ export class FluidSim {
       this.iceCySum[c] += prdY[i]
       this.iceCnt[c]++
       if (this.contactMat[i] >= 0) {
+        // CODEX : la glace consigne aussi ses contacts (matériau × état 1)
+        this.codexContacts[this.contactMat[i] * 3 + 1] = 1
         if (this.contactMat[i] === MAT_HYDROPHOBE) this.icePhobe[c]++
         else if (this.contactMat[i] === MAT_HYDROPHILE) this.icePhile[c]++
         this.iceNxSum[c] += this.contactNX[i]
@@ -2583,7 +2833,8 @@ export class FluidSim {
         // La chimie se lit à l'échelle du palet : la surface qui touche le
         // plus de particules dicte la réponse du bloc (tableau des règles —
         // bumper hydrophobe, mouillage hydrophile).
-        const surPhobe = this.icePhobe[c] > 0 && this.icePhobe[c] >= this.icePhile[c]
+        const surPhobe =
+          this.icePhobe[c] > 0 && this.icePhobe[c] >= this.icePhile[c]
         const surPhile = !surPhobe && this.icePhile[c] > 0
         const nl = Math.hypot(this.iceNxSum[c], this.iceNySum[c])
         if (nl > 1e-6) {
@@ -2604,8 +2855,11 @@ export class FluidSim {
             // propre + plancher d'éjection) ; l'hydrophile absorbe le choc.
             const rn = rx * ny - ry * nx
             const denom = 1 / cnt + (I > 1e-6 ? (rn * rn) / I : 0)
-            let vnOut = -vn * (surPhobe ? p.hydrophobeIceRestitution : surPhile ? 0 : rest)
-            if (surPhobe && vnOut < p.hydrophobeIceKick) vnOut = p.hydrophobeIceKick
+            let vnOut =
+              -vn *
+              (surPhobe ? p.hydrophobeIceRestitution : surPhile ? 0 : rest)
+            if (surPhobe && vnOut < p.hydrophobeIceKick)
+              vnOut = p.hydrophobeIceKick
             const j = (vnOut - vn) / denom
             vx += (j * nx) / cnt
             vy += (j * ny) / cnt
@@ -2680,7 +2934,17 @@ export class FluidSim {
       const xi = posX[i]
       const yi = posY[i]
       const gi = gasLink[i]
-      const end = grid.collect(posX, posY, xi, yi, gasLinkR, i, scratch, 0, scratch.length)
+      const end = grid.collect(
+        posX,
+        posY,
+        xi,
+        yi,
+        gasLinkR,
+        i,
+        scratch,
+        0,
+        scratch.length,
+      )
       for (let e = 0; e < end; e++) {
         const j = scratch[e]
         const v = gi > gasLink[j] ? gi : gasLink[j]
@@ -2696,7 +2960,12 @@ export class FluidSim {
         }
       }
     }
-    const componentCount = labelComponents(n, labels, forEachNeighbor, this.stack)
+    const componentCount = labelComponents(
+      n,
+      labels,
+      forEachNeighbor,
+      this.stack,
+    )
 
     // Composante contenant le plus de particules de l'ancien corps
     // (tampon réutilisé : relabel tourne à chaque frame, une allocation ici
@@ -2721,7 +2990,10 @@ export class FluidSim {
     // que le sas boit ne doit pas requalifier la fin en dispersion.
     const inDrainGrip =
       this.drainOn &&
-      Math.hypot(this.stats.centroidX - this.mouthX, this.stats.centroidY - this.mouthY) <
+      Math.hypot(
+        this.stats.centroidX - this.mouthX,
+        this.stats.centroidY - this.mouthY,
+      ) <
         this.params.exitRadius * 1.3
 
     if (playerLabel < 0) {
@@ -2774,7 +3046,8 @@ export class FluidSim {
       const dx = posX[i] - cx2
       const dy = posY[i] - cy2
       const d2 = dx * dx + dy * dy
-      const dedans = haloActif && (this.duCorps[i] === 2 ? d2 <= cOut2 : d2 <= cIn2)
+      const dedans =
+        haloActif && (this.duCorps[i] === 2 ? d2 <= cOut2 : d2 <= cIn2)
       this.duCorps[i] = dedans ? 2 : 1
       if (dedans) prets++
     }
@@ -2788,7 +3061,8 @@ export class FluidSim {
     // Sous le seuil critique : constaté ici, tranché par le délai de grâce
     // (dispersalGrace, dans step) — un corps en pleine transformation a le
     // temps de se regrouper avant que le protocole ne conclue à la perte.
-    this.belowCritical = (count + prets) * p.litersPerParticle < p.criticalVolumeLiters
+    this.belowCritical =
+      (count + prets) * p.litersPerParticle < p.criticalVolumeLiters
     if (count < 2) this.dispersed = true
   }
 
