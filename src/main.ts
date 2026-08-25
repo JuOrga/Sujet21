@@ -1715,6 +1715,9 @@ let eauMiroir =
     : localStorage.getItem('sujet21-miroir') === 'miroir'
       ? 1
       : 2
+// L'ŒIL du Sujet : ABYSSAL par défaut (pupille sombre, iris qui respire,
+// clignement lent) — DISCRET garde l'ancien noyau, au pixel près.
+let oeilChoix = localStorage.getItem('sujet21-oeil') === 'discret' ? 0 : 1
 // Éclairage de la PIÈCE : une lampe par cuve, des ombres portées cuites dans
 // une carte de lumière (recalculée seulement au changement de décor) et un
 // biseau directionnel sur les arêtes — du relief pour presque rien. ACTIF
@@ -1972,6 +1975,31 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
       }
     }
     renderMiroir()
+  }
+
+  const choixOeil = document.getElementById(
+    'params-oeil',
+  ) as HTMLDivElement | null
+  if (choixOeil) {
+    const renderOeil = (): void => {
+      choixOeil.innerHTML = ''
+      for (const [oeil, cle, label] of [
+        [1, 'abyssal', 'ABYSSAL'],
+        [0, 'discret', 'DISCRET'],
+      ] as const) {
+        const b = document.createElement('button')
+        b.type = 'button'
+        b.textContent = label
+        b.className = oeilChoix === oeil ? 'actif' : ''
+        b.addEventListener('click', () => {
+          oeilChoix = oeil
+          localStorage.setItem('sujet21-oeil', cle)
+          renderOeil()
+        })
+        choixOeil.appendChild(b)
+      }
+    }
+    renderOeil()
   }
 
   const choixLumiere = document.getElementById(
@@ -6302,6 +6330,7 @@ function frame(now: number): void {
     level.brume ?? 0,
     eauMiroir,
     level.plafond ?? '',
+    oeilChoix,
     {
       regardX: presence.x,
       regardY: presence.y,

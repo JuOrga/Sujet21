@@ -23,6 +23,16 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
+    date: '26/08/2026 05:10',
+    title:
+      'L’ŒIL ABYSSAL : le regard devient un œil — voyant, mystérieux, réglable',
+    notes: [
+      'Demandé : un œil plus voyant et plus mystérieux, en conservant la version actuelle. C’est fait, au choix dans PARAMÈTRES (« L’ŒIL DU SUJET ») : ABYSSAL, le nouveau défaut — une PUPILLE sombre creusée dans la masse, cerclée d’un IRIS lumineux vert d’abysse et d’un halo discret, comme les yeux des créatures des grands fonds ; et DISCRET — l’ancien noyau clair, conservé au pixel près.',
+      'L’iris est ÉMISSIF : il luit de sa propre lumière, versée après la passe d’éclairage du corps — il reste visible même dans la pénombre, là où l’ancien noyau se noyait. Et toutes les 6,7 secondes environ, l’œil CLIGNE : un battement bref où l’iris s’éteint et la pupille se referme — c’est ce presque-rien qui le rend vivant. Le rayon de l’iris respire doucement (±2 unités), jamais un cercle figé.',
+      'L’œil suit tout ce que le regard suivait déjà : la souris, le stick, les mécanismes, le sas, les vignettes d’idle, le réveil. Il s’estompe en vapeur, se fige à moitié dans la glace, et n’existe que dans le corps principal. Vérifié en jeu dans les deux modes : ABYSSAL bien visible au zoom (pupille + anneau + halo), DISCRET identique à la version précédente.',
+    ],
+  },
+  {
     date: '26/08/2026 03:40',
     title:
       'LE RÉVEIL : à chaque tableau, le Sujet s’éveille — petit scénario aléatoire pendant le zoom',
