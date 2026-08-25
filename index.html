@@ -494,6 +494,29 @@
       #salles-couv td.vide {
         color: rgba(242, 201, 142, 0.75);
       }
+      /* les MÉCANIQUES présentes dans une case : un point par mécanique,
+         aux couleurs des pastilles (aucune, glace, vapeur, toutes) */
+      .couv-mecas {
+        display: flex;
+        gap: 3px;
+        justify-content: center;
+        margin-top: 3px;
+      }
+      .couv-mecas i {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--dim);
+      }
+      .couv-mecas .cm-1 {
+        background: #8fc8ee;
+      }
+      .couv-mecas .cm-2 {
+        background: #f2c98e;
+      }
+      .couv-mecas .cm-3 {
+        background: #a878e8;
+      }
       #salles-couv .couv-note {
         margin: 6px 0 0;
         font-family: var(--font-mono, ui-monospace, monospace);
@@ -516,9 +539,6 @@
       }
       .ed-code-lecture.hors {
         color: rgba(242, 201, 142, 0.9);
-      }
-      .ed-code-lecture.doublon {
-        color: #ff8a3c;
       }
       #salles-liste button b {
         color: var(--specimen);

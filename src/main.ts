@@ -1069,21 +1069,31 @@ function renderSalles(): void {
       for (let p = pMin; p <= pMax; p++) {
         html += `<tr><th>PHASE ${p}</th>`
         for (let df = dMin; df <= dMax; df++) {
-          const noms = enSequence
-            .filter((lv) => {
-              const d = decodeCodeAtelier(lv.code)
-              return d !== null && d.phase === p && d.difficulte === df
-            })
-            .map((lv) => `${lv.code} ${lv.name}`)
-          html +=
-            noms.length > 0
-              ? `<td class="plein" title="${esc(noms.join('\n'))}">${noms.length}</td>`
-              : '<td class="vide">—</td>'
+          const dedans = enSequence
+            .map((lv) => ({ lv, d: decodeCodeAtelier(lv.code) }))
+            .filter(
+              (x): x is { lv: LevelDef; d: CodeAtelier } =>
+                x.d !== null && x.d.phase === p && x.d.difficulte === df,
+            )
+          if (dedans.length === 0) {
+            html += '<td class="vide">—</td>'
+            continue
+          }
+          const noms = dedans.map(
+            (x) =>
+              `${x.lv.code} ${x.lv.name} (${MECANIQUE_NOMS[x.d.mecanique]})`,
+          )
+          // un point par MÉCANIQUE présente dans la case, couleur des chips
+          const mecas = [...new Set(dedans.map((x) => x.d.mecanique))].sort()
+          const points = mecas
+            .map((m) => `<i class="cm-${m}" title="${MECANIQUE_NOMS[m]}"></i>`)
+            .join('')
+          html += `<td class="plein" title="${esc(noms.join('\n'))}">${dedans.length}<span class="couv-mecas">${points}</span></td>`
         }
         html += '</tr>'
       }
       html +=
-        '</table><p class="couv-note">Chaque case compte les salles de la bibliothèque — les « — » sont les trous à combler (survolez une case pour lire les noms).</p>'
+        '</table><p class="couv-note">Chaque case compte les salles de la bibliothèque — les « — » sont les trous à combler. Les points donnent les mécaniques présentes (gris aucune · bleu glace · ambre vapeur · violet toutes) ; survolez une case pour lire les noms.</p>'
       couv.innerHTML = html
     }
   }

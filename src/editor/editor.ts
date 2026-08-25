@@ -2770,9 +2770,6 @@ export class LevelEditor {
         if (id && j >= 0) void this.moveTo(id, j)
       })
     }
-    // les doublons de code se jugent CONTRE la bibliothèque : à chaque
-    // rafraîchissement de la liste, la lecture sous le champ Code se rejoue
-    this.majLectureCode()
   }
 
   /** Range la séquence PAR LE CODE ATELIER : phase, puis mécanique, puis
@@ -3021,6 +3018,24 @@ export class LevelEditor {
       this.level.name = proposed.trim().slice(0, 60) || this.level.name
       ;(this.el('ed-name') as HTMLInputElement).value = this.level.name
     }
+    // DOUBLON de code : l'alerte se joue ICI, avant de valider — une fois,
+    // en face du geste, plutôt qu'en continu sous le champ pendant la frappe.
+    const doublon = this.library.find(
+      (s) =>
+        s.id !== id &&
+        s.level.code.trim().toUpperCase() === this.level.code.trim().toUpperCase(),
+    )
+    if (
+      doublon &&
+      !confirm(
+        `Le code « ${this.level.code} » est déjà porté par « ${doublon.level.name} » dans la bibliothèque.\n` +
+          `Deux salles au même code se confondent dans les tris, les filtres et les records.\n\n` +
+          `Enregistrer quand même ?`,
+      )
+    ) {
+      this.commit('Enregistrement annulé — changez le code pour éviter le doublon.')
+      return
+    }
     this.busy = true
     this.commit('Enregistrement…')
     const saved = await saveLevel(this.level, id, this.hooks.operator())
@@ -3117,44 +3132,33 @@ export class LevelEditor {
   }
 
   /** La LECTURE du code, sous le champ : la convention atelier décodée en
-   * clair (« phase 1 · glace · difficulté 2 »), un signalement quand le
-   * code sort de la convention, et l'alerte quand un AUTRE tableau de la
-   * bibliothèque porte déjà ce code. */
+   * clair (« phase 1 · glace · difficulté 2 »), et un signalement quand le
+   * code sort de la convention. Les DOUBLONS ne se signalent pas ici — ils
+   * s'alertent au moment d'ENREGISTRER, une fois, en face du geste. */
   private majLectureCode(): void {
     const el = this.host.querySelector('#ed-code-lecture') as HTMLElement | null
     if (!el) return
     const code = this.level.code.trim()
-    const doublon = this.library.find(
-      (s) =>
-        s.id !== this.openId &&
-        s.level.code.trim().toUpperCase() === code.toUpperCase(),
-    )
-    const alerte = doublon
-      ? ` ⚠ Ce code est déjà porté par « ${doublon.level.name} » — deux salles au même code se confondent dans les tris et les records.`
-      : ''
     if (estCodeHub(code)) {
       el.className = 'ed-code-lecture ok'
       el.textContent =
-        (code.toUpperCase() === CODE_HUB
+        code.toUpperCase() === CODE_HUB
           ? 'Code réservé : ce tableau devient le LABORATOIRE (hors séquence).'
-          : 'Chantier de hub : hors séquence tant qu’il ne s’appelle pas HUB.') +
-        alerte
+          : 'Chantier de hub : hors séquence tant qu’il ne s’appelle pas HUB.'
       return
     }
     const d = decodeCodeAtelier(code)
     if (d) {
-      el.className = doublon ? 'ed-code-lecture doublon' : 'ed-code-lecture ok'
+      el.className = 'ed-code-lecture ok'
       el.textContent =
         `Code atelier — phase ${d.phase}${d.phase === 1 ? ' (début de game)' : ''} · ` +
-        `mécanique : ${MECANIQUE_NOMS[d.mecanique]} · difficulté ${d.difficulte}.` +
-        alerte
+        `mécanique : ${MECANIQUE_NOMS[d.mecanique]} · difficulté ${d.difficulte}.`
       return
     }
-    el.className = doublon ? 'ed-code-lecture doublon' : 'ed-code-lecture hors'
+    el.className = 'ed-code-lecture hors'
     el.textContent =
       `Hors convention atelier (« 111 » : phase · mécanique 0-3 · difficulté). ` +
-      `La salle se joue normalement, mais échappe aux tris et filtres par code.` +
-      alerte
+      `La salle se joue normalement, mais échappe aux tris et filtres par code.`
   }
 
   /** Panneau de propriétés de l'objet sélectionné. */
