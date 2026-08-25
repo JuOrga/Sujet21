@@ -312,6 +312,10 @@ uniform float uFrisson; // 0..1 : tremblement bref (le froid le saisit)
 // Le mode MERCURE (uMiroirEau = 2) organise son reflet autour du CORPS :
 // centre et rayon efficace lus dans les stats de la simulation.
 uniform vec2 uCentroide;
+// le repère RIGIDE du gel : centre et angle du plus gros bloc gelé — les
+// facettes s'y accrochent et tournent avec le palet
+uniform vec2 uGelCentre;
+uniform float uGelAngle;
 uniform float uRayonCorps;
 uniform float uLampeSpriteRond; // 1 : un asset dessine les plafonniers
 uniform float uLampeSpriteBande; // 1 : un asset dessine les bandes
@@ -1574,7 +1578,12 @@ void main() {
     float facette = 0.0; // nuance propre de la cellule (-1..1)
     float aretes = 0.0; // liseré des arêtes entre cellules
     if (icy > 0.001 && uMiroirEau > 1.5) {
-      vec2 rel = (world - uCentroide) / 95.0;
+      // repère du BLOC (centre + rotation intégrée) : le Voronoï est taillé
+      // dans la glace, il dérive ET pivote avec elle — cohérent, enfin
+      vec2 relG = world - uGelCentre;
+      float cg = cos(uGelAngle);
+      float sg = sin(uGelAngle);
+      vec2 rel = vec2(cg * relG.x + sg * relG.y, -sg * relG.x + cg * relG.y) / 95.0;
       vec2 ip = floor(rel);
       vec2 fp = fract(rel);
       float f1 = 8.0;
@@ -3011,6 +3020,8 @@ export class Renderer {
     gl.uniform1f(cu['uRegardInt'], presence?.regardInt ?? 0)
     gl.uniform2f(cu['uRespiration'], presence?.respAmp ?? 0, presence?.respVit ?? 1)
     gl.uniform1f(cu['uFrisson'], presence?.frisson ?? 0)
+    gl.uniform2f(cu['uGelCentre'], sim.gelCentreX, sim.gelCentreY)
+    gl.uniform1f(cu['uGelAngle'], sim.gelAngle)
     gl.uniform1f(cu['uRayonCorps'], Math.max(40, sim.stats.rmsRadius * 1.9))
     this.setPlafond(plafond)
     gl.uniform1f(cu['uLampeSpriteRond'], this.texLampeRonde ? 1 : 0)

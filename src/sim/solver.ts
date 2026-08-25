@@ -379,6 +379,13 @@ export class FluidSim {
   // réserve ; les plaques froides la rendent en rosée, avec perte.
   vaporBank = 0
   roseePerlee = 0 // gouttes de rosée effectivement perlées (trophée)
+  // Le REPÈRE DU GEL (pour le rendu) : centre et angle intégré de la plus
+  // grosse composante gelée — les facettes cristallines (et tout motif
+  // « collé au palet ») translatent ET tournent avec le bloc, au lieu de
+  // nager dans le volume. Remis à zéro au dégel complet.
+  gelCentreX = 0
+  gelCentreY = 0
+  gelAngle = 0
   private recondCarry = 0
   private recondYield = 0
   private recondSeed = 1
@@ -2719,7 +2726,10 @@ export class FluidSim {
         break
       }
     }
-    if (!any) return
+    if (!any) {
+      this.gelAngle = 0 // plus de glace : le repère du gel repart de zéro
+      return
+    }
     const p = this.params
     const linkR = p.linkRadiusFactor * p.kernelRadius
     const linkR2 = linkR * linkR
@@ -2892,6 +2902,24 @@ export class FluidSim {
       this.iceCxSum[c] = cx
       this.iceCySum[c] = cy
       this.iceOmega[c] = omega
+    }
+
+    // Le repère du gel suit la PLUS GROSSE composante : translation par son
+    // centre, rotation intégrée pas à pas. Un bloc soudé (omega nul) fige
+    // aussi son repère — les facettes ne bougent plus d'un poil.
+    let cBest = -1
+    for (let c = 0; c < comps; c++)
+      if (
+        this.iceCnt[c] > 0 &&
+        (cBest < 0 || this.iceCnt[c] > this.iceCnt[cBest])
+      )
+        cBest = c
+    if (cBest >= 0) {
+      this.gelAngle += this.iceOmega[cBest] * dt
+      this.gelCentreX = this.iceCxSum[cBest]
+      this.gelCentreY = this.iceCySum[cBest]
+    } else {
+      this.gelAngle = 0
     }
 
     // 3. projection sur un mouvement de corps rigide : translation + rotation
