@@ -1715,9 +1715,6 @@ let eauMiroir =
     : localStorage.getItem('sujet21-miroir') === 'miroir'
       ? 1
       : 2
-// L'ŒIL du Sujet : ABYSSAL par défaut (pupille sombre, iris qui respire,
-// clignement lent) — DISCRET garde l'ancien noyau, au pixel près.
-let oeilChoix = localStorage.getItem('sujet21-oeil') === 'discret' ? 0 : 1
 // Éclairage de la PIÈCE : une lampe par cuve, des ombres portées cuites dans
 // une carte de lumière (recalculée seulement au changement de décor) et un
 // biseau directionnel sur les arêtes — du relief pour presque rien. ACTIF
@@ -1975,31 +1972,6 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
       }
     }
     renderMiroir()
-  }
-
-  const choixOeil = document.getElementById(
-    'params-oeil',
-  ) as HTMLDivElement | null
-  if (choixOeil) {
-    const renderOeil = (): void => {
-      choixOeil.innerHTML = ''
-      for (const [oeil, cle, label] of [
-        [1, 'abyssal', 'ABYSSAL'],
-        [0, 'discret', 'DISCRET'],
-      ] as const) {
-        const b = document.createElement('button')
-        b.type = 'button'
-        b.textContent = label
-        b.className = oeilChoix === oeil ? 'actif' : ''
-        b.addEventListener('click', () => {
-          oeilChoix = oeil
-          localStorage.setItem('sujet21-oeil', cle)
-          renderOeil()
-        })
-        choixOeil.appendChild(b)
-      }
-    }
-    renderOeil()
   }
 
   const choixLumiere = document.getElementById(
@@ -3670,15 +3642,13 @@ function majIdle(dtReal: number): void {
         murY = py
       }
     }
-    const choix: Array<'toilette' | 'sas' | 'etire' | 'tapote' | 'tentacule'> = [
-      'toilette',
-      'sas',
-      'etire',
-    ]
+    const choix: Array<'toilette' | 'sas' | 'etire' | 'tapote' | 'tentacule'> =
+      ['toilette', 'sas', 'etire']
     if (best < sim.stats.rmsRadius + 130) choix.push('tapote')
     // le TENTACULE porte plus loin que le toc-toc — et c'est la vignette
     // vedette : deux billets dans le chapeau
-    if (best > 30 && best < sim.stats.rmsRadius + 300) choix.push('tentacule', 'tentacule')
+    if (best > 30 && best < sim.stats.rmsRadius + 300)
+      choix.push('tentacule', 'tentacule')
     idle.type = choix[Math.floor(Math.random() * choix.length)]
     idle.t0 = elapsed
     idle.murX = murX
@@ -3763,12 +3733,18 @@ function majIdle(dtReal: number): void {
     let mvy = 0
     let nLiq = 0
     for (let i = 0; i < sim.count; i++) {
-      if (sim.kind[i] !== KIND_PLAYER || sim.frozen[i] === 1 || sim.gaseous[i] === 1) continue
+      if (
+        sim.kind[i] !== KIND_PLAYER ||
+        sim.frozen[i] === 1 ||
+        sim.gaseous[i] === 1
+      )
+        continue
       nLiq++
       const px = tipX - sim.posX[i]
       const py = tipY - sim.posY[i]
       const d = Math.hypot(px, py)
-      if (age < 3.15) { // aimant du bout, puis rassemblement
+      if (age < 3.15) {
+        // aimant du bout, puis rassemblement
         if (d > 52 || d < 1e-3) {
           // rien : hors de portée de l'aimant
         } else {
@@ -3801,7 +3777,12 @@ function majIdle(dtReal: number): void {
       const rx = ((idle.ancX - cx) * 6 - mvx * 2.5) * dtReal
       const ry = ((idle.ancY - cy) * 6 - mvy * 2.5) * dtReal
       for (let i = 0; i < sim.count; i++) {
-        if (sim.kind[i] !== KIND_PLAYER || sim.frozen[i] === 1 || sim.gaseous[i] === 1) continue
+        if (
+          sim.kind[i] !== KIND_PLAYER ||
+          sim.frozen[i] === 1 ||
+          sim.gaseous[i] === 1
+        )
+          continue
         sim.velX[i] += rx
         sim.velY[i] += ry
       }
@@ -3924,7 +3905,8 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
   // l'ONDULATION de l'abandon : un court répit et le contour se met à
   // onduler franchement (le shader la dessine) — un geste, et elle s'efface
   const ondCible = idle.t > 1.5 ? 1 : 0
-  presence.ondule += (ondCible - presence.ondule) * (1 - Math.exp(-2.0 * dtReal))
+  presence.ondule +=
+    (ondCible - presence.ondule) * (1 - Math.exp(-2.0 * dtReal))
   // 3. le FRISSON : armé hors du froid, déclenché quand il saisit
   if (sim.froidFrac < 0.05) presence.armeFrisson = true
   if (presence.armeFrisson && sim.froidFrac >= 0.18) {
@@ -6330,7 +6312,6 @@ function frame(now: number): void {
     level.brume ?? 0,
     eauMiroir,
     level.plafond ?? '',
-    oeilChoix,
     {
       regardX: presence.x,
       regardY: presence.y,

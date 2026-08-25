@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 14:10',
+    title: 'Le regard, version finale : quelque chose vit SOUS la surface',
+    notes: [
+      'Retour du concepteur sur l’œil abyssal : il ressortait trop — retiré, ainsi que son réglage dans PARAMÈTRES. À la place, le noyau discret d’origine est ACCENTUÉ, dans son esprit : quelque chose se devine sous la surface, caché par le volume, sans jamais s’imposer.',
+      'Trois touches : une PÉNOMBRE large et douce dessine la silhouette de la chose tapie dans la masse (la profondeur vient de là) ; le noyau clair est un peu plus grand et plus lumineux qu’avant ; et sa lueur RESPIRE lentement — jamais figée. Le tout reste versé AVANT la passe de lumière du corps : le volume le voile à moitié, c’est précisément l’effet recherché.',
+      'Vérifié en jeu au zoom, comparaison avant/après à l’appui : la présence se voit nettement mieux, mais reste une lueur noyée dans la masse — pas un œil dessiné.',
+    ],
+  },
+  {
     date: '26/08/2026 13:00',
     title: 'Le TENTACULE — et le contour qui ondule à l’abandon',
     notes: [
