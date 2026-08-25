@@ -14,6 +14,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '25/08/2026 16:50',
+    title:
+      'Le CODEX : 33 fiches à débloquer en vivant chaque interaction du protocole',
+    notes: [
+      'Demandé : un codex dont chaque entrée se débloque à chaque NOUVELLE interaction — toucher une surface hydro en liquide, un mur en glace, traverser un évent en vapeur… toutes les combinaisons. C’est fait : la matrice complète des 9 éléments physiques (mur, hydrophile, hydrophobe, plaque froide, évent, chaudière, membrane, rideau, surchauffeur) × 3 états = 27 fiches, plus 6 fiches « phénomènes » (rosée du souffle, laser réfléchi par la glace, éponge, zones forcées glace/vapeur, mise en bonbonne au sas). Chaque fiche explique la mécanique en deux phrases : le codex devient le manuel du jeu, écrit par la partie elle-même.',
+      'Le déblocage se fait EN JOUANT, à la première fois : le solveur consigne au vol chaque contact du corps (état × matériau) — les « passages » aussi (l’évent traversé en vapeur, la membrane en eau, le rideau en glace). À la découverte : la fanfare des trophées, étiquetée « CODEX — NOUVELLE FICHE ». La page (fiche d’essai → bouton ◉ CODEX) montre les fiches consignées et des cartes « ? » pour tout ce qui reste à vivre — chaque « ? » est une expérience à tenter.',
+      'Vérifié en jeu : contact eau/mur dans LA CHICANE → toast à l’écran → fiche « Le liquide épouse la paroi » consignée (1/33) ; corps gelé poussé contre un mur → « Le palet rebondit entier » (2/33). Les découvertes persistent en local, comme les trophées. Coût en jeu : quasi nul (un marquage par contact, une lecture à 4 Hz).',
+    ],
+  },
+  {
     date: '25/08/2026 01:30',
     title:
       'Les FLANCS du relief prennent vie : panneaux rivetés et écrans de service',
