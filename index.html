@@ -4112,6 +4112,18 @@
       }
       .mb-carte.mb-dest { min-height: 108px; }
       .mb-cartes:has(.mb-dest) { grid-template-columns: 1fr 1fr; }
+      /* Le CHOIX DE SALLE (pool « 21XX-MMD ») : deux propositions,
+         mini-carte en tête, code + nom + chips dessous */
+      .mb-cartes:has(.mb-salle) { grid-template-columns: 1fr 1fr; }
+      .mb-carte.mb-salle { min-height: 0; padding-top: 8px; }
+      .mb-salle canvas {
+        width: 100%; max-width: 240px; border-radius: 6px;
+        border: 1px solid #223447; background: #0c141d;
+      }
+      .mb-salle .salle-chips { justify-content: center; }
+      @media (max-width: 560px) {
+        .mb-carte.mb-salle { flex-direction: column; text-align: center; }
+      }
       .mb-jauges {
         grid-column: 1 / -1; display: flex; justify-content: space-between;
         gap: 12px; flex-wrap: wrap; font-size: 12px; color: #9fb6c8;
