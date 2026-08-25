@@ -726,6 +726,83 @@ export class FluidSim {
     this.updatePlayerStats()
   }
 
+  /** VERSER n particules AU CORPS : le même réseau hexagonal que spawnDisc,
+   * centré en (cx, cy), mais chaque position déjà PRISE est sautée — une
+   * particule existante à moins d'un pas, une paroi, une cellule d'éponge
+   * gorgée, le bord de la cuve. Sans ce tri, verser la bonbonne posait la
+   * matière EN PLEIN CŒUR du corps : la contrainte de densité expulsait
+   * tout d'un coup et le versement EXPLOSAIT le volume au lieu de le
+   * regonfler. La matière s'installe donc en couronne, dans les creux
+   * autour du corps, et part à sa vitesse moyenne (le versement suit le
+   * mouvement, il ne le freine pas). Renvoie le nombre réellement posé. */
+  verserAuCorps(cx: number, cy: number, n: number, kind: number): number {
+    const s = this.params.particleSpacing
+    const rowH = s * Math.sqrt(3) * 0.5
+    const seuil2 = (0.9 * s) ** 2
+    const rp = s * 0.5
+    const cp = this.scratchCP
+    this.updatePlayerStats()
+    const mvx = this.stats.velX
+    const mvy = this.stats.velY
+    const libre = (px: number, py: number): boolean => {
+      if (
+        px < this.bounds.minX + rp ||
+        px > this.bounds.maxX - rp ||
+        py < this.bounds.minY + rp ||
+        py > this.bounds.maxY - rp
+      ) {
+        return false
+      }
+      for (let i = 0; i < this.count; i++) {
+        const dx = this.posX[i] - px
+        if (dx * dx > seuil2) continue
+        const dy = this.posY[i] - py
+        if (dx * dx + dy * dy < seuil2) return false
+      }
+      for (const b of this.boxes) {
+        boxContact(px, py, b, cp)
+        if (cp.dist < rp) return false
+      }
+      for (const sp of this.sponges) {
+        if (!sp.contains(px, py)) continue
+        const cell = sp.cellIndexAt(px, py)
+        if (cell >= 0 && sp.isSolid(cell)) return false
+      }
+      return true
+    }
+    let poses = 0
+    // l'étendue GRANDIT tant qu'il reste à poser : le cœur du réseau est
+    // occupé par le corps lui-même, les places libres sont plus loin
+    let extent = Math.ceil(Math.sqrt(n)) + 2
+    for (let essai = 0; essai < 6 && poses < n; essai++) {
+      const pts: { x: number; y: number; d2: number }[] = []
+      for (let row = -extent; row <= extent; row++) {
+        const y = row * rowH
+        const xOffset = (row & 1) !== 0 ? s * 0.5 : 0
+        for (let col = -extent; col <= extent; col++) {
+          const x = col * s + xOffset
+          pts.push({ x, y, d2: x * x + y * y })
+        }
+      }
+      pts.sort((a, b) => a.d2 - b.d2)
+      for (const pt of pts) {
+        if (poses >= n) break
+        const px = cx + pt.x
+        const py = cy + pt.y
+        if (!libre(px, py)) continue
+        const idx = this.addParticle(px, py, kind)
+        if (idx < 0) break // capacité atteinte : on s'arrête là
+        this.velX[idx] = mvx
+        this.velY[idx] = mvy
+        poses++
+      }
+      extent = Math.ceil(extent * 1.4) + 1
+    }
+    if (kind === KIND_PLAYER) this.baseVolume += poses
+    this.updatePlayerStats()
+    return poses
+  }
+
   // Le verbe unique (§3.3) : la matière part vers le point visé, le corps part
   // à l'opposé. Conservation exacte : la réaction est répartie uniformément
   // sur les particules restantes du corps.

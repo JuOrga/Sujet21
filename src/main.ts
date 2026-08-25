@@ -3364,11 +3364,20 @@ function verserBonbonne(): string {
     Math.floor(run.bonbonneLiters / params.litersPerParticle),
   )
   if (nParts < 1) return 'rien'
+  // le versement s'installe dans les CREUX autour du corps (jamais sur les
+  // particules en place) : poser au centroïde faisait exploser la densité —
+  // la bonbonne ne se débite que de ce qui a réellement trouvé sa place
+  const poses = sim.verserAuCorps(
+    sim.stats.centroidX,
+    sim.stats.centroidY,
+    nParts,
+    KIND_PLAYER,
+  )
+  if (poses < 1) return 'rien'
   run.bonbonneLiters = Math.max(
     0,
-    run.bonbonneLiters - nParts * params.litersPerParticle,
+    run.bonbonneLiters - poses * params.litersPerParticle,
   )
-  sim.spawnDisc(sim.stats.centroidX, sim.stats.centroidY, nParts, KIND_PLAYER)
   sim.relabel()
   bande.ponctuation('sting-collecte', 0.5)
   hudBonbonneChip.classList.add('ouvert')

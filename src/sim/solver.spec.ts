@@ -101,6 +101,56 @@ describe('FluidSim — invariants physiques', () => {
     expect(sim.stats.rmsRadius).toBeLessThan(r0 * 1.6)
   })
 
+  it('verserAuCorps pose la matière dans les CREUX, jamais sur le corps', () => {
+    const sim = makeSim()
+    sim.spawnDisc(0, 0, 300, KIND_PLAYER)
+    const avant = sim.count
+    const poses = sim.verserAuCorps(0, 0, 150, KIND_PLAYER)
+    expect(poses).toBe(150)
+    expect(sim.count).toBe(avant + 150)
+    // aucune particule versée ne chevauche une autre (c'était l'explosion :
+    // 150 particules posées au centroïde, la densité expulsait tout)
+    const seuil2 = (0.85 * sim.params.particleSpacing) ** 2
+    for (let i = avant; i < sim.count; i++) {
+      for (let j = 0; j < i; j++) {
+        const dx = sim.posX[i] - sim.posX[j]
+        const dy = sim.posY[i] - sim.posY[j]
+        expect(dx * dx + dy * dy).toBeGreaterThan(seuil2)
+      }
+    }
+  })
+
+  it('le versement ne fait pas exploser le corps (vitesses bornées après coup)', () => {
+    const sim = makeSim()
+    sim.spawnDisc(0, 0, 300, KIND_PLAYER)
+    for (let s = 0; s < 30; s++) sim.step(sim.params.dt) // le corps se tasse
+    sim.updatePlayerStats()
+    const r0 = sim.stats.rmsRadius
+    sim.verserAuCorps(sim.stats.centroidX, sim.stats.centroidY, 150, KIND_PLAYER)
+    for (let s = 0; s < 60; s++) sim.step(sim.params.dt)
+    // pas de gerbe : aucune particule n'est propulsée à une vitesse folle,
+    // et le corps regonflé reste un corps (rayon borné, pas une explosion)
+    let vMax = 0
+    for (let i = 0; i < sim.count; i++) {
+      vMax = Math.max(vMax, Math.hypot(sim.velX[i], sim.velY[i]))
+    }
+    expect(vMax).toBeLessThan(sim.params.ejectSpeed)
+    sim.updatePlayerStats()
+    expect(sim.stats.rmsRadius).toBeLessThan(r0 * 2)
+  })
+
+  it('le versement hérite de la vitesse moyenne du corps', () => {
+    const sim = makeSim()
+    sim.spawnDisc(0, 0, 200, KIND_PLAYER)
+    for (let i = 0; i < sim.count; i++) sim.velX[i] = 40
+    const avant = sim.count
+    const poses = sim.verserAuCorps(0, 0, 60, KIND_PLAYER)
+    expect(poses).toBe(60)
+    for (let i = avant; i < sim.count; i++) {
+      expect(sim.velX[i]).toBeCloseTo(40, 3)
+    }
+  })
+
   it('deux masses en contact fusionnent (§3.1)', () => {
     const sim = makeSim()
     sim.spawnDisc(0, 0, 200, KIND_PLAYER)
