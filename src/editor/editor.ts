@@ -126,6 +126,7 @@ type Sel =
   | { kind: 'porte'; index: number }
   | { kind: 'rail'; index: number }
   | { kind: 'lumiere'; index: number }
+  | { kind: 'decal'; index: number }
   | { kind: 'exit' }
   | { kind: 'spawn' }
   | null
@@ -495,6 +496,16 @@ export class LevelEditor {
     if (s.kind === 'cache') return (this.level.caches ?? [])[s.index] ?? null
     if (s.kind === 'porte') return (this.level.portes ?? [])[s.index] ?? null
     if (s.kind === 'exit') return this.level.exit
+    if (s.kind === 'decal') {
+      const d = (this.level.decals ?? [])[s.index]
+      if (!d) return null
+      return {
+        minX: d.x - d.w / 2,
+        minY: d.y - d.h / 2,
+        maxX: d.x + d.w / 2,
+        maxY: d.y + d.h / 2,
+      }
+    }
     if (s.kind === 'sponge') {
       const sp = this.level.sponges[s.index]
       if (!sp) return null
@@ -525,7 +536,15 @@ export class LevelEditor {
     else if (s.kind === 'porte')
       Object.assign((this.level.portes ?? [])[s.index], norm)
     else if (s.kind === 'exit') Object.assign(this.level.exit, norm)
-    else if (s.kind === 'sponge') {
+    else if (s.kind === 'decal') {
+      const d = (this.level.decals ?? [])[s.index]
+      if (d) {
+        d.x = (norm.minX + norm.maxX) / 2
+        d.y = (norm.minY + norm.maxY) / 2
+        d.w = Math.max(8, norm.maxX - norm.minX)
+        d.h = Math.max(8, norm.maxY - norm.minY)
+      }
+    } else if (s.kind === 'sponge') {
       const sp = this.level.sponges[s.index]
       sp.minX = norm.minX
       sp.minY = norm.minY
@@ -782,6 +801,22 @@ export class LevelEditor {
     if (Math.hypot(this.level.spawn.x - x, this.level.spawn.y - y) < sr)
       return { kind: 'spawn' }
     if (inside(this.level.exit)) return { kind: 'exit' }
+    // les décals sont dessinés PAR-DESSUS les parois : au clic, ils passent
+    // avant elles — mais après tout ce qui se joue (lampes, cibles, portes…)
+    const decals = this.level.decals ?? []
+    for (let i = decals.length - 1; i >= 0; i--) {
+      const d = decals[i]
+      if (
+        inside({
+          minX: d.x - d.w / 2,
+          minY: d.y - d.h / 2,
+          maxX: d.x + d.w / 2,
+          maxY: d.y + d.h / 2,
+        })
+      ) {
+        return { kind: 'decal', index: i }
+      }
+    }
     for (let i = this.level.boxes.length - 1; i >= 0; i--) {
       if (dansBoite(this.level.boxes[i], x, y)) return { kind: 'box', index: i }
     }
@@ -1125,13 +1160,26 @@ export class LevelEditor {
               oy: w.y - l.y,
               start: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
             }
-          } else {
-            const r = this.selRect()!
+          } else if (hit.kind === 'lumiere') {
+            // la lampe est un POINT (x, y), pas un rectangle : le chemin
+            // générique par selRect() la faisait planter — elle était le
+            // seul élément impossible à déplacer à la souris
+            const l = (this.level.lumieres ?? [])[hit.index]
             this.drag = {
               mode: 'move',
-              ox: w.x - r.minX,
-              oy: w.y - r.minY,
-              start: { ...r },
+              ox: w.x - l.x,
+              oy: w.y - l.y,
+              start: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+            }
+          } else {
+            const r = this.selRect()
+            if (r) {
+              this.drag = {
+                mode: 'move',
+                ox: w.x - r.minX,
+                oy: w.y - r.minY,
+                start: { ...r },
+              }
             }
           }
         }
@@ -2005,6 +2053,7 @@ export class LevelEditor {
       })
       cs.splice(s.index, 1)
     } else if (s.kind === 'label') this.level.labels.splice(s.index, 1)
+    else if (s.kind === 'decal') (this.level.decals ?? []).splice(s.index, 1)
     else {
       this.commit('Le sas et le point de départ ne se suppriment pas.')
       return
@@ -2069,6 +2118,10 @@ export class LevelEditor {
         points: r.points.map((p) => ({ x: p.x + off, y: p.y })),
       })
       this.sel = { kind: 'rail', index: this.level.rails!.length - 1 }
+    } else if (s.kind === 'decal') {
+      const d = (this.level.decals ?? [])[s.index]
+      this.level.decals!.push({ ...d, x: d.x + off })
+      this.sel = { kind: 'decal', index: this.level.decals!.length - 1 }
     } else return
     this.commit('Dupliqué (D).')
   }
@@ -3451,6 +3504,42 @@ export class LevelEditor {
           `</select></label>`,
       )
       rows.push(numField('X', 'p-lx', l.x), numField('Y', 'p-ly', l.y))
+    } else if (s.kind === 'decal') {
+      const d = (this.level.decals ?? [])[s.index]
+      rows.push(
+        `<label class="ed-f"><span>Sorte</span><select id="p-dk">` +
+          (
+            [
+              'tuyaux',
+              'vanne',
+              'ecran-off',
+              'ecran-on',
+              'fiole-pleine',
+              'fiole-vide',
+            ] as const
+          )
+            .map(
+              (k) =>
+                `<option value="${k}"${k === d.kind ? ' selected' : ''}>${k}</option>`,
+            )
+            .join('') +
+          `</select></label>`,
+      )
+      rows.push(numField('X (centre)', 'p-dx', d.x), numField('Y (centre)', 'p-dy', d.y))
+      rows.push(
+        numField('Largeur', 'p-dw', d.w),
+        numField('Hauteur', 'p-dh', d.h),
+      )
+      rows.push(
+        `<label class="ed-f"><span>Miroir</span><select id="p-df">` +
+          `<option value="non"${!d.flip ? ' selected' : ''}>Non</option>` +
+          `<option value="oui"${d.flip ? ' selected' : ''}>Oui — retourné horizontalement</option>` +
+          `</select></label>`,
+      )
+      rows.push(rangeField('Opacité', 'p-do', d.fade ?? 0.55, 0.05, 1, 0.05))
+      rows.push(
+        `<p class="ed-empty">Machinerie de décor : aucune physique, aucune règle — glissez-la, les poignées la redimensionnent.</p>`,
+      )
     }
 
     const kindName =
@@ -3479,7 +3568,9 @@ export class LevelEditor {
                         ? 'Porte asservie'
                         : s.kind === 'rail'
                           ? 'Rail magnétique'
-                          : 'Étiquette'
+                          : s.kind === 'decal'
+                            ? 'Décal (machinerie de décor)'
+                            : 'Étiquette'
 
     host.innerHTML =
       `<div class="ed-props-head">${kindName}</div><div class="ed-fields">${rows.join('')}</div>` +
@@ -3766,6 +3857,28 @@ export class LevelEditor {
       l.tone = text('p-tone') as WorldLabel['tone']
       l.x = val('p-lx')
       l.y = val('p-ly')
+    } else if (s.kind === 'decal') {
+      const d = (this.level.decals ?? [])[s.index]
+      const SORTES = [
+        'tuyaux',
+        'vanne',
+        'ecran-off',
+        'ecran-on',
+        'fiole-pleine',
+        'fiole-vide',
+      ] as const
+      const k = SORTES.find((x) => x === text('p-dk'))
+      if (k) d.kind = k
+      d.x = val('p-dx')
+      d.y = val('p-dy')
+      d.w = Math.max(8, val('p-dw'))
+      d.h = Math.max(8, val('p-dh'))
+      if (text('p-df') === 'oui') d.flip = true
+      else delete d.flip
+      // 0,55 est le défaut : on efface la clé pour garder le fichier minimal
+      const fade = Math.max(0.05, Math.min(1, val('p-do')))
+      if (fade !== 0.55) d.fade = fade
+      else delete d.fade
     }
   }
 
@@ -4171,10 +4284,24 @@ export class LevelEditor {
     // un tableau chargé avec ses décals se relit fidèlement ici
     for (const dcl of this.level.decals ?? []) {
       const im = this.img(`decal-${dcl.kind}`)
-      if (!im) continue
       const dp = this.toScreen(dcl.x - dcl.w / 2, dcl.y + dcl.h / 2)
       const dw = dcl.w * this.zoom
       const dh = dcl.h * this.zoom
+      if (!im) {
+        // image pas (encore) là : un gabarit tient sa place — le décal
+        // reste visible, donc saisissable et déplaçable comme le reste
+        g.save()
+        g.strokeStyle = 'rgba(169,192,210,0.5)'
+        g.lineWidth = 1
+        g.setLineDash([3, 3])
+        g.strokeRect(dp.sx, dp.sy, dw, dh)
+        g.setLineDash([])
+        g.fillStyle = 'rgba(169,192,210,0.6)'
+        g.font = '10px ui-monospace, monospace'
+        g.fillText(dcl.kind, dp.sx + 3, dp.sy + 12)
+        g.restore()
+        continue
+      }
       g.save()
       g.globalAlpha = dcl.fade ?? 0.55
       if (dcl.flip) {
