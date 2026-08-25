@@ -309,6 +309,7 @@ uniform vec2 uRegardPos; // le point interne vers lequel l'attention glisse
 uniform float uRegardInt; // 0..1 : présence du regard
 uniform vec2 uRespiration; // x amplitude (fraction du seuil) · y pulsation
 uniform float uFrisson; // 0..1 : tremblement bref (le froid le saisit)
+uniform float uOndule; // 0..1 : ondulation du contour à l'abandon (idle)
 // Le mode MERCURE (uMiroirEau = 2) organise son reflet autour du CORPS :
 // centre et rayon efficace lus dans les stats de la simulation.
 uniform vec2 uCentroide;
@@ -1332,7 +1333,17 @@ void main() {
   float respire = uRespiration.x * sin(uTime * uRespiration.y);
   float frisson = uFrisson * 0.05 *
     sin(world.x * 0.85 + uTime * 42.0) * sin(world.y * 0.8 - uTime * 36.0);
-  float field2 = field * (1.0 + 0.14 * waveGlow + (respire + frisson) * vivant);
+  // L'ONDULATION de l'abandon : laissé tranquille, le contour se met à
+  // onduler FRANCHEMENT — des vagues lentes qui tournent autour du corps,
+  // asymétriques (la respiration seule, uniforme, restait trop discrète).
+  float ondule = 0.0;
+  if (uOndule > 0.003) {
+    float angV = atan(world.y - uCentroide.y, world.x - uCentroide.x);
+    ondule = uOndule * (0.050 * sin(angV * 3.0 + uTime * 1.35)
+                      + 0.030 * sin(angV * 5.0 - uTime * 1.05)
+                      + 0.020 * sin(angV * 8.0 + uTime * 2.2));
+  }
+  float field2 = field * (1.0 + 0.14 * waveGlow + (respire + frisson + ondule) * vivant);
   // Les bords du nuage bouillonnent : le bruit ronge et gonfle la surface
   field2 *= 1.0 + vap * (smokeN - 0.5) * 1.1;
   float body = smoothstep(th - s, th + s, field2);
@@ -2850,6 +2861,7 @@ export class Renderer {
       respAmp: number
       respVit: number
       frisson: number
+      ondule: number
     } | null = null,
   ): void {
     const gl = this.gl
@@ -3021,6 +3033,7 @@ export class Renderer {
     gl.uniform1f(cu['uRegardInt'], presence?.regardInt ?? 0)
     gl.uniform2f(cu['uRespiration'], presence?.respAmp ?? 0, presence?.respVit ?? 1)
     gl.uniform1f(cu['uFrisson'], presence?.frisson ?? 0)
+    gl.uniform1f(cu['uOndule'], presence?.ondule ?? 0)
     gl.uniform2f(cu['uGelCentre'], sim.gelCentreX, sim.gelCentreY)
     gl.uniform1f(cu['uGelAngle'], sim.gelAngle)
     gl.uniform1f(cu['uRayonCorps'], Math.max(40, sim.stats.rmsRadius * 1.9))

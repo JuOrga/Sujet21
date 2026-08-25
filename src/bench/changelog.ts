@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 13:00',
+    title: 'Le TENTACULE — et le contour qui ondule à l’abandon',
+    notes: [
+      'Laissé tranquille près d’une paroi, le Sujet peut maintenant étendre un TENTACULE : un doigt de liquide sort du flanc, s’étire jusqu’au mur, le touche du bout (un tintement discret), puis se rembobine — c’est la vignette d’idle vedette, tirée deux fois plus souvent que les autres, et son regard suit son propre geste. Une ancre invisible tient le centroïde pendant toute la manœuvre : le contact de la paroi pousse le corps, le ressort le ramène — dérive mesurée sous une unité, rien à y gagner.',
+      'Et le contour VIT enfin visiblement : après un court répit sans geste, la surface se met à ONDULER franchement — des vagues lentes et asymétriques qui tournent autour du corps (la respiration seule, uniforme, restait trop discrète). Un geste, et tout s’efface en douceur. Ni le gel, ni le nuage, ni les gouttes égarées n’ondulent — et le banc de réglage, qui ne transmet pas de présence, affiche exactement comme avant : les présets sont intacts.',
+      'Vérifié au banc d’essai sans écran : extension de 116 unités jusqu’au contact (4 u du mur), rétraction complète, dérive du centroïde 0,4 u, ondulation à pleine amplitude — capture à l’appui au moment du toucher.',
+    ],
+  },
+  {
     date: '26/08/2026 03:40',
     title:
       'LE RÉVEIL : à chaque tableau, le Sujet s’éveille — petit scénario aléatoire pendant le zoom',

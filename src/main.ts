@@ -3537,6 +3537,7 @@ const presence = {
   frisson: 0,
   t0Frisson: -9,
   armeFrisson: true,
+  ondule: 0, // 0..1 : l'ondulation du contour, quand on le laisse tranquille
 }
 ;(window as unknown as { __presence: typeof presence }).__presence = presence
 
@@ -3545,15 +3546,18 @@ const presence = {
 // petites vignettes, jamais utiles, jamais à sa place : il fait sa
 // toilette (se resserre soigneusement), pense au sas (le regard y
 // glisse), s'étire (une grande respiration lente), tapote la paroi la
-// plus proche (deux petits coups, comme on éprouve un mur). Le moindre
-// geste du joueur remet tout à zéro.
+// plus proche (deux petits coups, comme on éprouve un mur), ou étend un
+// TENTACULE — un doigt de liquide qui va toucher la paroi, puis rentre.
+// Le moindre geste du joueur remet tout à zéro.
 const idle = {
   t: 0, // secondes sans geste
   prochaine: 6, // seuil (en secondes d'idle) de la prochaine vignette
-  type: '' as '' | 'toilette' | 'sas' | 'etire' | 'tapote',
+  type: '' as '' | 'toilette' | 'sas' | 'etire' | 'tapote' | 'tentacule',
   t0: 0, // début de la vignette (elapsed)
   murX: 0,
   murY: 0,
+  ancX: 0, // l'ancre du centroïde au départ de la vignette : rien à gagner
+  ancY: 0,
 }
 ;(window as unknown as { __idle: typeof idle }).__idle = idle
 // L'ÉVEIL DU TABLEAU : pendant le zoom automatique d'entrée, le Sujet se
@@ -3608,13 +3612,15 @@ function majIdle(dtReal: number): void {
   if (idle.type) {
     const age = elapsed - idle.t0
     const duree =
-      idle.type === 'sas'
-        ? 2.6
-        : idle.type === 'etire'
-          ? 1.9
-          : idle.type === 'tapote'
-            ? 1.1
-            : 1.0
+      idle.type === 'tentacule'
+        ? 3.9
+        : idle.type === 'sas'
+          ? 2.6
+          : idle.type === 'etire'
+            ? 1.9
+            : idle.type === 'tapote'
+              ? 1.1
+              : 1.0
     if (age > duree) {
       idle.type = ''
       idle.prochaine = idle.t + 4 + Math.random() * 5
@@ -3636,16 +3642,21 @@ function majIdle(dtReal: number): void {
         murY = py
       }
     }
-    const choix: Array<'toilette' | 'sas' | 'etire' | 'tapote'> = [
+    const choix: Array<'toilette' | 'sas' | 'etire' | 'tapote' | 'tentacule'> = [
       'toilette',
       'sas',
       'etire',
     ]
     if (best < sim.stats.rmsRadius + 130) choix.push('tapote')
+    // le TENTACULE porte plus loin que le toc-toc — et c'est la vignette
+    // vedette : deux billets dans le chapeau
+    if (best > 30 && best < sim.stats.rmsRadius + 300) choix.push('tentacule', 'tentacule')
     idle.type = choix[Math.floor(Math.random() * choix.length)]
     idle.t0 = elapsed
     idle.murX = murX
     idle.murY = murY
+    idle.ancX = cx
+    idle.ancY = cy
   }
   // les vignettes PHYSIQUES — infimes, sans aucun gain de déplacement
   if (idle.type === 'toilette') {
@@ -3694,6 +3705,80 @@ function majIdle(dtReal: number): void {
     }
     if (age >= 0.14 && age < 0.14 + dtReal) audio.iceImpact(0.16)
     if (age >= 0.59 && age < 0.59 + dtReal) audio.iceImpact(0.12)
+  } else if (idle.type === 'tentacule') {
+    // le PSEUDOPODE : un aimant au bout du doigt tire les gouttes en
+    // chaîne — il sort du flanc, s'étire jusqu'à la paroi, l'effleure,
+    // puis rentre en se rembobinant
+    const age = elapsed - idle.t0
+    const cx = sim.stats.centroidX
+    const cy = sim.stats.centroidY
+    const dxM = idle.murX - cx
+    const dyM = idle.murY - cy
+    const dMur = Math.hypot(dxM, dyM) || 1
+    const ux = dxM / dMur
+    const uy = dyM / dMur
+    const depart = Math.min(dMur, sim.stats.rmsRadius * 0.85)
+    // l'avancée du bout : sortie (→1,2 s), toucher (→1,9 s), retour
+    // (→3,15 s), rassemblement (→3,9 s). Le bout vise LÉGÈREMENT DANS la
+    // paroi : la collision fait le contact — les gouttes traînent toujours
+    // un peu derrière l'aimant, sans ça le doigt s'arrêtait à vingt unités
+    const lisse = (t: number): number => t * t * (3 - 2 * t)
+    const av =
+      lisse(Math.min(1, age / 1.2)) *
+      (1 - lisse(age < 2.1 ? 0 : Math.min(1, (age - 2.1) / 1.05)))
+    const tipD = depart + (dMur + 18 - depart) * av
+    const tipX = cx + ux * tipD
+    const tipY = cy + uy * tipD
+    const k = Math.min(1, 5 * dtReal)
+    const retire = age >= 2.1 ? 1.35 : 1 // le rembobinage tire plus fort
+    let mvx = 0
+    let mvy = 0
+    let nLiq = 0
+    for (let i = 0; i < sim.count; i++) {
+      if (sim.kind[i] !== KIND_PLAYER || sim.frozen[i] === 1 || sim.gaseous[i] === 1) continue
+      nLiq++
+      const px = tipX - sim.posX[i]
+      const py = tipY - sim.posY[i]
+      const d = Math.hypot(px, py)
+      if (age < 3.15) { // aimant du bout, puis rassemblement
+        if (d > 52 || d < 1e-3) {
+          // rien : hors de portée de l'aimant
+        } else {
+          const vCible = Math.min(130, 26 + d * 2.0) * retire
+          sim.velX[i] += ((px / d) * vCible - sim.velX[i]) * k
+          sim.velY[i] += ((py / d) * vCible - sim.velY[i]) * k
+        }
+      } else {
+        // le RASSEMBLEMENT : ce qui dépasse encore rentre au bercail
+        const gx = cx - sim.posX[i]
+        const gy = cy - sim.posY[i]
+        const g = Math.hypot(gx, gy)
+        if (g >= sim.stats.rmsRadius * 1.05) {
+          const vCible = Math.min(60, g * 1.2)
+          const vRad = (sim.velX[i] * gx + sim.velY[i] * gy) / g
+          sim.velX[i] += ((vCible - vRad) * gx * k * 0.6) / g
+          sim.velY[i] += ((vCible - vRad) * gy * k * 0.6) / g
+        }
+      }
+      mvx += sim.velX[i]
+      mvy += sim.velY[i]
+    }
+    // l'ANCRE : le pseudopode ne doit RIEN faire gagner. La neutralité
+    // d'élan ne suffit pas — le contact de la paroi POUSSE le corps ; un
+    // ressort doux (uniforme : il ne déforme pas le doigt) ramène le
+    // centroïde à sa position de départ et amortit la vitesse d'ensemble
+    if (nLiq > 0) {
+      mvx /= nLiq
+      mvy /= nLiq
+      const rx = ((idle.ancX - cx) * 6 - mvx * 2.5) * dtReal
+      const ry = ((idle.ancY - cy) * 6 - mvy * 2.5) * dtReal
+      for (let i = 0; i < sim.count; i++) {
+        if (sim.kind[i] !== KIND_PLAYER || sim.frozen[i] === 1 || sim.gaseous[i] === 1) continue
+        sim.velX[i] += rx
+        sim.velY[i] += ry
+      }
+    }
+    if (age >= 1.25 && age < 1.25 + dtReal) audio.iceImpact(0.09)
   }
 }
 function majPresence(dtReal: number, aimX: number, aimY: number): void {
@@ -3740,6 +3825,11 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
     // la vignette d'idle : il pense au sas — le regard y glisse
     tx = exitMouth.x
     ty = exitMouth.y
+    vise = true
+  } else if (idle.type === 'tentacule' || idle.type === 'tapote') {
+    // il regarde ce qu'il touche : le point de paroi de son propre geste
+    tx = idle.murX
+    ty = idle.murY
     vise = true
   } else if (!sim.dispersed) {
     let best = Infinity
@@ -3803,6 +3893,10 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
           : 1.7
   presence.amp += (ampCible - presence.amp) * k
   presence.vit += (vitCible - presence.vit) * k
+  // l'ONDULATION de l'abandon : un court répit et le contour se met à
+  // onduler franchement (le shader la dessine) — un geste, et elle s'efface
+  const ondCible = idle.t > 1.5 ? 1 : 0
+  presence.ondule += (ondCible - presence.ondule) * (1 - Math.exp(-2.0 * dtReal))
   // 3. le FRISSON : armé hors du froid, déclenché quand il saisit
   if (sim.froidFrac < 0.05) presence.armeFrisson = true
   if (presence.armeFrisson && sim.froidFrac >= 0.18) {
@@ -6215,6 +6309,7 @@ function frame(now: number): void {
       respAmp: presence.amp,
       respVit: presence.vit,
       frisson: presence.frisson,
+      ondule: presence.ondule,
     },
   )
   const rendRaw = performance.now() - renderT0
