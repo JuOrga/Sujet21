@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '25/08/2026 21:20',
+    title:
+      'Le toast du codex se VISITE : un clic (ou SELECT) ouvre la fiche neuve',
+    notes: [
+      'Demandé : cliquer la notification d’une fiche codex — souris, doigt, ou un bouton manette — pour ouvrir le codex directement DESSUS. C’est fait : le toast d’une fiche devient un bouton (l’invite « VOIR LA FICHE » l’annonce, et il reste affiché un peu plus longtemps). Clic ou toucher : le codex s’ouvre, DÉFILÉ sur la fiche fraîchement consignée, qui s’illumine le temps d’un regard. À la manette : SELECT pendant le toast visite la fiche (l’invite affiche alors « SELECT ») — hors toast, SELECT garde son rôle (recommencer) ; B, START ou SELECT referment le codex.',
+      'Ouvert en pleine partie depuis le toast, le codex FIGE l’essai (lecture au calme) et le rend en se refermant — ouvert depuis la fiche d’essai, rien ne change. Vérifié en jeu : fiche « Le palet rebondit entier » débloquée en jouant → clic sur le toast → codex ouvert, défilement centré sur la fiche illuminée, essai en pause — fermeture, l’essai repart.',
+    ],
+  },
+  {
     date: '25/08/2026 19:40',
     title:
       'La codification « 21XX-MMD » et le POOL : choisir sa prochaine salle',

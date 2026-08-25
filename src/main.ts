@@ -1264,7 +1264,12 @@ function majFpsCoin(dtReal: number): void {
 // dans le voile RECORDS. Détection par échantillonnage léger (4 Hz).
 const trophees = new Trophees()
 const tropheeToast = document.getElementById('trophee-toast') as HTMLDivElement
-const toastFile: { nom: string; icone: string; sur?: string }[] = []
+const toastFile: {
+  nom: string
+  icone: string
+  sur?: string
+  fiche?: string
+}[] = []
 let toastTimer = 0
 trophees.onDebloque = (t) => {
   toastFile.push({ nom: t.nom, icone: t.icone })
@@ -1278,6 +1283,7 @@ codex.onDecouverte = (d) => {
     nom: d.titre,
     icone: d.icone,
     sur: 'CODEX — NOUVELLE FICHE',
+    fiche: d.id,
   })
   audio.collect()
   renderCodexVoile()
@@ -1290,10 +1296,25 @@ function majToast(dtReal: number): void {
   }
   const t = toastFile.shift()
   if (!t) return
-  tropheeToast.innerHTML = `<i>${t.icone}</i><div><b>${t.sur ?? 'TROPHÉE DÉBLOQUÉ'}</b>${t.nom}</div>`
+  // une fiche codex se VISITE : le toast devient un bouton — clic, toucher,
+  // ou SELECT à la manette — et le codex s'ouvre, défilé sur la fiche neuve
+  const voir = t.fiche
+    ? `<em class="tt-voir">${manette.connectee ? 'SELECT · VOIR LA FICHE' : 'VOIR LA FICHE'}</em>`
+    : ''
+  tropheeToast.innerHTML = `<i>${t.icone}</i><div><b>${t.sur ?? 'TROPHÉE DÉBLOQUÉ'}</b>${t.nom}${voir}</div>`
+  if (t.fiche) tropheeToast.dataset.fiche = t.fiche
+  else delete tropheeToast.dataset.fiche
+  tropheeToast.classList.toggle('cliquable', Boolean(t.fiche))
   tropheeToast.classList.add('visible')
-  toastTimer = 3.8
+  toastTimer = t.fiche ? 5.2 : 3.8
 }
+tropheeToast.addEventListener('click', () => {
+  const fiche = tropheeToast.dataset.fiche
+  if (!fiche || !tropheeToast.classList.contains('visible')) return
+  tropheeToast.classList.remove('visible')
+  toastTimer = 0
+  ouvreCodexSur(fiche)
+})
 // état de détection par salle — remis à zéro quand la salle change
 let tropheeNiveauRef: unknown = null
 let gelContinu = 0
@@ -1505,7 +1526,7 @@ function renderCodexVoile(): void {
     html += '<div class="cdx-grille">'
     for (const d of fiches) {
       if (codex.connu(d.id)) {
-        html += `<div class="cdx-carte"><i>${d.icone}</i><div><b>${d.titre}</b><span>${d.texte}</span></div></div>`
+        html += `<div class="cdx-carte" data-fiche="${d.id}"><i>${d.icone}</i><div><b>${d.titre}</b><span>${d.texte}</span></div></div>`
       } else {
         html += `<div class="cdx-carte cdx-verrou"><i>?</i><div><b>FICHE À DÉCOUVRIR</b><span>Une interaction du protocole reste à vivre…</span></div></div>`
       }
@@ -1520,11 +1541,35 @@ document.getElementById('home-codex')?.addEventListener('click', () => {
   codexEl.hidden = false
   renderCodexVoile()
 })
-document.getElementById('codex-fermer')?.addEventListener('click', () => {
+// Ouvert DEPUIS LE TOAST en pleine partie, le codex fige l'essai (lecture au
+// calme) et le rend en se fermant — ouvert depuis la fiche, rien à figer.
+let codexAPause = false
+function fermeCodex(): void {
   codexEl.hidden = true
-})
+  if (codexAPause) {
+    codexAPause = false
+    input.paused = false
+  }
+}
+/** Ouvre le codex DÉFILÉ sur une fiche : le chemin du toast (clic, toucher,
+ * SELECT à la manette) — la fiche neuve s'illumine le temps d'un regard. */
+function ouvreCodexSur(fiche: string): void {
+  if (document.body.classList.contains('playing') && !input.paused) {
+    input.paused = true
+    codexAPause = true
+  }
+  codexEl.hidden = false
+  renderCodexVoile()
+  const carte = codexCorps.querySelector<HTMLElement>(`[data-fiche="${fiche}"]`)
+  if (carte) {
+    carte.scrollIntoView({ block: 'center' })
+    carte.classList.add('cdx-neuve')
+    window.setTimeout(() => carte.classList.remove('cdx-neuve'), 3200)
+  }
+}
+document.getElementById('codex-fermer')?.addEventListener('click', fermeCodex)
 codexEl.addEventListener('pointerdown', (e) => {
-  if (e.target === codexEl) codexEl.hidden = true
+  if (e.target === codexEl) fermeCodex()
 })
 
 document.getElementById('salles-fermer')?.addEventListener('click', () => {
@@ -4959,6 +5004,14 @@ function frame(now: number): void {
     } else if (!eveil1El.hidden || !eveil2El.hidden) {
       // cartes de l'éveil : A tourne la page, rien d'autre ne passe
       if (manette.edge(BOUTON.A)) avanceEveil()
+    } else if (!codexEl.hidden) {
+      // le CODEX ouvert : B, START ou SELECT le referme — rien d'autre ne passe
+      if (
+        manette.edge(BOUTON.B) ||
+        manette.edge(BOUTON.START) ||
+        manette.edge(BOUTON.SELECT)
+      )
+        fermeCodex()
     } else if (!enJeu) {
       // la FICHE : croix/stick pour choisir, A pour valider
       ficheNavigue()
@@ -4967,7 +5020,19 @@ function frame(now: number): void {
     } else if (enJeu) {
       // ☰ (Start) : pause ET menu — la fiche fige l'essai en s'ouvrant
       if (manette.edge(BOUTON.START)) openHome()
-      if (manette.edge(BOUTON.SELECT)) input.onReset?.()
+      // SELECT : recommencer — sauf pendant le toast d'une fiche codex, où
+      // il VISITE la fiche (l'invite du toast l'annonce)
+      if (manette.edge(BOUTON.SELECT)) {
+        const fiche = tropheeToast.classList.contains('visible')
+          ? tropheeToast.dataset.fiche
+          : undefined
+        if (fiche) {
+          tropheeToast.classList.remove('visible')
+          ouvreCodexSur(fiche)
+        } else {
+          input.onReset?.()
+        }
+      }
       // le temps aux épaules : LB ralentit, RB accélère (la croix ↔ aussi)
       if (manette.edge(BOUTON.LB)) input.stepWarp(-1)
       if (manette.edge(BOUTON.RB)) input.stepWarp(1)

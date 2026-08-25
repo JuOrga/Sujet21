@@ -650,6 +650,24 @@
         pointer-events: none; max-width: 320px;
       }
       #trophee-toast.visible { transform: translateX(0); }
+      /* le toast d'une fiche codex est un BOUTON : il se clique, se touche —
+         et l'invite (VOIR LA FICHE / SELECT) le dit */
+      #trophee-toast.cliquable { pointer-events: auto; cursor: pointer; }
+      #trophee-toast.cliquable:hover { border-color: #6dffb8; }
+      #trophee-toast .tt-voir {
+        display: block; margin-top: 3px; font-style: normal;
+        font-family: var(--font-display); font-size: 8px;
+        letter-spacing: 0.18em; color: #6dffb8;
+      }
+      /* la fiche fraîchement visitée s'illumine le temps d'un regard */
+      .cdx-carte.cdx-neuve {
+        border-color: var(--specimen);
+        animation: cdx-neuve 1.1s ease-in-out 3;
+      }
+      @keyframes cdx-neuve {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(99, 183, 230, 0); }
+        50% { box-shadow: 0 0 14px 2px rgba(99, 183, 230, 0.45); }
+      }
       #trophee-toast i { font-style: normal; font-size: 22px; }
       #trophee-toast b {
         display: block; font-family: var(--font-display); font-size: 9px;
