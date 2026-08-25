@@ -310,7 +310,6 @@ uniform float uRegardInt; // 0..1 : présence du regard
 uniform vec2 uRespiration; // x amplitude (fraction du seuil) · y pulsation
 uniform float uFrisson; // 0..1 : tremblement bref (le froid le saisit)
 uniform float uOndule; // 0..1 : ondulation du contour à l'abandon (idle)
-uniform float uOeil; // 1 œil ABYSSAL (pupille + iris + clignement), 0 discret
 // Le mode MERCURE (uMiroirEau = 2) organise son reflet autour du CORPS :
 // centre et rayon efficace lus dans les stats de la simulation.
 uniform vec2 uCentroide;
@@ -1408,8 +1407,6 @@ void main() {
     // plus bas dans la teinte de la glace — nul dans les autres modes.
     vec3 gelMiroir = vec3(0.0);
     float gelForce = 0.0;
-    // La lueur de l'œil abyssal : versée APRÈS la passe de lumière du corps.
-    vec3 oeilLueurDecl = vec3(0.0);
     if (uEau > 0.5) {
       // Scintillement interne discret : l'eau vit même au repos
       float shimmer = sin(world.x * 0.11 + uTime * 1.6) * sin(world.y * 0.09 - uTime * 1.2);
@@ -1560,39 +1557,22 @@ void main() {
         water = mix(water, env, force);
       }
 
-      // LE REGARD : l'attention du Sujet — un noyau plus dense et plus
-      // clair GLISSE dans la masse vers ce qu'il regarde (la visée, un
-      // mécanisme proche, le sas). Pas un œil dessiné : une intention dans
-      // la matière. APRÈS le miroir : posé avant, le reflet le diluait
-      // jusqu'à l'invisible. Le gel l'assourdit ; le nuage n'a pas de noyau.
+      // LE REGARD : l'attention du Sujet — QUELQUE CHOSE vit sous la
+      // surface, voilé par l'épaisseur du volume. Une ombre large et
+      // diffuse dessine sa silhouette tapie dans la masse ; au centre, un
+      // noyau clair — plus présent qu'avant — pulse lentement. Versé AVANT
+      // la passe de lumière : le corps le cache à moitié, c'est voulu.
       if (uRegardInt > 0.003) {
         float dRegard = distance(world, uRegardPos);
         float masque = uRegardInt * (1.0 - vap) * (1.0 - icy * 0.6) *
           clamp(player, 0.0, 1.0);
-        // (oeilLueur est déclarée plus haut : versée après l'éclairage)
-        if (uOeil > 0.5) {
-          // L'ŒIL ABYSSAL : une pupille sombre — un puits dans le corps —
-          // cerclée d'un iris qui respire, une aura large, et un CLIGNEMENT
-          // lent toutes les ~7 s : plus voyant, plus mystérieux. (Le mode
-          // DISCRET, en dessous, garde l'ancien rendu au pixel près.)
-          float ph = fract(uTime / 6.7);
-          float blink = 1.0 - 0.92 * exp(-pow((ph - 0.82) / 0.020, 2.0));
-          float rIris = 21.0 + 1.8 * sin(uTime * 0.9);
-          float pupille = exp(-dRegard * dRegard / (2.0 * 11.0 * 11.0));
-          float iris = exp(-pow((dRegard - rIris) / 6.5, 2.0));
-          float halo = exp(-dRegard * dRegard / (2.0 * 55.0 * 55.0));
-          float m = masque * blink;
-          water = mix(water, water * 0.28, pupille * m);
-          // l'iris et l'aura sont ÉMISSIFS : ajoutés après la passe de
-          // lumière (plus bas) — l'œil luit de sa propre lumière, même
-          // dans une salle noire. C'est là tout son mystère.
-          oeilLueurDecl =
-            vec3(0.16, 0.75, 0.62) * iris * m * 0.85 +
-            vec3(0.10, 0.30, 0.34) * halo * m * 0.28;
-        } else {
-          float noyau = exp(-dRegard * dRegard / (2.0 * 24.0 * 24.0));
-          water += vec3(0.20, 0.36, 0.46) * (noyau * masque);
-        }
+        // la silhouette : une pénombre douce, la chose devinée sous l'eau
+        float ombre = exp(-dRegard * dRegard / (2.0 * 44.0 * 44.0));
+        water = mix(water, water * 0.80, ombre * masque * 0.6);
+        // sa lueur, tamisée par l'épaisseur — elle respire doucement
+        float noyau = exp(-dRegard * dRegard / (2.0 * 27.0 * 27.0));
+        float pouls = 0.8 + 0.2 * sin(uTime * 0.7);
+        water += vec3(0.26, 0.47, 0.58) * (noyau * masque * pouls);
       }
     }
     water += vec3(0.30, 0.55, 0.65) * waveGlow * 0.45 * (1.0 - icy) * (1.0 - vap);
@@ -1670,7 +1650,6 @@ void main() {
     // parfaitement visible dans une pièce éteinte : peu naturel, signalé.
     if (uLumiereEau > 0.5)
       water *= clamp(vec3(uAmbiante * 1.15) + 1.05 * lmEau, vec3(0.10), vec3(1.0));
-      water += oeilLueurDecl; // l'œil abyssal luit de sa propre lumière
 
     col = mix(col, water, body);
     // L'eau qui recouvre l'œil du sas s'assombrit : elle sombre dans le trou
@@ -2878,7 +2857,6 @@ export class Renderer {
     brume = 0, // brume d'ambiance du tableau (0 : aucune)
     miroirEau = 1, // 1 surface MIROITANTE (reflet par houle), 2 MIROITANT MERCURE (reflet d'un seul tenant autour du corps), 0 classique
     plafond = '', // variante de plafond du tableau ('' : plafond.webp)
-    oeil = 1, // 1 œil ABYSSAL (pupille sombre, iris, clignement), 0 discret
     // le PACK PRÉSENCE : regard (position du noyau + intensité), respiration
     // (amplitude + pulsation) et frisson — calculés par le jeu, image par image
     presence: {
@@ -3069,7 +3047,6 @@ export class Renderer {
     )
     gl.uniform1f(cu['uFrisson'], presence?.frisson ?? 0)
     gl.uniform1f(cu['uOndule'], presence?.ondule ?? 0)
-    gl.uniform1f(cu['uOeil'], oeil)
     gl.uniform2f(cu['uGelCentre'], sim.gelCentreX, sim.gelCentreY)
     gl.uniform1f(cu['uGelAngle'], sim.gelAngle)
     gl.uniform1f(cu['uRayonCorps'], Math.max(40, sim.stats.rmsRadius * 1.9))
