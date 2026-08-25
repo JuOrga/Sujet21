@@ -4015,7 +4015,7 @@
       }
       #mb-veil[hidden] { display: none; }
       .mb-panneau {
-        width: min(480px, 92vw);
+        width: min(560px, 92vw);
         background: linear-gradient(180deg, #0d141f, #0a0f18);
         border: 1px solid #27405a; border-radius: 12px;
         padding: 18px 20px 16px;
@@ -4025,7 +4025,7 @@
       }
       .mb-titre {
         margin: 0 0 12px; font-family: Michroma, ui-monospace, monospace;
-        font-size: 13px; letter-spacing: 0.24em; color: #8fd8c8;
+        font-size: 15px; letter-spacing: 0.24em; color: #8fd8c8;
       }
       .mb-haut { display: flex; align-items: center; gap: 16px; }
       .mb-flacon {
@@ -4047,7 +4047,7 @@
         from { transform: translateY(-26px); opacity: 0; }
         to { transform: translateY(0); opacity: 1; }
       }
-      .mb-litres { font-size: 24px; }
+      .mb-litres { font-size: 34px; }
       .mb-litres b { color: #eaf6ff; }
       .mb-prime {
         display: block; margin-top: 6px; font-size: 11px; color: #a8d8f0;
@@ -4056,11 +4056,11 @@
       .mb-lignes { margin-top: 14px; display: grid; gap: 7px; }
       .mb-ligne {
         display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
-        font-size: 13px; opacity: 0; transform: translateY(7px);
+        font-size: 14px; opacity: 0; transform: translateY(7px);
         transition: opacity 0.28s ease, transform 0.28s ease;
       }
       .mb-ligne.mb-on { opacity: 1; transform: none; }
-      .mb-ligne small { color: #7b93a8; font-size: 11px; }
+      .mb-ligne small { color: #7b93a8; font-size: 12px; }
       .mb-record {
         font-style: normal; font-size: 10px; letter-spacing: 0.12em;
         color: #ffd977; border: 1px solid #ffd977; border-radius: 3px;
@@ -4073,15 +4073,108 @@
       }
       .mb-cond {
         margin-top: 14px; padding-top: 12px; border-top: 1px solid #1d2c3e;
-        font-size: 13px; letter-spacing: 0.08em; color: #9fd8c8;
+        font-size: 14px; letter-spacing: 0.08em; color: #9fd8c8;
         opacity: 0; transition: opacity 0.3s ease;
       }
       .mb-cond.mb-on { opacity: 1; }
-      .mb-cond b { font-size: 17px; color: #d5f3e8; }
-      .mb-cond-gain { margin-left: 8px; color: #6dffb8; font-size: 12px; }
+      .mb-cond b { font-size: 22px; color: #d5f3e8; }
+      .mb-cond-gain { margin-left: 8px; color: #6dffb8; font-size: 13px; }
+      /* ---- La JAUGE D'ÉTALONNAGE : l'XP se VOIT couler ---- */
+      .mb-etal {
+        margin-top: 16px; padding-top: 14px; border-top: 1px solid #1d2c3e;
+      }
+      .mb-etal[hidden] { display: none; }
+      .mb-etal-tete {
+        display: flex; justify-content: space-between; align-items: baseline;
+        margin-bottom: 10px;
+      }
+      .mb-etal-nom {
+        font-family: Michroma, ui-monospace, monospace;
+        font-size: 13px; letter-spacing: 0.22em; color: #8fd8c8;
+      }
+      .mb-etal-xp { font-size: 15px; color: #9fb6c8; }
+      .mb-etal-xp b { font-size: 28px; color: #eaf6ff; }
+      .mb-etal-xp i {
+        font-style: normal; margin-left: 8px; font-size: 15px; color: #6dffb8;
+        animation: mb-plonge 0.4s ease-out;
+      }
+      .mb-etal-jauge { display: flex; align-items: center; gap: 12px; }
+      /* les deux bornes : le palier ATTEINT (gros chiffre) et le PROCHAIN */
+      .mb-etal-palier {
+        flex: 0 0 58px; width: 58px; height: 58px; border-radius: 50%;
+        border: 2px solid #2d4a63; background: rgba(18, 30, 44, 0.8);
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 0;
+      }
+      .mb-etal-palier b {
+        font-size: 21px; line-height: 1; color: #d5f3e8;
+        font-family: Michroma, ui-monospace, monospace;
+      }
+      .mb-etal-palier small {
+        font-size: 8.5px; letter-spacing: 0.12em; color: #6d8aa5; margin-top: 3px;
+      }
+      .mb-etal-palier.d b { color: #8fd8c8; font-size: 16px; }
+      .mb-etal-palier.saute {
+        animation: mb-palier-pop 0.55s cubic-bezier(0.2, 2.4, 0.4, 1);
+        border-color: #6dffb8;
+      }
+      @keyframes mb-palier-pop {
+        0% { transform: scale(1); }
+        35% { transform: scale(1.35); box-shadow: 0 0 30px rgba(109, 255, 184, 0.7); }
+        100% { transform: scale(1); }
+      }
+      /* le tube gradué : le fluide y monte, la lueur marque le ménisque */
+      .mb-etal-tube {
+        position: relative; flex: 1; height: 30px; border-radius: 15px;
+        border: 1px solid #2d4a63; background: rgba(10, 18, 28, 0.9);
+        overflow: hidden;
+        box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.55);
+      }
+      .mb-etal-fluide {
+        position: absolute; top: 0; bottom: 0; left: 0; width: 0%;
+        background: linear-gradient(180deg, #52e0c0, #1d8c74 62%, #14705e);
+        border-radius: 0 6px 6px 0;
+      }
+      /* la vaguelette qui court sur le fluide : la jauge VIT même immobile */
+      .mb-etal-fluide::after {
+        content: ''; position: absolute; inset: 0;
+        background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.22) 46%, transparent 62%);
+        background-size: 220% 100%;
+        animation: mb-etal-reflet 2.6s linear infinite;
+      }
+      @keyframes mb-etal-reflet {
+        from { background-position: 130% 0; }
+        to { background-position: -90% 0; }
+      }
+      .mb-etal-lueur {
+        position: absolute; top: -4px; bottom: -4px; left: 0%; width: 10px;
+        margin-left: -5px; border-radius: 5px;
+        background: rgba(140, 255, 220, 0.9);
+        filter: blur(4px); opacity: 0;
+      }
+      .mb-etal.coule .mb-etal-lueur { opacity: 1; }
+      /* palier franchi : le tube entier s'embrase un instant */
+      .mb-etal-tube.eclair {
+        animation: mb-etal-eclair 0.6s ease-out;
+      }
+      @keyframes mb-etal-eclair {
+        0% { box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.55), 0 0 0 rgba(109, 255, 184, 0); }
+        30% { box-shadow: inset 0 0 18px rgba(140, 255, 220, 0.8), 0 0 34px rgba(109, 255, 184, 0.85); border-color: #6dffb8; }
+        100% { box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.55), 0 0 0 rgba(109, 255, 184, 0); }
+      }
+      .mb-etal-tampon {
+        margin: 12px auto 0; width: fit-content;
+        font-family: Michroma, ui-monospace, monospace;
+        font-size: 14px; letter-spacing: 0.18em; color: #ffd977;
+        border: 2px solid #ffd977; border-radius: 5px; padding: 7px 14px;
+        transform: rotate(-2deg);
+        animation: mb-tampon 0.4s cubic-bezier(0.2, 2.2, 0.4, 1);
+        text-shadow: 0 0 18px rgba(255, 217, 119, 0.5);
+      }
+      .mb-etal-tampon[hidden] { display: none; }
       .mb-choix { margin-top: 16px; }
       .mb-choix-titre {
-        margin: 0 0 10px; font-size: 11px; letter-spacing: 0.2em; color: #8ea2bd;
+        margin: 0 0 10px; font-size: 14px; letter-spacing: 0.18em; color: #a9c3de;
       }
       .mb-cartes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
       .mb-carte {
@@ -4096,20 +4189,21 @@
       .mb-carte:nth-child(2) { animation-delay: 0.08s; }
       .mb-carte:nth-child(3) { animation-delay: 0.16s; }
       .mb-carte:hover:not(:disabled) { transform: translateY(-3px); border-color: #6dffb8; }
-      .mb-carte b { font-size: 11px; line-height: 1.25; }
-      .mb-carte small { color: #7b93a8; font-size: 10px; line-height: 1.3; }
-      .mb-ico { font-size: 22px; }
+      .mb-carte b { font-size: 13px; line-height: 1.25; }
+      .mb-carte small { color: #8ba3b8; font-size: 11.5px; line-height: 1.35; }
+      .mb-ico { font-size: 26px; }
       .mb-prix {
-        margin-top: auto; font-style: normal; font-size: 10px;
+        margin-top: auto; font-style: normal; font-size: 11px;
         color: #ffd977; letter-spacing: 0.08em;
       }
       .mb-prix.mb-offert { color: #6dffb8; }
       .mb-carte.mb-pauvre { opacity: 0.45; cursor: not-allowed; }
       .mb-continuer {
-        grid-column: 1 / -1; padding: 12px; font: inherit; font-size: 12px;
+        grid-column: 1 / -1; padding: 14px; font: inherit; font-size: 14px;
         background: #14202f; border: 1px solid #2d4258; border-radius: 9px;
-        color: #cfe2ef; cursor: pointer; letter-spacing: 0.08em;
+        color: #cfe2ef; cursor: pointer; letter-spacing: 0.1em;
       }
+      .mb-continuer:hover { border-color: #6dffb8; }
       .mb-carte.mb-dest { min-height: 108px; }
       .mb-cartes:has(.mb-dest) { grid-template-columns: 1fr 1fr; }
       /* Le CHOIX DE SALLE (pool « 21XX-MMD ») : deux propositions,
@@ -4126,10 +4220,10 @@
       }
       .mb-jauges {
         grid-column: 1 / -1; display: flex; justify-content: space-between;
-        gap: 12px; flex-wrap: wrap; font-size: 12px; color: #9fb6c8;
+        gap: 12px; flex-wrap: wrap; font-size: 14px; color: #9fb6c8;
         padding: 4px 2px 2px;
       }
-      .mb-jauges b { color: #d5f3e8; }
+      .mb-jauges b { color: #d5f3e8; font-size: 16px; }
       .mb-passer {
         margin: 12px 0 0; text-align: center; font-size: 10px;
         letter-spacing: 0.14em; color: #55708c;
@@ -4786,6 +4880,22 @@
         </div>
         <div class="mb-lignes" id="mb-lignes"></div>
         <div class="mb-cond" id="mb-cond" hidden>CONDENSAT <b id="mb-cond-n">0</b> cL<span class="mb-cond-gain" id="mb-cond-gain"></span></div>
+        <!-- La JAUGE D'ÉTALONNAGE : l'XP se voit couler, palier par palier -->
+        <div class="mb-etal" id="mb-etal" hidden>
+          <div class="mb-etal-tete">
+            <span class="mb-etal-nom">ÉTALONNAGE</span>
+            <span class="mb-etal-xp"><b id="mb-etal-l">0,0</b> L<i id="mb-etal-gain" hidden></i></span>
+          </div>
+          <div class="mb-etal-jauge">
+            <div class="mb-etal-palier" id="mb-etal-pg"><b>0</b><small>palier</small></div>
+            <div class="mb-etal-tube" id="mb-etal-tube">
+              <div class="mb-etal-fluide" id="mb-etal-fluide"></div>
+              <div class="mb-etal-lueur" id="mb-etal-lueur"></div>
+            </div>
+            <div class="mb-etal-palier d" id="mb-etal-pd"><b>3 L</b><small>prochain</small></div>
+          </div>
+          <div class="mb-etal-tampon" id="mb-etal-tampon" hidden>PALIER 1 — TIRAGE OUVERT</div>
+        </div>
         <div class="mb-choix" id="mb-choix" hidden>
           <p class="mb-choix-titre" id="mb-choix-titre">OÙ VERSER LE SURPLUS ?</p>
           <div class="mb-cartes" id="mb-cartes"></div>

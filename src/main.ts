@@ -18,6 +18,7 @@ import { dessineMiniCarte } from './game/carte'
 import { propositionsSalles } from './game/poule'
 import {
   BONBONNE_CAP,
+  PALIERS_XP,
   instrumentDef,
   paliersAtteints,
   prochainPalier,
@@ -3496,6 +3497,24 @@ function verserBonbonne(): string {
 hudBonbonneChip?.addEventListener('click', verserBonbonne)
 // Sonde de test : verser depuis la console (comme __sim, __run)
 ;(window as unknown as { __verser: () => string }).__verser = verserBonbonne
+// Sonde de test : la cérémonie depuis la console — __bonbonne(2.5) ouvre la
+// mise en bonbonne avec un surplus factice, pour regarder la jauge couler
+;(window as unknown as { __bonbonne: (surplus?: number) => void }).__bonbonne =
+  (surplus = 2) => {
+    montreMiseEnBonbonne({
+      surplus,
+      prime: 0,
+      pct: Math.min(1, surplus / 4),
+      temps: 61.2,
+      newVolume: false,
+      newChrono: false,
+      recVol: '',
+      recChr: '',
+      note: 0,
+      gainCl: Math.round(surplus * 10),
+      totalCl: condensat,
+    })
+  }
 
 function resetLasers(): void {
   laserEtat.vues = []
@@ -3520,7 +3539,13 @@ const mbTimers: number[] = []
 // Le fil de la cérémonie : bilan (temps 1-3, sautables) → versement (le
 // surplus choisit sa destination) → draft (un tirage par palier franchi)
 // → fin (jauge et CONTINUER). Le versement et la suite ne se sautent pas.
-let mbEtape: 'bilan' | 'versement' | 'draft' | 'salles' | 'fin' = 'bilan'
+let mbEtape:
+  | 'bilan'
+  | 'versement'
+  | 'etalonnage'
+  | 'draft'
+  | 'salles'
+  | 'fin' = 'bilan'
 let mbDraftsRestants = 0
 let mbBilanCourant: BilanSalle | null = null
 
@@ -3650,13 +3675,142 @@ function mbMontreVersement(): void {
   host.appendChild(cx)
 }
 
-/** Crédite l'XP et enchaîne : un tirage par palier franchi, sinon la jauge. */
+// ---- LA JAUGE D'ÉTALONNAGE : l'XP se VOIT couler, palier par palier ----
+// La barre couvre le segment « palier atteint → palier suivant » (façon
+// barre de niveau) : un franchissement l'emplit, l'embrase, fait sauter le
+// compteur de paliers, tamponne « PALIER n — TIRAGE OUVERT » — puis elle
+// repart de zéro sur le segment suivant. Table épuisée : elle reste pleine.
+
+/** Le segment courant de la jauge : dernier palier atteint → prochain. */
+function mbSegmentXp(xp: number): { base: number; cible: number | null } {
+  let base = 0
+  for (const p of PALIERS_XP) {
+    if (xp >= p) base = p
+    else return { base, cible: p }
+  }
+  return { base, cible: null }
+}
+
+/** Peint la jauge pour une valeur d'XP donnée (remplissage, bornes, litres). */
+function mbPeintEtal(xp: number): void {
+  const seg = mbSegmentXp(xp)
+  const part =
+    seg.cible === null
+      ? 1
+      : Math.max(0, Math.min(1, (xp - seg.base) / (seg.cible - seg.base)))
+  const pct = `${(part * 100).toFixed(2)}%`
+  mbEl('mb-etal-fluide').style.width = pct
+  mbEl('mb-etal-lueur').style.left = pct
+  mbEl('mb-etal-l').textContent = xp.toFixed(1)
+  mbEl('mb-etal-pg').querySelector('b')!.textContent = String(
+    paliersAtteints(xp),
+  )
+  const pd = mbEl('mb-etal-pd')
+  pd.querySelector('b')!.textContent =
+    seg.cible === null ? '★' : `${seg.cible} L`
+  pd.querySelector('small')!.textContent =
+    seg.cible === null ? 'complet' : 'prochain'
+}
+
+/** Fait COULER la jauge de `depart` à `arrivee` : le fluide monte, chaque
+ * palier franchi s'embrase et se tamponne, puis `onDone` enchaîne. */
+function mbAnimeEtalonnage(
+  depart: number,
+  arrivee: number,
+  onDone: () => void,
+): void {
+  const etal = mbEl('mb-etal')
+  etal.hidden = false
+  mbEl('mb-etal-tampon').hidden = true
+  const gainEl = mbEl('mb-etal-gain')
+  const gain = arrivee - depart
+  if (gain > 0.005) {
+    gainEl.hidden = false
+    gainEl.textContent = `+${gain.toFixed(2)} L`
+  } else {
+    gainEl.hidden = true
+  }
+  mbPeintEtal(depart)
+  if (gain <= 0.005) {
+    onDone()
+    return
+  }
+  etal.classList.add('coule')
+  // le fluide coule segment par segment — la durée suit la part du gain,
+  // bornée pour que ni un filet ni un torrent ne cassent le rythme
+  const etape = (xp: number): void => {
+    const seg = mbSegmentXp(xp)
+    const cible = seg.cible !== null ? Math.min(arrivee, seg.cible) : arrivee
+    const duree = Math.max(
+      450,
+      Math.min(1400, ((cible - xp) / Math.max(0.001, gain)) * 1800),
+    )
+    const t0 = performance.now()
+    const anime = (): void => {
+      if (!miseEnBonbonne || mbEtape !== 'etalonnage') return // cérémonie fermée
+      const t = Math.min(1, (performance.now() - t0) / duree)
+      const e = t * t * (3 - 2 * t) // douce au départ ET à l'arrivée
+      mbPeintEtal(xp + (cible - xp) * e)
+      if (t < 1) {
+        requestAnimationFrame(anime)
+        return
+      }
+      const franchit = seg.cible !== null && cible >= seg.cible - 1e-9
+      if (franchit) {
+        // PALIER FRANCHI : l'embrasement du tube, le pop du compteur, le
+        // tampon doré, la ponctuation des records
+        const no = paliersAtteints(cible)
+        const tube = mbEl('mb-etal-tube')
+        tube.classList.remove('eclair')
+        void tube.offsetWidth // relance l'animation CSS
+        tube.classList.add('eclair')
+        const pg = mbEl('mb-etal-pg')
+        pg.classList.remove('saute')
+        void pg.offsetWidth
+        pg.classList.add('saute')
+        const tampon = mbEl('mb-etal-tampon')
+        tampon.hidden = false
+        tampon.textContent = `PALIER ${no} — TIRAGE OUVERT`
+        bande.ponctuation('sting-record', 0.75)
+        mbPeintEtal(cible) // la jauge repart de zéro sur le segment suivant
+        mbTimers.push(
+          window.setTimeout(
+            () => {
+              if (cible < arrivee - 1e-9) etape(cible)
+              else {
+                etal.classList.remove('coule')
+                onDone()
+              }
+            },
+            cible < arrivee - 1e-9 ? 850 : 1000,
+          ),
+        )
+        return
+      }
+      etal.classList.remove('coule')
+      mbTimers.push(window.setTimeout(onDone, 450))
+    }
+    requestAnimationFrame(anime)
+  }
+  etape(depart)
+}
+
+/** Crédite l'XP et fait COULER la jauge — puis un tirage par palier
+ * franchi, sinon la suite de la cérémonie. */
 function mbVerseXp(litres: number): void {
+  const avantXp = run.xp
   const avant = paliersAtteints(run.xp)
   run.xp += litres
   mbDraftsRestants = paliersAtteints(run.xp) - avant
-  if (mbDraftsRestants > 0) mbMontreDraft()
-  else mbApresRecompense()
+  mbEtape = 'etalonnage'
+  // les cartes du versement s'effacent : la jauge prend la scène
+  mbEl('mb-choix-titre').textContent =
+    litres > 0.005 ? 'L’ÉTALONNAGE SE CHARGE' : 'ÉTALONNAGE'
+  mbEl('mb-cartes').innerHTML = ''
+  mbAnimeEtalonnage(avantXp, run.xp, () => {
+    if (mbDraftsRestants > 0) mbMontreDraft()
+    else mbApresRecompense()
+  })
 }
 
 /** Un TIRAGE d'instruments (palier franchi) : trois cartes, on en emporte
@@ -3766,17 +3920,15 @@ function mbMontreSalles(props: LevelDef[]): void {
 /** La FIN : l'état des jauges, et CONTINUER mène à la salle suivante. */
 function mbMontreFin(): void {
   mbEtape = 'fin'
-  const prochain = prochainPalier(run.xp)
   mbEl('mb-choix-titre').textContent = 'PAROI DU SAS OUVERTE'
+  // la jauge d'étalonnage reste en scène (l'XP se lit dessus, en grand)
+  mbEl('mb-etal').hidden = false
+  mbPeintEtal(run.xp)
   const host = mbEl('mb-cartes')
   host.innerHTML = ''
   const info = document.createElement('div')
   info.className = 'mb-jauges'
-  info.innerHTML =
-    `<span>🫙 réserve <b>${run.bonbonneLiters.toFixed(2)} / ${BONBONNE_CAP} L</b></span>` +
-    `<span>🧰 XP <b>${run.xp.toFixed(1)} L</b>${
-      prochain !== null ? ` · palier à ${prochain} L` : ' · table épuisée'
-    }</span>`
+  info.innerHTML = `<span>🫙 réserve <b>${run.bonbonneLiters.toFixed(2)} / ${BONBONNE_CAP} L</b></span><span>se reverse dans le corps, en jeu</span>`
   host.appendChild(info)
   const btn = document.createElement('button')
   btn.type = 'button'
@@ -3803,6 +3955,10 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
   mbEl('mb-choix').hidden = true
   mbEl('mb-cond').hidden = true
   mbEl('mb-cond').classList.remove('mb-on')
+  mbEl('mb-etal').hidden = true
+  mbEl('mb-etal').classList.remove('coule')
+  mbEl('mb-etal-tampon').hidden = true
+  mbEl('mb-etal-gain').hidden = true
   mbEl('mb-passer').hidden = false
   const apres = (ms: number, fn: () => void): void => {
     mbTimers.push(window.setTimeout(fn, ms))
