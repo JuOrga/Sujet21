@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   checkLevel,
+  decodeCode21,
   decodeCodeAtelier,
+  lettresOrdre,
   estCodeHub,
   numeroTableau,
   parseLevel,
@@ -35,7 +37,13 @@ describe('levelIO — aller-retour JSON', () => {
       ],
     })
     expect(level!.boxes).toHaveLength(1)
-    expect(level!.boxes[0]).toEqual({ minX: 60, minY: 20, maxX: 200, maxY: 100, material: 0 })
+    expect(level!.boxes[0]).toEqual({
+      minX: 60,
+      minY: 20,
+      maxX: 200,
+      maxY: 100,
+      material: 0,
+    })
     expect(rejets).toHaveLength(2)
   })
 
@@ -45,11 +53,53 @@ describe('levelIO — aller-retour JSON', () => {
       bounds: { minX: -1000, minY: -600, maxX: 1000, maxY: 600 },
       boxes: [
         { minX: 0, minY: 0, maxX: 100, maxY: 100, material: 0, forme: 1 }, // disque
-        { minX: 0, minY: 0, maxX: 100, maxY: 100, material: 4, forme: 4, p0: 0.5, p1: 120 }, // arc réglé
-        { minX: 0, minY: 0, maxX: 100, maxY: 100, material: 2, forme: 3, p0: 2 }, // coin orienté
-        { minX: 0, minY: 0, maxX: 100, maxY: 100, material: 0, forme: 4, p0: 0.35, p1: 90 }, // arc aux défauts
-        { minX: 0, minY: 0, maxX: 100, maxY: 100, material: 0, forme: 99, p0: 7 }, // forme inconnue
-        { minX: 0, minY: 0, maxX: 100, maxY: 100, material: 0, forme: 2, skin: 3 }, // le skin est rect-only
+        {
+          minX: 0,
+          minY: 0,
+          maxX: 100,
+          maxY: 100,
+          material: 4,
+          forme: 4,
+          p0: 0.5,
+          p1: 120,
+        }, // arc réglé
+        {
+          minX: 0,
+          minY: 0,
+          maxX: 100,
+          maxY: 100,
+          material: 2,
+          forme: 3,
+          p0: 2,
+        }, // coin orienté
+        {
+          minX: 0,
+          minY: 0,
+          maxX: 100,
+          maxY: 100,
+          material: 0,
+          forme: 4,
+          p0: 0.35,
+          p1: 90,
+        }, // arc aux défauts
+        {
+          minX: 0,
+          minY: 0,
+          maxX: 100,
+          maxY: 100,
+          material: 0,
+          forme: 99,
+          p0: 7,
+        }, // forme inconnue
+        {
+          minX: 0,
+          minY: 0,
+          maxX: 100,
+          maxY: 100,
+          material: 0,
+          forme: 2,
+          skin: 3,
+        }, // le skin est rect-only
       ],
     })
     expect(rejets).toEqual([])
@@ -80,7 +130,14 @@ describe('levelIO — aller-retour JSON', () => {
       boxes: [],
       lumieres: [
         { x: 0, y: 100 }, // tout au défaut
-        { x: -300, y: 0, h: 150, portee: 900, intensite: 1.4, couleur: '#FF8A3C' },
+        {
+          x: -300,
+          y: 0,
+          h: 150,
+          portee: 900,
+          intensite: 1.4,
+          couleur: '#FF8A3C',
+        },
         { x: 300, y: 0, h: 9999, intensite: 99, couleur: 'rouge' }, // hors bornes
         { x: 0, y: -100, couleur: '#ffffff' }, // le blanc neutre s'efface
       ],
@@ -89,7 +146,14 @@ describe('levelIO — aller-retour JSON', () => {
     const lm = level!.lumieres!
     expect(lm[0]).toEqual({ x: 0, y: 100 })
     // la couleur se normalise en minuscules ; une couleur illisible s'efface
-    expect(lm[1]).toEqual({ x: -300, y: 0, h: 150, portee: 900, intensite: 1.4, couleur: '#ff8a3c' })
+    expect(lm[1]).toEqual({
+      x: -300,
+      y: 0,
+      h: 150,
+      portee: 900,
+      intensite: 1.4,
+      couleur: '#ff8a3c',
+    })
     expect(lm[2].h).toBe(2000)
     expect(lm[2].intensite).toBe(2)
     expect(lm[2].couleur).toBeUndefined()
@@ -100,7 +164,9 @@ describe('levelIO — aller-retour JSON', () => {
 
   it('refuse un document qui n’est pas un tableau', () => {
     expect(parseLevel('bonjour').level).toBeNull()
-    expect(parseLevel({ bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 } }).level).toBeNull()
+    expect(
+      parseLevel({ bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 } }).level,
+    ).toBeNull()
   })
 
   it('conserve les zones et le par', () => {
@@ -108,7 +174,16 @@ describe('levelIO — aller-retour JSON', () => {
       name: 'Zoné',
       bounds: { minX: -1000, minY: -600, maxX: 1000, maxY: 600 },
       par: 3,
-      zones: [{ minX: -200, minY: -200, maxX: 200, maxY: 200, force: 'vapeur', label: 'Le conduit' }],
+      zones: [
+        {
+          minX: -200,
+          minY: -200,
+          maxX: 200,
+          maxY: 200,
+          force: 'vapeur',
+          label: 'Le conduit',
+        },
+      ],
     }
     const { level } = parseLevel(src)
     expect(level!.par).toBe(3)
@@ -128,7 +203,8 @@ describe('levelIO — garde-fous du level design', () => {
   const base = (): LevelDef => ({
     name: 'Essai',
     code: '21-Z',
-    journal: 'Une entrée de journal suffisamment longue pour passer le seuil des quarante signes.',
+    journal:
+      'Une entrée de journal suffisamment longue pour passer le seuil des quarante signes.',
     bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
     spawn: { x: -950, y: 0, n: 900 },
     exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
@@ -143,15 +219,27 @@ describe('levelIO — garde-fous du level design', () => {
 
   it('signale un départ né dans une surface', () => {
     const l = base()
-    l.boxes.push({ minX: -1000, minY: -100, maxX: -900, maxY: 100, material: 0 })
+    l.boxes.push({
+      minX: -1000,
+      minY: -100,
+      maxX: -900,
+      maxY: 100,
+      material: 0,
+    })
     const v = checkLevel(l)
-    expect(v.some((x) => x.niveau === 'erreur' && /départ naît/.test(x.message))).toBe(true)
+    expect(
+      v.some((x) => x.niveau === 'erreur' && /départ naît/.test(x.message)),
+    ).toBe(true)
   })
 
   it('signale un sas hors cuve et un sas trop proche du départ', () => {
     const l = base()
     l.exit = { minX: 1150, minY: -60, maxX: 1400, maxY: 60 }
-    expect(checkLevel(l).some((x) => x.niveau === 'erreur' && /déborde/.test(x.message))).toBe(true)
+    expect(
+      checkLevel(l).some(
+        (x) => x.niveau === 'erreur' && /déborde/.test(x.message),
+      ),
+    ).toBe(true)
     const l2 = base()
     l2.exit = { minX: -600, minY: -60, maxX: -400, maxY: 60 }
     expect(checkLevel(l2).some((x) => /800 u/.test(x.message))).toBe(true)
@@ -162,7 +250,9 @@ describe('levelIO — garde-fous du level design', () => {
     l.boxes.push({ minX: 0, minY: -750, maxX: 40, maxY: 750, material: 5 })
     expect(checkLevel(l).some((x) => /évent barre/.test(x.message))).toBe(true)
     // avec une zone vapeur, l'avertissement disparaît
-    l.zones = [{ minX: -400, minY: -300, maxX: -200, maxY: 300, force: 'vapeur' }]
+    l.zones = [
+      { minX: -400, minY: -300, maxX: -200, maxY: 300, force: 'vapeur' },
+    ]
     expect(checkLevel(l).some((x) => /évent barre/.test(x.message))).toBe(false)
   })
 })
@@ -172,13 +262,21 @@ it('conserve le lit musical choisi pour le tableau', () => {
   const { level } = parseLevel(JSON.parse(serializeLevel(src)))
   expect(level!.ambiance).toBe('zone-hublot')
   // sans valeur, le tableau suit la cuve : le champ ne doit pas apparaître
-  const nu = parseLevel(JSON.parse(serializeLevel({ ...TABLEAUX[0], ambiance: undefined })))
+  const nu = parseLevel(
+    JSON.parse(serializeLevel({ ...TABLEAUX[0], ambiance: undefined })),
+  )
   expect(nu.level!.ambiance).toBeUndefined()
   expect(serializeLevel(TABLEAUX[0])).not.toContain('ambiance')
 })
 
 it('le rayon d’action d’une zone couvre TOUT son rectangle — murs et coins compris', () => {
-  const z = { minX: -300, minY: -200, maxX: 300, maxY: 200, force: 'glace' as const }
+  const z = {
+    minX: -300,
+    minY: -200,
+    maxX: 300,
+    maxY: 200,
+    force: 'glace' as const,
+  }
   const lvl: LevelDef = {
     ...TABLEAUX[0],
     zones: [z],
@@ -206,16 +304,31 @@ it('conserve les décals au passage par l’éditeur (aller-retour JSON)', () =>
     ...TABLEAUX[0],
     decals: [
       { x: 500, y: 400, w: 320, h: 200, kind: 'tuyaux' as const },
-      { x: 700, y: -400, w: 180, h: 180, kind: 'vanne' as const, flip: true, fade: 0.7 },
+      {
+        x: 700,
+        y: -400,
+        w: 180,
+        h: 180,
+        kind: 'vanne' as const,
+        flip: true,
+        fade: 0.7,
+      },
     ],
   }
   const { level, rejets } = parseLevel(JSON.parse(serializeLevel(src)))
   expect(rejets).toEqual([])
   expect(level!.decals).toHaveLength(2)
   expect(level!.decals![0].kind).toBe('tuyaux')
-  expect(level!.decals![1]).toMatchObject({ kind: 'vanne', flip: true, fade: 0.7 })
+  expect(level!.decals![1]).toMatchObject({
+    kind: 'vanne',
+    flip: true,
+    fade: 0.7,
+  })
   // un décal cassé est écarté sans faire tomber le tableau
-  const { level: l2, rejets: r2 } = parseLevel({ ...src, decals: [{ x: 0, y: 0, w: 0, h: 10, kind: 'tuyaux' }] })
+  const { level: l2, rejets: r2 } = parseLevel({
+    ...src,
+    decals: [{ x: 0, y: 0, w: 0, h: 10, kind: 'tuyaux' }],
+  })
   expect(l2!.decals).toBeUndefined()
   expect(r2.length).toBe(1)
 })
@@ -233,8 +346,15 @@ it('conserve les mécanismes laser (émetteurs, cibles, portes) à l’aller-ret
   expect(level!.cibles).toEqual(src.cibles)
   expect(level!.portes).toEqual(src.portes)
   // une porte asservie à un canal fantôme est signalée par le contrôle
-  const verdicts = checkLevel({ ...level!, portes: [{ ...src.portes[0], canal: 5 }] })
-  expect(verdicts.some((v) => v.niveau === 'erreur' && v.message.includes('canal nº 5'))).toBe(true)
+  const verdicts = checkLevel({
+    ...level!,
+    portes: [{ ...src.portes[0], canal: 5 }],
+  })
+  expect(
+    verdicts.some(
+      (v) => v.niveau === 'erreur' && v.message.includes('canal nº 5'),
+    ),
+  ).toBe(true)
 })
 
 it('canaux : le n° d’une cible survit, l’héritage porte.cible (indice) se traduit', () => {
@@ -248,7 +368,14 @@ it('canaux : le n° d’une cible survit, l’héritage porte.cible (indice) se 
       { x: 500, y: 0, r: 26, canal: 7 },
     ],
     portes: [
-      { minX: 100, minY: -200, maxX: 140, maxY: 200, canal: 1, regle: 'et' as const },
+      {
+        minX: 100,
+        minY: -200,
+        maxX: 140,
+        maxY: 200,
+        canal: 1,
+        regle: 'et' as const,
+      },
       { minX: 200, minY: -200, maxX: 240, maxY: 200, canal: 7 },
     ],
   }
@@ -257,14 +384,19 @@ it('canaux : le n° d’une cible survit, l’héritage porte.cible (indice) se 
   expect(again.level!.cibles).toEqual(src.cibles)
   expect(again.level!.portes).toEqual(src.portes)
   // un canal égal à la position reste implicite dans le fichier
-  const brut = JSON.parse(serializeLevel(src)) as { cibles: Record<string, unknown>[] }
+  const brut = JSON.parse(serializeLevel(src)) as {
+    cibles: Record<string, unknown>[]
+  }
   expect(brut.cibles[0].canal).toBeUndefined()
   expect(brut.cibles[1].canal).toBe(1)
   // héritage : un vieux fichier où `cible` était un INDICE — la porte se
   // rattache au n° logique de la pastille désignée
   const vieux = parseLevel({
     ...JSON.parse(serializeLevel(TABLEAUX[0])),
-    cibles: [{ x: 0, y: 0, r: 26 }, { x: 40, y: 0, r: 26, canal: 5 }],
+    cibles: [
+      { x: 0, y: 0, r: 26 },
+      { x: 40, y: 0, r: 26, canal: 5 },
+    ],
     portes: [
       { minX: 10, minY: -30, maxX: 14, maxY: 30, cible: 1 },
       { minX: 20, minY: -30, maxX: 24, maxY: 30, cible: -1 },
@@ -273,7 +405,9 @@ it('canaux : le n° d’une cible survit, l’héritage porte.cible (indice) se 
   expect(vieux.level!.portes![0].canal).toBe(5)
   expect(vieux.level!.portes![1].canal).toBe(-1) // scénarisée, conservée
   // le contrôle accepte un canal partagé et une porte scénarisée
-  expect(checkLevel(vieux.level!).some((v) => v.message.includes('canal'))).toBe(false)
+  expect(
+    checkLevel(vieux.level!).some((v) => v.message.includes('canal')),
+  ).toBe(false)
 })
 
 it('conserve les cachettes (pans voilés) et écarte celles de taille nulle', () => {
@@ -292,7 +426,9 @@ it('conserve les cachettes (pans voilés) et écarte celles de taille nulle', ()
       { minX: 0, minY: 0, maxX: 0, maxY: 50 },
     ],
   })
-  expect(tordu.level!.caches).toEqual([{ minX: 100, minY: -200, maxX: 400, maxY: 100 }])
+  expect(tordu.level!.caches).toEqual([
+    { minX: 100, minY: -200, maxX: 400, maxY: 100 },
+  ])
   expect(tordu.rejets.length).toBe(1)
 })
 
@@ -313,7 +449,9 @@ it('cachettes : style paroi, formes et rotation survivent à l’aller-retour', 
     ...JSON.parse(serializeLevel(TABLEAUX[0])),
     caches: [{ minX: 0, minY: 0, maxX: 100, maxY: 100, style: 'x', forme: 9 }],
   })
-  expect(brut.level!.caches).toEqual([{ minX: 0, minY: 0, maxX: 100, maxY: 100 }])
+  expect(brut.level!.caches).toEqual([
+    { minX: 0, minY: 0, maxX: 100, maxY: 100 },
+  ])
 })
 
 it('conserve les rails magnétiques et écarte les moignons', () => {
@@ -321,23 +459,41 @@ it('conserve les rails magnétiques et écarte les moignons', () => {
     ...TABLEAUX[0],
     lasers: [{ x: -600, y: 0, angle: 0 }],
     cibles: [{ x: 700, y: -300, r: 30 }],
-    rails: [{ points: [{ x: 0, y: 0 }, { x: 200, y: 0 }, { x: 200, y: 300 }] }],
+    rails: [
+      {
+        points: [
+          { x: 0, y: 0 },
+          { x: 200, y: 0 },
+          { x: 200, y: 300 },
+        ],
+      },
+    ],
   }
   const { level, rejets } = parseLevel(JSON.parse(serializeLevel(src)))
   expect(rejets).toEqual([])
   expect(level!.rails).toEqual(src.rails)
   // un rail d'un seul point est écarté sans faire tomber le tableau
-  const { level: l2, rejets: r2 } = parseLevel({ ...src, rails: [{ points: [{ x: 0, y: 0 }] }] })
+  const { level: l2, rejets: r2 } = parseLevel({
+    ...src,
+    rails: [{ points: [{ x: 0, y: 0 }] }],
+  })
   expect(l2!.rails).toBeUndefined()
   expect(r2.length).toBe(1)
   // un rail sans émetteur laser mérite un avertissement
   const verdicts = checkLevel({ ...level!, lasers: [] })
-  expect(verdicts.some((v) => v.niveau === 'avertissement' && v.message.includes('rail'))).toBe(true)
+  expect(
+    verdicts.some(
+      (v) => v.niveau === 'avertissement' && v.message.includes('rail'),
+    ),
+  ).toBe(true)
 })
 
 describe('levelIO — boîtes obliques', () => {
   it('l’angle d’une boîte survit à l’aller-retour JSON', () => {
-    const src = JSON.parse(serializeLevel(TABLEAUX[0])) as Record<string, unknown>
+    const src = JSON.parse(serializeLevel(TABLEAUX[0])) as Record<
+      string,
+      unknown
+    >
     ;(src.boxes as Record<string, unknown>[])[0].angle = 30
     const { level } = parseLevel(src)
     expect(level?.boxes[0].angle).toBe(30)
@@ -374,7 +530,8 @@ describe('levelIO — mode des récepteurs (TOR/NOR)', () => {
     const base = (): LevelDef => ({
       name: 'Essai',
       code: '21-Z',
-      journal: 'Une entrée de journal suffisamment longue pour passer le seuil des quarante signes.',
+      journal:
+        'Une entrée de journal suffisamment longue pour passer le seuil des quarante signes.',
       bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
       spawn: { x: -950, y: 0, n: 900 },
       exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
@@ -382,20 +539,24 @@ describe('levelIO — mode des récepteurs (TOR/NOR)', () => {
       sponges: [],
       labels: [],
     })
-    const relit = (l: unknown): LevelDef => parseLevel(l as object).level as LevelDef
+    const relit = (l: unknown): LevelDef =>
+      parseLevel(l as object).level as LevelDef
     const lvl = relit(JSON.parse(serializeLevel({ ...base(), ambiante: 0.06 })))
     expect(lvl.ambiante).toBeCloseTo(0.06)
     // absente : elle le reste (le tableau garde le niveau historique)
     expect(relit(JSON.parse(serializeLevel(base()))).ambiante).toBeUndefined()
     // bornée : un fichier étranger ne peut pas injecter n'importe quoi
-    expect(relit({ ...JSON.parse(serializeLevel(base())), ambiante: 7 }).ambiante).toBe(1)
+    expect(
+      relit({ ...JSON.parse(serializeLevel(base())), ambiante: 7 }).ambiante,
+    ).toBe(1)
   })
 
   it('cinématiques ancrées : avant/après et zone déclencheuse font le voyage', () => {
     const base = (): LevelDef => ({
       name: 'Essai',
       code: '21-Z',
-      journal: 'Une entrée de journal suffisamment longue pour passer le seuil des quarante signes.',
+      journal:
+        'Une entrée de journal suffisamment longue pour passer le seuil des quarante signes.',
       bounds: { minX: -1200, minY: -750, maxX: 1200, maxY: 750 },
       spawn: { x: -950, y: 0, n: 900 },
       exit: { minX: 1040, minY: -120, maxX: 1180, maxY: 120 },
@@ -403,14 +564,24 @@ describe('levelIO — mode des récepteurs (TOR/NOR)', () => {
       sponges: [],
       labels: [],
     })
-    const relit = (l: unknown): LevelDef => parseLevel(l as object).level as LevelDef
+    const relit = (l: unknown): LevelDef =>
+      parseLevel(l as object).level as LevelDef
     const lvl = relit(
       JSON.parse(
         serializeLevel({
           ...base(),
           cineAvant: 'OUVERTURE',
           cineApres: 'FIN-21Z',
-          zones: [{ minX: 0, minY: 0, maxX: 300, maxY: 200, force: 'libre', cine: 'SURPRISE' }],
+          zones: [
+            {
+              minX: 0,
+              minY: 0,
+              maxX: 300,
+              maxY: 200,
+              force: 'libre',
+              cine: 'SURPRISE',
+            },
+          ],
         }),
       ),
     )
@@ -421,7 +592,10 @@ describe('levelIO — mode des récepteurs (TOR/NOR)', () => {
     const nu = relit(JSON.parse(serializeLevel(base())))
     expect(nu.cineAvant).toBeUndefined()
     expect(nu.cineApres).toBeUndefined()
-    const long = relit({ ...JSON.parse(serializeLevel(base())), cineAvant: 'X'.repeat(60) })
+    const long = relit({
+      ...JSON.parse(serializeLevel(base())),
+      cineAvant: 'X'.repeat(60),
+    })
     expect(long.cineAvant).toHaveLength(24)
   })
 })
@@ -488,6 +662,45 @@ describe('le code HUB : un mot-clé, pas une casse à deviner', () => {
     ]) {
       expect(decodeCodeAtelier(non)).toBeNull()
     }
+  })
+  it('decodeCode21 lit la codification complète « 21XX-MMD »', () => {
+    expect(decodeCode21('21AA-111')).toEqual({
+      ordre: 1,
+      atelier: { moment: 1, mecanique: 1, difficulte: 1 },
+    })
+    // l'exemple du concepteur, espaces tolérées : B,E = (2-1)×26 + 5 = 31e rang
+    expect(decodeCode21('21BE - 121')).toEqual({
+      ordre: 31,
+      atelier: { moment: 1, mecanique: 2, difficulte: 1 },
+    })
+    expect(decodeCode21('21az-303')?.ordre).toBe(26) // minuscules acceptées
+    expect(decodeCode21('21BA-101')?.ordre).toBe(27)
+    for (const non of [
+      '21A-111',
+      '21AAA-111',
+      '21AA-411',
+      '21AA-011',
+      '111',
+      '21-01',
+    ]) {
+      expect(decodeCode21(non), non).toBeNull()
+    }
+  })
+  it('lettresOrdre est l’inverse du décodage', () => {
+    expect(lettresOrdre(1)).toBe('AA')
+    expect(lettresOrdre(2)).toBe('AB')
+    expect(lettresOrdre(26)).toBe('AZ')
+    expect(lettresOrdre(27)).toBe('BA')
+    for (const o of [1, 5, 26, 27, 31, 120]) {
+      expect(decodeCode21(`21${lettresOrdre(o)}-111`)?.ordre).toBe(o)
+    }
+  })
+  it('decodeCodeAtelier lit aussi les chiffres de la forme complète', () => {
+    expect(decodeCodeAtelier('21BE-121')).toEqual({
+      moment: 1,
+      mecanique: 2,
+      difficulte: 1,
+    })
   })
   it('numeroTableau lit le numéro d’ordre en tête du nom', () => {
     expect(numeroTableau('12 La chaudière')).toEqual({

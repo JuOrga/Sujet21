@@ -14,6 +14,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '25/08/2026 19:40',
+    title:
+      'La codification « 21XX-MMD » et le POOL : choisir sa prochaine salle',
+    notes: [
+      'La codification définitive du concepteur : tout niveau commence par « 21 », puis DEUX LETTRES d’ordre (AA = premier après le hub, AB, AC… puis BA après AZ), un tiret, et les trois chiffres de l’atelier — moment · mécanique · difficulté. Exemple : 21BE-121 (« 21BE - 121 » s’écrit aussi). Les anciens codes (21-01, 111, HUB…) restent valides et se jouent pareil : la nouvelle forme vit à côté, et ses trois chiffres alimentent les mêmes chips et filtres.',
+      'LE POOL : plusieurs tableaux peuvent porter le MÊME ordre — et c’est voulu. En fin de salle, APRÈS la récompense, si le rang suivant offre au moins deux tableaux, la cérémonie propose UN CHOIX : deux cartes, chacune avec sa MINI-CARTE (parois, surfaces, zones, départ, sas — les couleurs du jeu), son code, son nom et ses chips. La sélection est automatique sur les critères du code : moment le plus proche de la phase de run, puis diversité — deux mécaniques différentes si possible, sinon l’écart de difficulté le plus parlant. Rang sans pool : l’enchaînement reste linéaire, rien ne change.',
+      'Vérifié en jeu, run réelle : salle collectée → versement → propositions 21AC-111 (voie de glace) / 21AC-121 (voie de vapeur) avec leurs aperçus → choix vapeur → la salle suivante est bien celle élue (la sauvegarde de run saute à son rang). Huit tests neufs verrouillent le décodage (AA=1, BA=27, espaces tolérées) et la règle de sélection.',
+    ],
+  },
+  {
     date: '25/08/2026 16:50',
     title:
       'Le CODEX : 33 fiches à débloquer en vivant chaque interaction du protocole',

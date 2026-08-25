@@ -122,9 +122,56 @@ export const MECANIQUE_NOMS: Record<CodeAtelier['mecanique'], string> = {
   3: 'toutes',
 }
 
+// ---- La CODIFICATION COMPLÈTE « 21XX-MMD » ------------------------------
+// La forme définitive du concepteur : tout niveau commence par « 21 »,
+// puis DEUX LETTRES qui donnent l'ORDRE dans la run (AA = premier après le
+// hub, AB = deuxième… puis BA après AZ), un tiret, et les trois chiffres
+// de l'atelier (moment · mécanique · difficulté). Exemple : « 21BE-121 »
+// (« 21BE - 121 » s'écrit aussi, les espaces sont tolérées). Plusieurs
+// tableaux peuvent porter le MÊME ordre : c'est le POOL — en fin de salle,
+// le jeu en propose deux au choix.
+
+export interface Code21 {
+  ordre: number // AA = 1, AB = 2 … AZ = 26, BA = 27 …
+  atelier: CodeAtelier
+}
+
+/** Les lettres d'ordre du rang donné : 1 → AA, 2 → AB, 27 → BA. */
+export function lettresOrdre(ordre: number): string {
+  const n = Math.max(1, Math.floor(ordre)) - 1
+  return (
+    String.fromCharCode(65 + (Math.floor(n / 26) % 26)) +
+    String.fromCharCode(65 + (n % 26))
+  )
+}
+
+/** Décode la codification complète « 21XX-MMD » — null hors convention. */
+export function decodeCode21(code: string): Code21 | null {
+  const m = /^21\s*([A-Z]{2})\s*-\s*(\d)(\d)(\d)$/i.exec(code.trim())
+  if (!m) return null
+  const L = m[1].toUpperCase()
+  const ordre = (L.charCodeAt(0) - 65) * 26 + (L.charCodeAt(1) - 65) + 1
+  const moment = Number(m[2])
+  if (moment < 1 || moment > 3) return null
+  const mecanique = Number(m[3])
+  if (mecanique > 3) return null
+  return {
+    ordre,
+    atelier: {
+      moment: moment as CodeAtelier['moment'],
+      mecanique: mecanique as CodeAtelier['mecanique'],
+      difficulte: Number(m[4]),
+    },
+  }
+}
+
 /** Décode un code de la convention atelier — null si le code n'en est pas
- * (ce n'est pas une erreur : les codes livrés « 21-A » vivent à côté). */
+ * (ce n'est pas une erreur : les codes livrés « 21-A » vivent à côté).
+ * La codification complète « 21XX-MMD » se décode aussi : ses trois
+ * chiffres portent le même sens. */
 export function decodeCodeAtelier(code: string): CodeAtelier | null {
+  const c21 = decodeCode21(code)
+  if (c21) return c21.atelier
   const m = /^(\d)(\d)(\d)$/.exec(code.trim())
   if (!m) return null
   const moment = Number(m[1])
