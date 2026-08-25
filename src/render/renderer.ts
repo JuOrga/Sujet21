@@ -925,7 +925,7 @@ void main() {
     // remplissage, arête, ombre et auras suivent la vraie silhouette
     if (dec.y > 0.5) d = formeSdf(wb, uBoxes[bi], dec.y, dec.z, dec.w);
 
-    // ——— RELIEF 2.5D (murs, hydrophile, hydrophobe) ————————————————
+    // ——— RELIEF 2.5D (tous les solides, sauf la bouche du sas) ————————
     // dV / wbV : la géométrie du SOMMET (déplacé) — le remplissage et les
     // habillages la suivent. d reste LA BASE : ombres portées, auras et
     // physique y demeurent ancrées. Entre les deux : le FLANC, échantillonné
@@ -934,7 +934,7 @@ void main() {
     float dV = d;
     vec2 wbV = wb;
     float flanc = 0.0;
-    if (uRelief > 0.0 && mat < 2.5) {
+    if (uRelief > 0.0 && (mat < 2.5 || mat > 3.5)) {
       vec2 wT = world - relDisp;
       vec2 wbT = wT;
       float bAngR = uBoxAux[bi].y;
@@ -973,6 +973,44 @@ void main() {
     if (mat < 2.5 || mat > 3.5) {
       float shade = 1.0 - smoothstep(0.0, 56.0, max(d, 0.0));
       col = mix(col, col * vec3(0.50, 0.56, 0.70), shade * shade * 0.5);
+    }
+    // ——— LE FLANC : la tranche du solide, PLEINE et teintée matériau ————
+    // Opaque (fini le voile fantôme), sombre au pied, franche vers le
+    // sommet, strates et chant clair — chaque matériau garde son identité
+    // sur sa tranche : turquoise mouillé, violet cireux, vert de membrane,
+    // ambre de borne… Le sommet (déplacé) se peint ensuite par-dessus.
+    if (flanc > 0.003) {
+      vec2 gB = vec2(dFdx(d), dFdy(d));
+      float gn2 = max(length(gB), 1e-5);
+      vec2 nrm = gB / gn2;
+      float spanN = max(dot(relDisp, nrm), 6.0);
+      float ht = clamp(d / spanN, 0.0, 1.0);
+      float u = dot(wbV, vec2(-nrm.y, nrm.x));
+      vec3 basC; vec3 hautC;
+      if (mat < 0.5)      { basC = vec3(0.055, 0.070, 0.090); hautC = vec3(0.17, 0.21, 0.26); }
+      else if (mat < 1.5) { basC = vec3(0.030, 0.095, 0.110); hautC = vec3(0.10, 0.40, 0.44); }
+      else if (mat < 2.5) { basC = vec3(0.090, 0.055, 0.120); hautC = vec3(0.34, 0.20, 0.48); }
+      else if (mat < 4.5) { basC = vec3(0.080, 0.115, 0.150); hautC = vec3(0.36, 0.50, 0.62); }
+      else if (mat < 5.5) { basC = vec3(0.075, 0.095, 0.120); hautC = vec3(0.24, 0.30, 0.36); }
+      else if (mat < 6.5) { basC = vec3(0.140, 0.070, 0.035); hautC = vec3(0.50, 0.22, 0.08); }
+      else if (mat < 7.5) { basC = vec3(0.030, 0.100, 0.080); hautC = vec3(0.10, 0.32, 0.26); }
+      else if (mat < 8.5) { basC = vec3(0.100, 0.130, 0.175); hautC = vec3(0.32, 0.42, 0.55); }
+      else                { basC = vec3(0.130, 0.105, 0.060); hautC = vec3(0.46, 0.36, 0.17); }
+      vec3 fc = mix(basC, hautC, ht);
+      // strates horizontales : la tranche a des couches, pas un aplat
+      fc *= 0.92 + 0.08 * sin(ht * 18.0);
+      // joints verticaux réguliers — et des rivets sur les parois neutres
+      float ju = fract(u / 96.0);
+      float joint = 1.0 - smoothstep(0.015, 0.05, min(ju, 1.0 - ju));
+      fc *= 1.0 - 0.30 * joint;
+      if (mat < 0.5) {
+        float riv = smoothstep(0.93, 0.99, cos(u * 0.196)) *
+                    smoothstep(0.10, 0.22, abs(ht - 0.5));
+        fc += vec3(0.05, 0.06, 0.07) * riv;
+      }
+      // chant clair sous le sommet : l'arête haute attrape la lumière
+      fc += hautC * 0.55 * smoothstep(0.82, 0.97, ht);
+      col = mix(col, fc, flanc);
     }
     if (mat < 2.5) {
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
@@ -1058,61 +1096,6 @@ void main() {
           : vec3(0.16, 0.11, 0.20) + vec3(0.07, 0.035, 0.10) * wax;
         edgeCol = vec3(0.62, 0.42, 0.78);
       }
-      // LE FLANC : la tranche du mur — c'est elle qu'on « aperçoit » en se
-      // déplaçant, du côté qui regarde le centre. Peinte sous le remplissage
-      // du sommet : ombre de contact au pied, panneaux rivetés à joints
-      // réguliers, chant clair sous le sommet — et sur les murs neutres, par
-      // endroits, un ÉCRAN DE SERVICE allumé (relevés qui vivent), un détail
-      // qui n'existe QUE dans la perspective. Tout est procédural : les 16
-      // unités de texture sont prises, et le motif suit n'importe quel zoom.
-      if (flanc > 0.003) {
-        vec2 gB = vec2(dFdx(d), dFdy(d));
-        float gn2 = max(length(gB), 1e-5);
-        vec2 nrm = gB / gn2;
-        // hauteur révélée le long de la normale, et coordonnées de tranche :
-        // ht monte du pied (0) au sommet (1), u court le long de la paroi
-        float spanN = max(dot(relDisp, nrm), 6.0);
-        float ht = clamp(d / spanN, 0.0, 1.0);
-        float u = dot(wbV, vec2(-nrm.y, nrm.x));
-        vec3 fc = mix(vec3(0.052, 0.066, 0.086),
-                      mix(vec3(0.125, 0.150, 0.185), edgeCol, 0.32), ht);
-        fc *= 0.90 + 0.20 * dnoise(vec2(u * 0.12, ht * 3.0));
-        float ju = fract(u / 96.0);
-        float joint = 1.0 - smoothstep(0.015, 0.05, min(ju, 1.0 - ju));
-        fc *= 1.0 - 0.38 * joint;
-        float riv = smoothstep(0.93, 0.99, cos(u * 0.196)) *
-                    smoothstep(0.10, 0.22, abs(ht - 0.5));
-        fc += vec3(0.05, 0.06, 0.07) * riv;
-        fc += (edgeCol * 0.35 + vec3(0.04)) * smoothstep(0.80, 0.97, ht);
-        if (mat < 0.5) {
-          // une cellule sur trois environ porte un écran — seulement quand la
-          // tranche est assez large à l'écran (sinon fourmillement de loin)
-          float lisible = smoothstep(7.0, 20.0, spanN * uZoom);
-          float cel = floor(u / 96.0);
-          float hsc = hash21(vec2(cel * 0.731, float(bi) + 3.7));
-          if (hsc > 0.64 && lisible > 0.001) {
-            vec2 suv = vec2(ju, ht) - vec2(0.5, 0.52);
-            vec2 dctr = abs(suv) / vec2(0.34, 0.30);
-            float boite = max(dctr.x, dctr.y);
-            float scr = 1.0 - smoothstep(0.80, 0.95, boite);
-            float cadre = smoothstep(0.78, 0.92, boite) *
-                          (1.0 - smoothstep(1.0, 1.15, boite));
-            float ty = fract(hsc * 9.17);
-            vec3 scol = ty < 0.38 ? vec3(0.16, 0.75, 0.55)
-                      : ty < 0.66 ? vec3(0.95, 0.72, 0.38)
-                                  : vec3(0.36, 0.62, 0.95);
-            // le contenu vit : balayage lent + colonnes de relevés qui
-            // basculent — l'écran travaille, il ne décore pas
-            float scan = 0.72 + 0.28 * sin(ht * 46.0 + uTime * 1.7 + cel * 2.1);
-            float dat = step(0.55, hash21(vec2(floor(u / 9.0),
-              floor(ht * 7.0) + floor(uTime * 1.3 + hsc * 11.0))));
-            float vie = 0.85 + 0.15 * sin(uTime * (0.7 + hsc) + cel * 5.0);
-            fc = mix(fc, vec3(0.015, 0.02, 0.03), (scr + cadre * 0.8) * lisible);
-            fc += scol * 1.15 * (0.55 + 0.45 * dat) * scan * vie * scr * lisible;
-          }
-        }
-        col = mix(col, fc, flanc * (1.0 - fill));
-      }
       col = mix(col, fillCol, fill);
       col = mix(col, edgeCol, edge * 0.9);
       if (mat > 0.5) {
@@ -1130,8 +1113,8 @@ void main() {
       // SURCHAUFFEUR : serpentin AMBRE sous verre (la couleur de la vapeur) — la borne de recharge du
       // dash. Chargé (aux.z = 1), le serpentin pulse ; déchargé, il s'éteint
       // et le panneau redevient un mur gris — le manomètre est la lumière.
-      float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
-      float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
+      float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
+      float edge = 1.0 - smoothstep(0.0, edgeW, abs(dV));
       float charge = uBoxAux[bi].z;
       float coil = 0.5 + 0.5 * sin(world.x * 0.30 + sin(world.y * 0.24) * 2.2);
       float tube = smoothstep(0.55, 0.9, coil);
@@ -1147,8 +1130,8 @@ void main() {
       // Rideau lamellaire : lamelles souples bleu-glace qui ondulent — seule
       // la GLACE les écarte. Des fentes fines entre lamelles laissent deviner
       // le fond : c'est un rideau, pas un mur.
-      float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
-      float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
+      float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
+      float edge = 1.0 - smoothstep(0.0, edgeW, abs(dV));
       float sway = sin(world.y * 0.30 + uTime * 1.1 + world.x * 0.02) * 1.8;
       float lam = 0.5 + 0.5 * sin((world.y + sway) * 0.55);
       float fente = smoothstep(0.86, 0.97, lam);
@@ -1158,8 +1141,8 @@ void main() {
     } else if (mat > 6.5) {
       // Membrane gorgée d'eau : trame tissée vert d'eau qui suinte — seule
       // l'EAU la traverse. Des gouttes descendent le long de la trame.
-      float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
-      float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
+      float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
+      float edge = 1.0 - smoothstep(0.0, edgeW, abs(dV));
       float weave = 0.5 + 0.5 * sin(world.x * 0.42) * sin(world.y * 0.42);
       float drip = smoothstep(0.78, 1.0,
         0.5 + 0.5 * sin(world.y * 0.10 - uTime * 1.6 + dnoise(world * 0.05) * 6.0));
@@ -1170,8 +1153,8 @@ void main() {
       // Radiateur (tableau 4) : rayures chaudes qui défilent, arête incandes-
       // cente, et une aura de chaleur qui tremble — le danger (et la
       // ressource) se lit avant le contact, comme pour le froid.
-      float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
-      float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
+      float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
+      float edge = 1.0 - smoothstep(0.0, edgeW, abs(dV));
       float stripe = 0.5 + 0.5 * sin((world.x + world.y - uTime * 46.0) * 0.14);
       // Panneau à ailettes texturé quand l'image est là : les rayures animées
       // deviennent la CHALEUR qui court dessus, pas le panneau lui-même.
@@ -1190,8 +1173,8 @@ void main() {
     } else if (mat > 4.5) {
       // Grille (tableau 3) : panneau perforé — le liquide s'y écrase, la
       // vapeur passe entre les mailles. Les trous laissent voir le fond.
-      float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
-      float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
+      float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
+      float edge = 1.0 - smoothstep(0.0, edgeW, abs(dV));
       // Panneau perforé texturé : les trous de l'image (quasi noirs) servent
       // eux-mêmes de masque — le fond se voit à travers, comme avant.
       float hole;
@@ -1210,8 +1193,8 @@ void main() {
     } else if (mat > 3.5) {
       // Plaque froide (tableau 2) : givre cristallin, arête pâle, et une
       // aura de brume glacée — le danger se lit avant le contact.
-      float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
-      float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
+      float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
+      float edge = 1.0 - smoothstep(0.0, edgeW, abs(dV));
       float sparkle = smoothstep(0.72, 0.94, dnoise(world * 0.22));
       // Givre texturé quand l'image est là ; le scintillement procédural
       // reste par-dessus : le gel a l'air vivant, pas imprimé.
