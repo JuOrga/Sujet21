@@ -355,6 +355,44 @@
       #salles-liste button:hover {
         border-color: var(--specimen);
       }
+      /* ---- MODE CONCEPTEUR : l'accueil public masque les outils ----
+         Le mode se gagne par ?dev dans l'URL, ou 7 touchers sur le numéro
+         de version (Steam Deck et mobile : pas de barre d'adresse à taper).
+         Il colle au navigateur (localStorage) jusqu'à ?dev=0. */
+      body:not(.concepteur) [data-dev] { display: none !important; }
+      /* ---- LE PUPITRE D'ESSAIS : simuler les événements au doigt ---- */
+      #pupitre {
+        position: fixed; inset: 0; z-index: 58;
+        background: rgba(2, 6, 12, 0.72);
+        display: flex; align-items: center; justify-content: center;
+        padding: 18px;
+      }
+      #pupitre[hidden] { display: none; }
+      #pupitre .salles-boite { max-width: 620px; }
+      .pup-corps { overflow-y: auto; padding: 10px 14px 14px; }
+      .pup-sec {
+        margin: 10px 0 6px; font-family: var(--font-display);
+        font-size: 10px; letter-spacing: 0.16em; color: var(--dim);
+        border-bottom: 1px solid var(--line); padding-bottom: 3px;
+      }
+      .pup-sec:first-child { margin-top: 0; }
+      .pup-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 7px;
+      }
+      .pup-grid button {
+        min-height: 52px; padding: 9px 10px; text-align: left;
+        background: rgba(20, 32, 46, 0.75); border: 1px solid var(--line);
+        border-radius: 6px; color: inherit; font: inherit; font-size: 12px;
+        cursor: pointer; line-height: 1.3;
+      }
+      .pup-grid button:hover { border-color: var(--specimen); }
+      .pup-grid button b { display: block; font-size: 12.5px; }
+      .pup-grid button small { color: var(--dim); font-size: 10.5px; }
+      .pup-etat {
+        margin: 12px 2px 0; min-height: 18px;
+        font-size: 12px; color: var(--specimen);
+      }
       /* barre d'outils du voile SALLES : le tri par code atelier, et la
          légende qui explique la convention à trois chiffres */
       .salles-outils {
@@ -4284,14 +4322,15 @@
       <button id="start-secondaire" type="button" hidden>RUN SECONDAIRE — SALLE 1 (L'EXPÉDITION EN COURS EST CONSERVÉE)</button>
       <button id="start-abandon" type="button" hidden>ABANDONNER LA RUN — RETOUR AU LABO</button>
       <div class="home-duo" role="group" aria-label="Outils du protocole">
-        <button id="start-editor" type="button" title="Créer ou modifier un tableau"><i>✎</i><span>ÉDITEUR</span></button>
-        <button id="start-bis" type="button" title="L'école, puis les salles laser"><i>⚗&#xFE0E;</i><span>PARCOURS TEST</span></button>
-        <button id="start-hub2" type="button" title="Le chantier de refonte du hub : module compact, pictogrammes d'état, alcôve des fioles — en parallèle du hub actuel"><i>◐</i><span>HUB COMPACT</span></button>
-        <button id="open-montage" type="button" title="La table de montage des cinématiques : planches, effets, sons — et lecture immédiate"><i>▤</i><span>MONTAGE</span></button>
-        <button id="home-salles" type="button"><i>▦</i><span>SALLES</span></button>
+        <button id="start-editor" type="button" data-dev title="Créer ou modifier un tableau"><i>✎</i><span>ÉDITEUR</span></button>
+        <button id="start-bis" type="button" data-dev title="L'école, puis les salles laser"><i>⚗&#xFE0E;</i><span>PARCOURS TEST</span></button>
+        <button id="start-hub2" type="button" data-dev title="Le chantier de refonte du hub : module compact, pictogrammes d'état, alcôve des fioles — en parallèle du hub actuel"><i>◐</i><span>HUB COMPACT</span></button>
+        <button id="open-montage" type="button" data-dev title="La table de montage des cinématiques : planches, effets, sons — et lecture immédiate"><i>▤</i><span>MONTAGE</span></button>
+        <button id="home-salles" type="button" data-dev><i>▦</i><span>SALLES</span></button>
+        <button id="home-pupitre" type="button" data-dev title="Le pupitre d'essais : simuler les événements du jeu (cérémonie, bonbonne, paliers, sons) au doigt — sans console navigateur"><i>▚</i><span>PUPITRE</span></button>
         <button id="home-records" type="button"><i>✦</i><span>RECORDS</span></button>
         <button id="home-codex" type="button" title="Le manuel écrit par la partie : chaque interaction découverte débloque sa fiche"><i>◉</i><span>CODEX</span></button>
-        <button id="home-livraisons" type="button"><i>◈</i><span>NOTES DE VERSION</span></button>
+        <button id="home-livraisons" type="button" data-dev><i>◈</i><span>NOTES DE VERSION</span></button>
         <button id="home-cmds" type="button"><i>⌘</i><span>COMMANDES</span></button>
         <button id="home-params" type="button"><i>⚙&#xFE0E;</i><span>PARAMÈTRES</span></button>
         <button id="home-mute" type="button"><i>♪</i><span>SON</span></button>
@@ -4565,6 +4604,42 @@
           <kbd>ÉTATS</kbd>qui bloque quoi
           <kbd>BANC</kbd>réglages
           <kbd>≡</kbd>la fiche
+        </div>
+      </div>
+    </div>
+
+    <!-- Le PUPITRE D'ESSAIS : les événements du jeu, simulés au doigt -->
+    <div id="pupitre" hidden aria-label="Pupitre d'essais">
+      <div class="salles-boite">
+        <div class="salles-tete"><span>PUPITRE D'ESSAIS — simuler les événements du protocole</span>
+          <button type="button" id="pupitre-fermer" aria-label="Fermer">✕</button></div>
+        <div class="pup-corps">
+          <div class="pup-sec">CÉRÉMONIE DE FIN DE SALLE</div>
+          <div class="pup-grid">
+            <button type="button" data-pup="ceremonie-2"><b>Petit surplus</b><small>mise en bonbonne, 2 L</small></button>
+            <button type="button" data-pup="ceremonie-5"><b>Surplus moyen</b><small>5 L — franchit un palier</small></button>
+            <button type="button" data-pup="ceremonie-12"><b>Gros surplus</b><small>12 L — plusieurs paliers</small></button>
+          </div>
+          <div class="pup-sec">BONBONNE &amp; ÉTALONNAGE</div>
+          <div class="pup-grid">
+            <button type="button" data-pup="bonbonne-plus"><b>Bonbonne +2 L</b><small>remplir la réserve</small></button>
+            <button type="button" data-pup="bonbonne-vider"><b>Vider la bonbonne</b><small>réserve à zéro</small></button>
+            <button type="button" data-pup="verser"><b>Verser au corps</b><small>en jeu, état liquide</small></button>
+            <button type="button" data-pup="xp-bord"><b>Au bord du palier</b><small>XP à 0,5 L du prochain</small></button>
+            <button type="button" data-pup="xp-sec"><b>XP +2 L (sec)</b><small>sans cérémonie</small></button>
+          </div>
+          <div class="pup-sec">RESSOURCES</div>
+          <div class="pup-grid">
+            <button type="button" data-pup="condensat"><b>Condensat +150 cL</b><small>de quoi payer une carte</small></button>
+            <button type="button" data-pup="vie"><b>Vie +1</b><small>échantillon de secours</small></button>
+          </div>
+          <div class="pup-sec">PONCTUATIONS SONORES</div>
+          <div class="pup-grid">
+            <button type="button" data-pup="son-collecte"><b>Sting collecte</b></button>
+            <button type="button" data-pup="son-record"><b>Sting record</b></button>
+            <button type="button" data-pup="son-fin"><b>Fin de course</b></button>
+          </div>
+          <p class="pup-etat" id="pup-etat"></p>
         </div>
       </div>
     </div>

@@ -1202,6 +1202,55 @@ const livraisonsEl = document.getElementById('livraisons') as HTMLDivElement
   // la fiche (en petit) et dans l'en-tête du voile
   const versionJeu = document.getElementById('version-jeu')
   if (versionJeu) versionJeu.textContent = `v${VERSION} — prototype`
+
+  // ---- MODE CONCEPTEUR : deux accueils dans le même jeu ----
+  // L'accueil PUBLIC ne montre que l'essentiel (jouer, records, codex,
+  // commandes, paramètres) ; le mode concepteur rallume les outils
+  // (éditeur, montage, salles, pupitre…). Il se gagne par ?dev dans l'URL,
+  // ou par 7 TOUCHERS sur le numéro de version — Steam Deck et mobile
+  // n'ont pas de barre d'adresse sous la main. ?dev=0 le rend.
+  const CLE_CONCEPTEUR = 'projet21.concepteur.v1'
+  const concepteurActif = (): boolean => {
+    try {
+      return localStorage.getItem(CLE_CONCEPTEUR) === '1'
+    } catch {
+      return false
+    }
+  }
+  const poseConcepteur = (on: boolean): void => {
+    try {
+      if (on) localStorage.setItem(CLE_CONCEPTEUR, '1')
+      else localStorage.removeItem(CLE_CONCEPTEUR)
+    } catch {
+      // stockage refusé : le mode ne tiendra que la session — sans gravité
+    }
+    document.body.classList.toggle('concepteur', on)
+  }
+  {
+    const q = new URLSearchParams(location.search)
+    if (q.get('dev') === '0') poseConcepteur(false)
+    else if (q.has('dev')) poseConcepteur(true)
+    else document.body.classList.toggle('concepteur', concepteurActif())
+  }
+  let tapsVersion = 0
+  let dernierTapVersion = 0
+  versionJeu?.addEventListener('pointerdown', () => {
+    const t = performance.now()
+    if (t - dernierTapVersion > 1600) tapsVersion = 0
+    dernierTapVersion = t
+    tapsVersion++
+    if (tapsVersion < 7) return
+    tapsVersion = 0
+    const on = !concepteurActif()
+    poseConcepteur(on)
+    const avant = versionJeu.textContent
+    versionJeu.textContent = on
+      ? 'MODE CONCEPTEUR ACTIVÉ'
+      : 'ACCUEIL PUBLIC RÉTABLI'
+    window.setTimeout(() => {
+      versionJeu.textContent = avant
+    }, 2200)
+  })
   const livVersion = document.getElementById('liv-version')
   if (livVersion) livVersion.textContent = `le jeu est en v${VERSION}`
   const corps = document.getElementById('livraisons-corps') as HTMLDivElement
@@ -3542,24 +3591,123 @@ function verserBonbonne(): string {
 hudBonbonneChip?.addEventListener('click', verserBonbonne)
 // Sonde de test : verser depuis la console (comme __sim, __run)
 ;(window as unknown as { __verser: () => string }).__verser = verserBonbonne
+/** La cérémonie avec un surplus factice — la sonde __bonbonne et le
+ * PUPITRE D'ESSAIS passent tous deux par ici. */
+function simuleBonbonne(surplus = 2): void {
+  montreMiseEnBonbonne({
+    surplus,
+    prime: 0,
+    pct: Math.min(1, surplus / 4),
+    temps: 61.2,
+    newVolume: false,
+    newChrono: false,
+    recVol: '',
+    recChr: '',
+    note: 0,
+    gainCl: Math.round(surplus * 10),
+    totalCl: condensat,
+  })
+}
 // Sonde de test : la cérémonie depuis la console — __bonbonne(2.5) ouvre la
 // mise en bonbonne avec un surplus factice, pour regarder la jauge couler
 ;(window as unknown as { __bonbonne: (surplus?: number) => void }).__bonbonne =
-  (surplus = 2) => {
-    montreMiseEnBonbonne({
-      surplus,
-      prime: 0,
-      pct: Math.min(1, surplus / 4),
-      temps: 61.2,
-      newVolume: false,
-      newChrono: false,
-      recVol: '',
-      recChr: '',
-      note: 0,
-      gainCl: Math.round(surplus * 10),
-      totalCl: condensat,
-    })
-  }
+  simuleBonbonne
+
+// ---- LE PUPITRE D'ESSAIS : les événements du jeu, simulés au doigt ----
+// La console navigateur n'existe ni sur Steam Deck ni sur mobile : le
+// pupitre est un écran du menu (mode concepteur) qui rejoue les mêmes
+// événements en gros boutons — cérémonie, bonbonne, paliers, sons.
+const pupitreEl = document.getElementById('pupitre') as HTMLDivElement
+function pupDit(msg: string): void {
+  const e = document.getElementById('pup-etat')
+  if (e) e.textContent = msg
+}
+document.getElementById('home-pupitre')?.addEventListener('click', () => {
+  pupitreEl.hidden = false
+  pupDit('')
+})
+document.getElementById('pupitre-fermer')?.addEventListener('click', () => {
+  pupitreEl.hidden = true
+})
+pupitreEl?.addEventListener('pointerdown', (e) => {
+  if (e.target === pupitreEl) pupitreEl.hidden = true
+})
+for (const b of Array.from(
+  pupitreEl?.querySelectorAll<HTMLButtonElement>('[data-pup]') ?? [],
+)) {
+  b.addEventListener('click', () => {
+    const quoi = b.dataset.pup ?? ''
+    if (quoi.startsWith('ceremonie-')) {
+      pupitreEl.hidden = true
+      simuleBonbonne(Number(quoi.split('-')[1]))
+      return
+    }
+    switch (quoi) {
+      case 'bonbonne-plus':
+        run.bonbonneLiters = Math.min(BONBONNE_CAP, run.bonbonneLiters + 2)
+        pupDit(`Bonbonne : ${run.bonbonneLiters.toFixed(1)} / ${BONBONNE_CAP} L.`)
+        break
+      case 'bonbonne-vider':
+        run.bonbonneLiters = 0
+        pupDit('Bonbonne vidée.')
+        break
+      case 'verser': {
+        const r = verserBonbonne()
+        pupDit(
+          r === 'ok'
+            ? 'Versé au corps.'
+            : r === 'rien'
+              ? 'Rien à verser : bonbonne vide, ou corps déjà au volume de départ.'
+              : r === 'etat'
+                ? 'Impossible en glace ou en vapeur — redevenez liquide.'
+                : r === 'pause'
+                  ? 'Impossible : jeu en pause ou essai conclu.'
+                  : 'Impossible ici (hub, essai de tableau ou cérémonie en cours).',
+        )
+        break
+      }
+      case 'xp-bord': {
+        const p = prochainPalier(run.xp)
+        if (p === null) {
+          pupDit('Table des paliers épuisée : plus rien à franchir.')
+        } else {
+          run.xp = Math.max(run.xp, p - 0.5)
+          pupDit(
+            `XP amenée à ${run.xp.toFixed(1)} L (palier à ${p} L) — la prochaine cérémonie le franchira.`,
+          )
+        }
+        break
+      }
+      case 'xp-sec':
+        run.xp += 2
+        pupDit(
+          `XP : ${run.xp.toFixed(1)} L — à sec, sans cérémonie (les tirages ne s'ouvrent qu'en cérémonie).`,
+        )
+        break
+      case 'condensat':
+        gagneCondensat(150)
+        pupDit('Condensat +150 cL.')
+        break
+      case 'vie':
+        run.vies = Math.min(VIES_MAX, run.vies + 1)
+        majBoutonsRun()
+        pupDit(`Vies : ${run.vies} / ${VIES_MAX}.`)
+        break
+      case 'son-collecte':
+        bande.ponctuation('sting-collecte', 0.8)
+        pupDit('♪ sting-collecte')
+        break
+      case 'son-record':
+        bande.ponctuation('sting-record', 0.8)
+        pupDit('♪ sting-record')
+        break
+      case 'son-fin':
+        bande.ponctuation('fin-de-course', 0.8)
+        pupDit('♪ fin-de-course')
+        break
+    }
+  })
+}
 
 function resetLasers(): void {
   laserEtat.vues = []
