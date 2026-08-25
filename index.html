@@ -547,15 +547,40 @@
         letter-spacing: 0.14em;
         margin-right: 8px;
       }
-      #records[hidden] { display: none; }
-      #records {
+      #records[hidden], #codex[hidden] { display: none; }
+      #records, #codex {
         position: fixed; inset: 0; z-index: 40;
         background: rgba(2, 6, 12, 0.72);
         display: flex; align-items: center; justify-content: center;
         padding: 18px;
       }
-      #records .salles-boite { max-height: 86vh; overflow: auto; width: min(980px, 96vw); }
+      #records .salles-boite, #codex .salles-boite { max-height: 86vh; overflow: auto; width: min(980px, 96vw); }
       #records-corps { padding: 6px 12px 14px; }
+      /* ---- Le voile CODEX : fiches par état, cartes « ? » verrouillées ---- */
+      #codex-corps { padding: 6px 12px 14px; }
+      .cdx-groupe {
+        display: flex; justify-content: space-between; align-items: baseline;
+        margin-top: 14px; padding-bottom: 4px;
+        border-bottom: 1px solid var(--line);
+        font-family: var(--font-display); font-size: 11px;
+        letter-spacing: 0.16em; color: var(--specimen);
+      }
+      .cdx-groupe i { font-style: normal; font-family: var(--font-mono); font-size: 11px; color: var(--ink-dim); }
+      .cdx-grille { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+      @media (max-width: 900px) { .cdx-grille { grid-template-columns: repeat(2, 1fr); } }
+      @media (max-width: 620px) { .cdx-grille { grid-template-columns: 1fr; } }
+      .cdx-carte {
+        display: flex; gap: 10px; align-items: flex-start;
+        border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px;
+      }
+      .cdx-carte i { font-style: normal; font-size: 20px; line-height: 1.3; }
+      .cdx-carte b {
+        display: block; font-family: var(--font-display); font-size: 10px;
+        letter-spacing: 0.1em; margin-bottom: 3px;
+      }
+      .cdx-carte span { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-dim); line-height: 1.45; }
+      .cdx-verrou { opacity: 0.5; border-style: dashed; }
+      .cdx-verrou i { color: var(--ink-dim); }
       .rec-salle {
         margin-top: 12px; padding-top: 6px;
         font-family: var(--font-display); font-size: 11px; letter-spacing: 0.16em;
@@ -4141,6 +4166,7 @@
         <button id="open-montage" type="button" title="La table de montage des cinématiques : planches, effets, sons — et lecture immédiate"><i>▤</i><span>MONTAGE</span></button>
         <button id="home-salles" type="button"><i>▦</i><span>SALLES</span></button>
         <button id="home-records" type="button"><i>✦</i><span>RECORDS</span></button>
+        <button id="home-codex" type="button" title="Le manuel écrit par la partie : chaque interaction découverte débloque sa fiche"><i>◉</i><span>CODEX</span></button>
         <button id="home-livraisons" type="button"><i>◈</i><span>NOTES DE VERSION</span></button>
         <button id="home-cmds" type="button"><i>⌘</i><span>COMMANDES</span></button>
         <button id="home-params" type="button"><i>⚙&#xFE0E;</i><span>PARAMÈTRES</span></button>
@@ -4445,6 +4471,21 @@
     </div>
 
     <!-- Le voile RECORDS : le palmarès partagé — trois podiums par salle -->
+    <!-- Le voile CODEX : le manuel du jeu, écrit par la partie — chaque
+         interaction état × élément vécue en jeu débloque sa fiche -->
+    <div id="codex" hidden aria-label="Codex">
+      <div class="salles-boite">
+        <div class="salles-tete"><span>CODEX DU PROTOCOLE — <span id="codex-compte"></span></span>
+          <button type="button" id="codex-fermer" aria-label="Fermer">✕</button></div>
+        <div class="params-desc" style="padding: 8px 12px 0">
+          Le vaisseau consigne ce que le sujet apprend de lui-même. Chaque
+          interaction découverte EN JOUANT — un état, un élément, un contact —
+          débloque sa fiche. Les « ? » sont autant d'expériences à tenter.
+        </div>
+        <div id="codex-corps"></div>
+      </div>
+    </div>
+
     <div id="records" hidden aria-label="Records">
       <div class="salles-boite">
         <div class="salles-tete"><span>RECORDS DU PROTOCOLE — le palmarès des opérateurs</span>
