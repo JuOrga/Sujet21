@@ -2039,10 +2039,11 @@ export class FluidSim {
       // Asservissement en vitesse (comme le vortex) : la vitesse d'approche
       // cible décroît avec la distance — la pluie converge et se pose, sans
       // jamais s'effondrer sur le corps (une force constante exploserait un
-      // nuage compact)
+      // nuage compact). Pente 1 : la goutte ralentit dès un rayon d'écran,
+      // au lieu de foncer plein plafond jusqu'au contact (« la charge »).
       const ux = dx / d
       const uy = dy / d
-      const vTarget = Math.min(p.condenseRegroup, d * 2.5)
+      const vTarget = Math.min(p.condenseRegroup, d)
       const vRadial = this.velX[i] * ux + this.velY[i] * uy
       const k = Math.min(1, 6 * v * dt)
       this.velX[i] += (vTarget - vRadial) * ux * k
@@ -2087,10 +2088,10 @@ export class FluidSim {
       const d = Math.sqrt(d2)
       if (d < 1e-3) continue
       // même asservissement en vitesse que le rappel de condensation : la
-      // goutte converge et se pose, sans être catapultée
+      // goutte converge et se pose, sans être catapultée (même pente douce)
       const ux = dx / d
       const uy = dy / d
-      const vTarget = Math.min(p.condenseRegroup, d * 2.5)
+      const vTarget = Math.min(p.condenseRegroup, d)
       const vRadial = this.velX[i] * ux + this.velY[i] * uy
       const k = Math.min(1, 5 * dt)
       const ivx = (vTarget - vRadial) * ux * k

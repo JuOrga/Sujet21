@@ -101,6 +101,28 @@ describe('FluidSim — invariants physiques', () => {
     expect(sim.stats.rmsRadius).toBeLessThan(r0 * 1.6)
   })
 
+  it('le retour des égarées reste CALME : la goutte revient, elle ne charge pas', () => {
+    const sim = makeSim()
+    sim.setLevel([], [])
+    sim.spawnDisc(0, 0, 200, KIND_PLAYER)
+    // une goutte du corps égarée à portée de capture, au repos
+    const i = sim.addParticle(200, 0, KIND_FREE)
+    ;(sim as unknown as { duCorps: Uint8Array }).duCorps[i] = 1
+    let vMax = 0
+    for (let s = 0; s < 240; s++) {
+      sim.step(sim.params.dt)
+      for (let k = 0; k < sim.count; k++) {
+        vMax = Math.max(vMax, Math.hypot(sim.velX[k], sim.velY[k]))
+      }
+    }
+    // avant réglage, le rappel visait 420 u/s plein plafond : la goutte
+    // traversait l'écran. Désormais elle converge sous ~300 u/s, toujours.
+    expect(vMax).toBeLessThan(300)
+    // et elle revient bien : réabsorbée ou à toucher le corps
+    sim.relabel()
+    expect(sim.playerCount).toBeGreaterThanOrEqual(200)
+  })
+
   it('verserAuCorps pose la matière dans les CREUX, jamais sur le corps', () => {
     const sim = makeSim()
     sim.spawnDisc(0, 0, 300, KIND_PLAYER)

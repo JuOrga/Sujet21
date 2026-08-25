@@ -95,7 +95,7 @@ export interface SimParams {
   recondFraction: number // part récupérable à vaisseau tiède (+0,25 à froid complet)
   gasLinkFactor: number // × le rayon d'amas : le nuage distendu reste un seul corps
   // Règles de transformation : changer d'état ne doit pas tuer.
-  condenseRegroup: number // rappel des gouttelettes qui condensent vers le corps (u/s²)
+  condenseRegroup: number // PLAFOND de la vitesse de retour des gouttelettes vers le corps (u/s)
   gasLinkDecay: number // s d'extinction de la mémoire de lien du gaz après condensation
   dispersalGrace: number // s continues sous le seuil critique avant de constater la dispersion
 
@@ -268,7 +268,9 @@ export const DEFAULT_PARAMS: SimParams = {
   recondRate: 4,
   recondFraction: 0.5,
   gasLinkFactor: 3,
-  condenseRegroup: 420,
+  // 160 : le retour se LIT — l'eau égarée revient d'un pas décidé, sans
+  // traverser l'écran en trombe (420 transformait chaque rappel en charge)
+  condenseRegroup: 160,
   gasLinkDecay: 2.5,
   dispersalGrace: 2,
 
