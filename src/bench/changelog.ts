@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 11:30',
+    title: 'Le regard suit la souris et le stick — sans un clic',
+    notes: [
+      'Retour du concepteur : l’œil ne répondait pas au joystick. Deux causes : le stick seul (sans bouton) n’était pas une « visée » aux yeux du regard, et bouton pressé, le point de visée manette est le point d’ÉJECTION — DERRIÈRE le corps en eau : l’œil aurait regardé à l’envers. Corrigé : à la manette, le regard suit désormais la DIRECTION DU STICK — là où l’on veut aller — dès l’inclinaison, bouton pressé ou non.',
+      'Et à la souris, même vie : l’œil suit le curseur SANS clic, en glissant doucement (le même lissage que la visée). Souris immobile quelques secondes, la curiosité reprend ses droits — mécanismes, sas, vignettes d’idle. Le doigt levé, lui, ne retient jamais le regard : au tactile, rien ne change. Incliner le stick ou bouger la souris compte aussi comme une présence : l’idle se remet à zéro.',
+      'Vérifié au banc d’essai sans écran (manette simulée, souris réelle) : stick à droite, l’œil glisse à droite ; stick en haut, il monte ; survol souris en haut-droite, il s’y penche — et l’idle reste muet tant qu’on parle.',
+    ],
+  },
+  {
     date: '26/08/2026 09:30',
     title:
       'Le Sujet est VIVANT : regard, respiration, frisson — et l’idle',

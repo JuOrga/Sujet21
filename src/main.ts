@@ -3556,8 +3556,25 @@ const idle = {
   murY: 0,
 }
 ;(window as unknown as { __idle: typeof idle }).__idle = idle
+// Le STICK parle-t-il ? incliné, et la manette plus récente que le pointeur :
+// le regard le suit, et l'idle sait que le joueur est là
+function stickVise(): boolean {
+  return (
+    manette.connectee &&
+    input.touchCount === 0 &&
+    manette.lastActivity > input.lastPointerAt &&
+    manette.force > 0.03
+  )
+}
 function majIdle(dtReal: number): void {
-  const geste = input.aimActive || input.freezeIntent || input.gasIntent
+  // une souris qui BOUGE compte comme un geste (fenêtre courte : posée,
+  // elle laisse l'idle venir même si le regard la fixe encore)
+  const geste =
+    input.aimActive ||
+    input.freezeIntent ||
+    input.gasIntent ||
+    stickVise() ||
+    performance.now() / 1000 - input.sourisAt < 0.4
   const enVie =
     document.body.classList.contains('playing') &&
     !input.paused &&
@@ -3657,7 +3674,21 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
   let tx = 0
   let ty = 0
   let vise = false
-  if (input.aimActive) {
+  if (stickVise()) {
+    // à la manette, le point de visée est le point d'ÉJECTION — derrière le
+    // corps en eau : le regard, lui, suit le STICK — là où l'on veut aller
+    // (axe Y du stick vers le bas, monde vers le haut)
+    tx = cx + manette.dirX * 400
+    ty = cy - manette.dirY * 400
+    vise = true
+  } else if (
+    input.aimActive ||
+    // la souris retient le regard SANS clic : tant qu'elle a la main et
+    // qu'elle a bougé il y a peu — immobile trop longtemps, la curiosité
+    // reprend (mécanismes, sas, vignettes d'idle)
+    (performance.now() / 1000 - input.sourisAt < 6 &&
+      input.lastPointerAt >= manette.lastActivity)
+  ) {
     tx = aimX
     ty = aimY
     vise = true

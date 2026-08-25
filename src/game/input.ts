@@ -88,6 +88,10 @@ export class Input {
    * main sur la manette immédiatement, sans attendre un clic. */
   lastPointerAt = 0
 
+  /** Dernier survol SOURIS ou stylet (s) — jamais le doigt : un doigt levé
+   * ne survole pas, sa dernière position ne doit pas retenir le regard. */
+  sourisAt = -1e9
+
   stepWarp(dir: number): void {
     this.warpIndex = Math.min(TIME_WARP_STEPS.length - 1, Math.max(0, this.warpIndex + dir))
     this.onTimeWarpChange?.(TIME_WARP_STEPS[this.warpIndex])
@@ -202,6 +206,7 @@ export class Input {
       }
       this.aimClientX = e.clientX
       this.aimClientY = e.clientY
+      if (e.pointerType !== 'touch') this.sourisAt = performance.now() / 1000
     })
 
     const release = (e: PointerEvent) => {
