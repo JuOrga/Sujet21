@@ -3556,6 +3556,22 @@ const idle = {
   murY: 0,
 }
 ;(window as unknown as { __idle: typeof idle }).__idle = idle
+// L'ÉVEIL DU TABLEAU : pendant le zoom automatique d'entrée, le Sujet se
+// RÉVEILLE — un petit scénario aléatoire à chaque salle : grande
+// inspiration, regard qui balaie un coin de la pièce avant de glisser au
+// sas, parfois un frisson, parfois une vignette physique (toilette,
+// étirement). Jamais deux fois le même réveil : la salle paraît vivante
+// dès le plan large.
+const reveil = {
+  actif: false,
+  t0: 0,
+  frissonT: -1, // instant du frisson de réveil dans l'intro (-1 : aucun)
+  frissonFait: false,
+  balayageX: 0, // le point que le regard visite avant le sas
+  balayageY: 0,
+  bascule: 1, // seconde où le regard quitte ce point pour le sas
+}
+;(window as unknown as { __reveil: typeof reveil }).__reveil = reveil
 // Le STICK parle-t-il ? incliné, et la manette plus récente que le pointeur :
 // le regard le suit, et l'idle sait que le joueur est là
 function stickVise(): boolean {
@@ -3620,7 +3636,11 @@ function majIdle(dtReal: number): void {
         murY = py
       }
     }
-    const choix: Array<'toilette' | 'sas' | 'etire' | 'tapote'> = ['toilette', 'sas', 'etire']
+    const choix: Array<'toilette' | 'sas' | 'etire' | 'tapote'> = [
+      'toilette',
+      'sas',
+      'etire',
+    ]
     if (best < sim.stats.rmsRadius + 130) choix.push('tapote')
     idle.type = choix[Math.floor(Math.random() * choix.length)]
     idle.t0 = elapsed
@@ -3634,7 +3654,12 @@ function majIdle(dtReal: number): void {
     const cy = sim.stats.centroidY
     const k = Math.min(1, 2.2 * dtReal)
     for (let i = 0; i < sim.count; i++) {
-      if (sim.kind[i] !== KIND_PLAYER || sim.frozen[i] === 1 || sim.gaseous[i] === 1) continue
+      if (
+        sim.kind[i] !== KIND_PLAYER ||
+        sim.frozen[i] === 1 ||
+        sim.gaseous[i] === 1
+      )
+        continue
       const dx = cx - sim.posX[i]
       const dy = cy - sim.posY[i]
       const d = Math.hypot(dx, dy)
@@ -3657,7 +3682,12 @@ function majIdle(dtReal: number): void {
       const ax = ((idle.murX - cx) / d) * 240 * dtReal
       const ay = ((idle.murY - cy) / d) * 240 * dtReal
       for (let i = 0; i < sim.count; i++) {
-        if (sim.kind[i] !== KIND_PLAYER || sim.frozen[i] === 1 || sim.gaseous[i] === 1) continue
+        if (
+          sim.kind[i] !== KIND_PLAYER ||
+          sim.frozen[i] === 1 ||
+          sim.gaseous[i] === 1
+        )
+          continue
         sim.velX[i] += ax
         sim.velY[i] += ay
       }
@@ -3669,12 +3699,26 @@ function majIdle(dtReal: number): void {
 function majPresence(dtReal: number, aimX: number, aimY: number): void {
   const cx = sim.stats.centroidX
   const cy = sim.stats.centroidY
+  // le réveil ne vit que le temps de l'intro caméra
+  if (reveil.actif && (!camera.introEnCours || sim.dispersed))
+    reveil.actif = false
+  const tReveil = performance.now() / 1000 - reveil.t0
   // 1. l'ATTENTION : la visée d'abord ; sinon le mécanisme notable le plus
   // proche — chaudière, cible laser, cachette encore voilée — puis le sas
   let tx = 0
   let ty = 0
   let vise = false
-  if (stickVise()) {
+  if (reveil.actif) {
+    // le RÉVEIL : le regard visite un coin de la salle, puis glisse au sas
+    if (tReveil < reveil.bascule) {
+      tx = reveil.balayageX
+      ty = reveil.balayageY
+    } else {
+      tx = exitMouth.x
+      ty = exitMouth.y
+    }
+    vise = true
+  } else if (stickVise()) {
     // à la manette, le point de visée est le point d'ÉJECTION — derrière le
     // corps en eau : le regard, lui, suit le STICK — là où l'on veut aller
     // (axe Y du stick vers le bas, monde vers le haut)
@@ -3737,8 +3781,9 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
   // 2. la RESPIRATION : le rythme raconte l'état intérieur
   const peril = endgame.lastCall || endgame.spent
   // l'idle approfondit le souffle ; l'ÉTIREMENT est une grande inspiration
-  const ampCible =
-    input.aimActive
+  const ampCible = reveil.actif
+    ? 0.03 // la grande inspiration du réveil
+    : input.aimActive
       ? 0.004
       : peril
         ? 0.022
@@ -3747,13 +3792,31 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
           : idle.t > 4
             ? 0.017
             : 0.013
-  const vitCible = peril ? 4.8 : idle.type === 'etire' ? 0.9 : idle.t > 4 ? 1.35 : 1.7
+  const vitCible = reveil.actif
+    ? 1.0
+    : peril
+      ? 4.8
+      : idle.type === 'etire'
+        ? 0.9
+        : idle.t > 4
+          ? 1.35
+          : 1.7
   presence.amp += (ampCible - presence.amp) * k
   presence.vit += (vitCible - presence.vit) * k
   // 3. le FRISSON : armé hors du froid, déclenché quand il saisit
   if (sim.froidFrac < 0.05) presence.armeFrisson = true
   if (presence.armeFrisson && sim.froidFrac >= 0.18) {
     presence.armeFrisson = false
+    presence.t0Frisson = elapsed
+  }
+  // le frisson de RÉVEIL, à son instant tiré au sort
+  if (
+    reveil.actif &&
+    !reveil.frissonFait &&
+    reveil.frissonT >= 0 &&
+    tReveil >= reveil.frissonT
+  ) {
+    reveil.frissonFait = true
     presence.t0Frisson = elapsed
   }
   const dtF = elapsed - presence.t0Frisson
@@ -3885,7 +3948,9 @@ for (const b of Array.from(
     switch (quoi) {
       case 'bonbonne-plus':
         run.bonbonneLiters = Math.min(BONBONNE_CAP, run.bonbonneLiters + 2)
-        pupDit(`Bonbonne : ${run.bonbonneLiters.toFixed(1)} / ${BONBONNE_CAP} L.`)
+        pupDit(
+          `Bonbonne : ${run.bonbonneLiters.toFixed(1)} / ${BONBONNE_CAP} L.`,
+        )
         break
       case 'bonbonne-vider':
         run.bonbonneLiters = 0
@@ -3972,13 +4037,8 @@ const mbTimers: number[] = []
 // Le fil de la cérémonie : bilan (temps 1-3, sautables) → versement (le
 // surplus choisit sa destination) → draft (un tirage par palier franchi)
 // → fin (jauge et CONTINUER). Le versement et la suite ne se sautent pas.
-let mbEtape:
-  | 'bilan'
-  | 'versement'
-  | 'etalonnage'
-  | 'draft'
-  | 'salles'
-  | 'fin' = 'bilan'
+let mbEtape: 'bilan' | 'versement' | 'etalonnage' | 'draft' | 'salles' | 'fin' =
+  'bilan'
 let mbDraftsRestants = 0
 let mbBilanCourant: BilanSalle | null = null
 
@@ -4500,6 +4560,24 @@ function restart(): void {
   appliqueSequence()
   if (document.body.classList.contains('playing')) {
     camera.startIntro(sim.bounds, window.innerWidth, window.innerHeight)
+    // le RÉVEIL : tirage du petit scénario joué pendant l'intro caméra —
+    // chronométré en temps RÉEL, comme le zoom qu'il accompagne
+    reveil.actif = true
+    reveil.t0 = performance.now() / 1000
+    reveil.frissonT = Math.random() < 0.7 ? 0.4 + Math.random() * 1.2 : -1
+    reveil.frissonFait = false
+    const bv = level.bounds
+    reveil.balayageX =
+      bv.minX + (0.2 + 0.6 * Math.random()) * (bv.maxX - bv.minX)
+    reveil.balayageY =
+      bv.minY + (0.2 + 0.6 * Math.random()) * (bv.maxY - bv.minY)
+    reveil.bascule = 0.8 + Math.random() * 0.9
+    // une vignette physique au réveil, une fois sur deux — le corps se
+    // rassemble ou s'étire en sortant de sa torpeur
+    if (Math.random() < 0.55) {
+      idle.type = Math.random() < 0.5 ? 'toilette' : 'etire'
+      idle.t0 = elapsed
+    }
     showTableauCard()
     // la cinématique d'ENTRÉE du tableau : à l'arrivée seulement — un R sur
     // place ne la rejoue pas (et MAINTENIR la saute de toute façon)

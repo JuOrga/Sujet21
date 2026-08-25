@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 03:40',
+    title:
+      'LE RÉVEIL : à chaque tableau, le Sujet s’éveille — petit scénario aléatoire pendant le zoom',
+    notes: [
+      'Demandé : pendant le zoom automatique d’entrée d’un tableau, de petites animations aléatoires du volume vivant. C’est fait, bâti sur le PACK PRÉSENCE (regard, respiration, frisson) : à chaque arrivée en salle, un scénario de réveil est tiré au sort — une GRANDE INSPIRATION lente qui se calme, le REGARD qui visite d’abord un coin aléatoire de la pièce avant de glisser vers le sas, souvent un FRISSON à un instant tiré au sort (7 fois sur 10), et une fois sur deux une vignette physique : le corps se RASSEMBLE sur lui-même (toilette) ou s’ÉTIRE en sortant de sa torpeur.',
+      'Jamais deux réveils identiques : point de balayage, instant du frisson, choix de la vignette — tout est retiré à chaque essai (un simple R suffit à le voir). Le scénario est chronométré en temps RÉEL, calé sur la durée du zoom caméra, et s’efface dès que l’intro se termine ou que le joueur agit. Vérifié en jeu sur trois essais consécutifs : trois réveils différents, frisson déclenché à son instant, regard qui s’allume (0 → 0,9), inspiration qui gonfle.',
+    ],
+  },
+  {
     date: '26/08/2026 11:30',
     title: 'Le regard suit la souris et le stick — sans un clic',
     notes: [
@@ -24,8 +33,7 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '26/08/2026 09:30',
-    title:
-      'Le Sujet est VIVANT : regard, respiration, frisson — et l’idle',
+    title: 'Le Sujet est VIVANT : regard, respiration, frisson — et l’idle',
     notes: [
       'La personnification du volume, sans visage ni mascotte : la vie sort de la matière. LE REGARD — un noyau plus dense et plus clair glisse dans la masse vers ce que le corps regarde : la visée d’abord, sinon le mécanisme notable le plus proche (chaudière, cible laser, cachette voilée), sinon le sas. Pas un œil dessiné : une intention. (Correction de visibilité au passage : posé AVANT le reflet mercure, le miroir le diluait jusqu’à l’invisible — il s’ajoute désormais après, et se voit.)',
       'LA RESPIRATION — le contour du corps pulse doucement : lent au calme, plus ample quand on le laisse tranquille, court et rapide quand la réserve est à sec — et SUSPENDU pendant la visée : il retient son souffle. Seul le corps liquide respire : ni le gel, ni le nuage, ni les gouttes égarées. LE FRISSON — quand une aura froide le saisit, un tremblement bref le traverse, puis se réarme au chaud.',
