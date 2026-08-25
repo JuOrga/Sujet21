@@ -64,6 +64,16 @@ describe('FluidSim — le radiateur : la chaleur vaporise, dégèle, évapore', 
     expect(sim.gaseous[i]).toBe(1)
   })
 
+  it('froidFrac mesure la présence du corps dans une aura FROIDE (le frisson y lit son déclencheur)', () => {
+    const plate = { minX: -200, minY: -40, maxX: 200, maxY: 0, material: MAT_FROID }
+    const sim = new FluidSim({ ...DEFAULT_PARAMS }, OPEN, 2048)
+    sim.setLevel([plate], [])
+    sim.addParticle(0, 8, KIND_PLAYER) // dans l'aura
+    sim.addParticle(0, 1200, KIND_PLAYER) // à l'abri
+    sim.step(sim.params.dt)
+    expect(sim.froidFrac).toBeCloseTo(0.5, 1)
+  })
+
   it('chauffeFrac mesure la PRÉSENCE du corps actif dans l’aura', () => {
     const sim = makeSim()
     sim.addParticle(0, 8, KIND_PLAYER) // dans l'aura

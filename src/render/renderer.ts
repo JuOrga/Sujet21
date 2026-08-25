@@ -303,6 +303,12 @@ uniform float uBrume; // 0..1 : densité de la brume d'ambiance du tableau
 // renvoie les alentours (carte de lumière et décor, échantillonnés le
 // long de la normale) ; 0, le rendu classique, inchangé au pixel près.
 uniform float uMiroirEau;
+// LE PACK PRÉSENCE : le Sujet est VIVANT — son attention (le regard), sa
+// respiration (le contour qui pulse) et son frisson passent par ici.
+uniform vec2 uRegardPos; // le point interne vers lequel l'attention glisse
+uniform float uRegardInt; // 0..1 : présence du regard
+uniform vec2 uRespiration; // x amplitude (fraction du seuil) · y pulsation
+uniform float uFrisson; // 0..1 : tremblement bref (le froid le saisit)
 // Le mode MERCURE (uMiroirEau = 2) organise son reflet autour du CORPS :
 // centre et rayon efficace lus dans les stats de la simulation.
 uniform vec2 uCentroide;
@@ -1313,7 +1319,16 @@ void main() {
     smokeN = 0.62 * smokeN + 0.38 * dnoise(world * 0.11 - vec2(uTime * 0.31, -uTime * 0.24));
   }
 
-  float field2 = field * (1.0 + 0.14 * waveGlow);
+  // LA RESPIRATION et LE FRISSON : le contour du corps vivant PULSE
+  // doucement (amplitude et rythme dictés par le jeu : calme, alerte,
+  // souffle retenu en visée) et TREMBLE un court instant quand le froid le
+  // saisit. Seul le corps liquide respire : ni le gel, ni le nuage, ni les
+  // gouttes égarées (player ≈ 0).
+  float vivant = (1.0 - icy) * (1.0 - vap) * clamp(player, 0.0, 1.0);
+  float respire = uRespiration.x * sin(uTime * uRespiration.y);
+  float frisson = uFrisson * 0.05 *
+    sin(world.x * 0.85 + uTime * 42.0) * sin(world.y * 0.8 - uTime * 36.0);
+  float field2 = field * (1.0 + 0.14 * waveGlow + (respire + frisson) * vivant);
   // Les bords du nuage bouillonnent : le bruit ronge et gonfle la surface
   field2 *= 1.0 + vap * (smokeN - 0.5) * 1.1;
   float body = smoothstep(th - s, th + s, field2);
@@ -1330,6 +1345,18 @@ void main() {
     vec3 fast = vec3(0.55, 0.85, 0.95);
     vec3 water = mix(slow, fast, speedT);
     water = mix(water * 0.40, water, clamp(player, 0.0, 1.0)); // eau libre plus sombre
+
+    // LE REGARD : l'attention du Sujet — un noyau plus dense et plus clair
+    // GLISSE dans la masse vers ce qu'il regarde (la visée, un mécanisme
+    // proche, le sas). Pas un œil dessiné : une intention dans la matière.
+    // Le gel l'assourdit sans l'éteindre ; le nuage n'a pas de noyau.
+    if (uRegardInt > 0.003) {
+      float dRegard = distance(world, uRegardPos);
+      float noyau = exp(-dRegard * dRegard / (2.0 * 24.0 * 24.0));
+      water += vec3(0.15, 0.30, 0.40) *
+        (noyau * uRegardInt * (1.0 - vap) * (1.0 - icy * 0.6) *
+          clamp(player, 0.0, 1.0));
+    }
 
     // Relief : pseudo-normale sur un champ FLOUTÉ (4 prélèvements écartés) —
     // les dérivées par pixel liraient chaque particule comme une bille.
@@ -2804,6 +2831,16 @@ export class Renderer {
     brume = 0, // brume d'ambiance du tableau (0 : aucune)
     miroirEau = 1, // 1 surface MIROITANTE (reflet par houle), 2 MIROITANT MERCURE (reflet d'un seul tenant autour du corps), 0 classique
     plafond = '', // variante de plafond du tableau ('' : plafond.webp)
+    // le PACK PRÉSENCE : regard (position du noyau + intensité), respiration
+    // (amplitude + pulsation) et frisson — calculés par le jeu, image par image
+    presence: {
+      regardX: number
+      regardY: number
+      regardInt: number
+      respAmp: number
+      respVit: number
+      frisson: number
+    } | null = null,
   ): void {
     const gl = this.gl
     const devW = Math.max(1, Math.round(viewportW * dpr))
@@ -2969,6 +3006,11 @@ export class Renderer {
     // le miroir MERCURE s'enroule autour du corps : centre + rayon de
     // silhouette (rms → contour, facteur constaté ~1.9)
     gl.uniform2f(cu['uCentroide'], sim.stats.centroidX, sim.stats.centroidY)
+    // le pack présence : sans lui, tout dort (regard éteint, souffle plat)
+    gl.uniform2f(cu['uRegardPos'], presence?.regardX ?? 0, presence?.regardY ?? 0)
+    gl.uniform1f(cu['uRegardInt'], presence?.regardInt ?? 0)
+    gl.uniform2f(cu['uRespiration'], presence?.respAmp ?? 0, presence?.respVit ?? 1)
+    gl.uniform1f(cu['uFrisson'], presence?.frisson ?? 0)
     gl.uniform1f(cu['uRayonCorps'], Math.max(40, sim.stats.rmsRadius * 1.9))
     this.setPlafond(plafond)
     gl.uniform1f(cu['uLampeSpriteRond'], this.texLampeRonde ? 1 : 0)

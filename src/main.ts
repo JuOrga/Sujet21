@@ -42,6 +42,7 @@ import {
   TABLEAU_9,
   TABLEAUX,
   TABLEAUX_ECOLE,
+  MAT_CHAUD,
   MAT_WALL,
   pointInBox,
   zoneForceAt,
@@ -3520,6 +3521,89 @@ function rebuildRenderBoxes(): void {
     { ...level.exit, material: MAT_EXIT },
   ]
 }
+// ---- LE PACK PRÉSENCE : le Sujet est vivant ----
+// Trois signes de vie, purement visuels, calculés ici et rendus au shader :
+// · le REGARD — un noyau interne glisse vers ce que le corps regarde (la
+//   visée, un mécanisme proche, le sas) ;
+// · la RESPIRATION — le contour pulse : lent au calme, court en alerte
+//   (réserve à sec), suspendu pendant la visée ;
+// · le FRISSON — un tremblement bref quand le froid saisit le corps.
+const presence = {
+  x: 0,
+  y: 0,
+  int: 0,
+  amp: 0,
+  vit: 1.7,
+  frisson: 0,
+  t0Frisson: -9,
+  armeFrisson: true,
+}
+;(window as unknown as { __presence: typeof presence }).__presence = presence
+function majPresence(dtReal: number, aimX: number, aimY: number): void {
+  const cx = sim.stats.centroidX
+  const cy = sim.stats.centroidY
+  // 1. l'ATTENTION : la visée d'abord ; sinon le mécanisme notable le plus
+  // proche — chaudière, cible laser, cachette encore voilée — puis le sas
+  let tx = 0
+  let ty = 0
+  let vise = false
+  if (input.aimActive) {
+    tx = aimX
+    ty = aimY
+    vise = true
+  } else if (!sim.dispersed) {
+    let best = Infinity
+    const regarde = (x: number, y: number, portee: number): void => {
+      const d = Math.hypot(x - cx, y - cy)
+      if (d < portee && d < best) {
+        best = d
+        tx = x
+        ty = y
+        vise = true
+      }
+    }
+    for (const b of level.boxes) {
+      if (b.material === MAT_CHAUD)
+        regarde((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, 420)
+    }
+    for (const t of level.cibles ?? []) regarde(t.x, t.y, 500)
+    const caches = level.caches ?? []
+    for (let i = 0; i < caches.length; i++) {
+      if ((cachesLevee[i] ?? Infinity) === Infinity) {
+        const c = caches[i]
+        regarde((c.minX + c.maxX) / 2, (c.minY + c.maxY) / 2, 420)
+      }
+    }
+    regarde(exitMouth.x, exitMouth.y, 1100)
+  }
+  // le noyau vit DANS le corps : à mi-chemin du bord, du côté regardé
+  const k = 1 - Math.exp(-4.5 * dtReal)
+  if (vise) {
+    const d = Math.hypot(tx - cx, ty - cy) || 1
+    const portee = Math.min(d, sim.stats.rmsRadius * 0.55)
+    presence.x += (cx + ((tx - cx) / d) * portee - presence.x) * k
+    presence.y += (cy + ((ty - cy) / d) * portee - presence.y) * k
+  } else {
+    presence.x += (cx - presence.x) * k
+    presence.y += (cy - presence.y) * k
+  }
+  presence.int += ((vise && !sim.dispersed ? 1 : 0) - presence.int) * k
+  // 2. la RESPIRATION : le rythme raconte l'état intérieur
+  const peril = endgame.lastCall || endgame.spent
+  const ampCible = input.aimActive ? 0.004 : peril ? 0.022 : 0.013
+  const vitCible = peril ? 4.8 : 1.7
+  presence.amp += (ampCible - presence.amp) * k
+  presence.vit += (vitCible - presence.vit) * k
+  // 3. le FRISSON : armé hors du froid, déclenché quand il saisit
+  if (sim.froidFrac < 0.05) presence.armeFrisson = true
+  if (presence.armeFrisson && sim.froidFrac >= 0.18) {
+    presence.armeFrisson = false
+    presence.t0Frisson = elapsed
+  }
+  const dtF = elapsed - presence.t0Frisson
+  presence.frisson = dtF >= 0 && dtF < 1 ? Math.exp(-dtF * 3.4) : 0
+}
+
 // ---- HUD : les instruments emportés, et la bonbonne qui se VERSE ----
 const hudInstrChip = document.getElementById(
   'hud-instr-chip',
@@ -5862,6 +5946,7 @@ function frame(now: number): void {
   appliqueSequence() // carte et secousse de la mise en scène
   drawMecanismes(vw, vh, dpr)
   drawFleche(dtReal, dpr)
+  majPresence(dtReal, aim.x, aim.y)
   const renderT0 = performance.now()
   renderer.render(
     sim,
@@ -5888,6 +5973,14 @@ function frame(now: number): void {
     level.brume ?? 0,
     eauMiroir,
     level.plafond ?? '',
+    {
+      regardX: presence.x,
+      regardY: presence.y,
+      regardInt: presence.int,
+      respAmp: presence.amp,
+      respVit: presence.vit,
+      frisson: presence.frisson,
+    },
   )
   const rendRaw = performance.now() - renderT0
   monitor.renderMs += (rendRaw - monitor.renderMs) * 0.08

@@ -208,6 +208,9 @@ export class FluidSim {
   // chauffe — le déclencheur de la transformation à 95 % (main.ts). Mise à
   // jour à chaque pas par processCold.
   chauffeFrac = 0
+  // Fraction du corps actif dans une AURA FROIDE — le pack présence y lit
+  // le FRISSON (le tremblement bref du corps que le froid saisit)
+  froidFrac = 0
 
   // Impulsions vapeur restantes : le compteur se REMPLIT à chaque
   // TRANSFORMATION en vapeur (règle d'or : N par bascule, quel que soit le
@@ -2520,6 +2523,7 @@ export class FluidSim {
     const agit = p.heatAgitation * dt
     const kAgit = 0.06
     let joueursEnChauffe = 0
+    let joueursAuFroid = 0
     for (let i = 0; i < this.count; i++) {
       const x = this.posX[i]
       const y = this.posY[i]
@@ -2540,6 +2544,7 @@ export class FluidSim {
       // Radiateur (tableau 4) : l'aura de chaleur, symétrique de l'aura de gel
       const heat = this.heatExposureAt(x, y)
       if (heat > 0 && this.kind[i] === KIND_PLAYER) joueursEnChauffe++
+      if (exposure > 0.05 && this.kind[i] === KIND_PLAYER) joueursAuFroid++
 
       // Vapeur : le froid condense en priorité (vite), puis la chaleur
       // vaporise qu'on le veuille ou non, sinon l'intention (G) vaporise et
@@ -2656,6 +2661,8 @@ export class FluidSim {
 
     this.chauffeFrac =
       this.playerCount > 0 ? joueursEnChauffe / this.playerCount : 0
+    this.froidFrac =
+      this.playerCount > 0 ? joueursAuFroid / this.playerCount : 0
 
     // La vapeur qui s'attarde dans l'aura d'un radiateur s'évapore : perdue,
     // pas mise en bonbonne. La plus exposée part en premier.
