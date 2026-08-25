@@ -91,6 +91,42 @@ export function estCodeHub(code: string): boolean {
   return /^hub\d*$/i.test(code.trim())
 }
 
+// ---- Le CODE ATELIER : la convention de nommage des tableaux ------------
+// Trois chiffres, chacun porte un sens — « 111 » se lit chiffre à chiffre :
+//   · 1ᵉʳ  chiffre : la PHASE de la partie (1 = début de game, puis ça monte)
+//   · 2ᵉ   chiffre : la MÉCANIQUE requise pour franchir le tableau
+//         (0 rien de spécial · 1 la glace · 2 la vapeur · 3 toutes)
+//   · 3ᵉ   chiffre : la DIFFICULTÉ, à phase et mécanique égales
+// Tout autre code (21-A, HUB…) est simplement hors convention : il se charge
+// et se joue pareil — il n'a juste rien à décoder.
+
+export interface CodeAtelier {
+  phase: number
+  mecanique: 0 | 1 | 2 | 3
+  difficulte: number
+}
+
+export const MECANIQUE_NOMS: Record<CodeAtelier['mecanique'], string> = {
+  0: 'aucune',
+  1: 'glace',
+  2: 'vapeur',
+  3: 'toutes',
+}
+
+/** Décode un code de la convention atelier — null si le code n'en est pas
+ * (ce n'est pas une erreur : les codes livrés « 21-A » vivent à côté). */
+export function decodeCodeAtelier(code: string): CodeAtelier | null {
+  const m = /^(\d)(\d)(\d)$/.exec(code.trim())
+  if (!m) return null
+  const mecanique = Number(m[2])
+  if (mecanique > 3) return null // 4..9 : pas une mécanique connue
+  return {
+    phase: Number(m[1]),
+    mecanique: mecanique as CodeAtelier['mecanique'],
+    difficulte: Number(m[3]),
+  }
+}
+
 /** Boîte normalisée : min toujours inférieur à max, matériau connu. */
 function readBox(o: Record<string, unknown>): ObstacleBox | null {
   const minX = num(o.minX)

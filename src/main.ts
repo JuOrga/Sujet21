@@ -6,7 +6,12 @@ import { FluidSim, KIND_PLAYER } from './sim/solver'
 import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
 import { TABLEAU_HUB, TABLEAU_HUB_COMPACT } from './game/hub'
-import { estCodeHub } from './game/levelIO'
+import {
+  MECANIQUE_NOMS,
+  decodeCodeAtelier,
+  estCodeHub,
+  type CodeAtelier,
+} from './game/levelIO'
 import {
   BONBONNE_CAP,
   instrumentDef,
@@ -957,9 +962,15 @@ recsEl.addEventListener('pointerdown', (e) => {
 // de l'éditeur (dans l'ordre fixé là-bas) s'affichent en tête quand la
 // bibliothèque partagée en contient, au-dessus de l'expédition livrée.
 const sallesEl = document.getElementById('salles') as HTMLDivElement
+// Tri du voile : l'ordre de l'éditeur (défaut), ou l'un des trois chiffres
+// du CODE ATELIER (« 111 » : phase · mécanique requise · difficulté). Les
+// codes hors convention se rangent après, dans l'ordre de l'éditeur.
+let sallesTri: 'editeur' | 'phase' | 'meca' | 'diff' = 'editeur'
 function renderSalles(): void {
   const liste = document.getElementById('salles-liste') as HTMLDivElement
   liste.innerHTML = ''
+  const esc = (t: string): string =>
+    t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
   const section = (titre: string): void => {
     const h = document.createElement('div')
     h.className = 'salles-sec'
@@ -969,17 +980,48 @@ function renderSalles(): void {
   const salle = (lv: LevelDef): void => {
     const b = document.createElement('button')
     b.type = 'button'
-    b.innerHTML = `<b>${lv.code}</b>${lv.name}`
+    const d = decodeCodeAtelier(lv.code)
+    const chips = d
+      ? `<span class="salle-chips"><i>PHASE ${d.phase}</i>` +
+        `<i class="sc-m${d.mecanique}">${MECANIQUE_NOMS[d.mecanique].toUpperCase()}</i>` +
+        `<i>DIFF ${d.difficulte}</i></span>`
+      : ''
+    b.innerHTML = `<b>${esc(lv.code)}</b><span class="salle-nom">${esc(lv.name)}</span>${chips}`
     b.addEventListener('click', () => {
       sallesEl.hidden = true
       startTest([lv])
     })
     liste.appendChild(b)
   }
-  const enSequence = libraryLevels.filter((l) => !estCodeHub(l.code))
+  let enSequence = libraryLevels.filter((l) => !estCodeHub(l.code))
+  if (sallesTri !== 'editeur') {
+    const rang = (d: CodeAtelier): number =>
+      sallesTri === 'phase'
+        ? d.phase
+        : sallesTri === 'meca'
+          ? d.mecanique
+          : d.difficulte
+    // tri STABLE : à égalité, l'ordre de l'éditeur tient ; le chiffre choisi
+    // prime, les deux autres départagent (phase, puis mécanique, puis diff)
+    enSequence = [...enSequence].sort((a, b) => {
+      const da = decodeCodeAtelier(a.code)
+      const db = decodeCodeAtelier(b.code)
+      if (!da && !db) return 0
+      if (!da) return 1
+      if (!db) return -1
+      return (
+        rang(da) - rang(db) ||
+        da.phase - db.phase ||
+        da.mecanique - db.mecanique ||
+        da.difficulte - db.difficulte
+      )
+    })
+  }
   if (enSequence.length > 0) {
     section(
-      'BIBLIOTHÈQUE DU LABO — en tête de séquence, dans l’ordre de l’éditeur',
+      sallesTri === 'editeur'
+        ? 'BIBLIOTHÈQUE DU LABO — en tête de séquence, dans l’ordre de l’éditeur'
+        : 'BIBLIOTHÈQUE DU LABO — triée par le code atelier',
     )
     for (const lv of enSequence) salle(lv)
     section('EXPÉDITION LIVRÉE — elle s’enchaîne à la suite')
@@ -987,6 +1029,18 @@ function renderSalles(): void {
   for (const lv of [...TABLEAUX_ECOLE, ...TABLEAUX, TABLEAU_1BIS]) salle(lv)
 }
 renderSalles()
+{
+  const boutons = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('#salles-outils button'),
+  )
+  for (const btn of boutons) {
+    btn.addEventListener('click', () => {
+      sallesTri = (btn.dataset.tri as typeof sallesTri) ?? 'editeur'
+      for (const b of boutons) b.classList.toggle('actif', b === btn)
+      renderSalles()
+    })
+  }
+}
 document.getElementById('home-salles')?.addEventListener('click', () => {
   sallesEl.hidden = false
 })

@@ -355,6 +355,81 @@
       #salles-liste button:hover {
         border-color: var(--specimen);
       }
+      /* barre d'outils du voile SALLES : le tri par code atelier, et la
+         légende qui explique la convention à trois chiffres */
+      .salles-outils {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        padding: 10px 12px 0;
+      }
+      .salles-outils > span {
+        font-family: var(--font-display);
+        font-size: 9.5px;
+        letter-spacing: 0.16em;
+        color: var(--dim);
+      }
+      .salles-outils button {
+        font-family: var(--font-display);
+        font-size: 9.5px;
+        letter-spacing: 0.14em;
+        padding: 4px 9px;
+        background: transparent;
+        color: var(--dim);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .salles-outils button:hover {
+        border-color: var(--specimen);
+      }
+      .salles-outils button.actif {
+        color: var(--specimen);
+        border-color: var(--specimen);
+      }
+      .salles-legende {
+        margin: 7px 12px 0;
+        font-size: 11px;
+        line-height: 1.5;
+        color: var(--dim);
+      }
+      .salles-legende b {
+        color: var(--specimen);
+        font-weight: 600;
+      }
+      .salle-nom {
+        display: block;
+      }
+      /* pastilles décodées du code atelier : phase · mécanique · difficulté */
+      .salle-chips {
+        display: flex;
+        gap: 4px;
+        margin-top: 5px;
+        flex-wrap: wrap;
+      }
+      .salle-chips i {
+        font-style: normal;
+        font-family: var(--font-display);
+        font-size: 8.5px;
+        letter-spacing: 0.12em;
+        padding: 2px 6px;
+        border-radius: 3px;
+        border: 1px solid var(--line);
+        color: var(--dim);
+      }
+      .salle-chips .sc-m1 {
+        color: #8fc8ee;
+        border-color: rgba(143, 200, 238, 0.45);
+      }
+      .salle-chips .sc-m2 {
+        color: #f2c98e;
+        border-color: rgba(242, 201, 142, 0.45);
+      }
+      .salle-chips .sc-m3 {
+        color: #a878e8;
+        border-color: rgba(168, 120, 232, 0.45);
+      }
       #salles-liste button b {
         color: var(--specimen);
         font-family: var(--font-display);
@@ -4238,6 +4313,17 @@
       <div class="salles-boite">
         <div class="salles-tete"><span>CHARGER UNE SALLE — essai hors expédition</span>
           <button type="button" id="salles-fermer" aria-label="Fermer">✕</button></div>
+        <div class="salles-outils" id="salles-outils" role="group" aria-label="Trier les salles">
+          <span>TRI</span>
+          <button type="button" data-tri="editeur" class="actif">ORDRE DE L'ÉDITEUR</button>
+          <button type="button" data-tri="phase">PHASE</button>
+          <button type="button" data-tri="meca">MÉCANIQUE</button>
+          <button type="button" data-tri="diff">DIFFICULTÉ</button>
+        </div>
+        <p class="salles-legende">Code atelier « <b>111</b> », chiffre à chiffre :
+          <b>1ᵉʳ</b> la PHASE de la partie (1 = début de game) ·
+          <b>2ᵉ</b> la MÉCANIQUE requise (0 aucune · 1 glace · 2 vapeur · 3 toutes) ·
+          <b>3ᵉ</b> la DIFFICULTÉ. Les autres codes (21-A, HUB…) sont hors convention.</p>
         <div id="salles-liste"></div>
       </div>
     </div>

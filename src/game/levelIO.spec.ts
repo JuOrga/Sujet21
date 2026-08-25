@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { checkLevel, estCodeHub, parseLevel, serializeLevel } from './levelIO'
+import {
+  checkLevel,
+  decodeCodeAtelier,
+  estCodeHub,
+  parseLevel,
+  serializeLevel,
+} from './levelIO'
 import { TABLEAU_1BIS, TABLEAUX, zoneForceAt, type LevelDef } from './level'
 
 describe('levelIO — aller-retour JSON', () => {
@@ -446,6 +452,29 @@ describe('le code HUB : un mot-clé, pas une casse à deviner', () => {
     // le hublot n'est pas un hub, ni les codes de salle ordinaires
     for (const non of ['HUBLOT', '21-A', '21-hub', 'HUB-2', '']) {
       expect(estCodeHub(non)).toBe(false)
+    }
+  })
+  it('decodeCodeAtelier lit les trois chiffres de la convention', () => {
+    expect(decodeCodeAtelier('111')).toEqual({
+      phase: 1,
+      mecanique: 1,
+      difficulte: 1,
+    })
+    expect(decodeCodeAtelier('203')).toEqual({
+      phase: 2,
+      mecanique: 0,
+      difficulte: 3,
+    })
+    expect(decodeCodeAtelier(' 132 ')).toEqual({
+      phase: 1,
+      mecanique: 3,
+      difficulte: 2,
+    })
+  })
+  it('decodeCodeAtelier refuse ce qui sort de la convention', () => {
+    // pas trois chiffres, mécanique inconnue (4..9), codes livrés, hub…
+    for (const non of ['21-A', 'HUB', '11', '1111', '141', '1a1', '']) {
+      expect(decodeCodeAtelier(non)).toBeNull()
     }
   })
 })
