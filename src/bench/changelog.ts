@@ -14,6 +14,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 00:40',
+    title: 'Les tranches VERTICALES prennent enfin la couleur de leur volume',
+    notes: [
+      'Retour du concepteur : les arêtes verticales n’avaient pas les couleurs des volumes. La cause était une erreur de repère dans le dégradé de la tranche : sa « hauteur » se mesurait contre la mauvaise référence, si bien que TOUTE la tranche restait à la couleur du pied — sombre, quasi neutre — et le haut coloré n’était jamais atteint. Flagrant sur les faces verticales.',
+      'La hauteur se mesure désormais entre les deux vraies bornes de la tranche : la silhouette de la base (le pied) et le bord du dessus déplacé (le sommet) — par les deux champs de distance, fiable sur toutes les faces et toutes les formes. Et la couleur monte vite (courbe racine) : la tranche EST le matériau. Vérifié en jeu (relief FORT, banc des huit matériaux, caméra de côté) : les faces verticales de l’hydrophile, l’hydrophobe et la membrane affichent leur turquoise, violet et vert pleins, dégradé du pied au chant clair, strates comprises.',
+    ],
+  },
+  {
     date: '25/08/2026 23:30',
     title:
       'Relief 2.5D refondu : tranches PLEINES et teintées, volume pour TOUS les solides',
