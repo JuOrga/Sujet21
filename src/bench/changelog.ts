@@ -14,6 +14,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '25/08/2026 23:30',
+    title:
+      'Relief 2.5D refondu : tranches PLEINES et teintées, volume pour TOUS les solides',
+    notes: [
+      'Trois retours du concepteur, trois corrections. Les ÉCRANS DE SERVICE qui semblaient posés « à côté » des murs : SUPPRIMÉS. Les tranches « fades ou transparentes » : elles sont désormais PLEINES (opaques, plus de voile fantôme) et franchement teintées par matériau — turquoise mouillé pour l’hydrophile, violet cireux pour l’hydrophobe, vert d’eau pour la membrane, bleu givré pour le froid, orange pour la chaudière, ambre pour la borne… — avec le pied dans l’ombre, des strates, des joints, et un chant clair sous l’arête.',
+      'Et le VOLUME s’étend à TOUS les solides : membranes, rideaux, évents, plaques froides, chaudières et surchauffeurs ont maintenant un sommet qui fuit la caméra et une tranche qui se révèle — plus seulement les murs et surfaces chimiques. La cause du « à côté » est aussi corrigée à la racine : le sommet de ces éléments ne se déplaçait pas, la tranche flottait donc hors du bloc ; leurs remplissages suivent désormais la géométrie déplacée, la tranche colle au pied.',
+      'Vérifié en jeu (relief FORT, salle-témoin avec les huit matériaux en rang) : chaque colonne montre sa tranche pleine à sa couleur, l’identité des surfaces se lit sur le côté comme sur le dessus. Réglage inchangé : PARAMÈTRES → relief léger / fort.',
+    ],
+  },
+  {
     date: '25/08/2026 21:20',
     title:
       'Le toast du codex se VISITE : un clic (ou SELECT) ouvre la fiche neuve',
