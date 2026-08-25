@@ -983,8 +983,12 @@ void main() {
       vec2 gB = vec2(dFdx(d), dFdy(d));
       float gn2 = max(length(gB), 1e-5);
       vec2 nrm = gB / gn2;
-      float spanN = max(dot(relDisp, nrm), 6.0);
-      float ht = clamp(d / spanN, 0.0, 1.0);
+      // la hauteur RÉELLE le long de la tranche : 0 au pied (la silhouette
+      // de la base), 1 au sommet (le bord du dessus déplacé) — mesurée par
+      // les DEUX SDF, fiable sur toutes les faces, verticales comprises
+      // (l'ancienne formule laissait ht à zéro sur toute la tranche : le
+      // pied sombre partout, la couleur du matériau jamais atteinte)
+      float ht = clamp(-d / max(dV - d, 1e-3), 0.0, 1.0);
       float u = dot(wbV, vec2(-nrm.y, nrm.x));
       vec3 basC; vec3 hautC;
       if (mat < 0.5)      { basC = vec3(0.055, 0.070, 0.090); hautC = vec3(0.17, 0.21, 0.26); }
@@ -996,7 +1000,7 @@ void main() {
       else if (mat < 7.5) { basC = vec3(0.030, 0.100, 0.080); hautC = vec3(0.10, 0.32, 0.26); }
       else if (mat < 8.5) { basC = vec3(0.100, 0.130, 0.175); hautC = vec3(0.32, 0.42, 0.55); }
       else                { basC = vec3(0.130, 0.105, 0.060); hautC = vec3(0.46, 0.36, 0.17); }
-      vec3 fc = mix(basC, hautC, ht);
+      vec3 fc = mix(basC, hautC, sqrt(ht)); // la couleur monte vite : la tranche EST le matériau
       // strates horizontales : la tranche a des couches, pas un aplat
       fc *= 0.92 + 0.08 * sin(ht * 18.0);
       // joints verticaux réguliers — et des rivets sur les parois neutres
