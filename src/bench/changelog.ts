@@ -14,6 +14,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 09:30',
+    title:
+      'Le Sujet est VIVANT : regard, respiration, frisson — et l’idle',
+    notes: [
+      'La personnification du volume, sans visage ni mascotte : la vie sort de la matière. LE REGARD — un noyau plus dense et plus clair glisse dans la masse vers ce que le corps regarde : la visée d’abord, sinon le mécanisme notable le plus proche (chaudière, cible laser, cachette voilée), sinon le sas. Pas un œil dessiné : une intention. (Correction de visibilité au passage : posé AVANT le reflet mercure, le miroir le diluait jusqu’à l’invisible — il s’ajoute désormais après, et se voit.)',
+      'LA RESPIRATION — le contour du corps pulse doucement : lent au calme, plus ample quand on le laisse tranquille, court et rapide quand la réserve est à sec — et SUSPENDU pendant la visée : il retient son souffle. Seul le corps liquide respire : ni le gel, ni le nuage, ni les gouttes égarées. LE FRISSON — quand une aura froide le saisit, un tremblement bref le traverse, puis se réarme au chaud.',
+      'L’IDLE — sans geste pendant quelques secondes, le Sujet existe tout seul : il fait sa TOILETTE (se resserre soigneusement), PENSE AU SAS (le regard y glisse), S’ÉTIRE (une grande inspiration lente), ou TAPOTE la paroi la plus proche — deux petits coups, comme on éprouve un mur. Rien qui joue à votre place : aucun gain de déplacement, et le moindre geste remet tout à zéro.',
+      'Le tout est purement visuel : AUCUN paramètre de simulation touché — les présets du banc (Ballet orbital en tête) sont au pixel et à la virgule près, et le banc, qui n’envoie pas de « présence » au rendu, affiche exactement comme avant.',
+    ],
+  },
+  {
     date: '26/08/2026 02:10',
     title:
       'Les facettes de la glace sont COHÉRENTES : taillées dans le bloc, elles tournent avec lui',

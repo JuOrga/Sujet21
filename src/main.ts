@@ -3539,6 +3539,116 @@ const presence = {
   armeFrisson: true,
 }
 ;(window as unknown as { __presence: typeof presence }).__presence = presence
+
+// ---- L'IDLE : la vie quand on ne joue pas ----
+// Sans geste pendant quelques secondes, le Sujet EXISTE tout seul — de
+// petites vignettes, jamais utiles, jamais à sa place : il fait sa
+// toilette (se resserre soigneusement), pense au sas (le regard y
+// glisse), s'étire (une grande respiration lente), tapote la paroi la
+// plus proche (deux petits coups, comme on éprouve un mur). Le moindre
+// geste du joueur remet tout à zéro.
+const idle = {
+  t: 0, // secondes sans geste
+  prochaine: 6, // seuil (en secondes d'idle) de la prochaine vignette
+  type: '' as '' | 'toilette' | 'sas' | 'etire' | 'tapote',
+  t0: 0, // début de la vignette (elapsed)
+  murX: 0,
+  murY: 0,
+}
+;(window as unknown as { __idle: typeof idle }).__idle = idle
+function majIdle(dtReal: number): void {
+  const geste = input.aimActive || input.freezeIntent || input.gasIntent
+  const enVie =
+    document.body.classList.contains('playing') &&
+    !input.paused &&
+    !sim.dispersed &&
+    !run.ended &&
+    !miseEnBonbonne &&
+    !lecteurCine.actif
+  if (geste || !enVie) {
+    idle.t = 0
+    idle.type = ''
+    idle.prochaine = 6 + Math.random() * 3
+    return
+  }
+  idle.t += dtReal
+  if (idle.type) {
+    const age = elapsed - idle.t0
+    const duree =
+      idle.type === 'sas'
+        ? 2.6
+        : idle.type === 'etire'
+          ? 1.9
+          : idle.type === 'tapote'
+            ? 1.1
+            : 1.0
+    if (age > duree) {
+      idle.type = ''
+      idle.prochaine = idle.t + 4 + Math.random() * 5
+    }
+  } else if (idle.t >= idle.prochaine) {
+    // choisir la vignette — tapoter seulement si une paroi est à portée
+    const cx = sim.stats.centroidX
+    const cy = sim.stats.centroidY
+    let murX = 0
+    let murY = 0
+    let best = Infinity
+    for (const b of level.boxes) {
+      const px = Math.max(b.minX, Math.min(cx, b.maxX))
+      const py = Math.max(b.minY, Math.min(cy, b.maxY))
+      const d = Math.hypot(px - cx, py - cy)
+      if (d < best) {
+        best = d
+        murX = px
+        murY = py
+      }
+    }
+    const choix: Array<'toilette' | 'sas' | 'etire' | 'tapote'> = ['toilette', 'sas', 'etire']
+    if (best < sim.stats.rmsRadius + 130) choix.push('tapote')
+    idle.type = choix[Math.floor(Math.random() * choix.length)]
+    idle.t0 = elapsed
+    idle.murX = murX
+    idle.murY = murY
+  }
+  // les vignettes PHYSIQUES — infimes, sans aucun gain de déplacement
+  if (idle.type === 'toilette') {
+    // la toilette : le corps se resserre soigneusement sur lui-même
+    const cx = sim.stats.centroidX
+    const cy = sim.stats.centroidY
+    const k = Math.min(1, 2.2 * dtReal)
+    for (let i = 0; i < sim.count; i++) {
+      if (sim.kind[i] !== KIND_PLAYER || sim.frozen[i] === 1 || sim.gaseous[i] === 1) continue
+      const dx = cx - sim.posX[i]
+      const dy = cy - sim.posY[i]
+      const d = Math.hypot(dx, dy)
+      if (d < 1e-3) continue
+      const ux = dx / d
+      const uy = dy / d
+      const vTarget = Math.min(38, d * 1.1)
+      const vRadial = sim.velX[i] * ux + sim.velY[i] * uy
+      sim.velX[i] += (vTarget - vRadial) * ux * k * 0.5
+      sim.velY[i] += (vTarget - vRadial) * uy * k * 0.5
+    }
+  } else if (idle.type === 'tapote') {
+    // deux petits coups vers la paroi, puis plus rien — un toc-toc
+    const age = elapsed - idle.t0
+    const coup = age < 0.14 || (age > 0.45 && age < 0.59)
+    if (coup) {
+      const cx = sim.stats.centroidX
+      const cy = sim.stats.centroidY
+      const d = Math.hypot(idle.murX - cx, idle.murY - cy) || 1
+      const ax = ((idle.murX - cx) / d) * 240 * dtReal
+      const ay = ((idle.murY - cy) / d) * 240 * dtReal
+      for (let i = 0; i < sim.count; i++) {
+        if (sim.kind[i] !== KIND_PLAYER || sim.frozen[i] === 1 || sim.gaseous[i] === 1) continue
+        sim.velX[i] += ax
+        sim.velY[i] += ay
+      }
+    }
+    if (age >= 0.14 && age < 0.14 + dtReal) audio.iceImpact(0.16)
+    if (age >= 0.59 && age < 0.59 + dtReal) audio.iceImpact(0.12)
+  }
+}
 function majPresence(dtReal: number, aimX: number, aimY: number): void {
   const cx = sim.stats.centroidX
   const cy = sim.stats.centroidY
@@ -3550,6 +3660,11 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
   if (input.aimActive) {
     tx = aimX
     ty = aimY
+    vise = true
+  } else if (idle.type === 'sas') {
+    // la vignette d'idle : il pense au sas — le regard y glisse
+    tx = exitMouth.x
+    ty = exitMouth.y
     vise = true
   } else if (!sim.dispersed) {
     let best = Infinity
@@ -3590,8 +3705,18 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
   presence.int += ((vise && !sim.dispersed ? 1 : 0) - presence.int) * k
   // 2. la RESPIRATION : le rythme raconte l'état intérieur
   const peril = endgame.lastCall || endgame.spent
-  const ampCible = input.aimActive ? 0.004 : peril ? 0.022 : 0.013
-  const vitCible = peril ? 4.8 : 1.7
+  // l'idle approfondit le souffle ; l'ÉTIREMENT est une grande inspiration
+  const ampCible =
+    input.aimActive
+      ? 0.004
+      : peril
+        ? 0.022
+        : idle.type === 'etire'
+          ? 0.034
+          : idle.t > 4
+            ? 0.017
+            : 0.013
+  const vitCible = peril ? 4.8 : idle.type === 'etire' ? 0.9 : idle.t > 4 ? 1.35 : 1.7
   presence.amp += (ampCible - presence.amp) * k
   presence.vit += (vitCible - presence.vit) * k
   // 3. le FRISSON : armé hors du froid, déclenché quand il saisit
@@ -5946,6 +6071,7 @@ function frame(now: number): void {
   appliqueSequence() // carte et secousse de la mise en scène
   drawMecanismes(vw, vh, dpr)
   drawFleche(dtReal, dpr)
+  majIdle(dtReal)
   majPresence(dtReal, aim.x, aim.y)
   const renderT0 = performance.now()
   renderer.render(

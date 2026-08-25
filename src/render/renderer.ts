@@ -1350,18 +1350,6 @@ void main() {
     vec3 water = mix(slow, fast, speedT);
     water = mix(water * 0.40, water, clamp(player, 0.0, 1.0)); // eau libre plus sombre
 
-    // LE REGARD : l'attention du Sujet — un noyau plus dense et plus clair
-    // GLISSE dans la masse vers ce qu'il regarde (la visée, un mécanisme
-    // proche, le sas). Pas un œil dessiné : une intention dans la matière.
-    // Le gel l'assourdit sans l'éteindre ; le nuage n'a pas de noyau.
-    if (uRegardInt > 0.003) {
-      float dRegard = distance(world, uRegardPos);
-      float noyau = exp(-dRegard * dRegard / (2.0 * 24.0 * 24.0));
-      water += vec3(0.15, 0.30, 0.40) *
-        (noyau * uRegardInt * (1.0 - vap) * (1.0 - icy * 0.6) *
-          clamp(player, 0.0, 1.0));
-    }
-
     // Relief : pseudo-normale sur un champ FLOUTÉ (4 prélèvements écartés) —
     // les dérivées par pixel liraient chaque particule comme une bille.
     // En liquide SOBRE, pas de relief : normale plate, éclairage constant —
@@ -1556,6 +1544,19 @@ void main() {
         float corps = body * (1.0 - vap) * (1.0 - icy * 0.7);
         float force = corps * clamp(0.42 + 0.45 * fres + 0.30 * ond2 * core, 0.0, 0.92);
         water = mix(water, env, force);
+      }
+
+      // LE REGARD : l'attention du Sujet — un noyau plus dense et plus
+      // clair GLISSE dans la masse vers ce qu'il regarde (la visée, un
+      // mécanisme proche, le sas). Pas un œil dessiné : une intention dans
+      // la matière. APRÈS le miroir : posé avant, le reflet le diluait
+      // jusqu'à l'invisible. Le gel l'assourdit ; le nuage n'a pas de noyau.
+      if (uRegardInt > 0.003) {
+        float dRegard = distance(world, uRegardPos);
+        float noyau = exp(-dRegard * dRegard / (2.0 * 24.0 * 24.0));
+        water += vec3(0.20, 0.36, 0.46) *
+          (noyau * uRegardInt * (1.0 - vap) * (1.0 - icy * 0.6) *
+            clamp(player, 0.0, 1.0));
       }
     }
     water += vec3(0.30, 0.55, 0.65) * waveGlow * 0.45 * (1.0 - icy) * (1.0 - vap);
