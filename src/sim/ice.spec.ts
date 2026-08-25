@@ -6,7 +6,13 @@ import { MAT_FROID, MAT_WALL } from '../game/level'
 const OPEN: Bounds = { minX: -3000, minY: -3000, maxX: 3000, maxY: 3000 }
 
 // Plaque froide verticale : x ∈ [-60, 0], y ∈ [-300, 300]
-const PLAQUE = { minX: -60, minY: -300, maxX: 0, maxY: 300, material: MAT_FROID }
+const PLAQUE = {
+  minX: -60,
+  minY: -300,
+  maxX: 0,
+  maxY: 300,
+  material: MAT_FROID,
+}
 
 function makeSim(overrides: Partial<SimParams> = {}): FluidSim {
   const sim = new FluidSim({ ...DEFAULT_PARAMS, ...overrides }, OPEN, 2048)
@@ -20,13 +26,58 @@ function run(sim: FluidSim, seconds: number): void {
   for (let s = 0; s < steps; s++) sim.step(dt)
 }
 
+describe('FluidSim — le repère du gel (facettes collées au bloc)', () => {
+  it('l’angle du repère intègre la rotation du palet, et se remet à zéro au dégel', () => {
+    const sim = new FluidSim({ ...DEFAULT_PARAMS }, OPEN, 2048)
+    sim.setLevel([], [])
+    sim.spawnDisc(0, 0, 60, KIND_PLAYER)
+    sim.freezeIntent = true
+    // rotation pure : v = omega × r autour du centre
+    const OMEGA = 2
+    let cx = 0
+    let cy = 0
+    for (let i = 0; i < sim.count; i++) {
+      cx += sim.posX[i]
+      cy += sim.posY[i]
+    }
+    cx /= sim.count
+    cy /= sim.count
+    for (let i = 0; i < sim.count; i++) {
+      sim.frozen[i] = 1
+      sim.frost[i] = 1
+      sim.velX[i] = -OMEGA * (sim.posY[i] - cy)
+      sim.velY[i] = OMEGA * (sim.posX[i] - cx)
+    }
+    sim.relabel()
+    run(sim, 1)
+    // l'angle intégré suit la rotation réelle (à l'amortissement près)
+    expect(sim.gelAngle).toBeGreaterThan(OMEGA * 0.5)
+    expect(sim.gelAngle).toBeLessThan(OMEGA * 1.5)
+    // et le centre du repère est celui du bloc
+    expect(Math.abs(sim.gelCentreX - cx)).toBeLessThan(60)
+    expect(Math.abs(sim.gelCentreY - cy)).toBeLessThan(60)
+    // dégel complet : le repère repart de zéro
+    sim.freezeIntent = false
+    for (let i = 0; i < sim.count; i++) {
+      sim.frozen[i] = 0
+      sim.frost[i] = 0
+    }
+    sim.relabel()
+    run(sim, 0.1)
+    expect(sim.gelAngle).toBe(0)
+  })
+})
+
 describe('FluidSim — la glace : bloc balistique, soudure, dégel', () => {
   it('un choc excentré fait PIVOTER le bloc, il ne reste pas dans son axe', () => {
     // Un palet qui heurte une paroi hors de son centre doit prendre du tournis :
     // l'impulsion s'applique au point de contact, pas au centre de masse.
     const sim = new FluidSim({ ...DEFAULT_PARAMS }, OPEN, 2048)
     // paroi verticale à droite ; le bloc arrive dessus, décalé vers le haut
-    sim.setLevel([{ minX: 300, minY: -600, maxX: 400, maxY: 0, material: MAT_WALL }], [])
+    sim.setLevel(
+      [{ minX: 300, minY: -600, maxX: 400, maxY: 0, material: MAT_WALL }],
+      [],
+    )
     // Le corps arrive EN FRÔLANT LE COIN : seul son bas touche, le reste passe
     // au-dessus — l'impulsion est donc franchement excentrée.
     sim.spawnDisc(0, 16, 60, KIND_PLAYER)
@@ -40,14 +91,26 @@ describe('FluidSim — la glace : bloc balistique, soudure, dégel', () => {
 
     // vitesse angulaire mesurée sur le champ de vitesses du bloc
     const spin = (): number => {
-      let cx = 0, cy = 0, vx = 0, vy = 0, n = 0
+      let cx = 0,
+        cy = 0,
+        vx = 0,
+        vy = 0,
+        n = 0
       for (let i = 0; i < sim.count; i++) {
         if (sim.frozen[i] !== 1) continue
-        cx += sim.posX[i]; cy += sim.posY[i]; vx += sim.velX[i]; vy += sim.velY[i]; n++
+        cx += sim.posX[i]
+        cy += sim.posY[i]
+        vx += sim.velX[i]
+        vy += sim.velY[i]
+        n++
       }
       if (n === 0) return 0
-      cx /= n; cy /= n; vx /= n; vy /= n
-      let L = 0, I = 0
+      cx /= n
+      cy /= n
+      vx /= n
+      vy /= n
+      let L = 0,
+        I = 0
       for (let i = 0; i < sim.count; i++) {
         if (sim.frozen[i] !== 1) continue
         const rx = sim.posX[i] - cx
@@ -62,7 +125,6 @@ describe('FluidSim — la glace : bloc balistique, soudure, dégel', () => {
     run(sim, 1.5) // le temps d'aller heurter le coin de la paroi
     expect(Math.abs(spin())).toBeGreaterThan(0.25) // il en repart en tournant
   })
-
 
   it('gel volontaire (F) : le corps gèle vite et garde son élan', () => {
     const sim = makeSim()
@@ -124,7 +186,13 @@ describe('FluidSim — la glace : bloc balistique, soudure, dégel', () => {
 
   it('un bloc de glace rebondit sur un mur au lieu d’éclabousser', () => {
     const sim = makeSim()
-    sim.boxes.push({ minX: 500, minY: -400, maxX: 560, maxY: 400, material: MAT_WALL })
+    sim.boxes.push({
+      minX: 500,
+      minY: -400,
+      maxX: 560,
+      maxY: 400,
+      material: MAT_WALL,
+    })
     for (let k = -2; k <= 2; k++) {
       const i = sim.addParticle(400, k * 6, KIND_FREE)
       sim.frost[i] = 1

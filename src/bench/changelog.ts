@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 02:10',
+    title:
+      'Les facettes de la glace sont COHÉRENTES : taillées dans le bloc, elles tournent avec lui',
+    notes: [
+      'Retour du concepteur : bonne idée, mauvaise exécution — les facettes cristallines bougeaient DANS le volume. Deux causes : le motif n’était ancré qu’en translation (jamais en rotation — or un palet pivote), et son ancre était le centroïde du corps ENTIER, qui tremble dès qu’une partie du corps est liquide.',
+      'Le solveur tient désormais un REPÈRE RIGIDE DU GEL : le centre de la plus grosse composante gelée, et son angle de rotation intégré pas à pas à partir de la vitesse angulaire du bloc (celle, exacte, de la physique). Le Voronoï des facettes est taillé dans ce repère : il translate ET pivote avec le palet — un bloc soudé à une plaque froide fige aussi ses facettes, et l’angle repart de zéro à chaque nouveau gel. Vérifié en jeu (palet mis en rotation) : le motif garde sa place dans le volume, arêtes comprises, pendant que le bloc tourne. Un test du solveur verrouille l’intégration de l’angle et sa remise à zéro au dégel.',
+    ],
+  },
+  {
     date: '26/08/2026 00:40',
     title: 'Les tranches VERTICALES prennent enfin la couleur de leur volume',
     notes: [
