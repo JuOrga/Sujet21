@@ -9,10 +9,13 @@ import { CODEX, Codex, type CodexGroupe } from './game/codex'
 import { TABLEAU_HUB, TABLEAU_HUB_COMPACT } from './game/hub'
 import {
   MECANIQUE_NOMS,
+  decodeCode21,
   decodeCodeAtelier,
   estCodeHub,
   type CodeAtelier,
 } from './game/levelIO'
+import { dessineMiniCarte } from './game/carte'
+import { propositionsSalles } from './game/poule'
 import {
   BONBONNE_CAP,
   instrumentDef,
@@ -3508,7 +3511,7 @@ const mbTimers: number[] = []
 // Le fil de la cérémonie : bilan (temps 1-3, sautables) → versement (le
 // surplus choisit sa destination) → draft (un tirage par palier franchi)
 // → fin (jauge et CONTINUER). Le versement et la suite ne se sautent pas.
-let mbEtape: 'bilan' | 'versement' | 'draft' | 'fin' = 'bilan'
+let mbEtape: 'bilan' | 'versement' | 'draft' | 'salles' | 'fin' = 'bilan'
 let mbDraftsRestants = 0
 let mbBilanCourant: BilanSalle | null = null
 
@@ -3521,7 +3524,13 @@ function avanceSalle(): void {
   const cible = level.raccourciVers
     ? playedLevels().findIndex((t) => t.code === level.raccourciVers)
     : -1
-  levelIndex = cible > levelIndex ? cible : levelIndex + 1
+  // le CHOIX du pool prime : la salle élue à la cérémonie devient la suivante
+  const choix = salleChoisie
+    ? playedLevels().findIndex((t) => t === salleChoisie)
+    : -1
+  salleChoisie = null
+  levelIndex =
+    choix > levelIndex ? choix : cible > levelIndex ? cible : levelIndex + 1
   restart()
 }
 
@@ -3638,7 +3647,7 @@ function mbVerseXp(litres: number): void {
   run.xp += litres
   mbDraftsRestants = paliersAtteints(run.xp) - avant
   if (mbDraftsRestants > 0) mbMontreDraft()
-  else mbMontreFin()
+  else mbApresRecompense()
 }
 
 /** Un TIRAGE d'instruments (palier franchi) : trois cartes, on en emporte
@@ -3659,12 +3668,12 @@ function mbMontreDraft(): void {
   const suite = (): void => {
     mbDraftsRestants -= 1
     if (mbDraftsRestants > 0) mbMontreDraft()
-    else mbMontreFin()
+    else mbApresRecompense()
   }
   if (cartes.length === 0) {
     // plus rien au bassin (tout emporté, réserve pleine) : palier honoré
     mbDraftsRestants = 0
-    mbMontreFin()
+    mbApresRecompense()
     return
   }
   for (const carte of cartes) {
@@ -3692,6 +3701,54 @@ function mbMontreDraft(): void {
       majInstrumentsUI()
       bande.ponctuation('sting-collecte', 0.7)
       suite()
+    })
+    host.appendChild(btn)
+  }
+}
+
+// ---- Le POOL de salles : le choix de la prochaine, après la récompense --
+// Les codes « 21XX-MMD » peuvent porter PLUSIEURS tableaux au même rang :
+// quand le rang suivant en offre au moins deux, la cérémonie propose un
+// CHOIX — mini-carte, code, nom, chips — au lieu de l'enchaînement muet.
+let salleChoisie: LevelDef | null = null
+
+/** Après la récompense : le choix de salle si le pool du rang suivant en
+ * offre deux — sinon la fin ordinaire. */
+function mbApresRecompense(): void {
+  const seq = playedLevels()
+  const props = propositionsSalles(seq, levelIndex + 2, seq.length)
+  if (props.length === 2) mbMontreSalles(props)
+  else mbMontreFin()
+}
+
+function mbMontreSalles(props: LevelDef[]): void {
+  mbEtape = 'salles'
+  mbEl('mb-choix-titre').textContent =
+    'PAROI DU SAS OUVERTE — CHOISISSEZ LA PROCHAINE SALLE'
+  const host = mbEl('mb-cartes')
+  host.innerHTML = ''
+  for (const lv of props) {
+    const c21 = decodeCode21(lv.code)
+    const a = c21?.atelier
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'mb-carte mb-salle'
+    const esc = (t: string): string =>
+      t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    btn.innerHTML =
+      `<canvas width="220" height="126"></canvas>` +
+      `<b>${esc(lv.code)}</b><small>${esc(lv.name)}</small>` +
+      (a
+        ? `<span class="salle-chips"><i>${MOMENT_COURT[a.moment]}</i>` +
+          `<i class="sc-m${a.mecanique}">${MECANIQUE_NOMS[a.mecanique].toUpperCase()}</i>` +
+          `<i>DIFF ${a.difficulte}</i></span>`
+        : '')
+    dessineMiniCarte(btn.querySelector('canvas') as HTMLCanvasElement, lv)
+    btn.addEventListener('click', () => {
+      salleChoisie = lv
+      bande.ponctuation('sting-collecte', 0.7)
+      fermeMiseEnBonbonne()
+      avanceSalle()
     })
     host.appendChild(btn)
   }
