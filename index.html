@@ -430,6 +430,96 @@
         color: #a878e8;
         border-color: rgba(168, 120, 232, 0.45);
       }
+      /* filtres du voile SALLES : ne montrer que les codes atelier voulus */
+      .salles-filtres {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        padding: 6px 12px 0;
+      }
+      .salles-filtres:empty {
+        display: none;
+      }
+      .salles-filtres > span {
+        font-family: var(--font-display);
+        font-size: 9.5px;
+        letter-spacing: 0.16em;
+        color: var(--dim);
+      }
+      .salles-filtres button {
+        font-family: var(--font-display);
+        font-size: 9.5px;
+        letter-spacing: 0.14em;
+        padding: 3px 8px;
+        background: transparent;
+        color: var(--dim);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .salles-filtres button:hover {
+        border-color: var(--specimen);
+      }
+      .salles-filtres button.actif {
+        color: var(--specimen);
+        border-color: var(--specimen);
+      }
+      /* la carte de couverture : phases en lignes, difficultés en colonnes —
+         chaque case compte les salles, les trous restent creux et visibles */
+      #salles-couv {
+        padding: 8px 12px 0;
+        overflow-x: auto;
+      }
+      #salles-couv[hidden] {
+        display: none;
+      }
+      #salles-couv table {
+        border-collapse: collapse;
+        font-family: var(--font-display);
+        font-size: 9.5px;
+        letter-spacing: 0.1em;
+      }
+      #salles-couv th,
+      #salles-couv td {
+        border: 1px solid var(--line);
+        padding: 4px 9px;
+        text-align: center;
+        color: var(--dim);
+      }
+      #salles-couv td.plein {
+        color: var(--specimen);
+        background: rgba(56, 130, 160, 0.16);
+      }
+      #salles-couv td.vide {
+        color: rgba(242, 201, 142, 0.75);
+      }
+      #salles-couv .couv-note {
+        margin: 6px 0 0;
+        font-family: var(--font-mono, ui-monospace, monospace);
+        font-size: 10.5px;
+        letter-spacing: 0;
+        color: var(--dim);
+      }
+      /* lecture du code atelier sous le champ Code de l'éditeur */
+      .ed-code-lecture {
+        margin: 2px 0 0;
+        font-size: 10.5px;
+        line-height: 1.45;
+        color: var(--dim);
+      }
+      .ed-code-lecture:empty {
+        display: none;
+      }
+      .ed-code-lecture.ok {
+        color: var(--specimen);
+      }
+      .ed-code-lecture.hors {
+        color: rgba(242, 201, 142, 0.9);
+      }
+      .ed-code-lecture.doublon {
+        color: #ff8a3c;
+      }
       #salles-liste button b {
         color: var(--specimen);
         font-family: var(--font-display);
@@ -4206,7 +4296,8 @@
           <span class="k">Tableau</span>
           <label class="ed-f"><span>Nom</span><input id="ed-name" /></label>
           <label class="ed-f"><span>Code</span><input id="ed-code" /></label>
-          <p class="ed-astuce">Le code identifie la salle (21-A, 21-B…). Un seul est réservé : <b>HUB</b> — le tableau qui le porte devient le LABORATOIRE (le hub), remplace celui du jeu et sort de la séquence de l'expédition. Tous les autres codes s'enchaînent dans l'ordre de la bibliothèque.</p>
+          <p class="ed-code-lecture" id="ed-code-lecture"></p>
+          <p class="ed-astuce">Le code identifie la salle. La convention ATELIER tient en trois chiffres — « 111 » : la PHASE de la partie (1 = début de game), la MÉCANIQUE requise (0 aucune · 1 glace · 2 vapeur · 3 toutes), la DIFFICULTÉ. Un seul code est réservé : <b>HUB</b> — le tableau qui le porte devient le LABORATOIRE (le hub), remplace celui du jeu et sort de la séquence de l'expédition. Tous les autres codes s'enchaînent dans l'ordre de la bibliothèque.</p>
           <label class="ed-f"><span>Par (impulsions)</span><input type="number" id="ed-par" min="1" step="1" /></label>
           <label class="ed-f"><span>Dashs vapeur / écran</span><input type="number" id="ed-dashs" min="0" step="1" placeholder="banc" /></label>
           <label class="ed-f"><span>Musique</span><select id="ed-ambiance"></select></label>
@@ -4319,7 +4410,10 @@
           <button type="button" data-tri="phase">PHASE</button>
           <button type="button" data-tri="meca">MÉCANIQUE</button>
           <button type="button" data-tri="diff">DIFFICULTÉ</button>
+          <button type="button" id="salles-couv-btn" title="La carte de couverture : combien de salles par case phase × difficulté — les trous sautent aux yeux">COUVERTURE</button>
         </div>
+        <div class="salles-filtres" id="salles-filtres" role="group" aria-label="Filtrer les salles"></div>
+        <div id="salles-couv" hidden></div>
         <p class="salles-legende">Code atelier « <b>111</b> », chiffre à chiffre :
           <b>1ᵉʳ</b> la PHASE de la partie (1 = début de game) ·
           <b>2ᵉ</b> la MÉCANIQUE requise (0 aucune · 1 glace · 2 vapeur · 3 toutes) ·

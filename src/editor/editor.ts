@@ -52,8 +52,10 @@ import {
 } from '../game/formes'
 import {
   CODE_HUB,
+  MECANIQUE_NOMS,
   checkLevel,
   codeCanon,
+  decodeCodeAtelier,
   estCodeHub,
   parseLevel,
   serializeLevel,
@@ -2373,6 +2375,7 @@ export class LevelEditor {
         ).value
         this.persist()
         this.validate()
+        this.majLectureCode()
       })
       this.el(id).addEventListener('change', () => this.histoire())
     }
@@ -2628,9 +2631,20 @@ export class LevelEditor {
       )
       return
     }
+    // Ranger PAR CODE : la convention atelier (« 111 ») devient l'ordre de
+    // jeu — phase, puis mécanique, puis difficulté. Les entrées hors
+    // convention (hub compris) ne bougent pas de leur place.
+    const codesAtelier = this.library.filter(
+      (s) => decodeCodeAtelier(s.level.code) !== null,
+    ).length
+    const rangeur =
+      codesAtelier >= 2
+        ? `<button type="button" id="ed-lib-ranger" title="Range la séquence par le code atelier : phase, puis mécanique requise, puis difficulté. Les codes hors convention (21-A, HUB…) gardent leur place.">RANGER LA SÉQUENCE PAR CODE (${codesAtelier})</button>`
+        : ''
     host.innerHTML =
       majeur +
       semeur +
+      rangeur +
       this.library
         .map((s, i) => {
           const errs = checkLevel(s.level).filter(
@@ -2670,6 +2684,10 @@ export class LevelEditor {
     this.el('ed-lib-maj')?.addEventListener(
       'click',
       () => void this.majLivres(),
+    )
+    this.el('ed-lib-ranger')?.addEventListener(
+      'click',
+      () => void this.rangerParCode(),
     )
     for (const b of Array.from(host.querySelectorAll('.ed-lib-open'))) {
       b.addEventListener('click', () =>
@@ -2751,6 +2769,57 @@ export class LevelEditor {
         const j = this.library.findIndex((l) => l.id === row.dataset.id)
         if (id && j >= 0) void this.moveTo(id, j)
       })
+    }
+    // les doublons de code se jugent CONTRE la bibliothèque : à chaque
+    // rafraîchissement de la liste, la lecture sous le champ Code se rejoue
+    this.majLectureCode()
+  }
+
+  /** Range la séquence PAR LE CODE ATELIER : phase, puis mécanique, puis
+   * difficulté. Seules les entrées au code décodable bougent — elles se
+   * redistribuent dans leurs propres emplacements, si bien que le hub et
+   * les codes hors convention gardent exactement leur place. */
+  private async rangerParCode(): Promise<void> {
+    if (this.busy) return
+    const slots: number[] = []
+    const entrees: StoredLevel[] = []
+    this.library.forEach((s, i) => {
+      if (decodeCodeAtelier(s.level.code)) {
+        slots.push(i)
+        entrees.push(s)
+      }
+    })
+    if (entrees.length < 2) return
+    const triees = [...entrees].sort((a, b) => {
+      const da = decodeCodeAtelier(a.level.code)!
+      const db = decodeCodeAtelier(b.level.code)!
+      return (
+        da.phase - db.phase ||
+        da.mecanique - db.mecanique ||
+        da.difficulte - db.difficulte
+      )
+    })
+    const next = [...this.library]
+    slots.forEach((slot, k) => {
+      next[slot] = triees[k]
+    })
+    if (next.every((s, i) => s === this.library[i])) {
+      this.commit('La séquence est déjà rangée par code.')
+      return
+    }
+    this.library = next
+    this.renderLibrary()
+    const saved = await reorderLibrary(next.map((l) => l.id))
+    if (saved) {
+      this.library = saved
+      this.hooks.libraryChanged(saved)
+      this.renderLibrary()
+      this.commit(
+        `Séquence rangée par code : phase, puis mécanique, puis difficulté (${entrees.length} salles).`,
+      )
+    } else {
+      this.commit('Rangement refusé : bibliothèque injoignable.')
+      void this.refreshLibrary()
     }
   }
 
@@ -3044,6 +3113,48 @@ export class LevelEditor {
       this.level.ambiance ?? ''
     this.syncProps()
     this.validate()
+    this.majLectureCode()
+  }
+
+  /** La LECTURE du code, sous le champ : la convention atelier décodée en
+   * clair (« phase 1 · glace · difficulté 2 »), un signalement quand le
+   * code sort de la convention, et l'alerte quand un AUTRE tableau de la
+   * bibliothèque porte déjà ce code. */
+  private majLectureCode(): void {
+    const el = this.host.querySelector('#ed-code-lecture') as HTMLElement | null
+    if (!el) return
+    const code = this.level.code.trim()
+    const doublon = this.library.find(
+      (s) =>
+        s.id !== this.openId &&
+        s.level.code.trim().toUpperCase() === code.toUpperCase(),
+    )
+    const alerte = doublon
+      ? ` ⚠ Ce code est déjà porté par « ${doublon.level.name} » — deux salles au même code se confondent dans les tris et les records.`
+      : ''
+    if (estCodeHub(code)) {
+      el.className = 'ed-code-lecture ok'
+      el.textContent =
+        (code.toUpperCase() === CODE_HUB
+          ? 'Code réservé : ce tableau devient le LABORATOIRE (hors séquence).'
+          : 'Chantier de hub : hors séquence tant qu’il ne s’appelle pas HUB.') +
+        alerte
+      return
+    }
+    const d = decodeCodeAtelier(code)
+    if (d) {
+      el.className = doublon ? 'ed-code-lecture doublon' : 'ed-code-lecture ok'
+      el.textContent =
+        `Code atelier — phase ${d.phase}${d.phase === 1 ? ' (début de game)' : ''} · ` +
+        `mécanique : ${MECANIQUE_NOMS[d.mecanique]} · difficulté ${d.difficulte}.` +
+        alerte
+      return
+    }
+    el.className = doublon ? 'ed-code-lecture doublon' : 'ed-code-lecture hors'
+    el.textContent =
+      `Hors convention atelier (« 111 » : phase · mécanique 0-3 · difficulté). ` +
+      `La salle se joue normalement, mais échappe aux tris et filtres par code.` +
+      alerte
   }
 
   /** Panneau de propriétés de l'objet sélectionné. */

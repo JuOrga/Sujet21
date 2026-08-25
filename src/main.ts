@@ -966,6 +966,12 @@ const sallesEl = document.getElementById('salles') as HTMLDivElement
 // du CODE ATELIER (« 111 » : phase · mécanique requise · difficulté). Les
 // codes hors convention se rangent après, dans l'ordre de l'éditeur.
 let sallesTri: 'editeur' | 'phase' | 'meca' | 'diff' = 'editeur'
+// Filtres par les chiffres du code : null = tout montrer. Quand un filtre
+// est actif, seuls les codes atelier peuvent répondre — les autres (livrés
+// 21-A, HUB…) sont masqués, et la section le dit.
+let sallesFiltreMeca: CodeAtelier['mecanique'] | null = null
+let sallesFiltreDiff: number | null = null
+let sallesCouvVisible = false
 function renderSalles(): void {
   const liste = document.getElementById('salles-liste') as HTMLDivElement
   liste.innerHTML = ''
@@ -994,6 +1000,95 @@ function renderSalles(): void {
     liste.appendChild(b)
   }
   let enSequence = libraryLevels.filter((l) => !estCodeHub(l.code))
+  const decodes = enSequence
+    .map((lv) => decodeCodeAtelier(lv.code))
+    .filter((d): d is CodeAtelier => d !== null)
+
+  // ---- les FILTRES : mécanique et difficulté, bâtis sur ce qui existe ----
+  const filtres = document.getElementById('salles-filtres') as HTMLDivElement
+  if (decodes.length === 0) {
+    filtres.innerHTML = ''
+    sallesFiltreMeca = null
+    sallesFiltreDiff = null
+  } else {
+    const mecas = [...new Set(decodes.map((d) => d.mecanique))].sort()
+    const diffs = [...new Set(decodes.map((d) => d.difficulte))].sort(
+      (a, b) => a - b,
+    )
+    const chip = (
+      groupe: 'fm' | 'fd',
+      valeur: number | null,
+      texte: string,
+      actif: boolean,
+    ): string =>
+      `<button type="button" data-${groupe}="${valeur ?? ''}"${actif ? ' class="actif"' : ''}>${texte}</button>`
+    filtres.innerHTML =
+      `<span>MÉCANIQUE</span>` +
+      chip('fm', null, 'TOUT', sallesFiltreMeca === null) +
+      mecas
+        .map((m) =>
+          chip('fm', m, MECANIQUE_NOMS[m].toUpperCase(), sallesFiltreMeca === m),
+        )
+        .join('') +
+      `<span style="margin-left:8px">DIFFICULTÉ</span>` +
+      chip('fd', null, 'TOUT', sallesFiltreDiff === null) +
+      diffs.map((d) => chip('fd', d, String(d), sallesFiltreDiff === d)).join('')
+    for (const b of Array.from(filtres.querySelectorAll('button'))) {
+      b.addEventListener('click', () => {
+        if (b.dataset.fm !== undefined) {
+          sallesFiltreMeca =
+            b.dataset.fm === ''
+              ? null
+              : (Number(b.dataset.fm) as CodeAtelier['mecanique'])
+        } else {
+          sallesFiltreDiff = b.dataset.fd === '' ? null : Number(b.dataset.fd)
+        }
+        renderSalles()
+      })
+    }
+  }
+
+  // ---- la CARTE DE COUVERTURE : salles par case phase × difficulté ----
+  const couv = document.getElementById('salles-couv') as HTMLDivElement
+  couv.hidden = !sallesCouvVisible
+  document
+    .getElementById('salles-couv-btn')
+    ?.classList.toggle('actif', sallesCouvVisible)
+  if (sallesCouvVisible) {
+    if (decodes.length === 0) {
+      couv.innerHTML =
+        '<p class="couv-note">Aucune salle au code atelier (« 111 ») dans la bibliothèque : rien à cartographier.</p>'
+    } else {
+      const pMin = Math.min(...decodes.map((d) => d.phase))
+      const pMax = Math.max(...decodes.map((d) => d.phase))
+      const dMin = Math.min(...decodes.map((d) => d.difficulte))
+      const dMax = Math.max(...decodes.map((d) => d.difficulte))
+      let html = '<table><tr><th></th>'
+      for (let df = dMin; df <= dMax; df++) html += `<th>DIFF ${df}</th>`
+      html += '</tr>'
+      for (let p = pMin; p <= pMax; p++) {
+        html += `<tr><th>PHASE ${p}</th>`
+        for (let df = dMin; df <= dMax; df++) {
+          const noms = enSequence
+            .filter((lv) => {
+              const d = decodeCodeAtelier(lv.code)
+              return d !== null && d.phase === p && d.difficulte === df
+            })
+            .map((lv) => `${lv.code} ${lv.name}`)
+          html +=
+            noms.length > 0
+              ? `<td class="plein" title="${esc(noms.join('\n'))}">${noms.length}</td>`
+              : '<td class="vide">—</td>'
+        }
+        html += '</tr>'
+      }
+      html +=
+        '</table><p class="couv-note">Chaque case compte les salles de la bibliothèque — les « — » sont les trous à combler (survolez une case pour lire les noms).</p>'
+      couv.innerHTML = html
+    }
+  }
+
+  // ---- le TRI, puis le FILTRE, puis la liste ----
   if (sallesTri !== 'editeur') {
     const rang = (d: CodeAtelier): number =>
       sallesTri === 'phase'
@@ -1017,6 +1112,25 @@ function renderSalles(): void {
       )
     })
   }
+  const filtreActif = sallesFiltreMeca !== null || sallesFiltreDiff !== null
+  if (filtreActif) {
+    enSequence = enSequence.filter((lv) => {
+      const d = decodeCodeAtelier(lv.code)
+      if (!d) return false
+      if (sallesFiltreMeca !== null && d.mecanique !== sallesFiltreMeca)
+        return false
+      if (sallesFiltreDiff !== null && d.difficulte !== sallesFiltreDiff)
+        return false
+      return true
+    })
+    section(
+      enSequence.length > 0
+        ? 'BIBLIOTHÈQUE DU LABO — filtrée par le code atelier (les codes hors convention sont masqués)'
+        : 'Aucune salle ne répond à ce filtre — TOUT le retire.',
+    )
+    for (const lv of enSequence) salle(lv)
+    return
+  }
   if (enSequence.length > 0) {
     section(
       sallesTri === 'editeur'
@@ -1031,7 +1145,9 @@ function renderSalles(): void {
 renderSalles()
 {
   const boutons = Array.from(
-    document.querySelectorAll<HTMLButtonElement>('#salles-outils button'),
+    document.querySelectorAll<HTMLButtonElement>(
+      '#salles-outils button[data-tri]',
+    ),
   )
   for (const btn of boutons) {
     btn.addEventListener('click', () => {
@@ -1040,6 +1156,10 @@ renderSalles()
       renderSalles()
     })
   }
+  document.getElementById('salles-couv-btn')?.addEventListener('click', () => {
+    sallesCouvVisible = !sallesCouvVisible
+    renderSalles()
+  })
 }
 document.getElementById('home-salles')?.addEventListener('click', () => {
   sallesEl.hidden = false
