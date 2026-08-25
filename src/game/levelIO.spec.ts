@@ -3,6 +3,7 @@ import {
   checkLevel,
   decodeCodeAtelier,
   estCodeHub,
+  numeroTableau,
   parseLevel,
   serializeLevel,
 } from './levelIO'
@@ -456,25 +457,54 @@ describe('le code HUB : un mot-clé, pas une casse à deviner', () => {
   })
   it('decodeCodeAtelier lit les trois chiffres de la convention', () => {
     expect(decodeCodeAtelier('111')).toEqual({
-      phase: 1,
+      moment: 1,
       mecanique: 1,
       difficulte: 1,
     })
     expect(decodeCodeAtelier('203')).toEqual({
-      phase: 2,
+      moment: 2,
       mecanique: 0,
       difficulte: 3,
     })
-    expect(decodeCodeAtelier(' 132 ')).toEqual({
-      phase: 1,
+    expect(decodeCodeAtelier(' 332 ')).toEqual({
+      moment: 3,
       mecanique: 3,
       difficulte: 2,
     })
   })
   it('decodeCodeAtelier refuse ce qui sort de la convention', () => {
-    // pas trois chiffres, mécanique inconnue (4..9), codes livrés, hub…
-    for (const non of ['21-A', 'HUB', '11', '1111', '141', '1a1', '']) {
+    // pas trois chiffres, moment hors 1-3, mécanique inconnue (4..9),
+    // codes livrés, hub…
+    for (const non of [
+      '21-A',
+      'HUB',
+      '11',
+      '1111',
+      '141',
+      '411',
+      '011',
+      '1a1',
+      '',
+    ]) {
       expect(decodeCodeAtelier(non)).toBeNull()
+    }
+  })
+  it('numeroTableau lit le numéro d’ordre en tête du nom', () => {
+    expect(numeroTableau('12 La chaudière')).toEqual({
+      numero: 12,
+      lettre: '',
+    })
+    expect(numeroTableau('12a La chaudière bis')).toEqual({
+      numero: 12,
+      lettre: 'a',
+    })
+    expect(numeroTableau(' 3 - Petit gel ')).toEqual({
+      numero: 3,
+      lettre: '',
+    })
+    expect(numeroTableau('7B')).toEqual({ numero: 7, lettre: 'b' })
+    for (const non of ['La chaudière', 'a12', '']) {
+      expect(numeroTableau(non)).toBeNull()
     }
   })
 })

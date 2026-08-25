@@ -4317,7 +4317,7 @@
           <label class="ed-f"><span>Nom</span><input id="ed-name" /></label>
           <label class="ed-f"><span>Code</span><input id="ed-code" /></label>
           <p class="ed-code-lecture" id="ed-code-lecture"></p>
-          <p class="ed-astuce">Le code identifie la salle. La convention ATELIER tient en trois chiffres — « 111 » : la PHASE de la partie (1 = début de game), la MÉCANIQUE requise (0 aucune · 1 glace · 2 vapeur · 3 toutes), la DIFFICULTÉ. Un seul code est réservé : <b>HUB</b> — le tableau qui le porte devient le LABORATOIRE (le hub), remplace celui du jeu et sort de la séquence de l'expédition. Tous les autres codes s'enchaînent dans l'ordre de la bibliothèque.</p>
+          <p class="ed-astuce">Le code DÉCRIT la salle — la convention ATELIER tient en trois chiffres, « 111 » : le MOMENT de la run (1 début · 2 milieu · 3 fin), la MÉCANIQUE requise (0 aucune · 1 glace · 2 vapeur · 3 toutes), la DIFFICULTÉ. Plusieurs salles peuvent porter le même code : c'est le NUMÉRO du tableau, en tête du NOM (« 12 … », lettre pour départager : « 12a … »), qui donne l'ordre de jeu. Un seul code est réservé : <b>HUB</b> — le tableau qui le porte devient le LABORATOIRE (le hub), remplace celui du jeu et sort de la séquence de l'expédition.</p>
           <label class="ed-f"><span>Par (impulsions)</span><input type="number" id="ed-par" min="1" step="1" /></label>
           <label class="ed-f"><span>Dashs vapeur / écran</span><input type="number" id="ed-dashs" min="0" step="1" placeholder="banc" /></label>
           <label class="ed-f"><span>Musique</span><select id="ed-ambiance"></select></label>
@@ -4427,7 +4427,7 @@
         <div class="salles-outils" id="salles-outils" role="group" aria-label="Trier les salles">
           <span>TRI</span>
           <button type="button" data-tri="editeur" class="actif">ORDRE DE L'ÉDITEUR</button>
-          <button type="button" data-tri="phase">PHASE</button>
+          <button type="button" data-tri="moment">MOMENT</button>
           <button type="button" data-tri="meca">MÉCANIQUE</button>
           <button type="button" data-tri="diff">DIFFICULTÉ</button>
           <button type="button" id="salles-couv-btn" title="La carte de couverture : combien de salles par case phase × difficulté — les trous sautent aux yeux">COUVERTURE</button>
@@ -4435,9 +4435,11 @@
         <div class="salles-filtres" id="salles-filtres" role="group" aria-label="Filtrer les salles"></div>
         <div id="salles-couv" hidden></div>
         <p class="salles-legende">Code atelier « <b>111</b> », chiffre à chiffre :
-          <b>1ᵉʳ</b> la PHASE de la partie (1 = début de game) ·
+          <b>1ᵉʳ</b> le MOMENT de la run (1 début · 2 milieu · 3 fin) ·
           <b>2ᵉ</b> la MÉCANIQUE requise (0 aucune · 1 glace · 2 vapeur · 3 toutes) ·
-          <b>3ᵉ</b> la DIFFICULTÉ. Les autres codes (21-A, HUB…) sont hors convention.</p>
+          <b>3ᵉ</b> la DIFFICULTÉ. Plusieurs salles peuvent porter le même code —
+          l'ordre de jeu vient du NUMÉRO du tableau, pas du code.
+          Les autres codes (21-A, HUB…) sont hors convention.</p>
         <div id="salles-liste"></div>
       </div>
     </div>

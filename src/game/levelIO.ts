@@ -93,17 +93,26 @@ export function estCodeHub(code: string): boolean {
 
 // ---- Le CODE ATELIER : la convention de nommage des tableaux ------------
 // Trois chiffres, chacun porte un sens — « 111 » se lit chiffre à chiffre :
-//   · 1ᵉʳ  chiffre : la PHASE de la partie (1 = début de game, puis ça monte)
+//   · 1ᵉʳ  chiffre : le MOMENT de la run (1 début · 2 milieu · 3 fin)
 //   · 2ᵉ   chiffre : la MÉCANIQUE requise pour franchir le tableau
 //         (0 rien de spécial · 1 la glace · 2 la vapeur · 3 toutes)
-//   · 3ᵉ   chiffre : la DIFFICULTÉ, à phase et mécanique égales
-// Tout autre code (21-A, HUB…) est simplement hors convention : il se charge
-// et se joue pareil — il n'a juste rien à décoder.
+//   · 3ᵉ   chiffre : la DIFFICULTÉ, à moment et mécanique égaux
+// Le code DÉCRIT le tableau, il ne le range pas : plusieurs tableaux
+// portent naturellement le même code. L'ORDRE de la séquence, lui, vient du
+// NUMÉRO du tableau (en tête du nom — « 12 », et une lettre départage les
+// ex æquo : « 12a », « 12b »). Tout autre code (21-A, HUB…) est simplement
+// hors convention : il se charge et se joue pareil, il n'a rien à décoder.
 
 export interface CodeAtelier {
-  phase: number
+  moment: 1 | 2 | 3
   mecanique: 0 | 1 | 2 | 3
   difficulte: number
+}
+
+export const MOMENT_NOMS: Record<CodeAtelier['moment'], string> = {
+  1: 'début de run',
+  2: 'milieu de partie',
+  3: 'fin de partie',
 }
 
 export const MECANIQUE_NOMS: Record<CodeAtelier['mecanique'], string> = {
@@ -118,13 +127,26 @@ export const MECANIQUE_NOMS: Record<CodeAtelier['mecanique'], string> = {
 export function decodeCodeAtelier(code: string): CodeAtelier | null {
   const m = /^(\d)(\d)(\d)$/.exec(code.trim())
   if (!m) return null
+  const moment = Number(m[1])
+  if (moment < 1 || moment > 3) return null // le moment n'a que trois valeurs
   const mecanique = Number(m[2])
   if (mecanique > 3) return null // 4..9 : pas une mécanique connue
   return {
-    phase: Number(m[1]),
+    moment: moment as CodeAtelier['moment'],
     mecanique: mecanique as CodeAtelier['mecanique'],
     difficulte: Number(m[3]),
   }
+}
+
+/** Le NUMÉRO du tableau : ce qui le range dans la séquence — lu en tête du
+ * NOM (« 12 La chaudière », « 12a … », « 12b … » : la lettre départage les
+ * ex æquo). null quand le nom ne commence pas par un numéro. */
+export function numeroTableau(
+  name: string,
+): { numero: number; lettre: string } | null {
+  const m = /^\s*(\d+)\s*([a-z]?)(?=[\s.\-–—:]|$)/i.exec(name)
+  if (!m) return null
+  return { numero: Number(m[1]), lettre: m[2].toLowerCase() }
 }
 
 /** Boîte normalisée : min toujours inférieur à max, matériau connu. */

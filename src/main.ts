@@ -965,7 +965,13 @@ const sallesEl = document.getElementById('salles') as HTMLDivElement
 // Tri du voile : l'ordre de l'éditeur (défaut), ou l'un des trois chiffres
 // du CODE ATELIER (« 111 » : phase · mécanique requise · difficulté). Les
 // codes hors convention se rangent après, dans l'ordre de l'éditeur.
-let sallesTri: 'editeur' | 'phase' | 'meca' | 'diff' = 'editeur'
+let sallesTri: 'editeur' | 'moment' | 'meca' | 'diff' = 'editeur'
+// le MOMENT en un mot, pour les pastilles et la carte de couverture
+const MOMENT_COURT: Record<CodeAtelier['moment'], string> = {
+  1: 'DÉBUT',
+  2: 'MILIEU',
+  3: 'FIN',
+}
 // Filtres par les chiffres du code : null = tout montrer. Quand un filtre
 // est actif, seuls les codes atelier peuvent répondre — les autres (livrés
 // 21-A, HUB…) sont masqués, et la section le dit.
@@ -988,7 +994,7 @@ function renderSalles(): void {
     b.type = 'button'
     const d = decodeCodeAtelier(lv.code)
     const chips = d
-      ? `<span class="salle-chips"><i>PHASE ${d.phase}</i>` +
+      ? `<span class="salle-chips"><i>${MOMENT_COURT[d.moment]}</i>` +
         `<i class="sc-m${d.mecanique}">${MECANIQUE_NOMS[d.mecanique].toUpperCase()}</i>` +
         `<i>DIFF ${d.difficulte}</i></span>`
       : ''
@@ -1059,21 +1065,21 @@ function renderSalles(): void {
       couv.innerHTML =
         '<p class="couv-note">Aucune salle au code atelier (« 111 ») dans la bibliothèque : rien à cartographier.</p>'
     } else {
-      const pMin = Math.min(...decodes.map((d) => d.phase))
-      const pMax = Math.max(...decodes.map((d) => d.phase))
+      const pMin = Math.min(...decodes.map((d) => d.moment))
+      const pMax = Math.max(...decodes.map((d) => d.moment))
       const dMin = Math.min(...decodes.map((d) => d.difficulte))
       const dMax = Math.max(...decodes.map((d) => d.difficulte))
       let html = '<table><tr><th></th>'
       for (let df = dMin; df <= dMax; df++) html += `<th>DIFF ${df}</th>`
       html += '</tr>'
       for (let p = pMin; p <= pMax; p++) {
-        html += `<tr><th>PHASE ${p}</th>`
+        html += `<tr><th>${MOMENT_COURT[p as CodeAtelier['moment']]}</th>`
         for (let df = dMin; df <= dMax; df++) {
           const dedans = enSequence
             .map((lv) => ({ lv, d: decodeCodeAtelier(lv.code) }))
             .filter(
               (x): x is { lv: LevelDef; d: CodeAtelier } =>
-                x.d !== null && x.d.phase === p && x.d.difficulte === df,
+                x.d !== null && x.d.moment === p && x.d.difficulte === df,
             )
           if (dedans.length === 0) {
             html += '<td class="vide">—</td>'
@@ -1101,8 +1107,8 @@ function renderSalles(): void {
   // ---- le TRI, puis le FILTRE, puis la liste ----
   if (sallesTri !== 'editeur') {
     const rang = (d: CodeAtelier): number =>
-      sallesTri === 'phase'
-        ? d.phase
+      sallesTri === 'moment'
+        ? d.moment
         : sallesTri === 'meca'
           ? d.mecanique
           : d.difficulte
@@ -1116,7 +1122,7 @@ function renderSalles(): void {
       if (!db) return -1
       return (
         rang(da) - rang(db) ||
-        da.phase - db.phase ||
+        da.moment - db.moment ||
         da.mecanique - db.mecanique ||
         da.difficulte - db.difficulte
       )

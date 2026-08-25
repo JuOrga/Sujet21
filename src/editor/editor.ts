@@ -53,10 +53,12 @@ import {
 import {
   CODE_HUB,
   MECANIQUE_NOMS,
+  MOMENT_NOMS,
   checkLevel,
   codeCanon,
   decodeCodeAtelier,
   estCodeHub,
+  numeroTableau,
   parseLevel,
   serializeLevel,
 } from '../game/levelIO'
@@ -2631,15 +2633,15 @@ export class LevelEditor {
       )
       return
     }
-    // Ranger PAR CODE : la convention atelier (« 111 ») devient l'ordre de
-    // jeu — phase, puis mécanique, puis difficulté. Les entrées hors
-    // convention (hub compris) ne bougent pas de leur place.
-    const codesAtelier = this.library.filter(
-      (s) => decodeCodeAtelier(s.level.code) !== null,
+    // Ranger PAR NUMÉRO : c'est lui qui définit l'ordre de jeu — le numéro
+    // en tête du nom (« 12 … »), la lettre départage les ex æquo (« 12a »).
+    // Les entrées sans numéro (hub compris) ne bougent pas de leur place.
+    const numerotes = this.library.filter(
+      (s) => !estCodeHub(s.level.code) && numeroTableau(s.level.name) !== null,
     ).length
     const rangeur =
-      codesAtelier >= 2
-        ? `<button type="button" id="ed-lib-ranger" title="Range la séquence par le code atelier : phase, puis mécanique requise, puis difficulté. Les codes hors convention (21-A, HUB…) gardent leur place.">RANGER LA SÉQUENCE PAR CODE (${codesAtelier})</button>`
+      numerotes >= 2
+        ? `<button type="button" id="ed-lib-ranger" title="Range la séquence par le NUMÉRO en tête du nom des tableaux (« 12 … », puis « 12a », « 12b »…). Les tableaux sans numéro et le hub gardent leur place.">RANGER LA SÉQUENCE PAR NUMÉRO (${numerotes})</button>`
         : ''
     host.innerHTML =
       majeur +
@@ -2772,36 +2774,33 @@ export class LevelEditor {
     }
   }
 
-  /** Range la séquence PAR LE CODE ATELIER : phase, puis mécanique, puis
-   * difficulté. Seules les entrées au code décodable bougent — elles se
-   * redistribuent dans leurs propres emplacements, si bien que le hub et
-   * les codes hors convention gardent exactement leur place. */
+  /** Range la séquence PAR LE NUMÉRO du tableau (en tête du nom : « 12 »,
+   * puis « 12a », « 12b »…). Seules les entrées numérotées bougent — elles
+   * se redistribuent dans leurs propres emplacements, si bien que le hub et
+   * les tableaux sans numéro gardent exactement leur place. */
   private async rangerParCode(): Promise<void> {
     if (this.busy) return
     const slots: number[] = []
     const entrees: StoredLevel[] = []
     this.library.forEach((s, i) => {
-      if (decodeCodeAtelier(s.level.code)) {
+      if (!estCodeHub(s.level.code) && numeroTableau(s.level.name)) {
         slots.push(i)
         entrees.push(s)
       }
     })
     if (entrees.length < 2) return
     const triees = [...entrees].sort((a, b) => {
-      const da = decodeCodeAtelier(a.level.code)!
-      const db = decodeCodeAtelier(b.level.code)!
-      return (
-        da.phase - db.phase ||
-        da.mecanique - db.mecanique ||
-        da.difficulte - db.difficulte
-      )
+      const na = numeroTableau(a.level.name)!
+      const nb = numeroTableau(b.level.name)!
+      // « 12 » passe avant « 12a » : la lettre vide se range en tête
+      return na.numero - nb.numero || na.lettre.localeCompare(nb.lettre)
     })
     const next = [...this.library]
     slots.forEach((slot, k) => {
       next[slot] = triees[k]
     })
     if (next.every((s, i) => s === this.library[i])) {
-      this.commit('La séquence est déjà rangée par code.')
+      this.commit('La séquence est déjà rangée par numéro.')
       return
     }
     this.library = next
@@ -2812,7 +2811,7 @@ export class LevelEditor {
       this.hooks.libraryChanged(saved)
       this.renderLibrary()
       this.commit(
-        `Séquence rangée par code : phase, puis mécanique, puis difficulté (${entrees.length} salles).`,
+        `Séquence rangée par numéro (${entrees.length} tableaux) — la lettre départage les ex æquo.`,
       )
     } else {
       this.commit('Rangement refusé : bibliothèque injoignable.')
@@ -3018,22 +3017,32 @@ export class LevelEditor {
       this.level.name = proposed.trim().slice(0, 60) || this.level.name
       ;(this.el('ed-name') as HTMLInputElement).value = this.level.name
     }
-    // DOUBLON de code : l'alerte se joue ICI, avant de valider — une fois,
-    // en face du geste, plutôt qu'en continu sous le champ pendant la frappe.
-    const doublon = this.library.find(
-      (s) =>
-        s.id !== id &&
-        s.level.code.trim().toUpperCase() === this.level.code.trim().toUpperCase(),
-    )
+    // Le CODE se partage (il décrit la salle, il ne l'identifie pas) — c'est
+    // le NUMÉRO en tête du nom qui doit rester unique dans la séquence.
+    const num = numeroTableau(this.level.name)
+    const memeNumero = num
+      ? this.library.find((s) => {
+          if (s.id === id || estCodeHub(s.level.code)) return false
+          const n = numeroTableau(s.level.name)
+          return n !== null && n.numero === num.numero && n.lettre === num.lettre
+        })
+      : null
+    const suivante = num
+      ? num.numero +
+        (num.lettre ? String.fromCharCode(num.lettre.charCodeAt(0) + 1) : 'a')
+      : ''
     if (
-      doublon &&
+      memeNumero &&
       !confirm(
-        `Le code « ${this.level.code} » est déjà porté par « ${doublon.level.name} » dans la bibliothèque.\n` +
-          `Deux salles au même code se confondent dans les tris, les filtres et les records.\n\n` +
+        `Le numéro « ${num!.numero}${num!.lettre} » est déjà porté par « ${memeNumero.level.name} ».\n` +
+          `Deux tableaux au même numéro se disputent la même place dans la séquence — ` +
+          `une lettre en plus les départage (« ${suivante} … »).\n\n` +
           `Enregistrer quand même ?`,
       )
     ) {
-      this.commit('Enregistrement annulé — changez le code pour éviter le doublon.')
+      this.commit(
+        'Enregistrement annulé — départagez le numéro (une lettre en plus) avant de valider.',
+      )
       return
     }
     this.busy = true
@@ -3132,9 +3141,10 @@ export class LevelEditor {
   }
 
   /** La LECTURE du code, sous le champ : la convention atelier décodée en
-   * clair (« phase 1 · glace · difficulté 2 »), et un signalement quand le
-   * code sort de la convention. Les DOUBLONS ne se signalent pas ici — ils
-   * s'alertent au moment d'ENREGISTRER, une fois, en face du geste. */
+   * clair (« début de run · glace · difficulté 2 »), un signalement quand
+   * le code sort de la convention, et le NUMÉRO d'ordre lu en tête du nom.
+   * Un même code sur plusieurs salles est normal — le code décrit, c'est le
+   * numéro qui range (son doublon s'alerte à l'ENREGISTREMENT). */
   private majLectureCode(): void {
     const el = this.host.querySelector('#ed-code-lecture') as HTMLElement | null
     if (!el) return
@@ -3147,18 +3157,24 @@ export class LevelEditor {
           : 'Chantier de hub : hors séquence tant qu’il ne s’appelle pas HUB.'
       return
     }
+    const num = numeroTableau(this.level.name)
+    const ordre = num
+      ? ` Ordre : numéro ${num.numero}${num.lettre}, lu en tête du nom.`
+      : ' Le nom ne commence pas par un numéro : la salle se range à la main.'
     const d = decodeCodeAtelier(code)
     if (d) {
       el.className = 'ed-code-lecture ok'
       el.textContent =
-        `Code atelier — phase ${d.phase}${d.phase === 1 ? ' (début de game)' : ''} · ` +
-        `mécanique : ${MECANIQUE_NOMS[d.mecanique]} · difficulté ${d.difficulte}.`
+        `Code atelier — ${MOMENT_NOMS[d.moment]} · ` +
+        `mécanique : ${MECANIQUE_NOMS[d.mecanique]} · difficulté ${d.difficulte}.` +
+        ordre
       return
     }
     el.className = 'ed-code-lecture hors'
     el.textContent =
-      `Hors convention atelier (« 111 » : phase · mécanique 0-3 · difficulté). ` +
-      `La salle se joue normalement, mais échappe aux tris et filtres par code.`
+      `Hors convention atelier (« 111 » : moment 1-3 · mécanique 0-3 · difficulté). ` +
+      `La salle se joue normalement, mais échappe aux tris et filtres par code.` +
+      ordre
   }
 
   /** Panneau de propriétés de l'objet sélectionné. */
