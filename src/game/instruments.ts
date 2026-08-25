@@ -91,3 +91,26 @@ export function tirageInstruments(
   }
   return cartes
 }
+
+// ---- La BONBONNE et l'XP d'étalonnage ----
+// À chaque sas, le surplus se VERSE quelque part : dans la BONBONNE (une
+// réserve d'eau embarquée, qu'on peut reverser dans le corps en cours de
+// route — même non pleine) ou dans l'XP D'ÉTALONNAGE, qui nourrit les
+// instruments. Bonbonne PLEINE : le surplus va forcément à l'XP.
+export const BONBONNE_CAP = 8 // litres
+
+// Les paliers d'XP (litres cumulés versés) : chaque palier franchi ouvre un
+// tirage d'instruments. La marche grandit — la montée se mérite.
+export const PALIERS_XP = [3, 6, 10, 15, 21, 28, 36]
+
+export function paliersAtteints(xp: number): number {
+  let n = 0
+  for (const p of PALIERS_XP) if (xp >= p) n++
+  return n
+}
+
+/** Le prochain palier à franchir, ou null si la table est épuisée. */
+export function prochainPalier(xp: number): number | null {
+  for (const p of PALIERS_XP) if (xp < p) return p
+  return null
+}

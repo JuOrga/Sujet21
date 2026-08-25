@@ -3766,6 +3766,35 @@
         }
       }
     
+      /* ---- Instruments embarqués : le panneau de détail (pastille 🧰) ---- */
+      #instr-panel {
+        position: fixed; top: 64px; right: 14px; z-index: 46;
+        width: min(320px, 88vw);
+        background: linear-gradient(180deg, #0d141f, #0a0f18);
+        border: 1px solid #27405a; border-radius: 10px;
+        padding: 14px 16px; color: #cfe2ef;
+        font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px;
+        box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+      }
+      #instr-panel[hidden] { display: none; }
+      #instr-panel h4 {
+        margin: 0 0 10px; font-family: Michroma, ui-monospace, monospace;
+        font-size: 10px; letter-spacing: 0.2em; color: #8fd8c8;
+      }
+      #instr-panel .ip-row {
+        display: flex; gap: 10px; align-items: flex-start; padding: 7px 0;
+        border-top: 1px solid #16222f;
+      }
+      #instr-panel .ip-row b { display: block; font-size: 12px; }
+      #instr-panel .ip-row small { color: #7b93a8; font-size: 11px; line-height: 1.35; }
+      #instr-panel .ip-ico { font-size: 18px; }
+      #instr-panel .ip-vide { color: #7b93a8; font-size: 11px; margin: 0; }
+      #instr-panel .ip-note {
+        margin: 10px 0 0; font-size: 10px; letter-spacing: 0.1em; color: #55708c;
+      }
+      #hud-bonbonne-chip.verse-ok {
+        border-color: #6dffb8; box-shadow: 0 0 8px rgba(109, 255, 184, 0.25);
+      }
       /* ---- La MISE EN BONBONNE : l'écran de récompense de fin de salle ---- */
       #mb-veil {
         position: fixed; inset: 0; z-index: 50;
@@ -3871,6 +3900,14 @@
         background: #14202f; border: 1px solid #2d4258; border-radius: 9px;
         color: #cfe2ef; cursor: pointer; letter-spacing: 0.08em;
       }
+      .mb-carte.mb-dest { min-height: 108px; }
+      .mb-cartes:has(.mb-dest) { grid-template-columns: 1fr 1fr; }
+      .mb-jauges {
+        grid-column: 1 / -1; display: flex; justify-content: space-between;
+        gap: 12px; flex-wrap: wrap; font-size: 12px; color: #9fb6c8;
+        padding: 4px 2px 2px;
+      }
+      .mb-jauges b { color: #d5f3e8; }
       .mb-passer {
         margin: 12px 0 0; text-align: center; font-size: 10px;
         letter-spacing: 0.14em; color: #55708c;
@@ -3963,7 +4000,8 @@
         <div class="hud-chips">
           <button type="button" class="hud-chip" data-nom="progression de l'expédition"><i>▦</i><span class="v" id="hud-tableau">SALLE 1/1</span></button>
           <button type="button" class="hud-chip" data-nom="échantillons de secours — le dernier perdu, la run s'arrête" id="hud-vies-chip"><i>💠</i><span class="v" id="hud-vies">×1</span></button>
-          <button type="button" class="hud-chip" data-nom="bonbonnes collectées" id="hud-bonbonne-chip"><i>⛽</i><span class="v" id="hud-bonbonne">0.00 L</span></button>
+          <button type="button" class="hud-chip" data-nom="bonbonne — toucher pour VERSER la réserve dans le corps" id="hud-bonbonne-chip"><i>🫙</i><span class="v" id="hud-bonbonne">0.00 L</span></button>
+          <button type="button" class="hud-chip" data-nom="instruments embarqués — toucher pour le détail" id="hud-instr-chip" hidden><i>🧰</i><span class="v" id="hud-instr">—</span></button>
           <button type="button" class="hud-chip" data-nom="coque du vaisseau"><i>❄</i><span class="v" id="hud-coque">+21°</span></button>
         </div>
       </div>
@@ -4483,6 +4521,7 @@
 
     <!-- LES CINÉMATIQUES : le lecteur plein écran (cinelecteur.ts remplit)
          et la table de montage (montage.ts remplit) -->
+    <div id="instr-panel" hidden aria-label="Instruments embarqués"></div>
     <div id="mb-veil" hidden aria-label="Mise en bonbonne">
       <div class="mb-panneau">
         <h3 class="mb-titre">MISE EN BONBONNE</h3>
@@ -4493,7 +4532,7 @@
         <div class="mb-lignes" id="mb-lignes"></div>
         <div class="mb-cond" id="mb-cond" hidden>CONDENSAT <b id="mb-cond-n">0</b> cL<span class="mb-cond-gain" id="mb-cond-gain"></span></div>
         <div class="mb-choix" id="mb-choix" hidden>
-          <p class="mb-choix-titre">EMPORTEZ UN INSTRUMENT — il vaut pour toute la run</p>
+          <p class="mb-choix-titre" id="mb-choix-titre">OÙ VERSER LE SURPLUS ?</p>
           <div class="mb-cartes" id="mb-cartes"></div>
         </div>
         <p class="mb-passer" id="mb-passer">toucher pour passer</p>

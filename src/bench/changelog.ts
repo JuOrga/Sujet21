@@ -14,6 +14,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '25/08/2026 01:30',
+    title:
+      'Les FLANCS du relief prennent vie : panneaux rivetés et écrans de service',
+    notes: [
+      'Constat du concepteur : en se déplaçant (relief 2.5D, réglage PARAMÈTRES), les parois verticales qui se révèlent étaient « transparentes ou très neutres » — une teinte unie presque confondue avec le fond. La tranche est maintenant une vraie surface : ombre de contact au pied, panneaux à joints réguliers, rivets, chant clair sous le sommet — et sur les murs neutres, par endroits, un ÉCRAN DE SERVICE allumé (vert relevés, ambre jauge, bleu console) dont les colonnes de données vivent et balaient. Un détail qui n’existe QUE dans la perspective : immobile au centre, on ne le voit jamais.',
+      'Tout est PROCÉDURAL — les 16 unités de texture du décor sont déjà toutes occupées, un asset d’écran n’avait nulle part où loger ; le motif suit en plus n’importe quel zoom et n’importe quelle forme (boîtes pivotées comprises). Les écrans n’apparaissent que si la tranche est assez large à l’écran (pas de fourmillement de loin), et l’étanchéité des tranches fines est renforcée (3 hauteurs d’échantillonnage au lieu de 2 — moins de « trous » transparents).',
+      'Réglage inchangé : PARAMÈTRES → RELIEF DES PAROIS (léger / fort). Les surfaces chimiques (hydrophile, hydrophobe) gardent leur teinte sur la tranche, sans écran — la chimie reste lisible.',
+    ],
+  },
+  {
     date: '24/08/2026 21:30',
     title:
       'CINQ plafonds d’un coup : givre, observatoire, brèche, chaufferie, hélice',

@@ -7,7 +7,13 @@ import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
 import { TABLEAU_HUB, TABLEAU_HUB_COMPACT } from './game/hub'
 import { estCodeHub } from './game/levelIO'
-import { instrumentDef, tirageInstruments } from './game/instruments'
+import {
+  BONBONNE_CAP,
+  instrumentDef,
+  paliersAtteints,
+  prochainPalier,
+  tirageInstruments,
+} from './game/instruments'
 import { dansForme, formeOutline } from './game/formes'
 import { DELIVERIES, VERSION, versionDe } from './bench/changelog'
 import { Camera } from './render/camera'
@@ -117,6 +123,12 @@ const run = {
   // Les INSTRUMENTS EMBARQUÉS : les cartes emportées aux mises en bonbonne
   // de cette run — des avantages latéraux, perdus à la fin de la run.
   instruments: [] as string[],
+  // L'XP D'ÉTALONNAGE : les litres versés côté instruments — chaque palier
+  // franchi (PALIERS_XP) ouvre un tirage de cartes.
+  xp: 0,
+  // Le TOTAL LIVRÉ de la run (records d'expédition) : la bonbonne, elle,
+  // est une réserve qui se VIDE quand on la verse dans le corps.
+  livreTotal: 0,
 }
 const VIES_MAX = 3 // plafond, étalonnage et instruments compris
 // Sonde de test : l'état de la run depuis la console (comme __sim, __cam)
@@ -1872,6 +1884,8 @@ interface RunSauvee {
   vies: number
   conclues: number
   instruments: string[]
+  xp: number
+  livreTotal: number
 }
 function runSauvee(): RunSauvee | null {
   try {
@@ -1889,6 +1903,8 @@ function runSauvee(): RunSauvee | null {
       instruments: Array.isArray(d.instruments)
         ? d.instruments.filter((x): x is string => typeof x === 'string')
         : [],
+      xp: Math.max(0, Number(d.xp) || 0),
+      livreTotal: Math.max(0, Number(d.livreTotal) || 0),
     }
   } catch {
     return null
@@ -1911,6 +1927,8 @@ function sauveRun(): void {
           vies: run.vies,
           conclues: run.conclues,
           instruments: run.instruments,
+          xp: run.xp,
+          livreTotal: run.livreTotal,
         }),
       )
   } catch {
@@ -1937,6 +1955,8 @@ function reprendreRun(save: RunSauvee): void {
   run.vies = save.vies
   run.conclues = save.conclues
   run.instruments = save.instruments.slice()
+  run.xp = save.xp
+  run.livreTotal = save.livreTotal
   hasPlayed = true
   document.body.classList.add('playing')
   input.paused = false
@@ -2008,6 +2028,8 @@ document.getElementById('start-secondaire')?.addEventListener('click', () => {
   run.vies = 1
   run.conclues = 0
   run.instruments = []
+  run.xp = 0
+  run.livreTotal = 0
   hasPlayed = true
   document.body.classList.add('playing')
   input.paused = false
@@ -3107,6 +3129,66 @@ function rebuildRenderBoxes(): void {
     { ...level.exit, material: MAT_EXIT },
   ]
 }
+// ---- HUD : les instruments emportés, et la bonbonne qui se VERSE ----
+const hudInstrChip = document.getElementById('hud-instr-chip') as HTMLButtonElement
+const hudInstr = document.getElementById('hud-instr') as HTMLElement
+const instrPanel = document.getElementById('instr-panel') as HTMLDivElement
+/** La pastille montre les icônes emportées ; le panneau donne le détail. */
+function majInstrumentsUI(): void {
+  if (!hudInstrChip) return
+  const defs = run.instruments
+    .map((id) => instrumentDef(id))
+    .filter((d): d is NonNullable<typeof d> => d !== null)
+  hudInstr.textContent = defs.length > 0 ? defs.map((d) => d.icone).join('') : '—'
+  if (instrPanel) {
+    instrPanel.innerHTML =
+      `<h4>INSTRUMENTS EMBARQUÉS</h4>` +
+      (defs.length === 0
+        ? `<p class="ip-vide">Aucun pour l'instant — les paliers d'étalonnage (XP) ouvrent les tirages.</p>`
+        : defs
+            .map(
+              (d) =>
+                `<div class="ip-row"><span class="ip-ico">${d.icone}</span><div><b>${d.nom}</b><small>${d.desc}</small></div></div>`,
+            )
+            .join('')) +
+      `<p class="ip-note">valables jusqu'à la fin de la run</p>`
+  }
+}
+hudInstrChip?.addEventListener('click', () => {
+  if (instrPanel) instrPanel.hidden = !instrPanel.hidden
+})
+instrPanel?.addEventListener('click', () => {
+  instrPanel.hidden = true
+})
+
+/** VERSER LA BONBONNE : la réserve se reverse dans le corps, en jeu — même
+ * non pleine. Le corps se regonfle jusqu'à son volume de départ ; l'état
+ * liquide est requis (la glace n'absorbe pas, le nuage disperserait). */
+function verserBonbonne(): string {
+  if (auHub || testLevel || miseEnBonbonne || sim.dispersed) return 'contexte'
+  if (input.paused || run.ended || run.exitTimer > 0) return 'pause'
+  if (input.freezeIntent || input.gasIntent) return 'etat'
+  const manque = Math.max(0, level.spawn.n - sim.playerCount)
+  const nParts = Math.min(
+    manque,
+    Math.floor(run.bonbonneLiters / params.litersPerParticle),
+  )
+  if (nParts < 1) return 'rien'
+  run.bonbonneLiters = Math.max(
+    0,
+    run.bonbonneLiters - nParts * params.litersPerParticle,
+  )
+  sim.spawnDisc(sim.stats.centroidX, sim.stats.centroidY, nParts, KIND_PLAYER)
+  sim.relabel()
+  bande.ponctuation('sting-collecte', 0.5)
+  hudBonbonneChip.classList.add('ouvert')
+  window.setTimeout(() => hudBonbonneChip.classList.remove('ouvert'), 1200)
+  return 'ok'
+}
+hudBonbonneChip?.addEventListener('click', verserBonbonne)
+// Sonde de test : verser depuis la console (comme __sim, __run)
+;(window as unknown as { __verser: () => string }).__verser = verserBonbonne
+
 function resetLasers(): void {
   laserEtat.vues = []
   laserEtat.recepteurs = creerEtatRecepteurs((level.cibles ?? []).length)
@@ -3127,7 +3209,11 @@ function resetLasers(): void {
 let miseEnBonbonne = false
 const mbVeil = document.getElementById('mb-veil') as HTMLDivElement
 const mbTimers: number[] = []
-let mbPhaseChoix = false
+// Le fil de la cérémonie : bilan (temps 1-3, sautables) → versement (le
+// surplus choisit sa destination) → draft (un tirage par palier franchi)
+// → fin (jauge et CONTINUER). Le versement et la suite ne se sautent pas.
+let mbEtape: 'bilan' | 'versement' | 'draft' | 'fin' = 'bilan'
+let mbDraftsRestants = 0
 let mbBilanCourant: BilanSalle | null = null
 
 /** Le sas mène à la salle suivante (raccourci éventuel compris). */
@@ -3169,13 +3255,10 @@ function fermeMiseEnBonbonne(): void {
   mbBilanCourant = null
 }
 
-/** Les cartes du choix (phase 4) : tirées, affichées, câblées. */
-function mbMontreChoix(): void {
-  if (mbPhaseChoix) return
-  mbPhaseChoix = true
+/** Fige les temps 1-3 à leur état final (saut ou passage naturel). */
+function mbFigeBilan(): void {
   for (const t of mbTimers) clearTimeout(t)
   mbTimers.length = 0
-  // toutes les phases passent à leur état final (au cas où l'on a sauté)
   const b = mbBilanCourant
   if (b) {
     mbEl('mb-eau').style.height = `${Math.min(100, b.pct * 100).toFixed(0)}%`
@@ -3195,27 +3278,97 @@ function mbMontreChoix(): void {
     mbEl('mb-cond-n').textContent = String(b.totalCl)
   }
   mbEl('mb-passer').hidden = true
+}
+
+/** LE VERSEMENT : le surplus choisit sa destination — la RÉSERVE (bonbonne,
+ * reversable dans le corps en route) ou l'ÉTALONNAGE (l'XP des
+ * instruments). Bonbonne pleine : l'XP est le seul chemin. */
+function mbMontreVersement(): void {
+  if (mbEtape !== 'bilan') return
+  mbEtape = 'versement'
+  mbFigeBilan()
+  const b = mbBilanCourant
+  if (!b) return
   const bloc = mbEl('mb-choix')
   bloc.hidden = false
+  mbEl('mb-choix-titre').textContent = 'OÙ VERSER LE SURPLUS ?'
+  const host = mbEl('mb-cartes')
+  host.innerHTML = ''
+  const espace = Math.max(0, BONBONNE_CAP - run.bonbonneLiters)
+  const verse = Math.min(b.surplus, espace)
+  const spill = b.surplus - verse
+  const pleine = espace < 0.01
+
+  const cb = document.createElement('button')
+  cb.type = 'button'
+  cb.className = 'mb-carte mb-dest' + (pleine ? ' mb-pauvre' : '')
+  cb.disabled = pleine
+  cb.innerHTML =
+    `<span class="mb-ico">🫙</span><b>RÉSERVE</b>` +
+    `<small>${
+      pleine
+        ? 'bonbonne PLEINE — tout va à l’étalonnage'
+        : `+${verse.toFixed(2)} L en bonbonne (${run.bonbonneLiters.toFixed(1)} / ${BONBONNE_CAP} L)` +
+          (spill > 0.01 ? ` · excédent +${spill.toFixed(2)} L → XP` : '')
+    }</small>` +
+    `<em class="mb-prix mb-offert">se reverse dans le corps, en jeu</em>`
+  cb.addEventListener('click', () => {
+    run.bonbonneLiters = Math.min(BONBONNE_CAP, run.bonbonneLiters + verse)
+    bande.ponctuation('sting-collecte', 0.55)
+    mbVerseXp(spill)
+  })
+  host.appendChild(cb)
+
+  const prochain = prochainPalier(run.xp)
+  const cx = document.createElement('button')
+  cx.type = 'button'
+  cx.className = 'mb-carte mb-dest'
+  cx.innerHTML =
+    `<span class="mb-ico">🧰</span><b>ÉTALONNAGE</b>` +
+    `<small>+${b.surplus.toFixed(2)} L d’XP (jauge : ${run.xp.toFixed(1)} L${
+      prochain !== null ? ` · palier à ${prochain} L` : ''
+    })</small>` +
+    `<em class="mb-prix mb-offert">chaque palier ouvre un tirage</em>`
+  cx.addEventListener('click', () => {
+    bande.ponctuation('sting-collecte', 0.55)
+    mbVerseXp(b.surplus)
+  })
+  host.appendChild(cx)
+}
+
+/** Crédite l'XP et enchaîne : un tirage par palier franchi, sinon la jauge. */
+function mbVerseXp(litres: number): void {
+  const avant = paliersAtteints(run.xp)
+  run.xp += litres
+  mbDraftsRestants = paliersAtteints(run.xp) - avant
+  if (mbDraftsRestants > 0) mbMontreDraft()
+  else mbMontreFin()
+}
+
+/** Un TIRAGE d'instruments (palier franchi) : trois cartes, on en emporte
+ * une — certaines payantes en condensat, jamais toutes. */
+function mbMontreDraft(): void {
+  mbEtape = 'draft'
+  const palierNo = paliersAtteints(run.xp) - mbDraftsRestants + 1
+  mbEl('mb-choix-titre').textContent =
+    `PALIER D'ÉTALONNAGE ${palierNo} — EMPORTEZ UN INSTRUMENT`
+  const host = mbEl('mb-cartes')
+  host.innerHTML = ''
   const cartes = tirageInstruments(
     Math.random,
     run.instruments,
     run.vies,
     VIES_MAX,
   )
-  const host = mbEl('mb-cartes')
-  host.innerHTML = ''
+  const suite = (): void => {
+    mbDraftsRestants -= 1
+    if (mbDraftsRestants > 0) mbMontreDraft()
+    else mbMontreFin()
+  }
   if (cartes.length === 0) {
-    // plus rien au bassin (tout emporté, réserve pleine) : on file
-    const btn = document.createElement('button')
-    btn.type = 'button'
-    btn.className = 'mb-continuer'
-    btn.textContent = 'INSTRUMENTS AU COMPLET — CONTINUER'
-    btn.addEventListener('click', () => {
-      fermeMiseEnBonbonne()
-      avanceSalle()
-    })
-    host.appendChild(btn)
+    // plus rien au bassin (tout emporté, réserve pleine) : palier honoré
+    mbDraftsRestants = 0
+    mbMontreFin()
     return
   }
   for (const carte of cartes) {
@@ -3240,17 +3393,44 @@ function mbMontreChoix(): void {
       } else {
         run.instruments.push(carte.id)
       }
+      majInstrumentsUI()
       bande.ponctuation('sting-collecte', 0.7)
-      fermeMiseEnBonbonne()
-      avanceSalle()
+      suite()
     })
     host.appendChild(btn)
   }
 }
 
+/** La FIN : l'état des jauges, et CONTINUER mène à la salle suivante. */
+function mbMontreFin(): void {
+  mbEtape = 'fin'
+  const prochain = prochainPalier(run.xp)
+  mbEl('mb-choix-titre').textContent = 'PAROI DU SAS OUVERTE'
+  const host = mbEl('mb-cartes')
+  host.innerHTML = ''
+  const info = document.createElement('div')
+  info.className = 'mb-jauges'
+  info.innerHTML =
+    `<span>🫙 réserve <b>${run.bonbonneLiters.toFixed(2)} / ${BONBONNE_CAP} L</b></span>` +
+    `<span>🧰 XP <b>${run.xp.toFixed(1)} L</b>${
+      prochain !== null ? ` · palier à ${prochain} L` : ' · table épuisée'
+    }</span>`
+  host.appendChild(info)
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'mb-continuer'
+  btn.textContent = 'SALLE SUIVANTE'
+  btn.addEventListener('click', () => {
+    fermeMiseEnBonbonne()
+    avanceSalle()
+  })
+  host.appendChild(btn)
+}
+
 function montreMiseEnBonbonne(b: BilanSalle): void {
   miseEnBonbonne = true
-  mbPhaseChoix = false
+  mbEtape = 'bilan'
+  mbDraftsRestants = 0
   mbBilanCourant = b
   mbVeil.hidden = false
   // état de départ
@@ -3274,7 +3454,7 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
     const t = Math.min(1, (performance.now() - t0) / 1300)
     const e = 1 - (1 - t) * (1 - t) // sortie douce
     mbEl('mb-l').textContent = `${(b.surplus * e).toFixed(2)} L`
-    if (t < 1 && !mbPhaseChoix) requestAnimationFrame(litres)
+    if (t < 1 && mbEtape === 'bilan') requestAnimationFrame(litres)
   }
   requestAnimationFrame(litres)
   if (b.prime >= 0.01) {
@@ -3314,17 +3494,20 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
       mbEl('mb-cond-n').textContent = String(
         Math.round(b.totalCl - b.gainCl * (1 - e)),
       )
-      if (t < 1 && !mbPhaseChoix) requestAnimationFrame(roule)
+      if (t < 1 && mbEtape === 'bilan') requestAnimationFrame(roule)
     }
     requestAnimationFrame(roule)
   })
-  // Temps 4 — LE CHOIX
-  apres(4300, mbMontreChoix)
+  // Temps 4 — LE VERSEMENT
+  apres(4300, mbMontreVersement)
 }
-// un toucher pendant les temps 1-3 saute aux cartes ; jamais l'inverse
+// un toucher pendant les temps 1-3 saute au versement ; jamais l'inverse
 mbVeil?.addEventListener('pointerdown', (e) => {
-  if (!mbPhaseChoix && (e.target as HTMLElement).closest('.mb-carte') === null) {
-    mbMontreChoix()
+  if (
+    mbEtape === 'bilan' &&
+    (e.target as HTMLElement).closest('.mb-carte') === null
+  ) {
+    mbMontreVersement()
   }
 })
 const dashAimEl = el('dash-aim')
@@ -3379,6 +3562,7 @@ function restart(): void {
   } else {
     camera.snapTo(sim.stats.centroidX, sim.stats.centroidY, camera.zoom)
   }
+  majInstrumentsUI()
 }
 
 // Nouvelle expédition : retour au premier tableau, réserve vidée, vaisseau
@@ -3390,6 +3574,8 @@ function newExpedition(): void {
   run.vies = 1
   run.conclues = 0
   run.instruments = []
+  run.xp = 0
+  run.livreTotal = 0
   restart()
 }
 
@@ -3402,6 +3588,8 @@ function retourAuLabo(): void {
   run.vies = 1
   run.conclues = 0
   run.instruments = []
+  run.xp = 0
+  run.livreTotal = 0
   run.ended = false
   runSecondaire = false
   entrerHub()
@@ -4142,7 +4330,7 @@ function showOverlay(
 
 // Bilan d'expédition : la phrase que le tampon raconte au protocole
 function expeditionSummary(tableauxDone: number): string {
-  return `${tableauxDone}/${playedLevels().length} salles · 💧 ${fmtL(run.bonbonneLiters)} · ⏱ ${fmtDuree(run.runTime)}`
+  return `${tableauxDone}/${playedLevels().length} salles · 💧 ${fmtL(run.livreTotal)} · ⏱ ${fmtDuree(run.runTime)}`
 }
 
 let lastTime = performance.now()
@@ -4775,7 +4963,7 @@ function frame(now: number): void {
       sim.swallowedIce * params.litersPerParticle * params.iceCollectBonus
     const surplus =
       sim.liters() + sim.swallowed * params.litersPerParticle + prime
-    run.bonbonneLiters += surplus
+    run.livreTotal += surplus
     // chaque centilitre livré nourrit le CONDENSAT (méta) — y compris sur la
     // dernière salle : rien de ce qui atteint le sas n'est jamais perdu
     gagneCondensat(surplus * 100)
@@ -4821,12 +5009,12 @@ function frame(now: number): void {
       trophees.debloque('integrale')
       const exp = records.noteExpedition(
         playedLevels().length,
-        run.bonbonneLiters,
+        run.livreTotal,
         run.runTime,
       )
       pushExpeditionRecord(
         playedLevels().length,
-        run.bonbonneLiters,
+        run.livreTotal,
         run.runTime,
         records.operator(),
       ).then((b) => {
@@ -5037,7 +5225,19 @@ function frame(now: number): void {
   hudCoque.textContent = `${coque > 0 ? '+' : ''}${coque}°`
   hudCoque.classList.toggle('warn', chillNow() > 0.75)
   coqueBar.style.width = `${(chillNow() * 100).toFixed(1)}%`
-  hudBonbonne.textContent = `${run.bonbonneLiters.toFixed(2)} L`
+  hudBonbonne.textContent = `${run.bonbonneLiters.toFixed(2)} / ${BONBONNE_CAP} L`
+  // le versement est possible : la pastille s'allume pour inviter au geste
+  hudBonbonneChip.classList.toggle(
+    'verse-ok',
+    run.bonbonneLiters >= params.litersPerParticle &&
+      sim.playerCount < level.spawn.n &&
+      !input.freezeIntent &&
+      !input.gasIntent,
+  )
+  if (hudInstrChip) {
+    hudInstrChip.hidden = !!testLevel || auHub || run.instruments.length === 0
+    if (hudInstrChip.hidden && instrPanel) instrPanel.hidden = true
+  }
   // La vie compte la matière VIVANTE : le corps plus les gouttes marquées
   // encore dans son halo (la règle : n'est perdu que ce qui en SORT — et
   // tout ce qui reste dans le halo revient, le rappel s'en charge).
@@ -5345,11 +5545,11 @@ function frame(now: number): void {
     if (!testLevel) {
       // fin de l'échantillon ET de l'expédition : les registres consignent tout
       records.noteDispersion(level.code, run.tableauTime)
-      records.noteExpedition(levelIndex, run.bonbonneLiters, run.runTime)
-      if (levelIndex > 0 || run.bonbonneLiters >= 0.01) {
+      records.noteExpedition(levelIndex, run.livreTotal, run.runTime)
+      if (levelIndex > 0 || run.livreTotal >= 0.01) {
         pushExpeditionRecord(
           levelIndex,
-          run.bonbonneLiters,
+          run.livreTotal,
           run.runTime,
           records.operator(),
         ).then((b) => {
