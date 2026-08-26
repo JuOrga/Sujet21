@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 01:19',
+    title: 'La planche dit QUI a saisi chaque code, et QUAND',
+    notes: [
+      'Demandé : sous chaque code de la planche, en petit, la mention de sa saisie. C’est fait — « saisi par JU le 20/08/2026 » se lit sous les molettes (et sous le champ libre des codes hors nomenclature), l’heure exacte en info-bulle. Quand plusieurs mains codifient la même bibliothèque, on sait à qui s’adresser.',
+      'La provenance du CODE se tient à part de celle du tableau : le serveur ne la rafraîchit QUE lorsque la codification change. Retoucher le décor d’une salle ne réattribue donc pas son code — il reste au nom de qui l’a posé, à sa date. Peu importe l’écran qui enregistre (la planche, l’éditeur) : c’est le serveur qui tranche, seul à connaître l’état d’avant.',
+      'Les entrées d’avant cette règle ne restent pas muettes : elles héritent du dernier enregistrement connu, la meilleure approximation disponible. Règle gravée au banc (code changé → réattribué ; décor retouché → intact ; création → au nom de l’enregistreur ; entrée ancienne → héritée) et vérifiée dans la vraie planche, bibliothèque simulée à trois cartes. 369 tests verts, build propre.',
+    ],
+  },
+  {
     date: '27/08/2026 01:12',
     title:
       'Les VOLUMES entrent dans la lumière : le dessus et les flancs cessent d’ignorer les lampes',

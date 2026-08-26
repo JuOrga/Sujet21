@@ -10,12 +10,29 @@ export interface StoredLevel {
   id: string
   auteur: string
   majAt: string
+  // qui a saisi le CODE, et quand — la planche l'affiche sous chaque code.
+  // Le serveur ne la rafraîchit que lorsque la codification change ; pour
+  // les entrées d'avant cette règle, on retombe sur le dernier
+  // enregistrement du tableau, la meilleure approximation disponible.
+  codeAuteur: string
+  codeAt: string
   level: LevelDef
 }
 
 const ENDPOINT = '/api/levels'
 
-function readList(data: unknown): StoredLevel[] {
+/** « saisi par JU le 27/08/2026 » — la provenance d'un code, en clair et
+ *  en toutes lettres. Sans date connue, on dit au moins par qui. */
+export function mentionSaisie(auteur: string, iso: string): string {
+  const qui = auteur.trim() || 'anonyme'
+  const d = iso ? new Date(iso) : null
+  if (!d || Number.isNaN(d.getTime())) return `saisi par ${qui}`
+  const jj = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  return `saisi par ${qui} le ${jj}/${mm}/${d.getFullYear()}`
+}
+
+export function readList(data: unknown): StoredLevel[] {
   if (typeof data !== 'object' || data === null) return []
   const raw = (data as { levels?: unknown }).levels
   if (!Array.isArray(raw)) return []
@@ -25,10 +42,14 @@ function readList(data: unknown): StoredLevel[] {
     const o = item as Record<string, unknown>
     const { level } = parseLevel(o.level)
     if (!level || typeof o.id !== 'string') continue
+    const auteur = typeof o.auteur === 'string' ? o.auteur : ''
+    const majAt = typeof o.majAt === 'string' ? o.majAt : ''
     out.push({
       id: o.id,
-      auteur: typeof o.auteur === 'string' ? o.auteur : '',
-      majAt: typeof o.majAt === 'string' ? o.majAt : '',
+      auteur,
+      majAt,
+      codeAuteur: typeof o.codeAuteur === 'string' && o.codeAuteur ? o.codeAuteur : auteur,
+      codeAt: typeof o.codeAt === 'string' && o.codeAt ? o.codeAt : majAt,
       level,
     })
   }

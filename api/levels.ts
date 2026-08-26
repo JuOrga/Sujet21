@@ -8,6 +8,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { list } from '@vercel/blob'
 import { ecritDocument, litDocument } from './_magasin.js'
+import { provenanceCode } from './_provenance.js'
 
 const PREFIX = 'levels/'
 const MAX_LEVELS = 60
@@ -16,6 +17,11 @@ interface StoredLevel {
   id: string
   auteur: string
   majAt: string
+  // La provenance du CODE, à part : qui l'a saisi et quand. Elle ne bouge
+  // QUE lorsque le code change — retoucher le décor d'un tableau ne
+  // réattribue pas sa codification (la planche l'affiche sous le code).
+  codeAuteur?: string
+  codeAt?: string
   level: Record<string, unknown> // LevelDef sérialisé, validé côté client
 }
 
@@ -131,13 +137,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         while (lib.levels.some((l) => l.id === candidat)) candidat = `${base}-${n++}`.slice(0, 64)
         id = candidat
       }
+      // La saisie du CODE se date à part : seul le serveur connaît l'état
+      // d'avant, donc lui seul peut dire si la codification vient de
+      // changer — quel que soit l'écran (planche, éditeur) qui l'envoie.
+      const at = lib.levels.findIndex((l) => l.id === id)
+      const avant = at >= 0 ? lib.levels[at] : undefined
+      const maintenant = new Date().toISOString()
       const entry: StoredLevel = {
         id,
         auteur,
-        majAt: new Date().toISOString(),
+        majAt: maintenant,
+        ...provenanceCode(
+          avant,
+          (level as Record<string, unknown>).code,
+          auteur,
+          maintenant,
+        ),
         level: level as Record<string, unknown>,
       }
-      const at = lib.levels.findIndex((l) => l.id === id)
       if (at >= 0) lib.levels[at] = entry
       else lib.levels.push(entry)
       if (lib.levels.length > MAX_LEVELS) {

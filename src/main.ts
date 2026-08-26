@@ -70,6 +70,7 @@ import { PerfCollector } from './game/perf'
 import {
   fetchLibrary,
   reorderLibrary,
+  mentionSaisie,
   saveLevel,
   type StoredLevel,
 } from './game/netLevels'
@@ -3137,12 +3138,22 @@ function renderPlanche(): void {
           'DIFF',
         ) +
         `</div>`
+    // sous le code : QUI l'a saisi et QUAND — en petit, pour savoir à qui
+    // s'adresser quand une codification surprend (l'heure exacte en info-bulle)
+    const quand = s.codeAt ? new Date(s.codeAt) : null
+    const saisi =
+      `<small class="pl-saisi" title="${esc(
+        quand && !Number.isNaN(quand.getTime())
+          ? `Code saisi par ${s.codeAuteur || 'anonyme'} — ${quand.toLocaleString('fr-FR')}`
+          : `Code saisi par ${s.codeAuteur || 'anonyme'}`,
+      )}">${esc(mentionSaisie(s.codeAuteur, s.codeAt))}</small>`
     carte.innerHTML =
       `<canvas width="220" height="126"></canvas>` +
       `<span class="pl-rang">${i + 1}</span>` +
       `<button type="button" class="pl-jouer" title="Essayer ce tableau — le bouton « revenir à la planche » vous ramènera ici">⏵</button>` +
       `<button type="button" class="pl-editer" title="Ouvrir ce tableau dans l'ÉDITEUR — la planche est le sélecteur grand format">✎</button>` +
       rouesHtml +
+      (roues ? saisi : '') +
       `<div class="pl-bas">` +
       (roues
         ? ''
@@ -3152,6 +3163,7 @@ function renderPlanche(): void {
       `<button type="button" data-tot="-1" title="Jouer plus tôt"${i === 0 ? ' disabled' : ''}>◀</button>` +
       `<button type="button" data-tot="1" title="Jouer plus tard"${i === visibles.length - 1 ? ' disabled' : ''}>▶</button>` +
       `</span></div>` +
+      (roues ? '' : saisi) +
       (d ? `<span class="salle-chips">${chipsHtml(s.level.code)}</span>` : '')
     dessineMiniCarte(
       carte.querySelector('canvas') as HTMLCanvasElement,
