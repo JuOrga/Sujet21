@@ -3650,54 +3650,9 @@ function sauveOeil(): void {
     // stockage refusé : les curseurs ne tiendront que la session
   }
 }
-// Les curseurs du voile PARAMÈTRES : glisser applique EN DIRECT (l'œil
-// est à l'écran derrière le voile), la valeur s'écrit à côté du curseur.
-{
-  const host = document.getElementById('params-oeil')
-  if (host) {
-    const DEFS: [keyof OeilRegl, string, number, number, string][] = [
-      ['lueur', 'Lueur du noyau', 0, 2.5, '0 : éteint · 2,5 : phare'],
-      ['ombre', 'Pénombre (la silhouette)', 0, 2, '0 : aucune ombre autour'],
-      ['taille', 'Taille de l’œil', 0.5, 2, 'noyau, ombre et dôme ensemble'],
-      ['relief', 'Relief (le dôme)', 0, 2.5, 'courbure du miroir et modelé'],
-      ['vivacite', 'Vivacité du regard', 0.3, 3, 'vitesse de glissement'],
-      ['errance', 'Errance au repos', 0, 2, 'il vagabonde quand rien ne l’appelle'],
-      ['curiosite', 'Curiosité (occupations)', 0.3, 3, 'fréquence des vignettes d’idle'],
-    ]
-    host.innerHTML =
-      DEFS.map(
-        ([cle, nom, min, max, det]) =>
-          `<label class="po-ligne"><span>${nom}<small>${det}</small></span>` +
-          `<input type="range" data-oeil="${cle}" min="${min}" max="${max}" step="0.05" value="${oeilRegl[cle]}" />` +
-          `<b data-oeil-v="${cle}">${oeilRegl[cle].toFixed(2)}</b></label>`,
-      ).join('') +
-      `<button type="button" class="po-defauts" id="po-defauts">REVENIR AUX DÉFAUTS</button>`
-    const curseurs = Array.from(
-      host.querySelectorAll<HTMLInputElement>('input[data-oeil]'),
-    )
-    const montre = (cle: keyof OeilRegl): void => {
-      const v = host.querySelector(`[data-oeil-v="${cle}"]`)
-      if (v) v.textContent = oeilRegl[cle].toFixed(2)
-    }
-    for (const r of curseurs) {
-      r.addEventListener('input', () => {
-        const cle = r.dataset.oeil as keyof OeilRegl
-        oeilRegl[cle] = Number(r.value)
-        montre(cle)
-        sauveOeil()
-      })
-    }
-    document.getElementById('po-defauts')?.addEventListener('click', () => {
-      Object.assign(oeilRegl, OEIL_DEFAUTS)
-      sauveOeil()
-      for (const r of curseurs) {
-        const cle = r.dataset.oeil as keyof OeilRegl
-        r.value = String(oeilRegl[cle])
-        montre(cle)
-      }
-    })
-  }
-}
+// Les curseurs vivent dans LE BANC (dossier « L'œil du Sujet ») : le banc
+// flotte sur le jeu qui tourne — réglage à vue, image par image. Voir le
+// branchement dans createBench (actions.oeil), plus bas.
 
 // ---- L'IDLE : la vie quand on ne joue pas ----
 // Sans geste pendant quelques secondes, le Sujet EXISTE tout seul — de
@@ -5069,6 +5024,7 @@ document.getElementById('overlay-btn')!.addEventListener('click', resetAction)
 const pane = createBench(params, monitor, {
   reset: resetAction,
   autoZoom: () => camera.resetAutoZoom(),
+  oeil: { regl: oeilRegl, defauts: OEIL_DEFAUTS, sauve: sauveOeil },
   tableaux: TABLEAUX.map((t) => t.name),
   gotoTableau: (index) => {
     testLevel = null // le banc navigue dans l'expédition, pas dans le prototype

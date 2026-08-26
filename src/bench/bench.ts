@@ -46,6 +46,14 @@ export interface BenchActions {
   gotoBis(): void
   // Effets sonores (préférences hors présets : chacun règle son volume)
   sound: { actif: boolean; volume: number }
+  // L'ŒIL DU SUJET (pack présence) : les curseurs vivent ici, à VUE — le
+  // banc flotte sur le jeu qui tourne. Hors présets : mémorisé par
+  // appareil (localStorage), 1 partout = le rendu historique.
+  oeil?: {
+    regl: Record<string, number>
+    defauts: Record<string, number>
+    sauve(): void
+  }
 }
 
 export interface BenchMonitor {
@@ -710,6 +718,78 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     fRender.addBinding(params, 'speedColorScale', { min: 50, max: 800, label: 'échelle teinte' }),
     'Vitesse à laquelle la teinte de l’eau atteint sa couleur « rapide ». Bas : tout scintille. Haut : teinte plus sobre.',
   )
+
+  // ---- L'ŒIL DU SUJET : la présence se règle à VUE ----
+  // Le banc flotte sur le jeu : chaque glissière s'applique à l'image
+  // suivante. Hors présets — mémorisé par appareil, pas par préset.
+  if (actions.oeil) {
+    const { regl, defauts, sauve } = actions.oeil
+    const fOeil = pane.addFolder({ title: 'L’œil du Sujet', expanded: false })
+    const ROWS: [string, string, number, number, string][] = [
+      [
+        'lueur',
+        'lueur du noyau',
+        0,
+        2.5,
+        'Luminosité du noyau clair qui vit dans le corps. 0 : éteint. 2,5 : un phare sous la surface.',
+      ],
+      [
+        'ombre',
+        'pénombre',
+        0,
+        2,
+        'Profondeur de la silhouette sombre tapie autour du noyau. 0 : aucune ombre — la chose ne se devine plus.',
+      ],
+      [
+        'taille',
+        'taille de l’œil',
+        0.5,
+        2,
+        'Échelle de l’œil entier : noyau, pénombre et dôme grandissent ensemble.',
+      ],
+      [
+        'relief',
+        'relief (le dôme)',
+        0,
+        2.5,
+        'Hauteur du dôme que le regard soulève : la courbure du miroir et le modelé sans miroir. 0 : surface plate.',
+      ],
+      [
+        'vivacite',
+        'vivacité du regard',
+        0.3,
+        3,
+        'Vitesse à laquelle l’œil glisse vers ce qu’il regarde. Bas : contemplatif. Haut : nerveux.',
+      ],
+      [
+        'errance',
+        'errance au repos',
+        0,
+        2,
+        'Quand rien ne l’appelle, le regard vagabonde lentement dans le corps en gardant une demi-présence. 0 : il rentre se poser au centre et s’éteint (l’ancien comportement).',
+      ],
+      [
+        'curiosite',
+        'curiosité (idle)',
+        0.3,
+        3,
+        'Fréquence des occupations quand on le laisse tranquille : toilette, tentacule, toc-toc, penser au sas.',
+      ],
+    ]
+    for (const [cle, label, min, max, texte] of ROWS) {
+      const b = fOeil.addBinding(regl, cle, { min, max, step: 0.05, label })
+      b.on('change', sauve)
+      describe(b, texte)
+    }
+    describe(
+      fOeil.addButton({ title: 'Revenir aux défauts' }),
+      'Remet les sept curseurs à 1 — le rendu et le comportement d’origine, au pixel près.',
+    ).on('click', () => {
+      Object.assign(regl, defauts)
+      sauve()
+      pane.refresh()
+    })
+  }
 
   const fMon = pane.addFolder({ title: 'Mesures', expanded: true })
   describe(
