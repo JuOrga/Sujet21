@@ -45,6 +45,22 @@ jobs:
           except Exception as e:
             print('illisible :', e)
           EOF
+          echo "== LE CROP CIRCLE (JSON complet, base64) =="
+          python3 - <<'EOF'
+          import json, base64
+          try:
+            d = json.load(open('reponse.json'))
+            for l in d.get('levels', []):
+              nom = ((l.get('level') or {}).get('name') or '')
+              if 'crop' in nom.lower():
+                brut = json.dumps(l, ensure_ascii=False).encode()
+                print('taille', len(brut), 'octets — nom :', nom)
+                b64 = base64.b64encode(brut).decode()
+                for i in range(0, len(b64), 400):
+                  print('B64|' + b64[i:i+400])
+          except Exception as e:
+            print('extraction impossible :', e)
+          EOF
           echo "== /api/records =="
           curl -sS "https://sujet21.vercel.app/api/records" -o records.json -w "HTTP %{http_code}\n" || true
           python3 - <<'EOF'
