@@ -239,11 +239,22 @@ function coinContactAxe(
   }
 }
 
+/** L'étendue angulaire de l'EFFILAGE d'un bout en pointe : la griffe se
+ *  resserre sur ce dernier segment d'angle avant de mourir à ±ouverture. */
+export function arcTaper(rm: number, ht: number, ouverture: number): number {
+  return Math.min(ouverture * 0.7, Math.max(0.12, (2.2 * ht) / rm))
+}
+
 /** L'arc en géométrie UNITAIRE (rayon extérieur 1) + les ÉCHELLES qui le
  *  font remplir la boîte : la boîte est la boîte englobante EXACTE de
  *  l'arc — étiré en ellipse s'il le faut, comme le disque. Fini la moitié
  *  de boîte vide au-dessus d'un demi-anneau (signalé : les coins de la
- *  boîte collent désormais à l'arc, petit ou grand). */
+ *  boîte collent désormais à l'arc, petit ou grand).
+ *
+ *  Les BOUTS comptent dans ce calcul : la calotte ronde déborde le plan de
+ *  coupe, la coupe franche s'arrête net, la griffe meurt sur le rayon
+ *  médian — trois silhouettes, trois boîtes. Changer de bout resserre donc
+ *  la boîte sur ce qu'on voit, sans marge morte (signalé). */
 export function arcRayons(b: {
   minX: number
   minY: number
@@ -251,10 +262,13 @@ export function arcRayons(b: {
   maxY: number
   p0?: number
   p1?: number
+  p2?: number
 }): {
   rm: number
   ht: number
   ouverture: number
+  taper: number
+  bout: number
   cu: number
   sx: number
   sy: number
@@ -262,25 +276,48 @@ export function arcRayons(b: {
   const t = Math.min(1, Math.max(0.08, b.p0 ?? ARC_EPAISSEUR_DEFAUT))
   const ouverture =
     (Math.min(180, Math.max(15, b.p1 ?? ARC_OUVERTURE_DEFAUT)) * Math.PI) / 180
+  const bout = Math.min(2, Math.max(0, Math.round(b.p2 ?? ARC_BOUT_ROND)))
   const rm = 1 - t / 2
   const ht = t / 2
-  // la boîte englobante de l'arc unitaire : [xmin..1] × [-ymax..ymax]
-  const xmin = rm * Math.cos(ouverture) - ht // la calotte déborde toujours
-  const ymax = ouverture < Math.PI / 2 ? rm * Math.sin(ouverture) + ht : 1
+  const ri = Math.max(0, rm - ht) // le rayon intérieur (l'extérieur vaut 1)
+  const taper = arcTaper(rm, ht, ouverture)
+  // la boîte englobante de l'arc unitaire : [xmin..1] × [-ymax..ymax] — le
+  // bord DROIT est toujours le rayon extérieur (l'arc passe par θ = 0)
+  // un anneau COMPLET n'a pas de bouts : quelle que soit la finition, sa
+  // boîte est celle de l'anneau (le champ signé fait le même choix)
+  const coupe = ouverture < Math.PI - 1e-4
+  let xmin: number
+  let ymax: number
+  if (bout === ARC_BOUT_DROIT && coupe) {
+    // secteur d'anneau : les extrêmes sont sur la coupe (ou sur l'anneau
+    // lui-même quand il franchit un quart de tour)
+    const c = Math.cos(ouverture)
+    xmin = c < 0 ? c : ri * c
+    ymax = ouverture >= Math.PI / 2 ? 1 : Math.sin(ouverture)
+  } else if (bout === ARC_BOUT_POINTE && coupe) {
+    // griffe à tranchants droits : le corps va jusqu'à φ, la pointe est un
+    // SOMMET — des bords droits n'ont d'extrêmes qu'aux sommets
+    const phi = ouverture - taper
+    const c = Math.cos(phi)
+    xmin = Math.min(c < 0 ? c : ri * c, rm * Math.cos(ouverture))
+    ymax = Math.max(
+      phi >= Math.PI / 2 ? 1 : Math.sin(phi),
+      rm * Math.sin(ouverture),
+    )
+  } else {
+    xmin = rm * Math.cos(ouverture) - ht // la calotte déborde toujours
+    ymax = ouverture < Math.PI / 2 ? rm * Math.sin(ouverture) + ht : 1
+  }
   return {
     rm,
     ht,
     ouverture,
+    taper,
+    bout,
     cu: (xmin + 1) / 2, // centre x de cette boîte unitaire
     sx: Math.max(1e-6, (b.maxX - b.minX) / (1 - xmin)),
     sy: Math.max(1e-6, (b.maxY - b.minY) / (2 * ymax)),
   }
-}
-
-/** L'étendue angulaire de l'EFFILAGE d'un bout en pointe : la griffe se
- *  resserre sur ce dernier segment d'angle avant de mourir à ±ouverture. */
-export function arcTaper(rm: number, ht: number, ouverture: number): number {
-  return Math.min(ouverture * 0.7, Math.max(0.12, (2.2 * ht) / rm))
 }
 
 // Arc d'anneau : bande radiale sur ±ouverture autour de +x (la rotation de
@@ -306,8 +343,7 @@ function arcContactAxe(
   },
   out: FormeContact,
 ): void {
-  const { rm, ht, ouverture, cu, sx, sy } = arcRayons(b)
-  const bout = Math.round(b.p2 ?? ARC_BOUT_ROND)
+  const { rm, ht, ouverture, taper, bout, cu, sx, sy } = arcRayons(b)
   const qx = (x - (b.minX + b.maxX) / 2) / sx + cu
   const qy = (y - (b.minY + b.maxY) / 2) / sy
   const L = Math.hypot(qx, qy)
@@ -315,6 +351,8 @@ function arcContactAxe(
   // pli de symétrie : on travaille sur |angle|, le signe déplie la normale
   const a = Math.abs(th)
   const sg = th >= 0 ? 1 : -1
+  const ri = Math.max(0, rm - ht)
+  const ro = rm + ht
   let dU: number
   let nx: number
   let ny: number
@@ -333,9 +371,10 @@ function arcContactAxe(
   nx = 0
   ny = 1
   dU = 0
-  if (bout === ARC_BOUT_DROIT) {
-    const ri = Math.max(0, rm - ht)
-    const ro = rm + ht
+  // un anneau COMPLET (ouverture pleine) n'a pas de bouts : les couper
+  // laisserait une fente d'épaisseur nulle — un cheveu clair en travers
+  const coupe = ouverture < Math.PI - 1e-4
+  if (bout === ARC_BOUT_DROIT && coupe) {
     if (a <= ouverture) {
       radiale()
       // la coupe : distance signée au plan radial de l'extrémité (≤ 0 ici) —
@@ -360,29 +399,69 @@ function arcContactAxe(
         ny = (dy / d) * sg
       }
     }
-  } else if (bout === ARC_BOUT_POINTE) {
-    const ta = arcTaper(rm, ht, ouverture)
-    if (a <= ouverture - ta) {
-      radiale()
-    } else if (a <= ouverture) {
-      // la griffe : l'épaisseur s'effile linéairement jusqu'à zéro au bout
-      const hEff = (ht * (ouverture - a)) / ta
-      const dr = L - rm
-      dU = Math.abs(dr) - hEff
-      if (L > 1e-9) {
-        const sgn = dr >= 0 ? 1 : -1
-        nx = (sgn * qx) / L
-        ny = (sgn * qy) / L
+  } else if (bout === ARC_BOUT_POINTE && coupe) {
+    // La GRIFFE : le corps de l'anneau court jusqu'à φ, puis DEUX TRANCHANTS
+    // DROITS se rejoignent en une pointe posée sur le rayon médian. Des
+    // bords droits, c'est une boîte englobante exacte (les extrêmes sont aux
+    // sommets) — et la distance se lit sur les quatre morceaux de bord d'un
+    // seul tenant : aucune couture, donc aucun trait clair en travers.
+    const phi = ouverture - taper
+    const cf = Math.cos(phi)
+    const sf = Math.sin(phi)
+    const px = ro * cf // le bout de l'arc extérieur
+    const py = ro * sf
+    const ix = ri * cf // celui de l'arc intérieur
+    const iy = ri * sf
+    const tx = rm * Math.cos(ouverture) // la pointe
+    const ty = rm * Math.sin(ouverture)
+    const ax = qx
+    const ay = Math.abs(qy)
+    let bd2 = Infinity
+    let bx = 0
+    let by = 0
+    const cand = (cx2: number, cy2: number): void => {
+      const d2 = (ax - cx2) * (ax - cx2) + (ay - cy2) * (ay - cy2)
+      if (d2 < bd2) {
+        bd2 = d2
+        bx = cx2
+        by = cy2
       }
+    }
+    const seg = (x0: number, y0: number, x1: number, y1: number): void => {
+      const ex = x1 - x0
+      const ey = y1 - y0
+      const t = Math.min(
+        1,
+        Math.max(0, ((ax - x0) * ex + (ay - y0) * ey) / (ex * ex + ey * ey || 1)),
+      )
+      cand(x0 + t * ex, y0 + t * ey)
+    }
+    if (a <= phi) {
+      // sous le corps de l'anneau : les deux arcs se projettent radialement
+      const ux = L > 1e-9 ? ax / L : 1
+      const uy = L > 1e-9 ? ay / L : 0
+      cand(ro * ux, ro * uy)
+      cand(ri * ux, ri * uy)
     } else {
-      const dx = qx - rm * Math.cos(ouverture)
-      const dy = Math.abs(qy) - rm * Math.sin(ouverture)
-      const d = Math.hypot(dx, dy)
-      dU = d
-      if (d > 1e-9) {
-        nx = dx / d
-        ny = (dy / d) * sg
-      }
+      cand(px, py)
+      cand(ix, iy)
+    }
+    seg(px, py, tx, ty)
+    seg(tx, ty, ix, iy)
+    const c1 = (tx - px) * (ay - py) - (ty - py) * (ax - px)
+    const c2 = (ix - tx) * (ay - ty) - (iy - ty) * (ax - tx)
+    const c3 = (px - ix) * (ay - iy) - (py - iy) * (ax - ix)
+    const griffe = !(
+      (c1 < 0 || c2 < 0 || c3 < 0) &&
+      (c1 > 0 || c2 > 0 || c3 > 0)
+    )
+    const dedans = (a <= phi && L >= ri && L <= ro) || griffe
+    const d = Math.sqrt(bd2)
+    dU = dedans ? -d : d
+    if (d > 1e-9) {
+      const s = dedans ? -1 : 1
+      nx = (s * (ax - bx)) / d
+      ny = (s * (ay - by) * sg) / d
     }
   } else if (a <= ouverture) {
     radiale()
@@ -524,8 +603,7 @@ export function formeOutline(
     const [ax, ay, bx, by, cx2, cy2] = coinSommets(b)
     pts.push({ x: ax, y: ay }, { x: bx, y: by }, { x: cx2, y: cy2 })
   } else if (f === FORME_ARC) {
-    const { rm, ht, ouverture, cu, sx, sy } = arcRayons(b)
-    const bout = Math.round(b.p2 ?? ARC_BOUT_ROND)
+    const { rm, ht, ouverture, taper, bout, cu, sx, sy } = arcRayons(b)
     const monde = (ux: number, uy: number): { x: number; y: number } => ({
       x: cx + (ux - cu) * sx,
       y: cy + uy * sy,
@@ -533,9 +611,9 @@ export function formeOutline(
     const n = Math.max(8, Math.floor(steps / 2))
     const ro = rm + ht
     const ri = Math.max(0, rm - ht)
-    // l'étendue angulaire des lisières : en pointe, elles s'arrêtent où la
-    // griffe commence — le bout lui-même est un sommet unique
-    const fin = bout === ARC_BOUT_POINTE ? ouverture - arcTaper(rm, ht, ouverture) : ouverture
+    // l'étendue angulaire des lisières : en pointe, elles s'arrêtent où les
+    // tranchants commencent — le bout lui-même est un sommet unique
+    const fin = bout === ARC_BOUT_POINTE ? ouverture - taper : ouverture
     for (let i = 0; i <= n; i++) {
       const t = -fin + (i / n) * 2 * fin
       pts.push(monde(ro * Math.cos(t), ro * Math.sin(t)))

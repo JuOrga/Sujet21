@@ -6,12 +6,12 @@ import { describe, expect, it } from 'vitest'
 import {
   ARC_BOUT_DROIT,
   ARC_BOUT_POINTE,
+  ARC_BOUT_ROND,
   FORME_ARC,
   FORME_CAPSULE,
   FORME_COIN,
   FORME_DISQUE,
   arcRayons,
-  arcTaper,
   dansForme,
   formeContact,
   formeOutline,
@@ -307,60 +307,145 @@ describe('formes — le contour est cohérent avec le champ', () => {
   })
 })
 
-describe('formes — les BOUTS de l\u2019arc (p2)', () => {
-  // le m\u00eame arc dans les trois finitions : demi-anneau \u00e9pais, sans rotation
-  const base: FormeBox = {
-    minX: -150,
-    minY: -150,
-    maxX: 150,
-    maxY: 150,
+describe('formes — les BOUTS de l’arc (p2)', () => {
+  // le même arc dans les trois finitions — même boîte, même ouverture. La
+  // boîte collant à CHAQUE silhouette, chacune a sa propre mise à l’échelle :
+  // on interroge donc chaque forme dans SON espace unitaire.
+  const boite = { minX: -150, minY: -150, maxX: 150, maxY: 150 }
+  const arc = (p2?: number): FormeBox => ({
+    ...boite,
     forme: FORME_ARC,
     p0: 0.4,
     p1: 90,
-  }
-  // un point UNITAIRE remis au monde par les \u00e9chelles de la bo\u00eete
+    ...(p2 ? { p2 } : {}),
+  })
+  // un point donné en unitaire, ramené au monde par les échelles de SA boîte
   const monde = (b: FormeBox, ux: number, uy: number): [number, number] => {
     const { cu, sx, sy } = arcRayons(b)
-    return [(b.minX + b.maxX) / 2 + (ux - cu) * sx, (b.minY + b.maxY) / 2 + uy * sy]
+    return [
+      (b.minX + b.maxX) / 2 + (ux - cu) * sx,
+      (b.minY + b.maxY) / 2 + uy * sy,
+    ]
   }
 
-  it('la calotte ronde d\u00e9borde le plan de coupe \u2014 les bouts droits et pointus, non', () => {
-    const { rm, ht } = arcRayons(base)
-    // juste au-del\u00e0 de la coupe (x < 0 \u00e0 90\u00b0), au rayon m\u00e9dian : dans la
-    // calotte ronde, hors de la coupe franche, hors de la pointe
-    const [px, py] = monde(base, -ht * 0.5, rm)
-    expect(dansForme(base, px, py)).toBe(true)
-    expect(dansForme({ ...base, p2: ARC_BOUT_DROIT }, px, py)).toBe(false)
-    expect(dansForme({ ...base, p2: ARC_BOUT_POINTE }, px, py)).toBe(false)
+  it('la calotte ronde déborde le plan de coupe — les bouts droits et pointus, non', () => {
+    // juste au-DELÀ du plan de coupe, sur le rayon médian : dans la calotte
+    // ronde (qui déborde), hors de la coupe franche et hors de la griffe
+    const auDela = (b: FormeBox): boolean => {
+      const { rm, ht, ouverture } = arcRayons(b)
+      const c = Math.cos(ouverture)
+      const s2 = Math.sin(ouverture)
+      const [px, py] = monde(b, rm * c - 0.5 * ht * s2, rm * s2 + 0.5 * ht * c)
+      return dansForme(b, px, py)
+    }
+    expect(auDela(arc())).toBe(true)
+    expect(auDela(arc(ARC_BOUT_DROIT))).toBe(false)
+    expect(auDela(arc(ARC_BOUT_POINTE))).toBe(false)
   })
 
-  it('la griffe s\u2019effile : pr\u00e8s du bout, la pleine \u00e9paisseur n\u2019y est plus', () => {
-    const { rm, ht, ouverture } = arcRayons(base)
-    const ta = arcTaper(rm, ht, ouverture)
-    // \u00e0 mi-griffe, \u00e0 80 % de l\u2019\u00e9paisseur : encore dedans en rond et en
-    // droit, d\u00e9j\u00e0 dehors en pointe (l\u2019\u00e9paisseur locale est tomb\u00e9e \u00e0 50 %)
-    const a = ouverture - ta / 2
-    const L = rm + ht * 0.8
-    const [px, py] = monde(base, L * Math.cos(a), L * Math.sin(a))
-    expect(dansForme(base, px, py)).toBe(true)
-    expect(dansForme({ ...base, p2: ARC_BOUT_DROIT }, px, py)).toBe(true)
-    expect(dansForme({ ...base, p2: ARC_BOUT_POINTE }, px, py)).toBe(false)
-    // le c\u0153ur de l\u2019arc, loin des bouts : dedans dans les trois finitions
-    const [cx2, cy2] = monde(base, rm, 0)
-    for (const p2 of [0, ARC_BOUT_DROIT, ARC_BOUT_POINTE])
-      expect(dansForme({ ...base, p2 }, cx2, cy2)).toBe(true)
+  it('la griffe s’effile : à mi-tranchant, la pleine épaisseur n’y est plus', () => {
+    // à mi-chemin des tranchants, à 80 % de l’épaisseur vers l’extérieur :
+    // encore dans la bande pour les deux autres finitions, déjà dehors pour
+    // la griffe — ses tranchants ont ramené le bord vers le rayon médian
+    const epais = (b: FormeBox): boolean => {
+      const { rm, ht, ouverture, taper } = arcRayons(b)
+      const a = ouverture - taper / 2
+      const L = rm + ht * 0.8
+      const [px, py] = monde(b, L * Math.cos(a), L * Math.sin(a))
+      return dansForme(b, px, py)
+    }
+    expect(epais(arc())).toBe(true)
+    expect(epais(arc(ARC_BOUT_DROIT))).toBe(true)
+    expect(epais(arc(ARC_BOUT_POINTE))).toBe(false)
+    // le cœur de l’arc, loin des bouts : dedans dans les trois finitions
+    for (const p2 of [undefined, ARC_BOUT_DROIT, ARC_BOUT_POINTE]) {
+      const b = arc(p2)
+      const { rm } = arcRayons(b)
+      const [px, py] = monde(b, rm, 0)
+      expect(dansForme(b, px, py)).toBe(true)
+    }
   })
 
-  it('coupe franche : la normale au bout est PERPENDICULAIRE \u00e0 la courbe', () => {
-    const { rm, ouverture } = arcRayons(base)
-    // l\u00e9g\u00e8rement DANS la bande, contre la coupe du haut (angle +90\u00b0) : la
-    // normale du contact doit \u00eatre celle du plan de coupe (\u2212sin, cos)
+  it('coupe franche : la normale au bout est PERPENDICULAIRE à la courbe', () => {
+    const b = arc(ARC_BOUT_DROIT)
+    const { rm, ouverture } = arcRayons(b)
+    // légèrement DANS la bande, contre la coupe : la normale du contact doit
+    // être celle du plan de coupe (−sin, cos)
     const a = ouverture - 0.02
-    const [px, py] = monde(base, rm * Math.cos(a), rm * Math.sin(a))
-    const c = contact({ ...base, p2: ARC_BOUT_DROIT }, px, py)
+    const [px, py] = monde(b, rm * Math.cos(a), rm * Math.sin(a))
+    const c = contact(b, px, py)
     expect(c.dist).toBeLessThan(0)
     const attX = -Math.sin(ouverture)
     const attY = Math.cos(ouverture)
     expect(c.nx * attX + c.ny * attY).toBeGreaterThan(0.98)
   })
+})
+
+describe('formes — la BOÎTE colle à l’arc, bouts compris', () => {
+  // Pour chaque finition, la boîte doit être la boîte englobante EXACTE :
+  // rien ne dépasse (sinon la physique et le rendu rejettent à tort), et
+  // chaque côté est TOUCHÉ (sinon il reste de la marge morte — signalé).
+  const boite = { minX: -150, minY: -140, maxX: 150, maxY: 140 }
+  const cas = [
+    { p1: 45, p0: 0.3 },
+    { p1: 90, p0: 0.35 },
+    { p1: 110, p0: 0.4 },
+    { p1: 150, p0: 0.5 },
+    { p1: 180, p0: 0.35 },
+  ]
+  const PAS = 0.1 // le pas d’échantillonnage le long d’un côté
+
+  // balaye une ligne parallèle au côté, décalée de `dedans` vers l’intérieur
+  // (négatif : vers l’extérieur) — vrai si la forme est présente sur la ligne
+  const cote = (
+    b: FormeBox,
+    axe: 'x' | 'y',
+    bord: number,
+    dedans: number,
+  ): boolean => {
+    const v = bord + dedans
+    const de = axe === 'x' ? b.minY : b.minX
+    const a = axe === 'x' ? b.maxY : b.maxX
+    for (let t = de; t <= a; t += PAS) {
+      const px = axe === 'x' ? v : t
+      const py = axe === 'x' ? t : v
+      if (dansForme(b, px, py)) return true
+    }
+    return false
+  }
+
+  for (const bout of [ARC_BOUT_ROND, ARC_BOUT_DROIT, ARC_BOUT_POINTE]) {
+    it(`bout ${bout} : rien ne dépasse, et les quatre côtés sont touchés`, () => {
+      for (const c of cas) {
+        const b: FormeBox = {
+          ...boite,
+          forme: FORME_ARC,
+          p0: c.p0,
+          p1: c.p1,
+          ...(bout ? { p2: bout } : {}),
+        }
+        const quoi = `bout ${bout}, ouverture ${c.p1}`
+        // DEHORS : un cheveu au-delà de chaque côté, plus rien
+        const dehors = [
+          `sort à gauche : ${cote(b, 'x', b.minX, -0.6)}`,
+          `sort à droite : ${cote(b, 'x', b.maxX, 0.6)}`,
+          `sort en bas : ${cote(b, 'y', b.minY, -0.6)}`,
+          `sort en haut : ${cote(b, 'y', b.maxY, 0.6)}`,
+        ].join(' · ')
+        expect(`${quoi} · ${dehors}`).toBe(
+          `${quoi} · sort à gauche : false · sort à droite : false · sort en bas : false · sort en haut : false`,
+        )
+        // DEDANS : un cheveu en deçà, la forme est là — le côté est touché
+        const touche = [
+          `touche à gauche : ${cote(b, 'x', b.minX, 0.8)}`,
+          `touche à droite : ${cote(b, 'x', b.maxX, -0.8)}`,
+          `touche en bas : ${cote(b, 'y', b.minY, 0.8)}`,
+          `touche en haut : ${cote(b, 'y', b.maxY, -0.8)}`,
+        ].join(' · ')
+        expect(`${quoi} · ${touche}`).toBe(
+          `${quoi} · touche à gauche : true · touche à droite : true · touche en bas : true · touche en haut : true`,
+        )
+      }
+    })
+  }
 })
