@@ -3714,6 +3714,141 @@
       .ed-cle-glace { color: #9fd0f0; }
       .ed-cle-vapeur { color: #ffd24a; }
       .ed-cle-laser { color: #ff6a6a; }
+      .ed-bulle {
+        pointer-events: auto;
+      }
+      .ed-bulle-mod {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 22px;
+        height: 22px;
+        border: 1px solid #2c4256;
+        border-radius: 5px;
+        background: transparent;
+        color: #7f95a6;
+        font-size: 12px;
+        line-height: 1;
+        cursor: pointer;
+        opacity: 0.55;
+      }
+      .ed-bulle-mod:hover {
+        opacity: 1;
+        color: #eaf4fb;
+        border-color: #4a6b80;
+      }
+      .ed-bulle-sur {
+        margin-top: 7px;
+        font-size: 10px;
+        color: #d7ad55;
+        letter-spacing: 0.05em;
+      }
+      #ed-fiches.ed-fiches-marque {
+        color: #ffd24a;
+        border-color: #d7ad55;
+      }
+      .ed-fiches-voile {
+        position: fixed;
+        inset: 0;
+        z-index: 340;
+        background: rgba(4, 8, 12, 0.72);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .ed-fiches-carte {
+        width: min(520px, 94vw);
+        max-height: 86vh;
+        overflow: auto;
+        background: #0d131a;
+        border: 1px solid #2c4256;
+        border-radius: 10px;
+        padding: 16px 18px;
+        color: #c8d8e4;
+        font-size: 13px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .ed-fiches-large {
+        width: min(720px, 96vw);
+      }
+      .ed-fiches-tete {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        color: #eaf4fb;
+      }
+      .ed-fiches-tete span {
+        font-weight: 400;
+        color: #7f95a6;
+        letter-spacing: 0.03em;
+        flex: 1;
+      }
+      .ed-fiches-carte textarea {
+        width: 100%;
+        resize: vertical;
+        background: #0a0f15;
+        border: 1px solid #2c4256;
+        border-radius: 6px;
+        color: #c8d8e4;
+        padding: 8px;
+        font: 12px/1.5 ui-monospace, monospace;
+      }
+      .ed-fiches-note {
+        color: #7f95a6;
+        font-size: 12px;
+        margin: 0;
+      }
+      .ed-fiches-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+      .ed-btn-vert {
+        background: #123528 !important;
+        border-color: #35e0a4 !important;
+        color: #b8ffe3 !important;
+      }
+      .ed-fiches-item {
+        border: 1px solid #223648;
+        border-radius: 8px;
+        padding: 10px 12px;
+      }
+      .ed-fiches-item-tete {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .ed-fiches-item-tete span {
+        color: #7f95a6;
+        font-size: 11px;
+        flex: 1;
+      }
+      .ed-diff-champ {
+        margin-top: 6px;
+        font-size: 12px;
+      }
+      .ed-diff-champ b {
+        color: #9fb4c4;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .ed-diff-avant {
+        color: #b0705f;
+        text-decoration: line-through;
+        text-decoration-color: rgba(232, 106, 106, 0.6);
+        margin-top: 2px;
+      }
+      .ed-diff-apres {
+        color: #8fe6bd;
+        margin-top: 2px;
+      }
       #ed-stage {
         position: relative;
         overflow: hidden;
@@ -4528,6 +4663,7 @@
         <button type="button" id="ed-export">Exporter</button>
         <button type="button" id="ed-montage" title="La table de montage des cinématiques — leurs codes se branchent ici : champs CINÉ du tableau, ou champ Cinématique d'une zone">▤ Montage</button>
         <button type="button" id="ed-images" title="La bibliothèque d'images partagée : importez vos visuels (recompressés WebP), copiez leur lien, servez-vous-en dans les planches du montage">🖼 Images</button>
+        <button type="button" id="ed-fiches" title="Les fiches de la bulle savante réécrites par les concepteurs : l'écart face au texte d'origine, pour corriger le système ensuite">🗒 Fiches</button>
         <span class="sp"></span>
         <label class="ed-f" style="width:auto"><span>Grille</span>
           <input type="number" id="ed-grid" value="20" min="1" step="5" style="width:56px" /></label>
