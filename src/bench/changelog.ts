@@ -22,7 +22,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
-    date: '26/08/2026 17:40',
+    date: '26/08/2026 17:35',
+    title: 'La planche s’essaie : ⏵ sur chaque carte, et le retour au même endroit',
+    notes: [
+      'Chaque carte de LA PLANCHE porte un bouton ⏵ : le tableau se lance à l’essai sur-le-champ. En jeu, un bouton « ⟵ REVENIR À LA PLANCHE » (haut de l’écran) ramène exactement là où on en était — défilement compris — et la conclusion de l’essai (sas bu) y ramène aussi d’elle-même, comme un essai d’éditeur retourne à l’éditeur.',
+    ],
+  },
+  {
+    date: '26/08/2026 17:31',
     title: 'Le FAISCEAU SOMPTUEUX — et le sursaut de victoire à l’allumage',
     notes: [
       'Demandé : un rayon lumineux bien plus stylé et satisfaisant, l’ancien conservé dans PARAMÈTRES — et un effet de victoire quand le rayon touche sa cible, même sur un balayage éclair. C’est fait. SOMPTUEUX (défaut) : une nappe d’ambiance très large baigne la salle, le halo s’élargit, et surtout un FLUX de paquets lumineux REMONTE le rayon en continu — l’énergie voyage au lieu de poser un trait. La bouche de l’émetteur et le point d’arrivée LUISENT et crépitent doucement. L’arc plasma garde sa teinte violette, l’eau son rose diffus.',
@@ -58,8 +65,7 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '26/08/2026 15:00',
-    title:
-      'L’œil du Sujet : l’étalonnage du concepteur devient le défaut livré',
+    title: 'L’œil du Sujet : l’étalonnage du concepteur devient le défaut livré',
     notes: [
       'Les sept curseurs de l’œil (banc → « L’œil du Sujet ») partent désormais des valeurs retenues par le concepteur : noyau plus lumineux (1,6) dans une pénombre discrète (0,3), œil un rien plus petit (0,9) et plus plat (0,85), regard plus vif (1,25) qui erre peu (0,8) — et un Sujet nettement plus occupé (curiosité 1,85). « Revenir aux défauts » ramène à cet étalonnage ; un appareil qui avait déjà ses réglages les garde.',
     ],
