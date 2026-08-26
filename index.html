@@ -360,6 +360,64 @@
          de version (Steam Deck et mobile : pas de barre d'adresse à taper).
          Il colle au navigateur (localStorage) jusqu'à ?dev=0. */
       body:not(.concepteur) [data-dev] { display: none !important; }
+      /* ---- LA PLANCHE : l'ordonnancement en cartes visuelles ---- */
+      #planche {
+        position: fixed; inset: 0; z-index: 59;
+        background: rgba(2, 6, 12, 0.78);
+        display: flex; align-items: center; justify-content: center;
+        padding: 18px;
+      }
+      #planche[hidden] { display: none; }
+      .planche-boite { max-width: min(1180px, 96vw); width: 100%; }
+      #planche-corps {
+        overflow-y: auto; padding: 12px;
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 10px;
+      }
+      .pl-carte {
+        position: relative;
+        background: rgba(20, 32, 46, 0.75);
+        border: 1px solid var(--line); border-radius: 8px;
+        padding: 8px 8px 9px; cursor: grab;
+      }
+      .pl-carte.dragging { opacity: 0.45; }
+      .pl-carte.drag-over { border-color: var(--specimen); box-shadow: 0 0 0 1px var(--specimen); }
+      .pl-carte canvas {
+        width: 100%; border-radius: 5px; display: block;
+        border: 1px solid #223447; background: #0c141d;
+      }
+      /* le RANG : le grand numéro d'ordre, lisible de loin */
+      .pl-rang {
+        position: absolute; top: 12px; left: 12px;
+        font-family: var(--font-display); font-size: 17px; line-height: 1;
+        color: #eaf6ff; background: rgba(8, 14, 22, 0.82);
+        border: 1px solid var(--specimen); border-radius: 5px;
+        padding: 4px 8px; pointer-events: none;
+      }
+      .pl-bas {
+        display: flex; align-items: center; gap: 6px; margin-top: 7px;
+      }
+      .pl-code {
+        flex: 0 0 74px; width: 74px; font: inherit; font-size: 13px;
+        text-align: center; letter-spacing: 0.08em;
+        background: rgba(10, 18, 28, 0.9); color: #d5f3e8;
+        border: 1px solid var(--line); border-radius: 5px; padding: 5px 2px;
+      }
+      .pl-code:focus { border-color: var(--specimen); outline: none; }
+      .pl-nom {
+        flex: 1; min-width: 0; font-size: 12px; line-height: 1.3;
+        overflow: hidden; text-overflow: ellipsis;
+        display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      }
+      .pl-ord { display: flex; gap: 4px; }
+      .pl-ord button {
+        min-width: 34px; min-height: 34px; font: inherit; font-size: 13px;
+        background: transparent; color: var(--dim);
+        border: 1px solid var(--line); border-radius: 5px; cursor: pointer;
+      }
+      .pl-ord button:hover:not(:disabled) { border-color: var(--specimen); color: var(--specimen); }
+      .pl-ord button:disabled { opacity: 0.3; cursor: default; }
+      .pl-carte .salle-chips { margin-top: 6px; }
       /* ---- LE PUPITRE D'ESSAIS : simuler les événements au doigt ---- */
       #pupitre {
         position: fixed; inset: 0; z-index: 58;
@@ -4949,6 +5007,20 @@
       </div>
     </div>
 
+    <!-- LA PLANCHE : l'ordonnancement de l'expédition, en cartes visuelles -->
+    <div id="planche" hidden aria-label="La planche d'ordonnancement">
+      <div class="salles-boite planche-boite">
+        <div class="salles-tete"><span>LA PLANCHE — l'ordre de jeu, en visuel</span>
+          <button type="button" id="planche-fermer" aria-label="Fermer">✕</button></div>
+        <p class="salles-legende">Glissez une carte (ou ◀ ▶) pour changer l'<b>ordre de jeu</b> —
+          c'est le même que la séquence de l'éditeur : chaque geste s'enregistre aussitôt
+          dans la bibliothèque partagée. Le champ code accepte la nomenclature
+          (« <b>111</b> » : moment · mécanique · difficulté) et s'enregistre à la validation.</p>
+        <div id="planche-corps"></div>
+        <p class="pup-etat" id="planche-etat"></p>
+      </div>
+    </div>
+
     <!-- Le PUPITRE D'ESSAIS : les événements du jeu, simulés au doigt -->
     <div id="pupitre" hidden aria-label="Pupitre d'essais">
       <div class="salles-boite">
@@ -4997,6 +5069,7 @@
           <button type="button" data-tri="meca">MÉCANIQUE</button>
           <button type="button" data-tri="diff">DIFFICULTÉ</button>
           <button type="button" id="salles-couv-btn" title="La carte de couverture : combien de salles par case phase × difficulté — les trous sautent aux yeux">COUVERTURE</button>
+          <button type="button" id="salles-planche-btn" title="La planche d'ordonnancement : toutes les salles de la bibliothèque en cartes visuelles — glisser pour réordonner la séquence, renseigner le code nomenclature">LA PLANCHE</button>
         </div>
         <div class="salles-filtres" id="salles-filtres" role="group" aria-label="Filtrer les salles"></div>
         <div id="salles-couv" hidden></div>

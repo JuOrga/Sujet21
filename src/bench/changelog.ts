@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 17:06',
+    title: 'LA PLANCHE : l’ordonnancement de l’expédition, en cartes visuelles',
+    notes: [
+      'Demandé : ordonner les niveaux comme dans l’éditeur, mais dans un écran à part, bien plus visuel. C’est fait — le bouton LA PLANCHE (écran SALLES, mode concepteur) ouvre une grille de CARTES : mini-carte du tableau, grand numéro d’ordre, nom, champ CODE nomenclature (« 111 » — pastilles moment · mécanique · difficulté décodées dessous).',
+      'Glisser une carte sur une autre (ou ◀ ▶ au doigt) change l’ORDRE DE JEU : c’est la même séquence que l’éditeur — chaque geste s’enregistre aussitôt dans la bibliothèque partagée (reorderLibrary), l’éditeur se resynchronise dans la foulée, et le hub garde sa place hors séquence. Le champ code enregistre à la validation (saveLevel) et les pastilles suivent.',
+      'Vérifié en navigateur : trois cartes rendues avec leurs mini-cartes, ▶ envoie l’ordre complet (hub préservé en tête), l’édition d’un code part au serveur et l’écran SALLES rejoue le nouvel ordre aussitôt.',
+    ],
+  },
+  {
     date: '26/08/2026 16:29',
     title: 'Éditeur : l’aura et la cachette PIVOTENT avec leur pièce',
     notes: [

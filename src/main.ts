@@ -9,6 +9,7 @@ import { CODEX, Codex, type CodexGroupe } from './game/codex'
 import { TABLEAU_HUB, TABLEAU_HUB_COMPACT } from './game/hub'
 import {
   MECANIQUE_NOMS,
+  codeCanon,
   decodeCode21,
   decodeCodeAtelier,
   estCodeHub,
@@ -66,7 +67,12 @@ import {
 } from './game/laser'
 import { BOUTON, Manette } from './game/manette'
 import { PerfCollector } from './game/perf'
-import { fetchLibrary } from './game/netLevels'
+import {
+  fetchLibrary,
+  reorderLibrary,
+  saveLevel,
+  type StoredLevel,
+} from './game/netLevels'
 import { AudioFx, loadAudioPrefs } from './game/audio'
 import {
   Soundtrack,
@@ -2777,6 +2783,206 @@ const editor = new LevelEditor(el('editor'), {
     renderSalles()
   },
 })
+
+// ---- LA PLANCHE : l'ordonnancement de l'expédition, en cartes visuelles --
+// Toutes les salles de la bibliothèque en mini-cartes : glisser (ou ◀ ▶)
+// réordonne LA séquence — la même que l'éditeur (reorderLibrary), qui se
+// resynchronise aussitôt. Le champ code enregistre la nomenclature via
+// saveLevel. Le hub et ses chantiers ne s'affichent pas (hors séquence)
+// mais GARDENT leur place dans l'ordre envoyé au serveur.
+const plancheEl = document.getElementById('planche') as HTMLDivElement
+let plancheTous: StoredLevel[] = []
+let plancheBusy = false
+function plancheDit(msg: string): void {
+  const e = document.getElementById('planche-etat')
+  if (e) e.textContent = msg
+}
+/** Répercute une réponse serveur partout : planche, fiche, salles, éditeur. */
+function plancheSync(saved: StoredLevel[]): void {
+  plancheTous = saved
+  libraryLevels = saved.map((s) => s.level)
+  renderRegistres()
+  updateLibraryButton()
+  renderSalles()
+  editor.rechargeBibliotheque()
+  renderPlanche()
+}
+async function ouvrePlanche(): Promise<void> {
+  plancheEl.hidden = false
+  const corps = document.getElementById('planche-corps')
+  if (corps) corps.innerHTML = ''
+  plancheDit('Chargement de la bibliothèque…')
+  const lib = await fetchLibrary()
+  if (!lib) {
+    plancheDit(
+      'Bibliothèque injoignable (hors ligne ou serveur local) : la planche ordonne la bibliothèque partagée, elle a besoin du serveur.',
+    )
+    return
+  }
+  plancheTous = lib
+  renderPlanche()
+  plancheDit(
+    plancheTous.some((s) => !estCodeHub(s.level.code))
+      ? ''
+      : 'Bibliothèque vide : enregistrez des tableaux depuis l’éditeur, ils apparaîtront ici.',
+  )
+}
+/** L'ordre COMPLET à envoyer : les cartes visibles réarrangées, le hub et
+ * ses chantiers inchangés à leurs positions d'origine. */
+async function plancheOrdonne(visibles: StoredLevel[]): Promise<void> {
+  if (plancheBusy) return
+  plancheBusy = true
+  let k = 0
+  const ordre = plancheTous.map((s) =>
+    estCodeHub(s.level.code) ? s.id : visibles[k++].id,
+  )
+  // rendu optimiste : la carte bouge tout de suite, le serveur confirme
+  const avant = plancheTous
+  plancheTous = ordre.map((id) => plancheTous.find((s) => s.id === id)!)
+  renderPlanche()
+  plancheDit('Enregistrement de l’ordre…')
+  const saved = await reorderLibrary(ordre)
+  plancheBusy = false
+  if (saved) {
+    plancheSync(saved)
+    plancheDit('Ordre enregistré — la séquence de l’éditeur suit.')
+  } else {
+    plancheTous = avant
+    renderPlanche()
+    plancheDit('Réordonnancement refusé : bibliothèque injoignable.')
+  }
+}
+async function plancheCode(id: string, brut: string): Promise<void> {
+  if (plancheBusy) return
+  const entry = plancheTous.find((s) => s.id === id)
+  if (!entry) return
+  const code = codeCanon(brut.trim()).slice(0, 16)
+  if (!code || code === entry.level.code) {
+    renderPlanche() // restaure l'affichage si le champ a été vidé
+    return
+  }
+  plancheBusy = true
+  entry.level.code = code
+  plancheDit(`Enregistrement du code « ${code} »…`)
+  const saved = await saveLevel(
+    entry.level,
+    id,
+    records.operator() || 'anonyme',
+  )
+  plancheBusy = false
+  if (saved) {
+    plancheSync(saved.levels)
+    const d = decodeCodeAtelier(code)
+    plancheDit(
+      d
+        ? `Code « ${code} » enregistré — ${MOMENT_COURT[d.moment].toLowerCase()} · ${MECANIQUE_NOMS[d.mecanique]} · difficulté ${d.difficulte}.`
+        : `Code « ${code} » enregistré (hors nomenclature : il se joue pareil, sans tri par code).`,
+    )
+  } else {
+    plancheDit('Enregistrement refusé : bibliothèque injoignable.')
+    void ouvrePlanche() // repart de l'état serveur
+  }
+}
+function renderPlanche(): void {
+  const corps = document.getElementById('planche-corps')
+  if (!corps) return
+  const visibles = plancheTous.filter((s) => !estCodeHub(s.level.code))
+  corps.innerHTML = ''
+  visibles.forEach((s, i) => {
+    const carte = document.createElement('div')
+    carte.className = 'pl-carte'
+    carte.draggable = true
+    carte.dataset.id = s.id
+    const d = decodeCodeAtelier(s.level.code)
+    const esc = (t: string): string =>
+      t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    carte.innerHTML =
+      `<canvas width="220" height="126"></canvas>` +
+      `<span class="pl-rang">${i + 1}</span>` +
+      `<div class="pl-bas">` +
+      `<input class="pl-code" maxlength="16" value="${esc(s.level.code)}" title="Le code nomenclature (« 111 ») — Entrée ou sortir du champ enregistre" />` +
+      `<span class="pl-nom" title="${esc(s.level.name)}">${esc(s.level.name)}</span>` +
+      `<span class="pl-ord">` +
+      `<button type="button" data-tot="-1" title="Jouer plus tôt"${i === 0 ? ' disabled' : ''}>◀</button>` +
+      `<button type="button" data-tot="1" title="Jouer plus tard"${i === visibles.length - 1 ? ' disabled' : ''}>▶</button>` +
+      `</span></div>` +
+      (d
+        ? `<span class="salle-chips"><i>${MOMENT_COURT[d.moment]}</i>` +
+          `<i class="sc-m${d.mecanique}">${MECANIQUE_NOMS[d.mecanique].toUpperCase()}</i>` +
+          `<i>DIFF ${d.difficulte}</i></span>`
+        : '')
+    dessineMiniCarte(carte.querySelector('canvas') as HTMLCanvasElement, s.level)
+    // ◀ ▶ : l'échange avec la voisine
+    for (const b of Array.from(
+      carte.querySelectorAll<HTMLButtonElement>('[data-tot]'),
+    )) {
+      b.addEventListener('click', () => {
+        const j = i + Number(b.dataset.tot)
+        if (j < 0 || j >= visibles.length) return
+        const next = [...visibles]
+        ;[next[i], next[j]] = [next[j], next[i]]
+        void plancheOrdonne(next)
+      })
+    }
+    // le code : Entrée ou la sortie du champ enregistre
+    const codeInp = carte.querySelector('.pl-code') as HTMLInputElement
+    codeInp.addEventListener('change', () => void plancheCode(s.id, codeInp.value))
+    codeInp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        codeInp.blur()
+      }
+      e.stopPropagation()
+    })
+    codeInp.addEventListener('pointerdown', (e) => e.stopPropagation())
+    // le glisser-déposer : attraper une carte, la lâcher sur une autre —
+    // la carte prend cette place (le geste de l'éditeur, en grand)
+    carte.addEventListener('dragstart', (e) => {
+      if ((e.target as HTMLElement).closest('input, .pl-ord')) {
+        e.preventDefault()
+        return
+      }
+      e.dataTransfer?.setData('text/plain', s.id)
+      if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
+      carte.classList.add('dragging')
+    })
+    carte.addEventListener('dragend', () => {
+      carte.classList.remove('dragging')
+      for (const c of Array.from(corps.querySelectorAll('.drag-over')))
+        c.classList.remove('drag-over')
+    })
+    carte.addEventListener('dragover', (e) => {
+      e.preventDefault()
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+      carte.classList.add('drag-over')
+    })
+    carte.addEventListener('dragleave', () =>
+      carte.classList.remove('drag-over'),
+    )
+    carte.addEventListener('drop', (e) => {
+      e.preventDefault()
+      carte.classList.remove('drag-over')
+      const id = e.dataTransfer?.getData('text/plain') ?? ''
+      const from = visibles.findIndex((x) => x.id === id)
+      if (id === '' || from < 0 || from === i) return
+      const next = [...visibles]
+      const [prise] = next.splice(from, 1)
+      next.splice(i, 0, prise)
+      void plancheOrdonne(next)
+    })
+    corps.appendChild(carte)
+  })
+}
+document
+  .getElementById('salles-planche-btn')
+  ?.addEventListener('click', () => void ouvrePlanche())
+document.getElementById('planche-fermer')?.addEventListener('click', () => {
+  plancheEl.hidden = true
+})
+plancheEl?.addEventListener('pointerdown', (e) => {
+  if (e.target === plancheEl) plancheEl.hidden = true
+})
+
 // La fiche annonce la séquence jouée : bibliothèque partagée en tête
 // (si elle en contient), puis l'expédition livrée à la suite.
 const homeSeq = el('home-seq')

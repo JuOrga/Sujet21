@@ -3254,6 +3254,13 @@ export class LevelEditor {
   }
 
   // ——— Bibliothèque partagée ————————————————————————————
+  /** Recharge la bibliothèque depuis le serveur : LA PLANCHE (l'écran
+   * d'ordonnancement visuel, main.ts) vient de réordonner ou de renommer —
+   * l'éditeur se met au diapason sans attendre sa prochaine ouverture. */
+  rechargeBibliotheque(): void {
+    void this.refreshLibrary()
+  }
+
   private async refreshLibrary(): Promise<void> {
     const lib = await fetchLibrary()
     if (lib) {
