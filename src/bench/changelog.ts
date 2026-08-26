@@ -24,7 +24,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '26/08/2026 18:50',
-    title: 'Le générateur parle la NOMENCLATURE : « 101 » est un cahier des charges',
+    title:
+      'Le générateur parle la NOMENCLATURE : « 101 » est un cahier des charges',
     notes: [
       'Remarque du concepteur : la graine ne devrait-elle pas être le code à trois chiffres de la nomenclature ? Réponse : le code MMD (moment · mécanique · difficulté) DÉCRIT une salle sans l’identifier — plusieurs salles portent « 101 ». Le générateur le prend donc comme un CAHIER DES CHARGES : la MÉCANIQUE choisit les familles de maillons (1 : rideaux et miroirs de glace, JAMAIS d’exigence vapeur ; 2 : évents, rails, barrières, jamais de glace ; 3 : au moins une de chaque ; 0 : passages doux seulement), la DIFFICULTÉ dose compartiments (3 à 5), contraintes, resserrage des passages et dangers, et le MOMENT assombrit l’ambiance vers la fin de run.',
       'L’identité, elle, vient de la VARIANTE : ⚄ Générer accepte « 212 » (une salle au hasard DANS cette classe), et la salle arrive avec son code complet — « G-212-BJB » — qu’il suffit de retaper pour la retrouver à l’identique, au caractère près. Les plafonds de lisibilité respectent désormais la famille annoncée : un excédent glaceux redevient rideau, un excédent vaporeux, évent — la mécanique promise par le code n’est jamais trahie. Les graines libres d’hier (« Q », « B2 ») marchent toujours.',
@@ -33,11 +34,23 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '26/08/2026 17:40',
-    title: 'La grammaire du générateur s’enrichit : rail plasma, barrière tenue, double ET',
+    title:
+      'La grammaire du générateur s’enrichit : rail plasma, barrière tenue, double ET',
     notes: [
       'Trois maillons neufs dans la chaîne d’intentions du générateur. Le RAIL PLASMA — se tenir en VAPEUR au point marqué « IONISER ICI » ionise le fil de lumière ; le rail magnétique, amorcé dans le nuage, capture l’arc et le guide jusqu’à la pastille qui ouvre la porte. La BARRIÈRE TENUE — un faisceau vertical barre le chemin, sa pastille NOR (au sol) tient la porte ouverte TANT QUE la lumière la touche : l’eau plie le faisceau, la glace le renvoie — couper la lumière scelle la porte. On traverse EN VAPEUR : le faisceau s’ionise mais file droit. Le DOUBLE ET — deux miroirs, deux pastilles du même canal, règle ET : la porte exige les deux.',
       'Chaque énigme garde sa PREUVE par le vrai traceur, dans ses propres termes : le rail est muet sans nuage et guide avec ; la barrière est allumée d’office, la traversée en vapeur ne la coupe pas, la traversée en eau la coupe (sinon elle ne punirait rien) ; chaque miroir d’un ET n’allume QUE sa pastille. Et une garde neuve balaie tout ALLUMAGE CROISÉ : aucun faisceau ne doit allumer une pastille d’énigme sans le joueur — l’énigme morte est rejetée au tirage.',
       'Sur 300 graines : 91 rails, 95 barrières, 37 doubles ET, 258 miroirs — trois lasers par salle au plus, pour rester lisible. Vérifié : 12 tests (dont les trois preuves discriminantes), et la salle G-Q (barrière + miroir + rail, 3 portes) générée et jouée en essai sans écran — la barrière y est visible, faisceau tendu jusqu’à sa pastille verte, porte ouverte en pointillés.',
+    ],
+  },
+  {
+    date: '26/08/2026 18:40',
+    title:
+      'Éditeur : assistants d’alignement v2 — équirépartition, redim et rotation aimantés',
+    notes: [
+      'Retour du concepteur : les guides d’alignement ne couvraient pas tout. Quatre manques comblés. L’ÉQUIRÉPARTITION MAGNÉTIQUE d’abord : en déplaçant une paroi, l’aimant propose désormais le point d’ÉQUILIBRE — même écart de part et d’autre (les murs de la salle comptent comme voisins), ou RYTHME répété (l’écart des deux voisins d’un côté se reproduit). Des mesures roses à butées affichent les distances : quand les nombres sont égaux, c’est réparti.',
+      'Le REDIMENSIONNEMENT s’aimante enfin : le bord tiré se colle aux bords et centres des autres éléments ET aux murs de la salle, guide pointillé à l’appui (la grille reste le repli). La ROTATION s’accorde : à moins de 4° de l’angle d’une autre paroi oblique, elle adopte le sien — deux obliques de concert (Alt : libre au degré près) — et l’angle s’affiche en vif près de la poignée, « (accordée) » quand il épouse celui d’une voisine.',
+      'Et pour poser deux parois équitablement dans une salle SANS calcul mental : sélection multiple (Maj + clic) puis « RÉPARTIR dans la largeur/hauteur (salle) » — mêmes écarts entre les murs et chaque élément, d’un clic. Deux couvertures réparées au passage : la SALLE elle-même (murs + centre) et les éponges s’offrent maintenant à l’aimant — et le sas ne s’aimante plus sur lui-même quand c’est lui qu’on déplace (cela étouffait les autres guides).',
+      'Vérifié dans l’éditeur piloté à la souris : équirépartition aimantée pile au centre (mesures 850 · 850), bord collé au mur de la salle en redim, rotation accordée à 30° sur la paroi voisine, répartition 733 · 733 · 733 murs compris.',
     ],
   },
   {
@@ -58,7 +71,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '26/08/2026 15:20',
-    title: 'Le GÉNÉRATEUR de salles : une graine, une salle — traversée PROUVÉE',
+    title:
+      'Le GÉNÉRATEUR de salles : une graine, une salle — traversée PROUVÉE',
     notes: [
       'Demandé : un générateur de niveaux procédural qui donne de BONS résultats. La recette anti-soupe : le générateur tire d’abord la CHAÎNE D’INTENTIONS — la suite des franchissements entre compartiments (passage libre, ÉVENT à traverser en vapeur, RIDEAU à écarter en glace, MEMBRANE, ou PORTE AU LASER) — puis habille chaque maillon en géométrie : cloisons percées, décor aux formes variées, dangers (chaudière, hublot fendu), cachette voilée une fois sur deux, lampes, étiquettes.',
       'Et surtout : AUCUNE salle n’est remise sans PREUVE. Chaque porte asservie est démontrée ouvrable par le vrai traceur de faisceau — un miroir de glace synthétique posé à l’endroit marqué « MIROIR DE GLACE » doit allumer la pastille, et SANS miroir le faisceau ne doit rien ouvrir (l’énigme existe). Puis un parcours en largeur, avec la marge du corps, démontre que le sas est atteignable. Un tirage qui échoue est re-tiré — le joueur ne voit que des salles prouvées.',
