@@ -2821,6 +2821,95 @@ const editor = new LevelEditor(el('editor'), {
   planche: () => void ouvrePlanche(),
 })
 
+// ---- Les panneaux de l'éditeur se TIRENT au doigt --------------------------
+// Steam Deck, trackpad gauche en souris : presser n'importe où dans le
+// panneau et GLISSER — le contenu suit le geste, convention tactile (on tire
+// le contenu, pas l'ascenseur : glisser vers le haut fait monter le bas de
+// la liste). Un clic sans glissement reste un clic ; passé 6 px, le geste
+// devient défilement et le clic qui suivrait est avalé.
+function glisseAuDoigt(zone: HTMLElement): void {
+  let suivi: {
+    id: number
+    x0: number
+    y0: number
+    cible: HTMLElement
+    top0: number
+    left0: number
+    engage: boolean
+  } | null = null
+  let avaleClic = false
+  // la zone à défiler : le défilable le plus proche du point pressé (la
+  // liste des tableaux a son propre ascenseur, imbriqué dans le panneau)
+  const defilable = (depart: HTMLElement): HTMLElement => {
+    let n: HTMLElement | null = depart
+    while (n) {
+      if (n.scrollHeight > n.clientHeight + 1) {
+        const s = getComputedStyle(n)
+        if (/(auto|scroll)/.test(s.overflowY)) return n
+      }
+      if (n === zone) break
+      n = n.parentElement
+    }
+    return zone
+  }
+  zone.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return
+    avaleClic = false
+    const t = e.target as HTMLElement
+    if (t.closest('input, select, textarea')) return // les champs d'abord
+    suivi = {
+      id: e.pointerId,
+      x0: e.clientX,
+      y0: e.clientY,
+      cible: defilable(t),
+      top0: 0,
+      left0: 0,
+      engage: false,
+    }
+    suivi.top0 = suivi.cible.scrollTop
+    suivi.left0 = suivi.cible.scrollLeft
+  })
+  zone.addEventListener('pointermove', (e) => {
+    if (!suivi || e.pointerId !== suivi.id) return
+    const dx = e.clientX - suivi.x0
+    const dy = e.clientY - suivi.y0
+    if (!suivi.engage) {
+      if (Math.hypot(dx, dy) < 6) return
+      suivi.engage = true
+      try {
+        zone.setPointerCapture(e.pointerId)
+      } catch {
+        // pointeur déjà relâché ou simulé : le glissement marche sans capture
+      }
+    }
+    suivi.cible.scrollTop = suivi.top0 - dy
+    suivi.cible.scrollLeft = suivi.left0 - dx
+    e.preventDefault()
+  })
+  const finit = (e: PointerEvent): void => {
+    if (!suivi || e.pointerId !== suivi.id) return
+    avaleClic = suivi.engage // le glissement ne doit pas cliquer en se posant
+    suivi = null
+  }
+  zone.addEventListener('pointerup', finit)
+  zone.addEventListener('pointercancel', finit)
+  zone.addEventListener(
+    'click',
+    (e) => {
+      if (avaleClic) {
+        avaleClic = false
+        e.preventDefault()
+        e.stopPropagation()
+      }
+    },
+    true,
+  )
+}
+for (const p of Array.from(
+  document.querySelectorAll<HTMLElement>('#editor .ed-side'),
+))
+  glisseAuDoigt(p)
+
 // ---- LA PLANCHE : l'ordonnancement de l'expédition, en cartes visuelles --
 // Toutes les salles de la bibliothèque en mini-cartes : glisser (ou ◀ ▶)
 // réordonne LA séquence — la même que l'éditeur (reorderLibrary), qui se

@@ -22,6 +22,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 22:27',
+    title: 'Les panneaux de l’éditeur se TIRENT au doigt — et les ascenseurs passent à la charte',
+    notes: [
+      'Signalé : sur Steam Deck, défiler les panneaux de l’éditeur au trackpad obligeait à attraper l’ascenseur — et dans le mauvais sens. Désormais les panneaux se TIRENT : presser n’importe où (trackpad gauche en souris, doigt, souris) et glisser — le contenu SUIT le geste, convention tactile : glisser vers le haut fait monter la suite de la liste. Un clic sec reste un clic ; passé 6 pixels de glissement, le geste devient défilement et ne déclenche aucun bouton au passage. La liste des tableaux (son propre ascenseur, imbriqué) est visée juste : c’est la zone sous le doigt qui défile.',
+      'Et les barres de défilement système (l’ascenseur Windows) disparaissent PARTOUT : fines, sombres, liseré bleuté au survol — la charte du poste, dans tous les écrans qui défilent (éditeur, planche, salles, codex, notes de version…). Vérifié en 1280×800 : tirer vers le haut monte (0→120), vers le bas redescend (120→40), le clic d’après-glissement est avalé, le clic sec ouvre toujours son tableau. 354 tests verts.',
+    ],
+  },
+  {
     date: '26/08/2026 21:51',
     title: 'Changer de tableau au doigt : le ✎ des cartes, et la liste réparée',
     notes: [
