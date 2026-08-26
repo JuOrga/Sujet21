@@ -22,6 +22,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 20:52',
+    title: 'La planche à portée de main : depuis l’accueil et depuis l’éditeur',
+    notes: [
+      'Demandé : que l’écran planche soit accessible de l’accueil et depuis l’éditeur. C’est fait — un bouton LA PLANCHE sur l’accueil (mode concepteur, à côté de SALLES) et un bouton ▧ Planche dans la barre de l’éditeur. Le voile se pose par-dessus l’écran d’où l’on vient : le fermer rend cet écran tel quel — l’éditeur retrouve son tableau en cours.',
+      'Le ⏵ d’une carte marche de partout : lancé depuis la planche posée sur l’éditeur, il replie l’éditeur, démarre l’essai, et le bouton « revenir à la planche » ramène au même endroit comme d’habitude. Vérifié en navigateur sur les trois chemins (accueil, salles, éditeur). 353 tests verts.',
+    ],
+  },
+  {
     date: '26/08/2026 20:00',
     title: 'Manette : les menus se PARCOURENT enfin — et plus aucun appui perdu',
     notes: [
