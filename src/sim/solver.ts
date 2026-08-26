@@ -212,10 +212,12 @@ export class FluidSim {
   // le FRISSON (le tremblement bref du corps que le froid saisit)
   froidFrac = 0
 
-  // Impulsions vapeur restantes : la RÉSERVE DU TABLEAU (règle d'or : N
-  // dashs par écran, pleins au chargement — changer d'état ne touche PAS au
-  // compte). Le SURCHAUFFEUR frôlé en gaz en rend UNE, une seule fois par
-  // appareil, sans jamais dépasser la réserve maximale (dashBudgetMax).
+  // Impulsions vapeur restantes. La RÉSERVE (dashBudgetMax) est celle du
+  // tableau : pleine au chargement. Se vaporiser DE SON PROPRE CHEF refait
+  // le plein — mais une transformation SUBIE (chaudière, zone qui impose la
+  // vapeur) ne rend rien, sinon la salle serait une ferme à dashs. Le
+  // SURCHAUFFEUR frôlé en gaz en rend UNE, une seule fois par appareil,
+  // sans jamais dépasser la réserve.
   dashBudget = 0
   dashBudgetMax = 3
   // Bonus de rendement de recondensation (instrument « aimant à rosée ») —
@@ -1106,18 +1108,20 @@ export class FluidSim {
 
   // Le dash de vapeur (« air dash » à la Ori) : UNE impulsion qui envoie
   // tout le nuage vers le point visé — pas de recul, pas d'éjection, pas de
-  // pilotage continu. Les impulsions sont COMPTÉES : la réserve se remplit
-  // AU CHARGEMENT DU TABLEAU (dashBudgetMax) et seul un surchauffeur frôlé
-  // en rend une, plafonnée à la réserve. Renvoie 1 si le dash part, 0 sinon.
+  // pilotage continu. Les impulsions sont COMPTÉES : la réserve est pleine
+  // au chargement du tableau, une vaporisation DÉCIDÉE refait le plein, et
+  // un surchauffeur frôlé en rend une. Renvoie 1 si le dash part, 0 sinon.
   // La TRANSFORMATION en vapeur — touche, chaudière à 95 %, zone forcée :
   // toute cause confondue — se paie à l'instant du basculement : une
   // fraction du volume actif (vaporTollFrac, 20 %) part en gouttes éjectées
   // à grande vitesse dans TOUTES les directions. C'est la même matière que
-  // la propulsion : récupérable, elle perlera aussi en rosée au froid.
-  // Changer d'état ne touche JAMAIS au compte de dashs : la chaudière
-  // transforme, elle ne recharge pas — sinon elle vaudrait ferme à dashs
-  // (bascule eau/vapeur en boucle = réserve infinie). La quantité de
-  // mouvement d'ensemble est conservée exactement.
+  // la propulsion : récupérable, elle perlera aussi en rosée au froid. La
+  // quantité de mouvement d'ensemble est conservée exactement.
+  // `rendDashs` : une bascule DÉCIDÉE (touche G, bouton VAPEUR) refait le
+  // plein de la réserve — elle se paie en volume, c'est son prix. Une
+  // transformation SUBIE — chaudière, zone qui impose la vapeur — ne rend
+  // RIEN : sinon la salle vaudrait ferme à dashs (aller-retour devant la
+  // chaudière = réserve infinie, sans rien décider).
   /** Le corps NAÎT nuage. Un tableau qui commence en vapeur n'a pas à
    *  attendre la vaporisation progressive : sans cela, le compteur annonce
    *  ses dashs pendant que le corps est encore liquide — et aucun ne part
@@ -1133,9 +1137,10 @@ export class FluidSim {
     }
   }
 
-  transfoVapeur(): void {
+  transfoVapeur(rendDashs = true): void {
     if (this.dispersed) return
     const p = this.params
+    if (rendDashs) this.dashBudget = this.dashBudgetMax
     this.updatePlayerStats()
     const toll = Math.floor(this.playerCount * p.vaporTollFrac)
     if (toll <= 0) return

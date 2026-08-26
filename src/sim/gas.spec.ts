@@ -135,16 +135,16 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
     expect(sim.playerCount).toBeGreaterThan(40)
   })
 
-  it('la TRANSFORMATION en vapeur : péage de 20 % en gouttes — le compteur de dashs ne bouge PAS', () => {
+  it('la TRANSFORMATION en vapeur : péage de 20 % en gouttes — et le plein de dashs si elle est DÉCIDÉE', () => {
     const sim = makeSim()
     sim.setLevel([], [])
     sim.spawnDisc(0, 0, 300, KIND_PLAYER)
     sim.relabel()
     sim.dashBudgetMax = 3
-    sim.dashBudget = 2 // un dash déjà dépensé dans le tableau
+    sim.dashBudget = 1 // deux dashs déjà dépensés
     const before = sim.playerCount
     const avant = sim.totalMomentum()
-    sim.transfoVapeur()
+    sim.transfoVapeur() // se vaporiser DE SON PROPRE CHEF
     // 20 % du corps part en gouttes LIBRES, éjectées en étoile…
     expect(sim.playerCount).toBe(before - Math.floor(before * sim.params.vaporTollFrac))
     // …récupérables : elles existent toujours, sous délai de réabsorption
@@ -157,19 +157,29 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
     }
     expect(libres).toBe(before - sim.playerCount)
     expect(rapides).toBe(libres) // la gerbe part à grande vitesse
-    // le compteur de dashs n'a pas bougé (la réserve est au TABLEAU, pas à
-    // la bascule), et la quantité de mouvement est conservée
-    expect(sim.dashBudget).toBe(2)
+    // la bascule décidée refait le PLEIN (jamais au-delà), et la quantité
+    // de mouvement est conservée
+    expect(sim.dashBudget).toBe(3)
     const apres = sim.totalMomentum()
     expect(Math.abs(apres.px - avant.px)).toBeLessThan(5)
     expect(Math.abs(apres.py - avant.py)).toBeLessThan(5)
-    // se RE-transformer repaie le péage — et ne rend toujours RIEN : la
-    // chaudière n'est pas une ferme à dashs
-    sim.dashBudget = 0
-    const encore = sim.playerCount
-    sim.transfoVapeur()
-    expect(sim.playerCount).toBeLessThan(encore)
-    expect(sim.dashBudget).toBe(0)
+  })
+
+  it('une transformation SUBIE (chaudière, zone) se paie mais ne rend RIEN', () => {
+    const sim = makeSim()
+    sim.setLevel([], [])
+    sim.spawnDisc(0, 0, 300, KIND_PLAYER)
+    sim.relabel()
+    sim.dashBudgetMax = 3
+    sim.dashBudget = 1
+    const before = sim.playerCount
+    sim.transfoVapeur(false) // la salle décide à notre place
+    expect(sim.playerCount).toBeLessThan(before) // le péage, lui, reste dû
+    expect(sim.dashBudget).toBe(1) // …et le compteur ne bouge pas
+    // s'y reprendre à dix fois devant la chaudière n'y change rien : la
+    // ferme à dashs est fermée
+    for (let k = 0; k < 3; k++) sim.transfoVapeur(false)
+    expect(sim.dashBudget).toBe(1)
   })
 
   it('le SURCHAUFFEUR frôlé en vapeur rend UN dash — une seule fois par appareil', () => {

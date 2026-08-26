@@ -6439,6 +6439,9 @@ let continuerVoulu = false
 // le passage auto à l'état gazeux (chaudière) : armé tant que le corps
 // n'a pas déjà déclenché — réarmé quand il ressort de l'aura
 let autoGazArme = true
+// la prochaine vaporisation est SUBIE (la chaudière vient de la provoquer) :
+// elle se paie comme les autres, mais ne rend pas les dashs
+let gazSubi = false
 // la zone forcée actuellement TENUE par le corps (déclenchée à 95 %,
 // relâchée sous 85 %) — l'état, lui, persiste à la sortie
 let zoneTenue: number | null = null
@@ -6889,10 +6892,11 @@ function frame(now: number): void {
   sim.gasIntent = input.gasIntent
   // La BASCULE en vapeur — G, chaudière à 95 %, zone forcée : toute cause —
   // se règle à l'instant du basculement : péage de 20 % du volume actif
-  // (gerbe de gouttes récupérables). Le compteur de dashs, lui, ne bouge
-  // PAS : la réserve appartient au TABLEAU (pleine au chargement) — bascule
-  // décidée, chaudière ou zone, aucune transformation n'en rend ni n'en
-  // prend. Seul le surchauffeur recharge, dans la limite de la réserve.
+  // (gerbe de gouttes récupérables). Le compteur de dashs, lui, dépend de
+  // QUI a décidé : se vaporiser DE SON PROPRE CHEF (touche G, bouton
+  // VAPEUR) refait le plein de la réserve — le péage en est le prix ; une
+  // transformation SUBIE (chaudière à 95 %, zone qui impose la vapeur) ne
+  // rend rien, sinon la salle vaudrait ferme à dashs.
   // Et un tableau qui COMMENCE en vapeur ne bascule pas : c'est son état de
   // départ. Ni péage, ni événement — le corps naît nuage, avec sa réserve
   // (createSim l'a remplie), sans qu'on lui prenne un cinquième de lui-même.
@@ -6903,8 +6907,11 @@ function frame(now: number): void {
     const etatDeDepart =
       departEnVapeur && zoneActive === 'vapeur' && run.tableauTime < 3
     departEnVapeur = false
-    if (!etatDeDepart) sim.transfoVapeur()
+    const subie = gazSubi || zoneActive === 'vapeur'
+    gazSubi = false
+    if (!etatDeDepart) sim.transfoVapeur(!subie)
   }
+  if (!input.gasIntent) gazSubi = false // rien à consommer : la marque tombe
   gasIntentAvant = input.gasIntent
 
   sim.chill = chillNow() // le vaisseau refroidit : la physique suit
@@ -7804,6 +7811,7 @@ function frame(now: number): void {
   ) {
     autoGazArme = false
     if (input.freezeIntent) input.toggleFreeze()
+    gazSubi = true // la salle décide à notre place : pas de plein de dashs
     input.toggleGas() // le même chemin que la touche G : sons et UI suivent
   }
 

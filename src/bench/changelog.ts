@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 01:32',
+    title: 'Dashs : la bascule DÉCIDÉE refait le plein, la bascule SUBIE ne rend rien',
+    notes: [
+      'Correction : j’étais allé trop loin la fois d’avant en coupant toute recharge. La règle exacte, telle que demandée : se vaporiser DE SON PROPRE CHEF (touche G, bouton VAPEUR) refait le plein des trois dashs — le péage de 20 % du volume en est le prix, et c’est ce prix qui empêche d’en abuser. Une transformation SUBIE, elle, ne rend RIEN : la chaudière qui vous saisit à 95 %, la zone qui impose la vapeur — ces salles-là ne sont plus des fermes à dashs.',
+      'Le reste tient : la réserve est pleine au chargement du tableau, le surchauffeur rend un dash sans jamais dépasser la réserve (et reste chargé tant qu’il n’en manque pas), la buse calibrée agrandit la réserve d’un cran. Codex à jour.',
+      'Vérifié en jeu sur le cas discriminant : un dash en poche, le corps porté dans l’aura d’une chaudière — elle transforme toute seule, le compteur reste à UN ; retour à l’eau, vaporisation à la main — le compteur remonte à TROIS. Gravé au banc dans les deux sens. 370 tests verts, build propre.',
+    ],
+  },
+  {
     date: '27/08/2026 01:19',
     title: 'La planche dit QUI a saisi chaque code, et QUAND',
     notes: [
