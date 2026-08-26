@@ -22,6 +22,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 18:04',
+    title: 'La planche : le code entier, cran par cran',
+    notes: [
+      'Demandé : que tout le code de chaque tableau apparaisse sur sa carte, et un moyen sobre d’augmenter ou baisser chaque valeur — pensé pour le tactile. C’est fait : chaque caractère du code devient une MOLETTE — un cran ▴ au-dessus, la valeur bien lisible au centre (une liste déroulante : sur iPad c’est le sélecteur natif qui s’ouvre), un cran ▾ en dessous, l’étiquette MOMENT · MÉCA · DIFF sous chaque colonne. Les bornes tiennent (le moment s’arrête à 3, la mécanique à 3, la difficulté à 9) et les pastilles décodées suivent le cran immédiatement.',
+      'La codification complète « 21AB-123 » a aussi ses molettes : le « 21 » et le tiret restent gravés, les deux lettres d’ordre se règlent de A à Z. On peut monter plusieurs crans d’affilée : un seul enregistrement part, un instant après le dernier geste. Les codes hors nomenclature gardent le champ libre — y taper « 123 » fait naître les molettes. Vérifié en navigateur : crans, bornes, sélecteurs, enregistrements « 133 » et « 21AC-231 » reçus par le serveur. 353 tests verts.',
+    ],
+  },
+  {
     date: '26/08/2026 17:35',
     title: 'La planche s’essaie : ⏵ sur chaque carte, et le retour au même endroit',
     notes: [
