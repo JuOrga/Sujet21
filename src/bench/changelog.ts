@@ -23,6 +23,17 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
+    date: '26/08/2026 23:30',
+    title:
+      'Éditeur : les fiches se RÉÉCRIVENT — pour tout le monde, avec relecture des écarts',
+    notes: [
+      'Demandé : un bouton discret sur chaque bulle pour corriger son texte, sauvegardé pour tous, et un moyen ergonomique de voir ce qui a changé. C’est fait. Un ✎ discret dans le coin de la bulle (la souris peut y entrer, la bulle l’attend) ouvre l’édition : titre, résumé, lignes — « Enregistrer pour tous » publie au magasin partagé (/api/fiches, même mécanique que les présets). La bulle des autres concepteurs lit aussitôt le nouveau texte, signé en ambre : « réécrite par UNTEL · date ».',
+      'Les VALEURS VIVES (dimensions, canal d’une porte, angle d’un émetteur, capacité d’une éponge…) ne s’éditent pas : elles se recalculent à chaque survol et s’ajoutent sous le texte — une réécriture ne les perd jamais. La fiche d’origine n’est jamais détruite : « Rétablir l’original » l’exhume d’un clic, pour tous.',
+      'La RELECTURE : le bouton 🗒 FICHES de la barre (compteur ambre quand il y a des réécritures) ouvre l’écart fiche par fiche — texte d’origine barré rouge, texte corrigé en vert, auteur et date — avec Modifier et Rétablir sous la main. C’est là qu’on décide quoi reporter dans le système ; les réécritures se lisent aussi d’une requête à /api/fiches pour l’étude.',
+      'Vérifié dans l’éditeur piloté : bulle qui lit la surcharge (titre réécrit + signature), ✎ → modale préremplie → publication captée (clé, titre, auteur), panneau de relecture avec le diff exact, compteur « Fiches · 1 ». 5 tests gardent la mécanique (surcharge qui remplace le texte, valeurs vives qui survivent).',
+    ],
+  },
+  {
     date: '26/08/2026 21:40',
     title:
       'Le générateur ne se répète plus : orientations, montages, silhouettes',

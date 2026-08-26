@@ -90,7 +90,7 @@ describe('les fiches de la bulle savante', () => {
       ['cible', 'Canal n° 3'],
       ['porte', 'Règle ET'],
       ['zone', 'GLACE'],
-      ['cache', 'FACTICE'],
+      ['cache', 'paroi factice'],
       ['rail', 'IONISÉ'],
       ['lumiere', 'Hauteur 200'],
       ['decal', 'Aucune physique'],
@@ -104,6 +104,24 @@ describe('les fiches de la bulle savante', () => {
       )
       expect(tout, kind).toContain(attendu)
     }
+  })
+
+  it('une surcharge remplace le texte, les valeurs vives survivent', () => {
+    const surcharges = {
+      'genre:laser': {
+        cle: 'genre:laser',
+        titre: 'Canon lumineux',
+        resume: 'Réécrit par un concepteur.',
+        lignes: [{ cle: '·', txt: 'Nouveau texte partagé.' }],
+        auteur: 'JU',
+        date: '2026-08-26T00:00:00Z',
+      },
+    }
+    const f = ficheElement({ kind: 'laser', index: 0 }, niveau, surcharges)!
+    expect(f.titre).toBe('Canon lumineux')
+    expect(f.lignes.map((l) => l.txt).join(' ')).toContain('Nouveau texte')
+    // la ligne vive (angle) reste, recalculée — la réécriture ne la perd pas
+    expect(f.lignes.map((l) => l.txt).join(' ')).toContain('45°')
   })
 
   it('la cible NOR raconte le scellement, la TOR le verrou ouvrant', () => {

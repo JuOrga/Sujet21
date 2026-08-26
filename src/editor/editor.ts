@@ -39,7 +39,14 @@ import {
   type ZoneForce,
 } from '../game/level'
 import { TABLEAU_HUB, TABLEAU_HUB_COMPACT } from '../game/hub'
-import { ficheElement, FICHES_MATERIAUX, type Fiche } from './fiches'
+import {
+  cleFiche,
+  ficheElement,
+  ficheStatique,
+  type Fiche,
+  type FicheSurcharge,
+  type Surcharges,
+} from './fiches'
 import {
   ARC_EPAISSEUR_DEFAUT,
   ARC_OUVERTURE_DEFAUT,
@@ -305,6 +312,10 @@ export class LevelEditor {
   private bulle!: HTMLDivElement
   private bulleTimer: number | null = null
   private bulleCle = ''
+  // Les fiches RÉÉCRITES par les concepteurs (magasin partagé /api/fiches) :
+  // chargées à l'ouverture, elles remplacent le texte statique de la bulle.
+  private surcharges: Surcharges = {}
+  private ficheVoile: HTMLDivElement | null = null
 
   // Images du jeu (illustrations de zones, décals) : chargées à la demande,
   // le dessin se rafraîchit quand elles arrivent — l'éditeur montre la même
@@ -343,7 +354,18 @@ export class LevelEditor {
     this.bulle.className = 'ed-bulle'
     this.bulle.hidden = true
     document.body.appendChild(this.bulle)
+    this.bulle.addEventListener('mouseleave', () => this.cacheBulle())
+    this.bulle.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest('.ed-bulle-mod')
+      if (b instanceof HTMLElement && b.dataset.cle) {
+        this.ouvreEditionFiche(b.dataset.cle)
+        this.cacheBulle()
+      }
+    })
     this.bindBullesOutils()
+    document
+      .getElementById('ed-fiches')
+      ?.addEventListener('click', () => this.ouvreRelectureFiches())
     this.bindUi()
     this.bindCanvas()
     this.restore()
@@ -426,6 +448,7 @@ export class LevelEditor {
     this.syncForm()
     this.draw()
     void this.refreshLibrary()
+    void this.chargeSurcharges()
   }
 
   close(): void {
@@ -919,7 +942,12 @@ export class LevelEditor {
 
   // ——— La bulle savante ————————————————————————————————————————————
   /** Peint la fiche dans la bulle et la montre près du curseur. */
-  private montreBulle(fiche: Fiche, cx: number, cy: number): void {
+  private montreBulle(
+    fiche: Fiche,
+    cx: number,
+    cy: number,
+    cleF: string | null = null,
+  ): void {
     const cleClasse = (c: string): string =>
       c === 'EAU'
         ? ' ed-cle-eau'
@@ -932,15 +960,22 @@ export class LevelEditor {
               : ''
     const esc = (t: string): string =>
       t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    const sur = cleF ? this.surcharges[cleF] : undefined
     this.bulle.innerHTML =
       `<div class="ed-bulle-titre">${esc(fiche.titre)}</div>` +
+      (cleF
+        ? `<button type="button" class="ed-bulle-mod" data-cle="${esc(cleF)}" title="Modifier cette fiche — pour tout le monde">✎</button>`
+        : '') +
       `<div class="ed-bulle-resume">${esc(fiche.resume)}</div>` +
       fiche.lignes
         .map(
           (l) =>
             `<div class="ed-bulle-l"><span class="ed-bulle-cle${cleClasse(l.cle)}">${esc(l.cle)}</span><span>${esc(l.txt)}</span></div>`,
         )
-        .join('')
+        .join('') +
+      (sur
+        ? `<div class="ed-bulle-sur">réécrite par ${esc(sur.auteur || '?')} · ${esc(sur.date.slice(0, 10))}</div>`
+        : '')
     this.bulle.hidden = false
     this.positionneBulle(cx, cy)
   }
@@ -990,11 +1025,239 @@ export class LevelEditor {
     this.bulleTimer = window.setTimeout(() => {
       this.bulleTimer = null
       if (this.drag) return // jamais pendant un geste
-      const fiche = ficheElement(hit, this.level)
+      const fiche = ficheElement(hit, this.level, this.surcharges)
       if (!fiche) return
       this.bulleCle = cle
-      this.montreBulle(fiche, cx, cy)
+      this.montreBulle(fiche, cx, cy, cleFiche(hit, this.level))
     }, 650)
+  }
+
+  /** Charge les fiches réécrites depuis le magasin partagé. Sans réseau :
+   * la bulle garde son texte d'origine, rien ne casse. */
+  private async chargeSurcharges(): Promise<void> {
+    try {
+      const r = await fetch('/api/fiches')
+      if (!r.ok) return
+      const data = (await r.json()) as { surcharges?: FicheSurcharge[] }
+      const map: Surcharges = {}
+      for (const s of data.surcharges ?? []) if (s && s.cle) map[s.cle] = s
+      this.surcharges = map
+      this.majBoutonFiches()
+    } catch {
+      // hors-ligne : les fiches d'origine suffisent
+    }
+  }
+
+  /** Le compteur du bouton « Fiches » de la barre : n réécritures. */
+  private majBoutonFiches(): void {
+    const b = document.getElementById('ed-fiches')
+    if (!b) return
+    const n = Object.keys(this.surcharges).length
+    b.textContent = n > 0 ? `🗒 Fiches · ${n}` : '🗒 Fiches'
+    b.classList.toggle('ed-fiches-marque', n > 0)
+  }
+
+  /** L'ÉDITION d'une fiche : titre, résumé et lignes se réécrivent, la
+   * sauvegarde vaut pour tout le monde (magasin partagé). Les valeurs
+   * vives (dimensions, canal, angle…) ne sont pas là : elles se
+   * recalculent toutes seules et survivent à toute réécriture. */
+  private ouvreEditionFiche(cleF: string): void {
+    const statique = ficheStatique(cleF)
+    if (!statique) return
+    const actuel = this.surcharges[cleF] ?? statique
+    const voile = document.createElement('div')
+    voile.className = 'ed-fiches-voile'
+    const esc = (t: string): string =>
+      t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')
+    voile.innerHTML =
+      `<div class="ed-fiches-carte">` +
+      `<div class="ed-fiches-tete">MODIFIER LA FICHE <span>· ${esc(cleF)} · pour tout le monde</span></div>` +
+      `<label class="ed-f"><span>Titre</span><input id="fm-titre" maxlength="80" value="${esc(actuel.titre)}"></label>` +
+      `<label class="ed-f"><span>Résumé</span><input id="fm-resume" maxlength="400" value="${esc(actuel.resume)}"></label>` +
+      `<label class="ed-f"><span>Lignes — une par ligne, « CLÉ | texte » (clés : EAU, GLACE, VAPEUR, LASER, ·)</span>` +
+      `<textarea id="fm-lignes" rows="8">${esc(actuel.lignes.map((l) => `${l.cle} | ${l.txt}`).join('\n'))}</textarea></label>` +
+      `<p class="ed-fiches-note">Les valeurs vives (dimensions, canal, angle, capacité…) s'ajoutent toutes seules sous la fiche : inutile de les écrire ici.</p>` +
+      `<div class="ed-fiches-actions">` +
+      `<button type="button" class="ed-btn" id="fm-annuler">Annuler</button>` +
+      (this.surcharges[cleF]
+        ? `<button type="button" class="ed-btn" id="fm-retablir">Rétablir l'original</button>`
+        : '') +
+      `<button type="button" class="ed-btn ed-btn-vert" id="fm-enregistrer">Enregistrer pour tous</button>` +
+      `</div></div>`
+    document.body.appendChild(voile)
+    const ferme = (): void => voile.remove()
+    voile.addEventListener('click', (e) => {
+      if (e.target === voile) ferme()
+    })
+    voile.querySelector('#fm-annuler')?.addEventListener('click', ferme)
+    voile.querySelector('#fm-retablir')?.addEventListener('click', () => {
+      void (async () => {
+        try {
+          const r = await fetch(`/api/fiches?cle=${encodeURIComponent(cleF)}`, {
+            method: 'DELETE',
+          })
+          if (!r.ok) throw new Error(String(r.status))
+          delete this.surcharges[cleF]
+          this.majBoutonFiches()
+          this.status('Fiche rétablie à l’original — pour tout le monde.')
+          ferme()
+        } catch {
+          this.status('Rétablissement impossible (réseau ?) — réessayez.')
+        }
+      })()
+    })
+    voile.querySelector('#fm-enregistrer')?.addEventListener('click', () => {
+      const titre = (
+        voile.querySelector('#fm-titre') as HTMLInputElement
+      ).value.trim()
+      const resume = (
+        voile.querySelector('#fm-resume') as HTMLInputElement
+      ).value.trim()
+      const brut = (voile.querySelector('#fm-lignes') as HTMLTextAreaElement)
+        .value
+      const lignes = brut
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .map((l) => {
+          const i = l.indexOf('|')
+          return i >= 0
+            ? { cle: l.slice(0, i).trim() || '·', txt: l.slice(i + 1).trim() }
+            : { cle: '·', txt: l }
+        })
+        .filter((l) => l.txt)
+      if (!titre || lignes.length === 0) {
+        this.status('Il faut au moins un titre et une ligne.')
+        return
+      }
+      let auteur = ''
+      try {
+        const reg = JSON.parse(
+          localStorage.getItem('projet21.registres.v1') ?? '{}',
+        ) as { operator?: string }
+        auteur = reg.operator ?? ''
+      } catch {
+        // sans signature : la fiche part anonyme
+      }
+      void (async () => {
+        try {
+          const r = await fetch('/api/fiches', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cle: cleF, titre, resume, lignes, auteur }),
+          })
+          if (!r.ok) throw new Error(String(r.status))
+          const rep = (await r.json()) as { surcharge?: FicheSurcharge }
+          if (rep.surcharge) this.surcharges[cleF] = rep.surcharge
+          this.majBoutonFiches()
+          this.status(
+            'Fiche enregistrée — tout le monde la lit désormais ainsi.',
+          )
+          ferme()
+        } catch {
+          this.status('Enregistrement impossible (réseau ?) — réessayez.')
+        }
+      })()
+    })
+  }
+
+  /** La RELECTURE : ce qui a été réécrit, fiche par fiche, avec l'écart
+   * face au texte d'origine — pour corriger ensuite le système. */
+  private ouvreRelectureFiches(): void {
+    if (this.ficheVoile) this.ficheVoile.remove()
+    const voile = document.createElement('div')
+    voile.className = 'ed-fiches-voile'
+    this.ficheVoile = voile
+    const esc = (t: string): string =>
+      t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    const cles = Object.keys(this.surcharges).sort()
+    const diffChamp = (nom: string, avant: string, apres: string): string =>
+      avant === apres
+        ? ''
+        : `<div class="ed-diff-champ"><b>${nom}</b>` +
+          `<div class="ed-diff-avant">${esc(avant)}</div>` +
+          `<div class="ed-diff-apres">${esc(apres)}</div></div>`
+    const diffLignes = (avant: Fiche, apres: FicheSurcharge): string => {
+      const cleTxt = (l: { cle: string; txt: string }): string =>
+        `${l.cle} | ${l.txt}`
+      const a = avant.lignes.map(cleTxt)
+      const b = apres.lignes.map(cleTxt)
+      if (a.join('\n') === b.join('\n')) return ''
+      const enleve = a.filter((l) => !b.includes(l))
+      const ajoute = b.filter((l) => !a.includes(l))
+      return (
+        `<div class="ed-diff-champ"><b>Lignes</b>` +
+        enleve
+          .map((l) => `<div class="ed-diff-avant">${esc(l)}</div>`)
+          .join('') +
+        ajoute
+          .map((l) => `<div class="ed-diff-apres">${esc(l)}</div>`)
+          .join('') +
+        `</div>`
+      )
+    }
+    voile.innerHTML =
+      `<div class="ed-fiches-carte ed-fiches-large">` +
+      `<div class="ed-fiches-tete">FICHES RÉÉCRITES <span>· l'écart face au texte d'origine — pour corriger le système ensuite</span>` +
+      `<button type="button" class="ed-btn" id="fr-fermer">✕</button></div>` +
+      (cles.length === 0
+        ? `<p class="ed-fiches-note">Aucune fiche réécrite : toutes les bulles lisent le texte d'origine.</p>`
+        : cles
+            .map((cleF) => {
+              const s = this.surcharges[cleF]
+              const base = ficheStatique(cleF)
+              const corps = base
+                ? diffChamp('Titre', base.titre, s.titre) +
+                  diffChamp('Résumé', base.resume, s.resume) +
+                  diffLignes(base, s)
+                : `<p class="ed-fiches-note">Clé inconnue du code — fiche orpheline.</p>`
+              return (
+                `<div class="ed-fiches-item">` +
+                `<div class="ed-fiches-item-tete"><b>${esc(s.titre)}</b> <span>· ${esc(cleF)} · par ${esc(s.auteur || '?')} · ${esc(s.date.slice(0, 10))}</span>` +
+                `<button type="button" class="ed-btn" data-mod="${esc(cleF)}">Modifier</button>` +
+                `<button type="button" class="ed-btn" data-ret="${esc(cleF)}">Rétablir l'original</button></div>` +
+                (corps ||
+                  `<p class="ed-fiches-note">Identique à l'original (réécriture sans écart).</p>`) +
+                `</div>`
+              )
+            })
+            .join('')) +
+      `</div>`
+    document.body.appendChild(voile)
+    const ferme = (): void => {
+      voile.remove()
+      this.ficheVoile = null
+    }
+    voile.addEventListener('click', (e) => {
+      if (e.target === voile) ferme()
+      const t = e.target as HTMLElement
+      const mod = t.closest('[data-mod]') as HTMLElement | null
+      if (mod?.dataset.mod) {
+        ferme()
+        this.ouvreEditionFiche(mod.dataset.mod)
+      }
+      const ret = t.closest('[data-ret]') as HTMLElement | null
+      if (ret?.dataset.ret) {
+        const cleF = ret.dataset.ret
+        void (async () => {
+          try {
+            const r = await fetch(
+              `/api/fiches?cle=${encodeURIComponent(cleF)}`,
+              { method: 'DELETE' },
+            )
+            if (!r.ok) throw new Error(String(r.status))
+            delete this.surcharges[cleF]
+            this.majBoutonFiches()
+            this.status('Fiche rétablie à l’original — pour tout le monde.')
+            ferme()
+            this.ouvreRelectureFiches()
+          } catch {
+            this.status('Rétablissement impossible (réseau ?) — réessayez.')
+          }
+        })()
+      }
+    })
+    voile.querySelector('#fr-fermer')?.addEventListener('click', ferme)
   }
 
   /** Les mêmes fiches sur la PALETTE d'outils : survol posé d'un bouton
@@ -1003,23 +1266,30 @@ export class LevelEditor {
     const boutons = this.host.querySelectorAll<HTMLButtonElement>('.ed-tool')
     boutons.forEach((b) => {
       const outil = b.dataset.tool ?? ''
-      let fiche: Fiche | null = null
-      if (outil.startsWith('box:'))
-        fiche = FICHES_MATERIAUX[Number(outil.slice(4))] ?? null
-      else if (outil === 'sponge')
-        fiche = ficheElement({ kind: 'sponge', index: -1 }, this.level)
-      if (!fiche) return
-      const f = fiche
+      const cleF = outil.startsWith('box:')
+        ? `mat:${Number(outil.slice(4))}`
+        : outil === 'sponge'
+          ? 'genre:eponge'
+          : null
+      if (!cleF || !ficheStatique(cleF)) return
       let timer: number | null = null
       b.addEventListener('mouseenter', () => {
         timer = window.setTimeout(() => {
+          const fiche = this.surcharges[cleF] ?? ficheStatique(cleF)
+          if (!fiche) return
           const r = b.getBoundingClientRect()
-          this.montreBulle(f, r.right + 4, r.top - 8)
+          this.montreBulle(fiche, r.right + 4, r.top - 8, cleF)
         }, 650)
       })
-      b.addEventListener('mouseleave', () => {
+      b.addEventListener('mouseleave', (e) => {
         if (timer !== null) clearTimeout(timer)
         timer = null
+        // la souris part VERS la bulle : on la laisse ouverte (le ✎ est là)
+        if (
+          e.relatedTarget instanceof Node &&
+          this.bulle.contains(e.relatedTarget)
+        )
+          return
         this.cacheBulle()
       })
     })
@@ -2037,7 +2307,14 @@ export class LevelEditor {
       }
     }
     c.addEventListener('pointercancel', doigtParti)
-    c.addEventListener('pointerleave', () => this.cacheBulle())
+    c.addEventListener('pointerleave', (e) => {
+      if (
+        e.relatedTarget instanceof Node &&
+        this.bulle.contains(e.relatedTarget)
+      )
+        return // la souris va cliquer le ✎ : la bulle reste
+      this.cacheBulle()
+    })
     c.addEventListener('pointerup', (e) => {
       const pincait = this.pinceEcart !== null
       doigtParti(e)
