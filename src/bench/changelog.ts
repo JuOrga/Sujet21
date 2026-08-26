@@ -14,6 +14,22 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 16:30',
+    title: 'Le DÔME du regard : l’œil soulève vraiment le volume',
+    notes: [
+      'Demandé : que là où l’œil se pose, un volume supplémentaire se lise en relief grâce au reflet du plafond — comme si le regard déplaçait vraiment la matière. C’est fait : un dôme local naît au point du regard, et sa pente incline le miroir de la surface — le reflet (plafond en tête, mais aussi lampes et décor) se COURBE autour de l’œil, dans les deux modes miroir (Mercure et Miroitante). La pente d’un dôme est nulle au sommet et maximale sur le flanc : le centre reste calme, c’est l’anneau autour de l’œil qui travaille.',
+      'Le relief se lit aussi sans miroir : le flanc du dôme tourné vers le haut prend la lumière, l’autre s’ombre — un modelé doux qui fait de la lueur une vraie bosse, même en mode Classique. Le dôme respire au même pouls que la lueur, s’efface en vapeur et dans la glace, et suit le regard partout (souris, stick, mécanismes, sas, réveil).',
+      'Vérifié en jeu au zoom, comparaison avant/après : la lueur plate est devenue une bosse posée sous la surface, hublots et reflets se déforment à son passage.',
+    ],
+  },
+  {
+    date: '26/08/2026 16:20',
+    title: 'La flèche de cap manette : retirée par défaut, réglable',
+    notes: [
+      'Au stick, la flèche posée sur le corps est MASQUÉE par défaut : le regard du Sujet suit déjà la direction du stick, la flèche faisait double emploi. Pour qui la préfère, PARAMÈTRES gagne une ligne « FLÈCHE DE CAP (MANETTE) » : Masquée / Visible, mémorisé. La ligne de visée du dash, elle, ne change pas.',
+    ],
+  },
+  {
     date: '26/08/2026 14:10',
     title: 'Le regard, version finale : quelque chose vit SOUS la surface',
     notes: [

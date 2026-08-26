@@ -1709,6 +1709,9 @@ let eauRiche = localStorage.getItem('sujet21-eau') !== 'sobre'
 // s'y mirent), MIROITANTE (reflet des alentours par la houle de chaque
 // goutte) ou CLASSIQUE (l'ancien rendu, au pixel près). Valeur passée
 // telle quelle au shader : 0 classique, 1 miroitante, 2 mercure.
+// La FLÈCHE DE CAP à la manette : retirée par défaut (le regard du Sujet
+// suit déjà le stick) — réactivable dans PARAMÈTRES pour qui la préfère.
+let flecheVisible = localStorage.getItem('sujet21-fleche') === 'visible'
 let eauMiroir =
   localStorage.getItem('sujet21-miroir') === 'classique'
     ? 0
@@ -1972,6 +1975,31 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
       }
     }
     renderMiroir()
+  }
+
+  const choixFleche = document.getElementById(
+    'params-fleche',
+  ) as HTMLDivElement | null
+  if (choixFleche) {
+    const renderFleche = (): void => {
+      choixFleche.innerHTML = ''
+      for (const [visible, cle, label] of [
+        [false, 'masquee', 'MASQUÉE'],
+        [true, 'visible', 'VISIBLE'],
+      ] as const) {
+        const b = document.createElement('button')
+        b.type = 'button'
+        b.textContent = label
+        b.className = flecheVisible === visible ? 'actif' : ''
+        b.addEventListener('click', () => {
+          flecheVisible = visible
+          localStorage.setItem('sujet21-fleche', cle)
+          renderFleche()
+        })
+        choixFleche.appendChild(b)
+      }
+    }
+    renderFleche()
   }
 
   const choixLumiere = document.getElementById(
@@ -3429,7 +3457,12 @@ function drawFleche(dtReal: number, dpr: number): void {
     manette.lastActivity > input.lastPointerAt &&
     input.touchCount === 0
   const veut =
-    aMain && enJeu && manette.force > 0.03 && !dash.aiming && !input.paused
+    flecheVisible &&
+    aMain &&
+    enJeu &&
+    manette.force > 0.03 &&
+    !dash.aiming &&
+    !input.paused
   // naissance et extinction en douceur
   fleche.alpha += ((veut ? 1 : 0) - fleche.alpha) * Math.min(1, dtReal * 9)
   if (fleche.alpha < 0.02) return
