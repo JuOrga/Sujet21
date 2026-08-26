@@ -22,6 +22,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 22:48',
+    title: 'L’éditeur défile au STICK GAUCHE — la mécanique de la planche, partout',
+    notes: [
+      'Demandé : la mécanique de défilement au stick (celle de LA PLANCHE) dans l’éditeur, sur TOUS ses défilables — panneau gauche, panneau droit, liste des tableaux — au stick GAUCHE (le trackpad gauche du Deck configuré en joystick parle sur les mêmes axes). C’est fait, même vitesse que les menus.',
+      'Le défilement vise le défilable SOUS LE CURSEUR : pointez la liste des tableaux, le stick la défile ; pointez le panneau gauche, c’est lui qui bouge — à défaut, le panneau de droite. Au passage, une anomalie corrigée : la fiche restée SOUS l’éditeur gardait la main manette (son B, ses boutons) — l’éditeur la prend désormais, et une couche posée SUR lui (la planche, le montage) la garde. Vérifié manette simulée : liste défilée bas et haut au stick, panneau gauche visé au curseur défilé seul, liste intacte. 354 tests verts.',
+    ],
+  },
+  {
     date: '26/08/2026 22:27',
     title: 'Les panneaux de l’éditeur se TIRENT au doigt — et les ascenseurs passent à la charte',
     notes: [

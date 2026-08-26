@@ -2914,6 +2914,43 @@ for (const p of Array.from(
 ))
   glisseAuDoigt(p)
 
+// ---- L'ÉDITEUR au STICK GAUCHE : ses panneaux défilent comme la planche —
+// même mécanique que le stick droit des menus, même vitesse. Le trackpad
+// gauche du Deck configuré en joystick parle sur les mêmes axes. Le
+// défilement vise le défilable SOUS LE CURSEUR (panneau gauche, panneau
+// droit, liste des tableaux…) — à défaut, le panneau de droite.
+const editeurHote = document.getElementById('editor') as HTMLElement
+let editeurDefilable: HTMLElement | null = null
+function defilableSous(depart: HTMLElement | null): HTMLElement | null {
+  let n: HTMLElement | null = depart
+  while (n && n !== editeurHote) {
+    if (
+      n.scrollHeight > n.clientHeight + 4 ||
+      n.scrollWidth > n.clientWidth + 4
+    ) {
+      const s = getComputedStyle(n)
+      if (/(auto|scroll)/.test(s.overflowY + s.overflowX)) return n
+    }
+    n = n.parentElement
+  }
+  return null
+}
+editeurHote.addEventListener('pointermove', (e) => {
+  editeurDefilable = defilableSous(e.target as HTMLElement)
+})
+function defileEditeur(dt: number): void {
+  const vx = manette.dirX * manette.force
+  const vy = manette.dirY * manette.force
+  if (Math.abs(vx) < 0.02 && Math.abs(vy) < 0.02) return
+  const sc =
+    editeurDefilable && document.contains(editeurDefilable)
+      ? editeurDefilable
+      : document.querySelector<HTMLElement>('#editor .ed-side--right')
+  if (!sc) return
+  sc.scrollTop += vy * 1100 * dt
+  sc.scrollLeft += vx * 1100 * dt
+}
+
 // ---- LA PLANCHE : l'ordonnancement de l'expédition, en cartes visuelles --
 // Toutes les salles de la bibliothèque en mini-cartes : glisser (ou ◀ ▶)
 // réordonne LA séquence — la même que l'éditeur (reorderLibrary), qui se
@@ -6739,6 +6776,14 @@ function frame(now: number): void {
     } else if (!eveil1El.hidden || !eveil2El.hidden) {
       // cartes de l'éveil : A tourne la page, rien d'autre ne passe
       if (manette.edge(BOUTON.A)) avanceEveil()
+    } else if (
+      editeurHote.classList.contains('visible') &&
+      (!couche || couche.id === 'home')
+    ) {
+      // l'ÉDITEUR : le stick gauche (ou le pavé gauche en joystick) défile
+      // ses panneaux. La fiche SOUS l'éditeur ne prend pas la main — mais
+      // une couche posée SUR lui (la planche, le montage…) la garde.
+      defileEditeur(dtReal)
     } else if (couche && !couche.legere) {
       // un MENU au premier plan : croix/stick naviguent, A active, B revient
       navigueMenu(couche, dtReal)
