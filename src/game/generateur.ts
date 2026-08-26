@@ -276,7 +276,7 @@ function plafonne(maillons: Maillon[], largeurs: number[], o: OptionsGen): Maill
  * options du panneau restreignent ce que le tirage a le droit d'employer. */
 function tirePlan(rng: Rng, cahier: CodeAtelier | null, o: OptionsGen): Plan {
   const D = cahier ? cahier.difficulte : -1
-  const nbSalles =
+  let nbSalles =
     o.salles !== 0
       ? o.salles
       : cahier
@@ -286,6 +286,13 @@ function tirePlan(rng: Rng, cahier: CodeAtelier | null, o: OptionsGen): Plan {
             ? 4
             : 5
         : 3 + Math.floor(rng() * 3) // 3, 4 ou 5
+  // le même code ne donne pas toujours le même GABARIT : la difficulté
+  // garde la moyenne, le tirage garde la surprise
+  if (cahier && o.salles === 0) {
+    const j = rng()
+    if (j < 0.18 && nbSalles > 3) nbSalles--
+    else if (j > 0.82 && nbSalles < 5) nbSalles++
+  }
   const H = Math.round(entre(rng, 1150, 1450) / 10) * 10
   const largeurs: number[] = []
   for (let i = 0; i < nbSalles; i++)
@@ -392,6 +399,9 @@ export interface PreuveDef {
   /** miroir : où geler le corps · rail : où se tenir en vapeur ·
    * nor : où le chemin croise le faisceau (la traversée à démontrer). */
   spot: { x: number; y: number }
+  /** miroir : la normale du flanc de glace attendu (le montage varie —
+   * plafond, plancher, flanc — et le reflet part dans les quatre sens). */
+  normale: { nx: number; ny: number }
   cibleIndex: number
 }
 
@@ -454,11 +464,105 @@ function essaieNiveau(
   labels.push({ x: (exit.minX + exit.maxX) / 2, y: exit.maxY + 60, text: 'SAS', tone: 'sas' })
   reserves.push(gonfle(exit, 140))
 
-  // L'ÉNIGME DU MIROIR, posée dans une salle : un émetteur au plafond tire
-  // un fil à plomb de lumière ; le joueur gèle son corps sur le fil — le
-  // flanc du bloc renvoie le faisceau vers la pastille. La pastille est
-  // posée par CALIBRAGE : sur le trajet du reflet, avec du jeu.
-  const poseMiroir = (ex: number, sx1: number, canal: number): void => {
+  // Les INDICES peints au sol : un par ESPÈCE d'énigme et par salle au
+  // plus — et plus aucun au-delà de la difficulté 2 (l'atelier suppose le
+  // protocole connu ; le petit mot tuto n'a pas à se répéter partout).
+  const indicesVus = new Set<string>()
+  const poseIndice = (
+    type: string,
+    x: number,
+    y: number,
+    text: string,
+    tone: WorldLabel['tone'],
+  ): void => {
+    if (indicesVus.has(type)) return
+    if (atelier && atelier.cahier.difficulte > 2) return
+    indicesVus.add(type)
+    labels.push({ x, y, text, tone, rang: 'detail' })
+  }
+
+  /** Une bande rectangulaire autour du segment a → b, pour les réserves. */
+  const bande = (
+    ax: number,
+    ay: number,
+    bx: number,
+    by: number,
+    m: number,
+  ): Rect => ({
+    minX: Math.min(ax, bx) - m,
+    minY: Math.min(ay, by) - m,
+    maxX: Math.max(ax, bx) + m,
+    maxY: Math.max(ay, by) + m,
+  })
+
+  // L'ÉNIGME DU MIROIR, posée dans une salle — et le MONTAGE varie : le
+  // fil de lumière tombe du plafond, monte du plancher, ou court depuis le
+  // flanc gauche ; le reflet part à droite, à gauche, vers le haut ou vers
+  // le bas selon la place. Le joueur gèle son corps sur le fil — le flanc
+  // du bloc renvoie le faisceau vers la pastille, posée par CALIBRAGE sur
+  // le trajet du reflet (la preuve tranche, un tirage raté se re-tire).
+  const poseMiroir = (i: number, canal: number): void => {
+    const [sx0, sx1] = salleX[i]
+    const montage = parmi(rng, ['plafond', 'plancher', 'flanc'] as const)
+    let em: LaserDef
+    let spot: { x: number; y: number }
+    let d: { x: number; y: number }
+    let r: { x: number; y: number }
+    let L: number
+    if (montage === 'flanc') {
+      const ey = Math.round(entre(rng, -demiH * 0.3, demiH * 0.3) / 10) * 10
+      em = { x: sx0 + 16, y: ey, angle: 0 }
+      d = { x: 1, y: 0 }
+      const mx = Math.round(entre(rng, sx0 + 210, sx1 - 160) / 10) * 10
+      spot = { x: mx, y: ey }
+      const espaceHaut = demiH - 80 - ey
+      const espaceBas = ey + demiH - 80
+      const versHaut =
+        espaceHaut < 180 ? false : espaceBas < 180 ? true : rng() < 0.5
+      r = { x: 0, y: versHaut ? 1 : -1 }
+      L = entre(rng, 150, Math.min(320, (versHaut ? espaceHaut : espaceBas) - 20))
+    } else {
+      const ex = Math.round(entre(rng, sx0 + 150, sx1 - 150) / 10) * 10
+      const duHaut = montage === 'plafond'
+      em = { x: ex, y: duHaut ? demiH - 24 : -demiH + 24, angle: duHaut ? -90 : 90 }
+      d = { x: 0, y: duHaut ? -1 : 1 }
+      spot = { x: ex, y: Math.round(entre(rng, -demiH * 0.35, demiH * 0.35) / 10) * 10 }
+      const espaceDroite = sx1 - 70 - ex
+      const espaceGauche = ex - (sx0 + 70)
+      const versDroite =
+        espaceDroite < 175 ? false : espaceGauche < 175 ? true : rng() < 0.6
+      r = { x: versDroite ? 1 : -1, y: 0 }
+      L = entre(rng, 150, Math.min(300, versDroite ? espaceDroite : espaceGauche))
+    }
+    // la normale du flanc de glace qui envoie d sur r, et la pastille sur
+    // le trajet du reflet (départ au bord du bloc, léger biais du dégagement)
+    const nl = Math.hypot(r.x - d.x, r.y - d.y)
+    const normale = { nx: (r.x - d.x) / nl, ny: (r.y - d.y) / nl }
+    const cible: CibleDef = {
+      x: spot.x - d.x * 44 + normale.nx * 8 + r.x * L,
+      y: spot.y - d.y * 44 + normale.ny * 8 + r.y * L,
+      r: 30,
+      canal,
+    }
+    cibles.push(cible)
+    lasers.push(em)
+    preuves.push({
+      kind: 'miroir',
+      canal,
+      emetteur: em,
+      spot,
+      normale,
+      cibleIndex: cibles.length - 1,
+    })
+    poseIndice('miroir', spot.x + d.x * 66, spot.y + d.y * 66, 'MIROIR DE GLACE', 'froid')
+    // le fil du faisceau et le trajet du reflet restent dégagés
+    reserves.push(bande(em.x, em.y, spot.x - d.x * 40, spot.y - d.y * 40, 70))
+    reserves.push(bande(spot.x, spot.y, cible.x + r.x * 40, cible.y + r.y * 40, 90))
+  }
+
+  // Le DOUBLE MIROIR (canal ET) garde son montage classique — deux fils à
+  // plomb écartés, la salle large lui est réservée : il reste reconnaissable.
+  const poseMiroirPlafond = (ex: number, sx1: number, canal: number): void => {
     const my = Math.round(entre(rng, -demiH * 0.35, demiH * 0.35) / 10) * 10
     const emetteur: LaserDef = { x: ex, y: demiH - 24, angle: -90 }
     const porteeCible = entre(rng, 150, Math.min(260, sx1 - 70 - ex))
@@ -470,10 +574,10 @@ function essaieNiveau(
       canal,
       emetteur,
       spot: { x: ex, y: my },
+      normale: { nx: N45, ny: N45 },
       cibleIndex: cibles.length - 1,
     })
-    labels.push({ x: ex, y: my - 66, text: 'MIROIR DE GLACE', tone: 'froid', rang: 'detail' })
-    // le fil du faisceau et le trajet du reflet restent dégagés
+    poseIndice('miroir', ex, my - 66, 'MIROIR DE GLACE', 'froid')
     reserves.push({ minX: ex - 70, minY: my - 120, maxX: ex + 70, maxY: demiH })
     reserves.push({ minX: ex - 70, minY: my - 90, maxX: ex + porteeCible + 90, maxY: my + 130 })
   }
@@ -510,8 +614,7 @@ function essaieNiveau(
     } else if (maillon === 'porte') {
       const canal = canalSuivant++
       portes.push({ minX: wx, minY: gapMin, maxX: wx + EP_CLOISON, maxY: gapMax, canal })
-      const ex = Math.round(entre(rng, sx0 + 150, sx1 - 220) / 10) * 10
-      poseMiroir(ex, sx1, canal)
+      poseMiroir(i, canal)
     } else if (maillon === 'et') {
       // DEUX miroirs, un seul canal, règle ET : la porte veut les deux.
       // Les deux fils à plomb sont écartés, et leurs pastilles à des
@@ -520,8 +623,8 @@ function essaieNiveau(
       portes.push({ minX: wx, minY: gapMin, maxX: wx + EP_CLOISON, maxY: gapMax, canal, regle: 'et' })
       const ex1 = Math.round(entre(rng, sx0 + 140, sx0 + 240) / 10) * 10
       const ex2 = Math.round(entre(rng, ex1 + 280, sx1 - 220) / 10) * 10
-      poseMiroir(ex1, ex2 - 90, canal)
-      poseMiroir(ex2, sx1, canal)
+      poseMiroirPlafond(ex1, ex2 - 90, canal)
+      poseMiroirPlafond(ex2, sx1, canal)
       labels.push({
         x: wx + EP_CLOISON / 2,
         y: gapMax + 60,
@@ -532,27 +635,42 @@ function essaieNiveau(
     } else if (maillon === 'rail') {
       // LE PLASMA : se tenir en VAPEUR au point marqué ionise le faisceau ;
       // le rail magnétique, amorcé dans le nuage, capture l'arc et le guide
-      // jusqu'à la pastille posée dans l'axe de sa sortie.
+      // jusqu'à la pastille posée dans l'axe de sa sortie. Le fil tombe du
+      // plafond ou monte du plancher, le rail part du côté où la place est.
       const canal = canalSuivant++
       portes.push({ minX: wx, minY: gapMin, maxX: wx + EP_CLOISON, maxY: gapMax, canal })
-      const Lr = Math.round(entre(rng, 140, 200) / 10) * 10
-      const ex = Math.round(entre(rng, sx0 + 150, sx1 - (Lr + 160)) / 10) * 10
+      const ex = Math.round(entre(rng, sx0 + 150, sx1 - 150) / 10) * 10
+      const duHaut = rng() < 0.5
+      const d = { x: 0, y: duHaut ? -1 : 1 }
+      const emetteur: LaserDef = {
+        x: ex,
+        y: duHaut ? demiH - 24 : -demiH + 24,
+        angle: duHaut ? -90 : 90,
+      }
       const ny = Math.round(entre(rng, -demiH * 0.3, demiH * 0.3) / 10) * 10
-      const emetteur: LaserDef = { x: ex, y: demiH - 24, angle: -90 }
+      const espaceDroite = sx1 - 60 - ex
+      const espaceGauche = ex - (sx0 + 60)
+      const versDroite = espaceDroite >= espaceGauche
+      const s = versDroite ? 1 : -1
+      const Lr = Math.round(
+        entre(rng, 140, Math.min(200, (versDroite ? espaceDroite : espaceGauche) - 110)) / 10,
+      ) * 10
       lasers.push(emetteur)
-      rails.push({ points: [{ x: ex, y: ny - 30 }, { x: ex + Lr, y: ny - 30 }] })
-      const cible: CibleDef = { x: ex + Lr + 100, y: ny - 30, r: 26, canal }
+      const railY = ny + d.y * 30
+      rails.push({ points: [{ x: ex, y: railY }, { x: ex + s * Lr, y: railY }] })
+      const cible: CibleDef = { x: ex + s * (Lr + 100), y: railY, r: 26, canal }
       cibles.push(cible)
       preuves.push({
         kind: 'rail',
         canal,
         emetteur,
         spot: { x: ex, y: ny },
+        normale: { nx: 0, ny: 0 }, // sans objet : le nuage n'a pas de flanc
         cibleIndex: cibles.length - 1,
       })
-      labels.push({ x: ex, y: ny + 74, text: 'IONISER ICI', tone: 'grille', rang: 'detail' })
-      reserves.push({ minX: ex - 70, minY: ny - 120, maxX: ex + 70, maxY: demiH })
-      reserves.push({ minX: ex - 70, minY: ny - 110, maxX: ex + Lr + 150, maxY: ny + 40 })
+      poseIndice('rail', ex, ny - d.y * 74, 'IONISER ICI', 'grille')
+      reserves.push(bande(emetteur.x, emetteur.y, ex, ny - d.y * 60, 70))
+      reserves.push(bande(ex, railY, cible.x + s * 50, railY, 90))
     } else if (maillon === 'nor') {
       // LA BARRIÈRE TENUE : un faisceau vertical barre le chemin devant la
       // porte ; sa pastille NOR (au sol) tient la porte ouverte tant que la
@@ -564,22 +682,65 @@ function essaieNiveau(
       const bx = Math.round(
         entre(rng, Math.max(sx0 + 130, wx - 320), wx - 150) / 10,
       ) * 10
-      const emetteur: LaserDef = { x: bx, y: demiH - 24, angle: -90 }
+      // l'émetteur en haut ou en bas — la pastille au bout opposé
+      const duHaut = rng() < 0.5
+      const emetteur: LaserDef = {
+        x: bx,
+        y: duHaut ? demiH - 24 : -demiH + 24,
+        angle: duHaut ? -90 : 90,
+      }
       lasers.push(emetteur)
-      const cible: CibleDef = { x: bx, y: -demiH + 52, r: 22, mode: 'nor', canal }
+      const cible: CibleDef = {
+        x: bx,
+        y: duHaut ? -demiH + 52 : demiH - 52,
+        r: 22,
+        mode: 'nor',
+        canal,
+      }
       cibles.push(cible)
       preuves.push({
         kind: 'nor',
         canal,
         emetteur,
         spot: { x: bx, y: gy },
+        normale: { nx: 0, ny: 0 }, // sans objet : on traverse, on ne reflète pas
         cibleIndex: cibles.length - 1,
       })
-      labels.push({ x: bx, y: gy + 120, text: 'TRAVERSER EN VAPEUR', tone: 'grille', rang: 'detail' })
+      // la barrière SCELLE à la première coupure : son avertissement reste,
+      // lui — une fois par salle
+      if (!indicesVus.has('nor')) {
+        indicesVus.add('nor')
+        labels.push({ x: bx, y: gy + 120, text: 'TRAVERSER EN VAPEUR', tone: 'grille', rang: 'detail' })
+      }
       // la colonne du faisceau reste dégagée du plafond au sol : le décor
       // ne doit jamais couper la barrière à la place du joueur
       reserves.push({ minX: bx - 60, minY: -demiH, maxX: bx + 60, maxY: demiH })
     }
+  }
+
+  // ---- les BANDEAUX de silhouette : toutes les salles ne font pas ----
+  // pleine hauteur. Un bandeau plein mange le haut ou le bas d'une salle
+  // sur trois environ — le profil du niveau cesse d'être un rectangle.
+  for (let i = 0; i < salleX.length; i++) {
+    if (rng() >= 0.32) continue
+    const [sx0, sx1] = salleX[i]
+    const hB = Math.round(entre(rng, 120, 240) / 10) * 10
+    const enHaut = rng() < 0.5
+    const r: Rect = {
+      minX: sx0,
+      minY: enHaut ? demiH - hB : -demiH,
+      maxX: sx1,
+      maxY: enHaut ? demiH : -demiH + hB,
+    }
+    let libre = true
+    for (const res of reserves)
+      if (chevauche(gonfle(r, 30), res)) {
+        libre = false
+        break
+      }
+    if (!libre) continue
+    boxes.push({ ...r, material: MAT_WALL, skin: 1 + Math.floor(rng() * 4) })
+    reserves.push(r) // traverses, décor et cachettes s'en écartent
   }
 
   // ---- les TRAVERSES : l'esprit labyrinthe ----
@@ -816,7 +977,103 @@ function essaieNiveau(
   }
   // la preuve se joue sur le niveau FINI (tout le décor posé)
   ;(level as LevelGen).__preuves = preuves
+
+  // ---- l'ORIENTATION : le même squelette ne se lit pas toujours dans le
+  // même sens. Un niveau sur quatre reste ouest → est ; les autres se
+  // retournent (est → ouest), se dressent (montée), ou plongent — la
+  // transposition et le miroir emportent TOUT : parois, mécanismes,
+  // faisceaux, rails, preuves. La validation se joue après, sur la
+  // géométrie définitive.
+  const orientation = Math.floor(rng() * 4)
+  if (orientation & 2) transposeNiveau(level, preuves)
+  if (orientation & 1) miroirXNiveau(level, preuves)
   return level
+}
+
+// ---- Les RETOURNEMENTS : x ↔ y (le niveau se dresse), et x → −x ---------
+type Pt = { x: number; y: number }
+const swapPt = (p: Pt): void => {
+  const t = p.x
+  p.x = p.y
+  p.y = t
+}
+const swapRect = (r: Rect): void => {
+  let t = r.minX
+  r.minX = r.minY
+  r.minY = t
+  t = r.maxX
+  r.maxX = r.maxY
+  r.maxY = t
+}
+
+function transposeNiveau(level: LevelDef, preuves: PreuveDef[]): void {
+  swapRect(level.bounds as Rect)
+  for (const b of level.boxes) {
+    swapRect(b)
+    if (b.angle) b.angle = -b.angle // la réflexion sur la diagonale inverse le sens
+  }
+  swapPt(level.spawn)
+  swapRect(level.exit)
+  for (const l of level.labels) swapPt(l)
+  for (const dcl of level.decals ?? []) {
+    swapPt(dcl)
+    const t = dcl.w
+    dcl.w = dcl.h
+    dcl.h = t
+  }
+  for (const em of level.lasers ?? []) {
+    swapPt(em)
+    em.angle = 90 - em.angle // (dx, dy) → (dy, dx)
+  }
+  for (const c of level.cibles ?? []) swapPt(c)
+  for (const p of level.portes ?? []) swapRect(p)
+  for (const r of level.rails ?? []) for (const pt of r.points) swapPt(pt)
+  for (const c of level.caches ?? []) {
+    swapRect(c)
+    if (c.angle) c.angle = -c.angle
+  }
+  for (const lum of level.lumieres ?? []) swapPt(lum)
+  for (const p of preuves) {
+    swapPt(p.spot)
+    const t = p.normale.nx
+    p.normale.nx = p.normale.ny
+    p.normale.ny = t
+    // p.emetteur et la pastille sont les MÊMES objets que dans le niveau :
+    // déjà retournés ci-dessus
+  }
+}
+
+function miroirXNiveau(level: LevelDef, preuves: PreuveDef[]): void {
+  const flipRect = (r: Rect): void => {
+    const t = r.minX
+    r.minX = -r.maxX
+    r.maxX = -t
+  }
+  flipRect(level.bounds as Rect)
+  for (const b of level.boxes) {
+    flipRect(b)
+    if (b.angle) b.angle = -b.angle
+  }
+  level.spawn.x = -level.spawn.x
+  flipRect(level.exit)
+  for (const l of level.labels) l.x = -l.x
+  for (const dcl of level.decals ?? []) dcl.x = -dcl.x
+  for (const em of level.lasers ?? []) {
+    em.x = -em.x
+    em.angle = 180 - em.angle // (dx, dy) → (−dx, dy)
+  }
+  for (const c of level.cibles ?? []) c.x = -c.x
+  for (const p of level.portes ?? []) flipRect(p)
+  for (const r of level.rails ?? []) for (const pt of r.points) pt.x = -pt.x
+  for (const c of level.caches ?? []) {
+    flipRect(c)
+    if (c.angle) c.angle = -c.angle
+  }
+  for (const lum of level.lumieres ?? []) lum.x = -lum.x
+  for (const p of preuves) {
+    p.spot.x = -p.spot.x
+    p.normale.nx = -p.normale.nx
+  }
 }
 
 // ---- LES CORPS SYNTHÉTIQUES : le vrai traceur, un corps posé pour lui ----
@@ -827,7 +1084,7 @@ function essaieNiveau(
 const N45 = Math.SQRT1_2
 
 interface CorpsSynthetiques {
-  glace?: { x: number; y: number }
+  glace?: { x: number; y: number; nx: number; ny: number } // le flanc et sa normale
   vapeur?: { x: number; y: number }
   eau?: { x: number; y: number }
 }
@@ -847,7 +1104,9 @@ function traceSynthetique(
       ? (x, y) => {
           const dx = x - corps.glace!.x
           const dy = y - corps.glace!.y
-          return dx * dx + dy * dy <= 44 * 44 ? { nx: N45, ny: N45 } : null
+          return dx * dx + dy * dy <= 44 * 44
+            ? { nx: corps.glace!.nx, ny: corps.glace!.ny }
+            : null
         }
       : null,
     eau: corps.eau
@@ -878,18 +1137,24 @@ function traceSynthetique(
 }
 
 /** L'énigme du MIROIR : sans glace la pastille du canal reste éteinte,
- * avec un corps gelé au point prévu elle s'allume. */
+ * avec un corps gelé au point prévu (flanc à la normale donnée — 45°
+ * haut-droit par défaut, le montage historique) elle s'allume. */
 export function prouveMiroir(
   level: LevelDef,
   emetteur: LaserDef,
   miroir: { x: number; y: number },
   canal: number,
+  normale: { nx: number; ny: number } = { nx: N45, ny: N45 },
 ): { sansGlace: boolean; avecGlace: boolean } {
   const duCanal = (touchees: number[]): boolean =>
     touchees.some((c) => ((level.cibles ?? [])[c]?.canal ?? c + 1) === canal)
   return {
     sansGlace: duCanal(traceSynthetique(level, emetteur, {})),
-    avecGlace: duCanal(traceSynthetique(level, emetteur, { glace: miroir })),
+    avecGlace: duCanal(
+      traceSynthetique(level, emetteur, {
+        glace: { x: miroir.x, y: miroir.y, nx: normale.nx, ny: normale.ny },
+      }),
+    ),
   }
 }
 
@@ -911,7 +1176,9 @@ export function prouvePlasma(
 
 /** La BARRIÈRE TENUE : le faisceau tient sa pastille d'office ; la
  * traversée en VAPEUR ne le coupe pas ; la traversée en EAU le plie et le
- * coupe — c'est toute l'énigme. */
+ * coupe — c'est toute l'énigme. La flaque d'essai est décalée
+ * PERPENDICULAIREMENT au faisceau (quel que soit son sens) : c'est le
+ * flanc de la goutte qui plie la lumière, pas son cœur. */
 export function prouveBarriere(
   level: LevelDef,
   emetteur: LaserDef,
@@ -920,12 +1187,14 @@ export function prouveBarriere(
 ): { directe: boolean; enVapeur: boolean; enEau: boolean } {
   const duCanal = (touchees: number[]): boolean =>
     touchees.some((c) => ((level.cibles ?? [])[c]?.canal ?? c + 1) === canal)
+  const a = (emetteur.angle * Math.PI) / 180
+  const perp = { x: -Math.sin(a), y: Math.cos(a) }
   return {
     directe: duCanal(traceSynthetique(level, emetteur, {})),
     enVapeur: duCanal(traceSynthetique(level, emetteur, { vapeur: croisement })),
     enEau: duCanal(
       traceSynthetique(level, emetteur, {
-        eau: { x: croisement.x + 24, y: croisement.y },
+        eau: { x: croisement.x + perp.x * 24, y: croisement.y + perp.y * 24 },
       }),
     ),
   }
@@ -1046,7 +1315,9 @@ export function valideNiveau(level: LevelDef): VerdictGen {
     const base = baseParEmetteur.get(p.emetteur) ?? new Set()
     let ok = false
     if (p.kind === 'miroir') {
-      const avec = traceSynthetique(level, p.emetteur, { glace: p.spot })
+      const avec = traceSynthetique(level, p.emetteur, {
+        glace: { x: p.spot.x, y: p.spot.y, nx: p.normale.nx, ny: p.normale.ny },
+      })
       if (base.has(p.cibleIndex)) raisons.push(`canal ${p.canal} : la pastille s'allume sans miroir`)
       else if (!avec.includes(p.cibleIndex))
         raisons.push(`canal ${p.canal} : le reflet du miroir n'allume pas la pastille`)
@@ -1064,10 +1335,13 @@ export function valideNiveau(level: LevelDef): VerdictGen {
         raisons.push(`canal ${p.canal} : l'arc guidé n'atteint pas la pastille`)
       else ok = true
     } else {
-      // nor : allumée d'office, la vapeur ne coupe pas, l'eau coupe
+      // nor : allumée d'office, la vapeur ne coupe pas, l'eau coupe —
+      // la flaque d'essai décalée perpendiculairement au faisceau
+      const aB = (p.emetteur.angle * Math.PI) / 180
+      const perpB = { x: -Math.sin(aB), y: Math.cos(aB) }
       const enVapeur = traceSynthetique(level, p.emetteur, { vapeur: p.spot })
       const enEau = traceSynthetique(level, p.emetteur, {
-        eau: { x: p.spot.x + 24, y: p.spot.y },
+        eau: { x: p.spot.x + perpB.x * 24, y: p.spot.y + perpB.y * 24 },
       })
       if (!base.has(p.cibleIndex))
         raisons.push(`canal ${p.canal} : la barrière n'atteint pas sa pastille`)
@@ -1097,20 +1371,29 @@ export function valideNiveau(level: LevelDef): VerdictGen {
 // une sous-graine dérivée, pour rester déterministe) jusqu'à la preuve —
 // et l'on abandonne au-delà de 60 essais, ce qui ne s'observe pas en
 // pratique (les tests le tiennent à l'œil).
+export function genereNiveauDetaille(
+  graine: number,
+  atelier: Atelier | null = null,
+  options: OptionsGen = OPTIONS_DEFAUT,
+): { niveau: LevelDef; preuves: PreuveDef[] } {
+  for (let essai = 0; essai < 60; essai++) {
+    const rng = creeRng((graine >>> 0) + essai * 0x9e3779b9)
+    const niveau = essaieNiveau(graine, rng, atelier, options)
+    if (valideNiveau(niveau).valide) {
+      const preuves = (niveau as LevelGen).__preuves ?? []
+      delete (niveau as LevelGen).__preuves
+      return { niveau, preuves }
+    }
+  }
+  throw new Error(`générateur : aucune salle prouvée pour la graine ${graine}`)
+}
+
 export function genereNiveau(
   graine: number,
   atelier: Atelier | null = null,
   options: OptionsGen = OPTIONS_DEFAUT,
 ): LevelDef {
-  for (let essai = 0; essai < 60; essai++) {
-    const rng = creeRng((graine >>> 0) + essai * 0x9e3779b9)
-    const niveau = essaieNiveau(graine, rng, atelier, options)
-    if (valideNiveau(niveau).valide) {
-      delete (niveau as LevelGen).__preuves
-      return niveau
-    }
-  }
-  throw new Error(`générateur : aucune salle prouvée pour la graine ${graine}`)
+  return genereNiveauDetaille(graine, atelier, options).niveau
 }
 
 /** Une salle AU CODE ATELIER : « 101 » est le cahier des charges, la
