@@ -916,7 +916,10 @@ export class LevelEditor {
     }
     const caches = this.level.caches ?? []
     for (let i = caches.length - 1; i >= 0; i--) {
-      if (inside(caches[i])) return { kind: 'cache', index: i }
+      // une cachette a une FORME et un ANGLE, comme une paroi : le clic se
+      // juge sur sa vraie silhouette — l'AABB brute laissait la « hitbox »
+      // à l'angle d'avant après une rotation (signalé)
+      if (dansBoite(caches[i], x, y)) return { kind: 'cache', index: i }
     }
     const zones = this.level.zones ?? []
     for (let i = zones.length - 1; i >= 0; i--) {
@@ -5044,21 +5047,30 @@ export class LevelEditor {
         colA = '#a878e8'
       }
       if (band <= 0) continue
+      // L'aura PIVOTE avec sa pièce : la portée est une iso-distance de la
+      // surface — une pièce oblique porte donc une aura oblique. Avant,
+      // l'aura restait dessinée sur la boîte NON tournée : pivoter une
+      // chaudière laissait sa zone d'effet à l'angle d'avant (signalé).
       const aura = (
         portee: number,
         alphaFill: string,
         alphaLine: string,
         dash: number[],
       ): void => {
-        const p = this.toScreen(box.minX - portee, box.maxY + portee)
-        const q = this.toScreen(box.maxX + portee, box.minY - portee)
-        const r = Math.min(
-          portee * this.zoom,
-          (q.sx - p.sx) / 2,
-          (q.sy - p.sy) / 2,
+        const w = (box.maxX - box.minX + 2 * portee) * this.zoom
+        const h = (box.maxY - box.minY + 2 * portee) * this.zoom
+        const r = Math.min(portee * this.zoom, w / 2, h / 2)
+        const c = this.toScreen(
+          (box.minX + box.maxX) / 2,
+          (box.minY + box.maxY) / 2,
         )
+        g.save()
+        g.translate(c.sx, c.sy)
+        // même convention que le tracé des pièces : l'écran a l'axe y
+        // inversé, l'angle trigonométrique s'y dessine en négatif
+        if (box.angle) g.rotate((-box.angle * Math.PI) / 180)
         g.beginPath()
-        g.roundRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy, Math.max(0, r))
+        g.roundRect(-w / 2, -h / 2, w, h, Math.max(0, r))
         if (alphaFill) {
           g.fillStyle = colA + alphaFill
           g.fill()
@@ -5068,6 +5080,7 @@ export class LevelEditor {
         g.lineWidth = 1
         g.stroke()
         g.setLineDash([])
+        g.restore()
       }
       aura(band, '10', '55', [5, 4])
       if (box.material === MAT_FROID)

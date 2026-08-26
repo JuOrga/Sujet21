@@ -22,6 +22,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 16:29',
+    title: 'Éditeur : l’aura et la cachette PIVOTENT avec leur pièce',
+    notes: [
+      'Signalé : la « hitbox » ne suivait pas la rotation. Deux vrais coupables, tous deux dans l’éditeur (la physique du jeu, elle, tournait juste) : la ZONE D’EFFET (aura de chaudière, plaque froide, hydro) restait dessinée sur la boîte NON tournée — pivoter une pièce laissait son halo à l’angle d’avant ; et la SÉLECTION des cachettes se jugeait sur la boîte englobante brute — une cachette-coin pivotée se cliquait à côté de sa silhouette.',
+      'Corrigé : l’aura pivote avec sa pièce (même convention que le tracé), et le clic d’une cachette se juge sur sa vraie forme tournée. Cinq garde-fous neufs prouvent la rotation des hits, forme par forme (rectangle, coin, capsule, disque, arc) — 348 tests.',
+    ],
+  },
+  {
     date: '26/08/2026 15:00',
     title: 'L’œil du Sujet : l’étalonnage du concepteur devient le défaut livré',
     notes: [
