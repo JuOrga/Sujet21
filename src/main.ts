@@ -3549,10 +3549,13 @@ function navigueMenu(couche: CoucheMenu): void {
   focusParCouche.set(couche.id, vise)
   // le liseré s'affiche si la MANETTE a la main (a parlé plus récemment
   // que le pointeur) — pas de fenêtre de temps : sur un menu au rendu
-  // plafonné, une horloge expirerait entre deux images
+  // plafonné, une horloge expirerait entre deux images. UN SEUL liseré à
+  // l'écran : celui de la couche active — l'écran de dessous rend le sien
+  // (il le retrouvera par la mémoire de focus en revenant).
   const padALaMain = manette.lastActivity > input.lastPointerAt
-  for (const el of els)
-    el.classList.toggle('pad-focus', padALaMain && el === vise)
+  for (const el of document.querySelectorAll<HTMLElement>('.pad-focus'))
+    if (el !== vise) el.classList.remove('pad-focus')
+  vise.classList.toggle('pad-focus', padALaMain)
   if (dx !== 0 || dy !== 0)
     vise.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   if (manette.edge(BOUTON.A)) vise.click()

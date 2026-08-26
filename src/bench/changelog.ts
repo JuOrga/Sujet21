@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 20:00',
+    title: 'Manette : les menus se PARCOURENT enfin — et plus aucun appui perdu',
+    notes: [
+      'Gros chantier demandé : la navigation manette des menus et sous-menus. Fini la liste de boutons codée en dur qui laissait des écrans inaccessibles : la navigation devient GÉNÉRIQUE — chaque écran (fiche, paramètres, salles, planche, codex, records, livraisons, commandes, cérémonie de fin de salle, choix du pool…) est une couche de la pile, et l’écran du dessus prend la main. La croix ou le stick parcourent ses boutons EN 2D (on va au plus proche dans la direction pressée, répétition douce au maintien), A active, gauche/droite ajustent un sélecteur, le liseré bleu suit — un seul à l’écran — et reste en vue dans les listes qui défilent.',
+      'B REVIENT, PARTOUT : chaque écran déclare sa porte de sortie (le ✕ du panneau, la reprise d’essai depuis la fiche). La légende, les états et le panneau d’instruments, ouverts en pleine partie, sont des couches LÉGÈRES : B les referme sans voler les boutons du jeu — et ce B-là ne repasse pas le corps en eau. Le codex garde ses fermetures historiques (START, SELECT).',
+      'Et le bug de fond derrière les « boutons inaccessibles » : la manette n’était lue QUE dans la boucle d’images — sur un menu au rendu plafonné ou une machine lente, tout appui plus bref que l’intervalle entre deux images était PERDU. L’échantillonnage passe à cadence fixe (16 ms, hors rendu) et ACCUMULE les fronts jusqu’à l’image suivante : plus rien ne se perd, quel que soit le rythme d’affichage. Vérifié manette simulée sur la vraie page : fiche parcourue au liseré, PARAMÈTRES / CODEX / COMMANDES atteints en 2D, ouverts au A, refermés au B, focus retrouvé au retour. L’onglet manette du panneau COMMANDES documente le tout.',
+    ],
+  },
+  {
     date: '26/08/2026 18:04',
     title: 'La planche : le code entier, cran par cran',
     notes: [
