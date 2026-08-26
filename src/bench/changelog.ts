@@ -22,8 +22,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 23:30',
+    title:
+      'Caméra automatique : le plan large, calé sur la référence du concepteur',
+    notes: [
+      'Retour immédiat : encore beaucoup trop zoomé — avec capture de référence à l’appui. Recalé franchement dessus : le corps est maintenant cadré à 12 % du petit côté de l’écran (deux fois plus large que la veille), et le plafond de zoom garantit que la vue montre au moins la PETITE DIMENSION ENTIÈRE de la salle — le niveau se lit toujours en entier dans un sens, borné à 1600 u pour les salles géantes (hub).',
+      'Mesuré en salle réelle 2400×1500 : zoom auto 0,37 — 2188 unités visibles en hauteur, la salle entière avec ses marges, le corps à la taille de la référence. Le zoom manuel (molette, pincement) garde toute sa liberté.',
+    ],
+  },
+  {
     date: '26/08/2026 23:15',
-    title: 'La multi-sélection au Deck : L2 + clic — et l’appui long au tactile',
+    title:
+      'La multi-sélection au Deck : L2 + clic — et l’appui long au tactile',
     notes: [
       'Signalé : trackpad droit en souris sur Steam Deck, pas de clic droit — et pas de multi-sélection. Précision utile : dans l’éditeur, la multi-sélection n’a jamais été au clic droit (lui déplace la vue) mais à MAJ + CLIC — et c’est la touche Maj qui manque au Deck. Résolu : L2 TENU vaut Maj — L2 + clic ajoute ou retire l’élément de la sélection, autant de fois qu’on veut, puis on relâche L2 et on tire tout le groupe d’un geste.',
       'Au TACTILE : l’APPUI LONG (un demi-souffle, 480 ms, sans bouger) vaut Maj + clic — la convention des écrans tactiles. Annulé au moindre déplacement, au relâcher ou au second doigt : aucun conflit avec le déplacement d’élément ni le pincement-zoom. L’onglet manette du panneau COMMANDES documente les deux gestes. Vérifié manette simulée : L2 + deux clics = deux éléments, L2 relâché = gestes d’avant intacts (clic simple, déplacement de groupe), appui long = bascule. 354 tests verts.',

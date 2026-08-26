@@ -162,11 +162,11 @@ export class Camera {
     )
     // Le PLAFOND DU NIVEAU : quel que soit le rayon du corps (il rétrécit
     // au fil de la run et la caméra plongeait avec lui), la vue montre au
-    // moins VUE_MIN unités monde sur son petit côté — 62 % de la petite
-    // dimension de la salle, borné à 900 u pour les salles géantes (hub) :
-    // le corps y resterait sinon une tête d'épingle.
+    // moins la PETITE DIMENSION ENTIÈRE de la salle — le niveau se lit
+    // toujours en entier dans un sens. Borné à 1600 u pour les salles
+    // géantes (hub) : le corps y resterait sinon une tête d'épingle.
     if (this.nivMin > 0) {
-      const vueMin = Math.min(900, this.nivMin * 0.62)
+      const vueMin = Math.min(1600, this.nivMin)
       targetZoom = Math.min(targetZoom, Math.min(viewportW, viewportH) / vueMin)
     }
     if (this.manualZoom !== null) targetZoom = this.manualZoom
