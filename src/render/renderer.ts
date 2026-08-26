@@ -118,8 +118,12 @@ void main() {
 // (uBoxAux.x) : code = mat + 16·forme + 128·q0 + 16384·q1 — des entiers
 // exacts en float32, zéro uniforme de plus (le budget mobile est déjà plein).
 // q0 : orientation du coin (0..3) ou épaisseur d'arc ×100 ; q1 : demi-
-// ouverture d'arc en degrés.
+// ouverture d'arc en degrés + 256·bouts (0 ronds, 1 droits, 2 pointe).
 const FORMES_GLSL = `
+float cote2(vec2 a, vec2 b, vec2 p) { // de quel côté de (a→b) tombe p
+  return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+}
+
 vec4 decodeAux(float code) { // (matériau, forme, q0, q1)
   float q1 = floor(code / 16384.0);
   code -= q1 * 16384.0;
@@ -168,23 +172,88 @@ float formeSdf(vec2 w, vec4 b, float forme, float q0, float q1) {
                       vec2(dot(pq2, pq2), s * (v2.x * e2.y - v2.y * e2.x)));
     return -sqrt(dd.x) * sign(dd.y);
   }
-  // arc d'anneau aux bouts ronds — la boîte est sa boîte englobante EXACTE :
-  // l'arc s'étire en ellipse pour la remplir (miroir de arcRayons/
-  // arcContactAxe, même approximation de distance que l'ellipse).
+  // arc d'anneau — la boîte est la boîte englobante EXACTE de la silhouette,
+  // BOUTS COMPRIS (miroir de arcRayons/arcContactAxe : calotte débordante,
+  // coupe nette, ou griffe à tranchants droits — trois boîtes). q1 porte
+  // l'ouverture ET les bouts (+256·bout) : 0 rond, 1 droit, 2 pointe.
+  float bout = floor(q1 / 256.0);
   float ep = clamp(q0 / 100.0, 0.08, 1.0);
-  float ouv = radians(q1);
+  float ouv = radians(q1 - bout * 256.0);
   float rm = 1.0 - ep * 0.5;
   float ht = ep * 0.5;
-  float xminU = rm * cos(ouv) - ht;
-  float ymaxU = ouv < 1.5707963 ? rm * sin(ouv) + ht : 1.0;
+  float ri = max(0.0, rm - ht);
+  float ro = rm + ht;
+  float ta = min(ouv * 0.7, max(0.12, 2.2 * ht / rm));
+  float phi = ouv - ta;
+  bool coupe = ouv < 3.1414927; // un anneau complet n'a pas de bouts
+  float xminU;
+  float ymaxU;
+  if (bout > 1.5 && coupe) { // griffe : des bords droits, extrêmes aux sommets
+    float cf = cos(phi);
+    xminU = min(cf < 0.0 ? cf : ri * cf, rm * cos(ouv));
+    ymaxU = max(phi >= 1.5707963 ? 1.0 : sin(phi), rm * sin(ouv));
+  } else if (bout > 0.5 && coupe) { // secteur d'anneau : tout est sur la coupe
+    float c = cos(ouv);
+    xminU = c < 0.0 ? c : ri * c;
+    ymaxU = ouv >= 1.5707963 ? 1.0 : sin(ouv);
+  } else { // calotte ronde : elle déborde toujours le plan de coupe
+    xminU = rm * cos(ouv) - ht;
+    ymaxU = ouv < 1.5707963 ? rm * sin(ouv) + ht : 1.0;
+  }
   float cu = (xminU + 1.0) * 0.5;
   vec2 sxy = vec2(2.0 * half_.x / (1.0 - xminU), half_.y / ymaxU);
   vec2 q = p / sxy + vec2(cu, 0.0);
   float L = length(q);
   float th = atan(q.y, q.x);
+  float a = abs(th);
   float dU;
   vec2 nU;
-  if (abs(th) <= ouv) {
+  if (bout > 1.5 && coupe) { // GRIFFE : deux tranchants droits sur une pointe
+    vec2 Po = ro * vec2(cos(phi), sin(phi));
+    vec2 Pi = ri * vec2(cos(phi), sin(phi));
+    vec2 Pt = rm * vec2(cos(ouv), sin(ouv));
+    vec2 qa = vec2(q.x, abs(q.y));
+    vec2 dir = L > 1e-9 ? qa / L : vec2(1.0, 0.0);
+    // les quatre morceaux de bord : deux arcs, deux tranchants
+    vec2 c1 = a <= phi ? ro * dir : Po;
+    vec2 c2 = a <= phi ? ri * dir : Pi;
+    vec2 e1 = Pt - Po;
+    vec2 c3 = Po + e1 * clamp(dot(qa - Po, e1) / max(dot(e1, e1), 1e-9), 0.0, 1.0);
+    vec2 e2 = Pi - Pt;
+    vec2 c4 = Pt + e2 * clamp(dot(qa - Pt, e2) / max(dot(e2, e2), 1e-9), 0.0, 1.0);
+    vec2 best = c1;
+    float bd = distance(qa, c1);
+    if (distance(qa, c2) < bd) { bd = distance(qa, c2); best = c2; }
+    if (distance(qa, c3) < bd) { bd = distance(qa, c3); best = c3; }
+    if (distance(qa, c4) < bd) { bd = distance(qa, c4); best = c4; }
+    float k1 = cote2(Po, Pt, qa);
+    float k2 = cote2(Pt, Pi, qa);
+    float k3 = cote2(Pi, Po, qa);
+    bool griffe = !((k1 < 0.0 || k2 < 0.0 || k3 < 0.0) && (k1 > 0.0 || k2 > 0.0 || k3 > 0.0));
+    bool dedans = (a <= phi && L >= ri && L <= ro) || griffe;
+    dU = dedans ? -bd : bd;
+    vec2 nn = bd > 1e-9 ? (qa - best) / bd * (dedans ? -1.0 : 1.0) : vec2(0.0, 1.0);
+    nU = vec2(nn.x, nn.y * sign(th));
+  } else if (bout > 0.5 && coupe) { // coupe franche : bande ∩ plan radial
+    if (a <= ouv) {
+      float dr = L - rm;
+      dU = abs(dr) - ht;
+      nU = L > 1e-9 ? sign(dr) * q / L : vec2(0.0, 1.0);
+      float scut = L * sin(a - ouv);
+      if (scut > dU) {
+        dU = scut;
+        nU = vec2(-sin(ouv), cos(ouv) * sign(th));
+      }
+    } else {
+      vec2 qa = vec2(q.x, abs(q.y));
+      vec2 u = vec2(cos(ouv), sin(ouv));
+      float t = clamp(dot(qa, u), ri, ro);
+      vec2 dv = qa - t * u;
+      float d = length(dv);
+      dU = d;
+      nU = d > 1e-9 ? vec2(dv.x, dv.y * sign(th)) / d : vec2(0.0, 1.0);
+    }
+  } else if (a <= ouv) { // bouts ronds (l'historique)
     float dr = L - rm;
     dU = abs(dr) - ht;
     nU = L > 1e-9 ? sign(dr) * q / L : vec2(0.0, 1.0);
@@ -3000,9 +3069,9 @@ export class Renderer {
         q0 = Math.round(
           Math.min(1, Math.max(0.08, bx.p0 ?? ARC_EPAISSEUR_DEFAUT)) * 100,
         )
-        q1 = Math.round(
-          Math.min(180, Math.max(15, bx.p1 ?? ARC_OUVERTURE_DEFAUT)),
-        )
+        q1 =
+          Math.round(Math.min(180, Math.max(15, bx.p1 ?? ARC_OUVERTURE_DEFAUT))) +
+          256 * Math.min(2, Math.max(0, Math.round(bx.p2 ?? 0)))
       }
       this.auxScratch[i * 4] = bx.material + forme * 16 + q0 * 128 + q1 * 16384
       this.auxScratch[i * 4 + 1] = ((bx.angle ?? 0) * Math.PI) / 180

@@ -22,6 +22,33 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 00:50',
+    title: 'La boîte suit les BOUTS : plus un pouce de marge morte autour d’un arc',
+    notes: [
+      'Demandé, et c’était possible : changer les bouts d’un arc change aussi sa BOÎTE. Chaque finition a désormais sa boîte englobante EXACTE — la calotte ronde déborde le plan de coupe, la coupe franche s’arrête net, la griffe meurt sur le rayon médian : trois silhouettes, trois boîtes. Un arc à bouts droits ne traîne plus la marge que réclamaient les calottes ; il remplit son cadre, comme le demi-anneau depuis la correction d’alors.',
+      'La GRIFFE en profite pour se redresser : ses deux tranchants sont désormais DROITS et se rejoignent en une pointe franche (avant, l’épaisseur s’effilait en courbe). Des bords droits, ce sont des extrêmes aux sommets — donc une boîte exacte au lieu d’une estimation — et une pointe plus nette à l’œil. Le champ de distance se lit d’un seul tenant sur les quatre morceaux de bord : aucune couture, donc aucun cheveu clair en travers de la pièce.',
+      'Un anneau COMPLET (ouverture pleine) n’a pas de bouts : quelle que soit la finition, il garde la boîte et la silhouette de l’anneau — sans quoi la coupe y aurait laissé une fente d’épaisseur nulle. Les tests gravent la règle : pour chaque finition, RIEN ne dépasse la boîte et les QUATRE côtés sont touchés (contre-épreuve faite : l’ancienne boîte échoue). Vérifié en jeu, trois arcs dans des boîtes identiques : ils s’y logent enfin à égalité. 361 tests verts, build propre.',
+    ],
+  },
+  {
+    date: '27/08/2026 00:22',
+    title: 'Les arcs choisissent leurs BOUTS : ronds, droits à 90°, en pointe',
+    notes: [
+      'Demandé : pouvoir choisir la forme des extrémités des arcs — à commencer par une coupe à 90°. C’est fait, avec trois finitions au choix dans l’éditeur (panneau de la pièce, sélecteur « Bouts », pour les parois comme pour les cachettes) : ARRONDIS — la calotte demi-ronde historique ; DROITS (90°) — la coupe franche, exactement perpendiculaire à la courbe ; EN POINTE — l’anneau s’effile en griffe sur son dernier segment.',
+      'La géométrie est UNE : le champ de distance signée du moteur (collisions, laser, miroirs), son miroir GLSL du shader (rendu, ombres portées, éclairage) et le contour de l’éditeur parlent la même formule — les tests croisent le contour contre le champ, rotation comprise, et des points discriminants séparent les trois finitions. Changer de bouts ne déplace ni ne remet à l’échelle l’arc : la boîte englobante reste celle des bouts ronds.',
+      'Le style voyage dans le fichier du tableau (champ p2, omis au défaut — les tableaux existants ne changent pas d’un octet) et jusqu’au GPU sans un uniforme de plus, glissé dans l’empaquetage existant. Vérifié en jeu : trois arcs identiques côte à côte, seuls les bouts diffèrent — calottes, coupes nettes, griffes — ombres fidèles. 358 tests verts, build propre.',
+    ],
+  },
+  {
+    date: '27/08/2026 00:00',
+    title: 'Fin des fermes à dashs : la réserve appartient au TABLEAU',
+    notes: [
+      'Signalé : les chaudières servaient de fermes à dashs — deux dashs dépensés, un passage en eau, un tour de chaudière, et le compteur remontait à 3. La règle change, comme demandé : la réserve de dashs est celle du TABLEAU — trois par écran, pleines dès le chargement (même quand on naît liquide) — et CHANGER D’ÉTAT n’y touche plus jamais. Touche G, chaudière, zone forcée : la transformation se paie toujours (le péage de 20 % en gouttes demeure), mais elle ne rend plus rien.',
+      'Le SURCHAUFFEUR garde son rôle de borne : frôlé en vapeur, il rend UN dash — mais jamais au-delà de la réserve maximale. Et réserve pleine, son serpentin ne se vide plus pour rien : il reste chargé et attend qu’un dash manque. La buse calibrée agrandit simplement la réserve d’un cran. Codex et fiche d’instrument mis à jour.',
+      'Vérifié au banc ET en jeu : réserve à 3 dès l’arrivée en eau, bascules vapeur↔eau neutres (un dash en poche avant, un dash après — l’ancienne règle aurait remis 3), plafond du surchauffeur gravé au spec. 354 tests verts, build propre.',
+    ],
+  },
+  {
     date: '26/08/2026 23:30',
     title:
       'Caméra automatique : le plan large, calé sur la référence du concepteur',

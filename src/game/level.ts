@@ -39,6 +39,7 @@ export interface ObstacleBox {
   forme?: number
   p0?: number // COIN : orientation 0..3 · ARC : épaisseur relative 0..1
   p1?: number // ARC : demi-ouverture en degrés
+  p2?: number // ARC : bouts (0 arrondis, 1 droits à 90°, 2 en pointe)
 }
 
 /** Le point (x, y) ramené dans le repère LOCAL d'une boîte oblique. */
@@ -420,6 +421,7 @@ export interface CacheDef {
   forme?: number // formes.ts — absent : rectangle
   p0?: number // COIN : orientation 0..3 · ARC : épaisseur relative
   p1?: number // ARC : demi-ouverture en degrés
+  p2?: number // ARC : bouts (0 arrondis, 1 droits à 90°, 2 en pointe)
   style?: 'paroi' // absent : brouillard
 }
 

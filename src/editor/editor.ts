@@ -52,6 +52,7 @@ import {
   ARC_EPAISSEUR_DEFAUT,
   ARC_OUVERTURE_DEFAUT,
   FORME_ARC,
+  ARC_BOUT_NOMS,
   FORME_CAPSULE,
   FORME_COIN,
   FORME_DISQUE,
@@ -4030,6 +4031,14 @@ export class LevelEditor {
             5,
           ),
         )
+        rows.push(
+          `<label class="ed-f"><span>Bouts</span><select id="p-fbout">` +
+            ARC_BOUT_NOMS.map(
+              (n, i) =>
+                `<option value="${i}"${i === Math.round(b.p2 ?? 0) ? ' selected' : ''}>${n}</option>`,
+            ).join('') +
+            `</select></label>`,
+        )
       }
       if (b.material === MAT_CHAUD) {
         // chaque chaudière règle sa portée d'aura : gros bloc à petite aura…
@@ -4157,6 +4166,14 @@ export class LevelEditor {
             180,
             1,
           ),
+        )
+        rows.push(
+          `<label class="ed-f"><span>Bouts</span><select id="p-kbout">` +
+            ARC_BOUT_NOMS.map(
+              (n, i) =>
+                `<option value="${i}"${i === Math.round(c.p2 ?? 0) ? ' selected' : ''}>${n}</option>`,
+            ).join('') +
+            `</select></label>`,
         )
       }
     } else if (s.kind === 'sponge') {
@@ -4483,6 +4500,7 @@ export class LevelEditor {
       else delete b.forme
       delete b.p0
       delete b.p1
+      delete b.p2
       if (forme === FORME_COIN) {
         const q0 =
           ((Math.round(forme === ancienne ? val('p-fq0') : 0) % 4) + 4) % 4
@@ -4498,6 +4516,8 @@ export class LevelEditor {
         )
         if (ep !== ARC_EPAISSEUR_DEFAUT) b.p0 = ep
         if (ouv !== ARC_OUVERTURE_DEFAUT) b.p1 = ouv
+        const bout = Math.max(0, Math.min(2, Math.round(val('p-fbout'))))
+        if (bout) b.p2 = bout
       }
       // portée d'aura propre (chaudière) : 1 (ou vide) efface la clé
       if (b.material === MAT_CHAUD) {
@@ -4562,6 +4582,7 @@ export class LevelEditor {
         if (q0) c.p0 = q0
         else delete c.p0
         delete c.p1
+        delete c.p2
       } else if (kforme === FORME_ARC) {
         const ep = Math.max(0.08, Math.min(1, val('p-kep') / 100))
         if (ep !== ARC_EPAISSEUR_DEFAUT) c.p0 = ep
@@ -4569,9 +4590,13 @@ export class LevelEditor {
         const ouv = Math.max(15, Math.min(180, val('p-kouv')))
         if (ouv !== ARC_OUVERTURE_DEFAUT) c.p1 = ouv
         else delete c.p1
+        const bout = Math.max(0, Math.min(2, Math.round(val('p-kbout'))))
+        if (bout) c.p2 = bout
+        else delete c.p2
       } else {
         delete c.p0
         delete c.p1
+        delete c.p2
       }
     } else if (s.kind === 'sponge') {
       const sp = this.level.sponges[s.index]

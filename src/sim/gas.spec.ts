@@ -135,12 +135,13 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
     expect(sim.playerCount).toBeGreaterThan(40)
   })
 
-  it('la TRANSFORMATION en vapeur : péage de 20 % en gouttes, et le compteur de dashs se remplit', () => {
+  it('la TRANSFORMATION en vapeur : péage de 20 % en gouttes — le compteur de dashs ne bouge PAS', () => {
     const sim = makeSim()
     sim.setLevel([], [])
     sim.spawnDisc(0, 0, 300, KIND_PLAYER)
     sim.relabel()
-    sim.dashBudgetParTransfo = 3
+    sim.dashBudgetMax = 3
+    sim.dashBudget = 2 // un dash déjà dépensé dans le tableau
     const before = sim.playerCount
     const avant = sim.totalMomentum()
     sim.transfoVapeur()
@@ -156,18 +157,19 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
     }
     expect(libres).toBe(before - sim.playerCount)
     expect(rapides).toBe(libres) // la gerbe part à grande vitesse
-    // le compteur de dashs est rendu, et la quantité de mouvement conservée
-    expect(sim.dashBudget).toBe(3)
+    // le compteur de dashs n'a pas bougé (la réserve est au TABLEAU, pas à
+    // la bascule), et la quantité de mouvement est conservée
+    expect(sim.dashBudget).toBe(2)
     const apres = sim.totalMomentum()
     expect(Math.abs(apres.px - avant.px)).toBeLessThan(5)
     expect(Math.abs(apres.py - avant.py)).toBeLessThan(5)
-    // se RE-transformer repaie le péage et re-rend les dashs — jusqu'au
-    // game over si on en abuse : c'est le jeu
+    // se RE-transformer repaie le péage — et ne rend toujours RIEN : la
+    // chaudière n'est pas une ferme à dashs
     sim.dashBudget = 0
     const encore = sim.playerCount
     sim.transfoVapeur()
     expect(sim.playerCount).toBeLessThan(encore)
-    expect(sim.dashBudget).toBe(3)
+    expect(sim.dashBudget).toBe(0)
   })
 
   it('le SURCHAUFFEUR frôlé en vapeur rend UN dash — une seule fois par appareil', () => {
@@ -190,6 +192,34 @@ describe('FluidSim — la vapeur : se déplacer en gaz (tableau 3)', () => {
     // l'eau, elle, n'interagit pas : le second surchauffeur reste plein
     expect(sim.surchauffesVides.has(0)).toBe(true)
     expect(sim.surchauffesVides.has(1)).toBe(false)
+  })
+
+  it('le surchauffeur ne recharge JAMAIS au-delà de la réserve — et reste chargé en attendant', () => {
+    const sim = makeSim()
+    sim.setLevel(
+      [{ minX: -400, minY: -600, maxX: -340, maxY: 600, material: MAT_SURCHAUFFEUR }],
+      [],
+    )
+    sim.spawnDisc(-320, 0, 60, KIND_PLAYER) // au contact du serpentin
+    gasify(sim)
+    sim.dashBudgetMax = 3
+    sim.dashBudget = 3 // réserve pleine
+    run(sim, 0.15)
+    expect(sim.dashBudget).toBe(3) // rien au-delà du max
+    expect(sim.surchauffesVides.size).toBe(0) // le serpentin ne s'est PAS vidé pour rien
+    // un dash dépensé : la borne peut enfin donner — on recolle le nuage
+    // au serpentin (la dynamique l'a fait dériver pendant la 1re phase)
+    sim.dashBudget = 2
+    for (let i = 0; i < sim.count; i++) {
+      if (sim.kind[i] !== KIND_PLAYER) continue
+      sim.posX[i] = -336
+      sim.posY[i] = (i % 40) * 6 - 120
+      sim.velX[i] = 0
+      sim.velY[i] = 0
+    }
+    run(sim, 0.15)
+    expect(sim.dashBudget).toBe(3)
+    expect(sim.surchauffesVides.size).toBe(1) // déchargé, une seule fois
   })
 
   it('la vapeur traverse l’évent, le liquide s’y écrase', () => {

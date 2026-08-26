@@ -92,7 +92,7 @@ export const CODEX: CodexDef[] = [
     icone: '🔥',
     titre: 'La chaudière vaporise',
     texte:
-      'Baigner presque entier dans l’aura d’une chaudière transforme le corps en vapeur — et remplit le compteur de dashs. La transformation offerte par la salle ne coûte rien.',
+      'Baigner presque entier dans l’aura d’une chaudière transforme le corps en vapeur. Elle transforme, elle ne recharge pas : la réserve de dashs appartient au tableau. La transformation offerte par la salle ne coûte rien.',
     mat: MAT_CHAUD,
     etat: 0,
   },
@@ -304,7 +304,7 @@ export const CODEX: CodexDef[] = [
     icone: '⚡',
     titre: 'La borne rend un dash',
     texte:
-      'Frôlé en vapeur, le surchauffeur recharge UNE impulsion de dash — puis son serpentin ambre s’éteint. Une station-service, une seule fois.',
+      'Frôlé en vapeur, le surchauffeur recharge UNE impulsion de dash — jamais au-delà de la réserve du tableau — puis son serpentin ambre s’éteint. Réserve pleine, il reste chargé et attend. Une station-service, une seule fois.',
     mat: MAT_SURCHAUFFEUR,
     etat: 2,
   },
