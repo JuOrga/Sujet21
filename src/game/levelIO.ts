@@ -37,6 +37,8 @@ import {
   FORME_ARC,
   FORME_COIN,
   FORME_RECT,
+  formeContact,
+  type FormeContact,
 } from './formes'
 import { canalDeCible } from './laser'
 
@@ -679,13 +681,13 @@ export function checkLevel(level: LevelDef): Verdict[] {
       message: 'Le point de départ est hors de la cuve.',
     })
   }
+  // Le DÉGAGEMENT se mesure à la VRAIE silhouette (forme ET rotation) :
+  // la boîte englobante ne bouge pas quand la pièce pivote — un arc tourné
+  // pour éloigner sa bande du départ criait encore à tort.
+  const contact: FormeContact = { dist: 0, nx: 0, ny: 1 }
   for (const box of level.boxes) {
-    const near =
-      level.spawn.x > box.minX - 120 &&
-      level.spawn.x < box.maxX + 120 &&
-      level.spawn.y > box.minY - 120 &&
-      level.spawn.y < box.maxY + 120
-    if (near) {
+    formeContact(level.spawn.x, level.spawn.y, box, contact)
+    if (contact.dist < 120) {
       v.push({
         niveau: 'erreur',
         message:

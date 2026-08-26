@@ -22,6 +22,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 21:06',
+    title: 'Le dégagement du départ suit enfin la rotation des pièces',
+    notes: [
+      'Signalé : un arc posé sur le point de départ, puis pivoté pour éloigner sa matière, laissait l’erreur « le point de départ naît dans une surface ». En cause, le dernier garde-fou aveugle à la rotation : le contrôle du tableau mesurait la BOÎTE ENGLOBANTE de chaque pièce (± 120 u) — et une boîte englobante ne bouge pas quand la pièce pivote.',
+      'Le dégagement se mesure désormais à la VRAIE silhouette, par la distance signée du moteur (formeContact) : forme (rectangle, coin, capsule, disque, arc) ET rotation comprises. Vérifié dans l’éditeur vivant : le même arc posé près du départ crie ou se tait selon son angle — avant, les huit angles donnaient le même verdict. Test gravé au spec (coin pivoté : libéré à 187 u, rattrapé à 80 u). 354 tests verts.',
+    ],
+  },
+  {
     date: '26/08/2026 20:52',
     title: 'La planche à portée de main : depuis l’accueil et depuis l’éditeur',
     notes: [

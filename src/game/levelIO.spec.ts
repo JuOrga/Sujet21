@@ -10,6 +10,7 @@ import {
   serializeLevel,
 } from './levelIO'
 import { TABLEAU_1BIS, TABLEAUX, zoneForceAt, type LevelDef } from './level'
+import { FORME_COIN } from './formes'
 
 describe('levelIO — aller-retour JSON', () => {
   it('un tableau livré se sérialise et se relit à l’identique', () => {
@@ -230,6 +231,27 @@ describe('levelIO — garde-fous du level design', () => {
     expect(
       v.some((x) => x.niveau === 'erreur' && /départ naît/.test(x.message)),
     ).toBe(true)
+  })
+
+  it('le dégagement du départ suit la forme ET la rotation', () => {
+    // Signalé : un arc posé sur le départ, puis pivoté pour éloigner sa
+    // matière, criait encore — le garde-fou mesurait la boîte englobante,
+    // qui ne bouge pas en pivotant. Témoin déterministe : un coin dont la
+    // boîte frôle le départ (80 u) mais dont le triangle est à ~187 u.
+    const l = base()
+    l.boxes.push({
+      minX: -1150,
+      minY: -400,
+      maxX: -750,
+      maxY: -80,
+      material: 1,
+      forme: FORME_COIN,
+      p0: 0,
+    })
+    expect(checkLevel(l).some((x) => /départ naît/.test(x.message))).toBe(false)
+    // la même pièce pivotée de 180° ramène son triangle à 80 u : erreur
+    l.boxes[l.boxes.length - 1].angle = 180
+    expect(checkLevel(l).some((x) => /départ naît/.test(x.message))).toBe(true)
   })
 
   it('signale un sas hors cuve et un sas trop proche du départ', () => {
