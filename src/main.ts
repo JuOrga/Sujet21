@@ -3492,9 +3492,64 @@ function plusProcheVers(
   return mieux
 }
 
+// ---- Le DÉFILEMENT au stick droit : le geste « pavé » du Steam Deck ----
+// Dans n'importe quel écran de menu, le stick droit (ou le pavé configuré
+// en joystick) fait défiler — comme la molette en mode bureau. On défile
+// le conteneur du focus s'il en a un, sinon le plus grand défilable de
+// l'écran (mémorisé tant qu'il reste valable).
+const defilables = new Map<string, HTMLElement>()
+
+function conteneurDefilant(
+  couche: HTMLElement,
+  depuis: HTMLElement | null,
+): HTMLElement | null {
+  const defile = (el: HTMLElement): boolean => {
+    if (el.scrollHeight <= el.clientHeight + 4 && el.scrollWidth <= el.clientWidth + 4)
+      return false
+    const st = getComputedStyle(el)
+    return /(auto|scroll)/.test(st.overflowY + st.overflowX)
+  }
+  let el: HTMLElement | null = depuis
+  while (el && el !== couche.parentElement) {
+    if (defile(el)) return el
+    el = el.parentElement
+  }
+  const connu = defilables.get(couche.id)
+  if (connu && couche.contains(connu) && defile(connu)) return connu
+  if (defile(couche)) {
+    defilables.set(couche.id, couche)
+    return couche
+  }
+  let mieux: HTMLElement | null = null
+  let aire = 0
+  for (const cand of couche.querySelectorAll<HTMLElement>('div, section, aside')) {
+    if (!defile(cand)) continue
+    const r = cand.getBoundingClientRect()
+    if (r.width * r.height > aire) {
+      aire = r.width * r.height
+      mieux = cand
+    }
+  }
+  if (mieux) defilables.set(couche.id, mieux)
+  return mieux
+}
+
+function defileCouche(couche: CoucheMenu, dt: number): void {
+  if (Math.abs(manette.panX) < 0.02 && Math.abs(manette.panY) < 0.02) return
+  const host = document.getElementById(couche.id)
+  if (!host) return
+  const vise = focusParCouche.get(couche.id) ?? null
+  const sc = conteneurDefilant(host, vise && host.contains(vise) ? vise : null)
+  if (!sc) return
+  sc.scrollTop += manette.panY * 1100 * dt
+  sc.scrollLeft += manette.panX * 1100 * dt
+}
+
 /** La navigation d'un écran de menu, une image. */
-function navigueMenu(couche: CoucheMenu): void {
+function navigueMenu(couche: CoucheMenu, dt: number): void {
   const host = document.getElementById(couche.id)!
+  // le stick droit défile — dans tous les écrans, légers compris
+  defileCouche(couche, dt)
   // B : la porte de sortie de l'écran
   if (manette.edge(BOUTON.B) && couche.retour) {
     const porte = document.getElementById(couche.retour)
@@ -6410,9 +6465,13 @@ function frame(now: number): void {
     // une couche LÉGÈRE (légende, états, instruments — ouvertes en pleine
     // partie) : B la referme et se consume, le jeu garde tout le reste
     let bConsomme = false
-    if (couche?.legere && manette.edge(BOUTON.B)) {
-      navigueMenu(couche)
-      bConsomme = true
+    if (couche?.legere) {
+      // le stick droit défile le panneau (la caméra lui cède le geste)
+      defileCouche(couche, dtReal)
+      if (manette.edge(BOUTON.B)) {
+        navigueMenu(couche, dtReal)
+        bConsomme = true
+      }
     }
     if (!onboardEl.hidden) {
       // prise en main à l'écran : A avance les cartes, rien d'autre ne passe
@@ -6422,7 +6481,7 @@ function frame(now: number): void {
       if (manette.edge(BOUTON.A)) avanceEveil()
     } else if (couche && !couche.legere) {
       // un MENU au premier plan : croix/stick naviguent, A active, B revient
-      navigueMenu(couche)
+      navigueMenu(couche, dtReal)
     } else if (manette.edge(BOUTON.A) && clicMenuManette()) {
       // écrans de jeu (relance, fin de tableau) : le clic a consommé le A
     } else if (enJeu) {
@@ -6472,8 +6531,9 @@ function frame(now: number): void {
         camera.zoomBy(Math.pow(2.2, manette.rtVal * dtReal), params)
       if (manette.ltVal > 0.02)
         camera.zoomBy(Math.pow(2.2, -manette.ltVal * dtReal), params)
-      if (manette.panX !== 0 || manette.panY !== 0) {
-        // pousser à droite REGARDE à droite (le pan de drag est inversé)
+      if (!couche && (manette.panX !== 0 || manette.panY !== 0)) {
+        // pousser à droite REGARDE à droite (le pan de drag est inversé) —
+        // sauf panneau ouvert : le stick droit y DÉFILE, la caméra cède
         camera.panBy(-manette.panX * 900 * dtReal, -manette.panY * 900 * dtReal)
       }
       // viser et agir — seulement si la manette a parlé plus récemment que

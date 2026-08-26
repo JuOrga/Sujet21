@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 21:35',
+    title: 'Steam Deck : le stick droit DÉFILE les menus — comme le pavé en mode bureau',
+    notes: [
+      'Demandé : que tous les défilements des menus se pilotent aux pads du Steam Deck, comme en mode bureau. C’est fait : dans N’IMPORTE QUEL écran de menu — codex, salles, livraisons, paramètres, records, planche, commandes, légende, états, panneau d’instruments — le STICK DROIT (ou le pavé tactile configuré en joystick) fait défiler, verticalement et horizontalement, à la vitesse de l’inclinaison.',
+      'Le défilement vise juste : c’est le conteneur du focus qui défile s’il en a un, sinon le plus grand défilable de l’écran (retrouvé et mémorisé tout seul). Et pendant qu’un panneau léger est ouvert en pleine partie (légende, états, instruments), la caméra CÈDE le stick droit au panneau — refermé au B, elle le reprend aussitôt.',
+      'Vérifié manette simulée sur la vraie page : codex ouvert, stick droit poussé, la longue liste défile. La navigation à la croix, A et B de la livraison précédente est inchangée ; l’onglet manette du panneau COMMANDES documente le nouveau geste.',
+    ],
+  },
+  {
     date: '26/08/2026 21:28',
     title: 'Une seule maison pour l’ordre : LA PLANCHE — l’éditeur, lui, change de tableau',
     notes: [
