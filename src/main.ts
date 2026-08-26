@@ -2934,6 +2934,61 @@ async function plancheCode(id: string, brut: string): Promise<void> {
     void ouvrePlanche() // repart de l'état serveur
   }
 }
+// ---- Les MOLETTES du code : chaque chiffre se règle sur place ----------
+// Un cran ▴ au-dessus, la valeur au centre (une liste déroulante : le
+// picker natif sur iPad), un cran ▾ en dessous — sobre, au doigt comme à
+// la souris. L'enregistrement part un instant après le dernier cran.
+const CHOIX_MOMENT = ['1', '2', '3']
+const CHOIX_MECA = ['0', '1', '2', '3']
+const CHOIX_DIFF = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+const CHOIX_LETTRE = Array.from({ length: 26 }, (_, i) =>
+  String.fromCharCode(65 + i),
+)
+function roueHtml(
+  cur: string,
+  choix: string[],
+  titre: string,
+  cap: string,
+): string {
+  const i = choix.indexOf(cur)
+  const opts = choix
+    .map((v) => `<option value="${v}"${v === cur ? ' selected' : ''}>${v}</option>`)
+    .join('')
+  return (
+    `<span class="pr-col">` +
+    `<button type="button" class="pr-cran" data-dir="1" title="${titre} — cran au-dessus"${i >= choix.length - 1 ? ' disabled' : ''}>▴</button>` +
+    `<select class="pr-sel" title="${titre}">${opts}</select>` +
+    `<button type="button" class="pr-cran" data-dir="-1" title="${titre} — cran en dessous"${i <= 0 ? ' disabled' : ''}>▾</button>` +
+    `<small class="pr-cap">${cap}</small>` +
+    `</span>`
+  )
+}
+function chipsHtml(code: string): string {
+  const d = decodeCodeAtelier(code)
+  return d
+    ? `<i>${MOMENT_COURT[d.moment]}</i>` +
+        `<i class="sc-m${d.mecanique}">${MECANIQUE_NOMS[d.mecanique].toUpperCase()}</i>` +
+        `<i>DIFF ${d.difficulte}</i>`
+    : ''
+}
+const plancheTimers = new Map<string, number>()
+/** On peut monter plusieurs crans d'affilée : un seul enregistrement part,
+ * un instant après le dernier geste. */
+function plancheCodePlusTard(id: string, code: string): void {
+  const t = plancheTimers.get(id)
+  if (t !== undefined) window.clearTimeout(t)
+  plancheTimers.set(
+    id,
+    window.setTimeout(() => {
+      plancheTimers.delete(id)
+      if (plancheBusy) {
+        plancheCodePlusTard(id, code) // le serveur est occupé : on repasse
+        return
+      }
+      void plancheCode(id, code)
+    }, 600),
+  )
+}
 function renderPlanche(): void {
   const corps = document.getElementById('planche-corps')
   if (!corps) return
@@ -2947,22 +3002,40 @@ function renderPlanche(): void {
     const d = decodeCodeAtelier(s.level.code)
     const esc = (t: string): string =>
       t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    // le code, molette par molette : « 123 » nu, ou la codification
+    // complète « 21AB-123 » (le « 21 » et le tiret restent gravés)
+    const m21 = /^21\s*([A-Z])([A-Z])\s*-\s*(\d)(\d)(\d)$/i.exec(s.level.code)
+    const m3 = /^(\d)(\d)(\d)$/.exec(s.level.code.trim())
+    const roues = d !== null && (m21 !== null || m3 !== null)
+    const chiffres = m21 ? [m21[3], m21[4], m21[5]] : m3 ? [m3[1], m3[2], m3[3]] : []
+    const rouesHtml = !roues
+      ? ''
+      : `<div class="pl-roues">` +
+        (m21
+          ? `<span class="pr-fixe">21</span>` +
+            roueHtml(m21[1].toUpperCase(), CHOIX_LETTRE, 'ORDRE de la codification (AA, AB, …) — 1ʳᵉ lettre', 'ORDRE') +
+            roueHtml(m21[2].toUpperCase(), CHOIX_LETTRE, 'ORDRE de la codification (AA, AB, …) — 2ᵉ lettre', '') +
+            `<span class="pr-fixe">-</span>`
+          : '') +
+        roueHtml(chiffres[0], CHOIX_MOMENT, 'MOMENT de la run — 1 début · 2 milieu · 3 fin', 'MOMENT') +
+        roueHtml(chiffres[1], CHOIX_MECA, 'MÉCANIQUE requise — 0 aucune · 1 glace · 2 vapeur · 3 toutes', 'MÉCA') +
+        roueHtml(chiffres[2], CHOIX_DIFF, 'DIFFICULTÉ — de 0 à 9, à moment et mécanique égaux', 'DIFF') +
+        `</div>`
     carte.innerHTML =
       `<canvas width="220" height="126"></canvas>` +
       `<span class="pl-rang">${i + 1}</span>` +
       `<button type="button" class="pl-jouer" title="Essayer ce tableau — le bouton « revenir à la planche » vous ramènera ici">⏵</button>` +
+      rouesHtml +
       `<div class="pl-bas">` +
-      `<input class="pl-code" maxlength="16" value="${esc(s.level.code)}" title="Le code nomenclature (« 111 ») — Entrée ou sortir du champ enregistre" />` +
+      (roues
+        ? ''
+        : `<input class="pl-code" maxlength="16" value="${esc(s.level.code)}" title="Le code nomenclature (« 111 ») — Entrée ou sortir du champ enregistre" />`) +
       `<span class="pl-nom" title="${esc(s.level.name)}">${esc(s.level.name)}</span>` +
       `<span class="pl-ord">` +
       `<button type="button" data-tot="-1" title="Jouer plus tôt"${i === 0 ? ' disabled' : ''}>◀</button>` +
       `<button type="button" data-tot="1" title="Jouer plus tard"${i === visibles.length - 1 ? ' disabled' : ''}>▶</button>` +
       `</span></div>` +
-      (d
-        ? `<span class="salle-chips"><i>${MOMENT_COURT[d.moment]}</i>` +
-          `<i class="sc-m${d.mecanique}">${MECANIQUE_NOMS[d.mecanique].toUpperCase()}</i>` +
-          `<i>DIFF ${d.difficulte}</i></span>`
-        : '')
+      (d ? `<span class="salle-chips">${chipsHtml(s.level.code)}</span>` : '')
     dessineMiniCarte(carte.querySelector('canvas') as HTMLCanvasElement, s.level)
     // ◀ ▶ : l'échange avec la voisine
     for (const b of Array.from(
@@ -2976,17 +3049,63 @@ function renderPlanche(): void {
         void plancheOrdonne(next)
       })
     }
-    // le code : Entrée ou la sortie du champ enregistre
-    const codeInp = carte.querySelector('.pl-code') as HTMLInputElement
-    codeInp.addEventListener('change', () => void plancheCode(s.id, codeInp.value))
-    codeInp.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault()
-        codeInp.blur()
+    if (roues) {
+      // les MOLETTES : chaque cran ajuste un caractère, l'ensemble
+      // recompose le code et l'enregistre après le dernier geste
+      const sels = Array.from(
+        carte.querySelectorAll<HTMLSelectElement>('.pr-sel'),
+      )
+      const chips = carte.querySelector('.salle-chips')
+      const lire = (): string =>
+        m21
+          ? `21${sels[0].value}${sels[1].value}-${sels[2].value}${sels[3].value}${sels[4].value}`
+          : sels.map((x) => x.value).join('')
+      const applique = (): void => {
+        for (const col of Array.from(carte.querySelectorAll('.pr-col'))) {
+          const sel = col.querySelector('select') as HTMLSelectElement
+          for (const b of Array.from(
+            col.querySelectorAll<HTMLButtonElement>('.pr-cran'),
+          ))
+            b.disabled =
+              b.dataset.dir === '1'
+                ? sel.selectedIndex >= sel.options.length - 1
+                : sel.selectedIndex <= 0
+        }
+        const code = lire()
+        if (chips) chips.innerHTML = chipsHtml(code) // le sens suit le cran
+        plancheCodePlusTard(s.id, code)
       }
-      e.stopPropagation()
-    })
-    codeInp.addEventListener('pointerdown', (e) => e.stopPropagation())
+      for (const sel of sels) {
+        sel.addEventListener('change', applique)
+        sel.addEventListener('pointerdown', (e) => e.stopPropagation())
+      }
+      for (const b of Array.from(
+        carte.querySelectorAll<HTMLButtonElement>('.pr-cran'),
+      )) {
+        b.addEventListener('click', () => {
+          const sel = b.parentElement?.querySelector('select')
+          if (!sel) return
+          const j = sel.selectedIndex + Number(b.dataset.dir)
+          if (j < 0 || j >= sel.options.length) return
+          sel.selectedIndex = j
+          applique()
+        })
+        b.addEventListener('pointerdown', (e) => e.stopPropagation())
+      }
+    } else {
+      // code hors nomenclature : le champ libre reste — Entrée ou la
+      // sortie du champ enregistre (taper « 123 » fait naître les molettes)
+      const codeInp = carte.querySelector('.pl-code') as HTMLInputElement
+      codeInp.addEventListener('change', () => void plancheCode(s.id, codeInp.value))
+      codeInp.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          codeInp.blur()
+        }
+        e.stopPropagation()
+      })
+      codeInp.addEventListener('pointerdown', (e) => e.stopPropagation())
+    }
     // l'ESSAI : la carte se joue, et on saura revenir ici même
     carte.querySelector('.pl-jouer')?.addEventListener('click', (e) => {
       e.stopPropagation()
@@ -3004,7 +3123,11 @@ function renderPlanche(): void {
     // le glisser-déposer : attraper une carte, la lâcher sur une autre —
     // la carte prend cette place (le geste de l'éditeur, en grand)
     carte.addEventListener('dragstart', (e) => {
-      if ((e.target as HTMLElement).closest('input, .pl-ord, .pl-jouer')) {
+      if (
+        (e.target as HTMLElement).closest(
+          'input, select, .pl-roues, .pl-ord, .pl-jouer',
+        )
+      ) {
         e.preventDefault()
         return
       }
