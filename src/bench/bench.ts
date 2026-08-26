@@ -48,7 +48,7 @@ export interface BenchActions {
   sound: { actif: boolean; volume: number }
   // L'ŒIL DU SUJET (pack présence) : les curseurs vivent ici, à VUE — le
   // banc flotte sur le jeu qui tourne. Hors présets : mémorisé par
-  // appareil (localStorage), 1 partout = le rendu historique.
+  // appareil (localStorage) ; les défauts sont l'étalonnage du concepteur.
   oeil?: {
     regl: Record<string, number>
     defauts: Record<string, number>
@@ -783,7 +783,7 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     }
     describe(
       fOeil.addButton({ title: 'Revenir aux défauts' }),
-      'Remet les sept curseurs à 1 — le rendu et le comportement d’origine, au pixel près.',
+      'Remet les sept curseurs aux valeurs LIVRÉES — l’étalonnage retenu par le concepteur.',
     ).on('click', () => {
       Object.assign(regl, defauts)
       sauve()

@@ -22,6 +22,13 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 15:00',
+    title: 'L’œil du Sujet : l’étalonnage du concepteur devient le défaut livré',
+    notes: [
+      'Les sept curseurs de l’œil (banc → « L’œil du Sujet ») partent désormais des valeurs retenues par le concepteur : noyau plus lumineux (1,6) dans une pénombre discrète (0,3), œil un rien plus petit (0,9) et plus plat (0,85), regard plus vif (1,25) qui erre peu (0,8) — et un Sujet nettement plus occupé (curiosité 1,85). « Revenir aux défauts » ramène à cet étalonnage ; un appareil qui avait déjà ses réglages les garde.',
+    ],
+  },
+  {
     date: '26/08/2026 12:40',
     title:
       'Fiches : le ✎ s’attrape enfin — et un champ Notes pour les remontées',

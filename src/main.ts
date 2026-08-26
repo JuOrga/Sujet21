@@ -3607,17 +3607,20 @@ const presence = {
 }
 ;(window as unknown as { __presence: typeof presence }).__presence = presence
 
-// ---- LES CURSEURS DE L'ŒIL : la présence se règle (PARAMÈTRES) ----
-// Sept curseurs, mémorisés par appareil. Tout à 1 : le rendu et le
-// comportement historiques, au pixel près.
+// ---- LES CURSEURS DE L'ŒIL : la présence se règle (banc → L'œil) ----
+// Sept curseurs, mémorisés par appareil. Les DÉFAUTS ci-dessous sont
+// l'étalonnage du concepteur (26/08) : un noyau plus lumineux dans une
+// pénombre discrète, un œil un rien plus petit et plus plat, un regard
+// plus vif qui erre peu — et un Sujet nettement plus occupé. La valeur
+// 1 sur un curseur reste « le rendu du moteur, non dosé ».
 const OEIL_DEFAUTS = {
-  lueur: 1, // luminosité du noyau (0 : éteint · 2,5 : phare)
-  ombre: 1, // profondeur de la pénombre (0 : aucune silhouette)
-  taille: 1, // échelle de l'œil entier (noyau, ombre, dôme)
-  relief: 1, // hauteur du dôme : courbure du miroir et modelé
-  vivacite: 1, // vitesse de glissement du regard
-  errance: 1, // le regard vagabonde quand rien ne l'appelle
-  curiosite: 1, // fréquence des vignettes d'idle (toilette, tentacule…)
+  lueur: 1.6, // luminosité du noyau (0 : éteint · 2,5 : phare)
+  ombre: 0.3, // profondeur de la pénombre (0 : aucune silhouette)
+  taille: 0.9, // échelle de l'œil entier (noyau, ombre, dôme)
+  relief: 0.85, // hauteur du dôme : courbure du miroir et modelé
+  vivacite: 1.25, // vitesse de glissement du regard
+  errance: 0.8, // le regard vagabonde quand rien ne l'appelle
+  curiosite: 1.85, // fréquence des vignettes d'idle (toilette, tentacule…)
 }
 type OeilRegl = typeof OEIL_DEFAUTS
 const CLE_OEIL = 'sujet21-oeil-v1'
@@ -3631,13 +3634,13 @@ const oeilRegl: OeilRegl = (() => {
         ? Math.max(0, Math.min(3, v))
         : def
     return {
-      lueur: lit(d?.lueur, 1),
-      ombre: lit(d?.ombre, 1),
-      taille: Math.max(0.4, lit(d?.taille, 1)),
-      relief: lit(d?.relief, 1),
-      vivacite: Math.max(0.2, lit(d?.vivacite, 1)),
-      errance: lit(d?.errance, 1),
-      curiosite: Math.max(0.25, lit(d?.curiosite, 1)),
+      lueur: lit(d?.lueur, OEIL_DEFAUTS.lueur),
+      ombre: lit(d?.ombre, OEIL_DEFAUTS.ombre),
+      taille: Math.max(0.4, lit(d?.taille, OEIL_DEFAUTS.taille)),
+      relief: lit(d?.relief, OEIL_DEFAUTS.relief),
+      vivacite: Math.max(0.2, lit(d?.vivacite, OEIL_DEFAUTS.vivacite)),
+      errance: lit(d?.errance, OEIL_DEFAUTS.errance),
+      curiosite: Math.max(0.25, lit(d?.curiosite, OEIL_DEFAUTS.curiosite)),
     }
   } catch {
     return { ...OEIL_DEFAUTS }
