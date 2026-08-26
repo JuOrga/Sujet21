@@ -974,7 +974,7 @@ export class LevelEditor {
         )
         .join('') +
       (sur
-        ? `<div class="ed-bulle-sur">réécrite par ${esc(sur.auteur || '?')} · ${esc(sur.date.slice(0, 10))}</div>`
+        ? `<div class="ed-bulle-sur">réécrite par ${esc(sur.auteur || '?')} · ${esc(sur.date.slice(0, 10))}${sur.notes ? ' · une note attend en relecture' : ''}</div>`
         : '')
     this.bulle.hidden = false
     this.positionneBulle(cx, cy)
@@ -1005,9 +1005,22 @@ export class LevelEditor {
   }
 
   /** Au survol du canevas : repousse l'apparition tant que la souris
-   * bouge ; une bulle déjà ouverte SUIT le curseur sur le même élément,
-   * et se ferme dès qu'il en change. */
+   * bouge. Une bulle OUVERTE reste ancrée tant que le curseur demeure à
+   * son voisinage (le couloir qui mène au ✎) — elle ne se ferme qu'en
+   * s'éloignant vraiment, ou en changeant d'élément loin d'elle. */
   private majBulle(cx: number, cy: number, wx: number, wy: number): void {
+    if (!this.bulle.hidden) {
+      // le COULOIR : à moins de 28 px de la bulle, elle tient bon et ne
+      // bouge plus — une cible mouvante ne se clique pas
+      const r = this.bulle.getBoundingClientRect()
+      if (
+        cx >= r.left - 28 &&
+        cx <= r.right + 28 &&
+        cy >= r.top - 28 &&
+        cy <= r.bottom + 28
+      )
+        return
+    }
     const hit = this.pick(wx, wy)
     const cle = hit
       ? `${hit.kind}:${'index' in hit && hit.index !== undefined ? hit.index : ''}`
@@ -1077,6 +1090,8 @@ export class LevelEditor {
       `<label class="ed-f"><span>Lignes — une par ligne, « CLÉ | texte » (clés : EAU, GLACE, VAPEUR, LASER, ·)</span>` +
       `<textarea id="fm-lignes" rows="8">${esc(actuel.lignes.map((l) => `${l.cle} | ${l.txt}`).join('\n'))}</textarea></label>` +
       `<p class="ed-fiches-note">Les valeurs vives (dimensions, canal, angle, capacité…) s'ajoutent toutes seules sous la fiche : inutile de les écrire ici.</p>` +
+      `<label class="ed-f"><span>Notes — remonter un problème (valeur vive fausse, manque…) : lisibles dans la relecture, jamais en jeu</span>` +
+      `<textarea id="fm-notes" rows="3" placeholder="Ex. : le canal affiché ne suit pas quand on renumérote les pastilles…">${esc(this.surcharges[cleF]?.notes ?? '')}</textarea></label>` +
       `<div class="ed-fiches-actions">` +
       `<button type="button" class="ed-btn" id="fm-annuler">Annuler</button>` +
       (this.surcharges[cleF]
@@ -1113,6 +1128,9 @@ export class LevelEditor {
       const resume = (
         voile.querySelector('#fm-resume') as HTMLInputElement
       ).value.trim()
+      const notes = (
+        voile.querySelector('#fm-notes') as HTMLTextAreaElement
+      ).value.trim()
       const brut = (voile.querySelector('#fm-lignes') as HTMLTextAreaElement)
         .value
       const lignes = brut
@@ -1144,7 +1162,14 @@ export class LevelEditor {
           const r = await fetch('/api/fiches', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cle: cleF, titre, resume, lignes, auteur }),
+            body: JSON.stringify({
+              cle: cleF,
+              titre,
+              resume,
+              lignes,
+              auteur,
+              notes,
+            }),
           })
           if (!r.ok) throw new Error(String(r.status))
           const rep = (await r.json()) as { surcharge?: FicheSurcharge }
@@ -1206,11 +1231,16 @@ export class LevelEditor {
             .map((cleF) => {
               const s = this.surcharges[cleF]
               const base = ficheStatique(cleF)
-              const corps = base
-                ? diffChamp('Titre', base.titre, s.titre) +
-                  diffChamp('Résumé', base.resume, s.resume) +
-                  diffLignes(base, s)
-                : `<p class="ed-fiches-note">Clé inconnue du code — fiche orpheline.</p>`
+              const note = s.notes
+                ? `<div class="ed-diff-champ"><b>Note du concepteur</b><div class="ed-diff-note">${esc(s.notes)}</div></div>`
+                : ''
+              const corps =
+                (base
+                  ? diffChamp('Titre', base.titre, s.titre) +
+                    diffChamp('Résumé', base.resume, s.resume) +
+                    diffLignes(base, s)
+                  : `<p class="ed-fiches-note">Clé inconnue du code — fiche orpheline.</p>`) +
+                note
               return (
                 `<div class="ed-fiches-item">` +
                 `<div class="ed-fiches-item-tete"><b>${esc(s.titre)}</b> <span>· ${esc(cleF)} · par ${esc(s.auteur || '?')} · ${esc(s.date.slice(0, 10))}</span>` +

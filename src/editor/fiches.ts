@@ -40,6 +40,9 @@ export interface FicheSurcharge extends Fiche {
   cle: string
   auteur: string
   date: string
+  // Remontée libre du concepteur : une valeur vive fausse, un manque,
+  // une idée — lisible dans la relecture, jamais dans la bulle du joueur.
+  notes?: string
 }
 
 export type Surcharges = Record<string, FicheSurcharge>
