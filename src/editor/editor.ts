@@ -173,6 +173,9 @@ export interface EditorHooks {
   operator(): string
   /** La bibliothèque a changé : le jeu recharge sa séquence. */
   libraryChanged(levels: StoredLevel[]): void
+  /** Ouvrir LA PLANCHE (l'écran d'ordonnancement en cartes visuelles) —
+   * l'éditeur n'ordonne plus lui-même, il y renvoie. */
+  planche?(): void
   /** Les paramètres VIFS du banc de réglage — pas les défauts figés. Les
    * portées dessinées (aspiration du sas, auras, rails) suivent ainsi la
    * valeur renseignée, en direct. Absent : les défauts font l'affaire. */
@@ -3263,6 +3266,15 @@ export class LevelEditor {
     void this.refreshLibrary()
   }
 
+  /** Adopte une bibliothèque DÉJÀ à jour (la réponse du serveur à un geste
+   * de LA PLANCHE) : re-télécharger tomberait sur le cache du magasin (le
+   * pointeur reste servi 60 s) et faisait revenir l'ANCIEN ordre — signalé
+   * par le concepteur après un réordonnancement resté invisible ici. */
+  adopteBibliotheque(levels: StoredLevel[]): void {
+    this.library = levels
+    this.renderLibrary()
+  }
+
   private async refreshLibrary(): Promise<void> {
     const lib = await fetchLibrary()
     if (lib) {
@@ -3407,46 +3419,43 @@ export class LevelEditor {
       )
       return
     }
-    // Ranger PAR NUMÉRO : c'est lui qui définit l'ordre de jeu — le numéro
-    // en tête du nom (« 12 … »), la lettre départage les ex æquo (« 12a »).
-    // Les entrées sans numéro (hub compris) ne bougent pas de leur place.
-    const numerotes = this.library.filter(
-      (s) => !estCodeHub(s.level.code) && numeroTableau(s.level.name) !== null,
-    ).length
-    const rangeur =
-      numerotes >= 2
-        ? `<button type="button" id="ed-lib-ranger" title="Range la séquence par le NUMÉRO en tête du nom des tableaux (« 12 … », puis « 12a », « 12b »…). Les tableaux sans numéro et le hub gardent leur place.">RANGER LA SÉQUENCE PAR NUMÉRO (${numerotes})</button>`
-        : ''
+    // L'ORDRE se règle dans LA PLANCHE (l'écran de cartes visuelles) : ici,
+    // la liste sert à CHANGER de tableau d'un clic — le rang rappelle la
+    // séquence, sans se laisser modifier (une seule maison pour l'ordre).
+    const planchier = this.hooks.planche
+      ? `<button type="button" id="ed-lib-planche" title="La planche d'ordonnancement : toutes les salles en cartes visuelles — glisser pour réordonner LA séquence (celle de cette liste)">▧ ORDONNER DANS LA PLANCHE</button>`
+      : ''
+    let rang = 0
     host.innerHTML =
       majeur +
       semeur +
-      rangeur +
+      planchier +
       this.library
-        .map((s, i) => {
+        .map((s) => {
           const errs = checkLevel(s.level).filter(
             (v) => v.niveau === 'erreur',
           ).length
+          const hub = estCodeHub(s.level.code)
+          if (!hub) rang++
           return (
-            `<div class="ed-lib-row${s.id === this.openId ? ' open' : ''}" data-id="${s.id}" draggable="true">` +
-            `<input class="ed-lib-no" data-pos="${s.id}" type="number" min="1" max="${this.library.length}" value="${i + 1}" title="Position dans la séquence — tapez la position visée puis Entrée" />` +
+            `<div class="ed-lib-row${s.id === this.openId ? ' open' : ''}" data-id="${s.id}">` +
+            `<span class="ed-lib-rang" title="${hub ? 'Hors séquence' : 'Rang dans la séquence — se règle dans LA PLANCHE'}">${hub ? '·' : rang}</span>` +
             `<button type="button" class="ed-lib-open" data-id="${s.id}" title="${
               s.level.code === CODE_HUB
                 ? 'Le LABORATOIRE : ce tableau remplace le hub et ne compte pas dans la séquence'
-                : estCodeHub(s.level.code)
+                : hub
                   ? 'Un chantier de hub : hors séquence — publiez-le sous le code HUB pour qu’il devienne le laboratoire joué'
-                  : 'Ouvrir ce tableau (glisser la ligne pour la déplacer)'
+                  : 'Ouvrir ce tableau'
             }">` +
             `<b>${s.level.code}</b> ${s.level.name}` +
             (s.level.code === CODE_HUB
               ? `<em class="ed-lib-hub">LABORATOIRE</em>`
-              : estCodeHub(s.level.code)
+              : hub
                 ? `<em class="ed-lib-hub">HORS SÉQUENCE</em>`
                 : '') +
             `<small>${s.auteur ? s.auteur + ' · ' : ''}par ${s.level.par ?? '?'}${errs ? ' · ' + errs + ' erreur(s)' : ''}</small>` +
             `</button>` +
             `<span class="ed-lib-ord">` +
-            `<button type="button" data-up="${s.id}" title="Jouer plus tôt"${i === 0 ? ' disabled' : ''}>↑</button>` +
-            `<button type="button" data-down="${s.id}" title="Jouer plus tard"${i === this.library.length - 1 ? ' disabled' : ''}>↓</button>` +
             `<button type="button" data-del="${s.id}" title="Supprimer de la bibliothèque">✕</button>` +
             `</span></div>`
           )
@@ -3461,23 +3470,12 @@ export class LevelEditor {
       'click',
       () => void this.majLivres(),
     )
-    this.el('ed-lib-ranger')?.addEventListener(
-      'click',
-      () => void this.rangerParCode(),
+    this.el('ed-lib-planche')?.addEventListener('click', () =>
+      this.hooks.planche?.(),
     )
     for (const b of Array.from(host.querySelectorAll('.ed-lib-open'))) {
       b.addEventListener('click', () =>
         this.openFromLibrary((b as HTMLElement).dataset.id ?? ''),
-      )
-    }
-    for (const b of Array.from(host.querySelectorAll('[data-up]'))) {
-      b.addEventListener('click', () =>
-        this.move((b as HTMLElement).dataset.up ?? '', -1),
-      )
-    }
-    for (const b of Array.from(host.querySelectorAll('[data-down]'))) {
-      b.addEventListener('click', () =>
-        this.move((b as HTMLElement).dataset.down ?? '', 1),
       )
     }
     for (const b of Array.from(host.querySelectorAll('[data-del]'))) {
@@ -3485,111 +3483,6 @@ export class LevelEditor {
         'click',
         () => void this.removeFromLibrary((b as HTMLElement).dataset.del ?? ''),
       )
-    }
-    // Le saut direct : taper la position visée dans le numéro, Entrée (ou
-    // sortir du champ) — la ligne y va d'un coup, sans échelle de ↑.
-    for (const inp of Array.from(
-      host.querySelectorAll<HTMLInputElement>('input[data-pos]'),
-    )) {
-      const applique = (): void => {
-        const id = inp.dataset.pos ?? ''
-        const i = this.library.findIndex((l) => l.id === id)
-        const cible = Math.round(Number(inp.value)) - 1
-        if (i < 0 || !Number.isFinite(cible) || cible === i) {
-          inp.value = String(i + 1)
-          return
-        }
-        void this.moveTo(id, cible)
-      }
-      inp.addEventListener('change', applique)
-      inp.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault()
-          applique()
-        }
-        e.stopPropagation() // les chiffres ne déclenchent pas les raccourcis
-      })
-      inp.addEventListener('click', (e) => e.stopPropagation())
-    }
-    // Le glisser-déposer : attraper une ligne, la lâcher sur une autre — la
-    // ligne prend cette place. Les grands déplacements en UN geste.
-    for (const row of Array.from(
-      host.querySelectorAll<HTMLElement>('.ed-lib-row'),
-    )) {
-      row.addEventListener('dragstart', (e) => {
-        const cible = e.target as HTMLElement
-        // un champ ou un bouton n'entame pas un glissement
-        if (cible.closest('input, .ed-lib-ord')) {
-          e.preventDefault()
-          return
-        }
-        e.dataTransfer?.setData('text/plain', row.dataset.id ?? '')
-        if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
-        row.classList.add('dragging')
-      })
-      row.addEventListener('dragend', () => {
-        row.classList.remove('dragging')
-        for (const r of Array.from(host.querySelectorAll('.drag-over')))
-          r.classList.remove('drag-over')
-      })
-      row.addEventListener('dragover', (e) => {
-        e.preventDefault()
-        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
-        row.classList.add('drag-over')
-      })
-      row.addEventListener('dragleave', () => row.classList.remove('drag-over'))
-      row.addEventListener('drop', (e) => {
-        e.preventDefault()
-        row.classList.remove('drag-over')
-        const id = e.dataTransfer?.getData('text/plain') ?? ''
-        const j = this.library.findIndex((l) => l.id === row.dataset.id)
-        if (id && j >= 0) void this.moveTo(id, j)
-      })
-    }
-  }
-
-  /** Range la séquence PAR LE NUMÉRO du tableau (en tête du nom : « 12 »,
-   * puis « 12a », « 12b »…). Seules les entrées numérotées bougent — elles
-   * se redistribuent dans leurs propres emplacements, si bien que le hub et
-   * les tableaux sans numéro gardent exactement leur place. */
-  private async rangerParCode(): Promise<void> {
-    if (this.busy) return
-    const slots: number[] = []
-    const entrees: StoredLevel[] = []
-    this.library.forEach((s, i) => {
-      if (!estCodeHub(s.level.code) && numeroTableau(s.level.name)) {
-        slots.push(i)
-        entrees.push(s)
-      }
-    })
-    if (entrees.length < 2) return
-    const triees = [...entrees].sort((a, b) => {
-      const na = numeroTableau(a.level.name)!
-      const nb = numeroTableau(b.level.name)!
-      // « 12 » passe avant « 12a » : la lettre vide se range en tête
-      return na.numero - nb.numero || na.lettre.localeCompare(nb.lettre)
-    })
-    const next = [...this.library]
-    slots.forEach((slot, k) => {
-      next[slot] = triees[k]
-    })
-    if (next.every((s, i) => s === this.library[i])) {
-      this.commit('La séquence est déjà rangée par numéro.')
-      return
-    }
-    this.library = next
-    this.renderLibrary()
-    const saved = await reorderLibrary(next.map((l) => l.id))
-    if (saved) {
-      this.library = saved
-      this.hooks.libraryChanged(saved)
-      this.renderLibrary()
-      this.commit(
-        `Séquence rangée par numéro (${entrees.length} tableaux) — la lettre départage les ex æquo.`,
-      )
-    } else {
-      this.commit('Rangement refusé : bibliothèque injoignable.')
-      void this.refreshLibrary()
     }
   }
 
@@ -3716,37 +3609,6 @@ export class LevelEditor {
         `Cliquez le tableau dans la séquence pour charger la dernière version (le brouillon sera remplacé), ` +
         `ou ENREGISTRER pour publier la vôtre.`,
     )
-  }
-
-  private move(id: string, delta: number): Promise<void> {
-    const i = this.library.findIndex((l) => l.id === id)
-    return this.moveTo(id, i + delta)
-  }
-
-  /** Déplace une entrée À une position (0-based) : le geste commun du ↑↓,
-   *  du numéro tapé et du glisser-déposer. */
-  private async moveTo(id: string, cible: number): Promise<void> {
-    const i = this.library.findIndex((l) => l.id === id)
-    const j = Math.max(0, Math.min(this.library.length - 1, cible))
-    if (i < 0 || j === i) {
-      this.renderLibrary()
-      return
-    }
-    const next = [...this.library]
-    const [e] = next.splice(i, 1)
-    next.splice(j, 0, e)
-    this.library = next
-    this.renderLibrary()
-    const saved = await reorderLibrary(next.map((l) => l.id))
-    if (saved) {
-      this.library = saved
-      this.hooks.libraryChanged(saved)
-      this.renderLibrary()
-      this.commit('Séquence mise à jour.')
-    } else {
-      this.commit('Réordonnancement refusé : bibliothèque injoignable.')
-      void this.refreshLibrary()
-    }
   }
 
   private async removeFromLibrary(id: string): Promise<void> {

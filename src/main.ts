@@ -2817,6 +2817,8 @@ const editor = new LevelEditor(el('editor'), {
     updateLibraryButton()
     renderSalles()
   },
+  // l'éditeur n'ordonne plus lui-même : son bouton renvoie à LA PLANCHE
+  planche: () => void ouvrePlanche(),
 })
 
 // ---- LA PLANCHE : l'ordonnancement de l'expédition, en cartes visuelles --
@@ -2848,14 +2850,16 @@ function plancheDit(msg: string): void {
   const e = document.getElementById('planche-etat')
   if (e) e.textContent = msg
 }
-/** Répercute une réponse serveur partout : planche, fiche, salles, éditeur. */
+/** Répercute une réponse serveur partout : planche, fiche, salles, éditeur.
+ * L'éditeur ADOPTE la réponse telle quelle : re-télécharger tomberait sur le
+ * cache du magasin (pointeur servi 60 s) et faisait revenir l'ancien ordre. */
 function plancheSync(saved: StoredLevel[]): void {
   plancheTous = saved
   libraryLevels = saved.map((s) => s.level)
   renderRegistres()
   updateLibraryButton()
   renderSalles()
-  editor.rechargeBibliotheque()
+  editor.adopteBibliotheque(saved)
   renderPlanche()
 }
 async function ouvrePlanche(): Promise<void> {

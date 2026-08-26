@@ -4159,37 +4159,29 @@
         border-color: var(--specimen);
         background: rgba(99, 183, 230, 0.1);
       }
-      .ed-lib-no {
+      /* le RANG : lecture seule — l'ordre se règle dans LA PLANCHE */
+      .ed-lib-rang {
         width: 30px;
         flex: none;
-        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         font-size: 10px;
         color: var(--dim);
         background: rgba(99, 183, 230, 0.06);
         border: 1px solid rgba(99, 183, 230, 0.18);
         border-radius: 3px;
-        -moz-appearance: textfield;
-        appearance: textfield;
       }
-      .ed-lib-no::-webkit-outer-spin-button,
-      .ed-lib-no::-webkit-inner-spin-button {
-        -webkit-appearance: none;
-        margin: 0;
+      .ed-details summary {
+        cursor: pointer;
+        list-style: none;
       }
-      .ed-lib-no:focus {
-        color: var(--specimen);
-        border-color: var(--specimen);
-        outline: none;
-      }
-      .ed-lib-row.dragging {
-        opacity: 0.35;
-      }
-      .ed-lib-row.drag-over {
-        border-color: var(--vert, #3fd69b);
-        background: rgba(63, 214, 155, 0.08);
+      .ed-details summary::-webkit-details-marker {
+        display: none;
       }
       #ed-lib-semer,
-      #ed-lib-maj {
+      #ed-lib-maj,
+      #ed-lib-planche {
         width: 100%;
         margin-bottom: 2px;
       }
@@ -4948,14 +4940,16 @@
 
       <aside class="ed-side ed-side--right">
         <div class="ed-group">
-          <span class="k">Tableaux livrés — ouvrir une copie pour l’étudier ou en repartir</span>
-          <div class="ed-f" style="flex-direction: row; gap: 6px">
-            <select id="ed-livres" style="flex: 1"></select>
-            <button type="button" id="ed-livre-charger">Charger</button>
-          </div>
+          <details class="ed-details">
+            <summary class="k" title="Les tableaux GRAVÉS dans le jeu (hub, école, expédition) — rien à voir avec votre bibliothèque partagée ci-dessous. Charger ouvre une COPIE, à étudier ou à republier sous votre nom.">Modèles gravés dans le jeu — ouvrir une copie ▾</summary>
+            <div class="ed-f" style="flex-direction: row; gap: 6px; margin-top: 6px">
+              <select id="ed-livres" style="flex: 1"></select>
+              <button type="button" id="ed-livre-charger">Charger</button>
+            </div>
+          </details>
         </div>
         <div class="ed-group">
-          <span class="k">Bibliothèque du protocole — l’ordre est la séquence</span>
+          <span class="k">Bibliothèque — cliquer pour changer de tableau (l’ordre se règle dans LA PLANCHE)</span>
           <div id="ed-lib"></div>
         </div>
         <div class="ed-group">

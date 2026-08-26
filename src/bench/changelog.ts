@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 21:28',
+    title: 'Une seule maison pour l’ordre : LA PLANCHE — l’éditeur, lui, change de tableau',
+    notes: [
+      'Signalé : un réordonnancement fait dans LA PLANCHE restait invisible dans l’éditeur. Trouvé : après le geste, l’éditeur RE-TÉLÉCHARGEAIT la bibliothèque — et tombait sur le cache du magasin (le pointeur est servi 60 s) : l’ANCIEN ordre revenait. Il adopte désormais directement la réponse du serveur au geste, sans re-télécharger : l’ordre suit, immédiatement.',
+      'Et le panneau de droite fait peau neuve, comme demandé : l’éditeur N’ORDONNE PLUS (finis les numéros à taper, les ↑↓ et le glisser de lignes — sources de confusion et de conflits) ; la liste devient un simple SÉLECTEUR de tableau : le rang de séquence se lit, cliquer OUVRE. Un bouton « ▧ ORDONNER DANS LA PLANCHE » ouvre l’écran d’ordonnancement par-dessus l’éditeur — une seule maison pour l’ordre.',
+      'La liste déroulante du dessus, enfin expliquée : ce sont les tableaux GRAVÉS dans le jeu (hub, école, expédition livrée) — rien à voir avec la bibliothèque partagée, d’où son contenu différent. Elle sert à en ouvrir une COPIE à étudier ou à republier. Elle vit maintenant repliée sous « Modèles gravés dans le jeu », hors du chemin. Vérifié en navigateur, cache périmé simulé compris. 354 tests verts.',
+    ],
+  },
+  {
     date: '26/08/2026 21:06',
     title: 'Le dégagement du départ suit enfin la rotation des pièces',
     notes: [
