@@ -22,8 +22,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 21:00',
+    title: 'Caméra automatique : le dézoom conscient du niveau',
+    notes: [
+      'Retour du concepteur : la caméra automatique zoomait beaucoup trop par rapport aux niveaux. Deux causes : le corps était cadré à 28 % du petit côté de l’écran quelle que soit la salle, et comme le corps RÉTRÉCIT au fil de la run, la caméra plongeait avec lui — en fin de tableau on ne voyait plus que ~500 unités d’une salle de 1500.',
+      'Deux corrections. Le cadrage de base passe de 28 % à 24 % : plus d’air autour du corps dès l’ouverture. Et surtout un PLAFOND DE ZOOM conscient du niveau : quelle que soit la taille du corps, la vue montre toujours au moins 62 % de la petite dimension de la salle (borné à 900 unités pour les salles géantes comme le hub, où le corps deviendrait une tête d’épingle). La fin de run ne s’enferme plus dans un tunnel.',
+      'Le zoom MANUEL (molette, pincement) garde toute sa liberté — le plafond ne bride que l’automatique. Mesuré en salle réelle : 1094 unités visibles en hauteur pour une salle de 1500 (contre ~940 avant, et ~515 en fin de run) — capture à l’appui.',
+    ],
+  },
+  {
     date: '26/08/2026 22:50',
-    title: 'La fiche fait le ménage : le second parcours et le hub compact s’effacent',
+    title:
+      'La fiche fait le ménage : le second parcours et le hub compact s’effacent',
     notes: [
       'Demandé : retirer de la fiche le « deuxième parcours » et le « hub compact ». C’est fait — les boutons RUN SECONDAIRE, REPRENDRE et l’essai HUB COMPACT quittent l’écran d’accueil, et toute la mécanique du second parcours part avec eux : plus de sauvegarde de run à reprendre, plus de bandeau « 2ᵉ RUN » au tableau de bord, la fin de partie rend simplement au laboratoire. ABANDONNER reste — c’est un autre geste, indépendant — et le tableau du hub compact demeure dans le code pour l’atelier.',
       'Vérifié sur la vraie page en navigateur : la fiche s’affiche sans les trois boutons, ABANDONNER et LANCER présents, et LANCER démarre bien la partie — zéro erreur de page. 354 tests verts, build propre.',
@@ -31,7 +41,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '26/08/2026 22:48',
-    title: 'L’éditeur défile au STICK GAUCHE — la mécanique de la planche, partout',
+    title:
+      'L’éditeur défile au STICK GAUCHE — la mécanique de la planche, partout',
     notes: [
       'Demandé : la mécanique de défilement au stick (celle de LA PLANCHE) dans l’éditeur, sur TOUS ses défilables — panneau gauche, panneau droit, liste des tableaux — au stick GAUCHE (le trackpad gauche du Deck configuré en joystick parle sur les mêmes axes). C’est fait, même vitesse que les menus.',
       'Le défilement vise le défilable SOUS LE CURSEUR : pointez la liste des tableaux, le stick la défile ; pointez le panneau gauche, c’est lui qui bouge — à défaut, le panneau de droite. Au passage, une anomalie corrigée : la fiche restée SOUS l’éditeur gardait la main manette (son B, ses boutons) — l’éditeur la prend désormais, et une couche posée SUR lui (la planche, le montage) la garde. Vérifié manette simulée : liste défilée bas et haut au stick, panneau gauche visé au curseur défilé seul, liste intacte. 354 tests verts.',
@@ -39,7 +50,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '26/08/2026 22:27',
-    title: 'Les panneaux de l’éditeur se TIRENT au doigt — et les ascenseurs passent à la charte',
+    title:
+      'Les panneaux de l’éditeur se TIRENT au doigt — et les ascenseurs passent à la charte',
     notes: [
       'Signalé : sur Steam Deck, défiler les panneaux de l’éditeur au trackpad obligeait à attraper l’ascenseur — et dans le mauvais sens. Désormais les panneaux se TIRENT : presser n’importe où (trackpad gauche en souris, doigt, souris) et glisser — le contenu SUIT le geste, convention tactile : glisser vers le haut fait monter la suite de la liste. Un clic sec reste un clic ; passé 6 pixels de glissement, le geste devient défilement et ne déclenche aucun bouton au passage. La liste des tableaux (son propre ascenseur, imbriqué) est visée juste : c’est la zone sous le doigt qui défile.',
       'Et les barres de défilement système (l’ascenseur Windows) disparaissent PARTOUT : fines, sombres, liseré bleuté au survol — la charte du poste, dans tous les écrans qui défilent (éditeur, planche, salles, codex, notes de version…). Vérifié en 1280×800 : tirer vers le haut monte (0→120), vers le bas redescend (120→40), le clic d’après-glissement est avalé, le clic sec ouvre toujours son tableau. 354 tests verts.',

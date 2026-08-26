@@ -25,6 +25,11 @@ export class Camera {
   private introY = 0
   private introZoom = 1
 
+  // La petite dimension de la SALLE courante (posée par startIntro) : le
+  // zoom automatique s'en sert pour ne jamais cadrer trop serré — la vue
+  // montre toujours une part du niveau, pas seulement le corps.
+  private nivMin = 0
+
   startIntro(
     bounds: { minX: number; minY: number; maxX: number; maxY: number },
     viewportW: number,
@@ -32,11 +37,14 @@ export class Camera {
     hold = 0.9,
     dive = 1.7,
   ): void {
+    this.nivMin = Math.min(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY)
     this.introX = (bounds.minX + bounds.maxX) * 0.5
     this.introY = (bounds.minY + bounds.maxY) * 0.5
     this.introZoom =
-      Math.min(viewportW / (bounds.maxX - bounds.minX), viewportH / (bounds.maxY - bounds.minY)) *
-      0.92
+      Math.min(
+        viewportW / (bounds.maxX - bounds.minX),
+        viewportH / (bounds.maxY - bounds.minY),
+      ) * 0.92
     this.introHold = hold
     this.introTotal = hold + dive
     this.introTimer = this.introTotal
@@ -146,19 +154,41 @@ export class Camera {
     const kR = 1 - Math.exp(-3 * dtReal)
     this.radiusSmoothed += (bodyRmsRadius - this.radiusSmoothed) * kR
     const apparentDiameter = Math.max(this.radiusSmoothed * 1.8 * 2, 24)
-    let targetZoom = (p.cameraFraction * Math.min(viewportW, viewportH)) / apparentDiameter
-    targetZoom = Math.min(p.cameraMaxZoom, Math.max(p.cameraMinZoom, targetZoom))
+    let targetZoom =
+      (p.cameraFraction * Math.min(viewportW, viewportH)) / apparentDiameter
+    targetZoom = Math.min(
+      p.cameraMaxZoom,
+      Math.max(p.cameraMinZoom, targetZoom),
+    )
+    // Le PLAFOND DU NIVEAU : quel que soit le rayon du corps (il rétrécit
+    // au fil de la run et la caméra plongeait avec lui), la vue montre au
+    // moins VUE_MIN unités monde sur son petit côté — 62 % de la petite
+    // dimension de la salle, borné à 900 u pour les salles géantes (hub) :
+    // le corps y resterait sinon une tête d'épingle.
+    if (this.nivMin > 0) {
+      const vueMin = Math.min(900, this.nivMin * 0.62)
+      targetZoom = Math.min(targetZoom, Math.min(viewportW, viewportH) / vueMin)
+    }
     if (this.manualZoom !== null) targetZoom = this.manualZoom
 
     // Zoom d'ouverture : plan large tenu, puis plongée adoucie vers le corps
     if (this.introTimer > 0) {
       this.introTimer -= dtReal
       const elapsed = this.introTotal - this.introTimer
-      const t = Math.min(1, Math.max(0, (elapsed - this.introHold) / (this.introTotal - this.introHold)))
+      const t = Math.min(
+        1,
+        Math.max(
+          0,
+          (elapsed - this.introHold) / (this.introTotal - this.introHold),
+        ),
+      )
       const e = t * t * (3 - 2 * t)
       this.x = this.introX + (targetX - this.introX) * e
       this.y = this.introY + (targetY - this.introY) * e
-      this.zoom = Math.exp(Math.log(this.introZoom) + (Math.log(targetZoom) - Math.log(this.introZoom)) * e)
+      this.zoom = Math.exp(
+        Math.log(this.introZoom) +
+          (Math.log(targetZoom) - Math.log(this.introZoom)) * e,
+      )
       return
     }
 
@@ -178,10 +208,17 @@ export class Camera {
         this.glideVy = 0
       }
     }
-    this.zoom = Math.exp(Math.log(this.zoom) + (Math.log(targetZoom) - Math.log(this.zoom)) * k)
+    this.zoom = Math.exp(
+      Math.log(this.zoom) + (Math.log(targetZoom) - Math.log(this.zoom)) * k,
+    )
   }
 
-  screenToWorld(clientX: number, clientY: number, viewportW: number, viewportH: number): { x: number; y: number } {
+  screenToWorld(
+    clientX: number,
+    clientY: number,
+    viewportW: number,
+    viewportH: number,
+  ): { x: number; y: number } {
     return {
       x: this.x + (clientX - viewportW * 0.5) / this.zoom,
       y: this.y - (clientY - viewportH * 0.5) / this.zoom,

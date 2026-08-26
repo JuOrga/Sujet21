@@ -339,7 +339,7 @@ export const DEFAULT_PARAMS: SimParams = {
   componentEvery: 5,
   linkRadiusFactor: 1.1,
 
-  cameraFraction: 0.28,
+  cameraFraction: 0.24,
   cameraSmoothing: 2.5,
   cameraMinZoom: 0.12,
   cameraMaxZoom: 3,
