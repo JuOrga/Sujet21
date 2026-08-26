@@ -1,0 +1,296 @@
+[
+ {
+  "level": {
+   "name": "le tournesol",
+   "code": "AH-2",
+   "journal": "Relevé du champ, cuve Est. La figure est apparue en une nuit : trois cercles brisés dont les portes tournent, comme des feuilles autour d’une tige. Le Sujet en suit la spirale sans qu’on la lui enseigne.",
+   "bounds": {
+    "minX": -3000,
+    "minY": -2500,
+    "maxX": 3000,
+    "maxY": 2500
+   },
+   "spawn": {
+    "x": 0,
+    "y": 0,
+    "n": 900
+   },
+   "exit": {
+    "minX": 2520,
+    "minY": 240,
+    "maxX": 2720,
+    "maxY": 445
+   },
+   "boxes": [
+    {
+     "minX": 150,
+     "minY": -500,
+     "maxX": 650,
+     "maxY": 500,
+     "angle": 0,
+     "forme": 4,
+     "p0": 0.1,
+     "material": 0
+    },
+    {
+     "minX": -650,
+     "minY": -500,
+     "maxX": -150,
+     "maxY": 500,
+     "angle": -180,
+     "forme": 4,
+     "p0": 0.1,
+     "material": 0
+    },
+    {
+     "minX": -91,
+     "minY": -533,
+     "maxX": 959,
+     "maxY": 1567,
+     "angle": 50,
+     "forme": 4,
+     "p0": 0.1,
+     "material": 0
+    },
+    {
+     "minX": -959,
+     "minY": -1567,
+     "maxX": 91,
+     "maxY": 533,
+     "angle": -130,
+     "forme": 4,
+     "p0": 0.1,
+     "material": 0
+    },
+    {
+     "minX": -1024,
+     "minY": -715,
+     "maxX": 676,
+     "maxY": 2685,
+     "angle": 100,
+     "forme": 4,
+     "p0": 0.1,
+     "material": 0
+    },
+    {
+     "minX": -676,
+     "minY": -2685,
+     "maxX": 1024,
+     "maxY": 715,
+     "angle": -80,
+     "forme": 4,
+     "p0": 0.1,
+     "material": 0
+    },
+    {
+     "minX": -185,
+     "minY": 420,
+     "maxX": 185,
+     "maxY": 520,
+     "angle": 0,
+     "material": 7
+    },
+    {
+     "minX": -185,
+     "minY": -520,
+     "maxX": 185,
+     "maxY": -420,
+     "angle": 180,
+     "material": 8
+    },
+    {
+     "minX": -941,
+     "minY": 584,
+     "maxX": -571,
+     "maxY": 684,
+     "angle": 50,
+     "material": 5
+    },
+    {
+     "minX": 571,
+     "minY": -684,
+     "maxX": 941,
+     "maxY": -584,
+     "angle": -130,
+     "material": 7
+    },
+    {
+     "minX": -1759,
+     "minY": -327,
+     "maxX": -1389,
+     "maxY": -227,
+     "angle": 100,
+     "material": 7
+    },
+    {
+     "minX": 1389,
+     "minY": 227,
+     "maxX": 1759,
+     "maxY": 327,
+     "angle": -80,
+     "material": 7
+    }
+   ],
+   "sponges": [],
+   "labels": [
+    {
+     "x": 2620,
+     "y": 520,
+     "text": "SAS",
+     "tone": "sas"
+    }
+   ],
+   "par": 3
+  }
+ },
+ {
+  "level": {
+   "name": "le cortège des lunes",
+   "code": "AH-3",
+   "journal": "Relevé du champ, cuve Ouest. Trois lunes en cortège, percées d’une seule avenue ; deux lunes pleines veillent au large. Le Sujet change trois fois de nature pour suivre la procession — le sas attend au cœur de la plus grande.",
+   "bounds": {
+    "minX": -3000,
+    "minY": -2500,
+    "maxX": 3000,
+    "maxY": 2500
+   },
+   "spawn": {
+    "x": -2250,
+    "y": 0,
+    "n": 900
+   },
+   "exit": {
+    "minX": 1700,
+    "minY": -102,
+    "maxX": 1900,
+    "maxY": 102
+   },
+   "boxes": [
+    {
+     "minX": -2750,
+     "minY": -500,
+     "maxX": -1772,
+     "maxY": 500,
+     "angle": -180,
+     "forme": 4,
+     "p0": 0.1,
+     "p1": 163,
+     "material": 0
+    },
+    {
+     "minX": -975,
+     "minY": -275,
+     "maxX": -125,
+     "maxY": 1425,
+     "angle": 90,
+     "forme": 4,
+     "p0": 0.1,
+     "material": 0
+    },
+    {
+     "minX": -975,
+     "minY": -1425,
+     "maxX": -125,
+     "maxY": 275,
+     "angle": -90,
+     "forme": 4,
+     "p0": 0.1,
+     "material": 0
+    },
+    {
+     "minX": 659,
+     "minY": -1150,
+     "maxX": 2950,
+     "maxY": 1150,
+     "angle": 0,
+     "forme": 4,
+     "p0": 0.1,
+     "p1": 173,
+     "material": 0
+    },
+    {
+     "minX": -1965,
+     "minY": -50,
+     "maxX": -1595,
+     "maxY": 50,
+     "angle": -90,
+     "material": 7
+    },
+    {
+     "minX": -1534,
+     "minY": -50,
+     "maxX": -1164,
+     "maxY": 50,
+     "angle": 90,
+     "material": 8
+    },
+    {
+     "minX": 64,
+     "minY": -50,
+     "maxX": 434,
+     "maxY": 50,
+     "angle": -90,
+     "material": 5
+    },
+    {
+     "minX": 534,
+     "minY": -50,
+     "maxX": 904,
+     "maxY": 50,
+     "angle": 90,
+     "material": 7
+    },
+    {
+     "minX": -300,
+     "minY": 1510,
+     "maxX": -60,
+     "maxY": 1990,
+     "angle": 0,
+     "forme": 4,
+     "p0": 0.1,
+     "material": 0
+    },
+    {
+     "minX": -540,
+     "minY": 1510,
+     "maxX": -300,
+     "maxY": 1990,
+     "angle": -180,
+     "forme": 4,
+     "p0": 0.1,
+     "material": 0
+    },
+    {
+     "minX": 300,
+     "minY": -1990,
+     "maxX": 540,
+     "maxY": -1510,
+     "angle": 0,
+     "forme": 4,
+     "p0": 0.1,
+     "material": 0
+    },
+    {
+     "minX": 60,
+     "minY": -1990,
+     "maxX": 300,
+     "maxY": -1510,
+     "angle": -180,
+     "forme": 4,
+     "p0": 0.1,
+     "material": 0
+    }
+   ],
+   "sponges": [],
+   "labels": [
+    {
+     "x": 1800,
+     "y": 180,
+     "text": "SAS",
+     "tone": "sas"
+    }
+   ],
+   "par": 3
+  }
+ }
+]

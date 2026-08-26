@@ -22,8 +22,19 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 00:05',
+    title:
+      'Deux tableaux inspirés du CROP CIRCLE : le tournesol et le cortège des lunes',
+    notes: [
+      'Le concepteur a montré « crop circle », le tableau de son ami — magnifique, juste avec l’éclairage de base. Il a été étudié à la lettre : trois cercles brisés concentriques autour du DÉPART, faits de paires de demi-anneaux fins partageant le même centre mais glissés le long de leur axe — les moitiés ne se referment pas, et chaque couture est gardée par une plaque-filtre (membrane, rideau, évent) posée tangente. Aucune lampe, aucun mécanisme : la figure, le champ immense, et la lumière de base qui couche de grandes ombres radiales.',
+      'Deux tableaux nouveaux reprennent cette grammaire exacte, chacun avec sa figure. LE TOURNESOL (AH-2) : trois cercles brisés dont les coutures TOURNENT (0°, 50°, 100°) — la promenade est une spirale qui part du cœur, passe l’eau, la glace et la vapeur, et file vers un sas posé loin dans le champ. LE CORTÈGE DES LUNES (AH-3) : trois lunes en chaîne vers l’est, percées d’une seule avenue — membrane, rideau, évent, membrane — et le sas attend au CŒUR de la plus grande ; deux lunes pleines veillent au large, pour la beauté du champ. Les lunes du bout sont des anneaux presque pleins à ouverture unique : pas de porte dérobée, la procession ne se contourne pas.',
+      'Vérifié dans le jeu construit : les deux figures se lisent d’un seul regard au plan large, les portes d’état se présentent dans l’ordre voulu, 900 particules au départ, captures à l’appui. Les tableaux sont semés dans la bibliothèque partagée (ops/inspires-crop.json + workflow seed-inspires, gâchette seed-inspires-go, resemable sans danger) : ils s’ajoutent au bout, sans toucher l’ordre de jeu ni les tableaux existants — modifiables dans l’éditeur comme les autres.',
+    ],
+  },
+  {
     date: '27/08/2026 01:32',
-    title: 'Dashs : la bascule DÉCIDÉE refait le plein, la bascule SUBIE ne rend rien',
+    title:
+      'Dashs : la bascule DÉCIDÉE refait le plein, la bascule SUBIE ne rend rien',
     notes: [
       'Correction : j’étais allé trop loin la fois d’avant en coupant toute recharge. La règle exacte, telle que demandée : se vaporiser DE SON PROPRE CHEF (touche G, bouton VAPEUR) refait le plein des trois dashs — le péage de 20 % du volume en est le prix, et c’est ce prix qui empêche d’en abuser. Une transformation SUBIE, elle, ne rend RIEN : la chaudière qui vous saisit à 95 %, la zone qui impose la vapeur — ces salles-là ne sont plus des fermes à dashs.',
       'Le reste tient : la réserve est pleine au chargement du tableau, le surchauffeur rend un dash sans jamais dépasser la réserve (et reste chargé tant qu’il n’en manque pas), la buse calibrée agrandit la réserve d’un cran. Codex à jour.',
