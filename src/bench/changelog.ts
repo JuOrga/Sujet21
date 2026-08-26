@@ -15,11 +15,21 @@ export interface Delivery {
 export const DELIVERIES: Delivery[] = [
   {
     date: '26/08/2026 21:40',
-    title: 'Le générateur ne se répète plus : orientations, montages, silhouettes',
+    title:
+      'Le générateur ne se répète plus : orientations, montages, silhouettes',
     notes: [
       'Retour du concepteur, mérité : trois salles « 333 » d’affilée se ressemblaient — même chaîne ouest → est, même fil à plomb tombé du plafond, même pastille posée à côté, même petit mot tuto partout. Quatre causes, quatre réponses. L’ORIENTATION d’abord : un niveau sur quatre seulement reste ouest → est — les autres se retournent (est → ouest), se DRESSENT (on monte) ou plongent ; la transposition emporte tout, parois, faisceaux, rails, preuves.',
       'Les MONTAGES ensuite : le fil du miroir tombe du plafond, monte du plancher, ou court depuis le flanc — et le reflet part à droite, à gauche, vers le haut ou le bas selon la place, à distance variable ; chaque preuve porte désormais SA normale de glace. Le rail plasma et la barrière NOR se montent aussi dans les deux sens. Les SILHOUETTES : des bandeaux pleins mangent le haut ou le bas d’une salle sur trois, et le même code atelier fait varier son gabarit (3 à 5 compartiments autour de la moyenne de la difficulté).',
       'Et les ÉTIQUETTES-TUTO sont dosées : une seule par espèce d’énigme et par salle, et plus AUCUNE au-delà de la difficulté 2 — l’atelier suppose le protocole connu (seul l’avertissement de la barrière NOR, qui scelle, reste). Contre-épreuve rejouée en éditeur réel : trois « 333 » d’affilée → une salle horizontale sas à l’ouest, deux verticales sas au nord, un à trois faisceaux dans les quatre directions, gabarits différents, zéro tuto. 21 tests au générateur (330 au total).',
+    ],
+  },
+  {
+    date: '26/08/2026 21:20',
+    title: 'Éditeur : la BULLE SAVANTE — chaque élément se raconte au survol',
+    notes: [
+      'Demandé : au survol posé d’un élément de l’éditeur, des précisions sur ce qu’il fait. C’est fait : une bulle patiente (elle attend 650 ms que la souris se pose, jamais pendant un geste) ouvre la FICHE de la pièce sous le curseur. Pour une SURFACE : l’effet raconté par état — EAU, GLACE, VAPEUR en couleur, et le sort du LASER — plus la géométrie vive (forme, inclinaison, dimensions). Pour un MÉCANISME : ses paramètres réels — l’angle d’un émetteur, le canal et la règle (OU/ET) d’une porte, le mode TOR (verrou ouvrant) ou NOR (maintien scellant) d’une pastille, la capacité d’une éponge, la hauteur d’une lampe…',
+      'Dix-neuf genres couverts : les neuf matériaux, sas, départ, éponge, émetteur, pastille, porte (asservie ou scénarisée), zone d’état, cachette voilée, rail magnétique, lampe, machinerie de décor, pancarte. La bulle suit le curseur sur le même élément, s’efface dès qu’il en change, au moindre geste, au zoom, ou quand la souris quitte la cuve — jamais d’encombrement. La PALETTE d’outils profite des mêmes fiches : survol posé d’un bouton de surface, sa fiche s’ouvre à côté (les anciens petits titres natifs, moins riches, sont retirés).',
+      'Le savoir est exact : chaque fiche est écrite depuis les règles du moteur (et recoupe le CODEX du jeu). Vérifié dans l’éditeur piloté à la souris : fiche Chaudière complète après le délai, fiche Pastille NOR avec canal, fiche palette Hydrophobe, effacement dans le vide — et 4 tests neufs gardent la couverture (chaque matériau, chaque genre, TOR contre NOR).',
     ],
   },
   {
