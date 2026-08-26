@@ -2654,6 +2654,10 @@ function startTest(etapes: (LevelDef | CinematiqueDef)[]): void {
   }
   testQueue = etapes.slice()
   fromEditor = false
+  // tout nouveau départ désarme le retour-planche : seule la carte ⏵ le
+  // ré-arme, juste après cet appel
+  fromPlanche = false
+  document.getElementById('planche-retour')?.setAttribute('hidden', '')
   run.bonbonneLiters = 0
   run.runTime = 0
   hasPlayed = true
@@ -2793,6 +2797,22 @@ const editor = new LevelEditor(el('editor'), {
 const plancheEl = document.getElementById('planche') as HTMLDivElement
 let plancheTous: StoredLevel[] = []
 let plancheBusy = false
+// L'ESSAI DEPUIS LA PLANCHE : le ⏵ d'une carte lance le tableau, et l'on
+// REVIENT là où on en était — bouton « revenir à la planche » en jeu, et
+// retour automatique à la conclusion de l'essai (le miroir de fromEditor).
+let fromPlanche = false
+let plancheScroll = 0
+function retournePlanche(): void {
+  fromPlanche = false
+  document.getElementById('planche-retour')?.setAttribute('hidden', '')
+  openHome() // fige l'essai, comme le retour au menu
+  plancheEl.hidden = false
+  const corps = document.getElementById('planche-corps')
+  if (corps) corps.scrollTop = plancheScroll
+}
+document
+  .getElementById('planche-retour')
+  ?.addEventListener('click', retournePlanche)
 function plancheDit(msg: string): void {
   const e = document.getElementById('planche-etat')
   if (e) e.textContent = msg
@@ -2899,6 +2919,7 @@ function renderPlanche(): void {
     carte.innerHTML =
       `<canvas width="220" height="126"></canvas>` +
       `<span class="pl-rang">${i + 1}</span>` +
+      `<button type="button" class="pl-jouer" title="Essayer ce tableau — le bouton « revenir à la planche » vous ramènera ici">⏵</button>` +
       `<div class="pl-bas">` +
       `<input class="pl-code" maxlength="16" value="${esc(s.level.code)}" title="Le code nomenclature (« 111 ») — Entrée ou sortir du champ enregistre" />` +
       `<span class="pl-nom" title="${esc(s.level.name)}">${esc(s.level.name)}</span>` +
@@ -2935,10 +2956,24 @@ function renderPlanche(): void {
       e.stopPropagation()
     })
     codeInp.addEventListener('pointerdown', (e) => e.stopPropagation())
+    // l'ESSAI : la carte se joue, et on saura revenir ici même
+    carte.querySelector('.pl-jouer')?.addEventListener('click', (e) => {
+      e.stopPropagation()
+      plancheScroll = corps.scrollTop
+      plancheEl.hidden = true
+      sallesEl.hidden = true
+      startTest([s.level])
+      // startTest peut rendre la main à la fiche (nom d'opérateur manquant) :
+      // le retour ne s'arme que si l'essai a vraiment démarré
+      if (document.body.classList.contains('playing')) {
+        fromPlanche = true
+        document.getElementById('planche-retour')?.removeAttribute('hidden')
+      }
+    })
     // le glisser-déposer : attraper une carte, la lâcher sur une autre —
     // la carte prend cette place (le geste de l'éditeur, en grand)
     carte.addEventListener('dragstart', (e) => {
-      if ((e.target as HTMLElement).closest('input, .pl-ord')) {
+      if ((e.target as HTMLElement).closest('input, .pl-ord, .pl-jouer')) {
         e.preventDefault()
         return
       }
@@ -5166,6 +5201,10 @@ function resetAction(): void {
     if (run.ended) {
       if (fromEditor) {
         openEditor() // l'essai vient de l'éditeur : on y retourne
+        return
+      }
+      if (fromPlanche) {
+        retournePlanche() // l'essai vient de la planche : on y retourne
         return
       }
       // la file d'essai continue : le sas mène à la salle suivante —

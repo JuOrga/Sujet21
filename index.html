@@ -418,6 +418,25 @@
       .pl-ord button:hover:not(:disabled) { border-color: var(--specimen); color: var(--specimen); }
       .pl-ord button:disabled { opacity: 0.3; cursor: default; }
       .pl-carte .salle-chips { margin-top: 6px; }
+      /* le bouton d'ESSAI de la carte : lancer le tableau depuis la planche */
+      .pl-jouer {
+        position: absolute; top: 12px; right: 12px;
+        min-width: 36px; min-height: 36px; font: inherit; font-size: 16px;
+        background: rgba(8, 14, 22, 0.85); color: #6dffb8;
+        border: 1px solid #2d4a63; border-radius: 5px; cursor: pointer;
+      }
+      .pl-jouer:hover { border-color: #6dffb8; box-shadow: 0 0 10px rgba(109, 255, 184, 0.35); }
+      /* le retour d'essai : un rappel discret en haut de l'écran de jeu,
+         seulement quand l'essai a été lancé depuis la planche */
+      #planche-retour {
+        position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+        z-index: 45; display: none;
+        font-family: var(--font-display); font-size: 10px; letter-spacing: 0.16em;
+        padding: 9px 16px; background: rgba(13, 20, 31, 0.92); color: #8fd8c8;
+        border: 1px solid #2d4a63; border-radius: 6px; cursor: pointer;
+      }
+      #planche-retour:hover { border-color: var(--specimen); color: #d5f3e8; }
+      body.playing #planche-retour:not([hidden]) { display: block; }
       /* ---- LE PUPITRE D'ESSAIS : simuler les événements au doigt ---- */
       #pupitre {
         position: fixed; inset: 0; z-index: 58;
@@ -5006,6 +5025,9 @@
         </div>
       </div>
     </div>
+
+    <!-- Le retour d'essai : visible en jeu quand l'essai vient de LA PLANCHE -->
+    <button id="planche-retour" type="button" hidden>⟵ REVENIR À LA PLANCHE</button>
 
     <!-- LA PLANCHE : l'ordonnancement de l'expédition, en cartes visuelles -->
     <div id="planche" hidden aria-label="La planche d'ordonnancement">

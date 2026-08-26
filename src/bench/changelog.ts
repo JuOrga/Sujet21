@@ -22,6 +22,13 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 17:35',
+    title: 'La planche s’essaie : ⏵ sur chaque carte, et le retour au même endroit',
+    notes: [
+      'Chaque carte de LA PLANCHE porte un bouton ⏵ : le tableau se lance à l’essai sur-le-champ. En jeu, un bouton « ⟵ REVENIR À LA PLANCHE » (haut de l’écran) ramène exactement là où on en était — défilement compris — et la conclusion de l’essai (sas bu) y ramène aussi d’elle-même, comme un essai d’éditeur retourne à l’éditeur.',
+    ],
+  },
+  {
     date: '26/08/2026 17:06',
     title: 'LA PLANCHE : l’ordonnancement de l’expédition, en cartes visuelles',
     notes: [
