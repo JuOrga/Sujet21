@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 18:50',
+    title: 'Le générateur parle la NOMENCLATURE : « 101 » est un cahier des charges',
+    notes: [
+      'Remarque du concepteur : la graine ne devrait-elle pas être le code à trois chiffres de la nomenclature ? Réponse : le code MMD (moment · mécanique · difficulté) DÉCRIT une salle sans l’identifier — plusieurs salles portent « 101 ». Le générateur le prend donc comme un CAHIER DES CHARGES : la MÉCANIQUE choisit les familles de maillons (1 : rideaux et miroirs de glace, JAMAIS d’exigence vapeur ; 2 : évents, rails, barrières, jamais de glace ; 3 : au moins une de chaque ; 0 : passages doux seulement), la DIFFICULTÉ dose compartiments (3 à 5), contraintes, resserrage des passages et dangers, et le MOMENT assombrit l’ambiance vers la fin de run.',
+      'L’identité, elle, vient de la VARIANTE : ⚄ Générer accepte « 212 » (une salle au hasard DANS cette classe), et la salle arrive avec son code complet — « G-212-BJB » — qu’il suffit de retaper pour la retrouver à l’identique, au caractère près. Les plafonds de lisibilité respectent désormais la famille annoncée : un excédent glaceux redevient rideau, un excédent vaporeux, évent — la mécanique promise par le code n’est jamais trahie. Les graines libres d’hier (« Q », « B2 ») marchent toujours.',
+      'Vérifié : 16 tests (lecture des saisies, classes pures glace/vapeur/toutes/aucune sur cinq variantes, identité par code, dosage de la difficulté) — 325 au total. En headless dans l’éditeur réel : « 212 » → G-212-BJB (pure glace), code retapé → salle identique octet pour octet, « 129 » → G-129-QUO (pure vapeur : 2 évents, 1 rail, 1 barrière, 5 compartiments).',
+    ],
+  },
+  {
     date: '26/08/2026 17:40',
     title: 'La grammaire du générateur s’enrichit : rail plasma, barrière tenue, double ET',
     notes: [

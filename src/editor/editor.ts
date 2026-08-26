@@ -62,7 +62,7 @@ import {
   parseLevel,
   serializeLevel,
 } from '../game/levelIO'
-import { genereNiveau, graineDepuisTexte } from '../game/generateur'
+import { analyseSaisie, genereNiveau, genereNiveauAtelier } from '../game/generateur'
 import { MAX_LUMIERES } from '../render/renderer'
 import { canalDeCible, traceLaser } from '../game/laser'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
@@ -2441,19 +2441,33 @@ export class LevelEditor {
     })
     this.el('ed-gen').addEventListener('click', () => {
       const saisie = prompt(
-        'Graine de la salle (lettres et chiffres, base 36) — vide : au hasard.\nLa même graine redonne toujours la même salle.',
+        'Un CODE ATELIER — « 101 » (moment · mécanique · difficulté) tire une salle de cette classe, ' +
+          '« 101-K7 » redonne exactement CETTE salle-là — ou une graine libre (lettres et chiffres). ' +
+          'Vide : au hasard.',
         '',
       )
       if (saisie === null) return
-      const graine =
-        saisie.trim() === ''
-          ? Math.floor(Math.random() * 36 ** 4)
-          : graineDepuisTexte(saisie)
-      if (graine === null) {
-        this.commit('Graine illisible — lettres et chiffres seulement (base 36).')
-        return
+      let niveau: LevelDef | null = null
+      if (saisie.trim() === '') {
+        niveau = genereNiveau(Math.floor(Math.random() * 36 ** 4))
+      } else {
+        const lue = analyseSaisie(saisie)
+        if (!lue) {
+          this.commit(
+            'Saisie illisible — un code atelier (« 101 », « 101-K7 ») ou une graine libre (base 36).',
+          )
+          return
+        }
+        niveau =
+          lue.type === 'atelier'
+            ? genereNiveauAtelier(
+                lue.cahier,
+                lue.variante ??
+                  Math.floor(Math.random() * 36 ** 3).toString(36).toUpperCase(),
+              )
+            : genereNiveau(lue.graine)
       }
-      this.level = genereNiveau(graine)
+      this.level = niveau
       this.openId = ''
       this.base = ''
       this.sel = null
@@ -2461,7 +2475,7 @@ export class LevelEditor {
       this.syncForm()
       this.renderLibrary()
       this.commit(
-        `Salle générée — graine ${(graine >>> 0).toString(36).toUpperCase()} (code ${this.level.code}). Traversée prouvée par le traceur ; retouchez, puis Essayer.`,
+        `Salle générée — code ${this.level.code} (retapez-le pour la retrouver). Traversée prouvée par le traceur ; retouchez, puis Essayer.`,
       )
     })
     this.el('ed-save').addEventListener('click', () => void this.store(false))

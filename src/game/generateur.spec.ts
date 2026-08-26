@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   accessible,
+  analyseSaisie,
   creeRng,
   genereNiveau,
+  genereNiveauAtelier,
   graineDepuisTexte,
   prouveBarriere,
   prouveMiroir,
@@ -10,6 +12,7 @@ import {
   valideNiveau,
 } from './generateur'
 import { checkLevel } from './levelIO'
+import { MAT_GRILLE, MAT_RIDEAU } from './level'
 
 describe('generateur — une graine, une salle PROUVÉE', () => {
   it('est déterministe : même graine, même salle — au caractère près', () => {
@@ -89,6 +92,64 @@ describe('generateur — une graine, une salle PROUVÉE', () => {
     const verdict = valideNiveau(sabote)
     expect(verdict.valide).toBe(false)
     expect(verdict.raisons.join(' ')).toContain('inaccessible')
+  })
+
+  it('le CODE ATELIER se lit : « 101 », « 101-K7 », « G-101-K7 » — et la graine libre reste', () => {
+    expect(analyseSaisie('101')).toEqual({
+      type: 'atelier',
+      cahier: { moment: 1, mecanique: 0, difficulte: 1 },
+      variante: null,
+    })
+    expect(analyseSaisie('g-231 - K7')).toEqual({
+      type: 'atelier',
+      cahier: { moment: 2, mecanique: 3, difficulte: 1 },
+      variante: 'K7',
+    })
+    expect(analyseSaisie('401')).toEqual({ type: 'libre', graine: parseInt('401', 36) })
+    expect(analyseSaisie('ZZ')).toEqual({ type: 'libre', graine: 1295 })
+    expect(analyseSaisie('hé hé')).toBeNull()
+  })
+
+  it("le cahier des charges COMMANDE : mécanique glace → jamais d'exigence vapeur, et l'inverse", () => {
+    const vaporeux = (n: ReturnType<typeof genereNiveau>): number =>
+      n.boxes.filter((b) => b.material === MAT_GRILLE).length +
+      (n.rails?.length ?? 0) +
+      (n.cibles ?? []).filter((c) => c.mode === 'nor').length
+    const glaceux = (n: ReturnType<typeof genereNiveau>): number =>
+      n.boxes.filter((b) => b.material === MAT_RIDEAU).length +
+      n.labels.filter((l) => l.text === 'MIROIR DE GLACE').length
+    for (const variante of ['A', 'B', 'C', 'D', 'E']) {
+      const glace = genereNiveauAtelier({ moment: 2, mecanique: 1, difficulte: 4 }, variante)
+      expect(glaceux(glace), `glace ${variante}`).toBeGreaterThan(0)
+      expect(vaporeux(glace), `glace ${variante}`).toBe(0)
+      const vapeur = genereNiveauAtelier({ moment: 2, mecanique: 2, difficulte: 4 }, variante)
+      expect(vaporeux(vapeur), `vapeur ${variante}`).toBeGreaterThan(0)
+      expect(glaceux(vapeur), `vapeur ${variante}`).toBe(0)
+      const toutes = genereNiveauAtelier({ moment: 3, mecanique: 3, difficulte: 6 }, variante)
+      expect(glaceux(toutes), `toutes ${variante}`).toBeGreaterThan(0)
+      expect(vaporeux(toutes), `toutes ${variante}`).toBeGreaterThan(0)
+      const aucune = genereNiveauAtelier({ moment: 1, mecanique: 0, difficulte: 1 }, variante)
+      expect(glaceux(aucune) + vaporeux(aucune), `aucune ${variante}`).toBe(0)
+      expect(aucune.lasers ?? []).toEqual([])
+    }
+  })
+
+  it('le code atelier fait identité : « G-212-K7 » se retape et redonne la même salle', () => {
+    const cahier = { moment: 2, mecanique: 1, difficulte: 2 } as const
+    const a = genereNiveauAtelier(cahier, 'K7')
+    expect(a.code).toBe('G-212-K7')
+    expect(JSON.stringify(genereNiveauAtelier(cahier, 'k7'))).toBe(JSON.stringify(a))
+    expect(JSON.stringify(genereNiveauAtelier(cahier, 'K8'))).not.toBe(JSON.stringify(a))
+    // toutes valides, comme les libres
+    const erreurs = checkLevel(a).filter((v) => v.niveau === 'erreur')
+    expect(erreurs).toEqual([])
+  })
+
+  it('la difficulté du cahier dose la salle : 0 est plus court et plus doux que 9', () => {
+    const doux = genereNiveauAtelier({ moment: 1, mecanique: 1, difficulte: 0 }, 'A')
+    const rude = genereNiveauAtelier({ moment: 1, mecanique: 1, difficulte: 9 }, 'A')
+    expect(doux.lumieres!.length).toBeLessThan(rude.lumieres!.length) // 3 salles contre 5 (max 4 lampes)
+    expect(doux.par!).toBeLessThan(rude.par!)
   })
 
   it('les graines de partage : le texte base 36 fait l’aller-retour', () => {
