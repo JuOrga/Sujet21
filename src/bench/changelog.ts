@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 17:40',
+    title: 'La grammaire du générateur s’enrichit : rail plasma, barrière tenue, double ET',
+    notes: [
+      'Trois maillons neufs dans la chaîne d’intentions du générateur. Le RAIL PLASMA — se tenir en VAPEUR au point marqué « IONISER ICI » ionise le fil de lumière ; le rail magnétique, amorcé dans le nuage, capture l’arc et le guide jusqu’à la pastille qui ouvre la porte. La BARRIÈRE TENUE — un faisceau vertical barre le chemin, sa pastille NOR (au sol) tient la porte ouverte TANT QUE la lumière la touche : l’eau plie le faisceau, la glace le renvoie — couper la lumière scelle la porte. On traverse EN VAPEUR : le faisceau s’ionise mais file droit. Le DOUBLE ET — deux miroirs, deux pastilles du même canal, règle ET : la porte exige les deux.',
+      'Chaque énigme garde sa PREUVE par le vrai traceur, dans ses propres termes : le rail est muet sans nuage et guide avec ; la barrière est allumée d’office, la traversée en vapeur ne la coupe pas, la traversée en eau la coupe (sinon elle ne punirait rien) ; chaque miroir d’un ET n’allume QUE sa pastille. Et une garde neuve balaie tout ALLUMAGE CROISÉ : aucun faisceau ne doit allumer une pastille d’énigme sans le joueur — l’énigme morte est rejetée au tirage.',
+      'Sur 300 graines : 91 rails, 95 barrières, 37 doubles ET, 258 miroirs — trois lasers par salle au plus, pour rester lisible. Vérifié : 12 tests (dont les trois preuves discriminantes), et la salle G-Q (barrière + miroir + rail, 3 portes) générée et jouée en essai sans écran — la barrière y est visible, faisceau tendu jusqu’à sa pastille verte, porte ouverte en pointillés.',
+    ],
+  },
+  {
     date: '26/08/2026 16:30',
     title: 'Le DÔME du regard : l’œil soulève vraiment le volume',
     notes: [

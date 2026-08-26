@@ -4,7 +4,9 @@ import {
   creeRng,
   genereNiveau,
   graineDepuisTexte,
+  prouveBarriere,
   prouveMiroir,
+  prouvePlasma,
   valideNiveau,
 } from './generateur'
 import { checkLevel } from './levelIO'
@@ -48,8 +50,9 @@ describe('generateur — une graine, une salle PROUVÉE', () => {
       }
       if ((niveau.portes?.length ?? 0) > 0) {
         expect(niveau.lasers?.length ?? 0).toBeGreaterThan(0)
-        // l'énigme est signalée au joueur : l'étiquette du miroir existe
-        expect(niveau.labels.some((l) => l.text === 'MIROIR DE GLACE')).toBe(true)
+        // l'énigme est signalée au joueur : l'étiquette de SON espèce existe
+        const marques = ['MIROIR DE GLACE', 'IONISER ICI', 'TRAVERSER EN VAPEUR']
+        expect(niveau.labels.some((l) => marques.includes(l.text))).toBe(true)
       }
     }
   })
@@ -102,5 +105,72 @@ describe('generateur — une graine, une salle PROUVÉE', () => {
     expect(niveau.code).toBe('G-ZZ')
     expect(niveau.name).toContain('ZZ')
     expect(niveau.journal.length).toBeGreaterThanOrEqual(40)
+  })
+
+  it('la grammaire enrichie SORT vraiment : rail plasma, barrière NOR et double ET apparaissent', () => {
+    let rail = 0
+    let nor = 0
+    let et = 0
+    for (let g = 1; g <= 120; g++) {
+      const n = genereNiveau(g)
+      if ((n.rails?.length ?? 0) > 0) rail++
+      if ((n.cibles ?? []).some((c) => c.mode === 'nor')) nor++
+      if ((n.portes ?? []).some((p) => p.regle === 'et')) et++
+      if (rail && nor && et) break
+    }
+    expect(rail, 'aucun rail plasma en 120 graines').toBeGreaterThan(0)
+    expect(nor, 'aucune barrière NOR en 120 graines').toBeGreaterThan(0)
+    expect(et, 'aucun double ET en 120 graines').toBeGreaterThan(0)
+  })
+
+  it("le RAIL PLASMA discrimine : sans nuage la pastille dort, en vapeur l'arc guidé l'allume", () => {
+    for (let g = 1; g <= 200; g++) {
+      const n = genereNiveau(g)
+      if ((n.rails?.length ?? 0) === 0) continue
+      // l'étiquette IONISER ICI est posée 74 u sous le point — on remonte
+      const etiquette = n.labels.find((l) => l.text === 'IONISER ICI')!
+      const nuage = { x: etiquette.x, y: etiquette.y - 74 }
+      const em = (n.lasers ?? []).find((l) => Math.abs(l.x - nuage.x) < 1)!
+      const railCible = (n.cibles ?? []).find(
+        (c) => Math.abs(c.y - (nuage.y - 30)) < 1 && c.mode !== 'nor',
+      )!
+      const { sansVapeur, avecVapeur } = prouvePlasma(n, em, nuage, railCible.canal!)
+      expect(sansVapeur).toBe(false)
+      expect(avecVapeur).toBe(true)
+      return
+    }
+    throw new Error('aucune graine à rail parmi 1..200')
+  })
+
+  it("la BARRIÈRE NOR discrimine : allumée d'office, la vapeur passe, l'eau coupe", () => {
+    for (let g = 1; g <= 200; g++) {
+      const n = genereNiveau(g)
+      const cibleNor = (n.cibles ?? []).find((c) => c.mode === 'nor')
+      if (!cibleNor) continue
+      const em = (n.lasers ?? []).find((l) => Math.abs(l.x - cibleNor.x) < 1)!
+      const etiquette = n.labels.find((l) => l.text === 'TRAVERSER EN VAPEUR')!
+      const croisement = { x: etiquette.x, y: etiquette.y - 120 }
+      const { directe, enVapeur, enEau } = prouveBarriere(n, em, croisement, cibleNor.canal!)
+      expect(directe).toBe(true)
+      expect(enVapeur).toBe(true)
+      expect(enEau).toBe(false)
+      return
+    }
+    throw new Error('aucune graine à barrière NOR parmi 1..200')
+  })
+
+  it('le DOUBLE ET : une porte, deux pastilles du même canal, chacune son miroir', () => {
+    for (let g = 1; g <= 200; g++) {
+      const n = genereNiveau(g)
+      const porteEt = (n.portes ?? []).find((p) => p.regle === 'et')
+      if (!porteEt) continue
+      const pastilles = (n.cibles ?? []).filter((c, i) => (c.canal ?? i + 1) === porteEt.canal)
+      expect(pastilles.length).toBe(2)
+      // deux fils à plomb distincts, deux étiquettes MIROIR DE GLACE
+      const miroirs = n.labels.filter((l) => l.text === 'MIROIR DE GLACE')
+      expect(miroirs.length).toBeGreaterThanOrEqual(2)
+      return
+    }
+    throw new Error('aucune graine à double ET parmi 1..200')
   })
 })

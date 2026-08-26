@@ -1,7 +1,7 @@
 // Le GÉNÉRATEUR DE SALLES : une graine → un tableau complet, PROUVÉ
 // traversable avant d'être remis au joueur. La recette qui évite la soupe
 // aléatoire : on tire d'abord la CHAÎNE D'INTENTIONS (la suite des
-// franchissements — évent, rideau, membrane, porte au laser), puis on
+// franchissements — évent, rideau, membrane, énigmes au laser), puis on
 // habille chaque maillon en géométrie, et l'on REFUSE tout tirage dont la
 // traversée ne se démontre pas :
 //   · accessibilité spawn → sas par parcours en largeur, avec la marge du
@@ -9,12 +9,28 @@
 //     rideau, membrane) comptent passantes, puisqu'un état du corps les
 //     traverse et que l'état se choisit librement ;
 //   · chaque porte asservie est prouvée OUVRABLE par le VRAI traceur de
-//     faisceau (laser.ts) : on y pose un miroir de glace synthétique à
-//     l'endroit prévu pour le joueur — si le reflet n'allume pas la
-//     pastille, le tirage est rejeté. Et sans miroir, le faisceau ne doit
-//     PAS l'allumer : la salle ne s'ouvre pas toute seule.
+//     faisceau (laser.ts), corps synthétique posé à l'endroit prévu pour le
+//     joueur — glace-miroir, nuage ionisant ou traversée en vapeur selon
+//     l'énigme — et l'énigme doit EXISTER : sans le corps, rien ne s'ouvre
+//     (sauf la barrière NOR, allumée d'office par contrat).
 // Même graine, même salle — le générateur est déterministe : une salle se
 // partage par son code (G-…), se rejoue, se retouche à l'éditeur.
+//
+// LA GRAMMAIRE DES MAILLONS (un par cloison) :
+//   · libre     — un passage nu ;
+//   · grille    — l'évent : seul le corps en VAPEUR le traverse ;
+//   · rideau    — seule la GLACE l'écarte ;
+//   · membrane  — seule l'EAU la traverse ;
+//   · porte     — l'énigme du MIROIR : un fil à plomb de lumière, le corps
+//     gelé dessous ; son flanc renvoie le faisceau sur la pastille ;
+//   · et        — DEUX miroirs, deux pastilles du même canal, règle ET :
+//     la porte exige les deux (le TOR retient — l'une après l'autre) ;
+//   · rail      — le PLASMA : se tenir en vapeur au point marqué ionise le
+//     faisceau, le rail magnétique capture l'arc et le guide à la pastille ;
+//   · nor       — la BARRIÈRE TENUE : un faisceau vertical barre le chemin,
+//     sa pastille NOR tient la porte ouverte TANT QU'IL la touche. L'eau le
+//     plie, la glace le renvoie — couper le faisceau scelle la porte.
+//     Traverser la lumière EN VAPEUR : le faisceau s'ionise mais file droit.
 
 import {
   MAT_WALL,
@@ -34,6 +50,7 @@ import {
   type LumiereDef,
   type CacheDef,
   type DecalDef,
+  type RailDef,
 } from './level'
 import { traceLaser, type TraceMonde } from './laser'
 import { checkLevel } from './levelIO'
@@ -56,7 +73,15 @@ const parmi = <T>(rng: Rng, xs: readonly T[]): T =>
   xs[Math.floor(rng() * xs.length)]
 
 // ---- La CHAÎNE : ce que chaque cloison exige pour être franchie ---------
-export type Maillon = 'libre' | 'grille' | 'rideau' | 'membrane' | 'porte'
+export type Maillon =
+  | 'libre'
+  | 'grille'
+  | 'rideau'
+  | 'membrane'
+  | 'porte'
+  | 'et'
+  | 'rail'
+  | 'nor'
 
 // La marge du corps pour le parcours de validation : un couloir plus étroit
 // que ça n'est pas un passage, c'est un piège à goutte.
@@ -81,17 +106,42 @@ function tirePlan(rng: Rng): Plan {
   const largeurs: number[] = []
   for (let i = 0; i < nbSalles; i++)
     largeurs.push(Math.round(entre(rng, 640, 880) / 10) * 10)
-  // la chaîne : au moins UN maillon à état ou à porte — sinon c'est un couloir
-  const types: Maillon[] = ['libre', 'grille', 'rideau', 'membrane', 'porte']
+  // la chaîne : au moins UN maillon contraint — sinon c'est un couloir.
+  // Les énigmes au laser sont plafonnées (deux miroirs simples, un ET, un
+  // rail, une barrière NOR, trois lasers en tout) : la salle reste lisible.
+  const types: Maillon[] = [
+    'libre',
+    'grille',
+    'rideau',
+    'membrane',
+    'porte',
+    'et',
+    'rail',
+    'nor',
+  ]
   let maillons: Maillon[] = []
-  let portes = 0
   do {
     maillons = []
-    portes = 0
+    let miroirs = 0
+    let ets = 0
+    let rails = 0
+    let nors = 0
+    let lasers = 0
     for (let i = 0; i + 1 < nbSalles; i++) {
       let m = parmi(rng, types)
-      if (m === 'porte' && portes >= 2) m = 'grille' // deux énigmes laser au plus
-      if (m === 'porte') portes++
+      // le double miroir exige une salle large ; à défaut, un miroir simple
+      if (m === 'et' && largeurs[i] < 820) m = 'porte'
+      if (m === 'porte' && miroirs >= 2) m = 'grille'
+      if (m === 'et' && ets >= 1) m = 'porte'
+      if (m === 'rail' && rails >= 1) m = 'rideau'
+      if (m === 'nor' && nors >= 1) m = 'membrane'
+      if ((m === 'porte' || m === 'et' || m === 'rail' || m === 'nor') && lasers >= 3)
+        m = 'grille'
+      if (m === 'porte') miroirs++
+      if (m === 'et') ets++
+      if (m === 'rail') rails++
+      if (m === 'nor') nors++
+      if (m === 'porte' || m === 'et' || m === 'rail' || m === 'nor') lasers++
       maillons.push(m)
     }
   } while (maillons.every((m) => m === 'libre'))
@@ -140,6 +190,19 @@ function aabbVraie(b: Rect & { angle?: number }): Rect {
   return { minX: cx - ex, minY: cy - ey, maxX: cx + ex, maxY: cy + ey }
 }
 
+// ---- Les PREUVES à mener sur la salle finie ------------------------------
+export interface PreuveDef {
+  kind: 'miroir' | 'rail' | 'nor'
+  canal: number
+  emetteur: LaserDef
+  /** miroir : où geler le corps · rail : où se tenir en vapeur ·
+   * nor : où le chemin croise le faisceau (la traversée à démontrer). */
+  spot: { x: number; y: number }
+  cibleIndex: number
+}
+
+type LevelGen = LevelDef & { __preuves?: PreuveDef[] }
+
 /** Un essai de salle complet — géométrie, mécanismes, habillage. */
 function essaieNiveau(graine: number, rng: Rng): LevelDef {
   const plan = tirePlan(rng)
@@ -152,11 +215,13 @@ function essaieNiveau(graine: number, rng: Rng): LevelDef {
   const cibles: CibleDef[] = []
   const portes: PorteDef[] = []
   const lasers: LaserDef[] = []
+  const rails: RailDef[] = []
   const lumieres: LumiereDef[] = []
   const caches: CacheDef[] = []
   const decals: DecalDef[] = []
   // les couloirs à garder LIBRES : le chemin, les faisceaux, le spawn, le sas
   const reserves: Rect[] = []
+  const preuves: PreuveDef[] = []
 
   // bornes intérieures de chaque salle
   const salleX: [number, number][] = []
@@ -185,16 +250,33 @@ function essaieNiveau(graine: number, rng: Rng): LevelDef {
   labels.push({ x: (exit.minX + exit.maxX) / 2, y: exit.maxY + 60, text: 'SAS', tone: 'sas' })
   reserves.push(gonfle(exit, 140))
 
+  // L'ÉNIGME DU MIROIR, posée dans une salle : un émetteur au plafond tire
+  // un fil à plomb de lumière ; le joueur gèle son corps sur le fil — le
+  // flanc du bloc renvoie le faisceau vers la pastille. La pastille est
+  // posée par CALIBRAGE : sur le trajet du reflet, avec du jeu.
+  const poseMiroir = (ex: number, sx1: number, canal: number): void => {
+    const my = Math.round(entre(rng, -demiH * 0.35, demiH * 0.35) / 10) * 10
+    const emetteur: LaserDef = { x: ex, y: demiH - 24, angle: -90 }
+    const porteeCible = entre(rng, 150, Math.min(260, sx1 - 70 - ex))
+    const cible: CibleDef = { x: ex + porteeCible, y: my + 52, r: 30, canal }
+    cibles.push(cible)
+    lasers.push(emetteur)
+    preuves.push({
+      kind: 'miroir',
+      canal,
+      emetteur,
+      spot: { x: ex, y: my },
+      cibleIndex: cibles.length - 1,
+    })
+    labels.push({ x: ex, y: my - 66, text: 'MIROIR DE GLACE', tone: 'froid', rang: 'detail' })
+    // le fil du faisceau et le trajet du reflet restent dégagés
+    reserves.push({ minX: ex - 70, minY: my - 120, maxX: ex + 70, maxY: demiH })
+    reserves.push({ minX: ex - 70, minY: my - 90, maxX: ex + porteeCible + 90, maxY: my + 130 })
+  }
+
   // ---- les cloisons et leurs maillons ----
   const gaps: { x: number; y: number }[] = [] // le centre de chaque passage
   let canalSuivant = 1
-  // les preuves à mener : pour chaque porte, l'énigme du miroir
-  const preuves: {
-    canal: number
-    emetteur: LaserDef
-    miroir: { x: number; y: number }
-    cible: CibleDef
-  }[] = []
 
   for (let i = 0; i < plan.cloisonX.length; i++) {
     const wx = plan.cloisonX[i]
@@ -210,6 +292,7 @@ function essaieNiveau(graine: number, rng: Rng): LevelDef {
     // le couloir du passage reste dégagé de part et d'autre
     reserves.push({ minX: wx - 190, minY: gapMin - 40, maxX: wx + EP_CLOISON + 190, maxY: gapMax + 40 })
 
+    const [sx0, sx1] = salleX[i]
     if (maillon === 'grille' || maillon === 'rideau' || maillon === 'membrane') {
       const mat =
         maillon === 'grille' ? MAT_GRILLE : maillon === 'rideau' ? MAT_RIDEAU : MAT_MEMBRANE
@@ -221,25 +304,75 @@ function essaieNiveau(graine: number, rng: Rng): LevelDef {
     } else if (maillon === 'porte') {
       const canal = canalSuivant++
       portes.push({ minX: wx, minY: gapMin, maxX: wx + EP_CLOISON, maxY: gapMax, canal })
-      // L'ÉNIGME DU MIROIR, dans la salle à GAUCHE de la porte : un émetteur
-      // au plafond tire un fil à plomb de lumière ; le joueur gèle son corps
-      // sur le fil — le flanc du bloc renvoie le faisceau vers la pastille.
-      const [sx0, sx1] = salleX[i]
       const ex = Math.round(entre(rng, sx0 + 150, sx1 - 220) / 10) * 10
-      const my = Math.round(entre(rng, -demiH * 0.35, demiH * 0.35) / 10) * 10
+      poseMiroir(ex, sx1, canal)
+    } else if (maillon === 'et') {
+      // DEUX miroirs, un seul canal, règle ET : la porte veut les deux.
+      // Les deux fils à plomb sont écartés, et leurs pastilles à des
+      // hauteurs disjointes — un seul miroir ne peut pas servir deux fois.
+      const canal = canalSuivant++
+      portes.push({ minX: wx, minY: gapMin, maxX: wx + EP_CLOISON, maxY: gapMax, canal, regle: 'et' })
+      const ex1 = Math.round(entre(rng, sx0 + 140, sx0 + 240) / 10) * 10
+      const ex2 = Math.round(entre(rng, ex1 + 280, sx1 - 220) / 10) * 10
+      poseMiroir(ex1, ex2 - 90, canal)
+      poseMiroir(ex2, sx1, canal)
+      labels.push({
+        x: wx + EP_CLOISON / 2,
+        y: gapMax + 60,
+        text: 'DEUX PASTILLES — LES DEUX',
+        tone: 'grille',
+        rang: 'detail',
+      })
+    } else if (maillon === 'rail') {
+      // LE PLASMA : se tenir en VAPEUR au point marqué ionise le faisceau ;
+      // le rail magnétique, amorcé dans le nuage, capture l'arc et le guide
+      // jusqu'à la pastille posée dans l'axe de sa sortie.
+      const canal = canalSuivant++
+      portes.push({ minX: wx, minY: gapMin, maxX: wx + EP_CLOISON, maxY: gapMax, canal })
+      const Lr = Math.round(entre(rng, 140, 200) / 10) * 10
+      const ex = Math.round(entre(rng, sx0 + 150, sx1 - (Lr + 160)) / 10) * 10
+      const ny = Math.round(entre(rng, -demiH * 0.3, demiH * 0.3) / 10) * 10
       const emetteur: LaserDef = { x: ex, y: demiH - 24, angle: -90 }
-      const miroir = { x: ex, y: my }
-      // la pastille, posée par CALIBRAGE : on trace le reflet du miroir
-      // synthétique et on la met sur son trajet (plus loin, avec du jeu)
-      const porteeCible = entre(rng, 150, Math.min(260, sx1 - 70 - ex))
-      const cible: CibleDef = { x: ex + porteeCible, y: my + 52, r: 30, canal }
-      cibles.push(cible)
       lasers.push(emetteur)
-      preuves.push({ canal, emetteur, miroir, cible })
-      labels.push({ x: ex, y: my - 66, text: 'MIROIR DE GLACE', tone: 'froid', rang: 'detail' })
-      // le fil du faisceau et le trajet du reflet restent dégagés
-      reserves.push({ minX: ex - 70, minY: my - 120, maxX: ex + 70, maxY: demiH })
-      reserves.push({ minX: ex - 70, minY: my - 90, maxX: ex + porteeCible + 90, maxY: my + 130 })
+      rails.push({ points: [{ x: ex, y: ny - 30 }, { x: ex + Lr, y: ny - 30 }] })
+      const cible: CibleDef = { x: ex + Lr + 100, y: ny - 30, r: 26, canal }
+      cibles.push(cible)
+      preuves.push({
+        kind: 'rail',
+        canal,
+        emetteur,
+        spot: { x: ex, y: ny },
+        cibleIndex: cibles.length - 1,
+      })
+      labels.push({ x: ex, y: ny + 74, text: 'IONISER ICI', tone: 'grille', rang: 'detail' })
+      reserves.push({ minX: ex - 70, minY: ny - 120, maxX: ex + 70, maxY: demiH })
+      reserves.push({ minX: ex - 70, minY: ny - 110, maxX: ex + Lr + 150, maxY: ny + 40 })
+    } else if (maillon === 'nor') {
+      // LA BARRIÈRE TENUE : un faisceau vertical barre le chemin devant la
+      // porte ; sa pastille NOR (au sol) tient la porte ouverte tant que la
+      // lumière la touche. L'eau plie le faisceau, la glace le renvoie —
+      // la coupure scelle. On traverse la lumière en VAPEUR : ionisée,
+      // elle file droit.
+      const canal = canalSuivant++
+      portes.push({ minX: wx, minY: gapMin, maxX: wx + EP_CLOISON, maxY: gapMax, canal })
+      const bx = Math.round(
+        entre(rng, Math.max(sx0 + 130, wx - 320), wx - 150) / 10,
+      ) * 10
+      const emetteur: LaserDef = { x: bx, y: demiH - 24, angle: -90 }
+      lasers.push(emetteur)
+      const cible: CibleDef = { x: bx, y: -demiH + 52, r: 22, mode: 'nor', canal }
+      cibles.push(cible)
+      preuves.push({
+        kind: 'nor',
+        canal,
+        emetteur,
+        spot: { x: bx, y: gy },
+        cibleIndex: cibles.length - 1,
+      })
+      labels.push({ x: bx, y: gy + 120, text: 'TRAVERSER EN VAPEUR', tone: 'grille', rang: 'detail' })
+      // la colonne du faisceau reste dégagée du plafond au sol : le décor
+      // ne doit jamais couper la barrière à la place du joueur
+      reserves.push({ minX: bx - 60, minY: -demiH, maxX: bx + 60, maxY: demiH })
     }
   }
 
@@ -357,7 +490,7 @@ function essaieNiveau(graine: number, rng: Rng): LevelDef {
     }
   }
 
-  const nbPortes = portes.length
+  const nbEnigmes = preuves.length
   const code = 'G-' + (graine >>> 0).toString(36).toUpperCase()
   const noms = [
     'La dérivation',
@@ -386,59 +519,126 @@ function essaieNiveau(graine: number, rng: Rng): LevelDef {
     ...(lasers.length ? { lasers } : {}),
     ...(cibles.length ? { cibles } : {}),
     ...(portes.length ? { portes } : {}),
+    ...(rails.length ? { rails } : {}),
     ...(caches.length ? { caches } : {}),
     lumieres,
-    par: 2 + 3 * plan.maillons.length + 2 * nbPortes,
+    par: 2 + 3 * plan.maillons.length + 2 * nbEnigmes,
   }
-  // la preuve du miroir se joue sur le niveau FINI (tout le décor posé)
+  // la preuve se joue sur le niveau FINI (tout le décor posé)
   ;(level as LevelGen).__preuves = preuves
   return level
 }
 
-type LevelGen = LevelDef & {
-  __preuves?: {
-    canal: number
-    emetteur: LaserDef
-    miroir: { x: number; y: number }
-    cible: CibleDef
-  }[]
-}
-
-// ---- LA PREUVE DU MIROIR : le vrai traceur, un bloc de glace synthétique --
-// Le disque de glace posé au point prévu porte la normale à 45° (le flanc
-// haut-droit d'un corps gelé sous le fil du faisceau) : le reflet doit
-// allumer la pastille. Et SANS glace, il ne doit pas — sinon la porte
-// s'ouvre toute seule et l'énigme n'existe pas.
+// ---- LES CORPS SYNTHÉTIQUES : le vrai traceur, un corps posé pour lui ----
+// La preuve rejoue l'idée du joueur : un disque de GLACE au flanc à 45°
+// (le corps gelé sous le fil du faisceau), un NUAGE de vapeur ionisant, ou
+// une flaque d'EAU-lentille (la traversée qui plie le faisceau). Le traceur
+// est celui du jeu — la preuve et la partie parlent la même optique.
 const N45 = Math.SQRT1_2
 
+interface CorpsSynthetiques {
+  glace?: { x: number; y: number }
+  vapeur?: { x: number; y: number }
+  eau?: { x: number; y: number }
+}
+
+function traceSynthetique(
+  level: LevelDef,
+  em: LaserDef,
+  corps: CorpsSynthetiques,
+): number[] {
+  const monde: TraceMonde = {
+    bounds: level.bounds,
+    boxes: level.boxes,
+    // TOUTES les portes fermées : la preuve se joue avant toute ouverture
+    portesFermees: level.portes ?? [],
+    cibles: (level.cibles ?? []).map((c) => ({ x: c.x, y: c.y, r: c.r })),
+    iceNormal: corps.glace
+      ? (x, y) => {
+          const dx = x - corps.glace!.x
+          const dy = y - corps.glace!.y
+          return dx * dx + dy * dy <= 44 * 44 ? { nx: N45, ny: N45 } : null
+        }
+      : null,
+    eau: corps.eau
+      ? {
+          dedans: (x, y) => {
+            const dx = x - corps.eau!.x
+            const dy = y - corps.eau!.y
+            return dx * dx + dy * dy <= 40 * 40
+          },
+          normale: (x, y) => {
+            const dx = x - corps.eau!.x
+            const dy = y - corps.eau!.y
+            const d = Math.hypot(dx, dy) || 1
+            return { nx: dx / d, ny: dy / d }
+          },
+        }
+      : null,
+    vapeur: corps.vapeur
+      ? (x, y) => {
+          const dx = x - corps.vapeur!.x
+          const dy = y - corps.vapeur!.y
+          return dx * dx + dy * dy <= 44 * 44
+        }
+      : null,
+    rails: level.rails ?? [],
+  }
+  return traceLaser(em, monde).touchees
+}
+
+/** L'énigme du MIROIR : sans glace la pastille du canal reste éteinte,
+ * avec un corps gelé au point prévu elle s'allume. */
 export function prouveMiroir(
   level: LevelDef,
   emetteur: LaserDef,
   miroir: { x: number; y: number },
   canal: number,
 ): { sansGlace: boolean; avecGlace: boolean } {
-  const monde = (glace: boolean): TraceMonde => ({
-    bounds: level.bounds,
-    boxes: level.boxes,
-    // TOUTES les portes fermées : la preuve se joue avant toute ouverture
-    portesFermees: level.portes ?? [],
-    cibles: (level.cibles ?? []).map((c) => ({ x: c.x, y: c.y, r: c.r })),
-    iceNormal: glace
-      ? (x, y) => {
-          const dx = x - miroir.x
-          const dy = y - miroir.y
-          return dx * dx + dy * dy <= 44 * 44 ? { nx: N45, ny: N45 } : null
-        }
-      : null,
-    eau: null,
-    vapeur: null,
-    rails: [],
-  })
-  const indexCanal = (touchees: number[]): boolean =>
+  const duCanal = (touchees: number[]): boolean =>
     touchees.some((c) => ((level.cibles ?? [])[c]?.canal ?? c + 1) === canal)
-  const sans = traceLaser(emetteur, monde(false))
-  const avec = traceLaser(emetteur, monde(true))
-  return { sansGlace: indexCanal(sans.touchees), avecGlace: indexCanal(avec.touchees) }
+  return {
+    sansGlace: duCanal(traceSynthetique(level, emetteur, {})),
+    avecGlace: duCanal(traceSynthetique(level, emetteur, { glace: miroir })),
+  }
+}
+
+/** L'énigme du PLASMA : sans nuage le rail est muet, avec un corps en
+ * vapeur au point marqué l'arc suit le rail et allume la pastille. */
+export function prouvePlasma(
+  level: LevelDef,
+  emetteur: LaserDef,
+  nuage: { x: number; y: number },
+  canal: number,
+): { sansVapeur: boolean; avecVapeur: boolean } {
+  const duCanal = (touchees: number[]): boolean =>
+    touchees.some((c) => ((level.cibles ?? [])[c]?.canal ?? c + 1) === canal)
+  return {
+    sansVapeur: duCanal(traceSynthetique(level, emetteur, {})),
+    avecVapeur: duCanal(traceSynthetique(level, emetteur, { vapeur: nuage })),
+  }
+}
+
+/** La BARRIÈRE TENUE : le faisceau tient sa pastille d'office ; la
+ * traversée en VAPEUR ne le coupe pas ; la traversée en EAU le plie et le
+ * coupe — c'est toute l'énigme. */
+export function prouveBarriere(
+  level: LevelDef,
+  emetteur: LaserDef,
+  croisement: { x: number; y: number },
+  canal: number,
+): { directe: boolean; enVapeur: boolean; enEau: boolean } {
+  const duCanal = (touchees: number[]): boolean =>
+    touchees.some((c) => ((level.cibles ?? [])[c]?.canal ?? c + 1) === canal)
+  return {
+    directe: duCanal(traceSynthetique(level, emetteur, {})),
+    enVapeur: duCanal(traceSynthetique(level, emetteur, { vapeur: croisement })),
+    enEau: duCanal(
+      traceSynthetique(level, emetteur, {
+        eau: { x: croisement.x + 24, y: croisement.y },
+      }),
+    ),
+  }
 }
 
 // ---- L'ACCESSIBILITÉ : parcours en largeur avec la marge du corps --------
@@ -531,16 +731,70 @@ export function valideNiveau(level: LevelDef): VerdictGen {
   const erreurs = checkLevel(level).filter((v) => v.niveau === 'erreur')
   for (const e of erreurs) raisons.push(`éditeur : ${e.message}`)
   const preuves = (level as LevelGen).__preuves ?? []
-  const ouvrables = new Set<number>()
-  for (const p of preuves) {
-    const { sansGlace, avecGlace } = prouveMiroir(level, p.emetteur, p.miroir, p.canal)
-    if (sansGlace) raisons.push(`canal ${p.canal} : la porte s'ouvre sans miroir — l'énigme n'existe pas`)
-    else if (!avecGlace) raisons.push(`canal ${p.canal} : le reflet du miroir n'allume pas la pastille`)
-    else ouvrables.add(p.canal)
+
+  // L'ÉTAT DE BASE : chaque émetteur tracé sans corps. Seules les pastilles
+  // des barrières NOR ont le droit d'être allumées d'office — toute autre
+  // pastille allumée sans le joueur est une énigme morte (allumage croisé).
+  const norIndex = new Set(preuves.filter((p) => p.kind === 'nor').map((p) => p.cibleIndex))
+  const baseParEmetteur = new Map<LaserDef, Set<number>>()
+  for (const em of level.lasers ?? []) {
+    const touchees = new Set(traceSynthetique(level, em, {}))
+    baseParEmetteur.set(em, touchees)
+    for (const t of touchees) {
+      if (!norIndex.has(t))
+        raisons.push(
+          `pastille ${t + 1} allumée sans le joueur (allumage croisé) — l'énigme est morte`,
+        )
+    }
   }
+
+  // chaque preuve, dans les termes de son énigme
+  const canauxProuves = new Map<number, number>() // canal → preuves réussies
+  const attendus = new Map<number, number>() // canal → preuves exigées
+  for (const p of preuves) attendus.set(p.canal, (attendus.get(p.canal) ?? 0) + 1)
+  for (const p of preuves) {
+    const base = baseParEmetteur.get(p.emetteur) ?? new Set()
+    let ok = false
+    if (p.kind === 'miroir') {
+      const avec = traceSynthetique(level, p.emetteur, { glace: p.spot })
+      if (base.has(p.cibleIndex)) raisons.push(`canal ${p.canal} : la pastille s'allume sans miroir`)
+      else if (!avec.includes(p.cibleIndex))
+        raisons.push(`canal ${p.canal} : le reflet du miroir n'allume pas la pastille`)
+      else {
+        // le miroir ne doit servir QUE sa pastille : allumer la jumelle
+        // d'un canal ET depuis le même point trivialiserait l'énigme
+        const autres = preuves.filter((q) => q !== p && q.canal === p.canal)
+        ok = autres.every((q) => !avec.includes(q.cibleIndex))
+        if (!ok) raisons.push(`canal ${p.canal} : un seul miroir allume les deux pastilles`)
+      }
+    } else if (p.kind === 'rail') {
+      const avec = traceSynthetique(level, p.emetteur, { vapeur: p.spot })
+      if (base.has(p.cibleIndex)) raisons.push(`canal ${p.canal} : la pastille s'allume sans nuage`)
+      else if (!avec.includes(p.cibleIndex))
+        raisons.push(`canal ${p.canal} : l'arc guidé n'atteint pas la pastille`)
+      else ok = true
+    } else {
+      // nor : allumée d'office, la vapeur ne coupe pas, l'eau coupe
+      const enVapeur = traceSynthetique(level, p.emetteur, { vapeur: p.spot })
+      const enEau = traceSynthetique(level, p.emetteur, {
+        eau: { x: p.spot.x + 24, y: p.spot.y },
+      })
+      if (!base.has(p.cibleIndex))
+        raisons.push(`canal ${p.canal} : la barrière n'atteint pas sa pastille`)
+      else if (!enVapeur.includes(p.cibleIndex))
+        raisons.push(`canal ${p.canal} : la traversée en vapeur coupe la barrière`)
+      else if (enEau.includes(p.cibleIndex))
+        raisons.push(`canal ${p.canal} : l'eau ne plie pas le faisceau — la barrière ne punit rien`)
+      else ok = true
+    }
+    if (ok) canauxProuves.set(p.canal, (canauxProuves.get(p.canal) ?? 0) + 1)
+  }
+  const ouvrables = new Set<number>()
+  for (const [canal, n] of attendus)
+    if ((canauxProuves.get(canal) ?? 0) === n) ouvrables.add(canal)
   // une porte sans preuve n'est jamais ouvrable : elle doit ne pas exister
   for (const porte of level.portes ?? []) {
-    if (!preuves.some((p) => p.canal === porte.canal))
+    if (!attendus.has(porte.canal))
       raisons.push(`canal ${porte.canal} : porte sans énigme prouvée`)
   }
   if (raisons.length === 0 && !accessible(level, ouvrables))
