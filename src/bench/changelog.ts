@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 00:22',
+    title: 'Les arcs choisissent leurs BOUTS : ronds, droits à 90°, en pointe',
+    notes: [
+      'Demandé : pouvoir choisir la forme des extrémités des arcs — à commencer par une coupe à 90°. C’est fait, avec trois finitions au choix dans l’éditeur (panneau de la pièce, sélecteur « Bouts », pour les parois comme pour les cachettes) : ARRONDIS — la calotte demi-ronde historique ; DROITS (90°) — la coupe franche, exactement perpendiculaire à la courbe ; EN POINTE — l’anneau s’effile en griffe sur son dernier segment.',
+      'La géométrie est UNE : le champ de distance signée du moteur (collisions, laser, miroirs), son miroir GLSL du shader (rendu, ombres portées, éclairage) et le contour de l’éditeur parlent la même formule — les tests croisent le contour contre le champ, rotation comprise, et des points discriminants séparent les trois finitions. Changer de bouts ne déplace ni ne remet à l’échelle l’arc : la boîte englobante reste celle des bouts ronds.',
+      'Le style voyage dans le fichier du tableau (champ p2, omis au défaut — les tableaux existants ne changent pas d’un octet) et jusqu’au GPU sans un uniforme de plus, glissé dans l’empaquetage existant. Vérifié en jeu : trois arcs identiques côte à côte, seuls les bouts diffèrent — calottes, coupes nettes, griffes — ombres fidèles. 358 tests verts, build propre.',
+    ],
+  },
+  {
     date: '27/08/2026 00:00',
     title: 'Fin des fermes à dashs : la réserve appartient au TABLEAU',
     notes: [

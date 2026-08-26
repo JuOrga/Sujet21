@@ -24,6 +24,12 @@ export const FORME_NAMES: Record<number, string> = {
 export const ARC_EPAISSEUR_DEFAUT = 0.35
 export const ARC_OUVERTURE_DEFAUT = 90 // demi-ouverture en degrés : 90 = demi-anneau
 
+// Les BOUTS de l'arc (p2) : la forme des deux extrémités.
+export const ARC_BOUT_ROND = 0 // calotte demi-ronde (l'historique)
+export const ARC_BOUT_DROIT = 1 // coupe franche à 90° de la courbe (radiale)
+export const ARC_BOUT_POINTE = 2 // griffe : l'anneau s'effile en pointe
+export const ARC_BOUT_NOMS = ['Arrondis', 'Droits (90°)', 'En pointe']
+
 export interface FormeBox {
   minX: number
   minY: number
@@ -33,6 +39,7 @@ export interface FormeBox {
   forme?: number // absent/0 : rectangle — le chemin rapide partout
   p0?: number // COIN : orientation 0..3 · ARC : épaisseur relative 0..1
   p1?: number // ARC : demi-ouverture en degrés
+  p2?: number // ARC : bouts (0 arrondis, 1 droits, 2 en pointe)
 }
 
 export interface FormeContact {
@@ -270,11 +277,21 @@ export function arcRayons(b: {
   }
 }
 
-// Arc d'anneau aux bouts ronds : bande radiale sur ±ouverture autour de +x
-// (la rotation de la boîte oriente l'arc), calottes aux extrémités. Évalué
-// en espace UNITAIRE puis remis à l'échelle de la boîte — même approche (et
-// même approximation de distance) que l'ellipse : le gradient est exact, la
-// distance légèrement compressée sur les arcs très étirés.
+/** L'étendue angulaire de l'EFFILAGE d'un bout en pointe : la griffe se
+ *  resserre sur ce dernier segment d'angle avant de mourir à ±ouverture. */
+export function arcTaper(rm: number, ht: number, ouverture: number): number {
+  return Math.min(ouverture * 0.7, Math.max(0.12, (2.2 * ht) / rm))
+}
+
+// Arc d'anneau : bande radiale sur ±ouverture autour de +x (la rotation de
+// la boîte oriente l'arc), et des BOUTS au choix (p2) — calotte ronde,
+// coupe franche à 90° de la courbe, ou griffe en pointe. Évalué en espace
+// UNITAIRE puis remis à l'échelle de la boîte — même approche (et même
+// approximation de distance) que l'ellipse : le gradient est exact, la
+// distance légèrement compressée sur les arcs très étirés. La boîte reste
+// celle des bouts RONDS quel que soit p2 : changer de bout ne déplace ni ne
+// remet à l'échelle l'arc — les bouts droits et pointus vivent un cheveu en
+// retrait des coins.
 function arcContactAxe(
   x: number,
   y: number,
@@ -285,18 +302,23 @@ function arcContactAxe(
     maxY: number
     p0?: number
     p1?: number
+    p2?: number
   },
   out: FormeContact,
 ): void {
   const { rm, ht, ouverture, cu, sx, sy } = arcRayons(b)
+  const bout = Math.round(b.p2 ?? ARC_BOUT_ROND)
   const qx = (x - (b.minX + b.maxX) / 2) / sx + cu
   const qy = (y - (b.minY + b.maxY) / 2) / sy
   const L = Math.hypot(qx, qy)
   const th = Math.atan2(qy, qx)
+  // pli de symétrie : on travaille sur |angle|, le signe déplie la normale
+  const a = Math.abs(th)
+  const sg = th >= 0 ? 1 : -1
   let dU: number
   let nx: number
   let ny: number
-  if (Math.abs(th) <= ouverture) {
+  const radiale = (): void => {
     const dr = L - rm
     dU = Math.abs(dr) - ht
     if (L > 1e-9) {
@@ -307,7 +329,65 @@ function arcContactAxe(
       nx = 0
       ny = 1
     }
+  }
+  nx = 0
+  ny = 1
+  dU = 0
+  if (bout === ARC_BOUT_DROIT) {
+    const ri = Math.max(0, rm - ht)
+    const ro = rm + ht
+    if (a <= ouverture) {
+      radiale()
+      // la coupe : distance signée au plan radial de l'extrémité (≤ 0 ici) —
+      // l'intersection avec la bande donne la coupe franche à 90°
+      const scut = L * Math.sin(a - ouverture)
+      if (scut > dU) {
+        dU = scut
+        nx = -Math.sin(ouverture)
+        ny = Math.cos(ouverture) * sg
+      }
+    } else {
+      // au-delà de la coupe : le plus proche est le SEGMENT de coupe (ri→ro)
+      const ca = Math.cos(ouverture)
+      const sa = Math.sin(ouverture)
+      const t = Math.min(ro, Math.max(ri, qx * ca + Math.abs(qy) * sa))
+      const dx = qx - t * ca
+      const dy = Math.abs(qy) - t * sa
+      const d = Math.hypot(dx, dy)
+      dU = d
+      if (d > 1e-9) {
+        nx = dx / d
+        ny = (dy / d) * sg
+      }
+    }
+  } else if (bout === ARC_BOUT_POINTE) {
+    const ta = arcTaper(rm, ht, ouverture)
+    if (a <= ouverture - ta) {
+      radiale()
+    } else if (a <= ouverture) {
+      // la griffe : l'épaisseur s'effile linéairement jusqu'à zéro au bout
+      const hEff = (ht * (ouverture - a)) / ta
+      const dr = L - rm
+      dU = Math.abs(dr) - hEff
+      if (L > 1e-9) {
+        const sgn = dr >= 0 ? 1 : -1
+        nx = (sgn * qx) / L
+        ny = (sgn * qy) / L
+      }
+    } else {
+      const dx = qx - rm * Math.cos(ouverture)
+      const dy = Math.abs(qy) - rm * Math.sin(ouverture)
+      const d = Math.hypot(dx, dy)
+      dU = d
+      if (d > 1e-9) {
+        nx = dx / d
+        ny = (dy / d) * sg
+      }
+    }
+  } else if (a <= ouverture) {
+    radiale()
   } else {
+    // bouts RONDS (l'historique) : la calotte au bout du rayon médian
     const ca = th >= 0 ? ouverture : -ouverture
     const dx = qx - rm * Math.cos(ca)
     const dy = qy - rm * Math.sin(ca)
@@ -316,9 +396,6 @@ function arcContactAxe(
     if (d > 1e-9) {
       nx = dx / d
       ny = dy / d
-    } else {
-      nx = 0
-      ny = 1
     }
   }
   // retour au monde : gradient transformé par l'inverse des échelles
@@ -448,6 +525,7 @@ export function formeOutline(
     pts.push({ x: ax, y: ay }, { x: bx, y: by }, { x: cx2, y: cy2 })
   } else if (f === FORME_ARC) {
     const { rm, ht, ouverture, cu, sx, sy } = arcRayons(b)
+    const bout = Math.round(b.p2 ?? ARC_BOUT_ROND)
     const monde = (ux: number, uy: number): { x: number; y: number } => ({
       x: cx + (ux - cu) * sx,
       y: cy + uy * sy,
@@ -455,8 +533,11 @@ export function formeOutline(
     const n = Math.max(8, Math.floor(steps / 2))
     const ro = rm + ht
     const ri = Math.max(0, rm - ht)
+    // l'étendue angulaire des lisières : en pointe, elles s'arrêtent où la
+    // griffe commence — le bout lui-même est un sommet unique
+    const fin = bout === ARC_BOUT_POINTE ? ouverture - arcTaper(rm, ht, ouverture) : ouverture
     for (let i = 0; i <= n; i++) {
-      const t = -ouverture + (i / n) * 2 * ouverture
+      const t = -fin + (i / n) * 2 * fin
       pts.push(monde(ro * Math.cos(t), ro * Math.sin(t)))
     }
     const capN = 6
@@ -468,12 +549,18 @@ export function formeOutline(
         pts.push(monde(ex + ht * Math.cos(t), ey + ht * Math.sin(t)))
       }
     }
-    cap(ouverture, ouverture)
+    // BOUTS : ronds — la calotte ; droits — rien (la fermeture du polygone
+    // trace la coupe radiale) ; en pointe — le sommet de la griffe
+    if (bout === ARC_BOUT_ROND) cap(ouverture, ouverture)
+    else if (bout === ARC_BOUT_POINTE)
+      pts.push(monde(rm * Math.cos(ouverture), rm * Math.sin(ouverture)))
     for (let i = n; i >= 0; i--) {
-      const t = -ouverture + (i / n) * 2 * ouverture
+      const t = -fin + (i / n) * 2 * fin
       pts.push(monde(ri * Math.cos(t), ri * Math.sin(t)))
     }
-    cap(-ouverture, -ouverture + Math.PI)
+    if (bout === ARC_BOUT_ROND) cap(-ouverture, -ouverture + Math.PI)
+    else if (bout === ARC_BOUT_POINTE)
+      pts.push(monde(rm * Math.cos(-ouverture), rm * Math.sin(-ouverture)))
   } else {
     pts.push(
       { x: b.minX, y: b.minY },

@@ -218,6 +218,7 @@ function readBox(o: Record<string, unknown>): ObstacleBox | null {
   const forme = Math.round(num(o.forme, FORME_RECT))
   const p0 = num(o.p0, forme === FORME_ARC ? ARC_EPAISSEUR_DEFAUT : 0)
   const p1 = num(o.p1, ARC_OUVERTURE_DEFAUT)
+  const p2 = Math.round(num(o.p2, 0))
   const box: ObstacleBox = {
     minX: Math.min(minX, maxX),
     minY: Math.min(minY, maxY),
@@ -240,6 +241,7 @@ function readBox(o: Record<string, unknown>): ObstacleBox | null {
     ...(forme === FORME_ARC && p1 !== ARC_OUVERTURE_DEFAUT
       ? { p1: Math.max(15, Math.min(180, p1)) }
       : {}),
+    ...(forme === FORME_ARC && p2 !== 0 ? { p2: Math.max(0, Math.min(2, p2)) } : {}),
     material,
   }
   if (box.maxX - box.minX < 1 || box.maxY - box.minY < 1) return null
@@ -531,6 +533,7 @@ export function parseLevel(input: unknown): {
     const forme = Math.round(num(c.forme, FORME_RECT))
     const p0 = num(c.p0, forme === FORME_ARC ? ARC_EPAISSEUR_DEFAUT : 0)
     const p1 = num(c.p1, ARC_OUVERTURE_DEFAUT)
+    const p2 = Math.round(num(c.p2, 0))
     const cache: CacheDef = {
       minX: Math.min(num(c.minX), num(c.maxX)),
       minY: Math.min(num(c.minY), num(c.maxY)),
@@ -546,6 +549,9 @@ export function parseLevel(input: unknown): {
         : {}),
       ...(forme === FORME_ARC && p1 !== ARC_OUVERTURE_DEFAUT
         ? { p1: Math.max(15, Math.min(180, p1)) }
+        : {}),
+      ...(forme === FORME_ARC && p2 !== 0
+        ? { p2: Math.max(0, Math.min(2, p2)) }
         : {}),
       ...(c.style === 'paroi' ? { style: 'paroi' as const } : {}),
     }

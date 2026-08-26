@@ -4,10 +4,14 @@
 
 import { describe, expect, it } from 'vitest'
 import {
+  ARC_BOUT_DROIT,
+  ARC_BOUT_POINTE,
   FORME_ARC,
   FORME_CAPSULE,
   FORME_COIN,
   FORME_DISQUE,
+  arcRayons,
+  arcTaper,
   dansForme,
   formeContact,
   formeOutline,
@@ -268,6 +272,28 @@ describe('formes — le contour est cohérent avec le champ', () => {
         p1: 120,
         angle: 60,
       },
+      {
+        minX: 0,
+        minY: 0,
+        maxX: 300,
+        maxY: 280,
+        forme: FORME_ARC,
+        p0: 0.4,
+        p1: 120,
+        p2: ARC_BOUT_DROIT,
+        angle: -30,
+      },
+      {
+        minX: 0,
+        minY: 0,
+        maxX: 300,
+        maxY: 280,
+        forme: FORME_ARC,
+        p0: 0.4,
+        p1: 120,
+        p2: ARC_BOUT_POINTE,
+        angle: 210,
+      },
     ]
     for (const b of formes) {
       for (const p of formeOutline(b, 48)) {
@@ -278,5 +304,63 @@ describe('formes — le contour est cohérent avec le champ', () => {
         )
       }
     }
+  })
+})
+
+describe('formes — les BOUTS de l\u2019arc (p2)', () => {
+  // le m\u00eame arc dans les trois finitions : demi-anneau \u00e9pais, sans rotation
+  const base: FormeBox = {
+    minX: -150,
+    minY: -150,
+    maxX: 150,
+    maxY: 150,
+    forme: FORME_ARC,
+    p0: 0.4,
+    p1: 90,
+  }
+  // un point UNITAIRE remis au monde par les \u00e9chelles de la bo\u00eete
+  const monde = (b: FormeBox, ux: number, uy: number): [number, number] => {
+    const { cu, sx, sy } = arcRayons(b)
+    return [(b.minX + b.maxX) / 2 + (ux - cu) * sx, (b.minY + b.maxY) / 2 + uy * sy]
+  }
+
+  it('la calotte ronde d\u00e9borde le plan de coupe \u2014 les bouts droits et pointus, non', () => {
+    const { rm, ht } = arcRayons(base)
+    // juste au-del\u00e0 de la coupe (x < 0 \u00e0 90\u00b0), au rayon m\u00e9dian : dans la
+    // calotte ronde, hors de la coupe franche, hors de la pointe
+    const [px, py] = monde(base, -ht * 0.5, rm)
+    expect(dansForme(base, px, py)).toBe(true)
+    expect(dansForme({ ...base, p2: ARC_BOUT_DROIT }, px, py)).toBe(false)
+    expect(dansForme({ ...base, p2: ARC_BOUT_POINTE }, px, py)).toBe(false)
+  })
+
+  it('la griffe s\u2019effile : pr\u00e8s du bout, la pleine \u00e9paisseur n\u2019y est plus', () => {
+    const { rm, ht, ouverture } = arcRayons(base)
+    const ta = arcTaper(rm, ht, ouverture)
+    // \u00e0 mi-griffe, \u00e0 80 % de l\u2019\u00e9paisseur : encore dedans en rond et en
+    // droit, d\u00e9j\u00e0 dehors en pointe (l\u2019\u00e9paisseur locale est tomb\u00e9e \u00e0 50 %)
+    const a = ouverture - ta / 2
+    const L = rm + ht * 0.8
+    const [px, py] = monde(base, L * Math.cos(a), L * Math.sin(a))
+    expect(dansForme(base, px, py)).toBe(true)
+    expect(dansForme({ ...base, p2: ARC_BOUT_DROIT }, px, py)).toBe(true)
+    expect(dansForme({ ...base, p2: ARC_BOUT_POINTE }, px, py)).toBe(false)
+    // le c\u0153ur de l\u2019arc, loin des bouts : dedans dans les trois finitions
+    const [cx2, cy2] = monde(base, rm, 0)
+    for (const p2 of [0, ARC_BOUT_DROIT, ARC_BOUT_POINTE])
+      expect(dansForme({ ...base, p2 }, cx2, cy2)).toBe(true)
+  })
+
+  it('coupe franche : la normale au bout est PERPENDICULAIRE \u00e0 la courbe', () => {
+    const { rm, ouverture } = arcRayons(base)
+    // l\u00e9g\u00e8rement DANS la bande, contre la coupe du haut (angle +90\u00b0) : la
+    // normale du contact doit \u00eatre celle du plan de coupe (\u2212sin, cos)
+    const a = ouverture - 0.02
+    const [px, py] = monde(base, rm * Math.cos(a), rm * Math.sin(a))
+    const c = contact({ ...base, p2: ARC_BOUT_DROIT }, px, py)
+    expect(c.dist).toBeLessThan(0)
+    const attX = -Math.sin(ouverture)
+    const attY = Math.cos(ouverture)
+    expect(c.nx * attX + c.ny * attY).toBeGreaterThan(0.98)
   })
 })
