@@ -605,6 +605,13 @@ ${FORMES_GLSL}
 // Marche en ESPACE ÉCRAN : hors du cadre, l'occulteur n'est pas dessiné, la
 // marche s'arrête — l'ombre ne coûte que ce qui se voit.
 #define HAUTEUR_CORPS 95.0
+// Hauteur des blocs — DOIT rester égale à celle du cuiseur de carte plus
+// bas : c'est elle qui place le DESSUS des solides dans la lumière.
+#define HAUTEUR_BLOCS 140.0
+// Plancher de lisibilité des solides : un obstacle ne disparaît jamais tout
+// à fait, même dans une pièce éteinte. C'est une règle de jouabilité, pas
+// un choix d'image — on doit voir contre quoi on va buter.
+#define PLANCHER_SOLIDE 0.30
 float ombreVolume(vec2 world, float dansEau) {
   if (uLumiereEau < 0.5) return 0.0;
   float occ = 0.0;
@@ -765,6 +772,9 @@ void main() {
   // La direction de lumière dominante ICI (pour le biseau des arêtes) : la
   // somme des lampes, pondérée par intensité et retombée.
   vec2 lampeDir = vec2(0.0, 1.0);
+  vec3 lumHaut = vec3(0.0);   // lumière reçue par le sommet des solides
+  vec3 eclSolide = vec3(1.0); // multiplicateur des matières inertes
+  vec3 eclActif = vec3(1.0);  // idem, atténué, pour les surfaces actives
   if (uLumiere > 0.5) {
     vec2 acc = vec2(0.0);
     for (int li = 0; li < MAX_LUMIERES; li++) {
@@ -773,9 +783,34 @@ void main() {
       float dn = max(length(dl), 1.0);
       float w = uLampesInt[li] * (1.0 - 0.55 * smoothstep(0.0, uLampes[li].w, dn));
       acc += (dl / dn) * w;
+      // LA LUMIÈRE SUR LE DESSUS DES SOLIDES. Le sommet d'un bloc est à
+      // HAUTEUR_BLOCS, et tous les blocs ont la même hauteur : aucun n'ombre
+      // le toit d'un autre. Il n'y a donc pas d'occlusion à lire — la carte
+      // cuite, elle, ne vaut QUE pour le sol (à l'intérieur d'un bloc elle
+      // rend l'ombre du bloc lui-même). Même formule que la carte, mesurée
+      // depuis le sommet : la flaque d'une lampe basse ne monte pas sur les
+      // toits, une lampe haute les baigne.
+      float hRel = max(uLampes[li].z - HAUTEUR_BLOCS, 0.0);
+      // Retombée PLUS FRANCHE que celle du sol (0,72 contre 0,55) : le sol,
+      // lui, garde un plateau large parce que l'occlusion cuite y creuse
+      // déjà les ombres. Sur les toits, rien ne creuse — sans cette pente,
+      // un sommet à l'autre bout de la salle rendait comme un sommet sous
+      // la lampe, et c'est précisément ce qu'on corrige.
+      float fall = 1.0 - 0.72 * smoothstep(0.0, uLampes[li].w, dn);
+      fall += 0.85 * pow(max(0.0, 1.0 - dn / (hRel * 0.55 + 60.0)), 1.6);
+      lumHaut += uLampesCol[li] * (fall * uLampesInt[li]);
     }
     float an = length(acc);
     if (an > 1e-5) lampeDir = acc / an;
+    // Même contrat que le fond de cuve (ambiante + carte), BORNÉ À 1 : la
+    // lumière ne peut qu'assombrir un solide, jamais le surexposer — les
+    // tableaux déjà réglés gardent exactement leur clair d'aujourd'hui, et
+    // seuls les recoins que rien n'éclaire tombent vers le plancher.
+    eclSolide = clamp(vec3(uAmbiante) + 0.95 * lumHaut,
+                      vec3(PLANCHER_SOLIDE), vec3(1.0));
+    // Les surfaces ACTIVES gardent leur signal : une chaudière se lit
+    // brûlante même dans le noir. Elles n'obéissent qu'à moitié.
+    eclActif = mix(vec3(1.0), eclSolide, 0.45);
   }
   if (uLumiere > 0.5) {
     vec2 luv = (world - uLightMapMin) * uLightMapInvSize;
@@ -921,6 +956,12 @@ void main() {
     float d = boxSdf(wb, uBoxes[bi]);
     vec4 dec = decodeAux(uBoxAux[bi].x);
     float mat = dec.x;
+    // Plaque froide, chaudière et surchauffeur ÉMETTENT : ils ne prennent
+    // qu'une part de l'éclairage de la pièce. Tout le reste est de la
+    // matière, et la matière obéit à la lumière.
+    bool matActif = (mat > 3.5 && mat < 4.5) || (mat > 5.5 && mat < 6.5) ||
+                    (mat > 8.5 && mat < 9.5);
+    vec3 eclMat = matActif ? eclActif : eclSolide;
     // Court-circuit : au-delà de toute influence visuelle (ombre 56 u, arête,
     // aura selon le matériau), la boîte ne peut plus teinter ce pixel — on
     // saute remplissage, bruit et mélanges. Sur un tableau à 30-40 boîtes,
@@ -1028,6 +1069,15 @@ void main() {
       }
       // chant clair sous le sommet : l'arête haute attrape la lumière
       fc += hautC * 0.55 * smoothstep(0.82, 0.97, ht);
+      // LA TRANCHE REGARDE LA LAMPE. C'est une face verticale : celle qui
+      // fait face à la source s'allume, celle qui lui tourne le dos plonge
+      // — chant compris. Sans ça, le flanc éclairé était toujours le même,
+      // quelle que soit la position des lampes, et le volume ne tournait
+      // pas avec la lumière.
+      if (uLumiere > 0.5) {
+        float face = dot(nrm, lampeDir);
+        fc *= mix(0.52, 1.15, 0.5 + 0.5 * face) * eclMat;
+      }
       col = mix(col, fc, flanc);
     }
     if (mat < 2.5) {
@@ -1114,8 +1164,8 @@ void main() {
           : vec3(0.16, 0.11, 0.20) + vec3(0.07, 0.035, 0.10) * wax;
         edgeCol = vec3(0.62, 0.42, 0.78);
       }
-      col = mix(col, fillCol, fill);
-      col = mix(col, edgeCol, edge * 0.9);
+      col = mix(col, fillCol * eclMat, fill);
+      col = mix(col, edgeCol * eclMat, edge * 0.9);
       if (mat > 0.5) {
         // L'aura dit la portée : une brume diffuse sur toute la bande
         // d'influence, sur le modèle de la chaleur du radiateur — turquoise
@@ -1143,8 +1193,8 @@ void main() {
       base *= 0.86 + 0.14 * grain;
       base += vec3(0.05) * smoothstep(0.80, 1.0, stries);
       vec3 pol = base + vec3(0.34, 0.36, 0.38) * sweep;
-      col = mix(col, pol, fill);
-      col = mix(col, vec3(0.92, 0.97, 1.05), edge * 0.95);
+      col = mix(col, pol * eclMat, fill);
+      col = mix(col, vec3(0.92, 0.97, 1.05) * eclMat, edge * 0.95);
     } else if (mat > 8.5) {
       // SURCHAUFFEUR : serpentin AMBRE sous verre (la couleur de la vapeur) — la borne de recharge du
       // dash. Chargé (aux.z = 1), le serpentin pulse ; déchargé, il s'éteint
@@ -1157,8 +1207,8 @@ void main() {
       float pulse = 0.7 + 0.3 * sin(uTime * 3.1 + world.y * 0.05);
       vec3 metal = vec3(0.10, 0.13, 0.17) * (0.9 + 0.2 * dnoise(world * 0.14));
       vec3 lueur = mix(vec3(0.24, 0.20, 0.14), vec3(1.00, 0.76, 0.38) * pulse, charge);
-      col = mix(col, metal + lueur * tube * 0.85, fill);
-      col = mix(col, mix(vec3(0.42, 0.40, 0.35), vec3(1.00, 0.85, 0.55), charge), edge * 0.9);
+      col = mix(col, metal * eclMat + lueur * tube * 0.85, fill);
+      col = mix(col, mix(vec3(0.42, 0.40, 0.35) * eclMat, vec3(1.00, 0.85, 0.55), charge), edge * 0.9);
       // le halo dit « approchez en vapeur » : il meurt avec la charge
       float aura = (1.0 - smoothstep(0.0, 60.0, max(d, 0.0))) * step(0.0, d);
       col += vec3(0.34, 0.24, 0.09) * aura * aura * charge;
@@ -1172,8 +1222,8 @@ void main() {
       float lam = 0.5 + 0.5 * sin((world.y + sway) * 0.55);
       float fente = smoothstep(0.86, 0.97, lam);
       vec3 lamCol = vec3(0.34, 0.46, 0.60) * (0.72 + 0.38 * lam);
-      col = mix(col, lamCol, fill * (1.0 - fente * 0.75));
-      col = mix(col, vec3(0.70, 0.85, 0.98), edge * 0.85);
+      col = mix(col, lamCol * eclMat, fill * (1.0 - fente * 0.75));
+      col = mix(col, vec3(0.70, 0.85, 0.98) * eclMat, edge * 0.85);
     } else if (mat > 6.5) {
       // Membrane gorgée d'eau : trame tissée vert d'eau qui suinte — seule
       // l'EAU la traverse. Des gouttes descendent le long de la trame.
@@ -1183,8 +1233,8 @@ void main() {
       float drip = smoothstep(0.78, 1.0,
         0.5 + 0.5 * sin(world.y * 0.10 - uTime * 1.6 + dnoise(world * 0.05) * 6.0));
       vec3 memCol = vec3(0.05, 0.20, 0.17) + vec3(0.04, 0.15, 0.12) * weave;
-      col = mix(col, memCol + vec3(0.03, 0.11, 0.09) * drip, fill);
-      col = mix(col, vec3(0.25, 0.78, 0.62), edge * 0.9);
+      col = mix(col, (memCol + vec3(0.03, 0.11, 0.09) * drip) * eclMat, fill);
+      col = mix(col, vec3(0.25, 0.78, 0.62) * eclMat, edge * 0.9);
     } else if (mat > 5.5) {
       // Radiateur (tableau 4) : rayures chaudes qui défilent, arête incandes-
       // cente, et une aura de chaleur qui tremble — le danger (et la
@@ -1199,7 +1249,7 @@ void main() {
       vec3 fillCol = uHasChaud > 0.5
         ? texChaudC * vec3(2.3, 1.45, 0.95) + vec3(0.30, 0.11, 0.02) * smoothstep(0.4, 0.9, stripe)
         : vec3(0.26, 0.11, 0.05) + vec3(0.42, 0.17, 0.04) * smoothstep(0.35, 0.85, stripe);
-      col = mix(col, fillCol, fill);
+      col = mix(col, fillCol * eclMat, fill);
       col = mix(col, vec3(1.0, 0.56, 0.24), edge * 0.9);
       // chaque chaudière porte sa propre portée d'aura (aux.w) : le halo
       // dessiné est exactement la portée mécanique
@@ -1224,8 +1274,8 @@ void main() {
         hole = 1.0 - smoothstep(0.26, 0.34, max(abs(cellUv.x), abs(cellUv.y)));
         barCol = vec3(0.17, 0.21, 0.26) * (0.9 + 0.2 * dnoise(world * 0.15));
       }
-      col = mix(col, barCol, fill * (1.0 - hole * 0.85));
-      col = mix(col, vec3(0.45, 0.60, 0.70), edge * 0.8);
+      col = mix(col, barCol * eclMat, fill * (1.0 - hole * 0.85));
+      col = mix(col, vec3(0.45, 0.60, 0.70) * eclMat, edge * 0.8);
     } else if (mat > 3.5) {
       // Plaque froide (tableau 2) : givre cristallin, arête pâle, et une
       // aura de brume glacée — le danger se lit avant le contact.
@@ -1239,7 +1289,7 @@ void main() {
       vec3 fillCol = uHasFroid > 0.5
         ? texFroidC * vec3(0.52, 0.74, 1.02) * (0.60 + 0.28 * sparkle)
         : vec3(0.15, 0.21, 0.29) + vec3(0.26, 0.34, 0.40) * sparkle * 0.55;
-      col = mix(col, fillCol, fill);
+      col = mix(col, fillCol * eclMat, fill);
       col = mix(col, vec3(0.70, 0.86, 0.97), edge * 0.9);
       float aura = (1.0 - smoothstep(0.0, uColdBand, max(d, 0.0))) * step(0.0, d);
       float mist = 0.55 + 0.45 * dnoise(world * 0.05 + vec2(uTime * 0.10, -uTime * 0.06));
