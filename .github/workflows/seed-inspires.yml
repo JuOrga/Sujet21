@@ -1,0 +1,16 @@
+# Semis des tableaux inspirés du crop circle dans la bibliothèque
+# partagée. Gâchette : push sur seed-inspires-go (l'environnement
+# d'analyse ne joint pas l'API, GitHub Actions si).
+name: seed-inspires
+on:
+  workflow_dispatch:
+  push:
+    branches: [seed-inspires-go]
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Semer les tableaux inspirés
+        run: node ops/seed-inspires.mjs
