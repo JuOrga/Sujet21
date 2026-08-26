@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 00:00',
+    title: 'Fin des fermes à dashs : la réserve appartient au TABLEAU',
+    notes: [
+      'Signalé : les chaudières servaient de fermes à dashs — deux dashs dépensés, un passage en eau, un tour de chaudière, et le compteur remontait à 3. La règle change, comme demandé : la réserve de dashs est celle du TABLEAU — trois par écran, pleines dès le chargement (même quand on naît liquide) — et CHANGER D’ÉTAT n’y touche plus jamais. Touche G, chaudière, zone forcée : la transformation se paie toujours (le péage de 20 % en gouttes demeure), mais elle ne rend plus rien.',
+      'Le SURCHAUFFEUR garde son rôle de borne : frôlé en vapeur, il rend UN dash — mais jamais au-delà de la réserve maximale. Et réserve pleine, son serpentin ne se vide plus pour rien : il reste chargé et attend qu’un dash manque. La buse calibrée agrandit simplement la réserve d’un cran. Codex et fiche d’instrument mis à jour.',
+      'Vérifié au banc ET en jeu : réserve à 3 dès l’arrivée en eau, bascules vapeur↔eau neutres (un dash en poche avant, un dash après — l’ancienne règle aurait remis 3), plafond du surchauffeur gravé au spec. 354 tests verts, build propre.',
+    ],
+  },
+  {
     date: '26/08/2026 23:30',
     title:
       'Caméra automatique : le plan large, calé sur la référence du concepteur',

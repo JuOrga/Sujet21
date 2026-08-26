@@ -27,7 +27,7 @@ export const INSTRUMENTS: InstrumentDef[] = [
   {
     id: 'buse-calibree',
     nom: 'Buse calibrée',
-    desc: 'Chaque transformation en vapeur donne un dash de plus.',
+    desc: 'Un dash de plus dans la réserve de chaque tableau.',
     icone: '💨',
   },
   {

@@ -283,21 +283,18 @@ function appliqueMoteur(s: FluidSim): void {
 function createSim(level: LevelDef): FluidSim {
   const sim = new FluidSim(params, level.bounds, CAPACITY)
   appliqueMoteur(sim)
-  // les dashs se rendent à CHAQUE transformation en vapeur : le tableau peut
-  // fixer son propre nombre, sinon celui du banc — et on part à sec, la
-  // première bascule remplira le compteur.
-  // SAUF si le tableau COMMENCE en vapeur (le départ est posé dans une zone
-  // qui l'impose) : la bascule a eu lieu avant le premier pas, il n'y a plus
-  // rien à provoquer, et sans dash le nuage naîtrait sans aucune mobilité —
-  // l'éjection est coupée en vapeur. On entre donc avec le compteur plein.
-  sim.dashBudgetParTransfo = level.dashBudget ?? params.gasDashBudget
-  // Instruments embarqués : la buse calibrée offre un dash de plus par
-  // transformation, l'aimant à rosée bonifie la recondensation
-  if (run.instruments.includes('buse-calibree')) sim.dashBudgetParTransfo += 1
+  // les dashs sont la RÉSERVE DU TABLEAU : N par écran (le tableau peut
+  // fixer son propre nombre, sinon celui du banc), pleins dès le chargement.
+  // Changer d'état n'y touche jamais — la chaudière transforme, elle ne
+  // recharge pas — et seul un surchauffeur frôlé en rend un, plafonné au max.
+  sim.dashBudgetMax = level.dashBudget ?? params.gasDashBudget
+  // Instruments embarqués : la buse calibrée agrandit la réserve d'un dash,
+  // l'aimant à rosée bonifie la recondensation
+  if (run.instruments.includes('buse-calibree')) sim.dashBudgetMax += 1
   if (run.instruments.includes('aimant-rosee')) sim.recondBonus = 0.35
   const naitVapeur =
     zoneForceAt(level, level.spawn.x, level.spawn.y) === 'vapeur'
-  sim.dashBudget = naitVapeur ? sim.dashBudgetParTransfo : 0
+  sim.dashBudget = sim.dashBudgetMax
   sim.setLevel(level.boxes, level.sponges)
   sim.spawnDisc(level.spawn.x, level.spawn.y, level.spawn.n, KIND_PLAYER)
   // né dans une zone qui impose la vapeur : le corps EST un nuage dès la
@@ -6880,14 +6877,13 @@ function frame(now: number): void {
   sim.gasIntent = input.gasIntent
   // La BASCULE en vapeur — G, chaudière à 95 %, zone forcée : toute cause —
   // se règle à l'instant du basculement : péage de 20 % du volume actif
-  // (gerbe de gouttes récupérables) et compteur de dashs rendu.
-  // Une ZONE qui impose la vapeur n'est pas une chaudière : elle convertit,
-  // elle ne RECHARGE PAS. Entrer en zone avec un seul dash en poche, c'est
-  // ressortir avec un seul dash — le compteur ne se remplit qu'aux bascules
-  // qu'on décide (touche G) ou qu'une chaudière provoque.
+  // (gerbe de gouttes récupérables). Le compteur de dashs, lui, ne bouge
+  // PAS : la réserve appartient au TABLEAU (pleine au chargement) — bascule
+  // décidée, chaudière ou zone, aucune transformation n'en rend ni n'en
+  // prend. Seul le surchauffeur recharge, dans la limite de la réserve.
   // Et un tableau qui COMMENCE en vapeur ne bascule pas : c'est son état de
-  // départ. Ni péage, ni événement — le corps naît nuage, avec ses dashs
-  // (createSim les a comptés), sans qu'on lui prenne un cinquième de lui-même.
+  // départ. Ni péage, ni événement — le corps naît nuage, avec sa réserve
+  // (createSim l'a remplie), sans qu'on lui prenne un cinquième de lui-même.
   if (input.gasIntent && !gasIntentAvant && !tableauDone && !input.paused) {
     // l'état de départ, c'est la PREMIÈRE prise de la zone, au tout début du
     // tableau : une bascule décidée plus tard (touche G) se paie et rend ses
@@ -6895,7 +6891,7 @@ function frame(now: number): void {
     const etatDeDepart =
       departEnVapeur && zoneActive === 'vapeur' && run.tableauTime < 3
     departEnVapeur = false
-    if (!etatDeDepart) sim.transfoVapeur(zoneActive !== 'vapeur')
+    if (!etatDeDepart) sim.transfoVapeur()
   }
   gasIntentAvant = input.gasIntent
 

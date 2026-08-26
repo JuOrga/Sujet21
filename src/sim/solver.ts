@@ -212,12 +212,12 @@ export class FluidSim {
   // le FRISSON (le tremblement bref du corps que le froid saisit)
   froidFrac = 0
 
-  // Impulsions vapeur restantes : le compteur se REMPLIT à chaque
-  // TRANSFORMATION en vapeur (règle d'or : N par bascule, quel que soit le
-  // volume restant — se retransformer redonne ses dashs, mais repaie le
-  // péage). Le SURCHAUFFEUR frôlé en gaz en rend UNE, une seule fois.
+  // Impulsions vapeur restantes : la RÉSERVE DU TABLEAU (règle d'or : N
+  // dashs par écran, pleins au chargement — changer d'état ne touche PAS au
+  // compte). Le SURCHAUFFEUR frôlé en gaz en rend UNE, une seule fois par
+  // appareil, sans jamais dépasser la réserve maximale (dashBudgetMax).
   dashBudget = 0
-  dashBudgetParTransfo = 3
+  dashBudgetMax = 3
   // Bonus de rendement de recondensation (instrument « aimant à rosée ») —
   // posé par le jeu au début de la run, remis à zéro avec la simulation
   recondBonus = 0
@@ -1106,20 +1106,18 @@ export class FluidSim {
 
   // Le dash de vapeur (« air dash » à la Ori) : UNE impulsion qui envoie
   // tout le nuage vers le point visé — pas de recul, pas d'éjection, pas de
-  // pilotage continu. Les impulsions sont COMPTÉES : le compteur se remplit
-  // à chaque TRANSFORMATION en vapeur (dashBudgetParTransfo), et un
-  // surchauffeur frôlé en rend une. Renvoie 1 si le dash part, 0 sinon.
+  // pilotage continu. Les impulsions sont COMPTÉES : la réserve se remplit
+  // AU CHARGEMENT DU TABLEAU (dashBudgetMax) et seul un surchauffeur frôlé
+  // en rend une, plafonnée à la réserve. Renvoie 1 si le dash part, 0 sinon.
   // La TRANSFORMATION en vapeur — touche, chaudière à 95 %, zone forcée :
   // toute cause confondue — se paie à l'instant du basculement : une
   // fraction du volume actif (vaporTollFrac, 20 %) part en gouttes éjectées
   // à grande vitesse dans TOUTES les directions. C'est la même matière que
-  // la propulsion : récupérable, elle perlera aussi en rosée au froid. Et
-  // chaque bascule rend ses dashs — N par transformation, quel que soit le
-  // volume restant (se retransformer sans compter mène au game over : c'est
-  // le jeu). La quantité de mouvement d'ensemble est conservée exactement.
-  // `rendDashs` : une bascule DÉCIDÉE (touche G) ou provoquée par une
-  // chaudière remplit le compteur ; une ZONE qui impose la vapeur convertit
-  // sans rien rendre — sinon elle vaudrait borne de recharge gratuite.
+  // la propulsion : récupérable, elle perlera aussi en rosée au froid.
+  // Changer d'état ne touche JAMAIS au compte de dashs : la chaudière
+  // transforme, elle ne recharge pas — sinon elle vaudrait ferme à dashs
+  // (bascule eau/vapeur en boucle = réserve infinie). La quantité de
+  // mouvement d'ensemble est conservée exactement.
   /** Le corps NAÎT nuage. Un tableau qui commence en vapeur n'a pas à
    *  attendre la vaporisation progressive : sans cela, le compteur annonce
    *  ses dashs pendant que le corps est encore liquide — et aucun ne part
@@ -1135,10 +1133,9 @@ export class FluidSim {
     }
   }
 
-  transfoVapeur(rendDashs = true): void {
+  transfoVapeur(): void {
     if (this.dispersed) return
     const p = this.params
-    if (rendDashs) this.dashBudget = this.dashBudgetParTransfo
     this.updatePlayerStats()
     const toll = Math.floor(this.playerCount * p.vaporTollFrac)
     if (toll <= 0) return
@@ -1879,9 +1876,10 @@ export class FluidSim {
         anyPlayerGas = true
         // SURCHAUFFEUR : seul le gaz interagit avec lui — le frôler ou le
         // toucher rend UN dash, une seule fois par appareil (le manomètre
-        // tombe à zéro). La chaudière, elle, ne recharge plus : elle
-        // transforme.
-        if (this.hasSurchauffeur) {
+        // tombe à zéro), JAMAIS au-delà de la réserve du tableau : réserve
+        // pleine, le serpentin reste chargé — il attend qu'un dash manque.
+        // La chaudière, elle, ne recharge rien : elle transforme.
+        if (this.hasSurchauffeur && this.dashBudget < this.dashBudgetMax) {
           const bi = this.surchauffeurFrole(this.posX[i], this.posY[i])
           if (bi >= 0 && !this.surchauffesVides.has(bi)) {
             this.surchauffesVides.add(bi)
