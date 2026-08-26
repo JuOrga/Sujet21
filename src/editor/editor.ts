@@ -733,6 +733,39 @@ export class LevelEditor {
     this.commit('Alignés.')
   }
 
+  /** Répartit la sélection multiple ÉQUITABLEMENT dans la salle : mêmes
+   * écarts entre les murs et chaque élément — deux parois dans la largeur
+   * d'une pièce se posent d'un clic, sans calcul mental. */
+  private repartir(axe: 'x' | 'y'): void {
+    const items = this.multi
+      .map((m) => ({ m, b: this.boundsOf(m) }))
+      .filter((x): x is { m: Sel; b: Rect } => x.b !== null)
+    if (items.length < 2) return
+    const s = this.level.bounds
+    const debut = axe === 'x' ? s.minX : s.minY
+    const fin = axe === 'x' ? s.maxX : s.maxY
+    items.sort((p, q) =>
+      axe === 'x'
+        ? p.b.minX + p.b.maxX - (q.b.minX + q.b.maxX)
+        : p.b.minY + p.b.maxY - (q.b.minY + q.b.maxY),
+    )
+    const total = items.reduce(
+      (t, x) => t + (axe === 'x' ? x.b.maxX - x.b.minX : x.b.maxY - x.b.minY),
+      0,
+    )
+    const ecart = (fin - debut - total) / (items.length + 1)
+    let pos = debut + ecart
+    for (const { m, b } of items) {
+      const taille = axe === 'x' ? b.maxX - b.minX : b.maxY - b.minY
+      if (axe === 'x') this.moveSelBy(m, pos - b.minX, 0)
+      else this.moveSelBy(m, 0, pos - b.minY)
+      pos += taille + ecart
+    }
+    this.commit(
+      `Répartis dans la ${axe === 'x' ? 'largeur' : 'hauteur'} de la salle — écarts égaux de ${Math.round(ecart)} u, murs compris.`,
+    )
+  }
+
   /** Le nom d'une pièce désignée par la Superposition. */
   private nomCible(c: CutCible): string {
     return c.kind === 'sponge'
@@ -863,15 +896,16 @@ export class LevelEditor {
   private cutWinner: CutCible | null = null
   // Guides magnétiques pendant un déplacement (façon Canva)
   private guides: { axe: 'v' | 'h'; pos: number }[] = []
+  // Écarts ÉGAUX : les mesures roses dessinées quand l'aimant propose une
+  // équirépartition — même espace de part et d'autre, ou rythme répété.
+  // axe 'x' : un écart horizontal tracé à la latitude lat (y monde) ;
+  // axe 'y' : un écart vertical tracé à la longitude lat (x monde).
+  private ecarts: { axe: 'x' | 'y'; lat: number; a: number; b: number }[] = []
 
-  // Aimante un rectangle en mouvement sur les bords et centres des autres
-  // éléments (parois, sas) — et retourne les repères à dessiner. Façon
-  // Canva : qu'ils se touchent ou non, les alignements se proposent.
-  private aimant(r: Rect): {
-    rect: Rect
-    guides: { axe: 'v' | 'h'; pos: number }[]
-  } {
-    const TH = 8 / this.zoom
+  /** Les rectangles sur lesquels on s'aimante : parois droites, sas,
+   * éponges — sans l'élément tenu (le sas qu'on déplace ne doit pas
+   * s'aimanter sur lui-même). La salle s'ajoute à part (murs + centre). */
+  private ciblesAimant(): Rect[] {
     const cibles: Rect[] = []
     this.level.boxes.forEach((b, i) => {
       if (this.sel?.kind === 'box' && this.sel.index === i) return
@@ -879,7 +913,32 @@ export class LevelEditor {
       if (b.angle) return // les obliques ne proposent pas leurs bords droits
       cibles.push(b)
     })
-    cibles.push(this.level.exit)
+    if (this.sel?.kind !== 'exit') cibles.push(this.level.exit)
+    this.level.sponges.forEach((sp, i) => {
+      if (this.sel?.kind === 'sponge' && this.sel.index === i) return
+      cibles.push({
+        minX: sp.minX,
+        minY: sp.minY,
+        maxX: sp.minX + sp.cols * sp.cellSize,
+        maxY: sp.minY + sp.rows * sp.cellSize,
+      })
+    })
+    return cibles
+  }
+
+  // Aimante un rectangle en mouvement sur les bords et centres des autres
+  // éléments (parois, sas, éponges) ET de la salle — puis propose
+  // l'ÉQUIRÉPARTITION : même écart de part et d'autre (murs compris) ou
+  // rythme répété (l'écart des deux voisins se reproduit). Façon Canva :
+  // qu'ils se touchent ou non, les alignements se proposent.
+  private aimant(r: Rect): {
+    rect: Rect
+    guides: { axe: 'v' | 'h'; pos: number }[]
+  } {
+    const TH = 8 / this.zoom
+    const cibles = this.ciblesAimant()
+    // la salle propose ses murs et son centre, comme n'importe quel bord
+    const ciblesBords: Rect[] = [...cibles, { ...this.level.bounds }]
     const cand = (t: Rect, axe: 'v' | 'h'): number[] =>
       axe === 'v'
         ? [t.minX, t.maxX, (t.minX + t.maxX) / 2]
@@ -895,7 +954,7 @@ export class LevelEditor {
     const guides: { axe: 'v' | 'h'; pos: number }[] = []
     let gX: number | null = null
     let gY: number | null = null
-    for (const t of cibles) {
+    for (const t of ciblesBords) {
       for (const c of cand(t, 'v')) {
         for (const p of propre.v) {
           const d = Math.abs(c - p)
@@ -915,6 +974,123 @@ export class LevelEditor {
             gY = c
           }
         }
+      }
+    }
+    // ——— ÉQUIRÉPARTITION ———————————————————————————————————————————
+    // Sur chaque axe : les voisins les plus proches de part et d'autre
+    // (dans la bande du rectangle, murs de la salle compris). Deux
+    // propositions, la plus proche l'emporte sur l'aimant de bord :
+    //  · CENTRAGE — même écart à gauche et à droite ;
+    //  · RYTHME — l'écart entre les deux voisins d'un côté se répète.
+    this.ecarts = []
+    const salle = this.level.bounds
+    type Prop = { d: number; delta: number; ecarts: [number, number][] }
+    const propositions = (axeX: boolean): Prop[] => {
+      const lo = axeX ? r.minX : r.minY
+      const hi = axeX ? r.maxX : r.maxY
+      const mur0 = axeX ? salle.minX : salle.minY
+      const mur1 = axeX ? salle.maxX : salle.maxY
+      const enBande = (t: Rect): boolean =>
+        axeX
+          ? t.maxY > r.minY && t.minY < r.maxY
+          : t.maxX > r.minX && t.minX < r.maxX
+      // voisin immédiat de chaque côté (bord tourné vers nous) + suivant
+      let g1 = mur0
+      let d1 = mur1
+      let g1lo: number | null = null // l'autre bord du voisin gauche
+      let d1hi: number | null = null
+      for (const t of cibles) {
+        if (!enBande(t)) continue
+        const tLo = axeX ? t.minX : t.minY
+        const tHi = axeX ? t.maxX : t.maxY
+        if (tHi <= lo + 1e-6 && tHi > g1) {
+          g1 = tHi
+          g1lo = tLo
+        }
+        if (tLo >= hi - 1e-6 && tLo < d1) {
+          d1 = tLo
+          d1hi = tHi
+        }
+      }
+      const props: Prop[] = []
+      const taille = hi - lo
+      // CENTRAGE entre les deux voisins (ou les murs)
+      if (d1 - g1 > taille + 2) {
+        const cible = (g1 + d1) / 2
+        const delta = cible - (lo + hi) / 2
+        props.push({
+          d: Math.abs(delta),
+          delta,
+          ecarts: [
+            [g1, lo + delta],
+            [hi + delta, d1],
+          ],
+        })
+      }
+      // RYTHME côté gauche/bas : l'écart d'avant se répète
+      if (g1lo !== null) {
+        let g2 = mur0
+        for (const t of cibles) {
+          if (!enBande(t)) continue
+          const tHi = axeX ? t.maxX : t.maxY
+          if (tHi <= g1lo + 1e-6 && tHi > g2) g2 = tHi
+        }
+        const pas = g1lo - g2
+        if (pas > 2) {
+          const delta = g1 + pas - lo
+          props.push({
+            d: Math.abs(delta),
+            delta,
+            ecarts: [
+              [g2, g1lo],
+              [g1, lo + delta],
+            ],
+          })
+        }
+      }
+      // RYTHME côté droit/haut
+      if (d1hi !== null) {
+        let d2 = mur1
+        for (const t of cibles) {
+          if (!enBande(t)) continue
+          const tLo = axeX ? t.minX : t.minY
+          if (tLo >= d1hi - 1e-6 && tLo < d2) d2 = tLo
+        }
+        const pas = d2 - d1hi
+        if (pas > 2) {
+          const delta = d1 - pas - hi
+          props.push({
+            d: Math.abs(delta),
+            delta,
+            ecarts: [
+              [hi + delta, d1],
+              [d1hi, d2],
+            ],
+          })
+        }
+      }
+      return props
+    }
+    const latX = (r.minY + r.maxY) / 2
+    const latY = (r.minX + r.maxX) / 2
+    for (const p of propositions(true)) {
+      if (p.d < TH && p.d < bestX) {
+        bestX = p.d
+        dx = p.delta
+        gX = null // les mesures remplacent le trait
+        this.ecarts = this.ecarts.filter((ec) => ec.axe !== 'x')
+        for (const [a, b] of p.ecarts)
+          this.ecarts.push({ axe: 'x', lat: latX, a, b })
+      }
+    }
+    for (const p of propositions(false)) {
+      if (p.d < TH && p.d < bestY) {
+        bestY = p.d
+        dy = p.delta
+        gY = null
+        this.ecarts = this.ecarts.filter((ec) => ec.axe !== 'y')
+        for (const [a, b] of p.ecarts)
+          this.ecarts.push({ axe: 'y', lat: latY, a, b })
       }
     }
     if (gX !== null) guides.push({ axe: 'v', pos: gX })
@@ -1543,7 +1719,22 @@ export class LevelEditor {
           a = ((a + 540) % 360) - 180 // ramené dans (-180, 180]
           // aimanté aux 15° — Alt pour l'angle libre (au degré près)
           const cran = e.altKey ? 1 : 15
-          const ang = Math.round(a / cran) * cran
+          let ang = Math.round(a / cran) * cran
+          // l'aimant d'ANGLE : à moins de 4° de l'angle d'une autre paroi
+          // oblique, on adopte le sien — deux obliques de concert
+          if (!e.altKey) {
+            let bestA = 4
+            this.level.boxes.forEach((autre, i) => {
+              if (i === d.index) return
+              const aa = autre.angle ?? 0
+              if (!aa) return
+              const dA = Math.abs(a - aa)
+              if (dA < bestA) {
+                bestA = dA
+                ang = aa
+              }
+            })
+          }
           if (ang) b.angle = ang
           else delete b.angle
         }
@@ -1592,7 +1783,10 @@ export class LevelEditor {
               }
             : { ...r }
         }
-        if (bb) this.guides = this.aimant(bb).guides
+        if (bb) {
+          this.guides = this.aimant(bb).guides
+          this.ecarts = [] // le groupe montre les traits, pas les mesures
+        }
       } else if (d.mode === 'move') {
         if (this.sel?.kind === 'rail' && d.pts) {
           const r = (this.level.rails ?? [])[this.sel.index]
@@ -1666,11 +1860,40 @@ export class LevelEditor {
             b.maxY = cy + hy
           }
         } else {
+          // le bord tiré s'aimante lui aussi (bords, centres, salle) —
+          // même langage qu'au déplacement, la grille en repli
           const r = { ...d.start }
-          if (d.edge.includes('W')) r.minX = this.snapped(w.x)
-          if (d.edge.includes('E')) r.maxX = this.snapped(w.x)
-          if (d.edge.includes('N')) r.maxY = this.snapped(w.y)
-          if (d.edge.includes('S')) r.minY = this.snapped(w.y)
+          this.guides = []
+          this.ecarts = []
+          const colle = (v: number, axe: 'v' | 'h'): number => {
+            const TH = 8 / this.zoom
+            let best = TH
+            let pos = this.snapped(v)
+            let gd: number | null = null
+            for (const t of [
+              ...this.ciblesAimant(),
+              { ...this.level.bounds },
+            ]) {
+              const cs =
+                axe === 'v'
+                  ? [t.minX, t.maxX, (t.minX + t.maxX) / 2]
+                  : [t.minY, t.maxY, (t.minY + t.maxY) / 2]
+              for (const c of cs) {
+                const dd = Math.abs(c - v)
+                if (dd < best) {
+                  best = dd
+                  pos = c
+                  gd = c
+                }
+              }
+            }
+            if (gd !== null) this.guides.push({ axe, pos: gd })
+            return pos
+          }
+          if (d.edge.includes('W')) r.minX = colle(w.x, 'v')
+          if (d.edge.includes('E')) r.maxX = colle(w.x, 'v')
+          if (d.edge.includes('N')) r.maxY = colle(w.y, 'h')
+          if (d.edge.includes('S')) r.minY = colle(w.y, 'h')
           this.applyRect(r)
         }
       }
@@ -1692,6 +1915,7 @@ export class LevelEditor {
       const d = this.drag
       this.drag = null
       this.guides = []
+      this.ecarts = []
       if (!d) return
       if (d.mode === 'aim') {
         this.setTool({ kind: 'select' })
@@ -1988,7 +2212,9 @@ export class LevelEditor {
       if (!this.level.caches) this.level.caches = []
       this.level.caches.push({ ...r })
       this.sel = { kind: 'cache', index: this.level.caches.length - 1 }
-      this.commit('Cachette posée — voilée en jeu, révélée quand le corps y entre.')
+      this.commit(
+        'Cachette posée — voilée en jeu, révélée quand le corps y entre.',
+      )
     } else if (t.kind === 'porte') {
       if (!this.level.portes) this.level.portes = []
       // asservie au canal de la cible la plus proche — modifiable au panneau
@@ -3100,7 +3326,9 @@ export class LevelEditor {
       ? this.library.find((s) => {
           if (s.id === id || estCodeHub(s.level.code)) return false
           const n = numeroTableau(s.level.name)
-          return n !== null && n.numero === num.numero && n.lettre === num.lettre
+          return (
+            n !== null && n.numero === num.numero && n.lettre === num.lettre
+          )
         })
       : null
     const suivante = num
@@ -3270,6 +3498,8 @@ export class LevelEditor {
         `<button type="button" class="ed-btn" id="p-al-cv">Centrer (horizontal)</button>` +
         `<button type="button" class="ed-btn" id="p-dim-l">Même largeur (1ʳᵉ sélection)</button>` +
         `<button type="button" class="ed-btn" id="p-dim-h">Même hauteur (1ʳᵉ sélection)</button>` +
+        `<button type="button" class="ed-btn" id="p-rep-x">Répartir dans la largeur (salle)</button>` +
+        `<button type="button" class="ed-btn" id="p-rep-y">Répartir dans la hauteur (salle)</button>` +
         `</div>` +
         `<button type="button" class="ed-danger" id="p-del">Tout supprimer</button>`
       host
@@ -3296,6 +3526,12 @@ export class LevelEditor {
       host
         .querySelector('#p-dim-h')
         ?.addEventListener('click', () => this.memeDimension('hauteur'))
+      host
+        .querySelector('#p-rep-x')
+        ?.addEventListener('click', () => this.repartir('x'))
+      host
+        .querySelector('#p-rep-y')
+        ?.addEventListener('click', () => this.repartir('y'))
       host
         .querySelector('#p-del')
         ?.addEventListener('click', () => this.deleteSel())
@@ -3732,7 +3968,10 @@ export class LevelEditor {
             .join('') +
           `</select></label>`,
       )
-      rows.push(numField('X (centre)', 'p-dx', d.x), numField('Y (centre)', 'p-dy', d.y))
+      rows.push(
+        numField('X (centre)', 'p-dx', d.x),
+        numField('Y (centre)', 'p-dy', d.y),
+      )
       rows.push(
         numField('Largeur', 'p-dw', d.w),
         numField('Hauteur', 'p-dh', d.h),
@@ -3759,25 +3998,25 @@ export class LevelEditor {
           ? 'Zone d’état'
           : s.kind === 'cache'
             ? 'Cachette (pan voilé)'
-          : s.kind === 'sponge'
-            ? 'Éponge'
-            : s.kind === 'exit'
-              ? 'Sas'
-              : s.kind === 'spawn'
-                ? 'Point de départ'
-                : s.kind === 'laser'
-                  ? 'Émetteur laser'
-                  : s.kind === 'lumiere'
-                    ? `Lampe nº ${s.index + 1}`
-                    : s.kind === 'cible'
-                      ? `Cible nº ${canalDeCible(this.level.cibles ?? [], s.index)}`
-                      : s.kind === 'porte'
-                        ? 'Porte asservie'
-                        : s.kind === 'rail'
-                          ? 'Rail magnétique'
-                          : s.kind === 'decal'
-                            ? 'Décal (machinerie de décor)'
-                            : 'Étiquette'
+            : s.kind === 'sponge'
+              ? 'Éponge'
+              : s.kind === 'exit'
+                ? 'Sas'
+                : s.kind === 'spawn'
+                  ? 'Point de départ'
+                  : s.kind === 'laser'
+                    ? 'Émetteur laser'
+                    : s.kind === 'lumiere'
+                      ? `Lampe nº ${s.index + 1}`
+                      : s.kind === 'cible'
+                        ? `Cible nº ${canalDeCible(this.level.cibles ?? [], s.index)}`
+                        : s.kind === 'porte'
+                          ? 'Porte asservie'
+                          : s.kind === 'rail'
+                            ? 'Rail magnétique'
+                            : s.kind === 'decal'
+                              ? 'Décal (machinerie de décor)'
+                              : 'Étiquette'
 
     host.innerHTML =
       `<div class="ed-props-head">${kindName}</div><div class="ed-fields">${rows.join('')}</div>` +
@@ -3932,7 +4171,10 @@ export class LevelEditor {
       )
       if (text('p-kstyle') === 'paroi') c.style = 'paroi'
       else delete c.style
-      const kforme = Math.max(0, Math.min(FORME_ARC, Math.round(val('p-kforme'))))
+      const kforme = Math.max(
+        0,
+        Math.min(FORME_ARC, Math.round(val('p-kforme'))),
+      )
       if (kforme > 0) c.forme = kforme
       else delete c.forme
       const kang = Math.max(-180, Math.min(180, val('p-kang')))
@@ -4455,6 +4697,79 @@ export class LevelEditor {
         g.stroke()
       }
       g.restore()
+    }
+
+    // écarts ÉGAUX : les mesures roses de l'équirépartition — deux
+    // segments à butées, chacun porte sa longueur ; quand les nombres
+    // sont les mêmes, c'est équitablement réparti.
+    if (this.ecarts.length > 0) {
+      g.save()
+      g.strokeStyle = '#ff5cf0'
+      g.lineWidth = 1
+      g.setLineDash([])
+      g.font = '11px ui-monospace, monospace'
+      for (const ec of this.ecarts) {
+        const p =
+          ec.axe === 'x'
+            ? this.toScreen(ec.a, ec.lat)
+            : this.toScreen(ec.lat, ec.a)
+        const q =
+          ec.axe === 'x'
+            ? this.toScreen(ec.b, ec.lat)
+            : this.toScreen(ec.lat, ec.b)
+        g.beginPath()
+        g.moveTo(p.sx, p.sy)
+        g.lineTo(q.sx, q.sy)
+        if (ec.axe === 'x') {
+          g.moveTo(p.sx, p.sy - 5)
+          g.lineTo(p.sx, p.sy + 5)
+          g.moveTo(q.sx, q.sy - 5)
+          g.lineTo(q.sx, q.sy + 5)
+        } else {
+          g.moveTo(p.sx - 5, p.sy)
+          g.lineTo(p.sx + 5, p.sy)
+          g.moveTo(q.sx - 5, q.sy)
+          g.lineTo(q.sx + 5, q.sy)
+        }
+        g.stroke()
+        const txt = `${Math.round(Math.abs(ec.b - ec.a))}`
+        const mx = (p.sx + q.sx) / 2
+        const my = (p.sy + q.sy) / 2
+        const wT = g.measureText(txt).width
+        g.fillStyle = 'rgba(20,26,34,0.92)'
+        g.fillRect(mx - wT / 2 - 4, my - 8, wT + 8, 15)
+        g.fillStyle = '#ffd9fb'
+        g.fillText(txt, mx - wT / 2, my + 3)
+      }
+      g.restore()
+    }
+
+    // ROTATION en cours : l'angle s'affiche en vif près de la poignée —
+    // « (accordée) » quand il épouse celui d'une autre paroi oblique
+    if (this.drag?.mode === 'rotate' && this.sel?.kind === 'box') {
+      const b = this.level.boxes[this.sel.index]
+      const h = this.rotateHandlePos()
+      if (b && h) {
+        const angle = b.angle ?? 0
+        const idx = this.sel.index
+        const accord =
+          angle !== 0 &&
+          this.level.boxes.some((o, i) => i !== idx && (o.angle ?? 0) === angle)
+        const txt = accord ? `${angle}° (accordée)` : `${angle}°`
+        g.save()
+        g.font = '12px ui-monospace, monospace'
+        const wT = g.measureText(txt).width
+        const bx = h.sx + 14
+        const by = h.sy - 18
+        g.fillStyle = 'rgba(20,26,34,0.92)'
+        g.strokeStyle = '#ff5cf0'
+        g.lineWidth = 1
+        g.fillRect(bx - 6, by - 13, wT + 12, 20)
+        g.strokeRect(bx - 6, by - 13, wT + 12, 20)
+        g.fillStyle = '#ffd9fb'
+        g.fillText(txt, bx, by + 2)
+        g.restore()
+      }
     }
 
     // sas
