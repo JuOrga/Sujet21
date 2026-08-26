@@ -648,6 +648,26 @@
         display: flex; align-items: center; justify-content: center; padding: 18px;
       }
       #livraisons .salles-boite { max-height: 86vh; overflow: auto; width: min(880px, 96vw); }
+      /* L'ESSENTIEL : le récap éclair des dernières 24 h, une ligne par
+         livraison — l'heure vraie à gauche, le titre à droite */
+      .liv-recap {
+        margin: 4px 0 18px; padding: 10px 14px 12px;
+        border: 1px solid var(--specimen); border-radius: 8px;
+        background: rgba(56, 130, 160, 0.08);
+      }
+      .liv-recap h3 {
+        margin: 0 0 8px; font-family: var(--font-display);
+        font-size: 11px; letter-spacing: 0.18em; color: var(--specimen);
+      }
+      .liv-r {
+        display: flex; gap: 10px; align-items: baseline;
+        padding: 2.5px 0; font-size: 12.5px; line-height: 1.35;
+      }
+      .liv-r time {
+        flex: 0 0 74px; text-align: right;
+        font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums;
+      }
+      .liv-r span { color: #cfe2ef; }
       #livraisons-dl {
         font-family: var(--font-display); font-size: 9.5px; letter-spacing: 0.14em;
         padding: 4px 10px; background: transparent; color: var(--specimen);

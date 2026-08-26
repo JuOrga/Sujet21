@@ -1268,13 +1268,38 @@ const livraisonsEl = document.getElementById('livraisons') as HTMLDivElement
     if (rendu) return
     rendu = true
     const esc = (t: string): string => t.replace(/</g, '&lt;')
-    corps.innerHTML = DELIVERIES.map(
-      (d, i) =>
-        `<div class="liv-e"><h3>${esc(d.title)}</h3>` +
-        `<time>v${versionDe(i)} · ${esc(d.date)}</time>` +
-        (d.figure ? `<img src="${d.figure}" alt="" loading="lazy" />` : '') +
-        `<ul>${d.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul></div>`,
-    ).join('')
+    // L'ESSENTIEL — le récap éclair des dernières 24 h : une ligne par
+    // livraison (heure + titre), pour embrasser la journée avant le détail
+    const litDate = (d: string): number => {
+      const m = /^(\d\d)\/(\d\d)\/(\d{4}) (\d\d):(\d\d)$/.exec(d.trim())
+      if (!m) return NaN
+      return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]).getTime()
+    }
+    const aujourdhui = new Date()
+    const jourDe = (t: number): string =>
+      new Date(t).getDate() === aujourdhui.getDate() ? '' : 'hier '
+    const fraiches = DELIVERIES.map((d) => ({ d, t: litDate(d.date) }))
+      .filter((x) => Number.isFinite(x.t) && Date.now() - x.t < 24 * 3600_000)
+    const recap =
+      fraiches.length >= 2
+        ? `<div class="liv-recap"><h3>L’ESSENTIEL — DERNIÈRES 24 H (${fraiches.length} livraisons)</h3>` +
+          fraiches
+            .map(
+              (x) =>
+                `<div class="liv-r"><time>${jourDe(x.t)}${x.d.date.slice(11)}</time><span>${esc(x.d.title)}</span></div>`,
+            )
+            .join('') +
+          `</div>`
+        : ''
+    corps.innerHTML =
+      recap +
+      DELIVERIES.map(
+        (d, i) =>
+          `<div class="liv-e"><h3>${esc(d.title)}</h3>` +
+          `<time>v${versionDe(i)} · ${esc(d.date)}</time>` +
+          (d.figure ? `<img src="${d.figure}" alt="" loading="lazy" />` : '') +
+          `<ul>${d.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul></div>`,
+      ).join('')
   }
   document.getElementById('home-livraisons')?.addEventListener('click', () => {
     renderLivraisons()

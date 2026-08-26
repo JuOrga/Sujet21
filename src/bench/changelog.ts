@@ -2,9 +2,17 @@
 // « Livraisons »). Rempli automatiquement à chaque livraison — l'entrée la
 // plus récente en premier. Les testeurs voient ainsi ce qui a changé sans
 // quitter le jeu.
+//
+// L'HEURE EST UNE VRAIE HEURE. Le tampon `date` est l'heure de Paris du
+// commit de livraison — jamais une heure estimée ou inventée. Elle se lit
+// ainsi : `TZ=Europe/Paris date '+%d/%m/%Y %H:%M'` (ou `TZ=Europe/Paris
+// git log -1 --date=format-local:'%d/%m/%Y %H:%M' --format=%ad`). Les
+// conteneurs tournent en UTC : sans le fuseau, l'heure ment de 2 h — et le
+// concepteur s'en aperçoit. Les entrées restent triées de la plus récente
+// à la plus ancienne, à l'heure RÉELLE.
 
 export interface Delivery {
-  date: string // JJ/MM/AAAA HH:MM (heure de Paris)
+  date: string // JJ/MM/AAAA HH:MM (heure de Paris — celle du commit, cf. ci-dessus)
   title: string
   notes: string[]
   // illustration optionnelle (capture, schéma) : chemin sous /assets/,
@@ -14,7 +22,23 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
-    date: '26/08/2026 20:10',
+    date: '26/08/2026 12:20',
+    title: 'Notes de version : le RÉCAP ÉCLAIR — et les heures disent enfin vrai',
+    notes: [
+      'En tête de cet écran : L’ESSENTIEL DES DERNIÈRES 24 H — une ligne par livraison (heure + titre), pour embrasser la journée d’un coup d’œil avant le détail.',
+      'Les heures du journal mentaient (conteneurs en UTC, tampons estimés) : les entrées d’aujourd’hui sont recalées sur l’heure de Paris RÉELLE de leur commit, l’ordre chronologique est rétabli, et la consigne d’horodatage est gravée dans le fichier pour les prochaines livraisons.',
+      'Au passage, des livraisons d’hier après-midi n’avaient jamais été consignées : le versement de bonbonne qui n’explose plus (17:32), le rappel de l’eau égarée apaisé (17:54), la jauge d’étalonnage qui coule palier par palier (21:50), l’accueil public épuré + le pupitre d’essais (22:28).',
+    ],
+  },
+  {
+    date: '26/08/2026 11:15',
+    title: 'LE CABINET LOGIQUE : cinq circuits booléens prouvés, en démonstration',
+    notes: [
+      'Les mécanismes détournés sans toucher au moteur : une pastille TOR est une MÉMOIRE 1 bit, deux pastilles d’un canal font un OU, la règle « et » un ET, la barrière NOR un NON — et le VERROU compose le tout (porte = clé écrite ET fil intact). Cinq salles pédagogiques dans l’écran SALLES (mode concepteur), chaque table de vérité prouvée par le vrai traceur laser dans les tests.',
+    ],
+  },
+  {
+    date: '26/08/2026 11:07',
     title: 'Le générateur se RÈGLE — et les réglages voyagent dans le code',
     notes: [
       'Le bouton ⚄ Générer ouvre désormais un PANNEAU DE RÉGLAGES : nombre de compartiments (3-5 ou auto), franchissements autorisés (sept cases — évent, rideau, membrane, miroir laser, double ET, rail plasma, barrière NOR), dangers (aucun / rares / fréquents), cachette (jamais / toujours), décor (sobre / chargé), et LABYRINTHE. Chaque réglage a son cran « auto » — le comportement de toujours.',
@@ -23,7 +47,7 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
-    date: '26/08/2026 18:50',
+    date: '26/08/2026 10:42',
     title: 'Le générateur parle la NOMENCLATURE : « 101 » est un cahier des charges',
     notes: [
       'Remarque du concepteur : la graine ne devrait-elle pas être le code à trois chiffres de la nomenclature ? Réponse : le code MMD (moment · mécanique · difficulté) DÉCRIT une salle sans l’identifier — plusieurs salles portent « 101 ». Le générateur le prend donc comme un CAHIER DES CHARGES : la MÉCANIQUE choisit les familles de maillons (1 : rideaux et miroirs de glace, JAMAIS d’exigence vapeur ; 2 : évents, rails, barrières, jamais de glace ; 3 : au moins une de chaque ; 0 : passages doux seulement), la DIFFICULTÉ dose compartiments (3 à 5), contraintes, resserrage des passages et dangers, et le MOMENT assombrit l’ambiance vers la fin de run.',
@@ -32,7 +56,7 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
-    date: '26/08/2026 17:40',
+    date: '26/08/2026 09:58',
     title: 'La grammaire du générateur s’enrichit : rail plasma, barrière tenue, double ET',
     notes: [
       'Trois maillons neufs dans la chaîne d’intentions du générateur. Le RAIL PLASMA — se tenir en VAPEUR au point marqué « IONISER ICI » ionise le fil de lumière ; le rail magnétique, amorcé dans le nuage, capture l’arc et le guide jusqu’à la pastille qui ouvre la porte. La BARRIÈRE TENUE — un faisceau vertical barre le chemin, sa pastille NOR (au sol) tient la porte ouverte TANT QUE la lumière la touche : l’eau plie le faisceau, la glace le renvoie — couper la lumière scelle la porte. On traverse EN VAPEUR : le faisceau s’ionise mais file droit. Le DOUBLE ET — deux miroirs, deux pastilles du même canal, règle ET : la porte exige les deux.',
@@ -41,23 +65,7 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
-    date: '26/08/2026 16:30',
-    title: 'Le DÔME du regard : l’œil soulève vraiment le volume',
-    notes: [
-      'Demandé : que là où l’œil se pose, un volume supplémentaire se lise en relief grâce au reflet du plafond — comme si le regard déplaçait vraiment la matière. C’est fait : un dôme local naît au point du regard, et sa pente incline le miroir de la surface — le reflet (plafond en tête, mais aussi lampes et décor) se COURBE autour de l’œil, dans les deux modes miroir (Mercure et Miroitante). La pente d’un dôme est nulle au sommet et maximale sur le flanc : le centre reste calme, c’est l’anneau autour de l’œil qui travaille.',
-      'Le relief se lit aussi sans miroir : le flanc du dôme tourné vers le haut prend la lumière, l’autre s’ombre — un modelé doux qui fait de la lueur une vraie bosse, même en mode Classique. Le dôme respire au même pouls que la lueur, s’efface en vapeur et dans la glace, et suit le regard partout (souris, stick, mécanismes, sas, réveil).',
-      'Vérifié en jeu au zoom, comparaison avant/après : la lueur plate est devenue une bosse posée sous la surface, hublots et reflets se déforment à son passage.',
-    ],
-  },
-  {
-    date: '26/08/2026 16:20',
-    title: 'La flèche de cap manette : retirée par défaut, réglable',
-    notes: [
-      'Au stick, la flèche posée sur le corps est MASQUÉE par défaut : le regard du Sujet suit déjà la direction du stick, la flèche faisait double emploi. Pour qui la préfère, PARAMÈTRES gagne une ligne « FLÈCHE DE CAP (MANETTE) » : Masquée / Visible, mémorisé. La ligne de visée du dash, elle, ne change pas.',
-    ],
-  },
-  {
-    date: '26/08/2026 15:20',
+    date: '26/08/2026 02:33',
     title: 'Le GÉNÉRATEUR de salles : une graine, une salle — traversée PROUVÉE',
     notes: [
       'Demandé : un générateur de niveaux procédural qui donne de BONS résultats. La recette anti-soupe : le générateur tire d’abord la CHAÎNE D’INTENTIONS — la suite des franchissements entre compartiments (passage libre, ÉVENT à traverser en vapeur, RIDEAU à écarter en glace, MEMBRANE, ou PORTE AU LASER) — puis habille chaque maillon en géométrie : cloisons percées, décor aux formes variées, dangers (chaudière, hublot fendu), cachette voilée une fois sur deux, lampes, étiquettes.',
@@ -66,7 +74,23 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
-    date: '26/08/2026 14:10',
+    date: '26/08/2026 02:14',
+    title: 'Le DÔME du regard : l’œil soulève vraiment le volume',
+    notes: [
+      'Demandé : que là où l’œil se pose, un volume supplémentaire se lise en relief grâce au reflet du plafond — comme si le regard déplaçait vraiment la matière. C’est fait : un dôme local naît au point du regard, et sa pente incline le miroir de la surface — le reflet (plafond en tête, mais aussi lampes et décor) se COURBE autour de l’œil, dans les deux modes miroir (Mercure et Miroitante). La pente d’un dôme est nulle au sommet et maximale sur le flanc : le centre reste calme, c’est l’anneau autour de l’œil qui travaille.',
+      'Le relief se lit aussi sans miroir : le flanc du dôme tourné vers le haut prend la lumière, l’autre s’ombre — un modelé doux qui fait de la lueur une vraie bosse, même en mode Classique. Le dôme respire au même pouls que la lueur, s’efface en vapeur et dans la glace, et suit le regard partout (souris, stick, mécanismes, sas, réveil).',
+      'Vérifié en jeu au zoom, comparaison avant/après : la lueur plate est devenue une bosse posée sous la surface, hublots et reflets se déforment à son passage.',
+    ],
+  },
+  {
+    date: '26/08/2026 02:14',
+    title: 'La flèche de cap manette : retirée par défaut, réglable',
+    notes: [
+      'Au stick, la flèche posée sur le corps est MASQUÉE par défaut : le regard du Sujet suit déjà la direction du stick, la flèche faisait double emploi. Pour qui la préfère, PARAMÈTRES gagne une ligne « FLÈCHE DE CAP (MANETTE) » : Masquée / Visible, mémorisé. La ligne de visée du dash, elle, ne change pas.',
+    ],
+  },
+  {
+    date: '26/08/2026 01:20',
     title: 'Le regard, version finale : quelque chose vit SOUS la surface',
     notes: [
       'Retour du concepteur sur l’œil abyssal : il ressortait trop — retiré, ainsi que son réglage dans PARAMÈTRES. À la place, le noyau discret d’origine est ACCENTUÉ, dans son esprit : quelque chose se devine sous la surface, caché par le volume, sans jamais s’imposer.',
@@ -75,16 +99,7 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
-    date: '26/08/2026 13:00',
-    title: 'Le TENTACULE — et le contour qui ondule à l’abandon',
-    notes: [
-      'Laissé tranquille près d’une paroi, le Sujet peut maintenant étendre un TENTACULE : un doigt de liquide sort du flanc, s’étire jusqu’au mur, le touche du bout (un tintement discret), puis se rembobine — c’est la vignette d’idle vedette, tirée deux fois plus souvent que les autres, et son regard suit son propre geste. Une ancre invisible tient le centroïde pendant toute la manœuvre : le contact de la paroi pousse le corps, le ressort le ramène — dérive mesurée sous une unité, rien à y gagner.',
-      'Et le contour VIT enfin visiblement : après un court répit sans geste, la surface se met à ONDULER franchement — des vagues lentes et asymétriques qui tournent autour du corps (la respiration seule, uniforme, restait trop discrète). Un geste, et tout s’efface en douceur. Ni le gel, ni le nuage, ni les gouttes égarées n’ondulent — et le banc de réglage, qui ne transmet pas de présence, affiche exactement comme avant : les présets sont intacts.',
-      'Vérifié au banc d’essai sans écran : extension de 116 unités jusqu’au contact (4 u du mur), rétraction complète, dérive du centroïde 0,4 u, ondulation à pleine amplitude — capture à l’appui au moment du toucher.',
-    ],
-  },
-  {
-    date: '26/08/2026 05:10',
+    date: '26/08/2026 01:05',
     title:
       'L’ŒIL ABYSSAL : le regard devient un œil — voyant, mystérieux, réglable',
     notes: [
@@ -94,7 +109,16 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
-    date: '26/08/2026 03:40',
+    date: '26/08/2026 00:32',
+    title: 'Le TENTACULE — et le contour qui ondule à l’abandon',
+    notes: [
+      'Laissé tranquille près d’une paroi, le Sujet peut maintenant étendre un TENTACULE : un doigt de liquide sort du flanc, s’étire jusqu’au mur, le touche du bout (un tintement discret), puis se rembobine — c’est la vignette d’idle vedette, tirée deux fois plus souvent que les autres, et son regard suit son propre geste. Une ancre invisible tient le centroïde pendant toute la manœuvre : le contact de la paroi pousse le corps, le ressort le ramène — dérive mesurée sous une unité, rien à y gagner.',
+      'Et le contour VIT enfin visiblement : après un court répit sans geste, la surface se met à ONDULER franchement — des vagues lentes et asymétriques qui tournent autour du corps (la respiration seule, uniforme, restait trop discrète). Un geste, et tout s’efface en douceur. Ni le gel, ni le nuage, ni les gouttes égarées n’ondulent — et le banc de réglage, qui ne transmet pas de présence, affiche exactement comme avant : les présets sont intacts.',
+      'Vérifié au banc d’essai sans écran : extension de 116 unités jusqu’au contact (4 u du mur), rétraction complète, dérive du centroïde 0,4 u, ondulation à pleine amplitude — capture à l’appui au moment du toucher.',
+    ],
+  },
+  {
+    date: '26/08/2026 00:22',
     title:
       'LE RÉVEIL : à chaque tableau, le Sujet s’éveille — petit scénario aléatoire pendant le zoom',
     notes: [
@@ -103,39 +127,12 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
-    date: '26/08/2026 11:30',
+    date: '26/08/2026 00:08',
     title: 'Le regard suit la souris et le stick — sans un clic',
     notes: [
       'Retour du concepteur : l’œil ne répondait pas au joystick. Deux causes : le stick seul (sans bouton) n’était pas une « visée » aux yeux du regard, et bouton pressé, le point de visée manette est le point d’ÉJECTION — DERRIÈRE le corps en eau : l’œil aurait regardé à l’envers. Corrigé : à la manette, le regard suit désormais la DIRECTION DU STICK — là où l’on veut aller — dès l’inclinaison, bouton pressé ou non.',
       'Et à la souris, même vie : l’œil suit le curseur SANS clic, en glissant doucement (le même lissage que la visée). Souris immobile quelques secondes, la curiosité reprend ses droits — mécanismes, sas, vignettes d’idle. Le doigt levé, lui, ne retient jamais le regard : au tactile, rien ne change. Incliner le stick ou bouger la souris compte aussi comme une présence : l’idle se remet à zéro.',
       'Vérifié au banc d’essai sans écran (manette simulée, souris réelle) : stick à droite, l’œil glisse à droite ; stick en haut, il monte ; survol souris en haut-droite, il s’y penche — et l’idle reste muet tant qu’on parle.',
-    ],
-  },
-  {
-    date: '26/08/2026 09:30',
-    title: 'Le Sujet est VIVANT : regard, respiration, frisson — et l’idle',
-    notes: [
-      'La personnification du volume, sans visage ni mascotte : la vie sort de la matière. LE REGARD — un noyau plus dense et plus clair glisse dans la masse vers ce que le corps regarde : la visée d’abord, sinon le mécanisme notable le plus proche (chaudière, cible laser, cachette voilée), sinon le sas. Pas un œil dessiné : une intention. (Correction de visibilité au passage : posé AVANT le reflet mercure, le miroir le diluait jusqu’à l’invisible — il s’ajoute désormais après, et se voit.)',
-      'LA RESPIRATION — le contour du corps pulse doucement : lent au calme, plus ample quand on le laisse tranquille, court et rapide quand la réserve est à sec — et SUSPENDU pendant la visée : il retient son souffle. Seul le corps liquide respire : ni le gel, ni le nuage, ni les gouttes égarées. LE FRISSON — quand une aura froide le saisit, un tremblement bref le traverse, puis se réarme au chaud.',
-      'L’IDLE — sans geste pendant quelques secondes, le Sujet existe tout seul : il fait sa TOILETTE (se resserre soigneusement), PENSE AU SAS (le regard y glisse), S’ÉTIRE (une grande inspiration lente), ou TAPOTE la paroi la plus proche — deux petits coups, comme on éprouve un mur. Rien qui joue à votre place : aucun gain de déplacement, et le moindre geste remet tout à zéro.',
-      'Le tout est purement visuel : AUCUN paramètre de simulation touché — les présets du banc (Ballet orbital en tête) sont au pixel et à la virgule près, et le banc, qui n’envoie pas de « présence » au rendu, affiche exactement comme avant.',
-    ],
-  },
-  {
-    date: '26/08/2026 02:10',
-    title:
-      'Les facettes de la glace sont COHÉRENTES : taillées dans le bloc, elles tournent avec lui',
-    notes: [
-      'Retour du concepteur : bonne idée, mauvaise exécution — les facettes cristallines bougeaient DANS le volume. Deux causes : le motif n’était ancré qu’en translation (jamais en rotation — or un palet pivote), et son ancre était le centroïde du corps ENTIER, qui tremble dès qu’une partie du corps est liquide.',
-      'Le solveur tient désormais un REPÈRE RIGIDE DU GEL : le centre de la plus grosse composante gelée, et son angle de rotation intégré pas à pas à partir de la vitesse angulaire du bloc (celle, exacte, de la physique). Le Voronoï des facettes est taillé dans ce repère : il translate ET pivote avec le palet — un bloc soudé à une plaque froide fige aussi ses facettes, et l’angle repart de zéro à chaque nouveau gel. Vérifié en jeu (palet mis en rotation) : le motif garde sa place dans le volume, arêtes comprises, pendant que le bloc tourne. Un test du solveur verrouille l’intégration de l’angle et sa remise à zéro au dégel.',
-    ],
-  },
-  {
-    date: '26/08/2026 00:40',
-    title: 'Les tranches VERTICALES prennent enfin la couleur de leur volume',
-    notes: [
-      'Retour du concepteur : les arêtes verticales n’avaient pas les couleurs des volumes. La cause était une erreur de repère dans le dégradé de la tranche : sa « hauteur » se mesurait contre la mauvaise référence, si bien que TOUTE la tranche restait à la couleur du pied — sombre, quasi neutre — et le haut coloré n’était jamais atteint. Flagrant sur les faces verticales.',
-      'La hauteur se mesure désormais entre les deux vraies bornes de la tranche : la silhouette de la base (le pied) et le bord du dessus déplacé (le sommet) — par les deux champs de distance, fiable sur toutes les faces et toutes les formes. Et la couleur monte vite (courbe racine) : la tranche EST le matériau. Vérifié en jeu (relief FORT, banc des huit matériaux, caméra de côté) : les faces verticales de l’hydrophile, l’hydrophobe et la membrane affichent leur turquoise, violet et vert pleins, dégradé du pied au chant clair, strates comprises.',
     ],
   },
   {
@@ -146,6 +143,33 @@ export const DELIVERIES: Delivery[] = [
       'Trois retours du concepteur, trois corrections. Les ÉCRANS DE SERVICE qui semblaient posés « à côté » des murs : SUPPRIMÉS. Les tranches « fades ou transparentes » : elles sont désormais PLEINES (opaques, plus de voile fantôme) et franchement teintées par matériau — turquoise mouillé pour l’hydrophile, violet cireux pour l’hydrophobe, vert d’eau pour la membrane, bleu givré pour le froid, orange pour la chaudière, ambre pour la borne… — avec le pied dans l’ombre, des strates, des joints, et un chant clair sous l’arête.',
       'Et le VOLUME s’étend à TOUS les solides : membranes, rideaux, évents, plaques froides, chaudières et surchauffeurs ont maintenant un sommet qui fuit la caméra et une tranche qui se révèle — plus seulement les murs et surfaces chimiques. La cause du « à côté » est aussi corrigée à la racine : le sommet de ces éléments ne se déplaçait pas, la tranche flottait donc hors du bloc ; leurs remplissages suivent désormais la géométrie déplacée, la tranche colle au pied.',
       'Vérifié en jeu (relief FORT, salle-témoin avec les huit matériaux en rang) : chaque colonne montre sa tranche pleine à sa couleur, l’identité des surfaces se lit sur le côté comme sur le dessus. Réglage inchangé : PARAMÈTRES → relief léger / fort.',
+    ],
+  },
+  {
+    date: '25/08/2026 23:13',
+    title: 'Le Sujet est VIVANT : regard, respiration, frisson — et l’idle',
+    notes: [
+      'La personnification du volume, sans visage ni mascotte : la vie sort de la matière. LE REGARD — un noyau plus dense et plus clair glisse dans la masse vers ce que le corps regarde : la visée d’abord, sinon le mécanisme notable le plus proche (chaudière, cible laser, cachette voilée), sinon le sas. Pas un œil dessiné : une intention. (Correction de visibilité au passage : posé AVANT le reflet mercure, le miroir le diluait jusqu’à l’invisible — il s’ajoute désormais après, et se voit.)',
+      'LA RESPIRATION — le contour du corps pulse doucement : lent au calme, plus ample quand on le laisse tranquille, court et rapide quand la réserve est à sec — et SUSPENDU pendant la visée : il retient son souffle. Seul le corps liquide respire : ni le gel, ni le nuage, ni les gouttes égarées. LE FRISSON — quand une aura froide le saisit, un tremblement bref le traverse, puis se réarme au chaud.',
+      'L’IDLE — sans geste pendant quelques secondes, le Sujet existe tout seul : il fait sa TOILETTE (se resserre soigneusement), PENSE AU SAS (le regard y glisse), S’ÉTIRE (une grande inspiration lente), ou TAPOTE la paroi la plus proche — deux petits coups, comme on éprouve un mur. Rien qui joue à votre place : aucun gain de déplacement, et le moindre geste remet tout à zéro.',
+      'Le tout est purement visuel : AUCUN paramètre de simulation touché — les présets du banc (Ballet orbital en tête) sont au pixel et à la virgule près, et le banc, qui n’envoie pas de « présence » au rendu, affiche exactement comme avant.',
+    ],
+  },
+  {
+    date: '25/08/2026 23:07',
+    title:
+      'Les facettes de la glace sont COHÉRENTES : taillées dans le bloc, elles tournent avec lui',
+    notes: [
+      'Retour du concepteur : bonne idée, mauvaise exécution — les facettes cristallines bougeaient DANS le volume. Deux causes : le motif n’était ancré qu’en translation (jamais en rotation — or un palet pivote), et son ancre était le centroïde du corps ENTIER, qui tremble dès qu’une partie du corps est liquide.',
+      'Le solveur tient désormais un REPÈRE RIGIDE DU GEL : le centre de la plus grosse composante gelée, et son angle de rotation intégré pas à pas à partir de la vitesse angulaire du bloc (celle, exacte, de la physique). Le Voronoï des facettes est taillé dans ce repère : il translate ET pivote avec le palet — un bloc soudé à une plaque froide fige aussi ses facettes, et l’angle repart de zéro à chaque nouveau gel. Vérifié en jeu (palet mis en rotation) : le motif garde sa place dans le volume, arêtes comprises, pendant que le bloc tourne. Un test du solveur verrouille l’intégration de l’angle et sa remise à zéro au dégel.',
+    ],
+  },
+  {
+    date: '25/08/2026 22:41',
+    title: 'Les tranches VERTICALES prennent enfin la couleur de leur volume',
+    notes: [
+      'Retour du concepteur : les arêtes verticales n’avaient pas les couleurs des volumes. La cause était une erreur de repère dans le dégradé de la tranche : sa « hauteur » se mesurait contre la mauvaise référence, si bien que TOUTE la tranche restait à la couleur du pied — sombre, quasi neutre — et le haut coloré n’était jamais atteint. Flagrant sur les faces verticales.',
+      'La hauteur se mesure désormais entre les deux vraies bornes de la tranche : la silhouette de la base (le pied) et le bord du dessus déplacé (le sommet) — par les deux champs de distance, fiable sur toutes les faces et toutes les formes. Et la couleur monte vite (courbe racine) : la tranche EST le matériau. Vérifié en jeu (relief FORT, banc des huit matériaux, caméra de côté) : les faces verticales de l’hydrophile, l’hydrophobe et la membrane affichent leur turquoise, violet et vert pleins, dégradé du pied au chant clair, strates comprises.',
     ],
   },
   {
@@ -1973,21 +1997,21 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
-    date: '10/08/2026 16:35',
-    title: 'Neuf bruitages rejoignent la soute, derrière les musiques',
-    notes: [
-      'Après les dix musiques, voici les bruits de la matière : condensation, gel, vaporisation, goutte de rosée, impact sur la glace, souffle de vapeur, éponge, éjection et vortex du sas. Neuf sons courts, un par phénomène que la simulation sait déjà produire.',
-      'Le poids est sans commune mesure avec celui des musiques : 640 Ko pour les neuf réunis, contre 25 Mo pour la bande-son. Ils tiennent dans un battement de cil du chargement, et pourront donc être préchargés sans précaution particulière.',
-      'Comme les musiques, aucun ne se déclenche encore : le jeu continue de fabriquer ses sons à la volée. Reste à relier chaque fichier à l’événement qui lui correspond dans le solveur — et à décider ce qui se passe quand deux gouttes gèlent en même temps.',
-    ],
-  },
-  {
     date: '10/08/2026 16:45',
     title: 'La bande-son entre en soute : dix pistes embarquées avec le jeu',
     notes: [
       'Dix musiques rejoignent le vaisseau : un thème d’accueil, trois ambiances de zone (hublot, chambre, conduite), deux cuves (tiède, glaciale), une fin de course et trois stings (collecte, record, dernière impulsion). Une demi-heure de matière en tout.',
       'Les originaux livrés pesaient 295 Mo de WAV — de quoi faire attendre le joueur cinq minutes sur l’écran d’accueil. Ils sont encodés en MP3 (~130 kb/s) : 25 Mo au total, et l’accueil descend de 53 Mo à 3,6 Mo. Les WAV restent au sec en local, hors du dépôt, comme les sources des visuels.',
       'Les pistes sont en ligne et servies par le CDN, mais aucune ne se déclenche encore : le jeu continue de fabriquer ses sons à la volée. Reste à décider quand chaque morceau entre, et comment il s’efface quand on change de zone.',
+    ],
+  },
+  {
+    date: '10/08/2026 16:35',
+    title: 'Neuf bruitages rejoignent la soute, derrière les musiques',
+    notes: [
+      'Après les dix musiques, voici les bruits de la matière : condensation, gel, vaporisation, goutte de rosée, impact sur la glace, souffle de vapeur, éponge, éjection et vortex du sas. Neuf sons courts, un par phénomène que la simulation sait déjà produire.',
+      'Le poids est sans commune mesure avec celui des musiques : 640 Ko pour les neuf réunis, contre 25 Mo pour la bande-son. Ils tiennent dans un battement de cil du chargement, et pourront donc être préchargés sans précaution particulière.',
+      'Comme les musiques, aucun ne se déclenche encore : le jeu continue de fabriquer ses sons à la volée. Reste à relier chaque fichier à l’événement qui lui correspond dans le solveur — et à décider ce qui se passe quand deux gouttes gèlent en même temps.',
     ],
   },
   {
