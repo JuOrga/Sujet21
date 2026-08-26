@@ -120,8 +120,13 @@
         gap: 22px;
       }
       /* Le bouton visé à la manette : un liseré net, visible de loin */
-      #home button.pad-focus {
-        outline: 2px solid #63b7e6;
+      /* Le liseré du focus MANETTE — partout où la croix navigue : la
+         fiche, mais aussi tous les panneaux et sous-menus. */
+      button.pad-focus,
+      select.pad-focus,
+      input.pad-focus,
+      .pad-focus {
+        outline: 2px solid #63b7e6 !important;
         outline-offset: 2px;
         box-shadow: 0 0 14px rgba(99, 183, 230, 0.45);
       }
@@ -5041,8 +5046,10 @@
           <kbd>clic stick</kbd>recadrer (caméra auto)
           <kbd>croix ↔</kbd>ralenti / accéléré<br />
           <kbd>Start ☰</kbd>pause + la fiche
-          <kbd>Select</kbd>recommencer
-          <kbd>A</kbd>valider dans les menus
+          <kbd>Select</kbd>recommencer<br />
+          <kbd>croix / stick</kbd>MENUS : naviguer (le liseré bleu suit)
+          <kbd>A</kbd>valider
+          <kbd>B</kbd>revenir — partout, chaque écran a sa porte de sortie
         </div>
         <div class="cmds-page home-commands" data-page="tactile" hidden>
           <kbd>toucher</kbd>éjecter vers le doigt — le corps part à l'opposé<br />

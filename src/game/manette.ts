@@ -63,8 +63,18 @@ export class Manette {
   ltVal = 0
 
   private fronts = new Set<number>()
+  // les fronts ACCUMULÉS entre deux images : l'échantillonneur (cadence
+  // fixe, 16 ms) les collecte, la boucle de jeu les relève d'un coup —
+  // aucun appui n'est perdu, même quand le rendu tourne au ralenti
+  // (menus plafonnés, onglet économe, petite machine)
+  private frontsAccum = new Set<number>()
   private prec: boolean[] = []
   private derniereVie = -1e9
+
+  constructor() {
+    if (typeof window !== 'undefined')
+      window.setInterval(() => this.echantillonne(performance.now() / 1000), 16)
+  }
 
   /** Dernier signe de vie (s) — comparé au pointeur pour savoir qui a la main. */
   get lastActivity(): number {
@@ -83,8 +93,17 @@ export class Manette {
     return this.fronts.has(i)
   }
 
+  /** La RELÈVE, une fois par image : les fronts accumulés depuis la
+   * dernière image deviennent les fronts de celle-ci. L'échantillonneur
+   * (16 ms) a déjà tenu à jour tout l'état continu. */
   poll(now: number): void {
-    this.fronts.clear()
+    this.echantillonne(now) // un dernier prélèvement : l'état est frais
+    this.fronts = new Set(this.frontsAccum)
+    this.frontsAccum.clear()
+  }
+
+  /** Un prélèvement de la manette — appelé toutes les 16 ms, hors rendu. */
+  private echantillonne(now: number): void {
     const gp = this.pad()
     if (!gp) {
       this.connectee = false
@@ -102,7 +121,7 @@ export class Manette {
     }
     for (let i = 0; i < gp.buttons.length; i++) {
       const p = presse(i)
-      if (p && !this.prec[i]) this.fronts.add(i)
+      if (p && !this.prec[i]) this.frontsAccum.add(i)
       if (p) this.derniereVie = now
       this.prec[i] = p
     }

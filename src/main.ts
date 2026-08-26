@@ -3375,58 +3375,204 @@ function clicMenuManette(): boolean {
   return false
 }
 
-// ---- Navigation de la FICHE à la manette ----
-// Croix (ou stick) haut/bas : passer d'un bouton à l'autre — A : valider.
-// Le bouton visé porte un liseré (classe pad-focus).
-// dans l'ORDRE VISUEL de la fiche : la croix descend comme l'œil lit
-const FICHE_BOUTONS = [
-  'start',
-  'home-restart',
-  'start-reprendre',
-  'start-secondaire',
-  'start-abandon',
-  'start-bis',
-  'start-editor',
-  'home-salles',
-  'home-records',
-  'home-codex',
-  'home-livraisons',
-  'home-cmds',
-  'home-params',
-  'home-mute',
-  'home-plein',
+// ---- LA NAVIGATION MANETTE DES MENUS : générique, le même geste partout --
+// Fini la liste de boutons codée en dur : l'écran ACTIF est le premier
+// visible de la pile ci-dessous, et ses éléments actionnables (boutons,
+// sélecteurs, cases) se parcourent à la croix ou au stick dans l'ORDRE
+// VISUEL — la navigation est en 2D : on va au plus proche dans la
+// direction pressée. A active, B REVIENT (chaque écran déclare sa porte
+// de sortie), gauche/droite ajustent un sélecteur, et le focus — liseré
+// bleu — reste toujours en vue (défilement suiveur).
+interface CoucheMenu {
+  id: string
+  /** ce que B déclenche : l'id du bouton de fermeture de l'écran */
+  retour?: string
+  /** couche LÉGÈRE (légende, états, panneau d'instruments, ouverts en
+   * pleine partie) : seul B est capté — le jeu garde tous ses boutons */
+  legere?: boolean
+  /** condition d'activation supplémentaire (défaut : le conteneur est visible) */
+  actif?: () => boolean
+}
+const COUCHES_MENU: CoucheMenu[] = [
+  { id: 'mb-veil' }, // la cérémonie : pas de porte de sortie — on choisit
+  { id: 'codex', retour: 'codex-fermer' },
+  { id: 'cmds', retour: 'cmds-fermer' },
+  { id: 'planche', retour: 'planche-fermer' },
+  { id: 'salles', retour: 'salles-fermer' },
+  { id: 'records', retour: 'records-fermer' },
+  { id: 'livraisons', retour: 'livraisons-fermer' },
+  { id: 'params', retour: 'params-fermer' },
+  { id: 'legend', retour: 'legend-close', legere: true },
+  { id: 'states', retour: 'states-close', legere: true },
+  { id: 'instr-panel', retour: 'hud-instr-chip', legere: true },
+  {
+    id: 'home',
+    retour: 'start', // B depuis la fiche : reprendre l'essai (s'il y en a un)
+    actif: () => !document.body.classList.contains('playing'),
+  },
 ]
-let ficheFocus = 0
-let ficheNavPrete = true // anti-répétition du stick
-function ficheNavigue(): void {
+
+function elementVisible(el: HTMLElement | null): el is HTMLElement {
+  if (!el || el.hidden) return false
+  const r = el.getBoundingClientRect()
+  if (r.width <= 0 || r.height <= 0) return false
+  const st = getComputedStyle(el)
+  return st.visibility !== 'hidden' && st.display !== 'none'
+}
+
+/** L'écran actuellement au-dessus, s'il y en a un. */
+function coucheMenuActive(): CoucheMenu | null {
+  for (const c of COUCHES_MENU) {
+    const el = document.getElementById(c.id)
+    if (!elementVisible(el)) continue
+    if (c.actif && !c.actif()) continue
+    return c
+  }
+  return null
+}
+
+/** Les éléments actionnables de l'écran, visibles et vivants. */
+function actionnables(couche: HTMLElement): HTMLElement[] {
+  const els = couche.querySelectorAll<HTMLElement>(
+    'button, select, input[type="checkbox"], input[type="range"], [role="button"]',
+  )
+  return [...els].filter(
+    (el) =>
+      elementVisible(el) &&
+      !(el as HTMLButtonElement).disabled &&
+      getComputedStyle(el).pointerEvents !== 'none',
+  )
+}
+
+// le focus par écran : l'élément visé survit à l'aller-retour d'un
+// sous-menu ; s'il disparaît (liste reconstruite), on reprend au début
+const focusParCouche = new Map<string, HTMLElement>()
+let padNavPret = true // anti-répétition du stick
+let padNavDepuis = 0 // début du maintien, pour la répétition auto
+
+/** Un pas de navigation 2D : le plus proche dans la direction pressée. */
+function plusProcheVers(
+  depuis: HTMLElement,
+  parmi: HTMLElement[],
+  dx: number,
+  dy: number,
+): HTMLElement | null {
+  const a = depuis.getBoundingClientRect()
+  const ax = (a.left + a.right) / 2
+  const ay = (a.top + a.bottom) / 2
+  let mieux: HTMLElement | null = null
+  let mieuxScore = Infinity
+  for (const el of parmi) {
+    if (el === depuis) continue
+    const b = el.getBoundingClientRect()
+    const bx = (b.left + b.right) / 2
+    const by = (b.top + b.bottom) / 2
+    const le = (bx - ax) * dx + (by - ay) * dy // l'avancée dans la direction
+    if (le < 4) continue
+    const travers = Math.abs((bx - ax) * dy) + Math.abs((by - ay) * dx)
+    const score = le + travers * 2.2
+    if (score < mieuxScore) {
+      mieuxScore = score
+      mieux = el
+    }
+  }
+  return mieux
+}
+
+/** La navigation d'un écran de menu, une image. */
+function navigueMenu(couche: CoucheMenu): void {
+  const host = document.getElementById(couche.id)!
+  // B : la porte de sortie de l'écran
+  if (manette.edge(BOUTON.B) && couche.retour) {
+    const porte = document.getElementById(couche.retour)
+    if (boutonVisible(porte)) {
+      porte.click()
+      return
+    }
+  }
+  if (couche.legere) return // légende & co : B seulement, le jeu garde la main
   // ☰ (Start) depuis la fiche : reprendre l'essai directement
-  if (manette.edge(BOUTON.START)) {
+  if (couche.id === 'home' && manette.edge(BOUTON.START)) {
     document.getElementById('start')?.click()
     return
   }
-  const visibles = FICHE_BOUTONS.map((id) =>
-    document.getElementById(id),
-  ).filter(boutonVisible)
-  if (visibles.length === 0) return
-  // le stick fait aussi la navigation : un coup franc vers le haut/bas
-  let delta = 0
-  if (manette.edge(BOUTON.HAUT)) delta = -1
-  else if (manette.edge(BOUTON.BAS)) delta = 1
-  else if (manette.force > 0.55 && Math.abs(manette.dirY) > 0.6) {
-    if (ficheNavPrete) {
-      delta = manette.dirY > 0 ? 1 : -1
-      ficheNavPrete = false
+  // le codex garde ses fermetures historiques (START et SELECT)
+  if (
+    couche.id === 'codex' &&
+    (manette.edge(BOUTON.START) || manette.edge(BOUTON.SELECT))
+  ) {
+    document.getElementById('codex-fermer')?.click()
+    return
+  }
+  const els = actionnables(host)
+  // la cérémonie en phase contemplative (bilan) : aucun bouton — A avance
+  if (els.length === 0) {
+    if (manette.edge(BOUTON.A))
+      host.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    return
+  }
+  let vise = focusParCouche.get(couche.id) ?? null
+  if (!vise || !els.includes(vise)) vise = els[0]
+  // la direction pressée : croix, ou stick avec un cran anti-répétition
+  // (puis répétition douce au maintien — les longues listes se parcourent)
+  let dx = 0
+  let dy = 0
+  if (manette.edge(BOUTON.HAUT)) dy = -1
+  else if (manette.edge(BOUTON.BAS)) dy = 1
+  else if (manette.edge(BOUTON.GAUCHE)) dx = -1
+  else if (manette.edge(BOUTON.DROITE)) dx = 1
+  else if (manette.force > 0.55) {
+    const now = performance.now() / 1000
+    if (padNavPret || now - padNavDepuis > 0.34) {
+      if (Math.abs(manette.dirY) > Math.abs(manette.dirX))
+        dy = manette.dirY > 0 ? 1 : -1
+      else dx = manette.dirX > 0 ? 1 : -1
+      if (padNavPret) padNavDepuis = now
+      else padNavDepuis = now - 0.22 // la répétition suivante vient plus vite
+      padNavPret = false
     }
   }
-  if (manette.force < 0.3) ficheNavPrete = true
-  ficheFocus = Math.max(0, Math.min(visibles.length - 1, ficheFocus + delta))
-  for (let i = 0; i < visibles.length; i++) {
-    visibles[i].classList.toggle(
-      'pad-focus',
-      manette.active && i === ficheFocus,
-    )
+  if (manette.force < 0.3) padNavPret = true
+  // un SÉLECTEUR visé : gauche/droite changent sa valeur, pas le focus
+  if (dx !== 0 && vise instanceof HTMLSelectElement) {
+    const n = vise.options.length
+    if (n > 0) {
+      vise.selectedIndex = Math.max(0, Math.min(n - 1, vise.selectedIndex + dx))
+      vise.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+    dx = 0
   }
-  if (manette.edge(BOUTON.A)) visibles[ficheFocus].click()
+  if (dx !== 0 || dy !== 0) {
+    const prochain = plusProcheVers(vise, els, dx, dy)
+    if (prochain) vise = prochain
+  }
+  focusParCouche.set(couche.id, vise)
+  // le liseré s'affiche si la MANETTE a la main (a parlé plus récemment
+  // que le pointeur) — pas de fenêtre de temps : sur un menu au rendu
+  // plafonné, une horloge expirerait entre deux images
+  const padALaMain = manette.lastActivity > input.lastPointerAt
+  for (const el of els)
+    el.classList.toggle('pad-focus', padALaMain && el === vise)
+  if (dx !== 0 || dy !== 0)
+    vise.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  if (manette.edge(BOUTON.A)) vise.click()
+}
+// sonde du banc d'essai : l'état de la navigation manette, lisible du dehors
+let manettePolls = 0
+let manettePollNow = 0
+;(window as unknown as { __menu: unknown }).__menu = {
+  couche: () => coucheMenuActive()?.id ?? null,
+  pad: () => ({
+    connectee: manette.connectee,
+    active: manette.active,
+    polls: manettePolls,
+    now: manettePollNow,
+    vie: manette.lastActivity,
+  }),
+  actionnables: (id: string) => {
+    const el = document.getElementById(id)
+    return el ? actionnables(el).length : -1
+  },
 }
 input.attach(canvas)
 
@@ -6237,26 +6383,30 @@ function frame(now: number): void {
   let stepsFaits = 0
 
   // ---- Manette : elle écrit dans le même pointeur que le doigt ----
-  manette.poll(performance.now() / 1000)
+  manettePolls++
+  manettePollNow = performance.now() / 1000
+  manette.poll(manettePollNow)
   if (manette.connectee) {
     const enJeu = document.body.classList.contains('playing')
+    // l'écran de menu au-dessus, s'il y en a un — codex, sous-menus de la
+    // fiche, cérémonie, fiche elle-même… B y est TOUJOURS le retour
+    const couche = coucheMenuActive()
+    // une couche LÉGÈRE (légende, états, instruments — ouvertes en pleine
+    // partie) : B la referme et se consume, le jeu garde tout le reste
+    let bConsomme = false
+    if (couche?.legere && manette.edge(BOUTON.B)) {
+      navigueMenu(couche)
+      bConsomme = true
+    }
     if (!onboardEl.hidden) {
       // prise en main à l'écran : A avance les cartes, rien d'autre ne passe
       if (manette.edge(BOUTON.A)) avanceOnboard()
     } else if (!eveil1El.hidden || !eveil2El.hidden) {
       // cartes de l'éveil : A tourne la page, rien d'autre ne passe
       if (manette.edge(BOUTON.A)) avanceEveil()
-    } else if (!codexEl.hidden) {
-      // le CODEX ouvert : B, START ou SELECT le referme — rien d'autre ne passe
-      if (
-        manette.edge(BOUTON.B) ||
-        manette.edge(BOUTON.START) ||
-        manette.edge(BOUTON.SELECT)
-      )
-        fermeCodex()
-    } else if (!enJeu) {
-      // la FICHE : croix/stick pour choisir, A pour valider
-      ficheNavigue()
+    } else if (couche && !couche.legere) {
+      // un MENU au premier plan : croix/stick naviguent, A active, B revient
+      navigueMenu(couche)
     } else if (manette.edge(BOUTON.A) && clicMenuManette()) {
       // écrans de jeu (relance, fin de tableau) : le clic a consommé le A
     } else if (enJeu) {
@@ -6288,8 +6438,9 @@ function frame(now: number): void {
         if (input.freezeIntent) input.toggleFreeze()
         input.toggleGas()
       }
-      if (manette.edge(BOUTON.B)) {
-        // retour à l'eau, quel que soit l'état
+      if (!bConsomme && manette.edge(BOUTON.B)) {
+        // retour à l'eau, quel que soit l'état — sauf si B vient de
+        // refermer un panneau léger (légende, états, instruments)
         if (input.freezeIntent) input.toggleFreeze()
         else if (input.gasIntent) input.toggleGas()
       }
