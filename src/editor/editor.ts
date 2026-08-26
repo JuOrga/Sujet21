@@ -2836,6 +2836,9 @@ export class LevelEditor {
         laby: Number(
           (this.el('edg-laby') as HTMLSelectElement).value,
         ) as OptionsGen['laby'],
+        contraste: Number(
+          (this.el('edg-contraste') as HTMLSelectElement).value,
+        ) as OptionsGen['contraste'],
       }
     }
     const genere = (): void => {

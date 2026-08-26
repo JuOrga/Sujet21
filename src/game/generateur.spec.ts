@@ -170,6 +170,27 @@ describe('generateur — une graine, une salle PROUVÉE', () => {
     expect(cumulDedale).toBeGreaterThan(3)
   })
 
+  it("le mode CONTRASTÉ sculpte la lumière : ambiante éteinte, lampes basses, bandeaux", () => {
+    const o = { ...OPTIONS_DEFAUT, contraste: 1 as const }
+    let bandeaux = 0
+    for (const g of [11, 12, 13, 14]) {
+      const n = genereNiveau(g, null, o)
+      expect(n.ambiante!, `graine ${g}`).toBeLessThanOrEqual(0.2)
+      expect(n.lumieres!.length).toBeGreaterThan(0)
+      for (const l of n.lumieres!) {
+        expect(l.h!, `graine ${g} : lampe haute`).toBeLessThanOrEqual(180)
+        expect(l.intensite!, `graine ${g}`).toBeGreaterThanOrEqual(1.1)
+      }
+      bandeaux += n.lumieres!.filter((l) => l.forme === 'bandeau').length
+      // le code porte le réglage — la salle se repartage à l'identique
+      expect(n.code).toContain('~')
+    }
+    expect(bandeaux, 'aucun bandeau sur quatre graines').toBeGreaterThan(0)
+    // et le défaut n'a pas bougé : lampes sans hauteur (plafonnier standard)
+    const nu = genereNiveau(11)
+    expect(nu.lumieres!.every((l) => l.h === undefined)).toBe(true)
+  })
+
   it('les options COMMANDENT : sans lasers ni dangers, la salle obéit', () => {
     // familles : évent + rideau + membrane seulement (bits 0, 1, 2)
     const o = { ...OPTIONS_DEFAUT, familles: 0b0000111, dangers: 1 as const }

@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 22:30',
+    title: 'Générateur : le mode CONTRASTÉ — la lumière basse sculpte la salle',
+    notes: [
+      'Demandé : un réglage qui pousse le contraste — des lampes BASSES pour des ombres qui s’étirent, des jeux d’ombres voulus. Le panneau ⚄ gagne « Éclairage : contrasté » : l’ambiante s’éteint presque (0,10-0,16 au lieu de 0,52), et chaque salle reçoit une lampe basse (90-170 u de hauteur — elle rase le sol, les ombres du décor s’allongent), intense (1,2-1,6), souvent teintée (ambre, bleu froid, rosé), près d’un flanc — jamais au centre : la lumière prend la salle en enfilade. Une lampe sur deux est un BANDEAU lumineux (jusqu’à 420 u, horizontal, vertical ou incliné).',
+      'Et l’ombre se COMPOSE : à côté de chaque lampe basse, le générateur pose quand la place le permet un ÉCRAN D’OMBRE — un pilier fin, pivoté face à la lampe, entre elle et le cœur de la salle — pour découper une ombre longue et précise dans la pièce. Les écrans respectent les réserves (jamais sur un mécanisme ou le chemin), et le parcours de validation garde le dernier mot.',
+      'Le réglage voyage dans le code comme les autres (« G-Q~2TJ0 ») : retaper le code redonne la même salle, éclairage compris — et les bandeaux suivent les retournements d’orientation (transposition et miroir pivotent leur angle). Vérifié : 22 tests au générateur (338 au total), et une salle contrastée générée puis jouée en headless — ambiante éteinte, nappes de lumière, ombre diagonale de l’écran, capture à l’appui.',
+    ],
+  },
+  {
     date: '26/08/2026 21:40',
     title:
       'Le générateur ne se répète plus : orientations, montages, silhouettes',

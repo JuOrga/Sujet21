@@ -134,6 +134,10 @@ export interface OptionsGen {
   // qui forcent le serpentin — 0 auto (léger) · 1 aucune · 2 marqué ·
   // 3 dédale (plus de traverses, couloirs plus étroits)
   laby: 0 | 1 | 2 | 3
+  // l'ÉCLAIRAGE CONTRASTÉ : ambiante presque éteinte, lampes BASSES et
+  // intenses (les ombres s'étirent), bandeaux lumineux, teintes, et des
+  // écrans d'ombre posés exprès — 0 auto · 1 contrasté
+  contraste: 0 | 1
 }
 
 export const OPTIONS_DEFAUT: OptionsGen = {
@@ -143,6 +147,7 @@ export const OPTIONS_DEFAUT: OptionsGen = {
   cachette: 0,
   decor: 0,
   laby: 0,
+  contraste: 0,
 }
 
 /** Le suffixe des options — vide quand tout est « auto ». */
@@ -155,7 +160,8 @@ export function encodeOptions(o: OptionsGen): string {
     (o.dangers << 9) |
     (o.cachette << 11) |
     (o.decor << 13) |
-    (o.laby << 15)
+    (o.laby << 15) |
+    (o.contraste << 17)
   const defaut = 0 | (127 << 2)
   return paquet === defaut ? '' : paquet.toString(36).toUpperCase()
 }
@@ -163,7 +169,7 @@ export function encodeOptions(o: OptionsGen): string {
 export function decodeOptions(txt: string): OptionsGen | null {
   if (!/^[0-9A-Z]{1,4}$/i.test(txt.trim())) return null
   const paquet = parseInt(txt.trim(), 36)
-  if (!Number.isFinite(paquet) || paquet < 0 || paquet >= 1 << 17) return null
+  if (!Number.isFinite(paquet) || paquet < 0 || paquet >= 1 << 18) return null
   const sallesIdx = paquet & 3
   return {
     salles: (sallesIdx === 0 ? 0 : sallesIdx + 2) as OptionsGen['salles'],
@@ -172,6 +178,7 @@ export function decodeOptions(txt: string): OptionsGen | null {
     cachette: Math.min(2, (paquet >> 11) & 3) as OptionsGen['cachette'],
     decor: ((paquet >> 13) & 3) as OptionsGen['decor'],
     laby: ((paquet >> 15) & 3) as OptionsGen['laby'],
+    contraste: ((paquet >> 17) & 1) as OptionsGen['contraste'],
   }
 }
 
@@ -895,11 +902,61 @@ function essaieNiveau(
     }
     // la lampe de la salle (4 allumées au plus)
     if (lumieres.length < 4) {
-      lumieres.push({
-        x: (sx0 + sx1) / 2,
-        y: Math.round(entre(rng, -demiH * 0.3, demiH * 0.3)),
-        intensite: Number(entre(rng, 0.85, 1.15).toFixed(2)),
-      })
+      if (o.contraste === 1) {
+        // le MODE CONTRASTÉ : la lampe est BASSE (elle rase le sol, les
+        // ombres s'étirent), intense, souvent teintée, parfois en BANDEAU
+        // — et posée près d'un flanc, jamais au centre : la lumière prend
+        // la salle en enfilade et le décor découpe des ombres longues
+        const versGauche = rng() < 0.5
+        const lx = Math.round(
+          versGauche ? entre(rng, sx0 + 110, sx0 + 260) : entre(rng, sx1 - 260, sx1 - 110),
+        )
+        const ly = Math.round(entre(rng, -demiH * 0.45, demiH * 0.45))
+        const bandeau = rng() < 0.45
+        lumieres.push({
+          x: lx,
+          y: ly,
+          h: Math.round(entre(rng, 90, 170)), // basse : les ombres rasent
+          intensite: Number(entre(rng, 1.2, 1.6).toFixed(2)),
+          ...(rng() < 0.6
+            ? { couleur: parmi(rng, ['#ffd9a8', '#a8c8ff', '#ffc4c4', '#ffffff']) }
+            : {}),
+          ...(bandeau
+            ? {
+                forme: 'bandeau' as const,
+                longueur: Math.round(entre(rng, 240, 420)),
+                angle: parmi(rng, [0, 90, 30, -30]),
+              }
+            : {}),
+        })
+        // et son ÉCRAN D'OMBRE : un pilier fin posé exprès entre la lampe
+        // et le cœur de la salle — l'ombre précise qu'on a voulue
+        const versX = (sx0 + sx1) / 2 - lx
+        const versY = -ly
+        const dEcran = Math.hypot(versX, versY) || 1
+        const ex2 = lx + (versX / dEcran) * entre(rng, 140, 220)
+        const ey2 = ly + (versY / dEcran) * entre(rng, 140, 220)
+        const angleEcran = Math.round(
+          (Math.atan2(versY, versX) * 180) / Math.PI + 90 + entre(rng, -15, 15),
+        )
+        const wE = entre(rng, 44, 64)
+        const hE = entre(rng, 150, 250)
+        const rE: Rect = {
+          minX: ex2 - wE / 2,
+          minY: ey2 - hE / 2,
+          maxX: ex2 + wE / 2,
+          maxY: ey2 + hE / 2,
+        }
+        if (posePossible(rE)) {
+          boxes.push({ ...rE, material: MAT_WALL, angle: angleEcran, skin: 3 })
+        }
+      } else {
+        lumieres.push({
+          x: (sx0 + sx1) / 2,
+          y: Math.round(entre(rng, -demiH * 0.3, demiH * 0.3)),
+          intensite: Number(entre(rng, 0.85, 1.15).toFixed(2)),
+        })
+      }
     }
   }
 
@@ -969,10 +1026,13 @@ function essaieNiveau(
     ...(rails.length ? { rails } : {}),
     ...(caches.length ? { caches } : {}),
     lumieres,
-    // la FIN de run s'assombrit : l'ambiante suit le moment du cahier
-    ...(atelier && atelier.cahier.moment > 1
-      ? { ambiante: atelier.cahier.moment === 2 ? 0.46 : 0.4 }
-      : {}),
+    // la FIN de run s'assombrit ; le mode CONTRASTÉ éteint presque tout —
+    // seules les lampes basses sculptent la salle
+    ...(o.contraste === 1
+      ? { ambiante: Number(entre(rng, 0.1, 0.16).toFixed(2)) }
+      : atelier && atelier.cahier.moment > 1
+        ? { ambiante: atelier.cahier.moment === 2 ? 0.46 : 0.4 }
+        : {}),
     par: 2 + 3 * plan.maillons.length + 2 * nbEnigmes + (atelier ? atelier.cahier.difficulte : 0),
   }
   // la preuve se joue sur le niveau FINI (tout le décor posé)
@@ -1032,7 +1092,10 @@ function transposeNiveau(level: LevelDef, preuves: PreuveDef[]): void {
     swapRect(c)
     if (c.angle) c.angle = -c.angle
   }
-  for (const lum of level.lumieres ?? []) swapPt(lum)
+  for (const lum of level.lumieres ?? []) {
+    swapPt(lum)
+    if (lum.forme === 'bandeau') lum.angle = 90 - (lum.angle ?? 0)
+  }
   for (const p of preuves) {
     swapPt(p.spot)
     const t = p.normale.nx
@@ -1069,7 +1132,10 @@ function miroirXNiveau(level: LevelDef, preuves: PreuveDef[]): void {
     flipRect(c)
     if (c.angle) c.angle = -c.angle
   }
-  for (const lum of level.lumieres ?? []) lum.x = -lum.x
+  for (const lum of level.lumieres ?? []) {
+    lum.x = -lum.x
+    if (lum.forme === 'bandeau') lum.angle = 180 - (lum.angle ?? 0)
+  }
   for (const p of preuves) {
     p.spot.x = -p.spot.x
     p.normale.nx = -p.normale.nx
