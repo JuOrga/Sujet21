@@ -22,6 +22,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 19:10',
+    title:
+      'Le FAISCEAU FOUDROYANT : aura qui respire, mini-arcs, sursaut décuplé',
+    notes: [
+      'Demandé : accentuer les effets du laser — un rayon avec de l’aura et des mini-arcs électriques, le sursaut amplifié de même, en troisième choix. C’est fait : FOUDROYANT (nouveau défaut). L’AURA respire — une seconde nappe encore plus large dont l’intensité pulse lentement, le rayon irradie. Et des MINI-ARCS ÉLECTRIQUES crépitent le long du faisceau : deux éclairs en zigzag par segment (les coudes des reflets sont respectés), ancrés aux deux bouts, re-tirés 24 fois par seconde — bleu-blanc dans l’air, violet clair en plasma.',
+      'Le SURSAUT DE VICTOIRE frappe plus fort en foudroyant : plus long (0,7 s), flash ×1,6, la FOUDRE verte serpente le long de la trajectoire gelée tant que le flash vit, l’onde est DOUBLE (le second anneau part avec un temps de retard), et douze étincelles fusent au lieu de huit.',
+      'PARAMÈTRES « LE FAISCEAU LASER » passe à trois crans : FOUDROYANT (défaut) / SOMPTUEUX (flux + lueurs, sursaut sobre) / CLASSIQUE (l’ancien trait au pixel près). Vérifié en salle d’essai pilotée : arcs visibles le long du rayon, sursaut amplifié capturé, pastille allumée au premier passage. 354 tests verts.',
+    ],
+  },
+  {
     date: '26/08/2026 21:51',
     title: 'Changer de tableau au doigt : le ✎ des cartes, et la liste réparée',
     notes: [
@@ -31,7 +41,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '26/08/2026 21:35',
-    title: 'Steam Deck : le stick droit DÉFILE les menus — comme le pavé en mode bureau',
+    title:
+      'Steam Deck : le stick droit DÉFILE les menus — comme le pavé en mode bureau',
     notes: [
       'Demandé : que tous les défilements des menus se pilotent aux pads du Steam Deck, comme en mode bureau. C’est fait : dans N’IMPORTE QUEL écran de menu — codex, salles, livraisons, paramètres, records, planche, commandes, légende, états, panneau d’instruments — le STICK DROIT (ou le pavé tactile configuré en joystick) fait défiler, verticalement et horizontalement, à la vitesse de l’inclinaison.',
       'Le défilement vise juste : c’est le conteneur du focus qui défile s’il en a un, sinon le plus grand défilable de l’écran (retrouvé et mémorisé tout seul). Et pendant qu’un panneau léger est ouvert en pleine partie (légende, états, instruments), la caméra CÈDE le stick droit au panneau — refermé au B, elle le reprend aussitôt.',
@@ -40,7 +51,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '26/08/2026 21:28',
-    title: 'Une seule maison pour l’ordre : LA PLANCHE — l’éditeur, lui, change de tableau',
+    title:
+      'Une seule maison pour l’ordre : LA PLANCHE — l’éditeur, lui, change de tableau',
     notes: [
       'Signalé : un réordonnancement fait dans LA PLANCHE restait invisible dans l’éditeur. Trouvé : après le geste, l’éditeur RE-TÉLÉCHARGEAIT la bibliothèque — et tombait sur le cache du magasin (le pointeur est servi 60 s) : l’ANCIEN ordre revenait. Il adopte désormais directement la réponse du serveur au geste, sans re-télécharger : l’ordre suit, immédiatement.',
       'Et le panneau de droite fait peau neuve, comme demandé : l’éditeur N’ORDONNE PLUS (finis les numéros à taper, les ↑↓ et le glisser de lignes — sources de confusion et de conflits) ; la liste devient un simple SÉLECTEUR de tableau : le rang de séquence se lit, cliquer OUVRE. Un bouton « ▧ ORDONNER DANS LA PLANCHE » ouvre l’écran d’ordonnancement par-dessus l’éditeur — une seule maison pour l’ordre.',
@@ -65,7 +77,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '26/08/2026 20:00',
-    title: 'Manette : les menus se PARCOURENT enfin — et plus aucun appui perdu',
+    title:
+      'Manette : les menus se PARCOURENT enfin — et plus aucun appui perdu',
     notes: [
       'Gros chantier demandé : la navigation manette des menus et sous-menus. Fini la liste de boutons codée en dur qui laissait des écrans inaccessibles : la navigation devient GÉNÉRIQUE — chaque écran (fiche, paramètres, salles, planche, codex, records, livraisons, commandes, cérémonie de fin de salle, choix du pool…) est une couche de la pile, et l’écran du dessus prend la main. La croix ou le stick parcourent ses boutons EN 2D (on va au plus proche dans la direction pressée, répétition douce au maintien), A active, gauche/droite ajustent un sélecteur, le liseré bleu suit — un seul à l’écran — et reste en vue dans les listes qui défilent.',
       'B REVIENT, PARTOUT : chaque écran déclare sa porte de sortie (le ✕ du panneau, la reprise d’essai depuis la fiche). La légende, les états et le panneau d’instruments, ouverts en pleine partie, sont des couches LÉGÈRES : B les referme sans voler les boutons du jeu — et ce B-là ne repasse pas le corps en eau. Le codex garde ses fermetures historiques (START, SELECT).',
@@ -82,7 +95,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '26/08/2026 17:35',
-    title: 'La planche s’essaie : ⏵ sur chaque carte, et le retour au même endroit',
+    title:
+      'La planche s’essaie : ⏵ sur chaque carte, et le retour au même endroit',
     notes: [
       'Chaque carte de LA PLANCHE porte un bouton ⏵ : le tableau se lance à l’essai sur-le-champ. En jeu, un bouton « ⟵ REVENIR À LA PLANCHE » (haut de l’écran) ramène exactement là où on en était — défilement compris — et la conclusion de l’essai (sas bu) y ramène aussi d’elle-même, comme un essai d’éditeur retourne à l’éditeur.',
     ],
@@ -124,7 +138,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '26/08/2026 15:00',
-    title: 'L’œil du Sujet : l’étalonnage du concepteur devient le défaut livré',
+    title:
+      'L’œil du Sujet : l’étalonnage du concepteur devient le défaut livré',
     notes: [
       'Les sept curseurs de l’œil (banc → « L’œil du Sujet ») partent désormais des valeurs retenues par le concepteur : noyau plus lumineux (1,6) dans une pénombre discrète (0,3), œil un rien plus petit (0,9) et plus plat (0,85), regard plus vif (1,25) qui erre peu (0,8) — et un Sujet nettement plus occupé (curiosité 1,85). « Revenir aux défauts » ramène à cet étalonnage ; un appareil qui avait déjà ses réglages les garde.',
     ],

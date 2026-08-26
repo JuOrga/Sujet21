@@ -1752,11 +1752,14 @@ let eauRiche = localStorage.getItem('sujet21-eau') !== 'sobre'
 // La FLÈCHE DE CAP à la manette : retirée par défaut (le regard du Sujet
 // suit déjà le stick) — réactivable dans PARAMÈTRES pour qui la préfère.
 let flecheVisible = localStorage.getItem('sujet21-fleche') === 'visible'
-// LE FAISCEAU laser : SOMPTUEUX par défaut (flux qui remonte le rayon,
-// lueurs aux extrémités, sursaut de victoire à l'allumage d'une pastille)
-// — CLASSIQUE garde l'ancien rendu au pixel près.
-let faisceauChoix =
-  localStorage.getItem('sujet21-faisceau') === 'classique' ? 0 : 1
+// LE FAISCEAU laser, trois crans : FOUDROYANT par défaut (aura pulsante
+// + mini-arcs électriques qui crépitent le long du rayon, sursaut
+// amplifié), SOMPTUEUX (flux + lueurs, sursaut sobre), CLASSIQUE
+// (l'ancien rendu au pixel près).
+let faisceauChoix = ((): number => {
+  const v = localStorage.getItem('sujet21-faisceau')
+  return v === 'classique' ? 0 : v === 'somptueux' ? 1 : 2
+})()
 let eauMiroir =
   localStorage.getItem('sujet21-miroir') === 'classique'
     ? 0
@@ -2029,6 +2032,7 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     const renderFaisceau = (): void => {
       choixFaisceau.innerHTML = ''
       for (const [val, cle, label] of [
+        [2, 'foudroyant', 'FOUDROYANT'],
         [1, 'somptueux', 'SOMPTUEUX'],
         [0, 'classique', 'CLASSIQUE'],
       ] as const) {
@@ -2956,7 +2960,10 @@ function roueHtml(
 ): string {
   const i = choix.indexOf(cur)
   const opts = choix
-    .map((v) => `<option value="${v}"${v === cur ? ' selected' : ''}>${v}</option>`)
+    .map(
+      (v) =>
+        `<option value="${v}"${v === cur ? ' selected' : ''}>${v}</option>`,
+    )
     .join('')
   return (
     `<span class="pr-col">` +
@@ -3011,19 +3018,48 @@ function renderPlanche(): void {
     const m21 = /^21\s*([A-Z])([A-Z])\s*-\s*(\d)(\d)(\d)$/i.exec(s.level.code)
     const m3 = /^(\d)(\d)(\d)$/.exec(s.level.code.trim())
     const roues = d !== null && (m21 !== null || m3 !== null)
-    const chiffres = m21 ? [m21[3], m21[4], m21[5]] : m3 ? [m3[1], m3[2], m3[3]] : []
+    const chiffres = m21
+      ? [m21[3], m21[4], m21[5]]
+      : m3
+        ? [m3[1], m3[2], m3[3]]
+        : []
     const rouesHtml = !roues
       ? ''
       : `<div class="pl-roues">` +
         (m21
           ? `<span class="pr-fixe">21</span>` +
-            roueHtml(m21[1].toUpperCase(), CHOIX_LETTRE, 'ORDRE de la codification (AA, AB, …) — 1ʳᵉ lettre', 'ORDRE') +
-            roueHtml(m21[2].toUpperCase(), CHOIX_LETTRE, 'ORDRE de la codification (AA, AB, …) — 2ᵉ lettre', '') +
+            roueHtml(
+              m21[1].toUpperCase(),
+              CHOIX_LETTRE,
+              'ORDRE de la codification (AA, AB, …) — 1ʳᵉ lettre',
+              'ORDRE',
+            ) +
+            roueHtml(
+              m21[2].toUpperCase(),
+              CHOIX_LETTRE,
+              'ORDRE de la codification (AA, AB, …) — 2ᵉ lettre',
+              '',
+            ) +
             `<span class="pr-fixe">-</span>`
           : '') +
-        roueHtml(chiffres[0], CHOIX_MOMENT, 'MOMENT de la run — 1 début · 2 milieu · 3 fin', 'MOMENT') +
-        roueHtml(chiffres[1], CHOIX_MECA, 'MÉCANIQUE requise — 0 aucune · 1 glace · 2 vapeur · 3 toutes', 'MÉCA') +
-        roueHtml(chiffres[2], CHOIX_DIFF, 'DIFFICULTÉ — de 0 à 9, à moment et mécanique égaux', 'DIFF') +
+        roueHtml(
+          chiffres[0],
+          CHOIX_MOMENT,
+          'MOMENT de la run — 1 début · 2 milieu · 3 fin',
+          'MOMENT',
+        ) +
+        roueHtml(
+          chiffres[1],
+          CHOIX_MECA,
+          'MÉCANIQUE requise — 0 aucune · 1 glace · 2 vapeur · 3 toutes',
+          'MÉCA',
+        ) +
+        roueHtml(
+          chiffres[2],
+          CHOIX_DIFF,
+          'DIFFICULTÉ — de 0 à 9, à moment et mécanique égaux',
+          'DIFF',
+        ) +
         `</div>`
     carte.innerHTML =
       `<canvas width="220" height="126"></canvas>` +
@@ -3041,7 +3077,10 @@ function renderPlanche(): void {
       `<button type="button" data-tot="1" title="Jouer plus tard"${i === visibles.length - 1 ? ' disabled' : ''}>▶</button>` +
       `</span></div>` +
       (d ? `<span class="salle-chips">${chipsHtml(s.level.code)}</span>` : '')
-    dessineMiniCarte(carte.querySelector('canvas') as HTMLCanvasElement, s.level)
+    dessineMiniCarte(
+      carte.querySelector('canvas') as HTMLCanvasElement,
+      s.level,
+    )
     // ◀ ▶ : l'échange avec la voisine
     for (const b of Array.from(
       carte.querySelectorAll<HTMLButtonElement>('[data-tot]'),
@@ -3101,7 +3140,10 @@ function renderPlanche(): void {
       // code hors nomenclature : le champ libre reste — Entrée ou la
       // sortie du champ enregistre (taper « 123 » fait naître les molettes)
       const codeInp = carte.querySelector('.pl-code') as HTMLInputElement
-      codeInp.addEventListener('change', () => void plancheCode(s.id, codeInp.value))
+      codeInp.addEventListener(
+        'change',
+        () => void plancheCode(s.id, codeInp.value),
+      )
       codeInp.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
           e.preventDefault()
@@ -3514,7 +3556,10 @@ function conteneurDefilant(
   depuis: HTMLElement | null,
 ): HTMLElement | null {
   const defile = (el: HTMLElement): boolean => {
-    if (el.scrollHeight <= el.clientHeight + 4 && el.scrollWidth <= el.clientWidth + 4)
+    if (
+      el.scrollHeight <= el.clientHeight + 4 &&
+      el.scrollWidth <= el.clientWidth + 4
+    )
       return false
     const st = getComputedStyle(el)
     return /(auto|scroll)/.test(st.overflowY + st.overflowX)
@@ -3532,7 +3577,9 @@ function conteneurDefilant(
   }
   let mieux: HTMLElement | null = null
   let aire = 0
-  for (const cand of couche.querySelectorAll<HTMLElement>('div, section, aside')) {
+  for (const cand of couche.querySelectorAll<HTMLElement>(
+    'div, section, aside',
+  )) {
     if (!defile(cand)) continue
     const r = cand.getBoundingClientRect()
     if (r.width * r.height > aire) {
@@ -3894,6 +3941,45 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     }
   })
 
+  // MINI-ARCS ÉLECTRIQUES (mode foudroyant) : un éclair en zigzag qui
+  // serpente le long d'un segment — ancré aux deux bouts, offsets
+  // perpendiculaires pseudo-aléatoires re-tirés plusieurs fois par
+  // seconde (le crépitement), amplitude en ventre au milieu du chemin.
+  // Partagé entre le rayon vivant et le sursaut de victoire.
+  const bruitArc = (graine: number, i: number): number => {
+    const v = Math.sin(graine * 127.1 + i * 311.7) * 43758.5453
+    return (v - Math.floor(v)) * 2 - 1
+  }
+  const traceArcFx = (
+    a: { sx: number; sy: number },
+    b: { sx: number; sy: number },
+    graine: number,
+    amp: number,
+    coul: string,
+    larg: number,
+  ): void => {
+    const dx = b.sx - a.sx
+    const dy = b.sy - a.sy
+    const L = Math.hypot(dx, dy)
+    if (L < 14) return
+    const n = Math.min(26, Math.max(4, Math.round(L / (22 * Math.max(0.4, z)))))
+    const px = -dy / L
+    const py = dx / L
+    g.strokeStyle = coul
+    g.lineWidth = larg
+    g.lineJoin = 'round'
+    g.beginPath()
+    g.moveTo(a.sx, a.sy)
+    for (let i = 1; i < n; i++) {
+      const tI = i / n
+      const ventre = Math.sin(Math.PI * tI)
+      const off = bruitArc(graine, i) * amp * ventre
+      g.lineTo(a.sx + dx * tI + px * off, a.sy + dy * tI + py * off)
+    }
+    g.lineTo(b.sx, b.sy)
+    g.stroke()
+  }
+
   // faisceaux : halo large + cœur fin, en fusion additive
   g.globalCompositeOperation = 'lighter'
   for (const t of laserEtat.vues) {
@@ -3937,9 +4023,22 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       const mode = modeDe(t.points[k])
       let e = k + 1
       while (e + 1 < chemins.length && modeDe(t.points[e]) === mode) e++
+      // en FOUDROYANT, l'aura respire : une seconde nappe encore plus
+      // large dont l'intensité pulse lentement — le rayon irradie
+      const pulseAura = 0.75 + 0.25 * Math.sin(elapsed * 3.1)
       const passes: [number, string][] =
-        faisceauChoix === 1
+        faisceauChoix >= 1
           ? [
+              ...(faisceauChoix === 2
+                ? ([
+                    [
+                      40 * z,
+                      mode === 2
+                        ? `rgba(150,90,255,${(0.05 * pulseAura).toFixed(3)})`
+                        : `rgba(255,60,45,${(0.055 * pulseAura).toFixed(3)})`,
+                    ],
+                  ] as [number, string][])
+                : []),
               // l'AMBIANCE : une nappe très large et très douce — le rayon
               // baigne la salle au lieu de la rayer
               [
@@ -3949,7 +4048,11 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
                   : `rgba(255,50,40,${(0.07 * scint).toFixed(3)})`,
               ],
               ...palettes[mode].map(
-                ([l, c]) => [l * 1.35, c] as [number, string],
+                ([l, c]) =>
+                  [l * (faisceauChoix === 2 ? 1.5 : 1.35), c] as [
+                    number,
+                    string,
+                  ],
               ),
             ]
           : palettes[mode]
@@ -3963,7 +4066,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
         for (let m = k + 1; m <= e; m++) g.lineTo(chemins[m].sx, chemins[m].sy)
         g.stroke()
       }
-      if (faisceauChoix === 1) {
+      if (faisceauChoix >= 1) {
         const pas = 46 * z
         g.strokeStyle = FLUX[mode]
         g.lineWidth = Math.max(1.1, 3.2 * z)
@@ -3976,9 +4079,32 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
         g.setLineDash([])
         g.lineDashOffset = 0
       }
+      if (faisceauChoix === 2) {
+        // deux éclairs par SEGMENT (un rayon plié garde ses coudes),
+        // re-tirés ~24 fois par seconde : le CRÉPITEMENT
+        const grainT = Math.floor(elapsed * 24)
+        for (let m = k; m < e; m++) {
+          traceArcFx(
+            chemins[m],
+            chemins[m + 1],
+            grainT * 7.31 + m * 13.7,
+            8 * z,
+            mode === 2 ? 'rgba(210,180,255,0.6)' : 'rgba(150,215,255,0.55)',
+            Math.max(0.8, 1.3 * z),
+          )
+          traceArcFx(
+            chemins[m],
+            chemins[m + 1],
+            grainT * 11.73 + m * 5.1 + 99,
+            4.5 * z,
+            'rgba(255,255,255,0.4)',
+            Math.max(0.7, 1.0 * z),
+          )
+        }
+      }
       k = e
     }
-    if (faisceauChoix === 1) {
+    if (faisceauChoix >= 1) {
       // les EXTRÉMITÉS luisent : la bouche de l'émetteur, et le point
       // d'arrivée du rayon — l'absorption se VOIT, elle crépite doucement
       const bouts = [chemins[0], chemins[chemins.length - 1]]
@@ -4009,9 +4135,11 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   // pastille rejouent en flash blanc-vert pendant ~un demi-souffle — le
   // rayon SURSAUTE, la cible irradie, des étincelles jaillissent. Même si
   // le rayon vivant est déjà parti ailleurs : la victoire reste lisible.
-  if (faisceauChoix === 1 && laserEtat.impacts.length > 0) {
+  if (faisceauChoix >= 1 && laserEtat.impacts.length > 0) {
     const nowFx = performance.now() / 1000
-    const DUR = 0.55
+    // en FOUDROYANT, le sursaut dure un souffle de plus et frappe plus fort
+    const DUR = faisceauChoix === 2 ? 0.7 : 0.55
+    const boost = faisceauChoix === 2 ? 1.6 : 1
     laserEtat.impacts = laserEtat.impacts.filter((im) => nowFx - im.t0 < DUR)
     for (const im of laserEtat.impacts) {
       const age = nowFx - im.t0
@@ -4021,15 +4149,15 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       const chemins = im.points.map((pt) => S(pt.x, pt.y))
       const PASSES: [number, string][] = [
         [
-          16 * z * (1 + 1.6 * flash),
+          16 * z * (1 + 1.6 * flash * boost),
           `rgba(120,255,190,${(0.16 * alpha).toFixed(3)})`,
         ],
         [
-          6 * z * (1 + 2.2 * flash),
+          6 * z * (1 + 2.2 * flash * boost),
           `rgba(180,255,220,${(0.4 * alpha).toFixed(3)})`,
         ],
         [
-          2.2 * z * (1 + 2.6 * flash),
+          2.2 * z * (1 + 2.6 * flash * boost),
           `rgba(255,255,250,${(0.95 * alpha).toFixed(3)})`,
         ],
       ]
@@ -4044,6 +4172,29 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
           g.lineTo(chemins[m].sx, chemins[m].sy)
         g.stroke()
       }
+      if (faisceauChoix === 2) {
+        // la FOUDRE de la victoire : des éclairs verts serpentent le long
+        // de la trajectoire gelée tant que le flash vit
+        const grainV = Math.floor(nowFx * 30)
+        for (let m = 0; m + 1 < chemins.length; m++) {
+          traceArcFx(
+            chemins[m],
+            chemins[m + 1],
+            grainV * 9.17 + m * 3.3,
+            12 * z * (0.4 + 0.6 * flash),
+            `rgba(190,255,225,${(0.7 * alpha).toFixed(3)})`,
+            Math.max(0.9, 1.5 * z),
+          )
+          traceArcFx(
+            chemins[m],
+            chemins[m + 1],
+            grainV * 5.53 + m * 17.9 + 41,
+            7 * z * (0.4 + 0.6 * flash),
+            `rgba(255,255,255,${(0.5 * alpha).toFixed(3)})`,
+            Math.max(0.8, 1.1 * z),
+          )
+        }
+      }
       // la cible irradie : anneau qui s'évase depuis la pastille touchée
       const cib = cibles[im.cible]
       if (cib) {
@@ -4052,12 +4203,22 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
         g.strokeStyle = `rgba(150,255,200,${(0.8 * alpha).toFixed(3)})`
         g.lineWidth = Math.max(1, 3 * z * (1 - kAge * 0.6))
         g.beginPath()
-        g.arc(pc.sx, pc.sy, rBase * (1 + 2.6 * kAge), 0, Math.PI * 2)
+        g.arc(pc.sx, pc.sy, rBase * (1 + (2.6 + boost) * kAge), 0, Math.PI * 2)
         g.stroke()
+        if (faisceauChoix === 2 && kAge > 0.18) {
+          // le second anneau part avec un temps de retard — l'onde double
+          const k2 = (kAge - 0.18) / (1 - 0.18)
+          g.strokeStyle = `rgba(210,255,235,${(0.55 * (1 - k2)).toFixed(3)})`
+          g.lineWidth = Math.max(1, 2 * z * (1 - k2 * 0.5))
+          g.beginPath()
+          g.arc(pc.sx, pc.sy, rBase * (1 + 3.4 * k2), 0, Math.PI * 2)
+          g.stroke()
+        }
         // les étincelles : huit éclats déterministes qui fusent de l'impact
         const fin = chemins[chemins.length - 1]
-        for (let s2 = 0; s2 < 8; s2++) {
-          const a2 = (s2 / 8) * Math.PI * 2 + im.t0 * 3.7
+        const nEtin = faisceauChoix === 2 ? 12 : 8
+        for (let s2 = 0; s2 < nEtin; s2++) {
+          const a2 = (s2 / nEtin) * Math.PI * 2 + im.t0 * 3.7
           const d0 = rBase * 0.5 + (10 + 34 * kAge) * z
           const d1 = d0 + (6 + 10 * flash) * z
           g.strokeStyle = `rgba(220,255,235,${(0.75 * alpha).toFixed(3)})`
@@ -6884,7 +7045,7 @@ function frame(now: number): void {
       const litNow = cibles.map((t, c) =>
         cibleActive(t, laserEtat.recepteurs, c, nowRecepteurs),
       )
-      if (faisceauChoix === 1) {
+      if (faisceauChoix >= 1) {
         for (let c = 0; c < litNow.length; c++) {
           if (!litNow[c] || laserEtat.litPrec[c] === true) continue
           const trace = laserEtat.vues.find((t) => t.touchees.includes(c))
