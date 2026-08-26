@@ -224,13 +224,42 @@ export function graineAtelier(cahier: CodeAtelier, variante: string): number {
 const MARGE_CORPS = 40
 const PAS_GRILLE_VALID = 20 // résolution du parcours en largeur (u)
 
-interface Plan {
-  H: number // hauteur de la cuve
-  largeurs: number[] // largeur intérieure de chaque salle
-  maillons: Maillon[] // un par cloison (salles − 1)
-  cloisonX: number[] // bord gauche de chaque cloison
-  x0: number // bord gauche intérieur de la cuve
-  x1: number // bord droit intérieur
+// ---- La TOPOLOGIE : une grille de compartiments, plus seulement une ligne
+// Les salles s'arrangent en couloir 1×N (le classique), en grille 2×2 ou
+// 2×3, ou en L (un coin muré plein) ; les rangées se relient par des
+// OUVERTURES percées dans le plancher — d'où des boucles (PLUSIEURS VOIES
+// mènent au sas) et des embranchements en cul-de-sac où nichent les
+// cachettes. Le contrat de la nomenclature tient toujours : l'entrée du
+// sas est UNIQUE (coin de grille, jamais d'ouverture verticale dans sa
+// colonne) et porte la mécanique obligatoire — quelle que soit la voie,
+// on finit par elle.
+interface Rect {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+}
+
+interface SalleT {
+  ix: number
+  iy: number // 0 : rangée haute
+  rect: Rect // l'espace intérieur de la salle
+}
+
+interface ConnexionT {
+  sens: 'h' | 'v' // h : cloison verticale · v : plancher percé entre rangées
+  a: number // salle côté spawn — l'énigme s'y joue
+  b: number
+  maillon: Maillon
+}
+
+interface Topo {
+  salles: SalleT[]
+  pleins: Rect[] // les coins murés des formes en L
+  conns: ConnexionT[]
+  spawnSalle: number
+  exitSalle: number
+  bounds: { minX: number; minY: number; maxX: number; maxY: number }
 }
 
 const EP_CLOISON = 60
@@ -277,13 +306,12 @@ function plafonne(maillons: Maillon[], largeurs: number[], o: OptionsGen): Maill
   })
 }
 
-/** Un tirage de plan : la chaîne d'abord, la géométrie ensuite. Avec un
- * cahier des charges atelier, la chaîne OBÉIT au code : la mécanique
- * choisit les familles, la difficulté dose salles et contraintes. Les
- * options du panneau restreignent ce que le tirage a le droit d'employer. */
-function tirePlan(rng: Rng, cahier: CodeAtelier | null, o: OptionsGen): Plan {
+/** Le tirage de la topologie : la forme, les connexions, puis la chaîne
+ * d'intentions posée sur les connexions — le contrat du cahier d'abord
+ * (l'entrée du sas), la couleur ensuite. */
+function tireTopologie(rng: Rng, cahier: CodeAtelier | null, o: OptionsGen): Topo {
   const D = cahier ? cahier.difficulte : -1
-  let nbSalles =
+  let nb =
     o.salles !== 0
       ? o.salles
       : cahier
@@ -292,36 +320,166 @@ function tirePlan(rng: Rng, cahier: CodeAtelier | null, o: OptionsGen): Plan {
           : D <= 5
             ? 4
             : 5
-        : 3 + Math.floor(rng() * 3) // 3, 4 ou 5
-  // le même code ne donne pas toujours le même GABARIT : la difficulté
-  // garde la moyenne, le tirage garde la surprise
+        : 3 + Math.floor(rng() * 3)
+  // le même code ne donne pas toujours le même GABARIT
   if (cahier && o.salles === 0) {
     const j = rng()
-    if (j < 0.18 && nbSalles > 3) nbSalles--
-    else if (j > 0.82 && nbSalles < 5) nbSalles++
+    if (j < 0.18 && nb > 3) nb--
+    else if (j > 0.82 && nb < 6) nb++
   }
-  const H = Math.round(entre(rng, 1150, 1450) / 10) * 10
-  const largeurs: number[] = []
-  for (let i = 0; i < nbSalles; i++)
-    largeurs.push(Math.round(entre(rng, 640, 880) / 10) * 10)
-  const nbCloisons = nbSalles - 1
+  // la FORME : couloir, grille, ou L (coin haut-droit muré plein)
+  let cols: number
+  let rangs: number
+  let coinMure = false
+  if (nb <= 3) {
+    cols = 3
+    rangs = 1
+  } else if (nb === 4) {
+    if (rng() < 0.65) {
+      cols = 2
+      rangs = 2
+    } else {
+      cols = 4
+      rangs = 1
+    }
+  } else if (nb === 5) {
+    if (rng() < 0.65) {
+      cols = 3
+      rangs = 2
+      coinMure = true
+    } else {
+      cols = 5
+      rangs = 1
+    }
+  } else {
+    cols = 3
+    rangs = 2
+  }
+  const largCol: number[] = []
+  for (let c = 0; c < cols; c++)
+    largCol.push(Math.round(entre(rng, 640, 880) / 10) * 10)
+  const hautRang: number[] = []
+  for (let r = 0; r < rangs; r++)
+    hautRang.push(
+      Math.round(entre(rng, rangs === 1 ? 1150 : 640, rangs === 1 ? 1450 : 800) / 10) * 10,
+    )
+  const totalW = largCol.reduce((s, w) => s + w, 0) + (cols - 1) * EP_CLOISON
+  const totalH = hautRang.reduce((s, h) => s + h, 0) + (rangs - 1) * EP_CLOISON
+  const x0 = -Math.round(totalW / 2)
+  const yHaut = Math.round(totalH / 2)
+  const colX: [number, number][] = []
+  {
+    let x = x0
+    for (let c = 0; c < cols; c++) {
+      colX.push([x, x + largCol[c]])
+      x += largCol[c] + EP_CLOISON
+    }
+  }
+  const rowY: [number, number][] = []
+  {
+    let y = yHaut
+    for (let r = 0; r < rangs; r++) {
+      rowY.push([y - hautRang[r], y])
+      y -= hautRang[r] + EP_CLOISON
+    }
+  }
+  const presente = (c: number, r: number): boolean =>
+    !(coinMure && r === 0 && c === cols - 1)
+  const salles: SalleT[] = []
+  const idx = new Map<string, number>()
+  const pleins: Rect[] = []
+  for (let r = 0; r < rangs; r++)
+    for (let c = 0; c < cols; c++) {
+      const rect: Rect = {
+        minX: colX[c][0],
+        minY: rowY[r][0],
+        maxX: colX[c][1],
+        maxY: rowY[r][1],
+      }
+      if (!presente(c, r)) {
+        pleins.push(rect)
+        continue
+      }
+      idx.set(`${c},${r}`, salles.length)
+      salles.push({ ix: c, iy: r, rect })
+    }
+  const spawnSalle = idx.get('0,0')!
+  const exitSalle = idx.get(`${cols - 1},${rangs - 1}`)!
+  // les connexions : les voisines d'une rangée se parlent toutes ; les
+  // rangées se relient par le plancher percé — jamais dans la colonne du
+  // sas (son entrée reste unique), et parfois DEUX ouvertures : la boucle
+  const brutes: { sens: 'h' | 'v'; a: number; b: number }[] = []
+  for (let r = 0; r < rangs; r++)
+    for (let c = 0; c + 1 < cols; c++) {
+      const a = idx.get(`${c},${r}`)
+      const b = idx.get(`${c + 1},${r}`)
+      if (a !== undefined && b !== undefined) brutes.push({ sens: 'h', a, b })
+    }
+  const candidatesV: { a: number; b: number }[] = []
+  for (let c = 0; c < cols; c++) {
+    if (rangs < 2 || c === cols - 1) continue
+    const a = idx.get(`${c},0`)
+    const b = idx.get(`${c},1`)
+    if (a !== undefined && b !== undefined) candidatesV.push({ a, b })
+  }
+  const ouvertes = candidatesV.filter(() => rng() < 0.7)
+  if (rangs === 2 && ouvertes.length === 0 && candidatesV.length > 0)
+    ouvertes.push(parmi(rng, candidatesV))
+  for (const v of ouvertes) brutes.push({ sens: 'v', a: v.a, b: v.b })
+  // profondeur depuis le spawn : l'énigme d'une connexion se joue côté spawn
+  const adj = new Map<number, number[]>()
+  for (const e of brutes) {
+    adj.set(e.a, [...(adj.get(e.a) ?? []), e.b])
+    adj.set(e.b, [...(adj.get(e.b) ?? []), e.a])
+  }
+  const prof = new Map<number, number>([[spawnSalle, 0]])
+  const fileP = [spawnSalle]
+  while (fileP.length) {
+    const s = fileP.shift()!
+    for (const v of adj.get(s) ?? [])
+      if (!prof.has(v)) {
+        prof.set(v, prof.get(s)! + 1)
+        fileP.push(v)
+      }
+  }
+  const conns: ConnexionT[] = brutes.map((e) => {
+    const [a, b] =
+      (prof.get(e.a) ?? 0) <= (prof.get(e.b) ?? 0) ? [e.a, e.b] : [e.b, e.a]
+    return { sens: e.sens, a, b, maillon: 'libre' as Maillon }
+  })
+  // ---- la chaîne d'intentions, posée sur les connexions ----
+  const mec = cahier?.mecanique
+  const idxExit = conns.findIndex((cn) => cn.b === exitSalle || cn.a === exitSalle)
+  const versExit = conns[idxExit]
+  const forces = new Set<number>([idxExit])
+  if (cahier) {
+    versExit.maillon =
+      mec === 0
+        ? 'membrane'
+        : mec === 2
+          ? parmi(rng, filtre(o, VAPOREUX))
+          : parmi(rng, filtre(o, GLACEUX)) // mec 1 et 3 : la glace garde le sas
+    if (mec === 3) {
+      // la SECONDE famille verrouille TOUTES les entrées de l'avant-sas :
+      // quelle que soit la voie, la vapeur se prouve avant la glace
+      const pred = versExit.a === exitSalle ? versExit.b : versExit.a
+      for (let i = 0; i < conns.length; i++) {
+        if (i === idxExit) continue
+        if (conns[i].a === pred || conns[i].b === pred) {
+          conns[i].maillon = parmi(rng, filtre(o, VAPOREUX))
+          forces.add(i)
+        }
+      }
+    }
+  } else {
+    const pool = FAMILLES_OPT.filter((m) => autorise(o, m))
+    versExit.maillon = parmi(rng, pool.length ? pool : [...FAMILLES_OPT])
+  }
+  const restants = conns.map((_, i) => i).filter((i) => !forces.has(i))
   const doux: readonly Maillon[] = autorise(o, 'membrane')
     ? (['libre', 'libre', 'membrane'] as const)
     : (['libre'] as const)
-  let maillons: Maillon[] = []
   if (cahier) {
-    // la mécanique du code d'abord : ses OBLIGATIONS, puis des renforts de
-    // la même famille (dosés par la difficulté), puis des passages doux —
-    // et l'on bat les cartes pour que l'ordre ne se devine pas
-    const mec = cahier.mecanique
-    const obligatoires: Maillon[] = []
-    if (mec === 1 || mec === 3) obligatoires.push(parmi(rng, filtre(o, GLACEUX)))
-    if (mec === 2 || mec === 3) obligatoires.push(parmi(rng, filtre(o, VAPOREUX)))
-    if (mec === 0) obligatoires.push('membrane')
-    const viser = Math.max(
-      obligatoires.length,
-      Math.min(nbCloisons, 1 + Math.floor(D / 3) + (mec === 3 ? 1 : 0)),
-    )
     const renforts: readonly Maillon[] =
       mec === 0
         ? ['membrane']
@@ -330,47 +488,53 @@ function tirePlan(rng: Rng, cahier: CodeAtelier | null, o: OptionsGen): Plan {
           : mec === 2
             ? filtre(o, VAPOREUX)
             : [...filtre(o, GLACEUX), ...filtre(o, VAPOREUX)]
-    maillons = [...obligatoires]
-    while (maillons.length < viser) maillons.push(parmi(rng, renforts))
-    while (maillons.length < nbCloisons) maillons.push(parmi(rng, doux))
-    for (let i = maillons.length - 1; i > 0; i--) {
+    const viser = Math.min(
+      restants.length,
+      Math.max(0, 1 + Math.floor(D / 3) + (mec === 3 ? 1 : 0) - forces.size),
+    )
+    for (let i = restants.length - 1; i > 0; i--) {
       const j = Math.floor(rng() * (i + 1))
-      ;[maillons[i], maillons[j]] = [maillons[j], maillons[i]]
+      ;[restants[i], restants[j]] = [restants[j], restants[i]]
     }
-    maillons = plafonne(maillons, largeurs, o)
+    restants.forEach((ci, k) => {
+      conns[ci].maillon = k < viser ? parmi(rng, renforts) : parmi(rng, doux)
+    })
   } else {
-    // tirage LIBRE : au moins un maillon contraint — sinon c'est un couloir
     const contraints = FAMILLES_OPT.filter((m) => autorise(o, m))
-    const types: Maillon[] = [
+    const types: readonly Maillon[] = [
+      'libre',
       'libre',
       ...(contraints.length ? contraints : [...FAMILLES_OPT]),
     ]
-    do {
-      maillons = plafonne(
-        Array.from({ length: nbCloisons }, () => parmi(rng, types)),
-        largeurs,
-        o,
-      )
-    } while (maillons.every((m) => m === 'libre'))
+    for (const ci of restants) conns[ci].maillon = parmi(rng, types)
   }
-  const total =
-    largeurs.reduce((s, l) => s + l, 0) + (nbSalles - 1) * EP_CLOISON
-  const x0 = -Math.round(total / 2)
-  const cloisonX: number[] = []
-  let x = x0
-  for (let i = 0; i + 1 < nbSalles; i++) {
-    x += largeurs[i]
-    cloisonX.push(x)
-    x += EP_CLOISON
+  // la barrière NOR ne sait tenir qu'une cloison verticale ; ailleurs, évent
+  for (const cn of conns)
+    if (cn.maillon === 'nor' && cn.sens !== 'h')
+      cn.maillon = autorise(o, 'grille') ? 'grille' : 'membrane'
+  // les plafonds de lisibilité — les maillons du CONTRAT passent en premier
+  {
+    const ordre = [...forces, ...restants]
+    const larg = ordre.map((ci) => {
+      const R = salles[conns[ci].a].rect
+      return R.maxX - R.minX
+    })
+    const apres = plafonne(
+      ordre.map((ci) => conns[ci].maillon),
+      larg,
+      o,
+    )
+    ordre.forEach((ci, k) => {
+      conns[ci].maillon = apres[k]
+    })
   }
-  return { H, largeurs, maillons, cloisonX, x0, x1: x0 + total }
-}
-
-interface Rect {
-  minX: number
-  minY: number
-  maxX: number
-  maxY: number
+  const bounds = {
+    minX: x0 - 40,
+    minY: yHaut - totalH - 40,
+    maxX: x0 + totalW + 40,
+    maxY: yHaut + 40,
+  }
+  return { salles, pleins, conns, spawnSalle, exitSalle, bounds }
 }
 
 const gonfle = (r: Rect, m: number): Rect => ({
@@ -426,10 +590,8 @@ function essaieNiveau(
   atelier: Atelier | null,
   o: OptionsGen,
 ): LevelDef {
-  const plan = tirePlan(rng, atelier?.cahier ?? null, o)
-  const { H } = plan
-  const demiH = H / 2
-  const bounds = { minX: plan.x0 - 40, minY: -demiH, maxX: plan.x1 + 40, maxY: demiH }
+  const topo = tireTopologie(rng, atelier?.cahier ?? null, o)
+  const bounds = topo.bounds
 
   const boxes: ObstacleBox[] = []
   const labels: WorldLabel[] = []
@@ -444,29 +606,28 @@ function essaieNiveau(
   const reserves: Rect[] = []
   const preuves: PreuveDef[] = []
 
-  // bornes intérieures de chaque salle
-  const salleX: [number, number][] = []
-  {
-    let x = plan.x0
-    for (let i = 0; i < plan.largeurs.length; i++) {
-      salleX.push([x, x + plan.largeurs[i]])
-      x += plan.largeurs[i] + EP_CLOISON
-    }
-  }
+  const rectDe = (s: number): Rect => topo.salles[s].rect
 
+  const rs = rectDe(topo.spawnSalle)
   const spawn = {
-    x: plan.x0 + 230,
-    y: 0,
+    x: rs.minX + 230,
+    y: Math.round((rs.minY + rs.maxY) / 2),
     n: 700,
   }
-  reserves.push({ minX: spawn.x - 230, minY: -230, maxX: spawn.x + 230, maxY: 230 })
+  reserves.push({
+    minX: spawn.x - 230,
+    minY: spawn.y - 230,
+    maxX: spawn.x + 230,
+    maxY: spawn.y + 230,
+  })
 
-  const fin = salleX[salleX.length - 1][1]
+  const re = rectDe(topo.exitSalle)
+  const eyC = Math.round((re.minY + re.maxY) / 2)
   const exit = {
-    minX: fin - 130,
-    minY: -110,
-    maxX: fin - 10,
-    maxY: 110,
+    minX: re.maxX - 130,
+    minY: eyC - 110,
+    maxX: re.maxX - 10,
+    maxY: eyC + 110,
   }
   labels.push({ x: (exit.minX + exit.maxX) / 2, y: exit.maxY + 60, text: 'SAS', tone: 'sas' })
   reserves.push(gonfle(exit, 140))
@@ -489,27 +650,22 @@ function essaieNiveau(
   }
 
   /** Une bande rectangulaire autour du segment a → b, pour les réserves. */
-  const bande = (
-    ax: number,
-    ay: number,
-    bx: number,
-    by: number,
-    m: number,
-  ): Rect => ({
+  const bande = (ax: number, ay: number, bx: number, by: number, m: number): Rect => ({
     minX: Math.min(ax, bx) - m,
     minY: Math.min(ay, by) - m,
     maxX: Math.max(ax, bx) + m,
     maxY: Math.max(ay, by) + m,
   })
 
-  // L'ÉNIGME DU MIROIR, posée dans une salle — et le MONTAGE varie : le
-  // fil de lumière tombe du plafond, monte du plancher, ou court depuis le
-  // flanc gauche ; le reflet part à droite, à gauche, vers le haut ou vers
-  // le bas selon la place. Le joueur gèle son corps sur le fil — le flanc
-  // du bloc renvoie le faisceau vers la pastille, posée par CALIBRAGE sur
-  // le trajet du reflet (la preuve tranche, un tirage raté se re-tire).
-  const poseMiroir = (i: number, canal: number): void => {
-    const [sx0, sx1] = salleX[i]
+  // L'ÉNIGME DU MIROIR — le MONTAGE varie (plafond, plancher, flanc de la
+  // salle) et le reflet part dans les quatre sens selon la place. Tout est
+  // LOCAL à la salle : la grille des compartiments n'a plus de « pleine
+  // hauteur » commune. La pastille est posée par CALIBRAGE sur le trajet
+  // du reflet — la preuve tranche, un tirage raté se re-tire.
+  const poseMiroir = (s: number, canal: number): void => {
+    const R = rectDe(s)
+    const midY = (R.minY + R.maxY) / 2
+    const demi = (R.maxY - R.minY) / 2
     const montage = parmi(rng, ['plafond', 'plancher', 'flanc'] as const)
     let em: LaserDef
     let spot: { x: number; y: number }
@@ -517,32 +673,31 @@ function essaieNiveau(
     let r: { x: number; y: number }
     let L: number
     if (montage === 'flanc') {
-      const ey = Math.round(entre(rng, -demiH * 0.3, demiH * 0.3) / 10) * 10
-      em = { x: sx0 + 16, y: ey, angle: 0 }
+      const ey = Math.round(entre(rng, midY - demi * 0.3, midY + demi * 0.3) / 10) * 10
+      em = { x: R.minX + 16, y: ey, angle: 0 }
       d = { x: 1, y: 0 }
-      const mx = Math.round(entre(rng, sx0 + 210, sx1 - 160) / 10) * 10
+      const mx = Math.round(entre(rng, R.minX + 210, R.maxX - 160) / 10) * 10
       spot = { x: mx, y: ey }
-      const espaceHaut = demiH - 80 - ey
-      const espaceBas = ey + demiH - 80
-      const versHaut =
-        espaceHaut < 180 ? false : espaceBas < 180 ? true : rng() < 0.5
+      const espaceHaut = R.maxY - 80 - ey
+      const espaceBas = ey - (R.minY + 80)
+      const versHaut = espaceHaut < 180 ? false : espaceBas < 180 ? true : rng() < 0.5
       r = { x: 0, y: versHaut ? 1 : -1 }
-      L = entre(rng, 150, Math.min(320, (versHaut ? espaceHaut : espaceBas) - 20))
+      L = entre(rng, 150, Math.min(320, Math.max(160, (versHaut ? espaceHaut : espaceBas) - 20)))
     } else {
-      const ex = Math.round(entre(rng, sx0 + 150, sx1 - 150) / 10) * 10
+      const ex = Math.round(entre(rng, R.minX + 150, R.maxX - 150) / 10) * 10
       const duHaut = montage === 'plafond'
-      em = { x: ex, y: duHaut ? demiH - 24 : -demiH + 24, angle: duHaut ? -90 : 90 }
+      em = { x: ex, y: duHaut ? R.maxY - 24 : R.minY + 24, angle: duHaut ? -90 : 90 }
       d = { x: 0, y: duHaut ? -1 : 1 }
-      spot = { x: ex, y: Math.round(entre(rng, -demiH * 0.35, demiH * 0.35) / 10) * 10 }
-      const espaceDroite = sx1 - 70 - ex
-      const espaceGauche = ex - (sx0 + 70)
-      const versDroite =
-        espaceDroite < 175 ? false : espaceGauche < 175 ? true : rng() < 0.6
+      spot = {
+        x: ex,
+        y: Math.round(entre(rng, midY - demi * 0.35, midY + demi * 0.35) / 10) * 10,
+      }
+      const espaceDroite = R.maxX - 70 - ex
+      const espaceGauche = ex - (R.minX + 70)
+      const versDroite = espaceDroite < 175 ? false : espaceGauche < 175 ? true : rng() < 0.6
       r = { x: versDroite ? 1 : -1, y: 0 }
-      L = entre(rng, 150, Math.min(300, versDroite ? espaceDroite : espaceGauche))
+      L = entre(rng, 150, Math.min(300, Math.max(160, versDroite ? espaceDroite : espaceGauche)))
     }
-    // la normale du flanc de glace qui envoie d sur r, et la pastille sur
-    // le trajet du reflet (départ au bord du bloc, léger biais du dégagement)
     const nl = Math.hypot(r.x - d.x, r.y - d.y)
     const normale = { nx: (r.x - d.x) / nl, ny: (r.y - d.y) / nl }
     const cible: CibleDef = {
@@ -553,26 +708,21 @@ function essaieNiveau(
     }
     cibles.push(cible)
     lasers.push(em)
-    preuves.push({
-      kind: 'miroir',
-      canal,
-      emetteur: em,
-      spot,
-      normale,
-      cibleIndex: cibles.length - 1,
-    })
+    preuves.push({ kind: 'miroir', canal, emetteur: em, spot, normale, cibleIndex: cibles.length - 1 })
     poseIndice('miroir', spot.x + d.x * 66, spot.y + d.y * 66, 'MIROIR DE GLACE', 'froid')
-    // le fil du faisceau et le trajet du reflet restent dégagés
     reserves.push(bande(em.x, em.y, spot.x - d.x * 40, spot.y - d.y * 40, 70))
     reserves.push(bande(spot.x, spot.y, cible.x + r.x * 40, cible.y + r.y * 40, 90))
   }
 
   // Le DOUBLE MIROIR (canal ET) garde son montage classique — deux fils à
-  // plomb écartés, la salle large lui est réservée : il reste reconnaissable.
-  const poseMiroirPlafond = (ex: number, sx1: number, canal: number): void => {
-    const my = Math.round(entre(rng, -demiH * 0.35, demiH * 0.35) / 10) * 10
-    const emetteur: LaserDef = { x: ex, y: demiH - 24, angle: -90 }
-    const porteeCible = entre(rng, 150, Math.min(260, sx1 - 70 - ex))
+  // plomb écartés dans la même salle : il reste reconnaissable.
+  const poseMiroirPlafond = (s: number, ex: number, exMax: number, canal: number): void => {
+    const R = rectDe(s)
+    const midY = (R.minY + R.maxY) / 2
+    const demi = (R.maxY - R.minY) / 2
+    const my = Math.round(entre(rng, midY - demi * 0.35, midY + demi * 0.35) / 10) * 10
+    const emetteur: LaserDef = { x: ex, y: R.maxY - 24, angle: -90 }
+    const porteeCible = entre(rng, 150, Math.min(260, Math.max(160, exMax - 70 - ex)))
     const cible: CibleDef = { x: ex + porteeCible, y: my + 52, r: 30, canal }
     cibles.push(cible)
     lasers.push(emetteur)
@@ -585,159 +735,232 @@ function essaieNiveau(
       cibleIndex: cibles.length - 1,
     })
     poseIndice('miroir', ex, my - 66, 'MIROIR DE GLACE', 'froid')
-    reserves.push({ minX: ex - 70, minY: my - 120, maxX: ex + 70, maxY: demiH })
+    reserves.push({ minX: ex - 70, minY: my - 120, maxX: ex + 70, maxY: R.maxY })
     reserves.push({ minX: ex - 70, minY: my - 90, maxX: ex + porteeCible + 90, maxY: my + 130 })
   }
 
-  // ---- les cloisons et leurs maillons ----
-  const gaps: { x: number; y: number }[] = [] // le centre de chaque passage
-  let canalSuivant = 1
+  const poseRail = (s: number, canal: number): void => {
+    const R = rectDe(s)
+    const midY = (R.minY + R.maxY) / 2
+    const demi = (R.maxY - R.minY) / 2
+    const ex = Math.round(entre(rng, R.minX + 150, R.maxX - 150) / 10) * 10
+    const duHaut = rng() < 0.5
+    const d = { x: 0, y: duHaut ? -1 : 1 }
+    const emetteur: LaserDef = {
+      x: ex,
+      y: duHaut ? R.maxY - 24 : R.minY + 24,
+      angle: duHaut ? -90 : 90,
+    }
+    const ny = Math.round(entre(rng, midY - demi * 0.3, midY + demi * 0.3) / 10) * 10
+    const espaceDroite = R.maxX - 60 - ex
+    const espaceGauche = ex - (R.minX + 60)
+    const versDroite = espaceDroite >= espaceGauche
+    const sgn = versDroite ? 1 : -1
+    const Lr =
+      Math.round(
+        entre(rng, 140, Math.min(200, Math.max(150, (versDroite ? espaceDroite : espaceGauche) - 110))) / 10,
+      ) * 10
+    lasers.push(emetteur)
+    const railY = ny + d.y * 30
+    rails.push({ points: [{ x: ex, y: railY }, { x: ex + sgn * Lr, y: railY }] })
+    const cible: CibleDef = { x: ex + sgn * (Lr + 100), y: railY, r: 26, canal }
+    cibles.push(cible)
+    preuves.push({
+      kind: 'rail',
+      canal,
+      emetteur,
+      spot: { x: ex, y: ny },
+      normale: { nx: 0, ny: 0 }, // sans objet : le nuage n'a pas de flanc
+      cibleIndex: cibles.length - 1,
+    })
+    poseIndice('rail', ex, ny - d.y * 74, 'IONISER ICI', 'grille')
+    reserves.push(bande(emetteur.x, emetteur.y, ex, ny - d.y * 60, 70))
+    reserves.push(bande(ex, railY, cible.x + sgn * 50, railY, 90))
+  }
 
-  // la difficulté du cahier RESSERRE les passages (jamais sous la marge)
+  /** La BARRIÈRE TENUE, dans la salle-énigme, entre ses entrées et la
+   * porte : le faisceau vertical court du plafond au plancher DE LA SALLE.
+   * `versDroite` : la porte est sur le flanc droit de la salle. */
+  const poseBarriereNor = (s: number, canal: number, gy: number, versDroite: boolean): void => {
+    const R = rectDe(s)
+    const bx =
+      Math.round(
+        (versDroite
+          ? entre(rng, Math.max(R.minX + 130, R.maxX - 320), R.maxX - 150)
+          : entre(rng, R.minX + 150, Math.min(R.maxX - 130, R.minX + 320))) / 10,
+      ) * 10
+    const duHaut = rng() < 0.5
+    const emetteur: LaserDef = {
+      x: bx,
+      y: duHaut ? R.maxY - 24 : R.minY + 24,
+      angle: duHaut ? -90 : 90,
+    }
+    lasers.push(emetteur)
+    const cible: CibleDef = {
+      x: bx,
+      y: duHaut ? R.minY + 52 : R.maxY - 52,
+      r: 22,
+      mode: 'nor',
+      canal,
+    }
+    cibles.push(cible)
+    preuves.push({
+      kind: 'nor',
+      canal,
+      emetteur,
+      spot: { x: bx, y: gy },
+      normale: { nx: 0, ny: 0 }, // sans objet : on traverse, on ne reflète pas
+      cibleIndex: cibles.length - 1,
+    })
+    if (!indicesVus.has('nor')) {
+      indicesVus.add('nor')
+      labels.push({ x: bx, y: gy + 120, text: 'TRAVERSER EN VAPEUR', tone: 'grille', rang: 'detail' })
+    }
+    // la colonne du faisceau reste dégagée du plafond au plancher : le
+    // décor ne coupera jamais la barrière à la place du joueur
+    reserves.push({ minX: bx - 60, minY: R.minY, maxX: bx + 60, maxY: R.maxY })
+  }
+
+  // ---- la GRILLE : murs, passages, maillons ----
   const serrage = atelier ? atelier.cahier.difficulte * 6 : 0
-  for (let i = 0; i < plan.cloisonX.length; i++) {
-    const wx = plan.cloisonX[i]
-    const maillon = plan.maillons[i]
-    const gapH = Math.round(Math.max(190, entre(rng, 220, 290) - serrage) / 10) * 10
-    const gy = Math.round(entre(rng, -demiH + 260, demiH - 260) / 10) * 10
-    const gapMin = gy - gapH / 2
-    const gapMax = gy + gapH / 2
-    // les deux pans de la cloison, au-dessus et au-dessous du passage
-    boxes.push({ minX: wx, minY: gapMax, maxX: wx + EP_CLOISON, maxY: demiH, material: MAT_WALL, skin: 1 + Math.floor(rng() * 4) })
-    boxes.push({ minX: wx, minY: -demiH, maxX: wx + EP_CLOISON, maxY: gapMin, material: MAT_WALL, skin: 1 + Math.floor(rng() * 4) })
-    gaps.push({ x: wx + EP_CLOISON / 2, y: gy })
-    // le couloir du passage reste dégagé de part et d'autre
-    reserves.push({ minX: wx - 190, minY: gapMin - 40, maxX: wx + EP_CLOISON + 190, maxY: gapMax + 40 })
+  let canalSuivant = 1
+  // les coins murés des L : des blocs pleins, soudés à leurs murs
+  for (const p of topo.pleins)
+    boxes.push({ ...gonfle(p, EP_CLOISON), material: MAT_WALL, skin: 1 + Math.floor(rng() * 4) })
 
-    const [sx0, sx1] = salleX[i]
-    if (maillon === 'grille' || maillon === 'rideau' || maillon === 'membrane') {
-      const mat =
-        maillon === 'grille' ? MAT_GRILLE : maillon === 'rideau' ? MAT_RIDEAU : MAT_MEMBRANE
-      boxes.push({ minX: wx, minY: gapMin, maxX: wx + EP_CLOISON, maxY: gapMax, material: mat })
-      const tone = maillon === 'grille' ? 'grille' : maillon === 'rideau' ? 'froid' : 'phile'
-      const nom =
-        maillon === 'grille' ? 'ÉVENT' : maillon === 'rideau' ? 'RIDEAU' : 'MEMBRANE'
-      labels.push({ x: wx + EP_CLOISON / 2, y: gapMax + 60, text: nom, tone, rang: 'detail' })
-    } else if (maillon === 'porte') {
-      const canal = canalSuivant++
-      portes.push({ minX: wx, minY: gapMin, maxX: wx + EP_CLOISON, maxY: gapMax, canal })
-      poseMiroir(i, canal)
-    } else if (maillon === 'et') {
-      // DEUX miroirs, un seul canal, règle ET : la porte veut les deux.
-      // Les deux fils à plomb sont écartés, et leurs pastilles à des
-      // hauteurs disjointes — un seul miroir ne peut pas servir deux fois.
-      const canal = canalSuivant++
-      portes.push({ minX: wx, minY: gapMin, maxX: wx + EP_CLOISON, maxY: gapMax, canal, regle: 'et' })
-      const ex1 = Math.round(entre(rng, sx0 + 140, sx0 + 240) / 10) * 10
-      const ex2 = Math.round(entre(rng, ex1 + 280, sx1 - 220) / 10) * 10
-      poseMiroirPlafond(ex1, ex2 - 90, canal)
-      poseMiroirPlafond(ex2, sx1, canal)
+  // le maillon d'une connexion, posé dans son passage
+  const habilleMaillon = (
+    cn: ConnexionT,
+    gapRect: Rect,
+    gapCentre: { x: number; y: number },
+  ): void => {
+    const m = cn.maillon
+    if (m === 'grille' || m === 'rideau' || m === 'membrane') {
+      const mat = m === 'grille' ? MAT_GRILLE : m === 'rideau' ? MAT_RIDEAU : MAT_MEMBRANE
+      boxes.push({ ...gapRect, material: mat })
+      const tone = m === 'grille' ? 'grille' : m === 'rideau' ? 'froid' : 'phile'
+      const nom = m === 'grille' ? 'ÉVENT' : m === 'rideau' ? 'RIDEAU' : 'MEMBRANE'
       labels.push({
-        x: wx + EP_CLOISON / 2,
-        y: gapMax + 60,
+        x: gapCentre.x + (cn.sens === 'v' ? 0 : 0),
+        y: gapCentre.y + (cn.sens === 'h' ? (gapRect.maxY - gapRect.minY) / 2 + 60 : 0),
+        ...(cn.sens === 'v' ? { x: gapCentre.x + (gapRect.maxX - gapRect.minX) / 2 + 80 } : {}),
+        text: nom,
+        tone,
+        rang: 'detail',
+      } as WorldLabel)
+    } else if (m === 'porte') {
+      const canal = canalSuivant++
+      portes.push({ ...gapRect, canal })
+      poseMiroir(cn.a, canal)
+    } else if (m === 'et') {
+      const canal = canalSuivant++
+      portes.push({ ...gapRect, canal, regle: 'et' })
+      const R = rectDe(cn.a)
+      const ex1 = Math.round(entre(rng, R.minX + 140, R.minX + 240) / 10) * 10
+      const ex2 = Math.round(entre(rng, ex1 + 280, R.maxX - 220) / 10) * 10
+      poseMiroirPlafond(cn.a, ex1, ex2 - 90, canal)
+      poseMiroirPlafond(cn.a, ex2, R.maxX, canal)
+      labels.push({
+        x: gapCentre.x,
+        y: gapCentre.y + (cn.sens === 'h' ? (gapRect.maxY - gapRect.minY) / 2 + 60 : 90),
         text: 'DEUX PASTILLES — LES DEUX',
         tone: 'grille',
         rang: 'detail',
       })
-    } else if (maillon === 'rail') {
-      // LE PLASMA : se tenir en VAPEUR au point marqué ionise le faisceau ;
-      // le rail magnétique, amorcé dans le nuage, capture l'arc et le guide
-      // jusqu'à la pastille posée dans l'axe de sa sortie. Le fil tombe du
-      // plafond ou monte du plancher, le rail part du côté où la place est.
+    } else if (m === 'rail') {
       const canal = canalSuivant++
-      portes.push({ minX: wx, minY: gapMin, maxX: wx + EP_CLOISON, maxY: gapMax, canal })
-      const ex = Math.round(entre(rng, sx0 + 150, sx1 - 150) / 10) * 10
-      const duHaut = rng() < 0.5
-      const d = { x: 0, y: duHaut ? -1 : 1 }
-      const emetteur: LaserDef = {
-        x: ex,
-        y: duHaut ? demiH - 24 : -demiH + 24,
-        angle: duHaut ? -90 : 90,
-      }
-      const ny = Math.round(entre(rng, -demiH * 0.3, demiH * 0.3) / 10) * 10
-      const espaceDroite = sx1 - 60 - ex
-      const espaceGauche = ex - (sx0 + 60)
-      const versDroite = espaceDroite >= espaceGauche
-      const s = versDroite ? 1 : -1
-      const Lr = Math.round(
-        entre(rng, 140, Math.min(200, (versDroite ? espaceDroite : espaceGauche) - 110)) / 10,
-      ) * 10
-      lasers.push(emetteur)
-      const railY = ny + d.y * 30
-      rails.push({ points: [{ x: ex, y: railY }, { x: ex + s * Lr, y: railY }] })
-      const cible: CibleDef = { x: ex + s * (Lr + 100), y: railY, r: 26, canal }
-      cibles.push(cible)
-      preuves.push({
-        kind: 'rail',
-        canal,
-        emetteur,
-        spot: { x: ex, y: ny },
-        normale: { nx: 0, ny: 0 }, // sans objet : le nuage n'a pas de flanc
-        cibleIndex: cibles.length - 1,
-      })
-      poseIndice('rail', ex, ny - d.y * 74, 'IONISER ICI', 'grille')
-      reserves.push(bande(emetteur.x, emetteur.y, ex, ny - d.y * 60, 70))
-      reserves.push(bande(ex, railY, cible.x + s * 50, railY, 90))
-    } else if (maillon === 'nor') {
-      // LA BARRIÈRE TENUE : un faisceau vertical barre le chemin devant la
-      // porte ; sa pastille NOR (au sol) tient la porte ouverte tant que la
-      // lumière la touche. L'eau plie le faisceau, la glace le renvoie —
-      // la coupure scelle. On traverse la lumière en VAPEUR : ionisée,
-      // elle file droit.
+      portes.push({ ...gapRect, canal })
+      poseRail(cn.a, canal)
+    } else if (m === 'nor') {
       const canal = canalSuivant++
-      portes.push({ minX: wx, minY: gapMin, maxX: wx + EP_CLOISON, maxY: gapMax, canal })
-      const bx = Math.round(
-        entre(rng, Math.max(sx0 + 130, wx - 320), wx - 150) / 10,
-      ) * 10
-      // l'émetteur en haut ou en bas — la pastille au bout opposé
-      const duHaut = rng() < 0.5
-      const emetteur: LaserDef = {
-        x: bx,
-        y: duHaut ? demiH - 24 : -demiH + 24,
-        angle: duHaut ? -90 : 90,
-      }
-      lasers.push(emetteur)
-      const cible: CibleDef = {
-        x: bx,
-        y: duHaut ? -demiH + 52 : demiH - 52,
-        r: 22,
-        mode: 'nor',
-        canal,
-      }
-      cibles.push(cible)
-      preuves.push({
-        kind: 'nor',
-        canal,
-        emetteur,
-        spot: { x: bx, y: gy },
-        normale: { nx: 0, ny: 0 }, // sans objet : on traverse, on ne reflète pas
-        cibleIndex: cibles.length - 1,
-      })
-      // la barrière SCELLE à la première coupure : son avertissement reste,
-      // lui — une fois par salle
-      if (!indicesVus.has('nor')) {
-        indicesVus.add('nor')
-        labels.push({ x: bx, y: gy + 120, text: 'TRAVERSER EN VAPEUR', tone: 'grille', rang: 'detail' })
-      }
-      // la colonne du faisceau reste dégagée du plafond au sol : le décor
-      // ne doit jamais couper la barrière à la place du joueur
-      reserves.push({ minX: bx - 60, minY: -demiH, maxX: bx + 60, maxY: demiH })
+      portes.push({ ...gapRect, canal })
+      poseBarriereNor(cn.a, canal, gapCentre.y, topo.salles[cn.a].ix < topo.salles[cn.b].ix)
     }
   }
 
-  // ---- les BANDEAUX de silhouette : toutes les salles ne font pas ----
-  // pleine hauteur. Un bandeau plein mange le haut ou le bas d'une salle
-  // sur trois environ — le profil du niveau cesse d'être un rectangle.
-  for (let i = 0; i < salleX.length; i++) {
+  // les frontières VERTICALES (entre colonnes d'une même rangée).
+  // Les bandes du CHEMIN se posent à part : les traverses du labyrinthe
+  // ont le droit de barrer le chemin nominal (c'est le serpentin) — seul
+  // le décor doit s'en écarter, elles rejoindront les réserves après.
+  const bandesChemin: Rect[] = []
+  const gapsParPlancher = new Map<number, { c: number; gapMin: number; gapMax: number }[]>()
+  for (const cn of topo.conns) {
+    const A = topo.salles[cn.a]
+    const B = topo.salles[cn.b]
+    if (cn.sens === 'h') {
+      const gaucheS = A.ix < B.ix ? A : B
+      const R = gaucheS.rect
+      const wx = R.maxX
+      const gapH = Math.round(Math.max(190, entre(rng, 220, 290) - serrage) / 10) * 10
+      const gy =
+        Math.round(entre(rng, R.minY + 160 + gapH / 2, R.maxY - 160 - gapH / 2) / 10) * 10
+      const gapMin = gy - gapH / 2
+      const gapMax = gy + gapH / 2
+      boxes.push({ minX: wx, minY: gapMax, maxX: wx + EP_CLOISON, maxY: R.maxY, material: MAT_WALL, skin: 1 + Math.floor(rng() * 4) })
+      boxes.push({ minX: wx, minY: R.minY, maxX: wx + EP_CLOISON, maxY: gapMin, material: MAT_WALL, skin: 1 + Math.floor(rng() * 4) })
+      reserves.push({ minX: wx - 190, minY: gapMin - 40, maxX: wx + EP_CLOISON + 190, maxY: gapMax + 40 })
+      habilleMaillon(
+        cn,
+        { minX: wx, minY: gapMin, maxX: wx + EP_CLOISON, maxY: gapMax },
+        { x: wx + EP_CLOISON / 2, y: gy },
+      )
+      // le chemin d'une voie reste dégagé : centre → passage → centre
+      const ca = { x: (A.rect.minX + A.rect.maxX) / 2, y: (A.rect.minY + A.rect.maxY) / 2 }
+      const cb = { x: (B.rect.minX + B.rect.maxX) / 2, y: (B.rect.minY + B.rect.maxY) / 2 }
+      bandesChemin.push(bande(ca.x, ca.y, wx + EP_CLOISON / 2, gy, 120))
+      bandesChemin.push(bande(wx + EP_CLOISON / 2, gy, cb.x, cb.y, 120))
+    } else {
+      const hautS = A.iy < B.iy ? A : B
+      const R = hautS.rect
+      const wy = R.minY - EP_CLOISON // la bande du plancher percé
+      const gapW = Math.round(Math.max(190, entre(rng, 220, 290) - serrage) / 10) * 10
+      const gx =
+        Math.round(entre(rng, R.minX + 160 + gapW / 2, R.maxX - 160 - gapW / 2) / 10) * 10
+      const gapMin = gx - gapW / 2
+      const gapMax = gx + gapW / 2
+      const liste = gapsParPlancher.get(hautS.iy) ?? []
+      liste.push({ c: hautS.ix, gapMin, gapMax })
+      gapsParPlancher.set(hautS.iy, liste)
+      reserves.push({ minX: gapMin - 40, minY: wy - 190, maxX: gapMax + 40, maxY: wy + EP_CLOISON + 190 })
+      habilleMaillon(
+        cn,
+        { minX: gapMin, minY: wy, maxX: gapMax, maxY: wy + EP_CLOISON },
+        { x: gx, y: wy + EP_CLOISON / 2 },
+      )
+      const ca = { x: (A.rect.minX + A.rect.maxX) / 2, y: (A.rect.minY + A.rect.maxY) / 2 }
+      const cb = { x: (B.rect.minX + B.rect.maxX) / 2, y: (B.rect.minY + B.rect.maxY) / 2 }
+      bandesChemin.push(bande(ca.x, ca.y, gx, wy + EP_CLOISON / 2, 120))
+      bandesChemin.push(bande(gx, wy + EP_CLOISON / 2, cb.x, cb.y, 120))
+    }
+  }
+  // le PLANCHER entre rangées : pleine largeur, percé aux seules ouvertures
+  const rangees = [...new Set(topo.salles.map((s) => s.iy))]
+  if (rangees.length > 1) {
+    const hauts = topo.salles.filter((s) => s.iy === 0)
+    const wyTop = Math.min(...hauts.map((s) => s.rect.minY))
+    const wy = wyTop - EP_CLOISON
+    const trous = (gapsParPlancher.get(0) ?? []).sort((a, b) => a.gapMin - b.gapMin)
+    let x = bounds.minX
+    for (const t of trous) {
+      if (t.gapMin > x)
+        boxes.push({ minX: x, minY: wy, maxX: t.gapMin, maxY: wy + EP_CLOISON, material: MAT_WALL, skin: 1 + Math.floor(rng() * 4) })
+      x = t.gapMax
+    }
+    if (x < bounds.maxX)
+      boxes.push({ minX: x, minY: wy, maxX: bounds.maxX, maxY: wy + EP_CLOISON, material: MAT_WALL, skin: 1 + Math.floor(rng() * 4) })
+  }
+
+  // ---- les BANDEAUX de silhouette : un par salle sur trois environ ----
+  for (const s of topo.salles) {
     if (rng() >= 0.32) continue
-    const [sx0, sx1] = salleX[i]
+    const R = s.rect
     const hB = Math.round(entre(rng, 120, 240) / 10) * 10
     const enHaut = rng() < 0.5
     const r: Rect = {
-      minX: sx0,
-      minY: enHaut ? demiH - hB : -demiH,
-      maxX: sx1,
-      maxY: enHaut ? demiH : -demiH + hB,
+      minX: R.minX,
+      minY: enHaut ? R.maxY - hB : R.minY,
+      maxX: R.maxX,
+      maxY: enHaut ? R.maxY : R.minY + hB,
     }
     let libre = true
     for (const res of reserves)
@@ -747,45 +970,47 @@ function essaieNiveau(
       }
     if (!libre) continue
     boxes.push({ ...r, material: MAT_WALL, skin: 1 + Math.floor(rng() * 4) })
-    reserves.push(r) // traverses, décor et cachettes s'en écartent
+    reserves.push(r)
   }
 
-  // ---- les TRAVERSES : l'esprit labyrinthe ----
-  // Des demi-murs HORIZONTAUX ancrés à un flanc de la salle, un couloir
-  // libre au bout : le chemin serpente au lieu de filer tout droit. Jamais
-  // sur un mécanisme, un passage, le spawn ou le sas (les réserves posées
-  // plus haut font foi) — et le parcours de validation garde le dernier
-  // mot : une salle rendue infranchissable serait re-tirée.
+  // ---- les TRAVERSES : l'esprit labyrinthe, local à chaque salle ----
   if (o.laby !== 1) {
-    const traverses: number[] = [] // les hauteurs posées, par salle
-    for (let i = 0; i < salleX.length; i++) {
-      const [sx0, sx1] = salleX[i]
-      const larg = sx1 - sx0
+    for (const s of topo.salles) {
+      const R = s.rect
+      const larg = R.maxX - R.minX
       const nTrav =
-        o.laby === 3
-          ? rng() < 0.6
-            ? 2
-            : 1
-          : o.laby === 2
-            ? 1
-            : rng() < 0.45
-              ? 1
-              : 0
-      traverses.length = 0
+        o.laby === 3 ? (rng() < 0.6 ? 2 : 1) : o.laby === 2 ? 1 : rng() < 0.45 ? 1 : 0
+      const haut = R.maxY - R.minY
+      const posees: { vert: boolean; pos: number }[] = []
       let gauche = rng() < 0.5
       for (let t = 0; t < nTrav; t++) {
         for (let essai = 0; essai < 30; essai++) {
-          // un flanc encombré (colonne d'un laser, couloir d'un passage) :
-          // au bout de quelques refus, on tente l'ancrage d'en face
+          // la traverse se couche OU se dresse : dans une salle large et
+          // basse, la coupe verticale (ancrée au plafond ou au plancher)
+          // est la bonne — on alterne les deux au fil des refus
+          const verticale = (essai + (haut < larg ? 0 : 1)) % 2 === 0
           const flanc = essai % 6 < 3 ? gauche : !gauche
-          const canal = o.laby === 3 ? entre(rng, 150, 200) : entre(rng, 180, 250)
-          const ty = Math.round(entre(rng, -demiH + 300, demiH - 300) / 10) * 10
-          if (traverses.some((y) => Math.abs(y - ty) < 260)) continue
-          const lenW = larg - canal
-          if (lenW < 200) break
-          const r: Rect = flanc
-            ? { minX: sx0, minY: ty - 25, maxX: sx0 + lenW, maxY: ty + 25 }
-            : { minX: sx1 - lenW, minY: ty - 25, maxX: sx1, maxY: ty + 25 }
+          const canalT = o.laby === 3 ? entre(rng, 150, 200) : entre(rng, 180, 250)
+          let r: Rect
+          let pos: number
+          if (verticale) {
+            if (R.maxX - 240 <= R.minX + 240) continue
+            pos = Math.round(entre(rng, R.minX + 240, R.maxX - 240) / 10) * 10
+            const lenH = haut - canalT
+            if (lenH < 200) continue
+            r = flanc
+              ? { minX: pos - 25, minY: R.maxY - lenH, maxX: pos + 25, maxY: R.maxY }
+              : { minX: pos - 25, minY: R.minY, maxX: pos + 25, maxY: R.minY + lenH }
+          } else {
+            if (R.maxY - 220 <= R.minY + 220) continue
+            pos = Math.round(entre(rng, R.minY + 220, R.maxY - 220) / 10) * 10
+            const lenW = larg - canalT
+            if (lenW < 200) continue
+            r = flanc
+              ? { minX: R.minX, minY: pos - 25, maxX: R.minX + lenW, maxY: pos + 25 }
+              : { minX: R.maxX - lenW, minY: pos - 25, maxX: R.maxX, maxY: pos + 25 }
+          }
+          if (posees.some((q) => q.vert === verticale && Math.abs(q.pos - pos) < 260)) continue
           let libre = true
           for (const res of reserves)
             if (chevauche(gonfle(r, 30), res)) {
@@ -794,48 +1019,29 @@ function essaieNiveau(
             }
           if (!libre) continue
           boxes.push({ ...r, material: MAT_WALL, skin: 1 + Math.floor(rng() * 4) })
-          traverses.push(ty)
-          gauche = !flanc // la suivante s'ancre en face : le serpentin
+          posees.push({ vert: verticale, pos })
+          gauche = !flanc
           break
         }
       }
     }
   }
 
-  // ---- le chemin nominal (spawn → passages → sas) reste dégagé ----
-  const chemin: { x: number; y: number }[] = [
-    { x: spawn.x, y: spawn.y },
-    ...gaps,
-    { x: (exit.minX + exit.maxX) / 2, y: (exit.minY + exit.maxY) / 2 },
-  ]
-  for (let s = 0; s + 1 < chemin.length; s++) {
-    const a = chemin[s]
-    const b = chemin[s + 1]
-    reserves.push(
-      gonfle(
-        {
-          minX: Math.min(a.x, b.x),
-          minY: Math.min(a.y, b.y),
-          maxX: Math.max(a.x, b.x),
-          maxY: Math.max(a.y, b.y),
-        },
-        130,
-      ),
-    )
-  }
+  // le chemin nominal rejoint les réserves — les traverses sont posées,
+  // le décor et les cachettes, eux, s'en écarteront
+  reserves.push(...bandesChemin)
 
   // ---- le décor et les dangers, par rejet : jamais sur une réserve ----
   const posePossible = (r: Rect): boolean => {
-    if (r.minX < plan.x0 + 30 || r.maxX > plan.x1 - 30) return false
-    if (r.minY < -demiH + 30 || r.maxY > demiH - 30) return false
+    if (r.minX < bounds.minX + 30 || r.maxX > bounds.maxX - 30) return false
+    if (r.minY < bounds.minY + 30 || r.maxY > bounds.maxY - 30) return false
     for (const res of reserves) if (chevauche(gonfle(r, 40), res)) return false
     for (const b of boxes) if (chevauche(gonfle(r, 60), aabbVraie(b))) return false
     return true
   }
 
-  for (let i = 0; i < salleX.length; i++) {
-    const [sx0, sx1] = salleX[i]
-    // le décor par salle : sobre 0-1, normal 1-2, chargé 2-3
+  for (const s of topo.salles) {
+    const R = s.rect
     const nDecor =
       o.decor === 1
         ? Math.floor(rng() * 2)
@@ -846,8 +1052,8 @@ function essaieNiveau(
       for (let essai = 0; essai < 24; essai++) {
         const w = entre(rng, 110, 260)
         const h = entre(rng, 110, 260)
-        const cx = entre(rng, sx0 + 80, sx1 - 80)
-        const cy = entre(rng, -demiH + 120, demiH - 120)
+        const cx = entre(rng, R.minX + 80, R.maxX - 80)
+        const cy = entre(rng, R.minY + 120, R.maxY - 120)
         const r: Rect = { minX: cx - w / 2, minY: cy - h / 2, maxX: cx + w / 2, maxY: cy + h / 2 }
         if (!posePossible(r)) continue
         const mat = parmi(rng, [MAT_WALL, MAT_WALL, MAT_HYDROPHILE, MAT_HYDROPHOBE])
@@ -867,8 +1073,6 @@ function essaieNiveau(
         break
       }
     }
-    // un DANGER contre un bord — une fois sur trois, dosé par la difficulté
-    // du cahier des charges, ou imposé par le panneau de réglages
     const pDanger =
       o.dangers === 1
         ? 0
@@ -885,8 +1089,8 @@ function essaieNiveau(
         const w = entre(rng, 140, 240)
         const h = entre(rng, 50, 70)
         const enHaut = rng() < 0.5
-        const cx = entre(rng, sx0 + 120, sx1 - 120)
-        const cy = enHaut ? demiH - h / 2 - 4 : -demiH + h / 2 + 4
+        const cx = entre(rng, R.minX + 120, R.maxX - 120)
+        const cy = enHaut ? R.maxY - h / 2 - 4 : R.minY + h / 2 + 4
         const r: Rect = { minX: cx - w / 2, minY: cy - h / 2, maxX: cx + w / 2, maxY: cy + h / 2 }
         if (!posePossible(r)) continue
         boxes.push({ ...r, material: chaud ? MAT_CHAUD : MAT_FROID, ...(chaud ? { aura: 0.8 } : {}) })
@@ -900,23 +1104,24 @@ function essaieNiveau(
         break
       }
     }
-    // la lampe de la salle (4 allumées au plus)
     if (lumieres.length < 4) {
+      const midY = (R.minY + R.maxY) / 2
+      const demi = (R.maxY - R.minY) / 2
       if (o.contraste === 1) {
-        // le MODE CONTRASTÉ : la lampe est BASSE (elle rase le sol, les
-        // ombres s'étirent), intense, souvent teintée, parfois en BANDEAU
-        // — et posée près d'un flanc, jamais au centre : la lumière prend
-        // la salle en enfilade et le décor découpe des ombres longues
+        // le MODE CONTRASTÉ : lampe BASSE, intense, teintée, près d'un
+        // flanc — parfois en BANDEAU aligné à l'architecture
         const versGauche = rng() < 0.5
         const lx = Math.round(
-          versGauche ? entre(rng, sx0 + 110, sx0 + 260) : entre(rng, sx1 - 260, sx1 - 110),
+          versGauche
+            ? entre(rng, R.minX + 110, R.minX + 260)
+            : entre(rng, R.maxX - 260, R.maxX - 110),
         )
-        const ly = Math.round(entre(rng, -demiH * 0.45, demiH * 0.45))
+        const ly = Math.round(entre(rng, midY - demi * 0.45, midY + demi * 0.45))
         const bandeau = rng() < 0.45
         lumieres.push({
           x: lx,
           y: ly,
-          h: Math.round(entre(rng, 90, 170)), // basse : les ombres rasent
+          h: Math.round(entre(rng, 90, 170)),
           intensite: Number(entre(rng, 1.2, 1.6).toFixed(2)),
           ...(rng() < 0.6
             ? { couleur: parmi(rng, ['#ffd9a8', '#a8c8ff', '#ffc4c4', '#ffffff']) }
@@ -925,14 +1130,13 @@ function essaieNiveau(
             ? {
                 forme: 'bandeau' as const,
                 longueur: Math.round(entre(rng, 240, 420)),
-                angle: parmi(rng, [0, 90, 30, -30]),
+                angle: parmi(rng, [0, 90]),
               }
             : {}),
         })
-        // et son ÉCRAN D'OMBRE : un pilier fin posé exprès entre la lampe
-        // et le cœur de la salle — l'ombre précise qu'on a voulue
-        const versX = (sx0 + sx1) / 2 - lx
-        const versY = -ly
+        // et son ÉCRAN D'OMBRE : un pilier fin face à la lampe
+        const versX = (R.minX + R.maxX) / 2 - lx
+        const versY = midY - ly
         const dEcran = Math.hypot(versX, versY) || 1
         const ex2 = lx + (versX / dEcran) * entre(rng, 140, 220)
         const ey2 = ly + (versY / dEcran) * entre(rng, 140, 220)
@@ -952,28 +1156,38 @@ function essaieNiveau(
         }
       } else {
         lumieres.push({
-          x: (sx0 + sx1) / 2,
-          y: Math.round(entre(rng, -demiH * 0.3, demiH * 0.3)),
+          x: Math.round((R.minX + R.maxX) / 2),
+          y: Math.round(entre(rng, midY - demi * 0.3, midY + demi * 0.3)),
           intensite: Number(entre(rng, 0.85, 1.15).toFixed(2)),
         })
       }
     }
   }
 
-  // ---- la CACHETTE, une salle sur deux environ (ou selon le panneau) ----
+  // ---- la CACHETTE : de préférence dans un CUL-DE-SAC (la voie qui ne
+  // mène qu'à elle), sinon n'importe quelle salle ----
+  const degres = new Map<number, number>()
+  for (const cn of topo.conns) {
+    degres.set(cn.a, (degres.get(cn.a) ?? 0) + 1)
+    degres.set(cn.b, (degres.get(cn.b) ?? 0) + 1)
+  }
+  const culsDeSac = topo.salles
+    .map((_, i) => i)
+    .filter((i) => (degres.get(i) ?? 0) === 1 && i !== topo.spawnSalle && i !== topo.exitSalle)
   const pCache = o.cachette === 1 ? 0 : o.cachette === 2 ? 1 : 0.55
   if (rng() < pCache) {
     for (let essai = 0; essai < (o.cachette === 2 ? 60 : 20); essai++) {
-      const i = Math.floor(rng() * salleX.length)
-      const [sx0, sx1] = salleX[i]
+      const si =
+        culsDeSac.length && rng() < 0.7
+          ? parmi(rng, culsDeSac)
+          : Math.floor(rng() * topo.salles.length)
+      const R = rectDe(si)
       const w = entre(rng, 200, 280)
       const h = entre(rng, 200, 280)
       const enHaut = rng() < 0.5
-      const cx = entre(rng, sx0 + w / 2 + 40, sx1 - w / 2 - 40)
-      const cy = enHaut ? demiH - h / 2 - 30 : -demiH + h / 2 + 30
+      const cx = entre(rng, R.minX + w / 2 + 40, R.maxX - w / 2 - 40)
+      const cy = enHaut ? R.maxY - h / 2 - 30 : R.minY + h / 2 + 30
       const r: Rect = { minX: cx - w / 2, minY: cy - h / 2, maxX: cx + w / 2, maxY: cy + h / 2 }
-      // la cachette peut recouvrir du décor (c'est même son charme), mais ni
-      // le chemin nominal, ni les mécanismes
       let libre = true
       for (const res of reserves) if (chevauche(r, res)) libre = false
       if (!libre) continue
@@ -984,6 +1198,7 @@ function essaieNiveau(
   }
 
   const nbEnigmes = preuves.length
+  const nbVoies = topo.conns.length - (topo.salles.length - 1) // les boucles
   // l'IDENTITÉ : en mode atelier, le code porte la nomenclature ET la
   // variante (« G-101-K7 ») — retaper ce code redonne cette salle-là
   const suffixe = encodeOptions(o)
@@ -1008,7 +1223,8 @@ function essaieNiveau(
       `avant consignation. — Unité GÉN.`
     : `Plan tiré par le protocole génératif (graine ${ident}). ` +
       `La traversée a été démontrée par le traceur avant consignation : ` +
-      `${plan.largeurs.length} compartiments, ${plan.maillons.filter((m) => m !== 'libre').length} franchissements contraints. — Unité GÉN.`
+      `${topo.salles.length} compartiments, ${topo.conns.filter((c) => c.maillon !== 'libre').length} franchissements contraints` +
+      `${nbVoies > 0 ? `, ${1 + nbVoies} voies` : ''}. — Unité GÉN.`
   const level: LevelDef = {
     name: `${parmi(rng, noms)} ${ident}`,
     code: `G-${ident}`,
@@ -1033,17 +1249,20 @@ function essaieNiveau(
       : atelier && atelier.cahier.moment > 1
         ? { ambiante: atelier.cahier.moment === 2 ? 0.46 : 0.4 }
         : {}),
-    par: 2 + 3 * plan.maillons.length + 2 * nbEnigmes + (atelier ? atelier.cahier.difficulte : 0),
+    par:
+      2 +
+      3 * topo.conns.length +
+      2 * nbEnigmes +
+      (atelier ? atelier.cahier.difficulte : 0),
   }
   // la preuve se joue sur le niveau FINI (tout le décor posé)
   ;(level as LevelGen).__preuves = preuves
 
   // ---- l'ORIENTATION : le même squelette ne se lit pas toujours dans le
-  // même sens. Un niveau sur quatre reste ouest → est ; les autres se
-  // retournent (est → ouest), se dressent (montée), ou plongent — la
-  // transposition et le miroir emportent TOUT : parois, mécanismes,
-  // faisceaux, rails, preuves. La validation se joue après, sur la
-  // géométrie définitive.
+  // même sens. Un niveau sur quatre reste tel quel ; les autres se
+  // retournent, se dressent, ou plongent — la transposition et le miroir
+  // emportent TOUT : parois, mécanismes, faisceaux, rails, preuves. La
+  // validation se joue après, sur la géométrie définitive.
   const orientation = Math.floor(rng() * 4)
   if (orientation & 2) transposeNiveau(level, preuves)
   if (orientation & 1) miroirXNiveau(level, preuves)

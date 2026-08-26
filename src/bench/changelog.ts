@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 12:25',
+    title: 'Générateur : la GRILLE — deux rangées, des boucles, plusieurs voies',
+    notes: [
+      'Retour du concepteur : les compartiments restaient alignés en ligne, jamais autrement, sans voies multiples — et les bandeaux lumineux inclinés étaient laids. Les bandeaux sont désormais alignés à l’architecture (horizontaux ou verticaux, plus jamais en biais). Et la TOPOLOGIE change de dimension : les salles s’arrangent en couloir 1×N (le classique), en grille 2×2 ou 2×3, ou en L — le coin manquant est muré plein. Les rangées se relient par des OUVERTURES percées dans le plancher : deux ouvertures font une BOUCLE — plusieurs voies mènent au sas — et une salle sans issue devient un cul-de-sac où nichent de préférence les cachettes.',
+      'Le contrat de la nomenclature tient toujours : l’entrée du sas est UNIQUE (coin de grille, jamais d’ouverture dans sa colonne) et porte la mécanique obligatoire — quelle que soit la voie choisie, on finit par elle ; en mécanique « toutes », la seconde famille verrouille TOUTES les entrées de l’avant-sas. Les énigmes, traverses, bandeaux de silhouette, décors, dangers et lampes vivent désormais en coordonnées LOCALES à chaque salle — et les traverses du labyrinthe savent aussi se DRESSER (ancrées au plafond ou au plancher) dans les salles larges et basses de la grille.',
+      'Avec les quatre orientations déjà en place, une grille peut aussi se coucher ou se retourner. Vérifié : 22 tests (342 au total), 50 graines valides d’affilée, et la salle G-7 jouée en essai sans écran — grille 2×3 en L, deux ouvertures de plancher (la boucle), évent, rideau, miroir à faisceau de flanc, capture à l’appui.',
+    ],
+  },
+  {
     date: '26/08/2026 12:20',
     title: 'Notes de version : le RÉCAP ÉCLAIR — et les heures disent enfin vrai',
     notes: [
