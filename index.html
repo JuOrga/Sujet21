@@ -4288,6 +4288,73 @@
         .mb-cartes { grid-template-columns: 1fr; }
         .mb-carte { min-height: 0; flex-direction: row; text-align: left; flex-wrap: wrap; }
       }
+      /* ---- Le panneau du GÉNÉRATEUR (⚄) : les réglages qui voyagent ---- */
+      #edg-voile {
+        position: fixed;
+        inset: 0;
+        z-index: 60;
+        background: rgba(2, 5, 12, 0.72);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #edg-voile[hidden] {
+        display: none;
+      }
+      #edg-panneau {
+        width: min(420px, 92vw);
+        max-height: 86vh;
+        overflow: auto;
+        background: #0b1220;
+        border: 1px solid var(--line);
+        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+        padding: 16px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        font-family: var(--font-mono);
+      }
+      #edg-panneau h3 {
+        margin: 0 0 2px;
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        color: var(--ink);
+      }
+      #edg-panneau .edg-note {
+        font-size: 10px;
+        line-height: 1.5;
+        color: var(--dim);
+        margin: 0;
+      }
+      #edg-familles {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px 10px;
+        border: 1px solid var(--line);
+        padding: 8px 10px;
+        margin: 0;
+      }
+      #edg-familles legend {
+        font-size: 10px;
+        color: var(--dim);
+        padding: 0 4px;
+      }
+      #edg-familles label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 10.5px;
+        color: var(--ink);
+      }
+      #edg-familles input {
+        width: auto;
+      }
+      #edg-panneau .edg-boutons {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        margin-top: 4px;
+      }
     </style>
   </head>
   <body>
@@ -4488,6 +4555,66 @@
         <canvas id="ed-canvas"></canvas>
         <div id="ed-coords">x 0 · y 0</div>
         <div id="ed-hint"></div>
+      </div>
+
+      <!-- Le panneau du GÉNÉRATEUR : les réglages voyagent dans le code (~) -->
+      <div id="edg-voile" hidden>
+        <div id="edg-panneau">
+          <h3>⚄ GÉNÉRATEUR DE SALLES</h3>
+          <label class="ed-f"><span>Code ou graine</span>
+            <input id="edg-code" placeholder="212 · 101-K7 · Q · vide = hasard" /></label>
+          <p class="edg-note">« 212 » (moment · mécanique · difficulté) tire une salle de cette
+            classe ; le code complet affiché (« G-212-BJB~… ») la redonne à l’identique,
+            réglages compris. Une graine libre (« Q ») marche aussi.</p>
+          <label class="ed-f"><span>Compartiments</span>
+            <select id="edg-salles">
+              <option value="0">Auto</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+            </select></label>
+          <fieldset id="edg-familles">
+            <legend>Franchissements autorisés</legend>
+            <label><input type="checkbox" data-fam="0" checked /> Évent (vapeur)</label>
+            <label><input type="checkbox" data-fam="1" checked /> Rideau (glace)</label>
+            <label><input type="checkbox" data-fam="2" checked /> Membrane (eau)</label>
+            <label><input type="checkbox" data-fam="3" checked /> Miroir laser</label>
+            <label><input type="checkbox" data-fam="4" checked /> Double ET</label>
+            <label><input type="checkbox" data-fam="5" checked /> Rail plasma</label>
+            <label><input type="checkbox" data-fam="6" checked /> Barrière NOR</label>
+          </fieldset>
+          <label class="ed-f"><span>Dangers</span>
+            <select id="edg-dangers">
+              <option value="0">Auto</option>
+              <option value="1">Aucun</option>
+              <option value="2">Rares</option>
+              <option value="3">Fréquents</option>
+            </select></label>
+          <label class="ed-f"><span>Cachette</span>
+            <select id="edg-cachette">
+              <option value="0">Auto</option>
+              <option value="1">Jamais</option>
+              <option value="2">Toujours</option>
+            </select></label>
+          <label class="ed-f"><span>Labyrinthe</span>
+            <select id="edg-laby">
+              <option value="0">Auto (léger)</option>
+              <option value="1">Aucun</option>
+              <option value="2">Marqué</option>
+              <option value="3">Dédale</option>
+            </select></label>
+          <label class="ed-f"><span>Décor</span>
+            <select id="edg-decor">
+              <option value="0">Auto</option>
+              <option value="1">Sobre</option>
+              <option value="2">Normal</option>
+              <option value="3">Chargé</option>
+            </select></label>
+          <div class="edg-boutons">
+            <button type="button" id="edg-fermer">Fermer</button>
+            <button type="button" id="edg-generer" class="primary">Générer</button>
+          </div>
+        </div>
       </div>
 
       <aside class="ed-side ed-side--right">

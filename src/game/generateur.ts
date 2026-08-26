@@ -101,17 +101,93 @@ export interface SaisieAtelier {
   type: 'atelier'
   cahier: CodeAtelier
   variante: string | null // null : le générateur en tirera une au hasard
+  options: OptionsGen | null // portées par le suffixe « ~XXX » du code
 }
 export interface SaisieLibre {
   type: 'libre'
   graine: number
+  options: OptionsGen | null
+}
+
+// ---- Les OPTIONS du générateur : des réglages qui VOYAGENT dans le code --
+// Chaque réglage a un cran « auto » (le comportement historique). Dès qu'un
+// réglage s'en écarte, le tout s'encode en un court suffixe base 36 accolé
+// au code de la salle (« G-212-BJB~1A2 ») : retaper le code, suffixe
+// compris, redonne la même salle — les réglages font partie de l'identité.
+export const FAMILLES_OPT: readonly Maillon[] = [
+  'grille',
+  'rideau',
+  'membrane',
+  'porte',
+  'et',
+  'rail',
+  'nor',
+]
+
+export interface OptionsGen {
+  salles: 0 | 3 | 4 | 5 // 0 : auto
+  familles: number // masque de bits sur FAMILLES_OPT — 127 (tout) : auto
+  dangers: 0 | 1 | 2 | 3 // 0 auto · 1 aucun · 2 rares · 3 fréquents
+  cachette: 0 | 1 | 2 // 0 auto · 1 jamais · 2 toujours
+  decor: 0 | 1 | 2 | 3 // 0 auto · 1 sobre · 2 normal · 3 chargé
+  // l'esprit LABYRINTHE : des traverses horizontales ancrées aux flancs,
+  // qui forcent le serpentin — 0 auto (léger) · 1 aucune · 2 marqué ·
+  // 3 dédale (plus de traverses, couloirs plus étroits)
+  laby: 0 | 1 | 2 | 3
+}
+
+export const OPTIONS_DEFAUT: OptionsGen = {
+  salles: 0,
+  familles: 127,
+  dangers: 0,
+  cachette: 0,
+  decor: 0,
+  laby: 0,
+}
+
+/** Le suffixe des options — vide quand tout est « auto ». */
+export function encodeOptions(o: OptionsGen): string {
+  const sallesIdx = o.salles === 0 ? 0 : o.salles - 2 // 3, 4, 5 → 1, 2, 3
+  const familles = o.familles & 127 || 127
+  const paquet =
+    sallesIdx |
+    (familles << 2) |
+    (o.dangers << 9) |
+    (o.cachette << 11) |
+    (o.decor << 13) |
+    (o.laby << 15)
+  const defaut = 0 | (127 << 2)
+  return paquet === defaut ? '' : paquet.toString(36).toUpperCase()
+}
+
+export function decodeOptions(txt: string): OptionsGen | null {
+  if (!/^[0-9A-Z]{1,4}$/i.test(txt.trim())) return null
+  const paquet = parseInt(txt.trim(), 36)
+  if (!Number.isFinite(paquet) || paquet < 0 || paquet >= 1 << 17) return null
+  const sallesIdx = paquet & 3
+  return {
+    salles: (sallesIdx === 0 ? 0 : sallesIdx + 2) as OptionsGen['salles'],
+    familles: (paquet >> 2) & 127 || 127,
+    dangers: ((paquet >> 9) & 3) as OptionsGen['dangers'],
+    cachette: Math.min(2, (paquet >> 11) & 3) as OptionsGen['cachette'],
+    decor: ((paquet >> 13) & 3) as OptionsGen['decor'],
+    laby: ((paquet >> 15) & 3) as OptionsGen['laby'],
+  }
 }
 
 /** Lit une saisie de génération : « 101 » ou « 101-K7 » (atelier, avec le
  * préfixe G- toléré — on retape ce qu'affiche la salle), sinon une graine
- * libre en base 36. Null : illisible. */
+ * libre en base 36 — chacune avec son éventuel suffixe d'options « ~XXX ».
+ * Null : illisible. */
 export function analyseSaisie(txt: string): SaisieAtelier | SaisieLibre | null {
-  const nu = txt.trim().toUpperCase().replace(/^G-/, '')
+  let nu = txt.trim().toUpperCase().replace(/^G-/, '')
+  let options: OptionsGen | null = null
+  const tilde = /~\s*([0-9A-Z]{1,4})$/.exec(nu)
+  if (tilde) {
+    options = decodeOptions(tilde[1])
+    if (options === null) return null
+    nu = nu.slice(0, tilde.index).trim()
+  }
   const m = /^([123])([0-3])(\d)(?:\s*-\s*([0-9A-Z]{1,6}))?$/.exec(nu)
   if (m) {
     return {
@@ -122,10 +198,11 @@ export function analyseSaisie(txt: string): SaisieAtelier | SaisieLibre | null {
         difficulte: Number(m[3]),
       },
       variante: m[4] ?? null,
+      options,
     }
   }
   const graine = graineDepuisTexte(nu)
-  return graine === null ? null : { type: 'libre', graine }
+  return graine === null ? null : { type: 'libre', graine, options }
 }
 
 /** La graine numérique d'une salle atelier : cahier ⊕ variante — même
@@ -151,11 +228,25 @@ interface Plan {
 
 const EP_CLOISON = 60
 
+/** Une famille de maillons est-elle AUTORISÉE par les options ? */
+function autorise(o: OptionsGen, m: Maillon): boolean {
+  return m === 'libre' || (o.familles & (1 << FAMILLES_OPT.indexOf(m))) !== 0
+}
+
+/** Restreint une liste aux maillons autorisés — la liste entière si les
+ * options excluaient tout (un cahier atelier ne se laisse pas trahir). */
+function filtre(o: OptionsGen, xs: readonly Maillon[]): readonly Maillon[] {
+  const f = xs.filter((m) => autorise(o, m))
+  return f.length ? f : xs
+}
+
 // Les PLAFONDS de lisibilité (deux miroirs simples, un ET, un rail, une
-// barrière, trois lasers en tout), en restant DANS la famille du maillon :
-// un excédent glaceux redevient rideau, un excédent vaporeux, évent — la
-// mécanique annoncée par un code atelier n'est jamais trahie.
-function plafonne(maillons: Maillon[], largeurs: number[]): Maillon[] {
+// barrière, trois lasers en tout), en restant DANS la famille du maillon
+// ET dans les familles autorisées : un excédent glaceux redevient rideau,
+// un excédent vaporeux, évent — sinon membrane, sinon passage libre.
+function plafonne(maillons: Maillon[], largeurs: number[], o: OptionsGen): Maillon[] {
+  const retombe = (pref: Maillon[]): Maillon =>
+    pref.find((m) => autorise(o, m)) ?? 'libre'
   let miroirs = 0
   let ets = 0
   let rails = 0
@@ -163,13 +254,13 @@ function plafonne(maillons: Maillon[], largeurs: number[]): Maillon[] {
   let lasers = 0
   return maillons.map((m, i) => {
     // le double miroir exige une salle large ; à défaut, un miroir simple
-    if (m === 'et' && largeurs[i] < 820) m = 'porte'
-    if (m === 'et' && ets >= 1) m = 'porte'
-    if (m === 'porte' && miroirs >= 2) m = 'rideau'
-    if (m === 'rail' && rails >= 1) m = 'grille'
-    if (m === 'nor' && nors >= 1) m = 'grille'
+    if (m === 'et' && largeurs[i] < 820) m = retombe(['porte', 'rideau', 'membrane'])
+    if (m === 'et' && ets >= 1) m = retombe(['porte', 'rideau', 'membrane'])
+    if (m === 'porte' && miroirs >= 2) m = retombe(['rideau', 'membrane'])
+    if (m === 'rail' && rails >= 1) m = retombe(['grille', 'membrane'])
+    if (m === 'nor' && nors >= 1) m = retombe(['grille', 'membrane'])
     if ((m === 'porte' || m === 'et' || m === 'rail' || m === 'nor') && lasers >= 3)
-      m = estVaporeux(m) ? 'grille' : 'rideau'
+      m = estVaporeux(m) ? retombe(['grille', 'membrane']) : retombe(['rideau', 'membrane'])
     if (m === 'porte') miroirs++
     if (m === 'et') ets++
     if (m === 'rail') rails++
@@ -181,21 +272,28 @@ function plafonne(maillons: Maillon[], largeurs: number[]): Maillon[] {
 
 /** Un tirage de plan : la chaîne d'abord, la géométrie ensuite. Avec un
  * cahier des charges atelier, la chaîne OBÉIT au code : la mécanique
- * choisit les familles, la difficulté dose salles et contraintes. */
-function tirePlan(rng: Rng, cahier: CodeAtelier | null): Plan {
+ * choisit les familles, la difficulté dose salles et contraintes. Les
+ * options du panneau restreignent ce que le tirage a le droit d'employer. */
+function tirePlan(rng: Rng, cahier: CodeAtelier | null, o: OptionsGen): Plan {
   const D = cahier ? cahier.difficulte : -1
-  const nbSalles = cahier
-    ? D <= 2
-      ? 3
-      : D <= 5
-        ? 4
-        : 5
-    : 3 + Math.floor(rng() * 3) // 3, 4 ou 5
+  const nbSalles =
+    o.salles !== 0
+      ? o.salles
+      : cahier
+        ? D <= 2
+          ? 3
+          : D <= 5
+            ? 4
+            : 5
+        : 3 + Math.floor(rng() * 3) // 3, 4 ou 5
   const H = Math.round(entre(rng, 1150, 1450) / 10) * 10
   const largeurs: number[] = []
   for (let i = 0; i < nbSalles; i++)
     largeurs.push(Math.round(entre(rng, 640, 880) / 10) * 10)
   const nbCloisons = nbSalles - 1
+  const doux: readonly Maillon[] = autorise(o, 'membrane')
+    ? (['libre', 'libre', 'membrane'] as const)
+    : (['libre'] as const)
   let maillons: Maillon[] = []
   if (cahier) {
     // la mécanique du code d'abord : ses OBLIGATIONS, puis des renforts de
@@ -203,8 +301,8 @@ function tirePlan(rng: Rng, cahier: CodeAtelier | null): Plan {
     // et l'on bat les cartes pour que l'ordre ne se devine pas
     const mec = cahier.mecanique
     const obligatoires: Maillon[] = []
-    if (mec === 1 || mec === 3) obligatoires.push(parmi(rng, GLACEUX))
-    if (mec === 2 || mec === 3) obligatoires.push(parmi(rng, VAPOREUX))
+    if (mec === 1 || mec === 3) obligatoires.push(parmi(rng, filtre(o, GLACEUX)))
+    if (mec === 2 || mec === 3) obligatoires.push(parmi(rng, filtre(o, VAPOREUX)))
     if (mec === 0) obligatoires.push('membrane')
     const viser = Math.max(
       obligatoires.length,
@@ -214,35 +312,30 @@ function tirePlan(rng: Rng, cahier: CodeAtelier | null): Plan {
       mec === 0
         ? ['membrane']
         : mec === 1
-          ? GLACEUX
+          ? filtre(o, GLACEUX)
           : mec === 2
-            ? VAPOREUX
-            : [...GLACEUX, ...VAPOREUX]
+            ? filtre(o, VAPOREUX)
+            : [...filtre(o, GLACEUX), ...filtre(o, VAPOREUX)]
     maillons = [...obligatoires]
     while (maillons.length < viser) maillons.push(parmi(rng, renforts))
-    while (maillons.length < nbCloisons)
-      maillons.push(parmi(rng, ['libre', 'libre', 'membrane'] as const))
+    while (maillons.length < nbCloisons) maillons.push(parmi(rng, doux))
     for (let i = maillons.length - 1; i > 0; i--) {
       const j = Math.floor(rng() * (i + 1))
       ;[maillons[i], maillons[j]] = [maillons[j], maillons[i]]
     }
-    maillons = plafonne(maillons, largeurs)
+    maillons = plafonne(maillons, largeurs, o)
   } else {
     // tirage LIBRE : au moins un maillon contraint — sinon c'est un couloir
+    const contraints = FAMILLES_OPT.filter((m) => autorise(o, m))
     const types: Maillon[] = [
       'libre',
-      'grille',
-      'rideau',
-      'membrane',
-      'porte',
-      'et',
-      'rail',
-      'nor',
+      ...(contraints.length ? contraints : [...FAMILLES_OPT]),
     ]
     do {
       maillons = plafonne(
         Array.from({ length: nbCloisons }, () => parmi(rng, types)),
         largeurs,
+        o,
       )
     } while (maillons.every((m) => m === 'libre'))
   }
@@ -310,8 +403,13 @@ interface Atelier {
 }
 
 /** Un essai de salle complet — géométrie, mécanismes, habillage. */
-function essaieNiveau(graine: number, rng: Rng, atelier: Atelier | null): LevelDef {
-  const plan = tirePlan(rng, atelier?.cahier ?? null)
+function essaieNiveau(
+  graine: number,
+  rng: Rng,
+  atelier: Atelier | null,
+  o: OptionsGen,
+): LevelDef {
+  const plan = tirePlan(rng, atelier?.cahier ?? null, o)
   const { H } = plan
   const demiH = H / 2
   const bounds = { minX: plan.x0 - 40, minY: -demiH, maxX: plan.x1 + 40, maxY: demiH }
@@ -484,6 +582,58 @@ function essaieNiveau(graine: number, rng: Rng, atelier: Atelier | null): LevelD
     }
   }
 
+  // ---- les TRAVERSES : l'esprit labyrinthe ----
+  // Des demi-murs HORIZONTAUX ancrés à un flanc de la salle, un couloir
+  // libre au bout : le chemin serpente au lieu de filer tout droit. Jamais
+  // sur un mécanisme, un passage, le spawn ou le sas (les réserves posées
+  // plus haut font foi) — et le parcours de validation garde le dernier
+  // mot : une salle rendue infranchissable serait re-tirée.
+  if (o.laby !== 1) {
+    const traverses: number[] = [] // les hauteurs posées, par salle
+    for (let i = 0; i < salleX.length; i++) {
+      const [sx0, sx1] = salleX[i]
+      const larg = sx1 - sx0
+      const nTrav =
+        o.laby === 3
+          ? rng() < 0.6
+            ? 2
+            : 1
+          : o.laby === 2
+            ? 1
+            : rng() < 0.45
+              ? 1
+              : 0
+      traverses.length = 0
+      let gauche = rng() < 0.5
+      for (let t = 0; t < nTrav; t++) {
+        for (let essai = 0; essai < 30; essai++) {
+          // un flanc encombré (colonne d'un laser, couloir d'un passage) :
+          // au bout de quelques refus, on tente l'ancrage d'en face
+          const flanc = essai % 6 < 3 ? gauche : !gauche
+          const canal = o.laby === 3 ? entre(rng, 150, 200) : entre(rng, 180, 250)
+          const ty = Math.round(entre(rng, -demiH + 300, demiH - 300) / 10) * 10
+          if (traverses.some((y) => Math.abs(y - ty) < 260)) continue
+          const lenW = larg - canal
+          if (lenW < 200) break
+          const r: Rect = flanc
+            ? { minX: sx0, minY: ty - 25, maxX: sx0 + lenW, maxY: ty + 25 }
+            : { minX: sx1 - lenW, minY: ty - 25, maxX: sx1, maxY: ty + 25 }
+          let libre = true
+          for (const res of reserves)
+            if (chevauche(gonfle(r, 30), res)) {
+              libre = false
+              break
+            }
+          if (!libre) continue
+          boxes.push({ ...r, material: MAT_WALL, skin: 1 + Math.floor(rng() * 4) })
+          traverses.push(ty)
+          gauche = !flanc // la suivante s'ancre en face : le serpentin
+          break
+        }
+      }
+    }
+  }
+
   // ---- le chemin nominal (spawn → passages → sas) reste dégagé ----
   const chemin: { x: number; y: number }[] = [
     { x: spawn.x, y: spawn.y },
@@ -517,8 +667,13 @@ function essaieNiveau(graine: number, rng: Rng, atelier: Atelier | null): LevelD
 
   for (let i = 0; i < salleX.length; i++) {
     const [sx0, sx1] = salleX[i]
-    // 1 à 2 pièces de décor par salle
-    const nDecor = 1 + Math.floor(rng() * 2)
+    // le décor par salle : sobre 0-1, normal 1-2, chargé 2-3
+    const nDecor =
+      o.decor === 1
+        ? Math.floor(rng() * 2)
+        : o.decor === 3
+          ? 2 + Math.floor(rng() * 2)
+          : 1 + Math.floor(rng() * 2)
     for (let d = 0; d < nDecor; d++) {
       for (let essai = 0; essai < 24; essai++) {
         const w = entre(rng, 110, 260)
@@ -544,11 +699,18 @@ function essaieNiveau(graine: number, rng: Rng, atelier: Atelier | null): LevelD
         break
       }
     }
-    // un DANGER contre un bord — une fois sur trois, ou dosé par la
-    // difficulté du cahier des charges
-    const pDanger = atelier
-      ? Math.min(0.75, 0.15 + 0.07 * atelier.cahier.difficulte)
-      : 0.34
+    // un DANGER contre un bord — une fois sur trois, dosé par la difficulté
+    // du cahier des charges, ou imposé par le panneau de réglages
+    const pDanger =
+      o.dangers === 1
+        ? 0
+        : o.dangers === 2
+          ? 0.12
+          : o.dangers === 3
+            ? 0.6
+            : atelier
+              ? Math.min(0.75, 0.15 + 0.07 * atelier.cahier.difficulte)
+              : 0.34
     if (rng() < pDanger) {
       for (let essai = 0; essai < 18; essai++) {
         const chaud = rng() < 0.5
@@ -580,9 +742,10 @@ function essaieNiveau(graine: number, rng: Rng, atelier: Atelier | null): LevelD
     }
   }
 
-  // ---- la CACHETTE, une salle sur deux environ : une alcôve voilée ----
-  if (rng() < 0.55) {
-    for (let essai = 0; essai < 20; essai++) {
+  // ---- la CACHETTE, une salle sur deux environ (ou selon le panneau) ----
+  const pCache = o.cachette === 1 ? 0 : o.cachette === 2 ? 1 : 0.55
+  if (rng() < pCache) {
+    for (let essai = 0; essai < (o.cachette === 2 ? 60 : 20); essai++) {
       const i = Math.floor(rng() * salleX.length)
       const [sx0, sx1] = salleX[i]
       const w = entre(rng, 200, 280)
@@ -605,9 +768,11 @@ function essaieNiveau(graine: number, rng: Rng, atelier: Atelier | null): LevelD
   const nbEnigmes = preuves.length
   // l'IDENTITÉ : en mode atelier, le code porte la nomenclature ET la
   // variante (« G-101-K7 ») — retaper ce code redonne cette salle-là
-  const ident = atelier
-    ? `${atelier.cahier.moment}${atelier.cahier.mecanique}${atelier.cahier.difficulte}-${atelier.variante}`
-    : (graine >>> 0).toString(36).toUpperCase()
+  const suffixe = encodeOptions(o)
+  const ident =
+    (atelier
+      ? `${atelier.cahier.moment}${atelier.cahier.mecanique}${atelier.cahier.difficulte}-${atelier.variante}`
+      : (graine >>> 0).toString(36).toUpperCase()) + (suffixe ? `~${suffixe}` : '')
   const noms = [
     'La dérivation',
     'Le collecteur',
@@ -932,10 +1097,14 @@ export function valideNiveau(level: LevelDef): VerdictGen {
 // une sous-graine dérivée, pour rester déterministe) jusqu'à la preuve —
 // et l'on abandonne au-delà de 60 essais, ce qui ne s'observe pas en
 // pratique (les tests le tiennent à l'œil).
-export function genereNiveau(graine: number, atelier: Atelier | null = null): LevelDef {
+export function genereNiveau(
+  graine: number,
+  atelier: Atelier | null = null,
+  options: OptionsGen = OPTIONS_DEFAUT,
+): LevelDef {
   for (let essai = 0; essai < 60; essai++) {
     const rng = creeRng((graine >>> 0) + essai * 0x9e3779b9)
-    const niveau = essaieNiveau(graine, rng, atelier)
+    const niveau = essaieNiveau(graine, rng, atelier, options)
     if (valideNiveau(niveau).valide) {
       delete (niveau as LevelGen).__preuves
       return niveau
@@ -945,10 +1114,15 @@ export function genereNiveau(graine: number, atelier: Atelier | null = null): Le
 }
 
 /** Une salle AU CODE ATELIER : « 101 » est le cahier des charges, la
- * variante fait l'identité — le couple redonne toujours la même salle. */
-export function genereNiveauAtelier(cahier: CodeAtelier, variante: string): LevelDef {
+ * variante fait l'identité — le couple (et les options) redonne toujours
+ * la même salle. */
+export function genereNiveauAtelier(
+  cahier: CodeAtelier,
+  variante: string,
+  options: OptionsGen = OPTIONS_DEFAUT,
+): LevelDef {
   const nue = variante.trim().toUpperCase()
-  return genereNiveau(graineAtelier(cahier, nue), { cahier, variante: nue })
+  return genereNiveau(graineAtelier(cahier, nue), { cahier, variante: nue }, options)
 }
 
 /** Une graine de partage lisible (base 36) → nombre, et retour. */

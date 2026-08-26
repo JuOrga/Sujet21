@@ -14,6 +14,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 20:10',
+    title: 'Le générateur se RÈGLE — et les réglages voyagent dans le code',
+    notes: [
+      'Le bouton ⚄ Générer ouvre désormais un PANNEAU DE RÉGLAGES : nombre de compartiments (3-5 ou auto), franchissements autorisés (sept cases — évent, rideau, membrane, miroir laser, double ET, rail plasma, barrière NOR), dangers (aucun / rares / fréquents), cachette (jamais / toujours), décor (sobre / chargé), et LABYRINTHE. Chaque réglage a son cran « auto » — le comportement de toujours.',
+      'Et l’ESPRIT LABYRINTHE, réclamé par le concepteur : les salles filaient tout droit, tout en cloisons verticales. Des TRAVERSES horizontales s’ancrent maintenant aux flancs, un couloir libre au bout, en alternance — le chemin serpente. Léger par défaut (une salle sur deux), « marqué » ou « dédale » au panneau (plus de traverses, couloirs plus étroits), « aucun » pour l’ancien tout-droit. Jamais sur un mécanisme, un passage ou un faisceau — et le parcours de validation garde le dernier mot.',
+      'L’identité tient sa promesse : dès qu’un réglage quitte « auto », le tout s’encode en un court suffixe accolé au code (« G-Q~248S ») — retaper le code, suffixe compris, redonne la même salle, réglages compris (le suffixe prime alors sur le panneau : il EST l’identité). Vérifié : 19 tests (aller-retour des options, salle sans lasers ni dangers qui obéit, dédale contre tout-droit) — 328 au total — et en headless, panneau réglé « sans lasers, cachette toujours, 5 compartiments » → salle conforme, code retapé → identique octet pour octet ; dédale sur G-Q → traverses en jeu, capture à l’appui.',
+    ],
+  },
+  {
     date: '26/08/2026 18:50',
     title: 'Le générateur parle la NOMENCLATURE : « 101 » est un cahier des charges',
     notes: [
