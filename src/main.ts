@@ -3112,6 +3112,7 @@ function renderPlanche(): void {
       plancheScroll = corps.scrollTop
       plancheEl.hidden = true
       sallesEl.hidden = true
+      editor.close() // la planche peut être posée sur l'éditeur : on le replie
       startTest([s.level])
       // startTest peut rendre la main à la fiche (nom d'opérateur manquant) :
       // le retour ne s'arme que si l'essai a vraiment démarré
@@ -3164,6 +3165,14 @@ function renderPlanche(): void {
 }
 document
   .getElementById('salles-planche-btn')
+  ?.addEventListener('click', () => void ouvrePlanche())
+// la planche s'ouvre aussi depuis l'ACCUEIL (mode concepteur) et depuis
+// l'ÉDITEUR : le voile se pose par-dessus, le fermer rend l'écran d'avant
+document
+  .getElementById('home-planche')
+  ?.addEventListener('click', () => void ouvrePlanche())
+document
+  .getElementById('ed-planche')
   ?.addEventListener('click', () => void ouvrePlanche())
 document.getElementById('planche-fermer')?.addEventListener('click', () => {
   plancheEl.hidden = true
