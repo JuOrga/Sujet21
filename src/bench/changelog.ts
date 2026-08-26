@@ -22,6 +22,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 01:12',
+    title:
+      'Les VOLUMES entrent dans la lumière : le dessus et les flancs cessent d’ignorer les lampes',
+    notes: [
+      'Signalé : « est-ce que le haut des parois et des différents éléments gère bien l’éclairage ? » Non. La carte de lumière ne modulait que le fond de cuve — les blocs en étaient exclus, le shader le disait noir sur blanc. Le dessus d’une paroi rendait donc exactement pareil sous un plafonnier et à l’autre bout de la salle, et le flanc gardait son chant clair en haut quelle que soit la position des lampes. À `ambiante: 0`, le sol tombait au noir pendant que les sommets restaient à pleine teinte : les blocs flottaient, plus lumineux que la pièce qui les contenait.',
+      'LE DESSUS ne pouvait pas simplement lire la carte cuite : à l’intérieur d’un bloc, celle-ci contient l’ombre du bloc lui-même — le mur se serait ombré tout seul. Sa lumière se calcule donc à part, dans la boucle qui cherchait déjà la direction dominante : même formule que la carte (retombée + flaque), mais mesurée depuis le SOMMET, à la hauteur des blocs — la flaque d’une lampe basse ne monte plus sur les toits, une lampe haute les baigne. Et comme tous les blocs ont la même hauteur, aucun n’ombre le toit d’un autre : pas d’occlusion à marcher, pas un pixel de coût en plus. La retombée y est plus franche qu’au sol (0,72 contre 0,55), parce que là-haut rien ne creuse d’ombre. LE FLANC, lui, est une face verticale : il s’allume désormais du côté de la lampe et plonge à l’opposé, chant compris — le volume tourne enfin avec la lumière.',
+      'Deux garde-fous, qui sont des règles de JEU et pas des choix d’image : l’éclairage est BORNÉ À 1 — il ne peut qu’assombrir un solide, jamais le surexposer, donc les tableaux déjà réglés gardent leur clair d’aujourd’hui ; et un PLANCHER de lisibilité empêche un obstacle de disparaître tout à fait dans une pièce éteinte — on doit voir contre quoi on va buter. Les surfaces ACTIVES (plaque froide, chaudière, surchauffeur) n’obéissent qu’à 45 % et gardent leurs arêtes de signal : une chaudière se lit brûlante même dans le noir. Le sas, une bouche, n’est pas touché.',
+      'Mesuré sur le plan large, ambiante forcée à 0, luminance moyenne des mêmes zones : parois loin des lampes 19,9 → 16,9, parois sous les lampes 40,2 → 40,0, sol témoin inchangé — l’effet ne joue QUE là où la lumière manque. Vérifié dans le jeu construit, WebGL réel : aucune erreur de compilation de shader, rendu conforme au réglage normal. Un test verrouille la cohérence de la hauteur des blocs entre les deux shaders où elle est écrite. 363 tests verts, build propre.',
+    ],
+  },
+  {
     date: '26/08/2026 23:05',
     title:
       'L’œil du Sujet décliné : GIVRÉ dans la glace, TOURBILLON dans la vapeur',
