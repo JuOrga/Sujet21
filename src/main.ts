@@ -16,6 +16,7 @@ import {
 } from './game/levelIO'
 import { dessineMiniCarte } from './game/carte'
 import { propositionsSalles } from './game/poule'
+import { CIRCUITS } from './game/circuits'
 import {
   BONBONNE_CAP,
   PALIERS_XP,
@@ -1170,6 +1171,13 @@ function renderSalles(): void {
     section('EXPÉDITION LIVRÉE — elle s’enchaîne à la suite')
   }
   for (const lv of [...TABLEAUX_ECOLE, ...TABLEAUX, TABLEAU_1BIS]) salle(lv)
+  // LE CABINET LOGIQUE : les mécanismes détournés en algèbre booléenne —
+  // des démonstrations à l'essai, volontairement hors expédition et hors
+  // accueil (l'écran SALLES est déjà l'antichambre du concepteur)
+  section(
+    'LE CABINET LOGIQUE — pastilles et portes en algèbre booléenne (démonstration)',
+  )
+  for (const lv of CIRCUITS) salle(lv)
 }
 renderSalles()
 {
