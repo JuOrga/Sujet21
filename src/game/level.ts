@@ -15,6 +15,7 @@ export const MAT_CHAUD = 6 // chaudière : transforme en gaz à 95 % de présenc
 export const MAT_MEMBRANE = 7 // membrane gorgée d'eau : seule l'EAU la traverse (glace et vapeur butent)
 export const MAT_RIDEAU = 8 // rideau lamellaire : seule la GLACE l'écarte (eau et vapeur butent)
 export const MAT_SURCHAUFFEUR = 9 // surchauffeur : mur pour eau et glace ; frôlé en VAPEUR, il rend UN dash — une seule fois
+export const MAT_MIROIR = 10 // miroir fixe : mur poli qui RÉFLÉCHIT le faisceau laser — le corps y bute comme sur une paroi
 
 export interface ObstacleBox {
   minX: number
@@ -498,6 +499,7 @@ export const MATERIAL_NAMES: Record<number, string> = {
   [MAT_MEMBRANE]: 'Membrane (liquide)',
   [MAT_RIDEAU]: 'Rideau (glace)',
   [MAT_SURCHAUFFEUR]: 'Surchauffeur',
+  [MAT_MIROIR]: 'Miroir',
 }
 
 // La CAUSE de chaque zone : une zone n'impose pas un état par convention, elle

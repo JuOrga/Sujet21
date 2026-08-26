@@ -1127,6 +1127,24 @@ void main() {
         vec3 auraCol = mat < 1.5 ? vec3(0.12, 0.42, 0.45) : vec3(0.38, 0.20, 0.52);
         col += auraCol * aura * (0.45 + 0.55 * mist);
       }
+    } else if (mat > 9.5) {
+      // MIROIR FIXE : la paroi polie qui plie le faisceau (laser.ts fait la
+      // vraie optique — ici, le POLI se voit) : métal froid presque blanc,
+      // balayage spéculaire en diagonale, micro-rayures de polissage, arête
+      // claire comme un fil de lumière.
+      float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
+      float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
+      float grain = dnoise(world * 0.021);
+      float stries = 0.5 + 0.5 * sin((world.x - world.y) * 0.55);
+      float band = 0.5 + 0.5 * sin((world.x + world.y) * 0.030 - uTime * 0.45);
+      float sweep = smoothstep(0.70, 0.985, band);
+      float ciel = 0.5 + 0.5 * sin(world.y * 0.012 + world.x * 0.004);
+      vec3 base = mix(vec3(0.34, 0.40, 0.48), vec3(0.58, 0.66, 0.76), ciel);
+      base *= 0.86 + 0.14 * grain;
+      base += vec3(0.05) * smoothstep(0.80, 1.0, stries);
+      vec3 pol = base + vec3(0.34, 0.36, 0.38) * sweep;
+      col = mix(col, pol, fill);
+      col = mix(col, vec3(0.92, 0.97, 1.05), edge * 0.95);
     } else if (mat > 8.5) {
       // SURCHAUFFEUR : serpentin AMBRE sous verre (la couleur de la vapeur) — la borne de recharge du
       // dash. Chargé (aux.z = 1), le serpentin pulse ; déchargé, il s'éteint

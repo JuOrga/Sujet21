@@ -18,6 +18,7 @@ import {
   MAT_MEMBRANE,
   MAT_RIDEAU,
   MAT_SURCHAUFFEUR,
+  MAT_MIROIR,
   PLAFONDS_CONNUS,
   dansBoite,
   MAT_HYDROPHILE,
@@ -107,6 +108,7 @@ const MAT_COLORS: Record<number, string> = {
   [MAT_MEMBRANE]: '#35c9a0',
   [MAT_RIDEAU]: '#9fb9d8',
   [MAT_SURCHAUFFEUR]: '#29d8ff',
+  [MAT_MIROIR]: '#b8c8dc',
 }
 const ZONE_COLORS: Record<ZoneForce, string> = {
   libre: '#7b93a8',
@@ -4059,6 +4061,7 @@ export class LevelEditor {
             MAT_MEMBRANE,
             MAT_RIDEAU,
             MAT_SURCHAUFFEUR,
+            MAT_MIROIR,
           ]
             .map(
               (m) =>

@@ -7,9 +7,10 @@ import {
   CIBLE_PERSISTANCE,
   canalDeCible,
   canalActif,
+  LASER_MAX_BOUNCES,
   type TraceMonde,
 } from './laser'
-import { MAT_GRILLE, MAT_WALL } from './level'
+import { MAT_GRILLE, MAT_MIROIR, MAT_WALL } from './level'
 import { DEFAULT_PARAMS } from '../sim/params'
 import { FluidSim, KIND_FREE, KIND_PLAYER, type Bounds } from '../sim/solver'
 
@@ -496,5 +497,57 @@ describe('Canaux — le n° d’une pastille est logique, la porte choisit sa r�
     expect(canalActif(cibles, -1, undefined, etat, 1)).toBe(false)
     expect(canalActif(cibles, 9, undefined, etat, 1)).toBe(false)
     expect(canalActif(cibles, 9, 'et', etat, 1)).toBe(false) // ET sur canal vide : non
+  })
+})
+
+describe('traceLaser — le MIROIR FIXE réfléchit', () => {
+  const MONDE_NU = {
+    bounds: { minX: -1000, minY: -1000, maxX: 1000, maxY: 1000 },
+    portesFermees: [],
+    iceNormal: null,
+    eau: null,
+    vapeur: null,
+    rails: [],
+  }
+
+  it('le losange à 45° couche un fil vertical à l’horizontale — et la pastille s’allume', () => {
+    // faisceau plein sud depuis (0, 500) ; losange poli décalé de +40 :
+    // le fil frappe sa face haut-gauche et repart vers -x
+    const monde = {
+      ...MONDE_NU,
+      boxes: [{ minX: 0, minY: -40, maxX: 80, maxY: 40, material: MAT_MIROIR, angle: 45 }],
+      cibles: [{ x: -300, y: 30, r: 30 }],
+    }
+    const res = traceLaser({ x: 0, y: 500, angle: -90 }, monde)
+    expect(res.touchees).toEqual([0])
+    expect(res.rebondsGlace).toBe(1) // le rebond du poli compte au même plafond
+  })
+
+  it('le miroir DROIT renvoie le fil d’où il vient — et sans miroir, tout droit', () => {
+    const monde = {
+      ...MONDE_NU,
+      boxes: [{ minX: -100, minY: -220, maxX: 100, maxY: -160, material: MAT_MIROIR }],
+      cibles: [{ x: 0, y: 400, r: 26 }],
+    }
+    // le fil descend, frappe la face haute du miroir, repart plein nord :
+    // il retraverse son point de départ et va allumer la pastille au-dessus
+    const res = traceLaser({ x: 0, y: 200, angle: -90 }, monde)
+    expect(res.touchees).toEqual([0])
+    // sans miroir, le même fil file au sud et meurt sur la cuve
+    const sans = traceLaser({ x: 0, y: 200, angle: -90 }, { ...monde, boxes: [] })
+    expect(sans.touchees).toEqual([])
+  })
+
+  it('deux miroirs face à face : le plafond de rebonds éteint le faisceau', () => {
+    const monde = {
+      ...MONDE_NU,
+      boxes: [
+        { minX: -100, minY: -300, maxX: 100, maxY: -240, material: MAT_MIROIR },
+        { minX: -100, minY: 240, maxX: 100, maxY: 300, material: MAT_MIROIR },
+      ],
+      cibles: [],
+    }
+    const res = traceLaser({ x: 0, y: 0, angle: -90 }, monde)
+    expect(res.rebondsGlace).toBe(LASER_MAX_BOUNCES)
   })
 })

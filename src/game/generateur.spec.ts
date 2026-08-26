@@ -257,6 +257,49 @@ describe('generateur — une graine, une salle PROUVÉE', () => {
     expect(doux.par!).toBeLessThan(rude.par!)
   })
 
+
+  it("le LORE place le froid : tout hublot fendu est sur la COQUE — jamais en plein vaisseau", () => {
+    for (let g = 1; g <= 60; g++) {
+      const n = genereNiveau(g)
+      const b = n.bounds
+      for (const box of n.boxes) {
+        if (box.material !== 4) continue // MAT_FROID
+        const surCoque =
+          Math.abs(box.maxY - (b.maxY - 40)) < 6 ||
+          Math.abs(box.minY - (b.minY + 40)) < 6 ||
+          Math.abs(box.minX - (b.minX + 40)) < 6 ||
+          Math.abs(box.maxX - (b.maxX - 40)) < 6
+        expect(surCoque, `graine ${g} : hublot froid en plein vaisseau`).toBe(true)
+      }
+    }
+  })
+
+  it("le TRAJET RELAYÉ éloigne la cible du laser : miroir fixe en losange, preuve tenue", () => {
+    let vus = 0
+    for (let g = 1; g <= 120 && vus < 3; g++) {
+      const { niveau, preuves } = genereNiveauDetaille(g)
+      const relais = niveau.boxes.filter((b) => b.material === 10) // MAT_MIROIR
+      if (relais.length === 0) continue
+      vus++
+      // la preuve du miroir discrimine TOUJOURS, relais compris — et le
+      // spot du joueur (donc la pastille) est LOIN du fil de l'émetteur
+      const p = preuves.find((q) => q.kind === 'miroir')!
+      expect(Math.abs(p.spot.x - p.emetteur.x), `graine ${g} : relais trop court`).toBeGreaterThan(150)
+      const { sansGlace, avecGlace } = prouveMiroir(niveau, p.emetteur, p.spot, p.canal, p.normale)
+      expect(sansGlace, `graine ${g}`).toBe(false)
+      expect(avecGlace, `graine ${g}`).toBe(true)
+    }
+    expect(vus, 'aucun trajet relayé en 120 graines libres').toBeGreaterThan(0)
+    // et en atelier difficulté 3+, le relais est SYSTÉMATIQUE quand la place
+    // le permet : on doit en voir sur quelques variantes
+    let atelier = 0
+    for (const v of ['A', 'B', 'C', 'D', 'E', 'F']) {
+      const n = genereNiveauAtelier({ moment: 3, mecanique: 3, difficulte: 3 }, v)
+      if (n.boxes.some((b) => b.material === 10)) atelier++
+    }
+    expect(atelier, 'aucun relais en 333').toBeGreaterThan(0)
+  })
+
   it('les graines de partage : le texte base 36 fait l’aller-retour', () => {
     expect(graineDepuisTexte('ZZ')).toBe(1295)
     expect(graineDepuisTexte('zz')).toBe(1295)
