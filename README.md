@@ -16,6 +16,13 @@ Aucune installation, aucun outillage : ouvrir `index.html` dans un navigateur
 npx serve .        # ou : python3 -m http.server
 ```
 
+Au premier lancement, un **écran de chargement** couvre la mise en route
+(assemblage du tableau, calibration du solveur, stabilisation de l'échantillon) :
+elle prend quelques secondes sur une machine modeste, et sans ce voile la page
+resterait noire et immobile — on croirait à un plantage. La progression s'affiche
+étape par étape, et la boucle de jeu ne démarre qu'une fois la première image
+peinte.
+
 ## Commandes
 
 | Entrée | Effet |

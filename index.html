@@ -56,9 +56,39 @@
   #panel button { width:100%; margin-top:10px; padding:6px; background:#16324a; color:#9fdcff;
                   border:1px solid #2a5578; border-radius:4px; cursor:pointer; }
   #panel button:hover { background:#1d4360; }
+  /* Écran de chargement (§11, lisibilité) : la mise en route — assemblage du
+     tableau, calibration du solveur, stabilisation de l'échantillon — coûte
+     quelques secondes au premier lancement. Sans ce voile, la page reste
+     noire et immobile : on croit que ça a planté. */
+  #boot { position:absolute; inset:0; z-index:20; display:flex; align-items:center;
+          justify-content:center; flex-direction:column; background:#0b0e14;
+          text-align:center; transition:opacity .45s ease; }
+  #boot.done { opacity:0; pointer-events:none; }
+  #boot .drop { width:54px; height:54px; margin-bottom:22px; border-radius:50%;
+                background:radial-gradient(circle at 38% 34%, #cdefff, #79d0ff 55%, #2f7fb5);
+                animation:bootPulse 1.6s ease-in-out infinite; }
+  @keyframes bootPulse {
+    0%, 100% { transform:scale(1) translateY(0); opacity:.95; }
+    50%      { transform:scale(1.14) translateY(-4px); opacity:.7; }
+  }
+  @media (prefers-reduced-motion: reduce) { #boot .drop { animation:none; } }
+  #boot h1 { margin:0 0 12px; font-weight:300; font-size:30px; color:#cfe8ff; letter-spacing:1px; }
+  #bootStep { margin:0; font-size:14px; color:#8fa3b8; min-height:19px; }
+  #bootBar { width:260px; height:4px; margin:16px auto 0; background:#1a2130;
+             border-radius:2px; overflow:hidden; }
+  #bootBar b { display:block; width:0; height:100%; border-radius:2px;
+               background:linear-gradient(90deg, #dff4ff, #79d0ff); transition:width .25s ease; }
+  #bootNote { margin:14px 0 0; font-size:12px; line-height:1.5; color:#5c6b7f; max-width:360px; }
 </style>
 </head>
 <body>
+<div id="boot">
+  <div class="drop"></div>
+  <h1>Tension de surface</h1>
+  <p id="bootStep">Mise sous tension du laboratoire…</p>
+  <div id="bootBar"><b></b></div>
+  <p id="bootNote"></p>
+</div>
 <svg width="0" height="0" style="position:absolute">
   <defs>
     <filter id="goo">

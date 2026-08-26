@@ -12,7 +12,13 @@ const { chromium } = require("playwright");
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
 
   await page.goto("file://" + path.resolve(__dirname, "..", "index.html"));
-  await page.waitForTimeout(500);
+  // l'écran de chargement couvre la mise en route : on attend qu'il rende la main
+  const bootStart = Date.now();
+  await page.waitForFunction(() => window.__game && window.__game.ready(), null, { timeout: 30000 });
+  const bootMs = Date.now() - bootStart;
+  const bootHidden = await page.evaluate(() =>
+    document.getElementById("boot").classList.contains("done"));
+  console.log("démarrage (écran de chargement):", bootMs, "ms, voile effacé:", bootHidden);
 
   const s0 = await page.evaluate(() => window.__game.stats());
   console.log("t0:", JSON.stringify(s0));
@@ -80,6 +86,8 @@ const { chromium } = require("playwright");
 
   console.log("--- checks ---");
   console.log("erreurs JS:", errors.length ? errors : "aucune");
+  console.log("écran de chargement (mise en route puis effacement):",
+    bootHidden && s0.n > 0 ? "OK" : "ECHEC");
   console.log("corps stable au repos:", s1.player >= s0.player - 5 ? "OK" : "ECHEC");
   console.log("coût de la poussée (particules):", s1.player - s2.player);
   console.log("déplacement vers la droite:", (s2.cx - s1.cx).toFixed(1), "px puis", (s3.cx - s2.cx).toFixed(1), "px en dérive");

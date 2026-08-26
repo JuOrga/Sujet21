@@ -457,8 +457,90 @@
     else if (e.code === "KeyL") toggleLegend();
   });
 
+  // ---------- Démarrage : écran de chargement (§11) ----------
+
+  // Le premier lancement est le plus coûteux : construction du tableau,
+  // calibration du solveur, puis les premiers pas physiques, que le
+  // navigateur compile à chaud. Tout cela dans la même trame donnerait une
+  // page figée plusieurs secondes — indiscernable d'un plantage. On étale
+  // donc la mise en route sur plusieurs trames, derrière un écran qui dit
+  // ce qui se passe et où ça en est ; la boucle de jeu ne démarre qu'une
+  // fois l'échantillon stabilisé et la première image peinte.
+
+  const boot = document.getElementById("boot");
+  const bootStep = document.getElementById("bootStep");
+  const bootBar = document.querySelector("#bootBar b");
+  const bootNote = document.getElementById("bootNote");
+  let ready = false;
+
+  const WARMUP_STEPS = 48; // ~0,8 s de simulation avant de rendre la main
+  const WARMUP_CHUNK = 8;
+
+  const FIRST_RUN_KEY = "tension-de-surface.demarrage.v1";
+  function firstRun() {
+    try {
+      if (localStorage.getItem(FIRST_RUN_KEY)) return false;
+      localStorage.setItem(FIRST_RUN_KEY, "1");
+      return true;
+    } catch (e) { return false; } // stockage indisponible : on reste discret
+  }
+
+  function bootProgress(pct, label) {
+    if (label) bootStep.textContent = label;
+    bootBar.style.width = Math.round(pct * 100) + "%";
+  }
+
+  // rend la main au navigateur, le temps qu'il peigne l'état courant :
+  // la trame d'animation s'exécute avant le rendu, le timer juste après
+  function yieldToPaint() {
+    return new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+  }
+
+  async function bootSequence() {
+    if (firstRun()) {
+      bootNote.textContent = "Première mise en route : le solveur se calibre et " +
+        "l'échantillon se stabilise. Les lancements suivants seront immédiats.";
+    }
+    bootProgress(0.06, "Assemblage du tableau…");
+    await yieldToPaint();
+
+    reset(); // tableau, échantillon, calibration de la densité de repos
+    bootProgress(0.22, "Calibration du solveur…");
+    await yieldToPaint();
+
+    // Stabilisation : l'échantillon trouve son équilibre pendant que le
+    // navigateur chauffe le solveur. Par paquets, pour que la barre avance.
+    const stepDt = 1 / 60;
+    for (let done = 0; done < WARMUP_STEPS; done += WARMUP_CHUNK) {
+      for (let k = 0; k < WARMUP_CHUNK; k++) Fluid.step(stepDt, level);
+      updateCluster();
+      bootProgress(0.22 + 0.7 * (done + WARMUP_CHUNK) / WARMUP_STEPS,
+        "Stabilisation de l'échantillon…");
+      await yieldToPaint();
+    }
+
+    // première image peinte sous l'écran de chargement : quand le voile
+    // s'efface, la scène est déjà là, caméra cadrée (rdt élevé = pas de
+    // lissage, on colle d'emblée à la cible)
+    updateCamera(5);
+    Renderer.drawBackground(level, cam, 0);
+    Renderer.drawFluid(playerFlag, cam);
+    Renderer.drawEffects(steam, cam);
+    updateHud();
+    bootProgress(1, "Prêt.");
+    await yieldToPaint();
+
+    boot.classList.add("done");
+    setTimeout(() => { boot.style.display = "none"; }, 500);
+    ready = true;
+    lastT = performance.now();
+    accum = 0;
+    requestAnimationFrame(frame);
+  }
+
   // instrumentation pour les tests automatisés
   window.__game = {
+    ready() { return ready; },
     stats() {
       return {
         n: Fluid.n,
@@ -474,6 +556,10 @@
     },
   };
 
-  reset();
-  requestAnimationFrame(frame);
+  bootSequence().catch((e) => {
+    // un démarrage qui échoue doit le dire : l'écran reste, mais il explique
+    console.error(e);
+    bootProgress(1, "Le laboratoire n'a pas pu démarrer.");
+    bootNote.textContent = String(e && e.message ? e.message : e);
+  });
 })();
