@@ -3029,6 +3029,7 @@ function renderPlanche(): void {
       `<canvas width="220" height="126"></canvas>` +
       `<span class="pl-rang">${i + 1}</span>` +
       `<button type="button" class="pl-jouer" title="Essayer ce tableau — le bouton « revenir à la planche » vous ramènera ici">⏵</button>` +
+      `<button type="button" class="pl-editer" title="Ouvrir ce tableau dans l'ÉDITEUR — la planche est le sélecteur grand format">✎</button>` +
       rouesHtml +
       `<div class="pl-bas">` +
       (roues
@@ -3110,6 +3111,15 @@ function renderPlanche(): void {
       })
       codeInp.addEventListener('pointerdown', (e) => e.stopPropagation())
     }
+    // le ✎ : la carte s'ouvre dans l'ÉDITEUR — le sélecteur grand format,
+    // bien plus commode au doigt que la liste du panneau (Steam Deck)
+    carte.querySelector('.pl-editer')?.addEventListener('click', (e) => {
+      e.stopPropagation()
+      plancheEl.hidden = true
+      sallesEl.hidden = true
+      openEditor()
+      editor.ouvreTableau(s.id)
+    })
     // l'ESSAI : la carte se joue, et on saura revenir ici même
     carte.querySelector('.pl-jouer')?.addEventListener('click', (e) => {
       e.stopPropagation()
@@ -3130,7 +3140,7 @@ function renderPlanche(): void {
     carte.addEventListener('dragstart', (e) => {
       if (
         (e.target as HTMLElement).closest(
-          'input, select, .pl-roues, .pl-ord, .pl-jouer',
+          'input, select, .pl-roues, .pl-ord, .pl-jouer, .pl-editer',
         )
       ) {
         e.preventDefault()

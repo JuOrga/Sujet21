@@ -463,6 +463,15 @@
         border: 1px solid #2d4a63; border-radius: 5px; cursor: pointer;
       }
       .pl-jouer:hover { border-color: #6dffb8; box-shadow: 0 0 10px rgba(109, 255, 184, 0.35); }
+      /* le ✎ de la carte : ouvrir CE tableau dans l'éditeur — la planche
+         devient le sélecteur grand format (Steam Deck, tablette) */
+      .pl-editer {
+        position: absolute; top: 12px; right: 56px;
+        min-width: 36px; min-height: 36px; font: inherit; font-size: 15px;
+        background: rgba(8, 14, 22, 0.85); color: #9fd0f0;
+        border: 1px solid #2d4a63; border-radius: 5px; cursor: pointer;
+      }
+      .pl-editer:hover { border-color: var(--specimen); box-shadow: 0 0 10px rgba(99, 183, 230, 0.35); }
       /* le retour d'essai : un rappel discret en haut de l'écran de jeu,
          seulement quand l'essai a été lancé depuis la planche */
       #planche-retour {
@@ -4146,8 +4155,11 @@
         display: flex;
         flex-direction: column;
         gap: 3px;
-        max-height: 240px;
+        /* le SÉLECTEUR de tableau mérite de la place : presque la moitié de
+           l'écran, et jamais d'ascenseur horizontal (les noms replient) */
+        max-height: min(46vh, 460px);
         overflow-y: auto;
+        overflow-x: hidden;
       }
       .ed-lib-row {
         display: flex;
@@ -4198,7 +4210,10 @@
         text-align: left !important;
         text-transform: none !important;
         letter-spacing: 0.04em !important;
-        padding: 5px 8px !important;
+        padding: 8px 9px !important;
+        min-height: 40px; /* cible au doigt (Steam Deck, tablette) */
+        white-space: normal !important; /* le nom replie au lieu de déborder */
+        overflow-wrap: anywhere;
       }
       .ed-lib-open b {
         color: var(--specimen);
@@ -4215,15 +4230,13 @@
         gap: 2px;
         flex: none;
       }
+      /* le ✕ seul survit à la refonte : une vraie cible au doigt */
       .ed-lib-ord button {
-        padding: 0 6px !important;
-        min-height: 15px;
+        padding: 0 !important;
+        min-width: 32px;
+        min-height: 100%;
         line-height: 1;
-        font-size: 9px !important;
-      }
-      .ed-lib-ord button:disabled {
-        opacity: 0.3;
-        cursor: default;
+        font-size: 12px !important;
       }
       #ed-io {
         display: none;

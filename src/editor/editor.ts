@@ -3553,6 +3553,12 @@ export class LevelEditor {
     }
   }
 
+  /** Ouvre un tableau de la bibliothèque depuis l'EXTÉRIEUR (le ✎ d'une
+   * carte de LA PLANCHE) : même geste que le clic dans la liste. */
+  ouvreTableau(id: string): void {
+    this.openFromLibrary(id)
+  }
+
   private openFromLibrary(id: string): void {
     const entry = this.library.find((l) => l.id === id)
     if (!entry) return
