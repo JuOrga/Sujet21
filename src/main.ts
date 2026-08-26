@@ -1284,8 +1284,9 @@ const livraisonsEl = document.getElementById('livraisons') as HTMLDivElement
     const aujourdhui = new Date()
     const jourDe = (t: number): string =>
       new Date(t).getDate() === aujourdhui.getDate() ? '' : 'hier '
-    const fraiches = DELIVERIES.map((d) => ({ d, t: litDate(d.date) }))
-      .filter((x) => Number.isFinite(x.t) && Date.now() - x.t < 24 * 3600_000)
+    const fraiches = DELIVERIES.map((d) => ({ d, t: litDate(d.date) })).filter(
+      (x) => Number.isFinite(x.t) && Date.now() - x.t < 24 * 3600_000,
+    )
     const recap =
       fraiches.length >= 2
         ? `<div class="liv-recap"><h3>L’ESSENTIEL — DERNIÈRES 24 H (${fraiches.length} livraisons)</h3>` +
@@ -1751,6 +1752,11 @@ let eauRiche = localStorage.getItem('sujet21-eau') !== 'sobre'
 // La FLÈCHE DE CAP à la manette : retirée par défaut (le regard du Sujet
 // suit déjà le stick) — réactivable dans PARAMÈTRES pour qui la préfère.
 let flecheVisible = localStorage.getItem('sujet21-fleche') === 'visible'
+// LE FAISCEAU laser : SOMPTUEUX par défaut (flux qui remonte le rayon,
+// lueurs aux extrémités, sursaut de victoire à l'allumage d'une pastille)
+// — CLASSIQUE garde l'ancien rendu au pixel près.
+let faisceauChoix =
+  localStorage.getItem('sujet21-faisceau') === 'classique' ? 0 : 1
 let eauMiroir =
   localStorage.getItem('sujet21-miroir') === 'classique'
     ? 0
@@ -2014,6 +2020,31 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
       }
     }
     renderMiroir()
+  }
+
+  const choixFaisceau = document.getElementById(
+    'params-faisceau',
+  ) as HTMLDivElement | null
+  if (choixFaisceau) {
+    const renderFaisceau = (): void => {
+      choixFaisceau.innerHTML = ''
+      for (const [val, cle, label] of [
+        [1, 'somptueux', 'SOMPTUEUX'],
+        [0, 'classique', 'CLASSIQUE'],
+      ] as const) {
+        const b = document.createElement('button')
+        b.type = 'button'
+        b.textContent = label
+        b.className = faisceauChoix === val ? 'actif' : ''
+        b.addEventListener('click', () => {
+          faisceauChoix = val
+          localStorage.setItem('sujet21-faisceau', cle)
+          renderFaisceau()
+        })
+        choixFaisceau.appendChild(b)
+      }
+    }
+    renderFaisceau()
   }
 
   const choixFleche = document.getElementById(
@@ -3312,6 +3343,16 @@ const laserEtat = {
   recepteurs: creerEtatRecepteurs(0),
   portesOuvertes: [] as boolean[],
   doorsKey: '', // signature des portes fermées envoyées au solveur
+  // LE SURSAUT DE VICTOIRE : à l'allumage d'une pastille, la trajectoire
+  // du rayon vainqueur est GELÉE un court instant et rejouée en flash —
+  // même si la physique l'a déjà emporté ailleurs. Un balayage éclair sur
+  // la cible ne passe plus inaperçu.
+  impacts: [] as {
+    t0: number
+    cible: number
+    points: { x: number; y: number; eau?: boolean; plasma?: boolean }[]
+  }[],
+  litPrec: [] as boolean[],
 }
 // Sonde de test : l'état des portes/récepteurs depuis la console (comme __sim)
 ;(window as unknown as { __laserEtat: typeof laserEtat }).__laserEtat =
@@ -3497,12 +3538,37 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     const modeDe = (pt: (typeof t.points)[number]): number =>
       pt.plasma === true ? 2 : pt.eau === true ? 1 : 0
     // tronçons homogènes (air / eau / plasma) tracés d'un trait chacun
+    // Mode SOMPTUEUX : un FLUX de paquets lumineux remonte chaque tronçon
+    // (tirets animés le long du chemin) — l'énergie VOYAGE au lieu de
+    // poser un simple trait. Le classique garde ses trois passes, au
+    // pixel près.
+    const FLUX: string[] = [
+      'rgba(255,240,230,0.55)',
+      'rgba(255,245,240,0.5)',
+      'rgba(255,255,255,0.6)',
+    ]
     let k = 0
     while (k + 1 < chemins.length) {
       const mode = modeDe(t.points[k])
       let e = k + 1
       while (e + 1 < chemins.length && modeDe(t.points[e]) === mode) e++
-      for (const [larg, coul] of palettes[mode]) {
+      const passes: [number, string][] =
+        faisceauChoix === 1
+          ? [
+              // l'AMBIANCE : une nappe très large et très douce — le rayon
+              // baigne la salle au lieu de la rayer
+              [
+                26 * z,
+                mode === 2
+                  ? `rgba(140,80,255,${(0.06 * scintP).toFixed(3)})`
+                  : `rgba(255,50,40,${(0.07 * scint).toFixed(3)})`,
+              ],
+              ...palettes[mode].map(
+                ([l, c]) => [l * 1.35, c] as [number, string],
+              ),
+            ]
+          : palettes[mode]
+      for (const [larg, coul] of passes) {
         g.strokeStyle = coul
         g.lineWidth = Math.max(0.8, larg)
         g.lineJoin = 'round'
@@ -3512,7 +3578,111 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
         for (let m = k + 1; m <= e; m++) g.lineTo(chemins[m].sx, chemins[m].sy)
         g.stroke()
       }
+      if (faisceauChoix === 1) {
+        const pas = 46 * z
+        g.strokeStyle = FLUX[mode]
+        g.lineWidth = Math.max(1.1, 3.2 * z)
+        g.setLineDash([12 * z, pas - 12 * z])
+        g.lineDashOffset = -((elapsed * 300 * z) % pas)
+        g.beginPath()
+        g.moveTo(chemins[k].sx, chemins[k].sy)
+        for (let m = k + 1; m <= e; m++) g.lineTo(chemins[m].sx, chemins[m].sy)
+        g.stroke()
+        g.setLineDash([])
+        g.lineDashOffset = 0
+      }
       k = e
+    }
+    if (faisceauChoix === 1) {
+      // les EXTRÉMITÉS luisent : la bouche de l'émetteur, et le point
+      // d'arrivée du rayon — l'absorption se VOIT, elle crépite doucement
+      const bouts = [chemins[0], chemins[chemins.length - 1]]
+      for (let b = 0; b < 2; b++) {
+        const pt = bouts[b]
+        const r =
+          (b === 0 ? 10 : 16) * z * (0.85 + 0.15 * Math.sin(elapsed * 23 + b))
+        const gr = g.createRadialGradient(
+          pt.sx,
+          pt.sy,
+          0,
+          pt.sx,
+          pt.sy,
+          Math.max(2, r),
+        )
+        gr.addColorStop(0, 'rgba(255,235,225,0.85)')
+        gr.addColorStop(0.4, 'rgba(255,120,90,0.4)')
+        gr.addColorStop(1, 'rgba(255,80,60,0)')
+        g.fillStyle = gr
+        g.beginPath()
+        g.arc(pt.sx, pt.sy, Math.max(2, r), 0, Math.PI * 2)
+        g.fill()
+      }
+    }
+  }
+
+  // LE SURSAUT DE VICTOIRE : les trajectoires gelées à l'allumage d'une
+  // pastille rejouent en flash blanc-vert pendant ~un demi-souffle — le
+  // rayon SURSAUTE, la cible irradie, des étincelles jaillissent. Même si
+  // le rayon vivant est déjà parti ailleurs : la victoire reste lisible.
+  if (faisceauChoix === 1 && laserEtat.impacts.length > 0) {
+    const nowFx = performance.now() / 1000
+    const DUR = 0.55
+    laserEtat.impacts = laserEtat.impacts.filter((im) => nowFx - im.t0 < DUR)
+    for (const im of laserEtat.impacts) {
+      const age = nowFx - im.t0
+      const kAge = age / DUR
+      const flash = Math.exp(-age / 0.12) // le sursaut : violent puis calmé
+      const alpha = 1 - kAge
+      const chemins = im.points.map((pt) => S(pt.x, pt.y))
+      const PASSES: [number, string][] = [
+        [
+          16 * z * (1 + 1.6 * flash),
+          `rgba(120,255,190,${(0.16 * alpha).toFixed(3)})`,
+        ],
+        [
+          6 * z * (1 + 2.2 * flash),
+          `rgba(180,255,220,${(0.4 * alpha).toFixed(3)})`,
+        ],
+        [
+          2.2 * z * (1 + 2.6 * flash),
+          `rgba(255,255,250,${(0.95 * alpha).toFixed(3)})`,
+        ],
+      ]
+      for (const [larg, coul] of PASSES) {
+        g.strokeStyle = coul
+        g.lineWidth = Math.max(0.8, larg)
+        g.lineJoin = 'round'
+        g.lineCap = 'round'
+        g.beginPath()
+        g.moveTo(chemins[0].sx, chemins[0].sy)
+        for (let m = 1; m < chemins.length; m++)
+          g.lineTo(chemins[m].sx, chemins[m].sy)
+        g.stroke()
+      }
+      // la cible irradie : anneau qui s'évase depuis la pastille touchée
+      const cib = cibles[im.cible]
+      if (cib) {
+        const pc = S(cib.x, cib.y)
+        const rBase = Math.max(4, cib.r * z)
+        g.strokeStyle = `rgba(150,255,200,${(0.8 * alpha).toFixed(3)})`
+        g.lineWidth = Math.max(1, 3 * z * (1 - kAge * 0.6))
+        g.beginPath()
+        g.arc(pc.sx, pc.sy, rBase * (1 + 2.6 * kAge), 0, Math.PI * 2)
+        g.stroke()
+        // les étincelles : huit éclats déterministes qui fusent de l'impact
+        const fin = chemins[chemins.length - 1]
+        for (let s2 = 0; s2 < 8; s2++) {
+          const a2 = (s2 / 8) * Math.PI * 2 + im.t0 * 3.7
+          const d0 = rBase * 0.5 + (10 + 34 * kAge) * z
+          const d1 = d0 + (6 + 10 * flash) * z
+          g.strokeStyle = `rgba(220,255,235,${(0.75 * alpha).toFixed(3)})`
+          g.lineWidth = Math.max(0.8, 1.6 * z)
+          g.beginPath()
+          g.moveTo(fin.sx + Math.cos(a2) * d0, fin.sy + Math.sin(a2) * d0)
+          g.lineTo(fin.sx + Math.cos(a2) * d1, fin.sy + Math.sin(a2) * d1)
+          g.stroke()
+        }
+      }
     }
   }
   g.globalCompositeOperation = 'source-over'
@@ -4457,6 +4627,8 @@ for (const b of Array.from(
 
 function resetLasers(): void {
   laserEtat.vues = []
+  laserEtat.impacts = []
+  laserEtat.litPrec = []
   laserEtat.recepteurs = creerEtatRecepteurs((level.cibles ?? []).length)
   laserEtat.portesOuvertes = (level.portes ?? []).map(() => false)
   laserEtat.doorsKey = ''
@@ -6306,6 +6478,29 @@ function frame(now: number): void {
           nowRecepteurs,
         ),
     )
+    // le FRONT MONTANT d'une pastille : l'instant de la victoire — on gèle
+    // la trajectoire du rayon qui l'a allumée pour le sursaut (mode
+    // somptueux ; le classique reste au pixel près)
+    {
+      const litNow = cibles.map((t, c) =>
+        cibleActive(t, laserEtat.recepteurs, c, nowRecepteurs),
+      )
+      if (faisceauChoix === 1) {
+        for (let c = 0; c < litNow.length; c++) {
+          if (!litNow[c] || laserEtat.litPrec[c] === true) continue
+          const trace = laserEtat.vues.find((t) => t.touchees.includes(c))
+          if (trace && trace.points.length >= 2) {
+            laserEtat.impacts.push({
+              t0: nowRecepteurs,
+              cible: c,
+              points: trace.points.map((p) => ({ ...p })),
+            })
+            if (laserEtat.impacts.length > 6) laserEtat.impacts.shift()
+          }
+        }
+      }
+      laserEtat.litPrec = litNow
+    }
     // convoyage : quand un arc circule sur un rail, le champ s'y ENGAGE —
     // et il reste engagé tant qu'un nuage voyage dans la bande, même si le
     // rayon ne traverse plus la vapeur : ce qui est pris est porté jusqu'à
