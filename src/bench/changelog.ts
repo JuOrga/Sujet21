@@ -22,8 +22,19 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 23:05',
+    title:
+      'L’œil du Sujet décliné : GIVRÉ dans la glace, TOURBILLON dans la vapeur',
+    notes: [
+      'Demandé : que le regard (souris, stick) ait son équivalent quand le corps est en vapeur, et « dans l’idéal » aussi dans la glace. C’est fait — le même suivi du pointeur, décliné dans la matière de chaque état. Dans la GLACE : un cœur sombre figé sous la surface, cerné d’un anneau de givre clair — et un pouls très lent (deux fois plus lent que l’œil de l’eau), parce que la glace est rigide et que l’œil y est pris. Dans la VAPEUR : le nuage se creuse en spirale lente autour du point visé, et un cœur ambré — la couleur même de la vapeur d’opale — y couve avec une respiration plus vive.',
+      'Les deux œils obéissent aux MÊMES curseurs d’étalonnage que l’œil de l’eau (banc : lueur, pénombre, taille, errance) : un seul réglage gouverne le regard dans les trois états. Chaque déclinaison est posée APRÈS la teinte de son état dans le rendu — le givre n’efface plus le regard, le nuage non plus ; ils le portent. L’intensité suit la fraction de matière gelée ou vaporisée : aux transitions (dégel, condensation), l’œil glisse d’une forme à l’autre sans couture.',
+      'Vérifié dans le jeu construit, au clavier d’essai de l’éditeur (F glace, G vapeur) : l’anneau de givre suit la souris sur le palet gelé, le tourbillon ambré couve dans le nuage — captures à l’appui. Au passage, la fausse alerte sur la jauge de dash est confirmée : le dosage et le nombre de dashs s’affichent toujours pendant la visée, rien n’avait bougé. 361 tests verts, build propre.',
+    ],
+  },
+  {
     date: '27/08/2026 00:50',
-    title: 'La boîte suit les BOUTS : plus un pouce de marge morte autour d’un arc',
+    title:
+      'La boîte suit les BOUTS : plus un pouce de marge morte autour d’un arc',
     notes: [
       'Demandé, et c’était possible : changer les bouts d’un arc change aussi sa BOÎTE. Chaque finition a désormais sa boîte englobante EXACTE — la calotte ronde déborde le plan de coupe, la coupe franche s’arrête net, la griffe meurt sur le rayon médian : trois silhouettes, trois boîtes. Un arc à bouts droits ne traîne plus la marge que réclamaient les calottes ; il remplit son cadre, comme le demi-anneau depuis la correction d’alors.',
       'La GRIFFE en profite pour se redresser : ses deux tranchants sont désormais DROITS et se rejoignent en une pointe franche (avant, l’épaisseur s’effilait en courbe). Des bords droits, ce sont des extrêmes aux sommets — donc une boîte exacte au lieu d’une estimation — et une pointe plus nette à l’œil. Le champ de distance se lit d’un seul tenant sur les quatre morceaux de bord : aucune couture, donc aucun cheveu clair en travers de la pièce.',
