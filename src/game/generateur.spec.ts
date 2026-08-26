@@ -3,9 +3,12 @@ import {
   accessible,
   analyseSaisie,
   creeRng,
+  decodeOptions,
+  encodeOptions,
   genereNiveau,
   genereNiveauAtelier,
   graineDepuisTexte,
+  OPTIONS_DEFAUT,
   prouveBarriere,
   prouveMiroir,
   prouvePlasma,
@@ -99,15 +102,75 @@ describe('generateur — une graine, une salle PROUVÉE', () => {
       type: 'atelier',
       cahier: { moment: 1, mecanique: 0, difficulte: 1 },
       variante: null,
+      options: null,
     })
     expect(analyseSaisie('g-231 - K7')).toEqual({
       type: 'atelier',
       cahier: { moment: 2, mecanique: 3, difficulte: 1 },
       variante: 'K7',
+      options: null,
     })
-    expect(analyseSaisie('401')).toEqual({ type: 'libre', graine: parseInt('401', 36) })
-    expect(analyseSaisie('ZZ')).toEqual({ type: 'libre', graine: 1295 })
+    expect(analyseSaisie('401')).toEqual({
+      type: 'libre',
+      graine: parseInt('401', 36),
+      options: null,
+    })
+    expect(analyseSaisie('ZZ')).toEqual({ type: 'libre', graine: 1295, options: null })
     expect(analyseSaisie('hé hé')).toBeNull()
+  })
+
+  it('les OPTIONS voyagent dans le code : suffixe ~, aller-retour, identité', () => {
+    // le défaut ne s'encode pas — le code reste court
+    expect(encodeOptions(OPTIONS_DEFAUT)).toBe('')
+    // un réglage s'encode, se décode, et se relit depuis une saisie
+    const o = { ...OPTIONS_DEFAUT, salles: 5 as const, dangers: 1 as const }
+    const suf = encodeOptions(o)
+    expect(suf).not.toBe('')
+    expect(decodeOptions(suf)).toEqual(o)
+    const lue = analyseSaisie(`212-K7~${suf}`)
+    expect(lue && lue.type === 'atelier' && lue.options).toEqual(o)
+    // la salle paramétrée porte le suffixe, et le code complet la redonne
+    const a = genereNiveauAtelier({ moment: 2, mecanique: 1, difficulte: 2 }, 'K7', o)
+    expect(a.code).toBe(`G-212-K7~${suf}`)
+    expect(a.lumieres!.length).toBe(4) // 5 salles forcées (4 lampes au plus)
+    const relue = analyseSaisie(a.code)!
+    expect(relue.type).toBe('atelier')
+    if (relue.type === 'atelier') {
+      const b = genereNiveauAtelier(relue.cahier, relue.variante!, relue.options!)
+      expect(JSON.stringify(b)).toBe(JSON.stringify(a))
+    }
+  })
+
+  it("le LABYRINTHE se dose : « aucun » est tout droit, « dédale » serpente", () => {
+    // une traverse est un mur horizontal LARGE et plat ancré à un flanc
+    const nbTraverses = (n: ReturnType<typeof genereNiveau>): number =>
+      n.boxes.filter(
+        (b) => b.material === 0 && b.maxY - b.minY === 50 && b.maxX - b.minX >= 200,
+      ).length
+    let cumulAucun = 0
+    let cumulDedale = 0
+    for (const g of [3, 4, 5, 6]) {
+      const droit = genereNiveau(g, null, { ...OPTIONS_DEFAUT, laby: 1 })
+      const dedale = genereNiveau(g, null, { ...OPTIONS_DEFAUT, laby: 3 })
+      cumulAucun += nbTraverses(droit)
+      cumulDedale += nbTraverses(dedale)
+      // les deux restent PROUVÉES traversables (générées, donc validées)
+      expect(checkLevel(dedale).filter((v) => v.niveau === 'erreur')).toEqual([])
+    }
+    expect(cumulAucun).toBe(0)
+    expect(cumulDedale).toBeGreaterThan(3)
+  })
+
+  it('les options COMMANDENT : sans lasers ni dangers, la salle obéit', () => {
+    // familles : évent + rideau + membrane seulement (bits 0, 1, 2)
+    const o = { ...OPTIONS_DEFAUT, familles: 0b0000111, dangers: 1 as const }
+    for (const g of [7, 8, 9]) {
+      const n = genereNiveau(g, null, o)
+      expect(n.lasers ?? []).toEqual([])
+      expect(n.portes ?? []).toEqual([])
+      expect(n.rails ?? []).toEqual([])
+      expect(n.boxes.some((b) => b.material === 4 || b.material === 6)).toBe(false) // ni froid ni chaud
+    }
   })
 
   it("le cahier des charges COMMANDE : mécanique glace → jamais d'exigence vapeur, et l'inverse", () => {

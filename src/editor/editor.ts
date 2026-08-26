@@ -62,7 +62,12 @@ import {
   parseLevel,
   serializeLevel,
 } from '../game/levelIO'
-import { analyseSaisie, genereNiveau, genereNiveauAtelier } from '../game/generateur'
+import {
+  analyseSaisie,
+  genereNiveau,
+  genereNiveauAtelier,
+  type OptionsGen,
+} from '../game/generateur'
 import { MAX_LUMIERES } from '../render/renderer'
 import { canalDeCible, traceLaser } from '../game/laser'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
@@ -2439,17 +2444,39 @@ export class LevelEditor {
       this.renderLibrary()
       this.commit('Tableau vierge.')
     })
+    // ---- Le panneau du GÉNÉRATEUR : les réglages voyagent dans le code ----
     this.el('ed-gen').addEventListener('click', () => {
-      const saisie = prompt(
-        'Un CODE ATELIER — « 101 » (moment · mécanique · difficulté) tire une salle de cette classe, ' +
-          '« 101-K7 » redonne exactement CETTE salle-là — ou une graine libre (lettres et chiffres). ' +
-          'Vide : au hasard.',
-        '',
-      )
-      if (saisie === null) return
+      this.el('edg-voile').hidden = false
+      ;(this.el('edg-code') as HTMLInputElement).focus()
+    })
+    this.el('edg-fermer').addEventListener('click', () => {
+      this.el('edg-voile').hidden = true
+    })
+    this.el('edg-voile').addEventListener('click', (e) => {
+      if (e.target === this.el('edg-voile')) this.el('edg-voile').hidden = true
+    })
+    const litOptionsPanneau = (): OptionsGen => {
+      let familles = 0
+      this.host
+        .querySelectorAll<HTMLInputElement>('#edg-familles input')
+        .forEach((c) => {
+          if (c.checked) familles |= 1 << Number(c.dataset.fam)
+        })
+      return {
+        salles: Number((this.el('edg-salles') as HTMLSelectElement).value) as OptionsGen['salles'],
+        familles: familles || 127, // tout décocher n'a pas de sens : tout
+        dangers: Number((this.el('edg-dangers') as HTMLSelectElement).value) as OptionsGen['dangers'],
+        cachette: Number((this.el('edg-cachette') as HTMLSelectElement).value) as OptionsGen['cachette'],
+        decor: Number((this.el('edg-decor') as HTMLSelectElement).value) as OptionsGen['decor'],
+        laby: Number((this.el('edg-laby') as HTMLSelectElement).value) as OptionsGen['laby'],
+      }
+    }
+    const genere = (): void => {
+      const saisie = (this.el('edg-code') as HTMLInputElement).value
+      const panneau = litOptionsPanneau()
       let niveau: LevelDef | null = null
       if (saisie.trim() === '') {
-        niveau = genereNiveau(Math.floor(Math.random() * 36 ** 4))
+        niveau = genereNiveau(Math.floor(Math.random() * 36 ** 4), null, panneau)
       } else {
         const lue = analyseSaisie(saisie)
         if (!lue) {
@@ -2458,15 +2485,20 @@ export class LevelEditor {
           )
           return
         }
+        // le suffixe « ~ » d'un code retapé EST l'identité de la salle :
+        // ses réglages priment sur le panneau
+        const options = lue.options ?? panneau
         niveau =
           lue.type === 'atelier'
             ? genereNiveauAtelier(
                 lue.cahier,
                 lue.variante ??
                   Math.floor(Math.random() * 36 ** 3).toString(36).toUpperCase(),
+                options,
               )
-            : genereNiveau(lue.graine)
+            : genereNiveau(lue.graine, null, options)
       }
+      this.el('edg-voile').hidden = true
       this.level = niveau
       this.openId = ''
       this.base = ''
@@ -2475,8 +2507,12 @@ export class LevelEditor {
       this.syncForm()
       this.renderLibrary()
       this.commit(
-        `Salle générée — code ${this.level.code} (retapez-le pour la retrouver). Traversée prouvée par le traceur ; retouchez, puis Essayer.`,
+        `Salle générée — code ${this.level.code} (retapez-le pour la retrouver, réglages compris). Traversée prouvée par le traceur ; retouchez, puis Essayer.`,
       )
+    }
+    this.el('edg-generer').addEventListener('click', genere)
+    ;(this.el('edg-code') as HTMLInputElement).addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') genere()
     })
     this.el('ed-save').addEventListener('click', () => void this.store(false))
     this.el('ed-save-as').addEventListener('click', () => void this.store(true))
