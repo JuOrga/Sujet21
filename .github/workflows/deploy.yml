@@ -24,4 +24,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npx vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
+      # CLI épinglée : vercel@59.7.0 est sorti avec une dépendance
+      # introuvable (@vercel/container@3.0.2, ETARGET) — 59.6.2 est saine.
+      - run: npx vercel@59.6.2 deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
