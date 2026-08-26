@@ -307,6 +307,9 @@ uniform float uMiroirEau;
 // respiration (le contour qui pulse) et son frisson passent par ici.
 uniform vec2 uRegardPos; // le point interne vers lequel l'attention glisse
 uniform float uRegardInt; // 0..1 : présence du regard
+// Les RÉGLAGES de l'œil (PARAMÈTRES, curseurs du concepteur) :
+// x lueur du noyau · y profondeur de la pénombre · z taille · w relief
+uniform vec4 uOeilRegl;
 uniform vec2 uRespiration; // x amplitude (fraction du seuil) · y pulsation
 uniform float uFrisson; // 0..1 : tremblement bref (le froid le saisit)
 uniform float uOndule; // 0..1 : ondulation du contour à l'abandon (idle)
@@ -1448,9 +1451,12 @@ void main() {
       vec2 relOeil = world - uRegardPos;
       float rOeil = length(relOeil);
       float poulsOeil = 0.85 + 0.15 * sin(uTime * 0.7);
-      float domeOeil = uRegardInt * poulsOeil * (1.0 - vap) * (1.0 - icy) *
-        exp(-rOeil * rOeil / (2.0 * 34.0 * 34.0));
-      vec2 penteOeil = (relOeil / max(rOeil, 1.0)) * (rOeil / 34.0) * domeOeil;
+      // les curseurs du concepteur : la TAILLE étire tous les rayons de
+      // l'œil, le RELIEF dose la hauteur du dôme (et son modelé)
+      float sigOeil = 34.0 * uOeilRegl.z;
+      float domeOeil = uRegardInt * poulsOeil * uOeilRegl.w * (1.0 - vap) * (1.0 - icy) *
+        exp(-rOeil * rOeil / (2.0 * sigOeil * sigOeil));
+      vec2 penteOeil = (relOeil / max(rOeil, 1.0)) * (rOeil / sigOeil) * domeOeil;
       if (uMiroirEau > 1.5) {
         vec2 rad = world - uCentroide;
         float rC = length(rad);
@@ -1581,17 +1587,20 @@ void main() {
         float masque = uRegardInt * (1.0 - vap) * (1.0 - icy * 0.6) *
           clamp(player, 0.0, 1.0);
         // la silhouette : une pénombre douce, la chose devinée sous l'eau
-        float ombre = exp(-dRegard * dRegard / (2.0 * 44.0 * 44.0));
-        water = mix(water, water * 0.80, ombre * masque * 0.6);
+        // (le curseur OMBRE creuse ou efface, la TAILLE élargit)
+        float ombre = exp(-dRegard * dRegard / (2.0 * 44.0 * 44.0 * uOeilRegl.z * uOeilRegl.z));
+        water = mix(water, water * (1.0 - 0.20 * uOeilRegl.y),
+          ombre * masque * clamp(0.6 * uOeilRegl.y, 0.0, 1.0));
         // sa lueur, tamisée par l'épaisseur — elle respire doucement
-        float noyau = exp(-dRegard * dRegard / (2.0 * 27.0 * 27.0));
+        // (le curseur LUEUR l'éteint ou l'embrase)
+        float noyau = exp(-dRegard * dRegard / (2.0 * 27.0 * 27.0 * uOeilRegl.z * uOeilRegl.z));
         float pouls = 0.8 + 0.2 * sin(uTime * 0.7);
-        water += vec3(0.26, 0.47, 0.58) * (noyau * masque * pouls);
+        water += vec3(0.26, 0.47, 0.58) * (noyau * masque * pouls) * uOeilRegl.x;
         // le MODELÉ du dôme : le flanc tourné vers le haut prend la
         // lumière, l'autre s'ombre — la bosse se lit même sans miroir
-        float ombrage = (relOeil.y / max(rOeil, 1.0)) * (rOeil / 34.0) *
-          exp(-rOeil * rOeil / (2.0 * 34.0 * 34.0));
-        water *= 1.0 + ombrage * 0.22 * masque * poulsOeil;
+        float ombrage = (relOeil.y / max(rOeil, 1.0)) * (rOeil / sigOeil) *
+          exp(-rOeil * rOeil / (2.0 * sigOeil * sigOeil));
+        water *= 1.0 + ombrage * 0.22 * uOeilRegl.w * masque * poulsOeil;
       }
     }
     water += vec3(0.30, 0.55, 0.65) * waveGlow * 0.45 * (1.0 - icy) * (1.0 - vap);
@@ -2886,6 +2895,11 @@ export class Renderer {
       respVit: number
       frisson: number
       ondule: number
+      // les curseurs de l'œil (PARAMÈTRES) — 1 partout : le rendu historique
+      oeilLueur?: number
+      oeilOmbre?: number
+      oeilTaille?: number
+      oeilRelief?: number
     } | null = null,
   ): void {
     const gl = this.gl
@@ -3066,6 +3080,13 @@ export class Renderer {
     )
     gl.uniform1f(cu['uFrisson'], presence?.frisson ?? 0)
     gl.uniform1f(cu['uOndule'], presence?.ondule ?? 0)
+    gl.uniform4f(
+      cu['uOeilRegl'],
+      presence?.oeilLueur ?? 1,
+      presence?.oeilOmbre ?? 1,
+      Math.max(0.4, presence?.oeilTaille ?? 1),
+      presence?.oeilRelief ?? 1,
+    )
     gl.uniform2f(cu['uGelCentre'], sim.gelCentreX, sim.gelCentreY)
     gl.uniform1f(cu['uGelAngle'], sim.gelAngle)
     gl.uniform1f(cu['uRayonCorps'], Math.max(40, sim.stats.rmsRadius * 1.9))

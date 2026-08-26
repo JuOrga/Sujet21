@@ -3607,6 +3607,98 @@ const presence = {
 }
 ;(window as unknown as { __presence: typeof presence }).__presence = presence
 
+// ---- LES CURSEURS DE L'ŒIL : la présence se règle (PARAMÈTRES) ----
+// Sept curseurs, mémorisés par appareil. Tout à 1 : le rendu et le
+// comportement historiques, au pixel près.
+const OEIL_DEFAUTS = {
+  lueur: 1, // luminosité du noyau (0 : éteint · 2,5 : phare)
+  ombre: 1, // profondeur de la pénombre (0 : aucune silhouette)
+  taille: 1, // échelle de l'œil entier (noyau, ombre, dôme)
+  relief: 1, // hauteur du dôme : courbure du miroir et modelé
+  vivacite: 1, // vitesse de glissement du regard
+  errance: 1, // le regard vagabonde quand rien ne l'appelle
+  curiosite: 1, // fréquence des vignettes d'idle (toilette, tentacule…)
+}
+type OeilRegl = typeof OEIL_DEFAUTS
+const CLE_OEIL = 'sujet21-oeil-v1'
+const oeilRegl: OeilRegl = (() => {
+  try {
+    const d = JSON.parse(
+      localStorage.getItem(CLE_OEIL) ?? 'null',
+    ) as Partial<OeilRegl> | null
+    const lit = (v: unknown, def: number): number =>
+      typeof v === 'number' && Number.isFinite(v)
+        ? Math.max(0, Math.min(3, v))
+        : def
+    return {
+      lueur: lit(d?.lueur, 1),
+      ombre: lit(d?.ombre, 1),
+      taille: Math.max(0.4, lit(d?.taille, 1)),
+      relief: lit(d?.relief, 1),
+      vivacite: Math.max(0.2, lit(d?.vivacite, 1)),
+      errance: lit(d?.errance, 1),
+      curiosite: Math.max(0.25, lit(d?.curiosite, 1)),
+    }
+  } catch {
+    return { ...OEIL_DEFAUTS }
+  }
+})()
+function sauveOeil(): void {
+  try {
+    localStorage.setItem(CLE_OEIL, JSON.stringify(oeilRegl))
+  } catch {
+    // stockage refusé : les curseurs ne tiendront que la session
+  }
+}
+// Les curseurs du voile PARAMÈTRES : glisser applique EN DIRECT (l'œil
+// est à l'écran derrière le voile), la valeur s'écrit à côté du curseur.
+{
+  const host = document.getElementById('params-oeil')
+  if (host) {
+    const DEFS: [keyof OeilRegl, string, number, number, string][] = [
+      ['lueur', 'Lueur du noyau', 0, 2.5, '0 : éteint · 2,5 : phare'],
+      ['ombre', 'Pénombre (la silhouette)', 0, 2, '0 : aucune ombre autour'],
+      ['taille', 'Taille de l’œil', 0.5, 2, 'noyau, ombre et dôme ensemble'],
+      ['relief', 'Relief (le dôme)', 0, 2.5, 'courbure du miroir et modelé'],
+      ['vivacite', 'Vivacité du regard', 0.3, 3, 'vitesse de glissement'],
+      ['errance', 'Errance au repos', 0, 2, 'il vagabonde quand rien ne l’appelle'],
+      ['curiosite', 'Curiosité (occupations)', 0.3, 3, 'fréquence des vignettes d’idle'],
+    ]
+    host.innerHTML =
+      DEFS.map(
+        ([cle, nom, min, max, det]) =>
+          `<label class="po-ligne"><span>${nom}<small>${det}</small></span>` +
+          `<input type="range" data-oeil="${cle}" min="${min}" max="${max}" step="0.05" value="${oeilRegl[cle]}" />` +
+          `<b data-oeil-v="${cle}">${oeilRegl[cle].toFixed(2)}</b></label>`,
+      ).join('') +
+      `<button type="button" class="po-defauts" id="po-defauts">REVENIR AUX DÉFAUTS</button>`
+    const curseurs = Array.from(
+      host.querySelectorAll<HTMLInputElement>('input[data-oeil]'),
+    )
+    const montre = (cle: keyof OeilRegl): void => {
+      const v = host.querySelector(`[data-oeil-v="${cle}"]`)
+      if (v) v.textContent = oeilRegl[cle].toFixed(2)
+    }
+    for (const r of curseurs) {
+      r.addEventListener('input', () => {
+        const cle = r.dataset.oeil as keyof OeilRegl
+        oeilRegl[cle] = Number(r.value)
+        montre(cle)
+        sauveOeil()
+      })
+    }
+    document.getElementById('po-defauts')?.addEventListener('click', () => {
+      Object.assign(oeilRegl, OEIL_DEFAUTS)
+      sauveOeil()
+      for (const r of curseurs) {
+        const cle = r.dataset.oeil as keyof OeilRegl
+        r.value = String(oeilRegl[cle])
+        montre(cle)
+      }
+    })
+  }
+}
+
 // ---- L'IDLE : la vie quand on ne joue pas ----
 // Sans geste pendant quelques secondes, le Sujet EXISTE tout seul — de
 // petites vignettes, jamais utiles, jamais à sa place : il fait sa
@@ -3671,7 +3763,8 @@ function majIdle(dtReal: number): void {
   if (geste || !enVie) {
     idle.t = 0
     idle.type = ''
-    idle.prochaine = 6 + Math.random() * 3
+    // la CURIOSITÉ (curseur) rapproche ou éloigne la prochaine vignette
+    idle.prochaine = (6 + Math.random() * 3) / oeilRegl.curiosite
     return
   }
   idle.t += dtReal
@@ -3689,7 +3782,7 @@ function majIdle(dtReal: number): void {
               : 1.0
     if (age > duree) {
       idle.type = ''
-      idle.prochaine = idle.t + 4 + Math.random() * 5
+      idle.prochaine = idle.t + (4 + Math.random() * 5) / oeilRegl.curiosite
     }
   } else if (idle.t >= idle.prochaine) {
     // choisir la vignette — tapoter seulement si une paroi est à portée
@@ -3931,18 +4024,32 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
     }
     regarde(exitMouth.x, exitMouth.y, 1100)
   }
-  // le noyau vit DANS le corps : à mi-chemin du bord, du côté regardé
-  const k = 1 - Math.exp(-4.5 * dtReal)
+  // le noyau vit DANS le corps : à mi-chemin du bord, du côté regardé —
+  // la VIVACITÉ (curseur) règle la vitesse du glissement
+  const k = 1 - Math.exp(-4.5 * oeilRegl.vivacite * dtReal)
   if (vise) {
     const d = Math.hypot(tx - cx, ty - cy) || 1
     const portee = Math.min(d, sim.stats.rmsRadius * 0.55)
     presence.x += (cx + ((tx - cx) / d) * portee - presence.x) * k
     presence.y += (cy + ((ty - cy) / d) * portee - presence.y) * k
   } else {
-    presence.x += (cx - presence.x) * k
-    presence.y += (cy - presence.y) * k
+    // l'ERRANCE (curseur) : rien ne l'appelle — au lieu de rentrer se
+    // poser au centre, le regard vagabonde lentement dans le corps
+    const port = sim.stats.rmsRadius * 0.3 * Math.min(1.6, oeilRegl.errance)
+    const tw = elapsed * 0.33
+    const wx = Math.sin(tw + 1.7) * 0.7 + Math.sin(tw * 2.3) * 0.3
+    const wy = Math.cos(tw * 0.83) * 0.7 + Math.sin(tw * 1.9 + 4.2) * 0.3
+    presence.x += (cx + wx * port - presence.x) * k
+    presence.y += (cy + wy * port - presence.y) * k
   }
-  presence.int += ((vise && !sim.dispersed ? 1 : 0) - presence.int) * k
+  // sans cible, l'œil ne s'éteint plus tout à fait : l'errance se VOIT
+  // (elle garde une demi-présence — 0 sur le curseur la rend invisible)
+  const intCible = sim.dispersed
+    ? 0
+    : vise
+      ? 1
+      : Math.min(0.65, 0.65 * oeilRegl.errance)
+  presence.int += (intCible - presence.int) * k
   // 2. la RESPIRATION : le rythme raconte l'état intérieur
   const peril = endgame.lastCall || endgame.spent
   // l'idle approfondit le souffle ; l'ÉTIREMENT est une grande inspiration
@@ -6386,6 +6493,10 @@ function frame(now: number): void {
       respVit: presence.vit,
       frisson: presence.frisson,
       ondule: presence.ondule,
+      oeilLueur: oeilRegl.lueur,
+      oeilOmbre: oeilRegl.ombre,
+      oeilTaille: oeilRegl.taille,
+      oeilRelief: oeilRegl.relief,
     },
   )
   const rendRaw = performance.now() - renderT0

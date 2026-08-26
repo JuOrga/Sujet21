@@ -270,6 +270,31 @@
         line-height: 1.5;
         color: var(--dim);
       }
+      /* les curseurs de l'œil : une ligne = nom + glissière + valeur */
+      .params-oeil { display: grid; gap: 9px; margin-top: 10px; }
+      .po-ligne {
+        display: flex; align-items: center; gap: 12px; font-size: 12.5px;
+      }
+      .po-ligne > span { flex: 0 0 215px; line-height: 1.3; }
+      .po-ligne > span small {
+        display: block; color: var(--dim); font-size: 10.5px;
+      }
+      .po-ligne input[type='range'] {
+        flex: 1; min-width: 90px; accent-color: var(--specimen);
+        min-height: 28px;
+      }
+      .po-ligne b {
+        flex: 0 0 46px; text-align: right; color: #d5f3e8;
+        font-variant-numeric: tabular-nums;
+      }
+      .po-defauts {
+        justify-self: start; margin-top: 2px;
+        font-family: var(--font-display); font-size: 9.5px;
+        letter-spacing: 0.14em; padding: 5px 10px;
+        background: transparent; color: var(--dim);
+        border: 1px solid var(--line); border-radius: 4px; cursor: pointer;
+      }
+      .po-defauts:hover { border-color: var(--specimen); color: var(--specimen); }
       .params-choix {
         display: flex;
         flex-wrap: wrap;
@@ -5169,6 +5194,15 @@
           </div>
           <div id="params-moteur" class="params-choix" role="group" aria-label="Moteur physique"></div>
           <div id="params-moteur-etat" class="params-desc" style="margin: 8px 0 0"></div>
+          <div class="params-nom" style="margin-top: 16px">L'ŒIL DU SUJET — LES CURSEURS DE LA PRÉSENCE</div>
+          <div class="params-desc">
+            Le noyau qui vit dans le corps : sa lueur, sa pénombre, sa taille, le
+            relief qu'il soulève — et sa façon de bouger : la vivacité du regard,
+            l'errance quand rien ne l'appelle, la fréquence de ses occupations.
+            Glisser applique en direct (l'œil est derrière ce voile). Tout à 1 :
+            le rendu d'origine. Mémorisé sur cet appareil.
+          </div>
+          <div id="params-oeil" class="params-oeil"></div>
           <div class="params-nom" style="margin-top: 16px">PROTOCOLE — PRISE EN MAIN &amp; OPÉRATEUR</div>
           <div class="params-desc">
             REFAIRE LA PRISE EN MAIN rejoue l'éveil de l'échantillon (cryostase,
