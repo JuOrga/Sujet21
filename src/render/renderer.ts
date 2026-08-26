@@ -1796,6 +1796,22 @@ void main() {
     iceCol *= 1.0 + 0.07 * facette;
     iceCol += vec3(0.88, 0.95, 1.05) * aretes * 0.12;
     water = mix(water, iceCol, icy * 0.9);
+    // L'ŒIL DU GEL : même regard (souris, stick, mécanismes), pris dans la
+    // glace — un cœur sombre figé sous la surface, cerné d'un anneau de
+    // givre clair. Peu de pouls : la glace est rigide, l'œil y est LENT.
+    // Mêmes curseurs d'étalonnage que l'œil de l'eau (lueur, pénombre,
+    // taille). Posé APRÈS la teinte du gel : elle ne l'efface plus.
+    if (uRegardInt > 0.003 && icy > 0.05) {
+      float mG = uRegardInt * icy * clamp(player, 0.0, 1.0);
+      float tG = max(0.3, uOeilRegl.z);
+      float rG = length(world - uRegardPos);
+      float coeurG = exp(-rG * rG / (2.0 * 20.0 * 20.0 * tG * tG));
+      float givreG = exp(-pow((rG - 27.0 * tG) / (11.0 * tG), 2.0));
+      float poulsG = 0.92 + 0.08 * sin(uTime * 0.45);
+      water = mix(water, water * (1.0 - 0.32 * uOeilRegl.y),
+        coeurG * mG * clamp(0.8 * uOeilRegl.y, 0.0, 1.0));
+      water += vec3(0.74, 0.90, 1.05) * givreG * mG * 0.34 * uOeilRegl.x * poulsG;
+    }
     // Vapeur (tableau 3) : vapeur d'opale — cœur turquoise voilé, liseré
     // nacré qui accroche la lumière sur les bords, ombres lilas dans les plis.
     float smokeEdgeMix = 1.0 - smoothstep(th, th * 3.2, field2);
@@ -1805,6 +1821,24 @@ void main() {
     smoke += vec3(0.28, 0.22, 0.13) * smokeN * smokeN; // volutes lumineuses qui roulent
     smoke = mix(smoke, vec3(0.50, 0.40, 0.26), (1.0 - smokeN) * 0.22); // plis ambres
     water = mix(water, smoke, vap * 0.92);
+    // L'ŒIL DE LA VAPEUR : dans le nuage, le regard est un TOURBILLON —
+    // la fumée se creuse en spirale lente autour du point visé, et un
+    // cœur ambré (la couleur de la vapeur) y couve. Même suivi
+    // souris/stick, mêmes curseurs. Posé APRÈS la teinte du nuage.
+    if (uRegardInt > 0.003 && vap > 0.05) {
+      float mV = uRegardInt * vap * clamp(player, 0.0, 1.0);
+      float tV = max(0.3, uOeilRegl.z);
+      vec2 relV = world - uRegardPos;
+      float rV = length(relV);
+      float angV = atan(relV.y, relV.x);
+      float spirale = 0.5 + 0.5 * sin(angV * 3.0 - uTime * 1.6 + rV / (15.0 * tV));
+      float voileV = exp(-rV * rV / (2.0 * 40.0 * 40.0 * tV * tV));
+      water = mix(water, water * (1.0 - 0.30 * uOeilRegl.y * spirale),
+        voileV * mV * clamp(0.7 * uOeilRegl.y, 0.0, 1.0));
+      float coeurV = exp(-rV * rV / (2.0 * 17.0 * 17.0 * tV * tV));
+      float poulsV = 0.8 + 0.2 * sin(uTime * 1.3);
+      water += vec3(1.0, 0.84, 0.52) * coeurV * mV * 0.5 * uOeilRegl.x * poulsV;
+    }
 
     // Le corps baigne dans la lumière de la pièce : les ombres portées le
     // traversent, la teinte des lampes le colore — liquide, glace et vapeur
@@ -3070,7 +3104,9 @@ export class Renderer {
           Math.min(1, Math.max(0.08, bx.p0 ?? ARC_EPAISSEUR_DEFAUT)) * 100,
         )
         q1 =
-          Math.round(Math.min(180, Math.max(15, bx.p1 ?? ARC_OUVERTURE_DEFAUT))) +
+          Math.round(
+            Math.min(180, Math.max(15, bx.p1 ?? ARC_OUVERTURE_DEFAUT)),
+          ) +
           256 * Math.min(2, Math.max(0, Math.round(bx.p2 ?? 0)))
       }
       this.auxScratch[i * 4] = bx.material + forme * 16 + q0 * 128 + q1 * 16384
