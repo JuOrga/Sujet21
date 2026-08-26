@@ -1439,6 +1439,18 @@ void main() {
       // teinté par l'eau (un miroir d'eau n'est pas du chrome) et sa
       // pré-compensation d'éclairage est plafonnée (plancher 0,32 : plus
       // bas, le liseré s'embrasait en anneau blanc dans l'ombre).
+      // LE DÔME DU REGARD : là où l'œil se pose, le volume se SOULÈVE —
+      // une bosse locale incline le miroir, et le reflet (plafond en tête)
+      // se courbe autour d'elle : le relief se lit dans l'image déformée,
+      // comme si le regard déplaçait vraiment la matière. La pente d'un
+      // dôme gaussien est nulle au sommet, maximale sur le flanc (r = σ) :
+      // le centre reste calme, l'anneau autour de l'œil travaille.
+      vec2 relOeil = world - uRegardPos;
+      float rOeil = length(relOeil);
+      float poulsOeil = 0.85 + 0.15 * sin(uTime * 0.7);
+      float domeOeil = uRegardInt * poulsOeil * (1.0 - vap) * (1.0 - icy) *
+        exp(-rOeil * rOeil / (2.0 * 34.0 * 34.0));
+      vec2 penteOeil = (relOeil / max(rOeil, 1.0)) * (rOeil / 34.0) * domeOeil;
       if (uMiroirEau > 1.5) {
         vec2 rad = world - uCentroide;
         float rC = length(rad);
@@ -1450,6 +1462,7 @@ void main() {
         Nw = vec2(Nw.x * ca - Nw.y * sa, Nw.x * sa + Nw.y * ca);
         float profil = smoothstep(0.08, 1.0, rC / max(uRayonCorps, 1.0));
         vec2 reflPos = world + Nw * (30.0 * profil + 330.0 * profil * profil);
+        reflPos += penteOeil * 170.0; // le dôme du regard courbe le miroir
         vec3 envL = vec3(uAmbiante);
         if (uLumiereEau > 0.5) {
           vec2 luvR = clamp((reflPos - uLightMapMin) * uLightMapInvSize, vec2(0.0), vec2(1.0));
@@ -1521,6 +1534,7 @@ void main() {
         vec2 nDir = normalize(nrm.xy * 1.6 + (vec2(ond, ond2) - 0.5) * 1.3);
         float distR = 70.0 + 240.0 * fres + 160.0 * ond;
         vec2 reflPos = world + nDir * distR;
+        reflPos += penteOeil * 130.0; // le dôme du regard courbe le miroir
         vec3 envL = vec3(uAmbiante);
         if (uLumiereEau > 0.5) {
           vec2 luvR = clamp((reflPos - uLightMapMin) * uLightMapInvSize, vec2(0.0), vec2(1.0));
@@ -1573,6 +1587,11 @@ void main() {
         float noyau = exp(-dRegard * dRegard / (2.0 * 27.0 * 27.0));
         float pouls = 0.8 + 0.2 * sin(uTime * 0.7);
         water += vec3(0.26, 0.47, 0.58) * (noyau * masque * pouls);
+        // le MODELÉ du dôme : le flanc tourné vers le haut prend la
+        // lumière, l'autre s'ombre — la bosse se lit même sans miroir
+        float ombrage = (relOeil.y / max(rOeil, 1.0)) * (rOeil / 34.0) *
+          exp(-rOeil * rOeil / (2.0 * 34.0 * 34.0));
+        water *= 1.0 + ombrage * 0.22 * masque * poulsOeil;
       }
     }
     water += vec3(0.30, 0.55, 0.65) * waveGlow * 0.45 * (1.0 - icy) * (1.0 - vap);
