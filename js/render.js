@@ -128,11 +128,14 @@ const Renderer = (() => {
       }
     }
 
-    // parois
+    // parois : béton procédural (js/textures.js), motif ancré au monde —
+    // il suit la caméra et le zoom, la paroi ne glisse pas sous le décor
+    const mat = Textures.material();
+    const skin = Textures.pattern(bctx, Textures.current());
     for (const W of level.walls) {
-      bctx.fillStyle = "#232a38";
+      bctx.fillStyle = skin;
       bctx.fillRect(W.x, W.y, W.w, W.h);
-      bctx.strokeStyle = "#39455c";
+      bctx.strokeStyle = mat.edge;
       bctx.lineWidth = 1.5;
       bctx.strokeRect(W.x + 0.75, W.y + 0.75, W.w - 1.5, W.h - 1.5);
     }

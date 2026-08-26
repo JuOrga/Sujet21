@@ -455,6 +455,7 @@
     else if (e.code === "KeyR") reset();
     else if (e.code === "KeyT") Tuning.toggle();
     else if (e.code === "KeyL") toggleLegend();
+    else if (e.code === "KeyV") Textures.cycle(); // habillage des parois
   });
 
   // ---------- Démarrage : écran de chargement (§11) ----------

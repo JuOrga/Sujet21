@@ -31,6 +31,7 @@ peinte.
 | **1 – 5** | dilatation du temps (×0,25 à ×4) — le pas physique ne change jamais |
 | **R** | recommencer |
 | **T** | banc de réglage (sliders en direct + export JSON) |
+| **V** | habillage des parois : bascule entre les deux bétons |
 | **L** ou bouton « Légende » | légende : chaque surface, son effet, état par état — le bouton sert aussi au tactile |
 
 ## Ce que contient cette slice verticale
@@ -63,6 +64,12 @@ peinte.
   (liquide), payer la barrière d'éponge en volume — ou la traverser vite en
   vapeur —, ou geler dans la cryobaie et glisser par le couloir bas tapissé
   d'éponge. À la sortie, le surplus est « mis en bonbonne ».
+- **Habillage des parois** (`js/textures.js`) : béton gris foncé procédural,
+  cuit une fois dans une tuile raccordable de 128 px puis répété en motif
+  ancré au monde — deux versions, `beton` (dalle lisse, brute) et `sf`
+  (même béton coffré en panneaux : joints creusés, arête éclairée, boulons
+  d'angle). Aucun fichier binaire : la tuile est déterministe, le décor est
+  le même d'une partie à l'autre. Touche **V** pour comparer les deux.
 - **Caméra à zoom automatique**, time warp, trame de repère, rendu métaballes.
 - **Banc de réglage** (outil prioritaire du §13) : tous les paramètres de
   ressenti en sliders, export JSON.
