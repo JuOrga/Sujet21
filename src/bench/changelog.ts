@@ -22,8 +22,28 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 12:40',
+    title:
+      'Fiches : le ✎ s’attrape enfin — et un champ Notes pour les remontées',
+    notes: [
+      'Retour du concepteur : impossible d’atteindre le crayon, la bulle disparaissait dès que la souris quittait l’élément. Corrigé par un COULOIR : tant que le curseur reste à moins de 28 px d’une bulle ouverte, elle tient bon et cesse de suivre — une cible immobile se clique. Elle ne se ferme qu’en s’éloignant vraiment. Vérifié à la vraie souris : traversée élément → bulle → clic ✎ → modale ouverte.',
+      'Et la modale gagne un champ NOTES : les valeurs vives (dimensions, canal, angle…) ne s’éditent pas — quand l’une d’elles est fausse ou manquante, la note la remonte. Elle voyage avec la fiche (magasin partagé), s’affiche en AMBRE dans la relecture 🗒 FICHES, et la bulle signale « une note attend en relecture » — jamais visible en jeu. Round-trip vérifié : note saisie → publiée → lue dans la relecture.',
+    ],
+  },
+  {
+    date: '26/08/2026 12:25',
+    title:
+      'Générateur : la GRILLE — deux rangées, des boucles, plusieurs voies',
+    notes: [
+      'Retour du concepteur : les compartiments restaient alignés en ligne, jamais autrement, sans voies multiples — et les bandeaux lumineux inclinés étaient laids. Les bandeaux sont désormais alignés à l’architecture (horizontaux ou verticaux, plus jamais en biais). Et la TOPOLOGIE change de dimension : les salles s’arrangent en couloir 1×N (le classique), en grille 2×2 ou 2×3, ou en L — le coin manquant est muré plein. Les rangées se relient par des OUVERTURES percées dans le plancher : deux ouvertures font une BOUCLE — plusieurs voies mènent au sas — et une salle sans issue devient un cul-de-sac où nichent de préférence les cachettes.',
+      'Le contrat de la nomenclature tient toujours : l’entrée du sas est UNIQUE (coin de grille, jamais d’ouverture dans sa colonne) et porte la mécanique obligatoire — quelle que soit la voie choisie, on finit par elle ; en mécanique « toutes », la seconde famille verrouille TOUTES les entrées de l’avant-sas. Les énigmes, traverses, bandeaux de silhouette, décors, dangers et lampes vivent désormais en coordonnées LOCALES à chaque salle — et les traverses du labyrinthe savent aussi se DRESSER (ancrées au plafond ou au plancher) dans les salles larges et basses de la grille.',
+      'Avec les quatre orientations déjà en place, une grille peut aussi se coucher ou se retourner. Vérifié : 22 tests (342 au total), 50 graines valides d’affilée, et la salle G-7 jouée en essai sans écran — grille 2×3 en L, deux ouvertures de plancher (la boucle), évent, rideau, miroir à faisceau de flanc, capture à l’appui.',
+    ],
+  },
+  {
     date: '26/08/2026 12:20',
-    title: 'Notes de version : le RÉCAP ÉCLAIR — et les heures disent enfin vrai',
+    title:
+      'Notes de version : le RÉCAP ÉCLAIR — et les heures disent enfin vrai',
     notes: [
       'En tête de cet écran : L’ESSENTIEL DES DERNIÈRES 24 H — une ligne par livraison (heure + titre), pour embrasser la journée d’un coup d’œil avant le détail.',
       'Les heures du journal mentaient (conteneurs en UTC, tampons estimés) : les entrées d’aujourd’hui sont recalées sur l’heure de Paris RÉELLE de leur commit, l’ordre chronologique est rétabli, et la consigne d’horodatage est gravée dans le fichier pour les prochaines livraisons.',
@@ -82,7 +102,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '26/08/2026 11:15',
-    title: 'LE CABINET LOGIQUE : cinq circuits booléens prouvés, en démonstration',
+    title:
+      'LE CABINET LOGIQUE : cinq circuits booléens prouvés, en démonstration',
     notes: [
       'Les mécanismes détournés sans toucher au moteur : une pastille TOR est une MÉMOIRE 1 bit, deux pastilles d’un canal font un OU, la règle « et » un ET, la barrière NOR un NON — et le VERROU compose le tout (porte = clé écrite ET fil intact). Cinq salles pédagogiques dans l’écran SALLES (mode concepteur), chaque table de vérité prouvée par le vrai traceur laser dans les tests.',
     ],
@@ -98,7 +119,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '26/08/2026 10:42',
-    title: 'Le générateur parle la NOMENCLATURE : « 101 » est un cahier des charges',
+    title:
+      'Le générateur parle la NOMENCLATURE : « 101 » est un cahier des charges',
     notes: [
       'Remarque du concepteur : la graine ne devrait-elle pas être le code à trois chiffres de la nomenclature ? Réponse : le code MMD (moment · mécanique · difficulté) DÉCRIT une salle sans l’identifier — plusieurs salles portent « 101 ». Le générateur le prend donc comme un CAHIER DES CHARGES : la MÉCANIQUE choisit les familles de maillons (1 : rideaux et miroirs de glace, JAMAIS d’exigence vapeur ; 2 : évents, rails, barrières, jamais de glace ; 3 : au moins une de chaque ; 0 : passages doux seulement), la DIFFICULTÉ dose compartiments (3 à 5), contraintes, resserrage des passages et dangers, et le MOMENT assombrit l’ambiance vers la fin de run.',
       'L’identité, elle, vient de la VARIANTE : ⚄ Générer accepte « 212 » (une salle au hasard DANS cette classe), et la salle arrive avec son code complet — « G-212-BJB » — qu’il suffit de retaper pour la retrouver à l’identique, au caractère près. Les plafonds de lisibilité respectent désormais la famille annoncée : un excédent glaceux redevient rideau, un excédent vaporeux, évent — la mécanique promise par le code n’est jamais trahie. Les graines libres d’hier (« Q », « B2 ») marchent toujours.',
@@ -107,7 +129,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '26/08/2026 09:58',
-    title: 'La grammaire du générateur s’enrichit : rail plasma, barrière tenue, double ET',
+    title:
+      'La grammaire du générateur s’enrichit : rail plasma, barrière tenue, double ET',
     notes: [
       'Trois maillons neufs dans la chaîne d’intentions du générateur. Le RAIL PLASMA — se tenir en VAPEUR au point marqué « IONISER ICI » ionise le fil de lumière ; le rail magnétique, amorcé dans le nuage, capture l’arc et le guide jusqu’à la pastille qui ouvre la porte. La BARRIÈRE TENUE — un faisceau vertical barre le chemin, sa pastille NOR (au sol) tient la porte ouverte TANT QUE la lumière la touche : l’eau plie le faisceau, la glace le renvoie — couper la lumière scelle la porte. On traverse EN VAPEUR : le faisceau s’ionise mais file droit. Le DOUBLE ET — deux miroirs, deux pastilles du même canal, règle ET : la porte exige les deux.',
       'Chaque énigme garde sa PREUVE par le vrai traceur, dans ses propres termes : le rail est muet sans nuage et guide avec ; la barrière est allumée d’office, la traversée en vapeur ne la coupe pas, la traversée en eau la coupe (sinon elle ne punirait rien) ; chaque miroir d’un ET n’allume QUE sa pastille. Et une garde neuve balaie tout ALLUMAGE CROISÉ : aucun faisceau ne doit allumer une pastille d’énigme sans le joueur — l’énigme morte est rejetée au tirage.',
@@ -116,7 +139,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '26/08/2026 02:33',
-    title: 'Le GÉNÉRATEUR de salles : une graine, une salle — traversée PROUVÉE',
+    title:
+      'Le GÉNÉRATEUR de salles : une graine, une salle — traversée PROUVÉE',
     notes: [
       'Demandé : un générateur de niveaux procédural qui donne de BONS résultats. La recette anti-soupe : le générateur tire d’abord la CHAÎNE D’INTENTIONS — la suite des franchissements entre compartiments (passage libre, ÉVENT à traverser en vapeur, RIDEAU à écarter en glace, MEMBRANE, ou PORTE AU LASER) — puis habille chaque maillon en géométrie : cloisons percées, décor aux formes variées, dangers (chaudière, hublot fendu), cachette voilée une fois sur deux, lampes, étiquettes.',
       'Et surtout : AUCUNE salle n’est remise sans PREUVE. Chaque porte asservie est démontrée ouvrable par le vrai traceur de faisceau — un miroir de glace synthétique posé à l’endroit marqué « MIROIR DE GLACE » doit allumer la pastille, et SANS miroir le faisceau ne doit rien ouvrir (l’énigme existe). Puis un parcours en largeur, avec la marge du corps, démontre que le sas est atteignable. Un tirage qui échoue est re-tiré — le joueur ne voit que des salles prouvées.',

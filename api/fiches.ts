@@ -22,6 +22,7 @@ interface FicheSurcharge {
   lignes: { cle: string; txt: string }[]
   auteur: string
   date: string
+  notes?: string
 }
 
 function sanitize(input: unknown): FicheSurcharge | null {
@@ -54,6 +55,7 @@ function sanitize(input: unknown): FicheSurcharge | null {
     lignes,
     auteur: typeof p.auteur === 'string' ? p.auteur.trim().slice(0, 40) : '',
     date: new Date().toISOString(),
+    notes: typeof p.notes === 'string' ? p.notes.trim().slice(0, 1000) : '',
   }
 }
 
