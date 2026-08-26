@@ -6,7 +6,7 @@ import { FluidSim, KIND_PLAYER } from './sim/solver'
 import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
 import { CODEX, Codex, type CodexGroupe } from './game/codex'
-import { TABLEAU_HUB, TABLEAU_HUB_COMPACT } from './game/hub'
+import { TABLEAU_HUB } from './game/hub'
 import {
   MECANIQUE_NOMS,
   codeCanon,
@@ -2363,7 +2363,6 @@ startBtn.addEventListener('click', closeHome)
 // comptés) sans JAMAIS toucher à cette sauvegarde : l'expédition
 // principale reste à l'abri.
 const CLE_RUN = 'sujet21-run-v1'
-let runSecondaire = false
 interface RunSauvee {
   index: number
   liters: number
@@ -2401,7 +2400,7 @@ function sauveRun(): void {
   // seule l'expédition PRINCIPALE s'écrit — et seulement passée la salle 1
   // (une partie à peine commencée n'a rien à sauver ; y revenir efface).
   // Le hub, hors run, ne touche jamais à la sauvegarde.
-  if (testLevel || runSecondaire || auHub) return
+  if (testLevel || auHub) return
   try {
     if (levelIndex < 1) localStorage.removeItem(CLE_RUN)
     else
@@ -2432,7 +2431,6 @@ function effaceRun(): void {
   majBoutonsRun()
 }
 function reprendreRun(save: RunSauvee): void {
-  runSecondaire = false
   auHub = false
   testLevel = null
   fromEditor = false
@@ -2456,19 +2454,6 @@ function reprendreRun(save: RunSauvee): void {
 function majBoutonsRun(): void {
   const save = runSauvee()
   const total = playedLevels().length
-  const btnSec = document.getElementById(
-    'start-secondaire',
-  ) as HTMLButtonElement | null
-  const btnRep = document.getElementById(
-    'start-reprendre',
-  ) as HTMLButtonElement | null
-  if (btnRep) {
-    // visible seulement DEPUIS une run secondaire : le chemin du retour
-    btnRep.hidden = !(save && runSecondaire)
-    if (save)
-      btnRep.textContent = `REPRENDRE L'EXPÉDITION — SALLE ${save.index + 1}/${total}`
-  }
-  if (btnSec) btnSec.hidden = !save || runSecondaire
   const btnAband = document.getElementById(
     'start-abandon',
   ) as HTMLButtonElement | null
@@ -2500,36 +2485,6 @@ document.getElementById('start-abandon')?.addEventListener('click', (e) => {
   // se referme d'elle-même, comme à l'arrivée dans le jeu
   document.body.classList.remove('playing')
   abandonneRun()
-})
-document.getElementById('start-secondaire')?.addEventListener('click', () => {
-  if (requireName()) return
-  // une run À PART : même parcours, records comptés — la sauvegarde de
-  // l'expédition principale n'est jamais touchée
-  runSecondaire = true
-  auHub = false
-  testLevel = null
-  fromEditor = false
-  levelIndex = 0
-  run.bonbonneLiters = 0
-  run.runTime = 0
-  run.vies = 1
-  run.conclues = 0
-  run.instruments = []
-  run.xp = 0
-  run.livreTotal = 0
-  hasPlayed = true
-  document.body.classList.add('playing')
-  input.paused = false
-  startBtn.textContent = "REPRENDRE L'ESSAI"
-  homeRestartBtn.hidden = false
-  restart()
-  lanceEveil()
-  majBoutonsRun()
-})
-document.getElementById('start-reprendre')?.addEventListener('click', () => {
-  if (requireName()) return
-  const save = runSauvee()
-  if (save) reprendreRun(save)
 })
 // au chargement, la fiche est déjà à l'écran : les boutons disent tout de
 // suite s'il y a une expédition à reprendre
@@ -2719,11 +2674,6 @@ function startTest(etapes: (LevelDef | CinematiqueDef)[]): void {
 function startBisTest(): void {
   startTest([TABLEAU_1BIS])
 }
-// Le HUB COMPACT (chantier DÉMO 2) : visitable en essai hors expédition,
-// en PARALLÈLE du hub actuel — la bascule attend la validation du module.
-document.getElementById('start-hub2')?.addEventListener('click', () => {
-  startTest([TABLEAU_HUB_COMPACT])
-})
 // La bibliothèque d'images : import (recompressé WebP), catalogue partagé,
 // sélecteur pour les planches — accessible de l'éditeur et du montage
 const imagerie = new Imagerie(el('imagerie'), {
@@ -5905,7 +5855,6 @@ function retourAuLabo(): void {
   run.xp = 0
   run.livreTotal = 0
   run.ended = false
-  runSecondaire = false
   entrerHub()
   majBoutonsRun()
 }
@@ -5975,16 +5924,12 @@ function afficheDispersion(): void {
   // dernier échantillon : GAME OVER — la sauvegarde de la principale
   // s'efface (la run est perdue), la secondaire n'y touche pas
   ecranDispersion = 'fin'
-  if (!runSecondaire) effaceRun()
+  effaceRun()
   // LE SCÉNARIO : la cinématique de défaite, par-dessus l'écran de fin
   void joueMoment('run-perdue')
   showOverlay(
     'ÉCHANTILLON PERDU — FIN DE LA RUN',
-    `La dispersion a eu raison du dernier échantillon.${
-      runSecondaire
-        ? ' La run secondaire s’efface — l’expédition principale attend toujours.'
-        : ''
-    } Le laboratoire vous rappelle.`,
+    `La dispersion a eu raison du dernier échantillon. Le laboratoire vous rappelle.`,
     'danger',
     'RETOUR AU LABO',
   )
@@ -5994,7 +5939,7 @@ function afficheDispersion(): void {
 // labo, comme à l'arrivée dans le jeu. L'expédition en cours est perdue
 // (c'est un abandon, pas une pause : la fiche sait mettre en pause).
 function abandonneRun(): void {
-  if (!runSecondaire) effaceRun()
+  effaceRun()
   ecranDispersion = 'aucun'
   overlay.classList.remove('visible')
   retourAuLabo()
@@ -7302,7 +7247,6 @@ function frame(now: number): void {
       if (save) {
         reprendreRun(save)
       } else {
-        runSecondaire = false
         newExpedition()
       }
     })
@@ -7406,7 +7350,7 @@ function frame(now: number): void {
       })
       renderRegistres()
       // l'expédition principale conclue n'a plus rien à reprendre
-      if (!testLevel && !runSecondaire) effaceRun()
+      if (!testLevel) effaceRun()
       // LE SCÉNARIO : la cinématique de fin d'expédition, sur le bilan
       void joueMoment('expedition-achevee')
       showOverlay(
@@ -7607,7 +7551,7 @@ function frame(now: number): void {
     ? 'BIS'
     : auHub
       ? 'LABO'
-      : `${runSecondaire ? '2ᵉ RUN · ' : ''}SALLE ${levelIndex + 1}/${playedLevels().length}`
+      : `SALLE ${levelIndex + 1}/${playedLevels().length}`
   // les échantillons de secours (vies) et la bonbonne : en run seulement —
   // au labo comme aux essais, rien ne se paie et rien ne se collecte
   hudViesChip.hidden = !!testLevel || auHub

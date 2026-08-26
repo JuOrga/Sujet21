@@ -22,6 +22,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 22:50',
+    title: 'La fiche fait le ménage : le second parcours et le hub compact s’effacent',
+    notes: [
+      'Demandé : retirer de la fiche le « deuxième parcours » et le « hub compact ». C’est fait — les boutons RUN SECONDAIRE, REPRENDRE et l’essai HUB COMPACT quittent l’écran d’accueil, et toute la mécanique du second parcours part avec eux : plus de sauvegarde de run à reprendre, plus de bandeau « 2ᵉ RUN » au tableau de bord, la fin de partie rend simplement au laboratoire. ABANDONNER reste — c’est un autre geste, indépendant — et le tableau du hub compact demeure dans le code pour l’atelier.',
+      'Vérifié sur la vraie page en navigateur : la fiche s’affiche sans les trois boutons, ABANDONNER et LANCER présents, et LANCER démarre bien la partie — zéro erreur de page. 354 tests verts, build propre.',
+    ],
+  },
+  {
     date: '26/08/2026 22:48',
     title: 'L’éditeur défile au STICK GAUCHE — la mécanique de la planche, partout',
     notes: [
