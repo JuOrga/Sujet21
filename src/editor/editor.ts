@@ -40,6 +40,14 @@ import {
 } from '../game/level'
 import { TABLEAU_HUB, TABLEAU_HUB_COMPACT } from '../game/hub'
 import {
+  cleFiche,
+  ficheElement,
+  ficheStatique,
+  type Fiche,
+  type FicheSurcharge,
+  type Surcharges,
+} from './fiches'
+import {
   ARC_EPAISSEUR_DEFAUT,
   ARC_OUVERTURE_DEFAUT,
   FORME_ARC,
@@ -299,6 +307,16 @@ export class LevelEditor {
 
   private hint = ''
 
+  // La bulle savante du survol : l'élément div, son minuteur d'apparition
+  // (650 ms de souris posée), et la clé de l'élément qu'elle décrit.
+  private bulle!: HTMLDivElement
+  private bulleTimer: number | null = null
+  private bulleCle = ''
+  // Les fiches RÉÉCRITES par les concepteurs (magasin partagé /api/fiches) :
+  // chargées à l'ouverture, elles remplacent le texte statique de la bulle.
+  private surcharges: Surcharges = {}
+  private ficheVoile: HTMLDivElement | null = null
+
   // Images du jeu (illustrations de zones, décals) : chargées à la demande,
   // le dessin se rafraîchit quand elles arrivent — l'éditeur montre la même
   // chose que la cuve.
@@ -329,6 +347,25 @@ export class LevelEditor {
     this.hooks = hooks
     this.canvas = host.querySelector('#ed-canvas') as HTMLCanvasElement
     this.ctx = this.canvas.getContext('2d')!
+    // LA BULLE SAVANTE : au survol posé d'un élément, sa fiche (effet par
+    // état, paramètres vifs) apparaît après un court délai — jamais pendant
+    // un geste, jamais sous une souris qui bouge.
+    this.bulle = document.createElement('div')
+    this.bulle.className = 'ed-bulle'
+    this.bulle.hidden = true
+    document.body.appendChild(this.bulle)
+    this.bulle.addEventListener('mouseleave', () => this.cacheBulle())
+    this.bulle.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest('.ed-bulle-mod')
+      if (b instanceof HTMLElement && b.dataset.cle) {
+        this.ouvreEditionFiche(b.dataset.cle)
+        this.cacheBulle()
+      }
+    })
+    this.bindBullesOutils()
+    document
+      .getElementById('ed-fiches')
+      ?.addEventListener('click', () => this.ouvreRelectureFiches())
     this.bindUi()
     this.bindCanvas()
     this.restore()
@@ -411,6 +448,7 @@ export class LevelEditor {
     this.syncForm()
     this.draw()
     void this.refreshLibrary()
+    void this.chargeSurcharges()
   }
 
   close(): void {
@@ -733,6 +771,39 @@ export class LevelEditor {
     this.commit('Alignés.')
   }
 
+  /** Répartit la sélection multiple ÉQUITABLEMENT dans la salle : mêmes
+   * écarts entre les murs et chaque élément — deux parois dans la largeur
+   * d'une pièce se posent d'un clic, sans calcul mental. */
+  private repartir(axe: 'x' | 'y'): void {
+    const items = this.multi
+      .map((m) => ({ m, b: this.boundsOf(m) }))
+      .filter((x): x is { m: Sel; b: Rect } => x.b !== null)
+    if (items.length < 2) return
+    const s = this.level.bounds
+    const debut = axe === 'x' ? s.minX : s.minY
+    const fin = axe === 'x' ? s.maxX : s.maxY
+    items.sort((p, q) =>
+      axe === 'x'
+        ? p.b.minX + p.b.maxX - (q.b.minX + q.b.maxX)
+        : p.b.minY + p.b.maxY - (q.b.minY + q.b.maxY),
+    )
+    const total = items.reduce(
+      (t, x) => t + (axe === 'x' ? x.b.maxX - x.b.minX : x.b.maxY - x.b.minY),
+      0,
+    )
+    const ecart = (fin - debut - total) / (items.length + 1)
+    let pos = debut + ecart
+    for (const { m, b } of items) {
+      const taille = axe === 'x' ? b.maxX - b.minX : b.maxY - b.minY
+      if (axe === 'x') this.moveSelBy(m, pos - b.minX, 0)
+      else this.moveSelBy(m, 0, pos - b.minY)
+      pos += taille + ecart
+    }
+    this.commit(
+      `Répartis dans la ${axe === 'x' ? 'largeur' : 'hauteur'} de la salle — écarts égaux de ${Math.round(ecart)} u, murs compris.`,
+    )
+  }
+
   /** Le nom d'une pièce désignée par la Superposition. */
   private nomCible(c: CutCible): string {
     return c.kind === 'sponge'
@@ -863,15 +934,371 @@ export class LevelEditor {
   private cutWinner: CutCible | null = null
   // Guides magnétiques pendant un déplacement (façon Canva)
   private guides: { axe: 'v' | 'h'; pos: number }[] = []
+  // Écarts ÉGAUX : les mesures roses dessinées quand l'aimant propose une
+  // équirépartition — même espace de part et d'autre, ou rythme répété.
+  // axe 'x' : un écart horizontal tracé à la latitude lat (y monde) ;
+  // axe 'y' : un écart vertical tracé à la longitude lat (x monde).
+  private ecarts: { axe: 'x' | 'y'; lat: number; a: number; b: number }[] = []
 
-  // Aimante un rectangle en mouvement sur les bords et centres des autres
-  // éléments (parois, sas) — et retourne les repères à dessiner. Façon
-  // Canva : qu'ils se touchent ou non, les alignements se proposent.
-  private aimant(r: Rect): {
-    rect: Rect
-    guides: { axe: 'v' | 'h'; pos: number }[]
-  } {
-    const TH = 8 / this.zoom
+  // ——— La bulle savante ————————————————————————————————————————————
+  /** Peint la fiche dans la bulle et la montre près du curseur. */
+  private montreBulle(
+    fiche: Fiche,
+    cx: number,
+    cy: number,
+    cleF: string | null = null,
+  ): void {
+    const cleClasse = (c: string): string =>
+      c === 'EAU'
+        ? ' ed-cle-eau'
+        : c === 'GLACE'
+          ? ' ed-cle-glace'
+          : c === 'VAPEUR'
+            ? ' ed-cle-vapeur'
+            : c === 'LASER'
+              ? ' ed-cle-laser'
+              : ''
+    const esc = (t: string): string =>
+      t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    const sur = cleF ? this.surcharges[cleF] : undefined
+    this.bulle.innerHTML =
+      `<div class="ed-bulle-titre">${esc(fiche.titre)}</div>` +
+      (cleF
+        ? `<button type="button" class="ed-bulle-mod" data-cle="${esc(cleF)}" title="Modifier cette fiche — pour tout le monde">✎</button>`
+        : '') +
+      `<div class="ed-bulle-resume">${esc(fiche.resume)}</div>` +
+      fiche.lignes
+        .map(
+          (l) =>
+            `<div class="ed-bulle-l"><span class="ed-bulle-cle${cleClasse(l.cle)}">${esc(l.cle)}</span><span>${esc(l.txt)}</span></div>`,
+        )
+        .join('') +
+      (sur
+        ? `<div class="ed-bulle-sur">réécrite par ${esc(sur.auteur || '?')} · ${esc(sur.date.slice(0, 10))}</div>`
+        : '')
+    this.bulle.hidden = false
+    this.positionneBulle(cx, cy)
+  }
+
+  /** Place la bulle près du point (page), sans jamais sortir de l'écran. */
+  private positionneBulle(cx: number, cy: number): void {
+    const b = this.bulle
+    b.style.left = '0px'
+    b.style.top = '0px'
+    const r = b.getBoundingClientRect()
+    let x = cx + 16
+    let y = cy + 18
+    if (x + r.width > window.innerWidth - 8) x = Math.max(8, cx - r.width - 16)
+    if (y + r.height > window.innerHeight - 8)
+      y = Math.max(8, cy - r.height - 14)
+    b.style.left = `${Math.round(x)}px`
+    b.style.top = `${Math.round(y)}px`
+  }
+
+  private cacheBulle(): void {
+    if (this.bulleTimer !== null) {
+      clearTimeout(this.bulleTimer)
+      this.bulleTimer = null
+    }
+    if (!this.bulle.hidden) this.bulle.hidden = true
+    this.bulleCle = ''
+  }
+
+  /** Au survol du canevas : repousse l'apparition tant que la souris
+   * bouge ; une bulle déjà ouverte SUIT le curseur sur le même élément,
+   * et se ferme dès qu'il en change. */
+  private majBulle(cx: number, cy: number, wx: number, wy: number): void {
+    const hit = this.pick(wx, wy)
+    const cle = hit
+      ? `${hit.kind}:${'index' in hit && hit.index !== undefined ? hit.index : ''}`
+      : ''
+    if (!cle) {
+      this.cacheBulle()
+      return
+    }
+    if (!this.bulle.hidden && cle === this.bulleCle) {
+      this.positionneBulle(cx, cy)
+      return
+    }
+    if (!this.bulle.hidden) this.bulle.hidden = true
+    if (this.bulleTimer !== null) clearTimeout(this.bulleTimer)
+    this.bulleTimer = window.setTimeout(() => {
+      this.bulleTimer = null
+      if (this.drag) return // jamais pendant un geste
+      const fiche = ficheElement(hit, this.level, this.surcharges)
+      if (!fiche) return
+      this.bulleCle = cle
+      this.montreBulle(fiche, cx, cy, cleFiche(hit, this.level))
+    }, 650)
+  }
+
+  /** Charge les fiches réécrites depuis le magasin partagé. Sans réseau :
+   * la bulle garde son texte d'origine, rien ne casse. */
+  private async chargeSurcharges(): Promise<void> {
+    try {
+      const r = await fetch('/api/fiches')
+      if (!r.ok) return
+      const data = (await r.json()) as { surcharges?: FicheSurcharge[] }
+      const map: Surcharges = {}
+      for (const s of data.surcharges ?? []) if (s && s.cle) map[s.cle] = s
+      this.surcharges = map
+      this.majBoutonFiches()
+    } catch {
+      // hors-ligne : les fiches d'origine suffisent
+    }
+  }
+
+  /** Le compteur du bouton « Fiches » de la barre : n réécritures. */
+  private majBoutonFiches(): void {
+    const b = document.getElementById('ed-fiches')
+    if (!b) return
+    const n = Object.keys(this.surcharges).length
+    b.textContent = n > 0 ? `🗒 Fiches · ${n}` : '🗒 Fiches'
+    b.classList.toggle('ed-fiches-marque', n > 0)
+  }
+
+  /** L'ÉDITION d'une fiche : titre, résumé et lignes se réécrivent, la
+   * sauvegarde vaut pour tout le monde (magasin partagé). Les valeurs
+   * vives (dimensions, canal, angle…) ne sont pas là : elles se
+   * recalculent toutes seules et survivent à toute réécriture. */
+  private ouvreEditionFiche(cleF: string): void {
+    const statique = ficheStatique(cleF)
+    if (!statique) return
+    const actuel = this.surcharges[cleF] ?? statique
+    const voile = document.createElement('div')
+    voile.className = 'ed-fiches-voile'
+    const esc = (t: string): string =>
+      t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')
+    voile.innerHTML =
+      `<div class="ed-fiches-carte">` +
+      `<div class="ed-fiches-tete">MODIFIER LA FICHE <span>· ${esc(cleF)} · pour tout le monde</span></div>` +
+      `<label class="ed-f"><span>Titre</span><input id="fm-titre" maxlength="80" value="${esc(actuel.titre)}"></label>` +
+      `<label class="ed-f"><span>Résumé</span><input id="fm-resume" maxlength="400" value="${esc(actuel.resume)}"></label>` +
+      `<label class="ed-f"><span>Lignes — une par ligne, « CLÉ | texte » (clés : EAU, GLACE, VAPEUR, LASER, ·)</span>` +
+      `<textarea id="fm-lignes" rows="8">${esc(actuel.lignes.map((l) => `${l.cle} | ${l.txt}`).join('\n'))}</textarea></label>` +
+      `<p class="ed-fiches-note">Les valeurs vives (dimensions, canal, angle, capacité…) s'ajoutent toutes seules sous la fiche : inutile de les écrire ici.</p>` +
+      `<div class="ed-fiches-actions">` +
+      `<button type="button" class="ed-btn" id="fm-annuler">Annuler</button>` +
+      (this.surcharges[cleF]
+        ? `<button type="button" class="ed-btn" id="fm-retablir">Rétablir l'original</button>`
+        : '') +
+      `<button type="button" class="ed-btn ed-btn-vert" id="fm-enregistrer">Enregistrer pour tous</button>` +
+      `</div></div>`
+    document.body.appendChild(voile)
+    const ferme = (): void => voile.remove()
+    voile.addEventListener('click', (e) => {
+      if (e.target === voile) ferme()
+    })
+    voile.querySelector('#fm-annuler')?.addEventListener('click', ferme)
+    voile.querySelector('#fm-retablir')?.addEventListener('click', () => {
+      void (async () => {
+        try {
+          const r = await fetch(`/api/fiches?cle=${encodeURIComponent(cleF)}`, {
+            method: 'DELETE',
+          })
+          if (!r.ok) throw new Error(String(r.status))
+          delete this.surcharges[cleF]
+          this.majBoutonFiches()
+          this.status('Fiche rétablie à l’original — pour tout le monde.')
+          ferme()
+        } catch {
+          this.status('Rétablissement impossible (réseau ?) — réessayez.')
+        }
+      })()
+    })
+    voile.querySelector('#fm-enregistrer')?.addEventListener('click', () => {
+      const titre = (
+        voile.querySelector('#fm-titre') as HTMLInputElement
+      ).value.trim()
+      const resume = (
+        voile.querySelector('#fm-resume') as HTMLInputElement
+      ).value.trim()
+      const brut = (voile.querySelector('#fm-lignes') as HTMLTextAreaElement)
+        .value
+      const lignes = brut
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .map((l) => {
+          const i = l.indexOf('|')
+          return i >= 0
+            ? { cle: l.slice(0, i).trim() || '·', txt: l.slice(i + 1).trim() }
+            : { cle: '·', txt: l }
+        })
+        .filter((l) => l.txt)
+      if (!titre || lignes.length === 0) {
+        this.status('Il faut au moins un titre et une ligne.')
+        return
+      }
+      let auteur = ''
+      try {
+        const reg = JSON.parse(
+          localStorage.getItem('projet21.registres.v1') ?? '{}',
+        ) as { operator?: string }
+        auteur = reg.operator ?? ''
+      } catch {
+        // sans signature : la fiche part anonyme
+      }
+      void (async () => {
+        try {
+          const r = await fetch('/api/fiches', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cle: cleF, titre, resume, lignes, auteur }),
+          })
+          if (!r.ok) throw new Error(String(r.status))
+          const rep = (await r.json()) as { surcharge?: FicheSurcharge }
+          if (rep.surcharge) this.surcharges[cleF] = rep.surcharge
+          this.majBoutonFiches()
+          this.status(
+            'Fiche enregistrée — tout le monde la lit désormais ainsi.',
+          )
+          ferme()
+        } catch {
+          this.status('Enregistrement impossible (réseau ?) — réessayez.')
+        }
+      })()
+    })
+  }
+
+  /** La RELECTURE : ce qui a été réécrit, fiche par fiche, avec l'écart
+   * face au texte d'origine — pour corriger ensuite le système. */
+  private ouvreRelectureFiches(): void {
+    if (this.ficheVoile) this.ficheVoile.remove()
+    const voile = document.createElement('div')
+    voile.className = 'ed-fiches-voile'
+    this.ficheVoile = voile
+    const esc = (t: string): string =>
+      t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    const cles = Object.keys(this.surcharges).sort()
+    const diffChamp = (nom: string, avant: string, apres: string): string =>
+      avant === apres
+        ? ''
+        : `<div class="ed-diff-champ"><b>${nom}</b>` +
+          `<div class="ed-diff-avant">${esc(avant)}</div>` +
+          `<div class="ed-diff-apres">${esc(apres)}</div></div>`
+    const diffLignes = (avant: Fiche, apres: FicheSurcharge): string => {
+      const cleTxt = (l: { cle: string; txt: string }): string =>
+        `${l.cle} | ${l.txt}`
+      const a = avant.lignes.map(cleTxt)
+      const b = apres.lignes.map(cleTxt)
+      if (a.join('\n') === b.join('\n')) return ''
+      const enleve = a.filter((l) => !b.includes(l))
+      const ajoute = b.filter((l) => !a.includes(l))
+      return (
+        `<div class="ed-diff-champ"><b>Lignes</b>` +
+        enleve
+          .map((l) => `<div class="ed-diff-avant">${esc(l)}</div>`)
+          .join('') +
+        ajoute
+          .map((l) => `<div class="ed-diff-apres">${esc(l)}</div>`)
+          .join('') +
+        `</div>`
+      )
+    }
+    voile.innerHTML =
+      `<div class="ed-fiches-carte ed-fiches-large">` +
+      `<div class="ed-fiches-tete">FICHES RÉÉCRITES <span>· l'écart face au texte d'origine — pour corriger le système ensuite</span>` +
+      `<button type="button" class="ed-btn" id="fr-fermer">✕</button></div>` +
+      (cles.length === 0
+        ? `<p class="ed-fiches-note">Aucune fiche réécrite : toutes les bulles lisent le texte d'origine.</p>`
+        : cles
+            .map((cleF) => {
+              const s = this.surcharges[cleF]
+              const base = ficheStatique(cleF)
+              const corps = base
+                ? diffChamp('Titre', base.titre, s.titre) +
+                  diffChamp('Résumé', base.resume, s.resume) +
+                  diffLignes(base, s)
+                : `<p class="ed-fiches-note">Clé inconnue du code — fiche orpheline.</p>`
+              return (
+                `<div class="ed-fiches-item">` +
+                `<div class="ed-fiches-item-tete"><b>${esc(s.titre)}</b> <span>· ${esc(cleF)} · par ${esc(s.auteur || '?')} · ${esc(s.date.slice(0, 10))}</span>` +
+                `<button type="button" class="ed-btn" data-mod="${esc(cleF)}">Modifier</button>` +
+                `<button type="button" class="ed-btn" data-ret="${esc(cleF)}">Rétablir l'original</button></div>` +
+                (corps ||
+                  `<p class="ed-fiches-note">Identique à l'original (réécriture sans écart).</p>`) +
+                `</div>`
+              )
+            })
+            .join('')) +
+      `</div>`
+    document.body.appendChild(voile)
+    const ferme = (): void => {
+      voile.remove()
+      this.ficheVoile = null
+    }
+    voile.addEventListener('click', (e) => {
+      if (e.target === voile) ferme()
+      const t = e.target as HTMLElement
+      const mod = t.closest('[data-mod]') as HTMLElement | null
+      if (mod?.dataset.mod) {
+        ferme()
+        this.ouvreEditionFiche(mod.dataset.mod)
+      }
+      const ret = t.closest('[data-ret]') as HTMLElement | null
+      if (ret?.dataset.ret) {
+        const cleF = ret.dataset.ret
+        void (async () => {
+          try {
+            const r = await fetch(
+              `/api/fiches?cle=${encodeURIComponent(cleF)}`,
+              { method: 'DELETE' },
+            )
+            if (!r.ok) throw new Error(String(r.status))
+            delete this.surcharges[cleF]
+            this.majBoutonFiches()
+            this.status('Fiche rétablie à l’original — pour tout le monde.')
+            ferme()
+            this.ouvreRelectureFiches()
+          } catch {
+            this.status('Rétablissement impossible (réseau ?) — réessayez.')
+          }
+        })()
+      }
+    })
+    voile.querySelector('#fr-fermer')?.addEventListener('click', ferme)
+  }
+
+  /** Les mêmes fiches sur la PALETTE d'outils : survol posé d'un bouton
+   * de surface (ou de l'éponge), la fiche du matériau s'ouvre à côté. */
+  private bindBullesOutils(): void {
+    const boutons = this.host.querySelectorAll<HTMLButtonElement>('.ed-tool')
+    boutons.forEach((b) => {
+      const outil = b.dataset.tool ?? ''
+      const cleF = outil.startsWith('box:')
+        ? `mat:${Number(outil.slice(4))}`
+        : outil === 'sponge'
+          ? 'genre:eponge'
+          : null
+      if (!cleF || !ficheStatique(cleF)) return
+      let timer: number | null = null
+      b.addEventListener('mouseenter', () => {
+        timer = window.setTimeout(() => {
+          const fiche = this.surcharges[cleF] ?? ficheStatique(cleF)
+          if (!fiche) return
+          const r = b.getBoundingClientRect()
+          this.montreBulle(fiche, r.right + 4, r.top - 8, cleF)
+        }, 650)
+      })
+      b.addEventListener('mouseleave', (e) => {
+        if (timer !== null) clearTimeout(timer)
+        timer = null
+        // la souris part VERS la bulle : on la laisse ouverte (le ✎ est là)
+        if (
+          e.relatedTarget instanceof Node &&
+          this.bulle.contains(e.relatedTarget)
+        )
+          return
+        this.cacheBulle()
+      })
+    })
+  }
+
+  /** Les rectangles sur lesquels on s'aimante : parois droites, sas,
+   * éponges — sans l'élément tenu (le sas qu'on déplace ne doit pas
+   * s'aimanter sur lui-même). La salle s'ajoute à part (murs + centre). */
+  private ciblesAimant(): Rect[] {
     const cibles: Rect[] = []
     this.level.boxes.forEach((b, i) => {
       if (this.sel?.kind === 'box' && this.sel.index === i) return
@@ -879,7 +1306,32 @@ export class LevelEditor {
       if (b.angle) return // les obliques ne proposent pas leurs bords droits
       cibles.push(b)
     })
-    cibles.push(this.level.exit)
+    if (this.sel?.kind !== 'exit') cibles.push(this.level.exit)
+    this.level.sponges.forEach((sp, i) => {
+      if (this.sel?.kind === 'sponge' && this.sel.index === i) return
+      cibles.push({
+        minX: sp.minX,
+        minY: sp.minY,
+        maxX: sp.minX + sp.cols * sp.cellSize,
+        maxY: sp.minY + sp.rows * sp.cellSize,
+      })
+    })
+    return cibles
+  }
+
+  // Aimante un rectangle en mouvement sur les bords et centres des autres
+  // éléments (parois, sas, éponges) ET de la salle — puis propose
+  // l'ÉQUIRÉPARTITION : même écart de part et d'autre (murs compris) ou
+  // rythme répété (l'écart des deux voisins se reproduit). Façon Canva :
+  // qu'ils se touchent ou non, les alignements se proposent.
+  private aimant(r: Rect): {
+    rect: Rect
+    guides: { axe: 'v' | 'h'; pos: number }[]
+  } {
+    const TH = 8 / this.zoom
+    const cibles = this.ciblesAimant()
+    // la salle propose ses murs et son centre, comme n'importe quel bord
+    const ciblesBords: Rect[] = [...cibles, { ...this.level.bounds }]
     const cand = (t: Rect, axe: 'v' | 'h'): number[] =>
       axe === 'v'
         ? [t.minX, t.maxX, (t.minX + t.maxX) / 2]
@@ -895,7 +1347,7 @@ export class LevelEditor {
     const guides: { axe: 'v' | 'h'; pos: number }[] = []
     let gX: number | null = null
     let gY: number | null = null
-    for (const t of cibles) {
+    for (const t of ciblesBords) {
       for (const c of cand(t, 'v')) {
         for (const p of propre.v) {
           const d = Math.abs(c - p)
@@ -915,6 +1367,123 @@ export class LevelEditor {
             gY = c
           }
         }
+      }
+    }
+    // ——— ÉQUIRÉPARTITION ———————————————————————————————————————————
+    // Sur chaque axe : les voisins les plus proches de part et d'autre
+    // (dans la bande du rectangle, murs de la salle compris). Deux
+    // propositions, la plus proche l'emporte sur l'aimant de bord :
+    //  · CENTRAGE — même écart à gauche et à droite ;
+    //  · RYTHME — l'écart entre les deux voisins d'un côté se répète.
+    this.ecarts = []
+    const salle = this.level.bounds
+    type Prop = { d: number; delta: number; ecarts: [number, number][] }
+    const propositions = (axeX: boolean): Prop[] => {
+      const lo = axeX ? r.minX : r.minY
+      const hi = axeX ? r.maxX : r.maxY
+      const mur0 = axeX ? salle.minX : salle.minY
+      const mur1 = axeX ? salle.maxX : salle.maxY
+      const enBande = (t: Rect): boolean =>
+        axeX
+          ? t.maxY > r.minY && t.minY < r.maxY
+          : t.maxX > r.minX && t.minX < r.maxX
+      // voisin immédiat de chaque côté (bord tourné vers nous) + suivant
+      let g1 = mur0
+      let d1 = mur1
+      let g1lo: number | null = null // l'autre bord du voisin gauche
+      let d1hi: number | null = null
+      for (const t of cibles) {
+        if (!enBande(t)) continue
+        const tLo = axeX ? t.minX : t.minY
+        const tHi = axeX ? t.maxX : t.maxY
+        if (tHi <= lo + 1e-6 && tHi > g1) {
+          g1 = tHi
+          g1lo = tLo
+        }
+        if (tLo >= hi - 1e-6 && tLo < d1) {
+          d1 = tLo
+          d1hi = tHi
+        }
+      }
+      const props: Prop[] = []
+      const taille = hi - lo
+      // CENTRAGE entre les deux voisins (ou les murs)
+      if (d1 - g1 > taille + 2) {
+        const cible = (g1 + d1) / 2
+        const delta = cible - (lo + hi) / 2
+        props.push({
+          d: Math.abs(delta),
+          delta,
+          ecarts: [
+            [g1, lo + delta],
+            [hi + delta, d1],
+          ],
+        })
+      }
+      // RYTHME côté gauche/bas : l'écart d'avant se répète
+      if (g1lo !== null) {
+        let g2 = mur0
+        for (const t of cibles) {
+          if (!enBande(t)) continue
+          const tHi = axeX ? t.maxX : t.maxY
+          if (tHi <= g1lo + 1e-6 && tHi > g2) g2 = tHi
+        }
+        const pas = g1lo - g2
+        if (pas > 2) {
+          const delta = g1 + pas - lo
+          props.push({
+            d: Math.abs(delta),
+            delta,
+            ecarts: [
+              [g2, g1lo],
+              [g1, lo + delta],
+            ],
+          })
+        }
+      }
+      // RYTHME côté droit/haut
+      if (d1hi !== null) {
+        let d2 = mur1
+        for (const t of cibles) {
+          if (!enBande(t)) continue
+          const tLo = axeX ? t.minX : t.minY
+          if (tLo >= d1hi - 1e-6 && tLo < d2) d2 = tLo
+        }
+        const pas = d2 - d1hi
+        if (pas > 2) {
+          const delta = d1 - pas - hi
+          props.push({
+            d: Math.abs(delta),
+            delta,
+            ecarts: [
+              [hi + delta, d1],
+              [d1hi, d2],
+            ],
+          })
+        }
+      }
+      return props
+    }
+    const latX = (r.minY + r.maxY) / 2
+    const latY = (r.minX + r.maxX) / 2
+    for (const p of propositions(true)) {
+      if (p.d < TH && p.d < bestX) {
+        bestX = p.d
+        dx = p.delta
+        gX = null // les mesures remplacent le trait
+        this.ecarts = this.ecarts.filter((ec) => ec.axe !== 'x')
+        for (const [a, b] of p.ecarts)
+          this.ecarts.push({ axe: 'x', lat: latX, a, b })
+      }
+    }
+    for (const p of propositions(false)) {
+      if (p.d < TH && p.d < bestY) {
+        bestY = p.d
+        dy = p.delta
+        gY = null
+        this.ecarts = this.ecarts.filter((ec) => ec.axe !== 'y')
+        for (const [a, b] of p.ecarts)
+          this.ecarts.push({ axe: 'y', lat: latY, a, b })
       }
     }
     if (gX !== null) guides.push({ axe: 'v', pos: gX })
@@ -1016,6 +1585,7 @@ export class LevelEditor {
     c.addEventListener('contextmenu', (e) => e.preventDefault())
 
     c.addEventListener('pointerdown', (e) => {
+      this.cacheBulle() // un geste commence : la bulle s'efface
       try {
         c.setPointerCapture(e.pointerId)
       } catch {
@@ -1530,8 +2100,13 @@ export class LevelEditor {
                 ? 'nwse-resize'
                 : 'default'
             : 'crosshair'
+        // la bulle savante n'existe qu'en mode Sélection, souris posée
+        if (this.tool.kind === 'select' && this.pointeur === 'mouse')
+          this.majBulle(e.clientX, e.clientY, w.x, w.y)
+        else this.cacheBulle()
         return
       }
+      this.cacheBulle()
       const d = this.drag
       if (d.mode === 'rotate') {
         const b = this.level.boxes[d.index]
@@ -1543,7 +2118,22 @@ export class LevelEditor {
           a = ((a + 540) % 360) - 180 // ramené dans (-180, 180]
           // aimanté aux 15° — Alt pour l'angle libre (au degré près)
           const cran = e.altKey ? 1 : 15
-          const ang = Math.round(a / cran) * cran
+          let ang = Math.round(a / cran) * cran
+          // l'aimant d'ANGLE : à moins de 4° de l'angle d'une autre paroi
+          // oblique, on adopte le sien — deux obliques de concert
+          if (!e.altKey) {
+            let bestA = 4
+            this.level.boxes.forEach((autre, i) => {
+              if (i === d.index) return
+              const aa = autre.angle ?? 0
+              if (!aa) return
+              const dA = Math.abs(a - aa)
+              if (dA < bestA) {
+                bestA = dA
+                ang = aa
+              }
+            })
+          }
           if (ang) b.angle = ang
           else delete b.angle
         }
@@ -1592,7 +2182,10 @@ export class LevelEditor {
               }
             : { ...r }
         }
-        if (bb) this.guides = this.aimant(bb).guides
+        if (bb) {
+          this.guides = this.aimant(bb).guides
+          this.ecarts = [] // le groupe montre les traits, pas les mesures
+        }
       } else if (d.mode === 'move') {
         if (this.sel?.kind === 'rail' && d.pts) {
           const r = (this.level.rails ?? [])[this.sel.index]
@@ -1666,11 +2259,40 @@ export class LevelEditor {
             b.maxY = cy + hy
           }
         } else {
+          // le bord tiré s'aimante lui aussi (bords, centres, salle) —
+          // même langage qu'au déplacement, la grille en repli
           const r = { ...d.start }
-          if (d.edge.includes('W')) r.minX = this.snapped(w.x)
-          if (d.edge.includes('E')) r.maxX = this.snapped(w.x)
-          if (d.edge.includes('N')) r.maxY = this.snapped(w.y)
-          if (d.edge.includes('S')) r.minY = this.snapped(w.y)
+          this.guides = []
+          this.ecarts = []
+          const colle = (v: number, axe: 'v' | 'h'): number => {
+            const TH = 8 / this.zoom
+            let best = TH
+            let pos = this.snapped(v)
+            let gd: number | null = null
+            for (const t of [
+              ...this.ciblesAimant(),
+              { ...this.level.bounds },
+            ]) {
+              const cs =
+                axe === 'v'
+                  ? [t.minX, t.maxX, (t.minX + t.maxX) / 2]
+                  : [t.minY, t.maxY, (t.minY + t.maxY) / 2]
+              for (const c of cs) {
+                const dd = Math.abs(c - v)
+                if (dd < best) {
+                  best = dd
+                  pos = c
+                  gd = c
+                }
+              }
+            }
+            if (gd !== null) this.guides.push({ axe, pos: gd })
+            return pos
+          }
+          if (d.edge.includes('W')) r.minX = colle(w.x, 'v')
+          if (d.edge.includes('E')) r.maxX = colle(w.x, 'v')
+          if (d.edge.includes('N')) r.maxY = colle(w.y, 'h')
+          if (d.edge.includes('S')) r.minY = colle(w.y, 'h')
           this.applyRect(r)
         }
       }
@@ -1685,6 +2307,14 @@ export class LevelEditor {
       }
     }
     c.addEventListener('pointercancel', doigtParti)
+    c.addEventListener('pointerleave', (e) => {
+      if (
+        e.relatedTarget instanceof Node &&
+        this.bulle.contains(e.relatedTarget)
+      )
+        return // la souris va cliquer le ✎ : la bulle reste
+      this.cacheBulle()
+    })
     c.addEventListener('pointerup', (e) => {
       const pincait = this.pinceEcart !== null
       doigtParti(e)
@@ -1692,6 +2322,7 @@ export class LevelEditor {
       const d = this.drag
       this.drag = null
       this.guides = []
+      this.ecarts = []
       if (!d) return
       if (d.mode === 'aim') {
         this.setTool({ kind: 'select' })
@@ -1764,6 +2395,7 @@ export class LevelEditor {
     c.addEventListener(
       'wheel',
       (e) => {
+        this.cacheBulle()
         e.preventDefault()
         const rect = c.getBoundingClientRect()
         const before = this.toWorld(e.clientX - rect.left, e.clientY - rect.top)
@@ -1988,7 +2620,9 @@ export class LevelEditor {
       if (!this.level.caches) this.level.caches = []
       this.level.caches.push({ ...r })
       this.sel = { kind: 'cache', index: this.level.caches.length - 1 }
-      this.commit('Cachette posée — voilée en jeu, révélée quand le corps y entre.')
+      this.commit(
+        'Cachette posée — voilée en jeu, révélée quand le corps y entre.',
+      )
     } else if (t.kind === 'porte') {
       if (!this.level.portes) this.level.portes = []
       // asservie au canal de la cible la plus proche — modifiable au panneau
@@ -2463,12 +3097,25 @@ export class LevelEditor {
           if (c.checked) familles |= 1 << Number(c.dataset.fam)
         })
       return {
-        salles: Number((this.el('edg-salles') as HTMLSelectElement).value) as OptionsGen['salles'],
+        salles: Number(
+          (this.el('edg-salles') as HTMLSelectElement).value,
+        ) as OptionsGen['salles'],
         familles: familles || 127, // tout décocher n'a pas de sens : tout
-        dangers: Number((this.el('edg-dangers') as HTMLSelectElement).value) as OptionsGen['dangers'],
-        cachette: Number((this.el('edg-cachette') as HTMLSelectElement).value) as OptionsGen['cachette'],
-        decor: Number((this.el('edg-decor') as HTMLSelectElement).value) as OptionsGen['decor'],
-        laby: Number((this.el('edg-laby') as HTMLSelectElement).value) as OptionsGen['laby'],
+        dangers: Number(
+          (this.el('edg-dangers') as HTMLSelectElement).value,
+        ) as OptionsGen['dangers'],
+        cachette: Number(
+          (this.el('edg-cachette') as HTMLSelectElement).value,
+        ) as OptionsGen['cachette'],
+        decor: Number(
+          (this.el('edg-decor') as HTMLSelectElement).value,
+        ) as OptionsGen['decor'],
+        laby: Number(
+          (this.el('edg-laby') as HTMLSelectElement).value,
+        ) as OptionsGen['laby'],
+        contraste: Number(
+          (this.el('edg-contraste') as HTMLSelectElement).value,
+        ) as OptionsGen['contraste'],
       }
     }
     const genere = (): void => {
@@ -2476,7 +3123,11 @@ export class LevelEditor {
       const panneau = litOptionsPanneau()
       let niveau: LevelDef | null = null
       if (saisie.trim() === '') {
-        niveau = genereNiveau(Math.floor(Math.random() * 36 ** 4), null, panneau)
+        niveau = genereNiveau(
+          Math.floor(Math.random() * 36 ** 4),
+          null,
+          panneau,
+        )
       } else {
         const lue = analyseSaisie(saisie)
         if (!lue) {
@@ -2493,7 +3144,9 @@ export class LevelEditor {
             ? genereNiveauAtelier(
                 lue.cahier,
                 lue.variante ??
-                  Math.floor(Math.random() * 36 ** 3).toString(36).toUpperCase(),
+                  Math.floor(Math.random() * 36 ** 3)
+                    .toString(36)
+                    .toUpperCase(),
                 options,
               )
             : genereNiveau(lue.graine, null, options)
@@ -2511,9 +3164,12 @@ export class LevelEditor {
       )
     }
     this.el('edg-generer').addEventListener('click', genere)
-    ;(this.el('edg-code') as HTMLInputElement).addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') genere()
-    })
+    ;(this.el('edg-code') as HTMLInputElement).addEventListener(
+      'keydown',
+      (e) => {
+        if (e.key === 'Enter') genere()
+      },
+    )
     this.el('ed-save').addEventListener('click', () => void this.store(false))
     this.el('ed-save-as').addEventListener('click', () => void this.store(true))
     this.el('ed-play').addEventListener('click', () => {
@@ -3100,7 +3756,9 @@ export class LevelEditor {
       ? this.library.find((s) => {
           if (s.id === id || estCodeHub(s.level.code)) return false
           const n = numeroTableau(s.level.name)
-          return n !== null && n.numero === num.numero && n.lettre === num.lettre
+          return (
+            n !== null && n.numero === num.numero && n.lettre === num.lettre
+          )
         })
       : null
     const suivante = num
@@ -3270,6 +3928,8 @@ export class LevelEditor {
         `<button type="button" class="ed-btn" id="p-al-cv">Centrer (horizontal)</button>` +
         `<button type="button" class="ed-btn" id="p-dim-l">Même largeur (1ʳᵉ sélection)</button>` +
         `<button type="button" class="ed-btn" id="p-dim-h">Même hauteur (1ʳᵉ sélection)</button>` +
+        `<button type="button" class="ed-btn" id="p-rep-x">Répartir dans la largeur (salle)</button>` +
+        `<button type="button" class="ed-btn" id="p-rep-y">Répartir dans la hauteur (salle)</button>` +
         `</div>` +
         `<button type="button" class="ed-danger" id="p-del">Tout supprimer</button>`
       host
@@ -3296,6 +3956,12 @@ export class LevelEditor {
       host
         .querySelector('#p-dim-h')
         ?.addEventListener('click', () => this.memeDimension('hauteur'))
+      host
+        .querySelector('#p-rep-x')
+        ?.addEventListener('click', () => this.repartir('x'))
+      host
+        .querySelector('#p-rep-y')
+        ?.addEventListener('click', () => this.repartir('y'))
       host
         .querySelector('#p-del')
         ?.addEventListener('click', () => this.deleteSel())
@@ -3732,7 +4398,10 @@ export class LevelEditor {
             .join('') +
           `</select></label>`,
       )
-      rows.push(numField('X (centre)', 'p-dx', d.x), numField('Y (centre)', 'p-dy', d.y))
+      rows.push(
+        numField('X (centre)', 'p-dx', d.x),
+        numField('Y (centre)', 'p-dy', d.y),
+      )
       rows.push(
         numField('Largeur', 'p-dw', d.w),
         numField('Hauteur', 'p-dh', d.h),
@@ -3759,25 +4428,25 @@ export class LevelEditor {
           ? 'Zone d’état'
           : s.kind === 'cache'
             ? 'Cachette (pan voilé)'
-          : s.kind === 'sponge'
-            ? 'Éponge'
-            : s.kind === 'exit'
-              ? 'Sas'
-              : s.kind === 'spawn'
-                ? 'Point de départ'
-                : s.kind === 'laser'
-                  ? 'Émetteur laser'
-                  : s.kind === 'lumiere'
-                    ? `Lampe nº ${s.index + 1}`
-                    : s.kind === 'cible'
-                      ? `Cible nº ${canalDeCible(this.level.cibles ?? [], s.index)}`
-                      : s.kind === 'porte'
-                        ? 'Porte asservie'
-                        : s.kind === 'rail'
-                          ? 'Rail magnétique'
-                          : s.kind === 'decal'
-                            ? 'Décal (machinerie de décor)'
-                            : 'Étiquette'
+            : s.kind === 'sponge'
+              ? 'Éponge'
+              : s.kind === 'exit'
+                ? 'Sas'
+                : s.kind === 'spawn'
+                  ? 'Point de départ'
+                  : s.kind === 'laser'
+                    ? 'Émetteur laser'
+                    : s.kind === 'lumiere'
+                      ? `Lampe nº ${s.index + 1}`
+                      : s.kind === 'cible'
+                        ? `Cible nº ${canalDeCible(this.level.cibles ?? [], s.index)}`
+                        : s.kind === 'porte'
+                          ? 'Porte asservie'
+                          : s.kind === 'rail'
+                            ? 'Rail magnétique'
+                            : s.kind === 'decal'
+                              ? 'Décal (machinerie de décor)'
+                              : 'Étiquette'
 
     host.innerHTML =
       `<div class="ed-props-head">${kindName}</div><div class="ed-fields">${rows.join('')}</div>` +
@@ -3932,7 +4601,10 @@ export class LevelEditor {
       )
       if (text('p-kstyle') === 'paroi') c.style = 'paroi'
       else delete c.style
-      const kforme = Math.max(0, Math.min(FORME_ARC, Math.round(val('p-kforme'))))
+      const kforme = Math.max(
+        0,
+        Math.min(FORME_ARC, Math.round(val('p-kforme'))),
+      )
       if (kforme > 0) c.forme = kforme
       else delete c.forme
       const kang = Math.max(-180, Math.min(180, val('p-kang')))
@@ -4455,6 +5127,79 @@ export class LevelEditor {
         g.stroke()
       }
       g.restore()
+    }
+
+    // écarts ÉGAUX : les mesures roses de l'équirépartition — deux
+    // segments à butées, chacun porte sa longueur ; quand les nombres
+    // sont les mêmes, c'est équitablement réparti.
+    if (this.ecarts.length > 0) {
+      g.save()
+      g.strokeStyle = '#ff5cf0'
+      g.lineWidth = 1
+      g.setLineDash([])
+      g.font = '11px ui-monospace, monospace'
+      for (const ec of this.ecarts) {
+        const p =
+          ec.axe === 'x'
+            ? this.toScreen(ec.a, ec.lat)
+            : this.toScreen(ec.lat, ec.a)
+        const q =
+          ec.axe === 'x'
+            ? this.toScreen(ec.b, ec.lat)
+            : this.toScreen(ec.lat, ec.b)
+        g.beginPath()
+        g.moveTo(p.sx, p.sy)
+        g.lineTo(q.sx, q.sy)
+        if (ec.axe === 'x') {
+          g.moveTo(p.sx, p.sy - 5)
+          g.lineTo(p.sx, p.sy + 5)
+          g.moveTo(q.sx, q.sy - 5)
+          g.lineTo(q.sx, q.sy + 5)
+        } else {
+          g.moveTo(p.sx - 5, p.sy)
+          g.lineTo(p.sx + 5, p.sy)
+          g.moveTo(q.sx - 5, q.sy)
+          g.lineTo(q.sx + 5, q.sy)
+        }
+        g.stroke()
+        const txt = `${Math.round(Math.abs(ec.b - ec.a))}`
+        const mx = (p.sx + q.sx) / 2
+        const my = (p.sy + q.sy) / 2
+        const wT = g.measureText(txt).width
+        g.fillStyle = 'rgba(20,26,34,0.92)'
+        g.fillRect(mx - wT / 2 - 4, my - 8, wT + 8, 15)
+        g.fillStyle = '#ffd9fb'
+        g.fillText(txt, mx - wT / 2, my + 3)
+      }
+      g.restore()
+    }
+
+    // ROTATION en cours : l'angle s'affiche en vif près de la poignée —
+    // « (accordée) » quand il épouse celui d'une autre paroi oblique
+    if (this.drag?.mode === 'rotate' && this.sel?.kind === 'box') {
+      const b = this.level.boxes[this.sel.index]
+      const h = this.rotateHandlePos()
+      if (b && h) {
+        const angle = b.angle ?? 0
+        const idx = this.sel.index
+        const accord =
+          angle !== 0 &&
+          this.level.boxes.some((o, i) => i !== idx && (o.angle ?? 0) === angle)
+        const txt = accord ? `${angle}° (accordée)` : `${angle}°`
+        g.save()
+        g.font = '12px ui-monospace, monospace'
+        const wT = g.measureText(txt).width
+        const bx = h.sx + 14
+        const by = h.sy - 18
+        g.fillStyle = 'rgba(20,26,34,0.92)'
+        g.strokeStyle = '#ff5cf0'
+        g.lineWidth = 1
+        g.fillRect(bx - 6, by - 13, wT + 12, 20)
+        g.strokeRect(bx - 6, by - 13, wT + 12, 20)
+        g.fillStyle = '#ffd9fb'
+        g.fillText(txt, bx, by + 2)
+        g.restore()
+      }
     }
 
     // sas

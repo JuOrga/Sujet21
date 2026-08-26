@@ -31,6 +31,56 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
+    date: '26/08/2026 12:12',
+    title:
+      'Éditeur : les fiches se RÉÉCRIVENT — pour tout le monde, avec relecture des écarts',
+    notes: [
+      'Demandé : un bouton discret sur chaque bulle pour corriger son texte, sauvegardé pour tous, et un moyen ergonomique de voir ce qui a changé. C’est fait. Un ✎ discret dans le coin de la bulle (la souris peut y entrer, la bulle l’attend) ouvre l’édition : titre, résumé, lignes — « Enregistrer pour tous » publie au magasin partagé (/api/fiches, même mécanique que les présets). La bulle des autres concepteurs lit aussitôt le nouveau texte, signé en ambre : « réécrite par UNTEL · date ».',
+      'Les VALEURS VIVES (dimensions, canal d’une porte, angle d’un émetteur, capacité d’une éponge…) ne s’éditent pas : elles se recalculent à chaque survol et s’ajoutent sous le texte — une réécriture ne les perd jamais. La fiche d’origine n’est jamais détruite : « Rétablir l’original » l’exhume d’un clic, pour tous.',
+      'La RELECTURE : le bouton 🗒 FICHES de la barre (compteur ambre quand il y a des réécritures) ouvre l’écart fiche par fiche — texte d’origine barré rouge, texte corrigé en vert, auteur et date — avec Modifier et Rétablir sous la main. C’est là qu’on décide quoi reporter dans le système ; les réécritures se lisent aussi d’une requête à /api/fiches pour l’étude.',
+      'Vérifié dans l’éditeur piloté : bulle qui lit la surcharge (titre réécrit + signature), ✎ → modale préremplie → publication captée (clé, titre, auteur), panneau de relecture avec le diff exact, compteur « Fiches · 1 ». 5 tests gardent la mécanique (surcharge qui remplace le texte, valeurs vives qui survivent).',
+    ],
+  },
+  {
+    date: '26/08/2026 11:55',
+    title: 'Générateur : le mode CONTRASTÉ — la lumière basse sculpte la salle',
+    notes: [
+      'Demandé : un réglage qui pousse le contraste — des lampes BASSES pour des ombres qui s’étirent, des jeux d’ombres voulus. Le panneau ⚄ gagne « Éclairage : contrasté » : l’ambiante s’éteint presque (0,10-0,16 au lieu de 0,52), et chaque salle reçoit une lampe basse (90-170 u de hauteur — elle rase le sol, les ombres du décor s’allongent), intense (1,2-1,6), souvent teintée (ambre, bleu froid, rosé), près d’un flanc — jamais au centre : la lumière prend la salle en enfilade. Une lampe sur deux est un BANDEAU lumineux (jusqu’à 420 u, horizontal, vertical ou incliné).',
+      'Et l’ombre se COMPOSE : à côté de chaque lampe basse, le générateur pose quand la place le permet un ÉCRAN D’OMBRE — un pilier fin, pivoté face à la lampe, entre elle et le cœur de la salle — pour découper une ombre longue et précise dans la pièce. Les écrans respectent les réserves (jamais sur un mécanisme ou le chemin), et le parcours de validation garde le dernier mot.',
+      'Le réglage voyage dans le code comme les autres (« G-Q~2TJ0 ») : retaper le code redonne la même salle, éclairage compris — et les bandeaux suivent les retournements d’orientation (transposition et miroir pivotent leur angle). Vérifié : 22 tests au générateur (338 au total), et une salle contrastée générée puis jouée en headless — ambiante éteinte, nappes de lumière, ombre diagonale de l’écran, capture à l’appui.',
+    ],
+  },
+  {
+    date: '26/08/2026 11:52',
+    title: 'Éditeur : la BULLE SAVANTE — chaque élément se raconte au survol',
+    notes: [
+      'Demandé : au survol posé d’un élément de l’éditeur, des précisions sur ce qu’il fait. C’est fait : une bulle patiente (elle attend 650 ms que la souris se pose, jamais pendant un geste) ouvre la FICHE de la pièce sous le curseur. Pour une SURFACE : l’effet raconté par état — EAU, GLACE, VAPEUR en couleur, et le sort du LASER — plus la géométrie vive (forme, inclinaison, dimensions). Pour un MÉCANISME : ses paramètres réels — l’angle d’un émetteur, le canal et la règle (OU/ET) d’une porte, le mode TOR (verrou ouvrant) ou NOR (maintien scellant) d’une pastille, la capacité d’une éponge, la hauteur d’une lampe…',
+      'Dix-neuf genres couverts : les neuf matériaux, sas, départ, éponge, émetteur, pastille, porte (asservie ou scénarisée), zone d’état, cachette voilée, rail magnétique, lampe, machinerie de décor, pancarte. La bulle suit le curseur sur le même élément, s’efface dès qu’il en change, au moindre geste, au zoom, ou quand la souris quitte la cuve — jamais d’encombrement. La PALETTE d’outils profite des mêmes fiches : survol posé d’un bouton de surface, sa fiche s’ouvre à côté (les anciens petits titres natifs, moins riches, sont retirés).',
+      'Le savoir est exact : chaque fiche est écrite depuis les règles du moteur (et recoupe le CODEX du jeu). Vérifié dans l’éditeur piloté à la souris : fiche Chaudière complète après le délai, fiche Pastille NOR avec canal, fiche palette Hydrophobe, effacement dans le vide — et 4 tests neufs gardent la couverture (chaque matériau, chaque genre, TOR contre NOR).',
+    ],
+  },
+  {
+    date: '26/08/2026 11:30',
+    title:
+      'Le générateur ne se répète plus : orientations, montages, silhouettes',
+    notes: [
+      'Retour du concepteur, mérité : trois salles « 333 » d’affilée se ressemblaient — même chaîne ouest → est, même fil à plomb tombé du plafond, même pastille posée à côté, même petit mot tuto partout. Quatre causes, quatre réponses. L’ORIENTATION d’abord : un niveau sur quatre seulement reste ouest → est — les autres se retournent (est → ouest), se DRESSENT (on monte) ou plongent ; la transposition emporte tout, parois, faisceaux, rails, preuves.',
+      'Les MONTAGES ensuite : le fil du miroir tombe du plafond, monte du plancher, ou court depuis le flanc — et le reflet part à droite, à gauche, vers le haut ou le bas selon la place, à distance variable ; chaque preuve porte désormais SA normale de glace. Le rail plasma et la barrière NOR se montent aussi dans les deux sens. Les SILHOUETTES : des bandeaux pleins mangent le haut ou le bas d’une salle sur trois, et le même code atelier fait varier son gabarit (3 à 5 compartiments autour de la moyenne de la difficulté).',
+      'Et les ÉTIQUETTES-TUTO sont dosées : une seule par espèce d’énigme et par salle, et plus AUCUNE au-delà de la difficulté 2 — l’atelier suppose le protocole connu (seul l’avertissement de la barrière NOR, qui scelle, reste). Contre-épreuve rejouée en éditeur réel : trois « 333 » d’affilée → une salle horizontale sas à l’ouest, deux verticales sas au nord, un à trois faisceaux dans les quatre directions, gabarits différents, zéro tuto. 21 tests au générateur (330 au total).',
+    ],
+  },
+  {
+    date: '26/08/2026 11:28',
+    title:
+      'Éditeur : assistants d’alignement v2 — équirépartition, redim et rotation aimantés',
+    notes: [
+      'Retour du concepteur : les guides d’alignement ne couvraient pas tout. Quatre manques comblés. L’ÉQUIRÉPARTITION MAGNÉTIQUE d’abord : en déplaçant une paroi, l’aimant propose désormais le point d’ÉQUILIBRE — même écart de part et d’autre (les murs de la salle comptent comme voisins), ou RYTHME répété (l’écart des deux voisins d’un côté se reproduit). Des mesures roses à butées affichent les distances : quand les nombres sont égaux, c’est réparti.',
+      'Le REDIMENSIONNEMENT s’aimante enfin : le bord tiré se colle aux bords et centres des autres éléments ET aux murs de la salle, guide pointillé à l’appui (la grille reste le repli). La ROTATION s’accorde : à moins de 4° de l’angle d’une autre paroi oblique, elle adopte le sien — deux obliques de concert (Alt : libre au degré près) — et l’angle s’affiche en vif près de la poignée, « (accordée) » quand il épouse celui d’une voisine.',
+      'Et pour poser deux parois équitablement dans une salle SANS calcul mental : sélection multiple (Maj + clic) puis « RÉPARTIR dans la largeur/hauteur (salle) » — mêmes écarts entre les murs et chaque élément, d’un clic. Deux couvertures réparées au passage : la SALLE elle-même (murs + centre) et les éponges s’offrent maintenant à l’aimant — et le sas ne s’aimante plus sur lui-même quand c’est lui qu’on déplace (cela étouffait les autres guides).',
+      'Vérifié dans l’éditeur piloté à la souris : équirépartition aimantée pile au centre (mesures 850 · 850), bord collé au mur de la salle en redim, rotation accordée à 30° sur la paroi voisine, répartition 733 · 733 · 733 murs compris.',
+    ],
+  },
+  {
     date: '26/08/2026 11:15',
     title: 'LE CABINET LOGIQUE : cinq circuits booléens prouvés, en démonstration',
     notes: [
