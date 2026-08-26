@@ -2823,6 +2823,9 @@ const editor = new LevelEditor(el('editor'), {
   },
   // l'éditeur n'ordonne plus lui-même : son bouton renvoie à LA PLANCHE
   planche: () => void ouvrePlanche(),
+  // L2 tenu = Maj : la multi-sélection au Steam Deck (trackpad droit en
+  // souris, aucune touche Maj sous la main)
+  modMulti: () => manette.ltVal > 0.5,
 })
 
 // ---- Les panneaux de l'éditeur se TIRENT au doigt --------------------------

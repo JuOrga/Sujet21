@@ -176,6 +176,9 @@ export interface EditorHooks {
   /** Ouvrir LA PLANCHE (l'écran d'ordonnancement en cartes visuelles) —
    * l'éditeur n'ordonne plus lui-même, il y renvoie. */
   planche?(): void
+  /** Le modificateur de MULTI-SÉLECTION est-il tenu ? (L2 sur Steam Deck :
+   * pas de touche Maj au trackpad — L2 + clic vaut Maj + clic.) */
+  modMulti?(): boolean
   /** Les paramètres VIFS du banc de réglage — pas les défauts figés. Les
    * portées dessinées (aspiration du sas, auras, rails) suivent ainsi la
    * valeur renseignée, en direct. Absent : les défauts font l'affaire. */
@@ -309,6 +312,8 @@ export class LevelEditor {
   // Sélection MULTIPLE (Maj + clic) : déplacée d'un bloc, supprimée d'un
   // coup, ou passée aux outils d'alignement du panneau.
   private multi: Sel[] = []
+  // l'APPUI LONG tactile en cours : il vaudra Maj + clic s'il tient 480 ms
+  private appuiLong: { timer: number; sx: number; sy: number } | null = null
 
   private hint = ''
 
@@ -603,6 +608,29 @@ export class LevelEditor {
       sp.minY = norm.minY
       sp.cols = Math.max(1, Math.round((norm.maxX - norm.minX) / sp.cellSize))
       sp.rows = Math.max(1, Math.round((norm.maxY - norm.minY) / sp.cellSize))
+    }
+  }
+
+  /** Maj + clic, L2 + clic (manette) ou appui long (tactile) : la sélection
+   * MULTIPLE — l'élément sous le point s'ajoute ou se retire. */
+  private basculeMulti(wx: number, wy: number): void {
+    const hit = this.pick(wx, wy)
+    if (!hit) return
+    if (this.multi.length === 0 && this.sel && !this.sameSel(this.sel, hit)) {
+      this.multi = [this.sel]
+    }
+    const deja = this.multi.findIndex((m) => this.sameSel(m, hit))
+    if (deja >= 0) this.multi.splice(deja, 1)
+    else this.multi.push(hit)
+    this.sel = this.multi[this.multi.length - 1] ?? null
+    this.syncProps()
+    this.draw()
+  }
+
+  private annuleAppuiLong(): void {
+    if (this.appuiLong) {
+      window.clearTimeout(this.appuiLong.timer)
+      this.appuiLong = null
     }
   }
 
@@ -1641,6 +1669,7 @@ export class LevelEditor {
       if (this.doigts.size >= 2) {
         // deuxième doigt : on passe au pincement — le geste en cours est
         // abandonné (on ne veut pas déplacer une paroi en zoomant)
+        this.annuleAppuiLong()
         this.drag = null
         this.guides = []
         this.pinceEcart = this.ecartDoigts()
@@ -1656,24 +1685,24 @@ export class LevelEditor {
       }
 
       if (this.tool.kind === 'select') {
-        // Maj + clic : la sélection MULTIPLE — on ajoute ou retire l'élément
-        if (e.shiftKey) {
-          const hit = this.pick(w.x, w.y)
-          if (hit) {
-            if (
-              this.multi.length === 0 &&
-              this.sel &&
-              !this.sameSel(this.sel, hit)
-            ) {
-              this.multi = [this.sel]
-            }
-            const deja = this.multi.findIndex((m) => this.sameSel(m, hit))
-            if (deja >= 0) this.multi.splice(deja, 1)
-            else this.multi.push(hit)
-            this.sel = this.multi[this.multi.length - 1] ?? null
-            this.syncProps()
-            this.draw()
+        // TACTILE : l'appui long vaut Maj + clic — la multi-sélection au
+        // doigt (annulé au moindre déplacement, au relâcher, au 2ᵉ doigt)
+        if (e.pointerType === 'touch') {
+          this.annuleAppuiLong()
+          this.appuiLong = {
+            sx,
+            sy,
+            timer: window.setTimeout(() => {
+              this.appuiLong = null
+              this.drag = null
+              this.guides = []
+              this.basculeMulti(w.x, w.y)
+            }, 480),
           }
+        }
+        // Maj + clic (ou L2 + clic à la manette) : la sélection MULTIPLE
+        if (e.shiftKey || (this.hooks.modMulti?.() ?? false)) {
+          this.basculeMulti(w.x, w.y)
           return
         }
         // clic sur un élément déjà dans la sélection multiple : tout se déplace
@@ -2098,6 +2127,12 @@ export class LevelEditor {
       const sy = e.clientY - rect.top
       const w = this.toWorld(sx, sy)
       this.showCoords(w.x, w.y)
+      // le doigt bouge : ce n'est plus un appui long
+      if (
+        this.appuiLong &&
+        Math.hypot(sx - this.appuiLong.sx, sy - this.appuiLong.sy) > 8
+      )
+        this.annuleAppuiLong()
 
       const doigt = this.doigts.get(e.pointerId)
       if (doigt) {
@@ -2338,6 +2373,7 @@ export class LevelEditor {
     })
 
     const doigtParti = (e: PointerEvent): void => {
+      this.annuleAppuiLong() // relâché avant 480 ms : simple clic
       this.doigts.delete(e.pointerId)
       if (this.doigts.size < 2) {
         this.pinceEcart = null
