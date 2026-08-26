@@ -22,6 +22,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '26/08/2026 21:51',
+    title: 'Changer de tableau au doigt : le ✎ des cartes, et la liste réparée',
+    notes: [
+      'Signalé (capture Steam Deck à l’appui) : la liste des tableaux de l’éditeur restait impraticable — fenêtre minuscule, ASCENSEUR HORIZONTAL (les noms ne pouvaient pas replier : les boutons de l’éditeur interdisent le retour à la ligne), cibles trop petites. Réparé : la liste prend presque la moitié de l’écran, les noms replient sur deux lignes (plus jamais de défilement latéral), les lignes font 40 u et plus, le ✕ devient une vraie cible.',
+      'Et le geste fait pour le Deck : chaque carte de LA PLANCHE porte maintenant un ✎ à côté du ⏵ — il OUVRE ce tableau dans l’éditeur. La planche devient le sélecteur grand format : mini-cartes, gros boutons, un tap. Vérifié en 1280×800 (la résolution du Deck) : zéro débordement, lignes de 60-100 px, ✎ qui ferme la planche et charge le bon tableau, ligne surlignée dans la liste. 354 tests verts.',
+    ],
+  },
+  {
     date: '26/08/2026 21:35',
     title: 'Steam Deck : le stick droit DÉFILE les menus — comme le pavé en mode bureau',
     notes: [
