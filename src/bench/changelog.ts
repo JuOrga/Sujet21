@@ -29,6 +29,24 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
+    date: '26/08/2026 17:31',
+    title: 'Le FAISCEAU SOMPTUEUX — et le sursaut de victoire à l’allumage',
+    notes: [
+      'Demandé : un rayon lumineux bien plus stylé et satisfaisant, l’ancien conservé dans PARAMÈTRES — et un effet de victoire quand le rayon touche sa cible, même sur un balayage éclair. C’est fait. SOMPTUEUX (défaut) : une nappe d’ambiance très large baigne la salle, le halo s’élargit, et surtout un FLUX de paquets lumineux REMONTE le rayon en continu — l’énergie voyage au lieu de poser un trait. La bouche de l’émetteur et le point d’arrivée LUISENT et crépitent doucement. L’arc plasma garde sa teinte violette, l’eau son rose diffus.',
+      'LE SURSAUT DE VICTOIRE : à l’instant où une pastille s’allume (front montant TOR ou NOR), la trajectoire exacte du rayon vainqueur est GELÉE et rejouée en flash blanc-vert pendant un demi-souffle — sursaut violent puis apaisé, anneau qui s’évase depuis la pastille, huit étincelles qui fusent de l’impact. Même si la physique a déjà emporté le rayon ailleurs : un balayage à toute vitesse sur la cible ne passe plus jamais inaperçu.',
+      'PARAMÈTRES gagne la ligne « LE FAISCEAU LASER » : Somptueux / Classique — l’ancien rendu au pixel près, sursaut compris dans le seul mode somptueux (le classique reste exactement l’existant). Vérifié en salle d’essai pilotée : faisceau tracé, pastille allumée au premier passage (front montant capté), captures des trois rendus à l’appui. 343 tests verts.',
+    ],
+  },
+  {
+    date: '26/08/2026 17:21',
+    title: 'Le MIROIR FIXE — et le froid revient à la coque',
+    notes: [
+      'Deux retours du concepteur. Le LORE d’abord : le froid vient de l’ESPACE — un hublot fendu ne peut être que sur la COQUE, le tour du plateau. Le générateur ne pose plus jamais de plaque froide en plein vaisseau : il cherche les bords de salle qui touchent réellement la coque (haut, bas, flancs — les plaques savent désormais se dresser à la verticale) et s’y tient ; une salle sans coque reçoit une chaudière, machine du vaisseau, qui va partout.',
+      'Ensuite le MIROIR, nouvelle surface d’éditeur : une paroi POLIE qui RÉFLÉCHIT parfaitement le faisceau — rectangle (pivoté à 45° pour un renvoi d’équerre), disque bombé (la normale radiale), toute forme (la normale s’échantillonne). Le corps y bute comme sur un mur ; l’arc guidé par un rail s’y éteint ; le plafond de rebonds vaut celui de la glace. Rendu poli : métal froid presque blanc, balayage spéculaire, micro-rayures, arête en fil de lumière.',
+      'Et le générateur s’en sert contre les « cibles collées au laser » : dès la difficulté 3 (une fois sur trois en tirage libre), l’énigme du miroir devient un TRAJET RELAYÉ — le fil tombe, un losange poli le couche à l’horizontale à travers la salle, le corps gelé du joueur le redresse vers la pastille : trois temps, et la cible finit loin de l’émetteur. Vérifié : 3 tests d’optique du miroir fixe (renvoi d’équerre, renvoi droit, plafond de rebonds), preuve du relais discriminante, hublots tous sur coque sur 60 graines — 348 tests, et la salle G-333-B jouée en essai : le losange plie le fil sous nos yeux, capture à l’appui.',
+    ],
+  },
+  {
     date: '26/08/2026 17:06',
     title: 'LA PLANCHE : l’ordonnancement de l’expédition, en cartes visuelles',
     notes: [

@@ -26,7 +26,13 @@
 //     plasma se PROVOQUE — être vapeur dans la lumière au bon endroit —
 //     il ne se choisit pas : ce n'est pas un quatrième état.
 
-import { MAT_EXIT, MAT_GRILLE, type LaserDef, type ObstacleBox } from './level'
+import {
+  MAT_EXIT,
+  MAT_GRILLE,
+  MAT_MIROIR,
+  type LaserDef,
+  type ObstacleBox,
+} from './level'
 import { dansForme } from './formes'
 import type { Bounds } from '../sim/solver'
 
@@ -125,9 +131,80 @@ function dansRectAxe(x: number, y: number, r: Rect): boolean {
   return x >= r.minX && x <= r.maxX && y >= r.minY && y <= r.maxY
 }
 
-/** Une boîte absorbe-t-elle la lumière ? Grille et sas laissent passer. */
+/** Une boîte absorbe-t-elle la lumière ? Grille et sas laissent passer.
+ * (Le MIROIR FIXE « absorbe » aussi au sens des rails — l'arc guidé s'y
+ * éteint — mais la marche libre le RÉFLÉCHIT avant d'en arriver là.) */
 function absorbe(b: ObstacleBox): boolean {
   return b.material !== MAT_GRILLE && b.material !== MAT_EXIT
+}
+
+// ---- Le MIROIR FIXE : la paroi polie qui réfléchit le faisceau ----------
+// La normale au point d'impact : analytique pour le rectangle (pivoté ou
+// non — la face la plus proche dans le repère local) et pour le disque
+// (radiale) ; numérique pour les autres formes (l'échantillonnage du champ
+// autour du point donne la direction de sortie).
+export function normaleMiroir(
+  b: ObstacleBox,
+  x: number,
+  y: number,
+): { nx: number; ny: number } {
+  const cx = (b.minX + b.maxX) / 2
+  const cy = (b.minY + b.maxY) / 2
+  if (!b.forme) {
+    // repère local (dé-pivoté)
+    let lx = x
+    let ly = y
+    const rad = ((b.angle ?? 0) * Math.PI) / 180
+    if (b.angle) {
+      const ca = Math.cos(rad)
+      const sa = Math.sin(rad)
+      const rx = x - cx
+      const ry = y - cy
+      lx = cx + rx * ca + ry * sa
+      ly = cy - rx * sa + ry * ca
+    }
+    const pg = lx - b.minX
+    const pd = b.maxX - lx
+    const pb = ly - b.minY
+    const ph = b.maxY - ly
+    const m = Math.min(pg, pd, pb, ph)
+    let nx = 0
+    let ny = 0
+    if (m === pg) nx = -1
+    else if (m === pd) nx = 1
+    else if (m === pb) ny = -1
+    else ny = 1
+    if (!b.angle) return { nx, ny }
+    const ca = Math.cos(rad)
+    const sa = Math.sin(rad)
+    return { nx: nx * ca - ny * sa, ny: nx * sa + ny * ca }
+  }
+  if (b.forme === 1) {
+    // disque/ellipse : la normale radiale, corrigée des demi-axes
+    const ax = Math.max(1e-3, (b.maxX - b.minX) / 2)
+    const ay = Math.max(1e-3, (b.maxY - b.minY) / 2)
+    let nx = (x - cx) / (ax * ax)
+    let ny = (y - cy) / (ay * ay)
+    const n = Math.hypot(nx, ny) || 1
+    nx /= n
+    ny /= n
+    return { nx, ny }
+  }
+  // formes composées : la moyenne des directions qui SORTENT du champ
+  let sx = 0
+  let sy = 0
+  for (let k = 0; k < 8; k++) {
+    const a = (k * Math.PI) / 4
+    const ox = Math.cos(a) * 7
+    const oy = Math.sin(a) * 7
+    if (!dansForme(b, x + ox, y + oy)) {
+      sx += ox
+      sy += oy
+    }
+  }
+  const n = Math.hypot(sx, sy)
+  if (n < 1e-6) return { nx: 0, ny: 1 }
+  return { nx: sx / n, ny: sy / n }
 }
 
 export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
@@ -224,6 +301,43 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
         touchees.push(c)
         return { points, touchees, railsSuivis, rebondsGlace: bounces }
       }
+    }
+
+    // un MIROIR FIXE : la paroi polie réfléchit — même plafond de rebonds
+    // que la glace (contre les couloirs de miroirs infinis)
+    let miroirTouche: ObstacleBox | null = null
+    for (const b of monde.boxes) {
+      if (b.material === MAT_MIROIR && dansRect(x, y, b)) {
+        miroirTouche = b
+        break
+      }
+    }
+    if (miroirTouche) {
+      if (bounces >= LASER_MAX_BOUNCES) {
+        points.push({ x, y })
+        return { points, touchees, railsSuivis, rebondsGlace: bounces }
+      }
+      bounces++
+      points.push({ x, y })
+      const n = normaleMiroir(miroirTouche, x, y)
+      const dsc = dx * n.nx + dy * n.ny
+      dx -= 2 * dsc * n.nx
+      dy -= 2 * dsc * n.ny
+      const inv = 1 / Math.max(1e-6, Math.hypot(dx, dy))
+      dx *= inv
+      dy *= inv
+      // dégagement : on ressort du poli le long de la normale
+      let garde = 0
+      while (garde++ < 10 && dansRect(x, y, miroirTouche)) {
+        x += n.nx * LASER_STEP
+        y += n.ny * LASER_STEP
+        course += LASER_STEP
+      }
+      if (refracte) dansEau = monde.eau!.dedans(x, y)
+      if (monde.vapeur) dansVapeur = monde.vapeur(x, y)
+      points[points.length - 1].eau = dansEau
+      points[points.length - 1].plasma = dansVapeur
+      continue
     }
 
     // une paroi pleine ou une porte fermée : absorbé

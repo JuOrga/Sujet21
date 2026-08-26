@@ -41,6 +41,7 @@ import {
   MAT_CHAUD,
   MAT_MEMBRANE,
   MAT_RIDEAU,
+  MAT_MIROIR,
   type LevelDef,
   type ObstacleBox,
   type WorldLabel,
@@ -672,6 +673,70 @@ function essaieNiveau(
     let d: { x: number; y: number }
     let r: { x: number; y: number }
     let L: number
+    // le TRAJET RELAYÉ : au-delà de la difficulté 2 (ou une fois sur trois
+    // en tirage libre), un MIROIR FIXE en losange relaie le fil — le
+    // faisceau tombe, le losange poli le couche à l'horizontale à travers
+    // la salle, le corps gelé du joueur le redresse vers la pastille :
+    // la cible finit LOIN de l'émetteur, le trajet se lit en trois temps.
+    const veutRelais =
+      montage !== 'flanc' &&
+      (atelier ? atelier.cahier.difficulte >= 3 : rng() < 0.35)
+    if (veutRelais) {
+      const ex = Math.round(entre(rng, R.minX + 180, R.maxX - 180) / 10) * 10
+      const duHaut = montage === 'plafond'
+      em = { x: ex, y: duHaut ? R.maxY - 24 : R.minY + 24, angle: duHaut ? -90 : 90 }
+      const d0y = duHaut ? -1 : 1
+      const myF = Math.round(entre(rng, midY - demi * 0.3, midY + demi * 0.3) / 10) * 10
+      const espaceDroite = R.maxX - 90 - ex
+      const espaceGauche = ex - (R.minX + 90)
+      const sHor = espaceDroite >= espaceGauche ? 1 : -1
+      const espace = sHor > 0 ? espaceDroite : espaceGauche
+      if (espace >= 330) {
+        // le losange poli, décalé du fil pour présenter sa face à 45°
+        const decal = -sHor * 40
+        boxes.push({
+          minX: ex + decal - 40,
+          minY: myF - 40,
+          maxX: ex + decal + 40,
+          maxY: myF + 40,
+          material: MAT_MIROIR,
+          angle: 45,
+        })
+        const hitY = myF - d0y * 17
+        const Lf = entre(rng, 210, Math.min(420, espace - 110))
+        spot = { x: Math.round((ex + sHor * Lf) / 10) * 10, y: hitY }
+        d = { x: sHor, y: 0 } // le fil ARRIVE horizontal sur le corps gelé
+        const espaceHaut = R.maxY - 80 - hitY
+        const espaceBas = hitY - (R.minY + 80)
+        const versHaut = espaceHaut < 180 ? false : espaceBas < 180 ? true : rng() < 0.5
+        r = { x: 0, y: versHaut ? 1 : -1 }
+        L = entre(rng, 150, Math.min(340, Math.max(160, (versHaut ? espaceHaut : espaceBas) - 20)))
+        // réserves : le fil vertical (losange compris), puis le relais
+        reserves.push(bande(em.x, em.y, ex, myF, 80))
+        reserves.push(bande(ex, hitY, spot.x + sHor * 40, hitY, 80))
+        const nl0 = Math.hypot(r.x - d.x, r.y - d.y)
+        const normale0 = { nx: (r.x - d.x) / nl0, ny: (r.y - d.y) / nl0 }
+        const cible0: CibleDef = {
+          x: spot.x - d.x * 44 + normale0.nx * 8 + r.x * L,
+          y: spot.y - d.y * 44 + normale0.ny * 8 + r.y * L,
+          r: 30,
+          canal,
+        }
+        cibles.push(cible0)
+        lasers.push(em)
+        preuves.push({
+          kind: 'miroir',
+          canal,
+          emetteur: em,
+          spot,
+          normale: normale0,
+          cibleIndex: cibles.length - 1,
+        })
+        poseIndice('miroir', spot.x + d.x * 66, spot.y + d.y * 66, 'MIROIR DE GLACE', 'froid')
+        reserves.push(bande(spot.x, spot.y, cible0.x + r.x * 40, cible0.y + r.y * 40, 90))
+        return
+      }
+    }
     if (montage === 'flanc') {
       const ey = Math.round(entre(rng, midY - demi * 0.3, midY + demi * 0.3) / 10) * 10
       em = { x: R.minX + 16, y: ey, angle: 0 }
@@ -1084,19 +1149,44 @@ function essaieNiveau(
               ? Math.min(0.75, 0.15 + 0.07 * atelier.cahier.difficulte)
               : 0.34
     if (rng() < pDanger) {
+      // le LORE place les dangers : le froid vient de l'ESPACE — un hublot
+      // fendu ne peut être que sur la COQUE (le tour du plateau). La
+      // chaudière est une machine du vaisseau : n'importe quel bord.
+      const surCoque = {
+        haut: Math.abs(R.maxY - (bounds.maxY - 40)) < 1,
+        bas: Math.abs(R.minY - (bounds.minY + 40)) < 1,
+        gauche: Math.abs(R.minX - (bounds.minX + 40)) < 1,
+        droite: Math.abs(R.maxX - (bounds.maxX - 40)) < 1,
+      }
+      const bordsCoque = (['haut', 'bas', 'gauche', 'droite'] as const).filter(
+        (b) => surCoque[b],
+      )
+      let chaud = rng() < 0.5
+      if (!chaud && bordsCoque.length === 0) chaud = true // salle sans coque
+      const bords = chaud ? (['haut', 'bas', 'gauche', 'droite'] as const) : bordsCoque
       for (let essai = 0; essai < 18; essai++) {
-        const chaud = rng() < 0.5
-        const w = entre(rng, 140, 240)
-        const h = entre(rng, 50, 70)
-        const enHaut = rng() < 0.5
-        const cx = entre(rng, R.minX + 120, R.maxX - 120)
-        const cy = enHaut ? R.maxY - h / 2 - 4 : R.minY + h / 2 + 4
+        const bord = parmi(rng, bords)
+        const long = entre(rng, 140, 240)
+        const ep = entre(rng, 50, 70)
+        const vertical = bord === 'gauche' || bord === 'droite'
+        const cx = vertical
+          ? bord === 'gauche'
+            ? R.minX + ep / 2 + 4
+            : R.maxX - ep / 2 - 4
+          : entre(rng, R.minX + 120, R.maxX - 120)
+        const cy = vertical
+          ? entre(rng, R.minY + 120, R.maxY - 120)
+          : bord === 'haut'
+            ? R.maxY - ep / 2 - 4
+            : R.minY + ep / 2 + 4
+        const w = vertical ? ep : long
+        const h = vertical ? long : ep
         const r: Rect = { minX: cx - w / 2, minY: cy - h / 2, maxX: cx + w / 2, maxY: cy + h / 2 }
         if (!posePossible(r)) continue
         boxes.push({ ...r, material: chaud ? MAT_CHAUD : MAT_FROID, ...(chaud ? { aura: 0.8 } : {}) })
         labels.push({
-          x: cx,
-          y: cy + (enHaut ? -h - 40 : h + 40),
+          x: vertical ? cx + (bord === 'gauche' ? w + 60 : -w - 60) : cx,
+          y: vertical ? cy : cy + (bord === 'haut' ? -h - 40 : h + 40),
           text: chaud ? 'CHAUDIÈRE' : 'HUBLOT FENDU',
           tone: chaud ? 'chaud' : 'froid',
           rang: 'detail',
