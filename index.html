@@ -3670,6 +3670,50 @@
         border-color: var(--specimen);
         background: rgba(99, 183, 230, 0.16);
       }
+
+      /* La bulle savante de l'éditeur : la fiche d'un élément au survol */
+      .ed-bulle {
+        position: fixed;
+        z-index: 320;
+        max-width: 330px;
+        background: rgba(13, 19, 26, 0.96);
+        border: 1px solid #2c4256;
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-family: 'Space Grotesk', ui-monospace, monospace;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #c8d8e4;
+        pointer-events: none;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+      }
+      .ed-bulle-titre {
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #eaf4fb;
+      }
+      .ed-bulle-resume {
+        color: #9fb4c4;
+        margin: 2px 0 7px;
+      }
+      .ed-bulle-l {
+        display: flex;
+        gap: 8px;
+        margin-top: 3px;
+      }
+      .ed-bulle-cle {
+        flex: 0 0 52px;
+        text-align: right;
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        color: #7f95a6;
+        padding-top: 2px;
+      }
+      .ed-cle-eau { color: #63b7e6; }
+      .ed-cle-glace { color: #9fd0f0; }
+      .ed-cle-vapeur { color: #ffd24a; }
+      .ed-cle-laser { color: #ff6a6a; }
       #ed-stage {
         position: relative;
         overflow: hidden;
@@ -4504,11 +4548,11 @@
           <button type="button" class="ed-tool" data-tool="box:1"><i style="background:#2ec6c9"></i>Hydrophile</button>
           <button type="button" class="ed-tool" data-tool="box:2"><i style="background:#a878e8"></i>Hydrophobe</button>
           <button type="button" class="ed-tool" data-tool="box:4"><i style="background:#8fc8ee"></i>Hublot froid</button>
-          <button type="button" class="ed-tool" data-tool="box:6" title="Transforme en GAZ à 95 % de présence dans son aura, dégèle — jamais désactivée. Aura réglable par bloc (champ Aura)."><i style="background:#ff8a3c"></i>Chaudière</button>
-          <button type="button" class="ed-tool" data-tool="box:5" title="Seule la VAPEUR passe entre les lamelles — le liquide et la glace butent ; la lumière et le laser passent entre les barreaux (la lumière en ressort tamisée)"><i style="background:#8fb0c6"></i>Évent</button>
-          <button type="button" class="ed-tool" data-tool="box:7" title="Seule l'EAU la traverse — glace et vapeur butent, le laser est absorbé"><i style="background:#35c9a0"></i>Membrane</button>
-          <button type="button" class="ed-tool" data-tool="box:8" title="Seule la GLACE l'écarte — eau et vapeur butent, le laser est absorbé"><i style="background:#9fb9d8"></i>Rideau lamellaire</button>
-          <button type="button" class="ed-tool" data-tool="box:9" title="Mur pour le liquide et la glace. Frôlé en VAPEUR : rend UN dash — une seule fois, puis le serpentin s'éteint."><i style="background:#29d8ff"></i>Surchauffeur</button>
+          <button type="button" class="ed-tool" data-tool="box:6"><i style="background:#ff8a3c"></i>Chaudière</button>
+          <button type="button" class="ed-tool" data-tool="box:5"><i style="background:#8fb0c6"></i>Évent</button>
+          <button type="button" class="ed-tool" data-tool="box:7"><i style="background:#35c9a0"></i>Membrane</button>
+          <button type="button" class="ed-tool" data-tool="box:8"><i style="background:#9fb9d8"></i>Rideau lamellaire</button>
+          <button type="button" class="ed-tool" data-tool="box:9"><i style="background:#29d8ff"></i>Surchauffeur</button>
           <button type="button" class="ed-tool" data-tool="sponge"><i style="background:#d7ad55"></i>Éponge</button>
           <button type="button" class="ed-tool" data-tool="gomme" title="Effacer : glissez pour tracer une zone, tout ce qu'elle couvre disparaît. Une paroi à cheval est rognée ; une forme ou une oblique s'efface entière si son centre est dedans. La gomme reste en main : on gomme en série."><i style="background:#ffd24a"></i>Gomme</button>
           <button type="button" class="ed-tool" data-tool="cut" title="DEUX PAROIS QUI SE CHEVAUCHENT : cliquez celle qui prend le dessus, puis celle qui s'efface dessous — seule leur zone COMMUNE est rongée. Ne sert qu'à cela ; pour effacer librement, prenez la Gomme."><i style="background:#e86a6a"></i>Superposition</button>

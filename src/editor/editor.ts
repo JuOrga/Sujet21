@@ -39,6 +39,7 @@ import {
   type ZoneForce,
 } from '../game/level'
 import { TABLEAU_HUB, TABLEAU_HUB_COMPACT } from '../game/hub'
+import { ficheElement, FICHES_MATERIAUX, type Fiche } from './fiches'
 import {
   ARC_EPAISSEUR_DEFAUT,
   ARC_OUVERTURE_DEFAUT,
@@ -299,6 +300,12 @@ export class LevelEditor {
 
   private hint = ''
 
+  // La bulle savante du survol : l'élément div, son minuteur d'apparition
+  // (650 ms de souris posée), et la clé de l'élément qu'elle décrit.
+  private bulle!: HTMLDivElement
+  private bulleTimer: number | null = null
+  private bulleCle = ''
+
   // Images du jeu (illustrations de zones, décals) : chargées à la demande,
   // le dessin se rafraîchit quand elles arrivent — l'éditeur montre la même
   // chose que la cuve.
@@ -329,6 +336,14 @@ export class LevelEditor {
     this.hooks = hooks
     this.canvas = host.querySelector('#ed-canvas') as HTMLCanvasElement
     this.ctx = this.canvas.getContext('2d')!
+    // LA BULLE SAVANTE : au survol posé d'un élément, sa fiche (effet par
+    // état, paramètres vifs) apparaît après un court délai — jamais pendant
+    // un geste, jamais sous une souris qui bouge.
+    this.bulle = document.createElement('div')
+    this.bulle.className = 'ed-bulle'
+    this.bulle.hidden = true
+    document.body.appendChild(this.bulle)
+    this.bindBullesOutils()
     this.bindUi()
     this.bindCanvas()
     this.restore()
@@ -902,6 +917,114 @@ export class LevelEditor {
   // axe 'y' : un écart vertical tracé à la longitude lat (x monde).
   private ecarts: { axe: 'x' | 'y'; lat: number; a: number; b: number }[] = []
 
+  // ——— La bulle savante ————————————————————————————————————————————
+  /** Peint la fiche dans la bulle et la montre près du curseur. */
+  private montreBulle(fiche: Fiche, cx: number, cy: number): void {
+    const cleClasse = (c: string): string =>
+      c === 'EAU'
+        ? ' ed-cle-eau'
+        : c === 'GLACE'
+          ? ' ed-cle-glace'
+          : c === 'VAPEUR'
+            ? ' ed-cle-vapeur'
+            : c === 'LASER'
+              ? ' ed-cle-laser'
+              : ''
+    const esc = (t: string): string =>
+      t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    this.bulle.innerHTML =
+      `<div class="ed-bulle-titre">${esc(fiche.titre)}</div>` +
+      `<div class="ed-bulle-resume">${esc(fiche.resume)}</div>` +
+      fiche.lignes
+        .map(
+          (l) =>
+            `<div class="ed-bulle-l"><span class="ed-bulle-cle${cleClasse(l.cle)}">${esc(l.cle)}</span><span>${esc(l.txt)}</span></div>`,
+        )
+        .join('')
+    this.bulle.hidden = false
+    this.positionneBulle(cx, cy)
+  }
+
+  /** Place la bulle près du point (page), sans jamais sortir de l'écran. */
+  private positionneBulle(cx: number, cy: number): void {
+    const b = this.bulle
+    b.style.left = '0px'
+    b.style.top = '0px'
+    const r = b.getBoundingClientRect()
+    let x = cx + 16
+    let y = cy + 18
+    if (x + r.width > window.innerWidth - 8) x = Math.max(8, cx - r.width - 16)
+    if (y + r.height > window.innerHeight - 8)
+      y = Math.max(8, cy - r.height - 14)
+    b.style.left = `${Math.round(x)}px`
+    b.style.top = `${Math.round(y)}px`
+  }
+
+  private cacheBulle(): void {
+    if (this.bulleTimer !== null) {
+      clearTimeout(this.bulleTimer)
+      this.bulleTimer = null
+    }
+    if (!this.bulle.hidden) this.bulle.hidden = true
+    this.bulleCle = ''
+  }
+
+  /** Au survol du canevas : repousse l'apparition tant que la souris
+   * bouge ; une bulle déjà ouverte SUIT le curseur sur le même élément,
+   * et se ferme dès qu'il en change. */
+  private majBulle(cx: number, cy: number, wx: number, wy: number): void {
+    const hit = this.pick(wx, wy)
+    const cle = hit
+      ? `${hit.kind}:${'index' in hit && hit.index !== undefined ? hit.index : ''}`
+      : ''
+    if (!cle) {
+      this.cacheBulle()
+      return
+    }
+    if (!this.bulle.hidden && cle === this.bulleCle) {
+      this.positionneBulle(cx, cy)
+      return
+    }
+    if (!this.bulle.hidden) this.bulle.hidden = true
+    if (this.bulleTimer !== null) clearTimeout(this.bulleTimer)
+    this.bulleTimer = window.setTimeout(() => {
+      this.bulleTimer = null
+      if (this.drag) return // jamais pendant un geste
+      const fiche = ficheElement(hit, this.level)
+      if (!fiche) return
+      this.bulleCle = cle
+      this.montreBulle(fiche, cx, cy)
+    }, 650)
+  }
+
+  /** Les mêmes fiches sur la PALETTE d'outils : survol posé d'un bouton
+   * de surface (ou de l'éponge), la fiche du matériau s'ouvre à côté. */
+  private bindBullesOutils(): void {
+    const boutons = this.host.querySelectorAll<HTMLButtonElement>('.ed-tool')
+    boutons.forEach((b) => {
+      const outil = b.dataset.tool ?? ''
+      let fiche: Fiche | null = null
+      if (outil.startsWith('box:'))
+        fiche = FICHES_MATERIAUX[Number(outil.slice(4))] ?? null
+      else if (outil === 'sponge')
+        fiche = ficheElement({ kind: 'sponge', index: -1 }, this.level)
+      if (!fiche) return
+      const f = fiche
+      let timer: number | null = null
+      b.addEventListener('mouseenter', () => {
+        timer = window.setTimeout(() => {
+          const r = b.getBoundingClientRect()
+          this.montreBulle(f, r.right + 4, r.top - 8)
+        }, 650)
+      })
+      b.addEventListener('mouseleave', () => {
+        if (timer !== null) clearTimeout(timer)
+        timer = null
+        this.cacheBulle()
+      })
+    })
+  }
+
   /** Les rectangles sur lesquels on s'aimante : parois droites, sas,
    * éponges — sans l'élément tenu (le sas qu'on déplace ne doit pas
    * s'aimanter sur lui-même). La salle s'ajoute à part (murs + centre). */
@@ -1192,6 +1315,7 @@ export class LevelEditor {
     c.addEventListener('contextmenu', (e) => e.preventDefault())
 
     c.addEventListener('pointerdown', (e) => {
+      this.cacheBulle() // un geste commence : la bulle s'efface
       try {
         c.setPointerCapture(e.pointerId)
       } catch {
@@ -1706,8 +1830,13 @@ export class LevelEditor {
                 ? 'nwse-resize'
                 : 'default'
             : 'crosshair'
+        // la bulle savante n'existe qu'en mode Sélection, souris posée
+        if (this.tool.kind === 'select' && this.pointeur === 'mouse')
+          this.majBulle(e.clientX, e.clientY, w.x, w.y)
+        else this.cacheBulle()
         return
       }
+      this.cacheBulle()
       const d = this.drag
       if (d.mode === 'rotate') {
         const b = this.level.boxes[d.index]
@@ -1908,6 +2037,7 @@ export class LevelEditor {
       }
     }
     c.addEventListener('pointercancel', doigtParti)
+    c.addEventListener('pointerleave', () => this.cacheBulle())
     c.addEventListener('pointerup', (e) => {
       const pincait = this.pinceEcart !== null
       doigtParti(e)
@@ -1988,6 +2118,7 @@ export class LevelEditor {
     c.addEventListener(
       'wheel',
       (e) => {
+        this.cacheBulle()
         e.preventDefault()
         const rect = c.getBoundingClientRect()
         const before = this.toWorld(e.clientX - rect.left, e.clientY - rect.top)
@@ -2689,12 +2820,22 @@ export class LevelEditor {
           if (c.checked) familles |= 1 << Number(c.dataset.fam)
         })
       return {
-        salles: Number((this.el('edg-salles') as HTMLSelectElement).value) as OptionsGen['salles'],
+        salles: Number(
+          (this.el('edg-salles') as HTMLSelectElement).value,
+        ) as OptionsGen['salles'],
         familles: familles || 127, // tout décocher n'a pas de sens : tout
-        dangers: Number((this.el('edg-dangers') as HTMLSelectElement).value) as OptionsGen['dangers'],
-        cachette: Number((this.el('edg-cachette') as HTMLSelectElement).value) as OptionsGen['cachette'],
-        decor: Number((this.el('edg-decor') as HTMLSelectElement).value) as OptionsGen['decor'],
-        laby: Number((this.el('edg-laby') as HTMLSelectElement).value) as OptionsGen['laby'],
+        dangers: Number(
+          (this.el('edg-dangers') as HTMLSelectElement).value,
+        ) as OptionsGen['dangers'],
+        cachette: Number(
+          (this.el('edg-cachette') as HTMLSelectElement).value,
+        ) as OptionsGen['cachette'],
+        decor: Number(
+          (this.el('edg-decor') as HTMLSelectElement).value,
+        ) as OptionsGen['decor'],
+        laby: Number(
+          (this.el('edg-laby') as HTMLSelectElement).value,
+        ) as OptionsGen['laby'],
       }
     }
     const genere = (): void => {
@@ -2702,7 +2843,11 @@ export class LevelEditor {
       const panneau = litOptionsPanneau()
       let niveau: LevelDef | null = null
       if (saisie.trim() === '') {
-        niveau = genereNiveau(Math.floor(Math.random() * 36 ** 4), null, panneau)
+        niveau = genereNiveau(
+          Math.floor(Math.random() * 36 ** 4),
+          null,
+          panneau,
+        )
       } else {
         const lue = analyseSaisie(saisie)
         if (!lue) {
@@ -2719,7 +2864,9 @@ export class LevelEditor {
             ? genereNiveauAtelier(
                 lue.cahier,
                 lue.variante ??
-                  Math.floor(Math.random() * 36 ** 3).toString(36).toUpperCase(),
+                  Math.floor(Math.random() * 36 ** 3)
+                    .toString(36)
+                    .toUpperCase(),
                 options,
               )
             : genereNiveau(lue.graine, null, options)
@@ -2737,9 +2884,12 @@ export class LevelEditor {
       )
     }
     this.el('edg-generer').addEventListener('click', genere)
-    ;(this.el('edg-code') as HTMLInputElement).addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') genere()
-    })
+    ;(this.el('edg-code') as HTMLInputElement).addEventListener(
+      'keydown',
+      (e) => {
+        if (e.key === 'Enter') genere()
+      },
+    )
     this.el('ed-save').addEventListener('click', () => void this.store(false))
     this.el('ed-save-as').addEventListener('click', () => void this.store(true))
     this.el('ed-play').addEventListener('click', () => {
