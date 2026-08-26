@@ -30,6 +30,15 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
+    date: '26/08/2026 15:20',
+    title: 'Le GÉNÉRATEUR de salles : une graine, une salle — traversée PROUVÉE',
+    notes: [
+      'Demandé : un générateur de niveaux procédural qui donne de BONS résultats. La recette anti-soupe : le générateur tire d’abord la CHAÎNE D’INTENTIONS — la suite des franchissements entre compartiments (passage libre, ÉVENT à traverser en vapeur, RIDEAU à écarter en glace, MEMBRANE, ou PORTE AU LASER) — puis habille chaque maillon en géométrie : cloisons percées, décor aux formes variées, dangers (chaudière, hublot fendu), cachette voilée une fois sur deux, lampes, étiquettes.',
+      'Et surtout : AUCUNE salle n’est remise sans PREUVE. Chaque porte asservie est démontrée ouvrable par le vrai traceur de faisceau — un miroir de glace synthétique posé à l’endroit marqué « MIROIR DE GLACE » doit allumer la pastille, et SANS miroir le faisceau ne doit rien ouvrir (l’énigme existe). Puis un parcours en largeur, avec la marge du corps, démontre que le sas est atteignable. Un tirage qui échoue est re-tiré — le joueur ne voit que des salles prouvées.',
+      'Dans l’éditeur : le bouton ⚄ GÉNÉRER. Une graine en lettres et chiffres (vide : au hasard) — la MÊME graine redonne toujours la même salle, au caractère près : les salles se partagent par leur code (G-…), se rejouent, se retouchent. Vérifié : 50 graines d’affilée valides en test, et la salle G-B2 (5 compartiments, 2 énigmes de miroir, 2 rideaux, une cachette) générée, chargée et JOUÉE en essai sans écran.',
+    ],
+  },
+  {
     date: '26/08/2026 14:10',
     title: 'Le regard, version finale : quelque chose vit SOUS la surface',
     notes: [

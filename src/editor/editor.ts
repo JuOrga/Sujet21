@@ -62,6 +62,7 @@ import {
   parseLevel,
   serializeLevel,
 } from '../game/levelIO'
+import { genereNiveau, graineDepuisTexte } from '../game/generateur'
 import { MAX_LUMIERES } from '../render/renderer'
 import { canalDeCible, traceLaser } from '../game/laser'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
@@ -2437,6 +2438,31 @@ export class LevelEditor {
       this.syncForm()
       this.renderLibrary()
       this.commit('Tableau vierge.')
+    })
+    this.el('ed-gen').addEventListener('click', () => {
+      const saisie = prompt(
+        'Graine de la salle (lettres et chiffres, base 36) — vide : au hasard.\nLa même graine redonne toujours la même salle.',
+        '',
+      )
+      if (saisie === null) return
+      const graine =
+        saisie.trim() === ''
+          ? Math.floor(Math.random() * 36 ** 4)
+          : graineDepuisTexte(saisie)
+      if (graine === null) {
+        this.commit('Graine illisible — lettres et chiffres seulement (base 36).')
+        return
+      }
+      this.level = genereNiveau(graine)
+      this.openId = ''
+      this.base = ''
+      this.sel = null
+      this.fitView()
+      this.syncForm()
+      this.renderLibrary()
+      this.commit(
+        `Salle générée — graine ${(graine >>> 0).toString(36).toUpperCase()} (code ${this.level.code}). Traversée prouvée par le traceur ; retouchez, puis Essayer.`,
+      )
     })
     this.el('ed-save').addEventListener('click', () => void this.store(false))
     this.el('ed-save-as').addEventListener('click', () => void this.store(true))
