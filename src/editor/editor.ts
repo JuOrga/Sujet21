@@ -96,6 +96,9 @@ const STORE_KEY = 'projet21.editeur.v1'
 // C'est ce qui permet, à l'ouverture, de détecter qu'un autre appareil a
 // enregistré une version plus récente du même tableau.
 const META_KEY = 'projet21.editeur.meta.v1'
+// les aides au placement (aimant de grille, alignement auto) : un réglage
+// de la MAIN, pas du tableau — il suit le concepteur d'une séance à l'autre
+const AIDES_KEY = 'projet21.editeur.aides.v1'
 
 // Couleurs des matériaux : celles de la légende du jeu, pour qu'on reconnaisse
 // une surface d'un écran à l'autre.
@@ -262,6 +265,12 @@ export class LevelEditor {
   private sel: Sel = null
   private grid = 20
   private snap = true
+  // L'ALIGNEMENT AUTOMATIQUE (magnétisme aux voisins : bords, centres,
+  // écarts égaux) est distinct de l'aimant de GRILLE. Il rend service la
+  // plupart du temps, mais il tire parfois une pièce là où on ne veut pas
+  // (signalé sur des arcs qu'on veut raccorder au pixel) : il se coupe à la
+  // case ALIGNEMENT, ou momentanément en tenant Alt pendant le geste.
+  private alignAuto = true
 
   // caméra de l'éditeur : monde → écran
   private camX = 0
@@ -530,6 +539,31 @@ export class LevelEditor {
     return {
       x: this.camX + (sx - w * 0.5) / this.zoom,
       y: this.camY - (sy - h * 0.5) / this.zoom,
+    }
+  }
+
+  /** Les aides au placement retenues d'une séance à l'autre (réglage de la
+   *  main, pas du tableau) — tout défaut manquant vaut « activé ». */
+  private litAides(): { snap: boolean; align: boolean } {
+    try {
+      const o = JSON.parse(localStorage.getItem(AIDES_KEY) ?? '{}') as {
+        snap?: unknown
+        align?: unknown
+      }
+      return { snap: o.snap !== false, align: o.align !== false }
+    } catch {
+      return { snap: true, align: true }
+    }
+  }
+
+  private ecritAides(): void {
+    try {
+      localStorage.setItem(
+        AIDES_KEY,
+        JSON.stringify({ snap: this.snap, align: this.alignAuto }),
+      )
+    } catch {
+      // stockage refusé : le réglage ne tiendra que la séance — sans gravité
     }
   }
 
@@ -2257,7 +2291,8 @@ export class LevelEditor {
             : { ...r }
         }
         if (bb) {
-          this.guides = this.aimant(bb).guides
+          this.guides =
+            this.alignAuto && !e.altKey ? this.aimant(bb).guides : []
           this.ecarts = [] // le groupe montre les traits, pas les mesures
         }
       } else if (d.mode === 'move') {
@@ -2300,10 +2335,18 @@ export class LevelEditor {
             maxY: ny + (d.start.maxY - d.start.minY),
           }
           // les guides magnétiques priment sur la grille : l'alignement
-          // exact avec un autre élément se propose en pointillé
-          const colle = this.aimant(libre)
-          this.guides = colle.guides
-          this.applyRect(colle.rect)
+          // exact avec un autre élément se propose en pointillé — sauf si
+          // l'aide est coupée (case ALIGNEMENT) ou mise en pause (Alt) :
+          // la pièce se pose alors exactement où on la lâche
+          if (this.alignAuto && !e.altKey) {
+            const colle = this.aimant(libre)
+            this.guides = colle.guides
+            this.applyRect(colle.rect)
+          } else {
+            this.guides = []
+            this.ecarts = []
+            this.applyRect(libre)
+          }
         }
       } else if (d.mode === 'resize') {
         if (d.pivot && this.sel?.kind === 'box') {
@@ -2982,8 +3025,31 @@ export class LevelEditor {
     this.el('ed-undo').addEventListener('click', () => this.undo())
     this.el('ed-redo').addEventListener('click', () => this.redo())
 
-    this.el('ed-snap').addEventListener('change', (e) => {
+    // Les deux aides au placement : l'AIMANT de grille (arrondir au pas) et
+    // l'ALIGNEMENT automatique sur les voisins. Chacune se coupe seule, et
+    // le choix se retient d'une séance à l'autre.
+    const aides = this.litAides()
+    const caseSnap = this.el('ed-snap') as HTMLInputElement
+    const caseAlign = this.el('ed-align') as HTMLInputElement | null
+    this.snap = aides.snap
+    this.alignAuto = aides.align
+    caseSnap.checked = this.snap
+    if (caseAlign) caseAlign.checked = this.alignAuto
+    caseSnap.addEventListener('change', (e) => {
       this.snap = (e.target as HTMLInputElement).checked
+      this.ecritAides()
+    })
+    caseAlign?.addEventListener('change', (e) => {
+      this.alignAuto = (e.target as HTMLInputElement).checked
+      if (!this.alignAuto) {
+        this.guides = []
+        this.ecarts = []
+      }
+      this.hint = this.alignAuto
+        ? 'Alignement automatique rétabli — les pièces se collent aux bords et centres voisins.'
+        : 'Alignement automatique coupé — les pièces se posent exactement où on les lâche (Alt fait la même pause au coup par coup).'
+      this.draw()
+      this.ecritAides()
     })
     this.el('ed-grid').addEventListener('change', (e) => {
       this.grid = Math.max(

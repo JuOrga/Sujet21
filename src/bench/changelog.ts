@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 16:25',
+    title: 'L’ALIGNEMENT AUTOMATIQUE se coupe — la pièce se pose où on la lâche',
+    notes: [
+      'Signalé (capture d’arcs mal raccordés à l’appui) : l’alignement automatique tire parfois une pièce là où on ne veut pas. Il avait un défaut de naissance — aucun interrupteur : la case AIMANT ne commandait que l’arrondi à la GRILLE, tandis que le magnétisme aux voisines (bords, centres, écarts égaux) s’appliquait toujours, et primait même sur la grille.',
+      'La barre de l’éditeur porte donc une seconde case, ALIGNEMENT, à côté d’AIMANT : décochée, la pièce se pose exactement où on la lâche. Pour un seul geste, tenir ALT fait la même pause — sans rien décocher. Les deux aides sont maintenant indépendantes, et le choix se retient d’une séance à l’autre (c’est un réglage de la main, pas du tableau).',
+      'Vérifié dans le vrai éditeur, même geste répété trois fois vers une voisine dont le bord tombe à 313 (hors grille de 20) : aide active → 313, la pièce est collée ; aide coupée → 320, la grille seule ; aide active mais ALT tenu → 320. Et après rechargement de la page, la case décochée l’est restée. 390 tests verts, build propre.',
+    ],
+  },
+  {
     date: '27/08/2026 12:49',
     title:
       'LE FIL DE LA VOIE : le rail de descente, la carte d’entrée, le butin de fin',
