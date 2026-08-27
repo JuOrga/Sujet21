@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 14:10',
+    title: 'L’ARBRE DE L’ÉVEIL : la conscience s’achète en mémoire',
+    notes: [
+      'Quatrième et dernière pierre du chantier méta : l’ARBRE DE L’ÉVEIL, ouvert depuis la fiche (bouton L’ÉVEIL). La mémoire — l’information qui survit à la purge — s’y investit POUR TOUJOURS. Les branches suivent le schéma des états de la matière du concepteur : LIQUIDE (l’origine), SOLIDIFICATION (la glace), VAPORISATION (la vapeur), les TRANSITIONS DIRECTES, le PLASMA. Chaque transition est un pouvoir, chaque état une branche.',
+      'Les nœuds d’ouverture : LE CORPS AMPLE (20 — le corps naît avec 40 gouttes de plus), LA MATIÈRE RETENUE (25 — les pastilles rendent +25 %), L’ÉCHANTILLON PRUDENT (45 — +1 vie au départ de run), LE SOUFFLE LONG (40 — +1 dash de réserve), LA BASCULE ÉCONOME puis MAÎTRISÉE (35/70 — le péage de vaporisation 20 % → 17 % → 15 %, appliqué au moteur). Les pouvoirs d’état (solidification, vaporisation) sont ACQUIS D’ORIGINE : l’arbre est prêt pour leur déblocage progressif — il s’activera avec la re-parcellisation ISS, comme décidé. SUBLIMATION, CONDENSATION et IONISATION (le plasma) sont annoncés, verrouillés : leurs chantiers moteur viennent.',
+      'L’achat est ATOMIQUE dans les registres (mémoire débitée ET nœud gravé, ou rien — testé), les prérequis se respectent (testés), le facteur de péage recalculé depuis la valeur d’usine à chaque achat. Vérifié dans le jeu construit : deux nœuds achetés en direct (80 → 25 de mémoire), l’arbre surligne les acquis. Le chantier méta est complet : condensat + mémoire, l’Économat du Semblable, les fioles, l’Éveil. 425 tests verts.',
+    ],
+  },
+  {
     date: '27/08/2026 13:40',
     title: 'Les FIOLES : la collection d’échantillons scellés, deux au départ',
     notes: [

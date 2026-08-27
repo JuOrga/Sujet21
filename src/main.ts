@@ -129,6 +129,14 @@ import {
 } from './game/condensat'
 import { FIOLES, FIOLES_SLOTS, fioleDef } from './game/fioles'
 import {
+  BRANCHES_EVEIL,
+  NOEUDS_EVEIL,
+  facteurPeage,
+  noeudAchetable,
+  noeudTenu,
+  type BrancheEveil,
+} from './game/eveil'
+import {
   ETAL_ECONOMAT,
   TABLEAU_ECONOMAT,
   estEconomat,
@@ -295,6 +303,16 @@ function gagneMemoireRun(n: number): void {
   run.memoireGagnee += majore
   majMemoireUI()
 }
+// ---- L'ARBRE DE L'ÉVEIL : les nœuds tenus s'appliquent au moteur ------
+// Le PÉAGE de vaporisation est le seul réglage partagé avec le banc : on
+// le recalcule depuis la valeur d'usine à chaque achat (un réglage du
+// banc survit jusqu'au prochain achat — c'est un outil d'atelier).
+function appliqueEveil(): void {
+  params.vaporTollFrac =
+    DEFAULT_PARAMS.vaporTollFrac * facteurPeage(records.eveilAcquis())
+}
+appliqueEveil()
+
 // L'HÉRITAGE : l'ancien condensat persistant (d'avant la purge) devient de
 // la mémoire, une fois pour toutes — 10 cL de matière = 1 souvenir. La clé
 // disparaît ensuite : rien ne se migre deux fois.
@@ -351,12 +369,19 @@ function createSim(level: LevelDef): FluidSim {
   // Instruments embarqués : la buse calibrée agrandit la réserve d'un dash,
   // l'aimant à rosée bonifie la recondensation
   if (run.instruments.includes('buse-calibree')) sim.dashBudgetMax += 1
+  // L'ÉVEIL : le souffle long ajoute son dash de réserve
+  if (records.eveilTient('souffle')) sim.dashBudgetMax += 1
   if (run.instruments.includes('aimant-rosee')) sim.recondBonus = 0.35
   const naitVapeur =
     zoneForceAt(level, level.spawn.x, level.spawn.y) === 'vapeur'
   sim.dashBudget = sim.dashBudgetMax
   sim.setLevel(level.boxes, level.sponges)
-  sim.spawnDisc(level.spawn.x, level.spawn.y, level.spawn.n, KIND_PLAYER)
+  // L'ÉVEIL : le corps ample naît avec 40 gouttes de plus
+  const nDepart = Math.min(
+    CAPACITY,
+    level.spawn.n + (records.eveilTient('volume') ? 40 : 0),
+  )
+  sim.spawnDisc(level.spawn.x, level.spawn.y, nDepart, KIND_PLAYER)
   // né dans une zone qui impose la vapeur : le corps EST un nuage dès la
   // première image — sinon le compteur annonce des dashs qui ne partent pas,
   // le temps que la vaporisation progressive s'achève
@@ -1836,6 +1861,76 @@ document.getElementById('records-fermer')?.addEventListener('click', () => {
 })
 recordsEl.addEventListener('pointerdown', (e) => {
   if (e.target === recordsEl) recordsEl.hidden = true
+})
+
+// ---- Le voile de L'ÉVEIL : l'arbre de conscience -----------------------
+// Les branches suivent le schéma des états ; un nœud achetable se prend
+// d'un clic (la mémoire se débite, l'effet s'applique aussitôt).
+const eveilEl = document.getElementById('eveil') as HTMLDivElement
+const eveilCorps = document.getElementById('eveil-corps') as HTMLDivElement
+function renderEveilVoile(): void {
+  const acquis = records.eveilAcquis()
+  const titre = document.getElementById('eveil-titre')
+  if (titre)
+    titre.textContent = `L’ÉVEIL — mémoire disponible : ${records.memoire()}`
+  let html = ''
+  const branches: BrancheEveil[] = [
+    'liquide',
+    'solidification',
+    'vaporisation',
+    'transitions',
+    'plasma',
+  ]
+  for (const b of branches) {
+    html += `<div class="eveil-branche">${BRANCHES_EVEIL[b]}</div>`
+    html += '<div class="cdx-grille">'
+    for (const n of NOEUDS_EVEIL.filter((x) => x.branche === b)) {
+      const tenu = noeudTenu(n.id, acquis)
+      const achetable = noeudAchetable(n.id, acquis)
+      const etiquette = tenu
+        ? n.etat === 'pre-acquis'
+          ? ' · ACQUIS D’ORIGINE'
+          : ' · ACQUIS'
+        : n.etat === 'a-venir'
+          ? ' · À VENIR'
+          : ` · ${n.cout} mémoire`
+      const style = tenu
+        ? ';outline:2px solid #6dffb8'
+        : achetable
+          ? ';cursor:pointer'
+          : ';opacity:0.55'
+      const cls = achetable || tenu ? 'cdx-carte' : 'cdx-carte cdx-verrou'
+      const data = achetable ? ` data-noeud="${n.id}"` : ''
+      html += `<div class="${cls}"${data} style="min-width:260px${style}"><i>${n.icone}</i><div><b>${n.nom}${etiquette}</b><span>${n.desc}</span></div></div>`
+    }
+    html += '</div>'
+  }
+  eveilCorps.innerHTML = html
+}
+eveilCorps.addEventListener('click', (e) => {
+  const carte = (e.target as HTMLElement).closest('[data-noeud]')
+  if (!carte) return
+  const id = carte.getAttribute('data-noeud') ?? ''
+  const n = NOEUDS_EVEIL.find((x) => x.id === id)
+  if (!n || !noeudAchetable(id, records.eveilAcquis())) return
+  if (!records.acquiertEveil(id, n.cout)) {
+    renderEveilVoile() // solde insuffisant : le titre le rappelle
+    return
+  }
+  appliqueEveil()
+  majMemoireUI()
+  audio.collect()
+  renderEveilVoile()
+})
+document.getElementById('home-eveil')?.addEventListener('click', () => {
+  eveilEl.hidden = false
+  renderEveilVoile()
+})
+document.getElementById('eveil-fermer')?.addEventListener('click', () => {
+  eveilEl.hidden = true
+})
+eveilEl.addEventListener('pointerdown', (e) => {
+  if (e.target === eveilEl) eveilEl.hidden = true
 })
 
 // ---- Le voile FIOLES : la collection d'échantillons scellés ------------
@@ -7003,9 +7098,14 @@ function newExpedition(): void {
   levelIndex = 0
   run.bonbonneLiters = 0
   run.runTime = 0
-  // la fiole de SECOND SOUFFLE : la descente commence avec deux
-  // échantillons de secours
-  run.vies = fioleActive('second-souffle') ? Math.min(VIES_MAX, 2) : 1
+  // la fiole de SECOND SOUFFLE et l'Éveil « l'échantillon prudent » :
+  // chacun ajoute son échantillon de secours au départ
+  run.vies = Math.min(
+    VIES_MAX,
+    1 +
+      (fioleActive('second-souffle') ? 1 : 0) +
+      (records.eveilTient('coque') ? 1 : 0),
+  )
   run.conclues = 0
   run.instruments = []
   run.xp = 0
@@ -8241,8 +8341,12 @@ function frame(now: number): void {
     const rayon = (RAYON_PASTILLE + 14) * (fioleActive('aimant') ? 1.6 : 1)
     const bues = absorbePastilles(pastilles, pastillesPrises, sim, rayon)
     for (const i of bues) {
-      gagneCondensat(pastilles[i].cl)
-      run.pastillesCl += pastilles[i].cl
+      // l'Éveil « la matière retenue » : les pastilles rendent +25 %
+      const cl = Math.round(
+        pastilles[i].cl * (records.eveilTient('bourse') ? 1.25 : 1),
+      )
+      gagneCondensat(cl)
+      run.pastillesCl += cl
       audio.collect()
     }
   }

@@ -51,6 +51,9 @@ interface RecordsData {
   // sa descente une fois, elle vaut jusqu'au prochain changement.
   fioles: string[]
   fiolesEquipees: string[]
+  // L'ÉVEIL : les nœuds de l'arbre de conscience achetés (ids) — la
+  // mémoire dépensée est gravée là pour toujours.
+  eveil: string[]
 }
 
 export interface StorageLike {
@@ -72,6 +75,7 @@ function blank(): RecordsData {
     memoire: 0,
     fioles: [],
     fiolesEquipees: [],
+    eveil: [],
   }
 }
 
@@ -108,6 +112,7 @@ export class Records {
             d.memoire = 0 // registres d'avant l'Éveil
           if (!Array.isArray(d.fioles)) d.fioles = [] // avant les fioles
           if (!Array.isArray(d.fiolesEquipees)) d.fiolesEquipees = []
+          if (!Array.isArray(d.eveil)) d.eveil = [] // avant l'arbre
           // Migration : les registres d'avant la refonte (un seul record par
           // salle) sèment leurs deux records avec la même entrée.
           for (const code of Object.keys(d.tableaux)) {
@@ -178,6 +183,25 @@ export class Records {
     if (n <= 0) return true
     if (this.data.memoire < n) return false
     this.data.memoire -= Math.round(n)
+    this.save()
+    return true
+  }
+
+  /** Les nœuds de l'ÉVEIL achetés (ids). */
+  eveilAcquis(): string[] {
+    return [...this.data.eveil]
+  }
+
+  eveilTient(id: string): boolean {
+    return this.data.eveil.includes(id)
+  }
+
+  /** Achète un nœud : débite la mémoire ET grave le nœud, atomiquement.
+   * false si le solde ne suffit pas ou que le nœud est déjà tenu. */
+  acquiertEveil(id: string, cout: number): boolean {
+    if (this.data.eveil.includes(id)) return false
+    if (!this.depenseMemoire(cout)) return false
+    this.data.eveil.push(id)
     this.save()
     return true
   }
