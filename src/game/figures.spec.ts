@@ -121,6 +121,39 @@ describe('générateur en mode figure', () => {
     expect(lu?.mecanismes).toBe(0)
   })
 
+  it('conduits : la leçon de BOIZ — gaines minces, bande compacte, canal-réseau', () => {
+    const lv = genereNiveau(1234, null, opts({ figure: 8, mecanismes: 3 }))
+    // la CUVE EN BANDE : large et basse, l'inverse du champ immense
+    const w = lv.bounds.maxX - lv.bounds.minX
+    const h = lv.bounds.maxY - lv.bounds.minY
+    expect(w / h).toBeGreaterThan(1.8)
+    expect(h).toBeLessThan(1400)
+    // des GAINES : une majorité de murs minces (22 u)
+    const minces = lv.boxes.filter(
+      (b) => Math.min(b.maxX - b.minX, b.maxY - b.minY) <= 24,
+    )
+    expect(minces.length).toBeGreaterThanOrEqual(6)
+    // le CANAL-RÉSEAU : plusieurs portes sur le même canal
+    const parCanal = new Map<number, number>()
+    for (const p of lv.portes ?? [])
+      parCanal.set(p.canal, (parCanal.get(p.canal) ?? 0) + 1)
+    expect(Math.max(...parCanal.values())).toBeGreaterThanOrEqual(2)
+    // le PHARE unique et la CACHETTE
+    expect((lv.lumieres ?? []).length).toBe(1)
+    expect((lv.caches ?? []).length).toBe(1)
+    // le sas au cœur : l'exit est DANS la cuve, pas à son bord est
+    expect(lv.exit.maxX).toBeLessThan(lv.bounds.maxX - 400)
+  })
+
+  it('le grand bit de figure (familles ≥ 8) voyage et revient', () => {
+    const o = opts({ figure: 8, ampleur: 1, mecanismes: 2 })
+    const suffixe = encodeOptions(o)
+    expect(decodeOptions(suffixe)).toEqual(o)
+    const lv = genereNiveau(4242, null, o)
+    const lue = analyseSaisie(lv.code)
+    expect(lue?.options).toEqual(o)
+  })
+
   it('le code de la salle redonne la même salle, réglages compris', () => {
     const o = opts({ figure: 3, mecanismes: 2 })
     const lv = genereNiveau(777, null, o)

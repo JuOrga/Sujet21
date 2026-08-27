@@ -22,8 +22,19 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 01:15',
+    title:
+      'Le générateur apprend les CONDUITS : la leçon des conduits de ventilation',
+    notes: [
+      'L’entraînement du générateur continue, tableau par tableau : après le crop circle, « conduis de ventillation » (BOIZ) a été récupéré et étudié à la lettre — et c’est la philosophie INVERSE du crop circle, ce qui est exactement sa valeur. Ce que ses 33 pièces enseignent : des GAINES, pas des salles (murs de 22 unités partout, couloirs étroits, une cuve compacte en bande 3:1 — on est de la fumée dans des conduits) ; un SERPENTIN d’étages horizontaux tissés par de courts puits décalés ; un CANAL-RÉSEAU où une pastille-maître commande quatre portes à la fois ; le SAS AU CŒUR, tout près du départ à vol d’oiseau mais muré — le réseau force le grand tour ; une seule lampe posée sur le sas, et une cachette dans un cul-de-sac.',
+      'Tout cela est gravé dans une SEPTIÈME FAMILLE du mode figure : CONDUITS. Le vestibule de naissance (haut de deux gaines, sa bouche est une membrane — on entre en eau), les étages percés d’un puits alterné ouest/est, la paroi de la baie ouverte seulement en bas (l’aller) et en haut (le retour), la chambre du sas au milieu du serpentin avec son phare unique, la baie des machines à l’est où deux fils à plomb attendent le corps gelé — « OUVRE LE RÉSEAU » (les portes des puits, d’un coup) et « OUVRE LE SAS ». Sans mécanisme (réglage « aucun »), les puits et la chambre passent aux filtres d’état. La famille impose sa propre cuve : la bande serrée, pas le champ immense — le contrat des familles s’est élargi pour ça (cuve, lampes, cachettes et mécanismes peuvent désormais venir de la famille elle-même).',
+      'Le réglage FIGURE gagnait ses huit valeurs : le champ d’encodage était plein (3 bits) — un bit haut s’y ajoute sans toucher les codes existants, et la relecture des suffixes s’élargit à six caractères. Vérifié dans le jeu construit : une gaine générée au panneau (G-VENT2~…, 16 pièces, 4 portes sur 2 canaux, 2 miroirs, 1 phare), jouée en essai — le tableau entier se lit d’un regard, les fils à plomb rouges barrent la baie, le corps naît au large dans son vestibule. 700 tirages balayés sans échec, 381 tests verts (2 nouveaux).',
+    ],
+  },
+  {
     date: '27/08/2026 02:52',
-    title: 'LA VOIE, de bout en bout : le plan de descente, la fin, le palmarès',
+    title:
+      'LA VOIE, de bout en bout : le plan de descente, la fin, le palmarès',
     notes: [
       'Demandé pour la nuit : le cycle de vie COMPLET d’une partie en voie semi-procédurale — début, milieu, fin, terminable de bout en bout avec la génération actuelle, paramétrable — et de la progression qui donne envie de continuer. C’est fait. La voie suit désormais un PLAN DE DESCENTE : une longueur (12 salles par défaut), le moment par tiers (début → milieu → fin), et une RAMPE DE DIFFICULTÉ qui monte de 0 au départ jusqu’au plafond choisi. Quand la séquence écrite s’épuise, DEUX salles générées prennent la relève à chaque choix (deux mécaniques différentes) : la descente continue jusqu’au bout du plan, bibliothèque courte ou pas.',
       'La FIN existe : au dernier sas du plan, « LA VOIE EST BOUCLÉE » — bilan de la descente, records d’expédition consignés, et le PALMARÈS DE LA VOIE du poste : descentes entamées, bouclées, PROFONDEUR RECORD (mise à jour en direct, même sur une descente perdue), meilleur volume livré — avec le tampon « MEILLEURE DESCENTE ✦ » quand il tombe. Le palmarès se lit aussi sur la fiche, dans les registres. Le titre du choix annonce la position : « SALLE 4 / 12 ».',
