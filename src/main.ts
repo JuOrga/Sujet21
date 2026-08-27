@@ -127,6 +127,12 @@ import {
   type CondensatDef,
 } from './game/condensat'
 import {
+  ETAL_ECONOMAT,
+  TABLEAU_ECONOMAT,
+  estEconomat,
+  type ArticleEconomat,
+} from './game/economat'
+import {
   fetchSharedBoard,
   pushExpeditionRecord,
   pushTableauRecord,
@@ -436,6 +442,18 @@ let voieIntercalaire: LevelDef | null = null
 // séquence écrite (épuisée, elle cède la place aux salles générées)
 let voieRang = 0
 
+// L'ÉCONOMAT : la salle du Semblable s'intercale UNE fois par run, à
+// mi-descente — son sas est un passage (rien ne s'y consigne), ses achats
+// se font au contact des alcôves de l'étal.
+let economatIntercalaire: LevelDef | null = null
+let economatVisiteCetteRun = false
+// la CLEF DE CACHETTE achetée : les voiles du PROCHAIN tableau tombent
+let clefCachette = false
+// les achats déjà servis dans CETTE visite de l'Économat, et l'état
+// d'occupation des alcôves (l'achat se tente au FRONT d'entrée)
+const achatsEconomat = new Set<string>()
+let plotsDedans: boolean[] = []
+
 // Le PLAN de la voie : paramétrable au banc, mémorisé par poste.
 const CLE_PLAN_VOIE = 'sujet21-voie-plan-v1'
 const voiePlan: PlanVoie = (() => {
@@ -517,7 +535,10 @@ function applyLevel(): void {
     testLevel ??
     (auHub
       ? hubLevel()
-      : (voieIntercalaire ?? playedLevels()[levelIndex] ?? playedLevels()[0]))
+      : (economatIntercalaire ??
+        voieIntercalaire ??
+        playedLevels()[levelIndex] ??
+        playedLevels()[0]))
   levelHasCold = level.boxes.some((b) => b.material === MAT_FROID)
   rebuildRenderBoxes()
   exitMouth.x = (level.exit.minX + level.exit.maxX) * 0.5
@@ -2600,6 +2621,7 @@ interface RunSauvee {
   livreTotal: number
   condensat?: number // la bourse de la run (absente : anciennes sauvegardes)
   memoireGagnee?: number // le butin de mémoire déjà gravé cette run
+  economatVisite?: boolean // l'annexe du Semblable a-t-elle déjà servi ?
 }
 function runSauvee(): RunSauvee | null {
   try {
@@ -2645,6 +2667,7 @@ function sauveRun(): void {
           livreTotal: run.livreTotal,
           condensat,
           memoireGagnee: run.memoireGagnee,
+          economatVisite: economatVisiteCetteRun,
         }),
       )
   } catch {
@@ -2675,6 +2698,8 @@ function reprendreRun(save: RunSauvee): void {
   condensat = Math.max(0, Math.round(save.condensat ?? 0))
   majCondensatUI()
   run.memoireGagnee = Math.max(0, Math.round(save.memoireGagnee ?? 0))
+  economatIntercalaire = null
+  economatVisiteCetteRun = save.economatVisite ?? false
   hasPlayed = true
   document.body.classList.add('playing')
   input.paused = false
@@ -5893,12 +5918,78 @@ function resetLasers(): void {
   lastRailTime = 0
   railsEngages.clear()
   cachesLevee = (level.caches ?? []).map(() => Infinity)
+  // la CLEF DE CACHETTE se consomme ici : les voiles du tableau tombent
+  // d'emblée (le hub et l'Économat ne l'usent pas)
+  if (clefCachette && !estEconomat(level) && !auHub) {
+    clefCachette = false
+    cachesLevee = (level.caches ?? []).map(() => 0)
+  }
   // les pastilles de condensat se re-sèment (mêmes places : semis
-  // déterministe) — le hub n'en porte pas, on n'y farme rien
-  pastilles = auHub ? [] : semePastilles(level)
+  // déterministe) — ni au hub ni à l'Économat, on n'y farme rien
+  pastilles = auHub || estEconomat(level) ? [] : semePastilles(level)
   pastillesPrises = pastilles.map(() => false)
   run.pastillesCl = 0
+  // l'étal de l'Économat se réarme (le condensat dépensé, lui, l'est)
+  achatsEconomat.clear()
+  plotsDedans = ETAL_ECONOMAT.map(() => false)
   rebuildRenderBoxes() // les parois factices reprennent leur poste
+}
+
+// ---- L'ACHAT à l'Économat : le corps plonge dans une alcôve de l'étal —
+// le prix se débite, l'effet s'applique, le Semblable ne rend jamais.
+function tenteAchat(a: ArticleEconomat): void {
+  if (achatsEconomat.has(a.id)) {
+    toastFile.push({
+      nom: `${a.nom} — DÉJÀ SERVI`,
+      icone: a.icone,
+      sur: 'L’ÉCONOMAT',
+    })
+    return
+  }
+  if (!depenseCondensat(a.prix)) {
+    toastFile.push({
+      nom: `${a.nom} — CONDENSAT INSUFFISANT (${a.prix} cL)`,
+      icone: '🚫',
+      sur: 'L’ÉCONOMAT',
+    })
+    return
+  }
+  achatsEconomat.add(a.id)
+  audio.collect()
+  let detail = a.detail
+  switch (a.id) {
+    case 'gouttes':
+      run.bonbonneLiters = Math.min(BONBONNE_CAP, run.bonbonneLiters + 0.8)
+      break
+    case 'dashs':
+      sim.dashBudget = sim.dashBudgetMax
+      break
+    case 'clef':
+      clefCachette = true
+      break
+    case 'secours':
+      run.vies = Math.min(VIES_MAX, run.vies + 1)
+      majBoutonsRun()
+      break
+    case 'sac': {
+      const tirage = Math.random()
+      if (tirage < 0.45) {
+        gagneCondensat(100)
+        detail = 'dedans : +100 cL de condensat'
+      } else if (tirage < 0.8) {
+        gagneMemoireRun(2)
+        detail = 'dedans : +2 mémoire — il vous a appris quelque chose'
+      } else {
+        detail = 'le sac était vide. Le Semblable vous fixe.'
+      }
+      break
+    }
+  }
+  toastFile.push({
+    nom: `${a.nom} — ${detail}`,
+    icone: a.icone,
+    sur: 'L’ÉCONOMAT',
+  })
 }
 
 // ---- LA MISE EN BONBONNE : l'écran de récompense de fin de salle ----
@@ -5929,6 +6020,22 @@ function avanceSalle(): void {
     levelIndex += 1
     restart()
     return
+  }
+  // L'ÉCONOMAT : on en SORT (la séquence reprend son cours), ou il
+  // s'INTERCALE — une fois par run, à mi-descente. Le choix de salle fait
+  // à la cérémonie (salleChoisie) attend sagement la sortie de l'annexe.
+  if (economatIntercalaire && estEconomat(level)) {
+    economatIntercalaire = null
+  } else if (!auHub && !testLevel && !economatVisiteCetteRun) {
+    const total = modeVoie ? voiePlan.longueur : playedLevels().length
+    const rang = modeVoie ? voieRang : levelIndex + 1
+    if (total >= 4 && rang >= Math.floor(total / 2)) {
+      economatVisiteCetteRun = true
+      economatIntercalaire = TABLEAU_ECONOMAT
+      voieIntercalaire = null // la salle précédente est franchie
+      restart()
+      return
+    }
   }
   voieIntercalaire = null // l'intercalaire vient d'être franchie (ou quittée)
   // RACCOURCI (mécanique roguelike, préparée) : un tableau peut déclarer
@@ -6775,6 +6882,16 @@ function restart(): void {
   newExpedition()
 }
 
+// Crochet d'atelier : entrer directement à l'ÉCONOMAT (essai hors run) —
+// pour les sondes et le pupitre ; les registres ne bougent pas.
+;(window as unknown as { __economat: () => void }).__economat = () => {
+  auHub = false
+  hasPlayed = true
+  document.body.classList.add('playing')
+  testLevel = TABLEAU_ECONOMAT
+  restart()
+}
+
 function newExpedition(): void {
   levelIndex = 0
   run.bonbonneLiters = 0
@@ -6786,6 +6903,9 @@ function newExpedition(): void {
   run.livreTotal = 0
   run.memoireGagnee = 0
   purgeCondensat() // la bourse d'une run commence toujours vide
+  economatIntercalaire = null
+  economatVisiteCetteRun = false
+  clefCachette = false
   restart()
 }
 
@@ -6807,6 +6927,9 @@ function retourAuLabo(): void {
   run.memoireGagnee = 0
   // LA PURGE : le labo confisque la matière de la run — la mémoire reste
   purgeCondensat()
+  economatIntercalaire = null
+  economatVisiteCetteRun = false
+  clefCachette = false
   entrerHub()
   majBoutonsRun()
 }
@@ -8013,6 +8136,20 @@ function frame(now: number): void {
     }
   }
 
+  // ---- L'ÉTAL de l'Économat : l'achat au front d'entrée d'une alcôve ----
+  if (estEconomat(level) && !sim.dispersed) {
+    for (let i = 0; i < ETAL_ECONOMAT.length; i++) {
+      const a = ETAL_ECONOMAT[i]
+      const dedans =
+        sim.stats.centroidX > a.plot.minX &&
+        sim.stats.centroidX < a.plot.maxX &&
+        sim.stats.centroidY > a.plot.minY &&
+        sim.stats.centroidY < a.plot.maxY
+      if (dedans && !plotsDedans[i]) tenteAchat(a)
+      plotsDedans[i] = dedans
+    }
+  }
+
   // ---- Lasers : traçage, cibles, portes ----
   const lasers = level.lasers ?? []
   if (lasers.length > 0) {
@@ -8248,6 +8385,18 @@ function frame(now: number): void {
     )
     // la cinématique de CONCLUSION : par-dessus le bilan, qui l'attend derrière
     if (level.cineApres) void lireCineParCode(level.cineApres)
+  } else if (
+    !tableauDone &&
+    !sim.dispersed &&
+    (drunk || reached) &&
+    estEconomat(level)
+  ) {
+    // LE SAS DE REPRISE de l'Économat : un passage, pas un collecteur —
+    // rien ne se consigne, pas de cérémonie ; la descente reprend, la
+    // bourse en poche.
+    audio.collect()
+    bande.ponctuation('sting-collecte', 0.85)
+    avanceSalle()
   } else if (!tableauDone && !sim.dispersed && (drunk || reached)) {
     // Prime de glace : ce que le sas a avalé SOLIDE vaut plus cher que ce
     // qu'il a bu goutte à goutte.
@@ -8570,7 +8719,9 @@ function frame(now: number): void {
     ? 'BIS'
     : auHub
       ? 'LABO'
-      : `SALLE ${levelIndex + 1}/${playedLevels().length}`
+      : estEconomat(level)
+        ? 'ÉCONOMAT'
+        : `SALLE ${levelIndex + 1}/${playedLevels().length}`
   // les échantillons de secours (vies) et la bonbonne : en run seulement —
   // au labo comme aux essais, rien ne se paie et rien ne se collecte
   hudViesChip.hidden = !!testLevel || auHub
