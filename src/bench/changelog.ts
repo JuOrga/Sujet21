@@ -22,6 +22,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 02:11',
+    title: 'LE BUTIN DE LA VOIE : les salles générées élues se gardent',
+    notes: [
+      'Demandé : retenir les salles générées élues dans les registres, pour les rejouer ou les publier d’un geste. C’est fait — chaque salle générée ÉLUE pendant une descente semi-procédurale entre au BUTIN de ce poste (les 20 plus récentes, dédupliquées par code). L’écran SALLES gagne la section « LE BUTIN DE LA VOIE » : la salle, ses pastilles (décodées du code G-…), la date d’élection.',
+      'Trois gestes par salle : CLIQUER la rejoue à l’essai ; « ⇪ PUBLIER » l’enregistre dans la BIBLIOTHÈQUE PARTAGÉE (en fin de séquence — elle apparaît aussitôt dans la planche et l’éditeur, réordonnable comme les autres, et le bouton passe à « ✓ PUBLIÉE ») ; « ✕ » la retire du butin — sans perte : son code la regénère à l’identique. Vérifié en navigateur : affichage, publication reçue par le serveur et salle visible en bibliothèque dans la foulée, rejouée à l’essai. 372 tests verts.',
+    ],
+  },
+  {
     date: '27/08/2026 02:02',
     title: 'LA VOIE SEMI-PROCÉDURALE — et les lettres d’ordre se gravent',
     notes: [

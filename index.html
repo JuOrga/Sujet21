@@ -371,6 +371,34 @@
         font-size: 12.5px;
         cursor: pointer;
       }
+      /* le BUTIN DE LA VOIE : la salle élue + PUBLIER + retirer, en ligne */
+      .salle-butin {
+        display: flex;
+        gap: 6px;
+        align-items: stretch;
+        min-width: 0;
+      }
+      .salle-butin > button:first-child {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .salle-butin .salle-butin-act {
+        flex: none;
+        min-width: 44px;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+      }
+      .salle-butin .salle-butin-act:disabled {
+        opacity: 0.55;
+        cursor: default;
+      }
+      .salle-butin-date {
+        display: block;
+        font-size: 9px;
+        color: var(--dim);
+        letter-spacing: 0.08em;
+        margin-top: 2px;
+      }
       /* intercalaires du voile : la bibliothèque du labo au-dessus de
          l'expédition livrée — l'intercalaire occupe toute la largeur */
       .salles-sec {

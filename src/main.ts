@@ -389,6 +389,43 @@ let modeVoie = false
 let voieGenereeChoisie: LevelDef | null = null
 let voieIntercalaire: LevelDef | null = null
 
+// Le BUTIN de la voie : les salles générées ÉLUES, retenues sur ce poste
+// (registres locaux) — rejouables depuis l'écran SALLES, publiables dans la
+// bibliothèque partagée d'un geste. Dédupliqué par code, borné aux 20 plus
+// récentes.
+const CLE_BUTIN_VOIE = 'sujet21-voie-elues-v1'
+interface SalleElue {
+  level: LevelDef
+  eluAt: string
+  publie?: boolean
+}
+function chargeButin(): SalleElue[] {
+  try {
+    const arr = JSON.parse(
+      localStorage.getItem(CLE_BUTIN_VOIE) ?? '[]',
+    ) as unknown
+    return Array.isArray(arr)
+      ? (arr as SalleElue[]).filter(
+          (e) => e && e.level && typeof e.level.code === 'string',
+        )
+      : []
+  } catch {
+    return []
+  }
+}
+function sauveButin(butin: SalleElue[]): void {
+  try {
+    localStorage.setItem(CLE_BUTIN_VOIE, JSON.stringify(butin.slice(0, 20)))
+  } catch {
+    // stockage refusé : le butin ne tiendra que la session — sans gravité
+  }
+}
+function noteSalleElue(lv: LevelDef): void {
+  const butin = chargeButin().filter((e) => e.level.code !== lv.code)
+  butin.unshift({ level: structuredClone(lv), eluAt: new Date().toISOString() })
+  sauveButin(butin)
+}
+
 function applyLevel(): void {
   level =
     testLevel ??
@@ -1187,6 +1224,76 @@ function renderSalles(): void {
     section('EXPÉDITION LIVRÉE — elle s’enchaîne à la suite')
   }
   for (const lv of [...TABLEAUX_ECOLE, ...TABLEAUX, TABLEAU_1BIS]) salle(lv)
+  // LE BUTIN DE LA VOIE : les salles générées élues pendant les descentes
+  // semi-procédurales — retenues sur ce poste, rejouables, publiables
+  const butin = chargeButin()
+  if (butin.length > 0) {
+    section(
+      'LE BUTIN DE LA VOIE — les salles générées élues en descente (ce poste)',
+    )
+    for (const e of butin) {
+      const ligne = document.createElement('div')
+      ligne.className = 'salle-butin'
+      const dg = /^G-(\d)(\d)(\d)-/.exec(e.level.code)
+      const chips = dg
+        ? `<span class="salle-chips"><i>${MOMENT_COURT[Number(dg[1]) as CodeAtelier['moment']]}</i>` +
+          `<i class="sc-m${dg[2]}">${MECANIQUE_NOMS[Number(dg[2]) as CodeAtelier['mecanique']].toUpperCase()}</i>` +
+          `<i>DIFF ${dg[3]}</i></span>`
+        : ''
+      const dt = new Date(e.eluAt)
+      const quand = Number.isNaN(dt.getTime())
+        ? ''
+        : `élue le ${dt.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} à ${dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.title = 'Rejouer cette salle générée (essai)'
+      b.innerHTML =
+        `<b>${esc(e.level.code)}</b><span class="salle-nom">${esc(e.level.name)}</span>` +
+        `<small class="salle-butin-date">${quand}</small>${chips}`
+      b.addEventListener('click', () => {
+        sallesEl.hidden = true
+        startTest([structuredClone(e.level)])
+      })
+      const pub = document.createElement('button')
+      pub.type = 'button'
+      pub.className = 'salle-butin-act'
+      pub.textContent = e.publie ? '✓ PUBLIÉE' : '⇪ PUBLIER'
+      pub.disabled = !!e.publie
+      pub.title =
+        'Publier cette salle dans la BIBLIOTHÈQUE PARTAGÉE (en fin de séquence) — elle apparaîtra dans la planche et l’éditeur, réordonnable comme les autres'
+      pub.addEventListener('click', () => {
+        pub.disabled = true
+        pub.textContent = '…'
+        void saveLevel(
+          structuredClone(e.level),
+          '',
+          records.operator() || 'anonyme',
+        ).then((saved) => {
+          if (saved) {
+            const maj = chargeButin()
+            const mienne = maj.find((x) => x.level.code === e.level.code)
+            if (mienne) mienne.publie = true
+            sauveButin(maj)
+            plancheSync(saved.levels) // bibliothèque, planche, salles : tout suit
+          } else {
+            pub.disabled = false
+            pub.textContent = 'INJOIGNABLE — RÉESSAYER'
+          }
+        })
+      })
+      const sup = document.createElement('button')
+      sup.type = 'button'
+      sup.className = 'salle-butin-act'
+      sup.textContent = '✕'
+      sup.title = 'Retirer du butin (la salle reste regénérable par son code)'
+      sup.addEventListener('click', () => {
+        sauveButin(chargeButin().filter((x) => x.level.code !== e.level.code))
+        renderSalles()
+      })
+      ligne.append(b, pub, sup)
+      liste.appendChild(ligne)
+    }
+  }
   // LE CABINET LOGIQUE : les mécanismes détournés en algèbre booléenne —
   // des démonstrations à l'essai, volontairement hors expédition et hors
   // accueil (l'écran SALLES est déjà l'antichambre du concepteur)
@@ -5719,8 +5826,10 @@ function mbMontreSallesVoie(duo: {
         : '')
     dessineMiniCarte(btn.querySelector('canvas') as HTMLCanvasElement, lv)
     btn.addEventListener('click', () => {
-      if (generee) voieGenereeChoisie = lv
-      else salleChoisie = lv
+      if (generee) {
+        voieGenereeChoisie = lv
+        noteSalleElue(lv) // le butin retient l'élue : rejouable, publiable
+      } else salleChoisie = lv
       bande.ponctuation('sting-collecte', 0.7)
       fermeMiseEnBonbonne()
       avanceSalle()
