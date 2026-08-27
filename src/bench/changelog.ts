@@ -22,6 +22,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 11:37',
+    title: 'La VOIE SEMI-PROCÉDURALE porte son liséré : l’œil la trouve',
+    notes: [
+      'Demandé : un liséré de couleur sur le bouton de la voie procédurale, pour qu’il attire l’attention. C’est fait — VOIE SEMI-PROC. est désormais le seul bouton de la rangée d’outils à porter une bordure VERT MENTHE, la couleur des salles générées (celle de son étiquette dans la cérémonie) : le liséré ne décore pas, il annonce ce qu’il y a derrière. Le glyphe ⑂ prend la même teinte, et le survol l’avive.',
+      'Le liséré RESPIRE — une pulsation lente de trois secondes, jamais un clignotement — et s’immobilise si la machine demande qu’on épargne les animations. Vérifié sur la vraie fiche : bordure et halo menthe appliqués, pulsation active, et aucun autre bouton de la rangée ne partage cette couleur. 390 tests verts, build propre.',
+    ],
+  },
+  {
     date: '27/08/2026 08:55',
     title:
       'Le générateur apprend l’ÉCHANGEUR : le circuit thermique d’echangette',

@@ -205,6 +205,36 @@
         outline: 2px solid var(--specimen);
         outline-offset: 2px;
       }
+      /* LA VOIE SEMI-PROCÉDURALE : le seul bouton de la rangée à porter un
+         liséré vert-menthe — la couleur des salles GÉNÉRÉES, celle de son
+         étiquette dans la cérémonie. Il respire lentement pour attirer
+         l'œil sans clignoter (le mouvement se coupe si la machine demande
+         qu'on l'épargne). */
+      #home .home-duo button#home-voie {
+        border-color: var(--valid);
+        box-shadow: 0 0 0 1px rgba(63, 214, 155, 0.22),
+          0 0 12px rgba(63, 214, 155, 0.16);
+        animation: voie-liseret 3s ease-in-out infinite;
+      }
+      #home .home-duo button#home-voie i { color: #6dffb8; }
+      #home .home-duo button#home-voie:hover {
+        border-color: #8affd0;
+        box-shadow: 0 0 0 1px rgba(109, 255, 184, 0.55),
+          0 0 22px rgba(63, 214, 155, 0.34);
+      }
+      @keyframes voie-liseret {
+        0%, 100% {
+          box-shadow: 0 0 0 1px rgba(63, 214, 155, 0.2),
+            0 0 10px rgba(63, 214, 155, 0.12);
+        }
+        50% {
+          box-shadow: 0 0 0 1px rgba(63, 214, 155, 0.5),
+            0 0 20px rgba(63, 214, 155, 0.3);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #home .home-duo button#home-voie { animation: none; }
+      }
       @media (pointer: coarse) {
         #home .home-duo { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
         #home #home .home-duo button { min-height: 62px; font-size: 9.5px; }
