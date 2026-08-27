@@ -22,6 +22,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 00:45',
+    title:
+      'Le générateur apprend la FIGURE : la leçon des tableaux faits main, paramétrable',
+    notes: [
+      'Demandé : que le générateur, par rétrospective des tableaux crop-circle faits main, produise des salles qui procurent les mêmes sensations — en élargissant au-delà des cercles, mécanismes compris, et paramétrable. La rétrospective a été gravée en six principes dans un nouveau module : UNE SEULE IDÉE LISIBLE (le tableau est un glyphe qu’on lit d’un regard), L’IMMENSITÉ ET LE VIDE (traverser du vide fait partie du voyage), LA SOBRIÉTÉ (≤ 22 pièces, parois minces), L’ÉCLAIRAGE DE BASE (pas une lampe : la lumière par défaut sculpte seule), LES COUTURES GARDÉES (d’étroits passages tenus par des plaques-filtres d’état), LA SYMÉTRIE TORDUE (coutures qui tournent, moitiés glissées, satellites posés pour la beauté seule).',
+      'Six FAMILLES élargissent le vocabulaire : ANNEAUX (les cercles brisés concentriques du crop circle), SPIRALE (les coutures tournent et convergent sur la porte du sas), CORTÈGE (lunes et enceintes carrées en chaîne, le sas au cœur de la dernière), ROSACE (une couronne de capsules en polygone brisé autour de la chambre du cœur), NEF (l’orthogonale : enceinte, cloisons percées, colonnades), CONSTELLATION (des cellules à porte unique posées au large, reliées par le vide). Et les MÉCANISMES se greffent sur la couture finale : porte asservie au miroir de glace, ou barrière NOR en travers de l’avenue — prouvés par le même traceur et les mêmes corps synthétiques que le reste du générateur ; l’accessibilité a d’ailleurs appris à juger les formes au champ de distance exact (la boîte englobante d’un anneau est presque toute vide).',
+      'PARAMÉTRABLE, dans le panneau du générateur : FIGURE (off / famille au hasard / une des six), AMPLEUR du champ (intime, vaste, immense), MÉCANISMES (aucun, une énigme, deux verrous). Les réglages voyagent dans le suffixe « ~ » du code — retaper le code redonne la salle à l’identique (un suffixe plus long a d’ailleurs révélé que la relecture plafonnait à quatre caractères : corrigé, prouvé par test). Vérifié dans le jeu construit : les six familles générées et capturées en éditeur, une constellation jouée en essai — 595 tirages balayés sans un échec de preuve. 379 tests verts.',
+    ],
+  },
+  {
     date: '27/08/2026 02:11',
     title: 'LE BUTIN DE LA VOIE : les salles générées élues se gardent',
     notes: [

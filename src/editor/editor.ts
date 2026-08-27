@@ -3191,6 +3191,13 @@ export class LevelEditor {
         contraste: Number(
           (this.el('edg-contraste') as HTMLSelectElement).value,
         ) as OptionsGen['contraste'],
+        figure: Number((this.el('edg-figure') as HTMLSelectElement).value),
+        ampleur: Number(
+          (this.el('edg-ampleur') as HTMLSelectElement).value,
+        ) as OptionsGen['ampleur'],
+        mecanismes: Number(
+          (this.el('edg-mecanismes') as HTMLSelectElement).value,
+        ) as OptionsGen['mecanismes'],
       }
     }
     const genere = (): void => {
