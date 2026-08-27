@@ -2,7 +2,12 @@
 // dans une paroi, les cachettes servies d'abord), l'absorption se joue au
 // contact d'assez de particules du corps.
 import { describe, expect, it } from 'vitest'
-import { absorbePastilles, semePastilles, type CorpsLecture } from './condensat'
+import {
+  absorbePastilles,
+  semeFiole,
+  semePastilles,
+  type CorpsLecture,
+} from './condensat'
 import { dansForme, type FormeBox } from './formes'
 import type { LevelDef } from './level'
 
@@ -73,6 +78,30 @@ describe('le condensat ramassable', () => {
     const lv = cuve({ condensats: [{ x: 0, y: 900, cl: 40 }] })
     const p = semePastilles(lv)
     expect(p).toEqual([{ x: 0, y: 900, cl: 40 }])
+  })
+
+  it('la FIOLE dort dans la cachette profonde — déterministe, jamais murée', () => {
+    // sans cachette assez vaste : pas de fiole
+    expect(semeFiole(cuve({ caches: [] }))).toBeNull()
+    // avec la grande cachette : le même code rend la même réponse
+    const a = semeFiole(cuve())
+    expect(JSON.stringify(semeFiole(cuve()))).toBe(JSON.stringify(a))
+    // sur plusieurs codes, au moins un tableau en abrite une — et alors
+    // elle est DANS la cachette, hors des parois
+    let vues = 0
+    for (const code of ['21-T', '21-U', '21-V', '21-W', '21-X', '21-Y']) {
+      const lv = cuve({ code })
+      const f = semeFiole(lv)
+      if (!f) continue
+      vues++
+      expect(f.x).toBeGreaterThan(900)
+      expect(f.x).toBeLessThan(1500)
+      expect(f.y).toBeGreaterThan(-1100)
+      expect(f.y).toBeLessThan(-500)
+      for (const b of lv.boxes)
+        expect(dansForme(b as unknown as FormeBox, f.x, f.y)).toBe(false)
+    }
+    expect(vues).toBeGreaterThanOrEqual(1)
   })
 
   it('l’absorption exige le CONTACT d’assez de particules du corps', () => {

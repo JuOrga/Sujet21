@@ -46,6 +46,11 @@ interface RecordsData {
   // de la matière — la purge de fin de run confisque le condensat, jamais
   // la mémoire : le Sujet se souvient, même d'une run échouée.
   memoire: number
+  // LES FIOLES : la collection persistante (ids), et celles ÉQUIPÉES pour
+  // la run (deux logements) — l'équipement survit lui aussi : on prépare
+  // sa descente une fois, elle vaut jusqu'au prochain changement.
+  fioles: string[]
+  fiolesEquipees: string[]
 }
 
 export interface StorageLike {
@@ -65,6 +70,8 @@ function blank(): RecordsData {
     expedition: null,
     history: [],
     memoire: 0,
+    fioles: [],
+    fiolesEquipees: [],
   }
 }
 
@@ -99,6 +106,8 @@ export class Records {
           if (d.expedition === undefined) d.expedition = null // registres d'avant la boucle
           if (typeof d.memoire !== 'number' || !Number.isFinite(d.memoire))
             d.memoire = 0 // registres d'avant l'Éveil
+          if (!Array.isArray(d.fioles)) d.fioles = [] // avant les fioles
+          if (!Array.isArray(d.fiolesEquipees)) d.fiolesEquipees = []
           // Migration : les registres d'avant la refonte (un seul record par
           // salle) sèment leurs deux records avec la même entrée.
           for (const code of Object.keys(d.tableaux)) {
@@ -169,6 +178,50 @@ export class Records {
     if (n <= 0) return true
     if (this.data.memoire < n) return false
     this.data.memoire -= Math.round(n)
+    this.save()
+    return true
+  }
+
+  /** La collection de FIOLES (ids, ordre de découverte). */
+  fioles(): string[] {
+    return [...this.data.fioles]
+  }
+
+  possedeFiole(id: string): boolean {
+    return this.data.fioles.includes(id)
+  }
+
+  /** Ajoute une fiole à la collection — false si déjà possédée. */
+  ajouteFiole(id: string): boolean {
+    if (this.data.fioles.includes(id)) return false
+    this.data.fioles.push(id)
+    this.save()
+    return true
+  }
+
+  /** Les fioles équipées (au plus `slots`, possédées — auto-assaini). */
+  fiolesEquipees(): string[] {
+    return this.data.fiolesEquipees.filter((id) =>
+      this.data.fioles.includes(id),
+    )
+  }
+
+  fioleEquipee(id: string): boolean {
+    return this.fiolesEquipees().includes(id)
+  }
+
+  /** Équipe ou retire une fiole (bascule). Rend l'état final ; false si
+   * la fiole n'est pas possédée ou que les logements sont pleins. */
+  basculeFiole(id: string, slots: number): boolean {
+    if (!this.data.fioles.includes(id)) return false
+    const eq = this.fiolesEquipees()
+    if (eq.includes(id)) {
+      this.data.fiolesEquipees = eq.filter((f) => f !== id)
+      this.save()
+      return false
+    }
+    if (eq.length >= slots) return false
+    this.data.fiolesEquipees = [...eq, id]
     this.save()
     return true
   }

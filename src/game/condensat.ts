@@ -111,6 +111,34 @@ export function semePastilles(level: LevelDef): CondensatDef[] {
   return out
 }
 
+/** Une FIOLE dort-elle dans ce tableau ? Déterministe (graine = code) :
+ * la plus PROFONDE des cachettes (la plus vaste, au-delà de 300 000 u²) a
+ * une chance sur deux d'abriter un échantillon scellé. Rend sa place, ou
+ * null — l'appelant décide QUELLE fiole s'y trouve (celles qui manquent
+ * à la collection). */
+export function semeFiole(level: LevelDef): { x: number; y: number } | null {
+  const caches = (level.caches ?? []).filter(
+    (c) => (c.maxX - c.minX) * (c.maxY - c.minY) > 300000,
+  )
+  if (caches.length === 0) return null
+  const rng = melange(hacheCode(`fiole|${level.code}|${level.name}`))
+  if (rng() < 0.5) return null
+  const c = caches.reduce((a, b) =>
+    (a.maxX - a.minX) * (a.maxY - a.minY) >=
+    (b.maxX - b.minX) * (b.maxY - b.minY)
+      ? a
+      : b,
+  )
+  for (let essai = 0; essai < 14; essai++) {
+    const x = c.minX + 60 + rng() * Math.max(1, c.maxX - c.minX - 120)
+    const y = c.minY + 60 + rng() * Math.max(1, c.maxY - c.minY - 120)
+    if (!dansForme(c as unknown as FormeBox, x, y)) continue
+    if (!pointFranc(x, y, level)) continue
+    return { x: Math.round(x), y: Math.round(y) }
+  }
+  return null
+}
+
 /** Ce que l'absorption lit du corps — le sous-ensemble utile de FluidSim. */
 export interface CorpsLecture {
   count: number

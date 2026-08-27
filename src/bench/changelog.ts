@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 13:40',
+    title: 'Les FIOLES : la collection d’échantillons scellés, deux au départ',
+    notes: [
+      'Troisième pierre du méta-jeu : les ITEMS équipables. Des FIOLES — des échantillons scellés — dorment dans les CACHETTES PROFONDES (la plus vaste cachette d’un tableau a une chance sur deux d’en abriter une, semis déterministe par code : un double anneau violet qui pulse) et dans le SAC SURPRISE du Semblable. La collection est PERSISTANTE : une fiole trouvée l’est pour toujours — le choix, c’est l’ÉQUIPEMENT. Deux logements, à préparer depuis la fiche (bouton FIOLES) : cliquer équipe, cliquer range ; les effets sont passifs et valent toute la run.',
+      'Le catalogue d’ouverture, six fioles : l’AIMANT (rayon de collecte des pastilles +60 %), la SONDE (les pastilles luisent À TRAVERS les voiles des cachettes), le TROC (les prix de l’Économat baissent de 25 % — le Semblable vous reconnaît), le SOUVENIR (la mémoire gravée majorée de 25 %), l’ISOLANT (rare — la coque refroidit 15 % plus lentement, cumulable à la gaine), et le SECOND SOUFFLE (rare — chaque run commence avec DEUX échantillons de secours). Les rares ne se trouvent qu’en cachette profonde.',
+      'Le voile FIOLES affiche la collection (les manquantes en silhouette « ? », avec leur piste), le compte des logements, et l’état ÉQUIPÉE surligné. Registres migrés en douceur, bascule bornée aux deux logements et aux fioles possédées (testée), semis de fiole testé (déterministe, jamais muré). Le pupitre d’essais sait offrir une fiole surprise. Vérifié dans le jeu construit : 4/6 trouvées, équipement au clic, persistance. 420 tests verts.',
+    ],
+  },
+  {
     date: '27/08/2026 13:10',
     title: 'L’ÉCONOMAT : la salle du Semblable, le Charon de l’espace',
     notes: [

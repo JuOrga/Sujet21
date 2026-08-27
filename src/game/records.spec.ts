@@ -88,6 +88,42 @@ describe('Records — les registres du labo', () => {
     expect(new Records(ancien).memoire()).toBe(0)
   })
 
+  it('les FIOLES : collection persistante, deux logements, bascule', () => {
+    const st = memoryStorage()
+    const r = new Records(st)
+    expect(r.fioles()).toEqual([])
+    expect(r.ajouteFiole('aimant')).toBe(true)
+    expect(r.ajouteFiole('aimant')).toBe(false) // jamais deux fois
+    r.ajouteFiole('sonde')
+    r.ajouteFiole('troc')
+    // équiper : la bascule respecte les deux logements
+    expect(r.basculeFiole('aimant', 2)).toBe(true)
+    expect(r.basculeFiole('sonde', 2)).toBe(true)
+    expect(r.basculeFiole('troc', 2)).toBe(false) // logements pleins
+    expect(r.fiolesEquipees()).toEqual(['aimant', 'sonde'])
+    expect(r.basculeFiole('aimant', 2)).toBe(false) // rangée
+    expect(r.basculeFiole('troc', 2)).toBe(true) // la place s'est libérée
+    expect(r.fioleEquipee('troc')).toBe(true)
+    // une fiole non possédée ne s'équipe pas
+    expect(r.basculeFiole('isolant', 2)).toBe(false)
+    // persistance
+    expect(new Records(st).fiolesEquipees()).toEqual(['sonde', 'troc'])
+    // migration : registres d'avant les fioles
+    const ancien = memoryStorage()
+    ancien.setItem(
+      'projet21.registres.v1',
+      JSON.stringify({
+        essais: 0,
+        operator: '',
+        tableaux: {},
+        expedition: null,
+        history: [],
+        memoire: 4,
+      }),
+    )
+    expect(new Records(ancien).fioles()).toEqual([])
+  })
+
   it('la dispersion clôt l’essai : le n° d’échantillon avance', () => {
     const r = new Records(memoryStorage())
     expect(r.essaiNumber()).toBe(1)
