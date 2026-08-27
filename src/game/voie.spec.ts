@@ -95,12 +95,12 @@ describe('voie — le plan de descente', () => {
     expect(varianteDuJour('2026-08-27', 3)).toMatch(/^[0-9A-Z]{4}$/)
   })
 
-  it('les deux mécaniques du choix sont distinctes, la première évite l’écrite', () => {
+  it('les trois mécaniques du choix sont distinctes, la première évite l’écrite', () => {
     for (let tir = 0; tir < 50; tir++) {
       const alea = (): number => ((tir * 7919 + 13) % 97) / 97
-      const [a, b] = mecaniquesDuChoix(1, alea)
+      const [a, b, c] = mecaniquesDuChoix(1, alea)
       expect(a).not.toBe(1)
-      expect(a).not.toBe(b)
+      expect(new Set([a, b, c]).size).toBe(3)
     }
     const [a] = mecaniquesDuChoix(null, () => 0.99)
     expect([0, 1, 2, 3]).toContain(a)

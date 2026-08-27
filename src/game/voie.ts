@@ -136,22 +136,28 @@ export function varianteDuJour(jourIso: string, rang: number): string {
     .padStart(4, '0')
 }
 
-/** DEUX MÉCANIQUES distinctes pour les cartes du choix — la première évite
- * celle de la salle écrite (si elle existe) pour que le choix parle, ET
- * celle de la salle qu'on vient de jouer (la foulée varie) quand c'est
- * possible sans vider le chapeau. */
+/** TROIS MÉCANIQUES distinctes pour les cartes du choix — la première
+ * évite celle de la salle écrite (si elle existe) pour que le choix
+ * parle, ET celle de la salle qu'on vient de jouer (la foulée varie)
+ * quand c'est possible sans vider le chapeau. */
 export function mecaniquesDuChoix(
   exclue: number | null,
   alea: () => number,
   eviter: number | null = null,
-): [CodeAtelier['mecanique'], CodeAtelier['mecanique']] {
+): [
+  CodeAtelier['mecanique'],
+  CodeAtelier['mecanique'],
+  CodeAtelier['mecanique'],
+] {
   const toutes = [0, 1, 2, 3] as const
   let candidates = toutes.filter((m) => m !== exclue && m !== eviter)
   if (candidates.length === 0) candidates = toutes.filter((m) => m !== exclue)
   const a = candidates[Math.floor(alea() * candidates.length)]
   const restantes = toutes.filter((m) => m !== a)
   const b = restantes[Math.floor(alea() * restantes.length)]
-  return [a, b]
+  const dernieres = toutes.filter((m) => m !== a && m !== b)
+  const c = dernieres[Math.floor(alea() * dernieres.length)]
+  return [a, b, c]
 }
 
 // ---- Le PALMARÈS de la voie : ce qui donne envie de redescendre ----------

@@ -6211,7 +6211,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
       })()
     : Math.random
   // la mécanique de la salle qu'on VIENT de jouer s'évite : la foulée varie
-  const [mecaA, mecaB] = mecaniquesDuChoix(
+  const [mecaA, mecaB, mecaC] = mecaniquesDuChoix(
     aEcrite?.mecanique ?? null,
     alea,
     identiteAtelier(level)?.mecanique ?? null,
@@ -6255,8 +6255,8 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
     }
     return null
   }
-  // Le choix porte TOUJOURS DEUX salles générées, deux mécaniques — la
-  // suite écrite (si la séquence en offre une) s'y ajoute en troisième
+  // Le choix porte TOUJOURS TROIS salles générées, trois mécaniques — la
+  // suite écrite (si la séquence en offre une) s'y ajoute en quatrième
   // carte : la voie reste procédurale d'abord, l'écrite est une option.
   const cartes: CarteVoie[] = []
   if (ecrite)
@@ -6266,30 +6266,29 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
       generee: false,
       etiquette: 'LA SUITE ÉCRITE',
     })
-  const g1 = genere(mecaA, 1)
-  if (g1)
-    cartes.push({
-      lv: g1.lv,
-      cahier: g1.cahier,
-      generee: true,
-      etiquette: 'SALLE GÉNÉRÉE — INÉDITE, PROUVÉE',
-    })
-  const g2 = genere(mecaB, 2)
-  if (g2)
-    cartes.push({
-      lv: g2.lv,
-      cahier: g2.cahier,
-      generee: true,
-      etiquette: 'SALLE GÉNÉRÉE — L’AUTRE MÉCANIQUE',
-    })
+  const etiquettesGen = [
+    'SALLE GÉNÉRÉE — INÉDITE, PROUVÉE',
+    'SALLE GÉNÉRÉE — L’AUTRE MÉCANIQUE',
+    'SALLE GÉNÉRÉE — LA TROISIÈME MÉCANIQUE',
+  ]
+  ;[mecaA, mecaB, mecaC].forEach((mec, i) => {
+    const g = genere(mec, i + 1)
+    if (g)
+      cartes.push({
+        lv: g.lv,
+        cahier: g.cahier,
+        generee: true,
+        etiquette: etiquettesGen[Math.min(i, etiquettesGen.length - 1)],
+      })
+  })
   // le FILET : si un tirage a échoué (graine ingrate), on balaie les
   // mécaniques restantes jusqu'à tenir la garantie — au moins UNE générée,
-  // et deux tant que le générateur en donne
-  if (cartes.filter((c) => c.generee).length < 2) {
+  // et trois tant que le générateur en donne
+  if (cartes.filter((c) => c.generee).length < 3) {
     for (const mec of [0, 1, 2, 3] as const) {
-      if (cartes.filter((c) => c.generee).length >= 2) break
+      if (cartes.filter((c) => c.generee).length >= 3) break
       if (cartes.some((c) => c.generee && c.cahier?.mecanique === mec)) continue
-      const gx = genere(mec, 4 + mec)
+      const gx = genere(mec, 5 + mec)
       if (gx)
         cartes.push({
           lv: gx.lv,
@@ -6327,7 +6326,8 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
   mbPeintEtal(run.xp)
   const host = mbEl('mb-cartes')
   host.innerHTML = ''
-  host.classList.toggle('mb-trio', cartes.length >= 3)
+  // trois cartes : trois colonnes ; quatre (l'écrite en plus) : carré 2×2
+  host.classList.toggle('mb-trio', cartes.length === 3)
   const jauges = document.createElement('div')
   jauges.className = 'mb-jauges'
   jauges.innerHTML = `<span>🫙 réserve <b>${run.bonbonneLiters.toFixed(2)} / ${BONBONNE_CAP} L</b></span><span>💠 ×${run.vies} · profondeur ${voieRang} / ${voiePlan.longueur}</span>`

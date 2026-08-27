@@ -22,6 +22,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 22:15',
+    title: 'Le choix de la voie passe à TROIS salles générées',
+    notes: [
+      'Demandé dans la foulée : trois niveaux proposés au lieu de deux. Chaque récompense de la voie tire désormais TROIS salles générées, trois MÉCANIQUES DIFFÉRENTES (sur les quatre du jeu) — la première évite toujours celle de la salle qu’on vient de jouer et celle de la suite écrite, pour que le choix parle. La suite écrite, quand la séquence en offre une, devient la QUATRIÈME carte.',
+      'Le filet suit : un tirage raté fait balayer les mécaniques restantes jusqu’à tenir les trois cartes générées. L’affichage s’adapte — trois cartes en trois colonnes, quatre cartes en carré 2×2 (deux colonnes sur écran étroit). En descente du jour, les trois tirages restent les mêmes pour tous les postes. Vérifié en navigateur : quatre cartes au choix (écrite + trois générées, trois mécaniques distinctes), jauges en scène, zéro erreur. 402 tests verts.',
+    ],
+  },
+  {
     date: '27/08/2026 21:23',
     title: 'Le choix de la voie porte toujours DEUX salles générées',
     notes: [
