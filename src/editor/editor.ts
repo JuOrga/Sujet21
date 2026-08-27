@@ -35,6 +35,7 @@ import {
   zoneOutline,
   type LevelDef,
   type ObstacleBox,
+  type DecalDef,
   type SpongeDef,
   type WorldLabel,
   type ZoneForce,
@@ -121,12 +122,41 @@ const ZONE_COLORS: Record<ZoneForce, string> = {
   vapeur: '#f2c98e',
 }
 
+// LES DÉCALQUES : le décor sans physique. Une seule liste, lue par l'outil,
+// par le panneau de propriétés et par les tests — le moteur lit la même
+// (game/level.ts) et la lecture d'un tableau écarte tout ce qui n'y est pas.
+const DECAL_SORTES: DecalDef['kind'][] = [
+  'tuyaux',
+  'vanne',
+  'ecran-off',
+  'ecran-on',
+  'fiole-pleine',
+  'fiole-vide',
+  'serre-ble-nain',
+  'serre-rampe',
+  'serre-rampe-a',
+]
+const DECAL_NOMS: Record<DecalDef['kind'], string> = {
+  tuyaux: 'Tuyaux',
+  vanne: 'Vanne',
+  'ecran-off': 'Écran éteint',
+  'ecran-on': 'Écran allumé',
+  'fiole-pleine': 'Fiole pleine',
+  'fiole-vide': 'Fiole vide',
+  'serre-ble-nain': 'Serre — blé nain',
+  'serre-rampe': 'Serre — gouttière',
+  'serre-rampe-a': 'Serre — gouttière (seconde)',
+}
+
 type Tool =
   | { kind: 'select' }
   | { kind: 'box'; material: number; forme?: number }
   | { kind: 'sponge' }
   | { kind: 'zone'; force: ZoneForce }
   | { kind: 'cache' }
+  // Le DÉCOR : un décalque posé à la main (jusqu'ici, seuls les tableaux
+  // écrits ou générés en portaient — la serre demandait de pouvoir en poser)
+  | { kind: 'decal'; sorte: DecalDef['kind'] }
   | { kind: 'spawn' }
   | { kind: 'exit' }
   | { kind: 'label' }
@@ -2741,6 +2771,20 @@ export class LevelEditor {
       this.commit(
         'Cachette posée — voilée en jeu, révélée quand le corps y entre.',
       )
+    } else if (t.kind === 'decal') {
+      if (!this.level.decals) this.level.decals = []
+      // le décalque se donne en CENTRE + taille : le rectangle tracé le dit
+      this.level.decals.push({
+        x: (r.minX + r.maxX) / 2,
+        y: (r.minY + r.maxY) / 2,
+        w: r.maxX - r.minX,
+        h: r.maxY - r.minY,
+        kind: t.sorte,
+      })
+      this.sel = { kind: 'decal', index: this.level.decals.length - 1 }
+      this.commit(
+        `Décor « ${DECAL_NOMS[t.sorte] ?? t.sorte} » posé — pur décalque : aucune physique, l'eau passe devant.`,
+      )
     } else if (t.kind === 'porte') {
       if (!this.level.portes) this.level.portes = []
       // asservie au canal de la cible la plus proche — modifiable au panneau
@@ -2961,6 +3005,12 @@ export class LevelEditor {
             kind: 'box',
             material: this.matiereCourante,
             forme: Number(key.slice(6)) || 0,
+          })
+        } else if (key.startsWith('decal:')) {
+          const sorte = key.slice(6) as DecalDef['kind']
+          this.setTool({
+            kind: 'decal',
+            sorte: DECAL_SORTES.includes(sorte) ? sorte : 'tuyaux',
           })
         } else if (key.startsWith('zone:'))
           this.setTool({ kind: 'zone', force: key.slice(5) as ZoneForce })
@@ -4418,21 +4468,10 @@ export class LevelEditor {
       const d = (this.level.decals ?? [])[s.index]
       rows.push(
         `<label class="ed-f"><span>Sorte</span><select id="p-dk">` +
-          (
-            [
-              'tuyaux',
-              'vanne',
-              'ecran-off',
-              'ecran-on',
-              'fiole-pleine',
-              'fiole-vide',
-            ] as const
-          )
-            .map(
-              (k) =>
-                `<option value="${k}"${k === d.kind ? ' selected' : ''}>${k}</option>`,
-            )
-            .join('') +
+          DECAL_SORTES.map(
+            (k) =>
+              `<option value="${k}"${k === d.kind ? ' selected' : ''}>${DECAL_NOMS[k]}</option>`,
+          ).join('') +
           `</select></label>`,
       )
       rows.push(
@@ -4783,15 +4822,7 @@ export class LevelEditor {
       l.y = val('p-ly')
     } else if (s.kind === 'decal') {
       const d = (this.level.decals ?? [])[s.index]
-      const SORTES = [
-        'tuyaux',
-        'vanne',
-        'ecran-off',
-        'ecran-on',
-        'fiole-pleine',
-        'fiole-vide',
-      ] as const
-      const k = SORTES.find((x) => x === text('p-dk'))
+      const k = DECAL_SORTES.find((x) => x === text('p-dk'))
       if (k) d.kind = k
       d.x = val('p-dx')
       d.y = val('p-dy')

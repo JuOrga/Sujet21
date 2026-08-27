@@ -743,3 +743,46 @@ describe('le code HUB : un mot-clé, pas une casse à deviner', () => {
     }
   })
 })
+
+describe('levelIO — les décalques de LA SERRE', () => {
+  const base = {
+    name: 'Serre',
+    bounds: { minX: -1000, minY: -600, maxX: 1000, maxY: 600 },
+    spawn: { x: -800, y: 0, n: 60 },
+    exit: { minX: 900, minY: -60, maxX: 980, maxY: 60 },
+    boxes: [{ minX: 0, minY: -600, maxX: 60, maxY: -400, material: 0 }],
+  }
+
+  it('accepte les trois cultures, et les rend telles quelles', () => {
+    const { level, rejets } = parseLevel({
+      ...base,
+      decals: [
+        { x: 0, y: 0, w: 400, h: 120, kind: 'serre-ble-nain' },
+        { x: 0, y: 200, w: 400, h: 90, kind: 'serre-rampe' },
+        { x: 0, y: 400, w: 400, h: 100, kind: 'serre-rampe-a', flip: true },
+      ],
+    })
+    expect(rejets).toEqual([])
+    expect(level!.decals!.map((d) => d.kind)).toEqual([
+      'serre-ble-nain',
+      'serre-rampe',
+      'serre-rampe-a',
+    ])
+    expect(level!.decals![2].flip).toBe(true)
+    // et l'aller-retour JSON les conserve
+    const relu = parseLevel(JSON.parse(serializeLevel(level!)))
+    expect(relu.level!.decals).toEqual(level!.decals)
+  })
+
+  it('écarte toujours une sorte inconnue — la liste reste fermée', () => {
+    const { level, rejets } = parseLevel({
+      ...base,
+      decals: [
+        { x: 0, y: 0, w: 400, h: 120, kind: 'serre-courgettes' },
+        { x: 0, y: 0, w: 400, h: 120, kind: 'serre-rampe' },
+      ],
+    })
+    expect(level!.decals!.map((d) => d.kind)).toEqual(['serre-rampe'])
+    expect(rejets.length).toBe(1)
+  })
+})

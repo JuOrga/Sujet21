@@ -295,6 +295,10 @@ export interface DecalDef {
     | 'ecran-on'
     | 'fiole-pleine'
     | 'fiole-vide'
+    // LA SERRE (cultures hydroponiques) — décor du niveau serre
+    | 'serre-ble-nain'
+    | 'serre-rampe'
+    | 'serre-rampe-a'
   flip?: boolean // miroir horizontal : la même pièce ne se répète pas telle quelle
   fade?: number // 0..1, opacité (défaut 0,55)
 }

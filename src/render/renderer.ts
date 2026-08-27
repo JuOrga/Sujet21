@@ -2334,6 +2334,10 @@ export class Renderer {
   private readonly zonePhaseScratch = new Float32Array(MAX_ZONES * 3)
   private texDecalTuyaux: WebGLTexture | null = null
   private texDecalVanne: WebGLTexture | null = null
+  // LA SERRE : les cultures hydroponiques du niveau serre
+  private texSerreBle: WebGLTexture | null = null
+  private texSerreRampe: WebGLTexture | null = null
+  private texSerreRampeA: WebGLTexture | null = null
   // sprites de luminaires (optionnels : tant que les fichiers n'existent
   // pas, le dessin procédural du shader reste en place)
   private texLampeRonde: WebGLTexture | null = null
@@ -2634,6 +2638,25 @@ export class Renderer {
       false,
       true,
       (t) => (this.texDecalEcranOn = t),
+    )
+    // LA SERRE : cultures hydroponiques, décor du niveau serre
+    this.loadTexture(
+      '/assets/serre-ble-nain.webp',
+      false,
+      true,
+      (t) => (this.texSerreBle = t),
+    )
+    this.loadTexture(
+      '/assets/serre-rampe.webp',
+      false,
+      true,
+      (t) => (this.texSerreRampe = t),
+    )
+    this.loadTexture(
+      '/assets/serre-rampe-a.webp',
+      false,
+      true,
+      (t) => (this.texSerreRampeA = t),
     )
     this.loadTexture(
       '/assets/fiole-pleine.webp',
@@ -3540,7 +3563,13 @@ export class Renderer {
     let started = false
     for (const d of decals) {
       const tex =
-        d.kind === 'vanne'
+        d.kind === 'serre-ble-nain'
+          ? this.texSerreBle
+          : d.kind === 'serre-rampe'
+            ? this.texSerreRampe
+            : d.kind === 'serre-rampe-a'
+              ? this.texSerreRampeA
+              : d.kind === 'vanne'
           ? this.texDecalVanne
           : d.kind === 'ecran-off'
             ? this.texDecalEcranOff

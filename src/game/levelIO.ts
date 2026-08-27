@@ -435,6 +435,9 @@ export function parseLevel(input: unknown): {
       'ecran-on',
       'fiole-pleine',
       'fiole-vide',
+      'serre-ble-nain',
+      'serre-rampe',
+      'serre-rampe-a',
     ] as const
     const kind = SORTES.find((s) => s === d.kind) ?? null
     const w = num(d.w, 0)

@@ -292,7 +292,7 @@ sprite, no perspective, no ground shadow, no text
 ```
 Négatif : `soil, dirt, terracotta pot, garden bed, sunlight, warm yellow light, perspective, depth of field, ground shadow, background, sky, hands, people, text, watermark`
 
-### 14b. Blé nain — `serre-ble-nain.webp`
+### 14b. Blé nain — `serre-ble-nain.webp` ✅ LIVRÉ (27/08)
 **1024×1024 · PNG transparent · touffe dressée**
 
 ```
@@ -324,7 +324,7 @@ flat 2D game sprite, no perspective, no ground shadow, no text
 ```
 Négatif : `garden, soil, wooden stake, sunlight, warm ambient light, bokeh, perspective, ground shadow, background, sky, hands, text, watermark`
 
-### 14d. Gouttière nue + barre horticole — `serre-rampe.webp`
+### 14d. Gouttière nue + barre horticole — `serre-rampe.webp` ✅ LIVRÉ (27/08, deux versions : `serre-rampe.webp` et `serre-rampe-a.webp`)
 **1024×256 · PNG transparent · se répète horizontalement**
 
 ```
@@ -344,11 +344,20 @@ Négatif : `plants, leaves, vegetables, bright magenta, purple haze, lens flare,
 `a discreet low-saturation rose glow (#b06a8f)` par `a cold white glow (#d6e8f5)`
 dans le prompt 14d — la serre reste alors strictement dans la palette station.
 
-**Ce qu'il reste à faire une fois les images là** : elles s'affichent seules dans
-la bibliothèque d'images, mais pour les POSER dans un tableau il me faut une
-courte livraison (les décalques sont une liste fermée côté moteur : j'y ajoute
-« roquette », « blé nain », « tomates », « rampe », et l'outil décalque de
-l'éditeur les propose). Envoyez les fichiers, je m'en occupe.
+**Où en est la serre** (27/08) : le BLÉ NAIN et les DEUX GOUTTIÈRES sont
+intégrés — nettoyés (halo de détourage, taches, voile gris), recompressés aux
+réglages maison (WebP, côté ≤ 1600, qualité .85) et POSABLES : l'éditeur a
+désormais un groupe d'outils « Décor (sans physique) » avec Blé nain,
+Gouttière, Gouttière (2) et Machinerie. On trace un rectangle, la pièce s'y
+loge ; la sorte se rechange ensuite dans le panneau.
+
+Restent à générer : la ROQUETTE (14a) et les TOMATES (14c). Mêmes règles, même
+traitement à l'arrivée — envoyez les images, je les intègre.
+
+**Un mot sur le détourage** : les fonds transparents arrivent souvent avec un
+liséré vert (fond incrusté) et des poussières de pixels. Je les nettoie à
+l'intégration, mais si votre générateur propose « transparent background » ET
+un rendu sur fond NOIR, prenez le noir : le détourage y est plus franc.
 
 ---
 

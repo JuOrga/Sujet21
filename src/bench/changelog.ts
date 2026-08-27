@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 23:00',
+    title: 'LA SERRE entre en jeu : le blé nain, les gouttières — et un outil pour les poser',
+    notes: [
+      'Les images sont arrivées : blé nain et deux versions de la gouttière hydroponique. Elles sont intégrées — nettoyées d’abord (le détourage laissait un liséré VERT sur les épis et des poussières de pixels ; un dé-spill de bord et un tri des pixels esseulés les enlèvent), puis recompressées aux réglages maison, ceux-là mêmes qu’emploie l’import d’images du jeu : WebP, côté ≤ 1600, qualité .85 — 2,3 Mo de PNG deviennent 340 Ko. Le voile gris terne des lueurs s’estompe, mais le DÉGRADÉ rose des barres horticoles reste entier (au premier essai, mon tri l’avait coupé net : corrigé).',
+      'Et surtout : on peut enfin POSER du décor. L’éditeur n’avait aucun outil pour ça — les décalques n’existaient que dans les tableaux écrits à la main. Un groupe « Décor (sans physique) » apparaît dans la palette : BLÉ NAIN, GOUTTIÈRE, GOUTTIÈRE (2) et MACHINERIE (tuyaux, vanne, écrans, fioles). On trace un rectangle, la pièce s’y loge ; la sorte se rechange ensuite dans le panneau, où les noms sont enfin lisibles au lieu des étiquettes techniques.',
+      'Ce sont des DÉCALQUES : aucune physique, le fluide passe devant — posez une paroi derrière si la gouttière doit porter. La lecture d’un tableau garde sa liste fermée (une sorte inconnue est écartée, comme avant) et l’aller-retour JSON conserve tout : gravé au banc. Vérifié en jeu, trois étages de cultures rendus par le moteur. Restent à générer : la roquette et les tomates. 407 tests verts, build propre.',
+    ],
+  },
+  {
     date: '27/08/2026 22:16',
     title: 'LA SERRE : les prompts des cultures, et le catalogue qui les attend',
     notes: [

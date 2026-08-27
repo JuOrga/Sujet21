@@ -67,6 +67,7 @@ const NOMS: Record<string, string> = {
   'serre-ble-nain.webp': 'Serre — blé nain',
   'serre-tomates.webp': 'Serre — colonne de tomates',
   'serre-rampe.webp': 'Serre — gouttière et barre horticole',
+  'serre-rampe-a.webp': 'Serre — gouttière et barre horticole (seconde)',
 }
 
 /** La rubrique d'un fichier, d'après son chemin. Tout finit classé : ce qui
