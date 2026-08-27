@@ -170,46 +170,50 @@ export const CATALOGUE_REGLES: readonly RegleGen[] = [
   {
     id: 'point-de-repere',
     famille: 'structure',
-    etat: 'proposee',
+    etat: 'en-place',
     titre: 'Chaque salle porte un repère mémorisable',
     texte:
-      'Une silhouette, un bandeau, une lampe teintée — UN repère qui la ' +
-      'distingue de ses voisines, GARANTI par le générateur et non laissé au ' +
-      'hasard du décor. Le joueur ne doit jamais se demander « suis-je déjà ' +
-      'passé ici ? ».',
+      'Un danger, une cachette, un bandeau ou une décalcomanie font ' +
+      'repère ; la salle que le hasard laisse nue GAGNE le sien — une ' +
+      'décalcomanie d’atelier dont l’espèce tourne avec la salle ' +
+      '(tuyaux, vanne, écran, fiole), ou à défaut de place sa lampe se ' +
+      'teinte. Le joueur ne se demande jamais « suis-je déjà passé ici ? ».',
   },
   {
     id: 'boucle-qui-recompense',
     famille: 'structure',
-    etat: 'proposee',
+    etat: 'en-place',
     titre: 'Une boucle se choisit, elle ne se subit pas',
     texte:
-      'Deux voies équivalentes, c’est une voie de trop. La voie longue ' +
-      'paie (cachette, butin, sûreté) et la voie courte coûte (franchissement ' +
-      'plus dur, danger) : le choix de route devient une décision, pas un ' +
+      'Deux voies équivalentes, c’est une voie de trop. Quand les deux ' +
+      'ouvertures d’une boucle sont toutes deux libres, l’une prend ' +
+      'un filtre d’état : la voie qui l’évite s’allonge, celle qui ' +
+      'la prend se paie — le choix de route devient une décision, pas un ' +
       'pile ou face.',
   },
   {
     id: 'cul-de-sac-plein',
     famille: 'structure',
-    etat: 'proposee',
+    etat: 'en-place',
     titre: 'Un cul-de-sac vide est interdit',
     texte:
-      'Qui s’écarte du chemin trouve toujours quelque chose : cachette, ' +
-      'fiole, point de vue, écho de lore. Le détour se respecte — sinon le ' +
-      'joueur apprend à ne plus explorer, et la topologie à boucles ne sert ' +
-      'plus à rien.',
+      'Qui s’écarte du chemin trouve TOUJOURS quelque chose : chaque ' +
+      'cul-de-sac reçoit une cachette (quand les options le permettent) ou, ' +
+      'à défaut, une fiole visible. Le détour se respecte — sinon le joueur ' +
+      'apprend à ne plus explorer, et la topologie à boucles ne sert plus à ' +
+      'rien.',
   },
   {
     id: 'varier-la-foulee',
     famille: 'structure',
-    etat: 'proposee',
+    etat: 'en-place',
     titre: 'Deux salles consécutives ne se ressemblent jamais',
     texte:
-      'Alterner serré / ouvert, horizontal / vertical, clair / sombre. Le ' +
-      'générateur devrait regarder la salle PRÉCÉDENTE de la séquence au ' +
-      'moment de tirer la suivante — aujourd’hui chaque salle s’ignore, ' +
-      'et une descente peut enchaîner trois couloirs identiques.',
+      'Sur la voie, le rang commande la POSTURE de la salle générée : la ' +
+      'mécanique qu’on vient de jouer s’évite au choix suivant, le ' +
+      'labyrinthe et l’éclairage contrasté alternent un rang sur deux ' +
+      '(milieu et fin de plan) — et tout voyage dans le code de la salle, ' +
+      'l’identité tient.',
   },
   // ---- LA RAMPE -----------------------------------------------------------
   {
@@ -249,55 +253,58 @@ export const CATALOGUE_REGLES: readonly RegleGen[] = [
     id: 'rampe-de-la-voie',
     famille: 'rampe',
     etat: 'en-place',
-    titre: 'Sur la voie, la rampe est linéaire et le moment par tiers',
+    titre: 'Sur la voie, la rampe est en dents de scie, le moment par tiers',
     texte:
-      'La difficulté monte de 0 au départ à diffMax au dernier rang, ' +
-      'linéairement ; le moment (début / milieu / fin) se répartit par tiers ' +
-      'de la longueur du plan. Longueur, plafond et « descente du jour » se ' +
-      'règlent au banc.',
+      'L’enveloppe monte de 0 au départ jusqu’au SOMMET diffMax à ' +
+      'l’avant-dernier rang ; un rang sur trois creuse une respiration ' +
+      '(−1) ; le dernier rang redescend à 60 % du plafond. Le moment ' +
+      '(début / milieu / fin) se répartit par tiers de la longueur. Le plan ' +
+      'se règle dans LE CAHIER DES RÈGLES (paramètres du cycle).',
   },
   {
     id: 'enseigner-eprouver-tordre',
     famille: 'rampe',
-    etat: 'proposee',
+    etat: 'en-place',
     titre: 'Enseigner, éprouver, tordre',
     texte:
-      'Chaque mécanique se rencontre trois fois sur une descente : une salle ' +
-      'SÛRE qui l’enseigne (l’échec ne coûte rien), une salle qui ' +
-      'l’ÉPROUVE sous contrainte (serrage, danger), une salle qui la ' +
-      'DÉTOURNE (elle sert autrement qu’à sa leçon). La rampe devrait ' +
-      'ordonnancer ces trois temps, pas seulement doser des quantités.',
+      'Le tiers DÉBUT enseigne : la leçon est PURE (les familles de ' +
+      'maillons se resserrent sur la mécanique de la salle). Le tiers ' +
+      'MILIEU éprouve : l’esprit labyrinthe tord la structure un rang ' +
+      'sur deux. Le tiers FIN détourne : l’éclairage contrasté fait ' +
+      'rejouer les mêmes mécaniques dans la pénombre sculptée.',
   },
   {
     id: 'une-nouveaute-a-la-fois',
     famille: 'rampe',
-    etat: 'proposee',
+    etat: 'en-place',
     titre: 'Une nouveauté à la fois',
     texte:
-      'Une salle n’introduit jamais deux choses neuves à la fois : ' +
-      'nouvelle mécanique OU nouveau danger OU nouvelle topologie — jamais ' +
-      'deux. Le neuf se présente toujours dans un contexte connu.',
+      'Les deux premiers rangs de la voie sont SANS danger : d’abord la ' +
+      'mécanique, ensuite les pièges. Le neuf se présente toujours dans un ' +
+      'contexte connu — jamais une mécanique inconnue ET un danger neuf ' +
+      'dans la même salle.',
   },
   {
     id: 'respiration',
     famille: 'rampe',
-    etat: 'proposee',
+    etat: 'en-place',
     titre: 'La difficulté monte en dents de scie, pas en pente',
     texte:
-      'Après une salle exigeante, une salle de RESPIRATION : courte, sûre, ' +
-      'généreuse. La rampe linéaire actuelle de la voie devrait creuser ces ' +
-      'vallées — la tension se mesure à ses relâchements.',
+      'Un rang sur trois de la voie creuse une VALLÉE d’un cran sous ' +
+      'l’enveloppe : après l’exigence, le relâchement — la tension ' +
+      'se mesure à ses respirations. (Gravé dans la courbe diffAuRang, ' +
+      'testé rang par rang.)',
   },
   {
     id: 'sommet-avant-la-fin',
     famille: 'rampe',
-    etat: 'proposee',
+    etat: 'en-place',
     titre: 'Le pic se joue à l’avant-dernier rang',
     texte:
-      'La dernière salle est une victoire à prendre, pas un mur : le sommet ' +
-      'de difficulté se place juste avant, et le joueur sort de la descente ' +
-      'sur une réussite. Perdre au tout dernier rang est le plus sûr moyen ' +
-      'de ne jamais revoir un joueur.',
+      'Le sommet de difficulté (diffMax) tombe au rang L−1 ; la dernière ' +
+      'salle redescend à 60 % du plafond — une victoire à prendre, pas un ' +
+      'mur. Le joueur sort de la descente sur une réussite. Perdre au tout ' +
+      'dernier rang est le plus sûr moyen de ne jamais revoir un joueur.',
   },
   {
     id: 'duree-cible',
@@ -313,13 +320,14 @@ export const CATALOGUE_REGLES: readonly RegleGen[] = [
   {
     id: 'combiner-pas-encombrer',
     famille: 'rampe',
-    etat: 'proposee',
+    etat: 'en-place',
     titre: 'Combiner, jamais encombrer',
     texte:
-      'La difficulté monte en COMBINANT des mécaniques connues (un miroir ' +
-      'sous une barrière tenue, un rail à travers un rideau), jamais en ' +
-      'ajoutant du fouillis. Au-delà de D5, les plafonds de lisibilité ' +
-      'tiennent bon et la combinaison prend le relais des quantités.',
+      'Au-delà de la difficulté 5, les franchissements de renfort ' +
+      'deviennent des ÉNIGMES de la même famille (miroir, double ET, rail, ' +
+      'barrière) plutôt qu’un filtre d’état de plus : la difficulté ' +
+      'monte en montages, pas en quantités — et les plafonds de lisibilité ' +
+      'tiennent bon.',
   },
   // ---- LA LISIBILITÉ ------------------------------------------------------
   {
@@ -367,46 +375,64 @@ export const CATALOGUE_REGLES: readonly RegleGen[] = [
       'traversable.',
   },
   {
+    id: 'trajet-etire',
+    famille: 'lisibilite',
+    etat: 'en-place',
+    titre: 'Le trajet s’étire : jamais de pastille contre son émetteur',
+    texte:
+      'Chaque pose d’énigme s’ENGAGE sur une distance minimale ' +
+      'émetteur → pastille (miroir 300 u, relais 380, rail 280, double ET ' +
+      '260) et la validation la vérifie — un tirage qui niche sa pastille ' +
+      'se re-tire. Le corps gelé se tient du côté opposé à l’émetteur, ' +
+      'le rail court d’un flanc vers l’autre : le fil se LIT à ' +
+      'travers la salle, il ne se résout pas sur place.',
+  },
+  {
     id: 'lire-avant-agir',
     famille: 'lisibilite',
-    etat: 'proposee',
+    etat: 'en-place',
     titre: 'Lire avant d’agir',
     texte:
-      'Depuis l’entrée d’une salle, l’OBJECTIF (la porte, le ' +
-      'sas) se voit ou se déduit ; tout danger se télégraphie avant de ' +
-      'punir. Le premier regard répond à « où vais-je ? », le deuxième à ' +
-      '« qu’est-ce qui m’en empêche ? » — jamais l’inverse.',
+      'Le sas porte son étiquette, chaque danger la sienne (CHAUDIÈRE, ' +
+      'HUBLOT FENDU) avec son aura visible, et l’entrée est un sanctuaire ' +
+      '— le temps du premier regard. Il répond à « où vais-je ? », le ' +
+      'deuxième à « qu’est-ce qui m’en empêche ? » — jamais ' +
+      'l’inverse.',
   },
   {
     id: 'silhouette-souveraine',
     famille: 'lisibilite',
-    etat: 'proposee',
+    etat: 'en-place',
     titre: 'La silhouette est souveraine',
     texte:
-      'Éteindre lumière et textures : la salle doit rester compréhensible en ' +
-      'silhouette pure. La lumière sculpte et met en scène, elle ne porte ' +
-      'jamais une information indispensable à la traversée.',
+      'Aucune information de traversée n’est portée par la lumière : ' +
+      'matières, portes et pastilles se lisent en silhouette pure. Même en ' +
+      'éclairage contrasté, l’ambiante garde un plancher (0,12) — la ' +
+      'lumière sculpte et met en scène, elle ne cache jamais le chemin.',
   },
   {
     id: 'entree-sanctuaire',
     famille: 'lisibilite',
-    etat: 'proposee',
+    etat: 'en-place',
     titre: 'La zone d’arrivée est un sanctuaire',
     texte:
-      'Aucun danger, aucune énigme à moins de ~300 u du spawn : le temps de ' +
-      'lire la salle. Le générateur réserve déjà 230 u d’ESPACE autour ' +
-      'du spawn — en faire une règle de CALME, pas seulement de place.',
+      'Aucun danger à moins de 300 u du spawn — gravé dans la pose et ' +
+      'balayé par les tests. Dans la salle de naissance, l’énigme est ' +
+      'REPOUSSÉE du spawn autant que la salle le permet (le point ' +
+      'd’ionisation part du flanc opposé, le miroir s’écarte). Le ' +
+      'joueur a le temps de lire avant que la salle ne parle.',
   },
   {
     id: 'echec-eclairant',
     famille: 'lisibilite',
-    etat: 'proposee',
+    etat: 'en-place',
     titre: 'Chaque échec éclaire',
     texte:
-      'La cause d’une perte est visible À L’INSTANT de la perte, ' +
-      'jamais hors-champ. Si un danger peut coûter depuis hors-champ, il se ' +
-      'télégraphie (lueur, aura, son) avant de frapper. Un échec illisible ' +
-      'est un bug de design, pas une difficulté.',
+      'Tout danger posé porte son étiquette et son aura (bande de gel, ' +
+      'halo de chauffe) : la cause d’une perte est visible à ' +
+      'l’instant de la perte. Et le sanctuaire d’entrée garantit ' +
+      'qu’aucun danger ne frappe pendant la lecture de la salle. Un ' +
+      'échec illisible est un bug de design, pas une difficulté.',
   },
   // ---- L'HABILLAGE --------------------------------------------------------
   {

@@ -544,12 +544,22 @@ function tireTopologie(
       restants.length,
       Math.max(0, 1 + Math.floor(D / 3) + (mec === 3 ? 1 : 0) - forces.size),
     )
+    // COMBINER, JAMAIS ENCOMBRER : au-delà de la difficulté 5, les renforts
+    // deviennent des ÉNIGMES de la même famille (miroir, ET, rail, barrière)
+    // plutôt qu'un filtre d'état de plus — la difficulté monte en montages,
+    // pas en quantités, et les plafonds de lisibilité tiennent bon.
+    const especesEnigme: readonly Maillon[] = ['porte', 'et', 'rail', 'nor']
+    const renfortsDoses =
+      D >= 6 && renforts.some((m) => especesEnigme.includes(m))
+        ? renforts.filter((m) => especesEnigme.includes(m))
+        : renforts
     for (let i = restants.length - 1; i > 0; i--) {
       const j = Math.floor(rng() * (i + 1))
       ;[restants[i], restants[j]] = [restants[j], restants[i]]
     }
     restants.forEach((ci, k) => {
-      conns[ci].maillon = k < viser ? parmi(rng, renforts) : parmi(rng, doux)
+      conns[ci].maillon =
+        k < viser ? parmi(rng, renfortsDoses) : parmi(rng, doux)
     })
   } else {
     const contraints = FAMILLES_OPT.filter((m) => autorise(o, m))
@@ -564,6 +574,23 @@ function tireTopologie(
   for (const cn of conns)
     if (cn.maillon === 'nor' && cn.sens !== 'h')
       cn.maillon = autorise(o, 'grille') ? 'grille' : 'membrane'
+  // LA BOUCLE SE CHOISIT : deux ouvertures entre rangées toutes deux
+  // libres, c'est un pile ou face — pas un choix de route. L'une des deux
+  // prend un filtre d'état doux : la voie qui l'évite s'allonge, celle qui
+  // la prend se paie — le détour devient une décision.
+  {
+    const ouverturesV = conns.filter((cn) => cn.sens === 'v')
+    if (
+      ouverturesV.length >= 2 &&
+      ouverturesV.every((cn) => cn.maillon === 'libre')
+    ) {
+      parmi(rng, ouverturesV).maillon = autorise(o, 'membrane')
+        ? 'membrane'
+        : autorise(o, 'grille')
+          ? 'grille'
+          : 'libre'
+    }
+  }
   // les plafonds de lisibilité — les maillons du CONTRAT passent en premier
   {
     const ordre = [...forces, ...restants]
@@ -626,6 +653,11 @@ export interface PreuveDef {
    * plafond, plancher, flanc — et le reflet part dans les quatre sens). */
   normale: { nx: number; ny: number }
   cibleIndex: number
+  /** LE TRAJET S'ÉTIRE : la distance minimale émetteur → pastille que la
+   * pose s'est ENGAGÉE à tenir — la validation la vérifie et rejette la
+   * pastille nichée contre son émetteur (l'énigme sans trajet n'est pas
+   * challengeante). Absente (figures, anciens montages) : pas d'exigence. */
+  porteeMin?: number
 }
 
 type LevelGen = LevelDef & { __preuves?: PreuveDef[] }
@@ -829,6 +861,7 @@ function essaieNiveau(
           spot,
           normale: normale0,
           cibleIndex: cibles.length - 1,
+          porteeMin: 380, // le relais existe POUR étirer : il s'y engage
         })
         poseIndice(
           'miroir',
@@ -843,48 +876,68 @@ function essaieNiveau(
         return
       }
     }
+    // LE TRAJET S'ÉTIRE : le corps gelé loin de l'émetteur, la pastille
+    // loin des deux — le fil se LIT à travers la salle au lieu de se
+    // résoudre sur place. Et dans la salle de naissance, l'énigme est
+    // REPOUSSÉE du spawn autant que la salle le permet (le sanctuaire).
+    const largeur = R.maxX - R.minX
     if (montage === 'flanc') {
       const ey =
         Math.round(entre(rng, midY - demi * 0.3, midY + demi * 0.3) / 10) * 10
       em = { x: R.minX + 16, y: ey, angle: 0 }
       d = { x: 1, y: 0 }
-      const mx = Math.round(entre(rng, R.minX + 210, R.maxX - 160) / 10) * 10
+      const mxMin = Math.min(
+        R.maxX - 170,
+        Math.max(
+          R.minX + 210,
+          R.minX + largeur * 0.52,
+          s === topo.spawnSalle ? spawn.x + 260 : -Infinity,
+        ),
+      )
+      const mx = Math.round(entre(rng, mxMin, R.maxX - 160) / 10) * 10
       spot = { x: mx, y: ey }
       const espaceHaut = R.maxY - 80 - ey
       const espaceBas = ey - (R.minY + 80)
       const versHaut =
         espaceHaut < 180 ? false : espaceBas < 180 ? true : rng() < 0.5
+      const espaceL = (versHaut ? espaceHaut : espaceBas) - 20
+      const capL = Math.min(320, Math.max(160, espaceL))
       r = { x: 0, y: versHaut ? 1 : -1 }
-      L = entre(
-        rng,
-        150,
-        Math.min(320, Math.max(160, (versHaut ? espaceHaut : espaceBas) - 20)),
-      )
+      L = entre(rng, Math.max(150, Math.min(capL - 5, espaceL * 0.55)), capL)
     } else {
-      const ex = Math.round(entre(rng, R.minX + 150, R.maxX - 150) / 10) * 10
       const duHaut = montage === 'plafond'
+      const exMin = Math.min(
+        R.maxX - 160,
+        Math.max(
+          R.minX + 150,
+          s === topo.spawnSalle ? spawn.x + 240 : -Infinity,
+        ),
+      )
+      const ex = Math.round(entre(rng, exMin, R.maxX - 150) / 10) * 10
       em = {
         x: ex,
         y: duHaut ? R.maxY - 24 : R.minY + 24,
         angle: duHaut ? -90 : 90,
       }
       d = { x: 0, y: duHaut ? -1 : 1 }
+      // le corps gelé se tient du CÔTÉ OPPOSÉ à l'émetteur : le fil traverse
       spot = {
         x: ex,
         y:
-          Math.round(entre(rng, midY - demi * 0.35, midY + demi * 0.35) / 10) *
-          10,
+          Math.round(
+            (duHaut
+              ? entre(rng, midY - demi * 0.35, midY + demi * 0.05)
+              : entre(rng, midY - demi * 0.05, midY + demi * 0.35)) / 10,
+          ) * 10,
       }
       const espaceDroite = R.maxX - 70 - ex
       const espaceGauche = ex - (R.minX + 70)
       const versDroite =
         espaceDroite < 175 ? false : espaceGauche < 175 ? true : rng() < 0.6
+      const espaceL = versDroite ? espaceDroite : espaceGauche
+      const capL = Math.min(300, Math.max(160, espaceL))
       r = { x: versDroite ? 1 : -1, y: 0 }
-      L = entre(
-        rng,
-        150,
-        Math.min(300, Math.max(160, versDroite ? espaceDroite : espaceGauche)),
-      )
+      L = entre(rng, Math.max(150, Math.min(capL - 5, espaceL * 0.55)), capL)
     }
     const nl = Math.hypot(r.x - d.x, r.y - d.y)
     const normale = { nx: (r.x - d.x) / nl, ny: (r.y - d.y) / nl }
@@ -903,6 +956,7 @@ function essaieNiveau(
       spot,
       normale,
       cibleIndex: cibles.length - 1,
+      porteeMin: 300, // jamais de pastille nichée contre son émetteur
     })
     poseIndice(
       'miroir',
@@ -928,8 +982,9 @@ function essaieNiveau(
     const R = rectDe(s)
     const midY = (R.minY + R.maxY) / 2
     const demi = (R.maxY - R.minY) / 2
+    // le corps gelé LOIN du plafond porteur : le fil à plomb traverse la salle
     const my =
-      Math.round(entre(rng, midY - demi * 0.35, midY + demi * 0.35) / 10) * 10
+      Math.round(entre(rng, midY - demi * 0.35, midY + demi * 0.02) / 10) * 10
     const emetteur: LaserDef = { x: ex, y: R.maxY - 24, angle: -90 }
     const porteeCible = entre(
       rng,
@@ -946,6 +1001,7 @@ function essaieNiveau(
       spot: { x: ex, y: my },
       normale: { nx: N45, ny: N45 },
       cibleIndex: cibles.length - 1,
+      porteeMin: 260, // deux énigmes dans la salle : l'étirement du possible
     })
     poseIndice('miroir', ex, my - 66, 'MIROIR DE GLACE', 'froid')
     reserves.push({
@@ -966,7 +1022,17 @@ function essaieNiveau(
     const R = rectDe(s)
     const midY = (R.minY + R.maxY) / 2
     const demi = (R.maxY - R.minY) / 2
-    const ex = Math.round(entre(rng, R.minX + 150, R.maxX - 150) / 10) * 10
+    // LE TRAJET S'ÉTIRE : l'émetteur se colle à un FLANC et le rail court
+    // vers l'autre — l'arc guidé traverse la salle au lieu de tourner sur
+    // place. Dans la salle de naissance, le point d'ionisation (où le
+    // joueur se tient) part du côté OPPOSÉ au spawn.
+    const versDroite = s === topo.spawnSalle ? false : rng() < 0.5
+    const ex =
+      Math.round(
+        (versDroite
+          ? entre(rng, R.minX + 130, R.minX + 230)
+          : entre(rng, R.maxX - 230, R.maxX - 130)) / 10,
+      ) * 10
     const duHaut = rng() < 0.5
     const d = { x: 0, y: duHaut ? -1 : 1 }
     const emetteur: LaserDef = {
@@ -976,20 +1042,13 @@ function essaieNiveau(
     }
     const ny =
       Math.round(entre(rng, midY - demi * 0.3, midY + demi * 0.3) / 10) * 10
-    const espaceDroite = R.maxX - 60 - ex
-    const espaceGauche = ex - (R.minX + 60)
-    const versDroite = espaceDroite >= espaceGauche
+    const espace = (versDroite ? R.maxX - 60 - ex : ex - (R.minX + 60)) - 110
     const sgn = versDroite ? 1 : -1
+    const capR = Math.min(380, Math.max(160, espace))
     const Lr =
       Math.round(
-        entre(
-          rng,
-          140,
-          Math.min(
-            200,
-            Math.max(150, (versDroite ? espaceDroite : espaceGauche) - 110),
-          ),
-        ) / 10,
+        entre(rng, Math.min(capR - 10, Math.max(200, espace * 0.6)), capR) /
+          10,
       ) * 10
     lasers.push(emetteur)
     const railY = ny + d.y * 30
@@ -1008,6 +1067,7 @@ function essaieNiveau(
       spot: { x: ex, y: ny },
       normale: { nx: 0, ny: 0 }, // sans objet : le nuage n'a pas de flanc
       cibleIndex: cibles.length - 1,
+      porteeMin: 280, // l'arc guidé traverse — jamais un tour sur place
     })
     poseIndice('rail', ex, ny - d.y * 74, 'IONISER ICI', 'grille')
     reserves.push(bande(emetteur.x, emetteur.y, ex, ny - d.y * 60, 70))
@@ -1517,6 +1577,11 @@ function essaieNiveau(
           maxY: cy + h / 2,
         }
         if (!posePossible(r)) continue
+        // LE SANCTUAIRE D'ENTRÉE : aucun danger à moins de 300 u du spawn —
+        // le temps de LIRE la salle avant qu'elle ne punisse
+        const dxS = Math.max(r.minX - spawn.x, 0, spawn.x - r.maxX)
+        const dyS = Math.max(r.minY - spawn.y, 0, spawn.y - r.maxY)
+        if (Math.hypot(dxS, dyS) < 300) continue
         boxes.push({
           ...r,
           material: chaud ? MAT_CHAUD : MAT_FROID,
@@ -1617,12 +1682,9 @@ function essaieNiveau(
         i !== topo.exitSalle,
     )
   const pCache = o.cachette === 1 ? 0 : o.cachette === 2 ? 1 : 0.55
-  if (rng() < pCache) {
-    for (let essai = 0; essai < (o.cachette === 2 ? 60 : 20); essai++) {
-      const si =
-        culsDeSac.length && rng() < 0.7
-          ? parmi(rng, culsDeSac)
-          : Math.floor(rng() * topo.salles.length)
+  /** Une CACHETTE dans la salle donnée — vrai si elle a trouvé sa place. */
+  const poseCachette = (si: number, essais: number): boolean => {
+    for (let essai = 0; essai < essais; essai++) {
       const R = rectDe(si)
       const w = entre(rng, 200, 280)
       const h = entre(rng, 200, 280)
@@ -1647,8 +1709,112 @@ function essaieNiveau(
         kind: rng() < 0.5 ? 'fiole-pleine' : 'ecran-off',
         fade: 0.7,
       })
-      break
+      return true
     }
+    return false
+  }
+  /** À défaut de cachette : une FIOLE visible — le détour se respecte. */
+  const poseFiole = (si: number): void => {
+    const R = rectDe(si)
+    for (let essai = 0; essai < 14; essai++) {
+      const cx = entre(rng, R.minX + 100, R.maxX - 100)
+      const cy = entre(rng, R.minY + 100, R.maxY - 100)
+      const r: Rect = {
+        minX: cx - 45,
+        minY: cy - 35,
+        maxX: cx + 45,
+        maxY: cy + 35,
+      }
+      if (!posePossible(r)) continue
+      decals.push({
+        x: Math.round(cx),
+        y: Math.round(cy),
+        w: 90,
+        h: 70,
+        kind: 'fiole-pleine',
+        fade: 0.8,
+      })
+      return
+    }
+  }
+  // LE CUL-DE-SAC PLEIN : qui s'écarte du chemin trouve TOUJOURS quelque
+  // chose — une cachette quand les options le permettent, une fiole sinon.
+  // Un embranchement vide apprendrait au joueur à ne plus explorer.
+  for (const cds of culsDeSac) {
+    if (o.cachette !== 1 && poseCachette(cds, 24)) continue
+    poseFiole(cds)
+  }
+  // et la cachette « d'ambiance » hors culs-de-sac, au taux historique
+  if (caches.length === 0 && rng() < pCache) {
+    for (let essai = 0; essai < (o.cachette === 2 ? 60 : 20); essai++) {
+      if (poseCachette(Math.floor(rng() * topo.salles.length), 1)) break
+    }
+  }
+
+  // ---- LE POINT DE REPÈRE : chaque salle porte UNE marque mémorisable ----
+  // Un danger, une cachette, une décalcomanie ou un bandeau font repère ;
+  // la salle que le hasard a laissée nue gagne le sien — une décalcomanie
+  // d'atelier (l'espèce tourne avec la salle : deux voisines ne portent
+  // pas la même) ou, à défaut de place, sa lampe se teinte. Le joueur ne
+  // se demande jamais « suis-je déjà passé ici ? ».
+  {
+    const TEINTES_REPERE = ['#ffd9a8', '#a8c8ff', '#ffc4c4', '#c9f7d8']
+    const KINDS_REPERE: DecalDef['kind'][] = [
+      'tuyaux',
+      'vanne',
+      'ecran-on',
+      'ecran-off',
+      'fiole-vide',
+    ]
+    const dedans = (x: number, y: number, R: Rect): boolean =>
+      x >= R.minX && x <= R.maxX && y >= R.minY && y <= R.maxY
+    topo.salles.forEach((s, si) => {
+      const R = s.rect
+      const aDanger = boxes.some(
+        (b) =>
+          (b.material === MAT_CHAUD || b.material === MAT_FROID) &&
+          dedans((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, R),
+      )
+      const aCache = caches.some((c) =>
+        dedans((c.minX + c.maxX) / 2, (c.minY + c.maxY) / 2, R),
+      )
+      const aDecal = decals.some((dc) => dedans(dc.x, dc.y, R))
+      const aBandeau = boxes.some(
+        (b) =>
+          b.material === MAT_WALL &&
+          b.minX <= R.minX + 1 &&
+          b.maxX >= R.maxX - 1 &&
+          b.minY >= R.minY - 1 &&
+          b.maxY <= R.maxY + 1,
+      )
+      if (aDanger || aCache || aDecal || aBandeau) return
+      for (let essai = 0; essai < 14; essai++) {
+        const w = entre(rng, 100, 150)
+        const h = entre(rng, 80, 110)
+        const cx = entre(rng, R.minX + 90, R.maxX - 90)
+        const cy = entre(rng, R.minY + 90, R.maxY - 90)
+        const r: Rect = {
+          minX: cx - w / 2,
+          minY: cy - h / 2,
+          maxX: cx + w / 2,
+          maxY: cy + h / 2,
+        }
+        if (!posePossible(r)) continue
+        decals.push({
+          x: Math.round(cx),
+          y: Math.round(cy),
+          w: Math.round(w),
+          h: Math.round(h),
+          kind: KINDS_REPERE[si % KINDS_REPERE.length],
+          fade: 0.8,
+          ...(rng() < 0.5 ? { flip: true } : {}),
+        })
+        return
+      }
+      const lum = lumieres.find((l) => dedans(l.x, l.y, R))
+      if (lum && !lum.couleur)
+        lum.couleur = TEINTES_REPERE[si % TEINTES_REPERE.length]
+    })
   }
 
   const nbEnigmes = preuves.length
@@ -1699,8 +1865,10 @@ function essaieNiveau(
     lumieres,
     // la FIN de run s'assombrit ; le mode CONTRASTÉ éteint presque tout —
     // seules les lampes basses sculptent la salle
+    // la SILHOUETTE reste souveraine : même contrastée, l'ambiante garde un
+    // plancher — la géométrie se lit toujours, la lumière met en scène
     ...(o.contraste === 1
-      ? { ambiante: Number(entre(rng, 0.1, 0.16).toFixed(2)) }
+      ? { ambiante: Number(entre(rng, 0.12, 0.16).toFixed(2)) }
       : atelier && atelier.cahier.moment > 1
         ? { ambiante: atelier.cahier.moment === 2 ? 0.46 : 0.4 }
         : {}),
@@ -2084,6 +2252,17 @@ export function valideNiveau(level: LevelDef): VerdictGen {
   for (const p of preuves)
     attendus.set(p.canal, (attendus.get(p.canal) ?? 0) + 1)
   for (const p of preuves) {
+    // LE TRAJET S'ÉTIRE : la pose s'est engagée sur une distance minimale
+    // émetteur → pastille — l'énigme résolue sur place n'est pas une
+    // énigme. Les retournements sont des isométries : la distance tient.
+    if (p.porteeMin) {
+      const cp = (level.cibles ?? [])[p.cibleIndex]
+      const dEc = cp ? Math.hypot(cp.x - p.emetteur.x, cp.y - p.emetteur.y) : 0
+      if (dEc < p.porteeMin)
+        raisons.push(
+          `canal ${p.canal} : pastille nichée contre son émetteur (${Math.round(dEc)} u < ${p.porteeMin}) — le trajet doit s'étirer`,
+        )
+    }
     const base = baseParEmetteur.get(p.emetteur) ?? new Set()
     let ok = false
     if (p.kind === 'miroir') {

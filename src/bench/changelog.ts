@@ -22,6 +22,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 16:31',
+    title:
+      'Le générateur applique le cahier : treize règles passent EN PLACE',
+    notes: [
+      'Demandé : mettre en place les recommandations du cahier des règles (toutes sauf la durée-cible) et corriger le laser posé « juste à côté de la cible ». C’est fait — et le défaut signalé a désormais sa règle : LE TRAJET S’ÉTIRE. Chaque pose d’énigme s’ENGAGE sur une distance minimale émetteur → pastille (miroir 300 u, relais 380, rail 280, double ET 260) et la validation la tient : une pastille nichée contre son émetteur fait re-tirer la salle. Le corps gelé se tient du côté OPPOSÉ à l’émetteur, le rail court d’un flanc vers l’autre — le fil se lit à travers la salle, il ne se résout plus sur place.',
+      'Les salles générées gagnent leurs règles de conception : le SANCTUAIRE D’ENTRÉE (aucun danger à moins de 300 u du spawn, l’énigme repoussée du point de naissance), le CUL-DE-SAC PLEIN (chaque embranchement reçoit cachette ou fiole — le détour se respecte), la BOUCLE QUI SE CHOISIT (deux ouvertures libres : l’une prend un filtre, le choix de route devient une décision), le POINT DE REPÈRE (chaque salle porte une marque mémorisable — décalcomanie tournante ou lampe teintée), COMBINER PAS ENCOMBRER (au-delà de D5, les renforts deviennent des énigmes, pas des filtres de plus), et la silhouette garde son plancher d’ambiante même en contrasté.',
+      'La VOIE apprend le rythme : la rampe passe en DENTS DE SCIE — l’enveloppe monte jusqu’au SOMMET à l’avant-dernier rang, un rang sur trois creuse une respiration, et le dernier rang redescend (la victoire à prendre, pas un mur). Le rang commande la POSTURE de la salle générée : le début ENSEIGNE (leçon pure — familles resserrées sur la mécanique — et deux premiers rangs sans danger), le milieu ÉPROUVE (labyrinthe un rang sur deux), la fin DÉTOURNE (éclairage contrasté un rang sur deux). La mécanique qu’on vient de jouer s’évite au choix suivant — la foulée varie. Tout voyage dans le code de la salle : l’identité et la descente du jour tiennent.',
+      'Le cahier des règles dit vrai : les treize propositions retenues passent EN PLACE avec le texte de ce qui existe réellement (la durée-cible reste proposée, comme demandé), et la règle neuve du trajet étiré s’y grave. Les codes G-… retirés donnent désormais les salles NOUVELLES règles — un ancien code redonne une salle différente d’avant cette livraison, c’est le prix de la refonte. 401 tests verts (balayages : distances tenues sur 100 graines + 18 cahiers, sanctuaire sur 80 graines, descente entière rang par rang, sabotage refusé).',
+    ],
+  },
+  {
     date: '27/08/2026 16:25',
     title: 'L’ALIGNEMENT AUTOMATIQUE se coupe — la pièce se pose où on la lâche',
     notes: [

@@ -12,6 +12,7 @@
 // la phase de run du pool (poule.ts).
 
 import { phaseRun } from './poule'
+import { FAMILLES_OPT } from './generateur'
 import type { CodeAtelier } from './levelIO'
 
 export interface PlanVoie {
@@ -48,11 +49,72 @@ export function momentAuRang(rang: number, plan: PlanVoie): CodeAtelier['moment'
   return phaseRun(rang, plan.longueur)
 }
 
-/** La DIFFICULTÉ du rang : la rampe 0 → diffMax, linéaire sur la descente.
- * Rang 1 = 0, dernier rang = diffMax — le début accueille, la fin exige. */
+/** La DIFFICULTÉ du rang : la rampe en DENTS DE SCIE, pas en pente.
+ *  · l'enveloppe monte de 0 (rang 1) au SOMMET diffMax — placé à
+ *    l'AVANT-DERNIER rang : le pic se joue juste avant la fin ;
+ *  · un rang sur trois creuse une RESPIRATION (−1 sous l'enveloppe) —
+ *    la tension se mesure à ses relâchements ;
+ *  · le DERNIER rang est une victoire à prendre, pas un mur : nettement
+ *    sous le sommet (60 % du plafond) — le joueur sort sur une réussite. */
 export function diffAuRang(rang: number, plan: PlanVoie): number {
-  const t = (Math.max(1, rang) - 1) / Math.max(1, plan.longueur - 1)
-  return Math.max(0, Math.min(9, Math.round(Math.min(1, t) * plan.diffMax)))
+  const r = Math.max(1, rang)
+  const borne = (v: number): number => Math.max(0, Math.min(9, v))
+  if (r >= plan.longueur) return borne(Math.round(plan.diffMax * 0.6))
+  const sommet = Math.max(2, plan.longueur - 1)
+  const t = Math.min(1, (r - 1) / Math.max(1, sommet - 1))
+  let d = Math.round(t * plan.diffMax)
+  if (r % 3 === 0 && r < sommet) d -= 1 // la respiration
+  return borne(d)
+}
+
+// ---- Le RÉGLAGE DU RANG : enseigner, éprouver, tordre --------------------
+// Au-delà du chiffre de difficulté, le rang commande la POSTURE de la
+// salle générée :
+//   · le DÉBUT enseigne — la leçon est PURE (les familles de maillons se
+//     resserrent sur la mécanique de la salle) et les deux premiers rangs
+//     sont SANS danger : une nouveauté à la fois, d'abord la mécanique ;
+//   · le MILIEU éprouve — un rang sur deux prend l'esprit labyrinthe :
+//     la même mécanique, la structure qui se tord ;
+//   · la FIN tord la lecture — un rang sur deux passe en éclairage
+//     contrasté : la même mécanique, dans la pénombre sculptée.
+// Deux rangs consécutifs ne se ressemblent donc jamais tout à fait — la
+// foulée varie, et tout voyage dans le code de la salle (suffixe ~).
+
+export interface ReglageRang {
+  dangers: 0 | 1
+  laby: 0 | 2
+  contraste: 0 | 1
+  /** moment 1 : la leçon pure — familles resserrées sur la mécanique */
+  purete: boolean
+}
+
+export function reglageAuRang(rang: number, plan: PlanVoie): ReglageRang {
+  const m = momentAuRang(rang, plan)
+  return {
+    dangers: rang <= 2 ? 1 : 0,
+    laby: m === 2 && rang % 2 === 0 ? 2 : 0,
+    contraste: m === 3 && rang % 2 === 1 && rang < plan.longueur ? 1 : 0,
+    purete: m === 1,
+  }
+}
+
+/** Le MASQUE de familles d'une mécanique (bits de FAMILLES_OPT) — la
+ * leçon pure du début : la salle ne parle que sa propre langue. */
+export function masqueMecanique(mec: CodeAtelier['mecanique']): number {
+  const noms: Record<number, readonly string[]> = {
+    0: ['membrane'],
+    1: ['rideau', 'porte', 'et'],
+    2: ['grille', 'rail', 'nor'],
+    3: [],
+  }
+  const familles = noms[mec]
+  if (familles.length === 0) return 127
+  let masque = 0
+  for (const n of familles) {
+    const bit = FAMILLES_OPT.indexOf(n as (typeof FAMILLES_OPT)[number])
+    if (bit >= 0) masque |= 1 << bit
+  }
+  return masque || 127
 }
 
 /** Hachage FNV-1a 32 bits : stable, sans dépendance — la graine du jour. */
@@ -75,13 +137,17 @@ export function varianteDuJour(jourIso: string, rang: number): string {
 }
 
 /** DEUX MÉCANIQUES distinctes pour les cartes du choix — la première évite
- * celle de la salle écrite (si elle existe) pour que le choix parle. */
+ * celle de la salle écrite (si elle existe) pour que le choix parle, ET
+ * celle de la salle qu'on vient de jouer (la foulée varie) quand c'est
+ * possible sans vider le chapeau. */
 export function mecaniquesDuChoix(
   exclue: number | null,
   alea: () => number,
+  eviter: number | null = null,
 ): [CodeAtelier['mecanique'], CodeAtelier['mecanique']] {
   const toutes = [0, 1, 2, 3] as const
-  const candidates = toutes.filter((m) => m !== exclue)
+  let candidates = toutes.filter((m) => m !== exclue && m !== eviter)
+  if (candidates.length === 0) candidates = toutes.filter((m) => m !== exclue)
   const a = candidates[Math.floor(alea() * candidates.length)]
   const restantes = toutes.filter((m) => m !== a)
   const b = restantes[Math.floor(alea() * restantes.length)]

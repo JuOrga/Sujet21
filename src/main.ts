@@ -17,15 +17,21 @@ import {
 } from './game/levelIO'
 import { dessineMiniCarte } from './game/carte'
 import { propositionsSalles } from './game/poule'
-import { genereNiveauAtelier } from './game/generateur'
+import {
+  genereNiveauAtelier,
+  OPTIONS_DEFAUT,
+  type OptionsGen,
+} from './game/generateur'
 import { FAMILLES_REGLES, reglesDeFamille } from './game/reglesGen'
 import {
   clampPlanVoie,
   diffAuRang,
   hachage,
   litPalmaresVoie,
+  masqueMecanique,
   mecaniquesDuChoix,
   momentAuRang,
+  reglageAuRang,
   varianteDuJour,
   type PalmaresVoie,
   type PlanVoie,
@@ -6204,7 +6210,23 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
         }
       })()
     : Math.random
-  const [mecaA, mecaB] = mecaniquesDuChoix(aEcrite?.mecanique ?? null, alea)
+  // la mécanique de la salle qu'on VIENT de jouer s'évite : la foulée varie
+  const [mecaA, mecaB] = mecaniquesDuChoix(
+    aEcrite?.mecanique ?? null,
+    alea,
+    identiteAtelier(level)?.mecanique ?? null,
+  )
+  // le RÉGLAGE DU RANG (enseigner · éprouver · tordre) : la posture de la
+  // salle générée — pureté du début, laby du milieu, contraste de la fin,
+  // dangers différés — voyage dans le code (suffixe ~), l'identité tient
+  const regl = reglageAuRang(rangSuivant, voiePlan)
+  const optionsDuRang = (mec: CodeAtelier['mecanique']): OptionsGen => ({
+    ...OPTIONS_DEFAUT,
+    dangers: regl.dangers,
+    laby: regl.laby,
+    contraste: regl.contraste,
+    familles: regl.purete ? masqueMecanique(mec) : 127,
+  })
   const variante = (n: number): string =>
     voiePlan.graineDuJour
       ? varianteDuJour(jour, rangSuivant * 10 + n)
@@ -6219,7 +6241,14 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
     const cahier: CodeAtelier = { moment, mecanique, difficulte }
     for (let essai = 0; essai < 3; essai++) {
       try {
-        return { lv: genereNiveauAtelier(cahier, variante(n + essai * 3)), cahier }
+        return {
+          lv: genereNiveauAtelier(
+            cahier,
+            variante(n + essai * 3),
+            optionsDuRang(mecanique),
+          ),
+          cahier,
+        }
       } catch {
         // graine sans salle prouvée : on retire une variante voisine
       }

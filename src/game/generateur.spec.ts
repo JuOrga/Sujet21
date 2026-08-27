@@ -282,8 +282,12 @@ describe('generateur — une graine, une salle PROUVÉE', () => {
       if (relais.length === 0) continue
       vus++
       // la preuve du miroir discrimine TOUJOURS, relais compris — et le
-      // spot du joueur (donc la pastille) est LOIN du fil de l'émetteur
-      const p = preuves.find((q) => q.kind === 'miroir')!
+      // spot du joueur (donc la pastille) est LOIN du fil de l'émetteur.
+      // Le relais se reconnaît à son ENGAGEMENT de portée (380 u).
+      const p = preuves.find(
+        (q) => q.kind === 'miroir' && (q.porteeMin ?? 0) >= 380,
+      )!
+      expect(p, `graine ${g} : relais posé sans sa preuve`).toBeTruthy()
       expect(Math.abs(p.spot.x - p.emetteur.x), `graine ${g} : relais trop court`).toBeGreaterThan(150)
       const { sansGlace, avecGlace } = prouveMiroir(niveau, p.emetteur, p.spot, p.canal, p.normale)
       expect(sansGlace, `graine ${g}`).toBe(false)
@@ -407,6 +411,70 @@ describe('generateur — une graine, une salle PROUVÉE', () => {
           n.labels.filter((l) => l.text === texte).length,
           `graine ${g} : ${texte}`,
         ).toBeLessThanOrEqual(1)
+      }
+    }
+  })
+
+  it("le TRAJET S'ÉTIRE : jamais de pastille nichée contre son émetteur", () => {
+    const verifie = (
+      niveau: ReturnType<typeof genereNiveau>,
+      preuves: { porteeMin?: number; cibleIndex: number; canal: number; emetteur: { x: number; y: number } }[],
+      etiquette: string,
+    ): void => {
+      for (const p of preuves) {
+        if (!p.porteeMin) continue
+        const c = (niveau.cibles ?? [])[p.cibleIndex]
+        const d = Math.hypot(c.x - p.emetteur.x, c.y - p.emetteur.y)
+        expect(d, `${etiquette}, canal ${p.canal}`).toBeGreaterThanOrEqual(p.porteeMin)
+      }
+    }
+    for (let g = 1; g <= 100; g++) {
+      const { niveau, preuves } = genereNiveauDetaille(g)
+      verifie(niveau, preuves, `graine ${g}`)
+    }
+    // et en atelier : toutes les mécaniques à laser, jusqu'aux hautes difficultés
+    for (const mecanique of [1, 2, 3] as const)
+      for (const difficulte of [2, 5, 8])
+        for (const v of ['A', 'B']) {
+          const cahier = { moment: 2 as const, mecanique, difficulte }
+          const { niveau, preuves } = genereNiveauDetaille(
+            graineAtelier(cahier, v),
+            { cahier, variante: v },
+          )
+          verifie(niveau, preuves, `${mecanique}${difficulte}-${v}`)
+        }
+  })
+
+  it('une pastille DÉPLACÉE contre son émetteur est refusée par la validation', () => {
+    for (let g = 1; g <= 80; g++) {
+      const { niveau, preuves } = genereNiveauDetaille(g)
+      const p = preuves.find((q) => (q.porteeMin ?? 0) > 0)
+      if (!p) continue
+      const cibles = (niveau.cibles ?? []).map((c, i) =>
+        i === p.cibleIndex
+          ? { ...c, x: p.emetteur.x + 40, y: p.emetteur.y + 40 }
+          : c,
+      )
+      const sabote = { ...niveau, cibles } as typeof niveau & {
+        __preuves?: typeof preuves
+      }
+      sabote.__preuves = preuves
+      const verdict = valideNiveau(sabote)
+      expect(verdict.valide).toBe(false)
+      expect(verdict.raisons.join(' ')).toContain("s'étirer")
+      return
+    }
+    throw new Error('aucune preuve à portée minimale parmi 1..80')
+  })
+
+  it("le SANCTUAIRE d'entrée : aucun danger à moins de 300 u du spawn", () => {
+    for (let g = 1; g <= 80; g++) {
+      const n = genereNiveau(g)
+      for (const b of n.boxes) {
+        if (b.material !== 4 && b.material !== 6) continue // froid, chaud
+        const dx = Math.max(b.minX - n.spawn.x, 0, n.spawn.x - b.maxX)
+        const dy = Math.max(b.minY - n.spawn.y, 0, n.spawn.y - b.maxY)
+        expect(Math.hypot(dx, dy), `graine ${g}`).toBeGreaterThanOrEqual(300)
       }
     }
   })
