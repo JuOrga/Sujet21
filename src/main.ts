@@ -3646,10 +3646,109 @@ function zoneNoteRegle(id: string, conteneur: HTMLElement): void {
     conteneur.appendChild(s)
   }
 }
+// Le panneau des PARAMÈTRES DU CYCLE reste ouvert d'un re-rendu à l'autre
+let reglesCycleOuvert = false
+/** Le bouton + panneau PARAMÈTRES DU CYCLE : le plan de la voie (longueur,
+ * difficulté max, descente du jour) se règle ICI — plus au banc : le banc
+ * règle la simulation, le cahier règle le cycle de vie d'une partie. */
+function monteCycleRegles(corps: HTMLElement): void {
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'rg-cycle-btn'
+  btn.id = 'regles-cycle-btn'
+  btn.textContent = '⚙ PARAMÈTRES DU CYCLE — LE PLAN DE LA VOIE'
+  corps.appendChild(btn)
+  const panneau = document.createElement('div')
+  panneau.className = 'rg-cycle'
+  panneau.id = 'regles-cycle'
+  panneau.hidden = !reglesCycleOuvert
+  panneau.innerHTML =
+    `<p>La descente complète de la VOIE SEMI-PROCÉDURALE : sa <b>longueur</b> ` +
+    `(la voie se boucle au bout, salles générées à la relève), la <b>difficulté ` +
+    `maximale</b> (la rampe monte de 0 au départ jusqu'à ce plafond), et la ` +
+    `<b>descente du jour</b> (les salles viennent de la date — les mêmes pour ` +
+    `tous les postes, les palmarès se comparent). Chaque réglage s'enregistre ` +
+    `aussitôt et prend effet à la prochaine descente.</p>`
+  const lignes = document.createElement('div')
+  lignes.className = 'rg-cycle-lignes'
+  const cran = (
+    nom: string,
+    lit: () => number,
+    pose: (v: number) => void,
+  ): HTMLElement => {
+    const p = document.createElement('div')
+    p.className = 'rg-param'
+    const titre = document.createElement('b')
+    titre.textContent = nom
+    const moins = document.createElement('button')
+    moins.type = 'button'
+    moins.textContent = '−'
+    const val = document.createElement('output')
+    val.textContent = String(lit())
+    const plus = document.createElement('button')
+    plus.type = 'button'
+    plus.textContent = '+'
+    const applique = (delta: number): void => {
+      pose(lit() + delta)
+      Object.assign(voiePlan, clampPlanVoie(voiePlan))
+      sauvePlanVoie()
+      val.textContent = String(lit())
+      reglesDit('Plan enregistré — il prend effet à la prochaine descente.')
+    }
+    moins.addEventListener('click', () => applique(-1))
+    plus.addEventListener('click', () => applique(1))
+    p.append(titre, moins, val, plus)
+    return p
+  }
+  lignes.appendChild(
+    cran(
+      'LONGUEUR',
+      () => voiePlan.longueur,
+      (v) => {
+        voiePlan.longueur = v
+      },
+    ),
+  )
+  lignes.appendChild(
+    cran(
+      'DIFFICULTÉ MAX',
+      () => voiePlan.diffMax,
+      (v) => {
+        voiePlan.diffMax = v
+      },
+    ),
+  )
+  const pJour = document.createElement('div')
+  pJour.className = 'rg-param'
+  const lab = document.createElement('label')
+  const coche = document.createElement('input')
+  coche.type = 'checkbox'
+  coche.id = 'regles-cycle-jour'
+  coche.checked = voiePlan.graineDuJour
+  coche.addEventListener('change', () => {
+    voiePlan.graineDuJour = coche.checked
+    sauvePlanVoie()
+    reglesDit('Plan enregistré — il prend effet à la prochaine descente.')
+  })
+  const labTxt = document.createElement('b')
+  labTxt.textContent = 'DESCENTE DU JOUR'
+  lab.append(coche, labTxt)
+  pJour.appendChild(lab)
+  lignes.appendChild(pJour)
+  panneau.appendChild(lignes)
+  corps.appendChild(panneau)
+  btn.addEventListener('click', () => {
+    reglesCycleOuvert = !reglesCycleOuvert
+    panneau.hidden = !reglesCycleOuvert
+  })
+}
+
 function renderRegles(): void {
   const corps = document.getElementById('regles-corps')
   if (!corps) return
   corps.innerHTML = ''
+  // ---- Les PARAMÈTRES DU CYCLE : le plan de la voie, réglé ici ----
+  monteCycleRegles(corps)
   // ---- VOS RÈGLES : les ajouts en texte libre, la partie vivante ----
   const tete = document.createElement('div')
   tete.className = 'rg-famille'
@@ -6158,11 +6257,31 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
 
 function mbMontreSallesVoie(cartes: CarteVoie[]): void {
   mbEtape = 'salles'
+  // le CHANGEMENT DE STADE s'annonce : franchir un tiers du plan est un
+  // événement de la descente, pas un détail de nomenclature
+  const rangSuivant = voieRang + 1
+  const stadeNeuf =
+    voieRang >= 1 &&
+    momentAuRang(rangSuivant, voiePlan) !==
+      momentAuRang(Math.max(1, voieRang), voiePlan)
+      ? momentAuRang(rangSuivant, voiePlan) === 2
+        ? ' · LE MILIEU S’OUVRE'
+        : ' · LA FIN S’OUVRE'
+      : ''
   mbEl('mb-choix-titre').textContent =
-    `LA VOIE SE SÉPARE — SALLE ${voieRang + 1} / ${voiePlan.longueur}` +
-    (voiePlan.graineDuJour ? ' · DESCENTE DU JOUR' : '')
+    `LA VOIE SE SÉPARE — SALLE ${rangSuivant} / ${voiePlan.longueur}` +
+    (voiePlan.graineDuJour ? ' · DESCENTE DU JOUR' : '') +
+    stadeNeuf
+  // les JAUGES restent en scène, comme à la fin ordinaire : le choix se
+  // prend en voyant ce qu'on possède — étalonnage en grand, réserve en ligne
+  mbEl('mb-etal').hidden = false
+  mbPeintEtal(run.xp)
   const host = mbEl('mb-cartes')
   host.innerHTML = ''
+  const jauges = document.createElement('div')
+  jauges.className = 'mb-jauges'
+  jauges.innerHTML = `<span>🫙 réserve <b>${run.bonbonneLiters.toFixed(2)} / ${BONBONNE_CAP} L</b></span><span>💠 ×${run.vies} · profondeur ${voieRang} / ${voiePlan.longueur}</span>`
+  host.appendChild(jauges)
   const esc = (t: string): string =>
     t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
   for (const c of cartes) {
@@ -6339,6 +6458,93 @@ mbVeil?.addEventListener('pointerdown', (e) => {
 const dashAimEl = el('dash-aim')
 const dashCostEl = el('dash-cost')
 
+// ---- LE FIL DE LA VOIE : la descente se lit d'un regard -----------------
+// Un rail à CRANS sur le flanc droit — un cran par salle du plan, les tiers
+// (début · milieu · fin) marqués d'une couture, le cran courant qui pulse
+// menthe, les franchis pleins, la profondeur record étoilée ✦. Et à chaque
+// entrée de salle, la CARTE D'IDENTITÉ complète (nom, code, moment,
+// mécanique, difficulté, rang) passe en fondu — sans rien bloquer.
+const voieHudEl = document.getElementById('voie-hud') as HTMLDivElement
+const voieCarteEl = document.getElementById('voie-carte') as HTMLDivElement
+let voieCarteTimer = 0
+
+/** L'identité atelier d'une salle, quel que soit son code : « 21XX-MMD »,
+ * « MMD » nu, ou généré « G-MMD-VAR » (suffixe d'options toléré). */
+function identiteAtelier(lv: LevelDef): CodeAtelier | null {
+  const d = decodeCodeAtelier(lv.code)
+  if (d) return d
+  const g = /^G-([123])([0-3])(\d)-/.exec(lv.code.trim().toUpperCase())
+  if (!g) return null
+  return {
+    moment: Number(g[1]) as CodeAtelier['moment'],
+    mecanique: Number(g[2]) as CodeAtelier['mecanique'],
+    difficulte: Number(g[3]),
+  }
+}
+
+function voieHudVisible(): boolean {
+  return modeVoie && !auHub && !testLevel
+}
+
+/** Reconstruit le rail : appelé à chaque entrée de salle (restart). */
+function majVoieHud(): void {
+  const montre = voieHudVisible()
+  voieHudEl.hidden = !montre
+  if (!montre) return
+  const rang = Math.min(voiePlan.longueur, voieRang + 1) // la salle en cours
+  el('vh-rang').textContent = `${rang} / ${voiePlan.longueur}`
+  const id = identiteAtelier(level)
+  el('vh-stade').textContent =
+    MOMENT_COURT[momentAuRang(rang, voiePlan)] +
+    (id ? ` · DIFF ${id.difficulte}` : '')
+  const rail = el('vh-rail')
+  rail.innerHTML = ''
+  const record = chargePalmaresVoie().profondeurRecord
+  for (let r = 1; r <= voiePlan.longueur; r++) {
+    if (r > 1 && momentAuRang(r, voiePlan) !== momentAuRang(r - 1, voiePlan)) {
+      const sep = document.createElement('i')
+      sep.className = 'vh-tiers'
+      rail.appendChild(sep)
+    }
+    const c = document.createElement('i')
+    c.className =
+      'vh-cran' +
+      (r < rang ? ' vh-franchi' : r === rang ? ' vh-courant' : '')
+    if (r === record && record > 0) {
+      c.classList.add('vh-record')
+      c.title = 'profondeur record du poste'
+    }
+    rail.appendChild(c)
+  }
+}
+
+/** La carte d'entrée : l'identité complète de la salle, en fondu. */
+function annonceVoieCarte(): void {
+  if (!voieHudVisible()) return
+  clearTimeout(voieCarteTimer)
+  el('vc-rang').textContent =
+    `SALLE ${Math.min(voiePlan.longueur, voieRang + 1)} / ${voiePlan.longueur}` +
+    (voieIntercalaire ? ' · SALLE GÉNÉRÉE' : '') +
+    (voiePlan.graineDuJour ? ' · DESCENTE DU JOUR' : '')
+  el('vc-nom').textContent = level.name
+  el('vc-code').textContent = level.code
+  const id = identiteAtelier(level)
+  const chips = el('vc-chips')
+  chips.innerHTML = id
+    ? `<i>${MOMENT_COURT[id.moment]}</i>` +
+      `<i class="sc-m${id.mecanique}">${MECANIQUE_NOMS[id.mecanique].toUpperCase()}</i>` +
+      `<i>DIFF ${id.difficulte}</i>`
+    : ''
+  chips.hidden = !id
+  voieCarteEl.hidden = false
+  voieCarteEl.classList.remove('joue')
+  void voieCarteEl.offsetWidth // repartir l'animation du fondu
+  voieCarteEl.classList.add('joue')
+  voieCarteTimer = window.setTimeout(() => {
+    voieCarteEl.hidden = true
+  }, 4400)
+}
+
 function restart(): void {
   run.exitTimer = 0
   run.tableauTime = 0
@@ -6363,6 +6569,7 @@ function restart(): void {
   // chaque début de salle grave la progression de l'expédition principale
   sauveRun()
   applyLevel()
+  majVoieHud()
   sim = createSim(level)
   exposeSim()
   resetLasers()
@@ -6394,6 +6601,7 @@ function restart(): void {
       idle.t0 = elapsed
     }
     showTableauCard()
+    annonceVoieCarte()
     // la cinématique d'ENTRÉE du tableau : à l'arrivée seulement — un R sur
     // place ne la rejoue pas (et MAINTENIR la saute de toute façon)
     if (level !== cineNiveauVu) {
@@ -6610,7 +6818,6 @@ const pane = createBench(params, monitor, {
   reset: resetAction,
   autoZoom: () => camera.resetAutoZoom(),
   oeil: { regl: oeilRegl, defauts: OEIL_DEFAUTS, sauve: sauveOeil },
-  voie: { plan: voiePlan, sauve: sauvePlanVoie },
   tableaux: TABLEAUX.map((t) => t.name),
   gotoTableau: (index) => {
     testLevel = null // le banc navigue dans l'expédition, pas dans le prototype
@@ -7970,11 +8177,23 @@ function frame(now: number): void {
       // LE SCÉNARIO : la cinématique de fin d'expédition, sur le bilan
       void joueMoment('expedition-achevee')
       const palm = chargePalmaresVoie()
+      // le BUTIN de la descente : ce que la run a réellement rapporté — les
+      // instruments emportés (leurs glyphes), les paliers d'étalonnage, le
+      // condensat nourri (chaque centilitre livré en a versé un)
+      const glyphes = run.instruments
+        .map((i) => instrumentDef(i)?.icone ?? '')
+        .filter(Boolean)
+        .join(' ')
+      const butinVoie =
+        `<br>Butin de la descente : ` +
+        `${run.instruments.length > 0 ? `${glyphes} ${run.instruments.length} instrument(s)` : 'aucun instrument'} · ` +
+        `palier d'étalonnage ${paliersAtteints(run.xp)} · ` +
+        `+${Math.round(run.livreTotal * 100)} cL de condensat versés à la réserve.`
       showOverlay(
         modeVoie ? 'LA VOIE EST BOUCLÉE' : 'EXPÉDITION ACHEVÉE',
         modeVoie
           ? `<span class="bilan"><span class="bilan-l">${expeditionSummary(sallesFranchies)}${voieNeuf}</span></span>` +
-              `Descente de ${sallesFranchies} salles, du début à la fin de la voie. ` +
+              `Descente de ${sallesFranchies} salles, du début à la fin de la voie.${butinVoie}<br>` +
               `Palmarès du poste : ${palm.bouclees} bouclée(s) · profondeur record ${palm.profondeurRecord} · meilleur livré ${fmtL(palm.meilleurLivre)}.`
           : `<span class="bilan"><span class="bilan-l">${expeditionSummary(sallesFranchies)}${
               exp.newRecord
