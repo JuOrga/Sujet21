@@ -20,6 +20,8 @@ import {
   MAT_HYDROPHILE,
   MAT_HYDROPHOBE,
   MAT_FROID,
+  MAT_CHAUD,
+  MAT_SURCHAUFFEUR,
 } from './level'
 
 const opts = (sur: Partial<OptionsGen>): OptionsGen => ({
@@ -188,6 +190,30 @@ describe('générateur en mode figure', () => {
         expect(recouvre, 'membrane dans une zone force-glace').toBe(false)
       }
     }
+  })
+
+  it('échangeur : la leçon d’echangette — le circuit thermique', () => {
+    const lv = genereNiveau(555, null, opts({ figure: 10 }))
+    // le VOCABULAIRE THERMIQUE au complet : chaudière, froid, surchauffeur
+    const mats = new Set(lv.boxes.map((b) => b.material))
+    expect(mats.has(MAT_CHAUD)).toBe(true)
+    expect(mats.has(MAT_FROID)).toBe(true)
+    expect(mats.has(MAT_SURCHAUFFEUR)).toBe(true)
+    expect(mats.has(MAT_MEMBRANE)).toBe(true)
+    // le CYCLE imposé : une zone gèle, une zone recondense
+    const forces = (lv.zones ?? []).map((z) => z.force).sort()
+    expect(forces).toEqual(['eau', 'glace'])
+    // la MASSE : de grands blocs pleins (pas des gaines)
+    const massifs = lv.boxes.filter(
+      (b) => (b.maxX - b.minX) * (b.maxY - b.minY) > 150000,
+    )
+    expect(massifs.length).toBeGreaterThanOrEqual(4)
+    // l'éponge-plancher, la chambre voilée, la lampe bandeau
+    expect((lv.sponges ?? []).length).toBe(1)
+    expect((lv.caches ?? []).length).toBe(1)
+    expect(lv.lumieres?.[0]?.forme).toBe('bandeau')
+    // zéro laser : les machines thermiques sont les mécanismes
+    expect(lv.lasers ?? []).toEqual([])
   })
 
   it('le grand bit de figure (familles ≥ 8) voyage et revient', () => {
