@@ -22,6 +22,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 08:35',
+    title:
+      'Le générateur apprend la FUSION : le puzzle de matière de la voie de la fusion',
+    notes: [
+      'Troisième leçon de l’entraînement : « la voie de la fusion » (BOIZ) récupérée et étudiée à la lettre — et c’est une TROISIÈME philosophie, différente du glyphe du crop circle comme du réseau mécanisé des conduits : ici zéro laser, zéro porte, zéro lampe — TOUT LE PUZZLE EST FAIT DE MATIÈRE. Ses 45 pièces enseignent : des bandes horizontales en serpentin, larges comme des salles ; des cloisons qui sont des MOSAÏQUES DE SURFACES (sur une même rangée on lit paroi, rideau, hydrophobe, membrane, hydrophile, froid — la matière indique et contraint le chemin) ; des ZONES FORCE-GLACE qui couvrent le cœur des bandes — le tableau IMPOSE l’état au lieu de le laisser choisir : on gèle en traversant, le rideau devient la porte naturelle, et la membrane d’après exige la FONTE, d’où le nom ; une éponge-buveuse en cul-de-sac, des coins biseautés aux angles, des caches au nord-est.',
+      'Tout est gravé dans une HUITIÈME FAMILLE du mode figure : FUSION. Chaque cloison du serpentin porte son puits ouvert (alterné est/ouest), UN raccourci d’état posé selon la règle de BOIZ — rideau au centre quand la bande du dessous gèle, membrane au large sinon, et jamais une membrane dans l’empreinte d’une zone gelée (la fonte doit rester possible, un test le grave) — et un pavage tiré de paroi, d’hydrophobe, d’hydrophile et d’un peu de froid. Le grenier voilé du nord-est cache la buveuse derrière son rideau. Le contrat des familles s’élargit encore : zones forcées et éponges peuvent désormais venir de la famille — troisième extension en trois leçons, le squelette commun apprend à chaque tableau étudié.',
+      'Vérifié dans le jeu construit : une voie générée au panneau (G-FONTE1~…, 31 pièces, 2 hublots fendus qui gèlent leurs bandes, 1 éponge, 1 grenier voilé), jouée en essai — les mosaïques se lisent d’un regard, hydrophile lumineux, hydrophobe violet, membrane verte, rideau lamellaire. 765 tirages balayés sans un échec sur les neuf familles, 389 tests verts. L’entraînement continue : chaque tableau montré au générateur lui apprend une philosophie — envoyez le suivant.',
+    ],
+  },
+  {
     date: '27/08/2026 01:15',
     title:
       'Le générateur apprend les CONDUITS : la leçon des conduits de ventilation',

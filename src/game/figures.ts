@@ -39,6 +39,9 @@ import {
   MAT_GRILLE,
   MAT_MEMBRANE,
   MAT_RIDEAU,
+  MAT_HYDROPHILE,
+  MAT_HYDROPHOBE,
+  MAT_FROID,
   type LevelDef,
   type ObstacleBox,
   type WorldLabel,
@@ -47,6 +50,8 @@ import {
   type LaserDef,
   type LumiereDef,
   type CacheDef,
+  type ZoneDef,
+  type SpongeDef,
 } from './level'
 import { FORME_ARC, FORME_DISQUE, FORME_CAPSULE } from './formes'
 import type { CodeAtelier } from './levelIO'
@@ -60,6 +65,7 @@ export const FIGURE_FAMILLES = [
   'nef',
   'constellation',
   'conduits',
+  'fusion',
 ] as const
 export type FigureFamille = (typeof FIGURE_FAMILLES)[number]
 
@@ -71,6 +77,7 @@ export const FIGURE_NOMS: Record<FigureFamille, string> = {
   nef: 'Nef',
   constellation: 'Constellation',
   conduits: 'Conduits',
+  fusion: 'Fusion',
 }
 
 type Rng = () => number
@@ -114,6 +121,10 @@ interface Squelette {
   /** Ses lampes (les conduits posent leur phare unique) et ses cachettes. */
   lumieres?: LumiereDef[]
   caches?: CacheDef[]
+  /** Ses zones forcées et ses éponges (le puzzle de MATIÈRE de la
+   * famille fusion) — absentes : aucune. */
+  zones?: ZoneDef[]
+  sponges?: SpongeDef[]
   /** Ses MÉCANISMES déjà montés (les conduits câblent leur canal-réseau
    * eux-mêmes) : quand présents, l'établi commun ne pose rien d'autre. */
   greffes?: Greffe[]
@@ -1070,6 +1081,212 @@ function figConduits(cx: ContexteFamille): Squelette {
   }
 }
 
+/** fusion : la leçon de « la voie de la fusion » (BOIZ) — la troisième
+ * philosophie, le PUZZLE DE MATIÈRE : zéro laser, zéro porte, zéro lampe.
+ *   · des BANDES horizontales en serpentin, larges comme des salles ;
+ *   · les cloisons sont des MOSAÏQUES DE SURFACES : paroi, hydrophobe,
+ *     hydrophile, froid — et sur chaque cloison UN raccourci d'état
+ *     (rideau ou membrane) en plus du puits ouvert : deux voies, la
+ *     matière indique et contraint le chemin ;
+ *   · des ZONES FORCE-GLACE couvrent le cœur d'une bande sur deux — le
+ *     tableau IMPOSE l'état au lieu de le laisser choisir : on gèle en
+ *     traversant, le rideau au-dessus devient la porte naturelle, et la
+ *     membrane d'après exige la FONTE — d'où le nom ;
+ *   · une ÉPONGE-mur (la buveuse) dans le grenier caché, des plaques
+ *     froides dans les mosaïques, des coins biseautés aux puits. */
+function figFusion(cx: ContexteFamille): Squelette {
+  const { rng, nbCercles, ampleurScale } = cx
+  const s = ampleurScale
+  const EP = 60 // l'épaisseur des cloisons-mosaïques
+  const PUITS = 240 // la largeur du puits ouvert du serpentin
+  const nbBandes = Math.max(3, Math.min(5, nbCercles + 1))
+  const B = Math.round(450 * Math.min(s, 1.05)) // la hauteur d'une bande
+  const halfW = Math.round(1300 * s)
+  const innerH = nbBandes * B + (nbBandes - 1) * EP
+  const yBas = -Math.round(innerH / 2)
+  const bandeBas = (i: number): number => yBas + i * (B + EP)
+  const bandeHaut = (i: number): number => bandeBas(i) + B
+  const bandeMil = (i: number): number => bandeBas(i) + B / 2
+
+  const boxes: ObstacleBox[] = []
+  const labels: WorldLabel[] = []
+  const zones: ZoneDef[] = []
+  let nbFiltres = 0
+  const seg = (minX: number, maxX: number, y: number, mat: number): void => {
+    if (maxX - minX < 30) return
+    boxes.push({
+      minX: Math.round(minX),
+      minY: Math.round(y),
+      maxX: Math.round(maxX),
+      maxY: Math.round(y + EP),
+      material: mat,
+    })
+  }
+  // le coin biseauté (forme 3) posé contre un bord de puits — la petite
+  // signature de BOIZ aux angles du chemin
+  const biseau = (x: number, y: number, versEst: boolean): void => {
+    boxes.push({
+      minX: Math.round(x),
+      minY: Math.round(y),
+      maxX: Math.round(x + 42),
+      maxY: Math.round(y + 42),
+      forme: 3,
+      p0: versEst ? 1 : 0,
+      material: MAT_WALL,
+    })
+  }
+
+  // les ZONES FORCE-GLACE : une bande sur deux (impaires), le cœur
+  const bandesGelees = new Set<number>()
+  for (let i = 1; i < nbBandes; i += 2) bandesGelees.add(i)
+  for (const i of bandesGelees) {
+    zones.push({
+      minX: -Math.round(halfW * 0.32),
+      minY: bandeBas(i),
+      maxX: Math.round(halfW * 0.32),
+      maxY: bandeHaut(i),
+      force: 'glace',
+    })
+  }
+
+  // les CLOISONS-MOSAÏQUES : le puits ouvert alterne est/ouest ; le
+  // raccourci d'état (rideau au-dessus d'une bande gelée, membrane
+  // au-dessus d'une bande libre — la fonte) est posé au CENTRE, dans ou
+  // hors l'empreinte des zones selon sa nature ; le reste se pave de
+  // paroi, d'hydrophobe, d'hydrophile et d'un peu de froid.
+  const pave: number[] = [
+    MAT_WALL,
+    MAT_WALL,
+    MAT_HYDROPHOBE,
+    MAT_HYDROPHILE,
+    MAT_WALL,
+    MAT_HYDROPHOBE,
+    MAT_FROID,
+  ]
+  for (let i = 0; i < nbBandes - 1; i++) {
+    const y = bandeHaut(i)
+    const versEst = i % 2 === 0
+    const px = versEst ? halfW - 170 - PUITS / 2 : -halfW + 170 + PUITS / 2
+    const raccourciMat = bandesGelees.has(i) ? MAT_RIDEAU : MAT_MEMBRANE
+    // le raccourci : large comme le puits, au centre (dans l'empreinte
+    // gelée pour un rideau — on en sort gelé — jamais pour une membrane)
+    const rx = bandesGelees.has(i)
+      ? Math.round(entre(rng, -halfW * 0.2, halfW * 0.2))
+      : Math.round(
+          (rng() < 0.5 ? -1 : 1) * entre(rng, halfW * 0.42, halfW * 0.6),
+        )
+    const bornes = [
+      {
+        minX: Math.min(px, rx) + PUITS / 2,
+        maxX: Math.max(px, rx) - PUITS / 2,
+      },
+      { minX: -halfW, maxX: Math.min(px, rx) - PUITS / 2 },
+      { minX: Math.max(px, rx) + PUITS / 2, maxX: halfW },
+    ]
+    boxes.push({
+      minX: Math.round(rx - PUITS / 2),
+      minY: Math.round(y),
+      maxX: Math.round(rx + PUITS / 2),
+      maxY: Math.round(y + EP),
+      material: raccourciMat,
+    })
+    nbFiltres++
+    // le pavage : chaque tronçon plein se découpe en 2-3 segments tirés
+    for (const b of bornes) {
+      if (b.maxX - b.minX < 40) continue
+      const n = b.maxX - b.minX > 900 ? 3 : 2
+      let x0 = b.minX
+      for (let k = 0; k < n; k++) {
+        const x1 =
+          k === n - 1
+            ? b.maxX
+            : Math.round(entre(rng, x0 + 60, b.maxX - (n - 1 - k) * 60))
+        seg(x0, x1, y, parmi(rng, pave))
+        x0 = x1
+      }
+    }
+    // les biseaux du puits : un coin de part et d'autre, une fois sur deux
+    if (rng() < 0.6) {
+      biseau(px - PUITS / 2 - 42, versEst ? y + EP : y - 42, true)
+      biseau(px + PUITS / 2, versEst ? y + EP : y - 42, false)
+    }
+  }
+
+  // LE GRENIER CACHÉ au nord-est : un plafond scelle la bande haute, sauf
+  // une ouverture gardée par un RIDEAU — derrière, sous cache, la
+  // buveuse (l'éponge) attend les curieux gelés
+  const grenH = 240
+  const yGren = yBas + innerH
+  const ouvGren = Math.round(halfW * 0.45)
+  seg(-halfW, ouvGren - 120, yGren, MAT_WALL)
+  seg(ouvGren + 120, halfW, yGren, MAT_WALL)
+  seg(ouvGren - 120, ouvGren + 120, yGren, MAT_RIDEAU)
+  const eponge: SpongeDef = {
+    minX: Math.round(halfW * 0.72),
+    minY: yGren + EP + 24,
+    cols: 2,
+    rows: 7,
+    cellSize: 24,
+    capacityPerCell: 5,
+  }
+  const caches: CacheDef[] = [
+    {
+      minX: ouvGren - 160,
+      minY: yGren + EP,
+      maxX: halfW,
+      maxY: yGren + EP + grenH,
+    },
+  ]
+
+  // le départ à l'ouest de la bande basse, le sas à l'est de la bande haute
+  const spawn = { x: -halfW + 210, y: Math.round(bandeMil(0)) }
+  const dernier = nbBandes - 1
+  const exit = {
+    minX: halfW - 320,
+    minY: Math.round(bandeMil(dernier)) - 75,
+    maxX: halfW - 180,
+    maxY: Math.round(bandeMil(dernier)) + 75,
+  }
+  labels.push({
+    x: halfW - 250,
+    y: Math.round(bandeMil(dernier)) + 150,
+    text: 'SAS',
+    tone: 'sas',
+  })
+
+  return {
+    boxes,
+    labels,
+    spawn,
+    exit,
+    coutureFinale: null, // le puzzle est fait de matière, pas de portes
+    poche: null,
+    plafond: yGren + EP + grenH,
+    sol: yBas,
+    nbPortesEtat: nbFiltres,
+    bounds: {
+      minX: -halfW,
+      minY: yBas,
+      maxX: halfW,
+      maxY: yGren + EP + grenH,
+    },
+    caches,
+    zones,
+    sponges: [eponge],
+    greffes: [], // aucun mécanisme : la famille l'assume — documenté
+    journalNote:
+      'Ni laser ni lampe : la matière fait tout le puzzle — les zones y GÈLENT le corps, les membranes exigent la fonte. ',
+    noms: [
+      'La voie de la fonte',
+      'Le dégel',
+      'La bascule des états',
+      'Le passage à l’eau',
+      'La fonte des glaces',
+      'L’alternance',
+    ],
+  }
+}
+
 // ---- Les MÉCANISMES greffés sur la couture finale ------------------------
 
 interface Greffe {
@@ -1274,7 +1491,9 @@ export function essaieFigure(
               ? figNef(cx)
               : famille === 'constellation'
                 ? figConstellation(cx)
-                : figConduits(cx)
+                : famille === 'conduits'
+                  ? figConduits(cx)
+                  : figFusion(cx)
 
   const lasers: LaserDef[] = []
   const cibles: CibleDef[] = []
@@ -1364,13 +1583,14 @@ export function essaieFigure(
     spawn: { x: Math.round(sq.spawn.x), y: Math.round(sq.spawn.y), n: 900 },
     exit: sq.exit,
     boxes,
-    sponges: [],
+    sponges: sq.sponges ?? [],
     labels,
     ...(lasers.length ? { lasers } : {}),
     ...(cibles.length ? { cibles } : {}),
     ...(portes.length ? { portes } : {}),
     ...(sq.lumieres?.length ? { lumieres: sq.lumieres } : {}),
     ...(sq.caches?.length ? { caches: sq.caches } : {}),
+    ...(sq.zones?.length ? { zones: sq.zones } : {}),
     par: 3 + Math.round(sq.nbPortesEtat / 2) + 2 * preuves.length,
   }
   level.__preuves = preuves
