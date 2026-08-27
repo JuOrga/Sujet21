@@ -22,7 +22,7 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
-    date: '27/08/2026 12:40',
+    date: '27/08/2026 12:49',
     title:
       'LE FIL DE LA VOIE : le rail de descente, la carte d’entrée, le butin de fin',
     notes: [
