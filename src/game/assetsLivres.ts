@@ -23,6 +23,7 @@ export const RUBRIQUES = [
   'Surfaces & matériaux',
   'Zones d’état',
   'Machinerie & décalques',
+  'Serre & cultures',
   'Coque & fonds',
   'Objets & emblèmes',
   'Autres',
@@ -60,16 +61,23 @@ const NOMS: Record<string, string> = {
   'fiole-pleine.webp': 'Fiole pleine (semblable)',
   'fiole-vide.webp': 'Fiole vide (semblable)',
   'badge.webp': 'Badge du protocole',
+  // LA SERRE (niveau serre) — les prompts vivent dans docs/assets-ia.md ;
+  // déposer le fichier sous ce nom suffit à le voir arriver bien nommé
+  'serre-roquette.webp': 'Serre — bac de roquette',
+  'serre-ble-nain.webp': 'Serre — blé nain',
+  'serre-tomates.webp': 'Serre — colonne de tomates',
+  'serre-rampe.webp': 'Serre — gouttière et barre horticole',
 }
 
 /** La rubrique d'un fichier, d'après son chemin. Tout finit classé : ce qui
  *  n'entre dans aucune règle tombe dans « Autres » plutôt que d'être perdu. */
-function rubriqueDe(url: string): string {
+export function rubriqueDe(url: string): string {
   const f = url.slice(url.lastIndexOf('/') + 1)
   if (url.includes('/cine/')) return 'Cinématiques — planches'
   if (/^(wall|paroi|phile|phobe|froid|chaud|grille|sponge)/.test(f))
     return 'Surfaces & matériaux'
   if (f.startsWith('zone-')) return 'Zones d’état'
+  if (f.startsWith('serre-')) return 'Serre & cultures'
   if (
     f.startsWith('decal-') ||
     f.startsWith('iris') ||
@@ -84,7 +92,7 @@ function rubriqueDe(url: string): string {
 
 /** Le nom lisible : celui du dictionnaire, sinon le fichier déguisé en titre
  *  (« ouverture-2.webp » → « Ouverture 2 »). */
-function nomDe(url: string): string {
+export function nomDe(url: string): string {
   const f = url.slice(url.lastIndexOf('/') + 1)
   if (NOMS[f]) return NOMS[f]
   const nu = f.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ')

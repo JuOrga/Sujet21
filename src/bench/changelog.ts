@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 22:16',
+    title: 'LA SERRE : les prompts des cultures, et le catalogue qui les attend',
+    notes: [
+      'Demandé pour le niveau SERRE : de quoi générer roquette, blé nain et tomates en hydroponie. Les prompts sont écrits, prêts à copier-coller, dans le document maison des assets (docs/assets-ia.md, section 14) — avec une quatrième pièce, la gouttière nue et sa barre horticole, qui sert de support aux trois autres.',
+      'Ils tiennent la charte : vue de FACE strictement orthographique (le jeu n’a pas de perspective), pièce détourée sur fond transparent, aucune ombre portée au sol (le moteur pose les siennes), lumière froide venue du haut, acier bleu #0a1420 et liséré cyan #63b7e6 — et des verts FROIDS, seuls capables de ressortir sur le noir de la cuve. Pas de terre : l’hydroponie se lit aux cubes de laine de roche, aux billes d’argile et à l’eau qui luit dans la gouttière. La lueur rose de la barre horticole a sa variante blanc froid, pour qui préfère rester strictement dans la palette.',
+      'Le catalogue les attend déjà : toute image « serre-… » déposée dans public/assets tombe dans une nouvelle rubrique SERRE & CULTURES de la bibliothèque d’images, et les quatre noms annoncés s’affichent en clair. Gravé au banc (rubrique, noms, et une culture non prévue qui atterrit quand même dans la serre). Reste, quand les images seront là, à ouvrir la liste des décalques pour qu’on puisse les POSER dans un tableau : une courte livraison. 399 tests verts, build propre.',
+    ],
+  },
+  {
     date: '27/08/2026 22:15',
     title: 'Le choix de la voie passe à TROIS salles générées',
     notes: [

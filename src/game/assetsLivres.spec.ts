@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { assetsLivres, RUBRIQUES } from './assetsLivres'
+import { assetsLivres, nomDe, rubriqueDe, RUBRIQUES } from './assetsLivres'
 
 function fichiersDisque(dir: string, base = ''): string[] {
   const out: string[] = []
@@ -46,5 +46,36 @@ describe('catalogue des images livrées', () => {
       if (cat[i].rubrique !== cat[i - 1].rubrique) continue
       expect(cat[i - 1].nom.localeCompare(cat[i].nom, 'fr')).toBeLessThanOrEqual(0)
     }
+  })
+})
+
+describe('catalogue — LA SERRE accueille ses cultures avant même les fichiers', () => {
+  it('range toute image « serre- » dans sa rubrique, et la nomme', () => {
+    // les quatre pièces annoncées aux concepteurs (docs/assets-ia.md)
+    const attendus: [string, string][] = [
+      ['serre-roquette.webp', 'Serre — bac de roquette'],
+      ['serre-ble-nain.webp', 'Serre — blé nain'],
+      ['serre-tomates.webp', 'Serre — colonne de tomates'],
+      ['serre-rampe.webp', 'Serre — gouttière et barre horticole'],
+    ]
+    for (const [f, nom] of attendus) {
+      expect(rubriqueDe(`/assets/${f}`), f).toBe('Serre & cultures')
+      expect(nomDe(`/assets/${f}`), f).toBe(nom)
+    }
+  })
+
+  it('une culture NON prévue tombe quand même dans la serre, jamais dans « Autres »', () => {
+    expect(rubriqueDe('/assets/serre-basilic-2.webp')).toBe('Serre & cultures')
+    expect(nomDe('/assets/serre-basilic-2.webp')).toBe('Serre basilic 2')
+  })
+
+  it('la rubrique existe dans l’ordre d’écran, avant les objets', () => {
+    expect(RUBRIQUES).toContain('Serre & cultures')
+    expect(RUBRIQUES.indexOf('Serre & cultures')).toBeGreaterThan(
+      RUBRIQUES.indexOf('Machinerie & décalques'),
+    )
+    expect(RUBRIQUES.indexOf('Serre & cultures')).toBeLessThan(
+      RUBRIQUES.indexOf('Autres'),
+    )
   })
 })

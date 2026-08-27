@@ -258,6 +258,100 @@ Négatif : `floor, furniture, people, warm colors, lens flare, perspective, text
 
 ---
 
+## 14. LA SERRE — cultures hydroponiques
+
+Pour le niveau SERRE. Quatre pièces qui se composent : la gouttière nue et sa
+barre horticole servent de support, les trois cultures se posent dessus.
+
+**Règles communes à ces quatre prompts** (elles sont déjà dans le texte, ne les
+retirez pas) : vue de FACE strictement orthographique (le jeu n'a pas de
+perspective), pièce DÉTOURÉE sur fond transparent, aucune ombre portée au sol
+(le moteur pose les siennes), lumière froide venue du haut, palette de la
+station — et des verts FROIDS et lumineux, seuls capables de ressortir sur le
+noir de la cuve (`#030710`). Pas de terre : l'hydroponie se lit aux cubes de
+laine de roche, aux billes d'argile et à l'eau dans la gouttière.
+
+Déposez les fichiers dans `public/assets/` sous ces noms exacts — ils
+apparaîtront aussitôt dans la bibliothèque d'images, rubrique « Serre &
+cultures » : `serre-roquette.webp`, `serre-ble-nain.webp`,
+`serre-tomates.webp`, `serre-rampe.webp`.
+
+### 14a. Bac de roquette (jeunes pousses) — `serre-roquette.webp`
+**1254×627 · PNG transparent · pièce large et basse**
+
+```
+Hydroponic tray of young rocket arugula seedlings, flat orthographic FRONT
+elevation view, dense low rosettes of small lobed leaves rising from a row of
+pale rockwool cubes set in a shallow steel-blue NFT gutter (#0a1420) with rivets,
+a thin glowing cyan trim line (#63b7e6) and a narrow slit showing faint glowing
+cyan nutrient water, cool desaturated greens from deep #1f4a35 to bright #7fe3a8,
+crisp readable leaf silhouettes, soft cold light from above, subtle cyan rim
+light on the leaf edges, retro-futuristic 1970s orbital laboratory greenhouse,
+muted cold palette, dark scene, isolated on transparent background, flat 2D game
+sprite, no perspective, no ground shadow, no text
+```
+Négatif : `soil, dirt, terracotta pot, garden bed, sunlight, warm yellow light, perspective, depth of field, ground shadow, background, sky, hands, people, text, watermark`
+
+### 14b. Blé nain — `serre-ble-nain.webp`
+**1024×1024 · PNG transparent · touffe dressée**
+
+```
+Tuft of dwarf wheat growing hydroponically, flat orthographic FRONT elevation
+view, short stiff upright stalks with slender blades and small bearded ears at
+the top, roots hidden in a bed of pale clay pebbles inside a shallow steel-blue
+tray (#0a1420) with rivets and a thin glowing cyan trim (#63b7e6), stalks in cool
+desaturated green (#2b6b4a) with pale silvery-green ears (#cfe8d2), fine dry
+detail on the awns, soft cold light from above, subtle cyan rim light, retro-
+futuristic 1970s orbital laboratory greenhouse, muted cold palette, dark scene,
+isolated on transparent background, flat 2D game sprite, no perspective, no
+ground shadow, no text
+```
+Négatif : `field, farm, soil, sunset, golden warm light, wind blur, perspective, ground shadow, background, sky, people, text, watermark`
+
+### 14c. Colonne de tomates — `serre-tomates.webp`
+**1024×1536 · PNG transparent · pièce haute**
+
+```
+Hydroponic tomato plant trained on a vertical string, flat orthographic FRONT
+elevation view, tall central stem with compound serrated leaves and two trusses
+of ripe round tomatoes, roots in a white rockwool slab inside a steel-blue basin
+(#0a1420) with rivets, a thin glowing cyan trim (#63b7e6) and a drip line, dark
+cool green foliage (#1f4a35 to #6ed3a0), the tomatoes deep muted red-orange
+(#c8524a) reading as the only warm accent, soft cold light from above, subtle
+cyan rim light on leaf edges, retro-futuristic 1970s orbital laboratory
+greenhouse, muted cold palette, dark scene, isolated on transparent background,
+flat 2D game sprite, no perspective, no ground shadow, no text
+```
+Négatif : `garden, soil, wooden stake, sunlight, warm ambient light, bokeh, perspective, ground shadow, background, sky, hands, text, watermark`
+
+### 14d. Gouttière nue + barre horticole — `serre-rampe.webp`
+**1024×256 · PNG transparent · se répète horizontalement**
+
+```
+Empty hydroponic NFT gutter with a horticultural LED bar above it, flat
+orthographic FRONT elevation view, long shallow steel-blue channel (#0a1420)
+with rivets, end caps and a thin glowing cyan trim (#63b7e6), faint glowing cyan
+nutrient water inside, a slim LED grow bar mounted above on two brackets casting
+a discreet low-saturation rose glow (#b06a8f) downward into the channel, empty
+rockwool cube slots, retro-futuristic 1970s orbital laboratory greenhouse, muted
+cold palette, dark scene, matching left and right edges so several can be placed
+end to end, isolated on transparent background, flat 2D game sprite, no
+perspective, no ground shadow, no text
+```
+Négatif : `plants, leaves, vegetables, bright magenta, purple haze, lens flare, perspective, ground shadow, background, text, watermark`
+
+**Si la lueur rose vous gêne** (elle sort de la charte froide du jeu) : remplacez
+`a discreet low-saturation rose glow (#b06a8f)` par `a cold white glow (#d6e8f5)`
+dans le prompt 14d — la serre reste alors strictement dans la palette station.
+
+**Ce qu'il reste à faire une fois les images là** : elles s'affichent seules dans
+la bibliothèque d'images, mais pour les POSER dans un tableau il me faut une
+courte livraison (les décalques sont une liste fermée côté moteur : j'y ajoute
+« roquette », « blé nain », « tomates », « rampe », et l'outil décalque de
+l'éditeur les propose). Envoyez les fichiers, je m'en occupe.
+
+---
+
 ## Ce que je peux faire sans générateur d'images
 
 Vecteurs SVG (logo, cadres, icônes, écusson au trait) et textures procédurales en
