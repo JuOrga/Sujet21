@@ -123,9 +123,11 @@ import { Records } from './game/records'
 import {
   RAYON_PASTILLE,
   absorbePastilles,
+  semeFiole,
   semePastilles,
   type CondensatDef,
 } from './game/condensat'
+import { FIOLES, FIOLES_SLOTS, fioleDef } from './game/fioles'
 import {
   ETAL_ECONOMAT,
   TABLEAU_ECONOMAT,
@@ -219,9 +221,14 @@ function majCondensatUI(): void {
 majCondensatUI()
 
 function chillNow(): number {
-  // la gaine isolante (instrument embarqué) ralentit le refroidissement
+  // la gaine isolante (instrument embarqué) ralentit le refroidissement —
+  // la fiole d'ISOLANT (équipée au placard) s'y cumule
   const gaine = run.instruments.includes('gaine-isolante') ? 1.5 : 1
-  return Math.min(1, run.runTime / (Math.max(30, params.chillDuration) * gaine))
+  const fiole = records.fioleEquipee('isolant') ? 1.15 : 1
+  return Math.min(
+    1,
+    run.runTime / (Math.max(30, params.chillDuration) * gaine * fiole),
+  )
 }
 
 // Effets sonores : le contexte audio naît au premier geste (clic, toucher)
@@ -279,11 +286,13 @@ function majMemoireUI(): void {
   const dd = document.getElementById('home-memoire')
   if (dd) dd.textContent = String(records.memoire())
 }
-/** Grave la mémoire ET tient le compteur de butin de la run courante. */
+/** Grave la mémoire ET tient le compteur de butin de la run courante.
+ * La fiole de SOUVENIR majore chaque gain de 25 %. */
 function gagneMemoireRun(n: number): void {
   if (n <= 0) return
-  records.gagneMemoire(n)
-  run.memoireGagnee += Math.round(n)
+  const majore = Math.round(n * (records.fioleEquipee('souvenir') ? 1.25 : 1))
+  records.gagneMemoire(majore)
+  run.memoireGagnee += majore
   majMemoireUI()
 }
 // L'HÉRITAGE : l'ancien condensat persistant (d'avant la purge) devient de
@@ -1827,6 +1836,45 @@ document.getElementById('records-fermer')?.addEventListener('click', () => {
 })
 recordsEl.addEventListener('pointerdown', (e) => {
   if (e.target === recordsEl) recordsEl.hidden = true
+})
+
+// ---- Le voile FIOLES : la collection d'échantillons scellés ------------
+// Deux logements ; cliquer une fiole possédée l'équipe ou la range — les
+// effets sont passifs et valent pour toute la run.
+const fiolesEl = document.getElementById('fioles') as HTMLDivElement
+const fiolesCorps = document.getElementById('fioles-corps') as HTMLDivElement
+function renderFiolesVoile(): void {
+  const eq = records.fiolesEquipees()
+  const titre = document.getElementById('fioles-titre')
+  if (titre)
+    titre.textContent = `LES FIOLES — ${records.fioles().length}/${FIOLES.length} trouvées · ${eq.length}/${FIOLES_SLOTS} équipées`
+  let html = '<div class="cdx-grille">'
+  for (const f of FIOLES) {
+    if (records.possedeFiole(f.id)) {
+      const equipee = eq.includes(f.id)
+      html += `<div class="cdx-carte" data-fiole="${f.id}" style="cursor:pointer${equipee ? ';outline:2px solid #6dffb8' : ''}"><i>${f.icone}</i><div><b>${f.nom}${equipee ? ' · ÉQUIPÉE' : ''}</b><span>${f.desc}</span></div></div>`
+    } else {
+      html += `<div class="cdx-carte cdx-verrou"><i>?</i><div><b>FIOLE À TROUVER</b><span>${f.rare ? 'Elle dort dans une cachette profonde…' : 'Cachette profonde, ou le sac du Semblable…'}</span></div></div>`
+    }
+  }
+  html += '</div>'
+  fiolesCorps.innerHTML = html
+}
+fiolesCorps.addEventListener('click', (e) => {
+  const carte = (e.target as HTMLElement).closest('[data-fiole]')
+  if (!carte) return
+  records.basculeFiole(carte.getAttribute('data-fiole') ?? '', FIOLES_SLOTS)
+  renderFiolesVoile()
+})
+document.getElementById('home-fioles')?.addEventListener('click', () => {
+  fiolesEl.hidden = false
+  renderFiolesVoile()
+})
+document.getElementById('fioles-fermer')?.addEventListener('click', () => {
+  fiolesEl.hidden = true
+})
+fiolesEl.addEventListener('pointerdown', (e) => {
+  if (e.target === fiolesEl) fiolesEl.hidden = true
 })
 
 // ---- Le voile CODEX : le manuel écrit par la partie elle-même ----------
@@ -4502,7 +4550,8 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       portes.length +
       rails.length +
       caches.length +
-      pastilles.length >
+      pastilles.length +
+      (fiolePastille ? 1 : 0) >
     0
   const dprC = Math.min(dpr, 2)
   if (
@@ -5017,7 +5066,8 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   for (let i = 0; i < pastilles.length; i++) {
     if (pastillesPrises[i]) continue
     const pa = pastilles[i]
-    if (dansCacheVoilee(pa.x, pa.y)) continue
+    // la fiole de SONDE fait luire les pastilles à travers les voiles
+    if (!fioleActive('sonde') && dansCacheVoilee(pa.x, pa.y)) continue
     const p = S(pa.x, pa.y)
     const pouls = 0.82 + 0.18 * Math.sin(nowPastilles * 2.1 + i * 1.7)
     const r = Math.max(3, RAYON_PASTILLE * 0.55 * z) * pouls
@@ -5037,6 +5087,32 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     g.arc(p.sx - r * 0.28, p.sy - r * 0.3, r * 0.32, 0, Math.PI * 2)
     g.fillStyle = 'rgba(235,250,255,0.85)'
     g.fill()
+  }
+  // la FIOLE scellée : un double anneau violet, plus rare que la matière
+  if (
+    fiolePastille &&
+    !fiolePrise &&
+    (fioleActive('sonde') || !dansCacheVoilee(fiolePastille.x, fiolePastille.y))
+  ) {
+    const p = S(fiolePastille.x, fiolePastille.y)
+    const pouls = 0.85 + 0.15 * Math.sin(nowPastilles * 1.6)
+    const r = Math.max(4, RAYON_PASTILLE * 0.7 * z) * pouls
+    g.beginPath()
+    g.arc(p.sx, p.sy, r * 2, 0, Math.PI * 2)
+    g.fillStyle = 'rgba(200,140,255,0.10)'
+    g.fill()
+    g.beginPath()
+    g.arc(p.sx, p.sy, r, 0, Math.PI * 2)
+    g.fillStyle = 'rgba(190,130,255,0.35)'
+    g.fill()
+    g.lineWidth = 2
+    g.strokeStyle = '#c99aff'
+    g.stroke()
+    g.beginPath()
+    g.arc(p.sx, p.sy, r * 0.55, 0, Math.PI * 2)
+    g.strokeStyle = '#e8d2ff'
+    g.lineWidth = 1.2
+    g.stroke()
   }
 
   // LES CACHETTES, EN DERNIER : le brouillard « non cartographié » couvre
@@ -5215,6 +5291,12 @@ let cachesLevee: number[] = []
 // contact du corps. « Recommencer » re-sème tout : la cueillette se rejoue.
 let pastilles: CondensatDef[] = []
 let pastillesPrises: boolean[] = []
+// LA FIOLE du tableau (au plus une, dans la cachette la plus profonde) —
+// null : ce tableau n'en cache pas, ou la collection est complète
+let fiolePastille: { x: number; y: number } | null = null
+let fiolePrise = false
+/** Une fiole équipée est-elle active ? (les effets passifs de la run) */
+const fioleActive = (id: string): boolean => records.fioleEquipee(id)
 /** Ce point est-il sous un voile encore fermé ? (masque étiquettes et
  * mécanismes — la cachette a la forme qu'on lui a donnée). */
 function dansCacheVoilee(x: number, y: number): boolean {
@@ -5887,6 +5969,17 @@ for (const b of Array.from(
         gagneMemoireRun(25)
         pupDit(`Mémoire +25 — solde gravé : ${records.memoire()}.`)
         break
+      case 'fiole': {
+        const manque = FIOLES.filter((f) => !records.possedeFiole(f.id))
+        if (manque.length === 0) {
+          pupDit('La collection de fioles est déjà complète.')
+        } else {
+          const f = manque[Math.floor(Math.random() * manque.length)]
+          records.ajouteFiole(f.id)
+          pupDit(`${f.nom} ajoutée à la collection (${fioleDef(f.id)?.desc}).`)
+        }
+        break
+      }
       case 'vie':
         run.vies = Math.min(VIES_MAX, run.vies + 1)
         majBoutonsRun()
@@ -5929,6 +6022,11 @@ function resetLasers(): void {
   pastilles = auHub || estEconomat(level) ? [] : semePastilles(level)
   pastillesPrises = pastilles.map(() => false)
   run.pastillesCl = 0
+  // la FIOLE de la cachette profonde — seulement s'il en manque encore
+  const manqueFiole = FIOLES.some((f) => !records.possedeFiole(f.id))
+  fiolePastille =
+    auHub || estEconomat(level) || !manqueFiole ? null : semeFiole(level)
+  fiolePrise = false
   // l'étal de l'Économat se réarme (le condensat dépensé, lui, l'est)
   achatsEconomat.clear()
   plotsDedans = ETAL_ECONOMAT.map(() => false)
@@ -5946,9 +6044,11 @@ function tenteAchat(a: ArticleEconomat): void {
     })
     return
   }
-  if (!depenseCondensat(a.prix)) {
+  // la fiole de TROC : le Semblable vous reconnaît, les prix baissent
+  const prix = fioleActive('troc') ? Math.round(a.prix * 0.75) : a.prix
+  if (!depenseCondensat(prix)) {
     toastFile.push({
-      nom: `${a.nom} — CONDENSAT INSUFFISANT (${a.prix} cL)`,
+      nom: `${a.nom} — CONDENSAT INSUFFISANT (${prix} cL)`,
       icone: '🚫',
       sur: 'L’ÉCONOMAT',
     })
@@ -5973,12 +6073,19 @@ function tenteAchat(a: ArticleEconomat): void {
       break
     case 'sac': {
       const tirage = Math.random()
-      if (tirage < 0.45) {
+      const communes = FIOLES.filter(
+        (f) => !f.rare && !records.possedeFiole(f.id),
+      )
+      if (tirage < 0.4) {
         gagneCondensat(100)
         detail = 'dedans : +100 cL de condensat'
-      } else if (tirage < 0.8) {
+      } else if (tirage < 0.7) {
         gagneMemoireRun(2)
         detail = 'dedans : +2 mémoire — il vous a appris quelque chose'
+      } else if (tirage < 0.85 && communes.length > 0) {
+        const f = communes[Math.floor(Math.random() * communes.length)]
+        records.ajouteFiole(f.id)
+        detail = `dedans : ${f.nom} — ${f.desc}`
       } else {
         detail = 'le sac était vide. Le Semblable vous fixe.'
       }
@@ -6896,7 +7003,9 @@ function newExpedition(): void {
   levelIndex = 0
   run.bonbonneLiters = 0
   run.runTime = 0
-  run.vies = 1
+  // la fiole de SECOND SOUFFLE : la descente commence avec deux
+  // échantillons de secours
+  run.vies = fioleActive('second-souffle') ? Math.min(VIES_MAX, 2) : 1
   run.conclues = 0
   run.instruments = []
   run.xp = 0
@@ -8128,11 +8237,38 @@ function frame(now: number): void {
 
   // ---- Les pastilles de CONDENSAT : bues au contact du corps ----
   if (pastilles.length > 0 && !sim.dispersed) {
-    const bues = absorbePastilles(pastilles, pastillesPrises, sim)
+    // la fiole d'AIMANT élargit le rayon de collecte
+    const rayon = (RAYON_PASTILLE + 14) * (fioleActive('aimant') ? 1.6 : 1)
+    const bues = absorbePastilles(pastilles, pastillesPrises, sim, rayon)
     for (const i of bues) {
       gagneCondensat(pastilles[i].cl)
       run.pastillesCl += pastilles[i].cl
       audio.collect()
+    }
+  }
+  // la FIOLE de la cachette profonde : l'échantillon scellé rejoint la
+  // collection — laquelle, le tableau en décide (celles qui manquent)
+  if (fiolePastille && !fiolePrise && !sim.dispersed) {
+    const marque = [false]
+    if (
+      absorbePastilles([{ ...fiolePastille, cl: 0 }], marque, sim).length > 0
+    ) {
+      fiolePrise = true
+      const manquantes = FIOLES.filter((f) => !records.possedeFiole(f.id))
+      if (manquantes.length > 0) {
+        let h = 0
+        for (const ch of level.code) h = (h * 31 + ch.charCodeAt(0)) | 0
+        const f = manquantes[Math.abs(h) % manquantes.length]
+        records.ajouteFiole(f.id)
+        toastFile.push({
+          nom: `${f.nom} — ${f.desc}`,
+          icone: f.icone,
+          sur: 'FIOLE TROUVÉE',
+        })
+        audio.collect()
+      } else {
+        gagneCondensat(30)
+      }
     }
   }
 

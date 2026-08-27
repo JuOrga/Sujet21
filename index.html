@@ -979,7 +979,10 @@
         letter-spacing: 0.14em;
         margin-right: 8px;
       }
-      #records[hidden], #codex[hidden] { display: none; }
+      #records[hidden], #codex[hidden], #fioles[hidden] { display: none; }
+      #fioles { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(4, 8, 14, 0.72); }
+      #fioles .salles-boite { max-height: 86vh; overflow: auto; width: min(980px, 96vw); }
+      #fioles-corps { padding: 6px 12px 14px; }
       #records, #codex {
         position: fixed; inset: 0; z-index: 40;
         background: rgba(2, 6, 12, 0.72);
@@ -5007,6 +5010,7 @@
         <button id="home-pupitre" type="button" data-dev title="Le pupitre d'essais : simuler les événements du jeu (cérémonie, bonbonne, paliers, sons) au doigt — sans console navigateur"><i>▚</i><span>PUPITRE</span></button>
         <button id="home-records" type="button"><i>✦</i><span>RECORDS</span></button>
         <button id="home-codex" type="button" title="Le manuel écrit par la partie : chaque interaction découverte débloque sa fiche"><i>◉</i><span>CODEX</span></button>
+        <button id="home-fioles" type="button" title="La collection d’échantillons scellés : deux fioles s’équipent pour la run"><i>⚗&#xFE0E;</i><span>FIOLES</span></button>
         <button id="home-livraisons" type="button" data-dev><i>◈</i><span>NOTES DE VERSION</span></button>
         <button id="home-cmds" type="button"><i>⌘</i><span>COMMANDES</span></button>
         <button id="home-params" type="button"><i>⚙&#xFE0E;</i><span>PARAMÈTRES</span></button>
@@ -5457,6 +5461,7 @@
           <div class="pup-grid">
             <button type="button" data-pup="condensat"><b>Condensat +150 cL</b><small>de quoi payer une carte</small></button>
             <button type="button" data-pup="memoire"><b>Mémoire +25</b><small>la monnaie de l’Éveil</small></button>
+            <button type="button" data-pup="fiole"><b>Fiole surprise</b><small>une fiole manquante rejoint la collection</small></button>
             <button type="button" data-pup="vie"><b>Vie +1</b><small>échantillon de secours</small></button>
           </div>
           <div class="pup-sec">PONCTUATIONS SONORES</div>
@@ -5512,6 +5517,18 @@
       </div>
     </div>
 
+    <div id="fioles" hidden aria-label="Fioles">
+      <div class="salles-boite">
+        <div class="salles-tete"><span id="fioles-titre">LES FIOLES — la collection d’échantillons scellés</span>
+          <button type="button" id="fioles-fermer" aria-label="Fermer">✕</button></div>
+        <div class="params-desc" style="padding: 8px 12px 0">
+          Trouvées dans les cachettes profondes, ou dans le sac du Semblable.
+          DEUX logements : cliquer une fiole possédée l’équipe (ou la range) —
+          ses effets valent pour toute la run.
+        </div>
+        <div id="fioles-corps"></div>
+      </div>
+    </div>
     <div id="records" hidden aria-label="Records">
       <div class="salles-boite">
         <div class="salles-tete"><span>RECORDS DU PROTOCOLE — le palmarès des opérateurs</span>
