@@ -189,15 +189,16 @@ export function encodeOptions(o: OptionsGen): string {
     (o.contraste << 17) |
     ((o.figure & 7) << 18) |
     (o.ampleur << 21) |
-    (o.mecanismes << 23)
+    (o.mecanismes << 23) |
+    (((o.figure >> 3) & 1) << 25)
   const defaut = 0 | (127 << 2)
   return paquet === defaut ? '' : paquet.toString(36).toUpperCase()
 }
 
 export function decodeOptions(txt: string): OptionsGen | null {
-  if (!/^[0-9A-Z]{1,5}$/i.test(txt.trim())) return null
+  if (!/^[0-9A-Z]{1,6}$/i.test(txt.trim())) return null
   const paquet = parseInt(txt.trim(), 36)
-  if (!Number.isFinite(paquet) || paquet < 0 || paquet >= 1 << 25) return null
+  if (!Number.isFinite(paquet) || paquet < 0 || paquet >= 1 << 26) return null
   const sallesIdx = paquet & 3
   return {
     salles: (sallesIdx === 0 ? 0 : sallesIdx + 2) as OptionsGen['salles'],
@@ -207,7 +208,7 @@ export function decodeOptions(txt: string): OptionsGen | null {
     decor: ((paquet >> 13) & 3) as OptionsGen['decor'],
     laby: ((paquet >> 15) & 3) as OptionsGen['laby'],
     contraste: ((paquet >> 17) & 1) as OptionsGen['contraste'],
-    figure: (paquet >> 18) & 7,
+    figure: ((paquet >> 18) & 7) | (((paquet >> 25) & 1) << 3),
     ampleur: ((paquet >> 21) & 3) as OptionsGen['ampleur'],
     mecanismes: ((paquet >> 23) & 3) as OptionsGen['mecanismes'],
   }
@@ -220,7 +221,7 @@ export function decodeOptions(txt: string): OptionsGen | null {
 export function analyseSaisie(txt: string): SaisieAtelier | SaisieLibre | null {
   let nu = txt.trim().toUpperCase().replace(/^G-/, '')
   let options: OptionsGen | null = null
-  const tilde = /~\s*([0-9A-Z]{1,5})$/.exec(nu)
+  const tilde = /~\s*([0-9A-Z]{1,6})$/.exec(nu)
   if (tilde) {
     options = decodeOptions(tilde[1])
     if (options === null) return null

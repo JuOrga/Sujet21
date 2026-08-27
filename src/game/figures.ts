@@ -45,6 +45,8 @@ import {
   type CibleDef,
   type PorteDef,
   type LaserDef,
+  type LumiereDef,
+  type CacheDef,
 } from './level'
 import { FORME_ARC, FORME_DISQUE, FORME_CAPSULE } from './formes'
 import type { CodeAtelier } from './levelIO'
@@ -57,6 +59,7 @@ export const FIGURE_FAMILLES = [
   'rosace',
   'nef',
   'constellation',
+  'conduits',
 ] as const
 export type FigureFamille = (typeof FIGURE_FAMILLES)[number]
 
@@ -67,6 +70,7 @@ export const FIGURE_NOMS: Record<FigureFamille, string> = {
   rosace: 'Rosace',
   nef: 'Nef',
   constellation: 'Constellation',
+  conduits: 'Conduits',
 }
 
 type Rng = () => number
@@ -104,6 +108,19 @@ interface Squelette {
   plafond: number
   sol: number
   nbPortesEtat: number
+  /** Une famille peut imposer sa CUVE (les conduits vivent dans une bande
+   * serrée, pas dans le champ immense) — absente : l'ampleur commune. */
+  bounds?: { minX: number; minY: number; maxX: number; maxY: number }
+  /** Ses lampes (les conduits posent leur phare unique) et ses cachettes. */
+  lumieres?: LumiereDef[]
+  caches?: CacheDef[]
+  /** Ses MÉCANISMES déjà montés (les conduits câblent leur canal-réseau
+   * eux-mêmes) : quand présents, l'établi commun ne pose rien d'autre. */
+  greffes?: Greffe[]
+  /** La phrase d'éclairage du journal — absente : « Aucune lampe… ». */
+  journalNote?: string
+  /** Un vivier de noms propre à la famille — absent : le vivier commun. */
+  noms?: string[]
 }
 
 // ---- Le vocabulaire géométrique (celui des tableaux faits main) ---------
@@ -356,6 +373,8 @@ interface ContexteFamille {
   nbCercles: number // le dosage de la difficulté
   etats: number[] // la suite des filtres à poser
   veutMeca: boolean // la couture finale doit-elle rester cardinale ?
+  nbMecas: number // le compte exact (les conduits câblent eux-mêmes)
+  ampleurScale: number // le facteur d'ampleur, pour les familles à cuve propre
 }
 
 /** anneaux / spirale : les cercles brisés concentriques. En anneaux,
@@ -770,6 +789,287 @@ function figConstellation(cx: ContexteFamille): Squelette {
   }
 }
 
+/** conduits : la leçon des « conduits de ventilation » (BOIZ) — la
+ * philosophie INVERSE du crop circle, et c'est voulu :
+ *   · des GAINES, pas des salles : murs minces (22 u), couloirs étroits,
+ *     une cuve compacte en bande — on est de la fumée dans des conduits ;
+ *   · un SERPENTIN d'étages horizontaux tissés par de courts puits
+ *     décalés, et une BAIE DES MACHINES pleine hauteur à l'est ;
+ *   · un CANAL-RÉSEAU : une pastille-maître ouvre PLUSIEURS portes à la
+ *     fois, réparties dans les puits — toucher une cible déverrouille
+ *     l'étage entier ;
+ *   · le SAS AU CŒUR : tout près du départ à vol d'oiseau, mais muré —
+ *     le réseau force le grand tour par la baie ;
+ *   · UNE SEULE LAMPE, posée sur le sas — le phare dans la pénombre —
+ *     et une CACHETTE dans un cul-de-sac de gaine. */
+function figConduits(cx: ContexteFamille): Squelette {
+  const { nbCercles, nbMecas, ampleurScale } = cx
+  const T = 22 // l'épaisseur des parois de gaine (celle de BOIZ)
+  const DUCT = 130 // la hauteur intérieure d'une gaine
+  const GAP = 150 // la largeur d'un puits entre deux étages
+  const R = nbCercles + 2 // 4..6 étages
+  const s = ampleurScale
+  const halfW = Math.round(1150 * s)
+  const bayW = Math.round(620 * Math.min(s, 1.1))
+  const xBay = halfW - bayW
+  const innerH = R * DUCT + (R - 1) * T
+  const yBas = -Math.round(innerH / 2)
+  const rowBottom = (i: number): number => yBas + i * (DUCT + T)
+  const rowTop = (i: number): number => rowBottom(i) + DUCT
+  const rowMid = (i: number): number => rowBottom(i) + DUCT / 2
+
+  const boxes: ObstacleBox[] = []
+  const labels: WorldLabel[] = []
+  const portes: PorteDef[] = []
+  const greffes: Greffe[] = []
+  const mur = (
+    minX: number,
+    minY: number,
+    maxX: number,
+    maxY: number,
+  ): void => {
+    boxes.push({
+      minX: Math.round(minX),
+      minY: Math.round(minY),
+      maxX: Math.round(maxX),
+      maxY: Math.round(maxY),
+      material: MAT_WALL,
+    })
+  }
+  const plaquette = (
+    minX: number,
+    minY: number,
+    maxX: number,
+    maxY: number,
+    mat: number,
+  ): void => {
+    boxes.push({
+      minX: Math.round(minX),
+      minY: Math.round(minY),
+      maxX: Math.round(maxX),
+      maxY: Math.round(maxY),
+      material: mat,
+    })
+  }
+
+  // LE VESTIBULE : le coin de naissance, haut de deux gaines à l'ouest —
+  // le corps naît au large (120 u de dégagement exigés) avant de se
+  // glisser dans le réseau ; sa bouche est une membrane (on entre en eau).
+  const xVest = -halfW + 400
+  plaquette(xVest, rowBottom(0), xVest + T, rowTop(1), MAT_MEMBRANE)
+  let nbFiltres = 1
+
+  // les étages : un mur entre chaque paire, percé d'UN puits alterné
+  // ouest/est — le serpentin. Deux ou trois puits reçoivent une PORTE du
+  // canal-réseau ; les autres, une plaque-filtre d'état.
+  let iEtat = 1
+  const puitsPorte = new Set<number>()
+  if (nbMecas > 0) {
+    // les portes du réseau : un puits sur deux, au moins deux
+    for (let j = 1; j < R; j += 2) puitsPorte.add(j)
+    if (puitsPorte.size < 2 && R > 2) puitsPorte.add(2)
+  }
+  for (let j = 1; j < R; j++) {
+    const wy = rowTop(j - 1)
+    const xDebut = j === 1 ? xVest + T : -halfW
+    const gx = j % 2 === 1 ? xVest + T + 260 : xBay - 190
+    mur(xDebut, wy, gx - GAP / 2, wy + T)
+    mur(gx + GAP / 2, wy, xBay, wy + T)
+    if (puitsPorte.has(j)) {
+      portes.push({
+        minX: Math.round(gx - GAP / 2),
+        minY: wy,
+        maxX: Math.round(gx + GAP / 2),
+        maxY: wy + T,
+        canal: 2,
+      })
+    } else {
+      plaquette(gx - GAP / 2, wy, gx + GAP / 2, wy + T, cx.etats[iEtat++])
+      nbFiltres++
+    }
+  }
+  // la paroi de la baie : pleine hauteur, ouverte seulement à l'étage du
+  // bas (l'aller) et à l'étage du haut (le retour)
+  mur(xBay, rowTop(0), xBay + T, rowBottom(R - 1))
+
+  // LE SAS AU CŒUR : une chambre murée au milieu du serpentin — son
+  // entrée est une porte (canal 1) ou, sans mécanisme, un filtre.
+  const m = Math.floor(R / 2)
+  const cxCh = Math.round(-halfW * 0.25)
+  const demiCh = 190
+  mur(cxCh - demiCh - T, rowBottom(m), cxCh - demiCh, rowTop(m))
+  if (nbMecas >= 2) {
+    portes.push({
+      minX: cxCh + demiCh,
+      minY: rowBottom(m),
+      maxX: cxCh + demiCh + T,
+      maxY: rowTop(m),
+      canal: 1,
+    })
+  } else {
+    plaquette(
+      cxCh + demiCh,
+      rowBottom(m),
+      cxCh + demiCh + T,
+      rowTop(m),
+      cx.etats[iEtat++],
+    )
+    nbFiltres++
+  }
+  const exit = {
+    minX: cxCh - 80,
+    minY: Math.round(rowMid(m)) - 55,
+    maxX: cxCh + 80,
+    maxY: Math.round(rowMid(m)) + 55,
+  }
+  labels.push({ x: cxCh, y: rowTop(m) + 46, text: 'SAS', tone: 'sas' })
+
+  // une COUTURE D'ÉTAT en travers du retour : la gaine du haut exige un
+  // autre état que l'eau du vestibule
+  plaquette(
+    Math.round((xBay - halfW) / 2),
+    rowBottom(R - 1),
+    Math.round((xBay - halfW) / 2) + T,
+    rowTop(R - 1),
+    cx.etats[1 + (iEtat % 2)],
+  )
+  nbFiltres++
+
+  // LA BAIE DES MACHINES : les fils à plomb du canal-réseau (canal 2,
+  // les portes des puits) et du sas (canal 1) — deux miroirs de glace,
+  // aux hauteurs et aux renvois séparés pour que rien ne s'allume seul.
+  if (nbMecas > 0) {
+    const plafond = -yBas
+    const mx1 = xBay + T + 140
+    const ys1 = Math.round(innerH * 0.1)
+    const em1: LaserDef = { x: mx1, y: plafond - 24, angle: -90 }
+    const n1 = { nx: Math.SQRT1_2, ny: Math.SQRT1_2 } // renvoi vers l'est
+    const L1 = 250
+    greffes.push({
+      lasers: [em1],
+      cibles: [
+        { x: mx1 + n1.nx * 8 + L1, y: ys1 + 44 + n1.ny * 8, r: 26, canal: 2 },
+      ],
+      portes: [],
+      labels: [
+        {
+          x: mx1,
+          y: ys1 - 74,
+          text: 'MIROIR DE GLACE',
+          tone: 'froid',
+          rang: 'detail',
+        },
+        {
+          x: mx1 + 130,
+          y: ys1 + 150,
+          text: 'OUVRE LE RÉSEAU',
+          tone: 'grille',
+          rang: 'detail',
+        },
+      ],
+      preuves: [
+        {
+          kind: 'miroir',
+          canal: 2,
+          emetteur: em1,
+          spot: { x: mx1, y: ys1 },
+          normale: n1,
+          cibleIndex: -1,
+        },
+      ],
+    })
+    if (nbMecas >= 2) {
+      const mx2 = xBay + T + 480
+      const ys2 = -Math.round(innerH * 0.22)
+      const em2: LaserDef = { x: mx2, y: plafond - 24, angle: -90 }
+      const n2 = { nx: -Math.SQRT1_2, ny: Math.SQRT1_2 } // renvoi vers l'ouest
+      const L2 = 200
+      greffes.push({
+        lasers: [em2],
+        cibles: [
+          { x: mx2 + n2.nx * 8 - L2, y: ys2 + 44 + n2.ny * 8, r: 26, canal: 1 },
+        ],
+        portes: [],
+        labels: [
+          {
+            x: mx2,
+            y: ys2 - 74,
+            text: 'MIROIR DE GLACE',
+            tone: 'froid',
+            rang: 'detail',
+          },
+          {
+            x: mx2 - 130,
+            y: ys2 + 150,
+            text: 'OUVRE LE SAS',
+            tone: 'sas',
+            rang: 'detail',
+          },
+        ],
+        preuves: [
+          {
+            kind: 'miroir',
+            canal: 1,
+            emetteur: em2,
+            spot: { x: mx2, y: ys2 },
+            normale: n2,
+            cibleIndex: -1,
+          },
+        ],
+      })
+    }
+    // les portes du réseau voyagent avec la première greffe (canal 2),
+    // celle du sas avec la seconde (canal 1)
+    greffes[0].portes = portes.filter((p) => p.canal === 2)
+    if (greffes.length > 1)
+      greffes[1].portes = portes.filter((p) => p.canal === 1)
+    else if (portes.some((p) => p.canal === 1)) greffes[0].portes = portes
+  }
+
+  // LA CACHETTE : le bout mort d'une gaine, sous cache — le coin que le
+  // serpentin n'exige pas
+  const iCache = Math.min(R - 2, m + 1)
+  const caches: CacheDef[] = [
+    {
+      minX: -halfW,
+      minY: rowBottom(iCache),
+      maxX: -halfW + 150,
+      maxY: rowTop(iCache),
+    },
+  ]
+
+  return {
+    boxes,
+    labels,
+    spawn: { x: -halfW + 190, y: Math.round((rowBottom(0) + rowTop(1)) / 2) },
+    exit,
+    coutureFinale: null, // les conduits câblent leurs mécanismes eux-mêmes
+    poche: null,
+    plafond: -yBas,
+    sol: yBas,
+    nbPortesEtat: nbFiltres,
+    bounds: {
+      minX: -halfW,
+      minY: yBas,
+      maxX: halfW,
+      maxY: -yBas,
+    },
+    lumieres: [{ x: cxCh, y: Math.round(rowMid(m)) }],
+    caches,
+    greffes,
+    journalNote:
+      'Une seule lampe, posée sur le sas — le reste du réseau vit dans la pénombre. ',
+    noms: [
+      'Les conduits',
+      'La gaine',
+      'Le plénum',
+      'La reprise d’air',
+      'Le soufflage',
+      'L’extracteur',
+    ],
+  }
+}
+
 // ---- Les MÉCANISMES greffés sur la couture finale ------------------------
 
 interface Greffe {
@@ -958,6 +1258,8 @@ export function essaieFigure(
     nbCercles,
     etats,
     veutMeca: nbMecas > 0,
+    nbMecas,
+    ampleurScale: amp === 1 ? 0.85 : amp === 2 ? 1 : 1.2,
   }
   const sq =
     famille === 'anneaux'
@@ -970,7 +1272,9 @@ export function essaieFigure(
             ? figRosace(cx)
             : famille === 'nef'
               ? figNef(cx)
-              : figConstellation(cx)
+              : famille === 'constellation'
+                ? figConstellation(cx)
+                : figConduits(cx)
 
   const lasers: LaserDef[] = []
   const cibles: CibleDef[] = []
@@ -979,13 +1283,17 @@ export function essaieFigure(
   const labels = [...sq.labels]
   const boxes = [...sq.boxes]
 
+  // les greffes : celles que la famille a montées elle-même (conduits),
+  // sinon l'établi commun sur la couture finale
+  let greffes: Greffe[] = sq.greffes ?? []
   if (
+    greffes.length === 0 &&
     nbMecas > 0 &&
     sq.coutureFinale &&
     sq.poche &&
     sq.poche.maxX - sq.poche.minX > 260
   ) {
-    const greffes: Greffe[] = []
+    greffes = []
     const parMiroir = rng() < 0.5
     greffes.push(
       parMiroir
@@ -1016,20 +1324,20 @@ export function essaieFigure(
       )
     }
     // la plaque-filtre de la couture finale cède sa place aux portes
-    boxes.splice(sq.coutureFinale.plaque, 1)
-    for (const g of greffes) {
-      for (const em of g.lasers) lasers.push(em)
-      for (const p of g.portes) portes.push(p)
-      for (const l of g.labels) labels.push(l)
-      for (let i = 0; i < g.cibles.length; i++) {
-        cibles.push(g.cibles[i])
-        g.preuves[i].cibleIndex = cibles.length - 1
-      }
-      for (const p of g.preuves) preuves.push(p)
+    if (sq.coutureFinale) boxes.splice(sq.coutureFinale.plaque, 1)
+  }
+  for (const g of greffes) {
+    for (const em of g.lasers) lasers.push(em)
+    for (const p of g.portes) portes.push(p)
+    for (const l of g.labels) labels.push(l)
+    for (let i = 0; i < g.cibles.length; i++) {
+      cibles.push(g.cibles[i])
+      g.preuves[i].cibleIndex = cibles.length - 1
     }
+    for (const p of g.preuves) preuves.push(p)
   }
 
-  const noms = [
+  const noms = sq.noms ?? [
     'Le glyphe',
     'La figure',
     'Le sceau',
@@ -1045,13 +1353,14 @@ export function essaieFigure(
     (preuves.length
       ? `, ${preuves.length} mécanisme${preuves.length > 1 ? 's' : ''}`
       : '') +
-    `. Aucune lampe : la lumière de base sculpte seule. ` +
+    `. ` +
+    (sq.journalNote ?? 'Aucune lampe : la lumière de base sculpte seule. ') +
     `Traversée démontrée par le traceur avant consignation. — Unité GÉN.`
   const level: LevelDef & { __preuves?: PreuveDef[] } = {
     name: `${parmi(rng, noms)} ${ident}`,
     code: `G-${ident}`,
     journal,
-    bounds: { minX: -W, minY: -H, maxX: W, maxY: H },
+    bounds: sq.bounds ?? { minX: -W, minY: -H, maxX: W, maxY: H },
     spawn: { x: Math.round(sq.spawn.x), y: Math.round(sq.spawn.y), n: 900 },
     exit: sq.exit,
     boxes,
@@ -1060,6 +1369,8 @@ export function essaieFigure(
     ...(lasers.length ? { lasers } : {}),
     ...(cibles.length ? { cibles } : {}),
     ...(portes.length ? { portes } : {}),
+    ...(sq.lumieres?.length ? { lumieres: sq.lumieres } : {}),
+    ...(sq.caches?.length ? { caches: sq.caches } : {}),
     par: 3 + Math.round(sq.nbPortesEtat / 2) + 2 * preuves.length,
   }
   level.__preuves = preuves
