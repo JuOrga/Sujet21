@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 02:02',
+    title: 'LA VOIE SEMI-PROCÉDURALE — et les lettres d’ordre se gravent',
+    notes: [
+      'Demandé : un mode où les salles se génèrent en suivant la logique de la run, au moins deux propositions au moment de la récompense, lié aux niveaux existants. C’est fait — le bouton VOIE SEMI-PROC. (fiche, mode concepteur) lance la descente ordinaire, mais à CHAQUE récompense « la voie se sépare » : LA SUITE ÉCRITE (la salle suivante de la séquence, celle de la planche) est mise en face d’une SALLE GÉNÉRÉE — même moment de run (début/milieu/fin selon la progression), même difficulté que la suite écrite, mécanique DIFFÉRENTE pour que le choix parle. La salle générée est PROUVÉE traversable par le générateur, et son code (« G-121-E7LQ ») se partage : il la redonne à l’identique.',
+      'La salle générée élue s’INTERCALE : elle prend la place du rang suivant, puis la séquence écrite reprend son cours — les niveaux écrits restent la colonne vertébrale de la run. En fin de séquence, la cérémonie ordinaire conclut. LANCER reste la descente classique.',
+      'Et la remarque de nomenclature est appliquée : les LETTRES D’ORDRE (« 21AF ») ne se modifient plus — dans la planche, le préfixe et les lettres sont GRAVÉS, seuls les trois chiffres de la fin s’ajustent aux molettes. L’ordre de jeu, lui, se règle en glissant les cartes. Vérifié en navigateur : cérémonie déroulée jusqu’au choix (suite écrite 21AB-111 · GLACE face à G-121-E7LQ · VAPEUR générée), salle générée jouée après élection, molettes qui préservent les lettres (« 21AB-121 » reçu par le serveur). 354 tests verts.',
+    ],
+  },
+  {
     date: '26/08/2026 23:15',
     title: 'La multi-sélection au Deck : L2 + clic — et l’appui long au tactile',
     notes: [
