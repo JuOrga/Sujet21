@@ -22,7 +22,7 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
-    date: '27/08/2026 17:20',
+    date: '27/08/2026 21:23',
     title: 'Le choix de la voie porte toujours DEUX salles générées',
     notes: [
       'Demandé : qu’à chaque récompense de la voie il y ait toujours au moins une, voire deux, salles générées proposées. C’est fait, et c’est la version haute : le choix porte TOUJOURS DEUX salles générées (deux mécaniques différentes, chacune prouvée traversable) — la suite écrite, quand la séquence en offre une, s’ajoute en TROISIÈME carte. La voie est procédurale d’abord ; l’écrite est une option, plus l’inverse.',
