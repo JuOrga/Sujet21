@@ -3563,9 +3563,16 @@ async function ouvreRegles(): Promise<void> {
   }
   renderRegles()
 }
+// Sur ÉCHEC ou refus, on ne re-rend JAMAIS l'écran : ce que le concepteur a
+// tapé reste sous ses yeux — seul le succès reconstruit (et vide le champ).
+function reglesOccupe(): boolean {
+  if (!reglesBusy) return false
+  reglesDit('Un enregistrement est déjà en cours — réessayez dans un instant.')
+  return true
+}
 /** Annote une règle (note vide : l'annotation s'efface). */
 async function posteNoteRegle(id: string, note: string): Promise<void> {
-  if (reglesBusy || !reglesJoignable) return
+  if (!reglesJoignable || reglesOccupe()) return
   reglesBusy = true
   reglesDit('Enregistrement de la note…')
   try {
@@ -3583,16 +3590,17 @@ async function posteNoteRegle(id: string, note: string): Promise<void> {
     const d = (await r.json()) as { note?: NoteRegle }
     reglesNotes = reglesNotes.filter((n) => n.id !== id)
     if (d.note && d.note.note) reglesNotes.push(d.note)
+    reglesBusy = false
     reglesDit(note ? 'Note enregistrée — partagée entre postes.' : 'Note effacée.')
+    renderRegles()
   } catch {
+    reglesBusy = false
     reglesDit('Enregistrement refusé : magasin injoignable — la note reste à l’écran, réessayez.')
   }
-  reglesBusy = false
-  renderRegles()
 }
 /** Consigne une règle nouvelle (ou réécrit un ajout existant : même id). */
 async function posteAjoutRegle(texte: string, id?: string): Promise<void> {
-  if (reglesBusy || !reglesJoignable || !texte.trim()) return
+  if (!reglesJoignable || !texte.trim() || reglesOccupe()) return
   reglesBusy = true
   reglesDit('Consignation de la règle…')
   try {
@@ -3612,15 +3620,16 @@ async function posteAjoutRegle(texte: string, id?: string): Promise<void> {
       reglesAjouts = reglesAjouts.filter((a) => a.id !== d.ajout!.id)
       reglesAjouts.push(d.ajout)
     }
+    reglesBusy = false
     reglesDit(id ? 'Règle réécrite.' : 'Règle consignée — elle attend son implémentation.')
+    renderRegles()
   } catch {
-    reglesDit('Consignation refusée : magasin injoignable — copiez votre texte et réessayez.')
+    reglesBusy = false
+    reglesDit('Consignation refusée : magasin injoignable — votre texte reste à l’écran, réessayez.')
   }
-  reglesBusy = false
-  renderRegles()
 }
 async function oteAjoutRegle(id: string): Promise<void> {
-  if (reglesBusy || !reglesJoignable) return
+  if (!reglesJoignable || reglesOccupe()) return
   reglesBusy = true
   reglesDit('Retrait de la règle…')
   try {
@@ -3630,12 +3639,13 @@ async function oteAjoutRegle(id: string): Promise<void> {
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
     reglesAjouts = reglesAjouts.filter((a) => a.id !== id)
     reglesNotes = reglesNotes.filter((n) => n.id !== id)
+    reglesBusy = false
     reglesDit('Règle retirée.')
+    renderRegles()
   } catch {
+    reglesBusy = false
     reglesDit('Retrait refusé : magasin injoignable.')
   }
-  reglesBusy = false
-  renderRegles()
 }
 /** La zone d'annotation d'une règle : le texte se pose, le blur enregistre. */
 function zoneNoteRegle(id: string, conteneur: HTMLElement): void {
@@ -3720,7 +3730,8 @@ function renderRegles(): void {
       reglesDit('La règle est vide : écrivez-la d’abord.')
       return
     }
-    taNeuf.value = ''
+    // le champ n'est PAS vidé ici : seul le succès reconstruit l'écran —
+    // un refus (occupé, hors ligne) laisse le texte sous les yeux
     void posteAjoutRegle(texte)
   })
   ajout.appendChild(taNeuf)
