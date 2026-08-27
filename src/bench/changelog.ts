@@ -22,7 +22,7 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
-    date: '27/08/2026 14:45',
+    date: '27/08/2026 16:31',
     title:
       'Le générateur applique le cahier : treize règles passent EN PLACE',
     notes: [
