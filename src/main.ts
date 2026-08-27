@@ -6621,6 +6621,15 @@ function restart(): void {
 
 // Nouvelle expédition : retour au premier tableau, réserve vidée, vaisseau
 // retiédi. Le protocole recommence avec l'échantillon suivant (§10).
+// Crochet d'atelier : lancer l'expédition SANS traverser le hub — les
+// essais automatisés (et le pupitre, au besoin) sautent le sas de lancement.
+;(window as unknown as { __expedition: () => void }).__expedition = () => {
+  auHub = false
+  hasPlayed = true
+  document.body.classList.add('playing')
+  newExpedition()
+}
+
 function newExpedition(): void {
   levelIndex = 0
   run.bonbonneLiters = 0
