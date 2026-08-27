@@ -429,6 +429,17 @@ export interface CacheDef {
   style?: 'paroi' // absent : brouillard
 }
 
+// Une PASTILLE DE CONDENSAT : de la matière pure posée dans le tableau,
+// bue au contact du corps — la monnaie de RUN (purgée en fin de run).
+// La plupart des tableaux n'en déclarent pas : le semis automatique
+// (condensat.ts) en pose dans les cachettes et au large, déterministe par
+// code. En déclarer ici REMPLACE le semis (contrôle d'auteur).
+export interface CondensatPose {
+  x: number
+  y: number
+  cl: number // la valeur en centilitres
+}
+
 // Un RAIL MAGNÉTIQUE (palier 3) : une ligne de champ posée dans le décor.
 // Le faisceau ordinaire l'ignore ; un faisceau IONISÉ (qui traverse la
 // vapeur du joueur) est capturé s'il passe près d'une extrémité, suit la
@@ -456,6 +467,7 @@ export interface LevelDef {
   portes?: PorteDef[]
   rails?: RailDef[]
   caches?: CacheDef[] // cachettes voilées (brouillard levé à l'entrée du corps)
+  condensats?: CondensatPose[] // pastilles posées main (sinon : semis auto)
   // Lampes posées à l'éditeur (au plus MAX_LUMIERES allumées). Absentes :
   // la lampe par défaut de la cuve fait l'éclairage.
   lumieres?: LumiereDef[]

@@ -4991,7 +4991,8 @@
         <div><dt>ÉCHANTILLON</dt><dd id="home-volume">— L</dd></div>
         <div><dt>PARTICULES</dt><dd id="home-particles">—</dd></div>
         <div><dt>ÉTAT</dt><dd id="home-state">en dérive</dd></div>
-        <div><dt>CONDENSAT</dt><dd id="home-condensat">0 cL</dd></div>
+        <div><dt>CONDENSAT (RUN)</dt><dd id="home-condensat">0 cL</dd></div>
+        <div><dt>MÉMOIRE</dt><dd id="home-memoire">0</dd></div>
       </dl>
       <button id="start" type="button">COMMENCER L'ESSAI</button>
       <button id="home-restart" type="button" hidden>RECOMMENCER LE TABLEAU</button>
@@ -5051,6 +5052,7 @@
           <button type="button" class="hud-chip" data-nom="progression de l'expédition"><i>▦</i><span class="v" id="hud-tableau">SALLE 1/1</span></button>
           <button type="button" class="hud-chip" data-nom="échantillons de secours — le dernier perdu, la run s'arrête" id="hud-vies-chip"><i>💠</i><span class="v" id="hud-vies">×1</span></button>
           <button type="button" class="hud-chip" data-nom="bonbonne — toucher pour VERSER la réserve dans le corps" id="hud-bonbonne-chip"><i>🫙</i><span class="v" id="hud-bonbonne">0.00 L</span></button>
+          <button type="button" class="hud-chip" data-nom="condensat de la run — la matière ramassée, purgée en fin de run" id="hud-cond-chip"><i>💧</i><span class="v" id="hud-cond">0 cL</span></button>
           <button type="button" class="hud-chip" data-nom="instruments embarqués — toucher pour le détail" id="hud-instr-chip" hidden><i>🧰</i><span class="v" id="hud-instr">—</span></button>
           <button type="button" class="hud-chip" data-nom="coque du vaisseau"><i>❄</i><span class="v" id="hud-coque">+21°</span></button>
         </div>
@@ -5454,6 +5456,7 @@
           <div class="pup-sec">RESSOURCES</div>
           <div class="pup-grid">
             <button type="button" data-pup="condensat"><b>Condensat +150 cL</b><small>de quoi payer une carte</small></button>
+            <button type="button" data-pup="memoire"><b>Mémoire +25</b><small>la monnaie de l’Éveil</small></button>
             <button type="button" data-pup="vie"><b>Vie +1</b><small>échantillon de secours</small></button>
           </div>
           <div class="pup-sec">PONCTUATIONS SONORES</div>

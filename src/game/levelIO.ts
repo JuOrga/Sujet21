@@ -24,6 +24,7 @@ import {
   type WorldLabel,
   type CacheDef,
   type CibleDef,
+  type CondensatPose,
   type LaserDef,
   type PorteDef,
   type RailDef,
@@ -241,7 +242,9 @@ function readBox(o: Record<string, unknown>): ObstacleBox | null {
     ...(forme === FORME_ARC && p1 !== ARC_OUVERTURE_DEFAUT
       ? { p1: Math.max(15, Math.min(180, p1)) }
       : {}),
-    ...(forme === FORME_ARC && p2 !== 0 ? { p2: Math.max(0, Math.min(2, p2)) } : {}),
+    ...(forme === FORME_ARC && p2 !== 0
+      ? { p2: Math.max(0, Math.min(2, p2)) }
+      : {}),
     material,
   }
   if (box.maxX - box.minX < 1 || box.maxY - box.minY < 1) return null
@@ -566,6 +569,19 @@ export function parseLevel(input: unknown): {
   }
   if (caches.length > 0) level.caches = caches
 
+  // Pastilles de condensat posées main (rares : le semis automatique fait
+  // le cas général) — x, y et valeur en centilitres bornée
+  const condensats: CondensatPose[] = []
+  for (const raw of Array.isArray(o.condensats) ? o.condensats : []) {
+    const p = (raw ?? {}) as Record<string, unknown>
+    condensats.push({
+      x: num(p.x, 0),
+      y: num(p.y, 0),
+      cl: Math.max(1, Math.min(200, Math.round(num(p.cl, 8)))),
+    })
+  }
+  if (condensats.length > 0) level.condensats = condensats
+
   // Rails magnétiques : des polylignes d'au moins 2 points
   const rails: RailDef[] = []
   for (const raw of Array.isArray(o.rails) ? o.rails : []) {
@@ -657,6 +673,8 @@ export function serializeLevel(level: LevelDef): string {
   if (level.portes && level.portes.length > 0) out.portes = level.portes
   if (level.rails && level.rails.length > 0) out.rails = level.rails
   if (level.caches && level.caches.length > 0) out.caches = level.caches
+  if (level.condensats && level.condensats.length > 0)
+    out.condensats = level.condensats
   if (level.lumieres && level.lumieres.length > 0) out.lumieres = level.lumieres
   if (level.decals && level.decals.length > 0) out.decals = level.decals
   if (level.figure) out.figure = level.figure
