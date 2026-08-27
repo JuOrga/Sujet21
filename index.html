@@ -573,6 +573,79 @@
       }
       #planche-retour:hover { border-color: var(--specimen); color: #d5f3e8; }
       body.playing #planche-retour:not([hidden]) { display: block; }
+      /* ---- LE CAHIER DES RÈGLES : la génération, noir sur blanc ---- */
+      #regles {
+        position: fixed; inset: 0; z-index: 57;
+        background: rgba(2, 6, 12, 0.78);
+        display: flex; align-items: center; justify-content: center;
+        padding: 18px;
+      }
+      #regles[hidden] { display: none; }
+      .regles-boite { max-width: min(920px, 96vw); width: 100%; }
+      #regles-corps {
+        overflow-y: auto; max-height: min(66vh, 720px);
+        padding: 12px; display: flex; flex-direction: column; gap: 10px;
+      }
+      .rg-famille {
+        font-family: var(--font-display); font-size: 12px;
+        letter-spacing: 0.18em; color: var(--specimen);
+        margin-top: 10px; padding-bottom: 4px;
+        border-bottom: 1px solid var(--line);
+      }
+      .rg-famille:first-child { margin-top: 0; }
+      .rg-famille small {
+        margin-left: 10px; font-family: inherit; font-size: 10px;
+        letter-spacing: 0.08em; color: var(--dim); text-transform: none;
+      }
+      .rg-regle {
+        background: rgba(20, 32, 46, 0.6);
+        border: 1px solid var(--line); border-left-width: 3px;
+        border-radius: 7px; padding: 9px 11px;
+      }
+      .rg-regle.rg-place { border-left-color: #3f7a5e; }
+      .rg-regle.rg-propo { border-left-color: #7a6a3f; }
+      .rg-regle.rg-libre { border-left-color: var(--specimen); }
+      .rg-tete { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+      .rg-titre { font-size: 13px; font-weight: 600; color: #eaf6ff; }
+      .rg-badge {
+        font-size: 8px; letter-spacing: 0.14em; padding: 2px 6px;
+        border-radius: 4px; border: 1px solid var(--line); color: var(--dim);
+        white-space: nowrap;
+      }
+      .rg-place .rg-badge { color: #8fd8b0; border-color: #2d5a44; }
+      .rg-propo .rg-badge { color: #e0c580; border-color: #5a5230; }
+      .rg-libre .rg-badge { color: #9fd0f0; border-color: #2d4a63; }
+      .rg-texte { margin: 5px 0 0; font-size: 12px; line-height: 1.45; color: #b9cede; }
+      .rg-note {
+        width: 100%; margin-top: 7px; min-height: 34px;
+        font: inherit; font-size: 12px; line-height: 1.4;
+        background: rgba(10, 18, 28, 0.85); color: #d5f3e8;
+        border: 1px dashed var(--line); border-radius: 5px;
+        padding: 6px 8px; resize: vertical;
+      }
+      .rg-note:focus { border-color: var(--specimen); border-style: solid; outline: none; }
+      .rg-note::placeholder { color: var(--dim); opacity: 0.7; }
+      .rg-signe {
+        display: block; margin-top: 3px; font-size: 9px;
+        letter-spacing: 0.06em; color: var(--dim);
+      }
+      .rg-oter {
+        float: right; min-width: 30px; min-height: 30px; margin-left: 8px;
+        font: inherit; font-size: 13px; background: transparent;
+        color: var(--dim); border: 1px solid var(--line);
+        border-radius: 5px; cursor: pointer;
+      }
+      .rg-oter:hover { border-color: #d08080; color: #d08080; }
+      .rg-ajout { border: 1px dashed var(--line); border-radius: 7px; padding: 9px 11px; }
+      .rg-ajout .rg-note { border-style: solid; min-height: 56px; }
+      .rg-consigner {
+        margin-top: 7px; min-height: 36px; padding: 0 16px;
+        font-family: var(--font-display); font-size: 10px; letter-spacing: 0.14em;
+        background: rgba(8, 14, 22, 0.85); color: #9fd0f0;
+        border: 1px solid #2d4a63; border-radius: 5px; cursor: pointer;
+      }
+      .rg-consigner:hover:not(:disabled) { border-color: var(--specimen); color: #d5f3e8; }
+      .rg-consigner:disabled { opacity: 0.4; cursor: default; }
       /* ---- LE PUPITRE D'ESSAIS : simuler les événements au doigt ---- */
       #pupitre {
         position: fixed; inset: 0; z-index: 58;
@@ -4813,6 +4886,7 @@
       <div class="home-duo" role="group" aria-label="Outils du protocole">
         <button id="start-editor" type="button" data-dev title="Créer ou modifier un tableau"><i>✎</i><span>ÉDITEUR</span></button>
         <button id="home-voie" type="button" data-dev title="La descente SEMI-PROCÉDURALE, jouable de bout en bout : à chaque récompense, la suite écrite est mise en face d'une salle GÉNÉRÉE (prouvée) — séquence épuisée, deux générées prennent la relève jusqu'au bout du plan. Longueur, difficulté max et « descente du jour » se règlent au BANC (dossier « La voie »)."><i>⑂</i><span>VOIE SEMI-PROC.</span></button>
+        <button id="home-regles" type="button" data-dev title="Le cahier des règles de la génération procédurale : ce que le générateur fait (annotable), ce qu'un level designer en attend (propositions), et vos règles nouvelles en texte libre — partagé entre concepteurs, relu au moment d'implémenter"><i>§</i><span>RÈGLES DE GÉN.</span></button>
         <button id="open-montage" type="button" data-dev title="La table de montage des cinématiques : planches, effets, sons — et lecture immédiate"><i>▤</i><span>MONTAGE</span></button>
         <button id="home-salles" type="button" data-dev><i>▦</i><span>SALLES</span></button>
         <button id="home-planche" type="button" data-dev title="La planche d'ordonnancement : toutes les salles de la bibliothèque en cartes visuelles — glisser pour réordonner la séquence, régler le code cran par cran, essayer d'un ⏵"><i>▧</i><span>LA PLANCHE</span></button>
@@ -5217,6 +5291,20 @@
           (« <b>111</b> » : moment · mécanique · difficulté) et s'enregistre à la validation.</p>
         <div id="planche-corps"></div>
         <p class="pup-etat" id="planche-etat"></p>
+      </div>
+    </div>
+
+    <!-- LE CAHIER DES RÈGLES : la génération procédurale, écrite noir sur blanc -->
+    <div id="regles" hidden aria-label="Le cahier des règles de génération">
+      <div class="salles-boite regles-boite">
+        <div class="salles-tete"><span>LE CAHIER DES RÈGLES — la génération procédurale</span>
+          <button type="button" id="regles-fermer" aria-label="Fermer">✕</button></div>
+        <p class="salles-legende">Ce que le générateur fait <b>aujourd'hui</b> (règles EN PLACE),
+          ce qu'un level designer en <b>attend</b> (PROPOSITIONS), et vos <b>règles nouvelles</b>
+          en texte libre. Chaque règle s'annote ; notes et ajouts partent dans le magasin
+          partagé — l'implémentation viendra les y relire.</p>
+        <div id="regles-corps"></div>
+        <p class="pup-etat" id="regles-etat"></p>
       </div>
     </div>
 

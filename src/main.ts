@@ -18,6 +18,7 @@ import {
 import { dessineMiniCarte } from './game/carte'
 import { propositionsSalles } from './game/poule'
 import { genereNiveauAtelier } from './game/generateur'
+import { FAMILLES_REGLES, reglesDeFamille } from './game/reglesGen'
 import {
   clampPlanVoie,
   diffAuRang,
@@ -3482,6 +3483,272 @@ plancheEl?.addEventListener('pointerdown', (e) => {
   if (e.target === plancheEl) plancheEl.hidden = true
 })
 
+// ---- LE CAHIER DES RÈGLES : la génération procédurale, noir sur blanc ----
+// Le catalogue (reglesGen.ts) dit ce que le générateur FAIT et ce qu'un
+// level designer en ATTEND ; l'écran laisse ANNOTER chaque règle et en
+// CONSIGNER de nouvelles en texte libre. Notes et ajouts vivent dans le
+// magasin partagé (/api/regles) : écrits depuis le Deck ou la tablette,
+// ils sont relus au moment d'implémenter — le cahier est le pont entre
+// la partie et l'atelier.
+const reglesEl = document.getElementById('regles') as HTMLDivElement
+interface NoteRegle {
+  id: string
+  note: string
+  auteur: string
+  date: string
+}
+interface AjoutRegle {
+  id: string
+  titre: string
+  texte: string
+  auteur: string
+  date: string
+}
+let reglesNotes: NoteRegle[] = []
+let reglesAjouts: AjoutRegle[] = []
+let reglesJoignable = false
+let reglesBusy = false
+function reglesDit(msg: string): void {
+  const e = document.getElementById('regles-etat')
+  if (e) e.textContent = msg
+}
+function signeRegle(verbe: string, auteur: string, date: string): string {
+  const dt = new Date(date)
+  if (Number.isNaN(dt.getTime())) return ''
+  const quand = `${dt.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} à ${dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
+  return `${verbe} par ${auteur || 'anonyme'} le ${quand}`
+}
+async function ouvreRegles(): Promise<void> {
+  reglesEl.hidden = false
+  const corps = document.getElementById('regles-corps')
+  if (corps) corps.innerHTML = ''
+  reglesDit('Chargement du cahier partagé…')
+  try {
+    const r = await fetch('/api/regles')
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    const d = (await r.json()) as { notes?: NoteRegle[]; ajouts?: AjoutRegle[] }
+    reglesNotes = Array.isArray(d.notes) ? d.notes : []
+    reglesAjouts = Array.isArray(d.ajouts) ? d.ajouts : []
+    reglesJoignable = true
+    reglesDit('')
+  } catch {
+    reglesNotes = []
+    reglesAjouts = []
+    reglesJoignable = false
+    reglesDit(
+      'Magasin injoignable (hors ligne ou serveur local) : le cahier se lit, mais notes et ajouts ne s’enregistreront pas.',
+    )
+  }
+  renderRegles()
+}
+// Sur ÉCHEC ou refus, on ne re-rend JAMAIS l'écran : ce que le concepteur a
+// tapé reste sous ses yeux — seul le succès reconstruit (et vide le champ).
+function reglesOccupe(): boolean {
+  if (!reglesBusy) return false
+  reglesDit('Un enregistrement est déjà en cours — réessayez dans un instant.')
+  return true
+}
+/** Annote une règle (note vide : l'annotation s'efface). */
+async function posteNoteRegle(id: string, note: string): Promise<void> {
+  if (!reglesJoignable || reglesOccupe()) return
+  reglesBusy = true
+  reglesDit('Enregistrement de la note…')
+  try {
+    const r = await fetch('/api/regles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'note',
+        id,
+        note,
+        auteur: records.operator() || 'anonyme',
+      }),
+    })
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    const d = (await r.json()) as { note?: NoteRegle }
+    reglesNotes = reglesNotes.filter((n) => n.id !== id)
+    if (d.note && d.note.note) reglesNotes.push(d.note)
+    reglesBusy = false
+    reglesDit(note ? 'Note enregistrée — partagée entre postes.' : 'Note effacée.')
+    renderRegles()
+  } catch {
+    reglesBusy = false
+    reglesDit('Enregistrement refusé : magasin injoignable — la note reste à l’écran, réessayez.')
+  }
+}
+/** Consigne une règle nouvelle (ou réécrit un ajout existant : même id). */
+async function posteAjoutRegle(texte: string, id?: string): Promise<void> {
+  if (!reglesJoignable || !texte.trim() || reglesOccupe()) return
+  reglesBusy = true
+  reglesDit('Consignation de la règle…')
+  try {
+    const r = await fetch('/api/regles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'ajout',
+        ...(id ? { id } : {}),
+        texte,
+        auteur: records.operator() || 'anonyme',
+      }),
+    })
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    const d = (await r.json()) as { ajout?: AjoutRegle }
+    if (d.ajout) {
+      reglesAjouts = reglesAjouts.filter((a) => a.id !== d.ajout!.id)
+      reglesAjouts.push(d.ajout)
+    }
+    reglesBusy = false
+    reglesDit(id ? 'Règle réécrite.' : 'Règle consignée — elle attend son implémentation.')
+    renderRegles()
+  } catch {
+    reglesBusy = false
+    reglesDit('Consignation refusée : magasin injoignable — votre texte reste à l’écran, réessayez.')
+  }
+}
+async function oteAjoutRegle(id: string): Promise<void> {
+  if (!reglesJoignable || reglesOccupe()) return
+  reglesBusy = true
+  reglesDit('Retrait de la règle…')
+  try {
+    const r = await fetch(`/api/regles?id=${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    })
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    reglesAjouts = reglesAjouts.filter((a) => a.id !== id)
+    reglesNotes = reglesNotes.filter((n) => n.id !== id)
+    reglesBusy = false
+    reglesDit('Règle retirée.')
+    renderRegles()
+  } catch {
+    reglesBusy = false
+    reglesDit('Retrait refusé : magasin injoignable.')
+  }
+}
+/** La zone d'annotation d'une règle : le texte se pose, le blur enregistre. */
+function zoneNoteRegle(id: string, conteneur: HTMLElement): void {
+  const note = reglesNotes.find((n) => n.id === id)
+  const ta = document.createElement('textarea')
+  ta.className = 'rg-note'
+  ta.placeholder = 'Annoter cette règle — votre note est partagée entre concepteurs…'
+  ta.value = note?.note ?? ''
+  ta.dataset.initial = ta.value
+  ta.disabled = !reglesJoignable
+  ta.addEventListener('blur', () => {
+    if (ta.value.trim() === (ta.dataset.initial ?? '').trim()) return
+    void posteNoteRegle(id, ta.value.trim())
+  })
+  conteneur.appendChild(ta)
+  if (note?.note) {
+    const s = document.createElement('small')
+    s.className = 'rg-signe'
+    s.textContent = signeRegle('annotée', note.auteur, note.date)
+    conteneur.appendChild(s)
+  }
+}
+function renderRegles(): void {
+  const corps = document.getElementById('regles-corps')
+  if (!corps) return
+  corps.innerHTML = ''
+  // ---- VOS RÈGLES : les ajouts en texte libre, la partie vivante ----
+  const tete = document.createElement('div')
+  tete.className = 'rg-famille'
+  tete.innerHTML = `VOS RÈGLES <small>en texte libre — à implémenter</small>`
+  corps.appendChild(tete)
+  for (const a of [...reglesAjouts].sort((x, y) => x.date.localeCompare(y.date))) {
+    const carte = document.createElement('div')
+    carte.className = 'rg-regle rg-libre'
+    const oter = document.createElement('button')
+    oter.type = 'button'
+    oter.className = 'rg-oter'
+    oter.textContent = '✕'
+    oter.title = 'Retirer cette règle du cahier'
+    oter.disabled = !reglesJoignable
+    oter.addEventListener('click', () => void oteAjoutRegle(a.id))
+    carte.appendChild(oter)
+    const teteR = document.createElement('div')
+    teteR.className = 'rg-tete'
+    teteR.innerHTML = `<span class="rg-badge">RÈGLE À IMPLÉMENTER</span>`
+    carte.appendChild(teteR)
+    const ta = document.createElement('textarea')
+    ta.className = 'rg-note'
+    ta.value = a.texte
+    ta.dataset.initial = a.texte
+    ta.disabled = !reglesJoignable
+    ta.addEventListener('blur', () => {
+      const neuf = ta.value.trim()
+      if (neuf === (ta.dataset.initial ?? '').trim()) return
+      if (neuf) void posteAjoutRegle(neuf, a.id)
+      else renderRegles() // vider n'efface pas : le ✕ est le geste d'effacement
+    })
+    carte.appendChild(ta)
+    const s = document.createElement('small')
+    s.className = 'rg-signe'
+    s.textContent = signeRegle('consignée', a.auteur, a.date)
+    carte.appendChild(s)
+    corps.appendChild(carte)
+  }
+  const ajout = document.createElement('div')
+  ajout.className = 'rg-ajout'
+  const taNeuf = document.createElement('textarea')
+  taNeuf.className = 'rg-note'
+  taNeuf.id = 'regles-neuve'
+  taNeuf.placeholder =
+    'Écrivez une règle nouvelle pour le générateur — en français libre, comme elle vous vient. Exemple : « une salle sur trois doit se traverser sans jamais toucher une paroi ».'
+  taNeuf.disabled = !reglesJoignable
+  const consigner = document.createElement('button')
+  consigner.type = 'button'
+  consigner.className = 'rg-consigner'
+  consigner.id = 'regles-consigner'
+  consigner.textContent = 'CONSIGNER LA RÈGLE'
+  consigner.disabled = !reglesJoignable
+  consigner.addEventListener('click', () => {
+    const texte = taNeuf.value.trim()
+    if (!texte) {
+      reglesDit('La règle est vide : écrivez-la d’abord.')
+      return
+    }
+    // le champ n'est PAS vidé ici : seul le succès reconstruit l'écran —
+    // un refus (occupé, hors ligne) laisse le texte sous les yeux
+    void posteAjoutRegle(texte)
+  })
+  ajout.appendChild(taNeuf)
+  ajout.appendChild(consigner)
+  corps.appendChild(ajout)
+  // ---- Le CATALOGUE : en place (annotable) et propositions ----
+  for (const f of FAMILLES_REGLES) {
+    const t = document.createElement('div')
+    t.className = 'rg-famille'
+    t.innerHTML = `${f.nom} <small>${f.propos}</small>`
+    corps.appendChild(t)
+    for (const r of reglesDeFamille(f.id)) {
+      const carte = document.createElement('div')
+      carte.className = `rg-regle ${r.etat === 'en-place' ? 'rg-place' : 'rg-propo'}`
+      const teteR = document.createElement('div')
+      teteR.className = 'rg-tete'
+      const badge = r.etat === 'en-place' ? 'EN PLACE' : 'PROPOSITION'
+      teteR.innerHTML = `<span class="rg-titre"></span><span class="rg-badge">${badge}</span>`
+      teteR.querySelector('.rg-titre')!.textContent = r.titre
+      carte.appendChild(teteR)
+      const texte = document.createElement('p')
+      texte.className = 'rg-texte'
+      texte.textContent = r.texte
+      carte.appendChild(texte)
+      zoneNoteRegle(r.id, carte)
+      corps.appendChild(carte)
+    }
+  }
+}
+document
+  .getElementById('home-regles')
+  ?.addEventListener('click', () => void ouvreRegles())
+document.getElementById('regles-fermer')?.addEventListener('click', () => {
+  reglesEl.hidden = true
+})
+reglesEl?.addEventListener('pointerdown', (e) => {
+  if (e.target === reglesEl) reglesEl.hidden = true
+})
+
 // La fiche annonce la séquence jouée : bibliothèque partagée en tête
 // (si elle en contient), puis l'expédition livrée à la suite.
 const homeSeq = el('home-seq')
@@ -3708,6 +3975,7 @@ const COUCHES_MENU: CoucheMenu[] = [
   { id: 'codex', retour: 'codex-fermer' },
   { id: 'cmds', retour: 'cmds-fermer' },
   { id: 'planche', retour: 'planche-fermer' },
+  { id: 'regles', retour: 'regles-fermer' },
   { id: 'salles', retour: 'salles-fermer' },
   { id: 'records', retour: 'records-fermer' },
   { id: 'livraisons', retour: 'livraisons-fermer' },
