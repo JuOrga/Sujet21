@@ -22,6 +22,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 11:48',
+    title: 'PARCOURS TEST quitte la fiche',
+    notes: [
+      'Demandé : supprimer le parcours test. Le bouton ⚗ PARCOURS TEST disparaît de la rangée d’outils, et son enchaînement câblé en dur (l’école, puis les deux trilogies laser) part avec lui — la voie semi-procédurale et LA PLANCHE font ce travail-là, en mieux et sans liste figée dans le code.',
+      'Les tableaux eux-mêmes ne bougent pas d’un octet : l’école et les salles laser restent gravées dans le jeu, jouables depuis LES SALLES, LA PLANCHE et l’éditeur. Vérifié sur la vraie fiche : le bouton est absent, les douze autres outils sont en place, COMMENCER lance toujours la partie, zéro erreur de page. 390 tests verts, build propre.',
+    ],
+  },
+  {
     date: '27/08/2026 11:37',
     title: 'La VOIE SEMI-PROCÉDURALE porte son liséré : l’œil la trouve',
     notes: [

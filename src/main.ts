@@ -47,13 +47,7 @@ import { Input } from './game/input'
 import {
   MAT_EXIT,
   MAT_FROID,
-  TABLEAU_10,
-  TABLEAU_11,
-  TABLEAU_12,
-  TABLEAU_13,
   TABLEAU_1BIS,
-  TABLEAU_8,
-  TABLEAU_9,
   TABLEAUX,
   TABLEAUX_ECOLE,
   MAT_CHAUD,
@@ -986,7 +980,6 @@ document.getElementById('card-fermer')?.addEventListener('click', () => {
 // Fiche d'essai : visible au chargement ; « échap » ou ≡ pour y revenir.
 // L'essai continue de dériver derrière la fiche — elle observe, elle ne fige pas.
 const startBtn = document.getElementById('start') as HTMLButtonElement
-const startBisBtn = document.getElementById('start-bis') as HTMLButtonElement
 let hasPlayed = false
 // ---- Onboarding tactile : trois gestes, montrés une fois, au premier
 // lancement sur écran tactile. Le voile intercepte les touchers (il couvre
@@ -2900,21 +2893,6 @@ document
 ).__lireCine = (c) => lireCine(c as CinematiqueDef)
 ;(window as unknown as { __cineActif: () => boolean }).__cineActif = () =>
   lecteurCine.actif
-// Le bouton de la fiche mène aux salles laser : la trilogie 21-H → 21-J
-// (miroir, prisme, plasma), enchaînée sas après sas.
-startBisBtn.addEventListener('click', () =>
-  // l'école d'abord (surfaces, climats, zones), puis les deux trilogies laser
-  startTest([
-    ...TABLEAUX_ECOLE,
-    TABLEAU_8,
-    TABLEAU_9,
-    TABLEAU_10,
-    TABLEAU_11,
-    TABLEAU_12,
-    TABLEAU_13,
-  ]),
-)
-
 // ---- Éditeur de tableaux ----
 // Il se superpose au jeu ; « Essayer » repasse par le même chemin que le
 // prototype (testLevel), donc un tableau édité se joue avec toutes les
