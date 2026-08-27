@@ -979,7 +979,11 @@
         letter-spacing: 0.14em;
         margin-right: 8px;
       }
-      #records[hidden], #codex[hidden], #fioles[hidden] { display: none; }
+      #records[hidden], #codex[hidden], #fioles[hidden], #eveil[hidden] { display: none; }
+      #eveil { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(4, 8, 14, 0.72); }
+      #eveil .salles-boite { max-height: 86vh; overflow: auto; width: min(980px, 96vw); }
+      #eveil-corps { padding: 6px 12px 14px; }
+      .eveil-branche { margin: 14px 0 4px; font-size: 12px; letter-spacing: 0.14em; color: #8fb8d8; }
       #fioles { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(4, 8, 14, 0.72); }
       #fioles .salles-boite { max-height: 86vh; overflow: auto; width: min(980px, 96vw); }
       #fioles-corps { padding: 6px 12px 14px; }
@@ -5011,6 +5015,7 @@
         <button id="home-records" type="button"><i>✦</i><span>RECORDS</span></button>
         <button id="home-codex" type="button" title="Le manuel écrit par la partie : chaque interaction découverte débloque sa fiche"><i>◉</i><span>CODEX</span></button>
         <button id="home-fioles" type="button" title="La collection d’échantillons scellés : deux fioles s’équipent pour la run"><i>⚗&#xFE0E;</i><span>FIOLES</span></button>
+        <button id="home-eveil" type="button" title="L’arbre de conscience du Sujet : les nœuds s’achètent en mémoire, leurs effets sont permanents"><i>❉</i><span>L’ÉVEIL</span></button>
         <button id="home-livraisons" type="button" data-dev><i>◈</i><span>NOTES DE VERSION</span></button>
         <button id="home-cmds" type="button"><i>⌘</i><span>COMMANDES</span></button>
         <button id="home-params" type="button"><i>⚙&#xFE0E;</i><span>PARAMÈTRES</span></button>
@@ -5517,6 +5522,19 @@
       </div>
     </div>
 
+    <div id="eveil" hidden aria-label="L’Éveil">
+      <div class="salles-boite">
+        <div class="salles-tete"><span id="eveil-titre">L’ÉVEIL — l’arbre de conscience</span>
+          <button type="button" id="eveil-fermer" aria-label="Fermer">✕</button></div>
+        <div class="params-desc" style="padding: 8px 12px 0">
+          La MÉMOIRE survit à la purge — elle s’investit ici, pour toujours.
+          Les branches suivent les états de la matière : cliquer un nœud
+          achetable l’acquiert. Les pouvoirs d’état sont à vous d’origine ;
+          leur déblocage progressif s’activera avec la carte ISS.
+        </div>
+        <div id="eveil-corps"></div>
+      </div>
+    </div>
     <div id="fioles" hidden aria-label="Fioles">
       <div class="salles-boite">
         <div class="salles-tete"><span id="fioles-titre">LES FIOLES — la collection d’échantillons scellés</span>
