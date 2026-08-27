@@ -149,8 +149,10 @@ export interface OptionsGen {
   // le MODE FIGURE (figures.ts) : le tableau devient un GLYPHE posé dans
   // un champ immense, à la manière des tableaux faits main (crop circle,
   // tournesol, cortège des lunes) — 0 : salles à compartiments
-  // (l'historique) · 1 : figure, famille tirée de la graine · 2..7 :
-  // famille forcée (anneaux, spirale, cortège, rosace, nef, constellation)
+  // (l'historique) · 1 : figure, famille tirée de la graine · 2.. :
+  // famille forcée (index dans FIGURE_FAMILLES + 2 — anneaux, spirale,
+  // cortège, rosace, nef, constellation, conduits, fusion, échangeur,
+  // voies)
   figure: number
   // l'AMPLEUR du champ, en mode figure — 0 auto · 1 intime · 2 vaste ·
   // 3 immense

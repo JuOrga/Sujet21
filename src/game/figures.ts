@@ -20,12 +20,14 @@
 //   6. LA SYMÉTRIE TORDUE — jamais parfaite : coutures qui tournent,
 //      moitiés glissées, satellites posés au large pour la beauté seule.
 //
-// Six FAMILLES élargissent le vocabulaire au-delà des cercles :
+// Les FAMILLES élargissent le vocabulaire au-delà des cercles :
 //   anneaux · spirale · cortège (lunes ET enceintes carrées) · rosace
 //   (couronne de capsules) · nef (l'orthogonale à colonnades) ·
-//   constellation — et les mécanismes du jeu (porte asservie au miroir de
-//   glace, barrière NOR) se greffent sur la couture finale, prouvés par le
-//   même traceur que le reste du générateur.
+//   constellation · conduits (le réseau) · fusion (la matière) ·
+//   échangeur (le cycle) · voies (la tresse) — et les mécanismes du jeu
+//   (porte asservie au miroir de glace, barrière NOR) se greffent sur la
+//   couture finale, prouvés par le même traceur que le reste du
+//   générateur.
 //
 // Le module compose en ORIENTATION CANONIQUE : la promenade file vers +x.
 // Les retournements du générateur (transposition, miroir) ne savent pas
@@ -69,6 +71,7 @@ export const FIGURE_FAMILLES = [
   'conduits',
   'fusion',
   'echangeur',
+  'voies',
 ] as const
 export type FigureFamille = (typeof FIGURE_FAMILLES)[number]
 
@@ -82,6 +85,7 @@ export const FIGURE_NOMS: Record<FigureFamille, string> = {
   conduits: 'Conduits',
   fusion: 'Fusion',
   echangeur: 'Échangeur',
+  voies: 'Voies',
 }
 
 type Rng = () => number
@@ -1467,6 +1471,359 @@ function figEchangeur(cx: ContexteFamille): Squelette {
   }
 }
 
+/** voies : la leçon des « 3 voies » (BOIZ) — la cinquième philosophie,
+ * la TRESSE : trois routes parallèles entre la naissance et le sas, une
+ * par état de la matière.
+ *   · la cuve se FEUILLETTE en strates : la halle basse, le couloir
+ *     médian, la galerie haute — et un GRENIER voilé sous le plafond ;
+ *   · la chambre natale ouvre TROIS portes d'état : un bouchon-rideau
+ *     vers la halle, un tunnel-membrane vers le couloir, une grille au
+ *     plafond vers la galerie — on choisit sa voie en choisissant son
+ *     état ;
+ *   · les lignes qui séparent les strates sont des MOSAÏQUES : mur,
+ *     rideau (le plancher qui lâche), hydrophobe, surchauffeur coiffé
+ *     d'hydrophobe — la matière du sol fait la règle de chaque voie ;
+ *   · des piliers hydrophiles PENDENT de la ligne basse (on passe
+ *     dessous), une éponge-colonne boit debout contre le dernier ;
+ *   · le sas flotte au bout du couloir médian — les trois voies y
+ *     débouchent ; un couloir SECRET longe le mur est (canal 2) et le
+ *     grenier s'ouvre par une trappe sous rideau (canal 1). */
+function figVoies(cx: ContexteFamille): Squelette {
+  const { nbCercles, nbMecas, ampleurScale } = cx
+  const s = ampleurScale
+  const W = Math.round(1500 * s)
+  const H = Math.round(1000 * s)
+  const EPL = 48 // l'épaisseur des lignes-mosaïques
+  const xW = -W + 560 // la face interne de la chambre natale
+  const xE0 = xW + 200 // sa paroi est, épaisse (les bouchons d'état)
+  const yA = -H + Math.round(720 * s) // la ligne basse (le toit de la halle)
+  const yB = yA + EPL + Math.round(400 * s) // la ligne médiane
+  const yC = yB + EPL + Math.round(380 * s) // le plancher du grenier
+  const xCol = W - 420 // la colonne du couloir secret
+
+  const boxes: ObstacleBox[] = []
+  const labels: WorldLabel[] = []
+  const sponges: SpongeDef[] = []
+  const bloc = (
+    minX: number,
+    minY: number,
+    maxX: number,
+    maxY: number,
+    mat = MAT_WALL,
+    extra: Partial<ObstacleBox> = {},
+  ): void => {
+    boxes.push({
+      minX: Math.round(minX),
+      minY: Math.round(minY),
+      maxX: Math.round(maxX),
+      maxY: Math.round(maxY),
+      material: mat,
+      ...extra,
+    })
+  }
+
+  // LA CHAMBRE NATALE (du sol à la ligne médiane) : sa paroi est porte
+  // les trois bouchons d'état — rideau (bas), membrane (tunnel médian),
+  // grille (au plafond de la chambre)
+  const yRid0 = -H + 220
+  bloc(xW, -H, xE0, yRid0)
+  bloc(xW, yRid0, xE0, yRid0 + 320, MAT_RIDEAU)
+  bloc(xW, yRid0 + 320, xE0, yA + EPL)
+  bloc(xW, yA + EPL, xE0, yA + EPL + 130, MAT_MEMBRANE)
+  bloc(xW, yA + EPL + 130, xE0, yB)
+  const gx0 = -W + 90
+  bloc(-W, yB, gx0, yB + EPL)
+  bloc(gx0, yB, gx0 + 400, yB + EPL, MAT_GRILLE)
+  bloc(gx0 + 400, yB, xE0, yB + EPL)
+  let nbFiltres = 3
+  // la plaque FROIDE du mur natal (la glace des miroirs se fait ici)
+  bloc(-W, yA + 40, -W + 16, yA + 40 + Math.round(400 * s), MAT_FROID)
+  // le coin déflecteur du haut de chambre
+  bloc(xW - 190, yB - 190, xW, yB, MAT_HYDROPHOBE, { forme: 3, p0: 1 })
+
+  // LA LIGNE BASSE : la mosaïque du plancher médian — mur, rideau (le
+  // plancher qui lâche), hydrophobe, en alternance
+  const nSegA = 2 * Math.min(nbCercles, 3) + 1
+  const wSegA = (xCol - xE0) / nSegA
+  for (let i = 0; i < nSegA; i++) {
+    const x0 = xE0 + i * wSegA
+    const x1 = i === nSegA - 1 ? xCol : x0 + wSegA
+    const mat =
+      i % 2 === 1 ? (i % 4 === 1 ? MAT_RIDEAU : MAT_HYDROPHOBE) : MAT_WALL
+    bloc(x0, yA, x1, yA + EPL, mat)
+    if (mat === MAT_RIDEAU) nbFiltres++
+  }
+
+  // LES PILIERS SUSPENDUS de la halle : hydrophiles, pendus à la ligne
+  // basse — on passe DESSOUS ; l'éponge-colonne boit contre le dernier
+  const nP = nbCercles
+  const halleH = yA + H
+  let pxLast = 0
+  for (let i = 0; i < nP; i++) {
+    const px = Math.round(xE0 + ((i + 1) / (nP + 1)) * (xCol - xE0 - 300))
+    const hP = Math.round((i % 2 === 0 ? 0.52 : 0.4) * halleH)
+    bloc(px, yA - hP, px + 240, yA, MAT_HYDROPHILE)
+    pxLast = px
+  }
+  sponges.push({
+    minX: pxLast - 196,
+    minY: -H + 8,
+    cols: 8,
+    rows: 18,
+    cellSize: 24,
+    capacityPerCell: 5,
+  })
+
+  // LA LIGNE MÉDIANE : surchauffeurs coiffés d'hydrophobe aux bouts, un
+  // rideau au centre (la montée en vapeur vers la galerie)
+  const wSegB = (xCol - xE0) / 5
+  for (let i = 0; i < 5; i++) {
+    const x0 = xE0 + i * wSegB
+    const x1 = i === 4 ? xCol : x0 + wSegB
+    if (i === 0 || (i === 4 && nbCercles >= 3)) {
+      bloc(x0, yB, x1, yB + EPL - 16, MAT_SURCHAUFFEUR)
+      bloc(x0, yB + EPL - 16, x1, yB + EPL, MAT_HYDROPHOBE)
+    } else if (i === 2) {
+      bloc(x0, yB, x1, yB + EPL, MAT_RIDEAU)
+      nbFiltres++
+    } else {
+      bloc(x0, yB, x1, yB + EPL)
+    }
+  }
+  // le MASSIF de la galerie : un bloc hydrophile posé sur la ligne, on
+  // le franchit par le dessus, au ras du plafond de la galerie
+  const mx0 = xE0 + Math.round(wSegB * 0.7)
+  bloc(mx0, yB + EPL, mx0 + 480, yB + EPL + Math.round(280 * s), MAT_HYDROPHILE)
+
+  // LE PLANCHER DU GRENIER : plein, sauf la trappe (sous son rideau)
+  const hx = Math.round(xE0 + (xCol - xE0) * 0.42)
+  const GAPH = 170
+  bloc(-W, yC, hx - GAPH / 2, yC + EPL)
+  bloc(hx + GAPH / 2, yC, xCol, yC + EPL)
+  bloc(hx - GAPH / 2, yC + EPL, hx + GAPH / 2, yC + EPL + 44, MAT_RIDEAU)
+  nbFiltres++
+
+  // L'EST : le bloc qui ferme la halle, la colonne du couloir secret
+  // (une porte au niveau médian, un surchauffeur dans l'empilement)
+  const ySecret0 = yA - 300
+  const yMed0 = yA + EPL
+  bloc(xCol, -H, W, ySecret0)
+  bloc(xCol, ySecret0, xCol + EPL, yMed0)
+  const ySur0 = yB + Math.round(140 * s)
+  bloc(xCol, yMed0 + 256, xCol + EPL, ySur0)
+  bloc(xCol, ySur0, xCol + EPL, ySur0 + 220, MAT_SURCHAUFFEUR)
+  bloc(xCol, ySur0 + 220, xCol + EPL, yC + EPL)
+  sponges.push({
+    minX: xCol + EPL + 10,
+    minY: ySecret0 + 8,
+    cols: 3,
+    rows: 5,
+    cellSize: 24,
+    capacityPerCell: 5,
+  })
+
+  // LE PLAFOND : la mosaïque fine (hydrophobe / mur) — la vapeur ne se
+  // dépose pas partout pareil
+  const wSegT = (2 * W) / 3
+  for (let i = 0; i < 3; i++) {
+    bloc(
+      -W + i * wSegT,
+      H - 16,
+      i === 2 ? W : -W + (i + 1) * wSegT,
+      H,
+      i % 2 ? MAT_WALL : MAT_HYDROPHOBE,
+    )
+  }
+  // l'ornement du grenier : un point posé pour la beauté seule
+  const xG = xCol - 320
+  boxes.push(
+    ornementPoint(
+      { x: Math.round((-W + xG) / 2), y: Math.round((yC + EPL + H - 16) / 2) },
+      40,
+    ),
+  )
+
+  // LE SAS : il flotte au bout du couloir médian — les trois voies y
+  // débouchent (le couloir de face, la halle par-dessous, la galerie
+  // par le couloir secret)
+  const yMedMid = yA + EPL + Math.round(200 * s)
+  const exit = {
+    minX: xCol - 320,
+    minY: yMedMid - 98,
+    maxX: xCol - 180,
+    maxY: yMedMid + 98,
+  }
+  labels.push({ x: xCol - 250, y: yMedMid + 180, text: 'SAS', tone: 'sas' })
+
+  // les CACHETTES : le grenier entier, et le couloir secret de l'est
+  const caches: CacheDef[] = [
+    { minX: -W + 12, minY: yC + 6, maxX: xCol + EPL, maxY: H - 6 },
+    { minX: xCol + 6, minY: ySecret0 - 6, maxX: W - 4, maxY: yC + EPL },
+  ]
+  // les éponges d'angle de la chambre natale
+  sponges.push({
+    minX: -W + 8,
+    minY: -H + 8,
+    cols: 2,
+    rows: 2,
+    cellSize: 24,
+    capacityPerCell: 5,
+  })
+
+  // LES MÉCANISMES : la famille câble ses canaux elle-même — canal 2
+  // (le couloir secret : la porte de la colonne + la cloison du grenier),
+  // canal 1 (la trappe du grenier). Sans mécanisme : des plaques d'état.
+  const greffes: Greffe[] = []
+  const porteCol: PorteDef = {
+    minX: xCol,
+    minY: yMed0,
+    maxX: xCol + EPL,
+    maxY: yMed0 + 256,
+    canal: 2,
+  }
+  const porteGren: PorteDef = {
+    minX: xG,
+    minY: yC + EPL,
+    maxX: xG + 32,
+    maxY: H - 16,
+    canal: 2,
+  }
+  const porteHatch: PorteDef = {
+    minX: hx - GAPH / 2,
+    minY: yC,
+    maxX: hx + GAPH / 2,
+    maxY: yC + EPL,
+    canal: 1,
+  }
+  let iEtat = 1
+  const nE = { nx: Math.SQRT1_2, ny: Math.SQRT1_2 } // le renvoi vers l'est
+  if (nbMecas > 0) {
+    // le miroir de la halle : le fil tombe de la ligne basse, la glace
+    // le renvoie vers l'est — le couloir secret s'ouvre
+    const mxH = Math.round(xE0 + wSegA * 0.5)
+    const ysH = -H + Math.round(220 * s)
+    const emH: LaserDef = { x: mxH, y: yA - 24, angle: -90 }
+    greffes.push({
+      lasers: [emH],
+      cibles: [
+        { x: mxH + nE.nx * 8 + 250, y: ysH + 44 + nE.ny * 8, r: 26, canal: 2 },
+      ],
+      portes: [porteCol, porteGren],
+      labels: [
+        {
+          x: mxH,
+          y: ysH - 74,
+          text: 'MIROIR DE GLACE',
+          tone: 'froid',
+          rang: 'detail',
+        },
+        {
+          x: mxH + 160,
+          y: ysH + 150,
+          text: 'OUVRE LE COULOIR SECRET',
+          tone: 'grille',
+          rang: 'detail',
+        },
+      ],
+      preuves: [
+        {
+          kind: 'miroir',
+          canal: 2,
+          emetteur: emH,
+          spot: { x: mxH, y: ysH },
+          normale: nE,
+          cibleIndex: -1,
+        },
+      ],
+    })
+  } else {
+    bloc(
+      porteCol.minX,
+      porteCol.minY,
+      porteCol.maxX,
+      porteCol.maxY,
+      cx.etats[iEtat++],
+    )
+    bloc(xG, yC + EPL, xG + 32, H - 16, cx.etats[iEtat++])
+    nbFiltres += 2
+  }
+  if (nbMecas >= 2) {
+    // le miroir de la galerie : même fil, sous le plancher du grenier —
+    // la trappe s'ouvre
+    const mxC = Math.round(xE0 + (xCol - xE0) * 0.68)
+    const ysC = yB + EPL + Math.round(160 * s)
+    const emC: LaserDef = { x: mxC, y: yC - 24, angle: -90 }
+    greffes.push({
+      lasers: [emC],
+      cibles: [
+        { x: mxC + nE.nx * 8 + 220, y: ysC + 44 + nE.ny * 8, r: 26, canal: 1 },
+      ],
+      portes: [porteHatch],
+      labels: [
+        {
+          x: mxC,
+          y: ysC - 74,
+          text: 'MIROIR DE GLACE',
+          tone: 'froid',
+          rang: 'detail',
+        },
+        {
+          x: mxC + 150,
+          y: ysC + 150,
+          text: 'OUVRE LA TRAPPE',
+          tone: 'sas',
+          rang: 'detail',
+        },
+      ],
+      preuves: [
+        {
+          kind: 'miroir',
+          canal: 1,
+          emetteur: emC,
+          spot: { x: mxC, y: ysC },
+          normale: nE,
+          cibleIndex: -1,
+        },
+      ],
+    })
+  } else {
+    bloc(
+      porteHatch.minX,
+      porteHatch.minY,
+      porteHatch.maxX,
+      porteHatch.maxY,
+      cx.etats[iEtat++],
+    )
+    nbFiltres++
+  }
+
+  return {
+    boxes,
+    labels,
+    spawn: { x: -W + 280, y: -H + 320 },
+    exit,
+    coutureFinale: null, // la tresse câble ses canaux elle-même
+    poche: null,
+    plafond: H,
+    sol: -H,
+    nbPortesEtat: nbFiltres,
+    bounds: { minX: -W, minY: -H, maxX: W, maxY: H },
+    caches,
+    sponges,
+    greffes,
+    journalNote:
+      'Trois voies tressées entre le sol et le plafond — la halle, le couloir, la galerie — chacune franchie dans son état ; le grenier et le couloir est restent voilés. Aucune lampe : la lumière de base départage les routes. ',
+    noms: [
+      'Les trois voies',
+      'La tresse',
+      'L’aiguillage',
+      'Les strates',
+      'Le triage',
+      'La croisée',
+    ],
+  }
+}
+
 // ---- Les MÉCANISMES greffés sur la couture finale ------------------------
 
 interface Greffe {
@@ -1675,7 +2032,9 @@ export function essaieFigure(
                   ? figConduits(cx)
                   : famille === 'fusion'
                     ? figFusion(cx)
-                    : figEchangeur(cx)
+                    : famille === 'echangeur'
+                      ? figEchangeur(cx)
+                      : figVoies(cx)
 
   const lasers: LaserDef[] = []
   const cibles: CibleDef[] = []

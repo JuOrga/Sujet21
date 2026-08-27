@@ -38,6 +38,15 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
+    date: '27/08/2026 09:45',
+    title: 'Le générateur apprend les VOIES : la tresse des « 3 voies »',
+    notes: [
+      'Cinquième leçon de l’entraînement : « Les 3 voies » (BOIZ) récupéré et étudié pièce à pièce — 55 boîtes, 4 éponges, 2 lasers, 3 portes, 2 voiles — et c’est une CINQUIÈME philosophie : la TRESSE. La cuve se feuillette en strates : une halle basse, un couloir médian, une galerie haute — trois routes parallèles entre la naissance et le sas, et l’on choisit sa voie en choisissant son ÉTAT. La chambre natale ouvre trois portes de matière : un bouchon-rideau vers la halle, un tunnel-membrane vers le couloir, une grille au plafond vers la galerie. Les planchers eux-mêmes sont des MOSAÏQUES : mur, rideau (le plancher qui lâche sous le mauvais état), hydrophobe, surchauffeur coiffé d’hydrophobe — la matière du sol fait la règle de chaque voie.',
+      'Tout est gravé dans une DIXIÈME FAMILLE du mode figure : VOIES. Les piliers hydrophiles PENDUS à la ligne basse (on passe dessous), l’éponge-colonne debout contre le dernier, la plaque froide du mur natal (la glace des miroirs se fait là), le sas qui FLOTTE au bout du couloir médian — les trois voies y débouchent. Et les secrets de BOIZ : un GRENIER voilé sous le plafond (sa trappe sous rideau s’ouvre au canal 1), un COULOIR SECRET qui longe le mur est (canal 2 : la porte de la colonne et la cloison du grenier) — deux miroirs de glace les commandent, prouvés par le traceur comme le reste. Sans mécanisme, des plaques d’état prennent la relève. Aucune lampe : la lumière de base départage les routes, comme dans l’original.',
+      'Vérifié dans le jeu construit : une tresse générée au panneau (G-5Y3YRD~…, « La tresse »), jouée en essai — les piliers suspendus veillent sur la halle, les surchauffeurs soulignent les lignes, le sas s’annonce en vert au bout du couloir, les deux voiles gardent leurs secrets. 850 tirages balayés sans un échec sur les DIX familles, 391 tests verts. Cinq philosophies apprises : le glyphe, le réseau, la matière, le cycle, la tresse.',
+    ],
+  },
+  {
     date: '27/08/2026 08:55',
     title:
       'Le générateur apprend l’ÉCHANGEUR : le circuit thermique d’echangette',
