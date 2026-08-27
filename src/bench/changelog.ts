@@ -22,7 +22,7 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
-    date: '27/08/2026 22:05',
+    date: '27/08/2026 22:15',
     title: 'Le choix de la voie passe à TROIS salles générées',
     notes: [
       'Demandé dans la foulée : trois niveaux proposés au lieu de deux. Chaque récompense de la voie tire désormais TROIS salles générées, trois MÉCANIQUES DIFFÉRENTES (sur les quatre du jeu) — la première évite toujours celle de la salle qu’on vient de jouer et celle de la suite écrite, pour que le choix parle. La suite écrite, quand la séquence en offre une, devient la QUATRIÈME carte.',
