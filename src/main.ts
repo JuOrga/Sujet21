@@ -2531,12 +2531,14 @@ function openHome(): void {
 startBtn.addEventListener('click', () => {
   modeVoie = false // LANCER : la descente ordinaire
   closeHome()
+  majVoieHud() // le fil de la voie s'efface : on reprend la descente ordinaire
 })
 // LA VOIE SEMI-PROCÉDURALE : la même descente, mais à chaque récompense la
 // suite écrite est mise en face d'une salle générée — au joueur de choisir
 document.getElementById('home-voie')?.addEventListener('click', () => {
   modeVoie = true
   closeHome()
+  majVoieHud() // le rail apparaît tout de suite, même en reprenant une run
 })
 
 // ---- L'EXPÉDITION SE SOUVIENT : la progression (salle atteinte, réserve,
