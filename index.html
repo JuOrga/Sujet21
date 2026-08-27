@@ -4862,6 +4862,11 @@
       /* Le CHOIX DE SALLE (pool « 21XX-MMD ») : deux propositions,
          mini-carte en tête, code + nom + chips dessous */
       .mb-cartes:has(.mb-salle) { grid-template-columns: 1fr 1fr; }
+      /* le TRIO de la voie : suite écrite + DEUX générées, côte à côte */
+      .mb-cartes.mb-trio { grid-template-columns: 1fr 1fr 1fr; }
+      @media (max-width: 900px) {
+        .mb-cartes.mb-trio { grid-template-columns: 1fr 1fr; }
+      }
       .mb-carte.mb-salle { min-height: 0; padding-top: 8px; }
       /* la VOIE SEMI-PROCÉDURALE : l'étiquette qui distingue la suite
          écrite de la salle générée sur les cartes du choix */
@@ -4993,7 +4998,7 @@
       <button id="start-abandon" type="button" hidden>ABANDONNER LA RUN — RETOUR AU LABO</button>
       <div class="home-duo" role="group" aria-label="Outils du protocole">
         <button id="start-editor" type="button" data-dev title="Créer ou modifier un tableau"><i>✎</i><span>ÉDITEUR</span></button>
-        <button id="home-voie" type="button" data-dev title="La descente SEMI-PROCÉDURALE, jouable de bout en bout : à chaque récompense, la suite écrite est mise en face d'une salle GÉNÉRÉE (prouvée) — séquence épuisée, deux générées prennent la relève jusqu'au bout du plan. Longueur, difficulté max et « descente du jour » se règlent dans RÈGLES DE GÉN. (bouton PARAMÈTRES DU CYCLE)."><i>⑂</i><span>VOIE SEMI-PROC.</span></button>
+        <button id="home-voie" type="button" data-dev title="La descente SEMI-PROCÉDURALE, jouable de bout en bout : chaque récompense propose DEUX salles générées (prouvées, deux mécaniques) — la suite écrite s'ajoute en troisième carte quand la séquence en offre une. Les élues tombent au BUTIN (écran Salles) : rejouables et publiables d'un geste. Longueur, difficulté max et « descente du jour » se règlent dans RÈGLES DE GÉN. (bouton PARAMÈTRES DU CYCLE)."><i>⑂</i><span>VOIE SEMI-PROC.</span></button>
         <button id="home-regles" type="button" data-dev title="Le cahier des règles de la génération procédurale : ce que le générateur fait (annotable), ce qu'un level designer en attend (propositions), et vos règles nouvelles en texte libre — partagé entre concepteurs, relu au moment d'implémenter"><i>§</i><span>RÈGLES DE GÉN.</span></button>
         <button id="open-montage" type="button" data-dev title="La table de montage des cinématiques : planches, effets, sons — et lecture immédiate"><i>▤</i><span>MONTAGE</span></button>
         <button id="home-salles" type="button" data-dev><i>▦</i><span>SALLES</span></button>

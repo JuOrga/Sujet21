@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 17:20',
+    title: 'Le choix de la voie porte toujours DEUX salles générées',
+    notes: [
+      'Demandé : qu’à chaque récompense de la voie il y ait toujours au moins une, voire deux, salles générées proposées. C’est fait, et c’est la version haute : le choix porte TOUJOURS DEUX salles générées (deux mécaniques différentes, chacune prouvée traversable) — la suite écrite, quand la séquence en offre une, s’ajoute en TROISIÈME carte. La voie est procédurale d’abord ; l’écrite est une option, plus l’inverse.',
+      'Un FILET garantit la promesse : si un tirage échoue sur une graine ingrate, les mécaniques restantes sont balayées jusqu’à tenir les deux cartes générées. Et le trio s’affiche en trois colonnes (deux sur écran étroit) — les jauges restent en scène au-dessus.',
+      'Rappel du geste quand une salle générée PLAÎT : l’élire au choix suffit — elle tombe automatiquement au BUTIN DE LA VOIE (écran SALLES, registres), d’où elle se REJOUE d’un clic et se PUBLIE d’un geste (⇪) dans la bibliothèque partagée, où elle devient un tableau comme les autres : planche, éditeur, séquence. Son code G-… se retape aussi n’importe où. L’infobulle du bouton VOIE SEMI-PROC. le dit désormais.',
+    ],
+  },
+  {
     date: '27/08/2026 16:31',
     title:
       'Le générateur applique le cahier : treize règles passent EN PLACE',

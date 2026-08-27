@@ -6255,6 +6255,9 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
     }
     return null
   }
+  // Le choix porte TOUJOURS DEUX salles générées, deux mécaniques — la
+  // suite écrite (si la séquence en offre une) s'y ajoute en troisième
+  // carte : la voie reste procédurale d'abord, l'écrite est une option.
   const cartes: CarteVoie[] = []
   if (ecrite)
     cartes.push({
@@ -6271,15 +6274,30 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
       generee: true,
       etiquette: 'SALLE GÉNÉRÉE — INÉDITE, PROUVÉE',
     })
-  if (!ecrite) {
-    const g2 = genere(mecaB, 2)
-    if (g2)
-      cartes.push({
-        lv: g2.lv,
-        cahier: g2.cahier,
-        generee: true,
-        etiquette: 'SALLE GÉNÉRÉE — L’AUTRE MÉCANIQUE',
-      })
+  const g2 = genere(mecaB, 2)
+  if (g2)
+    cartes.push({
+      lv: g2.lv,
+      cahier: g2.cahier,
+      generee: true,
+      etiquette: 'SALLE GÉNÉRÉE — L’AUTRE MÉCANIQUE',
+    })
+  // le FILET : si un tirage a échoué (graine ingrate), on balaie les
+  // mécaniques restantes jusqu'à tenir la garantie — au moins UNE générée,
+  // et deux tant que le générateur en donne
+  if (cartes.filter((c) => c.generee).length < 2) {
+    for (const mec of [0, 1, 2, 3] as const) {
+      if (cartes.filter((c) => c.generee).length >= 2) break
+      if (cartes.some((c) => c.generee && c.cahier?.mecanique === mec)) continue
+      const gx = genere(mec, 4 + mec)
+      if (gx)
+        cartes.push({
+          lv: gx.lv,
+          cahier: gx.cahier,
+          generee: true,
+          etiquette: 'SALLE GÉNÉRÉE — INÉDITE, PROUVÉE',
+        })
+    }
   }
   // il faut au moins une porte pour continuer la descente ; une seule carte
   // reste un choix jouable (la séquence épuisée sur une graine ingrate)
@@ -6309,6 +6327,7 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
   mbPeintEtal(run.xp)
   const host = mbEl('mb-cartes')
   host.innerHTML = ''
+  host.classList.toggle('mb-trio', cartes.length >= 3)
   const jauges = document.createElement('div')
   jauges.className = 'mb-jauges'
   jauges.innerHTML = `<span>🫙 réserve <b>${run.bonbonneLiters.toFixed(2)} / ${BONBONNE_CAP} L</b></span><span>💠 ×${run.vies} · profondeur ${voieRang} / ${voiePlan.longueur}</span>`
@@ -6405,6 +6424,7 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
   mbDraftsRestants = 0
   mbBilanCourant = b
   mbVeil.hidden = false
+  mbEl('mb-cartes').classList.remove('mb-trio') // la disposition du choix repart à neuf
   // état de départ
   mbEl('mb-eau').style.height = '0%'
   mbEl('mb-l').textContent = '0,00 L'
