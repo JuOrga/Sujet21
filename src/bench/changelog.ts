@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 15:05',
+    title: 'L’Éveil au pupitre, et le méta se pose à la main dans l’éditeur',
+    notes: [
+      'Demandé : l’arbre de l’Éveil accessible depuis l’écran PUPITRE, et de quoi POSER les monnaies et items du méta dans l’éditeur. Le pupitre d’essais gagne son bouton « L’arbre de l’Éveil » : l’arbre s’ouvre PAR-DESSUS le pupitre (on achète, on referme, le pupitre est toujours là) — à côté des boutons qui créditent condensat, mémoire et fiole surprise pour tester.',
+      'L’ÉDITEUR gagne deux outils dans la palette des mécanismes. La PASTILLE DE CONDENSAT : un clic la pose, sa valeur en centilitres se règle au panneau (1..200), elle se déplace, se duplique, se supprime comme une cible — et dès la PREMIÈRE pastille posée main, le semis automatique du tableau se coupe : c’est le concepteur qui décide. L’EMPLACEMENT DE FIOLE : un seul par tableau (reposer le déplace) — en jeu, la fiole n’y apparaît que si la collection du joueur est incomplète ; sans emplacement posé, le semis automatique garde la main (la cachette la plus profonde, une chance sur deux). Les deux se dessinent dans l’éditeur au langage visuel du jeu (goutte cyan chiffrée, double anneau violet étiqueté FIOLE).',
+      'Le format des tableaux porte le champ « fiole » (aller-retour JSON testé, bornes comprises — les fichiers sans ces champs ne changent pas d’un octet). Vérifié dans le vrai éditeur au pointeur : deux pastilles et une fiole posées, lues dans le niveau ; et l’arbre ouvert depuis le pupitre, achats en direct. 426 tests verts.',
+    ],
+  },
+  {
     date: '27/08/2026 14:10',
     title: 'L’ARBRE DE L’ÉVEIL : la conscience s’achète en mémoire',
     notes: [

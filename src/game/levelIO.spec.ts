@@ -774,6 +774,32 @@ describe('levelIO — les décalques de LA SERRE', () => {
     expect(relu.level!.decals).toEqual(level!.decals)
   })
 
+  it('les pastilles de condensat et la fiole posées main font l’aller-retour', () => {
+    const { level, rejets } = parseLevel({
+      ...base,
+      condensats: [
+        { x: 100, y: -200, cl: 12 },
+        { x: 500, y: 300, cl: 999 }, // borné à 200
+        { x: 800, y: 0 }, // valeur par défaut : 8 cL
+      ],
+      fiole: { x: -400, y: 250 },
+    })
+    expect(rejets).toEqual([])
+    expect(level!.condensats).toEqual([
+      { x: 100, y: -200, cl: 12 },
+      { x: 500, y: 300, cl: 200 },
+      { x: 800, y: 0, cl: 8 },
+    ])
+    expect(level!.fiole).toEqual({ x: -400, y: 250 })
+    const relu = parseLevel(JSON.parse(serializeLevel(level!)))
+    expect(relu.level!.condensats).toEqual(level!.condensats)
+    expect(relu.level!.fiole).toEqual(level!.fiole)
+    // absents, les champs n'encombrent pas le fichier
+    const nu = parseLevel({ ...base })
+    expect(JSON.parse(serializeLevel(nu.level!)).condensats).toBeUndefined()
+    expect(JSON.parse(serializeLevel(nu.level!)).fiole).toBeUndefined()
+  })
+
   it('écarte toujours une sorte inconnue — la liste reste fermée', () => {
     const { level, rejets } = parseLevel({
       ...base,

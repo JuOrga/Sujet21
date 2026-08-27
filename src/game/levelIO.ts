@@ -582,6 +582,12 @@ export function parseLevel(input: unknown): {
   }
   if (condensats.length > 0) level.condensats = condensats
 
+  // L'emplacement de fiole posé main (un seul par tableau)
+  if (o.fiole && typeof o.fiole === 'object') {
+    const f = o.fiole as Record<string, unknown>
+    level.fiole = { x: num(f.x, 0), y: num(f.y, 0) }
+  }
+
   // Rails magnétiques : des polylignes d'au moins 2 points
   const rails: RailDef[] = []
   for (const raw of Array.isArray(o.rails) ? o.rails : []) {
@@ -675,6 +681,7 @@ export function serializeLevel(level: LevelDef): string {
   if (level.caches && level.caches.length > 0) out.caches = level.caches
   if (level.condensats && level.condensats.length > 0)
     out.condensats = level.condensats
+  if (level.fiole) out.fiole = level.fiole
   if (level.lumieres && level.lumieres.length > 0) out.lumieres = level.lumieres
   if (level.decals && level.decals.length > 0) out.decals = level.decals
   if (level.figure) out.figure = level.figure
