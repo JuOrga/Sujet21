@@ -22,6 +22,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 12:49',
+    title:
+      'LE FIL DE LA VOIE : le rail de descente, la carte d’entrée, le butin de fin',
+    notes: [
+      'Demandé : un repère visuel de progression « très satisfaisant » dans l’arène, l’identité complète de la salle (nom, code, difficulté, stade), et toutes les récompenses à leur place sur la voie. C’est fait. En descente, un RAIL À CRANS vit sur le flanc droit de l’écran : un cran par salle du plan, les crans franchis pleins (bleu spécimen), le cran courant qui PULSE menthe, les tiers du plan (début · milieu · fin) marqués d’une couture, et la profondeur record du poste étoilée ✦ sur son cran. Au-dessus, le rang (« 4 / 12 ») ; en dessous, le stade et la difficulté (« MILIEU · DIFF 2 »).',
+      'À CHAQUE ENTRÉE DE SALLE, la carte d’identité passe en fondu au-dessus du jeu, sans rien bloquer : rang dans le plan, nom complet, code, et les pastilles moment · mécanique · difficulté — plus la mention SALLE GÉNÉRÉE ou DESCENTE DU JOUR quand elles s’appliquent. Elle s’efface seule en quatre secondes (et respecte le réglage « animations réduites »).',
+      'Les RÉCOMPENSES de la voie se complètent : l’écran du choix garde désormais les jauges en scène — l’étalonnage en grand, la réserve, les échantillons de secours, la profondeur — comme la fin ordinaire ; franchir un tiers du plan s’annonce dans le titre (« LE MILIEU S’OUVRE », « LA FIN S’OUVRE ») ; et « LA VOIE EST BOUCLÉE » liste enfin le BUTIN de la descente : les instruments emportés (leurs glyphes), le palier d’étalonnage atteint, les centilitres de condensat versés à la réserve.',
+      'Les PARAMÈTRES DU CYCLE quittent le banc : ils vivent désormais dans l’écran LE CAHIER DES RÈGLES, derrière le bouton « ⚙ PARAMÈTRES DU CYCLE » — longueur de la descente, difficulté maximale, descente du jour, en gros boutons − / + faits pour le doigt et la manette, enregistrés aussitôt. Le banc règle la simulation ; le cahier règle le cycle de vie d’une partie. Vérifié en navigateur : rail et carte en descente, jauges sur le choix, panneau du cycle qui enregistre. 395 tests verts.',
+    ],
+  },
+  {
     date: '27/08/2026 11:56',
     title:
       'LE CAHIER DES RÈGLES : la génération procédurale, noir sur blanc',

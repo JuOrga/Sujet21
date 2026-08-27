@@ -54,12 +54,6 @@ export interface BenchActions {
     defauts: Record<string, number>
     sauve(): void
   }
-  // LA VOIE SEMI-PROCÉDURALE : le plan de descente — longueur, plafond de
-  // difficulté, descente du jour. Hors présets : mémorisé par appareil.
-  voie?: {
-    plan: { longueur: number; diffMax: number; graineDuJour: boolean }
-    sauve(): void
-  }
 }
 
 export interface BenchMonitor {
@@ -797,23 +791,9 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     })
   }
 
-  // ---- LA VOIE SEMI-PROCÉDURALE : le plan de descente ----
-  if (actions.voie) {
-    const { plan, sauve } = actions.voie
-    const fVoie = pane.addFolder({ title: 'La voie (plan de descente)', expanded: false })
-    describe(
-      fVoie.addBinding(plan, 'longueur', { min: 3, max: 40, step: 1, label: 'longueur' }),
-      'Le nombre de salles d’une descente complète : la voie se BOUCLE au bout, salles générées à la relève quand la séquence écrite s’épuise. Prend effet à la prochaine descente.',
-    ).on('change', sauve)
-    describe(
-      fVoie.addBinding(plan, 'diffMax', { min: 0, max: 9, step: 1, label: 'difficulté max' }),
-      'La difficulté atteinte en FIN de descente : la rampe monte de 0 au départ jusqu’à ce plafond, linéairement, pour les salles générées.',
-    ).on('change', sauve)
-    describe(
-      fVoie.addBinding(plan, 'graineDuJour', { label: 'descente du jour' }),
-      'Les salles générées viennent de la DATE : les mêmes pour tous les postes ce jour-là — les palmarès se comparent.',
-    ).on('change', sauve)
-  }
+  // Le PLAN DE LA VOIE ne se règle plus ici : ses paramètres vivent dans
+  // l'écran LE CAHIER DES RÈGLES (bouton PARAMÈTRES DU CYCLE) — le banc
+  // règle la simulation, pas le cycle de vie d'une partie.
 
   const fMon = pane.addFolder({ title: 'Mesures', expanded: true })
   describe(
