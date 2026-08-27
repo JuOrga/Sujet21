@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 13:10',
+    title: 'L’ÉCONOMAT : la salle du Semblable, le Charon de l’espace',
+    notes: [
+      'Deuxième pierre du méta-jeu : une salle-boutique S’INTERCALE une fois par run, à mi-descente — l’ANNEXE NON CARTOGRAPHIÉE. Derrière une grille, un AUTRE : le SUJET 12, un Semblable, une masse en capsule qui ne parle pas mais ÉCHANGE. Il prend le condensat — cette matière que le laboratoire confisquerait de toute façon à la purge — et pousse des choses à travers les barreaux. La salle compte comme un arrêt normal de la descente, mais son sas est un PASSAGE : rien ne s’y consigne, pas de cérémonie — on reprend la route, la bourse en poche.',
+      'L’ÉTAL : cinq alcôves le long du mur sud, l’achat au CONTACT — le corps s’y glisse, le prix se débite, le toast annonce. FIOLE DE GOUTTES (60 cL : +0,8 L à la bonbonne), RECHARGE DES DASHS (50 cL), CLEF DE CACHETTE (90 cL : les voiles du prochain tableau tombent d’emblée), ÉCHANTILLON DE SECOURS (150 cL : +1 vie), et le SAC SURPRISE (40 cL : le Semblable ne dit pas ce qu’il y a dedans — parfois du condensat, parfois un souvenir… parfois rien, et il vous fixe). Chaque article se sert une fois par visite ; condensat insuffisant, le refus s’affiche sans débiter.',
+      'La mécanique d’intercalation respecte tout le reste : le choix de salle fait à la cérémonie attend sagement la sortie de l’annexe, la voie semi-procédurale garde son plan (l’Économat s’y glisse à mi-parcours aussi), la sauvegarde de run retient la visite, et ni pastilles ni records n’existent chez le Semblable. Vérifié dans le jeu construit (crochet d’atelier __economat) : la grille, la masse cyan du Sujet 12, les cinq pancartes de l’étal, le sas de reprise. 418 tests verts.',
+    ],
+  },
+  {
     date: '27/08/2026 12:40',
     title: 'Les deux monnaies : le CONDENSAT de run et la MÉMOIRE de l’Éveil',
     notes: [
