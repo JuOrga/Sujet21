@@ -163,6 +163,10 @@ type Tool =
   | { kind: 'laser' }
   | { kind: 'cible' }
   | { kind: 'porte' }
+  // Le MÉTA : la pastille de condensat (la monnaie de run, bue au contact)
+  // et l'emplacement de FIOLE (un seul par tableau)
+  | { kind: 'condensat' }
+  | { kind: 'fiole' }
   | { kind: 'rail' }
   | { kind: 'lumiere' }
   | { kind: 'bande' }
@@ -178,6 +182,8 @@ type Sel =
   | { kind: 'laser'; index: number }
   | { kind: 'cible'; index: number }
   | { kind: 'porte'; index: number }
+  | { kind: 'condensat'; index: number }
+  | { kind: 'fiole' }
   | { kind: 'rail'; index: number }
   | { kind: 'lumiere'; index: number }
   | { kind: 'decal'; index: number }
@@ -728,6 +734,18 @@ export class LevelEditor {
         ? { minX: t.x - t.r, minY: t.y - t.r, maxX: t.x + t.r, maxY: t.y + t.r }
         : null
     }
+    if (s.kind === 'condensat') {
+      const c = (this.level.condensats ?? [])[s.index]
+      return c
+        ? { minX: c.x - 26, minY: c.y - 26, maxX: c.x + 26, maxY: c.y + 26 }
+        : null
+    }
+    if (s.kind === 'fiole') {
+      const f = this.level.fiole
+      return f
+        ? { minX: f.x - 30, minY: f.y - 30, maxX: f.x + 30, maxY: f.y + 30 }
+        : null
+    }
     if (s.kind === 'label') {
       const l = this.level.labels[s.index]
       return l ? { minX: l.x, minY: l.y, maxX: l.x, maxY: l.y } : null
@@ -778,6 +796,17 @@ export class LevelEditor {
       if (t) {
         t.x += dx
         t.y += dy
+      }
+    } else if (s.kind === 'condensat') {
+      const c = (this.level.condensats ?? [])[s.index]
+      if (c) {
+        c.x += dx
+        c.y += dy
+      }
+    } else if (s.kind === 'fiole') {
+      if (this.level.fiole) {
+        this.level.fiole.x += dx
+        this.level.fiole.y += dy
       }
     } else if (s.kind === 'label') {
       const l = this.level.labels[s.index]
@@ -962,6 +991,22 @@ export class LevelEditor {
       if (Math.hypot(cibles[i].x - x, cibles[i].y - y) < cibles[i].r + 8) {
         return { kind: 'cible', index: i }
       }
+    }
+    const condensats = this.level.condensats ?? []
+    for (let i = condensats.length - 1; i >= 0; i--) {
+      if (
+        Math.hypot(condensats[i].x - x, condensats[i].y - y) <
+        Math.max(26, 28 / this.zoom)
+      ) {
+        return { kind: 'condensat', index: i }
+      }
+    }
+    if (
+      this.level.fiole &&
+      Math.hypot(this.level.fiole.x - x, this.level.fiole.y - y) <
+        Math.max(28, 30 / this.zoom)
+    ) {
+      return { kind: 'fiole' }
     }
     const portes = this.level.portes ?? []
     for (let i = portes.length - 1; i >= 0; i--) {
@@ -1855,6 +1900,22 @@ export class LevelEditor {
               oy: w.y - t.y,
               start: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
             }
+          } else if (hit.kind === 'condensat') {
+            const c = (this.level.condensats ?? [])[hit.index]
+            this.drag = {
+              mode: 'move',
+              ox: w.x - c.x,
+              oy: w.y - c.y,
+              start: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+            }
+          } else if (hit.kind === 'fiole') {
+            const f = this.level.fiole!
+            this.drag = {
+              mode: 'move',
+              ox: w.x - f.x,
+              oy: w.y - f.y,
+              start: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+            }
           } else if (hit.kind === 'rail') {
             const r = (this.level.rails ?? [])[hit.index]
             this.drag = {
@@ -2081,6 +2142,32 @@ export class LevelEditor {
         this.sel = { kind: 'cible', index: this.level.cibles.length - 1 }
         this.setTool({ kind: 'select' })
         this.commit('Cible posée — un faisceau qui la touche l’allume.')
+        return
+      }
+      if (this.tool.kind === 'condensat') {
+        if (!this.level.condensats) this.level.condensats = []
+        this.level.condensats.push({
+          x: this.snapped(w.x),
+          y: this.snapped(w.y),
+          cl: 8,
+        })
+        this.sel = {
+          kind: 'condensat',
+          index: this.level.condensats.length - 1,
+        }
+        this.setTool({ kind: 'select' })
+        this.commit(
+          'Pastille de condensat posée — sa valeur (cL) se règle à droite. Dès la PREMIÈRE pastille posée main, le semis automatique du tableau se coupe : c’est vous qui décidez.',
+        )
+        return
+      }
+      if (this.tool.kind === 'fiole') {
+        this.level.fiole = { x: this.snapped(w.x), y: this.snapped(w.y) }
+        this.sel = { kind: 'fiole' }
+        this.setTool({ kind: 'select' })
+        this.commit(
+          'Emplacement de FIOLE posé (un seul par tableau — reposer le déplace). En jeu, la fiole n’apparaît que si la collection du joueur est incomplète.',
+        )
         return
       }
       if (this.tool.kind === 'lumiere' || this.tool.kind === 'bande') {
@@ -2348,6 +2435,14 @@ export class LevelEditor {
           const t = (this.level.cibles ?? [])[this.sel.index]
           t.x = this.snapped(w.x - d.ox)
           t.y = this.snapped(w.y - d.oy)
+        } else if (this.sel?.kind === 'condensat') {
+          const c = (this.level.condensats ?? [])[this.sel.index]
+          c.x = this.snapped(w.x - d.ox)
+          c.y = this.snapped(w.y - d.oy)
+        } else if (this.sel?.kind === 'fiole') {
+          const f = this.level.fiole!
+          f.x = this.snapped(w.x - d.ox)
+          f.y = this.snapped(w.y - d.oy)
         } else if (this.sel?.kind === 'spawn') {
           this.level.spawn.x = this.snapped(w.x - d.ox)
           this.level.spawn.y = this.snapped(w.y - d.oy)
@@ -2850,6 +2945,9 @@ export class LevelEditor {
       (this.level.lumieres ?? []).splice(s.index, 1)
     else if (s.kind === 'porte') (this.level.portes ?? []).splice(s.index, 1)
     else if (s.kind === 'rail') (this.level.rails ?? []).splice(s.index, 1)
+    else if (s.kind === 'condensat')
+      (this.level.condensats ?? []).splice(s.index, 1)
+    else if (s.kind === 'fiole') delete this.level.fiole
     else if (s.kind === 'cible') {
       // les numéros sont LOGIQUES : avant de retirer la pastille, chaque
       // survivante fige le sien — rien ne se renumérote, les portes tiennent
@@ -2914,6 +3012,16 @@ export class LevelEditor {
         x: t.x + off,
       })
       this.sel = { kind: 'cible', index: this.level.cibles!.length - 1 }
+    } else if (s.kind === 'condensat') {
+      const c = (this.level.condensats ?? [])[s.index]
+      this.level.condensats!.push({ ...c, x: c.x + off })
+      this.sel = {
+        kind: 'condensat',
+        index: this.level.condensats!.length - 1,
+      }
+    } else if (s.kind === 'fiole') {
+      this.status('Un seul emplacement de fiole par tableau.')
+      return
     } else if (s.kind === 'porte') {
       const q = (this.level.portes ?? [])[s.index]
       this.level.portes!.push({ ...q, minX: q.minX + off, maxX: q.maxX + off })
@@ -3020,6 +3128,8 @@ export class LevelEditor {
         else if (key === 'label') this.setTool({ kind: 'label' })
         else if (key === 'laser') this.setTool({ kind: 'laser' })
         else if (key === 'cible') this.setTool({ kind: 'cible' })
+        else if (key === 'condensat') this.setTool({ kind: 'condensat' })
+        else if (key === 'fiole') this.setTool({ kind: 'fiole' })
         else if (key === 'porte') this.setTool({ kind: 'porte' })
         else if (key === 'cache') this.setTool({ kind: 'cache' })
         else if (key === 'rail') this.setTool({ kind: 'rail' })
@@ -4404,6 +4514,19 @@ export class LevelEditor {
       rows.push(
         `<p class="ed-empty">Le N° se choisit librement : plusieurs pastilles peuvent porter le même — la porte décide alors si UNE suffit (OU) ou s’il les faut TOUTES (ET).</p>`,
       )
+    } else if (s.kind === 'condensat') {
+      const c = (this.level.condensats ?? [])[s.index]
+      rows.push(numField('X', 'p-cdx', c.x), numField('Y', 'p-cdy', c.y))
+      rows.push(numField('Valeur (cL)', 'p-cdcl', c.cl, 1))
+      rows.push(
+        `<p class="ed-empty">Une PASTILLE DE CONDENSAT : bue au contact du corps, elle nourrit la bourse de la run (purgée à la fin). Dès qu’un tableau porte SES pastilles posées main, le semis automatique se coupe.</p>`,
+      )
+    } else if (s.kind === 'fiole') {
+      const f = this.level.fiole!
+      rows.push(numField('X', 'p-fx', f.x), numField('Y', 'p-fy', f.y))
+      rows.push(
+        `<p class="ed-empty">L’emplacement de la FIOLE du tableau (un seul). En jeu, elle n’apparaît que si la collection du joueur est incomplète — la fiole offerte est tirée parmi les manquantes. Sans emplacement posé, le semis automatique décide (la cachette la plus profonde, une chance sur deux).</p>`,
+      )
     } else if (s.kind === 'porte') {
       const q = (this.level.portes ?? [])[s.index]
       rows.push(numField('Canal visé (nº de cible)', 'p-pc', q.canal))
@@ -4516,13 +4639,17 @@ export class LevelEditor {
                       ? `Lampe nº ${s.index + 1}`
                       : s.kind === 'cible'
                         ? `Cible nº ${canalDeCible(this.level.cibles ?? [], s.index)}`
-                        : s.kind === 'porte'
-                          ? 'Porte asservie'
-                          : s.kind === 'rail'
-                            ? 'Rail magnétique'
-                            : s.kind === 'decal'
-                              ? 'Décal (machinerie de décor)'
-                              : 'Étiquette'
+                        : s.kind === 'condensat'
+                          ? 'Pastille de condensat'
+                          : s.kind === 'fiole'
+                            ? 'Emplacement de fiole'
+                            : s.kind === 'porte'
+                              ? 'Porte asservie'
+                              : s.kind === 'rail'
+                                ? 'Rail magnétique'
+                                : s.kind === 'decal'
+                                  ? 'Décal (machinerie de décor)'
+                                  : 'Étiquette'
 
     host.innerHTML =
       `<div class="ed-props-head">${kindName}</div><div class="ed-fields">${rows.join('')}</div>` +
@@ -4789,6 +4916,17 @@ export class LevelEditor {
       // TOR reste implicite (clé absente) : les fichiers existants ne changent pas
       if (text('p-cmode') === 'nor') t.mode = 'nor'
       else delete t.mode
+    } else if (s.kind === 'condensat') {
+      const c = (this.level.condensats ?? [])[s.index]
+      c.x = val('p-cdx')
+      c.y = val('p-cdy')
+      c.cl = Math.max(1, Math.min(200, Math.round(val('p-cdcl') || 8)))
+    } else if (s.kind === 'fiole') {
+      const f = this.level.fiole
+      if (f) {
+        f.x = val('p-fx')
+        f.y = val('p-fy')
+      }
     } else if (s.kind === 'porte') {
       const q = (this.level.portes ?? [])[s.index]
       const canal = Math.round(val('p-pc'))
@@ -5621,6 +5759,43 @@ export class LevelEditor {
       g.font = '700 10px ui-monospace, monospace'
       const num = String(canalDeCible(cibles, i))
       g.fillText(num, p.sx - 3 * num.length, p.sy + 3.5)
+    }
+    // les pastilles de CONDENSAT posées main (leur valeur en cL au centre)
+    // et l'emplacement de FIOLE — le langage visuel du jeu
+    for (let i = 0; i < (this.level.condensats ?? []).length; i++) {
+      const c = this.level.condensats![i]
+      const p = this.toScreen(c.x, c.y)
+      const rr = Math.max(5, 15 * this.zoom)
+      g.beginPath()
+      g.arc(p.sx, p.sy, rr, 0, Math.PI * 2)
+      g.fillStyle = 'rgba(140,215,255,0.45)'
+      g.fill()
+      g.strokeStyle = '#9fdcff'
+      g.lineWidth = 1.5
+      g.stroke()
+      g.fillStyle = '#eaf7ff'
+      g.font = '700 9px ui-monospace, monospace'
+      const t = String(c.cl)
+      g.fillText(t, p.sx - 2.7 * t.length, p.sy + 3)
+    }
+    if (this.level.fiole) {
+      const p = this.toScreen(this.level.fiole.x, this.level.fiole.y)
+      const rr = Math.max(6, 18 * this.zoom)
+      g.beginPath()
+      g.arc(p.sx, p.sy, rr, 0, Math.PI * 2)
+      g.fillStyle = 'rgba(190,130,255,0.30)'
+      g.fill()
+      g.strokeStyle = '#c99aff'
+      g.lineWidth = 2
+      g.stroke()
+      g.beginPath()
+      g.arc(p.sx, p.sy, rr * 0.55, 0, Math.PI * 2)
+      g.strokeStyle = '#e8d2ff'
+      g.lineWidth = 1.2
+      g.stroke()
+      g.fillStyle = '#e8d2ff'
+      g.font = '600 9px ui-monospace, monospace'
+      g.fillText('FIOLE', p.sx - 13, p.sy - rr - 4)
     }
     for (const em of lasers) {
       const p = this.toScreen(em.x, em.y)

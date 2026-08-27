@@ -468,6 +468,11 @@ export interface LevelDef {
   rails?: RailDef[]
   caches?: CacheDef[] // cachettes voilées (brouillard levé à l'entrée du corps)
   condensats?: CondensatPose[] // pastilles posées main (sinon : semis auto)
+  // L'EMPLACEMENT DE FIOLE posé main (un seul par tableau) — absent : le
+  // semis automatique décide (la cachette la plus profonde, une chance
+  // sur deux). En jeu, la fiole n'apparaît que si la collection du
+  // joueur est incomplète.
+  fiole?: { x: number; y: number }
   // Lampes posées à l'éditeur (au plus MAX_LUMIERES allumées). Absentes :
   // la lampe par défaut de la cuve fait l'éclairage.
   lumieres?: LumiereDef[]

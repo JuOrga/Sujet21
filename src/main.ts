@@ -6075,6 +6075,15 @@ for (const b of Array.from(
         }
         break
       }
+      case 'eveil':
+        // l'arbre s'ouvre PAR-DESSUS le pupitre : on achète, on referme,
+        // le pupitre est toujours là
+        eveilEl.hidden = false
+        renderEveilVoile()
+        pupDit(
+          `L’arbre de l’Éveil est ouvert — mémoire disponible : ${records.memoire()}.`,
+        )
+        break
       case 'vie':
         run.vies = Math.min(VIES_MAX, run.vies + 1)
         majBoutonsRun()
@@ -6117,10 +6126,15 @@ function resetLasers(): void {
   pastilles = auHub || estEconomat(level) ? [] : semePastilles(level)
   pastillesPrises = pastilles.map(() => false)
   run.pastillesCl = 0
-  // la FIOLE de la cachette profonde — seulement s'il en manque encore
+  // la FIOLE — seulement s'il en manque encore à la collection : posée
+  // main par le tableau (level.fiole), sinon le semis automatique décide
   const manqueFiole = FIOLES.some((f) => !records.possedeFiole(f.id))
   fiolePastille =
-    auHub || estEconomat(level) || !manqueFiole ? null : semeFiole(level)
+    auHub || estEconomat(level) || !manqueFiole
+      ? null
+      : level.fiole
+        ? { ...level.fiole }
+        : semeFiole(level)
   fiolePrise = false
   // l'étal de l'Économat se réarme (le condensat dépensé, lui, l'est)
   achatsEconomat.clear()
