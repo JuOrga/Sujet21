@@ -22,13 +22,12 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
-    date: '27/08/2026 00:05',
-    title:
-      'Deux tableaux inspirés du CROP CIRCLE : le tournesol et le cortège des lunes',
+    date: '27/08/2026 02:02',
+    title: 'LA VOIE SEMI-PROCÉDURALE — et les lettres d’ordre se gravent',
     notes: [
-      'Le concepteur a montré « crop circle », le tableau de son ami — magnifique, juste avec l’éclairage de base. Il a été étudié à la lettre : trois cercles brisés concentriques autour du DÉPART, faits de paires de demi-anneaux fins partageant le même centre mais glissés le long de leur axe — les moitiés ne se referment pas, et chaque couture est gardée par une plaque-filtre (membrane, rideau, évent) posée tangente. Aucune lampe, aucun mécanisme : la figure, le champ immense, et la lumière de base qui couche de grandes ombres radiales.',
-      'Deux tableaux nouveaux reprennent cette grammaire exacte, chacun avec sa figure. LE TOURNESOL (AH-2) : trois cercles brisés dont les coutures TOURNENT (0°, 50°, 100°) — la promenade est une spirale qui part du cœur, passe l’eau, la glace et la vapeur, et file vers un sas posé loin dans le champ. LE CORTÈGE DES LUNES (AH-3) : trois lunes en chaîne vers l’est, percées d’une seule avenue — membrane, rideau, évent, membrane — et le sas attend au CŒUR de la plus grande ; deux lunes pleines veillent au large, pour la beauté du champ. Les lunes du bout sont des anneaux presque pleins à ouverture unique : pas de porte dérobée, la procession ne se contourne pas.',
-      'Vérifié dans le jeu construit : les deux figures se lisent d’un seul regard au plan large, les portes d’état se présentent dans l’ordre voulu, 900 particules au départ, captures à l’appui. Les tableaux sont semés dans la bibliothèque partagée (ops/inspires-crop.json + workflow seed-inspires, gâchette seed-inspires-go, resemable sans danger) : ils s’ajoutent au bout, sans toucher l’ordre de jeu ni les tableaux existants — modifiables dans l’éditeur comme les autres.',
+      'Demandé : un mode où les salles se génèrent en suivant la logique de la run, au moins deux propositions au moment de la récompense, lié aux niveaux existants. C’est fait — le bouton VOIE SEMI-PROC. (fiche, mode concepteur) lance la descente ordinaire, mais à CHAQUE récompense « la voie se sépare » : LA SUITE ÉCRITE (la salle suivante de la séquence, celle de la planche) est mise en face d’une SALLE GÉNÉRÉE — même moment de run (début/milieu/fin selon la progression), même difficulté que la suite écrite, mécanique DIFFÉRENTE pour que le choix parle. La salle générée est PROUVÉE traversable par le générateur, et son code (« G-121-E7LQ ») se partage : il la redonne à l’identique.',
+      'La salle générée élue s’INTERCALE : elle prend la place du rang suivant, puis la séquence écrite reprend son cours — les niveaux écrits restent la colonne vertébrale de la run. En fin de séquence, la cérémonie ordinaire conclut. LANCER reste la descente classique.',
+      'Et la remarque de nomenclature est appliquée : les LETTRES D’ORDRE (« 21AF ») ne se modifient plus — dans la planche, le préfixe et les lettres sont GRAVÉS, seuls les trois chiffres de la fin s’ajustent aux molettes. L’ordre de jeu, lui, se règle en glissant les cartes. Vérifié en navigateur : cérémonie déroulée jusqu’au choix (suite écrite 21AB-111 · GLACE face à G-121-E7LQ · VAPEUR générée), salle générée jouée après élection, molettes qui préservent les lettres (« 21AB-121 » reçu par le serveur). 354 tests verts.',
     ],
   },
   {
@@ -62,16 +61,6 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
-    date: '26/08/2026 23:05',
-    title:
-      'L’œil du Sujet décliné : GIVRÉ dans la glace, TOURBILLON dans la vapeur',
-    notes: [
-      'Demandé : que le regard (souris, stick) ait son équivalent quand le corps est en vapeur, et « dans l’idéal » aussi dans la glace. C’est fait — le même suivi du pointeur, décliné dans la matière de chaque état. Dans la GLACE : un cœur sombre figé sous la surface, cerné d’un anneau de givre clair — et un pouls très lent (deux fois plus lent que l’œil de l’eau), parce que la glace est rigide et que l’œil y est pris. Dans la VAPEUR : le nuage se creuse en spirale lente autour du point visé, et un cœur ambré — la couleur même de la vapeur d’opale — y couve avec une respiration plus vive.',
-      'Les deux œils obéissent aux MÊMES curseurs d’étalonnage que l’œil de l’eau (banc : lueur, pénombre, taille, errance) : un seul réglage gouverne le regard dans les trois états. Chaque déclinaison est posée APRÈS la teinte de son état dans le rendu — le givre n’efface plus le regard, le nuage non plus ; ils le portent. L’intensité suit la fraction de matière gelée ou vaporisée : aux transitions (dégel, condensation), l’œil glisse d’une forme à l’autre sans couture.',
-      'Vérifié dans le jeu construit, au clavier d’essai de l’éditeur (F glace, G vapeur) : l’anneau de givre suit la souris sur le palet gelé, le tourbillon ambré couve dans le nuage — captures à l’appui. Au passage, la fausse alerte sur la jauge de dash est confirmée : le dosage et le nombre de dashs s’affichent toujours pendant la visée, rien n’avait bougé. 361 tests verts, build propre.',
-    ],
-  },
-  {
     date: '27/08/2026 00:50',
     title:
       'La boîte suit les BOUTS : plus un pouce de marge morte autour d’un arc',
@@ -88,6 +77,16 @@ export const DELIVERIES: Delivery[] = [
       'Demandé : pouvoir choisir la forme des extrémités des arcs — à commencer par une coupe à 90°. C’est fait, avec trois finitions au choix dans l’éditeur (panneau de la pièce, sélecteur « Bouts », pour les parois comme pour les cachettes) : ARRONDIS — la calotte demi-ronde historique ; DROITS (90°) — la coupe franche, exactement perpendiculaire à la courbe ; EN POINTE — l’anneau s’effile en griffe sur son dernier segment.',
       'La géométrie est UNE : le champ de distance signée du moteur (collisions, laser, miroirs), son miroir GLSL du shader (rendu, ombres portées, éclairage) et le contour de l’éditeur parlent la même formule — les tests croisent le contour contre le champ, rotation comprise, et des points discriminants séparent les trois finitions. Changer de bouts ne déplace ni ne remet à l’échelle l’arc : la boîte englobante reste celle des bouts ronds.',
       'Le style voyage dans le fichier du tableau (champ p2, omis au défaut — les tableaux existants ne changent pas d’un octet) et jusqu’au GPU sans un uniforme de plus, glissé dans l’empaquetage existant. Vérifié en jeu : trois arcs identiques côte à côte, seuls les bouts diffèrent — calottes, coupes nettes, griffes — ombres fidèles. 358 tests verts, build propre.',
+    ],
+  },
+  {
+    date: '27/08/2026 00:05',
+    title:
+      'Deux tableaux inspirés du CROP CIRCLE : le tournesol et le cortège des lunes',
+    notes: [
+      'Le concepteur a montré « crop circle », le tableau de son ami — magnifique, juste avec l’éclairage de base. Il a été étudié à la lettre : trois cercles brisés concentriques autour du DÉPART, faits de paires de demi-anneaux fins partageant le même centre mais glissés le long de leur axe — les moitiés ne se referment pas, et chaque couture est gardée par une plaque-filtre (membrane, rideau, évent) posée tangente. Aucune lampe, aucun mécanisme : la figure, le champ immense, et la lumière de base qui couche de grandes ombres radiales.',
+      'Deux tableaux nouveaux reprennent cette grammaire exacte, chacun avec sa figure. LE TOURNESOL (AH-2) : trois cercles brisés dont les coutures TOURNENT (0°, 50°, 100°) — la promenade est une spirale qui part du cœur, passe l’eau, la glace et la vapeur, et file vers un sas posé loin dans le champ. LE CORTÈGE DES LUNES (AH-3) : trois lunes en chaîne vers l’est, percées d’une seule avenue — membrane, rideau, évent, membrane — et le sas attend au CŒUR de la plus grande ; deux lunes pleines veillent au large, pour la beauté du champ. Les lunes du bout sont des anneaux presque pleins à ouverture unique : pas de porte dérobée, la procession ne se contourne pas.',
+      'Vérifié dans le jeu construit : les deux figures se lisent d’un seul regard au plan large, les portes d’état se présentent dans l’ordre voulu, 900 particules au départ, captures à l’appui. Les tableaux sont semés dans la bibliothèque partagée (ops/inspires-crop.json + workflow seed-inspires, gâchette seed-inspires-go, resemable sans danger) : ils s’ajoutent au bout, sans toucher l’ordre de jeu ni les tableaux existants — modifiables dans l’éditeur comme les autres.',
     ],
   },
   {
@@ -124,6 +123,16 @@ export const DELIVERIES: Delivery[] = [
       'Retour du concepteur : la caméra automatique zoomait beaucoup trop par rapport aux niveaux. Deux causes : le corps était cadré à 28 % du petit côté de l’écran quelle que soit la salle, et comme le corps RÉTRÉCIT au fil de la run, la caméra plongeait avec lui — en fin de tableau on ne voyait plus que ~500 unités d’une salle de 1500.',
       'Deux corrections. Le cadrage de base passe de 28 % à 24 % : plus d’air autour du corps dès l’ouverture. Et surtout un PLAFOND DE ZOOM conscient du niveau : quelle que soit la taille du corps, la vue montre toujours au moins 62 % de la petite dimension de la salle (borné à 900 unités pour les salles géantes comme le hub, où le corps deviendrait une tête d’épingle). La fin de run ne s’enferme plus dans un tunnel.',
       'Le zoom MANUEL (molette, pincement) garde toute sa liberté — le plafond ne bride que l’automatique. Mesuré en salle réelle : 1094 unités visibles en hauteur pour une salle de 1500 (contre ~940 avant, et ~515 en fin de run) — capture à l’appui.',
+    ],
+  },
+  {
+    date: '26/08/2026 23:05',
+    title:
+      'L’œil du Sujet décliné : GIVRÉ dans la glace, TOURBILLON dans la vapeur',
+    notes: [
+      'Demandé : que le regard (souris, stick) ait son équivalent quand le corps est en vapeur, et « dans l’idéal » aussi dans la glace. C’est fait — le même suivi du pointeur, décliné dans la matière de chaque état. Dans la GLACE : un cœur sombre figé sous la surface, cerné d’un anneau de givre clair — et un pouls très lent (deux fois plus lent que l’œil de l’eau), parce que la glace est rigide et que l’œil y est pris. Dans la VAPEUR : le nuage se creuse en spirale lente autour du point visé, et un cœur ambré — la couleur même de la vapeur d’opale — y couve avec une respiration plus vive.',
+      'Les deux œils obéissent aux MÊMES curseurs d’étalonnage que l’œil de l’eau (banc : lueur, pénombre, taille, errance) : un seul réglage gouverne le regard dans les trois états. Chaque déclinaison est posée APRÈS la teinte de son état dans le rendu — le givre n’efface plus le regard, le nuage non plus ; ils le portent. L’intensité suit la fraction de matière gelée ou vaporisée : aux transitions (dégel, condensation), l’œil glisse d’une forme à l’autre sans couture.',
+      'Vérifié dans le jeu construit, au clavier d’essai de l’éditeur (F glace, G vapeur) : l’anneau de givre suit la souris sur le palet gelé, le tourbillon ambré couve dans le nuage — captures à l’appui. Au passage, la fausse alerte sur la jauge de dash est confirmée : le dosage et le nombre de dashs s’affichent toujours pendant la visée, rien n’avait bougé. 361 tests verts, build propre.',
     ],
   },
   {

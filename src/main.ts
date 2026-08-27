@@ -16,7 +16,8 @@ import {
   type CodeAtelier,
 } from './game/levelIO'
 import { dessineMiniCarte } from './game/carte'
-import { propositionsSalles } from './game/poule'
+import { phaseRun, propositionsSalles } from './game/poule'
+import { genereNiveauAtelier } from './game/generateur'
 import { CIRCUITS } from './game/circuits'
 import {
   BONBONNE_CAP,
@@ -379,10 +380,21 @@ let auHub = !new URLSearchParams(location.search).has('tableau')
 // se paie pas. Le drapeau se consomme au premier basculement de l'image.
 let departEnVapeur = false
 
+// ---- LA VOIE SEMI-PROCÉDURALE : l'état de la descente --------------------
+// Armée par le bouton de la fiche : à chaque récompense, la suite ÉCRITE de
+// la séquence est mise en face d'une salle GÉNÉRÉE assortie à la
+// progression de la run. La salle générée élue s'INTERCALE : elle prend la
+// place du rang suivant, puis la séquence reprend son cours.
+let modeVoie = false
+let voieGenereeChoisie: LevelDef | null = null
+let voieIntercalaire: LevelDef | null = null
+
 function applyLevel(): void {
   level =
     testLevel ??
-    (auHub ? hubLevel() : (playedLevels()[levelIndex] ?? playedLevels()[0]))
+    (auHub
+      ? hubLevel()
+      : (voieIntercalaire ?? playedLevels()[levelIndex] ?? playedLevels()[0]))
   levelHasCold = level.boxes.some((b) => b.material === MAT_FROID)
   rebuildRenderBoxes()
   exitMouth.x = (level.exit.minX + level.exit.maxX) * 0.5
@@ -2352,7 +2364,16 @@ function openHome(): void {
   homeRestartBtn.hidden = !hasPlayed
   majBoutonsRun()
 }
-startBtn.addEventListener('click', closeHome)
+startBtn.addEventListener('click', () => {
+  modeVoie = false // LANCER : la descente ordinaire
+  closeHome()
+})
+// LA VOIE SEMI-PROCÉDURALE : la même descente, mais à chaque récompense la
+// suite écrite est mise en face d'une salle générée — au joueur de choisir
+document.getElementById('home-voie')?.addEventListener('click', () => {
+  modeVoie = true
+  closeHome()
+})
 
 // ---- L'EXPÉDITION SE SOUVIENT : la progression (salle atteinte, réserve,
 // chrono) s'écrit au DÉBUT de chaque salle du parcours PRINCIPAL. On peut
@@ -3026,9 +3047,6 @@ async function plancheCode(id: string, brut: string): Promise<void> {
 const CHOIX_MOMENT = ['1', '2', '3']
 const CHOIX_MECA = ['0', '1', '2', '3']
 const CHOIX_DIFF = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
-const CHOIX_LETTRE = Array.from({ length: 26 }, (_, i) =>
-  String.fromCharCode(65 + i),
-)
 function roueHtml(
   cur: string,
   choix: string[],
@@ -3091,7 +3109,9 @@ function renderPlanche(): void {
     const esc = (t: string): string =>
       t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
     // le code, molette par molette : « 123 » nu, ou la codification
-    // complète « 21AB-123 » (le « 21 » et le tiret restent gravés)
+    // complète « 21AB-123 » — le préfixe ET les lettres d'ordre sont
+    // GRAVÉS (l'ordre de jeu se règle en glissant les cartes, pas dans le
+    // code) : seuls les trois chiffres de la fin s'ajustent
     const m21 = /^21\s*([A-Z])([A-Z])\s*-\s*(\d)(\d)(\d)$/i.exec(s.level.code)
     const m3 = /^(\d)(\d)(\d)$/.exec(s.level.code.trim())
     const roues = d !== null && (m21 !== null || m3 !== null)
@@ -3104,20 +3124,7 @@ function renderPlanche(): void {
       ? ''
       : `<div class="pl-roues">` +
         (m21
-          ? `<span class="pr-fixe">21</span>` +
-            roueHtml(
-              m21[1].toUpperCase(),
-              CHOIX_LETTRE,
-              'ORDRE de la codification (AA, AB, …) — 1ʳᵉ lettre',
-              'ORDRE',
-            ) +
-            roueHtml(
-              m21[2].toUpperCase(),
-              CHOIX_LETTRE,
-              'ORDRE de la codification (AA, AB, …) — 2ᵉ lettre',
-              '',
-            ) +
-            `<span class="pr-fixe">-</span>`
+          ? `<span class="pr-fixe" title="Le préfixe et les lettres sont GRAVÉS — l'ordre de jeu se règle en glissant les cartes, pas dans le code. Seuls les chiffres de la fin s'ajustent.">21${m21[1].toUpperCase()}${m21[2].toUpperCase()}-</span>`
           : '') +
         roueHtml(
           chiffres[0],
@@ -3188,9 +3195,11 @@ function renderPlanche(): void {
         carte.querySelectorAll<HTMLSelectElement>('.pr-sel'),
       )
       const chips = carte.querySelector('.salle-chips')
+      // les lettres gravées viennent du code d'origine — seules les trois
+      // molettes de chiffres écrivent
       const lire = (): string =>
         m21
-          ? `21${sels[0].value}${sels[1].value}-${sels[2].value}${sels[3].value}${sels[4].value}`
+          ? `21${m21[1].toUpperCase()}${m21[2].toUpperCase()}-${sels[0].value}${sels[1].value}${sels[2].value}`
           : sels.map((x) => x.value).join('')
       const applique = (): void => {
         for (const col of Array.from(carte.querySelectorAll('.pr-col'))) {
@@ -5292,6 +5301,16 @@ let mbBilanCourant: BilanSalle | null = null
 /** Le sas mène à la salle suivante (raccourci éventuel compris). */
 function avanceSalle(): void {
   overlay.classList.remove('visible')
+  // la salle GÉNÉRÉE élue s'INTERCALE : elle prend la place du rang suivant
+  // de la séquence — franchie, la séquence reprend après ce rang
+  if (voieGenereeChoisie) {
+    voieIntercalaire = voieGenereeChoisie
+    voieGenereeChoisie = null
+    levelIndex += 1
+    restart()
+    return
+  }
+  voieIntercalaire = null // l'intercalaire vient d'être franchie (ou quittée)
   // RACCOURCI (mécanique roguelike, préparée) : un tableau peut déclarer
   // `raccourciVers` — son sas envoie alors directement à la salle codée,
   // en SAUTANT les intermédiaires. Vers l'avant uniquement (pas de boucle).
@@ -5615,13 +5634,101 @@ function mbMontreDraft(): void {
 // CHOIX — mini-carte, code, nom, chips — au lieu de l'enchaînement muet.
 let salleChoisie: LevelDef | null = null
 
-/** Après la récompense : le choix de salle si le pool du rang suivant en
- * offre deux — sinon la fin ordinaire. */
+/** Après la récompense : en VOIE SEMI-PROCÉDURALE, la suite écrite face à
+ * une salle générée ; sinon le choix du pool si le rang suivant en offre
+ * deux — à défaut, la fin ordinaire. */
 function mbApresRecompense(): void {
   const seq = playedLevels()
+  if (modeVoie) {
+    const duo = propositionsVoie(seq)
+    if (duo) {
+      mbMontreSallesVoie(duo)
+      return
+    }
+  }
   const props = propositionsSalles(seq, levelIndex + 2, seq.length)
   if (props.length === 2) mbMontreSalles(props)
   else mbMontreFin()
+}
+
+/** LA VOIE SEMI-PROCÉDURALE : la salle suivante de la séquence (la suite
+ * ÉCRITE) mise en face d'une salle GÉNÉRÉE au cahier des charges de la
+ * progression — moment = phase de la run, difficulté de la suite écrite
+ * (ou de la progression), mécanique DIFFÉRENTE pour que le choix parle.
+ * La salle générée est PROUVÉE traversable par le générateur. */
+function propositionsVoie(seq: LevelDef[]): {
+  ecrite: LevelDef
+  generee: LevelDef
+  cahier: CodeAtelier
+} | null {
+  const ecrite = seq[levelIndex + 1]
+  if (!ecrite) return null // fin de séquence : la cérémonie ordinaire conclut
+  const rang = levelIndex + 2
+  const moment = phaseRun(rang, seq.length)
+  const aEcrite = decodeCodeAtelier(ecrite.code)
+  const difficulte =
+    aEcrite?.difficulte ??
+    Math.min(9, Math.round(((rang - 1) / Math.max(1, seq.length - 1)) * 3))
+  const mecas = [0, 1, 2, 3].filter((m) => m !== (aEcrite?.mecanique ?? -1))
+  const mecanique = mecas[Math.floor(Math.random() * mecas.length)]
+  const cahier: CodeAtelier = {
+    moment,
+    mecanique: mecanique as CodeAtelier['mecanique'],
+    difficulte,
+  }
+  const variante = Math.floor(Math.random() * 36 ** 4)
+    .toString(36)
+    .toUpperCase()
+    .padStart(2, '0')
+  try {
+    return { ecrite, generee: genereNiveauAtelier(cahier, variante), cahier }
+  } catch {
+    return null // aucune salle prouvée sur cette graine : enchaînement ordinaire
+  }
+}
+
+function mbMontreSallesVoie(duo: {
+  ecrite: LevelDef
+  generee: LevelDef
+  cahier: CodeAtelier
+}): void {
+  mbEtape = 'salles'
+  mbEl('mb-choix-titre').textContent =
+    'LA VOIE SE SÉPARE — CHOISISSEZ LA PROCHAINE SALLE'
+  const host = mbEl('mb-cartes')
+  host.innerHTML = ''
+  const esc = (t: string): string =>
+    t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  const carte = (
+    lv: LevelDef,
+    etiquette: string,
+    a: CodeAtelier | null,
+    generee: boolean,
+  ): void => {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'mb-carte mb-salle'
+    btn.innerHTML =
+      `<canvas width="220" height="126"></canvas>` +
+      `<em class="mb-voie-tag${generee ? ' mb-voie-gen' : ''}">${etiquette}</em>` +
+      `<b>${esc(lv.code)}</b><small>${esc(lv.name)}</small>` +
+      (a
+        ? `<span class="salle-chips"><i>${MOMENT_COURT[a.moment]}</i>` +
+          `<i class="sc-m${a.mecanique}">${MECANIQUE_NOMS[a.mecanique].toUpperCase()}</i>` +
+          `<i>DIFF ${a.difficulte}</i></span>`
+        : '')
+    dessineMiniCarte(btn.querySelector('canvas') as HTMLCanvasElement, lv)
+    btn.addEventListener('click', () => {
+      if (generee) voieGenereeChoisie = lv
+      else salleChoisie = lv
+      bande.ponctuation('sting-collecte', 0.7)
+      fermeMiseEnBonbonne()
+      avanceSalle()
+    })
+    host.appendChild(btn)
+  }
+  carte(duo.ecrite, 'LA SUITE ÉCRITE', decodeCodeAtelier(duo.ecrite.code), false)
+  carte(duo.generee, 'SALLE GÉNÉRÉE — INÉDITE, PROUVÉE', duo.cahier, true)
 }
 
 function mbMontreSalles(props: LevelDef[]): void {
@@ -5858,6 +5965,8 @@ function newExpedition(): void {
 // Fin de run (dernier échantillon dispersé, ou expédition conclue) : le
 // laboratoire rappelle — on se réveille AU HUB, prêt à relancer par le sas.
 function retourAuLabo(): void {
+  voieIntercalaire = null
+  voieGenereeChoisie = null
   levelIndex = 0
   run.bonbonneLiters = 0
   run.runTime = 0
