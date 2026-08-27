@@ -45,14 +45,14 @@ jobs:
           except Exception as e:
             print('illisible :', e)
           EOF
-          echo "== ECHANGETTE (JSON complet, base64) =="
+          echo "== LES 3 VOIES (JSON complet, base64) =="
           python3 - <<'EOF'
           import json, base64
           try:
             d = json.load(open('reponse.json'))
             for l in d.get('levels', []):
               nom = ((l.get('level') or {}).get('name') or '')
-              if 'echange' in nom.lower():
+              if 'voies' in nom.lower():
                 brut = json.dumps(l, ensure_ascii=False).encode()
                 print('taille', len(brut), 'octets — nom :', nom)
                 b64 = base64.b64encode(brut).decode()
