@@ -22,6 +22,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 11:45',
+    title:
+      'LE CAHIER DES RÈGLES : la génération procédurale, noir sur blanc',
+    notes: [
+      'Le chantier « améliorer ou refaire le générateur » commence par ses RÈGLES. Nouveau bouton au menu principal (mode concepteur) : « RÈGLES DE GÉN. » ouvre LE CAHIER DES RÈGLES — quarante règles écrites noir sur blanc, classées en six familles (le contrat, la structure, la rampe, la lisibilité, l’habillage, les figures). Vingt-six règles EN PLACE disent ce que le générateur fait réellement aujourd’hui, chiffres à l’appui (la preuve avant livraison, les plafonds de lisibilité, le dosage par difficulté, le lore qui place les dangers…) ; quatorze PROPOSITIONS disent ce qu’un level designer attend d’un bon générateur et que le nôtre ne fait pas encore (enseigner-éprouver-tordre, la respiration, le point de repère par salle, le cul-de-sac jamais vide, lire avant d’agir…).',
+      'Chaque règle s’ANNOTE : une zone de note sous la règle, partagée entre concepteurs — qui a annoté, quand. Et l’on CONSIGNE des règles nouvelles en texte libre, comme elles viennent, depuis le Steam Deck ou la tablette ; le ✕ les retire, la réécriture garde leur date. Notes et ajouts vivent dans le magasin partagé (/api/regles, le patron des fiches : pointeur + historique de 4 versions) : l’implémentation viendra les y relire — écrivez vos règles dans le jeu, elles seront récupérées et implémentées à la prochaine passe.',
+      'Le catalogue vit dans le code (reglesGen.ts) : une règle en place qui change se réécrit dans le même geste que la modification qui la change. L’écran est une couche menu à part entière — B referme, le stick droit fait défiler, le fond cliqué referme. Vérifié en navigateur : ouverture, note enregistrée et signée, règle consignée puis réécrite puis retirée, fermeture-réouverture qui relit le magasin. 395 tests verts (5 nouveaux sur l’intégrité du cahier).',
+    ],
+  },
+  {
     date: '27/08/2026 08:55',
     title:
       'Le générateur apprend l’ÉCHANGEUR : le circuit thermique d’echangette',
