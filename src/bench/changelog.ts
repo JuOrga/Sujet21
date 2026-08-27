@@ -22,6 +22,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 08:55',
+    title:
+      'Le générateur apprend l’ÉCHANGEUR : le circuit thermique d’echangette',
+    notes: [
+      'Quatrième leçon de l’entraînement : « echangette » (BOIZ) récupérée et étudiée à la lettre — et c’est une QUATRIÈME philosophie : le CIRCUIT THERMIQUE. De la MASSE, pas des murs : ses 43 pièces sont d’énormes blocs pleins et de grands coins diagonaux qui sculptent un circuit en S — les diagonales guident le flux comme des toboggans. Et les MACHINES THERMIQUES sont les jalons du parcours : une chaudière près du départ (vaporisé d’entrée), une zone force-glace au sud (regelé aussitôt), une zone force-eau au centre (la recondensation — le nom même de l’échangeur), deux surchauffeurs en bande (frôlés en vapeur, un dash rendu), et le QUARTIER FROID : le sas niché entre deux masses gelantes. Le corps fait le cycle complet des états en un tour de circuit.',
+      'Tout est gravé dans une NEUVIÈME FAMILLE du mode figure : ÉCHANGEUR. L’écluse du coin natal (une membrane en travers du couloir — on ne quitte la poche qu’en eau), la chaudière dans sa niche creusée au flanc de la descente, la zone gelée du couloir bas, l’ÉPONGE-PLANCHER en revêtement (le péage boit ce qui traîne, le couloir reste franc au-dessus — la leçon de pose de BOIZ), le grand coin hydrophobe au virage, le surchauffeur de la remontée, la recondensation avant l’arrivée, le sas entre ses deux masses froides. La CHAMBRE creusée dans le bloc central, bouche vers le bas, est la cachette — voilée. Une seule lampe, en BANDEAU. Des parois habillées (caissons, conduites).',
+      'Vérifié dans le jeu construit : un circuit généré au panneau (G-CYCLE1~…, 14 pièces massives, 2 zones, 1 éponge, 1 bandeau), joué en essai — la chaudière rougeoie près du départ, la chambre pressurisée souffle ses buses, le surchauffeur zigzague sur la remontée, le sas s’encadre de bleu froid. 850 tirages balayés sans un échec sur les dix familles, 390 tests verts. Quatre philosophies apprises : le glyphe, le réseau, la matière, le cycle — la bibliothèque du générateur s’étoffe à chaque tableau montré.',
+    ],
+  },
+  {
     date: '27/08/2026 08:35',
     title:
       'Le générateur apprend la FUSION : le puzzle de matière de la voie de la fusion',

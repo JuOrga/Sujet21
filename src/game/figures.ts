@@ -42,6 +42,8 @@ import {
   MAT_HYDROPHILE,
   MAT_HYDROPHOBE,
   MAT_FROID,
+  MAT_CHAUD,
+  MAT_SURCHAUFFEUR,
   type LevelDef,
   type ObstacleBox,
   type WorldLabel,
@@ -66,6 +68,7 @@ export const FIGURE_FAMILLES = [
   'constellation',
   'conduits',
   'fusion',
+  'echangeur',
 ] as const
 export type FigureFamille = (typeof FIGURE_FAMILLES)[number]
 
@@ -78,6 +81,7 @@ export const FIGURE_NOMS: Record<FigureFamille, string> = {
   constellation: 'Constellation',
   conduits: 'Conduits',
   fusion: 'Fusion',
+  echangeur: 'Échangeur',
 }
 
 type Rng = () => number
@@ -1287,6 +1291,182 @@ function figFusion(cx: ContexteFamille): Squelette {
   }
 }
 
+/** échangeur : la leçon d'« echangette » (BOIZ) — le CIRCUIT THERMIQUE.
+ * Quatrième philosophie : de la MASSE, pas des murs — d'énormes blocs
+ * pleins et de grands coins diagonaux sculptent un circuit en S, et les
+ * MACHINES THERMIQUES en sont les jalons : le corps fait le cycle complet
+ * des états en un tour de circuit.
+ *   · l'ÉCLUSE : le coin natal se quitte en eau (membrane en travers) ;
+ *   · la CHAUDIÈRE en niche sur la descente — vaporisé au passage ;
+ *   · la ZONE FORCE-GLACE sur le couloir bas — regelé aussitôt ;
+ *   · l'ÉPONGE-PLANCHER en revêtement du couloir (péage, pas barrage) ;
+ *   · le GRAND COIN HYDROPHOBE au virage — le toboggan qui renvoie ;
+ *   · le SURCHAUFFEUR en bande sur la remontée — frôlé en vapeur, un
+ *     dash rendu ;
+ *   · la ZONE FORCE-EAU avant l'arrivée — la recondensation, le nom
+ *     même de l'échangeur ;
+ *   · le QUARTIER FROID : le sas niché entre deux masses gelantes ;
+ *   · la CHAMBRE creusée dans la masse, voilée — la cachette ;
+ *   · une seule lampe BANDEAU, des parois habillées (skins). */
+function figEchangeur(cx: ContexteFamille): Squelette {
+  const { rng, nbCercles, ampleurScale } = cx
+  const s = ampleurScale
+  const W = Math.round(1500 * s)
+  const H = Math.round(830 * s)
+  const COUL = 320 // la largeur des couloirs du circuit
+  const boxes: ObstacleBox[] = []
+  const labels: WorldLabel[] = []
+  const zones: ZoneDef[] = []
+  const sponges: SpongeDef[] = []
+  const bloc = (
+    minX: number,
+    minY: number,
+    maxX: number,
+    maxY: number,
+    mat = MAT_WALL,
+    extra: Partial<ObstacleBox> = {},
+  ): void => {
+    if (maxX - minX < 20 || maxY - minY < 20) return
+    boxes.push({
+      minX: Math.round(minX),
+      minY: Math.round(minY),
+      maxX: Math.round(maxX),
+      maxY: Math.round(maxY),
+      material: mat,
+      ...extra,
+    })
+  }
+
+  // LE BLOC CENTRAL : la masse de l'échangeur — creusée d'une chambre
+  // (la future cachette, bouche vers le bas) et d'une niche (la
+  // chaudière, flanc ouest)
+  const xA0 = -W + COUL
+  const xB1 = W - 2 * COUL - 300
+  const yB0 = -H + COUL
+  const ccx = Math.round((xA0 + xB1) / 2)
+  const cy0 = yB0 + 240
+  const nY = Math.min(H - 420, yB0 + Math.round(entre(rng, 500, 750)))
+  // colonne gauche (la niche de la chaudière la coupe en deux)
+  bloc(xA0, yB0, xA0 + 240, nY)
+  bloc(xA0, nY + 300, xA0 + 240, H)
+  bloc(xA0 + 240, yB0, ccx - 260, H, MAT_WALL, { skin: 6 })
+  // la bande sous la chambre, percée de la bouche
+  bloc(ccx - 260, yB0, ccx - 130, cy0)
+  bloc(ccx + 130, yB0, ccx + 260, cy0)
+  // le toit de la chambre et la colonne droite
+  bloc(ccx - 260, cy0 + 360, ccx + 260, H)
+  bloc(ccx + 260, yB0, xB1, H, MAT_WALL, { skin: 2 })
+  // LA CHAUDIÈRE dans sa niche — vaporisé au passage de la descente
+  bloc(xA0 + 30, nY + 60, xA0 + 210, nY + 240, MAT_CHAUD)
+
+  // L'ÉCLUSE du coin natal : on naît en haut du couloir ouest, on ne le
+  // quitte qu'en EAU
+  bloc(-W, H - 420, -W + COUL, H - 420 + 70, MAT_MEMBRANE)
+
+  // LES GRANDS COINS : les diagonales qui guident le flux aux virages
+  const coinTaille = Math.round(280 * s)
+  bloc(xA0, yB0, xA0 + coinTaille, yB0 + coinTaille, MAT_WALL, {
+    forme: 3,
+    p0: 3,
+  })
+  bloc(
+    xB1 - Math.round(420 * s),
+    yB0,
+    xB1,
+    yB0 + Math.round(300 * s),
+    MAT_HYDROPHOBE,
+    {
+      forme: 3,
+      p0: 2,
+    },
+  )
+
+  // LE QUARTIER FROID : le sas niché entre deux masses gelantes, à l'est
+  const yExit = Math.round(-100 * s)
+  bloc(W - 300, -H, W, yExit - 150, MAT_FROID)
+  bloc(W - 300, yExit + 150, W, H, MAT_FROID)
+  const exit = {
+    minX: W - 260,
+    minY: yExit - 98,
+    maxX: W - 120,
+    maxY: yExit + 98,
+  }
+  labels.push({ x: W - 190, y: yExit + 180, text: 'SAS', tone: 'sas' })
+
+  // LE SURCHAUFFEUR en bande sur la remontée — frôlé en vapeur
+  bloc(xB1, yExit - 100, xB1 + 70, yExit + 160, MAT_SURCHAUFFEUR)
+  if (nbCercles >= 3)
+    bloc(
+      ccx + 400,
+      -H,
+      ccx + 400 + Math.round(260 * s),
+      -H + 60,
+      MAT_SURCHAUFFEUR,
+    )
+
+  // LES ZONES : gelé sur le couloir bas, recondensé avant l'arrivée
+  zones.push({
+    minX: xA0 + 20,
+    minY: -H,
+    maxX: xA0 + 20 + Math.round(520 * s),
+    maxY: yB0,
+    force: 'glace',
+  })
+  zones.push({
+    minX: xB1 + 80,
+    minY: yExit + 240,
+    maxX: W - 310,
+    maxY: yExit + 240 + Math.round(320 * s),
+    force: 'eau',
+  })
+
+  // L'ÉPONGE-PLANCHER : un revêtement du couloir bas, deux rangées — le
+  // péage boit ce qui traîne, le couloir reste franc au-dessus
+  sponges.push({
+    minX: ccx - 220,
+    minY: -H + 8,
+    cols: Math.max(12, Math.round(18 * s)),
+    rows: 2,
+    cellSize: 24,
+    capacityPerCell: 5,
+  })
+
+  // la CHAMBRE creusée, voilée : la cachette de l'échangeur
+  const caches: CacheDef[] = [
+    { minX: ccx - 260, minY: yB0, maxX: ccx + 260, maxY: cy0 + 360 },
+  ]
+
+  return {
+    boxes,
+    labels,
+    spawn: { x: -W + Math.round(COUL / 2), y: H - 200 },
+    exit,
+    coutureFinale: null, // les machines thermiques SONT les mécanismes
+    poche: null,
+    plafond: H,
+    sol: -H,
+    nbPortesEtat: 1,
+    bounds: { minX: -W, minY: -H, maxX: W, maxY: H },
+    lumieres: [
+      { x: xB1 + 160, y: yExit + 620, forme: 'bandeau', longueur: 300 },
+    ],
+    caches,
+    zones,
+    sponges,
+    greffes: [],
+    journalNote:
+      'Les machines thermiques sont les jalons du circuit : chaudière, gel, éponge, surchauffeur, recondensation — le corps fait le cycle complet des états en un tour. ',
+    noms: [
+      'L’échangeur',
+      'Le circuit',
+      'Le cycle',
+      'La recondensation',
+      'Le serpentin chaud',
+      'La calandre',
+    ],
+  }
+}
+
 // ---- Les MÉCANISMES greffés sur la couture finale ------------------------
 
 interface Greffe {
@@ -1493,7 +1673,9 @@ export function essaieFigure(
                 ? figConstellation(cx)
                 : famille === 'conduits'
                   ? figConduits(cx)
-                  : figFusion(cx)
+                  : famille === 'fusion'
+                    ? figFusion(cx)
+                    : figEchangeur(cx)
 
   const lasers: LaserDef[] = []
   const cibles: CibleDef[] = []
