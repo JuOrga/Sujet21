@@ -22,7 +22,7 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
-    date: '27/08/2026 11:45',
+    date: '27/08/2026 11:56',
     title:
       'LE CAHIER DES RÈGLES : la génération procédurale, noir sur blanc',
     notes: [
