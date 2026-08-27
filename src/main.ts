@@ -121,6 +121,12 @@ import {
 } from './game/scenario'
 import { Records } from './game/records'
 import {
+  RAYON_PASTILLE,
+  absorbePastilles,
+  semePastilles,
+  type CondensatDef,
+} from './game/condensat'
+import {
   fetchSharedBoard,
   pushExpeditionRecord,
   pushTableauRecord,
@@ -161,48 +167,44 @@ const run = {
   // Le TOTAL LIVRÉ de la run (records d'expédition) : la bonbonne, elle,
   // est une réserve qui se VIDE quand on la verse dans le corps.
   livreTotal: 0,
+  // Les PASTILLES bues dans CE tableau (centilitres) — pour le bilan de la
+  // mise en bonbonne ; remis à zéro à chaque entrée de tableau.
+  pastillesCl: 0,
+  // La MÉMOIRE gravée pendant cette run (l'affichage du butin ; le solde
+  // vrai vit dans les registres et survit à tout).
+  memoireGagnee: 0,
 }
 const VIES_MAX = 3 // plafond, étalonnage et instruments compris
 // Sonde de test : l'état de la run depuis la console (comme __sim, __cam)
 ;(window as unknown as { __run: typeof run }).__run = run
 
-// ---- LE CONDENSAT : la monnaie méta du roguelike. Chaque centilitre livré
-// au sas est CONSERVÉ par le labo, toutes runs confondues — c'est lui qui
-// paiera le banc d'étalonnage (améliorations permanentes, dont les
-// échantillons de secours supplémentaires). Farmer, sacrifier des runs :
-// rien de ce qu'on livre n'est perdu.
-const CLE_CONDENSAT = 'sujet21-condensat-v1'
-let condensat = (() => {
-  try {
-    const v = Math.floor(Number(localStorage.getItem(CLE_CONDENSAT)))
-    return Number.isFinite(v) && v > 0 ? v : 0
-  } catch {
-    return 0
-  }
-})()
+// ---- LE CONDENSAT : la monnaie de RUN du roguelike. De la MATIÈRE — les
+// centilitres livrés au sas, les pastilles ramassées dans les tableaux et
+// les cachettes. Elle se dépense EN ROUTE (cartes payantes de la mise en
+// bonbonne, et bientôt l'Économat du Semblable) ; à la fin de la run,
+// réussie ou non, le laboratoire PURGE la cuve : le condensat est
+// confisqué. Seule la MÉMOIRE (records) survit — le Sujet se souvient.
+const CLE_CONDENSAT = 'sujet21-condensat-v1' // l'héritage : migré en mémoire
+let condensat = 0
 function gagneCondensat(cl: number): void {
   if (cl <= 0) return
   condensat += Math.round(cl)
-  try {
-    localStorage.setItem(CLE_CONDENSAT, String(condensat))
-  } catch {
-    // stockage indisponible : le condensat vivra le temps de la session
-  }
   majCondensatUI()
 }
-/** Débite la réserve si elle suffit — la première dépense du condensat
- * (cartes payantes de la mise en bonbonne). */
+/** Débite la réserve de la run si elle suffit (cartes payantes de la mise
+ * en bonbonne, étal de l'Économat). */
 function depenseCondensat(cl: number): boolean {
   if (cl <= 0) return true
   if (condensat < cl) return false
   condensat -= cl
-  try {
-    localStorage.setItem(CLE_CONDENSAT, String(condensat))
-  } catch {
-    // stockage indisponible : la dépense vivra le temps de la session
-  }
   majCondensatUI()
   return true
+}
+/** La PURGE : la fin de run (réussie, perdue ou abandonnée) confisque la
+ * matière. Le compteur repart à zéro — la mémoire, elle, ne bouge pas. */
+function purgeCondensat(): void {
+  condensat = 0
+  majCondensatUI()
 }
 function majCondensatUI(): void {
   const dd = document.getElementById('home-condensat')
@@ -262,6 +264,35 @@ const sfx = {
 
 // Registres du labo (§10) : records par tableau et historique des essais.
 const records = new Records()
+
+// ---- LA MÉMOIRE : la monnaie PERSISTANTE de l'Éveil, gravée dans les
+// registres. De l'information, pas de la matière : la purge de fin de run
+// ne peut pas la confisquer — le Sujet se souvient, même d'une run
+// échouée. Elle paiera l'arbre de l'Éveil (améliorations permanentes).
+function majMemoireUI(): void {
+  const dd = document.getElementById('home-memoire')
+  if (dd) dd.textContent = String(records.memoire())
+}
+/** Grave la mémoire ET tient le compteur de butin de la run courante. */
+function gagneMemoireRun(n: number): void {
+  if (n <= 0) return
+  records.gagneMemoire(n)
+  run.memoireGagnee += Math.round(n)
+  majMemoireUI()
+}
+// L'HÉRITAGE : l'ancien condensat persistant (d'avant la purge) devient de
+// la mémoire, une fois pour toutes — 10 cL de matière = 1 souvenir. La clé
+// disparaît ensuite : rien ne se migre deux fois.
+try {
+  const brut = Math.floor(Number(localStorage.getItem(CLE_CONDENSAT)))
+  if (Number.isFinite(brut) && brut > 0) {
+    records.gagneMemoire(Math.max(1, Math.floor(brut / 10)))
+  }
+  localStorage.removeItem(CLE_CONDENSAT)
+} catch {
+  // stockage indisponible : rien à migrer
+}
+majMemoireUI()
 
 function fmtTime(s: number): string {
   return `${s.toFixed(1).replace('.', ',')} s`
@@ -755,6 +786,8 @@ const hudVies = el('hud-vies')
 const hudViesChip = el('hud-vies-chip') as HTMLButtonElement
 const hudBonbonneChip = el('hud-bonbonne-chip') as HTMLButtonElement
 const hudBonbonne = el('hud-bonbonne')
+const hudCondChip = el('hud-cond-chip') as HTMLButtonElement
+const hudCond = el('hud-cond')
 const hudCoque = el('hud-coque')
 const hudVolume = el('hud-volume')
 const hudSeuil = el('hud-seuil')
@@ -1542,8 +1575,10 @@ const toastFile: {
 }[] = []
 let toastTimer = 0
 trophees.onDebloque = (t) => {
-  toastFile.push({ nom: t.nom, icone: t.icone })
+  toastFile.push({ nom: `${t.nom} · +10 mémoire`, icone: t.icone })
   audio.collect()
+  // chaque trophée grave sa mémoire — une seule fois, l'amont le garantit
+  gagneMemoireRun(10)
 }
 // Le CODEX partage la fanfare des trophées : même toast, autre étiquette —
 // et sa page (fiche d'essai, bouton CODEX) se remplit au fil des découvertes
@@ -2563,6 +2598,8 @@ interface RunSauvee {
   instruments: string[]
   xp: number
   livreTotal: number
+  condensat?: number // la bourse de la run (absente : anciennes sauvegardes)
+  memoireGagnee?: number // le butin de mémoire déjà gravé cette run
 }
 function runSauvee(): RunSauvee | null {
   try {
@@ -2606,6 +2643,8 @@ function sauveRun(): void {
           instruments: run.instruments,
           xp: run.xp,
           livreTotal: run.livreTotal,
+          condensat,
+          memoireGagnee: run.memoireGagnee,
         }),
       )
   } catch {
@@ -2633,6 +2672,9 @@ function reprendreRun(save: RunSauvee): void {
   run.instruments = save.instruments.slice()
   run.xp = save.xp
   run.livreTotal = save.livreTotal
+  condensat = Math.max(0, Math.round(save.condensat ?? 0))
+  majCondensatUI()
+  run.memoireGagnee = Math.max(0, Math.round(save.memoireGagnee ?? 0))
   hasPlayed = true
   document.body.classList.add('playing')
   input.paused = false
@@ -3305,12 +3347,11 @@ function renderPlanche(): void {
     // sous le code : QUI l'a saisi et QUAND — en petit, pour savoir à qui
     // s'adresser quand une codification surprend (l'heure exacte en info-bulle)
     const quand = s.codeAt ? new Date(s.codeAt) : null
-    const saisi =
-      `<small class="pl-saisi" title="${esc(
-        quand && !Number.isNaN(quand.getTime())
-          ? `Code saisi par ${s.codeAuteur || 'anonyme'} — ${quand.toLocaleString('fr-FR')}`
-          : `Code saisi par ${s.codeAuteur || 'anonyme'}`,
-      )}">${esc(mentionSaisie(s.codeAuteur, s.codeAt))}</small>`
+    const saisi = `<small class="pl-saisi" title="${esc(
+      quand && !Number.isNaN(quand.getTime())
+        ? `Code saisi par ${s.codeAuteur || 'anonyme'} — ${quand.toLocaleString('fr-FR')}`
+        : `Code saisi par ${s.codeAuteur || 'anonyme'}`,
+    )}">${esc(mentionSaisie(s.codeAuteur, s.codeAt))}</small>`
     carte.innerHTML =
       `<canvas width="220" height="126"></canvas>` +
       `<span class="pl-rang">${i + 1}</span>` +
@@ -3577,11 +3618,15 @@ async function posteNoteRegle(id: string, note: string): Promise<void> {
     reglesNotes = reglesNotes.filter((n) => n.id !== id)
     if (d.note && d.note.note) reglesNotes.push(d.note)
     reglesBusy = false
-    reglesDit(note ? 'Note enregistrée — partagée entre postes.' : 'Note effacée.')
+    reglesDit(
+      note ? 'Note enregistrée — partagée entre postes.' : 'Note effacée.',
+    )
     renderRegles()
   } catch {
     reglesBusy = false
-    reglesDit('Enregistrement refusé : magasin injoignable — la note reste à l’écran, réessayez.')
+    reglesDit(
+      'Enregistrement refusé : magasin injoignable — la note reste à l’écran, réessayez.',
+    )
   }
 }
 /** Consigne une règle nouvelle (ou réécrit un ajout existant : même id). */
@@ -3607,11 +3652,17 @@ async function posteAjoutRegle(texte: string, id?: string): Promise<void> {
       reglesAjouts.push(d.ajout)
     }
     reglesBusy = false
-    reglesDit(id ? 'Règle réécrite.' : 'Règle consignée — elle attend son implémentation.')
+    reglesDit(
+      id
+        ? 'Règle réécrite.'
+        : 'Règle consignée — elle attend son implémentation.',
+    )
     renderRegles()
   } catch {
     reglesBusy = false
-    reglesDit('Consignation refusée : magasin injoignable — votre texte reste à l’écran, réessayez.')
+    reglesDit(
+      'Consignation refusée : magasin injoignable — votre texte reste à l’écran, réessayez.',
+    )
   }
 }
 async function oteAjoutRegle(id: string): Promise<void> {
@@ -3638,7 +3689,8 @@ function zoneNoteRegle(id: string, conteneur: HTMLElement): void {
   const note = reglesNotes.find((n) => n.id === id)
   const ta = document.createElement('textarea')
   ta.className = 'rg-note'
-  ta.placeholder = 'Annoter cette règle — votre note est partagée entre concepteurs…'
+  ta.placeholder =
+    'Annoter cette règle — votre note est partagée entre concepteurs…'
   ta.value = note?.note ?? ''
   ta.dataset.initial = ta.value
   ta.disabled = !reglesJoignable
@@ -3762,7 +3814,9 @@ function renderRegles(): void {
   tete.className = 'rg-famille'
   tete.innerHTML = `VOS RÈGLES <small>en texte libre — à implémenter</small>`
   corps.appendChild(tete)
-  for (const a of [...reglesAjouts].sort((x, y) => x.date.localeCompare(y.date))) {
+  for (const a of [...reglesAjouts].sort((x, y) =>
+    x.date.localeCompare(y.date),
+  )) {
     const carte = document.createElement('div')
     carte.className = 'rg-regle rg-libre'
     const oter = document.createElement('button')
@@ -4422,7 +4476,8 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       cibles.length +
       portes.length +
       rails.length +
-      caches.length >
+      caches.length +
+      pastilles.length >
     0
   const dprC = Math.min(dpr, 2)
   if (
@@ -4931,6 +4986,34 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     }
   }
 
+  // les pastilles de CONDENSAT : des gouttes de matière pure qui respirent
+  // doucement — bues au contact, elles s'éteignent du tableau
+  const nowPastilles = performance.now() / 1000
+  for (let i = 0; i < pastilles.length; i++) {
+    if (pastillesPrises[i]) continue
+    const pa = pastilles[i]
+    if (dansCacheVoilee(pa.x, pa.y)) continue
+    const p = S(pa.x, pa.y)
+    const pouls = 0.82 + 0.18 * Math.sin(nowPastilles * 2.1 + i * 1.7)
+    const r = Math.max(3, RAYON_PASTILLE * 0.55 * z) * pouls
+    // le halo : la pastille se voit de loin, sans crier
+    g.beginPath()
+    g.arc(p.sx, p.sy, r * 2.1, 0, Math.PI * 2)
+    g.fillStyle = 'rgba(110,200,255,0.10)'
+    g.fill()
+    g.beginPath()
+    g.arc(p.sx, p.sy, r, 0, Math.PI * 2)
+    g.fillStyle = 'rgba(140,215,255,0.55)'
+    g.fill()
+    g.lineWidth = 1.5
+    g.strokeStyle = '#9fdcff'
+    g.stroke()
+    g.beginPath()
+    g.arc(p.sx - r * 0.28, p.sy - r * 0.3, r * 0.32, 0, Math.PI * 2)
+    g.fillStyle = 'rgba(235,250,255,0.85)'
+    g.fill()
+  }
+
   // LES CACHETTES, EN DERNIER : le brouillard « non cartographié » couvre
   // TOUT — parois, fluide, mécanismes, décor. Le centre du corps qui entre
   // lève le voile en fondu ; il reste levé pour l'essai (Recommencer
@@ -5102,6 +5185,11 @@ const railsEngages = new Set<number>()
 // (Infinity : encore voilé). Le corps qui entre lève le voile — et
 // Recommencer re-voile tout : la découverte se rejoue à chaque essai.
 let cachesLevee: number[] = []
+// LES PASTILLES DE CONDENSAT : semées à l'entrée du tableau (condensat.ts,
+// semis déterministe par code — les cachettes ont les leurs), bues au
+// contact du corps. « Recommencer » re-sème tout : la cueillette se rejoue.
+let pastilles: CondensatDef[] = []
+let pastillesPrises: boolean[] = []
 /** Ce point est-il sous un voile encore fermé ? (masque étiquettes et
  * mécanismes — la cachette a la forme qu'on lui a donnée). */
 function dansCacheVoilee(x: number, y: number): boolean {
@@ -5768,7 +5856,11 @@ for (const b of Array.from(
         break
       case 'condensat':
         gagneCondensat(150)
-        pupDit('Condensat +150 cL.')
+        pupDit('Condensat +150 cL (bourse de la run).')
+        break
+      case 'memoire':
+        gagneMemoireRun(25)
+        pupDit(`Mémoire +25 — solde gravé : ${records.memoire()}.`)
         break
       case 'vie':
         run.vies = Math.min(VIES_MAX, run.vies + 1)
@@ -5801,13 +5893,18 @@ function resetLasers(): void {
   lastRailTime = 0
   railsEngages.clear()
   cachesLevee = (level.caches ?? []).map(() => Infinity)
+  // les pastilles de condensat se re-sèment (mêmes places : semis
+  // déterministe) — le hub n'en porte pas, on n'y farme rien
+  pastilles = auHub ? [] : semePastilles(level)
+  pastillesPrises = pastilles.map(() => false)
+  run.pastillesCl = 0
   rebuildRenderBoxes() // les parois factices reprennent leur poste
 }
 
 // ---- LA MISE EN BONBONNE : l'écran de récompense de fin de salle ----
 // Quatre temps : la compression (le surplus coule dans la bonbonne), la
 // lecture du protocole (les lignes tombent, les records se tamponnent), le
-// condensat (les centilitres s'égrènent vers la réserve méta), et LE CHOIX
+// condensat (les centilitres s'égrènent vers la bourse de la run), et LE CHOIX
 // (trois cartes d'instruments, on en emporte une — certaines payantes en
 // condensat). Un toucher saute aux cartes ; le choix, lui, ne se saute pas.
 let miseEnBonbonne = false
@@ -6559,8 +6656,7 @@ function majVoieHud(): void {
     }
     const c = document.createElement('i')
     c.className =
-      'vh-cran' +
-      (r < rang ? ' vh-franchi' : r === rang ? ' vh-courant' : '')
+      'vh-cran' + (r < rang ? ' vh-franchi' : r === rang ? ' vh-courant' : '')
     if (r === record && record > 0) {
       c.classList.add('vh-record')
       c.title = 'profondeur record du poste'
@@ -6688,6 +6784,8 @@ function newExpedition(): void {
   run.instruments = []
   run.xp = 0
   run.livreTotal = 0
+  run.memoireGagnee = 0
+  purgeCondensat() // la bourse d'une run commence toujours vide
   restart()
 }
 
@@ -6706,6 +6804,9 @@ function retourAuLabo(): void {
   run.xp = 0
   run.livreTotal = 0
   run.ended = false
+  run.memoireGagnee = 0
+  // LA PURGE : le labo confisque la matière de la run — la mémoire reste
+  purgeCondensat()
   entrerHub()
   majBoutonsRun()
 }
@@ -7902,6 +8003,16 @@ function frame(now: number): void {
     }
   }
 
+  // ---- Les pastilles de CONDENSAT : bues au contact du corps ----
+  if (pastilles.length > 0 && !sim.dispersed) {
+    const bues = absorbePastilles(pastilles, pastillesPrises, sim)
+    for (const i of bues) {
+      gagneCondensat(pastilles[i].cl)
+      run.pastillesCl += pastilles[i].cl
+      audio.collect()
+    }
+  }
+
   // ---- Lasers : traçage, cibles, portes ----
   const lasers = level.lasers ?? []
   if (lasers.length > 0) {
@@ -8145,7 +8256,8 @@ function frame(now: number): void {
     const surplus =
       sim.liters() + sim.swallowed * params.litersPerParticle + prime
     run.livreTotal += surplus
-    // chaque centilitre livré nourrit le CONDENSAT (méta) — y compris sur la
+    // chaque centilitre livré nourrit le CONDENSAT (la bourse de la RUN,
+    // purgée à la fin) — y compris sur la
     // dernière salle : rien de ce qui atteint le sas n'est jamais perdu
     gagneCondensat(surplus * 100)
     // Trophées de collecte : « Sans une goutte » (≥ 95 % du volume de
@@ -8155,10 +8267,16 @@ function frame(now: number): void {
     if (trophees.compte('collectes') >= 21)
       trophees.debloque('operateur-de-nuit')
     codex.marque('sas') // le codex consigne la première mise en bonbonne
+    const premiereFois = records.tableauRecord(level.code) === null
     const { newVolume, newChrono } = records.noteCollection(
       level.code,
       surplus,
       run.tableauTime,
+    )
+    // LA MÉMOIRE se grave à chaque sas — l'information survit à la purge :
+    // +5 la traversée, +5 la toute première de ce tableau, +2 par record
+    gagneMemoireRun(
+      5 + (premiereFois ? 5 : 0) + (newVolume ? 2 : 0) + (newChrono ? 2 : 0),
     )
     // Publication au tableau d'honneur partagé : le serveur ne garde que le
     // meilleur — la réponse remet les registres affichés à jour.
@@ -8203,6 +8321,7 @@ function frame(now: number): void {
       // Dernier sas : l'expédition est achevée — bilan, et registres à jour
       run.ended = true
       trophees.debloque('integrale')
+      gagneMemoireRun(10) // l'expédition bouclée grave son souvenir
       const sallesFranchies = modeVoie ? voieRang : playedLevels().length
       const exp = records.noteExpedition(
         sallesFranchies,
@@ -8248,7 +8367,7 @@ function frame(now: number): void {
         `<br>Butin de la descente : ` +
         `${run.instruments.length > 0 ? `${glyphes} ${run.instruments.length} instrument(s)` : 'aucun instrument'} · ` +
         `palier d'étalonnage ${paliersAtteints(run.xp)} · ` +
-        `+${Math.round(run.livreTotal * 100)} cL de condensat versés à la réserve.`
+        `+${run.memoireGagnee} MÉMOIRE gravée — la purge confisque le condensat restant (${condensat} cL).`
       showOverlay(
         modeVoie ? 'LA VOIE EST BOUCLÉE' : 'EXPÉDITION ACHEVÉE',
         modeVoie
@@ -8259,7 +8378,7 @@ function frame(now: number): void {
               exp.newRecord
                 ? ' — <em class="bilan-neuf">MEILLEURE EXPÉDITION ✦</em>'
                 : ''
-            }</span></span>Le laboratoire n'a plus d'échantillon. Quelque part dans les conduites, le fluide se souvient.`,
+            }</span></span>Le laboratoire n'a plus d'échantillon. Quelque part dans les conduites, le fluide se souvient.<br>+${run.memoireGagnee} MÉMOIRE gravée cette run — la purge confisque le condensat restant (${condensat} cL).`,
         'success',
         'RETOUR AU LABO',
       )
@@ -8278,7 +8397,7 @@ function frame(now: number): void {
         recVol: `${fmtL(bests.volume.liters)}${bests.volume.name ? ' · ' + htmlSafe(bests.volume.name) : ''}`,
         recChr: `${fmtTime(bests.chrono.time)}${bests.chrono.name ? ' · ' + htmlSafe(bests.chrono.name) : ''}`,
         note: Math.round((surplus * 100 * 60) / (60 + run.tableauTime)),
-        gainCl: Math.round(surplus * 100),
+        gainCl: Math.round(surplus * 100) + run.pastillesCl,
         totalCl: condensat,
       })
     }
@@ -8456,6 +8575,8 @@ function frame(now: number): void {
   // au labo comme aux essais, rien ne se paie et rien ne se collecte
   hudViesChip.hidden = !!testLevel || auHub
   hudBonbonneChip.hidden = !!testLevel || auHub
+  hudCondChip.hidden = !!testLevel || auHub
+  hudCond.textContent = `${condensat} cL`
   hudVies.textContent = `×${run.vies}`
   // La coque refroidit : +21° au départ, −60° à froid complet — la pression
   // temporelle se lit ici (chiffre ET barre), jamais sur un chronomètre
@@ -8784,6 +8905,8 @@ function frame(now: number): void {
     if (!testLevel) {
       // fin de l'échantillon ET de l'expédition : les registres consignent tout
       records.noteDispersion(level.code, run.tableauTime)
+      // même l'échec grave sa mémoire : le Sujet apprend de ses dispersions
+      if (!auHub) gagneMemoireRun(2)
       records.noteExpedition(levelIndex, run.livreTotal, run.runTime)
       if (levelIndex > 0 || run.livreTotal >= 0.01) {
         pushExpeditionRecord(

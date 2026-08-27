@@ -33,9 +33,15 @@ describe('Records — les registres du labo', () => {
     r.noteCollection('21-B', 3.0, 90)
     expect(r.noteCollection('21-B', 3.0, 70).newVolume).toBe(true)
     expect(r.noteCollection('21-B', 3.0, 95).newVolume).toBe(false)
-    expect(r.tableauRecord('21-B')!.volume).toMatchObject({ liters: 3.0, time: 70 })
+    expect(r.tableauRecord('21-B')!.volume).toMatchObject({
+      liters: 3.0,
+      time: 70,
+    })
     expect(r.noteCollection('21-B', 3.6, 70).newChrono).toBe(true) // même chrono, plus de litres
-    expect(r.tableauRecord('21-B')!.chrono).toMatchObject({ liters: 3.6, time: 70 })
+    expect(r.tableauRecord('21-B')!.chrono).toMatchObject({
+      liters: 3.6,
+      time: 70,
+    })
   })
 
   it('migration : un registre d’avant la refonte sème ses deux records', () => {
@@ -56,6 +62,32 @@ describe('Records — les registres du labo', () => {
     expect(bests.chrono).toMatchObject({ liters: 4.2, time: 66 })
   })
 
+  it('la MÉMOIRE : gain, dépense, et migration des vieux registres', () => {
+    const st = memoryStorage()
+    const r = new Records(st)
+    expect(r.memoire()).toBe(0)
+    expect(r.gagneMemoire(12)).toBe(12)
+    expect(r.gagneMemoire(0)).toBe(12) // un gain nul ne grave rien
+    expect(r.depenseMemoire(5)).toBe(true)
+    expect(r.depenseMemoire(50)).toBe(false) // solde insuffisant : refus
+    expect(r.memoire()).toBe(7)
+    // la persistance : une relecture retrouve le solde
+    expect(new Records(st).memoire()).toBe(7)
+    // migration : un registre d'AVANT l'Éveil (sans champ memoire) lit 0
+    const ancien = memoryStorage()
+    ancien.setItem(
+      'projet21.registres.v1',
+      JSON.stringify({
+        essais: 1,
+        operator: 'REX',
+        tableaux: {},
+        expedition: null,
+        history: [],
+      }),
+    )
+    expect(new Records(ancien).memoire()).toBe(0)
+  })
+
   it('la dispersion clôt l’essai : le n° d’échantillon avance', () => {
     const r = new Records(memoryStorage())
     expect(r.essaiNumber()).toBe(1)
@@ -73,7 +105,11 @@ describe('Records — les registres du labo', () => {
     a.noteDispersion('21-A', 10)
     const b = new Records(storage)
     expect(b.essaiNumber()).toBe(2)
-    expect(b.tableauRecord('21-A')!.volume).toMatchObject({ liters: 3.2, time: 55, essai: 1 })
+    expect(b.tableauRecord('21-A')!.volume).toMatchObject({
+      liters: 3.2,
+      time: 55,
+      essai: 1,
+    })
     b.wipe()
     expect(new Records(storage).essaiNumber()).toBe(1)
   })
@@ -84,7 +120,9 @@ describe('Records — les registres du labo', () => {
     r.setOperator('  julien du 21  ')
     expect(r.operator()).toBe('JULIEN DU 21')
     r.noteCollection('21-A', 3.0, 60)
-    expect(r.tableauRecord('21-A')!.volume).toMatchObject({ name: 'JULIEN DU 21' })
+    expect(r.tableauRecord('21-A')!.volume).toMatchObject({
+      name: 'JULIEN DU 21',
+    })
     // un record battu porte le nom du nouvel opérateur
     r.setOperator('vega')
     r.noteCollection('21-A', 3.5, 60)
@@ -101,7 +139,10 @@ describe('Records — les registres du labo', () => {
     expect(r.noteExpedition(1, 9.9, 100).newRecord).toBe(false) // moins loin : non
     expect(r.noteExpedition(2, 4.5, 400).newRecord).toBe(true) // aussi loin, plus riche
     expect(r.noteExpedition(4, 3.0, 700).newRecord).toBe(true) // plus loin : oui
-    expect(new Records(storage).expedition()).toMatchObject({ tableaux: 4, liters: 3.0 })
+    expect(new Records(storage).expedition()).toMatchObject({
+      tableaux: 4,
+      liters: 3.0,
+    })
   })
 
   it('survit à un stockage absent ou corrompu', () => {

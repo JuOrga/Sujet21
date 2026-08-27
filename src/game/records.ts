@@ -42,6 +42,10 @@ interface RecordsData {
   tableaux: Record<string, TableauBests>
   expedition: ExpeditionRecord | null
   history: HistoryEntry[]
+  // LA MÉMOIRE : la monnaie persistante de l'Éveil. De l'information, pas
+  // de la matière — la purge de fin de run confisque le condensat, jamais
+  // la mémoire : le Sujet se souvient, même d'une run échouée.
+  memoire: number
 }
 
 export interface StorageLike {
@@ -54,7 +58,14 @@ const KEY = 'projet21.registres.v1'
 const HISTORY_MAX = 40
 
 function blank(): RecordsData {
-  return { essais: 0, operator: '', tableaux: {}, expedition: null, history: [] }
+  return {
+    essais: 0,
+    operator: '',
+    tableaux: {},
+    expedition: null,
+    history: [],
+    memoire: 0,
+  }
 }
 
 function defaultStorage(): StorageLike | null {
@@ -79,15 +90,27 @@ export class Records {
       const raw = this.storage?.getItem(KEY)
       if (raw) {
         const d = JSON.parse(raw) as RecordsData
-        if (typeof d.essais === 'number' && d.tableaux && Array.isArray(d.history)) {
+        if (
+          typeof d.essais === 'number' &&
+          d.tableaux &&
+          Array.isArray(d.history)
+        ) {
           if (typeof d.operator !== 'string') d.operator = '' // registres d'avant le nom
           if (d.expedition === undefined) d.expedition = null // registres d'avant la boucle
+          if (typeof d.memoire !== 'number' || !Number.isFinite(d.memoire))
+            d.memoire = 0 // registres d'avant l'Éveil
           // Migration : les registres d'avant la refonte (un seul record par
           // salle) sèment leurs deux records avec la même entrée.
           for (const code of Object.keys(d.tableaux)) {
-            const t = d.tableaux[code] as unknown as TableauRecord & Partial<TableauBests>
+            const t = d.tableaux[code] as unknown as TableauRecord &
+              Partial<TableauBests>
             if (t && typeof t.liters === 'number' && !t.volume) {
-              const seed: TableauRecord = { liters: t.liters, time: t.time, essai: t.essai, name: t.name }
+              const seed: TableauRecord = {
+                liters: t.liters,
+                time: t.time,
+                essai: t.essai,
+                name: t.name,
+              }
               d.tableaux[code] = { volume: seed, chrono: { ...seed } }
             }
           }
@@ -125,6 +148,29 @@ export class Records {
 
   tableauRecord(code: string): TableauBests | null {
     return this.data.tableaux[code] ?? null
+  }
+
+  /** Le solde de MÉMOIRE — la monnaie persistante de l'Éveil. */
+  memoire(): number {
+    return this.data.memoire
+  }
+
+  /** Crédite la mémoire (l'information survit à la purge). Rend le solde. */
+  gagneMemoire(n: number): number {
+    if (n > 0) {
+      this.data.memoire += Math.round(n)
+      this.save()
+    }
+    return this.data.memoire
+  }
+
+  /** Débite la mémoire si le solde suffit (l'arbre de l'Éveil). */
+  depenseMemoire(n: number): boolean {
+    if (n <= 0) return true
+    if (this.data.memoire < n) return false
+    this.data.memoire -= Math.round(n)
+    this.save()
+    return true
   }
 
   lastEntries(n: number): HistoryEntry[] {
@@ -173,7 +219,11 @@ export class Records {
   }
 
   /** Fin d'expédition (achevée ou perdue) : la meilleure est retenue. */
-  noteExpedition(tableaux: number, liters: number, time: number): { newRecord: boolean } {
+  noteExpedition(
+    tableaux: number,
+    liters: number,
+    time: number,
+  ): { newRecord: boolean } {
     if (tableaux === 0 && liters < 0.01) return { newRecord: false } // rien à consigner
     const entry: ExpeditionRecord = {
       tableaux,

@@ -22,8 +22,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '27/08/2026 12:40',
+    title: 'Les deux monnaies : le CONDENSAT de run et la MÉMOIRE de l’Éveil',
+    notes: [
+      'Le méta-jeu du roguelike pose sa première pierre — deux monnaies, deux natures. Le CONDENSAT est de la MATIÈRE : la bourse de la run. Les centilitres livrés au sas la nourrissent (comme avant), et désormais des PASTILLES de condensat brillent dans les tableaux — semées automatiquement à chaque entrée (semis déterministe par code de salle : mêmes places à chaque essai), dans les recoins du champ et surtout dans les CACHETTES, qui récompensent enfin l’explorateur au-delà du secret. On les boit au contact du corps. Un chip 💧 les compte dans la barre. Et la règle nouvelle : à la fin de la run — réussie, perdue ou abandonnée — le laboratoire PURGE la cuve. Le condensat est confisqué : il se dépense EN ROUTE (les cartes payantes, et bientôt l’Économat du Semblable), pas en banque.',
+      'La MÉMOIRE est de l’INFORMATION : elle survit à la purge — le Sujet se souvient. Gravée dans les registres : +5 par sas bu, +5 la toute première traversée d’un tableau, +2 par record battu, +10 par trophée (le toast l’affiche), +10 l’expédition bouclée — et +2 même sur une DISPERSION : on apprend de ses échecs. Elle paiera l’arbre de l’ÉVEIL (les améliorations permanentes, la conscience qui grandit). Son solde s’affiche sur la fiche, à côté du condensat de run ; le butin de fin de run récapitule ce qui a été gravé. L’ancien condensat persistant est MIGRÉ une fois pour toutes : 10 cL d’hier = 1 souvenir, rien n’est perdu.',
+      'Sous le capot : les pastilles vivent dans le format de tableau (champ « condensats » posable à la main, sinon semis auto — jamais dans une paroi, jamais sur le départ ni le sas), l’absorption est une fonction pure testée, la sauvegarde de run emporte la bourse, et le pupitre d’essais sait créditer les deux monnaies. Vérifié dans le jeu construit : migration de l’héritage (250 cL → 25 de mémoire), pastilles visibles au tableau 1, chip HUD en place. 413 tests verts.',
+    ],
+  },
+  {
     date: '27/08/2026 23:00',
-    title: 'LA SERRE entre en jeu : le blé nain, les gouttières — et un outil pour les poser',
+    title:
+      'LA SERRE entre en jeu : le blé nain, les gouttières — et un outil pour les poser',
     notes: [
       'Les images sont arrivées : blé nain et deux versions de la gouttière hydroponique. Elles sont intégrées — nettoyées d’abord (le détourage laissait un liséré VERT sur les épis et des poussières de pixels ; un dé-spill de bord et un tri des pixels esseulés les enlèvent), puis recompressées aux réglages maison, ceux-là mêmes qu’emploie l’import d’images du jeu : WebP, côté ≤ 1600, qualité .85 — 2,3 Mo de PNG deviennent 340 Ko. Le voile gris terne des lueurs s’estompe, mais le DÉGRADÉ rose des barres horticoles reste entier (au premier essai, mon tri l’avait coupé net : corrigé).',
       'Et surtout : on peut enfin POSER du décor. L’éditeur n’avait aucun outil pour ça — les décalques n’existaient que dans les tableaux écrits à la main. Un groupe « Décor (sans physique) » apparaît dans la palette : BLÉ NAIN, GOUTTIÈRE, GOUTTIÈRE (2) et MACHINERIE (tuyaux, vanne, écrans, fioles). On trace un rectangle, la pièce s’y loge ; la sorte se rechange ensuite dans le panneau, où les noms sont enfin lisibles au lieu des étiquettes techniques.',
@@ -32,7 +42,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '27/08/2026 22:16',
-    title: 'LA SERRE : les prompts des cultures, et le catalogue qui les attend',
+    title:
+      'LA SERRE : les prompts des cultures, et le catalogue qui les attend',
     notes: [
       'Demandé pour le niveau SERRE : de quoi générer roquette, blé nain et tomates en hydroponie. Les prompts sont écrits, prêts à copier-coller, dans le document maison des assets (docs/assets-ia.md, section 14) — avec une quatrième pièce, la gouttière nue et sa barre horticole, qui sert de support aux trois autres.',
       'Ils tiennent la charte : vue de FACE strictement orthographique (le jeu n’a pas de perspective), pièce détourée sur fond transparent, aucune ombre portée au sol (le moteur pose les siennes), lumière froide venue du haut, acier bleu #0a1420 et liséré cyan #63b7e6 — et des verts FROIDS, seuls capables de ressortir sur le noir de la cuve. Pas de terre : l’hydroponie se lit aux cubes de laine de roche, aux billes d’argile et à l’eau qui luit dans la gouttière. La lueur rose de la barre horticole a sa variante blanc froid, pour qui préfère rester strictement dans la palette.',
@@ -58,8 +69,7 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '27/08/2026 16:31',
-    title:
-      'Le générateur applique le cahier : treize règles passent EN PLACE',
+    title: 'Le générateur applique le cahier : treize règles passent EN PLACE',
     notes: [
       'Demandé : mettre en place les recommandations du cahier des règles (toutes sauf la durée-cible) et corriger le laser posé « juste à côté de la cible ». C’est fait — et le défaut signalé a désormais sa règle : LE TRAJET S’ÉTIRE. Chaque pose d’énigme s’ENGAGE sur une distance minimale émetteur → pastille (miroir 300 u, relais 380, rail 280, double ET 260) et la validation la tient : une pastille nichée contre son émetteur fait re-tirer la salle. Le corps gelé se tient du côté OPPOSÉ à l’émetteur, le rail court d’un flanc vers l’autre — le fil se lit à travers la salle, il ne se résout plus sur place.',
       'Les salles générées gagnent leurs règles de conception : le SANCTUAIRE D’ENTRÉE (aucun danger à moins de 300 u du spawn, l’énigme repoussée du point de naissance), le CUL-DE-SAC PLEIN (chaque embranchement reçoit cachette ou fiole — le détour se respecte), la BOUCLE QUI SE CHOISIT (deux ouvertures libres : l’une prend un filtre, le choix de route devient une décision), le POINT DE REPÈRE (chaque salle porte une marque mémorisable — décalcomanie tournante ou lampe teintée), COMBINER PAS ENCOMBRER (au-delà de D5, les renforts deviennent des énigmes, pas des filtres de plus), et la silhouette garde son plancher d’ambiante même en contrasté.',
@@ -69,7 +79,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '27/08/2026 16:25',
-    title: 'L’ALIGNEMENT AUTOMATIQUE se coupe — la pièce se pose où on la lâche',
+    title:
+      'L’ALIGNEMENT AUTOMATIQUE se coupe — la pièce se pose où on la lâche',
     notes: [
       'Signalé (capture d’arcs mal raccordés à l’appui) : l’alignement automatique tire parfois une pièce là où on ne veut pas. Il avait un défaut de naissance — aucun interrupteur : la case AIMANT ne commandait que l’arrondi à la GRILLE, tandis que le magnétisme aux voisines (bords, centres, écarts égaux) s’appliquait toujours, et primait même sur la grille.',
       'La barre de l’éditeur porte donc une seconde case, ALIGNEMENT, à côté d’AIMANT : décochée, la pièce se pose exactement où on la lâche. Pour un seul geste, tenir ALT fait la même pause — sans rien décocher. Les deux aides sont maintenant indépendantes, et le choix se retient d’une séance à l’autre (c’est un réglage de la main, pas du tableau).',
@@ -89,8 +100,7 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '27/08/2026 11:56',
-    title:
-      'LE CAHIER DES RÈGLES : la génération procédurale, noir sur blanc',
+    title: 'LE CAHIER DES RÈGLES : la génération procédurale, noir sur blanc',
     notes: [
       'Le chantier « améliorer ou refaire le générateur » commence par ses RÈGLES. Nouveau bouton au menu principal (mode concepteur) : « RÈGLES DE GÉN. » ouvre LE CAHIER DES RÈGLES — quarante règles écrites noir sur blanc, classées en six familles (le contrat, la structure, la rampe, la lisibilité, l’habillage, les figures). Vingt-six règles EN PLACE disent ce que le générateur fait réellement aujourd’hui, chiffres à l’appui (la preuve avant livraison, les plafonds de lisibilité, le dosage par difficulté, le lore qui place les dangers…) ; quatorze PROPOSITIONS disent ce qu’un level designer attend d’un bon générateur et que le nôtre ne fait pas encore (enseigner-éprouver-tordre, la respiration, le point de repère par salle, le cul-de-sac jamais vide, lire avant d’agir…).',
       'Chaque règle s’ANNOTE : une zone de note sous la règle, partagée entre concepteurs — qui a annoté, quand. Et l’on CONSIGNE des règles nouvelles en texte libre, comme elles viennent, depuis le Steam Deck ou la tablette ; le ✕ les retire, la réécriture garde leur date. Notes et ajouts vivent dans le magasin partagé (/api/regles, le patron des fiches : pointeur + historique de 4 versions) : l’implémentation viendra les y relire — écrivez vos règles dans le jeu, elles seront récupérées et implémentées à la prochaine passe.',
