@@ -22,7 +22,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
-    date: '27/08/2026 00:45',
+    date: '27/08/2026 02:52',
+    title: 'LA VOIE, de bout en bout : le plan de descente, la fin, le palmarès',
+    notes: [
+      'Demandé pour la nuit : le cycle de vie COMPLET d’une partie en voie semi-procédurale — début, milieu, fin, terminable de bout en bout avec la génération actuelle, paramétrable — et de la progression qui donne envie de continuer. C’est fait. La voie suit désormais un PLAN DE DESCENTE : une longueur (12 salles par défaut), le moment par tiers (début → milieu → fin), et une RAMPE DE DIFFICULTÉ qui monte de 0 au départ jusqu’au plafond choisi. Quand la séquence écrite s’épuise, DEUX salles générées prennent la relève à chaque choix (deux mécaniques différentes) : la descente continue jusqu’au bout du plan, bibliothèque courte ou pas.',
+      'La FIN existe : au dernier sas du plan, « LA VOIE EST BOUCLÉE » — bilan de la descente, records d’expédition consignés, et le PALMARÈS DE LA VOIE du poste : descentes entamées, bouclées, PROFONDEUR RECORD (mise à jour en direct, même sur une descente perdue), meilleur volume livré — avec le tampon « MEILLEURE DESCENTE ✦ » quand il tombe. Le palmarès se lit aussi sur la fiche, dans les registres. Le titre du choix annonce la position : « SALLE 4 / 12 ».',
+      'Le plan se règle au BANC (dossier « La voie ») : longueur (3–40), difficulté max (0–9), et la DESCENTE DU JOUR — les salles générées viennent de la date, les mêmes pour tous les postes ce jour-là, les palmarès se comparent. Le tout vit dans src/game/voie.ts, gravé par 7 tests (rampe monotone 0→max, moments par tiers, graine du jour stable et distincte par jour et par rang, mécaniques du choix distinctes, palmarès blindé). Vérifié en navigateur : plan lu (SALLE 1/6 · DESCENTE DU JOUR), difficulté 0 au premier rang, ligne de palmarès dans les registres. 379 tests verts.',
+    ],
+  },
+  {
+    date: '27/08/2026 02:39',
     title:
       'Le générateur apprend la FIGURE : la leçon des tableaux faits main, paramétrable',
     notes: [

@@ -16,8 +16,19 @@ import {
   type CodeAtelier,
 } from './game/levelIO'
 import { dessineMiniCarte } from './game/carte'
-import { phaseRun, propositionsSalles } from './game/poule'
+import { propositionsSalles } from './game/poule'
 import { genereNiveauAtelier } from './game/generateur'
+import {
+  clampPlanVoie,
+  diffAuRang,
+  hachage,
+  litPalmaresVoie,
+  mecaniquesDuChoix,
+  momentAuRang,
+  varianteDuJour,
+  type PalmaresVoie,
+  type PlanVoie,
+} from './game/voie'
 import { CIRCUITS } from './game/circuits'
 import {
   BONBONNE_CAP,
@@ -388,6 +399,49 @@ let departEnVapeur = false
 let modeVoie = false
 let voieGenereeChoisie: LevelDef | null = null
 let voieIntercalaire: LevelDef | null = null
+// le RANG de la descente en cours : combien de salles FRANCHIES — la voie
+// se boucle quand il atteint la longueur du plan, quelle que soit la
+// séquence écrite (épuisée, elle cède la place aux salles générées)
+let voieRang = 0
+
+// Le PLAN de la voie : paramétrable au banc, mémorisé par poste.
+const CLE_PLAN_VOIE = 'sujet21-voie-plan-v1'
+const voiePlan: PlanVoie = (() => {
+  try {
+    return clampPlanVoie(
+      JSON.parse(localStorage.getItem(CLE_PLAN_VOIE) ?? 'null') as PlanVoie,
+    )
+  } catch {
+    return clampPlanVoie(null)
+  }
+})()
+function sauvePlanVoie(): void {
+  try {
+    localStorage.setItem(CLE_PLAN_VOIE, JSON.stringify(clampPlanVoie(voiePlan)))
+  } catch {
+    // stockage refusé : le plan ne tiendra que la session
+  }
+}
+
+// Le PALMARÈS de la voie : descentes, bouclées, profondeur record, meilleur
+// livré — ce qui donne envie de redescendre. Par poste.
+const CLE_PALMARES_VOIE = 'sujet21-voie-palmares-v1'
+function chargePalmaresVoie(): PalmaresVoie {
+  let brut: string | null = null
+  try {
+    brut = localStorage.getItem(CLE_PALMARES_VOIE)
+  } catch {
+    brut = null
+  }
+  return litPalmaresVoie(brut)
+}
+function sauvePalmaresVoie(p: PalmaresVoie): void {
+  try {
+    localStorage.setItem(CLE_PALMARES_VOIE, JSON.stringify(p))
+  } catch {
+    // stockage refusé : tant pis pour cette fois
+  }
+}
 
 // Le BUTIN de la voie : les salles générées ÉLUES, retenues sur ce poste
 // (registres locaux) — rejouables depuis l'écran SALLES, publiables dans la
@@ -782,6 +836,15 @@ function renderRegistres(): void {
     rows.push(
       `<div class="rec-hist">+ ${cachees} autre(s) salle(s) au palmarès — bouton RECORDS.</div>`,
     )
+  }
+  // le palmarès de LA VOIE : la ligne qui donne envie de redescendre
+  {
+    const palm = chargePalmaresVoie()
+    if (palm.descentes > 0) {
+      rows.push(
+        `<div class="rec-hist">⑂ LA VOIE : ${palm.bouclees} bouclée(s) sur ${palm.descentes} descente(s) · profondeur record ${palm.profondeurRecord} · meilleur livré ${fmtL(palm.meilleurLivre)}</div>`,
+      )
+    }
   }
   const localExp = records.expedition()
   const sharedExp = sharedBoard?.expedition ?? null
@@ -5431,6 +5494,10 @@ function avanceSalle(): void {
   salleChoisie = null
   levelIndex =
     choix > levelIndex ? choix : cible > levelIndex ? cible : levelIndex + 1
+  // garde-fou de la voie : séquence épuisée sans intercalaire élue (graine
+  // ingrate) — on ne REboucle jamais sur la salle 1 en pleine descente
+  if (modeVoie)
+    levelIndex = Math.min(levelIndex, Math.max(0, playedLevels().length - 1))
   restart()
 }
 
@@ -5758,86 +5825,125 @@ function mbApresRecompense(): void {
   else mbMontreFin()
 }
 
-/** LA VOIE SEMI-PROCÉDURALE : la salle suivante de la séquence (la suite
- * ÉCRITE) mise en face d'une salle GÉNÉRÉE au cahier des charges de la
- * progression — moment = phase de la run, difficulté de la suite écrite
- * (ou de la progression), mécanique DIFFÉRENTE pour que le choix parle.
- * La salle générée est PROUVÉE traversable par le générateur. */
-function propositionsVoie(seq: LevelDef[]): {
-  ecrite: LevelDef
-  generee: LevelDef
-  cahier: CodeAtelier
-} | null {
-  const ecrite = seq[levelIndex + 1]
-  if (!ecrite) return null // fin de séquence : la cérémonie ordinaire conclut
-  const rang = levelIndex + 2
-  const moment = phaseRun(rang, seq.length)
-  const aEcrite = decodeCodeAtelier(ecrite.code)
-  const difficulte =
-    aEcrite?.difficulte ??
-    Math.min(9, Math.round(((rang - 1) / Math.max(1, seq.length - 1)) * 3))
-  const mecas = [0, 1, 2, 3].filter((m) => m !== (aEcrite?.mecanique ?? -1))
-  const mecanique = mecas[Math.floor(Math.random() * mecas.length)]
-  const cahier: CodeAtelier = {
-    moment,
-    mecanique: mecanique as CodeAtelier['mecanique'],
-    difficulte,
-  }
-  const variante = Math.floor(Math.random() * 36 ** 4)
-    .toString(36)
-    .toUpperCase()
-    .padStart(2, '0')
-  try {
-    return { ecrite, generee: genereNiveauAtelier(cahier, variante), cahier }
-  } catch {
-    return null // aucune salle prouvée sur cette graine : enchaînement ordinaire
-  }
+/** Une carte du choix de la voie. */
+interface CarteVoie {
+  lv: LevelDef
+  cahier: CodeAtelier | null
+  generee: boolean
+  etiquette: string
 }
 
-function mbMontreSallesVoie(duo: {
-  ecrite: LevelDef
-  generee: LevelDef
-  cahier: CodeAtelier
-}): void {
+/** LA VOIE SEMI-PROCÉDURALE : le choix du rang suivant, tiré du PLAN de
+ * descente (longueur, rampe de difficulté, moment par tiers). La suite
+ * ÉCRITE tant que la séquence en offre — face à une salle GÉNÉRÉE au cahier
+ * du plan, mécanique différente. Séquence épuisée : DEUX salles générées,
+ * deux mécaniques — la descente continue jusqu'au bout du plan. En
+ * DESCENTE DU JOUR, graine et mécaniques viennent de la date : les mêmes
+ * salles pour tous les postes ce jour-là. */
+function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
+  const rangSuivant = voieRang + 1 // la salle que le choix désigne, dans le plan
+  if (rangSuivant > voiePlan.longueur) return null // la fin se joue au sas
+  const ecrite = seq[levelIndex + 1] ?? null
+  const moment = momentAuRang(rangSuivant, voiePlan)
+  const difficulte = diffAuRang(rangSuivant, voiePlan)
+  const aEcrite = ecrite ? decodeCodeAtelier(ecrite.code) : null
+  const jour = new Date().toISOString().slice(0, 10)
+  const alea = voiePlan.graineDuJour
+    ? ((): (() => number) => {
+        let h = hachage(`${jour}@${rangSuivant}`)
+        return () => {
+          h = Math.imul(h ^ (h >>> 13), 0x5bd1e995) >>> 0
+          return h / 2 ** 32
+        }
+      })()
+    : Math.random
+  const [mecaA, mecaB] = mecaniquesDuChoix(aEcrite?.mecanique ?? null, alea)
+  const variante = (n: number): string =>
+    voiePlan.graineDuJour
+      ? varianteDuJour(jour, rangSuivant * 10 + n)
+      : Math.floor(Math.random() * 36 ** 4)
+          .toString(36)
+          .toUpperCase()
+          .padStart(2, '0')
+  const genere = (
+    mecanique: CodeAtelier['mecanique'],
+    n: number,
+  ): { lv: LevelDef; cahier: CodeAtelier } | null => {
+    const cahier: CodeAtelier = { moment, mecanique, difficulte }
+    for (let essai = 0; essai < 3; essai++) {
+      try {
+        return { lv: genereNiveauAtelier(cahier, variante(n + essai * 3)), cahier }
+      } catch {
+        // graine sans salle prouvée : on retire une variante voisine
+      }
+    }
+    return null
+  }
+  const cartes: CarteVoie[] = []
+  if (ecrite)
+    cartes.push({
+      lv: ecrite,
+      cahier: aEcrite,
+      generee: false,
+      etiquette: 'LA SUITE ÉCRITE',
+    })
+  const g1 = genere(mecaA, 1)
+  if (g1)
+    cartes.push({
+      lv: g1.lv,
+      cahier: g1.cahier,
+      generee: true,
+      etiquette: 'SALLE GÉNÉRÉE — INÉDITE, PROUVÉE',
+    })
+  if (!ecrite) {
+    const g2 = genere(mecaB, 2)
+    if (g2)
+      cartes.push({
+        lv: g2.lv,
+        cahier: g2.cahier,
+        generee: true,
+        etiquette: 'SALLE GÉNÉRÉE — L’AUTRE MÉCANIQUE',
+      })
+  }
+  // il faut au moins une porte pour continuer la descente ; une seule carte
+  // reste un choix jouable (la séquence épuisée sur une graine ingrate)
+  return cartes.length >= 1 ? cartes : null
+}
+
+function mbMontreSallesVoie(cartes: CarteVoie[]): void {
   mbEtape = 'salles'
   mbEl('mb-choix-titre').textContent =
-    'LA VOIE SE SÉPARE — CHOISISSEZ LA PROCHAINE SALLE'
+    `LA VOIE SE SÉPARE — SALLE ${voieRang + 1} / ${voiePlan.longueur}` +
+    (voiePlan.graineDuJour ? ' · DESCENTE DU JOUR' : '')
   const host = mbEl('mb-cartes')
   host.innerHTML = ''
   const esc = (t: string): string =>
     t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
-  const carte = (
-    lv: LevelDef,
-    etiquette: string,
-    a: CodeAtelier | null,
-    generee: boolean,
-  ): void => {
+  for (const c of cartes) {
     const btn = document.createElement('button')
     btn.type = 'button'
     btn.className = 'mb-carte mb-salle'
     btn.innerHTML =
       `<canvas width="220" height="126"></canvas>` +
-      `<em class="mb-voie-tag${generee ? ' mb-voie-gen' : ''}">${etiquette}</em>` +
-      `<b>${esc(lv.code)}</b><small>${esc(lv.name)}</small>` +
-      (a
-        ? `<span class="salle-chips"><i>${MOMENT_COURT[a.moment]}</i>` +
-          `<i class="sc-m${a.mecanique}">${MECANIQUE_NOMS[a.mecanique].toUpperCase()}</i>` +
-          `<i>DIFF ${a.difficulte}</i></span>`
+      `<em class="mb-voie-tag${c.generee ? ' mb-voie-gen' : ''}">${c.etiquette}</em>` +
+      `<b>${esc(c.lv.code)}</b><small>${esc(c.lv.name)}</small>` +
+      (c.cahier
+        ? `<span class="salle-chips"><i>${MOMENT_COURT[c.cahier.moment]}</i>` +
+          `<i class="sc-m${c.cahier.mecanique}">${MECANIQUE_NOMS[c.cahier.mecanique].toUpperCase()}</i>` +
+          `<i>DIFF ${c.cahier.difficulte}</i></span>`
         : '')
-    dessineMiniCarte(btn.querySelector('canvas') as HTMLCanvasElement, lv)
+    dessineMiniCarte(btn.querySelector('canvas') as HTMLCanvasElement, c.lv)
     btn.addEventListener('click', () => {
-      if (generee) {
-        voieGenereeChoisie = lv
-        noteSalleElue(lv) // le butin retient l'élue : rejouable, publiable
-      } else salleChoisie = lv
+      if (c.generee) {
+        voieGenereeChoisie = c.lv
+        noteSalleElue(c.lv) // le butin retient l'élue : rejouable, publiable
+      } else salleChoisie = c.lv
       bande.ponctuation('sting-collecte', 0.7)
       fermeMiseEnBonbonne()
       avanceSalle()
     })
     host.appendChild(btn)
   }
-  carte(duo.ecrite, 'LA SUITE ÉCRITE', decodeCodeAtelier(duo.ecrite.code), false)
-  carte(duo.generee, 'SALLE GÉNÉRÉE — INÉDITE, PROUVÉE', duo.cahier, true)
 }
 
 function mbMontreSalles(props: LevelDef[]): void {
@@ -6076,6 +6182,7 @@ function newExpedition(): void {
 function retourAuLabo(): void {
   voieIntercalaire = null
   voieGenereeChoisie = null
+  voieRang = 0 // la profondeur est déjà consignée au palmarès, en direct
   levelIndex = 0
   run.bonbonneLiters = 0
   run.runTime = 0
@@ -6257,6 +6364,7 @@ const pane = createBench(params, monitor, {
   reset: resetAction,
   autoZoom: () => camera.resetAutoZoom(),
   oeil: { regl: oeilRegl, defauts: OEIL_DEFAUTS, sauve: sauveOeil },
+  voie: { plan: voiePlan, sauve: sauvePlanVoie },
   tableaux: TABLEAUX.map((t) => t.name),
   gotoTableau: (index) => {
     testLevel = null // le banc navigue dans l'expédition, pas dans le prototype
@@ -7564,17 +7672,32 @@ function frame(now: number): void {
       newVolume || newChrono ? 'sting-record' : 'sting-collecte',
       0.85,
     )
-    if (levelIndex + 1 >= playedLevels().length) {
+    // LA VOIE : chaque sas bu creuse la descente d'un rang — le palmarès
+    // suit en direct (profondeur record, descentes entamées)
+    if (modeVoie) {
+      voieRang += 1
+      const p = chargePalmaresVoie()
+      if (voieRang === 1) p.descentes += 1
+      if (voieRang > p.profondeurRecord) p.profondeurRecord = voieRang
+      sauvePalmaresVoie(p)
+    }
+    // la fin : en voie, la descente se boucle au bout du PLAN — sinon,
+    // l'expédition s'achève au bout de la séquence écrite
+    const finExpedition = modeVoie
+      ? voieRang >= voiePlan.longueur
+      : levelIndex + 1 >= playedLevels().length
+    if (finExpedition) {
       // Dernier sas : l'expédition est achevée — bilan, et registres à jour
       run.ended = true
       trophees.debloque('integrale')
+      const sallesFranchies = modeVoie ? voieRang : playedLevels().length
       const exp = records.noteExpedition(
-        playedLevels().length,
+        sallesFranchies,
         run.livreTotal,
         run.runTime,
       )
       pushExpeditionRecord(
-        playedLevels().length,
+        sallesFranchies,
         run.livreTotal,
         run.runTime,
         records.operator(),
@@ -7584,18 +7707,34 @@ function frame(now: number): void {
           renderRegistres()
         }
       })
+      // le palmarès de la voie : la descente est BOUCLÉE
+      let voieNeuf = ''
+      if (modeVoie) {
+        const p = chargePalmaresVoie()
+        p.bouclees += 1
+        if (run.livreTotal > p.meilleurLivre) {
+          p.meilleurLivre = run.livreTotal
+          voieNeuf = ' — <em class="bilan-neuf">MEILLEURE DESCENTE ✦</em>'
+        }
+        sauvePalmaresVoie(p)
+      }
       renderRegistres()
       // l'expédition principale conclue n'a plus rien à reprendre
       if (!testLevel) effaceRun()
       // LE SCÉNARIO : la cinématique de fin d'expédition, sur le bilan
       void joueMoment('expedition-achevee')
+      const palm = chargePalmaresVoie()
       showOverlay(
-        'EXPÉDITION ACHEVÉE',
-        `<span class="bilan"><span class="bilan-l">${expeditionSummary(playedLevels().length)}${
-          exp.newRecord
-            ? ' — <em class="bilan-neuf">MEILLEURE EXPÉDITION ✦</em>'
-            : ''
-        }</span></span>Le laboratoire n'a plus d'échantillon. Quelque part dans les conduites, le fluide se souvient.`,
+        modeVoie ? 'LA VOIE EST BOUCLÉE' : 'EXPÉDITION ACHEVÉE',
+        modeVoie
+          ? `<span class="bilan"><span class="bilan-l">${expeditionSummary(sallesFranchies)}${voieNeuf}</span></span>` +
+              `Descente de ${sallesFranchies} salles, du début à la fin de la voie. ` +
+              `Palmarès du poste : ${palm.bouclees} bouclée(s) · profondeur record ${palm.profondeurRecord} · meilleur livré ${fmtL(palm.meilleurLivre)}.`
+          : `<span class="bilan"><span class="bilan-l">${expeditionSummary(sallesFranchies)}${
+              exp.newRecord
+                ? ' — <em class="bilan-neuf">MEILLEURE EXPÉDITION ✦</em>'
+                : ''
+            }</span></span>Le laboratoire n'a plus d'échantillon. Quelque part dans les conduites, le fluide se souvient.`,
         'success',
         'RETOUR AU LABO',
       )
