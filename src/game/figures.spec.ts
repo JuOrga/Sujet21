@@ -216,6 +216,43 @@ describe('générateur en mode figure', () => {
     expect(lv.lasers ?? []).toEqual([])
   })
 
+  it('voies : la leçon des 3 voies — la tresse des trois routes', () => {
+    const lv = genereNiveau(555, null, opts({ figure: 11, mecanismes: 3 }))
+    // les TROIS PORTES D'ÉTAT de la chambre natale : rideau, membrane,
+    // grille — on choisit sa voie en choisissant son état
+    const mats = new Set(lv.boxes.map((b) => b.material))
+    expect(mats.has(MAT_RIDEAU)).toBe(true)
+    expect(mats.has(MAT_MEMBRANE)).toBe(true)
+    expect(mats.has(MAT_GRILLE)).toBe(true)
+    expect(mats.has(MAT_FROID)).toBe(true)
+    expect(mats.has(MAT_SURCHAUFFEUR)).toBe(true)
+    // les PILIERS SUSPENDUS : des hydrophiles pendus à la ligne basse
+    const piliers = lv.boxes.filter(
+      (b) => b.material === MAT_HYDROPHILE && b.maxY - b.minY > 200,
+    )
+    expect(piliers.length).toBeGreaterThanOrEqual(2)
+    // les DEUX voiles : le grenier et le couloir secret de l'est
+    expect((lv.caches ?? []).length).toBe(2)
+    // les éponges en nombre (la colonne-buveuse et les angles)
+    expect((lv.sponges ?? []).length).toBeGreaterThanOrEqual(3)
+    // AUCUNE lampe : la lumière de base départage les routes (BOIZ)
+    expect(lv.lumieres ?? []).toEqual([])
+    // les deux canaux : le couloir secret (2 portes) et la trappe
+    const parCanal = new Map<number, number>()
+    for (const p of lv.portes ?? [])
+      parCanal.set(p.canal, (parCanal.get(p.canal) ?? 0) + 1)
+    expect(parCanal.get(2)).toBe(2)
+    expect(parCanal.get(1)).toBe(1)
+    expect((lv.lasers ?? []).length).toBe(2)
+    // le SAS flotte au bout du couloir médian, pas au bord est
+    expect(lv.exit.maxX).toBeLessThan(lv.bounds.maxX - 400)
+    // sans mécanisme : des plaques d'état remplacent les portes
+    const sans = genereNiveau(555, null, opts({ figure: 11, mecanismes: 1 }))
+    expect(sans.portes ?? []).toEqual([])
+    expect(sans.lasers ?? []).toEqual([])
+    expect(sans.boxes.length).toBeGreaterThan(lv.boxes.length)
+  })
+
   it('le grand bit de figure (familles ≥ 8) voyage et revient', () => {
     const o = opts({ figure: 8, ampleur: 1, mecanismes: 2 })
     const suffixe = encodeOptions(o)
