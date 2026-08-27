@@ -13,7 +13,14 @@ import {
   type OptionsGen,
 } from './generateur'
 import { FIGURE_FAMILLES } from './figures'
-import { MAT_GRILLE, MAT_MEMBRANE, MAT_RIDEAU } from './level'
+import {
+  MAT_GRILLE,
+  MAT_MEMBRANE,
+  MAT_RIDEAU,
+  MAT_HYDROPHILE,
+  MAT_HYDROPHOBE,
+  MAT_FROID,
+} from './level'
 
 const opts = (sur: Partial<OptionsGen>): OptionsGen => ({
   ...OPTIONS_DEFAUT,
@@ -143,6 +150,44 @@ describe('générateur en mode figure', () => {
     expect((lv.caches ?? []).length).toBe(1)
     // le sas au cœur : l'exit est DANS la cuve, pas à son bord est
     expect(lv.exit.maxX).toBeLessThan(lv.bounds.maxX - 400)
+  })
+
+  it('fusion : la leçon de la voie de la fusion — le puzzle de matière', () => {
+    const lv = genereNiveau(555, null, opts({ figure: 9 }))
+    // ZÉRO mécanisme, ZÉRO lampe : la matière fait tout
+    expect(lv.lasers ?? []).toEqual([])
+    expect(lv.portes ?? []).toEqual([])
+    expect(lv.lumieres ?? []).toEqual([])
+    // les ZONES FORCE-GLACE existent
+    expect((lv.zones ?? []).length).toBeGreaterThanOrEqual(1)
+    for (const z of lv.zones ?? []) expect(z.force).toBe('glace')
+    // la MOSAÏQUE : des surfaces à caractère en nombre
+    const caracteres = lv.boxes.filter((b) =>
+      [
+        MAT_HYDROPHILE,
+        MAT_HYDROPHOBE,
+        MAT_FROID,
+        MAT_MEMBRANE,
+        MAT_RIDEAU,
+      ].includes(b.material),
+    )
+    expect(caracteres.length).toBeGreaterThanOrEqual(5)
+    // l'ÉPONGE et le grenier voilé
+    expect((lv.sponges ?? []).length).toBe(1)
+    expect((lv.caches ?? []).length).toBe(1)
+    // les MEMBRANES ne trempent jamais dans une zone gelée (la fonte
+    // doit rester possible)
+    for (const b of lv.boxes) {
+      if (b.material !== MAT_MEMBRANE) continue
+      for (const z of lv.zones ?? []) {
+        const recouvre =
+          b.minX < z.maxX &&
+          b.maxX > z.minX &&
+          b.minY < z.maxY &&
+          b.maxY > z.minY
+        expect(recouvre, 'membrane dans une zone force-glace').toBe(false)
+      }
+    }
   })
 
   it('le grand bit de figure (familles ≥ 8) voyage et revient', () => {
