@@ -6013,6 +6013,22 @@ bonbonneEl?.addEventListener('click', verserBonbonne)
 ;(window as unknown as { __verser: () => string }).__verser = verserBonbonne
 /** La cérémonie avec un surplus factice — la sonde __bonbonne et le
  * PUPITRE D'ESSAIS passent tous deux par ici. */
+// VALIDER LA SALLE EN COURS (outil de conception). Rien n'est simulé : on
+// déclare le sas franchi, et c'est le VRAI chemin de fin de salle qui se
+// déroule — surplus réellement compté, records consignés, condensat versé,
+// rang de la descente creusé, cérémonie ouverte. Une cérémonie simulée
+// (boutons voisins) ne fait rien de tout cela : elle ne sert qu'à regarder
+// l'écran couler.
+let forceSas = false
+function valideSalleCourante(): string {
+  if (!hasPlayed) return 'menu'
+  if (auHub) return 'hub'
+  if (miseEnBonbonne || run.ended) return 'deja'
+  if (sim.dispersed) return 'disperse'
+  forceSas = true
+  return 'ok'
+}
+
 function simuleBonbonne(surplus = 2): void {
   montreMiseEnBonbonne({
     surplus,
@@ -6063,6 +6079,26 @@ for (const b of Array.from(
       return
     }
     switch (quoi) {
+      case 'valider-salle': {
+        const r = valideSalleCourante()
+        if (r === 'ok') {
+          // la fiche fige l'essai : sans la refermer, la boucle ne tourne
+          // pas et le sas ne serait jamais franchi
+          pupitreEl.hidden = true
+          closeHome()
+        } else {
+          pupDit(
+            r === 'menu'
+              ? 'Aucun essai en cours : lancez une descente d’abord.'
+              : r === 'hub'
+                ? 'Au hub il n’y a rien à valider — son sas lance la run.'
+                : r === 'deja'
+                  ? 'La salle est déjà conclue (cérémonie ouverte ou expédition achevée).'
+                  : 'Le corps est dispersé : plus rien à livrer.',
+          )
+        }
+        break
+      }
       case 'bonbonne-plus':
         run.bonbonneLiters = Math.min(BONBONNE_CAP, run.bonbonneLiters + 2)
         pupDit(
@@ -7529,6 +7565,22 @@ const chipEditor = touchButton(
   'tb-chip tb-editor',
 )
 chipEditor.style.display = 'none'
+// LE HUB À TOUT MOMENT (outil de conception) : le module d'accueil est
+// atteignable depuis n'importe quelle salle, sans repasser par la fiche ni
+// abandonner la run. Réservé au mode concepteur (data-dev, comme les autres
+// outils) : en partie publique, quitter une salle d'un doigt casserait la
+// descente. La run n'est pas purgée — bonbonne, XP et instruments restent ;
+// c'est le sas du hub qui relance une descente.
+const chipHub = touchButton(
+  '⌂ HUB',
+  'aller au hub tout de suite (mode concepteur) — la salle en cours est quittée, la run n’est pas purgée',
+  () => {
+    if (miseEnBonbonne) fermeMiseEnBonbonne()
+    entrerHub()
+  },
+  'tb-chip tb-hub',
+)
+chipHub.dataset.dev = ''
 
 // La barre du bas passe sur deux lignes quand elle se remplit (le bouton de
 // retour à l'éditeur, par exemple). On publie sa hauteur réelle en variable
@@ -8736,8 +8788,11 @@ function frame(now: number): void {
   // moitié du volume INITIAL rendait le bouton inatteignable en vraie partie
   const aspireAssez = sim.swallowed >= Math.max(20, sim.baseVolume * 0.1)
   const drunk =
+    forceSas ||
     (sim.swallowed > 0 && sim.count <= seuilBu) ||
     (aspireAssez && continuerVoulu)
+  // le drapeau ne vaut que pour cette image : consommé, il retombe
+  forceSas = false
   btnContinuer.classList.toggle(
     'visible',
     aspireAssez &&

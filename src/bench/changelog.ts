@@ -22,6 +22,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 16:48',
+    title: 'Deux raccourcis de conception : VALIDER LA SALLE, et le HUB à portée de doigt',
+    notes: [
+      'Demandé : pouvoir conclure la salle en cours pendant une descente semi-procédurale et arriver à l’écran de récompense. Le pupitre d’essais ouvre la section CÉRÉMONIE sur un bouton « Valider la salle en cours ». Rien n’y est simulé — c’est le VRAI chemin de fin de salle qui se déroule : le sas est déclaré franchi à l’image suivante, le volume réellement présent est compté comme livré, les records se consignent, le condensat se verse, le rang de la descente se creuse, la voie propose sa suite. Les trois boutons voisins (petit, moyen, gros surplus) restent ce qu’ils étaient : une cérémonie factice, pour regarder l’écran couler sans toucher à la run.',
+      'À savoir, et c’est écrit sous le bouton : valider consigne de VRAIS records. Le chrono de la salle vaut alors une fraction de seconde — le record du protocole tombera, et la publication au tableau partagé suivra. C’est le prix d’un raccourci qui emprunte le vrai chemin plutôt que d’en singer un.',
+      'Demandé aussi : un accès permanent au hub. La barre du bas porte une chip « ⌂ HUB » qui y ramène depuis n’importe quelle salle, sans repasser par la fiche ni abandonner la run — la bonbonne, l’étalonnage et les instruments restent en poche, c’est le sas du hub qui relance une descente. La chip est réservée au MODE CONCEPTEUR (même porte que l’éditeur, le montage et le pupitre) : en partie publique, quitter une salle d’un doigt casserait la descente.',
+      'Vérifié dans le jeu construit : chip absente en accueil public, présente en ?dev ; depuis SALLE 1/24, un toucher ramène au LABO ; et le pupitre, déclenché en pleine salle, ouvre la mise en bonbonne avec le volume réel (4,50 L, 100 % du départ, condensat versé, trophée « Sans une goutte » au passage). 436 tests verts, build propre.',
+    ],
+  },
+  {
     date: '28/08/2026 16:31',
     title:
       'Les mémoires : les liens VIVENT, et le scénario peut tout reprendre',
