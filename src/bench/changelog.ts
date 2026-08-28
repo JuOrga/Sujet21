@@ -32,48 +32,22 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
-    date: '27/08/2026 15:05',
-    title: 'L’Éveil au pupitre, et le méta se pose à la main dans l’éditeur',
+    date: '28/08/2026 12:21',
+    title: 'LES MÉMOIRES : le cycle des états remplace l’arbre de l’Éveil',
     notes: [
-      'Demandé : l’arbre de l’Éveil accessible depuis l’écran PUPITRE, et de quoi POSER les monnaies et items du méta dans l’éditeur. Le pupitre d’essais gagne son bouton « L’arbre de l’Éveil » : l’arbre s’ouvre PAR-DESSUS le pupitre (on achète, on referme, le pupitre est toujours là) — à côté des boutons qui créditent condensat, mémoire et fiole surprise pour tester.',
-      'L’ÉDITEUR gagne deux outils dans la palette des mécanismes. La PASTILLE DE CONDENSAT : un clic la pose, sa valeur en centilitres se règle au panneau (1..200), elle se déplace, se duplique, se supprime comme une cible — et dès la PREMIÈRE pastille posée main, le semis automatique du tableau se coupe : c’est le concepteur qui décide. L’EMPLACEMENT DE FIOLE : un seul par tableau (reposer le déplace) — en jeu, la fiole n’y apparaît que si la collection du joueur est incomplète ; sans emplacement posé, le semis automatique garde la main (la cachette la plus profonde, une chance sur deux). Les deux se dessinent dans l’éditeur au langage visuel du jeu (goutte cyan chiffrée, double anneau violet étiqueté FIOLE).',
-      'Le format des tableaux porte le champ « fiole » (aller-retour JSON testé, bornes comprises — les fichiers sans ces champs ne changent pas d’un octet). Vérifié dans le vrai éditeur au pointeur : deux pastilles et une fiole posées, lues dans le niveau ; et l’arbre ouvert depuis le pupitre, achats en direct. 426 tests verts.',
+      'Le concepteur a tranché : pas d’arbre — un CYCLE, celui de son croquis. L’écran des mémoires (fiche → LES MÉMOIRES, pupitre → L’écran des mémoires) dessine les états de la matière : SOLIDE (octogone cristallin qui scintille), LIQUIDE (flaque vivante au contour qui ondule — l’origine), GAZ (nuée qui dérive), et une ENTITÉ INCONNUE au contour qui vacille — le quatrième état, voilé. Les TRANSFORMATIONS sont les liens entre eux, en bulles posées sur les flèches, comme sur le papier : sublimation et condensation en grands arcs extérieurs, écrites le long du trait.',
+      'On démarre avec DEUX liens acquis d’origine : FUSION (solide → liquide) et LIQUÉFACTION (gaz → liquide) — juste de quoi REDEVENIR liquide après une zone imposée ; revenir au liquide n’est jamais un achat. Les quatre autres se TISSENT en mémoire : SOLIDIFICATION (10), VAPORISATION (15), SUBLIMATION (60), CONDENSATION (60) — aucun prérequis, chaque lien est sa propre mémoire. Les liens du plasma affichent « ??? » et ne se tissent pas encore. Un lien tissé COULE : les tirets voyagent dans le sens de la transformation ; une bulle payable respire ; un refus secoue la tête sans rien débiter.',
+      'Les nœuds utilitaires de l’ancien arbre (corps ample, matière retenue, échantillon prudent, souffle long, bascules du péage) sont RETIRÉS et intégralement REMBOURSÉS en mémoire à la première lecture des registres — le péage de vaporisation revient à ses 20 % canoniques. Achats atomiques et persistants (testés), migration testée (une seule fois). Vérifié dans le jeu construit : deux tissages en direct (80 → 55), refus propre de la sublimation à 55/60. La suite au prochain train : ces liens commanderont les BOUTONS d’état de la descente. 427 tests verts.',
     ],
   },
   {
-    date: '27/08/2026 14:10',
-    title: 'L’ARBRE DE L’ÉVEIL : la conscience s’achète en mémoire',
+    date: '28/08/2026 12:06',
+    title:
+      'Le choix de la voie tient dans l’écran du Deck : le bilan se replie',
     notes: [
-      'Quatrième et dernière pierre du chantier méta : l’ARBRE DE L’ÉVEIL, ouvert depuis la fiche (bouton L’ÉVEIL). La mémoire — l’information qui survit à la purge — s’y investit POUR TOUJOURS. Les branches suivent le schéma des états de la matière du concepteur : LIQUIDE (l’origine), SOLIDIFICATION (la glace), VAPORISATION (la vapeur), les TRANSITIONS DIRECTES, le PLASMA. Chaque transition est un pouvoir, chaque état une branche.',
-      'Les nœuds d’ouverture : LE CORPS AMPLE (20 — le corps naît avec 40 gouttes de plus), LA MATIÈRE RETENUE (25 — les pastilles rendent +25 %), L’ÉCHANTILLON PRUDENT (45 — +1 vie au départ de run), LE SOUFFLE LONG (40 — +1 dash de réserve), LA BASCULE ÉCONOME puis MAÎTRISÉE (35/70 — le péage de vaporisation 20 % → 17 % → 15 %, appliqué au moteur). Les pouvoirs d’état (solidification, vaporisation) sont ACQUIS D’ORIGINE : l’arbre est prêt pour leur déblocage progressif — il s’activera avec la re-parcellisation ISS, comme décidé. SUBLIMATION, CONDENSATION et IONISATION (le plasma) sont annoncés, verrouillés : leurs chantiers moteur viennent.',
-      'L’achat est ATOMIQUE dans les registres (mémoire débitée ET nœud gravé, ou rien — testé), les prérequis se respectent (testés), le facteur de péage recalculé depuis la valeur d’usine à chaque achat. Vérifié dans le jeu construit : deux nœuds achetés en direct (80 → 25 de mémoire), l’arbre surligne les acquis. Le chantier méta est complet : condensat + mémoire, l’Économat du Semblable, les fioles, l’Éveil. 425 tests verts.',
-    ],
-  },
-  {
-    date: '27/08/2026 13:40',
-    title: 'Les FIOLES : la collection d’échantillons scellés, deux au départ',
-    notes: [
-      'Troisième pierre du méta-jeu : les ITEMS équipables. Des FIOLES — des échantillons scellés — dorment dans les CACHETTES PROFONDES (la plus vaste cachette d’un tableau a une chance sur deux d’en abriter une, semis déterministe par code : un double anneau violet qui pulse) et dans le SAC SURPRISE du Semblable. La collection est PERSISTANTE : une fiole trouvée l’est pour toujours — le choix, c’est l’ÉQUIPEMENT. Deux logements, à préparer depuis la fiche (bouton FIOLES) : cliquer équipe, cliquer range ; les effets sont passifs et valent toute la run.',
-      'Le catalogue d’ouverture, six fioles : l’AIMANT (rayon de collecte des pastilles +60 %), la SONDE (les pastilles luisent À TRAVERS les voiles des cachettes), le TROC (les prix de l’Économat baissent de 25 % — le Semblable vous reconnaît), le SOUVENIR (la mémoire gravée majorée de 25 %), l’ISOLANT (rare — la coque refroidit 15 % plus lentement, cumulable à la gaine), et le SECOND SOUFFLE (rare — chaque run commence avec DEUX échantillons de secours). Les rares ne se trouvent qu’en cachette profonde.',
-      'Le voile FIOLES affiche la collection (les manquantes en silhouette « ? », avec leur piste), le compte des logements, et l’état ÉQUIPÉE surligné. Registres migrés en douceur, bascule bornée aux deux logements et aux fioles possédées (testée), semis de fiole testé (déterministe, jamais muré). Le pupitre d’essais sait offrir une fiole surprise. Vérifié dans le jeu construit : 4/6 trouvées, équipement au clic, persistance. 420 tests verts.',
-    ],
-  },
-  {
-    date: '27/08/2026 13:10',
-    title: 'L’ÉCONOMAT : la salle du Semblable, le Charon de l’espace',
-    notes: [
-      'Deuxième pierre du méta-jeu : une salle-boutique S’INTERCALE une fois par run, à mi-descente — l’ANNEXE NON CARTOGRAPHIÉE. Derrière une grille, un AUTRE : le SUJET 12, un Semblable, une masse en capsule qui ne parle pas mais ÉCHANGE. Il prend le condensat — cette matière que le laboratoire confisquerait de toute façon à la purge — et pousse des choses à travers les barreaux. La salle compte comme un arrêt normal de la descente, mais son sas est un PASSAGE : rien ne s’y consigne, pas de cérémonie — on reprend la route, la bourse en poche.',
-      'L’ÉTAL : cinq alcôves le long du mur sud, l’achat au CONTACT — le corps s’y glisse, le prix se débite, le toast annonce. FIOLE DE GOUTTES (60 cL : +0,8 L à la bonbonne), RECHARGE DES DASHS (50 cL), CLEF DE CACHETTE (90 cL : les voiles du prochain tableau tombent d’emblée), ÉCHANTILLON DE SECOURS (150 cL : +1 vie), et le SAC SURPRISE (40 cL : le Semblable ne dit pas ce qu’il y a dedans — parfois du condensat, parfois un souvenir… parfois rien, et il vous fixe). Chaque article se sert une fois par visite ; condensat insuffisant, le refus s’affiche sans débiter.',
-      'La mécanique d’intercalation respecte tout le reste : le choix de salle fait à la cérémonie attend sagement la sortie de l’annexe, la voie semi-procédurale garde son plan (l’Économat s’y glisse à mi-parcours aussi), la sauvegarde de run retient la visite, et ni pastilles ni records n’existent chez le Semblable. Vérifié dans le jeu construit (crochet d’atelier __economat) : la grille, la masse cyan du Sujet 12, les cinq pancartes de l’étal, le sas de reprise. 418 tests verts.',
-    ],
-  },
-  {
-    date: '27/08/2026 12:40',
-    title: 'Les deux monnaies : le CONDENSAT de run et la MÉMOIRE de l’Éveil',
-    notes: [
-      'Le méta-jeu du roguelike pose sa première pierre — deux monnaies, deux natures. Le CONDENSAT est de la MATIÈRE : la bourse de la run. Les centilitres livrés au sas la nourrissent (comme avant), et désormais des PASTILLES de condensat brillent dans les tableaux — semées automatiquement à chaque entrée (semis déterministe par code de salle : mêmes places à chaque essai), dans les recoins du champ et surtout dans les CACHETTES, qui récompensent enfin l’explorateur au-delà du secret. On les boit au contact du corps. Un chip 💧 les compte dans la barre. Et la règle nouvelle : à la fin de la run — réussie, perdue ou abandonnée — le laboratoire PURGE la cuve. Le condensat est confisqué : il se dépense EN ROUTE (les cartes payantes, et bientôt l’Économat du Semblable), pas en banque.',
-      'La MÉMOIRE est de l’INFORMATION : elle survit à la purge — le Sujet se souvient. Gravée dans les registres : +5 par sas bu, +5 la toute première traversée d’un tableau, +2 par record battu, +10 par trophée (le toast l’affiche), +10 l’expédition bouclée — et +2 même sur une DISPERSION : on apprend de ses échecs. Elle paiera l’arbre de l’ÉVEIL (les améliorations permanentes, la conscience qui grandit). Son solde s’affiche sur la fiche, à côté du condensat de run ; le butin de fin de run récapitule ce qui a été gravé. L’ancien condensat persistant est MIGRÉ une fois pour toutes : 10 cL d’hier = 1 souvenir, rien n’est perdu.',
-      'Sous le capot : les pastilles vivent dans le format de tableau (champ « condensats » posable à la main, sinon semis auto — jamais dans une paroi, jamais sur le départ ni le sas), l’absorption est une fonction pure testée, la sauvegarde de run emporte la bourse, et le pupitre d’essais sait créditer les deux monnaies. Vérifié dans le jeu construit : migration de l’héritage (250 cL → 25 de mémoire), pastilles visibles au tableau 1, chip HUD en place. 413 tests verts.',
+      'Signalé, capture à l’appui : sur Steam Deck (800 px de haut), l’écran du choix coupait la rangée basse des cartes — le panneau de cérémonie cumulait bilan, condensat, grande jauge, tampon de palier ET les quatre cartes, débordait l’écran, et le centrage tronquait les deux bouts sans défilement.',
+      'Deux couches de correctif. Le FILET : le panneau ne dépasse plus jamais l’écran (96 % de la hauteur au plus) — s’il est trop grand, il DÉFILE au lieu de couper, à toutes les étapes de la cérémonie. Et le COMPACT : à l’étape du choix de salle, le bilan déjà lu se replie (flacon, lignes de records, condensat, tampon de palier) — l’étalonnage reste, resserré, et les cartes prennent la scène. Sur écran bas, leurs mini-cartes se resserrent d’un cran.',
+      'Vérifié en 1280×800 (la définition du Deck) : le panneau tient entièrement dans l’écran, les quatre cartes sont visibles jusqu’à leur base, le bilan est bien replié à cette étape et réapparaît à la cérémonie suivante. 402 tests verts.',
     ],
   },
   {
@@ -134,6 +108,42 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
+    date: '27/08/2026 15:05',
+    title: 'L’Éveil au pupitre, et le méta se pose à la main dans l’éditeur',
+    notes: [
+      'Demandé : l’arbre de l’Éveil accessible depuis l’écran PUPITRE, et de quoi POSER les monnaies et items du méta dans l’éditeur. Le pupitre d’essais gagne son bouton « L’arbre de l’Éveil » : l’arbre s’ouvre PAR-DESSUS le pupitre (on achète, on referme, le pupitre est toujours là) — à côté des boutons qui créditent condensat, mémoire et fiole surprise pour tester.',
+      'L’ÉDITEUR gagne deux outils dans la palette des mécanismes. La PASTILLE DE CONDENSAT : un clic la pose, sa valeur en centilitres se règle au panneau (1..200), elle se déplace, se duplique, se supprime comme une cible — et dès la PREMIÈRE pastille posée main, le semis automatique du tableau se coupe : c’est le concepteur qui décide. L’EMPLACEMENT DE FIOLE : un seul par tableau (reposer le déplace) — en jeu, la fiole n’y apparaît que si la collection du joueur est incomplète ; sans emplacement posé, le semis automatique garde la main (la cachette la plus profonde, une chance sur deux). Les deux se dessinent dans l’éditeur au langage visuel du jeu (goutte cyan chiffrée, double anneau violet étiqueté FIOLE).',
+      'Le format des tableaux porte le champ « fiole » (aller-retour JSON testé, bornes comprises — les fichiers sans ces champs ne changent pas d’un octet). Vérifié dans le vrai éditeur au pointeur : deux pastilles et une fiole posées, lues dans le niveau ; et l’arbre ouvert depuis le pupitre, achats en direct. 426 tests verts.',
+    ],
+  },
+  {
+    date: '27/08/2026 14:10',
+    title: 'L’ARBRE DE L’ÉVEIL : la conscience s’achète en mémoire',
+    notes: [
+      'Quatrième et dernière pierre du chantier méta : l’ARBRE DE L’ÉVEIL, ouvert depuis la fiche (bouton L’ÉVEIL). La mémoire — l’information qui survit à la purge — s’y investit POUR TOUJOURS. Les branches suivent le schéma des états de la matière du concepteur : LIQUIDE (l’origine), SOLIDIFICATION (la glace), VAPORISATION (la vapeur), les TRANSITIONS DIRECTES, le PLASMA. Chaque transition est un pouvoir, chaque état une branche.',
+      'Les nœuds d’ouverture : LE CORPS AMPLE (20 — le corps naît avec 40 gouttes de plus), LA MATIÈRE RETENUE (25 — les pastilles rendent +25 %), L’ÉCHANTILLON PRUDENT (45 — +1 vie au départ de run), LE SOUFFLE LONG (40 — +1 dash de réserve), LA BASCULE ÉCONOME puis MAÎTRISÉE (35/70 — le péage de vaporisation 20 % → 17 % → 15 %, appliqué au moteur). Les pouvoirs d’état (solidification, vaporisation) sont ACQUIS D’ORIGINE : l’arbre est prêt pour leur déblocage progressif — il s’activera avec la re-parcellisation ISS, comme décidé. SUBLIMATION, CONDENSATION et IONISATION (le plasma) sont annoncés, verrouillés : leurs chantiers moteur viennent.',
+      'L’achat est ATOMIQUE dans les registres (mémoire débitée ET nœud gravé, ou rien — testé), les prérequis se respectent (testés), le facteur de péage recalculé depuis la valeur d’usine à chaque achat. Vérifié dans le jeu construit : deux nœuds achetés en direct (80 → 25 de mémoire), l’arbre surligne les acquis. Le chantier méta est complet : condensat + mémoire, l’Économat du Semblable, les fioles, l’Éveil. 425 tests verts.',
+    ],
+  },
+  {
+    date: '27/08/2026 13:40',
+    title: 'Les FIOLES : la collection d’échantillons scellés, deux au départ',
+    notes: [
+      'Troisième pierre du méta-jeu : les ITEMS équipables. Des FIOLES — des échantillons scellés — dorment dans les CACHETTES PROFONDES (la plus vaste cachette d’un tableau a une chance sur deux d’en abriter une, semis déterministe par code : un double anneau violet qui pulse) et dans le SAC SURPRISE du Semblable. La collection est PERSISTANTE : une fiole trouvée l’est pour toujours — le choix, c’est l’ÉQUIPEMENT. Deux logements, à préparer depuis la fiche (bouton FIOLES) : cliquer équipe, cliquer range ; les effets sont passifs et valent toute la run.',
+      'Le catalogue d’ouverture, six fioles : l’AIMANT (rayon de collecte des pastilles +60 %), la SONDE (les pastilles luisent À TRAVERS les voiles des cachettes), le TROC (les prix de l’Économat baissent de 25 % — le Semblable vous reconnaît), le SOUVENIR (la mémoire gravée majorée de 25 %), l’ISOLANT (rare — la coque refroidit 15 % plus lentement, cumulable à la gaine), et le SECOND SOUFFLE (rare — chaque run commence avec DEUX échantillons de secours). Les rares ne se trouvent qu’en cachette profonde.',
+      'Le voile FIOLES affiche la collection (les manquantes en silhouette « ? », avec leur piste), le compte des logements, et l’état ÉQUIPÉE surligné. Registres migrés en douceur, bascule bornée aux deux logements et aux fioles possédées (testée), semis de fiole testé (déterministe, jamais muré). Le pupitre d’essais sait offrir une fiole surprise. Vérifié dans le jeu construit : 4/6 trouvées, équipement au clic, persistance. 420 tests verts.',
+    ],
+  },
+  {
+    date: '27/08/2026 13:10',
+    title: 'L’ÉCONOMAT : la salle du Semblable, le Charon de l’espace',
+    notes: [
+      'Deuxième pierre du méta-jeu : une salle-boutique S’INTERCALE une fois par run, à mi-descente — l’ANNEXE NON CARTOGRAPHIÉE. Derrière une grille, un AUTRE : le SUJET 12, un Semblable, une masse en capsule qui ne parle pas mais ÉCHANGE. Il prend le condensat — cette matière que le laboratoire confisquerait de toute façon à la purge — et pousse des choses à travers les barreaux. La salle compte comme un arrêt normal de la descente, mais son sas est un PASSAGE : rien ne s’y consigne, pas de cérémonie — on reprend la route, la bourse en poche.',
+      'L’ÉTAL : cinq alcôves le long du mur sud, l’achat au CONTACT — le corps s’y glisse, le prix se débite, le toast annonce. FIOLE DE GOUTTES (60 cL : +0,8 L à la bonbonne), RECHARGE DES DASHS (50 cL), CLEF DE CACHETTE (90 cL : les voiles du prochain tableau tombent d’emblée), ÉCHANTILLON DE SECOURS (150 cL : +1 vie), et le SAC SURPRISE (40 cL : le Semblable ne dit pas ce qu’il y a dedans — parfois du condensat, parfois un souvenir… parfois rien, et il vous fixe). Chaque article se sert une fois par visite ; condensat insuffisant, le refus s’affiche sans débiter.',
+      'La mécanique d’intercalation respecte tout le reste : le choix de salle fait à la cérémonie attend sagement la sortie de l’annexe, la voie semi-procédurale garde son plan (l’Économat s’y glisse à mi-parcours aussi), la sauvegarde de run retient la visite, et ni pastilles ni records n’existent chez le Semblable. Vérifié dans le jeu construit (crochet d’atelier __economat) : la grille, la masse cyan du Sujet 12, les cinq pancartes de l’étal, le sas de reprise. 418 tests verts.',
+    ],
+  },
+  {
     date: '27/08/2026 12:49',
     title:
       'LE FIL DE LA VOIE : le rail de descente, la carte d’entrée, le butin de fin',
@@ -142,6 +152,15 @@ export const DELIVERIES: Delivery[] = [
       'À CHAQUE ENTRÉE DE SALLE, la carte d’identité passe en fondu au-dessus du jeu, sans rien bloquer : rang dans le plan, nom complet, code, et les pastilles moment · mécanique · difficulté — plus la mention SALLE GÉNÉRÉE ou DESCENTE DU JOUR quand elles s’appliquent. Elle s’efface seule en quatre secondes (et respecte le réglage « animations réduites »).',
       'Les RÉCOMPENSES de la voie se complètent : l’écran du choix garde désormais les jauges en scène — l’étalonnage en grand, la réserve, les échantillons de secours, la profondeur — comme la fin ordinaire ; franchir un tiers du plan s’annonce dans le titre (« LE MILIEU S’OUVRE », « LA FIN S’OUVRE ») ; et « LA VOIE EST BOUCLÉE » liste enfin le BUTIN de la descente : les instruments emportés (leurs glyphes), le palier d’étalonnage atteint, les centilitres de condensat versés à la réserve.',
       'Les PARAMÈTRES DU CYCLE quittent le banc : ils vivent désormais dans l’écran LE CAHIER DES RÈGLES, derrière le bouton « ⚙ PARAMÈTRES DU CYCLE » — longueur de la descente, difficulté maximale, descente du jour, en gros boutons − / + faits pour le doigt et la manette, enregistrés aussitôt. Le banc règle la simulation ; le cahier règle le cycle de vie d’une partie. Vérifié en navigateur : rail et carte en descente, jauges sur le choix, panneau du cycle qui enregistre. 395 tests verts.',
+    ],
+  },
+  {
+    date: '27/08/2026 12:40',
+    title: 'Les deux monnaies : le CONDENSAT de run et la MÉMOIRE de l’Éveil',
+    notes: [
+      'Le méta-jeu du roguelike pose sa première pierre — deux monnaies, deux natures. Le CONDENSAT est de la MATIÈRE : la bourse de la run. Les centilitres livrés au sas la nourrissent (comme avant), et désormais des PASTILLES de condensat brillent dans les tableaux — semées automatiquement à chaque entrée (semis déterministe par code de salle : mêmes places à chaque essai), dans les recoins du champ et surtout dans les CACHETTES, qui récompensent enfin l’explorateur au-delà du secret. On les boit au contact du corps. Un chip 💧 les compte dans la barre. Et la règle nouvelle : à la fin de la run — réussie, perdue ou abandonnée — le laboratoire PURGE la cuve. Le condensat est confisqué : il se dépense EN ROUTE (les cartes payantes, et bientôt l’Économat du Semblable), pas en banque.',
+      'La MÉMOIRE est de l’INFORMATION : elle survit à la purge — le Sujet se souvient. Gravée dans les registres : +5 par sas bu, +5 la toute première traversée d’un tableau, +2 par record battu, +10 par trophée (le toast l’affiche), +10 l’expédition bouclée — et +2 même sur une DISPERSION : on apprend de ses échecs. Elle paiera l’arbre de l’ÉVEIL (les améliorations permanentes, la conscience qui grandit). Son solde s’affiche sur la fiche, à côté du condensat de run ; le butin de fin de run récapitule ce qui a été gravé. L’ancien condensat persistant est MIGRÉ une fois pour toutes : 10 cL d’hier = 1 souvenir, rien n’est perdu.',
+      'Sous le capot : les pastilles vivent dans le format de tableau (champ « condensats » posable à la main, sinon semis auto — jamais dans une paroi, jamais sur le départ ni le sas), l’absorption est une fonction pure testée, la sauvegarde de run emporte la bourse, et le pupitre d’essais sait créditer les deux monnaies. Vérifié dans le jeu construit : migration de l’héritage (250 cL → 25 de mémoire), pastilles visibles au tableau 1, chip HUD en place. 413 tests verts.',
     ],
   },
   {
@@ -199,16 +218,6 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
-    date: '27/08/2026 01:15',
-    title:
-      'Le générateur apprend les CONDUITS : la leçon des conduits de ventilation',
-    notes: [
-      'L’entraînement du générateur continue, tableau par tableau : après le crop circle, « conduis de ventillation » (BOIZ) a été récupéré et étudié à la lettre — et c’est la philosophie INVERSE du crop circle, ce qui est exactement sa valeur. Ce que ses 33 pièces enseignent : des GAINES, pas des salles (murs de 22 unités partout, couloirs étroits, une cuve compacte en bande 3:1 — on est de la fumée dans des conduits) ; un SERPENTIN d’étages horizontaux tissés par de courts puits décalés ; un CANAL-RÉSEAU où une pastille-maître commande quatre portes à la fois ; le SAS AU CŒUR, tout près du départ à vol d’oiseau mais muré — le réseau force le grand tour ; une seule lampe posée sur le sas, et une cachette dans un cul-de-sac.',
-      'Tout cela est gravé dans une SEPTIÈME FAMILLE du mode figure : CONDUITS. Le vestibule de naissance (haut de deux gaines, sa bouche est une membrane — on entre en eau), les étages percés d’un puits alterné ouest/est, la paroi de la baie ouverte seulement en bas (l’aller) et en haut (le retour), la chambre du sas au milieu du serpentin avec son phare unique, la baie des machines à l’est où deux fils à plomb attendent le corps gelé — « OUVRE LE RÉSEAU » (les portes des puits, d’un coup) et « OUVRE LE SAS ». Sans mécanisme (réglage « aucun »), les puits et la chambre passent aux filtres d’état. La famille impose sa propre cuve : la bande serrée, pas le champ immense — le contrat des familles s’est élargi pour ça (cuve, lampes, cachettes et mécanismes peuvent désormais venir de la famille elle-même).',
-      'Le réglage FIGURE gagnait ses huit valeurs : le champ d’encodage était plein (3 bits) — un bit haut s’y ajoute sans toucher les codes existants, et la relecture des suffixes s’élargit à six caractères. Vérifié dans le jeu construit : une gaine générée au panneau (G-VENT2~…, 16 pièces, 4 portes sur 2 canaux, 2 miroirs, 1 phare), jouée en essai — le tableau entier se lit d’un regard, les fils à plomb rouges barrent la baie, le corps naît au large dans son vestibule. 700 tirages balayés sans échec, 381 tests verts (2 nouveaux).',
-    ],
-  },
-  {
     date: '27/08/2026 02:52',
     title:
       'LA VOIE, de bout en bout : le plan de descente, la fin, le palmarès',
@@ -262,6 +271,16 @@ export const DELIVERIES: Delivery[] = [
       'Demandé : sous chaque code de la planche, en petit, la mention de sa saisie. C’est fait — « saisi par JU le 20/08/2026 » se lit sous les molettes (et sous le champ libre des codes hors nomenclature), l’heure exacte en info-bulle. Quand plusieurs mains codifient la même bibliothèque, on sait à qui s’adresser.',
       'La provenance du CODE se tient à part de celle du tableau : le serveur ne la rafraîchit QUE lorsque la codification change. Retoucher le décor d’une salle ne réattribue donc pas son code — il reste au nom de qui l’a posé, à sa date. Peu importe l’écran qui enregistre (la planche, l’éditeur) : c’est le serveur qui tranche, seul à connaître l’état d’avant.',
       'Les entrées d’avant cette règle ne restent pas muettes : elles héritent du dernier enregistrement connu, la meilleure approximation disponible. Règle gravée au banc (code changé → réattribué ; décor retouché → intact ; création → au nom de l’enregistreur ; entrée ancienne → héritée) et vérifiée dans la vraie planche, bibliothèque simulée à trois cartes. 369 tests verts, build propre.',
+    ],
+  },
+  {
+    date: '27/08/2026 01:15',
+    title:
+      'Le générateur apprend les CONDUITS : la leçon des conduits de ventilation',
+    notes: [
+      'L’entraînement du générateur continue, tableau par tableau : après le crop circle, « conduis de ventillation » (BOIZ) a été récupéré et étudié à la lettre — et c’est la philosophie INVERSE du crop circle, ce qui est exactement sa valeur. Ce que ses 33 pièces enseignent : des GAINES, pas des salles (murs de 22 unités partout, couloirs étroits, une cuve compacte en bande 3:1 — on est de la fumée dans des conduits) ; un SERPENTIN d’étages horizontaux tissés par de courts puits décalés ; un CANAL-RÉSEAU où une pastille-maître commande quatre portes à la fois ; le SAS AU CŒUR, tout près du départ à vol d’oiseau mais muré — le réseau force le grand tour ; une seule lampe posée sur le sas, et une cachette dans un cul-de-sac.',
+      'Tout cela est gravé dans une SEPTIÈME FAMILLE du mode figure : CONDUITS. Le vestibule de naissance (haut de deux gaines, sa bouche est une membrane — on entre en eau), les étages percés d’un puits alterné ouest/est, la paroi de la baie ouverte seulement en bas (l’aller) et en haut (le retour), la chambre du sas au milieu du serpentin avec son phare unique, la baie des machines à l’est où deux fils à plomb attendent le corps gelé — « OUVRE LE RÉSEAU » (les portes des puits, d’un coup) et « OUVRE LE SAS ». Sans mécanisme (réglage « aucun »), les puits et la chambre passent aux filtres d’état. La famille impose sa propre cuve : la bande serrée, pas le champ immense — le contrat des familles s’est élargi pour ça (cuve, lampes, cachettes et mécanismes peuvent désormais venir de la famille elle-même).',
+      'Le réglage FIGURE gagnait ses huit valeurs : le champ d’encodage était plein (3 bits) — un bit haut s’y ajoute sans toucher les codes existants, et la relecture des suffixes s’élargit à six caractères. Vérifié dans le jeu construit : une gaine générée au panneau (G-VENT2~…, 16 pièces, 4 portes sur 2 canaux, 2 miroirs, 1 phare), jouée en essai — le tableau entier se lit d’un regard, les fils à plomb rouges barrent la baie, le corps naît au large dans son vestibule. 700 tirages balayés sans échec, 381 tests verts (2 nouveaux).',
     ],
   },
   {
