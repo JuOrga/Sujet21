@@ -87,6 +87,23 @@ describe('Le cycle des états — l’écran des mémoires', () => {
     expect(transfoAchetable('fusion', rien)).toBe(false)
   })
 
+  it('les verrous narratifs ferment même les liens offerts — et le payé résiste', () => {
+    const rien: string[] = []
+    const verrous = ['fusion', 'liquefaction']
+    // l'acte 0 peut fermer le retour au liquide : ils redeviennent à tisser
+    expect(transfoTenue('fusion', rien, verrous)).toBe(false)
+    expect(transfoTenue('liquefaction', rien, verrous)).toBe(false)
+    expect(transfoAchetable('fusion', rien, verrous)).toBe(true)
+    expect(transfoCycle('fusion')!.cout).toBeGreaterThan(0) // un prix existe
+    // ce qu'on a tissé de sa propre mémoire, aucun scénario ne le reprend
+    expect(transfoTenue('fusion', ['fusion'], verrous)).toBe(true)
+    expect(transfoAchetable('fusion', ['fusion'], verrous)).toBe(false)
+    // un verrou sur un mystère ne le rend pas achetable pour autant
+    expect(transfoAchetable('ionisation', rien, ['ionisation'])).toBe(false)
+    // sans verrou, rien ne change : le cycle nominal
+    expect(transfoTenue('fusion', rien)).toBe(true)
+  })
+
   it('transfoEntre : les paires sans lien direct rendent null', () => {
     expect(transfoEntre('liquide', 'liquide')).toBeNull()
     expect(transfoEntre('solide', 'plasma')).toBeNull()
@@ -108,6 +125,28 @@ describe('Le cycle des états — l’écran des mémoires', () => {
     const r2 = new Records(st)
     expect(transfoTenue('solidification', r2.eveilAcquis())).toBe(true)
     expect(transfoTenue('vaporisation', r2.eveilAcquis())).toBe(false)
+  })
+
+  it('les verrous se posent, se lèvent et persistent dans les registres', () => {
+    const st = memoryStorage()
+    const r = new Records(st)
+    expect(r.verrousCycle()).toEqual([])
+    expect(r.basculeVerrouCycle('fusion')).toBe(true)
+    expect(r.verrousCycle()).toEqual(['fusion'])
+    // relu du stockage : le verrou tient, et la fusion n'est plus tenue
+    const r2 = new Records(st)
+    expect(transfoTenue('fusion', r2.eveilAcquis(), r2.verrousCycle())).toBe(
+      false,
+    )
+    // on la rachète : elle redevient tenue malgré le verrou
+    r2.gagneMemoire(50)
+    expect(r2.acquiertEveil('fusion', transfoCycle('fusion')!.cout)).toBe(true)
+    expect(transfoTenue('fusion', r2.eveilAcquis(), r2.verrousCycle())).toBe(
+      true,
+    )
+    // et la levée du verrou est symétrique
+    expect(r2.basculeVerrouCycle('fusion')).toBe(false)
+    expect(r2.verrousCycle()).toEqual([])
   })
 
   it('migration de l’ancien arbre : les nœuds utilitaires sont remboursés, une seule fois', () => {

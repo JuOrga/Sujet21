@@ -9,11 +9,18 @@
 //
 // Statuts d'un lien :
 //   · acquis d'origine — fusion et liquéfaction : le retour au liquide
-//     n'est jamais un achat ;
+//     n'est pas un achat… TANT QUE le scénario ne les VERROUILLE pas ;
 //   · à tisser — un coût en mémoire, l'achat se fait à l'écran des
 //     mémoires (aucun prérequis : chaque lien est sa propre mémoire) ;
 //   · mystère — les liens du quatrième état : montrés voilés (« ??? »),
 //     rien à acheter tant que le chantier moteur n'existe pas.
+//
+// LES VERROUS NARRATIFS : le déblocage progressif de l'acte 0 peut fermer
+// N'IMPORTE QUEL lien, les deux offerts compris — le Sujet sort de cuve
+// sans rien savoir, et réapprend jusqu'à revenir liquide. Un lien verrouillé
+// se tisse alors comme les autres, à son prix (d'où un coût sur fusion et
+// liquéfaction : il ne sert QUE dans ce cas). Un lien explicitement acquis
+// l'emporte toujours sur son verrou : ce qu'on a payé, on le garde.
 
 /** Les états que le corps peut prendre. Le plasma est annoncé, pas joué. */
 export type EtatCycle = 'solide' | 'liquide' | 'gaz' | 'plasma'
@@ -50,8 +57,8 @@ export const TRANSFOS_CYCLE: TransfoCycle[] = [
     de: 'solide',
     vers: 'liquide',
     nom: 'FUSION',
-    desc: 'la glace redevient liquide — le retour est un droit, pas un achat',
-    cout: 0,
+    desc: 'la glace redevient liquide — offert, sauf verrou du scénario',
+    cout: 5,
     etat: 'acquis-depart',
   },
   {
@@ -59,8 +66,8 @@ export const TRANSFOS_CYCLE: TransfoCycle[] = [
     de: 'gaz',
     vers: 'liquide',
     nom: 'LIQUÉFACTION',
-    desc: 'la vapeur se recondense en liquide — acquise d’origine, elle aussi',
-    cout: 0,
+    desc: 'la vapeur se recondense en liquide — offerte, sauf verrou du scénario',
+    cout: 5,
     etat: 'acquis-depart',
   },
   {
@@ -128,11 +135,19 @@ export function transfoEntre(
   return TRANSFOS_CYCLE.find((t) => t.de === de && t.vers === vers) ?? null
 }
 
-/** Un lien est-il TENU (tissé, ou acquis d'origine) ? Un mystère, jamais. */
-export function transfoTenue(id: string, acquis: readonly string[]): boolean {
+/** Un lien est-il TENU (tissé, ou offert d'origine) ? Un mystère, jamais ;
+ * un lien sous VERROU narratif non plus — sauf s'il a été payé, car ce
+ * qu'on a tissé de sa propre mémoire, aucun scénario ne le reprend. */
+export function transfoTenue(
+  id: string,
+  acquis: readonly string[],
+  verrous: readonly string[] = [],
+): boolean {
   const t = transfoCycle(id)
   if (!t || t.etat === 'mystere') return false
-  return t.etat === 'acquis-depart' || acquis.includes(id)
+  if (acquis.includes(id)) return true
+  if (verrous.includes(id)) return false
+  return t.etat === 'acquis-depart'
 }
 
 /** Un lien est-il À TISSER : ni tenu, ni mystère ? (Aucun prérequis :
@@ -140,8 +155,9 @@ export function transfoTenue(id: string, acquis: readonly string[]): boolean {
 export function transfoAchetable(
   id: string,
   acquis: readonly string[],
+  verrous: readonly string[] = [],
 ): boolean {
   const t = transfoCycle(id)
   if (!t || t.etat === 'mystere') return false
-  return !transfoTenue(id, acquis)
+  return !transfoTenue(id, acquis, verrous)
 }

@@ -1868,18 +1868,23 @@ const cycleScene = document.getElementById('cycle-scene') as HTMLDivElement
 const cycleRegListe = document.getElementById(
   'cycle-reg-liste',
 ) as HTMLDivElement
-/** Le STATUT d'un lien, celui de la légende : acquise d'origine · tissée
- * (la matière coule) · à tisser payable · à tisser, solde insuffisant ·
- * mystère. Il pilote le trait, la plaque ET la ligne du registre. */
+/** Le STATUT d'un lien : offert d'origine · tissé · à tisser payable · à
+ * tisser, solde insuffisant · mystère. Il pilote le trait, la plaque ET la
+ * ligne du registre. Les deux premiers sont ACQUIS — même vert, même
+ * lien qui coule : ce qui compte, c'est de l'avoir, pas de l'avoir payé.
+ * Un VERROU narratif referme même un lien offert : il redevient à tisser. */
 function statutTransfo(
   t: (typeof TRANSFOS_CYCLE)[number],
   acquis: readonly string[],
   solde: number,
+  verrous: readonly string[],
 ): 'origine' | 'tenue' | 'payable' | 'verrou' | 'mystere' {
   if (t.etat === 'mystere') return 'mystere'
-  if (t.etat === 'acquis-depart') return 'origine'
-  if (transfoTenue(t.id, acquis)) return 'tenue'
-  return solde >= t.cout ? 'payable' : 'verrou'
+  if (!transfoTenue(t.id, acquis, verrous))
+    return solde >= t.cout ? 'payable' : 'verrou'
+  return t.etat === 'acquis-depart' && !acquis.includes(t.id)
+    ? 'origine'
+    : 'tenue'
 }
 const CY_STATUTS = [
   'cy-origine',
@@ -1890,13 +1895,14 @@ const CY_STATUTS = [
 ]
 function renderCycleVoile(): void {
   const acquis = records.eveilAcquis()
+  const verrous = records.verrousCycle()
   const solde = records.memoire()
   const soldeEl = document.getElementById('cycle-solde-n')
   if (soldeEl) soldeEl.textContent = String(solde)
   // la jauge se remplit vers le lien à tisser le plus cher : pleine, tout
   // ce qui reste est payable (ou tout est tissé)
   const restants = TRANSFOS_CYCLE.filter(
-    (t) => statutTransfo(t, acquis, solde) === 'verrou',
+    (t) => statutTransfo(t, acquis, solde, verrous) === 'verrou',
   ).map((t) => t.cout)
   const cible = restants.length > 0 ? Math.max(...restants) : 0
   const jauge = document.querySelector<HTMLElement>('#cycle-jauge b')
@@ -1904,7 +1910,7 @@ function renderCycleVoile(): void {
     jauge.style.width = `${cible > 0 ? Math.min(100, (solde / cible) * 100) : 100}%`
   let registre = ''
   for (const t of TRANSFOS_CYCLE) {
-    const statut = statutTransfo(t, acquis, solde)
+    const statut = statutTransfo(t, acquis, solde, verrous)
     const sous =
       statut === 'mystere'
         ? '???'
@@ -1924,8 +1930,10 @@ function renderCycleVoile(): void {
       plaque.innerHTML = `<b>${t.nom}</b><span>${sous}</span>`
       plaque.title = t.desc
     }
+    // le lien du schéma : trois couches (halo, corps, comètes) réglées par
+    // le statut porté sur leur groupe
     cycleScene
-      .querySelector<SVGPathElement>(`path[data-transfo="${t.id}"]`)
+      .querySelector<SVGGElement>(`.cy-lien[data-transfo="${t.id}"]`)
       ?.setAttribute('data-etat', statut)
     const de = ETATS_CYCLE[t.de].nom
     const vers = ETATS_CYCLE[t.vers].nom
@@ -1941,7 +1949,11 @@ cycleEcran.addEventListener('click', (e) => {
   ) as HTMLElement | null
   if (!cible) return
   const t = transfoCycle(cible.dataset.transfo ?? '')
-  if (!t || !transfoAchetable(t.id, records.eveilAcquis())) return
+  if (
+    !t ||
+    !transfoAchetable(t.id, records.eveilAcquis(), records.verrousCycle())
+  )
+    return
   if (!records.acquiertEveil(t.id, t.cout)) {
     // solde insuffisant : la jauge le rappelle, la plaque proteste
     renderCycleVoile()
@@ -6122,6 +6134,21 @@ for (const b of Array.from(
           `L’écran des mémoires est ouvert — mémoire disponible : ${records.memoire()}.`,
         )
         break
+      case 'verrous': {
+        // L'ACTE 0 en essai : le scénario referme les deux liens offerts —
+        // le Sujet sort de cuve sans même savoir revenir liquide, et les
+        // rachète en mémoire. Bascule, pour éprouver le déblocage progressif.
+        const ferme = records.basculeVerrouCycle('fusion')
+        if (records.verrousCycle().includes('liquefaction') !== ferme)
+          records.basculeVerrouCycle('liquefaction')
+        renderCycleVoile()
+        pupDit(
+          ferme
+            ? 'Verrous posés : fusion et liquéfaction sont à retisser.'
+            : 'Verrous levés : le retour au liquide est de nouveau offert.',
+        )
+        break
+      }
       case 'vie':
         run.vies = Math.min(VIES_MAX, run.vies + 1)
         majBoutonsRun()
@@ -6672,8 +6699,9 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   // qui exige une transformation manuelle non tissée — mécaniques ET
   // maillons se restreignent aux liens que le joueur possède.
   const acquisCycle = records.eveilAcquis()
-  const solidTenue = transfoTenue('solidification', acquisCycle)
-  const vapoTenue = transfoTenue('vaporisation', acquisCycle)
+  const verrousCycle = records.verrousCycle()
+  const solidTenue = transfoTenue('solidification', acquisCycle, verrousCycle)
+  const vapoTenue = transfoTenue('vaporisation', acquisCycle, verrousCycle)
   const permises = mecaniquesPermises(solidTenue, vapoTenue)
   const masqueCycle = masquePermis(solidTenue, vapoTenue)
   // la mécanique de la salle qu'on VIENT de jouer s'évite : la foulée varie
@@ -7593,7 +7621,10 @@ input.peutDevenir = (vers) => {
     CYCLE_PAR_ETAT[input.etatManuel()],
     CYCLE_PAR_ETAT[vers],
   )
-  return t !== null && transfoTenue(t.id, records.eveilAcquis())
+  return (
+    t !== null &&
+    transfoTenue(t.id, records.eveilAcquis(), records.verrousCycle())
+  )
 }
 // Un refus MONTRE le verrou : le logement visé paraît quelques secondes,
 // cadenassé, le nom du lien à tisser dessus — l'envie se sème là.
@@ -7614,6 +7645,7 @@ function majCadranEtats(zoneActive: ZoneForce): void {
       ? verrouEtat.slot
       : null
   const acquis = records.eveilAcquis()
+  const verrousCycle = records.verrousCycle()
   const gate = cycleGateActif()
   const zone = zoneActive !== 'libre'
   const sig = [
@@ -7623,6 +7655,7 @@ function majCadranEtats(zoneActive: ZoneForce): void {
     zoneActive,
     gate,
     acquis.join('+'),
+    verrousCycle.join('+'),
   ].join('|')
   if (sig === cadranSignature) return
   cadranSignature = sig
@@ -7649,7 +7682,8 @@ function majCadranEtats(zoneActive: ZoneForce): void {
     const t = estCur
       ? null
       : transfoEntre(CYCLE_PAR_ETAT[cur], CYCLE_PAR_ETAT[s.etat])
-    const tenue = t !== null && (!gate || transfoTenue(t.id, acquis))
+    const tenue =
+      t !== null && (!gate || transfoTenue(t.id, acquis, verrousCycle))
     const montreVerrou = !estCur && !tenue && t !== null && verrou === s.etat
     s.el.hidden = !estCur && !tenue && !montreVerrou
     s.el.classList.toggle('active', estCur)
