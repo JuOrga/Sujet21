@@ -51,9 +51,23 @@ interface RecordsData {
   // sa descente une fois, elle vaut jusqu'au prochain changement.
   fioles: string[]
   fiolesEquipees: string[]
-  // L'ÉVEIL : les nœuds de l'arbre de conscience achetés (ids) — la
-  // mémoire dépensée est gravée là pour toujours.
+  // LE CYCLE DES ÉTATS : les transformations tissées à l'écran des
+  // mémoires (ids de cycle.ts). Le champ garde son nom historique
+  // (« eveil ») pour ne pas casser les registres existants.
   eveil: string[]
+}
+
+// Les nœuds utilitaires de l'ANCIEN arbre de l'Éveil (remplacé par le
+// cycle des états, 28/08) : à la première lecture, chaque nœud tenu est
+// REMBOURSÉ à son prix d'achat — la mémoire revient, les liens du cycle
+// s'achètent avec.
+const REMBOURSES_ARBRE: Record<string, number> = {
+  volume: 20,
+  bourse: 25,
+  coque: 45,
+  souffle: 40,
+  'peage-1': 35,
+  'peage-2': 70,
 }
 
 export interface StorageLike {
@@ -94,6 +108,19 @@ export class Records {
   constructor(storage: StorageLike | null = defaultStorage()) {
     this.storage = storage
     this.data = this.load()
+    // Migration de l'arbre vers le CYCLE : les anciens nœuds utilitaires
+    // sont remboursés puis retirés, et le registre est réécrit AUSSITÔT —
+    // le remboursement ne peut pas rejouer.
+    if (this.data.eveil.some((id) => id in REMBOURSES_ARBRE)) {
+      for (const id of this.data.eveil) {
+        const prix = REMBOURSES_ARBRE[id]
+        if (typeof prix === 'number') this.data.memoire += prix
+      }
+      this.data.eveil = this.data.eveil.filter(
+        (id) => !(id in REMBOURSES_ARBRE),
+      )
+      this.save()
+    }
   }
 
   private load(): RecordsData {

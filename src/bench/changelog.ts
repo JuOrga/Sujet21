@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 12:21',
+    title: 'LES MÉMOIRES : le cycle des états remplace l’arbre de l’Éveil',
+    notes: [
+      'Le concepteur a tranché : pas d’arbre — un CYCLE, celui de son croquis. L’écran des mémoires (fiche → LES MÉMOIRES, pupitre → L’écran des mémoires) dessine les états de la matière : SOLIDE (octogone cristallin qui scintille), LIQUIDE (flaque vivante au contour qui ondule — l’origine), GAZ (nuée qui dérive), et une ENTITÉ INCONNUE au contour qui vacille — le quatrième état, voilé. Les TRANSFORMATIONS sont les liens entre eux, en bulles posées sur les flèches, comme sur le papier : sublimation et condensation en grands arcs extérieurs, écrites le long du trait.',
+      'On démarre avec DEUX liens acquis d’origine : FUSION (solide → liquide) et LIQUÉFACTION (gaz → liquide) — juste de quoi REDEVENIR liquide après une zone imposée ; revenir au liquide n’est jamais un achat. Les quatre autres se TISSENT en mémoire : SOLIDIFICATION (10), VAPORISATION (15), SUBLIMATION (60), CONDENSATION (60) — aucun prérequis, chaque lien est sa propre mémoire. Les liens du plasma affichent « ??? » et ne se tissent pas encore. Un lien tissé COULE : les tirets voyagent dans le sens de la transformation ; une bulle payable respire ; un refus secoue la tête sans rien débiter.',
+      'Les nœuds utilitaires de l’ancien arbre (corps ample, matière retenue, échantillon prudent, souffle long, bascules du péage) sont RETIRÉS et intégralement REMBOURSÉS en mémoire à la première lecture des registres — le péage de vaporisation revient à ses 20 % canoniques. Achats atomiques et persistants (testés), migration testée (une seule fois). Vérifié dans le jeu construit : deux tissages en direct (80 → 55), refus propre de la sublimation à 55/60. La suite au prochain train : ces liens commanderont les BOUTONS d’état de la descente. 427 tests verts.',
+    ],
+  },
+  {
     date: '28/08/2026 12:06',
     title:
       'Le choix de la voie tient dans l’écran du Deck : le bilan se replie',
