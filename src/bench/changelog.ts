@@ -22,8 +22,20 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 17:16',
+    title:
+      'Les mémoires prennent la place : composition ample, liens sans équivoque',
+    notes: [
+      'Retour du concepteur : « tu as trop peur du vide, prends la place ». C’est fait — le schéma n’est plus une boîte posée au milieu du vide : la scène OCCUPE tout le cadre (804 × 708 px sur un Steam Deck, mesuré), les états sont plus grands, l’en-tête tient sur une seule ligne et la sphère du LIQUIDE règne au centre.',
+      'AMBIGUÏTÉ LEVÉE — on pouvait croire que la plaque FUSION appartenait au grand arc de SUBLIMATION qui passait derrière elle : mesuré, l’arc mordait de 17 pixels DANS la plaque. Les grands arcs filent maintenant aux bords de l’écran et les liens intérieurs se referment sur la sphère : 76 pixels séparent la plaque de l’arc voisin. Les quatre plaques intérieures se posent EN QUINCONCE sur leur courbe (jamais deux côte à côte : 12 et 20 px d’écart, elles se touchaient avant).',
+      'Et surtout : LE SURVOL ISOLE. Approcher une plaque — ou sa ligne au registre, ou la parcourir au clavier — éteint tous les autres traits à 7 % et ne laisse vivre que le lien concerné, plaque et ligne surlignées ensemble. La question « à quel trait appartient ce label ? » ne se pose plus une seconde, à la souris comme à la manette.',
+      'La NUÉE DE GAZ est ramenée à l’échelle des deux autres états (elle mangeait le bas de l’écran) : plus resserrée, plus dense en son cœur, ses volutes intactes. Vérifié en 1280×800 : écarts mesurés dans le vrai écran, extinction au survol mesurée (0,07 contre 0,85), en-tête sur une ligne. 436 tests verts.',
+    ],
+  },
+  {
     date: '28/08/2026 17:09',
-    title: 'La cérémonie se déplie en PAYSAGE : l’écran récompense pour PC, console et Deck',
+    title:
+      'La cérémonie se déplie en PAYSAGE : l’écran récompense pour PC, console et Deck',
     notes: [
       'Signalé : l’écran de récompense et le choix de salle étaient dessinés pour le portrait — une colonne de 560 px au milieu d’un écran de 1280 ou 1920, et des plans de salle en timbre-poste. Sur écran large et paysage, le même panneau se DÉPLIE désormais en instrument : le flacon, le relevé et le condensat à gauche, l’ÉTALONNAGE et son tampon de palier à droite, les cartes de choix en pleine largeur dessous. Le flacon y gagne sa présence (76 px de haut) et le litrage sa taille.',
       'LE CHOIX DE SALLE en profite le plus : le panneau s’ouvre à 1180 px et les mini-plans passent de 240 à 380 px — on choisit enfin sur ce qu’on VOIT du plan, pas sur une vignette. Le panneau ne dépasse jamais l’écran (92 % de sa hauteur au plus) : sur un Deck de 800 px de haut, la cérémonie tient d’un seul tenant.',
@@ -43,7 +55,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '28/08/2026 16:48',
-    title: 'Deux raccourcis de conception : VALIDER LA SALLE, et le HUB à portée de doigt',
+    title:
+      'Deux raccourcis de conception : VALIDER LA SALLE, et le HUB à portée de doigt',
     notes: [
       'Demandé : pouvoir conclure la salle en cours pendant une descente semi-procédurale et arriver à l’écran de récompense. Le pupitre d’essais ouvre la section CÉRÉMONIE sur un bouton « Valider la salle en cours ». Rien n’y est simulé — c’est le VRAI chemin de fin de salle qui se déroule : le sas est déclaré franchi à l’image suivante, le volume réellement présent est compté comme livré, les records se consignent, le condensat se verse, le rang de la descente se creuse, la voie propose sa suite. Les trois boutons voisins (petit, moyen, gros surplus) restent ce qu’ils étaient : une cérémonie factice, pour regarder l’écran couler sans toucher à la run.',
       'À savoir, et c’est écrit sous le bouton : valider consigne de VRAIS records. Le chrono de la salle vaut alors une fraction de seconde — le record du protocole tombera, et la publication au tableau partagé suivra. C’est le prix d’un raccourci qui emprunte le vrai chemin plutôt que d’en singer un.',
