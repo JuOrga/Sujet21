@@ -5341,6 +5341,11 @@
          quand le tableau s'ouvre. Elle bat doucement quand le corps touche à
          sa dernière goutte : le joueur oublie souvent qu'il a de quoi tenir. */
       .bonbonne {
+        position: relative;
+        /* LE BANDEAU EST TRANSPARENT AUX CLICS (#hud) : seules les pastilles
+           se réactivaient. Sans cette ligne, un toucher sur la fiole filait
+           au décor et coûtait une goutte au lieu de verser (signalé). */
+        pointer-events: auto;
         display: flex; align-items: center; gap: 5px; flex: none;
         margin: 0; padding: 1px 6px 1px 3px; line-height: 1;
         background: transparent; border: 1px solid transparent; border-radius: 9px;
@@ -5351,6 +5356,23 @@
       /* la fiole tient dans la HAUTEUR DE LA LIGNE : le bandeau garde son
          épaisseur d'avant (signalé) — c'est le niveau qui parle, pas la taille */
       .bonbonne svg { width: 12px; height: 18px; display: block; overflow: visible; }
+      /* LA CIBLE : la fiole est petite (le bandeau ne doit pas épaissir),
+         alors la zone qui répond DÉBORDE tout autour — un clic à côté
+         partait dans la cuve et coûtait une goutte (signalé). */
+      .bonbonne::after {
+        content: ''; position: absolute;
+        top: -9px; right: -8px; bottom: -11px; left: -8px;
+      }
+      /* le mot du versement : deux secondes sous la fiole, puis plus rien */
+      .bb-mot {
+        position: absolute; top: calc(100% + 3px); left: 0; white-space: nowrap;
+        font-size: 10px; letter-spacing: 0.08em; color: #8fffcf;
+        opacity: 0; transform: translateY(-3px);
+        transition: opacity 0.18s ease, transform 0.18s ease;
+        pointer-events: none;
+      }
+      .bb-mot.visible { opacity: 1; transform: translateY(0); }
+      .bb-mot.bb-non { color: #ffb59f; }
       .bb-verre {
         fill: rgba(120, 190, 230, 0.07);
         stroke: #6f9fc0; stroke-width: 1.6; stroke-linejoin: round;
@@ -5862,7 +5884,7 @@
              remplit de ce qu'on a mis de côté. Elle se présente au début du
              tableau et rappelle sa présence quand le corps touche à sa
              dernière goutte — un toucher la verse. -->
-        <button type="button" id="bonbonne" class="bonbonne" data-nom="bonbonne de secours — toucher pour VERSER la réserve dans le corps" hidden>
+        <button type="button" id="bonbonne" class="bonbonne" data-nom="bonbonne de secours — toucher, touche V, ou croix ↑ à la manette : la réserve se verse dans le corps (en liquide)" hidden>
           <svg viewBox="0 0 44 64" aria-hidden="true">
             <defs>
               <clipPath id="bb-dedans">
@@ -5890,6 +5912,7 @@
             <rect class="bb-eclat" x="-16" y="-8" width="9" height="86" />
           </svg>
           <span class="v" id="hud-bonbonne">0.00 L</span>
+          <span class="bb-mot" id="bb-mot" aria-live="polite"></span>
         </button>
         <div class="gauge">
           <div id="gauge-fill"></div>
@@ -6218,6 +6241,7 @@
           <kbd>sur le corps</kbd>maintenir SUR le volume : se rassembler (gratuit)<br />
           <kbd>F</kbd>glace : le bloc garde son élan
           <kbd>G</kbd>vapeur : viser (temps ralenti), relâcher = dash<br />
+          <kbd>V</kbd>verser la BONBONNE dans le corps (la fiole du bandeau se touche aussi) — en liquide seulement<br />
           <kbd>molette</kbd>zoom
           <kbd>clic droit maintenu</kbd>déplacer la caméra
           <kbd>⌖</kbd>recadrer<br />
@@ -6241,6 +6265,7 @@
           <kbd>stick droit</kbd>déplacer la caméra
           <kbd>clic stick</kbd>recadrer (caméra auto)
           <kbd>croix ↔</kbd>ralenti / accéléré<br />
+          <kbd>croix ↑</kbd>verser la BONBONNE dans le corps — la réserve mise de côté, en liquide seulement<br />
           <kbd>Start ☰</kbd>pause + la fiche
           <kbd>Select</kbd>recommencer<br />
           <kbd>croix / stick</kbd>MENUS : naviguer (le liseré bleu suit)

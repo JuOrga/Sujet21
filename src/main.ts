@@ -6051,7 +6051,45 @@ function verserBonbonne(): string {
   window.setTimeout(() => bonbonneEl.classList.remove('ouvert'), 600)
   return 'ok'
 }
-bonbonneEl?.addEventListener('click', verserBonbonne)
+/** LE GESTE COMPLET : verser, et DIRE ce qui s'est passé — au toucher, à la
+ *  touche V ou à la croix HAUT de la manette. Sans un mot, un refus (corps
+ *  plein, état glace, réserve vide) passait pour un bouton mort. */
+function verseEtDis(): void {
+  const r = verserBonbonne()
+  bbMot(
+    r === 'ok'
+      ? 'réserve versée'
+      : r === 'rien'
+        ? run.bonbonneLiters < params.litersPerParticle
+          ? 'réserve vide'
+          : 'le corps est déjà plein'
+        : r === 'etat'
+          ? 'seulement en LIQUIDE'
+          : r === 'pause'
+            ? 'pas maintenant'
+            : 'pas ici',
+    r === 'ok',
+  )
+}
+let bbMotTimer = 0
+/** Le mot sous la fiole : deux secondes, puis il s'efface. */
+function bbMot(texte: string, bon: boolean): void {
+  const e = document.getElementById('bb-mot')
+  if (!e) return
+  e.textContent = texte
+  e.classList.toggle('bb-non', !bon)
+  e.classList.add('visible')
+  window.clearTimeout(bbMotTimer)
+  bbMotTimer = window.setTimeout(() => e.classList.remove('visible'), 2200)
+}
+// le toucher sur la fiole : le même geste — et il ne file JAMAIS au jeu
+// derrière (un clic à côté coûtait une goutte : la cible s'est élargie)
+bonbonneEl?.addEventListener('pointerdown', (e) => e.stopPropagation())
+bonbonneEl?.addEventListener('click', (e) => {
+  e.stopPropagation()
+  verseEtDis()
+})
+input.onVerser = verseEtDis
 // Sonde de test : verser depuis la console (comme __sim, __run)
 ;(window as unknown as { __verser: () => string }).__verser = verserBonbonne
 /** La cérémonie avec un surplus factice — la sonde __bonbonne et le
@@ -8696,6 +8734,9 @@ function frame(now: number): void {
       }
       if (manette.edge(BOUTON.GAUCHE)) input.stepWarp(-1)
       if (manette.edge(BOUTON.DROITE)) input.stepWarp(1)
+      // la croix HAUT verse la réserve : viser une fiole de douze pixels au
+      // pavé tactile n'était pas un geste — au Deck, c'est un cran de croix
+      if (manette.edge(BOUTON.HAUT)) verseEtDis()
       // enfoncer le stick GAUCHE recadre : la caméra revient au suivi auto
       if (manette.edge(BOUTON.L3)) camera.resetAutoZoom()
       // le stick DROIT ouvre le DOSSIER — la convention manette pour « la

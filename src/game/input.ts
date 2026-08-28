@@ -68,6 +68,9 @@ export class Input {
     this.gasIntent = cible === 'vapeur'
   }
   onReset: (() => void) | null = null
+  // VERSER LA RÉSERVE (bonbonne) : la touche V, jumelle du toucher sur la
+  // fiole du bandeau — le geste ne doit pas exiger de viser un petit bouton
+  onVerser: (() => void) | null = null
   onTimeWarpChange: ((warp: number) => void) | null = null
   // le zoom porte son ANCRE (centre du pincement, curseur de la molette) :
   // le point du monde sous les doigts doit rester sous les doigts
@@ -314,6 +317,10 @@ export class Input {
         this.demande('glace')
       } else if (e.key === 'g' || e.key === 'G') {
         this.demande('vapeur')
+      } else if (e.key === 'v' || e.key === 'V') {
+        // VERSER LA RÉSERVE : jumelle du toucher sur la fiole du bandeau —
+        // le geste ne doit pas exiger de viser douze pixels
+        this.onVerser?.()
       }
     })
   }
