@@ -22,8 +22,19 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 18:20',
+    title:
+      'La présentation de salle revient partout, et le DOSSIER DE DESCENTE s’ouvre',
+    notes: [
+      'Signalé : plus de présentation du niveau à l’entrée d’un tableau. Trouvé — la carte d’identité (rang, nom, code, moment · mécanique · difficulté) était réservée au mode VOIE : hors de ce mode, elle ne s’annonçait jamais. Elle se montre désormais à CHAQUE entrée de tableau, descente ordinaire comprise, avec le bon rang (« SALLE 4 / 24 » sur la séquence écrite, le rang du plan en voie) et la mention L’ÉCONOMAT quand c’est la salle du Semblable. Seuls le hub et l’essai d’éditeur s’en passent : on sait où l’on est.',
+      'Et voici LE DOSSIER DE DESCENTE : un panneau qui glisse par la droite et récapitule tout, sans rien figer — la descente continue derrière. TAB l’ouvre et le referme (bouton ▤ dans la barre du bas, stick DROIT enfoncé à la manette : la convention « fiche d’état »). Cinq sections à filet coloré : LA SALLE (identité, chips, rail de progression, objectif, vos records du poste) · LE CORPS (volume et sa jauge, particules, coque et son refroidissement, dashs et échantillons de secours en pastilles) · LE CYCLE, ICI (l’état courant, et pour les deux autres : la transformation qui y mène, sa touche si elle est tissée, le cadenas sinon) · LE BUTIN (bonbonne, condensat, mémoire gravée, pastilles de la salle, salles conclues, temps de descente) · L’ÉQUIPEMENT (instruments embarqués et fioles équipées, avec leurs effets).',
+      'Le dossier se rafraîchit quatre fois par seconde tant qu’il est ouvert et ne coûte rien fermé. Vérifié dans le jeu construit en 1280×800 : carte d’entrée annoncée en descente ordinaire (« SALLE 1 / 24 · Le berceau · 21-01 », boîte de 177 × 105 px mesurée à l’écran), dossier ouvert à 849 px avec ses cinq sections et quinze relevés, le cycle affichant SOLIDIFICATION en direct (F) et VAPORISATION cadenassée, les deux fioles équipées listées — et la simulation qui tourne toujours derrière. 448 tests verts.',
+    ],
+  },
+  {
     date: '28/08/2026 17:33',
-    title: 'Le PUPITRE passe aussi au BANC : les manœuvres sous la main du réglage',
+    title:
+      'Le PUPITRE passe aussi au BANC : les manœuvres sous la main du réglage',
     notes: [
       'Demandé : que les manœuvres du pupitre soient dans le banc — « ou les deux plutôt ». Les deux, donc. Le banc gagne un dossier PUPITRE D’ESSAIS avec les mêmes sections que l’écran du menu : cérémonie de fin de salle, bonbonne & étalonnage, ressources, ponctuations sonores. On règle un paramètre et on rejoue l’événement dans la foulée, sans quitter le banc.',
       'Une seule mécanique, deux poignées : la manœuvre est devenue une fonction nommée que le panneau et le banc appellent tous deux, et le CATALOGUE (titres, explications, ordre) est LU SUR LE PANNEAU lui-même — il n’y a jamais deux listes à tenir, un bouton ajouté au pupitre paraît au banc sans qu’on y touche. Le banc n’ayant pas la ligne d’état du pupitre, il redit son mot dans sa propre ligne d’aide.',
@@ -32,7 +43,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '28/08/2026 17:31',
-    title: 'Les outils ne touchent plus aux registres — la règle, et sa mise en œuvre',
+    title:
+      'Les outils ne touchent plus aux registres — la règle, et sa mise en œuvre',
     notes: [
       'Rectification de la livraison de 16:48 : « Valider la salle en cours » consignait de vrais records, avec un chrono d’une fraction de seconde. C’était une erreur de conception, et la règle est désormais posée — un outil ne doit RIEN écrire de ce qui se mérite. Un record de 0,1 s serait resté pour toujours dans les registres, et il n’aurait été de personne.',
       'Une traversée déclarée par un outil se conclut donc pour de bon — cérémonie, condensat, mémoire, rang de la descente, suite de la voie — mais elle n’écrit RIEN : ni record du protocole (volume et chrono), ni publication au tableau d’honneur partagé, ni record d’expédition, ni palmarès de la voie (descentes, profondeur record, meilleure descente), ni trophée, ni marque au codex. La progression avance ; les titres, non. Le bilan de la salle affiche un tiret là où il n’y a pas de record, au lieu d’en inventer un.',
