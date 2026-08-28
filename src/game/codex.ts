@@ -355,7 +355,7 @@ export const CODEX: CodexDef[] = [
     icone: '🌀',
     titre: 'Le sas met en bonbonne',
     texte:
-      'Le collecteur aspire ce qui l’approche et le met en bonbonne : chaque centilitre livré fait la note — et la glace avalée solide vaut prime.',
+      'Le collecteur aspire ce qui l’approche et le met en bonbonne : chaque centilitre livré fait la note — et la glace avalée solide vaut prime. La réserve ainsi mise de côté se REVERSE en route : la fiole du bandeau, la touche V, ou la croix ↑ à la manette — en liquide seulement.',
   },
 ]
 

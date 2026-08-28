@@ -31,6 +31,15 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
+    date: '28/08/2026 18:45',
+    title: 'La bonbonne se verse enfin : le clic ne part plus dans la cuve, et V (ou croix ↑) suffit',
+    notes: [
+      'Signalé : toucher la fiole faisait partir des GOUTTES au lieu de verser, et rien ne répondait au Steam Deck. La cause était nette une fois cherchée : le bandeau du haut est transparent aux clics (c’est voulu — on joue à travers), et seules les pastilles se réactivaient. La fiole, elle, ne recevait RIEN : le toucher filait au décor, où il coûtait une goutte. Elle reçoit désormais les clics, et sa zone sensible DÉBORDE tout autour (une fiole de douze pixels ne se vise pas) — un clic à six pixels dessous verse encore.',
+      'Deux chemins de plus, pour ne plus avoir à viser : la touche V au clavier, et la CROIX ↑ à la manette (la seule direction libre en jeu — le Steam Deck a enfin son geste). Et le versement DIT ce qu’il fait : « réserve versée » sous la fiole, ou la raison du refus — « réserve vide », « le corps est déjà plein », « seulement en LIQUIDE ». Sans un mot, un refus passait pour un bouton mort.',
+      'Documenté là où on le cherche : onglet CLAVIER et onglet MANETTE du panneau COMMANDES, info-bulle de la fiole, et la fiche du codex sur la mise en bonbonne. Vérifié en jeu, les quatre chemins : toucher la fiole, cliquer six pixels à côté, touche V, croix ↑ — chaque fois la réserve baisse et le corps regonfle. 448 tests verts, build propre.',
+    ],
+  },
+  {
     date: '28/08/2026 18:20',
     title:
       'La présentation de salle revient partout, et le DOSSIER DE DESCENTE s’ouvre',
