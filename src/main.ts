@@ -6093,7 +6093,9 @@ function simuleBonbonne(surplus = 2): void {
 // pupitre est un écran du menu (mode concepteur) qui rejoue les mêmes
 // événements en gros boutons — cérémonie, bonbonne, paliers, sons.
 const pupitreEl = document.getElementById('pupitre') as HTMLDivElement
+let pupDernierMot = ''
 function pupDit(msg: string): void {
+  pupDernierMot = msg
   const e = document.getElementById('pup-etat')
   if (e) e.textContent = msg
 }
@@ -6107,11 +6109,19 @@ document.getElementById('pupitre-fermer')?.addEventListener('click', () => {
 pupitreEl?.addEventListener('pointerdown', (e) => {
   if (e.target === pupitreEl) pupitreEl.hidden = true
 })
-for (const b of Array.from(
-  pupitreEl?.querySelectorAll<HTMLButtonElement>('[data-pup]') ?? [],
-)) {
-  b.addEventListener('click', () => {
-    const quoi = b.dataset.pup ?? ''
+/** UNE MANŒUVRE DU PUPITRE, par sa clé (data-pup). Le panneau du menu et le
+ *  BANC de réglage l'appellent tous deux : une seule mécanique, deux
+ *  poignées. Renvoie le mot que la manœuvre a laissé (le banc l'affiche
+ *  dans sa ligne d'aide, faute d'avoir celle du pupitre sous les yeux). */
+function actionPupitre(quoi: string): string {
+  pupDernierMot = ''
+  lanceManoeuvre(quoi)
+  return pupDernierMot
+}
+;(window as unknown as { __pupitre: (c: string) => string }).__pupitre =
+  actionPupitre
+function lanceManoeuvre(quoi: string): void {
+  {
     if (quoi.startsWith('ceremonie-')) {
       pupitreEl.hidden = true
       simuleBonbonne(Number(quoi.split('-')[1]))
@@ -6242,7 +6252,47 @@ for (const b of Array.from(
         pupDit('♪ fin-de-course')
         break
     }
-  })
+  }
+}
+// LE PANNEAU : chaque bouton tire la même corde que le banc
+for (const b of Array.from(
+  pupitreEl?.querySelectorAll<HTMLButtonElement>('[data-pup]') ?? [],
+)) {
+  b.addEventListener('click', () => actionPupitre(b.dataset.pup ?? ''))
+}
+
+/** LE CATALOGUE des manœuvres, lu sur le panneau lui-même : le HTML reste
+ *  la seule source (titres, explications, ordre) — le banc s'en sert pour
+ *  offrir les mêmes gestes sans qu'on ait à tenir deux listes. */
+function cataloguePupitre(): {
+  titre: string
+  boutons: { cle: string; titre: string; aide: string }[]
+}[] {
+  const out: {
+    titre: string
+    boutons: { cle: string; titre: string; aide: string }[]
+  }[] = []
+  const corps = pupitreEl?.querySelector('.pup-corps')
+  let section: (typeof out)[number] | null = null
+  for (const el of Array.from(corps?.children ?? [])) {
+    if (el.classList.contains('pup-sec')) {
+      section = { titre: (el.textContent ?? '').trim(), boutons: [] }
+      out.push(section)
+      continue
+    }
+    for (const b of Array.from(el.querySelectorAll<HTMLElement>('[data-pup]'))) {
+      if (!section) {
+        section = { titre: 'Manœuvres', boutons: [] }
+        out.push(section)
+      }
+      section.boutons.push({
+        cle: b.dataset.pup ?? '',
+        titre: (b.querySelector('b')?.textContent ?? b.dataset.pup ?? '').trim(),
+        aide: (b.querySelector('small')?.textContent ?? '').trim(),
+      })
+    }
+  }
+  return out
 }
 
 function resetLasers(): void {
@@ -7572,6 +7622,8 @@ const pane = createBench(params, monitor, {
   reset: resetAction,
   autoZoom: () => camera.resetAutoZoom(),
   oeil: { regl: oeilRegl, defauts: OEIL_DEFAUTS, sauve: sauveOeil },
+  // le PUPITRE au banc : mêmes manœuvres, catalogue lu sur le panneau
+  pupitre: { sections: cataloguePupitre(), lance: actionPupitre },
   tableaux: TABLEAUX.map((t) => t.name),
   gotoTableau: (index) => {
     testLevel = null // le banc navigue dans l'expédition, pas dans le prototype

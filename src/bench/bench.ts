@@ -46,6 +46,13 @@ export interface BenchActions {
   gotoBis(): void
   // Effets sonores (préférences hors présets : chacun règle son volume)
   sound: { actif: boolean; volume: number }
+  // LE PUPITRE D'ESSAIS, aussi au banc : les mêmes manœuvres que l'écran du
+  // menu (cérémonie, bonbonne, ressources, sons). Le catalogue vient du
+  // panneau lui-même — une seule liste, deux poignées.
+  pupitre?: {
+    sections: { titre: string; boutons: { cle: string; titre: string; aide: string }[] }[]
+    lance(cle: string): string
+  }
   // L'ŒIL DU SUJET (pack présence) : les curseurs vivent ici, à VUE — le
   // banc flotte sur le jeu qui tourne. Hors présets : mémorisé par
   // appareil (localStorage) ; les défauts sont l'étalonnage du concepteur.
@@ -308,6 +315,29 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     actions.gotoBis()
     hint.textContent = 'Prototype 21-A bis — la galerie noyée.'
   })
+
+  // ---- LE PUPITRE D'ESSAIS, au banc ------------------------------------
+  // Les mêmes manœuvres que l'écran du menu — simuler une cérémonie, remplir
+  // la bonbonne, verser, semer une ressource, entendre une ponctuation. Ici
+  // elles tombent sous la main du réglage : on modifie un paramètre et on
+  // rejoue l'événement dans la foulée, sans quitter le banc. Le catalogue
+  // vient du panneau (main.ts) : jamais deux listes à tenir.
+  if (actions.pupitre) {
+    const fPup = pane.addFolder({ title: 'Pupitre d’essais', expanded: false })
+    for (const sec of actions.pupitre.sections) {
+      const fSec = fPup.addFolder({ title: sec.titre, expanded: false })
+      for (const bt of sec.boutons) {
+        describe(
+          fSec.addButton({ title: bt.titre }),
+          bt.aide || `Manœuvre du pupitre : ${bt.titre}.`,
+        ).on('click', () => {
+          const mot = actions.pupitre?.lance(bt.cle) ?? ''
+          // le banc n'a pas la ligne d'état du pupitre : il redit le mot ici
+          hint.textContent = mot || `${bt.titre} — fait.`
+        })
+      }
+    }
+  }
 
   const fSound = pane.addFolder({ title: 'Son', expanded: false })
   describe(
