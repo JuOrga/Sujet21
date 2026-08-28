@@ -243,6 +243,15 @@ export class Records {
     return i < 0
   }
 
+  /** OUTIL CONCEPTEUR : détisse TOUS les liens du cycle et rembourse la
+   * somme indiquée — l'écran des mémoires revient à son état d'origine.
+   * Les verrous narratifs, eux, ne bougent pas : ils sont au scénario. */
+  reinitialiseCycle(remboursement: number): void {
+    this.data.eveil = []
+    if (remboursement > 0) this.data.memoire += Math.round(remboursement)
+    this.save()
+  }
+
   /** Achète un nœud : débite la mémoire ET grave le nœud, atomiquement.
    * false si le solde ne suffit pas ou que le nœud est déjà tenu. */
   acquiertEveil(id: string, cout: number): boolean {
