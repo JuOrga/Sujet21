@@ -22,6 +22,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 20:44',
+    title: 'L’ATELIER DES RÉCOMPENSES : un écran pour les voir, et de quoi en fabriquer',
+    notes: [
+      'Demandé : un écran pour gérer les récompenses, et — « peut-être trop ambitieux » — de quoi en créer de neuves avec les pièces déjà là. Ce n’était pas trop ambitieux : il manquait une bascule, et elle est faite. Une carte n’est plus du code, c’est une LISTE D’EFFETS, et chaque effet tire sur un LEVIER nommé du jeu (quinze leviers : seuil de dispersion, délai de réabsorption, prise de l’éponge, réserve de dashs, péage de vaporisation, rebond du palet, dilatation de la visée, refroidissement, rosée, portée du sas, prime de glace, condensat, bonbonne, cartes au tirage, échantillons de secours). Le jeu ne demande plus jamais « ai-je telle carte » : il demande « que vaut ce levier ». Les quinze cartes livrées ont été retranscrites dans cette grammaire, sans changer un seul de leurs effets.',
+      'L’ÉCRAN (menu concepteur → RÉCOMPENSES) montre le catalogue complet : chaque carte avec son icône, son texte et les leviers qu’elle tire, en clair. Un bouton ESSAYER l’embarque dans la run en cours et recharge le tableau pour qu’elle agisse tout de suite — plus besoin d’attendre une fin de salle pour juger une carte.',
+      'LA FORGE, à droite : un nom, une icône, un ou plusieurs leviers avec leur valeur — et la carte se raconte toute seule, la phrase s’écrit depuis les leviers (« Le sas aspire 100 % plus loin »). Elle rejoint le catalogue, entre au tirage, s’emporte et agit : c’est LE MÊME CHEMIN que les cartes gravées, pas une maquette. L’atelier refuse en clair ce qui ne se joue pas : sans nom, sans effet, valeur hors plage ou neutre, deux fois le même levier sur une carte, identifiant ou icône déjà pris (une carte se reconnaît à son glyphe : deux glyphes identiques seraient indiscernables une fois embarqués). Export et import en JSON : quand une carte fabriquée fait ses preuves, on la colle dans instruments.ts et elle est gravée.',
+      'Vérifié dans le jeu construit : les quinze cartes listées avec leurs leviers, une carte forgée à l’écran (« Trompe du collecteur », portée du sas ×2) qui apparaît au catalogue, s’embarque, et dont le facteur se lit bien sur la simulation — puis le refus attendu quand on tente de reprendre son icône. 468 tests verts, build propre.',
+    ],
+  },
+  {
     date: '28/08/2026 19:28',
     title: 'PARAMÈTRES › COMMANDES : toutes les touches et tous les boutons se redéfinissent',
     notes: [

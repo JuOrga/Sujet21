@@ -969,6 +969,65 @@
         margin: 12px 2px 0; min-height: 18px;
         font-size: 12px; color: var(--specimen);
       }
+      /* ---- L'ATELIER DES RÉCOMPENSES ---- */
+      #recompenses { position: fixed; inset: 0; z-index: 60; display: flex;
+        align-items: center; justify-content: center; background: rgba(2,6,12,.82); }
+      /* l'atelier a besoin de largeur : à gauche des cartes qui se lisent
+         d'un regard, à droite une forge qui tient sans ascenseur */
+      #recompenses .salles-boite { width: min(1120px, 95vw); max-width: none; }
+      #recompenses[hidden] { display: none; }
+      .rec-corps { display: flex; gap: 18px; padding: 14px 16px; overflow: auto;
+        max-height: calc(90vh - 60px); }
+      .rec-liste { flex: 1 1 58%; min-width: 0; display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        align-content: start; gap: 6px; }
+      .rec-fam { grid-column: 1 / -1; }
+      .rec-forge { flex: 0 0 340px; border-left: 1px solid rgba(120,180,230,.18);
+        padding-left: 16px; display: flex; flex-direction: column; gap: 8px; }
+      .rec-forge h4 { margin: 0; font-size: 13px; letter-spacing: .12em; color: #9ed8ff; }
+      .rec-aide { margin: 0; font-size: 11px; line-height: 1.5; color: #7f98ae; }
+      .rec-fam { margin: 10px 0 2px; font-size: 11px; letter-spacing: .14em;
+        color: #6d8399; text-transform: uppercase; }
+      .rec-carte { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px;
+        border: 1px solid rgba(120,180,230,.16); border-radius: 8px;
+        background: rgba(10,20,32,.6); }
+      .rec-carte.perso { border-color: rgba(120,230,190,.34); }
+      .rec-carte > i { font-size: 20px; font-style: normal; line-height: 1.2; }
+      .rec-carte .rec-corps-carte { flex: 1; min-width: 0; }
+      .rec-carte b { display: block; font-size: 13px; color: #d8ecff; }
+      .rec-carte span.rec-desc { display: block; font-size: 11px; color: #8ba2b8; line-height: 1.45; }
+      .rec-carte .rec-effet { display: inline-block; margin: 4px 4px 0 0; padding: 1px 7px;
+        font-size: 10px; letter-spacing: .06em; border-radius: 10px;
+        border: 1px solid rgba(120,180,230,.3); color: #9ed8ff; }
+      .rec-carte .rec-boutons { display: flex; gap: 4px; flex: none; }
+      .rec-carte .rec-boutons button { font-size: 11px; padding: 2px 8px; }
+      .rec-f { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: #8ba2b8; }
+      .rec-f input { background: rgba(6,14,24,.9); border: 1px solid rgba(120,180,230,.28);
+        color: #d8ecff; border-radius: 5px; padding: 5px 8px; font: inherit; font-size: 12px; }
+      .rec-ligne { display: flex; gap: 6px; align-items: center; }
+      .rec-ligne select { flex: 1; min-width: 0; background: rgba(6,14,24,.9);
+        border: 1px solid rgba(120,180,230,.28); color: #d8ecff; border-radius: 5px;
+        padding: 4px 6px; font: inherit; font-size: 12px; }
+      .rec-ligne input { width: 74px; background: rgba(6,14,24,.9);
+        border: 1px solid rgba(120,180,230,.28); color: #d8ecff; border-radius: 5px;
+        padding: 4px 6px; font: inherit; font-size: 12px; }
+      .rec-phrase { font-size: 11px; color: #7f98ae; margin: 2px 0 8px; line-height: 1.4; }
+      .rec-apercu { margin: 4px 0 0; font-size: 12px; color: #a9e7c9; line-height: 1.5; }
+      .rec-refus { margin: 2px 0 0; font-size: 11px; color: #ffab8c; line-height: 1.5; }
+      .rec-actions { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+      .rec-io { display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+        border-top: 1px solid rgba(120,180,230,.14); padding-top: 8px; margin-top: 4px; }
+      #rec-json { width: 100%; background: rgba(6,14,24,.9); color: #9ed8ff;
+        border: 1px solid rgba(120,180,230,.28); border-radius: 5px; font-size: 11px;
+        font-family: ui-monospace, monospace; padding: 6px; }
+      .rec-lien { background: none; border: none; color: #7fc6ff; font-size: 11px;
+        text-decoration: underline; cursor: pointer; padding: 0; }
+      @media (max-width: 900px) {
+        .rec-corps { flex-direction: column; }
+        .rec-forge { flex: 1 1 auto; border-left: 0; padding-left: 0;
+          border-top: 1px solid rgba(120,180,230,.18); padding-top: 12px; }
+      }
+
       /* barre d'outils du voile SALLES : le tri par code atelier, et la
          légende qui explique la convention à trois chiffres */
       .salles-outils {
@@ -5968,6 +6027,7 @@
         <button id="open-montage" type="button" data-dev title="La table de montage des cinématiques : planches, effets, sons — et lecture immédiate"><i>▤</i><span>MONTAGE</span></button>
         <button id="home-salles" type="button" data-dev><i>▦</i><span>SALLES</span></button>
         <button id="home-planche" type="button" data-dev title="La planche d'ordonnancement : toutes les salles de la bibliothèque en cartes visuelles — glisser pour réordonner la séquence, régler le code cran par cran, essayer d'un ⏵"><i>▧</i><span>LA PLANCHE</span></button>
+        <button id="home-recompenses" type="button" data-dev title="L'atelier des récompenses : le catalogue complet des instruments, ce que chaque carte tire comme levier — et de quoi en fabriquer de nouvelles avec les mêmes pièces"><i>❖</i><span>RÉCOMPENSES</span></button>
         <button id="home-pupitre" type="button" data-dev title="Le pupitre d'essais : simuler les événements du jeu (cérémonie, bonbonne, paliers, sons) au doigt — sans console navigateur"><i>▚</i><span>PUPITRE</span></button>
         <button id="home-records" type="button"><i>✦</i><span>RECORDS</span></button>
         <button id="home-codex" type="button" title="Le manuel écrit par la partie : chaque interaction découverte débloque sa fiche"><i>◉</i><span>CODEX</span></button>
@@ -6465,6 +6525,39 @@
           partagé — l'implémentation viendra les y relire.</p>
         <div id="regles-corps"></div>
         <p class="pup-etat" id="regles-etat"></p>
+      </div>
+    </div>
+
+    <!-- L'ATELIER DES RÉCOMPENSES : le catalogue à gauche, la forge à
+         droite. Une carte fabriquée ici se tire, s'emporte et agit comme
+         une carte gravée dans le code — c'est le même chemin. -->
+    <div id="recompenses" hidden aria-label="Atelier des récompenses">
+      <div class="salles-boite">
+        <div class="salles-tete"><span>RÉCOMPENSES — le catalogue, et l'atelier</span>
+          <button type="button" id="recompenses-fermer" aria-label="Fermer">✕</button></div>
+        <div class="rec-corps">
+          <div class="rec-liste" id="rec-liste"></div>
+          <div class="rec-forge">
+            <h4 id="rec-forge-titre">FABRIQUER UNE CARTE</h4>
+            <p class="rec-aide">Une carte, c'est un nom, une icône et des LEVIERS. Le jeu ne lit que les leviers : ce qui sort d'ici se tire au hasard et agit comme le reste.</p>
+            <label class="rec-f"><span>Nom</span><input id="rec-nom" type="text" maxlength="28" placeholder="Membrane de tension" /></label>
+            <label class="rec-f"><span>Icône</span><input id="rec-icone" type="text" maxlength="4" placeholder="✦" /></label>
+            <label class="rec-f"><span>Texte de la carte <small>(vide : écrit par les effets)</small></span><input id="rec-desc" type="text" maxlength="140" placeholder="" /></label>
+            <div id="rec-effets"></div>
+            <button type="button" id="rec-ajout-effet" class="rec-lien">+ un effet</button>
+            <p id="rec-apercu" class="rec-apercu"></p>
+            <p id="rec-refus" class="rec-refus"></p>
+            <div class="rec-actions">
+              <button type="button" id="rec-fabriquer">FABRIQUER</button>
+              <button type="button" id="rec-annuler" class="rec-lien">vider le formulaire</button>
+            </div>
+            <div class="rec-io">
+              <button type="button" id="rec-exporter" class="rec-lien">exporter en JSON</button>
+              <button type="button" id="rec-importer" class="rec-lien">importer ce JSON</button>
+              <textarea id="rec-json" hidden rows="6" spellcheck="false" aria-label="JSON des cartes fabriquées"></textarea>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 

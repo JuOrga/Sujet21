@@ -4,11 +4,18 @@
 // cartes sont PAYANTES en condensat : la première dépense de la monnaie
 // méta — le banc d'étalonnage (permanent) viendra ensuite.
 
+import type { Effet, LevierId } from './leviers'
+import { phraseEffet, valeurLevier } from './leviers'
+
 export interface InstrumentDef {
   id: string
   nom: string
   desc: string
   icone: string
+  /** Ce que la carte FAIT, en leviers. Le jeu ne lit que ça. */
+  effets: Effet[]
+  /** Carte fabriquée à l'écran des récompenses (jamais livrée en dur). */
+  perso?: boolean
 }
 
 export const INSTRUMENTS: InstrumentDef[] = [
@@ -17,30 +24,35 @@ export const INSTRUMENTS: InstrumentDef[] = [
     nom: 'Échantillon de secours',
     desc: 'Un échantillon de plus en réserve : une dispersion pardonnée.',
     icone: '🧪',
+    effets: [{ levier: 'vies', valeur: 1 }],
   },
   {
     id: 'gaine-isolante',
     nom: 'Gaine isolante',
     desc: 'Le refroidissement du vaisseau mord un tiers plus lentement.',
     icone: '🧊',
+    effets: [{ levier: 'froid', valeur: 1.5 }],
   },
   {
     id: 'buse-calibree',
     nom: 'Buse calibrée',
     desc: 'Un dash de plus dans la réserve de chaque tableau.',
     icone: '💨',
+    effets: [{ levier: 'dashs', valeur: 1 }],
   },
   {
     id: 'aimant-rosee',
     nom: 'Aimant à rosée',
     desc: 'La rosée recondensée rend nettement plus de volume.',
     icone: '🫧',
+    effets: [{ levier: 'rosee', valeur: 0.35 }],
   },
   {
     id: 'chambre-froide',
     nom: 'Chambre froide',
     desc: 'La prime de glace vaut moitié plus au sas.',
     icone: '⚗️',
+    effets: [{ levier: 'primeGlace', valeur: 1.5 }],
   },
 
   // ——— Le corps et sa matière ————————————————————————————————
@@ -49,18 +61,21 @@ export const INSTRUMENTS: InstrumentDef[] = [
     nom: 'Peau tendue',
     desc: 'Les gouttes éjectées redeviennent réabsorbables deux fois plus tôt.',
     icone: '🩹',
+    effets: [{ levier: 'reabsorption', valeur: 0.5 }],
   },
   {
     id: 'vanne-de-secours',
     nom: 'Vanne de secours',
     desc: 'Le corps tient plus bas : le seuil de dispersion descend d’un cinquième.',
     icone: '🚨',
+    effets: [{ levier: 'seuilDispersion', valeur: 0.8 }],
   },
   {
     id: 'plastron',
     nom: 'Plastron',
     desc: 'L’éponge a moins de prise : elle boit un quart moins vite.',
     icone: '🛡️',
+    effets: [{ levier: 'priseEponge', valeur: 0.75 }],
   },
 
   // ——— Les états ————————————————————————————————————————————
@@ -69,18 +84,21 @@ export const INSTRUMENTS: InstrumentDef[] = [
     nom: 'Détendeur',
     desc: 'Se vaporiser coûte 40 % de moins : le péage en gouttes s’allège.',
     icone: '🫁',
+    effets: [{ levier: 'peageVapeur', valeur: 0.6 }],
   },
   {
     id: 'patins-de-givre',
     nom: 'Patins de givre',
     desc: 'Le palet de glace rebondit presque sans rien perdre.',
     icone: '⛸️',
+    effets: [{ levier: 'rebondGlace', valeur: 1.35 }],
   },
   {
     id: 'lentille-de-visee',
     nom: 'Lentille de visée',
     desc: 'La visée du dash ralentit le temps deux fois plus : on choisit sa ligne.',
     icone: '🔭',
+    effets: [{ levier: 'visee', valeur: 0.5 }],
   },
 
   // ——— La collecte et la bourse ——————————————————————————————
@@ -89,18 +107,21 @@ export const INSTRUMENTS: InstrumentDef[] = [
     nom: 'Gueule ouverte',
     desc: 'Le sas aspire de moitié plus loin : les traînardes rentrent seules.',
     icone: '🌀',
+    effets: [{ levier: 'sasPortee', valeur: 1.5 }],
   },
   {
     id: 'filtre-a-condensat',
     nom: 'Filtre à condensat',
     desc: 'Un quart de condensat en plus sur tout ce qui passe le sas.',
     icone: '💧',
+    effets: [{ levier: 'condensat', valeur: 1.25 }],
   },
   {
     id: 'ballast',
     nom: 'Ballast',
     desc: 'La bonbonne emporte trois litres de plus.',
     icone: '⚖️',
+    effets: [{ levier: 'bonbonne', valeur: 3 }],
   },
 
   // ——— Le protocole lui-même ————————————————————————————————
@@ -109,11 +130,49 @@ export const INSTRUMENTS: InstrumentDef[] = [
     nom: 'Carnet du Semblable',
     desc: 'Une carte de plus à chaque tirage de fin de salle.',
     icone: '📓',
+    effets: [{ levier: 'cartes', valeur: 1 }],
   },
 ]
 
-export function instrumentDef(id: string): InstrumentDef | null {
-  return INSTRUMENTS.find((t) => t.id === id) ?? null
+export function instrumentDef(
+  id: string,
+  catalogue: InstrumentDef[] = INSTRUMENTS,
+): InstrumentDef | null {
+  return catalogue.find((t) => t.id === id) ?? null
+}
+
+/** Tous les effets des cartes EMPORTÉES, mis bout à bout. */
+export function effetsTenus(
+  tenus: string[],
+  catalogue: InstrumentDef[] = INSTRUMENTS,
+): Effet[] {
+  const out: Effet[] = []
+  for (const id of tenus) {
+    const d = instrumentDef(id, catalogue)
+    if (d) out.push(...d.effets)
+  }
+  return out
+}
+
+/**
+ * Ce que vaut un levier pour la run en cours. C'est L'UNIQUE question que
+ * le jeu pose au catalogue : il ne demande jamais « ai-je telle carte »,
+ * il demande « que vaut ce levier » — et une carte fabriquée à l'écran des
+ * récompenses répond exactement comme une carte livrée.
+ */
+export function levier(
+  tenus: string[],
+  id: LevierId,
+  catalogue: InstrumentDef[] = INSTRUMENTS,
+): number {
+  return valeurLevier(effetsTenus(tenus, catalogue), id)
+}
+
+/** La description d'une carte : celle qu'on a écrite, ou celle que ses
+ * effets dictent (les cartes fabriquées se racontent toutes seules). */
+export function descriptionInstrument(d: InstrumentDef): string {
+  if (d.desc.trim()) return d.desc
+  return d.effets.map(phraseEffet).filter(Boolean).join(' ')
 }
 
 /** Une carte du tirage : l'instrument, et son prix en condensat (0 : offerte). */
@@ -140,9 +199,12 @@ export function tirageInstruments(
   vies: number,
   viesMax: number,
   nbCartes = 3,
+  catalogue: InstrumentDef[] = INSTRUMENTS,
 ): CarteTirage[] {
-  const pool = INSTRUMENTS.filter((d) => {
-    if (d.id === 'echantillon-secours') return vies < viesMax
+  const pool = catalogue.filter((d) => {
+    // une carte qui donne une VIE ne paraît que s'il en manque une — peu
+    // importe son nom : c'est son levier qui la range là
+    if (d.effets.some((e) => e.levier === 'vies')) return vies < viesMax
     return !tenus.includes(d.id)
   }).map((d) => d.id)
   // mélange de Fisher-Yates sur la copie

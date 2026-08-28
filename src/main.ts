@@ -39,14 +39,35 @@ import {
   type PlanVoie,
 } from './game/voie'
 import { CIRCUITS } from './game/circuits'
+import type { LevierId } from './game/leviers'
+import {
+  catalogueRecompenses,
+  exporteRecompenses,
+  idDepuisNom,
+  importeRecompenses,
+  poseRecompense,
+  recompensesPerso,
+  retireRecompense,
+} from './game/recompenses'
+import type { InstrumentDef } from './game/instruments'
 import {
   BONBONNE_CAP,
+  INSTRUMENTS,
   PALIERS_XP,
+  descriptionInstrument,
   instrumentDef,
+  levier,
   paliersAtteints,
   prochainPalier,
   tirageInstruments,
 } from './game/instruments'
+import {
+  FAMILLE_NOMS,
+  LEVIERS,
+  levierDef,
+  phraseEffet,
+  valeurLevier,
+} from './game/leviers'
 import { dansForme, formeOutline } from './game/formes'
 import { DELIVERIES, VERSION, versionDe } from './bench/changelog'
 import { Camera } from './render/camera'
@@ -246,18 +267,27 @@ function majCondensatUI(): void {
 }
 majCondensatUI()
 
+// LA LECTURE DES RÉCOMPENSES. Le jeu ne demande jamais « ai-je telle
+// carte » : il demande ce que vaut un LEVIER, tous instruments confondus.
+// Une carte fabriquée à l'atelier répond donc exactement comme une carte
+// livrée — c'est ce qui rend l'écran des récompenses jouable, et pas
+// seulement décoratif.
+function lev(id: LevierId): number {
+  return levier(run.instruments, id, catalogueRecompenses())
+}
+
 // La contenance de la bonbonne POUR CETTE RUN : le BALLAST (instrument
 // embarqué) lui ajoute trois litres. Toute lecture passe par ici — jauges
 // et bilans compris, sinon la réserve afficherait un plafond qu'elle
 // dépasse, ou refuserait un versement qu'elle peut tenir.
 function capBonbonne(): number {
-  return BONBONNE_CAP + (run.instruments.includes('ballast') ? 3 : 0)
+  return BONBONNE_CAP + lev('bonbonne')
 }
 
 function chillNow(): number {
   // la gaine isolante (instrument embarqué) ralentit le refroidissement —
   // la fiole d'ISOLANT (équipée au placard) s'y cumule
-  const gaine = run.instruments.includes('gaine-isolante') ? 1.5 : 1
+  const gaine = Math.max(0.2, lev('froid'))
   const fiole = records.fioleEquipee('isolant') ? 1.15 : 1
   return Math.min(
     1,
@@ -384,17 +414,16 @@ function createSim(level: LevelDef): FluidSim {
   sim.dashBudgetMax = level.dashBudget ?? params.gasDashBudget
   // Instruments embarqués : la buse calibrée agrandit la réserve d'un dash,
   // l'aimant à rosée bonifie la recondensation
-  if (run.instruments.includes('buse-calibree')) sim.dashBudgetMax += 1
-  if (run.instruments.includes('aimant-rosee')) sim.recondBonus = 0.35
-  // les autres instruments sont des FACTEURS posés sur la simulation : ils
-  // ne touchent pas au réglage du banc, ils le multiplient pour cette run
-  const tenu = (id: string): boolean => run.instruments.includes(id)
-  if (tenu('gueule-ouverte')) sim.exitRadiusFactor = 1.5
-  if (tenu('peau-tendue')) sim.reabsorbFactor = 0.5
-  if (tenu('detendeur')) sim.vaporTollFactor = 0.6
-  if (tenu('patins-de-givre')) sim.iceBounceFactor = 1.35
-  if (tenu('plastron')) sim.spongeGripFactor = 0.75
-  if (tenu('vanne-de-secours')) sim.criticalFactor = 0.8
+  // Les instruments embarqués, lus PAR LEVIER : le réglage du banc n'est
+  // jamais modifié, il est multiplié (ou augmenté) pour cette run.
+  sim.dashBudgetMax += lev('dashs')
+  sim.recondBonus = lev('rosee')
+  sim.exitRadiusFactor = lev('sasPortee')
+  sim.reabsorbFactor = lev('reabsorption')
+  sim.vaporTollFactor = lev('peageVapeur')
+  sim.iceBounceFactor = lev('rebondGlace')
+  sim.spongeGripFactor = lev('priseEponge')
+  sim.criticalFactor = lev('seuilDispersion')
   const naitVapeur =
     zoneForceAt(level, level.spawn.x, level.spawn.y) === 'vapeur'
   sim.dashBudget = sim.dashBudgetMax
@@ -6378,6 +6407,286 @@ function simuleBonbonne(surplus = 2): void {
 
 // ---- LE PUPITRE D'ESSAIS : les événements du jeu, simulés au doigt ----
 // La console navigateur n'existe ni sur Steam Deck ni sur mobile : le
+// ---- L'ATELIER DES RÉCOMPENSES ----
+// Un écran pour VOIR le catalogue (ce que chaque carte tire comme levier,
+// livrée ou fabriquée), et une forge pour en faire de neuves avec les
+// mêmes pièces. Rien n'y est maquette : une carte fabriquée ici entre au
+// tirage, s'emporte et agit — c'est le même chemin que les cartes gravées.
+const recEl = document.getElementById('recompenses') as HTMLDivElement
+let recEffetsForme: { levier: string; valeur: number }[] = []
+let recEdite: string | null = null // l'identifiant en cours de retouche
+
+function recDit(msgs: string[], bon = false): void {
+  const el = document.getElementById('rec-refus')
+  if (!el) return
+  el.style.color = bon ? '#a9e7c9' : ''
+  el.innerHTML = msgs.map((m) => htmlSafe(m)).join('<br>')
+}
+
+/** Le corps d'une carte : ses effets, dits par leurs leviers. */
+function recChips(d: InstrumentDef): string {
+  return d.effets
+    .map((e: { levier: string; valeur: number }) => {
+      const l = levierDef(e.levier)
+      if (!l) return ''
+      const v = l.mode === 'mult' ? `×${e.valeur}` : `+${e.valeur}`
+      return `<span class="rec-effet">${htmlSafe(l.nom)} ${v}</span>`
+    })
+    .join('')
+}
+
+function renderRecListe(): void {
+  const host = document.getElementById('rec-liste')
+  if (!host) return
+  const carte = (d: InstrumentDef): string => {
+    const tenue = run.instruments.includes(d.id)
+    return (
+      `<div class="rec-carte${d.perso ? ' perso' : ''}"><i>${htmlSafe(d.icone)}</i>` +
+      `<div class="rec-corps-carte"><b>${htmlSafe(d.nom)}${tenue ? ' · embarquée' : ''}</b>` +
+      `<span class="rec-desc">${htmlSafe(descriptionInstrument(d))}</span>` +
+      recChips(d) +
+      `</div><div class="rec-boutons">` +
+      `<button type="button" data-rec-essai="${htmlSafe(d.id)}" title="embarquer tout de suite dans la run en cours">essayer</button>` +
+      (d.perso
+        ? `<button type="button" data-rec-edit="${htmlSafe(d.id)}" title="reprendre cette carte">✎</button>` +
+          `<button type="button" data-rec-sup="${htmlSafe(d.id)}" title="retirer de l’atelier">✕</button>`
+        : '') +
+      `</div></div>`
+    )
+  }
+  const perso = recompensesPerso()
+  host.innerHTML =
+    `<div class="rec-fam">Atelier — fabriquées sur ce poste (${perso.length})</div>` +
+    (perso.length
+      ? perso.map(carte).join('')
+      : `<div class="rec-aide">Rien encore. La forge, à droite, part d’un nom et d’un levier.</div>`) +
+    `<div class="rec-fam">Livrées avec le jeu (${INSTRUMENTS.length})</div>` +
+    INSTRUMENTS.map(carte).join('')
+}
+
+function recApercu(): void {
+  const el = document.getElementById('rec-apercu')
+  if (!el) return
+  const phrases = recEffetsForme
+    .map((e: { levier: string; valeur: number }) =>
+      phraseEffet(e as { levier: LevierId; valeur: number }),
+    )
+    .filter(Boolean)
+  el.textContent = phrases.join(' ')
+}
+
+function renderRecEffets(): void {
+  const host = document.getElementById('rec-effets')
+  if (!host) return
+  host.innerHTML = ''
+  recEffetsForme.forEach((e, i) => {
+    const def = levierDef(e.levier)
+    const ligne = document.createElement('div')
+    ligne.className = 'rec-ligne'
+    const sel = document.createElement('select')
+    for (const fam of ['corps', 'etats', 'collecte', 'protocole'] as const) {
+      const g = document.createElement('optgroup')
+      g.label = FAMILLE_NOMS[fam]
+      for (const l of LEVIERS.filter((x) => x.famille === fam)) {
+        const o = document.createElement('option')
+        o.value = l.id
+        o.textContent = l.nom
+        o.selected = l.id === e.levier
+        g.appendChild(o)
+      }
+      sel.appendChild(g)
+    }
+    sel.addEventListener('change', () => {
+      const l = levierDef(sel.value)
+      recEffetsForme[i] = {
+        levier: sel.value,
+        // à changement de levier, on propose une valeur qui FAIT quelque
+        // chose : le milieu de la plage utile, jamais la valeur neutre
+        valeur: l
+          ? Math.round(((l.min + l.max) / 2 / l.pas) * 1) * l.pas
+          : 1,
+      }
+      renderRecEffets()
+      recApercu()
+    })
+    const val = document.createElement('input')
+    val.type = 'number'
+    if (def) {
+      val.min = String(def.min)
+      val.max = String(def.max)
+      val.step = String(def.pas)
+    }
+    val.value = String(e.valeur)
+    val.addEventListener('input', () => {
+      recEffetsForme[i].valeur = Number(val.value)
+      const p = ligne.nextElementSibling as HTMLElement | null
+      if (p && p.classList.contains('rec-phrase'))
+        p.textContent = phraseEffet(
+          recEffetsForme[i] as { levier: LevierId; valeur: number },
+        )
+      recApercu()
+    })
+    const sup = document.createElement('button')
+    sup.type = 'button'
+    sup.className = 'rec-lien'
+    sup.textContent = '✕'
+    sup.title = 'retirer cet effet'
+    sup.addEventListener('click', () => {
+      recEffetsForme.splice(i, 1)
+      renderRecEffets()
+      recApercu()
+    })
+    ligne.append(sel, val, sup)
+    const phrase = document.createElement('p')
+    phrase.className = 'rec-phrase'
+    phrase.textContent = phraseEffet(e as { levier: LevierId; valeur: number })
+    host.append(ligne, phrase)
+  })
+}
+
+function recVideForme(): void {
+  recEdite = null
+  recEffetsForme = []
+  for (const id of ['rec-nom', 'rec-icone', 'rec-desc'])
+    (document.getElementById(id) as HTMLInputElement).value = ''
+  const t = document.getElementById('rec-forge-titre')
+  if (t) t.textContent = 'FABRIQUER UNE CARTE'
+  renderRecEffets()
+  recApercu()
+  recDit([])
+}
+
+function recReprend(d: InstrumentDef): void {
+  recEdite = d.id
+  ;(document.getElementById('rec-nom') as HTMLInputElement).value = d.nom
+  ;(document.getElementById('rec-icone') as HTMLInputElement).value = d.icone
+  ;(document.getElementById('rec-desc') as HTMLInputElement).value = d.desc
+  recEffetsForme = d.effets.map((e) => ({ ...e }))
+  const t = document.getElementById('rec-forge-titre')
+  if (t) t.textContent = `REPRENDRE « ${d.nom.toUpperCase()} »`
+  renderRecEffets()
+  recApercu()
+  recDit([])
+}
+
+function ouvreRecompenses(): void {
+  recEl.hidden = false
+  renderRecListe()
+  renderRecEffets()
+  recApercu()
+}
+document
+  .getElementById('home-recompenses')
+  ?.addEventListener('click', ouvreRecompenses)
+document.getElementById('recompenses-fermer')?.addEventListener('click', () => {
+  recEl.hidden = true
+})
+recEl?.addEventListener('pointerdown', (e) => {
+  if (e.target === recEl) recEl.hidden = true
+})
+document.getElementById('rec-ajout-effet')?.addEventListener('click', () => {
+  // le premier levier libre : on ne propose jamais deux fois le même sur
+  // une carte (deux valeurs pour un même levier ne se liraient pas)
+  const pris = new Set(recEffetsForme.map((e) => e.levier))
+  const l = LEVIERS.find((x) => !pris.has(x.id))
+  if (!l) {
+    recDit(['Tous les leviers sont déjà posés sur cette carte.'])
+    return
+  }
+  recEffetsForme.push({ levier: l.id, valeur: (l.min + l.max) / 2 })
+  renderRecEffets()
+  recApercu()
+})
+document.getElementById('rec-annuler')?.addEventListener('click', recVideForme)
+document.getElementById('rec-fabriquer')?.addEventListener('click', () => {
+  const nom = (document.getElementById('rec-nom') as HTMLInputElement).value
+  const icone = (document.getElementById('rec-icone') as HTMLInputElement).value
+  const desc = (document.getElementById('rec-desc') as HTMLInputElement).value
+  const refus = poseRecompense(
+    {
+      id: recEdite ?? idDepuisNom(nom),
+      nom,
+      icone,
+      desc,
+      effets: recEffetsForme as { levier: LevierId; valeur: number }[],
+    },
+    recEdite ?? undefined,
+  )
+  if (refus.length > 0) {
+    recDit(refus)
+    return
+  }
+  const neuve = recEdite === null
+  recVideForme()
+  renderRecListe()
+  recDit(
+    [
+      neuve
+        ? `« ${nom.trim()} » rejoint le catalogue : elle entre au tirage dès la prochaine fin de salle.`
+        : `« ${nom.trim()} » est mise à jour.`,
+    ],
+    true,
+  )
+})
+document.getElementById('rec-exporter')?.addEventListener('click', () => {
+  const ta = document.getElementById('rec-json') as HTMLTextAreaElement
+  ta.hidden = false
+  ta.value = exporteRecompenses()
+  ta.select()
+  recDit(
+    ['Le JSON est prêt : à coller dans instruments.ts pour graver ces cartes.'],
+    true,
+  )
+})
+document.getElementById('rec-importer')?.addEventListener('click', () => {
+  const ta = document.getElementById('rec-json') as HTMLTextAreaElement
+  ta.hidden = false
+  if (!ta.value.trim()) {
+    recDit(['Collez un export dans la zone, puis reprenez ce bouton.'])
+    return
+  }
+  const n = importeRecompenses(ta.value)
+  if (n < 0) {
+    recDit(['Ce n’est pas un export lisible.'])
+    return
+  }
+  renderRecListe()
+  recDit([`${n} carte(s) reprise(s).`], true)
+})
+document.getElementById('rec-liste')?.addEventListener('click', (ev) => {
+  const b = (ev.target as HTMLElement).closest('button')
+  if (!b) return
+  const essai = b.dataset.recEssai
+  const edit = b.dataset.recEdit
+  const sup = b.dataset.recSup
+  if (essai) {
+    const d = instrumentDef(essai, catalogueRecompenses())
+    if (!d) return
+    const gainVies = valeurLevier(d.effets, 'vies')
+    if (gainVies > 0) run.vies = Math.min(VIES_MAX, run.vies + gainVies)
+    if (d.effets.some((e) => e.levier !== 'vies') && !run.instruments.includes(d.id))
+      run.instruments.push(d.id)
+    majInstrumentsUI()
+    majBoutonsRun()
+    // les facteurs se posent au chargement du tableau : on le recharge pour
+    // que la carte agisse tout de suite, sans attendre la salle suivante
+    if (hasPlayed) restart()
+    renderRecListe()
+    recDit([`« ${d.nom} » embarquée — le tableau est rechargé pour qu’elle agisse.`], true)
+  } else if (edit) {
+    const d = instrumentDef(edit, catalogueRecompenses())
+    if (d) recReprend(d)
+  } else if (sup) {
+    if (retireRecompense(sup)) {
+      const i = run.instruments.indexOf(sup)
+      if (i >= 0) run.instruments.splice(i, 1) // plus au catalogue, plus en poche
+      majInstrumentsUI()
+      renderRecListe()
+      recDit(['Carte retirée de l’atelier.'], true)
+    }
+  }
+})
+
 // pupitre est un écran du menu (mode concepteur) qui rejoue les mêmes
 // événements en gros boutons — cérémonie, bonbonne, paliers, sons.
 const pupitreEl = document.getElementById('pupitre') as HTMLDivElement
@@ -7106,7 +7415,8 @@ function mbMontreDraft(): void {
     run.instruments,
     run.vies,
     VIES_MAX,
-    run.instruments.includes('carnet-du-semblable') ? 4 : 3,
+    3 + lev('cartes'),
+    catalogueRecompenses(),
   )
   const suite = (): void => {
     mbDraftsRestants -= 1
@@ -7135,12 +7445,16 @@ function mbMontreDraft(): void {
         : `<em class="mb-prix mb-offert">offert</em>`)
     btn.addEventListener('click', () => {
       if (!depenseCondensat(carte.prix)) return
-      if (carte.id === 'echantillon-secours') {
-        run.vies = Math.min(VIES_MAX, run.vies + 1)
+      // le levier « vies » se consomme À L'INSTANT (une vie n'est pas un
+      // facteur qu'on relit : elle se prend) ; tout le reste s'embarque
+      const def = instrumentDef(carte.id, catalogueRecompenses())
+      const gainVies = valeurLevier(def?.effets ?? [], 'vies')
+      if (gainVies > 0) {
+        run.vies = Math.min(VIES_MAX, run.vies + gainVies)
         majBoutonsRun()
-      } else {
-        run.instruments.push(carte.id)
       }
+      if ((def?.effets ?? []).some((e) => e.levier !== 'vies'))
+        run.instruments.push(carte.id)
       majInstrumentsUI()
       bande.ponctuation('sting-collecte', 0.7)
       suite()
@@ -9181,11 +9495,7 @@ function frame(now: number): void {
     // le ralenti d'annonce de l'éveil multiplie le temps comme le slow-mo
     // de visée : physique, chrono, refroidissement — tout décélère ensemble
     const warpNow =
-      (dashAiming
-        ? params.timeWarp *
-          params.gasAimSlow *
-          (run.instruments.includes('lentille-de-visee') ? 0.5 : 1)
-        : params.timeWarp) *
+      (dashAiming ? params.timeWarp * params.gasAimSlow * lev('visee') : params.timeWarp) *
       eveil.ralenti
     const boost = Math.max(1, warpNow)
     // Troisième borne (retour joueur : « en accélérant, chutes drastiques ») :
@@ -9649,12 +9959,12 @@ function frame(now: number): void {
       sim.swallowedIce *
       params.litersPerParticle *
       params.iceCollectBonus *
-      (run.instruments.includes('chambre-froide') ? 1.5 : 1)
+      lev('primeGlace')
     const surplus =
       sim.liters() + sim.swallowed * params.litersPerParticle + prime
     run.livreTotal += surplus
     // FILTRE À CONDENSAT : un quart de plus sur tout ce qui passe le sas
-    const rendement = run.instruments.includes('filtre-a-condensat') ? 1.25 : 1
+    const rendement = lev('condensat')
     // chaque centilitre livré nourrit le CONDENSAT (la bourse de la RUN,
     // purgée à la fin) — y compris sur la
     // dernière salle : rien de ce qui atteint le sas n'est jamais perdu
