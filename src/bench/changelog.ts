@@ -22,6 +22,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 14:44',
+    title: 'La bonbonne rentre dans la ligne : le bandeau retrouve son épaisseur',
+    notes: [
+      'Signalé aussitôt : posée SOUS le litrage, la fiole faisait doubler l’épaisseur du bandeau du haut. Elle revient donc sur la MÊME LIGNE que le reste — juste après le litrage, avant la jauge — et à la taille de cette ligne : 22 pixels de haut, sous les 23 des pastilles voisines.',
+      'Mesuré dans une vraie salle plutôt qu’à l’œil : le bandeau fait 51 pixels avec la fiole comme sans elle — elle n’ajoute plus RIEN — et son centre est aligné sur celui du litrage. Le remplissage, l’ondulation, la présentation en début de tableau et le battement de la dernière goutte sont inchangés : c’est la place et la taille qui bougent, pas la vie de l’objet. 434 tests verts, build propre.',
+    ],
+  },
+  {
     date: '28/08/2026 14:06',
     title:
       'LES MÉMOIRES v2 : le projecteur volumétrique (maquette du concepteur)',

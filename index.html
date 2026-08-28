@@ -3072,11 +3072,6 @@
         align-items: center;
         gap: 14px;
       }
-      /* à gauche, une COLONNE : le litrage, et la bonbonne juste dessous */
-      .hud-gauche {
-        display: flex; flex-direction: column; align-items: flex-start;
-        gap: 2px; flex: none;
-      }
       .hud-vie .gauge {
         flex: 1 1 auto;
         margin: 0;
@@ -5061,14 +5056,16 @@
          quand le tableau s'ouvre. Elle bat doucement quand le corps touche à
          sa dernière goutte : le joueur oublie souvent qu'il a de quoi tenir. */
       .bonbonne {
-        display: flex; align-items: center; gap: 7px;
-        margin: 2px 0 0 -2px; padding: 2px 6px 2px 2px;
+        display: flex; align-items: center; gap: 5px; flex: none;
+        margin: 0; padding: 1px 6px 1px 3px; line-height: 1;
         background: transparent; border: 1px solid transparent; border-radius: 9px;
         color: #9fd6f2; font: inherit; font-size: 11px; letter-spacing: 0.04em;
         cursor: pointer; transition: border-color 0.18s ease, box-shadow 0.18s ease;
       }
       .bonbonne[hidden] { display: none; }
-      .bonbonne svg { width: 30px; height: 44px; display: block; overflow: visible; }
+      /* la fiole tient dans la HAUTEUR DE LA LIGNE : le bandeau garde son
+         épaisseur d'avant (signalé) — c'est le niveau qui parle, pas la taille */
+      .bonbonne svg { width: 12px; height: 18px; display: block; overflow: visible; }
       .bb-verre {
         fill: rgba(120, 190, 230, 0.07);
         stroke: #6f9fc0; stroke-width: 1.6; stroke-linejoin: round;
@@ -5519,7 +5516,6 @@
          (tableau, bonbonnes, coque) : un toucher dit leur nom. -->
     <div id="hud">
       <div class="hud-vie">
-        <div class="hud-gauche">
         <div id="hud-volume">— <small>L</small></div>
         <!-- LA BONBONNE DE SECOURS : sous le litrage, une fiole qui se
              remplit de ce qu'on a mis de côté. Elle se présente au début du
@@ -5554,7 +5550,6 @@
           </svg>
           <span class="v" id="hud-bonbonne">0.00 L</span>
         </button>
-        </div>
         <div class="gauge">
           <div id="gauge-fill"></div>
           <div id="gauge-threshold"></div>
