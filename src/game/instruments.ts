@@ -4,8 +4,14 @@
 // cartes sont PAYANTES en condensat : la première dépense de la monnaie
 // méta — le banc d'étalonnage (permanent) viendra ensuite.
 
-import type { Effet, LevierId } from './leviers'
-import { phraseEffet, valeurLevier } from './leviers'
+import type { Effet, LevierDef, LevierId } from './leviers'
+import {
+  forceEffet,
+  levierDef,
+  phraseEffet,
+  sensEffet,
+  valeurLevier,
+} from './leviers'
 
 export interface InstrumentDef {
   id: string
@@ -247,6 +253,56 @@ export function levier(
 export function descriptionInstrument(d: InstrumentDef): string {
   if (d.desc.trim()) return d.desc
   return d.effets.map(phraseEffet).filter(Boolean).join(' ')
+}
+
+// ---- LE CALIBRE : le rang d'une carte, DÉDUIT, jamais saisi ----
+// Le poids d'une carte se lit dans ses leviers : la somme des intensités
+// de ses GAINS (les prix, eux, ne grossissent pas la carte — ils la
+// rendent intéressante, pas puissante). Rien à renseigner : une carte
+// fabriquée à l'atelier, ou importée d'un export, se range toute seule.
+
+export type Calibre = 'commun' | 'notable' | 'majeur'
+
+// Les deux seuils sont calés sur le catalogue livré : la grande majorité
+// des cartes tire un levier à mi-plage (poids 0,25 à 0,50) — c'est le tout
+// venant ; au-delà de 0,55 la carte tire fort sur son levier ; au-delà de
+// 0,70 elle le tire à fond, ou elle en tire deux. Deux cartes sur vingt-
+// trois sont majeures : c'est la rareté qu'on veut voir briller.
+/** Au-delà : la carte est NOTABLE. En deçà : commune. */
+export const SEUIL_NOTABLE = 0.55
+/** Au-delà : la carte est MAJEURE — c'est celle qui fait pencher une run. */
+export const SEUIL_MAJEUR = 0.7
+
+/** Le poids brut d'une carte : la somme des intensités de ses gains. */
+export function poidsInstrument(d: InstrumentDef): number {
+  let p = 0
+  for (const e of d.effets) if (sensEffet(e) > 0) p += forceEffet(e)
+  return p
+}
+
+export function calibreInstrument(d: InstrumentDef): Calibre {
+  const p = poidsInstrument(d)
+  if (p >= SEUIL_MAJEUR) return 'majeur'
+  if (p >= SEUIL_NOTABLE) return 'notable'
+  return 'commun'
+}
+
+/** Une carte à CONTREPARTIE : elle donne d'une main et prend de l'autre. */
+export function aContrepartie(d: InstrumentDef): boolean {
+  return (
+    d.effets.some((e) => sensEffet(e) > 0) &&
+    d.effets.some((e) => sensEffet(e) < 0)
+  )
+}
+
+/** Les familles de leviers touchées, dans l'ordre d'apparition. */
+export function famillesInstrument(d: InstrumentDef): LevierDef['famille'][] {
+  const out: LevierDef['famille'][] = []
+  for (const e of d.effets) {
+    const l = levierDef(e.levier)
+    if (l && !out.includes(l.famille)) out.push(l.famille)
+  }
+  return out
 }
 
 /** Une carte du tirage : l'instrument, et son prix en condensat (0 : offerte). */

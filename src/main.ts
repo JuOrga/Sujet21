@@ -283,6 +283,14 @@ function lev(id: LevierId): number {
   return levier(run.instruments, id, catalogueRecompenses())
 }
 
+// La fiche d'une carte, LIVRÉE OU FABRIQUÉE. Passer par ici plutôt que par
+// `instrumentDef(id)` nu : sans le catalogue complet, une carte d'atelier
+// est tirée puis introuvable — elle disparaît du tirage, du HUD et du
+// bilan sans un mot. Un seul point de lecture, plus d'oubli possible.
+function carteDef(id: string): InstrumentDef | null {
+  return instrumentDef(id, catalogueRecompenses())
+}
+
 // La contenance de la bonbonne POUR CETTE RUN : le BALLAST (instrument
 // embarqué) lui ajoute trois litres. Toute lecture passe par ici — jauges
 // et bilans compris, sinon la réserve afficherait un plafond qu'elle
@@ -6286,7 +6294,7 @@ const instrPanel = document.getElementById('instr-panel') as HTMLDivElement
 function majInstrumentsUI(): void {
   if (!hudInstrChip) return
   const defs = run.instruments
-    .map((id) => instrumentDef(id))
+    .map((id) => carteDef(id))
     .filter((d): d is NonNullable<typeof d> => d !== null)
   hudInstr.textContent =
     defs.length > 0 ? defs.map((d) => d.icone).join('') : '—'
@@ -7679,7 +7687,7 @@ function mbMontreDraft(): void {
     return
   }
   for (const carte of cartes) {
-    const def = instrumentDef(carte.id)
+    const def = carteDef(carte.id)
     if (!def) continue
     const payable = carte.prix === 0 || condensat >= carte.prix
     const btn = document.createElement('button')
@@ -7696,7 +7704,7 @@ function mbMontreDraft(): void {
       if (!depenseCondensat(carte.prix)) return
       // le levier « vies » se consomme À L'INSTANT (une vie n'est pas un
       // facteur qu'on relit : elle se prend) ; tout le reste s'embarque
-      const def = instrumentDef(carte.id, catalogueRecompenses())
+      const def = carteDef(carte.id)
       const gainVies = valeurLevier(def?.effets ?? [], 'vies')
       if (gainVies > 0) {
         run.vies = Math.min(VIES_MAX, run.vies + gainVies)
@@ -8957,7 +8965,7 @@ function majDossier(): void {
 
   // ---- L'ÉQUIPEMENT : instruments de la run, fioles du placard
   const instrs = run.instruments
-    .map((i) => instrumentDef(i))
+    .map((i) => carteDef(i))
     .filter((d): d is NonNullable<typeof d> => d !== null)
   const fioles = records
     .fiolesEquipees()
@@ -10376,7 +10384,7 @@ function frame(now: number): void {
       // instruments emportés (leurs glyphes), les paliers d'étalonnage, le
       // condensat nourri (chaque centilitre livré en a versé un)
       const glyphes = run.instruments
-        .map((i) => instrumentDef(i)?.icone ?? '')
+        .map((i) => carteDef(i)?.icone ?? '')
         .filter(Boolean)
         .join(' ')
       const butinVoie =

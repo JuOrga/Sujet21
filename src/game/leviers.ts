@@ -390,3 +390,35 @@ export function phraseEffet(e: Effet): string {
   const def = levierDef(e.levier)
   return def ? def.phrase(e.valeur) : ''
 }
+
+/**
+ * LE SENS D'UN EFFET : +1 s'il avantage le joueur, −1 si c'est un prix.
+ *
+ * C'est la lecture qui manquait le plus à l'écran : dix leviers sur vingt
+ * et un ont `bon: -1`, donc le signe brut ne dit RIEN. « visée ×0,5 » est
+ * un gros cadeau, « condensat ×0,8 » une facture — l'œil ne peut pas les
+ * distinguer sans passer par ici.
+ */
+export function sensEffet(e: Effet): 1 | -1 {
+  const def = levierDef(e.levier)
+  if (!def) return 1
+  const ecart = e.valeur - neutre(def)
+  // un effet à la valeur neutre ne se joue pas (la validation l'interdit) :
+  // on le compte comme un gain, faute de mieux, plutôt que de rendre 0
+  return ecart === 0 ? 1 : ((Math.sign(ecart) * def.bon) as 1 | -1)
+}
+
+/**
+ * L'INTENSITÉ d'un effet, de 0 (ne fait rien) à 1 (le bout de la plage).
+ * Rapportée à SA plage : « +1 dash » sur une plage de 3 pèse autant que
+ * « portée ×2 » sur une plage de 1,5 — c'est ce qui permet de comparer des
+ * leviers qui n'ont ni la même unité ni la même échelle.
+ */
+export function forceEffet(e: Effet): number {
+  const def = levierDef(e.levier)
+  if (!def) return 0
+  const n = neutre(def)
+  const ampli = Math.max(Math.abs(def.min - n), Math.abs(def.max - n))
+  if (ampli <= 0) return 0
+  return Math.min(1, Math.abs(e.valeur - n) / ampli)
+}
