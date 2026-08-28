@@ -4276,6 +4276,10 @@ window.addEventListener('keydown', (e) => {
     toggleLegend()
   } else if (e.key === 'e' || e.key === 'E') {
     toggleStates()
+  } else if (e.key === 'Tab') {
+    // le DOSSIER DE DESCENTE : tout le relevé d'un geste, sans figer la run
+    e.preventDefault()
+    ouvreDossier(!dossierOuvert)
   }
 })
 
@@ -7280,14 +7284,22 @@ function majVoieHud(): void {
   }
 }
 
-/** La carte d'entrée : l'identité complète de la salle, en fondu. */
+/** La carte d'entrée : l'identité complète de la salle, en fondu. Elle se
+ * montre à CHAQUE entrée de tableau — descente ordinaire comprise : c'est
+ * la présentation du niveau, pas un ornement du mode voie. Seuls le hub et
+ * l'essai d'éditeur s'en passent (on sait où l'on est). */
 function annonceVoieCarte(): void {
-  if (!voieHudVisible()) return
+  if (auHub || testLevel !== null) return
   clearTimeout(voieCarteTimer)
+  const total = modeVoie ? voiePlan.longueur : playedLevels().length
+  const rang = modeVoie
+    ? Math.min(voiePlan.longueur, voieRang + 1)
+    : Math.min(total, levelIndex + 1)
   el('vc-rang').textContent =
-    `SALLE ${Math.min(voiePlan.longueur, voieRang + 1)} / ${voiePlan.longueur}` +
-    (voieIntercalaire ? ' · SALLE GÉNÉRÉE' : '') +
-    (descenteDuJour() ? ' · DESCENTE DU JOUR' : '')
+    `SALLE ${rang} / ${total}` +
+    (estEconomat(level) ? ' · L’ÉCONOMAT' : '') +
+    (modeVoie && voieIntercalaire ? ' · SALLE GÉNÉRÉE' : '') +
+    (modeVoie && descenteDuJour() ? ' · DESCENTE DU JOUR' : '')
   el('vc-nom').textContent = level.name
   el('vc-code').textContent = level.code
   const id = identiteAtelier(level)
@@ -7803,6 +7815,11 @@ tbSpeed.textContent = '×1'
 tbSpeed.title = 'vitesse du temps simulé'
 tbTime.appendChild(tbSpeed)
 timeButton('›', 'accélérer le temps (.)', () => input.stepWarp(1))
+// le DOSSIER a son bouton dans la barre : au doigt comme au Deck, on n'a
+// pas toujours un clavier sous la main
+touchButton('▤', 'dossier de descente (Tab)', () =>
+  ouvreDossier(!dossierOuvert),
+)
 const btnVortex = touchButton(
   '🌀',
   'vortex : armer puis toucher l’écran (clic droit)',
@@ -7931,6 +7948,195 @@ function majCadranEtats(zoneActive: ZoneForce): void {
   if (zone)
     stateZoneEl.textContent = `🔒 ${ZONE_CAUSES[zoneActive]} — RÉGIME IMPOSÉ`
 }
+
+// ---- LE DOSSIER DE DESCENTE : tout le relevé, d'un seul geste -----------
+// TAB (le bouton ▤ de la barre, R3 à la manette) fait glisser le panneau
+// depuis la droite : la salle et son identité, le corps et ses réserves,
+// le cycle et ce qu'il permet ICI, le butin, l'équipement embarqué. Il ne
+// fige RIEN — la descente continue derrière, c'est un dossier qu'on
+// consulte en jouant. Rafraîchi quatre fois par seconde tant qu'il est
+// ouvert ; fermé, il ne coûte pas une instruction.
+const dossierEl = document.getElementById('dossier') as HTMLElement
+const doCorps = document.getElementById('do-corps') as HTMLDivElement
+const doChrono = document.getElementById('do-chrono') as HTMLElement
+dossierEl.hidden = false // le panneau vit hors-champ : c'est le glissement qui le montre
+dossierEl.setAttribute('aria-hidden', 'true')
+let dossierOuvert = false
+let dossierProchainMaj = 0
+
+const doLigne = (nom: string, val: string, cls = ''): string =>
+  `<div class="do-ligne"><span>${nom}</span><b class="${cls}">${val}</b></div>`
+const doPastilles = (n: number, max: number, cls = ''): string => {
+  let h = ''
+  for (let i = 0; i < max; i++)
+    h += `<i class="${cls}${i < n ? ' plein' : ''}"></i>`
+  return h
+}
+const doJauge = (frac: number, cls = ''): string =>
+  `<div class="do-jauge ${cls}"><i style="width:${Math.max(0, Math.min(1, frac)) * 100}%"></i></div>`
+
+/** Le relevé complet, reconstruit à chaque rafraîchissement. */
+function majDossier(): void {
+  const enRun = !auHub && testLevel === null
+  doChrono.textContent = enRun ? fmtTime(run.tableauTime) : '—'
+  // ---- LA SALLE : son identité, sa place dans la descente
+  const id = identiteAtelier(level)
+  const total = modeVoie ? voiePlan.longueur : playedLevels().length
+  const rang = modeVoie
+    ? Math.min(voiePlan.longueur, voieRang + 1)
+    : Math.min(total, levelIndex + 1)
+  let rail = ''
+  if (enRun && total > 1 && total <= 40) {
+    rail = '<div class="do-rail">'
+    for (let r = 1; r <= total; r++)
+      rail += `<i class="${r < rang ? 'franchi' : r === rang ? 'courant' : ''}"></i>`
+    rail += '</div>'
+  }
+  const rec = records.tableauRecord(level.code)
+  let salle =
+    '<section class="do-sec do-salle"><h4>LA SALLE</h4>' +
+    `<div class="do-nom">${auHub ? 'LE HUB' : level.name}</div>` +
+    `<div class="do-code">${level.code}${estEconomat(level) ? ' · L’ÉCONOMAT' : ''}</div>`
+  if (id)
+    salle +=
+      `<div class="do-chips"><i>${MOMENT_COURT[id.moment]}</i>` +
+      `<i>${MECANIQUE_NOMS[id.mecanique].toUpperCase()}</i>` +
+      `<i>DIFF ${id.difficulte}</i></div>`
+  if (enRun)
+    salle +=
+      rail +
+      doLigne('RANG', `${rang} / ${total}${modeVoie ? ' · VOIE' : ''}`) +
+      (level.par ? doLigne('OBJECTIF', `${level.par} L`) : '') +
+      (rec
+        ? doLigne('RECORD VOLUME', fmtL(rec.volume.liters), 'vert') +
+          doLigne('RECORD CHRONO', fmtTime(rec.chrono.time), 'vert')
+        : doLigne('RECORD', 'aucun — à écrire'))
+  salle += '</section>'
+
+  // ---- LE CORPS : ce qu'il reste, et ce qui presse
+  const litres = sim.liters()
+  const depart = sim.baseVolume > 0 ? sim.baseVolume : level.spawn.n
+  const frac = depart > 0 ? sim.playerCount / depart : 0
+  const coque = Math.round(21 - 81 * chillNow())
+  const critique = litres < params.criticalVolumeLiters * 1.7
+  const corps =
+    '<section class="do-sec do-corps"><h4>LE CORPS</h4>' +
+    doLigne('VOLUME', fmtL(litres), critique ? 'chaud' : '') +
+    doJauge(frac) +
+    doLigne('PARTICULES', `${sim.playerCount} / ${depart}`) +
+    doLigne(
+      'COQUE',
+      `${coque > 0 ? '+' : ''}${coque}°`,
+      coque < -20 ? 'froid' : '',
+    ) +
+    doJauge(chillNow(), 'j-froid') +
+    `<div class="do-ligne"><span>DASHS</span><div class="do-pastilles">${doPastilles(sim.dashBudget, Math.max(sim.dashBudgetMax, sim.dashBudget))}</div></div>` +
+    (enRun
+      ? `<div class="do-ligne"><span>ÉCHANTILLONS</span><div class="do-pastilles">${doPastilles(run.vies, VIES_MAX, 'vie')}</div></div>`
+      : '') +
+    '</section>'
+
+  // ---- LE CYCLE : ce que les mémoires permettent ICI, à cet instant
+  const cur = input.etatManuel()
+  const acquis = records.eveilAcquis()
+  const verrous = records.verrousCycle()
+  const gate = cycleGateActif()
+  const NOMS: Record<EtatManuel, string> = {
+    eau: 'LIQUIDE',
+    glace: 'GLACE',
+    vapeur: 'VAPEUR',
+  }
+  const ICO: Record<EtatManuel, string> = {
+    eau: '💧',
+    glace: '❄',
+    vapeur: '💨',
+  }
+  const TOUCHE: Record<EtatManuel, string> = {
+    eau: 'B',
+    glace: 'F',
+    vapeur: 'G',
+  }
+  let cycle = '<section class="do-sec do-cycle"><h4>LE CYCLE, ICI</h4>'
+  for (const e of ['glace', 'eau', 'vapeur'] as EtatManuel[]) {
+    if (e === cur) {
+      cycle += `<div class="do-etat actuel"><i>${ICO[e]}</i><em>${NOMS[e]}</em><small>ÉTAT ACTUEL</small></div>`
+      continue
+    }
+    const t = transfoEntre(CYCLE_PAR_ETAT[cur], CYCLE_PAR_ETAT[e])
+    const tenue = t !== null && (!gate || transfoTenue(t.id, acquis, verrous))
+    cycle +=
+      `<div class="do-etat${tenue ? '' : ' verrou'}"><i>${ICO[e]}</i>` +
+      `<em>${t ? t.nom : NOMS[e]}</em>` +
+      (tenue
+        ? `<small>DIRECT</small><kbd>${TOUCHE[e]}</kbd>`
+        : `<small>🔒 MÉMOIRE À TISSER</small>`) +
+      '</div>'
+  }
+  cycle += `<p class="do-vide">Un lien non tissé se contourne : repassez par le LIQUIDE. Les régimes imposés du décor, eux, transforment toujours.</p></section>`
+
+  // ---- LE BUTIN de la descente en cours
+  const butin = enRun
+    ? '<section class="do-sec do-butin"><h4>LE BUTIN</h4>' +
+      doLigne(
+        'BONBONNE',
+        `${run.bonbonneLiters.toFixed(2)} / ${BONBONNE_CAP} L`,
+      ) +
+      doJauge(run.bonbonneLiters / BONBONNE_CAP) +
+      doLigne('CONDENSAT', `${condensat} cL`, 'chaud') +
+      doLigne('MÉMOIRE GRAVÉE', `+${run.memoireGagnee}`, 'vert') +
+      doLigne('PASTILLES (SALLE)', `${run.pastillesCl} cL`) +
+      doLigne('SALLES CONCLUES', `${run.conclues}`) +
+      doLigne('TEMPS DE DESCENTE', fmtDuree(run.runTime)) +
+      '</section>'
+    : ''
+
+  // ---- L'ÉQUIPEMENT : instruments de la run, fioles du placard
+  const instrs = run.instruments
+    .map((i) => instrumentDef(i))
+    .filter((d): d is NonNullable<typeof d> => d !== null)
+  const fioles = records
+    .fiolesEquipees()
+    .map((f) => fioleDef(f))
+    .filter((d): d is NonNullable<typeof d> => d !== null)
+  const equip =
+    '<section class="do-sec do-equip"><h4>L’ÉQUIPEMENT</h4>' +
+    (instrs.length === 0 && fioles.length === 0
+      ? '<p class="do-vide">Rien d’embarqué. Les instruments se gagnent aux paliers d’étalonnage, les fioles s’équipent au placard du hub.</p>'
+      : instrs
+          .map(
+            (d) =>
+              `<div class="do-objet"><i>${d.icone}</i><div><b>${d.nom}</b><small>${d.desc}</small></div></div>`,
+          )
+          .join('') +
+        fioles
+          .map(
+            (d) =>
+              `<div class="do-objet"><i>⚗</i><div><b>${d.nom}</b><small>${d.desc}</small></div></div>`,
+          )
+          .join('')) +
+    (fioles.length > 0
+      ? doLigne('LOGEMENTS', `${fioles.length} / ${FIOLES_SLOTS}`)
+      : '') +
+    '</section>'
+
+  doCorps.innerHTML = salle + corps + cycle + butin + equip
+}
+
+function ouvreDossier(v: boolean): void {
+  dossierOuvert = v
+  dossierEl.classList.toggle('ouvert', v)
+  dossierEl.setAttribute('aria-hidden', v ? 'false' : 'true')
+  if (v) {
+    majDossier()
+    dossierProchainMaj = performance.now() / 1000 + 0.25
+  }
+}
+document.getElementById('do-fermer')?.addEventListener('click', () => {
+  ouvreDossier(false)
+})
+// sonde d'essai : ouvrir/fermer le dossier depuis la console (comme __sim)
+;(window as unknown as { __dossier: (v: boolean) => void }).__dossier =
+  ouvreDossier
 
 // ---- L'ÉVEIL : la prise en main scénarisée ------------------------------
 // Trois temps, diégétiques. (1) Sortie de cryostase : le corps est GLACE
@@ -8490,9 +8696,11 @@ function frame(now: number): void {
       }
       if (manette.edge(BOUTON.GAUCHE)) input.stepWarp(-1)
       if (manette.edge(BOUTON.DROITE)) input.stepWarp(1)
-      // enfoncer un stick recadre : la caméra revient au suivi automatique
-      if (manette.edge(BOUTON.L3) || manette.edge(BOUTON.R3))
-        camera.resetAutoZoom()
+      // enfoncer le stick GAUCHE recadre : la caméra revient au suivi auto
+      if (manette.edge(BOUTON.L3)) camera.resetAutoZoom()
+      // le stick DROIT ouvre le DOSSIER — la convention manette pour « la
+      // fiche d'état » ; la descente continue derrière, comme au clavier
+      if (manette.edge(BOUTON.R3)) ouvreDossier(!dossierOuvert)
       if (manette.zoomAvant) camera.zoomBy(Math.pow(1.9, dtReal), params)
       if (manette.zoomArriere) camera.zoomBy(Math.pow(1.9, -dtReal), params)
       // les grosses gâchettes zooment, la pression dose la vitesse
@@ -9439,6 +9647,14 @@ function frame(now: number): void {
   btnVortex.classList.toggle('active', input.vortexArmed)
   btnVortex.style.display = params.vortexEnabled >= 0.5 ? '' : 'none'
   majCadranEtats(zoneActive)
+  // le DOSSIER se rafraîchit quatre fois par seconde tant qu'il est ouvert
+  if (dossierOuvert) {
+    const tMaj = performance.now() / 1000
+    if (tMaj >= dossierProchainMaj) {
+      majDossier()
+      dossierProchainMaj = tMaj + 0.25
+    }
+  }
   // dans une zone imposée, le sélecteur se grise : le choix n'est plus offert
   const locked = zoneActive !== 'libre'
   stateEau.disabled = locked
