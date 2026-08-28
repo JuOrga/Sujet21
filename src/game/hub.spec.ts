@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BANC_MEMOIRES_HUB,
-  ETAL_HUB,
-  SAS_GIVRE_HUB,
-  SAS_VAPEUR_HUB,
   TABLEAU_HUB,
+  TABLEAU_HUB_COMPACT,
+  ZONES_HUB_COMPACT,
+  ZONES_HUB_GRAND,
+  zonesDuHub,
 } from './hub'
 import { MAT_GRILLE, MAT_RIDEAU, MAT_WALL } from './level'
 import { checkLevel } from './levelIO'
@@ -16,7 +16,7 @@ const dedans = (r: Rect, b: Rect): boolean =>
 const chevauche = (a: Rect, b: Rect): boolean =>
   a.minX < b.maxX && a.maxX > b.minX && a.minY < b.maxY && a.maxY > b.minY
 
-describe('hub v4 — le méta a pris ses murs', () => {
+describe('hub v4 — le méta a pris ses murs (grand module)', () => {
   it('le tableau reste valide et le sas principal se rejoint', () => {
     const erreurs = checkLevel(TABLEAU_HUB).filter((v) => v.niveau === 'erreur')
     expect(erreurs.map((e) => e.message)).toEqual([])
@@ -28,9 +28,9 @@ describe('hub v4 — le méta a pris ses murs', () => {
     const b = TABLEAU_HUB.bounds
     for (const zone of [
       TABLEAU_HUB.exit,
-      SAS_GIVRE_HUB,
-      SAS_VAPEUR_HUB,
-      ...ETAL_HUB.map((a) => a.plot),
+      ZONES_HUB_GRAND.sasGivre,
+      ZONES_HUB_GRAND.sasVapeur,
+      ...ZONES_HUB_GRAND.etal.map((a) => a.plot),
     ]) {
       expect(dedans(zone, b)).toBe(true)
       for (const box of TABLEAU_HUB.boxes)
@@ -39,11 +39,11 @@ describe('hub v4 — le méta a pris ses murs', () => {
     }
     // la zone du banc, elle, ENVELOPPE la machine : le contact du corps
     // contre le banc ouvre l'écran des mémoires
-    expect(dedans(BANC_MEMOIRES_HUB, b)).toBe(true)
+    expect(dedans(ZONES_HUB_GRAND.banc, b)).toBe(true)
     const machine = TABLEAU_HUB.boxes.find(
       (bx) => bx.minX === 1400 && bx.minY === 120,
     )
-    expect(machine && dedans(machine, BANC_MEMOIRES_HUB)).toBe(true)
+    expect(machine && dedans(machine, ZONES_HUB_GRAND.banc)).toBe(true)
   })
 
   it('la chambre de givre ne s’ouvre que par un RIDEAU, celle de vapeur par une GRILLE', () => {
@@ -72,22 +72,6 @@ describe('hub v4 — le méta a pris ses murs', () => {
     expect(sud[0].minX).toBe(ouest?.maxX)
   })
 
-  it('le comptoir : quatre articles, identités uniques, prix en mémoire', () => {
-    expect(ETAL_HUB.length).toBe(4)
-    expect(new Set(ETAL_HUB.map((a) => a.id)).size).toBe(4)
-    for (const a of ETAL_HUB) {
-      expect(a.prix).toBeGreaterThan(0)
-      expect(a.nom.length).toBeGreaterThan(3)
-      // chaque alcôve a son étiquette de prix dans le tableau
-      expect(
-        TABLEAU_HUB.labels.some(
-          (l) => l.text.includes(a.nom) && l.text.includes(`${a.prix} MÉMOIRE`),
-        ),
-        a.id,
-      ).toBe(true)
-    }
-  })
-
   it('la signalétique annonce les routes et le banc', () => {
     const textes = TABLEAU_HUB.labels.map((l) => l.text).join(' · ')
     expect(textes).toContain('SORTIE DE GIVRE|LA VOIE SEMI-PROCÉDURALE')
@@ -96,5 +80,120 @@ describe('hub v4 — le méta a pris ses murs', () => {
     expect(textes).toContain('LE COMPTOIR|TOUT SE PAIE EN MÉMOIRE')
     // l'écran de contrôle est SOUS TENSION : le méta est branché
     expect(TABLEAU_HUB.decals?.some((d) => d.kind === 'ecran-on')).toBe(true)
+  })
+})
+
+describe('hub compact v4 — le module JOUÉ reçoit le même méta', () => {
+  it('le tableau reste valide et le sas principal se rejoint', () => {
+    const erreurs = checkLevel(TABLEAU_HUB_COMPACT).filter(
+      (v) => v.niveau === 'erreur',
+    )
+    expect(erreurs.map((e) => e.message)).toEqual([])
+    expect(accessible(TABLEAU_HUB_COMPACT, new Set())).toBe(true)
+  })
+
+  it('les trois sas et l’étal tiennent dans les bornes, hors des murs', () => {
+    const b = TABLEAU_HUB_COMPACT.bounds
+    for (const zone of [
+      TABLEAU_HUB_COMPACT.exit,
+      ZONES_HUB_COMPACT.sasGivre,
+      ZONES_HUB_COMPACT.sasVapeur,
+      ...ZONES_HUB_COMPACT.etal.map((a) => a.plot),
+    ]) {
+      expect(dedans(zone, b)).toBe(true)
+      for (const box of TABLEAU_HUB_COMPACT.boxes)
+        if (box.material === MAT_WALL)
+          expect(chevauche(zone, box), JSON.stringify(zone)).toBe(false)
+    }
+    // le banc ENVELOPPE l'établi du poste de gestion
+    expect(dedans(ZONES_HUB_COMPACT.banc, b)).toBe(true)
+    const etabli = TABLEAU_HUB_COMPACT.boxes.find(
+      (bx) => bx.minX === -500 && bx.minY === -800,
+    )
+    expect(etabli && dedans(etabli, ZONES_HUB_COMPACT.banc)).toBe(true)
+  })
+
+  it('givre derrière un RIDEAU, vapeur derrière une GRILLE — sans fente', () => {
+    const bande = (y0: number, y1: number) =>
+      TABLEAU_HUB_COMPACT.boxes
+        .filter((bx) => bx.minY === y0 && bx.maxY === y1)
+        .sort((a, b2) => a.minX - b2.minX)
+    // la cloison du givre (y 360..440) court de 2400 à 2750
+    const nord = bande(360, 440)
+    expect(nord.map((bx) => bx.material)).toEqual([
+      MAT_WALL,
+      MAT_RIDEAU,
+      MAT_WALL,
+    ])
+    expect(nord[0].minX).toBe(2400)
+    expect(nord[2].maxX).toBe(2750)
+    for (let i = 1; i < nord.length; i++)
+      expect(nord[i].minX).toBe(nord[i - 1].maxX)
+    // son épaulement ouest scelle la chambre jusqu'au plafond
+    const scelleNord = TABLEAU_HUB_COMPACT.boxes.find(
+      (bx) => bx.minX === 2400 && bx.minY === 440,
+    )
+    expect(scelleNord?.material).toBe(MAT_WALL)
+    expect(scelleNord?.maxY).toBe(800)
+    // la cloison de vapeur (y −440..−360), miroir au sud
+    const sud = bande(-440, -360)
+    expect(sud.map((bx) => bx.material)).toEqual([
+      MAT_WALL,
+      MAT_GRILLE,
+      MAT_WALL,
+    ])
+    expect(sud[0].minX).toBe(2400)
+    expect(sud[2].maxX).toBe(2750)
+    for (let i = 1; i < sud.length; i++)
+      expect(sud[i].minX).toBe(sud[i - 1].maxX)
+    const scelleSud = TABLEAU_HUB_COMPACT.boxes.find(
+      (bx) => bx.minX === 2400 && bx.maxY === -440,
+    )
+    expect(scelleSud?.material).toBe(MAT_WALL)
+    expect(scelleSud?.minY).toBe(-800)
+  })
+
+  it('la signalétique du compact annonce comptoir, banc et sorties', () => {
+    const textes = TABLEAU_HUB_COMPACT.labels.map((l) => l.text).join(' · ')
+    expect(textes).toContain('SORTIE DE GIVRE|LA VOIE SEMI-PROCÉDURALE')
+    expect(textes).toContain('SORTIE DE VAPEUR|LA DESCENTE DU JOUR')
+    expect(textes).toContain('LE BANC DES MÉMOIRES|TISSER LES LIENS')
+    expect(textes).toContain('LE COMPTOIR|TOUT SE PAIE EN MÉMOIRE')
+  })
+})
+
+describe('le comptoir — un seul catalogue, deux étals', () => {
+  it('quatre articles, identités uniques, prix affichés dans CHAQUE module', () => {
+    for (const [zones, tableau] of [
+      [ZONES_HUB_GRAND, TABLEAU_HUB],
+      [ZONES_HUB_COMPACT, TABLEAU_HUB_COMPACT],
+    ] as const) {
+      expect(zones.etal.length).toBe(4)
+      expect(new Set(zones.etal.map((a) => a.id)).size).toBe(4)
+      for (const a of zones.etal) {
+        expect(a.prix).toBeGreaterThan(0)
+        expect(a.nom.length).toBeGreaterThan(3)
+        // chaque alcôve a son étiquette de prix dans le tableau
+        expect(
+          tableau.labels.some(
+            (l) =>
+              l.text.includes(a.nom) && l.text.includes(`${a.prix} MÉMOIRE`),
+          ),
+          `${tableau.code} · ${a.id}`,
+        ).toBe(true)
+      }
+    }
+  })
+})
+
+describe('zonesDuHub — la géométrie tranche', () => {
+  it('grand module → zones du grand ; compact v4 → zones du compact', () => {
+    expect(zonesDuHub(TABLEAU_HUB)).toBe(ZONES_HUB_GRAND)
+    expect(zonesDuHub(TABLEAU_HUB_COMPACT)).toBe(ZONES_HUB_COMPACT)
+  })
+
+  it('un vieil instantané de la bibliothèque (sans annexe méta) → null', () => {
+    // l'ancien compact s'arrêtait à x 1750 : aucune zone ne doit s'activer
+    expect(zonesDuHub({ bounds: { maxX: 1750 } })).toBe(null)
   })
 })

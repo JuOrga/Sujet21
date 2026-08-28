@@ -1,0 +1,17 @@
+# Mise à jour du hub compact dans la bibliothèque partagée (l'entrée de
+# code HUB masque le code : hubLevel la sert en premier). Gâchette : push
+# sur maj-hub-go (l'environnement d'analyse ne joint pas l'API, GitHub
+# Actions si).
+name: maj-hub
+on:
+  workflow_dispatch:
+  push:
+    branches: [maj-hub-go]
+
+jobs:
+  maj:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remplacer l'instantané du hub
+        run: node ops/maj-hub.mjs
