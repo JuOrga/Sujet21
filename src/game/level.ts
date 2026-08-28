@@ -444,6 +444,29 @@ export interface CondensatPose {
   cl: number // la valeur en centilitres
 }
 
+// Un PLOT D'ARTICLE : une alcôve d'achat posée dans le tableau. La liste
+// fermée des articles vit dans les catalogues (economat.ts pour le
+// condensat, hub.ts pour la mémoire) — un id inconnu est écarté à la
+// lecture, comme une sorte de décalque inconnue.
+export type MonnaiePlot = 'condensat' | 'memoire'
+export interface PlotMeta {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+  article: string
+  monnaie: MonnaiePlot
+  prix?: number // surcharge du prix catalogue (1..999) ; absent : catalogue
+}
+
+// Un ÉCLAT DE MÉMOIRE : de l'information cristallisée — gravée aux
+// registres au contact, une fois par RUN. Jamais semé automatiquement.
+export interface EclatPose {
+  x: number
+  y: number
+  memoire: number // la valeur gravée (1..99)
+}
+
 // Un RAIL MAGNÉTIQUE (palier 3) : une ligne de champ posée dans le décor.
 // Le faisceau ordinaire l'ignore ; un faisceau IONISÉ (qui traverse la
 // vapeur du joueur) est capturé s'il passe près d'une extrémité, suit la
@@ -477,6 +500,23 @@ export interface LevelDef {
   // sur deux). En jeu, la fiole n'apparaît que si la collection du
   // joueur est incomplète.
   fiole?: { x: number; y: number }
+  // ---- LE MÉTA POSÉ : boutique, banc, marchand, éclats — en données ----
+  // Les PLOTS D'ARTICLE : le corps entre dans le rectangle, l'achat se
+  // tente. La monnaie décide du catalogue ET de l'effet : « condensat »
+  // vend les articles de l'étal (effet immédiat, prix en cL), « memoire »
+  // ceux du comptoir (provisions de la PROCHAINE descente). Le prix posé
+  // surcharge celui du catalogue. Le hub et l'Économat en dur passent par
+  // ces mêmes plots : un seul chemin d'exécution.
+  plots?: PlotMeta[]
+  // LE BANC DES MÉMOIRES : le contact du corps ouvre l'écran du cycle.
+  bancMemoires?: { minX: number; minY: number; maxX: number; maxY: number }
+  // LE MARCHAND (un Semblable en capsule) : décor-repère de boutique,
+  // aucune physique — la silhouette luit derrière sa grille.
+  marchand?: { x: number; y: number }
+  // Les ÉCLATS DE MÉMOIRE : +N mémoire GRAVÉE au contact — jamais semés
+  // automatiquement, une récompense qu'on place à la main. Un éclat pris
+  // l'est pour toute la RUN (pas de ferme au R).
+  eclats?: EclatPose[]
   // Lampes posées à l'éditeur (au plus MAX_LUMIERES allumées). Absentes :
   // la lampe par défaut de la cuve fait l'éclairage.
   lumieres?: LumiereDef[]

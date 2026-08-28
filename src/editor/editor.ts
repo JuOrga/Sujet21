@@ -41,6 +41,7 @@ import {
   type ZoneForce,
 } from '../game/level'
 import { TABLEAU_HUB, TABLEAU_HUB_COMPACT } from '../game/hub'
+import { TABLEAU_ECONOMAT } from '../game/economat'
 import {
   cleFiche,
   ficheElement,
@@ -3149,9 +3150,12 @@ export class LevelEditor {
     // REMPLACE le laboratoire joué — sans jamais entrer dans la séquence.
     // Le hub COMPACT (chantier, code HUB2) s'étudie et se copie ici aussi ;
     // pour qu'il devienne LE laboratoire, renommer sa copie en HUB.
+    // L'ÉCONOMAT suit la même règle que le HUB : publié sous le code « ECO »,
+    // sa copie remplace la salle-boutique jouée — plots, marchand compris.
     const livres = [
       TABLEAU_HUB,
       TABLEAU_HUB_COMPACT,
+      TABLEAU_ECONOMAT,
       ...TABLEAUX_ECOLE,
       ...TABLEAUX,
       TABLEAU_1BIS,

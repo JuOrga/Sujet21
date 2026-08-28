@@ -106,6 +106,17 @@ export const ETAL_ECONOMAT: ArticleEconomat[] = [
   },
 ]
 
+/** Les ids d'articles que la monnaie CONDENSAT accepte sur un plot posé —
+ * la liste fermée du format (levelIO écarte tout autre id). */
+export const ARTICLES_ETAL_IDS = ETAL_ECONOMAT.map((a) => a.id)
+
+/** La fiche catalogue d'un article de l'étal (nom, détail, icône, prix de
+ * référence) — le plot posé fournit sa propre alcôve, et son prix s'il
+ * surcharge. Null : id inconnu. */
+export function articleEtal(id: string): ArticleEconomat | null {
+  return ETAL_ECONOMAT.find((a) => a.id === id) ?? null
+}
+
 // ——— LA SALLE ———————————————————————————————————————————————————————
 // Un module court : la cuve d'accueil, le comptoir du Semblable au nord
 // (derrière sa grille), l'étal au sud, le sas de reprise à l'est.
@@ -153,6 +164,15 @@ export const TABLEAU_ECONOMAT: LevelDef = {
     box(1100, 240, 1180, 800, MAT_WALL, 5),
   ],
   sponges: [],
+  // le méta EN DONNÉES : les cinq alcôves de l'étal comme plots posés, et
+  // le Sujet 12 comme marchand — le même chemin d'exécution que les plots
+  // qu'on pose dans l'éditeur, et une copie de bibliothèque hérite de tout
+  plots: ETAL_ECONOMAT.map((a) => ({
+    ...a.plot,
+    article: a.id,
+    monnaie: 'condensat' as const,
+  })),
+  marchand: { x: 0, y: 580 },
   labels: [
     {
       x: 0,
