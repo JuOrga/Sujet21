@@ -1960,7 +1960,29 @@ function renderCycleVoile(): void {
     registre += `<button type="button" class="cy-reg cy-${statut}" data-transfo="${t.id}" title="${t.desc}"><span><b>${t.nom}</b><small>${de} → ${vers}</small></span><em>${sous}</em></button>`
   }
   cycleRegListe.innerHTML = registre
+  cycleScene.classList.remove('cy-isole') // le registre est neuf : rien n'est survolé
 }
+// LE SURVOL ISOLE : approcher une plaque (ou sa ligne au registre) éteint
+// tous les autres traits. C'est la réponse à « à quel lien appartient ce
+// label ? » — la question ne se pose plus une seconde. Le focus clavier
+// fait pareil : la manette et le Deck y ont droit aussi.
+function survoleTransfo(id: string | null): void {
+  cycleScene.classList.toggle('cy-isole', id !== null)
+  for (const el of cycleEcran.querySelectorAll<HTMLElement>(
+    '.cy-lien, .cy-transfo, .cy-reg',
+  ))
+    el.classList.toggle('cy-survol', id !== null && el.dataset.transfo === id)
+}
+const survolDepuis = (e: Event): void => {
+  const c = (e.target as HTMLElement).closest(
+    '.cy-transfo, .cy-reg',
+  ) as HTMLElement | null
+  survoleTransfo(c?.dataset.transfo ?? null)
+}
+cycleEcran.addEventListener('pointerover', survolDepuis)
+cycleEcran.addEventListener('focusin', survolDepuis)
+cycleEcran.addEventListener('pointerleave', () => survoleTransfo(null))
+
 // Le tissage se fait des DEUX mains : la plaque du projecteur ou la ligne
 // du registre — même lien, même geste. Un refus secoue ce qu'on a touché.
 cycleEcran.addEventListener('click', (e) => {

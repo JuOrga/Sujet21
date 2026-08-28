@@ -981,11 +981,12 @@
       }
       #records[hidden], #codex[hidden], #fioles[hidden], #cycle[hidden] { display: none; }
       /* ---- L'écran des MÉMOIRES : le PROJECTEUR VOLUMÉTRIQUE (maquette du
-         concepteur, 28/08). Cibles : PC, console, Steam Deck — un écran-
-         instrument PLEIN CADRE en paysage ; le mobile est mis de côté pour
-         l'instant (choix concepteur). L'en-tête porte le solde et sa jauge,
-         le cycle se projette à gauche, le REGISTRE DES TRANSFORMATIONS
-         tient la colonne de droite, la légende des traits dessous. */
+         concepteur). Cibles : PC, console, Steam Deck — un écran-instrument
+         PLEIN CADRE en paysage ; le mobile est mis de côté (choix
+         concepteur). La scène PREND TOUTE LA PLACE : le cycle s'étale
+         jusqu'aux bords, les grands arcs passent AU LARGE des plaques
+         intérieures — un label ne peut plus être pris pour celui d'un autre
+         lien. Le registre tient la colonne de droite, la légende dessous. */
       #cycle { position: fixed; inset: 0; z-index: 60; background: #04080e; }
       #cycle-ecran {
         position: absolute;
@@ -996,28 +997,30 @@
           repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.014) 0 1px, transparent 1px 3px),
           linear-gradient(rgba(99, 183, 230, 0.05) 1px, transparent 1px),
           linear-gradient(90deg, rgba(99, 183, 230, 0.05) 1px, transparent 1px),
-          radial-gradient(ellipse at 42% 48%, #081525 0%, #04080e 72%);
-        background-size: auto, 64px 64px, 64px 64px, auto;
+          radial-gradient(ellipse at 40% 52%, #08182a 0%, #04080e 74%);
+        background-size: auto, 72px 72px, 72px 72px, auto;
       }
       #cycle-tete {
         display: flex;
         align-items: center;
-        gap: 20px;
-        padding: 12px 22px;
+        gap: 22px;
+        padding: 15px 26px;
         border-bottom: 1px solid rgba(99, 183, 230, 0.2);
         background: rgba(6, 12, 20, 0.85);
       }
       #cycle-tete h2 {
         font-family: var(--font-display);
-        font-size: 19px;
-        letter-spacing: 0.42em;
+        white-space: nowrap;
+        font-size: 21px;
+        letter-spacing: 0.38em;
         font-weight: 600;
         color: var(--ink);
         margin: 0;
       }
       #cycle-tete .cy-soustitre {
         font-family: var(--font-display);
-        font-size: 8.5px;
+        white-space: nowrap;
+        font-size: 9px;
         letter-spacing: 0.3em;
         color: var(--dim);
       }
@@ -1025,13 +1028,13 @@
         margin-left: auto;
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 14px;
         font-family: var(--font-display);
       }
-      #cycle-solde > span { font-size: 8.5px; letter-spacing: 0.3em; color: var(--dim); }
+      #cycle-solde > span { font-size: 9px; letter-spacing: 0.3em; color: var(--dim); white-space: nowrap; }
       #cycle-jauge {
-        width: 150px;
-        height: 8px;
+        width: 170px;
+        height: 9px;
         border: 1px solid rgba(99, 183, 230, 0.4);
         background: rgba(10, 20, 32, 0.9);
       }
@@ -1046,18 +1049,18 @@
       #cycle-solde strong {
         font-family: var(--font-mono);
         font-weight: 600;
-        font-size: 25px;
+        font-size: 28px;
         color: #9fd9ff;
         text-shadow: 0 0 12px rgba(99, 183, 230, 0.5);
       }
       #cycle-fermer {
-        margin-left: 14px;
+        margin-left: 16px;
         background: none;
         border: 1px solid var(--line);
         border-radius: 4px;
         color: var(--dim);
-        font-size: 14px;
-        padding: 4px 10px;
+        font-size: 15px;
+        padding: 5px 12px;
         cursor: pointer;
       }
       #cycle-fermer:hover { color: var(--ink); border-color: var(--specimen); }
@@ -1065,49 +1068,33 @@
         flex: 1;
         min-height: 0;
         display: flex;
-        gap: 10px;
-        padding: 6px 18px 10px;
+        gap: 18px;
+        padding: 10px 22px 14px;
       }
-      #cycle-scene-cadre {
-        flex: 1;
-        min-width: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-      /* la scène garde le repère 1000 × 900 du projecteur : le SVG s'y
-         étire (preserveAspectRatio none), l'aspect-ratio CSS verrouille le
-         même cadre — les plaques en % restent donc SUR leurs liens */
-      #cycle-scene {
-        position: relative;
-        height: 100%;
-        aspect-ratio: 10 / 9;
-        max-width: 100%;
-      }
+      /* la scène REMPLIT son cadre : le repère 1160 × 1000 s'y étire
+         (preserveAspectRatio none) et les plaques, posées en %, suivent le
+         même étirement — tout reste calé, quelle que soit la fenêtre */
+      #cycle-scene { position: relative; flex: 1; min-width: 0; }
       #cycle-scene svg { position: absolute; inset: 0; width: 100%; height: 100%; }
       #cycle-scene svg use { fill: none; }
       /* ---- LES LIENS. Un lien ACQUIS (offert d'origine OU tissé) est
-         VIVANT : trait vert luminescent, gauchi par une turbulence (rien
+         VIVANT : trait vert luminescent gauchi par une turbulence (rien
          n'est droit dans un corps qui coule), doublé d'un halo, et parcouru
-         de COMÈTES à la couleur de l'état d'arrivée — la matière voyage
-         VERS quelque chose. Le gauchissement est STATIQUE (le filtre se met
-         en cache) ; seul le passage des comètes anime, à coût nul. ---- */
+         de COMÈTES à la couleur de l'état d'arrivée. Le gauchissement est
+         STATIQUE (filtre en cache) ; seules les comètes animent. ---- */
       .cy-lien-fixe { filter: url(#cy-onde); }
-      .cy-halo { stroke-width: 9; opacity: 0; filter: blur(7px); }
-      .cy-corps { stroke-width: 2.2; opacity: 0.9; }
+      .cy-halo { stroke-width: 10; opacity: 0; filter: blur(8px); }
+      .cy-corps { stroke-width: 2.4; opacity: 0.9; }
       .cy-flux, .cy-flux-b { opacity: 0; stroke-linecap: round; }
       .cy-lien[data-etat='origine'] .cy-halo,
       .cy-lien[data-etat='tenue'] .cy-halo { stroke: #6dffb8; opacity: 0.34; }
       .cy-lien[data-etat='origine'] .cy-corps,
       .cy-lien[data-etat='tenue'] .cy-corps { stroke: #8effcd; opacity: 0.85; }
-      /* les comètes : deux passages déphasés, la longueur en CENTIÈMES du
-         trait (pathLength=100) — tous les liens coulent à la même vitesse,
-         quelle que soit leur longueur */
       .cy-lien[data-etat='origine'] .cy-flux,
       .cy-lien[data-etat='tenue'] .cy-flux {
         stroke: var(--flux, #6dffb8);
         opacity: 0.95;
-        stroke-width: 3.6;
+        stroke-width: 3.8;
         stroke-dasharray: 7 93;
         filter: drop-shadow(0 0 5px var(--flux, #6dffb8));
         animation: cy-comete 3.4s linear infinite;
@@ -1116,20 +1103,31 @@
       .cy-lien[data-etat='tenue'] .cy-flux-b {
         stroke: #d9fff0;
         opacity: 0.5;
-        stroke-width: 1.6;
+        stroke-width: 1.7;
         stroke-dasharray: 3 97;
         animation: cy-comete 3.4s linear infinite -1.7s;
       }
       @keyframes cy-comete { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
-      /* à tisser : un trait pointillé, franc si la mémoire suffit, éteint
-         sinon — rien ne coule, justement */
       .cy-lien[data-etat='payable'] .cy-corps { stroke: #63b7e6; opacity: 0.8; stroke-dasharray: 2 3; }
       .cy-lien[data-etat='verrou'] .cy-corps { stroke: #5c7f9c; opacity: 0.32; stroke-dasharray: 1.5 4.5; }
       .cy-lien[data-etat='mystere'] .cy-corps { stroke: #c99aff; opacity: 0.4; stroke-dasharray: 1 4; }
+      /* LE SURVOL ISOLE : approcher une plaque (ou sa ligne au registre)
+         éteint tous les autres liens — la question « à quel trait
+         appartient ce label ? » ne se pose plus une seconde */
+      #cycle-scene.cy-isole .cy-lien:not(.cy-survol) .cy-halo,
+      #cycle-scene.cy-isole .cy-lien:not(.cy-survol) .cy-corps,
+      #cycle-scene.cy-isole .cy-lien:not(.cy-survol) .cy-flux,
+      #cycle-scene.cy-isole .cy-lien:not(.cy-survol) .cy-flux-b { opacity: 0.07; }
+      #cycle-scene.cy-isole .cy-transfo:not(.cy-survol) { opacity: 0.28; }
+      #cycle-scene.cy-isole .cy-etat, #cycle-scene.cy-isole #cy-secteur { opacity: 0.45; }
+      #cycle-scene.cy-isole .cy-transfo.cy-survol {
+        border-color: var(--specimen);
+        box-shadow: 0 0 20px rgba(99, 183, 230, 0.4);
+      }
       /* le lien PERDU vers le secteur scellé : il se dissout en chemin */
       .cy-perdu { stroke: url(#cy-degrade-perdu); stroke-width: 2; fill: none; stroke-dasharray: 2 6; animation: cy-derive 9s linear infinite; }
       @keyframes cy-derive { to { stroke-dashoffset: -80; } }
-      /* ---- les ÉTATS ---- */
+      /* ---- les ÉTATS : plus grands, largement espacés ---- */
       .cy-etat {
         position: absolute;
         transform: translate(-50%, -50%);
@@ -1137,20 +1135,20 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 3px;
+        gap: 4px;
         font-family: var(--font-display);
         color: var(--ink);
         text-align: center;
         z-index: 1;
       }
-      .cy-etat .cy-ico { font-size: 24px; line-height: 1.1; color: #bfe3f7; }
-      .cy-etat b { font-size: 16px; letter-spacing: 0.3em; font-weight: 600; }
-      .cy-etat small { font-size: 7.5px; letter-spacing: 0.34em; color: var(--dim); }
+      .cy-etat .cy-ico { font-size: 28px; line-height: 1.1; color: #bfe3f7; }
+      .cy-etat b { font-size: 19px; letter-spacing: 0.32em; font-weight: 600; }
+      .cy-etat small { font-size: 8px; letter-spacing: 0.36em; color: var(--dim); }
       /* SOLIDE : l'octogone taillé, panneau de verre froid */
       #cy-solide {
-        left: 47%;
-        top: 16.7%;
-        width: 19%;
+        left: 46%;
+        top: 13.5%;
+        width: 21%;
         aspect-ratio: 1.08;
         clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%);
         background: linear-gradient(160deg, rgba(167, 221, 245, 0.75), rgba(80, 122, 160, 0.45));
@@ -1166,89 +1164,92 @@
       #cy-solide > * { position: relative; }
       @keyframes cy-scintille {
         0%, 100% { filter: drop-shadow(0 0 6px rgba(167, 221, 245, 0.3)); }
-        50% { filter: drop-shadow(0 0 16px rgba(167, 221, 245, 0.6)); }
+        50% { filter: drop-shadow(0 0 18px rgba(167, 221, 245, 0.6)); }
       }
       /* LIQUIDE : la sphère-projecteur, le cœur lumineux du cycle */
       #cy-liquide {
-        left: 47%;
+        left: 46%;
         top: 50%;
-        width: 23%;
+        width: 25%;
         aspect-ratio: 1;
         border-radius: 50%;
         background: radial-gradient(circle at 42% 34%, #7cc4ec 0%, #2e79ab 44%, #123a5c 78%, #0b2036 100%);
-        box-shadow: 0 0 60px rgba(99, 183, 230, 0.35), 0 0 150px rgba(99, 183, 230, 0.14);
+        box-shadow: 0 0 70px rgba(99, 183, 230, 0.35), 0 0 170px rgba(99, 183, 230, 0.14);
         animation: cy-respire 6s ease-in-out infinite;
       }
       #cy-liquide .cy-ico, #cy-liquide b { color: #eaf6ff; }
       @keyframes cy-respire {
-        0%, 100% { box-shadow: 0 0 60px rgba(99, 183, 230, 0.35), 0 0 150px rgba(99, 183, 230, 0.14); }
-        50% { box-shadow: 0 0 78px rgba(99, 183, 230, 0.5), 0 0 180px rgba(99, 183, 230, 0.2); }
+        0%, 100% { box-shadow: 0 0 70px rgba(99, 183, 230, 0.35), 0 0 170px rgba(99, 183, 230, 0.14); }
+        50% { box-shadow: 0 0 92px rgba(99, 183, 230, 0.5), 0 0 200px rgba(99, 183, 230, 0.2); }
       }
-      /* ---- GAZ : une vraie NUÉE. Cinq lobes flous aux dérives propres —
-         jamais deux fois la même silhouette — et des volutes qui montent et
-         s'effacent. Aucun contour : un gaz n'a pas de bord. ---- */
-      #cy-gaz { left: 47%; top: 83.9%; width: 26%; aspect-ratio: 1.45; }
-      #cy-gaz .cy-nuee, #cy-gaz .cy-volutes { position: absolute; inset: -16% -10%; pointer-events: none; }
+      /* ---- GAZ : une nuée RESSERRÉE (elle mangeait le bas de l'écran).
+         Cinq lobes aux dérives propres, un cœur dense, des volutes qui
+         montent — mais à l'échelle des deux autres états. ---- */
+      #cy-gaz { left: 46%; top: 88%; width: 15%; aspect-ratio: 1.6; }
+      #cy-gaz .cy-nuee, #cy-gaz .cy-volutes { position: absolute; inset: -12% -8%; pointer-events: none; }
       #cy-gaz .cy-nuee i {
         position: absolute;
         border-radius: 50%;
-        background: radial-gradient(circle at 42% 38%, rgba(255, 228, 182, 0.5), rgba(242, 201, 142, 0.2) 52%, rgba(242, 201, 142, 0) 76%);
-        filter: blur(7px);
+        background: radial-gradient(circle at 42% 38%, rgba(255, 228, 182, 0.55), rgba(242, 201, 142, 0.2) 52%, rgba(242, 201, 142, 0) 76%);
+        filter: blur(6px);
         animation: cy-lobe 12s ease-in-out infinite;
       }
-      #cy-gaz .cy-nuee i:nth-child(1) { left: 8%; top: 22%; width: 54%; height: 66%; animation-duration: 13s; }
-      #cy-gaz .cy-nuee i:nth-child(2) { right: 6%; top: 16%; width: 50%; height: 70%; animation-duration: 11s; animation-delay: -3s; }
-      #cy-gaz .cy-nuee i:nth-child(3) { left: 26%; top: 4%; width: 46%; height: 58%; animation-duration: 15s; animation-delay: -6s; }
-      #cy-gaz .cy-nuee i:nth-child(4) { left: 20%; bottom: 2%; width: 60%; height: 52%; animation-duration: 10s; animation-delay: -1.5s; }
-      #cy-gaz .cy-nuee i:nth-child(5) { left: 33%; top: 26%; width: 36%; height: 46%; filter: blur(4px); background: radial-gradient(circle at 45% 40%, rgba(255, 236, 200, 0.62), rgba(242, 201, 142, 0.24) 55%, rgba(242, 201, 142, 0) 78%); animation-duration: 9s; animation-delay: -4.5s; }
+      #cy-gaz .cy-nuee i:nth-child(1) { left: 6%; top: 22%; width: 54%; height: 66%; animation-duration: 13s; }
+      #cy-gaz .cy-nuee i:nth-child(2) { right: 4%; top: 16%; width: 50%; height: 70%; animation-duration: 11s; animation-delay: -3s; }
+      #cy-gaz .cy-nuee i:nth-child(3) { left: 26%; top: 2%; width: 46%; height: 56%; animation-duration: 15s; animation-delay: -6s; }
+      #cy-gaz .cy-nuee i:nth-child(4) { left: 20%; bottom: 0%; width: 60%; height: 50%; animation-duration: 10s; animation-delay: -1.5s; }
+      #cy-gaz .cy-nuee i:nth-child(5) {
+        left: 31%; top: 24%; width: 38%; height: 48%; filter: blur(4px);
+        background: radial-gradient(circle at 45% 40%, rgba(255, 238, 205, 0.7), rgba(242, 201, 142, 0.26) 55%, rgba(242, 201, 142, 0) 78%);
+        animation-duration: 9s; animation-delay: -4.5s;
+      }
       @keyframes cy-lobe {
         0%, 100% { transform: translate(0, 0) scale(1); }
-        33% { transform: translate(5%, -4%) scale(1.09); }
+        33% { transform: translate(5%, -4%) scale(1.08); }
         66% { transform: translate(-4%, 3%) scale(0.94); }
       }
       #cy-gaz .cy-volutes i {
         position: absolute;
-        bottom: 26%;
-        width: 9%;
-        height: 13%;
+        bottom: 30%;
+        width: 10%;
+        height: 15%;
         border-radius: 50%;
-        background: radial-gradient(circle, rgba(255, 226, 178, 0.42), transparent 70%);
-        filter: blur(3px);
+        background: radial-gradient(circle, rgba(255, 226, 178, 0.45), transparent 70%);
+        filter: blur(2px);
         opacity: 0;
         animation: cy-volute 6.5s ease-out infinite;
       }
-      #cy-gaz .cy-volutes i:nth-child(1) { left: 26%; }
-      #cy-gaz .cy-volutes i:nth-child(2) { left: 47%; animation-delay: -2.2s; }
-      #cy-gaz .cy-volutes i:nth-child(3) { left: 66%; animation-delay: -4.4s; }
+      #cy-gaz .cy-volutes i:nth-child(1) { left: 24%; }
+      #cy-gaz .cy-volutes i:nth-child(2) { left: 46%; animation-delay: -2.2s; }
+      #cy-gaz .cy-volutes i:nth-child(3) { left: 68%; animation-delay: -4.4s; }
       @keyframes cy-volute {
         0% { opacity: 0; transform: translate(0, 0) scale(0.6); }
-        25% { opacity: 0.55; }
-        100% { opacity: 0; transform: translate(-30%, -150%) scale(1.5); }
+        25% { opacity: 0.5; }
+        100% { opacity: 0; transform: translate(-30%, -160%) scale(1.5); }
       }
       #cy-gaz b, #cy-gaz small { position: relative; z-index: 2; }
       #cy-gaz b { color: #ffdda6; text-shadow: 0 0 14px rgba(20, 10, 0, 0.9); }
-      #cy-gaz small { color: rgba(255, 221, 166, 0.6); text-shadow: 0 0 10px rgba(20, 10, 0, 0.9); }
+      #cy-gaz small { color: rgba(255, 221, 166, 0.62); text-shadow: 0 0 10px rgba(20, 10, 0, 0.9); }
       /* ---- LE SECTEUR SCELLÉ : le quatrième état n'est PAS dans le cycle.
-         Il est mis à l'écart, dans sa cellule d'observation — hors du
-         schéma, relié par un seul signal qui se perd en route. ---- */
+         Il est mis à l'écart, dans sa cellule d'observation, au large des
+         arcs — relié par un seul signal qui se perd en route. ---- */
       #cy-secteur {
         position: absolute;
-        left: 71%;
-        top: 71%;
-        width: 28%;
-        height: 27%;
+        left: 77.5%;
+        top: 72%;
+        width: 22%;
+        height: 26%;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 6px;
+        gap: 8px;
         overflow: hidden;
         border: 1px dashed rgba(201, 154, 255, 0.32);
         background: radial-gradient(ellipse at 50% 45%, rgba(60, 30, 92, 0.34), rgba(10, 8, 20, 0.55) 72%);
         font-family: var(--font-display);
         text-align: center;
       }
-      /* le balayage de la cellule : quelque chose est observé, en continu */
       #cy-secteur::after {
         content: '';
         position: absolute;
@@ -1262,7 +1263,7 @@
       .cy-sec-tete, .cy-sec-pied {
         position: relative;
         z-index: 1;
-        font-size: 7px;
+        font-size: 7.5px;
         letter-spacing: 0.3em;
         line-height: 1.7;
         color: rgba(201, 154, 255, 0.75);
@@ -1270,8 +1271,8 @@
       .cy-sec-orbe {
         position: relative;
         z-index: 1;
-        width: 74px;
-        height: 74px;
+        width: 86px;
+        height: 86px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -1279,51 +1280,50 @@
         background: radial-gradient(circle at 48% 42%, rgba(201, 154, 255, 0.42), rgba(70, 34, 110, 0.25) 55%, transparent 76%);
         animation: cy-vacille 3.4s ease-in-out infinite;
       }
-      /* l'anneau instable : il tourne, et son pointillé n'est jamais figé */
       .cy-sec-orbe::before {
         content: '';
         position: absolute;
-        inset: -6px;
+        inset: -7px;
         border: 1px dashed rgba(201, 154, 255, 0.5);
         border-radius: 50%;
         animation: cy-anneau 16s linear infinite;
       }
-      .cy-sec-orbe b { font-size: 15px; letter-spacing: 0.36em; color: #d9b6ff; text-shadow: 0 0 14px rgba(201, 154, 255, 0.6); }
+      .cy-sec-orbe b { font-size: 17px; letter-spacing: 0.36em; color: #d9b6ff; text-shadow: 0 0 14px rgba(201, 154, 255, 0.6); }
       @keyframes cy-anneau { to { transform: rotate(360deg); } }
       @keyframes cy-vacille {
         0%, 100% { opacity: 0.6; filter: drop-shadow(0 0 6px rgba(201, 154, 255, 0.2)); }
-        50% { opacity: 1; filter: drop-shadow(0 0 20px rgba(201, 154, 255, 0.5)); }
+        50% { opacity: 1; filter: drop-shadow(0 0 22px rgba(201, 154, 255, 0.5)); }
       }
-      /* ---- les TRANSFORMATIONS : plaques rectangulaires sur les liens ---- */
+      /* ---- les TRANSFORMATIONS : plaques posées sur leur lien ---- */
       .cy-transfo {
         position: absolute;
         transform: translate(-50%, -50%);
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 2px;
-        padding: 9px 16px;
-        background: rgba(10, 20, 34, 0.92);
+        gap: 3px;
+        padding: 10px 18px;
+        background: rgba(10, 20, 34, 0.94);
         border: 1px solid rgba(99, 183, 230, 0.3);
         font-family: var(--font-mono);
         text-align: center;
         white-space: nowrap;
         z-index: 2;
-        box-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
-        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        box-shadow: 0 2px 16px rgba(0, 0, 0, 0.55);
+        transition: border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.18s ease;
       }
       .cy-transfo b {
         font-family: var(--font-display);
         font-size: 12px;
-        letter-spacing: 0.22em;
+        letter-spacing: 0.15em;
         font-weight: 600;
         color: var(--ink);
       }
-      .cy-transfo span { font-family: var(--font-display); font-size: 8px; letter-spacing: 0.22em; color: var(--dim); }
+      .cy-transfo span { font-family: var(--font-display); font-size: 8.5px; letter-spacing: 0.22em; color: var(--dim); }
       /* ACQUIS = VERT, offert d'origine ou tissé : même promesse tenue */
       .cy-transfo.cy-origine, .cy-transfo.cy-tenue {
         border-color: rgba(109, 255, 184, 0.5);
-        box-shadow: 0 0 14px rgba(109, 255, 184, 0.12), 0 2px 14px rgba(0, 0, 0, 0.5);
+        box-shadow: 0 0 14px rgba(109, 255, 184, 0.12), 0 2px 16px rgba(0, 0, 0, 0.55);
       }
       .cy-transfo.cy-origine b, .cy-transfo.cy-tenue b { color: #d8ffee; }
       .cy-transfo.cy-origine span, .cy-transfo.cy-tenue span { color: #6dffb8; }
@@ -1331,41 +1331,40 @@
       .cy-transfo.cy-payable span { color: var(--specimen); }
       .cy-transfo.cy-payable:hover { border-color: var(--specimen); }
       @keyframes cy-appel {
-        0%, 100% { box-shadow: 0 2px 14px rgba(0, 0, 0, 0.5); }
-        50% { box-shadow: 0 0 16px rgba(99, 183, 230, 0.4); border-color: var(--specimen); }
+        0%, 100% { box-shadow: 0 2px 16px rgba(0, 0, 0, 0.55); }
+        50% { box-shadow: 0 0 18px rgba(99, 183, 230, 0.4); border-color: var(--specimen); }
       }
       .cy-transfo.cy-verrou { opacity: 0.55; }
       .cy-transfo.cy-mystere { border-color: rgba(201, 154, 255, 0.45); opacity: 0.8; }
       .cy-transfo.cy-mystere b, .cy-transfo.cy-mystere span { color: #c99aff; }
-      /* le REFUS (solde insuffisant) : la plaque secoue la tête */
       .cy-transfo.cy-refus, .cy-reg.cy-refus { animation: cy-non 0.35s ease; }
       @keyframes cy-non {
         0%, 100% { translate: 0 0; }
         25% { translate: -5px 0; }
         75% { translate: 5px 0; }
       }
-      /* les grands arcs écrivent LE LONG du trait, comme sur la maquette */
-      #cy-t-sublimation b, #cy-t-condensation b { font-size: 10.5px; letter-spacing: 0.16em; }
-      #cy-t-sublimation span, #cy-t-condensation span { font-size: 7.5px; }
+      /* les grands arcs écrivent LE LONG du trait, au large du reste */
+      #cy-t-sublimation b, #cy-t-condensation b { font-size: 11px; letter-spacing: 0.18em; }
+      #cy-t-sublimation span, #cy-t-condensation span { font-size: 8px; }
       #cy-t-sublimation { transform: translate(-50%, -50%) rotate(90deg); }
       #cy-t-condensation { transform: translate(-50%, -50%) rotate(-90deg); }
       #cy-t-sublimation.cy-refus, #cy-t-condensation.cy-refus { animation: none; }
       /* ---- le REGISTRE DES TRANSFORMATIONS : la colonne de droite ---- */
       #cycle-registre {
-        width: min(400px, 32vw);
+        width: min(410px, 33vw);
         display: flex;
         flex-direction: column;
-        gap: 7px;
+        gap: 9px;
         overflow: auto;
-        padding: 6px 2px;
+        padding: 4px 2px;
       }
       #cycle-registre h3 {
         font-family: var(--font-display);
-        font-size: 9.5px;
+        font-size: 10px;
         letter-spacing: 0.3em;
         font-weight: 600;
         color: var(--dim);
-        margin: 2px 0 3px;
+        margin: 2px 0 4px;
       }
       .cy-reg {
         display: flex;
@@ -1373,7 +1372,7 @@
         gap: 12px;
         width: 100%;
         text-align: left;
-        padding: 10px 14px;
+        padding: 12px 16px;
         background: rgba(10, 20, 32, 0.85);
         border: 1px solid var(--line);
         border-left-width: 3px;
@@ -1381,8 +1380,8 @@
         color: var(--ink);
         cursor: default;
       }
-      .cy-reg b { font-family: var(--font-display); font-size: 11.5px; letter-spacing: 0.2em; font-weight: 600; display: block; }
-      .cy-reg small { display: block; font-size: 8.5px; letter-spacing: 0.14em; color: var(--dim); margin-top: 3px; }
+      .cy-reg b { font-family: var(--font-display); font-size: 12px; letter-spacing: 0.2em; font-weight: 600; display: block; }
+      .cy-reg small { display: block; font-size: 8.5px; letter-spacing: 0.14em; color: var(--dim); margin-top: 4px; }
       .cy-reg em {
         margin-left: auto;
         font-style: normal;
@@ -1392,7 +1391,7 @@
         white-space: nowrap;
         color: var(--dim);
       }
-      /* ACQUIS = VERT ici aussi : le registre et le schéma disent la même chose */
+      /* ACQUIS = VERT ici aussi : registre et schéma disent la même chose */
       .cy-reg.cy-origine, .cy-reg.cy-tenue { border-left-color: #6dffb8; background: rgba(12, 30, 26, 0.85); }
       .cy-reg.cy-origine em, .cy-reg.cy-tenue em { color: #6dffb8; }
       .cy-reg.cy-payable { border-left-color: var(--specimen); cursor: pointer; }
@@ -1401,23 +1400,24 @@
       .cy-reg.cy-verrou { opacity: 0.55; }
       .cy-reg.cy-mystere { border-left-color: #c99aff; opacity: 0.8; }
       .cy-reg.cy-mystere b, .cy-reg.cy-mystere em { color: #c99aff; }
+      .cy-reg.cy-survol { border-color: var(--specimen); }
       /* ---- la LÉGENDE des traits, sous le registre ---- */
       #cycle-legende {
         margin-top: auto;
-        padding: 10px 2px 2px;
+        padding: 14px 2px 2px;
         font-family: var(--font-display);
-        font-size: 8px;
+        font-size: 8.5px;
         letter-spacing: 0.22em;
         color: var(--dim);
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 7px;
       }
-      #cycle-legende h4 { font-size: 8.5px; letter-spacing: 0.3em; margin: 0 0 2px; font-weight: 600; }
+      #cycle-legende h4 { font-size: 9px; letter-spacing: 0.3em; margin: 0 0 2px; font-weight: 600; }
       #cycle-legende i {
         display: inline-block;
-        width: 34px;
-        margin-right: 10px;
+        width: 36px;
+        margin-right: 12px;
         border-top: 2px solid currentColor;
         vertical-align: middle;
       }
@@ -1425,11 +1425,11 @@
       #cycle-legende .lg-payable i { color: var(--specimen); border-top-style: dotted; }
       #cycle-legende .lg-verrou i { color: var(--dim); border-top-style: dotted; }
       #cycle-legende .lg-mystere i { color: #c99aff; border-top-style: dotted; }
-      /* écrans étroits (fenêtre réduite) : le registre cède, l'écran défile */
+      /* fenêtre étroite : le registre passe dessous, l'écran défile */
       @media (max-width: 1000px) {
         #cycle-corps { flex-direction: column; overflow: auto; }
         #cycle-registre { width: 100%; }
-        #cycle-scene { height: auto; width: 100%; }
+        #cycle-scene { min-height: 78vh; }
       }
       #fioles { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(4, 8, 14, 0.72); }
       #fioles .salles-boite { max-height: 86vh; overflow: auto; width: min(980px, 96vw); }
@@ -6205,101 +6205,99 @@
           <button type="button" id="cycle-fermer" aria-label="Fermer">✕</button>
         </header>
         <div id="cycle-corps">
-          <div id="cycle-scene-cadre">
-            <div id="cycle-scene">
-              <svg viewBox="0 0 1000 900" preserveAspectRatio="none" aria-hidden="true">
-                <defs>
-                  <path id="cy-p-solidification" d="M 405 355 C 285 325 275 268 415 225" pathLength="100" />
-                  <path id="cy-p-fusion" d="M 525 225 C 665 268 655 325 535 355" pathLength="100" />
-                  <path id="cy-p-liquefaction" d="M 398 678 C 285 645 280 585 405 545" pathLength="100" />
-                  <path id="cy-p-vaporisation" d="M 535 545 C 660 585 665 645 542 678" pathLength="100" />
-                  <path id="cy-p-sublimation" d="M 555 205 C 830 305 830 585 570 680" pathLength="100" />
-                  <path id="cy-p-condensation" d="M 385 680 C 110 585 110 305 395 205" pathLength="100" />
-                  <marker id="cy-fleche" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                    <path d="M0,0 L10,5 L0,10 z" fill="context-stroke" stroke="none"/>
-                  </marker>
-                  <!-- le gauchissement ORGANIQUE des liens : une turbulence
-                       fixe déplace le trait — rien n'est droit dans un corps
-                       qui coule. Statique : le filtre se met en cache, seules
-                       les comètes animent. -->
-                  <filter id="cy-onde" x="-25%" y="-25%" width="150%" height="150%">
-                    <feTurbulence type="fractalNoise" baseFrequency="0.011" numOctaves="2" seed="7" result="n"/>
-                    <feDisplacementMap in="SourceGraphic" in2="n" scale="7" xChannelSelector="R" yChannelSelector="G"/>
-                  </filter>
-                  <linearGradient id="cy-degrade-perdu" gradientUnits="userSpaceOnUse" x1="580" y1="0" x2="714" y2="0">
-                    <stop offset="0" stop-color="#c99aff" stop-opacity="0.5"/>
-                    <stop offset="1" stop-color="#c99aff" stop-opacity="0"/>
-                  </linearGradient>
-                </defs>
-                <g class="cy-lien" data-transfo="solidification" style="--flux: #a7ddf5">
-                  <g class="cy-lien-fixe">
-                    <use class="cy-halo" href="#cy-p-solidification" stroke="#a7ddf5" marker-end="none" />
-                    <use class="cy-corps" href="#cy-p-solidification" stroke="#a7ddf5" marker-end="url(#cy-fleche)" />
-                  </g>
-                  <use class="cy-flux" href="#cy-p-solidification" marker-end="none" />
-                  <use class="cy-flux-b" href="#cy-p-solidification" marker-end="none" />
+          <div id="cycle-scene">
+            <svg viewBox="0 0 1160 1000" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <path id="cy-p-solidification" d="M 430 410 C 408 368 400 286 462 238" pathLength="100" />
+                <path id="cy-p-fusion" d="M 605 238 C 662 286 670 368 638 410" pathLength="100" />
+                <path id="cy-p-liquefaction" d="M 455 828 C 400 780 408 660 430 592" pathLength="100" />
+                <path id="cy-p-vaporisation" d="M 638 592 C 670 660 662 780 613 828" pathLength="100" />
+                <path id="cy-p-sublimation" d="M 622 225 C 1128 300 1128 700 608 845" pathLength="100" />
+                <path id="cy-p-condensation" d="M 460 845 C 32 700 32 300 445 225" pathLength="100" />
+                <marker id="cy-fleche" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M0,0 L10,5 L0,10 z" fill="context-stroke" stroke="none"/>
+                </marker>
+                <!-- le gauchissement ORGANIQUE des liens : une turbulence fixe
+                     déplace le trait — rien n'est droit dans un corps qui
+                     coule. Statique : le filtre se met en cache, seules les
+                     comètes animent. -->
+                <filter id="cy-onde" x="-25%" y="-25%" width="150%" height="150%">
+                  <feTurbulence type="fractalNoise" baseFrequency="0.011" numOctaves="2" seed="7" result="n"/>
+                  <feDisplacementMap in="SourceGraphic" in2="n" scale="7" xChannelSelector="R" yChannelSelector="G"/>
+                </filter>
+                <linearGradient id="cy-degrade-perdu" gradientUnits="userSpaceOnUse" x1="625" y1="0" x2="895" y2="0">
+                  <stop offset="0" stop-color="#c99aff" stop-opacity="0.5"/>
+                  <stop offset="1" stop-color="#c99aff" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <g class="cy-lien" data-transfo="solidification" style="--flux: #a7ddf5">
+                <g class="cy-lien-fixe">
+                  <use class="cy-halo" href="#cy-p-solidification" stroke="#a7ddf5" marker-end="none" />
+                  <use class="cy-corps" href="#cy-p-solidification" stroke="#a7ddf5" marker-end="url(#cy-fleche)" />
                 </g>
-                <g class="cy-lien" data-transfo="fusion" style="--flux: #63b7e6">
-                  <g class="cy-lien-fixe">
-                    <use class="cy-halo" href="#cy-p-fusion" stroke="#63b7e6" marker-end="none" />
-                    <use class="cy-corps" href="#cy-p-fusion" stroke="#63b7e6" marker-end="url(#cy-fleche)" />
-                  </g>
-                  <use class="cy-flux" href="#cy-p-fusion" marker-end="none" />
-                  <use class="cy-flux-b" href="#cy-p-fusion" marker-end="none" />
+                <use class="cy-flux" href="#cy-p-solidification" marker-end="none" />
+                <use class="cy-flux-b" href="#cy-p-solidification" marker-end="none" />
+              </g>
+              <g class="cy-lien" data-transfo="fusion" style="--flux: #63b7e6">
+                <g class="cy-lien-fixe">
+                  <use class="cy-halo" href="#cy-p-fusion" stroke="#63b7e6" marker-end="none" />
+                  <use class="cy-corps" href="#cy-p-fusion" stroke="#63b7e6" marker-end="url(#cy-fleche)" />
                 </g>
-                <g class="cy-lien" data-transfo="liquefaction" style="--flux: #63b7e6">
-                  <g class="cy-lien-fixe">
-                    <use class="cy-halo" href="#cy-p-liquefaction" stroke="#63b7e6" marker-end="none" />
-                    <use class="cy-corps" href="#cy-p-liquefaction" stroke="#63b7e6" marker-end="url(#cy-fleche)" />
-                  </g>
-                  <use class="cy-flux" href="#cy-p-liquefaction" marker-end="none" />
-                  <use class="cy-flux-b" href="#cy-p-liquefaction" marker-end="none" />
+                <use class="cy-flux" href="#cy-p-fusion" marker-end="none" />
+                <use class="cy-flux-b" href="#cy-p-fusion" marker-end="none" />
+              </g>
+              <g class="cy-lien" data-transfo="liquefaction" style="--flux: #63b7e6">
+                <g class="cy-lien-fixe">
+                  <use class="cy-halo" href="#cy-p-liquefaction" stroke="#63b7e6" marker-end="none" />
+                  <use class="cy-corps" href="#cy-p-liquefaction" stroke="#63b7e6" marker-end="url(#cy-fleche)" />
                 </g>
-                <g class="cy-lien" data-transfo="vaporisation" style="--flux: #f2c98e">
-                  <g class="cy-lien-fixe">
-                    <use class="cy-halo" href="#cy-p-vaporisation" stroke="#f2c98e" marker-end="none" />
-                    <use class="cy-corps" href="#cy-p-vaporisation" stroke="#f2c98e" marker-end="url(#cy-fleche)" />
-                  </g>
-                  <use class="cy-flux" href="#cy-p-vaporisation" marker-end="none" />
-                  <use class="cy-flux-b" href="#cy-p-vaporisation" marker-end="none" />
+                <use class="cy-flux" href="#cy-p-liquefaction" marker-end="none" />
+                <use class="cy-flux-b" href="#cy-p-liquefaction" marker-end="none" />
+              </g>
+              <g class="cy-lien" data-transfo="vaporisation" style="--flux: #f2c98e">
+                <g class="cy-lien-fixe">
+                  <use class="cy-halo" href="#cy-p-vaporisation" stroke="#f2c98e" marker-end="none" />
+                  <use class="cy-corps" href="#cy-p-vaporisation" stroke="#f2c98e" marker-end="url(#cy-fleche)" />
                 </g>
-                <g class="cy-lien" data-transfo="sublimation" style="--flux: #f2c98e">
-                  <g class="cy-lien-fixe">
-                    <use class="cy-halo" href="#cy-p-sublimation" stroke="#f2c98e" marker-end="none" />
-                    <use class="cy-corps" href="#cy-p-sublimation" stroke="#f2c98e" marker-end="url(#cy-fleche)" />
-                  </g>
-                  <use class="cy-flux" href="#cy-p-sublimation" marker-end="none" />
-                  <use class="cy-flux-b" href="#cy-p-sublimation" marker-end="none" />
+                <use class="cy-flux" href="#cy-p-vaporisation" marker-end="none" />
+                <use class="cy-flux-b" href="#cy-p-vaporisation" marker-end="none" />
+              </g>
+              <g class="cy-lien" data-transfo="sublimation" style="--flux: #f2c98e">
+                <g class="cy-lien-fixe">
+                  <use class="cy-halo" href="#cy-p-sublimation" stroke="#f2c98e" marker-end="none" />
+                  <use class="cy-corps" href="#cy-p-sublimation" stroke="#f2c98e" marker-end="url(#cy-fleche)" />
                 </g>
-                <g class="cy-lien" data-transfo="condensation" style="--flux: #a7ddf5">
-                  <g class="cy-lien-fixe">
-                    <use class="cy-halo" href="#cy-p-condensation" stroke="#a7ddf5" marker-end="none" />
-                    <use class="cy-corps" href="#cy-p-condensation" stroke="#a7ddf5" marker-end="url(#cy-fleche)" />
-                  </g>
-                  <use class="cy-flux" href="#cy-p-condensation" marker-end="none" />
-                  <use class="cy-flux-b" href="#cy-p-condensation" marker-end="none" />
+                <use class="cy-flux" href="#cy-p-sublimation" marker-end="none" />
+                <use class="cy-flux-b" href="#cy-p-sublimation" marker-end="none" />
+              </g>
+              <g class="cy-lien" data-transfo="condensation" style="--flux: #a7ddf5">
+                <g class="cy-lien-fixe">
+                  <use class="cy-halo" href="#cy-p-condensation" stroke="#a7ddf5" marker-end="none" />
+                  <use class="cy-corps" href="#cy-p-condensation" stroke="#a7ddf5" marker-end="url(#cy-fleche)" />
                 </g>
-                <path class="cy-perdu" d="M 578 790 C 636 802 670 794 712 784" />
-              </svg>
-              <div class="cy-etat" id="cy-solide"><span class="cy-ico">❄&#xFE0E;</span><b>SOLIDE</b><small>GLACE</small></div>
-              <div class="cy-etat" id="cy-liquide"><span class="cy-ico">◍</span><b>LIQUIDE</b><small>L’ORIGINE</small></div>
-              <div class="cy-etat" id="cy-gaz">
-                <span class="cy-nuee"><i></i><i></i><i></i><i></i><i></i></span>
-                <span class="cy-volutes"><i></i><i></i><i></i></span>
-                <b>GAZ</b><small>VAPEUR</small>
-              </div>
-              <div id="cy-secteur">
-                <span class="cy-sec-tete">SECTEUR SCELLÉ</span>
-                <div class="cy-sec-orbe"><b>???</b></div>
-                <span class="cy-sec-pied">ENTITÉ INCONNUE<br />DEUX LIENS PRESSENTIS</span>
-              </div>
-              <div class="cy-transfo" data-transfo="solidification" style="left: 31.2%; top: 32.8%"></div>
-              <div class="cy-transfo" data-transfo="fusion" style="left: 62.8%; top: 32.8%"></div>
-              <div class="cy-transfo" data-transfo="liquefaction" style="left: 31.2%; top: 68.2%"></div>
-              <div class="cy-transfo" data-transfo="vaporisation" style="left: 63.2%; top: 68.2%"></div>
-              <div class="cy-transfo" id="cy-t-sublimation" data-transfo="sublimation" style="left: 76.3%; top: 49.4%"></div>
-              <div class="cy-transfo" id="cy-t-condensation" data-transfo="condensation" style="left: 18%; top: 49.4%"></div>
+                <use class="cy-flux" href="#cy-p-condensation" marker-end="none" />
+                <use class="cy-flux-b" href="#cy-p-condensation" marker-end="none" />
+              </g>
+              <path class="cy-perdu" d="M 630 885 C 700 900 790 885 890 866" />
+            </svg>
+            <div class="cy-etat" id="cy-solide"><span class="cy-ico">❄&#xFE0E;</span><b>SOLIDE</b><small>GLACE</small></div>
+            <div class="cy-etat" id="cy-liquide"><span class="cy-ico">◍</span><b>LIQUIDE</b><small>L’ORIGINE</small></div>
+            <div class="cy-etat" id="cy-gaz">
+              <span class="cy-nuee"><i></i><i></i><i></i><i></i><i></i></span>
+              <span class="cy-volutes"><i></i><i></i><i></i></span>
+              <b>GAZ</b><small>VAPEUR</small>
             </div>
+            <div id="cy-secteur">
+              <span class="cy-sec-tete">SECTEUR SCELLÉ</span>
+              <div class="cy-sec-orbe"><b>???</b></div>
+              <span class="cy-sec-pied">ENTITÉ INCONNUE<br />DEUX LIENS PRESSENTIS</span>
+            </div>
+            <div class="cy-transfo" data-transfo="solidification" style="left: 36.9%; top: 27.9%"></div>
+            <div class="cy-transfo" data-transfo="fusion" style="left: 56.4%; top: 37.2%"></div>
+            <div class="cy-transfo" data-transfo="liquefaction" style="left: 36.3%; top: 76.9%"></div>
+            <div class="cy-transfo" data-transfo="vaporisation" style="left: 56.6%; top: 66.4%"></div>
+            <div class="cy-transfo" id="cy-t-sublimation" data-transfo="sublimation" style="left: 86.1%; top: 50.9%"></div>
+            <div class="cy-transfo" id="cy-t-condensation" data-transfo="condensation" style="left: 11.7%; top: 50.9%"></div>
           </div>
           <aside id="cycle-registre">
             <h3>REGISTRE DES TRANSFORMATIONS</h3>
