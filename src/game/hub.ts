@@ -73,70 +73,97 @@ export interface ArticleHub {
   plot: { minX: number; minY: number; maxX: number; maxY: number }
 }
 
-// l'étal du comptoir : quatre alcôves au sud de la salle d'étalonnage
-const PLOT_HUB_Y0 = -1750
-const PLOT_HUB_Y1 = -1560
-const plotHub = (
-  cx: number,
-): { minX: number; minY: number; maxX: number; maxY: number } => ({
-  minX: cx - 150,
-  minY: PLOT_HUB_Y0,
-  maxX: cx + 150,
-  maxY: PLOT_HUB_Y1,
-})
-const CX_HUB = [220, 760, 1300, 1840] // les centres des quatre alcôves
+type RectHub = { minX: number; minY: number; maxX: number; maxY: number }
 
-export const ETAL_HUB: ArticleHub[] = [
+// le catalogue du comptoir — les MÊMES articles quel que soit le module ;
+// seules les alcôves (plots) changent avec la géométrie du hub joué
+const ARTICLES_COMPTOIR = [
   {
-    id: 'viatique',
+    id: 'viatique' as const,
     nom: 'VIATIQUE DE GOUTTES',
     detail: '+0,8 L à la bonbonne, au départ de la prochaine descente',
     icone: '🧪',
     prix: 3,
-    plot: plotHub(CX_HUB[0]),
   },
   {
-    id: 'clef',
+    id: 'clef' as const,
     nom: 'CLEF DE CACHETTE',
     detail: 'les voiles du premier tableau tomberont d’emblée',
     icone: '🗝️',
     prix: 4,
-    plot: plotHub(CX_HUB[1]),
   },
   {
-    id: 'sac',
+    id: 'sac' as const,
     nom: 'SAC SURPRISE',
     detail: 'le Semblable ne dit pas ce qu’il y a dedans',
     icone: '🎴',
     prix: 3,
-    plot: plotHub(CX_HUB[2]),
   },
   {
-    id: 'secours',
+    id: 'secours' as const,
     nom: 'ÉCHANTILLON DE SECOURS',
     detail: '+1 vie pour la prochaine descente',
     icone: '💠',
     prix: 8,
-    plot: plotHub(CX_HUB[3]),
   },
 ]
 
-/** LE BANC DES MÉMOIRES : le contact du corps ouvre l'écran du cycle. */
-export const BANC_MEMOIRES_HUB = {
-  minX: 1330,
-  minY: 60,
-  maxX: 1970,
-  maxY: 420,
+function etalAvecPlots(plots: RectHub[]): ArticleHub[] {
+  return ARTICLES_COMPTOIR.map((a, i) => ({ ...a, plot: plots[i] }))
 }
 
-/** SAS DU GIVRE (nord-est, derrière le rideau) : lance LA VOIE. */
-export const SAS_GIVRE_HUB = { minX: 3740, minY: 1500, maxX: 3940, maxY: 1780 }
-/** SAS DE VAPEUR (sud-est, derrière la grille) : la DESCENTE DU JOUR. */
-export const SAS_VAPEUR_HUB = {
-  minX: 3740,
-  minY: -1780,
-  maxX: 3940,
-  maxY: -1500,
+/** Les ZONES MÉTA d'un hub : l'étal du comptoir, le banc des mémoires,
+ * et les deux sas gardés. Chaque module (grand, compact) a les siennes —
+ * le hub JOUÉ peut venir de la bibliothèque partagée, la géométrie
+ * tranche (zonesDuHub). */
+export interface ZonesHub {
+  etal: ArticleHub[]
+  banc: RectHub
+  sasGivre: RectHub
+  sasVapeur: RectHub
+}
+
+// ─── le GRAND module (TABLEAU_HUB, 8000×3600) ────────────────────────────
+export const ZONES_HUB_GRAND: ZonesHub = {
+  etal: etalAvecPlots(
+    [220, 760, 1300, 1840].map((cx) => ({
+      minX: cx - 150,
+      minY: -1750,
+      maxX: cx + 150,
+      maxY: -1560,
+    })),
+  ),
+  banc: { minX: 1330, minY: 60, maxX: 1970, maxY: 420 },
+  sasGivre: { minX: 3740, minY: 1500, maxX: 3940, maxY: 1780 },
+  sasVapeur: { minX: 3740, minY: -1780, maxX: 3940, maxY: -1500 },
+}
+
+// ─── le module COMPACT (TABLEAU_HUB_COMPACT v4, 4500×1600) ───────────────
+export const ZONES_HUB_COMPACT: ZonesHub = {
+  etal: etalAvecPlots(
+    [1460, 1720, 1980, 2240].map((cx) => ({
+      minX: cx - 100,
+      minY: -760,
+      maxX: cx + 100,
+      maxY: -580,
+    })),
+  ),
+  // l'ÉTABLI du poste de gestion devient le banc : la zone ENVELOPPE le
+  // plan de travail — le contact du corps contre lui ouvre l'écran
+  banc: { minX: -500, minY: -800, maxX: 400, maxY: -520 },
+  sasGivre: { minX: 2600, minY: 580, maxX: 2720, maxY: 780 },
+  sasVapeur: { minX: 2600, minY: -780, maxX: 2720, maxY: -580 },
+}
+
+/** Les zones méta du hub JOUÉ — la géométrie tranche : le grand module,
+ * le compact v4, ou null (un vieil instantané de la bibliothèque, sans
+ * annexe méta : aucune zone ne s'active à tort). */
+export function zonesDuHub(lv: {
+  bounds: { maxX: number }
+}): ZonesHub | null {
+  if (lv.bounds.maxX >= 3500) return ZONES_HUB_GRAND
+  if (lv.bounds.maxX >= 2600) return ZONES_HUB_COMPACT
+  return null
 }
 
 export const TABLEAU_HUB: LevelDef = {
@@ -290,9 +317,10 @@ export const TABLEAU_HUB_COMPACT: LevelDef = {
     'Module d’accueil, configuration compacte (chantier de refonte). Le poste de gestion affiche les procédures de contention par état.',
   par: 3,
   ambiante: 0.42,
-  bounds: { minX: -1750, minY: -800, maxX: 1750, maxY: 800 },
+  bounds: { minX: -1750, minY: -800, maxX: 2750, maxY: 800 },
   spawn: { x: -1400, y: 0, n: 900 },
-  exit: { minX: 1560, minY: -120, maxX: 1700, maxY: 120 },
+  // le sas PRINCIPAL (l'eau) : la descente écrite — tout à l'est
+  exit: { minX: 2560, minY: -120, maxX: 2700, maxY: 120 },
   boxes: [
     // ═══ LA CUVE (ouest, −1750..−900) : la chambre de naissance ════════
     // cloison cuve | poste — porte BASSE (y −420..−80)
@@ -304,21 +332,42 @@ export const TABLEAU_HUB_COMPACT: LevelDef = {
     box(-620, 520, -560, 800, MAT_WALL, 3),
     box(-180, 520, -120, 800, MAT_WALL, 3),
     box(260, 520, 320, 800, MAT_WALL, 3),
-    // l'établi bas du poste (un plan de travail, on passe au-dessus)
+    // l'ÉTABLI du poste — devenu LE BANC DES MÉMOIRES : le contact du
+    // corps contre le plan de travail ouvre l'écran du cycle des états
     box(-500, -800, 400, -700, MAT_WALL, 2),
 
-    // cloison poste | sas — porte HAUTE (y 140..480)
+    // cloison poste | aile est — porte HAUTE (y 140..480)
     box(700, 480, 700 + CLOISON, 800, MAT_WALL, 4),
     box(700, -800, 700 + CLOISON, 140, MAT_WALL, 4),
 
-    // ═══ LE SAS (est, 700..1750) : une chicane courte puis la sortie ═══
+    // ═══ L'AILE EST (700..2750) : chicane, comptoir, puis les TROIS sas ═
     box(1150, -800, 1220, 300, MAT_WALL, 5),
+    // LE COMPTOIR : les cloisons des quatre alcôves de l'étal, au sud —
+    // des niches à trois murs : on y PLONGE pour acheter, en MÉMOIRE
+    box(1300, -800, 1360, -560, MAT_WALL, 2),
+    box(1560, -800, 1620, -560, MAT_WALL, 2),
+    box(1820, -800, 1880, -560, MAT_WALL, 2),
+    box(2080, -800, 2140, -560, MAT_WALL, 2),
+    box(2340, -800, 2400, -560, MAT_WALL, 2),
+    // ─── la CHAMBRE DE GIVRE (nord-est) : murée, sauf un RIDEAU — seule
+    // la glace l'écarte. Le lien SOLIDIFICATION non tissé, pas de route.
+    box(2400, 360, 2460, 440, MAT_WALL, 5),
+    { minX: 2460, minY: 360, maxX: 2620, maxY: 440, material: MAT_RIDEAU },
+    box(2620, 360, 2750, 440, MAT_WALL, 5),
+    box(2400, 440, 2460, 800, MAT_WALL, 5),
+    // ─── la CHAMBRE DE VAPEUR (sud-est) : murée, sauf une GRILLE — seul
+    // le souffle passe. Le lien VAPORISATION est sa clef.
+    box(2400, -440, 2460, -360, MAT_WALL, 5),
+    { minX: 2460, minY: -440, maxX: 2620, maxY: -360, material: MAT_GRILLE },
+    box(2620, -440, 2750, -360, MAT_WALL, 5),
+    box(2400, -800, 2460, -440, MAT_WALL, 5),
   ],
   sponges: [],
   lumieres: [
     { x: -1350, y: 250, h: 520, intensite: 0.9, couleur: '#9fd4ee' }, // la cuve : froide
     { x: -100, y: 100, h: 620, intensite: 1.05 }, // le poste : neutre, large
-    { x: 1450, y: 250, h: 380, intensite: 0.95, couleur: '#8fe6b0' }, // le sas : verte
+    { x: 1700, y: 200, h: 420, intensite: 0.95, couleur: '#ffd9a8' }, // le comptoir : chaude
+    { x: 2550, y: 0, h: 380, intensite: 0.95, couleur: '#8fe6b0' }, // les sas : verte
   ],
   decals: [
     // l'écran de contrôle veille sur le poste de gestion
@@ -334,9 +383,22 @@ export const TABLEAU_HUB_COMPACT: LevelDef = {
     // ─── les lieux (plan large)
     { x: -1350, y: 620, text: 'MODULE MÉDUSE|LA CUVE', tone: 'mur', rang: 'secteur' },
     { x: -100, y: -260, text: 'POSTE DE GESTION|PROCÉDURES DE CONTENTION', tone: 'mur', rang: 'secteur' },
-    { x: 1450, y: 560, text: 'PROTOCOLE 21|SAS DE LANCEMENT', tone: 'sas', rang: 'secteur' },
+    { x: 2250, y: 160, text: 'PROTOCOLE 21|SAS DE LANCEMENT', tone: 'sas', rang: 'secteur' },
     // ─── l'alcôve des fioles (les semblables, asset du concepteur)
     { x: -150, y: 700, text: 'CONSERVATION|NE PAS RÉVEILLER', tone: 'froid' },
+    // ─── le banc des mémoires : l'établi du poste, ouvert au contact
+    { x: -50, y: -480, text: 'LE BANC DES MÉMOIRES|TISSER LES LIENS', tone: 'froid' },
+    // ─── le comptoir : quatre alcôves au sud de l'aile, prix en MÉMOIRE
+    { x: 1850, y: -340, text: 'LE COMPTOIR|TOUT SE PAIE EN MÉMOIRE', tone: 'chaud', rang: 'secteur' },
+    { x: 1460, y: -460, text: 'VIATIQUE DE GOUTTES|3 MÉMOIRE', tone: 'phile' },
+    { x: 1720, y: -530, text: 'CLEF DE CACHETTE|4 MÉMOIRE', tone: 'phobe' },
+    { x: 1980, y: -460, text: 'SAC SURPRISE|3 MÉMOIRE', tone: 'chaud' },
+    { x: 2240, y: -530, text: 'ÉCHANTILLON DE SECOURS|8 MÉMOIRE', tone: 'froid' },
+    // ─── les deux sorties gardées, au bout de l'aile
+    { x: 2580, y: 650, text: 'SORTIE DE GIVRE|LA VOIE SEMI-PROCÉDURALE', tone: 'froid', rang: 'secteur' },
+    { x: 2540, y: 270, text: 'RIDEAU|SEULE LA GLACE L’ÉCARTE', tone: 'froid' },
+    { x: 2580, y: -650, text: 'SORTIE DE VAPEUR|LA DESCENTE DU JOUR', tone: 'grille', rang: 'secteur' },
+    { x: 2540, y: -270, text: 'GRILLE|SEUL LE SOUFFLE PASSE', tone: 'grille' },
     // ─── LES PICTOGRAMMES D'ÉTAT, alignés au-dessus de l'établi :
     // sept moyens de contention, notés par état — sans un mot
     { x: -660, y: -580, text: '', tone: 'eponge', picto: { couleur: '#d9a441', eau: 3, glace: 1, vapeur: 1 } },

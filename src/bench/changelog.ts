@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 17:20',
+    title: 'Le méta arrive dans le hub JOUÉ : le module compact équipé',
+    notes: [
+      'Signalé : « je ne vois aucun changement dans le hub ». Trouvé, et c’était subtil : le hub joué n’est PAS celui du code — la bibliothèque partagée sert son tableau de code HUB en premier (le laboratoire se remodèle depuis l’éditeur), et cette entrée est l’instantané du MODULE COMPACT, resté d’avant le méta. La refonte d’hier habillait le grand module… que personne ne joue.',
+      'Le module compact reçoit donc tout le méta, taillé à son échelle : l’aile est s’agrandit (bornes portées à x 2750), LE COMPTOIR y aligne ses quatre alcôves à niches (mêmes articles, mêmes prix en MÉMOIRE), l’ÉTABLI du poste de gestion devient LE BANC DES MÉMOIRES (le contact du corps contre le plan de travail ouvre l’écran du cycle), et les deux chambres gardées encadrent le sas : SORTIE DE GIVRE derrière son RIDEAU au nord-est, SORTIE DE VAPEUR derrière sa GRILLE au sud-est, lumières et signalétique comprises.',
+      'Sous le capot, les zones du méta (étal, banc, sas gardés) ne sont plus des constantes du grand module : zonesDuHub(tableau) résout les zones DU HUB SERVI — grand, compact v4, ou aucune pour un vieil instantané (rien ne s’active à tort sur une géométrie qui n’a pas l’annexe). Et l’instantané de la bibliothèque est REMPLACÉ par le compact v4 via un semis dédié (ops/maj-hub, gardé conforme au code par test) : le hub que vous jouez porte enfin le comptoir, le banc et les trois sorties. 448 tests verts, traversée et cloisons sans fente prouvées sur les DEUX modules.',
+    ],
+  },
+  {
     date: '28/08/2026 16:55',
     title:
       'Le hub à l’ère du méta : comptoir, banc des mémoires, trois sorties',

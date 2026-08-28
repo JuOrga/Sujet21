@@ -6,14 +6,7 @@ import { FluidSim, KIND_PLAYER } from './sim/solver'
 import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
 import { CODEX, Codex, type CodexGroupe } from './game/codex'
-import {
-  BANC_MEMOIRES_HUB,
-  ETAL_HUB,
-  SAS_GIVRE_HUB,
-  SAS_VAPEUR_HUB,
-  TABLEAU_HUB,
-  type ArticleHub,
-} from './game/hub'
+import { TABLEAU_HUB, zonesDuHub, type ArticleHub } from './game/hub'
 import {
   MECANIQUE_NOMS,
   codeCanon,
@@ -6266,7 +6259,7 @@ function resetLasers(): void {
   plotsDedans = ETAL_ECONOMAT.map(() => false)
   // le comptoir du hub aussi : un article par VISITE du module
   achatsHub.clear()
-  plotsHubDedans = ETAL_HUB.map(() => false)
+  plotsHubDedans = [false, false, false, false]
   bancMemoiresDedans = false
   rebuildRenderBoxes() // les parois factices reprennent leur poste
 }
@@ -8753,10 +8746,13 @@ function frame(now: number): void {
   }
 
   // ---- LE MÉTA AU HUB : le comptoir (achats en mémoire) et le banc des
-  // mémoires (le contact ouvre l'écran du cycle — B ou ✕ le referme) ----
-  if (auHub && !sim.dispersed) {
-    for (let i = 0; i < ETAL_HUB.length; i++) {
-      const a = ETAL_HUB[i]
+  // mémoires (le contact ouvre l'écran du cycle — B ou ✕ le referme).
+  // Les zones dépendent du module JOUÉ (grand, compact, ou un vieil
+  // instantané de la bibliothèque : alors aucune zone, rien ne s'active).
+  const zonesHub = auHub && !sim.dispersed ? zonesDuHub(level) : null
+  if (zonesHub) {
+    for (let i = 0; i < zonesHub.etal.length; i++) {
+      const a = zonesHub.etal[i]
       const dedans =
         sim.stats.centroidX > a.plot.minX &&
         sim.stats.centroidX < a.plot.maxX &&
@@ -8768,7 +8764,7 @@ function frame(now: number): void {
     const surBanc = pointInBox(
       sim.stats.centroidX,
       sim.stats.centroidY,
-      BANC_MEMOIRES_HUB,
+      zonesHub.banc,
     )
     if (surBanc && !bancMemoiresDedans && cycleEl.hidden) {
       cycleEl.hidden = false
@@ -8967,12 +8963,13 @@ function frame(now: number): void {
   // écrite ; le SAS DU GIVRE (derrière le rideau — la glace) lance LA
   // VOIE ; le SAS DE VAPEUR (derrière la grille) lance la DESCENTE DU
   // JOUR. Le verrou est la MATIÈRE : sans le lien tissé, pas de passage.
+  const zonesSas = auHub ? zonesDuHub(level) : null
   const surSasGivre =
-    auHub &&
-    pointInBox(sim.stats.centroidX, sim.stats.centroidY, SAS_GIVRE_HUB)
+    !!zonesSas &&
+    pointInBox(sim.stats.centroidX, sim.stats.centroidY, zonesSas.sasGivre)
   const surSasVapeur =
-    auHub &&
-    pointInBox(sim.stats.centroidX, sim.stats.centroidY, SAS_VAPEUR_HUB)
+    !!zonesSas &&
+    pointInBox(sim.stats.centroidX, sim.stats.centroidY, zonesSas.sasVapeur)
   const rejointSasHub =
     (auHub &&
       pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit)) ||

@@ -1,0 +1,441 @@
+{
+  "name": "Le module Méduse — compact",
+  "code": "HUB",
+  "journal": "Module d’accueil, configuration compacte (chantier de refonte). Le poste de gestion affiche les procédures de contention par état.",
+  "par": 3,
+  "ambiante": 0.42,
+  "bounds": {
+    "minX": -1750,
+    "minY": -800,
+    "maxX": 2750,
+    "maxY": 800
+  },
+  "spawn": {
+    "x": -1400,
+    "y": 0,
+    "n": 900
+  },
+  "exit": {
+    "minX": 2560,
+    "minY": -120,
+    "maxX": 2700,
+    "maxY": 120
+  },
+  "boxes": [
+    {
+      "minX": -900,
+      "minY": -80,
+      "maxX": -810,
+      "maxY": 800,
+      "material": 0,
+      "skin": 6
+    },
+    {
+      "minX": -900,
+      "minY": -800,
+      "maxX": -810,
+      "maxY": -420,
+      "material": 0,
+      "skin": 1
+    },
+    {
+      "minX": -620,
+      "minY": 520,
+      "maxX": -560,
+      "maxY": 800,
+      "material": 0,
+      "skin": 3
+    },
+    {
+      "minX": -180,
+      "minY": 520,
+      "maxX": -120,
+      "maxY": 800,
+      "material": 0,
+      "skin": 3
+    },
+    {
+      "minX": 260,
+      "minY": 520,
+      "maxX": 320,
+      "maxY": 800,
+      "material": 0,
+      "skin": 3
+    },
+    {
+      "minX": -500,
+      "minY": -800,
+      "maxX": 400,
+      "maxY": -700,
+      "material": 0,
+      "skin": 2
+    },
+    {
+      "minX": 700,
+      "minY": 480,
+      "maxX": 790,
+      "maxY": 800,
+      "material": 0,
+      "skin": 4
+    },
+    {
+      "minX": 700,
+      "minY": -800,
+      "maxX": 790,
+      "maxY": 140,
+      "material": 0,
+      "skin": 4
+    },
+    {
+      "minX": 1150,
+      "minY": -800,
+      "maxX": 1220,
+      "maxY": 300,
+      "material": 0,
+      "skin": 5
+    },
+    {
+      "minX": 1300,
+      "minY": -800,
+      "maxX": 1360,
+      "maxY": -560,
+      "material": 0,
+      "skin": 2
+    },
+    {
+      "minX": 1560,
+      "minY": -800,
+      "maxX": 1620,
+      "maxY": -560,
+      "material": 0,
+      "skin": 2
+    },
+    {
+      "minX": 1820,
+      "minY": -800,
+      "maxX": 1880,
+      "maxY": -560,
+      "material": 0,
+      "skin": 2
+    },
+    {
+      "minX": 2080,
+      "minY": -800,
+      "maxX": 2140,
+      "maxY": -560,
+      "material": 0,
+      "skin": 2
+    },
+    {
+      "minX": 2340,
+      "minY": -800,
+      "maxX": 2400,
+      "maxY": -560,
+      "material": 0,
+      "skin": 2
+    },
+    {
+      "minX": 2400,
+      "minY": 360,
+      "maxX": 2460,
+      "maxY": 440,
+      "material": 0,
+      "skin": 5
+    },
+    {
+      "minX": 2460,
+      "minY": 360,
+      "maxX": 2620,
+      "maxY": 440,
+      "material": 8
+    },
+    {
+      "minX": 2620,
+      "minY": 360,
+      "maxX": 2750,
+      "maxY": 440,
+      "material": 0,
+      "skin": 5
+    },
+    {
+      "minX": 2400,
+      "minY": 440,
+      "maxX": 2460,
+      "maxY": 800,
+      "material": 0,
+      "skin": 5
+    },
+    {
+      "minX": 2400,
+      "minY": -440,
+      "maxX": 2460,
+      "maxY": -360,
+      "material": 0,
+      "skin": 5
+    },
+    {
+      "minX": 2460,
+      "minY": -440,
+      "maxX": 2620,
+      "maxY": -360,
+      "material": 5
+    },
+    {
+      "minX": 2620,
+      "minY": -440,
+      "maxX": 2750,
+      "maxY": -360,
+      "material": 0,
+      "skin": 5
+    },
+    {
+      "minX": 2400,
+      "minY": -800,
+      "maxX": 2460,
+      "maxY": -440,
+      "material": 0,
+      "skin": 5
+    }
+  ],
+  "sponges": [],
+  "lumieres": [
+    {
+      "x": -1350,
+      "y": 250,
+      "h": 520,
+      "intensite": 0.9,
+      "couleur": "#9fd4ee"
+    },
+    {
+      "x": -100,
+      "y": 100,
+      "h": 620,
+      "intensite": 1.05
+    },
+    {
+      "x": 1700,
+      "y": 200,
+      "h": 420,
+      "intensite": 0.95,
+      "couleur": "#ffd9a8"
+    },
+    {
+      "x": 2550,
+      "y": 0,
+      "h": 380,
+      "intensite": 0.95,
+      "couleur": "#8fe6b0"
+    }
+  ],
+  "decals": [
+    {
+      "x": -700,
+      "y": 340,
+      "w": 300,
+      "h": 374,
+      "kind": "ecran-off",
+      "fade": 0.95
+    },
+    {
+      "x": -370,
+      "y": 610,
+      "w": 75,
+      "h": 380,
+      "kind": "fiole-pleine",
+      "fade": 0.98
+    },
+    {
+      "x": 70,
+      "y": 610,
+      "w": 75,
+      "h": 380,
+      "kind": "fiole-vide",
+      "fade": 0.98
+    },
+    {
+      "x": 510,
+      "y": 610,
+      "w": 75,
+      "h": 380,
+      "kind": "fiole-pleine",
+      "fade": 0.98,
+      "flip": true
+    }
+  ],
+  "labels": [
+    {
+      "x": -1350,
+      "y": 620,
+      "text": "MODULE MÉDUSE|LA CUVE",
+      "tone": "mur",
+      "rang": "secteur"
+    },
+    {
+      "x": -100,
+      "y": -260,
+      "text": "POSTE DE GESTION|PROCÉDURES DE CONTENTION",
+      "tone": "mur",
+      "rang": "secteur"
+    },
+    {
+      "x": 2250,
+      "y": 160,
+      "text": "PROTOCOLE 21|SAS DE LANCEMENT",
+      "tone": "sas",
+      "rang": "secteur"
+    },
+    {
+      "x": -150,
+      "y": 700,
+      "text": "CONSERVATION|NE PAS RÉVEILLER",
+      "tone": "froid"
+    },
+    {
+      "x": -50,
+      "y": -480,
+      "text": "LE BANC DES MÉMOIRES|TISSER LES LIENS",
+      "tone": "froid"
+    },
+    {
+      "x": 1850,
+      "y": -340,
+      "text": "LE COMPTOIR|TOUT SE PAIE EN MÉMOIRE",
+      "tone": "chaud",
+      "rang": "secteur"
+    },
+    {
+      "x": 1460,
+      "y": -460,
+      "text": "VIATIQUE DE GOUTTES|3 MÉMOIRE",
+      "tone": "phile"
+    },
+    {
+      "x": 1720,
+      "y": -530,
+      "text": "CLEF DE CACHETTE|4 MÉMOIRE",
+      "tone": "phobe"
+    },
+    {
+      "x": 1980,
+      "y": -460,
+      "text": "SAC SURPRISE|3 MÉMOIRE",
+      "tone": "chaud"
+    },
+    {
+      "x": 2240,
+      "y": -530,
+      "text": "ÉCHANTILLON DE SECOURS|8 MÉMOIRE",
+      "tone": "froid"
+    },
+    {
+      "x": 2580,
+      "y": 650,
+      "text": "SORTIE DE GIVRE|LA VOIE SEMI-PROCÉDURALE",
+      "tone": "froid",
+      "rang": "secteur"
+    },
+    {
+      "x": 2540,
+      "y": 270,
+      "text": "RIDEAU|SEULE LA GLACE L’ÉCARTE",
+      "tone": "froid"
+    },
+    {
+      "x": 2580,
+      "y": -650,
+      "text": "SORTIE DE VAPEUR|LA DESCENTE DU JOUR",
+      "tone": "grille",
+      "rang": "secteur"
+    },
+    {
+      "x": 2540,
+      "y": -270,
+      "text": "GRILLE|SEUL LE SOUFFLE PASSE",
+      "tone": "grille"
+    },
+    {
+      "x": -660,
+      "y": -580,
+      "text": "",
+      "tone": "eponge",
+      "picto": {
+        "couleur": "#d9a441",
+        "eau": 3,
+        "glace": 1,
+        "vapeur": 1
+      }
+    },
+    {
+      "x": -440,
+      "y": -580,
+      "text": "",
+      "tone": "froid",
+      "picto": {
+        "couleur": "#8fc8ee",
+        "eau": 3,
+        "glace": 1,
+        "vapeur": 2
+      }
+    },
+    {
+      "x": -220,
+      "y": -580,
+      "text": "",
+      "tone": "chaud",
+      "picto": {
+        "couleur": "#e8843c",
+        "eau": 2,
+        "glace": 3,
+        "vapeur": 0
+      }
+    },
+    {
+      "x": 0,
+      "y": -580,
+      "text": "",
+      "tone": "grille",
+      "picto": {
+        "couleur": "#7fae9e",
+        "eau": 1,
+        "glace": 1,
+        "vapeur": 0
+      }
+    },
+    {
+      "x": 220,
+      "y": -580,
+      "text": "",
+      "tone": "phile",
+      "picto": {
+        "couleur": "#3fae9c",
+        "eau": 0,
+        "glace": 1,
+        "vapeur": 1
+      }
+    },
+    {
+      "x": 440,
+      "y": -580,
+      "text": "",
+      "tone": "mur",
+      "picto": {
+        "couleur": "#5b7ba6",
+        "eau": 1,
+        "glace": 0,
+        "vapeur": 1
+      }
+    },
+    {
+      "x": 660,
+      "y": -580,
+      "text": "",
+      "tone": "grille",
+      "picto": {
+        "couleur": "#39c8d8",
+        "eau": 1,
+        "glace": 1,
+        "vapeur": 0
+      }
+    }
+  ]
+}
