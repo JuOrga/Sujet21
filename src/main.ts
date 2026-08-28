@@ -2021,6 +2021,19 @@ document.getElementById('home-cycle')?.addEventListener('click', () => {
 document.getElementById('cycle-fermer')?.addEventListener('click', () => {
   cycleEl.hidden = true
 })
+// OUTIL CONCEPTEUR : tout détisser pour rejouer la progression du cycle.
+// Les liens tissés s'effacent et la mémoire dépensée revient — les verrous
+// narratifs, eux, ne bougent pas : ils appartiennent au scénario. Le
+// bouton n'existe qu'en mode concepteur (CSS body.concepteur).
+document.getElementById('cycle-reset')?.addEventListener('click', () => {
+  const rembourse = records
+    .eveilAcquis()
+    .reduce((somme, id) => somme + (transfoCycle(id)?.cout ?? 0), 0)
+  records.reinitialiseCycle(rembourse)
+  majMemoireUI()
+  renderCycleVoile()
+  audio.collect()
+})
 cycleEl.addEventListener('pointerdown', (e) => {
   if (e.target === cycleEl) cycleEl.hidden = true
 })
