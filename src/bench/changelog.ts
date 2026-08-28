@@ -22,6 +22,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '29/08/2026 00:48',
+    title: 'Les textes deviennent lisibles : les polices embarquent enfin, et tout peut grossir',
+    notes: [
+      'Signalé : les textes normaux sont trop petits — panneau de droite de l’éditeur, cérémonie de fin de salle, table de montage — et « on dirait que les petits textes ne sont pas en HD ». Les deux intuitions étaient justes, et la seconde cachait la vraie cause : LES POLICES N’ÉTAIENT PAS LÀ. La feuille de style réclamait Michroma et IBM Plex Mono depuis le premier jour sans jamais les fournir — aucun @font-face, aucun fichier. Sur une machine qui ne les a pas installées (c’est-à-dire à peu près toutes, Steam Deck compris), le navigateur retombait sur Arial Black et le monospace du système : des lettres mal dessinées, mal espacées, et un GRAS fabriqué à la volée en épaississant les traits — d’où l’empâtement des petits corps.',
+      'Elles voyagent désormais avec le jeu : six fichiers WOFF2, 90 ko en tout, sous licence SIL Open Font (la notice est rangée à côté). Aucun appel réseau, rien à installer, le même dessin partout — et un vrai gras 600, plus aucune lettre épaissie de force. Les sous-ensembles latin et latin-étendu sont séparés : le second ne se charge que si un caractère l’exige.',
+      'LES TEXTES GROSSISSENT, ensuite. Dans les trois écrans denses — éditeur, cérémonie, table de montage — cinquante et un corps ont été relevés d’un cran ou deux : 9,5 → 11, 10 → 11,5, 10,5 → 12, 11 → 12,5, 12 → 13. Les titres, eux, ne bougent pas : grossir un titre déjà lisible ne ferait que casser sa boîte. Les deux colonnes de l’éditeur s’élargissent d’autant (232 et 322 px) pour que le texte plus gros ait où tenir.',
+      'ET UN RÉGLAGE, pour que chacun tranche : PARAMÈTRES › TAILLE DES TEXTES — NORMALE, GRANDE, TRÈS GRANDE, ÉNORME. Il grossit TOUTE l’interface d’un coup, jusqu’à +45 % : un Steam Deck de sept pouces tenu à bout de bras et un grand écran posé à soixante centimètres ne demandent pas la même chose, et ce n’était pas à nous d’en décider une fois pour toutes. Les trois cent quarante-huit tailles de la feuille de style sont écrites `calc(Npx * var(--ui))` — un seul nombre les commande. Le choix vit dans le stockage local et s’applique AVANT le premier dessin : la page ne saute pas sous les yeux du joueur. Les colonnes de l’éditeur, les cases de l’écran des commandes et les pastilles d’état suivent l’échelle, sans jamais dépasser le tiers de l’écran : la cuve reste la pièce principale.',
+      'Un bug trouvé en mesurant, et corrigé : dans le panneau de droite de l’éditeur, la ligne « Exige au bouton » sortait de quarante-quatre pixels hors du panneau. La règle qui donne 128 px de large aux champs de saisie s’appliquait aussi aux CASES À COCHER — deux cases de 128 px côte à côte. Une case à cocher fait maintenant la taille d’une case à cocher : 365 px mesurés dans une colonne de 321, contre 323 après correction.',
+      'Vérifié dans le jeu construit, en 1280 × 800 (l’écran du Steam Deck) : les trois familles chargées et le gras confirmé, chaque taille mesurée avant et après, l’échelle appliquée exactement (×1,15 et ×1,45 au pixel près) et retenue au stockage. Puis un balayage du pire cas — ÉNORME sur tous les écrans — à la recherche du moindre texte coupé : plus un seul, et rien qui sorte de l’écran. 471 tests verts, build propre.',
+    ],
+  },
+  {
     date: '28/08/2026 23:57',
     title: 'HUIT CARTES DE PLUS, dont les premières À CONTREPARTIE — et la glace reste intouchable',
     notes: [

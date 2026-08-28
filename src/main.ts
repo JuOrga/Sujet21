@@ -2364,8 +2364,51 @@ let reliefChoix = (localStorage.getItem('sujet21-relief') ?? 'off') as
   | 'leger'
   | 'fort'
 const RELIEF_K = { off: 0, leger: 0.035, fort: 0.07 } as const
+
+// L'ÉCHELLE DES TEXTES. Toute l'interface est écrite en `calc(Npx *
+// var(--ui))` : ce seul nombre grossit tout d'un coup, sans qu'aucune boîte
+// ne soit redessinée. Un Steam Deck (7 pouces, à bout de bras) et un 27
+// pouces posé à soixante centimètres ne demandent pas la même chose — d'où
+// un réglage, et non une valeur unique décidée ici. Il s'applique AVANT le
+// premier dessin : la page ne doit pas sauter sous les yeux du joueur.
+const ECHELLES = [1, 1.15, 1.3, 1.45] as const
+let uiEchelle = ((): number => {
+  const v = Number(localStorage.getItem('sujet21-ui-echelle'))
+  return ECHELLES.includes(v as (typeof ECHELLES)[number]) ? v : 1
+})()
+function appliqueEchelle(): void {
+  document.documentElement.style.setProperty('--ui', String(uiEchelle))
+}
+appliqueEchelle()
+
 const paramsEl = document.getElementById('params') as HTMLDivElement
 {
+  const choixTaille = document.getElementById(
+    'params-taille',
+  ) as HTMLDivElement
+  const renderTaille = (): void => {
+    choixTaille.innerHTML = ''
+    for (const [k, label] of [
+      [1, 'NORMALE'],
+      [1.15, 'GRANDE'],
+      [1.3, 'TRÈS GRANDE'],
+      [1.45, 'ÉNORME'],
+    ] as const) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = label
+      b.className = k === uiEchelle ? 'actif' : ''
+      b.addEventListener('click', () => {
+        uiEchelle = k
+        localStorage.setItem('sujet21-ui-echelle', String(k))
+        appliqueEchelle()
+        renderTaille()
+      })
+      choixTaille.appendChild(b)
+    }
+  }
+  renderTaille()
+
   const choix = document.getElementById('params-fps') as HTMLDivElement
   const renderFps = (): void => {
     choix.innerHTML = ''

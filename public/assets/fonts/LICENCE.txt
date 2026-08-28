@@ -1,0 +1,16 @@
+Les deux familles embarquées ici sont sous licence SIL OPEN FONT LICENSE 1.1
+(https://scripts.sil.org/OFL), qui autorise l'usage, la modification et la
+redistribution — y compris dans un logiciel vendu — tant que les fichiers ne
+sont pas vendus seuls et que la présente notice les accompagne.
+
+  IBM Plex Mono — © 2017 IBM Corp. (github.com/IBM/plex)
+    plex-mono-400-latin.woff2, plex-mono-400-latin-ext.woff2
+    plex-mono-600-latin.woff2, plex-mono-600-latin-ext.woff2
+
+  Michroma — © Vernon Adams (github.com/googlefonts/michroma)
+    michroma-400-latin.woff2, michroma-400-latin-ext.woff2
+
+Sous-ensembles latin et latin-étendu uniquement (ce que le jeu écrit), au
+format WOFF2 : 90 ko en tout. Les déclarations @font-face sont dans
+index.html, avec leurs plages Unicode — le navigateur ne charge le fichier
+étendu que si un caractère l'exige.
