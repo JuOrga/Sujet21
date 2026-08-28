@@ -4292,6 +4292,7 @@ export class LevelEditor {
           'Hublots',
           'Écrans',
           'Câbles',
+          'Vitre',
         ]
         rows.push(
           `<label class="ed-f"><span>Habillage (décor)</span><select id="p-skin">` +
@@ -4769,7 +4770,7 @@ export class LevelEditor {
       // habillage d'une paroi neutre : 0 (standard) efface la clé — et les
       // motifs étant calés sur la boîte, une forme n'en porte pas
       if (b.material === MAT_WALL && !(b.forme ?? 0)) {
-        const skin = Math.max(0, Math.min(8, Math.round(val('p-skin'))))
+        const skin = Math.max(0, Math.min(9, Math.round(val('p-skin'))))
         if (skin > 0) b.skin = skin
         else delete b.skin
       } else {

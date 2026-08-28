@@ -124,6 +124,24 @@ describe('levelIO — aller-retour JSON', () => {
     expect(again.level!.boxes).toEqual(bx)
   })
 
+  it('la VITRE est un habillage comme un autre : elle survit, et rien au-delà', () => {
+    const { level, rejets } = parseLevel({
+      name: 'Vitrage',
+      bounds: { minX: -500, minY: -300, maxX: 500, maxY: 300 },
+      boxes: [
+        { minX: 0, minY: 0, maxX: 200, maxY: 40, material: 0, skin: 9 },
+        // au-delà du dernier habillage connu : ramené à la vitre, jamais
+        // une tuile d'atlas qui n'existe pas
+        { minX: 0, minY: 60, maxX: 200, maxY: 100, material: 0, skin: 42 },
+      ],
+    })
+    expect(rejets).toEqual([])
+    expect(level!.boxes[0].skin).toBe(9)
+    expect(level!.boxes[1].skin).toBe(9)
+    const again = parseLevel(JSON.parse(serializeLevel(level!)))
+    expect(again.level!.boxes).toEqual(level!.boxes)
+  })
+
   it('les lampes survivent à l’aller-retour, bornées, défauts effacés', () => {
     const { level, rejets } = parseLevel({
       name: 'Lampes',

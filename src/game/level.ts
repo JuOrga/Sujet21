@@ -30,7 +30,11 @@ export interface ObstacleBox {
   // (1 = réglage du banc). Permet un gros bloc à petite aura, et l'inverse.
   aura?: number
   // Habillage d'une PAROI neutre (décor pur, physique inchangée) :
-  // 0/absent standard, 1 caissons, 2 conduites, 3 poutrelle, 4 blindage
+  // 0/absent standard, 1 caissons, 2 conduites, 3 poutrelle, 4 blindage,
+  // 5 aération, 6 hublots, 7 écrans, 8 câbles, 9 VITRE. La vitre est le seul
+  // habillage qui change ce qu'on VOIT : le corps y bute comme sur n'importe
+  // quelle paroi, mais la salle se lit au travers et la lumière la traverse
+  // (son ombre portée n'est qu'un voile — cf. vitreTrans dans le rendu).
   skin?: number
   // FORME de la pièce (formes.ts) : absent/0 rectangle — le chemin rapide.
   // 1 disque (ellipse inscrite), 2 capsule, 3 coin (triangle), 4 arc.

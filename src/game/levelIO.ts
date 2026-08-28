@@ -230,7 +230,7 @@ function readBox(o: Record<string, unknown>): ObstacleBox | null {
       ? { aura: Math.max(0.25, Math.min(4, aura)) }
       : {}),
     ...(skin > 0 && material === MAT_WALL && forme === FORME_RECT
-      ? { skin: Math.min(8, skin) }
+      ? { skin: Math.min(9, skin) }
       : {}),
     ...(forme > FORME_RECT && forme <= FORME_ARC ? { forme } : {}),
     ...(forme === FORME_COIN && Math.round(p0) !== 0

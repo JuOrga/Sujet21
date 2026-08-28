@@ -1153,13 +1153,52 @@ void main() {
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
       float edge = 1.0 - smoothstep(0.0, edgeW, abs(dV));
       vec3 fillCol; vec3 edgeCol;
+      // opacité du remplissage : 1 partout, sauf la VITRE — c'est ce qui la
+      // fait lire comme du verre, on voit la salle au travers
+      float fillA = 1.0;
       if (mat < 0.5) {        // mur neutre : métal brossé — ou un HABILLAGE
         // (aux.z : 1 caissons, 2 conduites, 3 poutrelle, 4 blindage). Pur
         // décor : la physique reste celle d'une paroi neutre. Motifs dans le
         // repère LOCAL de la boîte (wb) : ils pivotent avec elle.
         float skin = uBoxAux[bi].z;
         edgeCol = vec3(0.30, 0.38, 0.46);
-        if (skin > 0.5 && uHasParoi > 0.5) {
+        if (skin > 8.5) {
+          // VITRE — verre feuilleté sur dormant métallique. Une paroi, donc
+          // le corps y bute comme sur le reste ; mais on VOIT au travers, et
+          // la lumière la traverse (cf. vitreTrans dans le cuiseur d'ombres).
+          // Ce qui la fait lire comme du verre, ce n'est pas sa couleur —
+          // c'est le dormant, les meneaux, et le reflet immobile de la salle.
+          vec2 bmin = uBoxes[bi].xy;
+          vec2 bsize = max(uBoxes[bi].zw - bmin, vec2(1.0));
+          vec2 loc = clamp(wbV - bmin, vec2(0.0), bsize);
+          // le DORMANT : le cadre qui tient le verre, tout le tour
+          float bord = min(min(loc.x, bsize.x - loc.x), min(loc.y, bsize.y - loc.y));
+          float cadre = 1.0 - smoothstep(6.0, 9.5, bord);
+          // les MENEAUX : un nombre ENTIER de travées, calées sur la boîte —
+          // les montants tombent donc juste aux deux bords, comme un vrai
+          // vitrage, quelle que soit la taille du panneau
+          vec2 rep = max(vec2(1.0), floor(bsize / 170.0 + 0.5));
+          vec2 pas = bsize / rep;
+          vec2 u = fract(loc / pas);
+          vec2 mdist = min(u, 1.0 - u) * pas;
+          float meneau = 1.0 - smoothstep(2.2, 4.2, min(mdist.x, mdist.y));
+          // le REFLET : deux nappes obliques et IMMOBILES. Une vitre ne
+          // scintille pas toute seule — elle renvoie la salle, qui ne bouge
+          // pas. C'est l'inverse exact des rayures animées du radiateur.
+          float nappe = 0.5 + 0.5 * sin((wbV.x - wbV.y) * 0.0125);
+          float refl = smoothstep(0.60, 0.99, nappe);
+          // poussière et micro-rayures : sans elles, le verre fait plastique
+          float grain = dnoise(wbV * 0.09);
+          vec3 verre = vec3(0.055, 0.085, 0.105) * (0.85 + 0.30 * grain)
+                     + vec3(0.16, 0.22, 0.28) * refl * 0.55;
+          vec3 metal = vec3(0.115, 0.140, 0.175) * (0.90 + 0.20 * grain);
+          float dur = max(cadre, meneau);
+          fillCol = mix(verre, metal, dur);
+          // le verre laisse voir la cuve dessous, le dormant est opaque ;
+          // le reflet épaissit un peu le verre là où il accroche la lumière
+          fillA = mix(0.32 + 0.30 * refl, 1.0, dur);
+          edgeCol = vec3(0.40, 0.52, 0.64); // le chant du dormant, sobre
+        } else if (skin > 0.5 && skin < 8.5 && uHasParoi > 0.5) {
           // habillage TEXTURÉ : tuile (skin-1) de l'atlas, répétée dans le
           // repère local — les motifs pivotent avec la boîte. Les tuiles
           // étant elles-mêmes sans couture, le léger saignement de mip aux
@@ -1233,7 +1272,7 @@ void main() {
           : vec3(0.16, 0.11, 0.20) + vec3(0.07, 0.035, 0.10) * wax;
         edgeCol = vec3(0.62, 0.42, 0.78);
       }
-      col = mix(col, fillCol * eclMat, fill);
+      col = mix(col, fillCol * eclMat, fill * fillA);
       col = mix(col, edgeCol * eclMat, edge * 0.9);
       if (mat > 0.5) {
         // L'aura dit la portée : une brume diffuse sur toute la bande
@@ -2045,6 +2084,7 @@ float sceneSdf(vec2 p) {
     vec4 dec = decodeAux(uBoxAux[i].x);
     if (dec.x > 2.5 && dec.x < 3.5) continue; // sas : une bouche, pas un mur
     if (dec.x > 4.5 && dec.x < 5.5) continue; // évent : tamisé à part (grilleTrans)
+    if (dec.x < 0.5 && uBoxAux[i].z > 8.5) continue; // vitre : tamisée (vitreTrans)
     vec2 wb = p;
     float ang = uBoxAux[i].y;
     if (abs(ang) > 0.0005) {
@@ -2107,6 +2147,40 @@ float grilleTrans(vec2 p, vec2 dir, float tMax) {
   return trans;
 }
 
+// L'OMBRE DE LA VITRE : le verre arrête le corps, pas la lumière. Un
+// panneau vitré ne coupe donc pas le faisceau — il le boit d'un tiers et
+// laisse la salle voisine éclairée. C'est ce qui distingue une vitre d'un
+// mur À DISTANCE, avant même d'aller la toucher : derrière un mur, le noir ;
+// derrière une vitre, la lumière de l'autre côté.
+float vitreTrans(vec2 p, vec2 dir, float tMax) {
+  float trans = 1.0;
+  for (int i = 0; i < MAX_BOXES; i++) {
+    if (i >= uBoxCount) break;
+    vec4 dec = decodeAux(uBoxAux[i].x);
+    if (dec.x > 0.5) continue; // seules les parois neutres…
+    if (uBoxAux[i].z < 8.5) continue; // … habillées en vitre
+    vec2 lp = p;
+    vec2 ld = dir;
+    float ang = uBoxAux[i].y;
+    if (abs(ang) > 0.0005) {
+      vec2 bc = 0.5 * (uBoxes[i].xy + uBoxes[i].zw);
+      float ca = cos(ang);
+      float sa = sin(ang);
+      vec2 rel = p - bc;
+      lp = bc + vec2(ca * rel.x + sa * rel.y, -sa * rel.x + ca * rel.y);
+      ld = vec2(ca * dir.x + sa * dir.y, -sa * dir.x + ca * dir.y);
+    }
+    vec2 safe = vec2(abs(ld.x) < 1e-6 ? 1e-6 : ld.x, abs(ld.y) < 1e-6 ? 1e-6 : ld.y);
+    vec2 ta = (uBoxes[i].xy - lp) / safe;
+    vec2 tb = (uBoxes[i].zw - lp) / safe;
+    float t0 = max(max(min(ta.x, tb.x), min(ta.y, tb.y)), 0.0);
+    float t1 = min(min(max(ta.x, tb.x), max(ta.y, tb.y)), tMax);
+    if (t1 <= t0) continue;
+    trans *= 0.62; // le verre boit un tiers de ce qui le traverse
+  }
+  return trans;
+}
+
 void main() {
   vec2 p = uMapMin + (gl_FragCoord.xy / uMapPx) * uMapSize;
   vec3 total = vec3(0.0);
@@ -2135,7 +2209,8 @@ void main() {
     }
     res = clamp(res, 0.0, 1.0);
     float tamis = grilleTrans(p, dir, min(distL, tLim))
-      * epongeTrans(p, dir, min(distL, tLim));
+      * epongeTrans(p, dir, min(distL, tLim))
+      * vitreTrans(p, dir, min(distL, tLim));
     // la VISIBILITÉ de cette lampe depuis ce texel, SANS le rebond : c'est
     // elle qui dit si la lampe éclaire vraiment ici — l'ombre dynamique du
     // corps s'y pèse, pour ne pas projeter l'ombre d'une lampe murée

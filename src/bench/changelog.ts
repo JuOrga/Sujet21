@@ -22,6 +22,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 12:25',
+    title: 'La VITRE : un habillage de paroi qu’on voit — et qui laisse passer la lumière',
+    notes: [
+      'Demandé : un nouvel habillage « vitre » dans l’éditeur. Il est là, dixième entrée du menu Habillage (décor) d’une paroi neutre, après Câbles. Verre feuilleté sur dormant métallique : le cadre tout le tour, des MENEAUX qui divisent le panneau en un nombre ENTIER de travées calées sur la boîte — les montants tombent donc juste aux deux bords quelle que soit la taille du vitrage —, un reflet en nappes obliques et IMMOBILES (une vitre ne scintille pas toute seule : elle renvoie la salle, qui ne bouge pas — l’inverse exact des rayures animées du radiateur), et un grain de poussière sans lequel le verre fait plastique.',
+      'C’est le premier habillage qui change ce qu’on VOIT : le remplissage est partiellement transparent, la cuve se lit au travers, seuls le dormant et les meneaux sont opaques. La physique, elle, ne bouge pas d’un pouce — une vitre reste une paroi neutre, le corps y bute comme sur le reste, et rien dans le solveur n’a été touché.',
+      'Et surtout, LA LUMIÈRE LA TRAVERSE. Le cuiseur d’ombres ne compte plus les vitres parmi les murs opaques : elles sont tamisées à part, comme l’étaient déjà les évents et les éponges, et boivent un tiers de ce qui les traverse. C’est ce qui distingue une vitre d’un mur À DISTANCE, avant d’aller la toucher : derrière un mur, le noir ; derrière une vitre, la salle voisine éclairée. Mesuré sur la cloison nord du hub, luminance moyenne du sol : dans son ombre 29,4 → 34,6, au-delà 40,5 → 46,4, et la zone témoin au sud (cloison opaque dans les deux essais) inchangée à 32.',
+      'Le fichier de tableau accepte la valeur (aller-retour stable, et tout habillage inconnu au-delà retombe sur la vitre plutôt que sur une tuile d’atlas qui n’existe pas — un test le grave). Vérifié en jeu, WebGL réel : panneau vitré cadré et meneauté, sol visible au travers, reflet en place, aucune erreur de compilation de shader. 427 tests verts, build propre.',
+    ],
+  },
+  {
     date: '27/08/2026 15:05',
     title: 'L’Éveil au pupitre, et le méta se pose à la main dans l’éditeur',
     notes: [
