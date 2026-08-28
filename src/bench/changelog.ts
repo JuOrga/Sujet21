@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 17:31',
+    title: 'Les outils ne touchent plus aux registres — la règle, et sa mise en œuvre',
+    notes: [
+      'Rectification de la livraison de 16:48 : « Valider la salle en cours » consignait de vrais records, avec un chrono d’une fraction de seconde. C’était une erreur de conception, et la règle est désormais posée — un outil ne doit RIEN écrire de ce qui se mérite. Un record de 0,1 s serait resté pour toujours dans les registres, et il n’aurait été de personne.',
+      'Une traversée déclarée par un outil se conclut donc pour de bon — cérémonie, condensat, mémoire, rang de la descente, suite de la voie — mais elle n’écrit RIEN : ni record du protocole (volume et chrono), ni publication au tableau d’honneur partagé, ni record d’expédition, ni palmarès de la voie (descentes, profondeur record, meilleure descente), ni trophée, ni marque au codex. La progression avance ; les titres, non. Le bilan de la salle affiche un tiret là où il n’y a pas de record, au lieu d’en inventer un.',
+      'Vérifié dans le jeu construit, registres relus dans le stockage avant et après : tableaux consignés 0 → 0, expéditions 0 → 0, trophées 0 → 0, palmarès de la voie intact — et plus une seule mention « RECORD DU PROTOCOLE » à l’écran de récompense, là où la version d’avant en tamponnait deux et débloquait un trophée. La cérémonie, elle, s’ouvre toujours avec le volume réel (4,50 L, 100 % du départ, 450 cL de condensat). 436 tests verts, build propre.',
+    ],
+  },
+  {
     date: '28/08/2026 16:48',
     title: 'Deux raccourcis de conception : VALIDER LA SALLE, et le HUB à portée de doigt',
     notes: [

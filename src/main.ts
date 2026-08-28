@@ -8787,12 +8787,18 @@ function frame(now: number): void {
   // suffit — la route coûte de l'eau (chaque impulsion éjecte), exiger la
   // moitié du volume INITIAL rendait le bouton inatteignable en vraie partie
   const aspireAssez = sim.swallowed >= Math.max(20, sim.baseVolume * 0.1)
+  // Une traversée déclarée par un OUTIL de conception. La salle se conclut
+  // pour de bon — cérémonie, condensat, descente qui avance — mais RIEN DE
+  // CE QUI SE MÉRITE ne s'écrit : ni record du protocole, ni tableau
+  // partagé, ni palmarès de la voie, ni trophée. Un outil ne doit jamais
+  // pouvoir salir les registres : un chrono de 0,1 s y resterait pour
+  // toujours, et il ne serait de personne.
+  const sasOutil = forceSas
+  forceSas = false // le drapeau ne vaut que pour cette image
   const drunk =
-    forceSas ||
+    sasOutil ||
     (sim.swallowed > 0 && sim.count <= seuilBu) ||
     (aspireAssez && continuerVoulu)
-  // le drapeau ne vaut que pour cette image : consommé, il retombe
-  forceSas = false
   btnContinuer.classList.toggle(
     'visible',
     aspireAssez &&
@@ -8908,17 +8914,19 @@ function frame(now: number): void {
     gagneCondensat(surplus * 100)
     // Trophées de collecte : « Sans une goutte » (≥ 95 % du volume de
     // départ livré) et « Opérateur de nuit » (21 collectes cumulées)
-    if (surplus >= 0.95 * level.spawn.n * params.litersPerParticle)
-      trophees.debloque('sans-une-goutte')
-    if (trophees.compte('collectes') >= 21)
-      trophees.debloque('operateur-de-nuit')
-    codex.marque('sas') // le codex consigne la première mise en bonbonne
+    if (!sasOutil) {
+      if (surplus >= 0.95 * level.spawn.n * params.litersPerParticle)
+        trophees.debloque('sans-une-goutte')
+      if (trophees.compte('collectes') >= 21)
+        trophees.debloque('operateur-de-nuit')
+      codex.marque('sas') // le codex consigne la première mise en bonbonne
+    }
     const premiereFois = records.tableauRecord(level.code) === null
-    const { newVolume, newChrono } = records.noteCollection(
-      level.code,
-      surplus,
-      run.tableauTime,
-    )
+    // les registres ne bougent pas sous un outil : aucun record consigné,
+    // donc aucun record neuf à annoncer
+    const { newVolume, newChrono } = sasOutil
+      ? { newVolume: false, newChrono: false }
+      : records.noteCollection(level.code, surplus, run.tableauTime)
     // LA MÉMOIRE se grave à chaque sas — l'information survit à la purge :
     // +5 la traversée, +5 la toute première de ce tableau, +2 par record
     gagneMemoireRun(
@@ -8926,22 +8934,24 @@ function frame(now: number): void {
     )
     // Publication au tableau d'honneur partagé : le serveur ne garde que le
     // meilleur — la réponse remet les registres affichés à jour.
-    pushTableauRecord(
-      level.code,
-      surplus,
-      run.tableauTime,
-      records.operator(),
-    ).then((b) => {
-      if (b) {
-        sharedBoard = b
-        renderRegistres()
-        // « La ligne de crête » : le rang 1 en NOTE vient de tomber ?
-        const top = b.tops?.[level.code]?.note?.[0]
-        if (top && top.name === records.operator())
-          trophees.debloque('ligne-de-crete')
-      }
-    })
-    const bests = records.tableauRecord(level.code)!
+    if (!sasOutil)
+      pushTableauRecord(
+        level.code,
+        surplus,
+        run.tableauTime,
+        records.operator(),
+      ).then((b) => {
+        if (b) {
+          sharedBoard = b
+          renderRegistres()
+          // « La ligne de crête » : le rang 1 en NOTE vient de tomber ?
+          const top = b.tops?.[level.code]?.note?.[0]
+          if (top && top.name === records.operator())
+            trophees.debloque('ligne-de-crete')
+        }
+      })
+    // sous un outil, la salle peut n'avoir aucun record : le bilan le dit
+    const bests = records.tableauRecord(level.code)
     audio.collect()
     // Le record a sa propre fanfare : la collecte ordinaire ne doit pas
     // sonner comme un exploit, sinon plus rien ne sonne comme un exploit.
@@ -8952,11 +8962,13 @@ function frame(now: number): void {
     // LA VOIE : chaque sas bu creuse la descente d'un rang — le palmarès
     // suit en direct (profondeur record, descentes entamées)
     if (modeVoie) {
-      voieRang += 1
-      const p = chargePalmaresVoie()
-      if (voieRang === 1) p.descentes += 1
-      if (voieRang > p.profondeurRecord) p.profondeurRecord = voieRang
-      sauvePalmaresVoie(p)
+      voieRang += 1 // la descente avance : c'est la progression, pas un titre
+      if (!sasOutil) {
+        const p = chargePalmaresVoie()
+        if (voieRang === 1) p.descentes += 1
+        if (voieRang > p.profondeurRecord) p.profondeurRecord = voieRang
+        sauvePalmaresVoie(p)
+      }
     }
     // la fin : en voie, la descente se boucle au bout du PLAN — sinon,
     // l'expédition s'achève au bout de la séquence écrite
@@ -8966,28 +8978,29 @@ function frame(now: number): void {
     if (finExpedition) {
       // Dernier sas : l'expédition est achevée — bilan, et registres à jour
       run.ended = true
-      trophees.debloque('integrale')
+      if (!sasOutil) trophees.debloque('integrale')
       gagneMemoireRun(10) // l'expédition bouclée grave son souvenir
       const sallesFranchies = modeVoie ? voieRang : playedLevels().length
-      const exp = records.noteExpedition(
-        sallesFranchies,
-        run.livreTotal,
-        run.runTime,
-      )
-      pushExpeditionRecord(
-        sallesFranchies,
-        run.livreTotal,
-        run.runTime,
-        records.operator(),
-      ).then((b) => {
-        if (b) {
-          sharedBoard = b
-          renderRegistres()
-        }
-      })
+      // une expédition CONCLUE PAR L'OUTIL ne s'inscrit nulle part : ni
+      // record d'expédition, ni tableau partagé
+      const exp = sasOutil
+        ? { newRecord: false }
+        : records.noteExpedition(sallesFranchies, run.livreTotal, run.runTime)
+      if (!sasOutil)
+        pushExpeditionRecord(
+          sallesFranchies,
+          run.livreTotal,
+          run.runTime,
+          records.operator(),
+        ).then((b) => {
+          if (b) {
+            sharedBoard = b
+            renderRegistres()
+          }
+        })
       // le palmarès de la voie : la descente est BOUCLÉE
       let voieNeuf = ''
-      if (modeVoie) {
+      if (modeVoie && !sasOutil) {
         const p = chargePalmaresVoie()
         p.bouclees += 1
         if (run.livreTotal > p.meilleurLivre) {
@@ -9040,8 +9053,12 @@ function frame(now: number): void {
         temps: run.tableauTime,
         newVolume,
         newChrono,
-        recVol: `${fmtL(bests.volume.liters)}${bests.volume.name ? ' · ' + htmlSafe(bests.volume.name) : ''}`,
-        recChr: `${fmtTime(bests.chrono.time)}${bests.chrono.name ? ' · ' + htmlSafe(bests.chrono.name) : ''}`,
+        recVol: bests
+          ? `${fmtL(bests.volume.liters)}${bests.volume.name ? ' · ' + htmlSafe(bests.volume.name) : ''}`
+          : '—',
+        recChr: bests
+          ? `${fmtTime(bests.chrono.time)}${bests.chrono.name ? ' · ' + htmlSafe(bests.chrono.name) : ''}`
+          : '—',
         note: Math.round((surplus * 100 * 60) / (60 + run.tableauTime)),
         gainCl: Math.round(surplus * 100) + run.pastillesCl,
         totalCl: condensat,
