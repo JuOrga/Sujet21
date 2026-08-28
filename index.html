@@ -5464,6 +5464,62 @@
         padding: 4px 2px 2px;
       }
       .mb-jauges b { color: #d5f3e8; font-size: 16px; }
+      /* ---- L'ÉCRAN LARGE (PC, console, Steam Deck) : la mise en bonbonne
+         cesse d'être une colonne. Le même panneau se DÉPLIE en instrument
+         paysage — le flacon et le relevé à gauche, l'étalonnage à droite,
+         les cartes de choix en pleine largeur dessous. Rien ne bouge dans
+         le HTML ni dans le jeu : c'est la grille qui replace les blocs, et
+         le portrait (mobile) garde exactement sa mise en page. */
+      @media (min-width: 900px) and (orientation: landscape) {
+        .mb-panneau {
+          width: min(1180px, 94vw);
+          padding: 22px 26px 18px;
+          display: grid;
+          grid-template-columns: minmax(300px, 0.95fr) minmax(320px, 1.05fr);
+          grid-template-areas:
+            'titre  titre'
+            'haut   etal'
+            'lignes etal'
+            'cond   etal'
+            'choix  choix'
+            'passer passer';
+          column-gap: 30px;
+          align-content: start;
+          /* jamais plus haut que l'écran : sur un Deck (800 px de haut) la
+             cérémonie doit tenir d'un seul tenant, sans ascenseur */
+          max-height: 92vh;
+          overflow-y: auto;
+        }
+        /* l'étalonnage absent (pas de palier ce coup-ci) : une seule colonne,
+           le panneau se resserre plutôt que de laisser un vide à droite */
+        .mb-panneau:has(.mb-etal[hidden]) {
+          width: min(940px, 92vw);
+          grid-template-columns: 1fr;
+          grid-template-areas: 'titre' 'haut' 'lignes' 'cond' 'choix' 'passer';
+        }
+        /* LE CHOIX DE SALLE mérite toute la place : on décide sur ce qu'on
+           voit du plan, pas sur deux vignettes de timbre-poste */
+        .mb-panneau:has(.mb-carte.mb-salle) { width: min(1180px, 94vw); }
+        .mb-titre { grid-area: titre; font-size: 17px; }
+        .mb-haut { grid-area: haut; }
+        .mb-lignes { grid-area: lignes; align-content: start; }
+        .mb-cond { grid-area: cond; }
+        .mb-etal { grid-area: etal; margin-top: 14px; }
+        .mb-choix { grid-area: choix; }
+        .mb-passer { grid-area: passer; }
+        /* le flacon prend de la présence : c'est la récompense qu'on regarde */
+        .mb-flacon { width: 76px; height: 132px; flex: 0 0 76px; }
+        .mb-litres b { font-size: 34px; }
+        /* LE CHOIX DE SALLE : les mini-cartes cessent d'être des vignettes —
+           on choisit sur ce qu'on VOIT du plan */
+        .mb-cartes:has(.mb-salle) { gap: 18px; }
+        /* le plan grandit — mais pas au point de chasser le reste de
+           l'écran : 380 px suffisent à LIRE une salle */
+        .mb-salle canvas { max-width: 380px; }
+        .mb-carte { min-height: 132px; padding: 14px 12px 12px; }
+        .mb-carte b { font-size: 14px; }
+        .mb-carte small { font-size: 12px; }
+      }
       .mb-passer {
         margin: 12px 0 0; text-align: center; font-size: 10px;
         letter-spacing: 0.14em; color: #55708c;

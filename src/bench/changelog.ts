@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 17:09',
+    title: 'La cérémonie se déplie en PAYSAGE : l’écran récompense pour PC, console et Deck',
+    notes: [
+      'Signalé : l’écran de récompense et le choix de salle étaient dessinés pour le portrait — une colonne de 560 px au milieu d’un écran de 1280 ou 1920, et des plans de salle en timbre-poste. Sur écran large et paysage, le même panneau se DÉPLIE désormais en instrument : le flacon, le relevé et le condensat à gauche, l’ÉTALONNAGE et son tampon de palier à droite, les cartes de choix en pleine largeur dessous. Le flacon y gagne sa présence (76 px de haut) et le litrage sa taille.',
+      'LE CHOIX DE SALLE en profite le plus : le panneau s’ouvre à 1180 px et les mini-plans passent de 240 à 380 px — on choisit enfin sur ce qu’on VOIT du plan, pas sur une vignette. Le panneau ne dépasse jamais l’écran (92 % de sa hauteur au plus) : sur un Deck de 800 px de haut, la cérémonie tient d’un seul tenant.',
+      'Rien n’a bougé dans le HTML ni dans le jeu : c’est une grille qui replace les blocs, et elle ne s’applique QU’EN paysage au-delà de 900 px — le portrait (mobile) garde exactement sa mise en page d’avant. Mesuré aux trois formats plutôt qu’à l’œil : PC 1920 en deux colonnes (relevé 546 px à gauche, étalonnage 604 px à droite, cartes 1180 px), Deck 1280 à 994 px avec ses deux cartes côte à côte, mobile 390 inchangé en colonne. 436 tests verts, build propre.',
+    ],
+  },
+  {
     date: '28/08/2026 16:55',
     title:
       'Le hub à l’ère du méta : comptoir, banc des mémoires, trois sorties',
