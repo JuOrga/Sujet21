@@ -11,7 +11,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { TABLEAU_HUB_COMPACT } from './hub'
 
-const CHEMIN = new URL('../../ops/hub-compact-v4.json', import.meta.url)
+const CHEMIN = new URL('../../ops/hub-compact.json', import.meta.url)
 // le code passe à 'HUB' : c'est LUI que hubLevel() cherche en bibliothèque
 const attendu = JSON.parse(
   JSON.stringify({ ...TABLEAU_HUB_COMPACT, code: 'HUB' }),
@@ -20,7 +20,7 @@ const attendu = JSON.parse(
 if (process.env.MAJ_HUB_JSON)
   writeFileSync(CHEMIN, JSON.stringify(attendu, null, 2) + '\n')
 
-describe('ops/hub-compact-v4.json — le semis suit le code', () => {
+describe('ops/hub-compact.json — le semis suit le code', () => {
   it('le JSON est la copie conforme de TABLEAU_HUB_COMPACT (code HUB)', () => {
     const seme = JSON.parse(readFileSync(CHEMIN, 'utf8'))
     expect(seme).toEqual(attendu)

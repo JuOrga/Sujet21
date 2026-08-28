@@ -22,6 +22,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '29/08/2026 01:26',
+    title: 'Le module Méduse v5 : le plan du hub cible, prêt pour l’accident',
+    notes: [
+      'Le hub gagne tout ce que le grand chantier va dégrader puis laisser réparer — livré ici À L’ÉTAT NEUF, dans les DEUX modules (grand et compact) : LE SECTEUR SCELLÉ, la 4e sortie, une alcôve condamnée « depuis l’accident » vers l’extérieur — vers le télescope (sa barrière viendra avec le code, l’encadrement est en dur) ; LA TABLE DE DÉPART, un plan de travail qu’on longe avant les sas et qui récapitulera ce qu’on emporte ; LE BAC D’ESSAI dans la cuve — chaudière, membrane, rideau, surchauffeur, les surfaces que le placard ne montrait pas, à toucher sans enjeu ; LE MUR DES RECORDS (le banc optique des calibrations) ; L’AILE DES ENDORMIS au nord de la cuve du grand module — deux capsules occupées, une vide ; et LE DISTILLATEUR DE PRIMES près du comptoir.',
+      'Sous le capot : chaque module déclare désormais SES SEPT STATIONS DE RÉPARATION (zones de contact posées contre l’objet qu’elles remettront en état, hors des trajets obligés), sa table et son alcôve scellée — la géométrie est prête pour l’accident et sa remise en état payée en mémoire. L’instantané de la bibliothèque partagée est resemé (le fichier du semis perd son numéro de version : le test de conformité fait foi). Vérifié en vue large dans le vrai jeu : toute la signalétique se lit, aucune erreur. 481 tests verts.',
+    ],
+  },
+  {
     date: '29/08/2026 01:08',
     title: 'Le grand chantier s’ouvre : socle du hub accidenté et de l’arc du récit',
     notes: [

@@ -6,7 +6,14 @@ import {
   ZONES_HUB_GRAND,
   zonesDuHub,
 } from './hub'
-import { MAT_GRILLE, MAT_RIDEAU, MAT_WALL } from './level'
+import {
+  MAT_CHAUD,
+  MAT_GRILLE,
+  MAT_MEMBRANE,
+  MAT_RIDEAU,
+  MAT_SURCHAUFFEUR,
+  MAT_WALL,
+} from './level'
 import { checkLevel } from './levelIO'
 import { accessible } from './generateur'
 
@@ -182,6 +189,50 @@ describe('le comptoir — un seul catalogue, deux étals', () => {
           `${tableau.code} · ${a.id}`,
         ).toBe(true)
       }
+    }
+  })
+})
+
+describe('hub v5 — le module accidenté et ses stations', () => {
+  it('les stations, la table et le scellé tiennent dans chaque module', () => {
+    for (const [zones, tableau] of [
+      [ZONES_HUB_GRAND, TABLEAU_HUB],
+      [ZONES_HUB_COMPACT, TABLEAU_HUB_COMPACT],
+    ] as const) {
+      const b = tableau.bounds
+      expect(Object.keys(zones.stations).length).toBe(7)
+      for (const [id, plot] of Object.entries(zones.stations)) {
+        expect(dedans(plot, b), `${tableau.code} · ${id}`).toBe(true)
+        // la table de départ ENVELOPPE son plan de travail (comme le banc) ;
+        // les autres stations restent hors des murs
+        if (id === 'table-depart') continue
+        for (const bx of tableau.boxes)
+          if (bx.material === MAT_WALL)
+            expect(chevauche(plot, bx), `${tableau.code} · ${id}`).toBe(false)
+      }
+      expect(dedans(zones.tableDepart, b)).toBe(true)
+      expect(dedans(zones.sasScelle, b)).toBe(true)
+      // le budget du moteur : 96 boîtes rendues, sas et parois comprises
+      expect(tableau.boxes.length).toBeLessThanOrEqual(90)
+    }
+  })
+
+  it('le bac d’essai complète le placard : chaudière, membrane, rideau, surchauffeur', () => {
+    for (const tableau of [TABLEAU_HUB, TABLEAU_HUB_COMPACT]) {
+      const mats = new Set(tableau.boxes.map((bx) => bx.material))
+      for (const mat of [MAT_CHAUD, MAT_MEMBRANE, MAT_RIDEAU, MAT_SURCHAUFFEUR])
+        expect(mats.has(mat), `${tableau.code} · mat ${mat}`).toBe(true)
+    }
+  })
+
+  it('la signalétique v5 annonce le scellé, la table et le bac', () => {
+    for (const tableau of [TABLEAU_HUB, TABLEAU_HUB_COMPACT]) {
+      const textes = tableau.labels.map((l) => l.text).join(' · ')
+      expect(textes).toContain('LE SECTEUR SCELLÉ|CE QUI DOIT PARTIR')
+      expect(textes).toContain('LA TABLE DE DÉPART|CE QUE VOUS EMPORTEZ')
+      expect(textes).toContain('LE BAC D’ESSAI|TOUTES LES SURFACES, SANS ENJEU')
+      expect(textes).toContain('LE MUR DES RECORDS|BANC OPTIQUE DES CALIBRATIONS')
+      expect(textes).toContain('LE DISTILLATEUR|LA PRIME DU RETOUR')
     }
   })
 })

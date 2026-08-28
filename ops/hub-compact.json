@@ -195,6 +195,58 @@
       "maxY": -440,
       "material": 0,
       "skin": 5
+    },
+    {
+      "minX": 1540,
+      "minY": 560,
+      "maxX": 1600,
+      "maxY": 800,
+      "material": 0,
+      "skin": 4
+    },
+    {
+      "minX": 2000,
+      "minY": 560,
+      "maxX": 2060,
+      "maxY": 800,
+      "material": 0,
+      "skin": 4
+    },
+    {
+      "minX": 1350,
+      "minY": 120,
+      "maxX": 1700,
+      "maxY": 200,
+      "material": 0,
+      "skin": 7
+    },
+    {
+      "minX": -1700,
+      "minY": -700,
+      "maxX": -1560,
+      "maxY": -640,
+      "material": 6
+    },
+    {
+      "minX": -1500,
+      "minY": -700,
+      "maxX": -1360,
+      "maxY": -640,
+      "material": 7
+    },
+    {
+      "minX": -1300,
+      "minY": -700,
+      "maxX": -1160,
+      "maxY": -640,
+      "material": 8
+    },
+    {
+      "minX": -1100,
+      "minY": -700,
+      "maxX": -960,
+      "maxY": -640,
+      "material": 9
     }
   ],
   "sponges": [],
@@ -351,6 +403,67 @@
       "x": 2540,
       "y": -270,
       "text": "GRILLE|SEUL LE SOUFFLE PASSE",
+      "tone": "grille"
+    },
+    {
+      "x": 1800,
+      "y": 730,
+      "text": "LE SECTEUR SCELLÉ|CE QUI DOIT PARTIR",
+      "tone": "sas",
+      "rang": "secteur"
+    },
+    {
+      "x": 1800,
+      "y": 480,
+      "text": "ACCÈS CONDAMNÉ|DEPUIS L’ACCIDENT",
+      "tone": "mur"
+    },
+    {
+      "x": 1520,
+      "y": 330,
+      "text": "LA TABLE DE DÉPART|CE QUE VOUS EMPORTEZ",
+      "tone": "sas"
+    },
+    {
+      "x": -1330,
+      "y": -300,
+      "text": "LE BAC D’ESSAI|TOUTES LES SURFACES, SANS ENJEU",
+      "tone": "mur"
+    },
+    {
+      "x": -1630,
+      "y": -560,
+      "text": "CHAUDIÈRE|ELLE VAPORISE",
+      "tone": "chaud"
+    },
+    {
+      "x": -1430,
+      "y": -480,
+      "text": "MEMBRANE|SEULE L’EAU PASSE",
+      "tone": "phile"
+    },
+    {
+      "x": -1230,
+      "y": -560,
+      "text": "RIDEAU|SEULE LA GLACE",
+      "tone": "froid"
+    },
+    {
+      "x": -1030,
+      "y": -480,
+      "text": "SURCHAUFFEUR|UN DASH EN VAPEUR",
+      "tone": "chaud"
+    },
+    {
+      "x": -700,
+      "y": 120,
+      "text": "LE MUR DES RECORDS|BANC OPTIQUE DES CALIBRATIONS",
+      "tone": "froid"
+    },
+    {
+      "x": 1340,
+      "y": -240,
+      "text": "LE DISTILLATEUR|LA PRIME DU RETOUR",
       "tone": "grille"
     },
     {

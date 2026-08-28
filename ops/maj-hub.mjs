@@ -2,7 +2,7 @@
 // tableau de code 'HUB' AVANT le code (hubLevel) : tant que l'instantané
 // « le-module-meduse-compact » reste l'ancien, aucune refonte du hub
 // n'atteint les joueurs. Ce script REMPLACE cette entrée (POST avec son id,
-// sémantique saveLevel) par ops/hub-compact-v4.json — généré depuis
+// sémantique saveLevel) par ops/hub-compact.json — généré depuis
 // TABLEAU_HUB_COMPACT, gardé conforme par src/game/hubExport.spec.ts.
 //
 // Même gâchette que les semis : l'environnement d'analyse ne joint pas
@@ -13,7 +13,7 @@
 import { readFileSync } from 'node:fs'
 
 const API = process.env.API ?? 'https://sujet21.vercel.app/api/levels'
-const v4 = JSON.parse(readFileSync(new URL('./hub-compact-v4.json', import.meta.url), 'utf8'))
+const v4 = JSON.parse(readFileSync(new URL('./hub-compact.json', import.meta.url), 'utf8'))
 
 const get = await fetch(API, { cache: 'no-store' })
 if (!get.ok) throw new Error(`GET ${get.status}`)
