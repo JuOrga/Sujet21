@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 19:00',
+    title: 'Les mémoires reviennent au croquis : goutte, glaçon, perles sur le fil',
+    notes: [
+      'Demandé : repartir du schéma papier — aéré — avec une goutte pour LIQUIDE, un beau glaçon pour SOLIDE, des liens évidents, et autre chose que des rectangles autour des transformations. C’est fait : la scène est recomposée sur le plan du croquis. La colonne des états au centre (le glaçon taillé en isométrie, trois faces de glace et son flocon gravé ; la goutte, pointe en haut, ventre rond, un reflet ; la nuée de GAZ inchangée), quatre arceaux intérieurs symétriques — à gauche on QUITTE le liquide, à droite on le REJOINT — et les deux grands arcs au large pour sublimation et condensation.',
+      'LES LIENS SE LISENT ENFIN : chaque trait part du bord d’une forme et arrive au bord de l’autre (l’épaule de la goutte, l’angle du glaçon, le flanc de la nuée), et des POINTES DE FLÈCHE OUVERTES — celles du croquis — sont semées le long du trait : le sens se voit sans réfléchir. Les rectangles ont disparu : chaque transformation est une CAPSULE enfilée sur SON trait, comme une perle sur un fil — le lien entre dessous et ressort au-dessus, plus aucun panneau posé sur le trait d’un autre. Le survol isole toujours le lien concerné.',
+      'ET L’OUTIL CONCEPTEUR : un bouton ⟲ RÉINITIALISER, en coin de l’écran, visible seulement en mode concepteur (la même porte que l’éditeur et le pupitre). Un clic détisse TOUS les liens du cycle et rembourse la mémoire dépensée — de quoi rejouer la progression à volonté ; les verrous narratifs, eux, ne bougent pas, ils appartiennent au scénario. Vérifié dans le vrai écran en 1280×800 : refus à solde insuffisant, réinitialisation 42 → 67 (10 + 15 remboursés), re-tissage au clic 67 → 57. Au passage, l’en-tête ne déborde plus : le ✕ FERMER reste à l’écran même en fenêtre étroite. 449 tests verts.',
+    ],
+  },
+  {
     date: '28/08/2026 17:20',
     title: 'Le méta arrive dans le hub JOUÉ : le module compact équipé',
     notes: [

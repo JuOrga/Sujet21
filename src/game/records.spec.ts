@@ -124,6 +124,17 @@ describe('Records — les registres du labo', () => {
     expect(new Records(ancien).fioles()).toEqual([])
   })
 
+  it('réinitialiser le cycle (outil concepteur) : détisse et rembourse', () => {
+    const r = new Records(memoryStorage())
+    r.gagneMemoire(30)
+    expect(r.acquiertEveil('solidification', 10)).toBe(true)
+    expect(r.acquiertEveil('vaporisation', 15)).toBe(true)
+    expect(r.memoire()).toBe(5)
+    r.reinitialiseCycle(25)
+    expect(r.eveilAcquis()).toEqual([])
+    expect(r.memoire()).toBe(30) // la mémoire dépensée est revenue
+  })
+
   it('la dispersion clôt l’essai : le n° d’échantillon avance', () => {
     const r = new Records(memoryStorage())
     expect(r.essaiNumber()).toBe(1)
