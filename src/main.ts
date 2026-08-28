@@ -474,6 +474,13 @@ let voieRang = 0
 // se font au contact des alcôves de l'étal.
 let economatIntercalaire: LevelDef | null = null
 let economatVisiteCetteRun = false
+// APPELER LE SEMBLABLE (outil de conception, banc et pupitre) : l'Économat
+// s'intercale d'ordinaire tout seul, une fois par run et à mi-descente —
+// impossible à convoquer pour l'essayer. Armé ici, il prend la prochaine
+// salle quoi qu'il arrive, même déjà visité cette run. Le drapeau ne
+// s'efface QUE lorsqu'il a servi : armé au hub, il tient jusqu'à la
+// première traversée ; armé en salle, il ouvre la suivante.
+let economatForce = false
 // la CLEF DE CACHETTE achetée : les voiles du PROCHAIN tableau tombent
 let clefCachette = false
 // les achats déjà servis dans CETTE visite de l'Économat, et l'état
@@ -6072,6 +6079,16 @@ function valideSalleCourante(): string {
   return 'ok'
 }
 
+// Arme l'Économat pour la prochaine salle. Rien n'est déplacé tout de
+// suite : c'est la traversée suivante qui l'intercale, comme le ferait la
+// mi-descente — le chemin est le vrai, seul le déclenchement est forcé.
+function appelleEconomat(): string {
+  if (testLevel) return 'essai'
+  if (estEconomat(level)) return 'dedans'
+  economatForce = true
+  return auHub ? 'hub' : 'ok'
+}
+
 function simuleBonbonne(surplus = 2): void {
   montreMiseEnBonbonne({
     surplus,
@@ -6132,6 +6149,19 @@ function lanceManoeuvre(quoi: string): void {
       return
     }
     switch (quoi) {
+      case 'economat': {
+        const r = appelleEconomat()
+        pupDit(
+          r === 'ok'
+            ? 'Le Semblable est appelé : l’Économat prendra la prochaine salle — la salle choisie à la cérémonie attendra sa sortie. (Avec « Valider la salle en cours », il est là en deux gestes.)'
+            : r === 'hub'
+              ? 'Le Semblable est appelé : l’Économat s’intercalera dès la première salle franchie de la descente.'
+              : r === 'dedans'
+                ? 'Vous y êtes déjà — c’est l’Économat.'
+                : 'Pas d’Économat dans un essai de tableau : lancez une descente.',
+        )
+        break
+      }
       case 'valider-salle': {
         const r = valideSalleCourante()
         if (r === 'ok') {
@@ -6516,10 +6546,11 @@ function avanceSalle(): void {
   // à la cérémonie (salleChoisie) attend sagement la sortie de l'annexe.
   if (economatIntercalaire && estEconomat(level)) {
     economatIntercalaire = null
-  } else if (!auHub && !testLevel && !economatVisiteCetteRun) {
+  } else if (!auHub && !testLevel && (economatForce || !economatVisiteCetteRun)) {
     const total = modeVoie ? voiePlan.longueur : playedLevels().length
     const rang = modeVoie ? voieRang : levelIndex + 1
-    if (total >= 4 && rang >= Math.floor(total / 2)) {
+    if (economatForce || (total >= 4 && rang >= Math.floor(total / 2))) {
+      economatForce = false // il a servi
       economatVisiteCetteRun = true
       economatIntercalaire = TABLEAU_ECONOMAT
       voieIntercalaire = null // la salle précédente est franchie

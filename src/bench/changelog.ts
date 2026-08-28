@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 18:47',
+    title: 'APPELER LE SEMBLABLE : l’Économat se convoque depuis le banc',
+    notes: [
+      'Demandé : pouvoir déclencher le marchand ambulant — le Charon de la descente — pour être sûr de le voir arriver dans les salles à venir. L’Économat s’intercalait jusqu’ici tout seul, une fois par run et seulement passé la mi-descente : impossible à convoquer pour l’essayer, et impossible à revoir une fois visité. La manœuvre « Appeler le Semblable » (pupitre, donc aussi banc de réglage) l’arme : il prendra la PROCHAINE salle, quel que soit le rang, même s’il a déjà servi cette run.',
+      'Rien n’est déplacé sur-le-champ : c’est la traversée suivante qui l’intercale, exactement comme le ferait la mi-descente — le chemin est le vrai, seul le déclenchement est forcé. La salle choisie à la cérémonie n’est pas perdue : elle attend sagement la sortie de l’annexe, comme d’habitude. Le drapeau ne s’efface que lorsqu’il a servi : armé au hub, il tient jusqu’à la première salle franchie ; armé en salle, il ouvre la suivante. Avec « Valider la salle en cours », le Semblable est donc là en deux gestes.',
+      'Vérifié dans le jeu construit, descente réelle : appel depuis le pupitre en salle 1, validation, cérémonie traversée — et l’étal est là, HUD « ÉCONOMAT », les quatre alcôves affichées avec leurs prix en condensat. Le refus est dit quand il n’y a rien à appeler (essai de tableau hors expédition, ou déjà dans l’Économat). 448 tests verts, build propre.',
+    ],
+  },
+  {
     date: '28/08/2026 18:20',
     title:
       'La présentation de salle revient partout, et le DOSSIER DE DESCENTE s’ouvre',
