@@ -22,8 +22,19 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 14:06',
+    title:
+      'LES MÉMOIRES v2 : le projecteur volumétrique (maquette du concepteur)',
+    notes: [
+      'L’écran des mémoires est refait sur la maquette validée par le concepteur — cible PC / console / Steam Deck, le mobile mis de côté pour l’instant. Fini le voile-modale en portrait : un ÉCRAN-INSTRUMENT plein cadre, en paysage. L’en-tête porte le titre (LES MÉMOIRES — projecteur volumétrique · cycle des états) et le SOLDE avec sa JAUGE : elle se remplit vers le lien à tisser le plus cher encore hors de portée — pleine, tout ce qui reste est payable.',
+      'À gauche, le CYCLE PROJETÉ : l’octogone SOLIDE (glace), la sphère-projecteur LIQUIDE au cœur lumineux (l’origine), la nuée GAZ (vapeur) sans contour, l’ENTITÉ INCONNUE en cercle violet qui vacille — et les transformations en PLAQUES rectangulaires posées sur les liens, sublimation et condensation écrites LE LONG de leurs grands arcs, les cartes du mystère penchées près du gaz. La LÉGENDE fait loi, cinq écritures de trait : acquise d’origine (tirets verts), tissée (la matière COULE — tirets qui voyagent), à tisser payable (pointillés francs), à tisser solde insuffisant (pointillés éteints), mystère (voilé violet).',
+      'À droite, le REGISTRE DES TRANSFORMATIONS : une ligne par lien — nom, trajet (SOLIDE → LIQUIDE…), statut ou action « ▸ TISSER · 60 ». Le tissage se fait des DEUX mains, plaque du projecteur ou ligne du registre — même lien, même geste ; un refus secoue ce qu’on a touché, sans rien débiter. Vérifié dans le jeu construit en 1280×800 (la définition du Deck) : tout tient sans défilement, tissage de la sublimation depuis le registre (75 → 15, l’arc se met à couler), condensation passée à « solde insuffisant », jauge à 25 %. 434 tests verts.',
+    ],
+  },
+  {
     date: '28/08/2026 13:01',
-    title: 'La BONBONNE DE SECOURS se voit enfin : une fiole qui se remplit, sous le litrage',
+    title:
+      'La BONBONNE DE SECOURS se voit enfin : une fiole qui se remplit, sous le litrage',
     notes: [
       'Demandé : que la réserve quitte la rangée de pastilles pour venir EN HAUT À GAUCHE, sous le litrage, sous la forme d’une bonbonne qui se remplit de ce qu’on a mis de côté. C’est fait — une fiole de verre dessinée au trait, dont le NIVEAU suit la réserve : il monte et descend à vue, jamais d’un coup, et la surface ondule sans fin (deux vagues, deux allures). Un toucher la verse, comme avant.',
       'Deux rappels, comme demandé. AU DÉBUT DU TABLEAU, la fiole se pose (elle grandit d’un rien) pendant qu’un éclat balaie le verre et que le niveau remonte de zéro sous les yeux : on se souvient qu’on a de quoi tenir. ET QUAND LA DERNIÈRE GOUTTE APPROCHE — le corps sous 1,7 fois le seuil critique — elle bat doucement, halo vert menthe, tant que le versement peut vraiment renflouer. Jamais pour rien : réserve vide ou corps plein, elle reste immobile. Les animations se coupent si la machine demande qu’on l’épargne.',

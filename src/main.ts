@@ -132,6 +132,7 @@ import {
 } from './game/condensat'
 import { FIOLES, FIOLES_SLOTS, fioleDef } from './game/fioles'
 import {
+  ETATS_CYCLE,
   TRANSFOS_CYCLE,
   transfoAchetable,
   transfoCycle,
@@ -1862,56 +1863,97 @@ recordsEl.addEventListener('pointerdown', (e) => {
 // habille : chaque lien porte son statut — TISSÉ (le flux anime le trait),
 // À TISSER (cliquer la bulle achète, si la mémoire suffit), MYSTÈRE.
 const cycleEl = document.getElementById('cycle') as HTMLDivElement
+const cycleEcran = document.getElementById('cycle-ecran') as HTMLDivElement
 const cycleScene = document.getElementById('cycle-scene') as HTMLDivElement
+const cycleRegListe = document.getElementById(
+  'cycle-reg-liste',
+) as HTMLDivElement
+/** Le STATUT d'un lien, celui de la légende : acquise d'origine · tissée
+ * (la matière coule) · à tisser payable · à tisser, solde insuffisant ·
+ * mystère. Il pilote le trait, la plaque ET la ligne du registre. */
+function statutTransfo(
+  t: (typeof TRANSFOS_CYCLE)[number],
+  acquis: readonly string[],
+  solde: number,
+): 'origine' | 'tenue' | 'payable' | 'verrou' | 'mystere' {
+  if (t.etat === 'mystere') return 'mystere'
+  if (t.etat === 'acquis-depart') return 'origine'
+  if (transfoTenue(t.id, acquis)) return 'tenue'
+  return solde >= t.cout ? 'payable' : 'verrou'
+}
+const CY_STATUTS = [
+  'cy-origine',
+  'cy-tenue',
+  'cy-payable',
+  'cy-verrou',
+  'cy-mystere',
+]
 function renderCycleVoile(): void {
   const acquis = records.eveilAcquis()
   const solde = records.memoire()
-  const titre = document.getElementById('cycle-titre')
-  if (titre) titre.textContent = `LES MÉMOIRES — mémoire disponible : ${solde}`
+  const soldeEl = document.getElementById('cycle-solde-n')
+  if (soldeEl) soldeEl.textContent = String(solde)
+  // la jauge se remplit vers le lien à tisser le plus cher : pleine, tout
+  // ce qui reste est payable (ou tout est tissé)
+  const restants = TRANSFOS_CYCLE.filter(
+    (t) => statutTransfo(t, acquis, solde) === 'verrou',
+  ).map((t) => t.cout)
+  const cible = restants.length > 0 ? Math.max(...restants) : 0
+  const jauge = document.querySelector<HTMLElement>('#cycle-jauge b')
+  if (jauge)
+    jauge.style.width = `${cible > 0 ? Math.min(100, (solde / cible) * 100) : 100}%`
+  let registre = ''
   for (const t of TRANSFOS_CYCLE) {
-    const bulle = cycleScene.querySelector<HTMLElement>(
-      `.cy-transfo[data-transfo="${t.id}"]`,
-    )
-    const lien = cycleScene.querySelector<SVGPathElement>(
-      `path[data-transfo="${t.id}"]`,
-    )
-    if (!bulle) continue // le retour du plasma partage la bulle du mystère
-    const tenue = transfoTenue(t.id, acquis)
-    const statut =
-      t.etat === 'mystere' ? 'mystere' : tenue ? 'tenue' : 'a-tisser'
-    bulle.classList.toggle('cy-tenue', statut === 'tenue')
-    bulle.classList.toggle('cy-a-tisser', statut === 'a-tisser')
-    bulle.classList.toggle('cy-mystere', statut === 'mystere')
-    bulle.classList.toggle(
-      'cy-payable',
-      statut === 'a-tisser' && solde >= t.cout,
-    )
+    const statut = statutTransfo(t, acquis, solde)
     const sous =
       statut === 'mystere'
         ? '???'
-        : tenue
-          ? t.etat === 'acquis-depart'
-            ? 'ACQUISE D’ORIGINE'
-            : 'TISSÉE'
-          : `${t.cout} mémoire`
-    bulle.innerHTML = `<b>${t.nom}</b><span>${sous}</span>`
-    bulle.title = t.desc
-    lien?.setAttribute('data-etat', statut)
+        : statut === 'origine'
+          ? 'ACQUISE D’ORIGINE'
+          : statut === 'tenue'
+            ? 'TISSÉE'
+            : statut === 'payable'
+              ? `▸ TISSER · ${t.cout}`
+              : `TISSER · ${t.cout}`
+    const plaque = cycleScene.querySelector<HTMLElement>(
+      `.cy-transfo[data-transfo="${t.id}"]`,
+    )
+    if (plaque) {
+      plaque.classList.remove(...CY_STATUTS, 'cy-refus')
+      plaque.classList.add(`cy-${statut}`)
+      plaque.innerHTML = `<b>${t.nom}</b><span>${sous}</span>`
+      plaque.title = t.desc
+    }
+    cycleScene
+      .querySelector<SVGPathElement>(`path[data-transfo="${t.id}"]`)
+      ?.setAttribute('data-etat', statut)
+    const de = ETATS_CYCLE[t.de].nom
+    const vers = ETATS_CYCLE[t.vers].nom
+    registre += `<button type="button" class="cy-reg cy-${statut}" data-transfo="${t.id}" title="${t.desc}"><span><b>${t.nom}</b><small>${de} → ${vers}</small></span><em>${sous}</em></button>`
   }
+  cycleRegListe.innerHTML = registre
 }
-cycleScene.addEventListener('click', (e) => {
-  const bulle = (e.target as HTMLElement).closest(
-    '.cy-transfo',
+// Le tissage se fait des DEUX mains : la plaque du projecteur ou la ligne
+// du registre — même lien, même geste. Un refus secoue ce qu'on a touché.
+cycleEcran.addEventListener('click', (e) => {
+  const cible = (e.target as HTMLElement).closest(
+    '.cy-transfo, .cy-reg',
   ) as HTMLElement | null
-  if (!bulle) return
-  const t = transfoCycle(bulle.dataset.transfo ?? '')
+  if (!cible) return
+  const t = transfoCycle(cible.dataset.transfo ?? '')
   if (!t || !transfoAchetable(t.id, records.eveilAcquis())) return
   if (!records.acquiertEveil(t.id, t.cout)) {
-    // solde insuffisant : le titre le rappelle, la bulle proteste
+    // solde insuffisant : la jauge le rappelle, la plaque proteste
     renderCycleVoile()
-    bulle.classList.remove('cy-refus')
-    void bulle.offsetWidth // relance l'animation même en refus répété
-    bulle.classList.add('cy-refus')
+    const rendu = document.querySelector<HTMLElement>(
+      `.cy-reg[data-transfo="${t.id}"]`,
+    )
+    const proteste = cible.isConnected ? cible : rendu
+    if (proteste) {
+      proteste.classList.remove('cy-refus')
+      void proteste.offsetWidth // relance l'animation même en refus répété
+      proteste.classList.add('cy-refus')
+    }
     return
   }
   majMemoireUI()
