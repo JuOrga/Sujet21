@@ -129,13 +129,11 @@ import {
 } from './game/condensat'
 import { FIOLES, FIOLES_SLOTS, fioleDef } from './game/fioles'
 import {
-  BRANCHES_EVEIL,
-  NOEUDS_EVEIL,
-  facteurPeage,
-  noeudAchetable,
-  noeudTenu,
-  type BrancheEveil,
-} from './game/eveil'
+  TRANSFOS_CYCLE,
+  transfoAchetable,
+  transfoCycle,
+  transfoTenue,
+} from './game/cycle'
 import {
   ETAL_ECONOMAT,
   TABLEAU_ECONOMAT,
@@ -303,16 +301,6 @@ function gagneMemoireRun(n: number): void {
   run.memoireGagnee += majore
   majMemoireUI()
 }
-// ---- L'ARBRE DE L'ÉVEIL : les nœuds tenus s'appliquent au moteur ------
-// Le PÉAGE de vaporisation est le seul réglage partagé avec le banc : on
-// le recalcule depuis la valeur d'usine à chaque achat (un réglage du
-// banc survit jusqu'au prochain achat — c'est un outil d'atelier).
-function appliqueEveil(): void {
-  params.vaporTollFrac =
-    DEFAULT_PARAMS.vaporTollFrac * facteurPeage(records.eveilAcquis())
-}
-appliqueEveil()
-
 // L'HÉRITAGE : l'ancien condensat persistant (d'avant la purge) devient de
 // la mémoire, une fois pour toutes — 10 cL de matière = 1 souvenir. La clé
 // disparaît ensuite : rien ne se migre deux fois.
@@ -369,19 +357,12 @@ function createSim(level: LevelDef): FluidSim {
   // Instruments embarqués : la buse calibrée agrandit la réserve d'un dash,
   // l'aimant à rosée bonifie la recondensation
   if (run.instruments.includes('buse-calibree')) sim.dashBudgetMax += 1
-  // L'ÉVEIL : le souffle long ajoute son dash de réserve
-  if (records.eveilTient('souffle')) sim.dashBudgetMax += 1
   if (run.instruments.includes('aimant-rosee')) sim.recondBonus = 0.35
   const naitVapeur =
     zoneForceAt(level, level.spawn.x, level.spawn.y) === 'vapeur'
   sim.dashBudget = sim.dashBudgetMax
   sim.setLevel(level.boxes, level.sponges)
-  // L'ÉVEIL : le corps ample naît avec 40 gouttes de plus
-  const nDepart = Math.min(
-    CAPACITY,
-    level.spawn.n + (records.eveilTient('volume') ? 40 : 0),
-  )
-  sim.spawnDisc(level.spawn.x, level.spawn.y, nDepart, KIND_PLAYER)
+  sim.spawnDisc(level.spawn.x, level.spawn.y, level.spawn.n, KIND_PLAYER)
   // né dans une zone qui impose la vapeur : le corps EST un nuage dès la
   // première image — sinon le compteur annonce des dashs qui ne partent pas,
   // le temps que la vaporisation progressive s'achève
@@ -1863,74 +1844,77 @@ recordsEl.addEventListener('pointerdown', (e) => {
   if (e.target === recordsEl) recordsEl.hidden = true
 })
 
-// ---- Le voile de L'ÉVEIL : l'arbre de conscience -----------------------
-// Les branches suivent le schéma des états ; un nœud achetable se prend
-// d'un clic (la mémoire se débite, l'effet s'applique aussitôt).
-const eveilEl = document.getElementById('eveil') as HTMLDivElement
-const eveilCorps = document.getElementById('eveil-corps') as HTMLDivElement
-function renderEveilVoile(): void {
+// ---- Le voile des MÉMOIRES : le cycle des états ------------------------
+// Le diagramme (le croquis du concepteur) est posé en dur dans index.html :
+// trois états en colonne, l'entité mystère, les liens en SVG. Ici on
+// habille : chaque lien porte son statut — TISSÉ (le flux anime le trait),
+// À TISSER (cliquer la bulle achète, si la mémoire suffit), MYSTÈRE.
+const cycleEl = document.getElementById('cycle') as HTMLDivElement
+const cycleScene = document.getElementById('cycle-scene') as HTMLDivElement
+function renderCycleVoile(): void {
   const acquis = records.eveilAcquis()
-  const titre = document.getElementById('eveil-titre')
-  if (titre)
-    titre.textContent = `L’ÉVEIL — mémoire disponible : ${records.memoire()}`
-  let html = ''
-  const branches: BrancheEveil[] = [
-    'liquide',
-    'solidification',
-    'vaporisation',
-    'transitions',
-    'plasma',
-  ]
-  for (const b of branches) {
-    html += `<div class="eveil-branche">${BRANCHES_EVEIL[b]}</div>`
-    html += '<div class="cdx-grille">'
-    for (const n of NOEUDS_EVEIL.filter((x) => x.branche === b)) {
-      const tenu = noeudTenu(n.id, acquis)
-      const achetable = noeudAchetable(n.id, acquis)
-      const etiquette = tenu
-        ? n.etat === 'pre-acquis'
-          ? ' · ACQUIS D’ORIGINE'
-          : ' · ACQUIS'
-        : n.etat === 'a-venir'
-          ? ' · À VENIR'
-          : ` · ${n.cout} mémoire`
-      const style = tenu
-        ? ';outline:2px solid #6dffb8'
-        : achetable
-          ? ';cursor:pointer'
-          : ';opacity:0.55'
-      const cls = achetable || tenu ? 'cdx-carte' : 'cdx-carte cdx-verrou'
-      const data = achetable ? ` data-noeud="${n.id}"` : ''
-      html += `<div class="${cls}"${data} style="min-width:260px${style}"><i>${n.icone}</i><div><b>${n.nom}${etiquette}</b><span>${n.desc}</span></div></div>`
-    }
-    html += '</div>'
+  const solde = records.memoire()
+  const titre = document.getElementById('cycle-titre')
+  if (titre) titre.textContent = `LES MÉMOIRES — mémoire disponible : ${solde}`
+  for (const t of TRANSFOS_CYCLE) {
+    const bulle = cycleScene.querySelector<HTMLElement>(
+      `.cy-transfo[data-transfo="${t.id}"]`,
+    )
+    const lien = cycleScene.querySelector<SVGPathElement>(
+      `path[data-transfo="${t.id}"]`,
+    )
+    if (!bulle) continue // le retour du plasma partage la bulle du mystère
+    const tenue = transfoTenue(t.id, acquis)
+    const statut =
+      t.etat === 'mystere' ? 'mystere' : tenue ? 'tenue' : 'a-tisser'
+    bulle.classList.toggle('cy-tenue', statut === 'tenue')
+    bulle.classList.toggle('cy-a-tisser', statut === 'a-tisser')
+    bulle.classList.toggle('cy-mystere', statut === 'mystere')
+    bulle.classList.toggle(
+      'cy-payable',
+      statut === 'a-tisser' && solde >= t.cout,
+    )
+    const sous =
+      statut === 'mystere'
+        ? '???'
+        : tenue
+          ? t.etat === 'acquis-depart'
+            ? 'ACQUISE D’ORIGINE'
+            : 'TISSÉE'
+          : `${t.cout} mémoire`
+    bulle.innerHTML = `<b>${t.nom}</b><span>${sous}</span>`
+    bulle.title = t.desc
+    lien?.setAttribute('data-etat', statut)
   }
-  eveilCorps.innerHTML = html
 }
-eveilCorps.addEventListener('click', (e) => {
-  const carte = (e.target as HTMLElement).closest('[data-noeud]')
-  if (!carte) return
-  const id = carte.getAttribute('data-noeud') ?? ''
-  const n = NOEUDS_EVEIL.find((x) => x.id === id)
-  if (!n || !noeudAchetable(id, records.eveilAcquis())) return
-  if (!records.acquiertEveil(id, n.cout)) {
-    renderEveilVoile() // solde insuffisant : le titre le rappelle
+cycleScene.addEventListener('click', (e) => {
+  const bulle = (e.target as HTMLElement).closest(
+    '.cy-transfo',
+  ) as HTMLElement | null
+  if (!bulle) return
+  const t = transfoCycle(bulle.dataset.transfo ?? '')
+  if (!t || !transfoAchetable(t.id, records.eveilAcquis())) return
+  if (!records.acquiertEveil(t.id, t.cout)) {
+    // solde insuffisant : le titre le rappelle, la bulle proteste
+    renderCycleVoile()
+    bulle.classList.remove('cy-refus')
+    void bulle.offsetWidth // relance l'animation même en refus répété
+    bulle.classList.add('cy-refus')
     return
   }
-  appliqueEveil()
   majMemoireUI()
   audio.collect()
-  renderEveilVoile()
+  renderCycleVoile()
 })
-document.getElementById('home-eveil')?.addEventListener('click', () => {
-  eveilEl.hidden = false
-  renderEveilVoile()
+document.getElementById('home-cycle')?.addEventListener('click', () => {
+  cycleEl.hidden = false
+  renderCycleVoile()
 })
-document.getElementById('eveil-fermer')?.addEventListener('click', () => {
-  eveilEl.hidden = true
+document.getElementById('cycle-fermer')?.addEventListener('click', () => {
+  cycleEl.hidden = true
 })
-eveilEl.addEventListener('pointerdown', (e) => {
-  if (e.target === eveilEl) eveilEl.hidden = true
+cycleEl.addEventListener('pointerdown', (e) => {
+  if (e.target === cycleEl) cycleEl.hidden = true
 })
 
 // ---- Le voile FIOLES : la collection d'échantillons scellés ------------
@@ -6075,13 +6059,13 @@ for (const b of Array.from(
         }
         break
       }
-      case 'eveil':
-        // l'arbre s'ouvre PAR-DESSUS le pupitre : on achète, on referme,
-        // le pupitre est toujours là
-        eveilEl.hidden = false
-        renderEveilVoile()
+      case 'cycle':
+        // l'écran des mémoires s'ouvre PAR-DESSUS le pupitre : on tisse,
+        // on referme, le pupitre est toujours là
+        cycleEl.hidden = false
+        renderCycleVoile()
         pupDit(
-          `L’arbre de l’Éveil est ouvert — mémoire disponible : ${records.memoire()}.`,
+          `L’écran des mémoires est ouvert — mémoire disponible : ${records.memoire()}.`,
         )
         break
       case 'vie':
@@ -7116,14 +7100,8 @@ function newExpedition(): void {
   levelIndex = 0
   run.bonbonneLiters = 0
   run.runTime = 0
-  // la fiole de SECOND SOUFFLE et l'Éveil « l'échantillon prudent » :
-  // chacun ajoute son échantillon de secours au départ
-  run.vies = Math.min(
-    VIES_MAX,
-    1 +
-      (fioleActive('second-souffle') ? 1 : 0) +
-      (records.eveilTient('coque') ? 1 : 0),
-  )
+  // la fiole de SECOND SOUFFLE ajoute son échantillon de secours au départ
+  run.vies = Math.min(VIES_MAX, 1 + (fioleActive('second-souffle') ? 1 : 0))
   run.conclues = 0
   run.instruments = []
   run.xp = 0
@@ -8359,10 +8337,7 @@ function frame(now: number): void {
     const rayon = (RAYON_PASTILLE + 14) * (fioleActive('aimant') ? 1.6 : 1)
     const bues = absorbePastilles(pastilles, pastillesPrises, sim, rayon)
     for (const i of bues) {
-      // l'Éveil « la matière retenue » : les pastilles rendent +25 %
-      const cl = Math.round(
-        pastilles[i].cl * (records.eveilTient('bourse') ? 1.25 : 1),
-      )
+      const cl = pastilles[i].cl
       gagneCondensat(cl)
       run.pastillesCl += cl
       audio.collect()

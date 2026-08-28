@@ -979,11 +979,79 @@
         letter-spacing: 0.14em;
         margin-right: 8px;
       }
-      #records[hidden], #codex[hidden], #fioles[hidden], #eveil[hidden] { display: none; }
-      #eveil { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(4, 8, 14, 0.72); }
-      #eveil .salles-boite { max-height: 86vh; overflow: auto; width: min(980px, 96vw); }
-      #eveil-corps { padding: 6px 12px 14px; }
-      .eveil-branche { margin: 14px 0 4px; font-size: 12px; letter-spacing: 0.14em; color: #8fb8d8; }
+      #records[hidden], #codex[hidden], #fioles[hidden], #cycle[hidden] { display: none; }
+      /* ---- L'écran des MÉMOIRES : le cycle des états (croquis du 28/08).
+         Une colonne d'états — solide, liquide, gaz — l'entité mystère en
+         bas à droite, les transformations en bulles posées sur les liens.
+         La scène est un repère 1000 × 1240 : le SVG des liens s'y étire
+         (preserveAspectRatio none) et l'aspect-ratio CSS verrouille le
+         même ratio — les bulles en % restent donc SUR leurs liens. ---- */
+      #cycle { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(4, 8, 14, 0.72); }
+      /* la largeur suit aussi la HAUTEUR disponible : la scène (ratio 1000/1240,
+         ~250 px d'en-tête au-dessus) tient alors entière à l'écran — le cycle se
+         lit d'un regard, sans défilement (il reste possible sur tout petit écran) */
+      #cycle .salles-boite { max-height: 92vh; overflow: auto; width: min(680px, 96vw, calc((92vh - 250px) / 1.24)); }
+      #cycle-scene { position: relative; aspect-ratio: 1000 / 1240; margin: 2px 8px 10px; }
+      #cycle-scene svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+      #cycle-scene svg path { fill: none; stroke-width: 2.5; }
+      /* le lien TISSÉ coule : les tirets voyagent DANS le sens de la
+         transformation — la flèche dit où l'on va, le flux le confirme */
+      #cycle-scene path[data-etat='tenue'] { stroke-dasharray: 9 13; animation: cy-flux 1.5s linear infinite; opacity: 0.95; }
+      #cycle-scene path[data-etat='a-tisser'] { stroke-dasharray: 3 8; opacity: 0.4; }
+      #cycle-scene path[data-etat='mystere'] { stroke-dasharray: 2 9; opacity: 0.28; }
+      @keyframes cy-flux { to { stroke-dashoffset: -22; } }
+      /* ---- les ÉTATS : chaque bulle a la forme de sa matière ---- */
+      .cy-etat { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-family: var(--font-display); letter-spacing: 0.18em; color: var(--ink); text-align: center; }
+      .cy-etat i { font-style: normal; font-size: 30px; line-height: 1; }
+      .cy-etat b { font-size: 11px; font-weight: 600; }
+      .cy-etat small { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.08em; color: var(--dim); }
+      /* SOLIDE : l'octogone cristallin, facettes et scintillement */
+      #cy-solide { left: 50%; top: 15.3%; width: 24%; aspect-ratio: 1.18; clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%); background: linear-gradient(155deg, rgba(231, 246, 255, 0.85), rgba(167, 221, 245, 0.5) 45%, rgba(90, 140, 175, 0.35)); animation: cy-scintille 5s ease-in-out infinite; }
+      #cy-solide::before { content: ''; position: absolute; inset: 2.5px; clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%); background: linear-gradient(155deg, rgba(20, 38, 54, 0.96), rgba(14, 26, 40, 0.96)); }
+      #cy-solide > * { position: relative; }
+      @keyframes cy-scintille { 0%, 100% { filter: drop-shadow(0 0 6px rgba(167, 221, 245, 0.35)); } 50% { filter: drop-shadow(0 0 16px rgba(167, 221, 245, 0.7)); } }
+      /* LIQUIDE : la flaque vivante — le contour ondule sans fin */
+      #cy-liquide { left: 50%; top: 50%; width: 27%; aspect-ratio: 1.16; border: 1.5px solid rgba(99, 183, 230, 0.75); background: radial-gradient(ellipse at 38% 30%, rgba(99, 183, 230, 0.4), rgba(20, 44, 66, 0.92) 68%); box-shadow: 0 0 22px rgba(99, 183, 230, 0.28), inset 0 0 26px rgba(99, 183, 230, 0.16); animation: cy-flaque 7s ease-in-out infinite; }
+      @keyframes cy-flaque {
+        0%, 100% { border-radius: 46% 54% 55% 45% / 52% 44% 56% 48%; }
+        33% { border-radius: 55% 45% 42% 58% / 44% 57% 43% 56%; }
+        66% { border-radius: 42% 58% 56% 44% / 57% 46% 54% 43%; }
+      }
+      /* GAZ : la nuée — trois volutes floues qui dérivent doucement */
+      #cy-gaz { left: 50%; top: 84.7%; width: 27%; aspect-ratio: 1.5; border-radius: 50%; background: radial-gradient(ellipse at 50% 55%, rgba(242, 201, 142, 0.34), rgba(242, 201, 142, 0.05) 70%); box-shadow: 0 0 26px rgba(242, 201, 142, 0.2); animation: cy-nuee 9s ease-in-out infinite; }
+      #cy-gaz::before, #cy-gaz::after { content: ''; position: absolute; border-radius: 50%; background: radial-gradient(ellipse, rgba(242, 201, 142, 0.24), transparent 72%); }
+      #cy-gaz::before { left: -16%; top: 6%; width: 58%; height: 76%; }
+      #cy-gaz::after { right: -14%; top: 14%; width: 52%; height: 68%; animation: cy-nuee 9s ease-in-out -4.5s infinite; }
+      @keyframes cy-nuee { 0%, 100% { transform: translate(-50%, -50%); } 50% { transform: translate(-52.5%, -51.5%); } }
+      /* l'ENTITÉ MYSTÈRE : un contour qui hésite, une teinte qui vacille */
+      #cy-plasma { left: 82%; top: 92%; width: 17%; aspect-ratio: 1.1; border: 1.5px dashed rgba(201, 154, 255, 0.6); border-radius: 28% 72% 35% 65% / 65% 30% 70% 35%; background: radial-gradient(ellipse at 50% 45%, rgba(201, 154, 255, 0.2), rgba(30, 18, 48, 0.85) 75%); animation: cy-vacille 3.2s ease-in-out infinite; }
+      #cy-plasma i { color: #c99aff; }
+      @keyframes cy-vacille { 0%, 100% { opacity: 0.55; box-shadow: 0 0 8px rgba(201, 154, 255, 0.15); } 50% { opacity: 0.95; box-shadow: 0 0 20px rgba(201, 154, 255, 0.45); } }
+      /* ---- les TRANSFORMATIONS : les bulles posées sur les liens ---- */
+      .cy-transfo { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 7px 13px; border: 1px solid var(--line); border-radius: 999px; background: rgba(10, 20, 32, 0.92); font-family: var(--font-mono); text-align: center; white-space: nowrap; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+      .cy-transfo b { font-family: var(--font-display); font-size: 10px; letter-spacing: 0.16em; font-weight: 600; color: var(--ink); }
+      .cy-transfo span { font-size: 8.5px; letter-spacing: 0.06em; color: var(--dim); }
+      .cy-transfo.cy-tenue { border-color: rgba(109, 255, 184, 0.55); box-shadow: 0 0 12px rgba(109, 255, 184, 0.14); }
+      .cy-transfo.cy-tenue span { color: #6dffb8; }
+      .cy-transfo.cy-a-tisser { cursor: pointer; }
+      .cy-transfo.cy-a-tisser:hover { border-color: var(--specimen); }
+      /* la bulle PAYABLE respire : la mémoire suffit, elle appelle le clic */
+      .cy-transfo.cy-payable { animation: cy-appel 2.2s ease-in-out infinite; }
+      .cy-transfo.cy-payable span { color: var(--specimen); }
+      @keyframes cy-appel { 0%, 100% { box-shadow: 0 0 0 rgba(99, 183, 230, 0); } 50% { box-shadow: 0 0 14px rgba(99, 183, 230, 0.45); border-color: var(--specimen); } }
+      .cy-transfo.cy-mystere { opacity: 0.55; border-style: dashed; }
+      /* le REFUS (mémoire insuffisante) : la bulle secoue la tête */
+      .cy-transfo.cy-refus { animation: cy-non 0.35s ease; }
+      @keyframes cy-non { 0%, 100% { translate: 0 0; } 25% { translate: -5px 0; } 75% { translate: 5px 0; } }
+      /* les arcs extérieurs écrivent LE LONG du lien, comme sur le croquis */
+      #cy-t-sublimation { transform: translate(-50%, -50%) rotate(76deg); }
+      #cy-t-condensation { transform: translate(-50%, -50%) rotate(-76deg); }
+      #cy-t-sublimation.cy-refus, #cy-t-condensation.cy-refus { animation: none; }
+      @media (max-width: 560px) {
+        .cy-transfo { padding: 5px 8px; }
+        .cy-transfo b { font-size: 8.5px; letter-spacing: 0.1em; }
+        .cy-transfo span { font-size: 7.5px; }
+      }
       #fioles { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(4, 8, 14, 0.72); }
       #fioles .salles-boite { max-height: 86vh; overflow: auto; width: min(980px, 96vw); }
       #fioles-corps { padding: 6px 12px 14px; }
@@ -5030,7 +5098,7 @@
         <button id="home-records" type="button"><i>✦</i><span>RECORDS</span></button>
         <button id="home-codex" type="button" title="Le manuel écrit par la partie : chaque interaction découverte débloque sa fiche"><i>◉</i><span>CODEX</span></button>
         <button id="home-fioles" type="button" title="La collection d’échantillons scellés : deux fioles s’équipent pour la run"><i>⚗&#xFE0E;</i><span>FIOLES</span></button>
-        <button id="home-eveil" type="button" title="L’arbre de conscience du Sujet : les nœuds s’achètent en mémoire, leurs effets sont permanents"><i>❉</i><span>L’ÉVEIL</span></button>
+        <button id="home-cycle" type="button" title="L’écran des mémoires : le cycle des états — chaque transformation manuelle est un lien à tisser en mémoire"><i>⚛</i><span>LES MÉMOIRES</span></button>
         <button id="home-livraisons" type="button" data-dev><i>◈</i><span>NOTES DE VERSION</span></button>
         <button id="home-cmds" type="button"><i>⌘</i><span>COMMANDES</span></button>
         <button id="home-params" type="button"><i>⚙&#xFE0E;</i><span>PARAMÈTRES</span></button>
@@ -5484,7 +5552,7 @@
             <button type="button" data-pup="condensat"><b>Condensat +150 cL</b><small>de quoi payer une carte</small></button>
             <button type="button" data-pup="memoire"><b>Mémoire +25</b><small>la monnaie de l’Éveil</small></button>
             <button type="button" data-pup="fiole"><b>Fiole surprise</b><small>une fiole manquante rejoint la collection</small></button>
-            <button type="button" data-pup="eveil"><b>L’arbre de l’Éveil</b><small>ouvrir l’arbre de conscience (achats en mémoire)</small></button>
+            <button type="button" data-pup="cycle"><b>L’écran des mémoires</b><small>ouvrir le cycle des états (tissages en mémoire)</small></button>
             <button type="button" data-pup="vie"><b>Vie +1</b><small>échantillon de secours</small></button>
           </div>
           <div class="pup-sec">PONCTUATIONS SONORES</div>
@@ -5540,17 +5608,46 @@
       </div>
     </div>
 
-    <div id="eveil" hidden aria-label="L’Éveil">
+    <div id="cycle" hidden aria-label="Les mémoires">
       <div class="salles-boite">
-        <div class="salles-tete"><span id="eveil-titre">L’ÉVEIL — l’arbre de conscience</span>
-          <button type="button" id="eveil-fermer" aria-label="Fermer">✕</button></div>
+        <div class="salles-tete"><span id="cycle-titre">LES MÉMOIRES — le cycle des états</span>
+          <button type="button" id="cycle-fermer" aria-label="Fermer">✕</button></div>
         <div class="params-desc" style="padding: 8px 12px 0">
-          La MÉMOIRE survit à la purge — elle s’investit ici, pour toujours.
-          Les branches suivent les états de la matière : cliquer un nœud
-          achetable l’acquiert. Les pouvoirs d’état sont à vous d’origine ;
-          leur déblocage progressif s’activera avec la carte ISS.
+          La MÉMOIRE survit à la purge et se tisse ici, pour toujours. Chaque
+          lien du cycle est une transformation MANUELLE : tissé, son bouton
+          existe en descente. FUSION et LIQUÉFACTION sont acquises d’origine —
+          revenir au liquide n’est jamais un achat. Les régimes imposés du
+          décor (hublot fendu, conduite rompue, chaudière) transforment
+          toujours, eux — c’est même pour en revenir que les deux premiers
+          liens vous sont donnés.
         </div>
-        <div id="eveil-corps"></div>
+        <div id="cycle-scene">
+          <svg viewBox="0 0 1000 1240" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <marker id="cy-fleche" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="context-stroke" stroke="none"/>
+              </marker>
+            </defs>
+            <path data-transfo="solidification" stroke="#a7ddf5" d="M 448 528 C 330 445 330 345 448 262" marker-end="url(#cy-fleche)"/>
+            <path data-transfo="fusion" stroke="#63b7e6" d="M 552 262 C 670 345 670 445 552 528" marker-end="url(#cy-fleche)"/>
+            <path data-transfo="liquefaction" stroke="#63b7e6" d="M 448 978 C 330 895 330 795 448 712" marker-end="url(#cy-fleche)"/>
+            <path data-transfo="vaporisation" stroke="#f2c98e" d="M 552 712 C 670 795 670 895 552 978" marker-end="url(#cy-fleche)"/>
+            <path data-transfo="sublimation" stroke="#f2c98e" d="M 628 216 C 950 400 950 840 630 1022" marker-end="url(#cy-fleche)"/>
+            <path data-transfo="condensation" stroke="#a7ddf5" d="M 372 1022 C 50 840 50 400 370 216" marker-end="url(#cy-fleche)"/>
+            <path data-transfo="ionisation" stroke="#c99aff" d="M 618 1108 C 700 1140 730 1146 762 1150" marker-end="url(#cy-fleche)"/>
+          </svg>
+          <div class="cy-etat" id="cy-solide"><i>❄</i><b>SOLIDE</b></div>
+          <div class="cy-etat" id="cy-liquide"><i>💧</i><b>LIQUIDE</b><small>l’origine</small></div>
+          <div class="cy-etat" id="cy-gaz"><i>💨</i><b>GAZ</b></div>
+          <div class="cy-etat" id="cy-plasma"><i>?</i><b>???</b><small>entité inconnue</small></div>
+          <div class="cy-transfo" data-transfo="solidification" style="left: 33%; top: 32%"></div>
+          <div class="cy-transfo" data-transfo="fusion" style="left: 67%; top: 32%"></div>
+          <div class="cy-transfo" data-transfo="liquefaction" style="left: 33%; top: 68%"></div>
+          <div class="cy-transfo" data-transfo="vaporisation" style="left: 67%; top: 68%"></div>
+          <div class="cy-transfo" id="cy-t-sublimation" data-transfo="sublimation" style="left: 89.5%; top: 50%"></div>
+          <div class="cy-transfo" id="cy-t-condensation" data-transfo="condensation" style="left: 10.5%; top: 50%"></div>
+          <div class="cy-transfo" data-transfo="ionisation" style="left: 65%; top: 94%"></div>
+        </div>
       </div>
     </div>
     <div id="fioles" hidden aria-label="Fioles">
