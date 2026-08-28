@@ -233,6 +233,11 @@ export class FluidSim {
   iceBounceFactor = 1 // « patins de givre » : restitution du palet
   spongeGripFactor = 1 // « plastron » : prise de l'éponge
   criticalFactor = 1 // « vanne de secours » : seuil de dispersion
+  basculeFactor = 1 // vitesse des bascules d'état volontaires
+  perteGazFactor = 1 // évaporation du nuage au repos
+  perteGrilleFactor = 1 // vapeur perdue dans les mailles d'un évent
+  priseSasGlaceFactor = 1 // prise du courant du sas sur un palet
+  glisseGlaceFactor = 1 // prise de l'hydrophile sur la glace
   // Surchauffeurs déjà déchargés (indices de boîtes) — remis à neuf au
   // chargement du tableau. Le rendu lit ce même état pour le manomètre.
   readonly surchauffesVides = new Set<number>()
@@ -1375,7 +1380,7 @@ export class FluidSim {
         // dérive vers le sas au lieu d'attendre qu'on l'y jette.
         const boost = 1 + 1.5 * (1 - d / R)
         const vIn = p.exitPull * inv * boost * rim
-        const grip = 1 - Math.exp(-4 * p.exitIceGrip * dt)
+        const grip = 1 - Math.exp(-4 * p.exitIceGrip * this.priseSasGlaceFactor * dt)
         this.velX[i] += (ux * vIn - this.velX[i]) * grip
         this.velY[i] += (uy * vIn - this.velY[i]) * grip
         continue
@@ -1907,7 +1912,8 @@ export class FluidSim {
       if (this.hasGrille && this.grilleAt(this.posX[i], this.posY[i])) inMesh++
     }
     // péage de grille : proportionnel à la présence dans la maille
-    if (inMesh > 0) this.grilleCarry += inMesh * p.grilleGasLoss * dt
+    if (inMesh > 0)
+      this.grilleCarry += inMesh * p.grilleGasLoss * this.perteGrilleFactor * dt
     else this.grilleCarry = 0
     while (this.grilleCarry >= 1) {
       this.grilleCarry -= 1
@@ -1928,7 +1934,8 @@ export class FluidSim {
       this.vaporBank++
     }
     // évaporation d'état : la traîne du nuage (la plus loin du corps) se perd
-    if (anyPlayerGas) this.gasIdleCarry += p.gasIdleLossRate * dt
+    if (anyPlayerGas)
+      this.gasIdleCarry += p.gasIdleLossRate * this.perteGazFactor * dt
     else this.gasIdleCarry = 0
     while (this.gasIdleCarry >= 1 && this.playerCount > 2) {
       this.gasIdleCarry -= 1
@@ -2533,10 +2540,10 @@ export class FluidSim {
     const rp = p.particleSpacing * 0.5
     const freeze =
       (dt * p.surfaceBite) / Math.max(0.05, p.freezeTime * (1 - 0.5 * chill))
-    const freezeSelf = dt / Math.max(0.05, p.freezeSelfTime)
+    const freezeSelf = dt / Math.max(0.05, p.freezeSelfTime * this.basculeFactor)
     const thaw = dt / Math.max(0.1, p.thawTime * (1 + chill))
     const boilTime = p.boilTime * (1 + 2 * p.chillHeatFade * chill)
-    const vaporizeTime = p.vaporizeTime * (1 + 1.5 * chill)
+    const vaporizeTime = p.vaporizeTime * this.basculeFactor * (1 + 1.5 * chill)
     const condenseTime = p.condenseTime * (1 - 0.4 * chill)
     const cp = this.scratchCP
     const intent = this.freezeIntent
@@ -2907,7 +2914,9 @@ export class FluidSim {
         if (surPhile) {
           // le mouillage retient : le palet qui glisse sur l'hydrophile
           // s'essouffle, translation et rotation comprises
-          const damp = Math.exp(-p.hydrophileIceDrag * p.surfaceBite * dt)
+          const damp = Math.exp(
+            -p.hydrophileIceDrag * p.surfaceBite * this.glisseGlaceFactor * dt,
+          )
           vx *= damp
           vy *= damp
           omega *= damp

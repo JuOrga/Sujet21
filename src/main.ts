@@ -287,8 +287,15 @@ function lev(id: LevierId): number {
 // embarqué) lui ajoute trois litres. Toute lecture passe par ici — jauges
 // et bilans compris, sinon la réserve afficherait un plafond qu'elle
 // dépasse, ou refuserait un versement qu'elle peut tenir.
+// Sonde de test : ce que vaut un levier depuis la console (comme __sim,
+// __run) — « __levier('bonbonne') » dit tout de suite ce que les cartes
+// embarquées pèsent sur un réglage.
+;(window as unknown as { __levier: (id: LevierId) => number }).__levier = lev
+
 function capBonbonne(): number {
-  return BONBONNE_CAP + lev('bonbonne')
+  // une contrepartie peut rogner la bonbonne — jamais en dessous de deux
+  // litres : en dessous, la réserve ne servirait plus à rien
+  return Math.max(2, BONBONNE_CAP + lev('bonbonne'))
 }
 
 function chillNow(): number {
@@ -423,7 +430,9 @@ function createSim(level: LevelDef): FluidSim {
   // l'aimant à rosée bonifie la recondensation
   // Les instruments embarqués, lus PAR LEVIER : le réglage du banc n'est
   // jamais modifié, il est multiplié (ou augmenté) pour cette run.
-  sim.dashBudgetMax += lev('dashs')
+  // une carte à contrepartie peut RETIRER un dash : jamais sous un seul,
+  // sinon la vapeur devient une impasse au lieu d'un choix
+  sim.dashBudgetMax = Math.max(1, sim.dashBudgetMax + lev('dashs'))
   sim.recondBonus = lev('rosee')
   sim.exitRadiusFactor = lev('sasPortee')
   sim.reabsorbFactor = lev('reabsorption')
@@ -431,6 +440,11 @@ function createSim(level: LevelDef): FluidSim {
   sim.iceBounceFactor = lev('rebondGlace')
   sim.spongeGripFactor = lev('priseEponge')
   sim.criticalFactor = lev('seuilDispersion')
+  sim.basculeFactor = lev('bascule')
+  sim.perteGazFactor = lev('perteVapeur')
+  sim.perteGrilleFactor = lev('perteGrille')
+  sim.priseSasGlaceFactor = lev('priseSasGlace')
+  sim.glisseGlaceFactor = lev('glisseGlace')
   const naitVapeur =
     zoneForceAt(level, level.spawn.x, level.spawn.y) === 'vapeur'
   sim.dashBudget = sim.dashBudgetMax
@@ -6585,7 +6599,11 @@ function recChips(d: InstrumentDef): string {
     .map((e: { levier: string; valeur: number }) => {
       const l = levierDef(e.levier)
       if (!l) return ''
-      const v = l.mode === 'mult' ? `×${e.valeur}` : `+${e.valeur}`
+      // une contrepartie se lit au signe : « +2 » et « −2 », jamais « +-2 »
+      const v =
+        l.mode === 'mult'
+          ? `×${e.valeur}`
+          : `${e.valeur > 0 ? '+' : '−'}${Math.abs(e.valeur)}`
       return `<span class="rec-effet">${htmlSafe(l.nom)} ${v}</span>`
     })
     .join('')

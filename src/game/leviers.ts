@@ -20,12 +20,17 @@ export type LevierId =
   // les états
   | 'dashs'
   | 'peageVapeur'
+  | 'bascule'
+  | 'perteVapeur'
+  | 'perteGrille'
   | 'rebondGlace'
+  | 'glisseGlace'
   | 'visee'
   | 'froid'
   | 'rosee'
   // la collecte et la bourse
   | 'sasPortee'
+  | 'priseSasGlace'
   | 'primeGlace'
   | 'condensat'
   | 'bonbonne'
@@ -80,11 +85,13 @@ export const LEVIERS: LevierDef[] = [
     famille: 'corps',
     mode: 'mult',
     min: 0.6,
-    max: 1,
+    max: 1.4,
     pas: 0.05,
     bon: -1,
     phrase: (v) =>
-      `Le corps tient plus bas : le seuil de dispersion baisse de ${Math.round((1 - v) * 100)} %.`,
+      v <= 1
+        ? `Le corps tient plus bas : le seuil de dispersion baisse de ${moins(v)} %.`
+        : `Le corps lâche plus tôt : le seuil de dispersion monte de ${plus(v)} %.`,
   },
   {
     id: 'reabsorption',
@@ -92,11 +99,13 @@ export const LEVIERS: LevierDef[] = [
     famille: 'corps',
     mode: 'mult',
     min: 0.3,
-    max: 1,
+    max: 2,
     pas: 0.05,
     bon: -1,
     phrase: (v) =>
-      `Les gouttes éjectées redeviennent réabsorbables ${Math.round((1 / v) * 10) / 10}× plus tôt.`,
+      v <= 1
+        ? `Les gouttes éjectées redeviennent réabsorbables ${Math.round((1 / v) * 10) / 10}× plus tôt.`
+        : `Les gouttes éjectées traînent ${Math.round(v * 10) / 10}× plus longtemps avant de revenir.`,
   },
   {
     id: 'priseEponge',
@@ -104,24 +113,32 @@ export const LEVIERS: LevierDef[] = [
     famille: 'corps',
     mode: 'mult',
     min: 0.4,
-    max: 1,
+    max: 1.8,
     pas: 0.05,
     bon: -1,
-    phrase: (v) => `L’éponge a moins de prise : elle boit ${moins(v)} % moins vite.`,
+    phrase: (v) =>
+      v <= 1
+        ? `L’éponge a moins de prise : elle boit ${moins(v)} % moins vite.`
+        : `L’éponge mord : elle boit ${plus(v)} % plus vite.`,
   },
 
   // ——— les états ————————————————————————————————————————————
+  // (rien ici ne fait perdre du volume à la GLACE : un bloc ne se fait
+  //  jamais grignoter au contact — éponge, feutre, maille le laissent
+  //  passer ou l'arrêtent, aucun ne le mange.)
   {
     id: 'dashs',
     nom: 'Réserve de dashs',
     famille: 'etats',
     mode: 'add',
-    min: 1,
+    min: -2,
     max: 3,
     pas: 1,
     bon: 1,
     phrase: (v) =>
-      `${v} dash${v > 1 ? 's' : ''} de plus dans la réserve de chaque tableau.`,
+      v > 0
+        ? `${v} dash${v > 1 ? 's' : ''} de plus dans la réserve de chaque tableau.`
+        : `${-v} dash${v < -1 ? 's' : ''} de moins dans la réserve de chaque tableau.`,
   },
   {
     id: 'peageVapeur',
@@ -129,21 +146,83 @@ export const LEVIERS: LevierDef[] = [
     famille: 'etats',
     mode: 'mult',
     min: 0.3,
-    max: 1,
+    max: 1.8,
     pas: 0.05,
     bon: -1,
-    phrase: (v) => `Se vaporiser coûte ${moins(v)} % de gouttes en moins.`,
+    phrase: (v) =>
+      v <= 1
+        ? `Se vaporiser coûte ${moins(v)} % de gouttes en moins.`
+        : `Se vaporiser coûte ${plus(v)} % de gouttes en plus.`,
+  },
+  {
+    id: 'bascule',
+    nom: 'Vitesse de bascule d’état',
+    famille: 'etats',
+    mode: 'mult',
+    min: 0.4,
+    max: 1.8,
+    pas: 0.05,
+    bon: -1,
+    phrase: (v) =>
+      v <= 1
+        ? `Se figer ou se vaporiser prend ${moins(v)} % de temps en moins.`
+        : `Se figer ou se vaporiser prend ${plus(v)} % de temps en plus.`,
+  },
+  {
+    id: 'perteVapeur',
+    nom: 'Évaporation du nuage',
+    famille: 'etats',
+    mode: 'mult',
+    min: 0.3,
+    max: 2,
+    pas: 0.05,
+    bon: -1,
+    phrase: (v) =>
+      v <= 1
+        ? `Le nuage s’évapore ${moins(v)} % moins vite au repos.`
+        : `Le nuage s’évapore ${plus(v)} % plus vite au repos.`,
+  },
+  {
+    id: 'perteGrille',
+    nom: 'Perte dans les mailles',
+    famille: 'etats',
+    mode: 'mult',
+    min: 0.2,
+    max: 2,
+    pas: 0.05,
+    bon: -1,
+    phrase: (v) =>
+      v <= 1
+        ? `Traverser une maille coûte ${moins(v)} % de vapeur en moins.`
+        : `Traverser une maille coûte ${plus(v)} % de vapeur en plus.`,
   },
   {
     id: 'rebondGlace',
     nom: 'Rebond du palet',
     famille: 'etats',
     mode: 'mult',
-    min: 1,
+    min: 0.6,
     max: 1.6,
     pas: 0.05,
     bon: 1,
-    phrase: (v) => `Le palet de glace rebondit ${plus(v)} % plus vif.`,
+    phrase: (v) =>
+      v >= 1
+        ? `Le palet de glace rebondit ${plus(v)} % plus vif.`
+        : `Le palet de glace rebondit ${moins(v)} % plus mou.`,
+  },
+  {
+    id: 'glisseGlace',
+    nom: 'Glisse du palet',
+    famille: 'etats',
+    mode: 'mult',
+    min: 0.2,
+    max: 2,
+    pas: 0.05,
+    bon: -1,
+    phrase: (v) =>
+      v <= 1
+        ? `L’hydrophile retient ${moins(v)} % moins le palet : la glace garde sa ligne.`
+        : `L’hydrophile retient ${plus(v)} % plus le palet.`,
   },
   {
     id: 'visee',
@@ -151,22 +230,27 @@ export const LEVIERS: LevierDef[] = [
     famille: 'etats',
     mode: 'mult',
     min: 0.3,
-    max: 1,
+    max: 1.6,
     pas: 0.05,
     bon: -1,
     phrase: (v) =>
-      `La visée du dash ralentit le temps ${Math.round((1 / v) * 10) / 10}× plus : on choisit sa ligne.`,
+      v <= 1
+        ? `La visée du dash ralentit le temps ${Math.round((1 / v) * 10) / 10}× plus : on choisit sa ligne.`
+        : `La visée du dash ralentit ${plus(v)} % moins le temps : il faut décider vite.`,
   },
   {
     id: 'froid',
     nom: 'Refroidissement de la coque',
     famille: 'etats',
     mode: 'mult',
-    min: 1,
+    min: 0.6,
     max: 2,
     pas: 0.05,
     bon: 1,
-    phrase: (v) => `Le froid du vaisseau mord ${moins(1 / v)} % moins vite.`,
+    phrase: (v) =>
+      v >= 1
+        ? `Le froid du vaisseau mord ${moins(1 / v)} % moins vite.`
+        : `Le froid du vaisseau mord ${plus(1 / v)} % plus vite.`,
   },
   {
     id: 'rosee',
@@ -187,46 +271,70 @@ export const LEVIERS: LevierDef[] = [
     nom: 'Portée du sas',
     famille: 'collecte',
     mode: 'mult',
-    min: 1,
+    min: 0.5,
     max: 2.5,
     pas: 0.1,
     bon: 1,
     phrase: (v) =>
-      `Le sas aspire ${plus(v)} % plus loin : les traînardes rentrent seules.`,
+      v >= 1
+        ? `Le sas aspire ${plus(v)} % plus loin : les traînardes rentrent seules.`
+        : `Le sas aspire ${moins(v)} % moins loin : il faut aller lui porter l’eau.`,
+  },
+  {
+    id: 'priseSasGlace',
+    nom: 'Prise du sas sur la glace',
+    famille: 'collecte',
+    mode: 'mult',
+    min: 0.4,
+    max: 3,
+    pas: 0.1,
+    bon: 1,
+    phrase: (v) =>
+      v >= 1
+        ? `Le sas happe la glace ${plus(v)} % plus fort : un palet ne file plus devant la bouche.`
+        : `Le sas n’a que ${moins(v)} % de prise en moins sur la glace : le palet passe tout droit.`,
   },
   {
     id: 'primeGlace',
     nom: 'Prime de glace',
     famille: 'collecte',
     mode: 'mult',
-    min: 1,
+    min: 0.4,
     max: 3,
     pas: 0.1,
     bon: 1,
-    phrase: (v) => `La prime de glace vaut ${plus(v)} % de plus au sas.`,
+    phrase: (v) =>
+      v >= 1
+        ? `La prime de glace vaut ${plus(v)} % de plus au sas.`
+        : `La prime de glace vaut ${moins(v)} % de moins au sas.`,
   },
   {
     id: 'condensat',
     nom: 'Rendement en condensat',
     famille: 'collecte',
     mode: 'mult',
-    min: 1,
+    min: 0.6,
     max: 2,
     pas: 0.05,
     bon: 1,
     phrase: (v) =>
-      `${plus(v)} % de condensat en plus sur tout ce qui passe le sas.`,
+      v >= 1
+        ? `${plus(v)} % de condensat en plus sur tout ce qui passe le sas.`
+        : `${moins(v)} % de condensat en moins sur tout ce qui passe le sas.`,
   },
   {
     id: 'bonbonne',
     nom: 'Contenance de la bonbonne',
     famille: 'collecte',
     mode: 'add',
-    min: 1,
+    min: -3,
     max: 6,
     pas: 1,
     bon: 1,
-    phrase: (v) => `La bonbonne emporte ${v} litre${v > 1 ? 's' : ''} de plus.`,
+    phrase: (v) =>
+      v > 0
+        ? `La bonbonne emporte ${v} litre${v > 1 ? 's' : ''} de plus.`
+        : `La bonbonne emporte ${-v} litre${v < -1 ? 's' : ''} de moins.`,
   },
 
   // ——— le protocole ————————————————————————————————————————

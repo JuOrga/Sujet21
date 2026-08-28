@@ -15,7 +15,7 @@ import { LEVIERS, valeurLevier } from './leviers'
 
 const carte = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
   nom: 'Membrane de tension',
-  icone: '🕸️',
+  icone: '🪺',
   desc: '',
   effets: [{ levier: 'seuilDispersion', valeur: 0.75 }],
   ...over,
@@ -84,7 +84,7 @@ describe('L’atelier des récompenses', () => {
     // retouche : même identifiant, l'atelier n'en garde qu'une
     expect(
       poseRecompense(
-        carte({ nom: 'Membrane de tension', icone: '🕸️', desc: 'retouchée' }),
+        carte({ nom: 'Membrane de tension', icone: '🪺', desc: 'retouchée' }),
         'membrane-de-tension',
       ),
     ).toEqual([])

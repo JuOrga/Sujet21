@@ -27,16 +27,22 @@ describe('Instruments — le tirage de fin de salle', () => {
     for (const id of ids) expect(INSTRUMENTS.some((d) => d.id === id)).toBe(true)
   })
 
-  it('un instrument déjà emporté ne revient pas — sauf l’échantillon de secours', () => {
-    // TOUT le catalogue est en poche, sauf l'échantillon : le bassin est
-    // vide, il ne reste que lui. Écrit ainsi, le test survit à l'ajout de
-    // nouveaux instruments — il dit la règle, pas la liste du jour.
+  it('un instrument déjà emporté ne revient pas — sauf les cartes de secours', () => {
+    // TOUT le catalogue est en poche, sauf les cartes qui donnent une VIE
+    // (celles-là ne s'emportent pas, elles se consomment) : il ne peut
+    // donc rester qu'elles. Écrit ainsi, le test dit la RÈGLE et survit à
+    // l'ajout de nouvelles cartes.
+    const secours = INSTRUMENTS.filter((d) =>
+      d.effets.some((e) => e.levier === 'vies'),
+    ).map((d) => d.id)
     const tenus = INSTRUMENTS.map((d) => d.id).filter(
-      (id) => id !== 'echantillon-secours',
+      (id) => !secours.includes(id),
     )
+    expect(secours.length).toBeGreaterThan(0)
     for (let seed = 1; seed < 40; seed++) {
       const cartes = tirageInstruments(lcg(seed), tenus, 1, 3)
-      expect(cartes.map((c) => c.id)).toEqual(['echantillon-secours'])
+      expect(cartes.length).toBeGreaterThan(0)
+      for (const c of cartes) expect(secours).toContain(c.id)
     }
   })
 

@@ -89,7 +89,7 @@ export const INSTRUMENTS: InstrumentDef[] = [
   {
     id: 'patins-de-givre',
     nom: 'Patins de givre',
-    desc: 'Le palet de glace rebondit presque sans rien perdre.',
+    desc: 'Le palet de glace rebondit presque sans s’amortir.',
     icone: '⛸️',
     effets: [{ levier: 'rebondGlace', valeur: 1.35 }],
   },
@@ -122,6 +122,80 @@ export const INSTRUMENTS: InstrumentDef[] = [
     desc: 'La bonbonne emporte trois litres de plus.',
     icone: '⚖️',
     effets: [{ levier: 'bonbonne', valeur: 3 }],
+  },
+
+  // ——— Les états, suite : ce que coûte une transformation ————
+  // (aucune de ces cartes ne touche au VOLUME DE LA GLACE : un bloc ne se
+  //  fait jamais grignoter au contact — c'est la vapeur qui fuit, la glace
+  //  ne perd rien à toucher quoi que ce soit.)
+  {
+    id: 'bascule-rapide',
+    nom: 'Bascule rapide',
+    desc: 'Se figer ou se vaporiser prend 40 % de temps en moins.',
+    icone: '⏱️',
+    effets: [{ levier: 'bascule', valeur: 0.6 }],
+  },
+  {
+    id: 'chambre-etanche',
+    nom: 'Chambre étanche',
+    desc: 'Le nuage s’évapore beaucoup moins vite quand il ne fait rien.',
+    icone: '🧯',
+    effets: [{ levier: 'perteVapeur', valeur: 0.55 }],
+  },
+  {
+    id: 'tamis-fin',
+    nom: 'Tamis fin',
+    desc: 'Traverser une maille d’évent ne coûte presque plus de vapeur.',
+    icone: '🕸️',
+    effets: [{ levier: 'perteGrille', valeur: 0.4 }],
+  },
+  {
+    id: 'semelles-polies',
+    nom: 'Semelles polies',
+    desc: 'L’hydrophile ne retient presque plus le palet : la glace garde sa ligne.',
+    icone: '🛷',
+    effets: [{ levier: 'glisseGlace', valeur: 0.4 }],
+  },
+  {
+    id: 'croc-du-sas',
+    nom: 'Croc du sas',
+    desc: 'Le sas happe la glace : un palet ne file plus devant la bouche.',
+    icone: '🪝',
+    effets: [{ levier: 'priseSasGlace', valeur: 2 }],
+  },
+
+  // ——— LES CONTREPARTIES : ce qu'on gagne, ce qu'on paie ————
+  // Une carte peut tirer un levier du mauvais côté. C'est là que le tirage
+  // devient un choix : l'avantage se lit d'un œil, le prix de l'autre.
+  {
+    id: 'sur-regime',
+    nom: 'Sur-régime',
+    desc: 'Deux dashs de plus par tableau — la bonbonne emporte deux litres de moins.',
+    icone: '🔥',
+    effets: [
+      { levier: 'dashs', valeur: 2 },
+      { levier: 'bonbonne', valeur: -2 },
+    ],
+  },
+  {
+    id: 'ration-de-survie',
+    nom: 'Ration de survie',
+    desc: 'Un échantillon de secours de plus — le Semblable prélève sa dîme : un cinquième du condensat.',
+    icone: '🥫',
+    effets: [
+      { levier: 'vies', valeur: 1 },
+      { levier: 'condensat', valeur: 0.8 },
+    ],
+  },
+  {
+    id: 'oeilleres',
+    nom: 'Œillères',
+    desc: 'La visée du dash ralentit deux fois plus le temps — mais le sas aspire 30 % moins loin.',
+    icone: '👁️',
+    effets: [
+      { levier: 'visee', valeur: 0.5 },
+      { levier: 'sasPortee', valeur: 0.7 },
+    ],
   },
 
   // ——— Le protocole lui-même ————————————————————————————————

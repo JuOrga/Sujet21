@@ -22,6 +22,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 23:57',
+    title: 'HUIT CARTES DE PLUS, dont les premières À CONTREPARTIE — et la glace reste intouchable',
+    notes: [
+      'Cinq leviers neufs ouvrent des terrains que le catalogue ne touchait pas : vitesse de bascule d’état, évaporation du nuage au repos, perte dans les mailles d’un évent, prise du sas sur la glace, glisse du palet sur l’hydrophile. Cinq cartes s’en servent — BASCULE RAPIDE ⏱️ (se figer ou se vaporiser prend 40 % de temps en moins), CHAMBRE ÉTANCHE 🧯 (le nuage s’évapore beaucoup moins vite), TAMIS FIN 🕸️ (traverser une maille ne coûte presque plus de vapeur), CROC DU SAS 🪝 (le sas happe la glace : un palet ne file plus devant la bouche), SEMELLES POLIES 🛷 (l’hydrophile ne retient presque plus le palet).',
+      'ET LES CONTREPARTIES, enfin. Une carte peut désormais tirer un levier du MAUVAIS côté : c’est là que le tirage devient un choix, et plus une file d’attente. SUR-RÉGIME 🔥 : deux dashs de plus par tableau, mais la bonbonne emporte deux litres de moins. RATION DE SURVIE 🥫 : un échantillon de secours de plus, et le Semblable prélève sa dîme — un cinquième du condensat. ŒILLÈRES 👁️ : la visée du dash ralentit deux fois plus le temps, mais le sas aspire 30 % moins loin. Deux planchers gardent le jeu jouable : jamais moins d’un dash, jamais moins de deux litres de réserve.',
+      'Pour que ça tienne, les plages des leviers traversent maintenant leur valeur neutre, et CHAQUE PHRASE se dit des deux côtés — « le sas aspire 40 % plus loin » ou « 30 % moins loin », selon le réglage. L’atelier peut donc fabriquer des cartes à contrepartie sans écrire une ligne, et la carte se raconte juste, quel que soit le sens. Les puces de l’écran affichent le signe (« −2 »), jamais un « +-2 ».',
+      'LA RÈGLE RAPPELÉE, ET GRAVÉE : la glace ne perd JAMAIS de volume au contact. Le moteur la tenait déjà (l’éponge saute les particules gelées, toutes les pertes déclarées sont vapeur ou liquide) ; trois tests la verrouillent désormais — un palet lancé dans une éponge en ressort entier, le même corps liquide s’y fait boire, et aucune carte du catalogue ne prétend le contraire. Une formulation ambiguë a d’ailleurs été corrigée au passage (« rebondit sans rien perdre » → « sans s’amortir »).',
+      'Vérifié dans le jeu construit : les cinq facteurs neufs lus sur la simulation (bascule 0,6 · évaporation 0,55 · mailles 0,4 · prise du sas 2 · glisse 0,4), la réserve de dashs à 5 et la bonbonne à 6 L avec Sur-régime, le sas à 0,7 avec Œillères, et les 23 cartes au catalogue de l’écran. Sonde ajoutée : __levier(\'bonbonne\') dit depuis la console ce que les cartes embarquées pèsent sur un réglage. 474 tests verts, build propre.',
+    ],
+  },
+  {
     date: '28/08/2026 21:40',
     title:
       'Les OUTILS DE POSE du méta : plot, banc, marchand et éclat se dessinent dans l’éditeur',
