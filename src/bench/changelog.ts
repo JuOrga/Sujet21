@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 17:33',
+    title: 'Le PUPITRE passe aussi au BANC : les manœuvres sous la main du réglage',
+    notes: [
+      'Demandé : que les manœuvres du pupitre soient dans le banc — « ou les deux plutôt ». Les deux, donc. Le banc gagne un dossier PUPITRE D’ESSAIS avec les mêmes sections que l’écran du menu : cérémonie de fin de salle, bonbonne & étalonnage, ressources, ponctuations sonores. On règle un paramètre et on rejoue l’événement dans la foulée, sans quitter le banc.',
+      'Une seule mécanique, deux poignées : la manœuvre est devenue une fonction nommée que le panneau et le banc appellent tous deux, et le CATALOGUE (titres, explications, ordre) est LU SUR LE PANNEAU lui-même — il n’y a jamais deux listes à tenir, un bouton ajouté au pupitre paraît au banc sans qu’on y touche. Le banc n’ayant pas la ligne d’état du pupitre, il redit son mot dans sa propre ligne d’aide.',
+      'Vérifié en jeu, des deux côtés : « Bonbonne +2 L » cliqué deux fois depuis le BANC porte la réserve de 0 à 4 L et affiche « Bonbonne : 4.0 / 8 L » ; le même geste depuis le PANNEAU fait exactement pareil ; et la manœuvre appelée par sa clé vide la réserve. Le dossier annonce bien ses quatre sections. 441 tests verts, build propre.',
+    ],
+  },
+  {
     date: '28/08/2026 17:20',
     title: 'Le méta arrive dans le hub JOUÉ : le module compact équipé',
     notes: [
