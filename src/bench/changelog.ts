@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 13:01',
+    title: 'La BONBONNE DE SECOURS se voit enfin : une fiole qui se remplit, sous le litrage',
+    notes: [
+      'Demandé : que la réserve quitte la rangée de pastilles pour venir EN HAUT À GAUCHE, sous le litrage, sous la forme d’une bonbonne qui se remplit de ce qu’on a mis de côté. C’est fait — une fiole de verre dessinée au trait, dont le NIVEAU suit la réserve : il monte et descend à vue, jamais d’un coup, et la surface ondule sans fin (deux vagues, deux allures). Un toucher la verse, comme avant.',
+      'Deux rappels, comme demandé. AU DÉBUT DU TABLEAU, la fiole se pose (elle grandit d’un rien) pendant qu’un éclat balaie le verre et que le niveau remonte de zéro sous les yeux : on se souvient qu’on a de quoi tenir. ET QUAND LA DERNIÈRE GOUTTE APPROCHE — le corps sous 1,7 fois le seuil critique — elle bat doucement, halo vert menthe, tant que le versement peut vraiment renflouer. Jamais pour rien : réserve vide ou corps plein, elle reste immobile. Les animations se coupent si la machine demande qu’on l’épargne.',
+      'Le verre s’ourle de vert dès que le versement est possible, et la valeur passe au menthe avec lui : l’invitation au geste se lit sans lire. Vérifié dans une vraie salle : le niveau suit la réserve (49 → 29,4 unités de verre pour 3,2 L sur 8), les deux états s’allument au bon moment et leurs couleurs sont bien celles attendues. 426 tests verts, build propre.',
+    ],
+  },
+  {
     date: '28/08/2026 12:51',
     title:
       'La descente au rythme du cycle : cadran d’états refondu, liens qui commandent',

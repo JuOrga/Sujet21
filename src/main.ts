@@ -825,7 +825,14 @@ const el = (id: string) => document.getElementById(id) as HTMLElement
 const hudTableau = el('hud-tableau')
 const hudVies = el('hud-vies')
 const hudViesChip = el('hud-vies-chip') as HTMLButtonElement
-const hudBonbonneChip = el('hud-bonbonne-chip') as HTMLButtonElement
+const bonbonneEl = el('bonbonne') as HTMLButtonElement
+// le groupe du liquide : on le fait GLISSER dans le verre (translateY en
+// unités du viewBox) — l'intérieur est clippé, le niveau se lit tout seul
+const bbLiquide = document.getElementById('bb-liquide') as SVGGElement | null
+// le niveau AFFICHÉ court après le niveau réel : la réserve monte et descend
+// à vue, jamais d'un coup — c'est là qu'est le plaisir
+let bbAffiche = 0
+let bbPresenteA = -1 // instant de la dernière présentation (début de tableau)
 const hudBonbonne = el('hud-bonbonne')
 const hudCondChip = el('hud-cond-chip') as HTMLButtonElement
 const hudCond = el('hud-cond')
@@ -5943,11 +5950,11 @@ function verserBonbonne(): string {
   )
   sim.relabel()
   bande.ponctuation('sting-collecte', 0.5)
-  hudBonbonneChip.classList.add('ouvert')
-  window.setTimeout(() => hudBonbonneChip.classList.remove('ouvert'), 1200)
+  bonbonneEl.classList.add('ouvert')
+  window.setTimeout(() => bonbonneEl.classList.remove('ouvert'), 600)
   return 'ok'
 }
-hudBonbonneChip?.addEventListener('click', verserBonbonne)
+bonbonneEl?.addEventListener('click', verserBonbonne)
 // Sonde de test : verser depuis la console (comme __sim, __run)
 ;(window as unknown as { __verser: () => string }).__verser = verserBonbonne
 /** La cérémonie avec un surplus factice — la sonde __bonbonne et le
@@ -7028,6 +7035,13 @@ function annonceVoieCarte(): void {
 function restart(): void {
   run.exitTimer = 0
   run.tableauTime = 0
+  // la BONBONNE se présente : le niveau repart de zéro et remonte à vue,
+  // l'éclat balaie le verre — un rappel discret de ce qu'on a en réserve
+  bbAffiche = 0
+  bbPresenteA = 0
+  bonbonneEl.classList.remove('presente')
+  void bonbonneEl.offsetWidth // relancer l'animation, même deux fois de suite
+  if (run.bonbonneLiters > 0) bonbonneEl.classList.add('presente')
   run.ended = false
   ecranDispersion = 'aucun'
   dispersionDelai = 0
@@ -9075,7 +9089,7 @@ function frame(now: number): void {
   // les échantillons de secours (vies) et la bonbonne : en run seulement —
   // au labo comme aux essais, rien ne se paie et rien ne se collecte
   hudViesChip.hidden = !!testLevel || auHub
-  hudBonbonneChip.hidden = !!testLevel || auHub
+  bonbonneEl.hidden = !!testLevel || auHub
   hudCondChip.hidden = !!testLevel || auHub
   hudCond.textContent = `${condensat} cL`
   hudVies.textContent = `×${run.vies}`
@@ -9086,14 +9100,40 @@ function frame(now: number): void {
   hudCoque.classList.toggle('warn', chillNow() > 0.75)
   coqueBar.style.width = `${(chillNow() * 100).toFixed(1)}%`
   hudBonbonne.textContent = `${run.bonbonneLiters.toFixed(2)} / ${BONBONNE_CAP} L`
-  // le versement est possible : la pastille s'allume pour inviter au geste
-  hudBonbonneChip.classList.toggle(
-    'verse-ok',
+  // LE NIVEAU DANS LE VERRE : la part de réserve, poursuivie en douceur.
+  // L'intérieur utile va de y = 8,5 (plein) à y = 57,5 (vide) dans le
+  // viewBox — soit 49 unités de descente pour un verre vide.
+  const bbCible = Math.max(0, Math.min(1, run.bonbonneLiters / BONBONNE_CAP))
+  bbAffiche += (bbCible - bbAffiche) * Math.min(1, dtReal * 5)
+  if (Math.abs(bbCible - bbAffiche) < 0.002) bbAffiche = bbCible
+  if (bbLiquide)
+    bbLiquide.setAttribute(
+      'transform',
+      `translate(0 ${((1 - bbAffiche) * 49).toFixed(2)})`,
+    )
+  // le versement est possible : le verre s'ourle de vert pour inviter au geste
+  const peutVerser =
     run.bonbonneLiters >= params.litersPerParticle &&
-      sim.playerCount < level.spawn.n &&
-      !input.freezeIntent &&
-      !input.gasIntent,
+    sim.playerCount < level.spawn.n &&
+    !input.freezeIntent &&
+    !input.gasIntent
+  bonbonneEl.classList.toggle('verse-ok', peutVerser)
+  // RAPPEL : le corps touche à sa dernière goutte (il approche du seuil
+  // critique) et la réserve peut le renflouer — la fiole bat doucement.
+  // On ne bat pas pour rien : sans réserve utile, elle reste immobile.
+  bonbonneEl.classList.toggle(
+    'rappel',
+    peutVerser &&
+      !tableauDone &&
+      !sim.dispersed &&
+      sim.liters() < params.criticalVolumeLiters * 1.7,
   )
+  // PRÉSENTATION : au début du tableau, la fiole se pose et son éclat
+  // balaie le verre — le niveau remonte de zéro sous les yeux du joueur
+  if (bbPresenteA >= 0 && run.tableauTime - bbPresenteA > 1) {
+    bbPresenteA = -1
+    bonbonneEl.classList.remove('presente')
+  }
   if (hudInstrChip) {
     hudInstrChip.hidden = !!testLevel || auHub || run.instruments.length === 0
     if (hudInstrChip.hidden && instrPanel) instrPanel.hidden = true
