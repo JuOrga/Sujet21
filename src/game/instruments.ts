@@ -42,6 +42,74 @@ export const INSTRUMENTS: InstrumentDef[] = [
     desc: 'La prime de glace vaut moitié plus au sas.',
     icone: '⚗️',
   },
+
+  // ——— Le corps et sa matière ————————————————————————————————
+  {
+    id: 'peau-tendue',
+    nom: 'Peau tendue',
+    desc: 'Les gouttes éjectées redeviennent réabsorbables deux fois plus tôt.',
+    icone: '🩹',
+  },
+  {
+    id: 'vanne-de-secours',
+    nom: 'Vanne de secours',
+    desc: 'Le corps tient plus bas : le seuil de dispersion descend d’un cinquième.',
+    icone: '🚨',
+  },
+  {
+    id: 'plastron',
+    nom: 'Plastron',
+    desc: 'L’éponge a moins de prise : elle boit un quart moins vite.',
+    icone: '🛡️',
+  },
+
+  // ——— Les états ————————————————————————————————————————————
+  {
+    id: 'detendeur',
+    nom: 'Détendeur',
+    desc: 'Se vaporiser coûte 40 % de moins : le péage en gouttes s’allège.',
+    icone: '🫁',
+  },
+  {
+    id: 'patins-de-givre',
+    nom: 'Patins de givre',
+    desc: 'Le palet de glace rebondit presque sans rien perdre.',
+    icone: '⛸️',
+  },
+  {
+    id: 'lentille-de-visee',
+    nom: 'Lentille de visée',
+    desc: 'La visée du dash ralentit le temps deux fois plus : on choisit sa ligne.',
+    icone: '🔭',
+  },
+
+  // ——— La collecte et la bourse ——————————————————————————————
+  {
+    id: 'gueule-ouverte',
+    nom: 'Gueule ouverte',
+    desc: 'Le sas aspire de moitié plus loin : les traînardes rentrent seules.',
+    icone: '🌀',
+  },
+  {
+    id: 'filtre-a-condensat',
+    nom: 'Filtre à condensat',
+    desc: 'Un quart de condensat en plus sur tout ce qui passe le sas.',
+    icone: '💧',
+  },
+  {
+    id: 'ballast',
+    nom: 'Ballast',
+    desc: 'La bonbonne emporte trois litres de plus.',
+    icone: '⚖️',
+  },
+
+  // ——— Le protocole lui-même ————————————————————————————————
+  {
+    id: 'carnet-du-semblable',
+    nom: 'Carnet du Semblable',
+    desc: 'Une carte de plus à chaque tirage de fin de salle.',
+    icone: '📓',
+  },
 ]
 
 export function instrumentDef(id: string): InstrumentDef | null {
@@ -57,7 +125,8 @@ export interface CarteTirage {
 export const PRIX_CARTE = 150 // cL — le tarif unique des cartes payantes
 
 /**
- * Le tirage de fin de salle : jusqu'à 3 cartes distinctes.
+ * Le tirage de fin de salle : jusqu'à `nbCartes` cartes distinctes (3 par
+ * défaut — le CARNET DU SEMBLABLE en ajoute une).
  * — un instrument déjà emporté ne revient pas (sauf l'échantillon de
  *   secours, tant que la réserve n'est pas pleine) ;
  * — l'échantillon de secours ne paraît que si une vie manque ;
@@ -70,6 +139,7 @@ export function tirageInstruments(
   tenus: string[],
   vies: number,
   viesMax: number,
+  nbCartes = 3,
 ): CarteTirage[] {
   const pool = INSTRUMENTS.filter((d) => {
     if (d.id === 'echantillon-secours') return vies < viesMax
@@ -82,7 +152,7 @@ export function tirageInstruments(
     pool[i] = pool[j]
     pool[j] = t
   }
-  const cartes = pool.slice(0, 3).map((id) => ({
+  const cartes = pool.slice(0, Math.max(1, nbCartes)).map((id) => ({
     id,
     prix: rand() < 1 / 3 ? PRIX_CARTE : 0,
   }))

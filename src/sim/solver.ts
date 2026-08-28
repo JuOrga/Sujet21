@@ -223,6 +223,16 @@ export class FluidSim {
   // Bonus de rendement de recondensation (instrument « aimant à rosée ») —
   // posé par le jeu au début de la run, remis à zéro avec la simulation
   recondBonus = 0
+  // LES INSTRUMENTS EMBARQUÉS, côté simulation. Chacun est un facteur posé
+  // par le jeu au chargement du tableau et remis à neuf avec la simulation :
+  // un instrument ne touche JAMAIS au réglage du banc — il multiplie ici,
+  // pour cette run seulement, et le banc reste la référence.
+  exitRadiusFactor = 1 // « gueule ouverte » : portée d'aspiration du sas
+  reabsorbFactor = 1 // « peau tendue » : délai avant de récupérer une goutte
+  vaporTollFactor = 1 // « détendeur » : péage de la vaporisation
+  iceBounceFactor = 1 // « patins de givre » : restitution du palet
+  spongeGripFactor = 1 // « plastron » : prise de l'éponge
+  criticalFactor = 1 // « vanne de secours » : seuil de dispersion
   // Surchauffeurs déjà déchargés (indices de boîtes) — remis à neuf au
   // chargement du tableau. Le rendu lit ce même état pour le manomètre.
   readonly surchauffesVides = new Set<number>()
@@ -942,7 +952,7 @@ export class FluidSim {
       this.posX[best] += dirX * p.kernelRadius * 0.8
       this.posY[best] += dirY * p.kernelRadius * 0.8
       this.kind[best] = KIND_FREE
-      this.cooldown[best] = p.reabsorbCooldown
+      this.cooldown[best] = p.reabsorbCooldown * this.reabsorbFactor
       // créditée VIVANTE à l'instant même du tir : elle part de la surface,
       // donc du halo — la jauge ne cille pas d'une image, elle ne baissera
       // qu'à la SORTIE réelle (constatée au relabel suivant)
@@ -1142,7 +1152,9 @@ export class FluidSim {
     const p = this.params
     if (rendDashs) this.dashBudget = this.dashBudgetMax
     this.updatePlayerStats()
-    const toll = Math.floor(this.playerCount * p.vaporTollFrac)
+    const toll = Math.floor(
+      this.playerCount * p.vaporTollFrac * this.vaporTollFactor,
+    )
     if (toll <= 0) return
     const cx = this.stats.centroidX
     const cy = this.stats.centroidY
@@ -1177,7 +1189,7 @@ export class FluidSim {
       this.posX[i] += ux * p.kernelRadius * 0.8
       this.posY[i] += uy * p.kernelRadius * 0.8
       this.kind[i] = KIND_FREE
-      this.cooldown[i] = p.reabsorbCooldown
+      this.cooldown[i] = p.reabsorbCooldown * this.reabsorbFactor
       this.duCorps[i] = 2 // gerbe de péage : part du halo, vivante jusqu'à la sortie
       this.enPretCount++
       this.playerCount--
@@ -1264,7 +1276,7 @@ export class FluidSim {
         this.velX[i] = ex * vSouffle
         this.velY[i] = ey * vSouffle
         this.kind[i] = KIND_FREE
-        this.cooldown[i] = p.reabsorbCooldown
+        this.cooldown[i] = p.reabsorbCooldown * this.reabsorbFactor
         this.duCorps[i] = 0 // chassé : ce souffle ne vous appartient plus
         this.souffle[i] = 4 // 4 s de vol : le temps de traverser une salle
         this.playerCount--
@@ -1336,7 +1348,7 @@ export class FluidSim {
   // et il n'y a pas de retombée : le trou avale, il ne dépose pas.
   applyExitSuction(cx: number, cy: number, dt: number): void {
     const p = this.params
-    const R = p.exitRadius
+    const R = p.exitRadius * this.exitRadiusFactor
     this.mouthX = cx
     this.mouthY = cy
     this.drainOn = R > 0 && p.exitPull > 0
@@ -2397,8 +2409,9 @@ export class FluidSim {
   // liquide s'y risque.
   private processSponges(dt: number): void {
     const p = this.params
-    const drag = Math.exp(-p.spongeDrag * p.surfaceBite * dt)
-    const absorbTime = p.spongeAbsorbTime / Math.max(0.1, p.surfaceBite)
+    const mordant = p.surfaceBite * this.spongeGripFactor
+    const drag = Math.exp(-p.spongeDrag * mordant * dt)
+    const absorbTime = p.spongeAbsorbTime / Math.max(0.1, mordant)
     let i = 0
     while (i < this.count) {
       if (this.frozen[i] === 1) {
@@ -2834,7 +2847,10 @@ export class FluidSim {
       this.iceInertia[c] += rx * rx + ry * ry
     }
 
-    const rest = Math.min(1, Math.max(0, p.iceRestitution))
+    const rest = Math.min(
+      1,
+      Math.max(0, p.iceRestitution * this.iceBounceFactor),
+    )
     const MAX_SPIN = 14 // rad/s : au-delà, un palet devient illisible
     for (let c = 0; c < comps; c++) {
       const cnt = this.iceCnt[c]
@@ -3033,7 +3049,7 @@ export class FluidSim {
         this.stats.centroidX - this.mouthX,
         this.stats.centroidY - this.mouthY,
       ) <
-        this.params.exitRadius * 1.3
+        this.params.exitRadius * this.exitRadiusFactor * 1.3
 
     if (playerLabel < 0) {
       this.playerCount = 0
@@ -3101,7 +3117,8 @@ export class FluidSim {
     // (dispersalGrace, dans step) — un corps en pleine transformation a le
     // temps de se regrouper avant que le protocole ne conclue à la perte.
     this.belowCritical =
-      (count + prets) * p.litersPerParticle < p.criticalVolumeLiters
+      (count + prets) * p.litersPerParticle <
+      p.criticalVolumeLiters * this.criticalFactor
     if (count < 2) this.dispersed = true
   }
 

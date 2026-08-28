@@ -22,6 +22,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 19:17',
+    title: 'DIX INSTRUMENTS DE PLUS : le tirage de fin de salle a enfin de quoi hésiter',
+    notes: [
+      'Le tirage n’avait que cinq cartes : passé deux salles, il se répétait, et une fois trois cartes en poche il ne restait plus rien à choisir. Le catalogue passe à quinze — dix nouveaux instruments, rangés par pilier du jeu, aucun qui redouble un effet déjà servi par une fiole ou par l’étal du Semblable. Aucun ne touche à la mémoire : ce sont des avantages de RUN, latéraux, jamais un raccourci.',
+      'LE CORPS ET SA MATIÈRE — PEAU TENDUE 🩹 : les gouttes éjectées redeviennent réabsorbables deux fois plus tôt (on récupère ce qu’on vient de lancer). VANNE DE SECOURS 🚨 : le seuil de dispersion descend d’un cinquième — le corps tient plus bas avant que le protocole ne conclue. PLASTRON 🛡️ : l’éponge boit un quart moins vite et retient moins.',
+      'LES ÉTATS — DÉTENDEUR 🫁 : le péage de vaporisation coûte 40 % de moins. PATINS DE GIVRE ⛸️ : le palet rebondit presque sans rien perdre. LENTILLE DE VISÉE 🔭 : la visée du dash ralentit le temps deux fois plus — on choisit sa ligne. LA COLLECTE — GUEULE OUVERTE 🌀 : le sas aspire de moitié plus loin, les traînardes rentrent seules. FILTRE À CONDENSAT 💧 : un quart de condensat en plus sur tout ce qui passe le sas. BALLAST ⚖️ : la bonbonne emporte trois litres de plus (le plafond devient celui de la RUN — jauges et versements compris). LE PROTOCOLE — CARNET DU SEMBLABLE 📓 : une carte de plus à chaque tirage.',
+      'Au passage, la CHAMBRE FROIDE tient enfin sa promesse : la carte annonçait « la prime de glace vaut moitié plus » depuis le premier jour, et rien ne l’appliquait — la ligne manquait au calcul du sas. Côté moteur, chaque instrument est un FACTEUR posé sur la simulation au chargement du tableau : le réglage du banc n’est jamais modifié, il est multiplié pour cette run — le banc reste la référence, et une run ne peut pas salir le prototype.',
+      'Vérifié dans le jeu construit : les six facteurs lus sur la simulation après embarquement (sas ×1,5 · réabsorption ×0,5 · péage ×0,6 · glace ×1,35 · éponge ×0,75 · seuil ×0,8), la bonbonne affichée à 11 L avec le ballast, et le tirage qui présente QUATRE cartes avec le carnet — les nouvelles comprises. Un test grave la règle du « sans doublon » : ni deux identifiants, ni deux icônes identiques dans le catalogue (une carte se reconnaît à son glyphe dans le HUD). 450 tests verts, build propre.',
+    ],
+  },
+  {
     date: '28/08/2026 18:47',
     title: 'APPELER LE SEMBLABLE : l’Économat se convoque depuis le banc',
     notes: [

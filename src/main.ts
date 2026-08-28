@@ -232,6 +232,14 @@ function majCondensatUI(): void {
 }
 majCondensatUI()
 
+// La contenance de la bonbonne POUR CETTE RUN : le BALLAST (instrument
+// embarqué) lui ajoute trois litres. Toute lecture passe par ici — jauges
+// et bilans compris, sinon la réserve afficherait un plafond qu'elle
+// dépasse, ou refuserait un versement qu'elle peut tenir.
+function capBonbonne(): number {
+  return BONBONNE_CAP + (run.instruments.includes('ballast') ? 3 : 0)
+}
+
 function chillNow(): number {
   // la gaine isolante (instrument embarqué) ralentit le refroidissement —
   // la fiole d'ISOLANT (équipée au placard) s'y cumule
@@ -364,6 +372,15 @@ function createSim(level: LevelDef): FluidSim {
   // l'aimant à rosée bonifie la recondensation
   if (run.instruments.includes('buse-calibree')) sim.dashBudgetMax += 1
   if (run.instruments.includes('aimant-rosee')) sim.recondBonus = 0.35
+  // les autres instruments sont des FACTEURS posés sur la simulation : ils
+  // ne touchent pas au réglage du banc, ils le multiplient pour cette run
+  const tenu = (id: string): boolean => run.instruments.includes(id)
+  if (tenu('gueule-ouverte')) sim.exitRadiusFactor = 1.5
+  if (tenu('peau-tendue')) sim.reabsorbFactor = 0.5
+  if (tenu('detendeur')) sim.vaporTollFactor = 0.6
+  if (tenu('patins-de-givre')) sim.iceBounceFactor = 1.35
+  if (tenu('plastron')) sim.spongeGripFactor = 0.75
+  if (tenu('vanne-de-secours')) sim.criticalFactor = 0.8
   const naitVapeur =
     zoneForceAt(level, level.spawn.x, level.spawn.y) === 'vapeur'
   sim.dashBudget = sim.dashBudgetMax
@@ -6221,9 +6238,9 @@ function lanceManoeuvre(quoi: string): void {
         break
       }
       case 'bonbonne-plus':
-        run.bonbonneLiters = Math.min(BONBONNE_CAP, run.bonbonneLiters + 2)
+        run.bonbonneLiters = Math.min(capBonbonne(), run.bonbonneLiters + 2)
         pupDit(
-          `Bonbonne : ${run.bonbonneLiters.toFixed(1)} / ${BONBONNE_CAP} L.`,
+          `Bonbonne : ${run.bonbonneLiters.toFixed(1)} / ${capBonbonne()} L.`,
         )
         break
       case 'bonbonne-vider':
@@ -6434,7 +6451,7 @@ function tenteAchat(a: ArticleEconomat): void {
   let detail = a.detail
   switch (a.id) {
     case 'gouttes':
-      run.bonbonneLiters = Math.min(BONBONNE_CAP, run.bonbonneLiters + 0.8)
+      run.bonbonneLiters = Math.min(capBonbonne(), run.bonbonneLiters + 0.8)
       break
     case 'dashs':
       sim.dashBudget = sim.dashBudgetMax
@@ -6538,7 +6555,7 @@ function appliqueProvisions(): void {
     run.vies = Math.min(VIES_MAX, run.vies + provisionsRun.vies)
   if (provisionsRun.bonbonne > 0)
     run.bonbonneLiters = Math.min(
-      BONBONNE_CAP,
+      capBonbonne(),
       run.bonbonneLiters + provisionsRun.bonbonne,
     )
   if (provisionsRun.clef) clefCachette = true
@@ -6682,7 +6699,7 @@ function mbMontreVersement(): void {
   mbEl('mb-choix-titre').textContent = 'OÙ VERSER LE SURPLUS ?'
   const host = mbEl('mb-cartes')
   host.innerHTML = ''
-  const espace = Math.max(0, BONBONNE_CAP - run.bonbonneLiters)
+  const espace = Math.max(0, capBonbonne() - run.bonbonneLiters)
   const verse = Math.min(b.surplus, espace)
   const spill = b.surplus - verse
   const pleine = espace < 0.01
@@ -6696,12 +6713,12 @@ function mbMontreVersement(): void {
     `<small>${
       pleine
         ? 'bonbonne PLEINE — tout va à l’étalonnage'
-        : `+${verse.toFixed(2)} L en bonbonne (${run.bonbonneLiters.toFixed(1)} / ${BONBONNE_CAP} L)` +
+        : `+${verse.toFixed(2)} L en bonbonne (${run.bonbonneLiters.toFixed(1)} / ${capBonbonne()} L)` +
           (spill > 0.01 ? ` · excédent +${spill.toFixed(2)} L → XP` : '')
     }</small>` +
     `<em class="mb-prix mb-offert">se reverse dans le corps, en jeu</em>`
   cb.addEventListener('click', () => {
-    run.bonbonneLiters = Math.min(BONBONNE_CAP, run.bonbonneLiters + verse)
+    run.bonbonneLiters = Math.min(capBonbonne(), run.bonbonneLiters + verse)
     bande.ponctuation('sting-collecte', 0.55)
     mbVerseXp(spill)
   })
@@ -6871,11 +6888,13 @@ function mbMontreDraft(): void {
     `PALIER D'ÉTALONNAGE ${palierNo} — EMPORTEZ UN INSTRUMENT`
   const host = mbEl('mb-cartes')
   host.innerHTML = ''
+  // le CARNET DU SEMBLABLE ouvre une quatrième carte
   const cartes = tirageInstruments(
     Math.random,
     run.instruments,
     run.vies,
     VIES_MAX,
+    run.instruments.includes('carnet-du-semblable') ? 4 : 3,
   )
   const suite = (): void => {
     mbDraftsRestants -= 1
@@ -7113,7 +7132,7 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
   host.classList.toggle('mb-trio', cartes.length === 3)
   const jauges = document.createElement('div')
   jauges.className = 'mb-jauges'
-  jauges.innerHTML = `<span>🫙 réserve <b>${run.bonbonneLiters.toFixed(2)} / ${BONBONNE_CAP} L</b></span><span>💠 ×${run.vies} · profondeur ${voieRang} / ${voiePlan.longueur}</span>`
+  jauges.innerHTML = `<span>🫙 réserve <b>${run.bonbonneLiters.toFixed(2)} / ${capBonbonne()} L</b></span><span>💠 ×${run.vies} · profondeur ${voieRang} / ${voiePlan.longueur}</span>`
   host.appendChild(jauges)
   const esc = (t: string): string =>
     t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -7189,7 +7208,7 @@ function mbMontreFin(): void {
   host.innerHTML = ''
   const info = document.createElement('div')
   info.className = 'mb-jauges'
-  info.innerHTML = `<span>🫙 réserve <b>${run.bonbonneLiters.toFixed(2)} / ${BONBONNE_CAP} L</b></span><span>se reverse dans le corps, en jeu</span>`
+  info.innerHTML = `<span>🫙 réserve <b>${run.bonbonneLiters.toFixed(2)} / ${capBonbonne()} L</b></span><span>se reverse dans le corps, en jeu</span>`
   host.appendChild(info)
   const btn = document.createElement('button')
   btn.type = 'button'
@@ -8148,9 +8167,9 @@ function majDossier(): void {
     ? '<section class="do-sec do-butin"><h4>LE BUTIN</h4>' +
       doLigne(
         'BONBONNE',
-        `${run.bonbonneLiters.toFixed(2)} / ${BONBONNE_CAP} L`,
+        `${run.bonbonneLiters.toFixed(2)} / ${capBonbonne()} L`,
       ) +
-      doJauge(run.bonbonneLiters / BONBONNE_CAP) +
+      doJauge(run.bonbonneLiters / capBonbonne()) +
       doLigne('CONDENSAT', `${condensat} cL`, 'chaud') +
       doLigne('MÉMOIRE GRAVÉE', `+${run.memoireGagnee}`, 'vert') +
       doLigne('PASTILLES (SALLE)', `${run.pastillesCl} cL`) +
@@ -8947,7 +8966,11 @@ function frame(now: number): void {
     // le ralenti d'annonce de l'éveil multiplie le temps comme le slow-mo
     // de visée : physique, chrono, refroidissement — tout décélère ensemble
     const warpNow =
-      (dashAiming ? params.timeWarp * params.gasAimSlow : params.timeWarp) *
+      (dashAiming
+        ? params.timeWarp *
+          params.gasAimSlow *
+          (run.instruments.includes('lentille-de-visee') ? 0.5 : 1)
+        : params.timeWarp) *
       eveil.ralenti
     const boost = Math.max(1, warpNow)
     // Troisième borne (retour joueur : « en accélérant, chutes drastiques ») :
@@ -9405,15 +9428,22 @@ function frame(now: number): void {
   } else if (!tableauDone && !sim.dispersed && (drunk || reached)) {
     // Prime de glace : ce que le sas a avalé SOLIDE vaut plus cher que ce
     // qu'il a bu goutte à goutte.
+    // CHAMBRE FROIDE : la prime de glace vaut moitié plus — la carte le
+    // promettait depuis le premier jour sans que rien ne l'applique
     const prime =
-      sim.swallowedIce * params.litersPerParticle * params.iceCollectBonus
+      sim.swallowedIce *
+      params.litersPerParticle *
+      params.iceCollectBonus *
+      (run.instruments.includes('chambre-froide') ? 1.5 : 1)
     const surplus =
       sim.liters() + sim.swallowed * params.litersPerParticle + prime
     run.livreTotal += surplus
+    // FILTRE À CONDENSAT : un quart de plus sur tout ce qui passe le sas
+    const rendement = run.instruments.includes('filtre-a-condensat') ? 1.25 : 1
     // chaque centilitre livré nourrit le CONDENSAT (la bourse de la RUN,
     // purgée à la fin) — y compris sur la
     // dernière salle : rien de ce qui atteint le sas n'est jamais perdu
-    gagneCondensat(surplus * 100)
+    gagneCondensat(surplus * 100 * rendement)
     // Trophées de collecte : « Sans une goutte » (≥ 95 % du volume de
     // départ livré) et « Opérateur de nuit » (21 collectes cumulées)
     if (!sasOutil) {
@@ -9562,7 +9592,7 @@ function frame(now: number): void {
           ? `${fmtTime(bests.chrono.time)}${bests.chrono.name ? ' · ' + htmlSafe(bests.chrono.name) : ''}`
           : '—',
         note: Math.round((surplus * 100 * 60) / (60 + run.tableauTime)),
-        gainCl: Math.round(surplus * 100) + run.pastillesCl,
+        gainCl: Math.round(surplus * 100 * rendement) + run.pastillesCl,
         totalCl: condensat,
       })
     }
@@ -9757,11 +9787,11 @@ function frame(now: number): void {
   hudCoque.textContent = `${coque > 0 ? '+' : ''}${coque}°`
   hudCoque.classList.toggle('warn', chillNow() > 0.75)
   coqueBar.style.width = `${(chillNow() * 100).toFixed(1)}%`
-  hudBonbonne.textContent = `${run.bonbonneLiters.toFixed(2)} / ${BONBONNE_CAP} L`
+  hudBonbonne.textContent = `${run.bonbonneLiters.toFixed(2)} / ${capBonbonne()} L`
   // LE NIVEAU DANS LE VERRE : la part de réserve, poursuivie en douceur.
   // L'intérieur utile va de y = 8,5 (plein) à y = 57,5 (vide) dans le
   // viewBox — soit 49 unités de descente pour un verre vide.
-  const bbCible = Math.max(0, Math.min(1, run.bonbonneLiters / BONBONNE_CAP))
+  const bbCible = Math.max(0, Math.min(1, run.bonbonneLiters / capBonbonne()))
   bbAffiche += (bbCible - bbAffiche) * Math.min(1, dtReal * 5)
   if (Math.abs(bbCible - bbAffiche) < 0.002) bbAffiche = bbCible
   if (bbLiquide)

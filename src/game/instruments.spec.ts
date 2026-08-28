@@ -28,11 +28,38 @@ describe('Instruments — le tirage de fin de salle', () => {
   })
 
   it('un instrument déjà emporté ne revient pas — sauf l’échantillon de secours', () => {
+    // TOUT le catalogue est en poche, sauf l'échantillon : le bassin est
+    // vide, il ne reste que lui. Écrit ainsi, le test survit à l'ajout de
+    // nouveaux instruments — il dit la règle, pas la liste du jour.
+    const tenus = INSTRUMENTS.map((d) => d.id).filter(
+      (id) => id !== 'echantillon-secours',
+    )
     for (let seed = 1; seed < 40; seed++) {
-      const tenus = ['gaine-isolante', 'buse-calibree', 'aimant-rosee', 'chambre-froide']
       const cartes = tirageInstruments(lcg(seed), tenus, 1, 3)
-      // il ne reste que l'échantillon de secours au bassin
       expect(cartes.map((c) => c.id)).toEqual(['echantillon-secours'])
+    }
+  })
+
+  it('le catalogue ne contient ni deux fois le même identifiant, ni deux fois la même icône', () => {
+    // la carte se reconnaît à son glyphe dans le HUD des instruments : deux
+    // cartes de même icône seraient indiscernables une fois embarquées
+    const ids = INSTRUMENTS.map((d) => d.id)
+    const icones = INSTRUMENTS.map((d) => d.icone)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(new Set(icones).size).toBe(icones.length)
+    for (const d of INSTRUMENTS) {
+      expect(d.nom.length).toBeGreaterThan(2)
+      expect(d.desc.length).toBeGreaterThan(10)
+    }
+  })
+
+  it('le CARNET DU SEMBLABLE ouvre une quatrième carte', () => {
+    for (let seed = 1; seed < 40; seed++) {
+      expect(tirageInstruments(lcg(seed), [], 1, 3, 4)).toHaveLength(4)
+      expect(tirageInstruments(lcg(seed), [], 1, 3)).toHaveLength(3)
+      // et les cartes restent distinctes
+      const ids = tirageInstruments(lcg(seed), [], 1, 3, 4).map((c) => c.id)
+      expect(new Set(ids).size).toBe(4)
     }
   })
 
