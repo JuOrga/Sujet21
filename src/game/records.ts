@@ -55,6 +55,10 @@ interface RecordsData {
   // mémoires (ids de cycle.ts). Le champ garde son nom historique
   // (« eveil ») pour ne pas casser les registres existants.
   eveil: string[]
+  // LES VERROUS NARRATIFS du cycle : les liens que le scénario ferme —
+  // y compris les deux offerts (fusion, liquéfaction), pour le déblocage
+  // progressif de l'acte 0. Vide : le cycle nominal.
+  cycleVerrous: string[]
 }
 
 // Les nœuds utilitaires de l'ANCIEN arbre de l'Éveil (remplacé par le
@@ -90,6 +94,7 @@ function blank(): RecordsData {
     fioles: [],
     fiolesEquipees: [],
     eveil: [],
+    cycleVerrous: [],
   }
 }
 
@@ -140,6 +145,7 @@ export class Records {
           if (!Array.isArray(d.fioles)) d.fioles = [] // avant les fioles
           if (!Array.isArray(d.fiolesEquipees)) d.fiolesEquipees = []
           if (!Array.isArray(d.eveil)) d.eveil = [] // avant l'arbre
+          if (!Array.isArray(d.cycleVerrous)) d.cycleVerrous = [] // avant les verrous
           // Migration : les registres d'avant la refonte (un seul record par
           // salle) sèment leurs deux records avec la même entrée.
           for (const code of Object.keys(d.tableaux)) {
@@ -221,6 +227,20 @@ export class Records {
 
   eveilTient(id: string): boolean {
     return this.data.eveil.includes(id)
+  }
+
+  /** Les VERROUS narratifs posés sur le cycle (ids de transformations). */
+  verrousCycle(): string[] {
+    return [...this.data.cycleVerrous]
+  }
+
+  /** Pose ou lève le verrou narratif d'un lien. Rend l'état final. */
+  basculeVerrouCycle(id: string): boolean {
+    const i = this.data.cycleVerrous.indexOf(id)
+    if (i >= 0) this.data.cycleVerrous.splice(i, 1)
+    else this.data.cycleVerrous.push(id)
+    this.save()
+    return i < 0
   }
 
   /** Achète un nœud : débite la mémoire ET grave le nœud, atomiquement.

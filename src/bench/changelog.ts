@@ -22,8 +22,20 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 16:31',
+    title:
+      'Les mémoires : les liens VIVENT, et le scénario peut tout reprendre',
+    notes: [
+      'Cinq retours du concepteur, cinq corrections. (1) ACQUIS = VERT, partout et tout seul : offert d’origine ou tissé de sa mémoire, un lien se lit de la même façon — plaque verte sur le schéma, ligne verte au registre. Ce qui compte, c’est de l’AVOIR, pas de l’avoir payé.',
+      '(2) LES LIENS VIVENT. Fini les pointillés qui glissent : un lien acquis est un trait GAUCHI (une turbulence le déforme — rien n’est droit dans un corps qui coule), doublé d’un halo vert luminescent, et parcouru de deux COMÈTES déphasées à la couleur de l’état d’ARRIVÉE : la matière voyage vers quelque chose. Longueurs normalisées : tous les liens coulent à la même vitesse, le petit comme le grand arc. Et les deux liens offerts coulent EUX AUSSI dès l’ouverture — c’était le reproche. Le gauchissement est calculé une fois pour toutes (filtre en cache) : seules les comètes animent, à coût nul pour la cadence.',
+      '(3) LE SCÉNARIO PEUT TOUT REPRENDRE : les VERROUS narratifs ferment n’importe quel lien, les deux offerts compris — le Sujet sort de cuve sans même savoir revenir liquide, et rachète la FUSION (5) puis la LIQUÉFACTION (5) en mémoire. Un lien payé résiste à tout verrou : ce qu’on a tissé de sa propre mémoire, aucun scénario ne le reprend. Le pupitre d’essais gagne le bouton « Verrous du scénario » pour éprouver le déblocage progressif de l’acte 0 ; le cadran d’états et la voie suivent le verrou comme le reste.',
+      '(4) LA NUÉE DE GAZ est refaite : cinq lobes flous aux dérives propres — jamais deux fois la même silhouette — un cœur plus dense, et des volutes qui montent et s’effacent. Aucun contour : un gaz n’a pas de bord. (5) LE QUATRIÈME ÉTAT quitte le schéma : plus de bulles violettes qui chevauchent le cycle, mais un SECTEUR SCELLÉ à l’écart, sa cellule d’observation balayée en continu, son orbe instable et son anneau qui tourne — relié au cycle par un seul signal qui se dissout en route. Il n’est pas dans le cycle : il est observé. Vérifié en 1280×800 (Deck) : cycle nominal (deux offerts + deux tissés qui coulent en vert), acte 0 tout verrouillé (seuls fusion et liquéfaction payables), rachat de la fusion sous verrou qui repasse au vert. 436 tests verts.',
+    ],
+  },
+  {
     date: '28/08/2026 14:44',
-    title: 'La bonbonne rentre dans la ligne : le bandeau retrouve son épaisseur',
+    title:
+      'La bonbonne rentre dans la ligne : le bandeau retrouve son épaisseur',
     notes: [
       'Signalé aussitôt : posée SOUS le litrage, la fiole faisait doubler l’épaisseur du bandeau du haut. Elle revient donc sur la MÊME LIGNE que le reste — juste après le litrage, avant la jauge — et à la taille de cette ligne : 22 pixels de haut, sous les 23 des pastilles voisines.',
       'Mesuré dans une vraie salle plutôt qu’à l’œil : le bandeau fait 51 pixels avec la fiole comme sans elle — elle n’ajoute plus RIEN — et son centre est aligné sur celui du litrage. Le remplissage, l’ondulation, la présentation en début de tableau et le battement de la dernière goutte sont inchangés : c’est la place et la taille qui bougent, pas la vie de l’objet. 434 tests verts, build propre.',
