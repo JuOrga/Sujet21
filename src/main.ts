@@ -6324,6 +6324,8 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
   // prend en voyant ce qu'on possède — étalonnage en grand, réserve en ligne
   mbEl('mb-etal').hidden = false
   mbPeintEtal(run.xp)
+  // le COMPACT : le bilan déjà lu se replie, les cartes prennent la scène
+  mbVeil.querySelector('.mb-panneau')?.classList.add('mb-compact')
   const host = mbEl('mb-cartes')
   host.innerHTML = ''
   // trois cartes : trois colonnes ; quatre (l'écrite en plus) : carré 2×2
@@ -6365,6 +6367,7 @@ function mbMontreSalles(props: LevelDef[]): void {
   mbEtape = 'salles'
   mbEl('mb-choix-titre').textContent =
     'PAROI DU SAS OUVERTE — CHOISISSEZ LA PROCHAINE SALLE'
+  mbVeil.querySelector('.mb-panneau')?.classList.add('mb-compact')
   const host = mbEl('mb-cartes')
   host.innerHTML = ''
   for (const lv of props) {
@@ -6425,6 +6428,7 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
   mbBilanCourant = b
   mbVeil.hidden = false
   mbEl('mb-cartes').classList.remove('mb-trio') // la disposition du choix repart à neuf
+  mbVeil.querySelector('.mb-panneau')?.classList.remove('mb-compact')
   // état de départ
   mbEl('mb-eau').style.height = '0%'
   mbEl('mb-l').textContent = '0,00 L'

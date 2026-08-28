@@ -22,6 +22,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 12:06',
+    title:
+      'Le choix de la voie tient dans l’écran du Deck : le bilan se replie',
+    notes: [
+      'Signalé, capture à l’appui : sur Steam Deck (800 px de haut), l’écran du choix coupait la rangée basse des cartes — le panneau de cérémonie cumulait bilan, condensat, grande jauge, tampon de palier ET les quatre cartes, débordait l’écran, et le centrage tronquait les deux bouts sans défilement.',
+      'Deux couches de correctif. Le FILET : le panneau ne dépasse plus jamais l’écran (96 % de la hauteur au plus) — s’il est trop grand, il DÉFILE au lieu de couper, à toutes les étapes de la cérémonie. Et le COMPACT : à l’étape du choix de salle, le bilan déjà lu se replie (flacon, lignes de records, condensat, tampon de palier) — l’étalonnage reste, resserré, et les cartes prennent la scène. Sur écran bas, leurs mini-cartes se resserrent d’un cran.',
+      'Vérifié en 1280×800 (la définition du Deck) : le panneau tient entièrement dans l’écran, les quatre cartes sont visibles jusqu’à leur base, le bilan est bien replié à cette étape et réapparaît à la cérémonie suivante. 402 tests verts.',
+    ],
+  },
+  {
     date: '27/08/2026 22:15',
     title: 'Le choix de la voie passe à TROIS salles générées',
     notes: [
