@@ -29,7 +29,9 @@ import {
   hachage,
   litPalmaresVoie,
   masqueMecanique,
+  masquePermis,
   mecaniquesDuChoix,
+  mecaniquesPermises,
   momentAuRang,
   reglageAuRang,
   varianteDuJour,
@@ -60,6 +62,7 @@ import {
   MAT_CHAUD,
   MAT_WALL,
   pointInBox,
+  ZONE_CAUSES,
   zoneForceAt,
   zoneName,
   zoneShape,
@@ -132,8 +135,10 @@ import {
   TRANSFOS_CYCLE,
   transfoAchetable,
   transfoCycle,
+  transfoEntre,
   transfoTenue,
 } from './game/cycle'
+import type { EtatManuel } from './game/input'
 import {
   ETAL_ECONOMAT,
   TABLEAU_ECONOMAT,
@@ -6614,11 +6619,20 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
         }
       })()
     : Math.random
+  // LE CYCLE tient aussi la voie : la descente ne propose jamais une salle
+  // qui exige une transformation manuelle non tissée — mécaniques ET
+  // maillons se restreignent aux liens que le joueur possède.
+  const acquisCycle = records.eveilAcquis()
+  const solidTenue = transfoTenue('solidification', acquisCycle)
+  const vapoTenue = transfoTenue('vaporisation', acquisCycle)
+  const permises = mecaniquesPermises(solidTenue, vapoTenue)
+  const masqueCycle = masquePermis(solidTenue, vapoTenue)
   // la mécanique de la salle qu'on VIENT de jouer s'évite : la foulée varie
   const [mecaA, mecaB, mecaC] = mecaniquesDuChoix(
     aEcrite?.mecanique ?? null,
     alea,
     identiteAtelier(level)?.mecanique ?? null,
+    permises,
   )
   // le RÉGLAGE DU RANG (enseigner · éprouver · tordre) : la posture de la
   // salle générée — pureté du début, laby du milieu, contraste de la fin,
@@ -6629,7 +6643,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
     dangers: regl.dangers,
     laby: regl.laby,
     contraste: regl.contraste,
-    familles: regl.purete ? masqueMecanique(mec) : 127,
+    familles: (regl.purete ? masqueMecanique(mec) : 127) & masqueCycle,
   })
   const variante = (n: number): string =>
     voiePlan.graineDuJour
@@ -6663,7 +6677,15 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   // suite écrite (si la séquence en offre une) s'y ajoute en quatrième
   // carte : la voie reste procédurale d'abord, l'écrite est une option.
   const cartes: CarteVoie[] = []
-  if (ecrite)
+  // la suite écrite ne se propose que JOUABLE : un tableau peut déclarer
+  // les états qu'il EXIGE au bouton (champ `exige`, posé dans l'éditeur) —
+  // un lien manquant l'écarte du choix, la descente reste procédurale
+  const ecriteJouable =
+    !ecrite ||
+    (ecrite.exige ?? []).every(
+      (e) => (e === 'glace' ? solidTenue : vapoTenue) || false,
+    )
+  if (ecrite && ecriteJouable)
     cartes.push({
       lv: ecrite,
       cahier: aEcrite,
@@ -6689,7 +6711,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   // mécaniques restantes jusqu'à tenir la garantie — au moins UNE générée,
   // et trois tant que le générateur en donne
   if (cartes.filter((c) => c.generee).length < 3) {
-    for (const mec of [0, 1, 2, 3] as const) {
+    for (const mec of permises) {
       if (cartes.filter((c) => c.generee).length >= 3) break
       if (cartes.some((c) => c.generee && c.cahier?.mecanique === mec)) continue
       const gx = genere(mec, 5 + mec)
@@ -7479,16 +7501,119 @@ const btnVortex = touchButton(
   'tb-vortex',
 )
 
-// Sélecteur d'état (EAU / GLACE / VAPEUR) : la commande centrale du jeu
+// ---- LE CADRAN DU CYCLE (refonte du sélecteur d'état) -------------------
+// Trois LOGEMENTS fixes — ❄ à gauche, 💧 au centre, 💨 à droite : la
+// mémoire musculaire tient, au doigt comme à la manette (X / B / Y). Mais
+// ce qu'ils montrent a changé : le logement de l'état COURANT devient le
+// MÉDAILLON (l'identité, pas une commande), et les autres ne paraissent
+// que si la TRANSFORMATION qui y mène est tissée — ils portent alors son
+// NOM (FUSION, SOLIDIFICATION…), le vocabulaire de l'écran des mémoires.
+// Au tout début de partie : le médaillon seul, AUCUN bouton — c'est voulu.
+// Le médaillon reste cliquable : re-toucher son état, c'est demander le
+// retour au liquide (le geste historique du dégel ne se perd pas).
 const stateEau = document.getElementById('state-eau') as HTMLButtonElement
 const stateGlace = document.getElementById('state-glace') as HTMLButtonElement
 const stateVapeur = document.getElementById('state-vapeur') as HTMLButtonElement
-stateEau.addEventListener('click', () => {
-  input.freezeIntent = false
-  input.gasIntent = false
-})
-stateGlace.addEventListener('click', () => input.toggleFreeze())
-stateVapeur.addEventListener('click', () => input.toggleGas())
+const stateZoneEl = document.getElementById('state-zone') as HTMLDivElement
+const statebarEl = document.getElementById('statebar') as HTMLDivElement
+stateEau.addEventListener('click', () => input.demande('eau'))
+stateGlace.addEventListener('click', () => input.demande('glace'))
+stateVapeur.addEventListener('click', () => input.demande('vapeur'))
+
+// Le GARDE du cycle : en descente (hors tableau d'atelier et tableaux
+// « états libres »), une transformation MANUELLE exige son lien tissé.
+// Les régimes du décor (zones, chaudière, cryostase) n'y passent pas.
+const CYCLE_PAR_ETAT = {
+  eau: 'liquide',
+  glace: 'solide',
+  vapeur: 'gaz',
+} as const
+function cycleGateActif(): boolean {
+  return testLevel === null && level.etats !== 'libres'
+}
+input.peutDevenir = (vers) => {
+  if (!cycleGateActif()) return true
+  const t = transfoEntre(
+    CYCLE_PAR_ETAT[input.etatManuel()],
+    CYCLE_PAR_ETAT[vers],
+  )
+  return t !== null && transfoTenue(t.id, records.eveilAcquis())
+}
+// Un refus MONTRE le verrou : le logement visé paraît quelques secondes,
+// cadenassé, le nom du lien à tisser dessus — l'envie se sème là.
+const verrouEtat = { slot: null as EtatManuel | null, jusqua: 0 }
+input.onDevenirRefuse = (vers) => {
+  verrouEtat.slot = vers
+  verrouEtat.jusqua = performance.now() / 1000 + 2.6
+}
+
+// Le cadran ne réécrit le DOM que quand sa SIGNATURE change — pas à
+// chaque image. La zone forcée verrouille tout et s'annonce en badge.
+let cadranSignature = ''
+function majCadranEtats(zoneActive: ZoneForce): void {
+  const cur = input.etatManuel()
+  const manetteActive = manette.lastActivity > input.lastPointerAt
+  const verrou =
+    verrouEtat.slot !== null && performance.now() / 1000 < verrouEtat.jusqua
+      ? verrouEtat.slot
+      : null
+  const acquis = records.eveilAcquis()
+  const gate = cycleGateActif()
+  const zone = zoneActive !== 'libre'
+  const sig = [
+    cur,
+    manetteActive,
+    verrou,
+    zoneActive,
+    gate,
+    acquis.join('+'),
+  ].join('|')
+  if (sig === cadranSignature) return
+  cadranSignature = sig
+  const NOMS_ETAT = {
+    eau: 'LIQUIDE',
+    glace: 'GLACE',
+    vapeur: 'VAPEUR',
+  } as const
+  const slots = [
+    { el: stateGlace, etat: 'glace' as const, kbd: 'F', pad: 'X' },
+    {
+      el: stateEau,
+      etat: 'eau' as const,
+      kbd: cur === 'vapeur' ? 'G' : 'F',
+      pad: 'B',
+    },
+    { el: stateVapeur, etat: 'vapeur' as const, kbd: 'G', pad: 'Y' },
+  ]
+  for (const s of slots) {
+    const label = s.el.querySelector('.st-label') as HTMLElement | null
+    const kbd = s.el.querySelector('kbd') as HTMLElement | null
+    if (!label || !kbd) continue
+    const estCur = s.etat === cur
+    const t = estCur
+      ? null
+      : transfoEntre(CYCLE_PAR_ETAT[cur], CYCLE_PAR_ETAT[s.etat])
+    const tenue = t !== null && (!gate || transfoTenue(t.id, acquis))
+    const montreVerrou = !estCur && !tenue && t !== null && verrou === s.etat
+    s.el.hidden = !estCur && !tenue && !montreVerrou
+    s.el.classList.toggle('active', estCur)
+    s.el.classList.toggle('st-cur', estCur)
+    s.el.classList.toggle('st-verrou', montreVerrou)
+    s.el.disabled = zone || montreVerrou
+    label.textContent = !estCur && t ? t.nom : NOMS_ETAT[s.etat]
+    kbd.textContent = montreVerrou ? '🔒' : manetteActive ? s.pad : s.kbd
+    kbd.hidden = estCur
+    s.el.title = estCur
+      ? 're-toucher : revenir liquide'
+      : montreVerrou
+        ? `${t?.nom} — mémoire non tissée. Passez par le liquide, ou tissez le lien à l’écran des MÉMOIRES.`
+        : (t?.desc ?? '')
+  }
+  statebarEl.classList.toggle('st-zone', zone)
+  stateZoneEl.hidden = !zone
+  if (zone)
+    stateZoneEl.textContent = `🔒 ${ZONE_CAUSES[zoneActive]} — RÉGIME IMPOSÉ`
+}
 
 // ---- L'ÉVEIL : la prise en main scénarisée ------------------------------
 // Trois temps, diégétiques. (1) Sortie de cryostase : le corps est GLACE
@@ -8037,20 +8162,14 @@ function frame(now: number): void {
       if (manette.edge(BOUTON.LB)) input.stepWarp(-1)
       if (manette.edge(BOUTON.RB)) input.stepWarp(1)
       // les trois états sur les trois boutons restants : X glace, Y vapeur,
-      // B retour à l'eau — A reste la main qui agit
-      if (manette.edge(BOUTON.X)) {
-        if (input.gasIntent) input.toggleGas()
-        input.toggleFreeze()
-      }
-      if (manette.edge(BOUTON.Y)) {
-        if (input.freezeIntent) input.toggleFreeze()
-        input.toggleGas()
-      }
+      // B retour à l'eau — A reste la main qui agit. Tout passe par la
+      // DEMANDE : le cycle des mémoires tranche, le cadran montre le verrou.
+      if (manette.edge(BOUTON.X)) input.demande('glace')
+      if (manette.edge(BOUTON.Y)) input.demande('vapeur')
       if (!bConsomme && manette.edge(BOUTON.B)) {
         // retour à l'eau, quel que soit l'état — sauf si B vient de
         // refermer un panneau léger (légende, états, instruments)
-        if (input.freezeIntent) input.toggleFreeze()
-        else if (input.gasIntent) input.toggleGas()
+        input.demande('eau')
       }
       if (manette.edge(BOUTON.GAUCHE)) input.stepWarp(-1)
       if (manette.edge(BOUTON.DROITE)) input.stepWarp(1)
@@ -8935,9 +9054,7 @@ function frame(now: number): void {
   chipEditor.style.display = fromEditor ? '' : 'none'
   btnVortex.classList.toggle('active', input.vortexArmed)
   btnVortex.style.display = params.vortexEnabled >= 0.5 ? '' : 'none'
-  stateEau.classList.toggle('active', !input.freezeIntent && !input.gasIntent)
-  stateGlace.classList.toggle('active', input.freezeIntent)
-  stateVapeur.classList.toggle('active', input.gasIntent)
+  majCadranEtats(zoneActive)
   // dans une zone imposée, le sélecteur se grise : le choix n'est plus offert
   const locked = zoneActive !== 'libre'
   stateEau.disabled = locked

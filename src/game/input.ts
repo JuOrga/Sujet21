@@ -10,6 +10,9 @@
 
 export const TIME_WARP_STEPS = [0.25, 0.5, 1, 2, 4]
 
+/** Les trois états qu'une COMMANDE peut viser (le plasma n'a pas de bouton). */
+export type EtatManuel = 'eau' | 'glace' | 'vapeur'
+
 export class Input {
   aimActive = false
   aimClientX = 0
@@ -34,11 +37,42 @@ export class Input {
     this.gasIntent = !this.gasIntent
     if (this.gasIntent) this.freezeIntent = false
   }
+
+  // ---- Le CYCLE DES ÉTATS a la main sur les transformations MANUELLES —
+  // bouton, clavier, manette passent par demande() : le garde répond selon
+  // les mémoires tissées. Les transformations du DÉCOR (zones forcées,
+  // chaudière, cryostase, fin de partie) posent les intentions directement
+  // ou passent par les toggles : le décor transforme toujours.
+  /** Le garde : la bascule vers cet état est-elle permise ? (null : tout
+   * est permis — banc, tableaux « états libres ».) */
+  peutDevenir: ((vers: EtatManuel) => boolean) | null = null
+  /** Une demande refusée (lien non tissé) : l'interface montre le verrou. */
+  onDevenirRefuse: ((vers: EtatManuel) => void) | null = null
+
+  /** L'état que les COMMANDES tiennent en ce moment. */
+  etatManuel(): EtatManuel {
+    return this.freezeIntent ? 'glace' : this.gasIntent ? 'vapeur' : 'eau'
+  }
+
+  /** Une demande de transformation MANUELLE. Re-demander l'état courant,
+   * c'est demander le retour au liquide (le geste historique : F dégèle).
+   * Le garde du cycle tranche ; refusée, la demande ne change rien. */
+  demande(vers: EtatManuel): void {
+    const cible = this.etatManuel() === vers ? 'eau' : vers
+    if (cible === this.etatManuel()) return // déjà liquide : rien à faire
+    if (this.peutDevenir && !this.peutDevenir(cible)) {
+      this.onDevenirRefuse?.(cible)
+      return
+    }
+    this.freezeIntent = cible === 'glace'
+    this.gasIntent = cible === 'vapeur'
+  }
   onReset: (() => void) | null = null
   onTimeWarpChange: ((warp: number) => void) | null = null
   // le zoom porte son ANCRE (centre du pincement, curseur de la molette) :
   // le point du monde sous les doigts doit rester sous les doigts
-  onZoom: ((factor: number, clientX: number, clientY: number) => void) | null = null
+  onZoom: ((factor: number, clientX: number, clientY: number) => void) | null =
+    null
   onPan: ((dxPx: number, dyPx: number) => void) | null = null
   // fin de glissement, avec l'élan du geste (px/s) : la carte continue
   onPanEnd: ((vxPx: number, vyPx: number) => void) | null = null
@@ -49,7 +83,12 @@ export class Input {
   private pinchCenter: { x: number; y: number } | null = null
   // Clic droit maintenu : déplacement de caméra ; relâché sans avoir bougé,
   // c'est le vortex (l'outil sandbox garde son geste historique)
-  private rightDrag: { id: number; x: number; y: number; moved: number } | null = null
+  private rightDrag: {
+    id: number
+    x: number
+    y: number
+    moved: number
+  } | null = null
   // élan du glissement en cours (px/s, moyenne mobile) — sert au lancer
   private panVx = 0
   private panVy = 0
@@ -93,7 +132,10 @@ export class Input {
   sourisAt = -1e9
 
   stepWarp(dir: number): void {
-    this.warpIndex = Math.min(TIME_WARP_STEPS.length - 1, Math.max(0, this.warpIndex + dir))
+    this.warpIndex = Math.min(
+      TIME_WARP_STEPS.length - 1,
+      Math.max(0, this.warpIndex + dir),
+    )
     this.onTimeWarpChange?.(TIME_WARP_STEPS[this.warpIndex])
   }
 
@@ -122,7 +164,12 @@ export class Input {
       if (!enJeu() || this.gelees) return
       if (e.button === 2) {
         // Maintenu : déplacement de caméra ; bref : vortex (au relâchement)
-        this.rightDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0 }
+        this.rightDrag = {
+          id: e.pointerId,
+          x: e.clientX,
+          y: e.clientY,
+          moved: 0,
+        }
         this.panVx = 0
         this.panVy = 0
         this.panLastT = performance.now() / 1000
@@ -237,7 +284,8 @@ export class Input {
         // (lignes/pages → pixels) et borné : Firefox en mode « lignes »
         // envoyait ±3 — un zoom quasi immobile ; les molettes libres, des
         // rafales géantes — un zoom qui saute.
-        const brut = e.deltaY * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 400 : 1)
+        const brut =
+          e.deltaY * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 400 : 1)
         const pas = Math.max(-3, Math.min(3, brut / 100))
         if (pas !== 0) this.onZoom?.(Math.pow(1.1, -pas), e.clientX, e.clientY)
       },
@@ -263,9 +311,9 @@ export class Input {
       } else if (e.key === '.' || e.key === '>') {
         this.stepWarp(1)
       } else if (e.key === 'f' || e.key === 'F') {
-        this.toggleFreeze()
+        this.demande('glace')
       } else if (e.key === 'g' || e.key === 'G') {
-        this.toggleGas()
+        this.demande('vapeur')
       }
     })
   }

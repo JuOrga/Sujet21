@@ -22,8 +22,19 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 12:51',
+    title:
+      'La descente au rythme du cycle : cadran d’états refondu, liens qui commandent',
+    notes: [
+      'Les mémoires COMMANDENT désormais la run. En descente, une transformation MANUELLE (bouton, clavier F/G, manette X/Y/B) exige son lien tissé : au départ, liquide, AUCUN bouton d’état — c’est voulu ; on tisse la solidification, le bouton ❄ naît ; la vaporisation, le bouton 💨. Glace → vapeur d’une touche ? Seulement une fois la SUBLIMATION tissée — sinon on repasse par le liquide (fusion, puis vaporisation). Les régimes du décor n’ont pas changé : zones forcées, chaudière et cryostase transforment toujours — et fusion/liquéfaction, acquises d’origine, garantissent le retour.',
+      'Le SÉLECTEUR D’ÉTAT est refondu — le cadran du cycle. Trois logements FIXES (❄ à gauche, 💧 au centre, 💨 à droite : la mémoire musculaire tient, au doigt comme au Steam Deck) ; le logement de l’état courant devient le MÉDAILLON (l’identité), les autres ne paraissent que si leur transformation est tissée, et portent son NOM — le vocabulaire de l’écran des mémoires, jusque dans le HUD. Fini le « re-toucher pour dégeler » ambigu : revenir au liquide est un bouton central nommé (FUSION, LIQUÉFACTION) — le médaillon re-touché le fait aussi, l’habitude ne se perd pas. Un refus fait paraître le logement quelques secondes, cadenassé, nom du lien dessus : l’envie se sème. Une zone forcée verrouille le cadran et l’annonce en badge (« HUBLOT FENDU — RÉGIME IMPOSÉ »). Les raccourcis s’affichent selon la main : F/G au clavier, X/Y/B dès que la manette parle.',
+      'La VOIE suit : les cartes du choix ne proposent jamais une salle qui exige un lien non tissé (mécaniques permises, maillons glaceux/vaporeux masqués — la membrane reste), et la « suite écrite » s’écarte si le tableau déclare une exigence non tissée. L’ÉDITEUR gagne ses réglages : « États en descente » (suivant les mémoires / libres) et « Exige au bouton » (glace, vapeur) — gravés au format JSON (aller-retour testé, fichiers existants inchangés). Vérifié dans le jeu construit : joueur neuf au médaillon seul, refus F/G avec verrou visible, tissages qui font naître les boutons, dégel par FUSION, éditeur lu dans le niveau. 433 tests verts.',
+    ],
+  },
+  {
     date: '28/08/2026 12:25',
-    title: 'La VITRE : un habillage de paroi qu’on voit — et qui laisse passer la lumière',
+    title:
+      'La VITRE : un habillage de paroi qu’on voit — et qui laisse passer la lumière',
     notes: [
       'Demandé : un nouvel habillage « vitre » dans l’éditeur. Il est là, dixième entrée du menu Habillage (décor) d’une paroi neutre, après Câbles. Verre feuilleté sur dormant métallique : le cadre tout le tour, des MENEAUX qui divisent le panneau en un nombre ENTIER de travées calées sur la boîte — les montants tombent donc juste aux deux bords quelle que soit la taille du vitrage —, un reflet en nappes obliques et IMMOBILES (une vitre ne scintille pas toute seule : elle renvoie la salle, qui ne bouge pas — l’inverse exact des rayures animées du radiateur), et un grain de poussière sans lequel le verre fait plastique.',
       'C’est le premier habillage qui change ce qu’on VOIT : le remplissage est partiellement transparent, la cuve se lit au travers, seuls le dormant et les meneaux sont opaques. La physique, elle, ne bouge pas d’un pouce — une vitre reste une paroi neutre, le corps y bute comme sur le reste, et rien dans le solveur n’a été touché.',

@@ -45,7 +45,10 @@ export function clampPlanVoie(p: Partial<PlanVoie> | null): PlanVoie {
 }
 
 /** Le MOMENT du rang (1-based) dans le plan : par tiers de la longueur. */
-export function momentAuRang(rang: number, plan: PlanVoie): CodeAtelier['moment'] {
+export function momentAuRang(
+  rang: number,
+  plan: PlanVoie,
+): CodeAtelier['moment'] {
   return phaseRun(rang, plan.longueur)
 }
 
@@ -117,6 +120,44 @@ export function masqueMecanique(mec: CodeAtelier['mecanique']): number {
   return masque || 127
 }
 
+/** Les MÉCANIQUES que les mémoires tissées permettent : la glace (1)
+ * demande la SOLIDIFICATION au bouton, la vapeur (2) la VAPORISATION,
+ * « toutes » (3) les deux. La 0 (aucune) reste toujours ouverte — la
+ * descente ne propose jamais une salle qui exige un lien non tissé. */
+export function mecaniquesPermises(
+  solidification: boolean,
+  vaporisation: boolean,
+): CodeAtelier['mecanique'][] {
+  const permises: CodeAtelier['mecanique'][] = [0]
+  if (solidification) permises.push(1)
+  if (vaporisation) permises.push(2)
+  if (solidification && vaporisation) permises.push(3)
+  return permises
+}
+
+/** Le masque de FAMILLES de maillons permis par les mémoires : les
+ * maillons glaceux (rideau, porte, et) et vaporeux (grille, rail, nor)
+ * disparaissent tant que leur lien manuel n'est pas tissé — la membrane
+ * (l'eau) reste toujours. */
+export function masquePermis(
+  solidification: boolean,
+  vaporisation: boolean,
+): number {
+  let masque = 0
+  for (const [nom, permis] of [
+    ['membrane', true],
+    ['rideau', solidification],
+    ['porte', solidification],
+    ['et', solidification],
+    ['grille', vaporisation],
+    ['rail', vaporisation],
+    ['nor', vaporisation],
+  ] as const) {
+    if (permis) masque |= 1 << FAMILLES_OPT.indexOf(nom)
+  }
+  return masque
+}
+
 /** Hachage FNV-1a 32 bits : stable, sans dépendance — la graine du jour. */
 export function hachage(txt: string): number {
   let h = 0x811c9dc5
@@ -139,24 +180,31 @@ export function varianteDuJour(jourIso: string, rang: number): string {
 /** TROIS MÉCANIQUES distinctes pour les cartes du choix — la première
  * évite celle de la salle écrite (si elle existe) pour que le choix
  * parle, ET celle de la salle qu'on vient de jouer (la foulée varie)
- * quand c'est possible sans vider le chapeau. */
+ * quand c'est possible sans vider le chapeau. Le chapeau lui-même se
+ * restreint aux mécaniques PERMISES par les mémoires : s'il en reste
+ * moins de trois, les cartes répètent (trois salles, mêmes mécaniques,
+ * variantes différentes) plutôt que d'exiger un lien non tissé. */
 export function mecaniquesDuChoix(
   exclue: number | null,
   alea: () => number,
   eviter: number | null = null,
+  permises: readonly CodeAtelier['mecanique'][] = [0, 1, 2, 3],
 ): [
   CodeAtelier['mecanique'],
   CodeAtelier['mecanique'],
   CodeAtelier['mecanique'],
 ] {
-  const toutes = [0, 1, 2, 3] as const
+  const toutes = permises.length > 0 ? permises : ([0] as const)
   let candidates = toutes.filter((m) => m !== exclue && m !== eviter)
   if (candidates.length === 0) candidates = toutes.filter((m) => m !== exclue)
-  const a = candidates[Math.floor(alea() * candidates.length)]
+  if (candidates.length === 0) candidates = [...toutes]
+  const tire = (liste: readonly CodeAtelier['mecanique'][]) =>
+    liste[Math.floor(alea() * liste.length)]
+  const a = tire(candidates)
   const restantes = toutes.filter((m) => m !== a)
-  const b = restantes[Math.floor(alea() * restantes.length)]
+  const b = restantes.length > 0 ? tire(restantes) : tire(toutes)
   const dernieres = toutes.filter((m) => m !== a && m !== b)
-  const c = dernieres[Math.floor(alea() * dernieres.length)]
+  const c = dernieres.length > 0 ? tire(dernieres) : tire(toutes)
   return [a, b, c]
 }
 
