@@ -197,3 +197,21 @@ describe('zonesDuHub — la géométrie tranche', () => {
     expect(zonesDuHub({ bounds: { maxX: 1750 } })).toBe(null)
   })
 })
+
+describe('le méta EN DONNÉES — les zones deviennent des plots posés', () => {
+  it('chaque hub porte ses plots (monnaie mémoire) et son banc, alignés sur ses zones', () => {
+    for (const [zones, tableau] of [
+      [ZONES_HUB_GRAND, TABLEAU_HUB],
+      [ZONES_HUB_COMPACT, TABLEAU_HUB_COMPACT],
+    ] as const) {
+      expect(tableau.plots).toEqual(
+        zones.etal.map((a) => ({
+          ...a.plot,
+          article: a.id,
+          monnaie: 'memoire',
+        })),
+      )
+      expect(tableau.bancMemoires).toEqual(zones.banc)
+    }
+  })
+})

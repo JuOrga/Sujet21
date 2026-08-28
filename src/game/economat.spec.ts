@@ -87,3 +87,18 @@ describe('l’Économat — la salle du Semblable', () => {
     expect(masse!.minY).toBeGreaterThan(grille!.maxY)
   })
 })
+
+describe('le méta EN DONNÉES — l’étal devient des plots posés', () => {
+  it('les cinq alcôves sont des plots condensat, et le marchand est posé', () => {
+    expect(TABLEAU_ECONOMAT.plots).toEqual(
+      ETAL_ECONOMAT.map((a) => ({
+        ...a.plot,
+        article: a.id,
+        monnaie: 'condensat',
+      })),
+    )
+    // le Sujet 12 : le point du marchand, derrière sa grille
+    expect(TABLEAU_ECONOMAT.marchand).toBeDefined()
+    expect(TABLEAU_ECONOMAT.marchand!.y).toBeGreaterThan(330)
+  })
+})

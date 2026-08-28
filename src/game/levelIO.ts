@@ -25,12 +25,17 @@ import {
   type CacheDef,
   type CibleDef,
   type CondensatPose,
+  type EclatPose,
   type LaserDef,
+  type MonnaiePlot,
+  type PlotMeta,
   type PorteDef,
   type RailDef,
   type ZoneDef,
   type ZoneForce,
 } from './level'
+import { ARTICLES_ETAL_IDS } from './economat'
+import { ARTICLES_COMPTOIR_IDS } from './hub'
 import { MAX_BOXES, MAX_LUMIERES, MAX_ZONES } from '../render/renderer'
 import {
   ARC_EPAISSEUR_DEFAUT,
@@ -69,6 +74,21 @@ const TONES: WorldLabel['tone'][] = [
 
 function num(v: unknown, fallback = 0): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : fallback
+}
+
+/** Un rectangle remis à l'endroit (min ≤ max), quel que soit l'ordre lu. */
+function normRect(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): { minX: number; minY: number; maxX: number; maxY: number } {
+  return {
+    minX: Math.min(ax, bx),
+    minY: Math.min(ay, by),
+    maxX: Math.max(ax, bx),
+    maxY: Math.max(ay, by),
+  }
 }
 
 function str(v: unknown, fallback = ''): string {
@@ -596,6 +616,62 @@ export function parseLevel(input: unknown): {
     level.fiole = { x: num(f.x, 0), y: num(f.y, 0) }
   }
 
+  // LE MÉTA POSÉ — les plots d'article : liste FERMÉE par monnaie (un id
+  // inconnu est écarté, comme une sorte de décalque inconnue), prix borné
+  const plots: PlotMeta[] = []
+  for (const raw of Array.isArray(o.plots) ? o.plots : []) {
+    const p = (raw ?? {}) as Record<string, unknown>
+    const monnaie: MonnaiePlot =
+      p.monnaie === 'memoire' ? 'memoire' : 'condensat'
+    const article = str(p.article)
+    const connus: readonly string[] =
+      monnaie === 'memoire' ? ARTICLES_COMPTOIR_IDS : ARTICLES_ETAL_IDS
+    if (!connus.includes(article)) {
+      rejets.push(`plot d'article inconnu écarté (${article || 'sans id'})`)
+      continue
+    }
+    const r = normRect(
+      num(p.minX, 0),
+      num(p.minY, 0),
+      num(p.maxX, 0),
+      num(p.maxY, 0),
+    )
+    const plotLu: PlotMeta = { ...r, article, monnaie }
+    if (p.prix !== undefined) {
+      plotLu.prix = Math.max(1, Math.min(999, Math.round(num(p.prix, 1))))
+    }
+    plots.push(plotLu)
+  }
+  if (plots.length > 0) level.plots = plots
+
+  // le banc des mémoires (un seul), le marchand (un seul)
+  if (o.bancMemoires && typeof o.bancMemoires === 'object') {
+    const b = o.bancMemoires as Record<string, unknown>
+    level.bancMemoires = normRect(
+      num(b.minX, 0),
+      num(b.minY, 0),
+      num(b.maxX, 0),
+      num(b.maxY, 0),
+    )
+  }
+  if (o.marchand && typeof o.marchand === 'object') {
+    const m = o.marchand as Record<string, unknown>
+    level.marchand = { x: num(m.x, 0), y: num(m.y, 0) }
+  }
+
+  // les éclats de mémoire : valeur gravée bornée (jamais semés — l'auteur
+  // seul en pose)
+  const eclats: EclatPose[] = []
+  for (const raw of Array.isArray(o.eclats) ? o.eclats : []) {
+    const e = (raw ?? {}) as Record<string, unknown>
+    eclats.push({
+      x: num(e.x, 0),
+      y: num(e.y, 0),
+      memoire: Math.max(1, Math.min(99, Math.round(num(e.memoire, 2)))),
+    })
+  }
+  if (eclats.length > 0) level.eclats = eclats
+
   // Rails magnétiques : des polylignes d'au moins 2 points
   const rails: RailDef[] = []
   for (const raw of Array.isArray(o.rails) ? o.rails : []) {
@@ -690,6 +766,10 @@ export function serializeLevel(level: LevelDef): string {
   if (level.condensats && level.condensats.length > 0)
     out.condensats = level.condensats
   if (level.fiole) out.fiole = level.fiole
+  if (level.plots?.length) out.plots = level.plots
+  if (level.bancMemoires) out.bancMemoires = level.bancMemoires
+  if (level.marchand) out.marchand = level.marchand
+  if (level.eclats?.length) out.eclats = level.eclats
   if (level.lumieres && level.lumieres.length > 0) out.lumieres = level.lumieres
   if (level.decals && level.decals.length > 0) out.decals = level.decals
   if (level.figure) out.figure = level.figure

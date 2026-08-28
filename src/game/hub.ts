@@ -18,6 +18,7 @@ import {
   MAT_WALL,
   type LevelDef,
   type ObstacleBox,
+  type PlotMeta,
 } from './level'
 
 function box(
@@ -28,7 +29,9 @@ function box(
   material: number,
   skin?: number,
 ): ObstacleBox {
-  return skin ? { minX, minY, maxX, maxY, material, skin } : { minX, minY, maxX, maxY, material }
+  return skin
+    ? { minX, minY, maxX, maxY, material, skin }
+    : { minX, minY, maxX, maxY, material }
 }
 
 // ——— LE PLAN (v3) : des SALLES, pas un couloir cloisonné ———————————
@@ -77,7 +80,7 @@ type RectHub = { minX: number; minY: number; maxX: number; maxY: number }
 
 // le catalogue du comptoir — les MÊMES articles quel que soit le module ;
 // seules les alcôves (plots) changent avec la géométrie du hub joué
-const ARTICLES_COMPTOIR = [
+export const ARTICLES_COMPTOIR = [
   {
     id: 'viatique' as const,
     nom: 'VIATIQUE DE GOUTTES',
@@ -110,6 +113,35 @@ const ARTICLES_COMPTOIR = [
 
 function etalAvecPlots(plots: RectHub[]): ArticleHub[] {
   return ARTICLES_COMPTOIR.map((a, i) => ({ ...a, plot: plots[i] }))
+}
+
+/** Les ids d'articles que la monnaie MÉMOIRE accepte sur un plot posé —
+ * la liste fermée du format (levelIO écarte tout autre id). */
+export const ARTICLES_COMPTOIR_IDS = ARTICLES_COMPTOIR.map((a) => a.id)
+
+/** La fiche catalogue d'un article du comptoir (les effets sont des
+ * PROVISIONS de la prochaine descente, où que le plot soit posé). */
+export function articleComptoir(
+  id: string,
+): (typeof ARTICLES_COMPTOIR)[number] | null {
+  return ARTICLES_COMPTOIR.find((a) => a.id === id) ?? null
+}
+
+/** Les zones méta d'un module, converties en PLOTS-DONNÉES : posées dans
+ * la définition du tableau, elles suivent le chemin d'exécution commun —
+ * le même que les plots qu'on pose dans l'éditeur. */
+function metaEnDonnees(z: ZonesHub): {
+  plots: PlotMeta[]
+  bancMemoires: RectHub
+} {
+  return {
+    plots: z.etal.map((a) => ({
+      ...a.plot,
+      article: a.id,
+      monnaie: 'memoire' as const,
+    })),
+    bancMemoires: z.banc,
+  }
 }
 
 /** Les ZONES MÉTA d'un hub : l'étal du comptoir, le banc des mémoires,
@@ -158,9 +190,7 @@ export const ZONES_HUB_COMPACT: ZonesHub = {
 /** Les zones méta du hub JOUÉ — la géométrie tranche : le grand module,
  * le compact v4, ou null (un vieil instantané de la bibliothèque, sans
  * annexe méta : aucune zone ne s'active à tort). */
-export function zonesDuHub(lv: {
-  bounds: { maxX: number }
-}): ZonesHub | null {
+export function zonesDuHub(lv: { bounds: { maxX: number } }): ZonesHub | null {
   if (lv.bounds.maxX >= 3500) return ZONES_HUB_GRAND
   if (lv.bounds.maxX >= 2600) return ZONES_HUB_COMPACT
   return null
@@ -244,7 +274,14 @@ export const TABLEAU_HUB: LevelDef = {
   sponges: [
     // le dernier casier du placard : l'éponge — elle boit, elle ne rend rien
     // (rangée au placard : la salle d'étalonnage appartient au comptoir)
-    { minX: -290, minY: -1700, cols: 3, rows: 3, cellSize: 30, capacityPerCell: 5 },
+    {
+      minX: -290,
+      minY: -1700,
+      cols: 3,
+      rows: 3,
+      cellSize: 30,
+      capacityPerCell: 5,
+    },
   ],
   decals: [
     // L'ÉCRAN DE CONTRÔLE de la salle d'observation — SOUS TENSION : la
@@ -258,37 +295,134 @@ export const TABLEAU_HUB: LevelDef = {
     // survit au dézoom (c'est la légende du plan) ; sans rang, la pancarte
     // commente un objet et s'efface dès qu'elle gênerait.
     // ─── la cuve
-    { x: -3200, y: 1300, text: 'MODULE MÉDUSE — SECTEUR 01|CUVE D’ENTRAÎNEMENT', tone: 'mur', rang: 'secteur' },
-    { x: -3200, y: -1400, text: 'NOTE DE SERVICE|LES CRÉATEURS OBSERVENT', tone: 'froid' },
+    {
+      x: -3200,
+      y: 1300,
+      text: 'MODULE MÉDUSE — SECTEUR 01|CUVE D’ENTRAÎNEMENT',
+      tone: 'mur',
+      rang: 'secteur',
+    },
+    {
+      x: -3200,
+      y: -1400,
+      text: 'NOTE DE SERVICE|LES CRÉATEURS OBSERVENT',
+      tone: 'froid',
+    },
     // ─── l'observation (nord)
-    { x: -1350, y: 1300, text: 'ACCÈS CRÉATEURS|SALLE D’OBSERVATION', tone: 'mur', rang: 'secteur' },
-    { x: -1350, y: 900, text: 'ÉCRAN DE CONTRÔLE|HORS TENSION', tone: 'grille' },
+    {
+      x: -1350,
+      y: 1300,
+      text: 'ACCÈS CRÉATEURS|SALLE D’OBSERVATION',
+      tone: 'mur',
+      rang: 'secteur',
+    },
+    {
+      x: -1350,
+      y: 900,
+      text: 'ÉCRAN DE CONTRÔLE|HORS TENSION',
+      tone: 'grille',
+    },
     // ─── le placard (sud) : le secteur au-dessus, les énigmes sur leurs
     // casiers — deux hauteurs alternées, 550 unités d'écart chacune
-    { x: -1250, y: -900, text: 'SECTEUR 02|PLACARD D’ENTRETIEN', tone: 'mur', rang: 'secteur' },
-    { x: -2080, y: -1400, text: 'HYDROPHILE|CE QUI AIME RETIENT', tone: 'phile' },
-    { x: -1530, y: -1780, text: 'HYDROPHOBE|CE QUI REPOUSSE PROPULSE', tone: 'phobe' },
-    { x: -980, y: -1400, text: 'PLAQUE FROIDE|LE FROID FIGE, LE FIGÉ FILE', tone: 'froid' },
+    {
+      x: -1250,
+      y: -900,
+      text: 'SECTEUR 02|PLACARD D’ENTRETIEN',
+      tone: 'mur',
+      rang: 'secteur',
+    },
+    {
+      x: -2080,
+      y: -1400,
+      text: 'HYDROPHILE|CE QUI AIME RETIENT',
+      tone: 'phile',
+    },
+    {
+      x: -1530,
+      y: -1780,
+      text: 'HYDROPHOBE|CE QUI REPOUSSE PROPULSE',
+      tone: 'phobe',
+    },
+    {
+      x: -980,
+      y: -1400,
+      text: 'PLAQUE FROIDE|LE FROID FIGE, LE FIGÉ FILE',
+      tone: 'froid',
+    },
     { x: -430, y: -1780, text: 'ÉVENT|SEUL LE SOUFFLE PASSE', tone: 'grille' },
-    { x: -245, y: -1400, text: 'ÉPONGE|ELLE BOIT, NE REND RIEN', tone: 'eponge' },
+    {
+      x: -245,
+      y: -1400,
+      text: 'ÉPONGE|ELLE BOIT, NE REND RIEN',
+      tone: 'eponge',
+    },
     // ─── le comptoir et le banc des mémoires (l'ancien « étalonnage »)
-    { x: 900, y: 1450, text: 'SECTEUR 03|COMPTOIR & MÉMOIRES', tone: 'mur', rang: 'secteur' },
-    { x: 1650, y: 480, text: 'LE BANC DES MÉMOIRES|TISSER LES LIENS', tone: 'froid' },
-    { x: 1030, y: -1200, text: 'LE COMPTOIR|TOUT SE PAIE EN MÉMOIRE', tone: 'chaud', rang: 'secteur' },
+    {
+      x: 900,
+      y: 1450,
+      text: 'SECTEUR 03|COMPTOIR & MÉMOIRES',
+      tone: 'mur',
+      rang: 'secteur',
+    },
+    {
+      x: 1650,
+      y: 480,
+      text: 'LE BANC DES MÉMOIRES|TISSER LES LIENS',
+      tone: 'froid',
+    },
+    {
+      x: 1030,
+      y: -1200,
+      text: 'LE COMPTOIR|TOUT SE PAIE EN MÉMOIRE',
+      tone: 'chaud',
+      rang: 'secteur',
+    },
     { x: 220, y: -1470, text: 'VIATIQUE DE GOUTTES|3 MÉMOIRE', tone: 'phile' },
     { x: 760, y: -1470, text: 'CLEF DE CACHETTE|4 MÉMOIRE', tone: 'phobe' },
     { x: 1300, y: -1470, text: 'SAC SURPRISE|3 MÉMOIRE', tone: 'chaud' },
-    { x: 1840, y: -1470, text: 'ÉCHANTILLON DE SECOURS|8 MÉMOIRE', tone: 'froid' },
+    {
+      x: 1840,
+      y: -1470,
+      text: 'ÉCHANTILLON DE SECOURS|8 MÉMOIRE',
+      tone: 'froid',
+    },
     // ─── le conduit et les trois départs
-    { x: 2900, y: 1400, text: 'SECTEUR 04|CONDUIT DE VENTILATION', tone: 'grille', rang: 'secteur' },
-    { x: 3520, y: 300, text: 'PROTOCOLE 21|SAS DE LANCEMENT', tone: 'sas', rang: 'secteur' },
-    { x: 3640, y: 1250, text: 'SORTIE DE GIVRE|LA VOIE SEMI-PROCÉDURALE', tone: 'froid', rang: 'secteur' },
+    {
+      x: 2900,
+      y: 1400,
+      text: 'SECTEUR 04|CONDUIT DE VENTILATION',
+      tone: 'grille',
+      rang: 'secteur',
+    },
+    {
+      x: 3520,
+      y: 300,
+      text: 'PROTOCOLE 21|SAS DE LANCEMENT',
+      tone: 'sas',
+      rang: 'secteur',
+    },
+    {
+      x: 3640,
+      y: 1250,
+      text: 'SORTIE DE GIVRE|LA VOIE SEMI-PROCÉDURALE',
+      tone: 'froid',
+      rang: 'secteur',
+    },
     { x: 3650, y: 800, text: 'RIDEAU|SEULE LA GLACE L’ÉCARTE', tone: 'froid' },
-    { x: 3780, y: -1150, text: 'SORTIE DE VAPEUR|LA DESCENTE DU JOUR', tone: 'grille', rang: 'secteur' },
+    {
+      x: 3780,
+      y: -1150,
+      text: 'SORTIE DE VAPEUR|LA DESCENTE DU JOUR',
+      tone: 'grille',
+      rang: 'secteur',
+    },
     { x: 3650, y: -420, text: 'GRILLE|SEUL LE SOUFFLE PASSE', tone: 'grille' },
   ],
+  // le méta EN DONNÉES : comptoir et banc suivent le chemin commun des
+  // plots posés — zonesDuHub ne sert plus qu'aux vieux instantanés (et
+  // aux sas gardés, qui restent géométriques)
+  ...metaEnDonnees(ZONES_HUB_GRAND),
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════
 // LE HUB COMPACT (bible v3.1, chantier DÉMO 2) — construit EN PARALLÈLE du
@@ -377,36 +511,133 @@ export const TABLEAU_HUB_COMPACT: LevelDef = {
     // question s'impose d'elle-même : où est passé celui-là ?
     { x: -370, y: 610, w: 75, h: 380, kind: 'fiole-pleine', fade: 0.98 },
     { x: 70, y: 610, w: 75, h: 380, kind: 'fiole-vide', fade: 0.98 },
-    { x: 510, y: 610, w: 75, h: 380, kind: 'fiole-pleine', fade: 0.98, flip: true },
+    {
+      x: 510,
+      y: 610,
+      w: 75,
+      h: 380,
+      kind: 'fiole-pleine',
+      fade: 0.98,
+      flip: true,
+    },
   ],
   labels: [
     // ─── les lieux (plan large)
-    { x: -1350, y: 620, text: 'MODULE MÉDUSE|LA CUVE', tone: 'mur', rang: 'secteur' },
-    { x: -100, y: -260, text: 'POSTE DE GESTION|PROCÉDURES DE CONTENTION', tone: 'mur', rang: 'secteur' },
-    { x: 2250, y: 160, text: 'PROTOCOLE 21|SAS DE LANCEMENT', tone: 'sas', rang: 'secteur' },
+    {
+      x: -1350,
+      y: 620,
+      text: 'MODULE MÉDUSE|LA CUVE',
+      tone: 'mur',
+      rang: 'secteur',
+    },
+    {
+      x: -100,
+      y: -260,
+      text: 'POSTE DE GESTION|PROCÉDURES DE CONTENTION',
+      tone: 'mur',
+      rang: 'secteur',
+    },
+    {
+      x: 2250,
+      y: 160,
+      text: 'PROTOCOLE 21|SAS DE LANCEMENT',
+      tone: 'sas',
+      rang: 'secteur',
+    },
     // ─── l'alcôve des fioles (les semblables, asset du concepteur)
     { x: -150, y: 700, text: 'CONSERVATION|NE PAS RÉVEILLER', tone: 'froid' },
     // ─── le banc des mémoires : l'établi du poste, ouvert au contact
-    { x: -50, y: -480, text: 'LE BANC DES MÉMOIRES|TISSER LES LIENS', tone: 'froid' },
+    {
+      x: -50,
+      y: -480,
+      text: 'LE BANC DES MÉMOIRES|TISSER LES LIENS',
+      tone: 'froid',
+    },
     // ─── le comptoir : quatre alcôves au sud de l'aile, prix en MÉMOIRE
-    { x: 1850, y: -340, text: 'LE COMPTOIR|TOUT SE PAIE EN MÉMOIRE', tone: 'chaud', rang: 'secteur' },
+    {
+      x: 1850,
+      y: -340,
+      text: 'LE COMPTOIR|TOUT SE PAIE EN MÉMOIRE',
+      tone: 'chaud',
+      rang: 'secteur',
+    },
     { x: 1460, y: -460, text: 'VIATIQUE DE GOUTTES|3 MÉMOIRE', tone: 'phile' },
     { x: 1720, y: -530, text: 'CLEF DE CACHETTE|4 MÉMOIRE', tone: 'phobe' },
     { x: 1980, y: -460, text: 'SAC SURPRISE|3 MÉMOIRE', tone: 'chaud' },
-    { x: 2240, y: -530, text: 'ÉCHANTILLON DE SECOURS|8 MÉMOIRE', tone: 'froid' },
+    {
+      x: 2240,
+      y: -530,
+      text: 'ÉCHANTILLON DE SECOURS|8 MÉMOIRE',
+      tone: 'froid',
+    },
     // ─── les deux sorties gardées, au bout de l'aile
-    { x: 2580, y: 650, text: 'SORTIE DE GIVRE|LA VOIE SEMI-PROCÉDURALE', tone: 'froid', rang: 'secteur' },
+    {
+      x: 2580,
+      y: 650,
+      text: 'SORTIE DE GIVRE|LA VOIE SEMI-PROCÉDURALE',
+      tone: 'froid',
+      rang: 'secteur',
+    },
     { x: 2540, y: 270, text: 'RIDEAU|SEULE LA GLACE L’ÉCARTE', tone: 'froid' },
-    { x: 2580, y: -650, text: 'SORTIE DE VAPEUR|LA DESCENTE DU JOUR', tone: 'grille', rang: 'secteur' },
+    {
+      x: 2580,
+      y: -650,
+      text: 'SORTIE DE VAPEUR|LA DESCENTE DU JOUR',
+      tone: 'grille',
+      rang: 'secteur',
+    },
     { x: 2540, y: -270, text: 'GRILLE|SEUL LE SOUFFLE PASSE', tone: 'grille' },
     // ─── LES PICTOGRAMMES D'ÉTAT, alignés au-dessus de l'établi :
     // sept moyens de contention, notés par état — sans un mot
-    { x: -660, y: -580, text: '', tone: 'eponge', picto: { couleur: '#d9a441', eau: 3, glace: 1, vapeur: 1 } },
-    { x: -440, y: -580, text: '', tone: 'froid', picto: { couleur: '#8fc8ee', eau: 3, glace: 1, vapeur: 2 } },
-    { x: -220, y: -580, text: '', tone: 'chaud', picto: { couleur: '#e8843c', eau: 2, glace: 3, vapeur: 0 } },
-    { x: 0, y: -580, text: '', tone: 'grille', picto: { couleur: '#7fae9e', eau: 1, glace: 1, vapeur: 0 } },
-    { x: 220, y: -580, text: '', tone: 'phile', picto: { couleur: '#3fae9c', eau: 0, glace: 1, vapeur: 1 } },
-    { x: 440, y: -580, text: '', tone: 'mur', picto: { couleur: '#5b7ba6', eau: 1, glace: 0, vapeur: 1 } },
-    { x: 660, y: -580, text: '', tone: 'grille', picto: { couleur: '#39c8d8', eau: 1, glace: 1, vapeur: 0 } },
+    {
+      x: -660,
+      y: -580,
+      text: '',
+      tone: 'eponge',
+      picto: { couleur: '#d9a441', eau: 3, glace: 1, vapeur: 1 },
+    },
+    {
+      x: -440,
+      y: -580,
+      text: '',
+      tone: 'froid',
+      picto: { couleur: '#8fc8ee', eau: 3, glace: 1, vapeur: 2 },
+    },
+    {
+      x: -220,
+      y: -580,
+      text: '',
+      tone: 'chaud',
+      picto: { couleur: '#e8843c', eau: 2, glace: 3, vapeur: 0 },
+    },
+    {
+      x: 0,
+      y: -580,
+      text: '',
+      tone: 'grille',
+      picto: { couleur: '#7fae9e', eau: 1, glace: 1, vapeur: 0 },
+    },
+    {
+      x: 220,
+      y: -580,
+      text: '',
+      tone: 'phile',
+      picto: { couleur: '#3fae9c', eau: 0, glace: 1, vapeur: 1 },
+    },
+    {
+      x: 440,
+      y: -580,
+      text: '',
+      tone: 'mur',
+      picto: { couleur: '#5b7ba6', eau: 1, glace: 0, vapeur: 1 },
+    },
+    {
+      x: 660,
+      y: -580,
+      text: '',
+      tone: 'grille',
+      picto: { couleur: '#39c8d8', eau: 1, glace: 1, vapeur: 0 },
+    },
   ],
+  ...metaEnDonnees(ZONES_HUB_COMPACT),
 }

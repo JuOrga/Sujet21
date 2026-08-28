@@ -22,8 +22,19 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 21:15',
+    title:
+      'Le MÉTA SE POSE dans l’éditeur : plots d’article, banc, marchand, éclats de mémoire',
+    notes: [
+      'Demandé : « gérer tous les éléments du hub, marchandise, marchand, mémoire » depuis l’éditeur. Le format des tableaux gagne donc le MÉTA POSÉ : des PLOTS D’ARTICLE (un rectangle d’achat au contact — l’article vient du catalogue, la monnaie choisit la caisse : CONDENSAT pour l’étal du Semblable, effet immédiat ; MÉMOIRE pour le comptoir, provision de la PROCHAINE descente — et un prix posé peut surcharger le barème), LE BANC DES MÉMOIRES (le rectangle dont le contact ouvre l’écran du cycle, posable dans n’importe quel tableau), LE MARCHAND (un point de présence), et les ÉCLATS DE MÉMOIRE — une pastille neuve : +N mémoire gravés au contact, UNE FOIS PAR RUN (recommencer la salle ne re-farme rien ; la run suivante, si). Le fichier reste minimal, la liste des articles est fermée (un id inconnu est écarté à la lecture), prix et valeurs bornés.',
+      'Le hub et l’Économat passent eux-mêmes par ce chemin : leurs alcôves sont désormais des plots EN DONNÉES dans leur fichier (grand module, compact v4 et salle du Semblable — l’instantané du semis est régénéré), si bien qu’une copie de bibliothèque hérite de tout et se remodèle. L’ÉCONOMAT gagne d’ailleurs la même règle que le hub : une copie publiée sous le code ECO remplace la salle-boutique jouée — elle s’ouvre depuis la liste des livrés de l’éditeur. Les anciens instantanés sans plots gardent les blocs hérités : rien ne casse.',
+      'Et tout se VOIT en jeu : l’alcôve d’un plot respire en pointillés teintés (cyan condensat, menthe mémoire) avec l’icône et le prix gravés au centre — « SERVI » une fois l’achat fait ; le banc luit menthe autour de son ⚛ ; le marchand pulse d’un anneau rose pâle ; l’éclat est un losange menthe qui tourne sur son halo. Vérifié dans le jeu construit (1280×800) : dans un tableau d’essai posé main, l’éclat du spawn se prend (« essai : rien ne se grave aux registres » — un banc ne farme pas), l’achat au plot débite bien la bourse, le plot mémoire affiche son prix surchargé « 7 mém. » ; l’Économat en données vend comme avant (« FIOLE DE GOUTTES — +0,8 L versés à la bonbonne ») ; le hub montre banc et comptoir servis par les données. 451 tests verts (aller-retour du format, bornes, alignement zones ↔ plots des trois modules). Les OUTILS DE POSE dans l’éditeur (dessiner un plot, poser un éclat au clic) arrivent à la livraison suivante — ici, le format, le moteur et les salles converties.',
+    ],
+  },
+  {
     date: '28/08/2026 20:44',
-    title: 'L’ATELIER DES RÉCOMPENSES : un écran pour les voir, et de quoi en fabriquer',
+    title:
+      'L’ATELIER DES RÉCOMPENSES : un écran pour les voir, et de quoi en fabriquer',
     notes: [
       'Demandé : un écran pour gérer les récompenses, et — « peut-être trop ambitieux » — de quoi en créer de neuves avec les pièces déjà là. Ce n’était pas trop ambitieux : il manquait une bascule, et elle est faite. Une carte n’est plus du code, c’est une LISTE D’EFFETS, et chaque effet tire sur un LEVIER nommé du jeu (quinze leviers : seuil de dispersion, délai de réabsorption, prise de l’éponge, réserve de dashs, péage de vaporisation, rebond du palet, dilatation de la visée, refroidissement, rosée, portée du sas, prime de glace, condensat, bonbonne, cartes au tirage, échantillons de secours). Le jeu ne demande plus jamais « ai-je telle carte » : il demande « que vaut ce levier ». Les quinze cartes livrées ont été retranscrites dans cette grammaire, sans changer un seul de leurs effets.',
       'L’ÉCRAN (menu concepteur → RÉCOMPENSES) montre le catalogue complet : chaque carte avec son icône, son texte et les leviers qu’elle tire, en clair. Un bouton ESSAYER l’embarque dans la run en cours et recharge le tableau pour qu’elle agisse tout de suite — plus besoin d’attendre une fin de salle pour juger une carte.',
@@ -33,7 +44,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '28/08/2026 19:28',
-    title: 'PARAMÈTRES › COMMANDES : toutes les touches et tous les boutons se redéfinissent',
+    title:
+      'PARAMÈTRES › COMMANDES : toutes les touches et tous les boutons se redéfinissent',
     notes: [
       'Demandé : un écran de paramètres pour changer les touches du jeu — clavier, souris et manette. Le voici. Une seule table gouverne désormais les commandes (game/commandes.ts) : quatorze manœuvres rangées en quatre sections — LE GESTE (agir), LES ÉTATS (glace, vapeur, liquide, verser la bonbonne), LE TEMPS (ralentir, accélérer, pause, recommencer) et LES ÉCRANS (légende, les trois états, dossier de descente, recadrer, la fiche). Chaque ligne porte son nom, ce qu’elle fait en une phrase, sa touche et son bouton.',
       'Le geste est celui qu’on attend : on clique la case, elle se met à battre et dit « appuyez… », le premier appui devient la commande. ÉCHAP annule, ⌫ efface. La commande est EXCLUSIVE : donner « G » à la glace la retire à la vapeur — et l’écran le dit (« elle a été libérée de Se changer en VAPEUR »), pour qu’on ne cherche pas ensuite pourquoi un geste a disparu. Les cases redéfinies restent en vert : d’un coup d’œil on voit ce qu’on a changé, et un bouton remet tout à l’origine.',
@@ -45,7 +57,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '28/08/2026 19:17',
-    title: 'DIX INSTRUMENTS DE PLUS : le tirage de fin de salle a enfin de quoi hésiter',
+    title:
+      'DIX INSTRUMENTS DE PLUS : le tirage de fin de salle a enfin de quoi hésiter',
     notes: [
       'Le tirage n’avait que cinq cartes : passé deux salles, il se répétait, et une fois trois cartes en poche il ne restait plus rien à choisir. Le catalogue passe à quinze — dix nouveaux instruments, rangés par pilier du jeu, aucun qui redouble un effet déjà servi par une fiole ou par l’étal du Semblable. Aucun ne touche à la mémoire : ce sont des avantages de RUN, latéraux, jamais un raccourci.',
       'LE CORPS ET SA MATIÈRE — PEAU TENDUE 🩹 : les gouttes éjectées redeviennent réabsorbables deux fois plus tôt (on récupère ce qu’on vient de lancer). VANNE DE SECOURS 🚨 : le seuil de dispersion descend d’un cinquième — le corps tient plus bas avant que le protocole ne conclue. PLASTRON 🛡️ : l’éponge boit un quart moins vite et retient moins.',
@@ -56,7 +69,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '28/08/2026 19:00',
-    title: 'Les mémoires reviennent au croquis : goutte, glaçon, perles sur le fil',
+    title:
+      'Les mémoires reviennent au croquis : goutte, glaçon, perles sur le fil',
     notes: [
       'Demandé : repartir du schéma papier — aéré — avec une goutte pour LIQUIDE, un beau glaçon pour SOLIDE, des liens évidents, et autre chose que des rectangles autour des transformations. C’est fait : la scène est recomposée sur le plan du croquis. La colonne des états au centre (le glaçon taillé en isométrie, trois faces de glace et son flocon gravé ; la goutte, pointe en haut, ventre rond, un reflet ; la nuée de GAZ inchangée), quatre arceaux intérieurs symétriques — à gauche on QUITTE le liquide, à droite on le REJOINT — et les deux grands arcs au large pour sublimation et condensation.',
       'LES LIENS SE LISENT ENFIN : chaque trait part du bord d’une forme et arrive au bord de l’autre (l’épaule de la goutte, l’angle du glaçon, le flanc de la nuée), et des POINTES DE FLÈCHE OUVERTES — celles du croquis — sont semées le long du trait : le sens se voit sans réfléchir. Les rectangles ont disparu : chaque transformation est une CAPSULE enfilée sur SON trait, comme une perle sur un fil — le lien entre dessous et ressort au-dessus, plus aucun panneau posé sur le trait d’un autre. Le survol isole toujours le lien concerné.',
@@ -74,7 +88,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '28/08/2026 18:45',
-    title: 'La bonbonne se verse enfin : le clic ne part plus dans la cuve, et V (ou croix ↑) suffit',
+    title:
+      'La bonbonne se verse enfin : le clic ne part plus dans la cuve, et V (ou croix ↑) suffit',
     notes: [
       'Signalé : toucher la fiole faisait partir des GOUTTES au lieu de verser, et rien ne répondait au Steam Deck. La cause était nette une fois cherchée : le bandeau du haut est transparent aux clics (c’est voulu — on joue à travers), et seules les pastilles se réactivaient. La fiole, elle, ne recevait RIEN : le toucher filait au décor, où il coûtait une goutte. Elle reçoit désormais les clics, et sa zone sensible DÉBORDE tout autour (une fiole de douze pixels ne se vise pas) — un clic à six pixels dessous verse encore.',
       'Deux chemins de plus, pour ne plus avoir à viser : la touche V au clavier, et la CROIX ↑ à la manette (la seule direction libre en jeu — le Steam Deck a enfin son geste). Et le versement DIT ce qu’il fait : « réserve versée » sous la fiole, ou la raison du refus — « réserve vide », « le corps est déjà plein », « seulement en LIQUIDE ». Sans un mot, un refus passait pour un bouton mort.',

@@ -837,6 +837,77 @@ describe('levelIO — les décalques de LA SERRE', () => {
     expect(JSON.parse(serializeLevel(nu.level!)).exige).toBeUndefined()
   })
 
+  it('le méta posé fait l’aller-retour : plots, banc, marchand, éclats', () => {
+    const { level, rejets } = parseLevel({
+      ...base,
+      plots: [
+        // rectangle donné à l'envers : remis à l'endroit
+        { minX: 300, minY: -100, maxX: 100, maxY: -300, article: 'gouttes' },
+        {
+          minX: 0,
+          minY: 0,
+          maxX: 200,
+          maxY: 150,
+          article: 'viatique',
+          monnaie: 'memoire',
+          prix: 5000, // borné à 999
+        },
+        { minX: 0, minY: 0, maxX: 10, maxY: 10, article: 'perlimpinpin' },
+      ],
+      bancMemoires: { minX: 500, minY: 400, maxX: 300, maxY: 200 },
+      marchand: { x: 40, y: -60 },
+      eclats: [
+        { x: 10, y: 20, memoire: 4 },
+        { x: 30, y: 40 }, // valeur par défaut : 2
+        { x: 50, y: 60, memoire: 1000 }, // bornée à 99
+      ],
+    })
+    // l'article inconnu s'écarte : la liste des ids reste fermée
+    expect(rejets).toEqual(["plot d'article inconnu écarté (perlimpinpin)"])
+    expect(level!.plots).toEqual([
+      {
+        minX: 100,
+        minY: -300,
+        maxX: 300,
+        maxY: -100,
+        article: 'gouttes',
+        monnaie: 'condensat',
+      },
+      {
+        minX: 0,
+        minY: 0,
+        maxX: 200,
+        maxY: 150,
+        article: 'viatique',
+        monnaie: 'memoire',
+        prix: 999,
+      },
+    ])
+    expect(level!.bancMemoires).toEqual({
+      minX: 300,
+      minY: 200,
+      maxX: 500,
+      maxY: 400,
+    })
+    expect(level!.marchand).toEqual({ x: 40, y: -60 })
+    expect(level!.eclats).toEqual([
+      { x: 10, y: 20, memoire: 4 },
+      { x: 30, y: 40, memoire: 2 },
+      { x: 50, y: 60, memoire: 99 },
+    ])
+    const relu = parseLevel(JSON.parse(serializeLevel(level!)))
+    expect(relu.level!.plots).toEqual(level!.plots)
+    expect(relu.level!.bancMemoires).toEqual(level!.bancMemoires)
+    expect(relu.level!.marchand).toEqual(level!.marchand)
+    expect(relu.level!.eclats).toEqual(level!.eclats)
+    // absents, les champs n'encombrent pas le fichier
+    const nu = JSON.parse(serializeLevel(parseLevel({ ...base }).level!))
+    expect(nu.plots).toBeUndefined()
+    expect(nu.bancMemoires).toBeUndefined()
+    expect(nu.marchand).toBeUndefined()
+    expect(nu.eclats).toBeUndefined()
+  })
+
   it('écarte toujours une sorte inconnue — la liste reste fermée', () => {
     const { level, rejets } = parseLevel({
       ...base,

@@ -437,5 +437,45 @@
         "vapeur": 0
       }
     }
-  ]
+  ],
+  "plots": [
+    {
+      "minX": 1360,
+      "minY": -760,
+      "maxX": 1560,
+      "maxY": -580,
+      "article": "viatique",
+      "monnaie": "memoire"
+    },
+    {
+      "minX": 1620,
+      "minY": -760,
+      "maxX": 1820,
+      "maxY": -580,
+      "article": "clef",
+      "monnaie": "memoire"
+    },
+    {
+      "minX": 1880,
+      "minY": -760,
+      "maxX": 2080,
+      "maxY": -580,
+      "article": "sac",
+      "monnaie": "memoire"
+    },
+    {
+      "minX": 2140,
+      "minY": -760,
+      "maxX": 2340,
+      "maxY": -580,
+      "article": "secours",
+      "monnaie": "memoire"
+    }
+  ],
+  "bancMemoires": {
+    "minX": -500,
+    "minY": -800,
+    "maxX": 400,
+    "maxY": -520
+  }
 }

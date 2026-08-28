@@ -6,7 +6,12 @@ import { FluidSim, KIND_PLAYER } from './sim/solver'
 import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
 import { CODEX, Codex, type CodexGroupe } from './game/codex'
-import { TABLEAU_HUB, zonesDuHub, type ArticleHub } from './game/hub'
+import {
+  TABLEAU_HUB,
+  articleComptoir,
+  zonesDuHub,
+  type ArticleHub,
+} from './game/hub'
 import {
   MECANIQUE_NOMS,
   codeCanon,
@@ -90,6 +95,7 @@ import {
   type LevelDef,
   type LumiereDef,
   type ObstacleBox,
+  type PlotMeta,
   type ZoneForce,
   AMBIANTE_DEFAUT,
 } from './game/level'
@@ -178,6 +184,7 @@ import type { EtatManuel } from './game/input'
 import {
   ETAL_ECONOMAT,
   TABLEAU_ECONOMAT,
+  articleEtal,
   estEconomat,
   type ArticleEconomat,
 } from './game/economat'
@@ -487,6 +494,12 @@ function hubLevel(): LevelDef {
   return libraryLevels.find((l) => l.code === 'HUB') ?? TABLEAU_HUB
 }
 
+// L'Économat joué : même règle — la copie de bibliothèque (code « ECO »),
+// remodelable dans l'éditeur, prime sur la salle du code.
+function economatLevel(): LevelDef {
+  return libraryLevels.find((l) => estEconomat(l)) ?? TABLEAU_ECONOMAT
+}
+
 // Un essai hors expédition : un tableau à part (prototype, salle laser,
 // tableau d'éditeur), sans toucher aux registres. La FILE enchaîne les
 // tableaux d'essai au sas — la trilogie laser se joue ainsi.
@@ -551,6 +564,15 @@ const achatsEconomat = new Set<string>()
 // au lancement de l'expédition suivante — le temps de la session.
 const achatsHub = new Set<string>()
 let plotsHubDedans: boolean[] = []
+// les PLOTS POSÉS du tableau courant (le méta en données — hub et Économat
+// modernes compris) : un drapeau « dedans » par plot, l'achat se tente au
+// FRONT d'entrée seulement
+let plotsPosesDedans: boolean[] = []
+// les ÉCLATS DE MÉMOIRE : gravés une fois par RUN (pas de ferme au R) —
+// la clé note la salle et l'index de l'éclat
+const eclatsPrisRun = new Set<string>()
+let eclatsEssai: { x: number; y: number; memoire: number; cle: string }[] = []
+let eclatsPrisEssai: boolean[] = []
 let bancMemoiresDedans = false
 const provisionsRun = { bonbonne: 0, vies: 0, clef: false, condensat: 0 }
 let plotsDedans: boolean[] = []
@@ -4819,6 +4841,10 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       rails.length +
       caches.length +
       pastilles.length +
+      eclatsEssai.length +
+      (level.plots?.length ?? 0) +
+      (level.bancMemoires ? 1 : 0) +
+      (level.marchand ? 1 : 0) +
       (fiolePastille ? 1 : 0) >
     0
   const dprC = Math.min(dpr, 2)
@@ -5381,6 +5407,136 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     g.strokeStyle = '#e8d2ff'
     g.lineWidth = 1.2
     g.stroke()
+  }
+
+  // ---- LE MÉTA POSÉ : plots d'article, banc des mémoires, marchand,
+  // éclats — la teinte dit la monnaie (cyan : condensat, menthe : mémoire).
+  const plotsDessin = level.plots ?? []
+  for (let i = 0; i < plotsDessin.length; i++) {
+    const pl = plotsDessin[i]
+    if (dansCacheVoilee((pl.minX + pl.maxX) / 2, (pl.minY + pl.maxY) / 2))
+      continue
+    const fiche =
+      pl.monnaie === 'memoire'
+        ? articleComptoir(pl.article)
+        : articleEtal(pl.article)
+    if (!fiche) continue
+    const servi =
+      pl.monnaie === 'memoire'
+        ? achatsHub.has(pl.article)
+        : achatsEconomat.has(pl.article)
+    const a = S(pl.minX, pl.maxY)
+    const b = S(pl.maxX, pl.minY)
+    if (b.sx < 0 || a.sx > vw || b.sy < 0 || a.sy > vh) continue
+    const teinte = pl.monnaie === 'memoire' ? '109,255,184' : '140,215,255'
+    const pouls = servi ? 0 : 0.5 + 0.5 * Math.sin(nowPastilles * 1.8 + i)
+    // l'alcôve respire tant qu'elle n'a pas servi
+    g.fillStyle = `rgba(${teinte},${servi ? 0.03 : 0.05 + 0.04 * pouls})`
+    g.fillRect(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy)
+    g.setLineDash([7, 6])
+    g.lineWidth = servi ? 1 : 1.6
+    g.strokeStyle = `rgba(${teinte},${servi ? 0.22 : 0.55 + 0.25 * pouls})`
+    g.strokeRect(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy)
+    g.setLineDash([])
+    // la fiche au centre : l'icône, puis le prix (ou « servi »)
+    const cx = (a.sx + b.sx) / 2
+    const cy = (a.sy + b.sy) / 2
+    const t = Math.max(10, Math.min(26, 88 * z))
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    g.globalAlpha = servi ? 0.35 : 1
+    g.font = `${t}px system-ui`
+    g.fillText(fiche.icone, cx, cy - t * 0.42)
+    g.font = `600 ${Math.round(t * 0.62)}px system-ui, sans-serif`
+    g.fillStyle = `rgba(${teinte},0.9)`
+    g.fillText(
+      servi
+        ? 'SERVI'
+        : `${pl.prix ?? fiche.prix} ${pl.monnaie === 'memoire' ? 'mém.' : 'cL'}`,
+      cx,
+      cy + t * 0.55,
+    )
+    g.globalAlpha = 1
+  }
+  // le BANC DES MÉMOIRES : une lueur menthe, l'atome au centre
+  if (level.bancMemoires) {
+    const bz = level.bancMemoires
+    if (!dansCacheVoilee((bz.minX + bz.maxX) / 2, (bz.minY + bz.maxY) / 2)) {
+      const a = S(bz.minX, bz.maxY)
+      const b = S(bz.maxX, bz.minY)
+      const cx = (a.sx + b.sx) / 2
+      const cy = (a.sy + b.sy) / 2
+      const pouls = 0.6 + 0.4 * Math.sin(nowPastilles * 1.3)
+      const ray = Math.max(8, Math.max(b.sx - a.sx, b.sy - a.sy) * 0.6)
+      const grad = g.createRadialGradient(cx, cy, 0, cx, cy, ray)
+      grad.addColorStop(0, `rgba(109,255,184,${0.08 + 0.16 * pouls})`)
+      grad.addColorStop(1, 'rgba(109,255,184,0)')
+      g.fillStyle = grad
+      g.fillRect(cx - ray, cy - ray, ray * 2, ray * 2)
+      g.setLineDash([4, 7])
+      g.strokeStyle = `rgba(109,255,184,${0.35 + 0.3 * pouls})`
+      g.lineWidth = 1.4
+      g.strokeRect(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy)
+      g.setLineDash([])
+      g.textAlign = 'center'
+      g.textBaseline = 'middle'
+      g.font = `${Math.max(12, Math.min(30, 100 * z))}px system-ui`
+      g.fillStyle = '#bdffdf'
+      g.fillText('⚛', cx, cy)
+    }
+  }
+  // le MARCHAND : une présence — l'anneau rose pâle pulse autour du point
+  if (level.marchand && !dansCacheVoilee(level.marchand.x, level.marchand.y)) {
+    const p = S(level.marchand.x, level.marchand.y)
+    const pouls = 0.75 + 0.25 * Math.sin(nowPastilles * 1.1)
+    const r = Math.max(10, 150 * z) * pouls
+    const grad = g.createRadialGradient(p.sx, p.sy, 0, p.sx, p.sy, r * 1.8)
+    grad.addColorStop(0, 'rgba(255,170,210,0.16)')
+    grad.addColorStop(1, 'rgba(255,170,210,0)')
+    g.fillStyle = grad
+    g.beginPath()
+    g.arc(p.sx, p.sy, r * 1.8, 0, Math.PI * 2)
+    g.fill()
+    g.beginPath()
+    g.arc(p.sx, p.sy, r, 0, Math.PI * 2)
+    g.setLineDash([2, 6])
+    g.strokeStyle = `rgba(255,190,220,${0.3 + 0.3 * pouls})`
+    g.lineWidth = 1.6
+    g.stroke()
+    g.setLineDash([])
+  }
+  // les ÉCLATS DE MÉMOIRE : le losange menthe qui tourne — l'information
+  // cristallisée, visible à travers les voiles avec la SONDE seulement
+  for (let i = 0; i < eclatsEssai.length; i++) {
+    if (eclatsPrisEssai[i]) continue
+    const e = eclatsEssai[i]
+    if (!fioleActive('sonde') && dansCacheVoilee(e.x, e.y)) continue
+    const p = S(e.x, e.y)
+    const pouls = 0.85 + 0.15 * Math.sin(nowPastilles * 2.4 + i)
+    const r = Math.max(4, RAYON_PASTILLE * 0.62 * z) * pouls
+    g.beginPath()
+    g.arc(p.sx, p.sy, r * 2.2, 0, Math.PI * 2)
+    g.fillStyle = 'rgba(109,255,184,0.10)'
+    g.fill()
+    g.save()
+    g.translate(p.sx, p.sy)
+    g.rotate(nowPastilles * 1.4 + i * 0.9)
+    g.beginPath()
+    g.moveTo(0, -r * 1.15)
+    g.lineTo(r * 0.72, 0)
+    g.lineTo(0, r * 1.15)
+    g.lineTo(-r * 0.72, 0)
+    g.closePath()
+    g.fillStyle = 'rgba(140,255,205,0.5)'
+    g.fill()
+    g.lineWidth = 1.5
+    g.strokeStyle = '#8effcd'
+    g.stroke()
+    g.beginPath()
+    g.arc(0, -r * 0.25, r * 0.22, 0, Math.PI * 2)
+    g.fillStyle = 'rgba(235,255,245,0.9)'
+    g.fill()
+    g.restore()
   }
 
   // LES CACHETTES, EN DERNIER : le brouillard « non cartographié » couvre
@@ -6890,14 +7046,20 @@ function cataloguePupitre(): {
       out.push(section)
       continue
     }
-    for (const b of Array.from(el.querySelectorAll<HTMLElement>('[data-pup]'))) {
+    for (const b of Array.from(
+      el.querySelectorAll<HTMLElement>('[data-pup]'),
+    )) {
       if (!section) {
         section = { titre: 'Manœuvres', boutons: [] }
         out.push(section)
       }
       section.boutons.push({
         cle: b.dataset.pup ?? '',
-        titre: (b.querySelector('b')?.textContent ?? b.dataset.pup ?? '').trim(),
+        titre: (
+          b.querySelector('b')?.textContent ??
+          b.dataset.pup ??
+          ''
+        ).trim(),
         aide: (b.querySelector('small')?.textContent ?? '').trim(),
       })
     }
@@ -6942,6 +7104,13 @@ function resetLasers(): void {
   // le comptoir du hub aussi : un article par VISITE du module
   achatsHub.clear()
   plotsHubDedans = [false, false, false, false]
+  // les plots POSÉS du tableau (le méta en données)
+  plotsPosesDedans = (level.plots ?? []).map(() => false)
+  // les éclats de mémoire : ceux déjà gravés CETTE RUN ne reviennent pas
+  eclatsEssai = (level.eclats ?? [])
+    .map((e, i) => ({ ...e, cle: `${level.code}|${i}` }))
+    .filter((e) => !eclatsPrisRun.has(e.cle))
+  eclatsPrisEssai = eclatsEssai.map(() => false)
   bancMemoiresDedans = false
   rebuildRenderBoxes() // les parois factices reprennent leur poste
 }
@@ -7069,6 +7238,24 @@ function tenteAchatHub(a: ArticleHub): void {
   })
 }
 
+// ---- L'ACHAT sur un PLOT POSÉ : le méta en données. La monnaie choisit
+// le catalogue ET la caisse — condensat : l'étal (effet immédiat) ;
+// mémoire : le comptoir (provisions de la PROCHAINE descente, où que le
+// plot soit posé). Le prix posé surcharge le catalogue. Les caisses
+// « déjà servi » restent celles des étals : deux plots du même article
+// dans un tableau ne servent qu'une fois.
+function tenteAchatPlot(p: PlotMeta): void {
+  if (p.monnaie === 'memoire') {
+    const base = articleComptoir(p.article)
+    if (!base) return
+    tenteAchatHub({ ...base, prix: p.prix ?? base.prix, plot: p })
+  } else {
+    const base = articleEtal(p.article)
+    if (!base) return
+    tenteAchat({ ...base, prix: p.prix ?? base.prix, plot: p })
+  }
+}
+
 /** Les PROVISIONS achetées au comptoir se livrent au départ de la
  * descente — puis la besace se vide (elles valent UNE expédition). */
 function appliqueProvisions(): void {
@@ -7128,7 +7315,7 @@ function avanceSalle(): void {
     if (economatForce || (total >= 4 && rang >= Math.floor(total / 2))) {
       economatForce = false // il a servi
       economatVisiteCetteRun = true
-      economatIntercalaire = TABLEAU_ECONOMAT
+      economatIntercalaire = economatLevel()
       voieIntercalaire = null // la salle précédente est franchie
       restart()
       return
@@ -8029,7 +8216,7 @@ function restart(): void {
   auHub = false
   hasPlayed = true
   document.body.classList.add('playing')
-  testLevel = TABLEAU_ECONOMAT
+  testLevel = economatLevel()
   restart()
 }
 
@@ -8044,6 +8231,8 @@ function newExpedition(): void {
   run.xp = 0
   run.livreTotal = 0
   run.memoireGagnee = 0
+  // les éclats de mémoire repoussent : une nouvelle run, une nouvelle chance
+  eclatsPrisRun.clear()
   purgeCondensat() // la bourse d'une run commence toujours vide
   economatIntercalaire = null
   economatVisiteCetteRun = false
@@ -9607,6 +9796,33 @@ function frame(now: number): void {
       audio.collect()
     }
   }
+  // ---- Les ÉCLATS DE MÉMOIRE : l'information cristallisée, gravée au
+  // contact — une fois par RUN (la clé retient la salle). Aux essais
+  // d'éditeur, l'éclat se prend mais rien ne se grave : on ne farme pas
+  // les registres depuis un banc.
+  if (eclatsEssai.length > 0 && !sim.dispersed) {
+    const formes = eclatsEssai.map((e) => ({ x: e.x, y: e.y, cl: 1 }))
+    const graves = absorbePastilles(formes, eclatsPrisEssai, sim)
+    for (const i of graves) {
+      const e = eclatsEssai[i]
+      eclatsPrisRun.add(e.cle)
+      if (testLevel) {
+        toastFile.push({
+          nom: 'essai : rien ne se grave aux registres',
+          icone: '✦',
+          sur: 'ÉCLAT DE MÉMOIRE',
+        })
+      } else {
+        gagneMemoireRun(e.memoire)
+        toastFile.push({
+          nom: `+${e.memoire} mémoire — la matière se souvient`,
+          icone: '✦',
+          sur: 'ÉCLAT DE MÉMOIRE',
+        })
+      }
+      audio.collect()
+    }
+  }
   // la FIOLE de la cachette profonde : l'échantillon scellé rejoint la
   // collection — laquelle, le tableau en décide (celles qui manquent)
   if (fiolePastille && !fiolePrise && !sim.dispersed) {
@@ -9633,8 +9849,26 @@ function frame(now: number): void {
     }
   }
 
-  // ---- L'ÉTAL de l'Économat : l'achat au front d'entrée d'une alcôve ----
-  if (estEconomat(level) && !sim.dispersed) {
+  // ---- LES PLOTS POSÉS (le méta en données) : l'achat au front d'entrée
+  // d'une alcôve. Le hub et l'Économat modernes passent ICI — les blocs
+  // hérités qui suivent ne couvrent plus que les vieux instantanés de
+  // bibliothèque, sans plots dans leur fichier.
+  const plotsNiveau = level.plots ?? []
+  if (plotsNiveau.length > 0 && !sim.dispersed) {
+    for (let i = 0; i < plotsNiveau.length; i++) {
+      const p = plotsNiveau[i]
+      const dedans =
+        sim.stats.centroidX > p.minX &&
+        sim.stats.centroidX < p.maxX &&
+        sim.stats.centroidY > p.minY &&
+        sim.stats.centroidY < p.maxY
+      if (dedans && !plotsPosesDedans[i]) tenteAchatPlot(p)
+      plotsPosesDedans[i] = dedans
+    }
+  }
+
+  // (hérité) l'étal de l'Économat en dur, pour un vieil instantané ECO
+  if (estEconomat(level) && plotsNiveau.length === 0 && !sim.dispersed) {
     for (let i = 0; i < ETAL_ECONOMAT.length; i++) {
       const a = ETAL_ECONOMAT[i]
       const dedans =
@@ -9647,12 +9881,10 @@ function frame(now: number): void {
     }
   }
 
-  // ---- LE MÉTA AU HUB : le comptoir (achats en mémoire) et le banc des
-  // mémoires (le contact ouvre l'écran du cycle — B ou ✕ le referme).
-  // Les zones dépendent du module JOUÉ (grand, compact, ou un vieil
-  // instantané de la bibliothèque : alors aucune zone, rien ne s'active).
+  // ---- LE MÉTA AU HUB : les zones héritées (comptoir par géométrie) —
+  // seulement quand le module joué n'a pas de plots en données
   const zonesHub = auHub && !sim.dispersed ? zonesDuHub(level) : null
-  if (zonesHub) {
+  if (zonesHub && plotsNiveau.length === 0) {
     for (let i = 0; i < zonesHub.etal.length; i++) {
       const a = zonesHub.etal[i]
       const dedans =
@@ -9663,10 +9895,16 @@ function frame(now: number): void {
       if (dedans && !plotsHubDedans[i]) tenteAchatHub(a)
       plotsHubDedans[i] = dedans
     }
+  }
+  // ---- LE BANC DES MÉMOIRES : posé en données (n'importe quel tableau),
+  // sinon celui du module hérité. Le contact ouvre l'écran du cycle.
+  const bancRect =
+    level.bancMemoires ?? (zonesHub && !level.plots ? zonesHub.banc : null)
+  if (bancRect && !sim.dispersed) {
     const surBanc = pointInBox(
       sim.stats.centroidX,
       sim.stats.centroidY,
-      zonesHub.banc,
+      bancRect,
     )
     if (surBanc && !bancMemoiresDedans && cycleEl.hidden) {
       cycleEl.hidden = false
