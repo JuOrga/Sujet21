@@ -421,6 +421,14 @@ export function parseLevel(input: unknown): {
         ? undefined
         : Math.max(0, Math.round(num(o.dashBudget, 3))),
     ambiance: str(o.ambiance) || undefined,
+    // seul 'libres' se grave : 'cycle' est le défaut, il reste implicite
+    etats: o.etats === 'libres' ? 'libres' : undefined,
+    exige: Array.isArray(o.exige)
+      ? (o.exige.filter((e: unknown) => e === 'glace' || e === 'vapeur') as (
+          | 'glace'
+          | 'vapeur'
+        )[])
+      : undefined,
     raccourciVers: str(o.raccourciVers).slice(0, 16) || undefined,
     cineAvant: str(o.cineAvant).trim().slice(0, 24) || undefined,
     cineApres: str(o.cineApres).trim().slice(0, 24) || undefined,
@@ -686,6 +694,8 @@ export function serializeLevel(level: LevelDef): string {
   if (level.decals && level.decals.length > 0) out.decals = level.decals
   if (level.figure) out.figure = level.figure
   if (level.ambiance) out.ambiance = level.ambiance
+  if (level.etats === 'libres') out.etats = 'libres'
+  if (level.exige?.length) out.exige = level.exige
   if (level.raccourciVers) out.raccourciVers = level.raccourciVers
   if (level.cineAvant) out.cineAvant = level.cineAvant
   if (level.cineApres) out.cineApres = level.cineApres

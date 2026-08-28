@@ -818,6 +818,25 @@ describe('levelIO — les décalques de LA SERRE', () => {
     expect(JSON.parse(serializeLevel(nu.level!)).fiole).toBeUndefined()
   })
 
+  it('le cycle des états du tableau fait l’aller-retour : etats libres, exigences', () => {
+    const { level, rejets } = parseLevel({
+      ...base,
+      etats: 'libres',
+      exige: ['glace', 'plasma', 'vapeur'], // la sorte inconnue s'écarte
+    })
+    expect(rejets).toEqual([])
+    expect(level!.etats).toBe('libres')
+    expect(level!.exige).toEqual(['glace', 'vapeur'])
+    const relu = parseLevel(JSON.parse(serializeLevel(level!)))
+    expect(relu.level!.etats).toBe('libres')
+    expect(relu.level!.exige).toEqual(['glace', 'vapeur'])
+    // le défaut (cycle, aucune exigence) reste implicite : rien au fichier
+    const nu = parseLevel({ ...base, etats: 'cycle' })
+    expect(nu.level!.etats).toBeUndefined()
+    expect(JSON.parse(serializeLevel(nu.level!)).etats).toBeUndefined()
+    expect(JSON.parse(serializeLevel(nu.level!)).exige).toBeUndefined()
+  })
+
   it('écarte toujours une sorte inconnue — la liste reste fermée', () => {
     const { level, rejets } = parseLevel({
       ...base,

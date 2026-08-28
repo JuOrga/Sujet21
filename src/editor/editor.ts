@@ -3248,6 +3248,36 @@ export class LevelEditor {
     // la frappe ne pousse pas d'instantané à chaque touche : c'est la sortie
     // du champ (change) qui grave l'étape dans l'historique
     this.el('ed-dashs').addEventListener('change', () => this.histoire())
+    // LE CYCLE en descente : ce tableau suit-il les mémoires tissées, ou
+    // laisse-t-il les trois états au bouton (leçons, tableaux d'atelier) ?
+    this.el('ed-etats').addEventListener('change', () => {
+      const v = (this.el('ed-etats') as HTMLSelectElement).value
+      this.level.etats = v === 'libres' ? 'libres' : undefined
+      this.persist()
+      this.commit(
+        v === 'libres'
+          ? 'États : libres — les trois boutons, sans mémoires.'
+          : 'États : suivant les mémoires (le cycle).',
+      )
+    })
+    // Les EXIGENCES du tableau : la voie n'offre pas sa suite écrite tant
+    // que le lien manuel correspondant n'est pas tissé aux mémoires.
+    const litExige = (): void => {
+      const ex: ('glace' | 'vapeur')[] = []
+      if ((this.el('ed-exige-glace') as HTMLInputElement).checked)
+        ex.push('glace')
+      if ((this.el('ed-exige-vapeur') as HTMLInputElement).checked)
+        ex.push('vapeur')
+      this.level.exige = ex.length > 0 ? ex : undefined
+      this.persist()
+      this.commit(
+        ex.length > 0
+          ? `Le tableau exige au bouton : ${ex.join(' + ')}.`
+          : 'Le tableau n’exige aucun état au bouton.',
+      )
+    }
+    this.el('ed-exige-glace').addEventListener('change', litExige)
+    this.el('ed-exige-vapeur').addEventListener('change', litExige)
     // Lumière générale : champ optionnel — vide, le tableau garde le niveau
     // historique (52 %). La frappe applique tout de suite (le banc d'essai
     // montre la pénombre en direct), la sortie du champ grave l'historique.
@@ -4020,6 +4050,12 @@ export class LevelEditor {
     )
     ;(this.el('ed-dashs') as HTMLInputElement).value =
       this.level.dashBudget === undefined ? '' : String(this.level.dashBudget)
+    ;(this.el('ed-etats') as HTMLSelectElement).value =
+      this.level.etats === 'libres' ? 'libres' : 'cycle'
+    ;(this.el('ed-exige-glace') as HTMLInputElement).checked =
+      this.level.exige?.includes('glace') ?? false
+    ;(this.el('ed-exige-vapeur') as HTMLInputElement).checked =
+      this.level.exige?.includes('vapeur') ?? false
     ;(this.el('ed-plafond') as HTMLInputElement).value =
       this.level.plafond ?? ''
     ;(this.el('ed-brume') as HTMLInputElement).value =

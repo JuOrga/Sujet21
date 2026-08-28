@@ -492,6 +492,16 @@ export interface LevelDef {
   // bascule, quel que soit le volume). Absent : le réglage du banc
   // (gasDashBudget).
   dashBudget?: number
+  // LE CYCLE DES ÉTATS en descente : absent (ou 'cycle'), les
+  // transformations MANUELLES obéissent aux mémoires tissées — 'libres',
+  // les trois états restent au bouton quoi qu'il en soit (tableaux
+  // d'atelier, leçons qui exigent un état avant son tissage). Les zones
+  // forcées et la chaudière transforment toujours, dans les deux cas.
+  etats?: 'cycle' | 'libres'
+  // Les états que ce tableau EXIGE au bouton pour être bouclé (déclaré
+  // dans l'éditeur) : la voie ne propose pas sa « suite écrite » tant que
+  // le lien manuel correspondant n'est pas tissé à l'écran des mémoires.
+  exige?: ('glace' | 'vapeur')[]
   // Lit musical imposé par le tableau. Sans valeur, la cuve suit le
   // refroidissement de la coque (tiède → glaciale) : c'est le cas général,
   // les tableaux n'ont pas à choisir une musique pour exister.

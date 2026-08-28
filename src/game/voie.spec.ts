@@ -5,7 +5,9 @@ import {
   diffAuRang,
   litPalmaresVoie,
   masqueMecanique,
+  masquePermis,
   mecaniquesDuChoix,
+  mecaniquesPermises,
   momentAuRang,
   reglageAuRang,
   varianteDuJour,
@@ -70,6 +72,29 @@ describe('voie — le plan de descente', () => {
     expect(masqueMecanique(3)).toBe(127)
   })
 
+  it('le cycle tient la voie : mécaniques et maillons permis par les mémoires', () => {
+    // rien de tissé : mécanique 0 seule, maillons membrane seuls
+    expect(mecaniquesPermises(false, false)).toEqual([0])
+    expect(masquePermis(false, false)).toBe(1 << 2)
+    // la solidification ouvre la glace ; la vaporisation, la vapeur
+    expect(mecaniquesPermises(true, false)).toEqual([0, 1])
+    expect(masquePermis(true, false)).toBe(
+      (1 << 1) | (1 << 2) | (1 << 3) | (1 << 4),
+    )
+    expect(mecaniquesPermises(false, true)).toEqual([0, 2])
+    // les deux : tout revient, « toutes » (3) comprise
+    expect(mecaniquesPermises(true, true)).toEqual([0, 1, 2, 3])
+    expect(masquePermis(true, true)).toBe(127)
+    // le choix restreint RÉPÈTE plutôt que d'exiger un lien non tissé
+    for (let tir = 0; tir < 20; tir++) {
+      const alea = (): number => ((tir * 7919 + 13) % 97) / 97
+      const [a, b, c] = mecaniquesDuChoix(1, alea, null, [0])
+      expect([a, b, c]).toEqual([0, 0, 0])
+      const [x, y, z] = mecaniquesDuChoix(null, alea, null, [0, 2])
+      for (const m of [x, y, z]) expect([0, 2]).toContain(m)
+    }
+  })
+
   it('le clamp ramène tout plan dans les bornes — et les défauts comblent', () => {
     expect(clampPlanVoie(null)).toEqual({
       longueur: 12,
@@ -85,7 +110,9 @@ describe('voie — le plan de descente', () => {
   })
 
   it('la graine du jour est stable, et change par jour comme par rang', () => {
-    expect(varianteDuJour('2026-08-27', 3)).toBe(varianteDuJour('2026-08-27', 3))
+    expect(varianteDuJour('2026-08-27', 3)).toBe(
+      varianteDuJour('2026-08-27', 3),
+    )
     expect(varianteDuJour('2026-08-27', 3)).not.toBe(
       varianteDuJour('2026-08-28', 3),
     )
@@ -152,9 +179,19 @@ describe('voie — le plan de descente', () => {
     expect(litPalmaresVoie('{pas du json')).toEqual(litPalmaresVoie(null))
     expect(
       litPalmaresVoie(
-        JSON.stringify({ descentes: 4, bouclees: 2, profondeurRecord: 17, meilleurLivre: 12.5 }),
+        JSON.stringify({
+          descentes: 4,
+          bouclees: 2,
+          profondeurRecord: 17,
+          meilleurLivre: 12.5,
+        }),
       ),
-    ).toEqual({ descentes: 4, bouclees: 2, profondeurRecord: 17, meilleurLivre: 12.5 })
+    ).toEqual({
+      descentes: 4,
+      bouclees: 2,
+      profondeurRecord: 17,
+      meilleurLivre: 12.5,
+    })
     expect(litPalmaresVoie(JSON.stringify({ descentes: -3 })).descentes).toBe(0)
   })
 })

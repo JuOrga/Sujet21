@@ -3415,10 +3415,54 @@
         background: rgba(242, 201, 142, 0.18);
         box-shadow: 0 0 16px rgba(242, 201, 142, 0.35);
       }
+      /* ---- Refonte « cadran du cycle » : trois logements FIXES, ❄ à
+         gauche, 💧 au centre, 💨 à droite (l'ordre du DOM reste eau/glace/
+         vapeur pour l'historique — c'est l'ordre visuel qui est réglé ici).
+         Le logement de l'état courant est le MÉDAILLON ; les autres ne
+         paraissent que si leur transformation est tissée. ---- */
+      #state-glace { order: 0; }
+      #state-eau { order: 1; }
+      #state-vapeur { order: 2; }
+      #statebar button[hidden] { display: none; }
+      #statebar button.st-cur {
+        min-width: 92px;
+        cursor: default;
+      }
+      #statebar button.st-cur .st-label { letter-spacing: 0.26em; }
+      /* le VERROU : un logement refusé paraît quelques secondes, cadenassé —
+         le nom du lien à tisser dessus, l'envie se sème là */
+      #statebar button.st-verrou {
+        opacity: 0.65;
+        border-style: dashed;
+      }
+      #statebar button.st-verrou kbd {
+        border: none;
+        font-size: 11px;
+        top: 2px;
+      }
+      /* le RÉGIME IMPOSÉ (zone forcée) : tout le cadran se verrouille et le
+         badge nomme la cause — l'interface dit POURQUOI les boutons se taisent */
+      #statebar.st-zone button { opacity: 0.55; }
+      #statebar.st-zone button.st-cur { opacity: 1; }
+      #state-zone {
+        position: absolute;
+        top: -24px;
+        left: 50%;
+        transform: translateX(-50%);
+        white-space: nowrap;
+        font-family: var(--font-display);
+        font-size: 8.5px;
+        letter-spacing: 0.16em;
+        color: #f2c98e;
+        text-shadow: 0 0 8px rgba(242, 201, 142, 0.4);
+      }
+      #state-zone[hidden] { display: none; }
       @media (pointer: coarse) {
         #statebar kbd {
           display: none;
         }
+        /* au doigt, le badge de zone se pose au-dessus de la colonne */
+        #state-zone { top: -20px; }
       }
       @media (max-width: 700px), (pointer: coarse) and (max-height: 620px) {
         /* au doigt : colonne à droite, sous le pouce, hors du HUD — la barre
@@ -5160,7 +5204,7 @@
 
     <div id="statebar" aria-label="État de l'échantillon">
       <button id="state-eau" type="button" title="redevenir liquide">
-        <span class="st-ico">💧</span><span class="st-label">LIQUIDE</span>
+        <span class="st-ico">💧</span><span class="st-label">LIQUIDE</span><kbd hidden></kbd>
       </button>
       <button id="state-glace" type="button" title="se changer en glace (F) : le bloc garde son élan">
         <span class="st-ico">❄</span><span class="st-label">GLACE</span><kbd>F</kbd>
@@ -5168,6 +5212,7 @@
       <button id="state-vapeur" type="button" title="se changer en vapeur (G) : visez — le temps ralentit — relâchez, le nuage fuse ; la distance du doigt fait la puissance">
         <span class="st-ico">💨</span><span class="st-label">VAPEUR</span><kbd>G</kbd>
       </button>
+      <div id="state-zone" hidden></div>
     </div>
 
     <div id="editor" aria-label="Éditeur de tableaux">
@@ -5392,6 +5437,19 @@
           <p class="ed-astuce">Le code DÉCRIT la salle — la convention ATELIER tient en trois chiffres, « 111 » : le MOMENT de la run (1 début · 2 milieu · 3 fin), la MÉCANIQUE requise (0 aucune · 1 glace · 2 vapeur · 3 toutes), la DIFFICULTÉ. Plusieurs salles peuvent porter le même code : c'est le NUMÉRO du tableau, en tête du NOM (« 12 … », lettre pour départager : « 12a … »), qui donne l'ordre de jeu. Un seul code est réservé : <b>HUB</b> — le tableau qui le porte devient le LABORATOIRE (le hub), remplace celui du jeu et sort de la séquence de l'expédition.</p>
           <label class="ed-f"><span>Par (impulsions)</span><input type="number" id="ed-par" min="1" step="1" /></label>
           <label class="ed-f"><span>Dashs vapeur / écran</span><input type="number" id="ed-dashs" min="0" step="1" placeholder="banc" /></label>
+          <label class="ed-f"><span>États en descente</span>
+            <select id="ed-etats">
+              <option value="cycle">Suivant les mémoires (cycle)</option>
+              <option value="libres">Libres — tout au bouton</option>
+            </select></label>
+          <label class="ed-f"><span>Exige au bouton</span>
+            <span style="display:flex;gap:10px">
+              <label style="display:flex;gap:4px;align-items:center"><input type="checkbox" id="ed-exige-glace" /> glace</label>
+              <label style="display:flex;gap:4px;align-items:center"><input type="checkbox" id="ed-exige-vapeur" /> vapeur</label>
+            </span></label>
+          <p class="edg-note">« Exige au bouton » prévient la VOIE : tant que le lien manuel
+            (solidification, vaporisation) n’est pas tissé aux mémoires, la descente
+            n’offre pas ce tableau en suite écrite.</p>
           <label class="ed-f"><span>Musique</span><select id="ed-ambiance"></select></label>
           <label class="ed-f" title="La part de lumière que la pièce garde LÀ OÙ AUCUNE LAMPE ne porte. 52 % = niveau historique ; 0 % = noir total hors des lampes — elles deviennent la seule source. ATTENTION : sans lampe posée, la cuve garde sa LAMPE PAR DÉFAUT (invisible, au centre) — à 0 % elle éclaire donc toujours. Pour le noir complet : posez une lampe et mettez son intensité à 0."><span>Lumière générale (%)</span><input type="number" id="ed-lum-generale" min="0" max="100" step="5" placeholder="52" /></label>
           <label class="ed-f" title="Des nappes de brume qui dérivent lentement dans la pièce — elles ne se voient que dans la lumière, et voilent aussi le corps. 0 % = aucune (défaut)."><span>Brume (%)</span><input type="number" id="ed-brume" min="0" max="100" step="5" placeholder="0" /></label>
