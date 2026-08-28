@@ -31,8 +31,50 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
+    date: '28/08/2026 17:20',
+    title: 'Le méta arrive dans le hub JOUÉ : le module compact équipé',
+    notes: [
+      'Signalé : « je ne vois aucun changement dans le hub ». Trouvé, et c’était subtil : le hub joué n’est PAS celui du code — la bibliothèque partagée sert son tableau de code HUB en premier (le laboratoire se remodèle depuis l’éditeur), et cette entrée est l’instantané du MODULE COMPACT, resté d’avant le méta. La refonte d’hier habillait le grand module… que personne ne joue.',
+      'Le module compact reçoit donc tout le méta, taillé à son échelle : l’aile est s’agrandit (bornes portées à x 2750), LE COMPTOIR y aligne ses quatre alcôves à niches (mêmes articles, mêmes prix en MÉMOIRE), l’ÉTABLI du poste de gestion devient LE BANC DES MÉMOIRES (le contact du corps contre le plan de travail ouvre l’écran du cycle), et les deux chambres gardées encadrent le sas : SORTIE DE GIVRE derrière son RIDEAU au nord-est, SORTIE DE VAPEUR derrière sa GRILLE au sud-est, lumières et signalétique comprises.',
+      'Sous le capot, les zones du méta (étal, banc, sas gardés) ne sont plus des constantes du grand module : zonesDuHub(tableau) résout les zones DU HUB SERVI — grand, compact v4, ou aucune pour un vieil instantané (rien ne s’active à tort sur une géométrie qui n’a pas l’annexe). Entre-temps le concepteur a recodé l’instantané en HUB2 : le hub servi est redevenu le grand module du code, méta compris — et le semis dédié (ops/maj-hub, gardé conforme au code par test) met tout de même l’instantané compact à niveau v4, SOUS SON CODE ACTUEL, sans re-masquer le code. 448 tests verts, traversée et cloisons sans fente prouvées sur les DEUX modules.',
+    ],
+  },
+  {
+    date: '28/08/2026 17:16',
+    title:
+      'Les mémoires prennent la place : composition ample, liens sans équivoque',
+    notes: [
+      'Retour du concepteur : « tu as trop peur du vide, prends la place ». C’est fait — le schéma n’est plus une boîte posée au milieu du vide : la scène OCCUPE tout le cadre (804 × 708 px sur un Steam Deck, mesuré), les états sont plus grands, l’en-tête tient sur une seule ligne et la sphère du LIQUIDE règne au centre.',
+      'AMBIGUÏTÉ LEVÉE — on pouvait croire que la plaque FUSION appartenait au grand arc de SUBLIMATION qui passait derrière elle : mesuré, l’arc mordait de 17 pixels DANS la plaque. Les grands arcs filent maintenant aux bords de l’écran et les liens intérieurs se referment sur la sphère : 76 pixels séparent la plaque de l’arc voisin. Les quatre plaques intérieures se posent EN QUINCONCE sur leur courbe (jamais deux côte à côte : 12 et 20 px d’écart, elles se touchaient avant).',
+      'Et surtout : LE SURVOL ISOLE. Approcher une plaque — ou sa ligne au registre, ou la parcourir au clavier — éteint tous les autres traits à 7 % et ne laisse vivre que le lien concerné, plaque et ligne surlignées ensemble. La question « à quel trait appartient ce label ? » ne se pose plus une seconde, à la souris comme à la manette.',
+      'La NUÉE DE GAZ est ramenée à l’échelle des deux autres états (elle mangeait le bas de l’écran) : plus resserrée, plus dense en son cœur, ses volutes intactes. Vérifié en 1280×800 : écarts mesurés dans le vrai écran, extinction au survol mesurée (0,07 contre 0,85), en-tête sur une ligne. 436 tests verts.',
+    ],
+  },
+  {
+    date: '28/08/2026 17:09',
+    title:
+      'La cérémonie se déplie en PAYSAGE : l’écran récompense pour PC, console et Deck',
+    notes: [
+      'Signalé : l’écran de récompense et le choix de salle étaient dessinés pour le portrait — une colonne de 560 px au milieu d’un écran de 1280 ou 1920, et des plans de salle en timbre-poste. Sur écran large et paysage, le même panneau se DÉPLIE désormais en instrument : le flacon, le relevé et le condensat à gauche, l’ÉTALONNAGE et son tampon de palier à droite, les cartes de choix en pleine largeur dessous. Le flacon y gagne sa présence (76 px de haut) et le litrage sa taille.',
+      'LE CHOIX DE SALLE en profite le plus : le panneau s’ouvre à 1180 px et les mini-plans passent de 240 à 380 px — on choisit enfin sur ce qu’on VOIT du plan, pas sur une vignette. Le panneau ne dépasse jamais l’écran (92 % de sa hauteur au plus) : sur un Deck de 800 px de haut, la cérémonie tient d’un seul tenant.',
+      'Rien n’a bougé dans le HTML ni dans le jeu : c’est une grille qui replace les blocs, et elle ne s’applique QU’EN paysage au-delà de 900 px — le portrait (mobile) garde exactement sa mise en page d’avant. Mesuré aux trois formats plutôt qu’à l’œil : PC 1920 en deux colonnes (relevé 546 px à gauche, étalonnage 604 px à droite, cartes 1180 px), Deck 1280 à 994 px avec ses deux cartes côte à côte, mobile 390 inchangé en colonne. 436 tests verts, build propre.',
+    ],
+  },
+  {
+    date: '28/08/2026 16:55',
+    title:
+      'Le hub à l’ère du méta : comptoir, banc des mémoires, trois sorties',
+    notes: [
+      'Demandé : que le hub soit revu avec les nouveaux systèmes de monnaie — un marchand pour dépenser ce qu’on gagne, l’accès à l’écran des mémoires — et d’autres sorties à mesure qu’on possède la glace puis la vapeur. C’est fait : la salle d’étalonnage cesse d’être « hors service », elle devient le SECTEUR COMPTOIR & MÉMOIRES, et l’écran de contrôle de l’observation passe SOUS TENSION.',
+      'LE COMPTOIR : quatre alcôves au sud de la salle, l’achat AU CONTACT comme à l’Économat — mais payé en MÉMOIRE, la monnaie qui survit à la purge. VIATIQUE DE GOUTTES (3 — +0,8 L à la bonbonne au départ), CLEF DE CACHETTE (4 — le premier tableau dévoilé), SAC SURPRISE (3 — condensat de départ, mémoire… ou rien), ÉCHANTILLON DE SECOURS (8 — +1 vie). Ce sont des PROVISIONS : elles se livrent au lancement de la prochaine descente, un article par visite du module.',
+      'LE BANC DES MÉMOIRES : glisser le corps contre le banc ouvre l’écran du cycle des états — les transformations s’y tissent en mémoire (B ou ✕ referme, l’écran rejoint les couches manette). Pour mémoire, la distribution actuelle : la mémoire se gagne en jouant (+5 par sas, +5 la première traversée, +2 par record, +10 par trophée, +10 l’expédition bouclée, +2 même dispersé) et chaque transformation manuelle est un lien à tisser à cet écran — solidification 10, vaporisation 15, sublimation et condensation 60, fusion et liquéfaction offertes sauf verrou du scénario.',
+      'LES TROIS SORTIES : le conduit gagne deux chambres gardées PAR LA MATIÈRE. Au nord-est, derrière un RIDEAU que seule la glace écarte, la SORTIE DE GIVRE lance LA VOIE SEMI-PROCÉDURALE ; au sud-est, derrière une GRILLE que seul le souffle passe, la SORTIE DE VAPEUR lance LA DESCENTE DU JOUR (graine du jour forcée pour cette run, sans toucher au réglage du poste). Le verrou est physique : tant que le lien SOLIDIFICATION ou VAPORISATION n’est pas tissé, le corps ne peut pas prendre l’état qui ouvre la route — les sorties s’ouvrent au fil de la progression, et les routes cessent d’être identiques. Le sas principal garde la descente écrite (et la reprise de sauvegarde). Géométrie prouvée par tests (traversée, cloisons sans fente, alcôves hors des murs) — 441 tests verts.',
+    ],
+  },
+  {
     date: '28/08/2026 16:48',
-    title: 'Deux raccourcis de conception : VALIDER LA SALLE, et le HUB à portée de doigt',
+    title:
+      'Deux raccourcis de conception : VALIDER LA SALLE, et le HUB à portée de doigt',
     notes: [
       'Demandé : pouvoir conclure la salle en cours pendant une descente semi-procédurale et arriver à l’écran de récompense. Le pupitre d’essais ouvre la section CÉRÉMONIE sur un bouton « Valider la salle en cours ». Rien n’y est simulé — c’est le VRAI chemin de fin de salle qui se déroule : le sas est déclaré franchi à l’image suivante, le volume réellement présent est compté comme livré, les records se consignent, le condensat se verse, le rang de la descente se creuse, la voie propose sa suite. Les trois boutons voisins (petit, moyen, gros surplus) restent ce qu’ils étaient : une cérémonie factice, pour regarder l’écran couler sans toucher à la run.',
       'À savoir, et c’est écrit sous le bouton : valider consigne de VRAIS records. Le chrono de la salle vaut alors une fraction de seconde — le record du protocole tombera, et la publication au tableau partagé suivra. C’est le prix d’un raccourci qui emprunte le vrai chemin plutôt que d’en singer un.',
