@@ -22,6 +22,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '29/08/2026 01:38',
+    title: 'Le rail de descente revient sur le flanc droit, et le dossier s’adresse enfin au joueur',
+    notes: [
+      'Signalé : la jolie barre verticale de droite, celle qui disait où l’on en était sur le total, a disparu. Elle n’a pas été cassée — elle était ENFERMÉE. Depuis le premier jour, le rail ne se montrait qu’en mode VOIE : dans la descente ordinaire, plus rien sur le flanc droit ne répondait à « où j’en suis », qui est pourtant la question la plus élémentaire d’un jeu de salles. Il accompagne désormais TOUTE descente, la séquence écrite comme la voie. En voie, les tiers viennent du plan ; en descente ordinaire, c’est le CODE de chaque salle qui dit son moment — la couture tombe donc au bon endroit, sans qu’on l’invente. L’étoile ✦ de profondeur record reste réservée à la voie : c’est là qu’elle veut dire quelque chose.',
+      'ET LE PANNEAU DE DROITE CHANGE DE DESTINATAIRE. Il était écrit pour l’atelier : des colonnes de mesures, « PARTICULES 431 / 512 », « RANG 4 / 24 », un relevé d’instrument. Il est maintenant écrit pour celui qui descend, et répond à trois questions dans cet ordre — QU’EST-CE QUE JE DOIS FAIRE ICI, QU’EST-CE QU’IL ME RESTE, QU’EST-CE QUE J’EMPORTE.',
+      'TA MISSION ouvre le panneau : la place dans la descente en grand, le rail à crans, la carte de la salle (nom, code, chips) et surtout L’OBJECTIF en clair — « RAMENER 5,00 L », une jauge d’or qui vire au vert quand c’est acquis, et la phrase qui va avec : « Il t’en manque 0,50 L : ne laisse pas de gouttes derrière toi. » Sous elle, tes records deviennent des DÉFIS à battre (✦ ton volume, ✦ ton chrono) — ou « aucun record, à écrire ».',
+      'TON CORPS remplace les colonnes par des barres à icône : le volume, la coque avec son mot (tiède, fraîche, froide, glaciale), les dashs et les échantillons de secours en grosses pastilles qu’on compte sur les doigts. Le chiffre exact reste là, en dessous, en petit : il ÉCLAIRE la barre, il ne la remplace plus. TON BUTIN devient six tuiles à icône plutôt qu’un tableau — bonbonne, condensat, mémoire, pastilles, salles, chrono. TON ÉQUIPEMENT, des cartes d’inventaire.',
+      'Un mensonge corrigé au passage : les trois cartes d’état annonçaient les touches F, G et B écrites EN DUR. Depuis que les commandes se redéfinissent, elles disaient donc faux dès qu’on changeait une touche. Elles lisent maintenant la table — et à défaut de touche, le bouton de la manette.',
+      'Vérifié dans le jeu construit, en 1280 × 800, dans une descente ORDINAIRE (pas la voie) : le rail affiché à droite, « 1 / 24 », mention DÉBUT, vingt-quatre crans, deux coutures de moment, le cran courant qui pulse, 468 px de haut collés au bord. Puis le panneau : ses cinq sections, l’objectif et son conseil, la tuile de défi, les trois cartes d’état, les six tuiles de butin — et pas un seul texte coupé. Enfin la preuve de la touche : GLACE redéfinie sur K, et la carte SOLIDIFICATION affiche K. 474 tests verts, build propre.',
+    ],
+  },
+  {
     date: '29/08/2026 01:26',
     title: 'Le module Méduse v5 : le plan du hub cible, prêt pour l’accident',
     notes: [
