@@ -124,6 +124,51 @@ describe('Records — les registres du labo', () => {
     expect(new Records(ancien).fioles()).toEqual([])
   })
 
+  it('les RÉPARATIONS : paiement atomique, refus si déjà fait ou sans solde', () => {
+    const r = new Records(memoryStorage())
+    r.gagneMemoire(25)
+    expect(r.repare('eclairage', 10)).toBe(true)
+    expect(r.memoire()).toBe(15)
+    expect(r.estRepare('eclairage')).toBe(true)
+    // déjà réparé : refus SANS débit
+    expect(r.repare('eclairage', 10)).toBe(false)
+    expect(r.memoire()).toBe(15)
+    // solde insuffisant : refus sans gravure
+    expect(r.repare('table-depart', 20)).toBe(false)
+    expect(r.estRepare('table-depart')).toBe(false)
+    expect(r.reparationsFaites()).toEqual(['eclairage'])
+  })
+
+  it('les DÉCOUVERTES : gravure idempotente, l’ordre fait foi', () => {
+    const r = new Records(memoryStorage())
+    expect(r.noteDecouverte('livraison')).toBe(true)
+    expect(r.noteDecouverte('cahier-charges')).toBe(true)
+    expect(r.noteDecouverte('livraison')).toBe(false) // jamais deux fois
+    expect(r.decouvertesVues()).toEqual(['livraison', 'cahier-charges'])
+  })
+
+  it('verrous du cycle : pose et levée idempotentes (pour le scénario)', () => {
+    const r = new Records(memoryStorage())
+    r.poseVerrouCycle('solidification')
+    r.poseVerrouCycle('solidification') // pose répétée : rien ne double
+    expect(r.verrousCycle()).toEqual(['solidification'])
+    r.leveVerrouCycle('solidification')
+    r.leveVerrouCycle('solidification') // levée répétée : rien ne casse
+    expect(r.verrousCycle()).toEqual([])
+  })
+
+  it('migration : un vieux registre sans réparations ni découvertes charge sain', () => {
+    const st = memoryStorage()
+    st.setItem(
+      'projet21.registres.v1',
+      JSON.stringify({ essais: 3, operator: 'JU', tableaux: {}, expedition: null, history: [] }),
+    )
+    const r = new Records(st)
+    expect(r.reparationsFaites()).toEqual([])
+    expect(r.decouvertesVues()).toEqual([])
+    expect(r.repare('eclairage', 0)).toBe(true) // et les accès écrivent sans casser
+  })
+
   it('réinitialiser le cycle (outil concepteur) : détisse et rembourse', () => {
     const r = new Records(memoryStorage())
     r.gagneMemoire(30)

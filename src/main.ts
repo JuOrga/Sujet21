@@ -7162,9 +7162,10 @@ function resetLasers(): void {
   // l'étal de l'Économat se réarme (le condensat dépensé, lui, l'est)
   achatsEconomat.clear()
   plotsDedans = ETAL_ECONOMAT.map(() => false)
-  // le comptoir du hub aussi : un article par VISITE du module
+  // le comptoir du hub aussi : un article par VISITE du module — le
+  // réarmement suit la géométrie du hub joué, pas un compte figé
   achatsHub.clear()
-  plotsHubDedans = [false, false, false, false]
+  plotsHubDedans = (zonesDuHub(level)?.etal ?? []).map(() => false)
   // les plots POSÉS du tableau (le méta en données)
   plotsPosesDedans = (level.plots ?? []).map(() => false)
   // les éclats de mémoire : ceux déjà gravés CETTE RUN ne reviennent pas
@@ -10955,11 +10956,13 @@ function frame(now: number): void {
   sfx.allGas = allGas
   if (sim.dispersed && !sfx.dispersed) {
     audio.disperse()
-    if (!testLevel) {
-      // fin de l'échantillon ET de l'expédition : les registres consignent tout
+    if (!testLevel && !auHub) {
+      // fin de l'échantillon ET de l'expédition : les registres consignent
+      // tout — mais pas au hub, où la dispersion recompose simplement
+      // l'échantillon : elle ne clôt aucun essai, ne grave rien
       records.noteDispersion(level.code, run.tableauTime)
       // même l'échec grave sa mémoire : le Sujet apprend de ses dispersions
-      if (!auHub) gagneMemoireRun(2)
+      gagneMemoireRun(2)
       records.noteExpedition(levelIndex, run.livreTotal, run.runTime)
       if (levelIndex > 0 || run.livreTotal >= 0.01) {
         pushExpeditionRecord(

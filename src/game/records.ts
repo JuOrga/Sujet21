@@ -59,6 +59,13 @@ interface RecordsData {
   // y compris les deux offerts (fusion, liquéfaction), pour le déblocage
   // progressif de l'acte 0. Vide : le cycle nominal.
   cycleVerrous: string[]
+  // LES RÉPARATIONS DU HUB : les stations remises en état après l'accident
+  // du télescope (ids de reparations.ts), payées en mémoire — le module
+  // Méduse se reconstruit au fil des retours. Vide : tout est en panne.
+  reparations: string[]
+  // LES DÉCOUVERTES : les jalons du récit déjà servis (ids de
+  // decouvertes.ts), un par retour de run — l'ordre de la file fait foi.
+  decouvertes: string[]
 }
 
 // Les nœuds utilitaires de l'ANCIEN arbre de l'Éveil (remplacé par le
@@ -95,6 +102,8 @@ function blank(): RecordsData {
     fiolesEquipees: [],
     eveil: [],
     cycleVerrous: [],
+    reparations: [],
+    decouvertes: [],
   }
 }
 
@@ -146,6 +155,8 @@ export class Records {
           if (!Array.isArray(d.fiolesEquipees)) d.fiolesEquipees = []
           if (!Array.isArray(d.eveil)) d.eveil = [] // avant l'arbre
           if (!Array.isArray(d.cycleVerrous)) d.cycleVerrous = [] // avant les verrous
+          if (!Array.isArray(d.reparations)) d.reparations = [] // avant l'accident
+          if (!Array.isArray(d.decouvertes)) d.decouvertes = [] // avant le récit
           // Migration : les registres d'avant la refonte (un seul record par
           // salle) sèment leurs deux records avec la même entrée.
           for (const code of Object.keys(d.tableaux)) {
@@ -234,6 +245,21 @@ export class Records {
     return [...this.data.cycleVerrous]
   }
 
+  /** Pose le verrou narratif d'un lien (idempotent — pour le scénario). */
+  poseVerrouCycle(id: string): void {
+    if (this.data.cycleVerrous.includes(id)) return
+    this.data.cycleVerrous.push(id)
+    this.save()
+  }
+
+  /** Lève le verrou narratif d'un lien (idempotent — pour le scénario). */
+  leveVerrouCycle(id: string): void {
+    const i = this.data.cycleVerrous.indexOf(id)
+    if (i < 0) return
+    this.data.cycleVerrous.splice(i, 1)
+    this.save()
+  }
+
   /** Pose ou lève le verrou narratif d'un lien. Rend l'état final. */
   basculeVerrouCycle(id: string): boolean {
     const i = this.data.cycleVerrous.indexOf(id)
@@ -258,6 +284,39 @@ export class Records {
     if (this.data.eveil.includes(id)) return false
     if (!this.depenseMemoire(cout)) return false
     this.data.eveil.push(id)
+    this.save()
+    return true
+  }
+
+  /** Les RÉPARATIONS du hub déjà payées (ids). */
+  reparationsFaites(): string[] {
+    return [...this.data.reparations]
+  }
+
+  estRepare(id: string): boolean {
+    return this.data.reparations.includes(id)
+  }
+
+  /** Paie une réparation : débite la mémoire ET grave la station,
+   * atomiquement. false si déjà réparée ou si le solde ne suffit pas. */
+  repare(id: string, cout: number): boolean {
+    if (this.data.reparations.includes(id)) return false
+    if (!this.depenseMemoire(cout)) return false
+    this.data.reparations.push(id)
+    this.save()
+    return true
+  }
+
+  /** Les DÉCOUVERTES du récit déjà servies (ids, dans l'ordre). */
+  decouvertesVues(): string[] {
+    return [...this.data.decouvertes]
+  }
+
+  /** Grave une découverte servie. false si elle l'était déjà (idempotent :
+   * un même jalon ne se raconte pas deux fois). */
+  noteDecouverte(id: string): boolean {
+    if (this.data.decouvertes.includes(id)) return false
+    this.data.decouvertes.push(id)
     this.save()
     return true
   }

@@ -22,6 +22,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '29/08/2026 01:08',
+    title: 'Le grand chantier s’ouvre : socle du hub accidenté et de l’arc du récit',
+    notes: [
+      'Décidé avec le concepteur : le module Méduse a subi un ACCIDENT à la livraison du télescope orbital — le hub se réparera station par station, payé en MÉMOIRE ; et chaque retour de run livrera une DÉCOUVERTE du récit (le Volume est un miroir devenu vivant), jusqu’à l’ouverture de la fin. Cette livraison pose le socle invisible : les registres savent désormais tenir les RÉPARATIONS payées (paiement et gravure atomiques, refus net si le solde manque ou si la station est déjà en état) et les DÉCOUVERTES servies (jamais deux fois, l’ordre fait foi) ; les verrous narratifs du cycle gagnent une pose et une levée idempotentes, prêtes pour l’acte 0.',
+      'Deux redressements au passage : une dispersion AU HUB ne compte plus un essai ni n’écrit d’historique — au module d’accueil, la dispersion recompose simplement l’échantillon, les registres n’ont rien à en dire ; et le réarmement des plots du comptoir suit maintenant la géométrie du hub joué au lieu d’un compte figé à quatre — préalable aux stations de réparation qui allongeront la liste. Les vieux registres migrent d’eux-mêmes (champs absents → vides). 478 tests verts.',
+    ],
+  },
+  {
     date: '29/08/2026 00:48',
     title: 'Les textes deviennent lisibles : les polices embarquent enfin, et tout peut grossir',
     notes: [
