@@ -8,6 +8,8 @@
 // pour déplacer la caméra. Pas de clavier : la barre tactile (main.ts) arme
 // le vortex et couvre pause / time warp / recommencer.
 
+import { actionDeTouche, sourisInverse } from './commandes'
+
 export const TIME_WARP_STEPS = [0.25, 0.5, 1, 2, 4]
 
 /** Les trois états qu'une COMMANDE peut viser (le plasma n'a pas de bouton). */
@@ -71,6 +73,10 @@ export class Input {
   // VERSER LA RÉSERVE (bonbonne) : la touche V, jumelle du toucher sur la
   // fiole du bandeau — le geste ne doit pas exiger de viser un petit bouton
   onVerser: (() => void) | null = null
+  // les manœuvres d'ÉCRAN (légende, états, dossier, recadrer) : elles
+  // appartiennent au jeu, pas à l'entrée — il les reçoit par leur nom et
+  // répond « vrai » s'il l'a prise (la touche est alors consommée)
+  onCommande: ((id: string) => boolean) | null = null
   onTimeWarpChange: ((warp: number) => void) | null = null
   // le zoom porte son ANCRE (centre du pincement, curseur de la molette) :
   // le point du monde sous les doigts doit rester sous les doigts
@@ -165,7 +171,13 @@ export class Input {
     const enJeu = (): boolean => document.body.classList.contains('playing')
     target.addEventListener('pointerdown', (e) => {
       if (!enJeu() || this.gelees) return
-      if (e.button === 2) {
+      // BOUTONS DE LA SOURIS : inversés (réglage des commandes), le clic
+      // DROIT éjecte et le GAUCHE attrape la caméra — les gauchers et les
+      // souris à pouce y tiennent
+      const inv = sourisInverse()
+      const bAgir = inv ? 2 : 0
+      const bCamera = inv ? 0 : 2
+      if (e.button === bCamera) {
         // Maintenu : déplacement de caméra ; bref : vortex (au relâchement)
         this.rightDrag = {
           id: e.pointerId,
@@ -183,7 +195,7 @@ export class Input {
         }
         return
       }
-      if (e.button !== 0) return
+      if (e.button !== bAgir) return
       try {
         target.setPointerCapture(e.pointerId)
       } catch {
@@ -304,23 +316,44 @@ export class Input {
       // commandes gelées (prise en main à l'écran) : aucune touche de jeu
       // ne passe — le voile bloque les pointeurs, ceci bloque le clavier
       if (this.gelees) return
-      if (e.key === ' ') {
-        this.togglePause()
-        e.preventDefault()
-      } else if (e.key === 'r' || e.key === 'R') {
-        this.onReset?.()
-      } else if (e.key === ',' || e.key === '<') {
-        this.stepWarp(-1)
-      } else if (e.key === '.' || e.key === '>') {
-        this.stepWarp(1)
-      } else if (e.key === 'f' || e.key === 'F') {
-        this.demande('glace')
-      } else if (e.key === 'g' || e.key === 'G') {
-        this.demande('vapeur')
-      } else if (e.key === 'v' || e.key === 'V') {
-        // VERSER LA RÉSERVE : jumelle du toucher sur la fiole du bandeau —
-        // le geste ne doit pas exiger de viser douze pixels
-        this.onVerser?.()
+      // LA TABLE DES COMMANDES décide (game/commandes.ts) : ce sont les
+      // touches d'origine tant que le joueur n'a rien redéfini dans
+      // PARAMÈTRES › COMMANDES. Les anciennes secondes (< et >) restent
+      // acceptées pour le temps, par habitude des testeurs.
+      const id =
+        actionDeTouche(e.key) ??
+        (e.key === '<' ? 'ralentir' : e.key === '>' ? 'accelerer' : null)
+      if (!id) return
+      switch (id) {
+        case 'pause':
+          this.togglePause()
+          e.preventDefault()
+          break
+        case 'recommencer':
+          this.onReset?.()
+          break
+        case 'ralentir':
+          this.stepWarp(-1)
+          break
+        case 'accelerer':
+          this.stepWarp(1)
+          break
+        case 'glace':
+          this.demande('glace')
+          break
+        case 'vapeur':
+          this.demande('vapeur')
+          break
+        case 'eau':
+          this.demande('eau')
+          break
+        case 'verser':
+          this.onVerser?.()
+          break
+        default:
+          // les écrans (légende, états, dossier, recadrage) vivent dans
+          // main.ts : il les reçoit par leur nom
+          if (this.onCommande?.(id)) e.preventDefault()
       }
     })
   }

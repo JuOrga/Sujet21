@@ -5488,6 +5488,69 @@
         .bonbonne.presente, .bonbonne.rappel, .bonbonne.ouvert,
         .bonbonne.presente .bb-eclat { animation: none; }
       }
+      /* ---- REDÉFINIR LES COMMANDES : une ligne par manœuvre ---------------- */
+      #touches {
+        /* 59 : SUR les paramètres (58), d'où l'on vient — sinon l'écran
+           s'ouvre derrière eux et l'on croit le bouton mort */
+        position: fixed; inset: 0; z-index: 59;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(4, 8, 14, 0.72);
+        backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+      }
+      #touches[hidden] { display: none; }
+      #touches .salles-boite { width: min(880px, 94vw); max-height: 88vh; display: flex; flex-direction: column; }
+      .touches-corps {
+        overflow-y: auto; padding: 14px 16px 16px;
+        font-family: 'IBM Plex Mono', ui-monospace, monospace; color: #cfe2ef;
+      }
+      .touches-aide { margin: 0 0 10px; font-size: 11px; color: #8ba3b8; line-height: 1.5; }
+      .touches-souris {
+        display: flex; align-items: flex-start; gap: 8px; margin: 0 0 14px;
+        font-size: 11px; color: #a9c3de; line-height: 1.45; cursor: pointer;
+      }
+      .touches-souris input { margin-top: 2px; }
+      .tch-sec {
+        margin: 14px 0 6px; font-family: Michroma, ui-monospace, monospace;
+        font-size: 10px; letter-spacing: 0.2em; color: #8fd8c8;
+      }
+      .tch-ligne {
+        display: grid; grid-template-columns: 1fr 118px 118px;
+        gap: 8px; align-items: center; padding: 5px 0;
+        border-top: 1px solid #16222f;
+      }
+      .tch-nom { font-size: 12px; }
+      .tch-nom small { display: block; color: #7b93a8; font-size: 10.5px; line-height: 1.35; }
+      .tch-case {
+        font: inherit; font-size: 12px; letter-spacing: 0.06em;
+        background: rgba(10, 18, 28, 0.9); color: #d5f3e8;
+        border: 1px solid var(--line); border-radius: 5px;
+        padding: 7px 4px; cursor: pointer; text-align: center;
+      }
+      .tch-case:hover:not(:disabled) { border-color: var(--specimen); }
+      .tch-case:disabled { opacity: 0.4; cursor: default; }
+      .tch-case.tch-change { border-color: #6dffb8; color: #8fffcf; }
+      .tch-case.tch-ecoute {
+        border-color: #ffd977; color: #ffd977;
+        animation: tch-attend 1s ease-in-out infinite;
+      }
+      @keyframes tch-attend { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+      .tch-tete {
+        display: grid; grid-template-columns: 1fr 118px 118px; gap: 8px;
+        font-size: 9px; letter-spacing: 0.18em; color: #6f8ba3; padding-bottom: 4px;
+      }
+      .tch-tete span:first-child { text-align: left; }
+      .tch-tete span { text-align: center; }
+      .touches-bas { margin-top: 16px; display: flex; justify-content: flex-end; }
+      .touches-bas button {
+        font: inherit; font-size: 11px; letter-spacing: 0.1em;
+        background: transparent; color: #a9c3de;
+        border: 1px solid var(--line); border-radius: 6px;
+        padding: 8px 14px; cursor: pointer;
+      }
+      .touches-bas button:hover { border-color: #e0685c; color: #ffb59f; }
+      @media (max-width: 620px) {
+        .tch-ligne, .tch-tete { grid-template-columns: 1fr 92px 92px; }
+      }
       /* ---- La MISE EN BONBONNE : l'écran de récompense de fin de salle ---- */
       #mb-veil {
         position: fixed; inset: 0; z-index: 50; padding: 10px;
@@ -6294,6 +6357,23 @@
       <div class="recs-boite"></div>
     </div>
 
+    <!-- LA REDÉFINITION DES COMMANDES : une ligne par manœuvre, sa touche
+         et son bouton — on clique la case, on appuie, c'est pris. -->
+    <div id="touches" hidden aria-label="Redéfinir les commandes">
+      <div class="salles-boite">
+        <div class="salles-tete"><span>COMMANDES — REDÉFINIR</span>
+          <button type="button" id="touches-fermer" aria-label="Fermer">✕</button></div>
+        <div class="touches-corps">
+          <p class="touches-aide" id="touches-aide">Cliquez une case, puis appuyez sur la touche ou le bouton voulu. ÉCHAP annule ; ⌫ efface la commande.</p>
+          <label class="touches-souris"><input type="checkbox" id="touches-souris" /> <span>Inverser les BOUTONS DE LA SOURIS — le clic droit éjecte, le gauche attrape la caméra</span></label>
+          <div id="touches-liste"></div>
+          <div class="touches-bas">
+            <button type="button" id="touches-defaut">TOUT REMETTRE PAR DÉFAUT</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Les commandes : un panneau à trois onglets — PC, manette, tactile -->
     <div id="cmds" hidden aria-label="Commandes du jeu">
       <div class="cmds-boite">
@@ -6316,6 +6396,7 @@
           <kbd>espace</kbd>pause
           <kbd>R</kbd>recommencer
           <kbd>échap</kbd>la fiche<br />
+          <kbd>toutes ces touches</kbd>se redéfinissent dans PARAMÈTRES › COMMANDES (clavier, souris, manette)<br />
           <kbd>L</kbd>légende des surfaces
           <kbd>E</kbd>les trois états
           <kbd>BANC</kbd>banc de réglage
@@ -6656,7 +6737,16 @@
         <div class="salles-tete"><span>PARAMÈTRES</span>
           <button type="button" id="params-fermer" aria-label="Fermer">✕</button></div>
         <div class="params-corps">
-          <div class="params-nom">FRÉQUENCE D'IMAGES — VERROUILLER POUR ÉVITER LE YO-YO</div>
+          <div class="params-nom">COMMANDES — CLAVIER, SOURIS, MANETTE</div>
+          <div class="params-desc">
+            Chaque manœuvre du jeu peut changer de touche et de bouton :
+            les états, le temps, la bonbonne, les écrans. Le réglage est
+            celui de l'appareil — il vous suit d'une séance à l'autre.
+          </div>
+          <div class="params-choix">
+            <button type="button" id="params-touches">✎ REDÉFINIR LES COMMANDES</button>
+          </div>
+          <div class="params-nom" style="margin-top: 16px">FRÉQUENCE D'IMAGES — VERROUILLER POUR ÉVITER LE YO-YO</div>
           <div class="params-desc">
             La cuve se cale sur cette cadence et n'essaie jamais d'aller plus vite :
             une fréquence stable vaut mieux qu'une fréquence qui oscille. La qualité

@@ -82,6 +82,20 @@ import {
   type TraceResultat,
 } from './game/laser'
 import { BOUTON, Manette } from './game/manette'
+import {
+  MANOEUVRES,
+  actionDeTouche,
+  boutonDe,
+  nomBouton,
+  nomTouche,
+  poseSourisInverse,
+  redefinis as redefinisCommande,
+  redefinie as commandeRedefinie,
+  reinitialise as reinitialiseCommandes,
+  sections as sectionsCommandes,
+  sourisInverse,
+  toucheDe,
+} from './game/commandes'
 import { PerfCollector } from './game/perf'
 import {
   fetchLibrary,
@@ -4309,15 +4323,13 @@ window.addEventListener('keydown', (e) => {
     else if (el('montage').classList.contains('visible')) montage.close()
     else if (document.body.classList.contains('playing')) openHome()
     else closeHome()
-  } else if (e.key === 'l' || e.key === 'L') {
-    toggleLegend()
-  } else if (e.key === 'e' || e.key === 'E') {
-    toggleStates()
-  } else if (e.key === 'Tab') {
-    // le DOSSIER DE DESCENTE : tout le relevé d'un geste, sans figer la run
+  } else if (e.key === 'Tab' && actionDeTouche('Tab') === 'dossier') {
+    // le dossier passe par la table des commandes (input.onCommande) ; ici
+    // on empêche seulement la tabulation de promener le focus
     e.preventDefault()
-    ouvreDossier(!dossierOuvert)
   }
+  // légende, états, dossier, recadrage : voir la table des commandes
+  // (game/commandes.ts) — ils arrivent par input.onCommande, redéfinis ou non
 })
 
 let sim = createSim(level)
@@ -4438,6 +4450,8 @@ const COUCHES_MENU: CoucheMenu[] = [
   { id: 'salles', retour: 'salles-fermer' },
   { id: 'records', retour: 'records-fermer' },
   { id: 'livraisons', retour: 'livraisons-fermer' },
+  // l'écran des commandes se pose SUR les paramètres : il passe donc avant
+  { id: 'touches', retour: 'touches-fermer' },
   { id: 'params', retour: 'params-fermer' },
   { id: 'legend', retour: 'legend-close', legere: true },
   { id: 'states', retour: 'states-close', legere: true },
@@ -6091,6 +6105,14 @@ function verserBonbonne(): string {
 /** LE GESTE COMPLET : verser, et DIRE ce qui s'est passé — au toucher, à la
  *  touche V ou à la croix HAUT de la manette. Sans un mot, un refus (corps
  *  plein, état glace, réserve vide) passait pour un bouton mort. */
+/** Ce bouton-ci vient-il d'être pressé POUR CETTE MANŒUVRE ? La table des
+ *  commandes donne l'index (redéfini ou d'origine) ; sans bouton assigné,
+ *  la manœuvre n'a pas de geste manette et la réponse est non. */
+function manetteFait(id: string): boolean {
+  const b = boutonDe(id)
+  return b !== null && manette.edge(b)
+}
+
 function verseEtDis(): void {
   const r = verserBonbonne()
   bbMot(
@@ -6127,6 +6149,183 @@ bonbonneEl?.addEventListener('click', (e) => {
   verseEtDis()
 })
 input.onVerser = verseEtDis
+// LES MANŒUVRES D'ÉCRAN : la table des commandes les nomme, le jeu les
+// exécute — c'est le même chemin pour la touche d'origine et pour celle
+// que le joueur a redéfinie.
+// ---- L'ÉCRAN DES COMMANDES : redéfinir touches et boutons ---------------
+// Une ligne par manœuvre, deux cases : la touche et le bouton. On clique la
+// case, l'écran ÉCOUTE (le clavier en capture, la manette au sondage), et le
+// premier appui devient la commande. ÉCHAP annule, ⌫ efface. La commande est
+// exclusive : si elle servait ailleurs, elle y est libérée — et l'écran le
+// dit, pour qu'on ne cherche pas ensuite pourquoi un geste a disparu.
+const touchesEl = el('touches')
+const touchesListe = el('touches-liste')
+const touchesAide = el('touches-aide')
+const touchesSouris = el('touches-souris') as HTMLInputElement
+const AIDE_TOUCHES =
+  'Cliquez une case, puis appuyez sur la touche ou le bouton voulu. ÉCHAP annule ; ⌫ efface la commande.'
+let ecouteCase: { id: string; quoi: 'clavier' | 'manette' } | null = null
+
+function litTouches(): void {
+  touchesSouris.checked = sourisInverse()
+  let html = ''
+  for (const sec of sectionsCommandes()) {
+    html += `<div class="tch-sec">${sec.titre}</div>`
+    html +=
+      '<div class="tch-tete"><span>manœuvre</span><span>clavier</span><span>manette</span></div>'
+    for (const m of sec.manoeuvres) {
+      const t = nomTouche(toucheDe(m.id))
+      const b = nomBouton(boutonDe(m.id))
+      const chg = commandeRedefinie(m.id) ? ' tch-change' : ''
+      const fixe = m.fixe ? ' disabled title="commande fixe : elle ouvre et ferme les écrans"' : ''
+      html +=
+        `<div class="tch-ligne"><div class="tch-nom">${m.nom}<small>${m.aide}</small></div>` +
+        `<button type="button" class="tch-case${chg}" data-tch="${m.id}" data-quoi="clavier"${fixe}>${t}</button>` +
+        `<button type="button" class="tch-case${chg}" data-tch="${m.id}" data-quoi="manette"${fixe}>${b}</button></div>`
+    }
+  }
+  touchesListe.innerHTML = html
+  for (const b of Array.from(
+    touchesListe.querySelectorAll<HTMLButtonElement>('.tch-case'),
+  )) {
+    b.addEventListener('click', () => {
+      if (b.disabled) return
+      ecouteCase = {
+        id: b.dataset.tch ?? '',
+        quoi: (b.dataset.quoi as 'clavier' | 'manette') ?? 'clavier',
+      }
+      for (const x of Array.from(
+        touchesListe.querySelectorAll('.tch-case'),
+      ))
+        x.classList.remove('tch-ecoute')
+      b.classList.add('tch-ecoute')
+      b.textContent = ecouteCase.quoi === 'clavier' ? 'appuyez…' : 'un bouton…'
+      if (ecouteCase.quoi === 'manette') armeSondeManette()
+      else arreteSondeManette()
+      touchesAide.textContent =
+        ecouteCase.quoi === 'clavier'
+          ? 'Appuyez sur la touche voulue (ÉCHAP annule, ⌫ efface).'
+          : 'Appuyez sur le bouton de la manette (ÉCHAP annule, ⌫ efface).'
+    })
+  }
+}
+
+// L'ÉCOUTE D'UN BOUTON a son propre sondage (16 ms) : quand un panneau est
+// ouvert, la boucle d'images du jeu se met en veille — attendre une image
+// pour lire la manette, c'est attendre indéfiniment.
+let sondeEcoute = 0
+let etatBoutons: boolean[] = []
+function armeSondeManette(): void {
+  arreteSondeManette()
+  etatBoutons = []
+  sondeEcoute = window.setInterval(() => {
+    if (!ecouteCase || ecouteCase.quoi !== 'manette' || touchesEl.hidden) return
+    const pads = navigator.getGamepads?.() ?? []
+    const gp = [...pads].find((g) => g?.connected)
+    if (!gp) return
+    for (let i = 0; i < gp.buttons.length && i < 16; i++) {
+      const b = gp.buttons[i]
+      const p = !!b && (b.pressed || b.value > 0.5)
+      if (p && !etatBoutons[i]) {
+        etatBoutons[i] = p
+        poseCommande(i)
+        return
+      }
+      etatBoutons[i] = p
+    }
+  }, 16)
+}
+function arreteSondeManette(): void {
+  if (sondeEcoute) window.clearInterval(sondeEcoute)
+  sondeEcoute = 0
+}
+
+/** Termine l'écoute : pose la commande (ou l'annule) et redessine. */
+function poseCommande(valeur: string | number | null, annule = false): void {
+  const c = ecouteCase
+  ecouteCase = null
+  arreteSondeManette()
+  if (!c) return
+  if (!annule) {
+    const libere = redefinisCommande(c.id, c.quoi, valeur)
+    touchesAide.textContent = libere
+      ? `Commande posée — elle a été libérée de « ${MANOEUVRES.find((m) => m.id === libere)?.nom ?? libere} ».`
+      : 'Commande posée.'
+  } else {
+    touchesAide.textContent = AIDE_TOUCHES
+  }
+  litTouches()
+}
+
+// le CLAVIER de l'écoute : en capture, avant tout le reste du jeu
+window.addEventListener(
+  'keydown',
+  (e) => {
+    if (!ecouteCase || touchesEl.hidden) return
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.key === 'Escape') return poseCommande(null, true)
+    if (e.key === 'Backspace' || e.key === 'Delete') return poseCommande(null)
+    if (ecouteCase.quoi === 'clavier') poseCommande(e.key)
+  },
+  true,
+)
+
+;(
+  window as unknown as {
+    __commandes: {
+      touche: (id: string) => string | null
+      bouton: (id: string) => number | null
+      action: (t: string) => string | null
+      redefinis: typeof redefinisCommande
+      reinitialise: typeof reinitialiseCommandes
+    }
+  }
+).__commandes = {
+  touche: toucheDe,
+  bouton: boutonDe,
+  action: actionDeTouche,
+  redefinis: redefinisCommande,
+  reinitialise: reinitialiseCommandes,
+}
+
+el('params-touches')?.addEventListener('click', () => {
+  touchesEl.hidden = false
+  touchesAide.textContent = AIDE_TOUCHES
+  litTouches()
+})
+el('touches-fermer')?.addEventListener('click', () => {
+  ecouteCase = null
+  arreteSondeManette()
+  touchesEl.hidden = true
+})
+touchesEl.addEventListener('pointerdown', (e) => {
+  if (e.target === touchesEl) {
+    ecouteCase = null
+    touchesEl.hidden = true
+  }
+})
+touchesSouris.addEventListener('change', () => {
+  poseSourisInverse(touchesSouris.checked)
+  touchesAide.textContent = touchesSouris.checked
+    ? 'Souris inversée : le clic DROIT éjecte, le GAUCHE attrape la caméra.'
+    : 'Souris standard : le clic GAUCHE éjecte, le DROIT attrape la caméra.'
+})
+el('touches-defaut')?.addEventListener('click', () => {
+  reinitialiseCommandes()
+  touchesSouris.checked = false
+  touchesAide.textContent = 'Toutes les commandes sont revenues à l’origine.'
+  litTouches()
+})
+
+input.onCommande = (id: string): boolean => {
+  if (id === 'legende') toggleLegend()
+  else if (id === 'etats') toggleStates()
+  else if (id === 'dossier') ouvreDossier(!dossierOuvert)
+  else if (id === 'recadrer') camera.resetAutoZoom()
+  else return false
+  return true
+}
 // Sonde de test : verser depuis la console (comme __sim, __run)
 ;(window as unknown as { __verser: () => string }).__verser = verserBonbonne
 /** La cérémonie avec un surplus factice — la sonde __bonbonne et le
@@ -8733,6 +8932,9 @@ function frame(now: number): void {
   manette.poll(manettePollNow)
   if (manette.connectee) {
     const enJeu = document.body.classList.contains('playing')
+    // (l'écoute d'un bouton pour REDÉFINIR une commande ne passe pas par
+    // ici : elle a son propre sondage, la boucle d'images étant à l'arrêt
+    // quand un panneau est ouvert — voir sondeManetteEcoute)
     // l'écran de menu au-dessus, s'il y en a un — codex, sous-menus de la
     // fiche, cérémonie, fiche elle-même… B y est TOUJOURS le retour
     const couche = coucheMenuActive()
@@ -8783,14 +8985,14 @@ function frame(now: number): void {
         }
       }
       // le temps aux épaules : LB ralentit, RB accélère (la croix ↔ aussi)
-      if (manette.edge(BOUTON.LB)) input.stepWarp(-1)
-      if (manette.edge(BOUTON.RB)) input.stepWarp(1)
+      if (manetteFait('ralentir')) input.stepWarp(-1)
+      if (manetteFait('accelerer')) input.stepWarp(1)
       // les trois états sur les trois boutons restants : X glace, Y vapeur,
       // B retour à l'eau — A reste la main qui agit. Tout passe par la
       // DEMANDE : le cycle des mémoires tranche, le cadran montre le verrou.
-      if (manette.edge(BOUTON.X)) input.demande('glace')
-      if (manette.edge(BOUTON.Y)) input.demande('vapeur')
-      if (!bConsomme && manette.edge(BOUTON.B)) {
+      if (manetteFait('glace')) input.demande('glace')
+      if (manetteFait('vapeur')) input.demande('vapeur')
+      if (!bConsomme && manetteFait('eau')) {
         // retour à l'eau, quel que soit l'état — sauf si B vient de
         // refermer un panneau léger (légende, états, instruments)
         input.demande('eau')
@@ -8799,12 +9001,12 @@ function frame(now: number): void {
       if (manette.edge(BOUTON.DROITE)) input.stepWarp(1)
       // la croix HAUT verse la réserve : viser une fiole de douze pixels au
       // pavé tactile n'était pas un geste — au Deck, c'est un cran de croix
-      if (manette.edge(BOUTON.HAUT)) verseEtDis()
+      if (manetteFait('verser')) verseEtDis()
       // enfoncer le stick GAUCHE recadre : la caméra revient au suivi auto
-      if (manette.edge(BOUTON.L3)) camera.resetAutoZoom()
+      if (manetteFait('recadrer')) camera.resetAutoZoom()
       // le stick DROIT ouvre le DOSSIER — la convention manette pour « la
       // fiche d'état » ; la descente continue derrière, comme au clavier
-      if (manette.edge(BOUTON.R3)) ouvreDossier(!dossierOuvert)
+      if (manetteFait('dossier')) ouvreDossier(!dossierOuvert)
       if (manette.zoomAvant) camera.zoomBy(Math.pow(1.9, dtReal), params)
       if (manette.zoomArriere) camera.zoomBy(Math.pow(1.9, -dtReal), params)
       // les grosses gâchettes zooment, la pression dose la vitesse

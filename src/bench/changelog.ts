@@ -22,6 +22,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 19:28',
+    title: 'PARAMÈTRES › COMMANDES : toutes les touches et tous les boutons se redéfinissent',
+    notes: [
+      'Demandé : un écran de paramètres pour changer les touches du jeu — clavier, souris et manette. Le voici. Une seule table gouverne désormais les commandes (game/commandes.ts) : quatorze manœuvres rangées en quatre sections — LE GESTE (agir), LES ÉTATS (glace, vapeur, liquide, verser la bonbonne), LE TEMPS (ralentir, accélérer, pause, recommencer) et LES ÉCRANS (légende, les trois états, dossier de descente, recadrer, la fiche). Chaque ligne porte son nom, ce qu’elle fait en une phrase, sa touche et son bouton.',
+      'Le geste est celui qu’on attend : on clique la case, elle se met à battre et dit « appuyez… », le premier appui devient la commande. ÉCHAP annule, ⌫ efface. La commande est EXCLUSIVE : donner « G » à la glace la retire à la vapeur — et l’écran le dit (« elle a été libérée de Se changer en VAPEUR »), pour qu’on ne cherche pas ensuite pourquoi un geste a disparu. Les cases redéfinies restent en vert : d’un coup d’œil on voit ce qu’on a changé, et un bouton remet tout à l’origine.',
+      'Deux manœuvres refusent de bouger, et c’est volontaire : AGIR (A, le clic) et LA FICHE (ÉCHAP, Start). Ce sont les poignées qui ouvrent et ferment les écrans — les laisser réassigner, c’est risquer de s’enfermer dans un panneau sans en sortir. Elles sont grisées et le disent.',
+      'La SOURIS a sa case à cocher : inversée, le clic DROIT éjecte et le GAUCHE attrape la caméra — les gauchers et les souris à pouce y tenaient. Le réglage est celui de l’APPAREIL, pas de la partie : il vit dans le stockage local et vous suit d’une séance à l’autre, sans toucher aux sauvegardes.',
+      'Un détail qui aurait tout gâché, trouvé à la vérification : l’écoute d’un BOUTON ne marchait pas. Quand un panneau est ouvert, la boucle d’images du jeu se met en veille — la mesure l’a montré, trois images en une seconde et demie d’appui. L’écoute a donc son propre sondage à 16 ms, qui lit la manette directement. Et l’écran lui-même s’ouvrait DERRIÈRE les paramètres d’où l’on vient (la capture l’a montré avant vous) : il passe maintenant devant.',
+      'Vérifié dans le jeu construit : l’écran ouvre ses quatorze lignes, capture « K » au clavier et « croix ↓ » à la manette, refuse la ligne fixe — puis, revenu dans la cuve, la LÉGENDE ne répond plus à L et s’ouvre bien par J, la table interne confirmant que « l » ne commande plus rien. 457 tests verts (dont neuf tout neufs sur la table des commandes), build propre.',
+    ],
+  },
+  {
     date: '28/08/2026 19:17',
     title: 'DIX INSTRUMENTS DE PLUS : le tirage de fin de salle a enfin de quoi hésiter',
     notes: [
