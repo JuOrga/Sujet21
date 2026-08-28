@@ -6,7 +6,14 @@ import { FluidSim, KIND_PLAYER } from './sim/solver'
 import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
 import { CODEX, Codex, type CodexGroupe } from './game/codex'
-import { TABLEAU_HUB } from './game/hub'
+import {
+  BANC_MEMOIRES_HUB,
+  ETAL_HUB,
+  SAS_GIVRE_HUB,
+  SAS_VAPEUR_HUB,
+  TABLEAU_HUB,
+  type ArticleHub,
+} from './game/hub'
 import {
   MECANIQUE_NOMS,
   codeCanon,
@@ -456,6 +463,12 @@ let departEnVapeur = false
 // progression de la run. La salle générée élue s'INTERCALE : elle prend la
 // place du rang suivant, puis la séquence reprend son cours.
 let modeVoie = false
+// la DESCENTE DU JOUR forcée par le SAS DE VAPEUR du hub — le temps d'une
+// run, sans toucher au réglage du plan (qui reste celui du poste)
+let voieDuJourForcee = false
+function descenteDuJour(): boolean {
+  return voiePlan.graineDuJour || voieDuJourForcee
+}
 let voieGenereeChoisie: LevelDef | null = null
 let voieIntercalaire: LevelDef | null = null
 // le RANG de la descente en cours : combien de salles FRANCHIES — la voie
@@ -473,6 +486,13 @@ let clefCachette = false
 // les achats déjà servis dans CETTE visite de l'Économat, et l'état
 // d'occupation des alcôves (l'achat se tente au FRONT d'entrée)
 const achatsEconomat = new Set<string>()
+// ---- LE COMPTOIR DU HUB : les provisions de la PROCHAINE descente ------
+// Payées en MÉMOIRE (la monnaie qui survit à la purge), elles s'appliquent
+// au lancement de l'expédition suivante — le temps de la session.
+const achatsHub = new Set<string>()
+let plotsHubDedans: boolean[] = []
+let bancMemoiresDedans = false
+const provisionsRun = { bonbonne: 0, vies: 0, clef: false, condensat: 0 }
 let plotsDedans: boolean[] = []
 
 // Le PLAN de la voie : paramétrable au banc, mémorisé par poste.
@@ -2785,6 +2805,7 @@ function openHome(): void {
 }
 startBtn.addEventListener('click', () => {
   modeVoie = false // LANCER : la descente ordinaire
+  voieDuJourForcee = false
   closeHome()
   majVoieHud() // le fil de la voie s'efface : on reprend la descente ordinaire
 })
@@ -2792,6 +2813,7 @@ startBtn.addEventListener('click', () => {
 // suite écrite est mise en face d'une salle générée — au joueur de choisir
 document.getElementById('home-voie')?.addEventListener('click', () => {
   modeVoie = true
+  voieDuJourForcee = false // le réglage du plan décide, pas le sas de vapeur
   closeHome()
   majVoieHud() // le rail apparaît tout de suite, même en reprenant une run
 })
@@ -2898,6 +2920,7 @@ function reprendreRun(save: RunSauvee): void {
   input.paused = false
   startBtn.textContent = "REPRENDRE L'ESSAI"
   homeRestartBtn.hidden = false
+  appliqueProvisions() // les provisions du comptoir valent aussi à la reprise
   restart()
   lanceEveil()
   majBoutonsRun()
@@ -4355,6 +4378,7 @@ const COUCHES_MENU: CoucheMenu[] = [
   { id: 'cmds', retour: 'cmds-fermer' },
   { id: 'planche', retour: 'planche-fermer' },
   { id: 'regles', retour: 'regles-fermer' },
+  { id: 'cycle', retour: 'cycle-fermer' }, // les mémoires — ouvertes au banc du hub aussi
   { id: 'salles', retour: 'salles-fermer' },
   { id: 'records', retour: 'records-fermer' },
   { id: 'livraisons', retour: 'livraisons-fermer' },
@@ -6240,6 +6264,10 @@ function resetLasers(): void {
   // l'étal de l'Économat se réarme (le condensat dépensé, lui, l'est)
   achatsEconomat.clear()
   plotsDedans = ETAL_ECONOMAT.map(() => false)
+  // le comptoir du hub aussi : un article par VISITE du module
+  achatsHub.clear()
+  plotsHubDedans = ETAL_HUB.map(() => false)
+  bancMemoiresDedans = false
   rebuildRenderBoxes() // les parois factices reprennent leur poste
 }
 
@@ -6307,6 +6335,82 @@ function tenteAchat(a: ArticleEconomat): void {
     icone: a.icone,
     sur: 'L’ÉCONOMAT',
   })
+}
+
+// ---- L'ACHAT au COMPTOIR du hub : payé en MÉMOIRE, livré au départ -----
+// Le Semblable détaché au module vend des PROVISIONS : elles s'appliquent
+// au lancement de la prochaine descente (le viatique ne gonfle pas une
+// bonbonne qui sera remise à zéro au départ — il attend le départ).
+function tenteAchatHub(a: ArticleHub): void {
+  if (achatsHub.has(a.id)) {
+    toastFile.push({
+      nom: `${a.nom} — DÉJÀ SERVI`,
+      icone: a.icone,
+      sur: 'LE COMPTOIR',
+    })
+    return
+  }
+  if (!records.depenseMemoire(a.prix)) {
+    toastFile.push({
+      nom: `${a.nom} — MÉMOIRE INSUFFISANTE (${a.prix})`,
+      icone: '🚫',
+      sur: 'LE COMPTOIR',
+    })
+    return
+  }
+  achatsHub.add(a.id)
+  audio.collect()
+  majMemoireUI()
+  let detail = a.detail
+  switch (a.id) {
+    case 'viatique':
+      provisionsRun.bonbonne += 0.8
+      break
+    case 'clef':
+      provisionsRun.clef = true
+      break
+    case 'secours':
+      provisionsRun.vies += 1
+      break
+    case 'sac': {
+      const tirage = Math.random()
+      if (tirage < 0.45) {
+        provisionsRun.condensat += 100
+        detail = 'dedans : +100 cL de condensat, au départ de la descente'
+      } else if (tirage < 0.8) {
+        records.gagneMemoire(2)
+        majMemoireUI()
+        detail = 'dedans : +2 mémoire — il vous a appris quelque chose'
+      } else {
+        detail = 'dedans : rien. Le Semblable vous fixe.'
+      }
+      break
+    }
+  }
+  toastFile.push({
+    nom: `${a.nom} — ${detail}`,
+    icone: a.icone,
+    sur: 'LE COMPTOIR',
+  })
+}
+
+/** Les PROVISIONS achetées au comptoir se livrent au départ de la
+ * descente — puis la besace se vide (elles valent UNE expédition). */
+function appliqueProvisions(): void {
+  if (provisionsRun.vies > 0)
+    run.vies = Math.min(VIES_MAX, run.vies + provisionsRun.vies)
+  if (provisionsRun.bonbonne > 0)
+    run.bonbonneLiters = Math.min(
+      BONBONNE_CAP,
+      run.bonbonneLiters + provisionsRun.bonbonne,
+    )
+  if (provisionsRun.clef) clefCachette = true
+  if (provisionsRun.condensat > 0) gagneCondensat(provisionsRun.condensat)
+  provisionsRun.bonbonne = 0
+  provisionsRun.vies = 0
+  provisionsRun.clef = false
+  provisionsRun.condensat = 0
+  majBoutonsRun()
 }
 
 // ---- LA MISE EN BONBONNE : l'écran de récompense de fin de salle ----
@@ -6722,7 +6826,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   const difficulte = diffAuRang(rangSuivant, voiePlan)
   const aEcrite = ecrite ? decodeCodeAtelier(ecrite.code) : null
   const jour = new Date().toISOString().slice(0, 10)
-  const alea = voiePlan.graineDuJour
+  const alea = descenteDuJour()
     ? ((): (() => number) => {
         let h = hachage(`${jour}@${rangSuivant}`)
         return () => {
@@ -6759,7 +6863,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
     familles: (regl.purete ? masqueMecanique(mec) : 127) & masqueCycle,
   })
   const variante = (n: number): string =>
-    voiePlan.graineDuJour
+    descenteDuJour()
       ? varianteDuJour(jour, rangSuivant * 10 + n)
       : Math.floor(Math.random() * 36 ** 4)
           .toString(36)
@@ -6857,7 +6961,7 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
       : ''
   mbEl('mb-choix-titre').textContent =
     `LA VOIE SE SÉPARE — SALLE ${rangSuivant} / ${voiePlan.longueur}` +
-    (voiePlan.graineDuJour ? ' · DESCENTE DU JOUR' : '') +
+    (descenteDuJour() ? ' · DESCENTE DU JOUR' : '') +
     stadeNeuf
   // les JAUGES restent en scène, comme à la fin ordinaire : le choix se
   // prend en voyant ce qu'on possède — étalonnage en grand, réserve en ligne
@@ -7118,7 +7222,7 @@ function annonceVoieCarte(): void {
   el('vc-rang').textContent =
     `SALLE ${Math.min(voiePlan.longueur, voieRang + 1)} / ${voiePlan.longueur}` +
     (voieIntercalaire ? ' · SALLE GÉNÉRÉE' : '') +
-    (voiePlan.graineDuJour ? ' · DESCENTE DU JOUR' : '')
+    (descenteDuJour() ? ' · DESCENTE DU JOUR' : '')
   el('vc-nom').textContent = level.name
   el('vc-code').textContent = level.code
   const id = identiteAtelier(level)
@@ -7253,6 +7357,9 @@ function newExpedition(): void {
   economatIntercalaire = null
   economatVisiteCetteRun = false
   clefCachette = false
+  // les PROVISIONS du comptoir se livrent maintenant — après la remise à
+  // zéro (le viatique s'ajoute à une bonbonne vide), avant la première salle
+  appliqueProvisions()
   restart()
 }
 
@@ -7261,6 +7368,7 @@ function newExpedition(): void {
 function retourAuLabo(): void {
   voieIntercalaire = null
   voieGenereeChoisie = null
+  voieDuJourForcee = false // la descente du jour forcée valait UNE run
   voieRang = 0 // la profondeur est déjà consignée au palmarès, en direct
   levelIndex = 0
   run.bonbonneLiters = 0
@@ -8644,6 +8752,32 @@ function frame(now: number): void {
     }
   }
 
+  // ---- LE MÉTA AU HUB : le comptoir (achats en mémoire) et le banc des
+  // mémoires (le contact ouvre l'écran du cycle — B ou ✕ le referme) ----
+  if (auHub && !sim.dispersed) {
+    for (let i = 0; i < ETAL_HUB.length; i++) {
+      const a = ETAL_HUB[i]
+      const dedans =
+        sim.stats.centroidX > a.plot.minX &&
+        sim.stats.centroidX < a.plot.maxX &&
+        sim.stats.centroidY > a.plot.minY &&
+        sim.stats.centroidY < a.plot.maxY
+      if (dedans && !plotsHubDedans[i]) tenteAchatHub(a)
+      plotsHubDedans[i] = dedans
+    }
+    const surBanc = pointInBox(
+      sim.stats.centroidX,
+      sim.stats.centroidY,
+      BANC_MEMOIRES_HUB,
+    )
+    if (surBanc && !bancMemoiresDedans && cycleEl.hidden) {
+      cycleEl.hidden = false
+      renderCycleVoile()
+      audio.collect()
+    }
+    bancMemoiresDedans = surBanc
+  }
+
   // ---- Lasers : traçage, cibles, portes ----
   const lasers = level.lasers ?? []
   if (lasers.length > 0) {
@@ -8829,8 +8963,21 @@ function frame(now: number): void {
       }
     }
   }
+  // LES TROIS SAS DU HUB : le sas principal (l'eau) lance la descente
+  // écrite ; le SAS DU GIVRE (derrière le rideau — la glace) lance LA
+  // VOIE ; le SAS DE VAPEUR (derrière la grille) lance la DESCENTE DU
+  // JOUR. Le verrou est la MATIÈRE : sans le lien tissé, pas de passage.
+  const surSasGivre =
+    auHub &&
+    pointInBox(sim.stats.centroidX, sim.stats.centroidY, SAS_GIVRE_HUB)
+  const surSasVapeur =
+    auHub &&
+    pointInBox(sim.stats.centroidX, sim.stats.centroidY, SAS_VAPEUR_HUB)
   const rejointSasHub =
-    auHub && pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit)
+    (auHub &&
+      pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit)) ||
+    surSasGivre ||
+    surSasVapeur
   if (
     !tableauDone &&
     !sim.dispersed &&
@@ -8840,12 +8987,16 @@ function frame(now: number): void {
     // LE SAS DE LANCEMENT : au hub, le sas ne collecte rien — il LANCE la
     // run. Reprise de l'expédition sauvée s'il y en a une, salle 1 sinon.
     auHub = false
+    modeVoie = surSasGivre || surSasVapeur
+    voieDuJourForcee = surSasVapeur
     audio.collect()
     bande.ponctuation('sting-collecte', 0.85)
     // LE SCÉNARIO : la cinématique du départ, s'il y en a une — la run
     // attend qu'elle finisse (la simulation est en pause pendant ce temps)
     void joueMoment('lancement-run').then(() => {
-      const save = runSauvee()
+      // les sorties gardées lancent toujours une descente NEUVE : la
+      // sauvegarde appartient à l'expédition écrite du sas principal
+      const save = modeVoie ? null : runSauvee()
       if (save) {
         reprendreRun(save)
       } else {

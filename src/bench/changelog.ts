@@ -22,6 +22,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 16:55',
+    title:
+      'Le hub à l’ère du méta : comptoir, banc des mémoires, trois sorties',
+    notes: [
+      'Demandé : que le hub soit revu avec les nouveaux systèmes de monnaie — un marchand pour dépenser ce qu’on gagne, l’accès à l’écran des mémoires — et d’autres sorties à mesure qu’on possède la glace puis la vapeur. C’est fait : la salle d’étalonnage cesse d’être « hors service », elle devient le SECTEUR COMPTOIR & MÉMOIRES, et l’écran de contrôle de l’observation passe SOUS TENSION.',
+      'LE COMPTOIR : quatre alcôves au sud de la salle, l’achat AU CONTACT comme à l’Économat — mais payé en MÉMOIRE, la monnaie qui survit à la purge. VIATIQUE DE GOUTTES (3 — +0,8 L à la bonbonne au départ), CLEF DE CACHETTE (4 — le premier tableau dévoilé), SAC SURPRISE (3 — condensat de départ, mémoire… ou rien), ÉCHANTILLON DE SECOURS (8 — +1 vie). Ce sont des PROVISIONS : elles se livrent au lancement de la prochaine descente, un article par visite du module.',
+      'LE BANC DES MÉMOIRES : glisser le corps contre le banc ouvre l’écran du cycle des états — les transformations s’y tissent en mémoire (B ou ✕ referme, l’écran rejoint les couches manette). Pour mémoire, la distribution actuelle : la mémoire se gagne en jouant (+5 par sas, +5 la première traversée, +2 par record, +10 par trophée, +10 l’expédition bouclée, +2 même dispersé) et chaque transformation manuelle est un lien à tisser à cet écran — solidification 10, vaporisation 15, sublimation et condensation 60, fusion et liquéfaction offertes sauf verrou du scénario.',
+      'LES TROIS SORTIES : le conduit gagne deux chambres gardées PAR LA MATIÈRE. Au nord-est, derrière un RIDEAU que seule la glace écarte, la SORTIE DE GIVRE lance LA VOIE SEMI-PROCÉDURALE ; au sud-est, derrière une GRILLE que seul le souffle passe, la SORTIE DE VAPEUR lance LA DESCENTE DU JOUR (graine du jour forcée pour cette run, sans toucher au réglage du poste). Le verrou est physique : tant que le lien SOLIDIFICATION ou VAPORISATION n’est pas tissé, le corps ne peut pas prendre l’état qui ouvre la route — les sorties s’ouvrent au fil de la progression, et les routes cessent d’être identiques. Le sas principal garde la descente écrite (et la reprise de sauvegarde). Géométrie prouvée par tests (traversée, cloisons sans fente, alcôves hors des murs) — 441 tests verts.',
+    ],
+  },
+  {
     date: '28/08/2026 16:48',
     title: 'Deux raccourcis de conception : VALIDER LA SALLE, et le HUB à portée de doigt',
     notes: [
