@@ -22,6 +22,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '28/08/2026 21:40',
+    title:
+      'Les OUTILS DE POSE du méta : plot, banc, marchand et éclat se dessinent dans l’éditeur',
+    notes: [
+      'La suite immédiate de la livraison de 21:15 (le méta posé — format et moteur) : les OUTILS. La palette de l’éditeur gagne cinq entrées dans la famille du méta : PLOT D’ARTICLE (CONDENSAT) et PLOT D’ARTICLE (MÉMOIRE) — on trace le rectangle d’achat comme une cachette, l’article naît sur le premier du catalogue de sa monnaie ; LE BANC DES MÉMOIRES — un rectangle, un seul par tableau, retracer le déplace ; LE MARCHAND — un point, un seul lui aussi ; et L’ÉCLAT DE MÉMOIRE — un point, valeur +N réglable.',
+      'Tout se manipule comme le reste de l’éditeur : clic pour sélectionner, glisser pour déplacer, poignées pour redimensionner les rectangles, Suppr pour effacer, duplication pour les plots et les éclats (le banc et le marchand refusent poliment : il n’y en a qu’un). Le PANNEAU de droite suit la sélection : l’article se choisit dans le catalogue de sa monnaie (icône, nom, prix de barème lisibles d’un œil), un PRIX à 0 suit le barème et toute autre valeur le surcharge ; l’éclat règle sa mémoire gravée (1–99). Sur la toile, le langage visuel est celui du jeu : pointillés cyan (condensat) ou menthe (mémoire) avec icône et prix au centre, ⚛ du banc, anneau rose du marchand, losange menthe de l’éclat avec son +N.',
+      'Vérifié dans le jeu construit, à la souris de bout en bout : les cinq outils tracés sur une salle vierge (deux plots 300×200, banc, marchand, éclat), le panneau qui change l’article GOUTTES → CLEF et pose un prix surchargé à 25 cL, l’éclat porté à +5 — puis ESSAYER : la salle posée main se joue avec tout son méta dessiné (« 25 cL », « 3 mém. », banc, anneau, losange). 471 tests verts, build propre.',
+    ],
+  },
+  {
     date: '28/08/2026 21:15',
     title:
       'Le MÉTA SE POSE dans l’éditeur : plots d’article, banc, marchand, éclats de mémoire',

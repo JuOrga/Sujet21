@@ -39,9 +39,15 @@ import {
   type SpongeDef,
   type WorldLabel,
   type ZoneForce,
+  type MonnaiePlot,
+  type PlotMeta,
 } from '../game/level'
-import { TABLEAU_HUB, TABLEAU_HUB_COMPACT } from '../game/hub'
-import { TABLEAU_ECONOMAT } from '../game/economat'
+import {
+  ARTICLES_COMPTOIR,
+  TABLEAU_HUB,
+  TABLEAU_HUB_COMPACT,
+} from '../game/hub'
+import { ETAL_ECONOMAT, TABLEAU_ECONOMAT } from '../game/economat'
 import {
   cleFiche,
   ficheElement,
@@ -149,6 +155,15 @@ const DECAL_NOMS: Record<DecalDef['kind'], string> = {
   'serre-rampe-a': 'Serre — gouttière (seconde)',
 }
 
+/** La fiche catalogue d'un plot posé — la monnaie choisit le catalogue. */
+function ficheArticle(
+  p: PlotMeta,
+): { id: string; nom: string; icone: string; prix: number } | null {
+  return p.monnaie === 'memoire'
+    ? (ARTICLES_COMPTOIR.find((a) => a.id === p.article) ?? null)
+    : (ETAL_ECONOMAT.find((a) => a.id === p.article) ?? null)
+}
+
 type Tool =
   | { kind: 'select' }
   | { kind: 'box'; material: number; forme?: number }
@@ -168,6 +183,13 @@ type Tool =
   // et l'emplacement de FIOLE (un seul par tableau)
   | { kind: 'condensat' }
   | { kind: 'fiole' }
+  // Le MÉTA POSÉ : le plot d'article (rectangle d'achat, monnaie choisie à
+  // l'outil), le banc des mémoires (un seul), le marchand (un seul), et
+  // l'éclat de mémoire (+N gravés au contact, une fois par run)
+  | { kind: 'plot'; monnaie: MonnaiePlot }
+  | { kind: 'banc' }
+  | { kind: 'marchand' }
+  | { kind: 'eclat' }
   | { kind: 'rail' }
   | { kind: 'lumiere' }
   | { kind: 'bande' }
@@ -185,6 +207,10 @@ type Sel =
   | { kind: 'porte'; index: number }
   | { kind: 'condensat'; index: number }
   | { kind: 'fiole' }
+  | { kind: 'plot'; index: number }
+  | { kind: 'banc' }
+  | { kind: 'marchand' }
+  | { kind: 'eclat'; index: number }
   | { kind: 'rail'; index: number }
   | { kind: 'lumiere'; index: number }
   | { kind: 'decal'; index: number }
@@ -625,6 +651,8 @@ export class LevelEditor {
     if (s.kind === 'zone') return (this.level.zones ?? [])[s.index] ?? null
     if (s.kind === 'cache') return (this.level.caches ?? [])[s.index] ?? null
     if (s.kind === 'porte') return (this.level.portes ?? [])[s.index] ?? null
+    if (s.kind === 'plot') return (this.level.plots ?? [])[s.index] ?? null
+    if (s.kind === 'banc') return this.level.bancMemoires ?? null
     if (s.kind === 'exit') return this.level.exit
     if (s.kind === 'decal') {
       const d = (this.level.decals ?? [])[s.index]
@@ -665,6 +693,10 @@ export class LevelEditor {
       Object.assign((this.level.caches ?? [])[s.index], norm)
     else if (s.kind === 'porte')
       Object.assign((this.level.portes ?? [])[s.index], norm)
+    else if (s.kind === 'plot')
+      Object.assign((this.level.plots ?? [])[s.index], norm)
+    else if (s.kind === 'banc' && this.level.bancMemoires)
+      Object.assign(this.level.bancMemoires, norm)
     else if (s.kind === 'exit') Object.assign(this.level.exit, norm)
     else if (s.kind === 'decal') {
       const d = (this.level.decals ?? [])[s.index]
@@ -747,6 +779,18 @@ export class LevelEditor {
         ? { minX: f.x - 30, minY: f.y - 30, maxX: f.x + 30, maxY: f.y + 30 }
         : null
     }
+    if (s.kind === 'marchand') {
+      const m = this.level.marchand
+      return m
+        ? { minX: m.x - 40, minY: m.y - 40, maxX: m.x + 40, maxY: m.y + 40 }
+        : null
+    }
+    if (s.kind === 'eclat') {
+      const e = (this.level.eclats ?? [])[s.index]
+      return e
+        ? { minX: e.x - 26, minY: e.y - 26, maxX: e.x + 26, maxY: e.y + 26 }
+        : null
+    }
     if (s.kind === 'label') {
       const l = this.level.labels[s.index]
       return l ? { minX: l.x, minY: l.y, maxX: l.x, maxY: l.y } : null
@@ -808,6 +852,17 @@ export class LevelEditor {
       if (this.level.fiole) {
         this.level.fiole.x += dx
         this.level.fiole.y += dy
+      }
+    } else if (s.kind === 'marchand') {
+      if (this.level.marchand) {
+        this.level.marchand.x += dx
+        this.level.marchand.y += dy
+      }
+    } else if (s.kind === 'eclat') {
+      const e = (this.level.eclats ?? [])[s.index]
+      if (e) {
+        e.x += dx
+        e.y += dy
       }
     } else if (s.kind === 'label') {
       const l = this.level.labels[s.index]
@@ -1009,9 +1064,32 @@ export class LevelEditor {
     ) {
       return { kind: 'fiole' }
     }
+    const eclats = this.level.eclats ?? []
+    for (let i = eclats.length - 1; i >= 0; i--) {
+      if (
+        Math.hypot(eclats[i].x - x, eclats[i].y - y) <
+        Math.max(26, 28 / this.zoom)
+      ) {
+        return { kind: 'eclat', index: i }
+      }
+    }
+    if (
+      this.level.marchand &&
+      Math.hypot(this.level.marchand.x - x, this.level.marchand.y - y) <
+        Math.max(34, 36 / this.zoom)
+    ) {
+      return { kind: 'marchand' }
+    }
     const portes = this.level.portes ?? []
     for (let i = portes.length - 1; i >= 0; i--) {
       if (inside(portes[i])) return { kind: 'porte', index: i }
+    }
+    const plots = this.level.plots ?? []
+    for (let i = plots.length - 1; i >= 0; i--) {
+      if (inside(plots[i])) return { kind: 'plot', index: i }
+    }
+    if (this.level.bancMemoires && inside(this.level.bancMemoires)) {
+      return { kind: 'banc' }
     }
     const rails = this.level.rails ?? []
     const tol = Math.max(10, 12 / this.zoom)
@@ -1917,6 +1995,22 @@ export class LevelEditor {
               oy: w.y - f.y,
               start: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
             }
+          } else if (hit.kind === 'marchand') {
+            const m = this.level.marchand!
+            this.drag = {
+              mode: 'move',
+              ox: w.x - m.x,
+              oy: w.y - m.y,
+              start: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+            }
+          } else if (hit.kind === 'eclat') {
+            const e = (this.level.eclats ?? [])[hit.index]
+            this.drag = {
+              mode: 'move',
+              ox: w.x - e.x,
+              oy: w.y - e.y,
+              start: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+            }
           } else if (hit.kind === 'rail') {
             const r = (this.level.rails ?? [])[hit.index]
             this.drag = {
@@ -2168,6 +2262,29 @@ export class LevelEditor {
         this.setTool({ kind: 'select' })
         this.commit(
           'Emplacement de FIOLE posé (un seul par tableau — reposer le déplace). En jeu, la fiole n’apparaît que si la collection du joueur est incomplète.',
+        )
+        return
+      }
+      if (this.tool.kind === 'marchand') {
+        this.level.marchand = { x: this.snapped(w.x), y: this.snapped(w.y) }
+        this.sel = { kind: 'marchand' }
+        this.setTool({ kind: 'select' })
+        this.commit(
+          'MARCHAND posé (un seul par tableau — reposer le déplace). Une présence : l’anneau pulse en jeu, les plots font le commerce.',
+        )
+        return
+      }
+      if (this.tool.kind === 'eclat') {
+        if (!this.level.eclats) this.level.eclats = []
+        this.level.eclats.push({
+          x: this.snapped(w.x),
+          y: this.snapped(w.y),
+          memoire: 2,
+        })
+        this.sel = { kind: 'eclat', index: this.level.eclats.length - 1 }
+        this.setTool({ kind: 'select' })
+        this.commit(
+          'ÉCLAT DE MÉMOIRE posé — sa valeur se règle à droite. Gravé au contact, UNE FOIS PAR RUN (Recommencer ne re-farme pas) ; rien ne se grave aux essais.',
         )
         return
       }
@@ -2444,6 +2561,14 @@ export class LevelEditor {
           const f = this.level.fiole!
           f.x = this.snapped(w.x - d.ox)
           f.y = this.snapped(w.y - d.oy)
+        } else if (this.sel?.kind === 'marchand') {
+          const m = this.level.marchand!
+          m.x = this.snapped(w.x - d.ox)
+          m.y = this.snapped(w.y - d.oy)
+        } else if (this.sel?.kind === 'eclat') {
+          const e = (this.level.eclats ?? [])[this.sel.index]
+          e.x = this.snapped(w.x - d.ox)
+          e.y = this.snapped(w.y - d.oy)
         } else if (this.sel?.kind === 'spawn') {
           this.level.spawn.x = this.snapped(w.x - d.ox)
           this.level.spawn.y = this.snapped(w.y - d.oy)
@@ -2867,6 +2992,26 @@ export class LevelEditor {
       this.commit(
         'Cachette posée — voilée en jeu, révélée quand le corps y entre.',
       )
+    } else if (t.kind === 'plot') {
+      if (!this.level.plots) this.level.plots = []
+      // l'article naît sur le premier du catalogue de sa monnaie — il se
+      // change dans le panneau, le prix du barème s'applique par défaut
+      const article =
+        t.monnaie === 'memoire' ? ARTICLES_COMPTOIR[0].id : ETAL_ECONOMAT[0].id
+      this.level.plots.push({ ...r, article, monnaie: t.monnaie })
+      this.sel = { kind: 'plot', index: this.level.plots.length - 1 }
+      this.commit(
+        t.monnaie === 'memoire'
+          ? 'Plot d’article (MÉMOIRE) posé — l’achat au contact provisionne la PROCHAINE descente. Article et prix à droite.'
+          : 'Plot d’article (CONDENSAT) posé — l’achat au contact, effet immédiat. Article et prix à droite.',
+      )
+    } else if (t.kind === 'banc') {
+      // un seul banc par tableau : retracer le déplace
+      this.level.bancMemoires = { ...r }
+      this.sel = { kind: 'banc' }
+      this.commit(
+        'BANC DES MÉMOIRES posé (un seul par tableau — retracer le déplace). En jeu, le contact du corps ouvre l’écran du cycle.',
+      )
     } else if (t.kind === 'decal') {
       if (!this.level.decals) this.level.decals = []
       // le décalque se donne en CENTRE + taille : le rectangle tracé le dit
@@ -2949,6 +3094,10 @@ export class LevelEditor {
     else if (s.kind === 'condensat')
       (this.level.condensats ?? []).splice(s.index, 1)
     else if (s.kind === 'fiole') delete this.level.fiole
+    else if (s.kind === 'plot') (this.level.plots ?? []).splice(s.index, 1)
+    else if (s.kind === 'banc') delete this.level.bancMemoires
+    else if (s.kind === 'marchand') delete this.level.marchand
+    else if (s.kind === 'eclat') (this.level.eclats ?? []).splice(s.index, 1)
     else if (s.kind === 'cible') {
       // les numéros sont LOGIQUES : avant de retirer la pastille, chaque
       // survivante fige le sien — rien ne se renumérote, les portes tiennent
@@ -3020,6 +3169,24 @@ export class LevelEditor {
         kind: 'condensat',
         index: this.level.condensats!.length - 1,
       }
+    } else if (s.kind === 'plot') {
+      const p = (this.level.plots ?? [])[s.index]
+      this.level.plots!.push({
+        ...p,
+        minX: p.minX + off,
+        maxX: p.maxX + off,
+      })
+      this.sel = { kind: 'plot', index: this.level.plots!.length - 1 }
+    } else if (s.kind === 'eclat') {
+      const e = (this.level.eclats ?? [])[s.index]
+      this.level.eclats!.push({ ...e, x: e.x + off })
+      this.sel = { kind: 'eclat', index: this.level.eclats!.length - 1 }
+    } else if (s.kind === 'banc') {
+      this.status('Un seul banc des mémoires par tableau.')
+      return
+    } else if (s.kind === 'marchand') {
+      this.status('Un seul marchand par tableau.')
+      return
     } else if (s.kind === 'fiole') {
       this.status('Un seul emplacement de fiole par tableau.')
       return
@@ -3131,6 +3298,14 @@ export class LevelEditor {
         else if (key === 'cible') this.setTool({ kind: 'cible' })
         else if (key === 'condensat') this.setTool({ kind: 'condensat' })
         else if (key === 'fiole') this.setTool({ kind: 'fiole' })
+        else if (key.startsWith('plot:'))
+          this.setTool({
+            kind: 'plot',
+            monnaie: key.slice(5) === 'memoire' ? 'memoire' : 'condensat',
+          })
+        else if (key === 'banc') this.setTool({ kind: 'banc' })
+        else if (key === 'marchand') this.setTool({ kind: 'marchand' })
+        else if (key === 'eclat') this.setTool({ kind: 'eclat' })
         else if (key === 'porte') this.setTool({ kind: 'porte' })
         else if (key === 'cache') this.setTool({ kind: 'cache' })
         else if (key === 'rail') this.setTool({ kind: 'rail' })
@@ -4568,6 +4743,43 @@ export class LevelEditor {
       rows.push(
         `<p class="ed-empty">L’emplacement de la FIOLE du tableau (un seul). En jeu, elle n’apparaît que si la collection du joueur est incomplète — la fiole offerte est tirée parmi les manquantes. Sans emplacement posé, le semis automatique décide (la cachette la plus profonde, une chance sur deux).</p>`,
       )
+    } else if (s.kind === 'plot') {
+      const p = (this.level.plots ?? [])[s.index]
+      const catalogue =
+        p.monnaie === 'memoire' ? ARTICLES_COMPTOIR : ETAL_ECONOMAT
+      rows.push(
+        `<label class="ed-f"><span>Article</span><select id="p-plart">` +
+          catalogue
+            .map(
+              (a) =>
+                `<option value="${a.id}"${a.id === p.article ? ' selected' : ''}>${a.icone} ${a.nom} — ${a.prix} ${p.monnaie === 'memoire' ? 'mém.' : 'cL'}</option>`,
+            )
+            .join('') +
+          `</select></label>`,
+      )
+      rows.push(numField('Prix (0 = barème)', 'p-plprix', p.prix ?? 0, 0))
+      rows.push(
+        p.monnaie === 'memoire'
+          ? `<p class="ed-empty">Plot payé en MÉMOIRE (la monnaie générale) : l’achat au contact PROVISIONNE LA PROCHAINE DESCENTE, comme au comptoir du hub — où que le plot soit posé. Un prix à 0 suit le barème du catalogue.</p>`
+          : `<p class="ed-empty">Plot payé en CONDENSAT (la bourse de la run) : l’achat au contact agit IMMÉDIATEMENT, comme à l’étal de l’Économat. Un prix à 0 suit le barème du catalogue. Deux plots du même article ne servent qu’une fois par salle.</p>`,
+      )
+    } else if (s.kind === 'banc') {
+      rows.push(
+        `<p class="ed-empty">LE BANC DES MÉMOIRES (un seul par tableau) : en jeu, le corps qui glisse dans ce rectangle ouvre l’écran du cycle des états — on y tisse les transformations contre de la mémoire. Les poignées le redimensionnent.</p>`,
+      )
+    } else if (s.kind === 'marchand') {
+      const m = this.level.marchand!
+      rows.push(numField('X', 'p-mx', m.x), numField('Y', 'p-my', m.y))
+      rows.push(
+        `<p class="ed-empty">LE MARCHAND (un seul par tableau) : une présence — l’anneau rose pulse à cet endroit. Le commerce, lui, passe par les plots d’article.</p>`,
+      )
+    } else if (s.kind === 'eclat') {
+      const e = (this.level.eclats ?? [])[s.index]
+      rows.push(numField('X', 'p-ex', e.x), numField('Y', 'p-ey', e.y))
+      rows.push(numField('Mémoire gravée (+N)', 'p-emem', e.memoire, 1))
+      rows.push(
+        `<p class="ed-empty">Un ÉCLAT DE MÉMOIRE : l’information cristallisée. Le contact grave +N mémoire aux registres, UNE FOIS PAR RUN — Recommencer la salle ne le fait pas repousser, la run suivante si. Aux essais d’éditeur, il se prend mais rien ne se grave.</p>`,
+      )
     } else if (s.kind === 'porte') {
       const q = (this.level.portes ?? [])[s.index]
       rows.push(numField('Canal visé (nº de cible)', 'p-pc', q.canal))
@@ -4690,7 +4902,15 @@ export class LevelEditor {
                                 ? 'Rail magnétique'
                                 : s.kind === 'decal'
                                   ? 'Décal (machinerie de décor)'
-                                  : 'Étiquette'
+                                  : s.kind === 'plot'
+                                    ? `Plot d’article (${(this.level.plots ?? [])[s.index]?.monnaie === 'memoire' ? 'mémoire' : 'condensat'})`
+                                    : s.kind === 'banc'
+                                      ? 'Banc des mémoires'
+                                      : s.kind === 'marchand'
+                                        ? 'Marchand'
+                                        : s.kind === 'eclat'
+                                          ? 'Éclat de mémoire'
+                                          : 'Étiquette'
 
     host.innerHTML =
       `<div class="ed-props-head">${kindName}</div><div class="ed-fields">${rows.join('')}</div>` +
@@ -4967,6 +5187,29 @@ export class LevelEditor {
       if (f) {
         f.x = val('p-fx')
         f.y = val('p-fy')
+      }
+    } else if (s.kind === 'plot') {
+      const p = (this.level.plots ?? [])[s.index]
+      const id = text('p-plart')
+      const catalogue =
+        p.monnaie === 'memoire' ? ARTICLES_COMPTOIR : ETAL_ECONOMAT
+      if (catalogue.some((a) => a.id === id))
+        p.article = id as PlotMeta['article']
+      const prix = Math.round(val('p-plprix'))
+      if (prix >= 1) p.prix = Math.min(999, prix)
+      else delete p.prix
+    } else if (s.kind === 'marchand') {
+      const m = this.level.marchand
+      if (m) {
+        m.x = val('p-mx')
+        m.y = val('p-my')
+      }
+    } else if (s.kind === 'eclat') {
+      const e = (this.level.eclats ?? [])[s.index]
+      if (e) {
+        e.x = val('p-ex')
+        e.y = val('p-ey')
+        e.memoire = Math.max(1, Math.min(99, Math.round(val('p-emem') || 2)))
       }
     } else if (s.kind === 'porte') {
       const q = (this.level.portes ?? [])[s.index]
@@ -5800,6 +6043,89 @@ export class LevelEditor {
       g.font = '700 10px ui-monospace, monospace'
       const num = String(canalDeCible(cibles, i))
       g.fillText(num, p.sx - 3 * num.length, p.sy + 3.5)
+    }
+    // LE MÉTA POSÉ : plots d'article (pointillés teintés par la monnaie,
+    // icône + prix), banc des mémoires, marchand, éclats — le langage du jeu
+    for (const p of this.level.plots ?? []) {
+      const a = this.toScreen(p.minX, p.maxY)
+      const b = this.toScreen(p.maxX, p.minY)
+      const teinte = p.monnaie === 'memoire' ? '109,255,184' : '140,215,255'
+      g.fillStyle = `rgba(${teinte},0.08)`
+      g.fillRect(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy)
+      g.setLineDash([7, 6])
+      g.strokeStyle = `rgba(${teinte},0.8)`
+      g.lineWidth = 1.5
+      g.strokeRect(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy)
+      g.setLineDash([])
+      const fiche = ficheArticle(p)
+      const cx = (a.sx + b.sx) / 2
+      const cy = (a.sy + b.sy) / 2
+      const t = Math.max(9, Math.min(22, 80 * this.zoom))
+      g.textAlign = 'center'
+      g.font = `${t}px system-ui`
+      g.fillText(fiche?.icone ?? '?', cx, cy - t * 0.15)
+      g.fillStyle = `rgba(${teinte},0.95)`
+      g.font = `600 ${Math.max(8, Math.round(t * 0.55))}px ui-monospace, monospace`
+      g.fillText(
+        `${p.prix ?? fiche?.prix ?? '?'} ${p.monnaie === 'memoire' ? 'mém.' : 'cL'}`,
+        cx,
+        cy + t * 0.75,
+      )
+      g.textAlign = 'left'
+    }
+    if (this.level.bancMemoires) {
+      const bz = this.level.bancMemoires
+      const a = this.toScreen(bz.minX, bz.maxY)
+      const b = this.toScreen(bz.maxX, bz.minY)
+      g.fillStyle = 'rgba(109,255,184,0.10)'
+      g.fillRect(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy)
+      g.setLineDash([4, 7])
+      g.strokeStyle = 'rgba(109,255,184,0.8)'
+      g.lineWidth = 1.5
+      g.strokeRect(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy)
+      g.setLineDash([])
+      g.textAlign = 'center'
+      g.font = `${Math.max(10, Math.min(24, 80 * this.zoom))}px system-ui`
+      g.fillText('⚛', (a.sx + b.sx) / 2, (a.sy + b.sy) / 2 + 4)
+      g.fillStyle = '#8effcd'
+      g.font = '600 9px ui-monospace, monospace'
+      g.fillText('BANC DES MÉMOIRES', (a.sx + b.sx) / 2, a.sy - 5)
+      g.textAlign = 'left'
+    }
+    if (this.level.marchand) {
+      const p = this.toScreen(this.level.marchand.x, this.level.marchand.y)
+      const rr = Math.max(8, 30 * this.zoom)
+      g.beginPath()
+      g.arc(p.sx, p.sy, rr, 0, Math.PI * 2)
+      g.fillStyle = 'rgba(255,170,210,0.18)'
+      g.fill()
+      g.setLineDash([2, 5])
+      g.strokeStyle = '#ffbedd'
+      g.lineWidth = 1.6
+      g.stroke()
+      g.setLineDash([])
+      g.fillStyle = '#ffbedd'
+      g.font = '600 9px ui-monospace, monospace'
+      g.fillText('MARCHAND', p.sx - 26, p.sy - rr - 4)
+    }
+    for (const e of this.level.eclats ?? []) {
+      const p = this.toScreen(e.x, e.y)
+      const rr = Math.max(6, 16 * this.zoom)
+      g.beginPath()
+      g.moveTo(p.sx, p.sy - rr * 1.15)
+      g.lineTo(p.sx + rr * 0.72, p.sy)
+      g.lineTo(p.sx, p.sy + rr * 1.15)
+      g.lineTo(p.sx - rr * 0.72, p.sy)
+      g.closePath()
+      g.fillStyle = 'rgba(140,255,205,0.45)'
+      g.fill()
+      g.strokeStyle = '#8effcd'
+      g.lineWidth = 1.5
+      g.stroke()
+      g.fillStyle = '#eafff5'
+      g.font = '700 9px ui-monospace, monospace'
+      const t = `+${e.memoire}`
+      g.fillText(t, p.sx - 2.7 * t.length, p.sy + 3)
     }
     // les pastilles de CONDENSAT posées main (leur valeur en cL au centre)
     // et l'emplacement de FIOLE — le langage visuel du jeu
