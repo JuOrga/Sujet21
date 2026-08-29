@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '29/08/2026 23:57',
+    title: 'Un rapport de performance dit désormais DE QUELLE VERSION il parle',
+    notes: [
+      'Quatre rapports reçus de l’iPad, dont deux pris EN JEU — et impossible de dire s’ils portent la correction d’il y a vingt minutes ou le paquet d’avant. Le rapport ne disait pas sa version. C’est le défaut qui rend une boucle de mesure inutile : deux rapports ne se comparent que s’ils disent d’où ils viennent, et un iPad peut garder un onglet ouvert longtemps après une mise en ligne. Chaque rapport porte maintenant un bloc `build` — version du jeu, date et titre de la dernière livraison. Et la ligne d’aperçu du voile PARAMÈTRES affiche la version avant la cadence : c’est la question qu’on se pose juste avant de mesurer.',
+      'Ce que disent les quatre rapports, en attendant : la médiane ne bouge pas d’un pouce — 18 à 19 images/s, que la simulation soit en pause ou en jeu, qu’on se déplace ou qu’on ne fasse rien, que le moteur physique soit WASM ou JavaScript. Sur 2 190 images mesurées, 2 190 ont pour poste dominant le HORS CPU : entre 40 et 47 ms par image passés hors de notre code, pendant que le code, lui, prend 9 à 14 ms. Une médiane qui refuse de bouger quoi qu’on fasse est la signature d’un coût FIXE par image — quelque chose qu’on paie une fois par image, indépendamment de la scène.',
+      'Le prochain pas ne sera pas une intuition de plus : les réglages du jeu permettent d’isoler ce coût en trois mesures (éclairage coupé, éclairage de volume coupé, résolution basse), chacune signée de sa configuration ET, désormais, de sa version. C’est l’appareil qui tranchera.',
+    ],
+  },
+  {
     date: '29/08/2026 23:47',
     title: 'Le rapport de performance passe au banc — et se prend enfin EN JEU',
     notes: [

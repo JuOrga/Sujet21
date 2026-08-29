@@ -2898,10 +2898,14 @@ const perfEtat = document.getElementById('perf-etat') as HTMLDivElement
 let perfVifCompte = 0
 function majPerfVifForce(): void {
   const r = perf.resume()
+  // la VERSION est dite ici aussi : c'est la question qu'on se pose juste
+  // avant de mesurer (« suis-je bien sur le paquet que je crois ? »), et
+  // un iPad peut garder un onglet ouvert longtemps après une mise en ligne
   perfVif.textContent =
-    r.images < 30
-      ? 'Mesure en cours — jouez quelques secondes, le voile ouvert ou fermé.'
-      : `En direct : ${r.p50.toFixed(0)} im/s en médiane · plancher (p5) ${r.p95.toFixed(0)} im/s · fenêtre de ${r.images} images.`
+    `v${VERSION} · ` +
+    (r.images < 30
+      ? 'mesure en cours — jouez quelques secondes, le voile ouvert ou fermé.'
+      : `en direct : ${r.p50.toFixed(0)} im/s en médiane · plancher (p5) ${r.p95.toFixed(0)} im/s · fenêtre de ${r.images} images.`)
 }
 function majPerfVif(): void {
   if (paramsEl.hidden) return
@@ -2910,6 +2914,16 @@ function majPerfVif(): void {
 }
 function rapportPerf(): Record<string, unknown> {
   return perf.rapport({
+    // LA VERSION DU JEU MESURÉ. Sans elle, un rapport ne se rattache à
+    // rien : on ne peut pas dire si une correction a payé, ni même si
+    // l'appareil tournait sur la version qu'on croit (un iPad garde un
+    // paquet en cache bien après la mise en ligne). Deux rapports ne se
+    // comparent que s'ils disent d'où ils viennent.
+    build: {
+      version: VERSION,
+      livraison: DELIVERIES[0]?.date ?? '',
+      titre: DELIVERIES[0]?.title ?? '',
+    },
     config: {
       fpsCap,
       resolution: resChoix,
