@@ -12,6 +12,7 @@ import {
   zonesDuHub,
   type ArticleHub,
 } from './game/hub'
+import { appliqueReparations } from './game/reparations'
 import {
   MECANIQUE_NOMS,
   codeCanon,
@@ -504,6 +505,21 @@ function playedLevels(): LevelDef[] {
 
 // Le hub joué : la version publiée dans la bibliothèque (code « HUB ») prime
 // sur celle du code — le laboratoire se remodèle depuis l'éditeur.
+let hubMemo: { base: LevelDef; cle: string; lv: LevelDef } | null = null
+/** Le hub JOUÉ : le hub cible (code ou bibliothèque), DÉGRADÉ pour
+ * chaque réparation encore due — l'accident du télescope se lit dans les
+ * murs. Mémoïsé : même base + mêmes réparations → même référence (le
+ * niveau est comparé par référence un peu partout). */
+function hubJoue(): LevelDef {
+  const base = hubLevel()
+  const cle = records.reparationsFaites().sort().join('+')
+  if (hubMemo && hubMemo.base === base && hubMemo.cle === cle)
+    return hubMemo.lv
+  const lv = appliqueReparations(base, records.reparationsFaites())
+  hubMemo = { base, cle, lv }
+  return lv
+}
+
 function hubLevel(): LevelDef {
   return libraryLevels.find((l) => l.code === 'HUB') ?? TABLEAU_HUB
 }
@@ -671,7 +687,7 @@ function applyLevel(): void {
   level =
     testLevel ??
     (auHub
-      ? hubLevel()
+      ? hubJoue()
       : (economatIntercalaire ??
         voieIntercalaire ??
         playedLevels()[levelIndex] ??
