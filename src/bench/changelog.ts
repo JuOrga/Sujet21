@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '29/08/2026 23:47',
+    title: 'Le rapport de performance passe au banc — et se prend enfin EN JEU',
+    notes: [
+      'Demandé : « le bouton pour envoyer au labo et copier devrait être dans le banc ». Fait — et ce n’est pas qu’un déplacement de confort, ça répare la mesure elle-même. Les deux boutons ne vivaient que dans le voile PARAMÈTRES, lequel s’ouvre depuis la fiche… qui MET L’ESSAI EN PAUSE. Autrement dit : tous les rapports reçus jusqu’ici portent `enPause: true` — on n’a jamais mesuré qu’un menu posé au-dessus d’une scène figée, jamais une partie. Le banc, lui, flotte sur le jeu qui tourne. Un rapport pris au banc mesure ce que le joueur vit.',
+      'Le dossier RAPPORT DE PERFORMANCE se range juste au-dessus du pupitre : on change un réglage, on mesure, on envoie, sans quitter le banc — et le collecteur repart à zéro à chaque changement, donc un rapport = une configuration, sans rien avoir à préparer. Les boutons du voile PARAMÈTRES restent en place pour les testeurs qui n’ouvrent pas le banc : une seule mise en œuvre, deux poignées, comme le pupitre.',
+      'Deux réparations au passage. La ligne d’état du banc GARDE désormais le dernier mot dit : elle repartait au texte d’accueil dès que la souris quittait le bouton — une réponse qui arrive après coup (un envoi réseau met une seconde) n’était donc jamais lue. Le pupitre en profite aussi. Et le bouton COPIER partait en erreur au lieu de retomber sur la console quand le presse-papier est indisponible (contexte non sécurisé, vieux navigateur) : la promesse n’existait pas, on appelait `.then` sur rien.',
+    ],
+  },
+  {
     date: '29/08/2026 23:36',
     title: 'iPad : deux lignes qui coûtaient la moitié de la cadence',
     notes: [

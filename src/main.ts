@@ -2952,41 +2952,52 @@ function rapportPerf(): Record<string, unknown> {
     },
   })
 }
-document.getElementById('perf-copier')?.addEventListener('click', () => {
+// COPIER et ENVOYER : une seule mise en œuvre, DEUX poignées — le voile
+// PARAMÈTRES et le banc. Chacune rend le mot d'état, que l'appelant
+// affiche chez lui. Le banc compte double ici : il flotte AU-DESSUS du jeu
+// qui tourne, alors que le voile s'ouvre depuis la fiche, laquelle met
+// l'essai en pause. Un rapport pris au banc mesure donc une VRAIE partie ;
+// un rapport pris au voile mesure le menu.
+async function copiePerf(): Promise<string> {
   const texte = JSON.stringify(rapportPerf(), null, 2)
-  navigator.clipboard
-    ?.writeText(texte)
-    .then(() => {
-      perfEtat.textContent =
-        'Rapport copié — collez-le dans la conversation d’analyse.'
+  try {
+    // `navigator.clipboard` manque en contexte non sécurisé (http://) et
+    // sur de vieux navigateurs : sans ce garde, la promesse n'existait pas
+    // et le clic partait en erreur au lieu de retomber sur la console.
+    if (!navigator.clipboard) throw new Error('presse-papier indisponible')
+    await navigator.clipboard.writeText(texte)
+    return 'Rapport copié — collez-le dans la conversation d’analyse.'
+  } catch {
+    console.log(texte)
+    return 'Presse-papier refusé — le rapport est dans la console (F12).'
+  }
+}
+async function envoiePerf(): Promise<string> {
+  try {
+    const r = await fetch('/api/perf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        auteur: records.operator() || 'anonyme',
+        rapport: rapportPerf(),
+      }),
     })
-    .catch(() => {
-      perfEtat.textContent =
-        'Presse-papier refusé — le rapport est dans la console (F12).'
-      console.log(texte)
-    })
+    if (!r.ok) throw new Error(String(r.status))
+    return 'Envoyé au labo ✓ — signalez-le, l’analyse peut commencer.'
+  } catch {
+    return 'Envoi impossible (hors ligne ou serveur local) — utilisez COPIER.'
+  }
+}
+document.getElementById('perf-copier')?.addEventListener('click', () => {
+  void copiePerf().then((mot) => {
+    perfEtat.textContent = mot
+  })
 })
 document.getElementById('perf-envoyer')?.addEventListener('click', () => {
   perfEtat.textContent = 'Envoi…'
-  fetch('/api/perf', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      auteur: records.operator() || 'anonyme',
-      rapport: rapportPerf(),
-    }),
+  void envoiePerf().then((mot) => {
+    perfEtat.textContent = mot
   })
-    .then((r) =>
-      r.ok ? r.json() : Promise.reject(new Error(String(r.status))),
-    )
-    .then(() => {
-      perfEtat.textContent =
-        'Envoyé au labo ✓ — signalez-le, l’analyse peut commencer.'
-    })
-    .catch(() => {
-      perfEtat.textContent =
-        'Envoi impossible (hors ligne ou serveur local) — utilisez COPIER.'
-    })
 })
 
 document.getElementById('home-params')?.addEventListener('click', () => {
@@ -9254,6 +9265,7 @@ const pane = createBench(params, monitor, {
   oeil: { regl: oeilRegl, defauts: OEIL_DEFAUTS, sauve: sauveOeil },
   // le PUPITRE au banc : mêmes manœuvres, catalogue lu sur le panneau
   pupitre: { sections: cataloguePupitre(), lance: actionPupitre },
+  perf: { copier: copiePerf, envoyer: envoiePerf },
   tableaux: TABLEAUX.map((t) => t.name),
   gotoTableau: (index) => {
     testLevel = null // le banc navigue dans l'expédition, pas dans le prototype

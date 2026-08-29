@@ -53,6 +53,16 @@ export interface BenchActions {
     sections: { titre: string; boutons: { cle: string; titre: string; aide: string }[] }[]
     lance(cle: string): string
   }
+  // LE RAPPORT DE PERFORMANCE, au banc. Il existait déjà dans le voile
+  // PARAMÈTRES, mais celui-ci s'ouvre depuis la fiche — qui met l'essai en
+  // PAUSE : on n'y mesurait jamais qu'un menu au-dessus d'une scène figée.
+  // Le banc, lui, flotte sur le jeu qui tourne : le rapport pris ici mesure
+  // une vraie partie, et il tombe sous la main juste après le réglage qu'on
+  // vient de changer (le collecteur repart à zéro à chaque changement).
+  perf?: {
+    copier(): Promise<string>
+    envoyer(): Promise<string>
+  }
   // L'ŒIL DU SUJET (pack présence) : les curseurs vivent ici, à VUE — le
   // banc flotte sur le jeu qui tourne. Hors présets : mémorisé par
   // appareil (localStorage) ; les défauts sont l'étalonnage du concepteur.
@@ -88,13 +98,22 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
 
   // Affiche l'explication au survol ; l'attribut title sert d'infobulle de
   // secours (lecteurs d'écran, souris immobile).
+  // Le mot laissé par une manœuvre doit SURVIVRE au survol suivant : sans
+  // cela, « Envoyé au labo ✓ » disparaissait dès que la souris quittait le
+  // bouton — et une réponse qui arrive après coup (envoi réseau) n'était
+  // jamais lue. Le repos n'est plus une constante, c'est le dernier mot dit.
+  let hintRepos = HINT_DEFAULT
+  function dis(mot: string): void {
+    hintRepos = mot
+    hint.textContent = mot
+  }
   function describe<T extends { element: HTMLElement }>(api: T, text: string): T {
     api.element.title = text
     api.element.addEventListener('pointerenter', () => {
       hint.textContent = text
     })
     api.element.addEventListener('pointerleave', () => {
-      hint.textContent = HINT_DEFAULT
+      hint.textContent = hintRepos
     })
     return api
   }
@@ -316,6 +335,27 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     hint.textContent = 'Prototype 21-A bis — la galerie noyée.'
   })
 
+  // ---- LE RAPPORT DE PERFORMANCE, au banc -------------------------------
+  // Deux boutons, au plus près des réglages : on change une chose, on
+  // mesure, on envoie — sans repasser par la fiche (qui met en pause et
+  // fausserait la mesure).
+  if (actions.perf) {
+    const fPerf = pane.addFolder({ title: 'Rapport de performance', expanded: false })
+    describe(
+      fPerf.addButton({ title: 'COPIER' }),
+      'Copie le rapport (JSON) dans le presse-papier : à coller dans la conversation d’analyse. Le rapport porte les réglages en cours, la scène, et la fenêtre de mesure — le collecteur repart à zéro à chaque changement de réglage, donc un rapport = une configuration.',
+    ).on('click', () => {
+      void actions.perf?.copier().then(dis)
+    })
+    describe(
+      fPerf.addButton({ title: 'ENVOYER AU LABO' }),
+      'Envoie le rapport au dépôt partagé (api/perf), signé de votre nom d’opérateur. Les vingt derniers sont conservés. Mesurez EN JEU — le banc flotte sur la partie qui tourne, contrairement au voile PARAMÈTRES qui la met en pause.',
+    ).on('click', () => {
+      dis('Envoi…')
+      void actions.perf?.envoyer().then(dis)
+    })
+  }
+
   // ---- LE PUPITRE D'ESSAIS, au banc ------------------------------------
   // Les mêmes manœuvres que l'écran du menu — simuler une cérémonie, remplir
   // la bonbonne, verser, semer une ressource, entendre une ponctuation. Ici
@@ -333,7 +373,7 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
         ).on('click', () => {
           const mot = actions.pupitre?.lance(bt.cle) ?? ''
           // le banc n'a pas la ligne d'état du pupitre : il redit le mot ici
-          hint.textContent = mot || `${bt.titre} — fait.`
+          dis(mot || `${bt.titre} — fait.`)
         })
       }
     }
