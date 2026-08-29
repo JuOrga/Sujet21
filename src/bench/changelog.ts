@@ -22,6 +22,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '29/08/2026 11:22',
+    title: 'La fin s’ouvre : le sceau du secteur 4 tombe',
+    notes: [
+      'Le grand chantier se referme sur sa promesse : quand LES DIX JALONS du récit sont servis ET que la passerelle du secteur 4 est réparée, LA RÉVÉLATION se joue au retour au module (nouvelle cinématique livrée — « le sceau n’a plus de raison de tenir ») : la barrière du secteur 4 tombe, la signalétique bascule — LE SECTEUR 4|LA ROUTE DU TÉLESCOPE, LE SAS S’OUVRE|LE CHOIX VOUS APPARTIENT. Et entrer dans l’alcôve joue LE MIROIR, la cinématique de fin : le convoyeur, la montée, et le choix que personne n’a eu avant vous. La route reste ouverte — la fin se rejoue à volonté, le module continue de vivre.',
+      'Sous le capot : le scénario gagne la condition « jalons du récit servis ≥ N » (disponible aussi au montage — le concepteur peut y brancher ses propres règles), la règle livrée « livre-revelation » (remplaçable par publication, comme toutes les livrées), et les deux cinématiques REVELATION et MIROIR sur les planches existantes — le montage peut publier les siennes, elles primeront. La descente finale JOUABLE du secteur (la route du plasma) attend le quatrième état : le sas et son récit sont prêts à l’accueillir. Vérifié en vrai : état forcé (10 jalons + tout réparé) → la RÉVÉLATION se joue à l’arrivée au module. 503 tests verts.',
+    ],
+  },
+  {
     date: '29/08/2026 11:02',
     title: 'L’arc des découvertes : le récit se livre un jalon par retour',
     notes: [

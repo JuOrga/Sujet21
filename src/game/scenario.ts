@@ -43,6 +43,7 @@ export type ConditionScenario =
   | 'salle-min'
   | 'trophee'
   | 'condensat-min'
+  | 'decouvertes-min'
 
 export const CONDITIONS: ConditionScenario[] = [
   'toujours',
@@ -51,6 +52,7 @@ export const CONDITIONS: ConditionScenario[] = [
   'salle-min',
   'trophee',
   'condensat-min',
+  'decouvertes-min',
 ]
 
 export const CONDITION_NOMS: Record<ConditionScenario, string> = {
@@ -60,11 +62,17 @@ export const CONDITION_NOMS: Record<ConditionScenario, string> = {
   'salle-min': 'meilleure salle atteinte ≥ N',
   trophee: 'trophée débloqué',
   'condensat-min': 'condensat ≥ N',
+  'decouvertes-min': 'jalons du récit servis ≥ N',
 }
 
 /** La condition a-t-elle besoin du seuil N ? (l'éditeur masque le reste) */
 export function conditionAValeur(c: ConditionScenario): boolean {
-  return c === 'runs-min' || c === 'salle-min' || c === 'condensat-min'
+  return (
+    c === 'runs-min' ||
+    c === 'salle-min' ||
+    c === 'condensat-min' ||
+    c === 'decouvertes-min'
+  )
 }
 
 export interface RegleScenario {
@@ -88,6 +96,7 @@ export interface EtatScenario {
   runs: number // runs terminées
   salleMax: number // meilleure salle atteinte
   condensat: number
+  decouvertes: number // jalons du récit déjà servis
   trophee: (id: string) => boolean
 }
 
@@ -129,6 +138,8 @@ function conditionRemplie(r: RegleScenario, etat: EtatScenario): boolean {
       return etat.salleMax >= r.valeur
     case 'condensat-min':
       return etat.condensat >= r.valeur
+    case 'decouvertes-min':
+      return etat.decouvertes >= r.valeur
     case 'trophee':
       return !!r.trophee && etat.trophee(r.trophee)
     default:
@@ -225,6 +236,16 @@ export const SCENARIO_LIVRE: ScenarioDef = {
       valeur: 0,
       trophee: '',
       cine: 'ESSAI', // la cuve, l'alerte, la brèche, le sas — l'acte 0
+      uneFois: true,
+      actif: true,
+    },
+    {
+      id: 'livre-revelation',
+      moment: 'avant-hub',
+      condition: 'decouvertes-min',
+      valeur: 10,
+      trophee: '',
+      cine: 'REVELATION', // le sceau tombe : la route du télescope
       uneFois: true,
       actif: true,
     },

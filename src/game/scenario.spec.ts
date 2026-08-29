@@ -15,6 +15,7 @@ function etat(p: Partial<EtatScenario> = {}): EtatScenario {
     runs: 0,
     salleMax: 0,
     condensat: 0,
+    decouvertes: 0,
     trophee: () => false,
     ...p,
   }
@@ -168,14 +169,18 @@ describe('le scénario — le format de données', () => {
 describe('le scénario LIVRÉ — le filet sous la bibliothèque', () => {
   it('les règles livrées parsent et survivent au tour de sérialisation', () => {
     const r = parseScenario(JSON.parse(JSON.stringify(SCENARIO_LIVRE)))
-    expect(r?.regles.map((x) => x.id)).toEqual(['livre-ouverture', 'livre-depart'])
+    expect(r?.regles.map((x) => x.id)).toEqual([
+      'livre-ouverture',
+      'livre-revelation',
+      'livre-depart',
+    ])
     expect(r?.regles[0].cine).toBe('ESSAI')
     expect(r?.regles.every((x) => x.uneFois && x.actif)).toBe(true)
   })
 
   it('la fusion : les règles reçues priment, les livrées font filet', () => {
     // un scénario vide (installation fraîche) reçoit tout le filet
-    expect(avecScenarioLivre({ regles: [] }).regles.length).toBe(2)
+    expect(avecScenarioLivre({ regles: [] }).regles.length).toBe(3)
     // une règle publiée sous le même id REMPLACE la livrée
     const publie = {
       regles: [
@@ -183,8 +188,8 @@ describe('le scénario LIVRÉ — le filet sous la bibliothèque', () => {
       ],
     }
     const fusion = avecScenarioLivre(publie)
-    expect(fusion.regles.length).toBe(2)
+    expect(fusion.regles.length).toBe(3)
     expect(fusion.regles[0].cine).toBe('AUTRE') // la publiée d'abord
-    expect(fusion.regles[1].id).toBe('livre-depart')
+    expect(fusion.regles[1].id).toBe('livre-revelation')
   })
 })
