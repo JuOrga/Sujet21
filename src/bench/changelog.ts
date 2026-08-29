@@ -22,7 +22,7 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
-    date: '29/08/2026 11:22',
+    date: '29/08/2026 11:14',
     title: 'La fin s’ouvre : le sceau du secteur 4 tombe',
     notes: [
       'Le grand chantier se referme sur sa promesse : quand LES DIX JALONS du récit sont servis ET que la passerelle du secteur 4 est réparée, LA RÉVÉLATION se joue au retour au module (nouvelle cinématique livrée — « le sceau n’a plus de raison de tenir ») : la barrière du secteur 4 tombe, la signalétique bascule — LE SECTEUR 4|LA ROUTE DU TÉLESCOPE, LE SAS S’OUVRE|LE CHOIX VOUS APPARTIENT. Et entrer dans l’alcôve joue LE MIROIR, la cinématique de fin : le convoyeur, la montée, et le choix que personne n’a eu avant vous. La route reste ouverte — la fin se rejoue à volonté, le module continue de vivre.',
