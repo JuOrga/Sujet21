@@ -483,7 +483,7 @@ export interface PlotMeta {
 // ordinaires (src/game/structures.ts) : le solveur, le shader et le laser
 // ne voient jamais une structure, seulement ses parois.
 //
-//   type 0  CHAMBRE — rectangle, hexagone ou octogone selon le chanfrein
+//   type 0  CHAMBRE — rectangle ou octogone, selon le chanfrein
 //   type 1  COULOIR — un tube ouvert aux deux bouts
 export interface StructureDef {
   type: number
@@ -495,7 +495,7 @@ export interface StructureDef {
   /** Épaisseur de coque en unités monde — absente : 40. */
   ep?: number
   /** CHAMBRE : la coupe des quatre angles, en PART du demi-petit-côté
-   * (0 rectangle · 0,25 octogone · 0,5 hexagone). En part et non en
+   * (0 rectangle · 0,25 octogone · 0,5 chanfrein maximal). En part et non en
    * unités : le concepteur redimensionne, la forme doit tenir. */
   chanfrein?: number
   /** Rotation en degrés autour du centre de l'emprise — absente : 0. */

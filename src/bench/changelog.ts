@@ -22,6 +22,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '30/08/2026 01:20',
+    title: 'LES STRUCTURES ENTRENT DANS LA PALETTE : on bâtit, on ne pave plus',
+    notes: [
+      'Le kit livré il y a un quart d’heure a maintenant ses deux boutons, dans un groupe neuf de la palette : STRUCTURES — LE TERRAIN DE JEU. On trace une CHAMBRE, on trace un COULOIR, et on les fait MORDRE l’un dans l’autre : la porte se perce toute seule. C’est la fin des vingt-cinq pavés de remplissage posés à la main pour dessiner un couloir.',
+      'Une structure est un objet VIVANT, pas des murs figés : les huit poignées la redimensionnent et ses parois se refabriquent à chaque pixel, la poignée de rotation l’incline (les branches obliques du plan), elle se déplace, se duplique (D), se supprime d’un bloc, et elle entre dans la sélection multiple comme le reste. Le panneau de droite règle l’ÉPAISSEUR DE COQUE, le CHANFREIN (trois préréglages : rectangle, octogone, chanfrein maxi), l’angle, et pour un couloir son axe et sa PORTE DE MATIÈRE — rideau (seule la glace l’écarte), grille (seul le souffle passe), membrane (seule l’eau).',
+      'Deux détails qui font la différence à l’usage. On attrape une structure PAR SES MURS : son intérieur reste transparent au clic, donc on pose le mobilier dedans sans jamais la saisir par erreur. Et l’éditeur ne dessine pas un schéma : il montre les parois RÉELLEMENT fabriquées, portes percées comprises — ce que vous voyez est ce que le moteur verra.',
+      'Une JAUGE DE BUDGET s’affiche en permanence sous Contrôle : « 62 / 95 blocs — 14 posés, 48 de structure ». Elle vire à l’orange à 85 %, au rouge au-delà, et poser une structure qui ferait déborder le tableau est refusé avec le chiffre en clair. Le moteur ne dessine que 95 blocs par tableau : autant le savoir en construisant plutôt qu’en jouant.',
+      'Vérifié : la géométrie et le percement sont prouvés par 20 tests (étanchéité de la coque sur 128 rayons, percement oblique à 30°, 45°, 127° et −63°, budget, aller-retour du format), et un relevé de plan montre une petite station de trois modules — octogones, portes percées, porte de grille au milieu d’un couloir, branche à 38° — en 36 blocs. L’essai en navigateur, lui, n’a pas abouti : le chromium du conteneur se ferme sur toute interaction (souci connu, pré-existant). 546 tests verts.',
+    ],
+  },
+  {
     date: '30/08/2026 01:13',
     title: 'La prose cesse de servir de clé — le premier verrou avant de réécrire les textes',
     notes: [

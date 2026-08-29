@@ -50,6 +50,19 @@ import {
   TABLEAU_HUB_COMPACT,
 } from '../game/hub'
 import { REPARATIONS } from '../game/reparations'
+import {
+  CHANFREIN_MAX,
+  EP_MAX,
+  EP_MIN,
+  STRUCT_CHAMBRE,
+  STRUCT_COULOIR,
+  boxesDesStructures,
+  coutStructures,
+  dansCoque,
+  epaisseurDe,
+  structureNeuve,
+  structureViable,
+} from '../game/structures'
 import { ETAL_ECONOMAT, TABLEAU_ECONOMAT } from '../game/economat'
 import {
   cleFiche,
@@ -89,7 +102,9 @@ import {
   genereNiveauAtelier,
   type OptionsGen,
 } from '../game/generateur'
-import { MAX_LUMIERES } from '../render/renderer'
+import { MAX_LUMIERES,
+  MAX_BOXES,
+} from '../render/renderer'
 import { canalDeCible, traceLaser } from '../game/laser'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
 import { PISTES, PISTE_NOMS, type Piste } from '../game/soundtrack'
@@ -205,6 +220,18 @@ function ficheArticle(
     : (ETAL_ECONOMAT.find((a) => a.id === p.article) ?? null)
 }
 
+// LES MATIÈRES D'UNE PORTE DE COULOIR : celles qui trient le passage.
+// Le rideau n'écarte que la glace, la grille ne laisse que le souffle, la
+// membrane ne laisse que l'eau — et la paroi ferme tout net.
+const MATIERES_PORTE = [
+  MAT_RIDEAU,
+  MAT_GRILLE,
+  MAT_MEMBRANE,
+  MAT_WALL,
+  MAT_FROID,
+  MAT_CHAUD,
+]
+
 type Tool =
   | { kind: 'select' }
   | { kind: 'box'; material: number; forme?: number }
@@ -235,6 +262,10 @@ type Tool =
   // secteur scellé, porte de cuve, sorties gardées — le rôle se choisit
   // ensuite dans le panneau
   | { kind: 'ancre' }
+  // LE KIT DE COQUE : des structures VIDES qui dessinent le terrain de jeu.
+  // On les RECOUVRE l'une l'autre : là où le vide de l'une traverse la
+  // paroi de l'autre, la porte se perce toute seule.
+  | { kind: 'structure'; type: number }
   | { kind: 'rail' }
   | { kind: 'lumiere' }
   | { kind: 'bande' }
@@ -257,6 +288,7 @@ type Sel =
   | { kind: 'marchand' }
   | { kind: 'eclat'; index: number }
   | { kind: 'ancre'; index: number }
+  | { kind: 'structure'; index: number }
   | { kind: 'rail'; index: number }
   | { kind: 'lumiere'; index: number }
   | { kind: 'decal'; index: number }
@@ -700,6 +732,8 @@ export class LevelEditor {
     if (s.kind === 'plot') return (this.level.plots ?? [])[s.index] ?? null
     if (s.kind === 'banc') return this.level.bancMemoires ?? null
     if (s.kind === 'ancre') return (this.level.ancres ?? [])[s.index] ?? null
+    if (s.kind === 'structure')
+      return (this.level.structures ?? [])[s.index] ?? null
     if (s.kind === 'exit') return this.level.exit
     if (s.kind === 'decal') {
       const d = (this.level.decals ?? [])[s.index]
@@ -744,6 +778,12 @@ export class LevelEditor {
       Object.assign((this.level.plots ?? [])[s.index], norm)
     else if (s.kind === 'ancre')
       Object.assign((this.level.ancres ?? [])[s.index], norm)
+    else if (s.kind === 'structure') {
+      // une coque doit garder son intérieur : sous deux parois plus le
+      // passage minimal, on refuse la nouvelle taille
+      const st = (this.level.structures ?? [])[s.index]
+      if (st && structureViable({ ...st, ...norm })) Object.assign(st, norm)
+    }
     else if (s.kind === 'banc' && this.level.bancMemoires)
       Object.assign(this.level.bancMemoires, norm)
     else if (s.kind === 'exit') Object.assign(this.level.exit, norm)
@@ -1188,6 +1228,13 @@ export class LevelEditor {
       ) {
         return { kind: 'sponge', index: i }
       }
+    }
+    // LES STRUCTURES s'attrapent PAR LEURS MURS : leur intérieur reste
+    // transparent au clic, on y pose le mobilier normalement
+    const structures = this.level.structures ?? []
+    for (let i = structures.length - 1; i >= 0; i--) {
+      if (dansCoque(structures[i], structures, x, y))
+        return { kind: 'structure', index: i }
     }
     const caches = this.level.caches ?? []
     for (let i = caches.length - 1; i >= 0; i--) {
@@ -3058,6 +3105,32 @@ export class LevelEditor {
           ? 'Plot d’article (MÉMOIRE) posé — l’achat au contact provisionne la PROCHAINE descente. Article et prix à droite.'
           : 'Plot d’article (CONDENSAT) posé — l’achat au contact, effet immédiat. Article et prix à droite.',
       )
+    } else if (t.kind === 'structure') {
+      if (!this.level.structures) this.level.structures = []
+      const st = structureNeuve(t.type, r)
+      if (!structureViable(st)) {
+        this.commit(
+          'Trop petit pour une coque : il faut deux parois plus un passage.',
+        )
+        return
+      }
+      // le budget du moteur : on refuse de poser ce qui ne se dessinerait pas
+      const apres =
+        this.level.boxes.length +
+        coutStructures([...this.level.structures, st])
+      if (apres > MAX_BOXES - 1) {
+        this.commit(
+          `Budget dépassé : cette structure porterait le tableau à ${apres} blocs (${MAX_BOXES - 1} au plus).`,
+        )
+        return
+      }
+      this.level.structures.push(st)
+      this.sel = { kind: 'structure', index: this.level.structures.length - 1 }
+      this.commit(
+        t.type === STRUCT_COULOIR
+          ? 'COULOIR posé — un tube ouvert aux deux bouts. RECOUVREZ une autre structure d’au moins son épaisseur : la porte se perce toute seule.'
+          : 'CHAMBRE posée — une coque vide. Le chanfrein (panneau de droite) la fait passer du rectangle à l’octogone, jusqu’au chanfrein maximal.',
+      )
     } else if (t.kind === 'ancre') {
       if (!this.level.ancres) this.level.ancres = []
       // toute ancre naît STATION (le rôle le plus fréquent) sur la première
@@ -3162,6 +3235,8 @@ export class LevelEditor {
     else if (s.kind === 'fiole') delete this.level.fiole
     else if (s.kind === 'plot') (this.level.plots ?? []).splice(s.index, 1)
     else if (s.kind === 'ancre') (this.level.ancres ?? []).splice(s.index, 1)
+    else if (s.kind === 'structure')
+      (this.level.structures ?? []).splice(s.index, 1)
     else if (s.kind === 'banc') delete this.level.bancMemoires
     else if (s.kind === 'marchand') delete this.level.marchand
     else if (s.kind === 'eclat') (this.level.eclats ?? []).splice(s.index, 1)
@@ -3248,6 +3323,14 @@ export class LevelEditor {
       const e = (this.level.eclats ?? [])[s.index]
       this.level.eclats!.push({ ...e, x: e.x + off })
       this.sel = { kind: 'eclat', index: this.level.eclats!.length - 1 }
+    } else if (s.kind === 'structure') {
+      const st = (this.level.structures ?? [])[s.index]
+      this.level.structures!.push({
+        ...st,
+        minX: st.minX + off,
+        maxX: st.maxX + off,
+      })
+      this.sel = { kind: 'structure', index: this.level.structures!.length - 1 }
     } else if (s.kind === 'ancre') {
       const a = (this.level.ancres ?? [])[s.index]
       this.level.ancres!.push({ ...a, minX: a.minX + off, maxX: a.maxX + off })
@@ -3376,6 +3459,11 @@ export class LevelEditor {
           })
         else if (key === 'banc') this.setTool({ kind: 'banc' })
         else if (key === 'ancre') this.setTool({ kind: 'ancre' })
+        else if (key.startsWith('struct:'))
+          this.setTool({
+            kind: 'structure',
+            type: Number(key.slice(7)) === STRUCT_COULOIR ? STRUCT_COULOIR : STRUCT_CHAMBRE,
+          })
         else if (key === 'marchand') this.setTool({ kind: 'marchand' })
         else if (key === 'eclat') this.setTool({ kind: 'eclat' })
         else if (key === 'porte') this.setTool({ kind: 'porte' })
@@ -4838,6 +4926,61 @@ export class LevelEditor {
           ? `<p class="ed-empty">Plot payé en MÉMOIRE (la monnaie générale) : l’achat au contact PROVISIONNE LA PROCHAINE DESCENTE, comme au comptoir du hub — où que le plot soit posé. Un prix à 0 suit le barème du catalogue.</p>`
           : `<p class="ed-empty">Plot payé en CONDENSAT (la bourse de la run) : l’achat au contact agit IMMÉDIATEMENT, comme à l’étal de l’Économat. Un prix à 0 suit le barème du catalogue. Deux plots du même article ne servent qu’une fois par salle.</p>`,
       )
+    } else if (s.kind === 'structure') {
+      const st = (this.level.structures ?? [])[s.index]
+      rows.push(
+        `<label class="ed-f"><span>Sorte</span><select id="p-stype">` +
+          `<option value="0"${st.type === STRUCT_CHAMBRE ? ' selected' : ''}>Chambre (coque fermée)</option>` +
+          `<option value="1"${st.type === STRUCT_COULOIR ? ' selected' : ''}>Couloir (tube ouvert)</option>` +
+          `</select></label>`,
+      )
+      rows.push(
+        numField('X min', 'p-minX', st.minX),
+        numField('Y min', 'p-minY', st.minY),
+        numField('X max', 'p-maxX', st.maxX),
+        numField('Y max', 'p-maxY', st.maxY),
+      )
+      rows.push(
+        rangeField('Épaisseur de coque', 'p-stEp', epaisseurDe(st), EP_MIN, EP_MAX, 2),
+      )
+      if (st.type === STRUCT_CHAMBRE) {
+        rows.push(
+          rangeField(
+            'Chanfrein (%)',
+            'p-stCh',
+            Math.round((st.chanfrein ?? 0.25) * 100),
+            0,
+            Math.round(CHANFREIN_MAX * 100),
+            1,
+          ),
+        )
+        rows.push(
+          `<button type="button" class="ed-btn" id="p-stRect">Rectangle</button>` +
+            `<button type="button" class="ed-btn" id="p-stOcto">Octogone</button>` +
+            `<button type="button" class="ed-btn" id="p-stHexa">Chanfrein maxi</button>`,
+        )
+      } else {
+        rows.push(
+          `<label class="ed-f"><span>Axe</span><select id="p-stAxe">` +
+            `<option value="0"${(st.axe ?? 0) === 0 ? ' selected' : ''}>Horizontal</option>` +
+            `<option value="1"${st.axe === 1 ? ' selected' : ''}>Vertical</option>` +
+            `</select></label>`,
+        )
+        rows.push(
+          `<label class="ed-f"><span>Porte de matière</span><select id="p-stBou">` +
+            `<option value="-1"${st.bouchon === undefined ? ' selected' : ''}>Aucune — libre</option>` +
+            MATIERES_PORTE.map(
+              (m) =>
+                `<option value="${m}"${st.bouchon === m ? ' selected' : ''}>${MATERIAL_NAMES[m] ?? m}</option>`,
+            ).join('') +
+            `</select></label>`,
+        )
+      }
+      rows.push(rangeField('Angle (°)', 'p-stAng', st.angle ?? 0, -180, 180, 1))
+      const cout = coutStructures([st])
+      rows.push(
+        `<p class="ed-empty">Une COQUE VIDE : le terrain de jeu. Le mobilier se pose dedans, à travers elle. Pour ouvrir une porte, RECOUVREZ une autre structure d’au moins une épaisseur — juxtaposer ne suffit pas, il faut que le vide traverse la paroi. Cette structure coûte <b>${cout} blocs</b> (une porte percée en plein mur en coûte un de plus, une porte au bout n’en coûte aucun).</p>`,
+      )
     } else if (s.kind === 'ancre') {
       const a = (this.level.ancres ?? [])[s.index]
       rows.push(
@@ -5000,7 +5143,9 @@ export class LevelEditor {
                                   ? 'Décal (machinerie de décor)'
                                   : s.kind === 'plot'
                                     ? `Plot d’article (${(this.level.plots ?? [])[s.index]?.monnaie === 'memoire' ? 'mémoire' : 'condensat'})`
-                                    : s.kind === 'ancre'
+                                    : s.kind === 'structure'
+                                      ? `Structure — ${(this.level.structures ?? [])[s.index]?.type === STRUCT_COULOIR ? 'couloir' : 'chambre'}`
+                                      : s.kind === 'ancre'
                                       ? `Ancre — ${ANCRE_NOMS[(this.level.ancres ?? [])[s.index]?.role ?? 'station']}`
                                       : s.kind === 'banc'
                                         ? 'Banc des mémoires'
@@ -5016,6 +5161,26 @@ export class LevelEditor {
         ? ''
         : `<button type="button" class="ed-danger" id="p-del">Supprimer</button>`)
 
+    for (const [id, part] of [
+      ['p-stRect', 0],
+      ['p-stOcto', 0.25],
+      ['p-stHexa', CHANFREIN_MAX],
+    ] as const) {
+      host.querySelector(`#${id}`)?.addEventListener('click', () => {
+        const sel = this.sel
+        if (sel?.kind !== 'structure') return
+        const st = (this.level.structures ?? [])[sel.index]
+        if (!st) return
+        st.chanfrein = part
+        this.commit(
+          part === 0
+            ? 'Chambre rectangulaire.'
+            : part === 0.25
+              ? 'Chambre octogonale.'
+              : 'Chambre à chanfrein maximal — les pans droits se réduisent à l’épaisseur.',
+        )
+      })
+    }
     host
       .querySelector('#p-del')
       ?.addEventListener('click', () => this.deleteSel())
@@ -5296,6 +5461,36 @@ export class LevelEditor {
       const prix = Math.round(val('p-plprix'))
       if (prix >= 1) p.prix = Math.min(999, prix)
       else delete p.prix
+    } else if (s.kind === 'structure') {
+      const st = (this.level.structures ?? [])[s.index]
+      if (st) {
+        const type = Number(text('p-stype'))
+        st.type = type === STRUCT_COULOIR ? STRUCT_COULOIR : STRUCT_CHAMBRE
+        const norm = this.normalized(
+          val('p-minX'),
+          val('p-minY'),
+          val('p-maxX'),
+          val('p-maxY'),
+        )
+        if (structureViable({ ...st, ...norm })) Object.assign(st, norm)
+        const ep = Math.round(val('p-stEp'))
+        if (ep >= EP_MIN && structureViable({ ...st, ep })) st.ep = ep
+        const ang = Math.round(val('p-stAng'))
+        if (ang) st.angle = Math.max(-180, Math.min(180, ang))
+        else delete st.angle
+        if (st.type === STRUCT_CHAMBRE) {
+          const ch = val('p-stCh') / 100
+          st.chanfrein = Math.max(0, Math.min(CHANFREIN_MAX, ch))
+          delete st.axe
+          delete st.bouchon
+        } else {
+          st.axe = Number(text('p-stAxe')) === 1 ? 1 : 0
+          const bou = Number(text('p-stBou'))
+          if (MATIERES_PORTE.includes(bou)) st.bouchon = bou
+          else delete st.bouchon
+          delete st.chanfrein
+        }
+      }
     } else if (s.kind === 'ancre') {
       const a = (this.level.ancres ?? [])[s.index]
       const role = text('p-anrole') as RoleAncre
@@ -5385,6 +5580,7 @@ export class LevelEditor {
   private validate(): void {
     const host = this.el('ed-check')
     const v = checkLevel(this.level)
+    this.majJauge()
     if (v.length === 0) {
       host.innerHTML =
         '<div class="ed-ok">Tableau valide — prêt à essayer.</div>'
@@ -5396,6 +5592,23 @@ export class LevelEditor {
           `<div class="ed-v ${x.niveau === 'erreur' ? 'err' : 'warn'}">${x.niveau === 'erreur' ? '✕' : '!'} ${x.message}</div>`,
       )
       .join('')
+  }
+
+  /** LA JAUGE DU BUDGET : le moteur ne dessine que MAX_BOXES−1 blocs par
+   * tableau, structures expansées comprises. Le concepteur doit le voir
+   * AVANT de dépasser, pas au moment du refus. */
+  private majJauge(): void {
+    const host = document.getElementById('ed-budget')
+    if (!host) return
+    const poses = this.level.boxes.length
+    const coques = coutStructures(this.level.structures)
+    const total = poses + coques
+    const max = MAX_BOXES - 1
+    host.className =
+      total > max ? 'ed-v err' : total > max * 0.88 ? 'ed-v warn' : 'ed-jauge'
+    host.textContent = coques
+      ? `${total} / ${max} blocs — ${poses} posés, ${coques} de structure`
+      : `${total} / ${max} blocs`
   }
 
   private showCoords(x: number, y: number): void {
@@ -5661,6 +5874,63 @@ export class LevelEditor {
         aura(band * (1 + P.chillColdGrowth), '', '2e', [2, 7])
       if (box.material === MAT_CHAUD)
         aura(band * (1 - P.chillHeatFade), '', '2e', [2, 7])
+    }
+
+    // LES STRUCTURES DE COQUE, sous le mobilier : on dessine les PAROIS
+    // RÉELLEMENT FABRIQUÉES (portes percées comprises), pas un schéma —
+    // le concepteur voit ce que le moteur verra
+    const structs = this.level.structures ?? []
+    if (structs.length > 0) {
+      for (const paroi of boxesDesStructures(structs)) {
+        const p = this.toScreen(paroi.minX, paroi.maxY)
+        const q = this.toScreen(paroi.maxX, paroi.minY)
+        g.save()
+        if (paroi.angle) {
+          const cx = (p.sx + q.sx) / 2
+          const cy = (p.sy + q.sy) / 2
+          g.translate(cx, cy)
+          g.rotate((-paroi.angle * Math.PI) / 180)
+          g.translate(-cx, -cy)
+        }
+        const col = MAT_COLORS[paroi.material] ?? '#5c7183'
+        g.fillStyle = paroi.material === MAT_WALL ? '#33465699' : col + '99'
+        g.fillRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
+        g.strokeStyle = paroi.material === MAT_WALL ? '#7f9bb3' : col
+        g.lineWidth = 1
+        g.strokeRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
+        g.restore()
+      }
+      // l'emprise de chaque structure, en pointillé : c'est elle que les
+      // poignées tiennent
+      structs.forEach((st, si) => {
+        const p = this.toScreen(st.minX, st.maxY)
+        const q = this.toScreen(st.maxX, st.minY)
+        const vise = this.sel?.kind === 'structure' && this.sel.index === si
+        g.save()
+        if (st.angle) {
+          const cx = (p.sx + q.sx) / 2
+          const cy = (p.sy + q.sy) / 2
+          g.translate(cx, cy)
+          g.rotate((-st.angle * Math.PI) / 180)
+          g.translate(-cx, -cy)
+        }
+        g.setLineDash(vise ? [8, 5] : [3, 6])
+        g.strokeStyle = vise ? '#8ee0ff' : '#5fd0ff66'
+        g.lineWidth = vise ? 2 : 1
+        g.strokeRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
+        g.setLineDash([])
+        g.restore()
+        if (vise || this.zoom > 0.16) {
+          g.fillStyle = vise ? '#8ee0ff' : '#5fd0ff99'
+          g.font = '600 10px ui-monospace, monospace'
+          g.textAlign = 'left'
+          g.fillText(
+            `${st.type === STRUCT_COULOIR ? 'COULOIR' : 'CHAMBRE'} · ${coutStructures([st])} blocs`,
+            p.sx + 4,
+            p.sy - 5,
+          )
+        }
+      })
     }
 
     // surfaces (les obliques pivotent autour de leur centre) — une FORME se
