@@ -6861,6 +6861,25 @@ function valideSalleCourante(): string {
   return 'ok'
 }
 
+// PASSER LE HUB (outil de conception). Le hub est un tableau comme un
+// autre pour le concepteur — sauf qu'il faut le TRAVERSER À LA NAGE
+// jusqu'au bon sas, et que le sas n'est pas un détail de trajet : c'est
+// lui qui décide du mode de descente (l'expédition écrite par le sas
+// principal, LA VOIE par le givre, LA DESCENTE DU JOUR par la vapeur).
+// Comme pour la salle, rien n'est simulé : on lève un drapeau, et c'est
+// le VRAI chemin de sortie qui se déroule à l'image suivante — même
+// cinématique, même son, même reprise de sauvegarde.
+// Le type porte les trois portes ; seul le sas principal est câblé au
+// panneau pour l'instant (les deux gardées coûteront un bouton chacune).
+let forceSortieHub: 'principal' | 'givre' | 'vapeur' | null = null
+function passeLeHub(sortie: 'principal' | 'givre' | 'vapeur'): string {
+  if (!hasPlayed) return 'menu'
+  if (!auHub) return 'dehors'
+  if (sim.dispersed) return 'disperse'
+  forceSortieHub = sortie
+  return 'ok'
+}
+
 // Arme l'Économat pour la prochaine salle. Rien n'est déplacé tout de
 // suite : c'est la traversée suivante qui l'intercale, comme le ferait la
 // mi-descente — le chemin est le vrai, seul le déclenchement est forcé.
@@ -7467,6 +7486,24 @@ function lanceManoeuvre(quoi: string): void {
         )
         break
       }
+      case 'hub-principal': {
+        const r = passeLeHub('principal')
+        if (r === 'ok') {
+          // la fiche fige l'essai : sans la refermer, la boucle ne tourne
+          // pas et le sas ne serait jamais franchi
+          pupitreEl.hidden = true
+          closeHome()
+        } else {
+          pupDit(
+            r === 'menu'
+              ? 'Aucun essai en cours : entrez au hub d’abord.'
+              : r === 'dehors'
+                ? 'Vous n’êtes pas au hub — ici, c’est « Valider la salle en cours ».'
+                : 'Le corps est dispersé : le sas ne s’ouvre pas.',
+          )
+        }
+        break
+      }
       case 'valider-salle': {
         const r = valideSalleCourante()
         if (r === 'ok') {
@@ -7479,7 +7516,7 @@ function lanceManoeuvre(quoi: string): void {
             r === 'menu'
               ? 'Aucun essai en cours : lancez une descente d’abord.'
               : r === 'hub'
-                ? 'Au hub il n’y a rien à valider — son sas lance la run.'
+                ? 'Au hub il n’y a rien à valider : prenez « Partir par le sas principal ».'
                 : r === 'deja'
                   ? 'La salle est déjà conclue (cérémonie ouverte ou expédition achevée).'
                   : 'Le corps est dispersé : plus rien à livrer.',
@@ -10974,6 +11011,11 @@ function frame(now: number): void {
   // toujours, et il ne serait de personne.
   const sasOutil = forceSas
   forceSas = false // le drapeau ne vaut que pour cette image
+  // LA SORTIE DU HUB déclarée par un outil : lue ICI, avec l'autre
+  // drapeau, pour qu'elle ne fuie jamais vers l'image suivante — même si
+  // la branche du hub ne s'exécute pas (dispersion, salle déjà conclue).
+  const sortieOutil = forceSortieHub
+  forceSortieHub = null
   const drunk =
     sasOutil ||
     (sim.swallowed > 0 && sim.count <= seuilBu) ||
@@ -11019,15 +11061,21 @@ function frame(now: number): void {
   // VOIE ; le SAS DE VAPEUR (derrière la grille) lance la DESCENTE DU
   // JOUR. Le verrou est la MATIÈRE : sans le lien tissé, pas de passage.
   const zonesSas = auHub ? zonesDuHub(level) : null
+  // une sortie DÉCLARÉE par le pupitre vaut le corps posé dessus : tout
+  // l'aval reste le vrai chemin (mode de descente, son, cinématique,
+  // reprise de la sauvegarde) — seul le déclenchement est forcé
   const surSasGivre =
-    !!zonesSas &&
-    pointInBox(sim.stats.centroidX, sim.stats.centroidY, zonesSas.sasGivre)
+    sortieOutil === 'givre' ||
+    (!!zonesSas &&
+      pointInBox(sim.stats.centroidX, sim.stats.centroidY, zonesSas.sasGivre))
   const surSasVapeur =
-    !!zonesSas &&
-    pointInBox(sim.stats.centroidX, sim.stats.centroidY, zonesSas.sasVapeur)
+    sortieOutil === 'vapeur' ||
+    (!!zonesSas &&
+      pointInBox(sim.stats.centroidX, sim.stats.centroidY, zonesSas.sasVapeur))
   const rejointSasHub =
     (auHub &&
-      pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit)) ||
+      (sortieOutil !== null ||
+        pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit))) ||
     surSasGivre ||
     surSasVapeur
   if (

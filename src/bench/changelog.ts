@@ -22,6 +22,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '29/08/2026 15:03',
+    title: 'Le banc sait enfin sortir du hub — par la porte qu’on lui désigne',
+    notes: [
+      'Demandé : « dans le banc, il faut pouvoir passer le hub également en choisissant la sortie ». Le pupitre savait valider une salle, mais au hub il refusait tout net : « Au hub il n’y a rien à valider — son sas lance la run. » Pour essayer une descente, il fallait donc TRAVERSER LE MODULE À LA NAGE jusqu’au bon sas. Et le sas n’est pas un détail de trajet : c’est LUI qui décide du cadre de la descente — l’expédition écrite par le sas de l’eau, LA VOIE par le givre, LA DESCENTE DU JOUR par la vapeur. Le dossier « Tableaux » du banc sautait bien à un niveau, mais sans jamais choisir ce cadre : il pouvait sauter le hub, pas en SORTIR par une porte donnée.',
+      'Une manœuvre neuve, dans une section LE HUB en tête du pupitre : « Partir par le sas principal ». Elle ne simule rien — elle lève un drapeau, exactement comme « Valider la salle en cours », et c’est le VRAI chemin de sortie qui se déroule à l’image suivante : le mode de descente, le son, la cinématique de lancement, et la reprise de la sauvegarde s’il y en a une. Vérifié au navigateur : depuis le hub (4000 × 1800), le bouton livre « Le berceau » (21-01, 1200 × 750, corps en x −950) — la salle 1 de l’expédition écrite, pas une salle de voie. Hors du hub, la manœuvre refuse et ne touche à rien.',
+      'Elle paraît AUSSI au banc, sans une ligne de plus : le dossier « Pupitre d’essais » est engendré depuis le panneau lui-même (titres de section, libellés, aides), donc le sous-dossier LE HUB s’y range tout seul, avec son bouton — jamais deux listes à tenir. Les registres ne bougent pas : relevé du stockage avant et après, `projet21.registres.v1` est identique au bit près ; la seule écriture est le marque-page du récit (la cinématique de départ notée « déjà vue »), exactement comme lorsqu’on prend le sas à la nage.',
+      'Les deux sorties gardées — le givre et la vapeur — ne sont pas encore câblées, à la demande du concepteur : la plomberie les porte déjà (le drapeau connaît les trois portes), chacune ne coûtera qu’un bouton et une ligne. Au passage, le refus de « Valider la salle en cours » au hub désigne maintenant la bonne poignée au lieu de laisser le concepteur devant une porte close.',
+    ],
+  },
+  {
     date: '29/08/2026 14:51',
     title:
       'TOUT LE MÉTA SE POSE : les stations de réparation entrent dans l’éditeur',
