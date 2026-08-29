@@ -4044,6 +4044,21 @@
         font-size: calc(12px * var(--ui));
         opacity: 0.75;
       }
+      /* LA PLANCHE D'ICÔNES DU MÉTA dans l'interface : une pastille qui
+         découpe la planche 4 × 2 en fond, à la taille du texte autour. Elle
+         remplace les emoji — 🧪 🗝️ 💠 ne se dessinent pas pareil sous
+         Windows, macOS et Steam Deck, et l'unité graphique en souffrait. */
+      .ico-meta {
+        display: inline-block;
+        width: 1.35em;
+        height: 1.35em;
+        vertical-align: -0.3em;
+        background-image: url('/assets/meta-icones.webp');
+        background-size: 400% 200%;
+        background-repeat: no-repeat;
+        background-position: calc(var(--ic-x) * 33.3333%) calc(var(--ic-y) * 100%);
+      }
+      .hud-chip .ico-meta { width: 1.5em; height: 1.5em; opacity: 0.9; }
       /* le toucher dit le nom : une étiquette éphémère sous la pastille */
       .hud-chip.ouvert::after {
         content: attr(data-nom);
@@ -6736,8 +6751,8 @@
         </div>
         <div class="hud-chips">
           <button type="button" class="hud-chip" data-nom="progression de l'expédition"><i>▦</i><span class="v" id="hud-tableau">SALLE 1/1</span></button>
-          <button type="button" class="hud-chip" data-nom="échantillons de secours — le dernier perdu, la run s'arrête" id="hud-vies-chip"><i>💠</i><span class="v" id="hud-vies">×1</span></button>
-          <button type="button" class="hud-chip" data-nom="condensat de la run — la matière ramassée, purgée en fin de run" id="hud-cond-chip"><i>💧</i><span class="v" id="hud-cond">0 cL</span></button>
+          <button type="button" class="hud-chip" data-nom="échantillons de secours — le dernier perdu, la run s'arrête" id="hud-vies-chip"><i class="ico-meta" style="--ic-x:3;--ic-y:1"></i><span class="v" id="hud-vies">×1</span></button>
+          <button type="button" class="hud-chip" data-nom="condensat de la run — la matière ramassée, purgée en fin de run" id="hud-cond-chip"><i class="ico-meta" style="--ic-x:2;--ic-y:1"></i><span class="v" id="hud-cond">0 cL</span></button>
           <button type="button" class="hud-chip" data-nom="instruments embarqués — toucher pour le détail" id="hud-instr-chip" hidden><i>🧰</i><span class="v" id="hud-instr">—</span></button>
           <button type="button" class="hud-chip" data-nom="coque du vaisseau"><i>❄</i><span class="v" id="hud-coque">+21°</span></button>
         </div>

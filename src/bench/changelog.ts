@@ -22,6 +22,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '29/08/2026 16:22',
+    title: 'Un seul cadre par alcôve, et la planche d’icônes gagne l’interface',
+    notes: [
+      'Deux finitions demandées après l’arrivée des images. LA PREMIÈRE : le trait en pointillés d’une alcôve doublait le cadre de métal dessiné — plus large que lui, l’œil voyait deux boîtes au lieu d’une. Le tracé suit désormais LA NICHE elle-même : le moteur et l’affichage 2D partagent la même géométrie (le cadre que la pièce occupe dans le rectangle posé), et il n’y a plus qu’un cadre, qui respire quand l’alcôve n’a pas encore servi.',
+      'LA SECONDE : la planche d’icônes ne servait qu’en jeu, l’interface gardait ses emoji. Elle sert maintenant les TOASTS (un achat à l’étal ou au comptoir montre l’article, un éclat ramassé montre le cristal), les PASTILLES DU HUD (le condensat et les échantillons de secours) et les TUILES DU DOSSIER (condensat, mémoire). C’est la fin d’un défaut discret mais coûteux : 🧪 🗝️ 💠 ne sont pas dessinés pareil sous Windows, macOS et Steam Deck — trois joueurs voyaient trois jeux différents. Les emoji restent le repli pour tout ce qui n’a pas de case dans la planche (trophées, fioles, fiches du codex), et pour un article inconnu.',
+      'Un défaut trouvé en chemin et corrigé : le crochet d’atelier « lancer l’expédition » ne quittait pas l’essai en cours — après un passage par l’Économat de test, la descente se croyait encore hors run, et le dossier n’affichait plus son butin. Il remet maintenant l’essai à zéro, comme son nom le promet.',
+      'Vérifié dans le jeu construit : un éclat posé sur le départ lève un toast dont l’icône vient bien de la planche (case du cristal, 27 px), les cinq niches de l’Économat se dessinent en 241 × 180 avec leur cadre unique, les deux pastilles du HUD tirent leurs cases (goutte et échantillon, 18 px), et le dossier montre CONDENSAT et MÉMOIRE en icônes de planche — les quatre autres tuiles gardant leur emoji, comme prévu. 517 tests verts.',
+    ],
+  },
+  {
     date: '29/08/2026 15:12',
     title:
       'LE MÉTA PREND SON VISAGE : les cinq pièces dessinées entrent en jeu',
