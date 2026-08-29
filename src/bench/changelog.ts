@@ -22,6 +22,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '30/08/2026 00:34',
+    title: 'La résolution adaptative VISE au lieu de tâtonner — et ne descend plus sous « faible »',
+    notes: [
+      'L’A/B du concepteur a tranché, et il a tranché contre mes hypothèses : couper l’éclairage — AUCUN effet. Couper l’éclairage de volume (ma livraison, mon suspect) — AUCUN effet. Passer en résolution « faible » — 18 im/s deviennent 45. Le coût est du REMPLISSAGE PUR : 19,6 ms par mégapixel à 2,83 Mpx, 17,7 ms par mégapixel à 1,26 Mpx. Proportionnel au nombre de pixels, sans surcoût fixe. Le shader n’est pas trop lourd : on lui donne trop de pixels à peindre.',
+      'Deuxième verdict du concepteur : « le mode auto n’est pas terrible, il dégrade beaucoup trop ». Deux causes, et la seconde est un vrai défaut. UN : les paliers sautaient de 25 à 33 % d’échelle, soit 44 à 56 % de pixels d’un cran à l’autre — un seul cran faisait passer de 26 à 41 im/s, et pour tenir 60 il fallait tomber si bas que l’image devenait floue. DEUX : chaque palier grossissait AUSSI le champ de métaballes (÷2, puis ÷3, puis ÷4). À RÉSOLUTION ÉGALE, l’auto rendait donc un fluide plus grossier que le mode fixe « faible » — c’est le fluide en patchwork qu’on voyait.',
+      'L’ÉCHELLE SE CALCULE MAINTENANT. Le temps d’une image varie comme le carré de l’échelle : celle qui atteint la cible vaut « échelle × √(im/s mesurées ÷ cible) ». Une correction proportionnelle à l’écart, bornée à −25 % / +12 % par pas, avec une zone morte de 94 à 104 % pour que rien ne tremble, et l’asymétrie conservée (descente en 1,2 s, remontée en 5 s). Sur l’iPad simulé, elle se pose en trois ajustements et ne bouge plus jamais — vérifié par un test qui la rejoue cent fois de suite. Et le champ de métaballes ne se grossit PLUS JAMAIS tout seul : déjà rendu au 1/2 et ne portant que ~900 sprites, il ne pèse rien à côté de la composition plein écran, alors que le grossir se voyait énormément.',
+      'LE PLANCHER, c’est le concepteur qui l’a posé : « en faible c’est bien encore la qualité ». L’adaptatif ne descendra donc jamais sous « faible » (échelle 0,50). Sur l’iPad cela le pose à ~45 im/s plutôt qu’à 60 : choix assumé, mieux vaut 45 nettes que 60 floues — et le jour où l’on préférera l’inverse, c’est un seul nombre qui bouge.',
+      'DEUX CHANGEMENTS QUE VOUS VERREZ. À la première ouverture sur un écran TACTILE, la résolution part désormais en DYNAMIQUE au lieu d’« élevée » : « élevée » veut dire natif, c’est-à-dire cinq mégapixels sur un iPad, mesurés à ~10 im/s — personne ne va chercher un réglage avant de juger un jeu. Sur écran de bureau, rien ne change. Et le banc affiche l’ÉCHELLE DE RENDU en clair (« ×1,00 » = natif) au lieu d’un mot vague : on la regarde s’installer pendant qu’on joue.',
+      'Le calcul vit dans son propre fichier et se teste : dix tests couvrent la zone morte, les bornes, le plancher, la convergence sans oscillation sur l’iPad, la remontée au natif sur une machine rapide, et les valeurs absurdes. 527 tests verts. Le rapport de performance porte l’échelle et les mégapixels au lieu d’un index de palier illisible (format v4).',
+    ],
+  },
+  {
     date: '29/08/2026 23:57',
     title: 'Un rapport de performance dit désormais DE QUELLE VERSION il parle',
     notes: [

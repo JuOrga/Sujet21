@@ -20,7 +20,11 @@ export class PerfCollector {
   private readonly rend = new Float32Array(CAP) // ms de soumission du rendu (CPU)
   private readonly steps = new Uint8Array(CAP) // pas physiques consommés
   private readonly parts = new Uint16Array(CAP) // particules simulées
-  private readonly qual = new Uint8Array(CAP) // palier de qualité actif
+  // l'ÉCHELLE DE RENDU de l'image, en centièmes (100 = natif). C'était
+  // un « palier de qualité » (un index de barreau) : illisible dans un
+  // rapport, et sans valeur depuis que l'échelle se calcule au lieu de
+  // sauter de cran en cran.
+  private readonly qual = new Uint8Array(CAP)
   private total = 0 // images notées depuis le début
   private cursor = 0
   // Cadence BRUTE des rappels rAF (rendus ou sautés) : c'est l'horloge de
@@ -56,7 +60,7 @@ export class PerfCollector {
     rendMs: number,
     steps: number,
     particles: number,
-    quality: number,
+    echelleX100: number,
   ): void {
     // Une « image » de plus d'1,5 s n'est pas une image : c'est un onglet
     // endormi, un écran éteint, une appli passée derrière — le navigateur
@@ -72,7 +76,7 @@ export class PerfCollector {
     this.rend[i] = rendMs
     this.steps[i] = Math.min(255, steps)
     this.parts[i] = Math.min(65535, particles)
-    this.qual[i] = quality
+    this.qual[i] = echelleX100
     this.cursor = (i + 1) % CAP
     this.total++
   }
@@ -132,7 +136,7 @@ export class PerfCollector {
       horsCpuMs: number
       pas: number
       particules: number
-      qualite: number
+      echelleX100: number
     }[] = []
     for (let k = 0; k < n; k++) {
       const d = this.dt[k]
@@ -147,7 +151,7 @@ export class PerfCollector {
           horsCpuMs: Math.round((d - cpu) * 100) / 100,
           pas: this.steps[k],
           particules: this.parts[k],
-          qualite: this.qual[k],
+          echelleX100: this.qual[k],
         })
         pires.sort((a, b) => b.dtMs - a.dtMs)
         if (pires.length > 10) pires.pop()
@@ -231,7 +235,7 @@ export class PerfCollector {
     const perfMem = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory
     return {
       quoi: 'sujet21-rapport-perf',
-      version: 3,
+      version: 4,
       quand: new Date().toISOString(),
       appareil: {
         userAgent: navigator.userAgent,

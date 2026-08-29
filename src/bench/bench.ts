@@ -885,11 +885,12 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   describe(
     fMon.addBinding(monitor, 'quality', {
       readonly: true,
-      label: 'qualité rendu',
-      format: (v: number) =>
-        ['maximale', 'haute', 'moyenne', 'basse', 'minimale', 'secours'][Math.round(v)] ?? '?',
+      label: 'échelle rendu',
+      // le nombre BRUT, pas un mot : c'est lui qui explique la cadence, et
+      // on veut le voir s'installer pendant qu'on joue. 1,00 = natif.
+      format: (v: number) => `×${v.toFixed(2)}`,
     }),
-    'Qualité de rendu choisie automatiquement selon les FPS de la machine. La physique, elle, n’est jamais dégradée.',
+    'L’ÉCHELLE DE RENDU appliquée au canvas (1,00 = natif ; l’interface HTML reste nette quoi qu’il arrive). Le coût d’une image est proportionnel au NOMBRE DE PIXELS — mesuré sur iPad : ×1,50 → 18 im/s, ×1,00 → 45. En résolution DYNAMIQUE, ce nombre se calcule pour atteindre la cadence visée et ne descend jamais sous « faible ». La physique, elle, n’est jamais dégradée.',
   )
   describe(
     fMon.addBinding(monitor, 'physMs', {

@@ -91,6 +91,11 @@ import {
   valeurProposee,
 } from './game/leviers'
 import { dansForme, formeOutline } from './game/formes'
+import {
+  PLAFOND_DPR,
+  echelleDepart,
+  viseEchelle,
+} from './game/resolution'
 import { DELIVERIES, VERSION, versionDe } from './bench/changelog'
 import { Camera } from './render/camera'
 import { MAX_BOXES, Renderer } from './render/renderer'
@@ -2428,7 +2433,18 @@ let resChoix: ResChoix = ((): ResChoix => {
   if (v === 'elevee' || v === 'moyenne' || v === 'faible' || v === 'dyn')
     return v
   // migration : l'ancien interrupteur résolution dynamique
-  return localStorage.getItem('sujet21-res-dyn') === '1' ? 'dyn' : 'elevee'
+  if (localStorage.getItem('sujet21-res-dyn') === '1') return 'dyn'
+  // PREMIÈRE OUVERTURE. Sur un écran TACTILE, « élevée » veut dire natif,
+  // c'est-à-dire cinq mégapixels sur un iPad — mesuré à ~10 im/s. Personne
+  // ne va chercher un réglage avant de juger un jeu : l'adaptatif prend la
+  // main par défaut, et il ne descend jamais sous « faible ». Sur un écran
+  // de bureau, où le natif passe, on ne touche à rien.
+  try {
+    if (window.matchMedia('(pointer: coarse)').matches) return 'dyn'
+  } catch {
+    // pas de matchMedia : on garde le défaut historique
+  }
+  return 'elevee'
 })()
 const resDynamique = (): boolean => resChoix === 'dyn'
 // rendu de la section MOTEUR PHYSIQUE — paresseux : `sim` n'existe pas
@@ -2584,7 +2600,7 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
       b.addEventListener('click', () => {
         resChoix = mode
         localStorage.setItem('sujet21-res', mode)
-        if (mode !== 'dyn') qualityLevel = 0 // les paliers adaptatifs se rangent
+        dynAmorce = false // l'adaptatif se réamorce au prochain passage
         perf.reset()
         renderRes()
       })
@@ -2939,7 +2955,15 @@ function rapportPerf(): Record<string, unknown> {
           : 'javascript (wasm non chargé)',
       rattrapage: rattrapageFluide ? 'fluidite' : 'temps-reel',
       simHz,
-      palierQualite: qualityLevel,
+      // l'ÉCHELLE DE RENDU réellement appliquée (1 = natif, plafonné à
+      // 2 dpr) : c'est le seul chiffre qui explique une cadence, puisque
+      // le coût est proportionnel au nombre de pixels
+      echelleRendu: Math.round(echelleRendue() * 1000) / 1000,
+      megapixels:
+        Math.round(
+          ((window.innerWidth * window.innerHeight * echelleRendue() ** 2) /
+            1e6) * 100,
+        ) / 100,
       timeWarp: params.timeWarp,
       downsampleChamp: params.renderDownsample,
     },
@@ -10314,54 +10338,60 @@ let lossPrevLiters = -1
 let lossPrevT = 0
 let lossRate = 0
 
-// Qualité adaptative : si la machine ne suit pas, on baisse la résolution de
-// rendu (densité de pixels, puis champ métaballes plus grossier). La physique
-// n'est jamais dégradée — sous forte charge, le jeu ralentit doucement
+// Qualité adaptative : si la machine ne suit pas, on baisse LA RÉSOLUTION DE
+// RENDU, et elle seule. Le champ de métaballes ne se grossit plus jamais tout
+// seul : il est déjà rendu au 1/2, il ne porte que ~900 sprites, il ne pèse
+// RIEN à côté de la composition plein écran — le grossir se voyait beaucoup
+// (fluide en patchwork) et ne rapportait presque rien. La physique, elle,
+// n'est jamais dégradée : sous forte charge, le jeu ralentit doucement
 // (plafond de pas par image) au lieu de saccader.
-const QUALITY_LEVELS = [
-  { dprCap: 2, down: 2 },
-  { dprCap: 1.5, down: 2 },
-  { dprCap: 1.25, down: 3 },
-  { dprCap: 1, down: 3 },
-  { dprCap: 0.8, down: 4 },
-  { dprCap: 0.65, down: 4 }, // palier de secours : écrans très denses (iPad) qui chauffent
-]
-let qualityLevel = window.matchMedia('(pointer: coarse)').matches ? 1 : 0
-// L'objectif est 60 CONSTANT, pas « au-dessus de 42 » : sous 55 fps, la
-// qualité descend vite (1,2 s de confirmation) ; elle ne remonte qu'après
-// 5 s bien au-dessus de l'objectif — l'asymétrie évite le clignotement
-// qualité haute ↔ basse autour du seuil.
-let qualitySous = 0 // s passées sous l'objectif
-let qualitySur = 0 // s passées avec de la marge
+// ---- LA RÉSOLUTION ADAPTATIVE ----
+// Le calcul vit dans src/game/resolution.ts, où il se teste : le coût d'une
+// image est proportionnel au nombre de pixels (mesuré sur iPad Pro M1), donc
+// l'échelle qui atteint la cible se CALCULE au lieu de se chercher par
+// paliers. Ici ne reste que le TEMPS : on descend vite, on remonte lentement.
+let echelleDyn = 1
+/** L'ÉCHELLE DE RENDU effective : ce par quoi on multiplie la taille de la
+ * vue pour obtenir le tampon de dessin. C'est LE chiffre qui explique une
+ * cadence, puisque le coût est proportionnel au nombre de pixels — d'où sa
+ * place dans le rapport de performance, à côté des mégapixels qu'elle
+ * représente. L'interface HTML, elle, reste à la netteté native. */
+function echelleRendue(): number {
+  return (
+    Math.min(window.devicePixelRatio || 1, PLAFOND_DPR) *
+    (resDynamique() ? echelleDyn : RES_ECHELLES[resChoix])
+  )
+}
+let dynAmorce = false
+let dynDepuis = 0 // s depuis le dernier ajustement
 function updateQuality(dtReal: number): void {
   // Résolution FIXE choisie (voile PARAMÈTRES) : l'échelle est constante,
-  // aucun palier adaptatif ne s'applique — pas de yo-yo visuel.
+  // rien d'adaptatif ne s'applique — pas de yo-yo visuel.
   if (!resDynamique()) {
-    qualityLevel = 0
+    dynAmorce = false
+    echelleDyn = 1
     return
   }
-  // La qualité vise la cadence VERROUILLÉE (bornée à 60 : le rendu est
-  // taillé pour 60 — au-delà, l'écran rapide profite du surplus sans que
-  // la qualité ne se sacrifie pour courir après 120).
-  const cible = Math.min(fpsCap, 60)
-  if (fpsSmoothed < cible * (55 / 60)) {
-    qualitySous += dtReal
-    qualitySur = 0
-  } else if (fpsSmoothed > cible * (58.5 / 60)) {
-    qualitySur += dtReal
-    qualitySous = 0
-  } else {
-    qualitySous = 0
-    qualitySur = 0
+  if (!dynAmorce) {
+    dynAmorce = true
+    const p = Math.min(window.devicePixelRatio || 1, PLAFOND_DPR)
+    echelleDyn = echelleDepart(window.innerWidth * p * window.innerHeight * p)
+    dynDepuis = 0
+    return
   }
-  if (qualitySous > 1.2 && qualityLevel < QUALITY_LEVELS.length - 1) {
-    qualityLevel++
-    qualitySous = 0
-  } else if (qualitySur > 5 && qualityLevel > 0) {
-    qualityLevel--
-    qualitySur = 0
-  }
+  dynDepuis += dtReal
+  // La cible est la cadence VERROUILLÉE, bornée à 60 : le rendu est taillé
+  // pour 60 — au-delà, l'écran rapide profite du surplus sans que la
+  // qualité se sacrifie pour courir après 120.
+  const a = viseEchelle(echelleDyn, fpsSmoothed, Math.min(fpsCap, 60))
+  if (!a) return
+  // Asymétrie : on descend vite (1,2 s de confirmation), on remonte
+  // lentement (5 s) — remonter trop tôt fait clignoter la netteté.
+  if (dynDepuis < (a.sens === 'baisse' ? 1.2 : 5)) return
+  dynDepuis = 0
+  echelleDyn = a.echelle
 }
+
 
 let tickPrecedent = 0
 function frame(now: number): void {
@@ -10391,14 +10421,11 @@ function frame(now: number): void {
   if (dtReal > 0) fpsSmoothed += (1 / dtReal - fpsSmoothed) * 0.05
 
   updateQuality(dtReal)
-  const quality = QUALITY_LEVELS[qualityLevel]
   const vw = window.innerWidth
   const vh = window.innerHeight
   // l'échelle fixe choisie s'applique ici : seul le canvas est mis à
   // l'échelle, l'interface HTML reste à la netteté native
-  const dpr =
-    Math.min(window.devicePixelRatio || 1, quality.dprCap) *
-    RES_ECHELLES[resChoix]
+  const dpr = echelleRendue()
   // mesures brutes de CETTE image, pour le collecteur de performance
   let physRaw = 0
   let stepsFaits = 0
@@ -11468,7 +11495,7 @@ function frame(now: number): void {
     elapsed,
     waveScratch,
     waves.length,
-    Math.max(params.renderDownsample, quality.down),
+    params.renderDownsample,
     chillNow(),
     decorAffiche(),
     level.zones ?? [],
@@ -11508,7 +11535,7 @@ function frame(now: number): void {
     rendRaw,
     stepsFaits,
     sim.count,
-    qualityLevel,
+    Math.round(echelleRendue() * 100),
   )
   majPerfVif()
 
@@ -11517,7 +11544,7 @@ function frame(now: number): void {
   monitor.particles = sim.count
   monitor.volume = sim.liters()
   monitor.speed = speed
-  monitor.quality = qualityLevel
+  monitor.quality = echelleRendue()
 
   btnPause.textContent = input.paused ? '▶' : '⏸'
   btnPause.classList.toggle('active', input.paused)
