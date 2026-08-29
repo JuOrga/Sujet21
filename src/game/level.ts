@@ -465,6 +465,41 @@ export interface PlotMeta {
   prix?: number // surcharge du prix catalogue (1..999) ; absent : catalogue
 }
 
+// UNE STRUCTURE DE COQUE : le kit de construction du terrain de jeu. Une
+// coque VIDE — un anneau de parois qui enferme un volume jouable — qu'on
+// pose, qu'on redimensionne, et qu'on RECOUVRE d'une autre pour que la
+// porte se perce toute seule. Le chargement l'expanse en ObstacleBox
+// ordinaires (src/game/structures.ts) : le solveur, le shader et le laser
+// ne voient jamais une structure, seulement ses parois.
+//
+//   type 0  CHAMBRE — rectangle, hexagone ou octogone selon le chanfrein
+//   type 1  COULOIR — un tube ouvert aux deux bouts
+export interface StructureDef {
+  type: number
+  /** L'EMPRISE EXTÉRIEURE : la coque tient dedans, tout entière. */
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+  /** Épaisseur de coque en unités monde — absente : 40. */
+  ep?: number
+  /** CHAMBRE : la coupe des quatre angles, en PART du demi-petit-côté
+   * (0 rectangle · 0,25 octogone · 0,5 hexagone). En part et non en
+   * unités : le concepteur redimensionne, la forme doit tenir. */
+  chanfrein?: number
+  /** Rotation en degrés autour du centre de l'emprise — absente : 0. */
+  angle?: number
+  /** COULOIR : 0 le long de X, 1 le long de Y — absent : le grand côté. */
+  axe?: 0 | 1
+  /** COULOIR : la matière qui barre le passage en son milieu (grille,
+   * rideau, membrane…) — absente : le couloir est libre. */
+  bouchon?: number
+  /** Matériau des pans — absent : MAT_WALL. */
+  material?: number
+  /** Habillage des pans — absent : la plaque de COQUE. */
+  skin?: number
+}
+
 // UNE ANCRE MÉTA : les rendez-vous du MODULE, posés en données comme le
 // reste. Jusqu'ici la géométrie du hub les devinait (zonesDuHub) — donc un
 // module rebâti à la main n'en avait aucun. Posées ici, elles suivent le
@@ -554,6 +589,16 @@ export interface LevelDef {
   // LE MARCHAND (un Semblable en capsule) : décor-repère de boutique,
   // aucune physique — la silhouette luit derrière sa grille.
   marchand?: { x: number; y: number }
+  // LES STRUCTURES DE COQUE : le terrain de jeu lui-même, en modules
+  // vides qu'on relie. Le chargement les EXPANSE en parois (elles passent
+  // donc au budget des blocs) ; le mobilier, lui, reste dans `boxes`. Un
+  // tableau peut n'avoir que les bords de la cuve, que des structures, ou
+  // les deux.
+  structures?: StructureDef[]
+  // LA COQUE DU TABLEAU : 'cuve' (défaut) dessine les quatre bandes de
+  // paroi autour des bornes — 'structures' les tait, et le dehors devient
+  // le vide spatial autour des modules posés.
+  coque?: 'cuve' | 'structures'
   // LES ANCRES MÉTA du module : stations de réparation, portes de dégât,
   // table de départ, secteur scellé, porte de cuve, sas gardés. Absentes,
   // la géométrie du hub tranche encore (les vieux instantanés) — présentes,

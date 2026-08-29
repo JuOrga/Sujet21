@@ -22,6 +22,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '30/08/2026 01:07',
+    title: 'LE KIT DE COQUE : les structures modulaires entrent dans le format',
+    notes: [
+      'Demandé : « j’espérais que tu allais faire des beaux modules hexagonaux avec couloir entre eux… ajoute à l’éditeur des structures toutes faites et modulaires… il faut que ces structures soient vides pour ensuite venir poser les éléments de gameplay, cela définirait le terrain de jeu… évidemment cela doit être redimensionnable ». Voici la fondation : le terrain de jeu cesse d’être un tas de pavés posés un par un.',
+      'UNE STRUCTURE est une coque VIDE. Deux sortes suffisent à tout le plan dessiné : la CHAMBRE — rectangle, octogone ou hexagone selon son chanfrein — et le COULOIR, un tube ouvert aux deux bouts, orientable en oblique et bouchable par une matière (c’est la porte zigzag du schéma : seule la vapeur passe la grille, seule la glace écarte le rideau). Elles restent VIVANTES : ce sont des données du tableau, pas des murs figés — on les redimensionne et les parois se refabriquent.',
+      'LE PRINCIPE DU MODULAIRE : là où le vide d’une structure traverse la paroi d’une autre, LA PORTE SE PERCE TOUTE SEULE. Rien à déclarer, rien à raccorder : on recouvre, ça s’ouvre. Le percement travaille dans le repère de chaque paroi, il est donc exact à n’importe quel angle — prouvé sur des couloirs à 30°, 45°, 127° et −63°. Et le chanfrein n’est pas un « coin » plein (qui boucherait l’angle et laisserait une silhouette carrée alors que le dehors est le vide) : c’est une bande diagonale d’épaisseur de coque, dont le bout coupé tombe dans le pan voisin — la coque est étanche, vérifiée par 128 rayons partant du centre.',
+      'Le prix est connu d’avance : 4 blocs pour une chambre droite, 8 pour une chambre chanfreinée, 2 pour un couloir, 3 avec sa porte de matière — et une porte percée au milieu d’un mur coûte un bloc, une porte percée au bout n’en coûte aucun. Le moteur n’en dessine que 95 par tableau : le contrôle du tableau compte désormais les parois générées, plus seulement les blocs posés à la main.',
+      'Sous le capot, tout tient dans un module neuf et pur (structures.ts) : le solveur, le shader, le laser et le format ne voient jamais une structure, seulement les parois qu’elle fabrique. Un tableau SANS structure traverse le dépliage sans être touché — même référence, zéro régression possible sur l’existant. 546 tests verts, dont 20 neufs sur la géométrie, l’étanchéité, le percement oblique et l’aller-retour du format. L’outil dans la palette de l’éditeur arrive juste derrière.',
+    ],
+  },
+  {
     date: '30/08/2026 00:34',
     title: 'La résolution adaptative VISE au lieu de tâtonner — et ne descend plus sous « faible »',
     notes: [

@@ -62,6 +62,7 @@ import {
 } from './levelIO'
 import { dansForme, formeContact, FORME_RECT } from './formes'
 import { essaieFigure } from './figures'
+import { niveauExpanse } from './structures'
 
 // ---- Le hasard APPRIVOISÉ : mulberry32, la graine fait tout -------------
 export function creeRng(graine: number): () => number {
@@ -2115,9 +2116,12 @@ export function prouveBarriere(
 // du corps les traverse, et l'état se choisit librement. Les portes PROUVÉES
 // ouvrables comptent ouvertes ; les autres, murées.
 export function accessible(
-  level: LevelDef,
+  brut: LevelDef,
   portesOuvrables: Set<number>,
 ): boolean {
+  // les structures de coque comptent comme des parois : la preuve de
+  // traversée se fait sur le tableau tel que le moteur le verra
+  const level = niveauExpanse(brut)
   const b = level.bounds
   const pas = PAS_GRILLE_VALID
   const cols = Math.floor((b.maxX - b.minX) / pas)
