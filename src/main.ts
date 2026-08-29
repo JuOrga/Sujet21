@@ -93,6 +93,13 @@ import {
 } from './game/leviers'
 import { dansForme, formeOutline } from './game/formes'
 import {
+  catalogueMarkdown,
+  catalogueTextes,
+  comptesParDomaine,
+  type DomaineTexte,
+  type EntreeTexte,
+} from './textes/catalogue'
+import {
   PLAFOND_DPR,
   echelleDepart,
   viseEchelle,
@@ -3001,19 +3008,27 @@ function rapportPerf(): Record<string, unknown> {
 // qui tourne, alors que le voile s'ouvre depuis la fiche, laquelle met
 // l'essai en pause. Un rapport pris au banc mesure donc une VRAIE partie ;
 // un rapport pris au voile mesure le menu.
-async function copiePerf(): Promise<string> {
-  const texte = JSON.stringify(rapportPerf(), null, 2)
+/**
+ * COPIER UN TEXTE. `navigator.clipboard` manque en contexte non sécurisé
+ * (http://) et sur de vieux navigateurs : sans ce garde, la promesse
+ * n'existe pas et le clic part en erreur au lieu de retomber sur la
+ * console. Rend `false` quand le presse-papier a refusé — l'appelant le
+ * dit à sa façon, et le texte est dans la console dans tous les cas.
+ */
+async function copieTexte(texte: string): Promise<boolean> {
   try {
-    // `navigator.clipboard` manque en contexte non sécurisé (http://) et
-    // sur de vieux navigateurs : sans ce garde, la promesse n'existait pas
-    // et le clic partait en erreur au lieu de retomber sur la console.
     if (!navigator.clipboard) throw new Error('presse-papier indisponible')
     await navigator.clipboard.writeText(texte)
-    return 'Rapport copié — collez-le dans la conversation d’analyse.'
+    return true
   } catch {
     console.log(texte)
-    return 'Presse-papier refusé — le rapport est dans la console (F12).'
+    return false
   }
+}
+async function copiePerf(): Promise<string> {
+  return (await copieTexte(JSON.stringify(rapportPerf(), null, 2)))
+    ? 'Rapport copié — collez-le dans la conversation d’analyse.'
+    : 'Presse-papier refusé — le rapport est dans la console (F12).'
 }
 async function envoiePerf(): Promise<string> {
   try {
@@ -7098,6 +7113,157 @@ function carteHTML(d: InstrumentDef, o: CarteOpts): string {
     `</${balise}>`
   )
 }
+
+// ---- L'ÉCRAN DES TEXTES : relire tout le lore d'un seul endroit ----
+// Le catalogue (src/textes/catalogue.ts) parcourt les modules et rend une
+// liste plate à clés. Cet écran la donne à LIRE : groupée par domaine,
+// cherchable, avec pour chaque texte sa clé et l'endroit où le joueur le
+// rencontre. C'est le plan de travail de la réécriture — et, le jour venu,
+// la carte de ce qu'il faudra traduire.
+const textesEl = document.getElementById('textes') as HTMLDivElement
+let txFiltre: DomaineTexte | 'tout' = 'tout'
+let txQuete = ''
+
+function txDit(msg: string): void {
+  const el = document.getElementById('tx-etat')
+  if (el) el.textContent = msg
+}
+
+/** Les entrées qui passent le filtre et la recherche du moment. */
+function txRetenues(): EntreeTexte[] {
+  const q = txQuete.trim().toLowerCase()
+  return catalogueTextes().filter((e) => {
+    if (txFiltre !== 'tout' && e.domaine !== txFiltre) return false
+    if (!q) return true
+    // on cherche dans le TEXTE, la CLÉ et le LIEU : « où ai-je écrit ça ? »
+    // et « qu'est-ce qui parle du sas ? » sont la même question ici
+    return (
+      e.texte.toLowerCase().includes(q) ||
+      e.cle.toLowerCase().includes(q) ||
+      e.ou.toLowerCase().includes(q)
+    )
+  })
+}
+
+/** Le passage cherché, surligné — sans jamais laisser passer de balise. */
+function txSurligne(texte: string, q: string): string {
+  const sur = htmlSafe(texte)
+  if (!q) return sur
+  const cible = htmlSafe(q)
+  const i = sur.toLowerCase().indexOf(cible.toLowerCase())
+  if (i < 0) return sur
+  return (
+    sur.slice(0, i) +
+    `<mark>${sur.slice(i, i + cible.length)}</mark>` +
+    sur.slice(i + cible.length)
+  )
+}
+
+function renderTxFiltres(): void {
+  const host = document.getElementById('tx-filtres')
+  if (!host) return
+  const cat = catalogueTextes()
+  const chips = [
+    { cle: 'tout' as const, mot: 'Tout', n: cat.length },
+    ...comptesParDomaine(cat).map((c) => ({
+      cle: c.domaine,
+      mot: c.nom,
+      n: c.entrees,
+    })),
+  ]
+  host.innerHTML = chips
+    .map(
+      (c) =>
+        `<button type="button" class="tx-chip${c.cle === txFiltre ? ' on' : ''}"` +
+        ` data-dom="${c.cle}">${htmlSafe(c.mot.toUpperCase())} · ${c.n}</button>`,
+    )
+    .join('')
+}
+
+function renderTextes(): void {
+  const host = document.getElementById('tx-liste')
+  if (!host) return
+  const cat = catalogueTextes()
+  const mets = (id: string, v: number): void => {
+    const el = document.getElementById(id)
+    if (el) el.textContent = String(v)
+  }
+  mets('tx-n-entrees', cat.length)
+  mets(
+    'tx-n-signes',
+    cat.reduce((s, e) => s + e.texte.length, 0),
+  )
+  const vues = txRetenues()
+  if (vues.length === 0) {
+    host.innerHTML = `<p class="tx-vide">Rien ne répond à « ${htmlSafe(txQuete)} ». La recherche va dans le texte, la clé et le lieu.</p>`
+    return
+  }
+  const q = txQuete.trim()
+  let out = ''
+  for (const c of comptesParDomaine(vues)) {
+    const lot = vues.filter((e) => e.domaine === c.domaine)
+    out +=
+      `<div class="tx-fam">${htmlSafe(c.nom.toUpperCase())}` +
+      `<small>${c.entrees} entrées · ${c.caracteres} signes</small></div>`
+    for (const e of lot) {
+      out +=
+        `<article class="tx-e${e.engendre ? ' engendre' : ''}">` +
+        `<div class="tx-e-tete"><code class="tx-cle">${htmlSafe(e.cle)}</code>` +
+        `<span class="tx-ou">${htmlSafe(e.ou)}</span>` +
+        (e.engendre ? `<i class="tx-tag">ENGENDRÉE PAR LE CODE</i>` : '') +
+        `</div><p class="tx-t">${txSurligne(e.texte, q)}</p></article>`
+    }
+  }
+  host.innerHTML = out
+}
+
+function ouvreTextes(): void {
+  textesEl.hidden = false
+  renderTxFiltres()
+  renderTextes()
+  txDit(
+    'La CLÉ ne se traduit ni ne se réécrit : c’est elle qui tiendra quand le texte changera.',
+  )
+}
+document.getElementById('home-textes')?.addEventListener('click', ouvreTextes)
+document.getElementById('textes-fermer')?.addEventListener('click', () => {
+  textesEl.hidden = true
+})
+document.getElementById('tx-filtres')?.addEventListener('click', (ev) => {
+  const b = (ev.target as HTMLElement).closest('button')
+  const d = b?.dataset.dom
+  if (!d) return
+  txFiltre = d as DomaineTexte | 'tout'
+  renderTxFiltres()
+  renderTextes()
+})
+document.getElementById('tx-q')?.addEventListener('input', (ev) => {
+  txQuete = (ev.target as HTMLInputElement).value
+  renderTextes()
+})
+// L'EXPORT : de quoi réécrire hors ligne. Le Markdown se lit et s'annote ;
+// le JSON se remet dans un tableur, ou dans l'outil qui portera la
+// traduction. Les deux portent les clés — c'est tout l'intérêt.
+document.getElementById('tx-md')?.addEventListener('click', () => {
+  const t = catalogueMarkdown(txRetenues())
+  void copieTexte(t).then((ok: boolean) =>
+    txDit(
+      ok
+        ? `Markdown copié — ${txRetenues().length} entrées, clés comprises.`
+        : 'Presse-papier refusé — le Markdown est dans la console (F12).',
+    ),
+  )
+})
+document.getElementById('tx-json')?.addEventListener('click', () => {
+  const t = JSON.stringify(txRetenues(), null, 2)
+  void copieTexte(t).then((ok: boolean) =>
+    txDit(
+      ok
+        ? `JSON copié — ${txRetenues().length} entrées, clés comprises.`
+        : 'Presse-papier refusé — le JSON est dans la console (F12).',
+    ),
+  )
+})
 
 // ---- L'ATELIER DES RÉCOMPENSES ----
 // Un écran pour VOIR le catalogue (ce que chaque carte tire comme levier,

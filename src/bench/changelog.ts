@@ -22,6 +22,19 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '30/08/2026 01:45',
+    title: 'L’écran TEXTES : tout ce que le joueur peut lire, en un endroit, avec sa clé',
+    notes: [
+      'Demandé : un écran ou un fichier de travail récapitulant tous les textes du lore, en vue de les réécrire — et la question de l’internationalisation. Les deux ne font qu’un : sortir les textes de leur cachette et les NOMMER, c’est à la fois le plan de travail d’une réécriture et le socle d’une traduction. Le catalogue français d’aujourd’hui sera la première colonne d’un tableau à deux langues, sans retoucher une ligne de code le jour venu.',
+      'L’écran TEXTES (accueil, mode concepteur) montre les 519 entrées et 25 100 signes du lore, groupées par domaine — le codex en tête avec ses 86 entrées et 8 100 signes, puis les 174 des tableaux. Chaque texte s’affiche avec SA CLÉ et l’endroit où le joueur le rencontre : « codex.recit-livraison.texte · Écran CODEX — groupe recit ». On cherche à la fois dans le texte, dans la clé et dans le lieu, avec le passage trouvé surligné : taper « miroir » remonte d’un coup tout le fil narratif du récit, à travers les fiches, les tableaux et les cinématiques. C’est exactement l’outil qu’il faut pour une passe de réécriture — on voit un motif traverser le jeu entier.',
+      'Le catalogue NE DÉTIENT AUCUN TEXTE : il parcourt les modules de jeu. C’est délibéré — la couverture est totale dès le premier jour, et aucun texte ne peut exister sans y paraître. Douze tests de COUVERTURE le garantissent en comparant le catalogue aux modules eux-mêmes plutôt qu’à une liste figée : toutes les fiches du codex, tous les tableaux avec chacune de leurs pancartes, les deux modules du hub, l’Économat, les cartes, les fioles, les trophées, les réparations, les cinématiques. Plus l’unicité des clés, sans quoi rien de tout cela ne serait traduisible.',
+      'DEUX EXPORTS, clés comprises : Markdown pour relire et annoter hors ligne, JSON pour un tableur ou un outil de traduction. Ils portent ce que l’écran affiche — filtre et recherche compris.',
+      'Une clé n’a qu’une forme, alors que le jeu a trois conventions d’identifiants : capitales pour les cinématiques (ESSAI), codes mêlés pour les tableaux (21-A), camelCase pour les leviers (seuilDispersion). On ne renomme rien — ce sont des identifiants de code — mais la clé les met au même régime : minuscules, mots séparés d’un tiret. Une clé se tape, se cite dans un tableur, se retrouve dans un diff.',
+      'Les vingt phrases ENGENDRÉES des leviers sont signalées comme telles, liseré ambre : elles ne sont pas des chaînes mais des fonctions, qui accordent leurs pluriels et insèrent des nombres. On ne les réécrit pas dans le catalogue, et ce sont elles qui coûteront le plus à traduire. Le catalogue en montre un exemple à la valeur que l’atelier propose — pas au milieu de plage brut, qui donnait « 1.5 cartes de plus », un cas qui n’existe pas en jeu et avec un point décimal là où le jeu écrit une virgule.',
+      'Hors périmètre, et c’est assumé : le journal des livraisons (430 000 signes de documentation de chantier), l’éditeur et le banc — des outils de conception. Et tout ce que le joueur écrit lui-même : tableaux de la bibliothèque, cinématiques du montage, cartes de l’atelier vivent hors du dépôt et resteront dans la langue de leur auteur. 561 tests verts.',
+    ],
+  },
+  {
     date: '30/08/2026 01:13',
     title: 'La prose cesse de servir de clé — le premier verrou avant de réécrire les textes',
     notes: [

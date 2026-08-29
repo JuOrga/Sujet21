@@ -1271,6 +1271,126 @@
       .crt.a-contrepartie { border-style: solid; }
       .crt.crt-perso-c { border-color: rgba(120, 230, 190, 0.42); }
 
+      /* ---- LE CATALOGUE DES TEXTES : la relecture du lore, plein cadre ---- */
+      #textes { position: fixed; inset: 0; z-index: 60; background: #04080e; }
+      #textes[hidden] { display: none; }
+      .tx-ecran {
+        position: absolute; inset: 0; display: flex; flex-direction: column;
+        background:
+          repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.014) 0 1px, transparent 1px 3px),
+          linear-gradient(rgba(99, 183, 230, 0.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(99, 183, 230, 0.05) 1px, transparent 1px),
+          radial-gradient(ellipse at 42% 46%, #08182a 0%, #04080e 76%);
+        background-size: auto, 72px 72px, 72px 72px, auto;
+        color: #cfe2ef;
+      }
+      .tx-tete {
+        display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+        padding: 13px 22px; border-bottom: 1px solid rgba(99, 183, 230, 0.2);
+        background: rgba(6, 12, 20, 0.85);
+      }
+      .tx-tete h2 {
+        margin: 0; font-family: var(--font-display); font-weight: 600;
+        font-size: calc(19px * var(--ui)); letter-spacing: 0.32em;
+        color: var(--ink, #eaf6ff); white-space: nowrap;
+      }
+      /* base 0 : le sous-titre ne réclame aucune largeur propre, il prend
+         ce qui reste — sinon c'est le bouton FERMER qui passe à la ligne */
+      .tx-soustitre {
+        flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+        white-space: nowrap; font-size: calc(11px * var(--ui)); color: var(--dim);
+      }
+      .tx-compteurs { display: flex; gap: 16px; }
+      .tx-cpt { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+      .tx-cpt b { font-family: var(--font-display); font-size: calc(15px * var(--ui)); color: #9ed8ff; }
+      .tx-cpt i {
+        font-style: normal; font-family: var(--font-display);
+        font-size: calc(7px * var(--ui)); letter-spacing: 0.16em; color: var(--dim);
+      }
+      #textes-fermer {
+        font-family: var(--font-display); font-size: calc(9.5px * var(--ui));
+        letter-spacing: 0.16em; padding: 8px 13px; min-height: 36px;
+        background: rgba(10, 22, 36, 0.8); border: 1px solid rgba(99, 183, 230, 0.3);
+        border-radius: 6px; color: #9ed8ff; cursor: pointer;
+      }
+      #textes-fermer:hover { border-color: var(--specimen); color: #eaf6ff; }
+      .tx-lien {
+        flex: none; white-space: nowrap;
+        background: none; border: none; color: #7fc6ff; font: inherit;
+        font-size: calc(11px * var(--ui)); text-decoration: underline; cursor: pointer;
+        padding: 4px 0; min-height: 30px;
+      }
+      .tx-lien:hover { color: #cfe9ff; }
+      .tx-barre {
+        display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+        padding: 10px 22px; border-bottom: 1px solid rgba(99, 183, 230, 0.12);
+      }
+      #tx-q {
+        flex: 0 1 320px; min-width: 160px;
+        background: rgba(4, 10, 18, 0.9); border: 1px solid rgba(120, 180, 230, 0.24);
+        color: #d8ecff; border-radius: 6px; padding: 7px 10px; min-height: 34px;
+        font-family: var(--font-mono); font-size: calc(12px * var(--ui));
+      }
+      #tx-q:focus { outline: none; border-color: var(--specimen); }
+      .tx-filtres { display: flex; gap: 6px; flex-wrap: wrap; }
+      .tx-chip {
+        font-family: var(--font-display); font-size: calc(8px * var(--ui));
+        letter-spacing: 0.14em; padding: 6px 11px; min-height: 30px;
+        background: rgba(10, 22, 36, 0.7); border: 1px solid rgba(99, 183, 230, 0.2);
+        border-radius: 14px; color: var(--dim); cursor: pointer;
+      }
+      .tx-chip:hover { color: #cfe2ef; border-color: rgba(99, 183, 230, 0.45); }
+      .tx-chip.on { color: #04080e; background: #9ed8ff; border-color: #9ed8ff; }
+      .tx-corps { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 22px 20px; }
+      .tx-fam {
+        display: flex; align-items: center; gap: 10px; margin: 16px 0 8px;
+        font-family: var(--font-display); font-size: calc(8.5px * var(--ui));
+        letter-spacing: 0.2em; color: #9ed8ff;
+      }
+      .tx-fam:first-child { margin-top: 0; }
+      .tx-fam::after {
+        content: ''; flex: 1; height: 1px;
+        background: linear-gradient(90deg, rgba(99, 183, 230, 0.3), transparent);
+      }
+      .tx-fam small { font-family: var(--font-mono); letter-spacing: 0; color: var(--dim); }
+      /* une entrée : la clé et le lieu au-dessus, le texte en dessous —
+         c'est le texte qu'on vient lire, il prend la place */
+      .tx-e {
+        border: 1px solid rgba(99, 183, 230, 0.14); border-left: 2px solid rgba(99, 183, 230, 0.4);
+        border-radius: 0 8px 8px 0; padding: 8px 12px 10px; margin-bottom: 7px;
+        background: rgba(8, 16, 26, 0.5);
+      }
+      .tx-e.engendre { border-left-color: #f2c98e; }
+      .tx-e-tete {
+        display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+        margin-bottom: 5px;
+      }
+      .tx-cle {
+        font-family: var(--font-mono); font-size: calc(10.5px * var(--ui));
+        color: #7fc6ff; user-select: all; /* on la copie d'un geste */
+      }
+      .tx-ou { font-size: calc(10px * var(--ui)); color: var(--dim); }
+      .tx-tag {
+        font-family: var(--font-display); font-size: calc(7px * var(--ui));
+        letter-spacing: 0.14em; color: #f2c98e;
+        border: 1px solid rgba(242, 201, 142, 0.4); border-radius: 4px; padding: 1px 6px;
+      }
+      .tx-t {
+        margin: 0; white-space: pre-wrap; line-height: 1.5;
+        font-size: calc(12.5px * var(--ui)); color: #e6f3ff;
+      }
+      .tx-t mark { background: rgba(109, 255, 184, 0.22); color: #eafff5; border-radius: 2px; }
+      .tx-vide { margin: 20px 0; color: var(--dim); font-size: calc(12px * var(--ui)); }
+      .tx-etat {
+        margin: 0; padding: 8px 22px; min-height: 18px;
+        border-top: 1px solid rgba(99, 183, 230, 0.12);
+        font-size: calc(11px * var(--ui)); color: #a9e7c9;
+        background: rgba(6, 12, 20, 0.7);
+      }
+      @media (max-width: 760px) {
+        .tx-tete h2 { font-size: calc(15px * var(--ui)); letter-spacing: 0.22em; }
+        .tx-soustitre { display: none; }
+      }
       /* ---- L'ATELIER DES RÉCOMPENSES : plein cadre, comme les mémoires ---- */
       #recompenses { position: fixed; inset: 0; z-index: 60; background: #04080e; }
       #recompenses[hidden] { display: none; }
@@ -6684,6 +6804,7 @@
         <button id="open-montage" type="button" data-dev title="La table de montage des cinématiques : planches, effets, sons — et lecture immédiate"><i>▤</i><span>MONTAGE</span></button>
         <button id="home-salles" type="button" data-dev><i>▦</i><span>SALLES</span></button>
         <button id="home-planche" type="button" data-dev title="La planche d'ordonnancement : toutes les salles de la bibliothèque en cartes visuelles — glisser pour réordonner la séquence, régler le code cran par cran, essayer d'un ⏵"><i>▧</i><span>LA PLANCHE</span></button>
+        <button id="home-textes" type="button" data-dev title="LE CATALOGUE DES TEXTES : tout ce que le joueur peut lire, en un endroit — chaque texte avec sa clé et l'endroit où il apparaît. Le plan de travail de la réécriture, et le socle d'une future traduction"><i>¶</i><span>TEXTES</span></button>
         <button id="home-recompenses" type="button" data-dev title="L'atelier des récompenses : le catalogue complet des instruments, ce que chaque carte tire comme levier — et de quoi en fabriquer de nouvelles avec les mêmes pièces"><i>❖</i><span>RÉCOMPENSES</span></button>
         <button id="home-pupitre" type="button" data-dev title="Le pupitre d'essais : simuler les événements du jeu (cérémonie, bonbonne, paliers, sons) au doigt — sans console navigateur"><i>▚</i><span>PUPITRE</span></button>
         <button id="home-records" type="button"><i>✦</i><span>RECORDS</span></button>
@@ -7194,6 +7315,28 @@
     <!-- L'ATELIER DES RÉCOMPENSES : le catalogue à gauche, la forge à
          droite. Une carte fabriquée ici se tire, s'emporte et agit comme
          une carte gravée dans le code — c'est le même chemin. -->
+    <div id="textes" hidden aria-label="Catalogue des textes">
+      <div class="tx-ecran">
+        <header class="tx-tete">
+          <h2>TEXTES</h2>
+          <span class="tx-soustitre">tout ce que le joueur peut lire — le plan de travail de la réécriture</span>
+          <div class="tx-compteurs">
+            <span class="tx-cpt"><b id="tx-n-entrees">0</b><i>entrées</i></span>
+            <span class="tx-cpt"><b id="tx-n-signes">0</b><i>signes</i></span>
+          </div>
+          <button type="button" id="tx-md" class="tx-lien" title="Copie les entrées affichées en Markdown, clés comprises — de quoi réécrire hors ligne">Markdown</button>
+          <button type="button" id="tx-json" class="tx-lien" title="Copie les entrées affichées en JSON, clés comprises — pour un tableur ou un outil de traduction">JSON</button>
+          <button type="button" id="textes-fermer" aria-label="Fermer">✕ FERMER</button>
+        </header>
+        <div class="tx-barre">
+          <input id="tx-q" type="search" placeholder="chercher dans les textes, les clés, les lieux…" aria-label="Chercher" />
+          <div class="tx-filtres" id="tx-filtres"></div>
+        </div>
+        <div class="tx-corps" id="tx-liste"></div>
+        <p class="tx-etat" id="tx-etat"></p>
+      </div>
+    </div>
+
     <div id="recompenses" hidden aria-label="Atelier des récompenses">
       <div class="at-ecran">
         <header class="at-tete">
