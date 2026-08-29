@@ -555,8 +555,7 @@ function hubJoue(): LevelDef {
   const base = hubLevel()
   const opts = { cuveClose: !eveilJoue(), finOuverte: finOuverte() }
   const cle = `${opts.cuveClose ? 'cuve|' : ''}${opts.finOuverte ? 'fin|' : ''}${records.reparationsFaites().sort().join('+')}`
-  if (hubMemo && hubMemo.base === base && hubMemo.cle === cle)
-    return hubMemo.lv
+  if (hubMemo && hubMemo.base === base && hubMemo.cle === cle) return hubMemo.lv
   const lv = appliqueReparations(base, records.reparationsFaites(), opts)
   hubMemo = { base, cle, lv }
   return lv
@@ -5128,28 +5127,31 @@ function dessineEclat(
 ): void {
   const img = sprite(ECLAT_URL)
   if (img) {
-    const cote = r * 2.6
+    // la vignette garde SA forme : le cristal livré est haut et étroit, le
+    // forcer dans un carré l'écraserait
     const vues = vuesEclat(img.naturalWidth, img.naturalHeight)
+    const source = img.naturalWidth / vues
+    const hauteur = r * 3.2
+    const largeur = hauteur * (source / img.naturalHeight)
     if (vues > 1) {
-      const w = img.naturalWidth / vues
       const tour = (((phase / (Math.PI * 2)) % 1) + 1) % 1
       const k = Math.min(vues - 1, Math.floor(tour * vues))
       g.drawImage(
         img,
-        k * w,
+        k * source,
         0,
-        w,
+        source,
         img.naturalHeight,
-        cx - cote / 2,
-        cy - cote / 2,
-        cote,
-        cote,
+        cx - largeur / 2,
+        cy - hauteur / 2,
+        largeur,
+        hauteur,
       )
     } else {
       g.save()
       g.translate(cx, cy)
       g.rotate(phase)
-      g.drawImage(img, -cote / 2, -cote / 2, cote, cote)
+      g.drawImage(img, -largeur / 2, -hauteur / 2, largeur, hauteur)
       g.restore()
     }
     return

@@ -4,7 +4,10 @@ import { describe, expect, it } from 'vitest'
 import {
   ICONES_COLONNES,
   ICONES_RANGEES,
-  MARCHAND_TAILLE,
+  MARCHAND_HAUTEUR,
+  RAPPORT_ALCOVE,
+  RAPPORT_BANC,
+  RAPPORT_MARCHAND,
   caseIcone,
   decalsDuMeta,
   vuesEclat,
@@ -33,7 +36,7 @@ describe('les décalques du méta', () => {
     for (const t of TABLEAUX) expect(decalsDuMeta(t), t.code).toEqual([])
   })
 
-  it('chaque plot pose son alcôve, exactement sur son rectangle', () => {
+  it('chaque plot pose son alcôve, centrée et JAMAIS déformée', () => {
     const metas = decalsDuMeta(TABLEAU_ECONOMAT)
     const alcoves = metas.filter((d) => d.kind === 'meta-alcove')
     expect(alcoves.length).toBe(ETAL_ECONOMAT.length)
@@ -44,8 +47,11 @@ describe('les décalques du méta', () => {
       )
       expect(d, a.id).toBeDefined()
       expect(d!.y).toBe((a.plot.minY + a.plot.maxY) / 2)
-      expect(d!.w).toBe(a.plot.maxX - a.plot.minX)
-      expect(d!.h).toBe(a.plot.maxY - a.plot.minY)
+      // la pièce garde SON rapport…
+      expect(d!.w / d!.h).toBeCloseTo(RAPPORT_ALCOVE, 5)
+      // …et tient tout entière dans le rectangle du plot
+      expect(d!.w).toBeLessThanOrEqual(a.plot.maxX - a.plot.minX + 1e-6)
+      expect(d!.h).toBeLessThanOrEqual(a.plot.maxY - a.plot.minY + 1e-6)
     }
   })
 
@@ -55,15 +61,21 @@ describe('les décalques du méta', () => {
     expect(m).toBeDefined()
     expect(m!.x).toBe(TABLEAU_ECONOMAT.marchand!.x)
     expect(m!.y).toBe(TABLEAU_ECONOMAT.marchand!.y)
-    expect(m!.w).toBe(MARCHAND_TAILLE)
-    expect(m!.h).toBe(MARCHAND_TAILLE)
+    expect(m!.h).toBe(MARCHAND_HAUTEUR)
+    expect(m!.w / m!.h).toBeCloseTo(RAPPORT_MARCHAND, 5)
+    // la colonne DESSINÉE couvre la colonne PHYSIQUE du Sujet 12 : l'art et
+    // la salle disent la même chose
+    const colonne = TABLEAU_ECONOMAT.boxes.find((b) => b.forme === 2)!
+    expect(m!.y - m!.h / 2).toBeCloseTo(colonne.minY, 0)
+    expect(m!.y + m!.h / 2).toBeCloseTo(colonne.maxY, 0)
 
     const hub = decalsDuMeta(TABLEAU_HUB)
     const b = hub.find((d) => d.kind === 'meta-banc')
     const banc = TABLEAU_HUB.bancMemoires!
     expect(b).toBeDefined()
-    expect(b!.w).toBe(banc.maxX - banc.minX)
-    expect(b!.h).toBe(banc.maxY - banc.minY)
+    expect(b!.w / b!.h).toBeCloseTo(RAPPORT_BANC, 5)
+    expect(b!.w).toBeLessThanOrEqual(banc.maxX - banc.minX + 1e-6)
+    expect(b!.h).toBeLessThanOrEqual(banc.maxY - banc.minY + 1e-6)
   })
 
   it('les pièces du méta ne sont jamais posables à la main (hors du format)', async () => {
