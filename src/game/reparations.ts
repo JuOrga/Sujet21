@@ -210,8 +210,8 @@ export function appliqueReparations(
         }))
     }
     if (r.porte) {
-      const rect = zones.portesDegat[r.id]
-      if (rect) portes.push({ ...rect, canal: CANAL_DEGAT })
+      for (const rect of zones.portesDegat[r.id] ?? [])
+        if (!ancreAbsente(rect)) portes.push({ ...rect, canal: CANAL_DEGAT })
     }
   }
 
