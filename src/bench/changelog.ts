@@ -22,7 +22,7 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
-    date: '29/08/2026 09:55',
+    date: '29/08/2026 10:02',
     title: 'Les réparations se paient au contact — et le module se rallume à chaud',
     notes: [
       'Le geste est celui du comptoir : le corps se POSE sur une station en panne, la mémoire se débite (refus net et sans double toast si le solde manque), et le module se rallume SOUS VOS YEUX — la plaque de panne cède la place à la signalétique d’état, les écrans se rallument, la pénombre se dissipe, la barrière d’énergie de l’aile tombe. Aucun restart, aucun respawn : le hub se répare pendant qu’on y nage. Une station réparée se tait pour toujours.',
