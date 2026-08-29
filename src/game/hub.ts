@@ -174,6 +174,10 @@ export interface ZonesHub {
   /** LE SCEAU du secteur 4 : la barrière qui tient même passerelle
    * réparée — seule la fin de l'arc du récit la lève. */
   sceau: RectHub
+  /** LA PORTE DE LA CUVE : close tant que l'éveil (acte 0) n'est pas
+   * joué — le sujet naît ENFERMÉ ; la séquence ALERTE la crève
+   * (brèche d'index 0 : cette porte doit rester la PREMIÈRE). */
+  porteCuve: RectHub
 }
 
 // ─── le GRAND module (TABLEAU_HUB, 8000×3600) ────────────────────────────
@@ -208,6 +212,7 @@ export const ZONES_HUB_GRAND: ZonesHub = {
     'passerelle-4': { minX: 3700, minY: 250, maxX: 3740, maxY: 450 },
   },
   sceau: { minX: 3860, minY: 250, maxX: 3900, maxY: 450 },
+  porteCuve: { minX: -2400, minY: -220, maxX: -2310, maxY: 220 },
 }
 
 // ─── le module COMPACT (TABLEAU_HUB_COMPACT v4, 4500×1600) ───────────────
@@ -242,6 +247,7 @@ export const ZONES_HUB_COMPACT: ZonesHub = {
     'passerelle-4': { minX: 1600, minY: 500, maxX: 2000, maxY: 555 },
   },
   sceau: { minX: 1620, minY: 690, maxX: 1980, maxY: 735 },
+  porteCuve: { minX: -900, minY: -420, maxX: -810, maxY: -80 },
 }
 
 /** Les zones méta du hub JOUÉ — la géométrie tranche : le grand module,

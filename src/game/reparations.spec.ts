@@ -69,6 +69,21 @@ describe('les réparations — le hub accidenté', () => {
     }
   })
 
+  it('la cuve close (acte 0) : la porte de la cuve est la PREMIÈRE (brèche 0)', () => {
+    for (const [base, zones] of [
+      [TABLEAU_HUB, ZONES_HUB_GRAND],
+      [TABLEAU_HUB_COMPACT, ZONES_HUB_COMPACT],
+    ] as const) {
+      const lv = appliqueReparations(base, [], true)
+      const p0 = lv.portes?.[0]
+      expect(p0?.minX).toBe(zones.porteCuve.minX)
+      expect(p0?.canal).toBeLessThan(0)
+      // sans cuve close : la première porte n'est PAS celle de la cuve
+      const lv2 = appliqueReparations(base, [], false)
+      expect(lv2.portes?.[0]?.minX).not.toBe(zones.porteCuve.minX)
+    }
+  })
+
   it('un vieil instantané sans zones méta traverse tel quel', () => {
     const vieux = { ...TABLEAU_HUB_COMPACT, bounds: { minX: -1750, minY: -800, maxX: 1750, maxY: 800 } }
     expect(appliqueReparations(vieux, [])).toBe(vieux)

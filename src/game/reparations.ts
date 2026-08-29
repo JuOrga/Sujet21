@@ -113,6 +113,7 @@ const CANAL_DEGAT = -21
 export function appliqueReparations(
   base: LevelDef,
   faites: readonly string[],
+  cuveClose = false,
 ): LevelDef {
   const zones = zonesDuHub(base)
   if (!zones) return base
@@ -124,6 +125,11 @@ export function appliqueReparations(
   let ambiante = base.ambiante
   let brume = base.brume
   const portes: PorteDef[] = [...(base.portes ?? [])]
+
+  // LA PORTE DE LA CUVE (acte 0) : le sujet naît enfermé — la séquence
+  // ALERTE crève la brèche d'INDEX 0, cette porte doit donc rester la
+  // toute première de la liste
+  if (cuveClose) portes.unshift({ ...zones.porteCuve, canal: CANAL_DEGAT })
 
   // LE SCEAU : tant que l'arc du récit n'est pas achevé, le secteur 4
   // reste condamné — même passerelle réparée. (La fin le lèvera.)

@@ -211,6 +211,46 @@ export function serializeScenario(s: ScenarioDef): string {
 const CLE_SCENARIO = 'sujet21-scenario-v1'
 const CLE_VUES = 'sujet21-scenario-vues-v1'
 
+// ─── LE SCÉNARIO LIVRÉ : les règles embarquées dans le code — le filet
+// sous la bibliothèque partagée. Sans lui, une installation fraîche n'a
+// AUCUNE règle (et la bibliothèque arrive souvent après le clic LANCER) :
+// l'ouverture ne se jouait jamais. Ids préfixés « livre- » : ils ne
+// heurtent ni idLibre ni les règles publiées.
+export const SCENARIO_LIVRE: ScenarioDef = {
+  regles: [
+    {
+      id: 'livre-ouverture',
+      moment: 'premier-lancement',
+      condition: 'toujours',
+      valeur: 0,
+      trophee: '',
+      cine: 'ESSAI', // la cuve, l'alerte, la brèche, le sas — l'acte 0
+      uneFois: true,
+      actif: true,
+    },
+    {
+      id: 'livre-depart',
+      moment: 'lancement-run',
+      condition: 'premiere-partie',
+      valeur: 0,
+      trophee: '',
+      cine: 'DEPART', // le sas de lancement, la première fois
+      uneFois: true,
+      actif: true,
+    },
+  ],
+}
+
+/** Le scénario JOUÉ : les règles reçues (bibliothèque ou poste), suivies
+ * du filet livré — une règle publiée sous le même id REMPLACE la livrée
+ * (le montage garde la main), et l'ordre premier-match est préservé. */
+export function avecScenarioLivre(s: ScenarioDef): ScenarioDef {
+  const ids = new Set(s.regles.map((r) => r.id))
+  return {
+    regles: [...s.regles, ...SCENARIO_LIVRE.regles.filter((r) => !ids.has(r.id))],
+  }
+}
+
 export function chargeScenario(): ScenarioDef {
   try {
     const raw = localStorage.getItem(CLE_SCENARIO)

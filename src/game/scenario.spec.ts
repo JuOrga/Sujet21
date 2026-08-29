@@ -1,3 +1,4 @@
+import { SCENARIO_LIVRE, avecScenarioLivre } from './scenario'
 import { describe, expect, it } from 'vitest'
 import {
   type EtatScenario,
@@ -161,5 +162,29 @@ describe('le scénario — le format de données', () => {
     })!
     expect(s.regles).toHaveLength(2)
     expect(s.regles[0].id).not.toBe(s.regles[1].id)
+  })
+})
+
+describe('le scénario LIVRÉ — le filet sous la bibliothèque', () => {
+  it('les règles livrées parsent et survivent au tour de sérialisation', () => {
+    const r = parseScenario(JSON.parse(JSON.stringify(SCENARIO_LIVRE)))
+    expect(r?.regles.map((x) => x.id)).toEqual(['livre-ouverture', 'livre-depart'])
+    expect(r?.regles[0].cine).toBe('ESSAI')
+    expect(r?.regles.every((x) => x.uneFois && x.actif)).toBe(true)
+  })
+
+  it('la fusion : les règles reçues priment, les livrées font filet', () => {
+    // un scénario vide (installation fraîche) reçoit tout le filet
+    expect(avecScenarioLivre({ regles: [] }).regles.length).toBe(2)
+    // une règle publiée sous le même id REMPLACE la livrée
+    const publie = {
+      regles: [
+        { ...SCENARIO_LIVRE.regles[0], cine: 'AUTRE' },
+      ],
+    }
+    const fusion = avecScenarioLivre(publie)
+    expect(fusion.regles.length).toBe(2)
+    expect(fusion.regles[0].cine).toBe('AUTRE') // la publiée d'abord
+    expect(fusion.regles[1].id).toBe('livre-depart')
   })
 })

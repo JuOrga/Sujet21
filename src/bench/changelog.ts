@@ -22,6 +22,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '29/08/2026 10:32',
+    title: 'L’acte 0 se joue enfin : né dans la cuve, sorti par l’accident',
+    notes: [
+      'Le récit avait toute sa tuyauterie et AUCUNE règle : sur une installation fraîche, rien ne se jouait jamais (et la bibliothèque partagée arrivait souvent après le clic LANCER). Le jeu embarque désormais son SCÉNARIO LIVRÉ : l’ouverture (la cinématique ESSAI — la cuve, l’alerte, la brèche, le sas) au premier lancement, et le DÉPART au premier passage du sas. Les règles publiées depuis le montage PRIMENT toujours : le livré n’est qu’un filet, une règle publiée sous le même id le remplace.',
+      'Et l’on naît ENFERMÉ : tant que la prise en main n’est pas jouée, la porte de la cuve est une barrière d’énergie (la première de la liste — la brèche de la séquence ALERTE la vise). Au moment où le sujet sait se mouvoir, la station bascule en rouge, la cuve tremble, le confinement cède — on sort par l’accident, et l’on découvre le module en panne. La clef de la prise en main passe en v3 : TOUT LE MONDE rejoue l’acte 0 (l’accident vient d’arriver pour tous) — mémoire, liens, fioles et records ne bougent pas. Vérifié dans le vrai jeu, deux parcours : sauvegarde vierge → cinématique ESSAI puis cuve close ; sauvegarde aguerrie → ni cinématique ni carte, cuve ouverte. 498 tests verts.',
+    ],
+  },
+  {
     date: '29/08/2026 10:02',
     title: 'Les réparations se paient au contact — et le module se rallume à chaud',
     notes: [

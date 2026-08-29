@@ -169,6 +169,7 @@ import {
   type EtatScenario,
   type MomentScenario,
   type ScenarioDef,
+  avecScenarioLivre,
   chargeScenario,
   chargeVues,
   choisitRegle,
@@ -531,10 +532,11 @@ let hubMemo: { base: LevelDef; cle: string; lv: LevelDef } | null = null
  * niveau est comparé par référence un peu partout). */
 function hubJoue(): LevelDef {
   const base = hubLevel()
-  const cle = records.reparationsFaites().sort().join('+')
+  const cuveClose = !eveilJoue()
+  const cle = `${cuveClose ? 'cuve|' : ''}${records.reparationsFaites().sort().join('+')}`
   if (hubMemo && hubMemo.base === base && hubMemo.cle === cle)
     return hubMemo.lv
-  const lv = appliqueReparations(base, records.reparationsFaites())
+  const lv = appliqueReparations(base, records.reparationsFaites(), cuveClose)
   hubMemo = { base, cle, lv }
   return lv
 }
@@ -1240,7 +1242,14 @@ const obCle = (): string =>
 // le chargement (plus bas) doit savoir s'il faut geler l'échantillon.
 // v2 : l'éveil finalisé (bouton CONTINUER, dizaine d'impulsions, ralenti
 // + fondus) se rejoue une fois pour tous — même les premiers testeurs.
-const CLE_EVEIL = 'sujet21-eveil-v2'
+const CLE_EVEIL = 'sujet21-eveil-v3' // v3 : l'accident du télescope — l'acte 0 se rejoue pour tous
+function eveilJoue(): boolean {
+  try {
+    return !!localStorage.getItem(CLE_EVEIL)
+  } catch {
+    return true // stockage muet : ne jamais enfermer le joueur
+  }
+}
 // Cartes gestuelles MISES DE CÔTÉ : l'ÉVEIL les remplace au premier
 // lancement. Le code et les cartes restent entiers au cas où — remettre
 // ce drapeau à true les rendrait au premier plan.
@@ -3272,13 +3281,13 @@ let cinesPartagees: CinematiqueDef[] = []
 // LE SCÉNARIO : le fil narratif hors tableaux (avant le hub, au lancement
 // d'une run, à la défaite…). Le poste garde le dernier connu ; la version
 // PARTAGÉE fait foi dès qu'elle arrive.
-let scenario: ScenarioDef = chargeScenario()
+let scenario: ScenarioDef = avecScenarioLivre(chargeScenario())
 fetchBibliotheque().then((biblio) => {
   if (!biblio) return
   cinesPartagees = biblio.cines.map((s) => s.cine)
   if (biblio.scenario) {
-    scenario = biblio.scenario
-    sauveScenario(scenario) // hors ligne la prochaine fois, il est là
+    scenario = avecScenarioLivre(biblio.scenario)
+    sauveScenario(biblio.scenario) // hors ligne la prochaine fois, il est là
   }
 })
 function lireCineParCode(code: string): Promise<void> {
@@ -9638,6 +9647,11 @@ function avanceEveil(): void {
     } catch {
       // stockage refusé : l'éveil se rejouera, sans gravité
     }
+    // L'ALERTE : au moment où le sujet SAIT se mouvoir, la station bascule
+    // en rouge, la cuve tremble — et la brèche (porte d'index 0 : celle de
+    // la cuve) cède. On naît enfermé, on sort par l'accident.
+    if (auHub && (level.portes?.length ?? 0) > 0)
+      demarreSequence('ALERTE')
   }
 }
 for (const carte of [eveil1El, eveil2El]) {
