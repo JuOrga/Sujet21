@@ -5763,6 +5763,15 @@
         line-height: 1.6;
         margin: 0;
       }
+      .ed-jauge {
+        font: 600 11px ui-monospace, monospace;
+        color: #8ea2bd;
+        padding: 4px 6px;
+        border-radius: 5px;
+        background: #0f1620;
+        border: 1px solid #1e2a38;
+        margin-bottom: 6px;
+      }
       .ed-v {
         font-size: calc(12px * var(--ui));
         line-height: 1.5;
@@ -6854,6 +6863,11 @@
           <button type="button" class="ed-tool" data-tool="forme:4" title="Arc d'anneau aux bouts ronds — conduite courbe, alcôve, déflecteur. Épaisseur et ouverture dans le panneau ; à 100 % d'épaisseur : un camembert. La rotation l'oriente."><i data-creux="1" style="border-radius:50%;background:transparent;border:3px solid #4a6b80"></i>Arc</button>
         </div>
         <div class="ed-group">
+          <span class="k">Structures — le terrain de jeu</span>
+          <button type="button" class="ed-tool" data-tool="struct:0" title="UNE CHAMBRE : une coque VIDE, à remplir de gameplay. Le chanfrein (panneau de droite) la fait passer du rectangle à l'octogone, jusqu'au chanfrein maximal. Elle reste VIVANTE : les poignées la redimensionnent et ses parois se refabriquent. Pour ouvrir une porte, RECOUVREZ une autre structure d'au moins une épaisseur — juxtaposer ne suffit pas."><i style="background:transparent;border:3px solid #5fd0ff"></i>Chambre</button>
+          <button type="button" class="ed-tool" data-tool="struct:1" title="UN COULOIR : un tube ouvert aux deux bouts, qui relie deux modules. Faites-le MORDRE dans la coque d'à côté : la porte se perce toute seule. L'angle l'incline (branches obliques), et une PORTE DE MATIÈRE peut le barrer — rideau (seule la glace l'écarte), grille (seul le souffle passe), membrane (seule l'eau)."><i style="background:transparent;border:3px solid #5fd0ff;border-top:none;border-bottom:none"></i>Couloir</button>
+        </div>
+        <div class="ed-group">
           <span class="k">Zones d’état</span>
           <button type="button" class="ed-tool" data-tool="zone:eau"><i style="background:#63b7e6"></i>Impose liquide</button>
           <button type="button" class="ed-tool" data-tool="zone:glace"><i style="background:#8fc8ee"></i>Impose glace</button>
@@ -7062,6 +7076,7 @@
         </div>
         <div class="ed-group">
           <span class="k">Contrôle</span>
+          <div id="ed-budget" class="ed-jauge"></div>
           <div id="ed-check"></div>
         </div>
         <div class="ed-group" id="ed-io">
