@@ -22,6 +22,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '29/08/2026 15:12',
+    title:
+      'LE MÉTA PREND SON VISAGE : les cinq pièces dessinées entrent en jeu',
+    notes: [
+      'Les images sont là, et le méta cesse d’être des pointillés. LE SUJET 12 se tient dans sa colonne, derrière les barreaux de l’Économat — une masse de fluide captive, un semblable qui pousse des choses à travers la grille. LE PUPITRE DU BANC DES MÉMOIRES est un vrai meuble de laboratoire, verre sombre et liserés menthe. LES ALCÔVES de l’étal sont des niches de métal éclairées par le haut, avec leur tablette et leur porte-étiquette. L’ÉCLAT DE MÉMOIRE est devenu un cristal facetté qui tourne sur lui-même. Et la PLANCHE D’ICÔNES remplace enfin les emoji : fiole, jets de dashs, clef, échantillon, sac, éclat, goutte de condensat, échantillon de vie — les mêmes partout, alors que Windows, Mac et Steam Deck n’en dessinaient pas deux pareils.',
+      'Une règle a changé au passage, et elle se voit : un décalque ÉPOUSAIT le rectangle posé, donc une alcôve s’élargissait et un pupitre s’écrasait selon la salle. Désormais la pièce garde SA forme — elle se pose entière dans le rectangle, centrée, à son propre rapport, et ne déborde jamais sur la salle autour. La colonne du Sujet 12, elle, a été accordée dans l’autre sens : la salle du Semblable avait une masse large et basse, elle a maintenant la colonne haute et étroite de la pièce dessinée — l’art et la géométrie disent la même chose, et un test le vérifie.',
+      'Côté atelier, les pièces arrivaient sur fond noir au premier envoi : le traitement d’intégration (recadrage sur le contenu, planche remise en cases rigoureusement égales à échelle commune, redimensionnement en alpha prémultiplié pour qu’aucune couleur morte ne bave sur les bords, éclaircissement ×1,30 pour rendre d’avance ce que le moteur va refroidir) est refait à chaque livraison — un rendu propre sur fond transparent suffit désormais. Les rapports livrés sont consignés dans la fiche de fabrication : remplacer une pièce sans changer son rapport la poserait plus petite, jamais déformée.',
+      'Vérifié dans le jeu construit : l’Économat sert ses cinq alcôves dessinées (241 × 180 chacune, centrées sur leurs plots) sous la colonne du Sujet 12 (162 × 380, exactement sur sa colonne physique), et une salle d’essai portant tout le méta montre les trois alcôves, le pupitre, la colonne et les deux cristaux — chaque plot tirant SA case de la planche (la fiole pour les gouttes, la clef pour la clef, l’échantillon pour le secours). 513 tests verts.',
+    ],
+  },
+  {
     date: '29/08/2026 15:03',
     title: 'Le banc sait enfin sortir du hub — par la porte qu’on lui désigne',
     notes: [
