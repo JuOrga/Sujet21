@@ -167,6 +167,13 @@ export interface ZonesHub {
   /** LE SECTEUR SCELLÉ : l'alcôve de la 4e sortie — condamnée jusqu'à la
    * fin de l'arc du récit. */
   sasScelle: RectHub
+  /** Les PORTES DE DÉGÂT : les barrières d'énergie qui condamnent une
+   * aile tant que sa station n'est pas réparée (id de station → porte).
+   * Elles passent par level.portes (canal négatif : scénarisées). */
+  portesDegat: Record<string, RectHub>
+  /** LE SCEAU du secteur 4 : la barrière qui tient même passerelle
+   * réparée — seule la fin de l'arc du récit la lève. */
+  sceau: RectHub
 }
 
 // ─── le GRAND module (TABLEAU_HUB, 8000×3600) ────────────────────────────
@@ -195,6 +202,12 @@ export const ZONES_HUB_GRAND: ZonesHub = {
   },
   tableDepart: { minX: 2740, minY: -140, maxX: 3180, maxY: 140 },
   sasScelle: { minX: 3760, minY: 250, maxX: 3940, maxY: 450 },
+  portesDegat: {
+    'bac-sable': { minX: -3980, minY: -1390, maxX: -2500, maxY: -1340 },
+    'aile-endormis': { minX: -3720, minY: 1030, maxX: -3080, maxY: 1080 },
+    'passerelle-4': { minX: 3700, minY: 250, maxX: 3740, maxY: 450 },
+  },
+  sceau: { minX: 3860, minY: 250, maxX: 3900, maxY: 450 },
 }
 
 // ─── le module COMPACT (TABLEAU_HUB_COMPACT v4, 4500×1600) ───────────────
@@ -223,6 +236,12 @@ export const ZONES_HUB_COMPACT: ZonesHub = {
   },
   tableDepart: { minX: 1300, minY: 60, maxX: 1750, maxY: 280 },
   sasScelle: { minX: 1600, minY: 560, maxX: 2000, maxY: 800 },
+  portesDegat: {
+    'bac-sable': { minX: -1720, minY: -630, maxX: -940, maxY: -590 },
+    'aile-endormis': { minX: -560, minY: 465, maxX: 260, maxY: 510 },
+    'passerelle-4': { minX: 1600, minY: 500, maxX: 2000, maxY: 555 },
+  },
+  sceau: { minX: 1620, minY: 690, maxX: 1980, maxY: 735 },
 }
 
 /** Les zones méta du hub JOUÉ — la géométrie tranche : le grand module,
@@ -635,8 +654,8 @@ export const TABLEAU_HUB_COMPACT: LevelDef = {
     { x: 2550, y: 0, h: 380, intensite: 0.95, couleur: '#8fe6b0' }, // les sas : verte
   ],
   decals: [
-    // l'écran de contrôle veille sur le poste de gestion
-    { x: -700, y: 340, w: 300, h: 374, kind: 'ecran-off', fade: 0.95 },
+    // l'écran du MUR DES RECORDS — sous tension une fois réparé
+    { x: -700, y: 340, w: 300, h: 374, kind: 'ecran-on', fade: 0.95 },
     // l'alcôve de CONSERVATION : les fioles des semblables, une par niche.
     // Deux occupées, une VIDE au centre — sous « NE PAS RÉVEILLER », la
     // question s'impose d'elle-même : où est passé celui-là ?

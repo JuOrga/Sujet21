@@ -22,6 +22,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '29/08/2026 09:42',
+    title: 'L’accident se voit : le hub en panne, réparable station par station',
+    notes: [
+      'Le lore prend ses murs : la livraison du télescope orbital a laissé le module Méduse ACCIDENTÉ. Le hub joué est désormais le hub cible DÉGRADÉ pour chaque réparation non payée — plaques ambrées « EN PANNE — RÉPARER · N MÉMOIRE » sur chaque station, pénombre et brume tant que le RÉSEAU D’ÉCLAIRAGE n’est pas remis, écrans éteints (table de départ, mur des records), et BARRIÈRES D’ÉNERGIE rouges qui condamnent le bac d’essai, l’aile des endormis et la passerelle du secteur 4. Le SCEAU du secteur scellé, lui, tient même passerelle réparée : seule la fin de l’arc du récit le lèvera.',
+      'Sept réparations, prix croissants (10 → 60, 225 mémoire en tout) : réseau d’éclairage, table de départ, mur des records, bac d’essai, distillateur de primes, aile des endormis, passerelle du secteur 4. La mécanique est PURE et prudente : appliqueReparations dégrade un CLONE du hub cible (jamais la base — elle peut venir de la bibliothèque partagée), les bornes ne bougent pas, la physique des murs non plus (les condamnations passent par les portes scénarisées du moteur : posées au solveur, dessinées en barreaux d’énergie, levées À CHAUD sans respawn). Un vieil instantané sans zones méta traverse tel quel. Le PAIEMENT au contact arrive à la prochaine livraison — pour l’heure, le module porte ses pannes. Vérifié en vue large dans le vrai jeu : plaques, pénombre et barrières se lisent d’un coup d’œil. 487 tests verts.',
+    ],
+  },
+  {
     date: '29/08/2026 02:32',
     title: 'La récompense se met à briller : la carte devient une pièce, le tirage un petit spectacle',
     notes: [
