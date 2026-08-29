@@ -23,6 +23,7 @@ export const RUBRIQUES = [
   'Surfaces & matériaux',
   'Zones d’état',
   'Machinerie & décalques',
+  'Méta & commerce',
   'Serre & cultures',
   'Coque & fonds',
   'Objets & emblèmes',
@@ -68,6 +69,13 @@ const NOMS: Record<string, string> = {
   'serre-tomates.webp': 'Serre — colonne de tomates',
   'serre-rampe.webp': 'Serre — gouttière et barre horticole',
   'serre-rampe-a.webp': 'Serre — gouttière et barre horticole (seconde)',
+  // LE MÉTA (commerce, banc, marchand, éclats) — prompts en § 15 de
+  // docs/assets-ia.md ; déposer le fichier sous ce nom suffit
+  'meta-alcove.webp': 'Méta — alcôve d’étal',
+  'meta-banc.webp': 'Méta — pupitre du banc des mémoires',
+  'meta-marchand.webp': 'Méta — le Sujet 12 (marchand)',
+  'meta-eclat.webp': 'Méta — éclat de mémoire',
+  'meta-icones.webp': 'Méta — planche d’icônes (4×2)',
 }
 
 /** La rubrique d'un fichier, d'après son chemin. Tout finit classé : ce qui
@@ -79,6 +87,7 @@ export function rubriqueDe(url: string): string {
     return 'Surfaces & matériaux'
   if (f.startsWith('zone-')) return 'Zones d’état'
   if (f.startsWith('serre-')) return 'Serre & cultures'
+  if (f.startsWith('meta-')) return 'Méta & commerce'
   if (
     f.startsWith('decal-') ||
     f.startsWith('iris') ||

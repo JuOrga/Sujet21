@@ -105,6 +105,7 @@ import {
   zoneForceAt,
   zoneName,
   zoneShape,
+  type DecalDef,
   type LevelDef,
   type LumiereDef,
   type ObstacleBox,
@@ -195,6 +196,16 @@ import {
   transfoTenue,
 } from './game/cycle'
 import type { EtatManuel } from './game/input'
+import {
+  ECLAT_URL,
+  ICONES_COLONNES,
+  ICONES_RANGEES,
+  ICONES_URL,
+  caseIcone,
+  decalsDuMeta,
+  vuesEclat,
+} from './game/metaAssets'
+import { sprite, spritesCharges } from './render/sprites'
 import {
   ETAL_ECONOMAT,
   TABLEAU_ECONOMAT,
@@ -535,8 +546,7 @@ function hubJoue(): LevelDef {
   const base = hubLevel()
   const cuveClose = !eveilJoue()
   const cle = `${cuveClose ? 'cuve|' : ''}${records.reparationsFaites().sort().join('+')}`
-  if (hubMemo && hubMemo.base === base && hubMemo.cle === cle)
-    return hubMemo.lv
+  if (hubMemo && hubMemo.base === base && hubMemo.cle === cle) return hubMemo.lv
   const lv = appliqueReparations(base, records.reparationsFaites(), cuveClose)
   hubMemo = { base, cle, lv }
   return lv
@@ -1793,7 +1803,11 @@ const toastFile: {
   fiche?: string
   genre?: ToastGenre
 }[] = []
-function toastGenre(t: { sur?: string; fiche?: string; genre?: ToastGenre }): ToastGenre {
+function toastGenre(t: {
+  sur?: string
+  fiche?: string
+  genre?: ToastGenre
+}): ToastGenre {
   if (t.genre) return t.genre
   if (t.fiche) return 'codex'
   const sur = (t.sur ?? '').toUpperCase()
@@ -2488,9 +2502,7 @@ appliqueEchelle()
 
 const paramsEl = document.getElementById('params') as HTMLDivElement
 {
-  const choixTaille = document.getElementById(
-    'params-taille',
-  ) as HTMLDivElement
+  const choixTaille = document.getElementById('params-taille') as HTMLDivElement
   const renderTaille = (): void => {
     choixTaille.innerHTML = ''
     for (const [k, label] of [
@@ -4990,6 +5002,127 @@ const laserEtat = {
 // Sonde de test : l'état des portes/récepteurs depuis la console (comme __sim)
 ;(window as unknown as { __laserEtat: typeof laserEtat }).__laserEtat =
   laserEtat
+// ---- LE DÉCOR AFFICHÉ : le décor POSÉ, plus les décalques que le méta
+// synthétise (l'alcôve d'un plot, le pupitre du banc, la masse du Sujet 12).
+// Le résultat se mémorise par tableau : la liste ne bouge pas d'une image à
+// l'autre, et il serait absurde de la reconstruire soixante fois par seconde.
+let decorMemoTableau: LevelDef | null = null
+let decorMemoListe: DecalDef[] = []
+function decorAffiche(): DecalDef[] {
+  if (decorMemoTableau !== level) {
+    decorMemoTableau = level
+    const meta = decalsDuMeta(level)
+    decorMemoListe =
+      meta.length > 0
+        ? [...(level.decals ?? []), ...meta]
+        : (level.decals ?? [])
+  }
+  return decorMemoListe
+}
+// Sonde d'atelier : le décor réellement envoyé au rendu, méta compris
+;(window as unknown as { __decor: () => DecalDef[] }).__decor = decorAffiche
+// Sonde d'atelier : les images 2D effectivement chargées (méta compris)
+;(window as unknown as { __sprites: () => string[] }).__sprites = spritesCharges
+
+// ---- LES DEUX PIÈCES 2D DU MÉTA : elles se dessinent PAR-DESSUS le fluide
+// (un éclat noyé qu'on ne verrait plus serait une information perdue), donc
+// ici et pas en décalque. Chacune prend son image si elle est livrée, et
+// retombe sur le tracé vectoriel sinon — le jeu ne dépend jamais d'un fichier.
+
+/** L'icône d'un article : la case de la planche du méta, ou l'emoji du
+ *  catalogue tant que la planche n'est pas déposée. Le centre est donné ;
+ *  l'appelant a posé textAlign/textBaseline au centre. */
+function dessineIconeArticle(
+  g: CanvasRenderingContext2D,
+  article: string,
+  emoji: string,
+  cx: number,
+  cy: number,
+  taille: number,
+): void {
+  const planche = sprite(ICONES_URL)
+  const c = caseIcone(article)
+  if (planche && c !== null) {
+    const cw = planche.naturalWidth / ICONES_COLONNES
+    const ch = planche.naturalHeight / ICONES_RANGEES
+    const col = c % ICONES_COLONNES
+    const rang = Math.floor(c / ICONES_COLONNES)
+    g.drawImage(
+      planche,
+      col * cw,
+      rang * ch,
+      cw,
+      ch,
+      cx - taille / 2,
+      cy - taille / 2,
+      taille,
+      taille,
+    )
+    return
+  }
+  g.font = `${taille}px system-ui`
+  g.fillText(emoji, cx, cy)
+}
+
+/** L'éclat de mémoire. Trois cas : une BANDE de vues déjà tournées (le moteur
+ *  y puise la vue du moment), une vignette carrée (il la fait pivoter), ou
+ *  rien de livré — et le losange se trace au vecteur, comme aujourd'hui. */
+function dessineEclat(
+  g: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number,
+  phase: number,
+): void {
+  const img = sprite(ECLAT_URL)
+  if (img) {
+    const cote = r * 2.6
+    const vues = vuesEclat(img.naturalWidth, img.naturalHeight)
+    if (vues > 1) {
+      const w = img.naturalWidth / vues
+      const tour = (((phase / (Math.PI * 2)) % 1) + 1) % 1
+      const k = Math.min(vues - 1, Math.floor(tour * vues))
+      g.drawImage(
+        img,
+        k * w,
+        0,
+        w,
+        img.naturalHeight,
+        cx - cote / 2,
+        cy - cote / 2,
+        cote,
+        cote,
+      )
+    } else {
+      g.save()
+      g.translate(cx, cy)
+      g.rotate(phase)
+      g.drawImage(img, -cote / 2, -cote / 2, cote, cote)
+      g.restore()
+    }
+    return
+  }
+  g.save()
+  g.translate(cx, cy)
+  g.rotate(phase)
+  g.beginPath()
+  g.moveTo(0, -r * 1.15)
+  g.lineTo(r * 0.72, 0)
+  g.lineTo(0, r * 1.15)
+  g.lineTo(-r * 0.72, 0)
+  g.closePath()
+  g.fillStyle = 'rgba(140,255,205,0.5)'
+  g.fill()
+  g.lineWidth = 1.5
+  g.strokeStyle = '#8effcd'
+  g.stroke()
+  g.beginPath()
+  g.arc(0, -r * 0.25, r * 0.22, 0, Math.PI * 2)
+  g.fillStyle = 'rgba(235,255,245,0.9)'
+  g.fill()
+  g.restore()
+}
+
 // La superposition des mécanismes : faisceaux, émetteurs, cibles, portes —
 // dessinée en 2D par-dessus la cuve, avec la même caméra que le rendu WebGL.
 function drawMecanismes(vw: number, vh: number, dpr: number): void {
@@ -5609,8 +5742,8 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     g.textAlign = 'center'
     g.textBaseline = 'middle'
     g.globalAlpha = servi ? 0.35 : 1
-    g.font = `${t}px system-ui`
-    g.fillText(fiche.icone, cx, cy - t * 0.42)
+    g.fillStyle = `rgba(${teinte},0.95)`
+    dessineIconeArticle(g, pl.article, fiche.icone, cx, cy - t * 0.42, t)
     g.font = `600 ${Math.round(t * 0.62)}px system-ui, sans-serif`
     g.fillStyle = `rgba(${teinte},0.9)`
     g.fillText(
@@ -5682,25 +5815,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     g.arc(p.sx, p.sy, r * 2.2, 0, Math.PI * 2)
     g.fillStyle = 'rgba(109,255,184,0.10)'
     g.fill()
-    g.save()
-    g.translate(p.sx, p.sy)
-    g.rotate(nowPastilles * 1.4 + i * 0.9)
-    g.beginPath()
-    g.moveTo(0, -r * 1.15)
-    g.lineTo(r * 0.72, 0)
-    g.lineTo(0, r * 1.15)
-    g.lineTo(-r * 0.72, 0)
-    g.closePath()
-    g.fillStyle = 'rgba(140,255,205,0.5)'
-    g.fill()
-    g.lineWidth = 1.5
-    g.strokeStyle = '#8effcd'
-    g.stroke()
-    g.beginPath()
-    g.arc(0, -r * 0.25, r * 0.22, 0, Math.PI * 2)
-    g.fillStyle = 'rgba(235,255,245,0.9)'
-    g.fill()
-    g.restore()
+    dessineEclat(g, p.sx, p.sy, r, nowPastilles * 1.4 + i * 0.9)
   }
 
   // LES CACHETTES, EN DERNIER : le brouillard « non cartographié » couvre
@@ -6526,7 +6641,9 @@ function litTouches(): void {
       const t = nomTouche(toucheDe(m.id))
       const b = nomBouton(boutonDe(m.id))
       const chg = commandeRedefinie(m.id) ? ' tch-change' : ''
-      const fixe = m.fixe ? ' disabled title="commande fixe : elle ouvre et ferme les écrans"' : ''
+      const fixe = m.fixe
+        ? ' disabled title="commande fixe : elle ouvre et ferme les écrans"'
+        : ''
       html +=
         `<div class="tch-ligne"><div class="tch-nom">${m.nom}<small>${m.aide}</small></div>` +
         `<button type="button" class="tch-case${chg}" data-tch="${m.id}" data-quoi="clavier"${fixe}>${t}</button>` +
@@ -6543,9 +6660,7 @@ function litTouches(): void {
         id: b.dataset.tch ?? '',
         quoi: (b.dataset.quoi as 'clavier' | 'manette') ?? 'clavier',
       }
-      for (const x of Array.from(
-        touchesListe.querySelectorAll('.tch-case'),
-      ))
+      for (const x of Array.from(touchesListe.querySelectorAll('.tch-case')))
         x.classList.remove('tch-ecoute')
       b.classList.add('tch-ecoute')
       b.textContent = ecouteCase.quoi === 'clavier' ? 'appuyez…' : 'un bouton…'
@@ -6619,7 +6734,6 @@ window.addEventListener(
   },
   true,
 )
-
 ;(
   window as unknown as {
     __commandes: {
@@ -6871,8 +6985,16 @@ const AT_FILTRES: { cle: string; mot: string; teinte?: string }[] = [
   { cle: 'poche', mot: 'En poche', teinte: '#6dffb8' },
   { cle: 'corps', mot: FAMILLE_NOMS.corps, teinte: FAMILLE_TEINTE.corps },
   { cle: 'etats', mot: FAMILLE_NOMS.etats, teinte: FAMILLE_TEINTE.etats },
-  { cle: 'collecte', mot: FAMILLE_NOMS.collecte, teinte: FAMILLE_TEINTE.collecte },
-  { cle: 'protocole', mot: FAMILLE_NOMS.protocole, teinte: FAMILLE_TEINTE.protocole },
+  {
+    cle: 'collecte',
+    mot: FAMILLE_NOMS.collecte,
+    teinte: FAMILLE_TEINTE.collecte,
+  },
+  {
+    cle: 'protocole',
+    mot: FAMILLE_NOMS.protocole,
+    teinte: FAMILLE_TEINTE.protocole,
+  },
 ]
 
 function renderRecFiltres(): void {
@@ -6973,7 +7095,9 @@ function recApercu(): void {
       verdict.textContent =
         `Calibre ${CALIBRE_MOT[cal].toUpperCase()}` +
         (aContrepartie(d) ? ' · à contrepartie' : '') +
-        ` · ${famillesInstrument(d).map((f) => FAMILLE_NOMS[f]).join(' + ')}`
+        ` · ${famillesInstrument(d)
+          .map((f) => FAMILLE_NOMS[f])
+          .join(' + ')}`
     }
   }
 }
@@ -7005,7 +7129,10 @@ function renderRecEffets(): void {
       const l = levierDef(sel.value)
       // à changement de levier, on propose une valeur qui FAIT quelque
       // chose, et qui tombe sur le pas du levier
-      recEffetsForme[i] = { levier: sel.value, valeur: l ? valeurProposee(l) : 1 }
+      recEffetsForme[i] = {
+        levier: sel.value,
+        valeur: l ? valeurProposee(l) : 1,
+      }
       renderRecEffets()
       recApercu()
     })
@@ -7054,8 +7181,10 @@ function renderRecEffets(): void {
         Math.min(100, ((n - def.min) / (def.max - def.min)) * 100),
       )
       // `bon: +1` : le gain est à DROITE du repère ; `bon: -1` : à gauche
-      const gauche = def.bon > 0 ? 'rgba(242,201,142,.22)' : 'rgba(109,255,184,.22)'
-      const droite = def.bon > 0 ? 'rgba(109,255,184,.22)' : 'rgba(242,201,142,.22)'
+      const gauche =
+        def.bon > 0 ? 'rgba(242,201,142,.22)' : 'rgba(109,255,184,.22)'
+      const droite =
+        def.bon > 0 ? 'rgba(109,255,184,.22)' : 'rgba(242,201,142,.22)'
       piste.style.setProperty('--gsplit', `${part.toFixed(1)}%`)
       piste.style.setProperty('--g1', gauche)
       piste.style.setProperty('--g2', droite)
@@ -7206,7 +7335,10 @@ document.getElementById('rec-liste')?.addEventListener('click', (ev) => {
     if (!d) return
     const gainVies = valeurLevier(d.effets, 'vies')
     if (gainVies > 0) run.vies = Math.min(VIES_MAX, run.vies + gainVies)
-    if (d.effets.some((e) => e.levier !== 'vies') && !run.instruments.includes(d.id))
+    if (
+      d.effets.some((e) => e.levier !== 'vies') &&
+      !run.instruments.includes(d.id)
+    )
       run.instruments.push(d.id)
     majInstrumentsUI()
     majBoutonsRun()
@@ -7214,7 +7346,10 @@ document.getElementById('rec-liste')?.addEventListener('click', (ev) => {
     // que la carte agisse tout de suite, sans attendre la salle suivante
     if (hasPlayed) restart()
     renderRecListe()
-    recDit([`« ${d.nom} » embarquée — le tableau est rechargé pour qu’elle agisse.`], true)
+    recDit(
+      [`« ${d.nom} » embarquée — le tableau est rechargé pour qu’elle agisse.`],
+      true,
+    )
   } else if (edit) {
     const d = carteDef(edit)
     if (d) recReprend(d)
@@ -7369,11 +7504,35 @@ function lanceManoeuvre(quoi: string): void {
         // essai d'affichage, pas un gain.
         pupitreEl.hidden = true
         toastFile.push(
-          { nom: 'Essai d’affichage — rien n’est gravé', icone: '🏆', genre: 'trophee' },
-          { nom: 'Essai d’affichage — rien n’est gravé', icone: '📄', sur: 'CODEX — NOUVELLE FICHE', genre: 'codex' },
-          { nom: '+3 mémoire — essai d’affichage', icone: '✦', sur: 'ÉCLAT DE MÉMOIRE', genre: 'eclat' },
-          { nom: 'Essai d’affichage — rien n’est gravé', icone: '🧪', sur: 'FIOLE TROUVÉE', genre: 'fiole' },
-          { nom: 'Essai d’affichage — rien n’est débité', icone: '🛒', sur: 'L’ÉCONOMAT', genre: 'achat' },
+          {
+            nom: 'Essai d’affichage — rien n’est gravé',
+            icone: '🏆',
+            genre: 'trophee',
+          },
+          {
+            nom: 'Essai d’affichage — rien n’est gravé',
+            icone: '📄',
+            sur: 'CODEX — NOUVELLE FICHE',
+            genre: 'codex',
+          },
+          {
+            nom: '+3 mémoire — essai d’affichage',
+            icone: '✦',
+            sur: 'ÉCLAT DE MÉMOIRE',
+            genre: 'eclat',
+          },
+          {
+            nom: 'Essai d’affichage — rien n’est gravé',
+            icone: '🧪',
+            sur: 'FIOLE TROUVÉE',
+            genre: 'fiole',
+          },
+          {
+            nom: 'Essai d’affichage — rien n’est débité',
+            icone: '🛒',
+            sur: 'L’ÉCONOMAT',
+            genre: 'achat',
+          },
         )
         pupDit('Cinq popups à la file — aucun registre touché.')
         break
@@ -7767,7 +7926,11 @@ function avanceSalle(): void {
   // à la cérémonie (salleChoisie) attend sagement la sortie de l'annexe.
   if (economatIntercalaire && estEconomat(level)) {
     economatIntercalaire = null
-  } else if (!auHub && !testLevel && (economatForce || !economatVisiteCetteRun)) {
+  } else if (
+    !auHub &&
+    !testLevel &&
+    (economatForce || !economatVisiteCetteRun)
+  ) {
     const total = modeVoie ? voiePlan.longueur : playedLevels().length
     const rang = modeVoie ? voieRang : levelIndex + 1
     if (economatForce || (total >= 4 && rang >= Math.floor(total / 2))) {
@@ -9442,7 +9605,13 @@ function majDossier(): void {
   const coque = Math.round(21 - 81 * chillNow())
   const critique = litres < params.criticalVolumeLiters * 1.7
   const motCoque =
-    coque <= -40 ? 'glaciale' : coque <= -10 ? 'froide' : coque <= 5 ? 'fraîche' : 'tiède'
+    coque <= -40
+      ? 'glaciale'
+      : coque <= -10
+        ? 'froide'
+        : coque <= 5
+          ? 'fraîche'
+          : 'tiède'
   const corps =
     '<section class="do-sec do-corps"><h4><u>💧</u>TON CORPS</h4>' +
     doBarre('💧', 'VOLUME', fmtL(litres), frac, {
@@ -9504,8 +9673,7 @@ function majDossier(): void {
     // dur, c'était mentir dès que le joueur change une touche
     const k = toucheDe(e)
     const b = boutonDe(e)
-    const geste =
-      k !== null ? nomTouche(k) : b !== null ? nomBouton(b) : '—'
+    const geste = k !== null ? nomTouche(k) : b !== null ? nomBouton(b) : '—'
     cycle +=
       `<div class="do-etat${tenue ? '' : ' verrou'}"><i>${ICO[e]}</i>` +
       `<em>${t ? t.nom : NOMS[e]}</em>` +
@@ -9671,8 +9839,7 @@ function avanceEveil(): void {
     // L'ALERTE : au moment où le sujet SAIT se mouvoir, la station bascule
     // en rouge, la cuve tremble — et la brèche (porte d'index 0 : celle de
     // la cuve) cède. On naît enfermé, on sort par l'accident.
-    if (auHub && (level.portes?.length ?? 0) > 0)
-      demarreSequence('ALERTE')
+    if (auHub && (level.portes?.length ?? 0) > 0) demarreSequence('ALERTE')
   }
 }
 for (const carte of [eveil1El, eveil2El]) {
@@ -10328,8 +10495,9 @@ function frame(now: number): void {
     // le ralenti d'annonce de l'éveil multiplie le temps comme le slow-mo
     // de visée : physique, chrono, refroidissement — tout décélère ensemble
     const warpNow =
-      (dashAiming ? params.timeWarp * params.gasAimSlow * lev('visee') : params.timeWarp) *
-      eveil.ralenti
+      (dashAiming
+        ? params.timeWarp * params.gasAimSlow * lev('visee')
+        : params.timeWarp) * eveil.ralenti
     const boost = Math.max(1, warpNow)
     // Troisième borne (retour joueur : « en accélérant, chutes drastiques ») :
     // la physique ne dépasse JAMAIS ~70 % de la période du verrou, même
@@ -10547,11 +10715,7 @@ function frame(now: number): void {
       const r = REPARATIONS[i]
       const plot = zonesHub.stations[r.id]
       if (!plot) continue
-      const dedans = pointInBox(
-        sim.stats.centroidX,
-        sim.stats.centroidY,
-        plot,
-      )
+      const dedans = pointInBox(sim.stats.centroidX, sim.stats.centroidY, plot)
       if (dedans && !plotsReparDedans[i]) tenteReparation(r.id)
       plotsReparDedans[i] = dedans
     }
@@ -11123,7 +11287,7 @@ function frame(now: number): void {
     waves.length,
     Math.max(params.renderDownsample, quality.down),
     chillNow(),
-    level.decals ?? [],
+    decorAffiche(),
     level.zones ?? [],
     decorRiche ? 1 : 0,
     eauRiche ? 1 : 0,

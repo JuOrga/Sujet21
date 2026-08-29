@@ -2421,6 +2421,12 @@ export class Renderer {
   private texDecalEcranOn: WebGLTexture | null = null
   private texDecalFiolePleine: WebGLTexture | null = null
   private texDecalFioleVide: WebGLTexture | null = null
+  // LE MÉTA : alcôve d'achat, pupitre du banc, masse du Sujet 12. Tant que le
+  // fichier n'est pas déposé, la texture reste nulle et le décalque se saute —
+  // le tracé vectoriel du fx-canvas tient seul la place.
+  private texMetaAlcove: WebGLTexture | null = null
+  private texMetaBanc: WebGLTexture | null = null
+  private texMetaMarchand: WebGLTexture | null = null
   // Tableau de textures des zones (calques : 0 buses/eau, 1 hublot/glace,
   // 2 conduite/vapeur) : une seule unité de texture pour les trois images.
   private texZones: WebGLTexture | null = null
@@ -2713,6 +2719,28 @@ export class Renderer {
       false,
       true,
       (t) => (this.texDecalEcranOn = t),
+    )
+    // LE MÉTA (commerce, banc, marchand) : les décalques sont SYNTHÉTISÉS
+    // depuis les données du tableau — un plot EST son alcôve. Tant qu'un
+    // fichier n'est pas déposé, la texture reste nulle, le décalque se saute,
+    // et le tracé vectoriel du fx-canvas tient seul la place.
+    this.loadTexture(
+      '/assets/meta-alcove.webp',
+      false,
+      true,
+      (t) => (this.texMetaAlcove = t),
+    )
+    this.loadTexture(
+      '/assets/meta-banc.webp',
+      false,
+      true,
+      (t) => (this.texMetaBanc = t),
+    )
+    this.loadTexture(
+      '/assets/meta-marchand.webp',
+      false,
+      true,
+      (t) => (this.texMetaMarchand = t),
     )
     // LA SERRE : cultures hydroponiques, décor du niveau serre
     this.loadTexture(
@@ -3625,6 +3653,39 @@ export class Renderer {
   // Décalques : un quad par pièce, dessinés en transparence. Le décor n'a pas
   // de physique — il ne coûte qu'un appel de dessin par pièce, et un tableau
   // n'en porte qu'une poignée.
+  /** La texture d'une sorte de décalque. Une table plutôt qu'une cascade de
+   *  ternaires : à onze sortes, la cascade ne se relisait plus — et le switch
+   *  exhaustif fait dire au compilateur ce qu'on a oublié en ajoutant une
+   *  sorte. Null : image pas encore là, l'appelant saute la pièce. */
+  private textureDecal(kind: DecalDef['kind']): WebGLTexture | null {
+    switch (kind) {
+      case 'vanne':
+        return this.texDecalVanne
+      case 'ecran-off':
+        return this.texDecalEcranOff
+      case 'ecran-on':
+        return this.texDecalEcranOn
+      case 'fiole-pleine':
+        return this.texDecalFiolePleine
+      case 'fiole-vide':
+        return this.texDecalFioleVide
+      case 'serre-ble-nain':
+        return this.texSerreBle
+      case 'serre-rampe':
+        return this.texSerreRampe
+      case 'serre-rampe-a':
+        return this.texSerreRampeA
+      case 'meta-alcove':
+        return this.texMetaAlcove
+      case 'meta-banc':
+        return this.texMetaBanc
+      case 'meta-marchand':
+        return this.texMetaMarchand
+      case 'tuyaux':
+        return this.texDecalTuyaux
+    }
+  }
+
   private drawDecals(
     decals: DecalDef[],
     camera: Camera,
@@ -3637,24 +3698,8 @@ export class Renderer {
     const du = this.uniforms['decal']
     let started = false
     for (const d of decals) {
-      const tex =
-        d.kind === 'serre-ble-nain'
-          ? this.texSerreBle
-          : d.kind === 'serre-rampe'
-            ? this.texSerreRampe
-            : d.kind === 'serre-rampe-a'
-              ? this.texSerreRampeA
-              : d.kind === 'vanne'
-          ? this.texDecalVanne
-          : d.kind === 'ecran-off'
-            ? this.texDecalEcranOff
-            : d.kind === 'ecran-on'
-              ? this.texDecalEcranOn
-              : d.kind === 'fiole-pleine'
-                ? this.texDecalFiolePleine
-                : d.kind === 'fiole-vide'
-                  ? this.texDecalFioleVide
-                  : this.texDecalTuyaux
+      const tex = this.textureDecal(d.kind)
+      // texture pas encore chargée (ou fichier absent) : la pièce se saute
       if (!tex) continue
       if (!started) {
         started = true

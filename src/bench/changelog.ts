@@ -22,6 +22,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '29/08/2026 11:13',
+    title:
+      'Les ASSETS DU MÉTA : la place est faite, et rien ne casse tant qu’elle est vide',
+    notes: [
+      'Le méta manquait d’images — voici le système qui les accueille, et la règle qui le gouverne : ce qui est fait de MATIÈRE descend sous le fluide, ce qui INFORME le joueur reste au-dessus. L’alcôve d’un plot, le pupitre du banc et la masse du Sujet 12 sont donc des DÉCALQUES (refroidis, fondus dans la cuve, effacés par l’eau qui passe devant) ; l’éclat de mémoire et les icônes d’articles sont du 2D par-dessus le fluide — un éclat noyé qu’on ne verrait plus serait une information perdue.',
+      'Les décalques du méta ne se posent pas à la main : ils sont SYNTHÉTISÉS depuis les données du tableau (un plot EST son alcôve, un banc EST son pupitre), donc une salle bâtie dans l’éditeur s’habille toute seule, et le format ne peut pas porter de pièce fantôme. Côté 2D, le jeu gagne son premier chargeur d’images pour la toile des mécanismes, avec la règle qui compte : tant que le fichier n’est pas déposé, le tracé vectoriel d’aujourd’hui tient la place — on peut livrer les images UNE PAR UNE sans jamais rien casser. Et les EMOJI des articles (🧪 🗝️ 💠…) pourront enfin disparaître : une planche d’icônes 4×2 les remplace, la même sur Windows, sur Mac et sur Steam Deck, qui aujourd’hui n’en dessinent pas deux pareils.',
+      'La fiche de fabrication va avec : docs/assets-ia.md § 15 donne les cinq prompts prêts à copier-coller (le Sujet 12 — une masse de fluide captive, pas un marchand humanoïde —, le pupitre, l’alcôve, l’éclat, la planche d’icônes), les tailles, les négatifs, et les pièges (les décalques s’étirent sur le rectangle tracé ; la grille d’icônes est le prompt le plus dur, on peut livrer les huit icônes séparément et je les assemble). La bibliothèque d’images range tout cela sous une rubrique neuve, « Méta & commerce » : déposer un fichier suffit à l’y voir.',
+      'Vérifié dans le jeu construit, LES DEUX chemins, sur une salle portant tout le méta : sans aucun fichier, le dessin d’avant est intact au pixel près ; avec des images témoins, les trois décalques entrent dans le décor envoyé au rendu (mesuré : trois alcôves sur leurs plots, le pupitre sur son banc, la masse sur son point), chaque plot tire SA case de la planche (la case du condensat relevée à la couleur exacte, 140-215-255) et l’éclat prend sa vignette. Deux sondes d’atelier au passage : `__sprites()` dit quelles images sont arrivées, `__decor()` dit ce qui part au rendu. 508 tests verts, dont onze neufs sur les décalques synthétisés, la planche et les bandes de rotation.',
+    ],
+  },
+  {
     date: '29/08/2026 11:02',
     title: 'L’arc des découvertes : le récit se livre un jalon par retour',
     notes: [
@@ -39,7 +50,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '29/08/2026 10:02',
-    title: 'Les réparations se paient au contact — et le module se rallume à chaud',
+    title:
+      'Les réparations se paient au contact — et le module se rallume à chaud',
     notes: [
       'Le geste est celui du comptoir : le corps se POSE sur une station en panne, la mémoire se débite (refus net et sans double toast si le solde manque), et le module se rallume SOUS VOS YEUX — la plaque de panne cède la place à la signalétique d’état, les écrans se rallument, la pénombre se dissipe, la barrière d’énergie de l’aile tombe. Aucun restart, aucun respawn : le hub se répare pendant qu’on y nage. Une station réparée se tait pour toujours.',
       'Et la première récompense fonctionnelle est branchée : LA TABLE DE DÉPART réparée, la longer affiche ce que vous emporterez à la prochaine descente — vies (fiole de second souffle et échantillons de secours comptés), réserve de bonbonne, fioles équipées, clef de cachette, condensat d’avance. Vérifié dans le vrai jeu : 42 mémoire → réseau d’éclairage (10) puis bac d’essai (30) payés, refus à 2 < 15, re-paiement impossible. 495 tests verts.',
@@ -47,7 +59,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '29/08/2026 09:42',
-    title: 'L’accident se voit : le hub en panne, réparable station par station',
+    title:
+      'L’accident se voit : le hub en panne, réparable station par station',
     notes: [
       'Le lore prend ses murs : la livraison du télescope orbital a laissé le module Méduse ACCIDENTÉ. Le hub joué est désormais le hub cible DÉGRADÉ pour chaque réparation non payée — plaques ambrées « EN PANNE — RÉPARER · N MÉMOIRE » sur chaque station, pénombre et brume tant que le RÉSEAU D’ÉCLAIRAGE n’est pas remis, écrans éteints (table de départ, mur des records), et BARRIÈRES D’ÉNERGIE rouges qui condamnent le bac d’essai, l’aile des endormis et la passerelle du secteur 4. Le SCEAU du secteur scellé, lui, tient même passerelle réparée : seule la fin de l’arc du récit le lèvera.',
       'Sept réparations, prix croissants (10 → 60, 225 mémoire en tout) : réseau d’éclairage, table de départ, mur des records, bac d’essai, distillateur de primes, aile des endormis, passerelle du secteur 4. La mécanique est PURE et prudente : appliqueReparations dégrade un CLONE du hub cible (jamais la base — elle peut venir de la bibliothèque partagée), les bornes ne bougent pas, la physique des murs non plus (les condamnations passent par les portes scénarisées du moteur : posées au solveur, dessinées en barreaux d’énergie, levées À CHAUD sans respawn). Un vieil instantané sans zones méta traverse tel quel. Le PAIEMENT au contact arrive à la prochaine livraison — pour l’heure, le module porte ses pannes. Vérifié en vue large dans le vrai jeu : plaques, pénombre et barrières se lisent d’un coup d’œil. 487 tests verts.',
@@ -55,7 +68,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '29/08/2026 02:32',
-    title: 'La récompense se met à briller : la carte devient une pièce, le tirage un petit spectacle',
+    title:
+      'La récompense se met à briller : la carte devient une pièce, le tirage un petit spectacle',
     notes: [
       'Demandé : « l’écran Récompenses ne fait vraiment pas jeu vidéo, et les popups qui les affichent en jeu doivent être très gamefiés ». Les deux tenaient à la même absence — la carte de récompense n’était nulle part un OBJET, seulement une liste de champs redessinée trois fois. Il n’y a donc plus qu’UNE carte, `carteHTML`, et elle sert partout : la vitrine de l’atelier, l’aperçu de la forge, et le tirage de fin de salle. Ce que le concepteur fabrique a exactement la tête de ce que le joueur tire.',
       'LE RANG D’UNE CARTE SE DÉDUIT, il ne se saisit pas. La puissance se lit dans l’écart de chaque levier à sa valeur neutre : commun, notable, majeur — deux cartes du catalogue sont majeures, cinq notables. Le halo et le liseré le disent sans un mot, et une carte fabriquée à l’atelier (ou reprise d’un export) se range toute seule, sans un champ de plus à remplir.',
@@ -69,7 +83,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '29/08/2026 01:38',
-    title: 'Le rail de descente revient sur le flanc droit, et le dossier s’adresse enfin au joueur',
+    title:
+      'Le rail de descente revient sur le flanc droit, et le dossier s’adresse enfin au joueur',
     notes: [
       'Signalé : la jolie barre verticale de droite, celle qui disait où l’on en était sur le total, a disparu. Elle n’a pas été cassée — elle était ENFERMÉE. Depuis le premier jour, le rail ne se montrait qu’en mode VOIE : dans la descente ordinaire, plus rien sur le flanc droit ne répondait à « où j’en suis », qui est pourtant la question la plus élémentaire d’un jeu de salles. Il accompagne désormais TOUTE descente, la séquence écrite comme la voie. En voie, les tiers viennent du plan ; en descente ordinaire, c’est le CODE de chaque salle qui dit son moment — la couture tombe donc au bon endroit, sans qu’on l’invente. L’étoile ✦ de profondeur record reste réservée à la voie : c’est là qu’elle veut dire quelque chose.',
       'ET LE PANNEAU DE DROITE CHANGE DE DESTINATAIRE. Il était écrit pour l’atelier : des colonnes de mesures, « PARTICULES 431 / 512 », « RANG 4 / 24 », un relevé d’instrument. Il est maintenant écrit pour celui qui descend, et répond à trois questions dans cet ordre — QU’EST-CE QUE JE DOIS FAIRE ICI, QU’EST-CE QU’IL ME RESTE, QU’EST-CE QUE J’EMPORTE.',
@@ -89,7 +104,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '29/08/2026 01:08',
-    title: 'Le grand chantier s’ouvre : socle du hub accidenté et de l’arc du récit',
+    title:
+      'Le grand chantier s’ouvre : socle du hub accidenté et de l’arc du récit',
     notes: [
       'Décidé avec le concepteur : le module Méduse a subi un ACCIDENT à la livraison du télescope orbital — le hub se réparera station par station, payé en MÉMOIRE ; et chaque retour de run livrera une DÉCOUVERTE du récit (le Volume est un miroir devenu vivant), jusqu’à l’ouverture de la fin. Cette livraison pose le socle invisible : les registres savent désormais tenir les RÉPARATIONS payées (paiement et gravure atomiques, refus net si le solde manque ou si la station est déjà en état) et les DÉCOUVERTES servies (jamais deux fois, l’ordre fait foi) ; les verrous narratifs du cycle gagnent une pose et une levée idempotentes, prêtes pour l’acte 0.',
       'Deux redressements au passage : une dispersion AU HUB ne compte plus un essai ni n’écrit d’historique — au module d’accueil, la dispersion recompose simplement l’échantillon, les registres n’ont rien à en dire ; et le réarmement des plots du comptoir suit maintenant la géométrie du hub joué au lieu d’un compte figé à quatre — préalable aux stations de réparation qui allongeront la liste. Les vieux registres migrent d’eux-mêmes (champs absents → vides). 478 tests verts.',
@@ -97,7 +113,8 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '29/08/2026 00:48',
-    title: 'Les textes deviennent lisibles : les polices embarquent enfin, et tout peut grossir',
+    title:
+      'Les textes deviennent lisibles : les polices embarquent enfin, et tout peut grossir',
     notes: [
       'Signalé : les textes normaux sont trop petits — panneau de droite de l’éditeur, cérémonie de fin de salle, table de montage — et « on dirait que les petits textes ne sont pas en HD ». Les deux intuitions étaient justes, et la seconde cachait la vraie cause : LES POLICES N’ÉTAIENT PAS LÀ. La feuille de style réclamait Michroma et IBM Plex Mono depuis le premier jour sans jamais les fournir — aucun @font-face, aucun fichier. Sur une machine qui ne les a pas installées (c’est-à-dire à peu près toutes, Steam Deck compris), le navigateur retombait sur Arial Black et le monospace du système : des lettres mal dessinées, mal espacées, et un GRAS fabriqué à la volée en épaississant les traits — d’où l’empâtement des petits corps.',
       'Elles voyagent désormais avec le jeu : six fichiers WOFF2, 90 ko en tout, sous licence SIL Open Font (la notice est rangée à côté). Aucun appel réseau, rien à installer, le même dessin partout — et un vrai gras 600, plus aucune lettre épaissie de force. Les sous-ensembles latin et latin-étendu sont séparés : le second ne se charge que si un caractère l’exige.',
@@ -109,13 +126,14 @@ export const DELIVERIES: Delivery[] = [
   },
   {
     date: '28/08/2026 23:57',
-    title: 'HUIT CARTES DE PLUS, dont les premières À CONTREPARTIE — et la glace reste intouchable',
+    title:
+      'HUIT CARTES DE PLUS, dont les premières À CONTREPARTIE — et la glace reste intouchable',
     notes: [
       'Cinq leviers neufs ouvrent des terrains que le catalogue ne touchait pas : vitesse de bascule d’état, évaporation du nuage au repos, perte dans les mailles d’un évent, prise du sas sur la glace, glisse du palet sur l’hydrophile. Cinq cartes s’en servent — BASCULE RAPIDE ⏱️ (se figer ou se vaporiser prend 40 % de temps en moins), CHAMBRE ÉTANCHE 🧯 (le nuage s’évapore beaucoup moins vite), TAMIS FIN 🕸️ (traverser une maille ne coûte presque plus de vapeur), CROC DU SAS 🪝 (le sas happe la glace : un palet ne file plus devant la bouche), SEMELLES POLIES 🛷 (l’hydrophile ne retient presque plus le palet).',
       'ET LES CONTREPARTIES, enfin. Une carte peut désormais tirer un levier du MAUVAIS côté : c’est là que le tirage devient un choix, et plus une file d’attente. SUR-RÉGIME 🔥 : deux dashs de plus par tableau, mais la bonbonne emporte deux litres de moins. RATION DE SURVIE 🥫 : un échantillon de secours de plus, et le Semblable prélève sa dîme — un cinquième du condensat. ŒILLÈRES 👁️ : la visée du dash ralentit deux fois plus le temps, mais le sas aspire 30 % moins loin. Deux planchers gardent le jeu jouable : jamais moins d’un dash, jamais moins de deux litres de réserve.',
       'Pour que ça tienne, les plages des leviers traversent maintenant leur valeur neutre, et CHAQUE PHRASE se dit des deux côtés — « le sas aspire 40 % plus loin » ou « 30 % moins loin », selon le réglage. L’atelier peut donc fabriquer des cartes à contrepartie sans écrire une ligne, et la carte se raconte juste, quel que soit le sens. Les puces de l’écran affichent le signe (« −2 »), jamais un « +-2 ».',
       'LA RÈGLE RAPPELÉE, ET GRAVÉE : la glace ne perd JAMAIS de volume au contact. Le moteur la tenait déjà (l’éponge saute les particules gelées, toutes les pertes déclarées sont vapeur ou liquide) ; trois tests la verrouillent désormais — un palet lancé dans une éponge en ressort entier, le même corps liquide s’y fait boire, et aucune carte du catalogue ne prétend le contraire. Une formulation ambiguë a d’ailleurs été corrigée au passage (« rebondit sans rien perdre » → « sans s’amortir »).',
-      'Vérifié dans le jeu construit : les cinq facteurs neufs lus sur la simulation (bascule 0,6 · évaporation 0,55 · mailles 0,4 · prise du sas 2 · glisse 0,4), la réserve de dashs à 5 et la bonbonne à 6 L avec Sur-régime, le sas à 0,7 avec Œillères, et les 23 cartes au catalogue de l’écran. Sonde ajoutée : __levier(\'bonbonne\') dit depuis la console ce que les cartes embarquées pèsent sur un réglage. 474 tests verts, build propre.',
+      "Vérifié dans le jeu construit : les cinq facteurs neufs lus sur la simulation (bascule 0,6 · évaporation 0,55 · mailles 0,4 · prise du sas 2 · glisse 0,4), la réserve de dashs à 5 et la bonbonne à 6 L avec Sur-régime, le sas à 0,7 avec Œillères, et les 23 cartes au catalogue de l’écran. Sonde ajoutée : __levier('bonbonne') dit depuis la console ce que les cartes embarquées pèsent sur un réglage. 474 tests verts, build propre.",
     ],
   },
   {

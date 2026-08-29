@@ -361,6 +361,147 @@ un rendu sur fond NOIR, prenez le noir : le détourage y est plus franc.
 
 ---
 
+---
+
+## 15. LE MÉTA — commerce, banc, marchand, éclats
+
+Pour tout ce que le méta pose dans les salles : les alcôves d'achat, le pupitre
+du banc des mémoires, le Sujet 12 derrière ses barreaux, l'éclat de mémoire, et
+la planche d'icônes qui remplacera les emoji.
+
+**Règles communes** (elles sont dans les textes, ne les retirez pas) : vue de
+FACE strictement orthographique (le jeu n'a pas de perspective), pièce DÉTOURÉE
+sur fond transparent, aucune ombre portée au sol (le moteur pose les siennes),
+lumière froide venue du haut, palette de la station.
+
+**À savoir sur l'intégration** — le moteur *refroidit* et *atténue* les
+décalques (ils se fondent dans la cuve, et l'eau passe devant) : générez les
+pièces un peu plus contrastées et un peu plus claires que le rendu voulu, elles
+seront calmées à l'affichage. Les pièces marquées « 2D » ne subissent pas ce
+traitement : elles se dessinent PAR-DESSUS le fluide, telles quelles.
+
+**Les décalques s'ÉTIRENT sur le rectangle tracé dans l'éditeur** (l'alcôve sur
+le plot, le pupitre sur le banc) : respectez les proportions données — carré
+pour l'alcôve, deux fois plus large que haut pour le banc — sinon la pièce se
+déforme quand le rectangle n'a pas la même forme. Le marchand, lui, est un
+POINT : sa pièce se pose carrée, à taille fixe.
+
+**Vérifier qu'un fichier est bien arrivé** : dans la console du jeu,
+`__sprites()` liste les images 2D chargées, et `__decor()` le décor envoyé au
+rendu, décalques du méta compris.
+
+Déposez les fichiers dans `public/assets/` sous ces noms exacts — ils
+apparaîtront aussitôt dans la bibliothèque d'images, rubrique « Méta &
+commerce ». **Tant qu'un fichier manque, le dessin actuel (vectoriel) tient la
+place** : rien ne casse, vous pouvez les livrer un par un.
+
+### 15a. LE SUJET 12 — le marchand — `meta-marchand.webp`
+**1024×1024 · PNG/WebP transparent · décalque**
+
+Un SEMBLABLE : la même matière que le joueur, mais captive et lasse. Pas un
+marchand humanoïde — une masse de fluide dans sa capsule, qui pousse des choses
+à travers les barreaux.
+
+```
+Flat orthographic 2D game sprite of a captive liquid creature held in a containment
+capsule, front view: a heavy viscous mass of pale blue-green fluid (#7fc9c2) sagging
+under its own weight inside a dull metal capsule with reinforced rings top and bottom,
+faint internal sediment and small clinging bubbles, one single dim luminous core deep
+inside the mass (#a9ffd6) reading as quiet attention, slack tired silhouette, thin cold
+rim light from above, retro-futuristic 1970s orbital laboratory, muted cold palette,
+low brightness, evenly lit, isolated on transparent background, flat 2D game asset,
+no perspective, no text
+```
+Négatif : `face, eyes, mouth, humanoid, character design, mascot, cute, anthropomorphic, arms, bright colors, warm colors, neon, perspective, ground shadow, background, text, watermark`
+
+### 15b. LE BANC DES MÉMOIRES — `meta-banc.webp`
+**1024×512 · PNG/WebP transparent · décalque**
+
+Le pupitre qu'on touche pour ouvrir le cycle des états. Du mobilier de
+laboratoire, pas une borne d'arcade.
+
+```
+Flat orthographic front view of a low laboratory console lectern, wide and shallow,
+dark steel-blue metal body with visible seams and rivets, a slanted dark glass reading
+panel inset in the top surface, a row of small unlit indicator studs along the front
+edge, faint mint-green glow (#6dffb8) leaking from under the panel and from a thin
+engraved line across the body, worn edges, retro-futuristic 1970s orbital laboratory,
+muted cold palette, evenly lit, isolated on transparent background, flat 2D game asset,
+no perspective, no text
+```
+Négatif : `screen content, user interface, letters, numbers, symbols, keyboard, chair, floor, perspective, ground shadow, background, bright glow, neon, text, watermark`
+
+### 15c. L'ALCÔVE D'ÉTAL — `meta-alcove.webp`
+**512×512 · PNG/WebP transparent · décalque**
+
+La niche où le corps se glisse pour acheter. Une seule pièce, répétée à chaque
+plot posé — donc NEUTRE : ni article dedans, ni prix (le jeu les dessine).
+
+```
+Flat orthographic front view of an empty recessed wall alcove for a shop stall, square
+three-sided metal niche, dark steel-blue panels with visible seams, a plain shelf ledge
+across the lower third, a small empty label holder plate under the shelf, dim cold light
+washing the inner back wall, worn metal edges, retro-futuristic 1970s orbital laboratory,
+muted cold palette, low brightness, isolated on transparent background, flat 2D game
+asset, no perspective, no text
+```
+Négatif : `products, goods, items, bottles, price tag, letters, numbers, shopkeeper, perspective, ground shadow, background, warm light, text, watermark`
+
+### 15d. L'ÉCLAT DE MÉMOIRE — `meta-eclat.webp`
+**256×256 · PNG/WebP transparent · 2D (dessiné par-dessus le fluide)**
+
+L'information cristallisée, ramassée au contact. Petite, franche, lisible même
+noyée dans l'eau.
+
+```
+Flat orthographic 2D game sprite of a small floating memory crystal shard, sharp
+elongated diamond shape seen face on, translucent mint green (#8effcd) with pale white
+inner facets, a bright concentrated highlight near the upper facet, clean crisp edges,
+faint cold glow around the silhouette, retro-futuristic sci-fi game icon, isolated on
+transparent background, flat 2D game asset, no perspective, no text
+```
+Négatif : `hand, holder, base, pedestal, background, ground shadow, warm colors, rainbow, lens flare, text, watermark`
+
+*Option luxe* — si vous voulez une vraie rotation plutôt qu'un pivot à plat :
+une bande `2048×256` de **8 vues** du même cristal tournant sur son axe
+vertical, régulièrement espacées, même cadrage et même échelle d'une case à
+l'autre. Nommez-la pareil : le moteur détecte la bande à ses proportions.
+
+### 15e. LA PLANCHE D'ICÔNES DU MÉTA — `meta-icones.webp`
+**1024×512 · PNG/WebP transparent · grille 4×2 de cases 256 · 2D**
+
+Les articles du commerce et les monnaies. Aujourd'hui ce sont des EMOJI, qui
+changent de dessin d'une machine à l'autre (Windows, Steam Deck, Mac) et
+cassent l'unité graphique ; cette planche les remplace partout.
+
+L'ordre des cases est IMPOSÉ — de gauche à droite, ligne du haut puis ligne du
+bas :
+
+| | 1 | 2 | 3 | 4 |
+|---|---|---|---|---|
+| **haut** | fiole de gouttes | recharge de dashs | clef de cachette | échantillon de secours |
+| **bas** | sac surprise | éclat de mémoire | goutte de condensat | vie (échantillon de secours du corps) |
+
+```
+Sheet of 8 video game inventory icons arranged in a strict 4 by 2 grid on a fully
+transparent background, each icon centred in its own equal square cell with generous
+even margins, identical style and identical visual weight across all eight: a small
+sealed vial of pale blue liquid, a stylised burst of three cold vapour jets, an angular
+maintenance key, a rounded containment sample cell, a plain closed cloth pouch, a
+faceted mint green crystal shard, a single fat cyan water droplet, a soft rounded
+blue-white droplet with a pale core. Flat orthographic 2D icons, thin crisp outlines,
+cold muted retro-futuristic space station palette, low saturation, subtle inner shading,
+no cell borders, no grid lines, no labels, no text, no drop shadows
+```
+Négatif : `text, letters, numbers, labels, captions, grid lines, cell borders, frames, drop shadow, background, gradient background, photorealism, 3d render, perspective, warm colors, gold, bright neon, watermark`
+
+**Si la grille sort mal** (c'est le prompt le plus difficile de la fiche : les
+générateurs alignent mal et changent de style d'une case à l'autre) : générez
+les **huit icônes séparément** en 512×512, nommez-les `meta-icone-1.webp` à
+`meta-icone-8.webp` dans l'ordre du tableau ci-dessus, et **j'assemble la
+planche** — c'est deux minutes de traitement à l'intégration, et le résultat
+est bien plus régulier.
+
 ## Ce que je peux faire sans générateur d'images
 
 Vecteurs SVG (logo, cadres, icônes, écusson au trait) et textures procédurales en
