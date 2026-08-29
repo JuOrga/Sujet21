@@ -422,3 +422,20 @@ export function forceEffet(e: Effet): number {
   if (ampli <= 0) return 0
   return Math.min(1, Math.abs(e.valeur - n) / ampli)
 }
+
+/**
+ * La valeur qu'on PROPOSE quand un levier arrive sur une carte : à
+ * mi-chemin entre le neutre et le bon bout de sa plage, calée sur le pas.
+ * Jamais la valeur neutre (la carte ne ferait rien — la validation la
+ * refuse), jamais une valeur hors du pas (« 1,5 échantillon de secours »).
+ */
+export function valeurProposee(l: LevierDef): number {
+  const n = neutre(l)
+  const bout = l.bon > 0 ? l.max : l.min
+  const pas = l.pas || 1
+  let v = Math.round((n + (bout - n) * 0.5) / pas) * pas
+  if (Math.abs(v - n) < pas / 2) v = n + Math.sign(bout - n) * pas
+  v = Math.min(l.max, Math.max(l.min, v))
+  // le pas peut être décimal : on coupe le bruit de virgule flottante
+  return Math.round(v * 1000) / 1000
+}

@@ -1030,63 +1030,364 @@
         margin: 12px 2px 0; min-height: 18px;
         font-size: calc(12px * var(--ui)); color: var(--specimen);
       }
-      /* ---- L'ATELIER DES RÉCOMPENSES ---- */
-      #recompenses { position: fixed; inset: 0; z-index: 60; display: flex;
-        align-items: center; justify-content: center; background: rgba(2,6,12,.82); }
-      /* l'atelier a besoin de largeur : à gauche des cartes qui se lisent
-         d'un regard, à droite une forge qui tient sans ascenseur */
-      #recompenses .salles-boite { width: min(1120px, 95vw); max-width: none; }
+      /* ==== LA CARTE DE RÉCOMPENSE : un seul composant, trois emplois ====
+         `.crt` sert à l'atelier (`.crt-vignette`), au tirage de fin de salle
+         (`.crt-draft`) et à l'aperçu vivant de la forge (`.crt-apercu`). Une
+         seule recette visuelle, un seul générateur (carteHTML) : ce que le
+         concepteur fabrique a exactement la tête de ce que le joueur tire.
+         Contenu en PHRASING pur (span/b/em/i) : la carte du tirage est un
+         <button>, qui n'accepte ni <p> ni <ul>. */
+      .crt {
+        --fam: var(--specimen);
+        --fam2: var(--fam);
+        position: relative; isolation: isolate; overflow: hidden;
+        display: flex; flex-direction: column; gap: 5px;
+        padding: 11px 12px 10px; text-align: left;
+        border: 1px solid color-mix(in srgb, var(--fam) 26%, transparent);
+        border-radius: 10px; color: #cfe2ef; font: inherit;
+        background:
+          repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.013) 0 1px, transparent 1px 3px),
+          radial-gradient(130% 80% at 50% -10%, rgba(255, 255, 255, 0.05), transparent 62%),
+          linear-gradient(180deg, #14202f, #101825);
+      }
+      /* le LISERÉ de famille : deux teintes quand la carte en touche deux */
+      .crt::before {
+        content: ''; position: absolute; inset: 0 0 auto; height: 2px;
+        background: linear-gradient(90deg, var(--fam), var(--fam2));
+        opacity: 0.75;
+      }
+      /* le HALO, en couche séparée : il s'allume sans repeindre la carte */
+      .crt-halo {
+        position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
+        box-shadow: inset 0 0 22px color-mix(in srgb, var(--fam) 12%, transparent);
+        opacity: 0; transition: opacity 0.18s ease;
+      }
+      .crt-tete { display: flex; align-items: flex-start; gap: 9px; }
+      .crt-ico {
+        font-style: normal; line-height: 1; flex: none;
+        font-size: calc(23px * var(--ui));
+        filter: drop-shadow(0 0 8px color-mix(in srgb, var(--fam) 45%, transparent));
+      }
+      .crt-titres { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+      .crt-nom {
+        font-size: calc(13px * var(--ui)); line-height: 1.2; color: #e6f3ff; font-weight: 600;
+      }
+      .crt-rang {
+        font-style: normal;
+        font-family: var(--font-display); font-size: calc(7.5px * var(--ui));
+        letter-spacing: 0.16em; color: color-mix(in srgb, var(--fam) 78%, #ffffff);
+        text-transform: uppercase;
+      }
+      .crt-txt {
+        display: block; font-size: calc(11.5px * var(--ui)); line-height: 1.45; color: #93aabf;
+      }
+      /* LES EFFETS, un par levier : le sens en couleur, la puissance en jauge.
+         C'est la lecture qui manquait le plus — « ×0,8 » ne dit pas si c'est
+         un cadeau ou une facture, la couleur et le mot le disent. */
+      .crt-effets { display: flex; flex-direction: column; gap: 3px; margin-top: 1px; }
+      .eff {
+        --e: #6dffb8;
+        position: relative; display: flex; align-items: baseline; gap: 6px;
+        padding: 2px 7px 4px; border-radius: 5px;
+        background: color-mix(in srgb, var(--e) 7%, transparent);
+        font-size: calc(10.5px * var(--ui));
+      }
+      .eff-prix { --e: #f2c98e; }
+      .eff i { font-style: normal; color: #a8bccd; flex: 1; min-width: 0; }
+      .eff em {
+        font-style: normal; font-weight: 600; letter-spacing: 0.04em;
+        color: var(--e); white-space: nowrap;
+      }
+      .eff-jauge {
+        position: absolute; left: 7px; right: 7px; bottom: 1px; height: 3px;
+        border-radius: 2px; background: rgba(255, 255, 255, 0.11); overflow: hidden;
+      }
+      .eff-jauge::after {
+        content: ''; position: absolute; inset: 0 auto 0 0;
+        width: calc(var(--f, 0) * 100%); background: var(--e); opacity: 0.85;
+      }
+      /* LA CONTREPARTIE : ces cartes sont le sel du tirage, elles le disent */
+      .crt-ctr {
+        display: flex; align-items: center; gap: 6px; margin-top: 1px;
+        font-family: var(--font-display); font-size: calc(7px * var(--ui));
+        letter-spacing: 0.2em; color: #f2c98e;
+      }
+      .crt-ctr::before, .crt-ctr::after {
+        content: ''; height: 1px; flex: 1;
+        background: linear-gradient(90deg, transparent, rgba(242, 201, 142, 0.42));
+      }
+      .crt-ctr::after { background: linear-gradient(90deg, rgba(242, 201, 142, 0.42), transparent); }
+      .crt-pied {
+        display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 4px;
+        font-size: calc(11px * var(--ui));
+      }
+      .crt-prix {
+        font-style: normal; letter-spacing: 0.08em; color: #ffd977;
+        font-size: calc(12px * var(--ui));
+      }
+      .crt-prix.crt-offert { color: #6dffb8; }
+      .crt-tenue {
+        font-style: normal; font-family: var(--font-display); font-size: calc(7px * var(--ui));
+        letter-spacing: 0.16em; color: #6dffb8; border: 1px solid rgba(109, 255, 184, 0.4);
+        border-radius: 4px; padding: 2px 6px;
+      }
+      .crt-perso {
+        font-style: normal; font-family: var(--font-display); font-size: calc(7px * var(--ui));
+        letter-spacing: 0.16em; color: #8fd8c8; border: 1px dashed rgba(143, 216, 200, 0.5);
+        border-radius: 4px; padding: 2px 6px;
+      }
+      .crt-actions { display: flex; gap: 4px; margin-left: auto; }
+      .crt-actions button {
+        font: inherit; font-size: calc(10.5px * var(--ui)); padding: 3px 8px; min-height: 26px;
+        background: rgba(8, 18, 30, 0.8); border: 1px solid rgba(120, 180, 230, 0.26);
+        border-radius: 5px; color: #9ed8ff; cursor: pointer;
+      }
+      .crt-actions button:hover { border-color: var(--fam); color: #eaf6ff; }
+      /* LE CALIBRE : il ne s'écrit pas, il se voit. Commun sobre, notable
+         liseré vif, majeure — un halo qui respire. */
+      .crt.cal-notable { border-color: color-mix(in srgb, var(--fam) 42%, transparent); }
+      .crt.cal-notable .crt-halo { opacity: 0.55; }
+      .crt.cal-majeur { border-color: color-mix(in srgb, var(--fam) 62%, transparent); }
+      .crt.cal-majeur .crt-halo {
+        opacity: 1; box-shadow:
+          inset 0 0 26px color-mix(in srgb, var(--fam) 22%, transparent),
+          0 0 18px color-mix(in srgb, var(--fam) 16%, transparent);
+        animation: crt-souffle 3.4s ease-in-out infinite;
+      }
+      @keyframes crt-souffle {
+        0%, 100% { opacity: 0.55; }
+        50% { opacity: 1; }
+      }
+      .crt.a-contrepartie { border-style: solid; }
+      .crt.crt-perso-c { border-color: rgba(120, 230, 190, 0.42); }
+
+      /* ---- L'ATELIER DES RÉCOMPENSES : plein cadre, comme les mémoires ---- */
+      #recompenses { position: fixed; inset: 0; z-index: 60; background: #04080e; }
       #recompenses[hidden] { display: none; }
-      .rec-corps { display: flex; gap: 18px; padding: 14px 16px; overflow: auto;
-        max-height: calc(90vh - 60px); }
-      .rec-liste { flex: 1 1 58%; min-width: 0; display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        align-content: start; gap: 6px; }
-      .rec-fam { grid-column: 1 / -1; }
-      .rec-forge { flex: 0 0 340px; border-left: 1px solid rgba(120,180,230,.18);
-        padding-left: 16px; display: flex; flex-direction: column; gap: 8px; }
-      .rec-forge h4 { margin: 0; font-size: calc(13px * var(--ui)); letter-spacing: .12em; color: #9ed8ff; }
-      .rec-aide { margin: 0; font-size: calc(11px * var(--ui)); line-height: 1.5; color: #7f98ae; }
-      .rec-fam { margin: 10px 0 2px; font-size: calc(11px * var(--ui)); letter-spacing: .14em;
-        color: #6d8399; text-transform: uppercase; }
-      .rec-carte { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px;
-        border: 1px solid rgba(120,180,230,.16); border-radius: 8px;
-        background: rgba(10,20,32,.6); }
-      .rec-carte.perso { border-color: rgba(120,230,190,.34); }
-      .rec-carte > i { font-size: calc(20px * var(--ui)); font-style: normal; line-height: 1.2; }
-      .rec-carte .rec-corps-carte { flex: 1; min-width: 0; }
-      .rec-carte b { display: block; font-size: calc(13px * var(--ui)); color: #d8ecff; }
-      .rec-carte span.rec-desc { display: block; font-size: calc(11px * var(--ui)); color: #8ba2b8; line-height: 1.45; }
-      .rec-carte .rec-effet { display: inline-block; margin: 4px 4px 0 0; padding: 1px 7px;
-        font-size: calc(10px * var(--ui)); letter-spacing: .06em; border-radius: 10px;
-        border: 1px solid rgba(120,180,230,.3); color: #9ed8ff; }
-      .rec-carte .rec-boutons { display: flex; gap: 4px; flex: none; }
-      .rec-carte .rec-boutons button { font-size: calc(11px * var(--ui)); padding: 2px 8px; }
-      .rec-f { display: flex; flex-direction: column; gap: 3px; font-size: calc(11px * var(--ui)); color: #8ba2b8; }
-      .rec-f input { background: rgba(6,14,24,.9); border: 1px solid rgba(120,180,230,.28);
-        color: #d8ecff; border-radius: 5px; padding: 5px 8px; font: inherit; font-size: calc(12px * var(--ui)); }
-      .rec-ligne { display: flex; gap: 6px; align-items: center; }
-      .rec-ligne select { flex: 1; min-width: 0; background: rgba(6,14,24,.9);
-        border: 1px solid rgba(120,180,230,.28); color: #d8ecff; border-radius: 5px;
-        padding: 4px 6px; font: inherit; font-size: calc(12px * var(--ui)); }
-      .rec-ligne input { width: 74px; background: rgba(6,14,24,.9);
-        border: 1px solid rgba(120,180,230,.28); color: #d8ecff; border-radius: 5px;
-        padding: 4px 6px; font: inherit; font-size: calc(12px * var(--ui)); }
-      .rec-phrase { font-size: calc(11px * var(--ui)); color: #7f98ae; margin: 2px 0 8px; line-height: 1.4; }
-      .rec-apercu { margin: 4px 0 0; font-size: calc(12px * var(--ui)); color: #a9e7c9; line-height: 1.5; }
-      .rec-refus { margin: 2px 0 0; font-size: calc(11px * var(--ui)); color: #ffab8c; line-height: 1.5; }
-      .rec-actions { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
-      .rec-io { display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
-        border-top: 1px solid rgba(120,180,230,.14); padding-top: 8px; margin-top: 4px; }
-      #rec-json { width: 100%; background: rgba(6,14,24,.9); color: #9ed8ff;
-        border: 1px solid rgba(120,180,230,.28); border-radius: 5px; font-size: calc(11px * var(--ui));
-        font-family: ui-monospace, monospace; padding: 6px; }
-      .rec-lien { background: none; border: none; color: #7fc6ff; font-size: calc(11px * var(--ui));
-        text-decoration: underline; cursor: pointer; padding: 0; }
-      @media (max-width: 900px) {
-        .rec-corps { flex-direction: column; }
-        .rec-forge { flex: 1 1 auto; border-left: 0; padding-left: 0;
-          border-top: 1px solid rgba(120,180,230,.18); padding-top: 12px; }
+      .at-ecran {
+        position: absolute; inset: 0; display: flex; flex-direction: column;
+        background:
+          repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.014) 0 1px, transparent 1px 3px),
+          linear-gradient(rgba(99, 183, 230, 0.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(99, 183, 230, 0.05) 1px, transparent 1px),
+          radial-gradient(ellipse at 42% 46%, #08182a 0%, #04080e 76%);
+        background-size: auto, 72px 72px, 72px 72px, auto;
+        color: #cfe2ef;
+      }
+      .at-tete {
+        display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+        padding: 13px 22px; border-bottom: 1px solid rgba(99, 183, 230, 0.2);
+        background: rgba(6, 12, 20, 0.85);
+      }
+      .at-tete h2 {
+        margin: 0; font-family: var(--font-display); font-weight: 600;
+        font-size: calc(19px * var(--ui)); letter-spacing: 0.32em; color: var(--ink, #eaf6ff);
+        white-space: nowrap;
+      }
+      .at-soustitre {
+        flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+        white-space: nowrap; font-size: calc(11px * var(--ui)); color: var(--dim);
+      }
+      .at-compteurs { display: flex; gap: 16px; }
+      .at-cpt { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+      .at-cpt b { font-family: var(--font-display); font-size: calc(15px * var(--ui)); color: #9ed8ff; }
+      .at-cpt i {
+        font-style: normal; font-family: var(--font-display);
+        font-size: calc(7px * var(--ui)); letter-spacing: 0.16em; color: var(--dim);
+      }
+      #recompenses-fermer {
+        font-family: var(--font-display); font-size: calc(9.5px * var(--ui));
+        letter-spacing: 0.16em; padding: 8px 13px; min-height: 36px;
+        background: rgba(10, 22, 36, 0.8); border: 1px solid rgba(99, 183, 230, 0.3);
+        border-radius: 6px; color: #9ed8ff; cursor: pointer;
+      }
+      #recompenses-fermer:hover { border-color: var(--specimen); color: #eaf6ff; }
+      .at-corps { flex: 1; min-height: 0; display: flex; gap: 0; }
+      .at-vitrine {
+        flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;
+        padding: 12px 18px 16px; overflow: hidden;
+      }
+      .at-filtres { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+      .at-chip {
+        font-family: var(--font-display); font-size: calc(8px * var(--ui));
+        letter-spacing: 0.14em; padding: 6px 11px; min-height: 30px;
+        background: rgba(10, 22, 36, 0.7); border: 1px solid rgba(99, 183, 230, 0.2);
+        border-radius: 14px; color: var(--dim); cursor: pointer;
+      }
+      .at-chip:hover { color: #cfe2ef; border-color: rgba(99, 183, 230, 0.45); }
+      .at-chip.on {
+        color: #04080e; background: var(--fc, #9ed8ff); border-color: var(--fc, #9ed8ff);
+      }
+      .at-grille { flex: 1; min-height: 0; overflow-y: auto; padding-right: 6px; }
+      .at-fam {
+        display: flex; align-items: center; gap: 10px; margin: 14px 0 7px;
+        font-family: var(--font-display); font-size: calc(8.5px * var(--ui));
+        letter-spacing: 0.2em; color: color-mix(in srgb, var(--fc, #7f9cb0) 80%, #ffffff);
+      }
+      .at-fam:first-child { margin-top: 0; }
+      .at-fam::after {
+        content: ''; flex: 1; height: 1px;
+        background: linear-gradient(90deg, color-mix(in srgb, var(--fc, #7f9cb0) 35%, transparent), transparent);
+      }
+      .at-fam small { font-family: var(--font-mono); letter-spacing: 0; color: var(--dim); }
+      .at-rangee {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+        gap: 9px; align-items: stretch;
+      }
+      .at-vide {
+        grid-column: 1 / -1; margin: 0; padding: 14px;
+        border: 1px dashed rgba(99, 183, 230, 0.2); border-radius: 9px;
+        font-size: calc(11.5px * var(--ui)); line-height: 1.5; color: var(--dim);
+      }
+      /* L'ÉTABLI : les champs à gauche, la carte qui se dessine à droite —
+         on voit ce qu'on fabrique pendant qu'on le fabrique. */
+      .at-etabli {
+        flex: 0 0 clamp(330px, 30vw, 420px); min-width: 0;
+        display: flex; flex-direction: column; gap: 8px;
+        padding: 12px 18px 16px; overflow-y: auto;
+        border-left: 1px solid rgba(99, 183, 230, 0.2);
+        background: linear-gradient(200deg, rgba(10, 22, 36, 0.72), rgba(5, 11, 19, 0.72));
+      }
+      .at-etabli h4 {
+        margin: 0; font-family: var(--font-display); font-size: calc(10.5px * var(--ui));
+        letter-spacing: 0.18em; color: #9ed8ff;
+      }
+      .at-aide { margin: 0; font-size: calc(11px * var(--ui)); line-height: 1.5; color: #7f98ae; }
+      .at-champ {
+        display: flex; flex-direction: column; gap: 3px;
+        font-family: var(--font-display); font-size: calc(8px * var(--ui));
+        letter-spacing: 0.14em; color: var(--dim);
+      }
+      .at-champ small { font-family: var(--font-mono); letter-spacing: 0; text-transform: none; }
+      .at-champ input {
+        background: rgba(4, 10, 18, 0.9); border: 1px solid rgba(120, 180, 230, 0.24);
+        color: #d8ecff; border-radius: 6px; padding: 7px 9px; min-height: 34px;
+        font-family: var(--font-mono); font-size: calc(12px * var(--ui)); letter-spacing: 0;
+      }
+      .at-champ input:focus { outline: none; border-color: var(--specimen); }
+      .at-duo { display: flex; gap: 8px; }
+      .at-duo .at-champ:first-child { flex: 0 0 84px; }
+      .at-duo .at-champ:last-child { flex: 1; min-width: 0; }
+      /* UN EFFET EN COURS DE RÉGLAGE : le levier, la valeur, et la
+         glissière qui montre de quel côté on passe la ligne. */
+      .at-effet {
+        --e: #6dffb8;
+        border: 1px solid rgba(120, 180, 230, 0.18); border-left: 2px solid var(--e);
+        border-radius: 7px; padding: 7px 9px 8px; background: rgba(6, 14, 24, 0.55);
+        display: flex; flex-direction: column; gap: 5px;
+      }
+      .at-effet.eff-prix { --e: #f2c98e; }
+      .at-effet-tete { display: flex; gap: 6px; align-items: center; }
+      .at-effet select {
+        flex: 1; min-width: 0; background: rgba(4, 10, 18, 0.9);
+        border: 1px solid rgba(120, 180, 230, 0.24); color: #d8ecff; border-radius: 5px;
+        padding: 5px 6px; min-height: 32px; font: inherit; font-size: calc(11.5px * var(--ui));
+      }
+      .at-effet .at-val {
+        width: 76px; flex: none; background: rgba(4, 10, 18, 0.9);
+        border: 1px solid rgba(120, 180, 230, 0.24); color: var(--e); border-radius: 5px;
+        padding: 5px 6px; min-height: 32px; font-family: var(--font-mono);
+        font-size: calc(11.5px * var(--ui)); text-align: center;
+      }
+      .at-effet .at-sup {
+        flex: none; width: 30px; min-height: 32px; background: none;
+        border: 1px solid rgba(120, 180, 230, 0.2); border-radius: 5px;
+        color: var(--dim); cursor: pointer; font-size: calc(12px * var(--ui));
+      }
+      .at-effet .at-sup:hover { color: #ffab8c; border-color: rgba(255, 171, 140, 0.5); }
+      /* la GLISSIÈRE : la moitié « gain » est teintée, la valeur neutre
+         porte un repère — on VOIT qu'on franchit la ligne */
+      .at-piste { position: relative; padding: 3px 0 1px; }
+      .at-piste::before {
+        content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 5px;
+        transform: translateY(-50%); border-radius: 3px;
+        background: linear-gradient(90deg, var(--g1) 0 var(--gsplit), var(--g2) var(--gsplit) 100%);
+      }
+      .at-piste::after {
+        content: ''; position: absolute; top: 50%; left: var(--gsplit); width: 1px; height: 13px;
+        transform: translate(-50%, -50%); background: rgba(226, 246, 255, 0.55);
+      }
+      /* la piste native peindrait par-dessus le dégradé gain/prix : on la
+         rend transparente et l'on ne garde que le curseur */
+      .at-piste input[type='range'] {
+        position: relative; width: 100%; margin: 0; height: 18px;
+        background: none; -webkit-appearance: none; appearance: none;
+      }
+      .at-piste input[type='range']::-webkit-slider-runnable-track {
+        height: 5px; background: transparent;
+      }
+      .at-piste input[type='range']::-moz-range-track { height: 5px; background: transparent; }
+      .at-piste input[type='range']::-webkit-slider-thumb {
+        -webkit-appearance: none; appearance: none;
+        width: 13px; height: 13px; margin-top: -4px; border-radius: 50%;
+        background: var(--e); border: 0; cursor: pointer;
+        box-shadow: 0 0 8px color-mix(in srgb, var(--e) 60%, transparent);
+      }
+      .at-piste input[type='range']::-moz-range-thumb {
+        width: 13px; height: 13px; border-radius: 50%; border: 0;
+        background: var(--e); cursor: pointer;
+        box-shadow: 0 0 8px color-mix(in srgb, var(--e) 60%, transparent);
+      }
+      .at-phrase {
+        margin: 0; font-size: calc(10.5px * var(--ui)); line-height: 1.45; color: #8ba2b8;
+      }
+      .at-lien {
+        background: none; border: none; color: #7fc6ff; font: inherit;
+        font-size: calc(11px * var(--ui)); text-decoration: underline; cursor: pointer;
+        padding: 2px 0; align-self: flex-start; min-height: 26px;
+      }
+      .at-lien:hover { color: #cfe9ff; }
+      /* L'APERÇU VIVANT : la carte telle qu'elle sortira, à chaque frappe */
+      .at-apercu-boite {
+        border-top: 1px solid rgba(99, 183, 230, 0.16); padding-top: 10px; margin-top: 2px;
+        display: flex; flex-direction: column; gap: 7px;
+      }
+      .at-apercu-boite > h4 { color: var(--dim); }
+      .crt-apercu { min-height: 96px; }
+      .at-verdict {
+        margin: 0; font-size: calc(11px * var(--ui)); line-height: 1.5; color: #a9e7c9;
+      }
+      /* Refus et confirmations : un filet à gauche, comme partout ailleurs */
+      .at-dit {
+        margin: 0; padding: 7px 10px; border-left: 2px solid #ffab8c;
+        background: rgba(255, 171, 140, 0.07); border-radius: 0 6px 6px 0;
+        font-size: calc(11px * var(--ui)); line-height: 1.5; color: #ffc7b0;
+      }
+      .at-dit:empty { display: none; }
+      .at-dit.bon {
+        border-left-color: #6dffb8; background: rgba(109, 255, 184, 0.07); color: #a9e7c9;
+      }
+      .at-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+      #rec-fabriquer {
+        font-family: var(--font-display); font-size: calc(9.5px * var(--ui));
+        letter-spacing: 0.16em; padding: 10px 16px; min-height: 40px;
+        background: rgba(12, 30, 24, 0.8); border: 1px solid #2d5a44; border-radius: 6px;
+        color: #8fd8b0; cursor: pointer;
+      }
+      #rec-fabriquer:hover { border-color: #6dffb8; color: #d5f3e8; }
+      .at-io {
+        display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+        border-top: 1px solid rgba(99, 183, 230, 0.14); padding-top: 8px; margin-top: 2px;
+      }
+      #rec-json {
+        width: 100%; background: rgba(4, 10, 18, 0.9); color: #9ed8ff;
+        border: 1px solid rgba(120, 180, 230, 0.24); border-radius: 6px;
+        font-size: calc(10.5px * var(--ui)); font-family: var(--font-mono); padding: 7px;
+      }
+      /* Steam Deck et fenêtres basses : l'établi passe sous la vitrine */
+      @media (max-width: 940px) {
+        .at-corps { flex-direction: column; overflow-y: auto; }
+        .at-vitrine { overflow: visible; }
+        .at-grille { overflow: visible; }
+        .at-etabli {
+          flex: 1 1 auto; border-left: 0; overflow: visible;
+          border-top: 1px solid rgba(99, 183, 230, 0.2);
+        }
+        .at-tete h2 { font-size: calc(15px * var(--ui)); letter-spacing: 0.22em; }
+        .at-soustitre { display: none; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .crt.cal-majeur .crt-halo { animation: none; opacity: 0.8; }
       }
 
       /* barre d'outils du voile SALLES : le tri par code atelier, et la
@@ -1916,23 +2217,80 @@
         background: rgba(4, 10, 18, 0.55); padding: 2px 7px; border-radius: 4px;
         pointer-events: none;
       }
+      /* ---- LE TOAST DE RÉCOMPENSE : six natures, six couleurs ----
+         Trophée (ambre), fiche de codex (bleu), éclat de mémoire (violet),
+         fiole (vert), achat (vert-eau) : la teinte `--tt` est posée par le
+         jeu, tout le décor s'y accorde. Le glyphe passe dans un CARTOUCHE,
+         et une barre de vie dit le temps qu'il reste pour cliquer. */
       #trophee-toast {
+        --tt: var(--specimen);
         position: fixed; top: 64px; right: 14px; z-index: 60;
-        display: flex; gap: 10px; align-items: center;
-        padding: 10px 14px; border: 1px solid var(--specimen);
-        border-radius: 6px; background: rgba(4, 12, 20, 0.92);
-        transform: translateX(120%); transition: transform 0.35s ease;
-        pointer-events: none; max-width: 320px;
+        display: flex; gap: 11px; align-items: center; overflow: hidden;
+        padding: 11px 15px 13px;
+        border: 1px solid color-mix(in srgb, var(--tt) 55%, transparent);
+        border-radius: 9px;
+        background:
+          repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.014) 0 1px, transparent 1px 3px),
+          linear-gradient(160deg, rgba(10, 22, 34, 0.95), rgba(4, 10, 18, 0.95));
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5),
+          0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+        transform: translateX(120%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 1, 1);
+        pointer-events: none; max-width: 330px;
       }
-      #trophee-toast.visible { transform: translateX(0); }
+      /* l'ENTRÉE : le toast glisse et dépasse un peu — la courbe maison */
+      #trophee-toast:not(.visible) { visibility: hidden; }
+      #trophee-toast.visible {
+        transform: translateX(0);
+        transition: transform 0.42s cubic-bezier(0.2, 2.4, 0.4, 1);
+      }
+      #trophee-toast.visible .tt-cartouche { animation: tt-pulse 0.7s ease-out 0.12s; }
+      @keyframes tt-pulse {
+        0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--tt) 55%, transparent); }
+        100% { box-shadow: 0 0 0 14px rgba(0, 0, 0, 0); }
+      }
+      .tt-cartouche {
+        flex: none; width: 40px; height: 40px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        border: 1px solid color-mix(in srgb, var(--tt) 60%, transparent);
+        background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--tt) 16%, transparent), transparent 70%);
+      }
+      .tt-cartouche i {
+        font-style: normal; font-size: calc(20px * var(--ui)); line-height: 1;
+        filter: drop-shadow(0 0 7px color-mix(in srgb, var(--tt) 55%, transparent));
+      }
+      .tt-corps { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+      .tt-nom {
+        font-family: var(--font-mono); font-size: calc(12.5px * var(--ui));
+        line-height: 1.35; color: var(--ink);
+      }
+      /* LA BARRE DE VIE : on voit le temps qui reste pour cliquer la fiche */
+      .tt-vie {
+        position: absolute; left: 0; bottom: 0; height: 2px; width: 100%;
+        transform-origin: left; background: var(--tt); opacity: 0.55;
+      }
+      #trophee-toast.visible .tt-vie {
+        animation: tt-vie var(--dur, 3.8s) linear forwards;
+      }
+      @keyframes tt-vie {
+        from { transform: scaleX(1); }
+        to { transform: scaleX(0); }
+      }
       /* le toast d'une fiche codex est un BOUTON : il se clique, se touche —
          et l'invite (VOIR LA FICHE / SELECT) le dit */
       #trophee-toast.cliquable { pointer-events: auto; cursor: pointer; }
-      #trophee-toast.cliquable:hover { border-color: #6dffb8; }
+      #trophee-toast.cliquable:hover { border-color: var(--tt); }
       #trophee-toast .tt-voir {
         display: block; margin-top: 3px; font-style: normal;
         font-family: var(--font-display); font-size: calc(8px * var(--ui));
         letter-spacing: 0.18em; color: #6dffb8;
+      }
+      /* le panneau des instruments partage ce coin : il se range dessous */
+      body.toast-on #instr-panel { transform: translateY(var(--toast-h, 92px)); }
+      #instr-panel { transition: transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1); }
+      @media (prefers-reduced-motion: reduce) {
+        #trophee-toast, #trophee-toast.visible, #instr-panel { transition: none; }
+        #trophee-toast.visible .tt-cartouche { animation: none; }
       }
       /* la fiche fraîchement visitée s'illumine le temps d'un regard */
       .cdx-carte.cdx-neuve {
@@ -1943,12 +2301,10 @@
         0%, 100% { box-shadow: 0 0 0 0 rgba(99, 183, 230, 0); }
         50% { box-shadow: 0 0 14px 2px rgba(99, 183, 230, 0.45); }
       }
-      #trophee-toast i { font-style: normal; font-size: calc(22px * var(--ui)); }
       #trophee-toast b {
-        display: block; font-family: var(--font-display); font-size: calc(9px * var(--ui));
-        letter-spacing: 0.2em; color: var(--specimen);
+        display: block; font-family: var(--font-display); font-size: calc(8.5px * var(--ui));
+        letter-spacing: 0.2em; color: var(--tt);
       }
-      #trophee-toast div { font-family: var(--font-mono); font-size: calc(13px * var(--ui)); color: var(--ink); }
       .tro-grille { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 6px; }
       @media (max-width: 760px) { .tro-grille { grid-template-columns: 1fr; } }
       .tro-carte {
@@ -5884,6 +6240,80 @@
         margin: 0 0 10px; font-size: calc(14px * var(--ui)); letter-spacing: 0.18em; color: #a9c3de;
       }
       .mb-cartes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+      /* ---- LE TIRAGE DE FIN DE SALLE : trois cartes, un petit spectacle
+         d'une seconde. Les cartes sont des `.crt` — le composant partagé
+         avec l'atelier — posées en cascade sur cette grille. `.mb-carte`
+         reste intacte : elle sert encore au versement et au choix de
+         salle, qu'on ne repeint pas. */
+      /* les colonnes suivent le NOMBRE de cartes (le Carnet du Semblable
+         en ouvre une quatrième, qui passait seule à la ligne) */
+      .mb-cartes.mb-draft { grid-template-columns: repeat(var(--n, 3), 1fr); }
+      .mb-cartes.mb-draft .crt-draft {
+        min-height: 168px; cursor: pointer; align-items: stretch;
+        animation: crt-pose 0.42s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+        animation-delay: calc(0.1s + var(--i, 0) * 0.12s);
+        transition: transform 0.16s ease, opacity 0.16s ease, border-color 0.16s ease;
+      }
+      @keyframes crt-pose {
+        0% { opacity: 0; transform: translateY(-26px) rotateX(24deg); }
+        100% { opacity: 1; transform: translateY(0) rotateX(0); }
+      }
+      /* l'ÉCLAT qui balaie la carte à la pose : la carte se révèle */
+      .mb-cartes.mb-draft .crt-draft::after {
+        content: ''; position: absolute; inset: 0; pointer-events: none;
+        background: linear-gradient(102deg, transparent 38%, rgba(226, 246, 255, 0.13) 50%, transparent 62%);
+        transform: translateX(-120%);
+        animation: crt-eclat 0.75s ease-out backwards;
+        animation-delay: calc(0.24s + var(--i, 0) * 0.12s);
+      }
+      @keyframes crt-eclat {
+        0% { transform: translateX(-120%); }
+        100% { transform: translateX(120%); }
+      }
+      /* L'ISOLEMENT AU SURVOL — le motif de l'écran des mémoires : celle
+         qu'on regarde monte et s'allume, les autres s'effacent. Le focus
+         fait le même office : à la manette, on voit ce qu'on désigne. */
+      .mb-cartes.mb-isole .crt-draft:not(.crt-survol) { opacity: 0.25; }
+      .mb-cartes.mb-draft .crt-draft.crt-survol {
+        transform: translateY(-5px);
+        border-color: color-mix(in srgb, var(--fam) 85%, transparent);
+      }
+      .mb-cartes.mb-draft .crt-draft.crt-survol .crt-halo {
+        opacity: 1;
+        box-shadow:
+          inset 0 0 30px color-mix(in srgb, var(--fam) 24%, transparent),
+          0 0 22px color-mix(in srgb, var(--fam) 20%, transparent);
+      }
+      .mb-cartes.mb-draft .crt-draft:focus-visible { outline: 2px solid var(--fam); outline-offset: 2px; }
+      .mb-cartes.mb-draft .crt-draft.mb-pauvre { opacity: 0.4; cursor: not-allowed; }
+      /* LE CHOIX : l'élue s'embrase et grandit, les autres tombent */
+      .mb-cartes.mb-elu .crt-draft:not(.crt-elue) {
+        animation: crt-refus 0.3s ease-in forwards; pointer-events: none;
+      }
+      .mb-cartes.mb-draft .crt-draft.crt-elue {
+        animation: crt-elue 0.34s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        border-color: var(--fam); z-index: 2;
+      }
+      @keyframes crt-elue {
+        0% { transform: translateY(-5px) scale(1); }
+        45% { transform: translateY(-9px) scale(1.06); box-shadow: 0 0 34px color-mix(in srgb, var(--fam) 40%, transparent); }
+        100% { transform: translateY(-6px) scale(1.03); box-shadow: 0 0 20px color-mix(in srgb, var(--fam) 26%, transparent); }
+      }
+      @keyframes crt-refus {
+        0% { opacity: 0.25; transform: translateY(0); }
+        100% { opacity: 0; transform: translateY(12px) scale(0.96); }
+      }
+      @media (max-width: 700px) {
+        .mb-cartes.mb-draft { grid-template-columns: 1fr; }
+        .mb-cartes.mb-draft .crt-draft { min-height: 0; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .mb-cartes.mb-draft .crt-draft,
+        .mb-cartes.mb-draft .crt-draft::after,
+        .mb-cartes.mb-draft .crt-draft.crt-elue,
+        .mb-cartes.mb-elu .crt-draft:not(.crt-elue) { animation: none; }
+        .mb-cartes.mb-elu .crt-draft:not(.crt-elue) { opacity: 0; }
+      }
       .mb-carte {
         display: flex; flex-direction: column; align-items: center; gap: 5px;
         padding: 12px 8px 10px; min-height: 122px;
@@ -6624,31 +7054,48 @@
          droite. Une carte fabriquée ici se tire, s'emporte et agit comme
          une carte gravée dans le code — c'est le même chemin. -->
     <div id="recompenses" hidden aria-label="Atelier des récompenses">
-      <div class="salles-boite">
-        <div class="salles-tete"><span>RÉCOMPENSES — le catalogue, et l'atelier</span>
-          <button type="button" id="recompenses-fermer" aria-label="Fermer">✕</button></div>
-        <div class="rec-corps">
-          <div class="rec-liste" id="rec-liste"></div>
-          <div class="rec-forge">
+      <div class="at-ecran">
+        <header class="at-tete">
+          <h2>RÉCOMPENSES</h2>
+          <span class="at-soustitre">le catalogue des instruments — et l'atelier qui en fabrique</span>
+          <div class="at-compteurs">
+            <span class="at-cpt"><b id="at-n-livrees">0</b><i>livrées</i></span>
+            <span class="at-cpt"><b id="at-n-atelier">0</b><i>atelier</i></span>
+            <span class="at-cpt"><b id="at-n-poche">0</b><i>en poche</i></span>
+          </div>
+          <button type="button" id="recompenses-fermer" aria-label="Fermer">✕ FERMER</button>
+        </header>
+        <div class="at-corps">
+          <section class="at-vitrine">
+            <div class="at-filtres" id="at-filtres"></div>
+            <div class="at-grille" id="rec-liste"></div>
+          </section>
+          <aside class="at-etabli">
             <h4 id="rec-forge-titre">FABRIQUER UNE CARTE</h4>
-            <p class="rec-aide">Une carte, c'est un nom, une icône et des LEVIERS. Le jeu ne lit que les leviers : ce qui sort d'ici se tire au hasard et agit comme le reste.</p>
-            <label class="rec-f"><span>Nom</span><input id="rec-nom" type="text" maxlength="28" placeholder="Membrane de tension" /></label>
-            <label class="rec-f"><span>Icône</span><input id="rec-icone" type="text" maxlength="4" placeholder="✦" /></label>
-            <label class="rec-f"><span>Texte de la carte <small>(vide : écrit par les effets)</small></span><input id="rec-desc" type="text" maxlength="140" placeholder="" /></label>
-            <div id="rec-effets"></div>
-            <button type="button" id="rec-ajout-effet" class="rec-lien">+ un effet</button>
-            <p id="rec-apercu" class="rec-apercu"></p>
-            <p id="rec-refus" class="rec-refus"></p>
-            <div class="rec-actions">
-              <button type="button" id="rec-fabriquer">FABRIQUER</button>
-              <button type="button" id="rec-annuler" class="rec-lien">vider le formulaire</button>
+            <p class="at-aide">Une carte, c'est un nom, une icône et des LEVIERS. Le jeu ne lit que les leviers : ce qui sort d'ici se tire au hasard, s'emporte et agit comme le reste.</p>
+            <div class="at-duo">
+              <label class="at-champ"><span>Icône</span><input id="rec-icone" type="text" maxlength="4" placeholder="✦" /></label>
+              <label class="at-champ"><span>Nom</span><input id="rec-nom" type="text" maxlength="28" placeholder="Membrane de tension" /></label>
             </div>
-            <div class="rec-io">
-              <button type="button" id="rec-exporter" class="rec-lien">exporter en JSON</button>
-              <button type="button" id="rec-importer" class="rec-lien">importer ce JSON</button>
+            <label class="at-champ"><span>Texte <small>(vide : écrit par les effets)</small></span><input id="rec-desc" type="text" maxlength="140" placeholder="" /></label>
+            <div id="rec-effets"></div>
+            <button type="button" id="rec-ajout-effet" class="at-lien">+ poser un levier</button>
+            <div class="at-apercu-boite">
+              <h4>APERÇU — LA CARTE TELLE QU'ELLE SORTIRA</h4>
+              <div id="at-apercu-carte"></div>
+              <p id="rec-apercu" class="at-verdict"></p>
+            </div>
+            <p id="rec-refus" class="at-dit"></p>
+            <div class="at-actions">
+              <button type="button" id="rec-fabriquer">FABRIQUER</button>
+              <button type="button" id="rec-annuler" class="at-lien">vider le formulaire</button>
+            </div>
+            <div class="at-io">
+              <button type="button" id="rec-exporter" class="at-lien">exporter en JSON</button>
+              <button type="button" id="rec-importer" class="at-lien">importer ce JSON</button>
               <textarea id="rec-json" hidden rows="6" spellcheck="false" aria-label="JSON des cartes fabriquées"></textarea>
             </div>
-          </div>
+          </aside>
         </div>
       </div>
     </div>
@@ -6680,6 +7127,7 @@
             <button type="button" data-pup="condensat"><b>Condensat +150 cL</b><small>de quoi payer une carte</small></button>
             <button type="button" data-pup="memoire"><b>Mémoire +25</b><small>la monnaie de l’Éveil</small></button>
             <button type="button" data-pup="fiole"><b>Fiole surprise</b><small>une fiole manquante rejoint la collection</small></button>
+            <button type="button" data-pup="toasts"><b>Les popups de récompense</b><small>les cinq natures à la file (trophée, codex, éclat, fiole, achat) — rien n’est gravé</small></button>
             <button type="button" data-pup="cycle"><b>L’écran des mémoires</b><small>ouvrir le cycle des états (tissages en mémoire)</small></button>
             <button type="button" data-pup="verrous"><b>Verrous du scénario</b><small>fermer/rouvrir fusion et liquéfaction (déblocage progressif)</small></button>
             <button type="button" data-pup="vie"><b>Vie +1</b><small>échantillon de secours</small></button>

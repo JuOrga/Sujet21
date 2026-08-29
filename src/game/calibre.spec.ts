@@ -9,7 +9,14 @@ import {
   poidsInstrument,
   tirageInstruments,
 } from './instruments'
-import { forceEffet, sensEffet, type Effet } from './leviers'
+import {
+  LEVIERS,
+  forceEffet,
+  neutre,
+  sensEffet,
+  valeurProposee,
+  type Effet,
+} from './leviers'
 import { catalogueRecompenses, poseRecompense, videAtelier } from './recompenses'
 
 // LE RANG D'UNE CARTE SE DÉDUIT, IL NE SE SAISIT PAS.
@@ -142,5 +149,25 @@ describe('Une carte d’atelier va jusqu’au tirage', () => {
         (c) => c.id === 'voile-de-tension',
       )
     expect(vue).toBe(true)
+  })
+})
+
+describe('La valeur proposée quand un levier arrive sur une carte', () => {
+  it('tombe dans la plage, sur le pas, du bon côté — et jamais au neutre', () => {
+    // l'atelier propose cette valeur au concepteur : une carte qui naît
+    // inerte (valeur neutre) ou hors du pas (« 1,5 échantillon de
+    // secours ») est une carte que la validation refusera aussitôt
+    for (const l of LEVIERS) {
+      const v = valeurProposee(l)
+      const n = neutre(l)
+      expect(v).toBeGreaterThanOrEqual(l.min)
+      expect(v).toBeLessThanOrEqual(l.max)
+      expect(v).not.toBe(n)
+      // sur le pas, à la poussière de virgule flottante près
+      const marches = (v - n) / l.pas
+      expect(Math.abs(marches - Math.round(marches))).toBeLessThan(0.01)
+      // et du côté qui AVANTAGE le joueur
+      expect(sensEffet({ levier: l.id, valeur: v })).toBe(1)
+    }
   })
 })

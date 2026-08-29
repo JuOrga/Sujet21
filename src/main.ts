@@ -59,7 +59,10 @@ import {
   BONBONNE_CAP,
   INSTRUMENTS,
   PALIERS_XP,
+  aContrepartie,
+  calibreInstrument,
   descriptionInstrument,
+  famillesInstrument,
   instrumentDef,
   levier,
   paliersAtteints,
@@ -69,9 +72,13 @@ import {
 import {
   FAMILLE_NOMS,
   LEVIERS,
+  forceEffet,
   levierDef,
+  neutre,
   phraseEffet,
+  sensEffet,
   valeurLevier,
+  valeurProposee,
 } from './game/leviers'
 import { dansForme, formeOutline } from './game/formes'
 import { DELIVERIES, VERSION, versionDe } from './bench/changelog'
@@ -1740,13 +1747,42 @@ function majFpsCoin(dtReal: number): void {
 // dans le voile RECORDS. Détection par échantillonnage léger (4 Hz).
 const trophees = new Trophees()
 const tropheeToast = document.getElementById('trophee-toast') as HTMLDivElement
+// LE GENRE D'UNE RÉCOMPENSE : six natures partageaient un seul bandeau
+// gris — trophée, fiche de codex, éclat de mémoire, fiole, achat. Le genre
+// leur donne une couleur et un cartouche, pour qu'on sache d'un coup d'œil
+// ce qu'on vient de gagner. Il se DÉDUIT de l'étiquette déjà passée : aucun
+// appelant n'a à changer, chacun pourra le préciser ensuite.
+type ToastGenre = 'trophee' | 'codex' | 'eclat' | 'fiole' | 'achat'
 const toastFile: {
   nom: string
   icone: string
   sur?: string
   fiche?: string
+  genre?: ToastGenre
 }[] = []
+function toastGenre(t: { sur?: string; fiche?: string; genre?: ToastGenre }): ToastGenre {
+  if (t.genre) return t.genre
+  if (t.fiche) return 'codex'
+  const sur = (t.sur ?? '').toUpperCase()
+  if (sur.includes('CODEX')) return 'codex'
+  if (sur.includes('ÉCLAT')) return 'eclat'
+  if (sur.includes('FIOLE')) return 'fiole'
+  if (sur.includes('ÉCONOMAT') || sur.includes('COMPTOIR')) return 'achat'
+  return 'trophee'
+}
+const TOAST_TEINTE: Record<ToastGenre, string> = {
+  trophee: '#ffd977',
+  codex: '#63b7e6',
+  eclat: '#c99aff',
+  fiole: '#6dffb8',
+  achat: '#8fd8c8',
+}
+// La durée d'un toast se compte en TEMPS RÉEL, pas en temps de rendu : la
+// barre de vie qui se vide est une animation CSS (horloge du navigateur),
+// et le toast doit disparaître AVEC elle. Le delta est plafonné à une
+// demi-seconde pour qu'un onglet caché ne consomme pas la file d'un coup.
 let toastTimer = 0
+let toastHorloge = 0
 trophees.onDebloque = (t) => {
   toastFile.push({ nom: `${t.nom} · +10 mémoire`, icone: t.icone })
   audio.collect()
@@ -1766,10 +1802,16 @@ codex.onDecouverte = (d) => {
   audio.collect()
   renderCodexVoile()
 }
-function majToast(dtReal: number): void {
+function majToast(): void {
+  const now = performance.now()
+  const dt = toastHorloge > 0 ? Math.min((now - toastHorloge) / 1000, 0.5) : 0
+  toastHorloge = now
   if (toastTimer > 0) {
-    toastTimer -= dtReal
-    if (toastTimer <= 0) tropheeToast.classList.remove('visible')
+    toastTimer -= dt
+    if (toastTimer <= 0) {
+      tropheeToast.classList.remove('visible')
+      document.body.classList.remove('toast-on')
+    }
     return
   }
   const t = toastFile.shift()
@@ -1779,17 +1821,38 @@ function majToast(dtReal: number): void {
   const voir = t.fiche
     ? `<em class="tt-voir">${manette.connectee ? 'SELECT · VOIR LA FICHE' : 'VOIR LA FICHE'}</em>`
     : ''
-  tropheeToast.innerHTML = `<i>${t.icone}</i><div><b>${t.sur ?? 'TROPHÉE DÉBLOQUÉ'}</b>${t.nom}${voir}</div>`
+  const genre = toastGenre(t)
+  const duree = t.fiche ? 5.2 : 3.8
+  tropheeToast.style.setProperty('--tt', TOAST_TEINTE[genre])
+  tropheeToast.style.setProperty('--dur', `${duree}s`)
+  tropheeToast.dataset.genre = genre
+  tropheeToast.innerHTML =
+    `<span class="tt-cartouche"><i>${t.icone}</i></span>` +
+    `<span class="tt-corps"><b>${t.sur ?? 'TROPHÉE DÉBLOQUÉ'}</b>` +
+    `<span class="tt-nom">${t.nom}</span>${voir}</span>` +
+    `<span class="tt-vie"></span>`
   if (t.fiche) tropheeToast.dataset.fiche = t.fiche
   else delete tropheeToast.dataset.fiche
   tropheeToast.classList.toggle('cliquable', Boolean(t.fiche))
+  // relancer l'entrée quand deux récompenses s'enchaînent : sans ce
+  // redémarrage, la seconde hériterait de l'animation déjà consommée
+  tropheeToast.classList.remove('visible')
+  void tropheeToast.offsetWidth
   tropheeToast.classList.add('visible')
-  toastTimer = t.fiche ? 5.2 : 3.8
+  // le panneau des instruments occupe le MÊME coin : il se décale sous le
+  // toast le temps qu'il vive, au lieu de disparaître dessous
+  document.documentElement.style.setProperty(
+    '--toast-h',
+    `${Math.round(tropheeToast.offsetHeight) + 10}px`,
+  )
+  document.body.classList.add('toast-on')
+  toastTimer = duree
 }
 tropheeToast.addEventListener('click', () => {
   const fiche = tropheeToast.dataset.fiche
   if (!fiche || !tropheeToast.classList.contains('visible')) return
   tropheeToast.classList.remove('visible')
+  document.body.classList.remove('toast-on')
   toastTimer = 0
   ouvreCodexSur(fiche)
 })
@@ -1801,7 +1864,7 @@ let vuGel = -1
 let vuVapeur = -1
 let tropheeEchant = 0
 function updateTrophees(dtReal: number): void {
-  majToast(dtReal)
+  majToast()
   if (tropheeNiveauRef !== level) {
     tropheeNiveauRef = level
     gelContinu = 0
@@ -6628,6 +6691,126 @@ function simuleBonbonne(surplus = 2): void {
 
 // ---- LE PUPITRE D'ESSAIS : les événements du jeu, simulés au doigt ----
 // La console navigateur n'existe ni sur Steam Deck ni sur mobile : le
+/** Le réglage système « moins d'animations » : la mise en scène du tirage
+ * se saute, le jeu reste jouable au même rythme. */
+function sansAnimation(): boolean {
+  try {
+    return matchMedia('(prefers-reduced-motion: reduce)').matches
+  } catch {
+    return false
+  }
+}
+
+// ---- LA CARTE DE RÉCOMPENSE : un seul dessin, trois emplois ----
+// L'atelier (vignette), le tirage de fin de salle (draft) et l'aperçu
+// vivant de la forge passent tous par `carteHTML`. Ce que le concepteur
+// fabrique a donc EXACTEMENT la tête de ce que le joueur tire — c'est ce
+// qui fait de l'atelier autre chose qu'une maquette.
+// Contenu en phrasing pur (span/b/em/i) : la carte du tirage est un
+// <button>, qui n'admet ni <p> ni <ul>.
+
+const FAMILLE_TEINTE: Record<string, string> = {
+  corps: '#63b7e6',
+  etats: '#f2c98e',
+  collecte: '#6dffb8',
+  protocole: '#c99aff',
+}
+const CALIBRE_MOT: Record<string, string> = {
+  commun: 'Commun',
+  notable: 'Notable',
+  majeur: 'Majeur',
+}
+// les noms de famille en court : sur une carte, « Le corps et sa matière »
+// mange la ligne et répète le titre de la rangée
+const FAMILLE_COURT: Record<string, string> = {
+  corps: 'Corps',
+  etats: 'États',
+  collecte: 'Collecte',
+  protocole: 'Protocole',
+}
+
+/** La valeur d'un effet, en clair : « +40 % », « −20 % », « +1 ». Jamais
+ * « ×0,8 » — un joueur ne lit pas un facteur. */
+function valeurEffetLisible(e: { levier: string; valeur: number }): string {
+  const l = levierDef(e.levier)
+  if (!l) return ''
+  if (l.mode === 'add') {
+    // un levier additif dont le PAS est sous l'unité compte en points de
+    // rendement, pas en unités : « +0,35 » ne veut rien dire, « +35 pts » si
+    const v = l.pas < 1 ? Math.round(e.valeur * 100) : e.valeur
+    const unite = l.pas < 1 ? ' pts' : ''
+    return `${v > 0 ? '+' : '−'}${Math.abs(v)}${unite}`
+  }
+  const pct = Math.round((e.valeur - 1) * 100)
+  return `${pct > 0 ? '+' : '−'}${Math.abs(pct)} %`
+}
+
+interface CarteOpts {
+  variante: 'vignette' | 'draft' | 'apercu'
+  /** Déjà embarquée dans la run en cours. */
+  tenue?: boolean
+  /** Prix en condensat (tirage) : 0 = offerte, undefined = pas de prix. */
+  prix?: number
+  /** HTML des boutons d'action, glissé dans le pied (atelier). */
+  actions?: string
+  /** Rendu en <button> (tirage) plutôt qu'en <div>. */
+  bouton?: boolean
+  /** Attributs supplémentaires sur l'élément racine. */
+  attrs?: string
+}
+
+/** Le dessin complet d'une carte, prêt à coller dans un innerHTML. */
+function carteHTML(d: InstrumentDef, o: CarteOpts): string {
+  const fams = famillesInstrument(d)
+  const t1 = FAMILLE_TEINTE[fams[0] ?? 'corps'] ?? '#63b7e6'
+  const t2 = FAMILLE_TEINTE[fams[1] ?? fams[0] ?? 'corps'] ?? t1
+  const cal = calibreInstrument(d)
+  const ctr = aContrepartie(d)
+  const rang =
+    `${CALIBRE_MOT[cal]} · ` +
+    fams.map((f) => FAMILLE_COURT[f] ?? f).join(' + ')
+  const effets = d.effets
+    .map((e) => {
+      const l = levierDef(e.levier)
+      if (!l) return ''
+      const prix = sensEffet(e) < 0
+      return (
+        `<span class="eff${prix ? ' eff-prix' : ''}">` +
+        `<i>${htmlSafe(l.nom)}</i><em>${valeurEffetLisible(e)}</em>` +
+        `<span class="eff-jauge" style="--f:${forceEffet(e).toFixed(2)}"></span>` +
+        `</span>`
+      )
+    })
+    .join('')
+  const pied: string[] = []
+  if (o.tenue) pied.push('<i class="crt-tenue">EN POCHE</i>')
+  if (d.perso) pied.push('<i class="crt-perso">ATELIER</i>')
+  if (o.prix !== undefined)
+    pied.push(
+      o.prix > 0
+        ? `<em class="crt-prix">${o.prix} cL</em>`
+        : `<em class="crt-prix crt-offert">offert</em>`,
+    )
+  if (o.actions) pied.push(`<span class="crt-actions">${o.actions}</span>`)
+  const cls =
+    `crt crt-${o.variante} cal-${cal}` +
+    (ctr ? ' a-contrepartie' : '') +
+    (d.perso ? ' crt-perso-c' : '')
+  const balise = o.bouton ? 'button' : 'div'
+  return (
+    `<${balise} class="${cls}" style="--fam:${t1};--fam2:${t2}"${o.bouton ? ' type="button"' : ''}${o.attrs ?? ''}>` +
+    `<span class="crt-halo"></span>` +
+    `<span class="crt-tete"><i class="crt-ico">${htmlSafe(d.icone)}</i>` +
+    `<span class="crt-titres"><b class="crt-nom">${htmlSafe(d.nom)}</b>` +
+    `<i class="crt-rang">${htmlSafe(rang)}</i></span></span>` +
+    `<span class="crt-txt">${htmlSafe(descriptionInstrument(d))}</span>` +
+    (ctr ? `<span class="crt-ctr">CONTREPARTIE</span>` : '') +
+    `<span class="crt-effets">${effets}</span>` +
+    (pied.length ? `<span class="crt-pied">${pied.join('')}</span>` : '') +
+    `</${balise}>`
+  )
+}
+
 // ---- L'ATELIER DES RÉCOMPENSES ----
 // Un écran pour VOIR le catalogue (ce que chaque carte tire comme levier,
 // livrée ou fabriquée), et une forge pour en faire de neuves avec les
@@ -6636,68 +6819,127 @@ function simuleBonbonne(surplus = 2): void {
 const recEl = document.getElementById('recompenses') as HTMLDivElement
 let recEffetsForme: { levier: string; valeur: number }[] = []
 let recEdite: string | null = null // l'identifiant en cours de retouche
+let recFiltre = 'tout'
 
 function recDit(msgs: string[], bon = false): void {
   const el = document.getElementById('rec-refus')
   if (!el) return
-  el.style.color = bon ? '#a9e7c9' : ''
+  el.classList.toggle('bon', bon)
   el.innerHTML = msgs.map((m) => htmlSafe(m)).join('<br>')
 }
 
-/** Le corps d'une carte : ses effets, dits par leurs leviers. */
-function recChips(d: InstrumentDef): string {
-  return d.effets
-    .map((e: { levier: string; valeur: number }) => {
-      const l = levierDef(e.levier)
-      if (!l) return ''
-      // une contrepartie se lit au signe : « +2 » et « −2 », jamais « +-2 »
-      const v =
-        l.mode === 'mult'
-          ? `×${e.valeur}`
-          : `${e.valeur > 0 ? '+' : '−'}${Math.abs(e.valeur)}`
-      return `<span class="rec-effet">${htmlSafe(l.nom)} ${v}</span>`
-    })
-    .join('')
+/** Les chips de tri : d'abord la provenance, puis les quatre familles. */
+const AT_FILTRES: { cle: string; mot: string; teinte?: string }[] = [
+  { cle: 'tout', mot: 'Toutes' },
+  { cle: 'atelier', mot: 'Atelier', teinte: '#8fd8c8' },
+  { cle: 'poche', mot: 'En poche', teinte: '#6dffb8' },
+  { cle: 'corps', mot: FAMILLE_NOMS.corps, teinte: FAMILLE_TEINTE.corps },
+  { cle: 'etats', mot: FAMILLE_NOMS.etats, teinte: FAMILLE_TEINTE.etats },
+  { cle: 'collecte', mot: FAMILLE_NOMS.collecte, teinte: FAMILLE_TEINTE.collecte },
+  { cle: 'protocole', mot: FAMILLE_NOMS.protocole, teinte: FAMILLE_TEINTE.protocole },
+]
+
+function renderRecFiltres(): void {
+  const host = document.getElementById('at-filtres')
+  if (!host) return
+  host.innerHTML = AT_FILTRES.map(
+    (f) =>
+      `<button type="button" class="at-chip${f.cle === recFiltre ? ' on' : ''}"` +
+      ` data-filtre="${f.cle}"${f.teinte ? ` style="--fc:${f.teinte}"` : ''}>` +
+      `${htmlSafe(f.mot.toUpperCase())}</button>`,
+  ).join('')
 }
 
+function renderRecCompteurs(): void {
+  const mets = (id: string, n: number): void => {
+    const el = document.getElementById(id)
+    if (el) el.textContent = String(n)
+  }
+  mets('at-n-livrees', INSTRUMENTS.length)
+  mets('at-n-atelier', recompensesPerso().length)
+  mets('at-n-poche', run.instruments.length)
+}
+
+/** La vitrine : les cartes du catalogue, groupées par FAMILLE de leviers
+ * — c'est le rangement qui parle au joueur (« qu'est-ce que ça touche »),
+ * pas celui du dépôt (« livrée ou fabriquée »), déjà dit par le liseré. */
 function renderRecListe(): void {
   const host = document.getElementById('rec-liste')
   if (!host) return
-  const carte = (d: InstrumentDef): string => {
-    const tenue = run.instruments.includes(d.id)
-    return (
-      `<div class="rec-carte${d.perso ? ' perso' : ''}"><i>${htmlSafe(d.icone)}</i>` +
-      `<div class="rec-corps-carte"><b>${htmlSafe(d.nom)}${tenue ? ' · embarquée' : ''}</b>` +
-      `<span class="rec-desc">${htmlSafe(descriptionInstrument(d))}</span>` +
-      recChips(d) +
-      `</div><div class="rec-boutons">` +
-      `<button type="button" data-rec-essai="${htmlSafe(d.id)}" title="embarquer tout de suite dans la run en cours">essayer</button>` +
-      (d.perso
-        ? `<button type="button" data-rec-edit="${htmlSafe(d.id)}" title="reprendre cette carte">✎</button>` +
-          `<button type="button" data-rec-sup="${htmlSafe(d.id)}" title="retirer de l’atelier">✕</button>`
-        : '') +
-      `</div></div>`
+  renderRecCompteurs()
+  const vignette = (d: InstrumentDef): string =>
+    carteHTML(d, {
+      variante: 'vignette',
+      tenue: run.instruments.includes(d.id),
+      actions:
+        `<button type="button" data-rec-essai="${htmlSafe(d.id)}" title="embarquer tout de suite dans la run en cours">essayer</button>` +
+        (d.perso
+          ? `<button type="button" data-rec-edit="${htmlSafe(d.id)}" title="reprendre cette carte">✎</button>` +
+            `<button type="button" data-rec-sup="${htmlSafe(d.id)}" title="retirer de l’atelier">✕</button>`
+          : ''),
+    })
+  const tout = catalogueRecompenses().filter((d) => {
+    if (recFiltre === 'tout') return true
+    if (recFiltre === 'atelier') return d.perso === true
+    if (recFiltre === 'poche') return run.instruments.includes(d.id)
+    return famillesInstrument(d).includes(
+      recFiltre as ReturnType<typeof famillesInstrument>[number],
     )
+  })
+  if (tout.length === 0) {
+    host.innerHTML = `<p class="at-vide">Aucune carte ici. Changez de filtre, ou fabriquez-en une : la forge, à droite, part d’un nom et d’un levier.</p>`
+    return
   }
-  const perso = recompensesPerso()
-  host.innerHTML =
-    `<div class="rec-fam">Atelier — fabriquées sur ce poste (${perso.length})</div>` +
-    (perso.length
-      ? perso.map(carte).join('')
-      : `<div class="rec-aide">Rien encore. La forge, à droite, part d’un nom et d’un levier.</div>`) +
-    `<div class="rec-fam">Livrées avec le jeu (${INSTRUMENTS.length})</div>` +
-    INSTRUMENTS.map(carte).join('')
+  const familles = ['corps', 'etats', 'collecte', 'protocole'] as const
+  let out = ''
+  for (const fam of familles) {
+    // une carte multi-familles paraît sous SA PREMIÈRE famille, pas deux fois
+    const lot = tout.filter((d) => famillesInstrument(d)[0] === fam)
+    if (lot.length === 0) continue
+    out +=
+      `<div class="at-fam" style="--fc:${FAMILLE_TEINTE[fam]}">${htmlSafe(FAMILLE_NOMS[fam].toUpperCase())}` +
+      `<small>${lot.length}</small></div>` +
+      `<div class="at-rangee">${lot.map(vignette).join('')}</div>`
+  }
+  host.innerHTML = out
 }
 
+/** La carte en cours de fabrication, telle que la validation la verra. */
+function recBrouillon(): InstrumentDef {
+  const lit = (id: string): string =>
+    (document.getElementById(id) as HTMLInputElement | null)?.value ?? ''
+  const nom = lit('rec-nom').trim()
+  return {
+    id: recEdite ?? idDepuisNom(nom),
+    nom: nom || 'Carte sans nom',
+    desc: lit('rec-desc').trim(),
+    icone: lit('rec-icone').trim() || '✦',
+    effets: recEffetsForme as { levier: LevierId; valeur: number }[],
+    perso: true,
+  }
+}
+
+/** L'APERÇU VIVANT : la carte se dessine pendant qu'on la fabrique, et le
+ * verdict dit son rang — le calibre se DÉDUIT, il n'y a rien à saisir. */
 function recApercu(): void {
-  const el = document.getElementById('rec-apercu')
-  if (!el) return
-  const phrases = recEffetsForme
-    .map((e: { levier: string; valeur: number }) =>
-      phraseEffet(e as { levier: LevierId; valeur: number }),
-    )
-    .filter(Boolean)
-  el.textContent = phrases.join(' ')
+  const boite = document.getElementById('at-apercu-carte')
+  const verdict = document.getElementById('rec-apercu')
+  const d = recBrouillon()
+  if (boite)
+    boite.innerHTML =
+      d.effets.length === 0
+        ? `<p class="at-vide">Posez un levier : la carte se dessinera ici.</p>`
+        : carteHTML(d, { variante: 'apercu' })
+  if (verdict) {
+    if (d.effets.length === 0) verdict.textContent = ''
+    else {
+      const cal = calibreInstrument(d)
+      verdict.textContent =
+        `Calibre ${CALIBRE_MOT[cal].toUpperCase()}` +
+        (aContrepartie(d) ? ' · à contrepartie' : '') +
+        ` · ${famillesInstrument(d).map((f) => FAMILLE_NOMS[f]).join(' + ')}`
+    }
+  }
 }
 
 function renderRecEffets(): void {
@@ -6706,8 +6948,10 @@ function renderRecEffets(): void {
   host.innerHTML = ''
   recEffetsForme.forEach((e, i) => {
     const def = levierDef(e.levier)
-    const ligne = document.createElement('div')
-    ligne.className = 'rec-ligne'
+    const bloc = document.createElement('div')
+    bloc.className = 'at-effet'
+    const tete = document.createElement('div')
+    tete.className = 'at-effet-tete'
     const sel = document.createElement('select')
     for (const fam of ['corps', 'etats', 'collecte', 'protocole'] as const) {
       const g = document.createElement('optgroup')
@@ -6723,37 +6967,29 @@ function renderRecEffets(): void {
     }
     sel.addEventListener('change', () => {
       const l = levierDef(sel.value)
-      recEffetsForme[i] = {
-        levier: sel.value,
-        // à changement de levier, on propose une valeur qui FAIT quelque
-        // chose : le milieu de la plage utile, jamais la valeur neutre
-        valeur: l
-          ? Math.round(((l.min + l.max) / 2 / l.pas) * 1) * l.pas
-          : 1,
-      }
+      // à changement de levier, on propose une valeur qui FAIT quelque
+      // chose, et qui tombe sur le pas du levier
+      recEffetsForme[i] = { levier: sel.value, valeur: l ? valeurProposee(l) : 1 }
       renderRecEffets()
       recApercu()
     })
     const val = document.createElement('input')
     val.type = 'number'
+    val.className = 'at-val'
+    const glis = document.createElement('input')
+    glis.type = 'range'
     if (def) {
-      val.min = String(def.min)
-      val.max = String(def.max)
-      val.step = String(def.pas)
+      for (const c of [val, glis]) {
+        c.min = String(def.min)
+        c.max = String(def.max)
+        c.step = String(def.pas)
+      }
     }
     val.value = String(e.valeur)
-    val.addEventListener('input', () => {
-      recEffetsForme[i].valeur = Number(val.value)
-      const p = ligne.nextElementSibling as HTMLElement | null
-      if (p && p.classList.contains('rec-phrase'))
-        p.textContent = phraseEffet(
-          recEffetsForme[i] as { levier: LevierId; valeur: number },
-        )
-      recApercu()
-    })
+    glis.value = String(e.valeur)
     const sup = document.createElement('button')
     sup.type = 'button'
-    sup.className = 'rec-lien'
+    sup.className = 'at-sup'
     sup.textContent = '✕'
     sup.title = 'retirer cet effet'
     sup.addEventListener('click', () => {
@@ -6761,11 +6997,46 @@ function renderRecEffets(): void {
       renderRecEffets()
       recApercu()
     })
-    ligne.append(sel, val, sup)
+    tete.append(sel, val, sup)
+    // LA PISTE : la moitié qui AVANTAGE le joueur est teintée en vert, la
+    // moitié qui coûte en ambre, et la valeur neutre porte un repère. On
+    // voit qu'on franchit la ligne au lieu de le déduire d'un signe.
+    const piste = document.createElement('div')
+    piste.className = 'at-piste'
+    piste.appendChild(glis)
     const phrase = document.createElement('p')
-    phrase.className = 'rec-phrase'
-    phrase.textContent = phraseEffet(e as { levier: LevierId; valeur: number })
-    host.append(ligne, phrase)
+    phrase.className = 'at-phrase'
+    const raconte = (): void => {
+      const eff = recEffetsForme[i] as { levier: LevierId; valeur: number }
+      phrase.textContent = phraseEffet(eff)
+      bloc.classList.toggle('eff-prix', sensEffet(eff) < 0)
+    }
+    if (def) {
+      const n = neutre(def)
+      const part = Math.max(
+        0,
+        Math.min(100, ((n - def.min) / (def.max - def.min)) * 100),
+      )
+      // `bon: +1` : le gain est à DROITE du repère ; `bon: -1` : à gauche
+      const gauche = def.bon > 0 ? 'rgba(242,201,142,.22)' : 'rgba(109,255,184,.22)'
+      const droite = def.bon > 0 ? 'rgba(109,255,184,.22)' : 'rgba(242,201,142,.22)'
+      piste.style.setProperty('--gsplit', `${part.toFixed(1)}%`)
+      piste.style.setProperty('--g1', gauche)
+      piste.style.setProperty('--g2', droite)
+    }
+    const change = (src: HTMLInputElement, autre: HTMLInputElement): void => {
+      const v = Number(src.value)
+      if (!Number.isFinite(v)) return
+      recEffetsForme[i].valeur = v
+      autre.value = src.value
+      raconte()
+      recApercu()
+    }
+    val.addEventListener('input', () => change(val, glis))
+    glis.addEventListener('input', () => change(glis, val))
+    raconte()
+    bloc.append(tete, piste, phrase)
+    host.append(bloc)
   })
 }
 
@@ -6792,10 +7063,12 @@ function recReprend(d: InstrumentDef): void {
   renderRecEffets()
   recApercu()
   recDit([])
+  document.querySelector('.at-etabli')?.scrollIntoView({ block: 'nearest' })
 }
 
 function ouvreRecompenses(): void {
   recEl.hidden = false
+  renderRecFiltres()
   renderRecListe()
   renderRecEffets()
   recApercu()
@@ -6806,8 +7079,16 @@ document
 document.getElementById('recompenses-fermer')?.addEventListener('click', () => {
   recEl.hidden = true
 })
-recEl?.addEventListener('pointerdown', (e) => {
-  if (e.target === recEl) recEl.hidden = true
+// l'aperçu suit la frappe : nom, icône et texte se voient sur la carte
+for (const id of ['rec-nom', 'rec-icone', 'rec-desc'])
+  document.getElementById(id)?.addEventListener('input', recApercu)
+document.getElementById('at-filtres')?.addEventListener('click', (ev) => {
+  const b = (ev.target as HTMLElement).closest('button')
+  const f = b?.dataset.filtre
+  if (!f) return
+  recFiltre = f
+  renderRecFiltres()
+  renderRecListe()
 })
 document.getElementById('rec-ajout-effet')?.addEventListener('click', () => {
   // le premier levier libre : on ne propose jamais deux fois le même sur
@@ -6818,7 +7099,7 @@ document.getElementById('rec-ajout-effet')?.addEventListener('click', () => {
     recDit(['Tous les leviers sont déjà posés sur cette carte.'])
     return
   }
-  recEffetsForme.push({ levier: l.id, valeur: (l.min + l.max) / 2 })
+  recEffetsForme.push({ levier: l.id, valeur: valeurProposee(l) })
   renderRecEffets()
   recApercu()
 })
@@ -6885,7 +7166,7 @@ document.getElementById('rec-liste')?.addEventListener('click', (ev) => {
   const edit = b.dataset.recEdit
   const sup = b.dataset.recSup
   if (essai) {
-    const d = instrumentDef(essai, catalogueRecompenses())
+    const d = carteDef(essai)
     if (!d) return
     const gainVies = valeurLevier(d.effets, 'vies')
     if (gainVies > 0) run.vies = Math.min(VIES_MAX, run.vies + gainVies)
@@ -6899,7 +7180,7 @@ document.getElementById('rec-liste')?.addEventListener('click', (ev) => {
     renderRecListe()
     recDit([`« ${d.nom} » embarquée — le tableau est rechargé pour qu’elle agisse.`], true)
   } else if (edit) {
-    const d = instrumentDef(edit, catalogueRecompenses())
+    const d = carteDef(edit)
     if (d) recReprend(d)
   } else if (sup) {
     if (retireRecompense(sup)) {
@@ -7043,6 +7324,22 @@ function lanceManoeuvre(quoi: string): void {
           records.ajouteFiole(f.id)
           pupDit(`${f.nom} ajoutée à la collection (${fioleDef(f.id)?.desc}).`)
         }
+        break
+      }
+      case 'toasts': {
+        // LES CINQ POPUPS DE RÉCOMPENSE, à la file : chaque nature a sa
+        // couleur et son cartouche, et l'enchaînement se voit d'un coup.
+        // Rien ne se grave : ni trophée, ni fiche, ni fiole — c'est un
+        // essai d'affichage, pas un gain.
+        pupitreEl.hidden = true
+        toastFile.push(
+          { nom: 'Essai d’affichage — rien n’est gravé', icone: '🏆', genre: 'trophee' },
+          { nom: 'Essai d’affichage — rien n’est gravé', icone: '📄', sur: 'CODEX — NOUVELLE FICHE', genre: 'codex' },
+          { nom: '+3 mémoire — essai d’affichage', icone: '✦', sur: 'ÉCLAT DE MÉMOIRE', genre: 'eclat' },
+          { nom: 'Essai d’affichage — rien n’est gravé', icone: '🧪', sur: 'FIOLE TROUVÉE', genre: 'fiole' },
+          { nom: 'Essai d’affichage — rien n’est débité', icone: '🛒', sur: 'L’ÉCONOMAT', genre: 'achat' },
+        )
+        pupDit('Cinq popups à la file — aucun registre touché.')
         break
       }
       case 'cycle':
@@ -7475,7 +7772,7 @@ function mbMontreVersement(): void {
   const bloc = mbEl('mb-choix')
   bloc.hidden = false
   mbEl('mb-choix-titre').textContent = 'OÙ VERSER LE SURPLUS ?'
-  const host = mbEl('mb-cartes')
+  const host = mbCartes()
   host.innerHTML = ''
   const espace = Math.max(0, capBonbonne() - run.bonbonneLiters)
   const verse = Math.min(b.surplus, espace)
@@ -7650,11 +7947,21 @@ function mbVerseXp(litres: number): void {
   // les cartes du versement s'effacent : la jauge prend la scène
   mbEl('mb-choix-titre').textContent =
     litres > 0.005 ? 'L’ÉTALONNAGE SE CHARGE' : 'ÉTALONNAGE'
-  mbEl('mb-cartes').innerHTML = ''
+  mbCartes().innerHTML = ''
   mbAnimeEtalonnage(avantXp, run.xp, () => {
     if (mbDraftsRestants > 0) mbMontreDraft()
     else mbApresRecompense()
   })
+}
+
+/** Le porte-cartes de la cérémonie, remis à neuf. Versement, tirage et
+ * choix de salle le réemploient tour à tour : il ne doit rien garder de
+ * l'étape précédente — ni disposition, ni mise en scène en cours. */
+function mbCartes(): HTMLElement {
+  const h = mbEl('mb-cartes')
+  h.classList.remove('mb-draft', 'mb-isole', 'mb-elu')
+  h.style.removeProperty('--n')
+  return h
 }
 
 /** Un TIRAGE d'instruments (palier franchi) : trois cartes, on en emporte
@@ -7664,7 +7971,7 @@ function mbMontreDraft(): void {
   const palierNo = paliersAtteints(run.xp) - mbDraftsRestants + 1
   mbEl('mb-choix-titre').textContent =
     `PALIER D'ÉTALONNAGE ${palierNo} — EMPORTEZ UN INSTRUMENT`
-  const host = mbEl('mb-cartes')
+  const host = mbCartes()
   host.innerHTML = ''
   // le CARNET DU SEMBLABLE ouvre une quatrième carte
   const cartes = tirageInstruments(
@@ -7686,22 +7993,43 @@ function mbMontreDraft(): void {
     mbApresRecompense()
     return
   }
-  for (const carte of cartes) {
+  // les colonnes suivent le NOMBRE de cartes : le Carnet du Semblable en
+  // ouvre une quatrième, qui passait jusqu'ici seule à la ligne
+  host.classList.add('mb-draft')
+  host.style.setProperty('--n', String(Math.min(4, cartes.length)))
+  // le tirage se POSE : chaque carte arrive avec un décalage, et le survol
+  // isole celle qu'on regarde (le motif de l'écran des mémoires). Au
+  // clavier ou à la manette, le focus fait le même office que la souris.
+  const isole = (el: HTMLElement | null): void => {
+    host.classList.toggle('mb-isole', el !== null)
+    for (const c of host.children) c.classList.toggle('crt-survol', c === el)
+  }
+  cartes.forEach((carte, i) => {
     const def = carteDef(carte.id)
-    if (!def) continue
+    if (!def) return
     const payable = carte.prix === 0 || condensat >= carte.prix
-    const btn = document.createElement('button')
-    btn.type = 'button'
-    btn.className = 'mb-carte' + (payable ? '' : ' mb-pauvre')
-    btn.disabled = !payable
-    btn.innerHTML =
-      `<span class="mb-ico">${def.icone}</span>` +
-      `<b>${def.nom}</b><small>${def.desc}</small>` +
-      (carte.prix > 0
-        ? `<em class="mb-prix">${carte.prix} cL</em>`
-        : `<em class="mb-prix mb-offert">offert</em>`)
+    const enveloppe = document.createElement('div')
+    enveloppe.innerHTML = carteHTML(def, {
+      variante: 'draft',
+      bouton: true,
+      prix: carte.prix,
+    })
+    const btn = enveloppe.firstElementChild as HTMLButtonElement
+    if (!payable) {
+      btn.classList.add('mb-pauvre')
+      btn.disabled = true
+    }
+    btn.style.setProperty('--i', String(i))
+    for (const ev of ['pointerenter', 'focusin'] as const)
+      btn.addEventListener(ev, () => isole(btn))
+    for (const ev of ['pointerleave', 'focusout'] as const)
+      btn.addEventListener(ev, () => isole(null))
     btn.addEventListener('click', () => {
       if (!depenseCondensat(carte.prix)) return
+      // LA CARTE ÉLUE s'embrase, les autres se retirent — puis la suite
+      isole(null)
+      host.classList.add('mb-elu')
+      btn.classList.add('crt-elue')
       // le levier « vies » se consomme À L'INSTANT (une vie n'est pas un
       // facteur qu'on relit : elle se prend) ; tout le reste s'embarque
       const def = carteDef(carte.id)
@@ -7714,10 +8042,12 @@ function mbMontreDraft(): void {
         run.instruments.push(carte.id)
       majInstrumentsUI()
       bande.ponctuation('sting-collecte', 0.7)
-      suite()
+      // l'embrasement dure 320 ms ; sans animation (réglage système), la
+      // suite s'enchaîne quand même — le tirage reste jouable
+      window.setTimeout(suite, sansAnimation() ? 0 : 320)
     })
     host.appendChild(btn)
-  }
+  })
 }
 
 // ---- Le POOL de salles : le choix de la prochaine, après la récompense --
@@ -7909,7 +8239,7 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
   mbPeintEtal(run.xp)
   // le COMPACT : le bilan déjà lu se replie, les cartes prennent la scène
   mbVeil.querySelector('.mb-panneau')?.classList.add('mb-compact')
-  const host = mbEl('mb-cartes')
+  const host = mbCartes()
   host.innerHTML = ''
   // trois cartes : trois colonnes ; quatre (l'écrite en plus) : carré 2×2
   host.classList.toggle('mb-trio', cartes.length === 3)
@@ -7951,7 +8281,7 @@ function mbMontreSalles(props: LevelDef[]): void {
   mbEl('mb-choix-titre').textContent =
     'PAROI DU SAS OUVERTE — CHOISISSEZ LA PROCHAINE SALLE'
   mbVeil.querySelector('.mb-panneau')?.classList.add('mb-compact')
-  const host = mbEl('mb-cartes')
+  const host = mbCartes()
   host.innerHTML = ''
   for (const lv of props) {
     const c21 = decodeCode21(lv.code)
@@ -7987,7 +8317,7 @@ function mbMontreFin(): void {
   // la jauge d'étalonnage reste en scène (l'XP se lit dessus, en grand)
   mbEl('mb-etal').hidden = false
   mbPeintEtal(run.xp)
-  const host = mbEl('mb-cartes')
+  const host = mbCartes()
   host.innerHTML = ''
   const info = document.createElement('div')
   info.className = 'mb-jauges'
@@ -8010,7 +8340,7 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
   mbDraftsRestants = 0
   mbBilanCourant = b
   mbVeil.hidden = false
-  mbEl('mb-cartes').classList.remove('mb-trio') // la disposition du choix repart à neuf
+  mbCartes().classList.remove('mb-trio') // la disposition du choix repart à neuf
   mbVeil.querySelector('.mb-panneau')?.classList.remove('mb-compact')
   // état de départ
   mbEl('mb-eau').style.height = '0%'
