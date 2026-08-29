@@ -22,6 +22,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '29/08/2026 23:55',
+    title: 'LE MODULE MÉDUSE EN RUBAN : le plan du concepteur, tout éditable',
+    notes: [
+      'Le hub est rebâti d’après le schéma livré : un RUBAN horizontal de 9000 × 2400 où l’on avance toujours vers l’est. LA CUVE (la naissance) → L’AILE DES ENDORMIS et ses six niches à fioles, trois au nord, trois au sud (celle du centre est VIDE) → LE BAC D’ESSAI et ses huit surfaces à toucher sans enjeu → le couloir des MÉMOIRES, deux rails qui encadrent le passage et ouvrent l’écran du cycle au contact → LE CENTRE DE CONTRÔLE et ses pictogrammes → le couloir des RECORDS, le banc optique des calibrations → LE CARREFOUR et ses trois routes : la branche du GAZ au nord derrière une GRILLE, celle de la GLACE au sud derrière un RIDEAU, et L’ÉTAL du comptoir tout droit, quatre alcôves et le Semblable derrière → la table de départ, l’alcôve SCELLÉE du secteur 4 au-dessus, et LE SAS.',
+      'Tout y est ÉDITABLE : plots d’article, banc des mémoires, marchand, et les treize ancres méta (les 7 stations de réparation, les barrières d’ailes, la table de départ, l’alcôve du secteur 4, son sceau, la porte de la cuve, les deux sorties gardées) sont des DONNÉES POSÉES, pas de la géométrie devinée. Le module s’ouvre dans l’éditeur par la liste des tableaux livrés — « HUB — Le module Méduse », en tête — et se retouche pièce par pièce, poignée par poignée.',
+      'Une aile condamnée peut désormais avoir PLUSIEURS bouches : l’aile des endormis et le bac d’essai sont des salles-passage dont les deux alcôves (nord et sud) se ferment ensemble tant que la station n’est pas payée, et se rouvrent d’un coup à la réparation — le couloir central, lui, reste toujours franchissable : on n’est jamais enfermé.',
+      'Vérifié : le tableau passe la validation du format, le sas se rejoint depuis la cuve, les deux routes gardées ne s’ouvrent QUE par leur matière (grille au nord, rideau au sud, cloisons sans fente), les quatre alcôves du comptoir et les sept stations tiennent hors des murs, 56 boîtes sur les 90 permises. 517 tests verts.',
+    ],
+  },
+  {
     date: '29/08/2026 23:47',
     title: 'Le rapport de performance passe au banc — et se prend enfin EN JEU',
     notes: [

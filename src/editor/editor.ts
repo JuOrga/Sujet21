@@ -3393,10 +3393,13 @@ export class LevelEditor {
     // Tableaux LIVRÉS : une copie s'ouvre comme brouillon — pour étudier la
     // construction des salles (miroirs, prisme, plasma…) ou en repartir.
     const selLivres = this.el<HTMLSelectElement>('ed-livres')
-    // le HUB en tête : publié dans la bibliothèque (code « HUB »), il
-    // REMPLACE le laboratoire joué — sans jamais entrer dans la séquence.
-    // Le hub COMPACT (chantier, code HUB2) s'étudie et se copie ici aussi ;
-    // pour qu'il devienne LE laboratoire, renommer sa copie en HUB.
+    // le HUB en tête (code « HUB », le module Méduse en RUBAN) : publié
+    // dans la bibliothèque, il REMPLACE le laboratoire joué — sans jamais
+    // entrer dans la séquence. Il porte TOUT son méta en données (plots,
+    // banc, marchand, ancres de réparation et de sas) : la copie s'ouvre
+    // ici pièce par pièce. Le hub COMPACT (chantier, code HUB2) s'étudie
+    // et se copie aussi ; pour qu'il devienne LE laboratoire, renommer sa
+    // copie en HUB.
     // L'ÉCONOMAT suit la même règle que le HUB : publié sous le code « ECO »,
     // sa copie remplace la salle-boutique jouée — plots, marchand compris.
     const livres = [
