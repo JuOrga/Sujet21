@@ -74,13 +74,26 @@ describe('les réparations — le hub accidenté', () => {
       [TABLEAU_HUB, ZONES_HUB_GRAND],
       [TABLEAU_HUB_COMPACT, ZONES_HUB_COMPACT],
     ] as const) {
-      const lv = appliqueReparations(base, [], true)
+      const lv = appliqueReparations(base, [], { cuveClose: true })
       const p0 = lv.portes?.[0]
       expect(p0?.minX).toBe(zones.porteCuve.minX)
       expect(p0?.canal).toBeLessThan(0)
       // sans cuve close : la première porte n'est PAS celle de la cuve
-      const lv2 = appliqueReparations(base, [], false)
+      const lv2 = appliqueReparations(base, [], {})
       expect(lv2.portes?.[0]?.minX).not.toBe(zones.porteCuve.minX)
+    }
+  })
+
+  it('la fin ouverte : le sceau tombe, la signalétique bascule', () => {
+    for (const base of [TABLEAU_HUB, TABLEAU_HUB_COMPACT]) {
+      const avant = appliqueReparations(base, TOUTES, {})
+      const apres = appliqueReparations(base, TOUTES, { finOuverte: true })
+      // une porte de moins : le sceau n'est plus posé
+      expect(apres.portes?.length).toBe((avant.portes?.length ?? 0) - 1)
+      const textes = apres.labels.map((l) => l.text).join(' · ')
+      expect(textes).not.toContain('LE SECTEUR SCELLÉ|CE QUI DOIT PARTIR')
+      expect(textes).toContain('LE SECTEUR 4|LA ROUTE DU TÉLESCOPE')
+      expect(textes).toContain('LE SAS S’OUVRE|LE CHOIX VOUS APPARTIENT')
     }
   })
 

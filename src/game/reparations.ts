@@ -110,10 +110,18 @@ const CANAL_DEGAT = -21
  * chaque réparation non payée. Clone superficiel — base n'est JAMAIS
  * modifié (c'est peut-être l'entrée partagée de la bibliothèque). Un
  * tableau sans zones méta (vieil instantané) revient tel quel. */
+export interface OptionsHub {
+  /** L'acte 0 n'est pas joué : le sujet naît enfermé dans la cuve. */
+  cuveClose?: boolean
+  /** L'arc du récit est achevé ET la passerelle réparée : le sceau du
+   * secteur 4 tombe, la signalétique bascule. */
+  finOuverte?: boolean
+}
+
 export function appliqueReparations(
   base: LevelDef,
   faites: readonly string[],
-  cuveClose = false,
+  opts: OptionsHub = {},
 ): LevelDef {
   const zones = zonesDuHub(base)
   if (!zones) return base
@@ -129,11 +137,37 @@ export function appliqueReparations(
   // LA PORTE DE LA CUVE (acte 0) : le sujet naît enfermé — la séquence
   // ALERTE crève la brèche d'INDEX 0, cette porte doit donc rester la
   // toute première de la liste
-  if (cuveClose) portes.unshift({ ...zones.porteCuve, canal: CANAL_DEGAT })
+  if (opts.cuveClose)
+    portes.unshift({ ...zones.porteCuve, canal: CANAL_DEGAT })
 
   // LE SCEAU : tant que l'arc du récit n'est pas achevé, le secteur 4
-  // reste condamné — même passerelle réparée. (La fin le lèvera.)
-  portes.push({ ...zones.sceau, canal: CANAL_DEGAT })
+  // reste condamné — même passerelle réparée. La fin le lève, et la
+  // signalétique du scellé bascule.
+  if (!opts.finOuverte) {
+    portes.push({ ...zones.sceau, canal: CANAL_DEGAT })
+  } else {
+    for (const t of [
+      'LE SECTEUR SCELLÉ|CE QUI DOIT PARTIR',
+      'ACCÈS CONDAMNÉ|DEPUIS L’ACCIDENT',
+    ]) {
+      const i = labels.findIndex((l) => l.text === t)
+      if (i >= 0) labels.splice(i, 1)
+    }
+    const sc = zones.sasScelle
+    labels.push({
+      x: (sc.minX + sc.maxX) / 2,
+      y: sc.maxY + 190,
+      text: 'LE SECTEUR 4|LA ROUTE DU TÉLESCOPE',
+      tone: 'sas',
+      rang: 'secteur',
+    })
+    labels.push({
+      x: (sc.minX + sc.maxX) / 2,
+      y: sc.minY - 150,
+      text: 'LE SAS S’OUVRE|LE CHOIX VOUS APPARTIENT',
+      tone: 'sas',
+    })
+  }
 
   for (const r of manquantes) {
     const plot = zones.stations[r.id]

@@ -391,8 +391,100 @@ export const CINEMATIQUE_DEPART: CinematiqueDef = {
   ],
 }
 
+// ─── LA RÉVÉLATION : tout est raconté — le sceau du secteur 4 tombe.
+// Jouée par la règle « livre-revelation » au retour au module, quand le
+// dixième jalon du récit est servi. (Planches sur les images existantes :
+// le montage peut publier les siennes, les règles publiées priment.)
+export const CINEMATIQUE_REVELATION: CinematiqueDef = {
+  code: 'REVELATION',
+  titre: 'La révélation — le sceau tombe',
+  planches: [
+    {
+      image: '/assets/cine/ouverture-2.webp',
+      texte: 'Tout est consigné. Tout est lu. Il ne reste rien à cacher.',
+      duree: 5,
+      effet: 'zoom-avant',
+      fondu: 'noir',
+      bruitage: '',
+      ponctuation: '',
+      piste: 'cuve-glaciale',
+    },
+    {
+      image: '/assets/cine/ouverture-3.webp',
+      texte: 'Quelqu’un avait scellé cette porte en sachant ce qu’il faisait.',
+      duree: 4.5,
+      effet: 'tremblement',
+      fondu: 'aucun',
+      bruitage: 'impact-glace',
+      ponctuation: '',
+      piste: '',
+    },
+    {
+      image: '/assets/cine/depart-2.webp',
+      texte: 'Le sceau n’a plus de raison de tenir. Le secteur 4 s’ouvre.',
+      duree: 5.5,
+      effet: 'zoom-avant',
+      fondu: 'aucun',
+      bruitage: 'vortex-sas',
+      ponctuation: 'sting-collecte',
+      piste: '',
+    },
+  ],
+}
+
+// ─── LE MIROIR : la fin de l'arc — franchir le sas du secteur 4. Le
+// convoyeur, la montée, et le choix que personne n'a eu avant vous.
+export const CINEMATIQUE_MIROIR: CinematiqueDef = {
+  code: 'MIROIR',
+  titre: 'Le miroir — la fin de l’arc',
+  planches: [
+    {
+      image: '/assets/cine/depart-3.webp',
+      texte: 'La route du plasma mène au convoyeur. Le convoyeur mène là-haut.',
+      duree: 5.5,
+      effet: 'zoom-avant',
+      fondu: 'noir',
+      bruitage: 'vortex-sas',
+      ponctuation: '',
+      piste: 'cuve-glaciale',
+    },
+    {
+      image: '/assets/cine/ouverture-4.webp',
+      texte: 'Là-haut, un télescope achevé à un miroir près attend son œil.',
+      duree: 5,
+      effet: 'pan-haut',
+      fondu: 'aucun',
+      bruitage: '',
+      ponctuation: '',
+      piste: '',
+    },
+    {
+      image: '/assets/cine/ouverture-2.webp',
+      texte: 'Devenir l’œil qui regarde l’univers — ou rester ce que vous êtes devenu.',
+      duree: 6,
+      effet: 'zoom-arriere',
+      fondu: 'aucun',
+      bruitage: '',
+      ponctuation: '',
+      piste: '',
+    },
+    {
+      image: '/assets/cine/ouverture-1.webp',
+      texte: 'Personne n’a jamais eu ce choix avant vous. Personne ne vous le prendra.',
+      duree: 6,
+      effet: 'fixe',
+      fondu: 'blanc',
+      bruitage: '',
+      ponctuation: 'sting-collecte',
+      piste: '',
+    },
+  ],
+}
+
 /** Les cinématiques livrées avec le jeu (lecture seule à la table). */
 export const CINEMATIQUES_LIVREES: CinematiqueDef[] = [
   CINEMATIQUE_ESSAI,
+  CINEMATIQUE_REVELATION,
+  CINEMATIQUE_MIROIR,
   CINEMATIQUE_DEPART,
 ]

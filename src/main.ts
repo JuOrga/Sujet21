@@ -17,7 +17,11 @@ import {
   appliqueReparations,
   reparationDef,
 } from './game/reparations'
-import { prochaineDecouverte } from './game/decouvertes'
+import {
+  DECOUVERTES,
+  prochaineDecouverte,
+  recitAcheve,
+} from './game/decouvertes'
 import {
   MECANIQUE_NOMS,
   codeCanon,
@@ -542,12 +546,18 @@ let hubMemo: { base: LevelDef; cle: string; lv: LevelDef } | null = null
  * chaque réparation encore due — l'accident du télescope se lit dans les
  * murs. Mémoïsé : même base + mêmes réparations → même référence (le
  * niveau est comparé par référence un peu partout). */
+function finOuverte(): boolean {
+  return (
+    recitAcheve(records.decouvertesVues()) && records.estRepare('passerelle-4')
+  )
+}
 function hubJoue(): LevelDef {
   const base = hubLevel()
-  const cuveClose = !eveilJoue()
-  const cle = `${cuveClose ? 'cuve|' : ''}${records.reparationsFaites().sort().join('+')}`
-  if (hubMemo && hubMemo.base === base && hubMemo.cle === cle) return hubMemo.lv
-  const lv = appliqueReparations(base, records.reparationsFaites(), cuveClose)
+  const opts = { cuveClose: !eveilJoue(), finOuverte: finOuverte() }
+  const cle = `${opts.cuveClose ? 'cuve|' : ''}${opts.finOuverte ? 'fin|' : ''}${records.reparationsFaites().sort().join('+')}`
+  if (hubMemo && hubMemo.base === base && hubMemo.cle === cle)
+    return hubMemo.lv
+  const lv = appliqueReparations(base, records.reparationsFaites(), opts)
   hubMemo = { base, cle, lv }
   return lv
 }
@@ -629,6 +639,7 @@ let plotsHubDedans: boolean[] = []
 // les STATIONS DE RÉPARATION du hub accidenté : front montant par station
 // (l'ordre du catalogue REPARATIONS fait foi)
 let plotsReparDedans: boolean[] = []
+let sasScelleDedans = false
 // les PLOTS POSÉS du tableau courant (le méta en données — hub et Économat
 // modernes compris) : un drapeau « dedans » par plot, l'achat se tente au
 // FRONT d'entrée seulement
@@ -3320,6 +3331,10 @@ function etatScenario(): EtatScenario {
     runs: Math.max(0, records.essaiNumber() - 1),
     salleMax: records.expedition()?.tableaux ?? 0,
     condensat,
+    // seuls les jalons du RÉCIT comptent (les marqueurs annexes, non)
+    decouvertes: records
+      .decouvertesVues()
+      .filter((id) => DECOUVERTES.includes(id)).length,
     trophee: (id) => trophees.gagne(id),
   }
 }
@@ -7667,6 +7682,7 @@ function resetLasers(): void {
   achatsHub.clear()
   plotsHubDedans = (zonesDuHub(level)?.etal ?? []).map(() => false)
   plotsReparDedans = REPARATIONS.map(() => false)
+  sasScelleDedans = false
   // les plots POSÉS du tableau (le méta en données)
   plotsPosesDedans = (level.plots ?? []).map(() => false)
   // les éclats de mémoire : ceux déjà gravés CETTE RUN ne reviennent pas
@@ -10719,6 +10735,17 @@ function frame(now: number): void {
       if (dedans && !plotsReparDedans[i]) tenteReparation(r.id)
       plotsReparDedans[i] = dedans
     }
+    // LE SECTEUR 4 (fin ouverte) : entrer dans l'alcôve joue la fin de
+    // l'arc — le convoyeur, la montée, le choix. Rejouable à chaque
+    // visite du module : la route reste ouverte.
+    const surScelle =
+      finOuverte() &&
+      pointInBox(sim.stats.centroidX, sim.stats.centroidY, zonesHub.sasScelle)
+    if (surScelle && !sasScelleDedans) {
+      records.noteDecouverte('fin-jouee') // le marqueur de la fin vue
+      void lireCineParCode('MIROIR')
+    }
+    sasScelleDedans = surScelle
     // LA TABLE DE DÉPART (une fois réparée) : le récapitulatif de ce
     // qu'on emporte, au moment où on longe le plan de travail
     const surTable =
