@@ -19,12 +19,20 @@ export interface PlanVoie {
   longueur: number
   diffMax: number
   graineDuJour: boolean
+  /** LES SALLES GÉNÉRÉES : le seul réglage qui change la nature d'une
+   * descente. Actif, chaque récompense met la suite écrite en face de
+   * salles fabriquées pour le rang — au joueur de choisir. Inactif, la
+   * descente enchaîne la séquence écrite (le choix du pool subsiste).
+   * Tout le reste — récompenses, butin, découvertes, palmarès, rail —
+   * est COMMUN : il n'y a qu'une seule descente. */
+  generees: boolean
 }
 
 export const PLAN_VOIE_DEFAUTS: PlanVoie = {
   longueur: 12,
   diffMax: 3,
   graineDuJour: false,
+  generees: true,
 }
 
 /** Ramène un plan (chargé du stockage, ou réglé au banc) dans les bornes. */
@@ -41,6 +49,8 @@ export function clampPlanVoie(p: Partial<PlanVoie> | null): PlanVoie {
       Math.min(9, Math.round(n(p?.diffMax, PLAN_VOIE_DEFAUTS.diffMax))),
     ),
     graineDuJour: p?.graineDuJour === true,
+    // absent d'un vieux réglage : les salles générées sont l'ordinaire
+    generees: p?.generees !== false,
   }
 }
 

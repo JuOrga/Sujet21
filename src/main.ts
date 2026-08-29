@@ -600,7 +600,12 @@ let departEnVapeur = false
 // la séquence est mise en face d'une salle GÉNÉRÉE assortie à la
 // progression de la run. La salle générée élue s'INTERCALE : elle prend la
 // place du rang suivant, puis la séquence reprend son cours.
-let modeVoie = false
+// UNE SEULE DESCENTE. Il n'y a plus de « mode voie » : toute descente suit
+// le PLAN (longueur, rampe de difficulté, moments) et gagne les mêmes
+// récompenses, le même butin, le même rail, le même palmarès. Le seul
+// réglage qui la change : voiePlan.generees — les salles fabriquées
+// proposées (ou non) à chaque récompense.
+const sallesGenerees = (): boolean => voiePlan.generees
 // la DESCENTE DU JOUR forcée par le SAS DE VAPEUR du hub — le temps d'une
 // run, sans toucher au réglage du plan (qui reste celui du poste)
 let voieDuJourForcee = false
@@ -3057,7 +3062,18 @@ const homeRestartBtn = document.getElementById(
 ) as HTMLButtonElement
 function closeHome(): void {
   if (requireName()) return // pas de plongée sans opérateur identifié
-  // Une expédition SAUVÉE attend et rien n'a encore été joué : le bouton
+  // NAVIGATION DIRECTE (?tableau=N, outil de conception) : on entre dans
+  // CETTE salle — le bouton ne doit pas renvoyer au module d'accueil.
+  if (!hasPlayed && !auHub) {
+    hasPlayed = true
+    document.body.classList.add('playing')
+    input.paused = false
+    startBtn.textContent = "REPRENDRE L'ESSAI"
+    homeRestartBtn.hidden = false
+    restart()
+    return
+  }
+  // Une descente SAUVÉE attend et rien n'a encore été joué : le bouton
   // principal EST la reprise (au début de sa salle) — aucune fausse
   // manœuvre ne peut repartir de la salle 1 par réflexe.
   const save = runSauvee()
@@ -3105,19 +3121,12 @@ function openHome(): void {
   homeRestartBtn.hidden = !hasPlayed
   majBoutonsRun()
 }
+// LE BOUTON PRINCIPAL : il n'y a qu'UNE descente et qu'une porte. Reprendre
+// celle qui est sauvée, ou rejoindre le module — c'est son sas qui lance.
 startBtn.addEventListener('click', () => {
-  modeVoie = false // LANCER : la descente ordinaire
-  voieDuJourForcee = false
+  voieDuJourForcee = false // le réglage du plan décide, pas un bouton
   closeHome()
-  majVoieHud() // le rail se recale sur la séquence écrite
-})
-// LA VOIE SEMI-PROCÉDURALE : la même descente, mais à chaque récompense la
-// suite écrite est mise en face d'une salle générée — au joueur de choisir
-document.getElementById('home-voie')?.addEventListener('click', () => {
-  modeVoie = true
-  voieDuJourForcee = false // le réglage du plan décide, pas le sas de vapeur
-  closeHome()
-  majVoieHud() // le rail apparaît tout de suite, même en reprenant une run
+  majVoieHud()
 })
 
 // ---- L'EXPÉDITION SE SOUVIENT : la progression (salle atteinte, réserve,
@@ -3129,6 +3138,7 @@ document.getElementById('home-voie')?.addEventListener('click', () => {
 const CLE_RUN = 'sujet21-run-v1'
 interface RunSauvee {
   index: number
+  rang?: number // profondeur dans le plan (absente : vieilles sauvegardes)
   liters: number
   time: number
   vies: number
@@ -3175,6 +3185,7 @@ function sauveRun(): void {
         CLE_RUN,
         JSON.stringify({
           index: levelIndex,
+          rang: voieRang,
           liters: run.bonbonneLiters,
           time: run.runTime,
           vies: run.vies,
@@ -3205,6 +3216,8 @@ function reprendreRun(save: RunSauvee): void {
   testLevel = null
   fromEditor = false
   levelIndex = Math.min(save.index, playedLevels().length - 1)
+  // le rang de la descente : celui de la sauvegarde, ou l'index à défaut
+  voieRang = Math.max(0, Math.round(save.rang ?? save.index))
   run.bonbonneLiters = save.liters
   run.runTime = save.time
   run.vies = save.vies
@@ -3229,7 +3242,7 @@ function reprendreRun(save: RunSauvee): void {
 }
 function majBoutonsRun(): void {
   const save = runSauvee()
-  const total = playedLevels().length
+  const total = voiePlan.longueur // la descente dure ce que le plan dit
   const btnAband = document.getElementById(
     'start-abandon',
   ) as HTMLButtonElement | null
@@ -3239,11 +3252,15 @@ function majBoutonsRun(): void {
     btnAband.hidden = auHub || !!testLevel || !hasPlayed
     if (btnAband.hidden) {
       btnAband.classList.remove('arme')
-      btnAband.textContent = 'ABANDONNER LA RUN — RETOUR AU LABO'
+      btnAband.textContent = 'QUITTER LA DESCENTE — RETOUR AU MENU'
     }
   }
-  if (!hasPlayed && save) {
-    startBtn.textContent = `REPRENDRE L'EXPÉDITION — SALLE ${save.index + 1}/${total}`
+  if (!hasPlayed) {
+    // hors partie, le bouton dit ce qu'il fera : reprendre la descente
+    // sauvée, ou en commencer une (par le module et son sas)
+    startBtn.textContent = save
+      ? `REPRENDRE LA DESCENTE — SALLE ${(save.rang ?? save.index) + 1}/${total}`
+      : "COMMENCER L'ESSAI"
   }
 }
 // Abandonner : en DEUX temps (l'expédition en cours se perd — un clic de
@@ -3252,15 +3269,12 @@ document.getElementById('start-abandon')?.addEventListener('click', (e) => {
   const b = e.currentTarget as HTMLButtonElement
   if (!b.classList.contains('arme')) {
     b.classList.add('arme')
-    b.textContent = 'CONFIRMER — LA RUN EN COURS SERA PERDUE'
+    b.textContent = 'CONFIRMER — LA DESCENTE EN COURS SERA PERDUE'
     return
   }
   b.classList.remove('arme')
-  b.textContent = 'ABANDONNER LA RUN — RETOUR AU LABO'
-  // entrerHub() rend la main au jeu et réveille dans la cuve : la fiche
-  // se referme d'elle-même, comme à l'arrivée dans le jeu
-  document.body.classList.remove('playing')
-  abandonneRun()
+  b.textContent = 'QUITTER LA DESCENTE — RETOUR AU MENU'
+  quitteAuMenu()
 })
 // au chargement, la fiche est déjà à l'écran : les boutons disent tout de
 // suite s'il y a une expédition à reprendre
@@ -4327,6 +4341,29 @@ function monteCycleRegles(corps: HTMLElement): void {
       },
     ),
   )
+  // LE réglage qui change la nature d'une descente : proposer ou non des
+  // salles fabriquées à chaque récompense. Tout le reste est commun.
+  const pGen = document.createElement('div')
+  pGen.className = 'rg-param'
+  const labG = document.createElement('label')
+  const cocheG = document.createElement('input')
+  cocheG.type = 'checkbox'
+  cocheG.id = 'regles-cycle-generees'
+  cocheG.checked = voiePlan.generees
+  cocheG.addEventListener('change', () => {
+    voiePlan.generees = cocheG.checked
+    sauvePlanVoie()
+    reglesDit(
+      cocheG.checked
+        ? 'Salles générées ACTIVES — chaque récompense proposera des salles fabriquées.'
+        : 'Salles générées coupées — la descente suit la séquence écrite.',
+    )
+  })
+  const labGTxt = document.createElement('b')
+  labGTxt.textContent = 'SALLES GÉNÉRÉES AUX RÉCOMPENSES'
+  labG.append(cocheG, labGTxt)
+  pGen.appendChild(labG)
+  lignes.appendChild(pGen)
   const pJour = document.createElement('div')
   pJour.className = 'rg-param'
   const lab = document.createElement('label')
@@ -7947,8 +7984,8 @@ function avanceSalle(): void {
     !testLevel &&
     (economatForce || !economatVisiteCetteRun)
   ) {
-    const total = modeVoie ? voiePlan.longueur : playedLevels().length
-    const rang = modeVoie ? voieRang : levelIndex + 1
+    const total = voiePlan.longueur
+    const rang = voieRang
     if (economatForce || (total >= 4 && rang >= Math.floor(total / 2))) {
       economatForce = false // il a servi
       economatVisiteCetteRun = true
@@ -7972,10 +8009,9 @@ function avanceSalle(): void {
   salleChoisie = null
   levelIndex =
     choix > levelIndex ? choix : cible > levelIndex ? cible : levelIndex + 1
-  // garde-fou de la voie : séquence épuisée sans intercalaire élue (graine
-  // ingrate) — on ne REboucle jamais sur la salle 1 en pleine descente
-  if (modeVoie)
-    levelIndex = Math.min(levelIndex, Math.max(0, playedLevels().length - 1))
+  // garde-fou : séquence écrite épuisée sans salle élue — on ne REboucle
+  // jamais sur la salle 1 en pleine descente (la dernière écrite tient)
+  levelIndex = Math.min(levelIndex, Math.max(0, playedLevels().length - 1))
   restart()
 }
 
@@ -8331,7 +8367,7 @@ let salleChoisie: LevelDef | null = null
  * deux — à défaut, la fin ordinaire. */
 function mbApresRecompense(): void {
   const seq = playedLevels()
-  if (modeVoie) {
+  if (sallesGenerees()) {
     const duo = propositionsVoie(seq)
     if (duo) {
       mbMontreSallesVoie(duo)
@@ -8728,8 +8764,8 @@ function identiteAtelier(lv: LevelDef): CodeAtelier | null {
  *  d'éditeur s'en passent (on sait où l'on est), et une séquence d'une seule
  *  salle n'a pas de progression à montrer. */
 function voieHudVisible(): boolean {
-  if (auHub || testLevel !== null) return false
-  return (modeVoie ? voiePlan.longueur : playedLevels().length) > 1
+  if (!hasPlayed || auHub || testLevel !== null) return false
+  return voiePlan.longueur > 1
 }
 
 /** Reconstruit le rail : appelé à chaque entrée de salle (restart). */
@@ -8737,10 +8773,8 @@ function majVoieHud(): void {
   const montre = voieHudVisible()
   voieHudEl.hidden = !montre
   if (!montre) return
-  const total = modeVoie ? voiePlan.longueur : playedLevels().length
-  const rang = modeVoie
-    ? Math.min(total, voieRang + 1) // la salle en cours
-    : Math.min(total, levelIndex + 1)
+  const total = voiePlan.longueur
+  const rang = Math.min(total, voieRang + 1) // la salle en cours
   el('vh-rang').textContent = `${rang} / ${total}`
   const id = identiteAtelier(level)
   el('vh-stade').textContent =
@@ -8750,7 +8784,7 @@ function majVoieHud(): void {
   rail.innerHTML = ''
   // l'étoile marque la PROFONDEUR RECORD : elle n'a de sens qu'en voie, où
   // la descente se rejoue depuis le début et se compare à elle-même
-  const record = modeVoie ? chargePalmaresVoie().profondeurRecord : 0
+  const record = chargePalmaresVoie().profondeurRecord
   for (let r = 1; r <= total; r++) {
     if (r > 1 && momentDuRang(r, total) !== momentDuRang(r - 1, total)) {
       const sep = document.createElement('i')
@@ -8775,15 +8809,13 @@ function majVoieHud(): void {
 function annonceVoieCarte(): void {
   if (auHub || testLevel !== null) return
   clearTimeout(voieCarteTimer)
-  const total = modeVoie ? voiePlan.longueur : playedLevels().length
-  const rang = modeVoie
-    ? Math.min(voiePlan.longueur, voieRang + 1)
-    : Math.min(total, levelIndex + 1)
+  const total = voiePlan.longueur
+  const rang = Math.min(total, voieRang + 1)
   el('vc-rang').textContent =
     `SALLE ${rang} / ${total}` +
     (estEconomat(level) ? ' · L’ÉCONOMAT' : '') +
-    (modeVoie && voieIntercalaire ? ' · SALLE GÉNÉRÉE' : '') +
-    (modeVoie && descenteDuJour() ? ' · DESCENTE DU JOUR' : '')
+    (voieIntercalaire ? ' · SALLE GÉNÉRÉE' : '') +
+    (descenteDuJour() ? ' · DESCENTE DU JOUR' : '')
   el('vc-nom').textContent = level.name
   el('vc-code').textContent = level.code
   const id = identiteAtelier(level)
@@ -8905,6 +8937,7 @@ function restart(): void {
 
 function newExpedition(): void {
   levelIndex = 0
+  voieRang = 0 // une descente neuve repart du premier rang du plan
   run.bonbonneLiters = 0
   run.runTime = 0
   // la fiole de SECOND SOUFFLE ajoute son échantillon de secours au départ
@@ -9047,14 +9080,34 @@ function afficheDispersion(): void {
   )
 }
 
-// Abandonner : la run s'arrête là où elle en est et l'on se réveille au
-// labo, comme à l'arrivée dans le jeu. L'expédition en cours est perdue
-// (c'est un abandon, pas une pause : la fiche sait mettre en pause).
-function abandonneRun(): void {
+/** QUITTER LA DESCENTE : la partie s'arrête et l'on revient au MENU (pas au
+ * module — quitter, c'est vraiment sortir). La descente en cours est perdue,
+ * les acquis (mémoire, liens, fioles, records) restent : ils survivent à
+ * tout. Le bouton principal redira alors COMMENCER. */
+function quitteAuMenu(): void {
   effaceRun()
   ecranDispersion = 'aucun'
   overlay.classList.remove('visible')
-  retourAuLabo()
+  // l'état de descente se remet à zéro sans passer par le module
+  voieIntercalaire = null
+  voieGenereeChoisie = null
+  voieDuJourForcee = false
+  voieRang = 0
+  levelIndex = 0
+  economatIntercalaire = null
+  economatVisiteCetteRun = false
+  clefCachette = false
+  run.ended = false
+  purgeCondensat()
+  auHub = false
+  testLevel = null
+  hasPlayed = false // la partie est close : le bouton redit COMMENCER
+  document.body.classList.remove('playing')
+  input.paused = true
+  homeRestartBtn.hidden = true
+  majVoieHud()
+  majBoutonsRun()
+  openHome()
 }
 
 // Recommencer un tableau relance l'essai ; une expédition conclue (bilan
@@ -9527,7 +9580,7 @@ const doTuile = (icone: string, val: string, quoi: string, cls = ''): string =>
  *  dit. Au-delà de soixante salles, le rail ne veut plus rien dire : on
  *  l'omet plutôt que d'aligner des cheveux. */
 function momentDuRang(r: number, total: number): 1 | 2 | 3 {
-  if (modeVoie) return momentAuRang(r, voiePlan)
+  if (voiePlan.longueur > 0) return momentAuRang(r, voiePlan)
   const lv = playedLevels()[r - 1]
   const id = lv ? identiteAtelier(lv) : null
   if (id) return id.moment
@@ -9559,15 +9612,13 @@ function majDossier(): void {
 
   // ---- TA MISSION : où l'on est, et ce qu'on vient chercher
   const id = identiteAtelier(level)
-  const total = modeVoie ? voiePlan.longueur : playedLevels().length
-  const rang = modeVoie
-    ? Math.min(voiePlan.longueur, voieRang + 1)
-    : Math.min(total, levelIndex + 1)
+  const total = voiePlan.longueur
+  const rang = Math.min(total, voieRang + 1)
   let mission = '<section class="do-sec do-salle"><h4><u>🎯</u>TA MISSION</h4>'
   if (enRun && total > 1) {
     mission +=
       `<div class="do-place">SALLE <b>${rang} / ${total}</b>` +
-      `${modeVoie ? ' · VOIE' : ''}</div>` +
+      `${descenteDuJour() ? ' · DESCENTE DU JOUR' : ''}</div>` +
       railDescente(rang, total)
   }
   mission +=
@@ -10988,7 +11039,9 @@ function frame(now: number): void {
     // LE SAS DE LANCEMENT : au hub, le sas ne collecte rien — il LANCE la
     // run. Reprise de l'expédition sauvée s'il y en a une, salle 1 sinon.
     auHub = false
-    modeVoie = surSasGivre || surSasVapeur
+    // les sorties GARDÉES lancent une descente NEUVE (on repart du premier
+    // rang) ; le sas principal, lui, reprend la descente sauvée s'il y en a
+    const descenteNeuve = surSasGivre || surSasVapeur
     voieDuJourForcee = surSasVapeur
     audio.collect()
     bande.ponctuation('sting-collecte', 0.85)
@@ -10997,7 +11050,7 @@ function frame(now: number): void {
     void joueMoment('lancement-run').then(() => {
       // les sorties gardées lancent toujours une descente NEUVE : la
       // sauvegarde appartient à l'expédition écrite du sas principal
-      const save = modeVoie ? null : runSauvee()
+      const save = descenteNeuve ? null : runSauvee()
       if (save) {
         reprendreRun(save)
       } else {
@@ -11122,26 +11175,22 @@ function frame(now: number): void {
     )
     // LA VOIE : chaque sas bu creuse la descente d'un rang — le palmarès
     // suit en direct (profondeur record, descentes entamées)
-    if (modeVoie) {
-      voieRang += 1 // la descente avance : c'est la progression, pas un titre
-      if (!sasOutil) {
-        const p = chargePalmaresVoie()
-        if (voieRang === 1) p.descentes += 1
-        if (voieRang > p.profondeurRecord) p.profondeurRecord = voieRang
-        sauvePalmaresVoie(p)
-      }
+    voieRang += 1 // la descente avance : c'est la progression, pas un titre
+    if (!sasOutil) {
+      const p = chargePalmaresVoie()
+      if (voieRang === 1) p.descentes += 1
+      if (voieRang > p.profondeurRecord) p.profondeurRecord = voieRang
+      sauvePalmaresVoie(p)
     }
-    // la fin : en voie, la descente se boucle au bout du PLAN — sinon,
-    // l'expédition s'achève au bout de la séquence écrite
-    const finExpedition = modeVoie
-      ? voieRang >= voiePlan.longueur
-      : levelIndex + 1 >= playedLevels().length
+    // la fin : la descente se boucle au bout du PLAN — c'est le réglage de
+    // longueur qui dit combien de salles fait une descente
+    const finExpedition = voieRang >= voiePlan.longueur
     if (finExpedition) {
       // Dernier sas : l'expédition est achevée — bilan, et registres à jour
       run.ended = true
       if (!sasOutil) trophees.debloque('integrale')
       gagneMemoireRun(10) // l'expédition bouclée grave son souvenir
-      const sallesFranchies = modeVoie ? voieRang : playedLevels().length
+      const sallesFranchies = voieRang
       // une expédition CONCLUE PAR L'OUTIL ne s'inscrit nulle part : ni
       // record d'expédition, ni tableau partagé
       const exp = sasOutil
@@ -11161,7 +11210,7 @@ function frame(now: number): void {
         })
       // le palmarès de la voie : la descente est BOUCLÉE
       let voieNeuf = ''
-      if (modeVoie && !sasOutil) {
+      if (!sasOutil) {
         const p = chargePalmaresVoie()
         p.bouclees += 1
         if (run.livreTotal > p.meilleurLivre) {
@@ -11189,16 +11238,14 @@ function frame(now: number): void {
         `palier d'étalonnage ${paliersAtteints(run.xp)} · ` +
         `+${run.memoireGagnee} MÉMOIRE gravée — la purge confisque le condensat restant (${condensat} cL).`
       showOverlay(
-        modeVoie ? 'LA VOIE EST BOUCLÉE' : 'EXPÉDITION ACHEVÉE',
-        modeVoie
-          ? `<span class="bilan"><span class="bilan-l">${expeditionSummary(sallesFranchies)}${voieNeuf}</span></span>` +
-              `Descente de ${sallesFranchies} salles, du début à la fin de la voie.${butinVoie}<br>` +
-              `Palmarès du poste : ${palm.bouclees} bouclée(s) · profondeur record ${palm.profondeurRecord} · meilleur livré ${fmtL(palm.meilleurLivre)}.`
-          : `<span class="bilan"><span class="bilan-l">${expeditionSummary(sallesFranchies)}${
-              exp.newRecord
-                ? ' — <em class="bilan-neuf">MEILLEURE EXPÉDITION ✦</em>'
-                : ''
-            }</span></span>Le laboratoire n'a plus d'échantillon. Quelque part dans les conduites, le fluide se souvient.<br>+${run.memoireGagnee} MÉMOIRE gravée cette run — la purge confisque le condensat restant (${condensat} cL).`,
+        'LA DESCENTE EST BOUCLÉE',
+        `<span class="bilan"><span class="bilan-l">${expeditionSummary(sallesFranchies)}${voieNeuf}${
+          exp.newRecord
+            ? ' — <em class="bilan-neuf">MEILLEURE EXPÉDITION ✦</em>'
+            : ''
+        }</span></span>` +
+          `Descente de ${sallesFranchies} salles, du premier sas au dernier.${butinVoie}<br>` +
+          `Palmarès du poste : ${palm.bouclees} bouclée(s) · profondeur record ${palm.profondeurRecord} · meilleur livré ${fmtL(palm.meilleurLivre)}.`,
         'success',
         'RETOUR AU LABO',
       )

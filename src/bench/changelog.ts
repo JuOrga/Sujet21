@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '29/08/2026 12:20',
+    title: 'UNE SEULE DESCENTE : les deux systèmes de run n’en font plus qu’un',
+    notes: [
+      'Signalé : « parfois on tombe sur le hub, parfois sur le premier niveau de l’arène, ça semble aléatoire » et « c’est le bazar entre les 2 systèmes de runs ». Ce n’était pas aléatoire : le menu ignorait quel bouton on avait cliqué — s’il existait une sauvegarde il reprenait l’expédition écrite, sinon il envoyait au module. Pire, une descente procédurale s’écrivait dans la sauvegarde de l’expédition écrite (sauveRun ne regardait pas le mode), et la reprise ne remettait pas le mode à zéro : on jouait la séquence écrite avec les compteurs, le rail et les récompenses de la voie. Deux systèmes tournaient sur la même partie.',
+      'Décision du concepteur, appliquée : il n’y a PLUS QU’UNE DESCENTE. Tout ce qui avait été bâti « pour la voie » — récompenses, choix de salles, découvertes du récit, butin, dossier joueur, descentes bouclées, palmarès — appartient désormais à toute descente. Le seul réglage qui change sa nature vit dans PARAMÈTRES DU CYCLE : « SALLES GÉNÉRÉES AUX RÉCOMPENSES », qu’on coche ou non. La longueur d’une descente, c’est le réglage du plan (12 par défaut) : le rail, la carte d’annonce et le dossier disent enfin TOUS la même chose (« SALLE 1 / 12 » — vérifié en jeu).',
+      'Les portes sont refaites : le menu n’a plus qu’une porte (le bouton VOIE SEMI-PROC. disparaît — on lance par le module et son sas), le bouton principal dit ce qu’il fera vraiment (COMMENCER L’ESSAI, ou REPRENDRE LA DESCENTE — SALLE N/12), et QUITTER LA DESCENTE ramène pour de bon AU MENU (plus au module) en effaçant la descente perdue — les acquis, eux, restent. La sauvegarde retient désormais le RANG (sans quoi une reprise en milieu de descente réaffichait « salle 1 »), une descente neuve repart du premier rang, et la navigation directe ?tableau=N entre enfin dans la salle demandée au lieu de renvoyer au module. 513 tests verts.',
+    ],
+  },
+  {
     date: '29/08/2026 11:14',
     title: 'La fin s’ouvre : le sceau du secteur 4 tombe',
     notes: [

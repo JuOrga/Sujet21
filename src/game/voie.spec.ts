@@ -14,7 +14,7 @@ import {
 } from './voie'
 
 describe('voie — le plan de descente', () => {
-  const plan = { longueur: 12, diffMax: 3, graineDuJour: false }
+  const plan = { longueur: 12, diffMax: 3, graineDuJour: false, generees: true }
 
   it('le moment se répartit par tiers : début, milieu, fin', () => {
     const moments = Array.from({ length: 12 }, (_, i) =>
@@ -100,11 +100,13 @@ describe('voie — le plan de descente', () => {
       longueur: 12,
       diffMax: 3,
       graineDuJour: false,
+      generees: true,
     })
     expect(clampPlanVoie({ longueur: 999, diffMax: -4 })).toEqual({
       longueur: 40,
       diffMax: 0,
       graineDuJour: false,
+      generees: true,
     })
     expect(clampPlanVoie({ longueur: 1 }).longueur).toBe(3)
   })
@@ -141,7 +143,7 @@ describe('voie — le plan de descente', () => {
   })
 
   it('une descente entière se génère : chaque rang, avec sa posture, donne une salle prouvée', () => {
-    const grand = { longueur: 12, diffMax: 6, graineDuJour: false }
+    const grand = { longueur: 12, diffMax: 6, graineDuJour: false, generees: true }
     for (let rang = 1; rang <= grand.longueur; rang++) {
       const mecanique = ([1, 2, 3] as const)[rang % 3]
       const cahier = {
