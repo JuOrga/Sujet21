@@ -1,8 +1,8 @@
 // LES STRUCTURES DE COQUE — le kit de construction du terrain de jeu.
 //
 // Une STRUCTURE est une coque VIDE : un anneau de parois qui enferme un
-// volume jouable. On en pose deux sortes — une CHAMBRE (rectangle,
-// hexagone ou octogone selon son chanfrein) et un COULOIR (un tube ouvert
+// volume jouable. On en pose deux sortes — une CHAMBRE (un rectangle
+// ou un octogone, selon son chanfrein) et un COULOIR (un tube ouvert
 // aux deux bouts) — et on les RECOUVRE les unes les autres : là où le vide
 // d'une structure traverse la paroi d'une autre, la porte se perce toute
 // seule. C'est tout le principe du modulaire : aucune « connexion » à
@@ -21,6 +21,7 @@
 // pivoté à ±45°. Même prix, forme juste.
 
 import {
+  dansBoite,
   MAT_WALL,
   type LevelDef,
   type ObstacleBox,
@@ -35,7 +36,7 @@ export const SORTES_STRUCTURE = [STRUCT_CHAMBRE, STRUCT_COULOIR] as const
 export const EP_DEFAUT = 40
 export const EP_MIN = 12
 export const EP_MAX = 240
-/** Le chanfrein, en PART du demi-petit-côté (0 rectangle, 0.5 hexagone).
+/** Le chanfrein, en PART du demi-petit-côté (0 rectangle, 0.5 chanfrein maximal).
  * En part et non en unités : le concepteur redimensionne, et l'octogone
  * doit garder sa forme au lieu de s'écraser. */
 export const CHANFREIN_DEFAUT = 0.25
@@ -442,3 +443,15 @@ export function niveauExpanse(level: LevelDef): LevelDef {
   }
 }
 
+
+/** Le point tombe-t-il sur la COQUE d'une structure (ses parois, pas son
+ * vide) ? L'éditeur attrape une structure par ses murs : son intérieur
+ * reste transparent au clic, on y pose le mobilier normalement. */
+export function dansCoque(
+  s: StructureDef,
+  autres: readonly StructureDef[],
+  x: number,
+  y: number,
+): boolean {
+  return boxesDeStructure(s, autres).some((b) => dansBoite(b, x, y))
+}
