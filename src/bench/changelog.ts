@@ -22,6 +22,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '29/08/2026 14:51',
+    title:
+      'TOUT LE MÉTA SE POSE : les stations de réparation entrent dans l’éditeur',
+    notes: [
+      'Demandé : « avec l’éditeur est-ce que je peux gérer la réparation du vaisseau comme je souhaite, j’ai besoin de pouvoir poser tous les éléments ». La réponse était NON pour la moitié du module : le comptoir, le banc et le marchand se posaient déjà, mais les SEPT STATIONS DE RÉPARATION, les barrières des ailes condamnées, la table de départ, l’alcôve du secteur 4, son sceau, la porte de la cuve et les deux sorties gardées étaient devinés PAR LA GÉOMÉTRIE (la largeur du tableau désignait le grand module ou le compact). Un hub rebâti à la main n’en héritait d’aucun — donc rien à réparer, aucune sortie gardée, aucune fin.',
+      'Ils deviennent des DONNÉES POSÉES, comme le reste. Un outil neuf dans la palette de l’éditeur — ANCRE MÉTA — trace le rectangle ; le panneau choisit son rôle : station de réparation (avec la station du catalogue, son icône et son prix), barrière d’aile condamnée, table de départ, alcôve du secteur 4, sceau, porte de la cuve (acte 0), sortie gardée par le givre, sortie gardée par la vapeur. Les ancres se déplacent, se redimensionnent, se dupliquent et s’effacent comme n’importe quelle pièce, se dessinent en trait ambré (rouge pointillé pour les barrières) et voyagent dans le fichier du tableau.',
+      'Le hub livré porte désormais SES PROPRES ancres : ouvrir « Le module Méduse » comme brouillon dans l’éditeur montre les treize, en place — de quoi refaire le module par-dessus au lieu de partir de rien. Ce qu’on ne pose pas n’existe pas : un module sans ancre de sceau n’a pas de barrière fantôme, sans porte de cuve l’acte 0 n’enferme personne. Et le filet reste tendu — un tableau SANS ancre (les vieux instantanés de la bibliothèque) retombe sur l’ancienne résolution géométrique : rien de ce qui marchait ne change.',
+      'Le format valide en liste fermée : un rôle inconnu ou une station inconnue est écarté au chargement, jamais chargé de travers. 517 tests verts, dont huit neufs sur ce chemin (aller-retour du format, ancres posées qui priment, module rebâti sans sceau ni cuve, hub livré conforme à ses zones).',
+    ],
+  },
+  {
     date: '29/08/2026 12:20',
     title: 'UNE SEULE DESCENTE : les deux systèmes de run n’en font plus qu’un',
     notes: [

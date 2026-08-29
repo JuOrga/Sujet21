@@ -11,7 +11,7 @@
 // une réparation payée les lève À CHAUD, sans respawn.
 
 import type { LevelDef, PorteDef, WorldLabel } from './level'
-import { zonesDuHub } from './hub'
+import { ancreAbsente, zonesDuHub } from './hub'
 
 export interface ReparationDef {
   id: string
@@ -137,14 +137,15 @@ export function appliqueReparations(
   // LA PORTE DE LA CUVE (acte 0) : le sujet naît enfermé — la séquence
   // ALERTE crève la brèche d'INDEX 0, cette porte doit donc rester la
   // toute première de la liste
-  if (opts.cuveClose)
+  if (opts.cuveClose && !ancreAbsente(zones.porteCuve))
     portes.unshift({ ...zones.porteCuve, canal: CANAL_DEGAT })
 
   // LE SCEAU : tant que l'arc du récit n'est pas achevé, le secteur 4
   // reste condamné — même passerelle réparée. La fin le lève, et la
   // signalétique du scellé bascule.
   if (!opts.finOuverte) {
-    portes.push({ ...zones.sceau, canal: CANAL_DEGAT })
+    if (!ancreAbsente(zones.sceau))
+      portes.push({ ...zones.sceau, canal: CANAL_DEGAT })
   } else {
     for (const t of [
       'LE SECTEUR SCELLÉ|CE QUI DOIT PARTIR',
@@ -154,19 +155,22 @@ export function appliqueReparations(
       if (i >= 0) labels.splice(i, 1)
     }
     const sc = zones.sasScelle
-    labels.push({
-      x: (sc.minX + sc.maxX) / 2,
-      y: sc.maxY + 190,
-      text: 'LE SECTEUR 4|LA ROUTE DU TÉLESCOPE',
-      tone: 'sas',
-      rang: 'secteur',
-    })
-    labels.push({
-      x: (sc.minX + sc.maxX) / 2,
-      y: sc.minY - 150,
-      text: 'LE SAS S’OUVRE|LE CHOIX VOUS APPARTIENT',
-      tone: 'sas',
-    })
+    // un module rebâti sans alcôve du secteur 4 : rien à annoncer
+    if (!ancreAbsente(sc)) {
+      labels.push({
+        x: (sc.minX + sc.maxX) / 2,
+        y: sc.maxY + 190,
+        text: 'LE SECTEUR 4|LA ROUTE DU TÉLESCOPE',
+        tone: 'sas',
+        rang: 'secteur',
+      })
+      labels.push({
+        x: (sc.minX + sc.maxX) / 2,
+        y: sc.minY - 150,
+        text: 'LE SAS S’OUVRE|LE CHOIX VOUS APPARTIENT',
+        tone: 'sas',
+      })
+    }
   }
 
   for (const r of manquantes) {

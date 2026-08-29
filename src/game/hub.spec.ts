@@ -5,6 +5,8 @@ import {
   ZONES_HUB_COMPACT,
   ZONES_HUB_GRAND,
   zonesDuHub,
+  zonesPosees,
+  ancreAbsente,
 } from './hub'
 import {
   MAT_CHAUD,
@@ -237,15 +239,55 @@ describe('hub v5 — le module accidenté et ses stations', () => {
   })
 })
 
-describe('zonesDuHub — la géométrie tranche', () => {
-  it('grand module → zones du grand ; compact v4 → zones du compact', () => {
-    expect(zonesDuHub(TABLEAU_HUB)).toBe(ZONES_HUB_GRAND)
-    expect(zonesDuHub(TABLEAU_HUB_COMPACT)).toBe(ZONES_HUB_COMPACT)
+describe('zonesDuHub — les ancres posées font foi, la géométrie dépanne', () => {
+  it('chaque module lit SES ancres posées (stations, portes de dégât, sas)', () => {
+    for (const [zones, tableau] of [
+      [ZONES_HUB_GRAND, TABLEAU_HUB],
+      [ZONES_HUB_COMPACT, TABLEAU_HUB_COMPACT],
+    ] as const) {
+      const z = zonesDuHub(tableau)!
+      expect(z.stations).toEqual(zones.stations)
+      expect(z.portesDegat).toEqual(zones.portesDegat)
+      expect(z.tableDepart).toEqual(zones.tableDepart)
+      expect(z.sasScelle).toEqual(zones.sasScelle)
+      expect(z.sceau).toEqual(zones.sceau)
+      expect(z.porteCuve).toEqual(zones.porteCuve)
+      expect(z.sasGivre).toEqual(zones.sasGivre)
+      expect(z.sasVapeur).toEqual(zones.sasVapeur)
+      expect(z.banc).toEqual(zones.banc)
+    }
+  })
+
+  it('sans ancres, la géométrie tranche encore (vieux instantanés)', () => {
+    const sansAncres = (lv: typeof TABLEAU_HUB) => {
+      const { ancres: _, ...reste } = lv
+      return reste
+    }
+    expect(zonesDuHub(sansAncres(TABLEAU_HUB))).toBe(ZONES_HUB_GRAND)
+    expect(zonesDuHub(sansAncres(TABLEAU_HUB_COMPACT))).toBe(ZONES_HUB_COMPACT)
   })
 
   it('un vieil instantané de la bibliothèque (sans annexe méta) → null', () => {
     // l'ancien compact s'arrêtait à x 1750 : aucune zone ne doit s'activer
     expect(zonesDuHub({ bounds: { maxX: 1750 } })).toBe(null)
+  })
+
+  it('un module rebâti à la main : seules SES ancres existent', () => {
+    const z = zonesPosees({
+      ancres: [
+        { minX: 0, minY: 0, maxX: 100, maxY: 100, role: 'station', id: 'eclairage' },
+        { minX: 200, minY: 0, maxX: 300, maxY: 100, role: 'sas-givre' },
+      ],
+    })!
+    expect(z.stations.eclairage).toEqual({ minX: 0, minY: 0, maxX: 100, maxY: 100 })
+    expect(z.stations.distillateur).toBeUndefined()
+    expect(z.sasGivre.maxX).toBe(300)
+    // ce qui n'est pas posé n'existe pas : le rectangle nul n'attrape rien
+    expect(ancreAbsente(z.sceau)).toBe(true)
+    expect(ancreAbsente(z.porteCuve)).toBe(true)
+    expect(ancreAbsente(z.sasVapeur)).toBe(true)
+    expect(zonesPosees({ ancres: [] })).toBe(null)
+    expect(zonesPosees({})).toBe(null)
   })
 })
 

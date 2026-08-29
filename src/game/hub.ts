@@ -19,9 +19,11 @@ import {
   MAT_RIDEAU,
   MAT_SURCHAUFFEUR,
   MAT_WALL,
+  type AncreMeta,
   type LevelDef,
   type ObstacleBox,
   type PlotMeta,
+  type RoleAncre,
 } from './level'
 
 function box(
@@ -136,7 +138,19 @@ export function articleComptoir(
 function metaEnDonnees(z: ZonesHub): {
   plots: PlotMeta[]
   bancMemoires: RectHub
+  ancres: AncreMeta[]
 } {
+  const ancres: AncreMeta[] = []
+  for (const [id, r] of Object.entries(z.stations))
+    ancres.push({ ...r, role: 'station', id })
+  for (const [id, r] of Object.entries(z.portesDegat))
+    ancres.push({ ...r, role: 'degat', id })
+  ancres.push({ ...z.tableDepart, role: 'table-depart' })
+  ancres.push({ ...z.sasScelle, role: 'sas-scelle' })
+  ancres.push({ ...z.sceau, role: 'sceau' })
+  ancres.push({ ...z.porteCuve, role: 'porte-cuve' })
+  ancres.push({ ...z.sasGivre, role: 'sas-givre' })
+  ancres.push({ ...z.sasVapeur, role: 'sas-vapeur' })
   return {
     plots: z.etal.map((a) => ({
       ...a.plot,
@@ -144,6 +158,7 @@ function metaEnDonnees(z: ZonesHub): {
       monnaie: 'memoire' as const,
     })),
     bancMemoires: z.banc,
+    ancres,
   }
 }
 
@@ -250,14 +265,89 @@ export const ZONES_HUB_COMPACT: ZonesHub = {
   porteCuve: { minX: -900, minY: -420, maxX: -810, maxY: -80 },
 }
 
-/** Les zones méta du hub JOUÉ — la géométrie tranche : le grand module,
- * le compact v4, ou null (un vieil instantané de la bibliothèque, sans
- * annexe méta : aucune zone ne s'active à tort). */
-export function zonesDuHub(lv: { bounds: { maxX: number } }): ZonesHub | null {
+/** LE RECTANGLE NUL : l'ancre absente d'un module rebâti à la main. Les
+ * tests de contact sont STRICTS (> et <) : rien n'est jamais dedans — la
+ * fonction qui manque ne s'active tout simplement pas. */
+export const RECT_NUL: RectHub = { minX: 0, minY: 0, maxX: 0, maxY: 0 }
+
+/** Une ancre absente ? (le rectangle nul, ou un rectangle sans surface) */
+export function ancreAbsente(r: RectHub): boolean {
+  return r.maxX <= r.minX || r.maxY <= r.minY
+}
+
+/** Les zones méta LUES DANS LE TABLEAU (level.ancres) : le module posé à
+ * l'éditeur fait foi. Aucune ancre posée : null — la géométrie tranchera.
+ * L'étal et le banc, eux, sont déjà des données (plots, bancMemoires) :
+ * ils n'ont plus besoin de ces zones héritées. */
+export function zonesPosees(lv: {
+  ancres?: readonly AncreMeta[]
+  bancMemoires?: RectHub
+}): ZonesHub | null {
+  const ancres = lv.ancres ?? []
+  if (ancres.length === 0) return null
+  const z: ZonesHub = {
+    etal: [],
+    banc: lv.bancMemoires ?? RECT_NUL,
+    sasGivre: RECT_NUL,
+    sasVapeur: RECT_NUL,
+    stations: {},
+    tableDepart: RECT_NUL,
+    sasScelle: RECT_NUL,
+    portesDegat: {},
+    sceau: RECT_NUL,
+    porteCuve: RECT_NUL,
+  }
+  const simples: Record<string, (r: RectHub) => void> = {
+    'table-depart': (r) => (z.tableDepart = r),
+    'sas-scelle': (r) => (z.sasScelle = r),
+    sceau: (r) => (z.sceau = r),
+    'porte-cuve': (r) => (z.porteCuve = r),
+    'sas-givre': (r) => (z.sasGivre = r),
+    'sas-vapeur': (r) => (z.sasVapeur = r),
+  }
+  for (const a of ancres) {
+    const r: RectHub = {
+      minX: a.minX,
+      minY: a.minY,
+      maxX: a.maxX,
+      maxY: a.maxY,
+    }
+    if (a.role === 'station') {
+      if (a.id) z.stations[a.id] = r
+    } else if (a.role === 'degat') {
+      if (a.id) z.portesDegat[a.id] = r
+    } else simples[a.role]?.(r)
+  }
+  return z
+}
+
+/** Les zones méta du hub JOUÉ. Les ANCRES POSÉES font foi (le module
+ * rebâti à l'éditeur porte les siennes) ; à défaut, la géométrie tranche
+ * pour les vieux instantanés : le grand module, le compact v4, ou null —
+ * aucune zone ne s'active à tort. */
+export function zonesDuHub(lv: {
+  bounds: { maxX: number }
+  ancres?: readonly AncreMeta[]
+  bancMemoires?: RectHub
+}): ZonesHub | null {
+  const posees = zonesPosees(lv)
+  if (posees) return posees
   if (lv.bounds.maxX >= 3500) return ZONES_HUB_GRAND
   if (lv.bounds.maxX >= 2600) return ZONES_HUB_COMPACT
   return null
 }
+
+/** Les rôles d'ancre, pour la palette de l'éditeur et le format. */
+export const ROLES_ANCRE: readonly RoleAncre[] = [
+  'station',
+  'degat',
+  'table-depart',
+  'sas-scelle',
+  'sceau',
+  'porte-cuve',
+  'sas-givre',
+  'sas-vapeur',
+]
 
 export const TABLEAU_HUB: LevelDef = {
   name: 'Le module Méduse',

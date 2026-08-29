@@ -465,6 +465,41 @@ export interface PlotMeta {
   prix?: number // surcharge du prix catalogue (1..999) ; absent : catalogue
 }
 
+// UNE ANCRE MÉTA : les rendez-vous du MODULE, posés en données comme le
+// reste. Jusqu'ici la géométrie du hub les devinait (zonesDuHub) — donc un
+// module rebâti à la main n'en avait aucun. Posées ici, elles suivent le
+// tableau : l'éditeur les trace, le jeu les lit.
+//
+//   station     (+ id) le plot où l'on PAIE la remise en état d'une station
+//   degat       (+ id) la barrière d'énergie qui condamne l'aile de cette
+//                      même station tant qu'elle est en panne
+//   table-depart       le récapitulatif de ce qu'on emporte
+//   sas-scelle         l'alcôve du secteur 4 (la fin de l'arc l'ouvre)
+//   sceau              la barrière qui tient le secteur 4 jusqu'à la fin
+//   porte-cuve         la porte de la cuve, close tant que l'acte 0 n'est
+//                      pas joué (la séquence ALERTE la crève)
+//   sas-givre          la sortie gardée par le RIDEAU (la glace l'écarte)
+//   sas-vapeur         la sortie gardée par la GRILLE (la vapeur passe)
+export type RoleAncre =
+  | 'station'
+  | 'degat'
+  | 'table-depart'
+  | 'sas-scelle'
+  | 'sceau'
+  | 'porte-cuve'
+  | 'sas-givre'
+  | 'sas-vapeur'
+
+export interface AncreMeta {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+  role: RoleAncre
+  /** L'id de station (reparations.ts) — pour les rôles station et degat. */
+  id?: string
+}
+
 // Un ÉCLAT DE MÉMOIRE : de l'information cristallisée — gravée aux
 // registres au contact, une fois par RUN. Jamais semé automatiquement.
 export interface EclatPose {
@@ -519,6 +554,11 @@ export interface LevelDef {
   // LE MARCHAND (un Semblable en capsule) : décor-repère de boutique,
   // aucune physique — la silhouette luit derrière sa grille.
   marchand?: { x: number; y: number }
+  // LES ANCRES MÉTA du module : stations de réparation, portes de dégât,
+  // table de départ, secteur scellé, porte de cuve, sas gardés. Absentes,
+  // la géométrie du hub tranche encore (les vieux instantanés) — présentes,
+  // elles font foi : un module rebâti à la main a enfin les siennes.
+  ancres?: AncreMeta[]
   // Les ÉCLATS DE MÉMOIRE : +N mémoire GRAVÉE au contact — jamais semés
   // automatiquement, une récompense qu'on place à la main. Un éclat pris
   // l'est pour toute la RUN (pas de ferme au R).

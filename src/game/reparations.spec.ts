@@ -98,8 +98,31 @@ describe('les réparations — le hub accidenté', () => {
   })
 
   it('un vieil instantané sans zones méta traverse tel quel', () => {
-    const vieux = { ...TABLEAU_HUB_COMPACT, bounds: { minX: -1750, minY: -800, maxX: 1750, maxY: 800 } }
+    const { ancres: _, ...sansAncres } = TABLEAU_HUB_COMPACT
+    const vieux = { ...sansAncres, bounds: { minX: -1750, minY: -800, maxX: 1750, maxY: 800 } }
     expect(appliqueReparations(vieux, [])).toBe(vieux)
+  })
+
+  it('un module rebâti sans ancres de sceau ni de cuve : aucune porte fantôme', () => {
+    const nu = {
+      ...TABLEAU_HUB_COMPACT,
+      ancres: [
+        {
+          minX: 0,
+          minY: 0,
+          maxX: 100,
+          maxY: 100,
+          role: 'station' as const,
+          id: 'eclairage',
+        },
+      ],
+    }
+    const lv = appliqueReparations(nu, [], { cuveClose: true })
+    // seule la station posée parle ; ni sceau, ni porte de cuve, ni ailes
+    expect(lv.portes?.length).toBe(nu.portes?.length ?? 0)
+    const textes = lv.labels.map((l) => l.text).join(' · ')
+    expect(textes).toContain('RÉSEAU D’ÉCLAIRAGE — EN PANNE')
+    expect(textes).not.toContain('PASSERELLE DU SECTEUR 4 — EN PANNE')
   })
 
   it('reparationDef retrouve chaque fiche', () => {

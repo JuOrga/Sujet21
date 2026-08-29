@@ -41,12 +41,15 @@ import {
   type ZoneForce,
   type MonnaiePlot,
   type PlotMeta,
+  type RoleAncre,
 } from '../game/level'
 import {
   ARTICLES_COMPTOIR,
+  ROLES_ANCRE,
   TABLEAU_HUB,
   TABLEAU_HUB_COMPACT,
 } from '../game/hub'
+import { REPARATIONS } from '../game/reparations'
 import { ETAL_ECONOMAT, TABLEAU_ECONOMAT } from '../game/economat'
 import {
   cleFiche,
@@ -161,6 +164,38 @@ const DECAL_NOMS: Record<DecalDef['kind'], string> = {
   'meta-marchand': 'Méta — le Sujet 12',
 }
 
+// LES ANCRES MÉTA : les rendez-vous du module. Jusqu'ici la géométrie du
+// hub les devinait — donc un module rebâti à la main n'en avait aucun.
+// Elles se POSENT maintenant comme le reste : un rectangle, un rôle.
+const ANCRE_NOMS: Record<RoleAncre, string> = {
+  station: 'Station de réparation',
+  degat: 'Barrière d’aile condamnée',
+  'table-depart': 'Table de départ',
+  'sas-scelle': 'Alcôve du secteur 4',
+  sceau: 'Sceau du secteur 4',
+  'porte-cuve': 'Porte de la cuve (acte 0)',
+  'sas-givre': 'Sortie gardée — givre',
+  'sas-vapeur': 'Sortie gardée — vapeur',
+}
+const ANCRE_NOTES: Record<RoleAncre, string> = {
+  station:
+    'LA STATION : le corps qui entre dans ce rectangle PAIE la remise en état (le prix vit au catalogue des réparations). Tant qu’elle est en panne, sa plaque « EN PANNE — RÉPARER · N MÉMOIRE » s’affiche ici même.',
+  degat:
+    'LA BARRIÈRE : elle condamne l’aile de sa station tant que celle-ci n’est pas réparée — une porte d’énergie qu’aucun faisceau n’ouvre. Payer la station la lève à chaud, sans respawn.',
+  'table-depart':
+    'LA TABLE DE DÉPART : au contact, le récapitulatif de ce qu’on emporte (vies, bonbonne, fioles, provisions) — une fois la station « table de départ » réparée.',
+  'sas-scelle':
+    'L’ALCÔVE DU SECTEUR 4 : la 4e sortie. Quand tout le récit est raconté ET la passerelle réparée, y entrer joue la FIN.',
+  sceau:
+    'LE SCEAU : la barrière qui tient le secteur 4 même passerelle réparée — seule la fin de l’arc du récit la lève.',
+  'porte-cuve':
+    'LA PORTE DE LA CUVE : close tant que l’acte 0 n’est pas joué — le sujet naît enfermé, la séquence ALERTE la crève.',
+  'sas-givre':
+    'LA SORTIE GARDÉE PAR LE RIDEAU (la glace l’écarte) : y entrer lance une descente NEUVE.',
+  'sas-vapeur':
+    'LA SORTIE GARDÉE PAR LA GRILLE (la vapeur passe) : y entrer lance une descente NEUVE (descente du jour).',
+}
+
 /** La fiche catalogue d'un plot posé — la monnaie choisit le catalogue. */
 function ficheArticle(
   p: PlotMeta,
@@ -196,6 +231,10 @@ type Tool =
   | { kind: 'banc' }
   | { kind: 'marchand' }
   | { kind: 'eclat' }
+  // L'ANCRE MÉTA : station de réparation, barrière d'aile, table de départ,
+  // secteur scellé, porte de cuve, sorties gardées — le rôle se choisit
+  // ensuite dans le panneau
+  | { kind: 'ancre' }
   | { kind: 'rail' }
   | { kind: 'lumiere' }
   | { kind: 'bande' }
@@ -217,6 +256,7 @@ type Sel =
   | { kind: 'banc' }
   | { kind: 'marchand' }
   | { kind: 'eclat'; index: number }
+  | { kind: 'ancre'; index: number }
   | { kind: 'rail'; index: number }
   | { kind: 'lumiere'; index: number }
   | { kind: 'decal'; index: number }
@@ -659,6 +699,7 @@ export class LevelEditor {
     if (s.kind === 'porte') return (this.level.portes ?? [])[s.index] ?? null
     if (s.kind === 'plot') return (this.level.plots ?? [])[s.index] ?? null
     if (s.kind === 'banc') return this.level.bancMemoires ?? null
+    if (s.kind === 'ancre') return (this.level.ancres ?? [])[s.index] ?? null
     if (s.kind === 'exit') return this.level.exit
     if (s.kind === 'decal') {
       const d = (this.level.decals ?? [])[s.index]
@@ -701,6 +742,8 @@ export class LevelEditor {
       Object.assign((this.level.portes ?? [])[s.index], norm)
     else if (s.kind === 'plot')
       Object.assign((this.level.plots ?? [])[s.index], norm)
+    else if (s.kind === 'ancre')
+      Object.assign((this.level.ancres ?? [])[s.index], norm)
     else if (s.kind === 'banc' && this.level.bancMemoires)
       Object.assign(this.level.bancMemoires, norm)
     else if (s.kind === 'exit') Object.assign(this.level.exit, norm)
@@ -1096,6 +1139,10 @@ export class LevelEditor {
     }
     if (this.level.bancMemoires && inside(this.level.bancMemoires)) {
       return { kind: 'banc' }
+    }
+    const ancres = this.level.ancres ?? []
+    for (let i = ancres.length - 1; i >= 0; i--) {
+      if (inside(ancres[i])) return { kind: 'ancre', index: i }
     }
     const rails = this.level.rails ?? []
     const tol = Math.max(10, 12 / this.zoom)
@@ -3011,6 +3058,19 @@ export class LevelEditor {
           ? 'Plot d’article (MÉMOIRE) posé — l’achat au contact provisionne la PROCHAINE descente. Article et prix à droite.'
           : 'Plot d’article (CONDENSAT) posé — l’achat au contact, effet immédiat. Article et prix à droite.',
       )
+    } else if (t.kind === 'ancre') {
+      if (!this.level.ancres) this.level.ancres = []
+      // toute ancre naît STATION (le rôle le plus fréquent) sur la première
+      // réparation du catalogue — le rôle se change dans le panneau
+      this.level.ancres.push({
+        ...r,
+        role: 'station',
+        id: REPARATIONS[0].id,
+      })
+      this.sel = { kind: 'ancre', index: this.level.ancres.length - 1 }
+      this.commit(
+        'ANCRE MÉTA posée — station de réparation par défaut. Le rôle (barrière d’aile, table de départ, secteur scellé, porte de cuve, sortie gardée) se choisit à droite.',
+      )
     } else if (t.kind === 'banc') {
       // un seul banc par tableau : retracer le déplace
       this.level.bancMemoires = { ...r }
@@ -3101,6 +3161,7 @@ export class LevelEditor {
       (this.level.condensats ?? []).splice(s.index, 1)
     else if (s.kind === 'fiole') delete this.level.fiole
     else if (s.kind === 'plot') (this.level.plots ?? []).splice(s.index, 1)
+    else if (s.kind === 'ancre') (this.level.ancres ?? []).splice(s.index, 1)
     else if (s.kind === 'banc') delete this.level.bancMemoires
     else if (s.kind === 'marchand') delete this.level.marchand
     else if (s.kind === 'eclat') (this.level.eclats ?? []).splice(s.index, 1)
@@ -3187,6 +3248,10 @@ export class LevelEditor {
       const e = (this.level.eclats ?? [])[s.index]
       this.level.eclats!.push({ ...e, x: e.x + off })
       this.sel = { kind: 'eclat', index: this.level.eclats!.length - 1 }
+    } else if (s.kind === 'ancre') {
+      const a = (this.level.ancres ?? [])[s.index]
+      this.level.ancres!.push({ ...a, minX: a.minX + off, maxX: a.maxX + off })
+      this.sel = { kind: 'ancre', index: this.level.ancres!.length - 1 }
     } else if (s.kind === 'banc') {
       this.status('Un seul banc des mémoires par tableau.')
       return
@@ -3310,6 +3375,7 @@ export class LevelEditor {
             monnaie: key.slice(5) === 'memoire' ? 'memoire' : 'condensat',
           })
         else if (key === 'banc') this.setTool({ kind: 'banc' })
+        else if (key === 'ancre') this.setTool({ kind: 'ancre' })
         else if (key === 'marchand') this.setTool({ kind: 'marchand' })
         else if (key === 'eclat') this.setTool({ kind: 'eclat' })
         else if (key === 'porte') this.setTool({ kind: 'porte' })
@@ -4769,6 +4835,27 @@ export class LevelEditor {
           ? `<p class="ed-empty">Plot payé en MÉMOIRE (la monnaie générale) : l’achat au contact PROVISIONNE LA PROCHAINE DESCENTE, comme au comptoir du hub — où que le plot soit posé. Un prix à 0 suit le barème du catalogue.</p>`
           : `<p class="ed-empty">Plot payé en CONDENSAT (la bourse de la run) : l’achat au contact agit IMMÉDIATEMENT, comme à l’étal de l’Économat. Un prix à 0 suit le barème du catalogue. Deux plots du même article ne servent qu’une fois par salle.</p>`,
       )
+    } else if (s.kind === 'ancre') {
+      const a = (this.level.ancres ?? [])[s.index]
+      rows.push(
+        `<label class="ed-f"><span>Rôle</span><select id="p-anrole">` +
+          ROLES_ANCRE.map(
+            (r) =>
+              `<option value="${r}"${r === a.role ? ' selected' : ''}>${ANCRE_NOMS[r]}</option>`,
+          ).join('') +
+          `</select></label>`,
+      )
+      if (a.role === 'station' || a.role === 'degat') {
+        rows.push(
+          `<label class="ed-f"><span>Station</span><select id="p-anid">` +
+            REPARATIONS.map(
+              (r) =>
+                `<option value="${r.id}"${r.id === a.id ? ' selected' : ''}>${r.icone} ${r.nom} — ${r.prix} mém.</option>`,
+            ).join('') +
+            `</select></label>`,
+        )
+      }
+      rows.push(`<p class="ed-empty">${ANCRE_NOTES[a.role]}</p>`)
     } else if (s.kind === 'banc') {
       rows.push(
         `<p class="ed-empty">LE BANC DES MÉMOIRES (un seul par tableau) : en jeu, le corps qui glisse dans ce rectangle ouvre l’écran du cycle des états — on y tisse les transformations contre de la mémoire. Les poignées le redimensionnent.</p>`,
@@ -4910,8 +4997,10 @@ export class LevelEditor {
                                   ? 'Décal (machinerie de décor)'
                                   : s.kind === 'plot'
                                     ? `Plot d’article (${(this.level.plots ?? [])[s.index]?.monnaie === 'memoire' ? 'mémoire' : 'condensat'})`
-                                    : s.kind === 'banc'
-                                      ? 'Banc des mémoires'
+                                    : s.kind === 'ancre'
+                                      ? `Ancre — ${ANCRE_NOMS[(this.level.ancres ?? [])[s.index]?.role ?? 'station']}`
+                                      : s.kind === 'banc'
+                                        ? 'Banc des mémoires'
                                       : s.kind === 'marchand'
                                         ? 'Marchand'
                                         : s.kind === 'eclat'
@@ -5204,6 +5293,17 @@ export class LevelEditor {
       const prix = Math.round(val('p-plprix'))
       if (prix >= 1) p.prix = Math.min(999, prix)
       else delete p.prix
+    } else if (s.kind === 'ancre') {
+      const a = (this.level.ancres ?? [])[s.index]
+      const role = text('p-anrole') as RoleAncre
+      if (ROLES_ANCRE.includes(role)) a.role = role
+      if (a.role === 'station' || a.role === 'degat') {
+        const id = text('p-anid')
+        // le rôle vient peut-être de changer : sans liste au panneau, la
+        // station reste celle d'avant, ou la première du catalogue
+        if (REPARATIONS.some((r) => r.id === id)) a.id = id
+        else if (!a.id) a.id = REPARATIONS[0].id
+      } else delete a.id
     } else if (s.kind === 'marchand') {
       const m = this.level.marchand
       if (m) {
@@ -6076,6 +6176,42 @@ export class LevelEditor {
         `${p.prix ?? fiche?.prix ?? '?'} ${p.monnaie === 'memoire' ? 'mém.' : 'cL'}`,
         cx,
         cy + t * 0.75,
+      )
+      g.textAlign = 'left'
+    }
+    // LES ANCRES MÉTA : les rendez-vous du module, en trait ambré — on les
+    // veut LISIBLES sans être confondues avec les plots d'article
+    for (const a of this.level.ancres ?? []) {
+      const p0 = this.toScreen(a.minX, a.maxY)
+      const p1 = this.toScreen(a.maxX, a.minY)
+      const barre = a.role === 'degat' || a.role === 'sceau' || a.role === 'porte-cuve'
+      const teinte = barre ? '255,120,110' : '236,178,90'
+      g.fillStyle = `rgba(${teinte},0.10)`
+      g.fillRect(p0.sx, p0.sy, p1.sx - p0.sx, p1.sy - p0.sy)
+      g.setLineDash(barre ? [3, 4] : [9, 5])
+      g.strokeStyle = `rgba(${teinte},0.9)`
+      g.lineWidth = 1.5
+      g.strokeRect(p0.sx, p0.sy, p1.sx - p0.sx, p1.sy - p0.sy)
+      g.setLineDash([])
+      const cx = (p0.sx + p1.sx) / 2
+      const cy = (p0.sy + p1.sy) / 2
+      const fiche =
+        a.role === 'station' || a.role === 'degat'
+          ? REPARATIONS.find((r) => r.id === a.id)
+          : null
+      g.textAlign = 'center'
+      if (fiche) {
+        const t = Math.max(9, Math.min(20, 70 * this.zoom))
+        g.font = `${t}px system-ui`
+        g.fillStyle = `rgba(${teinte},0.95)`
+        g.fillText(fiche.icone, cx, cy + t * 0.35)
+      }
+      g.fillStyle = `rgba(${teinte},0.95)`
+      g.font = '600 9px ui-monospace, monospace'
+      g.fillText(
+        fiche ? `${ANCRE_NOMS[a.role].toUpperCase()} · ${fiche.nom}` : ANCRE_NOMS[a.role].toUpperCase(),
+        cx,
+        p0.sy - 5,
       )
       g.textAlign = 'left'
     }

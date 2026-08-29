@@ -908,6 +908,42 @@ describe('levelIO — les décalques de LA SERRE', () => {
     expect(nu.eclats).toBeUndefined()
   })
 
+  it('les ancres méta font l’aller-retour ; rôle ou station inconnus écartés', () => {
+    const { level, rejets } = parseLevel({
+      ...base,
+      ancres: [
+        // rectangle à l'envers : remis à l'endroit
+        {
+          minX: 300,
+          minY: 100,
+          maxX: 100,
+          maxY: -100,
+          role: 'station',
+          id: 'distillateur',
+        },
+        { minX: 0, minY: 0, maxX: 40, maxY: 200, role: 'degat', id: 'bac-sable' },
+        { minX: 0, minY: 0, maxX: 100, maxY: 100, role: 'sas-givre', id: 'inutile' },
+        { minX: 0, minY: 0, maxX: 10, maxY: 10, role: 'salle-des-fetes' },
+        { minX: 0, minY: 0, maxX: 10, maxY: 10, role: 'station', id: 'cafetiere' },
+      ],
+    })
+    expect(rejets).toEqual([
+      'ancre méta de rôle inconnu écartée (salle-des-fetes)',
+      'ancre de station inconnue écartée (cafetiere)',
+    ])
+    expect(level!.ancres).toEqual([
+      { minX: 100, minY: -100, maxX: 300, maxY: 100, role: 'station', id: 'distillateur' },
+      { minX: 0, minY: 0, maxX: 40, maxY: 200, role: 'degat', id: 'bac-sable' },
+      // un rôle sans station ne garde pas d'id parasite
+      { minX: 0, minY: 0, maxX: 100, maxY: 100, role: 'sas-givre' },
+    ])
+    const relu = parseLevel(JSON.parse(serializeLevel(level!)))
+    expect(relu.level!.ancres).toEqual(level!.ancres)
+    // absentes, elles n'encombrent pas le fichier
+    const nu = JSON.parse(serializeLevel(parseLevel({ ...base }).level!))
+    expect(nu.ancres).toBeUndefined()
+  })
+
   it('écarte toujours une sorte inconnue — la liste reste fermée', () => {
     const { level, rejets } = parseLevel({
       ...base,

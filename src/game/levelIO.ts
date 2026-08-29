@@ -27,15 +27,18 @@ import {
   type CondensatPose,
   type EclatPose,
   type LaserDef,
+  type AncreMeta,
   type MonnaiePlot,
   type PlotMeta,
+  type RoleAncre,
   type PorteDef,
   type RailDef,
   type ZoneDef,
   type ZoneForce,
 } from './level'
 import { ARTICLES_ETAL_IDS } from './economat'
-import { ARTICLES_COMPTOIR_IDS } from './hub'
+import { ARTICLES_COMPTOIR_IDS, ROLES_ANCRE } from './hub'
+import { REPARATIONS } from './reparations'
 import { MAX_BOXES, MAX_LUMIERES, MAX_ZONES } from '../render/renderer'
 import {
   ARC_EPAISSEUR_DEFAUT,
@@ -644,6 +647,35 @@ export function parseLevel(input: unknown): {
   }
   if (plots.length > 0) level.plots = plots
 
+  // LES ANCRES MÉTA du module : rôle dans la liste fermée, id de station
+  // au catalogue des réparations (un rôle ou un id inconnu est écarté —
+  // une ancre muette vaut mieux qu'une ancre qui s'active à tort)
+  const ancres: AncreMeta[] = []
+  const idsStation = REPARATIONS.map((r) => r.id)
+  for (const raw of Array.isArray(o.ancres) ? o.ancres : []) {
+    const a = (raw ?? {}) as Record<string, unknown>
+    const role = str(a.role) as RoleAncre
+    if (!ROLES_ANCRE.includes(role)) {
+      rejets.push(`ancre méta de rôle inconnu écartée (${role || 'sans rôle'})`)
+      continue
+    }
+    const r = normRect(
+      num(a.minX, 0),
+      num(a.minY, 0),
+      num(a.maxX, 0),
+      num(a.maxY, 0),
+    )
+    if (role === 'station' || role === 'degat') {
+      const id = str(a.id)
+      if (!idsStation.includes(id)) {
+        rejets.push(`ancre de station inconnue écartée (${id || 'sans id'})`)
+        continue
+      }
+      ancres.push({ ...r, role, id })
+    } else ancres.push({ ...r, role })
+  }
+  if (ancres.length > 0) level.ancres = ancres
+
   // le banc des mémoires (un seul), le marchand (un seul)
   if (o.bancMemoires && typeof o.bancMemoires === 'object') {
     const b = o.bancMemoires as Record<string, unknown>
@@ -767,6 +799,7 @@ export function serializeLevel(level: LevelDef): string {
     out.condensats = level.condensats
   if (level.fiole) out.fiole = level.fiole
   if (level.plots?.length) out.plots = level.plots
+  if (level.ancres?.length) out.ancres = level.ancres
   if (level.bancMemoires) out.bancMemoires = level.bancMemoires
   if (level.marchand) out.marchand = level.marchand
   if (level.eclats?.length) out.eclats = level.eclats
