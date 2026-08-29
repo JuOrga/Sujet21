@@ -31,6 +31,7 @@ import {
   type MonnaiePlot,
   type PlotMeta,
   type RoleAncre,
+  type StructureDef,
   type PorteDef,
   type RailDef,
   type ZoneDef,
@@ -50,6 +51,15 @@ import {
   type FormeContact,
 } from './formes'
 import { canalDeCible } from './laser'
+import {
+  CHANFREIN_MAX,
+  EP_MAX,
+  EP_MIN,
+  STRUCT_CHAMBRE,
+  STRUCT_COULOIR,
+  niveauExpanse,
+  structureViable,
+} from './structures'
 
 export const MATERIALS = [
   MAT_WALL,
@@ -652,6 +662,58 @@ export function parseLevel(input: unknown): {
   }
   if (plots.length > 0) level.plots = plots
 
+  // LES STRUCTURES DE COQUE : sorte fermée, réglages bornés. Une coque
+  // sans intérieur (deux parois qui se touchent) est écartée — ce serait
+  // un bloc plein, pas un terrain de jeu.
+  const structures: StructureDef[] = []
+  for (const raw of Array.isArray(o.structures) ? o.structures : []) {
+    const t = (raw ?? {}) as Record<string, unknown>
+    const type = Math.round(num(t.type, STRUCT_CHAMBRE))
+    if (type !== STRUCT_CHAMBRE && type !== STRUCT_COULOIR) {
+      rejets.push(`structure de sorte inconnue écartée (${type})`)
+      continue
+    }
+    const r = normRect(
+      num(t.minX, 0),
+      num(t.minY, 0),
+      num(t.maxX, 0),
+      num(t.maxY, 0),
+    )
+    const st: StructureDef = { type, ...r }
+    if (t.ep !== undefined)
+      st.ep = Math.max(EP_MIN, Math.min(EP_MAX, Math.round(num(t.ep, 40))))
+    if (t.chanfrein !== undefined && type === STRUCT_CHAMBRE)
+      st.chanfrein = Math.max(
+        0,
+        Math.min(CHANFREIN_MAX, num(t.chanfrein, 0.25)),
+      )
+    if (t.angle !== undefined) {
+      const a = Math.max(-180, Math.min(180, num(t.angle, 0)))
+      if (a) st.angle = a
+    }
+    if (type === STRUCT_COULOIR && (t.axe === 0 || t.axe === 1)) st.axe = t.axe
+    if (t.bouchon !== undefined && type === STRUCT_COULOIR) {
+      const m = Math.round(num(t.bouchon, MAT_WALL))
+      if (MATERIALS.includes(m as (typeof MATERIALS)[number])) st.bouchon = m
+    }
+    if (t.material !== undefined) {
+      const m = Math.round(num(t.material, MAT_WALL))
+      if (MATERIALS.includes(m as (typeof MATERIALS)[number]) && m !== MAT_WALL)
+        st.material = m
+    }
+    if (t.skin !== undefined) {
+      const k = Math.round(num(t.skin, 0))
+      if (k >= 0 && k <= 10) st.skin = k
+    }
+    if (!structureViable(st)) {
+      rejets.push('une structure sans intérieur a été écartée (coque trop épaisse)')
+      continue
+    }
+    structures.push(st)
+  }
+  if (structures.length > 0) level.structures = structures
+  if (o.coque === 'structures') level.coque = 'structures'
+
   // LES ANCRES MÉTA du module : rôle dans la liste fermée, id de station
   // au catalogue des réparations (un rôle ou un id inconnu est écarté —
   // une ancre muette vaut mieux qu'une ancre qui s'active à tort)
@@ -804,6 +866,8 @@ export function serializeLevel(level: LevelDef): string {
     out.condensats = level.condensats
   if (level.fiole) out.fiole = level.fiole
   if (level.plots?.length) out.plots = level.plots
+  if (level.structures?.length) out.structures = level.structures
+  if (level.coque === 'structures') out.coque = 'structures'
   if (level.ancres?.length) out.ancres = level.ancres
   if (level.bancMemoires) out.bancMemoires = level.bancMemoires
   if (level.marchand) out.marchand = level.marchand
@@ -831,8 +895,12 @@ export interface Verdict {
  * Garde-fous du level design, les mêmes que ceux des tableaux livrés : une
  * erreur rend le tableau injouable, un avertissement le rend douteux.
  */
-export function checkLevel(level: LevelDef): Verdict[] {
+export function checkLevel(brut: LevelDef): Verdict[] {
   const v: Verdict[] = []
+  // LE TABLEAU TEL QUE LE MOTEUR LE VERRA : les structures expansées en
+  // parois. Le budget de blocs, le dégagement du départ et la chimie
+  // raisonnent donc sur la vérité, pas sur le plan.
+  const level = niveauExpanse(brut)
   const b = level.bounds
   const inBounds = (x: number, y: number): boolean =>
     x > b.minX && x < b.maxX && y > b.minY && y < b.maxY

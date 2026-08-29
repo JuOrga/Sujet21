@@ -6,6 +6,7 @@ import { FluidSim, KIND_PLAYER } from './sim/solver'
 import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
 import { CODEX, Codex, type CodexGroupe } from './game/codex'
+import { niveauExpanse } from './game/structures'
 import {
   TABLEAU_HUB,
   articleComptoir,
@@ -741,14 +742,18 @@ function noteSalleElue(lv: LevelDef): void {
 }
 
 function applyLevel(): void {
-  level =
+  // LES STRUCTURES DE COQUE se déplient ICI, à l'entonnoir unique : le jeu
+  // et le bouton ESSAYER de l'éditeur voient exactement la même chose. Un
+  // tableau sans structure traverse sans être touché (même référence).
+  level = niveauExpanse(
     testLevel ??
-    (auHub
-      ? hubJoue()
-      : (economatIntercalaire ??
-        voieIntercalaire ??
-        playedLevels()[levelIndex] ??
-        playedLevels()[0]))
+      (auHub
+        ? hubJoue()
+        : (economatIntercalaire ??
+          voieIntercalaire ??
+          playedLevels()[levelIndex] ??
+          playedLevels()[0])),
+  )
   levelHasCold = level.boxes.some((b) => b.material === MAT_FROID)
   rebuildRenderBoxes()
   exitMouth.x = (level.exit.minX + level.exit.maxX) * 0.5

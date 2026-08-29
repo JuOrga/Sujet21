@@ -944,6 +944,51 @@ describe('levelIO — les décalques de LA SERRE', () => {
     expect(nu.ancres).toBeUndefined()
   })
 
+  it('les structures de coque font l’aller-retour ; les défauts ne s’écrivent pas', () => {
+    const { level, rejets } = parseLevel({
+      ...base,
+      coque: 'structures',
+      structures: [
+        // rectangle à l'envers : remis à l'endroit ; réglages hors bornes : ramenés
+        { type: 0, minX: 600, minY: 400, maxX: -600, maxY: -400, ep: 9999, chanfrein: 9 },
+        { type: 1, minX: -300, minY: -100, maxX: 300, maxY: 100, axe: 0, bouchon: 5, angle: 30 },
+        { type: 7, minX: 0, minY: 0, maxX: 100, maxY: 100 },
+        { type: 0, minX: 0, minY: 0, maxX: 60, maxY: 60 }, // sans intérieur
+      ],
+    })
+    expect(rejets).toEqual([
+      'structure de sorte inconnue écartée (7)',
+      'une structure sans intérieur a été écartée (coque trop épaisse)',
+    ])
+    expect(level!.structures).toEqual([
+      { type: 0, minX: -600, minY: -400, maxX: 600, maxY: 400, ep: 240, chanfrein: 0.5 },
+      { type: 1, minX: -300, minY: -100, maxX: 300, maxY: 100, angle: 30, axe: 0, bouchon: 5 },
+    ])
+    expect(level!.coque).toBe('structures')
+    const relu = parseLevel(JSON.parse(serializeLevel(level!)))
+    expect(relu.level!.structures).toEqual(level!.structures)
+    expect(relu.level!.coque).toBe('structures')
+    // absentes, elles n'encombrent pas le fichier
+    const nu = JSON.parse(serializeLevel(parseLevel({ ...base }).level!))
+    expect(nu.structures).toBeUndefined()
+    expect(nu.coque).toBeUndefined()
+  })
+
+  it('le verdict compte les parois des structures dans le budget de blocs', () => {
+    const chambres = []
+    for (let i = 0; i < 13; i++)
+      chambres.push({
+        type: 0,
+        minX: -3000 + i * 460,
+        minY: -400,
+        maxX: -3000 + i * 460 + 440,
+        maxY: 400,
+      })
+    const { level } = parseLevel({ ...base, structures: chambres })
+    const trop = checkLevel(level!).filter((x) => x.message.includes('Trop de blocs'))
+    expect(trop.length).toBe(1)
+  })
+
   it('écarte toujours une sorte inconnue — la liste reste fermée', () => {
     const { level, rejets } = parseLevel({
       ...base,
