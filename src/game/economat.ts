@@ -141,13 +141,14 @@ export const TABLEAU_ECONOMAT: LevelDef = {
     box(420, GRILLE_Y, 700, GRILLE_Y + 60, MAT_WALL, 6),
     box(-700, GRILLE_Y + 60, -640, 800, MAT_WALL, 6),
     box(640, GRILLE_Y + 60, 700, 800, MAT_WALL, 6),
-    // LE SUJET 12 : une masse en capsule, posée derrière les barreaux —
-    // hydrophile : ce qui aime retient
+    // LE SUJET 12 : une masse captive DANS SA COLONNE, derrière les barreaux
+    // — hydrophile : ce qui aime retient. La colonne est haute et étroite,
+    // accordée à la pièce dessinée du marchand (le décalque se pose dessus).
     {
-      minX: -170,
-      minY: 470,
-      maxX: 170,
-      maxY: 690,
+      minX: -80,
+      minY: 400,
+      maxX: 80,
+      maxY: 780,
       material: MAT_HYDROPHILE,
       forme: FORME_CAPSULE,
     },
@@ -172,7 +173,7 @@ export const TABLEAU_ECONOMAT: LevelDef = {
     article: a.id,
     monnaie: 'condensat' as const,
   })),
-  marchand: { x: 0, y: 580 },
+  marchand: { x: 0, y: 590 }, // au centre de la colonne (400 → 780)
   labels: [
     {
       x: 0,

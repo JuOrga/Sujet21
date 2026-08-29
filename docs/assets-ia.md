@@ -395,6 +395,26 @@ apparaîtront aussitôt dans la bibliothèque d'images, rubrique « Méta &
 commerce ». **Tant qu'un fichier manque, le dessin actuel (vectoriel) tient la
 place** : rien ne casse, vous pouvez les livrer un par un.
 
+### ⬛ CE QUI EST LIVRÉ (août 2026)
+
+Les cinq pièces sont en place. Une pièce REMPLACÉE doit garder le rapport de
+celle qu'elle remplace, sinon le décalque se pose plus petit (il ne se déforme
+jamais : il se centre dans le rectangle, à son rapport) — et les rapports sont
+inscrits dans `src/game/metaAssets.ts`, à corriger en même temps que l'image.
+
+| Pièce | Rapport livré | Où il est inscrit |
+|---|---|---|
+| alcôve | 1,337 | `RAPPORT_ALCOVE` |
+| pupitre du banc | 2,188 | `RAPPORT_BANC` |
+| Sujet 12 | 0,426 | `RAPPORT_MARCHAND` (et la colonne de l'Économat) |
+| éclat | libre | lu sur l'image |
+| planche d'icônes | 4×2 imposé | recomposée à l'intégration |
+
+Le traitement d'intégration (recadrage, planche remise en cases égales, alpha
+prémultiplié, éclaircissement ×1,30 des décalques) est refait à chaque
+livraison — inutile de le préparer soi-même, un rendu propre sur fond
+transparent suffit.
+
 ### 15a. LE SUJET 12 — le marchand — `meta-marchand.webp`
 **1024×1024 · PNG/WebP transparent · décalque**
 

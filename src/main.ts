@@ -205,8 +205,10 @@ import {
   ICONES_COLONNES,
   ICONES_RANGEES,
   ICONES_URL,
+  cadreAlcove,
   caseIcone,
   decalsDuMeta,
+  iconeMetaHTML,
   vuesEclat,
 } from './game/metaAssets'
 import { sprite, spritesCharges } from './render/sprites'
@@ -555,8 +557,7 @@ function hubJoue(): LevelDef {
   const base = hubLevel()
   const opts = { cuveClose: !eveilJoue(), finOuverte: finOuverte() }
   const cle = `${opts.cuveClose ? 'cuve|' : ''}${opts.finOuverte ? 'fin|' : ''}${records.reparationsFaites().sort().join('+')}`
-  if (hubMemo && hubMemo.base === base && hubMemo.cle === cle)
-    return hubMemo.lv
+  if (hubMemo && hubMemo.base === base && hubMemo.cle === cle) return hubMemo.lv
   const lv = appliqueReparations(base, records.reparationsFaites(), opts)
   hubMemo = { base, cle, lv }
   return lv
@@ -1818,6 +1819,9 @@ const toastFile: {
   sur?: string
   fiche?: string
   genre?: ToastGenre
+  // l'article du méta, quand il y en a un : son icône vient alors de LA
+  // PLANCHE (la même sur toutes les machines), pas d'un emoji système
+  article?: string
 }[] = []
 function toastGenre(t: {
   sur?: string
@@ -1890,7 +1894,9 @@ function majToast(): void {
   tropheeToast.style.setProperty('--dur', `${duree}s`)
   tropheeToast.dataset.genre = genre
   tropheeToast.innerHTML =
-    `<span class="tt-cartouche"><i>${t.icone}</i></span>` +
+    `<span class="tt-cartouche">${
+      t.article ? iconeMetaHTML(t.article, t.icone) : `<i>${t.icone}</i>`
+    }</span>` +
     `<span class="tt-corps"><b>${t.sur ?? 'TROPHÉE DÉBLOQUÉ'}</b>` +
     `<span class="tt-nom">${t.nom}</span>${voir}</span>` +
     `<span class="tt-vie"></span>`
@@ -5128,28 +5134,31 @@ function dessineEclat(
 ): void {
   const img = sprite(ECLAT_URL)
   if (img) {
-    const cote = r * 2.6
+    // la vignette garde SA forme : le cristal livré est haut et étroit, le
+    // forcer dans un carré l'écraserait
     const vues = vuesEclat(img.naturalWidth, img.naturalHeight)
+    const source = img.naturalWidth / vues
+    const hauteur = r * 3.2
+    const largeur = hauteur * (source / img.naturalHeight)
     if (vues > 1) {
-      const w = img.naturalWidth / vues
       const tour = (((phase / (Math.PI * 2)) % 1) + 1) % 1
       const k = Math.min(vues - 1, Math.floor(tour * vues))
       g.drawImage(
         img,
-        k * w,
+        k * source,
         0,
-        w,
+        source,
         img.naturalHeight,
-        cx - cote / 2,
-        cy - cote / 2,
-        cote,
-        cote,
+        cx - largeur / 2,
+        cy - hauteur / 2,
+        largeur,
+        hauteur,
       )
     } else {
       g.save()
       g.translate(cx, cy)
       g.rotate(phase)
-      g.drawImage(img, -cote / 2, -cote / 2, cote, cote)
+      g.drawImage(img, -largeur / 2, -hauteur / 2, largeur, hauteur)
       g.restore()
     }
     return
@@ -5774,8 +5783,12 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       pl.monnaie === 'memoire'
         ? achatsHub.has(pl.article)
         : achatsEconomat.has(pl.article)
-    const a = S(pl.minX, pl.maxY)
-    const b = S(pl.maxX, pl.minY)
+    // le cadre suit LA NICHE DESSINÉE, pas le rectangle du plot : sans cela
+    // le trait en pointillés doublait le cadre de métal de l'alcôve, plus
+    // large que lui, et l'œil voyait deux boîtes au lieu d'une
+    const cadre = cadreAlcove(pl)
+    const a = S(cadre.minX, cadre.maxY)
+    const b = S(cadre.maxX, cadre.minY)
     if (b.sx < 0 || a.sx > vw || b.sy < 0 || a.sy > vh) continue
     const teinte = pl.monnaie === 'memoire' ? '109,255,184' : '140,215,255'
     const pouls = servi ? 0 : 0.5 + 0.5 * Math.sin(nowPastilles * 1.8 + i)
@@ -7607,6 +7620,7 @@ function lanceManoeuvre(quoi: string): void {
           {
             nom: '+3 mémoire — essai d’affichage',
             icone: '✦',
+            article: 'memoire',
             sur: 'ÉCLAT DE MÉMOIRE',
             genre: 'eclat',
           },
@@ -7619,6 +7633,7 @@ function lanceManoeuvre(quoi: string): void {
           {
             nom: 'Essai d’affichage — rien n’est débité',
             icone: '🛒',
+            article: 'gouttes',
             sur: 'L’ÉCONOMAT',
             genre: 'achat',
           },
@@ -7775,6 +7790,7 @@ function tenteAchat(a: ArticleEconomat): void {
     toastFile.push({
       nom: `${a.nom} — DÉJÀ SERVI`,
       icone: a.icone,
+      article: a.id,
       sur: 'L’ÉCONOMAT',
     })
     return
@@ -7830,6 +7846,7 @@ function tenteAchat(a: ArticleEconomat): void {
   toastFile.push({
     nom: `${a.nom} — ${detail}`,
     icone: a.icone,
+    article: a.id,
     sur: 'L’ÉCONOMAT',
   })
 }
@@ -7897,6 +7914,7 @@ function tenteAchatHub(a: ArticleHub): void {
     toastFile.push({
       nom: `${a.nom} — DÉJÀ SERVI`,
       icone: a.icone,
+      article: a.id,
       sur: 'LE COMPTOIR',
     })
     return
@@ -7941,6 +7959,7 @@ function tenteAchatHub(a: ArticleHub): void {
   toastFile.push({
     nom: `${a.nom} — ${detail}`,
     icone: a.icone,
+    article: a.id,
     sur: 'LE COMPTOIR',
   })
 }
@@ -8958,6 +8977,10 @@ function restart(): void {
 ;(window as unknown as { __expedition: () => void }).__expedition = () => {
   auHub = false
   hasPlayed = true
+  // un essai en cours (Économat, prototype) resterait sinon le tableau joué,
+  // et la descente se croirait « hors run » — dossier sans butin, registres
+  // muets. Lancer l'expédition, c'est quitter l'essai.
+  testLevel = null
   document.body.classList.add('playing')
   newExpedition()
 }
@@ -9795,8 +9818,18 @@ function majDossier(): void {
     ? '<section class="do-sec do-butin"><h4><u>💎</u>TON BUTIN</h4>' +
       '<div class="do-tuiles">' +
       doTuile('🫙', `${run.bonbonneLiters.toFixed(1)} L`, 'BONBONNE', 'or') +
-      doTuile('💠', `${condensat}`, 'CONDENSAT cL', 'or') +
-      doTuile('🧠', `+${run.memoireGagnee}`, 'MÉMOIRE', 'vert') +
+      doTuile(
+        iconeMetaHTML('condensat', '💠'),
+        `${condensat}`,
+        'CONDENSAT cL',
+        'or',
+      ) +
+      doTuile(
+        iconeMetaHTML('memoire', '🧠'),
+        `+${run.memoireGagnee}`,
+        'MÉMOIRE',
+        'vert',
+      ) +
       '</div>' +
       `<div class="do-jauge j-but"><i style="width:${Math.min(100, (run.bonbonneLiters / capBonbonne()) * 100)}%"></i></div>` +
       `<p class="do-note" style="margin-top:6px">Bonbonne : ${run.bonbonneLiters.toFixed(2)} L sur ${capBonbonne()} — le surplus de chaque salle s’y range, et se reverse d’un geste.</p>` +
@@ -10726,6 +10759,7 @@ function frame(now: number): void {
         toastFile.push({
           nom: 'essai : rien ne se grave aux registres',
           icone: '✦',
+          article: 'memoire',
           sur: 'ÉCLAT DE MÉMOIRE',
         })
       } else {
@@ -10733,6 +10767,7 @@ function frame(now: number): void {
         toastFile.push({
           nom: `+${e.memoire} mémoire — la matière se souvient`,
           icone: '✦',
+          article: 'memoire',
           sur: 'ÉCLAT DE MÉMOIRE',
         })
       }

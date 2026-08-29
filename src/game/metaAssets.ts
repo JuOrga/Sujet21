@@ -17,45 +17,87 @@
 
 import type { DecalDef, LevelDef } from './level'
 
-/** La taille du marchand, en unités monde : la masse déborde un peu de sa
- *  capsule de l'Économat (340 × 220) — c'est du décor, pas une collision. */
-export const MARCHAND_TAILLE = 360
+// ---- LES RAPPORTS DES PIÈCES LIVRÉES ----------------------------------
+// Un décalque ÉPOUSAIT le rectangle posé : l'alcôve s'élargissait, le pupitre
+// s'écrasait. Les pièces ont une forme — on la respecte : le décalque se pose
+// ENTIER dans le rectangle, centré, à son propre rapport. Ces valeurs suivent
+// les fichiers de public/assets ; changer une image sans changer son rapport
+// ici la déformerait de nouveau.
+export const RAPPORT_ALCOVE = 1.337
+export const RAPPORT_BANC = 2.188
+export const RAPPORT_MARCHAND = 0.426
+
+/** La hauteur du marchand, en unités monde : la capsule du Sujet 12, calée
+ *  sur sa chambre de l'Économat (400 → 780, derrière la grille). */
+export const MARCHAND_HAUTEUR = 380
 
 /** L'opacité des pièces du méta : plus franche que le décor ordinaire
  *  (0,55), parce qu'une alcôve d'achat doit se remarquer de loin. */
 const FONDU_META = 0.75
+
+export interface Rect {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+}
+
+/** Le rectangle QUE LA PIÈCE OCCUPE dans un rectangle posé : au centre, à son
+ *  rapport, aussi grande que possible sans jamais déborder. Le décalque et le
+ *  tracé 2D le partagent — c'est ce qui empêche le cadre dessiné et le cadre
+ *  en pointillés de se doubler l'un l'autre. */
+export function cadreAuRapport(r: Rect, rapport: number): Rect {
+  const w = Math.min(r.maxX - r.minX, (r.maxY - r.minY) * rapport)
+  const h = w / rapport
+  const cx = (r.minX + r.maxX) / 2
+  const cy = (r.minY + r.maxY) / 2
+  return {
+    minX: cx - w / 2,
+    minY: cy - h / 2,
+    maxX: cx + w / 2,
+    maxY: cy + h / 2,
+  }
+}
+
+/** Le cadre de l'alcôve d'un plot : la où la niche se dessine. */
+export function cadreAlcove(plot: Rect): Rect {
+  return cadreAuRapport(plot, RAPPORT_ALCOVE)
+}
+
+function poseAuRapport(
+  r: Rect,
+  rapport: number,
+  kind: DecalDef['kind'],
+): DecalDef {
+  const c = cadreAuRapport(r, rapport)
+  return {
+    // le centre se lit sur le rectangle POSÉ, pas sur le cadre calculé : le
+    // détour par les bords ferait dériver le centre d'un souffle de virgule
+    x: (r.minX + r.maxX) / 2,
+    y: (r.minY + r.maxY) / 2,
+    w: c.maxX - c.minX,
+    h: c.maxY - c.minY,
+    kind,
+    fade: FONDU_META,
+  }
+}
 
 /** Les décalques que le méta d'un tableau ajoute au décor posé. Vide quand
  *  le tableau n'a pas de méta — le cas de l'immense majorité des salles. */
 export function decalsDuMeta(level: LevelDef): DecalDef[] {
   const out: DecalDef[] = []
   for (const p of level.plots ?? []) {
-    out.push({
-      x: (p.minX + p.maxX) / 2,
-      y: (p.minY + p.maxY) / 2,
-      w: p.maxX - p.minX,
-      h: p.maxY - p.minY,
-      kind: 'meta-alcove',
-      fade: FONDU_META,
-    })
+    out.push(poseAuRapport(p, RAPPORT_ALCOVE, 'meta-alcove'))
   }
-  const b = level.bancMemoires
-  if (b) {
-    out.push({
-      x: (b.minX + b.maxX) / 2,
-      y: (b.minY + b.maxY) / 2,
-      w: b.maxX - b.minX,
-      h: b.maxY - b.minY,
-      kind: 'meta-banc',
-      fade: FONDU_META,
-    })
+  if (level.bancMemoires) {
+    out.push(poseAuRapport(level.bancMemoires, RAPPORT_BANC, 'meta-banc'))
   }
   if (level.marchand) {
     out.push({
       x: level.marchand.x,
       y: level.marchand.y,
-      w: MARCHAND_TAILLE,
-      h: MARCHAND_TAILLE,
+      w: MARCHAND_HAUTEUR * RAPPORT_MARCHAND,
+      h: MARCHAND_HAUTEUR,
       kind: 'meta-marchand',
       fade: FONDU_META,
     })
@@ -93,6 +135,17 @@ export const ICONE_CASE: Record<string, number> = {
 export function caseIcone(id: string): number | null {
   const c = ICONE_CASE[id]
   return c === undefined ? null : c
+}
+
+/** L'icône d'un article POUR L'INTERFACE : une pastille qui découpe la
+ *  planche en fond, à la taille du texte autour. L'emoji reste le repli —
+ *  pour un id sans case, et pour les écrans qu'on n'a pas encore repris. */
+export function iconeMetaHTML(id: string, secours: string): string {
+  const c = caseIcone(id)
+  if (c === null) return `<i>${secours}</i>`
+  const col = c % ICONES_COLONNES
+  const rang = Math.floor(c / ICONES_COLONNES)
+  return `<i class="ico-meta" style="--ic-x:${col};--ic-y:${rang}"></i>`
 }
 
 // ---- L'ÉCLAT DE MÉMOIRE ----------------------------------------------------
