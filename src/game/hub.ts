@@ -10,11 +10,14 @@
 // secours consommé — la dispersion recompose simplement l'échantillon.
 
 import {
+  MAT_CHAUD,
   MAT_FROID,
   MAT_GRILLE,
   MAT_HYDROPHILE,
   MAT_HYDROPHOBE,
+  MAT_MEMBRANE,
   MAT_RIDEAU,
+  MAT_SURCHAUFFEUR,
   MAT_WALL,
   type LevelDef,
   type ObstacleBox,
@@ -153,6 +156,17 @@ export interface ZonesHub {
   banc: RectHub
   sasGivre: RectHub
   sasVapeur: RectHub
+  // ─── le méta v5 : le hub accidenté se répare station par station ───
+  /** Les PLOTS des stations de réparation (id de reparations.ts → zone
+   * de contact). Le catalogue (noms, prix, dégâts) vit dans
+   * reparations.ts ; ici, seulement OÙ l'on paie dans chaque module. */
+  stations: Record<string, RectHub>
+  /** LA TABLE DE DÉPART : au contact, le récapitulatif de ce qu'on
+   * emporte (vies, bonbonne, fioles, provisions) — une fois réparée. */
+  tableDepart: RectHub
+  /** LE SECTEUR SCELLÉ : l'alcôve de la 4e sortie — condamnée jusqu'à la
+   * fin de l'arc du récit. */
+  sasScelle: RectHub
 }
 
 // ─── le GRAND module (TABLEAU_HUB, 8000×3600) ────────────────────────────
@@ -168,6 +182,19 @@ export const ZONES_HUB_GRAND: ZonesHub = {
   banc: { minX: 1330, minY: 60, maxX: 1970, maxY: 420 },
   sasGivre: { minX: 3740, minY: 1500, maxX: 3940, maxY: 1780 },
   sasVapeur: { minX: 3740, minY: -1780, maxX: 3940, maxY: -1500 },
+  // les stations, chacune posée CONTRE l'objet qu'elle remet en état,
+  // hors des trajets obligés (pas de toast au simple passage)
+  stations: {
+    eclairage: { minX: -1850, minY: 350, maxX: -1650, maxY: 550 },
+    'table-depart': { minX: 2740, minY: -140, maxX: 3180, maxY: 140 },
+    'mur-records': { minX: -700, minY: 900, maxX: -250, maxY: 1300 },
+    'bac-sable': { minX: -3980, minY: -1300, maxX: -3780, maxY: -1100 },
+    distillateur: { minX: 450, minY: 420, maxX: 950, maxY: 660 },
+    'aile-endormis': { minX: -3500, minY: 700, maxX: -3200, maxY: 950 },
+    'passerelle-4': { minX: 3480, minY: 200, maxX: 3680, maxY: 500 },
+  },
+  tableDepart: { minX: 2740, minY: -140, maxX: 3180, maxY: 140 },
+  sasScelle: { minX: 3760, minY: 250, maxX: 3940, maxY: 450 },
 }
 
 // ─── le module COMPACT (TABLEAU_HUB_COMPACT v4, 4500×1600) ───────────────
@@ -185,6 +212,17 @@ export const ZONES_HUB_COMPACT: ZonesHub = {
   banc: { minX: -500, minY: -800, maxX: 400, maxY: -520 },
   sasGivre: { minX: 2600, minY: 580, maxX: 2720, maxY: 780 },
   sasVapeur: { minX: 2600, minY: -780, maxX: 2720, maxY: -580 },
+  stations: {
+    eclairage: { minX: -350, minY: -150, maxX: -150, maxY: 50 },
+    'table-depart': { minX: 1300, minY: 60, maxX: 1750, maxY: 280 },
+    'mur-records': { minX: -800, minY: 150, maxX: -520, maxY: 500 },
+    'bac-sable': { minX: -1720, minY: -540, maxX: -1520, maxY: -340 },
+    distillateur: { minX: 1240, minY: -340, maxX: 1440, maxY: -140 },
+    'aile-endormis': { minX: -400, minY: 300, maxX: -100, maxY: 500 },
+    'passerelle-4': { minX: 1650, minY: 300, maxX: 1950, maxY: 480 },
+  },
+  tableDepart: { minX: 1300, minY: 60, maxX: 1750, maxY: 280 },
+  sasScelle: { minX: 1600, minY: 560, maxX: 2000, maxY: 800 },
 }
 
 /** Les zones méta du hub JOUÉ — la géométrie tranche : le grand module,
@@ -270,6 +308,23 @@ export const TABLEAU_HUB: LevelDef = {
     box(3470, -1800, 3560, -550, MAT_WALL, 5),
     box(3560, -640, 3740, -550, MAT_GRILLE),
     box(3740, -640, 4000, -550, MAT_WALL, 5),
+
+    // ═══ LE MÉTA v5 : le module d'après l'accident, remis en état ═════
+    // ─── LE SECTEUR SCELLÉ (mur est, au nord du sas de lancement) : la
+    // 4e sortie — vers l'EXTÉRIEUR, vers le télescope. Condamnée jusqu'à
+    // la fin de l'arc du récit (la barrière est posée par le code, pas
+    // par ces murs : l'encadrement seul est en dur).
+    box(3700, 190, 3960, 250, MAT_WALL, 4),
+    box(3700, 450, 3960, 510, MAT_WALL, 4),
+    // ─── LA TABLE DE DÉPART : le plan de travail du conduit — on le
+    // longe entre les deux chicanes, il récapitule ce qu'on emporte
+    box(2800, -60, 3120, 60, MAT_WALL, 7),
+    // ─── LE BAC D'ESSAI (sud de la cuve) : les surfaces que le placard
+    // ne montre pas, à toucher SANS ENJEU — le tutoriel permanent
+    box(-3880, -1500, -3640, -1420, MAT_CHAUD),
+    box(-3520, -1500, -3280, -1420, MAT_MEMBRANE),
+    box(-3160, -1500, -2920, -1420, MAT_RIDEAU),
+    box(-2800, -1500, -2560, -1420, MAT_SURCHAUFFEUR),
   ],
   sponges: [
     // le dernier casier du placard : l'éponge — elle boit, elle ne rend rien
@@ -288,6 +343,22 @@ export const TABLEAU_HUB: LevelDef = {
     // méta-progression est branchée (comptoir, banc des mémoires).
     // Ratio du fichier : 938/753 ≈ 1,246 — respecté pour ne pas l'écraser.
     { x: -1350, y: 1150, w: 380, h: 473, kind: 'ecran-on', fade: 0.95 },
+    // LE MUR DES RECORDS (est de l'observation) : le banc optique des
+    // calibrations — son écran s'éteint tant qu'il n'est pas réparé
+    { x: -450, y: 1150, w: 300, h: 374, kind: 'ecran-on', fade: 0.95 },
+    // L'AILE DES ENDORMIS (nord de la cuve) : les essais d'avant, en
+    // capsule — deux occupées, une vide. Qui était dans celle du centre ?
+    { x: -3650, y: 1350, w: 110, h: 560, kind: 'fiole-pleine', fade: 0.98 },
+    { x: -3400, y: 1350, w: 110, h: 560, kind: 'fiole-vide', fade: 0.98 },
+    {
+      x: -3150,
+      y: 1350,
+      w: 110,
+      h: 560,
+      kind: 'fiole-pleine',
+      fade: 0.98,
+      flip: true,
+    },
   ],
   labels: [
     // Toute la signalétique est en PLAQUES (« SUR-TITRE|TITRE »). Le RANG
@@ -417,6 +488,50 @@ export const TABLEAU_HUB: LevelDef = {
       rang: 'secteur',
     },
     { x: 3650, y: -420, text: 'GRILLE|SEUL LE SOUFFLE PASSE', tone: 'grille' },
+    // ─── le méta v5 : l'après-accident, remis en état
+    {
+      x: 3850,
+      y: 640,
+      text: 'LE SECTEUR SCELLÉ|CE QUI DOIT PARTIR',
+      tone: 'sas',
+      rang: 'secteur',
+    },
+    { x: 3560, y: 100, text: 'ACCÈS CONDAMNÉ|DEPUIS L’ACCIDENT', tone: 'mur' },
+    {
+      x: 2960,
+      y: 260,
+      text: 'LA TABLE DE DÉPART|CE QUE VOUS EMPORTEZ',
+      tone: 'sas',
+    },
+    {
+      x: -3220,
+      y: -1100,
+      text: 'LE BAC D’ESSAI|TOUTES LES SURFACES, SANS ENJEU',
+      tone: 'mur',
+      rang: 'secteur',
+    },
+    { x: -3760, y: -1280, text: 'CHAUDIÈRE|ELLE VAPORISE, ELLE DÉGÈLE', tone: 'chaud' },
+    { x: -3400, y: -1650, text: 'MEMBRANE|SEULE L’EAU TRAVERSE', tone: 'phile' },
+    { x: -3040, y: -1280, text: 'RIDEAU|SEULE LA GLACE L’ÉCARTE', tone: 'froid' },
+    { x: -2680, y: -1650, text: 'SURCHAUFFEUR|FRÔLÉ EN VAPEUR, UN DASH', tone: 'chaud' },
+    {
+      x: -450,
+      y: 1450,
+      text: 'LE MUR DES RECORDS|BANC OPTIQUE DES CALIBRATIONS',
+      tone: 'froid',
+    },
+    {
+      x: -3400,
+      y: 1700,
+      text: 'L’AILE DES ENDORMIS|NE PAS RÉVEILLER',
+      tone: 'froid',
+    },
+    {
+      x: 700,
+      y: 560,
+      text: 'LE DISTILLATEUR|LA PRIME DU RETOUR',
+      tone: 'grille',
+    },
   ],
   // le méta EN DONNÉES : comptoir et banc suivent le chemin commun des
   // plots posés — zonesDuHub ne sert plus qu'aux vieux instantanés (et
@@ -495,6 +610,22 @@ export const TABLEAU_HUB_COMPACT: LevelDef = {
     { minX: 2460, minY: -440, maxX: 2620, maxY: -360, material: MAT_GRILLE },
     box(2620, -440, 2750, -360, MAT_WALL, 5),
     box(2400, -800, 2460, -440, MAT_WALL, 5),
+
+    // ═══ LE MÉTA v5 : l'après-accident, remis en état ═════════════════
+    // ─── LE SECTEUR SCELLÉ (nord de l'aile est) : la 4e sortie — vers
+    // l'extérieur, vers le télescope. L'encadrement seul est en dur, la
+    // condamnation est posée par le code (barrière d'énergie).
+    box(1540, 560, 1600, 800, MAT_WALL, 4),
+    box(2000, 560, 2060, 800, MAT_WALL, 4),
+    // ─── LA TABLE DE DÉPART : le plan de travail qu'on longe avant les
+    // sas — il récapitule ce qu'on emporte
+    box(1350, 120, 1700, 200, MAT_WALL, 7),
+    // ─── LE BAC D'ESSAI (sud de la cuve) : les surfaces qui manquent au
+    // poste, à toucher SANS ENJEU
+    box(-1700, -700, -1560, -640, MAT_CHAUD),
+    box(-1500, -700, -1360, -640, MAT_MEMBRANE),
+    box(-1300, -700, -1160, -640, MAT_RIDEAU),
+    box(-1100, -700, -960, -640, MAT_SURCHAUFFEUR),
   ],
   sponges: [],
   lumieres: [
@@ -587,6 +718,43 @@ export const TABLEAU_HUB_COMPACT: LevelDef = {
       rang: 'secteur',
     },
     { x: 2540, y: -270, text: 'GRILLE|SEUL LE SOUFFLE PASSE', tone: 'grille' },
+    // ─── le méta v5 : l'après-accident, remis en état
+    {
+      x: 1800,
+      y: 730,
+      text: 'LE SECTEUR SCELLÉ|CE QUI DOIT PARTIR',
+      tone: 'sas',
+      rang: 'secteur',
+    },
+    { x: 1800, y: 480, text: 'ACCÈS CONDAMNÉ|DEPUIS L’ACCIDENT', tone: 'mur' },
+    {
+      x: 1520,
+      y: 330,
+      text: 'LA TABLE DE DÉPART|CE QUE VOUS EMPORTEZ',
+      tone: 'sas',
+    },
+    {
+      x: -1330,
+      y: -300,
+      text: 'LE BAC D’ESSAI|TOUTES LES SURFACES, SANS ENJEU',
+      tone: 'mur',
+    },
+    { x: -1630, y: -560, text: 'CHAUDIÈRE|ELLE VAPORISE', tone: 'chaud' },
+    { x: -1430, y: -480, text: 'MEMBRANE|SEULE L’EAU PASSE', tone: 'phile' },
+    { x: -1230, y: -560, text: 'RIDEAU|SEULE LA GLACE', tone: 'froid' },
+    { x: -1030, y: -480, text: 'SURCHAUFFEUR|UN DASH EN VAPEUR', tone: 'chaud' },
+    {
+      x: -700,
+      y: 120,
+      text: 'LE MUR DES RECORDS|BANC OPTIQUE DES CALIBRATIONS',
+      tone: 'froid',
+    },
+    {
+      x: 1340,
+      y: -240,
+      text: 'LE DISTILLATEUR|LA PRIME DU RETOUR',
+      tone: 'grille',
+    },
     // ─── LES PICTOGRAMMES D'ÉTAT, alignés au-dessus de l'établi :
     // sept moyens de contention, notés par état — sans un mot
     {

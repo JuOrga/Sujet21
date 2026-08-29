@@ -3052,7 +3052,7 @@ startBtn.addEventListener('click', () => {
   modeVoie = false // LANCER : la descente ordinaire
   voieDuJourForcee = false
   closeHome()
-  majVoieHud() // le fil de la voie s'efface : on reprend la descente ordinaire
+  majVoieHud() // le rail se recale sur la séquence écrite
 })
 // LA VOIE SEMI-PROCÉDURALE : la même descente, mais à chaque récompense la
 // suite écrite est mise en face d'une salle générée — au joueur de choisir
@@ -8426,8 +8426,9 @@ mbVeil?.addEventListener('pointerdown', (e) => {
 const dashAimEl = el('dash-aim')
 const dashCostEl = el('dash-cost')
 
-// ---- LE FIL DE LA VOIE : la descente se lit d'un regard -----------------
-// Un rail à CRANS sur le flanc droit — un cran par salle du plan, les tiers
+// ---- LE FIL DE LA DESCENTE : elle se lit d'un regard --------------------
+// Un rail à CRANS sur le flanc droit — un cran par salle de la séquence (la
+// suite écrite comme le plan de la voie), les tiers
 // (début · milieu · fin) marqués d'une couture, le cran courant qui pulse
 // menthe, les franchis pleins, la profondeur record étoilée ✦. Et à chaque
 // entrée de salle, la CARTE D'IDENTITÉ complète (nom, code, moment,
@@ -8450,8 +8451,15 @@ function identiteAtelier(lv: LevelDef): CodeAtelier | null {
   }
 }
 
+/** LE RAIL SE MONTRE DANS TOUTE DESCENTE, pas seulement en VOIE. Il était
+ *  enfermé dans le mode voie depuis le premier jour : hors de ce mode, plus
+ *  rien sur le flanc droit ne disait où l'on en était de la séquence — la
+ *  question la plus élémentaire d'un jeu de salles. Seuls le hub et l'essai
+ *  d'éditeur s'en passent (on sait où l'on est), et une séquence d'une seule
+ *  salle n'a pas de progression à montrer. */
 function voieHudVisible(): boolean {
-  return modeVoie && !auHub && !testLevel
+  if (auHub || testLevel !== null) return false
+  return (modeVoie ? voiePlan.longueur : playedLevels().length) > 1
 }
 
 /** Reconstruit le rail : appelé à chaque entrée de salle (restart). */
@@ -8459,17 +8467,22 @@ function majVoieHud(): void {
   const montre = voieHudVisible()
   voieHudEl.hidden = !montre
   if (!montre) return
-  const rang = Math.min(voiePlan.longueur, voieRang + 1) // la salle en cours
-  el('vh-rang').textContent = `${rang} / ${voiePlan.longueur}`
+  const total = modeVoie ? voiePlan.longueur : playedLevels().length
+  const rang = modeVoie
+    ? Math.min(total, voieRang + 1) // la salle en cours
+    : Math.min(total, levelIndex + 1)
+  el('vh-rang').textContent = `${rang} / ${total}`
   const id = identiteAtelier(level)
   el('vh-stade').textContent =
-    MOMENT_COURT[momentAuRang(rang, voiePlan)] +
+    MOMENT_COURT[momentDuRang(rang, total)] +
     (id ? ` · DIFF ${id.difficulte}` : '')
   const rail = el('vh-rail')
   rail.innerHTML = ''
-  const record = chargePalmaresVoie().profondeurRecord
-  for (let r = 1; r <= voiePlan.longueur; r++) {
-    if (r > 1 && momentAuRang(r, voiePlan) !== momentAuRang(r - 1, voiePlan)) {
+  // l'étoile marque la PROFONDEUR RECORD : elle n'a de sens qu'en voie, où
+  // la descente se rejoue depuis le début et se compare à elle-même
+  const record = modeVoie ? chargePalmaresVoie().profondeurRecord : 0
+  for (let r = 1; r <= total; r++) {
+    if (r > 1 && momentDuRang(r, total) !== momentDuRang(r - 1, total)) {
       const sep = document.createElement('i')
       sep.className = 'vh-tiers'
       rail.appendChild(sep)
@@ -9167,79 +9180,194 @@ dossierEl.setAttribute('aria-hidden', 'true')
 let dossierOuvert = false
 let dossierProchainMaj = 0
 
-const doLigne = (nom: string, val: string, cls = ''): string =>
-  `<div class="do-ligne"><span>${nom}</span><b class="${cls}">${val}</b></div>`
+// Les briques du dossier : une barre, une rangée de pastilles, une tuile.
+// Elles disent toutes la même chose de la même façon — une icône, un mot en
+// capitales, la mesure à droite —, pour que l'œil apprenne la grammaire du
+// panneau en une lecture.
 const doPastilles = (n: number, max: number, cls = ''): string => {
   let h = ''
   for (let i = 0; i < max; i++)
     h += `<i class="${cls}${i < n ? ' plein' : ''}"></i>`
   return h
 }
-const doJauge = (frac: number, cls = ''): string =>
-  `<div class="do-jauge ${cls}"><i style="width:${Math.max(0, Math.min(1, frac)) * 100}%"></i></div>`
 
-/** Le relevé complet, reconstruit à chaque rafraîchissement. */
+/** Une BARRE : l'icône, le mot, la valeur, la jauge — et sous elle, la
+ *  précision chiffrée pour qui veut la lire (elle éclaire la barre, elle ne
+ *  la remplace pas). */
+function doBarre(
+  icone: string,
+  nom: string,
+  valeur: string,
+  frac: number,
+  o: { cls?: string; jauge?: string; note?: string } = {},
+): string {
+  const p = Math.max(0, Math.min(1, frac)) * 100
+  return (
+    '<div class="do-barre">' +
+    `<div><u>${icone}</u>${nom}<b class="${o.cls ?? ''}">${valeur}</b></div>` +
+    `<div class="do-jauge ${o.jauge ?? ''}"><i style="width:${p}%"></i></div>` +
+    '</div>' +
+    (o.note ? `<p class="do-note">${o.note}</p>` : '')
+  )
+}
+
+/** Une RÉSERVE qui se compte sur les doigts : des pastilles, pas un ratio. */
+function doPastilleLigne(
+  icone: string,
+  nom: string,
+  n: number,
+  max: number,
+  cls: string,
+  note: string,
+): string {
+  return (
+    '<div class="do-barre">' +
+    `<div><u>${icone}</u>${nom}<div class="do-pastilles">${doPastilles(n, max, cls)}</div></div>` +
+    '</div>' +
+    `<p class="do-note">${note}</p>`
+  )
+}
+
+/** Une TUILE de butin : le gain se regarde, il ne se lit pas dans un tableau. */
+const doTuile = (icone: string, val: string, quoi: string, cls = ''): string =>
+  `<div class="do-tuile ${cls}"><u>${icone}</u><b>${val}</b><span>${quoi}</span></div>`
+
+/** LE RAIL de la descente, en crans — une couture à chaque changement de
+ *  moment (début · milieu · fin). En VOIE le plan donne le moment de chaque
+ *  rang ; en descente ordinaire, c'est le code de la salle elle-même qui le
+ *  dit. Au-delà de soixante salles, le rail ne veut plus rien dire : on
+ *  l'omet plutôt que d'aligner des cheveux. */
+function momentDuRang(r: number, total: number): 1 | 2 | 3 {
+  if (modeVoie) return momentAuRang(r, voiePlan)
+  const lv = playedLevels()[r - 1]
+  const id = lv ? identiteAtelier(lv) : null
+  if (id) return id.moment
+  // sans code lisible, on retombe sur les tiers de la séquence
+  return r <= total / 3 ? 1 : r <= (2 * total) / 3 ? 2 : 3
+}
+
+function railDescente(rang: number, total: number): string {
+  if (total < 2 || total > 60) return ''
+  let h = '<div class="do-rail">'
+  for (let r = 1; r <= total; r++) {
+    if (r > 1 && momentDuRang(r, total) !== momentDuRang(r - 1, total))
+      h += '<i class="coupe"></i>'
+    h += `<i class="${r < rang ? 'franchi' : r === rang ? 'courant' : ''}"></i>`
+  }
+  return h + '</div>'
+}
+
+/** LE DOSSIER, ÉCRIT POUR CELUI QUI DESCEND. Il répond à trois questions,
+ *  dans cet ordre : qu'est-ce que je dois faire ICI, qu'est-ce qu'il me
+ *  RESTE, qu'est-ce que j'EMPORTE. D'où un objectif en tête avec sa jauge,
+ *  des barres et des pastilles plutôt que des colonnes de chiffres, et des
+ *  mots de joueur. Les mesures fines (compte de gouttes, degrés de coque)
+ *  restent là, mais en second rang : elles éclairent la barre. */
 function majDossier(): void {
   const enRun = !auHub && testLevel === null
   doChrono.textContent = enRun ? fmtTime(run.tableauTime) : '—'
-  // ---- LA SALLE : son identité, sa place dans la descente
+  const litres = sim.liters()
+
+  // ---- TA MISSION : où l'on est, et ce qu'on vient chercher
   const id = identiteAtelier(level)
   const total = modeVoie ? voiePlan.longueur : playedLevels().length
   const rang = modeVoie
     ? Math.min(voiePlan.longueur, voieRang + 1)
     : Math.min(total, levelIndex + 1)
-  let rail = ''
-  if (enRun && total > 1 && total <= 40) {
-    rail = '<div class="do-rail">'
-    for (let r = 1; r <= total; r++)
-      rail += `<i class="${r < rang ? 'franchi' : r === rang ? 'courant' : ''}"></i>`
-    rail += '</div>'
+  let mission = '<section class="do-sec do-salle"><h4><u>🎯</u>TA MISSION</h4>'
+  if (enRun && total > 1) {
+    mission +=
+      `<div class="do-place">SALLE <b>${rang} / ${total}</b>` +
+      `${modeVoie ? ' · VOIE' : ''}</div>` +
+      railDescente(rang, total)
   }
-  const rec = records.tableauRecord(level.code)
-  let salle =
-    '<section class="do-sec do-salle"><h4>LA SALLE</h4>' +
-    `<div class="do-nom">${auHub ? 'LE HUB' : level.name}</div>` +
+  mission +=
+    '<div class="do-mission">' +
+    `<div class="do-nom">${auHub ? 'LE LABORATOIRE' : level.name}</div>` +
     `<div class="do-code">${level.code}${estEconomat(level) ? ' · L’ÉCONOMAT' : ''}</div>`
   if (id)
-    salle +=
+    mission +=
       `<div class="do-chips"><i>${MOMENT_COURT[id.moment]}</i>` +
       `<i>${MECANIQUE_NOMS[id.mecanique].toUpperCase()}</i>` +
       `<i>DIFF ${id.difficulte}</i></div>`
-  if (enRun)
-    salle +=
-      rail +
-      doLigne('RANG', `${rang} / ${total}${modeVoie ? ' · VOIE' : ''}`) +
-      (level.par ? doLigne('OBJECTIF', `${level.par} L`) : '') +
+  if (enRun) {
+    // L'OBJECTIF, en clair : le volume à ramener, et ce qu'il en manque —
+    // c'est LA question du joueur, elle passe donc avant tout le reste
+    if (level.par) {
+      const atteint = litres >= level.par
+      const reste = Math.max(0, level.par - litres)
+      mission +=
+        `<div class="do-objectif${atteint ? ' atteint' : ''}">` +
+        `<b>RAMENER<em>${fmtL(level.par)}</em></b>` +
+        `<div class="do-jauge j-but${atteint ? ' plein' : ''}" style="margin-top:8px">` +
+        `<i style="width:${Math.min(100, (litres / level.par) * 100)}%"></i></div>` +
+        `<p>${
+          atteint
+            ? 'Tu as de quoi. Le sas t’attend — tout litre en plus part à la bonbonne.'
+            : `Il t’en manque ${fmtL(reste)} : ne laisse pas de gouttes derrière toi.`
+        }</p></div>`
+    } else {
+      mission +=
+        '<div class="do-objectif"><b>ATTEINDRE LE SAS</b>' +
+        '<p>Aucun volume minimum ici : ressors, simplement — mais ce que tu ramènes compte quand même.</p></div>'
+    }
+  }
+  mission += '</div>'
+  // LES RECORDS, en défis à battre
+  if (enRun) {
+    const rec = records.tableauRecord(level.code)
+    mission +=
+      '<div class="do-defis">' +
       (rec
-        ? doLigne('RECORD VOLUME', fmtL(rec.volume.liters), 'vert') +
-          doLigne('RECORD CHRONO', fmtTime(rec.chrono.time), 'vert')
-        : doLigne('RECORD', 'aucun — à écrire'))
-  salle += '</section>'
+        ? `<div class="do-defi"><span>✦ TON VOLUME</span><b>${fmtL(rec.volume.liters)}</b></div>` +
+          `<div class="do-defi"><span>✦ TON CHRONO</span><b>${fmtTime(rec.chrono.time)}</b></div>`
+        : '<div class="do-defi vierge"><span>AUCUN RECORD</span><b>à écrire</b></div>') +
+      '</div>'
+  }
+  mission += '</section>'
 
-  // ---- LE CORPS : ce qu'il reste, et ce qui presse
-  const litres = sim.liters()
+  // ---- TON CORPS : ce qu'il reste, et ce qui presse
   const depart = sim.baseVolume > 0 ? sim.baseVolume : level.spawn.n
   const frac = depart > 0 ? sim.playerCount / depart : 0
   const coque = Math.round(21 - 81 * chillNow())
   const critique = litres < params.criticalVolumeLiters * 1.7
+  const motCoque =
+    coque <= -40 ? 'glaciale' : coque <= -10 ? 'froide' : coque <= 5 ? 'fraîche' : 'tiède'
   const corps =
-    '<section class="do-sec do-corps"><h4>LE CORPS</h4>' +
-    doLigne('VOLUME', fmtL(litres), critique ? 'chaud' : '') +
-    doJauge(frac) +
-    doLigne('PARTICULES', `${sim.playerCount} / ${depart}`) +
-    doLigne(
-      'COQUE',
-      `${coque > 0 ? '+' : ''}${coque}°`,
-      coque < -20 ? 'froid' : '',
+    '<section class="do-sec do-corps"><h4><u>💧</u>TON CORPS</h4>' +
+    doBarre('💧', 'VOLUME', fmtL(litres), frac, {
+      cls: critique ? 'chaud' : '',
+      jauge: critique ? 'j-alerte' : '',
+      note:
+        `${sim.playerCount} gouttes sur ${depart}` +
+        (critique ? ' — sous ce seuil, le protocole conclut. Ramasse.' : ''),
+    }) +
+    doBarre('❄', 'COQUE', `${coque > 0 ? '+' : ''}${coque}°`, chillNow(), {
+      cls: coque < -20 ? 'froid' : '',
+      jauge: 'j-froid',
+      note: `Coque ${motCoque} : elle ne se rembobine pas d’une salle à l’autre.`,
+    }) +
+    doPastilleLigne(
+      '⚡',
+      'DASHS',
+      sim.dashBudget,
+      Math.max(sim.dashBudgetMax, sim.dashBudget),
+      '',
+      'Trois par salle. Se changer en vapeur SOI-MÊME les rend ; les subir, non.',
     ) +
-    doJauge(chillNow(), 'j-froid') +
-    `<div class="do-ligne"><span>DASHS</span><div class="do-pastilles">${doPastilles(sim.dashBudget, Math.max(sim.dashBudgetMax, sim.dashBudget))}</div></div>` +
     (enRun
-      ? `<div class="do-ligne"><span>ÉCHANTILLONS</span><div class="do-pastilles">${doPastilles(run.vies, VIES_MAX, 'vie')}</div></div>`
+      ? doPastilleLigne(
+          '🧪',
+          'SECOURS',
+          run.vies,
+          VIES_MAX,
+          'vie',
+          'Un échantillon te relève d’une dispersion, une seule fois chacun.',
+        )
       : '') +
     '</section>'
 
-  // ---- LE CYCLE : ce que les mémoires permettent ICI, à cet instant
+  // ---- TES ÉTATS : ce que les mémoires permettent ICI, à cet instant
   const cur = input.etatManuel()
   const acquis = records.eveilAcquis()
   const verrous = records.verrousCycle()
@@ -9254,46 +9382,50 @@ function majDossier(): void {
     glace: '❄',
     vapeur: '💨',
   }
-  const TOUCHE: Record<EtatManuel, string> = {
-    eau: 'B',
-    glace: 'F',
-    vapeur: 'G',
-  }
-  let cycle = '<section class="do-sec do-cycle"><h4>LE CYCLE, ICI</h4>'
+  let cycle = '<section class="do-sec do-cycle"><h4><u>🔄</u>TES ÉTATS</h4>'
   for (const e of ['glace', 'eau', 'vapeur'] as EtatManuel[]) {
     if (e === cur) {
-      cycle += `<div class="do-etat actuel"><i>${ICO[e]}</i><em>${NOMS[e]}</em><small>ÉTAT ACTUEL</small></div>`
+      cycle += `<div class="do-etat actuel"><i>${ICO[e]}</i><em>${NOMS[e]}</em><small>TU Y ES</small></div>`
       continue
     }
     const t = transfoEntre(CYCLE_PAR_ETAT[cur], CYCLE_PAR_ETAT[e])
     const tenue = t !== null && (!gate || transfoTenue(t.id, acquis, verrous))
+    // LA COMMANDE VRAIE : celle de la table, redéfinie ou non — l'écrire en
+    // dur, c'était mentir dès que le joueur change une touche
+    const k = toucheDe(e)
+    const b = boutonDe(e)
+    const geste =
+      k !== null ? nomTouche(k) : b !== null ? nomBouton(b) : '—'
     cycle +=
       `<div class="do-etat${tenue ? '' : ' verrou'}"><i>${ICO[e]}</i>` +
       `<em>${t ? t.nom : NOMS[e]}</em>` +
       (tenue
-        ? `<small>DIRECT</small><kbd>${TOUCHE[e]}</kbd>`
+        ? `<small>D’UN GESTE</small><kbd>${geste}</kbd>`
         : `<small>🔒 MÉMOIRE À TISSER</small>`) +
       '</div>'
   }
-  cycle += `<p class="do-vide">Un lien non tissé se contourne : repassez par le LIQUIDE. Les régimes imposés du décor, eux, transforment toujours.</p></section>`
+  cycle +=
+    '<p class="do-vide">Un lien non tissé se contourne : repasse par le LIQUIDE. ' +
+    'Les régimes imposés par le décor, eux, te transforment de toute façon.</p></section>'
 
-  // ---- LE BUTIN de la descente en cours
+  // ---- TON BUTIN : ce que la descente t'a déjà rapporté
   const butin = enRun
-    ? '<section class="do-sec do-butin"><h4>LE BUTIN</h4>' +
-      doLigne(
-        'BONBONNE',
-        `${run.bonbonneLiters.toFixed(2)} / ${capBonbonne()} L`,
-      ) +
-      doJauge(run.bonbonneLiters / capBonbonne()) +
-      doLigne('CONDENSAT', `${condensat} cL`, 'chaud') +
-      doLigne('MÉMOIRE GRAVÉE', `+${run.memoireGagnee}`, 'vert') +
-      doLigne('PASTILLES (SALLE)', `${run.pastillesCl} cL`) +
-      doLigne('SALLES CONCLUES', `${run.conclues}`) +
-      doLigne('TEMPS DE DESCENTE', fmtDuree(run.runTime)) +
-      '</section>'
+    ? '<section class="do-sec do-butin"><h4><u>💎</u>TON BUTIN</h4>' +
+      '<div class="do-tuiles">' +
+      doTuile('🫙', `${run.bonbonneLiters.toFixed(1)} L`, 'BONBONNE', 'or') +
+      doTuile('💠', `${condensat}`, 'CONDENSAT cL', 'or') +
+      doTuile('🧠', `+${run.memoireGagnee}`, 'MÉMOIRE', 'vert') +
+      '</div>' +
+      `<div class="do-jauge j-but"><i style="width:${Math.min(100, (run.bonbonneLiters / capBonbonne()) * 100)}%"></i></div>` +
+      `<p class="do-note" style="margin-top:6px">Bonbonne : ${run.bonbonneLiters.toFixed(2)} L sur ${capBonbonne()} — le surplus de chaque salle s’y range, et se reverse d’un geste.</p>` +
+      '<div class="do-tuiles">' +
+      doTuile('🔹', `${run.pastillesCl}`, 'PASTILLES cL') +
+      doTuile('🚪', `${run.conclues}`, 'SALLES') +
+      doTuile('⏱', fmtDuree(run.runTime), 'DESCENTE') +
+      '</div></section>'
     : ''
 
-  // ---- L'ÉQUIPEMENT : instruments de la run, fioles du placard
+  // ---- TON ÉQUIPEMENT : ce que tu portes sur toi
   const instrs = run.instruments
     .map((i) => carteDef(i))
     .filter((d): d is NonNullable<typeof d> => d !== null)
@@ -9302,9 +9434,9 @@ function majDossier(): void {
     .map((f) => fioleDef(f))
     .filter((d): d is NonNullable<typeof d> => d !== null)
   const equip =
-    '<section class="do-sec do-equip"><h4>L’ÉQUIPEMENT</h4>' +
+    '<section class="do-sec do-equip"><h4><u>🎒</u>TON ÉQUIPEMENT</h4>' +
     (instrs.length === 0 && fioles.length === 0
-      ? '<p class="do-vide">Rien d’embarqué. Les instruments se gagnent aux paliers d’étalonnage, les fioles s’équipent au placard du hub.</p>'
+      ? '<p class="do-vide">Les mains vides. Les instruments se gagnent aux paliers d’étalonnage, en fin de salle ; les fioles s’équipent au placard du laboratoire.</p>'
       : instrs
           .map(
             (d) =>
@@ -9317,12 +9449,9 @@ function majDossier(): void {
               `<div class="do-objet"><i>⚗</i><div><b>${d.nom}</b><small>${d.desc}</small></div></div>`,
           )
           .join('')) +
-    (fioles.length > 0
-      ? doLigne('LOGEMENTS', `${fioles.length} / ${FIOLES_SLOTS}`)
-      : '') +
     '</section>'
 
-  doCorps.innerHTML = salle + corps + cycle + butin + equip
+  doCorps.innerHTML = mission + corps + cycle + butin + equip
 }
 
 function ouvreDossier(v: boolean): void {
