@@ -46,39 +46,45 @@ describe('hub v4 — le méta a pris ses murs (grand module)', () => {
         if (box.material === MAT_WALL)
           expect(chevauche(zone, box), JSON.stringify(zone)).toBe(false)
     }
-    // la zone du banc, elle, ENVELOPPE la machine : le contact du corps
-    // contre le banc ouvre l'écran des mémoires
+    // la zone du banc, elle, ENVELOPPE la console : le corps qui frôle
+    // l'un des deux rails du couloir ouvre l'écran des mémoires
     expect(dedans(ZONES_HUB_GRAND.banc, b)).toBe(true)
-    const machine = TABLEAU_HUB.boxes.find(
-      (bx) => bx.minX === 1400 && bx.minY === 120,
+    const rails = TABLEAU_HUB.boxes.filter(
+      (bx) => bx.minX === -1060 && bx.maxX === -560,
     )
-    expect(machine && dedans(machine, ZONES_HUB_GRAND.banc)).toBe(true)
+    expect(rails.length).toBe(2)
+    for (const rail of rails)
+      expect(dedans(rail, ZONES_HUB_GRAND.banc)).toBe(true)
   })
 
-  it('la chambre de givre ne s’ouvre que par un RIDEAU, celle de vapeur par une GRILLE', () => {
-    // la cloison nord (y 550..640) court de 3290 à 4000 : murs + UN rideau
-    const bande = (y0: number, y1: number) =>
-      TABLEAU_HUB.boxes.filter((bx) => bx.minY === y0 && bx.maxY === y1)
-    const nord = bande(550, 640).sort((a, b2) => a.minX - b2.minX)
-    expect(nord.map((bx) => bx.material)).toEqual([
-      MAT_WALL,
-      MAT_RIDEAU,
-      MAT_WALL,
-    ])
-    expect(nord[0].minX).toBe(3290)
-    expect(nord[2].maxX).toBe(4000)
-    for (let i = 1; i < nord.length; i++)
-      expect(nord[i].minX).toBe(nord[i - 1].maxX) // sans fente
-    // la cloison sud (y −640..−550) : murs + UNE grille, épaulée du mur ouest
-    const sud = bande(-640, -550).sort((a, b2) => a.minX - b2.minX)
-    expect(sud.map((bx) => bx.material)).toEqual([MAT_GRILLE, MAT_WALL])
-    expect(sud[1].maxX).toBe(4000)
-    const ouest = TABLEAU_HUB.boxes.find(
-      (bx) => bx.minX === 3470 && bx.minY === -1800,
-    )
-    expect(ouest?.material).toBe(MAT_WALL)
-    expect(ouest?.maxY).toBe(-550)
-    expect(sud[0].minX).toBe(ouest?.maxX)
+  it('le ruban : la branche du gaz derrière une GRILLE, celle de la glace derrière un RIDEAU', () => {
+    // les deux routes gardées partent du carrefour (x 1400) : leur bouche
+    // est la matière elle-même, et rien d'autre ne franchit la cloison
+    const bouche = (mat: number) =>
+      TABLEAU_HUB.boxes.find((bx) => bx.minX === 1400 && bx.material === mat)
+    const grille = bouche(MAT_GRILLE)
+    const rideau = bouche(MAT_RIDEAU)
+    expect(grille?.minY).toBe(520) // le gaz, au nord
+    expect(grille?.maxY).toBe(1160)
+    expect(rideau?.maxY).toBe(-520) // la glace, au sud
+    expect(rideau?.minY).toBe(-1160)
+    // la cloison pleine entre l'étal et chaque branche : aucune fente
+    const cloison = (y0: number, y1: number) =>
+      TABLEAU_HUB.boxes.find((bx) => bx.minY === y0 && bx.maxY === y1)
+    for (const [y0, y1] of [
+      [460, 520],
+      [-520, -460],
+    ] as const) {
+      const c = cloison(y0, y1)
+      expect(c?.material).toBe(MAT_WALL)
+      expect(c?.minX).toBe(1400)
+      expect(c?.maxX).toBe(2600)
+    }
+    // et les deux sorties gardées se tiennent DERRIÈRE leur matière
+    expect(ZONES_HUB_GRAND.sasVapeur.minX).toBeGreaterThan(1480)
+    expect(ZONES_HUB_GRAND.sasVapeur.minY).toBeGreaterThan(520)
+    expect(ZONES_HUB_GRAND.sasGivre.minX).toBeGreaterThan(1480)
+    expect(ZONES_HUB_GRAND.sasGivre.maxY).toBeLessThan(-520)
   })
 
   it('la signalétique annonce les routes et le banc', () => {

@@ -4,6 +4,7 @@ import {
   TABLEAU_HUB_COMPACT,
   ZONES_HUB_GRAND,
   ZONES_HUB_COMPACT,
+  zonesDuHub,
 } from './hub'
 import { REPARATIONS, appliqueReparations, reparationDef } from './reparations'
 
@@ -44,8 +45,13 @@ describe('les réparations — le hub accidenté', () => {
       expect(textes).toContain('PASSERELLE DU SECTEUR 4 — EN PANNE|RÉPARER · 60 MÉMOIRE')
       // la signalétique de l'état réparé s'est tue
       expect(textes).not.toContain('LA TABLE DE DÉPART|CE QUE VOUS EMPORTEZ')
-      // portes : le sceau + les trois ailes condamnées
-      expect(lv.portes?.length).toBe((base.portes?.length ?? 0) + 4)
+      // portes : le sceau + TOUTES les bouches des ailes condamnées
+      const zones = zonesDuHub(base)!
+      const bouches = Object.values(zones.portesDegat).reduce(
+        (n, rects) => n + rects.length,
+        0,
+      )
+      expect(lv.portes?.length).toBe((base.portes?.length ?? 0) + bouches + 1)
       for (const p of lv.portes ?? []) expect(p.canal).toBeLessThan(0)
       // la pénombre de panne
       expect(lv.ambiante ?? 0.52).toBeLessThan(base.ambiante ?? 0.52)
