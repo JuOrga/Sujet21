@@ -10,6 +10,73 @@ import { REPARATIONS, appliqueReparations, reparationDef } from './reparations'
 
 const TOUTES = REPARATIONS.map((r) => r.id)
 
+// LA PROSE N'EST PLUS UNE CLÉ.
+// Les pancartes du hub se désignaient par leur LIBELLÉ EXACT : réécrire
+// « LE MUR DES RECORDS|BANC OPTIQUE DES CALIBRATIONS » suffisait à ce que
+// la station en panne garde la pancarte de la station réparée — sans
+// erreur, sans test rouge. Puisque tous ces textes vont être réécrits,
+// c'est le premier verrou à poser.
+describe('l’identité d’un panneau ne tient pas à sa prose', () => {
+  it('les pancartes manipulées par le code portent toutes une clé', () => {
+    const attendues = new Set<string>(['hub.secteur-scelle', 'hub.acces-condamne'])
+    for (const r of REPARATIONS) for (const c of r.labelsCaches) attendues.add(c)
+    // le GRAND module les porte toutes
+    for (const c of attendues)
+      expect(
+        TABLEAU_HUB.labels.some((l) => l.cle === c),
+        `${c} absente du grand module`,
+      ).toBe(true)
+    // Le module COMPACT — celui qu'on joue — n'a JAMAIS eu de pancarte
+    // « L'AILE DES ENDORMIS », alors que sa station existe : le masquage y
+    // était déjà sans effet, bien avant les clés. On l'inscrit ici plutôt
+    // que de l'arrondir : le jour où la pancarte sera posée, ce test le
+    // dira, et c'est au concepteur de trancher, pas au test de couvrir.
+    const manquantes = [...attendues].filter(
+      (c) => !TABLEAU_HUB_COMPACT.labels.some((l) => l.cle === c),
+    )
+    expect(manquantes).toEqual(['hub.aile-endormis'])
+    // et aucune clé n'est portée par deux panneaux du même tableau
+    for (const base of [TABLEAU_HUB, TABLEAU_HUB_COMPACT]) {
+      const vues = base.labels.map((l) => l.cle).filter(Boolean)
+      expect(new Set(vues).size).toBe(vues.length)
+    }
+  })
+
+  it('RÉÉCRIRE un panneau ne casse plus la panne', () => {
+    // on refait la prose de fond en comble, comme le fera la passe de
+    // réécriture : seule la clé demeure
+    const base = {
+      ...TABLEAU_HUB_COMPACT,
+      labels: TABLEAU_HUB_COMPACT.labels.map((l) =>
+        l.cle ? { ...l, text: 'PROSE ENTIÈREMENT NEUVE|ON A TOUT RÉÉCRIT' } : l,
+      ),
+    }
+    // station réparée : sa pancarte reste ; en panne : elle disparaît
+    const reparee = appliqueReparations(base, ['mur-records'])
+    const enPanne = appliqueReparations(base, [])
+    const compte = (lv: typeof base, cle: string): number =>
+      lv.labels.filter((l) => l.cle === cle).length
+    expect(compte(reparee, 'hub.mur-records')).toBe(1)
+    expect(compte(enPanne, 'hub.mur-records')).toBe(0)
+    // et la plaque de PANNE a bien pris sa place
+    expect(enPanne.labels.some((l) => l.text.includes('EN PANNE'))).toBe(true)
+  })
+
+  it('le sceau du secteur 4 se lève à la clé, pas au libellé', () => {
+    const base = {
+      ...TABLEAU_HUB_COMPACT,
+      labels: TABLEAU_HUB_COMPACT.labels.map((l) =>
+        l.cle ? { ...l, text: 'AUTRE CHOSE|TOUT AUTRE CHOSE' } : l,
+      ),
+    }
+    const ferme = appliqueReparations(base, TOUTES, { finOuverte: false })
+    const ouvert = appliqueReparations(base, TOUTES, { finOuverte: true })
+    expect(ferme.labels.some((l) => l.cle === 'hub.secteur-scelle')).toBe(true)
+    expect(ouvert.labels.some((l) => l.cle === 'hub.secteur-scelle')).toBe(false)
+    expect(ouvert.labels.some((l) => l.cle === 'hub.acces-condamne')).toBe(false)
+  })
+})
+
 describe('les réparations — le hub accidenté', () => {
   it('sept stations, ids uniques, prix croissants, total 225', () => {
     expect(REPARATIONS.length).toBe(7)

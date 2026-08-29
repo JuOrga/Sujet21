@@ -333,10 +333,15 @@ function readLabel(o: Record<string, unknown>): WorldLabel | null {
       : undefined
   if (!text && !picto) return null
   const tone = str(o.tone, 'mur') as WorldLabel['tone']
+  // la CLÉ voyage avec l'étiquette : c'est elle qui la désigne dans le
+  // code (réparations, sceau du secteur 4), pas sa prose — un tableau
+  // exporté puis relu doit garder l'identité de ses panneaux
+  const cle = str(o.cle).slice(0, 48).trim()
   return {
     x: num(o.x),
     y: num(o.y),
     text,
+    cle: cle || undefined,
     tone: TONES.includes(tone) ? tone : 'mur',
     rang: str(o.rang) === 'secteur' ? 'secteur' : undefined,
     picto,

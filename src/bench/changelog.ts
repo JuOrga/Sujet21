@@ -22,6 +22,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '30/08/2026 01:13',
+    title: 'La prose cesse de servir de clé — le premier verrou avant de réécrire les textes',
+    notes: [
+      'Le concepteur veut un catalogue de tous les textes pour les réécrire, et se demande s’il est temps d’internationaliser. L’inventaire a d’abord mis au jour un défaut qui bloquait la réécriture AVANT même qu’on parle de traduction : dans reparations.ts, les pancartes du hub se désignaient PAR LEUR LIBELLÉ EXACT. « const i = labels.findIndex(l => l.text === "LE SECTEUR SCELLÉ|CE QUI DOIT PARTIR") ». Réécrire ce panneau — une virgule, un accent, un mot — et la station en panne gardait la pancarte de la station réparée, ou le sceau du secteur 4 ne se levait plus à l’ouverture de la fin. Sans erreur, sans test rouge. Sept textes étaient dans ce cas.',
+      'Une pancarte porte désormais une CLÉ, indépendante de sa prose (`WorldLabel.cle`), et c’est elle seule qui la désigne. Treize panneaux des deux modules sont étiquetés, la clé voyage dans les fichiers de tableau (levelIO) pour qu’un tableau exporté puis relu garde l’identité de ses panneaux, et la graine de la bibliothèque partagée a été régénérée. Le texte redevient ce qu’il aurait toujours dû être : du texte, qu’on réécrit sans rien casser.',
+      'Trois tests neufs le prouvent, dont celui qui compte : on réécrit TOUS les panneaux du hub de fond en comble — « PROSE ENTIÈREMENT NEUVE|ON A TOUT RÉÉCRIT » — et la panne, la réparation et le sceau du secteur 4 continuent de fonctionner exactement.',
+      'Un trou ancien découvert au passage, et inscrit plutôt qu’arrondi : le module COMPACT — celui qu’on joue — n’a jamais eu de pancarte « L’AILE DES ENDORMIS », alors que sa station de réparation existe. Le masquage y était donc déjà sans effet, bien avant les clés. Le test l’énonce noir sur blanc : le jour où la pancarte sera posée, il le dira. C’est un arbitrage de conception, pas quelque chose qu’un test doit couvrir en silence.',
+      'L’inventaire complet, lui, est fait et chiffré : environ 1 500 textes joueur (~74 000 caractères) dont ~690 de lore, une fois écartés le journal des livraisons (430 000 caractères de documentation), l’éditeur et le banc — des outils de conception. Le catalogue à clés suit, le lore d’abord. 530 tests verts.',
+    ],
+  },
+  {
     date: '30/08/2026 00:34',
     title: 'La résolution adaptative VISE au lieu de tâtonner — et ne descend plus sous « faible »',
     notes: [

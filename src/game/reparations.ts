@@ -19,8 +19,13 @@ export interface ReparationDef {
   detail: string // la ligne du toast au succès
   icone: string
   prix: number // en MÉMOIRE
-  /** Les textes de pancartes (exacts) retirés tant que la station est en
-   * panne — la signalétique de l'état réparé ne ment jamais. */
+  /**
+   * Les CLÉS des pancartes retirées tant que la station est en panne — la
+   * signalétique de l'état réparé ne ment jamais. Ce furent longtemps les
+   * TEXTES exacts, ce qui interdisait de réécrire un panneau du hub sans
+   * casser la panne en silence. Une clé se réécrit sans rien casser ; une
+   * prose, non.
+   */
   labelsCaches: string[]
   /** En panne, les écrans (ecran-on) DANS le plot de la station
    * s'éteignent (ecran-off). */
@@ -49,7 +54,7 @@ export const REPARATIONS: ReparationDef[] = [
     detail: 'le plan de travail récapitule ce que vous emportez',
     icone: '🗺️',
     prix: 15,
-    labelsCaches: ['LA TABLE DE DÉPART|CE QUE VOUS EMPORTEZ'],
+    labelsCaches: ['hub.table-depart'],
     eteintEcrans: true,
   },
   {
@@ -58,7 +63,7 @@ export const REPARATIONS: ReparationDef[] = [
     detail: 'le banc optique des calibrations se rallume',
     icone: '📊',
     prix: 20,
-    labelsCaches: ['LE MUR DES RECORDS|BANC OPTIQUE DES CALIBRATIONS'],
+    labelsCaches: ['hub.mur-records'],
     eteintEcrans: true,
   },
   {
@@ -67,7 +72,7 @@ export const REPARATIONS: ReparationDef[] = [
     detail: 'toutes les surfaces, sans enjeu — la cuve redevient un atelier',
     icone: '🧪',
     prix: 30,
-    labelsCaches: ['LE BAC D’ESSAI|TOUTES LES SURFACES, SANS ENJEU'],
+    labelsCaches: ['hub.bac-sable'],
     porte: true,
   },
   {
@@ -76,7 +81,7 @@ export const REPARATIONS: ReparationDef[] = [
     detail: 'chaque retour de descente versera sa prime de mémoire',
     icone: '⚗️',
     prix: 40,
-    labelsCaches: ['LE DISTILLATEUR|LA PRIME DU RETOUR'],
+    labelsCaches: ['hub.distillateur'],
   },
   {
     id: 'aile-endormis',
@@ -84,7 +89,7 @@ export const REPARATIONS: ReparationDef[] = [
     detail: 'les capsules des semblables sont de nouveau accessibles',
     icone: '🫙',
     prix: 50,
-    labelsCaches: ['L’AILE DES ENDORMIS|NE PAS RÉVEILLER'],
+    labelsCaches: ['hub.aile-endormis'],
     porte: true,
   },
   {
@@ -147,11 +152,8 @@ export function appliqueReparations(
     if (!ancreAbsente(zones.sceau))
       portes.push({ ...zones.sceau, canal: CANAL_DEGAT })
   } else {
-    for (const t of [
-      'LE SECTEUR SCELLÉ|CE QUI DOIT PARTIR',
-      'ACCÈS CONDAMNÉ|DEPUIS L’ACCIDENT',
-    ]) {
-      const i = labels.findIndex((l) => l.text === t)
+    for (const t of ['hub.secteur-scelle', 'hub.acces-condamne']) {
+      const i = labels.findIndex((l) => l.cle === t)
       if (i >= 0) labels.splice(i, 1)
     }
     const sc = zones.sasScelle
@@ -177,7 +179,7 @@ export function appliqueReparations(
     const plot = zones.stations[r.id]
     // la signalétique de l'état réparé se tait…
     for (const t of r.labelsCaches) {
-      const i = labels.findIndex((l) => l.text === t)
+      const i = labels.findIndex((l) => l.cle === t)
       if (i >= 0) labels.splice(i, 1)
     }
     // …et la plaque de PANNE prend sa place, sur le plot de la station

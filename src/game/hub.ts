@@ -498,11 +498,11 @@ export const TABLEAU_HUB: LevelDef = {
   labels: [
     // ─── les lieux, dans l'ordre du ruban
     { x: -4230, y: 300, text: 'MODULE MÉDUSE|LA CUVE', tone: 'mur', rang: 'secteur' },
-    { x: -3000, y: 480, text: 'L’AILE DES ENDORMIS|NE PAS RÉVEILLER', tone: 'froid', rang: 'secteur' },
-    { x: -1600, y: 480, text: 'LE BAC D’ESSAI|TOUTES LES SURFACES, SANS ENJEU', tone: 'mur', rang: 'secteur' },
+    { x: -3000, y: 480, text: 'L’AILE DES ENDORMIS|NE PAS RÉVEILLER', cle: 'hub.aile-endormis', tone: 'froid', rang: 'secteur' },
+    { x: -1600, y: 480, text: 'LE BAC D’ESSAI|TOUTES LES SURFACES, SANS ENJEU', cle: 'hub.bac-sable', tone: 'mur', rang: 'secteur' },
     { x: -810, y: -300, text: 'LE BANC DES MÉMOIRES|TISSER LES LIENS', tone: 'froid' },
     { x: -150, y: -300, text: 'CENTRE DE CONTRÔLE|LA CONDUITE DE L’ÉTAGE', tone: 'mur', rang: 'secteur' },
-    { x: 550, y: -300, text: 'LE MUR DES RECORDS|BANC OPTIQUE DES CALIBRATIONS', tone: 'froid' },
+    { x: 550, y: -300, text: 'LE MUR DES RECORDS|BANC OPTIQUE DES CALIBRATIONS', cle: 'hub.mur-records', tone: 'froid' },
     { x: 4050, y: 300, text: 'PROTOCOLE 21|SAS DE LANCEMENT', tone: 'sas', rang: 'secteur' },
     // ─── les surfaces du bac
     { x: -1910, y: -800, text: 'CHAUDIÈRE|ELLE VAPORISE', tone: 'chaud' },
@@ -525,10 +525,10 @@ export const TABLEAU_HUB: LevelDef = {
     { x: 2000, y: -1080, text: 'SORTIE DE GIVRE|LA VOIE SEMI-PROCÉDURALE', tone: 'froid', rang: 'secteur' },
     { x: 1560, y: -700, text: 'RIDEAU|SEULE LA GLACE L’ÉCARTE', tone: 'froid' },
     // ─── le méta v5 : l'après-accident
-    { x: 3130, y: 1100, text: 'LE SECTEUR SCELLÉ|CE QUI DOIT PARTIR', tone: 'sas', rang: 'secteur' },
-    { x: 3130, y: 640, text: 'ACCÈS CONDAMNÉ|DEPUIS L’ACCIDENT', tone: 'mur' },
-    { x: 3000, y: 300, text: 'LA TABLE DE DÉPART|CE QUE VOUS EMPORTEZ', tone: 'sas' },
-    { x: -180, y: -560, text: 'LE DISTILLATEUR|LA PRIME DU RETOUR', tone: 'grille' },
+    { x: 3130, y: 1100, text: 'LE SECTEUR SCELLÉ|CE QUI DOIT PARTIR', cle: 'hub.secteur-scelle', tone: 'sas', rang: 'secteur' },
+    { x: 3130, y: 640, text: 'ACCÈS CONDAMNÉ|DEPUIS L’ACCIDENT', cle: 'hub.acces-condamne', tone: 'mur' },
+    { x: 3000, y: 300, text: 'LA TABLE DE DÉPART|CE QUE VOUS EMPORTEZ', cle: 'hub.table-depart', tone: 'sas' },
+    { x: -180, y: -560, text: 'LE DISTILLATEUR|LA PRIME DU RETOUR', cle: 'hub.distillateur', tone: 'grille' },
     // ─── les pictogrammes d'état, au pupitre du centre de contrôle
     { x: -300, y: 620, text: '', tone: 'eponge', picto: { couleur: '#d9a441', eau: 3, glace: 1, vapeur: 1 } },
     { x: -150, y: 620, text: '', tone: 'froid', picto: { couleur: '#8fc8ee', eau: 3, glace: 1, vapeur: 2 } },
@@ -724,21 +724,21 @@ export const TABLEAU_HUB_COMPACT: LevelDef = {
     {
       x: 1800,
       y: 730,
-      text: 'LE SECTEUR SCELLÉ|CE QUI DOIT PARTIR',
+      text: 'LE SECTEUR SCELLÉ|CE QUI DOIT PARTIR', cle: 'hub.secteur-scelle',
       tone: 'sas',
       rang: 'secteur',
     },
-    { x: 1800, y: 480, text: 'ACCÈS CONDAMNÉ|DEPUIS L’ACCIDENT', tone: 'mur' },
+    { x: 1800, y: 480, text: 'ACCÈS CONDAMNÉ|DEPUIS L’ACCIDENT', cle: 'hub.acces-condamne', tone: 'mur' },
     {
       x: 1520,
       y: 330,
-      text: 'LA TABLE DE DÉPART|CE QUE VOUS EMPORTEZ',
+      text: 'LA TABLE DE DÉPART|CE QUE VOUS EMPORTEZ', cle: 'hub.table-depart',
       tone: 'sas',
     },
     {
       x: -1330,
       y: -300,
-      text: 'LE BAC D’ESSAI|TOUTES LES SURFACES, SANS ENJEU',
+      text: 'LE BAC D’ESSAI|TOUTES LES SURFACES, SANS ENJEU', cle: 'hub.bac-sable',
       tone: 'mur',
     },
     { x: -1630, y: -560, text: 'CHAUDIÈRE|ELLE VAPORISE', tone: 'chaud' },
@@ -748,13 +748,13 @@ export const TABLEAU_HUB_COMPACT: LevelDef = {
     {
       x: -700,
       y: 120,
-      text: 'LE MUR DES RECORDS|BANC OPTIQUE DES CALIBRATIONS',
+      text: 'LE MUR DES RECORDS|BANC OPTIQUE DES CALIBRATIONS', cle: 'hub.mur-records',
       tone: 'froid',
     },
     {
       x: 1340,
       y: -240,
-      text: 'LE DISTILLATEUR|LA PRIME DU RETOUR',
+      text: 'LE DISTILLATEUR|LA PRIME DU RETOUR', cle: 'hub.distillateur',
       tone: 'grille',
     },
     // ─── LES PICTOGRAMMES D'ÉTAT, alignés au-dessus de l'établi :

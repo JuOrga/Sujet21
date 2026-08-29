@@ -241,6 +241,17 @@ export interface WorldLabel {
   x: number
   y: number
   text: string
+  /**
+   * L'IDENTITÉ du panneau, indépendante de sa prose. Sans elle, le seul
+   * moyen de désigner une pancarte était de répéter son libellé mot pour
+   * mot — c'est ce que faisait `reparations.ts`, qui retirait la
+   * signalétique d'une station en la CHERCHANT PAR SON TEXTE. Une virgule
+   * changée dans le panneau, et la station en panne gardait la pancarte de
+   * la station réparée, sans erreur ni test rouge. Un texte qu'on peut
+   * réécrire ne peut pas servir de clé : les panneaux que le jeu manipule
+   * portent donc une clé, et elle seule les désigne.
+   */
+  cle?: string
   tone:
     | 'mur'
     | 'phile'

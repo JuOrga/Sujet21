@@ -409,6 +409,7 @@
       "x": 1800,
       "y": 730,
       "text": "LE SECTEUR SCELLÉ|CE QUI DOIT PARTIR",
+      "cle": "hub.secteur-scelle",
       "tone": "sas",
       "rang": "secteur"
     },
@@ -416,18 +417,21 @@
       "x": 1800,
       "y": 480,
       "text": "ACCÈS CONDAMNÉ|DEPUIS L’ACCIDENT",
+      "cle": "hub.acces-condamne",
       "tone": "mur"
     },
     {
       "x": 1520,
       "y": 330,
       "text": "LA TABLE DE DÉPART|CE QUE VOUS EMPORTEZ",
+      "cle": "hub.table-depart",
       "tone": "sas"
     },
     {
       "x": -1330,
       "y": -300,
       "text": "LE BAC D’ESSAI|TOUTES LES SURFACES, SANS ENJEU",
+      "cle": "hub.bac-sable",
       "tone": "mur"
     },
     {
@@ -458,12 +462,14 @@
       "x": -700,
       "y": 120,
       "text": "LE MUR DES RECORDS|BANC OPTIQUE DES CALIBRATIONS",
+      "cle": "hub.mur-records",
       "tone": "froid"
     },
     {
       "x": 1340,
       "y": -240,
       "text": "LE DISTILLATEUR|LA PRIME DU RETOUR",
+      "cle": "hub.distillateur",
       "tone": "grille"
     },
     {
