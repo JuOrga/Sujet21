@@ -22,6 +22,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '29/08/2026 23:36',
+    title: 'iPad : deux lignes qui coûtaient la moitié de la cadence',
+    notes: [
+      'Rapport reçu d’un iPad Pro M1 : 20 images/s de moyenne, 931 images sur 931 au-dessus de 33 ms, la pire à 6. Un M1 fait tourner des jeux 3D — ce n’était pas une question de puissance. Le rapport le disait d’ailleurs sans ambiguïté : notre code JavaScript prend 7,3 ms par image, mais l’image dure 47 ms. Les 40 ms manquants ne sont pas chez nous, ils sont dans le GPU et la composition de la page. Et surtout : LA SIMULATION ÉTAIT EN PAUSE — zéro pas de physique, rien qui bouge, et une image à 174 ms tout de même. On demandait donc quelque chose d’absurde à chaque image, pour une scène figée.',
+      'PREMIER COUPABLE, une ligne : `preserveDrawingBuffer: true` à la création du contexte WebGL. Le commentaire à côté disait « surcoût négligeable » — c’est vrai sur un GPU de bureau, c’est faux sur un GPU À TUILES, c’est-à-dire sur tout ce qu’Apple fabrique (iPhone, iPad, M1, M2). Demander à conserver le contenu d’une image à l’autre interdit au pilote de jeter la tuile en fin de rendu : il doit relire tout l’écran au début de chaque image et le réécrire à la fin. À 2,66 Mpx, c’est une dizaine de mégaoctets recopiés soixante fois par seconde — du temps qui n’apparaît dans aucun profil JavaScript, exactement la signature du rapport. Le drapeau était là pour que les captures du canvas fonctionnent : or RIEN dans le jeu ne capture ce canvas, et une capture d’écran système n’en a pas besoin. Il est retiré.',
+      'SECOND COUPABLE, du même genre : `backdrop-filter: blur()`, vingt fois dans la feuille de style, dont la fiche en flou 6 px, pleine hauteur, par-dessus le canvas. Flouter le fond oblige le compositeur à relire ce qu’il y a derrière le panneau, à le flouter, puis à composer — à chaque image, sur toute la surface. Au-dessus d’un canvas WebGL qui se redessine, iOS et iPadOS le paient très cher. L’effet est décoratif et les panneaux ont déjà leur fond opaque : sur tactile, il est coupé. Sur écran de bureau il reste — il n’y coûte rien.',
+      'Ce que ça ne règle pas encore, et qui est le prochain sur la liste : le jeu appelle le rendu à chaque image MÊME quand un panneau plein cadre couvre l’écran et que la simulation est figée. Deux mégapixels et demi de shader dessinés derrière un menu opaque, pour rien. La correction demande de savoir distinguer « rien n’a changé » de « la scène s’anime encore » (éveil, cinématique, séquence) : elle attend un rapport frais, pour changer une chose à la fois et savoir ce qui a payé.',
+      'Aucun chiffre n’est promis ici : cette session rend en logiciel, où les mesures absolues ne veulent rien dire. Ce qui est vérifié : le drapeau a bien disparu du paquet livré, la scène se dessine à l’identique (hub complet, étiquettes, sorties gardées, HUD), 517 tests verts. Le juge, c’est l’iPad — un rapport repris dans les mêmes réglages dira ce que ces deux lignes valaient.',
+    ],
+  },
+  {
     date: '29/08/2026 15:03',
     title: 'Le banc sait enfin sortir du hub — par la porte qu’on lui désigne',
     notes: [

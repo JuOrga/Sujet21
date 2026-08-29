@@ -2486,12 +2486,17 @@ export class Renderer {
 
   constructor(canvas: HTMLCanvasElement, capacity: number) {
     this.canvas = canvas
-    // preserveDrawingBuffer : les captures d'écran du canvas fonctionnent
-    // (retours des testeurs, comparaisons de réglages) — surcoût négligeable.
+    // PAS de preserveDrawingBuffer. Il était là pour que les captures du
+    // canvas marchent — mais RIEN dans le jeu ne capture ce canvas, et une
+    // capture d'écran système n'en a pas besoin. Sur les GPU à TUILES
+    // (Apple : iPhone, iPad, M1/M2), demander à conserver le contenu d'une
+    // image à l'autre interdit au pilote de jeter la tuile en fin de rendu :
+    // il doit RELIRE tout l'écran au début de chaque image et le RÉÉCRIRE à
+    // la fin. Le surcoût, « négligeable » sur un GPU de bureau, y devient le
+    // poste dominant — du temps hors CPU, invisible dans les profils JS.
     const gl = canvas.getContext('webgl2', {
       antialias: false,
       alpha: false,
-      preserveDrawingBuffer: true,
     })
     if (!gl) throw new Error('WebGL2 indisponible')
     this.gl = gl

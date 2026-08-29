@@ -6615,6 +6615,22 @@
         justify-content: flex-end;
         margin-top: 4px;
       }
+
+      /* ---- TACTILE : pas de flou de fond au-dessus du canvas ----
+         `backdrop-filter` demande au compositeur de RELIRE ce qu'il y a
+         derrière le panneau, de le flouter, puis de composer — à chaque
+         image, sur toute la surface du panneau. Au-dessus d'un canvas WebGL
+         qui se redessine, iOS/iPadOS le paie très cher : c'est du temps
+         hors CPU, invisible dans les profils JS. L'effet est décoratif, les
+         panneaux ont déjà leur fond opaque : sur tactile, on le coupe.
+         (Sur écran de bureau il reste : il n'y coûte rien.) */
+      @media (pointer: coarse) {
+        * {
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+        }
+      }
+
     </style>
   </head>
   <body>
