@@ -35,20 +35,48 @@ export const MARCHAND_HAUTEUR = 380
  *  (0,55), parce qu'une alcôve d'achat doit se remarquer de loin. */
 const FONDU_META = 0.75
 
-/** Pose une pièce DANS un rectangle sans la déformer : au centre, à son
- *  rapport, aussi grande que le rectangle le permet. Elle ne déborde jamais —
- *  un décalque qui dépasse mordrait sur la salle autour. */
+export interface Rect {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+}
+
+/** Le rectangle QUE LA PIÈCE OCCUPE dans un rectangle posé : au centre, à son
+ *  rapport, aussi grande que possible sans jamais déborder. Le décalque et le
+ *  tracé 2D le partagent — c'est ce qui empêche le cadre dessiné et le cadre
+ *  en pointillés de se doubler l'un l'autre. */
+export function cadreAuRapport(r: Rect, rapport: number): Rect {
+  const w = Math.min(r.maxX - r.minX, (r.maxY - r.minY) * rapport)
+  const h = w / rapport
+  const cx = (r.minX + r.maxX) / 2
+  const cy = (r.minY + r.maxY) / 2
+  return {
+    minX: cx - w / 2,
+    minY: cy - h / 2,
+    maxX: cx + w / 2,
+    maxY: cy + h / 2,
+  }
+}
+
+/** Le cadre de l'alcôve d'un plot : la où la niche se dessine. */
+export function cadreAlcove(plot: Rect): Rect {
+  return cadreAuRapport(plot, RAPPORT_ALCOVE)
+}
+
 function poseAuRapport(
-  r: { minX: number; minY: number; maxX: number; maxY: number },
+  r: Rect,
   rapport: number,
   kind: DecalDef['kind'],
 ): DecalDef {
-  const w = Math.min(r.maxX - r.minX, (r.maxY - r.minY) * rapport)
+  const c = cadreAuRapport(r, rapport)
   return {
+    // le centre se lit sur le rectangle POSÉ, pas sur le cadre calculé : le
+    // détour par les bords ferait dériver le centre d'un souffle de virgule
     x: (r.minX + r.maxX) / 2,
     y: (r.minY + r.maxY) / 2,
-    w,
-    h: w / rapport,
+    w: c.maxX - c.minX,
+    h: c.maxY - c.minY,
     kind,
     fade: FONDU_META,
   }
@@ -107,6 +135,17 @@ export const ICONE_CASE: Record<string, number> = {
 export function caseIcone(id: string): number | null {
   const c = ICONE_CASE[id]
   return c === undefined ? null : c
+}
+
+/** L'icône d'un article POUR L'INTERFACE : une pastille qui découpe la
+ *  planche en fond, à la taille du texte autour. L'emoji reste le repli —
+ *  pour un id sans case, et pour les écrans qu'on n'a pas encore repris. */
+export function iconeMetaHTML(id: string, secours: string): string {
+  const c = caseIcone(id)
+  if (c === null) return `<i>${secours}</i>`
+  const col = c % ICONES_COLONNES
+  const rang = Math.floor(c / ICONES_COLONNES)
+  return `<i class="ico-meta" style="--ic-x:${col};--ic-y:${rang}"></i>`
 }
 
 // ---- L'ÉCLAT DE MÉMOIRE ----------------------------------------------------
