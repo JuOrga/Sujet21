@@ -22,6 +22,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '29/08/2026 09:55',
+    title: 'Les réparations se paient au contact — et le module se rallume à chaud',
+    notes: [
+      'Le geste est celui du comptoir : le corps se POSE sur une station en panne, la mémoire se débite (refus net et sans double toast si le solde manque), et le module se rallume SOUS VOS YEUX — la plaque de panne cède la place à la signalétique d’état, les écrans se rallument, la pénombre se dissipe, la barrière d’énergie de l’aile tombe. Aucun restart, aucun respawn : le hub se répare pendant qu’on y nage. Une station réparée se tait pour toujours.',
+      'Et la première récompense fonctionnelle est branchée : LA TABLE DE DÉPART réparée, la longer affiche ce que vous emporterez à la prochaine descente — vies (fiole de second souffle et échantillons de secours comptés), réserve de bonbonne, fioles équipées, clef de cachette, condensat d’avance. Vérifié dans le vrai jeu : 42 mémoire → réseau d’éclairage (10) puis bac d’essai (30) payés, refus à 2 < 15, re-paiement impossible. 495 tests verts.',
+    ],
+  },
+  {
     date: '29/08/2026 09:42',
     title: 'L’accident se voit : le hub en panne, réparable station par station',
     notes: [

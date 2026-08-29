@@ -12,7 +12,11 @@ import {
   zonesDuHub,
   type ArticleHub,
 } from './game/hub'
-import { appliqueReparations } from './game/reparations'
+import {
+  REPARATIONS,
+  appliqueReparations,
+  reparationDef,
+} from './game/reparations'
 import {
   MECANIQUE_NOMS,
   codeCanon,
@@ -609,6 +613,9 @@ const achatsEconomat = new Set<string>()
 // au lancement de l'expédition suivante — le temps de la session.
 const achatsHub = new Set<string>()
 let plotsHubDedans: boolean[] = []
+// les STATIONS DE RÉPARATION du hub accidenté : front montant par station
+// (l'ordre du catalogue REPARATIONS fait foi)
+let plotsReparDedans: boolean[] = []
 // les PLOTS POSÉS du tableau courant (le méta en données — hub et Économat
 // modernes compris) : un drapeau « dedans » par plot, l'achat se tente au
 // FRONT d'entrée seulement
@@ -3315,6 +3322,8 @@ const sequenceur = new Sequenceur({
   cinematique: (code) => lireCineParCode(code),
 })
 ;(window as unknown as { __seq: Sequenceur }).__seq = sequenceur
+;(window as unknown as { __repare: (id: string) => void }).__repare =
+  tenteReparation
 /** Une séquence par son code : livrée, puis celles du poste. */
 function trouveSequence(code: string): SequenceDef | null {
   const cible = code.trim().toLowerCase()
@@ -7487,6 +7496,7 @@ function resetLasers(): void {
   // réarmement suit la géométrie du hub joué, pas un compte figé
   achatsHub.clear()
   plotsHubDedans = (zonesDuHub(level)?.etal ?? []).map(() => false)
+  plotsReparDedans = REPARATIONS.map(() => false)
   // les plots POSÉS du tableau (le méta en données)
   plotsPosesDedans = (level.plots ?? []).map(() => false)
   // les éclats de mémoire : ceux déjà gravés CETTE RUN ne reviennent pas
@@ -7568,6 +7578,60 @@ function tenteAchat(a: ArticleEconomat): void {
 // Le Semblable détaché au module vend des PROVISIONS : elles s'appliquent
 // au lancement de la prochaine descente (le viatique ne gonfle pas une
 // bonbonne qui sera remise à zéro au départ — il attend le départ).
+// ---- LA RÉPARATION au contact : le corps se pose sur une station en
+// panne — la mémoire se débite, la gravure est atomique (records.repare),
+// et le hub se RALLUME à chaud : le mémo est invalidé, applyLevel repose
+// pancartes, écrans, lumières ; les portes d'énergie se lèvent au frame
+// suivant (doorsKey → setDoors). Pas de restart : rien ne respawn.
+// Une station déjà réparée se tait (la table de départ vit sur sa zone).
+function tenteReparation(id: string): void {
+  const r = reparationDef(id)
+  if (!r || records.estRepare(id)) return
+  if (!records.repare(id, r.prix)) {
+    toastFile.push({
+      nom: `${r.nom} — MÉMOIRE INSUFFISANTE (${r.prix})`,
+      icone: '🚫',
+      sur: 'RÉPARATION',
+    })
+    return
+  }
+  audio.collect()
+  bande.ponctuation('sting-collecte', 0.8)
+  majMemoireUI()
+  hubMemo = null
+  applyLevel()
+  toastFile.push({
+    nom: `${r.nom} — RÉPARÉ · ${r.detail}`,
+    icone: r.icone,
+    sur: 'LE MODULE SE RALLUME',
+  })
+}
+
+// ---- LA TABLE DE DÉPART (réparée) : le récapitulatif de ce qu'on
+// emportera à la prochaine descente, quand on longe le plan de travail.
+let tableDepartDedans = false
+function montreTableDepart(): void {
+  const vies = Math.min(
+    VIES_MAX,
+    1 + (fioleActive('second-souffle') ? 1 : 0) + provisionsRun.vies,
+  )
+  const morceaux = [`${vies} vie${vies > 1 ? 's' : ''}`]
+  if (provisionsRun.bonbonne > 0)
+    morceaux.push(
+      `réserve +${provisionsRun.bonbonne.toFixed(1).replace('.', ',')} L`,
+    )
+  const eq = records.fiolesEquipees()
+  if (eq.length > 0) morceaux.push(`fioles : ${eq.join(' + ')}`)
+  if (provisionsRun.clef) morceaux.push('clef de cachette')
+  if (provisionsRun.condensat > 0)
+    morceaux.push(`+${provisionsRun.condensat} cL de condensat`)
+  toastFile.push({
+    nom: morceaux.join(' · '),
+    icone: '🗺️',
+    sur: 'LA TABLE DE DÉPART — VOUS EMPORTEZ',
+  })
+}
+
 function tenteAchatHub(a: ArticleHub): void {
   if (achatsHub.has(a.id)) {
     toastFile.push({
@@ -10440,6 +10504,29 @@ function frame(now: number): void {
       if (dedans && !plotsHubDedans[i]) tenteAchatHub(a)
       plotsHubDedans[i] = dedans
     }
+  }
+  // ---- LES STATIONS DE RÉPARATION : le corps se pose sur la station en
+  // panne, la mémoire se débite, le module se rallume À CHAUD ----
+  if (zonesHub) {
+    for (let i = 0; i < REPARATIONS.length; i++) {
+      const r = REPARATIONS[i]
+      const plot = zonesHub.stations[r.id]
+      if (!plot) continue
+      const dedans = pointInBox(
+        sim.stats.centroidX,
+        sim.stats.centroidY,
+        plot,
+      )
+      if (dedans && !plotsReparDedans[i]) tenteReparation(r.id)
+      plotsReparDedans[i] = dedans
+    }
+    // LA TABLE DE DÉPART (une fois réparée) : le récapitulatif de ce
+    // qu'on emporte, au moment où on longe le plan de travail
+    const surTable =
+      records.estRepare('table-depart') &&
+      pointInBox(sim.stats.centroidX, sim.stats.centroidY, zonesHub.tableDepart)
+    if (surTable && !tableDepartDedans) montreTableDepart()
+    tableDepartDedans = surTable
   }
   // ---- LE BANC DES MÉMOIRES : posé en données (n'importe quel tableau),
   // sinon celui du module hérité. Le contact ouvre l'écran du cycle.
