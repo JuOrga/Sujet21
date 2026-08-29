@@ -303,6 +303,12 @@ export interface DecalDef {
     | 'serre-ble-nain'
     | 'serre-rampe'
     | 'serre-rampe-a'
+    // LE MÉTA : synthétisés à l'exécution depuis les données du tableau
+    // (metaAssets.decalsDuMeta) — jamais posés à la main, donc absents de la
+    // liste des sortes que le format accepte dans un fichier
+    | 'meta-alcove'
+    | 'meta-banc'
+    | 'meta-marchand'
   flip?: boolean // miroir horizontal : la même pièce ne se répète pas telle quelle
   fade?: number // 0..1, opacité (défaut 0,55)
 }

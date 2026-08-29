@@ -153,6 +153,12 @@ const DECAL_NOMS: Record<DecalDef['kind'], string> = {
   'serre-ble-nain': 'Serre — blé nain',
   'serre-rampe': 'Serre — gouttière',
   'serre-rampe-a': 'Serre — gouttière (seconde)',
+  // le méta : jamais dans la palette (ces pièces sont SYNTHÉTISÉES par le
+  // moteur à partir des plots, du banc et du marchand posés) — mais le
+  // dictionnaire les nomme quand même, la table doit être complète
+  'meta-alcove': 'Méta — alcôve d’étal',
+  'meta-banc': 'Méta — pupitre du banc',
+  'meta-marchand': 'Méta — le Sujet 12',
 }
 
 /** La fiche catalogue d'un plot posé — la monnaie choisit le catalogue. */
