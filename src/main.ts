@@ -17,6 +17,7 @@ import {
   appliqueReparations,
   reparationDef,
 } from './game/reparations'
+import { prochaineDecouverte } from './game/decouvertes'
 import {
   MECANIQUE_NOMS,
   codeCanon,
@@ -2290,6 +2291,7 @@ function renderCodexVoile(): void {
     { cle: 'glace', nom: 'GLACE', icone: '❄' },
     { cle: 'vapeur', nom: 'VAPEUR', icone: '💨' },
     { cle: 'phenomenes', nom: 'PHÉNOMÈNES', icone: '✦' },
+    { cle: 'recit', nom: 'LE RÉCIT', icone: '🛰️' },
   ]
   let html = ''
   for (const g of groupes) {
@@ -8748,6 +8750,25 @@ function newExpedition(): void {
 // Fin de run (dernier échantillon dispersé, ou expédition conclue) : le
 // laboratoire rappelle — on se réveille AU HUB, prêt à relancer par le sas.
 function retourAuLabo(): void {
+  // ---- L'ARC DES DÉCOUVERTES : chaque retour de run (bouclée, dispersée
+  // ou abandonnée) livre le prochain jalon du récit — la fiche se
+  // consigne au codex (groupe RÉCIT), le toast est celui des fiches.
+  // (jamais depuis un ESSAI d'éditeur ni avant l'acte 0 : le récit ne se
+  // livre qu'aux vraies descentes)
+  const jalon = prochaineDecouverte(records.decouvertesVues())
+  if (jalon && eveilJoue() && !testLevel) {
+    records.noteDecouverte(jalon)
+    codex.marque(`recit-${jalon}`)
+  }
+  // LE DISTILLATEUR (réparé) : la prime du retour — le delta garanti
+  if (records.estRepare('distillateur') && !testLevel) {
+    gagneMemoireRun(2)
+    toastFile.push({
+      nom: '+2 MÉMOIRE — la prime du retour',
+      icone: '⚗️',
+      sur: 'LE DISTILLATEUR',
+    })
+  }
   voieIntercalaire = null
   voieGenereeChoisie = null
   voieDuJourForcee = false // la descente du jour forcée valait UNE run
@@ -10869,9 +10890,17 @@ function frame(now: number): void {
       ? { newVolume: false, newChrono: false }
       : records.noteCollection(level.code, surplus, run.tableauTime)
     // LA MÉMOIRE se grave à chaque sas — l'information survit à la purge :
-    // +5 la traversée, +5 la toute première de ce tableau, +2 par record
+    // +5 la traversée, +5 la toute première de ce tableau, +2 par record ;
+    // LE MUR DES RECORDS réparé double la part des records (le banc
+    // optique consigne mieux)
+    const primeMur =
+      records.estRepare('mur-records') && (newVolume || newChrono) ? 2 : 0
     gagneMemoireRun(
-      5 + (premiereFois ? 5 : 0) + (newVolume ? 2 : 0) + (newChrono ? 2 : 0),
+      5 +
+        (premiereFois ? 5 : 0) +
+        (newVolume ? 2 : 0) +
+        (newChrono ? 2 : 0) +
+        primeMur,
     )
     // Publication au tableau d'honneur partagé : le serveur ne garde que le
     // meilleur — la réponse remet les registres affichés à jour.

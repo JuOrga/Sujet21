@@ -72,7 +72,8 @@ describe('Codex — la table des fiches', () => {
   it('les groupes suivent l’état de la combinaison', () => {
     for (const d of CODEX) {
       if (d.etat === undefined) {
-        expect(d.groupe, d.id).toBe('phenomenes')
+        // sans combinaison : un phénomène (événement) ou un jalon du RÉCIT
+        expect(['phenomenes', 'recit'].includes(d.groupe), d.id).toBe(true)
       } else {
         expect(d.groupe, d.id).toBe(['eau', 'glace', 'vapeur'][d.etat])
       }

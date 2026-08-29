@@ -22,6 +22,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '29/08/2026 11:02',
+    title: 'L’arc des découvertes : le récit se livre un jalon par retour',
+    notes: [
+      'Chaque retour de descente — bouclée, dispersée ou abandonnée : le sujet apprend de tout — livre désormais UN JALON du récit, consigné au codex dans un nouveau groupe LE RÉCIT 🛰️, avec le toast et la date des fiches. Dix jalons, dans l’ordre : la livraison (le portique qui cède sous le miroir de rechange), le cahier des charges (vous n’êtes pas un sujet d’étude — vous êtes un MIROIR), la note du Dr Véga, les calibrations (vos records étaient des mesures de planéité), les endormis (les sujets 12 à 20, en sommeil dans la cuve), le Semblable (le sujet 12 — le marchand), pourquoi l’alerte (déclenchée NEUF SECONDES AVANT la rupture), là-haut (le télescope orbite sans œil), ceux d’avant (deux « produits conformes » déjà partis — aucun message redescendu), et LE CHOIX. Le dixième ouvrira la fin : le sceau du secteur 4 tombera à la prochaine livraison.',
+      'Les premières primes fonctionnelles s’allument aussi : LE DISTILLATEUR réparé verse +2 mémoire à chaque retour de descente (le delta garanti), et LE MUR DES RECORDS réparé double la part des records au sas (+2 quand un record tombe — le banc optique consigne mieux). Ni jalon ni prime depuis un essai d’éditeur, ni avant l’acte 0 : le récit ne se livre qu’aux vraies descentes. Garanti par tests : file ordonnée jamais servie deux fois, chaque jalon a sa fiche (et réciproquement), textes complets. 502 tests verts.',
+    ],
+  },
+  {
     date: '29/08/2026 10:32',
     title: 'L’acte 0 se joue enfin : né dans la cuve, sorti par l’accident',
     notes: [

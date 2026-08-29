@@ -17,7 +17,7 @@ import {
   MAT_WALL,
 } from './level'
 
-export type CodexGroupe = 'eau' | 'glace' | 'vapeur' | 'phenomenes'
+export type CodexGroupe = 'eau' | 'glace' | 'vapeur' | 'phenomenes' | 'recit'
 
 export interface CodexDef {
   id: string
@@ -356,6 +356,88 @@ export const CODEX: CodexDef[] = [
     titre: 'Le sas met en bonbonne',
     texte:
       'Le collecteur aspire ce qui l’approche et le met en bonbonne : chaque centilitre livré fait la note — et la glace avalée solide vaut prime. La réserve ainsi mise de côté se REVERSE en route : la fiole du bandeau, la touche V, ou la croix ↑ à la manette — en liquide seulement.',
+  },
+  // ---- LE RÉCIT 🛰️ — les jalons de l'arc (decouvertes.ts), servis un
+  // par retour de run : ce que le laboratoire n'aurait jamais dit --------
+  {
+    id: 'recit-livraison',
+    groupe: 'recit',
+    icone: '🛰️',
+    titre: 'La livraison',
+    texte:
+      'Fragment de registre de quai : « Réception du miroir de rechange, 14 h 02. Rupture du portique, 14 h 03. » Le module Méduse a pris le choc — les pannes du hub datent de cette minute-là. Le télescope orbital attendait sa pièce ; la station attendait autre chose.',
+  },
+  {
+    id: 'recit-cahier-charges',
+    groupe: 'recit',
+    icone: '🪞',
+    titre: 'Le cahier des charges',
+    texte:
+      'Note technique, en-tête arrachée : « Le produit n’est pas un sujet d’étude. Le produit est un MIROIR : un fluide capable de tenir une surface parfaite, à toute température, sous toute contrainte. » Vous n’avez pas été conçu pour apprendre. Vous avez appris quand même.',
+  },
+  {
+    id: 'recit-note-vega',
+    groupe: 'recit',
+    icone: '📄',
+    titre: 'Note de service — Dr N. Véga',
+    texte:
+      '« On me demande de cesser de consigner le comportement du produit. Je consigne donc ceci : le produit prend les chicanes du conduit sans jamais se tromper. Il s’attarde devant le placard. Il LIT, je crois. Je ne cesserai pas de consigner. — N.V. »',
+  },
+  {
+    id: 'recit-calibrations',
+    groupe: 'recit',
+    icone: '📐',
+    titre: 'Les calibrations',
+    texte:
+      'Vos « records » portent un autre nom dans les registres du labo : mesures de planéité. Chaque descente chronométrée était un banc d’essai optique — le mur des records est un banc de calibration. On ne mesurait pas vos exploits. On mesurait si vous feriez un bon miroir.',
+  },
+  {
+    id: 'recit-endormis',
+    groupe: 'recit',
+    icone: '🫙',
+    titre: 'Les endormis',
+    texte:
+      'Les capsules de la cuve ne sont pas des réserves. Ce sont les essais d’avant vous — sujets 12 à 20 — mis en sommeil quand leur surface a été jugée « insuffisante ». Vivants. La consigne « NE PAS RÉVEILLER » n’est pas une précaution d’hygiène.',
+  },
+  {
+    id: 'recit-semblable',
+    groupe: 'recit',
+    icone: '🧿',
+    titre: 'Le Semblable',
+    texte:
+      'Le marchand du comptoir en était un. Le sujet 12 — le premier à tenir une surface plus de dix secondes. Un matin, il a cessé de dormir, et personne n’a osé le rendormir. Alors on lui a donné une grille, un étal, et un registre. Il prend la mémoire en paiement : il sait ce qu’elle vaut.',
+  },
+  {
+    id: 'recit-alerte',
+    groupe: 'recit',
+    icone: '🚨',
+    titre: 'Pourquoi l’alerte',
+    texte:
+      'L’alerte n’a pas été déclenchée par la rupture du portique — elle l’a PRÉCÉDÉE de neuf secondes. Le secteur 4 n’est pas scellé contre l’accident. Il est scellé contre ce qui doit partir. Quelqu’un a fermé cette porte en sachant ce qu’il faisait.',
+  },
+  {
+    id: 'recit-la-haut',
+    groupe: 'recit',
+    icone: '🔭',
+    titre: 'Là-haut',
+    texte:
+      'Le télescope orbite depuis quatre ans, achevé à un miroir près. Sans son œil, il ne voit rien — et la station n’existe QUE pour le lui fournir. Chaque jour de retard se compte en carrières brisées, là-haut comme ici. N’importe quel miroir fera l’affaire. N’importe lequel.',
+  },
+  {
+    id: 'recit-precurseurs',
+    groupe: 'recit',
+    icone: '🕳️',
+    titre: 'Ceux d’avant',
+    texte:
+      'Deux « produits conformes » ont déjà pris la route du secteur 4. Les registres notent le départ, le vide des capsules, la mise sous tension du convoyeur. Puis plus rien. Aucun message n’est jamais redescendu — mais le télescope, lui, ne voit toujours pas.',
+  },
+  {
+    id: 'recit-le-choix',
+    groupe: 'recit',
+    icone: '🚪',
+    titre: 'Le choix',
+    texte:
+      'Tout est raconté. Le sceau du secteur 4 n’a plus de raison de tenir : la route du plasma mène au convoyeur, le convoyeur mène là-haut. Devenir l’œil du télescope — ou rester ce que vous êtes devenu. Personne n’a jamais eu ce choix avant vous. Le sas s’ouvre.',
   },
 ]
 
