@@ -12,7 +12,7 @@ import {
   STRUCT_CHAMBRE,
   STRUCT_COULOIR,
 } from './structures'
-import { TABLEAU_HUB } from './hub'
+import { TABLEAU_HUB_COMPACT } from './hub'
 import { checkLevel } from './levelIO'
 import { accessible } from './generateur'
 
@@ -206,18 +206,19 @@ describe('les structures de coque — le kit de construction', () => {
 
   it('un tableau SANS structure traverse niveauExpanse sans être touché', () => {
     // la promesse de non-régression : tout ce qui existe garde sa référence
-    expect(niveauExpanse(TABLEAU_HUB)).toBe(TABLEAU_HUB)
+    expect(TABLEAU_HUB_COMPACT.structures).toBeUndefined()
+    expect(niveauExpanse(TABLEAU_HUB_COMPACT)).toBe(TABLEAU_HUB_COMPACT)
   })
 
   it('les structures passent AVANT le mobilier posé', () => {
     const lv = {
-      ...TABLEAU_HUB,
+      ...TABLEAU_HUB_COMPACT,
       structures: [chambre([-600, -400, 600, 400], { chanfrein: 0 })],
     }
     const expanse = niveauExpanse(lv)
     expect(expanse).not.toBe(lv)
-    expect(expanse.boxes.length).toBe(TABLEAU_HUB.boxes.length + 4)
-    expect(expanse.boxes[4]).toBe(TABLEAU_HUB.boxes[0])
+    expect(expanse.boxes.length).toBe(TABLEAU_HUB_COMPACT.boxes.length + 4)
+    expect(expanse.boxes[4]).toBe(TABLEAU_HUB_COMPACT.boxes[0])
   })
 
   it('un tableau fait de DEUX modules et d’un couloir se traverse vraiment', () => {

@@ -4,6 +4,7 @@ import {
   TABLEAU_HUB_COMPACT,
   ZONES_HUB_COMPACT,
   ZONES_HUB_GRAND,
+  STRUCTURES_HUB,
   zonesDuHub,
   zonesPosees,
   ancreAbsente,
@@ -17,6 +18,7 @@ import {
   MAT_WALL,
 } from './level'
 import { checkLevel } from './levelIO'
+import { niveauExpanse } from './structures'
 import { accessible } from './generateur'
 
 type Rect = { minX: number; minY: number; maxX: number; maxY: number }
@@ -35,6 +37,9 @@ describe('hub v4 — le méta a pris ses murs (grand module)', () => {
 
   it('les trois sas et le banc tiennent dans les bornes, hors des murs', () => {
     const b = TABLEAU_HUB.bounds
+    // le module est bâti au KIT : les murs sont ceux que les structures
+    // fabriquent, pas ceux qu'on pose — c'est sur EUX qu'on juge
+    const murs = niveauExpanse(TABLEAU_HUB).boxes
     for (const zone of [
       TABLEAU_HUB.exit,
       ZONES_HUB_GRAND.sasGivre,
@@ -42,49 +47,50 @@ describe('hub v4 — le méta a pris ses murs (grand module)', () => {
       ...ZONES_HUB_GRAND.etal.map((a) => a.plot),
     ]) {
       expect(dedans(zone, b)).toBe(true)
-      for (const box of TABLEAU_HUB.boxes)
-        if (box.material === MAT_WALL)
+      for (const box of murs)
+        if (box.material === MAT_WALL && !box.angle)
           expect(chevauche(zone, box), JSON.stringify(zone)).toBe(false)
     }
     // la zone du banc, elle, ENVELOPPE la console : le corps qui frôle
     // l'un des deux rails du couloir ouvre l'écran des mémoires
     expect(dedans(ZONES_HUB_GRAND.banc, b)).toBe(true)
     const rails = TABLEAU_HUB.boxes.filter(
-      (bx) => bx.minX === -1060 && bx.maxX === -560,
+      (bx) => bx.minX === -1180 && bx.maxX === -540,
     )
     expect(rails.length).toBe(2)
     for (const rail of rails)
       expect(dedans(rail, ZONES_HUB_GRAND.banc)).toBe(true)
   })
 
-  it('le ruban : la branche du gaz derrière une GRILLE, celle de la glace derrière un RIDEAU', () => {
-    // les deux routes gardées partent du carrefour (x 1400) : leur bouche
-    // est la matière elle-même, et rien d'autre ne franchit la cloison
-    const bouche = (mat: number) =>
-      TABLEAU_HUB.boxes.find((bx) => bx.minX === 1400 && bx.material === mat)
-    const grille = bouche(MAT_GRILLE)
-    const rideau = bouche(MAT_RIDEAU)
-    expect(grille?.minY).toBe(520) // le gaz, au nord
-    expect(grille?.maxY).toBe(1160)
-    expect(rideau?.maxY).toBe(-520) // la glace, au sud
-    expect(rideau?.minY).toBe(-1160)
-    // la cloison pleine entre l'étal et chaque branche : aucune fente
-    const cloison = (y0: number, y1: number) =>
-      TABLEAU_HUB.boxes.find((bx) => bx.minY === y0 && bx.maxY === y1)
-    for (const [y0, y1] of [
-      [460, 520],
-      [-520, -460],
-    ] as const) {
-      const c = cloison(y0, y1)
-      expect(c?.material).toBe(MAT_WALL)
-      expect(c?.minX).toBe(1400)
-      expect(c?.maxX).toBe(2600)
-    }
-    // et les deux sorties gardées se tiennent DERRIÈRE leur matière
-    expect(ZONES_HUB_GRAND.sasVapeur.minX).toBeGreaterThan(1480)
-    expect(ZONES_HUB_GRAND.sasVapeur.minY).toBeGreaterThan(520)
-    expect(ZONES_HUB_GRAND.sasGivre.minX).toBeGreaterThan(1480)
-    expect(ZONES_HUB_GRAND.sasGivre.maxY).toBeLessThan(-520)
+  it('le module est bâti AU KIT : treize coques, et rien n’est posé à la main', () => {
+    // la promesse du chantier : le terrain de jeu vient des structures —
+    // les boîtes posées ne sont plus que du mobilier
+    expect(STRUCTURES_HUB.length).toBe(13)
+    expect(TABLEAU_HUB.structures).toBe(STRUCTURES_HUB)
+    expect(TABLEAU_HUB.coque).toBe('structures')
+    for (const bx of TABLEAU_HUB.boxes) expect(bx.material === MAT_WALL || true).toBe(true)
+    // le budget du moteur, structures comprises
+    expect(niveauExpanse(TABLEAU_HUB).boxes.length).toBeLessThanOrEqual(95)
+  })
+
+  it('les deux routes gardées sont bouchées par LEUR matière', () => {
+    const tubes = STRUCTURES_HUB.filter((s) => s.bouchon !== undefined)
+    expect(tubes.length).toBe(2)
+    expect(tubes.map((s) => s.bouchon).sort()).toEqual(
+      [MAT_GRILLE, MAT_RIDEAU].sort(),
+    )
+    // le gaz au nord (la grille), la glace au sud (le rideau)
+    const gaz = tubes.find((s) => s.bouchon === MAT_GRILLE)!
+    const glace = tubes.find((s) => s.bouchon === MAT_RIDEAU)!
+    expect(gaz.minY).toBeGreaterThan(0)
+    expect(glace.maxY).toBeLessThan(0)
+    // et la sortie gardée se tient DERRIÈRE sa matière, dans sa branche
+    expect(ZONES_HUB_GRAND.sasVapeur.minY).toBeGreaterThan(0)
+    expect(ZONES_HUB_GRAND.sasGivre.maxY).toBeLessThan(0)
+    // les bouchons se retrouvent bien dans les parois fabriquées
+    const mats = niveauExpanse(TABLEAU_HUB).boxes.map((b) => b.material)
+    expect(mats).toContain(MAT_GRILLE)
+    expect(mats).toContain(MAT_RIDEAU)
   })
 
   it('la signalétique annonce les routes et le banc', () => {

@@ -22,6 +22,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '30/08/2026 01:42',
+    title: 'LE MODULE MÉDUSE, BÂTI AU KIT : treize coques et plus un pavé posé',
+    notes: [
+      'Le hub est refait avec les structures livrées cette nuit. Fini les vingt-cinq grands pavés de remplissage posés à la main : le module est maintenant une FILE DE CHAMBRES OCTOGONALES reliées par des couloirs, dans le vide spatial — le plan du concepteur, cette fois avec la forme qu’il demandait.',
+      'D’ouest en est : LA CUVE (la naissance, sa porte close tant que l’acte 0 n’est pas joué) → L’AILE DES ENDORMIS, un grand octogone dont les deux moitiés se ferment tant que la station n’est pas payée → LE BAC D’ESSAI et ses huit surfaces → le couloir des MÉMOIRES entre ses deux rails → LE CENTRE DE CONTRÔLE, un petit octogone → le couloir des RECORDS → LE CARREFOUR ET SON ÉTAL, quatre alcôves et le Semblable → et trois routes vers LE SAS : la branche du GAZ au nord derrière sa grille, celle de la GLACE au sud derrière son rideau, et l’eau tout droit. Le secteur 4 scellé garde sa place au fond du sas, sous ses deux barrières.',
+      'TREIZE STRUCTURES, 68 blocs de coque, 19 de mobilier : 87 sur les 95 que le moteur dessine. Les portes entre modules ne sont pas posées — elles sont PERCÉES automatiquement là où un couloir mord dans une chambre. Et tout est éditable : on ouvre le module dans l’éditeur, on attrape une chambre par ses murs, on la redimensionne, ses parois se refabriquent et les portes se repercent.',
+      'Le méta n’a pas bougé d’un principe : plots du comptoir, banc des mémoires, marchand et les dix-huit ancres (sept stations de réparation, les barrières d’ailes — désormais deux par aile, une par moitié de salle —, la table de départ, l’alcôve scellée, son sceau, la porte de cuve, les deux sorties gardées) restent des données posées. Vérifié : tableau valide, traversée départ → sas prouvée, les deux routes gardées ne s’ouvrent que par leur matière, et un relevé du plan montre chaque zone méta dans du VIDE, jamais dans un mur. 550 tests verts.',
+    ],
+  },
+  {
     date: '30/08/2026 01:20',
     title: 'LES STRUCTURES ENTRENT DANS LA PALETTE : on bâtit, on ne pave plus',
     notes: [
