@@ -530,8 +530,13 @@ prompts ci-dessus visent Midjourney, DALL·E, Flux, Stable Diffusion, etc.
 
 ## 16. LE SAS DE RACCORD — `sas-raccord.webp` et `sas-raccord-v.webp` — PRIORITAIRE
 
-**1024×1650 · PNG/WebP TRANSPARENT · décalque** (et son quart de tour,
-1650×1024 pour `sas-raccord-v.webp` — envoyez la pièce une seule fois si
+**Référence fournie par le concepteur : `docs/reference/sas-raccord-reference.png`.**
+C'est elle qui fait foi — les lignes ci-dessous ne font que la traduire en
+contraintes de fabrication. Elle corrige au passage la règle commune de
+palette : sur cette pièce les veilleuses sont **ambre**, pas cyan.
+
+**1024 × 1280 · PNG/WebP TRANSPARENT · décalque** (et son quart de tour,
+1280 × 1024 pour `sas-raccord-v.webp` — envoyez la pièce une seule fois si
 vous préférez, je produis la rotation).
 
 La pièce qui JOINT deux modules de la station. Le jeu la pose tout seul, à
@@ -540,24 +545,59 @@ coques, à cheval sur le mur traversé et sur le col du couloir. Son rôle est
 double — cacher le joint entre deux parois qui ne se tuilent pas pareil, et
 dire à l'œil que le passage est un vrai sas, pas un trou dans un mur.
 
-Un COL D'AMARRAGE vu de profil, comme le reste du jeu : deux brides de
-métal boulonnées, une entre elles, un joint d'étanchéité sombre au milieu
-(c'est lui qui tombera pile sur la couture), des vérins courts de part et
-d'autre, et une paire de veilleuses. Le passage, au centre, est VIDE
-(transparent) sur toute la hauteur : c'est par là qu'on entre. Le fluide
-passe devant la pièce — elle ne porte aucune physique.
+### La géométrie est imposée — c'est le seul point non négociable
+
+Le moteur ne recadre pas la planche : il la pose entière, à son rapport, et
+il compte que **l'ouverture dessinée tombe pile sur la porte percée**. Donc,
+sur une planche de 1024 × 1280 :
+
+| élément | position |
+|---|---|
+| ouverture vide (transparente) | **centrée**, **800 px de haut** (les 5/8 de la hauteur), ~200 px de large |
+| bride gauche | de x ≈ 300 à x ≈ 410 |
+| bride droite | de x ≈ 615 à x ≈ 725 |
+| moignon de coque | les ~250 px de chaque bord, **fondus au transparent sur le bord extrême** |
+| col (au-dessus / au-dessous de l'ouverture) | 240 px en haut, 240 px en bas |
+
+Les 800 px d'ouverture doivent être **franchement transparents** : c'est par
+là qu'on entre, le fluide et le corps passent devant. Un décalque opaque au
+milieu boucherait visuellement le passage.
+
+Ne dessinez pas les longs fûts de modules de la référence : le moteur peint
+déjà les coques, avec leur propre matière. Ce qu'il manque, c'est le collier
+central — **cadrez sur les deux brides**, et laissez juste un moignon de
+coque de chaque côté qui s'éteint en transparence au bord de la planche.
+C'est ce moignon qui recouvre la couture.
+
+### Le dessin
+
+Un COL D'AMARRAGE vu de profil, comme le reste du jeu, exactement dans
+l'esprit de la référence : deux brides de métal épaisses boulonnées face à
+face, l'ouverture en pastille arrondie entre elles, un vérin hydraulique
+vertical avec sa biellette de part et d'autre, quatre petites veilleuses
+carrées ambre, tôle rivée, lignes de soudure, peinture usée.
 
 ```
-side view of a spacecraft docking collar, two bolted metal flanges facing each other with a dark rubber seal ring between them, short hydraulic rams on both sides, two small warning lights, open passage in the centre, brushed dark steel with worn paint, rivets and weld seams, retro-futuristic 1970s orbital laboratory, muted cold palette, low brightness, evenly lit, flat 2D game texture/asset, no perspective, no text
+side view of a spacecraft docking collar, two thick bolted metal flanges facing each other, tall rounded-rectangle passage opening between them, vertical hydraulic ram with linkage arms on each side, four small square amber indicator lamps, riveted panelled steel, weld seams, worn paint, scuffs and grime in the recesses, retro-futuristic orbital station, cold grey-blue palette with warm amber accents, evenly lit, flat 2D game asset, orthographic side elevation, no perspective, no text
 ```
 
-Négatif : `perspective, text, watermark, background, ground shadow, door, hatch, closed, people, logo`
+Négatif : `perspective, vanishing point, text, watermark, background, ground shadow, closed door, hatch cover, sealed, people, logo, long cylinder body`
 
-Règles communes de la section : palette `#0a1420` acier de coque,
-`#10151c`–`#2a3542` gris-bleu, `#63b7e6` liseré cyan pour les veilleuses.
-Le moteur refroidit et atténue les décalques : générez plus contrasté que
-le rendu voulu. Le CENTRE DOIT ÊTRE TRANSPARENT sur au moins 55 % de la
-hauteur, sinon le sas bouche visuellement le passage.
+### Palette relevée sur la référence
+
+`#14181c` fond / creux · `#22262b` ombres de tôle · `#3f454c`–`#5a6068`
+métal principal · `#7d838a` arêtes vives · `#9aa3ab` chrome des vérins ·
+`#e8951f` cœur des veilleuses, `#c96f14` leur cerne.
+
+Le moteur refroidit et atténue les décalques (opacité 0,75) : générez plus
+contrasté et un cran plus clair que le rendu voulu.
+
+### Ce que ça donne en jeu
+
+Sur le module Méduse, quatorze jonctions ; chaque sas est posé à 384 × 480
+unités monde, l'ouverture couvrant exactement les 300 unités de la porte, le
+col montant 90 unités au-dessus et au-dessous. Aucun sas n'en chevauche un
+autre — le couloir le plus court du hub mesure 428 unités.
 
 Déposez les fichiers dans `public/assets/` sous ces noms exacts — ils
 apparaîtront aussitôt dans la bibliothèque d'images, rubrique « Coque &

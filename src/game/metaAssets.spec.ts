@@ -5,9 +5,11 @@ import {
   ICONES_COLONNES,
   ICONES_RANGEES,
   MARCHAND_HAUTEUR,
+  PART_PASSAGE_SAS,
   RAPPORT_ALCOVE,
   RAPPORT_BANC,
   RAPPORT_MARCHAND,
+  RAPPORT_SAS,
   caseIcone,
   decalsDuMeta,
   vuesEclat,
@@ -139,17 +141,51 @@ describe('le sas de raccord — la pièce qui joint deux modules', () => {
     expect(jonctionsDesStructures(undefined)).toEqual([])
   })
 
-  it('le sas se pose SUR la couture, et déborde des deux côtés', () => {
-    for (const j of jonctionsDesStructures(TABLEAU_HUB.structures)) {
+  it('l’ouverture DESSINÉE tombe pile sur la porte percée', () => {
+    const j0 = jonctionsDesStructures(TABLEAU_HUB.structures)
+    for (const j of j0) {
       expect(j.passage).toBeGreaterThan(100)
-      // il couvre le mur repris ET le col du couloir
       expect(j.profondeur).toBeGreaterThan(40)
     }
-    const sas = decalsDuMeta(TABLEAU_HUB).filter((d) => d.kind === 'sas-raccord')
+    const sas = decalsDuMeta(TABLEAU_HUB).filter((d) => d.kind.startsWith('sas-'))
     for (const d of sas) {
-      // le col monte au-dessus du passage : un sas, pas un cache-misère
-      expect(d.h).toBeGreaterThan(300)
+      const j = j0.find((k) => k.x === d.x && k.y === d.y)!
+      expect(j, `${d.x},${d.y}`).toBeDefined()
+      // la dimension qui porte le trou est celle du passage…
+      const porteuse = j.axe === 0 ? d.h : d.w
+      expect(porteuse * PART_PASSAGE_SAS).toBeCloseTo(j.passage, 6)
+      // …et la planche garde son rapport, jamais étirée
+      const long = j.axe === 0 ? d.w : d.h
+      expect(long / porteuse).toBeCloseTo(RAPPORT_SAS, 6)
+      // le col monte franchement au-dessus du passage : un sas, pas un
+      // cache-misère rogné au ras de la porte
+      expect(porteuse).toBeGreaterThan(j.passage * 1.5)
+      // et la pièce couvre la couture qu'elle vient masquer
+      expect(long).toBeGreaterThan(j.profondeur)
       expect(d.fade).toBeGreaterThan(0.5)
+    }
+  })
+
+  it('une couture plus épaisse que la pièce la fait GRANDIR, pas s’étirer', () => {
+    // paroi énorme, porte étroite : le cas où le calage au passage seul
+    // laisserait le joint dépasser de part et d'autre du sas
+    const gros = {
+      ...TABLEAU_HUB,
+      structures: [
+        { type: 0, minX: -1200, minY: -900, maxX: 0, maxY: 900, ep: 240, porte: 128 },
+        { type: 1, minX: -200, minY: -64, maxX: 1200, maxY: 64, ep: 240, porte: 128 },
+      ],
+    }
+    const js = jonctionsDesStructures(gros.structures)
+    const sas = decalsDuMeta(gros).filter((d) => d.kind.startsWith('sas-'))
+    expect(sas.length).toBe(js.length)
+    for (const d of sas) {
+      const j = js.find((k) => k.x === d.x && k.y === d.y)!
+      const porteuse = j.axe === 0 ? d.h : d.w
+      const long = j.axe === 0 ? d.w : d.h
+      expect(long).toBeGreaterThan(j.profondeur)
+      // grandie en bloc : le rapport de la planche est intact
+      expect(long / porteuse).toBeCloseTo(RAPPORT_SAS, 6)
     }
   })
 

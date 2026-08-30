@@ -22,6 +22,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '30/08/2026 13:02',
+    title: 'LE SAS DE RACCORD, sur référence — et l’ouverture qui tombe enfin sur la porte',
+    notes: [
+      'Le concepteur a fourni la planche de référence du sas : un col d’amarrage vu de profil, deux brides boulonnées face à face, vérins hydrauliques et biellettes, veilleuses ambre, et au milieu une ouverture vide. Elle est versée au dépôt (docs/reference/sas-raccord-reference.png) et fait désormais foi : la fiche § 16 a été réécrite d’après elle, pas d’après mon idée du sas.',
+      'La confronter aux données a révélé un défaut de dimensionnement dans la pièce livrée ce matin. Le sas se calait dans un cadre tiré du MUR repris, puis y cherchait son rapport — et le rabotage se faisait sur le col : la planche sortait à 200 × 323 unités pour une porte de 300. Le col ne montait que d’ONZE unités au-dessus de l’ouverture. Autrement dit, la pièce censée annoncer un sas s’arrêtait au ras du trou.',
+      'Le sas se dimensionne maintenant sur le PASSAGE, pas sur la paroi : ce qui doit coïncider, c’est l’ouverture DESSINÉE et la porte PERCÉE. La planche fait 384 × 480, son ouverture couvre exactement les 300 unités de la porte, et le col monte 90 unités au-dessus et au-dessous. Elle couvre aussi bien plus de couture qu’avant (384 de large contre 200).',
+      'Une paroi très épaisse ne l’étire plus : elle la fait GRANDIR en bloc, rapport intact. Vérifié aussi qu’aucun des quatorze sas du module Méduse n’en chevauche un autre — le couloir le plus court mesure 428 unités pour une pièce de 384.',
+      'La fiche de fabrication donne désormais le cadrage au pixel (ouverture centrée de 800 px sur une planche de 1024 × 1280, brides, moignons de coque fondus au bord), la palette relevée sur la référence, et une correction de la règle commune : sur cette pièce les veilleuses sont ambre, pas cyan. Elle demande aussi de NE PAS dessiner les longs fûts de la référence — le moteur peint déjà les coques ; ce qu’il manque, c’est le collier.',
+      '596 tests verts. Deux tests neufs remplacent l’ancien : l’ouverture tombe pile sur la porte à chaque jonction, et une couture surdimensionnée fait grandir la pièce sans la déformer.',
+    ],
+  },
+  {
     date: '30/08/2026 12:12',
     title: 'LES LIGNES NOIRES DES COULOIRS : l’embrasure n’était NI mur NI sol',
     notes: [
