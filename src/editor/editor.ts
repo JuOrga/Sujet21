@@ -13,6 +13,7 @@ import {
   LAMPE_HAUTEUR_MIN,
   MATERIAL_NAMES,
   MAT_CHAUD,
+  MAT_PLATEAU,
   MAT_FROID,
   MAT_GRILLE,
   MAT_MEMBRANE,
@@ -146,6 +147,7 @@ const MAT_COLORS: Record<number, string> = {
   [MAT_RIDEAU]: '#9fb9d8',
   [MAT_SURCHAUFFEUR]: '#29d8ff',
   [MAT_MIROIR]: '#b8c8dc',
+  [MAT_PLATEAU]: '#d8c88f',
 }
 const ZONE_COLORS: Record<ZoneForce, string> = {
   libre: '#7b93a8',
@@ -4601,6 +4603,7 @@ export class LevelEditor {
             MAT_RIDEAU,
             MAT_SURCHAUFFEUR,
             MAT_MIROIR,
+            MAT_PLATEAU,
           ]
             .map(
               (m) =>
@@ -4679,6 +4682,26 @@ export class LevelEditor {
         rows.push(
           rangeField('Aura (× portée)', 'p-aura', b.aura ?? 1, 0.25, 4, 0.05),
         )
+      }
+      if (b.material === MAT_PLATEAU) {
+        // L'ÉTAGE : hauteur signée (estrade +, fosse −) ; une fosse peut
+        // porter un déclencheur — remplie au seuil, elle alimente son canal
+        rows.push(
+          rangeField(
+            'Hauteur du sol (+ estrade / − fosse)',
+            'p-hetage',
+            b.hauteur ?? 80,
+            -600,
+            600,
+            10,
+          ),
+        )
+        if ((b.hauteur ?? 80) < 0) {
+          rows.push(
+            rangeField('Canal déclenché (0 : aucun)', 'p-hcanal', b.canal ?? 0, 0, 20, 1),
+            rangeField('Seuil de remplissage (L)', 'p-hseuil', b.seuilL ?? 0.5, 0.05, 20, 0.05),
+          )
+        }
       }
       if (b.material === MAT_WALL && !(b.forme ?? 0)) {
         // habillage : pur décor, la physique reste celle d'une paroi neutre
@@ -5325,6 +5348,28 @@ export class LevelEditor {
         if (ouv !== ARC_OUVERTURE_DEFAUT) b.p1 = ouv
         const bout = Math.max(0, Math.min(2, Math.round(val('p-fbout'))))
         if (bout) b.p2 = bout
+      }
+      // L'ÉTAGE : hauteur signée obligatoire (jamais nulle) ; canal et
+      // seuil ne survivent que sur une fosse — comme aura sur une chaudière
+      if (b.material === MAT_PLATEAU) {
+        let h = Math.max(-600, Math.min(600, val('p-hetage') || 80))
+        if (Math.abs(h) < 10) h = h < 0 ? -10 : 80
+        b.hauteur = h
+        if (h < 0) {
+          const canal = Math.max(0, Math.min(99, Math.round(val('p-hcanal'))))
+          if (canal >= 1) b.canal = canal
+          else delete b.canal
+          const seuil = Math.max(0.05, Math.min(50, val('p-hseuil') || 0.5))
+          if (seuil !== 0.5) b.seuilL = seuil
+          else delete b.seuilL
+        } else {
+          delete b.canal
+          delete b.seuilL
+        }
+      } else {
+        delete b.hauteur
+        delete b.canal
+        delete b.seuilL
       }
       // portée d'aura propre (chaudière) : 1 (ou vide) efface la clé
       if (b.material === MAT_CHAUD) {

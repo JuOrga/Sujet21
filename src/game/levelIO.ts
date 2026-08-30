@@ -9,6 +9,7 @@ import {
   MAT_MEMBRANE,
   MAT_RIDEAU,
   MAT_SURCHAUFFEUR,
+  MAT_PLATEAU,
   MAT_HYDROPHILE,
   MAT_HYDROPHOBE,
   MAT_WALL,
@@ -72,6 +73,7 @@ export const MATERIALS = [
   MAT_MEMBRANE,
   MAT_RIDEAU,
   MAT_SURCHAUFFEUR,
+  MAT_PLATEAU,
 ] as const
 
 const FORCES: ZoneForce[] = ['libre', 'eau', 'glace', 'vapeur']
@@ -241,6 +243,18 @@ function readBox(o: Record<string, unknown>): ObstacleBox | null {
   const maxY = num(o.maxY)
   const material = num(o.material, MAT_WALL)
   if (!MATERIALS.includes(material as (typeof MATERIALS)[number])) return null
+  // L'ÉTAGE : sa hauteur signée est obligatoire (nulle, ce serait un sol
+  // plat — on retombe sur l'estrade de 80) ; canal et seuil de litres ne
+  // survivent que sur une FOSSE, comme aura ne survit que sur une chaudière.
+  let hEtage = 0
+  if (material === MAT_PLATEAU) {
+    hEtage = Math.max(-600, Math.min(600, num(o.hauteur, 80)))
+    if (Math.abs(hEtage) < 10) hEtage = hEtage < 0 ? -10 : 80
+  }
+  const canalFosse =
+    material === MAT_PLATEAU && hEtage < 0 ? Math.round(num(o.canal, 0)) : 0
+  const seuilFosse =
+    material === MAT_PLATEAU && hEtage < 0 ? num(o.seuilL, 0) : 0
   // Normaliser AVANT de juger la taille : une boîte tracée de droite à gauche
   // est parfaitement valide, elle est seulement à l'envers.
   const angle = num(o.angle, 0)
@@ -286,6 +300,11 @@ function readBox(o: Record<string, unknown>): ObstacleBox | null {
       : {}),
     ...(forme === FORME_ARC && p2 !== 0
       ? { p2: Math.max(0, Math.min(2, p2)) }
+      : {}),
+    ...(material === MAT_PLATEAU ? { hauteur: hEtage } : {}),
+    ...(canalFosse >= 1 ? { canal: Math.min(99, canalFosse) } : {}),
+    ...(seuilFosse > 0
+      ? { seuilL: Math.max(0.05, Math.min(50, seuilFosse)) }
       : {}),
     material,
   }

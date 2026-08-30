@@ -78,6 +78,14 @@ export interface BenchActions {
     cuveZoom: number
     ref: number
   }
+  // LES ÉTAGES : marches, rebords, montées et descentes du sol à hauteur
+  etages?: {
+    hauteurMax: number
+    seuilMontee: number
+    seuilDeborde: number
+    seuilDescente: number
+    fenetrePoussee: number
+  }
   // L'ŒIL DU SUJET (pack présence) : les curseurs vivent ici, à VUE — le
   // banc flotte sur le jeu qui tourne. Hors présets : mémorisé par
   // appareil (localStorage) ; les défauts sont l'étalonnage du concepteur.
@@ -401,6 +409,34 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     describe(
       fPar.addBinding(par, 'ref', { min: 0.15, max: 1.5, step: 0.01, label: 'zoom d’étalonnage' }),
       'Le grossissement auquel toutes les couches s’accordent avec le monde — là, l’image est exactement celle d’avant ce réglage. À caler sur le zoom de JEU ordinaire : la profondeur ne doit alors se manifester qu’aux moments où l’on prend du recul (viser un dash, recadrer, regarder). Le trop régler bas ou haut fait « respirer » le fond en pleine action.',
+    )
+  }
+
+  // ---- LES ÉTAGES : le sol à hauteur, réglé au ressenti ------------------
+  // La règle vit dans le solveur (passeEtages) ; ici, ses cinq seuils — à
+  // régler EN JOUANT sur une salle qui porte une estrade et une fosse.
+  if (actions.etages) {
+    const et = actions.etages
+    const fEt = pane.addFolder({ title: 'Étages (sol à hauteur)', expanded: false })
+    describe(
+      fEt.addBinding(et, 'hauteurMax', { min: 20, max: 600, step: 5, label: 'marche max (u)' }),
+      'La plus haute marche que le volume peut MONTER d’un geste. Au-delà, l’étage est infranchissable par en bas — un vrai surplomb. La descente, elle, n’a pas de limite : on saute de n’importe quelle hauteur.',
+    )
+    describe(
+      fEt.addBinding(et, 'seuilMontee', { min: 0, max: 200, step: 2, label: 'élan de montée (u/s)' }),
+      'L’élan d’approche minimal pour qu’une goutte pressée contre la marche l’escalade, PENDANT le geste d’éjection. Bas : le volume se verse dessus dès qu’on pousse. Haut : il faut vraiment s’élancer — la montée se mérite.',
+    )
+    describe(
+      fEt.addBinding(et, 'seuilDeborde', { min: 20, max: 600, step: 5, label: 'débordement (u/s)' }),
+      'SANS geste, le rebord retient — jusqu’à cet élan de fuite. Au-delà, ça déborde : une pression forte ou un élan lancé passent par-dessus bord tout seuls. Monter ce seuil rend les étages étanches ; le baisser fait des cascades.',
+    )
+    describe(
+      fEt.addBinding(et, 'seuilDescente', { min: 0, max: 100, step: 1, label: 'élan de descente (u/s)' }),
+      'L’élan minimal, PENDANT le geste, pour sauter volontairement le rebord. Presque nul par défaut : indiquer la direction et pousser suffit — on ne demande pas d’élan pour tomber.',
+    )
+    describe(
+      fEt.addBinding(et, 'fenetrePoussee', { min: 0.05, max: 0.6, step: 0.01, label: 'fenêtre du geste (s)' }),
+      'Combien de temps le geste d’éjection « compte » pour les marches et les rebords. Courte : il faut pousser au moment précis. Longue : un geste récent suffit — plus tolérant au Steam Deck.',
     )
   }
 

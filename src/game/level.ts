@@ -16,6 +16,17 @@ export const MAT_MEMBRANE = 7 // membrane gorgée d'eau : seule l'EAU la travers
 export const MAT_RIDEAU = 8 // rideau lamellaire : seule la GLACE l'écarte (eau et vapeur butent)
 export const MAT_SURCHAUFFEUR = 9 // surchauffeur : mur pour eau et glace ; frôlé en VAPEUR, il rend UN dash — une seule fois
 export const MAT_MIROIR = 10 // miroir fixe : mur poli qui RÉFLÉCHIT le faisceau laser — le corps y bute comme sur une paroi
+// L'ÉTAGE : le sol change de hauteur. Positif, une estrade ; négatif, une
+// fosse. Ce n'est PAS un solide : c'est un sol praticable plus haut ou plus
+// bas, et son pourtour est une MARCHE. Le liquide qui la heurte par en bas
+// la traite comme une paroi — sauf si le joueur pousse contre elle avec le
+// geste d'éjection : alors le volume MONTE dessus, comme de l'eau à
+// l'envers. Au bord haut, il est RETENU (la tension le tient), déborde si
+// la pression l'emporte, et DESCEND d'un geste voulu. La vapeur survole
+// tout ; la glace ignore les étages (bloc balistique, elle ponte). Une
+// fosse peut porter un CANAL : remplie au seuil, elle alimente les portes
+// comme une pastille — le déclencheur « quand la zone est pleine ».
+export const MAT_PLATEAU = 11
 
 export interface ObstacleBox {
   minX: number
@@ -44,6 +55,13 @@ export interface ObstacleBox {
   p0?: number // COIN : orientation 0..3 · ARC : épaisseur relative 0..1
   p1?: number // ARC : demi-ouverture en degrés
   p2?: number // ARC : bouts (0 arrondis, 1 droits à 90°, 2 en pointe)
+  // ÉTAGE (MAT_PLATEAU) seulement : la hauteur SIGNÉE du sol, en unités —
+  // positive c'est une estrade, négative une fosse. Jamais nulle.
+  hauteur?: number
+  // FOSSE (hauteur < 0) seulement : remplie à `seuilL` litres, elle alimente
+  // ce canal — même algèbre que les pastilles laser, règle OU.
+  canal?: number
+  seuilL?: number
 }
 
 /** Le point (x, y) ramené dans le repère LOCAL d'une boîte oblique. */
@@ -697,6 +715,7 @@ export const MATERIAL_NAMES: Record<number, string> = {
   [MAT_RIDEAU]: 'Rideau (glace)',
   [MAT_SURCHAUFFEUR]: 'Surchauffeur',
   [MAT_MIROIR]: 'Miroir',
+  [MAT_PLATEAU]: 'Étage (sol haut/bas)',
 }
 
 // La CAUSE de chaque zone : une zone n'impose pas un état par convention, elle

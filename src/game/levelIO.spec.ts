@@ -48,6 +48,34 @@ describe('levelIO — aller-retour JSON', () => {
     expect(rejets).toHaveLength(2)
   })
 
+  it('les ÉTAGES survivent : hauteur signée, canal et seuil sur fosse seule', () => {
+    const { level, rejets } = parseLevel({
+      name: 'Étages',
+      bounds: { minX: -1000, minY: -600, maxX: 1000, maxY: 600 },
+      boxes: [
+        // une estrade : la hauteur voyage, canal et seuil n'ont pas cours
+        { minX: 0, minY: 0, maxX: 200, maxY: 100, material: 11, hauteur: 120, canal: 4, seuilL: 2 },
+        // une fosse déclencheuse : tout voyage, borné
+        { minX: 300, minY: 0, maxX: 500, maxY: 100, material: 11, hauteur: -80, canal: 3, seuilL: 1.5 },
+        // hauteur quasi nulle : rabattue sur l'estrade de 80
+        { minX: 600, minY: 0, maxX: 700, maxY: 100, material: 11, hauteur: 2 },
+        // sans hauteur du tout : le défaut s'applique
+        { minX: 800, minY: 0, maxX: 900, maxY: 100, material: 11 },
+      ],
+    })
+    expect(rejets).toHaveLength(0)
+    const [estrade, fosse, mince, nue] = level!.boxes
+    expect(estrade.hauteur).toBe(120)
+    expect(estrade.canal).toBeUndefined()
+    expect(estrade.seuilL).toBeUndefined()
+    expect(fosse).toMatchObject({ hauteur: -80, canal: 3, seuilL: 1.5 })
+    expect(mince.hauteur).toBe(80)
+    expect(nue.hauteur).toBe(80)
+    // et l'aller-retour complet ne perd rien
+    const again = parseLevel(JSON.parse(serializeLevel(level!)))
+    expect(again.level!.boxes).toEqual(level!.boxes)
+  })
+
   it('les formes survivent à l’aller-retour, bornées, défauts effacés', () => {
     const { level, rejets } = parseLevel({
       name: 'Formes',

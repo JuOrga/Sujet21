@@ -30,6 +30,7 @@ import {
   MAT_EXIT,
   MAT_GRILLE,
   MAT_MIROIR,
+  MAT_PLATEAU,
   type LaserDef,
   type ObstacleBox,
 } from './level'
@@ -135,7 +136,13 @@ function dansRectAxe(x: number, y: number, r: Rect): boolean {
  * (Le MIROIR FIXE « absorbe » aussi au sens des rails — l'arc guidé s'y
  * éteint — mais la marche libre le RÉFLÉCHIT avant d'en arriver là.) */
 function absorbe(b: ObstacleBox): boolean {
-  return b.material !== MAT_GRILLE && b.material !== MAT_EXIT
+  // l'ÉTAGE est un sol, pas un mur : le faisceau court à hauteur d'appareil,
+  // bien au-dessus d'une estrade — il passe (et une fosse encore moins)
+  return (
+    b.material !== MAT_GRILLE &&
+    b.material !== MAT_EXIT &&
+    b.material !== MAT_PLATEAU
+  )
 }
 
 // ---- Le MIROIR FIXE : la paroi polie qui réfléchit le faisceau ----------

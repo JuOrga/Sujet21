@@ -1206,6 +1206,38 @@ void main() {
     // remplissage, arête, ombre et auras suivent la vraie silhouette
     if (dec.y > 0.5) d = formeSdf(wb, uBoxes[bi], dec.y, dec.z, dec.w);
 
+    // ——— L'ÉTAGE : une DALLE, pas un solide ————————————————————————————
+    // Estrade : le sol se soulève — plus clair, un chant qui attrape la
+    // lumière, une courte ombre portée au pied. Fosse : le sol se creuse —
+    // plus sombre, une ombre interne qui tombe du rebord. Ni relief 2.5D,
+    // ni flanc, ni aura : c'est du PLANCHER, le corps circule dessus.
+    if (mat > 10.5 && mat < 11.5) {
+      float hEt = uBoxAux[bi].w;
+      float fillEt = 1.0 - smoothstep(-edgeW, 0.0, d);
+      float edgeEt = 1.0 - smoothstep(0.0, edgeW * 1.8, abs(d));
+      if (hEt > 0.0) {
+        float lift = clamp(hEt / 160.0, 0.18, 1.0);
+        // l'ombre courte au pied : la dalle se détache du fond
+        float shEt = 1.0 - smoothstep(0.0, 20.0 + 26.0 * lift, max(d, 0.0));
+        col = mix(col, col * 0.66, shEt * shEt * (1.0 - fillEt) * 0.8);
+        vec3 dalle = col * (1.0 + 0.55 * lift) + vec3(0.012, 0.020, 0.028) * lift;
+        // le platelage : de fines lattes, pour que la surface se lise
+        float latte = 0.5 + 0.5 * cos(dot(wb, vec2(0.131, 0.017)));
+        dalle *= 0.96 + 0.05 * smoothstep(0.75, 0.95, latte);
+        col = mix(col, dalle, fillEt);
+        col += vec3(0.34, 0.52, 0.62) * edgeEt * (0.28 + 0.22 * lift);
+      } else {
+        float depth = clamp(-hEt / 160.0, 0.18, 1.0);
+        vec3 fond = col * (1.0 - 0.5 * depth);
+        // l'ombre interne : elle tombe du rebord, le creux se lit
+        float rim = 1.0 - smoothstep(0.0, 24.0 + 30.0 * depth, max(-d, 0.0));
+        fond *= 1.0 - 0.4 * depth * rim;
+        col = mix(col, fond, fillEt);
+        col += vec3(0.10, 0.17, 0.22) * edgeEt * 0.45;
+      }
+      continue;
+    }
+
     // ——— RELIEF 2.5D (tous les solides, sauf la bouche du sas) ————————
     // dV / wbV : la géométrie du SOMMET (déplacé) — le remplissage et les
     // habillages la suivent. d reste LA BASE : ombres portées, auras et
@@ -2242,6 +2274,7 @@ float sceneSdf(vec2 p) {
     if (dec.x > 2.5 && dec.x < 3.5) continue; // sas : une bouche, pas un mur
     if (dec.x > 4.5 && dec.x < 5.5) continue; // évent : tamisé à part (grilleTrans)
     if (dec.x < 0.5 && uBoxAux[i].z > 8.5) continue; // vitre : tamisée (vitreTrans)
+    if (dec.x > 10.5 && dec.x < 11.5) continue; // étage : un sol, pas un mur — aucune ombre
     vec2 wb = p;
     float ang = uBoxAux[i].y;
     if (abs(ang) > 0.0005) {
@@ -3490,7 +3523,9 @@ export class Renderer {
       // — ou HABILLAGE d'une paroi neutre (1-4), pur décor
       this.auxScratch[i * 4 + 2] =
         bx.material === 0 ? (bx.skin ?? 0) : sim.surchauffesVides.has(i) ? 0 : 1
-      this.auxScratch[i * 4 + 3] = bx.aura ?? 1
+      // aux.w : portée d'aura (chaudière) — ou HAUTEUR SIGNÉE d'un étage
+      this.auxScratch[i * 4 + 3] =
+        bx.material === 11 ? (bx.hauteur ?? 80) : (bx.aura ?? 1)
     }
     // La carte de lumière recuit si le décor ou les lampes ont changé
     const lampes = this.lampesEffectives(sim.bounds, lumieres)

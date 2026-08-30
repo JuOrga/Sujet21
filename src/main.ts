@@ -29,6 +29,7 @@ import {
   decodeCode21,
   decodeCodeAtelier,
   estCodeHub,
+  parseLevel,
   type CodeAtelier,
 } from './game/levelIO'
 import { dessineMiniCarte } from './game/carte'
@@ -130,6 +131,7 @@ import { MAX_BOXES, Renderer } from './render/renderer'
 import { FixedLoop } from './game/loop'
 import { Input } from './game/input'
 import {
+  MAT_PLATEAU,
   MAT_EXIT,
   MAT_FROID,
   TABLEAU_1BIS,
@@ -2539,6 +2541,18 @@ const cielReglages = { force: 0.45, etendue: 8000 }
 // vivent dans render/parallaxe.ts — ici on n'en tient que la copie RÉGLABLE,
 // celle que les curseurs du banc modifient en direct. Aplatie en un objet
 // plat parce que le banc lie des champs, pas des objets imbriqués.
+// LES ÉTAGES : la copie réglable des seuils du solveur — le banc la modifie
+// en direct, l'image la pousse au solveur (recréé à chaque salle). La règle
+// et ses défauts vivent dans sim/solver.ts (etagesRegl) : ceci n'est que la
+// main du concepteur posée dessus.
+const etagesReglages = {
+  hauteurMax: 140,
+  seuilMontee: 26,
+  seuilDeborde: 150,
+  seuilDescente: 8,
+  fenetrePoussee: 0.15,
+}
+
 const parallaxeReglages = {
   cielSuivi: PARALLAXE_DEFAUTS.ciel.suivi,
   cielZoom: PARALLAXE_DEFAUTS.ciel.zoom,
@@ -2552,6 +2566,13 @@ const parallaxeReglages = {
 ;(
   window as unknown as { __parallaxe: typeof parallaxeReglages }
 ).__parallaxe = parallaxeReglages
+// Sonde de test : l'état des portes depuis la console (comme __sim)
+;(
+  window as unknown as { __portes: () => boolean[] }
+).__portes = () => [...laserEtat.portesOuvertes]
+// Sonde de test : les seuils des étages depuis la console (comme __sim)
+;(window as unknown as { __etages: typeof etagesReglages }).__etages =
+  etagesReglages
 // Graphismes du LIQUIDE, séparés du décor : SOBRE débranche l'éclairage de
 // l'eau (relief, spéculaire, miroir, scintillement) dans le shader — la
 // silhouette, les couleurs de vitesse et les états restent. C'est le second
@@ -3634,6 +3655,17 @@ function startTest(etapes: (LevelDef | CinematiqueDef)[]): void {
 }
 function startBisTest(): void {
   startTest([TABLEAU_1BIS])
+}
+// Sonde de test : ESSAYER UN TABLEAU ARBITRAIRE depuis la console (comme
+// __sim, __verser) — le banc d'essai sans navigateur passe un JSON de
+// tableau et le joue par le vrai chemin (startTest), rendu compris.
+;(
+  window as unknown as { __essaieTableau: (brut: unknown) => string }
+).__essaieTableau = (brut: unknown): string => {
+  const { level: lv, rejets } = parseLevel(brut)
+  if (!lv) return 'tableau illisible'
+  startTest([lv])
+  return rejets.length ? `ok (${rejets.length} rejets)` : 'ok'
 }
 // La bibliothèque d'images : import (recompressé WebP), catalogue partagé,
 // sélecteur pour les planches — accessible de l'éditeur et du montage
@@ -9735,6 +9767,7 @@ const pane = createBench(params, monitor, {
   perf: { copier: copiePerf, envoyer: envoiePerf },
   ciel: cielReglages,
   parallaxe: parallaxeReglages,
+  etages: etagesReglages,
   tableaux: TABLEAUX.map((t) => t.name),
   gotoTableau: (index) => {
     testLevel = null // le banc navigue dans l'expédition, pas dans le prototype
@@ -11440,9 +11473,24 @@ function frame(now: number): void {
     // Elle vise un CANAL (le n° des pastilles) avec sa règle : OU (défaut,
     // une pastille active suffit) ou ET (toutes en même temps) — une porte
     // sans canal valide est une paroi que seul le récit ouvre.
+    // LES FOSSES DÉCLENCHEUSES : une fosse (étage négatif) qui porte un
+    // canal alimente les portes TANT QUE son volume tient le seuil — même
+    // algèbre que les pastilles, règle OU : verser de l'eau ouvre la porte,
+    // la reprendre la referme. Le liquide devient un poids sur un contacteur.
+    const fossesCanal = level.boxes.filter(
+      (bx) =>
+        bx.material === MAT_PLATEAU &&
+        (bx.hauteur ?? 80) < 0 &&
+        (bx.canal ?? 0) >= 1,
+    )
+    const fosseAlimente = (canal: number): boolean =>
+      fossesCanal.some(
+        (f) => f.canal === canal && sim.litresFosse(f) >= (f.seuilL ?? 0.5),
+      )
     laserEtat.portesOuvertes = portes.map(
       (p, i) =>
         sequenceur.etat.brechesOuvertes.has(i) ||
+        fosseAlimente(p.canal) ||
         canalActif(
           cibles,
           p.canal,
@@ -11922,6 +11970,8 @@ function frame(now: number): void {
   // s'affichait plus du tout. Posé à l'image, il ne peut ni arriver trop tôt
   // ni rester en retard d'un tableau.
   renderer.setSolModules(level.coque === 'structures')
+  // les seuils des étages suivent le banc, même après un changement de salle
+  sim.etagesRegl = etagesReglages
   renderer.setCiel(
     CIEL_MODE[cielChoix],
     cielReglages.force,

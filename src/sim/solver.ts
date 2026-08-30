@@ -22,6 +22,7 @@ import {
   MAT_HYDROPHILE,
   MAT_HYDROPHOBE,
   MAT_MEMBRANE,
+  MAT_PLATEAU,
   MAT_RIDEAU,
   MAT_SURCHAUFFEUR,
   dansBoite,
@@ -259,6 +260,29 @@ export class FluidSim {
   private lastKernelRadius: number
   private lastSpacing: number
   private ejectCarry = 0
+
+  // ---- LES ÉTAGES : le sol a une hauteur par endroit -----------------------
+  // etage[i] est la hauteur du sol SOUS la particule (0 : le fond de cuve).
+  // Le pourtour d'un étage est une MARCHE, jamais un solide : la passe
+  // passeEtages() décide à chaque pas qui monte, qui est retenu au bord,
+  // qui déborde et qui descend. Sans étage posé dans le tableau, tout ceci
+  // est court-circuité — aucun coût, aucun changement de comportement.
+  etage: Float32Array
+  private etageBoxes: ObstacleBox[] = []
+  private hasEtages = false
+  // La POUSSÉE : le joueur est en train d'éjecter (le geste AGIR, dirigé).
+  // C'est elle qui distingue « je veux monter/descendre » d'une dérive :
+  // sans elle, une marche est un mur et un rebord retient. Armée par
+  // eject(), elle expire en une fraction de seconde.
+  private pousseeTtl = 0
+  /** Réglages des étages — modifiables à chaud (banc, dossier « Étages »). */
+  etagesRegl = {
+    hauteurMax: 140, // au-delà, la marche est infranchissable (u)
+    seuilMontee: 26, // élan d'approche minimal pour monter (u/s)
+    seuilDeborde: 150, // élan de fuite qui fait déborder sans geste (u/s)
+    seuilDescente: 8, // élan minimal pour descendre d'un geste (u/s)
+    fenetrePoussee: 0.15, // combien de temps le geste « compte » (s)
+  }
   private stepIndex = 0
   private readonly stack: Int32Array
   // Voisinages en listes plates, construits une fois par pas et réutilisés
@@ -299,6 +323,7 @@ export class FluidSim {
     this.dvY = new Float32Array(capacity)
     this.density = new Float32Array(capacity)
     this.kind = new Uint8Array(capacity)
+    this.etage = new Float32Array(capacity)
     this.cooldown = new Float32Array(capacity)
     this.labels = new Int32Array(capacity)
     this.frost = new Float32Array(capacity)
@@ -426,6 +451,10 @@ export class FluidSim {
     this.refreshBoxCaches()
     this.surchauffesVides.clear()
     this.codexContacts.fill(0)
+    // le décor vient de changer : chaque particule reprend le sol du lieu
+    // où elle se tient (l'éditeur déplace des étages sous l'eau en direct)
+    for (let i = 0; i < this.count; i++)
+      this.etage[i] = this.solA(this.posX[i], this.posY[i])
   }
 
   // Listes de boîtes par famille, recalculées quand le niveau change (jamais
@@ -451,6 +480,69 @@ export class FluidSim {
     for (let bi = 0; bi < boxes.length; bi++) {
       if (boxes[bi].material === MAT_SURCHAUFFEUR) this.surchIdx.push(bi)
     }
+    this.etageBoxes = boxes.filter((b) => b.material === MAT_PLATEAU)
+    this.hasEtages = this.etageBoxes.length > 0
+  }
+
+  /** Le point (x, y) est-il dans l'emprise de cette boîte d'étage ?
+   *  (rotation comprise — le pourtour exact, pas le cercle englobant) */
+  private dansEtage(b: ObstacleBox, x: number, y: number): boolean {
+    let lx = x
+    let ly = y
+    if (b.angle) {
+      const cx = (b.minX + b.maxX) / 2
+      const cy = (b.minY + b.maxY) / 2
+      const rad = (-b.angle * Math.PI) / 180
+      const ca = Math.cos(rad)
+      const sa = Math.sin(rad)
+      lx = cx + ca * (x - cx) - sa * (y - cy)
+      ly = cy + sa * (x - cx) + ca * (y - cy)
+    }
+    return lx >= b.minX && lx <= b.maxX && ly >= b.minY && ly <= b.maxY
+  }
+
+  /** LE SOL en (x, y) : la plus haute des hauteurs d'étage qui couvrent le
+   *  point — 0 hors de tout étage. Une estrade posée sur une fosse la
+   *  recouvre : on marche sur le plus haut plancher présent. */
+  solA(x: number, y: number): number {
+    if (!this.hasEtages) return 0
+    let sol = -Infinity
+    for (const b of this.etageBoxes) {
+      if (!this.dansEtage(b, x, y)) continue
+      const h = b.hauteur ?? 80
+      if (h > sol) sol = h
+    }
+    return sol === -Infinity ? 0 : sol
+  }
+
+  /** La boîte d'étage de hauteur `h` qui couvre le point — la marche ou le
+   *  plancher concernés par une transition. Null : aucune. */
+  private boiteEtageEn(x: number, y: number, h: number): ObstacleBox | null {
+    for (const b of this.etageBoxes) {
+      if ((b.hauteur ?? 80) === h && this.dansEtage(b, x, y)) return b
+    }
+    return null
+  }
+
+  /** Le volume (litres) posé au FOND d'une fosse : les gouttes et la glace
+   *  dont l'étage est celui de la fosse, dans son emprise. C'est lui que le
+   *  déclencheur compare au seuil — la vapeur qui survole ne compte pas. */
+  litresFosse(b: ObstacleBox): number {
+    const h = b.hauteur ?? -10
+    let n = 0
+    for (let i = 0; i < this.count; i++) {
+      if (this.gaseous[i] === 1) continue
+      if (this.etage[i] > h + 0.5) continue
+      if (this.dansEtage(b, this.posX[i], this.posY[i])) n++
+    }
+    return n * this.params.litersPerParticle
+  }
+
+  /** ARME LA POUSSÉE : le geste d'éjection vient d'avoir lieu — pendant la
+   *  fenêtre, une marche se monte et un rebord se franchit. (Public pour le
+   *  banc d'essai : les tests n'ont pas de pointeur à maintenir.) */
+  armePoussee(): void {
+    this.pousseeTtl = this.etagesRegl.fenetrePoussee
   }
 
   // Portes asservies aux cibles laser : des parois qui vont et viennent.
@@ -759,6 +851,7 @@ export class FluidSim {
       this.welded[i] = this.welded[last]
       this.souffle[i] = this.souffle[last]
       this.duCorps[i] = this.duCorps[last]
+      this.etage[i] = this.etage[last]
     }
     this.count = last
   }
@@ -781,6 +874,8 @@ export class FluidSim {
     this.welded[i] = 0
     this.souffle[i] = 0
     this.duCorps[i] = 0
+    // une goutte naît SUR le sol du lieu où elle apparaît — étage compris
+    this.etage[i] = this.solA(x, y)
     if (kind === KIND_PLAYER) this.playerCount++
     return i
   }
@@ -841,6 +936,7 @@ export class FluidSim {
         if (dx * dx + dy * dy < seuil2) return false
       }
       for (const b of this.boxes) {
+        if (b.material === MAT_PLATEAU) continue // un étage est un sol : on s'y pose
         boxContact(px, py, b, cp)
         if (cp.dist < rp) return false
       }
@@ -889,6 +985,9 @@ export class FluidSim {
   // sur les particules restantes du corps.
   eject(aimX: number, aimY: number, dt: number): void {
     if (this.dispersed) return
+    // le geste dirigé compte pour les ÉTAGES : pendant sa fenêtre, une
+    // marche se monte et un rebord se franchit (voir passeEtages)
+    this.armePoussee()
     const p = this.params
     this.ejectCarry += p.ejectRate * dt
     while (this.ejectCarry >= 1) {
@@ -1479,6 +1578,7 @@ export class FluidSim {
 
   step(dt: number): void {
     this.refreshDerived()
+    if (this.pousseeTtl > 0) this.pousseeTtl -= dt
     const p = this.params
     const n = this.count
     if (n === 0) return
@@ -1736,6 +1836,9 @@ export class FluidSim {
 
     // 3. Obstacles solides (parois, cellules d'éponge saturées)
     this.resolveObstacles(dt)
+
+    // 3ter. Les ÉTAGES : marches, rebords, montées et descentes voulues
+    this.passeEtages(dt)
 
     // 3bis. Bords du monde (contact enregistré pour la glace : elle rebondit)
     const b = this.bounds
@@ -2171,6 +2274,9 @@ export class FluidSim {
       let y = this.prdY[i]
 
       for (const b of this.boxes) {
+        // L'ÉTAGE n'est pas un solide : c'est un sol plus haut ou plus bas,
+        // et son pourtour est une MARCHE — réglée après, dans passeEtages().
+        if (b.material === MAT_PLATEAU) continue
         // Chaque état a sa porte : la grille laisse passer la VAPEUR, la
         // membrane gorgée d'eau laisse suinter l'EAU, le rideau lamellaire
         // s'écarte devant la GLACE — tout le reste bute.
@@ -2277,6 +2383,162 @@ export class FluidSim {
 
       this.prdX[i] = x
       this.prdY[i] = y
+    }
+  }
+
+  // ---- LA PASSE DES ÉTAGES ------------------------------------------------
+  // Le sol a une hauteur par endroit (MAT_PLATEAU : estrade si positive,
+  // fosse si négative), et le POURTOUR d'un étage est une MARCHE. La règle,
+  // la même partout, dans les deux sens :
+  //
+  //   · d'en bas, la marche est une PAROI — sauf si le joueur POUSSE contre
+  //     elle (le geste d'éjection, dirigé) avec assez d'élan et que la
+  //     hauteur est à portée : alors la particule MONTE dessus. Le volume
+  //     s'y verse comme de l'eau à l'envers, au rythme de la pression.
+  //   · d'en haut, le rebord RETIENT (la goutte s'arrête au bord, la
+  //     glissade le long du rebord reste libre) — sauf débordement (l'élan
+  //     de fuite dépasse le seuil : la pression l'emporte) ou DESCENTE
+  //     voulue (poussée + élan vers le vide : on saute, petit élan de chute).
+  //
+  // La VAPEUR survole tout (son étage suit le sol, la condensation se pose
+  // au bon niveau). La GLACE ponte : bloc balistique, son étage ne bouge
+  // pas. Sans étage posé, la passe rend la main immédiatement.
+  private passeEtages(dt: number): void {
+    if (!this.hasEtages) return
+    const p = this.params
+    const rp = p.particleSpacing * 0.5
+    const invDt = 1 / dt
+    const r = this.etagesRegl
+    const cp = this.scratchCP
+    const pousse = this.pousseeTtl > 0
+    for (let i = 0; i < this.count; i++) {
+      if (this.frozen[i] === 1) continue
+      const x = this.prdX[i]
+      const y = this.prdY[i]
+      const sol = this.solA(x, y)
+      if (this.gaseous[i] === 1) {
+        this.etage[i] = sol
+        continue
+      }
+      const e = this.etage[i]
+      if (sol === e) continue
+
+      if (sol > e) {
+        // ---- une MARCHE MONTANTE en travers du chemin ----
+        // Deux géométries, une règle. Vers une ESTRADE, la marche est la
+        // frontière de la boîte de destination. Hors d'une FOSSE (le sol nu
+        // n'est porté par aucune boîte), la marche est le pourtour de la
+        // boîte qu'on QUITTE — la paroi intérieure de la fosse.
+        const marche = this.boiteEtageEn(x, y, sol)
+        if (!marche) {
+          const appui = this.boiteEtageEn(this.posX[i], this.posY[i], e)
+          if (!appui) {
+            this.etage[i] = sol // rien à lire d'aucun côté : on légalise
+            continue
+          }
+          boxContact(x, y, appui, cp) // sorti : dist > 0, normale vers nous
+          const vOut =
+            ((x - this.posX[i]) * cp.nx + (y - this.posY[i]) * cp.ny) * invDt
+          if (pousse && sol - e <= r.hauteurMax && vOut >= r.seuilMontee) {
+            this.etage[i] = sol // ON REMONTE, d'un geste appuyé
+            continue
+          }
+          // sinon : la paroi intérieure — ramené dans la fosse, glissade libre
+          const dedans = cp.dist + rp * 0.5
+          if (dedans > 0) {
+            this.prdX[i] = x - cp.nx * dedans
+            this.prdY[i] = y - cp.ny * dedans
+            this.contactMat[i] = MAT_WALL
+            this.contactNX[i] = -cp.nx
+            this.contactNY[i] = -cp.ny
+            this.contactVn[i] = vOut
+          }
+          continue
+        }
+        boxContact(x, y, marche, cp) // dedans : dist < 0, normale vers dehors
+        if (-cp.dist > rp * 2.5) {
+          // née DEDANS (fonte, apparition, téléport) : pas un franchissement
+          this.etage[i] = sol
+          continue
+        }
+        const vn =
+          ((x - this.posX[i]) * cp.nx + (y - this.posY[i]) * cp.ny) * invDt
+        if (pousse && sol - e <= r.hauteurMax && -vn >= r.seuilMontee) {
+          this.etage[i] = sol // ON MONTE — l'élan restant porte sur le plancher
+          continue
+        }
+        // sinon : une paroi. On ressort par la normale — la glissade
+        // tangentielle le long de la marche reste intacte.
+        const sep = cp.dist - rp
+        if (sep < 0) {
+          this.prdX[i] = x - cp.nx * sep
+          this.prdY[i] = y - cp.ny * sep
+          this.contactMat[i] = MAT_WALL
+          this.contactNX[i] = cp.nx
+          this.contactNY[i] = cp.ny
+          this.contactVn[i] = vn
+        }
+      } else {
+        // ---- LE REBORD : le sol se dérobe ----
+        // Deux géométries pour la même règle. Sur une ESTRADE, l'appui est
+        // une boîte : la retenue ramène la goutte dessus. Au bord d'une
+        // FOSSE, l'appui est le SOL NU (aucune boîte ne le porte) : le
+        // rebord est alors la frontière de la boîte de DESTINATION, et la
+        // retenue tient la goutte dehors. Même seuils, même gestes.
+        const appui = this.boiteEtageEn(this.posX[i], this.posY[i], e)
+        if (appui) {
+          boxContact(x, y, appui, cp) // dehors : dist > 0, normale vers nous
+          const vOut =
+            ((x - this.posX[i]) * cp.nx + (y - this.posY[i]) * cp.ny) * invDt
+          if (pousse && vOut >= r.seuilDescente) {
+            // DESCENDRE, d'un geste : on saute le rebord, petit élan de chute
+            this.etage[i] = sol
+            this.prdX[i] = x + cp.nx * rp
+            this.prdY[i] = y + cp.ny * rp
+            continue
+          }
+          if (vOut >= r.seuilDeborde) {
+            this.etage[i] = sol // ÇA DÉBORDE : la pression l'a emporté
+            continue
+          }
+          // RETENUE : la tension tient la goutte au bord — ramenée d'un
+          // souffle vers le plancher, la glissade LE LONG du rebord préservée
+          const dedans = cp.dist + rp * 0.5
+          if (dedans > 0) {
+            this.prdX[i] = x - cp.nx * dedans
+            this.prdY[i] = y - cp.ny * dedans
+          }
+          continue
+        }
+        const dest =
+          e === 0 ? this.boiteEtageEn(x, y, sol) : null
+        if (!dest) {
+          this.etage[i] = sol // plus d'appui, pas de rebord lisible : on tombe
+          continue
+        }
+        boxContact(x, y, dest, cp) // dedans : dist < 0, normale vers dehors
+        if (-cp.dist > rp * 2.5) {
+          // née AU FOND (fonte, apparition, téléport) : pas un franchissement
+          this.etage[i] = sol
+          continue
+        }
+        const vIn =
+          -((x - this.posX[i]) * cp.nx + (y - this.posY[i]) * cp.ny) * invDt
+        if (pousse && vIn >= r.seuilDescente) {
+          this.etage[i] = sol // on Y DESCEND, d'un geste
+          continue
+        }
+        if (vIn >= r.seuilDeborde) {
+          this.etage[i] = sol // l'élan l'emporte : ça verse dedans
+          continue
+        }
+        // RETENUE au bord de la fosse : tenue DEHORS, glissade préservée
+        const sep = cp.dist - rp * 0.5
+        if (sep < 0) {
+          this.prdX[i] = x - cp.nx * sep
+          this.prdY[i] = y - cp.ny * sep
+        }
+      }
     }
   }
 

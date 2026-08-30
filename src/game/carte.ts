@@ -5,6 +5,7 @@
 // vignette, et les couleurs reprennent le langage du jeu.
 
 import {
+  MAT_PLATEAU,
   MAT_CHAUD,
   MAT_FROID,
   MAT_GRILLE,
@@ -27,6 +28,8 @@ const COULEURS: Record<number, string> = {
   [MAT_MEMBRANE]: '#2e8f6a',
   [MAT_RIDEAU]: '#7f9dc0',
   [MAT_SURCHAUFFEUR]: '#e0a95a',
+  // l'étage : un sol, pas un mur — sable clair, pour qu'il se lise praticable
+  [MAT_PLATEAU]: '#8a7f57',
 }
 const ZONES: Record<string, string> = {
   glace: 'rgba(111, 183, 216, 0.20)',
