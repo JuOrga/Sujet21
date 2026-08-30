@@ -51,12 +51,19 @@ import {
 } from '../game/hub'
 import { REPARATIONS } from '../game/reparations'
 import {
+  COQUE_COTES,
+  COQUE_COTE_NOMS,
+  FORME_COQUE,
+  coquePieces,
+} from '../game/formes'
+import {
   CHANFREIN_MAX,
   EP_MAX,
   EP_MIN,
   STRUCT_CHAMBRE,
   STRUCT_COULOIR,
   boxesDesStructures,
+  cotesOuverts,
   coutStructures,
   dansCoque,
   epaisseurDe,
@@ -4977,9 +4984,27 @@ export class LevelEditor {
         )
       }
       rows.push(rangeField('Angle (°)', 'p-stAng', st.angle ?? 0, -180, 180, 1))
+      // LES CÔTÉS OUVERTS : devinés par défaut (un voisin qui vient au
+      // milieu d'une face y ouvre la porte), forçables à la main
+      const auto = st.ouvertures === undefined
+      const vus = cotesOuverts(st, this.level.structures ?? []).cotes
+      rows.push(
+        `<label class="ed-f"><span>Ouvertures</span><select id="p-stAuto">` +
+          `<option value="1"${auto ? ' selected' : ''}>Devinées (les voisins)</option>` +
+          `<option value="0"${auto ? '' : ' selected'}>Choisies à la main</option>` +
+          `</select></label>`,
+      )
+      rows.push(
+        `<div class="ed-f"><span>Côtés</span><span>` +
+          COQUE_COTES.map(
+            (bit, i) =>
+              `<label class="ed-chk"><input type="checkbox" id="p-stC${i}"${vus & bit ? ' checked' : ''}${auto ? ' disabled' : ''} /> ${COQUE_COTE_NOMS[i]}</label>`,
+          ).join(' ') +
+          `</span></div>`,
+      )
       const cout = coutStructures([st])
       rows.push(
-        `<p class="ed-empty">Une COQUE VIDE : le terrain de jeu. Le mobilier se pose dedans, à travers elle. Pour ouvrir une porte, RECOUVREZ une autre structure d’au moins une épaisseur — juxtaposer ne suffit pas, il faut que le vide traverse la paroi. Cette structure coûte <b>${cout} blocs</b> (une porte percée en plein mur en coûte un de plus, une porte au bout n’en coûte aucun).</p>`,
+        `<p class="ed-empty">Une COQUE VIDE, d’un seul tenant : le terrain de jeu. Le mobilier se pose dedans, à travers elle. LA RÈGLE DU KIT : deux modules se rejoignent CENTRE DE FACE contre CENTRE DE FACE — amenez un couloir au milieu d’une face et la porte s’ouvre toute seule. Une coque assez épaisse pour se refermer devient un octogone PLEIN (un pilier, une masse). Cette structure coûte <b>${cout} bloc${cout > 1 ? 's' : ''}</b>.</p>`,
       )
     } else if (s.kind === 'ancre') {
       const a = (this.level.ancres ?? [])[s.index]
@@ -5478,6 +5503,15 @@ export class LevelEditor {
         const ang = Math.round(val('p-stAng'))
         if (ang) st.angle = Math.max(-180, Math.min(180, ang))
         else delete st.angle
+        if (text('p-stAuto') === '1') delete st.ouvertures
+        else {
+          let m = 0
+          COQUE_COTES.forEach((bit, i) => {
+            const el = document.getElementById(`p-stC${i}`) as HTMLInputElement | null
+            if (el?.checked) m |= bit
+          })
+          st.ouvertures = m
+        }
         if (st.type === STRUCT_CHAMBRE) {
           const ch = val('p-stCh') / 100
           st.chanfrein = Math.max(0, Math.min(CHANFREIN_MAX, ch))
@@ -5882,6 +5916,26 @@ export class LevelEditor {
     const structs = this.level.structures ?? []
     if (structs.length > 0) {
       for (const paroi of boxesDesStructures(structs)) {
+        const col = MAT_COLORS[paroi.material] ?? '#5c7183'
+        if (paroi.forme === FORME_COQUE) {
+          // une COQUE se trace morceau par morceau : ce qu'on voit est la
+          // matière, et le creux reste creux — portes comprises
+          for (const piece of coquePieces(paroi)) {
+            g.beginPath()
+            piece.forEach((pt, i) => {
+              const sp = this.toScreen(pt.x, pt.y)
+              if (i === 0) g.moveTo(sp.sx, sp.sy)
+              else g.lineTo(sp.sx, sp.sy)
+            })
+            g.closePath()
+            g.fillStyle = '#33465699'
+            g.fill()
+            g.strokeStyle = '#7f9bb3'
+            g.lineWidth = 1
+            g.stroke()
+          }
+          continue
+        }
         const p = this.toScreen(paroi.minX, paroi.maxY)
         const q = this.toScreen(paroi.maxX, paroi.minY)
         g.save()
@@ -5892,7 +5946,6 @@ export class LevelEditor {
           g.rotate((-paroi.angle * Math.PI) / 180)
           g.translate(-cx, -cy)
         }
-        const col = MAT_COLORS[paroi.material] ?? '#5c7183'
         g.fillStyle = paroi.material === MAT_WALL ? '#33465699' : col + '99'
         g.fillRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
         g.strokeStyle = paroi.material === MAT_WALL ? '#7f9bb3' : col
@@ -5941,6 +5994,24 @@ export class LevelEditor {
       const gagnant =
         this.cutWinner?.kind === 'box' && this.cutWinner.index === bi
       g.save()
+      if (box.forme === FORME_COQUE) {
+        for (const piece of coquePieces(box)) {
+          g.beginPath()
+          piece.forEach((pt, i) => {
+            const sp = this.toScreen(pt.x, pt.y)
+            if (i === 0) g.moveTo(sp.sx, sp.sy)
+            else g.lineTo(sp.sx, sp.sy)
+          })
+          g.closePath()
+          g.fillStyle = col + '55'
+          g.fill()
+          g.strokeStyle = gagnant ? '#ffd24a' : col
+          g.lineWidth = gagnant ? 3 : 1.5
+          g.stroke()
+        }
+        g.restore()
+        return
+      }
       if (box.forme) {
         const pts = formeOutline(box, 64)
         g.beginPath()

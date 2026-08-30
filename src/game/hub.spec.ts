@@ -10,6 +10,7 @@ import {
   ancreAbsente,
 } from './hub'
 import {
+  dansBoite,
   MAT_CHAUD,
   MAT_GRILLE,
   MAT_MEMBRANE,
@@ -40,6 +41,8 @@ describe('hub v4 — le méta a pris ses murs (grand module)', () => {
     // le module est bâti au KIT : les murs sont ceux que les structures
     // fabriquent, pas ceux qu'on pose — c'est sur EUX qu'on juge
     const murs = niveauExpanse(TABLEAU_HUB).boxes
+    // une coque enveloppe TOUTE sa salle : c'est le champ qui tranche, pas
+    // la boîte englobante — on demande donc que la zone soit dans le VIDE
     for (const zone of [
       TABLEAU_HUB.exit,
       ZONES_HUB_GRAND.sasGivre,
@@ -47,30 +50,38 @@ describe('hub v4 — le méta a pris ses murs (grand module)', () => {
       ...ZONES_HUB_GRAND.etal.map((a) => a.plot),
     ]) {
       expect(dedans(zone, b)).toBe(true)
-      for (const box of murs)
-        if (box.material === MAT_WALL && !box.angle)
-          expect(chevauche(zone, box), JSON.stringify(zone)).toBe(false)
+      for (const [px, py] of [
+        [zone.minX, zone.minY],
+        [zone.maxX, zone.minY],
+        [zone.minX, zone.maxY],
+        [zone.maxX, zone.maxY],
+        [(zone.minX + zone.maxX) / 2, (zone.minY + zone.maxY) / 2],
+      ])
+        for (const box of murs)
+          expect(dansBoite(box, px, py), JSON.stringify(zone)).toBe(false)
     }
     // la zone du banc, elle, ENVELOPPE la console : le corps qui frôle
     // l'un des deux rails du couloir ouvre l'écran des mémoires
     expect(dedans(ZONES_HUB_GRAND.banc, b)).toBe(true)
     const rails = TABLEAU_HUB.boxes.filter(
-      (bx) => bx.minX === -1180 && bx.maxX === -540,
+      (bx) => bx.minX === -1200 && bx.maxX === -640,
     )
     expect(rails.length).toBe(2)
     for (const rail of rails)
       expect(dedans(rail, ZONES_HUB_GRAND.banc)).toBe(true)
   })
 
-  it('le module est bâti AU KIT : treize coques, et rien n’est posé à la main', () => {
+  it('le module est bâti AU KIT : dix-sept coques, et rien n’est posé à la main', () => {
     // la promesse du chantier : le terrain de jeu vient des structures —
     // les boîtes posées ne sont plus que du mobilier
-    expect(STRUCTURES_HUB.length).toBe(13)
+    expect(STRUCTURES_HUB.length).toBe(17)
     expect(TABLEAU_HUB.structures).toBe(STRUCTURES_HUB)
     expect(TABLEAU_HUB.coque).toBe('structures')
     for (const bx of TABLEAU_HUB.boxes) expect(bx.material === MAT_WALL || true).toBe(true)
     // le budget du moteur, structures comprises
-    expect(niveauExpanse(TABLEAU_HUB).boxes.length).toBeLessThanOrEqual(95)
+    // UNE boîte par coque (plus les deux portes de matière) : le terrain
+    // de jeu entier tient dans un cinquième du budget du moteur
+    expect(niveauExpanse(TABLEAU_HUB).boxes.length).toBeLessThanOrEqual(45)
   })
 
   it('les deux routes gardées sont bouchées par LEUR matière', () => {
