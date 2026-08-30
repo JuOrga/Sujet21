@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { dansBoite, MAT_GRILLE, type ObstacleBox, type StructureDef } from './level'
 import { COQUE_EST, COQUE_NORD, FORME_COQUE, coqueUnpack } from './formes'
 import {
+  boiteRaccordee,
   boxesDeStructure,
   boxesDesStructures,
+  epaisseurDessinee,
   cotesOuverts,
   coutStructures,
   interieurStructure,
@@ -164,6 +166,44 @@ describe('les structures de coque — une forme creuse, d’un seul tenant', () 
     const b = boxesDesStructures(lv.structures)
     expect(libre(b, -1100, 0, 1100, 0)).toBe(true)
     expect(libre(b, -1100, 0, -1100, 760)).toBe(false)
+  })
+
+  it('LE RACCORD : un couloir s’arrête à la face intérieure de ce qu’il rejoint', () => {
+    const ch = chambre([-900, -600, 0, 600])
+    // le couloir MORD dans la chambre : c'est ainsi qu'on dit « raccorde »
+    const co = couloir([-160, -200, 900, 200])
+    const r = boiteRaccordee(co, [ch, co])
+    // il repart de la face INTÉRIEURE du mur est, pas de son emprise tracée
+    expect(r.minX).toBe(0 - epaisseurDessinee(ch))
+    expect(r.maxX).toBe(900) // le bout libre ne bouge pas
+    // et plus rien du couloir ne dépasse dans la salle
+    const b = boxesDesStructures([ch, co])
+    expect(matiere(b, -200, 180)).toBe(false)
+    // la porte reste ouverte : le raccord ne referme rien
+    expect(libre(b, -450, 0, 860, 0)).toBe(true)
+  })
+
+  it('un couloir raccordé des DEUX bouts tient exactement l’écart', () => {
+    const g = chambre([-900, -600, 0, 600])
+    const d = chambre([600, -600, 1500, 600])
+    const co = couloir([-160, -200, 760, 200])
+    const r = boiteRaccordee(co, [g, d, co])
+    expect(r.minX).toBe(0 - epaisseurDessinee(g))
+    expect(r.maxX).toBe(600 + epaisseurDessinee(d))
+    expect(libre(boxesDesStructures([g, d, co]), -450, 0, 1050, 0)).toBe(true)
+  })
+
+  it('le concepteur peut refuser le raccord', () => {
+    const ch = chambre([-900, -600, 0, 600])
+    const co = couloir([-160, -200, 900, 200], { raccord: false })
+    expect(boiteRaccordee(co, [ch, co]).minX).toBe(-160)
+  })
+
+  it('un couloir qui ne touche rien garde son emprise', () => {
+    const co = couloir([-700, -200, 700, 200])
+    const r = boiteRaccordee(co, [co])
+    expect(r.minX).toBe(-700)
+    expect(r.maxX).toBe(700)
   })
 
   it('structureNeuve pose les défauts et devine l’axe d’un couloir', () => {

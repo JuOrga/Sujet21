@@ -320,6 +320,12 @@ export interface DecalDef {
     | 'meta-alcove'
     | 'meta-banc'
     | 'meta-marchand'
+    // LE SAS DE RACCORD : la pièce qui joint deux modules, vue de profil.
+    // Posée à chaque jonction d'un couloir, elle masque la couture entre
+    // deux coques. Deux orientations : le col vertical (un couloir qui
+    // arrive à l'horizontale) et son quart de tour.
+    | 'sas-raccord'
+    | 'sas-raccord-v'
   flip?: boolean // miroir horizontal : la même pièce ne se répète pas telle quelle
   fade?: number // 0..1, opacité (défaut 0,55)
 }
@@ -516,6 +522,11 @@ export interface StructureDef {
   /** La largeur des portes, en unités — absente : celle du passage du
    * voisin qui les ouvre. */
   porte?: number
+  /** LE RACCORD (couloirs) : absent ou vrai, le tube s'arrête à la FACE
+   * INTÉRIEURE des modules qu'il rejoint — sa paroi ne déborde pas dans la
+   * salle et la jonction se lit comme une seule pièce. Faux : l'emprise
+   * tracée est gardée telle quelle. */
+  raccord?: boolean
 }
 
 // UNE ANCRE MÉTA : les rendez-vous du MODULE, posés en données comme le

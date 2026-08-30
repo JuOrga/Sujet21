@@ -33,7 +33,28 @@ export const DELIVERIES: Delivery[] = [
       'LE SEMIS PROCHE RESTE PROCÉDURAL par-dessus la plaque, et ce n’est pas une économie : il est NET à tout grossissement là où la plaque s’adoucit, et c’est lui qui donne le MOUVEMENT — une plaque seule, si belle soit-elle, paraît collée à l’écran parce qu’elle défile à la même vitesse partout.',
       'AU BANC, « Ciel du dehors » : la FORCE et l’ÉTENDUE se règlent en jeu, à vue. C’est en regardant le vide qu’on trouve le dosage, pas dans un menu qui met la partie en pause.',
       'POUR DÉPOSER UNE VRAIE PLAQUE : docs/ciel.md. Il donne cinq champs qui conviennent (le champ profond de SMACS 0723, les Piliers de la Création, la Tarentule, le XDF de Hubble, la nébuleuse du Voile), la commande de conversion, LES CRÉDITS QUI NE SONT PAS FACULTATIFS (NASA/STScI : mention de la source ; ESA/Hubble et ESA/Webb : CC BY 4.0, mention obligatoire), et pourquoi 4096 et pas 16 384 — une texture coûte côté² × 4 octets plus un tiers : 4096 fait 90 Mo, 16 384 en fait 1,4 Go et ne se charge pas sur tablette. Écraser public/assets/ciel.webp suffit : pas une ligne de code à changer.',
-      'Une seule unité de texture consommée, et pas une de plus : le fragment shader n’en a que seize garanties et les seize étaient prises. La plaque et la tuile d’intérim se partagent celle du lointain — c’est l’une OU l’autre, jamais les deux. 587 tests verts.',
+      'Une seule unité de texture consommée, et pas une de plus : le fragment shader n’en a que seize garanties et les seize étaient prises. La plaque et la tuile d’intérim se partagent celle du lointain — c’est l’une OU l’autre, jamais les deux. 595 tests verts.',
+    ],
+  },
+  {
+    date: '30/08/2026 12:12',
+    title: 'LES LIGNES NOIRES DES COULOIRS : l’embrasure n’était NI mur NI sol',
+    notes: [
+      'Signalé : « on peut voir les lignes noires dans les couloirs, je ne comprends pas trop ce que c’est ». Trouvé, et c’était un vrai trou dans le raisonnement. Le sol des modules se peint dans le CREUX des coques ; la paroi se dessine dans la MATIÈRE. Mais l’embrasure d’une porte n’est ni l’un ni l’autre : c’est un morceau de mur qu’on a creusé. Personne ne la réclamait — d’où une bande NOIRE, large d’une épaisseur de coque, en travers de CHAQUE porte, sur toute sa hauteur.',
+      'L’embrasure fait désormais partie de la salle : le sol traverse la paroi avec le joueur. Relevé sur les données, de la cuve à l’aile des endormis : le sol est continu d’un bout à l’autre — salle, porte, couloir, porte, salle — sans un pixel de vide.',
+      'LE SAS DE RACCORD, ensuite : la pièce demandée, « un sas vu de profil qui relie deux éléments entre eux ». Le jeu la pose TOUT SEUL, à chaque bout de couloir raccordé — quatorze jonctions sur le module Méduse — à cheval sur la couture entre deux coques : un col d’amarrage, deux brides boulonnées, un joint sombre pile sur le joint, des vérins, deux veilleuses. C’est ce qui manquait pour que deux modules cessent de se voir accolés et deviennent une station.',
+      'Comme pour toutes les pièces du méta, la place est faite AVANT l’image : la fiche de fabrication est écrite (docs/assets-ia.md § 16, deux orientations — le col vertical et son quart de tour), le catalogue d’images les attend rubrique « Coque & fonds », et tant que les fichiers manquent, les jonctions restent telles qu’elles sont. Rien ne casse, la pièce s’ajoute quand elle arrive.',
+      '595 tests verts, dont quatre neufs sur le sas (un par jonction, aucun sans structures, le débord des deux côtés du joint, et le couloir dont le raccord est refusé qui n’en a pas).',
+    ],
+  },
+  {
+    date: '30/08/2026 11:56',
+    title: 'LE RACCORD : un couloir s’arrête au mur, il ne le traverse plus',
+    notes: [
+      'Signalé, capture à l’appui : aux jonctions du module, « ça ne fait pas beau ». C’était vrai et la cause est nette. Un couloir se pose en MORDANT dans les modules qu’il relie — c’est ainsi qu’on dit « raccorde-les ». Mais il gardait cette emprise : sa paroi traversait le mur d’en face et RESSORTAIT dans la salle. D’où, à chaque porte, une petite marche et deux blocs qui se chevauchent au lieu de se raccorder.',
+      'Le couloir reprend désormais sa vraie longueur : d’une FACE INTÉRIEURE à l’autre. Le tube bute contre le mur, le mur reste d’un seul tenant, et la jonction se lit comme une seule pièce — relevé sur les données : la paroi du couloir commence exactement où finit celle de la cuve, et s’arrête exactement où commence celle de l’aile des endormis. Plus un pixel de recouvrement, plus un bout qui dépasse.',
+      'Le geste, lui, ne change pas : on continue de faire mordre le couloir dans la coque d’en face — c’est le générateur qui rend le débord. Le raccord se calcule sur l’épaisseur TELLE QU’ELLE SERA DESSINÉE (le format la serre par pas de 8 unités : la calculer sur la valeur brute laissait une marche de quelques unités). Et l’on garde la main : une case RACCORD dans le panneau du couloir, cochée par défaut, décochée pour garder l’emprise tracée.',
+      'Au passage, les côtés ouverts et la largeur de porte forcés à la main survivent maintenant à l’enregistrement — ils se perdaient au rechargement. 591 tests verts, dont quatre neufs sur le raccord (un bout, deux bouts, le refus, et le couloir libre qui garde son emprise).',
     ],
   },
   {

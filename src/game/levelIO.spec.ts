@@ -951,7 +951,7 @@ describe('levelIO — les décalques de LA SERRE', () => {
       structures: [
         // rectangle à l'envers : remis à l'endroit ; réglages hors bornes : ramenés
         { type: 0, minX: 600, minY: 400, maxX: -600, maxY: -400, ep: 9999, chanfrein: 9 },
-        { type: 1, minX: -300, minY: -100, maxX: 300, maxY: 100, axe: 0, bouchon: 5, angle: 30 },
+        { type: 1, minX: -300, minY: -100, maxX: 300, maxY: 100, axe: 0, bouchon: 5, angle: 30, raccord: false, ouvertures: 3, porte: 320 },
         { type: 7, minX: 0, minY: 0, maxX: 100, maxY: 100 },
         { type: 0, minX: 0, minY: 0, maxX: 60, maxY: 60 }, // sans intérieur
       ],
@@ -962,7 +962,19 @@ describe('levelIO — les décalques de LA SERRE', () => {
     ])
     expect(level!.structures).toEqual([
       { type: 0, minX: -600, minY: -400, maxX: 600, maxY: 400, ep: 240, chanfrein: 0.5 },
-      { type: 1, minX: -300, minY: -100, maxX: 300, maxY: 100, angle: 30, axe: 0, bouchon: 5 },
+      {
+        type: 1,
+        minX: -300,
+        minY: -100,
+        maxX: 300,
+        maxY: 100,
+        angle: 30,
+        axe: 0,
+        raccord: false,
+        ouvertures: 3,
+        porte: 320,
+        bouchon: 5,
+      },
     ])
     expect(level!.coque).toBe('structures')
     const relu = parseLevel(JSON.parse(serializeLevel(level!)))

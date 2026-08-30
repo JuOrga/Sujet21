@@ -34,6 +34,7 @@ import {
   COQUE_SUD,
   FORME_COQUE,
   coquePack,
+  coqueUnpack,
 } from './formes'
 
 export const STRUCT_CHAMBRE = 0
@@ -237,6 +238,69 @@ export function cotesOuverts(
   return { cotes, porte: s.porte ?? (porte || passageDe(s)) }
 }
 
+/** L'ÉPAISSEUR TELLE QU'ELLE SERA DESSINÉE : le format serre l'épaisseur
+ * par pas de 8 unités (coquePack). Un raccord calculé sur la valeur brute
+ * tomberait à côté du mur réel de quelques unités — assez pour laisser une
+ * marche visible. */
+export function epaisseurDessinee(s: StructureDef): number {
+  return coqueUnpack(coquePack({
+    cotes: 0,
+    chanfrein: 0,
+    ep: epaisseurDe(s),
+    porte: 0,
+  })).ep
+}
+
+/** LE RACCORD. Un couloir se pose EN MORDANT dans les modules qu'il relie
+ * — c'est ainsi qu'on dit « raccorde-les ». Mais s'il gardait cette
+ * emprise, sa paroi traverserait le mur d'en face et dépasserait DANS la
+ * salle : une marche à chaque porte, et deux blocs qui se chevauchent au
+ * lieu de se raccorder.
+ *
+ * On rend donc au couloir sa vraie longueur : d'une FACE INTÉRIEURE à
+ * l'autre. Le tube bute contre le mur, le mur reste d'un seul tenant, et
+ * la jonction se lit comme une seule pièce. Le concepteur garde la main
+ * (raccord: false) s'il veut l'emprise brute. */
+export function boiteRaccordee(
+  s: StructureDef,
+  autres: readonly StructureDef[],
+): { minX: number; minY: number; maxX: number; maxY: number } {
+  const brut = {
+    minX: Math.min(s.minX, s.maxX),
+    minY: Math.min(s.minY, s.maxY),
+    maxX: Math.max(s.minX, s.maxX),
+    maxY: Math.max(s.minY, s.maxY),
+  }
+  if (s.type !== STRUCT_COULOIR || s.raccord === false || s.angle) return brut
+  const axe = axeDe(s)
+  const c = centreDe(s)
+  // l'axe long du couloir, et la coordonnée qu'il vise en travers
+  const bas = axe === 0 ? brut.minX : brut.minY
+  const haut = axe === 0 ? brut.maxX : brut.maxY
+  const travers = axe === 0 ? c.y : c.x
+  let a = bas
+  let b = haut
+  for (const o of autres) {
+    if (o === s || o.angle || !structureViable(o)) continue
+    const e = epaisseurDessinee(o)
+    const oBas = axe === 0 ? Math.min(o.minX, o.maxX) : Math.min(o.minY, o.maxY)
+    const oHaut = axe === 0 ? Math.max(o.minX, o.maxX) : Math.max(o.minY, o.maxY)
+    const oT0 = (axe === 0 ? Math.min(o.minY, o.maxY) : Math.min(o.minX, o.maxX)) + e
+    const oT1 = (axe === 0 ? Math.max(o.minY, o.maxY) : Math.max(o.minX, o.maxX)) - e
+    // le couloir ne vise ce module que s'il tombe en face de son creux
+    if (travers <= oT0 || travers >= oT1) continue
+    // un module qui avalerait le couloir tout entier ne le raccourcit pas
+    if (oBas < bas && oHaut > haut) continue
+    if (oBas < bas && oHaut > bas) a = Math.max(a, oHaut - e) // il entre par là
+    if (oHaut > haut && oBas < haut) b = Math.min(b, oBas + e)
+  }
+  // jamais au point de le faire disparaître
+  if (b - a < 4 * PASSAGE_MIN) return brut
+  return axe === 0
+    ? { ...brut, minX: a, maxX: b }
+    : { ...brut, minY: a, maxY: b }
+}
+
 /** LA COQUE d'une structure : UNE boîte, une forme creuse. */
 export function boxesDeStructure(
   s: StructureDef,
@@ -255,11 +319,9 @@ export function boxesDeStructure(
     // la porte ne peut pas manger toute la face : on lui laisse un montant
     porte: Math.max(0, Math.min(porte, 2 * petit - 2 * epaisseurDe(s))),
   })
+  const r = boiteRaccordee(s, autres)
   const b: ObstacleBox = {
-    minX: Math.min(s.minX, s.maxX),
-    minY: Math.min(s.minY, s.maxY),
-    maxX: Math.max(s.minX, s.maxX),
-    maxY: Math.max(s.minY, s.maxY),
+    ...r,
     material: s.material ?? MAT_WALL,
     forme: FORME_COQUE,
     p0,
@@ -359,4 +421,65 @@ export function niveauExpanse(level: LevelDef): LevelDef {
     ...level,
     boxes: [...boxesDesStructures(level.structures), ...level.boxes],
   }
+}
+
+/** UNE JONCTION : là où un couloir rejoint un module. Le sas de raccord s'y
+ * pose — c'est la pièce qui MASQUE la couture entre deux coques et qui dit,
+ * à l'œil, que les deux ne font qu'un. */
+export interface Jonction {
+  /** le centre de la jonction, sur la face du module rejoint */
+  x: number
+  y: number
+  /** l'ouverture franchie, en unités (la hauteur du sas vu de profil) */
+  passage: number
+  /** l'épaisseur traversée : le mur du module, plus le col du couloir */
+  profondeur: number
+  /** 0 : le couloir arrive horizontalement · 1 : verticalement */
+  axe: 0 | 1
+}
+
+/** Toutes les jonctions d'un plan : un couloir raccordé en a une par bout. */
+export function jonctionsDesStructures(
+  structures: readonly StructureDef[] | undefined,
+): Jonction[] {
+  if (!structures || structures.length === 0) return []
+  const out: Jonction[] = []
+  for (const s of structures) {
+    if (s.type !== STRUCT_COULOIR || s.raccord === false || s.angle) continue
+    if (!structureViable(s)) continue
+    const brut = {
+      minX: Math.min(s.minX, s.maxX),
+      minY: Math.min(s.minY, s.maxY),
+      maxX: Math.max(s.minX, s.maxX),
+      maxY: Math.max(s.minY, s.maxY),
+    }
+    const r = boiteRaccordee(s, structures)
+    const axe = axeDe(s)
+    const c = centreDe(s)
+    const e = epaisseurDessinee(s)
+    const passage = Math.max(0, passageDe(s))
+    // un bout RACCOURCI est un bout raccordé : la jonction se tient là
+    const bouts: [number, number][] =
+      axe === 0
+        ? [
+            [r.minX, brut.minX],
+            [r.maxX, brut.maxX],
+          ]
+        : [
+            [r.minY, brut.minY],
+            [r.maxY, brut.maxY],
+          ]
+    for (const [pose, tracee] of bouts) {
+      if (Math.abs(pose - tracee) < 1) continue // ce bout ne rejoint rien
+      out.push({
+        x: axe === 0 ? pose : c.x,
+        y: axe === 0 ? c.y : pose,
+        passage,
+        // le mur d'en face (l'écart repris) plus le col du couloir
+        profondeur: Math.abs(pose - tracee) + e,
+        axe,
+      })
+    }
+  }
+  return out
 }

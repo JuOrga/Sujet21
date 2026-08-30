@@ -16,6 +16,7 @@
 // du fx-canvas tient seul la place — on peut livrer les fichiers un par un.
 
 import type { DecalDef, LevelDef } from './level'
+import { jonctionsDesStructures } from './structures'
 
 // ---- LES RAPPORTS DES PIÈCES LIVRÉES ----------------------------------
 // Un décalque ÉPOUSAIT le rectangle posé : l'alcôve s'élargissait, le pupitre
@@ -26,6 +27,9 @@ import type { DecalDef, LevelDef } from './level'
 export const RAPPORT_ALCOVE = 1.337
 export const RAPPORT_BANC = 2.188
 export const RAPPORT_MARCHAND = 0.426
+/** LE SAS DE RACCORD, vu de profil : un col plus haut que large — le
+ *  quart de tour (sas-raccord-v) porte le rapport inverse. */
+export const RAPPORT_SAS = 0.62
 
 /** La hauteur du marchand, en unités monde : la capsule du Sujet 12, calée
  *  sur sa chambre de l'Économat (400 → 780, derrière la grille). */
@@ -34,6 +38,12 @@ export const MARCHAND_HAUTEUR = 380
 /** L'opacité des pièces du méta : plus franche que le décor ordinaire
  *  (0,55), parce qu'une alcôve d'achat doit se remarquer de loin. */
 const FONDU_META = 0.75
+
+/** Le sas déborde un peu de la couture, des deux côtés : une pièce qui
+ *  s'arrête pile sur le joint le souligne au lieu de le cacher. */
+const SAS_DEBORD = 120
+/** …et il monte au-dessus du passage : un col, pas un cache-misère. */
+const SAS_COL = 140
 
 export interface Rect {
   minX: number
@@ -91,6 +101,24 @@ export function decalsDuMeta(level: LevelDef): DecalDef[] {
   }
   if (level.bancMemoires) {
     out.push(poseAuRapport(level.bancMemoires, RAPPORT_BANC, 'meta-banc'))
+  }
+  // LES SAS DE RACCORD : un par jonction de couloir. Ils se posent SUR la
+  // couture entre deux coques — c'est leur seul rôle, et c'est pour cela
+  // qu'ils sont plus opaques que le décor ordinaire.
+  for (const j of jonctionsDesStructures(level.structures)) {
+    const demiL = (j.profondeur + SAS_DEBORD) / 2
+    const demiT = (j.passage + SAS_COL) / 2
+    const cadre =
+      j.axe === 0
+        ? { minX: j.x - demiL, minY: j.y - demiT, maxX: j.x + demiL, maxY: j.y + demiT }
+        : { minX: j.x - demiT, minY: j.y - demiL, maxX: j.x + demiT, maxY: j.y + demiL }
+    out.push(
+      poseAuRapport(
+        cadre,
+        j.axe === 0 ? RAPPORT_SAS : 1 / RAPPORT_SAS,
+        j.axe === 0 ? 'sas-raccord' : 'sas-raccord-v',
+      ),
+    )
   }
   if (level.marchand) {
     out.push({
