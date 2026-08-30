@@ -22,6 +22,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '30/08/2026 16:42',
+    title: 'La profondeur du fond : chaque couche répond au zoom, et le banc en décide',
+    notes: [
+      'Il y avait déjà de la parallaxe : le lointain suit la caméra à 62 %, la paroi de cuve à 10 %. Mais chaque couche n’avait qu’UN nombre — son glissement quand la caméra se DÉPLACE. Leur TAILLE, elle, suivait le zoom à l’identique sur toutes les couches. Or une chose lointaine ne grossit presque pas quand on s’en approche : c’est même à ça qu’on la reconnaît comme lointaine. D’où un dehors qui restait un DÉFILEMENT au lieu d’une profondeur.',
+      'Chaque couche porte maintenant DEUX nombres, tous deux entre 0 et 1, avec la même convention pour les deux : 1 = elle se comporte comme le plan de jeu, 0 = elle est infiniment loin. Le SUIVI répond au déplacement (c’est celui d’avant, au chiffre près) ; le ZOOM est neuf. Trois couches sont câblées : la station lointaine, le semis d’étoiles, la paroi de cuve — et le REFLET de la paroi suit la même couche qu’elle, car deux profondeurs qui se contredisent se voient tout de suite.',
+      'L’ÉTALONNAGE EST MESURÉ, PAS ESTIMÉ. Le zoom d’une salle en début de partie a été relevé dans le jeu construit : 0,13 à 0,15 en 1280 × 800 — l’auto-zoom cadre le corps, et le corps est alors au plus gros. J’avais parié 0,42 : c’était faux d’un facteur trois. C’est donc à 0,15 qu’on étalonne, et la conséquence tombe juste : à l’entrée d’une salle l’image est EXACTEMENT celle d’avant, et la profondeur se révèle ensuite — car le corps rétrécit à chaque impulsion, la caméra se rapproche, et les couches lointaines refusent de grossir avec elle. Le fond s’ouvre à mesure que le sujet s’amenuise.',
+      'SIX CURSEURS AU BANC, dossier « Profondeur du fond » : deux par couche, plus le zoom d’étalonnage, chacun avec sa notice. C’est fait pour être réglé à l’œil, en jouant — les valeurs livrées sont un point de départ, pas un verdict.',
+      'Le facteur ne dépend que du zoom et des réglages, jamais du pixel : il se calcule donc une fois par image, côté jeu, et part au shader tout cuit. Le shader n’a plus qu’une multiplication, et la règle n’a qu’UNE implémentation — celle que les tests couvrent (render/parallaxe.ts). En décor SOBRE, facteur 1 partout : le rendu d’avant au pixel près, pour que le test A/B de performance ne compare pas deux ambiances.',
+      'Six tests gravent les deux propriétés qui comptent : à facteur 1 la nouvelle formule rend l’ANCIENNE au chiffre près, à tout grossissement (garantie de non-régression) ; et une couche à zéro garde exactement la même taille apparente quel que soit le zoom. Vérifié en 1280 × 800 : les réglages arrivent bien au rendu, le zoom de jeu mesuré sur dix relevés, et un A/B à la même caméra — à l’étalonnage les deux images sont identiques, en s’approchant le champ d’étoiles refuse de grossir avec la salle. 602 tests verts, build propre.',
+    ],
+  },
+  {
     date: '30/08/2026 13:02',
     title: 'LE SAS DE RACCORD, sur référence — et l’ouverture qui tombe enfin sur la porte',
     notes: [

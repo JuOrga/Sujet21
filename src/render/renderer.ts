@@ -381,6 +381,21 @@ uniform sampler2D uTexCiel;
 uniform float uCielMode;   // 0 procédural · 1 tuilé · 2 plaque
 uniform float uCielSpan;   // largeur en unités-monde que couvre la plaque
 uniform float uCielForce;  // dosage : le vide doit rester plus sombre que la cuve
+// LA PROFONDEUR DES COUCHES DE FOND. Chaque couche porte DEUX nombres, tous
+// deux entre 0 et 1 et avec la même convention : 1 = elle se comporte comme
+// le plan de jeu, 0 = elle est infiniment loin.
+//   x — le SUIVI : ce qu'elle fait quand la caméra se DÉPLACE. 1, elle est
+//       collée au monde ; 0, collée à l'écran, elle ne bouge jamais.
+//   y — son FACTEUR, cuisiné à l'image d'après sa réponse au zoom : 1, elle
+//       grandit comme le monde ; en dessous, elle grandit moins — elle est
+//       loin. C'est ce nombre qui manquait, et sans lui le dehors n'était
+//       qu'un défilement.
+// Le second manquait : toutes les couches grandissaient à l'identique, et
+// c'est précisément pour ça que le dehors restait un DÉFILEMENT au lieu
+// d'une profondeur. À y = 1 partout, le rendu est celui d'avant, au pixel.
+uniform vec2 uParCiel;   // la station lointaine
+uniform vec2 uParSemis;  // le semis d'étoiles proches
+uniform vec2 uParCuve;   // la paroi de cuve, derrière l'eau
 uniform sampler2D uTexTank; // fond de cuve : panneaux, conduites, liserés
 uniform sampler2D uTexWall;
 uniform sampler2D uTexWallA; // seconde paroi : les murs alternent, sans répétition visible
@@ -510,6 +525,15 @@ float vnoise(vec2 p) {
 // le GPU saute réellement le calcul, c'est bien du coût en moins.
 float dnoise(vec2 p) {
   return uDecor > 0.5 ? vnoise(p) : 0.5;
+}
+
+/* LA POSITION D'ÉCHANTILLONNAGE D'UNE COUCHE DE FOND, à partir d'un point du
+   monde. La couche porte son SUIVI (x) et son FACTEUR (y), ce dernier calculé
+   à l'image par render/parallaxe.ts — il ne dépend que du zoom et des
+   réglages, pas du pixel. À facteur 1 la formule se réduit exactement à
+   l'ancienne : w moins uCenter fois (1 - suivi). */
+vec2 coucheFond(vec2 w, vec2 couche) {
+  return uCenter * couche.x + (w - uCenter) * couche.y;
 }
 
 // Points épars (étoiles, poussières) : au plus un par cellule de grille,
@@ -912,7 +936,7 @@ void main() {
     // répétition franche : sur uCielSpan unités-monde, un tableau n'en
     // traverse jamais assez pour qu'un motif se reconnaisse, et le jour où
     // le monde s'élargira, elle se raccordera sans couture.
-    vec3 fond = texture(uTexCiel, (world - uCenter * 0.62) / uCielSpan).rgb;
+    vec3 fond = texture(uTexCiel, coucheFond(world, uParCiel) / uCielSpan).rgb;
     // LE SEMIS PROCHE RESTE PROCÉDURAL, et ce n'est pas une économie : il
     // est NET à tout grossissement là où la plaque s'adoucit, et c'est lui
     // qui donne le MOUVEMENT — une plaque seule, si belle soit-elle, paraît
@@ -928,9 +952,9 @@ void main() {
     // La couche lointaine (station à la dérive) suit à moitié la caméra et
     // s'échantillonne en miroir : sa répétition ne se lit pas dans le noir.
     vec3 far_ = uHasCiel > 0.5
-      ? texture(uTexCiel, (world - uCenter * 0.62) / 5200.0).rgb * 1.35
-      : texture(uTexStars, (world - uCenter * 0.55) / 3400.0).rgb;
-    vec3 near_ = texture(uTexStars, world / 1500.0).rgb;
+      ? texture(uTexCiel, coucheFond(world, uParCiel) / 5200.0).rgb * 1.35
+      : texture(uTexStars, coucheFond(world, uParCiel) / 3400.0).rgb;
+    vec3 near_ = texture(uTexStars, coucheFond(world, uParSemis) / 1500.0).rgb;
     voidCol = (far_ * 0.4 + near_ * 0.6) * 0.55;
   } else {
     voidCol = vec3(0.004, 0.007, 0.014);
@@ -951,7 +975,7 @@ void main() {
   // est DERRIÈRE l'eau, elle suit un peu la caméra et la profondeur se sent.
   vec2 nuv = uv * 2.0 - 1.0;
   float vign = 1.0 - 0.35 * dot(nuv, nuv);
-  vec3 tankTex = texture(uTexTank, (world - uCenter * 0.10) / 900.0).rgb;
+  vec3 tankTex = texture(uTexTank, coucheFond(world, uParCuve) / 900.0).rgb;
   vec3 tank = uHasTank > 0.5
     ? tankTex * (0.55 * vign + 0.12)
     : vec3(0.012, 0.022, 0.040) * vign;
@@ -1784,7 +1808,7 @@ void main() {
           envL += 1.35 * texture(uLightMap, luvR).rgb;
         }
         vec3 envT = uHasTank > 0.5
-          ? textureLod(uTexTank, (reflPos - uCenter * 0.10) / 900.0, 2.0).rgb
+          ? textureLod(uTexTank, coucheFond(reflPos, uParCuve) / 900.0, 2.0).rgb
           : vec3(0.10, 0.16, 0.22);
         vec3 env = envT * envL * vec3(0.80, 1.00, 1.20) + envL * envL * vec3(0.30, 0.38, 0.46);
         // le plafond dans le cœur : là où la flaque regarde vers le haut
@@ -1856,7 +1880,7 @@ void main() {
           envL += 1.35 * texture(uLightMap, luvR).rgb;
         }
         vec3 envT = uHasTank > 0.5
-          ? textureLod(uTexTank, (reflPos - uCenter * 0.10) / 900.0, 2.0).rgb
+          ? textureLod(uTexTank, coucheFond(reflPos, uParCuve) / 900.0, 2.0).rgb
           : vec3(0.10, 0.16, 0.22);
         // le punch du miroir : les hautes lumières réfléchies CLAQUENT
         vec3 env = envT * envL * vec3(0.80, 1.00, 1.20) + envL * envL * vec3(0.30, 0.38, 0.46);
@@ -2581,6 +2605,13 @@ export class Renderer {
   private cielMode = 2
   private cielSpan = 6000
   private cielForce = 1
+  // LA PROFONDEUR DES COUCHES DE FOND : suivi et réponse au zoom, par
+  // couche (cf. uParCiel/uParSemis/uParCuve dans le shader). Les défauts
+  // reproduisent EXACTEMENT le rendu d'avant — suivi tel quel, zoom à 1 —
+  // pour que la brique arrive sans rien changer, et que le banc décide.
+  private parCiel = new Float32Array([0.38, 1])
+  private parSemis = new Float32Array([1, 1])
+  private parCuve = new Float32Array([0.9, 1])
   private texTank: WebGLTexture | null = null
   private texWall: WebGLTexture | null = null
   private texWallA: WebGLTexture | null = null
@@ -3030,6 +3061,31 @@ export class Renderer {
       this.cielDemandee = true
       this.loadTexture('/assets/ciel.webp', true, true, (t) => (this.texCiel = t))
     }
+  }
+
+  /**
+   * LA PROFONDEUR DES COUCHES DE FOND. Deux nombres par couche, entre 0 et
+   * 1, même convention pour les deux : 1 = la couche se comporte comme le
+   * plan de jeu, 0 = elle est infiniment loin. Le premier répond au
+   * DÉPLACEMENT de la caméra, le second à son ZOOM — et c'est le second qui
+   * manquait : sans lui toutes les couches grandissent à l'identique, et le
+   * dehors n'est qu'un défilement. Le second nombre arrive DÉJÀ CUIT
+   * (render/parallaxe.ts, facteurG) : il ne dépend que du zoom et des
+   * réglages, il n'a rien à faire dans une boucle de pixels.
+   *
+   * Appelé À L'IMAGE, comme tout ce qui pilote le renderer.
+   */
+  setParallaxe(
+    ciel: readonly [number, number],
+    semis: readonly [number, number],
+    cuve: readonly [number, number],
+  ): void {
+    this.parCiel[0] = ciel[0]
+    this.parCiel[1] = ciel[1]
+    this.parSemis[0] = semis[0]
+    this.parSemis[1] = semis[1]
+    this.parCuve[0] = cuve[0]
+    this.parCuve[1] = cuve[1]
   }
 
   setSolModules(actif: boolean): void {
@@ -3657,6 +3713,9 @@ export class Renderer {
     gl.uniform1f(cu['uCielMode'], cielPret ? 2 : Math.min(this.cielMode, 1))
     gl.uniform1f(cu['uCielSpan'], this.cielSpan)
     gl.uniform1f(cu['uCielForce'], this.cielForce)
+    gl.uniform2fv(cu['uParCiel'], this.parCiel)
+    gl.uniform2fv(cu['uParSemis'], this.parSemis)
+    gl.uniform2fv(cu['uParCuve'], this.parCuve)
     bindTex(8, this.texWallA, 'uTexWallA', 'uHasWallA')
     bindTex(9, this.texFroid, 'uTexFroid', 'uHasFroid')
     bindTex(10, this.texChaud, 'uTexChaud', 'uHasChaud')

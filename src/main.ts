@@ -174,6 +174,7 @@ import {
   sourisInverse,
   toucheDe,
 } from './game/commandes'
+import { PARALLAXE_DEFAUTS, facteurG } from './render/parallaxe'
 import { PerfCollector } from './game/perf'
 import {
   fetchLibrary,
@@ -2533,6 +2534,24 @@ if (!(cielChoix in CIEL_MODE)) cielChoix = 'plaque'
 // ciel de nuages que d'un champ profond ; 12 000 les diluait en brume.
 // 8 000 rend la structure lisible sans qu'elle prenne toute la place.
 const cielReglages = { force: 0.45, etendue: 8000 }
+
+// LA PROFONDEUR DES COUCHES DE FOND : la règle, les valeurs et les tests
+// vivent dans render/parallaxe.ts — ici on n'en tient que la copie RÉGLABLE,
+// celle que les curseurs du banc modifient en direct. Aplatie en un objet
+// plat parce que le banc lie des champs, pas des objets imbriqués.
+const parallaxeReglages = {
+  cielSuivi: PARALLAXE_DEFAUTS.ciel.suivi,
+  cielZoom: PARALLAXE_DEFAUTS.ciel.zoom,
+  semisSuivi: PARALLAXE_DEFAUTS.semis.suivi,
+  semisZoom: PARALLAXE_DEFAUTS.semis.zoom,
+  cuveSuivi: PARALLAXE_DEFAUTS.cuve.suivi,
+  cuveZoom: PARALLAXE_DEFAUTS.cuve.zoom,
+  ref: PARALLAXE_DEFAUTS.ref,
+}
+// Sonde de test : la profondeur du fond depuis la console (comme __sim, __cam)
+;(
+  window as unknown as { __parallaxe: typeof parallaxeReglages }
+).__parallaxe = parallaxeReglages
 // Graphismes du LIQUIDE, séparés du décor : SOBRE débranche l'éclairage de
 // l'eau (relief, spéculaire, miroir, scintillement) dans le shader — la
 // silhouette, les couleurs de vitesse et les états restent. C'est le second
@@ -9715,6 +9734,7 @@ const pane = createBench(params, monitor, {
   pupitre: { sections: cataloguePupitre(), lance: actionPupitre },
   perf: { copier: copiePerf, envoyer: envoiePerf },
   ciel: cielReglages,
+  parallaxe: parallaxeReglages,
   tableaux: TABLEAUX.map((t) => t.name),
   gotoTableau: (index) => {
     testLevel = null // le banc navigue dans l'expédition, pas dans le prototype
@@ -11906,6 +11926,22 @@ function frame(now: number): void {
     CIEL_MODE[cielChoix],
     cielReglages.force,
     cielReglages.etendue,
+  )
+  // LA PROFONDEUR DES COUCHES DE FOND : posée à l'image comme le ciel, pour
+  // que le banc l'entende tout de suite. Le facteur se cuisine ICI, une fois
+  // par image (il ne dépend que du zoom et des réglages) : le shader n'a plus
+  // qu'une multiplication par pixel. En décor SOBRE, facteur 1 partout — le
+  // rendu d'avant, au pixel près : un réglage d'ambiance ne doit pas être ce
+  // qui distingue les deux branches du test A/B.
+  const par = parallaxeReglages
+  const g = (suivi: number, zoom: number): [number, number] => [
+    suivi,
+    decorRiche ? facteurG(camera.zoom, { suivi, zoom }, par.ref) : 1,
+  ]
+  renderer.setParallaxe(
+    g(par.cielSuivi, par.cielZoom),
+    g(par.semisSuivi, par.semisZoom),
+    g(par.cuveSuivi, par.cuveZoom),
   )
   const renderT0 = performance.now()
   renderer.render(

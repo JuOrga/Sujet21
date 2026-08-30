@@ -67,6 +67,17 @@ export interface BenchActions {
   // DOSAGE se règle ici, à vue — c'est en regardant le vide qu'on trouve
   // la bonne force, pas dans un menu qui met la partie en pause.
   ciel?: { force: number; etendue: number }
+  // LA PROFONDEUR DES COUCHES DE FOND : deux nombres par couche, entre 0 et
+  // 1 — le suivi (déplacement de la caméra) et le zoom (grossissement).
+  parallaxe?: {
+    cielSuivi: number
+    cielZoom: number
+    semisSuivi: number
+    semisZoom: number
+    cuveSuivi: number
+    cuveZoom: number
+    ref: number
+  }
   // L'ŒIL DU SUJET (pack présence) : les curseurs vivent ici, à VUE — le
   // banc flotte sur le jeu qui tourne. Hors présets : mémorisé par
   // appareil (localStorage) ; les défauts sont l'étalonnage du concepteur.
@@ -357,6 +368,39 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
         label: 'étendue (u)',
       }),
       'Combien d’unités-monde la plaque couvre. Plus petite : le ciel est plus net et défile plus vite. Plus grande : plus doux, presque immobile. Un tableau fait 2400 unités, le hub 4500 — en dessous, le motif finit par se reconnaître.',
+    )
+  }
+
+  // ---- LA PROFONDEUR DU FOND : deux nombres par couche ------------------
+  // Une seule convention, pour les six curseurs : 1 = la couche se comporte
+  // comme le plan de jeu, 0 = elle est infiniment loin. On règle à l'œil, en
+  // dézoomant : c'est au moment où l'on prend du recul que ça se joue.
+  if (actions.parallaxe) {
+    const par = actions.parallaxe
+    const fPar = pane.addFolder({ title: 'Profondeur du fond', expanded: false })
+    const REGLE =
+      'La même convention pour les six : 1 = la couche se comporte comme le plan de jeu (collée au monde, elle grandit comme lui), 0 = elle est infiniment loin (immobile, ou d’une taille qui ne change jamais). Entre les deux, c’est de la distance.'
+    const couche = (
+      cle: 'cielSuivi' | 'semisSuivi' | 'cuveSuivi',
+      cleZ: 'cielZoom' | 'semisZoom' | 'cuveZoom',
+      nom: string,
+      quoi: string,
+    ): void => {
+      describe(
+        fPar.addBinding(par, cle, { min: 0, max: 1, step: 0.01, label: nom + ' — suivi' }),
+        quoi + ' Ce curseur-ci répond au DÉPLACEMENT de la caméra : à 1 la couche est collée au monde et défile comme lui, à 0 elle est collée à l’écran et ne bouge jamais. ' + REGLE,
+      )
+      describe(
+        fPar.addBinding(par, cleZ, { min: 0, max: 1, step: 0.01, label: nom + ' — zoom' }),
+        quoi + ' Ce curseur-ci répond au ZOOM, et c’est celui qui manquait : jusqu’ici toutes les couches grandissaient à l’identique, si bien que le dehors restait un défilement au lieu d’une profondeur. À 1 la couche grandit comme le monde ; à 0 sa taille apparente ne change jamais — elle est si loin que s’en approcher ne la grossit plus. C’est en DÉZOOMANT qu’on juge. ' + REGLE,
+      )
+    }
+    couche('cielSuivi', 'cielZoom', 'station', 'La couche la plus lointaine : la plaque de ciel, ou la tuile d’intérim — la station à la dérive.')
+    couche('semisSuivi', 'semisZoom', 'semis', 'Le semis d’étoiles proches, celui qui donne le mouvement du vide.')
+    couche('cuveSuivi', 'cuveZoom', 'paroi', 'La paroi de cuve, DERRIÈRE l’eau — et son reflet, qui suit la même couche : deux profondeurs qui se contredisent se voient tout de suite.')
+    describe(
+      fPar.addBinding(par, 'ref', { min: 0.15, max: 1.5, step: 0.01, label: 'zoom d’étalonnage' }),
+      'Le grossissement auquel toutes les couches s’accordent avec le monde — là, l’image est exactement celle d’avant ce réglage. À caler sur le zoom de JEU ordinaire : la profondeur ne doit alors se manifester qu’aux moments où l’on prend du recul (viser un dash, recadrer, regarder). Le trop régler bas ou haut fait « respirer » le fond en pleine action.',
     )
   }
 
