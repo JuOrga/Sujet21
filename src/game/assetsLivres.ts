@@ -57,6 +57,7 @@ const NOMS: Record<string, string> = {
   'tank-bg.webp': 'Fond de cuve',
   'stars.webp': 'Ciel étoilé (proche)',
   'stars-far.webp': 'Ciel étoilé (lointain, station)',
+  'ciel.webp': 'Plaque de ciel — champ profond 4096² (tools/ciel)',
   'home.webp': 'Fiche — illustration d’accueil',
   'card-galerie.webp': 'Carton de journal — la galerie noyée',
   'fiole-pleine.webp': 'Fiole pleine (semblable)',
@@ -95,7 +96,7 @@ export function rubriqueDe(url: string): string {
     f.startsWith('plafond')
   )
     return 'Machinerie & décalques'
-  if (/^(hull|tank-bg|stars|home|card-)/.test(f)) return 'Coque & fonds'
+  if (/^(hull|tank-bg|stars|ciel|home|card-)/.test(f)) return 'Coque & fonds'
   if (/^(fiole|badge)/.test(f)) return 'Objets & emblèmes'
   return 'Autres'
 }

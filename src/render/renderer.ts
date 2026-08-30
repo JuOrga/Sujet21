@@ -373,7 +373,14 @@ uniform float uZoneForce[MAX_ZONES]; // 1 eau, 2 glace, 3 vapeur, 0 libre
 // Textures d'habillage (chargées en arrière-plan ; uHas* passe à 1 quand
 // prêtes — d'ici là, le décor procédural fait l'intérim)
 uniform sampler2D uTexStars;
-uniform sampler2D uTexStarsFar; // lointain orbital : la station à la dérive
+// LE CIEL LOINTAIN partage une seule unité de texture — le fragment shader
+// n'en a que seize garanties, et les seize sont prises. Selon le mode, on y
+// lie soit la tuile d'intérim, soit LA PLAQUE : une image très grande,
+// périodique, qu'on survole en parallaxe lente.
+uniform sampler2D uTexCiel;
+uniform float uCielMode;   // 0 procédural · 1 tuilé · 2 plaque
+uniform float uCielSpan;   // largeur en unités-monde que couvre la plaque
+uniform float uCielForce;  // dosage : le vide doit rester plus sombre que la cuve
 uniform sampler2D uTexTank; // fond de cuve : panneaux, conduites, liserés
 uniform sampler2D uTexWall;
 uniform sampler2D uTexWallA; // seconde paroi : les murs alternent, sans répétition visible
@@ -389,7 +396,7 @@ uniform sampler2D uTexIris;
 uniform sampler2D uTexParoi;
 uniform float uHasParoi;
 uniform float uHasStars;
-uniform float uHasStarsFar;
+uniform float uHasCiel;
 uniform float uHasTank;
 uniform float uHasWall;
 uniform float uHasWallA;
@@ -875,13 +882,29 @@ void main() {
   // lointaine en parallaxe : elle suit à moitié la caméra), sinon décor
   // procédural d'intérim.
   vec3 voidCol;
-  if (uHasStars > 0.5) {
+  if (uCielMode > 1.5 && uHasCiel > 0.5) {
+    // LA PLAQUE DE CIEL : une seule image, très grande, survolée en
+    // parallaxe lente. Elle est PÉRIODIQUE, donc échantillonnée en
+    // répétition franche : sur uCielSpan unités-monde, un tableau n'en
+    // traverse jamais assez pour qu'un motif se reconnaisse, et le jour où
+    // le monde s'élargira, elle se raccordera sans couture.
+    vec3 fond = texture(uTexCiel, (world - uCenter * 0.62) / uCielSpan).rgb;
+    // LE SEMIS PROCHE RESTE PROCÉDURAL, et ce n'est pas une économie : il
+    // est NET à tout grossissement là où la plaque s'adoucit, et c'est lui
+    // qui donne le MOUVEMENT — une plaque seule, si belle soit-elle, paraît
+    // collée à l'écran parce qu'elle défile à la même vitesse partout.
+    if (uDecor > 0.5) {
+      fond += vec3(0.50, 0.60, 0.75) * specks(world + uCenter * 0.5, 130.0, 0.10, uZoom) * 0.38;
+      fond += vec3(0.75, 0.82, 0.95) * specks(world + 500.0, 200.0, 0.08, uZoom) * 0.62;
+    }
+    voidCol = fond * uCielForce;
+  } else if (uCielMode > 0.5 && uHasStars > 0.5) {
     // Atténuée : le vide doit rester plus sombre que la cuve éclairée,
     // sinon la hiérarchie lumineuse s'inverse et la scène se noie.
     // La couche lointaine (station à la dérive) suit à moitié la caméra et
     // s'échantillonne en miroir : sa répétition ne se lit pas dans le noir.
-    vec3 far_ = uHasStarsFar > 0.5
-      ? texture(uTexStarsFar, (world - uCenter * 0.62) / 5200.0).rgb * 1.35
+    vec3 far_ = uHasCiel > 0.5
+      ? texture(uTexCiel, (world - uCenter * 0.62) / 5200.0).rgb * 1.35
       : texture(uTexStars, (world - uCenter * 0.55) / 3400.0).rgb;
     vec3 near_ = texture(uTexStars, world / 1500.0).rgb;
     voidCol = (far_ * 0.4 + near_ * 0.6) * 0.55;
@@ -2523,6 +2546,15 @@ export class Renderer {
   // décor procédural assure l'intérim, l'image prend le relais sans à-coup.
   private texStars: WebGLTexture | null = null
   private texStarsFar: WebGLTexture | null = null
+  // LA PLAQUE DE CIEL, chargée SEULEMENT si on la demande : 4096², c'est
+  // ~90 Mo de mémoire graphique une fois les niveaux de détail construits.
+  // Un joueur qui reste au ciel procédural ne doit ni la télécharger ni la
+  // loger — d'où le chargement paresseux, et la libération au retour.
+  private texCiel: WebGLTexture | null = null
+  private cielDemandee = false
+  private cielMode = 2
+  private cielSpan = 6000
+  private cielForce = 1
   private texTank: WebGLTexture | null = null
   private texWall: WebGLTexture | null = null
   private texWallA: WebGLTexture | null = null
@@ -2688,8 +2720,9 @@ export class Renderer {
       true,
       (t) => (this.texStars = t),
     )
-    // Le lointain n'est pas raccordable : répété en MIROIR, la couture ne se
-    // lit pas dans le noir et la station à la dérive reste unique à l'écran.
+    // Le lointain d'intérim n'est pas raccordable : répété en MIROIR, la
+    // couture ne se lit pas dans le noir et la station à la dérive reste
+    // unique à l'écran. La PLAQUE, elle, ne se charge qu'à la demande.
     this.loadTexture(
       '/assets/stars-far.webp',
       true,
@@ -2943,6 +2976,23 @@ export class Renderer {
    * coques posées, et la coque de la toile ne se dessine plus. Réglé par
    * tableau (LevelDef.coque). */
   private solModules = false
+
+  /**
+   * LE CIEL DU DEHORS. 0 procédural · 1 tuilé (l'intérim) · 2 la plaque.
+   * Appelé À L'IMAGE, comme tout ce qui pilote le renderer : une fonction
+   * lancée au chargement du module ne peut pas le toucher — il n'existe pas
+   * encore (cf. src/main-amorce.spec.ts).
+   */
+  setCiel(mode: number, force: number, span: number): void {
+    this.cielMode = mode
+    this.cielForce = force
+    this.cielSpan = span
+    // le téléchargement n'est lancé qu'au premier passage en mode plaque
+    if (mode > 1.5 && !this.cielDemandee) {
+      this.cielDemandee = true
+      this.loadTexture('/assets/ciel.webp', true, true, (t) => (this.texCiel = t))
+    }
+  }
 
   setSolModules(actif: boolean): void {
     this.solModules = actif
@@ -3562,7 +3612,13 @@ export class Renderer {
     bindTex(1, this.texStars, 'uTexStars', 'uHasStars')
     bindTex(2, this.texWall, 'uTexWall', 'uHasWall')
     bindTex(6, this.texTank, 'uTexTank', 'uHasTank')
-    bindTex(7, this.texStarsFar, 'uTexStarsFar', 'uHasStarsFar')
+    // une seule unité pour le lointain : la plaque quand on la veut ET
+    // qu'elle est arrivée, la tuile d'intérim le reste du temps
+    const cielPret = this.cielMode > 1.5 && this.texCiel !== null
+    bindTex(7, cielPret ? this.texCiel : this.texStarsFar, 'uTexCiel', 'uHasCiel')
+    gl.uniform1f(cu['uCielMode'], cielPret ? 2 : Math.min(this.cielMode, 1))
+    gl.uniform1f(cu['uCielSpan'], this.cielSpan)
+    gl.uniform1f(cu['uCielForce'], this.cielForce)
     bindTex(8, this.texWallA, 'uTexWallA', 'uHasWallA')
     bindTex(9, this.texFroid, 'uTexFroid', 'uHasFroid')
     bindTex(10, this.texChaud, 'uTexChaud', 'uHasChaud')

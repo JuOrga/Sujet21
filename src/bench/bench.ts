@@ -63,6 +63,10 @@ export interface BenchActions {
     copier(): Promise<string>
     envoyer(): Promise<string>
   }
+  // LE CIEL DU DEHORS : le choix du fond est dans PARAMÈTRES, mais son
+  // DOSAGE se règle ici, à vue — c'est en regardant le vide qu'on trouve
+  // la bonne force, pas dans un menu qui met la partie en pause.
+  ciel?: { force: number; etendue: number }
   // L'ŒIL DU SUJET (pack présence) : les curseurs vivent ici, à VUE — le
   // banc flotte sur le jeu qui tourne. Hors présets : mémorisé par
   // appareil (localStorage) ; les défauts sont l'étalonnage du concepteur.
@@ -339,6 +343,23 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   // Deux boutons, au plus près des réglages : on change une chose, on
   // mesure, on envoie — sans repasser par la fiche (qui met en pause et
   // fausserait la mesure).
+  if (actions.ciel) {
+    const fCiel = pane.addFolder({ title: 'Ciel du dehors', expanded: false })
+    describe(
+      fCiel.addBinding(actions.ciel, 'force', { min: 0, max: 1.5, label: 'force' }),
+      'Dose la plaque de ciel. Le vide DOIT rester plus sombre que la cuve éclairée : au-delà, la hiérarchie lumineuse s’inverse et la scène se noie. Sans effet sur les fonds tuilé et procédural.',
+    )
+    describe(
+      fCiel.addBinding(actions.ciel, 'etendue', {
+        min: 2000,
+        max: 20000,
+        step: 100,
+        label: 'étendue (u)',
+      }),
+      'Combien d’unités-monde la plaque couvre. Plus petite : le ciel est plus net et défile plus vite. Plus grande : plus doux, presque immobile. Un tableau fait 2400 unités, le hub 4500 — en dessous, le motif finit par se reconnaître.',
+    )
+  }
+
   if (actions.perf) {
     const fPerf = pane.addFolder({ title: 'Rapport de performance', expanded: false })
     describe(

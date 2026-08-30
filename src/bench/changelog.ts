@@ -22,6 +22,21 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '30/08/2026 12:19',
+    title: 'LE CIEL DU DEHORS : une plaque de 4096², et la place pour une vraie photo de Webb',
+    notes: [
+      'Demandé : essayer un autre fond de décor — une image en très grosse qualité, un vrai ciel étoilé, tirée si possible des grands clichés libres de James Webb ou de Hubble. IL FAUT LE DIRE D’ENTRÉE : les serveurs de la NASA, de l’ESA et de Wikimedia sont TOUS refusés par la politique réseau de cette session (403 au proxy). Je ne peux pas aller chercher une plaque de Webb. J’ai donc bâti tout le chemin, et fabriqué la plaque moi-même en attendant la vraie.',
+      'LE FOND DU VIDE A TROIS FORMES, dans PARAMÈTRES › LE CIEL DU DEHORS. PLAQUE (le nouveau défaut) : une image de 4096 × 4096. TUILE : l’ancien fond, deux petites textures répétées. PROCÉDURAL : rien à charger, le vide entièrement calculé. La plaque ne se télécharge qu’à son premier affichage (1 Mo) — qui la coupe ne la paie jamais.',
+      'LA PLAQUE LIVRÉE N’EST PAS UNE PHOTOGRAPHIE, et le dépôt le dit. Elle est fabriquée par tools/ciel/genere-ciel.py : fond noir bleuté, filaments de poussière chauds, veines sombres qui absorbent, semis de dizaines de milliers d’étoiles colorées selon leur température, galaxies lointaines — et SIX AIGRETTES sur les plus vives, la diffraction d’un miroir hexagonal, qui est la signature de Webb. Elle est périodique par construction : ses bords se raccordent, donc elle se répète sans couture et le monde peut s’élargir sans qu’on tombe sur un bord.',
+      'UN OUTIL PLUTÔT QU’UNE IMAGE POSÉE LÀ, parce qu’une plaque se RÈGLE : densité d’étoiles, force de la nébulosité, graine, taille. Le script affiche à chaque tirage sa luminance moyenne — elle doit rester basse, sans quoi le vide cesse d’être un fond.',
+      'CE QUE L’ÉCRAN A CORRIGÉ QUE LE RAISONNEMENT N’AVAIT PAS VU. Au premier essai en jeu, la plaque à force 1 ÉCRASAIT la station : le vide devenait le sujet et les modules des découpes plates — exactement l’inversion contre laquelle le shader met en garde depuis toujours. Le défaut est descendu à 0,45. Au deuxième, les gros halos des étoiles vives faisaient des taches molles : superbe vue de près, sale en jeu, parce que le jeu montre environ UN TEXEL PAR PIXEL — un halo de quarante texels fait une tache de quarante pixels. Divisés par deux et demi. Au troisième, l’aile large de soixante-dix mille étoiles faibles s’additionnait en un VOILE LAITEUX qui mangeait le noir. Amincie. Quatre allers-retours à l’écran, aucun trouvé sur le papier.',
+      'LE SEMIS PROCHE RESTE PROCÉDURAL par-dessus la plaque, et ce n’est pas une économie : il est NET à tout grossissement là où la plaque s’adoucit, et c’est lui qui donne le MOUVEMENT — une plaque seule, si belle soit-elle, paraît collée à l’écran parce qu’elle défile à la même vitesse partout.',
+      'AU BANC, « Ciel du dehors » : la FORCE et l’ÉTENDUE se règlent en jeu, à vue. C’est en regardant le vide qu’on trouve le dosage, pas dans un menu qui met la partie en pause.',
+      'POUR DÉPOSER UNE VRAIE PLAQUE : docs/ciel.md. Il donne cinq champs qui conviennent (le champ profond de SMACS 0723, les Piliers de la Création, la Tarentule, le XDF de Hubble, la nébuleuse du Voile), la commande de conversion, LES CRÉDITS QUI NE SONT PAS FACULTATIFS (NASA/STScI : mention de la source ; ESA/Hubble et ESA/Webb : CC BY 4.0, mention obligatoire), et pourquoi 4096 et pas 16 384 — une texture coûte côté² × 4 octets plus un tiers : 4096 fait 90 Mo, 16 384 en fait 1,4 Go et ne se charge pas sur tablette. Écraser public/assets/ciel.webp suffit : pas une ligne de code à changer.',
+      'Une seule unité de texture consommée, et pas une de plus : le fragment shader n’en a que seize garanties et les seize étaient prises. La plaque et la tuile d’intérim se partagent celle du lointain — c’est l’une OU l’autre, jamais les deux. 587 tests verts.',
+    ],
+  },
+  {
     date: '30/08/2026 11:42',
     title: 'L’ACCUEIL NE DÉMARRAIT PLUS — réparé, et le piège refermé par un test',
     notes: [

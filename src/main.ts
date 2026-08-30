@@ -2511,6 +2511,28 @@ appliqueSimHz()
 // deux rapports de performance, mêmes conditions, seul ce réglage change —
 // l'écart chiffre le coût réel des graphismes sur la machine du joueur.
 let decorRiche = localStorage.getItem('sujet21-decor') !== 'sobre'
+// LE CIEL DU DEHORS. Trois fonds pour le vide, du plus riche au plus léger :
+// la PLAQUE (une image de 4096², un champ profond), la TUILE d'intérim
+// (l'ancien fond, deux petites textures répétées), le PROCÉDURAL (rien à
+// charger, tout calculé). La plaque ne se télécharge qu'à son premier
+// affichage — un joueur qui la coupe ne la paie jamais.
+type CielChoix = 'plaque' | 'tuile' | 'procedural'
+const CIEL_MODE: Record<CielChoix, number> = { procedural: 0, tuile: 1, plaque: 2 }
+let cielChoix = (localStorage.getItem('sujet21-ciel') ??
+  'plaque') as CielChoix
+if (!(cielChoix in CIEL_MODE)) cielChoix = 'plaque'
+// Réglés au banc, à vue : c'est en regardant le vide qu'on trouve le dosage.
+// La FORCE dose la plaque — le vide doit rester plus sombre que la cuve
+// éclairée, sans quoi la hiérarchie lumineuse s'inverse. L'ÉTENDUE dit
+// combien d'unités-monde la plaque couvre : plus elle est petite, plus le
+// ciel est net et plus il défile vite.
+// Les défauts sont ceux du premier étalonnage à l'écran : à force 1, la
+// plaque écrasait la station — le vide devenait le sujet et les modules des
+// découpes plates. 0,45 la remet DERRIÈRE la cuve éclairée, là où elle doit
+// être. L'étendue de 6000 donnait des volutes énormes, plus proches d'un
+// ciel de nuages que d'un champ profond ; 12 000 les diluait en brume.
+// 8 000 rend la structure lisible sans qu'elle prenne toute la place.
+const cielReglages = { force: 0.45, etendue: 8000 }
 // Graphismes du LIQUIDE, séparés du décor : SOBRE débranche l'éclairage de
 // l'eau (relief, spéculaire, miroir, scintillement) dans le shader — la
 // silhouette, les couleurs de vitesse et les états restent. C'est le second
@@ -2667,6 +2689,30 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     }
   }
   renderDecor()
+
+  const choixCiel = document.getElementById('params-ciel') as HTMLDivElement
+  const renderCiel = (): void => {
+    if (!choixCiel) return
+    choixCiel.innerHTML = ''
+    for (const [mode, label] of [
+      ['plaque', 'PLAQUE'],
+      ['tuile', 'TUILE'],
+      ['procedural', 'PROCÉDURAL'],
+    ] as const) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = label
+      b.className = cielChoix === mode ? 'actif' : ''
+      b.addEventListener('click', () => {
+        cielChoix = mode
+        localStorage.setItem('sujet21-ciel', mode)
+        perf.reset()
+        renderCiel()
+      })
+      choixCiel.appendChild(b)
+    }
+  }
+  renderCiel()
 
   const choixRelief = document.getElementById('params-relief') as HTMLDivElement
   const renderRelief = (): void => {
@@ -9668,6 +9714,7 @@ const pane = createBench(params, monitor, {
   // le PUPITRE au banc : mêmes manœuvres, catalogue lu sur le panneau
   pupitre: { sections: cataloguePupitre(), lance: actionPupitre },
   perf: { copier: copiePerf, envoyer: envoiePerf },
+  ciel: cielReglages,
   tableaux: TABLEAUX.map((t) => t.name),
   gotoTableau: (index) => {
     testLevel = null // le banc navigue dans l'expédition, pas dans le prototype
@@ -11855,6 +11902,11 @@ function frame(now: number): void {
   // s'affichait plus du tout. Posé à l'image, il ne peut ni arriver trop tôt
   // ni rester en retard d'un tableau.
   renderer.setSolModules(level.coque === 'structures')
+  renderer.setCiel(
+    CIEL_MODE[cielChoix],
+    cielReglages.force,
+    cielReglages.etendue,
+  )
   const renderT0 = performance.now()
   renderer.render(
     sim,
