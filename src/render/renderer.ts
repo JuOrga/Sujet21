@@ -20,6 +20,7 @@ import {
   FORME_ARC,
   FORME_COIN,
   FORME_RECT,
+  FORME_COQUE,
 } from '../game/formes'
 import type { Camera } from './camera'
 
@@ -171,6 +172,52 @@ float formeSdf(vec2 w, vec4 b, float forme, float q0, float q1) {
                       vec2(dot(pq1, pq1), s * (v1.x * e1.y - v1.y * e1.x))),
                       vec2(dot(pq2, pq2), s * (v2.x * e2.y - v2.y * e2.x)));
     return -sqrt(dd.x) * sign(dd.y);
+  }
+  if (forme > 4.5) { // COQUE : un octogone CREUX, percé sur les côtés ouverts
+    // q0 = côtés (0..15) + 16·chanfrein/8 · q1 = épaisseur/8 + 32·porte/32
+    float cotes = mod(q0, 16.0);
+    float ch = floor(mod(q0 / 16.0, 8.0)) * (0.5 / 7.0);
+    float ep = mod(q1, 32.0) * 8.0;
+    float porte = floor(q1 / 32.0) * 32.0;
+    float petit = min(half_.x, half_.y);
+    float c = clamp(ch * petit, 0.0, petit * 0.9);
+    float t = clamp(ep, 1.0, petit);
+    vec2 ap = abs(p);
+    // l'octogone : la boîte coupée par les quatre plans diagonaux
+    vec2 q = ap - half_;
+    float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+    if (c > 0.0) d = max(d, (ap.x + ap.y - (half_.x + half_.y - c)) * 0.70710678);
+    // le creux : le même octogone rentré d'une épaisseur
+    vec2 hi = half_ - vec2(t);
+    if (hi.x > 0.0 && hi.y > 0.0) {
+      float ci = max(0.0, c - t * 0.41421356);
+      vec2 qi = ap - hi;
+      float di = length(max(qi, 0.0)) + min(max(qi.x, qi.y), 0.0);
+      if (ci > 0.0) di = max(di, (ap.x + ap.y - (hi.x + hi.y - ci)) * 0.70710678);
+      d = max(d, -di);
+    }
+    // LES PORTES : une fente centrée par côté ouvert, qui traverse la paroi
+    if (cotes > 0.5 && porte > 0.0) {
+      float demi = porte * 0.5;
+      float prof = t + demi; // aussi profonde que large : cf. formes.ts
+      if (mod(cotes, 2.0) >= 0.5) {
+        vec2 s = abs(vec2(p.x, p.y - half_.y)) - vec2(demi, prof);
+        d = max(d, -(length(max(s, 0.0)) + min(max(s.x, s.y), 0.0)));
+      }
+      if (mod(floor(cotes / 2.0), 2.0) >= 0.5) {
+        vec2 s = abs(vec2(p.x - half_.x, p.y)) - vec2(prof, demi);
+        d = max(d, -(length(max(s, 0.0)) + min(max(s.x, s.y), 0.0)));
+      }
+      if (mod(floor(cotes / 4.0), 2.0) >= 0.5) {
+        vec2 s = abs(vec2(p.x, p.y + half_.y)) - vec2(demi, prof);
+        d = max(d, -(length(max(s, 0.0)) + min(max(s.x, s.y), 0.0)));
+      }
+      if (mod(floor(cotes / 8.0), 2.0) >= 0.5) {
+        vec2 s = abs(vec2(p.x + half_.x, p.y)) - vec2(prof, demi);
+        d = max(d, -(length(max(s, 0.0)) + min(max(s.x, s.y), 0.0)));
+      }
+    }
+    return d;
   }
   // arc d'anneau — la boîte est la boîte englobante EXACTE de la silhouette,
   // BOUTS COMPRIS (miroir de arcRayons/arcContactAxe : calotte débordante,
@@ -3239,6 +3286,11 @@ export class Renderer {
             Math.min(180, Math.max(15, bx.p1 ?? ARC_OUVERTURE_DEFAUT)),
           ) +
           256 * Math.min(2, Math.max(0, Math.round(bx.p2 ?? 0)))
+      } else if (forme === FORME_COQUE) {
+        // la coque porte ses quatre réglages serrés dans p0 et p1 : ils
+        // voyagent tels quels (coquePack les a déjà bornés)
+        q0 = Math.max(0, Math.min(127, Math.round(bx.p0 ?? 0)))
+        q1 = Math.max(0, Math.min(1023, Math.round(bx.p1 ?? 0)))
       }
       this.auxScratch[i * 4] = bx.material + forme * 16 + q0 * 128 + q1 * 16384
       this.auxScratch[i * 4 + 1] = ((bx.angle ?? 0) * Math.PI) / 180

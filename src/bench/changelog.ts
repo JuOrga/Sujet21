@@ -22,6 +22,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '30/08/2026 10:50',
+    title: 'LA COQUE : une forme CREUSE au moteur, un module = une boîte',
+    notes: [
+      'Signalé : « au lieu de fabriquer des formes avec les formes actuelles de l’éditeur, crée plutôt des formes entières creuses avec la forme que nous souhaitons — là ça fait très bricolage pour les modules ». C’était juste, et c’est corrigé à la racine : le moteur gagne une VRAIE forme creuse. Un module n’est plus huit rectangles assemblés — c’est UNE forme, d’un seul tenant.',
+      'LA COQUE (la sixième forme du moteur, après le disque, la capsule, le coin et l’arc) : un octogone CREUX inscrit dans sa boîte, à l’épaisseur et au chanfrein réglables, PERCÉ d’ouvertures centrées sur les côtés qu’on désigne. Les portes ne sont plus découpées après coup : elles sont taillées DANS le champ de la forme. Écrite deux fois, comme toutes les formes de la maison — en TypeScript pour la physique et le laser, en GLSL pour le rendu, au trait près.',
+      'Trois conséquences. LE PRIX : le module Méduse passe de 87 blocs à 38 — le terrain de jeu entier tient dans un cinquième du budget du moteur, et une station de trente modules devient possible. LE TRAIT : plus de coutures, plus de rectangles qui se chevauchent — le contour est celui que le shader évalue. LA RÈGLE : deux modules se rejoignent CENTRE DE FACE contre CENTRE DE FACE, et la porte s’ouvre toute seule. C’est cette discipline qui fait qu’un assemblage se lit comme une station plutôt que comme un bricolage.',
+      'Bonus de la même forme : une coque assez épaisse pour se refermer devient un OCTOGONE PLEIN — un pilier, une masse, un rocher. C’est la même pièce, remplie ; il n’y a rien de plus à apprendre.',
+      'Le module Méduse est rebâti là-dessus : dix-sept coques (cuve, aile des endormis, bac d’essai, centre de contrôle, carrefour et son étal, sas, secteur 4 scellé, et les deux pods des sorties gardées derrière leur grille et leur rideau), reliées par des couloirs tous au même gabarit — 420 de large, 300 de passage. Vérifié : tableau valide, traversée départ → sas prouvée, chaque zone méta relevée dans du VIDE, 38 blocs sur 95. 552 tests verts, dont cinq neufs sur la forme creuse (aller-retour des réglages, creux vide et paroi pleine, porte centrée qui ne perce QUE son côté, normale qui sort toujours de la matière, octogone plein).',
+    ],
+  },
+  {
     date: '30/08/2026 01:42',
     title: 'LE MODULE MÉDUSE, BÂTI AU KIT : treize coques et plus un pavé posé',
     notes: [

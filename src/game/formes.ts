@@ -11,6 +11,12 @@ export const FORME_DISQUE = 1 // ellipse inscrite dans la boîte (cercle si carr
 export const FORME_CAPSULE = 2 // pilule : segment sur le grand axe, bouts ronds
 export const FORME_COIN = 3 // triangle rectangle : la moitié de la boîte (p0 = coin 0..3)
 export const FORME_ARC = 4 // arc d'anneau centré (p0 = épaisseur 0..1, p1 = demi-ouverture °)
+// LA COQUE : une forme CREUSE d'un seul tenant — un module de station, pas
+// huit rectangles assemblés. Un anneau inscrit dans la boîte, aux quatre
+// angles chanfreinés (0 : un cadre droit · fort : un octogone), percé
+// d'OUVERTURES centrées sur les côtés qu'on désigne. Épaisse au point de se
+// refermer, elle devient un octogone PLEIN — c'est la même forme, remplie.
+export const FORME_COQUE = 5
 
 export const FORME_NAMES: Record<number, string> = {
   [FORME_RECT]: 'Rectangle',
@@ -18,6 +24,64 @@ export const FORME_NAMES: Record<number, string> = {
   [FORME_CAPSULE]: 'Capsule',
   [FORME_COIN]: 'Coin',
   [FORME_ARC]: 'Arc',
+  [FORME_COQUE]: 'Coque (creuse)',
+}
+
+// ——— LA COQUE : ses réglages, empaquetés dans p0 et p1 ————————————————
+//
+// Le shader ne reçoit que DEUX nombres par forme (q0 ∈ 0..127, q1 ∈ 0..1023,
+// cf. le packing de renderer.ts). La coque en demande quatre : les côtés
+// ouverts, le chanfrein, l'épaisseur, la largeur des portes. On les serre
+// donc à deux, en base fixe — le même tour que l'arc joue déjà avec ses
+// bouts (ouverture + 256·bout).
+//
+//   p0 = côtés ouverts (0..15) + 16 · chanfrein par huitièmes (0..7)
+//   p1 = épaisseur par pas de 8 u (0..31) + 32 · porte par pas de 32 u (0..31)
+
+export const COQUE_NORD = 1
+export const COQUE_EST = 2
+export const COQUE_SUD = 4
+export const COQUE_OUEST = 8
+export const COQUE_COTES = [COQUE_NORD, COQUE_EST, COQUE_SUD, COQUE_OUEST]
+export const COQUE_COTE_NOMS = ['Nord', 'Est', 'Sud', 'Ouest']
+
+export const COQUE_EP_PAS = 8 // l'épaisseur se règle par pas de 8 unités
+export const COQUE_PORTE_PAS = 32 // la porte, par pas de 32 unités
+export const COQUE_EP_DEFAUT = 64
+export const COQUE_PORTE_DEFAUT = 256
+export const COQUE_CHANFREIN_DEFAUT = 0.25 // en part du plus petit demi-côté
+
+const bornePas = (v: number, pas: number): number =>
+  Math.max(0, Math.min(31, Math.round(v / pas)))
+
+/** Les quatre réglages d'une coque → les deux nombres du format. */
+export function coquePack(r: {
+  cotes: number
+  chanfrein: number
+  ep: number
+  porte: number
+}): { p0: number; p1: number } {
+  const cotes = Math.max(0, Math.min(15, Math.round(r.cotes)))
+  const ch = Math.max(0, Math.min(7, Math.round((r.chanfrein / 0.5) * 7)))
+  return {
+    p0: cotes + 16 * ch,
+    p1: bornePas(r.ep, COQUE_EP_PAS) + 32 * bornePas(r.porte, COQUE_PORTE_PAS),
+  }
+}
+
+/** …et le chemin inverse, tel que le SDF et l'éditeur les relisent. */
+export function coqueUnpack(b: {
+  p0?: number
+  p1?: number
+}): { cotes: number; chanfrein: number; ep: number; porte: number } {
+  const p0 = Math.max(0, Math.round(b.p0 ?? 0))
+  const p1 = Math.max(0, Math.round(b.p1 ?? 0))
+  return {
+    cotes: p0 % 16,
+    chanfrein: (Math.floor(p0 / 16) % 8) * (0.5 / 7),
+    ep: (p1 % 32) * COQUE_EP_PAS,
+    porte: Math.floor(p1 / 32) * COQUE_PORTE_PAS,
+  }
 }
 
 // Défauts des paramètres de forme — partagés par l'éditeur et la lecture.
@@ -486,6 +550,186 @@ function arcContactAxe(
   out.ny = gy / gl
 }
 
+
+// ——— LA COQUE : le champ de distance ————————————————————————————————
+//
+// Un OCTOGONE creux : l'intersection de la boîte et des quatre plans
+// diagonaux, moins le même octogone rentré d'une épaisseur, moins les
+// fentes des côtés ouverts. Tout en une seule forme — pas d'assemblage.
+
+const boxSdf = (px: number, py: number, hx: number, hy: number): number => {
+  const qx = Math.abs(px) - hx
+  const qy = Math.abs(py) - hy
+  return (
+    Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0)
+  )
+}
+
+const octoSdf = (
+  px: number,
+  py: number,
+  hx: number,
+  hy: number,
+  c: number,
+): number => {
+  const d = boxSdf(px, py, hx, hy)
+  if (c <= 0) return d
+  // le pan coupé : la demi-distance au plan x + y = hx + hy − c
+  const diag = (Math.abs(px) + Math.abs(py) - (hx + hy - c)) * Math.SQRT1_2
+  return Math.max(d, diag)
+}
+
+/** Le SDF d'une coque, en coordonnées LOCALES (centre à l'origine). */
+export function coqueSdfLocal(
+  px: number,
+  py: number,
+  hx: number,
+  hy: number,
+  r: { cotes: number; chanfrein: number; ep: number; porte: number },
+): number {
+  const petit = Math.min(hx, hy)
+  const c = Math.max(0, Math.min(petit * 0.9, r.chanfrein * petit))
+  const t = Math.max(1, Math.min(petit, r.ep))
+  let d = octoSdf(px, py, hx, hy, c)
+  // le creux : le même octogone rentré d'une épaisseur (les plans
+  // diagonaux reculent de t le long de leur normale, soit t·√2 sur x + y)
+  const hix = hx - t
+  const hiy = hy - t
+  if (hix > 0 && hiy > 0) {
+    const ci = Math.max(0, c - t * (Math.SQRT2 - 1))
+    d = Math.max(d, -octoSdf(px, py, hix, hiy, ci))
+  }
+  // LES PORTES : une fente centrée par côté ouvert, qui traverse la paroi
+  if (r.cotes && r.porte > 0) {
+    const demi = r.porte / 2
+    // La fente est aussi PROFONDE que large. Une soustraction de champs ne
+    // donne qu'une distance MINORÉE : creuser au ras de la paroi ferait
+    // annoncer, en plein milieu d'une porte, un dégagement de quelques
+    // unités — et la validation de traversée (marge du corps : 40 u) la
+    // déclarerait bouchée. Profonde, la porte annonce sa vraie largeur.
+    const prof = t + demi
+    if (r.cotes & COQUE_NORD)
+      d = Math.max(d, -boxSdf(px, py - hy, demi, prof))
+    if (r.cotes & COQUE_SUD) d = Math.max(d, -boxSdf(px, py + hy, demi, prof))
+    if (r.cotes & COQUE_EST) d = Math.max(d, -boxSdf(px - hx, py, prof, demi))
+    if (r.cotes & COQUE_OUEST) d = Math.max(d, -boxSdf(px + hx, py, prof, demi))
+  }
+  return d
+}
+
+function coqueContactAxe(
+  x: number,
+  y: number,
+  b: FormeBox,
+  out: FormeContact,
+): void {
+  const cx = (b.minX + b.maxX) / 2
+  const cy = (b.minY + b.maxY) / 2
+  const hx = Math.max(1e-6, (b.maxX - b.minX) / 2)
+  const hy = Math.max(1e-6, (b.maxY - b.minY) / 2)
+  const r = coqueUnpack(b)
+  const px = x - cx
+  const py = y - cy
+  out.dist = coqueSdfLocal(px, py, hx, hy, r)
+  // le gradient par différences centrées : la coque est faite de max() et
+  // de plans, son champ est régulier partout sauf sur les arêtes — un pas
+  // d'une demi-unité suffit, et la normale reste unitaire
+  const h = 0.5
+  const gx =
+    coqueSdfLocal(px + h, py, hx, hy, r) - coqueSdfLocal(px - h, py, hx, hy, r)
+  const gy =
+    coqueSdfLocal(px, py + h, hx, hy, r) - coqueSdfLocal(px, py - h, hx, hy, r)
+  const g = Math.hypot(gx, gy)
+  if (g > 1e-9) {
+    out.nx = gx / g
+    out.ny = gy / g
+  } else {
+    out.nx = 0
+    out.ny = 1
+  }
+}
+
+/** LES MORCEAUX d'une coque, en polygones MONDE : de quoi la TRACER (à
+ * l'éditeur) sans repasser par le champ. Huit pans au plus — quatre côtés
+ * coupés par leur porte, quatre chanfreins — chacun un quadrilatère. */
+export function coquePieces(b: FormeBox): { x: number; y: number }[][] {
+  const cx = (b.minX + b.maxX) / 2
+  const cy = (b.minY + b.maxY) / 2
+  const hx = Math.max(1e-6, (b.maxX - b.minX) / 2)
+  const hy = Math.max(1e-6, (b.maxY - b.minY) / 2)
+  const r = coqueUnpack(b)
+  const petit = Math.min(hx, hy)
+  const c = Math.max(0, Math.min(petit * 0.9, r.chanfrein * petit))
+  const t = Math.max(1, Math.min(petit, r.ep))
+  const ci = Math.max(0, c - t * (Math.SQRT2 - 1))
+  const rad = ((b.angle ?? 0) * Math.PI) / 180
+  const ca = Math.cos(rad)
+  const sa = Math.sin(rad)
+  const monde = (px: number, py: number): { x: number; y: number } => ({
+    x: cx + px * ca - py * sa,
+    y: cy + px * sa + py * ca,
+  })
+  const out: { x: number; y: number }[][] = []
+  const quad = (
+    a: [number, number],
+    b2: [number, number],
+    c2: [number, number],
+    d2: [number, number],
+  ): void => {
+    out.push([monde(...a), monde(...b2), monde(...c2), monde(...d2)])
+  }
+  const demi = r.cotes && r.porte > 0 ? r.porte / 2 : 0
+  // les quatre côtés droits, coupés en deux par leur porte s'ils en ont une
+  const cote = (ouvert: boolean, axe: 'x' | 'y', signe: number): void => {
+    const long = axe === 'x' ? hx - c : hy - c
+    const bornes: [number, number][] = ouvert
+      ? [
+          [-long, -Math.min(demi, long)],
+          [Math.min(demi, long), long],
+        ]
+      : [[-long, long]]
+    for (const [u0, u1] of bornes) {
+      if (u1 - u0 < 1) continue
+      const e0 = axe === 'x' ? hy : hx
+      const e1 = e0 - t
+      if (axe === 'x')
+        quad(
+          [u0, signe * e0],
+          [u1, signe * e0],
+          [u1, signe * e1],
+          [u0, signe * e1],
+        )
+      else
+        quad(
+          [signe * e0, u0],
+          [signe * e0, u1],
+          [signe * e1, u1],
+          [signe * e1, u0],
+        )
+    }
+  }
+  cote((r.cotes & COQUE_NORD) !== 0, 'x', 1)
+  cote((r.cotes & COQUE_SUD) !== 0, 'x', -1)
+  cote((r.cotes & COQUE_EST) !== 0, 'y', 1)
+  cote((r.cotes & COQUE_OUEST) !== 0, 'y', -1)
+  // les quatre chanfreins : la bande diagonale entre les faces
+  if (c > 0.5)
+    for (const [sx, sy] of [
+      [1, 1],
+      [-1, 1],
+      [-1, -1],
+      [1, -1],
+    ] as const) {
+      quad(
+        [sx * (hx - c), sy * hy],
+        [sx * hx, sy * (hy - c)],
+        [sx * (hx - t), sy * (hy - t - ci)],
+        [sx * (hx - t - ci), sy * (hy - t)],
+      )
+    }
+  return out
+}
+
 // ---- Le dispatch : dépivoter, résoudre en local, repivoter la normale ------
 
 function formeContactAxe(
@@ -506,6 +750,9 @@ function formeContactAxe(
       return
     case FORME_ARC:
       arcContactAxe(x, y, b, out)
+      return
+    case FORME_COQUE:
+      coqueContactAxe(x, y, b, out)
       return
     default:
       rectContactAxe(x, y, b, out)
@@ -602,6 +849,35 @@ export function formeOutline(
   } else if (f === FORME_COIN) {
     const [ax, ay, bx, by, cx2, cy2] = coinSommets(b)
     pts.push({ x: ax, y: ay }, { x: bx, y: by }, { x: cx2, y: cy2 })
+  } else if (f === FORME_COQUE) {
+    // la silhouette EXTÉRIEURE de la coque : l'octogone. Le creux et les
+    // portes se tracent morceau par morceau (coquePieces).
+    const hx = (b.maxX - b.minX) / 2
+    const hy = (b.maxY - b.minY) / 2
+    const { chanfrein } = coqueUnpack(b)
+    const c = Math.max(0, Math.min(Math.min(hx, hy) * 0.9, chanfrein * Math.min(hx, hy)))
+    for (const [sx, sy] of [
+      [1, 1],
+      [-1, 1],
+      [-1, -1],
+      [1, -1],
+    ] as const) {
+      pts.push({ x: cx + sx * (hx - c), y: cy + sy * hy })
+      pts.push({ x: cx + sx * hx, y: cy + sy * (hy - c) })
+    }
+    // remettre les huit sommets dans l'ordre du tour
+    pts.splice(
+      0,
+      pts.length,
+      { x: cx + hx - c, y: cy + hy },
+      { x: cx - (hx - c), y: cy + hy },
+      { x: cx - hx, y: cy + hy - c },
+      { x: cx - hx, y: cy - (hy - c) },
+      { x: cx - (hx - c), y: cy - hy },
+      { x: cx + hx - c, y: cy - hy },
+      { x: cx + hx, y: cy - (hy - c) },
+      { x: cx + hx, y: cy + hy - c },
+    )
   } else if (f === FORME_ARC) {
     const { rm, ht, ouverture, taper, bout, cu, sx, sy } = arcRayons(b)
     const monde = (ux: number, uy: number): { x: number; y: number } => ({

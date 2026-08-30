@@ -49,6 +49,7 @@ import {
   FORME_RECT,
   formeContact,
   type FormeContact,
+  FORME_COQUE,
 } from './formes'
 import { canalDeCible } from './laser'
 import {
@@ -265,7 +266,7 @@ function readBox(o: Record<string, unknown>): ObstacleBox | null {
     ...(skin > 0 && material === MAT_WALL && forme === FORME_RECT
       ? { skin: Math.min(9, skin) }
       : {}),
-    ...(forme > FORME_RECT && forme <= FORME_ARC ? { forme } : {}),
+    ...(forme > FORME_RECT && forme <= FORME_COQUE ? { forme } : {}),
     ...(forme === FORME_COIN && Math.round(p0) !== 0
       ? { p0: ((Math.round(p0) % 4) + 4) % 4 }
       : {}),
@@ -274,6 +275,14 @@ function readBox(o: Record<string, unknown>): ObstacleBox | null {
       : {}),
     ...(forme === FORME_ARC && p1 !== ARC_OUVERTURE_DEFAUT
       ? { p1: Math.max(15, Math.min(180, p1)) }
+      : {}),
+    // LA COQUE : ses quatre réglages voyagent serrés dans p0 et p1 (cf.
+    // coquePack) — bornés ici comme partout ailleurs
+    ...(forme === FORME_COQUE
+      ? { p0: Math.max(0, Math.min(127, Math.round(p0))) }
+      : {}),
+    ...(forme === FORME_COQUE
+      ? { p1: Math.max(0, Math.min(1023, Math.round(p1))) }
       : {}),
     ...(forme === FORME_ARC && p2 !== 0
       ? { p2: Math.max(0, Math.min(2, p2)) }
