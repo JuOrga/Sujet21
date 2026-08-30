@@ -27,6 +27,14 @@ import {
   type ObstacleBox,
   type StructureDef,
 } from './level'
+import {
+  COQUE_EST,
+  COQUE_NORD,
+  COQUE_OUEST,
+  COQUE_SUD,
+  FORME_COQUE,
+  coquePack,
+} from './formes'
 
 export const STRUCT_CHAMBRE = 0
 export const STRUCT_COULOIR = 1
@@ -43,8 +51,6 @@ export const CHANFREIN_DEFAUT = 0.25
 export const CHANFREIN_MAX = 0.5
 /** Le passage libre minimal : sous ça, la structure n'a plus d'intérieur. */
 export const PASSAGE_MIN = 24
-/** Un morceau de paroi plus court que ça n'est pas dessiné. */
-const MIETTE = 8
 
 export interface RectStruct {
   minX: number
@@ -57,8 +63,6 @@ export interface RectStruct {
 
 const borne = (v: number, lo: number, hi: number): number =>
   Math.max(lo, Math.min(hi, v))
-
-const norm180 = (a: number): number => ((((a + 180) % 360) + 360) % 360) - 180
 
 export function epaisseurDe(s: StructureDef): number {
   return borne(Math.round(s.ep ?? EP_DEFAUT), EP_MIN, EP_MAX)
@@ -82,16 +86,23 @@ export function axeDe(s: StructureDef): 0 | 1 {
   return Math.abs(s.maxY - s.minY) > Math.abs(s.maxX - s.minX) ? 1 : 0
 }
 
-/** La structure a-t-elle encore un intérieur ? (deux parois plus le
- * passage minimal — sinon elle n'est plus une coque, mais un bloc) */
+/** La structure a-t-elle une taille tenable ? Une coque très épaisse n'est
+ * PAS refusée : elle se referme et devient un octogone PLEIN — un pilier,
+ * une masse. C'est la même forme, remplie. Seule la coque dégénérée (plus
+ * petite qu'un passage) n'a pas de sens. */
 export function structureViable(s: StructureDef): boolean {
+  const w = Math.abs(s.maxX - s.minX)
+  const h = Math.abs(s.maxY - s.minY)
+  return w >= 4 * PASSAGE_MIN && h >= 4 * PASSAGE_MIN
+}
+
+/** …et lui reste-t-il un VIDE ? (sinon c'est un plein, et rien ne la
+ * traverse — l'éditeur le dit au concepteur plutôt que de le deviner) */
+export function structureCreuse(s: StructureDef): boolean {
   const e = epaisseurDe(s)
   const w = Math.abs(s.maxX - s.minX)
   const h = Math.abs(s.maxY - s.minY)
-  const mini = 2 * e + PASSAGE_MIN
-  return s.type === STRUCT_COULOIR
-    ? (axeDe(s) === 0 ? h : w) >= mini && Math.max(w, h) >= mini
-    : w >= mini && h >= mini
+  return w - 2 * e >= PASSAGE_MIN && h - 2 * e >= PASSAGE_MIN
 }
 
 /** Une structure neuve, aux défauts de la maison, sur le rectangle tracé. */
@@ -107,314 +118,175 @@ export function structureNeuve(type: number, r: RectStruct): StructureDef {
   return s
 }
 
-// ——— Les pans, en coordonnées MONDE ————————————————————————————————
+// ——— La coque : UNE forme, UNE boîte ————————————————————————————————
 //
-// Un PAN est une bande : un centre, une demi-longueur le long de son axe,
-// une demi-épaisseur en travers, et l'angle de cet axe. C'est dans ce
-// repère que le percement travaille — c'est ce qui le rend exact à
-// n'importe quel angle, chanfreins compris.
-
-interface Pan {
-  cx: number
-  cy: number
-  demiLong: number
-  demiEp: number
-  ang: number // degrés, l'axe LONG par rapport à +X
-  material: number
-  skin?: number
-}
+// Une structure ne s'assemble plus : elle EST une forme creuse du moteur
+// (FORME_COQUE). Un module = une boîte. Les portes ne se percent plus
+// après coup — elles sont dans le champ de la forme, centrées sur les
+// côtés qu'on ouvre.
+//
+// LA RÈGLE DU KIT : les modules se rejoignent CENTRE DE CÔTÉ contre
+// CENTRE DE CÔTÉ. C'est ce qui fait qu'un assemblage est propre plutôt
+// que bricolé — et c'est ce qui permet à la porte d'être une simple fente
+// centrée, sans réglage de position.
 
 const RAD = Math.PI / 180
 
-/** Un pan local (repère de la structure) reporté dans le monde. */
-function poseLocal(
-  p: { cx: number; cy: number; demiLong: number; demiEp: number; ang: number },
-  cx: number,
-  cy: number,
-  a: number,
-  material: number,
-  skin: number | undefined,
-): Pan {
-  const c = Math.cos(a * RAD)
-  const s = Math.sin(a * RAD)
+/** Le rectangle intérieur d'une structure, en LOCAL (demi-largeurs). */
+function demiInterieur(s: StructureDef): { hx: number; hy: number } {
+  const e = epaisseurDe(s)
   return {
-    cx: cx + c * p.cx - s * p.cy,
-    cy: cy + s * p.cx + c * p.cy,
-    demiLong: p.demiLong,
-    demiEp: p.demiEp,
-    ang: norm180(a + p.ang),
-    material,
-    ...(skin !== undefined ? { skin } : {}),
+    hx: Math.abs(s.maxX - s.minX) / 2 - e,
+    hy: Math.abs(s.maxY - s.minY) / 2 - e,
   }
 }
 
-/** Le pan devenu boîte. Un axe à ±90° ou ±180° s'écrit SANS clé `angle`,
- * en échangeant les demi-côtés : on ne paie la branche oblique du shader
- * que pour les vrais chanfreins. */
-function panEnBoite(p: Pan): ObstacleBox {
-  let ang = norm180(p.ang)
-  let dl = p.demiLong
-  let dt = p.demiEp
-  if (Math.abs(Math.abs(ang) - 90) < 0.0005) {
-    ang = 0
-    dl = p.demiEp
-    dt = p.demiLong
-  } else if (Math.abs(Math.abs(ang) - 180) < 0.0005 || Math.abs(ang) < 0.0005) {
-    ang = 0
-  }
-  const b: ObstacleBox = {
-    minX: p.cx - dl,
-    minY: p.cy - dt,
-    maxX: p.cx + dl,
-    maxY: p.cy + dt,
-    material: p.material,
-  }
-  if (Math.abs(ang) > 0.0005) b.angle = Math.round(ang * 1000) / 1000
-  if (p.skin !== undefined && p.skin > 0 && p.material === MAT_WALL)
-    b.skin = p.skin
-  return b
+function centreDe(s: StructureDef): { x: number; y: number } {
+  return { x: (s.minX + s.maxX) / 2, y: (s.minY + s.maxY) / 2 }
 }
 
-/** Les pans d'une structure, en monde, AVANT percement. */
-function pansDeStructure(s: StructureDef): Pan[] {
-  const e = epaisseurDe(s)
-  const cx = (s.minX + s.maxX) / 2
-  const cy = (s.minY + s.maxY) / 2
-  const mat = s.material ?? MAT_WALL
-  const skin = s.skin
-  const locaux: {
-    cx: number
-    cy: number
-    demiLong: number
-    demiEp: number
-    ang: number
-    mat?: number
-  }[] = []
-
-  if (s.type === STRUCT_COULOIR) {
-    // le couloir se calcule TOUJOURS le long de +X : l'axe vertical n'est
-    // que la même figure tournée d'un quart de tour
-    const axe = axeDe(s)
-    const w = Math.abs(s.maxX - s.minX)
-    const h = Math.abs(s.maxY - s.minY)
-    const hw = (axe === 1 ? h : w) / 2
-    const hh = (axe === 1 ? w : h) / 2
-    locaux.push({ cx: 0, cy: hh - e / 2, demiLong: hw, demiEp: e / 2, ang: 0 })
-    locaux.push({ cx: 0, cy: -(hh - e / 2), demiLong: hw, demiEp: e / 2, ang: 0 })
-    if (s.bouchon !== undefined && s.bouchon !== null)
-      locaux.push({
-        cx: 0,
-        cy: 0,
-        demiLong: hh - e,
-        demiEp: e / 2,
-        ang: 90,
-        mat: s.bouchon,
-      })
-    const a = norm180((s.angle ?? 0) + (axe === 1 ? 90 : 0))
-    return locaux.map((p) =>
-      poseLocal(p, cx, cy, a, p.mat ?? mat, p.mat !== undefined ? undefined : skin),
-    )
-  }
-
-  const hw = Math.abs(s.maxX - s.minX) / 2
-  const hh = Math.abs(s.maxY - s.minY) / 2
-  const c = chanfreinDe(s)
-  // les quatre pans droits, raccourcis de la coupe des angles
-  locaux.push({ cx: 0, cy: hh - e / 2, demiLong: hw - c, demiEp: e / 2, ang: 0 })
-  locaux.push({ cx: 0, cy: -(hh - e / 2), demiLong: hw - c, demiEp: e / 2, ang: 0 })
-  locaux.push({ cx: hw - e / 2, cy: 0, demiLong: hh - c, demiEp: e / 2, ang: 90 })
-  locaux.push({ cx: -(hw - e / 2), cy: 0, demiLong: hh - c, demiEp: e / 2, ang: 90 })
-  if (c > 0.5) {
-    // LES QUATRE CHANFREINS : une bande diagonale par angle. Son bout coupé
-    // tombe DANS le pan droit voisin (décalage e/√2 < e) : aucune fente.
-    const d = e / (2 * Math.SQRT2)
-    const demi = (c * Math.SQRT2) / 2
-    const coins: [number, number, number][] = [
-      [1, 1, -45], // nord-est
-      [-1, 1, 45], // nord-ouest
-      [-1, -1, -45], // sud-ouest
-      [1, -1, 45], // sud-est
-    ]
-    for (const [sx, sy, ang] of coins)
-      locaux.push({
-        cx: sx * (hw - c / 2) - sx * d,
-        cy: sy * (hh - c / 2) - sy * d,
-        demiLong: demi,
-        demiEp: e / 2,
-        ang,
-      })
-  }
-  const a = norm180(s.angle ?? 0)
-  return locaux.map((p) => poseLocal(p, cx, cy, a, mat, skin))
-}
-
-// ——— L'intérieur : le vide que la structure enferme ————————————————
-
-/** L'intérieur d'une structure, en polygone MONDE (sens trigonométrique).
- * C'est lui qui perce les parois des autres. */
-export function interieurStructure(s: StructureDef): { x: number; y: number }[] {
-  return polygoneInterieur(s, 0)
-}
-
-function polygoneInterieur(
+/** Un point local reporté dans le monde (rotation autour du centre). */
+function versMonde(
   s: StructureDef,
-  rallonge: number,
-): { x: number; y: number }[] {
-  const e = epaisseurDe(s)
-  const cx = (s.minX + s.maxX) / 2
-  const cy = (s.minY + s.maxY) / 2
-  const pts: { x: number; y: number }[] = []
-  if (s.type === STRUCT_COULOIR) {
-    const axe = axeDe(s)
-    const w = Math.abs(s.maxX - s.minX)
-    const h = Math.abs(s.maxY - s.minY)
-    const hw = (axe === 1 ? h : w) / 2 + rallonge
-    const hh = (axe === 1 ? w : h) / 2 - e
-    pts.push({ x: hw, y: hh }, { x: -hw, y: hh }, { x: -hw, y: -hh }, { x: hw, y: -hh })
-    const a = norm180((s.angle ?? 0) + (axe === 1 ? 90 : 0))
-    return pts.map((p) => mondePoint(p, cx, cy, a))
-  }
-  const hw = Math.abs(s.maxX - s.minX) / 2 - e
-  const hh = Math.abs(s.maxY - s.minY) / 2 - e
-  const c = chanfreinDe(s)
-  if (c > 0.5) {
-    // l'octogone intérieur : les faces droites reculées de e, les
-    // diagonales reculées de e le long de leur normale (e·√2 sur x+y)
-    const d = c + e * (Math.SQRT2 - 1)
-    const dx = Math.min(d, hw + e - 1)
-    const dy = Math.min(d, hh + e - 1)
-    pts.push(
-      { x: hw, y: hh - dy },
-      { x: hw - dx, y: hh },
-      { x: -(hw - dx), y: hh },
-      { x: -hw, y: hh - dy },
-      { x: -hw, y: -(hh - dy) },
-      { x: -(hw - dx), y: -hh },
-      { x: hw - dx, y: -hh },
-      { x: hw, y: -(hh - dy) },
-    )
-  } else {
-    pts.push({ x: hw, y: hh }, { x: -hw, y: hh }, { x: -hw, y: -hh }, { x: hw, y: -hh })
-  }
-  const a = norm180(s.angle ?? 0)
-  return pts.map((p) => mondePoint(p, cx, cy, a))
-}
-
-function mondePoint(
-  p: { x: number; y: number },
-  cx: number,
-  cy: number,
-  a: number,
+  px: number,
+  py: number,
 ): { x: number; y: number } {
-  const c = Math.cos(a * RAD)
-  const s = Math.sin(a * RAD)
-  return { x: cx + c * p.x - s * p.y, y: cy + s * p.x + c * p.y }
+  const c = centreDe(s)
+  const a = (s.angle ?? 0) * RAD
+  const co = Math.cos(a)
+  const si = Math.sin(a)
+  return { x: c.x + co * px - si * py, y: c.y + si * px + co * py }
 }
 
-// ——— Le percement ————————————————————————————————————————————————
-//
-// On ne SOUSTRAIT pas des boîtes (subtractBox refuse les formes et ne coupe
-// qu'à l'axe, subtractBoxOblique refuse les angles différents) : on ne
-// FABRIQUE PAS le morceau de pan qui manque. Le vide de l'autre structure
-// est projeté sur l'axe long du pan, et le reste s'émet en morceaux.
-
-/** Le polygone qui perce : celui d'un couloir déborde d'une épaisseur à
- * chaque bout, pour traverser la coque d'en face de part en part — sans
- * quoi une branche oblique laisserait deux triangles de fuite au raccord. */
-function polygonePerceur(s: StructureDef): { x: number; y: number }[] {
-  return polygoneInterieur(s, s.type === STRUCT_COULOIR ? epaisseurDe(s) : 0)
+/** …et le chemin inverse. */
+function versLocal(
+  s: StructureDef,
+  x: number,
+  y: number,
+): { x: number; y: number } {
+  const c = centreDe(s)
+  const a = -(s.angle ?? 0) * RAD
+  const co = Math.cos(a)
+  const si = Math.sin(a)
+  const dx = x - c.x
+  const dy = y - c.y
+  return { x: co * dx - si * dy, y: si * dx + co * dy }
 }
 
-/** Clip d'un polygone convexe à la bande |v| ≤ dt (Sutherland–Hodgman). */
-function clipBande(
-  poly: { u: number; v: number }[],
-  dt: number,
-): { u: number; v: number }[] {
-  let out = poly
-  for (const signe of [1, -1]) {
-    const dedans = (p: { u: number; v: number }) => signe * p.v <= dt
-    const src = out
-    out = []
-    for (let i = 0; i < src.length; i++) {
-      const a = src[i]
-      const b = src[(i + 1) % src.length]
-      const da = dedans(a)
-      const db = dedans(b)
-      if (da) out.push(a)
-      if (da !== db) {
-        const t = (signe * dt - signe * a.v) / (signe * b.v - signe * a.v)
-        out.push({ u: a.u + t * (b.u - a.u), v: a.v + t * (b.v - a.v) })
-      }
+/** LA LARGEUR DE PASSAGE d'une structure : ce qu'un voisin doit ouvrir
+ * chez elle pour que le corps traverse. */
+export function passageDe(s: StructureDef): number {
+  const { hx, hy } = demiInterieur(s)
+  if (s.type === STRUCT_COULOIR) return 2 * Math.max(0, Math.min(hx, hy))
+  return 2 * Math.max(0, Math.min(hx, hy))
+}
+
+/** Le point est-il dans le VIDE d'une structure ? Le vide d'un couloir
+ * déborde d'une épaisseur à chaque bout : c'est ce débord qui vient
+ * chercher la paroi d'en face et lui demander sa porte. */
+function dansLeVide(s: StructureDef, x: number, y: number): boolean {
+  const p = versLocal(s, x, y)
+  const { hx, hy } = demiInterieur(s)
+  if (hx <= 0 || hy <= 0) return false
+  const e = epaisseurDe(s)
+  const marge = s.type === STRUCT_COULOIR ? e + 2 : 0
+  const axe = axeDe(s)
+  const dx = hx + (s.type === STRUCT_COULOIR && axe === 0 ? marge : 0)
+  const dy = hy + (s.type === STRUCT_COULOIR && axe === 1 ? marge : 0)
+  return Math.abs(p.x) < dx && Math.abs(p.y) < dy
+}
+
+/** LES CÔTÉS OUVERTS d'une structure. Forcés si le concepteur les a posés
+ * (ouvertures) ; sinon DEVINÉS : un côté s'ouvre quand le vide d'une autre
+ * structure vient toucher le milieu de sa face. */
+export function cotesOuverts(
+  s: StructureDef,
+  autres: readonly StructureDef[],
+): { cotes: number; porte: number } {
+  const hx = Math.abs(s.maxX - s.minX) / 2
+  const hy = Math.abs(s.maxY - s.minY) / 2
+  if (s.ouvertures !== undefined)
+    return {
+      cotes: Math.max(0, Math.min(15, Math.round(s.ouvertures))),
+      porte: s.porte ?? passageDe(s),
     }
-    if (out.length === 0) return []
-  }
-  return out
-}
-
-/** Le pan, moins les vides qui le traversent. */
-function percePan(pan: Pan, vides: { x: number; y: number }[][]): Pan[] {
-  const c = Math.cos(pan.ang * RAD)
-  const s = Math.sin(pan.ang * RAD)
-  const trous: [number, number][] = []
-  for (const poly of vides) {
-    const local = poly.map((p) => {
-      const dx = p.x - pan.cx
-      const dy = p.y - pan.cy
-      return { u: c * dx + s * dy, v: -s * dx + c * dy }
-    })
-    const q = clipBande(local, pan.demiEp)
-    if (q.length === 0) continue
-    let u0 = Infinity
-    let u1 = -Infinity
-    for (const p of q) {
-      if (p.u < u0) u0 = p.u
-      if (p.u > u1) u1 = p.u
+  // un COULOIR est ouvert à ses deux bouts, par nature
+  if (s.type === STRUCT_COULOIR)
+    return {
+      cotes: axeDe(s) === 0 ? COQUE_EST | COQUE_OUEST : COQUE_NORD | COQUE_SUD,
+      porte: s.porte ?? passageDe(s),
     }
-    if (u1 > -pan.demiLong && u0 < pan.demiLong) trous.push([u0, u1])
+  const faces: [number, number, number][] = [
+    [COQUE_NORD, 0, hy],
+    [COQUE_EST, hx, 0],
+    [COQUE_SUD, 0, -hy],
+    [COQUE_OUEST, -hx, 0],
+  ]
+  let cotes = 0
+  let porte = 0
+  for (const [bit, px, py] of faces) {
+    const m = versMonde(s, px, py)
+    for (const o of autres) {
+      if (o === s || !structureViable(o)) continue
+      if (!dansLeVide(o, m.x, m.y)) continue
+      cotes |= bit
+      porte = Math.max(porte, passageDe(o))
+      break
+    }
   }
-  if (trous.length === 0) return [pan]
-  trous.sort((a, b) => a[0] - b[0])
-  const morceaux: Pan[] = []
-  let curseur = -pan.demiLong
-  const emet = (a: number, b: number): void => {
-    if (b - a < MIETTE) return
-    const m = (a + b) / 2
-    morceaux.push({
-      ...pan,
-      cx: pan.cx + c * m,
-      cy: pan.cy + s * m,
-      demiLong: (b - a) / 2,
-    })
-  }
-  for (const [u0, u1] of trous) {
-    if (u0 > curseur) emet(curseur, Math.min(u0, pan.demiLong))
-    curseur = Math.max(curseur, u1)
-    if (curseur >= pan.demiLong) break
-  }
-  if (curseur < pan.demiLong) emet(curseur, pan.demiLong)
-  return morceaux
+  return { cotes, porte: s.porte ?? (porte || passageDe(s)) }
 }
 
-// ——— L'entrée du module ————————————————————————————————————————————
-
-/** Les parois d'UNE structure, percées par les vides des `autres`. */
+/** LA COQUE d'une structure : UNE boîte, une forme creuse. */
 export function boxesDeStructure(
   s: StructureDef,
   autres: readonly StructureDef[] = [],
 ): ObstacleBox[] {
   if (!structureViable(s)) return []
-  const vides = autres
-    .filter((o) => o !== s && structureViable(o))
-    .map(polygonePerceur)
-  const out: ObstacleBox[] = []
-  for (const pan of pansDeStructure(s))
-    for (const morceau of percePan(pan, vides))
-      if (morceau.demiLong >= 4 && morceau.demiEp >= 4)
-        out.push(panEnBoite(morceau))
+  const { cotes, porte } = cotesOuverts(s, autres)
+  const petit = Math.min(
+    Math.abs(s.maxX - s.minX) / 2,
+    Math.abs(s.maxY - s.minY) / 2,
+  )
+  const { p0, p1 } = coquePack({
+    cotes,
+    chanfrein: s.type === STRUCT_COULOIR ? 0 : (s.chanfrein ?? CHANFREIN_DEFAUT),
+    ep: epaisseurDe(s),
+    // la porte ne peut pas manger toute la face : on lui laisse un montant
+    porte: Math.max(0, Math.min(porte, 2 * petit - 2 * epaisseurDe(s))),
+  })
+  const b: ObstacleBox = {
+    minX: Math.min(s.minX, s.maxX),
+    minY: Math.min(s.minY, s.maxY),
+    maxX: Math.max(s.minX, s.maxX),
+    maxY: Math.max(s.minY, s.maxY),
+    material: s.material ?? MAT_WALL,
+    forme: FORME_COQUE,
+    p0,
+    p1,
+  }
+  if (s.angle) b.angle = Math.max(-180, Math.min(180, s.angle))
+  if (s.skin !== undefined && s.skin > 0) b.skin = s.skin
+  const out = [b]
+  // LA PORTE DE MATIÈRE d'un couloir : une lame en travers du passage. Elle
+  // ne peut pas vivre dans la coque (une forme n'a qu'un matériau) — c'est
+  // la seule pièce qu'une structure pose EN PLUS de sa coque.
+  if (s.type === STRUCT_COULOIR && s.bouchon !== undefined) {
+    const { hx, hy } = demiInterieur(s)
+    const e = epaisseurDe(s)
+    const axe = axeDe(s)
+    const c = centreDe(s)
+    const lame: ObstacleBox =
+      axe === 0
+        ? { minX: c.x - e / 2, minY: c.y - hy, maxX: c.x + e / 2, maxY: c.y + hy, material: s.bouchon }
+        : { minX: c.x - hx, minY: c.y - e / 2, maxX: c.x + hx, maxY: c.y + e / 2, material: s.bouchon }
+    if (s.angle) lame.angle = Math.max(-180, Math.min(180, s.angle))
+    out.push(lame)
+  }
   return out
 }
 
-/** Toutes les parois d'un plan de structures, percées entre elles. */
+/** Toutes les coques d'un plan — une boîte par structure. */
 export function boxesDesStructures(
   structures: readonly StructureDef[] | undefined,
 ): ObstacleBox[] {
@@ -424,23 +296,44 @@ export function boxesDesStructures(
   return out
 }
 
-/** Ce que coûte un plan de structures, en blocs dessinés. */
+/** Ce que coûte un plan de structures, en blocs dessinés : UN par coque. */
 export function coutStructures(
   structures: readonly StructureDef[] | undefined,
 ): number {
   return boxesDesStructures(structures).length
 }
 
-/** LE TABLEAU TEL QUE LE MOTEUR LE VOIT : les parois des structures
- * D'ABORD (en cas de dépassement du budget, mieux vaut perdre un meuble
- * qu'un mur), le mobilier posé ensuite. Sans structure, c'est le tableau
- * LUI-MÊME qui revient — même référence : rien de ce qui existe ne change. */
-export function niveauExpanse(level: LevelDef): LevelDef {
-  if (!level.structures || level.structures.length === 0) return level
-  return {
-    ...level,
-    boxes: [...boxesDesStructures(level.structures), ...level.boxes],
+/** L'intérieur d'une structure, en polygone MONDE : le vide qu'elle
+ * enferme. Sert aux tests, à l'éclairage et au repérage. */
+export function interieurStructure(s: StructureDef): { x: number; y: number }[] {
+  const { hx, hy } = demiInterieur(s)
+  if (hx <= 0 || hy <= 0) return []
+  const e = epaisseurDe(s)
+  const c = chanfreinDe(s)
+  const pts: { x: number; y: number }[] = []
+  if (s.type !== STRUCT_COULOIR && c > 0.5) {
+    const d = Math.max(0, c - e * (Math.SQRT2 - 1))
+    const dx = Math.min(d, hx - 1)
+    const dy = Math.min(d, hy - 1)
+    pts.push(
+      { x: hx, y: hy - dy },
+      { x: hx - dx, y: hy },
+      { x: -(hx - dx), y: hy },
+      { x: -hx, y: hy - dy },
+      { x: -hx, y: -(hy - dy) },
+      { x: -(hx - dx), y: -hy },
+      { x: hx - dx, y: -hy },
+      { x: hx, y: -(hy - dy) },
+    )
+  } else {
+    pts.push(
+      { x: hx, y: hy },
+      { x: -hx, y: hy },
+      { x: -hx, y: -hy },
+      { x: hx, y: -hy },
+    )
   }
+  return pts.map((p) => versMonde(s, p.x, p.y))
 }
 
 
@@ -454,4 +347,16 @@ export function dansCoque(
   y: number,
 ): boolean {
   return boxesDeStructure(s, autres).some((b) => dansBoite(b, x, y))
+}
+
+/** LE TABLEAU TEL QUE LE MOTEUR LE VOIT : les coques D'ABORD (en cas de
+ * dépassement du budget, mieux vaut perdre un meuble qu'un mur), le
+ * mobilier posé ensuite. Sans structure, c'est le tableau LUI-MÊME qui
+ * revient — même référence : rien de ce qui existe ne change. */
+export function niveauExpanse(level: LevelDef): LevelDef {
+  if (!level.structures || level.structures.length === 0) return level
+  return {
+    ...level,
+    boxes: [...boxesDesStructures(level.structures), ...level.boxes],
+  }
 }

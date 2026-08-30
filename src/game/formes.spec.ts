@@ -15,6 +15,10 @@ import {
   dansForme,
   formeContact,
   formeOutline,
+  FORME_COQUE,
+  COQUE_EST,
+  coquePack,
+  coqueUnpack,
   type FormeBox,
   type FormeContact,
 } from './formes'
@@ -448,4 +452,72 @@ describe('formes — la BOÎTE colle à l’arc, bouts compris', () => {
       }
     })
   }
+})
+
+describe('la COQUE : une forme creuse d’un seul tenant', () => {
+  const coque = (r: Partial<{ cotes: number; chanfrein: number; ep: number; porte: number }> = {}) => {
+    const { p0, p1 } = coquePack({
+      cotes: 0,
+      chanfrein: 0.25,
+      ep: 64,
+      porte: 256,
+      ...r,
+    })
+    return { minX: -600, minY: -400, maxX: 600, maxY: 400, forme: FORME_COQUE, p0, p1 }
+  }
+
+  it('les quatre réglages font l’aller-retour dans p0 et p1', () => {
+    const { p0, p1 } = coquePack({ cotes: 10, chanfrein: 0.5, ep: 64, porte: 320 })
+    expect(p0).toBeLessThanOrEqual(127)
+    expect(p1).toBeLessThanOrEqual(1023)
+    const r = coqueUnpack({ p0, p1 })
+    expect(r.cotes).toBe(10)
+    expect(r.ep).toBe(64)
+    expect(r.porte).toBe(320)
+    expect(r.chanfrein).toBeCloseTo(0.5, 2)
+  })
+
+  it('le creux est vide, la paroi pleine, et rien ne dépasse de la boîte', () => {
+    const b = coque()
+    expect(dansForme(b, 0, 0)).toBe(false) // le vide
+    expect(dansForme(b, 0, 370)).toBe(true) // la paroi nord
+    expect(dansForme(b, 570, 0)).toBe(true) // la paroi est
+    expect(dansForme(b, 590, 390)).toBe(false) // l’angle, chanfreiné
+    for (let i = 0; i < 64; i++) {
+      const a = (i / 64) * Math.PI * 2
+      const x = Math.cos(a) * 900
+      const y = Math.sin(a) * 900
+      expect(dansForme(b, x, y), `dehors ${i}`).toBe(false)
+    }
+  })
+
+  it('un côté ouvert perce une porte CENTRÉE, et lui seul', () => {
+    const b = coque({ cotes: COQUE_EST })
+    expect(dansForme(b, 570, 0)).toBe(false) // la porte
+    expect(dansForme(b, 570, 300)).toBe(true) // son montant
+    expect(dansForme(b, -570, 0)).toBe(true) // l’ouest reste plein
+  })
+
+  it('la normale sort toujours de la matière', () => {
+    const b = coque({ cotes: COQUE_EST })
+    const out = { dist: 0, nx: 0, ny: 1 }
+    for (const [x, y] of [
+      [0, 372],
+      [0, -372],
+      [-572, 0],
+      [300, 368],
+    ]) {
+      formeContact(x, y, b, out)
+      expect(Math.hypot(out.nx, out.ny)).toBeCloseTo(1, 3)
+      // un pas dans le sens de la normale sort de la matière
+      expect(dansForme(b, x + out.nx * 40, y + out.ny * 40)).toBe(false)
+    }
+  })
+
+  it('une coque assez épaisse se referme : un octogone PLEIN', () => {
+    const { p0, p1 } = coquePack({ cotes: 0, chanfrein: 0.35, ep: 248, porte: 0 })
+    const b = { minX: -200, minY: -200, maxX: 200, maxY: 200, forme: FORME_COQUE, p0, p1 }
+    expect(dansForme(b, 0, 0)).toBe(true)
+    expect(dansForme(b, 190, 190)).toBe(false) // les angles restent coupés
+  })
 })

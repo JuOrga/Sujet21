@@ -976,13 +976,13 @@ describe('levelIO — les décalques de LA SERRE', () => {
 
   it('le verdict compte les parois des structures dans le budget de blocs', () => {
     const chambres = []
-    for (let i = 0; i < 13; i++)
+    for (let i = 0; i < 120; i++)
       chambres.push({
         type: 0,
-        minX: -3000 + i * 460,
-        minY: -400,
-        maxX: -3000 + i * 460 + 440,
-        maxY: 400,
+        minX: -3000 + (i % 12) * 460,
+        minY: -400 + Math.floor(i / 12) * 20,
+        maxX: -3000 + (i % 12) * 460 + 440,
+        maxY: 400 + Math.floor(i / 12) * 20,
       })
     const { level } = parseLevel({ ...base, structures: chambres })
     const trop = checkLevel(level!).filter((x) => x.message.includes('Trop de blocs'))

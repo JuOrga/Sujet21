@@ -509,6 +509,13 @@ export interface StructureDef {
   material?: number
   /** Habillage des pans — absent : la plaque de COQUE. */
   skin?: number
+  /** LES CÔTÉS OUVERTS, forcés : un masque (1 nord, 2 est, 4 sud, 8 ouest).
+   * Absent, ils se DEVINENT — un côté s'ouvre quand le vide d'une autre
+   * structure vient toucher le milieu de sa face. */
+  ouvertures?: number
+  /** La largeur des portes, en unités — absente : celle du passage du
+   * voisin qui les ouvre. */
+  porte?: number
 }
 
 // UNE ANCRE MÉTA : les rendez-vous du MODULE, posés en données comme le
