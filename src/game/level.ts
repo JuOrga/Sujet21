@@ -516,6 +516,11 @@ export interface StructureDef {
   /** La largeur des portes, en unités — absente : celle du passage du
    * voisin qui les ouvre. */
   porte?: number
+  /** LE RACCORD (couloirs) : absent ou vrai, le tube s'arrête à la FACE
+   * INTÉRIEURE des modules qu'il rejoint — sa paroi ne déborde pas dans la
+   * salle et la jonction se lit comme une seule pièce. Faux : l'emprise
+   * tracée est gardée telle quelle. */
+  raccord?: boolean
 }
 
 // UNE ANCRE MÉTA : les rendez-vous du MODULE, posés en données comme le

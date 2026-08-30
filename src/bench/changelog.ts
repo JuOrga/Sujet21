@@ -22,6 +22,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '30/08/2026 11:56',
+    title: 'LE RACCORD : un couloir s’arrête au mur, il ne le traverse plus',
+    notes: [
+      'Signalé, capture à l’appui : aux jonctions du module, « ça ne fait pas beau ». C’était vrai et la cause est nette. Un couloir se pose en MORDANT dans les modules qu’il relie — c’est ainsi qu’on dit « raccorde-les ». Mais il gardait cette emprise : sa paroi traversait le mur d’en face et RESSORTAIT dans la salle. D’où, à chaque porte, une petite marche et deux blocs qui se chevauchent au lieu de se raccorder.',
+      'Le couloir reprend désormais sa vraie longueur : d’une FACE INTÉRIEURE à l’autre. Le tube bute contre le mur, le mur reste d’un seul tenant, et la jonction se lit comme une seule pièce — relevé sur les données : la paroi du couloir commence exactement où finit celle de la cuve, et s’arrête exactement où commence celle de l’aile des endormis. Plus un pixel de recouvrement, plus un bout qui dépasse.',
+      'Le geste, lui, ne change pas : on continue de faire mordre le couloir dans la coque d’en face — c’est le générateur qui rend le débord. Le raccord se calcule sur l’épaisseur TELLE QU’ELLE SERA DESSINÉE (le format la serre par pas de 8 unités : la calculer sur la valeur brute laissait une marche de quelques unités). Et l’on garde la main : une case RACCORD dans le panneau du couloir, cochée par défaut, décochée pour garder l’emprise tracée.',
+      'Au passage, les côtés ouverts et la largeur de porte forcés à la main survivent maintenant à l’enregistrement — ils se perdaient au rechargement. 591 tests verts, dont quatre neufs sur le raccord (un bout, deux bouts, le refus, et le couloir libre qui garde son emprise).',
+    ],
+  },
+  {
     date: '30/08/2026 11:42',
     title: 'L’ACCUEIL NE DÉMARRAIT PLUS — réparé, et le piège refermé par un test',
     notes: [

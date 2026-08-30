@@ -701,6 +701,11 @@ export function parseLevel(input: unknown): {
       if (a) st.angle = a
     }
     if (type === STRUCT_COULOIR && (t.axe === 0 || t.axe === 1)) st.axe = t.axe
+    if (type === STRUCT_COULOIR && t.raccord === false) st.raccord = false
+    if (t.ouvertures !== undefined)
+      st.ouvertures = Math.max(0, Math.min(15, Math.round(num(t.ouvertures, 0))))
+    if (t.porte !== undefined)
+      st.porte = Math.max(0, Math.min(2000, Math.round(num(t.porte, 0))))
     if (t.bouchon !== undefined && type === STRUCT_COULOIR) {
       const m = Math.round(num(t.bouchon, MAT_WALL))
       if (MATERIALS.includes(m as (typeof MATERIALS)[number])) st.bouchon = m

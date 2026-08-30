@@ -4988,6 +4988,9 @@ export class LevelEditor {
             `</select></label>`,
         )
         rows.push(
+          `<div class="ed-f"><span>Raccord</span><span><label class="ed-chk"><input type="checkbox" id="p-stRac"${st.raccord === false ? '' : ' checked'} /> S’arrêter au mur voisin</label></span></div>`,
+        )
+        rows.push(
           `<label class="ed-f"><span>Porte de matière</span><select id="p-stBou">` +
             `<option value="-1"${st.bouchon === undefined ? ' selected' : ''}>Aucune — libre</option>` +
             MATIERES_PORTE.map(
@@ -5018,7 +5021,7 @@ export class LevelEditor {
       )
       const cout = coutStructures([st])
       rows.push(
-        `<p class="ed-empty">Une COQUE VIDE, d’un seul tenant : le terrain de jeu. Le mobilier se pose dedans, à travers elle. LA RÈGLE DU KIT : deux modules se rejoignent CENTRE DE FACE contre CENTRE DE FACE — amenez un couloir au milieu d’une face et la porte s’ouvre toute seule. Une coque assez épaisse pour se refermer devient un octogone PLEIN (un pilier, une masse). Cette structure coûte <b>${cout} bloc${cout > 1 ? 's' : ''}</b>.</p>`,
+        `<p class="ed-empty">Une COQUE VIDE, d’un seul tenant : le terrain de jeu. Le mobilier se pose dedans, à travers elle. LA RÈGLE DU KIT : deux modules se rejoignent CENTRE DE FACE contre CENTRE DE FACE — amenez un couloir au milieu d’une face, faites-le MORDRE dans la coque d’en face, et la porte s’ouvre toute seule. Le couloir s’arrête alors de lui-même à la face intérieure du module : la jonction se lit comme une seule pièce, sans marche ni double paroi (décochez « Raccord » pour garder l’emprise tracée). Une coque assez épaisse pour se refermer devient un octogone PLEIN (un pilier, une masse). Cette structure coûte <b>${cout} bloc${cout > 1 ? 's' : ''}</b>.</p>`,
       )
     } else if (s.kind === 'ancre') {
       const a = (this.level.ancres ?? [])[s.index]
@@ -5533,6 +5536,9 @@ export class LevelEditor {
           delete st.bouchon
         } else {
           st.axe = Number(text('p-stAxe')) === 1 ? 1 : 0
+          const rac = document.getElementById('p-stRac') as HTMLInputElement | null
+          if (rac && !rac.checked) st.raccord = false
+          else delete st.raccord
           const bou = Number(text('p-stBou'))
           if (MATIERES_PORTE.includes(bou)) st.bouchon = bou
           else delete st.bouchon
