@@ -22,6 +22,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '30/08/2026 11:42',
+    title: 'L’ACCUEIL NE DÉMARRAIT PLUS — réparé, et le piège refermé par un test',
+    notes: [
+      'Signalé : « gros problème sur l’accueil, cela ne fonctionne plus » — « Cannot access ‹ sE › before initialization ». Le jeu ne s’affichait plus du tout, dès la première image. Reproduit ici à l’identique, sur le MÊME paquet que celui en ligne (index-DofYuZk3.js), ce qui a permis de désigner la ligne fautive sans deviner.',
+      'LA CAUSE : la livraison de 11 h 19 (le sol des modules) appelait « renderer.setSolModules(…) » depuis applyLevel(). Or applyLevel() tourne AU CHARGEMENT DU MODULE, quand le renderer n’existe pas encore — il naît quatre mille lignes plus bas. La liaison est alors en zone morte, et l’exception coupe le démarrage net. La logique du sol, elle, était juste : c’est l’endroit d’où on la posait qui ne l’était pas.',
+      'LA RÉPARATION : le réglage se pose désormais À L’IMAGE, juste avant le rendu, là où le renderer est déjà piloté. Il ne peut plus ni arriver trop tôt ni rester en retard d’un tableau. Vérifié en descente : l’accueil démarre sans une seule erreur, la cinématique tourne, et dans le hub le fond ne se peint bien QUE dans les coques — le dehors reste le vide étoilé, exactement l’effet voulu.',
+      'POURQUOI PERSONNE NE L’A VU VENIR, et c’est le plus instructif : en développement, les modules restent des fichiers séparés et l’ordre diffère — la page démarre. La panne n’apparaît qu’au BUILD, une fois tout concaténé. Et le compilateur ne bronche pas : « renderer » est bien déclaré, simplement plus bas. Ni tsc, ni les 585 tests, ni un essai en dev ne pouvaient l’attraper.',
+      'LE PIÈGE EST DONC REFERMÉ PAR UN TEST : il relit main.ts, retrouve les fonctions appelées au chargement (applyLevel, renderSalles, majMemoireUI…) et refuse qu’une seule d’entre elles touche un objet né plus tard — renderer, loop, input. Vérifié en remettant la ligne fautive : le test tombe, avec le nom de la fonction et celui de l’objet. Il ne suit qu’un niveau d’appel, et le dit. 587 tests verts.',
+    ],
+  },
+  {
     date: '30/08/2026 11:19',
     title: 'LE SOL DANS LES MODULES : le fond ne se peint plus que dedans',
     notes: [

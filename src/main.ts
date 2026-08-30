@@ -781,9 +781,6 @@ function applyLevel(): void {
           playedLevels()[levelIndex] ??
           playedLevels()[0])),
   )
-  // LE SOL DES MODULES : un tableau bâti en coques n'a pas de cuve — son
-  // fond ne se peint qu'à l'intérieur des modules, et le dehors est le vide
-  renderer.setSolModules(level.coque === 'structures')
   levelHasCold = level.boxes.some((b) => b.material === MAT_FROID)
   rebuildRenderBoxes()
   exitMouth.x = (level.exit.minX + level.exit.maxX) * 0.5
@@ -11850,6 +11847,14 @@ function frame(now: number): void {
   drawFleche(dtReal, dpr)
   majIdle(dtReal)
   majPresence(dtReal, aim.x, aim.y)
+  // LE SOL DES MODULES : un tableau bâti en coques n'a pas de cuve — son
+  // fond ne se peint qu'à l'intérieur des modules, et le dehors est le vide.
+  // Le réglage se pose ICI, à l'image, et non dans applyLevel : applyLevel
+  // tourne AU CHARGEMENT DU MODULE, avant que le renderer existe — l'appeler
+  // là-bas jetait « Cannot access before initialization » et l'accueil ne
+  // s'affichait plus du tout. Posé à l'image, il ne peut ni arriver trop tôt
+  // ni rester en retard d'un tableau.
+  renderer.setSolModules(level.coque === 'structures')
   const renderT0 = performance.now()
   renderer.render(
     sim,
