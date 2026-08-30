@@ -17,11 +17,18 @@ import {
   figuresDuChoix,
   figureDeLaCarte,
   varianteDuJour,
+  toutProcedural,
   PLAN_VOIE_DEFAUTS,
 } from './voie'
 
 describe('voie — le plan de descente', () => {
-  const plan = { longueur: 12, diffMax: 3, graineDuJour: false, generees: true }
+  const plan = {
+    longueur: 12,
+    diffMax: 3,
+    graineDuJour: false,
+    generees: true,
+    ecrites: true,
+  }
 
   it('le moment se répartit par tiers : début, milieu, fin', () => {
     const moments = Array.from({ length: 12 }, (_, i) =>
@@ -108,12 +115,14 @@ describe('voie — le plan de descente', () => {
       diffMax: 3,
       graineDuJour: false,
       generees: true,
+      ecrites: true,
     })
     expect(clampPlanVoie({ longueur: 999, diffMax: -4 })).toEqual({
       longueur: 40,
       diffMax: 0,
       graineDuJour: false,
       generees: true,
+      ecrites: true,
     })
     expect(clampPlanVoie({ longueur: 1 }).longueur).toBe(3)
   })
@@ -150,7 +159,13 @@ describe('voie — le plan de descente', () => {
   })
 
   it('une descente entière se génère : chaque rang, avec sa posture, donne une salle prouvée', () => {
-    const grand = { longueur: 12, diffMax: 6, graineDuJour: false, generees: true }
+    const grand = {
+      longueur: 12,
+      diffMax: 6,
+      graineDuJour: false,
+      generees: true,
+      ecrites: true,
+    }
     for (let rang = 1; rang <= grand.longueur; rang++) {
       const mecanique = ([1, 2, 3] as const)[rang % 3]
       const cahier = {
@@ -342,5 +357,24 @@ describe('UNE DESCENTE ENTIÈRE : les deux générateurs, et des faisceaux', () 
       // et la descente n'est plus muette : la moitié au moins porte un faisceau
       expect(b.lasers, `graine ${graine}`).toBeGreaterThanOrEqual(18)
     }
+  })
+})
+
+describe('LE MODE TOUT PROCÉDURAL', () => {
+  it('les tableaux écrits sont l’ordinaire, et se coupent', () => {
+    expect(PLAN_VOIE_DEFAUTS.ecrites).toBe(true)
+    expect(toutProcedural(PLAN_VOIE_DEFAUTS)).toBe(false)
+    expect(toutProcedural({ ...PLAN_VOIE_DEFAUTS, ecrites: false })).toBe(true)
+    // sans salles générées, couper les écrits ne fait pas une descente
+    // procédurale : il n'y a plus rien à proposer du tout
+    expect(
+      toutProcedural({ ...PLAN_VOIE_DEFAUTS, ecrites: false, generees: false }),
+    ).toBe(false)
+  })
+
+  it('un plan d’avant ce réglage garde ses tableaux écrits', () => {
+    const vieux = { longueur: 10, diffMax: 4, graineDuJour: false, generees: true }
+    expect(clampPlanVoie(vieux).ecrites).toBe(true)
+    expect(clampPlanVoie({ ...vieux, ecrites: false }).ecrites).toBe(false)
   })
 })

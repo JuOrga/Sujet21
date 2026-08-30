@@ -22,6 +22,19 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '30/08/2026 23:03',
+    title:
+      'La descente tout procédurale, et le pool qui se PIOCHE au lieu de se dérouler',
+    notes: [
+      'DEUX RÉGLAGES gouvernaient une descente : longueur et difficulté max, plus la descente du jour, plus l’interrupteur des salles générées. Il en manquait un — le symétrique : couper les TABLEAUX ÉCRITS. Il est au banc, dossier du cycle. Salles générées allumées et tableaux écrits coupés, la descente est TOUT PROCÉDURALE : les trois cartes de chaque récompense sont fabriquées, aucun tableau fait main ne se propose. C’est le mode d’épreuve du générateur, et la façon de jouer une descente inédite quand la bibliothèque est sue par cœur. Les deux coupés, le banc le dit au lieu de laisser une descente muette.',
+      'L’ORDRE N’EST PLUS L’ORDRE. Le tableau écrit venait de la POSITION suivante dans la bibliothèque — un simple « seq[levelIndex + 1] ». Deux runs enchaînaient donc les mêmes tableaux dans la même suite, et les deux lettres du code « 21XX » figeaient un rang unique. Le pool devient une vraie PIOCHE : à chaque rang le plan dit ce qu’il veut — le trigramme moment · mécanique · difficulté, « 111 », « 213 » — et l’on tire, parmi les tableaux qui s’en approchent le plus, celui qu’on n’a pas encore vu de la descente. À écart égal le hasard tranche : deux descentes ne racontent plus la même histoire.',
+      'L’ÉCART SE LIT DANS UN ORDRE, et cet ordre est un parti pris : le MOMENT pèse dix fois la difficulté (un tableau de fin n’ouvre pas une descente), la difficulté dix fois le reste (c’est la rampe, elle prime sur la couleur). La mécanique ne compte pas dans l’écart — elle sert seulement à ÉVITER celle qu’on vient de jouer, à écart égal : la foulée varie sans jamais vider le chapeau.',
+      'LE SAUT ARRIÈRE EST PERMIS, et il fallait bien qu’il le soit. Piocher sur le trigramme n’a de sens que si un tableau rangé haut dans la bibliothèque peut remplir une case tardive du plan — or l’avancée refusait jusqu’ici tout indice inférieur au rang courant. Ce qui interdit la boucle n’est plus la direction mais un REGISTRE DES SALLES VUES, tenu par run : un tableau déjà joué ne se repioche jamais, et la descente peut donc traverser la bibliothèque dans l’ordre qu’elle veut.',
+      'UN PIÈGE ÉVITÉ DE JUSTESSE, et il vaut d’être consigné : la convention « 21XX-MMD » existe dans le code depuis longtemps, mais AUCUN tableau livré ne la porte — ils sont tous en « 21-A », « 21-07 », « 21-S1 ». Une pioche strictement trigrammée aurait donc trouvé un pool VIDE et supprimé la carte écrite de toutes les descentes, sans rien casser de visible aux tests. Les tableaux muets restent donc tirables, avec un coût plus grand que le pire écart réel : la bibliothèque non migrée continue de se proposer DANS SON ORDRE, exactement comme avant, et chaque tableau qu’on code passe aussitôt devant. La migration peut se faire tableau par tableau, sans palier ni journée de bascule.',
+      'Dix tests neufs gravent le contrat : l’écart qui pèse le moment dix fois la difficulté, la pioche qui trouve la case, le tableau rangé haut qui remplit une case tardive, le déjà-vu qui ne revient pas, le tableau qui EXIGE un état non tissé et qu’on écarte, la mécanique répétée qui passe en second, le hasard qui départage trois ex æquo, la bibliothèque muette qui garde son ordre, le tableau codé qui passe devant un muet, et le mode tout procédural avec sa compatibilité de vieux réglage. 629 tests verts, type-check et build propres.',
+    ],
+  },
+  {
     date: '30/08/2026 17:53',
     title:
       'Les familles de BOIZ entrent dans la descente — et le faisceau revient en procédural',

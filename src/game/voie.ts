@@ -33,6 +33,13 @@ export interface PlanVoie {
    * Tout le reste — récompenses, butin, découvertes, palmarès, rail —
    * est COMMUN : il n'y a qu'une seule descente. */
   generees: boolean
+  /** LES TABLEAUX ÉCRITS au choix. Actif (l'ordinaire), la pioche du pool
+   * pose un tableau fait main face aux salles générées. Coupé alors que
+   * `generees` tient, la descente est TOUT PROCÉDURALE : les trois cartes
+   * du rang sont fabriquées, aucun tableau écrit ne se propose — le mode
+   * d'épreuve du générateur, et la façon de jouer une descente inédite
+   * quand la bibliothèque est déjà connue par cœur. */
+  ecrites: boolean
 }
 
 export const PLAN_VOIE_DEFAUTS: PlanVoie = {
@@ -40,6 +47,12 @@ export const PLAN_VOIE_DEFAUTS: PlanVoie = {
   diffMax: 3,
   graineDuJour: false,
   generees: true,
+  ecrites: true,
+}
+
+/** La descente est-elle TOUT PROCÉDURALE ? (salles générées seules) */
+export function toutProcedural(plan: PlanVoie): boolean {
+  return plan.generees && !plan.ecrites
 }
 
 /** Ramène un plan (chargé du stockage, ou réglé au banc) dans les bornes. */
@@ -58,6 +71,8 @@ export function clampPlanVoie(p: Partial<PlanVoie> | null): PlanVoie {
     graineDuJour: p?.graineDuJour === true,
     // absent d'un vieux réglage : les salles générées sont l'ordinaire
     generees: p?.generees !== false,
+    // idem pour les tableaux écrits : un plan d'avant ce réglage les garde
+    ecrites: p?.ecrites !== false,
   }
 }
 

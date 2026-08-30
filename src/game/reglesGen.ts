@@ -532,6 +532,34 @@ export const CATALOGUE_REGLES: readonly RegleGen[] = [
       'symétrie parfaite fait le mort.',
   },
   {
+    id: 'pool-pioche-trigramme',
+    famille: 'rampe',
+    etat: 'en-place',
+    titre: 'Le pool se PIOCHE sur le trigramme, il ne se déroule pas',
+    texte:
+      'Le tableau écrit ne vient plus de la position suivante dans la ' +
+      'bibliothèque : le plan dit ce que le rang demande (moment · ' +
+      'mécanique · difficulté) et l’on tire, parmi les tableaux qui s’en ' +
+      'approchent le plus, celui qu’on n’a pas encore vu de la descente. ' +
+      'Le MOMENT pèse dix fois la difficulté, la difficulté dix fois le ' +
+      'reste ; la mécanique sert seulement à éviter celle qu’on vient de ' +
+      'jouer. À écart égal, le hasard tranche. Un tableau sans trigramme ' +
+      'reste tirable, après tous les codés et dans l’ordre de la ' +
+      'bibliothèque : la migration se fait tableau par tableau.',
+  },
+  {
+    id: 'descente-tout-procedurale',
+    famille: 'rampe',
+    etat: 'en-place',
+    titre: 'Une descente peut n’être QUE générée',
+    texte:
+      'Les salles générées et les tableaux écrits sont deux interrupteurs ' +
+      'indépendants au banc. Générées seules : la descente est tout ' +
+      'procédurale, les trois cartes de chaque récompense sont fabriquées ' +
+      '— le mode d’épreuve du générateur, et la façon de jouer une ' +
+      'descente inédite quand la bibliothèque est sue par cœur.',
+  },
+  {
     id: 'enigme-a-la-demande',
     famille: 'figures',
     etat: 'en-place',

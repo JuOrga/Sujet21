@@ -32,7 +32,7 @@ import {
   type CodeAtelier,
 } from './game/levelIO'
 import { dessineMiniCarte } from './game/carte'
-import { propositionsSalles } from './game/poule'
+import { piocheEcrite, propositionsSalles } from './game/poule'
 import {
   genereNiveauAtelier,
   OPTIONS_DEFAUT,
@@ -657,6 +657,12 @@ let voieIntercalaire: LevelDef | null = null
 // se boucle quand il atteint la longueur du plan, quelle que soit la
 // séquence écrite (épuisée, elle cède la place aux salles générées)
 let voieRang = 0
+// LE REGISTRE DES SALLES VUES de la descente en cours (par code). La pioche
+// du pool tire dans la bibliothèque sans se soucier de l'ordre : c'est lui
+// qui garantit qu'on ne rejoue pas deux fois le même tableau dans une run,
+// et c'est lui qui rend le SAUT ARRIÈRE sûr (un tableau situé plus haut
+// dans la bibliothèque peut remplir une case tardive du plan).
+const voieVues = new Set<string>()
 
 // L'ÉCONOMAT : la salle du Semblable s'intercale UNE fois par run, à
 // mi-descente — son sas est un passage (rien ne s'y consigne), ses achats
@@ -4459,7 +4465,11 @@ function monteCycleRegles(corps: HTMLElement): void {
     `(la voie se boucle au bout, salles générées à la relève), la <b>difficulté ` +
     `maximale</b> (la rampe monte de 0 au départ jusqu'à ce plafond), et la ` +
     `<b>descente du jour</b> (les salles viennent de la date — les mêmes pour ` +
-    `tous les postes, les palmarès se comparent). Chaque réglage s'enregistre ` +
+    `tous les postes, les palmarès se comparent). Les <b>tableaux écrits</b> se ` +
+    `coupent : salles générées seules, la descente est alors TOUT PROCÉDURALE. ` +
+    `Quand ils tiennent, le tableau proposé n'est plus celui du rang suivant ` +
+    `mais une PIOCHE du pool sur le trigramme du plan — deux descentes ne ` +
+    `racontent plus la même suite. Chaque réglage s'enregistre ` +
     `aussitôt et prend effet à la prochaine descente.</p>`
   const lignes = document.createElement('div')
   lignes.className = 'rg-cycle-lignes'
@@ -4533,6 +4543,33 @@ function monteCycleRegles(corps: HTMLElement): void {
   labG.append(cocheG, labGTxt)
   pGen.appendChild(labG)
   lignes.appendChild(pGen)
+  // LES TABLEAUX ÉCRITS : coupés alors que les salles générées tiennent, la
+  // descente devient TOUT PROCÉDURALE — trois cartes fabriquées à chaque
+  // récompense, aucun tableau fait main. La façon de jouer une descente
+  // inédite quand la bibliothèque est sue par cœur.
+  const pEcr = document.createElement('div')
+  pEcr.className = 'rg-param'
+  const labE = document.createElement('label')
+  const cocheE = document.createElement('input')
+  cocheE.type = 'checkbox'
+  cocheE.id = 'regles-cycle-ecrites'
+  cocheE.checked = voiePlan.ecrites
+  cocheE.addEventListener('change', () => {
+    voiePlan.ecrites = cocheE.checked
+    sauvePlanVoie()
+    reglesDit(
+      cocheE.checked
+        ? 'Tableaux écrits ACTIFS — la pioche du pool en pose un face aux salles générées.'
+        : voiePlan.generees
+          ? 'Descente TOUT PROCÉDURALE — que des salles générées, aucun tableau écrit.'
+          : 'Tableaux écrits coupés : rallumez les salles générées, sinon la descente n’a plus rien à proposer.',
+    )
+  })
+  const labETxt = document.createElement('b')
+  labETxt.textContent = 'TABLEAUX ÉCRITS AU CHOIX'
+  labE.append(cocheE, labETxt)
+  pEcr.appendChild(labE)
+  lignes.appendChild(pEcr)
   const pJour = document.createElement('div')
   pJour.className = 'rg-param'
   const lab = document.createElement('label')
@@ -8540,13 +8577,22 @@ function avanceSalle(): void {
   const cible = level.raccourciVers
     ? playedLevels().findIndex((t) => t.code === level.raccourciVers)
     : -1
-  // le CHOIX du pool prime : la salle élue à la cérémonie devient la suivante
-  const choix = salleChoisie
-    ? playedLevels().findIndex((t) => t === salleChoisie)
-    : -1
+  // le CHOIX du pool prime : la salle élue à la cérémonie devient la suivante.
+  // LE SAUT ARRIÈRE EST PERMIS depuis que la voie PIOCHE dans le pool : la
+  // position d'un tableau dans la bibliothèque n'est plus son rang, et une
+  // case tardive du plan peut très bien se remplir d'un tableau rangé haut.
+  // Ce qui interdit la boucle n'est plus la direction mais le REGISTRE des
+  // salles vues — un tableau déjà joué n'est jamais repioché de la run.
+  const elue = salleChoisie
+  const choix = elue ? playedLevels().indexOf(elue) : -1
   salleChoisie = null
+  const sautLibre = choix >= 0 && elue !== null && !voieVues.has(elue.code)
   levelIndex =
-    choix > levelIndex ? choix : cible > levelIndex ? cible : levelIndex + 1
+    choix > levelIndex || sautLibre
+      ? choix
+      : cible > levelIndex
+        ? cible
+        : levelIndex + 1
   // garde-fou : séquence écrite épuisée sans salle élue — on ne REboucle
   // jamais sur la salle 1 en pleine descente (la dernière écrite tient)
   levelIndex = Math.min(levelIndex, Math.max(0, playedLevels().length - 1))
@@ -8935,10 +8981,8 @@ interface CarteVoie {
 function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   const rangSuivant = voieRang + 1 // la salle que le choix désigne, dans le plan
   if (rangSuivant > voiePlan.longueur) return null // la fin se joue au sas
-  const ecrite = seq[levelIndex + 1] ?? null
   const moment = momentAuRang(rangSuivant, voiePlan)
   const difficulte = diffAuRang(rangSuivant, voiePlan)
-  const aEcrite = ecrite ? decodeCodeAtelier(ecrite.code) : null
   const jour = new Date().toISOString().slice(0, 10)
   const alea = descenteDuJour()
     ? ((): (() => number) => {
@@ -8958,11 +9002,34 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   const vapoTenue = transfoTenue('vaporisation', acquisCycle, verrousCycle)
   const permises = mecaniquesPermises(solidTenue, vapoTenue)
   const masqueCycle = masquePermis(solidTenue, vapoTenue)
+  // LA PIOCHE DU POOL remplace l'ordre figé. Le tableau écrit ne vient plus
+  // de la POSITION suivante dans la bibliothèque : le plan dit ce qu'il veut
+  // pour ce rang (le trigramme moment · mécanique · difficulté) et l'on tire
+  // dans le pool le tableau qui s'en approche le plus, parmi ceux qu'on n'a
+  // pas encore vus de la descente. Deux runs ne racontent plus la même
+  // suite. Coupée au banc (« tableaux écrits »), la descente est TOUT
+  // PROCÉDURALE : aucun tableau fait main ne se propose.
+  const jouee = identiteAtelier(level)?.mecanique ?? null
+  const ecrite = voiePlan.ecrites
+    ? piocheEcrite(
+        seq,
+        { moment, mecanique: 3, difficulte },
+        voieVues,
+        // un tableau qui EXIGE un état non tissé n'est pas jouable
+        (lv) =>
+          (lv.exige ?? []).every((e) =>
+            e === 'glace' ? solidTenue : vapoTenue,
+          ),
+        alea,
+        jouee,
+      )
+    : null
+  const aEcrite = ecrite ? decodeCodeAtelier(ecrite.code) : null
   // la mécanique de la salle qu'on VIENT de jouer s'évite : la foulée varie
   const [mecaA, mecaB, mecaC] = mecaniquesDuChoix(
     aEcrite?.mecanique ?? null,
     alea,
-    identiteAtelier(level)?.mecanique ?? null,
+    jouee,
     permises,
   )
   // le RÉGLAGE DU RANG (enseigner · éprouver · tordre) : la posture de la
@@ -9032,20 +9099,14 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   // suite écrite (si la séquence en offre une) s'y ajoute en quatrième
   // carte : la voie reste procédurale d'abord, l'écrite est une option.
   const cartes: CarteVoie[] = []
-  // la suite écrite ne se propose que JOUABLE : un tableau peut déclarer
-  // les états qu'il EXIGE au bouton (champ `exige`, posé dans l'éditeur) —
-  // un lien manquant l'écarte du choix, la descente reste procédurale
-  const ecriteJouable =
-    !ecrite ||
-    (ecrite.exige ?? []).every(
-      (e) => (e === 'glace' ? solidTenue : vapoTenue) || false,
-    )
-  if (ecrite && ecriteJouable)
+  // le tableau pioché (déjà filtré sur ce qu'il EXIGE) ouvre le choix :
+  // la voie reste procédurale d'abord, l'écrit est une option
+  if (ecrite)
     cartes.push({
       lv: ecrite,
       cahier: aEcrite,
       generee: false,
-      etiquette: 'LA SUITE ÉCRITE',
+      etiquette: 'TABLEAU DU POOL',
     })
   const etiquettesGen = [
     'SALLE GÉNÉRÉE — INÉDITE, PROUVÉE',
@@ -9513,6 +9574,7 @@ function restart(): void {
 function newExpedition(): void {
   levelIndex = 0
   voieRang = 0 // une descente neuve repart du premier rang du plan
+  voieVues.clear()
   run.bonbonneLiters = 0
   run.runTime = 0
   // la fiole de SECOND SOUFFLE ajoute son échantillon de secours au départ
@@ -9560,6 +9622,7 @@ function retourAuLabo(): void {
   voieGenereeChoisie = null
   voieDuJourForcee = false // la descente du jour forcée valait UNE run
   voieRang = 0 // la profondeur est déjà consignée au palmarès, en direct
+  voieVues.clear()
   levelIndex = 0
   run.bonbonneLiters = 0
   run.runTime = 0
@@ -9668,6 +9731,7 @@ function quitteAuMenu(): void {
   voieGenereeChoisie = null
   voieDuJourForcee = false
   voieRang = 0
+  voieVues.clear()
   levelIndex = 0
   economatIntercalaire = null
   economatVisiteCetteRun = false
@@ -11780,6 +11844,7 @@ function frame(now: number): void {
     // LA VOIE : chaque sas bu creuse la descente d'un rang — le palmarès
     // suit en direct (profondeur record, descentes entamées)
     voieRang += 1 // la descente avance : c'est la progression, pas un titre
+    voieVues.add(level.code) // la pioche ne la reproposera pas de la run
     if (!sasOutil) {
       const p = chargePalmaresVoie()
       if (voieRang === 1) p.descentes += 1
