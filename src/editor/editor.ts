@@ -3665,6 +3665,18 @@ export class LevelEditor {
       else this.level.plafond = v
     })
     this.el('ed-plafond').addEventListener('change', () => this.histoire())
+    // LE SOL DES MODULES : le fond de cuve ne se peint qu'à l'intérieur des
+    // coques, et la bordure de la toile se tait — le dehors devient le vide
+    this.el('ed-sol-modules').addEventListener('change', () => {
+      const on = (this.el('ed-sol-modules') as HTMLInputElement).checked
+      if (on) this.level.coque = 'structures'
+      else delete this.level.coque
+      this.commit(
+        on
+          ? 'Sol dans les modules : le fond ne se peint qu’à l’intérieur des coques, le dehors est le vide.'
+          : 'Sol sur toute la toile : la cuve retrouve son fond et sa bordure de coque.',
+      )
+    })
     // Cinématiques ancrées : le code (table de montage) joué à l'entrée du
     // tableau, et celui joué à sa conclusion — vide = aucune
     for (const [id, champ] of [
@@ -4407,6 +4419,8 @@ export class LevelEditor {
       this.level.exige?.includes('vapeur') ?? false
     ;(this.el('ed-plafond') as HTMLInputElement).value =
       this.level.plafond ?? ''
+    ;(this.el('ed-sol-modules') as HTMLInputElement).checked =
+      this.level.coque === 'structures'
     ;(this.el('ed-brume') as HTMLInputElement).value =
       this.level.brume === undefined || this.level.brume === 0
         ? ''

@@ -22,6 +22,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '30/08/2026 11:19',
+    title: 'LE SOL DANS LES MODULES : le fond ne se peint plus que dedans',
+    notes: [
+      'Demandé : « pouvoir désactiver ou non l’image de fond de la toile, en dehors de l’intérieur des modules — ainsi quand ce sont des modules on aurait un sol qu’à l’intérieur ». C’est fait, et c’est une case à cocher dans les réglages du tableau : SOL DANS LES MODULES.',
+      'Décochée (le défaut) : rien ne change — le fond de cuve couvre toute la toile et la coque du vaisseau borde ses quatre côtés, comme depuis toujours. Cochée : LA SALLE N’EST PLUS LE RECTANGLE DE LA TOILE, c’est l’union des creux des coques posées. Le fond, sa trame de mesure, ses caustiques, son halo de paroi et le voile de brume s’arrêtent au seuil de chaque module ; la bordure de coque de la toile ne se dessine plus ; et tout ce qui est dehors devient le vide spatial, étoiles comprises. Une station se lit enfin comme une station posée dans le noir.',
+      'Sans un seul uniforme de plus : les coques sont déjà dans la liste des blocs que le shader parcourt — il lui suffit de relire leur CREUX. Et il s’arrête dès qu’il est bien à l’intérieur d’un module (au-delà, le voile et le halo sont saturés de toute façon) : sur le module Méduse, la boucle se ferme après une ou deux coques.',
+      'Le module Méduse porte le réglage. 576 tests verts, rendu construit propre — l’effet, lui, se juge à l’œil : le chromium du conteneur se ferme sur toute interaction, la vérification visuelle revient au concepteur.',
+    ],
+  },
+  {
     date: '30/08/2026 10:55',
     title: 'LE JEU LIT LE CATALOGUE — le codex d’abord, et l’anglais devient jouable',
     notes: [

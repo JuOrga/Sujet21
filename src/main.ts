@@ -781,6 +781,9 @@ function applyLevel(): void {
           playedLevels()[levelIndex] ??
           playedLevels()[0])),
   )
+  // LE SOL DES MODULES : un tableau bâti en coques n'a pas de cuve — son
+  // fond ne se peint qu'à l'intérieur des modules, et le dehors est le vide
+  renderer.setSolModules(level.coque === 'structures')
   levelHasCold = level.boxes.some((b) => b.material === MAT_FROID)
   rebuildRenderBoxes()
   exitMouth.x = (level.exit.minX + level.exit.maxX) * 0.5
