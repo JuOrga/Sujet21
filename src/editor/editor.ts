@@ -3936,6 +3936,13 @@ export class LevelEditor {
   adopteBibliotheque(levels: StoredLevel[]): void {
     this.library = levels
     this.renderLibrary()
+    // LE BROUILLON OUVERT SE CONFRONTE À LA NOUVELLE BIBLIOTHÈQUE. Sans
+    // cela, renommer un code dans la planche laissait l'éditeur avec
+    // l'ancien : ENREGISTRER depuis l'éditeur républiait le code d'avant et
+    // annulait le renommage. Le rattrapage sait déjà trancher les trois
+    // cas — identique (on renoue), sans travail local (on recharge),
+    // divergent (on prévient sans rien écraser).
+    this.rattrapeBibliotheque()
   }
 
   private async refreshLibrary(): Promise<void> {
@@ -4224,7 +4231,15 @@ export class LevelEditor {
 
   private openFromLibrary(id: string): void {
     const entry = this.library.find((l) => l.id === id)
-    if (!entry) return
+    // L'ÉCHEC NE DOIT PLUS ÊTRE MUET. Sans entrée, l'éditeur gardait le
+    // tableau précédent sans rien dire : on croyait éditer la salle
+    // demandée, et ENREGISTRER publiait l'autre. Mieux vaut le dire.
+    if (!entry) {
+      this.commit(
+        'Ce tableau n’est pas dans la bibliothèque de l’éditeur — rechargez la page si le décalage persiste.',
+      )
+      return
+    }
     this.level = structuredClone(entry.level)
     this.openId = id
     this.base = serializeLevel(entry.level)

@@ -3913,8 +3913,15 @@ async function ouvrePlanche(): Promise<void> {
     )
     return
   }
-  plancheTous = lib
-  renderPlanche()
+  // LA PLANCHE SYNCHRONISE TOUT LE MONDE, pas seulement ses cartes. Elle se
+  // contentait de « plancheTous = lib ; renderPlanche() » : l'éditeur, lui,
+  // gardait sa bibliothèque d'avant. Un tableau apparu depuis (autre poste,
+  // autre session) s'affichait donc bien dans la planche, mais son ✎
+  // ouvrait un identifiant que l'éditeur ne connaissait pas — il ne
+  // chargeait rien, gardait le tableau précédent, et ENREGISTRER écrivait
+  // ce tableau-là. La modification semblait « pas prise en compte », et une
+  // autre salle pouvait se faire écraser au passage.
+  plancheSync(lib)
   plancheDit(
     plancheTous.some((s) => !estCodeHub(s.level.code))
       ? ''

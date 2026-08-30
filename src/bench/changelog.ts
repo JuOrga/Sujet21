@@ -22,6 +22,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '30/08/2026 23:49',
+    title: 'La planche synchronisait ses cartes et personne d’autre',
+    notes: [
+      'LE SYMPTÔME : ouvrir la planche, cliquer le ✎ d’un tableau, modifier, ENREGISTRER — et rien ne bouge. La cause tient en deux lignes. « ouvrePlanche » rechargeait la bibliothèque du serveur et se contentait de « plancheTous = lib ; renderPlanche() » : les cartes affichaient bien l’état frais, mais l’ÉDITEUR gardait sa bibliothèque d’avant. Un tableau apparu depuis (autre poste, autre session, ou simplement une planche ouverte avant l’éditeur) s’affichait donc dans la planche avec un identifiant que l’éditeur ne connaissait pas.',
+      'ET L’ÉCHEC ÉTAIT MUET : « openFromLibrary » faisait « if (!entry) return » sans un mot. L’éditeur gardait le tableau précédemment ouvert, on croyait éditer la salle demandée, et ENREGISTRER publiait l’AUTRE — celle qui était restée ouverte. Non seulement la modification semblait perdue, mais une salle qu’on ne regardait pas pouvait se faire écraser. La planche appelle maintenant « plancheSync », la fonction qui existait déjà pour ça et qui répercute partout (planche, bibliothèque jouée, registres, écran des salles, éditeur) ; et l’absence d’entrée le dit au lieu de se taire.',
+      'TROISIÈME TROU, sur le même axe : renommer un code dans la planche ne touchait pas le BROUILLON ouvert dans l’éditeur. On renommait « 213 » en « 223 » depuis la planche, on repassait dans l’éditeur, on enregistrait — et le code d’avant revenait, silencieusement. « adopteBibliotheque » confronte désormais le brouillon à la bibliothèque fraîche, avec le rattrapage qui savait déjà trancher les trois cas : identique (on renoue le lien), sans travail local (on recharge en silence), divergent (on prévient sans rien écraser).',
+      'À NOTER, sans changement de code : une fois qu’un code se décode (« 213 » ou « 21AB-213 »), la planche montre les MOLETTES et non plus le champ texte — les trois chiffres se règlent, mais le préfixe et les lettres d’ordre sont gravés. On ne peut donc pas ajouter « 21AB- » à un code déjà en trois chiffres depuis la planche. Sans conséquence sur la descente : la pioche lit indifféremment « 213 » et « 21AB-213 », les lettres ne servent qu’au vieux pool hors voie.',
+      'Ces trois correctifs sont vérifiés par lecture du chemin, pas par un test : ils vivent dans du code à DOM et à réseau (la planche a besoin du magasin partagé, injoignable en aperçu local). 629 tests verts, type-check et build propres.',
+    ],
+  },
+  {
     date: '30/08/2026 23:03',
     title:
       'La descente tout procédurale, et le pool qui se PIOCHE au lieu de se dérouler',
