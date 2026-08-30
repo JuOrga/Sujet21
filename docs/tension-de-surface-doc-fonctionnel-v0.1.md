@@ -138,6 +138,60 @@ jamais un mur binaire.
 
 ---
 
+## 6 bis. Le relief — les niveaux
+
+*Ajout à la v0.1. Prototypé et jouable.*
+
+Le tableau se lit **de dessus**. L'altitude n'est donc pas une force : c'est un **niveau**.
+Une région de relief porte une altitude en niveaux — un **palier** au-dessus du sol,
+une **fosse** en dessous — et le décor devient un empilement d'étages plutôt qu'un plan.
+
+### La règle, en une phrase
+Une arête sépare deux niveaux et **se comporte comme une paroi** : le corps s'arrête
+tout seul contre un palier, et tout seul au bord d'un trou. Elle ne s'ouvre que si
+le joueur **pousse dans sa direction et tient la prise** (un bouton). Une prise,
+une arête : le passage terminé, il faut relâcher pour en tenir une autre.
+
+### Monter coûte, descendre est gratuit
+- **Monter.** L'arête s'ouvre, le volume s'y écoule lentement, à l'envers du
+  ruissellement. Chaque part qui franchit la marche en laisse une fraction sur la
+  paroi : **le film est perdu**. C'est un pouvoir, et il se paie en volume — donc
+  en réserve de mouvement, en inertie thermique et en récompense de sortie.
+- **Descendre.** L'arête s'ouvre, le volume tombe. Rien à payer : on ne fait
+  qu'aider la pente. Ressortir, en revanche, est une montée.
+
+Le contrat du §3.2 est intact : monter n'est pas « mieux », c'est un arbitrage.
+On échange du volume contre une route.
+
+### Le dénivelé franchissable
+Une montée ne franchit qu'un dénivelé donné d'un seul élan (réglable au banc).
+Au-delà, la marche reste une paroi et le jeu le dit (**TROP HAUT**) : on passe par
+le palier d'en dessous. C'est le point d'accroche naturel d'un déblocage de
+progression — le même décor, une route de plus, exactement le rôle donné aux états
+au §9.2. Aucun raccourci : une route latérale.
+
+### La zone d'interaction
+Une fosse peut être un **collecteur** : quand le volume qu'on y a versé atteint le
+seuil et s'y maintient, un déclencheur s'arme et ouvre une vanne ailleurs dans le
+tableau. Le prix, c'est ce qu'on y laisse — et le ressortir est une montée. C'est
+donc un vrai arbitrage, pas un interrupteur ; et cela ne crée aucune eau : le
+collecteur ne rend rien, conformément au §7.1.
+
+### Lecture
+Un palier est clair, plus clair encore quand il est haut, et porte son ombre au
+sol. Une fosse est un creux sombre à l'ombre intérieure. Chacun affiche son
+niveau (+1, +2, −1). Le corps lui-même s'éclaircit d'un étage au-dessus, se
+sourdit d'un étage en dessous ; le HUD nomme le niveau courant et l'état du
+franchissement (MONTÉE, DESCENTE, TROP HAUT).
+
+### Ce que ça n'est pas
+Ce n'est pas une pesanteur dans le plan. Le jeu reste celui du §1 — apesanteur,
+dérive inertielle, propulsion par éjection. Le relief ajoute un axe au décor,
+pas une force au corps. Voir la proposition de **régimes de jeu** dans
+`PROPOSITION.md` pour ce qu'ajouterait, à part, un module sous pesanteur.
+
+---
+
 ## 7. Boucle roguelike
 
 ### 7.1 Le tableau
@@ -256,7 +310,9 @@ sans que la réussite soit gratuite.
 **Validé sur prototype :** solveur de fluide PBF 2D, cohésion (le corps tient en apesanteur
 sans s'effondrer), propulsion par éjection à quantité de mouvement exactement conservée,
 absorption par temps de contact et saturation d'un matériau, identification dynamique du corps
-joueur par amas connexe, fusion automatique des masses d'eau, caméra à zoom, time warp.
+joueur par amas connexe, fusion automatique des masses d'eau, caméra à zoom, time warp,
+chaleur et changements d'état (glace, vapeur), **relief à niveaux** (§6 bis : arêtes-parois,
+montée payante, descente gratuite, dénivelé franchissable, zone d'interaction).
 
 **Non abordé :** son, interface de méta-progression, sauvegarde, manette, portage.
 
@@ -276,3 +332,9 @@ en direct, export des valeurs en JSON. C'est l'interface de travail entre le gam
 4. **La scission volontaire** est-elle un verbe explicite (commande dédiée) ou seulement
    une conséquence de la physique que le joueur découvre ?
 5. **La contamination** est-elle un état persistant sur toute la partie, ou nettoyable ?
+6. **Le relief** (§6 bis) : quel prix pour une montée, et le dénivelé franchissable
+   augmente-t-il avec la progression ? Les deux sont des sliders du banc, à trancher
+   manette en main.
+7. **Les régimes de jeu** : le vaisseau reste-t-il entièrement en apesanteur, ou
+   comporte-t-il des modules sous pesanteur et des modules dépressurisés ?
+   Proposition chiffrée dans `PROPOSITION.md`, §6.

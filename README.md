@@ -21,6 +21,8 @@ npx serve .        # ou : python3 -m http.server
 | Entrée | Effet |
 |---|---|
 | **Clic maintenu** | éjecte de la matière **vers** le curseur ; le corps part à l'opposé |
+| **Clic droit / Espace / bouton « Prise »** | prise sur une arête de relief — à combiner avec une direction |
+| **Flèches ou ZQSD / WASD** | direction du franchissement (à défaut : la direction du curseur) |
 | **1 – 5** | dilatation du temps (×0,25 à ×4) — le pas physique ne change jamais |
 | **R** | recommencer |
 | **T** | banc de réglage (sliders en direct + export JSON) |
@@ -47,6 +49,20 @@ npx serve .        # ou : python3 -m http.server
     bouffée explosive (poussée multipliée) qui part **définitivement**.
     Rester trop longtemps sur un radiateur évapore le corps — la chaleur
     latente donne une fenêtre d'usage avant la perte.
+- **Le relief (jalon M1.5, §6 bis)** : le tableau se lit **de dessus**, donc
+  l'altitude n'est pas une force mais un **niveau**. Un palier est au-dessus du
+  sol, une fosse en dessous, et une arête sépare deux niveaux.
+  - **Une arête est une paroi** tant qu'on ne la franchit pas : le corps s'arrête
+    de lui-même contre un palier, et de lui-même au bord d'un trou.
+  - **Monter** (direction vers l'arête + prise) ouvre le passage et le volume s'y
+    écoule à l'envers du ruissellement — **coûteux** : une part reste sur la paroi.
+  - **Descendre** est **gratuit** : on ne fait qu'aider la pente. Ressortir, non.
+  - **Le dénivelé franchissable** d'un seul élan est limité (le belvédère +2 est
+    hors de portée depuis le sol : on passe par le palier). C'est le crochet le
+    plus lisible pour une progression — la même carte, une route de plus.
+  - **Zone d'interaction** : verser le volume demandé dans le **collecteur** arme
+    un déclencheur et ouvre la **vanne**. Le prix, c'est ce qu'on y laisse.
+  - Une prise ne franchit qu'une arête : il faut relâcher pour en tenir une autre.
 - **Lisibilité systématique** : chaque surface a une identité visuelle
   univoque (rayures chaudes animées, givre, cellules d'éponge, sas pulsé),
   son nom peint dans le décor, et une **légende** (L) qui donne l'effet de
@@ -81,4 +97,9 @@ fin de tentative est consignée dans le navigateur (`localStorage`) :
 Un test de fumée automatisé (Playwright, `npm test`) vérifie : absence
 d'erreur JS, stabilité du corps au repos, coût et efficacité de la poussée,
 dérive inertielle, gel et dégel du corps, éjection vapeur (perte définitive),
-et les registres du labo (consignation, choix du record, départage).
+le relief (arrêt seul contre une arête, montée payante, dénivelé +2 refusé
+depuis le sol, descente gratuite, collecteur qui ouvre la vanne), et les
+registres du labo (consignation, choix du record, départage).
+
+Si Playwright ne trouve pas de navigateur, pointer le sien :
+`CHROMIUM_PATH=/chemin/vers/chrome npm test`.

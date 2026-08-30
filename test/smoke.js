@@ -13,6 +13,7 @@ const { chromium } = require("playwright");
 
   await page.goto("file://" + path.resolve(__dirname, "..", "index.html"));
   await page.waitForTimeout(500);
+  const P_DISPERSE = await page.evaluate(() => P.disperseCount);
 
   const s0 = await page.evaluate(() => window.__game.stats());
   console.log("t0:", JSON.stringify(s0));
@@ -61,6 +62,44 @@ const { chromium } = require("playwright");
   const sVap = await page.evaluate(() => window.__game.stats());
   console.log("poussée vapeur:", JSON.stringify(sVap));
 
+  // M1.5 — le relief. Le tableau se lit de dessus : une arête sépare deux
+  // niveaux et se comporte comme une paroi tant qu'on ne la franchit pas.
+  // On pose le corps contre chaque arête (warp) et on tient la prise.
+  const relief = async (x, y, dx, dy, ms) => {
+    await page.keyboard.press("KeyR");
+    await page.waitForTimeout(200);
+    await page.evaluate(([x, y]) => window.__game.warp(x, y), [x, y]);
+    await page.waitForTimeout(700);
+    await page.evaluate(([dx, dy]) => window.__game.grip(true, dx, dy), [dx, dy]);
+    await page.waitForTimeout(ms);
+    const s = await page.evaluate(() => window.__game.stats());
+    await page.evaluate(() => window.__game.grip(false));
+    return s;
+  };
+
+  // sans prise, le corps s'arrête de lui-même contre l'arête du palier
+  await page.keyboard.press("KeyR");
+  await page.waitForTimeout(200);
+  await page.evaluate(() => window.__game.warp(400, 860));
+  await page.waitForTimeout(900);
+  const sArret = await page.evaluate(() => window.__game.stats());
+  console.log("arrêté contre l'arête:", JSON.stringify(sArret));
+
+  // monter sur le palier +1 : ça coûte du volume, le corps reste un
+  const sMonte = await relief(400, 860, -1, 0, 4000);
+  console.log("montée sur le palier +1:", JSON.stringify(sMonte));
+
+  // le belvédère +2 depuis le sol : au-delà du dénivelé franchissable
+  const sHaut = await relief(400, 1050, -1, 0, 900);
+  console.log("belvédère +2 depuis le sol:", JSON.stringify(sHaut));
+
+  // descendre dans le collecteur : gratuit, et son remplissage ouvre la vanne
+  const sFosse = await relief(504, 900, 1, 0, 2500);
+  console.log("descente dans le collecteur:", JSON.stringify(sFosse));
+  await page.screenshot({ path: "test/shot_relief.png" });
+  await page.keyboard.press("KeyR");
+  await page.waitForTimeout(200);
+
   // Registres du labo : consignation, record (temps min, volume départage), persistance
   const rec = await page.evaluate(() => {
     Records.wipe();
@@ -87,6 +126,18 @@ const { chromium } = require("playwright");
   console.log("dégel du corps:", !sThaw.frozen ? "OK" : "ECHEC");
   console.log("éjection vapeur (bouffées, perte définitive):",
     sVap.steam > 0 && sVap.n < sThaw.n ? "OK" : "ECHEC " + JSON.stringify(sVap));
+  console.log("arrêt seul sur l'arête (sans prise):",
+    sArret.z === 0 && !sArret.climbing ? "OK" : "ECHEC " + JSON.stringify(sArret));
+  console.log("montée sur le palier +1:",
+    sMonte.z === 1 && sMonte.n < 220 && sMonte.player > P_DISPERSE ? "OK"
+      : "ECHEC " + JSON.stringify(sMonte));
+  console.log("coût de la montée (particules):", 220 - sMonte.n);
+  console.log("dénivelé +2 refusé depuis le sol:",
+    sHaut.blocked && sHaut.z === 0 ? "OK" : "ECHEC " + JSON.stringify(sHaut));
+  console.log("descente gratuite dans le collecteur:",
+    sFosse.z === -1 && sFosse.n === 220 ? "OK" : "ECHEC " + JSON.stringify(sFosse));
+  console.log("collecteur rempli -> vanne ouverte:",
+    sFosse.armed && sFosse.vanne ? "OK" : "ECHEC " + JSON.stringify(sFosse));
   const recOK = rec.attempts === 4 && rec.history === 4 &&
     rec.best && rec.best.time === 35.5 && rec.best.no === 3 &&
     String(rec.newBests) === "false,true,true,false";

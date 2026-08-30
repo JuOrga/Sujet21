@@ -20,6 +20,13 @@
   #gauge i { position:absolute; top:-3px; width:2px; height:12px; }
   #gauge .mkF { background:#9fdcff; }
   #gauge .mkB { background:#ff9c5b; }
+  #hud .trig { margin-top:8px; font-size:13px; font-weight:600; letter-spacing:1.2px;
+               color:#78ffbe; }
+  #gripBtn { position:absolute; bottom:10px; left:104px; padding:6px 14px;
+             font-size:13px; color:#ffd08a; background:rgba(10,14,20,.88);
+             border:1px solid #6a5330; border-radius:16px; cursor:pointer;
+             user-select:none; -webkit-user-select:none; touch-action:manipulation; }
+  #gripBtn:active { background:#3a2d18; }
   #legendBtn { position:absolute; bottom:10px; left:14px; padding:6px 14px;
                font-size:13px; color:#9fdcff; background:rgba(10,14,20,.88);
                border:1px solid #2a5578; border-radius:16px; cursor:pointer;
@@ -76,6 +83,7 @@
 
 <div id="hud"></div>
 <div id="legendBtn">Légende</div>
+<div id="gripBtn">Prise</div>
 <div id="legend">
   <h3>Lecture du vaisseau <span>· L ou le bouton : masquer</span></h3>
   <div class="lrow"><i style="background:#ff8c46"></i><div><b>Radiateur</b> — chauffe.
@@ -88,6 +96,20 @@
     Glace : sans prise · la vitesse limite la perte</div></div>
   <div class="lrow"><i style="background:#50e6a0"></i><div><b>Sas</b> — la sortie :
     s'y tenir une seconde</div></div>
+  <div class="lrow"><i style="background:#ffd08a"></i><div><b>Palier</b> —
+    surface surélevée (+1, +2…). Vue de dessus, ce n'est pas un obstacle mais
+    un autre niveau : le corps s'arrête seul contre ses arêtes. Direction vers
+    l'arête + <b>Prise</b> : le volume monte dessus · <b>coûteux</b>, une part
+    reste sur la paroi · Glace : sans prise</div></div>
+  <div class="lrow"><i style="background:#ff9c8a"></i><div><b>TROP HAUT</b> —
+    au-delà du dénivelé franchissable d'un seul élan. On passe par le palier
+    d'en dessous — ou par un pouvoir qui se règle au banc</div></div>
+  <div class="lrow"><i style="background:#8affc8"></i><div><b>Fosse</b> — creux
+    (−1). Le corps s'arrête de lui-même sur ses arêtes.
+    Direction + <b>Prise</b> : il s'y écoule — <b>gratuit</b></div></div>
+  <div class="lrow"><i style="background:#78ffbe"></i><div><b>Collecteur</b> — zone
+    d'interaction : y verser le volume demandé ouvre la <b>vanne</b>.
+    Le prix, c'est ce qu'on y laisse</div></div>
   <div class="states">États :
     <b style="color:#79d0ff">LIQUIDE</b> pilotable ·
     <b style="color:#eaf7ff">GLACE</b> glisse et rebondit ·
@@ -95,6 +117,8 @@
 </div>
 <div id="help">
   Maintenir le clic : éjecter de la matière vers le curseur (le corps part à l'opposé) ·
+  Clic droit / Espace / bouton « Prise » + direction (flèches, ZQSD, ou le curseur) :
+  monter sur un palier, descendre dans une fosse ·
   1–5 : dilatation du temps · R : recommencer · T : banc de réglage · L : légende
 </div>
 <div id="overlay"><h1 id="ovTitle"></h1><p id="ovText"></p><p id="ovRecord"></p>

@@ -43,6 +43,23 @@ const P = {
   iceBounce: 0.8,     // restitution des rebonds du corps gelé
   steamLife: 1.4,     // durée de vie visuelle d'une bouffée (s)
 
+  // --- Relief : les niveaux (M1.5) ---
+  // Le tableau se lit de dessus : l'altitude n'est pas une force, c'est un
+  // niveau. Un palier est au-dessus du sol, une fosse en dessous ; une arête
+  // sépare deux niveaux et se comporte comme une paroi tant qu'on ne la
+  // franchit pas. Monter coûte du volume, descendre est gratuit.
+  climbFlow: 60,       // vitesse d'écoulement en montant (px/s) : on s'y reprend
+  climbLoss: 0.3,      // part du volume perdue par niveau monté (le film sur la paroi)
+  climbMaxStep: 1,     // dénivelé franchissable en une fois (niveaux) — un pouvoir qui s'améliore
+  descendFlow: 170,    // vitesse d'écoulement en descendant (px/s) : ça tombe
+  flowDrive: 7,        // raideur de cet écoulement (1/s) — la prise stabilise le corps
+  transferReach: 14,   // distance à l'arête en deçà de laquelle on la « tient » (px) :
+                       // c'est elle qui exige de pousser vers l'arête pour la tenir
+
+  // --- Zones d'interaction (déclencheurs) ---
+  basinFill: 0.3,     // volume à verser dans un collecteur pour l'amorcer (L)
+  basinHold: 0.5,     // temps de maintien du niveau avant déclenchement (s)
+
   // --- Caméra et temps ---
   camFraction: 0.16, // le corps occupe cette fraction du petit côté de l'écran
   camSmooth: 3.0,
@@ -73,6 +90,14 @@ const PARAM_SCHEMA = [
   ["spongeAbsorbTime", "Éponge : t. d'absorption", 0.05, 1.5, 0.05],
   ["spongeDrag",       "Éponge : traînée",         0,   15,  0.5],
   ["spongeCellCap",    "Éponge : capacité/cellule",1,   6,   1],
+  ["climbFlow",        "Montée : écoulement",      10,  400, 5],
+  ["climbLoss",        "Montée : perte / niveau",  0,   0.8, 0.02],
+  ["climbMaxStep",     "Montée : dénivelé max",    1,   4,   1],
+  ["descendFlow",      "Descente : écoulement",    10,  500, 10],
+  ["flowDrive",        "Arête : raideur",          1,   20,  0.5],
+  ["transferReach",    "Arête : portée de prise",  4,   40,  1],
+  ["basinFill",        "Collecteur : seuil (L)",   0.05, 1.5, 0.05],
+  ["basinHold",        "Collecteur : maintien (s)",0,   3,   0.1],
   ["camFraction",      "Cadrage caméra",           0.06, 0.4, 0.01],
   ["maxSpeed",         "Vitesse max",              200, 2000, 50],
 ];
