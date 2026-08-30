@@ -76,15 +76,48 @@ livrant la plaque. Une image libre mal créditée n'est plus une image libre.
 
 ### 4. Convertir
 
+**L'ORIGINAL N'ENTRE JAMAIS DANS LE DÉPÔT.** Les plaques de Webb en pleine
+taille pèsent de cent à cinq cents mégaoctets ; le dépôt entier en fait
+quatre-vingt-dix, historique compris. Un binaire commité y reste POUR TOUJOURS,
+et chaque personne qui clone le paie. Le dossier `assets-src/` existe
+précisément pour ça — il est ignoré par git, comme le dit `.gitignore` :
+« seuls les WebP optimisés de public/assets sont versionnés ». Déposez-y
+l'original, ne versionnez que le WebP.
+
+**Le plus souvent, l'original ne sert à rien.** La cible fait 4096 px : si vous
+prenez l'image ENTIÈRE, le « Large JPEG » de 4000 px proposé sur la page suffit,
+et vous vous épargnez un demi-gigaoctet. L'original ne devient utile que pour
+DÉCOUPER un carré dans une grande panoramique.
+
 ```bash
-# depuis un TIFF/PNG d'origine, quelle que soit sa taille
+# fichier déjà proche de la cible (quelques dizaines de Mo)
 python3 - <<'PY'
 from PIL import Image
 Image.MAX_IMAGE_PIXELS = None          # les plaques de Webb dépassent la garde
-im = Image.open('smacs0723.tif').convert('RGB')
-im = im.resize((4096, 4096), Image.LANCZOS)   # carré : le jeu répète la plaque
+im = Image.open('assets-src/smacs0723.tif').convert('RGB')
+c = min(im.size)                        # carré centré : le jeu répète la plaque
+im = im.crop(((im.width - c) // 2, (im.height - c) // 2,
+              (im.width + c) // 2, (im.height + c) // 2))
+im = im.resize((4096, 4096), Image.LANCZOS)
 im.save('public/assets/ciel.webp', 'WEBP', quality=88, method=6)
 PY
+```
+
+**Au-delà de cent mégaoctets, ne passez pas par Pillow** : il décompresse tout
+en mémoire d'un bloc. Un TIFF de 14 000 × 14 000 fait 588 Mo une fois décodé, et
+le redimensionnement en réclame autant — deux gigaoctets de pointe pour une
+image, et un plantage sec sur une machine chargée. **libvips** est fait pour ça :
+il travaille par bandes et ne monte jamais au-delà de quelques centaines de
+mégaoctets, quelle que soit la taille de l'entrée.
+
+```bash
+# libvips (brew install vips · apt install libvips-tools) — le bon outil
+vips thumbnail assets-src/original.tif 'public/assets/ciel.webp[Q=88]' 4096 \
+     --height 4096 --crop centre
+
+# ImageMagick, à défaut
+magick assets-src/original.tif -gravity center -crop 1:1 +repage \
+       -resize 4096x4096 -quality 88 public/assets/ciel.webp
 ```
 
 **Pourquoi 4096 et pas 16 384.** Une texture coûte en mémoire graphique
