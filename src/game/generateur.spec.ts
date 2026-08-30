@@ -479,3 +479,57 @@ describe('generateur — une graine, une salle PROUVÉE', () => {
     }
   })
 })
+
+describe('le réglage MÉCANISMES vaut aussi en salles à compartiments', () => {
+  // Avant ce lot, « Énigmes au laser » ne pilotait que le mode figure :
+  // l'auteur qui voulait un faisceau dans un tableau à compartiments
+  // n'avait qu'à retirer des graines. Le réglage porte maintenant sur les
+  // deux modes, sans trahir la mécanique du cahier — les maillons promus
+  // restent dans la famille de celui qu'ils remplacent.
+  const graines = [3, 77, 1234, 55555, 987654]
+
+  it('« deux énigmes » en pose au moins deux, « une » au moins une', () => {
+    for (const graine of graines)
+      for (const [reglage, mini] of [
+        [2, 1],
+        [3, 2],
+      ] as const) {
+        const lv = genereNiveau(
+          graine,
+          { cahier: { moment: 2, mecanique: 3, difficulte: 3 }, variante: 'A' },
+          { ...OPTIONS_DEFAUT, mecanismes: reglage },
+        )
+        expect(
+          lv.lasers?.length ?? 0,
+          `graine ${graine} réglage ${reglage}`,
+        ).toBeGreaterThanOrEqual(mini)
+      }
+  })
+
+  it('« aucune » rend un tableau qui se joue à l’état seul', () => {
+    for (const graine of graines)
+      for (const mec of [1, 2, 3] as const) {
+        const lv = genereNiveau(
+          graine,
+          { cahier: { moment: 3, mecanique: mec, difficulte: 6 }, variante: 'A' },
+          { ...OPTIONS_DEFAUT, mecanismes: 1 },
+        )
+        expect(lv.lasers?.length ?? 0, `graine ${graine} méca ${mec}`).toBe(0)
+        expect(lv.cibles?.length ?? 0, `graine ${graine} méca ${mec}`).toBe(0)
+      }
+  })
+
+  it('la promotion reste PROUVÉE et dans la famille du cahier', () => {
+    for (const graine of graines) {
+      // mécanique GLACE : jamais un rail ni une barrière (pastilles NOR)
+      const { niveau, preuves } = genereNiveauDetaille(
+        graine,
+        { cahier: { moment: 2, mecanique: 1, difficulte: 2 }, variante: 'A' },
+        { ...OPTIONS_DEFAUT, mecanismes: 3 },
+      )
+      ;(niveau as { __preuves?: unknown }).__preuves = preuves
+      expect(valideNiveau(niveau).raisons, `graine ${graine}`).toEqual([])
+      for (const p of preuves) expect(p.kind, `graine ${graine}`).toBe('miroir')
+    }
+  })
+})

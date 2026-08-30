@@ -12,7 +12,8 @@ import {
   valideNiveau,
   type OptionsGen,
 } from './generateur'
-import { FIGURE_FAMILLES } from './figures'
+import { FIGURE_FAMILLES, FIGURE_PROFILS, optionFigure } from './figures'
+import { FAMILLES_OPT } from './generateur'
 import {
   MAT_GRILLE,
   MAT_MEMBRANE,
@@ -277,6 +278,107 @@ describe('générateur en mode figure', () => {
     if (lue && lue.type === 'libre') {
       const rejoue = genereNiveau(lue.graine, null, lue.options ?? o)
       expect(JSON.stringify(rejoue)).toBe(JSON.stringify(lv))
+    }
+  })
+})
+
+describe('mode figure — LES ÉNIGMES AU LASER', () => {
+  // Le trou que ce lot rebouche : le dosage AUTO n'accordait un mécanisme
+  // qu'à partir de la difficulté 4, alors que la rampe d'une descente
+  // ordinaire plafonne à 3 — pas un faisceau dans toute une run en mode
+  // figure. La règle suit maintenant le plan : le premier rang enseigne,
+  // dès qu'une difficulté est demandée l'énigme vient.
+  const cahier = (difficulte: number): { moment: 1; mecanique: 3; difficulte: number } => ({
+    moment: 1,
+    mecanique: 3,
+    difficulte,
+  })
+
+  it('dès la difficulté 1, toute famille qui porte le faisceau en pose un', () => {
+    for (const f of FIGURE_FAMILLES) {
+      if (!FIGURE_PROFILS[f].enigmes) continue
+      for (const graine of GRAINES) {
+        const { niveau } = genereNiveauDetaille(
+          graine,
+          { cahier: cahier(1), variante: 'A' },
+          opts({ figure: optionFigure(f) }),
+        )
+        expect(niveau.lasers?.length ?? 0, `${f} graine ${graine}`).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('la difficulté 0 enseigne : aucune énigme, les plaques gardent seules', () => {
+    for (const f of FIGURE_FAMILLES) {
+      for (const graine of GRAINES) {
+        const { niveau } = genereNiveauDetaille(
+          graine,
+          { cahier: cahier(0), variante: 'A' },
+          opts({ figure: optionFigure(f) }),
+        )
+        expect(niveau.lasers?.length ?? 0, `${f} graine ${graine}`).toBe(0)
+      }
+    }
+  })
+
+  it('fusion et échangeur restent des puzzles de MATIÈRE : zéro faisceau', () => {
+    for (const f of ['fusion', 'echangeur'] as const) {
+      expect(FIGURE_PROFILS[f].enigmes).toBe(false)
+      for (const graine of GRAINES) {
+        const lv = genereNiveau(
+          graine,
+          { cahier: cahier(6), variante: 'A' },
+          opts({ figure: optionFigure(f), mecanismes: 3 }),
+        )
+        expect(lv.lasers?.length ?? 0, `${f} graine ${graine}`).toBe(0)
+      }
+    }
+  })
+
+  it('le cortège a désormais SA POCHE : l’établi tient entre les deux dernières cellules', () => {
+    for (const graine of GRAINES) {
+      const lv = genereNiveau(
+        graine,
+        null,
+        opts({ figure: optionFigure('cortege'), mecanismes: 2 }),
+      )
+      expect(lv.lasers?.length ?? 0, `cortège graine ${graine}`).toBeGreaterThan(0)
+    }
+  })
+
+  it('le MASQUE tranche l’espèce : sans « porte », pas de miroir ; sans « nor », pas de barrière', () => {
+    const bit = (m: (typeof FAMILLES_OPT)[number]): number =>
+      1 << FAMILLES_OPT.indexOf(m)
+    const sansMiroir = 127 & ~bit('porte')
+    const sansBarriere = 127 & ~bit('nor')
+    for (const graine of GRAINES) {
+      // sans miroir : les pastilles posées sont toutes en mode NOR
+      const a = genereNiveau(
+        graine,
+        null,
+        opts({ figure: 1, mecanismes: 2, familles: sansMiroir }),
+      )
+      for (const c of a.cibles ?? [])
+        expect(c.mode, `graine ${graine}`).toBe('nor')
+      // sans barrière : aucune pastille NOR
+      const b = genereNiveau(
+        graine,
+        null,
+        opts({ figure: 1, mecanismes: 2, familles: sansBarriere }),
+      )
+      for (const c of b.cibles ?? [])
+        expect(c.mode, `graine ${graine}`).not.toBe('nor')
+      // les deux interdits : la couture garde sa plaque, rien ne se greffe
+      const z = genereNiveau(
+        graine,
+        null,
+        opts({
+          figure: 1,
+          mecanismes: 3,
+          familles: 127 & ~bit('porte') & ~bit('nor'),
+        }),
+      )
+      expect(z.lasers?.length ?? 0, `graine ${graine}`).toBe(0)
     }
   })
 })

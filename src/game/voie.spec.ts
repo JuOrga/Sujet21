@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { genereNiveauAtelier, OPTIONS_DEFAUT } from './generateur'
+import { genereNiveauAtelier, OPTIONS_DEFAUT, type OptionsGen } from './generateur'
+import { FIGURE_FAMILLES } from './figures'
+import type { CodeAtelier } from './levelIO'
 import {
   clampPlanVoie,
   diffAuRang,
@@ -10,7 +12,12 @@ import {
   mecaniquesPermises,
   momentAuRang,
   reglageAuRang,
+  ampleurAuRang,
+  famillesEligibles,
+  figuresDuChoix,
+  figureDeLaCarte,
   varianteDuJour,
+  PLAN_VOIE_DEFAUTS,
 } from './voie'
 
 describe('voie — le plan de descente', () => {
@@ -195,5 +202,145 @@ describe('voie — le plan de descente', () => {
       meilleurLivre: 12.5,
     })
     expect(litPalmaresVoie(JSON.stringify({ descentes: -3 })).descentes).toBe(0)
+  })
+})
+
+describe('les FAMILLES DE FIGURE dans la descente', () => {
+  it('les mémoires non tissées écartent les familles qui les exigent', () => {
+    // rien de tissé : seuls les glyphes géométriques, qui n'exigent rien
+    const nues = famillesEligibles(3, 3, false, false)
+    expect(nues).toEqual([
+      'anneaux',
+      'spirale',
+      'cortege',
+      'rosace',
+      'nef',
+      'constellation',
+    ])
+    // la glace seule ouvre le réseau et la matière, pas le cycle thermique
+    const glace = famillesEligibles(3, 1, true, false)
+    expect(glace).toContain('conduits')
+    expect(glace).toContain('fusion')
+    expect(glace).not.toContain('echangeur')
+    expect(glace).not.toContain('voies')
+    // les deux liens tissés, mécanique « toutes » : tout le vocabulaire
+    expect(famillesEligibles(3, 3, true, true).length).toBe(10)
+  })
+
+  it('le MOMENT retient les familles : un réseau ne s’ouvre pas au premier rang', () => {
+    const debut = famillesEligibles(1, 3, true, true)
+    expect(debut).toEqual(['anneaux', 'spirale', 'cortege'])
+    expect(famillesEligibles(2, 3, true, true)).toContain('conduits')
+    expect(famillesEligibles(2, 3, true, true)).not.toContain('voies')
+  })
+
+  it('une carte « glace » ne porte pas une famille qui réclame la vapeur', () => {
+    const glaceSeule = famillesEligibles(3, 1, true, true)
+    expect(glaceSeule).not.toContain('echangeur')
+    expect(glaceSeule).not.toContain('voies')
+    expect(glaceSeule).toContain('conduits')
+  })
+
+  it('le choix du rang MÊLE les deux générateurs — jamais trois figures', () => {
+    const alea = (): number => 0.5
+    for (const m of [1, 2, 3] as const) {
+      const modes = figuresDuChoix(m, alea)
+      expect(modes.length).toBe(3)
+      const n = modes.filter(Boolean).length
+      expect(n).toBe(m === 1 ? 1 : 2)
+      expect(n).toBeLessThan(3) // une salle à compartiments reste toujours
+    }
+  })
+
+  it('une carte non-figure reste en compartiments, une figure sans vivier aussi', () => {
+    const alea = (): number => 0
+    expect(figureDeLaCarte(false, 3, 3, true, true, alea)).toBe(0)
+    // moment 1, mécanique « eau » (0), rien de tissé : le vivier existe
+    // (les glyphes n'exigent rien) — c'est « anneaux », le premier
+    expect(figureDeLaCarte(true, 1, 0, false, false, alea)).toBe(2)
+  })
+
+  it('l’AMPLEUR s’ouvre avec la descente', () => {
+    const plan = { ...PLAN_VOIE_DEFAUTS, longueur: 12 }
+    expect(ampleurAuRang(1, plan)).toBe(1)
+    expect(ampleurAuRang(6, plan)).toBe(2)
+    expect(ampleurAuRang(12, plan)).toBe(3)
+  })
+})
+
+describe('UNE DESCENTE ENTIÈRE : les deux générateurs, et des faisceaux', () => {
+  // Le contrat que ce lot pose : à chaque rang, le choix montre à la fois
+  // des salles à compartiments et des FIGURES (dont les familles de BOIZ),
+  // et la descente n'est plus muette côté énigmes.
+  const plan = { ...PLAN_VOIE_DEFAUTS, longueur: 12, diffMax: 3 }
+
+  const descente = (
+    graine: number,
+  ): {
+    figures: number
+    compartiments: number
+    lasers: number
+    total: number
+    familles: Set<string>
+  } => {
+    let h = graine >>> 0
+    const alea = (): number => {
+      h = Math.imul(h ^ (h >>> 13), 0x5bd1e995) >>> 0
+      return h / 2 ** 32
+    }
+    const masqueCycle = masquePermis(true, true)
+    const bilan = {
+      figures: 0,
+      compartiments: 0,
+      lasers: 0,
+      total: 0,
+      familles: new Set<string>(),
+    }
+    for (let rang = 1; rang <= plan.longueur; rang++) {
+      const moment = momentAuRang(rang, plan)
+      const difficulte = diffAuRang(rang, plan)
+      const regl = reglageAuRang(rang, plan)
+      const modes = figuresDuChoix(moment, alea)
+      for (let c = 0; c < 3; c++) {
+        const mec = ([1, 2, 3] as const)[c]
+        const figure = figureDeLaCarte(modes[c], moment, mec, true, true, alea)
+        const o: OptionsGen = {
+          ...OPTIONS_DEFAUT,
+          dangers: regl.dangers,
+          laby: regl.laby,
+          contraste: regl.contraste,
+          familles: (regl.purete ? masqueMecanique(mec) : 127) & masqueCycle,
+          figure,
+          ampleur: ampleurAuRang(rang, plan),
+        }
+        const cahier: CodeAtelier = { moment, mecanique: mec, difficulte }
+        const lv = genereNiveauAtelier(cahier, `R${rang}${c}`, o)
+        bilan.total++
+        if (figure) {
+          bilan.figures++
+          bilan.familles.add(FIGURE_FAMILLES[figure - 2])
+        } else bilan.compartiments++
+        if ((lv.lasers?.length ?? 0) > 0) bilan.lasers++
+      }
+    }
+    return bilan
+  }
+
+  it('chaque rang mêle figures et compartiments, sur plusieurs graines', () => {
+    for (const graine of [1, 12345, 987654]) {
+      const b = descente(graine)
+      expect(b.total, `graine ${graine}`).toBe(36)
+      expect(b.figures, `graine ${graine}`).toBeGreaterThanOrEqual(12)
+      expect(b.compartiments, `graine ${graine}`).toBeGreaterThanOrEqual(12)
+      // les familles de BOIZ atteignent bien la descente
+      expect(
+        [...b.familles].some((f) =>
+          ['conduits', 'fusion', 'echangeur', 'voies'].includes(f),
+        ),
+        `graine ${graine} — familles vues : ${[...b.familles].join(', ')}`,
+      ).toBe(true)
+      // et la descente n'est plus muette : la moitié au moins porte un faisceau
+      expect(b.lasers, `graine ${graine}`).toBeGreaterThanOrEqual(18)
+    }
   })
 })

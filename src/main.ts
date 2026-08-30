@@ -40,8 +40,11 @@ import {
 } from './game/generateur'
 import { FAMILLES_REGLES, reglesDeFamille } from './game/reglesGen'
 import {
+  ampleurAuRang,
   clampPlanVoie,
   diffAuRang,
+  figureDeLaCarte,
+  figuresDuChoix,
   hachage,
   litPalmaresVoie,
   masqueMecanique,
@@ -54,6 +57,7 @@ import {
   type PalmaresVoie,
   type PlanVoie,
 } from './game/voie'
+import { FIGURE_FAMILLES, FIGURE_NOMS } from './game/figures'
 import { CIRCUITS } from './game/circuits'
 import type { LevierId } from './game/leviers'
 import {
@@ -8965,12 +8969,31 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   // salle générée — pureté du début, laby du milieu, contraste de la fin,
   // dangers différés — voyage dans le code (suffixe ~), l'identité tient
   const regl = reglageAuRang(rangSuivant, voiePlan)
-  const optionsDuRang = (mec: CodeAtelier['mecanique']): OptionsGen => ({
+  // LE MÉLANGE DES DEUX GÉNÉRATEURS : les salles à compartiments (le
+  // système historique) et les FIGURES — dont les familles tirées des
+  // tableaux de BOIZ. Le choix du rang en montre les deux : une figure au
+  // début, deux dès que le milieu s'ouvre, les autres cartes en
+  // compartiments. La famille se tire dans le vivier éligible (mémoires
+  // tissées, mécanique de la carte, moment du plan).
+  const modesFigure = figuresDuChoix(moment, alea)
+  const optionsDuRang = (
+    mec: CodeAtelier['mecanique'],
+    carte: number,
+  ): OptionsGen => ({
     ...OPTIONS_DEFAUT,
     dangers: regl.dangers,
     laby: regl.laby,
     contraste: regl.contraste,
     familles: (regl.purete ? masqueMecanique(mec) : 127) & masqueCycle,
+    figure: figureDeLaCarte(
+      modesFigure[carte] ?? false,
+      moment,
+      mec,
+      solidTenue,
+      vapoTenue,
+      alea,
+    ),
+    ampleur: ampleurAuRang(rangSuivant, voiePlan),
   })
   const variante = (n: number): string =>
     descenteDuJour()
@@ -8982,22 +9005,27 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   const genere = (
     mecanique: CodeAtelier['mecanique'],
     n: number,
-  ): { lv: LevelDef; cahier: CodeAtelier } | null => {
+    carte: number,
+  ): { lv: LevelDef; cahier: CodeAtelier; figure: number } | null => {
     const cahier: CodeAtelier = { moment, mecanique, difficulte }
-    for (let essai = 0; essai < 3; essai++) {
-      try {
-        return {
-          lv: genereNiveauAtelier(
+    // les options se tirent UNE FOIS par carte (la famille de figure est un
+    // tirage) : les variantes de secours redonnent la même salle, pas une
+    // autre famille — et l'étiquette de la carte reste vraie
+    const opts = optionsDuRang(mecanique, carte)
+    // une figure qui ne se prouve pas ne coûte pas la carte : le repli est
+    // la salle à compartiments, le système historique
+    for (const o of opts.figure !== 0 ? [opts, { ...opts, figure: 0 }] : [opts])
+      for (let essai = 0; essai < 3; essai++) {
+        try {
+          return {
+            lv: genereNiveauAtelier(cahier, variante(n + essai * 3), o),
             cahier,
-            variante(n + essai * 3),
-            optionsDuRang(mecanique),
-          ),
-          cahier,
+            figure: o.figure,
+          }
+        } catch {
+          // graine sans salle prouvée : on retire une variante voisine
         }
-      } catch {
-        // graine sans salle prouvée : on retire une variante voisine
       }
-    }
     return null
   }
   // Le choix porte TOUJOURS TROIS salles générées, trois mécaniques — la
@@ -9024,14 +9052,23 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
     'SALLE GÉNÉRÉE — L’AUTRE MÉCANIQUE',
     'SALLE GÉNÉRÉE — LA TROISIÈME MÉCANIQUE',
   ]
+  // une figure s'annonce PAR SA FAMILLE : le joueur apprend à les
+  // reconnaître d'un rang à l'autre, et le choix se prend sur la forme
+  // autant que sur la mécanique
+  const etiquetteGeneree = (figure: number, i: number): string => {
+    const fam = FIGURE_FAMILLES[figure - 2]
+    return fam
+      ? `SALLE GÉNÉRÉE — FIGURE : ${FIGURE_NOMS[fam].toUpperCase()}`
+      : etiquettesGen[Math.min(i, etiquettesGen.length - 1)]
+  }
   ;[mecaA, mecaB, mecaC].forEach((mec, i) => {
-    const g = genere(mec, i + 1)
+    const g = genere(mec, i + 1, i)
     if (g)
       cartes.push({
         lv: g.lv,
         cahier: g.cahier,
         generee: true,
-        etiquette: etiquettesGen[Math.min(i, etiquettesGen.length - 1)],
+        etiquette: etiquetteGeneree(g.figure, i),
       })
   })
   // le FILET : si un tirage a échoué (graine ingrate), on balaie les
@@ -9041,13 +9078,13 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
     for (const mec of permises) {
       if (cartes.filter((c) => c.generee).length >= 3) break
       if (cartes.some((c) => c.generee && c.cahier?.mecanique === mec)) continue
-      const gx = genere(mec, 5 + mec)
+      const gx = genere(mec, 5 + mec, cartes.filter((c) => c.generee).length)
       if (gx)
         cartes.push({
           lv: gx.lv,
           cahier: gx.cahier,
           generee: true,
-          etiquette: 'SALLE GÉNÉRÉE — INÉDITE, PROUVÉE',
+          etiquette: etiquetteGeneree(gx.figure, 0),
         })
     }
   }

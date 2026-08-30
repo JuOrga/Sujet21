@@ -13,6 +13,13 @@
 
 import { phaseRun } from './poule'
 import { FAMILLES_OPT } from './generateur'
+import {
+  FAMILLES_BOIZ,
+  FIGURE_FAMILLES,
+  FIGURE_PROFILS,
+  optionFigure,
+  type FigureFamille,
+} from './figures'
 import type { CodeAtelier } from './levelIO'
 
 export interface PlanVoie {
@@ -251,4 +258,112 @@ export function litPalmaresVoie(brut: string | null): PalmaresVoie {
   } catch {
     return { ...PALMARES_VOIE_VIERGE }
   }
+}
+
+// ---- LES FAMILLES DE FIGURE DANS LA DESCENTE -----------------------------
+// Le mode FIGURE (figures.ts) — les glyphes géométriques et, surtout, les
+// familles distillées des tableaux faits main de BOIZ (conduits, fusion,
+// échangeur, voies) — vivait jusqu'ici dans le seul éditeur : la descente
+// procédurale ne générait QUE des salles à compartiments, et pas un joueur
+// ne croisait un tableau de BOIZ en run.
+//
+// Il s'y invite ici EN PLUS du système existant, jamais à sa place : à
+// chaque rang, le choix mêle des salles à compartiments et des figures.
+// Le tirage est aléatoire dans le vivier ÉLIGIBLE, et le vivier, lui, est
+// tenu par trois règles :
+//   · les MÉMOIRES TISSÉES — une famille qui grave du rideau dans sa
+//     géométrie exige la solidification, une qui pose des surchauffeurs
+//     exige la vaporisation : sans le lien, elle ne se propose pas ;
+//   · la MÉCANIQUE de la carte — une carte « glace » ne porte pas une
+//     famille qui réclame aussi la vapeur ;
+//   · le MOMENT — un glyphe simple se lit dès le début, un réseau (les
+//     conduits) attend le milieu, le cycle thermique et la tresse la fin.
+
+/** Les familles de figure jouables à ce moment de la descente, pour une
+ * carte de cette mécanique, avec ces mémoires tissées. */
+export function famillesEligibles(
+  moment: CodeAtelier['moment'],
+  mecanique: CodeAtelier['mecanique'],
+  solidification: boolean,
+  vaporisation: boolean,
+): FigureFamille[] {
+  const glaceOK = solidification && (mecanique === 1 || mecanique === 3)
+  const vapeurOK = vaporisation && (mecanique === 2 || mecanique === 3)
+  return FIGURE_FAMILLES.filter((f) => {
+    const p = FIGURE_PROFILS[f]
+    if (p.momentMin > moment) return false
+    if (p.exigeGlace && !glaceOK) return false
+    if (p.exigeVapeur && !vapeurOK) return false
+    return true
+  })
+}
+
+/** LE MODE DES TROIS CARTES d'un rang : lesquelles sont des figures.
+ * Le mélange est garanti — jamais trois figures, jamais trois
+ * compartiments quand les deux sont possibles : le choix doit montrer
+ * DEUX façons de faire une salle. La part de figures monte avec le
+ * moment (une au début, deux dès le milieu). */
+export function figuresDuChoix(
+  moment: CodeAtelier['moment'],
+  alea: () => number,
+): boolean[] {
+  const combien = moment === 1 ? 1 : 2
+  const modes = [false, false, false]
+  const rangs = [0, 1, 2]
+  for (let i = rangs.length - 1; i > 0; i--) {
+    const j = Math.floor(alea() * (i + 1))
+    ;[rangs[i], rangs[j]] = [rangs[j], rangs[i]]
+  }
+  for (let k = 0; k < combien; k++) modes[rangs[k]] = true
+  return modes
+}
+
+/** La valeur de l'option `figure` pour une carte : 0 (salles à
+ * compartiments) si la carte n'est pas une figure ou si aucune famille
+ * n'est éligible — sinon l'index d'une famille tirée du vivier. */
+export function figureDeLaCarte(
+  estFigure: boolean,
+  moment: CodeAtelier['moment'],
+  mecanique: CodeAtelier['mecanique'],
+  solidification: boolean,
+  vaporisation: boolean,
+  alea: () => number,
+): number {
+  if (!estFigure) return 0
+  const vivier = famillesEligibles(
+    moment,
+    mecanique,
+    solidification,
+    vaporisation,
+  )
+  if (vivier.length === 0) return 0
+  // LE TIRAGE SE FAIT EN DEUX TEMPS, et c'est voulu. Six glyphes
+  // géométriques contre quatre familles de BOIZ, et ces quatre-là sont les
+  // plus contraintes (elles exigent des liens tissés, elles attendent le
+  // milieu ou la fin) : un tirage plat les rendrait quasi invisibles — la
+  // tresse sortait moins d'une fois sur cent. On tire donc d'abord le
+  // VOCABULAIRE (glyphe ou tableau de BOIZ, à égalité quand les deux sont
+  // ouverts), puis la famille dedans. Les tableaux faits main pèsent alors
+  // autant que la géométrie, ce qui est leur juste part.
+  const boiz = vivier.filter((f) => FAMILLES_BOIZ.includes(f))
+  const glyphes = vivier.filter((f) => !FAMILLES_BOIZ.includes(f))
+  const groupe =
+    boiz.length === 0
+      ? glyphes
+      : glyphes.length === 0
+        ? boiz
+        : alea() < 0.5
+          ? boiz
+          : glyphes
+  return optionFigure(groupe[Math.floor(alea() * groupe.length)])
+}
+
+/** L'AMPLEUR du champ au rang donné : la descente s'ouvre en avançant —
+ * intime au début, vaste au milieu, immense à la fin. */
+export function ampleurAuRang(
+  rang: number,
+  plan: PlanVoie,
+): 0 | 1 | 2 | 3 {
+  const m = momentAuRang(rang, plan)
+  return m === 1 ? 1 : m === 2 ? 2 : 3
 }
