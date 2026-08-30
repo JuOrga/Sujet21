@@ -158,8 +158,11 @@ export interface OptionsGen {
   // l'AMPLEUR du champ, en mode figure — 0 auto · 1 intime · 2 vaste ·
   // 3 immense
   ampleur: 0 | 1 | 2 | 3
-  // les MÉCANISMES greffés sur la couture finale, en mode figure —
-  // 0 auto · 1 aucun (filtres d'état seuls) · 2 une énigme · 3 deux
+  // les ÉNIGMES AU LASER — 0 auto · 1 aucune (filtres d'état seuls) ·
+  // 2 une énigme · 3 deux. Le réglage vaut pour LES DEUX MODES : en figure
+  // il dose les mécanismes greffés sur la couture finale, en salles à
+  // compartiments il promeut (ou rabat) les maillons à faisceau — miroir
+  // de glace, double ET, rail plasma, barrière NOR.
   mecanismes: 0 | 1 | 2 | 3
 }
 
@@ -349,6 +352,76 @@ function plafonne(
     if (m === 'porte' || m === 'et' || m === 'rail' || m === 'nor') lasers++
     return m
   })
+}
+
+const ESPECES_ENIGME: readonly Maillon[] = ['porte', 'et', 'rail', 'nor']
+const estEnigme = (m: Maillon): boolean => ESPECES_ENIGME.includes(m)
+
+/** Le réglage MÉCANISMES, en mode salles à compartiments. Il ne valait
+ * jusqu'ici que pour le mode figure : demander « une énigme » dans le
+ * panneau du générateur ne changeait rien à un tableau à compartiments, et
+ * l'auteur n'avait aucun moyen d'EXIGER un faisceau — il retirait des
+ * graines jusqu'à en voir un. Le réglage porte maintenant sur les deux
+ * modes :
+ *   · 1 (aucun) — les maillons à faisceau retombent sur le filtre d'état
+ *     de leur famille : la salle se joue à l'état seul ;
+ *   · 2 / 3 — au moins une (deux) connexions passent en énigme, PROMUES
+ *     dans la famille du maillon qu'elles portaient (un rideau devient
+ *     miroir ou double ET, un évent devient rail ou barrière) : la
+ *     mécanique du cahier n'est pas trahie, elle se complique.
+ * Les plafonds de lisibilité (`plafonne`) repassent derrière. */
+function doseEnigmes(
+  conns: ConnexionT[],
+  salles: SalleT[],
+  cahier: CodeAtelier | null,
+  o: OptionsGen,
+  rng: Rng,
+): void {
+  if (o.mecanismes === 1) {
+    for (const cn of conns) {
+      if (!estEnigme(cn.maillon)) continue
+      const pref: Maillon[] = estVaporeux(cn.maillon)
+        ? ['grille', 'membrane']
+        : ['rideau', 'membrane']
+      cn.maillon = pref.find((m) => autorise(o, m)) ?? 'libre'
+    }
+    return
+  }
+  const vise = o.mecanismes === 2 ? 1 : o.mecanismes === 3 ? 2 : 0
+  if (vise === 0) return
+  let n = conns.filter((cn) => estEnigme(cn.maillon)).length
+  if (n >= vise) return
+  // la famille du maillon promu passe d'abord ; à défaut (un passage
+  // libre, une membrane) celle du CAHIER — la mécanique demandée ne se
+  // trahit pas : une salle de glace ne se voit pas coiffer d'une barrière
+  const familleCahier: readonly Maillon[] =
+    cahier?.mecanique === 1
+      ? ['porte', 'et']
+      : cahier?.mecanique === 2
+        ? ['rail', 'nor']
+        : ESPECES_ENIGME
+  // on promeut d'abord les connexions les plus PROFONDES (l'énigme se
+  // mérite) : l'ordre des connexions suit déjà la profondeur du tirage
+  for (let i = conns.length - 1; i >= 0 && n < vise; i--) {
+    const cn = conns[i]
+    if (estEnigme(cn.maillon)) continue
+    const memeFamille: readonly Maillon[] =
+      cn.maillon === 'grille'
+        ? ['rail', 'nor']
+        : cn.maillon === 'rideau'
+          ? ['porte', 'et']
+          : familleCahier
+    const larg = salles[cn.a].rect.maxX - salles[cn.a].rect.minX
+    const ok = memeFamille.filter(
+      (m) =>
+        autorise(o, m) &&
+        !(m === 'et' && larg < 820) &&
+        !(m === 'nor' && cn.sens !== 'h'),
+    )
+    if (!ok.length) continue
+    cn.maillon = parmi(rng, ok)
+    n++
+  }
 }
 
 /** Le tirage de la topologie : la forme, les connexions, puis la chaîne
@@ -549,10 +622,9 @@ function tireTopologie(
     // deviennent des ÉNIGMES de la même famille (miroir, ET, rail, barrière)
     // plutôt qu'un filtre d'état de plus — la difficulté monte en montages,
     // pas en quantités, et les plafonds de lisibilité tiennent bon.
-    const especesEnigme: readonly Maillon[] = ['porte', 'et', 'rail', 'nor']
     const renfortsDoses =
-      D >= 6 && renforts.some((m) => especesEnigme.includes(m))
-        ? renforts.filter((m) => especesEnigme.includes(m))
+      D >= 6 && renforts.some(estEnigme)
+        ? renforts.filter(estEnigme)
         : renforts
     for (let i = restants.length - 1; i > 0; i--) {
       const j = Math.floor(rng() * (i + 1))
@@ -592,6 +664,8 @@ function tireTopologie(
           : 'libre'
     }
   }
+  // les ÉNIGMES à la demande — avant les plafonds, qui rabotent l'excès
+  doseEnigmes(conns, salles, cahier, o, rng)
   // les plafonds de lisibilité — les maillons du CONTRAT passent en premier
   {
     const ordre = [...forces, ...restants]

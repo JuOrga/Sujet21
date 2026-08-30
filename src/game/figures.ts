@@ -88,6 +88,82 @@ export const FIGURE_NOMS: Record<FigureFamille, string> = {
   voies: 'Voies',
 }
 
+/** Les familles VENUES DES TABLEAUX DE BOIZ : celles qui ne sont pas des
+ * glyphes géométriques mais la distillation d'un tableau fait main —
+ * conduits (le réseau), fusion (la matière), échangeur (le cycle), voies
+ * (la tresse). Elles portent chacune leur exigence d'état. */
+export const FAMILLES_BOIZ: readonly FigureFamille[] = [
+  'conduits',
+  'fusion',
+  'echangeur',
+  'voies',
+]
+
+/** Ce qu'une famille EXIGE et ce qu'elle SAIT PORTER — le contrat que la
+ * descente lit avant de proposer un tableau. Les glyphes géométriques
+ * (anneaux…constellation) ne posent que des plaques-filtres tirées du
+ * masque : ils n'exigent rien et se plient à toutes les mécaniques. Les
+ * familles de BOIZ, elles, gravent leur matière dans la géométrie même. */
+export interface ProfilFamille {
+  /** la famille impose de la GLACE (rideau, plaque froide, miroir câblé
+   * par la famille) — sans la solidification tissée, elle est injouable */
+  exigeGlace: boolean
+  /** la famille impose de la VAPEUR (évent, surchauffeur) */
+  exigeVapeur: boolean
+  /** le plus tôt qu'on ose la poser dans une descente : la lecture d'un
+   * glyphe simple s'apprend au début, un réseau se mérite */
+  momentMin: 1 | 2 | 3
+  /** la famille sait-elle porter une ÉNIGME AU LASER sur sa couture ?
+   * fusion et échangeur disent non, et c'est leur leçon : tout le puzzle
+   * y est fait de MATIÈRE — leur imposer un faisceau les trahirait */
+  enigmes: boolean
+}
+
+const glyphe = (momentMin: 1 | 2 | 3): ProfilFamille => ({
+  exigeGlace: false,
+  exigeVapeur: false,
+  momentMin,
+  enigmes: true,
+})
+
+export const FIGURE_PROFILS: Record<FigureFamille, ProfilFamille> = {
+  anneaux: glyphe(1),
+  spirale: glyphe(1),
+  cortege: glyphe(1),
+  rosace: glyphe(2),
+  nef: glyphe(2),
+  constellation: glyphe(2),
+  // BOIZ — le réseau : son canal-maître est un MIROIR DE GLACE câblé par
+  // la famille elle-même
+  conduits: {
+    exigeGlace: true,
+    exigeVapeur: false,
+    momentMin: 2,
+    enigmes: true,
+  },
+  // BOIZ — la matière : rideaux et zones force-glace, zéro faisceau
+  fusion: {
+    exigeGlace: true,
+    exigeVapeur: false,
+    momentMin: 2,
+    enigmes: false,
+  },
+  // BOIZ — le cycle thermique : chaudière, surchauffeurs, quartier froid
+  echangeur: {
+    exigeGlace: true,
+    exigeVapeur: true,
+    momentMin: 3,
+    enigmes: false,
+  },
+  // BOIZ — la tresse : rideau ET grille, trois routes par l'état
+  voies: { exigeGlace: true, exigeVapeur: true, momentMin: 3, enigmes: true },
+}
+
+/** L'index d'option `figure` d'une famille (2.. — voir OptionsGen). */
+export function optionFigure(f: FigureFamille): number {
+  return FIGURE_FAMILLES.indexOf(f) + 2
+}
+
 type Rng = () => number
 const entre = (rng: Rng, a: number, b: number): number => a + rng() * (b - a)
 const parmi = <T>(rng: Rng, xs: readonly T[]): T =>
@@ -460,21 +536,37 @@ function figAnneaux(cx: ContexteFamille, spirale: boolean): Squelette {
 /** cortège : la chaîne de cellules vers l'est — lunes et enceintes carrées
  * alternées, une seule avenue, le sas au cœur de la dernière. */
 function figCortege(cx: ContexteFamille): Squelette {
-  const { rng, W, H, nbCercles } = cx
+  const { rng, W, H, nbCercles, veutMeca } = cx
   const n = Math.max(2, Math.min(4, nbCercles + 1))
   const boxes: ObstacleBox[] = []
   const labels: WorldLabel[] = []
   const rayons: number[] = []
+  // L'ÉTABLI DEMANDE SA PLACE : l'intervalle ordinaire du cortège (340-470)
+  // ne laissait qu'une poche de 20 à 150 unités entre les deux dernières
+  // cellules — sous les 260 exigés, le tronc commun renonçait à toute
+  // énigme, et le cortège était la seule famille géométrique à n'en
+  // porter JAMAIS. Quand un mécanisme est demandé, les cellules se resserrent d'un
+  // cran et le dernier vide s'ouvre : la poche devient l'atelier du glyphe.
+  const etale = veutMeca ? 0.3 : 0.34
   for (let k = 0; k < n; k++)
-    rayons.push(Math.round(Math.min(H * 0.58, (W * 0.34 * (k + 1.5)) / n)))
-  let inter = Math.round(entre(rng, 340, 470)) // le vide entre cellules
+    rayons.push(Math.round(Math.min(H * 0.58, (W * etale * (k + 1.5)) / n)))
+  // le vide entre cellules
+  let inter = Math.round(veutMeca ? entre(rng, 660, 820) : entre(rng, 340, 470))
   // tout doit tenir entre −W et W, marges comprises
   const largeur = (): number =>
     rayons.reduce((s, r) => s + 2 * r, 0) + inter * (n - 1)
   if (largeur() > 2 * (W - 320)) {
-    const f = (2 * (W - 320)) / largeur()
+    // le surplus se prend d'abord sur les CELLULES : l'établi survit au
+    // rétrécissement du champ, sinon l'énigme se perdrait à nouveau
+    const somme = rayons.reduce((s, r) => s + 2 * r, 0)
+    const cible = Math.max(0, 2 * (W - 320) - inter * (n - 1))
+    const f = Math.max(0.4, somme > 0 ? cible / somme : 1)
     for (let k = 0; k < n; k++) rayons[k] = Math.round(rayons[k] * f)
-    inter = Math.round(inter * f)
+    if (largeur() > 2 * (W - 320)) {
+      const g = (2 * (W - 320)) / largeur()
+      for (let k = 0; k < n; k++) rayons[k] = Math.round(rayons[k] * g)
+      inter = Math.round(inter * g)
+    }
   }
   let xBord = -Math.round(largeur() / 2)
   const centres: Pt[] = []
@@ -1984,7 +2076,14 @@ export function essaieFigure(
   const D = cahier ? cahier.difficulte : Math.floor(entre(rng, 1, 7))
   const nbCercles = D <= 2 ? 2 : D <= 5 ? 3 : 4
   // les MÉCANISMES : décidés avant la géométrie (la couture finale d'une
-  // figure à mécanisme doit rester cardinale)
+  // figure à mécanisme doit rester cardinale). Le DOSAGE AUTO suit la
+  // leçon du plan de descente. L'ancien seuil (difficulté ≥ 4) laissait
+  // une run entière sans un seul faisceau : la rampe ordinaire plafonne à
+  // 3, et le mode figure n'y posait JAMAIS d'énigme. Désormais le premier
+  // palier enseigne (rien), dès qu'une difficulté est demandée un
+  // mécanisme se greffe, et le haut de la rampe en empile deux. Les
+  // familles qui refusent le faisceau (fusion, échangeur) restent
+  // servies par leur matière.
   const nbMecas =
     reglages.mecanismes === 1
       ? 0
@@ -1993,10 +2092,12 @@ export function essaieFigure(
         : reglages.mecanismes === 3
           ? 2
           : cahier
-            ? cahier.difficulte >= 4
-              ? 1
-              : 0
-            : rng() < 0.35
+            ? cahier.difficulte >= 5
+              ? 2
+              : cahier.difficulte >= 1
+                ? 1
+                : 0
+            : rng() < 0.7
               ? 1
               : 0
   const etats = suiteEtats(
@@ -2046,15 +2147,23 @@ export function essaieFigure(
   // les greffes : celles que la famille a montées elle-même (conduits),
   // sinon l'établi commun sur la couture finale
   let greffes: Greffe[] = sq.greffes ?? []
+  // le MASQUE tranche l'espèce du mécanisme : le miroir de glace est un
+  // maillon « porte » (bit 3 de FAMILLES_OPT), la barrière NOR un « nor »
+  // (bit 6). Une descente où la solidification n'est pas tissée ne doit pas
+  // se voir proposer un miroir, ni la vapeur manquante une barrière — les
+  // deux interdits, la couture garde sa plaque-filtre et rien ne se greffe.
+  const miroirPermis = (reglages.famillesMasque & (1 << 3)) !== 0
+  const barrierePermise = (reglages.famillesMasque & (1 << 6)) !== 0
   if (
     greffes.length === 0 &&
     nbMecas > 0 &&
+    (miroirPermis || barrierePermise) &&
     sq.coutureFinale &&
     sq.poche &&
     sq.poche.maxX - sq.poche.minX > 260
   ) {
     greffes = []
-    const parMiroir = rng() < 0.5
+    const parMiroir = miroirPermis && (!barrierePermise || rng() < 0.5)
     greffes.push(
       parMiroir
         ? greffeMiroir(rng, sq.plafond, sq.coutureFinale, sq.poche, 1)
@@ -2069,22 +2178,25 @@ export function essaieFigure(
     )
     if (nbMecas > 1) {
       // la seconde énigme partage la poche, garde son canal : deux
-      // verrous s'empilent sur la même couture
+      // verrous s'empilent sur la même couture. On préfère l'AUTRE espèce
+      // (les deux lectures se répondent) ; si le masque n'en autorise
+      // qu'une, on redouble celle-là plutôt que de trahir la descente.
+      const secondMiroir = parMiroir ? !barrierePermise : miroirPermis
       greffes.push(
-        parMiroir
-          ? greffeBarriere(
+        secondMiroir
+          ? greffeMiroir(rng, sq.plafond, sq.coutureFinale, sq.poche, 2)
+          : greffeBarriere(
               rng,
               sq.plafond,
               sq.sol,
               sq.coutureFinale,
               sq.poche,
               2,
-            )
-          : greffeMiroir(rng, sq.plafond, sq.coutureFinale, sq.poche, 2),
+            ),
       )
     }
     // la plaque-filtre de la couture finale cède sa place aux portes
-    if (sq.coutureFinale) boxes.splice(sq.coutureFinale.plaque, 1)
+    boxes.splice(sq.coutureFinale.plaque, 1)
   }
   for (const g of greffes) {
     for (const em of g.lasers) lasers.push(em)

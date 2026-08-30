@@ -486,8 +486,9 @@ export const CATALOGUE_REGLES: readonly RegleGen[] = [
     texte:
       'Le tableau EST un glyphe qu’on lit d’un regard au plan ' +
       'large — pas un assemblage de salles : un dessin posé dans le champ. ' +
-      'Neuf familles aujourd’hui : anneaux, spirale, cortège, rosace, ' +
-      'nef, constellation, conduits, fusion, échangeur.',
+      'Dix familles aujourd’hui : anneaux, spirale, cortège, rosace, ' +
+      'nef, constellation — et les quatre distillées des tableaux de ' +
+      'BOIZ : conduits, fusion, échangeur, voies.',
   },
   {
     id: 'figure-immensite',
@@ -529,6 +530,91 @@ export const CATALOGUE_REGLES: readonly RegleGen[] = [
       'Coutures qui tournent, moitiés glissées, satellites posés au large ' +
       'pour la beauté seule : la symétrie tordue fait le vivant — la ' +
       'symétrie parfaite fait le mort.',
+  },
+  {
+    id: 'pool-pioche-trigramme',
+    famille: 'rampe',
+    etat: 'en-place',
+    titre: 'Le pool se PIOCHE sur le trigramme, il ne se déroule pas',
+    texte:
+      'Le tableau écrit ne vient plus de la position suivante dans la ' +
+      'bibliothèque : le plan dit ce que le rang demande (moment · ' +
+      'mécanique · difficulté) et l’on tire, parmi les tableaux qui s’en ' +
+      'approchent le plus, celui qu’on n’a pas encore vu de la descente. ' +
+      'Le MOMENT pèse dix fois la difficulté, la difficulté dix fois le ' +
+      'reste ; la mécanique sert seulement à éviter celle qu’on vient de ' +
+      'jouer. À écart égal, le hasard tranche. Un tableau sans trigramme ' +
+      'reste tirable, après tous les codés et dans l’ordre de la ' +
+      'bibliothèque : la migration se fait tableau par tableau.',
+  },
+  {
+    id: 'descente-tout-procedurale',
+    famille: 'rampe',
+    etat: 'en-place',
+    titre: 'Une descente peut n’être QUE générée',
+    texte:
+      'Les salles générées et les tableaux écrits sont deux interrupteurs ' +
+      'indépendants au banc. Générées seules : la descente est tout ' +
+      'procédurale, les trois cartes de chaque récompense sont fabriquées ' +
+      '— le mode d’épreuve du générateur, et la façon de jouer une ' +
+      'descente inédite quand la bibliothèque est sue par cœur.',
+  },
+  {
+    id: 'enigme-a-la-demande',
+    famille: 'figures',
+    etat: 'en-place',
+    titre: 'L’auteur peut EXIGER un faisceau, dans les deux modes',
+    texte:
+      'Le réglage « Énigmes au laser » du panneau ne pilotait que le mode ' +
+      'figure : dans un tableau à compartiments, l’auteur n’avait qu’à ' +
+      'retirer des graines jusqu’à en voir un. Il porte maintenant sur les ' +
+      'deux modes — « aucune » rabat les maillons à faisceau sur le filtre ' +
+      'd’état de leur famille, « une » et « deux » promeuvent des ' +
+      'connexions en énigmes. La promotion reste DANS la famille : le ' +
+      'maillon remplacé d’abord (un rideau devient miroir ou double ET), ' +
+      'la mécanique du cahier à défaut — une salle de glace ne se voit ' +
+      'jamais coiffer d’une barrière NOR.',
+  },
+  {
+    id: 'figure-dans-la-descente',
+    famille: 'figures',
+    etat: 'en-place',
+    titre: 'Les figures se jouent DANS la descente, mêlées aux compartiments',
+    texte:
+      'Le mode figure ne vit plus dans le seul éditeur : à chaque rang, le ' +
+      'choix mêle des salles à compartiments (le système historique) et ' +
+      'des figures — une au début, deux dès que le milieu s’ouvre, jamais ' +
+      'les trois. La carte s’annonce par sa FAMILLE, et le champ s’ouvre ' +
+      'avec le plan : intime au début, vaste au milieu, immense à la fin.',
+  },
+  {
+    id: 'figure-vivier-eligible',
+    famille: 'figures',
+    etat: 'en-place',
+    titre: 'Une famille ne se propose que si la descente peut la jouer',
+    texte:
+      'Chaque famille déclare ce qu’elle EXIGE (les familles de BOIZ ' +
+      'gravent leur matière dans la géométrie : rideau, plaque froide, ' +
+      'surchauffeur) et le plus tôt qu’on ose la poser. Le vivier se ' +
+      'filtre sur trois critères — les mémoires tissées, la mécanique de ' +
+      'la carte, le moment du plan — et la famille se tire au hasard dans ' +
+      'ce qui reste. Le masque tranche aussi l’espèce du mécanisme : pas ' +
+      'de miroir de glace sans solidification, pas de barrière NOR sans ' +
+      'vaporisation.',
+  },
+  {
+    id: 'figure-enigme-des-le-premier-palier',
+    famille: 'figures',
+    etat: 'en-place',
+    titre: 'L’énigme vient dès qu’une difficulté est demandée',
+    texte:
+      'Le dosage AUTO n’accordait un mécanisme qu’à partir de la ' +
+      'difficulté 4 — or la rampe d’une descente ordinaire plafonne à 3 : ' +
+      'pas un faisceau de toute une run. La règle suit désormais le plan : ' +
+      'difficulté 0 enseigne (les plaques gardent seules), dès 1 une ' +
+      'énigme se greffe sur la couture finale, dès 5 deux verrous s’y ' +
+      'empilent. Fusion et échangeur font exception, et c’est leur leçon : ' +
+      'leur puzzle est fait de MATIÈRE, pas de faisceau.',
   },
 ] as const
 
