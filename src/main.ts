@@ -8941,14 +8941,17 @@ function mbMontreDraft(): void {
 }
 
 // ---- Le POOL de salles : le choix de la prochaine, après la récompense --
-// Les codes « 21XX-MMD » peuvent porter PLUSIEURS tableaux au même rang :
-// quand le rang suivant en offre au moins deux, la cérémonie propose un
-// CHOIX — mini-carte, code, nom, chips — au lieu de l'enchaînement muet.
+// Deux chemins, et il faut les distinguer. En VOIE (salles générées
+// allumées, l'ordinaire), le choix se compose au rang : trois salles
+// fabriquées et, si les tableaux écrits tiennent, un tableau PIOCHÉ dans le
+// pool sur le trigramme du plan. Hors voie, le vieux chemin subsiste : les
+// codes « 21XX-MMD » peuvent porter plusieurs tableaux au MÊME ordre, et le
+// jeu en propose alors deux — sinon l'enchaînement reste linéaire.
 let salleChoisie: LevelDef | null = null
 
-/** Après la récompense : en VOIE SEMI-PROCÉDURALE, la suite écrite face à
- * une salle générée ; sinon le choix du pool si le rang suivant en offre
- * deux — à défaut, la fin ordinaire. */
+/** Après la récompense : en VOIE SEMI-PROCÉDURALE, le tableau PIOCHÉ dans
+ * le pool face aux salles générées ; sinon le choix du pool au rang, si
+ * celui-ci offre deux tableaux — à défaut, la fin ordinaire. */
 function mbApresRecompense(): void {
   const seq = playedLevels()
   if (sallesGenerees()) {
@@ -8972,12 +8975,12 @@ interface CarteVoie {
 }
 
 /** LA VOIE SEMI-PROCÉDURALE : le choix du rang suivant, tiré du PLAN de
- * descente (longueur, rampe de difficulté, moment par tiers). La suite
- * ÉCRITE tant que la séquence en offre — face à une salle GÉNÉRÉE au cahier
- * du plan, mécanique différente. Séquence épuisée : DEUX salles générées,
- * deux mécaniques — la descente continue jusqu'au bout du plan. En
- * DESCENTE DU JOUR, graine et mécaniques viennent de la date : les mêmes
- * salles pour tous les postes ce jour-là. */
+ * descente (longueur, rampe de difficulté, moment par tiers). TROIS salles
+ * générées, trois mécaniques — plus, quand les tableaux écrits tiennent, un
+ * tableau PIOCHÉ dans le pool sur le trigramme du rang. Pool vide ou
+ * tableaux écrits coupés : la descente est tout procédurale et continue
+ * jusqu'au bout du plan. En DESCENTE DU JOUR, graine, mécaniques et pioche
+ * viennent de la date : les mêmes salles pour tous les postes ce jour-là. */
 function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   const rangSuivant = voieRang + 1 // la salle que le choix désigne, dans le plan
   if (rangSuivant > voiePlan.longueur) return null // la fin se joue au sas
