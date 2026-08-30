@@ -11224,19 +11224,41 @@ function frame(now: number): void {
     monitor.physMs += (physRaw - monitor.physMs) * 0.08
   }
 
+  // LES FOSSES DÉCLENCHEUSES : une fosse (étage négatif) qui porte un canal
+  // alimente les portes TANT QUE son volume tient le seuil — même algèbre
+  // que les pastilles, règle OU : verser de l'eau ouvre, la reprendre
+  // referme. Le liquide devient un poids posé sur un contacteur. Visible des
+  // DEUX chemins : les salles à lasers, et celles qui n'en ont pas.
+  const fossesCanal = level.boxes.filter(
+    (bx) =>
+      bx.material === MAT_PLATEAU &&
+      (bx.hauteur ?? 80) < 0 &&
+      (bx.canal ?? 0) >= 1,
+  )
+  const fosseAlimente = (canal: number): boolean =>
+    fossesCanal.some(
+      (f) => f.canal === canal && sim.litresFosse(f) >= (f.seuilL ?? 0.5),
+    )
+
   // ---- LES PORTES vers le solveur. HORS du bloc des lasers : un tableau
-  // peut n'avoir que des portes SCÉNARISÉES (la brèche de l'ouverture),
-  // sans le moindre émetteur — leur paroi doit tout de même être solide
-  // jusqu'à l'instant où le récit la crève.
+  // peut n'avoir que des portes SCÉNARISÉES (la brèche de l'ouverture) ou
+  // des FOSSES déclencheuses, sans le moindre émetteur — leur paroi doit
+  // être solide jusqu'à l'instant où le récit (ou l'eau versée) l'ouvre.
   {
     const portes = level.portes ?? []
     if (portes.length > 0) {
       if (laserEtat.portesOuvertes.length !== portes.length) {
         laserEtat.portesOuvertes = portes.map(() => false)
       }
+      // dans une salle à LASERS, le verdict du faisceau (calculé plus bas,
+      // à l'image précédente) est CONSERVÉ ici — le réécrire à faux une
+      // image le temps du recalcul referait des portes battantes au solveur
+      const aLasers = (level.lasers ?? []).length > 0
       for (let i = 0; i < portes.length; i++) {
-        if (sequenceur.etat.brechesOuvertes.has(i))
-          laserEtat.portesOuvertes[i] = true
+        laserEtat.portesOuvertes[i] =
+          sequenceur.etat.brechesOuvertes.has(i) ||
+          fosseAlimente(portes[i].canal) ||
+          (aLasers && laserEtat.portesOuvertes[i])
       }
       // le solveur ne reçoit que les portes closes — recomposé au changement
       const closes = portes.filter((_, i) => !laserEtat.portesOuvertes[i])
@@ -11473,20 +11495,6 @@ function frame(now: number): void {
     // Elle vise un CANAL (le n° des pastilles) avec sa règle : OU (défaut,
     // une pastille active suffit) ou ET (toutes en même temps) — une porte
     // sans canal valide est une paroi que seul le récit ouvre.
-    // LES FOSSES DÉCLENCHEUSES : une fosse (étage négatif) qui porte un
-    // canal alimente les portes TANT QUE son volume tient le seuil — même
-    // algèbre que les pastilles, règle OU : verser de l'eau ouvre la porte,
-    // la reprendre la referme. Le liquide devient un poids sur un contacteur.
-    const fossesCanal = level.boxes.filter(
-      (bx) =>
-        bx.material === MAT_PLATEAU &&
-        (bx.hauteur ?? 80) < 0 &&
-        (bx.canal ?? 0) >= 1,
-    )
-    const fosseAlimente = (canal: number): boolean =>
-      fossesCanal.some(
-        (f) => f.canal === canal && sim.litresFosse(f) >= (f.seuilL ?? 0.5),
-      )
     laserEtat.portesOuvertes = portes.map(
       (p, i) =>
         sequenceur.etat.brechesOuvertes.has(i) ||
