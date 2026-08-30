@@ -331,6 +331,10 @@ uniform float uSoftness;
 uniform float uFieldScale;
 uniform vec2 uRoomCenter;
 uniform vec2 uRoomHalf;
+// LE SOL DES MODULES : 0 la salle est le rectangle de la toile (la cuve
+// historique) — 1 la salle est l'UNION DES CREUX des coques posées, et le
+// fond ne se peint qu'à l'intérieur des modules.
+uniform float uSolModules;
 uniform int uBoxCount;
 uniform vec4 uBoxes[MAX_BOXES];   // minX, minY, maxX, maxY
 // x : matériau (0 mur, 1 hydrophile, 2 hydrophobe, 3 sas…) ; y : rotation
@@ -828,8 +832,43 @@ void main() {
 
   // La cuve d'essai flotte dans le vide : le décor se scinde en deux mondes
   // de part et d'autre de la coque (roomD < 0 : intérieur).
-  vec2 dr = abs(world - uRoomCenter) - uRoomHalf;
-  float roomD = max(dr.x, dr.y);
+  float roomD;
+  if (uSolModules > 0.5) {
+    // LE SOL NE VIT QU'À L'INTÉRIEUR DES MODULES : la salle n'est plus le
+    // rectangle de la toile, c'est l'union des creux des COQUES posées.
+    // Aucun uniforme de plus : les coques sont déjà là, dans uBoxes.
+    roomD = 1.0e9;
+    for (int bi = 0; bi < MAX_BOXES; bi++) {
+      if (bi >= uBoxCount) break;
+      vec4 dec = decodeAux(uBoxAux[bi].x);
+      if (dec.y < 4.5) continue; // seule une COQUE fait salle
+      vec2 c = (uBoxes[bi].xy + uBoxes[bi].zw) * 0.5;
+      vec2 h = (uBoxes[bi].zw - uBoxes[bi].xy) * 0.5;
+      vec2 p = world - c;
+      float a = uBoxAux[bi].y;
+      if (abs(a) > 0.0005) {
+        float ca = cos(a); float sa = sin(a);
+        p = vec2(p.x * ca + p.y * sa, -p.x * sa + p.y * ca);
+      }
+      float petit = min(h.x, h.y);
+      float cc = clamp(floor(mod(dec.z / 16.0, 8.0)) * (0.5 / 7.0) * petit, 0.0, petit * 0.9);
+      float t = clamp(mod(dec.w, 32.0) * 8.0, 1.0, petit);
+      vec2 hi = h - vec2(t);
+      if (hi.x <= 0.0 || hi.y <= 0.0) continue; // coque pleine : pas de salle
+      vec2 ap = abs(p);
+      vec2 qi = ap - hi;
+      float di = length(max(qi, 0.0)) + min(max(qi.x, qi.y), 0.0);
+      float ci = max(0.0, cc - t * 0.41421356);
+      if (ci > 0.0) di = max(di, (ap.x + ap.y - (hi.x + hi.y - ci)) * 0.70710678);
+      roomD = min(roomD, di);
+      // bien à l'intérieur d'un module, tout ce qui suit est saturé (le
+      // voile, le halo de paroi, le liseré) : inutile de finir la liste
+      if (roomD < -420.0) break;
+    }
+  } else {
+    vec2 dr = abs(world - uRoomCenter) - uRoomHalf;
+    roomD = max(dr.x, dr.y);
+  }
   float inRoom = 1.0 - smoothstep(0.0, 6.0 / uZoom, roomD);
 
   // Dehors : nuit orbitale — texture générée si chargée (deux couches, la
@@ -2900,6 +2939,15 @@ export class Renderer {
   // plafond.webp (les verrières), « x » charge plafond-x.webp. Le calque 3
   // est RÉUTILISÉ (un seul téléversement de 1024² au changement de salle) ;
   // une variante absente retombe sur le plafond par défaut, sans trou.
+  /** LE SOL DES MODULES : le fond de cuve ne se peint qu'à l'intérieur des
+   * coques posées, et la coque de la toile ne se dessine plus. Réglé par
+   * tableau (LevelDef.coque). */
+  private solModules = false
+
+  setSolModules(actif: boolean): void {
+    this.solModules = actif
+  }
+
   private plafondActuel = ''
   private plafondJeton = 0
 
@@ -3394,6 +3442,7 @@ export class Renderer {
       (b.maxX - b.minX) * 0.5,
       (b.maxY - b.minY) * 0.5,
     )
+    gl.uniform1f(cu['uSolModules'], this.solModules ? 1 : 0)
     gl.uniform1i(cu['uBoxCount'], boxCount)
     gl.uniform4fv(cu['uBoxes[0]'], this.boxScratch)
     gl.uniform4fv(cu['uBoxAux[0]'], this.auxScratch)
@@ -3544,8 +3593,10 @@ export class Renderer {
     gl.activeTexture(gl.TEXTURE0)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
 
-    // Passe B bis — coque texturée autour de la cuve
-    this.drawHull(sim, camera, viewportW, viewportH)
+    // Passe B bis — coque texturée autour de la cuve. Un tableau bâti en
+    // MODULES n'a pas de cuve : ses parois sont celles de ses coques, et
+    // le dehors doit rester le vide.
+    if (!this.solModules) this.drawHull(sim, camera, viewportW, viewportH)
 
     // Passe B ter — décalques de décor (tuyaux, vannes), effacés sous l'eau
     this.drawDecals(decals, camera, viewportW, viewportH, params)
