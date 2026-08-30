@@ -22,6 +22,19 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '30/08/2026 10:55',
+    title: 'LE JEU LIT LE CATALOGUE — le codex d’abord, et l’anglais devient jouable',
+    notes: [
+      'Demandé : que l’écran des textes serve à quelque chose. Jusqu’ici l’atelier rangeait des retouches que personne ne voyait jamais en jeu — il fallait me les rendre pour que je les grave. C’est fini pour le CODEX : ce que vous écrivez sur l’écran TEXTES paraît dans le jeu à la fiche suivante, sans passer par moi. 86 entrées, 8 100 signes, le plus gros gisement de lore et celui qui porte l’arc du récit.',
+      'ET LA LANGUE CHOISIE EN HAUT EST CELLE DU JEU. Il n’y a pas deux réglages : basculer sur ENGLISH met le codex en anglais, titres des fiches et fanfares comprises. C’est ce qui fait passer la traduction du tableur au jeu.',
+      'LA RÈGLE DE REPLI diffère EXPRÈS entre l’écran et le jeu, et c’est le cœur de la livraison. Sur l’écran, une traduction manquante s’affiche VIDE : un trou doit se voir, sinon on ne saura jamais ce qui reste à faire. En jeu, un trou serait une fiche blanche : on retombe donc sur le français — sur LA RETOUCHE française s’il y en a une, pas sur la version que vous avez désavouée. Un joueur anglais lit du français là où la traduction manque ; il ne lit jamais du vide. Les deux règles disent la même chose vue des deux côtés : l’atelier montre le travail restant, le jeu ne montre jamais un manque.',
+      'L’ÉCRAN DIT CE QUE LE JEU LIT, plutôt que de laisser réécrire dans le vide. « LE CODEX · 86 » porte une pastille verte « lu par le jeu » ; les dix autres domaines gardent une pastille ambre pointillée et un petit degré — on peut y écrire, tout est gardé et exportable, mais le jeu affiche encore la chaîne du code. La bascule se fera domaine par domaine et la liste se remplira au fur et à mesure.',
+      'UNE SEULE FABRIQUE DE CLÉ, appelée des deux côtés (cleTexte). C’est le piège qu’il fallait fermer : deux fabrications qui divergent d’un tiret rangeraient la retouche sous un nom que le jeu n’irait pas chercher — l’écran afficherait fièrement RETOUCHÉ et rien ne bougerait en jeu. Un test le vérifie fiche par fiche, sur les 43, en posant une retouche par la clé du CATALOGUE et en la relisant par le lecteur du JEU.',
+      'Le codex n’affiche plus des constantes de code : ses titres et ses corps sont désormais ÉCHAPPÉS avant l’affichage, dans le voile comme dans le toast. Un texte qu’un humain peut retaper peut contenir un chevron ; il doit s’écrire, pas s’exécuter.',
+      'Neuf tests neufs sur la lecture : la source rendue telle quelle sans retouche, la retouche qui paraît, la traduction qui l’emporte, le repli qui passe par la retouche française, l’impossibilité qu’une fiche sorte blanche à 0 % traduit, la coexistence des deux règles, et l’anti-dérive des clés. 583 tests verts.',
+    ],
+  },
+  {
     date: '30/08/2026 10:31',
     title: 'Les textes se réécrivent SUR L’ÉCRAN, et le catalogue parle déjà deux langues',
     notes: [

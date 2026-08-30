@@ -93,11 +93,18 @@ import {
 } from './game/leviers'
 import { dansForme, formeOutline } from './game/formes'
 import {
+  DOMAINE_NOMS,
   catalogueMarkdown,
   catalogueTextes,
   comptesParDomaine,
   type DomaineTexte,
 } from './textes/catalogue'
+import {
+  DOMAINES_LUS,
+  codexLu,
+  langueLue,
+  poseLangueLue,
+} from './textes/lecture'
 import {
   LANGUES,
   LANGUE_SOURCE,
@@ -1891,7 +1898,7 @@ trophees.onDebloque = (t) => {
 const codex = new Codex()
 codex.onDecouverte = (d) => {
   toastFile.push({
-    nom: d.titre,
+    nom: codexLu(d).titre,
     icone: d.icone,
     sur: 'CODEX — NOUVELLE FICHE',
     fiche: d.id,
@@ -1928,7 +1935,7 @@ function majToast(): void {
       t.article ? iconeMetaHTML(t.article, t.icone) : `<i>${t.icone}</i>`
     }</span>` +
     `<span class="tt-corps"><b>${t.sur ?? 'TROPHÉE DÉBLOQUÉ'}</b>` +
-    `<span class="tt-nom">${t.nom}</span>${voir}</span>` +
+    `<span class="tt-nom">${htmlSafe(t.nom)}</span>${voir}</span>` +
     `<span class="tt-vie"></span>`
   if (t.fiche) tropheeToast.dataset.fiche = t.fiche
   else delete tropheeToast.dataset.fiche
@@ -2367,7 +2374,12 @@ function renderCodexVoile(): void {
     html += '<div class="cdx-grille">'
     for (const d of fiches) {
       if (codex.connu(d.id)) {
-        html += `<div class="cdx-carte" data-fiche="${d.id}"><i>${d.icone}</i><div><b>${d.titre}</b><span>${d.texte}</span></div></div>`
+        // le titre et le corps viennent du CATALOGUE : ce que le
+        // concepteur a réécrit sur l'écran TEXTES paraît ici, dans la
+        // langue du moment — et se voit donc échapper, comme tout texte
+        // qui n'est plus une constante du code
+        const lu = codexLu(d)
+        html += `<div class="cdx-carte" data-fiche="${d.id}"><i>${d.icone}</i><div><b>${htmlSafe(lu.titre)}</b><span>${htmlSafe(lu.texte)}</span></div></div>`
       } else {
         html += `<div class="cdx-carte cdx-verrou"><i>?</i><div><b>FICHE À DÉCOUVRIR</b><span>Une interaction du protocole reste à vivre…</span></div></div>`
       }
@@ -7140,7 +7152,14 @@ function carteHTML(d: InstrumentDef, o: CarteOpts): string {
 const textesEl = document.getElementById('textes') as HTMLDivElement
 let txFiltre: DomaineTexte | 'tout' = 'tout'
 let txQuete = ''
-let txLangue: Langue = LANGUE_SOURCE
+/**
+ * LA LANGUE REGARDÉE EST CELLE DU JEU. Il n'y a pas deux réglages : basculer
+ * sur ENGLISH ici met le jeu en anglais — c'est ce qui rend la traduction
+ * jouable au lieu de rester un tableur. L'écran et le jeu la RENDENT
+ * différemment, et c'est voulu : l'écran laisse voir les trous, le jeu les
+ * bouche avec le français (src/textes/lecture.ts).
+ */
+const txLangue = (): Langue => langueLue()
 let txSaisie: string | null = null // la clé en cours d'édition, s'il y en a une
 
 function txDit(msg: string): void {
@@ -7150,7 +7169,7 @@ function txDit(msg: string): void {
 
 /** Le catalogue vu dans la langue du moment. */
 function txToutes(): EntreeLangue[] {
-  return applique(catalogueTextes(), txLangue)
+  return applique(catalogueTextes(), txLangue())
 }
 
 /** Les entrées qui passent le filtre et la recherche du moment. */
@@ -7194,7 +7213,9 @@ function renderTxLangues(): void {
     // on y compte les RETOUCHES, ce qui n'est pas la même promesse
     const chiffre = l.source ? `${a.faits} retouches` : `${a.faits} / ${a.total}`
     return (
-      `<button type="button" class="tx-lg${l.code === txLangue ? ' on' : ''}"` +
+      `<button type="button" class="tx-lg${l.code === txLangue() ? ' on' : ''}"` +
+      ` title="Affiche le catalogue ET LE JEU dans cette langue` +
+      `${l.source ? '' : ' — un texte non traduit y reste en français'}"` +
       ` data-lg="${l.code}">${htmlSafe(l.nom.toUpperCase())}<i>${chiffre}</i></button>`
     )
   }).join('')
@@ -7212,12 +7233,22 @@ function renderTxFiltres(): void {
       n: c.entrees,
     })),
   ]
+  // une pastille grisée : le domaine se retouche, mais le JEU ne le lit pas
+  // encore — la bascule se fait domaine par domaine, et il vaut mieux le
+  // dire que laisser réécrire dans le vide
   host.innerHTML = chips
-    .map(
-      (c) =>
-        `<button type="button" class="tx-chip${c.cle === txFiltre ? ' on' : ''}"` +
-        ` data-dom="${c.cle}">${htmlSafe(c.mot.toUpperCase())} · ${c.n}</button>`,
-    )
+    .map((c) => {
+      const lu = c.cle === 'tout' || DOMAINES_LUS.has(c.cle)
+      return (
+        `<button type="button" class="tx-chip${c.cle === txFiltre ? ' on' : ''}` +
+        `${lu ? '' : ' pas-lu'}" data-dom="${c.cle}"` +
+        ` title="${
+          lu
+            ? 'Le jeu affiche ces textes tels que vous les écrivez ici'
+            : 'Pas encore branché : vos retouches sont gardées et exportables, mais le jeu affiche encore le texte du code'
+        }">${htmlSafe(c.mot.toUpperCase())} · ${c.n}${lu ? '' : ' °'}</button>`
+      )
+    })
     .join('')
 }
 
@@ -7246,13 +7277,17 @@ function renderTextes(): void {
     return
   }
   const q = txQuete.trim()
-  const estSource = txLangue === LANGUE_SOURCE
+  const estSource = txLangue() === LANGUE_SOURCE
   let out = ''
   for (const c of comptesParDomaine(vues)) {
     const lot = vues.filter((e) => e.domaine === c.domaine)
     out +=
       `<div class="tx-fam">${htmlSafe(c.nom.toUpperCase())}` +
-      `<small>${c.entrees} entrées</small></div>`
+      `<small>${c.entrees} entrées</small>` +
+      (DOMAINES_LUS.has(c.domaine)
+        ? `<small class="tx-lu">lu par le jeu</small>`
+        : `<small class="tx-pas-lu">pas encore lu par le jeu</small>`) +
+      `</div>`
     for (const e of lot) {
       const mot = TX_ETAT_MOT[e.etat]
       const vide = e.texte.length === 0
@@ -7310,9 +7345,11 @@ function txOuvreSaisie(cle: string): void {
   ta.addEventListener('blur', () => {
     txSaisie = null
     if (!annule) {
-      poseTexte(txLangue, cle, ta.value, e.source)
+      poseTexte(txLangue(), cle, ta.value, e.source)
       txDit(
-        `« ${cle} » enregistré sur ce poste. Exportez pour le graver dans le jeu.`,
+        `« ${cle} » enregistré sur ce poste` +
+          `${DOMAINES_LUS.has(e.domaine) ? ' — et déjà visible en jeu' : ''}. ` +
+          `Exportez pour le graver dans le dépôt.`,
       )
     }
     renderTxLangues()
@@ -7325,8 +7362,12 @@ function ouvreTextes(): void {
   renderTxLangues()
   renderTxFiltres()
   renderTextes()
+  const lus = [...DOMAINES_LUS].map((d) => DOMAINE_NOMS[d].toLowerCase())
   txDit(
-    'Cliquez un texte pour le réécrire. Les retouches vivent SUR CE POSTE : exportez-les pour qu’elles soient gravées dans le jeu.',
+    `Cliquez un texte pour le réécrire — ${lus.join(', ')} : ce que vous écrivez ` +
+      `PARAÎT EN JEU tout de suite. Les autres domaines attendent leur bascule. ` +
+      `Dans tous les cas les retouches vivent SUR CE POSTE : exportez-les pour ` +
+      `qu’elles soient gravées dans le dépôt.`,
   )
 }
 document.getElementById('home-textes')?.addEventListener('click', ouvreTextes)
@@ -7337,7 +7378,7 @@ document.getElementById('tx-langues')?.addEventListener('click', (ev) => {
   const b = (ev.target as HTMLElement).closest('button')
   const l = b?.dataset.lg
   if (!l || !langueDef(l)) return
-  txLangue = l as Langue
+  poseLangueLue(l as Langue)
   txSaisie = null
   renderTxLangues()
   renderTxFiltres()
@@ -7359,7 +7400,7 @@ document.getElementById('tx-liste')?.addEventListener('click', (ev) => {
   const cible = ev.target as HTMLElement
   const rendre = cible.closest<HTMLElement>('[data-defaire]')?.dataset.defaire
   if (rendre) {
-    retireTexte(txLangue, rendre)
+    retireTexte(txLangue(), rendre)
     txDit(`« ${rendre} » rendu à la source.`)
     renderTxLangues()
     renderTextes()
@@ -7386,10 +7427,10 @@ document.getElementById('tx-exp')?.addEventListener('click', () => {
     txDit('Aucune retouche dans cette langue : rien à exporter.')
     return
   }
-  void copieTexte(exporteTextes(txLangue)).then((ok: boolean) =>
+  void copieTexte(exporteTextes(txLangue())).then((ok: boolean) =>
     txDit(
       ok
-        ? `${a.faits} retouche(s) copiée(s) en ${txLangue.toUpperCase()} — collez-les-moi pour que je les grave.`
+        ? `${a.faits} retouche(s) copiée(s) en ${txLangue().toUpperCase()} — collez-les-moi pour que je les grave.`
         : 'Presse-papier refusé — l’export est dans la console (F12).',
     ),
   )
@@ -7408,7 +7449,7 @@ document.getElementById('tx-imp')?.addEventListener('click', () => {
     txDit('Ce n’est pas un export lisible (il lui faut une langue et des textes).')
     return
   }
-  if (r.langue) txLangue = r.langue
+  if (r.langue) poseLangueLue(r.langue)
   ta.value = ''
   ta.hidden = true
   renderTxLangues()

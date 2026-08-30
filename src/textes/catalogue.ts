@@ -100,6 +100,22 @@ export function enCle(id: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
+/**
+ * LA CLÉ, construite ici et NULLE PART AILLEURS. Le jeu lit désormais le
+ * catalogue (src/textes/lecture.ts) : il doit fabriquer exactement la même
+ * clé que celle inscrite ici, sinon une retouche se rangerait sous un nom
+ * que personne n'irait chercher — et l'on ne s'en apercevrait qu'en jeu, en
+ * voyant le texte d'origine s'obstiner. Une seule fonction, donc, appelée
+ * des deux côtés.
+ */
+export function cleTexte(
+  domaine: DomaineTexte,
+  sujet: string,
+  ...champs: string[]
+): string {
+  return [domaine, enCle(sujet), ...champs.map(enCle)].join('.')
+}
+
 function pousse(
   out: EntreeTexte[],
   e: Omit<EntreeTexte, 'texte'> & { texte: string | undefined },
@@ -162,7 +178,7 @@ export function catalogueTextes(): EntreeTexte[] {
   for (const f of CODEX) {
     const ou = `Écran CODEX — groupe ${f.groupe}`
     pousse(out, {
-      cle: `codex.${enCle(f.id)}.titre`,
+      cle: cleTexte('codex', f.id, 'titre'),
       domaine: 'codex',
       sujet: f.id,
       champ: 'titre',
@@ -170,7 +186,7 @@ export function catalogueTextes(): EntreeTexte[] {
       ou,
     })
     pousse(out, {
-      cle: `codex.${enCle(f.id)}.texte`,
+      cle: cleTexte('codex', f.id, 'texte'),
       domaine: 'codex',
       sujet: f.id,
       champ: 'texte',
