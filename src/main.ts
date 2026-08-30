@@ -97,8 +97,21 @@ import {
   catalogueTextes,
   comptesParDomaine,
   type DomaineTexte,
-  type EntreeTexte,
 } from './textes/catalogue'
+import {
+  LANGUES,
+  LANGUE_SOURCE,
+  applique,
+  avance,
+  exporteTextes,
+  importeTextes,
+  langueDef,
+  poseTexte,
+  retireTexte,
+  type EntreeLangue,
+  type EtatTexte,
+  type Langue,
+} from './textes/atelier'
 import {
   PLAFOND_DPR,
   echelleDepart,
@@ -7114,31 +7127,44 @@ function carteHTML(d: InstrumentDef, o: CarteOpts): string {
   )
 }
 
-// ---- L'ÉCRAN DES TEXTES : relire tout le lore d'un seul endroit ----
+// ---- L'ÉCRAN DES TEXTES : relire ET RÉÉCRIRE le lore d'un seul endroit ----
 // Le catalogue (src/textes/catalogue.ts) parcourt les modules et rend une
-// liste plate à clés. Cet écran la donne à LIRE : groupée par domaine,
-// cherchable, avec pour chaque texte sa clé et l'endroit où le joueur le
-// rencontre. C'est le plan de travail de la réécriture — et, le jour venu,
-// la carte de ce qu'il faudra traduire.
+// liste plate à clés — c'est la SOURCE, elle vient du code. L'atelier
+// (src/textes/atelier.ts) pose par-dessus les retouches du concepteur,
+// rangées par langue.
+//
+// Réécrire et traduire sont le même geste : une retouche française
+// remplace la source, une entrée anglaise remplit un vide. Même écran,
+// même stockage, même export — et ajouter une langue ne demandera qu'une
+// ligne dans LANGUES.
 const textesEl = document.getElementById('textes') as HTMLDivElement
 let txFiltre: DomaineTexte | 'tout' = 'tout'
 let txQuete = ''
+let txLangue: Langue = LANGUE_SOURCE
+let txSaisie: string | null = null // la clé en cours d'édition, s'il y en a une
 
 function txDit(msg: string): void {
   const el = document.getElementById('tx-etat')
   if (el) el.textContent = msg
 }
 
+/** Le catalogue vu dans la langue du moment. */
+function txToutes(): EntreeLangue[] {
+  return applique(catalogueTextes(), txLangue)
+}
+
 /** Les entrées qui passent le filtre et la recherche du moment. */
-function txRetenues(): EntreeTexte[] {
+function txRetenues(): EntreeLangue[] {
   const q = txQuete.trim().toLowerCase()
-  return catalogueTextes().filter((e) => {
+  return txToutes().filter((e) => {
     if (txFiltre !== 'tout' && e.domaine !== txFiltre) return false
     if (!q) return true
-    // on cherche dans le TEXTE, la CLÉ et le LIEU : « où ai-je écrit ça ? »
-    // et « qu'est-ce qui parle du sas ? » sont la même question ici
+    // on cherche dans le TEXTE, la SOURCE, la CLÉ et le LIEU : « où ai-je
+    // écrit ça ? » et « qu'est-ce qui parle du sas ? » sont la même
+    // question ici — et en traduisant, on cherche dans le français
     return (
       e.texte.toLowerCase().includes(q) ||
+      e.source.toLowerCase().includes(q) ||
       e.cle.toLowerCase().includes(q) ||
       e.ou.toLowerCase().includes(q)
     )
@@ -7159,10 +7185,25 @@ function txSurligne(texte: string, q: string): string {
   )
 }
 
+function renderTxLangues(): void {
+  const host = document.getElementById('tx-langues')
+  if (!host) return
+  host.innerHTML = LANGUES.map((l) => {
+    const a = avance(applique(catalogueTextes(), l.code))
+    // la langue SOURCE n'a pas d'avancement à montrer (tout y est écrit) :
+    // on y compte les RETOUCHES, ce qui n'est pas la même promesse
+    const chiffre = l.source ? `${a.faits} retouches` : `${a.faits} / ${a.total}`
+    return (
+      `<button type="button" class="tx-lg${l.code === txLangue ? ' on' : ''}"` +
+      ` data-lg="${l.code}">${htmlSafe(l.nom.toUpperCase())}<i>${chiffre}</i></button>`
+    )
+  }).join('')
+}
+
 function renderTxFiltres(): void {
   const host = document.getElementById('tx-filtres')
   if (!host) return
-  const cat = catalogueTextes()
+  const cat = txToutes()
   const chips = [
     { cle: 'tout' as const, mot: 'Tout', n: cat.length },
     ...comptesParDomaine(cat).map((c) => ({
@@ -7180,54 +7221,127 @@ function renderTxFiltres(): void {
     .join('')
 }
 
+const TX_ETAT_MOT: Record<EtatTexte, string> = {
+  origine: '',
+  retouche: 'RETOUCHÉ',
+  traduit: 'TRADUIT',
+  'a-traduire': 'À TRADUIRE',
+}
+
 function renderTextes(): void {
   const host = document.getElementById('tx-liste')
   if (!host) return
-  const cat = catalogueTextes()
-  const mets = (id: string, v: number): void => {
+  const toutes = txToutes()
+  const a = avance(toutes)
+  const mets = (id: string, v: string): void => {
     const el = document.getElementById(id)
-    if (el) el.textContent = String(v)
+    if (el) el.textContent = v
   }
-  mets('tx-n-entrees', cat.length)
-  mets(
-    'tx-n-signes',
-    cat.reduce((s, e) => s + e.texte.length, 0),
-  )
+  mets('tx-n-entrees', String(a.total))
+  mets('tx-n-faits', String(a.faits))
+  mets('tx-n-signes', String(a.signes))
   const vues = txRetenues()
   if (vues.length === 0) {
-    host.innerHTML = `<p class="tx-vide">Rien ne répond à « ${htmlSafe(txQuete)} ». La recherche va dans le texte, la clé et le lieu.</p>`
+    host.innerHTML = `<p class="tx-vide">Rien ne répond à « ${htmlSafe(txQuete)} ». La recherche va dans le texte, la source, la clé et le lieu.</p>`
     return
   }
   const q = txQuete.trim()
+  const estSource = txLangue === LANGUE_SOURCE
   let out = ''
   for (const c of comptesParDomaine(vues)) {
     const lot = vues.filter((e) => e.domaine === c.domaine)
     out +=
       `<div class="tx-fam">${htmlSafe(c.nom.toUpperCase())}` +
-      `<small>${c.entrees} entrées · ${c.caracteres} signes</small></div>`
+      `<small>${c.entrees} entrées</small></div>`
     for (const e of lot) {
+      const mot = TX_ETAT_MOT[e.etat]
+      const vide = e.texte.length === 0
       out +=
-        `<article class="tx-e${e.engendre ? ' engendre' : ''}">` +
+        `<article class="tx-e ${e.etat}${e.engendre ? ' engendre' : ''}" data-cle="${htmlSafe(e.cle)}">` +
         `<div class="tx-e-tete"><code class="tx-cle">${htmlSafe(e.cle)}</code>` +
         `<span class="tx-ou">${htmlSafe(e.ou)}</span>` +
         (e.engendre ? `<i class="tx-tag">ENGENDRÉE PAR LE CODE</i>` : '') +
-        `</div><p class="tx-t">${txSurligne(e.texte, q)}</p></article>`
+        (mot ? `<i class="tx-etat-tag">${mot}</i>` : '') +
+        (e.etat === 'retouche' || e.etat === 'traduit'
+          ? `<button type="button" class="tx-defaire" data-defaire="${htmlSafe(e.cle)}">rendre à la source</button>`
+          : '') +
+        `</div>` +
+        `<p class="tx-t${vide ? ' vide' : ''}" data-edit="${htmlSafe(e.cle)}">` +
+        (vide ? 'à traduire — cliquez pour écrire' : txSurligne(e.texte, q)) +
+        `</p>` +
+        // en traduction, le français reste sous les yeux : on n'écrit pas
+        // une langue en se souvenant de l'autre
+        (!estSource
+          ? `<p class="tx-src">${txSurligne(e.source, q)}</p>`
+          : '') +
+        `</article>`
     }
   }
   host.innerHTML = out
+  if (txSaisie) txOuvreSaisie(txSaisie)
+}
+
+/** Le texte devient une zone de saisie, sur place. Une seule à la fois. */
+function txOuvreSaisie(cle: string): void {
+  const p = document.querySelector<HTMLElement>(`.tx-t[data-edit="${CSS.escape(cle)}"]`)
+  if (!p) return
+  const e = txToutes().find((x) => x.cle === cle)
+  if (!e) return
+  txSaisie = cle
+  const ta = document.createElement('textarea')
+  ta.className = 'tx-saisie'
+  ta.value = e.texte
+  ta.rows = Math.max(2, Math.min(14, e.texte.split('\n').length + 1))
+  const aide = document.createElement('p')
+  aide.className = 'tx-aide-saisie'
+  aide.textContent =
+    'Entrée pour un retour à la ligne · Échap pour annuler · cliquer ailleurs pour garder'
+  p.replaceWith(ta)
+  ta.after(aide)
+  ta.focus()
+  ta.setSelectionRange(ta.value.length, ta.value.length)
+  let annule = false
+  ta.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') {
+      annule = true
+      ta.blur()
+    }
+  })
+  ta.addEventListener('blur', () => {
+    txSaisie = null
+    if (!annule) {
+      poseTexte(txLangue, cle, ta.value, e.source)
+      txDit(
+        `« ${cle} » enregistré sur ce poste. Exportez pour le graver dans le jeu.`,
+      )
+    }
+    renderTxLangues()
+    renderTextes()
+  })
 }
 
 function ouvreTextes(): void {
   textesEl.hidden = false
+  renderTxLangues()
   renderTxFiltres()
   renderTextes()
   txDit(
-    'La CLÉ ne se traduit ni ne se réécrit : c’est elle qui tiendra quand le texte changera.',
+    'Cliquez un texte pour le réécrire. Les retouches vivent SUR CE POSTE : exportez-les pour qu’elles soient gravées dans le jeu.',
   )
 }
 document.getElementById('home-textes')?.addEventListener('click', ouvreTextes)
 document.getElementById('textes-fermer')?.addEventListener('click', () => {
   textesEl.hidden = true
+})
+document.getElementById('tx-langues')?.addEventListener('click', (ev) => {
+  const b = (ev.target as HTMLElement).closest('button')
+  const l = b?.dataset.lg
+  if (!l || !langueDef(l)) return
+  txLangue = l as Langue
+  txSaisie = null
+  renderTxLangues()
+  renderTxFiltres()
+  renderTextes()
 })
 document.getElementById('tx-filtres')?.addEventListener('click', (ev) => {
   const b = (ev.target as HTMLElement).closest('button')
@@ -7241,9 +7355,21 @@ document.getElementById('tx-q')?.addEventListener('input', (ev) => {
   txQuete = (ev.target as HTMLInputElement).value
   renderTextes()
 })
-// L'EXPORT : de quoi réécrire hors ligne. Le Markdown se lit et s'annote ;
-// le JSON se remet dans un tableur, ou dans l'outil qui portera la
-// traduction. Les deux portent les clés — c'est tout l'intérêt.
+document.getElementById('tx-liste')?.addEventListener('click', (ev) => {
+  const cible = ev.target as HTMLElement
+  const rendre = cible.closest<HTMLElement>('[data-defaire]')?.dataset.defaire
+  if (rendre) {
+    retireTexte(txLangue, rendre)
+    txDit(`« ${rendre} » rendu à la source.`)
+    renderTxLangues()
+    renderTextes()
+    return
+  }
+  const cle = cible.closest<HTMLElement>('[data-edit]')?.dataset.edit
+  if (cle && cle !== txSaisie) txOuvreSaisie(cle)
+})
+// L'EXPORT : le Markdown se lit et s'annote ; l'export de RETOUCHES est ce
+// qu'on rend pour graver dans le code, ou ce qu'un traducteur renvoie.
 document.getElementById('tx-md')?.addEventListener('click', () => {
   const t = catalogueMarkdown(txRetenues())
   void copieTexte(t).then((ok: boolean) =>
@@ -7254,15 +7380,41 @@ document.getElementById('tx-md')?.addEventListener('click', () => {
     ),
   )
 })
-document.getElementById('tx-json')?.addEventListener('click', () => {
-  const t = JSON.stringify(txRetenues(), null, 2)
-  void copieTexte(t).then((ok: boolean) =>
+document.getElementById('tx-exp')?.addEventListener('click', () => {
+  const a = avance(txToutes())
+  if (a.faits === 0) {
+    txDit('Aucune retouche dans cette langue : rien à exporter.')
+    return
+  }
+  void copieTexte(exporteTextes(txLangue)).then((ok: boolean) =>
     txDit(
       ok
-        ? `JSON copié — ${txRetenues().length} entrées, clés comprises.`
-        : 'Presse-papier refusé — le JSON est dans la console (F12).',
+        ? `${a.faits} retouche(s) copiée(s) en ${txLangue.toUpperCase()} — collez-les-moi pour que je les grave.`
+        : 'Presse-papier refusé — l’export est dans la console (F12).',
     ),
   )
+})
+document.getElementById('tx-imp')?.addEventListener('click', () => {
+  const ta = document.getElementById('tx-io') as HTMLTextAreaElement
+  ta.hidden = false
+  if (!ta.value.trim()) {
+    ta.placeholder = 'Collez un export de retouches ici, puis reprenez ce bouton.'
+    ta.focus()
+    txDit('Collez un export dans la zone, puis reprenez « Importer ».')
+    return
+  }
+  const r = importeTextes(ta.value)
+  if (r.repris < 0) {
+    txDit('Ce n’est pas un export lisible (il lui faut une langue et des textes).')
+    return
+  }
+  if (r.langue) txLangue = r.langue
+  ta.value = ''
+  ta.hidden = true
+  renderTxLangues()
+  renderTxFiltres()
+  renderTextes()
+  txDit(`${r.repris} texte(s) repris en ${String(r.langue).toUpperCase()}.`)
 })
 
 // ---- L'ATELIER DES RÉCOMPENSES ----

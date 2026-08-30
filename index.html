@@ -1341,7 +1341,28 @@
       }
       .tx-chip:hover { color: #cfe2ef; border-color: rgba(99, 183, 230, 0.45); }
       .tx-chip.on { color: #04080e; background: #9ed8ff; border-color: #9ed8ff; }
+      /* LE CHOIX DE LANGUE : deux pastilles, la source marquée d'un point */
+      .tx-langues { display: flex; gap: 5px; flex: none; }
+      .tx-lg {
+        font-family: var(--font-display); font-size: calc(8.5px * var(--ui));
+        letter-spacing: 0.14em; padding: 7px 12px; min-height: 32px;
+        background: rgba(10, 22, 36, 0.7); border: 1px solid rgba(99, 183, 230, 0.22);
+        border-radius: 6px; color: var(--dim); cursor: pointer; white-space: nowrap;
+      }
+      .tx-lg:hover { color: #cfe2ef; border-color: rgba(99, 183, 230, 0.5); }
+      .tx-lg.on { color: #04080e; background: #9ed8ff; border-color: #9ed8ff; }
+      .tx-lg i {
+        font-style: normal; opacity: 0.7; font-size: calc(7px * var(--ui));
+        margin-left: 5px;
+      }
       .tx-corps { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 22px 20px; }
+      #tx-io {
+        margin: 0 22px 10px; width: calc(100% - 44px); box-sizing: border-box;
+        background: rgba(4, 10, 18, 0.9); color: #9ed8ff;
+        border: 1px solid rgba(120, 180, 230, 0.24); border-radius: 6px;
+        font-family: var(--font-mono); font-size: calc(11px * var(--ui)); padding: 8px;
+      }
+      #tx-io[hidden] { display: none; }
       .tx-fam {
         display: flex; align-items: center; gap: 10px; margin: 16px 0 8px;
         font-family: var(--font-display); font-size: calc(8.5px * var(--ui));
@@ -1361,6 +1382,45 @@
         background: rgba(8, 16, 26, 0.5);
       }
       .tx-e.engendre { border-left-color: #f2c98e; }
+      /* L'ÉTAT se lit au liseré : à l'origine (sobre), retouché (vert),
+         traduit (vert), à traduire (ambre pointillé — le trou se voit). */
+      .tx-e.retouche, .tx-e.traduit { border-left-color: #6dffb8; }
+      .tx-e.a-traduire { border-left-style: dashed; border-left-color: #f2c98e; }
+      .tx-etat-tag {
+        font-family: var(--font-display); font-size: calc(7px * var(--ui));
+        letter-spacing: 0.14em; border-radius: 4px; padding: 1px 6px;
+        border: 1px solid currentColor;
+      }
+      .tx-e.retouche .tx-etat-tag, .tx-e.traduit .tx-etat-tag { color: #6dffb8; }
+      .tx-e.a-traduire .tx-etat-tag { color: #f2c98e; }
+      /* LA SOURCE, sous la traduction : la référence qu'on lit en écrivant */
+      .tx-src {
+        margin: 6px 0 0; padding-left: 9px; border-left: 1px solid rgba(99, 183, 230, 0.2);
+        white-space: pre-wrap; line-height: 1.45;
+        font-size: calc(11.5px * var(--ui)); color: #7f98ae;
+      }
+      /* LE TEXTE S'ÉDITE SUR PLACE : un clic, il devient une zone de
+         saisie. Une seule à la fois — cinq cents zones de saisie dans le
+         document coûteraient cher pour rien. */
+      .tx-t { cursor: text; border-radius: 4px; padding: 2px 4px; margin: 0 -4px; }
+      .tx-t:hover { background: rgba(99, 183, 230, 0.07); }
+      .tx-t.vide { color: #6d8399; font-style: italic; }
+      .tx-saisie {
+        width: 100%; box-sizing: border-box; resize: vertical;
+        background: rgba(4, 10, 18, 0.95); border: 1px solid var(--specimen);
+        border-radius: 6px; color: #eaf6ff; padding: 7px 9px;
+        font-family: var(--font-mono); font-size: calc(12.5px * var(--ui));
+        line-height: 1.5;
+      }
+      .tx-saisie:focus { outline: none; }
+      .tx-aide-saisie {
+        margin: 4px 0 0; font-size: calc(10px * var(--ui)); color: var(--dim);
+      }
+      .tx-defaire {
+        background: none; border: none; color: #7fc6ff; font: inherit;
+        font-size: calc(10px * var(--ui)); text-decoration: underline;
+        cursor: pointer; padding: 0; margin-left: auto;
+      }
       .tx-e-tete {
         display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
         margin-bottom: 5px;
@@ -1387,9 +1447,11 @@
         font-size: calc(11px * var(--ui)); color: #a9e7c9;
         background: rgba(6, 12, 20, 0.7);
       }
+      /* le sous-titre s'efface avant d'être illisible : trois caractères
+         suivis de points de suspension ne renseignent personne */
+      @media (max-width: 1340px) { .tx-soustitre { display: none; } }
       @media (max-width: 760px) {
         .tx-tete h2 { font-size: calc(15px * var(--ui)); letter-spacing: 0.22em; }
-        .tx-soustitre { display: none; }
       }
       /* ---- L'ATELIER DES RÉCOMPENSES : plein cadre, comme les mémoires ---- */
       #recompenses { position: fixed; inset: 0; z-index: 60; background: #04080e; }
@@ -7335,12 +7397,15 @@
         <header class="tx-tete">
           <h2>TEXTES</h2>
           <span class="tx-soustitre">tout ce que le joueur peut lire — le plan de travail de la réécriture</span>
+          <div class="tx-langues" id="tx-langues"></div>
           <div class="tx-compteurs">
             <span class="tx-cpt"><b id="tx-n-entrees">0</b><i>entrées</i></span>
+            <span class="tx-cpt"><b id="tx-n-faits">0</b><i>rendus</i></span>
             <span class="tx-cpt"><b id="tx-n-signes">0</b><i>signes</i></span>
           </div>
-          <button type="button" id="tx-md" class="tx-lien" title="Copie les entrées affichées en Markdown, clés comprises — de quoi réécrire hors ligne">Markdown</button>
-          <button type="button" id="tx-json" class="tx-lien" title="Copie les entrées affichées en JSON, clés comprises — pour un tableur ou un outil de traduction">JSON</button>
+          <button type="button" id="tx-md" class="tx-lien" title="Copie les entrées affichées en Markdown, clés comprises — de quoi relire hors ligne">Markdown</button>
+          <button type="button" id="tx-exp" class="tx-lien" title="Copie VOS RETOUCHES de cette langue en JSON — c'est ce fichier qu'on grave dans le code, ou qu'on envoie à un traducteur">Exporter</button>
+          <button type="button" id="tx-imp" class="tx-lien" title="Reprend un export de retouches. La langue du document fait foi, quelle que soit celle affichée">Importer</button>
           <button type="button" id="textes-fermer" aria-label="Fermer">✕ FERMER</button>
         </header>
         <div class="tx-barre">
@@ -7348,6 +7413,7 @@
           <div class="tx-filtres" id="tx-filtres"></div>
         </div>
         <div class="tx-corps" id="tx-liste"></div>
+        <textarea id="tx-io" hidden rows="5" spellcheck="false" aria-label="Import de retouches"></textarea>
         <p class="tx-etat" id="tx-etat"></p>
       </div>
     </div>

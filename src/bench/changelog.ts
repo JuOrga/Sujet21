@@ -22,6 +22,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '30/08/2026 10:31',
+    title: 'Les textes se réécrivent SUR L’ÉCRAN, et le catalogue parle déjà deux langues',
+    notes: [
+      'Demandé : pouvoir modifier les textes directement sur l’écran, et un choix de langue en haut. Les deux ne font qu’un — UNE LANGUE N’EST QU’UNE COUCHE DE RETOUCHES par-dessus la source. Une retouche française remplace le texte du code ; une entrée anglaise remplit un vide. Même mécanisme, même stockage, même export, même écran. Ajouter une troisième langue ne demandera qu’une ligne.',
+      'ON CLIQUE UN TEXTE, il devient une zone de saisie sur place — une seule à la fois, parce que cinq cents zones de saisie dans le document coûteraient cher pour rien. Échap annule, cliquer ailleurs garde. L’entrée se marque alors RETOUCHÉ, liseré vert, avec un lien « rendre à la source » qui la ramène au texte du code. Une retouche identique à la source ne s’enregistre pas : le compteur d’avancement mentirait en comptant comme fait un texte que personne n’a touché.',
+      'LE CHOIX DE LANGUE est en tête, avec l’avancement de chacune : « FRANÇAIS · 0 retouches », « ENGLISH · 1 / 519 » — deux promesses différentes, donc deux libellés différents. En anglais, les 519 entrées s’affichent d’abord VIDES, liseré ambre pointillé et mention À TRADUIRE : un trou doit se voir. Et le français reste sous les yeux, en retrait, comme référence — on n’écrit pas une langue en se souvenant de l’autre. La recherche fouille les deux à la fois : on retrouve une entrée par son français même quand on travaille l’anglais.',
+      'L’EXPORT rend les retouches d’une langue, clés triées, prêtes à graver dans le code ou à confier à un traducteur. L’import les reprend — et LA LANGUE DU DOCUMENT FAIT FOI, quelle que soit celle affichée : un fichier anglais ne doit pas se déverser dans le français parce qu’un onglet était ouvert au mauvais endroit.',
+      'CE QUE ÇA NE FAIT PAS ENCORE, et l’écran le dit en toutes lettres : les retouches vivent SUR CE POSTE, dans le stockage du navigateur, comme les cartes de l’atelier des récompenses. Le jeu affiche toujours les textes du code. Il faut exporter et me les rendre pour qu’elles soient gravées — la bascule « le jeu lit le catalogue » se fera domaine par domaine, le codex d’abord. Mieux vaut le dire que laisser réécrire cinq cents textes en croyant les avoir livrés.',
+      'Douze tests neufs sur l’atelier : la source intacte quoi qu’on retouche, le vide qui se voit en langue étrangère, la retouche identique qui ne s’enregistre pas, le texte vidé qui rend à la source, l’avancement qui compte ce qui est FAIT et non ce qui existe, l’export trié pour se comparer au diff, et les imports malformés qui refusent au lieu de perdre en silence. 574 tests verts.',
+    ],
+  },
+  {
     date: '30/08/2026 01:45',
     title: 'L’écran TEXTES : tout ce que le joueur peut lire, en un endroit, avec sa clé',
     notes: [
