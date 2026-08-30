@@ -22,6 +22,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '30/08/2026 12:12',
+    title: 'LES LIGNES NOIRES DES COULOIRS : l’embrasure n’était NI mur NI sol',
+    notes: [
+      'Signalé : « on peut voir les lignes noires dans les couloirs, je ne comprends pas trop ce que c’est ». Trouvé, et c’était un vrai trou dans le raisonnement. Le sol des modules se peint dans le CREUX des coques ; la paroi se dessine dans la MATIÈRE. Mais l’embrasure d’une porte n’est ni l’un ni l’autre : c’est un morceau de mur qu’on a creusé. Personne ne la réclamait — d’où une bande NOIRE, large d’une épaisseur de coque, en travers de CHAQUE porte, sur toute sa hauteur.',
+      'L’embrasure fait désormais partie de la salle : le sol traverse la paroi avec le joueur. Relevé sur les données, de la cuve à l’aile des endormis : le sol est continu d’un bout à l’autre — salle, porte, couloir, porte, salle — sans un pixel de vide.',
+      'LE SAS DE RACCORD, ensuite : la pièce demandée, « un sas vu de profil qui relie deux éléments entre eux ». Le jeu la pose TOUT SEUL, à chaque bout de couloir raccordé — quatorze jonctions sur le module Méduse — à cheval sur la couture entre deux coques : un col d’amarrage, deux brides boulonnées, un joint sombre pile sur le joint, des vérins, deux veilleuses. C’est ce qui manquait pour que deux modules cessent de se voir accolés et deviennent une station.',
+      'Comme pour toutes les pièces du méta, la place est faite AVANT l’image : la fiche de fabrication est écrite (docs/assets-ia.md § 16, deux orientations — le col vertical et son quart de tour), le catalogue d’images les attend rubrique « Coque & fonds », et tant que les fichiers manquent, les jonctions restent telles qu’elles sont. Rien ne casse, la pièce s’ajoute quand elle arrive.',
+      '595 tests verts, dont quatre neufs sur le sas (un par jonction, aucun sans structures, le débord des deux côtés du joint, et le couloir dont le raccord est refusé qui n’en a pas).',
+    ],
+  },
+  {
     date: '30/08/2026 11:56',
     title: 'LE RACCORD : un couloir s’arrête au mur, il ne le traverse plus',
     notes: [

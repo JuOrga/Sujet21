@@ -74,6 +74,8 @@ const NOMS: Record<string, string> = {
   'meta-alcove.webp': 'Méta — alcôve d’étal',
   'meta-banc.webp': 'Méta — pupitre du banc des mémoires',
   'meta-marchand.webp': 'Méta — le Sujet 12 (marchand)',
+  'sas-raccord.webp': 'Sas de raccord (col vertical)',
+  'sas-raccord-v.webp': 'Sas de raccord (quart de tour)',
   'meta-eclat.webp': 'Méta — éclat de mémoire',
   'meta-icones.webp': 'Méta — planche d’icônes (4×2)',
 }
@@ -88,6 +90,7 @@ export function rubriqueDe(url: string): string {
   if (f.startsWith('zone-')) return 'Zones d’état'
   if (f.startsWith('serre-')) return 'Serre & cultures'
   if (f.startsWith('meta-')) return 'Méta & commerce'
+  if (f.startsWith('sas-')) return 'Coque & fonds'
   if (
     f.startsWith('decal-') ||
     f.startsWith('iris') ||

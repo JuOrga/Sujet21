@@ -527,3 +527,41 @@ est bien plus régulier.
 Vecteurs SVG (logo, cadres, icônes, écusson au trait) et textures procédurales en
 shader (le décor actuel : étoiles, nébulosité, caustiques, métal brossé…). Les
 prompts ci-dessus visent Midjourney, DALL·E, Flux, Stable Diffusion, etc.
+
+## 16. LE SAS DE RACCORD — `sas-raccord.webp` et `sas-raccord-v.webp` — PRIORITAIRE
+
+**1024×1650 · PNG/WebP TRANSPARENT · décalque** (et son quart de tour,
+1650×1024 pour `sas-raccord-v.webp` — envoyez la pièce une seule fois si
+vous préférez, je produis la rotation).
+
+La pièce qui JOINT deux modules de la station. Le jeu la pose tout seul, à
+chaque bout de couloir raccordé : elle se plante SUR la couture entre deux
+coques, à cheval sur le mur traversé et sur le col du couloir. Son rôle est
+double — cacher le joint entre deux parois qui ne se tuilent pas pareil, et
+dire à l'œil que le passage est un vrai sas, pas un trou dans un mur.
+
+Un COL D'AMARRAGE vu de profil, comme le reste du jeu : deux brides de
+métal boulonnées, une entre elles, un joint d'étanchéité sombre au milieu
+(c'est lui qui tombera pile sur la couture), des vérins courts de part et
+d'autre, et une paire de veilleuses. Le passage, au centre, est VIDE
+(transparent) sur toute la hauteur : c'est par là qu'on entre. Le fluide
+passe devant la pièce — elle ne porte aucune physique.
+
+```
+side view of a spacecraft docking collar, two bolted metal flanges facing each other with a dark rubber seal ring between them, short hydraulic rams on both sides, two small warning lights, open passage in the centre, brushed dark steel with worn paint, rivets and weld seams, retro-futuristic 1970s orbital laboratory, muted cold palette, low brightness, evenly lit, flat 2D game texture/asset, no perspective, no text
+```
+
+Négatif : `perspective, text, watermark, background, ground shadow, door, hatch, closed, people, logo`
+
+Règles communes de la section : palette `#0a1420` acier de coque,
+`#10151c`–`#2a3542` gris-bleu, `#63b7e6` liseré cyan pour les veilleuses.
+Le moteur refroidit et atténue les décalques : générez plus contrasté que
+le rendu voulu. Le CENTRE DOIT ÊTRE TRANSPARENT sur au moins 55 % de la
+hauteur, sinon le sas bouche visuellement le passage.
+
+Déposez les fichiers dans `public/assets/` sous ces noms exacts — ils
+apparaîtront aussitôt dans la bibliothèque d'images, rubrique « Coque &
+fonds ». **Tant que les fichiers manquent, les jonctions restent telles
+qu'elles sont** : rien ne casse, la pièce s'ajoute quand elle arrive.
+Vérification en jeu : `__decor()` dans la console liste les décalques
+envoyés au rendu — les sas y apparaissent sous `sas-raccord`.

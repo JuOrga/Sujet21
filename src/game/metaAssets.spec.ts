@@ -12,6 +12,7 @@ import {
   decalsDuMeta,
   vuesEclat,
 } from './metaAssets'
+import { jonctionsDesStructures } from './structures'
 import { ARTICLES_ETAL_IDS, TABLEAU_ECONOMAT, ETAL_ECONOMAT } from './economat'
 import { ARTICLES_COMPTOIR_IDS, TABLEAU_HUB } from './hub'
 import { TABLEAUX, type LevelDef } from './level'
@@ -123,5 +124,53 @@ describe('l’éclat : vignette ou bande de vues', () => {
 
   it('une hauteur absurde ne casse rien', () => {
     expect(vuesEclat(256, 0)).toBe(1)
+  })
+})
+
+describe('le sas de raccord — la pièce qui joint deux modules', () => {
+  it('un sas par jonction de couloir, et rien sans structures', () => {
+    const j = jonctionsDesStructures(TABLEAU_HUB.structures)
+    const sas = decalsDuMeta(TABLEAU_HUB).filter((d) =>
+      d.kind.startsWith('sas-'),
+    )
+    expect(j.length).toBeGreaterThan(0)
+    expect(sas.length).toBe(j.length)
+    // un tableau sans structure n'en pose aucun
+    expect(jonctionsDesStructures(undefined)).toEqual([])
+  })
+
+  it('le sas se pose SUR la couture, et déborde des deux côtés', () => {
+    for (const j of jonctionsDesStructures(TABLEAU_HUB.structures)) {
+      expect(j.passage).toBeGreaterThan(100)
+      // il couvre le mur repris ET le col du couloir
+      expect(j.profondeur).toBeGreaterThan(40)
+    }
+    const sas = decalsDuMeta(TABLEAU_HUB).filter((d) => d.kind === 'sas-raccord')
+    for (const d of sas) {
+      // le col monte au-dessus du passage : un sas, pas un cache-misère
+      expect(d.h).toBeGreaterThan(300)
+      expect(d.fade).toBeGreaterThan(0.5)
+    }
+  })
+
+  it('un couloir dont le raccord est refusé n’a pas de sas', () => {
+    const sans = {
+      ...TABLEAU_HUB,
+      structures: (TABLEAU_HUB.structures ?? []).map((s) => ({
+        ...s,
+        raccord: false as const,
+      })),
+    }
+    expect(jonctionsDesStructures(sans.structures)).toEqual([])
+  })
+
+  it('les deux orientations existent : le col et son quart de tour', () => {
+    const sortes = new Set(
+      decalsDuMeta(TABLEAU_HUB)
+        .filter((d) => d.kind.startsWith('sas-'))
+        .map((d) => d.kind),
+    )
+    expect(sortes.has('sas-raccord')).toBe(true)
+    expect(sortes.has('sas-raccord-v')).toBe(true)
   })
 })

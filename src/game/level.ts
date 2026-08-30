@@ -320,6 +320,12 @@ export interface DecalDef {
     | 'meta-alcove'
     | 'meta-banc'
     | 'meta-marchand'
+    // LE SAS DE RACCORD : la pièce qui joint deux modules, vue de profil.
+    // Posée à chaque jonction d'un couloir, elle masque la couture entre
+    // deux coques. Deux orientations : le col vertical (un couloir qui
+    // arrive à l'horizontale) et son quart de tour.
+    | 'sas-raccord'
+    | 'sas-raccord-v'
   flip?: boolean // miroir horizontal : la même pièce ne se répète pas telle quelle
   fade?: number // 0..1, opacité (défaut 0,55)
 }

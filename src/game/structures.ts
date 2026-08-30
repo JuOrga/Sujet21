@@ -422,3 +422,64 @@ export function niveauExpanse(level: LevelDef): LevelDef {
     boxes: [...boxesDesStructures(level.structures), ...level.boxes],
   }
 }
+
+/** UNE JONCTION : là où un couloir rejoint un module. Le sas de raccord s'y
+ * pose — c'est la pièce qui MASQUE la couture entre deux coques et qui dit,
+ * à l'œil, que les deux ne font qu'un. */
+export interface Jonction {
+  /** le centre de la jonction, sur la face du module rejoint */
+  x: number
+  y: number
+  /** l'ouverture franchie, en unités (la hauteur du sas vu de profil) */
+  passage: number
+  /** l'épaisseur traversée : le mur du module, plus le col du couloir */
+  profondeur: number
+  /** 0 : le couloir arrive horizontalement · 1 : verticalement */
+  axe: 0 | 1
+}
+
+/** Toutes les jonctions d'un plan : un couloir raccordé en a une par bout. */
+export function jonctionsDesStructures(
+  structures: readonly StructureDef[] | undefined,
+): Jonction[] {
+  if (!structures || structures.length === 0) return []
+  const out: Jonction[] = []
+  for (const s of structures) {
+    if (s.type !== STRUCT_COULOIR || s.raccord === false || s.angle) continue
+    if (!structureViable(s)) continue
+    const brut = {
+      minX: Math.min(s.minX, s.maxX),
+      minY: Math.min(s.minY, s.maxY),
+      maxX: Math.max(s.minX, s.maxX),
+      maxY: Math.max(s.minY, s.maxY),
+    }
+    const r = boiteRaccordee(s, structures)
+    const axe = axeDe(s)
+    const c = centreDe(s)
+    const e = epaisseurDessinee(s)
+    const passage = Math.max(0, passageDe(s))
+    // un bout RACCOURCI est un bout raccordé : la jonction se tient là
+    const bouts: [number, number][] =
+      axe === 0
+        ? [
+            [r.minX, brut.minX],
+            [r.maxX, brut.maxX],
+          ]
+        : [
+            [r.minY, brut.minY],
+            [r.maxY, brut.maxY],
+          ]
+    for (const [pose, tracee] of bouts) {
+      if (Math.abs(pose - tracee) < 1) continue // ce bout ne rejoint rien
+      out.push({
+        x: axe === 0 ? pose : c.x,
+        y: axe === 0 ? c.y : pose,
+        passage,
+        // le mur d'en face (l'écart repris) plus le col du couloir
+        profondeur: Math.abs(pose - tracee) + e,
+        axe,
+      })
+    }
+  }
+  return out
+}

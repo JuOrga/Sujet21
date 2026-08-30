@@ -860,6 +860,30 @@ void main() {
       float di = length(max(qi, 0.0)) + min(max(qi.x, qi.y), 0.0);
       float ci = max(0.0, cc - t * 0.41421356);
       if (ci > 0.0) di = max(di, (ap.x + ap.y - (hi.x + hi.y - ci)) * 0.70710678);
+      // L'EMBRASURE DES PORTES FAIT PARTIE DE LA SALLE. Sans elle, la
+      // traversée d'une paroi n'est ni mur ni sol : une bande NOIRE, large
+      // d'une épaisseur de coque, en travers de chaque porte.
+      float cotes = mod(dec.z, 16.0);
+      float porte = floor(dec.w / 32.0) * 32.0;
+      if (cotes > 0.5 && porte > 0.0) {
+        // la coque, pour borner la fente à l'épaisseur du mur
+        vec2 qo = ap - h;
+        float dOut = length(max(qo, 0.0)) + min(max(qo.x, qo.y), 0.0);
+        if (cc > 0.0) dOut = max(dOut, (ap.x + ap.y - (h.x + h.y - cc)) * 0.70710678);
+        float demi = porte * 0.5;
+        float prof = t + 2.0;
+        for (int k = 0; k < 4; k++) {
+          if (mod(floor(cotes / pow(2.0, float(k))), 2.0) < 0.5) continue;
+          vec2 ctr = k == 0 ? vec2(0.0, h.y)
+                   : k == 1 ? vec2(h.x, 0.0)
+                   : k == 2 ? vec2(0.0, -h.y)
+                            : vec2(-h.x, 0.0);
+          vec2 dem = (k == 0 || k == 2) ? vec2(demi, prof) : vec2(prof, demi);
+          vec2 qs = abs(p - ctr) - dem;
+          float ds = length(max(qs, 0.0)) + min(max(qs.x, qs.y), 0.0);
+          di = min(di, max(ds, dOut)); // la fente, bornée à la coque
+        }
+      }
       roomD = min(roomD, di);
       // bien à l'intérieur d'un module, tout ce qui suit est saturé (le
       // voile, le halo de paroi, le liseré) : inutile de finir la liste
@@ -2510,6 +2534,8 @@ export class Renderer {
   // LE MÉTA : alcôve d'achat, pupitre du banc, masse du Sujet 12. Tant que le
   // fichier n'est pas déposé, la texture reste nulle et le décalque se saute —
   // le tracé vectoriel du fx-canvas tient seul la place.
+  private texSasRaccord: WebGLTexture | null = null
+  private texSasRaccordV: WebGLTexture | null = null
   private texMetaAlcove: WebGLTexture | null = null
   private texMetaBanc: WebGLTexture | null = null
   private texMetaMarchand: WebGLTexture | null = null
@@ -2815,6 +2841,18 @@ export class Renderer {
     // depuis les données du tableau — un plot EST son alcôve. Tant qu'un
     // fichier n'est pas déposé, la texture reste nulle, le décalque se saute,
     // et le tracé vectoriel du fx-canvas tient seul la place.
+    this.loadTexture(
+      '/assets/sas-raccord.webp',
+      false,
+      true,
+      (t) => (this.texSasRaccord = t),
+    )
+    this.loadTexture(
+      '/assets/sas-raccord-v.webp',
+      false,
+      true,
+      (t) => (this.texSasRaccordV = t),
+    )
     this.loadTexture(
       '/assets/meta-alcove.webp',
       false,
@@ -3789,6 +3827,10 @@ export class Renderer {
         return this.texMetaBanc
       case 'meta-marchand':
         return this.texMetaMarchand
+      case 'sas-raccord':
+        return this.texSasRaccord
+      case 'sas-raccord-v':
+        return this.texSasRaccordV
       case 'tuyaux':
         return this.texDecalTuyaux
     }

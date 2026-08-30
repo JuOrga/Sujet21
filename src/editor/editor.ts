@@ -184,6 +184,8 @@ const DECAL_NOMS: Record<DecalDef['kind'], string> = {
   'meta-alcove': 'Méta — alcôve d’étal',
   'meta-banc': 'Méta — pupitre du banc',
   'meta-marchand': 'Méta — le Sujet 12',
+  'sas-raccord': 'Sas de raccord',
+  'sas-raccord-v': 'Sas de raccord (quart de tour)',
 }
 
 // LES ANCRES MÉTA : les rendez-vous du module. Jusqu'ici la géométrie du
