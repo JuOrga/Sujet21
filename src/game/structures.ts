@@ -402,7 +402,7 @@ export function interieurStructure(s: StructureDef): { x: number; y: number }[] 
 /** L'EMPRISE DESSINÉE d'une structure : le rectangle que sa coque occupe
  * VRAIMENT à l'écran — raccord compris (un couloir raccordé est plus court
  * que son emprise brute) et élargi par sa rotation s'il y en a une. C'est
- * ce rectangle-là que la gomme doit couvrir : on efface ce qu'on voit. */
+ * sur ce rectangle-là que la gomme juge : on efface ce qu'on voit. */
 export function empriseDessinee(
   s: StructureDef,
   autres: readonly StructureDef[] = [],
@@ -425,17 +425,28 @@ export function empriseDessinee(
   }
 }
 
-/** Ce que la GOMME fait d'une coque quand elle passe dessus :
+/** Ce que la GOMME fait d'une coque quand elle passe dessus. Une coque ne
+ * se ROGNE pas — un anneau de parois coupé en deux n'est plus une coque, et
+ * le format n'a pas de quoi dire un demi-module : c'est tout ou rien. Reste
+ * à dire QUAND c'est tout, et le geste décide en deux temps.
  *
- *   intacte   la zone ne la concerne pas — elle passe à côté, ou elle est
- *             tracée DANS son vide (on y gomme le mobilier, pas les murs :
- *             sans quoi tout gommage à l'intérieur d'une chambre aurait
- *             emporté la chambre) ;
- *   effacee   la zone la couvre TOUT ENTIÈRE : la coque disparaît ;
- *   epargnee  la zone la mord sans la couvrir. Une coque ne se ROGNE pas —
- *             un anneau de parois coupé en deux n'est plus une coque, et
- *             le format n'a pas de quoi dire un demi-module. Elle survit
- *             donc entière, et l'éditeur le dit au lieu de le taire.
+ *   1. La zone touche-t-elle ses MURS ? Tracée entièrement dans le creux,
+ *      elle ne la concerne pas : le vide d'une chambre est justement là où
+ *      l'on pose et où l'on gomme le mobilier.
+ *   2. Alors, atteint-elle son CŒUR ? C'est déjà la règle des formes et des
+ *      obliques, que la gomme ne sait pas non plus découper : le centre
+ *      dans la zone, la pièce part entière. Pour une coque creuse, les deux
+ *      conditions ensemble décrivent un geste franc — traverser la pièce et
+ *      ressortir par un mur. On n'y arrive pas en gommant un meuble.
+ *
+ * Exiger la couverture TOTALE aurait été plus simple, et impraticable : une
+ * chambre tient rarement dans l'écran, et la zone est de toute façon bornée
+ * à la cuve. On gommait sans jamais rien effacer.
+ *
+ *   intacte   la zone passe à côté, ou reste dans le creux ;
+ *   effacee   elle mord les murs ET tient le cœur : la coque disparaît ;
+ *   epargnee  elle mord les murs mais s'arrête avant le cœur — la coque
+ *             survit entière, et l'éditeur le dit au lieu de le taire.
  */
 export type VerdictGomme = 'intacte' | 'effacee' | 'epargnee'
 
@@ -454,13 +465,6 @@ export function gommeStructure(
   const dehors =
     r.minX >= e.maxX || r.maxX <= e.minX || r.minY >= e.maxY || r.maxY <= e.minY
   if (dehors) return 'intacte'
-  if (
-    r.minX <= e.minX &&
-    r.maxX >= e.maxX &&
-    r.minY <= e.minY &&
-    r.maxY >= e.maxY
-  )
-    return 'effacee'
   // tracée dans le creux, la zone ne touche aucun mur : on gomme dedans.
   // (le creux se juge au large — chanfrein ignoré, bouts de couloir
   // compris : mieux vaut se taire d'un cheveu que crier pour rien)
@@ -471,7 +475,10 @@ export function gommeStructure(
     [r.minX, r.maxY],
   ]
   if (coins.every(([x, y]) => dansLeVide(s, x, y))) return 'intacte'
-  return 'epargnee'
+  const cx = (e.minX + e.maxX) / 2
+  const cy = (e.minY + e.maxY) / 2
+  const coeur = cx >= r.minX && cx <= r.maxX && cy >= r.minY && cy <= r.maxY
+  return coeur ? 'effacee' : 'epargnee'
 }
 
 /** Le point tombe-t-il sur la COQUE d'une structure (ses parois, pas son
