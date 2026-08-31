@@ -31,6 +31,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '01/09/2026 00:27',
+    title: 'La bonbonne ne s’épuise plus au hub, et elle s’y verse toute seule',
+    notes: [
+      'AU HUB, LA RÉSERVE EST INFINIE. On ne s’assèche pas chez soi : perdre un corps en allant parler au marchand ou consulter le banc des mémoires n’a aucun intérêt de jeu. Le bouton de versement, qui refusait le hub d’un « contexte » sec, y est désormais admis — et n’y débite rien. La jauge affiche « ∞ » et le verre reste plein, plutôt qu’un litrage figé qui passerait pour une jauge en panne.',
+      'ET ELLE SE VERSE AVANT L’ALERTE, PAS APRÈS. Le versement automatique se déclenche à un seuil posé 25 % AU-DESSUS de « lastCallLiters » (0,6 L), celui qui lève la bannière « la dernière impulsion approche ». Le but est que cette bannière n’ait jamais l’occasion de s’afficher au hub. Le contrôle est placé juste avant le bloc de fin de course, qui est celui qui lève les alertes : à l’image où la bannière se poserait, le corps est déjà renfloué.',
+      'LA MARGE DE 25 % N’EST PAS DÉCORATIVE : le versement ne se pose pas d’un bloc, il s’installe dans les creux autour du corps, et déclencher pile sur le seuil ferait clignoter l’alerte entre deux images. Un repos de 0,75 s entre deux versements évite en outre que le son de collecte ne crépite quand le corps n’arrive pas à absorber.',
+      'EN DESCENTE, RIEN NE CHANGE : la réserve reste comptée, le versement reste un geste, et la jauge qui descend reste la tension du tableau. Un test le grave à part.',
+      'LA RÈGLE VIT DANS UN MODULE PUR — src/game/bonbonne.ts — au lieu de main.ts, où aucun test ne va. Neuf tests, dont un formulé à l’envers : pour TOUT volume qui déclencherait l’alerte, la décision de verser était déjà prise avant. Vérifié dans les deux sens — le seuil ramené sur l’alerte, le contrat tombe ; remis, il passe.',
+    ],
+  },
+  {
     date: '01/09/2026 00:20',
     title: 'Les rails deviennent des raccourcis, ouverts au PLASMA seul',
     notes: [
@@ -44,21 +55,6 @@ export const DELIVERIES: Delivery[] = [
       'DIX TESTS gravent la promesse dans les deux sens, parce qu’une moitié seule n’a aucune valeur — un tube qui laisse passer tout le monde n’est pas un raccourci, c’est un trou. Le couple décisif : tube FERMÉ, le même nuage reste du mauvais côté ; tube OUVERT, il passe. La seule différence est l’engagement de l’arc.',
       'UN RELEVÉ A CORRIGÉ LE TEST AVANT LE CODE : le nuage lâché à l’arrêt recondensait en moins d’une demi-seconde et n’allait nulle part. L’état vapeur est TENU par l’intention du joueur. Le test le tient donc, comme la touche le fait, et le corps franchit la cloison à une seconde puis se gare au terminus.',
       'DANS L’ÉDITEUR : une case « CONDUIT — raccourci traversable » sur le panneau du rail, avec sa notice. Le drapeau ne s’écrit que s’il est vrai, pour que les tableaux d’avant ne gagnent pas un champ dont ils n’ont que faire.',
-    ],
-  },
-  {
-    date: '01/09/2026 00:13',
-    title: 'Les rails deviennent des raccourcis : paroi en eau, passage en vapeur',
-    notes: [
-      'LA DEMANDE : que les rails de plasma aient un corps — solides comme des parois, traversables seulement en vapeur — pour servir de raccourcis à travers les cloisons, à la manière du téléporteur de Dead Cells.',
-      'CE QUI EXISTAIT DÉJÀ, ET CE QUI MANQUAIT. La moitié du chemin était faite : « railConvoy » sait depuis longtemps porter un nuage le long d’une ligne de champ, virages compris, avec un freinage à l’arrivée pour que la condensation n’explose pas en gare. Mais un rail n’avait AUCUNE physique — c’était une polyligne que seul le traceur de faisceau consultait — et il ne s’engageait qu’une fois un arc ionisé accroché dessus. Un rail était donc une énigme, jamais un passage.',
-      'LE CONDUIT est un rail marqué d’un drapeau, et ce drapeau lui donne deux visages. EN EAU OU EN GLACE, le tube est plein : on est expulsé de son axe, on bute dessus comme sur une coque. EN VAPEUR, le tube est un passage : tant que le nuage y est, le décor ne le touche plus du tout — il file À TRAVERS les parois jusqu’à l’autre bout, porté par le champ. Et il n’attend plus le laser : un conduit s’engage sur la seule présence de vapeur. C’est la différence entre une énigme (ioniser d’abord) et un raccourci (être dans le bon état).',
-      'LE TUBE EST UNE CAPSULE, pas des boîtes. Convertir la polyligne en rectangles obliques aurait demandé de toucher au format des tableaux, au générateur et à l’éditeur pour une géométrie que le solveur sait déjà mesurer — « railConvoy » projette sur les tronçons depuis toujours. Le conduit réutilise la même mesure, au même rayon que la bande de convoyage : ce qui est porté est exactement ce qui est dedans, sinon le nuage se ferait expulser d’un bord qu’il croyait libre.',
-      'RIEN NE CHANGE SANS LE DRAPEAU, et c’est délibéré. Les tableaux 10, 12 et 14 gardent leurs énigmes d’arc au comportement près ; le générateur procédural n’en pose jamais, donc ses preuves de traversée restent valides. Un test compare d’ailleurs un tableau sans conduit à un solveur qui n’en a jamais entendu parler : même position du corps à six décimales.',
-      'LE PIÈGE DU MIROIR, ÉVITÉ DE JUSTESSE. La lecture d’un rail faisait « rails.push({ points: pts }) » — tout champ supplémentaire aurait disparu à l’enregistrement, en silence, exactement comme MAT_MIROIR absent de MATERIALS. Le drapeau est désormais relu, et un test le vérifie sur DEUX allers-retours (c’est au second que la perte se voyait, pour le miroir). Au passage, l’avertissement « rail sans émetteur laser » ne tombe plus sur un conduit, qui n’a aucun arc à guider.',
-      'NEUF TESTS gravent la promesse dans les deux sens, parce qu’une moitié seule n’a aucune valeur : un tube qui laisse passer tout le monde n’est pas un raccourci, c’est un trou. Le nuage traverse la paroi et ressort de l’autre côté ; le même rail sans le drapeau ne fait rien ; l’eau et la glace sont refusées ; l’eau posée sur l’axe en est chassée sans y rester coincée ; la vapeur HORS du tube bute sur la paroi comme n’importe quoi. Vérifié dans les deux sens : le laissez-passer retiré, le passage tombe ; la paroi retirée, l’eau s’engouffre.',
-      'UN RELEVÉ EN COURS DE ROUTE, qui a corrigé le test avant de corriger le code : le nuage lâché à l’arrêt recondensait en moins d’une demi-seconde et n’allait nulle part. L’état vapeur est TENU par l’intention du joueur — on choisit de rester nuage. Le test le tient donc, comme la touche le fait, et le corps franchit la cloison à une seconde puis se gare au terminus.',
-      'DANS L’ÉDITEUR : une case « CONDUIT — raccourci traversable » sur le panneau du rail, avec sa notice. Le drapeau ne s’écrit que s’il est vrai, pour que les tableaux d’avant ne gagnent pas un champ dont ils n’ont que faire. 653 tests verts, type-check et build propres.',
     ],
   },
   {
