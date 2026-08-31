@@ -22,6 +22,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '31/08/2026 17:12',
+    title: 'Les étiquettes volaient le clic : leur emprise valait dix fois leur texte',
+    notes: [
+      'LE SYMPTÔME, signalé depuis l’éditeur : impossible de sélectionner une paroi dès qu’une étiquette traîne dans les parages. La cause est une emprise écrite en dur. La zone cliquable d’une étiquette valait « 60 / zoom » en demi-hauteur et « 96 / zoom » en demi-largeur — soit 192 × 60 PIXELS D’ÉCRAN autour de son point, la même quelle que soit la longueur du mot. Or l’étiquette se dessine en 11 px : « SAS » montre 20 px de large et en réclamait 192.',
+      'ET LES ÉTIQUETTES PASSENT EN PREMIER au clic — avant les lampes, les cibles, les portes, les parois. Un rectangle invisible de dix fois leur taille raflait donc la sélection de tout ce qui passait dessous. On mesure maintenant le TEXTE lui-même, dans la police qui le trace, avec 6 px de marge autour et 5 px au-dessus et en dessous : de quoi viser au doigt sans déborder.',
+      'Mesuré dans la police exacte (600 11px ui-monospace) : « SAS » passe de 192 × 60 à 32 × 21 pixels — une zone 17 fois plus petite ; « DÉPART » 10,6 fois ; « MIROIR DE GLACE » 4,9 fois ; « TRAVERSER EN VAPEUR », la plus longue du jeu, 4 fois. Les étiquettes restent parfaitement saisissables : leur zone épouse ce qu’on voit, au lieu de le déborder de partout.',
+      'LA POLICE N’A PLUS QU’UNE DÉFINITION. Elle était recopiée à cinq endroits ; le tracé et la zone cliquable se mesurent désormais dans la même constante, sinon elles divergent en silence et l’on reclique à côté de ce qu’on voit. 632 tests verts, type-check et build propres.',
+    ],
+  },
+  {
     date: '31/08/2026 15:52',
     title: 'Le miroir disparaissait à l’enregistrement — un mot manquait à une liste',
     notes: [
