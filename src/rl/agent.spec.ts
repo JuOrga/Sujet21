@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { TABLEAU_1 } from '../game/level'
-import { AgentEnJeu } from './agent'
+import { AgentEnJeu, chargeAgent } from './agent'
 import { Capteurs } from './capteurs'
 import {
   ACTION_CONCLURE,
@@ -43,6 +43,50 @@ describe('Capteurs — le pont entre l’entraînement et l’écran', () => {
     )
     for (let i = 12; i < sonde.length; i += 2) materiaux.add(Math.round(sonde[i] * 10))
     expect(materiaux.has(11)).toBe(true) // MAT_EPONGE
+  })
+})
+
+describe('chargeAgent — le suivi d’un entraînement en cours', () => {
+  const fichier = {
+    version: 2,
+    type: 'mlp',
+    enCours: true,
+    tailleObs: 3,
+    nbActions: 2,
+    tailles: [3, 2],
+    // Une seule couche 3→2 : W (2×3) puis b (2). L'écart de 30 rend le
+    // tirage au sort certain en pratique — le test ne doit pas clignoter.
+    poids: [30, 0, 0, 0, 0, 0, 0, 0], // « meilleure retenue » : l'action 0
+    poidsCourants: [0, 0, 0, 30, 0, 0, 0, 0], // « à cet instant » : l'action 1
+    journal: [{ generation: 12, litresMoyens: 0.4, traversees: 3 }],
+  }
+  const avecFetch = async <T>(f: () => Promise<T>): Promise<T> => {
+    const vrai = globalThis.fetch
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify(fichier))) as typeof fetch
+    try {
+      return await f()
+    } finally {
+      globalThis.fetch = vrai
+    }
+  }
+
+  it('prend la MEILLEURE politique par défaut', async () => {
+    const charge = await avecFetch(() => chargeAgent('/agents/x.json'))
+    expect(charge.decide!(Float32Array.from([1, 1, 1]))).toBe(0)
+  })
+
+  it('prend la politique DU MOMENT en suivi, et dit où en est l’entraînement', async () => {
+    const charge = await avecFetch(() =>
+      chargeAgent('/agents/x.json', { courant: true }),
+    )
+    expect(charge.decide!(Float32Array.from([1, 1, 1]))).toBe(1)
+    expect(charge.progression).toEqual({
+      iteration: 12,
+      litresMoyens: 0.4,
+      traversees: 3,
+      enCours: true,
+    })
   })
 })
 
@@ -112,6 +156,16 @@ describe('AgentEnJeu — il ne parle au jeu que par le doigt', () => {
     agent.ordre(sim(0, 0), 0.11)
     expect(appels).toBe(2)
     expect(agent.decisions).toBe(2)
+  })
+
+  it('remplace son cerveau à chaud sans perdre le fil', () => {
+    const agent = agentDe(ACTION_RASSEMBLE)
+    agent.ordre(sim(0, 0), 0)
+    agent.remplace({ nom: 'suivant', pilote: () => ACTION_RIEN })
+    const o = agent.ordre(sim(0, 0), 1)
+    expect(o.tient).toBe(false)
+    expect(agent.relectures).toBe(1)
+    expect(agent.decisions).toBe(2) // le compteur de gestes ne repart pas de zéro
   })
 
   it('le pilote de référence tient dans le jeu comme à l’entraînement', () => {

@@ -11,7 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { spawn } from 'node:child_process'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -262,8 +262,11 @@ async function entraine(r: Reglages, argv: string[]): Promise<void> {
   // et une machine qui s'éteint ne doit pas emporter le travail avec elle.
   mkdirSync(dirname(r.sortie), { recursive: true })
   const ecris = (enCours: boolean): void => {
+    // Écrit à côté puis renommé : un lecteur (le jeu, la courbe) ne peut
+    // jamais tomber sur un fichier à moitié écrit.
+    const provisoire = `${r.sortie}.tmp`
     writeFileSync(
-      r.sortie,
+      provisoire,
       JSON.stringify(
         {
           version: 1,
@@ -278,6 +281,7 @@ async function entraine(r: Reglages, argv: string[]): Promise<void> {
         1,
       ),
     )
+    renameSync(provisoire, r.sortie)
   }
 
   for (let g = 1; g <= r.generations; g++) {

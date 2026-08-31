@@ -268,6 +268,31 @@ Quatre manières, de la plus immédiate à la plus parlante :
    pose le doigt là où un joueur le poserait — `input.aimActive` et un point
    visé, rien d'autre —, et le jeu ne sait pas qui tient le doigt. Poser une
    politique apprise à l'écran, c'est copier son JSON dans `public/agents/`.
+
+5. **Le regarder S'ENTRAÎNER, en direct.** Deux terminaux et un onglet :
+
+   ```bash
+   pnpm rl:ppo --sortie public/agents/live.json --travailleurs 8   # terminal 1
+   pnpm dev                                                        # terminal 2
+   ```
+   ```
+   http://localhost:5173/?tableau=1&agent=./agents/live.json&suivre=2
+   ```
+
+   Le jeu relit le fichier toutes les deux secondes et **remplace le cerveau
+   de l'agent à chaud**, sans couper la partie : la traversée en cours
+   continue avec une politique un peu meilleure. Le bandeau affiche l'état de
+   l'entraînement (itération, litres moyens, traversées) à côté de ce que
+   l'agent fait à l'écran.
+
+   En suivi, c'est la politique **du moment** qui joue (`poidsCourants`), pas
+   la meilleure retenue depuis le début : regarder s'entraîner, c'est voir
+   aussi les mauvais moments. Trois détails rendent la chose possible :
+   l'entraînement écrit son fichier **de façon atomique** (écrit à côté, puis
+   renommé — sinon le jeu lirait un JSON coupé en deux) ; la requête porte un
+   anti-cache ; et `vite.config.ts` exclut `public/agents/` de la surveillance
+   du serveur de développement, sans quoi vite rechargerait la page à chaque
+   itération. Cela demande `pnpm dev` : `pnpm preview` sert une copie figée.
 Les plafonds de comparaison, dans l'ordre : le hasard (0,00 L, corps défait
 en dix secondes) · le pilote « cap » écrit à la main (1,82 L sur *Le berceau*
 à 900 particules, 0,72 L à 450, dispersé sur *Le sas*) · les records humains

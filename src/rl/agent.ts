@@ -58,6 +58,16 @@ export interface PolitiqueChargee {
   decide?: (obs: Float32Array) => number
   /** …ou pilote écrit à la main. */
   pilote?: Pilote
+  /** Où en est l'entraînement qui a produit ces poids (mode suivi). */
+  progression?: Progression
+}
+
+/** Le dernier état connu de l'entraînement, lu dans le journal du fichier. */
+export interface Progression {
+  iteration: number
+  litresMoyens: number
+  traversees: number
+  enCours: boolean
 }
 
 /**
@@ -67,36 +77,95 @@ export interface PolitiqueChargee {
  */
 export async function chargeAgent(
   nom: string,
-  opts: { argmax?: boolean } = {},
+  opts: { argmax?: boolean; courant?: boolean } = {},
 ): Promise<PolitiqueChargee> {
   if (nom === 'cap' || nom === '1' || nom === '') {
     return { nom: 'cap (écrit à la main)', pilote: piloteCap() }
   }
   if (nom === 'hasard') return { nom: 'hasard', pilote: piloteHasard(1) }
-  const rep = await fetch(nom)
+  // L'anti-cache est indispensable en mode suivi : sans lui, le navigateur
+  // resservirait la première version du fichier pendant toute la séance.
+  const url = opts.courant ? `${nom}?t=${Date.now()}` : nom
+  const rep = await fetch(url)
   if (!rep.ok) throw new Error(`agent introuvable : ${nom} (HTTP ${rep.status})`)
   const brut = (await rep.json()) as {
     type?: string
     tailleObs: number
     tailles?: number[]
     poids: number[]
+    poidsCourants?: number[]
+    enCours?: boolean
+    journal?: Record<string, number>[]
   }
   if (!brut.poids) throw new Error(`${nom} : ce n’est pas une politique`)
-  const charge = decideurDepuis(brut, { argmax: opts.argmax })
+  // En suivi, on veut la politique TELLE QU'ELLE EST À CET INSTANT
+  // (poidsCourants), pas la meilleure retenue depuis le début : regarder
+  // s'entraîner, c'est voir aussi les mauvais moments.
+  const poids = opts.courant && brut.poidsCourants ? brut.poidsCourants : brut.poids
+  const charge = decideurDepuis({ ...brut, poids }, { argmax: opts.argmax })
+  const derniere = brut.journal?.[brut.journal.length - 1]
   return {
     nom: `${nom.replace(/^.*\//, '')} · ${charge.genre}`,
     decide: charge.decide,
+    progression: derniere
+      ? {
+          iteration: derniere.generation ?? 0,
+          litresMoyens: derniere.litresMoyens ?? derniere.litresMax ?? 0,
+          traversees: derniere.traversees ?? 0,
+          enCours: brut.enCours !== false,
+        }
+      : undefined,
+  }
+}
+
+/**
+ * SUIVRE UN ENTRAÎNEMENT EN DIRECT. Le fichier de politique est réécrit par
+ * `pnpm rl:ppo` à chaque itération (et de façon atomique : on ne peut pas en
+ * lire une moitié) ; on le relit ici toutes les `periode` secondes et on
+ * remplace le cerveau de l'agent à chaud. Le jeu ne s'interrompt pas : la
+ * même traversée continue avec une politique un peu meilleure.
+ *
+ * Rend la fonction qui arrête le suivi.
+ */
+export function suitPolitique(
+  nom: string,
+  periode: number,
+  surMaj: (charge: PolitiqueChargee) => void,
+  surErreur?: (e: unknown) => void,
+): () => void {
+  let vivant = true
+  let enVol = false
+  const minuteur = setInterval(() => {
+    if (!vivant || enVol) return
+    enVol = true
+    void chargeAgent(nom, { courant: true })
+      .then((c) => {
+        if (vivant) surMaj(c)
+      })
+      .catch((e: unknown) => surErreur?.(e))
+      .finally(() => {
+        enVol = false
+      })
+  }, Math.max(500, periode * 1000))
+  return () => {
+    vivant = false
+    clearInterval(minuteur)
   }
 }
 
 export class AgentEnJeu {
-  readonly nom: string
+  nom: string
   actif = true
   derniereAction = ACTION_RIEN
   /** Décisions prises depuis le début du tableau — le « nombre de gestes ». */
   decisions = 0
   /** Coût mesuré d'une décision, en millisecondes (moyenne glissante). */
   coutMs = 0
+
+  /** Où en est l'entraînement suivi, s'il y en a un. */
+  progression: Progression | null = null
+  /** Nombre de fois que le cerveau a été remplacé à chaud. */
+  relectures = 0
 
   private capteurs: Capteurs
   private readonly periode: number
@@ -110,14 +179,22 @@ export class AgentEnJeu {
   }
 
   constructor(
-    private readonly charge: PolitiqueChargee,
+    private charge: PolitiqueChargee,
     level: LevelDef,
     /** Secondes simulées entre deux décisions (0,1 s à l'entraînement). */
     periode = 0.1,
   ) {
     this.nom = charge.nom
+    this.progression = charge.progression ?? null
     this.capteurs = new Capteurs(level)
     this.periode = periode
+  }
+
+  /** Remplace le cerveau à chaud, sans couper la partie en cours. */
+  remplace(charge: PolitiqueChargee): void {
+    this.charge = charge
+    this.progression = charge.progression ?? this.progression
+    this.relectures++
   }
 
   /** Le tableau a changé (ou recommencé) : les capteurs suivent. */

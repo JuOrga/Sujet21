@@ -80,6 +80,11 @@ L'entraînement ne tient qu'aux **cœurs** de la machine (`--travailleurs`) :
 99 % du temps part dans le solveur de fluide, le réseau ne pèse rien — un GPU
 n'aurait rien à y faire.
 
+On peut même le **regarder s'entraîner en direct** — `pnpm rl:ppo --sortie
+public/agents/live.json` d'un côté, `?agent=./agents/live.json&suivre=2` de
+l'autre : le jeu relit la politique toutes les deux secondes et l'agent
+s'améliore à l'écran pendant que vous le regardez.
+
 Et on peut le **regarder jouer dans le jeu**, sur n'importe quel tableau :
 `/?tableau=3&agent=cap` (le pilote écrit à la main), `?agent=hasard`, ou
 `?agent=./agents/berceau.json` pour une politique apprise. La touche `A`

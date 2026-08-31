@@ -154,7 +154,7 @@ import {
   type ZoneForce,
   AMBIANTE_DEFAUT,
 } from './game/level'
-import { AgentEnJeu, chargeAgent } from './rl/agent'
+import { AgentEnJeu, chargeAgent, suitPolitique } from './rl/agent'
 import { LevelEditor } from './editor/editor'
 import {
   traceLaser,
@@ -632,6 +632,11 @@ const exitMouth = { x: 0, y: 0 }
 // combine à ?tableau=N et au saut de salle du banc : on regarde l'agent
 // essayer n'importe quel tableau. La touche A le débranche pour reprendre la
 // main en pleine partie.
+// ?suivre=N (secondes) : LE VOIR S'ENTRAÎNER. Le fichier de politique est
+// relu toutes les N secondes et le cerveau remplacé à chaud — lancez
+// `pnpm rl:ppo --sortie public/agents/live.json` d'un côté, ouvrez
+// ?agent=./agents/live.json&suivre=2 de l'autre, et l'agent à l'écran
+// s'améliore pendant que vous le regardez.
 // Il ne triche pas : il pose le doigt là où un joueur le poserait, et le jeu
 // ne sait pas qui le tient. Voir src/rl/agent.ts.
 let agent: AgentEnJeu | null = null
@@ -648,17 +653,37 @@ function majBadgeAgent(): void {
     document.body.appendChild(badgeAgent)
   }
   const a = agent
+  const p = a.progression
+  const suivi = p
+    ? `\nentraînement : it. ${p.iteration} · ${p.litresMoyens.toFixed(2)} L en moyenne · ` +
+      `${p.traversees} traversée(s)${p.enCours ? '' : ' · TERMINÉ'} (relu ${a.relectures}×)`
+    : ''
   badgeAgent.textContent = a.actif
-    ? `AGENT ${a.nom}\n${a.libelle()} · ${a.decisions} gestes · ${a.coutMs.toFixed(2)} ms/décision\n(A : reprendre la main)`
-    : `AGENT ${a.nom} — débranché (A : lui rendre la main)`
+    ? `AGENT ${a.nom}\n${a.libelle()} · ${a.decisions} gestes · ${a.coutMs.toFixed(2)} ms/décision${suivi}\n(A : reprendre la main)`
+    : `AGENT ${a.nom} — débranché (A : lui rendre la main)${suivi}`
 }
 {
-  const nomAgent = new URLSearchParams(location.search).get('agent')
+  const requete = new URLSearchParams(location.search)
+  const nomAgent = requete.get('agent')
+  const suivre = requete.has('suivre') ? Number(requete.get('suivre') || 2) : 0
   if (nomAgent !== null) {
-    void chargeAgent(nomAgent)
+    void chargeAgent(nomAgent, { courant: suivre > 0 })
       .then((charge) => {
         agent = new AgentEnJeu(charge, level)
         majBadgeAgent()
+        if (suivre > 0) {
+          // On relit le fichier pendant que l'entraînement l'écrit : le
+          // cerveau est remplacé à chaud, la partie en cours ne s'arrête pas.
+          suitPolitique(
+            nomAgent,
+            suivre,
+            (frais) => {
+              agent?.remplace(frais)
+              majBadgeAgent()
+            },
+            (e) => console.warn('suivi de la politique :', e),
+          )
+        }
         // On entre dans la salle sans attendre un clic : l'observation
         // commence tout de suite. (Si le poste exige un nom d'opérateur,
         // closeHome le demande et le bouton reprend son rôle.)

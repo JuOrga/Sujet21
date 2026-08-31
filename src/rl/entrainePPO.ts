@@ -17,7 +17,7 @@
 // ---------------------------------------------------------------------------
 
 import { spawn } from 'node:child_process'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import process from 'node:process'
 import { createInterface } from 'node:readline'
@@ -226,8 +226,13 @@ async function entraine(r: Reglages, argv: string[]): Promise<void> {
   const t0 = Date.now()
   mkdirSync(dirname(r.sortie), { recursive: true })
   const ecris = (enCours: boolean): void => {
+    // Écriture ATOMIQUE : le jeu peut relire ce fichier dix fois par minute
+    // pendant qu'il s'écrit (« le voir s'entraîner en direct »). Un
+    // writeFileSync direct lui servirait un JSON coupé en deux. On écrit à
+    // côté, puis on renomme — le renommage, lui, est instantané.
+    const provisoire = `${r.sortie}.tmp`
     writeFileSync(
-      r.sortie,
+      provisoire,
       JSON.stringify({
         version: 2,
         type: 'mlp',
@@ -241,6 +246,7 @@ async function entraine(r: Reglages, argv: string[]): Promise<void> {
         journal,
       }),
     )
+    renameSync(provisoire, r.sortie)
   }
 
   for (let it = 1; it <= r.iterations; it++) {
