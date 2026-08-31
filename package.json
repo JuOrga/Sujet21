@@ -10,6 +10,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "rl:entraine": "vite-node src/rl/entraine.ts",
+    "rl:rejoue": "vite-node src/rl/rejoue.ts",
+    "rl:banc": "vite-node src/rl/banc.ts",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
@@ -24,6 +27,7 @@
     "assemblyscript": "^0.28.20",
     "typescript": "^5.5.0",
     "vite": "^5.4.0",
+    "vite-node": "^2.1.9",
     "vitest": "^2.1.0"
   }
 }

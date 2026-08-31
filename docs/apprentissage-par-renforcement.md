@@ -1,0 +1,223 @@
+# Apprendre à jouer — l'agent, l'environnement, les outils
+
+*Réponse à la question : « est-ce qu'on pourrait faire en sorte qu'une IA
+apprenne à jouer à Sujet 21, et qu'on voie comment elle évolue ? »*
+
+**Oui.** Le jeu est un candidat inhabituellement propre pour l'apprentissage
+par renforcement, et une première boucle complète — environnement, agent,
+entraînement, courbe de progression — est livrée dans `src/rl/`. Ce document
+dit ce qui est déjà là, ce que ça mesure, et ce qu'il faut comme outils pour
+aller plus loin.
+
+---
+
+## 1. Pourquoi ce jeu s'y prête
+
+Trois propriétés, vérifiées dans le code, décident de tout :
+
+| Propriété | Vérification |
+| --- | --- |
+| **Le solveur ne dépend pas du navigateur** | `src/sim/solver.ts` n'importe ni DOM, ni canvas, ni audio — la suite de tests le fait déjà tourner sous Node. |
+| **Aucun aléa dans la physique** | pas un `Math.random()` dans `src/sim/` : deux essais aux mêmes gestes donnent la même trajectoire, au bit près. C'est ce qui rend une courbe d'apprentissage lisible. |
+| **La boucle de jeu tient en quatre appels** | à chaque pas, `main.ts` ne demande au solveur que `eject` (ou `rassemble`), `applyExitSuction` et `step`. L'environnement d'entraînement fait exactement les mêmes appels, dans le même ordre. |
+
+À quoi s'ajoute un avantage rare : le score du jeu est déjà un nombre —
+les **litres livrés au sas** — et les records humains sont enregistrés
+(`src/game/records.ts`). L'agent et le joueur se comparent sur la même règle.
+
+## 2. Ce qui est livré
+
+```
+src/rl/env.ts        l'environnement : le jeu sans écran (reset / step / observe)
+src/rl/politique.ts  une politique linéaire + l'apprentissage sans gradient (CEM)
+src/rl/pilotes.ts    deux pilotes ÉCRITS À LA MAIN — le plancher de comparaison
+src/rl/entraine.ts   l'entraînement en ligne de commande, parallélisé
+src/rl/rejoue.ts     rejouer une politique, tableau par tableau, et tracer ses gestes
+src/rl/banc.ts       le banc de vitesse : combien de jeu par seconde de machine
+src/rl/env.spec.ts   les garanties : déterminisme, fins conformes, observation saine
+```
+
+Les sorties d'entraînement (politiques, journaux, traces) vont dans `.rl/`,
+ignoré par git.
+
+```bash
+pnpm rl:rejoue --pilote hasard --tableaux 21-01      # le plancher
+pnpm rl:rejoue --pilote cap    --tableaux 21-01      # la référence à la main
+pnpm rl:entraine --tableaux 21-01 --generations 30 --travailleurs 4
+pnpm rl:rejoue --politique .rl/politique.json --tableaux tous
+```
+
+### L'environnement en trois lignes
+
+- **Observation** (43 nombres) : position et vitesse du corps, direction et
+  distance du sas, volume restant, volume déjà bu, étalement du corps, temps
+  écoulé, et **seize rayons de télémétrie** qui tâtent les parois autour du
+  corps (distance + matériau). Pas de pixels : le corps ne « voit » pas
+  l'écran, il sent sa forme et son voisinage — ce qui suffit, et coûte mille
+  fois moins cher qu'une image.
+- **Actions** (19) : ne rien faire · se rassembler · **conclure** (le bouton
+  CONTINUER du jeu, offert dès qu'un dixième du volume est bu) · pousser dans
+  l'une des 16 directions. Une décision toutes les 0,1 s simulée (12 pas
+  physiques), comme un joueur au geste tenu.
+- **Récompense** : les litres livrés (le score du jeu), plus la progression
+  vers le sas, moins ce qu'on abandonne en route et le temps qui passe ; prime
+  à la traversée, amende à la dispersion. Le **score** rapporté, lui, reste
+  celui du jeu, litre pour litre : c'est lui qu'on compare aux records.
+
+### Les fins d'un essai, recopiées de `main.ts`
+
+`sas` (tout est bu) · `conclu` (le joueur embarque le surplus) · `disperse`
+(le corps s'est défait) · `perdu` (plus rien de vivant) · `temps` (le chrono
+de l'entraînement, qui n'existe pas en jeu).
+
+## 3. Ce que ça coûte — mesures, pas estimations
+
+Mesuré sur ce dépôt (`pnpm rl:banc`, à refaire sur votre machine), un cœur,
+tableau 21-A, moteur JavaScript puis WASM (`public/noyaux.wasm`, déjà
+compilé) :
+
+| Particules | JS | WASM | Vitesse / temps réel |
+| ---: | ---: | ---: | ---: |
+| 900 (le jeu) | 2,63 ms/pas | 1,83 ms/pas | ×3,2 à ×4,5 |
+| 450 | 1,13 ms/pas | 0,85 ms/pas | ×7,4 à ×9,8 |
+| 200 | 0,42 ms/pas | 0,41 ms/pas | ×20 |
+
+Traduction : **un essai de 60 secondes de jeu coûte 8 à 16 secondes de
+calcul** sur un cœur, à 450–900 particules. Sur une machine à 8 cœurs, une
+nuit d'entraînement, c'est de l'ordre de 20 000 essais. C'est peu pour du RL
+moderne — mais l'espace d'action est minuscule et l'observation est un vecteur
+de 43 nombres, pas une image : c'est jouable.
+
+Les leviers, dans l'ordre de rentabilité :
+
+1. **Paralléliser** (déjà là) : `--travailleurs N`, un processus par cœur,
+   accélération quasi linéaire.
+2. **Réduire le corps** : `--particules 450`. Attention, ce n'est pas neutre —
+   le seuil de dispersion est un volume absolu ; l'environnement le met donc à
+   l'échelle du corps pour que l'arbitrage du jeu reste le même. Un corps plus
+   petit reste plus fragile : à valider avant d'entraîner sérieusement.
+3. **Les noyaux WASM** : +40 % à 900 particules, rien à 200.
+4. **Raccourcir les essais** (`--duree`) : la plupart des politiques ratées se
+   trahissent dans les dix premières secondes.
+
+## 4. Les outils — trois paliers
+
+### Palier 0 — ce qui est déjà installé (rien à acheter)
+
+`node`, `pnpm`, `vite-node` (ajouté aux dépendances de développement) et les
+fichiers ci-dessus. L'apprentissage est une **méthode d'entropie croisée**
+(CEM) : on tire une population de politiques, on garde l'élite, on recentre.
+Sans gradient, sans réseau, sans dépendance. Ça monte, ça se voit, et ça donne
+le premier point de comparaison honnête.
+
+Sa limite est connue : une politique **linéaire** de 836 poids ne saura jamais
+enfiler un couloir en trois temps. C'est un plancher, pas un plafond.
+
+### Palier 1 — le vrai RL (PPO / SAC), la semaine suivante
+
+L'algorithme qui convient ici est **PPO** (politique stochastique, actions
+discrètes, épisodes courts, récompense dense). Deux chemins :
+
+**A. Rester en TypeScript.** Un petit PPO en JS avec un réseau à deux couches
+(`tfjs-node`, ou écrit à la main : le réseau tient en 200 lignes). Zéro pont,
+zéro friction, tout le monde parle la même langue que le jeu. C'est le chemin
+que je recommande si le but est de rester dans ce dépôt.
+
+**B. Le pont vers Python**, l'écosystème de référence :
+
+| Outil | Rôle |
+| --- | --- |
+| **Python 3.11+** | l'écosystème |
+| **Gymnasium** | l'interface standard `reset/step` — 60 lignes d'enveloppe autour du pont |
+| **Stable-Baselines3** (ou **CleanRL**) | PPO/DQN prêts à l'emploi, éprouvés |
+| **PyTorch** | le réseau (CPU suffit : notre observation est un vecteur) |
+| **TensorBoard** ou **Weights & Biases** | les courbes, les comparaisons de graines |
+| **Optuna** | la recherche d'hyperparamètres, plus tard |
+
+Le pont : un processus Node par environnement, qui lit une action et écrit une
+observation en JSON par ligne sur stdin/stdout — exactement le protocole que
+`--travailleurs` utilise déjà. `SubprocVecEnv` en lance seize, PPO les
+consomme. Compter une journée de travail. (Le portage du solveur en Python est
+à exclure : 3 000 lignes de physique à maintenir en double, et la moindre
+divergence rend l'entraînement mensonger.)
+
+Matériel : **un PC à 8–16 cœurs suffit.** Pas de GPU tant que l'observation
+reste un vecteur — le goulot est la simulation du fluide, pas le réseau.
+
+### Palier 2 — si l'ambition monte
+
+- **Jouer le VRAI jeu** : glace, vapeur, dash, lasers, cibles, portes (§5) ;
+- **entraînement sur tableaux générés** (`src/game/generateur.ts` en produit à
+  la demande, avec graine) : c'est le vrai remède au sur-apprentissage, et le
+  jeu a déjà l'outil ;
+- **apprentissage par imitation** : les traversées humaines existent
+  (`records.ts`) ; pré-entraîner sur des démonstrations avant le RL divise le
+  coût par cinq quand la récompense est rare ;
+- **agent-designer** : retourner l'outil et faire mesurer par l'agent la
+  difficulté d'un tableau généré (« un agent moyen le passe-t-il ? à quel
+  prix ? ») — c'est le débouché le plus utile pour le jeu lui-même.
+
+## 5. Ce que l'agent ne joue pas encore (et pourquoi)
+
+L'environnement est une **réduction assumée** : il ne connaît que l'eau. Ni
+glace, ni vapeur, ni dash — non par difficulté technique, mais parce que ces
+règles-là vivent dans `main.ts` (péage de bascule, réserve de dashs,
+transformations subies) et non dans le solveur. Les lasers, cibles, rails,
+zones et toute la méta (bonbonnes, instruments, boutique) sont hors champ pour
+la même raison. `tableauxRL()` ne propose donc que les tableaux qui s'en
+passent — dix-neuf aujourd'hui, dont 21-A.
+
+**Le vrai travail d'ingénierie à venir n'est pas l'IA : c'est d'extraire de
+`main.ts` la boucle de règles** (états, dashs, lasers, portes) dans un module
+sans écran, que le jeu ET l'entraînement appelleraient tous les deux. Ce
+serait un gain pour le jeu seul — cette boucle est aujourd'hui impossible à
+tester autrement qu'à la main.
+
+En attendant, un garde-fou est indispensable : **un test de parité** qui
+rejoue la même suite de gestes dans le navigateur et dans l'environnement, et
+compare les trajectoires. Sans lui, un réglage du banc peut faire diverger
+l'entraînement du jeu réel sans que rien ne prévienne.
+
+## 6. Comment on regarde l'agent progresser
+
+- **La courbe d'entraînement** : chaque génération imprime retour moyen,
+  meilleur retour, litres livrés et nombre de traversées ; le journal complet
+  est écrit dans le JSON de sortie (`.rl/`), prêt à tracer.
+- **Les plafonds de comparaison**, dans l'ordre : le hasard (0,00 L, corps
+  défait en 10 s) · le pilote « cap » écrit à la main (1,82 L sur *Le
+  berceau*, dispersé sur *Le sas*) · les records humains de `records.ts`.
+- **Rejouer la traversée** : `pnpm rl:rejoue --trace .rl/trace.json` écrit la
+  suite des décisions. La prochaine étape naturelle est un lecteur de traces
+  dans le jeu — brancher la suite d'actions sur `Input` et **regarder** l'agent
+  jouer à l'écran, plutôt que lire ses chiffres.
+
+## 7. Les pièges connus
+
+- **La récompense est un contrat, pas un vœu.** C'est arrivé au premier
+  entraînement de ce dépôt : avec une amende de dispersion à 10 et un coût du
+  temps à 0,02, rester immobile coûtait 1,2 et tenter la traversée en coûtait
+  10. En cinq générations l'agent avait appris la seule leçon que le contrat
+  récompensait — **ne rien faire**. Les poids ont été rééquilibrés (l'immobilité
+  doit coûter plus cher qu'un échec courageux) ; la trace de l'incident est
+  dans `POIDS_DEFAUT`. Toute modification des poids demande un coup d'œil à ce
+  que l'agent FAIT, pas seulement à ce qu'il marque.
+- **Il trouvera les failles de la physique** avant de trouver le beau jeu.
+  C'est une bonne nouvelle : un agent qui exploite un bug est un détecteur de
+  bugs qui ne se fatigue jamais.
+- **Le sur-apprentissage par tableau** : une politique qui « connaît » 21-01
+  par cœur ne transfère pas. D'où l'entraînement multi-tableaux
+  (`--tableaux 21-01,21-A,21-C`) et, ensuite, les tableaux générés.
+- **La dérive de fidélité** entre l'environnement et le jeu : voir le test de
+  parité, §5.
+
+## 8. Si je devais faire la suite, dans cet ordre
+
+1. Un **test de parité** navigateur ↔ environnement (une demi-journée).
+2. **PPO** (chemin A, en TypeScript) et sa courbe face aux deux pilotes de
+   référence (deux jours).
+3. Le **lecteur de traces** dans le jeu : voir l'agent jouer (un jour).
+4. L'**extraction de la boucle de règles** hors de `main.ts` — glace, vapeur,
+   dash — qui ouvre les tableaux restants (le gros morceau, utile au jeu
+   lui-même).
+5. L'entraînement sur **tableaux générés**, puis l'agent au service du level
+   design.

@@ -62,6 +62,22 @@ pendant l'éjection), cohésion en apesanteur, fusion par contact, délai de
 réabsorption des gouttelettes, dispersion sous volume critique, exactitude de
 la grille spatiale et de l'étiquetage d'amas.
 
+## Apprendre à jouer (renforcement)
+
+Le jeu tourne aussi **sans écran** : `src/rl/` expose le tableau comme un
+environnement d'apprentissage (le solveur est déterministe et n'a besoin
+d'aucun DOM), avec deux pilotes de référence, un entraînement parallélisé et
+la courbe de progression.
+
+```bash
+pnpm rl:rejoue --pilote cap --tableaux 21-01          # la référence à la main
+pnpm rl:entraine --tableaux 21-01 --generations 30 --travailleurs 4
+```
+
+Tout est expliqué — l'environnement, les mesures de coût, les outils d'un vrai
+PPO, ce que l'agent ne joue pas encore — dans
+[`docs/apprentissage-par-renforcement.md`](docs/apprentissage-par-renforcement.md).
+
 ## Prochains jalons
 
 3. **La chaleur et les états** — carte thermique, glace, vapeur,

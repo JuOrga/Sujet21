@@ -12,3 +12,6 @@ assets-src/
 
 # Résidus NTFS de WSL
 *:Zone.Identifier
+
+# Entraînements par renforcement (politiques, journaux, traces)
+.rl/
