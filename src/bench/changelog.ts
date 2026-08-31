@@ -22,6 +22,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '31/08/2026 17:21',
+    title: 'Le canal d’une porte se comptait par dizaines — et refusait le reste',
+    notes: [
+      'LE SYMPTÔME, signalé depuis l’éditeur : ajouter 1 au canal d’une porte pose « des chiffres au hasard ». Ils ne l’étaient pas. Le champ du canal appelait le fabricant de champs numériques sans lui donner de PAS, et retombait donc sur son défaut : 10 — celui des COORDONNÉES, qui se règlent bien par dizaines d’unités monde. Or un « input type=number » à pas 10 ne se contente pas de sauter de dix : il n’accepte QUE la grille du pas.',
+      'RELEVÉ DANS LE NAVIGATEUR, en partant de 1 : la flèche du haut donne 11, puis 21, puis 31 — et saisir 3 à la main est refusé par la validation. D’où une numérotation qui semblait tirée au sort. Le canal de la CIBLE passait bien son pas de 1 ; celui de la PORTE l’avait perdu, et c’est la seule valeur entière de tout le panneau qui était restée au défaut des coordonnées.',
+      'Le pas vaut 1. Aucun « min » n’est posé, et c’est voulu : le canal −1 désigne la porte SCÉNARISÉE, qu’aucun faisceau n’ouvre — vérifié au passage, le pas 1 l’accepte bien. 632 tests verts, type-check et build propres.',
+    ],
+  },
+  {
     date: '31/08/2026 17:12',
     title: 'Les étiquettes volaient le clic : leur emprise valait dix fois leur texte',
     notes: [

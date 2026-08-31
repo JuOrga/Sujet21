@@ -5104,7 +5104,17 @@ export class LevelEditor {
       )
     } else if (s.kind === 'porte') {
       const q = (this.level.portes ?? [])[s.index]
-      rows.push(numField('Canal visé (nº de cible)', 'p-pc', q.canal))
+      // LE CANAL COMPTE PAR UN. Sans le pas explicite, le champ retombait
+      // sur le défaut de numField — 10, celui des COORDONNÉES, qui se
+      // règlent bien par dizaines d'unités monde. Un « input type=number »
+      // à pas 10 ne se contente pas de sauter de dix : il n'accepte QUE la
+      // grille du pas. Relevé dans le navigateur, en partant de 1 : la
+      // flèche du haut donne 11, puis 21, puis 31 — et saisir 3 à la main
+      // est refusé. D'où des numéros de canal qui semblaient tirés au sort.
+      // Le canal de la CIBLE (« p-ccanal ») passait bien 1 ; celui de la
+      // PORTE l'avait perdu. Pas de « min » : le canal −1 est la porte
+      // SCÉNARISÉE, qu'aucun faisceau n'ouvre — et le pas 1 l'accepte.
+      rows.push(numField('Canal visé (nº de cible)', 'p-pc', q.canal, 1))
       rows.push(
         `<label class="ed-f"><span>Règle</span><select id="p-pregle">` +
           `<option value="ou"${q.regle !== 'et' ? ' selected' : ''}>OU — une cible du canal suffit</option>` +
