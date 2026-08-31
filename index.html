@@ -6855,6 +6855,82 @@
         }
       }
 
+      /* ---- L'ÉCRAN DE PANNE : le dernier filet ---------------------------
+         Quand le jeu ne démarre pas, il ne démarre pas DU TOUT : `const
+         renderer = new Renderer(...)` s'exécute au niveau du module de
+         main.ts et lève « WebGL2 indisponible » s'il n'y a pas de WebGL2.
+         Rien ne rattrapait cette exception, donc le joueur voyait un écran
+         noir, sans un mot — pas même de quoi comprendre que c'est son
+         navigateur et pas le jeu.
+
+         Ce panneau est écrit en COULEURS LITTÉRALES, sans var(), sans
+         webfont : c'est un écran de secours, il doit tenir même quand le
+         reste n'a pas eu lieu. Il est masqué par défaut et n'entre dans
+         aucun flux — il ne peut rien décaler tant qu'il ne s'affiche pas. */
+      #panne {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: #030710;
+        color: #d9ecf7;
+        font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+        overflow-y: auto;
+        padding: 32px 24px;
+        align-items: center;
+        justify-content: center;
+      }
+      #panne.visible {
+        display: flex;
+      }
+      #panne .dedans {
+        max-width: 560px;
+        width: 100%;
+        border: 1px solid rgba(150, 200, 235, 0.38);
+        border-radius: 4px;
+        background: #0a1420;
+        padding: 26px 26px 28px;
+      }
+      #panne h2 {
+        font-family: 'Michroma', 'Arial Black', sans-serif;
+        font-size: 15px;
+        font-weight: 400;
+        line-height: 1.45;
+        margin: 0 0 14px;
+        color: #63b7e6;
+      }
+      #panne p {
+        font-size: 13.5px;
+        line-height: 1.65;
+        margin: 0 0 12px;
+        color: #d9ecf7;
+      }
+      #panne ul {
+        font-size: 13px;
+        line-height: 1.7;
+        margin: 0 0 12px;
+        padding-left: 20px;
+        color: #7f9cb0;
+      }
+      #panne .detail {
+        font-size: 11.5px;
+        line-height: 1.55;
+        color: #7f9cb0;
+        background: rgba(3, 7, 16, 0.7);
+        border: 1px solid rgba(150, 200, 235, 0.16);
+        border-radius: 3px;
+        padding: 9px 11px;
+        margin: 14px 0 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        overflow-x: auto;
+      }
+      #panne .sous {
+        font-size: 11px;
+        color: #7f9cb0;
+        margin: 14px 0 0;
+        letter-spacing: 0.06em;
+      }
     </style>
   </head>
   <body>
@@ -8242,6 +8318,136 @@
     <button id="relance" type="button">RECOMMENCER LE TABLEAU</button>
     <button id="continuer" type="button">CONTINUER — CONCLURE L'ESSAI</button>
     <div id="touchbar"></div>
+
+    <div id="panne" role="alert" aria-live="assertive">
+      <div class="dedans">
+        <h2 id="panne-titre">LE PROTOCOLE N'A PAS PU S'OUVRIR</h2>
+        <div id="panne-corps"></div>
+        <pre class="detail" id="panne-detail" hidden></pre>
+        <p class="sous">SUJET 21 — COMPLEXE ORBITAL MÉDUSE</p>
+      </div>
+    </div>
+
+    <!-- LA GARDE D'AMORÇAGE. Script CLASSIQUE, placé AVANT le module : il
+         s'exécute pendant l'analyse du document, donc ses écouteurs sont en
+         place avant que main.ts (différé, comme tout module) ne commence.
+         C'est toute la raison de sa position ici, et non dans le module.
+
+         Trois filets, du plus précis au plus grossier :
+           1. le SONDAGE WebGL2, avant même de charger le jeu — c'est la
+              panne connue, et la seule qu'on sache nommer exactement ;
+           2. les ERREURS d'amorçage (exception ou promesse rejetée) tant
+              que le jeu n'a pas signalé qu'il tourne ;
+           3. la VEILLE : si rien n'a démarré au bout de douze secondes,
+              on cesse d'attendre en silence.
+         Après le premier passage de la boucle de rendu, plus rien de tout
+         cela ne se déclenche : un incident en cours de partie n'a pas à
+         recouvrir le jeu d'un panneau. -->
+    <script>
+      (function () {
+        var demarre = false
+        var montre = false
+        var veille = 0
+
+        function affiche(titre, corps, detail) {
+          if (montre || demarre) return
+          montre = true
+          if (veille) clearTimeout(veille)
+          try {
+            var el = document.getElementById('panne')
+            document.getElementById('panne-titre').textContent = titre
+            document.getElementById('panne-corps').innerHTML = corps
+            if (detail) {
+              var d = document.getElementById('panne-detail')
+              d.textContent = String(detail).slice(0, 800)
+              d.hidden = false
+            }
+            el.classList.add('visible')
+          } catch (e) {
+            // Le panneau lui-même est hors d'usage : il reste le texte brut,
+            // qui vaut toujours mieux qu'un écran noir.
+            document.body.innerHTML =
+              '<pre style="color:#d9ecf7;background:#030710;padding:24px;' +
+              'font:13px ui-monospace,monospace;white-space:pre-wrap">' +
+              titre +
+              '\n\n' +
+              String(detail || '') +
+              '</pre>'
+          }
+        }
+
+        // Le jeu appelle ceci à sa première image : la preuve qu'il tourne,
+        // pas seulement que son module s'est évalué.
+        window.__sujet21Demarre = function () {
+          demarre = true
+          if (veille) clearTimeout(veille)
+        }
+
+        // 1. WebGL2 — la panne qu'on sait nommer.
+        var aWebGL2 = false
+        try {
+          aWebGL2 = !!document.createElement('canvas').getContext('webgl2')
+        } catch (e) {
+          aWebGL2 = false
+        }
+        if (!aWebGL2) {
+          affiche(
+            'CE NAVIGATEUR NE SAIT PAS AFFICHER LE PROTOCOLE',
+            '<p>Le jeu dessine son fluide avec <b>WebGL&nbsp;2</b>, que ce' +
+              ' navigateur ne fournit pas. Rien de cassé de votre côté&nbsp;:' +
+              ' il manque une capacité, pas un fichier.</p>' +
+              '<ul>' +
+              '<li>Essayez un Chrome, Edge, Firefox ou Safari <b>à jour</b>.</li>' +
+              '<li>Sur un poste ancien, l’accélération matérielle est parfois' +
+              ' désactivée dans les réglages du navigateur.</li>' +
+              '<li>En bureau à distance ou en machine virtuelle, le GPU n’est' +
+              ' souvent pas transmis.</li>' +
+              '</ul>',
+          )
+        }
+
+        // 2. Une exception pendant l'amorçage. On écarte les erreurs de
+        // CHARGEMENT de ressource (image, son) : elles arrivent sans
+        // `message`, et une image manquante n'est pas une panne de démarrage.
+        window.addEventListener('error', function (e) {
+          if (!e || typeof e.message !== 'string') return
+          affiche(
+            'LE PROTOCOLE N’A PAS PU S’OUVRIR',
+            '<p>Une erreur est survenue au démarrage. Recharger la page suffit' +
+              ' souvent&nbsp;; si elle revient, le détail ci-dessous est ce' +
+              ' qu’il faut transmettre.</p>',
+            e.message + (e.filename ? '\n' + e.filename + ':' + e.lineno : ''),
+          )
+        })
+        window.addEventListener('unhandledrejection', function (e) {
+          affiche(
+            'LE PROTOCOLE N’A PAS PU S’OUVRIR',
+            '<p>Une opération de démarrage a échoué. Recharger la page suffit' +
+              ' souvent&nbsp;; si elle revient, le détail ci-dessous est ce' +
+              ' qu’il faut transmettre.</p>',
+            (e && e.reason && (e.reason.message || e.reason)) || 'promesse rejetée',
+          )
+        })
+
+        // 3. La veille. Douze secondes : large pour un premier chargement sur
+        // une connexion lente, court comparé à l'attente devant un écran noir.
+        if (aWebGL2) {
+          veille = setTimeout(function () {
+            affiche(
+              'LE PROTOCOLE MET TROP LONGTEMPS À S’OUVRIR',
+              '<p>Le jeu n’a pas démarré au bout de douze secondes, et n’a' +
+                ' signalé aucune erreur. C’est en général un fichier qui n’est' +
+                ' pas arrivé.</p>' +
+                '<ul>' +
+                '<li>Vérifiez la connexion, puis rechargez.</li>' +
+                '<li>Un rechargement forcé (Ctrl/Cmd + Maj + R) écarte un cache' +
+                ' abîmé.</li>' +
+                '</ul>',
+            )
+          }, 12000)
+        }
+      })()
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
