@@ -1055,13 +1055,15 @@ export function checkLevel(brut: LevelDef): Verdict[] {
   }
   // Rails : un rail sans émetteur ne guidera jamais rien, et un rail hors
   // cuve est inatteignable.
-  // Un CONDUIT n'attend aucun arc : il s'engage sur la seule vapeur. Seuls
-  // les rails de guidage réclament un émetteur.
-  const railsGuidage = (level.rails ?? []).filter((r) => r.conduit !== true)
-  if (railsGuidage.length > 0 && (level.lasers?.length ?? 0) === 0) {
+  // TOUT rail réclame un émetteur, CONDUIT COMPRIS : le tube ne s'ouvre
+  // qu'au plasma, donc à un arc ionisé. Un conduit sans laser n'est pas un
+  // raccourci, c'est une paroi invisible que rien ne pourra jamais ouvrir —
+  // le pire des tableaux, celui qui a l'air jouable.
+  if ((level.rails?.length ?? 0) > 0 && (level.lasers?.length ?? 0) === 0) {
     v.push({
       niveau: 'avertissement',
-      message: 'Un rail magnétique sans émetteur laser : aucun arc à guider.',
+      message:
+        'Un rail magnétique sans émetteur laser : aucun arc à guider — et un CONDUIT sans arc ne s’ouvrira jamais.',
     })
   }
   for (const r of level.rails ?? []) {

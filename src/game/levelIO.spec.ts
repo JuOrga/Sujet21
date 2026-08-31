@@ -560,15 +560,19 @@ it('conserve le drapeau CONDUIT d’un rail, sur deux allers-retours', () => {
   expect(deux.level!.rails![1].conduit).toBeUndefined()
 })
 
-// Un CONDUIT n'a pas besoin d'émetteur : l'avertissement ne doit plus tomber.
-it('ne réclame pas d’émetteur laser pour un rail marqué conduit', () => {
-  const avecConduit = checkLevel({
+// UN CONDUIT RÉCLAME UN ÉMETTEUR, LUI AUSSI. La dispense d'origine était
+// fondée sur la règle « la vapeur seule ouvre le tube », abandonnée : le
+// conduit ne s'ouvre qu'au PLASMA, donc à un arc. Sans laser, ce n'est pas
+// un raccourci mais une paroi invisible que rien n'ouvrira jamais — le pire
+// des tableaux, celui qui a l'air jouable.
+it('réclame un émetteur laser MÊME pour un rail marqué conduit', () => {
+  const conduitSansLaser = checkLevel({
     ...TABLEAUX[0],
     lasers: [],
     rails: [{ points: [{ x: 0, y: 0 }, { x: 400, y: 0 }], conduit: true }],
   } as never)
-  expect(avecConduit.some((v) => /émetteur laser/.test(v.message))).toBe(false)
-  // mais un rail de GUIDAGE sans émetteur reste signalé
+  expect(conduitSansLaser.some((v) => /émetteur laser/.test(v.message))).toBe(true)
+  // et le rail de GUIDAGE reste signalé comme avant
   const guidage = checkLevel({
     ...TABLEAUX[0],
     lasers: [],

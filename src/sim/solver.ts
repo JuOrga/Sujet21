@@ -2212,6 +2212,10 @@ export class FluidSim {
       this.dansConduit[i] = 0
       const px = this.prdX[i]
       const py = this.prdY[i]
+      // UN TUBE OUVERT PRIME. Deux conduits peuvent se croiser : prendre
+      // bêtement le plus proche ferait qu'un tube FERMÉ voisin expulse un
+      // corps en pleine traversée d'un tube OUVERT. On retient donc le
+      // meilleur candidat ouvert s'il en existe un, le plus proche sinon.
       let best = Infinity
       let bnx = 0
       let bny = 0
@@ -2219,6 +2223,9 @@ export class FluidSim {
       let bouvert = 0
       for (const tube of this.conduits) {
         const pts = tube.pts
+        const ouvert = tube.actif ? 1 : 0
+        // un tube fermé ne peut pas déloger un tube ouvert déjà retenu
+        if (bouvert === 1 && ouvert === 0) continue
         for (let k = 0; k + 1 < pts.length; k++) {
           const a = pts[k]
           const b = pts[k + 1]
@@ -2232,25 +2239,27 @@ export class FluidSim {
           const dx = px - cx
           const dy = py - cy
           const d2 = dx * dx + dy * dy
-          if (d2 < best) {
-            best = d2
-            const d = Math.sqrt(d2)
-            // sur l'axe même, la normale est indéfinie : on prend la
-            // perpendiculaire au tronçon, pour que l'expulsion ait un sens
-            if (d > 1e-6) {
-              bnx = dx / d
-              bny = dy / d
-            } else {
-              const inv = 1 / Math.sqrt(len2)
-              bnx = -aby * inv
-              bny = abx * inv
-            }
-            brayon = tube.rayon
-            bouvert = tube.actif ? 1 : 0
+          if (d2 > tube.rayon * tube.rayon) continue // hors de CE tube
+          // un ouvert détrône un fermé ; à égalité d'ouverture, le plus proche
+          if (bouvert === 1 && ouvert === 1 && d2 >= best) continue
+          if (bouvert === 0 && ouvert === 0 && d2 >= best) continue
+          best = d2
+          bouvert = ouvert
+          const d = Math.sqrt(d2)
+          // sur l'axe même, la normale est indéfinie : on prend la
+          // perpendiculaire au tronçon, pour que l'expulsion ait un sens
+          if (d > 1e-6) {
+            bnx = dx / d
+            bny = dy / d
+          } else {
+            const inv = 1 / Math.sqrt(len2)
+            bnx = -aby * inv
+            bny = abx * inv
           }
+          brayon = tube.rayon
         }
       }
-      if (best <= brayon * brayon) {
+      if (brayon > 0) {
         this.dansConduit[i] = 1
         this.conduitOuvert[i] = bouvert
         this.conduitNX[i] = bnx
@@ -2260,29 +2269,46 @@ export class FluidSim {
     }
   }
 
-  /** LA PAROI DU TUBE. Ce qui n'est pas gazeux est repoussé DEHORS — c'est
-   *  ce qui fait du conduit un raccourci qu'on ne prend qu'en vapeur, et non
-   *  un trou ouvert à tous. La glace comme l'eau : on ne se faufile pas dans
-   *  une ligne de champ en étant de la matière condensée. */
+  /** LA PAROI DU TUBE — pour ce qui est CONDENSÉ, et pour cela seulement.
+   *
+   *  LE VERROU QU'IL A FALLU OUVRIR. Expulser aussi la VAPEUR rendait le
+   *  conduit inutilisable : pour lever le champ il faut ioniser le faisceau
+   *  DANS le tube (la capture se fait à `plasmaRailRadius`, 30 u de l'axe),
+   *  or un tube fermé qui repousse la vapeur la met hors d'atteinte — mesuré,
+   *  elle finissait à plus de deux mille unités. On ne pouvait donc JAMAIS
+   *  ouvrir un conduit en jouant ; seuls les tests, qui lèvent le champ à la
+   *  main, voyaient la mécanique fonctionner.
+   *
+   *  La vapeur ENTRE donc, et n'y gagne rien tant que l'arc n'est pas pris :
+   *  ni convoyage, ni laissez-passer du décor. C'est bien le PLASMA qui
+   *  ouvre le raccourci — la vapeur seule ne fait qu'avoir le droit de
+   *  s'approcher pour l'allumer.
+   *
+   *  L'eau et la glace, elles, butent : on ne se faufile pas dans une ligne
+   *  de champ en étant de la matière condensée. */
   private expulseDesConduits(): void {
     if (this.conduits.length === 0) return
     for (let i = 0; i < this.count; i++) {
       if (this.dansConduit[i] !== 1) continue
-      // seul le PLASMA a le laissez-passer : vapeur DANS un tube ouvert.
-      // Une vapeur qui n'a pas ionisé d'arc bute comme l'eau et la glace.
-      if (this.gaseous[i] === 1 && this.conduitOuvert[i] === 1) continue
+      // la vapeur a le droit d'entrer, ouverte ou non : c'est elle qui allume
+      if (this.gaseous[i] === 1) continue
       const prof = this.conduitProf[i]
       if (prof <= 0) continue
-      this.prdX[i] += this.conduitNX[i] * prof
-      this.prdY[i] += this.conduitNY[i] * prof
-      // la vitesse normale entrante est annulée : on bute, on ne rebondit
-      // pas — un tube de champ n'a aucune raison d'être élastique
-      const vn = this.velX[i] * this.conduitNX[i] + this.velY[i] * this.conduitNY[i]
-      if (vn < 0) {
-        this.velX[i] -= vn * this.conduitNX[i]
-        this.velY[i] -= vn * this.conduitNY[i]
-      }
-      // expulsée, elle n'est plus dedans : la vapeur seule garde le laissez-passer
+      const nx = this.conduitNX[i]
+      const ny = this.conduitNY[i]
+      this.prdX[i] += nx * prof
+      this.prdY[i] += ny * prof
+      // LE CONTACT EST DÉCLARÉ, comme pour n'importe quel solide : sans lui
+      // la passe de glace ne reçoit aucune impulsion et un palet se DÉFORME
+      // dans le tube au lieu d'y rebondir.
+      const vn =
+        ((this.prdX[i] - this.posX[i]) * nx + (this.prdY[i] - this.posY[i]) * ny) /
+        Math.max(1e-6, this.params.dt)
+      this.contactMat[i] = MAT_WALL
+      this.contactNX[i] = nx
+      this.contactNY[i] = ny
+      this.contactVn[i] = Math.min(0, vn)
+      // expulsée, elle n'est plus dedans
       this.dansConduit[i] = 0
     }
   }
