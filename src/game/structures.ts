@@ -399,6 +399,81 @@ export function interieurStructure(s: StructureDef): { x: number; y: number }[] 
 }
 
 
+/** L'EMPRISE DESSINÉE d'une structure : le rectangle que sa coque occupe
+ * VRAIMENT à l'écran — raccord compris (un couloir raccordé est plus court
+ * que son emprise brute) et élargi par sa rotation s'il y en a une. C'est
+ * ce rectangle-là que la gomme doit couvrir : on efface ce qu'on voit. */
+export function empriseDessinee(
+  s: StructureDef,
+  autres: readonly StructureDef[] = [],
+): RectStruct {
+  const r = boiteRaccordee(s, autres)
+  if (!s.angle) return r
+  const hx = (r.maxX - r.minX) / 2
+  const hy = (r.maxY - r.minY) / 2
+  const coins = [
+    versMonde(s, hx, hy),
+    versMonde(s, -hx, hy),
+    versMonde(s, -hx, -hy),
+    versMonde(s, hx, -hy),
+  ]
+  return {
+    minX: Math.min(...coins.map((p) => p.x)),
+    minY: Math.min(...coins.map((p) => p.y)),
+    maxX: Math.max(...coins.map((p) => p.x)),
+    maxY: Math.max(...coins.map((p) => p.y)),
+  }
+}
+
+/** Ce que la GOMME fait d'une coque quand elle passe dessus :
+ *
+ *   intacte   la zone ne la concerne pas — elle passe à côté, ou elle est
+ *             tracée DANS son vide (on y gomme le mobilier, pas les murs :
+ *             sans quoi tout gommage à l'intérieur d'une chambre aurait
+ *             emporté la chambre) ;
+ *   effacee   la zone la couvre TOUT ENTIÈRE : la coque disparaît ;
+ *   epargnee  la zone la mord sans la couvrir. Une coque ne se ROGNE pas —
+ *             un anneau de parois coupé en deux n'est plus une coque, et
+ *             le format n'a pas de quoi dire un demi-module. Elle survit
+ *             donc entière, et l'éditeur le dit au lieu de le taire.
+ */
+export type VerdictGomme = 'intacte' | 'effacee' | 'epargnee'
+
+export function gommeStructure(
+  s: StructureDef,
+  autres: readonly StructureDef[],
+  zone: RectStruct,
+): VerdictGomme {
+  const e = empriseDessinee(s, autres)
+  const r = {
+    minX: Math.min(zone.minX, zone.maxX),
+    minY: Math.min(zone.minY, zone.maxY),
+    maxX: Math.max(zone.minX, zone.maxX),
+    maxY: Math.max(zone.minY, zone.maxY),
+  }
+  const dehors =
+    r.minX >= e.maxX || r.maxX <= e.minX || r.minY >= e.maxY || r.maxY <= e.minY
+  if (dehors) return 'intacte'
+  if (
+    r.minX <= e.minX &&
+    r.maxX >= e.maxX &&
+    r.minY <= e.minY &&
+    r.maxY >= e.maxY
+  )
+    return 'effacee'
+  // tracée dans le creux, la zone ne touche aucun mur : on gomme dedans.
+  // (le creux se juge au large — chanfrein ignoré, bouts de couloir
+  // compris : mieux vaut se taire d'un cheveu que crier pour rien)
+  const coins: [number, number][] = [
+    [r.minX, r.minY],
+    [r.maxX, r.minY],
+    [r.maxX, r.maxY],
+    [r.minX, r.maxY],
+  ]
+  if (coins.every(([x, y]) => dansLeVide(s, x, y))) return 'intacte'
+  return 'epargnee'
+}
+
 /** Le point tombe-t-il sur la COQUE d'une structure (ses parois, pas son
  * vide) ? L'éditeur attrape une structure par ses murs : son intérieur
  * reste transparent au clic, on y pose le mobilier normalement. */
