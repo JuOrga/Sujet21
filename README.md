@@ -72,6 +72,7 @@ la courbe de progression.
 ```bash
 pnpm rl:rejoue --pilote cap --tableaux 21-01          # la référence à la main
 pnpm rl:entraine --tableaux 21-01 --generations 30 --travailleurs 4
+pnpm rl:courbe                                        # la progression, en direct
 ```
 
 Tout est expliqué — l'environnement, les mesures de coût, les outils d'un vrai

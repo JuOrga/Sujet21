@@ -20,13 +20,16 @@ import { EnvSujet21, joue, reussie, type OptionsEnv } from './env'
 import { NoyauxWasm } from '../sim/wasm'
 import {
   alea,
+  apprendParImitation,
   cemDepart,
   cemEchantillon,
   cemRecentre,
   decide,
   nbParams,
   politiqueDepuis,
+  type Exemple,
 } from './politique'
+import { piloteCap } from './pilotes'
 
 interface Reglages {
   tableaux: string[]
@@ -42,6 +45,8 @@ interface Reglages {
   sortie: string
   travailleurs: number
   wasm: boolean
+  depart: string
+  tours: number
 }
 
 function lisArgs(argv: string[]): Reglages {
@@ -64,6 +69,8 @@ function lisArgs(argv: string[]): Reglages {
     sortie: get('sortie', '.rl/politique.json'),
     travailleurs: Math.max(1, num('travailleurs', 1)),
     wasm: argv.includes('--wasm'),
+    depart: get('depart', 'zero'),
+    tours: num('tours', 3),
   }
 }
 
@@ -185,7 +192,51 @@ async function entraine(r: Reglages, argv: string[]): Promise<void> {
   const wasm = await noyaux(r.wasm)
   const envsLocaux = construitEnvs(r, wasm)
   const taille = nbParams(envsLocaux[0].tailleObs)
-  const etat = cemDepart(taille, r.ecart0)
+  // Le point de départ. « zero » : tout à plat, la recherche part de rien.
+  // « cap » : on copie d'abord le pilote écrit à la main (imitation), et
+  // l'optimisation repart de sa copie — la courbe démarre alors au niveau du
+  // pilote, et ce qu'elle gagne ensuite, la machine l'a trouvé seule.
+  const etat = cemDepart(taille, r.depart === 'zero' ? r.ecart0 : r.ecart0 * 0.3)
+  if (r.depart === 'cap') {
+    // ---- IMITATION, puis RATTRAPAGE (DAgger).
+    // Copier les décisions du pilote sur SES trajectoires ne suffit pas : la
+    // copie dérive au premier écart, se retrouve dans des situations que le
+    // pilote n'a jamais traversées, et n'a rien appris à y faire. Le remède
+    // classique est de recommencer sur SES PROPRES trajectoires à elle, en
+    // demandant au pilote ce qu'il aurait fait à chaque instant — ici c'est
+    // gratuit, le pilote est une fonction. Trois tours suffisent à voir la
+    // différence, et le journal imprime ce que vaut la copie à chaque tour.
+    const exemples: Exemple[] = []
+    const tailleObs = envsLocaux[0].tailleObs
+    let poids: Float64Array = new Float64Array(taille)
+    for (let tour = 0; tour <= r.tours; tour++) {
+      for (const env of envsLocaux) {
+        const pilote = piloteCap()
+        const pol = politiqueDepuis(tailleObs, poids)
+        env.reset()
+        for (;;) {
+          const obs = env.observe()
+          // L'étiquette vient TOUJOURS du pilote ; au premier tour c'est aussi
+          // lui qui conduit, ensuite c'est la copie (et le pilote corrige).
+          const expert = pilote(env)
+          exemples.push({ obs: obs.slice(), action: expert })
+          const action = tour === 0 ? expert : decide(pol, obs)
+          if (env.step(action).fini) break
+        }
+      }
+      const copie = apprendParImitation(exemples, tailleObs)
+      poids = copie.poids
+      // Ce que VAUT la copie, pas seulement ce qu'elle recopie : une fidélité
+      // de 90 % peut manquer les 10 % de décisions qui font la traversée.
+      const vaut = evalue(envsLocaux, poids)
+      console.log(
+        `Imitation, tour ${tour} : ${exemples.length} décisions du pilote « cap », ` +
+          `${(copie.exactitude * 100).toFixed(0)} % de fidélité · ` +
+          `la copie vaut ${vaut.score.toFixed(2)} L (retour ${vaut.retour.toFixed(2)})`,
+      )
+    }
+    etat.moyenne.set(poids)
+  }
   const rnd = alea(r.graine)
   const equipe =
     r.travailleurs > 1 ? new Equipe(r.travailleurs, argv) : null
@@ -205,6 +256,29 @@ async function entraine(r: Reglages, argv: string[]): Promise<void> {
   const t0 = Date.now()
   let meilleurGlobal = { retour: -Infinity, poids: new Float64Array(taille) }
   const journal: Record<string, number>[] = []
+
+  // Le fichier est réécrit APRÈS CHAQUE GÉNÉRATION, pas à la fin : un
+  // entraînement de deux heures doit se regarder progresser (pnpm rl:courbe),
+  // et une machine qui s'éteint ne doit pas emporter le travail avec elle.
+  mkdirSync(dirname(r.sortie), { recursive: true })
+  const ecris = (enCours: boolean): void => {
+    writeFileSync(
+      r.sortie,
+      JSON.stringify(
+        {
+          version: 1,
+          enCours,
+          tailleObs: envsLocaux[0].tailleObs,
+          reglages: r,
+          retour: meilleurGlobal.retour,
+          poids: Array.from(meilleurGlobal.poids),
+          journal,
+        },
+        null,
+        1,
+      ),
+    )
+  }
 
   for (let g = 1; g <= r.generations; g++) {
     const candidats: Float64Array[] = []
@@ -242,27 +316,13 @@ async function entraine(r: Reglages, argv: string[]): Promise<void> {
       litresMax: verdicts[best].score,
       traversees,
     })
+    ecris(g < r.generations)
   }
   equipe?.ferme()
-
-  mkdirSync(dirname(r.sortie), { recursive: true })
-  writeFileSync(
-    r.sortie,
-    JSON.stringify(
-      {
-        version: 1,
-        tailleObs: envsLocaux[0].tailleObs,
-        reglages: r,
-        retour: meilleurGlobal.retour,
-        poids: Array.from(meilleurGlobal.poids),
-        journal,
-      },
-      null,
-      1,
-    ),
-  )
+  ecris(false)
   console.log(`\nMeilleure politique écrite dans ${r.sortie}`)
   console.log(`Rejouer :  pnpm rl:rejoue --politique ${r.sortie}`)
+  console.log(`La courbe : pnpm rl:courbe --journal ${r.sortie}`)
 }
 
 const argv = process.argv.slice(2)

@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "rl:entraine": "vite-node src/rl/entraine.ts",
     "rl:rejoue": "vite-node src/rl/rejoue.ts",
+    "rl:courbe": "vite-node src/rl/courbe.ts",
     "rl:banc": "vite-node src/rl/banc.ts",
     "type-check": "tsc --noEmit"
   },

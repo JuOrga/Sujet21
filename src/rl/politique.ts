@@ -127,3 +127,71 @@ export function cemRecentre(
     etat.ecart[i] = Math.sqrt(v) + bruitSup
   }
 }
+
+// ---------------------------------------------------------------------------
+// L'IMITATION — partir de ce qu'un humain sait déjà faire.
+//
+// Chercher au hasard une politique qui traverse un tableau, c'est chercher
+// une aiguille : la récompense de la traversée n'arrive qu'au bout d'un
+// enchaînement que le hasard ne produit presque jamais. L'usage, en
+// apprentissage par renforcement, est de PARTIR d'une démonstration : on
+// apprend d'abord à copier un pilote écrit à la main (régression softmax sur
+// ses décisions), puis on laisse l'optimisation améliorer la copie. La courbe
+// ne part plus de zéro mais du niveau du pilote — et ce qu'elle gagne
+// ensuite est exactement ce que la machine a trouvé toute seule.
+// ---------------------------------------------------------------------------
+
+export interface Exemple {
+  obs: Float32Array
+  action: number
+}
+
+/**
+ * Régression softmax (descente de gradient simple) : les poids qui
+ * reproduisent au mieux les décisions du pilote. Quelques milliers
+ * d'exemples, quelques centaines de passes — l'affaire d'une seconde.
+ */
+export function apprendParImitation(
+  exemples: Exemple[],
+  tailleObs: number,
+  nbActions = NB_ACTIONS,
+  passes = 400,
+  pas = 0.5,
+): { poids: Float64Array; exactitude: number } {
+  const n = tailleObs
+  const poids = new Float64Array(nbActions * (n + 1))
+  const logits = new Float64Array(nbActions)
+  for (let e = 0; e < passes; e++) {
+    const grad = new Float64Array(poids.length)
+    for (const ex of exemples) {
+      let max = -Infinity
+      for (let a = 0; a < nbActions; a++) {
+        const base = a * (n + 1)
+        let z = poids[base + n]
+        for (let i = 0; i < n; i++) z += poids[base + i] * ex.obs[i]
+        logits[a] = z
+        if (z > max) max = z
+      }
+      let somme = 0
+      for (let a = 0; a < nbActions; a++) {
+        logits[a] = Math.exp(logits[a] - max)
+        somme += logits[a]
+      }
+      for (let a = 0; a < nbActions; a++) {
+        const err = logits[a] / somme - (a === ex.action ? 1 : 0)
+        const base = a * (n + 1)
+        for (let i = 0; i < n; i++) grad[base + i] += err * ex.obs[i]
+        grad[base + n] += err
+      }
+    }
+    const echelle = pas / exemples.length
+    for (let i = 0; i < poids.length; i++) poids[i] -= echelle * grad[i]
+  }
+  // L'exactitude dit si la copie a pris : sous 60 %, la politique linéaire
+  // n'a pas les moyens du pilote qu'on lui demande d'imiter, et partir de là
+  // ne vaut pas mieux que partir de zéro.
+  const pol = { tailleObs: n, nbActions, poids }
+  let bons = 0
+  for (const ex of exemples) if (decide(pol, ex.obs) === ex.action) bons++
+  return { poids, exactitude: bons / exemples.length }
+}

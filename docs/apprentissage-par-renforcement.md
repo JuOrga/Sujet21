@@ -33,6 +33,7 @@ src/rl/politique.ts  une politique linéaire + l'apprentissage sans gradient (CE
 src/rl/pilotes.ts    deux pilotes ÉCRITS À LA MAIN — le plancher de comparaison
 src/rl/entraine.ts   l'entraînement en ligne de commande, parallélisé
 src/rl/rejoue.ts     rejouer une politique, tableau par tableau, et tracer ses gestes
+src/rl/courbe.ts     la courbe de progression, dans le terminal, pendant que ça tourne
 src/rl/banc.ts       le banc de vitesse : combien de jeu par seconde de machine
 src/rl/env.spec.ts   les garanties : déterminisme, fins conformes, observation saine
 ```
@@ -44,6 +45,7 @@ ignoré par git.
 pnpm rl:rejoue --pilote hasard --tableaux 21-01      # le plancher
 pnpm rl:rejoue --pilote cap    --tableaux 21-01      # la référence à la main
 pnpm rl:entraine --tableaux 21-01 --generations 30 --travailleurs 4
+pnpm rl:courbe --journal .rl/politique.json        # même pendant l'entraînement
 pnpm rl:rejoue --politique .rl/politique.json --tableaux tous
 ```
 
@@ -113,6 +115,19 @@ le premier point de comparaison honnête.
 Sa limite est connue : une politique **linéaire** de 836 poids ne saura jamais
 enfiler un couloir en trois temps. C'est un plancher, pas un plafond.
 
+**Deux départs possibles.** `--depart zero` cherche à partir de rien.
+`--depart cap` **imite d'abord le pilote écrit à la main**, puis optimise sa
+copie : c'est la recette classique (imitation puis renforcement), et elle
+change tout quand la récompense de la traversée est trop rare pour être
+trouvée au hasard. Copier les décisions du pilote sur ses propres
+trajectoires ne suffit pas — la copie dérive au premier écart et se retrouve
+dans des situations que le pilote n'a jamais traversées ; `--tours N`
+applique donc le rattrapage classique (DAgger) : on rejoue les trajectoires
+de la COPIE en demandant au pilote ce qu'il aurait fait. Mesuré ici sur *Le
+berceau* : la copie brute vaut un retour de −2,25 (elle n'ose plus bouger),
+et trois tours de rattrapage la portent à +5,76 — avant même la première
+génération d'optimisation.
+
 ### Palier 1 — le vrai RL (PPO / SAC), la semaine suivante
 
 L'algorithme qui convient ici est **PPO** (politique stochastique, actions
@@ -180,16 +195,30 @@ l'entraînement du jeu réel sans que rien ne prévienne.
 
 ## 6. Comment on regarde l'agent progresser
 
-- **La courbe d'entraînement** : chaque génération imprime retour moyen,
-  meilleur retour, litres livrés et nombre de traversées ; le journal complet
-  est écrit dans le JSON de sortie (`.rl/`), prêt à tracer.
-- **Les plafonds de comparaison**, dans l'ordre : le hasard (0,00 L, corps
-  défait en 10 s) · le pilote « cap » écrit à la main (1,82 L sur *Le
-  berceau*, dispersé sur *Le sas*) · les records humains de `records.ts`.
-- **Rejouer la traversée** : `pnpm rl:rejoue --trace .rl/trace.json` écrit la
-  suite des décisions. La prochaine étape naturelle est un lecteur de traces
-  dans le jeu — brancher la suite d'actions sur `Input` et **regarder** l'agent
-  jouer à l'écran, plutôt que lire ses chiffres.
+Quatre manières, de la plus immédiate à la plus parlante :
+
+1. **Le tableau, en direct.** Chaque génération imprime retour moyen, meilleur
+   retour, litres livrés, traversées et temps écoulé. C'est le pouls.
+2. **La courbe, pendant que ça tourne.** Le journal est réécrit dans le JSON
+   de sortie **après chaque génération** (pas à la fin) : `pnpm rl:courbe
+   --journal .rl/politique.json` la trace dans le terminal, à n'importe quel
+   moment, depuis un autre onglet. Trois séries : `--serie retour` (ce que
+   l'agent optimise — la moyenne de la population ET le meilleur de la
+   génération), `--serie litres` (le score du jeu), `--serie traversees`.
+   Lire les deux traits du retour ensemble vaut le détour : une moyenne qui
+   monte sans meilleur qui monte, c'est une population qui se range derrière
+   une prudence — le symptôme d'une récompense qui paie l'immobilité.
+   Le même JSON s'ouvre dans n'importe quel tableur ou notebook, le champ
+   `journal` est une simple liste de lignes.
+3. **Le duel avec les références.** `pnpm rl:rejoue --politique …` rejoue la
+   politique tableau par tableau et affiche fin, litres et chrono — à
+   comparer aux deux pilotes écrits à la main et aux records humains.
+4. **La regarder jouer** — la pièce qui manque : `--trace` écrit déjà la suite
+   des décisions, il reste à la rejouer dans le jeu (voir §8).
+Les plafonds de comparaison, dans l'ordre : le hasard (0,00 L, corps défait
+en dix secondes) · le pilote « cap » écrit à la main (1,82 L sur *Le berceau*
+à 900 particules, 0,72 L à 450, dispersé sur *Le sas*) · les records humains
+de `records.ts`.
 
 ## 7. Les pièges connus
 
