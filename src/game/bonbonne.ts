@@ -53,7 +53,10 @@ export const REPOS_VERSEMENT_S = 0.75
 export function doitVerserAuto(e: EtatVersement): boolean {
   if (!e.auHub) return false // en descente, le versement reste un GESTE
   if (e.empeche) return false
-  if (e.depuisDernier < REPOS_VERSEMENT_S) return false
+  // Un « depuis » NÉGATIF n'est pas un repos, c'est une horloge qui vient de
+  // repartir de zéro (changement de salle). Le prendre pour un repos muselait
+  // le versement au hub pendant tout le temps écoulé dans la salle d'avant.
+  if (e.depuisDernier >= 0 && e.depuisDernier < REPOS_VERSEMENT_S) return false
   // rien à rendre : le corps est déjà à son volume de départ
   if (e.litres >= e.litresPleins) return false
   return e.litres <= seuilVersementAuto(e.lastCallLiters)

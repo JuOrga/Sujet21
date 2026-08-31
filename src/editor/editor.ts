@@ -5156,7 +5156,7 @@ export class LevelEditor {
         } /> <span>CONDUIT — raccourci traversable</span></label>`,
       )
       rows.push(
-        `<p class="ed-empty">Coché, le rail prend un corps : PAROI en eau et en glace (on bute dessus), PASSAGE en vapeur — le nuage y entre et file à travers les cloisons jusqu’à l’autre bout. Il n’attend aucun faisceau : être en vapeur suffit. Décoché, c’est le rail de guidage d’arc habituel.</p>`,
+        `<p class="ed-empty">Coché, le rail prend un corps : PAROI en eau et en glace (on bute dessus), PASSAGE au PLASMA — il faut qu’un arc ionisé circule dessus, donc s’être vaporisé DANS le faisceau. Le nuage file alors à travers les cloisons jusqu’à l’autre bout. Un conduit RÉCLAME donc un émetteur laser dont le faisceau passe près du tube — sans lui, c’est une paroi que rien n’ouvrira. Décoché, c’est le rail de guidage d’arc habituel.</p>`,
       )
     } else if (s.kind === 'label') {
       const l = this.level.labels[s.index]

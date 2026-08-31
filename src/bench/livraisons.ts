@@ -31,6 +31,21 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '01/09/2026 01:01',
+    title: 'Le conduit ne pouvait JAMAIS s’ouvrir en jouant — et sept autres défauts',
+    notes: [
+      'LE VERROU, trouvé en revue avant la mise en ligne et vérifié à la mesure. Un conduit fermé expulsait TOUT ce qui n’était pas du plasma, la vapeur comprise. Or c’est la vapeur qui allume le champ : la capture du rail par le faisceau se fait à 30 unités de l’axe, et l’expulsion la jetait au-delà du rayon du tube (75) — mesuré, à plus de DEUX MILLE unités. Le raccourci était donc inatteignable en jeu. Mes dix tests passaient parce qu’ils levaient le champ à la main, sans jamais faire tourner le laser : ils prouvaient la mécanique, pas son accès.',
+      'LA VAPEUR ENTRE DÉSORMAIS dans un tube fermé, et n’y gagne rien : ni convoyage, ni traversée des parois. C’est bien le PLASMA qui ouvre le raccourci — la vapeur a seulement le droit de s’approcher pour l’allumer. Entrer n’est pas traverser. L’eau et la glace, elles, butent comme avant. Deux tests neufs gravent l’accès : la vapeur reste à portée de capture, l’eau non.',
+      'UN CONDUIT RÉCLAME UN LASER, et l’éditeur le disait faux. La dispense d’avertissement « rail sans émetteur » avait été posée sur la règle vapeur-seule, abandonnée depuis : un conduit sans laser n’est pas un raccourci, c’est une paroi invisible que rien n’ouvrira jamais — le pire des tableaux, celui qui a l’air jouable. La dispense est retirée, et la notice de l’éditeur comme la fiche du drapeau disent maintenant la règle du plasma.',
+      'LE VERSEMENT DU HUB SE TAISAIT AU MAUVAIS MOMENT. Le compteur du dernier versement n’était jamais remis à zéro alors que l’horloge de tableau repart de 0 à chaque salle : après un versement au temps T, la visite suivante du hub calculait « depuis » = −T et se taisait pendant T secondes. La bannière d’alerte s’affichait donc au hub, précisément ce que la mécanique promet d’éviter. Corrigé à deux endroits — la remise à zéro accompagne l’horloge, et la décision ne prend plus un « depuis » négatif pour un repos.',
+      'ET IL CRÉPITAIT quand le corps n’arrivait pas à absorber : l’horodatage ne se posait que sur un versement RÉUSSI, donc un « rien » relançait la tentative à chaque image, avec son son de collecte. Il se pose sur toute tentative. La sortie de salle en cours rejoint aussi la liste des empêchements.',
+      'LE TUBE MENTAIT SUR SA TAILLE : il faisait collision sur 150 unités de large et n’était dessiné que sur 60. Un corps liquide s’arrêtait donc 45 unités avant tout ce qui se voit. La bande dessinée épouse maintenant le tube réel, et un conduit se dessine plus franc qu’un rail de guidage — c’est une paroi, elle doit se voir.',
+      'DEUX CONDUITS QUI SE CROISENT : le relevé ne gardait que le tronçon le plus proche, tous tubes confondus, si bien qu’un tube FERMÉ voisin pouvait expulser un corps en pleine traversée d’un tube OUVERT. Un tube ouvert prime désormais sur un fermé.',
+      'ET LA GLACE NE REBONDISSAIT PAS : l’expulsion ne déclarait pas le contact (matériau, normale, vitesse entrante) comme le fait tout autre solide, donc la passe de glace ne recevait aucune impulsion — un palet se DÉFORMAIT dans le tube au lieu d’y rebondir. Le contact est déclaré.',
+      'CE QUE CET ÉPISODE ENSEIGNE, et qui vaut au-delà du conduit : dix tests verts ne disent rien de l’ACCESSIBILITÉ d’une mécanique quand ils court-circuitent la chaîne qui y mène. 668 tests verts, type-check et build propres.',
+    ],
+  },
+  {
     date: '01/09/2026 00:27',
     title: 'La bonbonne ne s’épuise plus au hub, et elle s’y verse toute seule',
     notes: [

@@ -593,10 +593,13 @@ export interface RailDef {
    *     qu'il y est le décor ne le touche plus : il file À TRAVERS les
    *     parois jusqu'à l'autre bout, porté par le champ.
    *
-   *  Et il n'attend pas le laser : un conduit s'engage tout seul dès que
-   *  de la vapeur entre dedans. C'est la différence entre une énigme (il
-   *  faut d'abord ioniser un faisceau) et un raccourci (il suffit d'être
-   *  dans le bon état).
+   *  IL FAUT LE PLASMA, pas seulement la vapeur : le tube ne s'ouvre que
+   *  si un ARC IONISÉ circule sur ce rail — donc si l'on s'est vaporisé
+   *  DANS le faisceau. Le raccourci est la récompense de l'énigme, pas son
+   *  contournement. La vapeur a le droit d'ENTRER dans un tube fermé (sans
+   *  quoi elle ne pourrait jamais venir l'allumer), mais elle n'y gagne
+   *  rien tant que l'arc n'est pas pris : ni convoyage, ni traversée.
+   *  Un conduit réclame donc un émetteur laser dans le tableau.
    *
    *  Absent ou faux : le rail se comporte EXACTEMENT comme avant — aucun
    *  tableau existant ne change, et le générateur n'en pose jamais. */

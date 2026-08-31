@@ -114,6 +114,39 @@ describe('Le conduit — au plasma c’est un passage', () => {
   })
 })
 
+describe('Le conduit — ATTEIGNABLE : la vapeur peut venir l’allumer', () => {
+  it('la vapeur ENTRE dans un tube fermé, assez près pour ioniser', () => {
+    // LE VERROU D'ORIGINE. Un tube fermé qui expulsait aussi la vapeur la
+    // mettait hors d'atteinte du faisceau : la capture du rail se fait à
+    // `plasmaRailRadius` (30 u) de l'axe, or l'expulsion la jetait au-delà
+    // du rayon du tube (75 u) — mesuré, à plus de deux mille unités. Le
+    // conduit ne pouvait donc JAMAIS s'ouvrir en jouant, et seuls les tests,
+    // qui lèvent le champ à la main, le voyaient marcher.
+    const sim = monte(true, false) // FERMÉ
+    sim.spawnDisc(-200, 0, 40, KIND_PLAYER) // sur l'axe, à l'écart de la paroi
+    sim.gasIntent = true
+    sim.naitEnVapeur()
+    joue(sim, 1.5, false)
+    let mini = Infinity
+    for (let i = 0; i < sim.count; i++)
+      if (sim.kind[i] === KIND_PLAYER && sim.posX[i] > -300 && sim.posX[i] < -20)
+        mini = Math.min(mini, Math.abs(sim.posY[i]))
+    // il DOIT rester de la vapeur dans le rayon de capture du faisceau
+    expect(mini).toBeLessThan(DEFAULT_PARAMS.plasmaRailRadius)
+  })
+
+  it('mais l’EAU, elle, reste dehors — le tube est bien une paroi', () => {
+    const sim = monte(true, false)
+    sim.spawnDisc(-200, 0, 40, KIND_PLAYER) // sur l'axe, en liquide
+    joue(sim, 1.5, false)
+    let mini = Infinity
+    for (let i = 0; i < sim.count; i++)
+      if (sim.kind[i] === KIND_PLAYER && sim.posX[i] > -300 && sim.posX[i] < -20)
+        mini = Math.min(mini, Math.abs(sim.posY[i]))
+    expect(mini).toBeGreaterThan(DEFAULT_PARAMS.plasmaRailRadius)
+  })
+})
+
 describe('Le conduit — sans l’arc, la vapeur ne suffit pas', () => {
   it('le MÊME nuage, tube fermé, reste du mauvais côté de la paroi', () => {
     // C'est la règle demandée : plasma = vapeur + laser. Un corps qui s'est
@@ -127,20 +160,17 @@ describe('Le conduit — sans l’arc, la vapeur ne suffit pas', () => {
     expect(centreX(sim)).toBeLessThan(0)
   })
 
-  it('le tube fermé REPOUSSE aussi la vapeur : c’est une paroi pour tous', () => {
+  it('le tube fermé laisse ENTRER la vapeur, mais elle n’y gagne RIEN', () => {
+    // La règle a changé sciemment : expulser la vapeur d'un tube fermé la
+    // mettait hors d'atteinte du faisceau et rendait le conduit inouvrable
+    // (voir le groupe ATTEIGNABLE). Elle entre donc — et bute quand même sur
+    // la paroi, faute d'arc. Entrer n'est pas traverser.
     const sim = monte(true, false)
-    sim.spawnDisc(-200, 0, 30, KIND_PLAYER)
+    poseAGauche(sim)
     sim.gasIntent = true
     sim.naitEnVapeur()
-    joue(sim, 2)
-    const rayon = DEFAULT_PARAMS.plasmaRailRadius * 2.5
-    let dedans = 0
-    for (let i = 0; i < sim.count; i++) {
-      if (sim.kind[i] !== KIND_PLAYER) continue
-      if (Math.abs(sim.posY[i]) < rayon * 0.5 && Math.abs(sim.posX[i]) < 300)
-        dedans++
-    }
-    expect(dedans).toBe(0)
+    joue(sim, 3)
+    expect(passees(sim)).toBe(0)
   })
 
   it('l’arc levé, le même montage laisse enfin passer', () => {

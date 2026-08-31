@@ -54,6 +54,21 @@ describe('Le versement automatique — avant l’alerte, jamais après', () => {
   })
 })
 
+describe('Le versement automatique — l’horloge qui l’a trahi', () => {
+  it('un « depuis » NÉGATIF ne doit pas museler le versement', () => {
+    // LE DÉFAUT, trouvé en revue. Le compteur du dernier versement vivait au
+    // niveau du module et n'était jamais remis à zéro, alors que l'horloge
+    // de tableau, elle, repart de 0 à chaque salle. Après un versement au
+    // temps T, la visite suivante du hub calculait donc depuisDernier = −T
+    // et se taisait pendant T secondes — la bannière d'alerte s'affichait au
+    // hub, précisément ce que la mécanique promet d'éviter. La remise à zéro
+    // vit désormais avec `run.tableauTime = 0` ; ce test garde la règle côté
+    // décision : un « depuis » négatif n'est pas un repos.
+    expect(doitVerserAuto(etat({ depuisDernier: -30, litres: 0.2 }))).toBe(true)
+    expect(doitVerserAuto(etat({ depuisDernier: -0.1, litres: 0.2 }))).toBe(true)
+  })
+})
+
 describe('Le versement automatique — ce qu’il ne fait pas', () => {
   it('ne se déclenche JAMAIS en descente : là, verser reste un geste', () => {
     expect(doitVerserAuto(etat({ auHub: false, litres: 0.1 }))).toBe(false)

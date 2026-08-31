@@ -5514,8 +5514,17 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       }
     }
     // la bande de capture : la portée du champ, tout du long
-    g.strokeStyle = 'rgba(150,120,255,0.07)'
-    g.lineWidth = Math.max(2, params.plasmaRailRadius * 2 * z)
+    // LA BANDE DESSINÉE DOIT ÊTRE LE TUBE RÉEL. Un conduit fait collision sur
+    // `plasmaRailRadius × 2,5` (la bande de convoyage) alors que la bande de
+    // CAPTURE du faisceau ne fait qu'un rayon : dessiner la seconde pour un
+    // conduit ferait buter le corps 45 unités avant tout ce qui se voit.
+    const rayonDessine = rail.conduit === true
+      ? params.plasmaRailRadius * 2.5
+      : params.plasmaRailRadius
+    g.strokeStyle = rail.conduit === true
+      ? 'rgba(150,120,255,0.14)' // un conduit est une PAROI : il se voit plus
+      : 'rgba(150,120,255,0.07)'
+    g.lineWidth = Math.max(2, rayonDessine * 2 * z)
     g.lineJoin = 'round'
     g.lineCap = 'round'
     chemin()
@@ -9514,6 +9523,11 @@ function annonceVoieCarte(): void {
 function restart(): void {
   run.exitTimer = 0
   run.tableauTime = 0
+  // remis à zéro AVEC l'horloge qu'il mesure : sans cela, après un versement
+  // au temps T, la visite suivante du hub calculait depuisDernier = −T et
+  // taisait le versement pendant T secondes — donc la bannière d'alerte
+  // s'affichait au hub, précisément ce que la mécanique promet d'éviter
+  dernierVersementAuto = -99
   // la BONBONNE se présente : le niveau repart de zéro et remonte à vue,
   // l'éclat balaie le verre — un rappel discret de ce qu'on a en réserve
   bbAffiche = 0
@@ -12332,11 +12346,18 @@ function frame(now: number): void {
         input.gasIntent ||
         miseEnBonbonne ||
         sim.dispersed ||
-        run.ended,
+        run.ended ||
+        run.exitTimer > 0,
       depuisDernier: run.tableauTime - dernierVersementAuto,
     })
   ) {
-    if (verserBonbonne() === 'ok') dernierVersementAuto = run.tableauTime
+    // l'horodatage se pose sur TOUTE tentative, pas seulement sur celle qui
+    // réussit : un corps qui n'arrive pas à absorber (creux pleins) renvoie
+    // 'rien', et sans cela le versement — et son son de collecte — repartait
+    // à chaque image. C'est exactement le crépitement que le repos existe
+    // pour empêcher.
+    verserBonbonne()
+    dernierVersementAuto = run.tableauTime
   }
 
   // ---- Fin de course : dernière impulsion, gel, arrêt ----
