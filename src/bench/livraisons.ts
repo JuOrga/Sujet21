@@ -31,6 +31,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '01/09/2026 00:27',
+    title: 'La bonbonne ne s’épuise plus au hub, et elle s’y verse toute seule',
+    notes: [
+      'AU HUB, LA RÉSERVE EST INFINIE. On ne s’assèche pas chez soi : perdre un corps en allant parler au marchand ou consulter le banc des mémoires n’a aucun intérêt de jeu. Le bouton de versement, qui refusait le hub d’un « contexte » sec, y est désormais admis — et n’y débite rien. La jauge affiche « ∞ » et le verre reste plein, plutôt qu’un litrage figé qui passerait pour une jauge en panne.',
+      'ET ELLE SE VERSE AVANT L’ALERTE, PAS APRÈS. Le versement automatique se déclenche à un seuil posé 25 % AU-DESSUS de « lastCallLiters » (0,6 L), celui qui lève la bannière « la dernière impulsion approche ». Le but est que cette bannière n’ait jamais l’occasion de s’afficher au hub. Le contrôle est placé juste avant le bloc de fin de course, qui est celui qui lève les alertes : à l’image où la bannière se poserait, le corps est déjà renfloué.',
+      'LA MARGE DE 25 % N’EST PAS DÉCORATIVE : le versement ne se pose pas d’un bloc, il s’installe dans les creux autour du corps, et déclencher pile sur le seuil ferait clignoter l’alerte entre deux images. Un repos de 0,75 s entre deux versements évite en outre que le son de collecte ne crépite quand le corps n’arrive pas à absorber.',
+      'EN DESCENTE, RIEN NE CHANGE : la réserve reste comptée, le versement reste un geste, et la jauge qui descend reste la tension du tableau. Un test le grave à part.',
+      'LA RÈGLE VIT DANS UN MODULE PUR — src/game/bonbonne.ts — au lieu de main.ts, où aucun test ne va. Neuf tests, dont un formulé à l’envers : pour TOUT volume qui déclencherait l’alerte, la décision de verser était déjà prise avant. Vérifié dans les deux sens — le seuil ramené sur l’alerte, le contrat tombe ; remis, il passe.',
+    ],
+  },
+  {
     date: '31/08/2026 15:52',
     title: 'Le miroir disparaissait à l’enregistrement — un mot manquait à une liste',
     notes: [
