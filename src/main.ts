@@ -154,6 +154,7 @@ import {
   type ZoneForce,
   AMBIANTE_DEFAUT,
 } from './game/level'
+import { AgentEnJeu, chargeAgent } from './rl/agent'
 import { LevelEditor } from './editor/editor'
 import {
   traceLaser,
@@ -623,6 +624,62 @@ let level: LevelDef = TABLEAUX[levelIndex]
 let renderBoxes: ObstacleBox[] = []
 let levelHasCold = false // le HUD n'annonce la rosée que si des plaques la rendent
 const exitMouth = { x: 0, y: 0 }
+
+// ---- L'AGENT QUI JOUE (?agent=…) ------------------------------------------
+// Un outil d'observation, pas une fonctionnalité de jeu : ?agent=cap fait
+// jouer le pilote écrit à la main, ?agent=hasard le plancher, et
+// ?agent=/agents/xxx.json une politique apprise (pnpm rl:entraine). Il se
+// combine à ?tableau=N et au saut de salle du banc : on regarde l'agent
+// essayer n'importe quel tableau. La touche A le débranche pour reprendre la
+// main en pleine partie.
+// Il ne triche pas : il pose le doigt là où un joueur le poserait, et le jeu
+// ne sait pas qui le tient. Voir src/rl/agent.ts.
+let agent: AgentEnJeu | null = null
+let badgeAgent: HTMLDivElement | null = null
+function majBadgeAgent(): void {
+  if (!agent) return
+  if (!badgeAgent) {
+    badgeAgent = document.createElement('div')
+    badgeAgent.style.cssText =
+      'position:fixed;left:12px;bottom:12px;z-index:60;pointer-events:none;' +
+      'font:600 12px/1.5 "IBM Plex Mono",monospace;letter-spacing:.06em;' +
+      'color:#a7ddf5;background:rgba(3,7,16,.72);border:1px solid #24435c;' +
+      'border-radius:6px;padding:6px 10px;white-space:pre'
+    document.body.appendChild(badgeAgent)
+  }
+  const a = agent
+  badgeAgent.textContent = a.actif
+    ? `AGENT ${a.nom}\n${a.libelle()} · ${a.decisions} gestes · ${a.coutMs.toFixed(2)} ms/décision\n(A : reprendre la main)`
+    : `AGENT ${a.nom} — débranché (A : lui rendre la main)`
+}
+{
+  const nomAgent = new URLSearchParams(location.search).get('agent')
+  if (nomAgent !== null) {
+    void chargeAgent(nomAgent)
+      .then((charge) => {
+        agent = new AgentEnJeu(charge, level)
+        majBadgeAgent()
+        // On entre dans la salle sans attendre un clic : l'observation
+        // commence tout de suite. (Si le poste exige un nom d'opérateur,
+        // closeHome le demande et le bouton reprend son rôle.)
+        closeHome()
+      })
+      .catch((e: unknown) => {
+        console.error('agent :', e)
+        alert(`Agent introuvable : ${nomAgent}`)
+      })
+    window.addEventListener('keydown', (e) => {
+      if (e.key !== 'a' && e.key !== 'A') return
+      const cible = document.activeElement
+      if (cible instanceof HTMLInputElement || cible instanceof HTMLTextAreaElement)
+        return
+      if (!agent) return
+      agent.actif = !agent.actif
+      if (!agent.actif) input.aimActive = false
+      majBadgeAgent()
+    })
+  }
+}
 // LE HUB : le module d'accueil (src/game/hub.ts) — la zone de départ du
 // roguelike. Prioritaire derrière les essais (testLevel) : l'éditeur et les
 // parcours d'essai passent toujours devant. C'est aussi le décor du
@@ -798,6 +855,7 @@ function applyLevel(): void {
   exitMouth.y = (level.exit.minY + level.exit.maxY) * 0.5
   bande.setAmbiance((level.ambiance as Piste | undefined) ?? null)
   departEnVapeur = zoneForceAt(level, level.spawn.x, level.spawn.y) === 'vapeur'
+  agent?.changeTableau(level) // ses capteurs regardent la nouvelle salle
   buildWorldLabels()
 }
 
@@ -11103,8 +11161,19 @@ function frame(now: number): void {
     }
   }
 
-  const aim = camera.screenToWorld(input.aimClientX, input.aimClientY, vw, vh)
+  let aim = camera.screenToWorld(input.aimClientX, input.aimClientY, vw, vh)
   const tableauDone = run.exitTimer > 0 || run.ended || miseEnBonbonne
+
+  // L'AGENT tient le doigt à la place du joueur. Il décide dix fois par
+  // seconde SIMULÉE (la même cadence qu'à l'entraînement) ; entre deux
+  // décisions le geste reste tenu. Tout le reste du jeu l'ignore.
+  if (agent?.actif && !tableauDone && !sim.dispersed && !input.paused) {
+    const ordre = agent.ordre(sim, run.tableauTime)
+    input.aimActive = ordre.tient
+    if (ordre.tient) aim = { x: ordre.x, y: ordre.y }
+    if (ordre.conclure) continuerVoulu = true
+    majBadgeAgent()
+  }
 
   // Zones d'état (refonte 2026) : une zone impose un état et verrouille le
   // sélecteur tant qu'on y est. L'intention du joueur est écrasée, pas effacée

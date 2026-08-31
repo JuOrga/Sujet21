@@ -75,6 +75,11 @@ pnpm rl:entraine --tableaux 21-01 --generations 30 --travailleurs 4
 pnpm rl:courbe                                        # la progression, en direct
 ```
 
+Et on peut le **regarder jouer dans le jeu**, sur n'importe quel tableau :
+`/?tableau=3&agent=cap` (le pilote écrit à la main), `?agent=hasard`, ou
+`?agent=./agents/berceau.json` pour une politique apprise. La touche `A`
+reprend la main.
+
 Tout est expliqué — l'environnement, les mesures de coût, les outils d'un vrai
 PPO, ce que l'agent ne joue pas encore — dans
 [`docs/apprentissage-par-renforcement.md`](docs/apprentissage-par-renforcement.md).

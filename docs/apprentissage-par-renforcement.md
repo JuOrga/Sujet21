@@ -28,14 +28,16 @@ les **litres livrés au sas** — et les records humains sont enregistrés
 ## 2. Ce qui est livré
 
 ```
+src/rl/capteurs.ts   ce que l'agent VOIT — partagé par l'entraînement et le jeu
 src/rl/env.ts        l'environnement : le jeu sans écran (reset / step / observe)
-src/rl/politique.ts  une politique linéaire + l'apprentissage sans gradient (CEM)
+src/rl/politique.ts  politique linéaire, apprentissage sans gradient (CEM), imitation
 src/rl/pilotes.ts    deux pilotes ÉCRITS À LA MAIN — le plancher de comparaison
 src/rl/entraine.ts   l'entraînement en ligne de commande, parallélisé
 src/rl/rejoue.ts     rejouer une politique, tableau par tableau, et tracer ses gestes
 src/rl/courbe.ts     la courbe de progression, dans le terminal, pendant que ça tourne
+src/rl/agent.ts      l'agent qui joue DANS LE JEU (?agent=…) — voir §6
 src/rl/banc.ts       le banc de vitesse : combien de jeu par seconde de machine
-src/rl/env.spec.ts   les garanties : déterminisme, fins conformes, observation saine
+src/rl/*.spec.ts     les garanties : déterminisme, fins conformes, capteurs identiques
 ```
 
 Les sorties d'entraînement (politiques, journaux, traces) vont dans `.rl/`,
@@ -213,12 +215,44 @@ Quatre manières, de la plus immédiate à la plus parlante :
 3. **Le duel avec les références.** `pnpm rl:rejoue --politique …` rejoue la
    politique tableau par tableau et affiche fin, litres et chrono — à
    comparer aux deux pilotes écrits à la main et aux records humains.
-4. **La regarder jouer** — la pièce qui manque : `--trace` écrit déjà la suite
-   des décisions, il reste à la rejouer dans le jeu (voir §8).
+4. **La regarder jouer, dans le vrai jeu.** `?agent=…` fait tenir le doigt par
+   l'agent, sur n'importe quel tableau :
+
+   ```
+   /?tableau=3&agent=cap                    le pilote écrit à la main
+   /?tableau=3&agent=hasard                 le plancher
+   /?tableau=3&agent=./agents/berceau.json  une politique apprise
+   ```
+
+   Le tableau se choisit par `?tableau=N`, ou en direct par le saut de salle
+   du banc — les capteurs de l'agent suivent la nouvelle salle. Un bandeau en
+   bas à gauche dit qui joue, ce qu'il fait à l'instant, combien de gestes il
+   a faits et ce que lui coûte une décision. **La touche A le débranche** : on
+   reprend la main en pleine partie, et on la lui rend.
+
+   L'agent ne triche pas : il n'écrit ni dans le solveur ni dans le monde. Il
+   pose le doigt là où un joueur le poserait — `input.aimActive` et un point
+   visé, rien d'autre —, et le jeu ne sait pas qui tient le doigt. Poser une
+   politique apprise à l'écran, c'est copier son JSON dans `public/agents/`.
 Les plafonds de comparaison, dans l'ordre : le hasard (0,00 L, corps défait
 en dix secondes) · le pilote « cap » écrit à la main (1,82 L sur *Le berceau*
 à 900 particules, 0,72 L à 450, dispersé sur *Le sas*) · les records humains
 de `records.ts`.
+
+## 6 bis. Ce que ça coûte de la REGARDER jouer (rien)
+
+Mesuré dans Chromium : **0,19 ms par décision** pour une politique apprise
+(capteurs compris — les seize rayons sont l'essentiel de la facture), 0,01 à
+0,06 ms pour le pilote écrit à la main, qui ne lit que le centre de gravité.
+À dix décisions par seconde simulée, l'agent ajoute **~2 ms par seconde de
+jeu** — face aux ~310 ms que coûtent les 120 pas de fluide de cette même
+seconde. Moins de 1 % : regarder l'agent jouer coûte ce que coûte jouer.
+
+Tout se passe **sur la machine du joueur, dans l'onglet** : aucun serveur,
+aucun appel réseau (le JSON de la politique fait 6 ko), rien à installer. Le
+coût de calcul du projet est ailleurs — il est dans l'ENTRAÎNEMENT (§3), qui
+se fait hors ligne, sur des cœurs de CPU, et dont le prix unitaire est le pas
+de fluide.
 
 ## 7. Les pièges connus
 
@@ -239,14 +273,39 @@ de `records.ts`.
 - **La dérive de fidélité** entre l'environnement et le jeu : voir le test de
   parité, §5.
 
-## 8. Si je devais faire la suite, dans cet ordre
+## 8. Où en est l'apprentissage, honnêtement
 
-1. Un **test de parité** navigateur ↔ environnement (une demi-journée).
-2. **PPO** (chemin A, en TypeScript) et sa courbe face aux deux pilotes de
-   référence (deux jours).
-3. Le **lecteur de traces** dans le jeu : voir l'agent jouer (un jour).
-4. L'**extraction de la boucle de règles** hors de `main.ts` — glace, vapeur,
+Deux entraînements de trente générations sur *Le berceau* (450 particules,
+essais de 45 s, quatre cœurs, ~20 minutes chacun) :
+
+| Départ | Retour, gén. 1 → 30 | Litres livrés |
+| --- | --- | --- |
+| à froid (`--depart zero`) | −6,6 → −1,0 | 0,00 |
+| imitation + rattrapage (`--depart cap --tours 3`) | +6,7 → +6,4 (pic 8,8) | 0,00 |
+
+La progression est réelle et lisible — à froid, l'agent apprend en trente
+générations à ne plus se disperser ; en partant de l'imitation, il navigue
+d'emblée bien mieux. **Mais aucune des deux ne livre une goutte au sas**,
+là où le pilote écrit à la main livre 0,72 L.
+
+Le diagnostic est net, et c'est celui qu'on attendait : une politique
+**linéaire** n'a pas les moyens de la décision qui fait la traversée
+(« pousser SI la vitesse vers le sas est sous le seuil, sinon se rassembler »
+— une condition, pas une pondération). L'imitation le montre chiffre en main :
+elle recopie 80 à 94 % des décisions du pilote et rate exactement celles qui
+comptent. Ce n'est pas un problème d'exploration, c'est un plafond de
+représentation.
+
+## 9. Si je devais faire la suite, dans cet ordre
+
+1. **PPO avec un petit réseau** (deux couches de 64 : quelques milliers de
+   poids au lieu de 836, et surtout des non-linéarités) — chemin A, en
+   TypeScript, face aux mêmes pilotes de référence. C'est LE pas suivant :
+   tout le reste est déjà en place.
+2. Un **test de parité** navigateur ↔ environnement, pour que les capteurs
+   partagés le restent quoi qu'il arrive au banc.
+3. L'**extraction de la boucle de règles** hors de `main.ts` — glace, vapeur,
    dash — qui ouvre les tableaux restants (le gros morceau, utile au jeu
    lui-même).
-5. L'entraînement sur **tableaux générés**, puis l'agent au service du level
+4. L'entraînement sur **tableaux générés**, puis l'agent au service du level
    design.

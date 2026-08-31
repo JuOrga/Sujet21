@@ -27,15 +27,9 @@
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
 import { FluidSim, KIND_PLAYER } from '../sim/solver'
 import type { NoyauxWasm } from '../sim/wasm'
-import {
-  MAT_EXIT,
-  TABLEAUX,
-  TABLEAUX_ECOLE,
-  dansBoite,
-  type LevelDef,
-  type ObstacleBox,
-} from '../game/level'
+import { TABLEAUX, TABLEAUX_ECOLE, type LevelDef } from '../game/level'
 import { niveauExpanse } from '../game/structures'
+import { Capteurs } from './capteurs'
 
 /**
  * Le corps ne se pilote qu'en poussant : 16 directions, se rassembler, ne rien
@@ -154,38 +148,20 @@ function trouveTableau(code: string): LevelDef {
   return lv
 }
 
-/**
- * Code de matériau réservé à l'éponge pour la télémétrie : elle n'est pas dans
- * `MATERIAL_NAMES` (ce n'est pas une paroi), mais l'agent doit la distinguer.
- */
-const MAT_EPONGE = 11
-
-/** Une paroi arrête-t-elle l'eau ? Le sas est du rendu, jamais de la physique. */
-function paroiSolide(b: ObstacleBox): boolean {
-  return b.material !== MAT_EXIT
-}
-
 export class EnvSujet21 {
   readonly level: LevelDef
   readonly params: SimParams
   readonly poids: PoidsRecompense = { ...POIDS_DEFAUT }
   readonly pasParDecision: number
   readonly dureeMax: number
-  readonly rayons: number
-  readonly porteeRayon: number
   readonly tailleObs: number
+  /** Les capteurs — les mêmes qu'à l'écran, c'est tout l'intérêt. */
+  readonly capteurs: Capteurs
+  readonly sortie: { x: number; y: number }
 
   private readonly wasm: NoyauxWasm | null
   private readonly refroidissement: boolean
   private readonly particules: number
-  private readonly parois: ObstacleBox[]
-  private readonly eponges: {
-    minX: number
-    minY: number
-    maxX: number
-    maxY: number
-  }[]
-  readonly sortie: { x: number; y: number }
   private readonly diagonale: number
 
   sim!: FluidSim
@@ -194,7 +170,6 @@ export class EnvSujet21 {
   private vivantsAvant = 0
   private avalesAvant = 0
   private distAvant = 0
-  private readonly obs: Float32Array
 
   constructor(opts: OptionsEnv = {}) {
     this.level = niveauExpanse(opts.level ?? trouveTableau(opts.code ?? '21-A'))
@@ -213,29 +188,17 @@ export class EnvSujet21 {
     }
     this.pasParDecision = opts.pasParDecision ?? 12
     this.dureeMax = opts.dureeMax ?? 60
-    this.rayons = opts.rayons ?? 16
-    this.porteeRayon = opts.porteeRayon ?? 700
     this.wasm = opts.wasm ?? null
     this.refroidissement = opts.refroidissement ?? true
     this.particules = opts.particules ?? this.level.spawn.n
-    this.parois = this.level.boxes.filter(paroiSolide)
-    // L'éponge n'est pas une paroi (elle englue, elle absorbe) mais elle barre
-    // la route : la télémétrie doit la sentir, sinon le tableau 21-A est un
-    // piège invisible.
-    this.eponges = this.level.sponges.map((e) => ({
-      minX: e.minX,
-      minY: e.minY,
-      maxX: e.minX + e.cols * e.cellSize,
-      maxY: e.minY + e.rows * e.cellSize,
-    }))
-    this.sortie = {
-      x: (this.level.exit.minX + this.level.exit.maxX) * 0.5,
-      y: (this.level.exit.minY + this.level.exit.maxY) * 0.5,
-    }
-    const b = this.level.bounds
-    this.diagonale = Math.hypot(b.maxX - b.minX, b.maxY - b.minY)
-    this.tailleObs = 11 + 2 * this.rayons
-    this.obs = new Float32Array(this.tailleObs)
+    this.capteurs = new Capteurs(this.level, {
+      rayons: opts.rayons,
+      porteeRayon: opts.porteeRayon,
+      dureeReference: this.dureeMax,
+    })
+    this.sortie = this.capteurs.sortie
+    this.diagonale = this.capteurs.diagonale
+    this.tailleObs = this.capteurs.taille
     this.reset()
   }
 
@@ -393,6 +356,11 @@ export class EnvSujet21 {
     }
   }
 
+  /** Ce que l'agent voit — délégué aux capteurs partagés avec le jeu. */
+  observe(): Float32Array {
+    return this.capteurs.lis(this.sim, this.temps)
+  }
+
   /**
    * Le score du jeu, litre pour litre comme main.ts : le SURPLUS embarqué —
    * ce que le sas a bu, plus ce qui reste vivant au moment de conclure. Un
@@ -404,78 +372,6 @@ export class EnvSujet21 {
     return this.sim.swallowed * this.params.litersPerParticle + this.sim.liters()
   }
 
-  // ---- L'OBSERVATION : ce que l'agent « voit ». Pas de pixels — le corps
-  // connaît sa position, sa vitesse, son volume, la direction du sas, et
-  // tâte les parois autour de lui par télémétrie (des rayons, comme les
-  // moustaches d'un chat). Tout est normalisé dans [-1, 1] environ : un
-  // réseau (ou une politique linéaire) n'a pas à deviner les échelles.
-  observe(): Float32Array {
-    const s = this.sim
-    const b = this.level.bounds
-    const o = this.obs
-    const lx = b.maxX - b.minX
-    const ly = b.maxY - b.minY
-    const cx = s.stats.centroidX
-    const cy = s.stats.centroidY
-    const vmax = Math.max(1, this.params.maxSpeed)
-    let i = 0
-    o[i++] = ((cx - b.minX) / lx) * 2 - 1
-    o[i++] = ((cy - b.minY) / ly) * 2 - 1
-    o[i++] = s.stats.velX / vmax
-    o[i++] = s.stats.velY / vmax
-    const dx = this.sortie.x - cx
-    const dy = this.sortie.y - cy
-    const d = Math.hypot(dx, dy) || 1
-    o[i++] = dx / d
-    o[i++] = dy / d
-    o[i++] = Math.min(1, d / this.diagonale)
-    o[i++] = s.baseVolume > 0 ? s.aliveCount() / s.baseVolume : 0
-    o[i++] = s.baseVolume > 0 ? s.swallowed / s.baseVolume : 0
-    o[i++] = Math.min(1, s.stats.rmsRadius / (this.params.kernelRadius * 12))
-    o[i++] = Math.min(1, this.temps / this.dureeMax)
-    for (let k = 0; k < this.rayons; k++) {
-      const a = (k / this.rayons) * Math.PI * 2
-      const t = this.tateParoi(cx, cy, Math.cos(a), Math.sin(a))
-      o[i++] = t.distance / this.porteeRayon
-      o[i++] = t.materiau / 10
-    }
-    return o
-  }
-
-  /**
-   * Télémétrie : jusqu'où va-t-on dans cette direction avant une paroi (ou le
-   * bord de la cuve) ? Échantillonnage régulier — la précision d'un pas de
-   * grille suffit largement à une décision prise dix fois par seconde.
-   */
-  private tateParoi(
-    x: number,
-    y: number,
-    dx: number,
-    dy: number,
-  ): { distance: number; materiau: number } {
-    const pas = 14
-    const b = this.level.bounds
-    for (let d = pas; d <= this.porteeRayon; d += pas) {
-      const px = x + dx * d
-      const py = y + dy * d
-      if (px < b.minX || px > b.maxX || py < b.minY || py > b.maxY) {
-        return { distance: d, materiau: 0 } // la coque de la cuve
-      }
-      for (let j = 0; j < this.parois.length; j++) {
-        const boite = this.parois[j]
-        if (dansBoite(boite, px, py)) {
-          return { distance: d, materiau: boite.material }
-        }
-      }
-      for (let j = 0; j < this.eponges.length; j++) {
-        const e = this.eponges[j]
-        if (px >= e.minX && px <= e.maxX && py >= e.minY && py <= e.maxY) {
-          return { distance: d, materiau: MAT_EPONGE }
-        }
-      }
-    }
-    return { distance: this.porteeRayon, materiau: -1 }
-  }
 }
 
 /** Un essai complet sous une politique donnée. */

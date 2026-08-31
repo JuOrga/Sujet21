@@ -8,17 +8,29 @@
 // rien appris.
 // ---------------------------------------------------------------------------
 
+import type { FluidSim } from '../sim/solver'
 import {
   ACTION_CONCLURE,
   ACTION_POUSSE_0,
   ACTION_RASSEMBLE,
   DIRECTIONS,
   NB_ACTIONS,
-  type EnvSujet21,
 } from './env'
 import { alea } from './politique'
 
-export type Pilote = (env: EnvSujet21) => number
+/**
+ * Le strict minimum qu'un pilote a besoin de savoir. `EnvSujet21` le satisfait
+ * tel quel, et le jeu dans le navigateur peut le fabriquer en trois lignes :
+ * c'est ce qui permet de REGARDER à l'écran le pilote qui sert de référence
+ * aux entraînements, sans en écrire une seconde version.
+ */
+export interface VueDuJeu {
+  sim: FluidSim
+  sortie: { x: number; y: number }
+  aspireAssez(): boolean
+}
+
+export type Pilote = (vue: VueDuJeu) => number
 
 /** Le plancher : n'importe quoi, à chaque décision. */
 export function piloteHasard(graine = 1): Pilote {
@@ -33,11 +45,11 @@ export function piloteHasard(graine = 1): Pilote {
  * corps part dans le dos de ce qu'il éjecte (§3.3).
  */
 export function piloteCap(vitesse = 40): Pilote {
-  return (env) => {
-    if (env.aspireAssez()) return ACTION_CONCLURE
-    const s = env.sim.stats
-    const dx = env.sortie.x - s.centroidX
-    const dy = env.sortie.y - s.centroidY
+  return (vue) => {
+    if (vue.aspireAssez()) return ACTION_CONCLURE
+    const s = vue.sim.stats
+    const dx = vue.sortie.x - s.centroidX
+    const dy = vue.sortie.y - s.centroidY
     const d = Math.hypot(dx, dy) || 1
     const ux = dx / d
     const uy = dy / d

@@ -13,7 +13,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import process from 'node:process'
 import { EnvSujet21, joue, tableauxRL, type Fin } from './env'
-import { piloteCap, piloteHasard, type Pilote } from './pilotes'
+import { piloteCap, piloteHasard } from './pilotes'
 import { decide, politiqueDepuis } from './politique'
 
 const argv = process.argv.slice(2)
@@ -32,7 +32,11 @@ const duree = num('duree', 90)
 const pasParDecision = num('pas', 12)
 const fichierTrace = get('trace', '')
 
-function politiqueChoisie(): { nom: string; pilote: Pilote } {
+// Le pilote d'ici reçoit l'environnement complet (il peut donc lire
+// l'observation) ; ceux de pilotes.ts se contentent de la vue minimale.
+type PiloteLocal = (env: EnvSujet21) => number
+
+function politiqueChoisie(): { nom: string; pilote: PiloteLocal } {
   const fichier = get('politique', '')
   if (fichier) {
     const brut = JSON.parse(readFileSync(fichier, 'utf8')) as {
