@@ -1,8 +1,48 @@
+# LA CI — au régime.
+#
+# ELLE TOURNAIT DEUX FOIS PAR POUSSÉE. « on: push » sans filtre ET
+# « on: pull_request » : une branche qui a une PR ouverte déclenchait les
+# deux sur le même commit, donc deux fois le même travail. Mesuré au
+# 31/08 : 1 603 exécutions en 23 jours, ~70 par jour, ~1 336 minutes.
+#
+# DÉSORMAIS, RIEN NE TOURNE QUE POUR PROD :
+#   · les PULL REQUESTS vers prod — la porte du site en ligne ;
+#   · les poussées sur PROD — le filet après une livraison ;
+#   · à la demande, pour vérifier une branche sans ouvrir de PR.
+#
+# Les PR vers `dev` ne déclenchent RIEN, et c'est un choix assumé pour
+# rester dans le palier gratuit. La conséquence doit être dite en face :
+# entre une branche de travail et `dev`, la SEULE vérification est celle
+# faite EN LOCAL avant de pousser (type-check, test, build — cf.
+# CLAUDE.md). Un défaut peut donc atteindre `dev` sans être vu ; il sera
+# arrêté à la PR `dev` → `prod`, avant la mise en ligne. C'est le
+# compromis : on protège ce qui est PUBLIÉ, pas ce qui est intégré.
 name: ci
 
+# (La liste `paths-ignore` est répétée : GitHub Actions ne résout PAS les
+# ancres YAML — un `&ancre` / `*ancre` fait échouer l'analyse du workflow.)
 on:
-  push:
   pull_request:
+    branches: [prod]
+    paths-ignore:
+      - 'docs/**'
+      - 'masters/**'
+      - 'ops/**'
+      - '**/*.md'
+  push:
+    branches: [prod]
+    paths-ignore:
+      - 'docs/**'
+      - 'masters/**'
+      - 'ops/**'
+      - '**/*.md'
+  workflow_dispatch:
+
+# Trois poussées d'affilée n'ont jamais besoin d'être vérifiées trois fois :
+# seule la dernière compte. Les exécutions dépassées sont annulées.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   ci:
