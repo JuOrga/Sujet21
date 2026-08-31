@@ -55,6 +55,7 @@ Objectif : rejoindre le sas vert avec le plus de volume possible.
 pnpm test        # invariants physiques (Vitest)
 pnpm type-check
 pnpm build
+pnpm playtest    # le banc de playtest : le bot rejoue tous les tableaux
 ```
 
 Les tests couvrent : conservation de la quantité de mouvement (au repos et
@@ -68,3 +69,23 @@ la grille spatiale et de l'étiquetage d'amas.
    recondensation, refroidissement du vaisseau.
 4. **La boucle roguelike** — enchaînement de tableaux distincts, contenu des
    bonbonnes (§8), routes ramifiées, méta-progression.
+
+## Le banc de playtest
+
+`pnpm playtest` rejoue tous les tableaux sans navigateur et dit ce qu'ils
+valent. Deux moitiés, de fiabilité très différente :
+
+- **l'audit** (`pnpm playtest --audit`, instantané) — géométrie pure : le
+  corps naît-il dans une paroi, le sas est-il muré, **dans quels états**
+  est-il atteignable (eau, glace, vapeur — chacun a ses portes), quelle est la
+  section du plus large passage face au diamètre du corps, le laser est-il
+  obligatoire. Quand il dit « muré », il l'est ;
+- **le pilote** — un bot qui joue vraiment, franchit dix à onze des treize
+  tableaux jouables à l'eau, en trois à sept impulsions. Il n'est pas un
+  joueur humain : sa valeur est comparative. La simulation étant déterministe,
+  `pnpm playtest --base` compare à la référence versionnée
+  (`tools/playtest/reference.json`) et signale tout tableau qui passait et ne
+  passe plus, comme tout effondrement du volume livré.
+
+Le détail — options, méthode du pilote, ce qui reste hors périmètre — est dans
+[`tools/playtest/README.md`](tools/playtest/README.md).

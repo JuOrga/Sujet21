@@ -1,0 +1,1022 @@
+{
+  "genere": "2026-08-31T15:23:36.573Z",
+  "tableaux": [
+    {
+      "code": "21-01",
+      "nom": "Le berceau",
+      "par": 5,
+      "audit": {
+        "code": "21-01",
+        "nom": "Le berceau",
+        "constats": [],
+        "accessible": true,
+        "etatsQuiPassent": [
+          "eau",
+          "glace",
+          "vapeur"
+        ],
+        "largeurPassage": 312,
+        "diametreCorps": 147.0417487709794
+      },
+      "essais": [
+        {
+          "reglage": "économe",
+          "verdict": "atteint",
+          "temps": 24.866666666665896,
+          "impulsions": 4,
+          "litres": 2.275,
+          "rendement": 0.5055555555555555,
+          "distanceDepart": 172.62741699796948,
+          "distanceMin": 4
+        },
+        {
+          "reglage": "franc",
+          "verdict": "atteint",
+          "temps": 18.224999999999607,
+          "impulsions": 4,
+          "litres": 1.58,
+          "rendement": 0.35111111111111115,
+          "distanceDepart": 172.62741699796948,
+          "distanceMin": 5
+        },
+        {
+          "reglage": "pressé",
+          "verdict": "atteint",
+          "temps": 14.933333333333126,
+          "impulsions": 3,
+          "litres": 0.655,
+          "rendement": 0.14555555555555555,
+          "distanceDepart": 172.62741699796948,
+          "distanceMin": 0
+        }
+      ]
+    },
+    {
+      "code": "21-02",
+      "nom": "Le rebond",
+      "par": 6,
+      "audit": {
+        "code": "21-02",
+        "nom": "Le rebond",
+        "constats": [],
+        "accessible": true,
+        "etatsQuiPassent": [
+          "eau",
+          "glace",
+          "vapeur"
+        ],
+        "largeurPassage": 312,
+        "diametreCorps": 147.0417487709794
+      },
+      "essais": [
+        {
+          "reglage": "économe",
+          "verdict": "bloque",
+          "temps": 65.666666666665,
+          "impulsions": 5,
+          "litres": 1.225,
+          "rendement": 0.27222222222222225,
+          "distanceDepart": 193.3380951166242,
+          "distanceMin": 73.12489168102778
+        },
+        {
+          "reglage": "franc",
+          "verdict": "atteint",
+          "temps": 21.20833333333277,
+          "impulsions": 4,
+          "litres": 0.595,
+          "rendement": 0.1322222222222222,
+          "distanceDepart": 193.3380951166242,
+          "distanceMin": 0
+        },
+        {
+          "reglage": "pressé",
+          "verdict": "bloque",
+          "temps": 75.00000000000576,
+          "impulsions": 3,
+          "litres": 0.42,
+          "rendement": 0.09333333333333332,
+          "distanceDepart": 193.3380951166242,
+          "distanceMin": 0
+        }
+      ]
+    },
+    {
+      "code": "21-03",
+      "nom": "L’ancrage",
+      "par": 6,
+      "audit": {
+        "code": "21-03",
+        "nom": "L’ancrage",
+        "constats": [],
+        "accessible": true,
+        "etatsQuiPassent": [
+          "eau",
+          "glace",
+          "vapeur"
+        ],
+        "largeurPassage": 159.7645019878171,
+        "diametreCorps": 147.0417487709794
+      },
+      "essais": [
+        {
+          "reglage": "économe",
+          "verdict": "bloque",
+          "temps": 62.24999999999711,
+          "impulsions": 17,
+          "litres": 1.345,
+          "rendement": 0.29888888888888887,
+          "distanceDepart": 185.05382386916244,
+          "distanceMin": 146.5685424949238
+        },
+        {
+          "reglage": "franc",
+          "verdict": "bloque",
+          "temps": 65.9999999999986,
+          "impulsions": 19,
+          "litres": 0.995,
+          "rendement": 0.22111111111111112,
+          "distanceDepart": 185.05382386916244,
+          "distanceMin": 99.45584412271566
+        },
+        {
+          "reglage": "pressé",
+          "verdict": "bloque",
+          "temps": 65.0833333333312,
+          "impulsions": 61,
+          "litres": 0.535,
+          "rendement": 0.11888888888888889,
+          "distanceDepart": 185.05382386916244,
+          "distanceMin": 146.9827560572969
+        }
+      ]
+    },
+    {
+      "code": "21-04",
+      "nom": "Le premier gel",
+      "par": 6,
+      "audit": {
+        "code": "21-04",
+        "nom": "Le premier gel",
+        "constats": [],
+        "accessible": true,
+        "etatsQuiPassent": [
+          "eau",
+          "glace",
+          "vapeur"
+        ],
+        "largeurPassage": 105.94112549695427,
+        "diametreCorps": 147.0417487709794
+      },
+      "essais": [
+        {
+          "reglage": "économe",
+          "verdict": "bloque",
+          "temps": 69.00000000000098,
+          "impulsions": 4,
+          "litres": 1.465,
+          "rendement": 0.3255555555555556,
+          "distanceDepart": 168.89949493661163,
+          "distanceMin": 25.414213562373096
+        },
+        {
+          "reglage": "franc",
+          "verdict": "bloque",
+          "temps": 62.74999999999708,
+          "impulsions": 11,
+          "litres": 0.9199999999999999,
+          "rendement": 0.20444444444444443,
+          "distanceDepart": 168.89949493661163,
+          "distanceMin": 31.656854249492383
+        },
+        {
+          "reglage": "pressé",
+          "verdict": "bloque",
+          "temps": 57.24999999999739,
+          "impulsions": 6,
+          "litres": 0.585,
+          "rendement": 0.13,
+          "distanceDepart": 168.89949493661163,
+          "distanceMin": 27.242640687119287
+        }
+      ]
+    },
+    {
+      "code": "21-05",
+      "nom": "Le premier souffle",
+      "par": 7,
+      "audit": {
+        "code": "21-05",
+        "nom": "Le premier souffle",
+        "constats": [
+          {
+            "gravite": "note",
+            "code": "sas-inatteignable-eau",
+            "message": "le sas ne s'atteint qu'en vapeur"
+          }
+        ],
+        "accessible": false,
+        "etatsQuiPassent": [
+          "vapeur"
+        ],
+        "largeurPassage": 0,
+        "diametreCorps": 147.0417487709794
+      },
+      "essais": []
+    },
+    {
+      "code": "21-06",
+      "nom": "La buveuse",
+      "par": 6,
+      "audit": {
+        "code": "21-06",
+        "nom": "La buveuse",
+        "constats": [
+          {
+            "gravite": "note",
+            "code": "eponge-obligatoire",
+            "message": "le seul passage traverse l'éponge : la brèche est payée en volume, et elle est permanente"
+          }
+        ],
+        "accessible": true,
+        "etatsQuiPassent": [
+          "eau",
+          "glace",
+          "vapeur"
+        ],
+        "largeurPassage": 312,
+        "diametreCorps": 147.0417487709794
+      },
+      "essais": [
+        {
+          "reglage": "économe",
+          "verdict": "bloque",
+          "temps": 66.83333333333259,
+          "impulsions": 3,
+          "litres": 0.79,
+          "rendement": 0.17555555555555558,
+          "distanceDepart": 189.07106781186548,
+          "distanceMin": 54.24264068711928
+        },
+        {
+          "reglage": "franc",
+          "verdict": "bloque",
+          "temps": 60.33333333333055,
+          "impulsions": 3,
+          "litres": 0.96,
+          "rendement": 0.21333333333333332,
+          "distanceDepart": 189.07106781186548,
+          "distanceMin": 49
+        },
+        {
+          "reglage": "pressé",
+          "verdict": "atteint",
+          "temps": 11.083333333333345,
+          "impulsions": 4,
+          "litres": 0.855,
+          "rendement": 0.19,
+          "distanceDepart": 189.07106781186548,
+          "distanceMin": 50
+        }
+      ]
+    },
+    {
+      "code": "21-A",
+      "nom": "Le sas",
+      "audit": {
+        "code": "21-A",
+        "nom": "Le sas",
+        "constats": [
+          {
+            "gravite": "note",
+            "code": "par-absent",
+            "message": "aucun budget d'impulsions déclaré : le record n'a pas de référence"
+          }
+        ],
+        "accessible": true,
+        "etatsQuiPassent": [
+          "eau",
+          "glace",
+          "vapeur"
+        ],
+        "largeurPassage": 192,
+        "diametreCorps": 147.0417487709794
+      },
+      "essais": [
+        {
+          "reglage": "économe",
+          "verdict": "atteint",
+          "temps": 26.374999999999144,
+          "impulsions": 4,
+          "litres": 1.385,
+          "rendement": 0.30777777777777776,
+          "distanceDepart": 185.4680374315356,
+          "distanceMin": 2
+        },
+        {
+          "reglage": "franc",
+          "verdict": "bloque",
+          "temps": 58.66666666666398,
+          "impulsions": 5,
+          "litres": 0.995,
+          "rendement": 0.22111111111111112,
+          "distanceDepart": 185.4680374315356,
+          "distanceMin": 74.11269837220806
+        },
+        {
+          "reglage": "pressé",
+          "verdict": "bloque",
+          "temps": 72.16666666667017,
+          "impulsions": 2,
+          "litres": 0.365,
+          "rendement": 0.0811111111111111,
+          "distanceDepart": 185.4680374315356,
+          "distanceMin": 0
+        }
+      ]
+    },
+    {
+      "code": "21-B",
+      "nom": "La chambre froide",
+      "audit": {
+        "code": "21-B",
+        "nom": "La chambre froide",
+        "constats": [
+          {
+            "gravite": "note",
+            "code": "par-absent",
+            "message": "aucun budget d'impulsions déclaré : le record n'a pas de référence"
+          }
+        ],
+        "accessible": true,
+        "etatsQuiPassent": [
+          "eau",
+          "glace",
+          "vapeur"
+        ],
+        "largeurPassage": 264,
+        "diametreCorps": 147.0417487709794
+      },
+      "essais": [
+        {
+          "reglage": "économe",
+          "verdict": "bloque",
+          "temps": 70.41666666666877,
+          "impulsions": 4,
+          "litres": 1.205,
+          "rendement": 0.2677777777777778,
+          "distanceDepart": 168.07106781186548,
+          "distanceMin": 29
+        },
+        {
+          "reglage": "franc",
+          "verdict": "bloque",
+          "temps": 65.1666666666646,
+          "impulsions": 3,
+          "litres": 0.9,
+          "rendement": 0.2,
+          "distanceDepart": 168.07106781186548,
+          "distanceMin": 28.242640687119284
+        },
+        {
+          "reglage": "pressé",
+          "verdict": "atteint",
+          "temps": 12.724999999999918,
+          "impulsions": 4,
+          "litres": 0.75,
+          "rendement": 0.16666666666666666,
+          "distanceDepart": 168.07106781186548,
+          "distanceMin": 0
+        }
+      ]
+    },
+    {
+      "code": "21-07",
+      "nom": "La membrane",
+      "par": 6,
+      "audit": {
+        "code": "21-07",
+        "nom": "La membrane",
+        "constats": [],
+        "accessible": true,
+        "etatsQuiPassent": [
+          "eau"
+        ],
+        "largeurPassage": 240,
+        "diametreCorps": 147.0417487709794
+      },
+      "essais": [
+        {
+          "reglage": "économe",
+          "verdict": "atteint",
+          "temps": 25.558333333332524,
+          "impulsions": 4,
+          "litres": 2.585,
+          "rendement": 0.5744444444444444,
+          "distanceDepart": 175.11269837220803,
+          "distanceMin": 1
+        },
+        {
+          "reglage": "franc",
+          "verdict": "atteint",
+          "temps": 20.724999999999465,
+          "impulsions": 4,
+          "litres": 1.1700000000000002,
+          "rendement": 0.26,
+          "distanceDepart": 175.11269837220803,
+          "distanceMin": 1
+        },
+        {
+          "reglage": "pressé",
+          "verdict": "atteint",
+          "temps": 14.291666666666496,
+          "impulsions": 2,
+          "litres": 1,
+          "rendement": 0.2222222222222222,
+          "distanceDepart": 175.11269837220803,
+          "distanceMin": 0
+        }
+      ]
+    },
+    {
+      "code": "21-C",
+      "nom": "Le conduit",
+      "audit": {
+        "code": "21-C",
+        "nom": "Le conduit",
+        "constats": [
+          {
+            "gravite": "note",
+            "code": "sas-inatteignable-eau",
+            "message": "le sas ne s'atteint qu'en vapeur"
+          },
+          {
+            "gravite": "note",
+            "code": "par-absent",
+            "message": "aucun budget d'impulsions déclaré : le record n'a pas de référence"
+          }
+        ],
+        "accessible": false,
+        "etatsQuiPassent": [
+          "vapeur"
+        ],
+        "largeurPassage": 0,
+        "diametreCorps": 147.0417487709794
+      },
+      "essais": []
+    },
+    {
+      "code": "21-08",
+      "nom": "Le rideau",
+      "par": 6,
+      "audit": {
+        "code": "21-08",
+        "nom": "Le rideau",
+        "constats": [
+          {
+            "gravite": "note",
+            "code": "sas-inatteignable-eau",
+            "message": "le sas ne s'atteint qu'en glace"
+          }
+        ],
+        "accessible": false,
+        "etatsQuiPassent": [
+          "glace"
+        ],
+        "largeurPassage": 0,
+        "diametreCorps": 147.0417487709794
+      },
+      "essais": []
+    },
+    {
+      "code": "21-09",
+      "nom": "Les régimes",
+      "par": 7,
+      "audit": {
+        "code": "21-09",
+        "nom": "Les régimes",
+        "constats": [
+          {
+            "gravite": "note",
+            "code": "sas-inatteignable-eau",
+            "message": "le sas ne s'atteint qu'en vapeur — attendu ici (zone qui impose glace — le bot ne joue que l'eau)"
+          }
+        ],
+        "accessible": false,
+        "etatsQuiPassent": [
+          "vapeur"
+        ],
+        "largeurPassage": 0,
+        "diametreCorps": 147.0417487709794
+      },
+      "horsPerimetre": "zone qui impose glace — le bot ne joue que l'eau",
+      "essais": []
+    },
+    {
+      "code": "21-E",
+      "nom": "La serre",
+      "audit": {
+        "code": "21-E",
+        "nom": "La serre",
+        "constats": [
+          {
+            "gravite": "note",
+            "code": "par-absent",
+            "message": "aucun budget d'impulsions déclaré : le record n'a pas de référence"
+          }
+        ],
+        "accessible": true,
+        "etatsQuiPassent": [
+          "eau",
+          "glace",
+          "vapeur"
+        ],
+        "largeurPassage": 312,
+        "diametreCorps": 147.0417487709794
+      },
+      "essais": [
+        {
+          "reglage": "économe",
+          "verdict": "bloque",
+          "temps": 66.24999999999879,
+          "impulsions": 41,
+          "litres": 1.375,
+          "rendement": 0.3055555555555556,
+          "distanceDepart": 176.35533905932732,
+          "distanceMin": 115.87005768508878
+        },
+        {
+          "reglage": "franc",
+          "verdict": "bloque",
+          "temps": 58.333333333330664,
+          "impulsions": 37,
+          "litres": 0.99,
+          "rendement": 0.22,
+          "distanceDepart": 176.35533905932732,
+          "distanceMin": 112.0416305603426
+        },
+        {
+          "reglage": "pressé",
+          "verdict": "atteint",
+          "temps": 12.516666666666596,
+          "impulsions": 3,
+          "litres": 0.45,
+          "rendement": 0.1,
+          "distanceDepart": 176.35533905932732,
+          "distanceMin": 0
+        }
+      ]
+    },
+    {
+      "code": "21-10",
+      "nom": "La halte",
+      "par": 8,
+      "audit": {
+        "code": "21-10",
+        "nom": "La halte",
+        "constats": [
+          {
+            "gravite": "alerte",
+            "code": "goulot-serre",
+            "message": "le plus large passage vers le sas fait 58 u pour un corps de 147 u : la traversée se paie en déformation, et le tableau demande peut-être un autre état"
+          }
+        ],
+        "accessible": true,
+        "etatsQuiPassent": [
+          "eau",
+          "glace",
+          "vapeur"
+        ],
+        "largeurPassage": 57.94112549695428,
+        "diametreCorps": 147.0417487709794
+      },
+      "essais": [
+        {
+          "reglage": "économe",
+          "verdict": "bloque",
+          "temps": 79.91666666667633,
+          "impulsions": 5,
+          "litres": 1.2349999999999999,
+          "rendement": 0.27444444444444444,
+          "distanceDepart": 191.6812408671318,
+          "distanceMin": 40.76955262170047
+        },
+        {
+          "reglage": "franc",
+          "verdict": "bloque",
+          "temps": 62.91666666666374,
+          "impulsions": 6,
+          "litres": 1.195,
+          "rendement": 0.26555555555555554,
+          "distanceDepart": 191.6812408671318,
+          "distanceMin": 49.76955262170047
+        },
+        {
+          "reglage": "pressé",
+          "verdict": "bloque",
+          "temps": 96.33333333335607,
+          "impulsions": 7,
+          "litres": 0.7,
+          "rendement": 0.15555555555555556,
+          "distanceDepart": 191.6812408671318,
+          "distanceMin": 30.82842712474619
+        }
+      ]
+    },
+    {
+      "code": "21-F",
+      "nom": "Le dépôt de givre",
+      "audit": {
+        "code": "21-F",
+        "nom": "Le dépôt de givre",
+        "constats": [
+          {
+            "gravite": "note",
+            "code": "sas-inatteignable-eau",
+            "message": "le sas ne s'atteint qu'en vapeur"
+          },
+          {
+            "gravite": "note",
+            "code": "par-absent",
+            "message": "aucun budget d'impulsions déclaré : le record n'a pas de référence"
+          }
+        ],
+        "accessible": false,
+        "etatsQuiPassent": [
+          "vapeur"
+        ],
+        "largeurPassage": 0,
+        "diametreCorps": 147.0417487709794
+      },
+      "essais": []
+    },
+    {
+      "code": "21-D",
+      "nom": "La cuve thermique",
+      "audit": {
+        "code": "21-D",
+        "nom": "La cuve thermique",
+        "constats": [
+          {
+            "gravite": "note",
+            "code": "par-absent",
+            "message": "aucun budget d'impulsions déclaré : le record n'a pas de référence"
+          }
+        ],
+        "accessible": true,
+        "etatsQuiPassent": [
+          "eau",
+          "glace",
+          "vapeur"
+        ],
+        "largeurPassage": 312,
+        "diametreCorps": 147.0417487709794
+      },
+      "essais": [
+        {
+          "reglage": "économe",
+          "verdict": "atteint",
+          "temps": 30.099999999998932,
+          "impulsions": 4,
+          "litres": 0.92,
+          "rendement": 0.20444444444444446,
+          "distanceDepart": 187.53910524340085,
+          "distanceMin": 2
+        },
+        {
+          "reglage": "franc",
+          "verdict": "bloque",
+          "temps": 71.83333333333657,
+          "impulsions": 4,
+          "litres": 1.025,
+          "rendement": 0.22777777777777775,
+          "distanceDepart": 187.53910524340085,
+          "distanceMin": 15.485281374238571
+        },
+        {
+          "reglage": "pressé",
+          "verdict": "bloque",
+          "temps": 59.416666666663936,
+          "impulsions": 3,
+          "litres": 0.75,
+          "rendement": 0.16666666666666666,
+          "distanceDepart": 187.53910524340085,
+          "distanceMin": 43.11269837220808
+        }
+      ]
+    },
+    {
+      "code": "21-11",
+      "nom": "La voie lumineuse",
+      "par": 6,
+      "audit": {
+        "code": "21-11",
+        "nom": "La voie lumineuse",
+        "constats": [],
+        "accessible": true,
+        "etatsQuiPassent": [
+          "eau",
+          "glace",
+          "vapeur"
+        ],
+        "largeurPassage": 312,
+        "diametreCorps": 147.0417487709794
+      },
+      "essais": [
+        {
+          "reglage": "économe",
+          "verdict": "atteint",
+          "temps": 34.69166666666534,
+          "impulsions": 4,
+          "litres": 1.085,
+          "rendement": 0.2411111111111111,
+          "distanceDepart": 166,
+          "distanceMin": 42
+        },
+        {
+          "reglage": "franc",
+          "verdict": "atteint",
+          "temps": 14.124999999999838,
+          "impulsions": 3,
+          "litres": 1.17,
+          "rendement": 0.26,
+          "distanceDepart": 166,
+          "distanceMin": 2
+        },
+        {
+          "reglage": "pressé",
+          "verdict": "atteint",
+          "temps": 40.649999999998336,
+          "impulsions": 5,
+          "litres": 1,
+          "rendement": 0.2222222222222222,
+          "distanceDepart": 166,
+          "distanceMin": 44
+        }
+      ]
+    },
+    {
+      "code": "21-H",
+      "nom": "La salle des miroirs",
+      "audit": {
+        "code": "21-H",
+        "nom": "La salle des miroirs",
+        "constats": [
+          {
+            "gravite": "note",
+            "code": "portes-obligatoires",
+            "message": "le laser est obligatoire : portes fermées, le sas est coupé"
+          },
+          {
+            "gravite": "note",
+            "code": "par-absent",
+            "message": "aucun budget d'impulsions déclaré : le record n'a pas de référence"
+          },
+          {
+            "gravite": "note",
+            "code": "hors-perimetre",
+            "message": "le pilote ne joue pas ce tableau : portes asservies au laser — le bot ne pilote pas le faisceau"
+          }
+        ],
+        "accessible": true,
+        "etatsQuiPassent": [
+          "eau",
+          "glace",
+          "vapeur"
+        ],
+        "largeurPassage": 293.8233764908628,
+        "diametreCorps": 147.0417487709794
+      },
+      "horsPerimetre": "portes asservies au laser — le bot ne pilote pas le faisceau",
+      "essais": []
+    },
+    {
+      "code": "21-I",
+      "nom": "Le prisme",
+      "audit": {
+        "code": "21-I",
+        "nom": "Le prisme",
+        "constats": [
+          {
+            "gravite": "note",
+            "code": "portes-obligatoires",
+            "message": "le laser est obligatoire : portes fermées, le sas est coupé"
+          },
+          {
+            "gravite": "note",
+            "code": "par-absent",
+            "message": "aucun budget d'impulsions déclaré : le record n'a pas de référence"
+          },
+          {
+            "gravite": "note",
+            "code": "hors-perimetre",
+            "message": "le pilote ne joue pas ce tableau : portes asservies au laser — le bot ne pilote pas le faisceau"
+          }
+        ],
+        "accessible": true,
+        "etatsQuiPassent": [
+          "eau",
+          "glace",
+          "vapeur"
+        ],
+        "largeurPassage": 312,
+        "diametreCorps": 147.04174918221892
+      },
+      "horsPerimetre": "portes asservies au laser — le bot ne pilote pas le faisceau",
+      "essais": []
+    },
+    {
+      "code": "21-J",
+      "nom": "La voie de plasma",
+      "audit": {
+        "code": "21-J",
+        "nom": "La voie de plasma",
+        "constats": [
+          {
+            "gravite": "note",
+            "code": "portes-obligatoires",
+            "message": "le laser est obligatoire : portes fermées, le sas est coupé"
+          },
+          {
+            "gravite": "note",
+            "code": "par-absent",
+            "message": "aucun budget d'impulsions déclaré : le record n'a pas de référence"
+          },
+          {
+            "gravite": "note",
+            "code": "hors-perimetre",
+            "message": "le pilote ne joue pas ce tableau : portes asservies au laser — le bot ne pilote pas le faisceau"
+          }
+        ],
+        "accessible": true,
+        "etatsQuiPassent": [
+          "eau",
+          "glace",
+          "vapeur"
+        ],
+        "largeurPassage": 216,
+        "diametreCorps": 147.0417487709794
+      },
+      "horsPerimetre": "portes asservies au laser — le bot ne pilote pas le faisceau",
+      "essais": []
+    },
+    {
+      "code": "21-K",
+      "nom": "Les deux verrous",
+      "audit": {
+        "code": "21-K",
+        "nom": "Les deux verrous",
+        "constats": [
+          {
+            "gravite": "note",
+            "code": "portes-obligatoires",
+            "message": "le laser est obligatoire : portes fermées, le sas est coupé"
+          },
+          {
+            "gravite": "note",
+            "code": "par-absent",
+            "message": "aucun budget d'impulsions déclaré : le record n'a pas de référence"
+          },
+          {
+            "gravite": "note",
+            "code": "hors-perimetre",
+            "message": "le pilote ne joue pas ce tableau : portes asservies au laser — le bot ne pilote pas le faisceau"
+          }
+        ],
+        "accessible": true,
+        "etatsQuiPassent": [
+          "eau",
+          "glace",
+          "vapeur"
+        ],
+        "largeurPassage": 293.8233764908628,
+        "diametreCorps": 147.0417487709794
+      },
+      "horsPerimetre": "portes asservies au laser — le bot ne pilote pas le faisceau",
+      "essais": []
+    },
+    {
+      "code": "21-L",
+      "nom": "À travers l’évent",
+      "audit": {
+        "code": "21-L",
+        "nom": "À travers l’évent",
+        "constats": [
+          {
+            "gravite": "note",
+            "code": "sas-inatteignable-eau",
+            "message": "le sas ne s'atteint qu'en vapeur — attendu ici (portes asservies au laser — le bot ne pilote pas le faisceau)"
+          },
+          {
+            "gravite": "note",
+            "code": "portes-obligatoires",
+            "message": "le laser est obligatoire : portes fermées, le sas est coupé"
+          },
+          {
+            "gravite": "note",
+            "code": "par-absent",
+            "message": "aucun budget d'impulsions déclaré : le record n'a pas de référence"
+          }
+        ],
+        "accessible": false,
+        "etatsQuiPassent": [
+          "vapeur"
+        ],
+        "largeurPassage": 0,
+        "diametreCorps": 147.0417487709794
+      },
+      "horsPerimetre": "portes asservies au laser — le bot ne pilote pas le faisceau",
+      "essais": []
+    },
+    {
+      "code": "21-M",
+      "nom": "La traversée des états",
+      "audit": {
+        "code": "21-M",
+        "nom": "La traversée des états",
+        "constats": [
+          {
+            "gravite": "note",
+            "code": "portes-obligatoires",
+            "message": "le laser est obligatoire : portes fermées, le sas est coupé"
+          },
+          {
+            "gravite": "note",
+            "code": "par-absent",
+            "message": "aucun budget d'impulsions déclaré : le record n'a pas de référence"
+          },
+          {
+            "gravite": "note",
+            "code": "hors-perimetre",
+            "message": "le pilote ne joue pas ce tableau : portes asservies au laser — le bot ne pilote pas le faisceau"
+          }
+        ],
+        "accessible": true,
+        "etatsQuiPassent": [
+          "eau",
+          "glace",
+          "vapeur"
+        ],
+        "largeurPassage": 227.6467529817257,
+        "diametreCorps": 147.0417487709794
+      },
+      "horsPerimetre": "portes asservies au laser — le bot ne pilote pas le faisceau",
+      "essais": []
+    },
+    {
+      "code": "21-G",
+      "nom": "La dérive",
+      "audit": {
+        "code": "21-G",
+        "nom": "La dérive",
+        "constats": [
+          {
+            "gravite": "note",
+            "code": "par-absent",
+            "message": "aucun budget d'impulsions déclaré : le record n'a pas de référence"
+          }
+        ],
+        "accessible": true,
+        "etatsQuiPassent": [
+          "eau",
+          "glace",
+          "vapeur"
+        ],
+        "largeurPassage": 312,
+        "diametreCorps": 147.04174895230747
+      },
+      "essais": [
+        {
+          "reglage": "économe",
+          "verdict": "atteint",
+          "temps": 21.549999999999418,
+          "impulsions": 3,
+          "litres": 0.915,
+          "rendement": 0.20333333333333334,
+          "distanceDepart": 181.25483399593895,
+          "distanceMin": 2
+        },
+        {
+          "reglage": "franc",
+          "verdict": "atteint",
+          "temps": 18.79166666666624,
+          "impulsions": 4,
+          "litres": 0.54,
+          "rendement": 0.12000000000000001,
+          "distanceDepart": 181.25483399593895,
+          "distanceMin": 0
+        },
+        {
+          "reglage": "pressé",
+          "verdict": "atteint",
+          "temps": 13.366666666666548,
+          "impulsions": 3,
+          "litres": 0.46,
+          "rendement": 0.10222222222222223,
+          "distanceDepart": 181.25483399593895,
+          "distanceMin": 0
+        }
+      ]
+    }
+  ]
+}
