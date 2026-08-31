@@ -17,7 +17,7 @@
 // ---------------------------------------------------------------------------
 
 import { NB_ACTIONS } from './env'
-import { Reseau, argmax } from './reseau'
+import { Reseau, argmax, probabilites, tire } from './reseau'
 
 export interface Politique {
   tailleObs: number
@@ -71,19 +71,37 @@ export function politiqueDepuis(
  * de lecture pour le jeu, le rejeu et les outils : le format évolue, les
  * appelants ne bougent pas.
  */
-export function decideurDepuis(brut: {
-  type?: string
-  tailleObs: number
-  tailles?: number[]
-  poids: ArrayLike<number>
-}): { decide: (obs: Float32Array) => number; genre: string; tailleObs: number } {
+export function decideurDepuis(
+  brut: {
+    type?: string
+    tailleObs: number
+    tailles?: number[]
+    poids: ArrayLike<number>
+  },
+  opts: { argmax?: boolean; graine?: number } = {},
+): { decide: (obs: Float32Array) => number; genre: string; tailleObs: number } {
   if (brut.type === 'mlp') {
     if (!brut.tailles) throw new Error('politique mlp sans « tailles »')
     const reseau = new Reseau(brut.tailles)
     reseau.importe(brut.poids)
+    const nbActions = brut.tailles[brut.tailles.length - 1]
+    const probs = new Float64Array(nbActions)
+    // PAR DÉFAUT, ON TIRE AU SORT — et ce n'est pas un détail.
+    // PPO apprend une politique STOCHASTIQUE : l'hésitation fait partie de ce
+    // qu'elle a appris (elle sort des impasses en variant). Prendre toujours
+    // l'action la mieux notée (argmax) donne une AUTRE politique, souvent
+    // pire : mesuré sur Le berceau, 0,84 L en tirant au sort contre 0,00 en
+    // prenant le maximum — le corps se bloquait dans une boucle. L'argmax
+    // reste disponible pour comparer, jamais par défaut.
+    const rnd = alea(opts.graine ?? 12345)
     return {
-      decide: (obs) => argmax(reseau.avant(obs)),
-      genre: `réseau ${brut.tailles.join('→')}`,
+      decide: (obs) => {
+        const logits = reseau.avant(obs)
+        if (opts.argmax) return argmax(logits)
+        probabilites(logits, probs)
+        return tire(probs, rnd())
+      },
+      genre: `réseau ${brut.tailles.join('→')}${opts.argmax ? ', au maximum' : ', tiré au sort'}`,
       tailleObs: brut.tailles[0],
     }
   }

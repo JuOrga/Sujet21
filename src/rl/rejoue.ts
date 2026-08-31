@@ -45,7 +45,10 @@ function politiqueChoisie(): { nom: string; pilote: PiloteLocal } {
       tailles?: number[]
       poids: number[]
     }
-    const charge = decideurDepuis(brut)
+    const charge = decideurDepuis(brut, {
+      argmax: argv.includes('--argmax'),
+      graine: num('graine', 1),
+    })
     return {
       nom: `${fichier} (${charge.genre})`,
       pilote: (env) => charge.decide(env.observe()),

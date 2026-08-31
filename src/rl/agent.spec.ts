@@ -53,10 +53,14 @@ describe('AgentEnJeu — il ne parle au jeu que par le doigt', () => {
       TABLEAU_1,
     )
   }
-  const sim = (cx: number, cy: number): Parameters<AgentEnJeu['ordre']>[0] =>
+  const sim = (
+    cx: number,
+    cy: number,
+    swallowed = 0,
+  ): Parameters<AgentEnJeu['ordre']>[0] =>
     ({
       stats: { centroidX: cx, centroidY: cy },
-      swallowed: 0,
+      swallowed,
       baseVolume: 900,
     }) as unknown as Parameters<AgentEnJeu['ordre']>[0]
 
@@ -77,9 +81,15 @@ describe('AgentEnJeu — il ne parle au jeu que par le doigt', () => {
 
   it('« attendre » lève le doigt, « conclure » appuie sur CONTINUER', () => {
     expect(agentDe(ACTION_RIEN).ordre(sim(0, 0), 0).tient).toBe(false)
-    const c = agentDe(ACTION_CONCLURE).ordre(sim(0, 0), 0)
+    const c = agentDe(ACTION_CONCLURE).ordre(sim(0, 0, 300), 0)
     expect(c.conclure).toBe(true)
     expect(c.tient).toBe(false)
+  })
+
+  it('conclure trop tôt ne fait rien — le jeu ne doit pas retenir l’intention', () => {
+    const o = agentDe(ACTION_CONCLURE).ordre(sim(0, 0, 0), 0)
+    expect(o.conclure).toBe(false)
+    expect(o.action).toBe(ACTION_RIEN)
   })
 
   it('ne décide qu’une fois par période : entre deux, le geste est TENU', () => {

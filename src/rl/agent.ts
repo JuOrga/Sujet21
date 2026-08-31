@@ -65,7 +65,10 @@ export interface PolitiqueChargee {
  * la main ; tout le reste est traité comme l'URL d'un JSON produit par
  * `pnpm rl:entraine`.
  */
-export async function chargeAgent(nom: string): Promise<PolitiqueChargee> {
+export async function chargeAgent(
+  nom: string,
+  opts: { argmax?: boolean } = {},
+): Promise<PolitiqueChargee> {
   if (nom === 'cap' || nom === '1' || nom === '') {
     return { nom: 'cap (écrit à la main)', pilote: piloteCap() }
   }
@@ -79,7 +82,7 @@ export async function chargeAgent(nom: string): Promise<PolitiqueChargee> {
     poids: number[]
   }
   if (!brut.poids) throw new Error(`${nom} : ce n’est pas une politique`)
-  const charge = decideurDepuis(brut)
+  const charge = decideurDepuis(brut, { argmax: opts.argmax })
   return {
     nom: `${nom.replace(/^.*\//, '')} · ${charge.genre}`,
     decide: charge.decide,
@@ -144,8 +147,8 @@ export class AgentEnJeu {
       const action = this.choisit(sim, temps)
       this.coutMs += (performance.now() - t0 - this.coutMs) * 0.1
       this.decisions++
-      this.derniereAction = action
       this.ordreCourant = this.traduit(action, sim)
+      this.derniereAction = this.ordreCourant.action
     }
     return this.ordreCourant
   }
@@ -167,6 +170,14 @@ export class AgentEnJeu {
     const cx = sim.stats.centroidX
     const cy = sim.stats.centroidY
     if (action === ACTION_CONCLURE) {
+      // CONCLURE avant que le sas ait assez bu ne fait RIEN — comme à
+      // l'entraînement, où le geste est refusé. Sans cette garde, le jeu
+      // retiendrait l'intention (continuerVoulu ne se dégonfle pas) et
+      // conclurait de lui-même à la seconde où le seuil est franchi : l'agent
+      // se verrait offrir une salle bouclée qu'il n'a pas décidé de boucler.
+      if (sim.swallowed < Math.max(20, sim.baseVolume * 0.1)) {
+        return { tient: false, x: cx, y: cy, conclure: false, action: ACTION_RIEN }
+      }
       return { tient: false, x: cx, y: cy, conclure: true, action }
     }
     if (action === ACTION_RASSEMBLE) {
