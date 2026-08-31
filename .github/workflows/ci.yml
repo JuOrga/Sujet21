@@ -5,19 +5,25 @@
 # deux sur le même commit, donc deux fois le même travail. Mesuré au
 # 31/08 : 1 603 exécutions en 23 jours, ~70 par jour, ~1 336 minutes.
 #
-# DÉSORMAIS, une exécution par état à vérifier :
-#   · les PULL REQUESTS vers dev et prod — c'est là qu'on décide ;
+# DÉSORMAIS, RIEN NE TOURNE QUE POUR PROD :
+#   · les PULL REQUESTS vers prod — la porte du site en ligne ;
 #   · les poussées sur PROD — le filet après une livraison ;
 #   · à la demande, pour vérifier une branche sans ouvrir de PR.
-# Une poussée sur une branche de travail ne déclenche donc plus rien : la
-# PR s'en charge. C'est ce qui coupe le gros de la facture.
+#
+# Les PR vers `dev` ne déclenchent RIEN, et c'est un choix assumé pour
+# rester dans le palier gratuit. La conséquence doit être dite en face :
+# entre une branche de travail et `dev`, la SEULE vérification est celle
+# faite EN LOCAL avant de pousser (type-check, test, build — cf.
+# CLAUDE.md). Un défaut peut donc atteindre `dev` sans être vu ; il sera
+# arrêté à la PR `dev` → `prod`, avant la mise en ligne. C'est le
+# compromis : on protège ce qui est PUBLIÉ, pas ce qui est intégré.
 name: ci
 
 # (La liste `paths-ignore` est répétée : GitHub Actions ne résout PAS les
 # ancres YAML — un `&ancre` / `*ancre` fait échouer l'analyse du workflow.)
 on:
   pull_request:
-    branches: [dev, prod]
+    branches: [prod]
     paths-ignore:
       - 'docs/**'
       - 'masters/**'

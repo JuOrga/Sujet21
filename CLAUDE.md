@@ -19,7 +19,9 @@ dev  ──●────●────●─────────●──
 y arrive uniquement par une PR depuis `dev`, et cette fusion **publie**.
 
 **`dev`** — l'intégration. On n'y pousse **jamais** directement non plus :
-tout y entre par PR. Aucun déploiement ne part de `dev`.
+tout y entre par PR. Ni déploiement ni CI ne partent de `dev` — une PR vers
+`dev` ne déclenche **rien**, d'où l'obligation de vérifier en local (voir
+plus bas).
 
 **Une branche par demande.** À **chaque nouvelle demande**, créer une
 branche **issue de `dev`**, y travailler, puis ouvrir une **PR vers `dev`**.
@@ -47,9 +49,11 @@ avant réglage, il consommait **~2 361 min d'Actions par mois** (quota gratuit :
 
 Trois règles en découlent, et elles passent **avant le confort** :
 
-1. **Aucun workflow ne se déclenche sur `push` sans filtre de branche.**
-   C'est ce qui faisait tourner la CI deux fois par poussée (une fois pour
-   `push`, une fois pour `pull_request`).
+1. **Rien ne tourne que pour `prod`.** La CI se déclenche sur les PR vers
+   `prod` et les poussées sur `prod` — **pas** sur les PR vers `dev`, ni sur
+   les branches de travail. Aucun workflow ne se déclenche sur `push` sans
+   filtre de branche : c'est ce qui faisait tourner la CI deux fois par
+   poussée (une fois pour `push`, une fois pour `pull_request`).
 2. **Seul `prod` déploie.** Pour voir une branche en ligne : `deploy` →
    *Run workflow* → cible `previsualisation`. Jamais un déploiement
    automatique depuis `dev` ou une branche de travail.
@@ -64,10 +68,16 @@ gâchette (voir `ops/LISEZ-MOI.md`) à un déclenchement automatique.
 
 ---
 
-## Vérifier avant de pousser
+## Vérifier avant de pousser — LE FILET, C'EST VOUS
 
-La CI ne tourne plus sur les branches de travail : **c'est donc en local
-que ça se joue**. Les trois commandes, systématiquement :
+**Aucune vérification automatique n'a lieu avant `prod`.** Une PR vers
+`dev` ne déclenche rien du tout : entre une branche de travail et `dev`, la
+seule chose qui protège le code est ce qu'on lance **en local avant de
+pousser**. Un défaut peut donc atteindre `dev` sans que rien ne le signale.
+Il sera arrêté à la PR `dev` → `prod` — on protège ce qui est **publié**,
+pas ce qui est intégré, et c'est un choix assumé pour rester gratuit.
+
+Les trois commandes, **systématiquement, sans exception** :
 
 ```bash
 pnpm type-check    # strict, doit être à 0 erreur

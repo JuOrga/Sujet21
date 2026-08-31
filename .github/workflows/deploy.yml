@@ -16,15 +16,11 @@
 #
 # Déploiement en CLI avec token (secrets VERCEL_*) — pas d'intégration Git
 # Vercel, qui demanderait un plan Pro pour un dépôt privé d'organisation.
-#
-# NOTE DE TRANSITION : `claude/game-development-me41vn` est encore listée
-# le temps du renommage en `prod`, pour qu'aucun ordre d'opération ne casse
-# la publication. Elle se retire à la première livraison qui suit.
 name: deploy
 
 on:
   push:
-    branches: [prod, claude/game-development-me41vn]
+    branches: [prod]
     # Ce qui ne part pas dans le site ne mérite pas un déploiement.
     paths-ignore:
       - 'docs/**'
