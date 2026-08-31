@@ -1,14 +1,51 @@
-import { defineConfig } from 'vitest/config'
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
+import { defineConfig, type Plugin } from 'vitest/config'
+
+// LES POLITIQUES SERVIES À CHAUD. Deux pièges de vite se combinent ici, et
+// il faut les traiter ensemble :
+//
+//  1. Le SUIVI d'entraînement (?agent=…&suivre=N) réécrit un fichier de
+//     politique dans public/agents/ à chaque itération, soit environ une
+//     fois par seconde. Si vite surveille ce dossier, il RECHARGE la page à
+//     chaque écriture : on ne verrait jamais l'agent jouer plus d'une
+//     seconde. D'où l'exception de `server.watch.ignored`.
+//  2. Mais vite 5 dresse au démarrage la LISTE des fichiers de public/ et
+//     refuse de servir ce qui n'y figure pas ; cette liste est tenue à jour
+//     par le watcher. Un fichier créé après coup dans un dossier ignoré
+//     n'est donc jamais servi : vite retombe sur index.html et le jeu reçoit
+//     du HTML au lieu d'une politique.
+//
+// Ce plugin lit le fichier sur le disque à chaque requête, avant que vite
+// n'ait son mot à dire. L'ordre de lancement (entraînement ou serveur
+// d'abord) n'a plus d'importance.
+function politiquesEnDirect(): Plugin {
+  return {
+    name: 'politiques-en-direct',
+    configureServer(serveur) {
+      serveur.middlewares.use((req, res, suite) => {
+        const chemin = (req.url ?? '').split('?')[0]
+        if (!/^\/agents\/[\w.-]+\.json$/.test(chemin)) return suite()
+        const fichier = path.join(process.cwd(), 'public', chemin)
+        readFile(fichier)
+          .then((contenu) => {
+            res.setHeader('Content-Type', 'application/json')
+            res.setHeader('Cache-Control', 'no-store')
+            res.end(contenu)
+          })
+          .catch(() => suite())
+      })
+    },
+  }
+}
 
 export default defineConfig({
   base: './',
+  plugins: [politiquesEnDirect()],
   server: {
     watch: {
-      // LE SUIVI D'ENTRAÎNEMENT (?agent=…&suivre=N) écrit un fichier de
-      // politique dans public/agents/ à chaque itération, soit environ une
-      // fois par seconde. Sans cette exception, vite verrait le fichier
-      // changer et RECHARGERAIT la page à chaque fois : on ne verrait jamais
-      // l'agent jouer plus d'une seconde. Le jeu le relit tout seul.
+      // Voir le commentaire ci-dessus : sans cette exception, chaque
+      // itération d'entraînement rechargerait la page.
       ignored: ['**/public/agents/**'],
     },
   },
