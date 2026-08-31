@@ -42,6 +42,22 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
+    date: '01/09/2026 00:20',
+    title: 'Les rails deviennent des raccourcis, ouverts au PLASMA seul',
+    notes: [
+      'LA DEMANDE : que les rails de plasma aient un corps — solides comme des parois, traversables en plasma — pour servir de raccourcis à travers les cloisons, à la manière du téléporteur de Dead Cells.',
+      'PLASMA = VAPEUR + LASER, et c’est ce qui fait tout l’intérêt. Un premier essai ouvrait le tube à la vapeur seule ; c’était un contournement de l’énigme, pas une récompense. Il faut désormais qu’un ARC IONISÉ circule sur ce rail — donc s’être vaporisé DANS le faisceau, au pied du tube. Tant que le champ n’est pas levé, le conduit reste plein pour tout le monde, la vapeur comprise.',
+      'LES DEUX VISAGES DU CONDUIT. Hors plasma, le tube est une PAROI : on est expulsé de son axe, on bute dessus comme sur une coque, en eau comme en glace comme en vapeur non ionisée. Au plasma, c’est un PASSAGE : tant que le nuage y est, le décor ne le touche plus du tout — il file À TRAVERS les parois jusqu’à l’autre bout, porté par le champ.',
+      'LA MOITIÉ DU CHEMIN ÉTAIT DÉJÀ FAITE : « railConvoy » sait depuis longtemps porter un nuage le long d’une ligne de champ, virages compris, avec un freinage à l’arrivée pour que la condensation n’explose pas en gare. Ce qui manquait, c’est qu’un rail n’avait AUCUNE physique — une polyligne que seul le traceur de faisceau consultait.',
+      'LE TUBE EST UNE CAPSULE, pas des boîtes. Convertir la polyligne en rectangles obliques aurait demandé de toucher au format des tableaux, au générateur et à l’éditeur pour une géométrie que le solveur sait déjà mesurer. Le conduit réutilise la même projection, au même rayon que la bande de convoyage : ce qui est porté est exactement ce qui est dedans.',
+      'RIEN NE CHANGE SANS LE DRAPEAU. Les tableaux à énigme d’arc gardent leur comportement au chiffre près ; le générateur procédural n’en pose jamais, donc ses preuves de traversée restent valides. Un test compare un tableau sans conduit à un solveur qui n’en a jamais entendu parler : même position du corps à six décimales.',
+      'LE PIÈGE DU MIROIR, ÉVITÉ DE JUSTESSE. La lecture d’un rail faisait « rails.push({ points: pts }) » — tout champ supplémentaire aurait disparu à l’enregistrement, en silence, exactement comme MAT_MIROIR absent de MATERIALS. Le drapeau est relu, et un test le vérifie sur DEUX allers-retours (c’est au second que la perte se voyait). L’avertissement « rail sans émetteur laser » ne tombe plus sur un conduit, qui n’a aucun arc à guider.',
+      'DIX TESTS gravent la promesse dans les deux sens, parce qu’une moitié seule n’a aucune valeur — un tube qui laisse passer tout le monde n’est pas un raccourci, c’est un trou. Le couple décisif : tube FERMÉ, le même nuage reste du mauvais côté ; tube OUVERT, il passe. La seule différence est l’engagement de l’arc.',
+      'UN RELEVÉ A CORRIGÉ LE TEST AVANT LE CODE : le nuage lâché à l’arrêt recondensait en moins d’une demi-seconde et n’allait nulle part. L’état vapeur est TENU par l’intention du joueur. Le test le tient donc, comme la touche le fait, et le corps franchit la cloison à une seconde puis se gare au terminus.',
+      'DANS L’ÉDITEUR : une case « CONDUIT — raccourci traversable » sur le panneau du rail, avec sa notice. Le drapeau ne s’écrit que s’il est vrai, pour que les tableaux d’avant ne gagnent pas un champ dont ils n’ont que faire.',
+    ],
+  },
+  {
     date: '31/08/2026 15:52',
     title: 'Le miroir disparaissait à l’enregistrement — un mot manquait à une liste',
     notes: [

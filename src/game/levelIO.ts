@@ -808,7 +808,12 @@ export function parseLevel(input: unknown): {
       rejets.push('un rail magnétique a été écarté (moins de 2 points)')
       continue
     }
-    rails.push({ points: pts })
+    // Le drapeau CONDUIT doit être relu ici, sinon il disparaît à
+    // l'enregistrement sans un mot — c'est exactement la panne du miroir
+    // (MATERIALS oubliait MAT_MIROIR, la boîte entière était jetée).
+    const rail: RailDef = { points: pts }
+    if (r.conduit === true) rail.conduit = true
+    rails.push(rail)
   }
   if (rails.length > 0) level.rails = rails
 
@@ -1050,7 +1055,10 @@ export function checkLevel(brut: LevelDef): Verdict[] {
   }
   // Rails : un rail sans émetteur ne guidera jamais rien, et un rail hors
   // cuve est inatteignable.
-  if ((level.rails?.length ?? 0) > 0 && (level.lasers?.length ?? 0) === 0) {
+  // Un CONDUIT n'attend aucun arc : il s'engage sur la seule vapeur. Seuls
+  // les rails de guidage réclament un émetteur.
+  const railsGuidage = (level.rails ?? []).filter((r) => r.conduit !== true)
+  if (railsGuidage.length > 0 && (level.lasers?.length ?? 0) === 0) {
     v.push({
       niveau: 'avertissement',
       message: 'Un rail magnétique sans émetteur laser : aucun arc à guider.',
