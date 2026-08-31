@@ -153,6 +153,7 @@ Les réglages qui comptent, dans l'ordre :
 | Option | Rôle | Défaut |
 | --- | --- | --- |
 | `--travailleurs N` | processus de collecte — **mettez le nombre de cœurs** | 4 |
+| `--evalue N` / `--essais E` | l'épreuve à graines fixes, toutes les N itérations | 10 / 3 |
 | `--envs K` | tableaux menés de front par travailleur | 2 |
 | `--horizon T` | décisions collectées par tableau et par itération | 256 |
 | `--iterations` | nombre de pas d'apprentissage | 300 |
@@ -163,6 +164,17 @@ Les réglages qui comptent, dans l'ordre :
 Une itération collecte `travailleurs × envs × horizon` décisions. Le journal
 et la politique sont réécrits **à chaque itération** : la courbe se regarde en
 direct, et la politique se pose dans `public/agents/` pour la voir jouer.
+
+**L'épreuve, et pourquoi elle existe.** Les épisodes d'entraînement sont tirés
+au sort : une dizaine par itération, sous une politique qui explore. Retenir
+« la meilleure politique » sur leur moyenne, c'est retenir l'itération la plus
+CHANCEUSE. Mesuré ici, et l'erreur a été commise : la politique élue de cette
+façon rendait **0,35 L** sur cinq graines, quand une autre, prise cent
+itérations plus tôt, en rendait **0,81**. Depuis, toutes les `--evalue N`
+itérations, la politique du moment passe une **épreuve à graines fixes** —
+la même épreuve pour tout le monde, d'un bout à l'autre — et c'est elle qui
+décide de la politique sauvée. `pnpm rl:courbe --serie epreuve` ne trace que
+ces points-là : c'est la seule courbe comparable dans le temps.
 
 **Et le GPU ?** Il ne servira à rien, et ce n'est pas une figure de style :
 99 % du temps part dans le solveur de fluide (CPU, séquentiel, un cœur par
@@ -334,33 +346,52 @@ de fluide.
 
 ## 8. Où en est l'apprentissage, honnêtement
 
-Deux entraînements de trente générations sur *Le berceau* (450 particules,
-essais de 45 s, quatre cœurs, ~20 minutes chacun) :
+Toutes les mesures sur *Le berceau* (21-01), 450 particules, essais de 45 s.
+
+**Sans gradient (CEM, politique linéaire), 30 générations, ~20 min sur quatre
+cœurs :**
 
 | Départ | Retour, gén. 1 → 30 | Litres livrés |
 | --- | --- | --- |
 | à froid (`--depart zero`) | −6,6 → −1,0 | 0,00 |
 | imitation + rattrapage (`--depart cap --tours 3`) | +6,7 → +6,4 (pic 8,8) | 0,00 |
 
-La progression est réelle et lisible — à froid, l'agent apprend en trente
-générations à ne plus se disperser ; en partant de l'imitation, il navigue
-d'emblée bien mieux. **Mais aucune des deux ne livre une goutte au sas**,
-là où le pilote écrit à la main livre 0,72 L.
+La progression est réelle et lisible, mais **aucune des deux ne livre une
+goutte**. Le diagnostic est net : une politique **linéaire** n'a pas les
+moyens de la décision qui fait la traversée (« pousser SI la vitesse vers le
+sas est sous le seuil, sinon se rassembler » — une condition, pas une
+pondération). L'imitation le montre chiffre en main : elle recopie 80 à 94 %
+des décisions du pilote et rate exactement celles qui comptent. Plafond de
+représentation, pas manque d'exploration.
 
-Le diagnostic est net, et c'est celui qu'on attendait : une politique
-**linéaire** n'a pas les moyens de la décision qui fait la traversée
-(« pousser SI la vitesse vers le sas est sous le seuil, sinon se rassembler »
-— une condition, pas une pondération). L'imitation le montre chiffre en main :
-elle recopie 80 à 94 % des décisions du pilote et rate exactement celles qui
-comptent. Ce n'est pas un problème d'exploration, c'est un plafond de
-représentation.
+**Avec PPO (réseau 43→64→64→19), 250 itérations, 768 000 décisions, une heure
+sur quatre cœurs :**
+
+| | 30 premières itérations | 30 dernières |
+| --- | --- | --- |
+| retour moyen | +0,33 | **+8,13** |
+| litres livrés (entraînement) | 0,20 L | **0,61 L** |
+| traversées | 63 / 570 épisodes (11 %) | **196 / 282 (70 %)** |
+
+Le réseau **traverse**, et c'est la rupture : la même récompense, le même
+environnement, le même budget de calcul — seule la forme de la politique a
+changé. Les dispersions tombent à zéro sur les dernières itérations.
+
+Sur cinq graines à l'épreuve, la politique livrée rend **0,81 L en moyenne
+(3 traversées sur 5)**, contre 0,72 L au pilote écrit à la main. Elle le
+dépasse donc, mais de peu et en étant **beaucoup plus irrégulière** — elle
+signe des 1,57 L et des 0,00 L. Une première mesure sur UNE graine avait
+donné 1,57 L : le chiffre était vrai et la conclusion fausse. C'est de là que
+vient l'épreuve à graines fixes décrite plus haut.
 
 ## 9. Si je devais faire la suite, dans cet ordre
 
-1. **PPO avec un petit réseau** (deux couches de 64 : quelques milliers de
-   poids au lieu de 836, et surtout des non-linéarités) — chemin A, en
-   TypeScript, face aux mêmes pilotes de référence. C'est LE pas suivant :
-   tout le reste est déjà en place.
+1. **Réduire l'irrégularité** : la politique traverse sept fois sur dix mais
+   rate franchement les autres. Trois pistes, dans l'ordre du rapport
+   qualité-prix : entraîner plus longtemps (la courbe n'est pas plate),
+   allonger `--horizon` (les épisodes font 450 décisions, la collecte 256 :
+   l'avantage de fin de traversée arrive dilué), et faire décroître la prime
+   d'entropie pour que la politique se décide en fin d'entraînement.
 2. Un **test de parité** navigateur ↔ environnement, pour que les capteurs
    partagés le restent quoi qu'il arrive au banc.
 3. L'**extraction de la boucle de règles** hors de `main.ts` — glace, vapeur,

@@ -22,9 +22,9 @@ import { dirname } from 'node:path'
 import process from 'node:process'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { NB_ACTIONS } from './env'
+import { EnvSujet21, NB_ACTIONS, joue, reussie } from './env'
 import { PPO_DEFAUT, avantagesGAE, majPPO, type Transition } from './ppo'
-import { Adam, Reseau, parametres } from './reseau'
+import { Adam, Reseau, parametres, probabilites, tire } from './reseau'
 import { Collecteur, resume, type BilanEpisode, type OptionsCollecte } from './rollout'
 import { alea } from './politique'
 
@@ -37,6 +37,8 @@ interface Reglages extends OptionsCollecte {
   couches: number[]
   sortie: string
   recuit: boolean
+  evalue: number // toutes les N itérations (0 : jamais)
+  essais: number // épisodes par évaluation et par tableau
 }
 
 function lisArgs(argv: string[]): Reglages {
@@ -59,6 +61,8 @@ function lisArgs(argv: string[]): Reglages {
     couches: get('couches', '64,64').split(',').map(Number),
     sortie: get('sortie', '.rl/ppo.json'),
     recuit: get('recuit', '1') !== '0',
+    evalue: num('evalue', 10),
+    essais: num('essais', 3),
   }
 }
 
@@ -220,9 +224,46 @@ async function entraine(r: Reglages, argv: string[]): Promise<void> {
     'it. |  décisions | épis. | retour moy | litres moy | litres max | trav. | disp. | entropie |    KL |    temps',
   )
 
+  // ---- L'ÉVALUATION, séparée de l'entraînement.
+  // Retenir « la meilleure politique » sur la moyenne des épisodes d'une
+  // itération est un piège : ils sont une dizaine, tirés au sort, et la
+  // meilleure itération est le plus souvent la plus CHANCEUSE. Mesuré ici :
+  // la politique ainsi élue rendait 0,35 L sur cinq graines, quand une autre,
+  // prise au hasard cent itérations plus tôt, en rendait 0,81. On évalue donc
+  // à part, sur des essais aux graines FIXES — la même épreuve pour tout le
+  // monde, d'un bout à l'autre de l'entraînement.
+  const envsEval = r.codes.map(
+    (code) =>
+      new EnvSujet21({
+        code,
+        particules: r.particules,
+        dureeMax: r.duree,
+        pasParDecision: r.pasParDecision,
+      }),
+  )
+  const probsEval = new Float64Array(NB_ACTIONS)
+  const epreuve = (): { litres: number; traversees: number; essais: number } => {
+    let litres = 0
+    let traversees = 0
+    let n = 0
+    for (const env of envsEval) {
+      for (let g = 1; g <= r.essais; g++) {
+        const tirage = alea(7000 + g)
+        const res = joue(env, (obs) => {
+          probabilites(politique.avant(obs), probsEval)
+          return tire(probsEval, tirage())
+        })
+        litres += res.score
+        if (reussie(res.fin)) traversees++
+        n++
+      }
+    }
+    return { litres: litres / (n || 1), traversees, essais: n }
+  }
+
   const journal: Record<string, number>[] = []
   let total = 0
-  let meilleur = { litres: -1, poids: politique.exporte() }
+  let meilleur = { litres: -1, poids: politique.exporte(), iteration: 0 }
   const t0 = Date.now()
   mkdirSync(dirname(r.sortie), { recursive: true })
   const ecris = (enCours: boolean): void => {
@@ -241,6 +282,7 @@ async function entraine(r: Reglages, argv: string[]): Promise<void> {
         nbActions: NB_ACTIONS,
         tailles: [tailleObs, ...r.couches, NB_ACTIONS],
         reglages: { ...r, tableaux: r.codes },
+        meilleure: { litres: meilleur.litres, iteration: meilleur.iteration },
         poids: meilleur.poids.map((v) => Number(v.toFixed(5))),
         poidsCourants: politique.exporte().map((v) => Number(v.toFixed(5))),
         journal,
@@ -316,8 +358,17 @@ async function entraine(r: Reglages, argv: string[]): Promise<void> {
       rnd,
     )
     const bilan = resume(bilans)
-    if (bilan.episodes > 0 && bilan.litresMoyens > meilleur.litres) {
-      meilleur = { litres: bilan.litresMoyens, poids: politique.exporte() }
+    let evaluation: { litres: number; traversees: number; essais: number } | null =
+      null
+    if (r.evalue > 0 && (it % r.evalue === 0 || it === r.iterations)) {
+      evaluation = epreuve()
+      if (evaluation.litres > meilleur.litres) {
+        meilleur = {
+          litres: evaluation.litres,
+          poids: politique.exporte(),
+          iteration: it,
+        }
+      }
     }
     journal.push({
       generation: it,
@@ -329,6 +380,13 @@ async function entraine(r: Reglages, argv: string[]): Promise<void> {
       litresMax: bilan.litresMax,
       traversees: bilan.traversees,
       entropie: diag.entropie,
+      ...(evaluation
+        ? {
+            evalLitres: evaluation.litres,
+            evalTraversees: evaluation.traversees,
+            evalEssais: evaluation.essais,
+          }
+        : {}),
     })
     console.log(
       `${String(it).padStart(3)} | ${String(total).padStart(10)} | ` +
@@ -336,13 +394,23 @@ async function entraine(r: Reglages, argv: string[]): Promise<void> {
         `${bilan.litresMoyens.toFixed(2).padStart(10)} | ${bilan.litresMax.toFixed(2).padStart(10)} | ` +
         `${String(bilan.traversees).padStart(5)} | ${String(bilan.dispersions).padStart(5)} | ` +
         `${diag.entropie.toFixed(3).padStart(8)} | ${diag.klApprox.toFixed(3).padStart(5)} | ` +
-        `${horodate(Date.now() - t0)}`,
+        `${horodate(Date.now() - t0)}` +
+        (evaluation
+          ? `  ← épreuve : ${evaluation.litres.toFixed(2)} L, ` +
+            `${evaluation.traversees}/${evaluation.essais} traversées` +
+            (meilleur.iteration === it ? ' (meilleure à ce jour)' : '')
+          : ''),
     )
     ecris(it < r.iterations)
   }
   equipe?.ferme()
   ecris(false)
-  console.log(`\nPolitique écrite dans ${r.sortie}`)
+  console.log(
+    `\nPolitique écrite dans ${r.sortie}` +
+      (meilleur.iteration > 0
+        ? ` (la meilleure à l'épreuve : itération ${meilleur.iteration}, ${meilleur.litres.toFixed(2)} L)`
+        : ''),
+  )
   console.log(`La courbe :   pnpm rl:courbe --journal ${r.sortie} --serie litres`)
   console.log(`La regarder : copier ${r.sortie} dans public/agents/ puis ?agent=./agents/…`)
 }

@@ -21,6 +21,8 @@ interface Ligne {
   retourMax: number
   litresMax: number
   traversees: number
+  /** Présent aux itérations évaluées (PPO, --evalue N). */
+  evalLitres?: number
 }
 
 const argv = process.argv.slice(2)
@@ -39,7 +41,8 @@ const brut = JSON.parse(readFileSync(fichier, 'utf8')) as {
   reglages?: { tableaux: string[]; particules: number; duree: number }
   enCours?: boolean
 }
-const journal = brut.journal ?? []
+let journal = brut.journal ?? []
+if (serie === 'epreuve') journal = journal.filter((l) => l.evalLitres !== undefined)
 if (journal.length === 0) {
   console.log(`${fichier} : aucun journal (l’entraînement n’a pas encore conclu de génération)`)
   process.exit(0)
@@ -67,10 +70,18 @@ const series: Record<string, { nom: string; traits: [string, (l: Ligne) => numbe
     nom: 'politiques ayant conclu leur tableau',
     traits: [['traversées +', (l) => l.traversees]],
   },
+  // L'ÉPREUVE : la seule série comparable d'un bout à l'autre — mêmes
+  // graines, mêmes tableaux, la politique du moment mise à l'épreuve à part.
+  // Les autres séries mesurent des épisodes d'ENTRAÎNEMENT, tirés au sort :
+  // leur bruit se lit comme des progrès qui n'existent pas.
+  epreuve: {
+    nom: 'litres livrés à l’épreuve (graines fixes)',
+    traits: [['litres +', (l) => l.evalLitres ?? 0]],
+  },
 }
 const choix = series[serie]
 if (!choix) {
-  console.error(`série inconnue : ${serie} (retour, litres, traversees)`)
+  console.error(`série inconnue : ${serie} (retour, litres, traversees, epreuve)`)
   process.exit(1)
 }
 
