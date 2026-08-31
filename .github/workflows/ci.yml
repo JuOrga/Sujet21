@@ -1,8 +1,42 @@
+# LA CI — au régime.
+#
+# ELLE TOURNAIT DEUX FOIS PAR POUSSÉE. « on: push » sans filtre ET
+# « on: pull_request » : une branche qui a une PR ouverte déclenchait les
+# deux sur le même commit, donc deux fois le même travail. Mesuré au
+# 31/08 : 1 603 exécutions en 23 jours, ~70 par jour, ~1 336 minutes.
+#
+# DÉSORMAIS, une exécution par état à vérifier :
+#   · les PULL REQUESTS vers dev et prod — c'est là qu'on décide ;
+#   · les poussées sur PROD — le filet après une livraison ;
+#   · à la demande, pour vérifier une branche sans ouvrir de PR.
+# Une poussée sur une branche de travail ne déclenche donc plus rien : la
+# PR s'en charge. C'est ce qui coupe le gros de la facture.
 name: ci
 
+# (La liste `paths-ignore` est répétée : GitHub Actions ne résout PAS les
+# ancres YAML — un `&ancre` / `*ancre` fait échouer l'analyse du workflow.)
 on:
-  push:
   pull_request:
+    branches: [dev, prod]
+    paths-ignore:
+      - 'docs/**'
+      - 'masters/**'
+      - 'ops/**'
+      - '**/*.md'
+  push:
+    branches: [prod]
+    paths-ignore:
+      - 'docs/**'
+      - 'masters/**'
+      - 'ops/**'
+      - '**/*.md'
+  workflow_dispatch:
+
+# Trois poussées d'affilée n'ont jamais besoin d'être vérifiées trois fois :
+# seule la dernière compte. Les exécutions dépassées sont annulées.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   ci:

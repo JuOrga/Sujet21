@@ -12,24 +12,17 @@
 # et l'on peut remonter à n'importe quel jour. Une exécution qui ne trouve
 # aucun changement ne commite rien.
 #
-# COMMENT ON LE DÉCLENCHE, ET POURQUOI C'EST LA GÂCHETTE QUI COMPTE.
-# GitHub ne lit `schedule` et `workflow_dispatch` QUE sur la branche par
-# défaut du dépôt. Ici, cette branche est `claude/game-proposal-1r3pkq` :
-# seize fichiers d'une ancienne proposition, SANS `.github/` du tout. Donc,
-# dans ce dépôt et pour TOUS les workflows :
-#   · aucune exécution planifiée ne part jamais ;
-#   · le bouton « Run workflow » n'apparaît pas ;
-#   · un workflow qui n'a jamais tourné n'est même pas listé dans l'onglet
-#     Actions — c'est pourquoi celui-ci y était invisible.
-# Seul le déclenchement par PUSH fonctionne, parce qu'il lit les workflows
-# du commit poussé. C'est la raison d'être des gâchettes du dépôt
-# (perf-sync-go, diag-levels-go…) : ce n'est pas une préférence de style.
+# COMMENT ON LE DÉCLENCHE. GitHub ne lit `schedule` et `workflow_dispatch`
+# que sur la branche par défaut du dépôt. Elle a longtemps pointé sur un
+# vestige sans `.github/` — aucun cron ne partait, aucun bouton « Run
+# workflow » n'apparaissait, pour AUCUN workflow. Elle pointe désormais sur
+# la branche de production : une fois ce fichier fusionné là, le cron
+# ci-dessous part tout seul et le bouton existe.
 #
-# DONC, POUR SAUVEGARDER MAINTENANT : pousser la branche `sauvegarde-go`
-# sur un commit qui contient ce fichier.
+# Avant cette fusion — ou pour sauvegarder depuis une branche quelconque —
+# la gâchette reste le moyen sûr, puisqu'un `push` lit les workflows du
+# commit poussé :
 #     git push -f origin <votre-branche>:sauvegarde-go
-# Le cron ci-dessous est correct et se mettra à tourner tout seul le jour
-# où les workflows vivront sur la branche par défaut — pas avant.
 #
 # RENDRE UNE SAUVEGARDE : voir ops/LISEZ-MOI.md — c'est un geste manuel,
 # jamais automatique.

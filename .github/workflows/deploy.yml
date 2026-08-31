@@ -1,13 +1,43 @@
-name: deploy
-
-# Auto-déploiement Vercel à chaque poussée sur la branche de développement :
-# le banc de réglage en ligne (sujet21.vercel.app) suit le dernier commit.
+# LE DÉPLOIEMENT — groupé, et seulement depuis prod.
+#
+# CE QU'ON PAYAIT. Chaque poussée sur la branche de développement partait
+# en PRODUCTION sur sujet21.vercel.app. Mesuré au 31/08 : 474 déploiements
+# en 23 jours, soit ~618 par mois — dont des commits qui ne touchaient que
+# `docs/`. C'était le principal poste Vercel, et 474 minutes d'Actions.
+#
+# DÉSORMAIS on livre par lots : le travail s'accumule sur `dev`, et c'est
+# la fusion `dev` → `prod` qui publie. Une livraison = un déploiement, au
+# moment choisi, au lieu d'un déploiement par commit.
+#
+# LE SITE DE TEST N'EST PAS PERDU pour autant : « Run workflow » déploie
+# n'importe quelle branche à la demande, et le choix `cible` permet une
+# PRÉVISUALISATION (URL séparée) qui ne touche pas au site en ligne. On
+# déploie donc quand on veut voir, pas à chaque commit.
+#
 # Déploiement en CLI avec token (secrets VERCEL_*) — pas d'intégration Git
 # Vercel, qui demanderait un plan Pro pour un dépôt privé d'organisation.
+#
+# NOTE DE TRANSITION : `claude/game-development-me41vn` est encore listée
+# le temps du renommage en `prod`, pour qu'aucun ordre d'opération ne casse
+# la publication. Elle se retire à la première livraison qui suit.
+name: deploy
+
 on:
   push:
-    branches: [claude/game-development-me41vn]
+    branches: [prod, claude/game-development-me41vn]
+    # Ce qui ne part pas dans le site ne mérite pas un déploiement.
+    paths-ignore:
+      - 'docs/**'
+      - 'masters/**'
+      - 'ops/**'
+      - '**/*.md'
   workflow_dispatch:
+    inputs:
+      cible:
+        description: 'production = sujet21.vercel.app · previsualisation = URL séparée, le site en ligne n’est pas touché'
+        type: choice
+        default: previsualisation
+        options: [previsualisation, production]
 
 concurrency:
   group: vercel-deploy
@@ -26,4 +56,17 @@ jobs:
           node-version: 22
       # CLI épinglée : vercel@59.7.0 est sorti avec une dépendance
       # introuvable (@vercel/container@3.0.2, ETARGET) — 59.6.2 est saine.
-      - run: npx vercel@59.6.2 deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
+      #
+      # Une poussée sur prod publie ; un lancement manuel suit le choix
+      # `cible`, et une prévisualisation n'emporte pas le drapeau --prod.
+      - name: Déployer
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] \
+             && [ "${{ inputs.cible }}" = "previsualisation" ]; then
+            echo "PRÉVISUALISATION — le site en ligne n'est pas touché"
+            npx vercel@59.6.2 deploy --yes --token=${{ secrets.VERCEL_TOKEN }}
+          else
+            echo "PRODUCTION — sujet21.vercel.app"
+            npx vercel@59.6.2 deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
+          fi

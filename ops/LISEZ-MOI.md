@@ -38,30 +38,26 @@ donc l'historique complet, aussi loin qu'on remonte.
 
 ### Comment on le déclenche
 
-**Par la gâchette, et elle seule pour l'instant :**
+Une fois ce workflow présent sur la branche de **production** (qui est la
+branche par défaut du dépôt), il tourne **tous les jours à 03:17 UTC** et
+le bouton *Run workflow* est disponible dans l'onglet Actions.
+
+Depuis n'importe quelle autre branche, ou pour une sauvegarde immédiate,
+la **gâchette** reste le moyen sûr :
 
 ```bash
 git push -f origin <votre-branche>:sauvegarde-go
 ```
 
-GitHub ne lit `schedule` et `workflow_dispatch` que sur la **branche par
-défaut** du dépôt. Ici cette branche est `claude/game-proposal-1r3pkq` —
-seize fichiers d'une ancienne proposition, **sans `.github/` du tout**.
-Dans ce dépôt, pour *tous* les workflows :
-
-- aucune exécution planifiée ne part jamais ;
-- le bouton *Run workflow* n'apparaît pas ;
-- un workflow qui n'a **jamais tourné** n'est même pas listé dans l'onglet
-  Actions — GitHub n'y inscrit un workflow qu'à sa première exécution.
-
-Seul le déclenchement par **push** fonctionne : il lit les workflows du
-commit poussé. C'est la raison d'être des gâchettes du dépôt
-(`perf-sync-go`, `diag-levels-go`, `seed-levels-go`…) — une contrainte, pas
-un choix de style.
-
-Le `cron` (03:17 UTC) est écrit et correct : il se mettra à tourner tout
-seul le jour où les workflows vivront sur la branche par défaut. Tant que
-ce n'est pas le cas, **c'est la gâchette qui sauvegarde**.
+**Pourquoi les gâchettes existent.** GitHub ne lit `schedule` et
+`workflow_dispatch` que sur la **branche par défaut**. Celle du dépôt a
+longtemps pointé sur un vestige sans `.github/` : aucun cron ne partait,
+aucun bouton *Run workflow* n'apparaissait, et un workflow qui n'a jamais
+tourné n'est même pas listé dans l'onglet Actions. Seul le `push`
+fonctionnait, parce qu'il lit les workflows du commit poussé — d'où
+`perf-sync-go`, `diag-levels-go`, `seed-levels-go`… Le défaut est corrigé,
+mais les gâchettes restent utiles pour déclencher depuis une branche qui
+n'est pas la branche par défaut.
 
 ### Où c'est déposé
 
