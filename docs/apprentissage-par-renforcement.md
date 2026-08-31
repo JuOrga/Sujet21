@@ -29,6 +29,10 @@ les **litres livrés au sas** — et les records humains sont enregistrés
 
 ```
 src/rl/capteurs.ts   ce que l'agent VOIT — partagé par l'entraînement et le jeu
+src/rl/reseau.ts     le réseau (MLP), sa passe arrière et Adam — sans dépendance
+src/rl/ppo.ts        PPO : avantages (GAE) et pas écrêté — testables à la main
+src/rl/rollout.ts    la collecte : faire jouer la politique et rapporter
+src/rl/entrainePPO.ts  l'entraînement PPO en ligne de commande, parallélisé
 src/rl/env.ts        l'environnement : le jeu sans écran (reset / step / observe)
 src/rl/politique.ts  politique linéaire, apprentissage sans gradient (CEM), imitation
 src/rl/pilotes.ts    deux pilotes ÉCRITS À LA MAIN — le plancher de comparaison
@@ -130,17 +134,46 @@ berceau* : la copie brute vaut un retour de −2,25 (elle n'ose plus bouger),
 et trois tours de rattrapage la portent à +5,76 — avant même la première
 génération d'optimisation.
 
-### Palier 1 — le vrai RL (PPO / SAC), la semaine suivante
+### Palier 1 — PPO (fait)
 
-L'algorithme qui convient ici est **PPO** (politique stochastique, actions
-discrètes, épisodes courts, récompense dense). Deux chemins :
+```bash
+pnpm rl:ppo --tableaux 21-01 --iterations 300 --travailleurs 8
+pnpm rl:courbe --journal .rl/ppo.json --serie litres     # pendant que ça tourne
+```
 
-**A. Rester en TypeScript.** Un petit PPO en JS avec un réseau à deux couches
-(`tfjs-node`, ou écrit à la main : le réseau tient en 200 lignes). Zéro pont,
-zéro friction, tout le monde parle la même langue que le jeu. C'est le chemin
-que je recommande si le but est de rester dans ce dépôt.
+Un réseau à deux couches de 64 (**8 211 poids** pour la politique, 7 041 pour
+le critique) et **PPO** : politique stochastique, actions discrètes, épisodes
+courts, récompense dense — c'est exactement son terrain. Écrit à la main, sans
+dépendance : à cette taille, charger un moteur de tenseurs coûterait plus cher
+que le calcul. La passe arrière est vérifiée par différences finies dans les
+tests ; l'écrêtage et GAE sont vérifiés sur des cas calculables de tête.
 
-**B. Le pont vers Python**, l'écosystème de référence :
+Les réglages qui comptent, dans l'ordre :
+
+| Option | Rôle | Défaut |
+| --- | --- | --- |
+| `--travailleurs N` | processus de collecte — **mettez le nombre de cœurs** | 4 |
+| `--envs K` | tableaux menés de front par travailleur | 2 |
+| `--horizon T` | décisions collectées par tableau et par itération | 256 |
+| `--iterations` | nombre de pas d'apprentissage | 300 |
+| `--couches 64,64` | la taille du réseau | 64,64 |
+| `--particules` / `--duree` | le corps et la durée d'un essai | 450 / 45 s |
+| `--lr`, `--recuit 0` | pas d'apprentissage, et son extinction linéaire | 3e-4 |
+
+Une itération collecte `travailleurs × envs × horizon` décisions. Le journal
+et la politique sont réécrits **à chaque itération** : la courbe se regarde en
+direct, et la politique se pose dans `public/agents/` pour la voir jouer.
+
+**Et le GPU ?** Il ne servira à rien, et ce n'est pas une figure de style :
+99 % du temps part dans le solveur de fluide (CPU, séquentiel, un cœur par
+tableau), et le réseau représente ~8 000 multiplications par décision — moins
+d'un millième de la facture. Le seul levier est le **nombre de cœurs**. Sur
+une machine à 8 cœurs, `--travailleurs 8`.
+
+### Palier 1 bis — le pont vers Python, si un jour l'envie prend
+
+Ce n'est PAS nécessaire (le PPO ci-dessus est complet), mais si vous voulez
+l'écosystème de référence :
 
 | Outil | Rôle |
 | --- | --- |
@@ -158,8 +191,9 @@ consomme. Compter une journée de travail. (Le portage du solveur en Python est
 à exclure : 3 000 lignes de physique à maintenir en double, et la moindre
 divergence rend l'entraînement mensonger.)
 
-Matériel : **un PC à 8–16 cœurs suffit.** Pas de GPU tant que l'observation
-reste un vecteur — le goulot est la simulation du fluide, pas le réseau.
+Le gain serait dans l'outillage (TensorBoard, Optuna, les algorithmes déjà
+réglés), jamais dans la vitesse : la simulation resterait dans Node, sur les
+mêmes cœurs.
 
 ### Palier 2 — si l'ambition monte
 

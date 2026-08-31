@@ -28,7 +28,7 @@ import {
   DIRECTIONS,
 } from './env'
 import { piloteCap, piloteHasard, type Pilote } from './pilotes'
-import { decide, politiqueDepuis, type Politique } from './politique'
+import { decideurDepuis } from './politique'
 
 /** La distance du « doigt » virtuel : la même qu'à l'entraînement. */
 const PORTEE_VISEE = 900
@@ -54,8 +54,9 @@ export const NOMS_ACTIONS: string[] = (() => {
 
 export interface PolitiqueChargee {
   nom: string
-  /** Politique apprise (poids), ou pilote écrit à la main. */
-  politique?: Politique
+  /** Politique apprise — linéaire (CEM) ou réseau (PPO). */
+  decide?: (obs: Float32Array) => number
+  /** …ou pilote écrit à la main. */
   pilote?: Pilote
 }
 
@@ -71,11 +72,17 @@ export async function chargeAgent(nom: string): Promise<PolitiqueChargee> {
   if (nom === 'hasard') return { nom: 'hasard', pilote: piloteHasard(1) }
   const rep = await fetch(nom)
   if (!rep.ok) throw new Error(`agent introuvable : ${nom} (HTTP ${rep.status})`)
-  const brut = (await rep.json()) as { tailleObs: number; poids: number[] }
-  if (!brut.poids || !brut.tailleObs) throw new Error(`${nom} : ce n’est pas une politique`)
+  const brut = (await rep.json()) as {
+    type?: string
+    tailleObs: number
+    tailles?: number[]
+    poids: number[]
+  }
+  if (!brut.poids) throw new Error(`${nom} : ce n’est pas une politique`)
+  const charge = decideurDepuis(brut)
   return {
-    nom: nom.replace(/^.*\//, ''),
-    politique: politiqueDepuis(brut.tailleObs, brut.poids),
+    nom: `${nom.replace(/^.*\//, '')} · ${charge.genre}`,
+    decide: charge.decide,
   }
 }
 
@@ -152,7 +159,7 @@ export class AgentEnJeu {
           sim.swallowed >= Math.max(20, sim.baseVolume * 0.1),
       })
     }
-    return decide(this.charge.politique!, this.capteurs.lis(sim, temps))
+    return this.charge.decide!(this.capteurs.lis(sim, temps))
   }
 
   /** De l'action abstraite au geste : où le doigt se pose, et s'il se pose. */

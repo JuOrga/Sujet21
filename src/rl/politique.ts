@@ -17,6 +17,7 @@
 // ---------------------------------------------------------------------------
 
 import { NB_ACTIONS } from './env'
+import { Reseau, argmax } from './reseau'
 
 export interface Politique {
   tailleObs: number
@@ -62,6 +63,36 @@ export function politiqueDepuis(
   const p = politiqueVide(tailleObs, nbActions)
   p.poids.set(poids)
   return p
+}
+
+/**
+ * Charge n'importe quelle politique sauvée — linéaire (CEM, version 1) ou
+ * réseau (PPO, version 2) — et rend la fonction qui décide. Un seul chemin
+ * de lecture pour le jeu, le rejeu et les outils : le format évolue, les
+ * appelants ne bougent pas.
+ */
+export function decideurDepuis(brut: {
+  type?: string
+  tailleObs: number
+  tailles?: number[]
+  poids: ArrayLike<number>
+}): { decide: (obs: Float32Array) => number; genre: string; tailleObs: number } {
+  if (brut.type === 'mlp') {
+    if (!brut.tailles) throw new Error('politique mlp sans « tailles »')
+    const reseau = new Reseau(brut.tailles)
+    reseau.importe(brut.poids)
+    return {
+      decide: (obs) => argmax(reseau.avant(obs)),
+      genre: `réseau ${brut.tailles.join('→')}`,
+      tailleObs: brut.tailles[0],
+    }
+  }
+  const pol = politiqueDepuis(brut.tailleObs, brut.poids)
+  return {
+    decide: (obs) => decide(pol, obs),
+    genre: 'linéaire',
+    tailleObs: brut.tailleObs,
+  }
 }
 
 // ---- Aléa reproductible : deux entraînements de même graine sont identiques.

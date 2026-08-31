@@ -14,7 +14,7 @@ import { dirname } from 'node:path'
 import process from 'node:process'
 import { EnvSujet21, joue, tableauxRL, type Fin } from './env'
 import { piloteCap, piloteHasard } from './pilotes'
-import { decide, politiqueDepuis } from './politique'
+import { decideurDepuis } from './politique'
 
 const argv = process.argv.slice(2)
 const get = (nom: string, def: string): string => {
@@ -40,11 +40,16 @@ function politiqueChoisie(): { nom: string; pilote: PiloteLocal } {
   const fichier = get('politique', '')
   if (fichier) {
     const brut = JSON.parse(readFileSync(fichier, 'utf8')) as {
+      type?: string
       tailleObs: number
+      tailles?: number[]
       poids: number[]
     }
-    const pol = politiqueDepuis(brut.tailleObs, brut.poids)
-    return { nom: fichier, pilote: (env) => decide(pol, env.observe()) }
+    const charge = decideurDepuis(brut)
+    return {
+      nom: `${fichier} (${charge.genre})`,
+      pilote: (env) => charge.decide(env.observe()),
+    }
   }
   const nom = get('pilote', 'cap')
   if (nom === 'hasard') return { nom: 'hasard', pilote: piloteHasard(num('graine', 1)) }

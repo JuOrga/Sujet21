@@ -71,9 +71,14 @@ la courbe de progression.
 
 ```bash
 pnpm rl:rejoue --pilote cap --tableaux 21-01          # la référence à la main
-pnpm rl:entraine --tableaux 21-01 --generations 30 --travailleurs 4
-pnpm rl:courbe                                        # la progression, en direct
+pnpm rl:ppo --tableaux 21-01 --travailleurs 8         # PPO : réseau + gradient
+pnpm rl:courbe --journal .rl/ppo.json --serie litres  # la progression, en direct
+pnpm rl:entraine --tableaux 21-01 --generations 30    # l'ancienne voie, sans gradient
 ```
+
+L'entraînement ne tient qu'aux **cœurs** de la machine (`--travailleurs`) :
+99 % du temps part dans le solveur de fluide, le réseau ne pèse rien — un GPU
+n'aurait rien à y faire.
 
 Et on peut le **regarder jouer dans le jeu**, sur n'importe quel tableau :
 `/?tableau=3&agent=cap` (le pilote écrit à la main), `?agent=hasard`, ou
