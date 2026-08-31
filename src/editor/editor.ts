@@ -37,6 +37,7 @@ import {
   type ObstacleBox,
   type DecalDef,
   type SpongeDef,
+  type StructureDef,
   type WorldLabel,
   type ZoneForce,
   type MonnaiePlot,
@@ -67,6 +68,7 @@ import {
   coutStructures,
   dansCoque,
   epaisseurDe,
+  gommeStructure,
   structureNeuve,
   structureViable,
 } from '../game/structures'
@@ -3049,15 +3051,43 @@ export class LevelEditor {
       else epRognees++
       spRestantes.push(...morceaux)
     }
+    // LES COQUES (chambres et couloirs) sont de la matière, elles aussi :
+    // la gomme les emporte quand la zone les couvre tout entières. Une
+    // coque ne se ROGNE pas — un anneau de parois coupé en deux n'est plus
+    // une coque — et une zone tracée DANS le vide d'une chambre ne la
+    // concerne pas : c'est là qu'on gomme le mobilier. Mordue sans être
+    // couverte, elle survit et on le dit (gommeStructure tranche).
+    const structures = this.level.structures ?? []
+    const stRestantes: StructureDef[] = []
+    let stChambres = 0
+    let stCouloirs = 0
+    let stEpargnees = 0
+    for (const st of structures) {
+      const verdict = gommeStructure(st, structures, r)
+      if (verdict === 'effacee') {
+        if (st.type === STRUCT_COULOIR) stCouloirs++
+        else stChambres++
+        continue
+      }
+      if (verdict === 'epargnee') stEpargnees++
+      stRestantes.push(st)
+    }
+    const stEffacees = stChambres + stCouloirs
     if (
       effacees === 0 &&
       rognees === 0 &&
       epEffacees === 0 &&
-      epRognees === 0
+      epRognees === 0 &&
+      stEffacees === 0
     ) {
-      this.status('Gomme : rien à effacer dans cette zone.')
+      this.status(
+        stEpargnees > 0
+          ? `Gomme : ${stEpargnees} coque${stEpargnees > 1 ? 's' : ''} seulement mordue${stEpargnees > 1 ? 's' : ''} — une coque ne se rogne pas. Couvrez-la entièrement, ou sélectionnez-la et Suppr.`
+          : 'Gomme : rien à effacer dans cette zone.',
+      )
       return
     }
+    if (stEffacees > 0) this.level.structures = stRestantes
     this.level.sponges = spRestantes
     this.level.boxes = restantes
     this.sel = null
@@ -3076,6 +3106,18 @@ export class LevelEditor {
     if (epRognees > 0)
       bouts.push(
         `${epRognees} éponge${epRognees > 1 ? 's' : ''} entamée${epRognees > 1 ? 's' : ''}`,
+      )
+    if (stChambres > 0)
+      bouts.push(
+        `${stChambres} chambre${stChambres > 1 ? 's' : ''} effacée${stChambres > 1 ? 's' : ''}`,
+      )
+    if (stCouloirs > 0)
+      bouts.push(
+        `${stCouloirs} couloir${stCouloirs > 1 ? 's' : ''} effacé${stCouloirs > 1 ? 's' : ''}`,
+      )
+    if (stEpargnees > 0)
+      bouts.push(
+        `${stEpargnees} coque${stEpargnees > 1 ? 's' : ''} épargnée${stEpargnees > 1 ? 's' : ''} (une coque ne se rogne pas)`,
       )
     this.commit(`Gomme : ${bouts.join(', ')}.`)
   }

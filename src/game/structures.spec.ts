@@ -8,6 +8,8 @@ import {
   epaisseurDessinee,
   cotesOuverts,
   coutStructures,
+  empriseDessinee,
+  gommeStructure,
   interieurStructure,
   niveauExpanse,
   structureNeuve,
@@ -209,5 +211,61 @@ describe('les structures de coque — une forme creuse, d’un seul tenant', () 
   it('structureNeuve pose les défauts et devine l’axe d’un couloir', () => {
     expect(structureNeuve(STRUCT_COULOIR, { minX: 0, minY: 0, maxX: 200, maxY: 900 }).axe).toBe(1)
     expect(structureNeuve(STRUCT_CHAMBRE, { minX: 300, minY: 0, maxX: 0, maxY: 300 }).minX).toBe(0)
+  })
+})
+
+describe('la gomme face à une coque — tout ou rien', () => {
+  const zone = (minX: number, minY: number, maxX: number, maxY: number) => ({
+    minX,
+    minY,
+    maxX,
+    maxY,
+  })
+
+  it('une chambre entièrement couverte s’efface', () => {
+    const ch = chambre([-600, -400, 600, 400])
+    expect(gommeStructure(ch, [ch], zone(-700, -500, 700, 500))).toBe('effacee')
+  })
+
+  it('couverte au pixel près, elle s’efface encore', () => {
+    const ch = chambre([-600, -400, 600, 400])
+    expect(gommeStructure(ch, [ch], zone(-600, -400, 600, 400))).toBe('effacee')
+  })
+
+  it('une zone qui passe à côté la laisse intacte', () => {
+    const ch = chambre([-600, -400, 600, 400])
+    expect(gommeStructure(ch, [ch], zone(800, 800, 1200, 1200))).toBe('intacte')
+  })
+
+  it('gommer DANS une chambre efface le mobilier, pas la chambre', () => {
+    // le piège : le centre d'une chambre est du vide — c'est là qu'on pose
+    // les meubles, et c'est là qu'on les gomme
+    const ch = chambre([-600, -400, 600, 400])
+    expect(gommeStructure(ch, [ch], zone(-200, -150, 200, 150))).toBe('intacte')
+  })
+
+  it('mordue sans être couverte, elle est épargnée', () => {
+    const ch = chambre([-600, -400, 600, 400])
+    expect(gommeStructure(ch, [ch], zone(-800, -600, 0, 600))).toBe('epargnee')
+  })
+
+  it('une coque tournée est jugée sur l’emprise que sa rotation lui donne', () => {
+    const ch = chambre([-600, -400, 600, 400], { angle: 45 })
+    const e = empriseDessinee(ch, [ch])
+    expect(e.maxY).toBeGreaterThan(400)
+    // l'emprise droite ne suffit plus : la coque déborde en diagonale
+    expect(gommeStructure(ch, [ch], zone(-620, -420, 620, 420))).toBe('epargnee')
+    expect(
+      gommeStructure(ch, [ch], zone(e.minX - 1, e.minY - 1, e.maxX + 1, e.maxY + 1)),
+    ).toBe('effacee')
+  })
+
+  it('un couloir raccordé se juge sur sa longueur RÉELLE, pas sur son emprise', () => {
+    const ch = chambre([-900, -600, 0, 600])
+    const co = couloir([-160, -200, 900, 200])
+    const plan = [ch, co]
+    expect(empriseDessinee(co, plan).minX).toBeGreaterThan(-160)
+    // la zone s'arrête à l'aplomb de la chambre : le tube y est déjà fini
+    expect(gommeStructure(co, plan, zone(-40, -300, 1000, 300))).toBe('effacee')
   })
 })
