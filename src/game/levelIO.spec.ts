@@ -9,7 +9,14 @@ import {
   parseLevel,
   serializeLevel,
 } from './levelIO'
-import { TABLEAU_1BIS, TABLEAUX, zoneForceAt, type LevelDef } from './level'
+import {
+  MAT_MIROIR,
+  MAT_WALL,
+  TABLEAU_1BIS,
+  TABLEAUX,
+  zoneForceAt,
+  type LevelDef,
+} from './level'
 import { FORME_COIN } from './formes'
 
 describe('levelIO — aller-retour JSON', () => {
@@ -1011,5 +1018,65 @@ describe('levelIO — les décalques de LA SERRE', () => {
     })
     expect(level!.decals!.map((d) => d.kind)).toEqual(['serre-rampe'])
     expect(rejets.length).toBe(1)
+  })
+})
+
+describe('LE MIROIR SURVIT À L’ENREGISTREMENT', () => {
+  // Le miroir était offert dans la palette de l'éditeur, réfléchissait le
+  // faisceau et arrêtait le corps — mais son matériau manquait à MATERIALS,
+  // la liste que « readBox » consulte pour juger une surface. On en posait
+  // un, on ENREGISTRAIT sans la moindre erreur, et il avait disparu à la
+  // relecture : le seul endroit qui l'ignorait était celui qui décidait de
+  // sa survie.
+  const avec = (boxes: unknown[]): ReturnType<typeof parseLevel> =>
+    parseLevel({
+      name: 'Essai miroir',
+      code: '21-TEST',
+      bounds: { minX: -1000, minY: -600, maxX: 1000, maxY: 600 },
+      spawn: { x: -800, y: 0, n: 700 },
+      exit: { minX: 860, minY: -60, maxX: 940, maxY: 60 },
+      boxes,
+    })
+
+  it('un miroir rectangulaire traverse l’aller-retour', () => {
+    const { level, rejets } = avec([
+      { minX: -100, minY: -200, maxX: -60, maxY: 200, material: MAT_MIROIR },
+    ])
+    expect(rejets).toEqual([])
+    expect(level!.boxes).toHaveLength(1)
+    expect(level!.boxes[0].material).toBe(MAT_MIROIR)
+  })
+
+  it('un COIN en miroir aussi — la forme et le matériau tiennent ensemble', () => {
+    // le cas signalé : un coin biseauté, matériau miroir
+    const coin = {
+      minX: 120,
+      minY: -80,
+      maxX: 320,
+      maxY: 120,
+      material: MAT_MIROIR,
+      forme: FORME_COIN,
+      p0: 2,
+    }
+    const { level, rejets } = avec([coin])
+    expect(rejets).toEqual([])
+    expect(level!.boxes).toHaveLength(1)
+    expect(level!.boxes[0].material).toBe(MAT_MIROIR)
+    expect(level!.boxes[0].forme).toBe(FORME_COIN)
+    expect(level!.boxes[0].p0).toBe(2)
+    // et il tient un SECOND aller-retour : c'est là que la perte se voyait
+    const encore = parseLevel(JSON.parse(serializeLevel(level!)))
+    expect(encore.level!.boxes).toEqual(level!.boxes)
+  })
+
+  it('le sas reste hors palette : ce n’est pas une surface qu’on trace', () => {
+    // MAT_EXIT (3) est absent de MATERIALS et doit le rester — le sas est un
+    // champ à part. Ce test garde la distinction entre les deux absences.
+    const { level } = avec([
+      { minX: 0, minY: 0, maxX: 50, maxY: 50, material: 3 },
+      { minX: 60, minY: 0, maxX: 110, maxY: 50, material: MAT_WALL },
+    ])
+    expect(level!.boxes).toHaveLength(1)
+    expect(level!.boxes[0].material).toBe(MAT_WALL)
   })
 })
