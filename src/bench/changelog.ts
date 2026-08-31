@@ -22,6 +22,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '31/08/2026 15:52',
+    title: 'Le miroir disparaissait à l’enregistrement — un mot manquait à une liste',
+    notes: [
+      'LE SYMPTÔME, signalé depuis l’éditeur : on trace un coin, on lui donne le matériau MIROIR, on enregistre — aucune erreur — et le miroir n’est plus là à la relecture. La cause tient en une omission. « MATERIALS » (levelIO.ts) est la liste que « readBox » consulte pour juger une surface au CHARGEMENT : tout matériau absent fait jeter la boîte entière, silencieusement. Le miroir n’y figurait pas.',
+      'IL FIGURAIT PARTOUT AILLEURS, et c’est ce qui rendait le bug invisible à la pose : la palette de l’éditeur l’offrait (MAT_MIROIR dans la liste déroulante du matériau), il avait sa couleur, son nom dans la légende, le traceur de faisceau le réfléchissait bel et bien (laser.ts, même plafond de rebonds que la glace pour éviter les couloirs infinis), et le solveur l’arrêtait comme une paroi — puisqu’il ne laisse passer que la grille en vapeur, la membrane en eau et le rideau en glace. Le seul endroit qui l’ignorait était celui qui décidait de sa survie.',
+      'La liste le comprend désormais. MAT_EXIT, lui, reste dehors et c’est voulu : le sas est un champ à part du tableau, pas une surface qu’on trace — un test garde maintenant la distinction entre ces deux absences, pour que la prochaine lecture ne les confonde pas.',
+      'TROIS TESTS gravent l’aller-retour : un miroir rectangulaire, le COIN en miroir du cas signalé (la forme, le matériau et le paramètre de biseau tiennent ensemble, sur DEUX allers-retours — c’est au second que la perte se voyait), et le sas qui reste écarté. Vérifié dans les deux sens : le correctif retiré, les deux premiers tombent ; remis, tout passe. 632 tests verts, type-check et build propres.',
+    ],
+  },
+  {
     date: '30/08/2026 23:49',
     title: 'La planche synchronisait ses cartes et personne d’autre',
     notes: [

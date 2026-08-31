@@ -7,6 +7,7 @@ import {
   MAT_FROID,
   MAT_GRILLE,
   MAT_MEMBRANE,
+  MAT_MIROIR,
   MAT_RIDEAU,
   MAT_SURCHAUFFEUR,
   MAT_HYDROPHILE,
@@ -62,6 +63,14 @@ import {
   structureViable,
 } from './structures'
 
+// LA LISTE FAIT FOI AU CHARGEMENT : `readBox` jette toute surface dont le
+// matériau n'y figure pas. Le MIROIR y manquait — il était pourtant offert
+// dans la palette de l'éditeur, réfléchissait bien le faisceau (laser.ts) et
+// arrêtait le corps comme une paroi (le solveur ne laisse passer que la
+// grille, la membrane et le rideau). On pouvait donc en poser un, l'ENREGISTRER
+// sans erreur, et le retrouver disparu à la relecture : le seul endroit qui
+// l'ignorait était celui qui décide de sa survie. MAT_EXIT reste dehors, lui,
+// et c'est voulu : le sas est un champ à part, pas une surface qu'on trace.
 export const MATERIALS = [
   MAT_WALL,
   MAT_HYDROPHILE,
@@ -72,6 +81,7 @@ export const MATERIALS = [
   MAT_MEMBRANE,
   MAT_RIDEAU,
   MAT_SURCHAUFFEUR,
+  MAT_MIROIR,
 ] as const
 
 const FORCES: ZoneForce[] = ['libre', 'eau', 'glace', 'vapeur']
