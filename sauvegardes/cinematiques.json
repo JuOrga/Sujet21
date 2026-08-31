@@ -1,0 +1,70 @@
+{
+  "cines": [
+    {
+      "code": "SONDE-CI",
+      "titre": "Sonde du pont CI",
+      "planches": [
+        {
+          "image": "/assets/cine/ouverture-1.webp",
+          "texte": "sonde",
+          "duree": 2,
+          "effet": "fixe",
+          "fondu": "aucun",
+          "bruitage": "",
+          "ponctuation": "",
+          "piste": ""
+        }
+      ],
+      "auteur": "CI",
+      "majAt": "2026-08-17T10:32:51.945Z"
+    },
+    {
+      "code": "ESSAI-3",
+      "titre": "Essai — ju ouverture",
+      "planches": [
+        {
+          "image": "/assets/cine/ouverture-1.webp",
+          "texte": "Module Méduse. Une cuve, une substance. Vingt échecs avant elle.",
+          "duree": 6,
+          "effet": "zoom-avant",
+          "fondu": "noir",
+          "bruitage": "",
+          "ponctuation": "",
+          "piste": "cuve-tiede"
+        },
+        {
+          "image": "/assets/cine/ouverture-2.webp",
+          "texte": "WTF !?",
+          "duree": 5,
+          "effet": "pan-droite",
+          "fondu": "aucun",
+          "bruitage": "condensation",
+          "ponctuation": "",
+          "piste": ""
+        },
+        {
+          "image": "/assets/cine/ouverture-3.webp",
+          "texte": "Pas le temps de philosopher.",
+          "duree": 4,
+          "effet": "battement-rouge",
+          "fondu": "aucun",
+          "bruitage": "souffle-vapeur",
+          "ponctuation": "sting-derniere-impulsion",
+          "piste": ""
+        },
+        {
+          "image": "/assets/cine/ouverture-4.webp",
+          "texte": "Le confinement cède.",
+          "duree": 4,
+          "effet": "tremblement",
+          "fondu": "aucun",
+          "bruitage": "impact-glace",
+          "ponctuation": "",
+          "piste": ""
+        }
+      ],
+      "auteur": "JU",
+      "majAt": "2026-08-17T11:39:03.654Z"
+    }
+  ]
+}
