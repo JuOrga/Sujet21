@@ -43,6 +43,12 @@ export default defineConfig({
   base: './',
   plugins: [politiquesEnDirect()],
   server: {
+    // PARTAGER LA PARTIE EN COURS. `cloudflared tunnel --url
+    // http://localhost:5173` donne une adresse publique en *.trycloudflare.com
+    // ; sans cette autorisation vite refuse la requête (« Blocked request »).
+    // Volontairement limité à ce domaine : le serveur de développement n'est
+    // pas ouvert à n'importe quel hôte.
+    allowedHosts: ['.trycloudflare.com'],
     watch: {
       // Voir le commentaire ci-dessus : sans cette exception, chaque
       // itération d'entraînement rechargerait la page.
