@@ -36,11 +36,32 @@ filet d'écriture, pas une sauvegarde : quatre enregistrements suffisent à
 le faire défiler entièrement. Ici, **chaque exécution ajoute un commit** —
 donc l'historique complet, aussi loin qu'on remonte.
 
-### Quand ça tourne
+### Comment on le déclenche
 
-- tous les jours à **03:17 UTC** ;
-- à la demande (onglet Actions → *sauvegarde* → *Run workflow*) ;
-- sur un push de la branche-gâchette `sauvegarde-go`.
+**Par la gâchette, et elle seule pour l'instant :**
+
+```bash
+git push -f origin <votre-branche>:sauvegarde-go
+```
+
+GitHub ne lit `schedule` et `workflow_dispatch` que sur la **branche par
+défaut** du dépôt. Ici cette branche est `claude/game-proposal-1r3pkq` —
+seize fichiers d'une ancienne proposition, **sans `.github/` du tout**.
+Dans ce dépôt, pour *tous* les workflows :
+
+- aucune exécution planifiée ne part jamais ;
+- le bouton *Run workflow* n'apparaît pas ;
+- un workflow qui n'a **jamais tourné** n'est même pas listé dans l'onglet
+  Actions — GitHub n'y inscrit un workflow qu'à sa première exécution.
+
+Seul le déclenchement par **push** fonctionne : il lit les workflows du
+commit poussé. C'est la raison d'être des gâchettes du dépôt
+(`perf-sync-go`, `diag-levels-go`, `seed-levels-go`…) — une contrainte, pas
+un choix de style.
+
+Le `cron` (03:17 UTC) est écrit et correct : il se mettra à tourner tout
+seul le jour où les workflows vivront sur la branche par défaut. Tant que
+ce n'est pas le cas, **c'est la gâchette qui sauvegarde**.
 
 ### Où c'est déposé
 
@@ -114,4 +135,4 @@ restauration que personne n'a essayée serait un piège.
 | `seed-inspires.mjs` | semer les recadrages d'inspiration | `seed-inspires-go` |
 
 Ceux-là **écrivent** vers l'API. Une sauvegarde fraîche avant de les lancer
-est une bonne habitude — c'est maintenant à un `Run workflow` près.
+est une bonne habitude — c'est maintenant à un `git push` près.

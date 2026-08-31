@@ -12,9 +12,24 @@
 # et l'on peut remonter à n'importe quel jour. Une exécution qui ne trouve
 # aucun changement ne commite rien.
 #
-# QUAND. Tous les jours à 03:17 UTC (une heure creuse, une minute décalée
-# pour ne pas tomber avec tout le monde), plus le dispatch manuel et la
-# gâchette habituelle (push sur `sauvegarde-go`).
+# COMMENT ON LE DÉCLENCHE, ET POURQUOI C'EST LA GÂCHETTE QUI COMPTE.
+# GitHub ne lit `schedule` et `workflow_dispatch` QUE sur la branche par
+# défaut du dépôt. Ici, cette branche est `claude/game-proposal-1r3pkq` :
+# seize fichiers d'une ancienne proposition, SANS `.github/` du tout. Donc,
+# dans ce dépôt et pour TOUS les workflows :
+#   · aucune exécution planifiée ne part jamais ;
+#   · le bouton « Run workflow » n'apparaît pas ;
+#   · un workflow qui n'a jamais tourné n'est même pas listé dans l'onglet
+#     Actions — c'est pourquoi celui-ci y était invisible.
+# Seul le déclenchement par PUSH fonctionne, parce qu'il lit les workflows
+# du commit poussé. C'est la raison d'être des gâchettes du dépôt
+# (perf-sync-go, diag-levels-go…) : ce n'est pas une préférence de style.
+#
+# DONC, POUR SAUVEGARDER MAINTENANT : pousser la branche `sauvegarde-go`
+# sur un commit qui contient ce fichier.
+#     git push -f origin <votre-branche>:sauvegarde-go
+# Le cron ci-dessous est correct et se mettra à tourner tout seul le jour
+# où les workflows vivront sur la branche par défaut — pas avant.
 #
 # RENDRE UNE SAUVEGARDE : voir ops/LISEZ-MOI.md — c'est un geste manuel,
 # jamais automatique.
