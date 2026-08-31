@@ -531,6 +531,10 @@ function createSim(level: LevelDef): FluidSim {
     zoneForceAt(level, level.spawn.x, level.spawn.y) === 'vapeur'
   sim.dashBudget = sim.dashBudgetMax
   sim.setLevel(level.boxes, level.sponges)
+  // Le tube d'un conduit épouse la bande de convoyage (railConvoy travaille
+  // à plasmaRailRadius × 2,5) : ce qui est porté est exactement ce qui est
+  // dedans, sinon le nuage se ferait expulser d'un bord qu'il croyait libre.
+  sim.setConduits(level.rails ?? [], params.plasmaRailRadius * 2.5)
   sim.spawnDisc(level.spawn.x, level.spawn.y, level.spawn.n, KIND_PLAYER)
   // né dans une zone qui impose la vapeur : le corps EST un nuage dès la
   // première image — sinon le compteur annonce des dashs qui ne partent pas,
@@ -11624,6 +11628,12 @@ function frame(now: number): void {
       for (const t of laserEtat.vues)
         for (const ri of t.railsSuivis) actifs.add(ri)
       for (const ri of actifs) railsEngages.add(ri)
+      // LE CONDUIT S'OUVRE AU PLASMA, PAS À LA VAPEUR. Un nuage seul ne
+      // suffit pas : il faut que l'arc ionisé circule sur CE rail — donc
+      // s'être vaporisé DANS le faisceau, au pied du tube. Le raccourci est
+      // la récompense de l'énigme, pas son contournement. Tant que le champ
+      // n'est pas levé, le tube reste plein pour tout le monde.
+      sim.setConduitsActifs(railsEngages)
       for (const ri of [...railsEngages]) {
         const rail = railsDuNiveau[ri]
         if (!rail) {
