@@ -10936,7 +10936,20 @@ function updateQuality(dtReal: number): void {
 
 
 let tickPrecedent = 0
+// La GARDE D'AMORÇAGE (index.html) tient un écran de panne prêt tant que le
+// jeu n'a pas donné signe de vie : WebGL2 absent, exception au démarrage, ou
+// douze secondes sans rien. C'est la PREMIÈRE IMAGE qui la désarme — et pas
+// la fin du module : le module peut s'évaluer entièrement et la boucle ne
+// jamais tourner. Une seule fois, puis plus rien : un incident en cours de
+// partie n'a pas à recouvrir le jeu d'un panneau.
+let amorceSignalee = false
+
 function frame(now: number): void {
+  if (!amorceSignalee) {
+    amorceSignalee = true
+    const w = window as unknown as { __sujet21Demarre?: () => void }
+    w.__sujet21Demarre?.()
+  }
   // chaque rappel rAF, rendu OU sauté, date l'horloge de l'écran : le
   // collecteur en tire le Hz réel du panneau (adaptatif sur mobile)
   if (tickPrecedent > 0) perf.tick(now - tickPrecedent)
