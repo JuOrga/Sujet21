@@ -128,7 +128,12 @@ import {
   echelleDepart,
   viseEchelle,
 } from './game/resolution'
-import { DELIVERIES, VERSION, versionDe } from './bench/changelog'
+import {
+  DERNIERE_LIVRAISON,
+  VERSION,
+  litLivraisons,
+  versionDe,
+} from './bench/changelog'
 import { Camera } from './render/camera'
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { FixedLoop } from './game/loop'
@@ -1771,9 +1776,14 @@ const livraisonsEl = document.getElementById('livraisons') as HTMLDivElement
   if (livVersion) livVersion.textContent = `le jeu est en v${VERSION}`
   const corps = document.getElementById('livraisons-corps') as HTMLDivElement
   let rendu = false
-  const renderLivraisons = (): void => {
+  // Le journal n'est plus dans le paquet : il arrive à la PREMIÈRE
+  // ouverture de l'écran. Le voile s'affiche tout de suite, la liste se
+  // remplit un instant après — sur un écran que l'on vient d'ouvrir, cela
+  // ne se voit pas ; dans le paquet de tous les joueurs, cela se voyait.
+  const renderLivraisons = async (): Promise<void> => {
     if (rendu) return
     rendu = true
+    const DELIVERIES = await litLivraisons()
     const esc = (t: string): string => t.replace(/</g, '&lt;')
     // L'ESSENTIEL — le récap éclair des dernières 24 h : une ligne par
     // livraison (heure + titre), pour embrasser la journée avant le détail
@@ -1810,7 +1820,7 @@ const livraisonsEl = document.getElementById('livraisons') as HTMLDivElement
       ).join('')
   }
   document.getElementById('home-livraisons')?.addEventListener('click', () => {
-    renderLivraisons()
+    void renderLivraisons()
     livraisonsEl.hidden = false
   })
   document
@@ -1822,6 +1832,8 @@ const livraisonsEl = document.getElementById('livraisons') as HTMLDivElement
     if (e.target === livraisonsEl) livraisonsEl.hidden = true
   })
   document.getElementById('livraisons-dl')?.addEventListener('click', () => {
+    void (async () => {
+    const DELIVERIES = await litLivraisons()
     const md =
       `# Sujet 21 — notes de version (v${VERSION})\n\n` +
       DELIVERIES.map(
@@ -1834,6 +1846,7 @@ const livraisonsEl = document.getElementById('livraisons') as HTMLDivElement
     a.download = 'sujet21-notes-de-version.md'
     a.click()
     URL.revokeObjectURL(url)
+    })()
   })
 }
 
@@ -3049,8 +3062,8 @@ function rapportPerf(): Record<string, unknown> {
     // comparent que s'ils disent d'où ils viennent.
     build: {
       version: VERSION,
-      livraison: DELIVERIES[0]?.date ?? '',
-      titre: DELIVERIES[0]?.title ?? '',
+      livraison: DERNIERE_LIVRAISON.date,
+      titre: DERNIERE_LIVRAISON.title,
     },
     config: {
       fpsCap,
