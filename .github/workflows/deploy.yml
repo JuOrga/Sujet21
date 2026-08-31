@@ -59,14 +59,33 @@ jobs:
       #
       # Une poussée sur prod publie ; un lancement manuel suit le choix
       # `cible`, et une prévisualisation n'emporte pas le drapeau --prod.
+      #
+      # L'URL EST REMONTÉE EN TÊTE DE L'EXÉCUTION. Une prévisualisation
+      # reçoit une adresse NEUVE à chaque fois (sujet21-<hash>.vercel.app) :
+      # la laisser au fond des logs obligerait à la pêcher à la main avant
+      # de pouvoir ouvrir le jeu sur un téléphone. La CLI écrit l'URL sur sa
+      # sortie standard — on la capture, et elle s'affiche en gros, cliquable,
+      # dans le résumé de l'exécution.
       - name: Déployer
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] \
              && [ "${{ inputs.cible }}" = "previsualisation" ]; then
-            echo "PRÉVISUALISATION — le site en ligne n'est pas touché"
-            npx vercel@59.6.2 deploy --yes --token=${{ secrets.VERCEL_TOKEN }}
+            quoi='PRÉVISUALISATION'
+            note='Adresse jetable — le site en ligne n’est pas touché.'
+            url=$(npx vercel@59.6.2 deploy --yes --token=${{ secrets.VERCEL_TOKEN }} | tail -1)
           else
-            echo "PRODUCTION — sujet21.vercel.app"
-            npx vercel@59.6.2 deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
+            quoi='PRODUCTION'
+            note='Le site en ligne a été remplacé.'
+            url=$(npx vercel@59.6.2 deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }} | tail -1)
           fi
+          echo "$quoi → $url"
+          {
+            echo "## $quoi"
+            echo
+            echo "### 👉 [$url]($url)"
+            echo
+            echo "$note"
+            echo
+            echo "Branche déployée : \`${{ github.ref_name }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
