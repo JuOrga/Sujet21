@@ -1,0 +1,90 @@
+# SAUVEGARDE des documents partagés — tableaux (et leur ordre : la carte),
+# présets, cahier des règles, fiches, cinématiques, catalogue d'images,
+# registres.
+#
+# POURQUOI ICI. L'environnement d'analyse ne joint pas le site (la
+# politique réseau du bac à sable refuse sujet21.vercel.app) ; le runner
+# GitHub, si. Même dispositif que perf-sync et les semis.
+#
+# CE QU'IL FAIT. Il lit (GET seulement — le script ne sait rien écrire vers
+# l'API), puis commite le résultat sur la branche `sauvegardes`, EN
+# AJOUTANT un commit. Pas de --force : chaque exécution laisse une strate,
+# et l'on peut remonter à n'importe quel jour. Une exécution qui ne trouve
+# aucun changement ne commite rien.
+#
+# QUAND. Tous les jours à 03:17 UTC (une heure creuse, une minute décalée
+# pour ne pas tomber avec tout le monde), plus le dispatch manuel et la
+# gâchette habituelle (push sur `sauvegarde-go`).
+#
+# RENDRE UNE SAUVEGARDE : voir ops/LISEZ-MOI.md — c'est un geste manuel,
+# jamais automatique.
+name: sauvegarde
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+  push:
+    branches: [sauvegarde-go]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sauvegarde
+  cancel-in-progress: false
+
+jobs:
+  sauver:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Le script échoue (code 1) si UNE famille est illisible, et n'écrit
+      # alors rien du tout : on préfère une sauvegarde manquante à une
+      # sauvegarde partielle qui écraserait la précédente.
+      - name: Lire les documents partagés
+        run: node ops/sauvegarde.mjs sauvegardes
+
+      # Un artefact téléchargeable depuis l'onglet Actions, en plus du
+      # commit : utile pour récupérer un instantané sans cloner la branche.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sauvegarde-${{ github.run_number }}
+          path: sauvegardes/
+          retention-days: 90
+
+      # La branche `sauvegardes` est ORPHELINE (elle ne porte que ces
+      # fichiers) mais son HISTORIQUE s'accumule : on la récupère si elle
+      # existe, on ajoute un commit, on pousse sans forcer.
+      - name: Déposer sur la branche sauvegardes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          REMOTE="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}"
+          mkdir depot && cd depot
+          git init -q
+          git config user.name "sauvegarde"
+          git config user.email "actions@users.noreply.github.com"
+          if git fetch -q --depth=1 "$REMOTE" sauvegardes 2>/dev/null; then
+            git checkout -q -B sauvegardes FETCH_HEAD
+            echo "branche sauvegardes trouvée — un commit de plus"
+          else
+            git checkout -q -B sauvegardes
+            echo "première sauvegarde — la branche est créée"
+          fi
+          rm -rf sauvegardes
+          cp -r ../sauvegardes sauvegardes
+          git add -A sauvegardes
+          if git diff --cached --quiet; then
+            echo "rien n'a changé depuis la dernière sauvegarde — pas de commit"
+            exit 0
+          fi
+          git commit -q -m "sauvegarde — $(date -u +%FT%TZ)"
+          git push -q "$REMOTE" sauvegardes
+          echo "poussé sur la branche sauvegardes"
