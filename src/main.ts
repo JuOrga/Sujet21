@@ -2,7 +2,7 @@ import '@fontsource/michroma'
 import '@fontsource/ibm-plex-mono/400.css'
 import '@fontsource/ibm-plex-mono/600.css'
 import { DEFAULT_PARAMS, type SimParams } from './sim/params'
-import { FluidSim, KIND_PLAYER } from './sim/solver'
+import { FluidSim, KIND_PLAYER, COEUR_PART } from './sim/solver'
 import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
 import { evenementsPlasma } from './game/plasmaFx'
@@ -6028,6 +6028,12 @@ const fxCtx = fxCanvas.getContext('2d')!
 // cible en un tiers de seconde. C'est cet écart qui donne son temps à
 // l'éclair — et il vaut dans les deux sens, sans rien de plus à écrire.
 const railBascule: number[] = []
+// LA CHARGE D'ÉTINCELLE, PAR RAIL. L'éclair ne vit pas dans la POSITION de
+// la bascule mais dans son MOUVEMENT : un corps arrêté à 95 % de vapeur
+// tient une valeur intermédiaire pour toujours, et faisait crépiter chaque
+// rail engagé en permanence — un feu d'artifice qui ne disait plus rien.
+// On charge donc au déplacement, et la charge retombe seule.
+const railEtincelle: number[] = []
 let railBasculeT = 0
 let dtFx = 0.016
 
@@ -6341,8 +6347,11 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   // pas seulement du rail. On mesure la part gazeuse du corps — pas
   // l'intention de touche : pendant les deux dixièmes de la transformation,
   // c'est bien la matière qui décide de qui passe, particule par particule.
+  // Un tableau SANS rail ne paie pas ce balayage : c'est la règle du dépôt
+  // partout ailleurs (setConduits sort au premier test), et la plupart des
+  // tableaux n'ont aucun rail.
   let partGaz = 1
-  {
+  if (rails.length > 0) {
     let n = 0
     let gaz = 0
     for (let i = 0; i < sim.count; i++) {
@@ -6376,10 +6385,17 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     const railSolide =
       courant + (cible - courant) * Math.min(1, dtFx / 0.33)
     railBascule[railIdx] = railSolide
-    // L'ÉCLAIR VIT DANS L'ÉCART. Il naît nul aux deux bouts (paroi pleine,
-    // ligne ouverte) et culmine à mi-chemin : une seule formule, et la
-    // transition crépite dans les DEUX SENS sans qu'on ait à savoir lequel.
-    const bascule = 4 * railSolide * (1 - railSolide)
+    // L'ÉCLAIR VIT DANS LE MOUVEMENT. Il naissait de la POSITION de la
+    // bascule (nulle aux deux bouts, maximale à mi-chemin) — mais un corps
+    // arrêté en chemin s'y arrête aussi : à 95 % de vapeur, chaque rail
+    // engagé crépitait pour toujours, et l'effet ne signalait plus rien.
+    // On lit donc ce qu'il RESTE à parcourir, et on garde la charge un
+    // court instant pour que la décharge ait une queue. Nul à l'arrêt,
+    // maximal quand ça bouge — dans les DEUX SENS, sans rien de plus.
+    const ecart = Math.abs(cible - courant)
+    const memoire = (railEtincelle[railIdx] ?? 0) * Math.exp(-dtFx / 0.18)
+    const bascule = Math.min(1, Math.max(memoire, ecart * 2.4))
+    railEtincelle[railIdx] = bascule
     const chemin = (): void => {
       g.beginPath()
       const p0 = S(pts[0].x, pts[0].y)
@@ -6397,6 +6413,18 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     const rayonDessine = rail.conduit === true
       ? params.plasmaRailRadius * 2.5
       : params.plasmaRailRadius
+    // ET LA PAROI SE PEINT À L'ÉPAISSEUR QUI ARRÊTE — celle-là seulement.
+    // L'eau et la glace butent sur tout le tube ; la vapeur sans arc bute
+    // sur son CŒUR (COEUR_PART du rayon d'ionisation, cf. solver). Peindre
+    // le mur à 75 devant un corps gazeux qui s'arrête à 27, c'était le
+    // « tube qui ment sur sa taille » à l'envers : le corps s'immobilisait
+    // loin d'une surface qu'on lui montrait pourtant collée. La paroi
+    // s'amincit donc à mesure que le corps se vaporise.
+    const rayonCoeur = Math.min(
+      rayonDessine,
+      params.plasmaRailRadius * COEUR_PART,
+    )
+    const rayonParoi = rayonDessine + (rayonCoeur - rayonDessine) * partGaz
     g.strokeStyle = rail.conduit === true
       ? 'rgba(150,120,255,0.14)' // un conduit est une PAROI : il se voit plus
       : 'rgba(150,120,255,0.07)'
@@ -6413,14 +6441,14 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     // paroi qu'on ne distingue pas d'un décalque est un piège, et le corps
     // butait jusqu'ici sur une chose qui avait l'air d'un passage.
     //
-    // La largeur peinte est celle de la COLLISION, au pixel : rayonDessine
-    // est le rayon que le solveur reçoit (cf. setConduits). Le dépôt s'est
-    // déjà fait avoir une fois — « le tube mentait sur sa taille ».
+    // La largeur peinte est celle de la COLLISION, au pixel : `rayonParoi`
+    // suit l'état du corps — tout le tube pour du condensé, son cœur pour
+    // de la vapeur. Le dépôt s'est déjà fait avoir deux fois sur ce point.
     if (railSolide > 0.01) {
       const k = railSolide
       // le corps de la paroi : dense, un peu froid, franchement opaque
       g.strokeStyle = `rgba(74,62,120,${(0.62 * k).toFixed(3)})`
-      g.lineWidth = Math.max(2, rayonDessine * 2 * z)
+      g.lineWidth = Math.max(2, rayonParoi * 2 * z)
       chemin()
       g.stroke()
       // LES DEUX ARÊTES, D'UN SEUL TRAIT ET AVEC DE VRAIES JOINTURES. C'est
@@ -6433,7 +6461,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       // décalées, dans la direction bissectrice.
       const contour = (cote: number): { sx: number; sy: number }[] => {
         const e = pts.map((q) => S(q.x, q.y))
-        const d = rayonDessine * z * cote
+        const d = rayonParoi * z * cote
         // la normale de chaque tronçon, en écran
         const nrm: { x: number; y: number }[] = []
         for (let m = 0; m + 1 < e.length; m++) {
@@ -6525,7 +6553,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
         const v = S(voisin.x, voisin.y)
         // la direction de SORTIE : du voisin vers le bout, prolongée
         const dehors = Math.atan2(p.sy - v.sy, p.sx - v.sx)
-        const r = Math.max(1, rayonDessine * z)
+        const r = Math.max(1, rayonParoi * z)
         g.beginPath()
         g.arc(p.sx, p.sy, r, dehors - Math.PI / 2, dehors + Math.PI / 2)
         g.stroke()
@@ -6545,7 +6573,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     if (bascule > 0.02) {
       const e = pts.map((q) => S(q.x, q.y))
       const grain = Math.floor((performance.now() / 1000) * 30)
-      const ampl = rayonDessine * z * (0.55 + 0.85 * bascule)
+      const ampl = rayonParoi * z * (0.55 + 0.85 * bascule)
       g.lineCap = 'round'
       for (let m = 0; m + 1 < e.length; m++) {
         // la nappe : large, sourde, elle donne le volume de la décharge
@@ -6584,7 +6612,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       // AUX COUDES, ÇA CRAQUE. Un éclat à chaque sommet — c'est là que la
       // ligne se plie, donc là que le champ force le plus.
       for (let m = 1; m + 1 < e.length; m++) {
-        const r = rayonDessine * z * (0.6 + 1.5 * bascule)
+        const r = rayonParoi * z * (0.6 + 1.5 * bascule)
         const gr = g.createRadialGradient(e[m].sx, e[m].sy, 0, e[m].sx, e[m].sy, Math.max(2, r))
         gr.addColorStop(0, `rgba(252,250,255,${(0.8 * bascule).toFixed(3)})`)
         gr.addColorStop(0.45, `rgba(180,140,255,${(0.35 * bascule).toFixed(3)})`)
@@ -9494,6 +9522,12 @@ function resetLasers(): void {
   laserEtat.doorsKey = ''
   lastRailTime = 0
   railsEngages.clear()
+  // LA BASCULE NE SE TRANSMET PAS D'UN TABLEAU À L'AUTRE. Sans cela, le
+  // rail n° 0 du tableau suivant héritait de la valeur lissée du rail n° 0
+  // du précédent : un tiers de seconde de fondu et une gerbe d'éclairs à
+  // chaque chargement, pour un rail qui n'avait rien changé.
+  railBascule.length = 0
+  railEtincelle.length = 0
   cachesLevee = (level.caches ?? []).map(() => Infinity)
   // la CLEF DE CACHETTE se consomme ici : les voiles du tableau tombent
   // d'emblée (le hub et l'Économat ne l'usent pas)

@@ -52,7 +52,11 @@ on:
     #   git push -f origin <votre-branche>:previsu-go
     #
     branches: [prod, previsu-go]
-    # Ce qui ne part pas dans le site ne mérite pas un déploiement.
+    # Ce qui ne part pas dans le site ne mérite pas un déploiement. À savoir
+    # pour la gâchette : le filtre vaut pour elle aussi. Une poussée sur
+    # previsu-go qui ne changerait QUE de la documentation ne déclenche rien
+    # — et rien ne le dit. On y pousse une branche de travail entière, donc
+    # le cas est rare ; s'il arrive, c'est ici qu'il faut revenir.
     paths-ignore:
       - 'docs/**'
       - 'masters/**'
@@ -66,8 +70,14 @@ on:
         default: previsualisation
         options: [previsualisation, production]
 
+# LA CONCURRENCE EST PAR BRANCHE, ET C'EST VITAL DEPUIS LA GÂCHETTE. Un
+# groupe unique annulait l'exécution en cours : une prévisualisation poussée
+# pendant une mise en ligne aurait TUÉ la mise en ligne, laissant le site sur
+# la version d'avant, en silence. Chaque branche a donc sa file — trois
+# poussées d'affilée sur previsu-go ne construisent toujours qu'une fois,
+# mais elles ne touchent plus à ce que fait prod.
 concurrency:
-  group: vercel-deploy
+  group: vercel-deploy-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:

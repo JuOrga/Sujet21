@@ -533,3 +533,60 @@ describe('le réglage MÉCANISMES vaut aussi en salles à compartiments', () => 
     }
   })
 })
+
+// LE DÉPART NE NAÎT PAS DANS UNE PAROI. Depuis qu'un rail a un corps — il
+// barre l'eau, la glace et la vapeur ordinaire, seul le plasma le franchit —
+// un tracé qui passe sur le point de départ y ferait naître le corps DANS le
+// mur. La preuve de traversée ne peut pas le voir : elle ignore les portes
+// d'état. C'est checkLevel qui le dit, et valideNiveau le relit, donc le
+// générateur retire la graine et en essaie une autre.
+//
+// Mesuré AVANT le garde-fou, sur les mille cinq cents premières graines :
+// 463 posaient un rail, 8 y faisaient naître le corps — la pire à 0,0 unité
+// de l'axe. Après : 0, et quatre graines seulement ont dû changer d'agencement.
+describe('Le générateur ne fait jamais naître le corps dans un rail', () => {
+  const RAYON = 30 // le corps d'un rail, cf. plasmaRailRadius
+
+  const distance = (
+    pts: { x: number; y: number }[],
+    x: number,
+    y: number,
+  ): number => {
+    let d = Infinity
+    for (let k = 0; k + 1 < pts.length; k++) {
+      const a = pts[k]
+      const b = pts[k + 1]
+      const abx = b.x - a.x
+      const aby = b.y - a.y
+      const l2 = abx * abx + aby * aby
+      const t =
+        l2 < 1e-9
+          ? 0
+          : Math.max(0, Math.min(1, ((x - a.x) * abx + (y - a.y) * aby) / l2))
+      d = Math.min(d, Math.hypot(x - (a.x + abx * t), y - (a.y + aby * t)))
+    }
+    return d
+  }
+
+  it('sur trois cents graines, aucun départ dans le corps d’un rail', () => {
+    let avecRail = 0
+    for (let graine = 1; graine <= 300; graine++) {
+      let niveau
+      try {
+        niveau = genereNiveau(graine)
+      } catch {
+        continue
+      }
+      const rails = niveau.rails ?? []
+      if (rails.length === 0) continue
+      avecRail++
+      for (const r of rails)
+        expect(
+          distance(r.points, niveau.spawn.x, niveau.spawn.y),
+          `graine ${graine}`,
+        ).toBeGreaterThanOrEqual(RAYON)
+    }
+    // et le garde-fou n'a pas tué les rails au passage
+    expect(avecRail).toBeGreaterThan(50)
+  })
+})

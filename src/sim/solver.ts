@@ -108,7 +108,10 @@ const LIVRAISON_VITESSE = 150
 // plus jamais allumer ce qu'elle veut franchir — c'est le verrou de #304,
 // qui avait rendu le conduit inatteignable en jeu. À 0,9, il reste 3 unités
 // de marge, et la paroi garde presque toute l'épaisseur qu'on lui dessine.
-const COEUR_PART = 0.9
+// Exporté : le DESSIN de la paroi doit peindre l'épaisseur qui arrête pour
+// de bon, sans quoi le tube ment de nouveau sur sa taille — dans l'autre
+// sens cette fois (peint à 75, il n'arrêtait la vapeur qu'à 27).
+export const COEUR_PART = 0.9
 
 export class FluidSim {
   readonly params: SimParams
@@ -2361,9 +2364,12 @@ export class FluidSim {
     }
   }
 
-  /** Les tubes du tableau. Appelé au chargement, comme setLevel : un rail
-   *  ordinaire n'entre pas dans cette liste, donc un tableau sans conduit
-   *  ne paie strictement rien (la passe sort au premier test). */
+  /** Les tubes du tableau. Appelé au chargement, comme setLevel.
+   *
+   *  TOUT RAIL Y ENTRE désormais : depuis qu'un rail a un corps, la passe
+   *  travaille dès qu'un rail est posé, et non plus seulement pour un
+   *  conduit. Un tableau SANS rail ne paie toujours rien — la passe sort au
+   *  premier test. */
   setConduits(
     rails: { points: { x: number; y: number }[]; conduit?: boolean }[],
     rayonRaccourci: number,
@@ -2421,16 +2427,17 @@ export class FluidSim {
       this.dansConduit[i] = 0
       const px = this.prdX[i]
       const py = this.prdY[i]
-      // UN TUBE OUVERT PRIME. Deux conduits peuvent se croiser : prendre
-      // bêtement le plus proche ferait qu'un tube FERMÉ voisin expulse un
-      // corps en pleine traversée d'un tube OUVERT. On retient donc le
-      // meilleur candidat ouvert s'il en existe un, le plus proche sinon.
+      // LE PLUS PERMISSIF PRIME. Deux tubes peuvent se croiser : prendre
+      // bêtement le plus proche ferait qu'un voisin moins permissif expulse
+      // un corps en pleine traversée. Le classement est établi plus bas, à
+      // trois crans (`rang`) ; la distance ne départage qu'à rang égal.
       let best = Infinity
       let bnx = 0
       let bny = 0
       let brayon = 0
       let bouvert = 0
       let barc = 0
+      let bRang = -1
       let bqx = 0
       let bqy = 0
       for (const tube of this.conduits) {
@@ -2444,9 +2451,17 @@ export class FluidSim {
         //   rail ordinaire guide le faisceau, il n'ouvre aucun mur.
         const arc = tube.actif ? 1 : 0
         const ouvert = tube.actif && tube.raccourci ? 1 : 0
-        // un tube éteint ne peut pas déloger un tube à l'arc déjà retenu :
-        // c'est l'arc qui décide du passage, il prime sur la proximité
-        if (barc === 1 && arc === 0) continue
+        // LE PLUS PERMISSIF PRIME, ET DANS CET ORDRE. Deux tubes peuvent se
+        // croiser : prendre bêtement le plus proche ferait qu'un voisin
+        // moins permissif expulse un corps en pleine traversée. On classe
+        // donc — un RACCOURCI ouvert (2) devant un rail à l'arc (1) devant
+        // un tube éteint (0) — et l'on ne départage à la distance qu'à
+        // égalité de rang. Départager sur le seul `arc` perdait le rang du
+        // raccourci : un rail ORDINAIRE engagé, passant plus près, gagnait
+        // et effaçait le laissez-passer du décor. Mesuré sur un conduit
+        // doublé d'un rail ordinaire à 10 u : 34 traversées tombaient à 20.
+        const rang = ouvert * 2 + arc
+        if (rang < bRang) continue
         for (let k = 0; k + 1 < pts.length; k++) {
           const a = pts[k]
           const b = pts[k + 1]
@@ -2461,9 +2476,11 @@ export class FluidSim {
           const dy = py - cy
           const d2 = dx * dx + dy * dy
           if (d2 > tube.rayon * tube.rayon) continue // hors de CE tube
-          // un tube à l'arc détrône un tube éteint ; à égalité, le plus proche
-          if (barc === arc && d2 >= best) continue
+          // à rang égal, le plus proche l'emporte ; un rang supérieur
+          // détrône quelle que soit la distance
+          if (rang === bRang && d2 >= best) continue
           best = d2
+          bRang = rang
           barc = arc
           bouvert = ouvert
           bqx = cx
