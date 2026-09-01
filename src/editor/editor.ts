@@ -408,6 +408,11 @@ function blankLevel(): LevelDef {
 }
 
 export class LevelEditor {
+  /** La police des étiquettes — une seule définition : le TRACÉ et la ZONE
+   * CLIQUABLE doivent se mesurer dans la même, sinon elles divergent en
+   * silence et l'on reclique à côté de ce qu'on voit. */
+  private static readonly POLICE_LABEL = '600 11px ui-monospace, monospace'
+
   private readonly host: HTMLElement
   private readonly canvas: HTMLCanvasElement
   private readonly ctx: CanvasRenderingContext2D
@@ -1114,14 +1119,33 @@ export class LevelEditor {
   }
 
   /** Ce qui se trouve sous le point monde, du plus « au-dessus » au plus bas. */
+  /** L'EMPRISE D'UNE ÉTIQUETTE, en unités du monde — celle du TEXTE qu'on
+   * voit, marge comprise. Elle valait « 60 / zoom » en demi-hauteur et
+   * « 96 / zoom » en demi-largeur : 192 × 60 pixels d'écran autour du point,
+   * quelle que soit la longueur du mot. Une étiquette de trois lettres
+   * couvrait donc une zone cinq à dix fois plus grande que ce qu'elle
+   * montrait — et comme les étiquettes passent EN PREMIER au clic, elles
+   * volaient la sélection de toute paroi qui passait dessous. On mesure
+   * maintenant le texte lui-même, dans la police qui le dessine. */
+  private empriseLabel(l: WorldLabel): { dx: number; dy: number } {
+    const g = this.ctx
+    g.save()
+    g.font = LevelEditor.POLICE_LABEL
+    const w = g.measureText(l.text).width
+    g.restore()
+    // 6 px de marge autour du texte, 11 px de corps : de quoi viser au doigt
+    // sans déborder sur les surfaces voisines
+    return { dx: (w / 2 + 6) / this.zoom, dy: (11 / 2 + 5) / this.zoom }
+  }
+
   private pick(x: number, y: number): Sel {
     const inside = (r: Rect): boolean =>
       x >= r.minX && x <= r.maxX && y >= r.minY && y <= r.maxY
     const labels = this.level.labels
     for (let i = labels.length - 1; i >= 0; i--) {
       const l = labels[i]
-      const r = 60 / this.zoom
-      if (Math.abs(l.x - x) < r * 1.6 && Math.abs(l.y - y) < r * 0.5) {
+      const e = this.empriseLabel(l)
+      if (Math.abs(l.x - x) < e.dx && Math.abs(l.y - y) < e.dy) {
         return { kind: 'label', index: i }
       }
     }
@@ -5128,7 +5152,17 @@ export class LevelEditor {
       )
     } else if (s.kind === 'porte') {
       const q = (this.level.portes ?? [])[s.index]
-      rows.push(numField('Canal visé (nº de cible)', 'p-pc', q.canal))
+      // LE CANAL COMPTE PAR UN. Sans le pas explicite, le champ retombait
+      // sur le défaut de numField — 10, celui des COORDONNÉES, qui se
+      // règlent bien par dizaines d'unités monde. Un « input type=number »
+      // à pas 10 ne se contente pas de sauter de dix : il n'accepte QUE la
+      // grille du pas. Relevé dans le navigateur, en partant de 1 : la
+      // flèche du haut donne 11, puis 21, puis 31 — et saisir 3 à la main
+      // est refusé. D'où des numéros de canal qui semblaient tirés au sort.
+      // Le canal de la CIBLE (« p-ccanal ») passait bien 1 ; celui de la
+      // PORTE l'avait perdu. Pas de « min » : le canal −1 est la porte
+      // SCÉNARISÉE, qu'aucun faisceau n'ouvre — et le pas 1 l'accepte.
+      rows.push(numField('Canal visé (nº de cible)', 'p-pc', q.canal, 1))
       rows.push(
         `<label class="ed-f"><span>Règle</span><select id="p-pregle">` +
           `<option value="ou"${q.regle !== 'et' ? ' selected' : ''}>OU — une cible du canal suffit</option>` +
@@ -5860,7 +5894,7 @@ export class LevelEditor {
       g.lineWidth = 1.5
       g.stroke()
       g.fillStyle = col
-      g.font = '600 11px ui-monospace, monospace'
+      g.font = LevelEditor.POLICE_LABEL
       g.fillText(
         `${zoneName(z)} · ${z.force.toUpperCase()}`,
         p.sx + 6,
@@ -5910,7 +5944,7 @@ export class LevelEditor {
       g.stroke()
       g.setLineDash([])
       g.fillStyle = '#aebfd8'
-      g.font = '600 11px ui-monospace, monospace'
+      g.font = LevelEditor.POLICE_LABEL
       g.fillText(
         c.style === 'paroi'
           ? 'CACHETTE — paroi factice'
@@ -6278,7 +6312,7 @@ export class LevelEditor {
       g.lineWidth = 2
       g.strokeRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
       g.fillStyle = '#35e0a4'
-      g.font = '600 11px ui-monospace, monospace'
+      g.font = LevelEditor.POLICE_LABEL
       g.fillText('SAS', p.sx + 5, p.sy + 14)
       // le rayon d'aspiration : la vraie portée du courant qui hale l'eau
       // (et la glace) vers la bouche — réglage par défaut du banc
@@ -6790,12 +6824,12 @@ export class LevelEditor {
       g.fillStyle = 'rgba(99,183,230,0.25)'
       g.fill()
       g.fillStyle = '#63b7e6'
-      g.font = '600 11px ui-monospace, monospace'
+      g.font = LevelEditor.POLICE_LABEL
       g.fillText('DÉPART', s.sx + r + 4, s.sy + 4)
     }
 
     // étiquettes
-    g.font = '600 11px ui-monospace, monospace'
+    g.font = LevelEditor.POLICE_LABEL
     for (const l of this.level.labels) {
       const p = this.toScreen(l.x, l.y)
       g.fillStyle = '#a9c0d2'
