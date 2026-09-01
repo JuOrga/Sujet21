@@ -55,9 +55,23 @@ Trois règles en découlent, et elles passent **avant le confort** :
    filtre de branche : c'est ce qui faisait tourner la CI deux fois par
    poussée (une fois pour `push`, une fois pour `pull_request`).
 2. **Seul `prod` déploie**, et **seul le workflow `deploy` publie**. Pour
-   voir une branche en ligne : `deploy` → *Run workflow* → cible
-   `previsualisation`. Jamais un déploiement automatique depuis `dev` ou une
+   voir une branche en ligne, deux chemins, le même résultat :
+
+   ```bash
+   git push -f origin <votre-branche>:previsu-go   # la gâchette
+   ```
+   ou `deploy` → *Run workflow* → cible `previsualisation` — mais ce bouton
+   ne s'affiche pas partout (il se replie selon l'appareil et la largeur de
+   la fenêtre), d'où la gâchette, qui marche toujours.
+
+   L'adresse s'affiche en tête du résumé de l'exécution. Le site en ligne
+   n'est pas touché. Jamais un déploiement automatique depuis `dev` ou une
    branche de travail.
+
+   **PUBLIER EST L'EXCEPTION** : `deploy` ne met en ligne que sur une
+   poussée vers `prod` ou un lancement manuel ciblant `production`. Tout le
+   reste est un aperçu — une branche déclenchante ajoutée par mégarde ne
+   peut donc plus publier.
 
    ⚠️ **Une seconde chaîne existe, invisible depuis le dépôt.** L'application
    GitHub de Vercel est connectée au projet et reçoit le même webhook : le
@@ -107,6 +121,7 @@ vérifie dans les deux sens (retiré : rouge ; remis : vert).
 | --- | --- |
 | `sauvegardes` | les sauvegardes des documents partagés, un commit par exécution |
 | `sauvegarde-go`, `perf-sync-go`, `diag-*-go`, `seed-*-go` | **gâchettes** : y pousser lance le workflow du même nom |
+| `previsu-go` | **gâchette** : y pousser déploie un APERÇU de ce qu'on y pousse (jamais la production) |
 
 Les gâchettes existent parce que l'environnement d'analyse ne joint pas
 `sujet21.vercel.app` (politique réseau) : le runner GitHub, si. Détail dans
