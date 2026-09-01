@@ -31,6 +31,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '01/09/2026 11:46',
+    title: 'Le plasma ne ressemble plus à la vapeur : blanc-violet, et il crépite',
+    notes: [
+      'LE DÉFAUT, rapporté : le plasma ressemblait beaucoup trop à la vapeur — même opale ambrée, même robe. Or c’est l’état qui ouvre les conduits : il doit se voir d’un coup d’œil, sinon le joueur ne sait jamais si son raccourci est armé.',
+      'LE NUAGE CONVOYÉ PREND LA ROBE DE L’ARC. Quand la vapeur voyage dans la bande d’un rail au champ engagé, elle s’IONISE (montée en ~0,2 s) : le nuage quitte l’opale ambrée pour le BLANC-VIOLET du faisceau ionisé — exactement les teintes de l’arc — et il CRÉPITE, du même tremblement rapide, désynchronisé par la position pour scintiller au lieu de clignoter d’un bloc. Hors du champ, l’ionisation retombe en ~0,5 s : la vapeur ordinaire revient sans à-coup.',
+      'ET IL ÉMET. Un gaz ionisé est une source de lumière, pas un reflet : la lueur du plasma est posée APRÈS l’éclairage de la pièce — dans une salle éteinte, le nuage engagé sur un rail brille comme l’arc qui l’a allumé.',
+      'RIEN NE CHANGE À LA PHYSIQUE : l’ionisation est un état de RENDU (un tampon de plus dans le solveur, parce que lui seul sait qui voyage dans la bande), et l’encodage particule→shader est rétro-compatible — le givre en positif, la vapeur en négatif, le plasma pousse simplement la vapeur au-delà de −1, et tout ce qui ne connaît pas le plasma (taille des sprites, pondération du champ) sature comme avant. Une seule formule partagée (etatRendu), testée, pour que l’encodage ne dérive jamais des décodages.',
+      'UNE PARTICULE QUI CONDENSE PERD SON IONISATION IMMÉDIATEMENT — sans cette purge, une goutte redevenue eau garderait son état en silence et renaîtrait violette à sa prochaine vaporisation, des tableaux plus tard. L’eau et la glace, elles, n’ionisent jamais : le champ ne parle qu’au gaz. Six tests neufs.',
+      'VÉRIFIÉ EN MACHINE : shaders compilés sans erreur dans un Chromium réel, ionisation mesurée en jeu (montée à 0,6-0,8 sous convoyage, retour à 0 champ coupé). LA ROBE, elle, attend l’œil du concepteur — c’est lui qui dira si le violet est le bon.',
+    ],
+  },
+  {
     date: '01/09/2026 10:52',
     title: 'Les chambres et les couloirs portent enfin leur ombre',
     notes: [

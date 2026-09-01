@@ -83,6 +83,17 @@ function horsBoite(
   )
 }
 
+/** L'ÉTAT d'une particule tel que le RENDU l'encode, en un seul nombre :
+ *  givre en positif (0..1), vapeur en négatif (0..−1) — et le PLASMA pousse
+ *  la vapeur AU-DELÀ de −1, jusqu'à −2. Les décodages en bout de chaîne :
+ *  `gas = clamp(-état, 0, 1)` (saturé, donc inchangé par le plasma) et
+ *  `plasma = clamp(-état - 1, 0, 1)`. Une seule formule, partagée entre le
+ *  paquetage des sprites et les tests — pour que l'encodage ne puisse pas
+ *  dériver en silence de ce que les shaders décodent. */
+export function etatRendu(frost: number, vapor: number, ionise: number): number {
+  return frost - vapor * (1 + ionise)
+}
+
 export class FluidSim {
   readonly params: SimParams
   readonly bounds: Bounds
@@ -117,6 +128,13 @@ export class FluidSim {
   // les grilles, et se PILOTE en continu vers le pointeur — au prix d'une
   // évaporation. Le froid la condense avant de gérer quoi que ce soit d'autre.
   vapor: Float32Array
+  // Ionisation VISIBLE (0..1) : à quel point cette particule de vapeur est
+  // du PLASMA. Monte quand elle voyage dans la bande d'un rail au champ
+  // engagé, retombe en ~0,5 s hors du champ, s'éteint à la condensation.
+  // Ne pèse sur AUCUNE physique : c'est un état de RENDU (le nuage
+  // blanc-violet qui crépite), tenu ici parce que seul le solveur sait qui
+  // voyage dans la bande.
+  ionise: Float32Array
   gaseous: Uint8Array
   // Mémoire de lien du gaz : à 1 tant que la particule est gazeuse, décroît
   // lentement après (gasLinkDecay). Le rayon d'adjacence des amas et le
@@ -322,6 +340,7 @@ export class FluidSim {
     this.frost = new Float32Array(capacity)
     this.frozen = new Uint8Array(capacity)
     this.vapor = new Float32Array(capacity)
+    this.ionise = new Float32Array(capacity)
     this.gasLink = new Float32Array(capacity)
     this.gaseous = new Uint8Array(capacity)
     this.welded = new Uint8Array(capacity)
@@ -692,6 +711,12 @@ export class FluidSim {
       if (this.gaseous[i] !== 1) continue
       const px = this.posX[i]
       const py = this.posY[i]
+      if (dansBande[i]) {
+        // ce qui voyage dans la bande d'un champ engagé DEVIENT du plasma,
+        // en ~0,2 s : l'identité visuelle suit l'état physique, pas le
+        // pinceau. La retombée (fadeIonise) fait le chemin inverse.
+        this.ionise[i] = Math.min(1, this.ionise[i] + 6 * dt)
+      }
       if (dansBande[i] && auTerminus[i]) {
         // arrivée en gare : on freine fort, et on ne RAMÈNE vers le
         // terminus qu'au-delà d'un rayon mort — comprimer le nuage sur un
@@ -828,6 +853,7 @@ export class FluidSim {
       this.frost[i] = this.frost[last]
       this.frozen[i] = this.frozen[last]
       this.vapor[i] = this.vapor[last]
+      this.ionise[i] = this.ionise[last]
       this.gaseous[i] = this.gaseous[last]
       this.gasLink[i] = this.gasLink[last]
       this.welded[i] = this.welded[last]
@@ -850,6 +876,7 @@ export class FluidSim {
     this.frost[i] = 0
     this.frozen[i] = 0
     this.vapor[i] = 0
+    this.ionise[i] = 0
     this.gaseous[i] = 0
     this.gasLink[i] = 0
     this.welded[i] = 0
@@ -1532,6 +1559,7 @@ export class FluidSim {
     permuteF(this.cooldown)
     permuteF(this.frost)
     permuteF(this.vapor)
+    permuteF(this.ionise)
     permuteF(this.gasLink)
     permuteF(this.contactTime)
     permuteF(this.contactNX)
@@ -1914,6 +1942,7 @@ export class FluidSim {
 
     // 4quater. Vapeur : expansion douce et flottement
     this.applyGasDynamics(dt)
+    this.fadeIonise(dt)
 
     // 5. Validation des positions, cooldowns, identité du corps
     for (let i = 0; i < n; i++) {
@@ -2680,6 +2709,23 @@ export class FluidSim {
       if (removed) continue // l'indice i contient maintenant une autre particule
       if (!touching) this.contactTime[i] = 0
       i++
+    }
+  }
+
+  /** Le plasma RETOMBE. Hors de la bande d'un champ engagé, l'ionisation
+   *  s'éteint en ~0,5 s (le nuage redevient vapeur ordinaire, sans à-coup) ;
+   *  une particule qui n'est plus gazeuse la perd immédiatement — sans cette
+   *  purge, une goutte condensée garderait son ionisation en silence et
+   *  renaîtrait violette à sa prochaine vaporisation, des tableaux plus
+   *  tard. Inconditionnelle et à part d'applyGasDynamics : celle-ci sort
+   *  au premier pas sans gaz, précisément le moment où il faut purger. */
+  private fadeIonise(dt: number): void {
+    const fade = Math.exp(-2.2 * dt)
+    const ionise = this.ionise
+    for (let i = 0; i < this.count; i++) {
+      if (ionise[i] === 0) continue
+      if (this.gaseous[i] !== 1 || ionise[i] < 1e-3) ionise[i] = 0
+      else ionise[i] *= fade
     }
   }
 
