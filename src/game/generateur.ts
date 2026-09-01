@@ -2208,11 +2208,20 @@ export function accessible(
   // vérité du solveur comme du rendu. Les rectangles gardent le chemin
   // rapide historique (boîte vraie, prudente pour les pivotés).
   const formes: ObstacleBox[] = []
-  // LES RAILS NE SONT PAS COMPTÉS, ET C'EST VOULU. Depuis qu'ils ont un
-  // corps, ils arrêtent l'eau et la glace — mais pas la vapeur, exactement
-  // comme une grille, une membrane ou un rideau. Ce sont des portes D'ÉTAT,
-  // et la preuve de traversée les ignore toutes : elle démontre qu'un chemin
-  // existe, pas qu'il se franchit dans un seul régime.
+  // LES RAILS NE SONT PAS COMPTÉS — et il faut dire exactement pourquoi,
+  // parce que ce n'est PAS le même cas qu'une grille.
+  //
+  // Une grille, une membrane, un rideau s'ouvrent à un ÉTAT (vapeur, eau,
+  // glace) : le corps les franchit en changeant de régime, tout seul. Un
+  // rail, lui, ne s'ouvre qu'au PLASMA — vapeur PLUS un faisceau ionisé sur
+  // sa ligne. C'est une porte d'état, mais dont la clé est une ÉNIGME.
+  //
+  // La preuve de traversée les ignore quand même, et c'est un choix : elle
+  // démontre qu'un chemin de géométrie existe, jamais qu'il se franchit
+  // dans un régime donné — elle ignore déjà les trois autres portes pour la
+  // même raison. Ce qu'elle ne voit pas, en revanche, c'est un DÉPART posé
+  // dans le corps d'un rail : là, le corps naît dans une paroi. À surveiller
+  // si le générateur se met un jour à poser des rails.
   for (const box of level.boxes) {
     if (
       box.material === MAT_GRILLE ||

@@ -924,6 +924,34 @@ export interface Verdict {
  * Garde-fous du level design, les mêmes que ceux des tableaux livrés : une
  * erreur rend le tableau injouable, un avertissement le rend douteux.
  */
+/** Le corps d'un rail, en unités monde : sa bande de capture, celle que le
+ *  calque dessine et sur laquelle le solveur fait buter la matière. Copié de
+ *  DEFAULT_PARAMS.plasmaRailRadius — l'importer ici ferait entrer tout le
+ *  banc de réglage dans le format. */
+const PLASMA_RAIL_RAYON = 30
+
+/** La distance d'un point à une polyligne. */
+function distanceAuTrace(
+  pts: { x: number; y: number }[],
+  x: number,
+  y: number,
+): number {
+  let d = Infinity
+  for (let k = 0; k + 1 < pts.length; k++) {
+    const a = pts[k]
+    const b = pts[k + 1]
+    const abx = b.x - a.x
+    const aby = b.y - a.y
+    const l2 = abx * abx + aby * aby
+    const t =
+      l2 < 1e-9
+        ? 0
+        : Math.max(0, Math.min(1, ((x - a.x) * abx + (y - a.y) * aby) / l2))
+    d = Math.min(d, Math.hypot(x - (a.x + abx * t), y - (a.y + aby * t)))
+  }
+  return d
+}
+
 export function checkLevel(brut: LevelDef): Verdict[] {
   const v: Verdict[] = []
   // LE TABLEAU TEL QUE LE MOTEUR LE VERRA : les structures expansées en
@@ -1071,6 +1099,24 @@ export function checkLevel(brut: LevelDef): Verdict[] {
       v.push({
         niveau: 'erreur',
         message: 'Un rail magnétique sort de la cuve.',
+      })
+    }
+    // LE DÉPART NE NAÎT PAS DANS UNE PAROI. Depuis qu'un rail a un corps —
+    // il barre l'eau, la glace et la vapeur ordinaire, seul le plasma le
+    // franchit — un tracé qui passe sur le point de départ y ferait naître
+    // le corps DANS le mur, et le solveur l'expulserait à la première image.
+    // Mesuré sur le générateur : 8 graines sur 1500 tombaient dedans, la
+    // pire à 0,0 unité de l'axe. La preuve de traversée ne peut pas le voir
+    // (elle ignore les portes d'état) : c'est donc ici que ça se dit, et
+    // comme valideNiveau relit checkLevel, le générateur retire la graine.
+    if (
+      distanceAuTrace(r.points, level.spawn.x, level.spawn.y) <
+      PLASMA_RAIL_RAYON
+    ) {
+      v.push({
+        niveau: 'erreur',
+        message:
+          'Le départ est posé dans le corps d’un rail : le corps naîtrait dans une paroi.',
       })
     }
   }
