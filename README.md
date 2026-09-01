@@ -6,10 +6,10 @@ une partie de soi-même — **se déplacer, c'est rétrécir**.
 
 Le document de référence est [`docs/doc-fonctionnel.md`](docs/doc-fonctionnel.md).
 
-## État — version 0.21.404, une run jouable de bout en bout
+## État — version 0.21.405, une run jouable de bout en bout
 
 Le jeu tourne dans le navigateur, sur ordinateur, tablette et téléphone.
-**404 livraisons consignées entre le 08/08/2026 et le 01/09/2026** — le journal
+**405 livraisons consignées entre le 08/08/2026 et le 01/09/2026** — le journal
 complet se lit dans l'écran NOTES DE VERSION, les données sont dans
 [`src/bench/livraisons.ts`](src/bench/livraisons.ts).
 
@@ -81,7 +81,7 @@ l'URL, ou sept tapes rapides sur le numéro de version (tactile compris).
 ## Qualité
 
 ```bash
-pnpm test        # 733 tests dans 66 fichiers, ~23 s
+pnpm test        # 751 tests dans 68 fichiers, ~22 s
 pnpm type-check
 pnpm build
 ```

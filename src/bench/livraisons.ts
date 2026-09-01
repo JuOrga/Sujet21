@@ -31,6 +31,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '01/09/2026 18:38',
+    title: 'Les coques fusionnent : plus un seul bord qui se coupe en travers',
+    notes: [
+      'LE DÉFAUT, rapporté en image : à la jointure d’une chambre et d’un couloir, les deux liserés se COUPAIENT en travers au lieu de ne faire qu’une silhouette. Le raccord se voyait comme un trait de crayon oublié — sur le hub, à chaque module.',
+      'LA CAUSE : chaque solide peignait son liseré sur TOUTE sa silhouette, y compris la part ENTERRÉE sous un autre. Le remplissage, lui, obéissait déjà à l’ordre de peinture — donc le bord d’en dessous disparaissait bien, mais celui du DESSUS continuait de traverser son voisin. Or le modulaire repose entièrement sur le recouvrement : « on empile des formes et le passage apparaît » (structures.ts). Le défaut était donc systématique, par construction.',
+      'LE CORRECTIF : un passage de COUVERTURE, avant la peinture, repère en une seule boucle le solide le plus intérieur à chaque pixel ; chaque liseré s’efface ensuite sous lui, en fondu sur son épaisseur (un seuil net aurait fait un escalier). Deux formes qui se chevauchent ne rendent plus que le contour de leur UNION : elles ont l’air fusionnées, sans qu’un seul point de géométrie ne bouge — ni la physique, ni le laser, ni le format n’en savent rien. Le rejet par la boîte englobante garde le passage au prix d’un survol : seules les formes qui contiennent vraiment le pixel se calculent.',
+      'ET L’ORDRE SE RÈGLE ENFIN. Puisque plus rien ne trahit la couture, il ne reste qu’une question en cas de chevauchement : qui est dessus ? Elle se répondait déjà, mais nulle part : c’était l’ordre des listes, invisible depuis l’éditeur. Le panneau de propriétés affiche désormais le RANG de l’élément et quatre boutons — tout au fond, derrière, devant, tout devant — pour les parois comme pour les coques. La sélection SUIT l’élément déplacé, sinon le second clic bougerait son voisin.',
+      'CE QUE ÇA NE FAIT PAS : deux formes qui se touchent bord à bord, sans se recouvrir, gardent leur trait de séparation. La couverture se lit sur la distance au solide voisin, et à une face partagée cette distance est nulle des deux côtés — il n’y a rien à enterrer. Dans ce décor, les coques se RECOUVRENT (c’est la règle du modulaire), donc le cas ne se présente pas ; s’il se présentait, c’est un chevauchement de quelques unités qui le réglerait.',
+      'MESURÉ : 18 tests neufs (751 au total, tous verts), type-check à 0 erreur, build propre. La règle de fusion a son JUMEAU testé en TypeScript (render/fusion.ts), comme formes.ts l’est pour son GLSL — un shader ne se teste pas, sa formule si : retirée, deux tests tombent ; remise, ils passent. Le shader compile et la cuve s’affiche dans un Chromium réel, sans une ligne de console.',
+    ],
+  },
+  {
     date: '01/09/2026 15:35',
     title: 'La bibliothèque ne se ferme plus à 60 tableaux — le plafond est un poids',
     notes: [

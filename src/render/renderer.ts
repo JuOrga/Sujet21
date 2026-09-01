@@ -751,6 +751,27 @@ float boxSdf(vec2 world, vec4 b) {
   return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
 }
 ${FORMES_GLSL}
+// LA GÉOMÉTRIE VISIBLE d'une boîte : sa distance signée dans la forme qu'on
+// VOIT (sommet déplacé par le relief, boîte dépivotée) — exactement celle
+// dont chaque matériau tire son liseré. Elle sert à savoir QUI RECOUVRE QUI.
+// Le rejet par l'englobante est un vrai raccourci, pas une approximation :
+// toute forme est inscrite dans sa boîte, donc hors de la boîte on est hors
+// de la forme — et la valeur rendue n'est lue que lorsqu'elle est négative.
+float sdfVisible(int bi, vec2 p) {
+  vec2 wb = p;
+  float a = uBoxAux[bi].y;
+  if (abs(a) > 0.0005) {
+    vec2 bc = 0.5 * (uBoxes[bi].xy + uBoxes[bi].zw);
+    vec2 rel = p - bc;
+    float ca = cos(a);
+    float sa = sin(a);
+    wb = bc + vec2(ca * rel.x + sa * rel.y, -sa * rel.x + ca * rel.y);
+  }
+  float db = boxSdf(wb, uBoxes[bi]);
+  if (db > 0.0) return db;
+  vec4 dec = decodeAux(uBoxAux[bi].x);
+  return dec.y > 0.5 ? formeSdf(wb, uBoxes[bi], dec.y, dec.z, dec.w) : db;
+}
 
 // ---- L'OMBRE PORTÉE DU VOLUME (dynamique) --------------------------------
 // La carte de lumière est CUITE : elle ne connaît que les obstacles, qui ne
@@ -1174,6 +1195,32 @@ void main() {
   // centre (en écran), fondu sous le zoom de carte
   vec2 relDisp = (world - uCenter) * (uRelief * clamp(uZoom * 1.2, 0.0, 1.0));
   float drainEye = 0.0; // œil du sas, retenu pour assombrir l'eau qui y coule
+  // ——— LA COUVERTURE : quel solide recouvre ce pixel ? ————————————————
+  // LE DÉFAUT qu'elle corrige : chaque boîte peignait son liseré sur TOUTE
+  // sa silhouette, y compris la part ENTERRÉE dans une autre. Or le
+  // modulaire repose sur le recouvrement — « on empile des formes et le
+  // passage apparaît » (structures.ts) : une chambre et un couloir qui se
+  // chevauchent montraient donc leurs deux bords se couper en travers, au
+  // lieu de ne faire qu'une seule silhouette.
+  // On repère ici, EN UN SEUL PASSAGE, le solide le plus intérieur à ce
+  // pixel ; chaque liseré s'efface ensuite sous lui. Le REMPLISSAGE, lui,
+  // ne change pas : il obéit toujours à l'ordre du tableau — la dernière
+  // boîte est dessus, et c'est cet ordre que l'éditeur règle (ordre.ts).
+  // LA RÈGLE A UN JUMEAU TESTÉ : render/fusion.ts, comme formes.ts l'est
+  // pour son GLSL. Les deux disent la même chose, à l'identique — l'égalité
+  // comprise : on n'écrase que sur un STRICTEMENT plus petit.
+  float dCouv = 1.0e9;
+  int iCouv = -1;
+  for (int bi = 0; bi < MAX_BOXES; bi++) {
+    if (bi >= uBoxCount) break;
+    float mc = decodeAux(uBoxAux[bi].x).x;
+    if (mc > 2.5 && mc < 3.5) continue; // le sas est une bouche, il n'enterre rien
+    float dc = sdfVisible(bi, world - relDisp);
+    if (dc < dCouv) {
+      dCouv = dc;
+      iCouv = bi;
+    }
+  }
   for (int bi = 0; bi < MAX_BOXES; bi++) {
     if (bi >= uBoxCount) break;
     // boîte oblique : le monde pivote dans le repère local de la boîte —
@@ -1213,6 +1260,13 @@ void main() {
     // FORME de la pièce : la distance se raffine après le rejet grossier —
     // remplissage, arête, ombre et auras suivent la vraie silhouette
     if (dec.y > 0.5) d = formeSdf(wb, uBoxes[bi], dec.y, dec.z, dec.w);
+
+    // FUSION : le liseré ne se peint pas là où un AUTRE solide recouvre ce
+    // pixel. Le fondu sur edgeW, et non un seuil net, évite l'escalier à
+    // l'endroit où le bord plonge sous le voisin.
+    float libre = (iCouv >= 0 && iCouv != bi)
+      ? smoothstep(-edgeW, 0.0, dCouv)
+      : 1.0;
 
     // ——— RELIEF 2.5D (tous les solides, sauf la bouche du sas) ————————
     // dV / wbV : la géométrie du SOMMET (déplacé) — le remplissage et les
@@ -1316,7 +1370,7 @@ void main() {
     }
     if (mat < 2.5) {
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
-      float edge = 1.0 - smoothstep(0.0, edgeW, abs(dV));
+      float edge = (1.0 - smoothstep(0.0, edgeW, abs(dV))) * libre;
       vec3 fillCol; vec3 edgeCol;
       // opacité du remplissage : 1 partout, sauf la VITRE — c'est ce qui la
       // fait lire comme du verre, on voit la salle au travers
@@ -1456,7 +1510,7 @@ void main() {
       // balayage spéculaire en diagonale, micro-rayures de polissage, arête
       // claire comme un fil de lumière.
       float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
-      float edge = 1.0 - smoothstep(0.0, edgeW, abs(d));
+      float edge = (1.0 - smoothstep(0.0, edgeW, abs(d))) * libre;
       float grain = dnoise(world * 0.021);
       float stries = 0.5 + 0.5 * sin((world.x - world.y) * 0.55);
       float band = 0.5 + 0.5 * sin((world.x + world.y) * 0.030 - uTime * 0.45);
@@ -1473,7 +1527,7 @@ void main() {
       // dash. Chargé (aux.z = 1), le serpentin pulse ; déchargé, il s'éteint
       // et le panneau redevient un mur gris — le manomètre est la lumière.
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
-      float edge = 1.0 - smoothstep(0.0, edgeW, abs(dV));
+      float edge = (1.0 - smoothstep(0.0, edgeW, abs(dV))) * libre;
       float charge = uBoxAux[bi].z;
       float coil = 0.5 + 0.5 * sin(world.x * 0.30 + sin(world.y * 0.24) * 2.2);
       float tube = smoothstep(0.55, 0.9, coil);
@@ -1490,7 +1544,7 @@ void main() {
       // la GLACE les écarte. Des fentes fines entre lamelles laissent deviner
       // le fond : c'est un rideau, pas un mur.
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
-      float edge = 1.0 - smoothstep(0.0, edgeW, abs(dV));
+      float edge = (1.0 - smoothstep(0.0, edgeW, abs(dV))) * libre;
       float sway = sin(world.y * 0.30 + uTime * 1.1 + world.x * 0.02) * 1.8;
       float lam = 0.5 + 0.5 * sin((world.y + sway) * 0.55);
       float fente = smoothstep(0.86, 0.97, lam);
@@ -1501,7 +1555,7 @@ void main() {
       // Membrane gorgée d'eau : trame tissée vert d'eau qui suinte — seule
       // l'EAU la traverse. Des gouttes descendent le long de la trame.
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
-      float edge = 1.0 - smoothstep(0.0, edgeW, abs(dV));
+      float edge = (1.0 - smoothstep(0.0, edgeW, abs(dV))) * libre;
       float weave = 0.5 + 0.5 * sin(world.x * 0.42) * sin(world.y * 0.42);
       float drip = smoothstep(0.78, 1.0,
         0.5 + 0.5 * sin(world.y * 0.10 - uTime * 1.6 + dnoise(world * 0.05) * 6.0));
@@ -1513,7 +1567,7 @@ void main() {
       // cente, et une aura de chaleur qui tremble — le danger (et la
       // ressource) se lit avant le contact, comme pour le froid.
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
-      float edge = 1.0 - smoothstep(0.0, edgeW, abs(dV));
+      float edge = (1.0 - smoothstep(0.0, edgeW, abs(dV))) * libre;
       float stripe = 0.5 + 0.5 * sin((world.x + world.y - uTime * 46.0) * 0.14);
       // Panneau à ailettes texturé quand l'image est là : les rayures animées
       // deviennent la CHALEUR qui court dessus, pas le panneau lui-même.
@@ -1533,7 +1587,7 @@ void main() {
       // Grille (tableau 3) : panneau perforé — le liquide s'y écrase, la
       // vapeur passe entre les mailles. Les trous laissent voir le fond.
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
-      float edge = 1.0 - smoothstep(0.0, edgeW, abs(dV));
+      float edge = (1.0 - smoothstep(0.0, edgeW, abs(dV))) * libre;
       // Panneau perforé texturé : les trous de l'image (quasi noirs) servent
       // eux-mêmes de masque — le fond se voit à travers, comme avant.
       float hole;
@@ -1553,7 +1607,7 @@ void main() {
       // Plaque froide (tableau 2) : givre cristallin, arête pâle, et une
       // aura de brume glacée — le danger se lit avant le contact.
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
-      float edge = 1.0 - smoothstep(0.0, edgeW, abs(dV));
+      float edge = (1.0 - smoothstep(0.0, edgeW, abs(dV))) * libre;
       float sparkle = smoothstep(0.72, 0.94, dnoise(world * 0.22));
       // Givre texturé quand l'image est là ; le scintillement procédural
       // reste par-dessus : le gel a l'air vivant, pas imprimé.
