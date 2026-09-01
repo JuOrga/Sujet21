@@ -4,7 +4,7 @@
 //   B. seuillage du champ plein écran + trame de repère procédurale du décor.
 
 import type { FluidSim } from '../sim/solver'
-import { KIND_PLAYER } from '../sim/solver'
+import { KIND_PLAYER, etatRendu } from '../sim/solver'
 import type { SimParams } from '../sim/params'
 import {
   LAMPE_HAUTEUR_DEFAUT,
@@ -856,6 +856,8 @@ void main() {
   float stateS = tex.a / max(tex.r, 1e-5); // givre en positif, vapeur en négatif
   float icy = clamp(stateS, 0.0, 1.0);
   float vap = clamp(-stateS, 0.0, 1.0);
+  // au-delà de −1, la vapeur est IONISÉE : la part de plasma du pixel
+  float plasmaS = clamp(-stateS - 1.0, 0.0, 1.0);
 
   // Reconstruction monde (repère y vers le haut, cohérent avec la passe A)
   vec2 css = gl_FragCoord.xy / uDpr;
@@ -2016,6 +2018,19 @@ void main() {
     vec3 smoke = mix(smokeCore, smokeEdge, smokeEdgeMix * (0.35 + 0.65 * smokeN));
     smoke += vec3(0.28, 0.22, 0.13) * smokeN * smokeN; // volutes lumineuses qui roulent
     smoke = mix(smoke, vec3(0.50, 0.40, 0.26), (1.0 - smokeN) * 0.22); // plis ambres
+    // PLASMA (vapeur ionisée sur un rail au champ engagé) : le nuage quitte
+    // l'opale ambrée pour le BLANC-VIOLET de l'arc (les mêmes teintes que
+    // le faisceau ionisé, rgba(150,90,255) → rgba(250,245,255)) et il
+    // CRÉPITE — le même tremblement rapide que l'arc (sin 37), désynchronisé
+    // par la position pour que le nuage scintille au lieu de clignoter d'un
+    // bloc. Sans cela le plasma ressemblait à la vapeur au point de s'y
+    // confondre : l'état qui ouvre les conduits doit se voir d'un coup d'œil.
+    float crepite = 0.80 + 0.20 * sin(uTime * 37.0 + (world.x + world.y) * 0.05);
+    vec3 plasCoeur = vec3(0.59, 0.35, 1.00);
+    vec3 plasBord = vec3(0.98, 0.96, 1.00);
+    vec3 plas = mix(plasCoeur, plasBord, smokeEdgeMix * (0.30 + 0.70 * smokeN));
+    plas += vec3(0.24, 0.16, 0.45) * smokeN * smokeN; // volutes violettes
+    smoke = mix(smoke, plas * (0.82 + 0.18 * crepite), plasmaS);
     water = mix(water, smoke, vap * 0.92);
     // L'ŒIL DE LA VAPEUR : dans le nuage, le regard est un TOURBILLON —
     // la fumée se creuse en spirale lente autour du point visé, et un
@@ -2045,6 +2060,11 @@ void main() {
     // parfaitement visible dans une pièce éteinte : peu naturel, signalé.
     if (uLumiereEau > 0.5)
       water *= clamp(vec3(uAmbiante * 1.15) + 1.05 * lmEau, vec3(0.10), vec3(1.0));
+    // Le plasma ÉMET : un gaz ionisé est une source, pas un reflet — dans
+    // une pièce éteinte, le nuage engagé sur un rail doit briller comme
+    // l'arc qui l'a allumé. Posé APRÈS l'éclairage de la pièce, pour que la
+    // nuit ne l'éteigne pas.
+    water += plas * plasmaS * vap * 0.30 * crepite;
 
     col = mix(col, water, body);
     // L'eau qui recouvre l'œil du sas s'assombrit : elle sombre dans le trou
@@ -3533,7 +3553,8 @@ export class Renderer {
         data[o + 4] = 0
         data[o + 5] = 0
       }
-      data[o + 6] = sim.frost[i] - sim.vapor[i] // givre positif, vapeur négative
+      // givre positif, vapeur négative — le plasma pousse au-delà de −1
+      data[o + 6] = etatRendu(sim.frost[i], sim.vapor[i], sim.ionise[i])
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, this.splatVbo)
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, data, 0, n * 7)
