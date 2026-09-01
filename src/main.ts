@@ -6187,8 +6187,11 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   // pas seulement du rail. On mesure la part gazeuse du corps — pas
   // l'intention de touche : pendant les deux dixièmes de la transformation,
   // c'est bien la matière qui décide de qui passe, particule par particule.
+  // Un tableau SANS rail ne paie pas ce balayage : c'est la règle du dépôt
+  // partout ailleurs (setConduits sort au premier test), et la plupart des
+  // tableaux n'ont aucun rail.
   let partGaz = 1
-  {
+  if (rails.length > 0) {
     let n = 0
     let gaz = 0
     for (let i = 0; i < sim.count; i++) {

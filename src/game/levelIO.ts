@@ -920,10 +920,6 @@ export interface Verdict {
   message: string
 }
 
-/**
- * Garde-fous du level design, les mêmes que ceux des tableaux livrés : une
- * erreur rend le tableau injouable, un avertissement le rend douteux.
- */
 /** Le corps d'un rail, en unités monde : sa bande de capture, celle que le
  *  calque dessine et sur laquelle le solveur fait buter la matière. Copié de
  *  DEFAULT_PARAMS.plasmaRailRadius — l'importer ici ferait entrer tout le
@@ -952,6 +948,10 @@ function distanceAuTrace(
   return d
 }
 
+/**
+ * Garde-fous du level design, les mêmes que ceux des tableaux livrés : une
+ * erreur rend le tableau injouable, un avertissement le rend douteux.
+ */
 export function checkLevel(brut: LevelDef): Verdict[] {
   const v: Verdict[] = []
   // LE TABLEAU TEL QUE LE MOTEUR LE VERRA : les structures expansées en

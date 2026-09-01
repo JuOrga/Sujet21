@@ -2220,8 +2220,9 @@ export function accessible(
   // démontre qu'un chemin de géométrie existe, jamais qu'il se franchit
   // dans un régime donné — elle ignore déjà les trois autres portes pour la
   // même raison. Ce qu'elle ne voit pas, en revanche, c'est un DÉPART posé
-  // dans le corps d'un rail : là, le corps naît dans une paroi. À surveiller
-  // si le générateur se met un jour à poser des rails.
+  // dans le corps d'un rail : là, le corps naît dans une paroi. Le générateur
+  // en pose (459 tableaux sur 1500 graines), et c'est checkLevel qui refuse
+  // ce départ — valideNiveau le relit, la graine est retirée avant livraison.
   for (const box of level.boxes) {
     if (
       box.material === MAT_GRILLE ||
