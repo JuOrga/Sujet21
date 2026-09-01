@@ -2161,6 +2161,17 @@ precision highp float;
 #define MAX_BOXES 96
 #define MAX_LUMIERES 4
 #define HAUTEUR_BLOCS 140.0
+// UNE COQUE N'EST PAS UN BLOC : c'est une cloison qui monte au PLAFOND.
+// Les blocs font tous 140 u — le rayon qui grimpe vers la lampe leur passe
+// dessus, et c'est voulu : du mobilier n'enferme pas la lumière. Une chambre
+// ou un couloir, si. Tant que les coques comptaient pour 140 u, la lampe
+// d'une salle éclairait la salle d'à côté À TRAVERS le mur : mesuré sur deux
+// chambres mitoyennes de 1200 u (mur de 40, lampe à 600), l'ombre du mur
+// mitoyen s'arrêtait à 196 u derrière lui — 16 % de la pièce — et le reste
+// baignait en plein jour. C'est le défaut signalé : « pas d'ombres pour les
+// couloirs et les chambres ». Au-dessus de LAMPE_HAUTEUR_MAX (2000 u) :
+// aucune lampe ne peut regarder par-dessus un mur de salle.
+#define HAUTEUR_COQUE 2400.0
 uniform int uBoxCount;
 uniform vec4 uBoxes[MAX_BOXES];
 uniform vec4 uBoxAux[MAX_BOXES];
@@ -2234,7 +2245,11 @@ vec2 pointLampe(int li, vec2 p) {
   return c + axe * clamp(dot(p - c, axe), -uLampesFix[li].z, uLampesFix[li].z);
 }
 
-float sceneSdf(vec2 p) {
+// alt : l'ALTITUDE du rayon à ce point, sur sa montée du sol vers la
+// lampe. Un obstacle plus bas qu'elle est déjà sous le rayon — il n'ombre
+// plus rien. C'est ce qui sépare le mobilier (140 u, enjambé) de la coque
+// d'une salle (jusqu'au plafond, jamais enjambée).
+float sceneSdf(vec2 p, float alt) {
   float d = 1e9;
   for (int i = 0; i < MAX_BOXES; i++) {
     if (i >= uBoxCount) break;
@@ -2242,6 +2257,7 @@ float sceneSdf(vec2 p) {
     if (dec.x > 2.5 && dec.x < 3.5) continue; // sas : une bouche, pas un mur
     if (dec.x > 4.5 && dec.x < 5.5) continue; // évent : tamisé à part (grilleTrans)
     if (dec.x < 0.5 && uBoxAux[i].z > 8.5) continue; // vitre : tamisée (vitreTrans)
+    if (alt > (dec.y > 4.5 ? HAUTEUR_COQUE : HAUTEUR_BLOCS)) continue;
     vec2 wb = p;
     float ang = uBoxAux[i].y;
     if (abs(ang) > 0.0005) {
@@ -2349,10 +2365,13 @@ void main() {
     float distL = max(length(toL), 1e-4);
     vec2 dir = toL / distL;
     // La HAUTEUR borne l'ombre : le rayon qui grimpe du sol vers la lampe
-    // passe au-dessus des blocs dès que son altitude dépasse la leur — seuls
-    // les obstacles rencontrés avant t·hLampe/distL = HAUTEUR_BLOCS comptent.
+    // passe au-dessus d'un obstacle dès que son altitude dépasse la sienne.
+    // L'altitude au paramètre t vaut t·hLampe/distL — DEUX bornes en
+    // découlent : tBloc, où le rayon quitte le mobilier (140 u), et tLim, où
+    // il quitterait une coque (jamais, en pratique : cf. HAUTEUR_COQUE).
     // Lampe haute : ombres courtes et douces ; lampe basse : ombres longues.
-    float tLim = min(distL, distL * HAUTEUR_BLOCS / max(hL, HAUTEUR_BLOCS + 1.0));
+    float tBloc = min(distL, distL * HAUTEUR_BLOCS / max(hL, HAUTEUR_BLOCS + 1.0));
+    float tLim = min(distL, distL * HAUTEUR_COQUE / max(hL, HAUTEUR_COQUE + 1.0));
     // ombre douce : le min de k·h/t le long de la marche vers la lampe —
     // la pénombre s'élargit avec la hauteur (une lampe haute diffuse)
     float pen = 4.0 + hL * 0.008;
@@ -2360,14 +2379,18 @@ void main() {
     float t = 4.0;
     for (int k = 0; k < 40; k++) {
       if (t >= tLim || res < 0.004) break;
-      float h = sceneSdf(p + dir * t);
+      float h = sceneSdf(p + dir * t, t * hL / distL);
       res = min(res, pen * h / t);
       t += clamp(h, 8.0, 200.0);
     }
     res = clamp(res, 0.0, 1.0);
-    float tamis = grilleTrans(p, dir, min(distL, tLim))
-      * epongeTrans(p, dir, min(distL, tLim))
-      * vitreTrans(p, dir, min(distL, tLim));
+    // Les TAMIS restent bornés par la hauteur des BLOCS : un évent, une
+    // éponge et une vitre sont du mobilier, pas des cloisons — les border à
+    // tLim les ferait tamiser tout le trajet, et l'ombre des barreaux
+    // s'étendrait à toute la salle.
+    float tamis = grilleTrans(p, dir, min(distL, tBloc))
+      * epongeTrans(p, dir, min(distL, tBloc))
+      * vitreTrans(p, dir, min(distL, tBloc));
     // la VISIBILITÉ de cette lampe depuis ce texel, SANS le rebond : c'est
     // elle qui dit si la lampe éclaire vraiment ici — l'ombre dynamique du
     // corps s'y pèse, pour ne pas projeter l'ombre d'une lampe murée
