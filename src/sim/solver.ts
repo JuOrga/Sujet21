@@ -2427,10 +2427,10 @@ export class FluidSim {
       this.dansConduit[i] = 0
       const px = this.prdX[i]
       const py = this.prdY[i]
-      // UN TUBE OUVERT PRIME. Deux conduits peuvent se croiser : prendre
-      // bêtement le plus proche ferait qu'un tube FERMÉ voisin expulse un
-      // corps en pleine traversée d'un tube OUVERT. On retient donc le
-      // meilleur candidat ouvert s'il en existe un, le plus proche sinon.
+      // LE PLUS PERMISSIF PRIME. Deux tubes peuvent se croiser : prendre
+      // bêtement le plus proche ferait qu'un voisin moins permissif expulse
+      // un corps en pleine traversée. Le classement est établi plus bas, à
+      // trois crans (`rang`) ; la distance ne départage qu'à rang égal.
       let best = Infinity
       let bnx = 0
       let bny = 0
