@@ -101,6 +101,18 @@ export function etatRendu(frost: number, vapor: number, ionise: number): number 
 // doucement pour que ce ne soit pas une éjection.
 const LIVRAISON_VITESSE = 150
 
+// LE CŒUR D'UNE LIGNE DE CHAMP, en part du rayon de capture. C'est
+// l'épaisseur sur laquelle la vapeur ORDINAIRE bute. Elle est JUSTE en
+// dessous du rayon où le faisceau s'ionise (plasmaRailRadius), et pas
+// davantage : repoussée jusqu'au rayon de capture, la vapeur ne pourrait
+// plus jamais allumer ce qu'elle veut franchir — c'est le verrou de #304,
+// qui avait rendu le conduit inatteignable en jeu. À 0,9, il reste 3 unités
+// de marge, et la paroi garde presque toute l'épaisseur qu'on lui dessine.
+// Exporté : le DESSIN de la paroi doit peindre l'épaisseur qui arrête pour
+// de bon, sans quoi le tube ment de nouveau sur sa taille — dans l'autre
+// sens cette fois (peint à 75, il n'arrêtait la vapeur qu'à 27).
+export const COEUR_PART = 0.9
+
 export class FluidSim {
   readonly params: SimParams
   readonly bounds: Bounds
@@ -224,7 +236,16 @@ export class FluidSim {
   // une CAPSULE (distance à une polyligne), pas un rectangle — le convertir
   // en boîtes obliques aurait demandé de toucher au format des tableaux, au
   // générateur et à l'éditeur pour une géométrie qu'on sait déjà mesurer.
-  private conduits: { pts: { x: number; y: number }[]; rayon: number; rail: number; actif: boolean }[] = []
+  // LES TUBES. Un par rail : tout rail a un corps, l'eau et la glace y
+  // butent. `raccourci` distingue le CONDUIT — celui qui, arc engagé, laisse
+  // en plus la vapeur ignorer le décor et franchir une paroi.
+  private conduits: {
+    pts: { x: number; y: number }[]
+    rayon: number
+    raccourci: boolean
+    rail: number
+    actif: boolean
+  }[] = []
   // 1 = la particule est DANS un tube, à cet instant. Recalculé une fois par
   // pas, avant la résolution des solides, et lu deux fois : la vapeur y
   // ignore tout le décor (c'est le raccourci), l'eau et la glace s'en font
@@ -232,11 +253,18 @@ export class FluidSim {
   private readonly dansConduit: Uint8Array
   // 1 = ce tube-là est OUVERT (arc engagé) : seul cas où la vapeur passe
   private readonly conduitOuvert: Uint8Array
+  // 1 = le tube le plus proche porte un ARC. C'est lui qui décide du GAZ :
+  // seul le plasma — de la vapeur sur une ligne de champ allumée — franchit
+  // un rail. La vapeur ordinaire bute comme l'eau, sur un cœur plus mince.
+  private readonly conduitArc: Uint8Array
   // l'axe du tube au point le plus proche : sert à repousser ce qui n'est
   // pas gazeux, sans refaire la projection
   private readonly conduitNX: Float32Array
   private readonly conduitNY: Float32Array
-  private readonly conduitProf: Float32Array // enfoncement sous la peau du tube
+  private readonly conduitDist: Float32Array // distance à l'axe du tube
+  private readonly conduitRayon: Float32Array // rayon du tube retenu
+  private readonly conduitQX: Float32Array // le point de l'axe le plus proche
+  private readonly conduitQY: Float32Array
   private contactMat: Int8Array // -1 aucun, sinon matériau du contact solide
   private contactNX: Float32Array
   private contactNY: Float32Array
@@ -392,9 +420,13 @@ export class FluidSim {
     this.contactTime = new Float32Array(capacity)
     this.dansConduit = new Uint8Array(capacity)
     this.conduitOuvert = new Uint8Array(capacity)
+    this.conduitArc = new Uint8Array(capacity)
     this.conduitNX = new Float32Array(capacity)
     this.conduitNY = new Float32Array(capacity)
-    this.conduitProf = new Float32Array(capacity)
+    this.conduitDist = new Float32Array(capacity)
+    this.conduitRayon = new Float32Array(capacity)
+    this.conduitQX = new Float32Array(capacity)
+    this.conduitQY = new Float32Array(capacity)
     this.contactMat = new Int8Array(capacity)
     this.contactNX = new Float32Array(capacity)
     this.contactNY = new Float32Array(capacity)
@@ -2332,17 +2364,44 @@ export class FluidSim {
     }
   }
 
-  /** Les tubes du tableau. Appelé au chargement, comme setLevel : un rail
-   *  ordinaire n'entre pas dans cette liste, donc un tableau sans conduit
-   *  ne paie strictement rien (la passe sort au premier test). */
-  setConduits(rails: { points: { x: number; y: number }[]; conduit?: boolean }[], rayon: number): void {
+  /** Les tubes du tableau. Appelé au chargement, comme setLevel.
+   *
+   *  TOUT RAIL Y ENTRE désormais : depuis qu'un rail a un corps, la passe
+   *  travaille dès qu'un rail est posé, et non plus seulement pour un
+   *  conduit. Un tableau SANS rail ne paie toujours rien — la passe sort au
+   *  premier test. */
+  setConduits(
+    rails: { points: { x: number; y: number }[]; conduit?: boolean }[],
+    rayonRaccourci: number,
+    rayonRail: number,
+  ): void {
     this.conduits = []
     for (let i = 0; i < rails.length; i++) {
       const r = rails[i]
-      if (r.conduit !== true || r.points.length < 2) continue
-      // l'indice de rail est gardé : c'est par lui que l'engagement de
-      // l'arc (calculé côté jeu, sur le traceur de faisceau) retrouve son tube
-      this.conduits.push({ pts: r.points, rayon, rail: i, actif: false })
+      if (r.points.length < 2) continue
+      // TOUT RAIL A UN CORPS. Une ligne de champ magnétique n'est pas un
+      // décalque : de la matière CONDENSÉE ne la traverse pas — l'eau et la
+      // glace butent dessus comme sur une paroi. Seul le gaz passe, parce
+      // que seul le gaz s'ionise ; c'est ce qui fait du rail une mécanique
+      // et non un dessin. Avant, un rail ordinaire n'avait AUCUNE physique
+      // et le corps le traversait sans rien sentir.
+      //
+      // Ce qui distingue le RACCOURCI (`conduit`), c'est autre chose : lui
+      // seul, une fois son arc engagé, laisse la vapeur ignorer le DÉCOR et
+      // franchir une paroi. Un rail ordinaire ne fait jamais traverser quoi
+      // que ce soit — il barre, voilà tout.
+      const raccourci = r.conduit === true
+      this.conduits.push({
+        pts: r.points,
+        // le corps d'un rail est SA BANDE DE CAPTURE, celle qu'on dessine :
+        // la portée du champ est son épaisseur. Le tube d'un raccourci, lui,
+        // épouse la bande de convoyage (railConvoy y travaille) — ce qui est
+        // porté est exactement ce qui est dedans.
+        rayon: raccourci ? rayonRaccourci : rayonRail,
+        raccourci,
+        rail: i,
+        actif: false,
+      })
     }
   }
 
@@ -2368,20 +2427,41 @@ export class FluidSim {
       this.dansConduit[i] = 0
       const px = this.prdX[i]
       const py = this.prdY[i]
-      // UN TUBE OUVERT PRIME. Deux conduits peuvent se croiser : prendre
-      // bêtement le plus proche ferait qu'un tube FERMÉ voisin expulse un
-      // corps en pleine traversée d'un tube OUVERT. On retient donc le
-      // meilleur candidat ouvert s'il en existe un, le plus proche sinon.
+      // LE PLUS PERMISSIF PRIME. Deux tubes peuvent se croiser : prendre
+      // bêtement le plus proche ferait qu'un voisin moins permissif expulse
+      // un corps en pleine traversée. Le classement est établi plus bas, à
+      // trois crans (`rang`) ; la distance ne départage qu'à rang égal.
       let best = Infinity
       let bnx = 0
       let bny = 0
       let brayon = 0
       let bouvert = 0
+      let barc = 0
+      let bRang = -1
+      let bqx = 0
+      let bqy = 0
       for (const tube of this.conduits) {
         const pts = tube.pts
-        const ouvert = tube.actif ? 1 : 0
-        // un tube fermé ne peut pas déloger un tube ouvert déjà retenu
-        if (bouvert === 1 && ouvert === 0) continue
+        // DEUX QUALITÉS, ET ELLES NE SE CONFONDENT PAS.
+        // · ARC : ce tube porte un arc ionisé. C'est lui qui laisse passer le
+        //   GAZ — le plasma traverse la ligne de champ, la vapeur ordinaire
+        //   non. Vrai pour tout rail, raccourci ou pas.
+        // · OUVERT : ce tube me laisse ignorer le DÉCOR et franchir une
+        //   paroi. Seul un RACCOURCI le fait, et seulement arc engagé. Un
+        //   rail ordinaire guide le faisceau, il n'ouvre aucun mur.
+        const arc = tube.actif ? 1 : 0
+        const ouvert = tube.actif && tube.raccourci ? 1 : 0
+        // LE PLUS PERMISSIF PRIME, ET DANS CET ORDRE. Deux tubes peuvent se
+        // croiser : prendre bêtement le plus proche ferait qu'un voisin
+        // moins permissif expulse un corps en pleine traversée. On classe
+        // donc — un RACCOURCI ouvert (2) devant un rail à l'arc (1) devant
+        // un tube éteint (0) — et l'on ne départage à la distance qu'à
+        // égalité de rang. Départager sur le seul `arc` perdait le rang du
+        // raccourci : un rail ORDINAIRE engagé, passant plus près, gagnait
+        // et effaçait le laissez-passer du décor. Mesuré sur un conduit
+        // doublé d'un rail ordinaire à 10 u : 34 traversées tombaient à 20.
+        const rang = ouvert * 2 + arc
+        if (rang < bRang) continue
         for (let k = 0; k + 1 < pts.length; k++) {
           const a = pts[k]
           const b = pts[k + 1]
@@ -2396,11 +2476,15 @@ export class FluidSim {
           const dy = py - cy
           const d2 = dx * dx + dy * dy
           if (d2 > tube.rayon * tube.rayon) continue // hors de CE tube
-          // un ouvert détrône un fermé ; à égalité d'ouverture, le plus proche
-          if (bouvert === 1 && ouvert === 1 && d2 >= best) continue
-          if (bouvert === 0 && ouvert === 0 && d2 >= best) continue
+          // à rang égal, le plus proche l'emporte ; un rang supérieur
+          // détrône quelle que soit la distance
+          if (rang === bRang && d2 >= best) continue
           best = d2
+          bRang = rang
+          barc = arc
           bouvert = ouvert
+          bqx = cx
+          bqy = cy
           const d = Math.sqrt(d2)
           // sur l'axe même, la normale est indéfinie : on prend la
           // perpendiculaire au tronçon, pour que l'expulsion ait un sens
@@ -2418,14 +2502,18 @@ export class FluidSim {
       if (brayon > 0) {
         this.dansConduit[i] = 1
         this.conduitOuvert[i] = bouvert
+        this.conduitArc[i] = barc
         this.conduitNX[i] = bnx
         this.conduitNY[i] = bny
-        this.conduitProf[i] = brayon - Math.sqrt(best)
+        this.conduitDist[i] = Math.sqrt(best)
+        this.conduitRayon[i] = brayon
+        this.conduitQX[i] = bqx
+        this.conduitQY[i] = bqy
       }
     }
   }
 
-  /** LA PAROI DU TUBE — pour ce qui est CONDENSÉ, et pour cela seulement.
+  /** LA PAROI DU TUBE — et ce qui la franchit : LE PLASMA, rien d'autre.
    *
    *  LE VERROU QU'IL A FALLU OUVRIR. Expulser aussi la VAPEUR rendait le
    *  conduit inutilisable : pour lever le champ il faut ioniser le faisceau
@@ -2435,20 +2523,32 @@ export class FluidSim {
    *  ouvrir un conduit en jouant ; seuls les tests, qui lèvent le champ à la
    *  main, voyaient la mécanique fonctionner.
    *
-   *  La vapeur ENTRE donc, et n'y gagne rien tant que l'arc n'est pas pris :
-   *  ni convoyage, ni laissez-passer du décor. C'est bien le PLASMA qui
-   *  ouvre le raccourci — la vapeur seule ne fait qu'avoir le droit de
-   *  s'approcher pour l'allumer.
+   *  D'OÙ DEUX ÉPAISSEURS, ET C'EST TOUT L'ÉQUILIBRE. La vapeur ordinaire ne
+   *  traverse pas non plus une ligne de champ — seul le PLASMA le fait, et le
+   *  plasma c'est de la vapeur sur un rail dont l'arc est engagé. Mais si on
+   *  la repoussait au rayon de CAPTURE, elle ne pourrait plus jamais allumer
+   *  ce qu'elle veut franchir : le verrou de #304, à l'identique. Le gaz bute
+   *  donc sur un CŒUR plus mince que le rayon de capture (COEUR_PART), assez
+   *  pour barrer, assez peu pour qu'il reste toujours de la vapeur dans les
+   *  30 unités où le faisceau s'ionise.
    *
-   *  L'eau et la glace, elles, butent : on ne se faufile pas dans une ligne
-   *  de champ en étant de la matière condensée. */
+   *  L'eau et la glace, elles, butent sur toute l'épaisseur du tube : on ne
+   *  se faufile pas dans une ligne de champ en étant de la matière condensée. */
   private expulseDesConduits(): void {
     if (this.conduits.length === 0) return
     for (let i = 0; i < this.count; i++) {
       if (this.dansConduit[i] !== 1) continue
-      // la vapeur a le droit d'entrer, ouverte ou non : c'est elle qui allume
-      if (this.gaseous[i] === 1) continue
-      let prof = this.conduitProf[i]
+      // LE PLASMA PASSE, ET LUI SEUL. Du gaz sur un tube dont l'arc est
+      // engagé est du plasma : la ligne de champ le porte, elle ne le
+      // repousse pas. Sans arc, c'est de la vapeur ordinaire — elle bute,
+      // mais sur le CŒUR seulement, pour qu'il lui reste de quoi venir
+      // allumer le rail depuis le rayon de capture (cf. l'en-tête).
+      let rayon = this.conduitRayon[i]
+      if (this.gaseous[i] === 1) {
+        if (this.conduitArc[i] === 1) continue
+        rayon = Math.min(rayon, this.params.plasmaRailRadius * COEUR_PART)
+      }
+      let prof = rayon - this.conduitDist[i]
       if (prof <= 0) continue
       const nx = this.conduitNX[i]
       const ny = this.conduitNY[i]
@@ -2464,6 +2564,28 @@ export class FluidSim {
       if (prof > maxPas) prof = maxPas
       this.prdX[i] += nx * prof
       this.prdY[i] += ny * prof
+      // LE GAZ EST ARRÊTÉ, PAS CHASSÉ. La vitesse se lit (prd − pos)/dt :
+      // repousser la seule position prédite AJOUTE de la vitesse vers
+      // l'extérieur, et le répéter à chaque pas la pompe — mesuré, la vapeur
+      // pressée contre une ligne de champ finissait à 37,8 u de l'axe, hors
+      // des 30 où le faisceau s'ionise. Elle ne pouvait plus allumer ce
+      // qu'elle voulait franchir : le verrou de #304, revenu par une autre
+      // porte. On aligne donc la position d'ORIGINE sur la même hauteur
+      // normale : la composante rentrante tombe à zéro, la tangentielle est
+      // gardée intacte — le nuage longe la ligne, il ne la franchit ni n'en
+      // est soufflé. C'est ce que fait une paroi.
+      //
+      // La matière condensée, elle, garde sa poussée bornée : un rail ne se
+      // contente pas de l'arrêter, il la remet dehors.
+      if (this.gaseous[i] === 1) {
+        const qx = this.conduitQX[i]
+        const qy = this.conduitQY[i]
+        const dPos = (this.posX[i] - qx) * nx + (this.posY[i] - qy) * ny
+        const dPrd = (this.prdX[i] - qx) * nx + (this.prdY[i] - qy) * ny
+        const corr = dPrd - dPos
+        this.posX[i] += nx * corr
+        this.posY[i] += ny * corr
+      }
       // LE CONTACT EST DÉCLARÉ, comme pour n'importe quel solide : sans lui
       // la passe de glace ne reçoit aucune impulsion et un palet se DÉFORME
       // dans le tube au lieu d'y rebondir.

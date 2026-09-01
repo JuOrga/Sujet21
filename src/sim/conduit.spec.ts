@@ -44,7 +44,11 @@ function monte(
 ): FluidSim {
   const sim = new FluidSim({ ...DEFAULT_PARAMS, ...overrides }, OPEN, 2048)
   sim.setLevel([PAROI], [])
-  sim.setConduits([{ points: LIGNE, conduit }], DEFAULT_PARAMS.plasmaRailRadius * 2.5)
+  sim.setConduits(
+    [{ points: LIGNE, conduit }],
+    DEFAULT_PARAMS.plasmaRailRadius * 2.5,
+    DEFAULT_PARAMS.plasmaRailRadius,
+  )
   sim.setConduitsActifs(arc ? new Set([0]) : new Set<number>())
   return sim
 }
@@ -377,5 +381,47 @@ describe('Le conduit — sa paroi POUSSE, elle ne catapulte pas', () => {
     for (let s = 0; s < Math.round(2 / dt); s++) sim.step(dt)
     // le tube fait 75 u de rayon autour de y = 0 : dehors, c'est au-delà
     expect(Math.abs(corps(sim).cy)).toBeGreaterThan(DEFAULT_PARAMS.plasmaRailRadius * 2.5)
+  })
+})
+
+// DEUX TUBES QUI SE CROISENT — et le plus permissif doit primer.
+//
+// La règle existait déjà pour « ouvert » : un tube FERMÉ voisin ne doit pas
+// expulser un corps en pleine traversée d'un tube OUVERT. Quand les rails
+// ordinaires ont gagné un corps, le départage s'est fait sur le seul ARC —
+// et un rail ordinaire engagé, passant plus près, gagnait alors le duel et
+// effaçait le laissez-passer du décor que portait le conduit. Mesuré :
+// 34 traversées tombaient à 20.
+describe('Le conduit — un tube voisin ne referme pas le raccourci', () => {
+  const R = DEFAULT_PARAMS.plasmaRailRadius
+  const VOISIN = [
+    { x: 10, y: -300 },
+    { x: 10, y: 300 },
+  ]
+
+  const traverse = (avecVoisin: boolean): number => {
+    const sim = new FluidSim({ ...DEFAULT_PARAMS }, OPEN, 2048)
+    sim.setLevel([PAROI], [])
+    sim.setConduits(
+      avecVoisin
+        ? [{ points: LIGNE, conduit: true }, { points: VOISIN, conduit: false }]
+        : [{ points: LIGNE, conduit: true }],
+      R * 2.5,
+      R,
+    )
+    sim.setConduitsActifs(avecVoisin ? new Set([0, 1]) : new Set([0]))
+    poseAGauche(sim)
+    sim.gasIntent = true
+    sim.naitEnVapeur()
+    joue(sim, 3)
+    return passees(sim)
+  }
+
+  it('un rail ORDINAIRE engagé en travers ne bouche pas le conduit', () => {
+    const seul = traverse(false)
+    expect(seul).toBeGreaterThan(10) // le conduit fait son office
+    // et le même conduit, doublé d'un rail ordinaire lui aussi engagé,
+    // laisse passer AUTANT : le rang du raccourci prime sur la proximité
+    expect(traverse(true)).toBeGreaterThanOrEqual(seul)
   })
 })

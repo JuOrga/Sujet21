@@ -41,8 +41,22 @@ name: deploy
 
 on:
   push:
-    branches: [prod]
-    # Ce qui ne part pas dans le site ne mérite pas un déploiement.
+    # `prod` PUBLIE. `previsu-go` est la GÂCHETTE de prévisualisation : y
+    # pousser n'importe quelle branche en déploie un aperçu, sans jamais
+    # toucher au site en ligne. Tous les autres workflows du dépôt ont la
+    # leur (sauvegarde-go, perf-sync-go, diag-*-go, seed-*-go) ; `deploy`
+    # était le seul à n'en avoir pas, et il fallait donc trouver le bouton
+    # « Run workflow » — qui ne s'affiche pas toujours selon l'appareil et
+    # la largeur de la fenêtre. Une gâchette, elle, marche partout :
+    #
+    #   git push -f origin <votre-branche>:previsu-go
+    #
+    branches: [prod, previsu-go]
+    # Ce qui ne part pas dans le site ne mérite pas un déploiement. À savoir
+    # pour la gâchette : le filtre vaut pour elle aussi. Une poussée sur
+    # previsu-go qui ne changerait QUE de la documentation ne déclenche rien
+    # — et rien ne le dit. On y pousse une branche de travail entière, donc
+    # le cas est rare ; s'il arrive, c'est ici qu'il faut revenir.
     paths-ignore:
       - 'docs/**'
       - 'masters/**'
@@ -56,8 +70,14 @@ on:
         default: previsualisation
         options: [previsualisation, production]
 
+# LA CONCURRENCE EST PAR BRANCHE, ET C'EST VITAL DEPUIS LA GÂCHETTE. Un
+# groupe unique annulait l'exécution en cours : une prévisualisation poussée
+# pendant une mise en ligne aurait TUÉ la mise en ligne, laissant le site sur
+# la version d'avant, en silence. Chaque branche a donc sa file — trois
+# poussées d'affilée sur previsu-go ne construisent toujours qu'une fois,
+# mais elles ne touchent plus à ce que fait prod.
 concurrency:
-  group: vercel-deploy
+  group: vercel-deploy-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -74,8 +94,15 @@ jobs:
       # CLI épinglée : vercel@59.7.0 est sorti avec une dépendance
       # introuvable (@vercel/container@3.0.2, ETARGET) — 59.6.2 est saine.
       #
-      # Une poussée sur prod publie ; un lancement manuel suit le choix
-      # `cible`, et une prévisualisation n'emporte pas le drapeau --prod.
+      # PUBLIER EST L'EXCEPTION, PAS LE DÉFAUT. La règle était écrite à
+      # l'envers : tout ce qui n'était pas un lancement manuel demandant
+      # une prévisualisation partait en PRODUCTION. Ça tenait tant que
+      # `prod` était la seule branche déclenchante ; avec une gâchette de
+      # plus, la même règle aurait publié à sa première poussée. On nomme
+      # donc les DEUX cas qui publient — une poussée sur `prod`, un
+      # lancement manuel ciblant `production` — et tout le reste est un
+      # aperçu. Une branche ajoutée par mégarde ne peut plus mettre en
+      # ligne : elle ne peut que faire un aperçu de trop.
       #
       # L'URL EST REMONTÉE EN TÊTE DE L'EXÉCUTION. Une prévisualisation
       # reçoit une adresse NEUVE à chaque fois (sujet21-<hash>.vercel.app) :
@@ -86,15 +113,23 @@ jobs:
       - name: Déployer
         run: |
           set -euo pipefail
+          publie=non
+          if [ "${{ github.event_name }}" = "push" ] \
+             && [ "${{ github.ref_name }}" = "prod" ]; then
+            publie=oui
+          fi
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] \
-             && [ "${{ inputs.cible }}" = "previsualisation" ]; then
-            quoi='PRÉVISUALISATION'
-            note='Adresse jetable — le site en ligne n’est pas touché.'
-            url=$(npx vercel@59.6.2 deploy --yes --token=${{ secrets.VERCEL_TOKEN }} | tail -1)
-          else
+             && [ "${{ inputs.cible }}" = "production" ]; then
+            publie=oui
+          fi
+          if [ "$publie" = "oui" ]; then
             quoi='PRODUCTION'
             note='Le site en ligne a été remplacé.'
             url=$(npx vercel@59.6.2 deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }} | tail -1)
+          else
+            quoi='PRÉVISUALISATION'
+            note='Adresse jetable — le site en ligne n’est pas touché.'
+            url=$(npx vercel@59.6.2 deploy --yes --token=${{ secrets.VERCEL_TOKEN }} | tail -1)
           fi
           echo "$quoi → $url"
           {
