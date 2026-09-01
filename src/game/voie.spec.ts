@@ -19,16 +19,20 @@ import {
   varianteDuJour,
   toutProcedural,
   PLAN_VOIE_DEFAUTS,
+  type PlanVoie,
 } from './voie'
+import { POIDS_PIOCHE_DEFAUTS } from './poule'
 
 describe('voie — le plan de descente', () => {
-  const plan = {
+  // le plan ORDINAIRE : les réglages de rampe restent aux défauts, et c'est
+  // exactement ce que ces tests gravent — la descente d'avant les réglages
+  const plan = clampPlanVoie({
     longueur: 12,
     diffMax: 3,
     graineDuJour: false,
     generees: true,
     ecrites: true,
-  }
+  })
 
   it('le moment se répartit par tiers : début, milieu, fin', () => {
     const moments = Array.from({ length: 12 }, (_, i) =>
@@ -110,21 +114,69 @@ describe('voie — le plan de descente', () => {
   })
 
   it('le clamp ramène tout plan dans les bornes — et les défauts comblent', () => {
-    expect(clampPlanVoie(null)).toEqual({
-      longueur: 12,
-      diffMax: 3,
-      graineDuJour: false,
-      generees: true,
-      ecrites: true,
-    })
+    expect(clampPlanVoie(null)).toEqual(PLAN_VOIE_DEFAUTS)
     expect(clampPlanVoie({ longueur: 999, diffMax: -4 })).toEqual({
+      ...PLAN_VOIE_DEFAUTS,
       longueur: 40,
       diffMax: 0,
-      graineDuJour: false,
-      generees: true,
-      ecrites: true,
     })
     expect(clampPlanVoie({ longueur: 1 }).longueur).toBe(3)
+  })
+
+  it('un plan d’AVANT les réglages de rampe retrouve la descente d’avant', () => {
+    // LE PIÈGE DU STOCKAGE : un plan enregistré sur un poste avant que la
+    // rampe ne devienne réglable ne porte que cinq champs. S'il revenait
+    // avec des zéros, la descente de ce poste changerait de forme SANS que
+    // personne n'ait rien réglé — le pire des défauts, celui qu'on n'impute
+    // à rien. Les défauts sont donc les anciennes constantes, au chiffre.
+    const ancien = clampPlanVoie(
+      JSON.parse(
+        '{"longueur":12,"diffMax":3,"graineDuJour":false,"generees":true,"ecrites":true}',
+      ) as Partial<PlanVoie>,
+    )
+    expect(ancien.sommetRecul).toBe(1)
+    expect(ancien.respiration).toBe(3)
+    expect(ancien.finale).toBe(60)
+    expect(ancien.rangsSansDanger).toBe(2)
+    expect(ancien.cadenceLaby).toBe(2)
+    expect(ancien.cadenceContraste).toBe(2)
+    expect(ancien.figuresDebut).toBe(1)
+    expect(ancien.figuresSuite).toBe(2)
+    expect(ancien.poids).toEqual(POIDS_PIOCHE_DEFAUTS)
+    // et la rampe qu'il décrit est celle que les tests d'origine gravent
+    expect(
+      Array.from({ length: 12 }, (_, i) => diffAuRang(i + 1, ancien)),
+    ).toEqual(Array.from({ length: 12 }, (_, i) => diffAuRang(i + 1, plan)))
+  })
+
+  it('la rampe se règle : sommet, respiration, finale', () => {
+    const lisse = clampPlanVoie({ longueur: 12, diffMax: 6, respiration: 0 })
+    // sans respiration, la rampe ne redescend JAMAIS avant la finale
+    for (let r = 2; r < lisse.longueur; r++)
+      expect(diffAuRang(r, lisse)).toBeGreaterThanOrEqual(diffAuRang(r - 1, lisse))
+    // le SOMMET reculé de trois rangs : le plafond est atteint plus tôt
+    const tot = clampPlanVoie({ longueur: 12, diffMax: 6, sommetRecul: 3 })
+    expect(diffAuRang(9, tot)).toBe(6)
+    // la FINALE commande le dernier rang, et lui seul
+    expect(diffAuRang(12, clampPlanVoie({ longueur: 12, diffMax: 6, finale: 100 }))).toBe(6)
+    expect(diffAuRang(12, clampPlanVoie({ longueur: 12, diffMax: 6, finale: 0 }))).toBe(0)
+  })
+
+  it('la posture se règle : rangs sans danger, cadences laby et contraste', () => {
+    const p = clampPlanVoie({
+      longueur: 12,
+      rangsSansDanger: 4,
+      cadenceLaby: 0,
+      cadenceContraste: 1,
+    })
+    expect(reglageAuRang(4, p).dangers).toBe(1)
+    expect(reglageAuRang(5, p).dangers).toBe(0)
+    // cadence 0 : le labyrinthe ne sort jamais
+    for (let r = 5; r <= 8; r++) expect(reglageAuRang(r, p).laby).toBe(0)
+    // cadence 1 : TOUS les rangs de fin passent en contraste, sauf le dernier
+    expect(reglageAuRang(9, p).contraste).toBe(1)
+    expect(reglageAuRang(10, p).contraste).toBe(1)
+    expect(reglageAuRang(12, p).contraste).toBe(0)
   })
 
   it('la graine du jour est stable, et change par jour comme par rang', () => {
@@ -159,13 +211,13 @@ describe('voie — le plan de descente', () => {
   })
 
   it('une descente entière se génère : chaque rang, avec sa posture, donne une salle prouvée', () => {
-    const grand = {
+    const grand = clampPlanVoie({
       longueur: 12,
       diffMax: 6,
       graineDuJour: false,
       generees: true,
       ecrites: true,
-    }
+    })
     for (let rang = 1; rang <= grand.longueur; rang++) {
       const mecanique = ([1, 2, 3] as const)[rang % 3]
       const cahier = {
