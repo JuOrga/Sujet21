@@ -86,15 +86,20 @@ jobs:
       - name: Déployer
         run: |
           set -euo pipefail
+          # D'OÙ VIENT LE PAQUET. Vercel construit sur ses machines, sans
+          # dépôt git : sans ces deux valeurs, un paquet de branche porte la
+          # même signature que le site en ligne, et un A/B de performance ne
+          # prouve rien (constaté le 01/09 — cf. src/game/provenance.ts).
+          provenance="--build-env VITE_COMMIT=${{ github.sha }} --build-env VITE_BRANCHE=${{ github.ref_name }}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] \
              && [ "${{ inputs.cible }}" = "previsualisation" ]; then
             quoi='PRÉVISUALISATION'
             note='Adresse jetable — le site en ligne n’est pas touché.'
-            url=$(npx vercel@59.6.2 deploy --yes --token=${{ secrets.VERCEL_TOKEN }} | tail -1)
+            url=$(npx vercel@59.6.2 deploy --yes --token=${{ secrets.VERCEL_TOKEN }} $provenance | tail -1)
           else
             quoi='PRODUCTION'
             note='Le site en ligne a été remplacé.'
-            url=$(npx vercel@59.6.2 deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }} | tail -1)
+            url=$(npx vercel@59.6.2 deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }} $provenance | tail -1)
           fi
           echo "$quoi → $url"
           {

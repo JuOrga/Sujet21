@@ -128,6 +128,7 @@ import {
   echelleDepart,
   viseEchelle,
 } from './game/resolution'
+import { PROVENANCE } from './game/provenance'
 import {
   DERNIERE_LIVRAISON,
   VERSION,
@@ -3049,9 +3050,12 @@ function majPerfVifForce(): void {
   const r = perf.resume()
   // la VERSION est dite ici aussi : c'est la question qu'on se pose juste
   // avant de mesurer (« suis-je bien sur le paquet que je crois ? »), et
-  // un iPad peut garder un onglet ouvert longtemps après une mise en ligne
+  // un iPad peut garder un onglet ouvert longtemps après une mise en ligne.
+  // LE COMMIT AVEC ELLE : la version seule ne distingue pas deux branches
+  // non livrées — c'est ce qui a rendu un A/B illisible le 01/09. Ici, on
+  // le LIT AVANT de mesurer, au lieu de le découvrir dans le rapport.
   perfVif.textContent =
-    `v${VERSION} · ` +
+    `v${VERSION} · ${PROVENANCE.commit} · ${PROVENANCE.branche} · ` +
     (r.images < 30
       ? 'mesure en cours — jouez quelques secondes, le voile ouvert ou fermé.'
       : `en direct : ${r.p50.toFixed(0)} im/s en médiane · plancher (p5) ${r.p95.toFixed(0)} im/s · fenêtre de ${r.images} images.`)
@@ -3072,6 +3076,10 @@ function rapportPerf(): Record<string, unknown> {
       version: VERSION,
       livraison: DERNIERE_LIVRAISON.date,
       titre: DERNIERE_LIVRAISON.title,
+      // Le COMMIT, sans quoi deux branches non livrées portent la même
+      // signature et l'A/B ne prouve rien (cf. game/provenance.ts).
+      commit: PROVENANCE.commit,
+      branche: PROVENANCE.branche,
     },
     config: {
       fpsCap,
