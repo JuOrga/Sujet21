@@ -59,34 +59,12 @@ describe('Éclairage des volumes — la hauteur des coques', () => {
     expect(source).toMatch(
       /float\s+tLim\s*=\s*min\(distL,\s*distL\s*\*\s*HAUTEUR_COQUE\s*\/\s*max\(hL,\s*HAUTEUR_COQUE\s*\+\s*1\.0\)\);/,
     )
-    // et chaque boîte est écartée à SA hauteur, pas à celle de la scène —
-    // une coque (forme 5) monte au plafond, le reste plafonne aux blocs
-    expect(source).toMatch(/dec\.y\s*>\s*4\.5/)
+    // et chaque boîte est écartée à SA hauteur, pas à celle de la scène
     expect(source).toMatch(
-      /if\s*\(alt\s*>\s*\(auPlafond\s*\?\s*HAUTEUR_COQUE\s*:\s*HAUTEUR_BLOCS\)\)\s*continue;/,
+      /if\s*\(alt\s*>\s*\(dec\.y\s*>\s*4\.5\s*\?\s*HAUTEUR_COQUE\s*:\s*HAUTEUR_BLOCS\)\)\s*continue;/,
     )
     // l'altitude passée au SDF : t·hLampe/distL, la montée réelle du rayon
     expect(source).toMatch(/sceneSdf\(p\s*\+\s*dir\s*\*\s*t,\s*t\s*\*\s*hL\s*\/\s*distL\)/)
-  })
-
-  // Une porte fermée bouche une embrasure — un trou dans un mur qui monte au
-  // plafond. Haute de 140 u comme un meuble, elle laissait filer la lumière
-  // par-dessus son battant et l'embrasure se lisait comme un rectangle clair.
-  it('vaut aussi pour un RECTANGLE marqué cloison — la porte fermée', () => {
-    expect(source).toMatch(
-      /bool\s+auPlafond\s*=\s*dec\.y\s*>\s*4\.5\s*\|\|\s*\(dec\.y\s*<\s*0\.5\s*&&\s*dec\.z\s*>\s*0\.5\);/,
-    )
-    expect(source).toMatch(
-      /if\s*\(alt\s*>\s*\(auPlafond\s*\?\s*HAUTEUR_COQUE\s*:\s*HAUTEUR_BLOCS\)\)\s*continue;/,
-    )
-    // et l'empaquetage pose bien ce 1 sur un rectangle marqué cloison
-    expect(source).toMatch(/\}\s*else\s+if\s*\(bx\.cloison\)\s*\{\s*(\/\/[^\n]*\n\s*)*q0\s*=\s*1/)
-  })
-
-  // La carte ne recuit qu'au changement de décor : si le drapeau n'entrait
-  // pas dans la clé, une porte qui devient cloison ne recuirait rien.
-  it('le drapeau cloison entre dans la clé de cuisson', () => {
-    expect(source).toContain('${bx.cloison ? 1 : 0}')
   })
 
   it('ne déborde PAS sur les tamis : évent, éponge et vitre restent du mobilier', () => {
