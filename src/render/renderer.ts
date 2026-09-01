@@ -2622,6 +2622,27 @@ void main() {
   outColor = vec4(c, t.a * uFade * (1.0 - fluide));
 }`
 
+// LA SONDE D'APLAT — la composition qui ne calcule plus rien.
+//
+// Les interrupteurs du voile PARAMÈTRES (éclairage, ombres, détails) sont
+// TOUS des uniformes : ils sautent des branches, mais ne retirent ni un
+// prélèvement de texture, ni un registre, ni une ligne du programme lié.
+// Deux mesures ont buté là-dessus — 29/08 (« couper l'éclairage n'y change
+// rien ») et 01/09 (« tout désactivé, peut-être 2 im/s »). Avec eux seuls,
+// impossible de dire si le shader est innocent ou si les interrupteurs sont
+// impuissants : les deux donnent le même résultat.
+//
+// Ici, le pixel ne coûte plus que d'exister. Même pipeline, même
+// résolution, mêmes passes, mêmes textures liées, mêmes couches par-dessus
+// — seule la composition est remplacée. Si la cadence ne bouge pas, le
+// shader n'est PAS le coût, et il faut chercher ailleurs.
+const SONDE_FS = `#version 300 es
+precision highp float;
+out vec4 outColor;
+void main() {
+  outColor = vec4(0.05, 0.07, 0.10, 1.0);
+}`
+
 function compile(
   gl: WebGL2RenderingContext,
   type: number,
@@ -2844,6 +2865,10 @@ export class Renderer {
   // ne bouge plus : on ne cuit que ce qui dure (cf. MASQUE_STABLE).
   private masqueVu = -1
   private masqueVuDepuis = 0
+  // La sonde d'aplat (voir SONDE_FS) : liée à la première demande, jamais
+  // si personne ne la demande.
+  private sonde: VarianteCompose | null = null
+  private sondeActive = false
   // Réemployés d'une image à l'autre : construire deux ensembles par image
   // pour ≤ 96 boîtes serait du déchet pur.
   private readonly materiauxPoses = new Set<number>()
@@ -3622,6 +3647,26 @@ export class Renderer {
     }
   }
 
+  /** LA SONDE D'APLAT (?sonde=plat) : la composition peint un aplat, tout
+   * le reste est identique. Voir SONDE_FS pour ce qu'elle répond. */
+  setSonde(active: boolean): void {
+    this.sondeActive = active
+  }
+
+  /** Le programme d'aplat, lié au premier usage — il ne coûte rien tant que
+   * personne ne demande la sonde. Sans uniforme actif : toutes les écritures
+   * de la passe de composition se perdent d'elles-mêmes, sans un test de
+   * plus dans le chemin normal. */
+  private varianteSonde(): VarianteCompose {
+    if (!this.sonde)
+      this.sonde = {
+        program: link(this.gl, COMPOSE_VS, SONDE_FS),
+        uniforms: {},
+        etat: 'prete',
+      }
+    return this.sonde
+  }
+
   /**
    * La variante à lier pour ce masque — ou la GÉNÉRIQUE tant que celle-ci
    * n'est pas prête. Cette méthode ne bloque jamais et ne jette jamais :
@@ -3854,19 +3899,20 @@ export class Renderer {
     if (this.texFroid) this.texturesPretes.add(MAT_FROID)
     if (this.texGrille) this.texturesPretes.add(MAT_GRILLE)
     if (this.texChaud) this.texturesPretes.add(MAT_CHAUD)
-    const variante = this.varianteCompose(
-      masqueCompose({
-        modules: this.solModules,
-        zones: zones.length > 0,
-        relief: relief > 0,
-        // LES MÊMES SEUILS QUE LE SHADER, au chiffre près : un drapeau qui
-        // mentirait sur une borne éteindrait un effet que le tableau demande.
-        brume: brume > 0.003 && decor > 0.5,
-        ombreVolume: lumiere > 0.5 && lumiereEau > 0.5,
-        materiaux: this.materiauxPoses,
-        texturesPretes: this.texturesPretes,
-      }),
-    )
+    const masque = masqueCompose({
+      modules: this.solModules,
+      zones: zones.length > 0,
+      relief: relief > 0,
+      // LES MÊMES SEUILS QUE LE SHADER, au chiffre près : un drapeau qui
+      // mentirait sur une borne éteindrait un effet que le tableau demande.
+      brume: brume > 0.003 && decor > 0.5,
+      ombreVolume: lumiere > 0.5 && lumiereEau > 0.5,
+      materiaux: this.materiauxPoses,
+      texturesPretes: this.texturesPretes,
+    })
+    const variante = this.sondeActive
+      ? this.varianteSonde()
+      : this.varianteCompose(masque)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
     gl.viewport(0, 0, devW, devH)
     gl.useProgram(variante.program)

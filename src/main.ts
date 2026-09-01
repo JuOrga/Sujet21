@@ -129,6 +129,7 @@ import {
   viseEchelle,
 } from './game/resolution'
 import { PROVENANCE } from './game/provenance'
+import { litSonde } from './game/sonde'
 import {
   DERNIERE_LIVRAISON,
   VERSION,
@@ -815,6 +816,11 @@ function applyLevel(): void {
   buildWorldLabels()
 }
 
+// LA SONDE DE RENDU (?sonde=plat|nu|zero) : l'escalier qui dit où part le
+// temps hors-CPU, quand les interrupteurs du voile n'y suffisent pas. Le
+// pourquoi, les marches et la règle du défaut vivent dans game/sonde.ts.
+const sonde = litSonde(location.search)
+
 // Étiquettes de monde : le nom de chaque surface, projeté par la caméra —
 // la lisibilité de la légende, mais dans le décor lui-même.
 const worldLabelsHost = document.getElementById(
@@ -984,6 +990,15 @@ function majBandeBasse(t: number): void {
 // fondu. Résultat : jamais deux textes l'un sur l'autre, à aucun zoom, et
 // le plan large se lit comme une carte — les lieux, sans le bavardage.
 function updateWorldLabels(vw: number, vh: number): void {
+  // ?sonde=nu : les pancartes quittent l'écran. Ce sont des éléments DOM
+  // repositionnés à chaque image AU-DESSUS du canvas (33 sur le hub) — un
+  // suspect à part entière du temps hors-CPU, que seule leur absence peut
+  // innocenter. Le calque est retiré une fois, pas caché élément par
+  // élément : c'est la COUCHE qu'on veut soustraire au compositeur.
+  if (sonde.nu) {
+    worldLabelsHost.hidden = true
+    return
+  }
   majBandeBasse(performance.now())
   // Au plan large, les pancartes RÉTRÉCISSENT avec la carte (plancher 0,45)
   // au lieu de garder leur taille de lecture : deux plaques géantes
@@ -3082,6 +3097,9 @@ function rapportPerf(): Record<string, unknown> {
       branche: PROVENANCE.branche,
     },
     config: {
+      // La SONDE, en tête : une mesure sondée n'est pas une mesure du jeu,
+      // et rien ne serait pire que de les comparer sans le savoir.
+      sonde: sonde.mode === '' ? 'aucune' : sonde.mode,
       fpsCap,
       resolution: resChoix,
       resolutionDynamique: resDynamique(),
@@ -12097,7 +12115,8 @@ function frame(now: number): void {
   majFpsCoin(dtReal)
   updateWorldLabels(vw, vh)
   appliqueSequence() // carte et secousse de la mise en scène
-  drawMecanismes(vw, vh, dpr)
+  if (sonde.nu) fxCanvas.hidden = true
+  else drawMecanismes(vw, vh, dpr)
   drawFleche(dtReal, dpr)
   majIdle(dtReal)
   majPresence(dtReal, aim.x, aim.y)
@@ -12131,45 +12150,47 @@ function frame(now: number): void {
     g(par.cuveSuivi, par.cuveZoom),
   )
   const renderT0 = performance.now()
-  renderer.render(
-    sim,
-    camera,
-    params,
-    vw,
-    vh,
-    dpr,
-    renderBoxes,
-    elapsed,
-    waveScratch,
-    waves.length,
-    params.renderDownsample,
-    chillNow(),
-    decorAffiche(),
-    level.zones ?? [],
-    decorRiche ? 1 : 0,
-    eauRiche ? 1 : 0,
-    lumiereActive ? 1 : 0,
-    lumieresVives(),
-    lumiereEauActive ? 1 : 0,
-    level.ambiante ?? AMBIANTE_DEFAUT,
-    RELIEF_K[reliefChoix],
-    level.brume ?? 0,
-    eauMiroir,
-    level.plafond ?? '',
-    {
-      regardX: presence.x,
-      regardY: presence.y,
-      regardInt: presence.int,
-      respAmp: presence.amp,
-      respVit: presence.vit,
-      frisson: presence.frisson,
-      ondule: presence.ondule,
-      oeilLueur: oeilRegl.lueur,
-      oeilOmbre: oeilRegl.ombre,
-      oeilTaille: oeilRegl.taille,
-      oeilRelief: oeilRegl.relief,
-    },
-  )
+  renderer.setSonde(sonde.plat)
+  if (!sonde.zero)
+    renderer.render(
+      sim,
+      camera,
+      params,
+      vw,
+      vh,
+      dpr,
+      renderBoxes,
+      elapsed,
+      waveScratch,
+      waves.length,
+      params.renderDownsample,
+      chillNow(),
+      decorAffiche(),
+      level.zones ?? [],
+      decorRiche ? 1 : 0,
+      eauRiche ? 1 : 0,
+      lumiereActive ? 1 : 0,
+      lumieresVives(),
+      lumiereEauActive ? 1 : 0,
+      level.ambiante ?? AMBIANTE_DEFAUT,
+      RELIEF_K[reliefChoix],
+      level.brume ?? 0,
+      eauMiroir,
+      level.plafond ?? '',
+      {
+        regardX: presence.x,
+        regardY: presence.y,
+        regardInt: presence.int,
+        respAmp: presence.amp,
+        respVit: presence.vit,
+        frisson: presence.frisson,
+        ondule: presence.ondule,
+        oeilLueur: oeilRegl.lueur,
+        oeilOmbre: oeilRegl.ombre,
+        oeilTaille: oeilRegl.taille,
+        oeilRelief: oeilRegl.relief,
+      },
+    )
   const rendRaw = performance.now() - renderT0
   monitor.renderMs += (rendRaw - monitor.renderMs) * 0.08
   // le collecteur note CHAQUE image rendue — c'est la matière du rapport.
