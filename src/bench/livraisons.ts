@@ -31,6 +31,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '01/09/2026 15:35',
+    title: 'La bibliothèque ne se ferme plus à 60 tableaux — le plafond est un poids',
+    notes: [
+      'LE DÉFAUT : la bibliothèque partagée refusait la 61e entrée (« bibliothèque pleine »). Le chiffre 60 ne protégeait rien de réel — mesuré sur les 32 tableaux écrits du jeu, une entrée pèse 1 469 octets en moyenne, 2 164 au plus lourd : soixante tableaux tiennent dans une petite centaine de kilo-octets. Le plafond tombait mille fois avant le moindre danger, et il tombait en plein travail.',
+      'LA CAUSE : on comptait des ENTRÉES là où le coût est un POIDS. Ce qui part sur le réseau à chaque lecture comme à chaque écriture, c’est le document entier ; un tableau lourd et un tableau léger n’ont jamais coûté la même chose.',
+      'LE CORRECTIF : le plafond est désormais un budget d’octets (2 Mo, api/_budget.ts), mesuré sur le document sérialisé en UTF-8 — soit de l’ordre de 1 300 tableaux au poids constaté. Le nombre d’opérations Vercel Blob ne bouge pas d’un pouce : une écriture coûte 2 put + 1 list, qu’il y ait dix entrées ou mille.',
+      'ET LE REFUS SE DIT ENFIN. Le client repliait tout échec sur « bibliothèque injoignable » : un refus du serveur envoyait donc chercher le réseau alors que la cause était écrite dans la réponse. L’éditeur et la planche citent maintenant la raison du serveur, et gardent « injoignable » pour ce qui l’est vraiment.',
+      'VÉRIFIÉ dans les deux sens : budget rabaissé sous le poids de 61 entrées, les tests tombent ; budget remis, ils passent. 711 tests verts, type-check à 0 erreur, construction faite.',
+    ],
+  },
+  {
     date: '01/09/2026 15:16',
     title: 'LA DESCENTE : un écran pour le déroulement de la run, et de quoi jouer avec',
     notes: [
