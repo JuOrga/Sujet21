@@ -1088,7 +1088,15 @@ export class FluidSim {
       }
       extent = Math.ceil(extent * 1.4) + 1
     }
-    if (kind === KIND_PLAYER) this.baseVolume += poses
+    // LE VOLUME DE DÉPART NE GRANDIT PAS QUAND ON LE REJOINT. Cette ligne
+    // faisait `baseVolume += poses`, et c'était un défaut à soi seul : la
+    // jauge de vie affiche `playerCount / baseVolume`, donc verser gonflait
+    // le NUMÉRATEUR et le DÉNOMINATEUR ensemble — le corps revenait à son
+    // plein pendant que la barre, elle, montrait de moins en moins. MESURÉ
+    // au hub, quatre versements d'affilée : base 900 → 967 → 1035 → 1104 →
+    // 1176, soit une jauge tombée à 76 % pour un corps pourtant PLEIN. Le
+    // seuil critique dessiné sur la jauge dérivait avec elle. Le volume de
+    // départ est celui du DÉPART : seul spawnDisc le pose.
     this.updatePlayerStats()
     return poses
   }
