@@ -54,9 +54,20 @@ Trois règles en découlent, et elles passent **avant le confort** :
    les branches de travail. Aucun workflow ne se déclenche sur `push` sans
    filtre de branche : c'est ce qui faisait tourner la CI deux fois par
    poussée (une fois pour `push`, une fois pour `pull_request`).
-2. **Seul `prod` déploie.** Pour voir une branche en ligne : `deploy` →
-   *Run workflow* → cible `previsualisation`. Jamais un déploiement
-   automatique depuis `dev` ou une branche de travail.
+2. **Seul `prod` déploie**, et **seul le workflow `deploy` publie**. Pour
+   voir une branche en ligne : `deploy` → *Run workflow* → cible
+   `previsualisation`. Jamais un déploiement automatique depuis `dev` ou une
+   branche de travail.
+
+   ⚠️ **Une seconde chaîne existe, invisible depuis le dépôt.** L'application
+   GitHub de Vercel est connectée au projet et reçoit le même webhook : le
+   31/08 elle construisait **toutes les branches**, 3 s après chaque poussée —
+   20 déploiements sur une heure, dont 2 seulement en production. Ce qui la
+   retient est le réglage **« Ignored Build Step » → « Don't build anything »**
+   du projet Vercel. Le remettre sur `Automatic` ramène le doublon **en
+   silence** : aucune ligne du dépôt ne le signalerait. Avant de conclure quoi
+   que ce soit sur le coût, regarder le tableau de bord Vercel — l'onglet
+   Actions ne voit pas cette chaîne.
 3. **Tout workflow porte `paths-ignore`** (`docs/**`, `masters/**`,
    `ops/**`, `**/*.md`) **et un `concurrency` avec `cancel-in-progress`**.
    Un commit de documentation ne construit rien ; trois poussées d'affilée
