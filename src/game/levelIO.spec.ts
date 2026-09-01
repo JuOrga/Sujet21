@@ -535,6 +535,52 @@ it('conserve les rails magnétiques et écarte les moignons', () => {
   ).toBe(true)
 })
 
+// LE DRAPEAU CONDUIT SURVIT À L'ENREGISTREMENT — la panne du miroir, gravée.
+// « readBox » jetait toute boîte dont le matériau manquait à une liste, en
+// silence : on posait un miroir, on enregistrait, il n'était plus là. Le
+// même piège attendait ici — la lecture d'un rail reconstruisait
+// `{ points }` et rien d'autre, donc un conduit serait redevenu un rail
+// ordinaire à la relecture, sans une erreur.
+it('conserve le drapeau CONDUIT d’un rail, sur deux allers-retours', () => {
+  const src = {
+    ...TABLEAUX[0],
+    rails: [
+      { points: [{ x: 0, y: 0 }, { x: 400, y: 0 }], conduit: true },
+      { points: [{ x: 0, y: 200 }, { x: 400, y: 200 }] },
+    ],
+  }
+  // DEUX allers-retours : c'est au second que la perte se voyait, pour le
+  // miroir — le premier passe encore par l'objet d'origine en mémoire.
+  const un = parseLevel(JSON.parse(serializeLevel(src)))
+  expect(un.rejets).toEqual([])
+  const deux = parseLevel(JSON.parse(serializeLevel(un.level!)))
+  expect(deux.rejets).toEqual([])
+  expect(deux.level!.rails![0].conduit).toBe(true)
+  // et le rail ORDINAIRE ne gagne pas le champ au passage
+  expect(deux.level!.rails![1].conduit).toBeUndefined()
+})
+
+// UN CONDUIT RÉCLAME UN ÉMETTEUR, LUI AUSSI. La dispense d'origine était
+// fondée sur la règle « la vapeur seule ouvre le tube », abandonnée : le
+// conduit ne s'ouvre qu'au PLASMA, donc à un arc. Sans laser, ce n'est pas
+// un raccourci mais une paroi invisible que rien n'ouvrira jamais — le pire
+// des tableaux, celui qui a l'air jouable.
+it('réclame un émetteur laser MÊME pour un rail marqué conduit', () => {
+  const conduitSansLaser = checkLevel({
+    ...TABLEAUX[0],
+    lasers: [],
+    rails: [{ points: [{ x: 0, y: 0 }, { x: 400, y: 0 }], conduit: true }],
+  } as never)
+  expect(conduitSansLaser.some((v) => /émetteur laser/.test(v.message))).toBe(true)
+  // et le rail de GUIDAGE reste signalé comme avant
+  const guidage = checkLevel({
+    ...TABLEAUX[0],
+    lasers: [],
+    rails: [{ points: [{ x: 0, y: 0 }, { x: 400, y: 0 }] }],
+  } as never)
+  expect(guidage.some((v) => /émetteur laser/.test(v.message))).toBe(true)
+})
+
 describe('levelIO — boîtes obliques', () => {
   it('l’angle d’une boîte survit à l’aller-retour JSON', () => {
     const src = JSON.parse(serializeLevel(TABLEAUX[0])) as Record<

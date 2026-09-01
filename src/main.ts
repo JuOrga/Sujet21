@@ -192,6 +192,10 @@ import {
   saveLevel,
   type StoredLevel,
 } from './game/netLevels'
+import {
+  bonbonneIllimitee,
+  doitVerserAuto,
+} from './game/bonbonne'
 import { AudioFx, loadAudioPrefs } from './game/audio'
 import {
   Soundtrack,
@@ -531,6 +535,10 @@ function createSim(level: LevelDef): FluidSim {
     zoneForceAt(level, level.spawn.x, level.spawn.y) === 'vapeur'
   sim.dashBudget = sim.dashBudgetMax
   sim.setLevel(level.boxes, level.sponges)
+  // Le tube d'un conduit épouse la bande de convoyage (railConvoy travaille
+  // à plasmaRailRadius × 2,5) : ce qui est porté est exactement ce qui est
+  // dedans, sinon le nuage se ferait expulser d'un bord qu'il croyait libre.
+  sim.setConduits(level.rails ?? [], params.plasmaRailRadius * 2.5)
   sim.spawnDisc(level.spawn.x, level.spawn.y, level.spawn.n, KIND_PLAYER)
   // né dans une zone qui impose la vapeur : le corps EST un nuage dès la
   // première image — sinon le compteur annonce des dashs qui ne partent pas,
@@ -5506,8 +5514,17 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       }
     }
     // la bande de capture : la portée du champ, tout du long
-    g.strokeStyle = 'rgba(150,120,255,0.07)'
-    g.lineWidth = Math.max(2, params.plasmaRailRadius * 2 * z)
+    // LA BANDE DESSINÉE DOIT ÊTRE LE TUBE RÉEL. Un conduit fait collision sur
+    // `plasmaRailRadius × 2,5` (la bande de convoyage) alors que la bande de
+    // CAPTURE du faisceau ne fait qu'un rayon : dessiner la seconde pour un
+    // conduit ferait buter le corps 45 unités avant tout ce qui se voit.
+    const rayonDessine = rail.conduit === true
+      ? params.plasmaRailRadius * 2.5
+      : params.plasmaRailRadius
+    g.strokeStyle = rail.conduit === true
+      ? 'rgba(150,120,255,0.14)' // un conduit est une PAROI : il se voit plus
+      : 'rgba(150,120,255,0.07)'
+    g.lineWidth = Math.max(2, rayonDessine * 2 * z)
     g.lineJoin = 'round'
     g.lineCap = 'round'
     chemin()
@@ -6267,6 +6284,9 @@ function drawFleche(dtReal: number, dpr: number): void {
 }
 
 let lastRailTime = 0
+// quand le hub a versé pour la dernière fois (temps de tableau) : le repos
+// entre deux versements évite que le son de collecte ne crépite
+let dernierVersementAuto = -99
 // rails dont le champ est engagé : allumés par un arc, ils ne se relâchent
 // qu'une fois leur bande vidée (le nuage porté jusqu'à l'arrivée)
 const railsEngages = new Set<number>()
@@ -6822,14 +6842,21 @@ instrPanel?.addEventListener('click', () => {
  * non pleine. Le corps se regonfle jusqu'à son volume de départ ; l'état
  * liquide est requis (la glace n'absorbe pas, le nuage disperserait). */
 function verserBonbonne(): string {
-  if (auHub || testLevel || miseEnBonbonne || sim.dispersed) return 'contexte'
+  // AU HUB, la réserve est INFINIE et le versement y est admis : on ne
+  // s'assèche pas chez soi, et perdre un corps en allant parler au marchand
+  // n'a aucun intérêt de jeu. Ailleurs, le contexte refuse comme avant.
+  const illimitee = bonbonneIllimitee(auHub)
+  if ((auHub && !illimitee) || testLevel || miseEnBonbonne || sim.dispersed)
+    return 'contexte'
   if (input.paused || run.ended || run.exitTimer > 0) return 'pause'
   if (input.freezeIntent || input.gasIntent) return 'etat'
   const manque = Math.max(0, level.spawn.n - sim.playerCount)
-  const nParts = Math.min(
-    manque,
-    Math.floor(run.bonbonneLiters / params.litersPerParticle),
-  )
+  const nParts = illimitee
+    ? manque
+    : Math.min(
+        manque,
+        Math.floor(run.bonbonneLiters / params.litersPerParticle),
+      )
   if (nParts < 1) return 'rien'
   // le versement s'installe dans les CREUX autour du corps (jamais sur les
   // particules en place) : poser au centroïde faisait exploser la densité —
@@ -6841,10 +6868,13 @@ function verserBonbonne(): string {
     KIND_PLAYER,
   )
   if (poses < 1) return 'rien'
-  run.bonbonneLiters = Math.max(
-    0,
-    run.bonbonneLiters - poses * params.litersPerParticle,
-  )
+  // une réserve infinie ne se débite pas — sinon la jauge du hub tomberait
+  // à zéro en montrant « ∞ »
+  if (!illimitee)
+    run.bonbonneLiters = Math.max(
+      0,
+      run.bonbonneLiters - poses * params.litersPerParticle,
+    )
   sim.relabel()
   bande.ponctuation('sting-collecte', 0.5)
   bonbonneEl.classList.add('ouvert')
@@ -9493,6 +9523,11 @@ function annonceVoieCarte(): void {
 function restart(): void {
   run.exitTimer = 0
   run.tableauTime = 0
+  // remis à zéro AVEC l'horloge qu'il mesure : sans cela, après un versement
+  // au temps T, la visite suivante du hub calculait depuisDernier = −T et
+  // taisait le versement pendant T secondes — donc la bannière d'alerte
+  // s'affichait au hub, précisément ce que la mécanique promet d'éviter
+  dernierVersementAuto = -99
   // la BONBONNE se présente : le niveau repart de zéro et remonte à vue,
   // l'éclat balaie le verre — un rappel discret de ce qu'on a en réserve
   bbAffiche = 0
@@ -11624,6 +11659,12 @@ function frame(now: number): void {
       for (const t of laserEtat.vues)
         for (const ri of t.railsSuivis) actifs.add(ri)
       for (const ri of actifs) railsEngages.add(ri)
+      // LE CONDUIT S'OUVRE AU PLASMA, PAS À LA VAPEUR. Un nuage seul ne
+      // suffit pas : il faut que l'arc ionisé circule sur CE rail — donc
+      // s'être vaporisé DANS le faisceau, au pied du tube. Le raccourci est
+      // la récompense de l'énigme, pas son contournement. Tant que le champ
+      // n'est pas levé, le tube reste plein pour tout le monde.
+      sim.setConduitsActifs(railsEngages)
       for (const ri of [...railsEngages]) {
         const rail = railsDuNiveau[ri]
         if (!rail) {
@@ -12197,11 +12238,18 @@ function frame(now: number): void {
   hudCoque.textContent = `${coque > 0 ? '+' : ''}${coque}°`
   hudCoque.classList.toggle('warn', chillNow() > 0.75)
   coqueBar.style.width = `${(chillNow() * 100).toFixed(1)}%`
-  hudBonbonne.textContent = `${run.bonbonneLiters.toFixed(2)} / ${capBonbonne()} L`
+  // AU HUB la réserve est infinie : afficher un litrage qui ne descend
+  // jamais ferait croire à une jauge en panne.
+  const bbInfinie = bonbonneIllimitee(auHub)
+  hudBonbonne.textContent = bbInfinie
+    ? '∞'
+    : `${run.bonbonneLiters.toFixed(2)} / ${capBonbonne()} L`
   // LE NIVEAU DANS LE VERRE : la part de réserve, poursuivie en douceur.
   // L'intérieur utile va de y = 8,5 (plein) à y = 57,5 (vide) dans le
   // viewBox — soit 49 unités de descente pour un verre vide.
-  const bbCible = Math.max(0, Math.min(1, run.bonbonneLiters / capBonbonne()))
+  const bbCible = bbInfinie
+    ? 1
+    : Math.max(0, Math.min(1, run.bonbonneLiters / capBonbonne()))
   bbAffiche += (bbCible - bbAffiche) * Math.min(1, dtReal * 5)
   if (Math.abs(bbCible - bbAffiche) < 0.002) bbAffiche = bbCible
   if (bbLiquide)
@@ -12278,6 +12326,39 @@ function frame(now: number): void {
     levelHasCold && roseeL >= 0.05
       ? `rosée récupérable aux plaques froides : ${roseeL.toFixed(2)} L`
       : ''
+
+  // ---- LE VERSEMENT AUTOMATIQUE DU HUB ------------------------------
+  // Au hub, la jauge basse n'est pas une tension de jeu : c'est une gêne.
+  // La réserve s'y verse donc toute seule, AVANT que la première alerte
+  // n'ait eu le temps de s'afficher — le seuil est posé au-dessus de
+  // `lastCallLiters` exprès (src/game/bonbonne.ts). Placé juste avant le
+  // bloc de fin de course, qui est celui qui lève les alertes : à l'image
+  // où la bannière se poserait, le corps est déjà renfloué.
+  if (
+    doitVerserAuto({
+      auHub,
+      litres: sim.liters(),
+      litresPleins: level.spawn.n * params.litersPerParticle,
+      lastCallLiters: params.lastCallLiters,
+      empeche:
+        input.paused ||
+        input.freezeIntent ||
+        input.gasIntent ||
+        miseEnBonbonne ||
+        sim.dispersed ||
+        run.ended ||
+        run.exitTimer > 0,
+      depuisDernier: run.tableauTime - dernierVersementAuto,
+    })
+  ) {
+    // l'horodatage se pose sur TOUTE tentative, pas seulement sur celle qui
+    // réussit : un corps qui n'arrive pas à absorber (creux pleins) renvoie
+    // 'rien', et sans cela le versement — et son son de collecte — repartait
+    // à chaque image. C'est exactement le crépitement que le repos existe
+    // pour empêcher.
+    verserBonbonne()
+    dernierVersementAuto = run.tableauTime
+  }
 
   // ---- Fin de course : dernière impulsion, gel, arrêt ----
   // Aucun minimum à ramener : on peut finir un tableau sur un souffle. Sous le

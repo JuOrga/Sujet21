@@ -5149,6 +5149,15 @@ export class LevelEditor {
       rows.push(
         `<button type="button" class="ed-btn" id="p-railrev">Inverser le sens</button>`,
       )
+      // LE CONDUIT : le même tracé, mais en RACCOURCI au lieu d'énigme.
+      rows.push(
+        `<label class="ed-row"><input type="checkbox" id="p-railconduit"${
+          r.conduit ? ' checked' : ''
+        } /> <span>CONDUIT — raccourci traversable</span></label>`,
+      )
+      rows.push(
+        `<p class="ed-empty">Coché, le rail prend un corps : PAROI en eau et en glace (on bute dessus), PASSAGE au PLASMA — il faut qu’un arc ionisé circule dessus, donc s’être vaporisé DANS le faisceau. Le nuage file alors à travers les cloisons jusqu’à l’autre bout. Un conduit RÉCLAME donc un émetteur laser dont le faisceau passe près du tube — sans lui, c’est une paroi que rien n’ouvrira. Décoché, c’est le rail de guidage d’arc habituel.</p>`,
+      )
     } else if (s.kind === 'label') {
       const l = this.level.labels[s.index]
       // zone de texte (et non ligne unique) : ENTRÉE fait un vrai saut de
@@ -5339,6 +5348,19 @@ export class LevelEditor {
         | HTMLSelectElement
         | null
       return e ? e.value : ''
+    }
+
+    if (s.kind === 'rail') {
+      const r = (this.level.rails ?? [])[s.index]
+      if (r) {
+        const c = this.host.querySelector('#p-railconduit') as HTMLInputElement | null
+        // le drapeau ne s'ÉCRIT que s'il est vrai : un rail ordinaire garde
+        // exactement la forme qu'il avait, et les tableaux d'avant ne
+        // gagnent pas un champ dont ils n'ont que faire
+        if (c?.checked) r.conduit = true
+        else delete r.conduit
+      }
+      return
     }
 
     if (s.kind === 'box') {

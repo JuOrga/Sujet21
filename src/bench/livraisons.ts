@@ -31,6 +31,48 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '01/09/2026 01:01',
+    title: 'Le conduit ne pouvait JAMAIS s’ouvrir en jouant — et sept autres défauts',
+    notes: [
+      'LE VERROU, trouvé en revue avant la mise en ligne et vérifié à la mesure. Un conduit fermé expulsait TOUT ce qui n’était pas du plasma, la vapeur comprise. Or c’est la vapeur qui allume le champ : la capture du rail par le faisceau se fait à 30 unités de l’axe, et l’expulsion la jetait au-delà du rayon du tube (75) — mesuré, à plus de DEUX MILLE unités. Le raccourci était donc inatteignable en jeu. Mes dix tests passaient parce qu’ils levaient le champ à la main, sans jamais faire tourner le laser : ils prouvaient la mécanique, pas son accès.',
+      'LA VAPEUR ENTRE DÉSORMAIS dans un tube fermé, et n’y gagne rien : ni convoyage, ni traversée des parois. C’est bien le PLASMA qui ouvre le raccourci — la vapeur a seulement le droit de s’approcher pour l’allumer. Entrer n’est pas traverser. L’eau et la glace, elles, butent comme avant. Deux tests neufs gravent l’accès : la vapeur reste à portée de capture, l’eau non.',
+      'UN CONDUIT RÉCLAME UN LASER, et l’éditeur le disait faux. La dispense d’avertissement « rail sans émetteur » avait été posée sur la règle vapeur-seule, abandonnée depuis : un conduit sans laser n’est pas un raccourci, c’est une paroi invisible que rien n’ouvrira jamais — le pire des tableaux, celui qui a l’air jouable. La dispense est retirée, et la notice de l’éditeur comme la fiche du drapeau disent maintenant la règle du plasma.',
+      'LE VERSEMENT DU HUB SE TAISAIT AU MAUVAIS MOMENT. Le compteur du dernier versement n’était jamais remis à zéro alors que l’horloge de tableau repart de 0 à chaque salle : après un versement au temps T, la visite suivante du hub calculait « depuis » = −T et se taisait pendant T secondes. La bannière d’alerte s’affichait donc au hub, précisément ce que la mécanique promet d’éviter. Corrigé à deux endroits — la remise à zéro accompagne l’horloge, et la décision ne prend plus un « depuis » négatif pour un repos.',
+      'ET IL CRÉPITAIT quand le corps n’arrivait pas à absorber : l’horodatage ne se posait que sur un versement RÉUSSI, donc un « rien » relançait la tentative à chaque image, avec son son de collecte. Il se pose sur toute tentative. La sortie de salle en cours rejoint aussi la liste des empêchements.',
+      'LE TUBE MENTAIT SUR SA TAILLE : il faisait collision sur 150 unités de large et n’était dessiné que sur 60. Un corps liquide s’arrêtait donc 45 unités avant tout ce qui se voit. La bande dessinée épouse maintenant le tube réel, et un conduit se dessine plus franc qu’un rail de guidage — c’est une paroi, elle doit se voir.',
+      'DEUX CONDUITS QUI SE CROISENT : le relevé ne gardait que le tronçon le plus proche, tous tubes confondus, si bien qu’un tube FERMÉ voisin pouvait expulser un corps en pleine traversée d’un tube OUVERT. Un tube ouvert prime désormais sur un fermé.',
+      'ET LA GLACE NE REBONDISSAIT PAS : l’expulsion ne déclarait pas le contact (matériau, normale, vitesse entrante) comme le fait tout autre solide, donc la passe de glace ne recevait aucune impulsion — un palet se DÉFORMAIT dans le tube au lieu d’y rebondir. Le contact est déclaré.',
+      'CE QUE CET ÉPISODE ENSEIGNE, et qui vaut au-delà du conduit : dix tests verts ne disent rien de l’ACCESSIBILITÉ d’une mécanique quand ils court-circuitent la chaîne qui y mène. 668 tests verts, type-check et build propres.',
+    ],
+  },
+  {
+    date: '01/09/2026 00:27',
+    title: 'La bonbonne ne s’épuise plus au hub, et elle s’y verse toute seule',
+    notes: [
+      'AU HUB, LA RÉSERVE EST INFINIE. On ne s’assèche pas chez soi : perdre un corps en allant parler au marchand ou consulter le banc des mémoires n’a aucun intérêt de jeu. Le bouton de versement, qui refusait le hub d’un « contexte » sec, y est désormais admis — et n’y débite rien. La jauge affiche « ∞ » et le verre reste plein, plutôt qu’un litrage figé qui passerait pour une jauge en panne.',
+      'ET ELLE SE VERSE AVANT L’ALERTE, PAS APRÈS. Le versement automatique se déclenche à un seuil posé 25 % AU-DESSUS de « lastCallLiters » (0,6 L), celui qui lève la bannière « la dernière impulsion approche ». Le but est que cette bannière n’ait jamais l’occasion de s’afficher au hub. Le contrôle est placé juste avant le bloc de fin de course, qui est celui qui lève les alertes : à l’image où la bannière se poserait, le corps est déjà renfloué.',
+      'LA MARGE DE 25 % N’EST PAS DÉCORATIVE : le versement ne se pose pas d’un bloc, il s’installe dans les creux autour du corps, et déclencher pile sur le seuil ferait clignoter l’alerte entre deux images. Un repos de 0,75 s entre deux versements évite en outre que le son de collecte ne crépite quand le corps n’arrive pas à absorber.',
+      'EN DESCENTE, RIEN NE CHANGE : la réserve reste comptée, le versement reste un geste, et la jauge qui descend reste la tension du tableau. Un test le grave à part.',
+      'LA RÈGLE VIT DANS UN MODULE PUR — src/game/bonbonne.ts — au lieu de main.ts, où aucun test ne va. Neuf tests, dont un formulé à l’envers : pour TOUT volume qui déclencherait l’alerte, la décision de verser était déjà prise avant. Vérifié dans les deux sens — le seuil ramené sur l’alerte, le contrat tombe ; remis, il passe.',
+    ],
+  },
+  {
+    date: '01/09/2026 00:20',
+    title: 'Les rails deviennent des raccourcis, ouverts au PLASMA seul',
+    notes: [
+      'LA DEMANDE : que les rails de plasma aient un corps — solides comme des parois, traversables en plasma — pour servir de raccourcis à travers les cloisons, à la manière du téléporteur de Dead Cells.',
+      'PLASMA = VAPEUR + LASER, et c’est ce qui fait tout l’intérêt. Un premier essai ouvrait le tube à la vapeur seule ; c’était un contournement de l’énigme, pas une récompense. Il faut désormais qu’un ARC IONISÉ circule sur ce rail — donc s’être vaporisé DANS le faisceau, au pied du tube. Tant que le champ n’est pas levé, le conduit reste plein pour tout le monde, la vapeur comprise.',
+      'LES DEUX VISAGES DU CONDUIT. Hors plasma, le tube est une PAROI : on est expulsé de son axe, on bute dessus comme sur une coque, en eau comme en glace comme en vapeur non ionisée. Au plasma, c’est un PASSAGE : tant que le nuage y est, le décor ne le touche plus du tout — il file À TRAVERS les parois jusqu’à l’autre bout, porté par le champ.',
+      'LA MOITIÉ DU CHEMIN ÉTAIT DÉJÀ FAITE : « railConvoy » sait depuis longtemps porter un nuage le long d’une ligne de champ, virages compris, avec un freinage à l’arrivée pour que la condensation n’explose pas en gare. Ce qui manquait, c’est qu’un rail n’avait AUCUNE physique — une polyligne que seul le traceur de faisceau consultait.',
+      'LE TUBE EST UNE CAPSULE, pas des boîtes. Convertir la polyligne en rectangles obliques aurait demandé de toucher au format des tableaux, au générateur et à l’éditeur pour une géométrie que le solveur sait déjà mesurer. Le conduit réutilise la même projection, au même rayon que la bande de convoyage : ce qui est porté est exactement ce qui est dedans.',
+      'RIEN NE CHANGE SANS LE DRAPEAU. Les tableaux à énigme d’arc gardent leur comportement au chiffre près ; le générateur procédural n’en pose jamais, donc ses preuves de traversée restent valides. Un test compare un tableau sans conduit à un solveur qui n’en a jamais entendu parler : même position du corps à six décimales.',
+      'LE PIÈGE DU MIROIR, ÉVITÉ DE JUSTESSE. La lecture d’un rail faisait « rails.push({ points: pts }) » — tout champ supplémentaire aurait disparu à l’enregistrement, en silence, exactement comme MAT_MIROIR absent de MATERIALS. Le drapeau est relu, et un test le vérifie sur DEUX allers-retours (c’est au second que la perte se voyait). L’avertissement « rail sans émetteur laser » ne tombe plus sur un conduit, qui n’a aucun arc à guider.',
+      'DIX TESTS gravent la promesse dans les deux sens, parce qu’une moitié seule n’a aucune valeur — un tube qui laisse passer tout le monde n’est pas un raccourci, c’est un trou. Le couple décisif : tube FERMÉ, le même nuage reste du mauvais côté ; tube OUVERT, il passe. La seule différence est l’engagement de l’arc.',
+      'UN RELEVÉ A CORRIGÉ LE TEST AVANT LE CODE : le nuage lâché à l’arrêt recondensait en moins d’une demi-seconde et n’allait nulle part. L’état vapeur est TENU par l’intention du joueur. Le test le tient donc, comme la touche le fait, et le corps franchit la cloison à une seconde puis se gare au terminus.',
+      'DANS L’ÉDITEUR : une case « CONDUIT — raccourci traversable » sur le panneau du rail, avec sa notice. Le drapeau ne s’écrit que s’il est vrai, pour que les tableaux d’avant ne gagnent pas un champ dont ils n’ont que faire.',
+    ],
+  },
+  {
     date: '31/08/2026 15:52',
     title: 'Le miroir disparaissait à l’enregistrement — un mot manquait à une liste',
     notes: [

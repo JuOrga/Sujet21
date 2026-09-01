@@ -186,6 +186,24 @@ export class FluidSim {
   boxes: ObstacleBox[] = []
   sponges: Sponge[] = []
   contactTime: Float32Array // temps de contact continu avec l'éponge
+  // LES CONDUITS (rails marqués `conduit`) : des tubes qui ne se comportent
+  // pas pareil selon l'état. Rangés à part des boîtes parce qu'un tube est
+  // une CAPSULE (distance à une polyligne), pas un rectangle — le convertir
+  // en boîtes obliques aurait demandé de toucher au format des tableaux, au
+  // générateur et à l'éditeur pour une géométrie qu'on sait déjà mesurer.
+  private conduits: { pts: { x: number; y: number }[]; rayon: number; rail: number; actif: boolean }[] = []
+  // 1 = la particule est DANS un tube, à cet instant. Recalculé une fois par
+  // pas, avant la résolution des solides, et lu deux fois : la vapeur y
+  // ignore tout le décor (c'est le raccourci), l'eau et la glace s'en font
+  // expulser (c'est la paroi).
+  private readonly dansConduit: Uint8Array
+  // 1 = ce tube-là est OUVERT (arc engagé) : seul cas où la vapeur passe
+  private readonly conduitOuvert: Uint8Array
+  // l'axe du tube au point le plus proche : sert à repousser ce qui n'est
+  // pas gazeux, sans refaire la projection
+  private readonly conduitNX: Float32Array
+  private readonly conduitNY: Float32Array
+  private readonly conduitProf: Float32Array // enfoncement sous la peau du tube
   private contactMat: Int8Array // -1 aucun, sinon matériau du contact solide
   private contactNX: Float32Array
   private contactNY: Float32Array
@@ -337,6 +355,11 @@ export class FluidSim {
     this.pairW = new Float32Array(capacity * MAX_NEIGHBORS)
     this.pairC = new Float32Array(capacity * MAX_NEIGHBORS)
     this.contactTime = new Float32Array(capacity)
+    this.dansConduit = new Uint8Array(capacity)
+    this.conduitOuvert = new Uint8Array(capacity)
+    this.conduitNX = new Float32Array(capacity)
+    this.conduitNY = new Float32Array(capacity)
+    this.conduitProf = new Float32Array(capacity)
     this.contactMat = new Int8Array(capacity)
     this.contactNX = new Float32Array(capacity)
     this.contactNY = new Float32Array(capacity)
@@ -2153,6 +2176,143 @@ export class FluidSim {
     }
   }
 
+  /** Les tubes du tableau. Appelé au chargement, comme setLevel : un rail
+   *  ordinaire n'entre pas dans cette liste, donc un tableau sans conduit
+   *  ne paie strictement rien (la passe sort au premier test). */
+  setConduits(rails: { points: { x: number; y: number }[]; conduit?: boolean }[], rayon: number): void {
+    this.conduits = []
+    for (let i = 0; i < rails.length; i++) {
+      const r = rails[i]
+      if (r.conduit !== true || r.points.length < 2) continue
+      // l'indice de rail est gardé : c'est par lui que l'engagement de
+      // l'arc (calculé côté jeu, sur le traceur de faisceau) retrouve son tube
+      this.conduits.push({ pts: r.points, rayon, rail: i, actif: false })
+    }
+  }
+
+  /** QUELS TUBES SONT OUVERTS, à cet instant. Un conduit ne s'ouvre qu'au
+   *  PLASMA : il faut qu'un arc ionisé circule sur ce rail — donc que le
+   *  corps se soit vaporisé DANS le faisceau. La vapeur seule ne suffit
+   *  pas, et c'est ce qui fait du raccourci la récompense de l'énigme
+   *  plutôt que son contournement. Appelé une fois par image. */
+  setConduitsActifs(engages: ReadonlySet<number>): void {
+    for (const tube of this.conduits) tube.actif = engages.has(tube.rail)
+  }
+
+  /** Qui est dans un tube, et à quelle profondeur. Une passe par pas, avant
+   *  la résolution des solides — les deux usages (laisser filer la vapeur,
+   *  expulser le reste) lisent le même relevé. */
+  private majConduits(): void {
+    const n = this.count
+    if (this.conduits.length === 0) {
+      if (n > 0) this.dansConduit.fill(0, 0, n)
+      return
+    }
+    for (let i = 0; i < n; i++) {
+      this.dansConduit[i] = 0
+      const px = this.prdX[i]
+      const py = this.prdY[i]
+      // UN TUBE OUVERT PRIME. Deux conduits peuvent se croiser : prendre
+      // bêtement le plus proche ferait qu'un tube FERMÉ voisin expulse un
+      // corps en pleine traversée d'un tube OUVERT. On retient donc le
+      // meilleur candidat ouvert s'il en existe un, le plus proche sinon.
+      let best = Infinity
+      let bnx = 0
+      let bny = 0
+      let brayon = 0
+      let bouvert = 0
+      for (const tube of this.conduits) {
+        const pts = tube.pts
+        const ouvert = tube.actif ? 1 : 0
+        // un tube fermé ne peut pas déloger un tube ouvert déjà retenu
+        if (bouvert === 1 && ouvert === 0) continue
+        for (let k = 0; k + 1 < pts.length; k++) {
+          const a = pts[k]
+          const b = pts[k + 1]
+          const abx = b.x - a.x
+          const aby = b.y - a.y
+          const len2 = abx * abx + aby * aby
+          if (len2 < 1e-9) continue
+          const t = Math.max(0, Math.min(1, ((px - a.x) * abx + (py - a.y) * aby) / len2))
+          const cx = a.x + abx * t
+          const cy = a.y + aby * t
+          const dx = px - cx
+          const dy = py - cy
+          const d2 = dx * dx + dy * dy
+          if (d2 > tube.rayon * tube.rayon) continue // hors de CE tube
+          // un ouvert détrône un fermé ; à égalité d'ouverture, le plus proche
+          if (bouvert === 1 && ouvert === 1 && d2 >= best) continue
+          if (bouvert === 0 && ouvert === 0 && d2 >= best) continue
+          best = d2
+          bouvert = ouvert
+          const d = Math.sqrt(d2)
+          // sur l'axe même, la normale est indéfinie : on prend la
+          // perpendiculaire au tronçon, pour que l'expulsion ait un sens
+          if (d > 1e-6) {
+            bnx = dx / d
+            bny = dy / d
+          } else {
+            const inv = 1 / Math.sqrt(len2)
+            bnx = -aby * inv
+            bny = abx * inv
+          }
+          brayon = tube.rayon
+        }
+      }
+      if (brayon > 0) {
+        this.dansConduit[i] = 1
+        this.conduitOuvert[i] = bouvert
+        this.conduitNX[i] = bnx
+        this.conduitNY[i] = bny
+        this.conduitProf[i] = brayon - Math.sqrt(best)
+      }
+    }
+  }
+
+  /** LA PAROI DU TUBE — pour ce qui est CONDENSÉ, et pour cela seulement.
+   *
+   *  LE VERROU QU'IL A FALLU OUVRIR. Expulser aussi la VAPEUR rendait le
+   *  conduit inutilisable : pour lever le champ il faut ioniser le faisceau
+   *  DANS le tube (la capture se fait à `plasmaRailRadius`, 30 u de l'axe),
+   *  or un tube fermé qui repousse la vapeur la met hors d'atteinte — mesuré,
+   *  elle finissait à plus de deux mille unités. On ne pouvait donc JAMAIS
+   *  ouvrir un conduit en jouant ; seuls les tests, qui lèvent le champ à la
+   *  main, voyaient la mécanique fonctionner.
+   *
+   *  La vapeur ENTRE donc, et n'y gagne rien tant que l'arc n'est pas pris :
+   *  ni convoyage, ni laissez-passer du décor. C'est bien le PLASMA qui
+   *  ouvre le raccourci — la vapeur seule ne fait qu'avoir le droit de
+   *  s'approcher pour l'allumer.
+   *
+   *  L'eau et la glace, elles, butent : on ne se faufile pas dans une ligne
+   *  de champ en étant de la matière condensée. */
+  private expulseDesConduits(): void {
+    if (this.conduits.length === 0) return
+    for (let i = 0; i < this.count; i++) {
+      if (this.dansConduit[i] !== 1) continue
+      // la vapeur a le droit d'entrer, ouverte ou non : c'est elle qui allume
+      if (this.gaseous[i] === 1) continue
+      const prof = this.conduitProf[i]
+      if (prof <= 0) continue
+      const nx = this.conduitNX[i]
+      const ny = this.conduitNY[i]
+      this.prdX[i] += nx * prof
+      this.prdY[i] += ny * prof
+      // LE CONTACT EST DÉCLARÉ, comme pour n'importe quel solide : sans lui
+      // la passe de glace ne reçoit aucune impulsion et un palet se DÉFORME
+      // dans le tube au lieu d'y rebondir.
+      const vn =
+        ((this.prdX[i] - this.posX[i]) * nx + (this.prdY[i] - this.posY[i]) * ny) /
+        Math.max(1e-6, this.params.dt)
+      this.contactMat[i] = MAT_WALL
+      this.contactNX[i] = nx
+      this.contactNY[i] = ny
+      this.contactVn[i] = Math.min(0, vn)
+      // expulsée, elle n'est plus dedans
+      this.dansConduit[i] = 0
+    }
+  }
+
   private readonly scratchCP: ClosestPoint = { dist: 0, nx: 0, ny: 0 }
 
   // Pousse les particules hors des solides et enregistre le contact (normale,
@@ -2164,11 +2324,28 @@ export class FluidSim {
     const invDt = 1 / dt
     const cp = this.scratchCP
     this.contactMat.fill(-1, 0, n)
+    // LES TUBES D'ABORD : le relevé sert aux deux règles qui suivent, et
+    // l'expulsion doit avoir lieu AVANT que le décor ne se prononce (une
+    // particule d'eau chassée du tube doit pouvoir buter sur la paroi
+    // derrière, dans le même pas).
+    this.majConduits()
+    this.expulseDesConduits()
     if (this.boxes.length === 0 && this.sponges.length === 0) return
 
     for (let i = 0; i < n; i++) {
       let x = this.prdX[i]
       let y = this.prdY[i]
+
+      // LE RACCOURCI. Dans un conduit, la vapeur ne touche plus RIEN du
+      // décor : c'est ce qui lui fait traverser la paroi au lieu de la
+      // longer. Hors du tube, ou dans un autre état, le décor reprend tous
+      // ses droits — la particule vient d'ailleurs d'en être expulsée.
+      if (
+        this.dansConduit[i] === 1 &&
+        this.conduitOuvert[i] === 1 &&
+        this.gaseous[i] === 1
+      )
+        continue
 
       for (const b of this.boxes) {
         // Chaque état a sa porte : la grille laisse passer la VAPEUR, la
