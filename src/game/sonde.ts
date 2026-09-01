@@ -24,8 +24,18 @@
 //
 // La marche qui fait bondir la cadence nomme le coupable.
 
-/** Les modes, du plus complet au plus dépouillé. */
-export type ModeSonde = '' | 'plat' | 'nu' | 'zero'
+/** Les modes. Les trois premiers RETIRENT des couches ; les `arretN`
+ * gardent tout mais arrêtent le shader de composition à la fin d'un bloc. */
+export type ModeSonde =
+  | ''
+  | 'plat'
+  | 'nu'
+  | 'zero'
+  | 'arret1'
+  | 'arret2'
+  | 'arret3'
+  | 'arret4'
+  | 'arret5'
 
 export interface Sonde {
   /** Le mode demandé ; '' quand personne ne sonde — le cas de tous les
@@ -37,6 +47,9 @@ export interface Sonde {
   nu: boolean
   /** En plus : plus aucun rendu. */
   zero: boolean
+  /** La marche du PROFIL : la composition s'arrête à la fin de ce bloc.
+   * 0 = elle va jusqu'au bout, c'est-à-dire le jeu tel qu'il est. */
+  arret: number
 }
 
 export const SONDE_ETEINTE: Sonde = {
@@ -44,6 +57,7 @@ export const SONDE_ETEINTE: Sonde = {
   plat: false,
   nu: false,
   zero: false,
+  arret: 0,
 }
 
 /**
@@ -56,12 +70,24 @@ export const SONDE_ETEINTE: Sonde = {
  * plus proche », c'est « aucune sonde ».
  */
 export function litSonde(recherche: string): Sonde {
-  const mode = new URLSearchParams(recherche).get('sonde')
+  const mode = new URLSearchParams(recherche).get('sonde') ?? ''
+  // LE PROFIL : tout est gardé, la composition s'arrête à la fin d'un bloc.
+  const marche = /^arret([1-5])$/.exec(mode)
+  if (marche)
+    return {
+      mode: mode as ModeSonde,
+      plat: false,
+      nu: false,
+      zero: false,
+      arret: Number(marche[1]),
+    }
+  // LES COUCHES : chaque marche retire ce que la précédente retirait.
   if (mode !== 'plat' && mode !== 'nu' && mode !== 'zero') return SONDE_ETEINTE
   return {
     mode,
-    plat: true, // les trois marches remplacent la composition
+    plat: true, // les trois remplacent la composition par un aplat
     nu: mode === 'nu' || mode === 'zero',
     zero: mode === 'zero',
+    arret: 0,
   }
 }

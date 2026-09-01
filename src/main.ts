@@ -12150,7 +12150,7 @@ function frame(now: number): void {
     g(par.cuveSuivi, par.cuveZoom),
   )
   const renderT0 = performance.now()
-  renderer.setSonde(sonde.plat)
+  renderer.setSonde(sonde.plat, sonde.arret)
   if (!sonde.zero)
     renderer.render(
       sim,

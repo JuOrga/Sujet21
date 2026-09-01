@@ -867,6 +867,34 @@ float ombreVolume(vec2 world, float dansEau) {
 }
 #endif
 
+// LES MARCHES DE LA SONDE (?sonde=arret1..5) — le PROFIL du shader.
+//
+// La sonde d'aplat a répondu à la première question (01/09 : le shader EST
+// le coût — sans lui, 60 im/s bloqués là où le jeu en rendait 30). Elle ne
+// dit pas QUELLE PART. Les interrupteurs du voile ne le diront jamais : ils
+// ne touchent qu'environ 7 % du travail, le socle leur échappe entièrement.
+//
+// Chaque marche arrête main() à la fin d'un bloc. La différence entre deux
+// marches consécutives est le coût MARGINAL du bloc qui les sépare — c'est
+// le profil qu'aucun outil ne nous donne sur cet appareil.
+//
+//   1  la salle          reconstruction monde + SDF de salle (ou de coques)
+//   2  + le fond         ciel, cuve, éclairage de pièce, coque
+//   3  + les zones       voile, liseré, chevrons
+//   4  + les boîtes      textures de matériau et la boucle des obstacles
+//   5  + l'eau           ombre du volume, ondes, seuillage et habillage
+//   0  complet           + brume, plafonnier, refroidissement
+#ifndef SONDE_ARRET
+#define SONDE_ARRET 0
+#endif
+#if SONDE_ARRET != 0
+// LA SORTIE D'UNE MARCHE DOIT DÉPENDRE DE TOUT CE QUI PRÉCÈDE. Sans ça, le
+// compilateur supprime le travail qu'on prétend mesurer et la marche mesure
+// zéro — on lirait « ce bloc est gratuit » alors qu'on l'a effacé. Le poids
+// infime des grandeurs du champ suffit à les rendre vivantes.
+#define SONDE_SORTIE(c) { outColor = vec4(c, 1.0) + 0.0001 * vec4(field, speed, player, 0.0); return; }
+#endif
+
 void main() {
   vec2 uv = gl_FragCoord.xy / uCanvasSize;
   vec4 tex = texture(uField, uv);
@@ -951,6 +979,9 @@ void main() {
     roomD = max(dr.x, dr.y);
   }
   float inRoom = 1.0 - smoothstep(0.0, 6.0 / uZoom, roomD);
+#if SONDE_ARRET == 1
+  SONDE_SORTIE(vec3(inRoom))
+#endif
 
   // Dehors : nuit orbitale — texture générée si chargée (deux couches, la
   // lointaine en parallaxe : elle suit à moitié la caméra), sinon décor
@@ -1096,6 +1127,10 @@ void main() {
   float wallLine = 1.0 - smoothstep(0.0, 3.0 / uZoom, abs(roomD));
   col += vec3(0.10, 0.22, 0.30) * wallLine * (1.0 - 0.8 * uHasHull);
 
+#if SONDE_ARRET == 2
+  SONDE_SORTIE(col)
+#endif
+
   // Zones d'état, sous les surfaces : un voile teinté qui emplit la région,
   // un liseré net à la frontière, et des chevrons lents qui balaient vers
   // l'intérieur — on voit qu'on entre dans un régime imposé, pas dans un décor.
@@ -1168,6 +1203,10 @@ void main() {
     // limite se devine, elle ne se trace pas
     col += fogCol * exp(-abs(szn - 1.0) * 26.0) * 0.14 * fog * fog * fogAmp;
   }
+#endif
+
+#if SONDE_ARRET == 3
+  SONDE_SORTIE(col)
 #endif
 
   // Textures des matériaux : prélevées hors des branches (flux de contrôle
@@ -1693,6 +1732,10 @@ void main() {
     }
   }
 
+#if SONDE_ARRET == 4
+  SONDE_SORTIE(col)
+#endif
+
   // L'ombre du CORPS se couche sur tout ce qui est déjà peint — fond de
   // cuve, zones, parois : le volume existe dans la lumière, il l'intercepte.
   // Teintée vers le bleu d'ombre, comme celle des blocs.
@@ -2123,6 +2166,10 @@ void main() {
     // L'eau qui recouvre l'œil du sas s'assombrit : elle sombre dans le trou
     col *= 1.0 - drainEye * body * 0.55;
   }
+
+#if SONDE_ARRET == 5
+  SONDE_SORTIE(col)
+#endif
 
   // ---- LA BRUME D'AMBIANCE : des nappes qui dérivent lentement dans la
   // pièce, réglées par tableau (éditeur, « Brume »). Deux octaves de bruit
@@ -2869,6 +2916,10 @@ export class Renderer {
   // si personne ne la demande.
   private sonde: VarianteCompose | null = null
   private sondeActive = false
+  // Les marches du PROFIL, par numéro. Aucune n'existe tant qu'on ne la
+  // demande pas : la sonde ne pèse rien sur le jeu.
+  private readonly sondesArret = new Map<number, VarianteCompose>()
+  private sondeArret = 0
   // Réemployés d'une image à l'autre : construire deux ensembles par image
   // pour ≤ 96 boîtes serait du déchet pur.
   private readonly materiauxPoses = new Set<number>()
@@ -3647,10 +3698,32 @@ export class Renderer {
     }
   }
 
-  /** LA SONDE D'APLAT (?sonde=plat) : la composition peint un aplat, tout
-   * le reste est identique. Voir SONDE_FS pour ce qu'elle répond. */
-  setSonde(active: boolean): void {
-    this.sondeActive = active
+  /** LA SONDE (?sonde=…). `plat` remplace la composition par un aplat (voir
+   * SONDE_FS) ; `arret` l'arrête à la fin d'un bloc pour en mesurer le coût
+   * marginal (voir SONDE_ARRET dans le shader). Les deux dorment à zéro. */
+  setSonde(plat: boolean, arret = 0): void {
+    this.sondeActive = plat
+    this.sondeArret = arret
+  }
+
+  /** La marche demandée, liée au premier usage. Elle part de la GÉNÉRIQUE —
+   * le shader entier, coupé net : une marche doit mesurer le jeu, pas une
+   * variante allégée. */
+  private varianteArret(arret: number): VarianteCompose {
+    const dejaLa = this.sondesArret.get(arret)
+    if (dejaLa) return dejaLa
+    const neuve: VarianteCompose = {
+      program: link(
+        this.gl,
+        COMPOSE_VS,
+        sourceVariante(COMPOSE_FS, MASQUE_TOUT, arret),
+      ),
+      uniforms: {},
+      etat: 'prete',
+    }
+    neuve.uniforms = uniformesDe(this.gl, neuve.program)
+    this.sondesArret.set(arret, neuve)
+    return neuve
   }
 
   /** Le programme d'aplat, lié au premier usage — il ne coûte rien tant que
@@ -3912,7 +3985,9 @@ export class Renderer {
     })
     const variante = this.sondeActive
       ? this.varianteSonde()
-      : this.varianteCompose(masque)
+      : this.sondeArret > 0
+        ? this.varianteArret(this.sondeArret)
+        : this.varianteCompose(masque)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
     gl.viewport(0, 0, devW, devH)
     gl.useProgram(variante.program)

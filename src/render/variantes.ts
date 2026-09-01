@@ -162,8 +162,17 @@ export function prelude(masque: number): string {
 
 /** La source d'une variante : le prélude glissé JUSTE APRÈS la directive de
  * version, qui doit rester la toute première ligne du fichier (GLSL ES 3.00
- * le refuse ailleurs). */
-export function sourceVariante(source: string, masque: number): string {
+ * le refuse ailleurs).
+ *
+ * `arret` n'est pas un drapeau : c'est LA SONDE DE PROFIL (?sonde=arret1..5),
+ * qui arrête main() à la fin d'un bloc pour en mesurer le coût marginal.
+ * Elle ne sert jamais au jeu — 0 la laisse dormir. */
+export function sourceVariante(
+  source: string,
+  masque: number,
+  arret = 0,
+): string {
   const fin = source.indexOf('\n')
-  return `${source.slice(0, fin + 1)}${prelude(masque)}${source.slice(fin + 1)}`
+  const marche = arret > 0 ? `#define SONDE_ARRET ${arret}\n` : ''
+  return `${source.slice(0, fin + 1)}${marche}${prelude(masque)}${source.slice(fin + 1)}`
 }
