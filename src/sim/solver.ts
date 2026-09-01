@@ -482,9 +482,14 @@ export class FluidSim {
   setDoors(
     portes: { minX: number; minY: number; maxX: number; maxY: number }[],
   ): void {
+    // Une porte fermée est une CLOISON, pas un meuble : elle bouche une
+    // embrasure, et cette embrasure est un trou dans un mur qui monte au
+    // plafond. Sans ce drapeau, la lumière passait par-dessus le battant et
+    // l'embrasure se lisait comme un rectangle clair dans un mur opaque.
+    // Elle s'ouvre, la lumière entre : c'est aussi le signal de jeu.
     this.boxes = [
       ...this.baseBoxes,
-      ...portes.map((p) => ({ ...p, material: MAT_WALL })),
+      ...portes.map((p) => ({ ...p, material: MAT_WALL, cloison: true })),
     ]
     this.refreshBoxCaches()
   }
