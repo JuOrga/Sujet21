@@ -112,6 +112,14 @@ export const MANOEUVRES: Manoeuvre[] = [
     manette: null,
   },
   {
+    id: 'carte',
+    nom: 'Le plan de la station',
+    aide: 'Le complexe entier, module par module : d’où l’on vient, où l’on est, ce qui attend. Le plan couvre l’écran, il met donc la partie en pause.',
+    section: 'Les écrans',
+    clavier: 'c',
+    manette: 8, // SELECT
+  },
+  {
     id: 'dossier',
     nom: 'Dossier de descente',
     aide: 'Tout le relevé de la run d’un geste, sans figer la partie.',

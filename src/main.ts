@@ -60,6 +60,16 @@ import {
   type PlanVoie,
 } from './game/voie'
 import {
+  CASES,
+  MODULES,
+  MODULE_HUB,
+  caseDuRang,
+  moduleDuRang,
+  pasRegulier,
+  rangsDeCase,
+} from './game/station'
+import { planStationSVG, type OptionsPlan } from './game/planStation'
+import {
   apercuDescente,
   bilanDescentes,
   tireDescente,
@@ -4492,6 +4502,153 @@ function zoneNoteRegle(id: string, conteneur: HTMLElement): void {
     conteneur.appendChild(s)
   }
 }
+// ==== L'ÉCRAN « LA STATION » : le plan général, pour le joueur ==========
+// La descente était une SUITE — un rail de crans sur le flanc droit — et le
+// joueur ne traversait aucun lieu. Ici, elle traverse une station : six
+// modules amarrés à une poutre, franchis d'un bout à l'autre au fil de la
+// run. Ce que le rail disait en chiffres (« salle 5 / 12 »), le plan le dit
+// en géographie : d'où l'on vient, où l'on est, ce qui attend, et jusqu'où
+// on est déjà allé.
+//
+// LE PLAN NE SE RECONSTRUIT PAS AU SURVOL. Le SVG est bâti une fois à
+// l'ouverture ; survoler ou tabuler un module ne fait que basculer une
+// classe et repeindre la FICHE du bas. Rebâtir le dessin à chaque
+// déplacement du pointeur relancerait toutes les animations (le halo, la
+// route) et volerait le focus au clavier.
+//
+// IL MET LA PARTIE EN PAUSE, et c'est délibéré : le plan couvre tout
+// l'écran, or le corps dérive derrière. Le dossier de descente (Tab), lui,
+// ne fige rien — mais il est un panneau de côté, pas un voile. La pause
+// n'est rendue qu'à la fermeture, et SEULEMENT si c'est le plan qui l'a
+// posée : on ne réveille pas une partie que le joueur avait figée exprès.
+const stationEl = document.getElementById('station') as HTMLDivElement | null
+let stationVise: number | null = null
+let stationAPose = false
+
+function optionsStation(): OptionsPlan {
+  return {
+    rang: voieRang,
+    longueur: voiePlan.longueur,
+    record: chargePalmaresVoie().profondeurRecord,
+    scelle: !finOuverte(),
+    selection: stationVise,
+  }
+}
+
+/** LA FICHE DU BAS : le module lu — celui qu'on vise, ou celui où l'on est
+ *  quand rien n'est visé. Elle porte la teinte du module, comme le plan. */
+function peintFicheStation(): void {
+  const fiche = document.getElementById('station-fiche')
+  if (!fiche) return
+  const courant = caseDuRang(voieRang, voiePlan.longueur)
+  const i = stationVise ?? (courant > 0 ? courant - 1 : -1)
+  const m = i < 0 ? MODULE_HUB : MODULES[i]
+  fiche.style.setProperty('--t', m.teinte)
+  const rangs =
+    i < 0
+      ? 'hors descente — on n’y risque rien'
+      : (() => {
+          const { premier, dernier } = rangsDeCase(i + 1, voiePlan.longueur)
+          const n = dernier - premier + 1
+          return `salles ${premier} à ${dernier} · ${n} salle${n > 1 ? 's' : ''} · ${MOMENT_COURT[m.moment].toLowerCase()} de descente`
+        })()
+  const esc = (t: string): string =>
+    t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  fiche.innerHTML =
+    `<h3>${esc(m.nom)}</h3>` +
+    `<span class="st-rangs">${esc(rangs)}</span>` +
+    `<p>${esc(m.ambiance)}</p>` +
+    `<div class="st-matieres">${m.matieres.map((x) => `<i>${esc(x)}</i>`).join('')}</div>`
+}
+
+/** LA LIGNE D'AVANCE, en haut à droite : où l'on en est, en deux temps —
+ *  le module d'abord (c'est le lieu), la salle ensuite (c'est le compte). */
+function peintAvanceStation(): void {
+  const e = document.getElementById('station-etat')
+  if (!e) return
+  const total = voiePlan.longueur
+  const c = caseDuRang(voieRang, total)
+  const pas = pasRegulier(total)
+  // le PAS n'est un chiffre rond que si la longueur se coupe en six ; sinon
+  // la répartition tient toujours, mais l'annoncer serait mentir
+  const cadence = pas
+    ? `${pas} salle${pas > 1 ? 's' : ''} par module`
+    : `${total} salles réparties au plus juste sur ${CASES} modules`
+  if (c === 0) {
+    const record = chargePalmaresVoie().profondeurRecord
+    const rc = caseDuRang(record, total)
+    e.innerHTML =
+      `AU MODULE D’ACCUEIL<small>${cadence}` +
+      (rc > 0 ? ` · le plus loin atteint : ${MODULES[rc - 1].nom}` : '') +
+      `</small>`
+    return
+  }
+  e.innerHTML =
+    `MODULE ${c} / ${CASES} — ${MODULES[c - 1].nom}` +
+    `<small>salle ${Math.min(total, voieRang + 1)} / ${total} · ${cadence}</small>`
+}
+
+function renderStation(): void {
+  const hote = document.getElementById('station-plan')
+  if (!hote) return
+  hote.innerHTML = planStationSVG(optionsStation())
+  peintAvanceStation()
+  peintFicheStation()
+}
+
+/** Le module visé change : on ne repeint que ce qui bouge. */
+function viseStation(i: number | null): void {
+  if (stationVise === i) return
+  stationVise = i
+  const plan = document.getElementById('station-plan')
+  plan?.querySelectorAll('.ps-vise').forEach((g) => g.classList.remove('ps-vise'))
+  if (i !== null)
+    plan?.querySelector(`[data-mod="${i}"]`)?.classList.add('ps-vise')
+  peintFicheStation()
+}
+
+function ouvreStation(v: boolean): void {
+  if (!stationEl) return
+  if (v) {
+    stationVise = null
+    renderStation()
+    // le plan couvre l'écran : on fige, sauf si la partie l'était déjà
+    if (hasPlayed && !input.paused) {
+      input.togglePause()
+      stationAPose = true
+    }
+    stationEl.hidden = false
+  } else {
+    stationEl.hidden = true
+    if (stationAPose && input.paused) input.togglePause()
+    stationAPose = false
+  }
+}
+
+document
+  .getElementById('home-station')
+  ?.addEventListener('click', () => ouvreStation(true))
+document
+  .getElementById('station-fermer')
+  ?.addEventListener('click', () => ouvreStation(false))
+stationEl?.addEventListener('pointerdown', (e) => {
+  if (e.target === stationEl) ouvreStation(false)
+})
+// le survol, le clic et le CLAVIER visent le même module : un plan qui ne
+// se lirait qu'à la souris laisserait la manette et le clavier dehors
+{
+  const plan = document.getElementById('station-plan')
+  const lit = (e: Event): number | null => {
+    const g = (e.target as Element | null)?.closest?.('[data-mod]')
+    const i = g?.getAttribute('data-mod')
+    return i === null || i === undefined || Number(i) < 0 ? null : Number(i)
+  }
+  plan?.addEventListener('pointermove', (e) => viseStation(lit(e)))
+  plan?.addEventListener('pointerleave', () => viseStation(null))
+  plan?.addEventListener('focusin', (e) => viseStation(lit(e)))
+  plan?.addEventListener('click', (e) => viseStation(lit(e)))
+}
+
 // ==== L'ÉCRAN « LA DESCENTE » : régler le déroulement d'une run =========
 // POURQUOI UN ÉCRAN ENTIER. Le plan de la voie tenait dans un tiroir du
 // cahier des règles : deux crans et trois cases. Or ce plan ne décide pas
@@ -5422,7 +5579,10 @@ window.addEventListener('keydown', (e) => {
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
   if (e.key === 'Escape') {
     if (lecteurCine.actif) return // le lecteur gère lui-même son Échap (sauter)
-    if (!recsEl.hidden)
+    // le plan de la station passe AVANT tout : c'est le voile du dessus, et
+    // il a figé la partie — Échap doit d'abord la rendre
+    if (stationEl && !stationEl.hidden) ouvreStation(false)
+    else if (!recsEl.hidden)
       fermerRecs() // les voiles d'abord
     else if (!cmdsEl.hidden) cmdsEl.hidden = true
     else if (!sallesEl.hidden) sallesEl.hidden = true
@@ -8148,6 +8308,7 @@ input.onCommande = (id: string): boolean => {
   if (id === 'legende') toggleLegend()
   else if (id === 'etats') toggleStates()
   else if (id === 'dossier') ouvreDossier(!dossierOuvert)
+  else if (id === 'carte') ouvreStation(!!stationEl?.hidden)
   else if (id === 'recadrer') camera.resetAutoZoom()
   else return false
   return true
@@ -10555,6 +10716,9 @@ function annonceVoieCarte(): void {
   const rang = Math.min(total, voieRang + 1)
   el('vc-rang').textContent =
     `SALLE ${rang} / ${total}` +
+    // LE MODULE se nomme à l'entrée de chaque salle : sans lui, la station
+    // n'existerait que dans son écran, et le biome ne serait qu'un dessin.
+    ` · ${moduleDuRang(rang, total).nom}` +
     (estEconomat(level) ? ' · L’ÉCONOMAT' : '') +
     (voieIntercalaire ? ' · SALLE GÉNÉRÉE' : '') +
     (descenteDuJour() ? ' · DESCENTE DU JOUR' : '')
@@ -11135,6 +11299,7 @@ timeButton('›', 'accélérer le temps (.)', () => input.stepWarp(1))
 touchButton('▤', 'dossier de descente (Tab)', () =>
   ouvreDossier(!dossierOuvert),
 )
+touchButton('🛰\uFE0E', 'le plan de la station (C)', () => ouvreStation(true))
 const btnVortex = touchButton(
   '🌀',
   'vortex : armer puis toucher l’écran (clic droit)',
