@@ -104,9 +104,11 @@ const prelude = (masque) =>
     ]
   }).join('\n') + '\n'
 
-const source = (masque, arret = 0) => {
+const source = (masque, arret = 0, boitesNu = false) => {
   const f = COMPOSE_FS.indexOf('\n')
-  const marche = arret > 0 ? `#define SONDE_ARRET ${arret}\n` : ''
+  const marche =
+    (arret > 0 ? `#define SONDE_ARRET ${arret}\n` : '') +
+    (boitesNu ? '#define SONDE_BOITES_NU 1\n' : '')
   return COMPOSE_FS.slice(0, f + 1) + marche + prelude(masque) + COMPOSE_FS.slice(f + 1)
 }
 
@@ -121,7 +123,7 @@ for (let i = 0; i < 16; i++) masques.add(Math.floor(Math.random() * (MASQUE_TOUT
 // LES MARCHES DU PROFIL (?sonde=arret1..5). Une marche qui ne compilerait
 // pas ne se découvrirait qu'au moment de mesurer, sur l'appareil, à l'autre
 // bout d'un déploiement.
-const MARCHES = [1, 2, 3, 4, 5]
+const MARCHES = [1, 2, 3, 4, 5, 6]
 
 const MATS =
   bit('AVEC_TEX_PAROI') | bit('AVEC_TEX_PHILE') | bit('AVEC_TEX_PHOBE')
@@ -400,6 +402,8 @@ try {
         s: source(MASQUE_TOUT, arret),
         generique: false,
       })),
+      // la boucle entière, son habillage retiré
+      { masque: 'boitesnu', s: source(MASQUE_TOUT, 0, true), generique: false },
     ],
     cas: CAS.map((c) => ({ ...c, s: source(c.masque) })),
   })
@@ -408,7 +412,7 @@ try {
     process.exit(1)
   }
   console.log(
-    `Compilation — ${masques.size} variantes et ${MARCHES.length} marches de sonde éprouvées`,
+    `Compilation — ${masques.size} variantes et ${MARCHES.length + 1} marches de sonde éprouvées`,
   )
   if (r.refusees.length) {
     sortie = 1

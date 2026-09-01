@@ -36,6 +36,8 @@ export type ModeSonde =
   | 'arret3'
   | 'arret4'
   | 'arret5'
+  | 'arret6'
+  | 'boitesnu'
   | 'boites1'
   | 'boites2'
   | 'boites4'
@@ -69,6 +71,18 @@ export interface Sonde {
    * l'éclairage changerait d'une marche à l'autre et on comparerait deux
    * images au lieu de deux coûts. */
   boites: number
+  /** La boucle des obstacles tourne ENTIÈREMENT, mais son habillage est
+   * retiré à la compilation : il ne reste que la distance et l'ombre
+   * portée.
+   *
+   * C'est la question que ?sonde=boites1 a ouverte. Borner la boucle à UNE
+   * boîte n'a rien changé — le coût ne vient donc pas du nombre de tours.
+   * Reste l'autre mécanisme, celui qui a toujours expliqué pourquoi les
+   * interrupteurs sont impuissants : le corps de boucle réserve ses
+   * REGISTRES qu'il s'exécute ou non, l'occupation du GPU tombe, et la
+   * latence des textures cesse d'être masquée. Un `if` ne rend pas un
+   * registre ; un `#ifndef`, si. */
+  boitesNu: boolean
 }
 
 export const SONDE_ETEINTE: Sonde = {
@@ -78,6 +92,7 @@ export const SONDE_ETEINTE: Sonde = {
   zero: false,
   arret: 0,
   boites: 0,
+  boitesNu: false,
 }
 
 /**
@@ -92,13 +107,16 @@ export const SONDE_ETEINTE: Sonde = {
 export function litSonde(recherche: string): Sonde {
   const mode = new URLSearchParams(recherche).get('sonde') ?? ''
   // LE PROFIL : tout est gardé, la composition s'arrête à la fin d'un bloc.
-  const marche = /^arret([1-5])$/.exec(mode)
+  const marche = /^arret([1-6])$/.exec(mode)
   if (marche)
     return {
       ...SONDE_ETEINTE,
       mode: mode as ModeSonde,
       arret: Number(marche[1]),
     }
+  // L'HABILLAGE : la boucle tourne en entier, son gros corps est retiré.
+  if (mode === 'boitesnu')
+    return { ...SONDE_ETEINTE, mode, boitesNu: true }
   // LE COMPTE : tout est gardé, la composition ne regarde que N boîtes.
   const compte = /^boites(1|2|4|8|16)$/.exec(mode)
   if (compte)
@@ -116,5 +134,6 @@ export function litSonde(recherche: string): Sonde {
     zero: mode === 'zero',
     arret: 0,
     boites: 0,
+    boitesNu: false,
   }
 }

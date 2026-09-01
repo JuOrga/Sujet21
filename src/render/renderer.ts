@@ -1260,6 +1260,10 @@ void main() {
   vec3 texGrilleC = vec3(0.0);
 #endif
 
+#if SONDE_ARRET == 6
+  SONDE_SORTIE(col)
+#endif
+
   // Obstacles : remplissage texturé + liseré, couleur par matériau (§6)
   float edgeW = 2.5 / uZoom;
   // relief : décalage du sommet des parois, proportionnel à l'écart au
@@ -1416,6 +1420,11 @@ void main() {
       col = mix(col, fc, flanc);
     }
 #endif
+    // L'HABILLAGE DES BOÎTES (?sonde=boitesnu le retire) : tout ce qui
+    // suit la distance et l'ombre portée — matériau, remplissage texturé,
+    // liserés, auras, sas. C'est le gros du corps de boucle, et donc le
+    // gros de ce qu'il réserve en REGISTRES, exécuté ou non.
+#ifndef SONDE_BOITES_NU
     if (mat < 2.5) {
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
       float edge = 1.0 - smoothstep(0.0, edgeW, abs(dV));
@@ -1730,6 +1739,7 @@ void main() {
         col += col * (facing * bevel * 0.30);
       }
     }
+#endif
   }
 
 #if SONDE_ARRET == 4
@@ -2921,6 +2931,7 @@ export class Renderer {
   private readonly sondesArret = new Map<number, VarianteCompose>()
   private sondeArret = 0
   private sondeBoites = 0
+  private sondeBoitesNu = false
   // Réemployés d'une image à l'autre : construire deux ensembles par image
   // pour ≤ 96 boîtes serait du déchet pur.
   private readonly materiauxPoses = new Set<number>()
@@ -3702,29 +3713,33 @@ export class Renderer {
   /** LA SONDE (?sonde=…). `plat` remplace la composition par un aplat (voir
    * SONDE_FS) ; `arret` l'arrête à la fin d'un bloc pour en mesurer le coût
    * marginal (voir SONDE_ARRET dans le shader). Les deux dorment à zéro. */
-  setSonde(plat: boolean, arret = 0, boites = 0): void {
+  setSonde(plat: boolean, arret = 0, boites = 0, boitesNu = false): void {
     this.sondeActive = plat
     this.sondeArret = arret
     this.sondeBoites = boites
+    this.sondeBoitesNu = boitesNu
   }
 
   /** La marche demandée, liée au premier usage. Elle part de la GÉNÉRIQUE —
    * le shader entier, coupé net : une marche doit mesurer le jeu, pas une
    * variante allégée. */
-  private varianteArret(arret: number): VarianteCompose {
-    const dejaLa = this.sondesArret.get(arret)
+  private varianteArret(arret: number, boitesNu: boolean): VarianteCompose {
+    // La clé porte les DEUX : sinon une marche servirait pour l'autre et on
+    // lirait un profil pour un autre.
+    const cle = arret * 2 + (boitesNu ? 1 : 0)
+    const dejaLa = this.sondesArret.get(cle)
     if (dejaLa) return dejaLa
     const neuve: VarianteCompose = {
       program: link(
         this.gl,
         COMPOSE_VS,
-        sourceVariante(COMPOSE_FS, MASQUE_TOUT, arret),
+        sourceVariante(COMPOSE_FS, MASQUE_TOUT, arret, boitesNu),
       ),
       uniforms: {},
       etat: 'prete',
     }
     neuve.uniforms = uniformesDe(this.gl, neuve.program)
-    this.sondesArret.set(arret, neuve)
+    this.sondesArret.set(cle, neuve)
     return neuve
   }
 
@@ -3987,8 +4002,8 @@ export class Renderer {
     })
     const variante = this.sondeActive
       ? this.varianteSonde()
-      : this.sondeArret > 0
-        ? this.varianteArret(this.sondeArret)
+      : this.sondeArret > 0 || this.sondeBoitesNu
+        ? this.varianteArret(this.sondeArret, this.sondeBoitesNu)
         : this.varianteCompose(masque)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
     gl.viewport(0, 0, devW, devH)

@@ -171,8 +171,11 @@ export function sourceVariante(
   source: string,
   masque: number,
   arret = 0,
+  boitesNu = false,
 ): string {
   const fin = source.indexOf('\n')
-  const marche = arret > 0 ? `#define SONDE_ARRET ${arret}\n` : ''
+  const marche =
+    (arret > 0 ? `#define SONDE_ARRET ${arret}\n` : '') +
+    (boitesNu ? '#define SONDE_BOITES_NU 1\n' : '')
   return `${source.slice(0, fin + 1)}${marche}${prelude(masque)}${source.slice(fin + 1)}`
 }

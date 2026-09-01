@@ -19,7 +19,8 @@ describe('Sonde de rendu — elle dort, sauf si on la réveille', () => {
   it('éteint tout ce qu’elle ne reconnaît pas', () => {
     for (const mauvais of [
       'PLAT', 'plate', 'nu2', ' zero', 'oui', '1',
-      'arret', 'arret0', 'arret6', 'arret12', 'ARRET1', 'arret-1',
+      'arret', 'arret0', 'arret7', 'arret12', 'ARRET1', 'arret-1',
+      'boitesNu', 'boites-nu',
       'boites', 'boites0', 'boites3', 'boites32', 'BOITES4',
     ]) {
       expect(litSonde(`?sonde=${mauvais}`).mode).toBe('')
@@ -32,13 +33,16 @@ describe('Sonde de rendu — elle dort, sauf si on la réveille', () => {
   // incomparables entre elles — c'est tout l'intérêt d'un escalier.
   it('emboîte ses marches de couches', () => {
     expect(litSonde('?sonde=plat')).toEqual({
-      mode: 'plat', plat: true, nu: false, zero: false, arret: 0, boites: 0,
+      mode: 'plat', plat: true, nu: false, zero: false,
+      arret: 0, boites: 0, boitesNu: false,
     })
     expect(litSonde('?sonde=nu')).toEqual({
-      mode: 'nu', plat: true, nu: true, zero: false, arret: 0, boites: 0,
+      mode: 'nu', plat: true, nu: true, zero: false,
+      arret: 0, boites: 0, boitesNu: false,
     })
     expect(litSonde('?sonde=zero')).toEqual({
-      mode: 'zero', plat: true, nu: true, zero: true, arret: 0, boites: 0,
+      mode: 'zero', plat: true, nu: true, zero: true,
+      arret: 0, boites: 0, boitesNu: false,
     })
   })
 
@@ -58,8 +62,19 @@ describe('Sonde de rendu — elle dort, sauf si on la réveille', () => {
     }
   })
 
+  // L'HABILLAGE retiré : la boucle tourne en entier, seul son gros corps
+  // disparaît — c'est la question des REGISTRES, pas celle du nombre de
+  // tours. Une famille de plus, à ne mélanger avec aucune autre.
+  it('retire l’habillage sans rien couper d’autre', () => {
+    const s = litSonde('?sonde=boitesnu')
+    expect(s.boitesNu).toBe(true)
+    expect(s.arret).toBe(0)
+    expect(s.boites).toBe(0)
+    expect(s.plat).toBe(false)
+  })
+
   it('garde toutes les couches sur une marche de profil', () => {
-    for (let n = 1; n <= 5; n++) {
+    for (let n = 1; n <= 6; n++) {
       const s = litSonde(`?sonde=arret${n}`)
       expect(s.arret).toBe(n)
       expect(s.boites).toBe(0)
@@ -86,17 +101,18 @@ describe('Sonde de rendu — elle est branchée, et elle se dit', () => {
     expect(main).toMatch(/sonde\.nu[\s\S]{0,80}worldLabelsHost\.hidden = true/)
     expect(renderer).toContain('const SONDE_FS')
     expect(main).toContain(
-      'renderer.setSonde(sonde.plat, sonde.arret, sonde.boites)',
+      'renderer.setSonde(sonde.plat, sonde.arret, sonde.boites, sonde.boitesNu)',
     )
   })
 
   // Les cinq marches doivent EXISTER dans le shader : sans elles, l'adresse
   // répondrait sans rien couper, et le profil serait plat par construction.
   it('porte ses cinq marches dans le shader', () => {
-    for (let n = 1; n <= 5; n++) {
+    for (let n = 1; n <= 6; n++) {
       expect(renderer).toContain(`#if SONDE_ARRET == ${n}`)
     }
     expect(renderer).toContain('#define SONDE_ARRET 0')
+    expect(renderer).toContain('#ifndef SONDE_BOITES_NU')
   })
 
   // Une mesure sondée n'est pas une mesure du jeu. Rien ne serait pire que
