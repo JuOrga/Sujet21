@@ -120,8 +120,6 @@ void main() {
 // exacts en float32, zéro uniforme de plus (le budget mobile est déjà plein).
 // q0 : orientation du coin (0..3) ou épaisseur d'arc ×100 ; q1 : demi-
 // ouverture d'arc en degrés + 256·bouts (0 ronds, 1 droits, 2 pointe).
-// Sur un RECTANGLE, q0 et q1 ne servent à rien : q0 = 1 y dit CLOISON — la
-// boîte monte au plafond et la lumière ne l'enjambe pas (cf. HAUTEUR_COQUE).
 const FORMES_GLSL = `
 float cote2(vec2 a, vec2 b, vec2 p) { // de quel côté de (a→b) tombe p
   return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
@@ -2259,10 +2257,7 @@ float sceneSdf(vec2 p, float alt) {
     if (dec.x > 2.5 && dec.x < 3.5) continue; // sas : une bouche, pas un mur
     if (dec.x > 4.5 && dec.x < 5.5) continue; // évent : tamisé à part (grilleTrans)
     if (dec.x < 0.5 && uBoxAux[i].z > 8.5) continue; // vitre : tamisée (vitreTrans)
-    // coque, ou rectangle marqué CLOISON (une porte fermée) : jusqu'au
-    // plafond. Tout le reste est du mobilier, haut de HAUTEUR_BLOCS.
-    bool auPlafond = dec.y > 4.5 || (dec.y < 0.5 && dec.z > 0.5);
-    if (alt > (auPlafond ? HAUTEUR_COQUE : HAUTEUR_BLOCS)) continue;
+    if (alt > (dec.y > 4.5 ? HAUTEUR_COQUE : HAUTEUR_BLOCS)) continue;
     vec2 wb = p;
     float ang = uBoxAux[i].y;
     if (abs(ang) > 0.0005) {
@@ -3355,7 +3350,7 @@ export class Renderer {
       key += `;L${l.x},${l.y},${l.h},${l.portee},${l.intensite},${l.rvb.join('/')}`
     for (let i = 0; i < boxCount; i++) {
       const bx = boxes[i]
-      key += `;${bx.minX},${bx.minY},${bx.maxX},${bx.maxY},${bx.angle ?? 0},${bx.material},${bx.forme ?? 0},${bx.p0 ?? 0},${bx.p1 ?? 0},${bx.cloison ? 1 : 0}`
+      key += `;${bx.minX},${bx.minY},${bx.maxX},${bx.maxY},${bx.angle ?? 0},${bx.material},${bx.forme ?? 0},${bx.p0 ?? 0},${bx.p1 ?? 0}`
     }
     if (key === this.lightKey) return
     this.lightKey = key
@@ -3511,10 +3506,6 @@ export class Renderer {
         // voyagent tels quels (coquePack les a déjà bornés)
         q0 = Math.max(0, Math.min(127, Math.round(bx.p0 ?? 0)))
         q1 = Math.max(0, Math.min(1023, Math.round(bx.p1 ?? 0)))
-      } else if (bx.cloison) {
-        // RECTANGLE CLOISON (une porte fermée) : q0 est libre sur un
-        // rectangle, il y porte la seule chose à dire — ceci monte au plafond
-        q0 = 1
       }
       this.auxScratch[i * 4] = bx.material + forme * 16 + q0 * 128 + q1 * 16384
       this.auxScratch[i * 4 + 1] = ((bx.angle ?? 0) * Math.PI) / 180

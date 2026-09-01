@@ -479,17 +479,20 @@ export class FluidSim {
   // Portes asservies aux cibles laser : des parois qui vont et viennent.
   // Recomposé sans toucher aux éponges (setLevel les reconstruirait et
   // effacerait leur saturation en pleine partie).
+  //
+  // CES BOÎTES NE SORTENT PAS DU SOLVEUR. Le rendu ne reçoit pas sim.boxes
+  // mais renderBoxes (main.ts), bâti sur level.boxes : une porte n'entre
+  // jamais dans la carte de lumière, à aucune hauteur. Et c'est juste — une
+  // porte close se dessine en BARRIÈRE D'ÉNERGIE translucide, pas en
+  // bulkhead : un champ qu'on voit au travers n'a pas à coucher d'ombre.
+  // Essayé une fois (marquer la porte « pleine hauteur » pour qu'elle ombre
+  // comme un mur) : le drapeau n'atteignait rien, et il n'aurait pas dû.
   setDoors(
     portes: { minX: number; minY: number; maxX: number; maxY: number }[],
   ): void {
-    // Une porte fermée est une CLOISON, pas un meuble : elle bouche une
-    // embrasure, et cette embrasure est un trou dans un mur qui monte au
-    // plafond. Sans ce drapeau, la lumière passait par-dessus le battant et
-    // l'embrasure se lisait comme un rectangle clair dans un mur opaque.
-    // Elle s'ouvre, la lumière entre : c'est aussi le signal de jeu.
     this.boxes = [
       ...this.baseBoxes,
-      ...portes.map((p) => ({ ...p, material: MAT_WALL, cloison: true })),
+      ...portes.map((p) => ({ ...p, material: MAT_WALL })),
     ]
     this.refreshBoxCaches()
   }
