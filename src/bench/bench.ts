@@ -726,6 +726,10 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     'Tant que l’arc circule sur un rail, le champ est actif : la VAPEUR prise dans la bande est ENTRAÎNÉE le long de la ligne, dans le sens des chevrons — le nuage voyage sur la ligne de champ. À 0 : seul l’arc est guidé, le nuage reste sur place.',
   )
   describe(
+    fLaser.addBinding(params, 'plasmaSortie', { min: 40, max: 1200, step: 20, label: 'sortie du tube (u/s)' }),
+    'La paroi d’un conduit POUSSE dehors ce qui s’y condense, à cette vitesse au plus. Sans borne, une particule enfoncée de tout le rayon du tube en ressortait à rayon/pas de temps — mesuré 2861 u/s, le corps projeté à 680 u de son point d’arrivée. Grand : le tube recrache sec ; petit : le corps s’extrait mollement.',
+  )
+  describe(
     fLaser.addBinding(params, 'plasmaConfin', { min: 0, max: 30, step: 1, label: 'confinement (1/s)' }),
     'Le champ CONFINE : la vitesse EN TRAVERS de la ligne s’amortit à cette cadence pour ce qui voyage dans la bande — c’est lui qui fait prendre les virages (le rappel seul ne courbe pas un nuage lancé à 500 u/s ; mesuré : le coude à 90° éjectait TOUT le nuage). À 0 : la tenue de rail d’avant, qui s’éparpille au premier coude.',
   )

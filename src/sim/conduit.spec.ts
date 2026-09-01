@@ -243,3 +243,139 @@ describe('Le conduit — ce qu’il ne change pas', () => {
     expect(passees(sim)).toBe(0)
   })
 })
+
+// ——— L'ARRIVÉE ————————————————————————————————————————————————————————
+//
+// LE DÉFAUT VÉCU : « à la fin du circuit, le volume explose puis se
+// regroupe ». Le convoyage GARAIT le nuage sur le dernier point du rail —
+// donc DANS le tube — et l'y tenait par un rappel. Reprendre la main
+// voulait dire l'y laisser se condenser ; or la paroi d'un conduit expulse
+// ce qui est condensé, et elle le faisait d'un seul pas de temps : une
+// particule enfoncée de tout le rayon ressortait à rayon/dt. Mesuré sur ce
+// montage : pic à 2861 u/s et le corps projeté à 680 u de son arrivée,
+// contre 611 u/s pour le même nuage qui se condense en plein air.
+//
+// L'arrivée est désormais une LIVRAISON : le champ pousse le nuage hors de
+// la bouche à allure de livraison, puis le lâche — c'est une vapeur
+// ordinaire, dirigeable, que le joueur condensera où il voudra.
+
+/** Le centre du corps, et la vitesse la plus grande qu'il porte. */
+function corps(sim: FluidSim): { cx: number; cy: number; vmax: number; n: number } {
+  let cx = 0, cy = 0, vmax = 0, n = 0
+  for (let i = 0; i < sim.count; i++) {
+    if (sim.kind[i] !== KIND_PLAYER) continue
+    cx += sim.posX[i]
+    cy += sim.posY[i]
+    vmax = Math.max(vmax, Math.hypot(sim.velX[i], sim.velY[i]))
+    n++
+  }
+  return { cx: cx / n, cy: cy / n, vmax, n }
+}
+
+/** Le voyage entier, puis le lâcher de touche — en rendant le pic de
+ *  vitesse traversé pendant la condensation. `convoie` reproduit le jeu :
+ *  le champ se relâche quand la bande se vide. */
+function voyageEtLache(sim: FluidSim, apres = 2.5): { pic: number; fin: ReturnType<typeof corps> } {
+  const dt = sim.params.dt
+  joue(sim, 3)
+  sim.gasIntent = false
+  let pic = 0
+  for (let s = 0; s < Math.round(apres / dt); s++) {
+    const nb = sim.railConvoy(LIGNE, DEFAULT_PARAMS.plasmaRailRadius * 2.5, DEFAULT_PARAMS.plasmaConvoy, dt)
+    if (nb === 0) sim.setConduitsActifs(new Set<number>())
+    sim.step(dt)
+    pic = Math.max(pic, corps(sim).vmax)
+  }
+  return { pic, fin: corps(sim) }
+}
+
+describe('Le conduit — l’arrivée LIVRE, elle ne gare pas', () => {
+  const BANDE = DEFAULT_PARAMS.plasmaRailRadius * 2.5
+  const BOUT = LIGNE[LIGNE.length - 1].x
+
+  it('dépose le nuage HORS du tube, passé la bouche', () => {
+    const sim = monte(true)
+    poseAGauche(sim)
+    sim.gasIntent = true
+    sim.naitEnVapeur()
+    joue(sim, 3)
+    // le tube est une capsule de rayon BANDE autour de la ligne : sortir
+    // vraiment, c'est dépasser le bout de plus que ce rayon
+    expect(corps(sim).cx).toBeGreaterThan(BOUT + BANDE)
+  })
+
+  it('puis LÂCHE : la bande ne compte plus le nuage livré', () => {
+    const sim = monte(true)
+    poseAGauche(sim)
+    sim.gasIntent = true
+    sim.naitEnVapeur()
+    // le joueur TIENT toujours la touche : rien de ce qui suit ne vient de
+    // lui. C'est le champ qui, tout seul, finit par n'avoir plus rien à
+    // porter — et donc à se relâcher. Avant, il tenait le nuage garé sur le
+    // terminus indéfiniment : ce compte ne retombait JAMAIS à zéro.
+    const dt = sim.params.dt
+    let reste = -1
+    for (let s = 0; s < Math.round(6 / dt); s++) {
+      reste = sim.railConvoy(LIGNE, BANDE, DEFAULT_PARAMS.plasmaConvoy, dt)
+      sim.step(dt)
+      if (reste === 0) break
+    }
+    expect(reste).toBe(0)
+  })
+
+  it('et le volume libéré se condense SANS exploser', () => {
+    const sim = monte(true)
+    poseAGauche(sim)
+    sim.gasIntent = true
+    sim.naitEnVapeur()
+    const { pic, fin } = voyageEtLache(sim)
+    // le pic reste de l'ordre d'une condensation ordinaire (611 u/s sur le
+    // même nuage en plein air), très loin des 2861 u/s de l'expulsion
+    expect(pic).toBeLessThan(1200)
+    // et le corps se reforme LÀ, pas à six cents unités de travers
+    expect(Math.abs(fin.cy)).toBeLessThan(200)
+  })
+})
+
+describe('Le conduit — sa paroi POUSSE, elle ne catapulte pas', () => {
+  it('borne la sortie de ce qui se condense en plein tube', () => {
+    // Le joueur lâche la touche AU MILIEU du tunnel : le tube doit le
+    // remettre dehors — c'est la règle, on ne se faufile pas condensé dans
+    // une ligne de champ — mais en le poussant, pas en le catapultant.
+    const sim = monte(true)
+    poseAGauche(sim)
+    sim.gasIntent = true
+    sim.naitEnVapeur()
+    const dt = sim.params.dt
+    for (let s = 0; s < Math.round(0.8 / dt); s++) {
+      sim.railConvoy(LIGNE, DEFAULT_PARAMS.plasmaRailRadius * 2.5, DEFAULT_PARAMS.plasmaConvoy, dt)
+      sim.step(dt)
+    }
+    sim.gasIntent = false
+    let pic = 0
+    for (let s = 0; s < Math.round(2 / dt); s++) {
+      sim.railConvoy(LIGNE, DEFAULT_PARAMS.plasmaRailRadius * 2.5, DEFAULT_PARAMS.plasmaConvoy, dt)
+      sim.step(dt)
+      pic = Math.max(pic, corps(sim).vmax)
+    }
+    // sans borne : 2909 u/s, et le corps à 758 u de travers
+    expect(pic).toBeLessThan(2200)
+    expect(Math.abs(corps(sim).cy)).toBeLessThan(600)
+  })
+
+  it('mais il le remet DEHORS : condensé, on ne reste pas dans le tube', () => {
+    const sim = monte(true)
+    poseAGauche(sim)
+    sim.gasIntent = true
+    sim.naitEnVapeur()
+    const dt = sim.params.dt
+    for (let s = 0; s < Math.round(0.8 / dt); s++) {
+      sim.railConvoy(LIGNE, DEFAULT_PARAMS.plasmaRailRadius * 2.5, DEFAULT_PARAMS.plasmaConvoy, dt)
+      sim.step(dt)
+    }
+    sim.gasIntent = false
+    for (let s = 0; s < Math.round(2 / dt); s++) sim.step(dt)
+    // le tube fait 75 u de rayon autour de y = 0 : dehors, c'est au-delà
+    expect(Math.abs(corps(sim).cy)).toBeGreaterThan(DEFAULT_PARAMS.plasmaRailRadius * 2.5)
+  })
+})

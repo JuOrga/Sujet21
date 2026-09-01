@@ -94,6 +94,13 @@ export function etatRendu(frost: number, vapor: number, ionise: number): number 
   return frost - vapor * (1 + ionise)
 }
 
+// L'ALLURE DE LIVRAISON (u/s) : la vitesse à laquelle le champ pousse le
+// nuage hors de la bouche du tube, une fois arrivé au terminus. Le voyage se
+// fait à ~500 u/s ; on sort bien plus lentement — assez vite pour être
+// dehors avant que le joueur n'ait fini de relâcher la touche, assez
+// doucement pour que ce ne soit pas une éjection.
+const LIVRAISON_VITESSE = 150
+
 export class FluidSim {
   readonly params: SimParams
   readonly bounds: Bounds
@@ -151,6 +158,14 @@ export class FluidSim {
   iceImpact = 0
   // Gouttes bues par les éponges depuis le début (consommé par l'audio)
   spongeBites = 0
+  // LIVRÉ PAR LE CHAMP : cette particule est sortie par la bouche d'un rail,
+  // et le champ ne la reprend plus à cette bouche. Sans ce cran d'arrêt, le
+  // nuage se garait sur le SEUIL de livraison : poussé dehors, relâché,
+  // repoussé dedans par sa propre expansion, repris — mesuré, il oscillait
+  // indéfiniment à 376 u (le seuil est à 375) et le champ ne se relâchait
+  // JAMAIS. Le drapeau tombe dès que la particule retrouve le corps du rail
+  // ailleurs qu'au terminus : un second voyage reste possible.
+  private readonly livreParChamp: Uint8Array
   private readonly welded: Uint8Array // gelée au contact d'une plaque : soudée
   // LE SOUFFLE EN VOL : vapeur chassée par un dash, qui ne vous appartient
   // plus. Elle reste GAZ le temps du voyage (sinon elle se condense en l'air
@@ -343,6 +358,7 @@ export class FluidSim {
     this.ionise = new Float32Array(capacity)
     this.gasLink = new Float32Array(capacity)
     this.gaseous = new Uint8Array(capacity)
+    this.livreParChamp = new Uint8Array(capacity)
     this.welded = new Uint8Array(capacity)
     this.souffle = new Float32Array(capacity)
     this.duCorps = new Uint8Array(capacity)
@@ -619,17 +635,30 @@ export class FluidSim {
     // nuage reste UN nuage dans les virages (et quand seul un morceau est
     // pris par le champ, il emmène le reste au lieu de s'en détacher).
     let nBande = 0
+    let nTerminus = 0
     let cxB = 0
     let cyB = 0
     const dansBande: boolean[] = []
     const auTerminus: boolean[] = []
+    // LIVRÉ : sorti du tube par la bouche. Ni porté, ni rappelé — le champ
+    // n'a plus rien à lui dire. Sans cette troisième case, un nuage livré
+    // retombait dans la branche « retardataire » et se faisait tirer en
+    // arrière vers le cœur encore convoyé : mesuré, il repartait à 1524 u/s.
+    const livre: boolean[] = []
     const uxA: number[] = []
     const uyA: number[] = []
     const qxA: number[] = []
     const qyA: number[] = []
     const fin = pts[pts.length - 1]
+    // L'AXE DE SORTIE : la direction du dernier tronçon. C'est par là que le
+    // convoyage pousse le nuage DEHORS, au lieu de le garer sur le terminus.
+    const avantFin = pts[pts.length - 2]
+    const lFin = Math.max(1e-6, Math.hypot(fin.x - avantFin.x, fin.y - avantFin.y))
+    const sx = (fin.x - avantFin.x) / lFin
+    const sy = (fin.y - avantFin.y) / lFin
     for (let i = 0; i < this.count; i++) {
       dansBande[i] = false
+      livre[i] = false
       if (this.gaseous[i] !== 1) continue
       const px = this.posX[i]
       const py = this.posY[i]
@@ -696,19 +725,59 @@ export class FluidSim {
       // n'y pousse plus, on y FREINE (sinon le nuage arrive comme un boulet
       // et la condensation « explose »)
       auTerminus[i] = Math.hypot(qx - fin.x, qy - fin.y) < band * 1.2
+      // LIVRÉ : SORTI DU TUBE, ET LÂCHÉ. Le champ tenait le nuage contre le
+      // terminus, DANS le tube : le joueur ne pouvait pas l'emmener
+      // ailleurs, et reprendre la main voulait dire l'y laisser se
+      // condenser — ce que la paroi punissait d'une expulsion (mesuré :
+      // 2861 u/s, le corps projeté à 680 u de son point de garage). Le
+      // convoyage ne gare donc plus : il LIVRE. Passé la bouche d'une
+      // longueur de bande — le rayon du tube, donc dehors pour de bon — le
+      // nuage sort du compte de la bande : le champ se relâche de lui-même,
+      // l'arc se désionise, et c'est une vapeur ordinaire, dirigeable, qui
+      // se condensera où le joueur voudra.
+      // revenue sur le corps du rail, loin de la bouche : le champ a de
+      // nouveau le droit de la prendre — un second voyage reste possible
+      if (!auTerminus[i]) this.livreParChamp[i] = 0
+      if (this.livreParChamp[i] === 1) {
+        dansBande[i] = false
+        livre[i] = true
+        continue
+      }
       uxA[i] = ux
       uyA[i] = uy
       qxA[i] = qx
       qyA[i] = qy
       nBande++
+      if (auTerminus[i]) nTerminus++
       cxB += px
       cyB += py
     }
     if (nBande === 0) return 0
     cxB /= nBande
     cyB /= nBande
+    // LA LIVRAISON SE DÉCIDE POUR LE NUAGE, PAS PARTICULE PAR PARTICULE.
+    // Lâcher chaque particule dès qu'elle franchissait un seuil ne marchait
+    // pas : la tête relâchée faisait barrage, la queue s'entassait derrière,
+    // et le nuage se garait SUR le seuil — mesuré, il oscillait à 376 u
+    // pour un seuil à 375, et le champ ne se relâchait jamais. Quand le
+    // CŒUR du nuage a franchi la bouche, le champ lâche donc TOUT d'un
+    // coup : la vapeur, désionisée, s'en va sur son élan de livraison.
+    if (
+      nTerminus > nBande * 0.6 &&
+      (cxB - fin.x) * sx + (cyB - fin.y) * sy > band * 0.3
+    ) {
+      for (let i = 0; i < this.count; i++)
+        if (dansBande[i]) this.livreParChamp[i] = 1
+      return 0
+    }
     for (let i = 0; i < this.count; i++) {
       if (this.gaseous[i] !== 1) continue
+      // LIVRÉ : le champ ne le touche plus, en rien — et l'ionisation ne
+      // monte donc plus non plus. C'est voulu, et c'est ce qui se voit :
+      // sorti du tube, le nuage se DÉSIONISE (fadeIonise, ~0,5 s) et quitte
+      // le blanc-violet de l'arc pour redevenir une vapeur ordinaire, que le
+      // joueur dirige. L'arc l'a porté, il l'a rendu.
+      if (livre[i]) continue
       const px = this.posX[i]
       const py = this.posY[i]
       if (dansBande[i]) {
@@ -718,19 +787,26 @@ export class FluidSim {
         this.ionise[i] = Math.min(1, this.ionise[i] + 6 * dt)
       }
       if (dansBande[i] && auTerminus[i]) {
-        // arrivée en gare : on freine fort, et on ne RAMÈNE vers le
-        // terminus qu'au-delà d'un rayon mort — comprimer le nuage sur un
-        // point le rendait plus dense que l'eau au repos, et la
-        // condensation EXPLOSAIT sous la pression. La poche le laisse se
-        // garer à densité naturelle.
-        const frein = Math.exp(-6 * dt)
-        this.velX[i] *= frein
-        this.velY[i] *= frein
-        const dFin = Math.hypot(fin.x - px, fin.y - py)
-        if (dFin > band * 0.6) {
-          this.velX[i] += ((fin.x - px) / dFin) * accel * 0.15 * dt
-          this.velY[i] += ((fin.y - py) / dFin) * accel * 0.15 * dt
-        }
+        // L'ARRIVÉE EST UNE LIVRAISON, PAS UN GARAGE. L'ancien terminus
+        // freinait et RAMENAIT le nuage sur le dernier point : il y restait
+        // collé, dans le tube, et la seule façon de reprendre la main était
+        // de le laisser s'y condenser — ce que la paroi punissait d'une
+        // expulsion. On règle donc la vitesse AXIALE sur une allure de
+        // livraison, et l'on amortit tout le reste : le nuage sort par la
+        // bouche, calmement, et se fait lâcher dès qu'il est dehors.
+        const vAxe = this.velX[i] * sx + this.velY[i] * sy
+        const k = Math.min(1, 6 * dt)
+        this.velX[i] += sx * (LIVRAISON_VITESSE - vAxe) * k
+        this.velY[i] += sy * (LIVRAISON_VITESSE - vAxe) * k
+        // le travers s'éteint : on sort droit, pas en crabe
+        const vx = this.velX[i] - (this.velX[i] * sx + this.velY[i] * sy) * sx
+        const vy = this.velY[i] - (this.velX[i] * sx + this.velY[i] * sy) * sy
+        const frein = 1 - Math.exp(-6 * dt)
+        this.velX[i] -= vx * frein
+        this.velY[i] -= vy * frein
+        // recentrage doux sur l'axe : on sort par la bouche, pas de biais
+        this.velX[i] += ((qxA[i] - px) / band) * accel * 0.3 * dt
+        this.velY[i] += ((qyA[i] - py) / band) * accel * 0.3 * dt
       } else if (dansBande[i]) {
         // LE CHAMP CONFINE, et c'est lui qui fait prendre les virages. Le
         // rappel seul (0,8 × accel au bord de bande) ne courbe pas une
@@ -2372,10 +2448,20 @@ export class FluidSim {
       if (this.dansConduit[i] !== 1) continue
       // la vapeur a le droit d'entrer, ouverte ou non : c'est elle qui allume
       if (this.gaseous[i] === 1) continue
-      const prof = this.conduitProf[i]
+      let prof = this.conduitProf[i]
       if (prof <= 0) continue
       const nx = this.conduitNX[i]
       const ny = this.conduitNY[i]
+      // LE TUBE POUSSE, IL NE CATAPULTE PAS. Une particule qui se condense
+      // AU MILIEU du tube y est enfoncée de tout le rayon : replacée d'un
+      // coup sur la paroi, elle sortait du pas de temps avec rayon/dt en
+      // vitesse — mesuré 2861 u/s à l'arrivée d'un convoyage, et le corps
+      // projeté à 680 u de son point de garage. Ce n'est pas une paroi qui
+      // repousse, c'est une catapulte. Le déplacement est donc borné à ce
+      // que `plasmaSortie` autorise par seconde : le corps SORT du tube,
+      // en quelques images, à une vitesse qui reste celle d'un déplacement.
+      const maxPas = this.params.plasmaSortie * this.params.dt
+      if (prof > maxPas) prof = maxPas
       this.prdX[i] += nx * prof
       this.prdY[i] += ny * prof
       // LE CONTACT EST DÉCLARÉ, comme pour n'importe quel solide : sans lui
