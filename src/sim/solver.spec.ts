@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PARAMS, type SimParams } from './params'
 import { FluidSim, KIND_FREE, KIND_PLAYER, type Bounds } from './solver'
+import { MAT_WALL } from '../game/level'
 
 // Salle assez vaste pour que rien ne touche les parois pendant les tests
 // (le contact paroi absorbe légitimement de la quantité de mouvement).
@@ -255,5 +256,36 @@ describe('FluidSim — invariants physiques', () => {
     // le cooldown court
     sim.relabel()
     expect(sim.playerCount).toBeLessThan(200)
+  })
+})
+
+// LA PORTE FERMÉE EST UNE CLOISON. Depuis que les coques montent au plafond,
+// une porte haute de 140 u comme un meuble laissait la lumière passer
+// par-dessus son battant : dans un mur devenu opaque, l'embrasure se lisait
+// comme un rectangle clair. Le drapeau ne touche QUE le rendu — la physique
+// d'une porte ne change pas d'un iota.
+describe('FluidSim.setDoors — une porte fermée monte au plafond', () => {
+  it('marque chaque porte posée comme cloison, sans rien changer d’autre', () => {
+    const sim = makeSim()
+    sim.setDoors([{ minX: -50, minY: -200, maxX: 50, maxY: 200 }])
+    const portes = sim.boxes.filter((b) => b.cloison)
+    expect(portes).toHaveLength(1)
+    expect(portes[0]).toMatchObject({
+      minX: -50,
+      minY: -200,
+      maxX: 50,
+      maxY: 200,
+      material: MAT_WALL,
+    })
+  })
+
+  it('ne marque pas les parois du décor : elles restent du mobilier', () => {
+    const sim = makeSim()
+    sim.setLevel(
+      [{ minX: 100, minY: 100, maxX: 200, maxY: 200, material: MAT_WALL }],
+      [],
+    )
+    sim.setDoors([])
+    expect(sim.boxes.some((b) => b.cloison)).toBe(false)
   })
 })
