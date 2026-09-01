@@ -45,6 +45,17 @@ function lance(sim: FluidSim, vitesse = 700): void {
   }
 }
 
+/** Le même corps, mais gazeux. */
+function lanceVapeur(sim: FluidSim, vitesse = 700): void {
+  sim.spawnDisc(-220, 0, 40, KIND_PLAYER)
+  sim.gasIntent = true
+  sim.naitEnVapeur()
+  for (let i = 0; i < sim.count; i++) {
+    if (sim.kind[i] !== KIND_PLAYER) continue
+    sim.velX[i] = vitesse
+  }
+}
+
 function joue(sim: FluidSim, secondes: number): void {
   const dt = sim.params.dt
   for (let s = 0; s < Math.round(secondes / dt); s++) sim.step(dt)
@@ -76,58 +87,122 @@ describe('Le rail est une PAROI pour l’eau et la glace', () => {
     expect(passees(sim)).toBe(0)
   })
 
-  it('mais la VAPEUR passe : seul le gaz s’ionise, seul le gaz franchit', () => {
-    const sim = monte()
-    sim.spawnDisc(-220, 0, 40, KIND_PLAYER)
-    sim.gasIntent = true
-    sim.naitEnVapeur()
-    for (let i = 0; i < sim.count; i++) {
-      if (sim.kind[i] !== KIND_PLAYER) continue
-      sim.velX[i] = 700
-    }
+  it('et la VAPEUR ORDINAIRE non plus : seul le PLASMA franchit', () => {
+    // Être gazeux ne suffit pas. Le plasma, c'est de la vapeur sur une ligne
+    // de champ ALLUMÉE — un nuage qui n'a rien ionisé bute comme le reste.
+    const sim = monte(false, false)
+    lanceVapeur(sim)
+    joue(sim, 1.5)
+    expect(passees(sim)).toBe(0)
+  })
+
+  it('mais le PLASMA passe : l’arc engagé, le même nuage franchit', () => {
+    const sim = monte(false, true) // l'arc court sur ce rail
+    lanceVapeur(sim)
     joue(sim, 1.5)
     expect(passees(sim)).toBeGreaterThan(20)
   })
 })
 
-describe('Un rail ordinaire BARRE, il n’ouvre jamais de passage', () => {
-  it('même son arc engagé, il ne fait pas traverser le décor', () => {
-    // C'est la ligne de partage avec le conduit. Si un rail ordinaire
-    // ouvrait le décor dès qu'un arc le suit, chaque rail deviendrait un
-    // contournement d'énigme — et le raccourci ne se mériterait plus.
-    const sim = monte(false, true)
-    sim.spawnDisc(-220, 0, 40, KIND_PLAYER)
+// LE VERROU DE #304, À SURVEILLER POUR TOUJOURS. Pour allumer un rail il
+// faut ioniser le faisceau à moins de `plasmaRailRadius` de sa ligne. Si la
+// vapeur ordinaire était repoussée jusqu'à ce rayon-là, on ne pourrait plus
+// JAMAIS allumer ce qu'on veut franchir. Le gaz bute donc sur un CŒUR plus
+// mince, et il doit rester de la vapeur dans le rayon de capture.
+describe('Un rail barré reste ALLUMABLE', () => {
+  it('la vapeur repoussée reste à portée d’ionisation', () => {
+    const sim = monte()
+    sim.spawnDisc(0, 0, 40, KIND_PLAYER) // pile sur l'axe
     sim.gasIntent = true
     sim.naitEnVapeur()
-    // une paroi PLEINE posée juste derrière le rail : franchir le rail est
-    // permis (c'est du gaz), franchir le mur ne l'est pas
-    sim.setLevel(
-      [{ minX: 60, minY: -500, maxX: 100, maxY: 500, material: 0 }],
-      [],
-    )
-    for (let i = 0; i < sim.count; i++) {
-      if (sim.kind[i] !== KIND_PLAYER) continue
-      sim.velX[i] = 900
-    }
-    joue(sim, 1.5)
-    let auDela = 0
+    joue(sim, 2)
+    // le rail est VERTICAL (x = 0) : la distance à son axe, c'est |x|
+    let mini = Infinity
     for (let i = 0; i < sim.count; i++)
-      if (sim.kind[i] === KIND_PLAYER && sim.posX[i] > 100) auDela++
-    expect(auDela).toBe(0)
+      if (sim.kind[i] === KIND_PLAYER) mini = Math.min(mini, Math.abs(sim.posX[i]))
+    expect(mini).toBeLessThan(R)
+  })
+
+  it('le cœur BARRE sans CHASSER : la vapeur n’est pas propulsée', () => {
+    // La vitesse se lit (prd − pos)/dt : repousser la seule position prédite
+    // ajoute de la vitesse, et le répéter à chaque pas la pompe — mesuré, la
+    // vapeur finissait à 37,8 u de l'axe, hors de portée d'allumage. On
+    // translate donc aussi la position d'origine : arrêtée, pas éjectée.
+    const sim = monte()
+    sim.spawnDisc(0, 0, 40, KIND_PLAYER)
+    sim.gasIntent = true
+    sim.naitEnVapeur()
+    joue(sim, 2)
+    let vmax = 0
+    for (let i = 0; i < sim.count; i++)
+      if (sim.kind[i] === KIND_PLAYER)
+        vmax = Math.max(vmax, Math.hypot(sim.velX[i], sim.velY[i]))
+    expect(vmax).toBeLessThan(140) // le nuage flotte, il n'est pas soufflé
   })
 })
 
-describe('Le corps d’un rail est CE QU’ON DESSINE', () => {
-  it('épouse la bande de capture, pas la bande de convoyage', () => {
-    // Le dépôt s'est fait avoir une fois dans l'autre sens — « le tube
-    // mentait sur sa taille », collision sur 150, dessiné sur 60. Une
-    // particule posée entre les deux rayons doit rester LIBRE.
-    const sim = monte()
-    const entreLesDeux = (R + BANDE) / 2 // 52,5 : hors du rail, dans la bande
-    sim.spawnDisc(entreLesDeux, 0, 1, KIND_PLAYER)
-    const avant = sim.posX[0]
-    joue(sim, 0.5)
-    // rien ne l'a poussée : elle n'est pas dans le corps du rail
-    expect(Math.abs(sim.posX[0] - avant)).toBeLessThan(12)
+// LA SORTIE DE L'ÉTAT PLASMA — le moment délicat. Le nuage voyage SUR l'axe,
+// donc dans la paroi, et l'instant où l'arc tombe il redevient de la vapeur
+// ordinaire, que la ligne de champ refuse. Ce qu'on exige alors : que rien
+// ne soit soufflé, et que le corps ne se retrouve pas de l'autre côté par
+// accident. Il reste où il est, à cheval sur la ligne, et il ne la franchit
+// plus — la paroi ARRÊTE, elle ne catapulte pas.
+describe('Quand on sort du plasma sur la ligne', () => {
+  it('rien n’est soufflé : aucune bourrasque à la coupure de l’arc', () => {
+    const sim = monte(false, true) // arc engagé : le nuage est du plasma
+    lanceVapeur(sim, 0)
+    joue(sim, 0.4) // il s'installe sur la ligne
+    sim.setConduitsActifs(new Set<number>()) // l'arc tombe
+    const dt = sim.params.dt
+    let pic = 0
+    for (let s = 0; s < Math.round(1.5 / dt); s++) {
+      sim.step(dt)
+      for (let i = 0; i < sim.count; i++)
+        if (sim.kind[i] === KIND_PLAYER)
+          pic = Math.max(pic, Math.hypot(sim.velX[i], sim.velY[i]))
+    }
+    expect(pic).toBeLessThan(200)
+  })
+
+  it('et le corps ne franchit plus la ligne', () => {
+    // Lancé vers la ligne EN PLASMA, il la traverserait. L'arc coupé juste
+    // avant, il doit rester du côté d'où il vient.
+    const sim = monte(false, true)
+    lanceVapeur(sim, 700)
+    joue(sim, 0.15) // il approche, encore du bon côté
+    sim.setConduitsActifs(new Set<number>()) // l'arc tombe avant la ligne
+    joue(sim, 1.5)
+    expect(passees(sim)).toBe(0)
+  })
+
+  it('et s’il se CONDENSE dessus, la paroi le remet dehors sans le catapulter', () => {
+    // L'autre sortie d'état : le joueur lâche la touche pendant le voyage.
+    // Le corps devient de la matière condensée DANS la ligne de champ — et
+    // là, ce n'est plus un arrêt, c'est une expulsion. Elle est bornée par
+    // plasmaSortie, comme celle d'un conduit (cf. la livraison au terminus).
+    const sim = monte(false, true) // arc engagé : le nuage peut être DANS l'axe
+    sim.spawnDisc(0, 0, 40, KIND_PLAYER) // pile sur la ligne, en plasma
+    sim.gasIntent = true
+    sim.naitEnVapeur()
+    joue(sim, 0.3)
+    sim.setConduitsActifs(new Set<number>()) // l'arc tombe
+    sim.gasIntent = false // et le corps se condense sur place
+    const dt = sim.params.dt
+    let pic = 0
+    for (let s = 0; s < Math.round(2 / dt); s++) {
+      sim.step(dt)
+      for (let i = 0; i < sim.count; i++)
+        if (sim.kind[i] === KIND_PLAYER)
+          pic = Math.max(pic, Math.hypot(sim.velX[i], sim.velY[i]))
+    }
+    // très loin des 2861 u/s que l'expulsion non bornée produisait
+    expect(pic).toBeLessThan(1400)
+    // et il est bien SORTI de la paroi : condensé, on ne reste pas dedans.
+    // Le rail est VERTICAL (x = 0) : la distance à l'axe, c'est |x|.
+    let dedans = 0
+    for (let i = 0; i < sim.count; i++)
+      if (sim.kind[i] === KIND_PLAYER && sim.gaseous[i] === 0 && Math.abs(sim.posX[i]) < R * 0.6)
+        dedans++
+    expect(dedans).toBe(0)
   })
 })

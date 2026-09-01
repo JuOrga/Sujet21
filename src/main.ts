@@ -5550,9 +5550,9 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     }
     if (n > 0) partGaz = gaz / n
   }
-  // 0 = le corps est gazeux, le rail est une ligne de champ · 1 = il est
-  // condensé, le rail est un MUR. Entre les deux, le mur apparaît en fondu.
-  const railSolide = 1 - partGaz
+  // Ce qui reste de solide pour un corps gazeux : rien, SI la ligne porte un
+  // arc. Le calcul se fait par rail, plus bas — `engage` en décide.
+  const gazBloque = 1 - partGaz
 
   rails.forEach((rail, railIdx) => {
     const pts = rail.points
@@ -5561,6 +5561,15 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     // dessiné (le voile brume le couvre, et couper une polyligne la fausse)
     if (pts.every((p) => dansCacheVoilee(p.x, p.y))) return
     const engage = railsEngages.has(railIdx)
+    // CE QUI BLOQUE SE DESSINE COMME TEL. Un rail ne se franchit qu'au
+    // PLASMA — de la vapeur sur une ligne dont l'arc est engagé. Tout le
+    // reste bute : l'eau, la glace, et la vapeur ordinaire. Le rail se
+    // montre donc en paroi dès qu'il barre, et ne redevient la ligne de
+    // champ ouverte que là où il laisse vraiment passer : arc engagé ET
+    // corps gazeux. Une paroi qu'on ne distingue pas d'un décalque est un
+    // piège, et le corps butait jusqu'ici sur une chose qui avait l'air
+    // d'un passage.
+    const railSolide = engage ? gazBloque : 1
     const chemin = (): void => {
       g.beginPath()
       const p0 = S(pts[0].x, pts[0].y)
