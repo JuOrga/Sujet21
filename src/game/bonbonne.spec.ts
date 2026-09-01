@@ -3,9 +3,11 @@ import {
   CREUX_MINI,
   DOSE_AUTO,
   REPOS_VERSEMENT_S,
+  SEUIL_RENFLOUEMENT,
   bonbonneIllimitee,
   doitVerserAuto,
   doseVersementAuto,
+  renflouementEngage,
   type EtatVersement,
 } from './bonbonne'
 import { DEFAULT_PARAMS } from '../sim/params'
@@ -16,6 +18,7 @@ const BASE: EtatVersement = {
   litresPleins: 3,
   empeche: false,
   depuisDernier: 10,
+  renflouement: false,
 }
 
 const etat = (o: Partial<EtatVersement> = {}): EtatVersement => ({ ...BASE, ...o })
@@ -35,15 +38,44 @@ describe('Le versement automatique — on entretient, on ne réanime pas', () =>
   // six dans le même instant. « Le volume regonfle d'un coup, et il perd
   // toute propulsion. » Les tests ci-dessous gravent la règle inverse.
 
-  it('verse dès qu’il manque quelque chose, sans attendre la panne sèche', () => {
-    // à 90 % du plein, l'ancienne règle se taisait ; la nouvelle entretient
-    expect(doitVerserAuto(etat({ litres: 2.7, litresPleins: 3 }))).toBe(true)
+  it('s’amorce à 30 % du plein, pas avant', () => {
+    const plein = 4.5
+    expect(doitVerserAuto(etat({ litres: plein * 0.31, litresPleins: plein }))).toBe(false)
+    expect(doitVerserAuto(etat({ litres: plein * 0.29, litresPleins: plein }))).toBe(true)
+    expect(SEUIL_RENFLOUEMENT).toBe(0.3)
+  })
+
+  it('UNE FOIS AMORCÉ, remonte jusqu’au PLEIN — l’hystérésis', () => {
+    // sans elle, la première dose repasserait les 30 % et le versement
+    // s'arrêterait là : le corps vivrait collé à son seuil, à un souffle de
+    // l'alerte. Engagé, il continue tant que le plein n'est pas rejoint.
+    const plein = 4.5
+    const engage = etat({ litres: plein * 0.5, litresPleins: plein, renflouement: true })
+    expect(doitVerserAuto(engage)).toBe(true)
+    // le même volume, renflouement NON engagé : on ne verse pas
+    expect(doitVerserAuto({ ...engage, renflouement: false })).toBe(false)
+    // et le drapeau se relâche au plein, pas avant
+    expect(renflouementEngage(engage)).toBe(true)
+    expect(renflouementEngage({ ...engage, litres: plein })).toBe(false)
+  })
+
+  it('un état empêché ne relâche PAS le renflouement en cours', () => {
+    // passer en glace au milieu d'un renflouement ne doit pas l'annuler :
+    // on reprend où l'on en était.
+    const plein = 4.5
+    const gele = etat({ litres: plein * 0.5, litresPleins: plein, renflouement: true, empeche: true })
+    expect(doitVerserAuto(gele)).toBe(false) // on ne verse pas maintenant
+    expect(renflouementEngage(gele)).toBe(true) // mais on reste engagé
   })
 
   it('ne verse pas pour un creux négligeable', () => {
     const plein = 3
     expect(
-      doitVerserAuto(etat({ litres: plein * (1 - CREUX_MINI / 2), litresPleins: plein })),
+      doitVerserAuto(etat({
+        litres: plein * (1 - CREUX_MINI / 2),
+        litresPleins: plein,
+        renflouement: true,
+      })),
     ).toBe(false)
     expect(doitVerserAuto(etat({ litres: plein, litresPleins: plein }))).toBe(false)
   })
@@ -76,6 +108,10 @@ describe('Le versement automatique — on entretient, on ne réanime pas', () =>
     // en n'y descendant jamais — tout volume sous le plein réclame déjà une
     // dose, bien au-dessus du seuil d'alerte.
     const plein = 4.5
+    // l'alerte se lève à 0,6 L, soit 13 % de 4,50 L — bien SOUS le seuil
+    // d'amorçage : tout volume qui l'atteindrait a déjà déclenché le
+    // renflouement en descendant.
+    expect(DEFAULT_PARAMS.lastCallLiters).toBeLessThan(plein * SEUIL_RENFLOUEMENT)
     for (let l = 0; l <= DEFAULT_PARAMS.lastCallLiters; l += 0.05)
       expect(doitVerserAuto(etat({ litres: l, litresPleins: plein })), `${l} L`).toBe(true)
   })
