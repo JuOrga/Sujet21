@@ -161,6 +161,33 @@ describe('FluidSim — invariants physiques', () => {
     expect(sim.stats.rmsRadius).toBeLessThan(r0 * 2)
   })
 
+  it('LE VERSEMENT NE GONFLE PAS LE VOLUME DE DÉPART', () => {
+    // LE DÉFAUT, rapporté depuis le hub : « le volume regonfle d'un coup et
+    // trop par rapport au gain constaté dans la barre ». La barre affiche
+    // playerCount / baseVolume, et verser faisait `baseVolume += poses` :
+    // le corps revenait à son plein pendant que la jauge, elle, montrait de
+    // moins en moins. MESURÉ avant correctif, quatre versements au hub :
+    // base 900 → 967 → 1035 → 1104 → 1176, jauge tombée à 76 % pour un
+    // corps POURTANT PLEIN. Le volume de départ est celui du DÉPART.
+    const sim = makeSim()
+    sim.spawnDisc(0, 0, 300, KIND_PLAYER)
+    expect(sim.baseVolume).toBe(300)
+    // on dépense, puis on rend — plusieurs fois, comme au hub
+    for (let cycle = 0; cycle < 3; cycle++) {
+      for (let s = 0; s < 60; s++) {
+        sim.eject(3000, 0, sim.params.dt)
+        sim.step(sim.params.dt)
+      }
+      sim.relabel()
+      const manque = Math.max(0, 300 - sim.aliveCount())
+      sim.verserAuCorps(sim.stats.centroidX, sim.stats.centroidY, manque, KIND_PLAYER)
+      expect(sim.baseVolume, `après le versement ${cycle + 1}`).toBe(300)
+    }
+    // et la jauge dit donc la vérité : un corps plein se lit plein
+    sim.relabel()
+    expect(sim.playerCount / sim.baseVolume).toBeGreaterThan(0.85)
+  })
+
   it('le versement hérite de la vitesse moyenne du corps', () => {
     const sim = makeSim()
     sim.spawnDisc(0, 0, 200, KIND_PLAYER)

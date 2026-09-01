@@ -214,6 +214,8 @@ import {
 import {
   bonbonneIllimitee,
   doitVerserAuto,
+  doseVersementAuto,
+  renflouementEngage,
 } from './game/bonbonne'
 import { AudioFx, loadAudioPrefs } from './game/audio'
 import {
@@ -7490,6 +7492,10 @@ let lastRailTime = 0
 // quand le hub a versé pour la dernière fois (temps de tableau) : le repos
 // entre deux versements évite que le son de collecte ne crépite
 let dernierVersementAuto = -99
+// L'HYSTÉRÉSIS DU RENFLOUEMENT : engagé sous 30 % du plein, relâché au
+// plein. Sans cette mémoire, la première dose repasserait le seuil et le
+// corps vivrait collé à 30 %, à un souffle de l'alerte.
+let renflouementHub = false
 // rails dont le champ est engagé : allumés par un arc, ils ne se relâchent
 // qu'une fois leur bande vidée (le nuage porté jusqu'à l'arrivée)
 const railsEngages = new Set<number>()
@@ -8049,7 +8055,9 @@ instrPanel?.addEventListener('click', () => {
 /** VERSER LA BONBONNE : la réserve se reverse dans le corps, en jeu — même
  * non pleine. Le corps se regonfle jusqu'à son volume de départ ; l'état
  * liquide est requis (la glace n'absorbe pas, le nuage disperserait). */
-function verserBonbonne(): string {
+function verserBonbonne(
+  o: { dose?: number; discret?: boolean } = {},
+): string {
   // AU HUB, la réserve est INFINIE et le versement y est admis : on ne
   // s'assèche pas chez soi, et perdre un corps en allant parler au marchand
   // n'a aucun intérêt de jeu. Ailleurs, le contexte refuse comme avant.
@@ -8058,13 +8066,23 @@ function verserBonbonne(): string {
     return 'contexte'
   if (input.paused || run.ended || run.exitTimer > 0) return 'pause'
   if (input.freezeIntent || input.gasIntent) return 'etat'
-  const manque = Math.max(0, level.spawn.n - sim.playerCount)
-  const nParts = illimitee
-    ? manque
-    : Math.min(
-        manque,
-        Math.floor(run.bonbonneLiters / params.litersPerParticle),
-      )
+  // LE CREUX SE COMPTE COMME LA JAUGE LE MONTRE : halo compris. On lisait
+  // `playerCount`, qui ignore les gouttes du halo — or elles REVIENNENT, et
+  // la règle qui décide s'il faut verser, elle, lit `liters()` (halo
+  // compris). Les deux ne parlaient donc pas de la même chose, et l'écart
+  // se versait en trop.
+  const manque = Math.max(0, level.spawn.n - sim.aliveCount())
+  // LA DOSE borne le versement AUTOMATIQUE ; le geste, lui, remplit d'un
+  // trait — c'est une décision du joueur, elle a le droit d'être franche.
+  const plafond =
+    o.dose === undefined ? manque : Math.max(0, Math.floor(o.dose))
+  const nParts = Math.min(
+    manque,
+    plafond,
+    illimitee
+      ? Number.POSITIVE_INFINITY
+      : Math.floor(run.bonbonneLiters / params.litersPerParticle),
+  )
   if (nParts < 1) return 'rien'
   // le versement s'installe dans les CREUX autour du corps (jamais sur les
   // particules en place) : poser au centroïde faisait exploser la densité —
@@ -8084,9 +8102,16 @@ function verserBonbonne(): string {
       run.bonbonneLiters - poses * params.litersPerParticle,
     )
   sim.relabel()
-  bande.ponctuation('sting-collecte', 0.5)
-  bonbonneEl.classList.add('ouvert')
-  window.setTimeout(() => bonbonneEl.classList.remove('ouvert'), 600)
+  // LE VERSEMENT AUTOMATIQUE EST MUET. Il passe désormais souvent (une dose
+  // par repos, au lieu d'un renflouement rare), et le sting de collecte
+  // crépiterait — c'est exactement ce que REPOS_VERSEMENT_S existait pour
+  // empêcher. Le son et l'ouverture du verre restent au GESTE : ils
+  // récompensent une décision, pas un entretien.
+  if (!o.discret) {
+    bande.ponctuation('sting-collecte', 0.5)
+    bonbonneEl.classList.add('ouvert')
+    window.setTimeout(() => bonbonneEl.classList.remove('ouvert'), 600)
+  }
   return 'ok'
 }
 /** LE GESTE COMPLET : verser, et DIRE ce qui s'est passé — au toucher, à la
@@ -10749,6 +10774,7 @@ function restart(): void {
   // taisait le versement pendant T secondes — donc la bannière d'alerte
   // s'affichait au hub, précisément ce que la mécanique promet d'éviter
   dernierVersementAuto = -99
+  renflouementHub = false
   // la BONBONNE se présente : le niveau repart de zéro et remonte à vue,
   // l'éclat balaie le verre — un rappel discret de ce qu'on a en réserve
   bbAffiche = 0
@@ -13571,34 +13597,46 @@ function frame(now: number): void {
 
   // ---- LE VERSEMENT AUTOMATIQUE DU HUB ------------------------------
   // Au hub, la jauge basse n'est pas une tension de jeu : c'est une gêne.
-  // La réserve s'y verse donc toute seule, AVANT que la première alerte
-  // n'ait eu le temps de s'afficher — le seuil est posé au-dessus de
-  // `lastCallLiters` exprès (src/game/bonbonne.ts). Placé juste avant le
-  // bloc de fin de course, qui est celui qui lève les alertes : à l'image
-  // où la bannière se poserait, le corps est déjà renfloué.
-  if (
-    doitVerserAuto({
-      auHub,
-      litres: sim.liters(),
-      litresPleins: level.spawn.n * params.litersPerParticle,
-      lastCallLiters: params.lastCallLiters,
-      empeche:
-        input.paused ||
-        input.freezeIntent ||
-        input.gasIntent ||
-        miseEnBonbonne ||
-        sim.dispersed ||
-        run.ended ||
-        run.exitTimer > 0,
-      depuisDernier: run.tableauTime - dernierVersementAuto,
-    })
-  ) {
+  // La réserve s'y renfloue donc toute seule — mais en DEUX TEMPS : le
+  // renflouement s'amorce sous 30 % du volume de départ, puis rend une
+  // DOSE par repos jusqu'au plein (src/game/bonbonne.ts). Le corps garde
+  // ainsi le droit de maigrir, donc sa nervosité, et ne reprend jamais son
+  // volume d'un bloc — ce qui divisait sa poussée d'un coup.
+  // Placé juste avant le bloc de fin de course, qui est celui qui lève les
+  // alertes : à l'image où la bannière se poserait, le corps est renfloué.
+  const etatVersement = {
+    auHub,
+    litres: sim.liters(),
+    litresPleins: level.spawn.n * params.litersPerParticle,
+    empeche:
+      input.paused ||
+      input.freezeIntent ||
+      input.gasIntent ||
+      miseEnBonbonne ||
+      sim.dispersed ||
+      run.ended ||
+      run.exitTimer > 0,
+    depuisDernier: run.tableauTime - dernierVersementAuto,
+    renflouement: renflouementHub,
+  }
+  // le drapeau se tient à CHAQUE image, pas seulement quand on verse :
+  // c'est lui qui porte l'hystérésis, et il doit se relâcher au plein même
+  // si le dernier versement a été empêché
+  renflouementHub = renflouementEngage(etatVersement)
+  if (doitVerserAuto(etatVersement)) {
     // l'horodatage se pose sur TOUTE tentative, pas seulement sur celle qui
     // réussit : un corps qui n'arrive pas à absorber (creux pleins) renvoie
     // 'rien', et sans cela le versement — et son son de collecte — repartait
     // à chaque image. C'est exactement le crépitement que le repos existe
     // pour empêcher.
-    verserBonbonne()
+    verserBonbonne({
+      dose:
+        doseVersementAuto(
+          sim.liters(),
+          level.spawn.n * params.litersPerParticle,
+        ) / params.litersPerParticle,
+      discret: true,
+    })
     dernierVersementAuto = run.tableauTime
   }
 
