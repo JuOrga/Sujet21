@@ -53,6 +53,12 @@ export const MAX_LUMIERES = 4
 // Un obstacle ordinaire monte à HAUTEUR_BLOCS et le rayon qui grimpe vers la
 // lampe lui passe dessus ; une COQUE (une chambre, un couloir) monte au
 // plafond et n'est jamais enjambée.
+/** L'ÉCHELLE MONDE de chaque texture de matériau : le diviseur écrit dans
+ * le shader (world / K). Elles vivent ici parce que le CPU en a besoin pour
+ * calculer le niveau de détail du prélèvement (uLodMat) — un test vérifie
+ * qu'elles ne dérivent pas de celles du shader, qui sont les vraies. */
+export const ECHELLES_MAT = [230, 520, 170, 210, 460, 380, 624] as const
+
 export const HAUTEUR_BLOCS = 140
 export const HAUTEUR_COQUE = 2400
 
@@ -417,6 +423,10 @@ uniform sampler2D uTexTank; // fond de cuve : panneaux, conduites, liserés
 uniform sampler2D uTexWall;
 uniform sampler2D uTexWallA; // seconde paroi : les murs alternent, sans répétition visible
 uniform sampler2D uTexFroid;
+// LE NIVEAU DE DÉTAIL DE CHAQUE TEXTURE DE MATÉRIAU, calculé au CPU.
+// 0 paroi · 1 paroi bis · 2 hydrophobe · 3 hydrophile · 4 froid · 5 chaud
+// · 6 grille. Voir plus bas pourquoi il ne peut pas se déduire ici.
+uniform float uLodMat[7];
 uniform sampler2D uTexChaud;
 uniform sampler2D uTexGrille;
 uniform sampler2D uTexPhobe;
@@ -1209,57 +1219,31 @@ void main() {
   SONDE_SORTIE(col)
 #endif
 
-  // Textures des matériaux : prélevées hors des branches (flux de contrôle
-  // uniforme requis par les mipmaps), utilisées dans la boucle d'obstacles.
-  // Les deux parois alternent selon un bruit très basse fréquence : les longs
-  // murs cessent de répéter le même motif d'un bout à l'autre du tableau.
+  // LES TEXTURES DE MATÉRIAU NE SE PRÉLÈVENT PLUS ICI — et c'est tout le
+  // sujet de cette version.
   //
-  // ET C'EST BIEN LÀ LE PROBLÈME : « hors des branches » veut dire SUR TOUT
-  // L'ÉCRAN. Un tableau sans plaque froide ni chaudière prélevait quand même
-  // le givre et la chaudière à chacun de ses pixels, pour une valeur que
-  // personne ne lit ensuite. Aucun « if » ne pouvait les sauver — les
-  // mipmaps exigent ce flux uniforme. Un #ifdef, si : le drapeau n'est posé
-  // que si le matériau est POSÉ sur le tableau ET son image chargée (cf.
-  // variantes.ts). Sinon la branche procédurale prend le relais, comme elle
-  // le faisait déjà quand l'image n'était pas encore arrivée.
-#ifdef AVEC_TEX_PAROI
-  vec3 texWallC = texture(uTexWall, world / 230.0).rgb;
-  if (uHasWallA > 0.5) {
-    vec3 wallA = texture(uTexWallA, world / 520.0).rgb;
-    float blend = uDecor > 0.5 ? smoothstep(0.35, 0.65, smoothField(world * 0.0023 + 5.3)) : 0.5;
-    texWallC = uHasWall > 0.5 ? mix(texWallC, wallA, blend) : wallA;
-  }
-#else
-  vec3 texWallC = vec3(0.0);
-#endif
-#ifdef AVEC_TEX_PHOBE
-  vec3 texPhobeC = texture(uTexPhobe, world / 170.0).rgb;
-#else
-  vec3 texPhobeC = vec3(0.0);
-#endif
-#ifdef AVEC_TEX_PHILE
-  vec3 texPhileC = texture(uTexPhile, world / 210.0).rgb;
-#else
-  vec3 texPhileC = vec3(0.0);
-#endif
-#ifdef AVEC_TEX_FROID
-  vec3 texFroidC = texture(uTexFroid, world / 460.0).rgb;
-#else
-  vec3 texFroidC = vec3(0.0);
-#endif
-#ifdef AVEC_TEX_CHAUD
-  vec3 texChaudC = texture(uTexChaud, world / 380.0).rgb;
-#else
-  vec3 texChaudC = vec3(0.0);
-#endif
-  // la grille est calée pour que ses perforations fassent ~24 u, comme le
-  // motif procédural qu'elle remplace
-#ifdef AVEC_TEX_GRILLE
-  vec3 texGrilleC = texture(uTexGrille, world / 624.0).rgb;
-#else
-  vec3 texGrilleC = vec3(0.0);
-#endif
-
+  // Elles étaient prélevées là, hors de toute branche, sur CHAQUE pixel de
+  // l'écran, avec ce commentaire pour seule excuse : « flux de contrôle
+  // uniforme requis par les mipmaps ». C'était vrai : texture() choisit
+  // son niveau de détail d'après les DÉRIVÉES de la coordonnée, qui ne sont
+  // définies que si tous les pixels d'un quad prennent le même chemin. Les
+  // sortir des branches était donc la seule façon de les mipmapper.
+  //
+  // MESURÉ (iPad Pro M1, hub, 1,21 Mpx, sonde de profil) : la composition
+  // arrêtée AVANT ces prélèvements rend 45 im/s ; arrêtée JUSTE APRÈS, 25.
+  // Sept prélèvements coûtaient 18 ms — plus que tout le reste du jeu
+  // réuni, boucle des obstacles comprise. Borner cette boucle à une seule
+  // boîte (?sonde=boites1) ne changeait rien : ce n'était jamais elle.
+  //
+  // textureLod, lui, n'a pas besoin de dérivées : il prend le niveau qu'on
+  // lui donne. Et ce niveau se CALCULE exactement : l'échelle est la
+  // même sur tout l'écran — un pixel vaut 1/(uZoom·uDpr) unités-monde,
+  // partout. Le CPU le calcule une fois par image (uLodMat) et le résultat
+  // est celui que les dérivées auraient trouvé.
+  //
+  // Chaque prélèvement retourne donc dans la branche de SON matériau, où il
+  // n'est payé que par les pixels que ce matériau recouvre. Sept fois par
+  // pixel, partout, devient une fois pour les pixels concernés.
 #if SONDE_ARRET == 6
   SONDE_SORTIE(col)
 #endif
@@ -1531,21 +1515,37 @@ void main() {
           fillCol = vec3(0.105, 0.125, 0.155) * teinte * (0.55 + 0.45 * bordC);
           edgeCol = vec3(0.32, 0.39, 0.46);
         } else {
-          fillCol = (SI_TEX_PAROI && uHasWall > 0.5)
-            ? texWallC * 0.95
-            : vec3(0.10, 0.13, 0.17) * (0.88 + 0.24 * dnoise(world * vec2(0.03, 0.30)));
+          fillCol = vec3(0.10, 0.13, 0.17) * (0.88 + 0.24 * dnoise(world * vec2(0.03, 0.30)));
+#ifdef AVEC_TEX_PAROI
+          // les deux parois alternent selon un bruit très basse fréquence :
+          // les longs murs cessent de répéter le même motif d'un bout à
+          // l'autre du tableau
+          if (uHasWall > 0.5) {
+            vec3 mur = textureLod(uTexWall, world / 230.0, uLodMat[0]).rgb;
+            if (uHasWallA > 0.5) {
+              vec3 wallA = textureLod(uTexWallA, world / 520.0, uLodMat[1]).rgb;
+              float blend = uDecor > 0.5 ? smoothstep(0.35, 0.65, smoothField(world * 0.0023 + 5.3)) : 0.5;
+              mur = mix(mur, wallA, blend);
+            }
+            fillCol = mur * 0.95;
+          }
+#endif
         }
       } else if (mat < 1.5) { // hydrophile : mouillé, brillant, reflet qui glisse
         float sheen = 0.5 + 0.5 * sin(world.x * 0.045 + world.y * 0.10 + uTime * 0.7);
-        fillCol = (SI_TEX_PHILE && uHasPhile > 0.5)
-          ? texPhileC * (0.85 + 0.25 * sheen)
-          : vec3(0.05, 0.16, 0.20) + vec3(0.015, 0.055, 0.065) * sheen;
+        fillCol = vec3(0.05, 0.16, 0.20) + vec3(0.015, 0.055, 0.065) * sheen;
+#ifdef AVEC_TEX_PHILE
+        if (uHasPhile > 0.5)
+          fillCol = textureLod(uTexPhile, world / 210.0, uLodMat[3]).rgb * (0.85 + 0.25 * sheen);
+#endif
         edgeCol = vec3(0.20, 0.65, 0.70);
       } else {                // hydrophobe : cireux, grain perlé qui repousse
         float wax = smoothstep(0.72, 0.95, dnoise(world * 0.12));
-        fillCol = (SI_TEX_PHOBE && uHasPhobe > 0.5)
-          ? texPhobeC * 0.75
-          : vec3(0.16, 0.11, 0.20) + vec3(0.07, 0.035, 0.10) * wax;
+        fillCol = vec3(0.16, 0.11, 0.20) + vec3(0.07, 0.035, 0.10) * wax;
+#ifdef AVEC_TEX_PHOBE
+        if (uHasPhobe > 0.5)
+          fillCol = textureLod(uTexPhobe, world / 170.0, uLodMat[2]).rgb * 0.75;
+#endif
         edgeCol = vec3(0.62, 0.42, 0.78);
       }
       col = mix(col, fillCol * eclMat, fill * fillA);
@@ -1630,9 +1630,12 @@ void main() {
       // deviennent la CHALEUR qui court dessus, pas le panneau lui-même.
       // L'image est très sombre : sans ce réchauffement, le panneau se lit
       // comme du métal noir et perd son identité de SOURCE DE CHALEUR.
-      vec3 fillCol = (SI_TEX_CHAUD && uHasChaud > 0.5)
-        ? texChaudC * vec3(2.3, 1.45, 0.95) + vec3(0.30, 0.11, 0.02) * smoothstep(0.4, 0.9, stripe)
-        : vec3(0.26, 0.11, 0.05) + vec3(0.42, 0.17, 0.04) * smoothstep(0.35, 0.85, stripe);
+      vec3 fillCol = vec3(0.26, 0.11, 0.05) + vec3(0.42, 0.17, 0.04) * smoothstep(0.35, 0.85, stripe);
+#ifdef AVEC_TEX_CHAUD
+      if (uHasChaud > 0.5)
+        fillCol = textureLod(uTexChaud, world / 380.0, uLodMat[5]).rgb * vec3(2.3, 1.45, 0.95)
+          + vec3(0.30, 0.11, 0.02) * smoothstep(0.4, 0.9, stripe);
+#endif
       col = mix(col, fillCol * eclMat, fill);
       col = mix(col, vec3(1.0, 0.56, 0.24), edge * 0.9);
       // chaque chaudière porte sa propre portée d'aura (aux.w) : le halo
@@ -1649,11 +1652,15 @@ void main() {
       // eux-mêmes de masque — le fond se voit à travers, comme avant.
       float hole;
       vec3 barCol;
-      if (SI_TEX_GRILLE && uHasGrille > 0.5) {
+#ifdef AVEC_TEX_GRILLE
+      if (uHasGrille > 0.5) {
+        vec3 texGrilleC = textureLod(uTexGrille, world / 624.0, uLodMat[6]).rgb;
         float lum = dot(texGrilleC, vec3(0.299, 0.587, 0.114));
         hole = 1.0 - smoothstep(0.020, 0.075, lum);
         barCol = texGrilleC * 1.5;
-      } else {
+      } else
+#endif
+      {
         vec2 cellUv = fract(world / 24.0) - 0.5;
         hole = 1.0 - smoothstep(0.26, 0.34, max(abs(cellUv.x), abs(cellUv.y)));
         barCol = vec3(0.17, 0.21, 0.26) * (0.9 + 0.2 * dnoise(world * 0.15));
@@ -1670,9 +1677,12 @@ void main() {
       // reste par-dessus : le gel a l'air vivant, pas imprimé.
       // Teinte franchement bleue : brute, l'image tire vers le gris béton et
       // la plaque cesse de se lire comme du GEL au premier coup d'œil.
-      vec3 fillCol = (SI_TEX_FROID && uHasFroid > 0.5)
-        ? texFroidC * vec3(0.52, 0.74, 1.02) * (0.60 + 0.28 * sparkle)
-        : vec3(0.15, 0.21, 0.29) + vec3(0.26, 0.34, 0.40) * sparkle * 0.55;
+      vec3 fillCol = vec3(0.15, 0.21, 0.29) + vec3(0.26, 0.34, 0.40) * sparkle * 0.55;
+#ifdef AVEC_TEX_FROID
+      if (uHasFroid > 0.5)
+        fillCol = textureLod(uTexFroid, world / 460.0, uLodMat[4]).rgb
+          * vec3(0.52, 0.74, 1.02) * (0.60 + 0.28 * sparkle);
+#endif
       col = mix(col, fillCol * eclMat, fill);
       col = mix(col, vec3(0.70, 0.86, 0.97), edge * 0.9);
       float aura = (1.0 - smoothstep(0.0, uColdBand, max(d, 0.0))) * step(0.0, d);
@@ -2871,6 +2881,13 @@ export class Renderer {
   private texTank: WebGLTexture | null = null
   private texWall: WebGLTexture | null = null
   private texWallA: WebGLTexture | null = null
+  // LES SEPT TEXTURES DE MATÉRIAU et leur taille, dans l'ordre de uLodMat.
+  // La taille sert au niveau de détail : le prélèvement se fait désormais
+  // en textureLod, dans la branche de son matériau (voir le shader).
+  // 0 tant que l'image n'est pas arrivée — le décor procédural tient la
+  // place, et aucun prélèvement n'a lieu.
+  private readonly taillesMat = new Float32Array(7)
+  private readonly lodMat = new Float32Array(7)
   private texFroid: WebGLTexture | null = null
   private texParoi: WebGLTexture | null = null
   private texChaud: WebGLTexture | null = null
@@ -3091,18 +3108,27 @@ export class Renderer {
       (t) => (this.texTank = t),
       true,
     )
-    this.loadTexture('/assets/wall.webp', true, true, (t) => (this.texWall = t))
+    this.loadTexture('/assets/wall.webp', true, true, (t, taille) => {
+      this.texWall = t
+      this.taillesMat[0] = taille
+    })
     this.loadTexture(
       '/assets/wall-a.webp',
       true,
       true,
-      (t) => (this.texWallA = t),
+      (t, taille) => {
+        this.texWallA = t
+        this.taillesMat[1] = taille
+      },
     )
     this.loadTexture(
       '/assets/froid.webp',
       true,
       true,
-      (t) => (this.texFroid = t),
+      (t, taille) => {
+        this.texFroid = t
+        this.taillesMat[4] = taille
+      },
     )
     // atlas des habillages de parois (8 tuiles de 1024 en grille 4×2)
     this.loadTexture(
@@ -3115,25 +3141,37 @@ export class Renderer {
       '/assets/chaud.webp',
       true,
       true,
-      (t) => (this.texChaud = t),
+      (t, taille) => {
+        this.texChaud = t
+        this.taillesMat[5] = taille
+      },
     )
     this.loadTexture(
       '/assets/grille.webp',
       true,
       true,
-      (t) => (this.texGrille = t),
+      (t, taille) => {
+        this.texGrille = t
+        this.taillesMat[6] = taille
+      },
     )
     this.loadTexture(
       '/assets/phobe.webp',
       true,
       true,
-      (t) => (this.texPhobe = t),
+      (t, taille) => {
+        this.texPhobe = t
+        this.taillesMat[2] = taille
+      },
     )
     this.loadTexture(
       '/assets/phile.webp',
       true,
       true,
-      (t) => (this.texPhile = t),
+      (t, taille) => {
+        this.texPhile = t
+        this.taillesMat[3] = taille
+      },
     )
     this.loadTexture(
       '/assets/iris.webp',
@@ -3411,7 +3449,7 @@ export class Renderer {
     url: string,
     repeat: boolean,
     mips: boolean,
-    assign: (t: WebGLTexture) => void,
+    assign: (t: WebGLTexture, taille: number) => void,
     mirrored = false,
   ): void {
     const img = new Image()
@@ -3441,7 +3479,9 @@ export class Renderer {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
       }
       gl.bindTexture(gl.TEXTURE_2D, null)
-      assign(tex)
+      // La TAILLE part avec la texture : sans elle, impossible de calculer
+      // le niveau de détail d'un prélèvement (cf. uLodMat).
+      assign(tex, img.width)
     }
     img.src = url
   }
@@ -4143,6 +4183,29 @@ export class Renderer {
       gl.uniform1fv(cu['uZoneForce[0]'], this.zoneForceScratch)
       gl.uniform3fv(cu['uZonePhase[0]'], this.zonePhaseScratch)
     }
+    // LES NIVEAUX DE DÉTAIL DES TEXTURES DE MATÉRIAU. Le shader les prélève
+    // désormais en textureLod, dans la branche de leur matériau, et
+    // textureLod ne devine rien : il faut lui donner le niveau.
+    //
+    // Il se CALCULE exactement, et c'est ce qui rend le changement gratuit
+    // pour l'image. L'échelle est la même sur tout l'écran : un pixel du
+    // tampon vaut 1/(zoom·dpr) unités-monde, partout. Une texture de taille
+    // S échantillonnée en world/K couvre donc S/(K·zoom·dpr) texels par
+    // pixel, et le niveau est le logarithme binaire de ce nombre — exactement
+    // ce que les dérivées auraient trouvé, sans avoir à les demander.
+    //
+    // Tant qu'une image n'est pas arrivée (taille 0), la valeur ne sert à
+    // personne : le drapeau uHas* laisse le décor procédural en place.
+    const texelsParPixel = 1 / Math.max(1e-6, camera.zoom * dpr)
+    for (let i = 0; i < ECHELLES_MAT.length; i++) {
+      const taille = this.taillesMat[i]
+      this.lodMat[i] =
+        taille > 0
+          ? Math.max(0, Math.log2((taille * texelsParPixel) / ECHELLES_MAT[i]))
+          : 0
+    }
+    gl.uniform1fv(cu['uLodMat[0]'], this.lodMat)
+
     const bindTex = (
       unit: number,
       tex: WebGLTexture | null,

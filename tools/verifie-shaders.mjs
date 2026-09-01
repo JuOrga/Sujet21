@@ -168,6 +168,15 @@ const CAS = [
   },
 ]
 
+// Les niveaux de détail des textures de matériau, comme le jeu les calcule
+// (ECHELLES_MAT et la taille des images) : sans eux la comparaison opposerait
+// un rendu doté de ses niveaux à un rendu qui n'en a pas.
+const ECHELLES_MAT = [230, 520, 170, 210, 460, 380, 624]
+const TAILLE_EPREUVE = 64 // le damier du banc
+const LOD_MAT = ECHELLES_MAT.map((k) =>
+  Math.max(0, Math.log2((TAILLE_EPREUVE * (1 / (0.22 * 1))) / k)),
+)
+
 const BASE = {
   uDpr: 1, uZoom: 0.22, uThreshold: 0.5, uSoftness: 0.25, uFieldScale: 1,
   uTime: 1.234, uDecor: 1, uEau: 1, uAmbiante: 0.52, uChill: 0.2,
@@ -179,7 +188,7 @@ const BASE = {
 }
 
 // ------------------------------------------------------------------ la vérité GPU
-function dansLaPage({ vs, sources, cas, base }) {
+function dansLaPage({ vs, sources, cas, base, lodMat }) {
   const N = 192
   const cv = document.createElement('canvas')
   cv.width = N
@@ -337,6 +346,8 @@ function dansLaPage({ vs, sources, cas, base }) {
     met('uParCuve', [0.9, 1])
     met('uOeilRegl', [1, 1, 1, 1])
     met('uHasZones', [0, 0, 0])
+    if (inf['uLodMat[0]'])
+      gl.uniform1fv(inf['uLodMat[0]'].loc, new Float32Array(lodMat))
     for (const [k, val] of Object.entries({ ...base, ...sup })) met(k, val)
     if (inf['uBoxCount']) gl.uniform1i(inf['uBoxCount'].loc, 3)
     if (inf['uBoxes[0]']) gl.uniform4fv(inf['uBoxes[0]'].loc, BOITES)
@@ -391,6 +402,7 @@ try {
   const r = await page.evaluate(dansLaPage, {
     vs: COMPOSE_VS,
     base: BASE,
+    lodMat: LOD_MAT,
     sources: [
       ...[...masques].map((masque) => ({
         masque,
