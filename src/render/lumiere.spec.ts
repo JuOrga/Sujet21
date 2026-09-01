@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { LAMPE_HAUTEUR_MAX } from '../game/level'
+import { HAUTEUR_BLOCS, HAUTEUR_COQUE } from './renderer'
 
 // La hauteur des blocs est écrite DEUX FOIS dans renderer.ts : une fois dans
 // le shader principal (qui éclaire le DESSUS des solides) et une fois dans le
@@ -55,16 +56,27 @@ describe('Éclairage des volumes — la hauteur des coques', () => {
   })
 
   it('sert de borne à la marche du cuiseur, et la coque (forme 5) y échappe au rejet', () => {
-    // la marche va jusqu'à tLim, calculé sur HAUTEUR_COQUE
+    // la marche va jusqu'à tLim, calculé sur le plus haut obstacle POSÉ —
+    // pas sur HAUTEUR_COQUE en dur : un tableau sans coque doit s'arrêter
+    // à la hauteur des blocs, comme avant, et ne rien payer de plus
     expect(source).toMatch(
-      /float\s+tLim\s*=\s*min\(distL,\s*distL\s*\*\s*HAUTEUR_COQUE\s*\/\s*max\(hL,\s*HAUTEUR_COQUE\s*\+\s*1\.0\)\);/,
+      /float\s+tLim\s*=\s*min\(distL,\s*distL\s*\*\s*uHautMax\s*\/\s*max\(hL,\s*uHautMax\s*\+\s*1\.0\)\);/,
     )
+    expect(source).toMatch(/hautMax\s*=\s*HAUTEUR_COQUE/)
+    expect(source).toContain("gl.uniform1f(lu['uHautMax'], hautMax)")
     // et chaque boîte est écartée à SA hauteur, pas à celle de la scène
     expect(source).toMatch(
       /if\s*\(alt\s*>\s*\(dec\.y\s*>\s*4\.5\s*\?\s*HAUTEUR_COQUE\s*:\s*HAUTEUR_BLOCS\)\)\s*continue;/,
     )
     // l'altitude passée au SDF : t·hLampe/distL, la montée réelle du rayon
     expect(source).toMatch(/sceneSdf\(p\s*\+\s*dir\s*\*\s*t,\s*t\s*\*\s*hL\s*\/\s*distL\)/)
+  })
+
+  it('a la même valeur des deux côtés — TypeScript et shader', () => {
+    expect(HAUTEUR_COQUE).toBe(hauteurCoque())
+    expect(HAUTEUR_BLOCS).toBe(
+      Number(source.match(/#define\s+HAUTEUR_BLOCS\s+([0-9.]+)/)![1]),
+    )
   })
 
   it('ne déborde PAS sur les tamis : évent, éponge et vitre restent du mobilier', () => {
@@ -75,5 +87,20 @@ describe('Éclairage des volumes — la hauteur des coques', () => {
     expect(source).toMatch(
       /float\s+tBloc\s*=\s*min\(distL,\s*distL\s*\*\s*HAUTEUR_BLOCS\s*\/\s*max\(hL,\s*HAUTEUR_BLOCS\s*\+\s*1\.0\)\);/,
     )
+  })
+})
+
+// LA CLÉ DE CUISSON décide de tout : la carte ne recuit QUE si elle change.
+// Ce qui n'y entre pas ne se voit jamais bouger à l'écran.
+describe('Éclairage des volumes — la clé de cuisson', () => {
+  it('porte la forme du luminaire, sa longueur et son angle', () => {
+    // pointLampe éclaire depuis le point du SEGMENT le plus proche : sans
+    // ces trois-là, basculer une lampe en bandeau sans la déplacer laissait
+    // la carte d'avant à l'écran
+    expect(source).toContain('${l.bandeau ? 1 : 0},${l.demiLong},${l.angleRad}')
+  })
+
+  it('porte la hauteur du plus haut obstacle posé', () => {
+    expect(source).toContain('H${hautMax}')
   })
 })

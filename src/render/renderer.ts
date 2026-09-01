@@ -35,9 +35,15 @@ import type { Camera } from './camera'
 export const MAX_BOXES = 96
 export const MAX_ZONES = 16
 // Lampes par tableau : au-delà, les excédentaires ne s'allument pas —
-// l'éditeur avertit (même contrat que MAX_BOXES). La hauteur des blocs pour
-// le calcul d'ombre est HAUTEUR_BLOCS (140 u), définie dans le shader.
+// l'éditeur avertit (même contrat que MAX_BOXES).
 export const MAX_LUMIERES = 4
+// LES DEUX HAUTEURS DU CALCUL D'OMBRE, côté TypeScript. Elles doublent les
+// #define des shaders — lumiere.spec.ts vérifie qu'elles ne dérivent pas.
+// Un obstacle ordinaire monte à HAUTEUR_BLOCS et le rayon qui grimpe vers la
+// lampe lui passe dessus ; une COQUE (une chambre, un couloir) monte au
+// plafond et n'est jamais enjambée.
+export const HAUTEUR_BLOCS = 140
+export const HAUTEUR_COQUE = 2400
 
 const SPLAT_VS = `#version 300 es
 layout(location = 0) in vec2 aPos;
@@ -2183,6 +2189,16 @@ uniform vec4 uLampes[MAX_LUMIERES]; // x, y, hauteur, portée
 uniform float uLampesInt[MAX_LUMIERES]; // intensité
 uniform vec3 uLampesCol[MAX_LUMIERES]; // couleur
 uniform vec4 uLampesFix[MAX_LUMIERES]; // taille, bandeau, demi-longueur, angle
+// La hauteur du plus haut obstacle RÉELLEMENT posé : HAUTEUR_COQUE s'il y a
+// une coque dans le tableau, HAUTEUR_BLOCS sinon. C'est elle qui borne la
+// marche. Sans elle, un tableau bâti en cuve — sans une seule coque — payait
+// la marche jusqu'à la lampe pour rien : passé HAUTEUR_BLOCS plus aucune
+// boîte ne compte, le SDF rend l'infini, et le rayon avance de 200 u par pas
+// en rescannant les 96 boîtes à chaque fois. Mesuré sur six tableaux en
+// cuve : 16 % de pas de marche en moins, pour un écart d'éclairement de
+// 2,6·10⁻⁴ au pire (une lampe sous 141 u : sa borne frôle la distance à la
+// lampe, et le dernier centième du rayon n'est plus parcouru).
+uniform float uHautMax;
 #define MAX_SPONGES 8
 uniform int uSpongeCount;
 uniform vec4 uSponges[MAX_SPONGES]; // minX, minY, maxX, maxY
@@ -2368,10 +2384,11 @@ void main() {
     // passe au-dessus d'un obstacle dès que son altitude dépasse la sienne.
     // L'altitude au paramètre t vaut t·hLampe/distL — DEUX bornes en
     // découlent : tBloc, où le rayon quitte le mobilier (140 u), et tLim, où
-    // il quitterait une coque (jamais, en pratique : cf. HAUTEUR_COQUE).
+    // il quitte le plus haut obstacle du tableau (uHautMax) — soit tBloc
+    // quand il n'y a pas de coque, soit tout le trajet quand il y en a une.
     // Lampe haute : ombres courtes et douces ; lampe basse : ombres longues.
     float tBloc = min(distL, distL * HAUTEUR_BLOCS / max(hL, HAUTEUR_BLOCS + 1.0));
-    float tLim = min(distL, distL * HAUTEUR_COQUE / max(hL, HAUTEUR_COQUE + 1.0));
+    float tLim = min(distL, distL * uHautMax / max(hL, uHautMax + 1.0));
     // ombre douce : le min de k·h/t le long de la marche vers la lampe —
     // la pénombre s'élargit avec la hauteur (une lampe haute diffuse)
     float pen = 4.0 + hL * 0.008;
@@ -3345,9 +3362,25 @@ export class Renderer {
     const w = 480
     const h = Math.max(48, Math.min(480, Math.round((w * sizeY) / sizeX)))
     this.ensureLightTarget(w, h)
-    let key = `${boxCount};${minX},${minY},${sizeX},${sizeY}`
+    // Le plus haut obstacle posé : une seule coque suffit à faire monter la
+    // borne de marche au plafond ; sans coque, elle reste à la hauteur des
+    // blocs et le cuiseur rend exactement ce qu'il rendait avant elles.
+    let hautMax = HAUTEUR_BLOCS
+    for (let i = 0; i < boxCount; i++)
+      if ((boxes[i].forme ?? 0) === FORME_COQUE) {
+        hautMax = HAUTEUR_COQUE
+        break
+      }
+    let key = `${boxCount};${minX},${minY},${sizeX},${sizeY};H${hautMax}`
+    // La clé porte TOUT ce dont le cuiseur se sert. Le bandeau, sa longueur
+    // et son angle en font partie : pointLampe éclaire depuis le point du
+    // SEGMENT le plus proche, et sans eux, basculer une lampe ronde en
+    // bandeau — ou la rallonger, ou la tourner — sans la déplacer laissait
+    // la carte d'avant à l'écran (l'aperçu de l'éditeur mentait).
     for (const l of lampes)
-      key += `;L${l.x},${l.y},${l.h},${l.portee},${l.intensite},${l.rvb.join('/')}`
+      key +=
+        `;L${l.x},${l.y},${l.h},${l.portee},${l.intensite},${l.rvb.join('/')}` +
+        `,${l.bandeau ? 1 : 0},${l.demiLong},${l.angleRad}`
     for (let i = 0; i < boxCount; i++) {
       const bx = boxes[i]
       key += `;${bx.minX},${bx.minY},${bx.maxX},${bx.maxY},${bx.angle ?? 0},${bx.material},${bx.forme ?? 0},${bx.p0 ?? 0},${bx.p1 ?? 0}`
@@ -3368,6 +3401,7 @@ export class Renderer {
     gl.uniform2f(lu['uMapMin'], minX, minY)
     gl.uniform2f(lu['uMapSize'], sizeX, sizeY)
     gl.uniform2f(lu['uMapPx'], w, h)
+    gl.uniform1f(lu['uHautMax'], hautMax)
     this.remplitLampes(lampes)
     gl.uniform1i(lu['uLampeCount'], lampes.length)
     gl.uniform4fv(lu['uLampes[0]'], this.lampScratch)
