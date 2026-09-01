@@ -92,7 +92,7 @@ Les trois commandes, **systématiquement, sans exception** :
 
 ```bash
 pnpm type-check    # strict, doit être à 0 erreur
-pnpm test          # 644 tests, ~18 s
+pnpm test          # 711 tests, ~22 s (mesuré le 01/09/2026)
 pnpm build
 ```
 
