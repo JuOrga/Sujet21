@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { LAMPE_HAUTEUR_MAX } from '../game/level'
 
 // La hauteur des blocs est écrite DEUX FOIS dans renderer.ts : une fois dans
 // le shader principal (qui éclaire le DESSUS des solides) et une fois dans le
@@ -28,5 +29,51 @@ describe('Éclairage des volumes — la hauteur des blocs', () => {
     const plancher = Number(m![1])
     expect(plancher).toBeGreaterThan(0.1) // un obstacle reste visible
     expect(plancher).toBeLessThan(1) // mais la lumière a bien un effet
+  })
+})
+
+// LES COQUES MONTENT AU PLAFOND. Une chambre et un couloir sont des
+// cloisons, pas du mobilier : la lampe d'une salle ne doit pas éclairer la
+// salle voisine par-dessus le mur. Tant que tout mesurait HAUTEUR_BLOCS,
+// c'est exactement ce qui se passait — l'ombre du mur mitoyen s'arrêtait à
+// 196 u derrière lui (deux chambres de 1200 u, mur de 40, lampe à 600) et le
+// reste de la pièce d'à côté baignait en plein jour.
+describe('Éclairage des volumes — la hauteur des coques', () => {
+  const hauteurCoque = () => {
+    const m = source.match(/#define\s+HAUTEUR_COQUE\s+([0-9.]+)/)
+    expect(m).not.toBeNull()
+    return Number(m![1])
+  }
+
+  it('dépasse la lampe la plus haute : aucune ne regarde par-dessus un mur', () => {
+    expect(hauteurCoque()).toBeGreaterThanOrEqual(LAMPE_HAUTEUR_MAX)
+  })
+
+  it('dépasse la hauteur des blocs — sinon la coque ne serait qu’un meuble', () => {
+    const blocs = Number(source.match(/#define\s+HAUTEUR_BLOCS\s+([0-9.]+)/)![1])
+    expect(hauteurCoque()).toBeGreaterThan(blocs)
+  })
+
+  it('sert de borne à la marche du cuiseur, et la coque (forme 5) y échappe au rejet', () => {
+    // la marche va jusqu'à tLim, calculé sur HAUTEUR_COQUE
+    expect(source).toMatch(
+      /float\s+tLim\s*=\s*min\(distL,\s*distL\s*\*\s*HAUTEUR_COQUE\s*\/\s*max\(hL,\s*HAUTEUR_COQUE\s*\+\s*1\.0\)\);/,
+    )
+    // et chaque boîte est écartée à SA hauteur, pas à celle de la scène
+    expect(source).toMatch(
+      /if\s*\(alt\s*>\s*\(dec\.y\s*>\s*4\.5\s*\?\s*HAUTEUR_COQUE\s*:\s*HAUTEUR_BLOCS\)\)\s*continue;/,
+    )
+    // l'altitude passée au SDF : t·hLampe/distL, la montée réelle du rayon
+    expect(source).toMatch(/sceneSdf\(p\s*\+\s*dir\s*\*\s*t,\s*t\s*\*\s*hL\s*\/\s*distL\)/)
+  })
+
+  it('ne déborde PAS sur les tamis : évent, éponge et vitre restent du mobilier', () => {
+    // un évent tamisé sur tout le trajet coucherait ses barreaux dans toute
+    // la salle — les trois tamis se bornent à la hauteur des BLOCS
+    for (const tamis of ['grilleTrans', 'epongeTrans', 'vitreTrans'])
+      expect(source).toContain(`${tamis}(p, dir, min(distL, tBloc))`)
+    expect(source).toMatch(
+      /float\s+tBloc\s*=\s*min\(distL,\s*distL\s*\*\s*HAUTEUR_BLOCS\s*\/\s*max\(hL,\s*HAUTEUR_BLOCS\s*\+\s*1\.0\)\);/,
+    )
   })
 })
