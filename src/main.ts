@@ -5613,34 +5613,112 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       g.lineWidth = Math.max(2, rayonDessine * 2 * z)
       chemin()
       g.stroke()
-      // les deux arêtes : c'est le liseré qui fait lire une SURFACE. Tracé
-      // en pointillé serré, il dit aussi que la matière est un champ figé,
-      // pas de la tôle — la parenté avec l'état vapeur reste lisible.
-      g.strokeStyle = `rgba(198,178,255,${(0.85 * k).toFixed(3)})`
-      g.lineWidth = Math.max(1, 1.6 * z)
-      for (const cote of [-1, 1]) {
-        g.beginPath()
-        for (let m = 0; m + 1 < pts.length; m++) {
-          const a = S(pts[m].x, pts[m].y)
-          const b2 = S(pts[m + 1].x, pts[m + 1].y)
-          const dx = b2.sx - a.sx
-          const dy = b2.sy - a.sy
+      // LES DEUX ARÊTES, D'UN SEUL TRAIT ET AVEC DE VRAIES JOINTURES. C'est
+      // le liseré qui fait lire une SURFACE — mais tracé segment par
+      // segment, il se brisait à chaque coude : les deux droites décalées
+      // se croisaient au lieu de se rejoindre, et le rail montrait une
+      // encoche à l'intérieur du virage et un trou à l'extérieur. Le
+      // contour décalé se calcule donc en une passe, avec un raccord
+      // d'ONGLET : au sommet, on prend l'intersection des deux droites
+      // décalées, dans la direction bissectrice.
+      const contour = (cote: number): { sx: number; sy: number }[] => {
+        const e = pts.map((q) => S(q.x, q.y))
+        const d = rayonDessine * z * cote
+        // la normale de chaque tronçon, en écran
+        const nrm: { x: number; y: number }[] = []
+        for (let m = 0; m + 1 < e.length; m++) {
+          const dx = e[m + 1].sx - e[m].sx
+          const dy = e[m + 1].sy - e[m].sy
           const l = Math.hypot(dx, dy) || 1
-          const nx = (-dy / l) * rayonDessine * z * cote
-          const ny = (dx / l) * rayonDessine * z * cote
-          g.moveTo(a.sx + nx, a.sy + ny)
-          g.lineTo(b2.sx + nx, b2.sy + ny)
+          nrm.push({ x: -dy / l, y: dx / l })
         }
+        const out: { sx: number; sy: number }[] = []
+        for (let m = 0; m < e.length; m++) {
+          if (m === 0 || m === e.length - 1) {
+            // un bout : la normale de son unique tronçon
+            const n = nrm[m === 0 ? 0 : nrm.length - 1]
+            out.push({ sx: e[m].sx + n.x * d, sy: e[m].sy + n.y * d })
+            continue
+          }
+          // UN SOMMET : la bissectrice des deux normales, allongée de
+          // 1/cos(θ/2) pour retomber sur l'intersection des deux droites
+          // décalées. Bornée à trois épaisseurs, sinon un angle très aigu
+          // ferait jaillir une aiguille de plusieurs écrans.
+          const a = nrm[m - 1]
+          const b3 = nrm[m]
+          let mx = a.x + b3.x
+          let my = a.y + b3.y
+          const ml = Math.hypot(mx, my)
+          if (ml < 1e-4) {
+            // demi-tour parfait : pas de bissectrice, on garde la normale
+            out.push({ sx: e[m].sx + a.x * d, sy: e[m].sy + a.y * d })
+            continue
+          }
+          mx /= ml
+          my /= ml
+          const cos = mx * a.x + my * a.y
+          const allonge = Math.min(3, 1 / Math.max(0.34, cos))
+          out.push({
+            sx: e[m].sx + mx * d * allonge,
+            sy: e[m].sy + my * d * allonge,
+          })
+        }
+        return out
+      }
+      g.lineJoin = 'round'
+      g.lineCap = 'butt'
+      for (const cote of [-1, 1]) {
+        const c = contour(cote)
+        // l'arête, d'un seul trait : plus aucune brisure aux coudes
+        g.strokeStyle = `rgba(198,178,255,${(0.85 * k).toFixed(3)})`
+        g.lineWidth = Math.max(1, 1.7 * z)
+        g.beginPath()
+        g.moveTo(c[0].sx, c[0].sy)
+        for (let m = 1; m < c.length; m++) g.lineTo(c[m].sx, c[m].sy)
         g.stroke()
       }
-      // les bouts : une calotte, pour que le rail ne semble pas coupé net —
-      // le tube est une CAPSULE, et c'est par là qu'on le contourne
-      g.fillStyle = `rgba(74,62,120,${(0.62 * k).toFixed(3)})`
-      for (const bout of [pts[0], pts[pts.length - 1]]) {
-        const p = S(bout.x, bout.y)
+      // LE BISEAU. Une paroi n'est pas un aplat : un second liseré, plus
+      // fin et rentré, donne l'épaisseur — la lumière accroche le bord et
+      // le centre reste sombre. C'est le même geste que le chant des
+      // solides dans le rendu du décor.
+      g.strokeStyle = `rgba(150,124,235,${(0.4 * k).toFixed(3)})`
+      g.lineWidth = Math.max(1, 1.1 * z)
+      for (const cote of [-1, 1]) {
+        const c = contour(cote * 0.72)
         g.beginPath()
-        g.arc(p.sx, p.sy, Math.max(1, rayonDessine * z), 0, Math.PI * 2)
-        g.fill()
+        g.moveTo(c[0].sx, c[0].sy)
+        for (let m = 1; m < c.length; m++) g.lineTo(c[m].sx, c[m].sy)
+        g.stroke()
+      }
+      // LA VEINE DU CHAMP. Même figée, la ligne reste une ligne de champ :
+      // un trait clair court en son milieu. C'est ce qui garde la parenté
+      // avec l'état ouvert — on reconnaît le même objet, barré.
+      g.strokeStyle = `rgba(214,198,255,${(0.3 * k).toFixed(3)})`
+      g.lineWidth = Math.max(1, 1.2 * z)
+      g.lineCap = 'round'
+      chemin()
+      g.stroke()
+      // LES BOUTS SE FERMENT EN DEMI-LUNE. Le tube est une CAPSULE : son
+      // contour, c'est une arête, un demi-cercle, l'autre arête. Un cercle
+      // entier rapporté au bout dessinait un anneau en travers de la
+      // paroi — une perle posée là, qui n'existe nulle part dans la
+      // collision. On ne trace donc que la moitié qui REFERME, centrée sur
+      // la direction de sortie, et elle se raccorde pile aux deux arêtes.
+      g.lineWidth = Math.max(1, 1.7 * z)
+      g.strokeStyle = `rgba(198,178,255,${(0.85 * k).toFixed(3)})`
+      const bouts: [{ x: number; y: number }, { x: number; y: number }][] = [
+        [pts[0], pts[1]],
+        [pts[pts.length - 1], pts[pts.length - 2]],
+      ]
+      for (const [bout, voisin] of bouts) {
+        const p = S(bout.x, bout.y)
+        const v = S(voisin.x, voisin.y)
+        // la direction de SORTIE : du voisin vers le bout, prolongée
+        const dehors = Math.atan2(p.sy - v.sy, p.sx - v.sx)
+        const r = Math.max(1, rayonDessine * z)
+        g.beginPath()
+        g.arc(p.sx, p.sy, r, dehors - Math.PI / 2, dehors + Math.PI / 2)
+        g.stroke()
       }
     }
     // la ligne elle-même — et quand le champ est ENGAGÉ (il porte un nuage,
