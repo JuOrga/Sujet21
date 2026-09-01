@@ -143,6 +143,12 @@ export interface SimParams {
   // une trajectoire à 500 u/s — mesuré : le nuage ENTIER finissait à 380 u
   // d'un rail dont la bande fait 75, et le champ, vidé, lâchait.
   plasmaConfin: number
+  // Vitesse (u/s) à laquelle la paroi d'un conduit pousse dehors ce qui s'y
+  // est condensé. Une particule qui change d'état AU MILIEU du tube y est
+  // enfoncée de tout le rayon : la replacer d'un coup sur la paroi la
+  // catapultait à rayon/dt — mesuré 2861 u/s à l'arrivée d'un convoyage,
+  // le corps projeté à 680 u. Bornée, la sortie redevient un déplacement.
+  plasmaSortie: number
 
   // Sas de sortie : une bouche d'aspiration dans laquelle l'eau s'engouffre
   exitRadius: number // portée de l'aspiration autour de la bouche (unités monde)
@@ -297,6 +303,7 @@ export const DEFAULT_PARAMS: SimParams = {
   plasmaRailRadius: 30,
   plasmaConvoy: 950,
   plasmaConfin: 8,
+  plasmaSortie: 180,
 
   exitRadius: 240,
   exitPull: 300,
