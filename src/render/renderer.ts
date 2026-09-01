@@ -10,6 +10,12 @@ import {
   LAMPE_HAUTEUR_DEFAUT,
   LAMPE_HAUTEUR_MAX,
   LAMPE_HAUTEUR_MIN,
+  MAT_CHAUD,
+  MAT_FROID,
+  MAT_GRILLE,
+  MAT_HYDROPHILE,
+  MAT_HYDROPHOBE,
+  MAT_WALL,
   lampeCouleurRVB,
   zonePhases,
 } from '../game/level'
@@ -23,6 +29,11 @@ import {
   FORME_COQUE,
 } from '../game/formes'
 import type { Camera } from './camera'
+import {
+  MASQUE_TOUT,
+  masqueCompose,
+  sourceVariante,
+} from './variantes'
 
 // Budgets de rendu : au-delà, les éléments excédentaires ne sont plus
 // dessinés (la physique, elle, les voit tous) — l'éditeur avertit quand un
@@ -654,6 +665,7 @@ float segDist(vec2 p, vec2 a, vec2 b) {
 // hasTex : 1 quand l'image de la cause est peinte en fond — la géométrie
 // STATIQUE du décor procédural s'efface (l'image la remplace), seuls les
 // effets ANIMÉS restent : souffle glacé, panache, gouttes, voile.
+#ifdef AVEC_ZONES
 vec3 zoneDecor(vec2 world, vec2 zc, vec2 zh, float force, float t, float hasTex) {
   vec3 acc = vec3(0.0);
   vec2 q = world - zc;
@@ -742,6 +754,7 @@ vec3 zoneDecor(vec2 world, vec2 zc, vec2 zh, float force, float t, float hasTex)
   }
   return acc;
 }
+#endif
 
 // distance signée à une boîte (négatif à l'intérieur)
 float boxSdf(vec2 world, vec4 b) {
@@ -769,6 +782,7 @@ ${FORMES_GLSL}
 // à fait, même dans une pièce éteinte. C'est une règle de jouabilité, pas
 // un choix d'image — on doit voir contre quoi on va buter.
 #define PLANCHER_SOLIDE 0.30
+#ifdef AVEC_OMBRE_VOLUME
 float ombreVolume(vec2 world, float dansEau) {
   if (uLumiereEau < 0.5) return 0.0;
   float occ = 0.0;
@@ -851,6 +865,7 @@ float ombreVolume(vec2 world, float dansEau) {
   // sous le corps lui-même, pas d'ombre : il est éclairé, pas assombri
   return clamp(occ, 0.0, 1.0) * (1.0 - dansEau);
 }
+#endif
 
 void main() {
   vec2 uv = gl_FragCoord.xy / uCanvasSize;
@@ -870,6 +885,7 @@ void main() {
   // La cuve d'essai flotte dans le vide : le décor se scinde en deux mondes
   // de part et d'autre de la coque (roomD < 0 : intérieur).
   float roomD;
+#ifdef AVEC_MODULES
   if (uSolModules > 0.5) {
     // LE SOL NE VIT QU'À L'INTÉRIEUR DES MODULES : la salle n'est plus le
     // rectangle de la toile, c'est l'union des creux des COQUES posées.
@@ -926,7 +942,11 @@ void main() {
       // voile, le halo de paroi, le liseré) : inutile de finir la liste
       if (roomD < -420.0) break;
     }
-  } else {
+  } else
+#endif
+  {
+    // Sans COQUE posée, la salle est le rectangle de la toile : la boucle
+    // sur les 96 boîtes n'aurait rien à y trouver.
     vec2 dr = abs(world - uRoomCenter) - uRoomHalf;
     roomD = max(dr.x, dr.y);
   }
@@ -1079,6 +1099,7 @@ void main() {
   // Zones d'état, sous les surfaces : un voile teinté qui emplit la région,
   // un liseré net à la frontière, et des chevrons lents qui balaient vers
   // l'intérieur — on voit qu'on entre dans un régime imposé, pas dans un décor.
+#ifdef AVEC_ZONES
   for (int zi = 0; zi < MAX_ZONES; zi++) {
     if (zi >= uZoneCount) break;
     float f = uZoneForce[zi];
@@ -1147,30 +1168,66 @@ void main() {
     // limite se devine, elle ne se trace pas
     col += fogCol * exp(-abs(szn - 1.0) * 26.0) * 0.14 * fog * fog * fogAmp;
   }
+#endif
 
   // Textures des matériaux : prélevées hors des branches (flux de contrôle
   // uniforme requis par les mipmaps), utilisées dans la boucle d'obstacles.
   // Les deux parois alternent selon un bruit très basse fréquence : les longs
   // murs cessent de répéter le même motif d'un bout à l'autre du tableau.
+  //
+  // ET C'EST BIEN LÀ LE PROBLÈME : « hors des branches » veut dire SUR TOUT
+  // L'ÉCRAN. Un tableau sans plaque froide ni chaudière prélevait quand même
+  // le givre et la chaudière à chacun de ses pixels, pour une valeur que
+  // personne ne lit ensuite. Aucun « if » ne pouvait les sauver — les
+  // mipmaps exigent ce flux uniforme. Un #ifdef, si : le drapeau n'est posé
+  // que si le matériau est POSÉ sur le tableau ET son image chargée (cf.
+  // variantes.ts). Sinon la branche procédurale prend le relais, comme elle
+  // le faisait déjà quand l'image n'était pas encore arrivée.
+#ifdef AVEC_TEX_PAROI
   vec3 texWallC = texture(uTexWall, world / 230.0).rgb;
   if (uHasWallA > 0.5) {
     vec3 wallA = texture(uTexWallA, world / 520.0).rgb;
     float blend = uDecor > 0.5 ? smoothstep(0.35, 0.65, smoothField(world * 0.0023 + 5.3)) : 0.5;
     texWallC = uHasWall > 0.5 ? mix(texWallC, wallA, blend) : wallA;
   }
+#else
+  vec3 texWallC = vec3(0.0);
+#endif
+#ifdef AVEC_TEX_PHOBE
   vec3 texPhobeC = texture(uTexPhobe, world / 170.0).rgb;
+#else
+  vec3 texPhobeC = vec3(0.0);
+#endif
+#ifdef AVEC_TEX_PHILE
   vec3 texPhileC = texture(uTexPhile, world / 210.0).rgb;
+#else
+  vec3 texPhileC = vec3(0.0);
+#endif
+#ifdef AVEC_TEX_FROID
   vec3 texFroidC = texture(uTexFroid, world / 460.0).rgb;
+#else
+  vec3 texFroidC = vec3(0.0);
+#endif
+#ifdef AVEC_TEX_CHAUD
   vec3 texChaudC = texture(uTexChaud, world / 380.0).rgb;
+#else
+  vec3 texChaudC = vec3(0.0);
+#endif
   // la grille est calée pour que ses perforations fassent ~24 u, comme le
   // motif procédural qu'elle remplace
+#ifdef AVEC_TEX_GRILLE
   vec3 texGrilleC = texture(uTexGrille, world / 624.0).rgb;
+#else
+  vec3 texGrilleC = vec3(0.0);
+#endif
 
   // Obstacles : remplissage texturé + liseré, couleur par matériau (§6)
   float edgeW = 2.5 / uZoom;
   // relief : décalage du sommet des parois, proportionnel à l'écart au
   // centre (en écran), fondu sous le zoom de carte
+#ifdef AVEC_RELIEF
   vec2 relDisp = (world - uCenter) * (uRelief * clamp(uZoom * 1.2, 0.0, 1.0));
+#endif
   float drainEye = 0.0; // œil du sas, retenu pour assombrir l'eau qui y coule
   for (int bi = 0; bi < MAX_BOXES; bi++) {
     if (bi >= uBoxCount) break;
@@ -1206,7 +1263,11 @@ void main() {
       else if (mat > 5.5 && mat < 6.5) reachMax = max(reachMax, uHeatBand * uBoxAux[bi].w);
       else if (mat > 3.5 && mat < 4.5) reachMax = max(reachMax, uColdBand);
       else if (mat > 8.5) reachMax = max(reachMax, 60.0);
+#ifdef AVEC_RELIEF
       if (d > reachMax + edgeW + (uRelief > 0.0 ? length(relDisp) : 0.0)) continue;
+#else
+      if (d > reachMax + edgeW) continue;
+#endif
     }
     // FORME de la pièce : la distance se raffine après le rejet grossier —
     // remplissage, arête, ombre et auras suivent la vraie silhouette
@@ -1220,6 +1281,7 @@ void main() {
     // trou quand le sommet glisse au-delà de leur épaisseur).
     float dV = d;
     vec2 wbV = wb;
+#ifdef AVEC_RELIEF
     float flanc = 0.0;
     if (uRelief > 0.0 && (mat < 2.5 || mat > 3.5)) {
       vec2 wT = world - relDisp;
@@ -1254,6 +1316,7 @@ void main() {
         }
       }
     }
+#endif
     // Ombre portée douce autour de chaque solide (sauf le sas) : les blocs
     // se détachent du fond au lieu de flotter — la cuve prend de la
     // profondeur, les rectangles cessent d'être des aplats.
@@ -1266,6 +1329,7 @@ void main() {
     // sommet, strates et chant clair — chaque matériau garde son identité
     // sur sa tranche : turquoise mouillé, violet cireux, vert de membrane,
     // ambre de borne… Le sommet (déplacé) se peint ensuite par-dessus.
+#ifdef AVEC_RELIEF
     if (flanc > 0.003) {
       vec2 gB = vec2(dFdx(d), dFdy(d));
       float gn2 = max(length(gB), 1e-5);
@@ -1312,6 +1376,7 @@ void main() {
       }
       col = mix(col, fc, flanc);
     }
+#endif
     if (mat < 2.5) {
       float fill = 1.0 - smoothstep(-edgeW, 0.0, dV);
       float edge = 1.0 - smoothstep(0.0, edgeW, abs(dV));
@@ -1418,19 +1483,19 @@ void main() {
           fillCol = vec3(0.105, 0.125, 0.155) * teinte * (0.55 + 0.45 * bordC);
           edgeCol = vec3(0.32, 0.39, 0.46);
         } else {
-          fillCol = uHasWall > 0.5
+          fillCol = (SI_TEX_PAROI && uHasWall > 0.5)
             ? texWallC * 0.95
             : vec3(0.10, 0.13, 0.17) * (0.88 + 0.24 * dnoise(world * vec2(0.03, 0.30)));
         }
       } else if (mat < 1.5) { // hydrophile : mouillé, brillant, reflet qui glisse
         float sheen = 0.5 + 0.5 * sin(world.x * 0.045 + world.y * 0.10 + uTime * 0.7);
-        fillCol = uHasPhile > 0.5
+        fillCol = (SI_TEX_PHILE && uHasPhile > 0.5)
           ? texPhileC * (0.85 + 0.25 * sheen)
           : vec3(0.05, 0.16, 0.20) + vec3(0.015, 0.055, 0.065) * sheen;
         edgeCol = vec3(0.20, 0.65, 0.70);
       } else {                // hydrophobe : cireux, grain perlé qui repousse
         float wax = smoothstep(0.72, 0.95, dnoise(world * 0.12));
-        fillCol = uHasPhobe > 0.5
+        fillCol = (SI_TEX_PHOBE && uHasPhobe > 0.5)
           ? texPhobeC * 0.75
           : vec3(0.16, 0.11, 0.20) + vec3(0.07, 0.035, 0.10) * wax;
         edgeCol = vec3(0.62, 0.42, 0.78);
@@ -1517,7 +1582,7 @@ void main() {
       // deviennent la CHALEUR qui court dessus, pas le panneau lui-même.
       // L'image est très sombre : sans ce réchauffement, le panneau se lit
       // comme du métal noir et perd son identité de SOURCE DE CHALEUR.
-      vec3 fillCol = uHasChaud > 0.5
+      vec3 fillCol = (SI_TEX_CHAUD && uHasChaud > 0.5)
         ? texChaudC * vec3(2.3, 1.45, 0.95) + vec3(0.30, 0.11, 0.02) * smoothstep(0.4, 0.9, stripe)
         : vec3(0.26, 0.11, 0.05) + vec3(0.42, 0.17, 0.04) * smoothstep(0.35, 0.85, stripe);
       col = mix(col, fillCol * eclMat, fill);
@@ -1536,7 +1601,7 @@ void main() {
       // eux-mêmes de masque — le fond se voit à travers, comme avant.
       float hole;
       vec3 barCol;
-      if (uHasGrille > 0.5) {
+      if (SI_TEX_GRILLE && uHasGrille > 0.5) {
         float lum = dot(texGrilleC, vec3(0.299, 0.587, 0.114));
         hole = 1.0 - smoothstep(0.020, 0.075, lum);
         barCol = texGrilleC * 1.5;
@@ -1557,7 +1622,7 @@ void main() {
       // reste par-dessus : le gel a l'air vivant, pas imprimé.
       // Teinte franchement bleue : brute, l'image tire vers le gris béton et
       // la plaque cesse de se lire comme du GEL au premier coup d'œil.
-      vec3 fillCol = uHasFroid > 0.5
+      vec3 fillCol = (SI_TEX_FROID && uHasFroid > 0.5)
         ? texFroidC * vec3(0.52, 0.74, 1.02) * (0.60 + 0.28 * sparkle)
         : vec3(0.15, 0.21, 0.29) + vec3(0.26, 0.34, 0.40) * sparkle * 0.55;
       col = mix(col, fillCol * eclMat, fill);
@@ -1631,11 +1696,13 @@ void main() {
   // L'ombre du CORPS se couche sur tout ce qui est déjà peint — fond de
   // cuve, zones, parois : le volume existe dans la lumière, il l'intercepte.
   // Teintée vers le bleu d'ombre, comme celle des blocs.
+#ifdef AVEC_OMBRE_VOLUME
   if (uLumiere > 0.5 && uLumiereEau > 0.5) {
     float dansEau = smoothstep(uThreshold * 0.8, uThreshold * 1.4, field);
     float ombre = ombreVolume(world, dansEau);
     col = mix(col, col * vec3(0.44, 0.51, 0.66), ombre * 0.72);
   }
+#endif
 
   // Ondes d'éjection : anneaux qui traversent le volume depuis le point
   // d'éjection. Elles gonflent légèrement le champ (la surface ondule) et
@@ -2063,6 +2130,7 @@ void main() {
   // LUMIÈRE : éclairée elle se voit, dans le noir elle disparaît (c'est la
   // lumière qu'on voit, pas la fumée). Elle voile aussi le corps : il passe
   // DANS les nappes.
+#ifdef AVEC_BRUME
   if (uBrume > 0.003 && uDecor > 0.5) {
     vec2 bp = world * 0.0042 + vec2(uTime * 0.011, -uTime * 0.007);
     float b = vnoise(bp) * 0.62
@@ -2078,6 +2146,7 @@ void main() {
     float voile = b * uBrume * 0.30 * clamp(eclB, 0.0, 1.0) * inRoom;
     col = mix(col, vec3(0.60, 0.70, 0.78), voile);
   }
+#endif
 
   // ---- LE PLAFONNIER : la source se VOIT. Un luminaire de station vu du
   // dessus — verre teinté à trois barreaux de grille, monture d'acier à
@@ -2582,6 +2651,75 @@ function link(
   return program
 }
 
+/** L'emplacement de chaque uniforme ACTIF d'un programme. Les uniformes
+ * qu'une variante n'utilise plus n'y figurent pas : `gl.uniform*` reçoit
+ * alors `undefined`, que WebGL traite comme `null` — l'écriture se perd en
+ * silence, ce qui est exactement ce qu'on veut. Aucun appelant n'a à savoir
+ * quelle variante dessine. */
+function uniformesDe(
+  gl: WebGL2RenderingContext,
+  program: WebGLProgram,
+): Record<string, WebGLUniformLocation | null> {
+  const map: Record<string, WebGLUniformLocation | null> = {}
+  const count = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS) as number
+  for (let i = 0; i < count; i++) {
+    const info = gl.getActiveUniform(program, i)
+    if (info) map[info.name] = gl.getUniformLocation(program, info.name)
+  }
+  return map
+}
+
+/** Le drapeau de KHR_parallel_shader_compile : « la liaison est-elle
+ * finie ? », posée SANS forcer le pilote à conclure. */
+const COMPLETION_STATUS_KHR = 0x91b1
+
+/** Lance une compilation SANS en demander le verdict. Interroger
+ * COMPILE_STATUS ou LINK_STATUS oblige le pilote à finir sur-le-champ :
+ * une variante qui cuit au milieu d'une partie coûterait l'image. On lance,
+ * on repart, la générique dessine, et on repassera. */
+function lieSansAttendre(
+  gl: WebGL2RenderingContext,
+  vs: string,
+  fs: string,
+): WebGLProgram {
+  const program = gl.createProgram()!
+  for (const [type, src] of [
+    [gl.VERTEX_SHADER, vs],
+    [gl.FRAGMENT_SHADER, fs],
+  ] as const) {
+    const shader = gl.createShader(type)!
+    gl.shaderSource(shader, src)
+    gl.compileShader(shader)
+    gl.attachShader(program, shader)
+    gl.deleteShader(shader) // le programme le retient : plus rien à suivre
+  }
+  gl.linkProgram(program)
+  return program
+}
+
+/** Une variante du shader de composition, dans le cache. */
+interface VarianteCompose {
+  program: WebGLProgram
+  uniforms: Record<string, WebGLUniformLocation | null>
+  /** `cuisson` : lancée, verdict pas encore relevé. `prete` : elle dessine.
+   * `echec` : la liaison a été refusée — l'entrée reste pour qu'on ne
+   * réessaie JAMAIS, et la générique reprend la main. */
+  etat: 'cuisson' | 'prete' | 'echec'
+}
+
+/** Plafond du cache de variantes. Les drapeaux sont grossiers : une poignée
+ * de combinaisons couvre tout le jeu. Le plafond ne protège que d'un
+ * tableau ENGENDRÉ qui en inventerait à la chaîne — au-delà, la générique
+ * reprend la main : cela coûte des images, jamais de la mémoire. */
+const VARIANTES_MAX = 24
+
+/** Images pendant lesquelles un masque doit se tenir avant qu'on cuise sa
+ * variante. Au chargement d'un tableau, les images de matériau arrivent une
+ * à une et le masque bouge à CHAQUE arrivée : cuire à chaque frémissement
+ * remplirait le cache de variantes que personne ne reverra. Une demi-seconde
+ * de calme suffit, et l'attente ne coûte rien — la générique dessine. */
+const MASQUE_STABLE = 30
+
 export class Renderer {
   private readonly gl: WebGL2RenderingContext
   private readonly canvas: HTMLCanvasElement
@@ -2698,6 +2836,18 @@ export class Renderer {
     string,
     Record<string, WebGLUniformLocation | null>
   > = {}
+  // LE CACHE DES VARIANTES DE COMPOSITION, par masque de drapeaux (cf.
+  // variantes.ts). MASQUE_TOUT y est toujours : c'est la générique.
+  private readonly variantes = new Map<number, VarianteCompose>()
+  private compileParallele = false
+  // Le masque demandé à l'image précédente, et depuis combien d'images il
+  // ne bouge plus : on ne cuit que ce qui dure (cf. MASQUE_STABLE).
+  private masqueVu = -1
+  private masqueVuDepuis = 0
+  // Réemployés d'une image à l'autre : construire deux ensembles par image
+  // pour ≤ 96 boîtes serait du déchet pur.
+  private readonly materiauxPoses = new Set<number>()
+  private readonly texturesPretes = new Set<number>()
 
   constructor(canvas: HTMLCanvasElement, capacity: number) {
     this.canvas = canvas
@@ -2726,7 +2876,15 @@ export class Renderer {
     this.fieldScale = this.floatField ? 1.0 : 0.02
 
     this.splatProgram = link(gl, SPLAT_VS, SPLAT_FS)
-    this.composeProgram = link(gl, COMPOSE_VS, COMPOSE_FS)
+    // La composition ne se lie JAMAIS sur la source brute : les jumeaux
+    // SI_* n'y sont pas déclarés (c'est le prélude qui les pose), et le
+    // shader ne compilerait pas. MASQUE_TOUT les met tous à vrai — d'où une
+    // générique identique, ligne pour ligne, au shader d'avant.
+    this.composeProgram = link(
+      gl,
+      COMPOSE_VS,
+      sourceVariante(COMPOSE_FS, MASQUE_TOUT),
+    )
     this.spongeProgram = link(gl, SPONGE_VS, SPONGE_FS)
     this.hullProgram = link(gl, HULL_VS, HULL_FS)
     this.decalProgram = link(gl, DECAL_VS, DECAL_FS)
@@ -2739,17 +2897,23 @@ export class Renderer {
       ['decal', this.decalProgram],
       ['light', this.lightProgram],
     ] as const) {
-      const map: Record<string, WebGLUniformLocation | null> = {}
-      const count = gl.getProgramParameter(
-        program,
-        gl.ACTIVE_UNIFORMS,
-      ) as number
-      for (let i = 0; i < count; i++) {
-        const info = gl.getActiveUniform(program, i)
-        if (info) map[info.name] = gl.getUniformLocation(program, info.name)
-      }
-      this.uniforms[name] = map
+      this.uniforms[name] = uniformesDe(gl, program)
     }
+    // LA VARIANTE GÉNÉRIQUE — tous les drapeaux allumés, donc mot pour mot
+    // le shader d'avant. Elle est compilée ici, une fois, et sert de REPLI :
+    // tant qu'une variante spécialisée n'est pas liée (ou si elle échoue),
+    // c'est elle qui dessine. Le jeu ne peut donc pas perdre une image à
+    // cause de cette brique — au pire il n'y gagne rien.
+    this.variantes.set(MASQUE_TOUT, {
+      program: this.composeProgram,
+      uniforms: this.uniforms['compose'],
+      etat: 'prete',
+    })
+    // Sans cette extension, relever le verdict d'une liaison BLOQUE. On la
+    // demande donc, et à défaut on relèvera à l'image suivante : la question
+    // ne se pose qu'une fois par variante, à la prise d'un tableau.
+    this.compileParallele =
+      gl.getExtension('KHR_parallel_shader_compile') !== null
 
     this.scratch = new Float32Array(capacity * 7)
     this.splatVao = gl.createVertexArray()!
@@ -3458,6 +3622,64 @@ export class Renderer {
     }
   }
 
+  /**
+   * La variante à lier pour ce masque — ou la GÉNÉRIQUE tant que celle-ci
+   * n'est pas prête. Cette méthode ne bloque jamais et ne jette jamais :
+   * une variante qui cuit, qui déborde du cache ou qui échoue laisse
+   * simplement la générique dessiner, c'est-à-dire l'image d'avant.
+   */
+  private varianteCompose(masque: number): VarianteCompose {
+    if (masque === this.masqueVu) this.masqueVuDepuis++
+    else {
+      this.masqueVu = masque
+      this.masqueVuDepuis = 0
+    }
+    const generique = this.variantes.get(MASQUE_TOUT)!
+    if (masque === MASQUE_TOUT) return generique
+    const v = this.variantes.get(masque)
+    if (!v) {
+      // Une variante DÉJÀ cuite sert tout de suite ; on n'en lance une
+      // nouvelle que sur un état qui se tient (voir MASQUE_STABLE).
+      if (this.masqueVuDepuis < MASQUE_STABLE) return generique
+      if (this.variantes.size >= VARIANTES_MAX) return generique
+      this.variantes.set(masque, {
+        program: lieSansAttendre(
+          this.gl,
+          COMPOSE_VS,
+          sourceVariante(COMPOSE_FS, masque),
+        ),
+        uniforms: {},
+        etat: 'cuisson',
+      })
+      return generique // cette image-ci se dessine avec la générique
+    }
+    if (v.etat === 'prete') return v
+    if (v.etat === 'echec') return generique
+    // En cuisson : ne demander le verdict que si le pilote sait répondre
+    // « pas fini » SANS finir. Sinon on relève au passage suivant — la
+    // question ne se pose qu'une fois par variante, à la prise du tableau.
+    if (
+      this.compileParallele &&
+      !this.gl.getProgramParameter(v.program, COMPLETION_STATUS_KHR)
+    )
+      return generique
+    if (!this.gl.getProgramParameter(v.program, this.gl.LINK_STATUS)) {
+      // Une variante refusée n'est pas une raison de perdre le jeu : la
+      // générique rend EXACTEMENT la même image, en plus cher. On le dit une
+      // fois — l'entrée reste en cache pour qu'on ne réessaie jamais.
+      console.warn(
+        `Variante de composition refusée (masque ${masque}) :`,
+        this.gl.getProgramInfoLog(v.program),
+      )
+      this.gl.deleteProgram(v.program)
+      v.etat = 'echec'
+      return generique
+    }
+    v.uniforms = uniformesDe(this.gl, v.program)
+    v.etat = 'prete'
+    return v
+  }
+
   render(
     sim: FluidSim,
     camera: Camera,
@@ -3516,8 +3738,13 @@ export class Renderer {
     // aux.x empaquette matériau + forme + paramètres (voir FORMES_GLSL) :
     // des entiers exacts en float32, aucun uniforme de plus.
     const boxCount = Math.min(boxes.length, MAX_BOXES)
+    // Les matériaux RÉELLEMENT posés : ils commandent les prélèvements de
+    // texture du shader (cf. variantes.ts). Relevés ici, dans la boucle qui
+    // parcourt déjà les boîtes — aucune passe de plus.
+    this.materiauxPoses.clear()
     for (let i = 0; i < boxCount; i++) {
       const bx = boxes[i]
+      this.materiauxPoses.add(bx.material)
       this.boxScratch[i * 4] = bx.minX
       this.boxScratch[i * 4 + 1] = bx.minY
       this.boxScratch[i * 4 + 2] = bx.maxX
@@ -3616,11 +3843,34 @@ export class Renderer {
     gl.bindVertexArray(null)
     gl.disable(gl.BLEND)
 
-    // Passe B — composition
+    // Passe B — composition. LE SHADER DE CE TABLEAU, pas celui de tous les
+    // tableaux : ce qu'il n'emploie pas n'existe pas dans le programme lié
+    // ici (cf. variantes.ts). Tant que la variante cuit, la générique répond
+    // — l'image ne dépend jamais de l'attente.
+    this.texturesPretes.clear()
+    if (this.texWall || this.texWallA) this.texturesPretes.add(MAT_WALL)
+    if (this.texPhile) this.texturesPretes.add(MAT_HYDROPHILE)
+    if (this.texPhobe) this.texturesPretes.add(MAT_HYDROPHOBE)
+    if (this.texFroid) this.texturesPretes.add(MAT_FROID)
+    if (this.texGrille) this.texturesPretes.add(MAT_GRILLE)
+    if (this.texChaud) this.texturesPretes.add(MAT_CHAUD)
+    const variante = this.varianteCompose(
+      masqueCompose({
+        modules: this.solModules,
+        zones: zones.length > 0,
+        relief: relief > 0,
+        // LES MÊMES SEUILS QUE LE SHADER, au chiffre près : un drapeau qui
+        // mentirait sur une borne éteindrait un effet que le tableau demande.
+        brume: brume > 0.003 && decor > 0.5,
+        ombreVolume: lumiere > 0.5 && lumiereEau > 0.5,
+        materiaux: this.materiauxPoses,
+        texturesPretes: this.texturesPretes,
+      }),
+    )
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
     gl.viewport(0, 0, devW, devH)
-    gl.useProgram(this.composeProgram)
-    const cu = this.uniforms['compose']
+    gl.useProgram(variante.program)
+    const cu = variante.uniforms
     gl.activeTexture(gl.TEXTURE0)
     gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
     gl.uniform1i(cu['uField'], 0)
