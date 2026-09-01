@@ -57,6 +57,7 @@ import {
   FORME_COQUE,
   coquePieces,
 } from '../game/formes'
+import { deplaceDans, ditLeDeplacement, type SensOrdre } from '../game/ordre'
 import {
   CHANFREIN_MAX,
   EP_MAX,
@@ -3445,6 +3446,24 @@ export class LevelEditor {
     this.draw()
   }
 
+  /** L'ORDRE DE PEINTURE de l'élément sélectionné. La sélection SUIT
+   *  l'élément déplacé : sans cela, le panneau se rabattrait sur le voisin
+   *  qui vient de prendre sa place, et le second clic bougerait le mauvais.
+   *  La sélection multiple n'y a pas droit — déplacer l'un décalerait les
+   *  indices des autres, et le panneau d'alignement mentirait. */
+  private deplaceOrdre(sens: SensOrdre): void {
+    const s = this.sel
+    if (!s || this.multi.length > 1) return
+    if (s.kind !== 'box' && s.kind !== 'structure') return
+    const liste: unknown[] | undefined =
+      s.kind === 'box' ? this.level.boxes : this.level.structures
+    if (!liste || liste.length < 2) return
+    const avant = s.index
+    const apres = deplaceDans(liste, avant, sens)
+    if (apres !== avant) this.sel = { kind: s.kind, index: apres }
+    this.commit(ditLeDeplacement(sens, avant, apres, liste.length))
+  }
+
   private commit(hint: string): void {
     this.histoire() // un instantané si (et seulement si) le tableau a changé
     this.hint = hint
@@ -5305,8 +5324,30 @@ export class LevelEditor {
                                           ? 'Éclat de mémoire'
                                           : 'Étiquette'
 
+    // L'ORDRE DE PEINTURE — seulement là où il veut dire quelque chose : les
+    // coques entre elles, le mobilier entre lui. Le reste (sas, départ,
+    // lampes…) ne se recouvre pas, un bouton d'ordre n'y dirait rien.
+    const ordreInfo =
+      s.kind === 'box'
+        ? { n: this.level.boxes.length, rang: s.index, meuble: true }
+        : s.kind === 'structure'
+          ? { n: (this.level.structures ?? []).length, rang: s.index, meuble: false }
+          : null
+    const blocOrdre =
+      ordreInfo && ordreInfo.n > 1
+        ? `<div class="ed-props-head">Ordre de peinture — rang ${ordreInfo.rang + 1} / ${ordreInfo.n}</div>` +
+          `<p class="ed-astuce">Le DERNIER se peint dessus. Depuis que les silhouettes fusionnent, c’est la seule chose qui décide, en cas de chevauchement, quelle matière se voit${ordreInfo.meuble ? ' — et le mobilier passe toujours après les coques' : ''}.</p>` +
+          `<div class="ed-fields">` +
+          `<button type="button" class="ed-btn" id="p-ord-fond" title="Tout au fond : tout le reste se peindra par-dessus">⤓ Tout au fond</button>` +
+          `<button type="button" class="ed-btn" id="p-ord-derriere" title="Reculer d’un rang : le voisin passe devant">◂ Derrière</button>` +
+          `<button type="button" class="ed-btn" id="p-ord-devant" title="Avancer d’un rang : il passe devant son voisin">Devant ▸</button>` +
+          `<button type="button" class="ed-btn" id="p-ord-dessus" title="Tout devant : il couvrira tout le reste">⤒ Tout devant</button>` +
+          `</div>`
+        : ''
+
     host.innerHTML =
       `<div class="ed-props-head">${kindName}</div><div class="ed-fields">${rows.join('')}</div>` +
+      blocOrdre +
       (s.kind === 'exit' || s.kind === 'spawn'
         ? ''
         : `<button type="button" class="ed-danger" id="p-del">Supprimer</button>`)
@@ -5334,6 +5375,16 @@ export class LevelEditor {
     host
       .querySelector('#p-del')
       ?.addEventListener('click', () => this.deleteSel())
+    for (const [id, sens] of [
+      ['p-ord-fond', 'fond'],
+      ['p-ord-derriere', 'derriere'],
+      ['p-ord-devant', 'devant'],
+      ['p-ord-dessus', 'dessus'],
+    ] as const) {
+      host
+        .querySelector('#' + id)
+        ?.addEventListener('click', () => this.deplaceOrdre(sens))
+    }
     host.querySelector('#p-railrev')?.addEventListener('click', () => {
       if (this.sel?.kind === 'rail') {
         ;(this.level.rails ?? [])[this.sel.index]?.points.reverse()
