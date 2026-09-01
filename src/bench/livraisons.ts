@@ -175,6 +175,25 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
+    date: '31/08/2026 17:21',
+    title: 'Le canal d’une porte se comptait par dizaines — et refusait le reste',
+    notes: [
+      'LE SYMPTÔME, signalé depuis l’éditeur : ajouter 1 au canal d’une porte pose « des chiffres au hasard ». Ils ne l’étaient pas. Le champ du canal appelait le fabricant de champs numériques sans lui donner de PAS, et retombait donc sur son défaut : 10 — celui des COORDONNÉES, qui se règlent bien par dizaines d’unités monde. Or un « input type=number » à pas 10 ne se contente pas de sauter de dix : il n’accepte QUE la grille du pas.',
+      'RELEVÉ DANS LE NAVIGATEUR, en partant de 1 : la flèche du haut donne 11, puis 21, puis 31 — et saisir 3 à la main est refusé par la validation. D’où une numérotation qui semblait tirée au sort. Le canal de la CIBLE passait bien son pas de 1 ; celui de la PORTE l’avait perdu, et c’est la seule valeur entière de tout le panneau qui était restée au défaut des coordonnées.',
+      'Le pas vaut 1. Aucun « min » n’est posé, et c’est voulu : le canal −1 désigne la porte SCÉNARISÉE, qu’aucun faisceau n’ouvre — vérifié au passage, le pas 1 l’accepte bien. 632 tests verts, type-check et build propres.',
+    ],
+  },
+  {
+    date: '31/08/2026 17:12',
+    title: 'Les étiquettes volaient le clic : leur emprise valait dix fois leur texte',
+    notes: [
+      'LE SYMPTÔME, signalé depuis l’éditeur : impossible de sélectionner une paroi dès qu’une étiquette traîne dans les parages. La cause est une emprise écrite en dur. La zone cliquable d’une étiquette valait « 60 / zoom » en demi-hauteur et « 96 / zoom » en demi-largeur — soit 192 × 60 PIXELS D’ÉCRAN autour de son point, la même quelle que soit la longueur du mot. Or l’étiquette se dessine en 11 px : « SAS » montre 20 px de large et en réclamait 192.',
+      'ET LES ÉTIQUETTES PASSENT EN PREMIER au clic — avant les lampes, les cibles, les portes, les parois. Un rectangle invisible de dix fois leur taille raflait donc la sélection de tout ce qui passait dessous. On mesure maintenant le TEXTE lui-même, dans la police qui le trace, avec 6 px de marge autour et 5 px au-dessus et en dessous : de quoi viser au doigt sans déborder.',
+      'Mesuré dans la police exacte (600 11px ui-monospace) : « SAS » passe de 192 × 60 à 32 × 21 pixels — une zone 17 fois plus petite ; « DÉPART » 10,6 fois ; « MIROIR DE GLACE » 4,9 fois ; « TRAVERSER EN VAPEUR », la plus longue du jeu, 4 fois. Les étiquettes restent parfaitement saisissables : leur zone épouse ce qu’on voit, au lieu de le déborder de partout.',
+      'LA POLICE N’A PLUS QU’UNE DÉFINITION. Elle était recopiée à cinq endroits ; le tracé et la zone cliquable se mesurent désormais dans la même constante, sinon elles divergent en silence et l’on reclique à côté de ce qu’on voit. 632 tests verts, type-check et build propres.',
+    ],
+  },
+  {
     date: '31/08/2026 15:52',
     title: 'Le miroir disparaissait à l’enregistrement — un mot manquait à une liste',
     notes: [
