@@ -135,6 +135,20 @@ export interface SimParams {
   // dans la bande : accélération (u/s²) le long de la ligne, sens du tracé.
   // Le nuage voyage sur la ligne de champ. À 0 : l'arc seul est guidé.
   plasmaConvoy: number
+  // Confinement magnétique du convoyage (1/s) : vitesse d'amortissement de
+  // la composante de vitesse EN TRAVERS de la ligne, pour les particules
+  // dans la bande. C'est lui qui fait prendre les virages : sans lui, tout
+  // l'élan accumulé sur la ligne droite pointe hors du tracé au premier
+  // coude, et le rappel (0,8 × accel au bord de bande) ne peut pas courber
+  // une trajectoire à 500 u/s — mesuré : le nuage ENTIER finissait à 380 u
+  // d'un rail dont la bande fait 75, et le champ, vidé, lâchait.
+  plasmaConfin: number
+  // Vitesse (u/s) à laquelle la paroi d'un conduit pousse dehors ce qui s'y
+  // est condensé. Une particule qui change d'état AU MILIEU du tube y est
+  // enfoncée de tout le rayon : la replacer d'un coup sur la paroi la
+  // catapultait à rayon/dt — mesuré 2861 u/s à l'arrivée d'un convoyage,
+  // le corps projeté à 680 u. Bornée, la sortie redevient un déplacement.
+  plasmaSortie: number
 
   // Sas de sortie : une bouche d'aspiration dans laquelle l'eau s'engouffre
   exitRadius: number // portée de l'aspiration autour de la bouche (unités monde)
@@ -288,6 +302,8 @@ export const DEFAULT_PARAMS: SimParams = {
   laserRefractIndex: 1.33,
   plasmaRailRadius: 30,
   plasmaConvoy: 950,
+  plasmaConfin: 8,
+  plasmaSortie: 180,
 
   exitRadius: 240,
   exitPull: 300,

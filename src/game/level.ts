@@ -579,6 +579,31 @@ export interface EclatPose {
 // PROVOQUE : être vapeur dans la lumière, au bon endroit.
 export interface RailDef {
   points: { x: number; y: number }[] // ≥ 2 points, dans l'ordre du tracé
+  /** LE CONDUIT — le rail devient un RACCOURCI, et non plus seulement un
+   *  guide à faisceau.
+   *
+   *  Un rail ordinaire n'a aucun corps : il ne se sent qu'à travers l'arc
+   *  qu'il capture. Un rail marqué `conduit` prend une épaisseur, et cette
+   *  épaisseur a deux visages selon l'état du corps :
+   *
+   *   · EN EAU ou EN GLACE, c'est une PAROI. Le tube est plein, on bute
+   *     dessus comme sur n'importe quelle coque. Le raccourci se voit et
+   *     se refuse — c'est ce qui en fait une récompense d'état.
+   *   · EN VAPEUR, c'est un PASSAGE. Le nuage entre dans le tube, et tant
+   *     qu'il y est le décor ne le touche plus : il file À TRAVERS les
+   *     parois jusqu'à l'autre bout, porté par le champ.
+   *
+   *  IL FAUT LE PLASMA, pas seulement la vapeur : le tube ne s'ouvre que
+   *  si un ARC IONISÉ circule sur ce rail — donc si l'on s'est vaporisé
+   *  DANS le faisceau. Le raccourci est la récompense de l'énigme, pas son
+   *  contournement. La vapeur a le droit d'ENTRER dans un tube fermé (sans
+   *  quoi elle ne pourrait jamais venir l'allumer), mais elle n'y gagne
+   *  rien tant que l'arc n'est pas pris : ni convoyage, ni traversée.
+   *  Un conduit réclame donc un émetteur laser dans le tableau.
+   *
+   *  Absent ou faux : le rail se comporte EXACTEMENT comme avant — aucun
+   *  tableau existant ne change, et le générateur n'en pose jamais. */
+  conduit?: boolean
 }
 
 export interface LevelDef {

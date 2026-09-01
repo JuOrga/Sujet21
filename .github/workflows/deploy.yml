@@ -14,8 +14,29 @@
 # PRÉVISUALISATION (URL séparée) qui ne touche pas au site en ligne. On
 # déploie donc quand on veut voir, pas à chaque commit.
 #
-# Déploiement en CLI avec token (secrets VERCEL_*) — pas d'intégration Git
-# Vercel, qui demanderait un plan Pro pour un dépôt privé d'organisation.
+# DEUX CHAÎNES PARTENT D'UNE POUSSÉE — et une seule est écrite ici.
+#
+# Celle-ci : GitHub démarre un runner, la CLI Vercel ENVOIE LES SOURCES
+# (sans --prebuilt, elle ne construit rien elle-même) et Vercel compile sur
+# ses machines. Le runner passe l'essentiel de sa minute à attendre. Une
+# livraison coûte donc les deux : ~57 s d'Actions ET une construction Vercel.
+#
+# L'AUTRE, invisible depuis le dépôt : l'application GitHub de Vercel est
+# CONNECTÉE au projet et reçoit le même webhook. Mesuré le 31/08 : elle
+# créait son déploiement 3 s après la poussée — avant même que le runner
+# n'ait démarré — et elle le faisait sur TOUTES les branches. Sur une heure :
+# 20 déploiements, dont 2 seulement en production ; les 18 autres étaient des
+# aperçus que personne n'ouvre, y compris sur `sauvegardes` qui ne contient
+# que du JSON et échouait à chaque fois.
+#
+# CE QUI LA RETIENT AUJOURD'HUI n'est pas dans ce fichier : c'est le réglage
+# « Ignored Build Step » du projet Vercel, passé à « Don't build anything ».
+# Le remettre sur « Automatic » ramènerait le doublon EN SILENCE — aucune
+# ligne du dépôt ne le dirait. C'est écrit ici faute de pouvoir l'écrire
+# là-bas.
+#
+# Déploiement en CLI avec token (secrets VERCEL_*) : c'est ce workflow, et
+# lui seul, qui publie.
 name: deploy
 
 on:

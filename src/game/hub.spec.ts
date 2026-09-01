@@ -19,6 +19,7 @@ import {
   MAT_WALL,
 } from './level'
 import { checkLevel } from './levelIO'
+import { MAX_LUMIERES } from '../render/renderer'
 import { niveauExpanse } from './structures'
 import { accessible } from './generateur'
 
@@ -191,6 +192,62 @@ describe('hub compact v4 — le module JOUÉ reçoit le même méta', () => {
     expect(textes).toContain('SORTIE DE VAPEUR|LA DESCENTE DU JOUR')
     expect(textes).toContain('LE BANC DES MÉMOIRES|TISSER LES LIENS')
     expect(textes).toContain('LE COMPTOIR|TOUT SE PAIE EN MÉMOIRE')
+  })
+})
+
+// LE PLAN DE LAMPES. Le moteur n'allume que les MAX_LUMIERES premières :
+// tant que le hub en posait six, l'étal et le sas restaient ÉTEINTS et
+// l'est du module ne vivait que de la lumière qui fuyait par-dessus les
+// murs de l'ouest. Depuis que les coques montent au plafond, cette fuite
+// n'existe plus — le plan doit donc tenir en quatre lampes, et ces quatre
+// doivent atteindre les deux bouts du module.
+describe('hub — les lampes posées sont les lampes allumées', () => {
+  const lampes = TABLEAU_HUB.lumieres ?? []
+
+  it('n’en pose pas plus que le moteur n’en allume', () => {
+    expect(lampes.length).toBeLessThanOrEqual(MAX_LUMIERES)
+    expect(
+      checkLevel(TABLEAU_HUB).filter((v) => v.message.includes('Trop de lampes')),
+    ).toEqual([])
+  })
+
+  // Un bandeau éclaire depuis le point de son segment le plus proche : ses
+  // DEUX BOUTS doivent tomber dans les coques qu'il dessert, sinon il n'en
+  // couvre qu'une et la salle du bout retombe au rebond.
+  const bouts = (l: (typeof lampes)[number]) => {
+    const a = (((l.angle ?? 0) % 360) * Math.PI) / 180
+    const demi = Math.max(40, Math.min(800, (l.longueur ?? 260) / 2))
+    return [
+      { x: l.x - Math.cos(a) * demi, y: l.y - Math.sin(a) * demi },
+      { x: l.x + Math.cos(a) * demi, y: l.y + Math.sin(a) * demi },
+    ]
+  }
+  const coque = (i: number) => STRUCTURES_HUB[i]
+
+  it('les deux bandeaux de l’ouest atteignent chacun leurs deux chambres', () => {
+    const bandeaux = lampes.filter((l) => l.forme === 'bandeau')
+    expect(bandeaux).toHaveLength(2)
+    // 0 : la cuve → 2 : l'aile des endormis · 4 : le bac → 6 : le contrôle
+    for (const [b, ouest, est] of [
+      [bandeaux[0], coque(0), coque(2)],
+      [bandeaux[1], coque(4), coque(6)],
+    ] as const) {
+      const [g, d] = bouts(b)
+      expect(dansBoite(ouest, g.x, g.y)).toBe(true)
+      expect(dansBoite(est, d.x, d.y)).toBe(true)
+    }
+  })
+
+  // Un bandeau traverse les cloisons : dessiné, son luminaire se coucherait
+  // en travers des murs. Il éclaire, il ne se montre pas.
+  it('les bandeaux n’ont pas de corps — le segment traverse les murs', () => {
+    for (const l of lampes.filter((x) => x.forme === 'bandeau'))
+      expect(l.taille).toBe(0)
+  })
+
+  it('l’est du module garde ses deux lampes, l’étal et le sas', () => {
+    const rondes = lampes.filter((l) => l.forme !== 'bandeau')
+    expect(rondes.map((l) => l.x)).toEqual([1640, 3650])
   })
 })
 

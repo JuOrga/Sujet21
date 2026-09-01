@@ -5,6 +5,7 @@ import { DEFAULT_PARAMS, type SimParams } from './sim/params'
 import { FluidSim, KIND_PLAYER } from './sim/solver'
 import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
+import { evenementsPlasma } from './game/plasmaFx'
 import { CODEX, Codex, type CodexGroupe } from './game/codex'
 import { niveauExpanse } from './game/structures'
 import {
@@ -40,12 +41,12 @@ import {
 } from './game/generateur'
 import { FAMILLES_REGLES, reglesDeFamille } from './game/reglesGen'
 import {
+  aleaDeGraine,
   ampleurAuRang,
   clampPlanVoie,
   diffAuRang,
   figureDeLaCarte,
   figuresDuChoix,
-  hachage,
   litPalmaresVoie,
   masqueMecanique,
   masquePermis,
@@ -54,9 +55,16 @@ import {
   momentAuRang,
   reglageAuRang,
   varianteDuJour,
+  PLAN_VOIE_DEFAUTS,
   type PalmaresVoie,
   type PlanVoie,
 } from './game/voie'
+import {
+  apercuDescente,
+  bilanDescentes,
+  tireDescente,
+  type RangTirage,
+} from './game/descente'
 import { FIGURE_FAMILLES, FIGURE_NOMS } from './game/figures'
 import { CIRCUITS } from './game/circuits'
 import type { LevierId } from './game/leviers'
@@ -189,9 +197,14 @@ import {
   fetchLibrary,
   reorderLibrary,
   mentionSaisie,
+  raisonDuRefus,
   saveLevel,
   type StoredLevel,
 } from './game/netLevels'
+import {
+  bonbonneIllimitee,
+  doitVerserAuto,
+} from './game/bonbonne'
 import { AudioFx, loadAudioPrefs } from './game/audio'
 import {
   Soundtrack,
@@ -531,6 +544,10 @@ function createSim(level: LevelDef): FluidSim {
     zoneForceAt(level, level.spawn.x, level.spawn.y) === 'vapeur'
   sim.dashBudget = sim.dashBudgetMax
   sim.setLevel(level.boxes, level.sponges)
+  // Le tube d'un conduit épouse la bande de convoyage (railConvoy travaille
+  // à plasmaRailRadius × 2,5) : ce qui est porté est exactement ce qui est
+  // dedans, sinon le nuage se ferait expulser d'un bord qu'il croyait libre.
+  sim.setConduits(level.rails ?? [], params.plasmaRailRadius * 2.5)
   sim.spawnDisc(level.spawn.x, level.spawn.y, level.spawn.n, KIND_PLAYER)
   // né dans une zone qui impose la vapeur : le corps EST un nuage dès la
   // première image — sinon le compteur annonce des dashs qui ne partent pas,
@@ -3993,7 +4010,9 @@ async function plancheCode(id: string, brut: string): Promise<void> {
         : `Code « ${code} » enregistré (hors nomenclature : il se joue pareil, sans tri par code).`,
     )
   } else {
-    plancheDit('Enregistrement refusé : bibliothèque injoignable.')
+    plancheDit(
+      `Enregistrement refusé : ${raisonDuRefus() || 'bibliothèque injoignable'}.`,
+    )
     void ouvrePlanche() // repart de l'état serveur
   }
 }
@@ -4464,155 +4483,729 @@ function zoneNoteRegle(id: string, conteneur: HTMLElement): void {
     conteneur.appendChild(s)
   }
 }
-// Le panneau des PARAMÈTRES DU CYCLE reste ouvert d'un re-rendu à l'autre
-let reglesCycleOuvert = false
-/** Le bouton + panneau PARAMÈTRES DU CYCLE : le plan de la voie (longueur,
- * difficulté max, descente du jour) se règle ICI — plus au banc : le banc
- * règle la simulation, le cahier règle le cycle de vie d'une partie. */
-function monteCycleRegles(corps: HTMLElement): void {
-  const btn = document.createElement('button')
-  btn.type = 'button'
-  btn.className = 'rg-cycle-btn'
-  btn.id = 'regles-cycle-btn'
-  btn.textContent = '⚙ PARAMÈTRES DU CYCLE — LE PLAN DE LA VOIE'
-  corps.appendChild(btn)
-  const panneau = document.createElement('div')
-  panneau.className = 'rg-cycle'
-  panneau.id = 'regles-cycle'
-  panneau.hidden = !reglesCycleOuvert
-  panneau.innerHTML =
-    `<p>La descente complète de la VOIE SEMI-PROCÉDURALE : sa <b>longueur</b> ` +
-    `(la voie se boucle au bout, salles générées à la relève), la <b>difficulté ` +
-    `maximale</b> (la rampe monte de 0 au départ jusqu'à ce plafond), et la ` +
-    `<b>descente du jour</b> (les salles viennent de la date — les mêmes pour ` +
-    `tous les postes, les palmarès se comparent). Les <b>tableaux écrits</b> se ` +
-    `coupent : salles générées seules, la descente est alors TOUT PROCÉDURALE. ` +
-    `Quand ils tiennent, le tableau proposé n'est plus celui du rang suivant ` +
-    `mais une PIOCHE du pool sur le trigramme du plan — deux descentes ne ` +
-    `racontent plus la même suite. Chaque réglage s'enregistre ` +
-    `aussitôt et prend effet à la prochaine descente.</p>`
-  const lignes = document.createElement('div')
-  lignes.className = 'rg-cycle-lignes'
-  const cran = (
-    nom: string,
-    lit: () => number,
-    pose: (v: number) => void,
-  ): HTMLElement => {
-    const p = document.createElement('div')
-    p.className = 'rg-param'
-    const titre = document.createElement('b')
-    titre.textContent = nom
-    const moins = document.createElement('button')
-    moins.type = 'button'
-    moins.textContent = '−'
-    const val = document.createElement('output')
-    val.textContent = String(lit())
-    const plus = document.createElement('button')
-    plus.type = 'button'
-    plus.textContent = '+'
-    const applique = (delta: number): void => {
-      pose(lit() + delta)
-      Object.assign(voiePlan, clampPlanVoie(voiePlan))
-      sauvePlanVoie()
-      val.textContent = String(lit())
-      reglesDit('Plan enregistré — il prend effet à la prochaine descente.')
-    }
-    moins.addEventListener('click', () => applique(-1))
-    plus.addEventListener('click', () => applique(1))
-    p.append(titre, moins, val, plus)
-    return p
+// ==== L'ÉCRAN « LA DESCENTE » : régler le déroulement d'une run =========
+// POURQUOI UN ÉCRAN ENTIER. Le plan de la voie tenait dans un tiroir du
+// cahier des règles : deux crans et trois cases. Or ce plan ne décide pas
+// d'un détail — il décide de TOUT le déroulement d'une run. Et la moitié de
+// ce déroulement n'était réglable NULLE PART : la forme de la rampe, la
+// posture des rangs et les quatre poids de l'algorithme de pioche étaient
+// des nombres écrits dans le code. Pour voir l'effet d'un chiffre, il
+// fallait descendre — un quart d'heure par essai.
+//
+// TROIS CHOSES SE FONT ICI, et l'écran est rangé dans cet ordre :
+//   · RÉGLER — le plan, la rampe, la posture, les poids de la pioche ;
+//   · VOIR — la table du plan déroulé, rang par rang, refaite à chaque
+//     cran : ce que la descente POSERA, sans jouer une seconde ;
+//   · ÉPROUVER — tirer une descente à blanc (rejouable à la graine près),
+//     en tirer cent et compter, et sauter à un rang pour aller y jouer.
+//
+// RIEN N'EST GÉNÉRÉ ICI. La table et les tirages ne déroulent que les
+// DÉCISIONS (moment, difficulté, posture, mécaniques, tableau pioché) —
+// construire les salles coûterait des dizaines de millisecondes chacune et
+// échouerait parfois sur une graine ingrate : l'écran figerait et mentirait.
+// Ce qu'on lit est donc exactement ce que le plan commande, tout de suite.
+const descenteEl = document.getElementById('descente') as HTMLDivElement | null
+// la graine du dernier tirage à blanc : elle reste À L'ÉCRAN et se rejoue —
+// comparer deux réglages n'a de sens qu'à hasard égal
+let descenteGraine = ''
+let descenteTirage: RangTirage[] | null = null
+let descenteBilanFait: ReturnType<typeof bilanDescentes> | null = null
+// les MÉMOIRES supposées tissées pour les tirages : par défaut les deux,
+// c'est-à-dire la descente d'un joueur avancé. Les décocher montre ce que
+// voit un joueur qui n'a pas encore tissé ses liens — et c'est là que les
+// mauvaises surprises se cachent (un pool qui se vide, des cartes qui
+// répètent la même mécanique faute de mieux).
+const descenteMemoires = { solidification: true, vaporisation: true }
+// le nombre de descentes du bilan : réglable, parce que 20 suffit pour une
+// impression et 500 pour une preuve
+let descenteCombien = 100
+
+function descenteDit(msg: string): void {
+  const e = document.getElementById('descente-etat')
+  if (e) e.textContent = msg
+}
+
+// L'AMPLEUR n'avait pas de nom lisible : les trois autres colonnes en
+// avaient déjà un (MOMENT_COURT, MECANIQUE_NOMS), on les reprend plutôt
+// que d'en écrire de nouveaux — une seule liste de mots par notion.
+const AMPLEUR_NOMS = ['auto', 'intime', 'vaste', 'immense']
+
+/** Une graine neuve, courte et lisible — on doit pouvoir la recopier. */
+function descenteGraineNeuve(): string {
+  return Math.floor(Math.random() * 36 ** 5)
+    .toString(36)
+    .toUpperCase()
+    .padStart(5, '0')
+}
+
+/** Un titre de section. */
+function dscSec(txt: string): HTMLElement {
+  const d = document.createElement('div')
+  d.className = 'dsc-sec'
+  d.textContent = txt
+  return d
+}
+
+/** Un CRAN : − valeur +, avec son nom et sa raison d'être. Toute pose
+ *  repasse par clampPlanVoie (les bornes vivent là, et nulle part ailleurs)
+ *  puis enregistre et refait l'écran — la table doit dire la vérité à
+ *  l'instant même où le chiffre change. */
+function dscCran(
+  nom: string,
+  aide: string,
+  lit: () => number,
+  pose: (v: number) => void,
+  pas = 1,
+  format: (v: number) => string = String,
+): HTMLElement {
+  const p = document.createElement('div')
+  p.className = 'dsc-cran'
+  const txt = document.createElement('div')
+  const b = document.createElement('b')
+  b.textContent = nom
+  const s = document.createElement('small')
+  s.textContent = aide
+  txt.append(b, s)
+  const moins = document.createElement('button')
+  moins.type = 'button'
+  moins.textContent = '−'
+  moins.setAttribute('aria-label', `${nom} : diminuer`)
+  const val = document.createElement('output')
+  val.textContent = format(lit())
+  const plus = document.createElement('button')
+  plus.type = 'button'
+  plus.textContent = '+'
+  plus.setAttribute('aria-label', `${nom} : augmenter`)
+  const applique = (delta: number): void => {
+    pose(lit() + delta)
+    poseDescente(`${nom} : ${format(lit())}`)
   }
-  lignes.appendChild(
-    cran(
+  moins.addEventListener('click', () => applique(-pas))
+  plus.addEventListener('click', () => applique(pas))
+  p.append(txt, moins, val, plus)
+  return p
+}
+
+/** Une CASE À COCHER, même contrat que le cran. */
+function dscCoche(
+  nom: string,
+  aide: string,
+  lit: () => boolean,
+  pose: (v: boolean) => void,
+): HTMLElement {
+  const p = document.createElement('div')
+  p.className = 'dsc-cran'
+  const lab = document.createElement('label')
+  const coche = document.createElement('input')
+  coche.type = 'checkbox'
+  coche.checked = lit()
+  const txt = document.createElement('div')
+  const b = document.createElement('b')
+  b.textContent = nom
+  const s = document.createElement('small')
+  s.textContent = aide
+  txt.append(b, s)
+  lab.append(coche, txt)
+  coche.addEventListener('change', () => {
+    pose(coche.checked)
+    poseDescente(`${nom} : ${coche.checked ? 'actif' : 'coupé'}`)
+  })
+  p.appendChild(lab)
+  return p
+}
+
+/** Enregistre le plan, invalide les tirages (ils ne décrivent plus ce
+ *  plan-là) et refait l'écran. Le tirage à blanc SURVIT à un réglage
+ *  seulement s'il est refait : garder à l'écran un tirage périmé ferait
+ *  juger un réglage sur les résultats du précédent. */
+function poseDescente(quoi: string): void {
+  Object.assign(voiePlan, clampPlanVoie(voiePlan))
+  sauvePlanVoie()
+  if (descenteTirage) descenteTirage = tirageDescenteCourant()
+  descenteBilanFait = null
+  renderDescente()
+  descenteDit(`${quoi} — enregistré, effet à la prochaine descente.`)
+}
+
+/** La bibliothèque telle que la pioche la voit (le hub en est déjà exclu). */
+function descenteBibliotheque(): LevelDef[] {
+  return playedLevels()
+}
+
+function tirageDescenteCourant(): RangTirage[] {
+  return tireDescente(
+    descenteBibliotheque(),
+    voiePlan,
+    descenteGraine,
+    descenteMemoires,
+  )
+}
+
+/** LA RAMPE DESSINÉE : une barre par rang, teintée par le moment. La forme
+ *  d'une rampe (le sommet, les respirations, la victoire finale) ne se lit
+ *  pas dans une colonne de chiffres — elle se lit d'un trait. */
+function dscRampe(): HTMLElement {
+  const d = document.createElement('div')
+  d.className = 'dsc-rampe'
+  const rangs = apercuDescente(voiePlan)
+  const haut = Math.max(1, ...rangs.map((r) => r.difficulte))
+  for (const r of rangs) {
+    const s = document.createElement('span')
+    if (r.moment === 2) s.className = 'dsc-m2'
+    if (r.moment === 3) s.className = 'dsc-m3'
+    // une difficulté 0 garde un trait : sinon la barre disparaît et l'on
+    // croit à un rang manquant
+    s.style.height = `${8 + (r.difficulte / haut) * 92}%`
+    s.title = `rang ${r.rang} · ${MOMENT_COURT[r.moment]} · difficulté ${r.difficulte}`
+    d.appendChild(s)
+  }
+  return d
+}
+
+/** LA TABLE : une ligne par rang. Sans tirage, elle dit ce que le plan
+ *  commande ; après un tirage, elle ajoute ce que la pioche a choisi. */
+function dscTable(): HTMLElement {
+  const rangs = apercuDescente(voiePlan)
+  const t = document.createElement('table')
+  t.className = 'dsc-table'
+  const entetes = [
+    'RANG',
+    'MOMENT',
+    'DIFF.',
+    'AMPLEUR',
+    'FIG.',
+    'POSTURE',
+    descenteTirage ? 'TABLEAU PIOCHÉ' : 'MÉCANIQUES (au tirage)',
+  ]
+  const thead = document.createElement('thead')
+  const trh = document.createElement('tr')
+  for (const e of entetes) {
+    const th = document.createElement('th')
+    th.textContent = e
+    trh.appendChild(th)
+  }
+  thead.appendChild(trh)
+  t.appendChild(thead)
+  const tb = document.createElement('tbody')
+  for (const r of rangs) {
+    const tr = document.createElement('tr')
+    if (r.moment === 2) tr.className = 'dsc-mom2'
+    if (r.moment === 3) tr.className = 'dsc-mom3'
+    const cell = (contenu: string | HTMLElement, large = false): void => {
+      const td = document.createElement('td')
+      if (large) td.className = 'dsc-large'
+      if (typeof contenu === 'string') td.textContent = contenu
+      else td.appendChild(contenu)
+      tr.appendChild(td)
+    }
+    cell(`${r.rang} / ${voiePlan.longueur}`)
+    cell(MOMENT_COURT[r.moment])
+    cell(String(r.difficulte))
+    cell(AMPLEUR_NOMS[r.ampleur])
+    cell(`${r.figures} / 3`)
+    const posture = document.createElement('span')
+    const badge = (txt: string): void => {
+      const s = document.createElement('span')
+      s.className = 'dsc-badge'
+      s.textContent = txt
+      posture.appendChild(s)
+    }
+    if (r.dangers) badge('SANS DANGER')
+    if (r.purete) badge('LEÇON PURE')
+    if (r.laby) badge('LABY')
+    if (r.contraste) badge('CONTRASTE')
+    if (!posture.childElementCount) badge('—')
+    cell(posture, true)
+    const tire = descenteTirage?.[r.rang - 1]
+    if (!descenteTirage) {
+      cell('—')
+    } else if (tire?.ecrite) {
+      const c = document.createElement('span')
+      const cah = tire.ecrite.cahier
+      c.textContent = `${tire.ecrite.code} — ${tire.ecrite.nom}`
+      if (cah)
+        c.textContent += ` (${MOMENT_COURT[cah.moment].toLowerCase()} · ${MECANIQUE_NOMS[cah.mecanique]} · diff. ${cah.difficulte})`
+      cell(c, true)
+    } else {
+      const c = document.createElement('span')
+      c.className = 'dsc-vide'
+      c.textContent = `procédurale seule — ${(tire?.mecaniques ?? []).map((m) => MECANIQUE_NOMS[m]).join(', ')}`
+      cell(c, true)
+    }
+    tb.appendChild(tr)
+  }
+  t.appendChild(tb)
+  return t
+}
+
+/** LE BILAN AFFICHÉ : ce que cent descentes proposent — et surtout ce
+ *  qu'elles ne proposent JAMAIS. */
+function dscBilan(): HTMLElement {
+  const d = document.createElement('div')
+  d.className = 'dsc-bilan'
+  const b = descenteBilanFait
+  if (!b) {
+    d.className += ' dsc-vide'
+    d.textContent =
+      'Aucun bilan tiré. Le bilan répond à la seule question que le tirage à blanc ne pose pas : sur cent descentes, quels tableaux sortent — et lesquels ne sortent jamais.'
+    return d
+  }
+  const ligne = (html: string): void => {
+    const p = document.createElement('div')
+    p.innerHTML = html
+    d.appendChild(p)
+  }
+  const total = b.parMecanique.reduce((s, n) => s + n, 0) || 1
+  ligne(
+    `<b>${b.descentes}</b> descentes tirées · <b>${b.ecritesParDescente.toFixed(1)}</b> tableaux écrits par descente en moyenne (sur ${voiePlan.longueur} rangs) · <b>${b.parCode.length}</b> tableaux distincts proposés.`,
+  )
+  ligne(
+    'Cartes générées par mécanique : ' +
+      b.parMecanique
+        .map(
+          (n, m) =>
+            `${MECANIQUE_NOMS[m as CodeAtelier['mecanique']]} <b>${((n / total) * 100).toFixed(0)} %</b>`,
+        )
+        .join(' · '),
+  )
+  const tete = b.parCode.slice(0, 8)
+  if (tete.length)
+    ligne(
+      'Les plus proposés : ' +
+        tete
+          .map((c) => `${c.code} <b>${(c.part * 100).toFixed(0)} %</b>`)
+          .join(' · '),
+    )
+  if (b.oublies.length) {
+    const p = document.createElement('div')
+    p.className = 'dsc-oublies'
+    p.textContent =
+      `JAMAIS PROPOSÉS (${b.oublies.length}) — un tableau qu'aucune descente ne pose est un tableau mort : ` +
+      b.oublies.map((o) => `${o.code} ${o.nom}`).join(' · ')
+    d.appendChild(p)
+  } else {
+    ligne('Aucun tableau oublié : toute la bibliothèque se propose.')
+  }
+  return d
+}
+
+/** LES OUTILS : tirer, compter, sauter, revenir aux défauts. */
+function dscOutils(): HTMLElement {
+  const d = document.createElement('div')
+  d.className = 'dsc-outils'
+  const bouton = (txt: string, titre: string, fait: () => void): void => {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.textContent = txt
+    b.title = titre
+    b.addEventListener('click', fait)
+    d.appendChild(b)
+  }
+  const graine = document.createElement('input')
+  graine.type = 'text'
+  graine.value = descenteGraine
+  graine.placeholder = 'GRAINE'
+  graine.setAttribute('aria-label', 'Graine du tirage à blanc')
+  graine.title =
+    'La graine du tirage. Deux tirages de MÊME graine donnent la même descente : c’est la seule façon de juger un réglage — en ne changeant qu’une chose à la fois.'
+  graine.addEventListener('change', () => {
+    descenteGraine = graine.value.trim() || descenteGraineNeuve()
+  })
+  d.appendChild(graine)
+  bouton(
+    '↯ TIRER UNE DESCENTE',
+    'Déroule la descente entière sans rien générer : le tableau que la pioche choisirait à chaque rang, et les mécaniques des trois cartes.',
+    () => {
+      descenteGraine = graine.value.trim() || descenteGraineNeuve()
+      descenteTirage = tirageDescenteCourant()
+      renderDescente()
+      descenteDit(`Descente tirée sur la graine ${descenteGraine}.`)
+    },
+  )
+  bouton('⟳ NOUVELLE GRAINE', 'Une autre descente, mêmes réglages.', () => {
+    descenteGraine = descenteGraineNeuve()
+    descenteTirage = tirageDescenteCourant()
+    renderDescente()
+    descenteDit(`Descente tirée sur la graine ${descenteGraine}.`)
+  })
+  bouton(
+    `∑ BILAN SUR ${descenteCombien} DESCENTES`,
+    'Tire N descentes et compte : quels tableaux sortent, à quelle fréquence, et lesquels ne sortent jamais.',
+    () => {
+      const t0 = performance.now()
+      descenteBilanFait = bilanDescentes(
+        descenteBibliotheque(),
+        voiePlan,
+        descenteCombien,
+        descenteGraine || descenteGraineNeuve(),
+        descenteMemoires,
+      )
+      const ms = performance.now() - t0
+      renderDescente()
+      descenteDit(
+        `Bilan de ${descenteCombien} descentes en ${ms.toFixed(0)} ms.`,
+      )
+    },
+  )
+  bouton(
+    '↺ REVENIR AUX DÉFAUTS',
+    'Remet tout le plan — rampe, posture, figures, poids — aux valeurs d’origine.',
+    () => {
+      Object.assign(voiePlan, clampPlanVoie(PLAN_VOIE_DEFAUTS))
+      sauvePlanVoie()
+      descenteTirage = null
+      descenteBilanFait = null
+      renderDescente()
+      descenteDit('Plan remis aux défauts.')
+    },
+  )
+  // LE SAUT DE RANG : le seul outil qui touche à la partie en cours. Régler
+  // la fin d'une descente demandait d'en jouer douze salles ; ici on se pose
+  // au rang voulu et la prochaine cérémonie propose ce que ce rang commande.
+  bouton(
+    '⇥ SE POSER AU RANG…',
+    'Pose la profondeur de la descente en cours au rang voulu : la prochaine fin de salle proposera ce que CE rang commande. Rien d’autre ne bouge — ni réserve, ni registres.',
+    () => {
+      const rep = window.prompt(
+        `Se poser à quel rang ? (1 à ${voiePlan.longueur}, la descente en est au rang ${voieRang})`,
+        String(Math.min(voiePlan.longueur, voieRang + 1)),
+      )
+      if (rep === null) return
+      const n = Math.round(Number(rep))
+      if (!Number.isFinite(n) || n < 0 || n > voiePlan.longueur) {
+        descenteDit(`Rang hors du plan : gardez-vous entre 0 et ${voiePlan.longueur}.`)
+        return
+      }
+      voieRang = n
+      majVoieHud()
+      descenteDit(
+        `Descente posée au rang ${n} — la prochaine fin de salle proposera le rang ${Math.min(voiePlan.longueur, n + 1)}.`,
+      )
+    },
+  )
+  return d
+}
+
+/** LE PLAN EN CLAIR : le JSON, à copier d'un poste à l'autre. Un réglage
+ *  qui ne se transmet pas n'existe que sur la machine qui l'a trouvé. */
+function dscEchange(): HTMLElement {
+  const d = document.createElement('div')
+  const zone = document.createElement('textarea')
+  zone.className = 'dsc-json'
+  zone.spellcheck = false
+  zone.value = JSON.stringify(clampPlanVoie(voiePlan), null, 1)
+  zone.setAttribute('aria-label', 'Le plan de la descente, en JSON')
+  const outils = document.createElement('div')
+  outils.className = 'dsc-outils'
+  const appliquer = document.createElement('button')
+  appliquer.type = 'button'
+  appliquer.textContent = '⤓ APPLIQUER CE PLAN'
+  appliquer.title = 'Relit le texte ci-dessus et pose le plan qu’il décrit.'
+  appliquer.addEventListener('click', () => {
+    try {
+      const lu = JSON.parse(zone.value) as Partial<PlanVoie>
+      Object.assign(voiePlan, clampPlanVoie(lu))
+      sauvePlanVoie()
+      descenteTirage = null
+      descenteBilanFait = null
+      renderDescente()
+      descenteDit('Plan appliqué — les valeurs hors bornes ont été ramenées.')
+    } catch {
+      descenteDit('Ce texte n’est pas un plan lisible : rien n’a été changé.')
+    }
+  })
+  outils.appendChild(appliquer)
+  d.append(zone, outils)
+  return d
+}
+
+function renderDescente(): void {
+  const corps = document.getElementById('descente-corps')
+  if (!corps) return
+  // le défilement se garde : un cran refait tout l'écran, et perdre sa
+  // place à chaque clic rendrait le réglage pénible
+  const haut = corps.scrollTop
+  corps.innerHTML = ''
+  const aide = document.createElement('p')
+  aide.className = 'dsc-aide'
+  aide.innerHTML =
+    'Tout ce qui décide du <b>déroulement d’une run</b> se règle ici, et se lit tout de suite dans la table du bas : ' +
+    'le <b>plan</b> (longueur, plafond de difficulté, ce qui se propose), la <b>forme de la rampe</b>, la <b>posture</b> ' +
+    'des rangs et les <b>quatre poids</b> de l’algorithme qui choisit les tableaux du pool. Chaque réglage s’enregistre ' +
+    'aussitôt sur ce poste et prend effet à la <b>prochaine descente</b>. Rien n’est généré ici : on déroule les décisions, ' +
+    'pas les salles — c’est ce qui rend l’aperçu instantané et honnête.'
+  corps.appendChild(aide)
+
+  corps.appendChild(dscSec('LE PLAN'))
+  const g1 = document.createElement('div')
+  g1.className = 'dsc-grille'
+  g1.append(
+    dscCran(
       'LONGUEUR',
+      'le nombre de salles de la descente — la voie se boucle au bout',
       () => voiePlan.longueur,
       (v) => {
         voiePlan.longueur = v
       },
     ),
-  )
-  lignes.appendChild(
-    cran(
+    dscCran(
       'DIFFICULTÉ MAX',
+      'le plafond que la rampe atteint au sommet',
       () => voiePlan.diffMax,
       (v) => {
         voiePlan.diffMax = v
       },
     ),
+    dscCoche(
+      'SALLES GÉNÉRÉES',
+      'trois salles fabriquées proposées à chaque récompense',
+      () => voiePlan.generees,
+      (v) => {
+        voiePlan.generees = v
+      },
+    ),
+    dscCoche(
+      'TABLEAUX ÉCRITS',
+      'la pioche du pool pose un tableau fait main en face — coupés alors que les générées tiennent, la descente est TOUT PROCÉDURALE',
+      () => voiePlan.ecrites,
+      (v) => {
+        voiePlan.ecrites = v
+      },
+    ),
+    dscCoche(
+      'DESCENTE DU JOUR',
+      'les salles viennent de la date : les mêmes pour tous les postes, les palmarès se comparent',
+      () => voiePlan.graineDuJour,
+      (v) => {
+        voiePlan.graineDuJour = v
+      },
+    ),
   )
-  // LE réglage qui change la nature d'une descente : proposer ou non des
-  // salles fabriquées à chaque récompense. Tout le reste est commun.
-  const pGen = document.createElement('div')
-  pGen.className = 'rg-param'
-  const labG = document.createElement('label')
-  const cocheG = document.createElement('input')
-  cocheG.type = 'checkbox'
-  cocheG.id = 'regles-cycle-generees'
-  cocheG.checked = voiePlan.generees
-  cocheG.addEventListener('change', () => {
-    voiePlan.generees = cocheG.checked
-    sauvePlanVoie()
-    reglesDit(
-      cocheG.checked
-        ? 'Salles générées ACTIVES — chaque récompense proposera des salles fabriquées.'
-        : 'Salles générées coupées — la descente suit la séquence écrite.',
-    )
-  })
-  const labGTxt = document.createElement('b')
-  labGTxt.textContent = 'SALLES GÉNÉRÉES AUX RÉCOMPENSES'
-  labG.append(cocheG, labGTxt)
-  pGen.appendChild(labG)
-  lignes.appendChild(pGen)
-  // LES TABLEAUX ÉCRITS : coupés alors que les salles générées tiennent, la
-  // descente devient TOUT PROCÉDURALE — trois cartes fabriquées à chaque
-  // récompense, aucun tableau fait main. La façon de jouer une descente
-  // inédite quand la bibliothèque est sue par cœur.
-  const pEcr = document.createElement('div')
-  pEcr.className = 'rg-param'
-  const labE = document.createElement('label')
-  const cocheE = document.createElement('input')
-  cocheE.type = 'checkbox'
-  cocheE.id = 'regles-cycle-ecrites'
-  cocheE.checked = voiePlan.ecrites
-  cocheE.addEventListener('change', () => {
-    voiePlan.ecrites = cocheE.checked
-    sauvePlanVoie()
-    reglesDit(
-      cocheE.checked
-        ? 'Tableaux écrits ACTIFS — la pioche du pool en pose un face aux salles générées.'
-        : voiePlan.generees
-          ? 'Descente TOUT PROCÉDURALE — que des salles générées, aucun tableau écrit.'
-          : 'Tableaux écrits coupés : rallumez les salles générées, sinon la descente n’a plus rien à proposer.',
-    )
-  })
-  const labETxt = document.createElement('b')
-  labETxt.textContent = 'TABLEAUX ÉCRITS AU CHOIX'
-  labE.append(cocheE, labETxt)
-  pEcr.appendChild(labE)
-  lignes.appendChild(pEcr)
-  const pJour = document.createElement('div')
-  pJour.className = 'rg-param'
-  const lab = document.createElement('label')
-  const coche = document.createElement('input')
-  coche.type = 'checkbox'
-  coche.id = 'regles-cycle-jour'
-  coche.checked = voiePlan.graineDuJour
-  coche.addEventListener('change', () => {
-    voiePlan.graineDuJour = coche.checked
-    sauvePlanVoie()
-    reglesDit('Plan enregistré — il prend effet à la prochaine descente.')
-  })
-  const labTxt = document.createElement('b')
-  labTxt.textContent = 'DESCENTE DU JOUR'
-  lab.append(coche, labTxt)
-  pJour.appendChild(lab)
-  lignes.appendChild(pJour)
-  panneau.appendChild(lignes)
-  corps.appendChild(panneau)
+  corps.appendChild(g1)
+
+  corps.appendChild(dscSec('LA RAMPE — la forme de la difficulté'))
+  corps.appendChild(dscRampe())
+  const g2 = document.createElement('div')
+  g2.className = 'dsc-grille'
+  g2.append(
+    dscCran(
+      'RECUL DU SOMMET',
+      'de combien de rangs le pic recule depuis la fin (1 : l’avant-dernier)',
+      () => voiePlan.sommetRecul,
+      (v) => {
+        voiePlan.sommetRecul = v
+      },
+    ),
+    dscCran(
+      'RESPIRATION',
+      'un rang sur N redescend d’un cran — 0 : la rampe est lisse',
+      () => voiePlan.respiration,
+      (v) => {
+        voiePlan.respiration = v
+      },
+    ),
+    dscCran(
+      'FINALE',
+      'la part du plafond au dernier rang : une victoire à prendre, pas un mur',
+      () => voiePlan.finale,
+      (v) => {
+        voiePlan.finale = v
+      },
+      10,
+      (v) => `${v} %`,
+    ),
+  )
+  corps.appendChild(g2)
+
+  corps.appendChild(dscSec('LA POSTURE DES RANGS — enseigner, éprouver, tordre'))
+  const g3 = document.createElement('div')
+  g3.className = 'dsc-grille'
+  g3.append(
+    dscCran(
+      'RANGS SANS DANGER',
+      'les premiers rangs n’en posent aucun : une nouveauté à la fois',
+      () => voiePlan.rangsSansDanger,
+      (v) => {
+        voiePlan.rangsSansDanger = v
+      },
+    ),
+    dscCran(
+      'CADENCE LABYRINTHE',
+      'au MILIEU, un rang sur N se tord — 0 : jamais',
+      () => voiePlan.cadenceLaby,
+      (v) => {
+        voiePlan.cadenceLaby = v
+      },
+    ),
+    dscCran(
+      'CADENCE CONTRASTE',
+      'à la FIN, un rang sur N passe en pénombre sculptée (jamais le dernier) — 0 : jamais',
+      () => voiePlan.cadenceContraste,
+      (v) => {
+        voiePlan.cadenceContraste = v
+      },
+    ),
+    dscCran(
+      'FIGURES AU DÉBUT',
+      'combien des trois cartes sont des FIGURES au début de la descente',
+      () => voiePlan.figuresDebut,
+      (v) => {
+        voiePlan.figuresDebut = v
+      },
+    ),
+    dscCran(
+      'FIGURES ENSUITE',
+      'combien dès que le milieu s’ouvre',
+      () => voiePlan.figuresSuite,
+      (v) => {
+        voiePlan.figuresSuite = v
+      },
+    ),
+  )
+  corps.appendChild(g3)
+
+  corps.appendChild(
+    dscSec('L’ALGORITHME DE PIOCHE — ce qui choisit le tableau du pool'),
+  )
+  const aidePioche = document.createElement('p')
+  aidePioche.className = 'dsc-aide'
+  aidePioche.innerHTML =
+    'À chaque rang, le plan demande un trigramme (moment · mécanique · difficulté) et la pioche prend, parmi les tableaux ' +
+    'jamais vus de la descente, celui dont l’ÉCART est le plus petit — à écart égal, le hasard tranche. Ces quatre poids ' +
+    '<b>sont</b> l’écart. Monter le poids du moment interdit à un tableau de fin d’ouvrir une descente ; le descendre à zéro ' +
+    'brasse toute la bibliothèque. Le <b>coût d’un tableau muet</b> (sans code « 21XX-MMD ») le garde tirable tout en le ' +
+    'faisant passer derrière n’importe quel tableau codé : il ne peut pas descendre sous le pire écart réel, sinon la ' +
+    'nomenclature ne servirait plus à rien.'
+  corps.appendChild(aidePioche)
+  const g4 = document.createElement('div')
+  g4.className = 'dsc-grille'
+  g4.append(
+    dscCran(
+      'POIDS DU MOMENT',
+      'ce que coûte un moment d’écart — le plus lourd des trois d’ordinaire',
+      () => voiePlan.poids.moment,
+      (v) => {
+        voiePlan.poids.moment = v
+      },
+      10,
+    ),
+    dscCran(
+      'POIDS DE LA DIFFICULTÉ',
+      'ce que coûte un cran de difficulté d’écart',
+      () => voiePlan.poids.difficulte,
+      (v) => {
+        voiePlan.poids.difficulte = v
+      },
+      1,
+    ),
+    dscCran(
+      'MALUS MÉCANIQUE RÉPÉTÉE',
+      'ce que coûte de reproposer la mécanique qu’on vient de jouer — la foulée varie',
+      () => voiePlan.poids.mecaRepetee,
+      (v) => {
+        voiePlan.poids.mecaRepetee = v
+      },
+    ),
+    dscCran(
+      'COÛT D’UN TABLEAU MUET',
+      'le prix d’un tableau sans code d’atelier — jamais sous le pire écart réel',
+      () => voiePlan.poids.sansCahier,
+      (v) => {
+        voiePlan.poids.sansCahier = v
+      },
+      100,
+    ),
+  )
+  corps.appendChild(g4)
+
+  corps.appendChild(dscSec('LES OUTILS — éprouver le plan sans le jouer'))
+  corps.appendChild(dscOutils())
+  const g5 = document.createElement('div')
+  g5.className = 'dsc-grille'
+  g5.append(
+    dscCran(
+      'DESCENTES DU BILAN',
+      'combien de descentes le bilan tire — 20 pour une impression, 500 pour une preuve',
+      () => descenteCombien,
+      (v) => {
+        descenteCombien = Math.max(5, Math.min(1000, v))
+      },
+      20,
+    ),
+    dscCoche(
+      'SOLIDIFICATION TISSÉE',
+      'les tirages supposent le lien de la GLACE acquis — décoché, la descente d’un joueur qui ne l’a pas',
+      () => descenteMemoires.solidification,
+      (v) => {
+        descenteMemoires.solidification = v
+      },
+    ),
+    dscCoche(
+      'VAPORISATION TISSÉE',
+      'idem pour la VAPEUR — c’est là que se voient les pools qui se vident',
+      () => descenteMemoires.vaporisation,
+      (v) => {
+        descenteMemoires.vaporisation = v
+      },
+    ),
+  )
+  corps.appendChild(g5)
+  corps.appendChild(dscBilan())
+
+  corps.appendChild(
+    dscSec(
+      descenteTirage
+        ? `LA DESCENTE DÉROULÉE — tirage sur la graine ${descenteGraine}`
+        : 'LA DESCENTE DÉROULÉE — ce que le plan commande, rang par rang',
+    ),
+  )
+  corps.appendChild(dscTable())
+
+  corps.appendChild(dscSec('LE PLAN, EN CLAIR — à emporter d’un poste à l’autre'))
+  corps.appendChild(dscEchange())
+  corps.scrollTop = haut
+}
+
+function ouvreDescente(): void {
+  if (!descenteEl) return
+  if (!descenteGraine) descenteGraine = descenteGraineNeuve()
+  descenteEl.hidden = false
+  descenteDit('')
+  renderDescente()
+}
+document
+  .getElementById('home-descente')
+  ?.addEventListener('click', () => ouvreDescente())
+document.getElementById('descente-fermer')?.addEventListener('click', () => {
+  if (descenteEl) descenteEl.hidden = true
+})
+descenteEl?.addEventListener('pointerdown', (e) => {
+  if (e.target === descenteEl) descenteEl.hidden = true
+})
+
+/** LE CAHIER RENVOIE À L'ÉCRAN. Le plan de la voie se réglait ici, dans un
+ * tiroir du cahier des règles : deux crans et trois cases, pendant que la
+ * moitié du déroulement (la rampe, la posture, les poids de la pioche)
+ * n'était réglable nulle part. Tout a déménagé dans l'écran LA DESCENTE, et
+ * ce bouton est ce qui reste : UNE seule porte, donc un seul endroit où le
+ * plan se règle — deux panneaux qui écrivent le même plan auraient fini par
+ * se contredire à l'écran. */
+function monteCycleRegles(corps: HTMLElement): void {
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'rg-cycle-btn'
+  btn.id = 'regles-cycle-btn'
+  btn.textContent = '⚙ LE DÉROULEMENT DE LA RUN — OUVRIR L’ÉCRAN « LA DESCENTE »'
   btn.addEventListener('click', () => {
-    reglesCycleOuvert = !reglesCycleOuvert
-    panneau.hidden = !reglesCycleOuvert
+    reglesEl.hidden = true
+    ouvreDescente()
   })
+  corps.appendChild(btn)
+  const note = document.createElement('p')
+  note.className = 'rg-cycle-note'
+  note.textContent =
+    'Le plan de la descente — longueur, rampe de difficulté, posture des rangs, part des figures et les quatre poids de l’algorithme qui choisit les tableaux — se règle dans son écran, qui le déroule rang par rang et le tire à blanc sans jouer.'
+  corps.appendChild(note)
 }
 
 function renderRegles(): void {
@@ -5276,6 +5869,33 @@ const laserEtat = {
     points: { x: number; y: number; eau?: boolean; plasma?: boolean }[]
   }[],
   litPrec: [] as boolean[],
+  // ——— LES DEUX INSTANTS DU PLASMA ————————————————————————————————————
+  // Ils étaient jusqu'ici invisibles : le rayon changeait de couleur, le
+  // rail s'allumait, et c'était tout. Or ce sont les deux gestes que
+  // l'énigme demande — se vaporiser DANS la lumière, puis amener l'arc au
+  // pied du tube. Ce qu'on demande au joueur doit se voir quand il le
+  // réussit. Chaque événement GÈLE sa géométrie : le rayon vivant est
+  // reparti ailleurs bien avant la fin du flash.
+  //
+  // L'IONISATION : le faisceau vient d'entrer dans la vapeur du corps.
+  ionisations: [] as {
+    t0: number
+    entree: { x: number; y: number }
+    points: { x: number; y: number }[]
+  }[],
+  // LA CAPTURE : l'arc ionisé vient d'être happé par un rail — le champ
+  // s'engage, et si c'est un conduit, le tube s'ouvre. `cumul` : les deux
+  // instants sont tombés dans la MÊME image (le joueur s'est vaporisé pile
+  // au pied du tube) — un seul temps fort, plus large, remplace les deux.
+  captures: [] as {
+    t0: number
+    prise: { x: number; y: number }
+    ligne: { x: number; y: number }[]
+    cumul: boolean
+  }[],
+  // l'arête d'ionisation se lit par émetteur : un rayon qui RESTE dans la
+  // vapeur ne doit pas rallumer l'effet soixante fois par seconde
+  ionisePrec: [] as boolean[],
 }
 // Sonde de test : l'état des portes/récepteurs depuis la console (comme __sim)
 ;(window as unknown as { __laserEtat: typeof laserEtat }).__laserEtat =
@@ -5506,8 +6126,17 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       }
     }
     // la bande de capture : la portée du champ, tout du long
-    g.strokeStyle = 'rgba(150,120,255,0.07)'
-    g.lineWidth = Math.max(2, params.plasmaRailRadius * 2 * z)
+    // LA BANDE DESSINÉE DOIT ÊTRE LE TUBE RÉEL. Un conduit fait collision sur
+    // `plasmaRailRadius × 2,5` (la bande de convoyage) alors que la bande de
+    // CAPTURE du faisceau ne fait qu'un rayon : dessiner la seconde pour un
+    // conduit ferait buter le corps 45 unités avant tout ce qui se voit.
+    const rayonDessine = rail.conduit === true
+      ? params.plasmaRailRadius * 2.5
+      : params.plasmaRailRadius
+    g.strokeStyle = rail.conduit === true
+      ? 'rgba(150,120,255,0.14)' // un conduit est une PAROI : il se voit plus
+      : 'rgba(150,120,255,0.07)'
+    g.lineWidth = Math.max(2, rayonDessine * 2 * z)
     g.lineJoin = 'round'
     g.lineCap = 'round'
     chemin()
@@ -5849,6 +6478,147 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
           g.lineTo(fin.sx + Math.cos(a2) * d1, fin.sy + Math.sin(a2) * d1)
           g.stroke()
         }
+      }
+    }
+  }
+  // ═══ LES DEUX INSTANTS DU PLASMA ═══════════════════════════════════════
+  // Ce que l'énigme demande — se vaporiser DANS la lumière, puis amener
+  // l'arc au pied du tube — ne se voyait pas quand on le réussissait : le
+  // rayon changeait de teinte, le rail s'allumait, et c'était tout. Deux
+  // temps forts le disent maintenant, et un troisième quand ils coïncident.
+
+  // ① L'IONISATION : la traversée s'embrase. Une onde blanche court sur la
+  // portion ionisée, l'entrée dans le nuage souffle un anneau, et deux
+  // filaments serpentent le long du chemin — le gaz devient conducteur, il
+  // ne se contente pas de changer de couleur.
+  if (laserEtat.ionisations.length > 0) {
+    const nowFx = performance.now() / 1000
+    const DUR = 0.42
+    laserEtat.ionisations = laserEtat.ionisations.filter(
+      (io) => nowFx - io.t0 < DUR,
+    )
+    for (const io of laserEtat.ionisations) {
+      const age = nowFx - io.t0
+      const k = age / DUR
+      const vif = Math.exp(-age / 0.09) // le claquement, puis la braise
+      const a = 1 - k
+      const ch = io.points.map((pt) => S(pt.x, pt.y))
+      if (ch.length >= 2) {
+        for (const [larg, coul] of [
+          [26 * z * (1 + 1.4 * vif), `rgba(150,90,255,${(0.18 * a).toFixed(3)})`],
+          [9 * z * (1 + 2.0 * vif), `rgba(200,160,255,${(0.45 * a).toFixed(3)})`],
+          [2.6 * z * (1 + 2.4 * vif), `rgba(252,248,255,${(0.95 * a).toFixed(3)})`],
+        ] as [number, string][]) {
+          g.strokeStyle = coul
+          g.lineWidth = Math.max(0.8, larg)
+          g.lineJoin = 'round'
+          g.lineCap = 'round'
+          g.beginPath()
+          g.moveTo(ch[0].sx, ch[0].sy)
+          for (let m = 1; m < ch.length; m++) g.lineTo(ch[m].sx, ch[m].sy)
+          g.stroke()
+        }
+        // les filaments : le gaz conduit, et ça se tord
+        const grain = Math.floor(nowFx * 34)
+        for (let m = 0; m + 1 < ch.length; m++) {
+          traceArcFx(ch[m], ch[m + 1], grain * 7.7 + m * 4.1,
+            14 * z * (0.3 + 0.7 * vif),
+            `rgba(215,180,255,${(0.7 * a).toFixed(3)})`, Math.max(0.9, 1.4 * z))
+          traceArcFx(ch[m], ch[m + 1], grain * 3.3 + m * 12.7 + 61,
+            8 * z * (0.3 + 0.7 * vif),
+            `rgba(250,245,255,${(0.5 * a).toFixed(3)})`, Math.max(0.7, 1 * z))
+        }
+      }
+      // l'anneau de souffle, au point d'entrée dans le nuage
+      const pe = S(io.entree.x, io.entree.y)
+      g.strokeStyle = `rgba(205,170,255,${(0.75 * a * a).toFixed(3)})`
+      g.lineWidth = Math.max(1, 3 * z * (1 - k * 0.7))
+      g.beginPath()
+      g.arc(pe.sx, pe.sy, Math.max(3, (14 + 70 * k) * z), 0, Math.PI * 2)
+      g.stroke()
+    }
+  }
+
+  // ② LA CAPTURE, et ③ LE CUMUL : le champ prend l'arc. Une CRÊTE remonte
+  // la ligne du point de prise jusqu'au bout — le champ se propage, il ne
+  // s'allume pas d'un bloc — et une onde s'ouvre au point de prise. En
+  // cumul (l'ionisation dans la même image), tout est plus large, plus
+  // long, et une seconde onde part en retard : c'est l'énigme qui se
+  // résout d'un seul geste, ça mérite un temps fort à part.
+  if (laserEtat.captures.length > 0) {
+    const nowFx = performance.now() / 1000
+    laserEtat.captures = laserEtat.captures.filter(
+      (c) => nowFx - c.t0 < (c.cumul ? 1.0 : 0.7),
+    )
+    for (const c of laserEtat.captures) {
+      const DUR = c.cumul ? 1.0 : 0.7
+      const boost = c.cumul ? 1.9 : 1
+      const age = nowFx - c.t0
+      const k = age / DUR
+      const a = 1 - k
+      const ch = c.ligne.map((q) => S(q.x, q.y))
+      // longueurs cumulées : la crête avance à vitesse constante le long
+      // du tracé, quel que soit le nombre de tronçons
+      const cum = [0]
+      for (let m = 1; m < ch.length; m++)
+        cum.push(cum[m - 1] + Math.hypot(ch[m].sx - ch[m - 1].sx, ch[m].sy - ch[m - 1].sy))
+      const total = cum[cum.length - 1] || 1
+      const tete = total * Math.min(1, k * 1.7)
+      const queue = Math.max(0, tete - total * 0.35)
+      const sur = (d: number): { sx: number; sy: number } => {
+        let m = 1
+        while (m < cum.length - 1 && cum[m] < d) m++
+        const t = (d - cum[m - 1]) / Math.max(1e-6, cum[m] - cum[m - 1])
+        return {
+          sx: ch[m - 1].sx + (ch[m].sx - ch[m - 1].sx) * t,
+          sy: ch[m - 1].sy + (ch[m].sy - ch[m - 1].sy) * t,
+        }
+      }
+      // la crête : un segment lumineux qui remonte la ligne
+      if (tete > queue) {
+        const pas = Math.max(6, total / 40)
+        const pts: { sx: number; sy: number }[] = []
+        for (let d = queue; d <= tete; d += pas) pts.push(sur(d))
+        pts.push(sur(tete))
+        for (const [larg, coul] of [
+          [24 * z * boost, `rgba(150,90,255,${(0.20 * a).toFixed(3)})`],
+          [10 * z * boost, `rgba(200,165,255,${(0.5 * a).toFixed(3)})`],
+          [3 * z * boost, `rgba(252,250,255,${(0.95 * a).toFixed(3)})`],
+        ] as [number, string][]) {
+          g.strokeStyle = coul
+          g.lineWidth = Math.max(0.8, larg)
+          g.lineJoin = 'round'
+          g.lineCap = 'round'
+          g.beginPath()
+          g.moveTo(pts[0].sx, pts[0].sy)
+          for (let m = 1; m < pts.length; m++) g.lineTo(pts[m].sx, pts[m].sy)
+          g.stroke()
+        }
+      }
+      // l'onde au point de prise — deux en cumul, la seconde en retard
+      const pp = S(c.prise.x, c.prise.y)
+      const anneau = (kk: number, larg: number, alpha: number): void => {
+        if (kk <= 0 || kk >= 1) return
+        g.strokeStyle = `rgba(215,185,255,${(alpha * (1 - kk)).toFixed(3)})`
+        g.lineWidth = Math.max(1, larg * z * (1 - kk * 0.6))
+        g.beginPath()
+        g.arc(pp.sx, pp.sy, Math.max(3, (10 + 110 * boost * kk) * z), 0, Math.PI * 2)
+        g.stroke()
+      }
+      anneau(k, 3.4 * boost, 0.85)
+      if (c.cumul) anneau((k - 0.22) / 0.78, 2.4, 0.6)
+      // les étincelles de la prise : l'arc SAUTE sur la ligne
+      const nEt = c.cumul ? 14 : 9
+      for (let e = 0; e < nEt; e++) {
+        const ang = (e / nEt) * Math.PI * 2 + c.t0 * 5.1
+        const d0 = (12 + 60 * boost * k) * z
+        const d1 = d0 + (7 + 14 * (1 - k)) * z
+        g.strokeStyle = `rgba(235,215,255,${(0.8 * a).toFixed(3)})`
+        g.lineWidth = Math.max(0.8, 1.6 * z)
+        g.beginPath()
+        g.moveTo(pp.sx + Math.cos(ang) * d0, pp.sy + Math.sin(ang) * d0)
+        g.lineTo(pp.sx + Math.cos(ang) * d1, pp.sy + Math.sin(ang) * d1)
+        g.stroke()
       }
     }
   }
@@ -6267,6 +7037,9 @@ function drawFleche(dtReal: number, dpr: number): void {
 }
 
 let lastRailTime = 0
+// quand le hub a versé pour la dernière fois (temps de tableau) : le repos
+// entre deux versements évite que le son de collecte ne crépite
+let dernierVersementAuto = -99
 // rails dont le champ est engagé : allumés par un arc, ils ne se relâchent
 // qu'une fois leur bande vidée (le nuage porté jusqu'à l'arrivée)
 const railsEngages = new Set<number>()
@@ -6822,14 +7595,21 @@ instrPanel?.addEventListener('click', () => {
  * non pleine. Le corps se regonfle jusqu'à son volume de départ ; l'état
  * liquide est requis (la glace n'absorbe pas, le nuage disperserait). */
 function verserBonbonne(): string {
-  if (auHub || testLevel || miseEnBonbonne || sim.dispersed) return 'contexte'
+  // AU HUB, la réserve est INFINIE et le versement y est admis : on ne
+  // s'assèche pas chez soi, et perdre un corps en allant parler au marchand
+  // n'a aucun intérêt de jeu. Ailleurs, le contexte refuse comme avant.
+  const illimitee = bonbonneIllimitee(auHub)
+  if ((auHub && !illimitee) || testLevel || miseEnBonbonne || sim.dispersed)
+    return 'contexte'
   if (input.paused || run.ended || run.exitTimer > 0) return 'pause'
   if (input.freezeIntent || input.gasIntent) return 'etat'
   const manque = Math.max(0, level.spawn.n - sim.playerCount)
-  const nParts = Math.min(
-    manque,
-    Math.floor(run.bonbonneLiters / params.litersPerParticle),
-  )
+  const nParts = illimitee
+    ? manque
+    : Math.min(
+        manque,
+        Math.floor(run.bonbonneLiters / params.litersPerParticle),
+      )
   if (nParts < 1) return 'rien'
   // le versement s'installe dans les CREUX autour du corps (jamais sur les
   // particules en place) : poser au centroïde faisait exploser la densité —
@@ -6841,10 +7621,13 @@ function verserBonbonne(): string {
     KIND_PLAYER,
   )
   if (poses < 1) return 'rien'
-  run.bonbonneLiters = Math.max(
-    0,
-    run.bonbonneLiters - poses * params.litersPerParticle,
-  )
+  // une réserve infinie ne se débite pas — sinon la jauge du hub tomberait
+  // à zéro en montrant « ∞ »
+  if (!illimitee)
+    run.bonbonneLiters = Math.max(
+      0,
+      run.bonbonneLiters - poses * params.litersPerParticle,
+    )
   sim.relabel()
   bande.ponctuation('sting-collecte', 0.5)
   bonbonneEl.classList.add('ouvert')
@@ -8275,6 +9058,9 @@ function resetLasers(): void {
   laserEtat.vues = []
   laserEtat.impacts = []
   laserEtat.litPrec = []
+  laserEtat.ionisations = []
+  laserEtat.captures = []
+  laserEtat.ionisePrec = []
   laserEtat.recepteurs = creerEtatRecepteurs((level.cibles ?? []).length)
   laserEtat.portesOuvertes = (level.portes ?? []).map(() => false)
   laserEtat.doorsKey = ''
@@ -9008,13 +9794,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   const difficulte = diffAuRang(rangSuivant, voiePlan)
   const jour = new Date().toISOString().slice(0, 10)
   const alea = descenteDuJour()
-    ? ((): (() => number) => {
-        let h = hachage(`${jour}@${rangSuivant}`)
-        return () => {
-          h = Math.imul(h ^ (h >>> 13), 0x5bd1e995) >>> 0
-          return h / 2 ** 32
-        }
-      })()
+    ? aleaDeGraine(`${jour}@${rangSuivant}`)
     : Math.random
   // LE CYCLE tient aussi la voie : la descente ne propose jamais une salle
   // qui exige une transformation manuelle non tissée — mécaniques ET
@@ -9045,6 +9825,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
           ),
         alea,
         jouee,
+        voiePlan.poids,
       )
     : null
   const aEcrite = ecrite ? decodeCodeAtelier(ecrite.code) : null
@@ -9065,7 +9846,12 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   // début, deux dès que le milieu s'ouvre, les autres cartes en
   // compartiments. La famille se tire dans le vivier éligible (mémoires
   // tissées, mécanique de la carte, moment du plan).
-  const modesFigure = figuresDuChoix(moment, alea)
+  const modesFigure = figuresDuChoix(
+    moment,
+    alea,
+    voiePlan.figuresDebut,
+    voiePlan.figuresSuite,
+  )
   const optionsDuRang = (
     mec: CodeAtelier['mecanique'],
     carte: number,
@@ -9493,6 +10279,11 @@ function annonceVoieCarte(): void {
 function restart(): void {
   run.exitTimer = 0
   run.tableauTime = 0
+  // remis à zéro AVEC l'horloge qu'il mesure : sans cela, après un versement
+  // au temps T, la visite suivante du hub calculait depuisDernier = −T et
+  // taisait le versement pendant T secondes — donc la bannière d'alerte
+  // s'affichait au hub, précisément ce que la mécanique promet d'éviter
+  dernierVersementAuto = -99
   // la BONBONNE se présente : le niveau repart de zéro et remonte à vue,
   // l'éclat balaie le verre — un rappel discret de ce qu'on a en réserve
   bbAffiche = 0
@@ -11623,7 +12414,33 @@ function frame(now: number): void {
       const actifs = new Set<number>()
       for (const t of laserEtat.vues)
         for (const ri of t.railsSuivis) actifs.add(ri)
+      // LES DEUX INSTANTS DU PLASMA, relevés AVANT d'engager les rails :
+      // c'est la comparaison avec l'image d'avant qui fait l'événement. La
+      // règle vit dans un module PUR (game/plasmaFx.ts) parce qu'aucun test
+      // ne vient ici ; main.ts ne fait que la brancher et la dessiner.
+      const fx = evenementsPlasma(
+        laserEtat.vues,
+        railsDuNiveau,
+        railsEngages,
+        laserEtat.ionisePrec,
+        performance.now() / 1000,
+      )
+      laserEtat.ionisations.push(...fx.ionisations)
+      laserEtat.captures.push(...fx.captures)
+      // on ne garde que les derniers : un effet vit moins d'une seconde,
+      // en empiler douze ne ferait que blanchir l'écran
+      if (laserEtat.ionisations.length > 4)
+        laserEtat.ionisations.splice(0, laserEtat.ionisations.length - 4)
+      if (laserEtat.captures.length > 4)
+        laserEtat.captures.splice(0, laserEtat.captures.length - 4)
+      laserEtat.ionisePrec = fx.ionise
       for (const ri of actifs) railsEngages.add(ri)
+      // LE CONDUIT S'OUVRE AU PLASMA, PAS À LA VAPEUR. Un nuage seul ne
+      // suffit pas : il faut que l'arc ionisé circule sur CE rail — donc
+      // s'être vaporisé DANS le faisceau, au pied du tube. Le raccourci est
+      // la récompense de l'énigme, pas son contournement. Tant que le champ
+      // n'est pas levé, le tube reste plein pour tout le monde.
+      sim.setConduitsActifs(railsEngages)
       for (const ri of [...railsEngages]) {
         const rail = railsDuNiveau[ri]
         if (!rail) {
@@ -12197,11 +13014,18 @@ function frame(now: number): void {
   hudCoque.textContent = `${coque > 0 ? '+' : ''}${coque}°`
   hudCoque.classList.toggle('warn', chillNow() > 0.75)
   coqueBar.style.width = `${(chillNow() * 100).toFixed(1)}%`
-  hudBonbonne.textContent = `${run.bonbonneLiters.toFixed(2)} / ${capBonbonne()} L`
+  // AU HUB la réserve est infinie : afficher un litrage qui ne descend
+  // jamais ferait croire à une jauge en panne.
+  const bbInfinie = bonbonneIllimitee(auHub)
+  hudBonbonne.textContent = bbInfinie
+    ? '∞'
+    : `${run.bonbonneLiters.toFixed(2)} / ${capBonbonne()} L`
   // LE NIVEAU DANS LE VERRE : la part de réserve, poursuivie en douceur.
   // L'intérieur utile va de y = 8,5 (plein) à y = 57,5 (vide) dans le
   // viewBox — soit 49 unités de descente pour un verre vide.
-  const bbCible = Math.max(0, Math.min(1, run.bonbonneLiters / capBonbonne()))
+  const bbCible = bbInfinie
+    ? 1
+    : Math.max(0, Math.min(1, run.bonbonneLiters / capBonbonne()))
   bbAffiche += (bbCible - bbAffiche) * Math.min(1, dtReal * 5)
   if (Math.abs(bbCible - bbAffiche) < 0.002) bbAffiche = bbCible
   if (bbLiquide)
@@ -12278,6 +13102,39 @@ function frame(now: number): void {
     levelHasCold && roseeL >= 0.05
       ? `rosée récupérable aux plaques froides : ${roseeL.toFixed(2)} L`
       : ''
+
+  // ---- LE VERSEMENT AUTOMATIQUE DU HUB ------------------------------
+  // Au hub, la jauge basse n'est pas une tension de jeu : c'est une gêne.
+  // La réserve s'y verse donc toute seule, AVANT que la première alerte
+  // n'ait eu le temps de s'afficher — le seuil est posé au-dessus de
+  // `lastCallLiters` exprès (src/game/bonbonne.ts). Placé juste avant le
+  // bloc de fin de course, qui est celui qui lève les alertes : à l'image
+  // où la bannière se poserait, le corps est déjà renfloué.
+  if (
+    doitVerserAuto({
+      auHub,
+      litres: sim.liters(),
+      litresPleins: level.spawn.n * params.litersPerParticle,
+      lastCallLiters: params.lastCallLiters,
+      empeche:
+        input.paused ||
+        input.freezeIntent ||
+        input.gasIntent ||
+        miseEnBonbonne ||
+        sim.dispersed ||
+        run.ended ||
+        run.exitTimer > 0,
+      depuisDernier: run.tableauTime - dernierVersementAuto,
+    })
+  ) {
+    // l'horodatage se pose sur TOUTE tentative, pas seulement sur celle qui
+    // réussit : un corps qui n'arrive pas à absorber (creux pleins) renvoie
+    // 'rien', et sans cela le versement — et son son de collecte — repartait
+    // à chaque image. C'est exactement le crépitement que le repos existe
+    // pour empêcher.
+    verserBonbonne()
+    dernierVersementAuto = run.tableauTime
+  }
 
   // ---- Fin de course : dernière impulsion, gel, arrêt ----
   // Aucun minimum à ramener : on peut finir un tableau sur un souffle. Sous le

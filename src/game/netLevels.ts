@@ -66,6 +66,19 @@ export async function fetchLibrary(): Promise<StoredLevel[] | null> {
   }
 }
 
+// POURQUOI une raison retenue : tout échec retombait sur `null`, si bien
+// qu'un REFUS du serveur (« bibliothèque au plafond de poids ») s'affichait
+// « bibliothèque injoignable ». Le concepteur cherchait alors le réseau
+// alors que la cause était écrite dans la réponse. On garde donc la
+// dernière raison, et les écrans la citent au lieu de la deviner.
+let derniereRaison = ''
+
+/** La raison du dernier refus du serveur, en clair. Vide quand le dernier
+ *  échec était une panne de réseau — là, « injoignable » est la vérité. */
+export function raisonDuRefus(): string {
+  return derniereRaison
+}
+
 async function post(body: object): Promise<{ levels: StoredLevel[]; id: string } | null> {
   try {
     const r = await fetch(ENDPOINT, {
@@ -73,7 +86,11 @@ async function post(body: object): Promise<{ levels: StoredLevel[]; id: string }
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    if (!r.ok) return null
+    if (!r.ok) {
+      derniereRaison = await raisonDeLaReponse(r)
+      return null
+    }
+    derniereRaison = ''
     const data = await r.json()
     return {
       levels: readList(data),
@@ -82,7 +99,19 @@ async function post(body: object): Promise<{ levels: StoredLevel[]; id: string }
       id: typeof (data as { id?: unknown }).id === 'string' ? (data as { id: string }).id : '',
     }
   } catch {
+    derniereRaison = '' // réseau : « injoignable » est le mot juste
     return null
+  }
+}
+
+/** Le `{ error }` du serveur s'il est lisible — sinon rien, pour ne pas
+ *  inventer une cause là où seul un code HTTP est connu. */
+async function raisonDeLaReponse(r: Response): Promise<string> {
+  try {
+    const data = (await r.json()) as { error?: unknown }
+    return typeof data.error === 'string' ? data.error : ''
+  } catch {
+    return ''
   }
 }
 

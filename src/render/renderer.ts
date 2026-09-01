@@ -4,7 +4,7 @@
 //   B. seuillage du champ plein écran + trame de repère procédurale du décor.
 
 import type { FluidSim } from '../sim/solver'
-import { KIND_PLAYER } from '../sim/solver'
+import { KIND_PLAYER, etatRendu } from '../sim/solver'
 import type { SimParams } from '../sim/params'
 import {
   LAMPE_HAUTEUR_DEFAUT,
@@ -35,9 +35,15 @@ import type { Camera } from './camera'
 export const MAX_BOXES = 96
 export const MAX_ZONES = 16
 // Lampes par tableau : au-delà, les excédentaires ne s'allument pas —
-// l'éditeur avertit (même contrat que MAX_BOXES). La hauteur des blocs pour
-// le calcul d'ombre est HAUTEUR_BLOCS (140 u), définie dans le shader.
+// l'éditeur avertit (même contrat que MAX_BOXES).
 export const MAX_LUMIERES = 4
+// LES DEUX HAUTEURS DU CALCUL D'OMBRE, côté TypeScript. Elles doublent les
+// #define des shaders — lumiere.spec.ts vérifie qu'elles ne dérivent pas.
+// Un obstacle ordinaire monte à HAUTEUR_BLOCS et le rayon qui grimpe vers la
+// lampe lui passe dessus ; une COQUE (une chambre, un couloir) monte au
+// plafond et n'est jamais enjambée.
+export const HAUTEUR_BLOCS = 140
+export const HAUTEUR_COQUE = 2400
 
 const SPLAT_VS = `#version 300 es
 layout(location = 0) in vec2 aPos;
@@ -856,6 +862,8 @@ void main() {
   float stateS = tex.a / max(tex.r, 1e-5); // givre en positif, vapeur en négatif
   float icy = clamp(stateS, 0.0, 1.0);
   float vap = clamp(-stateS, 0.0, 1.0);
+  // au-delà de −1, la vapeur est IONISÉE : la part de plasma du pixel
+  float plasmaS = clamp(-stateS - 1.0, 0.0, 1.0);
 
   // Reconstruction monde (repère y vers le haut, cohérent avec la passe A)
   vec2 css = gl_FragCoord.xy / uDpr;
@@ -2016,6 +2024,19 @@ void main() {
     vec3 smoke = mix(smokeCore, smokeEdge, smokeEdgeMix * (0.35 + 0.65 * smokeN));
     smoke += vec3(0.28, 0.22, 0.13) * smokeN * smokeN; // volutes lumineuses qui roulent
     smoke = mix(smoke, vec3(0.50, 0.40, 0.26), (1.0 - smokeN) * 0.22); // plis ambres
+    // PLASMA (vapeur ionisée sur un rail au champ engagé) : le nuage quitte
+    // l'opale ambrée pour le BLANC-VIOLET de l'arc (les mêmes teintes que
+    // le faisceau ionisé, rgba(150,90,255) → rgba(250,245,255)) et il
+    // CRÉPITE — le même tremblement rapide que l'arc (sin 37), désynchronisé
+    // par la position pour que le nuage scintille au lieu de clignoter d'un
+    // bloc. Sans cela le plasma ressemblait à la vapeur au point de s'y
+    // confondre : l'état qui ouvre les conduits doit se voir d'un coup d'œil.
+    float crepite = 0.80 + 0.20 * sin(uTime * 37.0 + (world.x + world.y) * 0.05);
+    vec3 plasCoeur = vec3(0.59, 0.35, 1.00);
+    vec3 plasBord = vec3(0.98, 0.96, 1.00);
+    vec3 plas = mix(plasCoeur, plasBord, smokeEdgeMix * (0.30 + 0.70 * smokeN));
+    plas += vec3(0.24, 0.16, 0.45) * smokeN * smokeN; // volutes violettes
+    smoke = mix(smoke, plas * (0.82 + 0.18 * crepite), plasmaS);
     water = mix(water, smoke, vap * 0.92);
     // L'ŒIL DE LA VAPEUR : dans le nuage, le regard est un TOURBILLON —
     // la fumée se creuse en spirale lente autour du point visé, et un
@@ -2045,6 +2066,11 @@ void main() {
     // parfaitement visible dans une pièce éteinte : peu naturel, signalé.
     if (uLumiereEau > 0.5)
       water *= clamp(vec3(uAmbiante * 1.15) + 1.05 * lmEau, vec3(0.10), vec3(1.0));
+    // Le plasma ÉMET : un gaz ionisé est une source, pas un reflet — dans
+    // une pièce éteinte, le nuage engagé sur un rail doit briller comme
+    // l'arc qui l'a allumé. Posé APRÈS l'éclairage de la pièce, pour que la
+    // nuit ne l'éteigne pas.
+    water += plas * plasmaS * vap * 0.30 * crepite;
 
     col = mix(col, water, body);
     // L'eau qui recouvre l'œil du sas s'assombrit : elle sombre dans le trou
@@ -2161,6 +2187,17 @@ precision highp float;
 #define MAX_BOXES 96
 #define MAX_LUMIERES 4
 #define HAUTEUR_BLOCS 140.0
+// UNE COQUE N'EST PAS UN BLOC : c'est une cloison qui monte au PLAFOND.
+// Les blocs font tous 140 u — le rayon qui grimpe vers la lampe leur passe
+// dessus, et c'est voulu : du mobilier n'enferme pas la lumière. Une chambre
+// ou un couloir, si. Tant que les coques comptaient pour 140 u, la lampe
+// d'une salle éclairait la salle d'à côté À TRAVERS le mur : mesuré sur deux
+// chambres mitoyennes de 1200 u (mur de 40, lampe à 600), l'ombre du mur
+// mitoyen s'arrêtait à 196 u derrière lui — 16 % de la pièce — et le reste
+// baignait en plein jour. C'est le défaut signalé : « pas d'ombres pour les
+// couloirs et les chambres ». Au-dessus de LAMPE_HAUTEUR_MAX (2000 u) :
+// aucune lampe ne peut regarder par-dessus un mur de salle.
+#define HAUTEUR_COQUE 2400.0
 uniform int uBoxCount;
 uniform vec4 uBoxes[MAX_BOXES];
 uniform vec4 uBoxAux[MAX_BOXES];
@@ -2172,6 +2209,16 @@ uniform vec4 uLampes[MAX_LUMIERES]; // x, y, hauteur, portée
 uniform float uLampesInt[MAX_LUMIERES]; // intensité
 uniform vec3 uLampesCol[MAX_LUMIERES]; // couleur
 uniform vec4 uLampesFix[MAX_LUMIERES]; // taille, bandeau, demi-longueur, angle
+// La hauteur du plus haut obstacle RÉELLEMENT posé : HAUTEUR_COQUE s'il y a
+// une coque dans le tableau, HAUTEUR_BLOCS sinon. C'est elle qui borne la
+// marche. Sans elle, un tableau bâti en cuve — sans une seule coque — payait
+// la marche jusqu'à la lampe pour rien : passé HAUTEUR_BLOCS plus aucune
+// boîte ne compte, le SDF rend l'infini, et le rayon avance de 200 u par pas
+// en rescannant les 96 boîtes à chaque fois. Mesuré sur six tableaux en
+// cuve : 16 % de pas de marche en moins, pour un écart d'éclairement de
+// 2,6·10⁻⁴ au pire (une lampe sous 141 u : sa borne frôle la distance à la
+// lampe, et le dernier centième du rayon n'est plus parcouru).
+uniform float uHautMax;
 #define MAX_SPONGES 8
 uniform int uSpongeCount;
 uniform vec4 uSponges[MAX_SPONGES]; // minX, minY, maxX, maxY
@@ -2234,7 +2281,11 @@ vec2 pointLampe(int li, vec2 p) {
   return c + axe * clamp(dot(p - c, axe), -uLampesFix[li].z, uLampesFix[li].z);
 }
 
-float sceneSdf(vec2 p) {
+// alt : l'ALTITUDE du rayon à ce point, sur sa montée du sol vers la
+// lampe. Un obstacle plus bas qu'elle est déjà sous le rayon — il n'ombre
+// plus rien. C'est ce qui sépare le mobilier (140 u, enjambé) de la coque
+// d'une salle (jusqu'au plafond, jamais enjambée).
+float sceneSdf(vec2 p, float alt) {
   float d = 1e9;
   for (int i = 0; i < MAX_BOXES; i++) {
     if (i >= uBoxCount) break;
@@ -2242,6 +2293,7 @@ float sceneSdf(vec2 p) {
     if (dec.x > 2.5 && dec.x < 3.5) continue; // sas : une bouche, pas un mur
     if (dec.x > 4.5 && dec.x < 5.5) continue; // évent : tamisé à part (grilleTrans)
     if (dec.x < 0.5 && uBoxAux[i].z > 8.5) continue; // vitre : tamisée (vitreTrans)
+    if (alt > (dec.y > 4.5 ? HAUTEUR_COQUE : HAUTEUR_BLOCS)) continue;
     vec2 wb = p;
     float ang = uBoxAux[i].y;
     if (abs(ang) > 0.0005) {
@@ -2349,10 +2401,14 @@ void main() {
     float distL = max(length(toL), 1e-4);
     vec2 dir = toL / distL;
     // La HAUTEUR borne l'ombre : le rayon qui grimpe du sol vers la lampe
-    // passe au-dessus des blocs dès que son altitude dépasse la leur — seuls
-    // les obstacles rencontrés avant t·hLampe/distL = HAUTEUR_BLOCS comptent.
+    // passe au-dessus d'un obstacle dès que son altitude dépasse la sienne.
+    // L'altitude au paramètre t vaut t·hLampe/distL — DEUX bornes en
+    // découlent : tBloc, où le rayon quitte le mobilier (140 u), et tLim, où
+    // il quitte le plus haut obstacle du tableau (uHautMax) — soit tBloc
+    // quand il n'y a pas de coque, soit tout le trajet quand il y en a une.
     // Lampe haute : ombres courtes et douces ; lampe basse : ombres longues.
-    float tLim = min(distL, distL * HAUTEUR_BLOCS / max(hL, HAUTEUR_BLOCS + 1.0));
+    float tBloc = min(distL, distL * HAUTEUR_BLOCS / max(hL, HAUTEUR_BLOCS + 1.0));
+    float tLim = min(distL, distL * uHautMax / max(hL, uHautMax + 1.0));
     // ombre douce : le min de k·h/t le long de la marche vers la lampe —
     // la pénombre s'élargit avec la hauteur (une lampe haute diffuse)
     float pen = 4.0 + hL * 0.008;
@@ -2360,14 +2416,18 @@ void main() {
     float t = 4.0;
     for (int k = 0; k < 40; k++) {
       if (t >= tLim || res < 0.004) break;
-      float h = sceneSdf(p + dir * t);
+      float h = sceneSdf(p + dir * t, t * hL / distL);
       res = min(res, pen * h / t);
       t += clamp(h, 8.0, 200.0);
     }
     res = clamp(res, 0.0, 1.0);
-    float tamis = grilleTrans(p, dir, min(distL, tLim))
-      * epongeTrans(p, dir, min(distL, tLim))
-      * vitreTrans(p, dir, min(distL, tLim));
+    // Les TAMIS restent bornés par la hauteur des BLOCS : un évent, une
+    // éponge et une vitre sont du mobilier, pas des cloisons — les border à
+    // tLim les ferait tamiser tout le trajet, et l'ombre des barreaux
+    // s'étendrait à toute la salle.
+    float tamis = grilleTrans(p, dir, min(distL, tBloc))
+      * epongeTrans(p, dir, min(distL, tBloc))
+      * vitreTrans(p, dir, min(distL, tBloc));
     // la VISIBILITÉ de cette lampe depuis ce texel, SANS le rebond : c'est
     // elle qui dit si la lampe éclaire vraiment ici — l'ombre dynamique du
     // corps s'y pèse, pour ne pas projeter l'ombre d'une lampe murée
@@ -3322,9 +3382,25 @@ export class Renderer {
     const w = 480
     const h = Math.max(48, Math.min(480, Math.round((w * sizeY) / sizeX)))
     this.ensureLightTarget(w, h)
-    let key = `${boxCount};${minX},${minY},${sizeX},${sizeY}`
+    // Le plus haut obstacle posé : une seule coque suffit à faire monter la
+    // borne de marche au plafond ; sans coque, elle reste à la hauteur des
+    // blocs et le cuiseur rend exactement ce qu'il rendait avant elles.
+    let hautMax = HAUTEUR_BLOCS
+    for (let i = 0; i < boxCount; i++)
+      if ((boxes[i].forme ?? 0) === FORME_COQUE) {
+        hautMax = HAUTEUR_COQUE
+        break
+      }
+    let key = `${boxCount};${minX},${minY},${sizeX},${sizeY};H${hautMax}`
+    // La clé porte TOUT ce dont le cuiseur se sert. Le bandeau, sa longueur
+    // et son angle en font partie : pointLampe éclaire depuis le point du
+    // SEGMENT le plus proche, et sans eux, basculer une lampe ronde en
+    // bandeau — ou la rallonger, ou la tourner — sans la déplacer laissait
+    // la carte d'avant à l'écran (l'aperçu de l'éditeur mentait).
     for (const l of lampes)
-      key += `;L${l.x},${l.y},${l.h},${l.portee},${l.intensite},${l.rvb.join('/')}`
+      key +=
+        `;L${l.x},${l.y},${l.h},${l.portee},${l.intensite},${l.rvb.join('/')}` +
+        `,${l.bandeau ? 1 : 0},${l.demiLong},${l.angleRad}`
     for (let i = 0; i < boxCount; i++) {
       const bx = boxes[i]
       key += `;${bx.minX},${bx.minY},${bx.maxX},${bx.maxY},${bx.angle ?? 0},${bx.material},${bx.forme ?? 0},${bx.p0 ?? 0},${bx.p1 ?? 0}`
@@ -3345,6 +3421,7 @@ export class Renderer {
     gl.uniform2f(lu['uMapMin'], minX, minY)
     gl.uniform2f(lu['uMapSize'], sizeX, sizeY)
     gl.uniform2f(lu['uMapPx'], w, h)
+    gl.uniform1f(lu['uHautMax'], hautMax)
     this.remplitLampes(lampes)
     gl.uniform1i(lu['uLampeCount'], lampes.length)
     gl.uniform4fv(lu['uLampes[0]'], this.lampScratch)
@@ -3533,7 +3610,8 @@ export class Renderer {
         data[o + 4] = 0
         data[o + 5] = 0
       }
-      data[o + 6] = sim.frost[i] - sim.vapor[i] // givre positif, vapeur négative
+      // givre positif, vapeur négative — le plasma pousse au-delà de −1
+      data[o + 6] = etatRendu(sim.frost[i], sim.vapor[i], sim.ionise[i])
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, this.splatVbo)
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, data, 0, n * 7)

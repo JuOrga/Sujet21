@@ -77,31 +77,76 @@ export function propositionsSalles(
 //     mécanique 0 (l'eau seule) passe partout : elle n'exige aucun lien.
 // À écart égal, le hasard tranche : deux descentes ne se ressemblent pas.
 
-const ECART_MOMENT = 100
-const ECART_DIFF = 10
-const ECART_MECA_REPETEE = 3 // la foulée varie : on préfère changer de couleur
+// LES QUATRE POIDS SONT DES RÉGLAGES, pas des constantes de compilation.
+// Ils étaient figés dans ce fichier ; l'écran LA DESCENTE les met entre les
+// mains du concepteur, parce que ce sont eux — et rien d'autre — qui
+// décident si une descente respecte la rampe ou brasse la bibliothèque.
+// Les valeurs par défaut sont celles qui tenaient ici : sans réglage, la
+// pioche se comporte exactement comme avant.
+export interface PoidsPioche {
+  /** ce que coûte un moment d'écart (un tableau de fin en ouverture) */
+  moment: number
+  /** ce que coûte un cran de difficulté d'écart */
+  difficulte: number
+  /** le malus d'une mécanique qu'on vient de jouer — la foulée varie */
+  mecaRepetee: number
+  /** le coût d'un tableau SANS cahier lisible (cf. plus bas) */
+  sansCahier: number
+}
 
-/** L'écart d'un tableau à la case du plan — le MOMENT pèse dix fois la
- * difficulté, la difficulté dix fois le reste : c'est la rampe qui commande.
- * Plus l'écart est petit, mieux le tableau remplit la case. */
-export function ecartAuCahier(a: CodeAtelier, vise: CodeAtelier): number {
+export const POIDS_PIOCHE_DEFAUTS: PoidsPioche = {
+  moment: 100,
+  difficulte: 10,
+  mecaRepetee: 3,
+  sansCahier: 1000,
+}
+
+/** Ramène des poids (réglés à l'écran, relus du stockage) dans les bornes.
+ * Le poids « sans cahier » garde un plancher : au-dessous du pire écart
+ * réel, un tableau muet passerait devant un tableau codé et la nomenclature
+ * ne servirait plus à rien. */
+export function clampPoidsPioche(p: Partial<PoidsPioche> | null): PoidsPioche {
+  const n = (v: unknown, d: number): number =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : d
+  const moment = Math.max(0, Math.min(999, n(p?.moment, 100)))
+  const difficulte = Math.max(0, Math.min(999, n(p?.difficulte, 10)))
+  return {
+    moment,
+    difficulte,
+    mecaRepetee: Math.max(0, Math.min(999, n(p?.mecaRepetee, 3))),
+    // le pire écart réel : 2 moments + 9 crans de difficulté
+    sansCahier: Math.max(
+      moment * 2 + difficulte * 9 + 1,
+      Math.min(99999, n(p?.sansCahier, 1000)),
+    ),
+  }
+}
+
+/** L'écart d'un tableau à la case du plan — d'ordinaire le MOMENT pèse dix
+ * fois la difficulté, la difficulté dix fois le reste : c'est la rampe qui
+ * commande. Les poids se règlent (cf. PoidsPioche). Plus l'écart est petit,
+ * mieux le tableau remplit la case. */
+export function ecartAuCahier(
+  a: CodeAtelier,
+  vise: CodeAtelier,
+  poids: PoidsPioche = POIDS_PIOCHE_DEFAUTS,
+): number {
   return (
-    Math.abs(a.moment - vise.moment) * ECART_MOMENT +
-    Math.abs(a.difficulte - vise.difficulte) * ECART_DIFF
+    Math.abs(a.moment - vise.moment) * poids.moment +
+    Math.abs(a.difficulte - vise.difficulte) * poids.difficulte
   )
 }
 
-/** Le coût d'un tableau SANS cahier lisible. Il est plus grand que le pire
- * écart réel (2 moments + 9 crans de difficulté = 290) : un tableau codé,
- * même mal assorti, passe toujours devant un tableau muet — mais le muet
- * reste tirable, et c'est essentiel. La convention « 21XX-MMD » existe dans
- * le code ; AUCUN tableau livré ne la porte encore (ils sont en « 21-A »,
- * « 21-07 »…). Une pioche strictement trigrammée aurait donc fait
- * DISPARAÎTRE la carte écrite de toutes les descentes. Ici la bibliothèque
- * non migrée continue de se proposer, dans son ordre, comme avant — et
- * chaque tableau qu'on code passe aussitôt devant. La migration peut se
- * faire tableau par tableau, sans palier. */
-const ECART_SANS_CAHIER = 1000
+// LE COÛT D'UN TABLEAU SANS CAHIER LISIBLE (poids.sansCahier) est plus
+// grand que le pire écart réel (2 moments + 9 crans de difficulté) : un
+// tableau codé, même mal assorti, passe toujours devant un tableau muet —
+// mais le muet reste tirable, et c'est essentiel. La convention
+// « 21XX-MMD » existe dans le code ; AUCUN tableau livré ne la porte encore
+// (ils sont en « 21-A », « 21-07 »…). Une pioche strictement trigrammée
+// aurait donc fait DISPARAÎTRE la carte écrite de toutes les descentes. Ici
+// la bibliothèque non migrée continue de se proposer, dans son ordre, comme
+// avant — et chaque tableau qu'on code passe aussitôt devant. La migration
+// peut se faire tableau par tableau, sans palier.
 
 /** Les tableaux du pool, avec leur cahier quand le code en porte un. Le hub
  * et ses annexes sont déjà écartés en amont (playedLevels). */
@@ -120,7 +165,8 @@ export function candidatsPool(
  *    mémoires n'ont pas tissé est écarté) ;
  *  · `eviteMecanique` — celle qu'on vient de jouer : à écart égal, une
  *    autre couleur passe devant, sans jamais vider le chapeau ;
- *  · `alea` — départage les ex æquo, et c'est là que vit la variété.
+ *  · `alea` — départage les ex æquo, et c'est là que vit la variété ;
+ *  · `poids` — les quatre poids de l'écart, réglés à l'écran LA DESCENTE.
  * Null : le pool n'a rien pour cette case — la descente reste alors
  * procédurale, ce qui est une réponse et non un échec. */
 export function piocheEcrite(
@@ -130,6 +176,7 @@ export function piocheEcrite(
   jouable: (lv: LevelDef) => boolean,
   alea: () => number,
   eviteMecanique: CodeAtelier['mecanique'] | null = null,
+  poids: PoidsPioche = POIDS_PIOCHE_DEFAUTS,
 ): LevelDef | null {
   const cands = candidatsPool(niveaux).filter(
     (c) => !exclus.has(c.lv.code) && jouable(c.lv),
@@ -137,10 +184,10 @@ export function piocheEcrite(
   if (cands.length === 0) return null
   const note = (c: { atelier: CodeAtelier | null }): number =>
     c.atelier === null
-      ? ECART_SANS_CAHIER
-      : ecartAuCahier(c.atelier, vise) +
+      ? poids.sansCahier
+      : ecartAuCahier(c.atelier, vise, poids) +
         (eviteMecanique !== null && c.atelier.mecanique === eviteMecanique
-          ? ECART_MECA_REPETEE
+          ? poids.mecaRepetee
           : 0)
   let meilleur = Infinity
   for (const c of cands) meilleur = Math.min(meilleur, note(c))
@@ -148,6 +195,6 @@ export function piocheEcrite(
   // les tableaux MUETS gardent l'ordre de la bibliothèque : tant qu'ils ne
   // sont pas codés, la descente les enchaîne comme avant plutôt que de les
   // battre au hasard — le hasard ne se justifie qu'entre égaux ASSUMÉS.
-  if (meilleur === ECART_SANS_CAHIER) return exAequo[0].lv
+  if (meilleur === poids.sansCahier) return exAequo[0].lv
   return exAequo[Math.floor(alea() * exAequo.length)].lv
 }
