@@ -1088,6 +1088,219 @@
       .rg-cycle-note {
         margin: 6px 0 0; font-size: calc(11px * var(--ui)); line-height: 1.45; color: #b9cede;
       }
+      /* ==== L'ÉCRAN « LA STATION » : le plan général, pour le joueur ====
+         Le plan est la SCÈNE : il prend toute la largeur et le haut de
+         l'écran, la fiche du module lue vient dessous. Tout le style des
+         modules passe par --t, la teinte que le dessin porte en propriété
+         CSS : aucune couleur de module n'est écrite ici, sinon le plan et
+         la feuille de style pourraient diverger en silence. */
+      #station {
+        position: fixed; inset: 0; z-index: 59;
+        background:
+          radial-gradient(120% 90% at 50% 0%, rgba(30, 58, 88, 0.5), transparent 62%),
+          rgba(2, 5, 10, 0.94);
+        display: flex; align-items: center; justify-content: center;
+        padding: 16px;
+      }
+      #station[hidden] { display: none; }
+      .st-boite {
+        width: min(1320px, 100%); max-height: 100%;
+        display: flex; flex-direction: column; gap: 10px;
+      }
+      .st-tete {
+        display: flex; align-items: flex-start; gap: 16px;
+        border-bottom: 1px solid var(--line); padding-bottom: 10px;
+      }
+      .st-titres { display: flex; flex-direction: column; gap: 2px; flex: none; }
+      .st-titres b {
+        font-family: var(--font-display); font-size: calc(15px * var(--ui));
+        letter-spacing: 0.16em; color: #eaf6ff;
+      }
+      .st-titres span {
+        font-size: calc(10.5px * var(--ui)); letter-spacing: 0.1em; color: var(--dim);
+        text-transform: uppercase;
+      }
+      .st-avance {
+        margin: 0; flex: 1; align-self: center; text-align: right;
+        font-family: var(--font-display); font-size: calc(11px * var(--ui));
+        letter-spacing: 0.08em; color: var(--specimen);
+      }
+      .st-avance small { display: block; color: var(--dim); letter-spacing: 0.06em; }
+      #station-fermer {
+        flex: none; width: 34px; height: 34px; border-radius: 6px;
+        background: rgba(20, 32, 46, 0.8); border: 1px solid var(--line);
+        color: inherit; font: inherit; font-size: calc(14px * var(--ui)); cursor: pointer;
+      }
+      #station-fermer:hover { border-color: var(--specimen); }
+
+      /* ---- LE PLAN ---- */
+      .st-plan {
+        flex: 1 1 auto; min-height: 0;
+        border: 1px solid var(--line); border-radius: 10px;
+        background: linear-gradient(180deg, #060c14, #030710);
+        overflow: hidden;
+      }
+      .ps-svg { display: block; width: 100%; height: 100%; }
+      .ps-ciel circle { pointer-events: none; }
+
+      /* la poutre, les panneaux, les radiateurs : le décor qui fait station */
+      .ps-poutre rect { fill: #1b2734; stroke: #2f4356; stroke-width: 1; }
+      .ps-radiateur { fill: #223244 !important; }
+      .ps-panneau rect {
+        fill: #16233d; stroke: #2c4468; stroke-width: 1;
+      }
+      .ps-cellules line { stroke: #2c4468; stroke-width: 1; }
+      .ps-manchon { fill: #16212e; stroke: #2b3d4e; stroke-width: 1; }
+      .ps-manchon-trait { stroke: #33485c; stroke-width: 1; }
+
+      /* ---- LA ROUTE PARCOURUE ---- */
+      .ps-route-trait {
+        stroke: var(--specimen); stroke-width: 2.5; stroke-linecap: round;
+        stroke-dasharray: 9 7; opacity: 0.85;
+        filter: drop-shadow(0 0 6px rgba(99, 183, 230, 0.55));
+        animation: ps-file 1.6s linear infinite;
+      }
+      @keyframes ps-file { to { stroke-dashoffset: -16; } }
+      .ps-sujet {
+        fill: #d8f1ff;
+        filter: drop-shadow(0 0 9px rgba(99, 183, 230, 0.95));
+        animation: ps-battement 2.4s ease-in-out infinite;
+      }
+      @keyframes ps-battement {
+        0%, 100% { r: 5.6; opacity: 0.95; }
+        50% { r: 7.4; opacity: 1; }
+      }
+
+      /* ---- UN MODULE ---- */
+      .ps-mod { cursor: pointer; }
+      .ps-fut {
+        fill: #101c28;
+        stroke: color-mix(in srgb, var(--t) 40%, #2b3d4e);
+        stroke-width: 1.5;
+        transition: fill 0.2s ease, stroke 0.2s ease;
+      }
+      .ps-bande { fill: var(--t); opacity: 0.35; transition: opacity 0.2s ease; }
+      .ps-nervures line { stroke: #22344a; stroke-width: 1; }
+      .ps-hublot {
+        fill: #0a141e; stroke: color-mix(in srgb, var(--t) 55%, #2b3d4e); stroke-width: 1.5;
+        transition: fill 0.2s ease;
+      }
+      .ps-halo { fill: none; stroke: none; }
+      .ps-badge {
+        fill: var(--dim); font-family: var(--font-display);
+        font-size: 13px; text-anchor: middle; letter-spacing: 0.06em;
+      }
+      .ps-nom {
+        fill: #9fbdd2; font-family: var(--font-display);
+        font-size: 11px; text-anchor: middle; letter-spacing: 0.05em;
+        transition: fill 0.2s ease;
+      }
+      .ps-sous {
+        fill: #5f778b; font-family: var(--font-mono);
+        font-size: 10.5px; text-anchor: middle;
+      }
+      /* la flèche du marqueur : elle pointe le fût sans le recouvrir */
+      .ps-fleche { fill: #d8f1ff; opacity: 0.9; }
+
+      /* à venir : la coque est là, la teinte dort */
+      .ps-avenir .ps-bande { opacity: 0.16; }
+
+      /* franchi : la teinte s'allume, le hublot est éclairé */
+      .ps-franchi .ps-fut { fill: #142334; }
+      .ps-franchi .ps-bande { opacity: 0.7; }
+      .ps-franchi .ps-hublot { fill: color-mix(in srgb, var(--t) 30%, #0a141e); }
+      .ps-franchi .ps-nom { fill: #c3dced; }
+
+      /* courant : le seul module qui respire */
+      .ps-courant .ps-fut {
+        fill: #17293c;
+        stroke: var(--t); stroke-width: 2;
+      }
+      .ps-courant .ps-bande { opacity: 1; }
+      .ps-courant .ps-hublot { fill: color-mix(in srgb, var(--t) 62%, #0a141e); }
+      .ps-courant .ps-nom { fill: #eef8ff; }
+      .ps-courant .ps-badge { fill: var(--t); }
+      .ps-courant .ps-halo {
+        fill: none;
+        stroke: var(--t); stroke-width: 1.5; opacity: 0.42;
+        animation: ps-souffle 3.2s ease-in-out infinite;
+      }
+      @keyframes ps-souffle {
+        0%, 100% { opacity: 0.16; }
+        50% { opacity: 0.5; }
+      }
+
+      /* le hub : toujours connu, jamais « courant » */
+      .ps-hub .ps-fut { fill: #12261f; stroke: color-mix(in srgb, var(--t) 45%, #2b3d4e); }
+      .ps-hub .ps-bande { opacity: 0.6; }
+      .ps-hub .ps-nom { fill: #b6dcc7; }
+
+      /* visé au pointeur ou au clavier : le contour, rien d'autre */
+      .ps-mod:hover .ps-fut, .ps-vise .ps-fut, .ps-mod:focus-visible .ps-fut {
+        stroke: color-mix(in srgb, var(--t) 85%, white);
+      }
+      .ps-mod:focus { outline: none; }
+      .ps-mod:focus-visible .ps-halo { stroke: #eef8ff; opacity: 0.8; animation: none; }
+
+      /* le fanion du record, et le sceau du secteur 4 */
+      .ps-record line { stroke: #f2c98e; stroke-width: 1.5; }
+      .ps-record path { fill: #f2c98e; }
+      .ps-sceau line { stroke: rgba(224, 138, 106, 0.75); stroke-width: 3; stroke-linecap: round; }
+      .ps-sceau text {
+        fill: #e08a6a; font-family: var(--font-display); font-size: 10.5px;
+        text-anchor: middle; letter-spacing: 0.2em;
+      }
+
+      /* ---- LA FICHE DU MODULE, sous le plan ---- */
+      .st-bas { display: flex; gap: 14px; align-items: stretch; flex: none; }
+      .st-fiche {
+        flex: 1; min-height: 96px;
+        padding: 13px 16px; border-radius: 9px;
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--t, var(--specimen));
+        background: linear-gradient(180deg, rgba(20, 34, 52, 0.85), rgba(16, 24, 37, 0.85));
+      }
+      .st-fiche h3 {
+        margin: 0 0 3px; font-family: var(--font-display);
+        font-size: calc(13px * var(--ui)); letter-spacing: 0.08em; color: #eef8ff;
+      }
+      .st-fiche .st-rangs {
+        font-family: var(--font-mono); font-size: calc(11px * var(--ui));
+        color: var(--t, var(--specimen)); letter-spacing: 0.04em;
+      }
+      .st-fiche p {
+        margin: 8px 0 0; font-size: calc(12.5px * var(--ui)); line-height: 1.5;
+        color: #bfd6e6; max-width: 78ch;
+      }
+      .st-matieres { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+      .st-matieres i {
+        font-style: normal; padding: 2px 8px; border-radius: 3px;
+        border: 1px solid color-mix(in srgb, var(--t, var(--specimen)) 42%, transparent);
+        color: color-mix(in srgb, var(--t, var(--specimen)) 80%, white);
+        font-size: calc(10.5px * var(--ui)); letter-spacing: 0.05em;
+      }
+      .st-legende {
+        flex: none; list-style: none; margin: 0; padding: 13px 14px;
+        display: flex; flex-direction: column; gap: 7px; justify-content: center;
+        border: 1px solid var(--line); border-radius: 9px;
+        background: rgba(16, 24, 37, 0.7);
+        font-size: calc(11px * var(--ui)); color: var(--dim);
+      }
+      .st-legende li { display: flex; align-items: center; gap: 8px; }
+      .st-legende i { width: 15px; height: 9px; border-radius: 2px; flex: none; }
+      .st-p-franchi { background: rgba(99, 183, 230, 0.65); }
+      .st-p-courant { background: #eef8ff; box-shadow: 0 0 7px rgba(99, 183, 230, 0.9); }
+      .st-p-avenir { background: rgba(99, 183, 230, 0.16); }
+      .st-p-record { background: #f2c98e; }
+
+      @media (max-width: 760px) {
+        .st-bas { flex-direction: column; }
+        .st-legende { flex-direction: row; flex-wrap: wrap; }
+        .st-avance { font-size: calc(10px * var(--ui)); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .ps-route-trait, .ps-sujet, .ps-courant .ps-halo { animation: none; }
+      }
       /* ---- L'ÉCRAN « LA DESCENTE » : régler, voir, éprouver ----
          Trois zones et un seul principe de lecture : à gauche ce qu'on
          TOURNE (les réglages, en colonnes serrées), en dessous ce que ça
@@ -7055,6 +7268,7 @@
       <button id="home-restart" type="button" hidden>RECOMMENCER LE TABLEAU</button>
       <button id="start-abandon" type="button" hidden>ABANDONNER LA RUN — RETOUR AU LABO</button>
       <div class="home-duo" role="group" aria-label="Outils du protocole">
+        <button id="home-station" type="button" title="LA STATION : le plan général du complexe orbital — six modules amarrés à la poutre, traversés au fil de la descente. On y voit d'où l'on vient, où l'on est, et ce qui attend"><i>🛰&#xFE0E;</i><span>LA STATION</span></button>
         <button id="start-editor" type="button" data-dev title="Créer ou modifier un tableau"><i>✎</i><span>ÉDITEUR</span></button>
         <button id="home-regles" type="button" data-dev title="Le cahier des règles de la génération procédurale : ce que le générateur fait (annotable), ce qu'un level designer en attend (propositions), et vos règles nouvelles en texte libre — partagé entre concepteurs, relu au moment d'implémenter"><i>§</i><span>RÈGLES DE GÉN.</span></button>
         <button id="home-descente" type="button" data-dev title="LA DESCENTE : le déroulement d'une run réglé de bout en bout — longueur, rampe de difficulté, posture des salles, et les quatre poids de l'algorithme qui choisit les tableaux. Le plan se déroule rang par rang sous les yeux, et se tire à blanc sans jouer"><i>▼</i><span>LA DESCENTE</span></button>
@@ -7656,6 +7870,30 @@
               <textarea id="rec-json" hidden rows="6" spellcheck="false" aria-label="JSON des cartes fabriquées"></textarea>
             </div>
           </aside>
+        </div>
+      </div>
+    </div>
+
+    <!-- LA STATION : le plan général — six modules, traversés au fil de la run -->
+    <div id="station" hidden aria-label="Plan de la station">
+      <div class="st-boite">
+        <div class="st-tete">
+          <div class="st-titres">
+            <b>LA STATION</b>
+            <span>complexe orbital Méduse — plan général</span>
+          </div>
+          <p class="st-avance" id="station-etat"></p>
+          <button type="button" id="station-fermer" aria-label="Fermer le plan">✕</button>
+        </div>
+        <div class="st-plan" id="station-plan"></div>
+        <div class="st-bas">
+          <div class="st-fiche" id="station-fiche"></div>
+          <ul class="st-legende">
+            <li><i class="st-p-franchi"></i>franchi</li>
+            <li><i class="st-p-courant"></i>vous êtes ici</li>
+            <li><i class="st-p-avenir"></i>à venir</li>
+            <li><i class="st-p-record"></i>votre record</li>
+          </ul>
         </div>
       </div>
     </div>
