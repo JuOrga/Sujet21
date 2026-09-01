@@ -49,6 +49,18 @@ la **gâchette** reste le moyen sûr :
 git push -f origin <votre-branche>:sauvegarde-go
 ```
 
+**La gâchette de PRÉVISUALISATION.** `deploy` a la sienne depuis que le
+bouton *Run workflow* s'est révélé introuvable sur certains appareils :
+
+```bash
+git push -f origin <votre-branche>:previsu-go
+```
+
+Un aperçu part, sur une adresse jetable, et l'adresse s'affiche en tête du
+résumé de l'exécution. Le site en ligne n'est jamais touché : `deploy` ne
+publie que sur une poussée vers `prod` ou un lancement manuel ciblant
+`production`.
+
 **Pourquoi les gâchettes existent.** GitHub ne lit `schedule` et
 `workflow_dispatch` que sur la **branche par défaut**. Celle du dépôt a
 longtemps pointé sur un vestige sans `.github/` : aucun cron ne partait,
