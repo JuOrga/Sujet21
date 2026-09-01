@@ -120,6 +120,7 @@ import { PISTES, PISTE_NOMS, type Piste } from '../game/soundtrack'
 import {
   deleteLevel,
   fetchLibrary,
+  raisonDuRefus,
   reorderLibrary,
   saveLevel,
   type StoredLevel,
@@ -4415,7 +4416,11 @@ export class LevelEditor {
     const saved = await saveLevel(this.level, id, this.hooks.operator())
     this.busy = false
     if (!saved) {
-      this.commit('Enregistrement refusé : bibliothèque injoignable.')
+      // le serveur dit POURQUOI quand il refuse (plafond de poids) ; sans
+      // raison, c'est le réseau, et « injoignable » est le mot juste
+      this.commit(
+        `Enregistrement refusé : ${raisonDuRefus() || 'bibliothèque injoignable'}.`,
+      )
       return
     }
     this.library = saved.levels
