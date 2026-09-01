@@ -365,11 +365,42 @@ export const TABLEAU_HUB: LevelDef = {
     box(2220, -500, 2280, -320, MAT_WALL, 2),
   ],
   sponges: [],
+  // QUATRE LAMPES, PAS SIX. Le moteur n'en allume que MAX_LUMIERES (4) : les
+  // six posées ici laissaient les deux dernières — l'étal et le sas —
+  // ÉTEINTES, et tout l'est du module vivait de la lumière qui fuyait par
+  // dessus les murs de l'ouest. Depuis que les coques montent au plafond,
+  // cette fuite n'existe plus : mesuré coque par coque, le sas tombait à
+  // 0,33, la passerelle à 0,26, le secteur 4 à 0,26.
+  //
+  // Les deux lampes de l'ouest deviennent donc des BANDEAUX de 1600 u (le
+  // maximum que le moteur tient : la demi-longueur est bornée à 800). Un
+  // bandeau éclaire depuis le point de son segment le plus proche du texel —
+  // un seul en couvre trois coques d'affilée, chambre-couloir-chambre, et
+  // l'ouest garde exactement son clair d'avant avec deux lampes au lieu de
+  // quatre. Elles sont posées SANS CORPS (taille 0) : le segment traverse
+  // les cloisons, un luminaire dessiné se coucherait en travers des murs.
   lumieres: [
-    { x: -4100, y: 0, h: 480, intensite: 0.9, couleur: '#9fd4ee' }, // la cuve
-    { x: -2940, y: 0, h: 640, intensite: 0.85, couleur: '#a8c6dd' }, // les endormis
-    { x: -1640, y: 0, h: 600, intensite: 1.0 }, // le bac d'essai
-    { x: -290, y: 0, h: 520, intensite: 1.05 }, // le centre de contrôle
+    // la cuve → l'aile des endormis : x de -4050 à -2450
+    {
+      x: -3250,
+      y: 0,
+      h: 640,
+      intensite: 0.9,
+      couleur: '#9fd4ee',
+      forme: 'bandeau',
+      longueur: 1600,
+      taille: 0,
+    },
+    // le bac d'essai → le couloir des MÉMOIRES → le centre de contrôle
+    {
+      x: -900,
+      y: 0,
+      h: 640,
+      intensite: 1.0,
+      forme: 'bandeau',
+      longueur: 1600,
+      taille: 0,
+    },
     { x: 1640, y: -120, h: 620, intensite: 0.95, couleur: '#ffd9a8' }, // l'étal
     { x: 3650, y: 0, h: 560, intensite: 0.95, couleur: '#8fe6b0' }, // le sas
   ],
