@@ -31,6 +31,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '01/09/2026 10:03',
+    title: 'Le nuage convoyé prend enfin les virages, au lieu de s’éparpiller',
+    notes: [
+      'LE SYMPTÔME, rapporté : sur un rail qui tourne, le nuage « s’éparpille rapidement en cas de virage » — diriger le plasma devenait une loterie. MESURÉ AU BANC sur un coude à 90° (bande de 75 u) : 100 % du nuage dans la bande sur la ligne droite, 0 % après le coude — le nuage ENTIER finissait à 380 u du rail, et le champ, vidé, lâchait pour de bon.',
+      'DEUX CAUSES, pas une. D’abord la poussée : chaque particule est poussée dans l’axe du tronçon LE PLUS PROCHE — donc TOUT DROIT au coude. Le nuage dépassait le virage et se stabilisait ~94 u derrière lui, pile là où la poussée du tronçon et le rappel vers le coin s’annulent : hors bande, hors jeu. Ensuite l’élan : même en tournant la poussée, un nuage lancé à 500 u/s ne se courbe pas — le rappel vers la ligne (0,8 × accélération au bord de bande) est dix fois trop faible pour l’infléchir.',
+      'DEUX REMÈDES, donc. LA POUSSÉE ANTICIPE : à moins d’une bande de la fin d’un tronçon, elle tourne progressivement vers l’axe du tronçon suivant — une ligne de champ se courbe, elle n’a pas d’angle. ET LE CHAMP CONFINE : la composante de vitesse EN TRAVERS de la ligne s’amortit (nouveau paramètre plasmaConfin, 8/s, réglable au banc) — une particule chargée s’enroule autour de sa ligne de champ, elle ne la quitte pas. La vitesse LE LONG du rail n’est pas touchée : le voyage reste rapide.',
+      'MESURÉ APRÈS, mêmes conditions : 100 % du nuage dans la bande sur TOUT le trajet, coude compris, arrivée au terminus en 2,2 s. Sur un zigzag à deux virages opposés : pareil, 2,6 s. La ligne droite, elle, arrive exactement comme avant (1,9 s) — le confinement ne freine que ce qui s’écarte.',
+      'CHAQUE REMÈDE EST NÉCESSAIRE : l’anticipation retirée, le coude redevient rouge aux tests ; le confinement à zéro, le nuage s’éjecte encore. Quatre tests neufs gravent le voyage — coude, zigzag, ligne droite témoin, et la mémoire du défaut (sans confinement, le coude éjecte : si ce test passe un jour, c’est qu’un autre mécanisme confine et que le paramètre peut partir).',
+      'RIEN D’AUTRE NE BOUGE : l’eau et la glace ignorent toujours le champ, le terminus freine comme avant, et un rail droit se comporte au chiffre près comme hier — 668 tests d’avant tous verts.',
+    ],
+  },
+  {
     date: '01/09/2026 01:01',
     title: 'Le conduit ne pouvait JAMAIS s’ouvrir en jouant — et sept autres défauts',
     notes: [

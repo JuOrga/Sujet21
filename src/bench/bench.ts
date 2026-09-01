@@ -725,6 +725,10 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
     fLaser.addBinding(params, 'plasmaConvoy', { min: 0, max: 3000, step: 50, label: 'convoyage (u/s²)' }),
     'Tant que l’arc circule sur un rail, le champ est actif : la VAPEUR prise dans la bande est ENTRAÎNÉE le long de la ligne, dans le sens des chevrons — le nuage voyage sur la ligne de champ. À 0 : seul l’arc est guidé, le nuage reste sur place.',
   )
+  describe(
+    fLaser.addBinding(params, 'plasmaConfin', { min: 0, max: 30, step: 1, label: 'confinement (1/s)' }),
+    'Le champ CONFINE : la vitesse EN TRAVERS de la ligne s’amortit à cette cadence pour ce qui voyage dans la bande — c’est lui qui fait prendre les virages (le rappel seul ne courbe pas un nuage lancé à 500 u/s ; mesuré : le coude à 90° éjectait TOUT le nuage). À 0 : la tenue de rail d’avant, qui s’éparpille au premier coude.',
+  )
 
   const fBody = pane.addFolder({ title: 'Corps', expanded: false })
   describe(
