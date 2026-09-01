@@ -479,6 +479,14 @@ export class FluidSim {
   // Portes asservies aux cibles laser : des parois qui vont et viennent.
   // Recomposé sans toucher aux éponges (setLevel les reconstruirait et
   // effacerait leur saturation en pleine partie).
+  //
+  // CES BOÎTES NE SORTENT PAS DU SOLVEUR. Le rendu ne reçoit pas sim.boxes
+  // mais renderBoxes (main.ts), bâti sur level.boxes : une porte n'entre
+  // jamais dans la carte de lumière, à aucune hauteur. Et c'est juste — une
+  // porte close se dessine en BARRIÈRE D'ÉNERGIE translucide, pas en
+  // bulkhead : un champ qu'on voit au travers n'a pas à coucher d'ombre.
+  // Essayé une fois (marquer la porte « pleine hauteur » pour qu'elle ombre
+  // comme un mur) : le drapeau n'atteignait rien, et il n'aurait pas dû.
   setDoors(
     portes: { minX: number; minY: number; maxX: number; maxY: number }[],
   ): void {
@@ -612,6 +620,8 @@ export class FluidSim {
       let uy = 0
       let qx = 0
       let qy = 0
+      let sBest = -1
+      let qFinDist = 0
       for (let s = 0; s + 1 < pts.length; s++) {
         const a = pts[s]
         const b = pts[s + 1]
@@ -633,9 +643,35 @@ export class FluidSim {
           uy = aby * inv
           qx = cx
           qy = cy
+          sBest = s
+          qFinDist = Math.hypot(b.x - cx, b.y - cy)
         }
       }
       if (best > band * band) continue
+      // LE VIRAGE S'ANTICIPE. Au coude, le tronçon le plus proche pousse
+      // dans SON axe — donc TOUT DROIT, au-delà du virage : mesuré au banc,
+      // le nuage dépassait le coude et se stabilisait à ~94 u derrière lui
+      // (là où la poussée du tronçon et le rappel vers le coin s'annulent),
+      // hors bande — et le champ, vidé, lâchait. À moins d'une bande de la
+      // fin du tronçon, la poussée TOURNE donc progressivement vers l'axe
+      // du tronçon suivant : le nuage entame le virage avant le coin, comme
+      // une ligne de champ qui se courbe — elle n'a pas d'angle.
+      if (sBest >= 0 && sBest + 2 < pts.length && qFinDist < band) {
+        const a2 = pts[sBest + 1]
+        const b2 = pts[sBest + 2]
+        const l2 = Math.hypot(b2.x - a2.x, b2.y - a2.y)
+        if (l2 > 1e-6) {
+          const f = 1 - qFinDist / band
+          const mx = ux * (1 - f) + ((b2.x - a2.x) / l2) * f
+          const my = uy * (1 - f) + ((b2.y - a2.y) / l2) * f
+          const ml = Math.hypot(mx, my)
+          // deux tronçons à 180° s'annulent : on garde alors l'axe courant
+          if (ml > 1e-6) {
+            ux = mx / ml
+            uy = my / ml
+          }
+        }
+      }
       dansBande[i] = true
       // zone de terminus : le point porté est arrivé en bout de ligne — on
       // n'y pousse plus, on y FREINE (sinon le nuage arrive comme un boulet
@@ -671,9 +707,24 @@ export class FluidSim {
           this.velY[i] += ((fin.y - py) / dFin) * accel * 0.15 * dt
         }
       } else if (dansBande[i]) {
-        // poussée le long du rail + rappel vers la ligne (le virage se prend)
-        this.velX[i] += (uxA[i] + ((qxA[i] - px) / band) * 0.8) * accel * dt
-        this.velY[i] += (uyA[i] + ((qyA[i] - py) / band) * 0.8) * accel * dt
+        // LE CHAMP CONFINE, et c'est lui qui fait prendre les virages. Le
+        // rappel seul (0,8 × accel au bord de bande) ne courbe pas une
+        // trajectoire lancée : au premier coude, tout l'élan gagné sur la
+        // ligne droite pointe HORS du tracé — mesuré au banc (virage à 90°,
+        // bande 75) : le nuage ENTIER finissait à 380 u du rail, et le
+        // champ, vidé, lâchait pour de bon. On amortit donc la composante
+        // de vitesse EN TRAVERS de la ligne (le long, on n'y touche pas :
+        // c'est la vitesse du voyage) — une particule chargée s'enroule
+        // autour de sa ligne de champ, elle ne la quitte pas.
+        const ux = uxA[i]
+        const uy = uyA[i]
+        const va = this.velX[i] * ux + this.velY[i] * uy
+        const g = Math.exp(-this.params.plasmaConfin * dt)
+        this.velX[i] = va * ux + (this.velX[i] - va * ux) * g
+        this.velY[i] = va * uy + (this.velY[i] - va * uy) * g
+        // poussée le long du rail + rappel vers la ligne
+        this.velX[i] += (ux + ((qxA[i] - px) / band) * 0.8) * accel * dt
+        this.velY[i] += (uy + ((qyA[i] - py) / band) * 0.8) * accel * dt
       } else {
         // retardataire : rappelé vers le cœur convoyé — le nuage fait corps
         const dx = cxB - px
