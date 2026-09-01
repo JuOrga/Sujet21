@@ -5,6 +5,7 @@ import { DEFAULT_PARAMS, type SimParams } from './sim/params'
 import { FluidSim, KIND_PLAYER } from './sim/solver'
 import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
+import { evenementsPlasma } from './game/plasmaFx'
 import { CODEX, Codex, type CodexGroupe } from './game/codex'
 import { niveauExpanse } from './game/structures'
 import {
@@ -5284,6 +5285,33 @@ const laserEtat = {
     points: { x: number; y: number; eau?: boolean; plasma?: boolean }[]
   }[],
   litPrec: [] as boolean[],
+  // ——— LES DEUX INSTANTS DU PLASMA ————————————————————————————————————
+  // Ils étaient jusqu'ici invisibles : le rayon changeait de couleur, le
+  // rail s'allumait, et c'était tout. Or ce sont les deux gestes que
+  // l'énigme demande — se vaporiser DANS la lumière, puis amener l'arc au
+  // pied du tube. Ce qu'on demande au joueur doit se voir quand il le
+  // réussit. Chaque événement GÈLE sa géométrie : le rayon vivant est
+  // reparti ailleurs bien avant la fin du flash.
+  //
+  // L'IONISATION : le faisceau vient d'entrer dans la vapeur du corps.
+  ionisations: [] as {
+    t0: number
+    entree: { x: number; y: number }
+    points: { x: number; y: number }[]
+  }[],
+  // LA CAPTURE : l'arc ionisé vient d'être happé par un rail — le champ
+  // s'engage, et si c'est un conduit, le tube s'ouvre. `cumul` : les deux
+  // instants sont tombés dans la MÊME image (le joueur s'est vaporisé pile
+  // au pied du tube) — un seul temps fort, plus large, remplace les deux.
+  captures: [] as {
+    t0: number
+    prise: { x: number; y: number }
+    ligne: { x: number; y: number }[]
+    cumul: boolean
+  }[],
+  // l'arête d'ionisation se lit par émetteur : un rayon qui RESTE dans la
+  // vapeur ne doit pas rallumer l'effet soixante fois par seconde
+  ionisePrec: [] as boolean[],
 }
 // Sonde de test : l'état des portes/récepteurs depuis la console (comme __sim)
 ;(window as unknown as { __laserEtat: typeof laserEtat }).__laserEtat =
@@ -5866,6 +5894,147 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
           g.lineTo(fin.sx + Math.cos(a2) * d1, fin.sy + Math.sin(a2) * d1)
           g.stroke()
         }
+      }
+    }
+  }
+  // ═══ LES DEUX INSTANTS DU PLASMA ═══════════════════════════════════════
+  // Ce que l'énigme demande — se vaporiser DANS la lumière, puis amener
+  // l'arc au pied du tube — ne se voyait pas quand on le réussissait : le
+  // rayon changeait de teinte, le rail s'allumait, et c'était tout. Deux
+  // temps forts le disent maintenant, et un troisième quand ils coïncident.
+
+  // ① L'IONISATION : la traversée s'embrase. Une onde blanche court sur la
+  // portion ionisée, l'entrée dans le nuage souffle un anneau, et deux
+  // filaments serpentent le long du chemin — le gaz devient conducteur, il
+  // ne se contente pas de changer de couleur.
+  if (laserEtat.ionisations.length > 0) {
+    const nowFx = performance.now() / 1000
+    const DUR = 0.42
+    laserEtat.ionisations = laserEtat.ionisations.filter(
+      (io) => nowFx - io.t0 < DUR,
+    )
+    for (const io of laserEtat.ionisations) {
+      const age = nowFx - io.t0
+      const k = age / DUR
+      const vif = Math.exp(-age / 0.09) // le claquement, puis la braise
+      const a = 1 - k
+      const ch = io.points.map((pt) => S(pt.x, pt.y))
+      if (ch.length >= 2) {
+        for (const [larg, coul] of [
+          [26 * z * (1 + 1.4 * vif), `rgba(150,90,255,${(0.18 * a).toFixed(3)})`],
+          [9 * z * (1 + 2.0 * vif), `rgba(200,160,255,${(0.45 * a).toFixed(3)})`],
+          [2.6 * z * (1 + 2.4 * vif), `rgba(252,248,255,${(0.95 * a).toFixed(3)})`],
+        ] as [number, string][]) {
+          g.strokeStyle = coul
+          g.lineWidth = Math.max(0.8, larg)
+          g.lineJoin = 'round'
+          g.lineCap = 'round'
+          g.beginPath()
+          g.moveTo(ch[0].sx, ch[0].sy)
+          for (let m = 1; m < ch.length; m++) g.lineTo(ch[m].sx, ch[m].sy)
+          g.stroke()
+        }
+        // les filaments : le gaz conduit, et ça se tord
+        const grain = Math.floor(nowFx * 34)
+        for (let m = 0; m + 1 < ch.length; m++) {
+          traceArcFx(ch[m], ch[m + 1], grain * 7.7 + m * 4.1,
+            14 * z * (0.3 + 0.7 * vif),
+            `rgba(215,180,255,${(0.7 * a).toFixed(3)})`, Math.max(0.9, 1.4 * z))
+          traceArcFx(ch[m], ch[m + 1], grain * 3.3 + m * 12.7 + 61,
+            8 * z * (0.3 + 0.7 * vif),
+            `rgba(250,245,255,${(0.5 * a).toFixed(3)})`, Math.max(0.7, 1 * z))
+        }
+      }
+      // l'anneau de souffle, au point d'entrée dans le nuage
+      const pe = S(io.entree.x, io.entree.y)
+      g.strokeStyle = `rgba(205,170,255,${(0.75 * a * a).toFixed(3)})`
+      g.lineWidth = Math.max(1, 3 * z * (1 - k * 0.7))
+      g.beginPath()
+      g.arc(pe.sx, pe.sy, Math.max(3, (14 + 70 * k) * z), 0, Math.PI * 2)
+      g.stroke()
+    }
+  }
+
+  // ② LA CAPTURE, et ③ LE CUMUL : le champ prend l'arc. Une CRÊTE remonte
+  // la ligne du point de prise jusqu'au bout — le champ se propage, il ne
+  // s'allume pas d'un bloc — et une onde s'ouvre au point de prise. En
+  // cumul (l'ionisation dans la même image), tout est plus large, plus
+  // long, et une seconde onde part en retard : c'est l'énigme qui se
+  // résout d'un seul geste, ça mérite un temps fort à part.
+  if (laserEtat.captures.length > 0) {
+    const nowFx = performance.now() / 1000
+    laserEtat.captures = laserEtat.captures.filter(
+      (c) => nowFx - c.t0 < (c.cumul ? 1.0 : 0.7),
+    )
+    for (const c of laserEtat.captures) {
+      const DUR = c.cumul ? 1.0 : 0.7
+      const boost = c.cumul ? 1.9 : 1
+      const age = nowFx - c.t0
+      const k = age / DUR
+      const a = 1 - k
+      const ch = c.ligne.map((q) => S(q.x, q.y))
+      // longueurs cumulées : la crête avance à vitesse constante le long
+      // du tracé, quel que soit le nombre de tronçons
+      const cum = [0]
+      for (let m = 1; m < ch.length; m++)
+        cum.push(cum[m - 1] + Math.hypot(ch[m].sx - ch[m - 1].sx, ch[m].sy - ch[m - 1].sy))
+      const total = cum[cum.length - 1] || 1
+      const tete = total * Math.min(1, k * 1.7)
+      const queue = Math.max(0, tete - total * 0.35)
+      const sur = (d: number): { sx: number; sy: number } => {
+        let m = 1
+        while (m < cum.length - 1 && cum[m] < d) m++
+        const t = (d - cum[m - 1]) / Math.max(1e-6, cum[m] - cum[m - 1])
+        return {
+          sx: ch[m - 1].sx + (ch[m].sx - ch[m - 1].sx) * t,
+          sy: ch[m - 1].sy + (ch[m].sy - ch[m - 1].sy) * t,
+        }
+      }
+      // la crête : un segment lumineux qui remonte la ligne
+      if (tete > queue) {
+        const pas = Math.max(6, total / 40)
+        const pts: { sx: number; sy: number }[] = []
+        for (let d = queue; d <= tete; d += pas) pts.push(sur(d))
+        pts.push(sur(tete))
+        for (const [larg, coul] of [
+          [24 * z * boost, `rgba(150,90,255,${(0.20 * a).toFixed(3)})`],
+          [10 * z * boost, `rgba(200,165,255,${(0.5 * a).toFixed(3)})`],
+          [3 * z * boost, `rgba(252,250,255,${(0.95 * a).toFixed(3)})`],
+        ] as [number, string][]) {
+          g.strokeStyle = coul
+          g.lineWidth = Math.max(0.8, larg)
+          g.lineJoin = 'round'
+          g.lineCap = 'round'
+          g.beginPath()
+          g.moveTo(pts[0].sx, pts[0].sy)
+          for (let m = 1; m < pts.length; m++) g.lineTo(pts[m].sx, pts[m].sy)
+          g.stroke()
+        }
+      }
+      // l'onde au point de prise — deux en cumul, la seconde en retard
+      const pp = S(c.prise.x, c.prise.y)
+      const anneau = (kk: number, larg: number, alpha: number): void => {
+        if (kk <= 0 || kk >= 1) return
+        g.strokeStyle = `rgba(215,185,255,${(alpha * (1 - kk)).toFixed(3)})`
+        g.lineWidth = Math.max(1, larg * z * (1 - kk * 0.6))
+        g.beginPath()
+        g.arc(pp.sx, pp.sy, Math.max(3, (10 + 110 * boost * kk) * z), 0, Math.PI * 2)
+        g.stroke()
+      }
+      anneau(k, 3.4 * boost, 0.85)
+      if (c.cumul) anneau((k - 0.22) / 0.78, 2.4, 0.6)
+      // les étincelles de la prise : l'arc SAUTE sur la ligne
+      const nEt = c.cumul ? 14 : 9
+      for (let e = 0; e < nEt; e++) {
+        const ang = (e / nEt) * Math.PI * 2 + c.t0 * 5.1
+        const d0 = (12 + 60 * boost * k) * z
+        const d1 = d0 + (7 + 14 * (1 - k)) * z
+        g.strokeStyle = `rgba(235,215,255,${(0.8 * a).toFixed(3)})`
+        g.lineWidth = Math.max(0.8, 1.6 * z)
+        g.beginPath()
+        g.moveTo(pp.sx + Math.cos(ang) * d0, pp.sy + Math.sin(ang) * d0)
+        g.lineTo(pp.sx + Math.cos(ang) * d1, pp.sy + Math.sin(ang) * d1)
+        g.stroke()
       }
     }
   }
@@ -8305,6 +8474,9 @@ function resetLasers(): void {
   laserEtat.vues = []
   laserEtat.impacts = []
   laserEtat.litPrec = []
+  laserEtat.ionisations = []
+  laserEtat.captures = []
+  laserEtat.ionisePrec = []
   laserEtat.recepteurs = creerEtatRecepteurs((level.cibles ?? []).length)
   laserEtat.portesOuvertes = (level.portes ?? []).map(() => false)
   laserEtat.doorsKey = ''
@@ -11658,6 +11830,26 @@ function frame(now: number): void {
       const actifs = new Set<number>()
       for (const t of laserEtat.vues)
         for (const ri of t.railsSuivis) actifs.add(ri)
+      // LES DEUX INSTANTS DU PLASMA, relevés AVANT d'engager les rails :
+      // c'est la comparaison avec l'image d'avant qui fait l'événement. La
+      // règle vit dans un module PUR (game/plasmaFx.ts) parce qu'aucun test
+      // ne vient ici ; main.ts ne fait que la brancher et la dessiner.
+      const fx = evenementsPlasma(
+        laserEtat.vues,
+        railsDuNiveau,
+        railsEngages,
+        laserEtat.ionisePrec,
+        performance.now() / 1000,
+      )
+      laserEtat.ionisations.push(...fx.ionisations)
+      laserEtat.captures.push(...fx.captures)
+      // on ne garde que les derniers : un effet vit moins d'une seconde,
+      // en empiler douze ne ferait que blanchir l'écran
+      if (laserEtat.ionisations.length > 4)
+        laserEtat.ionisations.splice(0, laserEtat.ionisations.length - 4)
+      if (laserEtat.captures.length > 4)
+        laserEtat.captures.splice(0, laserEtat.captures.length - 4)
+      laserEtat.ionisePrec = fx.ionise
       for (const ri of actifs) railsEngages.add(ri)
       // LE CONDUIT S'OUVRE AU PLASMA, PAS À LA VAPEUR. Un nuage seul ne
       // suffit pas : il faut que l'arc ionisé circule sur CE rail — donc
