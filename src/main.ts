@@ -190,6 +190,7 @@ import {
   fetchLibrary,
   reorderLibrary,
   mentionSaisie,
+  raisonDuRefus,
   saveLevel,
   type StoredLevel,
 } from './game/netLevels'
@@ -4002,7 +4003,9 @@ async function plancheCode(id: string, brut: string): Promise<void> {
         : `Code « ${code} » enregistré (hors nomenclature : il se joue pareil, sans tri par code).`,
     )
   } else {
-    plancheDit('Enregistrement refusé : bibliothèque injoignable.')
+    plancheDit(
+      `Enregistrement refusé : ${raisonDuRefus() || 'bibliothèque injoignable'}.`,
+    )
     void ouvrePlanche() // repart de l'état serveur
   }
 }

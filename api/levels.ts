@@ -9,9 +9,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { list } from '@vercel/blob'
 import { ecritDocument, litDocument } from './_magasin.js'
 import { provenanceCode } from './_provenance.js'
+import { refusDeBudget } from './_budget.js'
 
 const PREFIX = 'levels/'
-const MAX_LEVELS = 60
 
 interface StoredLevel {
   id: string
@@ -157,8 +157,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }
       if (at >= 0) lib.levels[at] = entry
       else lib.levels.push(entry)
-      if (lib.levels.length > MAX_LEVELS) {
-        res.status(400).json({ error: `bibliothèque pleine (${MAX_LEVELS} tableaux)` })
+      // Le plafond est un POIDS, pas un nombre d'entrées (cf. _budget.ts) :
+      // le document part en entier à chaque lecture, c'est lui qu'on tient.
+      const refus = refusDeBudget(lib)
+      if (refus) {
+        res.status(400).json({ error: refus })
         return
       }
       await writeLib(lib)
