@@ -5277,6 +5277,16 @@ let gasIntentAvant = false
 // clignote pas quand le miroir tremble.
 const fxCanvas = document.getElementById('fx-canvas') as HTMLCanvasElement
 const fxCtx = fxCanvas.getContext('2d')!
+// LA BASCULE D'UN RAIL, LISSÉE. Un rail passe de PAROI à ligne de champ
+// ouverte quand l'arc s'engage sur lui, et l'inverse quand il retombe ou
+// que le corps se condense. Sauter d'un état à l'autre en une image ne se
+// lit pas : on garde donc, par rail, la valeur COURANTE, qui court vers sa
+// cible en un tiers de seconde. C'est cet écart qui donne son temps à
+// l'éclair — et il vaut dans les deux sens, sans rien de plus à écrire.
+const railBascule: number[] = []
+let railBasculeT = 0
+let dtFx = 0.016
+
 const laserEtat = {
   vues: [] as TraceResultat[],
   // La mémoire des récepteurs (TOR : verrou ouvrant · NOR : maintien, la
@@ -5534,6 +5544,54 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   // capture translucide (l'arc s'accroche N'IMPORTE OÙ le long), pointillé
   // violet, et des CHEVRONS qui donnent le sens de circulation de l'arc.
   // Le faisceau ordinaire les ignore ; seul le plasma s'y accroche.
+  // MINI-ARCS ÉLECTRIQUES (mode foudroyant) : un éclair en zigzag qui
+  // serpente le long d'un segment — ancré aux deux bouts, offsets
+  // perpendiculaires pseudo-aléatoires re-tirés plusieurs fois par
+  // seconde (le crépitement), amplitude en ventre au milieu du chemin.
+  // Partagé par le rayon vivant, le sursaut de victoire et la bascule des
+  // rails — d'où sa place ICI, avant tous ceux qui l'appellent.
+  const bruitArc = (graine: number, i: number): number => {
+    const v = Math.sin(graine * 127.1 + i * 311.7) * 43758.5453
+    return (v - Math.floor(v)) * 2 - 1
+  }
+  const traceArcFx = (
+    a: { sx: number; sy: number },
+    b: { sx: number; sy: number },
+    graine: number,
+    amp: number,
+    coul: string,
+    larg: number,
+  ): void => {
+    const dx = b.sx - a.sx
+    const dy = b.sy - a.sy
+    const L = Math.hypot(dx, dy)
+    if (L < 14) return
+    const n = Math.min(26, Math.max(4, Math.round(L / (22 * Math.max(0.4, z)))))
+    const px = -dy / L
+    const py = dx / L
+    g.strokeStyle = coul
+    g.lineWidth = larg
+    g.lineJoin = 'round'
+    g.beginPath()
+    g.moveTo(a.sx, a.sy)
+    for (let i = 1; i < n; i++) {
+      const tI = i / n
+      const ventre = Math.sin(Math.PI * tI)
+      const off = bruitArc(graine, i) * amp * ventre
+      g.lineTo(a.sx + dx * tI + px * off, a.sy + dy * tI + py * off)
+    }
+    g.lineTo(b.sx, b.sy)
+    g.stroke()
+  }
+
+  // Le pas de temps du calque, mesuré à l'horloge réelle : le dessin des
+  // mécanismes n'est pas la simulation, il ne connaît pas son dt.
+  {
+    const t = performance.now() / 1000
+    dtFx = railBasculeT > 0 ? Math.min(0.1, t - railBasculeT) : 0.016
+    railBasculeT = t
+  }
+
   // CE QUE LE CORPS EST, À CET INSTANT. Un rail barre l'eau et la glace et
   // laisse filer le gaz : le dessin doit donc dépendre de l'ÉTAT du joueur,
   // pas seulement du rail. On mesure la part gazeuse du corps — pas
@@ -5569,7 +5627,15 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     // corps gazeux. Une paroi qu'on ne distingue pas d'un décalque est un
     // piège, et le corps butait jusqu'ici sur une chose qui avait l'air
     // d'un passage.
-    const railSolide = engage ? gazBloque : 1
+    const cible = engage ? gazBloque : 1
+    const courant = railBascule[railIdx] ?? cible
+    const railSolide =
+      courant + (cible - courant) * Math.min(1, dtFx / 0.33)
+    railBascule[railIdx] = railSolide
+    // L'ÉCLAIR VIT DANS L'ÉCART. Il naît nul aux deux bouts (paroi pleine,
+    // ligne ouverte) et culmine à mi-chemin : une seule formule, et la
+    // transition crépite dans les DEUX SENS sans qu'on ait à savoir lequel.
+    const bascule = 4 * railSolide * (1 - railSolide)
     const chemin = (): void => {
       g.beginPath()
       const p0 = S(pts[0].x, pts[0].y)
@@ -5721,6 +5787,70 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
         g.stroke()
       }
     }
+    // ═══ LA BASCULE : L'ÉLECTRICITÉ DU CHANGEMENT D'ÉTAT ═════════════════
+    // Une paroi qui s'ouvre au plasma, ou qui se referme quand l'arc lâche,
+    // ne doit pas se contenter de fondre : c'est un champ magnétique qui
+    // s'amorce ou qui claque. Trois filaments serpentent le long de chaque
+    // tronçon, re-tirés trente fois par seconde — le crépitement — sur un
+    // cœur blanc qui court toute la ligne. Aux sommets, là où le champ se
+    // plie, une étincelle plus vive : c'est aux coudes que ça craque.
+    //
+    // `bascule` est nul aux deux bouts et culmine à mi-chemin : l'effet
+    // joue donc à l'ouverture COMME à la fermeture, sans qu'on ait besoin
+    // de savoir dans quel sens on va.
+    if (bascule > 0.02) {
+      const e = pts.map((q) => S(q.x, q.y))
+      const grain = Math.floor((performance.now() / 1000) * 30)
+      const ampl = rayonDessine * z * (0.55 + 0.85 * bascule)
+      g.lineCap = 'round'
+      for (let m = 0; m + 1 < e.length; m++) {
+        // la nappe : large, sourde, elle donne le volume de la décharge
+        traceArcFx(
+          e[m],
+          e[m + 1],
+          grain * 5.1 + m * 13.7,
+          ampl,
+          `rgba(150,90,255,${(0.32 * bascule).toFixed(3)})`,
+          Math.max(1.4, 5 * z),
+        )
+        // les deux filaments : c'est eux qu'on voit crépiter
+        traceArcFx(
+          e[m],
+          e[m + 1],
+          grain * 9.7 + m * 3.1,
+          ampl * 0.8,
+          `rgba(215,190,255,${(0.75 * bascule).toFixed(3)})`,
+          Math.max(1, 1.7 * z),
+        )
+        traceArcFx(
+          e[m],
+          e[m + 1],
+          grain * 2.3 + m * 27.9 + 41,
+          ampl * 0.45,
+          `rgba(252,250,255,${(0.9 * bascule).toFixed(3)})`,
+          Math.max(0.8, 1.1 * z),
+        )
+      }
+      // le cœur : un trait blanc sur toute la ligne, l'amorce du champ
+      g.strokeStyle = `rgba(252,250,255,${(0.85 * bascule).toFixed(3)})`
+      g.lineWidth = Math.max(1, 2.2 * z * bascule)
+      g.lineJoin = 'round'
+      chemin()
+      g.stroke()
+      // AUX COUDES, ÇA CRAQUE. Un éclat à chaque sommet — c'est là que la
+      // ligne se plie, donc là que le champ force le plus.
+      for (let m = 1; m + 1 < e.length; m++) {
+        const r = rayonDessine * z * (0.6 + 1.5 * bascule)
+        const gr = g.createRadialGradient(e[m].sx, e[m].sy, 0, e[m].sx, e[m].sy, Math.max(2, r))
+        gr.addColorStop(0, `rgba(252,250,255,${(0.8 * bascule).toFixed(3)})`)
+        gr.addColorStop(0.45, `rgba(180,140,255,${(0.35 * bascule).toFixed(3)})`)
+        gr.addColorStop(1, 'rgba(150,90,255,0)')
+        g.fillStyle = gr
+        g.beginPath()
+        g.arc(e[m].sx, e[m].sy, Math.max(2, r), 0, Math.PI * 2)
+        g.fill()
+      }
+    }
     // la ligne elle-même — et quand le champ est ENGAGÉ (il porte un nuage,
     // même rayon éteint), le rail s'embrase : halo + tirets qui défilent
     // dans le sens du convoyage. Il s'éteint quand l'attirance se relâche.
@@ -5777,45 +5907,6 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       }
     }
   })
-
-  // MINI-ARCS ÉLECTRIQUES (mode foudroyant) : un éclair en zigzag qui
-  // serpente le long d'un segment — ancré aux deux bouts, offsets
-  // perpendiculaires pseudo-aléatoires re-tirés plusieurs fois par
-  // seconde (le crépitement), amplitude en ventre au milieu du chemin.
-  // Partagé entre le rayon vivant et le sursaut de victoire.
-  const bruitArc = (graine: number, i: number): number => {
-    const v = Math.sin(graine * 127.1 + i * 311.7) * 43758.5453
-    return (v - Math.floor(v)) * 2 - 1
-  }
-  const traceArcFx = (
-    a: { sx: number; sy: number },
-    b: { sx: number; sy: number },
-    graine: number,
-    amp: number,
-    coul: string,
-    larg: number,
-  ): void => {
-    const dx = b.sx - a.sx
-    const dy = b.sy - a.sy
-    const L = Math.hypot(dx, dy)
-    if (L < 14) return
-    const n = Math.min(26, Math.max(4, Math.round(L / (22 * Math.max(0.4, z)))))
-    const px = -dy / L
-    const py = dx / L
-    g.strokeStyle = coul
-    g.lineWidth = larg
-    g.lineJoin = 'round'
-    g.beginPath()
-    g.moveTo(a.sx, a.sy)
-    for (let i = 1; i < n; i++) {
-      const tI = i / n
-      const ventre = Math.sin(Math.PI * tI)
-      const off = bruitArc(graine, i) * amp * ventre
-      g.lineTo(a.sx + dx * tI + px * off, a.sy + dy * tI + py * off)
-    }
-    g.lineTo(b.sx, b.sy)
-    g.stroke()
-  }
 
   // faisceaux : halo large + cœur fin, en fusion additive
   g.globalCompositeOperation = 'lighter'
@@ -6630,6 +6721,11 @@ let dernierVersementAuto = -99
 // rails dont le champ est engagé : allumés par un arc, ils ne se relâchent
 // qu'une fois leur bande vidée (le nuage porté jusqu'à l'arrivée)
 const railsEngages = new Set<number>()
+// Sonde de test : l'état du champ depuis la console (comme __sim et
+// __laserEtat). C'est par elle qu'on peut jouer la bascule d'un rail —
+// paroi ↔ ligne ouverte — sans avoir à réussir l'énigme à la main.
+;(window as unknown as { __railsEngages: Set<number> }).__railsEngages =
+  railsEngages
 // LES CACHETTES : l'instant où le voile de chaque pan s'est levé
 // (Infinity : encore voilé). Le corps qui entre lève le voile — et
 // Recommencer re-voile tout : la découverte se rejoue à chaque essai.
