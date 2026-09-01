@@ -32,6 +32,7 @@ import type { Camera } from './camera'
 import {
   MASQUE_TOUT,
   masqueCompose,
+  masqueSansTextures,
   sourceVariante,
 } from './variantes'
 
@@ -2949,6 +2950,7 @@ export class Renderer {
   private sondeArret = 0
   private sondeBoites = 0
   private sondeBoitesNu = false
+  private sondeSansTex = false
   // Réemployés d'une image à l'autre : construire deux ensembles par image
   // pour ≤ 96 boîtes serait du déchet pur.
   private readonly materiauxPoses = new Set<number>()
@@ -3753,11 +3755,18 @@ export class Renderer {
   /** LA SONDE (?sonde=…). `plat` remplace la composition par un aplat (voir
    * SONDE_FS) ; `arret` l'arrête à la fin d'un bloc pour en mesurer le coût
    * marginal (voir SONDE_ARRET dans le shader). Les deux dorment à zéro. */
-  setSonde(plat: boolean, arret = 0, boites = 0, boitesNu = false): void {
+  setSonde(
+    plat: boolean,
+    arret = 0,
+    boites = 0,
+    boitesNu = false,
+    sansTex = false,
+  ): void {
     this.sondeActive = plat
     this.sondeArret = arret
     this.sondeBoites = boites
     this.sondeBoitesNu = boitesNu
+    this.sondeSansTex = sansTex
   }
 
   /** La marche demandée, liée au premier usage. Elle part de la GÉNÉRIQUE —
@@ -4029,7 +4038,7 @@ export class Renderer {
     if (this.texFroid) this.texturesPretes.add(MAT_FROID)
     if (this.texGrille) this.texturesPretes.add(MAT_GRILLE)
     if (this.texChaud) this.texturesPretes.add(MAT_CHAUD)
-    const masque = masqueCompose({
+    const masqueTableau = masqueCompose({
       modules: this.solModules,
       zones: zones.length > 0,
       relief: relief > 0,
@@ -4040,6 +4049,9 @@ export class Renderer {
       materiaux: this.materiauxPoses,
       texturesPretes: this.texturesPretes,
     })
+    const masque = this.sondeSansTex
+      ? masqueSansTextures(masqueTableau)
+      : masqueTableau
     const variante = this.sondeActive
       ? this.varianteSonde()
       : this.sondeArret > 0 || this.sondeBoitesNu

@@ -12,6 +12,8 @@ import {
 import {
   DRAPEAUX,
   MASQUE_TOUT,
+  MATERIAU_TEXTURE,
+  masqueSansTextures,
   masqueCompose,
   nomSi,
   prelude,
@@ -190,5 +192,24 @@ describe('Variantes de composition — le masque d’un tableau', () => {
     expect(allume(m, 'AVEC_ZONES')).toBe(false)
     expect(allume(m, 'AVEC_MODULES')).toBe(false)
     expect(allume(m, 'AVEC_OMBRE_VOLUME')).toBe(false)
+  })
+})
+
+describe('Variantes de composition — le masque sans textures', () => {
+  // La sonde ?sonde=santex. Elle doit éteindre TOUS les drapeaux de texture
+  // et n'en toucher aucun autre : si elle emportait le relief ou les zones
+  // avec, on comparerait deux décors au lieu de deux coûts de prélèvement.
+  it('éteint les six drapeaux de texture, et eux seuls', () => {
+    const sansTex = masqueSansTextures(MASQUE_TOUT)
+    for (const d of DRAPEAUX) {
+      const eteint = !allume(sansTex, d)
+      expect(eteint, d).toBe(MATERIAU_TEXTURE.has(d))
+    }
+  })
+
+  it('ne rallume jamais rien', () => {
+    for (const m of [0, 0b101010, MASQUE_TOUT]) {
+      expect(masqueSansTextures(m) & ~m).toBe(0)
+    }
   })
 })

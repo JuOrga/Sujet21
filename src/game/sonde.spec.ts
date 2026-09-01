@@ -20,7 +20,7 @@ describe('Sonde de rendu — elle dort, sauf si on la réveille', () => {
     for (const mauvais of [
       'PLAT', 'plate', 'nu2', ' zero', 'oui', '1',
       'arret', 'arret0', 'arret7', 'arret12', 'ARRET1', 'arret-1',
-      'boitesNu', 'boites-nu',
+      'boitesNu', 'boites-nu', 'sanstex', 'SANTEX', 'santex2',
       'boites', 'boites0', 'boites3', 'boites32', 'BOITES4',
     ]) {
       expect(litSonde(`?sonde=${mauvais}`).mode).toBe('')
@@ -34,15 +34,15 @@ describe('Sonde de rendu — elle dort, sauf si on la réveille', () => {
   it('emboîte ses marches de couches', () => {
     expect(litSonde('?sonde=plat')).toEqual({
       mode: 'plat', plat: true, nu: false, zero: false,
-      arret: 0, boites: 0, boitesNu: false,
+      arret: 0, boites: 0, boitesNu: false, sansTex: false,
     })
     expect(litSonde('?sonde=nu')).toEqual({
       mode: 'nu', plat: true, nu: true, zero: false,
-      arret: 0, boites: 0, boitesNu: false,
+      arret: 0, boites: 0, boitesNu: false, sansTex: false,
     })
     expect(litSonde('?sonde=zero')).toEqual({
       mode: 'zero', plat: true, nu: true, zero: true,
-      arret: 0, boites: 0, boitesNu: false,
+      arret: 0, boites: 0, boitesNu: false, sansTex: false,
     })
   })
 
@@ -70,6 +70,18 @@ describe('Sonde de rendu — elle dort, sauf si on la réveille', () => {
     expect(s.boitesNu).toBe(true)
     expect(s.arret).toBe(0)
     expect(s.boites).toBe(0)
+    expect(s.plat).toBe(false)
+  })
+
+  // SANS TEXTURES : la seule sonde qui passe par les DRAPEAUX de variante
+  // plutôt que par une coupe du shader — elle éteint les six matériaux
+  // texturés et laisse tout le reste debout.
+  it('éteint les textures sans rien couper d’autre', () => {
+    const s = litSonde('?sonde=santex')
+    expect(s.sansTex).toBe(true)
+    expect(s.arret).toBe(0)
+    expect(s.boites).toBe(0)
+    expect(s.boitesNu).toBe(false)
     expect(s.plat).toBe(false)
   })
 
@@ -101,7 +113,7 @@ describe('Sonde de rendu — elle est branchée, et elle se dit', () => {
     expect(main).toMatch(/sonde\.nu[\s\S]{0,80}worldLabelsHost\.hidden = true/)
     expect(renderer).toContain('const SONDE_FS')
     expect(main).toContain(
-      'renderer.setSonde(sonde.plat, sonde.arret, sonde.boites, sonde.boitesNu)',
+      'sonde.sansTex,',
     )
   })
 

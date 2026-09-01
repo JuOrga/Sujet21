@@ -135,6 +135,30 @@ export function masqueCompose(etat: EtatCompose): number {
   return masque
 }
 
+/**
+ * Le même masque, tous les drapeaux de TEXTURE éteints.
+ *
+ * C'est la sonde ?sonde=santex. Le shader prend alors la branche
+ * procédurale de chaque matériau — pas un seul prélèvement de texture de
+ * matériau — et TOUT LE RESTE est identique : même boucle, mêmes boîtes,
+ * même eau, mêmes couches.
+ *
+ * Elle tranche ce que deux mesures ont laissé ouvert. Le profil dit que
+ * ces prélèvements coûtent 18 ms des 40 (arret3 : 45 im/s ; arret6 : 25).
+ * Mais les déplacer dans la branche de leur matériau — donc les payer
+ * beaucoup plus rarement — n'a rien rendu. Deux lectures possibles : ou
+ * bien ils s'exécutent encore presque partout (dans un groupe de pixels,
+ * il suffit d'UN voisin sur une paroi pour que tout le groupe paie), ou
+ * bien leur coût ne tient pas au nombre d'exécutions. Les retirer
+ * COMPLÈTEMENT sépare les deux.
+ */
+export function masqueSansTextures(masque: number): number {
+  let sortie = masque
+  for (const drapeau of MATERIAU_TEXTURE.keys())
+    sortie &= ~(1 << DRAPEAUX.indexOf(drapeau))
+  return sortie
+}
+
 /** Le nom du jumeau utilisable DANS une expression : `AVEC_RELIEF` →
  * `SI_RELIEF`. Deux formes pour deux besoins — `#ifdef` retire une
  * déclaration ou un bloc entier, `SI_*` s'écrit au milieu d'un ternaire

@@ -38,6 +38,7 @@ export type ModeSonde =
   | 'arret5'
   | 'arret6'
   | 'boitesnu'
+  | 'santex'
   | 'boites1'
   | 'boites2'
   | 'boites4'
@@ -83,6 +84,10 @@ export interface Sonde {
    * latence des textures cesse d'être masquée. Un `if` ne rend pas un
    * registre ; un `#ifndef`, si. */
   boitesNu: boolean
+  /** Aucun prélèvement de texture de MATÉRIAU : chaque matériau prend sa
+   * branche procédurale, tout le reste est identique. Voir
+   * masqueSansTextures dans render/variantes.ts pour ce qu'elle tranche. */
+  sansTex: boolean
 }
 
 export const SONDE_ETEINTE: Sonde = {
@@ -93,6 +98,7 @@ export const SONDE_ETEINTE: Sonde = {
   arret: 0,
   boites: 0,
   boitesNu: false,
+  sansTex: false,
 }
 
 /**
@@ -114,6 +120,8 @@ export function litSonde(recherche: string): Sonde {
       mode: mode as ModeSonde,
       arret: Number(marche[1]),
     }
+  // SANS TEXTURES : le décor procédural partout, zéro prélèvement.
+  if (mode === 'santex') return { ...SONDE_ETEINTE, mode, sansTex: true }
   // L'HABILLAGE : la boucle tourne en entier, son gros corps est retiré.
   if (mode === 'boitesnu')
     return { ...SONDE_ETEINTE, mode, boitesNu: true }
@@ -135,5 +143,6 @@ export function litSonde(recherche: string): Sonde {
     arret: 0,
     boites: 0,
     boitesNu: false,
+    sansTex: false,
   }
 }
