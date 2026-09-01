@@ -19,28 +19,50 @@ export function bonbonneIllimitee(auHub: boolean): boolean {
   return auHub
 }
 
-/** LE SEUIL DU VERSEMENT AUTOMATIQUE, en litres.
- *
- *  Il se pose au-DESSUS de la première alerte (`lastCallLiters`, la
- *  bannière « la dernière impulsion approche ») : le but est que cette
- *  bannière ne s'affiche JAMAIS au hub. La marge de 25 % laisse le temps
- *  au versement de trouver sa place dans les creux autour du corps — le
- *  débit n'est pas instantané, et déclencher pile sur le seuil ferait
- *  clignoter l'alerte entre deux images. */
-export function seuilVersementAuto(lastCallLiters: number): number {
-  return lastCallLiters * 1.25
-}
+// LE SEUIL A ÉTÉ LE DÉFAUT, et il vaut d'être raconté. Le versement se
+// déclenchait 25 % au-dessus de `lastCallLiters` (0,6 L), pour que la
+// bannière d'alerte n'ait jamais l'occasion de paraître au hub. L'intention
+// était bonne, le réglage désastreux : 0,75 L sur un corps plein de 4,50 L,
+// c'est attendre 17 % du volume de départ pour renflouer d'un coup les 83 %
+// qui manquent. MESURÉ : 750 particules rendues en une image, le corps
+// multiplié par SIX — et comme le recul d'une éjection se répartit sur tout
+// le corps, la propulsion se trouvait divisée par six dans le même
+// instant. Le joueur voyait son volume exploser et sa poussée mourir.
+//
+// LA RÈGLE EST DONC INVERSÉE : on ne RÉANIME plus, on ENTRETIENT. Dès qu'il
+// manque quelque chose, une DOSE part — jamais plus d'une fraction du
+// volume de départ. Le corps reste près du plein, la bannière ne paraît
+// pas davantage qu'avant, et ni le volume ni la poussée ne sautent.
+
+/** La part du volume de départ qu'un versement automatique rend au plus.
+ *  Huit pour cent : au-dessus, le saut de propulsion se sent (le recul se
+ *  divise par le volume) ; au-dessous, le débit ne suit plus une poussée
+ *  soutenue, qui dépense environ 3,5 % du corps par seconde. */
+export const DOSE_AUTO = 0.08
+
+/** Le creux en deçà duquel on ne verse pas : sans lui, le versement
+ *  repartirait pour une particule à chaque repos, indéfiniment. */
+export const CREUX_MINI = 0.02
 
 export interface EtatVersement {
   auHub: boolean
   litres: number
   /** volume visé : celui du départ du tableau */
   litresPleins: number
-  lastCallLiters: number
   /** l'un des états qui refusent le versement (glace, vapeur, pause…) */
   empeche: boolean
   /** secondes écoulées depuis le dernier versement automatique */
   depuisDernier: number
+}
+
+/** LA DOSE d'un versement automatique, en litres : ce qui manque, borné à
+ *  DOSE_AUTO du volume de départ. C'est elle qui remplace le renflouement
+ *  d'un coup — et c'est elle qui garantit que le volume ne saute jamais. */
+export function doseVersementAuto(
+  litres: number,
+  litresPleins: number,
+): number {
+  return Math.max(0, Math.min(litresPleins - litres, litresPleins * DOSE_AUTO))
 }
 
 /** Le délai minimal entre deux versements automatiques. Sans lui, un corps
@@ -57,7 +79,7 @@ export function doitVerserAuto(e: EtatVersement): boolean {
   // repartir de zéro (changement de salle). Le prendre pour un repos muselait
   // le versement au hub pendant tout le temps écoulé dans la salle d'avant.
   if (e.depuisDernier >= 0 && e.depuisDernier < REPOS_VERSEMENT_S) return false
-  // rien à rendre : le corps est déjà à son volume de départ
-  if (e.litres >= e.litresPleins) return false
-  return e.litres <= seuilVersementAuto(e.lastCallLiters)
+  // rien à rendre : le corps est à son volume de départ, ou tout comme —
+  // un creux d'un centième ne vaut pas un versement
+  return e.litres < e.litresPleins * (1 - CREUX_MINI)
 }

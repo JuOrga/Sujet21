@@ -31,6 +31,21 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '01/09/2026 22:17',
+    title: 'La bonbonne du hub ne réanime plus : elle entretient',
+    notes: [
+      'LE SYMPTÔME, rapporté : « le volume regonfle d’un coup et trop par rapport au gain constaté dans la barre » — et « le volume perd toute propulsion, comme si inertie énorme, après la bonbonne ».',
+      'DEUX DÉFAUTS, qui s’additionnaient. LE PREMIER EST LE SEUIL. Le versement automatique du hub se déclenchait 25 % au-dessus de « lastCallLiters » (0,6 L), pour que la bannière d’alerte n’ait jamais l’occasion de paraître. L’intention était bonne, le réglage désastreux : 0,75 L sur un corps plein de 4,50 L, c’est attendre 17 % du volume de départ pour rendre les 83 % qui manquent EN UNE IMAGE. MESURÉ : 750 particules d’un coup, le corps multiplié par SIX. Et comme le recul d’une éjection se répartit sur tout le corps, la propulsion se trouvait divisée par six dans le même instant. Les deux symptômes rapportés sont un seul défaut.',
+      'LE SECOND EST LA JAUGE, et il expliquait le « trop par rapport au gain constaté ». Verser faisait « baseVolume += poses » : la barre de vie affiche playerCount / baseVolume, donc le versement gonflait le numérateur ET le dénominateur. MESURÉ sur quatre versements au hub : base 900 → 967 → 1035 → 1104 → 1176, soit une jauge tombée à 76 % pour un corps POURTANT PLEIN — et le seuil critique dessiné sur la jauge dérivait avec elle. Le volume de départ est celui du départ : seul le semis initial le pose désormais.',
+      'LA RÈGLE EST INVERSÉE : on n’attend plus la panne sèche pour renflouer, on ENTRETIENT. Dès qu’il manque plus d’un cinquantième, une DOSE part — au plus 8 % du volume de départ. Huit pour cent parce qu’au-dessus le saut de propulsion se sent, et qu’au-dessous le débit ne suivrait pas une poussée soutenue, qui dépense environ 3,5 % du corps par seconde.',
+      'MESURÉ, douze secondes de va-et-vient au hub. AVANT : le seuil est si bas qu’il ne se déclenche pas une seule fois, le corps descend à 35 % — et le renflouement, quand il vient, saute de 83 points d’un coup. APRÈS : seize versements, saut maximal 8 % du plein, le corps ne descend jamais sous 90 %, la jauge d’un corps plein affiche enfin 100 %.',
+      'LE CREUX SE COMPTE MAINTENANT COMME LA JAUGE LE MONTRE, halo compris. On lisait « playerCount », qui ignore les gouttes du halo — or elles REVIENNENT, et la règle qui décide S’IL FAUT verser lisait, elle, « liters() », halo compris. Les deux ne parlaient pas de la même chose et l’écart se versait en trop.',
+      'LE VERSEMENT AUTOMATIQUE DEVIENT MUET. Il passe désormais souvent au lieu de rarement, et le sting de collecte aurait crépité — c’est exactement ce que le repos de 0,75 s existait pour empêcher. Le son et l’ouverture du verre restent au GESTE : ils récompensent une décision, pas un entretien. Le versement manuel, lui, remplit toujours d’un trait.',
+      'CE QU’IL FAUT SAVOIR, ET QUI N’EST PAS UN DÉFAUT : au hub, le corps reste désormais près du plein en permanence, donc à la poussée d’un corps plein — exactement celle du début de n’importe quel tableau. On n’y retrouvera plus la nervosité d’un corps à 35 %, mais on n’y perdra plus non plus sa poussée d’un coup. C’est le sens de « on ne s’assèche pas chez soi ».',
+      'VÉRIFIÉ : 786 tests verts (6 neufs), type-check à 0 erreur, build propre. Le test du volume de départ a été éprouvé DANS LES DEUX SENS — défaut remis, il tombe sur « expected 321 to be 300 » ; correctif remis, il passe.',
+    ],
+  },
+  {
     date: '01/09/2026 18:50',
     title: 'LA STATION : la descente traverse enfin un LIEU, et non une suite',
     notes: [

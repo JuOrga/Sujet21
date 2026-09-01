@@ -214,6 +214,7 @@ import {
 import {
   bonbonneIllimitee,
   doitVerserAuto,
+  doseVersementAuto,
 } from './game/bonbonne'
 import { AudioFx, loadAudioPrefs } from './game/audio'
 import {
@@ -8049,7 +8050,9 @@ instrPanel?.addEventListener('click', () => {
 /** VERSER LA BONBONNE : la réserve se reverse dans le corps, en jeu — même
  * non pleine. Le corps se regonfle jusqu'à son volume de départ ; l'état
  * liquide est requis (la glace n'absorbe pas, le nuage disperserait). */
-function verserBonbonne(): string {
+function verserBonbonne(
+  o: { dose?: number; discret?: boolean } = {},
+): string {
   // AU HUB, la réserve est INFINIE et le versement y est admis : on ne
   // s'assèche pas chez soi, et perdre un corps en allant parler au marchand
   // n'a aucun intérêt de jeu. Ailleurs, le contexte refuse comme avant.
@@ -8058,13 +8061,23 @@ function verserBonbonne(): string {
     return 'contexte'
   if (input.paused || run.ended || run.exitTimer > 0) return 'pause'
   if (input.freezeIntent || input.gasIntent) return 'etat'
-  const manque = Math.max(0, level.spawn.n - sim.playerCount)
-  const nParts = illimitee
-    ? manque
-    : Math.min(
-        manque,
-        Math.floor(run.bonbonneLiters / params.litersPerParticle),
-      )
+  // LE CREUX SE COMPTE COMME LA JAUGE LE MONTRE : halo compris. On lisait
+  // `playerCount`, qui ignore les gouttes du halo — or elles REVIENNENT, et
+  // la règle qui décide s'il faut verser, elle, lit `liters()` (halo
+  // compris). Les deux ne parlaient donc pas de la même chose, et l'écart
+  // se versait en trop.
+  const manque = Math.max(0, level.spawn.n - sim.aliveCount())
+  // LA DOSE borne le versement AUTOMATIQUE ; le geste, lui, remplit d'un
+  // trait — c'est une décision du joueur, elle a le droit d'être franche.
+  const plafond =
+    o.dose === undefined ? manque : Math.max(0, Math.floor(o.dose))
+  const nParts = Math.min(
+    manque,
+    plafond,
+    illimitee
+      ? Number.POSITIVE_INFINITY
+      : Math.floor(run.bonbonneLiters / params.litersPerParticle),
+  )
   if (nParts < 1) return 'rien'
   // le versement s'installe dans les CREUX autour du corps (jamais sur les
   // particules en place) : poser au centroïde faisait exploser la densité —
@@ -8084,9 +8097,16 @@ function verserBonbonne(): string {
       run.bonbonneLiters - poses * params.litersPerParticle,
     )
   sim.relabel()
-  bande.ponctuation('sting-collecte', 0.5)
-  bonbonneEl.classList.add('ouvert')
-  window.setTimeout(() => bonbonneEl.classList.remove('ouvert'), 600)
+  // LE VERSEMENT AUTOMATIQUE EST MUET. Il passe désormais souvent (une dose
+  // par repos, au lieu d'un renflouement rare), et le sting de collecte
+  // crépiterait — c'est exactement ce que REPOS_VERSEMENT_S existait pour
+  // empêcher. Le son et l'ouverture du verre restent au GESTE : ils
+  // récompensent une décision, pas un entretien.
+  if (!o.discret) {
+    bande.ponctuation('sting-collecte', 0.5)
+    bonbonneEl.classList.add('ouvert')
+    window.setTimeout(() => bonbonneEl.classList.remove('ouvert'), 600)
+  }
   return 'ok'
 }
 /** LE GESTE COMPLET : verser, et DIRE ce qui s'est passé — au toucher, à la
@@ -13581,7 +13601,6 @@ function frame(now: number): void {
       auHub,
       litres: sim.liters(),
       litresPleins: level.spawn.n * params.litersPerParticle,
-      lastCallLiters: params.lastCallLiters,
       empeche:
         input.paused ||
         input.freezeIntent ||
@@ -13598,7 +13617,14 @@ function frame(now: number): void {
     // 'rien', et sans cela le versement — et son son de collecte — repartait
     // à chaque image. C'est exactement le crépitement que le repos existe
     // pour empêcher.
-    verserBonbonne()
+    verserBonbonne({
+      dose:
+        doseVersementAuto(
+          sim.liters(),
+          level.spawn.n * params.litersPerParticle,
+        ) / params.litersPerParticle,
+      discret: true,
+    })
     dernierVersementAuto = run.tableauTime
   }
 
