@@ -27,6 +27,11 @@ export class PerfCollector {
   private readonly qual = new Uint8Array(CAP)
   private total = 0 // images notées depuis le début
   private cursor = 0
+  // LE PAS FIXE de la simulation, en ms (8,33 à 120 Hz, 16,67 à 60). Sans
+  // lui, les `steps` relevés ne sont qu'un compte : c'est lui qui les
+  // convertit en TEMPS SIMULÉ, donc qui permet de dire si le monde a
+  // avancé aussi vite que l'horloge. Voir `vitesseDuTemps()`.
+  private pasMs = 1000 / 120
   // Cadence BRUTE des rappels rAF (rendus ou sautés) : c'est l'horloge de
   // l'écran. Sur un panneau adaptatif (LTPO : 60/90/120 Hz qui changent en
   // cours de partie), elle explique un verrou qui « ne tient pas » : viser
@@ -85,6 +90,16 @@ export class PerfCollector {
     return Math.min(this.total, CAP)
   }
 
+  /** Déclare le pas fixe courant (1000/simHz). Changer de pas VIDE la
+   *  fenêtre : mélanger deux régimes de temps dans un même relevé ferait
+   *  mentir la vitesse du temps sans que rien ne le signale — le collecteur
+   *  se protège ici plutôt que de compter sur ses appelants. */
+  pasFixe(ms: number): void {
+    if (!(ms > 0) || ms === this.pasMs) return
+    this.pasMs = ms
+    this.reset()
+  }
+
   /** Vide la fenêtre. Appelé à chaque changement de réglage (moteur,
    * graphismes, verrou…) : un rapport ne mélange JAMAIS deux
    * configurations — sans quoi les A/B envoyés coup sur coup se
@@ -115,6 +130,40 @@ export class PerfCollector {
       p95: 1000 / tri[Math.floor(n * 0.95)],
       images: n,
     }
+  }
+
+  /** LA VITESSE DU TEMPS : le temps SIMULÉ divisé par le temps RÉEL sur la
+   *  fenêtre. 1 = le monde avance à l'horloge. 0,75 = il tourne au ralenti
+   *  d'un quart, en permanence.
+   *
+   *  POURQUOI CE CHIFFRE EXISTE. La boucle à pas fixe ABANDONNE le retard
+   *  qu'elle n'a pas les moyens de payer (`FixedLoop.advance` : « le retard
+   *  non payé est abandonné »). C'est le bon garde-fou — sans lui, une image
+   *  en retard impose plus de pas, coûte plus cher, prend plus de retard, et
+   *  la machine s'installe à 15 im/s. Mais il paie en TEMPS SIMULÉ, et il le
+   *  faisait SANS RIEN DIRE : le rapport annonçait 40 im/s honnêtes pendant
+   *  que le monde tournait à 75 % de sa vitesse. Le joueur, lui, le sentait
+   *  — « certains niveaux tournent au ralenti » — sans qu'aucun chiffre du
+   *  rapport ne puisse le confirmer.
+   *
+   *  Le calcul est EXACT et ne coûte rien de plus : les pas par image sont
+   *  déjà relevés, le pas fixe est connu. Le report d'accumulateur d'une
+   *  image sur l'autre ne fausse rien — il se paie à l'image suivante, et il
+   *  reste au plus un pas en suspens au bout de la fenêtre.
+   *
+   *  `null` tant que la fenêtre est trop courte pour vouloir dire quelque
+   *  chose (une seconde d'images). */
+  vitesseDuTemps(): number | null {
+    const n = this.taille()
+    if (n < 60) return null
+    let pas = 0
+    let reelMs = 0
+    for (let k = 0; k < n; k++) {
+      pas += this.steps[k]
+      reelMs += this.dt[k]
+    }
+    if (reelMs <= 0) return null
+    return (pas * this.pasMs) / reelMs
   }
 
   /** Le rapport complet — tout ce qu'il faut pour diagnostiquer à distance. */
@@ -231,11 +280,14 @@ export class PerfCollector {
       cadenceTicks.length > 0 && cadenceTicks[0].ms > 0
         ? Math.round(1000 / cadenceTicks[0].ms)
         : null
+    const vitesse = this.vitesseDuTemps()
     const nav = navigator as Navigator & { deviceMemory?: number }
     const perfMem = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory
     return {
       quoi: 'sujet21-rapport-perf',
-      version: 4,
+      // 5 : la VITESSE DU TEMPS entre dans la fenêtre. Un rapport v4 n'a
+      // pas le champ — c'est à ça que sert le numéro.
+      version: 5,
       quand: new Date().toISOString(),
       appareil: {
         userAgent: navigator.userAgent,
@@ -258,6 +310,13 @@ export class PerfCollector {
           pire: n > 0 ? Math.round(1000 / tri[n - 1]) : 0,
         },
         imagesLentes: { sup20ms: sup20, sup33ms: sup33, sup50ms: sup50 },
+        // Le monde a-t-il avancé aussi vite que l'horloge ? (1 = oui.)
+        // Sous 1, la boucle a abandonné du temps simulé faute de budget :
+        // c'est du RALENTI, pas une chute de cadence — et c'est le seul
+        // chiffre qui le dise. `pasFixeMs` accompagne, pour qu'on puisse
+        // refaire le calcul à la main depuis le rapport.
+        vitesseDuTemps: vitesse === null ? null : Math.round(vitesse * 1000) / 1000,
+        pasFixeMs: Math.round(this.pasMs * 100) / 100,
         bandesLentes: bandes,
         cadenceImages,
         moyennes: {

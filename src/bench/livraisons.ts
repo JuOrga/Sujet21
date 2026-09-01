@@ -31,6 +31,20 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '01/09/2026 09:47',
+    title: 'Le monde tournait à 75 % de la vitesse réelle, et aucun chiffre ne le disait',
+    notes: [
+      'LE SYMPTÔME, rapporté : « certains niveaux tournent au ralenti ». LA CAUSE, mesurée dans le rapport de performance du 01/09 07:35 (iPad, tableau « 111 — Les régimes », 900 particules) : le monde avançait à 75 % de l’horloge. Ce n’est PAS une chute de cadence — le rapport annonçait 40 im/s tout à fait honnêtes pendant ce temps-là. C’est du ralenti, et c’est autre chose.',
+      'LE MÉCANISME. La boucle à pas fixe abandonne le retard qu’elle n’a pas les moyens de payer — « le retard non payé est abandonné », c’est écrit dans son code depuis toujours, et c’est le bon garde-fou : sans lui, une image en retard impose plus de pas, coûte plus cher, prend plus de retard, et la machine s’installe à 15 im/s. Mais il paie en TEMPS SIMULÉ, et il le faisait SANS RIEN DIRE.',
+      'POURQUOI CET APPAREIL-LÀ N’Y ARRIVE PAS, en un calcul. À 120 Hz de simulation, chaque seconde de jeu réclame 120 pas. Le rapport donne le coût d’un pas sur place : environ 8,4 ms (physMs divisé par pas, sur les pires images). 120 × 8,4 ms = 1,008 s de calcul pour 1 s de jeu. Le temps réel est hors d’atteinte AVANT même de dessiner quoi que ce soit. La boucle ne pouvait qu’abandonner la différence.',
+      'CE QUI CHANGE : LA VITESSE DU TEMPS EST MESURÉE. Temps simulé divisé par temps réel, sur la fenêtre — 1 = le monde avance à l’horloge. Elle s’affiche en direct dans le voile PARAMÈTRES à côté de la cadence, et elle entre dans le rapport (fenêtre.vitesseDuTemps, avec le pas fixe pour refaire le calcul à la main). Sous 97 %, la ligne dit RALENTI et nomme le remède. Le calcul est exact et ne coûte rien : les pas par image étaient déjà relevés, il manquait seulement de les convertir en secondes.',
+      'LE REMÈDE EXISTE DÉJÀ, et il est dans le même voile : PARAMÈTRES → SIMULATION → « 60 — ÉCONOMIE ». Rejoué sur la cadence d’images exacte du rapport, avec la vraie boucle : 75 % à 120 Hz, 100 % à 60 Hz sur le même appareil et le même coût de pas. Deux fois moins de pas par seconde, deux fois plus de monde par pas — le budget suffit.',
+      'AUCUN COMPORTEMENT DE JEU N’EST TOUCHÉ. Ni la boucle, ni le solveur, ni le réglage par défaut : cette livraison ne fait que MESURER ce qui se passait déjà. Changer le réglage par défaut modifierait la physique pour tout le monde — c’est une décision, pas un correctif, et elle n’est pas prise ici.',
+      'UN RELEVÉ NE MÉLANGE JAMAIS DEUX RÉGIMES DE TEMPS : changer le pas de simulation vide la fenêtre de mesure. Le collecteur se protège lui-même au lieu de compter sur ses appelants. Neuf tests, dont trois qui rejouent la cadence réelle du rapport à travers la vraie boucle. Vérifiés dans les deux sens : la vitesse rendue aveugle, deux tests tombent ; la protection retirée, un troisième.',
+      'RESTE UNE PISTE, non prouvée par ce seul rapport : le coût d’un pas TRIPLE au fil d’une session sur mobile (bridage thermique, déjà consigné au banc). Cela expliquerait qu’un ralenti apparaisse en cours de partie et disparaisse après un rechargement. Le chiffre posé aujourd’hui permettra de le vérifier au prochain rapport au lieu d’en débattre.',
+    ],
+  },
+  {
     date: '01/09/2026 01:01',
     title: 'Le conduit ne pouvait JAMAIS s’ouvrir en jouant — et sept autres défauts',
     notes: [

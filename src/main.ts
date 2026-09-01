@@ -2821,6 +2821,7 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
         simHz = hz
         localStorage.setItem('sujet21-simhz', String(hz))
         appliqueSimHz()
+        perf.pasFixe(1000 / simHz) // vide la fenêtre au passage
         perf.reset()
         renderSimHz()
       })
@@ -3041,7 +3042,18 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
 }
 
 // ---- Rapport de performance : mesurer la VRAIE machine, analyser à distance ----
+// Sous ce rapport temps simulé / temps réel, on annonce le RALENTI. 3 % de
+// marge : l'accumulateur en suspens et l'arrondi des pas font osciller la
+// mesure d'un cheveu autour de 1 même quand la machine tient sans peine —
+// alerter là-dessus apprendrait à ignorer l'alerte.
+const SEUIL_RALENTI = 0.97
 const perf = new PerfCollector()
+// LE PAS FIXE EST DIT ICI, pas dans appliqueSimHz() : celle-ci tourne au
+// tout début du module, bien avant que `perf` n'existe — l'y appeler
+// planterait le chargement en zone morte (la panne déjà vécue avec
+// openEditor). Les deux seuls endroits qui doivent le dire sont donc
+// celui-ci et le bouton du voile PARAMÈTRES.
+perf.pasFixe(1000 / simHz)
 const perfVif = document.getElementById('perf-vif') as HTMLDivElement
 const perfEtat = document.getElementById('perf-etat') as HTMLDivElement
 let perfVifCompte = 0
@@ -3050,11 +3062,24 @@ function majPerfVifForce(): void {
   // la VERSION est dite ici aussi : c'est la question qu'on se pose juste
   // avant de mesurer (« suis-je bien sur le paquet que je crois ? »), et
   // un iPad peut garder un onglet ouvert longtemps après une mise en ligne
+  // LA VITESSE DU TEMPS, à côté de la cadence. Les deux ne disent pas la
+  // même chose et c'est tout l'intérêt : on peut afficher 40 im/s honnêtes
+  // pendant que le monde avance à 75 % — la boucle abandonne alors le retard
+  // qu'elle n'a pas les moyens de payer, et cela se SENT (« ce niveau tourne
+  // au ralenti ») sans qu'aucun chiffre ne le disait jusqu'ici.
+  const v = perf.vitesseDuTemps()
+  const tempsDit =
+    v === null
+      ? ''
+      : ` · temps ${Math.round(v * 100)} %` +
+        (v < SEUIL_RALENTI
+          ? ` ⚠ RALENTI : la simulation n'a pas le temps de payer ses pas. À ${simHz} Hz, chaque seconde en réclame ${simHz}. Essayez « 60 — ÉCONOMIE » ci-dessous.`
+          : '')
   perfVif.textContent =
     `v${VERSION} · ` +
     (r.images < 30
       ? 'mesure en cours — jouez quelques secondes, le voile ouvert ou fermé.'
-      : `en direct : ${r.p50.toFixed(0)} im/s en médiane · plancher (p5) ${r.p95.toFixed(0)} im/s · fenêtre de ${r.images} images.`)
+      : `en direct : ${r.p50.toFixed(0)} im/s en médiane · plancher (p5) ${r.p95.toFixed(0)} im/s · fenêtre de ${r.images} images${tempsDit}.`)
 }
 function majPerfVif(): void {
   if (paramsEl.hidden) return
