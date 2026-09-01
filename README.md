@@ -6,10 +6,10 @@ une partie de soi-même — **se déplacer, c'est rétrécir**.
 
 Le document de référence est [`docs/doc-fonctionnel.md`](docs/doc-fonctionnel.md).
 
-## État — version 0.21.403, une run jouable de bout en bout
+## État — version 0.21.404, une run jouable de bout en bout
 
 Le jeu tourne dans le navigateur, sur ordinateur, tablette et téléphone.
-**403 livraisons consignées entre le 08/08/2026 et le 01/09/2026** — le journal
+**404 livraisons consignées entre le 08/08/2026 et le 01/09/2026** — le journal
 complet se lit dans l'écran NOTES DE VERSION, les données sont dans
 [`src/bench/livraisons.ts`](src/bench/livraisons.ts).
 
@@ -45,7 +45,9 @@ sujet découvre en jouant, les trophées de ce qu'il réussit.
 **Les écrans.** Cinématiques en planches illustrées (le montage compose, il ne
 code pas), accueil, notes de version, palmarès partagé, codex, cycle.
 
-**La fabrication.** Un éditeur de tableaux complet (~7 000 lignes), la
+**La fabrication.** L'écran LA DESCENTE, où le déroulement d'une run se
+règle, se déroule à blanc et se met en statistiques ; un éditeur de tableaux
+complet (~7 000 lignes) ; la
 PLANCHE — toutes les salles de la bibliothèque partagée en vignettes dessinées
 depuis leur géométrie, l'ordre y est la séquence de l'expédition —, et un
 générateur qui refuse tout tirage dont la traversée ne se démontre pas.
@@ -79,7 +81,7 @@ l'URL, ou sept tapes rapides sur le numéro de version (tactile compris).
 ## Qualité
 
 ```bash
-pnpm test        # 711 tests dans 65 fichiers, ~22 s
+pnpm test        # 733 tests dans 66 fichiers, ~23 s
 pnpm type-check
 pnpm build
 ```
