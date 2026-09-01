@@ -2208,6 +2208,11 @@ export function accessible(
   // vérité du solveur comme du rendu. Les rectangles gardent le chemin
   // rapide historique (boîte vraie, prudente pour les pivotés).
   const formes: ObstacleBox[] = []
+  // LES RAILS NE SONT PAS COMPTÉS, ET C'EST VOULU. Depuis qu'ils ont un
+  // corps, ils arrêtent l'eau et la glace — mais pas la vapeur, exactement
+  // comme une grille, une membrane ou un rideau. Ce sont des portes D'ÉTAT,
+  // et la preuve de traversée les ignore toutes : elle démontre qu'un chemin
+  // existe, pas qu'il se franchit dans un seul régime.
   for (const box of level.boxes) {
     if (
       box.material === MAT_GRILLE ||

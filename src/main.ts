@@ -536,10 +536,19 @@ function createSim(level: LevelDef): FluidSim {
     zoneForceAt(level, level.spawn.x, level.spawn.y) === 'vapeur'
   sim.dashBudget = sim.dashBudgetMax
   sim.setLevel(level.boxes, level.sponges)
-  // Le tube d'un conduit épouse la bande de convoyage (railConvoy travaille
-  // à plasmaRailRadius × 2,5) : ce qui est porté est exactement ce qui est
+  // DEUX ÉPAISSEURS, ET CHACUNE EST CELLE QU'ON DESSINE. Le tube d'un
+  // conduit épouse la bande de convoyage (railConvoy travaille à
+  // plasmaRailRadius × 2,5) : ce qui est porté est exactement ce qui est
   // dedans, sinon le nuage se ferait expulser d'un bord qu'il croyait libre.
-  sim.setConduits(level.rails ?? [], params.plasmaRailRadius * 2.5)
+  // Le corps d'un rail ordinaire, lui, est sa BANDE DE CAPTURE — la portée
+  // du champ, celle que le calque trace en violet translucide. Le dépôt
+  // s'est déjà fait avoir une fois dans l'autre sens (« le tube mentait sur
+  // sa taille » : collision sur 150, dessiné sur 60).
+  sim.setConduits(
+    level.rails ?? [],
+    params.plasmaRailRadius * 2.5,
+    params.plasmaRailRadius,
+  )
   sim.spawnDisc(level.spawn.x, level.spawn.y, level.spawn.n, KIND_PLAYER)
   // né dans une zone qui impose la vapeur : le corps EST un nuage dès la
   // première image — sinon le compteur annonce des dashs qui ne partent pas,
@@ -5525,6 +5534,26 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   // capture translucide (l'arc s'accroche N'IMPORTE OÙ le long), pointillé
   // violet, et des CHEVRONS qui donnent le sens de circulation de l'arc.
   // Le faisceau ordinaire les ignore ; seul le plasma s'y accroche.
+  // CE QUE LE CORPS EST, À CET INSTANT. Un rail barre l'eau et la glace et
+  // laisse filer le gaz : le dessin doit donc dépendre de l'ÉTAT du joueur,
+  // pas seulement du rail. On mesure la part gazeuse du corps — pas
+  // l'intention de touche : pendant les deux dixièmes de la transformation,
+  // c'est bien la matière qui décide de qui passe, particule par particule.
+  let partGaz = 1
+  {
+    let n = 0
+    let gaz = 0
+    for (let i = 0; i < sim.count; i++) {
+      if (sim.kind[i] !== KIND_PLAYER) continue
+      n++
+      if (sim.gaseous[i] === 1) gaz++
+    }
+    if (n > 0) partGaz = gaz / n
+  }
+  // 0 = le corps est gazeux, le rail est une ligne de champ · 1 = il est
+  // condensé, le rail est un MUR. Entre les deux, le mur apparaît en fondu.
+  const railSolide = 1 - partGaz
+
   rails.forEach((rail, railIdx) => {
     const pts = rail.points
     if (pts.length < 2) return
@@ -5557,6 +5586,54 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     g.lineCap = 'round'
     chemin()
     g.stroke()
+    // ═══ LE RAIL VU PAR UN CORPS CONDENSÉ : UN MUR ════════════════════════
+    // En vapeur, rien de ceci ne se dessine (alpha nul) et le rail garde
+    // EXACTEMENT l'aspect qu'il a toujours eu : une ligne de champ, ouverte.
+    // Dès que le corps se condense, la même bande s'épaissit en matière et
+    // gagne deux arêtes vives — parce qu'à cet instant elle ARRÊTE. Une
+    // paroi qu'on ne distingue pas d'un décalque est un piège, et le corps
+    // butait jusqu'ici sur une chose qui avait l'air d'un passage.
+    //
+    // La largeur peinte est celle de la COLLISION, au pixel : rayonDessine
+    // est le rayon que le solveur reçoit (cf. setConduits). Le dépôt s'est
+    // déjà fait avoir une fois — « le tube mentait sur sa taille ».
+    if (railSolide > 0.01) {
+      const k = railSolide
+      // le corps de la paroi : dense, un peu froid, franchement opaque
+      g.strokeStyle = `rgba(74,62,120,${(0.62 * k).toFixed(3)})`
+      g.lineWidth = Math.max(2, rayonDessine * 2 * z)
+      chemin()
+      g.stroke()
+      // les deux arêtes : c'est le liseré qui fait lire une SURFACE. Tracé
+      // en pointillé serré, il dit aussi que la matière est un champ figé,
+      // pas de la tôle — la parenté avec l'état vapeur reste lisible.
+      g.strokeStyle = `rgba(198,178,255,${(0.85 * k).toFixed(3)})`
+      g.lineWidth = Math.max(1, 1.6 * z)
+      for (const cote of [-1, 1]) {
+        g.beginPath()
+        for (let m = 0; m + 1 < pts.length; m++) {
+          const a = S(pts[m].x, pts[m].y)
+          const b2 = S(pts[m + 1].x, pts[m + 1].y)
+          const dx = b2.sx - a.sx
+          const dy = b2.sy - a.sy
+          const l = Math.hypot(dx, dy) || 1
+          const nx = (-dy / l) * rayonDessine * z * cote
+          const ny = (dx / l) * rayonDessine * z * cote
+          g.moveTo(a.sx + nx, a.sy + ny)
+          g.lineTo(b2.sx + nx, b2.sy + ny)
+        }
+        g.stroke()
+      }
+      // les bouts : une calotte, pour que le rail ne semble pas coupé net —
+      // le tube est une CAPSULE, et c'est par là qu'on le contourne
+      g.fillStyle = `rgba(74,62,120,${(0.62 * k).toFixed(3)})`
+      for (const bout of [pts[0], pts[pts.length - 1]]) {
+        const p = S(bout.x, bout.y)
+        g.beginPath()
+        g.arc(p.sx, p.sy, Math.max(1, rayonDessine * z), 0, Math.PI * 2)
+        g.fill()
+      }
+    }
     // la ligne elle-même — et quand le champ est ENGAGÉ (il porte un nuage,
     // même rayon éteint), le rail s'embrase : halo + tirets qui défilent
     // dans le sens du convoyage. Il s'éteint quand l'attirance se relâche.
@@ -5566,7 +5643,14 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       chemin()
       g.stroke()
     }
-    g.strokeStyle = engage ? 'rgba(215,190,255,0.95)' : 'rgba(150,120,255,0.45)'
+    // LE POINTILLÉ ET LES CHEVRONS DISENT « ÇA CIRCULE ». Devant un corps
+    // condensé, ils mentent : rien n'y circule, ça bute. Ils s'effacent donc
+    // à mesure que la paroi apparaît — sans disparaître tout à fait, le rail
+    // reste le même objet, c'est le regard qui change.
+    const vivant = 1 - 0.72 * railSolide
+    g.strokeStyle = engage
+      ? `rgba(215,190,255,${(0.95 * vivant).toFixed(3)})`
+      : `rgba(150,120,255,${(0.45 * vivant).toFixed(3)})`
     g.lineWidth = Math.max(1, (engage ? 3 : 2) * z)
     g.setLineDash([2 * z, 9 * z])
     if (engage) g.lineDashOffset = -((performance.now() * 0.05) % 11) * z
@@ -5575,7 +5659,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     g.setLineDash([])
     g.lineDashOffset = 0
     // chevrons de sens, à intervalle régulier le long de chaque tronçon
-    g.strokeStyle = 'rgba(190,160,255,0.7)'
+    g.strokeStyle = `rgba(190,160,255,${(0.7 * vivant).toFixed(3)})`
     g.lineWidth = Math.max(1, 1.6 * z)
     const taille = Math.max(3, 7 * z)
     for (let k = 0; k + 1 < pts.length; k++) {

@@ -224,7 +224,16 @@ export class FluidSim {
   // une CAPSULE (distance à une polyligne), pas un rectangle — le convertir
   // en boîtes obliques aurait demandé de toucher au format des tableaux, au
   // générateur et à l'éditeur pour une géométrie qu'on sait déjà mesurer.
-  private conduits: { pts: { x: number; y: number }[]; rayon: number; rail: number; actif: boolean }[] = []
+  // LES TUBES. Un par rail : tout rail a un corps, l'eau et la glace y
+  // butent. `raccourci` distingue le CONDUIT — celui qui, arc engagé, laisse
+  // en plus la vapeur ignorer le décor et franchir une paroi.
+  private conduits: {
+    pts: { x: number; y: number }[]
+    rayon: number
+    raccourci: boolean
+    rail: number
+    actif: boolean
+  }[] = []
   // 1 = la particule est DANS un tube, à cet instant. Recalculé une fois par
   // pas, avant la résolution des solides, et lu deux fois : la vapeur y
   // ignore tout le décor (c'est le raccourci), l'eau et la glace s'en font
@@ -2335,14 +2344,38 @@ export class FluidSim {
   /** Les tubes du tableau. Appelé au chargement, comme setLevel : un rail
    *  ordinaire n'entre pas dans cette liste, donc un tableau sans conduit
    *  ne paie strictement rien (la passe sort au premier test). */
-  setConduits(rails: { points: { x: number; y: number }[]; conduit?: boolean }[], rayon: number): void {
+  setConduits(
+    rails: { points: { x: number; y: number }[]; conduit?: boolean }[],
+    rayonRaccourci: number,
+    rayonRail: number,
+  ): void {
     this.conduits = []
     for (let i = 0; i < rails.length; i++) {
       const r = rails[i]
-      if (r.conduit !== true || r.points.length < 2) continue
-      // l'indice de rail est gardé : c'est par lui que l'engagement de
-      // l'arc (calculé côté jeu, sur le traceur de faisceau) retrouve son tube
-      this.conduits.push({ pts: r.points, rayon, rail: i, actif: false })
+      if (r.points.length < 2) continue
+      // TOUT RAIL A UN CORPS. Une ligne de champ magnétique n'est pas un
+      // décalque : de la matière CONDENSÉE ne la traverse pas — l'eau et la
+      // glace butent dessus comme sur une paroi. Seul le gaz passe, parce
+      // que seul le gaz s'ionise ; c'est ce qui fait du rail une mécanique
+      // et non un dessin. Avant, un rail ordinaire n'avait AUCUNE physique
+      // et le corps le traversait sans rien sentir.
+      //
+      // Ce qui distingue le RACCOURCI (`conduit`), c'est autre chose : lui
+      // seul, une fois son arc engagé, laisse la vapeur ignorer le DÉCOR et
+      // franchir une paroi. Un rail ordinaire ne fait jamais traverser quoi
+      // que ce soit — il barre, voilà tout.
+      const raccourci = r.conduit === true
+      this.conduits.push({
+        pts: r.points,
+        // le corps d'un rail est SA BANDE DE CAPTURE, celle qu'on dessine :
+        // la portée du champ est son épaisseur. Le tube d'un raccourci, lui,
+        // épouse la bande de convoyage (railConvoy y travaille) — ce qui est
+        // porté est exactement ce qui est dedans.
+        rayon: raccourci ? rayonRaccourci : rayonRail,
+        raccourci,
+        rail: i,
+        actif: false,
+      })
     }
   }
 
@@ -2379,7 +2412,11 @@ export class FluidSim {
       let bouvert = 0
       for (const tube of this.conduits) {
         const pts = tube.pts
-        const ouvert = tube.actif ? 1 : 0
+        // « OUVERT » VEUT DIRE : ce tube me laisse ignorer le décor. Seul un
+        // RACCOURCI le fait, et seulement quand son arc est engagé. Un rail
+        // ordinaire dont un arc suit la ligne reste fermé à ce titre : il
+        // guide le faisceau, il n'ouvre pas de passage dans les murs.
+        const ouvert = tube.actif && tube.raccourci ? 1 : 0
         // un tube fermé ne peut pas déloger un tube ouvert déjà retenu
         if (bouvert === 1 && ouvert === 0) continue
         for (let k = 0; k + 1 < pts.length; k++) {
