@@ -544,10 +544,19 @@ function createSim(level: LevelDef): FluidSim {
     zoneForceAt(level, level.spawn.x, level.spawn.y) === 'vapeur'
   sim.dashBudget = sim.dashBudgetMax
   sim.setLevel(level.boxes, level.sponges)
-  // Le tube d'un conduit épouse la bande de convoyage (railConvoy travaille
-  // à plasmaRailRadius × 2,5) : ce qui est porté est exactement ce qui est
+  // DEUX ÉPAISSEURS, ET CHACUNE EST CELLE QU'ON DESSINE. Le tube d'un
+  // conduit épouse la bande de convoyage (railConvoy travaille à
+  // plasmaRailRadius × 2,5) : ce qui est porté est exactement ce qui est
   // dedans, sinon le nuage se ferait expulser d'un bord qu'il croyait libre.
-  sim.setConduits(level.rails ?? [], params.plasmaRailRadius * 2.5)
+  // Le corps d'un rail ordinaire, lui, est sa BANDE DE CAPTURE — la portée
+  // du champ, celle que le calque trace en violet translucide. Le dépôt
+  // s'est déjà fait avoir une fois dans l'autre sens (« le tube mentait sur
+  // sa taille » : collision sur 150, dessiné sur 60).
+  sim.setConduits(
+    level.rails ?? [],
+    params.plasmaRailRadius * 2.5,
+    params.plasmaRailRadius,
+  )
   sim.spawnDisc(level.spawn.x, level.spawn.y, level.spawn.n, KIND_PLAYER)
   // né dans une zone qui impose la vapeur : le corps EST un nuage dès la
   // première image — sinon le compteur annonce des dashs qui ne partent pas,
@@ -5852,6 +5861,16 @@ let gasIntentAvant = false
 // clignote pas quand le miroir tremble.
 const fxCanvas = document.getElementById('fx-canvas') as HTMLCanvasElement
 const fxCtx = fxCanvas.getContext('2d')!
+// LA BASCULE D'UN RAIL, LISSÉE. Un rail passe de PAROI à ligne de champ
+// ouverte quand l'arc s'engage sur lui, et l'inverse quand il retombe ou
+// que le corps se condense. Sauter d'un état à l'autre en une image ne se
+// lit pas : on garde donc, par rail, la valeur COURANTE, qui court vers sa
+// cible en un tiers de seconde. C'est cet écart qui donne son temps à
+// l'éclair — et il vaut dans les deux sens, sans rien de plus à écrire.
+const railBascule: number[] = []
+let railBasculeT = 0
+let dtFx = 0.016
+
 const laserEtat = {
   vues: [] as TraceResultat[],
   // La mémoire des récepteurs (TOR : verrou ouvrant · NOR : maintien, la
@@ -6109,93 +6128,12 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   // capture translucide (l'arc s'accroche N'IMPORTE OÙ le long), pointillé
   // violet, et des CHEVRONS qui donnent le sens de circulation de l'arc.
   // Le faisceau ordinaire les ignore ; seul le plasma s'y accroche.
-  rails.forEach((rail, railIdx) => {
-    const pts = rail.points
-    if (pts.length < 2) return
-    // un rail entièrement sous voile se tait ; un rail qui en sort reste
-    // dessiné (le voile brume le couvre, et couper une polyligne la fausse)
-    if (pts.every((p) => dansCacheVoilee(p.x, p.y))) return
-    const engage = railsEngages.has(railIdx)
-    const chemin = (): void => {
-      g.beginPath()
-      const p0 = S(pts[0].x, pts[0].y)
-      g.moveTo(p0.sx, p0.sy)
-      for (let k = 1; k < pts.length; k++) {
-        const pk = S(pts[k].x, pts[k].y)
-        g.lineTo(pk.sx, pk.sy)
-      }
-    }
-    // la bande de capture : la portée du champ, tout du long
-    // LA BANDE DESSINÉE DOIT ÊTRE LE TUBE RÉEL. Un conduit fait collision sur
-    // `plasmaRailRadius × 2,5` (la bande de convoyage) alors que la bande de
-    // CAPTURE du faisceau ne fait qu'un rayon : dessiner la seconde pour un
-    // conduit ferait buter le corps 45 unités avant tout ce qui se voit.
-    const rayonDessine = rail.conduit === true
-      ? params.plasmaRailRadius * 2.5
-      : params.plasmaRailRadius
-    g.strokeStyle = rail.conduit === true
-      ? 'rgba(150,120,255,0.14)' // un conduit est une PAROI : il se voit plus
-      : 'rgba(150,120,255,0.07)'
-    g.lineWidth = Math.max(2, rayonDessine * 2 * z)
-    g.lineJoin = 'round'
-    g.lineCap = 'round'
-    chemin()
-    g.stroke()
-    // la ligne elle-même — et quand le champ est ENGAGÉ (il porte un nuage,
-    // même rayon éteint), le rail s'embrase : halo + tirets qui défilent
-    // dans le sens du convoyage. Il s'éteint quand l'attirance se relâche.
-    if (engage) {
-      g.strokeStyle = 'rgba(190,160,255,0.30)'
-      g.lineWidth = Math.max(3, 10 * z)
-      chemin()
-      g.stroke()
-    }
-    g.strokeStyle = engage ? 'rgba(215,190,255,0.95)' : 'rgba(150,120,255,0.45)'
-    g.lineWidth = Math.max(1, (engage ? 3 : 2) * z)
-    g.setLineDash([2 * z, 9 * z])
-    if (engage) g.lineDashOffset = -((performance.now() * 0.05) % 11) * z
-    chemin()
-    g.stroke()
-    g.setLineDash([])
-    g.lineDashOffset = 0
-    // chevrons de sens, à intervalle régulier le long de chaque tronçon
-    g.strokeStyle = 'rgba(190,160,255,0.7)'
-    g.lineWidth = Math.max(1, 1.6 * z)
-    const taille = Math.max(3, 7 * z)
-    for (let k = 0; k + 1 < pts.length; k++) {
-      const a = pts[k]
-      const b = pts[k + 1]
-      const len = Math.hypot(b.x - a.x, b.y - a.y)
-      if (len < 1) continue
-      const ux = (b.x - a.x) / len
-      const uy = (b.y - a.y) / len
-      const n = Math.max(1, Math.floor(len / 70))
-      for (let m = 1; m <= n; m++) {
-        const t = m / (n + 1)
-        const p = S(a.x + ux * len * t, a.y + uy * len * t)
-        // direction en coordonnées écran (y inversé)
-        const ex = ux
-        const ey = -uy
-        g.beginPath()
-        g.moveTo(
-          p.sx - (ex + ey * 0.6) * taille,
-          p.sy - (ey - ex * 0.6) * taille,
-        )
-        g.lineTo(p.sx, p.sy)
-        g.lineTo(
-          p.sx - (ex - ey * 0.6) * taille,
-          p.sy - (ey + ex * 0.6) * taille,
-        )
-        g.stroke()
-      }
-    }
-  })
-
   // MINI-ARCS ÉLECTRIQUES (mode foudroyant) : un éclair en zigzag qui
   // serpente le long d'un segment — ancré aux deux bouts, offsets
   // perpendiculaires pseudo-aléatoires re-tirés plusieurs fois par
   // seconde (le crépitement), amplitude en ventre au milieu du chemin.
-  // Partagé entre le rayon vivant et le sursaut de victoire.
+  // Partagé par le rayon vivant, le sursaut de victoire et la bascule des
+  // rails — d'où sa place ICI, avant tous ceux qui l'appellent.
   const bruitArc = (graine: number, i: number): number => {
     const v = Math.sin(graine * 127.1 + i * 311.7) * 43758.5453
     return (v - Math.floor(v)) * 2 - 1
@@ -6229,6 +6167,330 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     g.lineTo(b.sx, b.sy)
     g.stroke()
   }
+
+  // Le pas de temps du calque, mesuré à l'horloge réelle : le dessin des
+  // mécanismes n'est pas la simulation, il ne connaît pas son dt.
+  {
+    const t = performance.now() / 1000
+    dtFx = railBasculeT > 0 ? Math.min(0.1, t - railBasculeT) : 0.016
+    railBasculeT = t
+  }
+
+  // CE QUE LE CORPS EST, À CET INSTANT. Un rail barre l'eau et la glace et
+  // laisse filer le gaz : le dessin doit donc dépendre de l'ÉTAT du joueur,
+  // pas seulement du rail. On mesure la part gazeuse du corps — pas
+  // l'intention de touche : pendant les deux dixièmes de la transformation,
+  // c'est bien la matière qui décide de qui passe, particule par particule.
+  let partGaz = 1
+  {
+    let n = 0
+    let gaz = 0
+    for (let i = 0; i < sim.count; i++) {
+      if (sim.kind[i] !== KIND_PLAYER) continue
+      n++
+      if (sim.gaseous[i] === 1) gaz++
+    }
+    if (n > 0) partGaz = gaz / n
+  }
+  // Ce qui reste de solide pour un corps gazeux : rien, SI la ligne porte un
+  // arc. Le calcul se fait par rail, plus bas — `engage` en décide.
+  const gazBloque = 1 - partGaz
+
+  rails.forEach((rail, railIdx) => {
+    const pts = rail.points
+    if (pts.length < 2) return
+    // un rail entièrement sous voile se tait ; un rail qui en sort reste
+    // dessiné (le voile brume le couvre, et couper une polyligne la fausse)
+    if (pts.every((p) => dansCacheVoilee(p.x, p.y))) return
+    const engage = railsEngages.has(railIdx)
+    // CE QUI BLOQUE SE DESSINE COMME TEL. Un rail ne se franchit qu'au
+    // PLASMA — de la vapeur sur une ligne dont l'arc est engagé. Tout le
+    // reste bute : l'eau, la glace, et la vapeur ordinaire. Le rail se
+    // montre donc en paroi dès qu'il barre, et ne redevient la ligne de
+    // champ ouverte que là où il laisse vraiment passer : arc engagé ET
+    // corps gazeux. Une paroi qu'on ne distingue pas d'un décalque est un
+    // piège, et le corps butait jusqu'ici sur une chose qui avait l'air
+    // d'un passage.
+    const cible = engage ? gazBloque : 1
+    const courant = railBascule[railIdx] ?? cible
+    const railSolide =
+      courant + (cible - courant) * Math.min(1, dtFx / 0.33)
+    railBascule[railIdx] = railSolide
+    // L'ÉCLAIR VIT DANS L'ÉCART. Il naît nul aux deux bouts (paroi pleine,
+    // ligne ouverte) et culmine à mi-chemin : une seule formule, et la
+    // transition crépite dans les DEUX SENS sans qu'on ait à savoir lequel.
+    const bascule = 4 * railSolide * (1 - railSolide)
+    const chemin = (): void => {
+      g.beginPath()
+      const p0 = S(pts[0].x, pts[0].y)
+      g.moveTo(p0.sx, p0.sy)
+      for (let k = 1; k < pts.length; k++) {
+        const pk = S(pts[k].x, pts[k].y)
+        g.lineTo(pk.sx, pk.sy)
+      }
+    }
+    // la bande de capture : la portée du champ, tout du long
+    // LA BANDE DESSINÉE DOIT ÊTRE LE TUBE RÉEL. Un conduit fait collision sur
+    // `plasmaRailRadius × 2,5` (la bande de convoyage) alors que la bande de
+    // CAPTURE du faisceau ne fait qu'un rayon : dessiner la seconde pour un
+    // conduit ferait buter le corps 45 unités avant tout ce qui se voit.
+    const rayonDessine = rail.conduit === true
+      ? params.plasmaRailRadius * 2.5
+      : params.plasmaRailRadius
+    g.strokeStyle = rail.conduit === true
+      ? 'rgba(150,120,255,0.14)' // un conduit est une PAROI : il se voit plus
+      : 'rgba(150,120,255,0.07)'
+    g.lineWidth = Math.max(2, rayonDessine * 2 * z)
+    g.lineJoin = 'round'
+    g.lineCap = 'round'
+    chemin()
+    g.stroke()
+    // ═══ LE RAIL VU PAR UN CORPS CONDENSÉ : UN MUR ════════════════════════
+    // En vapeur, rien de ceci ne se dessine (alpha nul) et le rail garde
+    // EXACTEMENT l'aspect qu'il a toujours eu : une ligne de champ, ouverte.
+    // Dès que le corps se condense, la même bande s'épaissit en matière et
+    // gagne deux arêtes vives — parce qu'à cet instant elle ARRÊTE. Une
+    // paroi qu'on ne distingue pas d'un décalque est un piège, et le corps
+    // butait jusqu'ici sur une chose qui avait l'air d'un passage.
+    //
+    // La largeur peinte est celle de la COLLISION, au pixel : rayonDessine
+    // est le rayon que le solveur reçoit (cf. setConduits). Le dépôt s'est
+    // déjà fait avoir une fois — « le tube mentait sur sa taille ».
+    if (railSolide > 0.01) {
+      const k = railSolide
+      // le corps de la paroi : dense, un peu froid, franchement opaque
+      g.strokeStyle = `rgba(74,62,120,${(0.62 * k).toFixed(3)})`
+      g.lineWidth = Math.max(2, rayonDessine * 2 * z)
+      chemin()
+      g.stroke()
+      // LES DEUX ARÊTES, D'UN SEUL TRAIT ET AVEC DE VRAIES JOINTURES. C'est
+      // le liseré qui fait lire une SURFACE — mais tracé segment par
+      // segment, il se brisait à chaque coude : les deux droites décalées
+      // se croisaient au lieu de se rejoindre, et le rail montrait une
+      // encoche à l'intérieur du virage et un trou à l'extérieur. Le
+      // contour décalé se calcule donc en une passe, avec un raccord
+      // d'ONGLET : au sommet, on prend l'intersection des deux droites
+      // décalées, dans la direction bissectrice.
+      const contour = (cote: number): { sx: number; sy: number }[] => {
+        const e = pts.map((q) => S(q.x, q.y))
+        const d = rayonDessine * z * cote
+        // la normale de chaque tronçon, en écran
+        const nrm: { x: number; y: number }[] = []
+        for (let m = 0; m + 1 < e.length; m++) {
+          const dx = e[m + 1].sx - e[m].sx
+          const dy = e[m + 1].sy - e[m].sy
+          const l = Math.hypot(dx, dy) || 1
+          nrm.push({ x: -dy / l, y: dx / l })
+        }
+        const out: { sx: number; sy: number }[] = []
+        for (let m = 0; m < e.length; m++) {
+          if (m === 0 || m === e.length - 1) {
+            // un bout : la normale de son unique tronçon
+            const n = nrm[m === 0 ? 0 : nrm.length - 1]
+            out.push({ sx: e[m].sx + n.x * d, sy: e[m].sy + n.y * d })
+            continue
+          }
+          // UN SOMMET : la bissectrice des deux normales, allongée de
+          // 1/cos(θ/2) pour retomber sur l'intersection des deux droites
+          // décalées. Bornée à trois épaisseurs, sinon un angle très aigu
+          // ferait jaillir une aiguille de plusieurs écrans.
+          const a = nrm[m - 1]
+          const b3 = nrm[m]
+          let mx = a.x + b3.x
+          let my = a.y + b3.y
+          const ml = Math.hypot(mx, my)
+          if (ml < 1e-4) {
+            // demi-tour parfait : pas de bissectrice, on garde la normale
+            out.push({ sx: e[m].sx + a.x * d, sy: e[m].sy + a.y * d })
+            continue
+          }
+          mx /= ml
+          my /= ml
+          const cos = mx * a.x + my * a.y
+          const allonge = Math.min(3, 1 / Math.max(0.34, cos))
+          out.push({
+            sx: e[m].sx + mx * d * allonge,
+            sy: e[m].sy + my * d * allonge,
+          })
+        }
+        return out
+      }
+      g.lineJoin = 'round'
+      g.lineCap = 'butt'
+      for (const cote of [-1, 1]) {
+        const c = contour(cote)
+        // l'arête, d'un seul trait : plus aucune brisure aux coudes
+        g.strokeStyle = `rgba(198,178,255,${(0.85 * k).toFixed(3)})`
+        g.lineWidth = Math.max(1, 1.7 * z)
+        g.beginPath()
+        g.moveTo(c[0].sx, c[0].sy)
+        for (let m = 1; m < c.length; m++) g.lineTo(c[m].sx, c[m].sy)
+        g.stroke()
+      }
+      // LE BISEAU. Une paroi n'est pas un aplat : un second liseré, plus
+      // fin et rentré, donne l'épaisseur — la lumière accroche le bord et
+      // le centre reste sombre. C'est le même geste que le chant des
+      // solides dans le rendu du décor.
+      g.strokeStyle = `rgba(150,124,235,${(0.4 * k).toFixed(3)})`
+      g.lineWidth = Math.max(1, 1.1 * z)
+      for (const cote of [-1, 1]) {
+        const c = contour(cote * 0.72)
+        g.beginPath()
+        g.moveTo(c[0].sx, c[0].sy)
+        for (let m = 1; m < c.length; m++) g.lineTo(c[m].sx, c[m].sy)
+        g.stroke()
+      }
+      // LA VEINE DU CHAMP. Même figée, la ligne reste une ligne de champ :
+      // un trait clair court en son milieu. C'est ce qui garde la parenté
+      // avec l'état ouvert — on reconnaît le même objet, barré.
+      g.strokeStyle = `rgba(214,198,255,${(0.3 * k).toFixed(3)})`
+      g.lineWidth = Math.max(1, 1.2 * z)
+      g.lineCap = 'round'
+      chemin()
+      g.stroke()
+      // LES BOUTS SE FERMENT EN DEMI-LUNE. Le tube est une CAPSULE : son
+      // contour, c'est une arête, un demi-cercle, l'autre arête. Un cercle
+      // entier rapporté au bout dessinait un anneau en travers de la
+      // paroi — une perle posée là, qui n'existe nulle part dans la
+      // collision. On ne trace donc que la moitié qui REFERME, centrée sur
+      // la direction de sortie, et elle se raccorde pile aux deux arêtes.
+      g.lineWidth = Math.max(1, 1.7 * z)
+      g.strokeStyle = `rgba(198,178,255,${(0.85 * k).toFixed(3)})`
+      const bouts: [{ x: number; y: number }, { x: number; y: number }][] = [
+        [pts[0], pts[1]],
+        [pts[pts.length - 1], pts[pts.length - 2]],
+      ]
+      for (const [bout, voisin] of bouts) {
+        const p = S(bout.x, bout.y)
+        const v = S(voisin.x, voisin.y)
+        // la direction de SORTIE : du voisin vers le bout, prolongée
+        const dehors = Math.atan2(p.sy - v.sy, p.sx - v.sx)
+        const r = Math.max(1, rayonDessine * z)
+        g.beginPath()
+        g.arc(p.sx, p.sy, r, dehors - Math.PI / 2, dehors + Math.PI / 2)
+        g.stroke()
+      }
+    }
+    // ═══ LA BASCULE : L'ÉLECTRICITÉ DU CHANGEMENT D'ÉTAT ═════════════════
+    // Une paroi qui s'ouvre au plasma, ou qui se referme quand l'arc lâche,
+    // ne doit pas se contenter de fondre : c'est un champ magnétique qui
+    // s'amorce ou qui claque. Trois filaments serpentent le long de chaque
+    // tronçon, re-tirés trente fois par seconde — le crépitement — sur un
+    // cœur blanc qui court toute la ligne. Aux sommets, là où le champ se
+    // plie, une étincelle plus vive : c'est aux coudes que ça craque.
+    //
+    // `bascule` est nul aux deux bouts et culmine à mi-chemin : l'effet
+    // joue donc à l'ouverture COMME à la fermeture, sans qu'on ait besoin
+    // de savoir dans quel sens on va.
+    if (bascule > 0.02) {
+      const e = pts.map((q) => S(q.x, q.y))
+      const grain = Math.floor((performance.now() / 1000) * 30)
+      const ampl = rayonDessine * z * (0.55 + 0.85 * bascule)
+      g.lineCap = 'round'
+      for (let m = 0; m + 1 < e.length; m++) {
+        // la nappe : large, sourde, elle donne le volume de la décharge
+        traceArcFx(
+          e[m],
+          e[m + 1],
+          grain * 5.1 + m * 13.7,
+          ampl,
+          `rgba(150,90,255,${(0.32 * bascule).toFixed(3)})`,
+          Math.max(1.4, 5 * z),
+        )
+        // les deux filaments : c'est eux qu'on voit crépiter
+        traceArcFx(
+          e[m],
+          e[m + 1],
+          grain * 9.7 + m * 3.1,
+          ampl * 0.8,
+          `rgba(215,190,255,${(0.75 * bascule).toFixed(3)})`,
+          Math.max(1, 1.7 * z),
+        )
+        traceArcFx(
+          e[m],
+          e[m + 1],
+          grain * 2.3 + m * 27.9 + 41,
+          ampl * 0.45,
+          `rgba(252,250,255,${(0.9 * bascule).toFixed(3)})`,
+          Math.max(0.8, 1.1 * z),
+        )
+      }
+      // le cœur : un trait blanc sur toute la ligne, l'amorce du champ
+      g.strokeStyle = `rgba(252,250,255,${(0.85 * bascule).toFixed(3)})`
+      g.lineWidth = Math.max(1, 2.2 * z * bascule)
+      g.lineJoin = 'round'
+      chemin()
+      g.stroke()
+      // AUX COUDES, ÇA CRAQUE. Un éclat à chaque sommet — c'est là que la
+      // ligne se plie, donc là que le champ force le plus.
+      for (let m = 1; m + 1 < e.length; m++) {
+        const r = rayonDessine * z * (0.6 + 1.5 * bascule)
+        const gr = g.createRadialGradient(e[m].sx, e[m].sy, 0, e[m].sx, e[m].sy, Math.max(2, r))
+        gr.addColorStop(0, `rgba(252,250,255,${(0.8 * bascule).toFixed(3)})`)
+        gr.addColorStop(0.45, `rgba(180,140,255,${(0.35 * bascule).toFixed(3)})`)
+        gr.addColorStop(1, 'rgba(150,90,255,0)')
+        g.fillStyle = gr
+        g.beginPath()
+        g.arc(e[m].sx, e[m].sy, Math.max(2, r), 0, Math.PI * 2)
+        g.fill()
+      }
+    }
+    // la ligne elle-même — et quand le champ est ENGAGÉ (il porte un nuage,
+    // même rayon éteint), le rail s'embrase : halo + tirets qui défilent
+    // dans le sens du convoyage. Il s'éteint quand l'attirance se relâche.
+    if (engage) {
+      g.strokeStyle = 'rgba(190,160,255,0.30)'
+      g.lineWidth = Math.max(3, 10 * z)
+      chemin()
+      g.stroke()
+    }
+    // LE POINTILLÉ ET LES CHEVRONS DISENT « ÇA CIRCULE ». Devant un corps
+    // condensé, ils mentent : rien n'y circule, ça bute. Ils s'effacent donc
+    // à mesure que la paroi apparaît — sans disparaître tout à fait, le rail
+    // reste le même objet, c'est le regard qui change.
+    const vivant = 1 - 0.72 * railSolide
+    g.strokeStyle = engage
+      ? `rgba(215,190,255,${(0.95 * vivant).toFixed(3)})`
+      : `rgba(150,120,255,${(0.45 * vivant).toFixed(3)})`
+    g.lineWidth = Math.max(1, (engage ? 3 : 2) * z)
+    g.setLineDash([2 * z, 9 * z])
+    if (engage) g.lineDashOffset = -((performance.now() * 0.05) % 11) * z
+    chemin()
+    g.stroke()
+    g.setLineDash([])
+    g.lineDashOffset = 0
+    // chevrons de sens, à intervalle régulier le long de chaque tronçon
+    g.strokeStyle = `rgba(190,160,255,${(0.7 * vivant).toFixed(3)})`
+    g.lineWidth = Math.max(1, 1.6 * z)
+    const taille = Math.max(3, 7 * z)
+    for (let k = 0; k + 1 < pts.length; k++) {
+      const a = pts[k]
+      const b = pts[k + 1]
+      const len = Math.hypot(b.x - a.x, b.y - a.y)
+      if (len < 1) continue
+      const ux = (b.x - a.x) / len
+      const uy = (b.y - a.y) / len
+      const n = Math.max(1, Math.floor(len / 70))
+      for (let m = 1; m <= n; m++) {
+        const t = m / (n + 1)
+        const p = S(a.x + ux * len * t, a.y + uy * len * t)
+        // direction en coordonnées écran (y inversé)
+        const ex = ux
+        const ey = -uy
+        g.beginPath()
+        g.moveTo(
+          p.sx - (ex + ey * 0.6) * taille,
+          p.sy - (ey - ex * 0.6) * taille,
+        )
+        g.lineTo(p.sx, p.sy)
+        g.lineTo(
+          p.sx - (ex - ey * 0.6) * taille,
+          p.sy - (ey + ex * 0.6) * taille,
+        )
+        g.stroke()
+      }
+    }
+  })
 
   // faisceaux : halo large + cœur fin, en fusion additive
   g.globalCompositeOperation = 'lighter'
@@ -7043,6 +7305,11 @@ let dernierVersementAuto = -99
 // rails dont le champ est engagé : allumés par un arc, ils ne se relâchent
 // qu'une fois leur bande vidée (le nuage porté jusqu'à l'arrivée)
 const railsEngages = new Set<number>()
+// Sonde de test : l'état du champ depuis la console (comme __sim et
+// __laserEtat). C'est par elle qu'on peut jouer la bascule d'un rail —
+// paroi ↔ ligne ouverte — sans avoir à réussir l'énigme à la main.
+;(window as unknown as { __railsEngages: Set<number> }).__railsEngages =
+  railsEngages
 // LES CACHETTES : l'instant où le voile de chaque pan s'est levé
 // (Infinity : encore voilé). Le corps qui entre lève le voile — et
 // Recommencer re-voile tout : la découverte se rejoue à chaque essai.

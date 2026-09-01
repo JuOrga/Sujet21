@@ -44,7 +44,11 @@ function monte(
 ): FluidSim {
   const sim = new FluidSim({ ...DEFAULT_PARAMS, ...overrides }, OPEN, 2048)
   sim.setLevel([PAROI], [])
-  sim.setConduits([{ points: LIGNE, conduit }], DEFAULT_PARAMS.plasmaRailRadius * 2.5)
+  sim.setConduits(
+    [{ points: LIGNE, conduit }],
+    DEFAULT_PARAMS.plasmaRailRadius * 2.5,
+    DEFAULT_PARAMS.plasmaRailRadius,
+  )
   sim.setConduitsActifs(arc ? new Set([0]) : new Set<number>())
   return sim
 }
