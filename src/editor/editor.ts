@@ -3051,12 +3051,13 @@ export class LevelEditor {
       else epRognees++
       spRestantes.push(...morceaux)
     }
-    // LES COQUES (chambres et couloirs) sont de la matière, elles aussi :
-    // la gomme les emporte quand la zone les couvre tout entières. Une
-    // coque ne se ROGNE pas — un anneau de parois coupé en deux n'est plus
-    // une coque — et une zone tracée DANS le vide d'une chambre ne la
-    // concerne pas : c'est là qu'on gomme le mobilier. Mordue sans être
-    // couverte, elle survit et on le dit (gommeStructure tranche).
+    // LES COQUES (chambres et couloirs) sont de la matière, elles aussi.
+    // Une coque ne se ROGNE pas — un anneau de parois coupé en deux n'est
+    // plus une coque — alors la gomme la prend entière dès que le geste est
+    // franc : mordre ses murs ET atteindre son cœur, c'est-à-dire traverser
+    // la pièce et ressortir. Une zone tracée DANS le vide d'une chambre ne
+    // la concerne pas (c'est là qu'on gomme le mobilier) ; arrêtée avant le
+    // cœur, la coque survit et on le dit (gommeStructure tranche).
     const structures = this.level.structures ?? []
     const stRestantes: StructureDef[] = []
     let stChambres = 0
@@ -3082,7 +3083,7 @@ export class LevelEditor {
     ) {
       this.status(
         stEpargnees > 0
-          ? `Gomme : ${stEpargnees} coque${stEpargnees > 1 ? 's' : ''} seulement mordue${stEpargnees > 1 ? 's' : ''} — une coque ne se rogne pas. Couvrez-la entièrement, ou sélectionnez-la et Suppr.`
+          ? `Gomme : ${stEpargnees} coque${stEpargnees > 1 ? 's' : ''} mordue${stEpargnees > 1 ? 's' : ''} sur un bord — une coque part d'un bloc ou pas du tout. Poussez la zone jusqu'à son cœur, ou sélectionnez-la et Suppr.`
           : 'Gomme : rien à effacer dans cette zone.',
       )
       return
@@ -3117,7 +3118,7 @@ export class LevelEditor {
       )
     if (stEpargnees > 0)
       bouts.push(
-        `${stEpargnees} coque${stEpargnees > 1 ? 's' : ''} épargnée${stEpargnees > 1 ? 's' : ''} (une coque ne se rogne pas)`,
+        `${stEpargnees} coque${stEpargnees > 1 ? 's' : ''} épargnée${stEpargnees > 1 ? 's' : ''} (mordue sur un bord : une coque part d'un bloc)`,
       )
     this.commit(`Gomme : ${bouts.join(', ')}.`)
   }
