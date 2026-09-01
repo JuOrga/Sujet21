@@ -36,6 +36,11 @@ export type ModeSonde =
   | 'arret3'
   | 'arret4'
   | 'arret5'
+  | 'boites1'
+  | 'boites2'
+  | 'boites4'
+  | 'boites8'
+  | 'boites16'
 
 export interface Sonde {
   /** Le mode demandé ; '' quand personne ne sonde — le cas de tous les
@@ -50,6 +55,20 @@ export interface Sonde {
   /** La marche du PROFIL : la composition s'arrête à la fin de ce bloc.
    * 0 = elle va jusqu'au bout, c'est-à-dire le jeu tel qu'il est. */
   arret: number
+  /** Le nombre de boîtes que la COMPOSITION regarde (0 = toutes).
+   *
+   * Le profil a montré que tout le déficit tient dans le bloc des
+   * obstacles. Reste à savoir de quoi il est fait : du NOMBRE de boîtes que
+   * chaque pixel parcourt, ou du TRAVAIL que chacune lui demande. Les deux
+   * appellent des correctifs sans rapport — dessiner les boîtes en
+   * géométrie plutôt qu'en boucle, ou alléger ce que fait chaque boîte.
+   * Une réponse linéaire au nombre désigne le premier ; une réponse plate,
+   * le second.
+   *
+   * Le CUISEUR DE LUMIÈRE, lui, garde toutes les boîtes : sans quoi
+   * l'éclairage changerait d'une marche à l'autre et on comparerait deux
+   * images au lieu de deux coûts. */
+  boites: number
 }
 
 export const SONDE_ETEINTE: Sonde = {
@@ -58,6 +77,7 @@ export const SONDE_ETEINTE: Sonde = {
   nu: false,
   zero: false,
   arret: 0,
+  boites: 0,
 }
 
 /**
@@ -75,11 +95,17 @@ export function litSonde(recherche: string): Sonde {
   const marche = /^arret([1-5])$/.exec(mode)
   if (marche)
     return {
+      ...SONDE_ETEINTE,
       mode: mode as ModeSonde,
-      plat: false,
-      nu: false,
-      zero: false,
       arret: Number(marche[1]),
+    }
+  // LE COMPTE : tout est gardé, la composition ne regarde que N boîtes.
+  const compte = /^boites(1|2|4|8|16)$/.exec(mode)
+  if (compte)
+    return {
+      ...SONDE_ETEINTE,
+      mode: mode as ModeSonde,
+      boites: Number(compte[1]),
     }
   // LES COUCHES : chaque marche retire ce que la précédente retirait.
   if (mode !== 'plat' && mode !== 'nu' && mode !== 'zero') return SONDE_ETEINTE
@@ -89,5 +115,6 @@ export function litSonde(recherche: string): Sonde {
     nu: mode === 'nu' || mode === 'zero',
     zero: mode === 'zero',
     arret: 0,
+    boites: 0,
   }
 }

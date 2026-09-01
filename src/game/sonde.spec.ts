@@ -20,6 +20,7 @@ describe('Sonde de rendu — elle dort, sauf si on la réveille', () => {
     for (const mauvais of [
       'PLAT', 'plate', 'nu2', ' zero', 'oui', '1',
       'arret', 'arret0', 'arret6', 'arret12', 'ARRET1', 'arret-1',
+      'boites', 'boites0', 'boites3', 'boites32', 'BOITES4',
     ]) {
       expect(litSonde(`?sonde=${mauvais}`).mode).toBe('')
       expect(litSonde(`?sonde=${mauvais}`).plat).toBe(false)
@@ -31,23 +32,37 @@ describe('Sonde de rendu — elle dort, sauf si on la réveille', () => {
   // incomparables entre elles — c'est tout l'intérêt d'un escalier.
   it('emboîte ses marches de couches', () => {
     expect(litSonde('?sonde=plat')).toEqual({
-      mode: 'plat', plat: true, nu: false, zero: false, arret: 0,
+      mode: 'plat', plat: true, nu: false, zero: false, arret: 0, boites: 0,
     })
     expect(litSonde('?sonde=nu')).toEqual({
-      mode: 'nu', plat: true, nu: true, zero: false, arret: 0,
+      mode: 'nu', plat: true, nu: true, zero: false, arret: 0, boites: 0,
     })
     expect(litSonde('?sonde=zero')).toEqual({
-      mode: 'zero', plat: true, nu: true, zero: true, arret: 0,
+      mode: 'zero', plat: true, nu: true, zero: true, arret: 0, boites: 0,
     })
   })
 
   // LE PROFIL ne retire aucune couche : il GARDE tout et arrête la
   // composition à la fin d'un bloc. Confondre les deux familles fausserait
   // la lecture — on comparerait un shader coupé à un écran dépouillé.
+  // Le COMPTE ne coupe pas le shader et ne retire pas de couche : il borne
+  // la boucle. Trois familles, trois questions — les confondre ferait lire
+  // un profil pour un autre.
+  it('borne la boucle sans rien couper d’autre', () => {
+    for (const n of [1, 2, 4, 8, 16]) {
+      const s = litSonde(`?sonde=boites${n}`)
+      expect(s.boites).toBe(n)
+      expect(s.arret).toBe(0)
+      expect(s.plat).toBe(false)
+      expect(s.nu).toBe(false)
+    }
+  })
+
   it('garde toutes les couches sur une marche de profil', () => {
     for (let n = 1; n <= 5; n++) {
       const s = litSonde(`?sonde=arret${n}`)
       expect(s.arret).toBe(n)
+      expect(s.boites).toBe(0)
       expect(s.plat).toBe(false)
       expect(s.nu).toBe(false)
       expect(s.zero).toBe(false)
@@ -70,7 +85,9 @@ describe('Sonde de rendu — elle est branchée, et elle se dit', () => {
     expect(main).toContain('if (sonde.nu) fxCanvas.hidden = true')
     expect(main).toMatch(/sonde\.nu[\s\S]{0,80}worldLabelsHost\.hidden = true/)
     expect(renderer).toContain('const SONDE_FS')
-    expect(main).toContain('renderer.setSonde(sonde.plat, sonde.arret)')
+    expect(main).toContain(
+      'renderer.setSonde(sonde.plat, sonde.arret, sonde.boites)',
+    )
   })
 
   // Les cinq marches doivent EXISTER dans le shader : sans elles, l'adresse

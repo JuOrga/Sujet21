@@ -2920,6 +2920,7 @@ export class Renderer {
   // demande pas : la sonde ne pèse rien sur le jeu.
   private readonly sondesArret = new Map<number, VarianteCompose>()
   private sondeArret = 0
+  private sondeBoites = 0
   // Réemployés d'une image à l'autre : construire deux ensembles par image
   // pour ≤ 96 boîtes serait du déchet pur.
   private readonly materiauxPoses = new Set<number>()
@@ -3701,9 +3702,10 @@ export class Renderer {
   /** LA SONDE (?sonde=…). `plat` remplace la composition par un aplat (voir
    * SONDE_FS) ; `arret` l'arrête à la fin d'un bloc pour en mesurer le coût
    * marginal (voir SONDE_ARRET dans le shader). Les deux dorment à zéro. */
-  setSonde(plat: boolean, arret = 0): void {
+  setSonde(plat: boolean, arret = 0, boites = 0): void {
     this.sondeActive = plat
     this.sondeArret = arret
+    this.sondeBoites = boites
   }
 
   /** La marche demandée, liée au premier usage. Elle part de la GÉNÉRIQUE —
@@ -4015,7 +4017,13 @@ export class Renderer {
       (b.maxY - b.minY) * 0.5,
     )
     gl.uniform1f(cu['uSolModules'], this.solModules ? 1 : 0)
-    gl.uniform1i(cu['uBoxCount'], boxCount)
+    // La SONDE DU COMPTE (?sonde=boitesN) ne borne QUE la composition : le
+    // cuiseur de lumière garde toutes les boîtes, plus haut. Sans cela on
+    // comparerait deux éclairages au lieu de deux coûts.
+    gl.uniform1i(
+      cu['uBoxCount'],
+      this.sondeBoites > 0 ? Math.min(boxCount, this.sondeBoites) : boxCount,
+    )
     gl.uniform4fv(cu['uBoxes[0]'], this.boxScratch)
     gl.uniform4fv(cu['uBoxAux[0]'], this.auxScratch)
     gl.uniform1f(cu['uTime'], timeSec)
