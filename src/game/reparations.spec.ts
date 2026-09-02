@@ -203,3 +203,29 @@ describe('les réparations — le hub accidenté', () => {
     expect(reparationDef('inconnue')).toBe(null)
   })
 })
+
+describe('une station en panne éteint sa console', () => {
+  const ecransDe = (faites: string[]): string[] =>
+    (appliqueReparations(TABLEAU_HUB, faites).pupitres ?? []).map((q) => q.ecran)
+
+  it('le MUR DES RECORDS en panne retire son pupitre — réparé, il revient', () => {
+    // Un mur mort qui ouvrirait quand même le palmarès dirait le
+    // contraire de sa pancarte « EN PANNE ». Le pupitre disparaît avec
+    // l'écran (même bande d'extinction), et revient à la réparation.
+    expect(ecransDe([])).not.toContain('records')
+    expect(ecransDe(['mur-records'])).toContain('records')
+    expect(ecransDe(TOUTES)).toContain('records')
+  })
+
+  it('le tableau des avaries et le plan, eux, tiennent debout module éteint', () => {
+    // c'est justement quand tout est en panne qu'on vient les lire
+    const rien = ecransDe([])
+    expect(rien).toContain('reparations')
+    expect(rien).toContain('station')
+  })
+
+  it('la base n’est jamais mutée : le tableau CIBLE garde ses trois consoles', () => {
+    appliqueReparations(TABLEAU_HUB, [])
+    expect((TABLEAU_HUB.pupitres ?? []).length).toBe(3)
+  })
+})

@@ -508,6 +508,36 @@ export const TABLEAU_HUB: LevelDef = {
   ],
   // LE MARCHAND : le Semblable, derrière son étal
   marchand: { x: 1640, y: -60 },
+  // LES CONSOLES DU MODULE : des surfaces de contact qui ouvrent un écran
+  // (pupitres.ts). Elles sont posées EN DONNÉES, comme tout le reste du
+  // méta — l'éditeur en pose autant qu'il veut, dans n'importe quel
+  // tableau ; ici, les trois du module Méduse.
+  pupitres: [
+    // LE MUR DES RECORDS : la moitié EST du banc optique. On répare en
+    // entrant par l'ouest (le plot de la station couvre tout le couloir) —
+    // la console, elle, attend plus loin : la réparation et la consultation
+    // ne se déclenchent pas du même pas.
+    { minX: 430, minY: -80, maxX: 700, maxY: 80, ecran: 'records' as const },
+    // LE CENTRE DE CONTRÔLE, sous son pupitre : la conduite de l'étage.
+    // Le tableau des avaries n'est PAS gardé par une réparation — c'est
+    // précisément quand le module est en panne qu'on vient le lire.
+    {
+      minX: -540,
+      minY: 245,
+      maxX: -310,
+      maxY: 330,
+      ecran: 'reparations' as const,
+      titre: 'TABLEAU DES AVARIES',
+    },
+    {
+      minX: -290,
+      minY: 245,
+      maxX: -60,
+      maxY: 330,
+      ecran: 'station' as const,
+      titre: 'PLAN DU COMPLEXE',
+    },
+  ],
   // le méta EN DONNÉES : plots, banc et ANCRES suivent le chemin commun
   ...metaEnDonnees(ZONES_HUB_GRAND),
 }

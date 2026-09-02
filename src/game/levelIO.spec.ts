@@ -961,6 +961,76 @@ describe('levelIO — les décalques de LA SERRE', () => {
     expect(nu.eclats).toBeUndefined()
   })
 
+  it('les pupitres font l’aller-retour ; un écran inconnu est écarté', () => {
+    const { level, rejets } = parseLevel({
+      ...base,
+      pupitres: [
+        // rectangle donné à l'envers : remis à l'endroit
+        { minX: 900, minY: 700, maxX: 600, maxY: 400, ecran: 'records' },
+        {
+          minX: 0,
+          minY: 0,
+          maxX: 200,
+          maxY: 120,
+          ecran: 'station',
+          titre: '  PLAN DU COMPLEXE  ', // rogné aux deux bouts
+        },
+        // un titre vide ne s'écrit pas dans le fichier
+        { minX: 0, minY: 0, maxX: 10, maxY: 10, ecran: 'reparations', titre: '  ' },
+        // l'écran hors catalogue est ÉCARTÉ : un pupitre muet vaut mieux
+        // qu'un pupitre qui ouvrirait le mauvais voile
+        { minX: 0, minY: 0, maxX: 10, maxY: 10, ecran: 'la-lune' },
+      ],
+    })
+    expect(rejets).toEqual(['pupitre d’écran inconnu écarté (la-lune)'])
+    expect(level!.pupitres).toEqual([
+      { minX: 600, minY: 400, maxX: 900, maxY: 700, ecran: 'records' },
+      {
+        minX: 0,
+        minY: 0,
+        maxX: 200,
+        maxY: 120,
+        ecran: 'station',
+        titre: 'PLAN DU COMPLEXE',
+      },
+      { minX: 0, minY: 0, maxX: 10, maxY: 10, ecran: 'reparations' },
+    ])
+    const relu = parseLevel(JSON.parse(serializeLevel(level!)))
+    expect(relu.level!.pupitres).toEqual(level!.pupitres)
+    // absent, le champ n'encombre pas le fichier
+    const nu = JSON.parse(serializeLevel(parseLevel({ ...base }).level!))
+    expect(nu.pupitres).toBeUndefined()
+  })
+
+  it('un pupitre posé dans une paroi est signalé au concepteur', () => {
+    // muet et sans raison visible, c'est le pire des défauts : rien à
+    // l'écran ne dirait pourquoi la console ne s'ouvre pas
+    const mur = {
+      minX: 1000,
+      minY: 1000,
+      maxX: 1400,
+      maxY: 1400,
+      material: 0,
+    }
+    const dansLeMur = checkLevel({
+      ...parseLevel({ ...base, boxes: [mur] }).level!,
+      pupitres: [
+        { minX: 1100, minY: 1100, maxX: 1300, maxY: 1300, ecran: 'records' },
+      ],
+    })
+    expect(
+      dansLeMur.filter((x) => x.message.includes('pupitre')).length,
+    ).toBe(1)
+    // posé à côté du mur, plus rien à signaler
+    const aCote = checkLevel({
+      ...parseLevel({ ...base, boxes: [mur] }).level!,
+      pupitres: [
+        { minX: 1500, minY: 1100, maxX: 1700, maxY: 1300, ecran: 'records' },
+      ],
+    })
+    expect(aCote.filter((x) => x.message.includes('pupitre')).length).toBe(0)
+  })
+
   it('les ancres méta font l’aller-retour ; rôle ou station inconnus écartés', () => {
     const { level, rejets } = parseLevel({
       ...base,
