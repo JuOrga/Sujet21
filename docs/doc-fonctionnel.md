@@ -122,7 +122,8 @@ L'eau passe partout : un mur n'arrête rien. Les obstacles jouent donc sur les p
 | Surface hydrophobe | repousse, dévie les trajectoires |
 | Éponge / matériau absorbant | siphonne le volume au contact prolongé |
 | Radiateur, conduite chaude | évapore — danger ou ressource selon l'état |
-| Filtre, grille | laisse passer l'eau pure, retient le reste |
+| Filtre | laisse passer l'eau pure, retient le reste |
+| Évent | arrête le liquide et la glace, laisse passer la vapeur |
 | Champ électrostatique | l'eau est polaire : attirée, déviée, retenue |
 | Souillure (encre, huile, sel) | modifie les propriétés du corps (voir §8) |
 
@@ -188,7 +189,7 @@ récompense le joueur par moins de jeu.
 
 ### 9.2 Les états comme clés rétroactives
 Chaque état débloque des passages dans des modules déjà connus : figer un jet pour faire pont
-ou caler une porte (glace), monter par les grilles et les conduits verticaux (vapeur).
+ou caler une porte (glace), monter par les évents et les conduits verticaux (vapeur).
 Revenir dans le premier module et y voir trois chemins invisibles jusque-là est le moteur
 des parties 2 à 15.
 

@@ -29,7 +29,7 @@ mémoires : chaque transformation manuelle est un lien à tisser, on commence
 avec juste de quoi redevenir liquide.
 
 **Le vaisseau.** Des obstacles de chimie, pas de géométrie : parois
-hydrophobes et hydrophiles, éponge à saturation, membranes, rideaux, grilles,
+hydrophobes et hydrophiles, éponge à saturation, membranes, rideaux,
 plaques chaudes et froides, surchauffeurs, évents. Des faisceaux laser, des
 pastilles mémoire et des portes qui forment une algèbre complète — le cabinet
 logique en fait cinq salles de démonstration sans ajouter un seul mécanisme.
