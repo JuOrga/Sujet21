@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="color-scheme" content="dark">
+<style>
+:root{color-scheme:dark;}
+@font-face { font-family:'Michroma'; font-weight:400; src:url('public/assets/fonts/michroma-400-latin.woff2') format('woff2'); }
+@font-face { font-family:'IBM Plex Mono'; font-weight:400; src:url('public/assets/fonts/plex-mono-400-latin.woff2') format('woff2'); }
+@font-face { font-family:'IBM Plex Mono'; font-weight:600; src:url('public/assets/fonts/plex-mono-600-latin.woff2') format('woff2'); }
+html,body{margin:0;background:#030710;color:#d9ecf7;}
+a{color:#63b7e6}a:hover{color:#a7ddf5}
+@keyframes cs-pulse{0%,100%{opacity:1}50%{opacity:.7}}
+@keyframes cs-flow{to{stroke-dashoffset:-28}}
+@keyframes cs-scan{0%{transform:translateY(-100%)}100%{transform:translateY(100vh)}}
+</style>
+</helmet>
+<div data-screen-label="Carte de la station" style="position:relative;width:100vw;height:100vh;overflow:hidden;background:radial-gradient(ellipse at 50% 40%,#0a1826 0%,#030710 70%);font-family:'IBM Plex Mono',ui-monospace,monospace;display:grid;grid-template-rows:auto 1fr;">
+  <div style="position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(rgba(150,200,235,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(150,200,235,.05) 1px,transparent 1px);background-size:48px 48px;"></div>
+  <div style="position:absolute;left:0;right:0;height:120px;pointer-events:none;background:linear-gradient(180deg,transparent,rgba(99,183,230,.05),transparent);animation:cs-scan 9s linear infinite;"></div>
+
+  <header style="position:relative;min-width:0;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 32px;border-bottom:1px solid rgba(150,200,235,.16);background:rgba(9,18,30,.6);">
+    <div style="display:flex;align-items:baseline;gap:18px;">
+      <span style="font-family:'Michroma',sans-serif;font-size:15px;letter-spacing:.32em;color:#d9ecf7;white-space:nowrap;">PLAN DE LA STATION</span>
+      <span style="font-size:11px;letter-spacing:.2em;color:#7f9cb0;white-space:nowrap;">SUJET 21 · RUN 07 · SECTEUR {{ zoneCourante }}</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:6px 18px;min-width:0;font-size:10px;letter-spacing:.12em;color:#7f9cb0;">
+      <span style="display:flex;align-items:center;gap:7px;"><i style="width:22px;height:3px;background:#63b7e6;box-shadow:0 0 8px #63b7e6;"></i>VOIE PRINCIPALE</span>
+      <span style="display:flex;align-items:center;gap:7px;"><i style="width:22px;height:0;border-top:2px dashed #7f9cb0;"></i>DÉTOUR</span>
+      <span style="display:flex;align-items:center;gap:7px;"><i style="width:22px;height:2px;background:#a7ddf5;"></i>❄ TRANSFO GLACE</span>
+      <span style="display:flex;align-items:center;gap:7px;"><i style="width:22px;height:2px;background:#f2c98e;"></i>💨 TRANSFO GAZ</span>
+      <span style="display:flex;align-items:center;gap:7px;"><i style="width:10px;height:10px;border-radius:50%;border:2px solid #7f9cb0;"></i>NŒUD</span>
+    </div>
+  </header>
+
+  <div style="position:relative;display:grid;grid-template-columns:minmax(0,1fr) clamp(230px,26vw,300px);min-height:0;min-width:0;">
+    <div style="position:relative;margin:24px 8px 24px 28px;background:#020509;overflow:hidden;">
+      <div style="position:absolute;inset:0;background:radial-gradient(1px 1px at 12% 18%,#d9ecf7 60%,transparent 61%),radial-gradient(1px 1px at 33% 72%,#a7ddf5 60%,transparent 61%),radial-gradient(1.5px 1.5px at 58% 12%,#d9ecf7 60%,transparent 61%),radial-gradient(1px 1px at 71% 88%,#d9ecf7 60%,transparent 61%),radial-gradient(1px 1px at 88% 40%,#a7ddf5 60%,transparent 61%),radial-gradient(1.5px 1.5px at 45% 48%,#d9ecf7 60%,transparent 61%),radial-gradient(1px 1px at 5% 92%,#d9ecf7 60%,transparent 61%),radial-gradient(1px 1px at 94% 8%,#d9ecf7 60%,transparent 61%),radial-gradient(ellipse at 70% 110%,rgba(99,183,230,.14),transparent 55%);"></div>
+      <div data-carte-boite="1" style="position:absolute;inset:0;"></div>
+      <div style="position:absolute;left:50%;top:50%;width:1600px;height:804px;transform:translate(-50%,-50%) scale({{ echelle }});transform-origin:center;">
+
+      <svg viewBox="0 0 1600 804" width="1600" height="804" style="position:absolute;inset:0;overflow:visible;">
+        <defs>
+          <linearGradient id="cs-plaque" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1b2838"></stop><stop offset="1" stop-color="#0b1420"></stop></linearGradient>
+          <radialGradient id="cs-dome" cx="38%" cy="32%" r="70%"><stop offset="0" stop-color="#8fb4ff"></stop><stop offset=".45" stop-color="#3a52c4"></stop><stop offset="1" stop-color="#101a48"></stop></radialGradient>
+          <pattern id="cs-cellules" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="10" height="10" fill="#0f1a36"></rect><path d="M10 0H0V10" fill="none" stroke="#2c4a8a" stroke-width="1"></path></pattern>
+          <pattern id="cs-hex" width="28" height="48.5" patternUnits="userSpaceOnUse"><path d="M14 0 L28 8 L28 24 L14 32 L0 24 L0 8 Z M14 32 L14 48.5" fill="none" stroke="rgba(150,200,235,.06)" stroke-width="1"></path></pattern>
+          <filter id="cs-ombre" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000" flood-opacity=".75"></feDropShadow></filter>
+        </defs>
+        <rect width="1600" height="804" fill="url(#cs-hex)"></rect>
+        <!-- Arc de coque -->
+        <g filter="url(#cs-ombre)">
+          <path d="M330 14 C -60 224, -60 534, 330 754 C 130 534, 130 224, 330 14 Z" fill="url(#cs-plaque)" stroke="#324a62" stroke-width="3"></path>
+          <path d="M330 14 C -60 224, -60 534, 330 754 C 130 534, 130 224, 330 14 Z" fill="none" stroke="#63b7e6" stroke-width="1" opacity=".5"></path>
+          <path d="M142.8 150.5 L234 150.5 M63.9 263.1 L193.6 263.1 M37.5 380 L180 380 M63.9 497.4 L193.6 497.4 M142.8 610 L234 610" stroke="#324a62" stroke-width="3"></path>
+          <path d="M100 205 L212 205 M48 320 L186 320 M48 440 L186 440 M100 555 L212 555" stroke="rgba(150,200,235,.16)" stroke-width="1.5"></path>
+          <path d="M120 120 C 20 250, 20 510, 120 640" fill="none" stroke="rgba(150,200,235,.22)" stroke-width="1.5"></path>
+          <path d="M190 90 C 110 230, 110 530, 190 670" fill="none" stroke="rgba(150,200,235,.12)" stroke-width="1"></path>
+          <g fill="#63b7e6" style="filter:drop-shadow(0 0 5px #63b7e6)">
+            <rect x="96" y="225" width="4" height="16"></rect><rect x="70" y="345" width="4" height="16"></rect><rect x="70" y="400" width="4" height="16"></rect><rect x="96" y="520" width="4" height="16"></rect>
+            <rect x="196" y="128" width="14" height="4"></rect><rect x="196" y="630" width="14" height="4"></rect>
+          </g>
+          <path d="M180 380 H210" stroke="#2a3d52" stroke-width="22"></path>
+        </g>
+        <!-- Télescope spatial amarré -->
+        <path d="M1105 385 H1160 C 1196 385, 1196 426, 1226 426" fill="none" stroke="#2a3d52" stroke-width="18"></path>
+        <path d="M1105 385 H1160 C 1196 385, 1196 426, 1226 426" fill="none" stroke="#0b131e" stroke-width="12"></path>
+        <path d="M1105 385 H1160 C 1196 385, 1196 426, 1226 426" fill="none" stroke="#3a5470" stroke-width="22" stroke-dasharray="4 40"></path>
+        <g transform="translate(1222 426) rotate(-33)" filter="url(#cs-ombre)">
+          <!-- amarrage -->
+          <rect x="0" y="-14" width="40" height="28" rx="3" fill="#1b2838" stroke="#4a6478" stroke-width="2"></rect>
+          <path d="M8 -14V14 M20 -14V14 M32 -14V14" stroke="#324a62" stroke-width="1.5"></path>
+          <!-- mâts des panneaux -->
+          <path d="M200 -36 V-150 M200 36 V150" stroke="#5a7a96" stroke-width="4"></path>
+          <!-- panneaux solaires (ailes) -->
+          <g stroke="#3f5c85" stroke-width="2">
+            <rect x="110" y="-150" width="180" height="96" fill="url(#cs-cellules)"></rect>
+            <rect x="110" y="54" width="180" height="96" fill="url(#cs-cellules)"></rect>
+          </g>
+          <path d="M200 -150 V-54 M200 54 V150 M110 -102 H290 M110 102 H290" stroke="#5a7a96" stroke-width="2"></path>
+          <!-- tube principal -->
+          <rect x="40" y="-38" width="330" height="76" rx="6" fill="url(#cs-plaque)" stroke="#4a6478" stroke-width="2.5"></rect>
+          <rect x="40" y="-38" width="330" height="76" rx="6" fill="none" stroke="rgba(150,200,235,.3)" stroke-width="1"></rect>
+          <path d="M40 -12 H370 M40 12 H370" stroke="rgba(150,200,235,.14)" stroke-width="1"></path>
+          <path d="M120 -38 V38 M170 -38 V38 M230 -38 V38 M300 -38 V38" stroke="#324a62" stroke-width="2.5"></path>
+          <rect x="230" y="-30" width="70" height="60" fill="#1f2f44" stroke="#3a5470" stroke-width="1.5"></rect>
+          <path d="M240 -20 H290 M240 -8 H290 M240 4 H290 M240 16 H290" stroke="rgba(150,200,235,.16)" stroke-width="1"></path>
+          <g fill="#63b7e6" style="filter:drop-shadow(0 0 4px #63b7e6)"><rect x="60" y="-30" width="10" height="3"></rect><rect x="60" y="27" width="10" height="3"></rect><rect x="345" y="-30" width="10" height="3"></rect><rect x="345" y="27" width="10" height="3"></rect></g>
+          <!-- bague d'ouverture + volet -->
+          <rect x="360" y="-42" width="24" height="84" rx="4" fill="#243648" stroke="#5a7a96" stroke-width="2.5"></rect>
+          <ellipse cx="384" cy="0" rx="6" ry="36" fill="#05080f" stroke="#63b7e6" stroke-width="1.5"></ellipse>
+          <path d="M384 -42 L430 -78 L436 -68 L388 -34 Z" fill="#1b2838" stroke="#5a7a96" stroke-width="2"></path>
+          <!-- antenne à grand gain -->
+          <path d="M100 38 L100 74" stroke="#4a6478" stroke-width="3"></path>
+          <ellipse cx="100" cy="84" rx="16" ry="10" fill="#16253a" stroke="#5a7a96" stroke-width="2"></ellipse>
+          <path d="M100 84 V70" stroke="#a7ddf5" stroke-width="1.5"></path>
+        </g>
+        <!-- Coursives : parois + sol + anneaux -->
+        <sc-for list="{{ aretes }}" as="e" hint-placeholder-count="12">
+          <path d="{{ e.d }}" fill="none" stroke="#2a3d52" stroke-width="{{ e.coque }}" stroke-linecap="butt"></path>
+        </sc-for>
+        <sc-for list="{{ aretes }}" as="e" hint-placeholder-count="12">
+          <path d="{{ e.d }}" fill="none" stroke="#0b131e" stroke-width="{{ e.interieur }}" stroke-linecap="butt"></path>
+        </sc-for>
+        <sc-for list="{{ aretes }}" as="e" hint-placeholder-count="12">
+          <path d="{{ e.d }}" fill="none" stroke="#3a5470" stroke-width="{{ e.anneau }}" stroke-linecap="butt" stroke-dasharray="4 44"></path>
+        </sc-for>
+        <sc-for list="{{ aretes }}" as="e" hint-placeholder-count="12">
+          <path d="{{ e.d }}" fill="none" stroke="{{ e.couleur }}" stroke-width="{{ e.epaisseur }}" stroke-dasharray="{{ e.tirets }}" opacity="{{ e.opacite }}" stroke-linecap="round" style="{{ e.style }}"></path>
+        </sc-for>
+      </svg>
+
+      <sc-for list="{{ aretes }}" as="e" hint-placeholder-count="12">
+        <sc-if value="{{ e.badge }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;left:{{ e.bx }};top:{{ e.by }};transform:translate(-50%,-50%) translate({{ e.bdx }},{{ e.bdy }});padding:3px 9px;border:1px solid {{ e.couleur }};background:#0a1420;color:{{ e.couleur }};font-size:12px;letter-spacing:.1em;border-radius:3px;white-space:nowrap;box-shadow:0 0 10px rgba(0,0,0,.6);">{{ e.badge }}</div>
+        </sc-if>
+      </sc-for>
+
+      <div style="position:absolute;left:1470px;top:580px;transform:translateX(-50%);text-align:center;pointer-events:none;">
+        <div style="font-family:'Michroma',sans-serif;font-size:10px;letter-spacing:.14em;color:#7f9cb0;">TÉLESCOPE SPATIAL</div>
+        <div style="font-size:10px;letter-spacing:.18em;color:#4a6478;margin-top:3px;">AMARRÉ · HORS ACCÈS</div>
+      </div>
+      <sc-for list="{{ noeuds }}" as="n" hint-placeholder-count="11">
+        <div style="position:absolute;left:{{ n.left }};top:{{ n.top }};width:{{ n.largeur }};height:{{ n.hauteur }};transform:translate(-50%,-50%);filter:{{ n.filtre }};animation:{{ n.anim }};opacity:{{ n.opacite }};transition:transform .15s;" style-hover="transform:translate(-50%,-50%) scale(1.06)">
+          <button onClick="{{ n.choisir }}" title="{{ n.nom }}" style="position:absolute;inset:0;border:0;padding:0;background:{{ n.bord }};clip-path:{{ n.forme }};cursor:pointer;overflow:hidden;">
+            <span style="position:absolute;inset:3px;background:{{ n.fond }};clip-path:{{ n.forme }};"></span>
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px);clip-path:{{ n.forme }};opacity:{{ n.vecOpacite }};">
+              <rect width="100" height="100" fill="url(#cs-plaque)"></rect>
+              <sc-if value="{{ n.rond }}" hint-placeholder-val="{{ false }}">
+                <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(150,200,235,.35)" stroke-width="2" vector-effect="non-scaling-stroke"></circle>
+                <circle cx="50" cy="50" r="22" fill="#0a1420" stroke="{{ n.accent }}" stroke-width="1.5" vector-effect="non-scaling-stroke"></circle>
+                <path d="M50 10V28M50 72V90M10 50H28M72 50H90" stroke="rgba(150,200,235,.35)" stroke-width="1.5" vector-effect="non-scaling-stroke"></path>
+              </sc-if>
+              <sc-if value="{{ n.plat }}" hint-placeholder-val="{{ true }}">
+                <polygon points="27,8 73,8 92,30 92,70 73,92 27,92 8,70 8,30" fill="none" stroke="rgba(150,200,235,.32)" stroke-width="1.5" vector-effect="non-scaling-stroke"></polygon>
+                <polygon points="33,16 67,16 84,34 84,66 67,84 33,84 16,66 16,34" fill="#0d1826" stroke="rgba(150,200,235,.16)" stroke-width="1" vector-effect="non-scaling-stroke"></polygon>
+                <path d="M50 16V84M16 50H84" stroke="rgba(150,200,235,.14)" stroke-width="1" vector-effect="non-scaling-stroke"></path>
+                <path d="M33 16L16 34M67 16L84 34M16 66L33 84M84 66L67 84" stroke="rgba(150,200,235,.14)" stroke-width="1" vector-effect="non-scaling-stroke"></path>
+                <g fill="{{ n.accent }}"><rect x="47" y="9" width="6" height="3"></rect><rect x="47" y="88" width="6" height="3"></rect><rect x="9" y="47" width="3" height="6"></rect><rect x="88" y="47" width="3" height="6"></rect></g>
+              </sc-if>
+              <sc-if value="{{ n.dome }}" hint-placeholder-val="{{ false }}">
+                <circle cx="50" cy="50" r="28" fill="url(#cs-dome)" stroke="#a7b8ff" stroke-width="1.5" vector-effect="non-scaling-stroke"></circle>
+                <path d="M22 50H78M50 22V78M30 30L70 70M70 30L30 70" stroke="rgba(200,215,255,.35)" stroke-width="1" vector-effect="non-scaling-stroke"></path>
+                <circle cx="50" cy="50" r="16" fill="none" stroke="rgba(200,215,255,.35)" stroke-width="1" vector-effect="non-scaling-stroke"></circle>
+              </sc-if>
+            </svg>
+            <span style="position:absolute;inset:3px;background:#0a1420 url({{ n.img }}) center/cover;clip-path:{{ n.forme }};opacity:{{ n.imgOpacite }};"></span>
+            <span style="position:absolute;inset:0;display:grid;place-items:center;font-size:{{ n.fonte }};color:{{ n.glypheCouleur }};text-shadow:0 0 8px #030710;">{{ n.glyphe }}</span>
+            <sc-if value="{{ n.verrou }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:0;display:grid;place-items:center;background:rgba(3,7,16,.55);font-size:15px;">🔒</span></sc-if>
+            <sc-if value="{{ n.visite }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;right:10px;top:3px;font-size:10px;color:#63b7e6;">✓</span></sc-if>
+          </button>
+        </div>
+        <sc-if value="{{ n.etiquette }}" hint-placeholder-val="{{ true }}">
+        <div style="position:absolute;left:{{ n.left }};top:{{ n.etiqTop }};transform:translateX(-50%);text-align:center;pointer-events:none;opacity:{{ n.opacite }};">
+          <div style="font-family:'Michroma',sans-serif;font-size:11px;letter-spacing:.1em;line-height:1.35;color:{{ n.texte }};max-width:150px;text-wrap:balance;">{{ n.nom }}</div>
+          <sc-if value="{{ afficherTemp }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;justify-content:center;align-items:center;gap:5px;margin-top:4px;font-size:12px;color:#7f9cb0;">
+              <i style="width:40px;height:4px;background:rgba(150,200,235,.12);position:relative;display:inline-block;"><i style="position:absolute;left:0;top:0;bottom:0;width:{{ n.tempLargeur }};background:{{ n.tempCouleur }};"></i></i>
+              <span style="color:{{ n.tempCouleur }};">{{ n.temp }}°</span>
+            </div>
+          </sc-if>
+        </div>
+        </sc-if>
+      </sc-for>
+      </div>
+    </div>
+
+    <aside style="position:relative;margin:24px 28px 24px 8px;display:flex;flex-direction:column;gap:12px;min-height:0;overflow:auto;">
+      <div style="border:1px solid rgba(99,183,230,.28);background:rgba(9,18,30,.82);padding:16px 18px;">
+        <div style="display:flex;justify-content:space-between;font-size:9px;letter-spacing:.3em;color:#7f9cb0;"><span>MODULE SÉLECTIONNÉ</span><span style="color:{{ sel.zoneCouleur }};">{{ sel.type }}</span></div>
+        <div style="margin-top:10px;height:150px;border:1px solid rgba(150,200,235,.16);background:#0a1420 url({{ sel.img }}) center/cover;display:grid;place-items:center;font-size:34px;color:{{ sel.zoneCouleur }};opacity:.95;">{{ sel.glypheAffiche }}</div>
+        <div style="font-family:'Michroma',sans-serif;font-size:13px;letter-spacing:.12em;margin-top:10px;color:#d9ecf7;line-height:1.4;">{{ sel.nom }}</div>
+        <div style="font-size:11px;letter-spacing:.14em;color:{{ sel.zoneCouleur }};margin-top:4px;">{{ sel.zoneNom }}</div>
+        <p style="font-size:11.5px;line-height:1.55;color:#7f9cb0;margin:10px 0 0;">{{ sel.desc }}</p>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin-top:12px;">
+          <div style="min-width:0;border:1px solid rgba(150,200,235,.16);padding:8px 10px;"><div style="font-size:9px;letter-spacing:.2em;color:#7f9cb0;">TEMPÉRATURE</div><div style="font-size:16px;font-weight:600;color:{{ sel.tempCouleur }};margin-top:3px;">{{ sel.temp }}°C</div></div>
+          <div style="min-width:0;border:1px solid rgba(150,200,235,.16);padding:8px 10px;"><div style="font-size:9px;letter-spacing:.2em;color:#7f9cb0;">ÉTAT</div><div style="font-size:10.5px;font-weight:600;color:{{ sel.etatCouleur }};margin-top:6px;letter-spacing:.04em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ sel.etat }}</div></div>
+        </div>
+        <div style="margin-top:12px;font-size:11px;line-height:1.5;color:{{ sel.accesCouleur }};">{{ sel.acces }}</div>
+        <button onClick="{{ sel.entrer }}" disabled="{{ sel.bloque }}" style="margin-top:14px;width:100%;padding:12px;border:1px solid {{ sel.btnBord }};background:{{ sel.btnFond }};color:{{ sel.btnTexte }};font-family:'Michroma',sans-serif;font-size:11px;letter-spacing:.28em;cursor:{{ sel.btnCurseur }};" style-hover="filter:brightness(1.15)">{{ sel.btnLibelle }}</button>
+      </div>
+
+      <div style="border:1px solid rgba(150,200,235,.16);background:rgba(9,18,30,.82);padding:14px 18px;display:flex;flex-direction:column;gap:10px;">
+        <div style="font-size:9px;letter-spacing:.3em;color:#7f9cb0;">SUJET 21</div>
+        <div style="display:flex;gap:8px;">
+          <div style="flex:1;border:1px solid {{ pastilles.glaceBord }};background:{{ pastilles.glaceFond }};padding:8px 0;text-align:center;font-size:16px;">❄</div>
+          <div style="flex:1;border:1px solid {{ pastilles.eauBord }};background:{{ pastilles.eauFond }};padding:8px 0;text-align:center;font-size:16px;">💧</div>
+          <div style="flex:1;border:1px solid {{ pastilles.vapeurBord }};background:{{ pastilles.vapeurFond }};padding:8px 0;text-align:center;font-size:16px;filter:sepia(1) saturate(2.6) hue-rotate(-14deg) brightness(1.15);">💨</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;letter-spacing:.12em;color:#7f9cb0;"><span>MODULES TRAVERSÉS</span><span style="color:#d9ecf7;font-weight:600;">{{ nbVisites }}</span></div>
+        <div style="height:4px;background:rgba(150,200,235,.12);position:relative;"><div style="position:absolute;left:0;top:0;bottom:0;width:{{ progression }};background:#63b7e6;box-shadow:0 0 8px #63b7e6;"></div></div>
+      </div>
+
+      <div style="margin-top:auto;display:flex;justify-content:space-between;font-size:10px;letter-spacing:.18em;color:#7f9cb0;">
+        <span>ÉCHAP · FERMER</span><span>OBJECTIF · OBSERVATOIRE</span>
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;etatJoueur&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;eau&quot;,&quot;glace&quot;,&quot;vapeur&quot;],&quot;default&quot;:&quot;eau&quot;,&quot;tsType&quot;:&quot;'eau'|'glace'|'vapeur'&quot;,&quot;section&quot;:&quot;Joueur&quot;},&quot;afficherTemp&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Lecture&quot;},&quot;vectoriel&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Rendu&quot;}}">
+class Component extends DCLogic {
+  state = { courant: 'HUB', visites: [], selection: 'T2', echelle: 1 };
+  mesurer = () => { const el = document.querySelector('[data-carte-boite]'); if (!el) return; const { width, height } = el.getBoundingClientRect(); if (!width || !height) return; const e = Math.min(width / 1600, height / 804); if (Math.abs(e - this.state.echelle) > 0.001) this.setState({ echelle: e }); };
+  componentDidMount() { this.mesurer(); setTimeout(this.mesurer, 0); setTimeout(this.mesurer, 300); const brancher = () => { const el = document.querySelector('[data-carte-boite]'); if (!el) { requestAnimationFrame(brancher); return; } this.mesurer(); this._ro = new ResizeObserver(this.mesurer); this._ro.observe(el); }; requestAnimationFrame(brancher); window.addEventListener('resize', this.mesurer); }
+  componentWillUnmount() { this._ro && this._ro.disconnect(); window.removeEventListener('resize', this.mesurer); }
+  // ---- DONNÉES DE LA STATION ----
+  // img : vignette dans public/assets/map/<img>.png (anciennes vignettes réutilisées en attendant les nouvelles)
+  zones = [
+    { code: 'Z-01', nom: 'Hub', couleur: '#63b7e6' },
+    { code: 'Z-02', nom: 'Transformateurs', couleur: '#3fd69b' },
+    { code: 'Z-03', nom: 'Nœud', couleur: '#a7ddf5' },
+    { code: 'Z-04', nom: 'Observatoire', couleur: '#c99aff' },
+  ];
+  types = { sas: ['⊕', 'HUB'], jonction: ['', 'NŒUD'], combat: ['⚔', 'COMBAT'], enigme: ['▦', 'ÉNIGME'], coffre: ['◆', 'CACHE'], boss: ['⬢', 'TERMINAL'] };
+  noeuds = {
+    HUB: { x: 263, y: 380, w: 112, h: 292, z: 0, t: 'sas', nom: 'HUB', temp: 15, img: 'A0', desc: 'Cœur de la station, amarré à l’arc de coque. Trois coursives partent vers les transformateurs.' },
+    T1:  { x: 507, y: 231, w: 136, h: 136, z: 1, t: 'enigme', nom: 'TRANSFO GLACE', temp: -25, img: 'B3', desc: 'Accessible seulement à l’état GLACE.' },
+    T2:  { x: 507, y: 385, w: 136, h: 136, z: 1, t: 'combat', nom: 'AUCUNE TRANSFO', temp: 18, img: 'B1', desc: 'Voie libre, aucune transformation manuelle requise.' },
+    T3:  { x: 507, y: 539, w: 136, h: 136, z: 1, t: 'combat', nom: 'TRANSFO GAZ', temp: 72, img: 'C3', desc: 'Accessible seulement à l’état VAPEUR.' },
+    N:   { x: 666, y: 385, w: 66, h: 66, z: 2, t: 'jonction', nom: 'NŒUD ?', temp: 20, img: 'C1', desc: 'Les trois voies convergent. Trois directions.' },
+    S1:  { x: 801, y: 249, w: 100, h: 100, z: 2, t: 'combat', nom: 'MODULE ?', temp: 5, img: 'C2', desc: 'À définir.' },
+    S2:  { x: 801, y: 385, w: 100, h: 100, z: 2, t: 'combat', nom: 'MODULE ?', temp: 30, img: 'D1', desc: 'À définir.' },
+    S3:  { x: 801, y: 525, w: 100, h: 100, z: 2, t: 'combat', nom: 'MODULE ?', temp: 50, img: 'D3', desc: 'À définir.' },
+    S1b: { x: 1032, y: 131, w: 92, h: 92, z: 2, t: 'coffre', nom: 'MODULE ?', temp: -10, img: 'C4', desc: 'Cul-de-sac. À définir.' },
+    S3b: { x: 1032, y: 643, w: 92, h: 92, z: 2, t: 'coffre', nom: 'MODULE ?', temp: 60, img: 'D4', desc: 'Cul-de-sac. À définir.' },
+    OBS: { x: 1028, y: 385, w: 166, h: 166, z: 3, t: 'boss', nom: 'OBSERVATOIRE', temp: 40, img: 'E1', desc: 'Module terminal sous dôme. Un télescope spatial y est amarré par un tube coudé.' },
+  };
+
+  aretes = [
+    { a: 'HUB', b: 'T1', t: 'glace' }, { a: 'HUB', b: 'T2', t: 'main' }, { a: 'HUB', b: 'T3', t: 'vapeur' },
+    { a: 'T1', b: 'N', t: 'alt' }, { a: 'T2', b: 'N', t: 'main' }, { a: 'T3', b: 'N', t: 'alt' },
+    { a: 'N', b: 'S1', t: 'alt' }, { a: 'N', b: 'S2', t: 'main' }, { a: 'N', b: 'S3', t: 'alt' },
+    { a: 'S1', b: 'S1b', t: 'alt' }, { a: 'S3', b: 'S3b', t: 'alt' }, { a: 'S2', b: 'OBS', t: 'main' },
+  ];
+  // ---- FIN DONNÉES ----
+  tempCouleur(t) { return t <= 0 ? '#a7ddf5' : t < 30 ? '#63b7e6' : t < 60 ? '#f2c98e' : '#e0685c'; }
+  accessible(e) {
+    const etat = this.props.etatJoueur ?? 'eau';
+    if (e.t === 'glace') return etat === 'glace' ? null : 'Transformation glace nécessaire : passer à l’état ❄ GLACE.';
+    if (e.t === 'vapeur') return etat === 'vapeur' ? null : 'Transformation gaz nécessaire : passer à l’état 💨 VAPEUR.';
+    return null;
+  }
+  renderVals() {
+    const { courant, visites, selection } = this.state;
+    const etat = this.props.etatJoueur ?? 'eau', afficherTemp = this.props.afficherTemp ?? true;
+    const P = (id) => this.noeuds[id];
+    const atteignable = {}; this.aretes.filter(e => e.a === courant).forEach(e => { atteignable[e.b] = e; });
+    const aretes = this.aretes.map(e => {
+      const p = P(e.a), q = P(e.b), x1 = p.x, x2 = q.x, mx = (x1 + x2) / 2;
+      const yDep = e.a === 'HUB' ? Math.max(p.y - 110, Math.min(p.y + 110, q.y)) : p.y;
+      const d = `M${x1} ${yDep} L${x2} ${q.y}`;
+      const parcourue = visites.includes(e.a) && (visites.includes(e.b) || e.b === courant);
+      const active = e.a === courant;
+      const couleur = e.t === 'glace' ? '#a7ddf5' : e.t === 'vapeur' ? '#f2c98e' : e.t === 'main' ? '#63b7e6' : '#7f9cb0';
+      const badge = e.t === 'glace' ? '❄ GLACE' : e.t === 'vapeur' ? '💨 GAZ' : null;
+      const k = 0.5;
+      return {
+        d, couleur, badge,
+        epaisseur: e.t === 'main' ? 4 : 2.5, coque: e.t === 'main' ? 26 : 18, interieur: e.t === 'main' ? 20 : 13, anneau: e.t === 'main' ? 32 : 24,
+        tirets: e.t === 'alt' ? '6 8' : active ? '14 14' : 'none',
+        opacite: parcourue ? 0.35 : active ? 1 : e.t === 'main' ? 0.9 : 0.75,
+        style: active ? `filter:drop-shadow(0 0 6px ${couleur});animation:cs-flow 1.2s linear infinite` : e.t === 'main' ? 'filter:drop-shadow(0 0 6px #63b7e6)' : '',
+        bx: `${x1 + (x2 - x1) * k}px`, by: `${p.y + (q.y - p.y) * k}px`, bdx: '0px', bdy: q.y < p.y ? '-20px' : '20px',
+      };
+    });
+    const noeuds = Object.entries(this.noeuds).map(([id, n]) => {
+      const visite = visites.includes(id), estCourant = id === courant, arete = atteignable[id];
+      const verrou = arete ? !!this.accessible(arete) : false;
+      const cliquable = !!arete, selectionne = id === selection, boss = n.t === 'boss', jonction = n.t === 'jonction';
+      const zc = this.zones[n.z].couleur;
+      const w = n.w || 104, h = n.h || Math.round(w * 0.9);
+      const forme = jonction ? 'circle(50%)' : 'polygon(22% 0,78% 0,100% 28%,100% 72%,78% 100%,22% 100%,0 72%,0 28%)';
+      const vectoriel = this.props.vectoriel ?? true;
+      const aImg = !!n.img && !vectoriel;
+      return {
+        rond: jonction, plat: !jonction && !boss, dome: boss, accent: estCourant ? '#a7ddf5' : zc,
+        vecOpacite: vectoriel ? (estCourant ? 0.7 : visite ? 0.75 : 1) : 0,
+        nom: n.nom, temp: n.temp, visite: visite && !estCourant, verrou, etiquette: !jonction || selectionne || estCourant,
+        glyphe: estCourant ? '◈' : aImg ? '' : this.types[n.t][0], glypheCouleur: estCourant ? '#d9ecf7' : zc,
+        img: aImg ? `public/assets/map/${n.img}.png` : 'public/assets/map/_none.png', imgOpacite: aImg ? (estCourant ? 0.55 : visite ? 0.6 : 1) : 0,
+        left: `${n.x}px`, top: `${n.y}px`, etiqTop: `${n.y + h / 2 + 8}px`,
+        largeur: `${w}px`, hauteur: `${h}px`, forme, fonte: boss ? '30px' : jonction ? '0' : '20px',
+        filtre: estCourant ? 'drop-shadow(0 0 14px rgba(99,183,230,.9))' : selectionne ? 'drop-shadow(0 0 10px rgba(217,236,247,.6))' : cliquable && !verrou ? `drop-shadow(0 0 8px ${zc})` : 'drop-shadow(0 4px 8px rgba(0,0,0,.7))',
+        bord: estCourant ? '#a7ddf5' : selectionne ? '#d9ecf7' : cliquable ? (verrou ? '#7f9cb0' : zc) : visite ? '#63b7e6' : jonction ? '#7f9cb0' : '#4a6478',
+        fond: estCourant ? 'rgba(99,183,230,.35)' : visite ? 'rgba(99,183,230,.18)' : boss ? 'rgba(201,154,255,.2)' : '#0a1420',
+        texte: estCourant || selectionne ? '#d9ecf7' : cliquable ? zc : '#7f9cb0',
+        opacite: visite || estCourant || cliquable || boss ? 1 : 0.6,
+        anim: estCourant ? 'cs-pulse 1.8s ease-out infinite' : 'none',
+        tempLargeur: `${Math.max(4, Math.min(100, (n.temp + 60) / 1.6))}%`, tempCouleur: this.tempCouleur(n.temp),
+        choisir: () => this.setState({ selection: id }),
+      };
+    });
+    const s = P(selection), aS = atteignable[selection], verrouS = aS ? this.accessible(aS) : null;
+    const visiteS = visites.includes(selection) || selection === courant;
+    const bloque = !aS || !!verrouS;
+    const sel = {
+      nom: s.nom, type: this.types[s.t][1], glypheAffiche: s.img && !(this.props.vectoriel ?? true) ? '' : (this.types[s.t][0] || '○'), img: s.img && !(this.props.vectoriel ?? true) ? `public/assets/map/${s.img}.png` : 'public/assets/map/_none.png',
+      zoneNom: `${this.zones[s.z].code} · ${this.zones[s.z].nom}`, zoneCouleur: this.zones[s.z].couleur, desc: s.desc,
+      temp: s.temp, tempCouleur: this.tempCouleur(s.temp),
+      etat: selection === courant ? 'POSITION' : visiteS ? 'TRAVERSÉ' : aS ? (verrouS ? 'VERROUILLÉ' : 'ACCESSIBLE') : 'HORS DE PORTÉE',
+      etatCouleur: selection === courant ? '#a7ddf5' : aS && !verrouS ? '#3fd69b' : verrouS ? '#e0685c' : '#7f9cb0',
+      acces: verrouS || (aS ? (aS.t === 'main' ? 'Voie principale.' : 'Voie alternative.') : selection === courant ? 'Vous êtes ici.' : 'Aucun passage direct depuis votre position.'),
+      accesCouleur: verrouS ? '#e0685c' : '#7f9cb0',
+      bloque, btnLibelle: bloque ? (verrouS ? 'ACCÈS REFUSÉ' : 'INACCESSIBLE') : 'ENTRER →',
+      btnBord: bloque ? 'rgba(150,200,235,.16)' : '#63b7e6', btnFond: bloque ? 'transparent' : 'rgba(99,183,230,.18)',
+      btnTexte: bloque ? '#7f9cb0' : '#d9ecf7', btnCurseur: bloque ? 'default' : 'pointer',
+      entrer: () => { if (bloque) return; const suiv = this.aretes.find(e => e.a === selection); this.setState({ courant: selection, visites: [...visites, courant], selection: suiv ? suiv.b : selection }); },
+    };
+    const on = (k, c) => etat === k ? { bord: c, fond: c.replace(')', ',.18)').replace('rgb', 'rgba') } : { bord: 'rgba(150,200,235,.16)', fond: 'transparent' };
+    const g = on('glace', 'rgb(167,221,245)'), w = on('eau', 'rgb(99,183,230)'), v = on('vapeur', 'rgb(242,201,142)');
+    return {
+      zoneCourante: this.zones[P(courant).z].code, aretes, noeuds, sel, afficherTemp, echelle: this.state.echelle,
+      nbVisites: visites.length + 1, progression: `${Math.min(100, ((P(courant).z + 1) / 4) * 100)}%`,
+      pastilles: { glaceBord: g.bord, glaceFond: g.fond, eauBord: w.bord, eauFond: w.fond, vapeurBord: v.bord, vapeurFond: v.fond },
+    };
+  }
+}
+</script>
+</body>
+</html>

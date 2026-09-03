@@ -355,6 +355,9 @@ export interface EditorHooks {
   cines?(): { code: string; titre: string }[]
   /** Les séquences in-map connues, même usage. */
   sequences?(): { code: string; titre: string }[]
+  /** LES BIOMES de la carte de la station (code + nom du module) : le
+   * champ Biome du tableau en fait un menu. Absent : le champ se cache. */
+  biomes?(): { code: string; nom: string }[]
 }
 
 /**
@@ -640,6 +643,26 @@ export class LevelEditor {
 
   close(): void {
     this.host.classList.remove('visible')
+  }
+
+  /** Le menu Biome : les biomes de la carte, et le biome COURANT même s'il
+   *  n'y figure plus (un module renommé ne doit pas effacer l'étiquette). */
+  private peintBiome(): void {
+    const sel = this.el('ed-biome') as HTMLSelectElement
+    const biomes = this.hooks.biomes?.() ?? []
+    const courant = this.level.biome ?? ''
+    const lab = sel.closest('label') as HTMLElement | null
+    if (lab) lab.hidden = biomes.length === 0 && !courant
+    const orphelin = courant && !biomes.some((b) => b.code === courant)
+    sel.innerHTML =
+      `<option value=""${courant ? '' : ' selected'}>— universel (tout module) —</option>` +
+      biomes
+        .map(
+          (b) =>
+            `<option value="${b.code}"${b.code === courant ? ' selected' : ''}>${b.code} · ${b.nom}</option>`,
+        )
+        .join('') +
+      (orphelin ? `<option value="${courant}" selected>${courant} (plus sur la carte)</option>` : '')
   }
 
   currentLevel(): LevelDef {
@@ -3819,6 +3842,15 @@ export class LevelEditor {
       })
       this.el(id).addEventListener('change', () => this.histoire())
     }
+    // LE BIOME : le module de la carte qui peut proposer ce tableau ; vide,
+    // le tableau est universel (tout module le pioche)
+    this.el('ed-biome').addEventListener('change', () => {
+      const v = (this.el('ed-biome') as HTMLSelectElement).value.trim()
+      if (v) this.level.biome = v
+      else delete this.level.biome
+      this.persist()
+      this.histoire()
+    })
     for (const id of ['ed-name', 'ed-code', 'ed-par', 'ed-journal'] as const) {
       this.el(id).addEventListener('input', () => {
         this.level.name =
@@ -4542,6 +4574,7 @@ export class LevelEditor {
   private syncForm(): void {
     ;(this.el('ed-name') as HTMLInputElement).value = this.level.name
     ;(this.el('ed-code') as HTMLInputElement).value = this.level.code
+    this.peintBiome()
     ;(this.el('ed-par') as HTMLInputElement).value = String(this.level.par ?? 3)
     ;(this.el('ed-bxmin') as HTMLInputElement).value = String(
       this.level.bounds.minX,
