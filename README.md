@@ -81,7 +81,7 @@ l'URL, ou sept tapes rapides sur le numéro de version (tactile compris).
 ## Qualité
 
 ```bash
-pnpm test        # 788 tests dans 70 fichiers, ~25 s
+pnpm test        # 806 tests dans 71 fichiers, ~24 s
 pnpm type-check
 pnpm build
 ```

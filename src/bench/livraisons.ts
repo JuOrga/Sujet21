@@ -31,6 +31,22 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '03/09/2026 14:46',
+    title: 'LES CAPACITÉS : cinq gestes qu’une carte ouvre — esquille, gouvernail, surfusion, Leidenfrost, ricochet',
+    notes: [
+      'LA DEMANDE : « c’est un roguelike, il nous faut de bonnes récompenses — des transformations ou états qui n’existeraient pas forcément mais qui seraient hyper fun à jouer ». Branche d’essai issue de PROD, à éprouver avant de rien graver (docs/capacites.md).',
+      'CE QUI CHANGE DE NATURE. Une récompense MODULAIT une règle (un dash de plus, un sas qui aspire plus loin). Cinq leviers nouveaux OUVRENT un geste : à leur valeur neutre, le geste n’existe pas et le solveur joue exactement comme avant la carte — c’est ce qui permet de les livrer sans toucher aux 788 tests qui décrivent le jeu d’avant. Chaque geste est testé dans les deux sens (avec / sans la carte) : 18 tests neufs.',
+      'ESQUILLE 💠 — en glace, TOUCHER détache un éclat du bloc vers le point visé, le palet part à l’opposé : réaction exacte, comme l’éjection liquide (se déplacer, c’est rétrécir, en glace aussi). L’éclat est un petit palet rigide qui rebondit et peut revenir percuter le bloc, puis fond en gouttes récupérables. Un cœur de palet reste toujours. MESURÉ : 60 particules, 15 % — 9 partent à 980 u/s, le bloc recule à 173 u/s, quantité de mouvement conservée.',
+      'GOUVERNAIL 🧭 — en glace, MAINTENIR infléchit la course du palet vers le pointeur : la vitesse TOURNE sans changer de norme, rien n’est dépensé. À 3 rad/s le palet fait des cercles (le palier T3 « glissade abusée » de la table de récompenses). MESURÉ : demi-tour en 1,05 s, norme conservée à 200,0 u/s. Toucher et maintenir cohabitent sur le même bouton.',
+      'SURFUSION 🌡️ — l’eau surfondue est un état RÉEL : liquide sous zéro, elle cristallise d’un coup au premier germe. Avec la carte, le bouton GLACE n’immobilise plus : le corps s’ARME (givre à 0,95, encore eau, encore pilotable — l’éjection marche) et prend EN ENTIER, dans son élan, au premier choc franc (> 60 u/s). Une plaque froide gèle comme toujours ; une glace IMPOSÉE (zone, dernière impulsion) fige sur place — le jeu pose « surfusionLibre » à chaque image. MESURÉ : 80 particules à 250 u/s, prise à t = 1,06 s, 80 gelées sur 80, le palet repart à −110 u/s.',
+      'LEIDENFROST 🍳 — la goutte sur la plaque chaude flotte sur son propre coussin de vapeur. Ici, l’aura des chaudières REPOUSSE le liquide (poussée normale, 1 800 u/s² à plein — un bumper de chaleur, du même ordre que la répulsion hydrophobe) et l’ISOLE : seule l’exposition qui perce le coussin compte, pour la chauffe et pour le seuil des 95 %. MESURÉ sur le rig « catapulte » de heat.spec (300 particules à 150 u/s) : sans la carte 100 % du corps baigne à 3 s ; à 0,5, 0 % — le corps est refoulé à x = 22 (parti de 60), en recul à 132 u/s. Le coussin ne porte que le liquide : glace et vapeur inchangées.',
+      'RICOCHET 🎱 — dans la fenêtre de 0,8 s qui suit un dash, le nuage qui frappe une paroi REPART : la composante normale que la résolution de contact efface lui est rendue, à la restitution près ; chaque rebond rouvre la fenêtre. Un nuage qui dérive sans dash s’écrase comme avant, le souffle chassé ne rebondit pas. MESURÉ (dash de 820 u/s sur un mur à 400 u, 0,9 s après) : sans la carte vx = +4 (collé) ; à 0,65, −154 u/s ; à 1, −243 u/s.',
+      'HUIT CARTES : les cinq gestes seuls, et trois à contrepartie — GRÊLON 🌨️ (esquille + gouvernail, palet plus mou, bonbonne −2 L), TREMPE 🔩 (surfusion + palet plus vif, bascules plus lentes), BILLE DE VAPEUR 🪩 (ricochet entier, nuage qui s’évapore moitié plus vite). Le calibre est déduit des leviers comme pour les autres ; les cinq leviers sont dans l’atelier des Récompenses, famille « Les états », pour forger d’autres combinaisons.',
+      'CE QUI N’EST PAS FAIT, ET POURQUOI : aucun rendu propre (traînée d’esquille, teinte de surfusion, éclair de ricochet), aucun son — un retour manette seulement. On éprouve d’abord la PHYSIQUE ; le rendu vient quand un geste est retenu. Ni codex ni trophées.',
+      'VÉRIFIÉ : 806 tests verts (18 neufs, 71 fichiers), type-check à 0 erreur, build propre. À voir en ligne : « git push -f origin <branche>:previsu-go ».',
+    ],
+  },
+  {
     date: '01/09/2026 22:17',
     title: 'La bonbonne du hub ne réanime plus : elle entretient',
     notes: [
