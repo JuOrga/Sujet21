@@ -31,6 +31,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '03/09/2026 22:13',
+    title: 'LA REVUE DE LA PR CARTE : une cache n’est plus un piège, et huit défauts de moindre taille',
+    notes: [
+      'LA REVUE des quatre étapes de la carte (type-check à 0, tests verts, donc des défauts de COMPORTEMENT) a trouvé neuf points ; le concepteur a validé la règle qui règle le premier. Tous corrigés.',
+      'LE BLOQUANT : un joueur entré dans une cache (S1b, S3b) n’avait plus AUCUNE porte — le module épuisé rouvrait la carte sans coursive au bout, sans bouton, et la sauvegarde retenait la position : recharger n’aidait pas. L’ancienne fin de run par longueur du plan avait disparu sans remplaçant. LA RÈGLE : d’un module d’où l’objectif est hors de portée, la carte offre le RETOUR vers le module d’où l’on vient — le dernier traversé qui y mène par une coursive, pas la cache qu’on quitte (de S1 revenu de S1b, on retourne à N, pas à S1b). Au retour, le module est déjà épuisé : ses salles ne se rejouent pas, la carte se rouvre aussitôt. Le retour s’allume comme une cible sur le dessin, la fiche le dit, et la cérémonie titre « CUL-DE-SAC : ON REVIENT SUR SES PAS ». L’aperçu de l’éditeur passe par le MÊME chemin que le jeu (descenteCarte), il n’a plus sa propre lecture des coursives.',
+      'LA VÉRIFICATION LE DISAIT VERT : elle contrôlait que tout est atteignable DEPUIS le départ, pas que l’objectif reste atteignable depuis chaque module. Elle signale désormais chaque module d’où l’objectif est hors de portée (sur la carte livrée : S1, S3, S1b, S3b) — une attention, puisque le retour existe.',
+      'LES HUIT AUTRES : tirets et badge d’un type de coursive impossibles à saisir quand le type n’en avait pas (le champ rougissait — ils se créent à la saisie et s’effacent quand on les vide) ; le départ de run SANS salles générées sautait la salle 1 de la bibliothèque et proposait les candidates un rang trop tôt (rien n’a été joué au départ : le choix vise l’index 0) ; le toast de la cache annonçait un orbe trouvé même déjà en poche ou tissé (il dit désormais « la cache est vide — vous l’aviez déjà ») ; le code de biome d’un tableau était tronqué à 16 caractères à la relecture alors qu’un module n’a pas de limite (plus de troncature) ; dupliquer un module oubliait niveaux, biome et orbe (un HUB copié passait à 3 niveaux) ; une provision achetée chez le marchand sonnait deux fois, et sonnait sur un refus (le comptoir dit s’il a servi, le voile ne fait que se repeindre) ; huit copies locales d’un échappement HTML à trois rigueurs différentes (la maison en a un, htmlSafe — il échappe désormais aussi le guillemet, un code de biome qui en porte un cassait un attribut).',
+      'VÉRIFIÉ : 861 tests verts dans 75 fichiers (deux de plus : le retour depuis une cache et son enchaînement, tirets et badge ; le verdict « hors de portée »), type-check à 0, build propre. Pas vu au navigateur (jeu complet non rendu en headless).',
+    ],
+  },
+  {
     date: '03/09/2026 21:53',
     title: 'LE BIOME D’UNE SALLE SE RÈGLE DANS LA PLANCHE ET DANS L’ÉDITEUR : un menu par carte, un filtre par module, le compte des salles',
     notes: [

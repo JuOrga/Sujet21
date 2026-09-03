@@ -173,6 +173,12 @@ describe('un module est un biome — niveaux et trajet', () => {
     expect(longueursTrajet(c)).toEqual({ min: 9, max: 10 })
   })
 
+  it('un module d’où l’objectif est hors de portée se signale — le joueur reviendra sur ses pas', () => {
+    const v = verifieCarte(CARTE_LIVREE).filter((x) => x.message.includes('hors de portée'))
+    expect(v.map((x) => x.module).sort()).toEqual(['S1', 'S1b', 'S3', 'S3b'])
+    expect(v.every((x) => x.niveau === 'attention')).toBe(true)
+  })
+
   it('un objectif inatteignable n’a pas de trajet', () => {
     const c = cloneCarte(CARTE_LIVREE)
     c.liens = c.liens.filter((l) => l.vers !== 'OBS')

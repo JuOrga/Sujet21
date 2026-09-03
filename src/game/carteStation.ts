@@ -612,6 +612,8 @@ export function verifieCarte(c: CarteStation): VerdictCarte[] {
       v.push({ niveau: 'erreur', message: `l’objectif ${c.regles.objectif} est inatteignable depuis ${c.regles.depart}` })
     for (const m of c.modules)
       if (!vus.has(m.id)) v.push({ niveau: 'attention', message: `${m.id} n’est atteignable par aucune route depuis ${c.regles.depart}`, module: m.id })
+      else if (m.id !== c.regles.objectif && plusCourtVers(c, m.id, c.regles.objectif) === null)
+        v.push({ niveau: 'attention', message: `depuis ${m.id}, l’objectif ${c.regles.objectif} est hors de portée — le joueur devra revenir sur ses pas`, module: m.id })
   }
   for (const d of c.decor)
     if (!ids.has(d.ancrage)) v.push({ niveau: 'attention', message: `décor ${d.id} : ancrage « ${d.ancrage} » inconnu` })

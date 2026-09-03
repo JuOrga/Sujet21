@@ -54,6 +54,24 @@ describe('la descente sur la carte', () => {
     expect(entreModule(c, e, 'T1', ['solidification'])?.module).toBe('T1')
   })
 
+  it('une cache n’est pas un piège : quand l’objectif est hors de portée, on revient sur ses pas', () => {
+    // HUB → T1 → N → S1 → S1b : de la cache, rien ne repart — sauf le retour
+    const e = { module: 'S1b', niveau: 1, visites: ['HUB', 'T1', 'N', 'S1'] }
+    const choix = choixModules(c, e, [])
+    expect(choix.map((x) => `${x.module.id}:${x.retour ? 'retour' : x.lien.type}`)).toEqual(['S1:retour'])
+    const r = entreModule(c, e, 'S1', [])!
+    // S1 est déjà épuisé : la carte se rouvre sans rejouer ses salles
+    expect(r).toEqual({ module: 'S1', niveau: 3, visites: ['HUB', 'T1', 'N', 'S1', 'S1b'] })
+    // de S1, l'objectif reste hors de portée (S1 ne mène qu'à S1b) : retour
+    // vers N — le module d'où l'on VIENT, pas le dernier traversé (la cache)
+    const c2 = choixModules(c, r, [])
+    expect(c2.map((x) => `${x.module.id}:${x.retour ? 'retour' : x.lien.type}`)).toEqual(['S1b:alt', 'N:retour'])
+    const n = entreModule(c, r, 'N', [])!
+    // de N, l'objectif est atteignable : aucun retour offert
+    expect(choixModules(c, n, []).some((x) => x.retour)).toBe(false)
+    expect(choixModules(c, n, []).map((x) => x.module.id)).toEqual(['S1', 'S2', 'S3'])
+  })
+
   it('un module se finit salle par salle ; l’objectif s’atteint au bout du sien', () => {
     let e = entreModule(c, departCarte(c), 'T2', [])!
     expect(moduleFini(c, e)).toBe(false)

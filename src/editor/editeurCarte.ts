@@ -26,7 +26,6 @@ import {
   TYPES_MODULE,
   cloneCarte,
   couleurTemperature,
-  orbeRequis,
   longueursTrajet,
   ORBES,
   liensDepuis,
@@ -39,6 +38,7 @@ import {
   type ModuleCarte,
 } from '../game/carteStation'
 import { GLYPHES, dessinCarteSVG, esc, type OptionsDessin } from '../game/dessinCarte'
+import { choixModules, entreModule as entreModuleCarte, type EtatCarteRun } from '../game/descenteCarte'
 import {
   Historique,
   ajouteLien,
@@ -240,9 +240,16 @@ export class EditeurCarte {
 
   // ---- LE DESSIN -------------------------------------------------------------------
 
+  /** L'état de l'aperçu, dans les termes de la descente : le module courant
+   *  y est toujours tenu pour épuisé (l'aperçu ne joue pas les salles). */
+  private etatApercu(module = this.courant): EtatCarteRun {
+    return { module, niveau: moduleParId(this.carte, module)?.niveaux ?? 0, visites: this.visites }
+  }
+
   private options(): OptionsDessin {
     const jeu = this.mode === 'jeu'
     return {
+      retour: jeu ? (choixModules(this.carte, this.etatApercu(), [...this.orbes]).find((x) => x.retour)?.module.id ?? null) : null,
       courant: jeu ? this.courant : null,
       visites: jeu ? this.visites : [],
       selection: this.selection,
@@ -499,21 +506,24 @@ export class EditeurCarte {
     const m = (this.selection !== null ? moduleParId(c, this.selection) : undefined) ?? moduleParId(c, this.courant)
     if (!m) return `<p class="ce-note">Aucun module.</p>`
     const z = zoneDe(c, m)
-    const lien = liensDepuis(c, this.courant).find((l) => l.vers === m.id)
-    const requis = lien ? orbeRequis(c, lien, this.orbes) : null
+    const choix = choixModules(c, this.etatApercu(), [...this.orbes]).find((x) => x.module.id === m.id)
+    const lien = choix?.lien
+    const requis = choix?.orbeManquant ?? null
     const ici = m.id === this.courant
     const traverse = this.visites.includes(m.id)
-    const bloque = !lien || requis !== null
-    const etat = ici ? 'POSITION' : traverse ? 'TRAVERSÉ' : lien ? (requis ? 'VERROUILLÉ' : 'ACCESSIBLE') : 'HORS DE PORTÉE'
+    const bloque = !choix || requis !== null
+    const etat = ici ? 'POSITION' : choix?.retour ? 'RETOUR' : traverse ? 'TRAVERSÉ' : lien ? (requis ? 'VERROUILLÉ' : 'ACCESSIBLE') : 'HORS DE PORTÉE'
     const couleurEtat = ici ? '#a7ddf5' : lien && !requis ? '#3fd69b' : requis ? '#e0685c' : '#7f9cb0'
     const nomOrbe = (id: string): string => ORBES.find((o) => o.id === id)?.nom ?? id
     const acces = requis
       ? `Orbe nécessaire : ${nomOrbe(requis)}.`
-      : lien
-        ? `Coursive « ${lien.type} ».`
-        : ici
-          ? 'Vous êtes ici.'
-          : 'Aucun passage direct depuis votre position.'
+      : choix?.retour
+        ? 'Revenir sur ses pas — l’objectif est hors de portée d’ici.'
+        : lien
+          ? `Coursive « ${lien.type} ».`
+          : ici
+            ? 'Vous êtes ici.'
+            : 'Aucun passage direct depuis votre position.'
     const tc = couleurTemperature(c, m.temp)
     return (
       `<div class="ce-fiche" style="--z:${z?.couleur ?? '#7f9cb0'}">` +
@@ -810,20 +820,20 @@ export class EditeurCarte {
    *  l'état du sujet laisse passer — sinon la première tout court, pour que
    *  la fiche explique le refus. Null en cul-de-sac. */
   private cibleParDefaut(id: string): string | null {
-    const liens = liensDepuis(this.carte, id)
-    const ouvert = liens.find((l) => orbeRequis(this.carte, l, this.orbes) === null)
-    return (ouvert ?? liens[0])?.vers ?? null
+    const choix = choixModules(this.carte, this.etatApercu(id), [...this.orbes])
+    const ouvert = choix.find((x) => !x.orbeManquant)
+    return (ouvert ?? choix[0])?.module.id ?? null
   }
 
   private entre(): void {
-    const c = this.carte
     const cible = this.selection
     if (cible === null) return
-    const lien = liensDepuis(c, this.courant).find((l) => l.vers === cible)
-    if (!lien || orbeRequis(c, lien, this.orbes) !== null) return
-    this.visites = [...this.visites, this.courant]
-    this.courant = cible
-    this.selection = this.cibleParDefaut(cible) ?? cible
+    // le même chemin que le jeu (descenteCarte) : coursives, cadenas, retour
+    const suivant = entreModuleCarte(this.carte, this.etatApercu(), cible, [...this.orbes])
+    if (!suivant) return
+    this.visites = suivant.visites
+    this.courant = suivant.module
+    this.selection = this.cibleParDefaut(this.courant) ?? this.courant
     this.dessine()
   }
 
@@ -953,7 +963,10 @@ export class EditeurCarte {
         if (!m) return
         this.memorise()
         const n = ajouteModule(c, m.x + m.w + 24, m.y, this.pas())
-        Object.assign(n, { nom: m.nom, type: m.type, zone: m.zone, w: m.w, h: m.h, temp: m.temp, forme: m.forme, desc: m.desc })
+        Object.assign(n, {
+          nom: m.nom, type: m.type, zone: m.zone, w: m.w, h: m.h, temp: m.temp, forme: m.forme,
+          niveaux: m.niveaux, biome: m.biome, desc: m.desc, ...(m.orbe ? { orbe: m.orbe } : {}),
+        })
         this.selection = n.id
         this.change()
         return

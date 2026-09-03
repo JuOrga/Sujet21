@@ -487,7 +487,7 @@ export function parseLevel(input: unknown): {
         )[])
       : undefined,
     raccourciVers: str(o.raccourciVers).slice(0, 16) || undefined,
-    biome: str(o.biome).trim().slice(0, 16) || undefined,
+    biome: str(o.biome).trim() || undefined,
     cineAvant: str(o.cineAvant).trim().slice(0, 24) || undefined,
     cineApres: str(o.cineApres).trim().slice(0, 24) || undefined,
     sequence: str(o.sequence).trim().slice(0, 24) || undefined,

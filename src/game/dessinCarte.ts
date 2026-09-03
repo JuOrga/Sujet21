@@ -52,6 +52,9 @@ export interface OptionsDessin {
   grille?: number
   /** la coursive en cours de tracé (éditeur) */
   brouillon?: { x1: number; y1: number; x2: number; y2: number } | null
+  /** le module joignable EN REVENANT SUR SES PAS (l'objectif est hors de
+   *  portée d'ici) : il s'allume comme une cible, sans coursive */
+  retour?: string | null
 }
 
 /** Les glyphes des natures de module — le dessin, pas la donnée : un
@@ -343,7 +346,7 @@ function module(c: CarteStation, m: ModuleCarte, k: number, o: OptionsDessin): s
   const visite = o.visites.includes(m.id)
   const arete = o.courant !== null ? liensDepuis(c, o.courant).find((l) => l.vers === m.id) : undefined
   const verrou = arete ? orbeRequis(c, arete, o.orbes) !== null : false
-  const cliquable = !!arete
+  const cliquable = !!arete || o.retour === m.id
   const sel = o.selection === m.id
   const edition = o.mode === 'editeur'
 

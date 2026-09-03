@@ -147,6 +147,14 @@ describe('poseChamp — un chemin, une valeur', () => {
     const c = carte()
     expect(poseChamp(c, 'typesLiens.glace.condition', '  ')).toBe(true)
     expect(c.typesLiens.glace.condition).toBeNull()
+    // tirets et badge se créent à la saisie sur un type qui n'en avait pas,
+    // et s'effacent quand on vide le champ
+    expect(poseChamp(c, 'typesLiens.main.tirets', '6 8')).toBe(true)
+    expect(c.typesLiens.main.tirets).toBe('6 8')
+    expect(poseChamp(c, 'typesLiens.main.tirets', '')).toBe(true)
+    expect('tirets' in c.typesLiens.main).toBe(false)
+    expect(poseChamp(c, 'typesLiens.alt.badge', '↯ DÉTOUR')).toBe(true)
+    expect(c.typesLiens.alt.badge).toBe('↯ DÉTOUR')
     expect(poseChamp(c, 'typesLiens.main.condition', 'orbe == vaporisation')).toBe(true)
     expect(c.typesLiens.main.condition).toBe('orbe == vaporisation')
   })

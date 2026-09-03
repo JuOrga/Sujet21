@@ -166,6 +166,12 @@ un fût de 292 : `traceLien` l'applique à tout module plus haut que large,
   (`planEffectif()`). L'écran LA DESCENTE, lui, simule toujours avec sa
   propre longueur : c'est un banc, pas la run.
 - **La fin de l'expédition** : le module objectif, épuisé.
+- **Une cache n'est pas un piège.** D'un module d'où l'objectif est hors
+  de portée (un cul-de-sac), la carte offre le **retour** vers le module
+  d'où l'on vient — le dernier traversé qui y mène par une coursive, pas
+  la cache qu'on quitte. Au retour, le module est déjà épuisé : ses salles
+  ne se rejouent pas, la carte se rouvre aussitôt. La vérification de
+  l'éditeur signale chaque module d'où l'objectif est hors de portée.
 - **La pioche suit le biome** : un tableau qui porte un `biome` ne se
   propose que dans le module de ce biome ; un tableau sans biome est
   universel (la bibliothèque n'est pas encore réétiquetée) ; une salle

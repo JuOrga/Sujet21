@@ -714,6 +714,10 @@ function descenteDuJour(): boolean {
 }
 let voieGenereeChoisie: LevelDef | null = null
 let voieIntercalaire: LevelDef | null = null
+// LA PREMIÈRE SALLE d'une run lancée par la carte : rien n'a encore été
+// joué — le choix vise l'index 0, pas l'index suivant (revue du 03/09 :
+// sans salles générées, la salle 1 de la bibliothèque était sautée)
+let premiereSalleDeLaRun = false
 // le RANG de la descente en cours : combien de salles FRANCHIES — la voie
 // se boucle quand il atteint la longueur du plan, quelle que soit la
 // séquence écrite (épuisée, elle cède la place aux salles générées)
@@ -2503,9 +2507,11 @@ marchandCorps.addEventListener('click', (e) => {
     if (!a || !records.acheteAmelioration(a.id, a.prix)) return
     toastFile.push({ nom: `${a.nom} — ${a.detail}`, icone: a.icone, sur: 'LE MARCHAND' })
   } else if (b.dataset.provision) {
+    // le comptoir sonne et compte lui-même : on ne repeint que l'étal
     const a = articleComptoir(b.dataset.provision)
-    if (!a) return
-    tenteAchatHub({ ...a, plot: { minX: 0, minY: 0, maxX: 0, maxY: 0 } })
+    if (!a || !tenteAchatHub({ ...a, plot: { minX: 0, minY: 0, maxX: 0, maxY: 0 } })) return
+    renderMarchandVoile()
+    return
   } else return
   audio.collect()
   majMemoireUI()
@@ -4206,7 +4212,7 @@ async function plancheBiome(id: string, biome: string): Promise<void> {
   if (plancheBusy) return
   const entry = plancheTous.find((s) => s.id === id)
   if (!entry) return
-  const v = biome.trim().slice(0, 16)
+  const v = biome.trim()
   if ((entry.level.biome ?? '') === v) return
   plancheBusy = true
   if (v) entry.level.biome = v
@@ -4324,8 +4330,7 @@ function renderPlanche(): void {
     carte.draggable = true
     carte.dataset.id = s.id
     const d = decodeCodeAtelier(s.level.code)
-    const esc = (t: string): string =>
-      t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    const esc = htmlSafe
     // le code, molette par molette : « 123 » nu, ou la codification
     // complète « 21AB-123 » — le préfixe ET les lettres d'ordre sont
     // GRAVÉS (l'ordre de jeu se règle en glissant les cartes, pas dans le
@@ -4771,6 +4776,9 @@ function optionsStation(): OptionsDessin {
     lienSelection: null,
     orbes: orbesAcquis(),
     afficherTemp: true,
+    retour: enRunCarte()
+      ? (choixModules(carte, carteRun, orbesAcquis()).find((x) => x.retour)?.module.id ?? null)
+      : null,
   }
 }
 
@@ -4787,8 +4795,7 @@ function peintFicheStation(): void {
   }
   const z = zoneDe(carte, m)
   fiche.style.setProperty('--t', z?.couleur ?? '#7f9cb0')
-  const esc = (t: string): string =>
-    t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  const esc = htmlSafe
   const ici = enRunCarte() && id === carteRun.module
   const choix = enRunCarte()
     ? choixModules(carte, carteRun, orbesAcquis()).find((x) => x.module.id === id)
@@ -4802,7 +4809,9 @@ function peintFicheStation(): void {
       : choix
         ? choix.orbeManquant
           ? `verrouillé — orbe nécessaire : ${choix.orbeManquant}`
-          : 'accessible depuis votre position'
+          : choix.retour
+            ? 'revenir sur ses pas — l’objectif est hors de portée d’ici'
+            : 'accessible depuis votre position'
         : salles
   fiche.innerHTML =
     `<h3>${esc(m.nom)}</h3>` +
@@ -4836,7 +4845,7 @@ function peintAvanceStation(): void {
 function peintLegendeStation(): void {
   const l = document.getElementById('station-legende')
   if (!l) return
-  const esc = (t: string): string => t.replace(/</g, '&lt;')
+  const esc = htmlSafe
   l.innerHTML =
     Object.entries(carte.typesLiens)
       .map(
@@ -10010,7 +10019,7 @@ function montreTableDepart(): void {
   })
 }
 
-function tenteAchatHub(a: ArticleHub): void {
+function tenteAchatHub(a: ArticleHub): boolean {
   if (achatsHub.has(a.id)) {
     toastFile.push({
       nom: `${a.nom} — DÉJÀ SERVI`,
@@ -10018,7 +10027,7 @@ function tenteAchatHub(a: ArticleHub): void {
       article: a.id,
       sur: 'LE COMPTOIR',
     })
-    return
+    return false
   }
   if (!records.depenseMemoire(a.prix)) {
     toastFile.push({
@@ -10026,7 +10035,7 @@ function tenteAchatHub(a: ArticleHub): void {
       icone: '🚫',
       sur: 'LE COMPTOIR',
     })
-    return
+    return false
   }
   achatsHub.add(a.id)
   audio.collect()
@@ -10063,6 +10072,7 @@ function tenteAchatHub(a: ArticleHub): void {
     article: a.id,
     sur: 'LE COMPTOIR',
   })
+  return true
 }
 
 // ---- L'ACHAT sur un PLOT POSÉ : le méta en données. La monnaie choisit
@@ -10132,12 +10142,14 @@ let mbBilanCourant: BilanSalle | null = null
 /** Le sas mène à la salle suivante (raccourci éventuel compris). */
 function avanceSalle(): void {
   overlay.classList.remove('visible')
+  const premiere = premiereSalleDeLaRun
+  premiereSalleDeLaRun = false
   // la salle GÉNÉRÉE élue s'INTERCALE : elle prend la place du rang suivant
   // de la séquence — franchie, la séquence reprend après ce rang
   if (voieGenereeChoisie) {
     voieIntercalaire = voieGenereeChoisie
     voieGenereeChoisie = null
-    levelIndex += 1
+    if (!premiere) levelIndex += 1
     restart()
     return
   }
@@ -10184,7 +10196,9 @@ function avanceSalle(): void {
       ? choix
       : cible > levelIndex
         ? cible
-        : levelIndex + 1
+        : premiere
+          ? levelIndex // la salle 1 n'a pas été jouée : elle vient
+          : levelIndex + 1
   // garde-fou : séquence écrite épuisée sans salle élue — on ne REboucle
   // jamais sur la salle 1 en pleine descente (la dernière écrite tient)
   levelIndex = Math.min(levelIndex, Math.max(0, playedLevels().length - 1))
@@ -10565,7 +10579,7 @@ function mbMontreSallesDuModule(): void {
       return
     }
   }
-  const props = propositionsSalles(seq, levelIndex + 2, seq.length)
+  const props = propositionsSalles(seq, levelIndex + (premiereSalleDeLaRun ? 1 : 2), seq.length)
   if (props.length === 2) mbMontreSalles(props)
   else mbMontreFin()
 }
@@ -10597,9 +10611,11 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
   mbEl('mb-choix-titre').textContent =
     raison === 'depart'
       ? 'LE SAS EST FRANCHI — CHOISISSEZ UNE COURSIVE'
-      : m && m.niveaux > 0
-        ? `${m.nom} TRAVERSÉ — CHOISISSEZ LA COURSIVE SUIVANTE`
-        : `${m?.nom ?? 'NŒUD'} — TROIS DIRECTIONS, UNE COURSIVE`
+      : m && choixModules(carte, carteRun, orbesAcquis()).every((x) => x.retour)
+        ? `${m.nom} — CUL-DE-SAC : ON REVIENT SUR SES PAS`
+        : m && m.niveaux > 0
+          ? `${m.nom} TRAVERSÉ — CHOISISSEZ LA COURSIVE SUIVANTE`
+          : `${m?.nom ?? 'NŒUD'} — UNE COURSIVE À CHOISIR`
   const host = mbCartes()
   host.innerHTML = ''
   host.classList.add('mb-station')
@@ -10615,6 +10631,7 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
     lienSelection: null,
     orbes,
     afficherTemp: true,
+    retour: choix.find((x) => x.retour)?.module.id ?? null,
   })
   const fiche = document.createElement('p')
   fiche.className = 'mb-station-fiche'
@@ -10632,7 +10649,9 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
     const acces = x
       ? x.orbeManquant
         ? `verrouillé — orbe nécessaire : ${x.orbeManquant}`
-        : `coursive « ${x.lien.type} » ouverte`
+        : x.retour
+          ? 'revenir sur ses pas — l’objectif est hors de portée d’ici'
+          : `coursive « ${x.lien.type} » ouverte`
       : id === carteRun.module
         ? 'vous êtes ici'
         : 'aucune coursive n’y mène d’ici'
@@ -11351,6 +11370,7 @@ function newExpedition(avecCarte = false): void {
   // zéro (le viatique s'ajoute à une bonbonne vide), avant la première salle
   appliqueProvisions()
   carteRun = departCarte(carte)
+  premiereSalleDeLaRun = avecCarte
   if (avecCarte) {
     // AU SAS DE LANCEMENT, la carte s'ouvre : le premier module se choisit
     // sur le plan, puis ses salles en vignettes — la première salle de la
@@ -12611,8 +12631,14 @@ function updateTutor(dtReal: number): void {
   }
 }
 
+/** L'échappement HTML de la maison — texte ET attributs : le guillemet
+ *  aussi, sinon un code de biome qui en porte un casse un `value="…"`. */
 function htmlSafe(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 function showOverlay(
@@ -13685,19 +13711,27 @@ function frame(now: number): void {
     // LA CACHE : un module qui recèle un orbe le donne quand il est épuisé,
     // une fois par poste — jamais sous un outil (rien de mérité ne s'écrit)
     const modFini = moduleEnCours()
-    if (
-      modFini?.orbe &&
-      moduleFini(carte, carteRun) &&
-      !sasOutil &&
-      records.videCache(modFini.id, modFini.orbe)
-    ) {
-      const nomOrbe = ORBES.find((o) => o.id === modFini.orbe)?.nom ?? modFini.orbe
-      toastFile.push({
-        nom: `ORBE D’ESSENCE — ${nomOrbe.toUpperCase()}`,
-        icone: '🔮',
-        sur: `TROUVÉ DANS ${modFini.nom}`,
-      })
-      majMemoireUI()
+    if (modFini?.orbe && moduleFini(carte, carteRun) && !sasOutil) {
+      // un orbe déjà en poche ou déjà tissé ne se gagne pas deux fois : la
+      // cache se vide quand même, et le toast le dit tel quel
+      const dejaTenu = records.aOrbe(modFini.orbe) || records.eveilTient(modFini.orbe)
+      if (records.videCache(modFini.id, modFini.orbe)) {
+        const nomOrbe = ORBES.find((o) => o.id === modFini.orbe)?.nom ?? modFini.orbe
+        toastFile.push(
+          dejaTenu
+            ? {
+                nom: `LA CACHE EST VIDE — l’orbe ${nomOrbe}, vous l’aviez déjà`,
+                icone: '🔮',
+                sur: modFini.nom,
+              }
+            : {
+                nom: `ORBE D’ESSENCE — ${nomOrbe.toUpperCase()}`,
+                icone: '🔮',
+                sur: `TROUVÉ DANS ${modFini.nom}`,
+              },
+        )
+        majMemoireUI()
+      }
     }
     voieVues.add(level.code) // la pioche ne la reproposera pas de la run
     if (!sasOutil) {

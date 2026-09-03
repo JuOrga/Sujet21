@@ -196,6 +196,15 @@ export function poseChamp(c: CarteStation, chemin: string, texte: string): boole
   if (typeof o !== 'object' || o === null) return false
   const cle = parts[parts.length - 1]
   const cible = o as Record<string, unknown>
+  // `tirets` et `badge` sont OPTIONNELS sur un type de coursive : absents
+  // du JSON, ils n'existaient pas encore et le champ rougissait (revue du
+  // 03/09) — ils se créent à la saisie, et s'effacent quand on les vide
+  const optionnel = cle === 'tirets' || cle === 'badge'
+  if (optionnel) {
+    if (texte.trim() === '') delete cible[cle]
+    else cible[cle] = texte.trim()
+    return true
+  }
   if (!(cle in cible)) return false
   const actuel = cible[cle]
   if (typeof actuel === 'number') {

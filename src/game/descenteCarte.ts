@@ -76,9 +76,28 @@ export interface ChoixModule {
   lien: LienCarte
   /** l'orbe qui manque pour passer — null : la coursive est ouverte */
   orbeManquant: string | null
+  /** REVENIR SUR SES PAS : pas une coursive de la carte, le chemin du
+   *  retour — offert seulement quand l'objectif est hors de portée d'ici */
+  retour: boolean
 }
 
-/** Les modules au bout d'une coursive partant d'ici, ouverts ou non. */
+/** LE MODULE D'OÙ L'ON VIENT : le dernier traversé qui mène ici par une
+ *  coursive. Pas simplement le dernier de la liste — au retour d'une cache,
+ *  le dernier traversé EST la cache, et l'on ne va pas y retourner. */
+export function moduleDOuLOnVient(c: CarteStation, e: EtatCarteRun): ModuleCarte | undefined {
+  for (let i = e.visites.length - 1; i >= 0; i--) {
+    const id = e.visites[i]
+    if (id === e.module) continue
+    if (c.liens.some((l) => l.de === id && l.vers === e.module)) return moduleParId(c, id)
+  }
+  return undefined
+}
+
+/** Les modules au bout d'une coursive partant d'ici, ouverts ou non — et,
+ *  quand l'objectif est HORS DE PORTÉE d'ici (une cache, un cul-de-sac),
+ *  le retour vers le module d'où l'on vient. Une cache est un détour, pas
+ *  un piège : la run ne s'y arrête pas (revue du 03/09 — un joueur entré
+ *  dans S1b n'avait plus aucune porte, sauvegarde comprise). */
 export function choixModules(
   c: CarteStation,
   e: EtatCarteRun,
@@ -88,7 +107,17 @@ export function choixModules(
   for (const lien of liensDepuis(c, e.module)) {
     const module = moduleParId(c, lien.vers)
     if (!module) continue
-    out.push({ module, lien, orbeManquant: orbeRequis(c, lien, orbes) })
+    out.push({ module, lien, orbeManquant: orbeRequis(c, lien, orbes), retour: false })
+  }
+  if (e.module !== c.regles.objectif && plusCourtVers(c, e.module, c.regles.objectif) === null) {
+    const prec = moduleDOuLOnVient(c, e)
+    if (prec && !out.some((x) => x.module.id === prec.id))
+      out.push({
+        module: prec,
+        lien: { de: e.module, vers: prec.id, type: 'retour' },
+        orbeManquant: null,
+        retour: true,
+      })
   }
   return out
 }
@@ -103,7 +132,10 @@ export function entreModule(
 ): EtatCarteRun | null {
   const choix = choixModules(c, e, orbes).find((x) => x.module.id === id)
   if (!choix || choix.orbeManquant) return null
-  return { module: id, niveau: 0, visites: [...e.visites, e.module] }
+  // au RETOUR, le module est déjà épuisé : ses salles ne se rejouent pas,
+  // la carte se rouvre aussitôt sur ses coursives
+  const niveau = choix.retour ? Math.max(0, choix.module.niveaux) : 0
+  return { module: id, niveau, visites: [...e.visites, e.module] }
 }
 
 /** LA LONGUEUR DE LA RUN, déduite du trajet : les salles déjà franchies,
