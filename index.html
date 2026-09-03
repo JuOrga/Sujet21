@@ -606,6 +606,23 @@
       .pl-ord button:hover:not(:disabled) { border-color: var(--specimen); color: var(--specimen); }
       .pl-ord button:disabled { opacity: 0.3; cursor: default; }
       .pl-carte .salle-chips { margin-top: 6px; }
+      /* le biome de la carte, et les filtres par biome en tête de planche */
+      .pl-biome {
+        width: 100%; margin-top: 6px; padding: 3px 5px; min-width: 0;
+        font-family: var(--font-mono); font-size: calc(11px * var(--ui)); color: var(--ink);
+        background: rgba(3, 7, 16, 0.6); border: 1px solid var(--line);
+      }
+      #planche-filtres { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+      #planche-filtres button {
+        font-family: var(--font-mono); font-size: calc(11px * var(--ui)); letter-spacing: 0.08em;
+        text-transform: uppercase; color: var(--ink); background: rgba(99, 183, 230, 0.07);
+        border: 1px solid var(--line); padding: 5px 9px; cursor: pointer; white-space: nowrap;
+      }
+      #planche-filtres button b { color: var(--specimen); margin-left: 4px; }
+      #planche-filtres button.on { border-color: var(--specimen); background: rgba(99, 183, 230, 0.18); }
+      #planche-filtres button.vide { border-style: dashed; }
+      #planche-filtres button.vide b { color: var(--alert); }
+      #planche-filtres button:hover { border-color: var(--specimen); }
       /* le bouton d'ESSAI de la carte : lancer le tableau depuis la planche */
       .pl-jouer {
         position: absolute; top: 12px; right: 12px;
@@ -7730,6 +7747,7 @@
           <label class="ed-f"><span>Nom</span><input id="ed-name" /></label>
           <label class="ed-f"><span>Code</span><input id="ed-code" /></label>
           <p class="ed-code-lecture" id="ed-code-lecture"></p>
+          <label class="ed-f" title="Le BIOME : le module de la carte de la station qui peut proposer ce tableau. Universel : tout module le pioche. La liste vient de carteStation.json."><span>Biome</span><select id="ed-biome"><option value="">— universel (tout module) —</option></select></label>
           <p class="ed-astuce">Le code DÉCRIT la salle — la convention ATELIER tient en trois chiffres, « 111 » : le MOMENT de la run (1 début · 2 milieu · 3 fin), la MÉCANIQUE requise (0 aucune · 1 glace · 2 vapeur · 3 toutes), la DIFFICULTÉ. Plusieurs salles peuvent porter le même code : c'est le NUMÉRO du tableau, en tête du NOM (« 12 … », lettre pour départager : « 12a … »), qui donne l'ordre de jeu. Un seul code est réservé : <b>HUB</b> — le tableau qui le porte devient le LABORATOIRE (le hub), remplace celui du jeu et sort de la séquence de l'expédition.</p>
           <label class="ed-f"><span>Par (impulsions)</span><input type="number" id="ed-par" min="1" step="1" /></label>
           <label class="ed-f"><span>Dashs vapeur / écran</span><input type="number" id="ed-dashs" min="0" step="1" placeholder="banc" /></label>
@@ -7883,7 +7901,10 @@
         <p class="salles-legende">Glissez une carte (ou ◀ ▶) pour changer l'<b>ordre de jeu</b> —
           c'est le même que la séquence de l'éditeur : chaque geste s'enregistre aussitôt
           dans la bibliothèque partagée. Le champ code accepte la nomenclature
-          (« <b>111</b> » : moment · mécanique · difficulté) et s'enregistre à la validation.</p>
+          (« <b>111</b> » : moment · mécanique · difficulté) et s'enregistre à la validation.
+          Le menu <b>biome</b> sous chaque carte dit quel module de la carte de la station
+          peut proposer la salle ; les filtres du haut comptent les salles par module.</p>
+        <div id="planche-filtres" aria-label="Filtrer par biome"></div>
         <div id="planche-corps"></div>
         <p class="pup-etat" id="planche-etat"></p>
       </div>

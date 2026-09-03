@@ -6,6 +6,7 @@ import {
   cloneCarte,
   couleurTemperature,
   orbeRequis,
+  biomesDeCarte,
   longueursTrajet,
   ORBES,
   liensDepuis,
@@ -146,6 +147,19 @@ describe('les conditions d’accès — un orbe acquis, pas l’état du corps',
     const c = cloneCarte(CARTE_LIVREE)
     c.typesLiens.glace.condition = 'orbe == teleportation'
     expect(verifieCarte(c).some((v) => v.niveau === 'erreur' && v.message.includes('teleportation'))).toBe(true)
+  })
+})
+
+describe('biomesDeCarte — la liste que la planche et l’éditeur proposent', () => {
+  it('un biome par code, seuls les modules à salles, sans doublon', () => {
+    expect(biomesDeCarte(CARTE_LIVREE).map((b) => b.code)).toEqual([
+      'T1', 'T2', 'T3', 'S1', 'S2', 'S3', 'S1b', 'S3b', 'OBS',
+    ])
+    const c = cloneCarte(CARTE_LIVREE)
+    c.modules[1].biome = 'T2' // T1 rejoint le biome de T2
+    c.modules[5].niveaux = 0 // S1 n’a plus de salle
+    expect(biomesDeCarte(c).map((b) => b.code)).toEqual(['T2', 'T3', 'S2', 'S3', 'S1b', 'S3b', 'OBS'])
+    expect(biomesDeCarte(c)[0].nom).toBe('TRANSFO GLACE') // le premier qui le porte nomme le biome
   })
 })
 

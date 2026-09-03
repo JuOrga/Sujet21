@@ -63,6 +63,7 @@ import {
 import {
   CARTE_LIVREE,
   ORBES,
+  biomesDeCarte,
   couleurTemperature,
   moduleParId,
   zoneDe,
@@ -3931,6 +3932,8 @@ const editor = new LevelEditor(el('editor'), {
     [SEQUENCE_ALERTE, ...chargeSequences()]
       .filter((s, i, t) => t.findIndex((o) => o.code === s.code) === i)
       .map((s) => ({ code: s.code, titre: s.titre })),
+  // les biomes de la carte de la station : le champ Biome du tableau
+  biomes: () => biomesDeCarte(carte),
   libraryChanged: (levels) => {
     libraryLevels = levels.map((s) => s.level)
     renderRegistres()
@@ -4196,6 +4199,37 @@ async function plancheCode(id: string, brut: string): Promise<void> {
     void ouvrePlanche() // repart de l'état serveur
   }
 }
+/** LE BIOME D'UNE CARTE DE LA PLANCHE : le module de la carte de la station
+ *  qui peut proposer ce tableau — vide, le tableau est universel. Même
+ *  chemin que le code : la bibliothèque partagée le retient. */
+async function plancheBiome(id: string, biome: string): Promise<void> {
+  if (plancheBusy) return
+  const entry = plancheTous.find((s) => s.id === id)
+  if (!entry) return
+  const v = biome.trim().slice(0, 16)
+  if ((entry.level.biome ?? '') === v) return
+  plancheBusy = true
+  if (v) entry.level.biome = v
+  else delete entry.level.biome
+  plancheDit(v ? `Enregistrement du biome « ${v} »…` : 'Le tableau redevient universel…')
+  const saved = await saveLevel(entry.level, id, records.operator() || 'anonyme')
+  plancheBusy = false
+  if (saved) {
+    plancheSync(saved.levels)
+    const b = biomesDeCarte(carte).find((x) => x.code === v)
+    plancheDit(
+      v
+        ? `Biome « ${v} » enregistré — ${b ? b.nom : 'module absent de la carte'} : seul ce module proposera ce tableau.`
+        : 'Tableau universel enregistré : tout module peut le proposer.',
+    )
+  } else {
+    plancheDit(`Enregistrement refusé : ${raisonDuRefus() || 'bibliothèque injoignable'}.`)
+    void ouvrePlanche()
+  }
+}
+/** Le filtre de la planche : null = tout, '' = sans biome, sinon un code. */
+let plancheFiltre: string | null = null
+
 // ---- Les MOLETTES du code : chaque chiffre se règle sur place ----------
 // Un cran ▴ au-dessus, la valeur au centre (une liste déroulante : le
 // picker natif sur iPad), un cran ▾ en dessous — sobre, au doigt comme à
@@ -4254,7 +4288,35 @@ function plancheCodePlusTard(id: string, code: string): void {
 function renderPlanche(): void {
   const corps = document.getElementById('planche-corps')
   if (!corps) return
-  const visibles = plancheTous.filter((s) => !estCodeHub(s.level.code))
+  const toutes = plancheTous.filter((s) => !estCodeHub(s.level.code))
+  // LES BIOMES : un filtre par module de la carte, avec le COMPTE de
+  // salles — d'un regard, quels biomes sont vides. L'ordre de jeu (◀ ▶,
+  // glisser) ne se règle que sur la vue complète : un rang n'a de sens
+  // que dans la liste entière.
+  const biomes = biomesDeCarte(carte)
+  const filtres = document.getElementById('planche-filtres')
+  if (filtres) {
+    const nb = (code: string): number => toutes.filter((s) => (s.level.biome ?? '') === code).length
+    const bouton = (val: string | null, libelle: string, n: number, titre: string): string =>
+      `<button type="button" data-filtre="${val === null ? '*' : val}" class="${plancheFiltre === val ? 'on' : ''}${n === 0 && val ? ' vide' : ''}" title="${titre}">${libelle} <b>${n}</b></button>`
+    filtres.innerHTML =
+      bouton(null, 'TOUTES', toutes.length, 'Toutes les salles de la bibliothèque — la seule vue où l’ordre de jeu se règle') +
+      bouton('', 'SANS BIOME', nb(''), 'Les salles universelles : tout module de la carte peut les proposer') +
+      biomes
+        .map((b) => bouton(b.code, `${b.code} · ${b.nom}`, nb(b.code), `Les salles que seul le module ${b.nom} propose — 0 : un biome vide, le module n’aura que des salles générées et universelles`))
+        .join('')
+    for (const b of Array.from(filtres.querySelectorAll<HTMLButtonElement>('[data-filtre]')))
+      b.addEventListener('click', () => {
+        const v = b.dataset.filtre ?? '*'
+        plancheFiltre = v === '*' ? null : v
+        renderPlanche()
+      })
+  }
+  const visibles =
+    plancheFiltre === null
+      ? toutes
+      : toutes.filter((s) => (s.level.biome ?? '') === plancheFiltre)
+  const ordonnable = plancheFiltre === null
   corps.innerHTML = ''
   visibles.forEach((s, i) => {
     const carte = document.createElement('div')
@@ -4322,15 +4384,28 @@ function renderPlanche(): void {
         : `<input class="pl-code" maxlength="16" value="${esc(s.level.code)}" title="Le code nomenclature (« 111 ») — Entrée ou sortir du champ enregistre" />`) +
       `<span class="pl-nom" title="${esc(s.level.name)}">${esc(s.level.name)}</span>` +
       `<span class="pl-ord">` +
-      `<button type="button" data-tot="-1" title="Jouer plus tôt"${i === 0 ? ' disabled' : ''}>◀</button>` +
-      `<button type="button" data-tot="1" title="Jouer plus tard"${i === visibles.length - 1 ? ' disabled' : ''}>▶</button>` +
+      `<button type="button" data-tot="-1" title="Jouer plus tôt"${i === 0 || !ordonnable ? ' disabled' : ''}>◀</button>` +
+      `<button type="button" data-tot="1" title="Jouer plus tard"${i === visibles.length - 1 || !ordonnable ? ' disabled' : ''}>▶</button>` +
       `</span></div>` +
       (roues ? '' : saisi) +
-      (d ? `<span class="salle-chips">${chipsHtml(s.level.code)}</span>` : '')
+      (d ? `<span class="salle-chips">${chipsHtml(s.level.code)}</span>` : '') +
+      // LE BIOME : le module de la carte qui propose ce tableau
+      `<select class="pl-biome" title="Le BIOME : le module de la carte de la station qui peut proposer ce tableau. Universel : tout module le pioche. La liste vient de carteStation.json — un module ajouté dans l'éditeur de carte apparaît ici.">` +
+      `<option value=""${s.level.biome ? '' : ' selected'}>— universel —</option>` +
+      biomes
+        .map((b) => `<option value="${esc(b.code)}"${s.level.biome === b.code ? ' selected' : ''}>${esc(b.code)} · ${esc(b.nom)}</option>`)
+        .join('') +
+      (s.level.biome && !biomes.some((b) => b.code === s.level.biome)
+        ? `<option value="${esc(s.level.biome)}" selected>${esc(s.level.biome)} (plus sur la carte)</option>`
+        : '') +
+      `</select>`
     dessineMiniCarte(
       carte.querySelector('canvas') as HTMLCanvasElement,
       s.level,
     )
+    const biomeSel = carte.querySelector('.pl-biome') as HTMLSelectElement
+    biomeSel.addEventListener('change', () => void plancheBiome(s.id, biomeSel.value))
+    biomeSel.addEventListener('pointerdown', (e) => e.stopPropagation())
     // ◀ ▶ : l'échange avec la voisine
     for (const b of Array.from(
       carte.querySelectorAll<HTMLButtonElement>('[data-tot]'),
@@ -4462,7 +4537,7 @@ function renderPlanche(): void {
       carte.classList.remove('drag-over')
       const id = e.dataTransfer?.getData('text/plain') ?? ''
       const from = visibles.findIndex((x) => x.id === id)
-      if (id === '' || from < 0 || from === i) return
+      if (!ordonnable || id === '' || from < 0 || from === i) return
       const next = [...visibles]
       const [prise] = next.splice(from, 1)
       next.splice(i, 0, prise)

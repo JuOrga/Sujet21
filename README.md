@@ -6,10 +6,10 @@ une partie de soi-même — **se déplacer, c'est rétrécir**.
 
 Le document de référence est [`docs/doc-fonctionnel.md`](docs/doc-fonctionnel.md).
 
-## État — version 0.21.414, une run jouable de bout en bout
+## État — version 0.21.415, une run jouable de bout en bout
 
 Le jeu tourne dans le navigateur, sur ordinateur, tablette et téléphone.
-**414 livraisons consignées entre le 08/08/2026 et le 03/09/2026** — le journal
+**415 livraisons consignées entre le 08/08/2026 et le 03/09/2026** — le journal
 complet se lit dans l'écran NOTES DE VERSION, les données sont dans
 [`src/bench/livraisons.ts`](src/bench/livraisons.ts).
 
@@ -91,7 +91,7 @@ station, `?tableau=N` démarre à la salle N,
 ## Qualité
 
 ```bash
-pnpm test        # 858 tests dans 75 fichiers, ~23 s
+pnpm test        # 859 tests dans 75 fichiers, ~23 s
 pnpm type-check
 pnpm build
 ```
@@ -106,9 +106,10 @@ codex, trophées, cycle, récompenses, voie, générateur) et les écrans
 
 - **Le boss.** La Pompe de reprise n'est qu'une esquisse écrite
   ([`docs/boss-pompe.md`](docs/boss-pompe.md)) : rien n'est implémenté.
-- **Le réétiquetage des tableaux par biome** : les tableaux livrés ne
-  portent pas encore de code de biome (ils sont universels), et l'éditeur
-  de tableaux n'expose pas le champ ([`docs/carte-station.md`](docs/carte-station.md)).
+- **L'étiquetage des tableaux par biome** : le champ existe (planche,
+  éditeur de tableaux), mais aucune salle n'est encore étiquetée — toutes
+  sont universelles, tout module les pioche
+  ([`docs/carte-station.md`](docs/carte-station.md)).
 - **Les cinq décisions ouvertes** du §14, à commencer par l'intensité de la
   cohésion — le curseur d'identité du jeu.
 - **L'empaquetage Steam** : les visuels de boutique sont dessinés

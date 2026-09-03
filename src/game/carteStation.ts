@@ -535,6 +535,20 @@ export function plusCourtVers(c: CarteStation, de: string, vers: string): number
   return null
 }
 
+/** LES BIOMES DE LA CARTE : un par code, dans l'ordre des modules, avec
+ *  le nom du premier module qui le porte. C'est LA liste que l'éditeur de
+ *  tableaux et la planche proposent pour étiqueter une salle — jamais une
+ *  liste à part : un module ajouté sur la carte apparaît dans les deux. */
+export function biomesDeCarte(c: CarteStation): { code: string; nom: string }[] {
+  const out: { code: string; nom: string }[] = []
+  for (const m of c.modules) {
+    const code = m.biome.trim()
+    if (!code || m.niveaux <= 0 || out.some((b) => b.code === code)) continue
+    out.push({ code, nom: m.nom })
+  }
+  return out
+}
+
 // ---- LA VÉRIFICATION DE FOND ----------------------------------------------
 
 export interface VerdictCarte {

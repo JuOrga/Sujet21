@@ -192,12 +192,32 @@ Dans l'ordre, une PR vers `dev` par étape :
    sur les orbes. Éditeur mis à jour.~~ Fait.
 2. ~~**La descente pilotée par la carte**~~ Fait — voir ci-dessous.
 3. ~~**Les orbes**~~ Fait — voir ci-dessous.
-4. **Le réétiquetage des tableaux existants par biome**, et le code de
-   biome dans la nomenclature atelier (champ `biome` dans l'éditeur de
-   tableaux, tableaux livrés étiquetés, tableaux manquants par biome).
+4. ~~**Le champ biome dans la planche et l'éditeur de tableaux**~~ Fait —
+   voir ci-dessous. L'étiquetage lui-même est un choix de conception par
+   salle : il se fait dans la planche, les compteurs disent où il manque.
 5. **Retirer** `src/game/station.ts`, `planStation.ts` et
    `station.spec.ts` : plus importés, leur suppression a été refusée à
    l'outil.
+
+## Étiqueter les tableaux par biome
+
+- **Dans la planche** : un menu « biome » sous chaque carte (universel, ou
+  un module de la carte de la station), enregistré dans la bibliothèque
+  partagée comme le code. En tête, un filtre par biome avec le **compte de
+  salles** par module : un compteur à zéro, en rouge, est un biome vide —
+  le module n'aura que des salles générées et universelles. L'ordre de jeu
+  (◀ ▶, glisser) ne se règle que sur la vue TOUTES : un rang n'a de sens
+  que dans la liste entière.
+- **Dans l'éditeur de tableaux** : la ligne « Biome » sous le code, même
+  liste. Un tableau créé ou retouché sort étiqueté.
+- **La liste des biomes** vient de `carteStation.json` (`biomesDeCarte`) :
+  un module ajouté dans l'éditeur de carte apparaît dans les deux. Un
+  tableau dont le biome n'est plus sur la carte garde son étiquette,
+  marquée « plus sur la carte ».
+- **Les tableaux livrés** (dans le code, `level.ts`) ne passent pas par
+  la planche : pour en étiqueter un, l'ouvrir dans l'éditeur et
+  l'enregistrer dans la bibliothèque — la copie de bibliothèque prime sur
+  le livré du même code.
 
 ## Les orbes d'essence de conscience (`src/game/marchand.ts`, `records.ts`)
 

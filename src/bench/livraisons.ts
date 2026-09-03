@@ -31,6 +31,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '03/09/2026 21:53',
+    title: 'LE BIOME D’UNE SALLE SE RÈGLE DANS LA PLANCHE ET DANS L’ÉDITEUR : un menu par carte, un filtre par module, le compte des salles',
+    notes: [
+      'L’ÉTAPE 4 DE LA CARTE : le champ `biome` d’un tableau existait depuis l’étape 2 (la pioche le lit, la bibliothèque le retient) mais AUCUN écran ne le montrait — une salle sortait toujours universelle. Le concepteur a demandé que l’étiquetage se fasse dans LA PLANCHE, l’écran où l’on voit toutes les salles côte à côte, et l’éditeur de tableaux expose le même champ pour la salle qu’on fabrique.',
+      'DANS LA PLANCHE : un menu « biome » sous chaque carte — universel, ou un module de la carte de la station — enregistré dans la bibliothèque partagée par le même chemin que le code (plancheBiome, saveLevel, plancheSync). En tête, des FILTRES par biome avec le COMPTE de salles par module : TOUTES, SANS BIOME, puis un bouton par module ; un compteur à zéro, en rouge et tirets, est un biome vide — le module n’aura que des salles générées et universelles. L’ordre de jeu (◀ ▶, glisser-déposer) ne se règle que sur la vue TOUTES : un rang n’a de sens que dans la liste entière, les boutons se désactivent et le dépôt s’ignore sous un filtre.',
+      'DANS L’ÉDITEUR DE TABLEAUX : la ligne « Biome » sous le code, même liste, par un crochet biomes() — l’éditeur ne connaît pas la carte, il reçoit la liste. Un biome qui n’est plus sur la carte reste sur le tableau, marqué « plus sur la carte » : un module renommé n’efface pas une étiquette.',
+      'UNE SEULE LISTE : biomesDeCarte (carteStation.ts, testé) — un biome par code, dans l’ordre des modules, seuls les modules à salles, nommé par le premier module qui le porte. Elle vient de carteStation.json : un module ajouté dans l’éditeur de carte apparaît dans la planche et dans l’éditeur de tableaux sans qu’on touche à rien.',
+      'PAS ÉTIQUETÉ : aucune salle ne l’est — c’est un choix de conception par salle, et les compteurs disent où il manque. Les tableaux LIVRÉS (dans le code) ne passent pas par la planche : pour en étiqueter un, l’ouvrir dans l’éditeur et l’enregistrer dans la bibliothèque, la copie de bibliothèque prime sur le livré du même code.',
+      'VÉRIFIÉ : 859 tests verts dans 75 fichiers, type-check à 0, build propre. Pas vu au navigateur (jeu complet non rendu en headless) : à regarder en vrai — un biome posé dans la planche, le filtre et ses comptes, la ligne Biome de l’éditeur.',
+    ],
+  },
+  {
     date: '03/09/2026 21:30',
     title: 'LES ORBES D’ESSENCE DE CONSCIENCE : le marchand du hub les vend, l’écran des mémoires les dépense, les caches les recèlent',
     notes: [
