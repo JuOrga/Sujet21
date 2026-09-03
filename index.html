@@ -2,6 +2,13 @@
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
+    <!-- LE JEU EST DÉJÀ SOMBRE, et il le DIT. Sans cette déclaration, le
+         mode sombre forcé d'un navigateur (Chrome « auto dark », Dark
+         Reader…) prend la page pour une page claire et INVERSE ce qu'il
+         juge clair : sur le plan de la station, les plaques des modules,
+         les coursives et les panneaux solaires passaient au blanc. Un site
+         qui se déclare dark est laissé tranquille. -->
+    <meta name="color-scheme" content="dark" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
@@ -64,6 +71,7 @@
           U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
       }
       :root {
+        color-scheme: dark; /* voir la balise meta du même nom */
         --void: #030710;
         --panel: rgba(9, 18, 30, 0.82);
         --panel-solid: #0a1420;
