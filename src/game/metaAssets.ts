@@ -107,6 +107,13 @@ export function decalsDuMeta(level: LevelDef): DecalDef[] {
   if (level.bancMemoires) {
     out.push(poseAuRapport(level.bancMemoires, RAPPORT_BANC, 'meta-banc'))
   }
+  // Les PUPITRES portent la MÊME console que le banc : c'est la même
+  // pièce de mobilier, elle n'ouvre pas le même écran. Une image par
+  // écran viendra si le besoin se fait sentir — d'ici là, un pupitre a un
+  // corps dès qu'il est posé, au lieu d'un rectangle vide.
+  for (const q of level.pupitres ?? []) {
+    out.push(poseAuRapport(q, RAPPORT_BANC, 'meta-banc'))
+  }
   // LES SAS DE RACCORD : un par jonction de couloir. Ils se posent SUR la
   // couture entre deux coques — c'est leur seul rôle, et c'est pour cela
   // qu'ils sont plus opaques que le décor ordinaire.

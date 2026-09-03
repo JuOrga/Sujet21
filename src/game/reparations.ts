@@ -10,7 +10,7 @@
 // les pose au solveur (setDoors) et les dessine en barrières d'énergie —
 // une réparation payée les lève À CHAUD, sans respawn.
 
-import type { LevelDef, PorteDef, WorldLabel } from './level'
+import type { LevelDef, PorteDef, PupitreDef, WorldLabel } from './level'
 import { ancreAbsente, zonesDuHub } from './hub'
 
 export interface ReparationDef {
@@ -28,7 +28,8 @@ export interface ReparationDef {
    */
   labelsCaches: string[]
   /** En panne, les écrans (ecran-on) DANS le plot de la station
-   * s'éteignent (ecran-off). */
+   * s'éteignent (ecran-off) — et les PUPITRES de la même bande se taisent :
+   * une console morte n'ouvre pas son écran. */
   eteintEcrans?: boolean
   /** En panne, tout le module s'assombrit : ambiante et lumières
    * réduites, la brume monte (le réseau d'éclairage). */
@@ -134,6 +135,7 @@ export function appliqueReparations(
   // tout est réparé : le hub cible, avec son seul SCEAU du secteur 4
   const labels: WorldLabel[] = [...(base.labels ?? [])]
   let decals = base.decals ? [...base.decals] : undefined
+  let pupitres = base.pupitres ? [...base.pupitres] : undefined
   let lumieres = base.lumieres ? [...base.lumieres] : undefined
   let ambiante = base.ambiante
   let brume = base.brume
@@ -191,16 +193,38 @@ export function appliqueReparations(
         tone: 'chaud',
       })
     }
-    if (r.eteintEcrans && decals && plot) {
-      decals = decals.map((d) =>
-        d.kind === 'ecran-on' &&
-        d.x >= plot.minX - 400 &&
-        d.x <= plot.maxX + 400 &&
-        d.y >= plot.minY - 400 &&
-        d.y <= plot.maxY + 400
-          ? { ...d, kind: 'ecran-off' as const }
-          : d,
-      )
+    if (r.eteintEcrans && plot) {
+      // Les ÉCRANS DE DÉCOR s'éteignent LARGE (le plot, plus 400 de marge) :
+      // la vitrine d'une station déborde son plot de contact.
+      if (decals)
+        decals = decals.map((d) =>
+          d.kind === 'ecran-on' &&
+          d.x >= plot.minX - 400 &&
+          d.x <= plot.maxX + 400 &&
+          d.y >= plot.minY - 400 &&
+          d.y <= plot.maxY + 400
+            ? { ...d, kind: 'ecran-off' as const }
+            : d,
+        )
+      // Le PUPITRE, lui, s'éteint SERRÉ — sur le plot exact. Un pupitre
+      // n'est pas du décor : il rend un service, et la marge de 400 en
+      // emporterait d'une salle voisine (le tableau des avaries du centre
+      // de contrôle tombait avec le mur des records, à deux pièces de là).
+      // En panne il DISPARAÎT plutôt que de rester posé et muet : le corps
+      // qui traverse un mur des records éteint ne doit pas voir s'ouvrir le
+      // palmarès. Il revient avec la réparation — applyLevel repose le
+      // tableau à chaud, la console se rallume.
+      if (pupitres)
+        pupitres = pupitres.filter((q: PupitreDef) => {
+          const cx = (q.minX + q.maxX) / 2
+          const cy = (q.minY + q.maxY) / 2
+          return !(
+            cx >= plot.minX &&
+            cx <= plot.maxX &&
+            cy >= plot.minY &&
+            cy <= plot.maxY
+          )
+        })
     }
     if (r.assombrit) {
       ambiante = (ambiante ?? 0.52) * 0.62
@@ -221,6 +245,7 @@ export function appliqueReparations(
     ...base,
     labels,
     ...(decals ? { decals } : {}),
+    ...(pupitres ? { pupitres } : {}),
     ...(lumieres ? { lumieres } : {}),
     ...(ambiante !== undefined ? { ambiante } : {}),
     ...(brume !== undefined ? { brume } : {}),

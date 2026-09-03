@@ -72,6 +72,60 @@ describe('hub v4 — le méta a pris ses murs (grand module)', () => {
       expect(dedans(rail, ZONES_HUB_GRAND.banc)).toBe(true)
   })
 
+  it('les trois consoles sont posées dans le VIDE, dans LES DEUX modules', () => {
+    // Une console dans une paroi ne s'ouvrirait jamais : le corps ne peut
+    // pas entrer dans un mur. Et le module COMPACT compte autant que le
+    // grand — c'est LUI que la bibliothèque sert (code « HUB », semé par
+    // ops/maj-hub.mjs) : des consoles posées dans le seul grand module
+    // n'atteindraient aucun joueur.
+    for (const [lv, zones] of [
+      [TABLEAU_HUB, ZONES_HUB_GRAND],
+      [TABLEAU_HUB_COMPACT, ZONES_HUB_COMPACT],
+    ] as const) {
+      const murs = niveauExpanse(lv).boxes
+      const consoles = lv.pupitres ?? []
+      expect(consoles.map((q) => q.ecran), lv.code).toEqual([
+        'records',
+        'reparations',
+        'station',
+      ])
+      for (const q of consoles) {
+        expect(dedans(q, lv.bounds), JSON.stringify(q)).toBe(true)
+        for (const [px, py] of [
+          [q.minX, q.minY],
+          [q.maxX, q.minY],
+          [q.minX, q.maxY],
+          [q.maxX, q.maxY],
+          [(q.minX + q.maxX) / 2, (q.minY + q.maxY) / 2],
+        ])
+          for (const box of murs)
+            expect(dansBoite(box, px, py), JSON.stringify(q)).toBe(false)
+      }
+      // deux consoles ne se recouvrent pas : un seul pas, un seul écran
+      for (let i = 0; i < consoles.length; i++)
+        for (let k = i + 1; k < consoles.length; k++)
+          expect(chevauche(consoles[i], consoles[k])).toBe(false)
+      // ni un plot d'achat : un pas ne doit pas payer ET ouvrir un écran
+      for (const q of consoles)
+        for (const a of zones.etal)
+          expect(chevauche(q, a.plot), `${lv.code} ${q.ecran}`).toBe(false)
+      // LE MUR DES RECORDS : la console est DANS le plot de sa station —
+      // elle s'éteint donc avec elle — mais jamais sur tout le plot : la
+      // réparation se paie en entrant, la consultation vient après
+      const plot = zones.stations['mur-records']
+      const rec = consoles.find((q) => q.ecran === 'records')!
+      expect(dedans(rec, plot), lv.code).toBe(true)
+      const aire = (r: typeof plot): number =>
+        (r.maxX - r.minX) * (r.maxY - r.minY)
+      expect(aire(rec) / aire(plot), lv.code).toBeLessThan(0.75)
+      // le tableau des avaries, lui, ne dépend d'AUCUNE station : c'est
+      // quand tout est en panne qu'on vient le lire
+      const av = consoles.find((q) => q.ecran === 'reparations')!
+      for (const [id, r] of Object.entries(zones.stations))
+        expect(chevauche(av, r), `${lv.code} avaries sur ${id}`).toBe(false)
+    }
+  })
+
   it('le module est bâti AU KIT : dix-sept coques, et rien n’est posé à la main', () => {
     // la promesse du chantier : le terrain de jeu vient des structures —
     // les boîtes posées ne sont plus que du mobilier

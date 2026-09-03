@@ -3,6 +3,7 @@
 // simple à écrire à la main et impossible à charger cassé.
 
 import {
+  dansBoite,
   MAT_CHAUD,
   MAT_FROID,
   MAT_GRILLE,
@@ -31,6 +32,7 @@ import {
   type AncreMeta,
   type MonnaiePlot,
   type PlotMeta,
+  type PupitreDef,
   type RoleAncre,
   type StructureDef,
   type PorteDef,
@@ -41,6 +43,7 @@ import {
 import { ARTICLES_ETAL_IDS } from './economat'
 import { ARTICLES_COMPTOIR_IDS, ROLES_ANCRE } from './hub'
 import { REPARATIONS } from './reparations'
+import { ECRANS_PUPITRE, type EcranPupitre } from './pupitres'
 import { MAX_BOXES, MAX_LUMIERES, MAX_ZONES } from '../render/renderer'
 import {
   ARC_EPAISSEUR_DEFAUT,
@@ -782,6 +785,29 @@ export function parseLevel(input: unknown): {
     level.marchand = { x: num(m.x, 0), y: num(m.y, 0) }
   }
 
+  // LES PUPITRES : un rectangle, un ÉCRAN du catalogue (liste fermée). Un
+  // id inconnu est ÉCARTÉ plutôt que rabattu sur un écran par défaut : un
+  // fichier venu d'une version qui connaîtrait un écran de plus ne doit
+  // pas ouvrir le mauvais voile sous les doigts du joueur.
+  const pupitres: PupitreDef[] = []
+  for (const raw of Array.isArray(o.pupitres) ? o.pupitres : []) {
+    const q = (raw ?? {}) as Record<string, unknown>
+    const ecran = str(q.ecran) as EcranPupitre
+    if (!ECRANS_PUPITRE.includes(ecran)) {
+      rejets.push(`pupitre d’écran inconnu écarté (${ecran || 'sans écran'})`)
+      continue
+    }
+    const r = normRect(
+      num(q.minX, 0),
+      num(q.minY, 0),
+      num(q.maxX, 0),
+      num(q.maxY, 0),
+    )
+    const titre = str(q.titre).slice(0, 40).trim()
+    pupitres.push(titre ? { ...r, ecran, titre } : { ...r, ecran })
+  }
+  if (pupitres.length > 0) level.pupitres = pupitres
+
   // les éclats de mémoire : valeur gravée bornée (jamais semés — l'auteur
   // seul en pose)
   const eclats: EclatPose[] = []
@@ -899,6 +925,7 @@ export function serializeLevel(level: LevelDef): string {
   if (level.coque === 'structures') out.coque = 'structures'
   if (level.ancres?.length) out.ancres = level.ancres
   if (level.bancMemoires) out.bancMemoires = level.bancMemoires
+  if (level.pupitres?.length) out.pupitres = level.pupitres
   if (level.marchand) out.marchand = level.marchand
   if (level.eclats?.length) out.eclats = level.eclats
   if (level.lumieres && level.lumieres.length > 0) out.lumieres = level.lumieres
@@ -1168,6 +1195,27 @@ export function checkLevel(brut: LevelDef): Verdict[] {
       message:
         'Un évent barre la route sans radiateur ni zone vapeur pour le franchir.',
     })
+  }
+
+  // Un PUPITRE dans une paroi ne s'ouvrira JAMAIS : le corps ne peut pas
+  // entrer dans un mur, et rien à l'écran ne dirait pourquoi. `level` est
+  // DÉJÀ le tableau expansé (en tête de fonction) : ses boîtes portent les
+  // parois des coques — le ré-expanser les poserait une seconde fois. On
+  // juge sur le CENTRE seulement : un pupitre calé contre sa console mord
+  // forcément un peu — c'est même ainsi qu'on le pose.
+  const pupitres = level.pupitres ?? []
+  if (pupitres.length > 0) {
+    const murs = level.boxes
+    for (const q of pupitres) {
+      const cx = (q.minX + q.maxX) / 2
+      const cy = (q.minY + q.maxY) / 2
+      if (murs.some((b) => dansBoite(b, cx, cy))) {
+        v.push({
+          niveau: 'avertissement',
+          message: `Un pupitre (${q.ecran}) a son centre dans une paroi : son écran ne s’ouvrira jamais.`,
+        })
+      }
+    }
   }
 
   const chimie = level.boxes.some(
