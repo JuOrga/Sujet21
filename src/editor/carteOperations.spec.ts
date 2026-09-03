@@ -147,15 +147,15 @@ describe('poseChamp — un chemin, une valeur', () => {
     const c = carte()
     expect(poseChamp(c, 'typesLiens.glace.condition', '  ')).toBe(true)
     expect(c.typesLiens.glace.condition).toBeNull()
-    expect(poseChamp(c, 'typesLiens.main.condition', 'etatJoueur == vapeur')).toBe(true)
-    expect(c.typesLiens.main.condition).toBe('etatJoueur == vapeur')
+    expect(poseChamp(c, 'typesLiens.main.condition', 'orbe == vaporisation')).toBe(true)
+    expect(c.typesLiens.main.condition).toBe('orbe == vaporisation')
   })
 
   it('refuse un chemin qui n’existe pas', () => {
     const c = carte()
     expect(poseChamp(c, 'modules.99.nom', 'x')).toBe(false)
     expect(poseChamp(c, 'modules.1.inconnu', 'x')).toBe(false)
-    expect(poseChamp(c, 'regles.etatsJoueur', 'x')).toBe(false)
+    expect(poseChamp(c, 'regles.temperatureCouleur', 'x')).toBe(false)
   })
 })
 

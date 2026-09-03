@@ -49,6 +49,8 @@
       "h": 292,
       "temp": 15,
       "forme": "octogone",
+      "niveaux": 0,
+      "biome": "",
       "desc": "Cœur de la station, amarré à l’arc de coque."
     },
     {
@@ -62,6 +64,8 @@
       "h": 136,
       "temp": -25,
       "forme": "octogone",
+      "niveaux": 3,
+      "biome": "T1",
       "desc": "Accessible seulement à l’état GLACE."
     },
     {
@@ -75,6 +79,8 @@
       "h": 136,
       "temp": 18,
       "forme": "octogone",
+      "niveaux": 3,
+      "biome": "T2",
       "desc": "Voie libre."
     },
     {
@@ -88,6 +94,8 @@
       "h": 136,
       "temp": 72,
       "forme": "octogone",
+      "niveaux": 3,
+      "biome": "T3",
       "desc": "Accessible seulement à l’état VAPEUR."
     },
     {
@@ -101,6 +109,8 @@
       "h": 66,
       "temp": 20,
       "forme": "rond",
+      "niveaux": 0,
+      "biome": "",
       "desc": "Les trois voies convergent."
     },
     {
@@ -114,6 +124,8 @@
       "h": 100,
       "temp": 5,
       "forme": "octogone",
+      "niveaux": 3,
+      "biome": "S1",
       "desc": "À définir."
     },
     {
@@ -127,6 +139,8 @@
       "h": 100,
       "temp": 30,
       "forme": "octogone",
+      "niveaux": 3,
+      "biome": "S2",
       "desc": "À définir."
     },
     {
@@ -140,6 +154,8 @@
       "h": 100,
       "temp": 50,
       "forme": "octogone",
+      "niveaux": 3,
+      "biome": "S3",
       "desc": "À définir."
     },
     {
@@ -153,6 +169,8 @@
       "h": 92,
       "temp": -10,
       "forme": "octogone",
+      "niveaux": 1,
+      "biome": "S1b",
       "desc": "Cul-de-sac."
     },
     {
@@ -166,6 +184,8 @@
       "h": 92,
       "temp": 60,
       "forme": "octogone",
+      "niveaux": 1,
+      "biome": "S3b",
       "desc": "Cul-de-sac."
     },
     {
@@ -179,6 +199,8 @@
       "h": 166,
       "temp": 40,
       "forme": "octogone-dome",
+      "niveaux": 3,
+      "biome": "OBS",
       "desc": "Module terminal. Un télescope spatial y est amarré."
     }
   ],
@@ -262,14 +284,14 @@
       "couleur": "#a7ddf5",
       "epaisseur": 2.5,
       "coque": 18,
-      "condition": "etatJoueur == glace",
+      "condition": "orbe == solidification",
       "badge": "❄ GLACE"
     },
     "vapeur": {
       "couleur": "#f2c98e",
       "epaisseur": 2.5,
       "coque": 18,
-      "condition": "etatJoueur == vapeur",
+      "condition": "orbe == vaporisation",
       "badge": "💨 GAZ"
     }
   },
@@ -311,12 +333,6 @@
   "regles": {
     "depart": "HUB",
     "objectif": "OBS",
-    "etatsJoueur": [
-      "eau",
-      "glace",
-      "vapeur"
-    ],
-    "etatInitial": "eau",
     "couloirHub": "un lien partant du HUB sort à y = clamp(cible.y, HUB.y-110, HUB.y+110) puis va en ligne droite vers la cible",
     "temperatureCouleur": {
       "<=0": "#a7ddf5",

@@ -31,6 +31,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '03/09/2026 18:52',
+    title: 'LA CARTE PREND LES RÈGLES DU JEU : un module est un biome, un cadenas est un orbe',
+    notes: [
+      'LA DÉCISION DU CONCEPTEUR, après l’éditeur de carte livré ce jour : un module est un BIOME — un ensemble de niveaux, dont le nombre se règle par module ; au bout de ces niveaux, la carte s’ouvre et le module choisi s’agrandit sur les vignettes de ses salles ; les tableaux portent un code de biome ajouté à la nomenclature atelier ; les cadenas sont des BARRIÈRES DURABLES, ouvertes par un ORBE D’ESSENCE DE CONSCIENCE — chaque orbe est une transformation ou un état du cycle, acheté au marchand du hub contre de la mémoire (la monnaie durable ; le condensat, lui, se perd à la fin de la run) ou trouvé en run ; les caches restent un bonus ; la longueur d’une run découle du trajet.',
+      'CE QUI CHANGE DANS LE MODÈLE. Chaque module gagne `niveaux` (0 pour le hub et le nœud, 1 pour les caches, 3 ailleurs) et `biome` (le code atelier, prérempli sur l’identifiant). La condition d’une coursive ne lit plus l’ÉTAT du corps (« etatJoueur == glace », un guichet où l’on se transformerait devant la porte) mais un ACQUIS : « orbe == solidification ». La liste des orbes n’est pas dupliquée dans la carte : elle DÉRIVE du cycle des mémoires (huit transformations, quatre états) — un orbe inconnu dans une condition est une erreur de fond, et le message dit les ids attendus. `regles.etatsJoueur` et `etatInitial` disparaissent : ce n’était pas à la carte de les porter.',
+      'LE TRAJET SE COMPTE EN NIVEAUX. longueursTrajet énumère les chemins simples du départ à l’objectif (la carte a une dizaine de modules, pas mille) et rend le plus court et le plus long : la ligne de vérification de l’éditeur l’affiche — sur la carte livrée, 9 niveaux (HUB 0 → T2 3 → N 0 → S2 3 → OBS 3). Passer T1 à 5 niveaux donne aussitôt « 9 à 11 » : le concepteur voit ce que sa carte coûte au joueur sans jouer.',
+      'L’ÉDITEUR SUIT : deux champs par module (niveaux, code de biome, avec leur bulle), la liste des modules dit « 3 niv. », le dessin en édition écrit « 3 NIV. · T2 » sous la température ; l’aperçu jeu remplace le sélecteur d’état par les ORBES À COCHER (chaque bouton est un orbe ; la fiche dit « Orbe nécessaire : solidification ») ; un module sans code de biome mais avec des niveaux est signalé — la pioche ne saurait pas quoi lui donner.',
+      'VÉRIFIÉ : 841 tests verts dans 73 fichiers (cinq de plus : lecture des orbes, orbe inconnu refusé, trajet 9 / 9 à 10 / inatteignable, niveaux sans biome, niveaux affichés en édition seulement), type-check à 0, build propre ; et au navigateur (Chromium, page d’essai) : champ niveaux qui met le trajet à jour, T1 refusée sans orbe puis ouverte avec l’orbe de solidification, zéro erreur console. La suite est posée dans docs/carte-station.md : la descente pilotée par la carte, les orbes et le marchand, le réétiquetage des tableaux par biome.',
+    ],
+  },
+  {
     date: '03/09/2026 17:47',
     title: 'L’ÉDITEUR DE LA CARTE : le plan à routes ramifiées se dessine, se vérifie et s’exporte',
     notes: [

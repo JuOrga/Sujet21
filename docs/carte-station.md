@@ -80,36 +80,87 @@ dépôt (annulable).
   `combat`, `enigme`, `coffre`, `boss`.
 - `modules[]` : `id`, `nom`, `type`, `zone`, `x`, `y` (**le centre**),
   `w`, `h`, `temp` (°C), `forme` (`octogone` | `rond` | `octogone-dome`),
-  `desc`.
+  `niveaux` (**un module est un biome** : le nombre de salles qu'on y joue
+  avant que la carte ne s'ouvre à nouveau ; 0 pour un lieu sans salle,
+  hub ou nœud), `biome` (le code du biome dans la nomenclature atelier,
+  la pioche ne tirera que des tableaux qui le portent), `desc`.
 - `liens[]` : `de`, `vers`, `type`. **Orientés** : le joueur avance de
   `de` vers `vers`. Une clé de `typesLiens`.
 - `typesLiens` : par type, `couleur`, `epaisseur` (la ligne de route),
   `coque` (la largeur de la paroi), `tirets` (optionnel), `condition`
-  (`null` = libre, sinon `etatJoueur == glace`), `badge` (optionnel).
+  (`null` = libre, sinon `orbe == solidification` — un id d'orbe, voir
+  ci-dessous), `badge` (optionnel).
 - `decor[]` : le non-jouable, ancré à un module — l'arc de coque
   (`coque-croissant`, deux courbes) et le télescope (`telescope-hubble`,
   position, rotation, tube). Les nervures et lumières de l'arc sont
   calculées sur ses courbes : l'arc peut changer de forme sans qu'on les
   refasse.
 - `palette` : les couleurs du dessin.
-- `regles` : `depart`, `objectif`, `etatsJoueur`, `etatInitial`,
-  `couloirHub` (la règle en français), `temperatureCouleur` (des seuils,
-  lus dans l'ordre : `<=0`, `<30`, `<60`, `sinon`).
+- `regles` : `depart`, `objectif`, `couloirHub` (la règle en français),
+  `temperatureCouleur` (des seuils, lus dans l'ordre : `<=0`, `<30`,
+  `<60`, `sinon`).
+
+**Les orbes d'essence de conscience.** Un cadenas ne lit pas l'état du
+corps à l'instant : il lit un ACQUIS. Chaque orbe est une transformation ou
+un état du cycle des mémoires (`src/game/cycle.ts`) — `fusion`,
+`liquefaction`, `solidification`, `vaporisation`, `sublimation`,
+`condensation`, `ionisation`, `deionisation`, et les états `solide`,
+`liquide`, `gaz`, `plasma`. La liste `ORBES` de `carteStation.ts` est
+dérivée du cycle : la carte ne la duplique pas. La vérification refuse une
+condition qui cite un orbe inconnu. L'aperçu jeu coche les orbes acquis et
+les cadenas suivent.
+
+**Le trajet en niveaux.** `longueursTrajet` compte les salles du départ à
+l'objectif, au plus court et au plus long ; la ligne de vérification de
+l'éditeur l'affiche. La longueur d'une run n'est plus un réglage, c'est une
+conséquence de la carte : sur la carte livrée, 9 niveaux.
 
 **La règle du hub.** « Un lien partant du HUB sort à
 y = clamp(cible.y, HUB.y − 110, HUB.y + 110) ». Le 110 est h/2 − 36 pour
 un fût de 292 : `traceLien` l'applique à tout module plus haut que large,
 à chaque bout. Un second hub se comportera comme le premier.
 
+## La conception retenue (concepteur, 03/09/2026)
+
+1. **Un module = un biome = un ensemble de niveaux.** Le nombre de salles
+   par module se règle dans l'éditeur (`niveaux`) ; le nombre de modules
+   aussi, en en ajoutant sur la carte. L'extension se fait en ajoutant des
+   modules à la suite.
+2. **Au bout des niveaux du module, la carte s'ouvre.** Le joueur choisit le
+   module suivant parmi ceux au bout d'une coursive partant de sa position.
+   Le module choisi s'agrandit à l'écran et présente les vignettes de ses
+   salles, comme le choix actuel en trois vignettes : un seul écran, deux
+   temps.
+3. **Les tableaux portent un code de biome**, ajouté à la nomenclature
+   atelier moment · mécanique · difficulté (101, 223…). La pioche ne tire que
+   des tableaux du biome du module. Les tableaux existants sont à
+   réétiqueter, et à compléter là où un biome est vide.
+4. **Les cadenas sont des barrières durables.** Une coursive glace ne
+   s'ouvre que si l'orbe de solidification est acquis. Les orbes s'achètent
+   au **marchand du hub** contre de la mémoire (la monnaie durable ; le
+   condensat, lui, est perdu à la fin de la run), et se trouvent aussi en
+   run. Le marchand vend également d'autres améliorations durables. L'écran
+   des mémoires dépense les orbes pour tisser les transformations.
+5. **Les caches** (S1b, S3b) restent un bonus sans règle arrêtée — un orbe
+   trouvable au fond du cul-de-sac est la piste naturelle.
+6. **La longueur d'une run découle du trajet** et des niveaux par module.
+
 ## Ce qui reste à faire
 
-- **Brancher la carte dans le jeu.** L'écran LA STATION lit encore le plan
-  linéaire de `station.ts` (six modules sur une poutre, un module toutes
-  les *n* salles). La carte ramifiée demande une décision de conception :
-  comment une coursive choisie se traduit en salle suivante (le générateur
-  pioche par moment · mécanique ; un module pourrait porter ce code), et ce
-  que « entrer dans un module » coûte ou rapporte. `dessinCarteSVG` en mode
-  `jeu` est prêt pour cet écran.
+Dans l'ordre, une PR vers `dev` par étape :
+
+1. ~~Le JSON de la carte : niveaux par module, code de biome, condition lue
+   sur les orbes. Éditeur mis à jour.~~ Fait.
+2. **La descente pilotée par la carte** : la carte s'ouvre en fin de module,
+   le module s'agrandit sur ses vignettes, le plan de voie garde la rampe de
+   difficulté mais la longueur suit le trajet. L'écran LA STATION lit
+   encore le plan linéaire de `station.ts` ; `dessinCarteSVG` en mode `jeu`
+   est prêt pour le remplacer.
+3. **Les orbes** : la monnaie, l'écran des mémoires qui les dépense, le
+   marchand du hub qui les vend contre de la mémoire (et d'autres
+   améliorations durables), l'orbe trouvable en cache.
+4. **Le réétiquetage des tableaux existants par biome**, et le code de
+   biome dans la nomenclature atelier.
 - Les vignettes bitmap par module (`docs/carte-station/assets-prompts.md`)
   si l'on quitte le tout-vectoriel — le champ `img` de la maquette n'est pas
   repris dans le JSON tant qu'elles n'existent pas.

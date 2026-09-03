@@ -5841,8 +5841,6 @@
       .ce-f--ligne { flex-direction: row; align-items: center; gap: 6px; }
       .ce-signal { font-size: calc(11px * var(--ui)); color: var(--valid); opacity: 0; transition: opacity 0.3s; }
       .ce-signal.on { opacity: 1; }
-      .ce-jeu-seul { display: none; }
-      #carte-editeur.ce-jeu .ce-jeu-seul { display: flex; }
       .ce-side {
         border-right: 1px solid var(--line); overflow-y: auto; overscroll-behavior: contain;
         padding: 12px; display: flex; flex-direction: column; gap: 14px;
@@ -5900,6 +5898,9 @@
       #carte-editeur .ce-entrer { width: 100%; padding: 12px; font-family: var(--font-display); font-size: calc(11px * var(--ui)); letter-spacing: 0.28em; border-color: var(--specimen); background: rgba(99, 183, 230, 0.18); }
       #carte-editeur .ce-entrer:disabled { border-color: var(--line); background: transparent; color: var(--dim); opacity: 1; }
       #carte-editeur .ce-etat { flex: 1; padding: 8px 0; }
+      .ce-orbes { display: flex; flex-wrap: wrap; gap: 4px; }
+      #carte-editeur .ce-orbes .ce-etat { flex: none; padding: 5px 8px; font-size: calc(10.5px * var(--ui)); text-transform: none; letter-spacing: 0.04em; }
+      .cs-niv { font-size: 10px; letter-spacing: 0.12em; text-anchor: middle; pointer-events: none; }
 
       /* ==== LE DESSIN DE LA CARTE (game/dessinCarte.ts) — vaut pour l'éditeur
          comme pour un futur écran de jeu. Les couleurs de la carte voyagent

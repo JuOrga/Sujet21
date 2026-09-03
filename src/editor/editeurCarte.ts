@@ -16,8 +16,8 @@
 // qui rend le reste testable sans navigateur.
 //
 // LE MODE APERÇU JEU rejoue le comportement voulu de la carte in-game (le
-// joueur sur un module, les cibles cliquables, le cadenas quand l'état ne
-// convient pas, ENTRER) — sans quitter l'éditeur, pour vérifier qu'une
+// joueur sur un module, les cibles cliquables, le cadenas quand l'orbe
+// manque, ENTRER) — sans quitter l'éditeur, pour vérifier qu'une
 // carte se traverse avant de la livrer.
 
 import {
@@ -26,7 +26,9 @@ import {
   TYPES_MODULE,
   cloneCarte,
   couleurTemperature,
-  etatRequis,
+  orbeRequis,
+  longueursTrajet,
+  ORBES,
   liensDepuis,
   moduleParId,
   parseCarte,
@@ -86,7 +88,8 @@ export class EditeurCarte {
   // l'aperçu jeu
   private courant = CARTE_LIVREE.regles.depart
   private visites: string[] = []
-  private etat = CARTE_LIVREE.regles.etatInitial
+  /** les orbes acquis dans l'aperçu — décident des cadenas */
+  private orbes = new Set<string>()
   private geste: Geste | null = null
   private brouillon: OptionsDessin['brouillon'] = null
   private svg: SVGSVGElement | null = null
@@ -113,7 +116,7 @@ export class EditeurCarte {
     this.host.classList.add('visible')
     this.courant = this.carte.regles.depart
     this.visites = []
-    this.etat = this.carte.regles.etatInitial
+    this.orbes.clear()
     this.dessine()
   }
 
@@ -244,7 +247,7 @@ export class EditeurCarte {
       visites: jeu ? this.visites : [],
       selection: this.selection,
       lienSelection: jeu ? null : this.lienSel,
-      etatJoueur: this.etat,
+      orbes: [...this.orbes],
       mode: jeu ? 'jeu' : 'editeur',
       afficherTemp: true,
       grille: this.grille,
@@ -283,10 +286,6 @@ export class EditeurCarte {
     this.el('ce-mode').textContent = jeu ? '✎ Édition' : '⏵ Aperçu jeu'
     this.el('ce-mode').classList.toggle('primary', !jeu)
     this.host.classList.toggle('ce-jeu', jeu)
-    const sel = this.el('ce-etat') as HTMLSelectElement
-    sel.innerHTML = this.carte.regles.etatsJoueur
-      .map((e) => `<option value="${esc(e)}"${e === this.etat ? ' selected' : ''}>${esc(e.toUpperCase())}</option>`)
-      .join('')
     // la légende suit les types de coursive de la carte : un trait par type
     this.el('ce-legende').innerHTML =
       Object.entries(this.carte.typesLiens)
@@ -310,7 +309,7 @@ export class EditeurCarte {
         const z = zoneDe(c, m)
         return (
           `<button type="button" class="ce-item${m.id === this.selection ? ' active' : ''}" data-mod-liste="${esc(m.id)}" style="--z:${z?.couleur ?? '#7f9cb0'}">` +
-          `<i></i><b>${esc(m.id)}</b><span>${esc(m.nom)}</span><em>${GLYPHES[m.type] || '○'}</em></button>`
+          `<i></i><b>${esc(m.id)}</b><span>${esc(m.nom)}${m.niveaux > 0 ? ` · ${m.niveaux} niv.` : ''}</span><em>${GLYPHES[m.type] || '○'}</em></button>`
         )
       })
       .join('')
@@ -328,8 +327,10 @@ export class EditeurCarte {
   private peintVerdicts(): void {
     const v = verifieCarte(this.carte)
     const hote = this.el('ce-verdicts')
+    const t = longueursTrajet(this.carte)
+    const trajet = t ? ` · trajet ${t.min === t.max ? `${t.min}` : `${t.min} à ${t.max}`} niveaux` : ''
     if (v.length === 0) {
-      hote.innerHTML = `<p class="ce-ok">✓ carte cohérente — ${this.carte.modules.length} modules, ${this.carte.liens.length} coursives</p>`
+      hote.innerHTML = `<p class="ce-ok">✓ carte cohérente — ${this.carte.modules.length} modules, ${this.carte.liens.length} coursives${trajet}</p>`
       return
     }
     hote.innerHTML = v
@@ -389,6 +390,9 @@ export class EditeurCarte {
       this.choix(P + 'zone', 'Zone', m.zone, c.zones.map((zz) => [zz.id, `${zz.code} · ${zz.nom}`])) +
       this.choix(P + 'forme', 'Silhouette', m.forme, FORMES_MODULE.map((f) => [f, f])) +
       `<div class="ce-grille2">` +
+      this.champ(P + 'niveaux', 'Niveaux (salles)', m.niveaux, 'type="number" step="1" min="0" title="Un module est un biome : le nombre de salles qu’on y joue avant que la carte ne s’ouvre à nouveau. 0 : un lieu sans salle (hub, nœud)"') +
+      this.champ(P + 'biome', 'Code de biome', m.biome, 'spellcheck="false" title="Le code du biome dans la nomenclature atelier : la pioche ne tirera que des tableaux qui le portent"') +
+      `</div><div class="ce-grille2">` +
       this.champ(P + 'x', 'x (centre)', m.x, 'type="number" step="1"') +
       this.champ(P + 'y', 'y (centre)', m.y, 'type="number" step="1"') +
       this.champ(P + 'w', 'largeur', m.w, 'type="number" step="1" min="32"') +
@@ -443,13 +447,11 @@ export class EditeurCarte {
   private formulaireCarte(): string {
     const c = this.carte
     const mods = c.modules.map((m): [string, string] => [m.id, `${m.id} — ${m.nom}`])
-    const etats = c.regles.etatsJoueur.map((e): [string, string] => [e, e])
     return (
       `<div class="ce-group"><span class="k">La carte</span>` +
       `<p class="ce-note">Cliquez un module ou une coursive pour l’éditer. Glissez un module pour le déplacer, ses coins pour le redimensionner. « Lier » (ou Maj + glisser) trace une coursive d’un module à un autre.</p>` +
       this.choix('regles.depart', 'Départ', c.regles.depart, mods) +
       this.choix('regles.objectif', 'Objectif', c.regles.objectif, mods) +
-      this.choix('regles.etatInitial', 'État initial du joueur', c.regles.etatInitial, etats) +
       `<div class="ce-grille2">` +
       this.champ('scene.width', 'scène : largeur', c.scene.width, 'type="number" step="1" min="200"') +
       this.champ('scene.height', 'scène : hauteur', c.scene.height, 'type="number" step="1" min="200"') +
@@ -476,11 +478,12 @@ export class EditeurCarte {
             this.champ(`typesLiens.${k}.coque`, 'coque', s.coque, 'type="number" step="1" min="4"') +
             `</div>` +
             this.champ(`typesLiens.${k}.tirets`, 'tirets (ex. « 6 8 »)', s.tirets ?? '') +
-            this.champ(`typesLiens.${k}.condition`, 'condition (ex. « etatJoueur == glace »)', s.condition ?? '') +
+            this.champ(`typesLiens.${k}.condition`, 'condition (ex. « orbe == solidification »)', s.condition ?? '') +
             this.champ(`typesLiens.${k}.badge`, 'badge', s.badge ?? '') +
             `</details>`,
         )
         .join('') +
+      `<p class="ce-note">orbes connus : ${ORBES.map((o) => esc(o.id)).join(', ')}</p>` +
       `<button type="button" id="ce-type-ajouter">+ Type de coursive</button></div>`
     )
   }
@@ -493,14 +496,15 @@ export class EditeurCarte {
     if (!m) return `<p class="ce-note">Aucun module.</p>`
     const z = zoneDe(c, m)
     const lien = liensDepuis(c, this.courant).find((l) => l.vers === m.id)
-    const requis = lien ? etatRequis(c, lien, this.etat) : null
+    const requis = lien ? orbeRequis(c, lien, this.orbes) : null
     const ici = m.id === this.courant
     const traverse = this.visites.includes(m.id)
     const bloque = !lien || requis !== null
     const etat = ici ? 'POSITION' : traverse ? 'TRAVERSÉ' : lien ? (requis ? 'VERROUILLÉ' : 'ACCESSIBLE') : 'HORS DE PORTÉE'
     const couleurEtat = ici ? '#a7ddf5' : lien && !requis ? '#3fd69b' : requis ? '#e0685c' : '#7f9cb0'
+    const nomOrbe = (id: string): string => ORBES.find((o) => o.id === id)?.nom ?? id
     const acces = requis
-      ? `Transformation nécessaire : passer à l’état ${requis.toUpperCase()}.`
+      ? `Orbe nécessaire : ${nomOrbe(requis)}.`
       : lien
         ? `Coursive « ${lien.type} ».`
         : ici
@@ -521,8 +525,9 @@ export class EditeurCarte {
       `<p class="ce-acces" style="color:${requis ? '#e0685c' : '#7f9cb0'}">${esc(acces)}</p>` +
       `<button type="button" id="ce-entrer" class="ce-entrer" ${bloque ? 'disabled' : ''}>${bloque ? (requis ? 'ACCÈS REFUSÉ' : 'INACCESSIBLE') : 'ENTRER →'}</button>` +
       `</div>` +
-      `<div class="ce-group"><span class="k">Le sujet</span>` +
-      `<div class="ce-ligne">${c.regles.etatsJoueur.map((e) => `<button type="button" class="ce-etat${e === this.etat ? ' active' : ''}" data-etat="${esc(e)}">${esc(e.toUpperCase())}</button>`).join('')}</div>` +
+      `<div class="ce-group"><span class="k">Orbes acquis</span>` +
+      `<p class="ce-note">Chaque orbe est une transformation ou un état du cycle. Cochez ce que le sujet possède : les cadenas suivent.</p>` +
+      `<div class="ce-orbes">${ORBES.map((o) => `<button type="button" class="ce-etat${this.orbes.has(o.id) ? ' active' : ''}" data-orbe="${esc(o.id)}" title="${esc(o.nom)}">${esc(o.id)}</button>`).join('')}</div>` +
       `<p class="ce-note">modules traversés : ${this.visites.length + 1} · objectif : ${esc(c.regles.objectif)}${this.courant === c.regles.objectif ? ' — ATTEINT' : ''}</p>` +
       `<button type="button" id="ce-rejouer">↺ Revenir au départ</button></div>`
     )
@@ -564,15 +569,11 @@ export class EditeurCarte {
       if (this.mode === 'jeu') {
         this.courant = this.carte.regles.depart
         this.visites = []
-        this.etat = this.carte.regles.etatInitial
+        this.orbes.clear()
         this.selection = this.cibleParDefaut(this.courant)
         this.lienSel = null
         this.outil = 'selection'
       }
-      this.dessine()
-    })
-    this.el('ce-etat').addEventListener('change', (e) => {
-      this.etat = (e.target as HTMLSelectElement).value
       this.dessine()
     })
     this.el('ce-export').addEventListener('click', () => this.exporte())
@@ -806,7 +807,7 @@ export class EditeurCarte {
    *  la fiche explique le refus. Null en cul-de-sac. */
   private cibleParDefaut(id: string): string | null {
     const liens = liensDepuis(this.carte, id)
-    const ouvert = liens.find((l) => etatRequis(this.carte, l, this.etat) === null)
+    const ouvert = liens.find((l) => orbeRequis(this.carte, l, this.orbes) === null)
     return (ouvert ?? liens[0])?.vers ?? null
   }
 
@@ -815,7 +816,7 @@ export class EditeurCarte {
     const cible = this.selection
     if (cible === null) return
     const lien = liensDepuis(c, this.courant).find((l) => l.vers === cible)
-    if (!lien || etatRequis(c, lien, this.etat) !== null) return
+    if (!lien || orbeRequis(c, lien, this.orbes) !== null) return
     this.visites = [...this.visites, this.courant]
     this.courant = cible
     this.selection = this.cibleParDefaut(cible) ?? cible
@@ -838,9 +839,11 @@ export class EditeurCarte {
         this.selectionne(null, Number(bl.getAttribute('data-lien-liste')))
         return
       }
-      const be = t.closest?.('[data-etat]')
-      if (be) {
-        this.etat = be.getAttribute('data-etat') ?? this.etat
+      const bo = t.closest?.('[data-orbe]')
+      if (bo) {
+        const id = bo.getAttribute('data-orbe') ?? ''
+        if (this.orbes.has(id)) this.orbes.delete(id)
+        else this.orbes.add(id)
         this.dessine()
         return
       }
@@ -1084,7 +1087,6 @@ function gabarit(): string {
     `<span id="ce-signal" class="ce-signal"></span>` +
     `<label class="ce-f ce-f--ligne"><span>Grille</span><input type="number" id="ce-grille" value="8" min="0" step="1" style="width:52px"/></label>` +
     `<label class="ce-f ce-f--ligne" title="AIMANT : les positions s'arrondissent au pas de la grille"><span>Aimant</span><input type="checkbox" id="ce-aimant" checked/></label>` +
-    `<label class="ce-f ce-f--ligne ce-jeu-seul" title="L'état du sujet dans l'aperçu : décide des cadenas"><span>État</span><select id="ce-etat"></select></label>` +
     `<button type="button" id="ce-mode" class="primary">⏵ Aperçu jeu</button>` +
     `<button type="button" id="ce-quit">↩ Accueil</button>` +
     `</div>` +

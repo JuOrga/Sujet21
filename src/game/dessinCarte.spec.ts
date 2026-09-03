@@ -7,7 +7,7 @@ const base: OptionsDessin = {
   visites: [],
   selection: null,
   lienSelection: null,
-  etatJoueur: 'eau',
+  orbes: [],
   mode: 'editeur',
   afficherTemp: true,
   grille: 8,
@@ -59,8 +59,8 @@ describe('dessinCarteSVG — le plan, depuis les données', () => {
     expect(compte(svg, /cs-active/g)).toBe(3)
   })
 
-  it('en état glace, la transfo glace s’ouvre et la transfo gaz reste close', () => {
-    const svg = dessinCarteSVG(CARTE_LIVREE, { ...base, mode: 'jeu', courant: 'HUB', etatJoueur: 'glace' })
+  it('avec l’orbe de solidification, la transfo glace s’ouvre et la transfo gaz reste close', () => {
+    const svg = dessinCarteSVG(CARTE_LIVREE, { ...base, mode: 'jeu', courant: 'HUB', orbes: ['solidification'] })
     expect(svg).toMatch(/cs-cible" data-mod="T1"/)
     expect(svg).toMatch(/cs-verrou" data-mod="T3"/)
   })
@@ -78,6 +78,9 @@ describe('dessinCarteSVG — le plan, depuis les données', () => {
     const jeu = dessinCarteSVG(CARTE_LIVREE, { ...base, mode: 'jeu', courant: 'HUB' })
     expect(jeu).not.toContain('cs-grille')
     expect(jeu).not.toContain('cs-sens')
+    // les niveaux du biome ne se lisent qu'en édition
+    expect(svg).toContain('3 NIV. · T2')
+    expect(jeu).not.toContain('NIV.')
     expect(jeu).not.toContain('data-poignee')
   })
 

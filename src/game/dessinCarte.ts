@@ -22,7 +22,7 @@
 
 import {
   couleurTemperature,
-  etatRequis,
+  orbeRequis,
   liensDepuis,
   moduleParId,
   traceLien,
@@ -43,8 +43,8 @@ export interface OptionsDessin {
   selection: string | null
   /** la coursive sélectionnée dans l'éditeur (index dans liens) */
   lienSelection: number | null
-  /** l'état du joueur — décide des cadenas */
-  etatJoueur: string
+  /** les orbes acquis — décident des cadenas */
+  orbes: readonly string[]
   /** l'éditeur ajoute poignées, flèches de sens, zones de prise et grille */
   mode: 'jeu' | 'editeur'
   afficherTemp: boolean
@@ -342,7 +342,7 @@ function module(c: CarteStation, m: ModuleCarte, k: number, o: OptionsDessin): s
   const estCourant = o.courant === m.id
   const visite = o.visites.includes(m.id)
   const arete = o.courant !== null ? liensDepuis(c, o.courant).find((l) => l.vers === m.id) : undefined
-  const verrou = arete ? etatRequis(c, arete, o.etatJoueur) !== null : false
+  const verrou = arete ? orbeRequis(c, arete, o.orbes) !== null : false
   const cliquable = !!arete
   const sel = o.selection === m.id
   const edition = o.mode === 'editeur'
@@ -410,6 +410,9 @@ function module(c: CarteStation, m: ModuleCarte, k: number, o: OptionsDessin): s
         `<rect x="-31" y="-2" width="40" height="4" fill="rgba(150,200,235,.12)"/>` +
         `<rect x="-31" y="-2" width="${n1((40 * larg) / 100)}" height="4" fill="${tc}"/>` +
         `<text x="14" y="4" fill="${tc}">${n1(m.temp)}°</text></g>`
+      // en édition, la mesure qui compte pour la run : les niveaux du biome
+      if (edition && m.niveaux > 0)
+        s += `<text class="cs-niv" x="${n1(m.x)}" y="${n1(yt + 15)}" fill="${P.texteSecondaire}">${m.niveaux} NIV.${m.biome ? ' · ' + esc(m.biome) : ''}</text>`
     }
   }
   if (edition && sel) {

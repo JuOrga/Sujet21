@@ -21,6 +21,32 @@
 // Tout ici est pur : aucun DOM, aucun état — testable sans navigateur.
 
 import brut from './carteStation.json'
+import { ETATS_CYCLE, TRANSFOS_CYCLE } from './cycle'
+
+/** LES ORBES D'ESSENCE DE CONSCIENCE. Chaque orbe est UNE transformation ou
+ *  UN état du cycle des mémoires (décision du concepteur, 03/09) : on les
+ *  achète au marchand du hub contre de la mémoire, ou on les trouve en run,
+ *  et l'écran des mémoires les dépense pour tisser. Une coursive
+ *  conditionnée s'ouvre quand l'orbe est ACQUIS — un acquis durable, pas
+ *  l'état du corps à l'instant : la carte se lit comme une progression, pas
+ *  comme un guichet où l'on se transformerait devant la porte. */
+export interface Orbe {
+  id: string
+  nom: string
+}
+export const ORBES: readonly Orbe[] = [
+  ...TRANSFOS_CYCLE.map((t) => ({
+    id: t.id,
+    nom: t.etat === 'mystere' ? `${t.de} → ${t.vers} (???)` : t.nom.toLowerCase(),
+  })),
+  ...(Object.keys(ETATS_CYCLE) as (keyof typeof ETATS_CYCLE)[]).map((id) => ({
+    id,
+    nom: `état ${ETATS_CYCLE[id].nom.toLowerCase()}`,
+  })),
+]
+export function orbeConnu(id: string): boolean {
+  return ORBES.some((o) => o.id === id)
+}
 
 /** Une zone (secteur) de la station : un code, un nom, une teinte. */
 export interface ZoneCarte {
@@ -58,6 +84,12 @@ export interface ModuleCarte {
   /** la température du module, en °C — colorée par `regles.temperatureCouleur` */
   temp: number
   forme: FormeModule
+  /** UN MODULE EST UN BIOME : le nombre de salles qu'on y joue avant que la
+   *  carte ne s'ouvre à nouveau. 0 : un lieu sans salle (le hub, un nœud). */
+  niveaux: number
+  /** le code du biome dans la nomenclature atelier — la pioche ne tirera
+   *  que des tableaux qui le portent. Vide : à définir. */
+  biome: string
   desc: string
 }
 
@@ -76,7 +108,7 @@ export interface StyleLien {
   /** la largeur de la paroi de coque, la coursive dessinée en trois traits */
   coque: number
   tirets?: string
-  /** null : passage libre ; sinon « etatJoueur == glace » */
+  /** null : passage libre ; sinon « orbe == solidification » (un id d'ORBES) */
   condition: string | null
   badge?: string
 }
@@ -111,8 +143,6 @@ export interface PaletteCarte {
 export interface ReglesCarte {
   depart: string
   objectif: string
-  etatsJoueur: string[]
-  etatInitial: string
   /** la règle des coursives du hub, en français — la fonction traceLien l'applique */
   couloirHub: string
   /** l'échelle de couleur, par seuils : « <=0 », « <30 », « <60 », « sinon » */
@@ -183,7 +213,7 @@ export function parseCarte(entree: unknown): {
       if (!estChaine(m.nom)) erreurs.push(`${ou} : nom requis`)
       if (!TYPES_MODULE.includes(m.type as TypeModule)) erreurs.push(`${ou} : type inconnu « ${String(m.type)} »`)
       if (!estNombre(m.zone)) erreurs.push(`${ou} : zone (nombre) requise`)
-      for (const k of ['x', 'y', 'w', 'h', 'temp'] as const)
+      for (const k of ['x', 'y', 'w', 'h', 'temp', 'niveaux'] as const)
         if (!estNombre(m[k])) erreurs.push(`${ou} : ${k} (nombre) requis`)
       if (!FORMES_MODULE.includes(m.forme as FormeModule)) erreurs.push(`${ou} : forme inconnue « ${String(m.forme)} »`)
       if (erreurs.some((e) => e.startsWith(ou))) return
@@ -198,6 +228,8 @@ export function parseCarte(entree: unknown): {
         h: m.h as number,
         temp: m.temp as number,
         forme: m.forme as FormeModule,
+        niveaux: m.niveaux as number,
+        biome: estChaine(m.biome) ? m.biome.trim() : '',
         desc: estChaine(m.desc) ? m.desc : '',
       })
     })
@@ -270,19 +302,14 @@ export function parseCarte(entree: unknown): {
   if (!estObjet(o.regles)) erreurs.push('regles doit être un objet')
   else {
     const r = o.regles
-    const etats = Array.isArray(r.etatsJoueur) && r.etatsJoueur.every(estChaine) ? [...r.etatsJoueur] : null
     if (!estChaine(r.depart)) erreurs.push('regles.depart manque')
     if (!estChaine(r.objectif)) erreurs.push('regles.objectif manque')
-    if (!etats || etats.length === 0) erreurs.push('regles.etatsJoueur doit lister les états du joueur')
-    if (!estChaine(r.etatInitial)) erreurs.push('regles.etatInitial manque')
     const tc = estObjet(r.temperatureCouleur) ? r.temperatureCouleur : null
     if (!tc || !Object.values(tc).every(estChaine)) erreurs.push('regles.temperatureCouleur doit associer des seuils à des couleurs')
-    if (estChaine(r.depart) && estChaine(r.objectif) && etats && estChaine(r.etatInitial) && tc)
+    if (estChaine(r.depart) && estChaine(r.objectif) && tc)
       regles = {
         depart: r.depart,
         objectif: r.objectif,
-        etatsJoueur: etats,
-        etatInitial: r.etatInitial,
         couloirHub: estChaine(r.couloirHub) ? r.couloirHub : '',
         temperatureCouleur: { ...(tc as Record<string, string>) },
       }
@@ -307,7 +334,7 @@ export function serialiseCarte(c: CarteStation): string {
     types: Object.fromEntries(TYPES_MODULE.map((t) => [t, c.types[t]])) as Record<TypeModule, string>,
     modules: c.modules.map((m) => ({
       id: m.id, nom: m.nom, type: m.type, zone: m.zone, x: m.x, y: m.y, w: m.w, h: m.h,
-      temp: m.temp, forme: m.forme, desc: m.desc,
+      temp: m.temp, forme: m.forme, niveaux: m.niveaux, biome: m.biome, desc: m.desc,
     })),
     liens: c.liens.map((l) => ({ de: l.de, vers: l.vers, type: l.type })),
     typesLiens: Object.fromEntries(
@@ -321,7 +348,12 @@ export function serialiseCarte(c: CarteStation): string {
     ),
     decor: c.decor.map((d) => ({ ...d })),
     palette: { ...c.palette, dome: [...c.palette.dome] },
-    regles: { ...c.regles, etatsJoueur: [...c.regles.etatsJoueur], temperatureCouleur: { ...c.regles.temperatureCouleur } },
+    regles: {
+      depart: c.regles.depart,
+      objectif: c.regles.objectif,
+      couloirHub: c.regles.couloirHub,
+      temperatureCouleur: { ...c.regles.temperatureCouleur },
+    },
   }
   return JSON.stringify(ordonne, null, 2) + '\n'
 }
@@ -378,24 +410,29 @@ export function liensDepuis(c: CarteStation, id: string): LienCarte[] {
   return c.liens.filter((l) => l.de === id)
 }
 
-/** La condition d'un type de lien, lue : « etatJoueur == glace » demande
- *  l'état glace. Une condition qu'on ne sait pas lire est traitée comme
- *  FERMÉE, et dite telle quelle — mieux vaut une porte close qu'une porte
- *  qui s'ouvre parce qu'on n'a pas compris la consigne. */
-export function litCondition(condition: string | null): { etat: string } | null {
+/** La condition d'un type de lien, lue : « orbe == solidification » demande
+ *  l'orbe de la solidification. Une condition qu'on ne sait pas lire est
+ *  traitée comme FERMÉE, et dite telle quelle — mieux vaut une porte close
+ *  qu'une porte qui s'ouvre parce qu'on n'a pas compris la consigne. */
+export function litCondition(condition: string | null): { orbe: string } | null {
   if (!condition) return null
-  const m = /^\s*etatJoueur\s*==\s*['"]?([\w-]+)['"]?\s*$/.exec(condition)
-  return { etat: m ? m[1] : `?${condition}` }
+  const m = /^\s*orbe\s*==\s*['"]?([\w-]+)['"]?\s*$/.exec(condition)
+  return { orbe: m ? m[1] : `?${condition}` }
 }
 
-/** Le lien est-il franchissable dans cet état ? Rend null si oui, sinon
- *  l'état requis. */
-export function etatRequis(c: CarteStation, l: LienCarte, etatJoueur: string): string | null {
+/** Le lien est-il franchissable avec ces orbes acquis ? Rend null si oui,
+ *  sinon l'orbe qui manque. */
+export function orbeRequis(
+  c: CarteStation,
+  l: LienCarte,
+  orbes: ReadonlySet<string> | readonly string[],
+): string | null {
   const style = c.typesLiens[l.type]
   if (!style) return null
   const cond = litCondition(style.condition)
   if (!cond) return null
-  return cond.etat === etatJoueur ? null : cond.etat
+  const acquis = orbes instanceof Set ? orbes.has(cond.orbe) : (orbes as readonly string[]).includes(cond.orbe)
+  return acquis ? null : cond.orbe
 }
 
 /** La couleur d'une température, par seuils. Les clés sont lues dans
@@ -431,6 +468,36 @@ export function accessibles(c: CarteStation, depart: string): Set<string> {
   return vus
 }
 
+/** LE TRAJET EN NIVEAUX : combien de salles séparent le départ de
+ *  l'objectif, au plus court et au plus long, en suivant les coursives dans
+ *  leur sens (la longueur d'une run n'est plus un réglage : elle découle de
+ *  la carte). Null : l'objectif est inatteignable. Les chemins simples
+ *  s'énumèrent — la carte a une dizaine de modules, pas mille. */
+export function longueursTrajet(c: CarteStation): { min: number; max: number } | null {
+  const niv = new Map(c.modules.map((m) => [m.id, Math.max(0, m.niveaux)]))
+  if (!niv.has(c.regles.depart) || !niv.has(c.regles.objectif)) return null
+  let min = Infinity
+  let max = -Infinity
+  let budget = 20000 // au-delà, la carte est un plat de nouilles : on s'arrête
+  const marche = (id: string, total: number, vus: Set<string>): void => {
+    if (budget-- <= 0) return
+    const t = total + (niv.get(id) ?? 0)
+    if (id === c.regles.objectif) {
+      min = Math.min(min, t)
+      max = Math.max(max, t)
+      return
+    }
+    for (const l of liensDepuis(c, id)) {
+      if (vus.has(l.vers) || !niv.has(l.vers)) continue
+      vus.add(l.vers)
+      marche(l.vers, t, vus)
+      vus.delete(l.vers)
+    }
+  }
+  marche(c.regles.depart, 0, new Set([c.regles.depart]))
+  return Number.isFinite(min) ? { min, max } : null
+}
+
 // ---- LA VÉRIFICATION DE FOND ----------------------------------------------
 
 export interface VerdictCarte {
@@ -452,6 +519,10 @@ export function verifieCarte(c: CarteStation): VerdictCarte[] {
   for (const m of c.modules) {
     if (!zoneDe(c, m)) v.push({ niveau: 'erreur', message: `${m.id} : zone ${m.zone} inconnue`, module: m.id })
     if (m.w < 24 || m.h < 24) v.push({ niveau: 'attention', message: `${m.id} : module trop petit pour être lu (${m.w}×${m.h})`, module: m.id })
+    if (!Number.isInteger(m.niveaux) || m.niveaux < 0)
+      v.push({ niveau: 'erreur', message: `${m.id} : niveaux doit être un entier positif ou nul (${m.niveaux})`, module: m.id })
+    if (m.niveaux > 0 && m.biome.trim() === '')
+      v.push({ niveau: 'attention', message: `${m.id} : ${m.niveaux} niveau${m.niveaux > 1 ? 'x' : ''} sans code de biome — la pioche ne saura pas quels tableaux lui donner`, module: m.id })
     if (m.x - m.w / 2 < 0 || m.y - m.h / 2 < 0 || m.x + m.w / 2 > c.scene.width || m.y + m.h / 2 > c.scene.height)
       v.push({ niveau: 'attention', message: `${m.id} déborde de la scène`, module: m.id })
   }
@@ -473,16 +544,14 @@ export function verifieCarte(c: CarteStation): VerdictCarte[] {
   })
   for (const [k, s] of Object.entries(c.typesLiens)) {
     const cond = litCondition(s.condition)
-    if (cond && (cond.etat.startsWith('?') || !c.regles.etatsJoueur.includes(cond.etat)))
-      v.push({ niveau: 'erreur', message: `typesLiens.${k} : condition illisible ou état inconnu « ${s.condition} »` })
+    if (cond && (cond.orbe.startsWith('?') || !orbeConnu(cond.orbe)))
+      v.push({ niveau: 'erreur', message: `typesLiens.${k} : condition illisible ou orbe inconnu « ${s.condition} » — attendu « orbe == <id> », ids : ${ORBES.map((o) => o.id).join(', ')}` })
   }
 
   if (!ids.has(c.regles.depart))
     v.push({ niveau: 'erreur', message: `le départ « ${c.regles.depart} » n’est pas un module` })
   if (!ids.has(c.regles.objectif))
     v.push({ niveau: 'erreur', message: `l’objectif « ${c.regles.objectif} » n’est pas un module` })
-  if (!c.regles.etatsJoueur.includes(c.regles.etatInitial))
-    v.push({ niveau: 'erreur', message: `l’état initial « ${c.regles.etatInitial} » n’est pas dans etatsJoueur` })
 
   if (ids.has(c.regles.depart)) {
     const vus = accessibles(c, c.regles.depart)

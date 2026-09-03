@@ -99,6 +99,8 @@ export function ajouteModule(c: CarteStation, x: number, y: number, pas: number)
     h: 100,
     temp: 20,
     forme: 'octogone',
+    niveaux: 3,
+    biome: '',
     desc: 'À définir.',
   }
   c.modules.push(m)

@@ -5,7 +5,9 @@ import {
   accessibles,
   cloneCarte,
   couleurTemperature,
-  etatRequis,
+  orbeRequis,
+  longueursTrajet,
+  ORBES,
   liensDepuis,
   litCondition,
   parseCarte,
@@ -112,23 +114,63 @@ describe('traceLien — la règle des coursives du hub', () => {
   })
 })
 
-describe('les conditions d’accès', () => {
-  it('lit « etatJoueur == glace »', () => {
-    expect(litCondition('etatJoueur == glace')).toEqual({ etat: 'glace' })
-    expect(litCondition("etatJoueur == 'vapeur'")).toEqual({ etat: 'vapeur' })
+describe('les conditions d’accès — un orbe acquis, pas l’état du corps', () => {
+  it('lit « orbe == solidification »', () => {
+    expect(litCondition('orbe == solidification')).toEqual({ orbe: 'solidification' })
+    expect(litCondition("orbe == 'vaporisation'")).toEqual({ orbe: 'vaporisation' })
     expect(litCondition(null)).toBeNull()
   })
 
   it('une condition illisible FERME la porte au lieu de l’ouvrir', () => {
-    expect(litCondition('temp > 3')!.etat.startsWith('?')).toBe(true)
+    expect(litCondition('temp > 3')!.orbe.startsWith('?')).toBe(true)
+    expect(litCondition('etatJoueur == glace')!.orbe.startsWith('?')).toBe(true)
   })
 
-  it('la transfo glace demande l’état glace, et rien d’autre', () => {
+  it('les orbes sont les transformations et les états du cycle des mémoires', () => {
+    const ids = ORBES.map((o) => o.id)
+    for (const id of ['fusion', 'solidification', 'vaporisation', 'sublimation', 'solide', 'liquide', 'gaz', 'plasma'])
+      expect(ids).toContain(id)
+  })
+
+  it('la transfo glace demande l’orbe de solidification, et rien d’autre', () => {
     const glace = CARTE_LIVREE.liens.find((l) => l.type === 'glace')!
-    expect(etatRequis(CARTE_LIVREE, glace, 'eau')).toBe('glace')
-    expect(etatRequis(CARTE_LIVREE, glace, 'glace')).toBeNull()
+    expect(orbeRequis(CARTE_LIVREE, glace, [])).toBe('solidification')
+    expect(orbeRequis(CARTE_LIVREE, glace, ['vaporisation'])).toBe('solidification')
+    expect(orbeRequis(CARTE_LIVREE, glace, ['solidification'])).toBeNull()
+    expect(orbeRequis(CARTE_LIVREE, glace, new Set(['solidification']))).toBeNull()
     const libre = CARTE_LIVREE.liens.find((l) => l.type === 'main')!
-    expect(etatRequis(CARTE_LIVREE, libre, 'eau')).toBeNull()
+    expect(orbeRequis(CARTE_LIVREE, libre, [])).toBeNull()
+  })
+
+  it('un orbe inconnu dans une condition est une erreur de fond', () => {
+    const c = cloneCarte(CARTE_LIVREE)
+    c.typesLiens.glace.condition = 'orbe == teleportation'
+    expect(verifieCarte(c).some((v) => v.niveau === 'erreur' && v.message.includes('teleportation'))).toBe(true)
+  })
+})
+
+describe('un module est un biome — niveaux et trajet', () => {
+  it('la carte livrée compte ses niveaux : 9 salles au plus court, 12 au plus long', () => {
+    // HUB(0) → T2(3) → N(0) → S2(3) → OBS(3) = 9 ; les caches sont des culs-de-sac, hors trajet
+    expect(longueursTrajet(CARTE_LIVREE)).toEqual({ min: 9, max: 9 })
+    const c = cloneCarte(CARTE_LIVREE)
+    c.liens.push({ de: 'S1b', vers: 'OBS', type: 'alt' })
+    // HUB → T1(3) → N → S1(3) → S1b(1) → OBS(3) = 10
+    expect(longueursTrajet(c)).toEqual({ min: 9, max: 10 })
+  })
+
+  it('un objectif inatteignable n’a pas de trajet', () => {
+    const c = cloneCarte(CARTE_LIVREE)
+    c.liens = c.liens.filter((l) => l.vers !== 'OBS')
+    expect(longueursTrajet(c)).toBeNull()
+  })
+
+  it('des niveaux sans code de biome, ou négatifs, se signalent', () => {
+    const c = cloneCarte(CARTE_LIVREE)
+    c.modules[1].biome = ''
+    expect(verifieCarte(c).some((v) => v.niveau === 'attention' && v.module === 'T1' && v.message.includes('biome'))).toBe(true)
+    c.modules[1].niveaux = -2
+    expect(verifieCarte(c).some((v) => v.niveau === 'erreur' && v.module === 'T1')).toBe(true)
   })
 })
 
