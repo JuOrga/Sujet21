@@ -145,17 +145,51 @@ un fût de 292 : `traceLien` l'applique à tout module plus haut que large,
    trouvable au fond du cul-de-sac est la piste naturelle.
 6. **La longueur d'une run découle du trajet** et des niveaux par module.
 
+## La descente pilotée par la carte (`src/game/descenteCarte.ts`)
+
+- **L'état** : `carteRun = { module, niveau, visites }` — le module où l'on
+  joue, les salles déjà franchies dedans, les modules traversés. Il s'écrit
+  dans la sauvegarde de run et se relit à la reprise (une sauvegarde d'avant
+  la carte repart du départ).
+- **Au sas de lancement**, la carte s'ouvre dans la cérémonie : le premier
+  module se choisit sur le plan. Au bout des salles d'un module, elle se
+  rouvre. Un module fermé dit l'orbe qui manque (et secoue la scène), un
+  module hors de portée dit qu'aucune coursive n'y mène. Le module élu
+  s'agrandit (la scène zoome sur lui), puis ses salles arrivent en
+  vignettes — le choix habituel de la voie, titré du nom du module et de la
+  salle dans le module. Un nœud (module sans salle) rouvre la carte aussitôt.
+- **La longueur d'une run** n'est plus le réglage du plan de voie : c'est
+  `longueurRun()` — salles franchies + salles restantes du module + plus
+  court chemin en niveaux jusqu'à l'objectif. Le plan de voie garde tout le
+  reste (rampe, moments, postures, pioche) et reçoit cette longueur
+  (`planEffectif()`). L'écran LA DESCENTE, lui, simule toujours avec sa
+  propre longueur : c'est un banc, pas la run.
+- **La fin de l'expédition** : le module objectif, épuisé.
+- **La pioche suit le biome** : un tableau qui porte un `biome` ne se
+  propose que dans le module de ce biome ; un tableau sans biome est
+  universel (la bibliothèque n'est pas encore réétiquetée) ; une salle
+  générée prend le biome du module. Le champ `biome` d'un tableau se lit et
+  s'écrit avec le tableau (levelIO), l'éditeur de tableaux ne l'expose pas
+  encore (étape 4).
+- **Les orbes, en attendant les orbes** (`orbesDuCycle`) : un orbe est tenu
+  pour acquis quand la transformation qu'il nomme est tissée au cycle des
+  mémoires, et un orbe d'état quand une transformation qui y mène l'est.
+  L'étape 3 remplacera cette lecture par l'inventaire réel.
+- **L'écran LA STATION** lit la carte : position, modules traversés,
+  coursives ouvertes ou sous cadenas, fiche du module visé, légende tirée
+  des types de coursive. Les anciens `station.ts` et `planStation.ts`
+  (le plan linéaire à six modules) ne sont plus importés.
+- **Les outils** (`__expedition`, files d'essai) lancent une run sans
+  carte : elle entre d'office par la première coursive ouverte et joue la
+  salle 1 comme avant.
+
 ## Ce qui reste à faire
 
 Dans l'ordre, une PR vers `dev` par étape :
 
 1. ~~Le JSON de la carte : niveaux par module, code de biome, condition lue
    sur les orbes. Éditeur mis à jour.~~ Fait.
-2. **La descente pilotée par la carte** : la carte s'ouvre en fin de module,
-   le module s'agrandit sur ses vignettes, le plan de voie garde la rampe de
-   difficulté mais la longueur suit le trajet. L'écran LA STATION lit
-   encore le plan linéaire de `station.ts` ; `dessinCarteSVG` en mode `jeu`
-   est prêt pour le remplacer.
+2. ~~**La descente pilotée par la carte**~~ Fait — voir ci-dessous.
 3. **Les orbes** : la monnaie, l'écran des mémoires qui les dépense, le
    marchand du hub qui les vend contre de la mémoire (et d'autres
    améliorations durables), l'orbe trouvable en cache.

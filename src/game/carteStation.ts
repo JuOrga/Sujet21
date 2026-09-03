@@ -498,6 +498,36 @@ export function longueursTrajet(c: CarteStation): { min: number; max: number } |
   return Number.isFinite(min) ? { min, max } : null
 }
 
+/** LE PLUS COURT CHEMIN EN NIVEAUX d'un module à un autre, en suivant les
+ *  coursives dans leur sens — les niveaux du module de DÉPART ne comptent
+ *  pas (on y est déjà), ceux de l'arrivée si. Null : inatteignable. C'est
+ *  ce qui reste à jouer, au mieux, depuis là où l'on est. */
+export function plusCourtVers(c: CarteStation, de: string, vers: string): number | null {
+  const niv = new Map(c.modules.map((m) => [m.id, Math.max(0, m.niveaux)]))
+  if (!niv.has(de) || !niv.has(vers)) return null
+  if (de === vers) return 0
+  // Dijkstra sur une dizaine de sommets : la file est une liste triée
+  const dist = new Map<string, number>([[de, 0]])
+  const file: string[] = [de]
+  const clos = new Set<string>()
+  while (file.length) {
+    file.sort((a, b) => (dist.get(a) ?? 0) - (dist.get(b) ?? 0))
+    const id = file.shift()!
+    if (clos.has(id)) continue
+    clos.add(id)
+    if (id === vers) return dist.get(id) ?? null
+    for (const l of liensDepuis(c, id)) {
+      if (!niv.has(l.vers)) continue
+      const d = (dist.get(id) ?? 0) + (niv.get(l.vers) ?? 0)
+      if (d < (dist.get(l.vers) ?? Infinity)) {
+        dist.set(l.vers, d)
+        file.push(l.vers)
+      }
+    }
+  }
+  return null
+}
+
 // ---- LA VÉRIFICATION DE FOND ----------------------------------------------
 
 export interface VerdictCarte {

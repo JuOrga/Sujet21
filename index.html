@@ -1140,116 +1140,8 @@
         background: linear-gradient(180deg, #060c14, #030710);
         overflow: hidden;
       }
-      .ps-svg { display: block; width: 100%; height: 100%; }
-      .ps-ciel circle { pointer-events: none; }
-
-      /* la poutre, les panneaux, les radiateurs : le décor qui fait station */
-      .ps-poutre rect { fill: #1b2734; stroke: #2f4356; stroke-width: 1; }
-      .ps-radiateur { fill: #223244 !important; }
-      .ps-panneau rect {
-        fill: #16233d; stroke: #2c4468; stroke-width: 1;
-      }
-      .ps-cellules line { stroke: #2c4468; stroke-width: 1; }
-      .ps-manchon { fill: #16212e; stroke: #2b3d4e; stroke-width: 1; }
-      .ps-manchon-trait { stroke: #33485c; stroke-width: 1; }
-
-      /* ---- LA ROUTE PARCOURUE ---- */
-      .ps-route-trait {
-        stroke: var(--specimen); stroke-width: 2.5; stroke-linecap: round;
-        stroke-dasharray: 9 7; opacity: 0.85;
-        filter: drop-shadow(0 0 6px rgba(99, 183, 230, 0.55));
-        animation: ps-file 1.6s linear infinite;
-      }
-      @keyframes ps-file { to { stroke-dashoffset: -16; } }
-      .ps-sujet {
-        fill: #d8f1ff;
-        filter: drop-shadow(0 0 9px rgba(99, 183, 230, 0.95));
-        animation: ps-battement 2.4s ease-in-out infinite;
-      }
-      @keyframes ps-battement {
-        0%, 100% { r: 5.6; opacity: 0.95; }
-        50% { r: 7.4; opacity: 1; }
-      }
-
-      /* ---- UN MODULE ---- */
-      .ps-mod { cursor: pointer; }
-      .ps-fut {
-        fill: #101c28;
-        stroke: color-mix(in srgb, var(--t) 40%, #2b3d4e);
-        stroke-width: 1.5;
-        transition: fill 0.2s ease, stroke 0.2s ease;
-      }
-      .ps-bande { fill: var(--t); opacity: 0.35; transition: opacity 0.2s ease; }
-      .ps-nervures line { stroke: #22344a; stroke-width: 1; }
-      .ps-hublot {
-        fill: #0a141e; stroke: color-mix(in srgb, var(--t) 55%, #2b3d4e); stroke-width: 1.5;
-        transition: fill 0.2s ease;
-      }
-      .ps-halo { fill: none; stroke: none; }
-      .ps-badge {
-        fill: var(--dim); font-family: var(--font-display);
-        font-size: 13px; text-anchor: middle; letter-spacing: 0.06em;
-      }
-      .ps-nom {
-        fill: #9fbdd2; font-family: var(--font-display);
-        font-size: 11px; text-anchor: middle; letter-spacing: 0.05em;
-        transition: fill 0.2s ease;
-      }
-      .ps-sous {
-        fill: #5f778b; font-family: var(--font-mono);
-        font-size: 10.5px; text-anchor: middle;
-      }
-      /* la flèche du marqueur : elle pointe le fût sans le recouvrir */
-      .ps-fleche { fill: #d8f1ff; opacity: 0.9; }
-
-      /* à venir : la coque est là, la teinte dort */
-      .ps-avenir .ps-bande { opacity: 0.16; }
-
-      /* franchi : la teinte s'allume, le hublot est éclairé */
-      .ps-franchi .ps-fut { fill: #142334; }
-      .ps-franchi .ps-bande { opacity: 0.7; }
-      .ps-franchi .ps-hublot { fill: color-mix(in srgb, var(--t) 30%, #0a141e); }
-      .ps-franchi .ps-nom { fill: #c3dced; }
-
-      /* courant : le seul module qui respire */
-      .ps-courant .ps-fut {
-        fill: #17293c;
-        stroke: var(--t); stroke-width: 2;
-      }
-      .ps-courant .ps-bande { opacity: 1; }
-      .ps-courant .ps-hublot { fill: color-mix(in srgb, var(--t) 62%, #0a141e); }
-      .ps-courant .ps-nom { fill: #eef8ff; }
-      .ps-courant .ps-badge { fill: var(--t); }
-      .ps-courant .ps-halo {
-        fill: none;
-        stroke: var(--t); stroke-width: 1.5; opacity: 0.42;
-        animation: ps-souffle 3.2s ease-in-out infinite;
-      }
-      @keyframes ps-souffle {
-        0%, 100% { opacity: 0.16; }
-        50% { opacity: 0.5; }
-      }
-
-      /* le hub : toujours connu, jamais « courant » */
-      .ps-hub .ps-fut { fill: #12261f; stroke: color-mix(in srgb, var(--t) 45%, #2b3d4e); }
-      .ps-hub .ps-bande { opacity: 0.6; }
-      .ps-hub .ps-nom { fill: #b6dcc7; }
-
-      /* visé au pointeur ou au clavier : le contour, rien d'autre */
-      .ps-mod:hover .ps-fut, .ps-vise .ps-fut, .ps-mod:focus-visible .ps-fut {
-        stroke: color-mix(in srgb, var(--t) 85%, white);
-      }
-      .ps-mod:focus { outline: none; }
-      .ps-mod:focus-visible .ps-halo { stroke: #eef8ff; opacity: 0.8; animation: none; }
-
-      /* le fanion du record, et le sceau du secteur 4 */
-      .ps-record line { stroke: #f2c98e; stroke-width: 1.5; }
-      .ps-record path { fill: #f2c98e; }
-      .ps-sceau line { stroke: rgba(224, 138, 106, 0.75); stroke-width: 3; stroke-linecap: round; }
-      .ps-sceau text {
-        fill: #e08a6a; font-family: var(--font-display); font-size: 10.5px;
-        text-anchor: middle; letter-spacing: 0.2em;
-      }
+      /* le dessin (game/dessinCarte.ts, règles .cs-* plus bas) remplit le cadre */
+      .st-plan .cs-svg { display: block; width: 100%; height: 100%; }
 
       /* ---- LA FICHE DU MODULE, sous le plan ---- */
       .st-bas { display: flex; gap: 14px; align-items: stretch; flex: none; }
@@ -7123,6 +7015,32 @@
         color: #cfe2ef; cursor: pointer; letter-spacing: 0.1em;
       }
       .mb-continuer:hover { border-color: #6dffb8; }
+      /* ---- LA CARTE DANS LA CÉRÉMONIE : le module épuisé, le plan se
+         déploie ; le panneau s'élargit le temps du choix, le module élu
+         S'AGRANDIT (la scène zoome sur lui) puis ses salles arrivent ---- */
+      .mb-panneau.mb-large { width: min(1180px, 96vw); }
+      .mb-cartes.mb-station { grid-template-columns: 1fr; gap: 4px; }
+      .mb-station-carte {
+        aspect-ratio: 1600 / 804; max-height: 62vh; width: 100%; margin: 0 auto;
+        border: 1px solid #27405a; border-radius: 8px; overflow: hidden; background: #020509;
+        transition: transform 0.42s cubic-bezier(0.2, 0.7, 0.2, 1), opacity 0.42s ease;
+      }
+      .mb-station-carte .cs-svg { width: 100%; height: 100%; }
+      .mb-station-carte.mb-station-zoom { transform: scale(2.4); opacity: 0; }
+      .mb-station-carte.mb-station-refus { animation: mb-secousse 0.32s ease; }
+      @keyframes mb-secousse {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-6px); }
+        75% { transform: translateX(6px); }
+      }
+      .mb-station-fiche {
+        margin: 6px 0 0; min-height: 1.5em; text-align: center;
+        font-size: calc(12px * var(--ui)); letter-spacing: 0.06em; color: #8ba3b8;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .mb-station-carte { transition: none; }
+        .mb-station-carte.mb-station-refus { animation: none; }
+      }
       .mb-carte.mb-dest { min-height: 108px; }
       .mb-cartes:has(.mb-dest) { grid-template-columns: 1fr 1fr; }
       /* Le CHOIX DE SALLE (pool « 21XX-MMD ») : deux propositions,
@@ -7412,7 +7330,7 @@
       <button id="home-restart" type="button" hidden>RECOMMENCER LE TABLEAU</button>
       <button id="start-abandon" type="button" hidden>ABANDONNER LA RUN — RETOUR AU LABO</button>
       <div class="home-duo" role="group" aria-label="Outils du protocole">
-        <button id="home-station" type="button" title="LA STATION : le plan général du complexe orbital — six modules amarrés à la poutre, traversés au fil de la descente. On y voit d'où l'on vient, où l'on est, et ce qui attend"><i>🛰&#xFE0E;</i><span>LA STATION</span></button>
+        <button id="home-station" type="button" title="LA STATION : le plan général du complexe orbital — les modules et leurs coursives, tels que la descente les traverse. On y voit d'où l'on vient, où l'on est, ce qui est ouvert et ce qui attend un orbe"><i>🛰&#xFE0E;</i><span>LA STATION</span></button>
         <button id="start-editor" type="button" data-dev title="Créer ou modifier un tableau"><i>✎</i><span>ÉDITEUR</span></button>
         <button id="home-carte" type="button" data-dev title="L'ÉDITEUR DE LA CARTE : le plan à routes ramifiées de la station — modules, coursives, zones, conditions d'accès. Se glisse, se lie, s'exporte en carteStation.json ; un aperçu jeu rejoue la traversée"><i>⌬</i><span>CARTE</span></button>
         <button id="home-regles" type="button" data-dev title="Le cahier des règles de la génération procédurale : ce que le générateur fait (annotable), ce qu'un level designer en attend (propositions), et vos règles nouvelles en texte libre — partagé entre concepteurs, relu au moment d'implémenter"><i>§</i><span>RÈGLES DE GÉN.</span></button>
@@ -8022,7 +7940,7 @@
       </div>
     </div>
 
-    <!-- LA STATION : le plan général — six modules, traversés au fil de la run -->
+    <!-- LA STATION : le plan général — la carte à routes ramifiées, en lecture -->
     <div id="station" hidden aria-label="Plan de la station">
       <div class="st-boite">
         <div class="st-tete">
@@ -8036,12 +7954,8 @@
         <div class="st-plan" id="station-plan"></div>
         <div class="st-bas">
           <div class="st-fiche" id="station-fiche"></div>
-          <ul class="st-legende">
-            <li><i class="st-p-franchi"></i>franchi</li>
-            <li><i class="st-p-courant"></i>vous êtes ici</li>
-            <li><i class="st-p-avenir"></i>à venir</li>
-            <li><i class="st-p-record"></i>votre record</li>
-          </ul>
+          <!-- la légende suit les types de coursive de la carte (main.ts) -->
+          <ul class="st-legende" id="station-legende"></ul>
         </div>
       </div>
     </div>

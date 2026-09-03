@@ -6,10 +6,10 @@ une partie de soi-même — **se déplacer, c'est rétrécir**.
 
 Le document de référence est [`docs/doc-fonctionnel.md`](docs/doc-fonctionnel.md).
 
-## État — version 0.21.412, une run jouable de bout en bout
+## État — version 0.21.413, une run jouable de bout en bout
 
 Le jeu tourne dans le navigateur, sur ordinateur, tablette et téléphone.
-**412 livraisons consignées entre le 08/08/2026 et le 03/09/2026** — le journal
+**413 livraisons consignées entre le 08/08/2026 et le 03/09/2026** — le journal
 complet se lit dans l'écran NOTES DE VERSION, les données sont dans
 [`src/bench/livraisons.ts`](src/bench/livraisons.ts).
 
@@ -35,8 +35,11 @@ pastilles mémoire et des portes qui forment une algèbre complète — le cabin
 logique en fait cinq salles de démonstration sans ajouter un seul mécanisme.
 Des rails à champ qui convoient la vapeur et l'ionisent en plasma.
 
-**La boucle.** Le hub du laboratoire Méduse, le sas de lancement, la descente
-semi-procédurale (longueur et rampe de difficulté réglables, graine du jour
+**La boucle.** Le hub du laboratoire Méduse, le sas de lancement, la carte
+de la station à routes ramifiées (un module est un biome ; au bout de ses
+salles la carte s'ouvre et la coursive suivante se choisit, sous cadenas
+tant que l'orbe manque ; la longueur d'une run découle du trajet), la
+descente semi-procédurale (rampe de difficulté réglable, graine du jour
 commune à tous les postes), le choix de la salle suivante en vignettes,
 l'économat à mi-descente qui troque contre du condensat, la mise en bonbonne
 du surplus au sas, la purge de fin de run. Le codex se remplit de ce que le
@@ -85,7 +88,7 @@ station, `?tableau=N` démarre à la salle N,
 ## Qualité
 
 ```bash
-pnpm test        # 841 tests dans 73 fichiers, ~23 s
+pnpm test        # 850 tests dans 74 fichiers, ~23 s
 pnpm type-check
 pnpm build
 ```
@@ -100,11 +103,11 @@ codex, trophées, cycle, récompenses, voie, générateur) et les écrans
 
 - **Le boss.** La Pompe de reprise n'est qu'une esquisse écrite
   ([`docs/boss-pompe.md`](docs/boss-pompe.md)) : rien n'est implémenté.
-- **La carte à routes ramifiées** (§9 du document fonctionnel) : la carte
-  est dessinée, éditable et vérifiée (`src/game/carteStation.json`,
-  éditeur `?carte`), mais la descente se lit encore en profondeur et en
-  choix de salle — l'écran LA STATION montre le plan linéaire, et le passage
-  d'une coursive choisie à la salle suivante reste à concevoir.
+- **Les orbes et le marchand du hub** : les cadenas de la carte lisent
+  encore le cycle des mémoires (une transformation tissée vaut son orbe) ;
+  la monnaie des orbes, le marchand qui les vend contre de la mémoire et
+  l'orbe trouvable en cache sont à faire, puis le réétiquetage des tableaux
+  par biome ([`docs/carte-station.md`](docs/carte-station.md)).
 - **Les cinq décisions ouvertes** du §14, à commencer par l'intensité de la
   cohésion — le curseur d'identité du jeu.
 - **L'empaquetage Steam** : les visuels de boutique sont dessinés

@@ -60,15 +60,26 @@ import {
   type PlanVoie,
 } from './game/voie'
 import {
-  CASES,
-  MODULES,
-  MODULE_HUB,
-  caseDuRang,
-  moduleDuRang,
-  pasRegulier,
-  rangsDeCase,
-} from './game/station'
-import { planStationSVG, type OptionsPlan } from './game/planStation'
+  CARTE_LIVREE,
+  couleurTemperature,
+  moduleParId,
+  zoneDe,
+  type ModuleCarte,
+} from './game/carteStation'
+import { dessinCarteSVG, type OptionsDessin } from './game/dessinCarte'
+import {
+  choixModules,
+  departCarte,
+  entreModule,
+  franchitSalle,
+  litEtatCarteRun,
+  longueurRun as longueurRunCarte,
+  moduleCourant,
+  moduleFini,
+  objectifAtteint,
+  orbesDuCycle,
+  type EtatCarteRun,
+} from './game/descenteCarte'
 import {
   apercuDescente,
   bilanDescentes,
@@ -758,6 +769,30 @@ const voiePlan: PlanVoie = (() => {
     return clampPlanVoie(null)
   }
 })()
+// ---- LA CARTE DE LA STATION : la descente est pilotée par le plan ------
+// Un module est un BIOME (des salles, réglées dans carteStation.json) ; au
+// bout de ses salles, la carte s'ouvre dans la cérémonie et la coursive
+// suivante se choisit. La LONGUEUR d'une run n'est plus le réglage du plan
+// de voie : elle DÉCOULE du trajet — salles franchies, salles restantes du
+// module, plus court chemin en niveaux jusqu'à l'objectif (descenteCarte.ts).
+// Le plan de voie garde tout le reste : rampe de difficulté, moments,
+// postures, pioche — il reçoit simplement la longueur vraie (planEffectif).
+const carte = CARTE_LIVREE
+let carteRun: EtatCarteRun = departCarte(carte)
+/** Les orbes tenus pour acquis — lus dans le cycle des mémoires tant que la
+ *  monnaie des orbes (étape 3) n'existe pas. */
+function orbesAcquis(): string[] {
+  return orbesDuCycle(records.eveilAcquis(), records.verrousCycle())
+}
+function longueurRun(): number {
+  return longueurRunCarte(carte, carteRun, voieRang)
+}
+function planEffectif(): PlanVoie {
+  return { ...voiePlan, longueur: longueurRun() }
+}
+function moduleEnCours(): ModuleCarte | undefined {
+  return moduleCourant(carte, carteRun)
+}
 function sauvePlanVoie(): void {
   try {
     localStorage.setItem(CLE_PLAN_VOIE, JSON.stringify(clampPlanVoie(voiePlan)))
@@ -3376,6 +3411,7 @@ interface RunSauvee {
   condensat?: number // la bourse de la run (absente : anciennes sauvegardes)
   memoireGagnee?: number // le butin de mémoire déjà gravé cette run
   economatVisite?: boolean // l'annexe du Semblable a-t-elle déjà servi ?
+  carte?: unknown // où l'on en est sur la carte (descenteCarte.ts)
 }
 function runSauvee(): RunSauvee | null {
   try {
@@ -3395,6 +3431,13 @@ function runSauvee(): RunSauvee | null {
         : [],
       xp: Math.max(0, Number(d.xp) || 0),
       livreTotal: Math.max(0, Number(d.livreTotal) || 0),
+      // ces champs s'écrivaient sans jamais être RELUS : la reprise repartait
+      // au rang de l'index, bourse vide, Économat oublié — ils reviennent
+      rang: typeof d.rang === 'number' ? d.rang : undefined,
+      condensat: typeof d.condensat === 'number' ? d.condensat : undefined,
+      memoireGagnee: typeof d.memoireGagnee === 'number' ? d.memoireGagnee : undefined,
+      economatVisite: typeof d.economatVisite === 'boolean' ? d.economatVisite : undefined,
+      carte: d.carte,
     }
   } catch {
     return null
@@ -3423,6 +3466,7 @@ function sauveRun(): void {
           condensat,
           memoireGagnee: run.memoireGagnee,
           economatVisite: economatVisiteCetteRun,
+          carte: carteRun,
         }),
       )
   } catch {
@@ -3457,6 +3501,7 @@ function reprendreRun(save: RunSauvee): void {
   run.memoireGagnee = Math.max(0, Math.round(save.memoireGagnee ?? 0))
   economatIntercalaire = null
   economatVisiteCetteRun = save.economatVisite ?? false
+  carteRun = litEtatCarteRun(save.carte, carte)
   hasPlayed = true
   document.body.classList.add('playing')
   input.paused = false
@@ -3469,7 +3514,7 @@ function reprendreRun(save: RunSauvee): void {
 }
 function majBoutonsRun(): void {
   const save = runSauvee()
-  const total = voiePlan.longueur // la descente dure ce que le plan dit
+  const total = longueurRun() // la descente dure ce que la carte dit
   const btnAband = document.getElementById(
     'start-abandon',
   ) as HTMLButtonElement | null
@@ -4525,88 +4570,112 @@ function zoneNoteRegle(id: string, conteneur: HTMLElement): void {
 // n'est rendue qu'à la fermeture, et SEULEMENT si c'est le plan qui l'a
 // posée : on ne réveille pas une partie que le joueur avait figée exprès.
 const stationEl = document.getElementById('station') as HTMLDivElement | null
-let stationVise: number | null = null
+let stationVise: string | null = null
 let stationAPose = false
+const enRunCarte = (): boolean => hasPlayed && !auHub && testLevel === null
 
-function optionsStation(): OptionsPlan {
+function optionsStation(): OptionsDessin {
   return {
-    rang: voieRang,
-    longueur: voiePlan.longueur,
-    record: chargePalmaresVoie().profondeurRecord,
-    scelle: !finOuverte(),
+    mode: 'jeu',
+    courant: enRunCarte() ? carteRun.module : carte.regles.depart,
+    visites: enRunCarte() ? carteRun.visites : [],
     selection: stationVise,
+    lienSelection: null,
+    orbes: orbesAcquis(),
+    afficherTemp: true,
   }
 }
 
 /** LA FICHE DU BAS : le module lu — celui qu'on vise, ou celui où l'on est
- *  quand rien n'est visé. Elle porte la teinte du module, comme le plan. */
+ *  quand rien n'est visé. Elle porte la teinte de sa zone, comme le plan. */
 function peintFicheStation(): void {
   const fiche = document.getElementById('station-fiche')
   if (!fiche) return
-  const courant = caseDuRang(voieRang, voiePlan.longueur)
-  const i = stationVise ?? (courant > 0 ? courant - 1 : -1)
-  const m = i < 0 ? MODULE_HUB : MODULES[i]
-  fiche.style.setProperty('--t', m.teinte)
-  const rangs =
-    i < 0
-      ? 'hors descente — on n’y risque rien'
-      : (() => {
-          const { premier, dernier } = rangsDeCase(i + 1, voiePlan.longueur)
-          const n = dernier - premier + 1
-          return `salles ${premier} à ${dernier} · ${n} salle${n > 1 ? 's' : ''} · ${MOMENT_COURT[m.moment].toLowerCase()} de descente`
-        })()
+  const id = stationVise ?? (enRunCarte() ? carteRun.module : carte.regles.depart)
+  const m = moduleParId(carte, id)
+  if (!m) {
+    fiche.innerHTML = ''
+    return
+  }
+  const z = zoneDe(carte, m)
+  fiche.style.setProperty('--t', z?.couleur ?? '#7f9cb0')
   const esc = (t: string): string =>
     t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  const ici = enRunCarte() && id === carteRun.module
+  const choix = enRunCarte()
+    ? choixModules(carte, carteRun, orbesAcquis()).find((x) => x.module.id === id)
+    : undefined
+  const salles =
+    m.niveaux > 0 ? `${m.niveaux} salle${m.niveaux > 1 ? 's' : ''}` : 'sans salle'
+  const etat = ici
+    ? `vous êtes ici · salle ${Math.min(m.niveaux, carteRun.niveau + 1)} / ${m.niveaux}`
+    : enRunCarte() && carteRun.visites.includes(id)
+      ? 'traversé'
+      : choix
+        ? choix.orbeManquant
+          ? `verrouillé — orbe nécessaire : ${choix.orbeManquant}`
+          : 'accessible depuis votre position'
+        : salles
   fiche.innerHTML =
     `<h3>${esc(m.nom)}</h3>` +
-    `<span class="st-rangs">${esc(rangs)}</span>` +
-    `<p>${esc(m.ambiance)}</p>` +
-    `<div class="st-matieres">${m.matieres.map((x) => `<i>${esc(x)}</i>`).join('')}</div>`
+    `<span class="st-rangs">${esc(`${z ? `${z.code} · ${z.nom}` : ''} · ${etat}`)}</span>` +
+    `<p>${esc(m.desc)}</p>` +
+    `<div class="st-matieres"><i>${esc(carte.types[m.type])}</i>` +
+    `<i style="color:${couleurTemperature(carte, m.temp)}">${m.temp}°C</i>` +
+    (m.niveaux > 0 ? `<i>${esc(salles)}</i>` : '') +
+    `</div>`
 }
 
-/** LA LIGNE D'AVANCE, en haut à droite : où l'on en est, en deux temps —
- *  le module d'abord (c'est le lieu), la salle ensuite (c'est le compte). */
+/** LA LIGNE D'AVANCE, en haut à droite : le module d'abord (c'est le
+ *  lieu), la salle ensuite (c'est le compte). */
 function peintAvanceStation(): void {
   const e = document.getElementById('station-etat')
   if (!e) return
-  const total = voiePlan.longueur
-  const c = caseDuRang(voieRang, total)
-  const pas = pasRegulier(total)
-  // le PAS n'est un chiffre rond que si la longueur se coupe en six ; sinon
-  // la répartition tient toujours, mais l'annoncer serait mentir
-  const cadence = pas
-    ? `${pas} salle${pas > 1 ? 's' : ''} par module`
-    : `${total} salles réparties au plus juste sur ${CASES} modules`
-  if (c === 0) {
-    const record = chargePalmaresVoie().profondeurRecord
-    const rc = caseDuRang(record, total)
+  const objectif = moduleParId(carte, carte.regles.objectif)?.nom ?? '?'
+  if (!enRunCarte()) {
     e.innerHTML =
-      `AU MODULE D’ACCUEIL<small>${cadence}` +
-      (rc > 0 ? ` · le plus loin atteint : ${MODULES[rc - 1].nom}` : '') +
-      `</small>`
+      `AU MODULE D’ACCUEIL<small>${carte.modules.length} modules · objectif : ${objectif}</small>`
     return
   }
+  const total = longueurRun()
+  const m = moduleEnCours()
   e.innerHTML =
-    `MODULE ${c} / ${CASES} — ${MODULES[c - 1].nom}` +
-    `<small>salle ${Math.min(total, voieRang + 1)} / ${total} · ${cadence}</small>`
+    `${m?.nom ?? '?'}` +
+    `<small>salle ${Math.min(total, voieRang + 1)} / ${total} de la descente · objectif : ${objectif}</small>`
+}
+
+/** La légende suit les types de coursive de la carte, jamais une liste en dur. */
+function peintLegendeStation(): void {
+  const l = document.getElementById('station-legende')
+  if (!l) return
+  const esc = (t: string): string => t.replace(/</g, '&lt;')
+  l.innerHTML =
+    Object.entries(carte.typesLiens)
+      .map(
+        ([k, st]) =>
+          `<li><i style="${st.tirets ? `height:0;border-top:2px dashed ${st.couleur};background:none` : `background:${st.couleur}`}"></i>` +
+          `${esc((st.badge ?? k).toLowerCase())}${st.condition ? ' 🔒' : ''}</li>`,
+      )
+      .join('') + `<li><i class="st-p-courant"></i>vous êtes ici</li>`
 }
 
 function renderStation(): void {
   const hote = document.getElementById('station-plan')
   if (!hote) return
-  hote.innerHTML = planStationSVG(optionsStation())
+  hote.innerHTML = dessinCarteSVG(carte, optionsStation())
   peintAvanceStation()
   peintFicheStation()
+  peintLegendeStation()
 }
 
 /** Le module visé change : on ne repeint que ce qui bouge. */
-function viseStation(i: number | null): void {
-  if (stationVise === i) return
-  stationVise = i
+function viseStation(id: string | null): void {
+  if (stationVise === id) return
+  stationVise = id
   const plan = document.getElementById('station-plan')
-  plan?.querySelectorAll('.ps-vise').forEach((g) => g.classList.remove('ps-vise'))
-  if (i !== null)
-    plan?.querySelector(`[data-mod="${i}"]`)?.classList.add('ps-vise')
+  plan?.querySelectorAll('.cs-sel').forEach((g) => g.classList.remove('cs-sel'))
+  if (id !== null)
+    plan?.querySelector(`[data-mod="${CSS.escape(id)}"]`)?.classList.add('cs-sel')
   peintFicheStation()
 }
 
@@ -4641,11 +4710,9 @@ stationEl?.addEventListener('pointerdown', (e) => {
 // se lirait qu'à la souris laisserait la manette et le clavier dehors
 {
   const plan = document.getElementById('station-plan')
-  const lit = (e: Event): number | null => {
-    const g = (e.target as Element | null)?.closest?.('[data-mod]')
-    const i = g?.getAttribute('data-mod')
-    return i === null || i === undefined || Number(i) < 0 ? null : Number(i)
-  }
+  const lit = (e: Event): string | null =>
+    (e.target as Element | null)?.closest?.('[data-mod]')?.getAttribute('data-mod') ??
+    null
   plan?.addEventListener('pointermove', (e) => viseStation(lit(e)))
   plan?.addEventListener('pointerleave', () => viseStation(null))
   plan?.addEventListener('focusin', (e) => viseStation(lit(e)))
@@ -5036,19 +5103,19 @@ function dscOutils(): HTMLElement {
     'Pose la profondeur de la descente en cours au rang voulu : la prochaine fin de salle proposera ce que CE rang commande. Rien d’autre ne bouge — ni réserve, ni registres.',
     () => {
       const rep = window.prompt(
-        `Se poser à quel rang ? (1 à ${voiePlan.longueur}, la descente en est au rang ${voieRang})`,
-        String(Math.min(voiePlan.longueur, voieRang + 1)),
+        `Se poser à quel rang ? (1 à ${longueurRun()}, la descente en est au rang ${voieRang})`,
+        String(Math.min(longueurRun(), voieRang + 1)),
       )
       if (rep === null) return
       const n = Math.round(Number(rep))
-      if (!Number.isFinite(n) || n < 0 || n > voiePlan.longueur) {
-        descenteDit(`Rang hors du plan : gardez-vous entre 0 et ${voiePlan.longueur}.`)
+      if (!Number.isFinite(n) || n < 0 || n > longueurRun()) {
+        descenteDit(`Rang hors du plan : gardez-vous entre 0 et ${longueurRun()}.`)
         return
       }
       voieRang = n
       majVoieHud()
       descenteDit(
-        `Descente posée au rang ${n} — la prochaine fin de salle proposera le rang ${Math.min(voiePlan.longueur, n + 1)}.`,
+        `Descente posée au rang ${n} — la prochaine fin de salle proposera le rang ${Math.min(longueurRun(), n + 1)}.`,
       )
     },
   )
@@ -9857,8 +9924,14 @@ const mbTimers: number[] = []
 // Le fil de la cérémonie : bilan (temps 1-3, sautables) → versement (le
 // surplus choisit sa destination) → draft (un tirage par palier franchi)
 // → fin (jauge et CONTINUER). Le versement et la suite ne se sautent pas.
-let mbEtape: 'bilan' | 'versement' | 'etalonnage' | 'draft' | 'salles' | 'fin' =
-  'bilan'
+let mbEtape:
+  | 'bilan'
+  | 'versement'
+  | 'etalonnage'
+  | 'draft'
+  | 'carte'
+  | 'salles'
+  | 'fin' = 'bilan'
 let mbDraftsRestants = 0
 let mbBilanCourant: BilanSalle | null = null
 
@@ -9884,7 +9957,7 @@ function avanceSalle(): void {
     !testLevel &&
     (economatForce || !economatVisiteCetteRun)
   ) {
-    const total = voiePlan.longueur
+    const total = longueurRun()
     const rang = voieRang
     if (economatForce || (total >= 4 && rang >= Math.floor(total / 2))) {
       economatForce = false // il a servi
@@ -9946,6 +10019,7 @@ function fermeMiseEnBonbonne(): void {
   for (const t of mbTimers) clearTimeout(t)
   mbTimers.length = 0
   mbVeil.hidden = true
+  mbVeil.querySelector('.mb-panneau')?.classList.remove('mb-large')
   miseEnBonbonne = false
   mbBilanCourant = null
 }
@@ -10174,7 +10248,7 @@ function mbVerseXp(litres: number): void {
  * l'étape précédente — ni disposition, ni mise en scène en cours. */
 function mbCartes(): HTMLElement {
   const h = mbEl('mb-cartes')
-  h.classList.remove('mb-draft', 'mb-isole', 'mb-elu')
+  h.classList.remove('mb-draft', 'mb-isole', 'mb-elu', 'mb-station')
   h.style.removeProperty('--n')
   return h
 }
@@ -10278,6 +10352,17 @@ let salleChoisie: LevelDef | null = null
  * le pool face aux salles générées ; sinon le choix du pool au rang, si
  * celui-ci offre deux tableaux — à défaut, la fin ordinaire. */
 function mbApresRecompense(): void {
+  // LA CARTE : le module épuisé, la coursive suivante se choisit sur le plan
+  if (moduleFini(carte, carteRun)) {
+    mbMontreCarte('suite')
+    return
+  }
+  mbMontreSallesDuModule()
+}
+
+/** Les salles du module en cours : la voie (générées + pioche du biome),
+ *  ou le vieux choix du pool, ou la fin ordinaire. */
+function mbMontreSallesDuModule(): void {
   const seq = playedLevels()
   if (sallesGenerees()) {
     const duo = propositionsVoie(seq)
@@ -10289,6 +10374,133 @@ function mbApresRecompense(): void {
   const props = propositionsSalles(seq, levelIndex + 2, seq.length)
   if (props.length === 2) mbMontreSalles(props)
   else mbMontreFin()
+}
+
+/** LA CARTE DANS LA CÉRÉMONIE. Le module épuisé (ou le sas de lancement
+ *  franchi), le plan de la station se déploie et la coursive suivante se
+ *  choisit d'un clic — un module fermé dit l'orbe qui manque, un module
+ *  hors de portée dit qu'aucune coursive n'y mène. Le module élu
+ *  S'AGRANDIT (la scène zoome sur lui), puis ses salles se présentent en
+ *  vignettes : un écran, deux temps, comme le concepteur l'a voulu. Un
+ *  NŒUD (module sans salle) rouvre la carte aussitôt. */
+function montreCarteRun(raison: 'depart' | 'suite'): void {
+  miseEnBonbonne = true // tableauDone en découle : le sas du hub se tait
+  mbBilanCourant = null
+  mbVeil.hidden = false
+  mbVeil.querySelector('.mb-panneau')?.classList.add('mb-compact')
+  mbEl('mb-etal').hidden = true
+  mbEl('mb-passer').hidden = true
+  mbEl('mb-choix').hidden = false
+  mbMontreCarte(raison)
+}
+
+function mbMontreCarte(raison: 'depart' | 'suite'): void {
+  mbEtape = 'carte'
+  mbVeil.querySelector('.mb-panneau')?.classList.add('mb-large')
+  mbEl('mb-etal').hidden = true
+  mbEl('mb-passer').hidden = true
+  const m = moduleEnCours()
+  mbEl('mb-choix-titre').textContent =
+    raison === 'depart'
+      ? 'LE SAS EST FRANCHI — CHOISISSEZ UNE COURSIVE'
+      : m && m.niveaux > 0
+        ? `${m.nom} TRAVERSÉ — CHOISISSEZ LA COURSIVE SUIVANTE`
+        : `${m?.nom ?? 'NŒUD'} — TROIS DIRECTIONS, UNE COURSIVE`
+  const host = mbCartes()
+  host.innerHTML = ''
+  host.classList.add('mb-station')
+  const orbes = orbesAcquis()
+  const choix = choixModules(carte, carteRun, orbes)
+  const scene = document.createElement('div')
+  scene.className = 'mb-station-carte'
+  scene.innerHTML = dessinCarteSVG(carte, {
+    mode: 'jeu',
+    courant: carteRun.module,
+    visites: carteRun.visites,
+    selection: null,
+    lienSelection: null,
+    orbes,
+    afficherTemp: true,
+  })
+  const fiche = document.createElement('p')
+  fiche.className = 'mb-station-fiche'
+  const ouvertes = choix.filter((x) => !x.orbeManquant).length
+  const defaut = `${ouvertes} coursive${ouvertes > 1 ? 's' : ''} ouverte${ouvertes > 1 ? 's' : ''} · descente ${voieRang} / ${longueurRun()} salles`
+  const litId = (e: Event): string | null =>
+    (e.target as Element | null)?.closest?.('[data-mod]')?.getAttribute('data-mod') ?? null
+  const dit = (id: string | null): void => {
+    const mod = id ? moduleParId(carte, id) : undefined
+    if (!mod) {
+      fiche.textContent = defaut
+      return
+    }
+    const x = choix.find((c) => c.module.id === id)
+    const acces = x
+      ? x.orbeManquant
+        ? `verrouillé — orbe nécessaire : ${x.orbeManquant}`
+        : `coursive « ${x.lien.type} » ouverte`
+      : id === carteRun.module
+        ? 'vous êtes ici'
+        : 'aucune coursive n’y mène d’ici'
+    fiche.textContent =
+      `${mod.nom} · ${mod.niveaux > 0 ? `${mod.niveaux} salle${mod.niveaux > 1 ? 's' : ''}` : 'sans salle'} · ${mod.temp}°C · ${acces}`
+  }
+  dit(null)
+  scene.addEventListener('pointerover', (e) => dit(litId(e)))
+  scene.addEventListener('pointerout', () => dit(null))
+  scene.addEventListener('focusin', (e) => dit(litId(e)))
+  let elu = false
+  const elit = (x: (typeof choix)[number]): void => {
+    if (elu) return
+    elu = true
+    const mod = x.module
+    scene.style.transformOrigin = `${((mod.x / carte.scene.width) * 100).toFixed(1)}% ${((mod.y / carte.scene.height) * 100).toFixed(1)}%`
+    scene.querySelector(`[data-mod="${CSS.escape(mod.id)}"]`)?.classList.add('cs-sel')
+    scene.classList.add('mb-station-zoom')
+    dit(mod.id)
+    bande.ponctuation('sting-collecte', 0.7)
+    window.setTimeout(() => entreModuleRun(mod.id), sansAnimation() ? 0 : 420)
+  }
+  const choisit = (id: string | null): void => {
+    if (!id) return
+    const x = choix.find((c) => c.module.id === id)
+    if (!x) {
+      dit(id)
+      return
+    }
+    if (x.orbeManquant) {
+      dit(id)
+      scene.classList.remove('mb-station-refus')
+      void scene.offsetWidth
+      scene.classList.add('mb-station-refus')
+      return
+    }
+    elit(x)
+  }
+  scene.addEventListener('click', (e) => choisit(litId(e)))
+  scene.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      choisit(litId(e))
+    }
+  })
+  host.appendChild(scene)
+  host.appendChild(fiche)
+}
+
+/** Entrer dans un module de la carte : un nœud rouvre la carte, un biome
+ *  présente ses salles. */
+function entreModuleRun(id: string): void {
+  const suivant = entreModule(carte, carteRun, id, orbesAcquis())
+  if (!suivant) return
+  carteRun = suivant
+  if (moduleFini(carte, carteRun)) {
+    mbMontreCarte('suite')
+    return
+  }
+  mbVeil.querySelector('.mb-panneau')?.classList.remove('mb-large')
+  mbCartes() // ôte mb-station : la grille des vignettes reprend ses colonnes
+  mbMontreSallesDuModule()
 }
 
 /** Une carte du choix de la voie. */
@@ -10308,9 +10520,9 @@ interface CarteVoie {
  * viennent de la date : les mêmes salles pour tous les postes ce jour-là. */
 function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   const rangSuivant = voieRang + 1 // la salle que le choix désigne, dans le plan
-  if (rangSuivant > voiePlan.longueur) return null // la fin se joue au sas
-  const moment = momentAuRang(rangSuivant, voiePlan)
-  const difficulte = diffAuRang(rangSuivant, voiePlan)
+  if (rangSuivant > longueurRun()) return null // la fin se joue au sas
+  const moment = momentAuRang(rangSuivant, planEffectif())
+  const difficulte = diffAuRang(rangSuivant, planEffectif())
   const jour = new Date().toISOString().slice(0, 10)
   const alea = descenteDuJour()
     ? aleaDeGraine(`${jour}@${rangSuivant}`)
@@ -10332,6 +10544,12 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   // suite. Coupée au banc (« tableaux écrits »), la descente est TOUT
   // PROCÉDURALE : aucun tableau fait main ne se propose.
   const jouee = identiteAtelier(level)?.mecanique ?? null
+  // LE BIOME du module : un tableau qui en porte un autre ne se propose pas
+  // ici ; un tableau sans biome est universel (bibliothèque pas encore
+  // réétiquetée) ; une salle générée prend le biome du module
+  const biomeCourant = moduleEnCours()?.biome ?? ''
+  const marqueBiome = (lv: LevelDef): LevelDef =>
+    biomeCourant ? { ...lv, biome: biomeCourant } : lv
   const ecrite = voiePlan.ecrites
     ? piocheEcrite(
         seq,
@@ -10339,6 +10557,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
         voieVues,
         // un tableau qui EXIGE un état non tissé n'est pas jouable
         (lv) =>
+          (!lv.biome || !biomeCourant || lv.biome === biomeCourant) &&
           (lv.exige ?? []).every((e) =>
             e === 'glace' ? solidTenue : vapoTenue,
           ),
@@ -10358,7 +10577,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   // le RÉGLAGE DU RANG (enseigner · éprouver · tordre) : la posture de la
   // salle générée — pureté du début, laby du milieu, contraste de la fin,
   // dangers différés — voyage dans le code (suffixe ~), l'identité tient
-  const regl = reglageAuRang(rangSuivant, voiePlan)
+  const regl = reglageAuRang(rangSuivant, planEffectif())
   // LE MÉLANGE DES DEUX GÉNÉRATEURS : les salles à compartiments (le
   // système historique) et les FIGURES — dont les familles tirées des
   // tableaux de BOIZ. Le choix du rang en montre les deux : une figure au
@@ -10388,7 +10607,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
       vapoTenue,
       alea,
     ),
-    ampleur: ampleurAuRang(rangSuivant, voiePlan),
+    ampleur: ampleurAuRang(rangSuivant, planEffectif()),
   })
   const variante = (n: number): string =>
     descenteDuJour()
@@ -10413,7 +10632,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
       for (let essai = 0; essai < 3; essai++) {
         try {
           return {
-            lv: genereNiveauAtelier(cahier, variante(n + essai * 3), o),
+            lv: marqueBiome(genereNiveauAtelier(cahier, variante(n + essai * 3), o)),
             cahier,
             figure: o.figure,
           }
@@ -10489,14 +10708,17 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
   const rangSuivant = voieRang + 1
   const stadeNeuf =
     voieRang >= 1 &&
-    momentAuRang(rangSuivant, voiePlan) !==
-      momentAuRang(Math.max(1, voieRang), voiePlan)
-      ? momentAuRang(rangSuivant, voiePlan) === 2
+    momentAuRang(rangSuivant, planEffectif()) !==
+      momentAuRang(Math.max(1, voieRang), planEffectif())
+      ? momentAuRang(rangSuivant, planEffectif()) === 2
         ? ' · LE MILIEU S’OUVRE'
         : ' · LA FIN S’OUVRE'
       : ''
   mbEl('mb-choix-titre').textContent =
-    `LA VOIE SE SÉPARE — SALLE ${rangSuivant} / ${voiePlan.longueur}` +
+    // le MODULE se nomme en tête : c'est son biome qu'on traverse, et la
+    // salle se compte dans le module avant de se compter dans la descente
+    `${moduleEnCours()?.nom ?? 'LA VOIE SE SÉPARE'} — SALLE ${Math.min(moduleEnCours()?.niveaux ?? 1, carteRun.niveau + 1)} / ${moduleEnCours()?.niveaux ?? '?'}` +
+    ` · DESCENTE ${rangSuivant} / ${longueurRun()}` +
     (descenteDuJour() ? ' · DESCENTE DU JOUR' : '') +
     stadeNeuf
   // les JAUGES restent en scène, comme à la fin ordinaire : le choix se
@@ -10511,7 +10733,7 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
   host.classList.toggle('mb-trio', cartes.length === 3)
   const jauges = document.createElement('div')
   jauges.className = 'mb-jauges'
-  jauges.innerHTML = `<span>🫙 réserve <b>${run.bonbonneLiters.toFixed(2)} / ${capBonbonne()} L</b></span><span>💠 ×${run.vies} · profondeur ${voieRang} / ${voiePlan.longueur}</span>`
+  jauges.innerHTML = `<span>🫙 réserve <b>${run.bonbonneLiters.toFixed(2)} / ${capBonbonne()} L</b></span><span>💠 ×${run.vies} · profondeur ${voieRang} / ${longueurRun()}</span>`
   host.appendChild(jauges)
   const esc = (t: string): string =>
     t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -10725,7 +10947,7 @@ function identiteAtelier(lv: LevelDef): CodeAtelier | null {
  *  salle n'a pas de progression à montrer. */
 function voieHudVisible(): boolean {
   if (!hasPlayed || auHub || testLevel !== null) return false
-  return voiePlan.longueur > 1
+  return longueurRun() > 1
 }
 
 /** Reconstruit le rail : appelé à chaque entrée de salle (restart). */
@@ -10733,11 +10955,15 @@ function majVoieHud(): void {
   const montre = voieHudVisible()
   voieHudEl.hidden = !montre
   if (!montre) return
-  const total = voiePlan.longueur
+  const total = longueurRun()
   const rang = Math.min(total, voieRang + 1) // la salle en cours
   el('vh-rang').textContent = `${rang} / ${total}`
   const id = identiteAtelier(level)
+  const mod = moduleEnCours()
   el('vh-stade').textContent =
+    (mod && mod.niveaux > 0
+      ? `${mod.nom} · ${Math.min(mod.niveaux, carteRun.niveau + 1)}/${mod.niveaux} · `
+      : '') +
     MOMENT_COURT[momentDuRang(rang, total)] +
     (id ? ` · DIFF ${id.difficulte}` : '')
   const rail = el('vh-rail')
@@ -10769,13 +10995,13 @@ function majVoieHud(): void {
 function annonceVoieCarte(): void {
   if (auHub || testLevel !== null) return
   clearTimeout(voieCarteTimer)
-  const total = voiePlan.longueur
+  const total = longueurRun()
   const rang = Math.min(total, voieRang + 1)
   el('vc-rang').textContent =
     `SALLE ${rang} / ${total}` +
     // LE MODULE se nomme à l'entrée de chaque salle : sans lui, la station
     // n'existerait que dans son écran, et le biome ne serait qu'un dessin.
-    ` · ${moduleDuRang(rang, total).nom}` +
+    ` · ${moduleEnCours()?.nom ?? 'HORS CARTE'}` +
     (estEconomat(level) ? ' · L’ÉCONOMAT' : '') +
     (voieIntercalaire ? ' · SALLE GÉNÉRÉE' : '') +
     (descenteDuJour() ? ' · DESCENTE DU JOUR' : '')
@@ -10908,7 +11134,7 @@ function restart(): void {
   restart()
 }
 
-function newExpedition(): void {
+function newExpedition(avecCarte = false): void {
   levelIndex = 0
   voieRang = 0 // une descente neuve repart du premier rang du plan
   voieVues.clear()
@@ -10930,6 +11156,23 @@ function newExpedition(): void {
   // les PROVISIONS du comptoir se livrent maintenant — après la remise à
   // zéro (le viatique s'ajoute à une bonbonne vide), avant la première salle
   appliqueProvisions()
+  carteRun = departCarte(carte)
+  if (avecCarte) {
+    // AU SAS DE LANCEMENT, la carte s'ouvre : le premier module se choisit
+    // sur le plan, puis ses salles en vignettes — la première salle de la
+    // run n'est plus la première de la bibliothèque
+    montreCarteRun('depart')
+    return
+  }
+  // sans carte (outils, essais automatisés) : on entre d'office par la
+  // première coursive ouverte, et la salle 1 se joue comme avant
+  const premiere = choixModules(carte, carteRun, orbesAcquis()).find(
+    (x) => !x.orbeManquant,
+  )
+  if (premiere)
+    carteRun =
+      entreModule(carte, carteRun, premiere.module.id, orbesAcquis()) ??
+      carteRun
   restart()
 }
 
@@ -11560,7 +11803,7 @@ const doTuile = (icone: string, val: string, quoi: string, cls = ''): string =>
  *  dit. Au-delà de soixante salles, le rail ne veut plus rien dire : on
  *  l'omet plutôt que d'aligner des cheveux. */
 function momentDuRang(r: number, total: number): 1 | 2 | 3 {
-  if (voiePlan.longueur > 0) return momentAuRang(r, voiePlan)
+  if (voiePlan.longueur > 0) return momentAuRang(r, planEffectif())
   const lv = playedLevels()[r - 1]
   const id = lv ? identiteAtelier(lv) : null
   if (id) return id.moment
@@ -11592,7 +11835,7 @@ function majDossier(): void {
 
   // ---- TA MISSION : où l'on est, et ce qu'on vient chercher
   const id = identiteAtelier(level)
-  const total = voiePlan.longueur
+  const total = longueurRun()
   const rang = Math.min(total, voieRang + 1)
   let mission = '<section class="do-sec do-salle"><h4><u>🎯</u>TA MISSION</h4>'
   if (enRun && total > 1) {
@@ -13099,7 +13342,7 @@ function frame(now: number): void {
       if (save) {
         reprendreRun(save)
       } else {
-        newExpedition()
+        newExpedition(true)
       }
     })
   } else if (
@@ -13221,6 +13464,7 @@ function frame(now: number): void {
     // LA VOIE : chaque sas bu creuse la descente d'un rang — le palmarès
     // suit en direct (profondeur record, descentes entamées)
     voieRang += 1 // la descente avance : c'est la progression, pas un titre
+    carteRun = franchitSalle(carteRun) // et le module se vide d'une salle
     voieVues.add(level.code) // la pioche ne la reproposera pas de la run
     if (!sasOutil) {
       const p = chargePalmaresVoie()
@@ -13230,7 +13474,8 @@ function frame(now: number): void {
     }
     // la fin : la descente se boucle au bout du PLAN — c'est le réglage de
     // longueur qui dit combien de salles fait une descente
-    const finExpedition = voieRang >= voiePlan.longueur
+    // LA FIN : le module objectif de la carte, épuisé — plus la longueur du plan
+    const finExpedition = objectifAtteint(carte, carteRun)
     if (finExpedition) {
       // Dernier sas : l'expédition est achevée — bilan, et registres à jour
       run.ended = true
