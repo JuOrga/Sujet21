@@ -6,10 +6,10 @@ une partie de soi-même — **se déplacer, c'est rétrécir**.
 
 Le document de référence est [`docs/doc-fonctionnel.md`](docs/doc-fonctionnel.md).
 
-## État — version 0.21.413, une run jouable de bout en bout
+## État — version 0.21.414, une run jouable de bout en bout
 
 Le jeu tourne dans le navigateur, sur ordinateur, tablette et téléphone.
-**413 livraisons consignées entre le 08/08/2026 et le 03/09/2026** — le journal
+**414 livraisons consignées entre le 08/08/2026 et le 03/09/2026** — le journal
 complet se lit dans l'écran NOTES DE VERSION, les données sont dans
 [`src/bench/livraisons.ts`](src/bench/livraisons.ts).
 
@@ -41,6 +41,9 @@ salles la carte s'ouvre et la coursive suivante se choisit, sous cadenas
 tant que l'orbe manque ; la longueur d'une run découle du trajet), la
 descente semi-procédurale (rampe de difficulté réglable, graine du jour
 commune à tous les postes), le choix de la salle suivante en vignettes,
+les orbes d'essence de conscience (achetés au marchand du hub contre de la
+mémoire, trouvés en cache, dépensés à l'écran des mémoires pour tisser une
+transformation), les améliorations durables du marchand,
 l'économat à mi-descente qui troque contre du condensat, la mise en bonbonne
 du surplus au sas, la purge de fin de run. Le codex se remplit de ce que le
 sujet découvre en jouant, les trophées de ce qu'il réussit.
@@ -88,7 +91,7 @@ station, `?tableau=N` démarre à la salle N,
 ## Qualité
 
 ```bash
-pnpm test        # 850 tests dans 74 fichiers, ~23 s
+pnpm test        # 858 tests dans 75 fichiers, ~23 s
 pnpm type-check
 pnpm build
 ```
@@ -103,11 +106,9 @@ codex, trophées, cycle, récompenses, voie, générateur) et les écrans
 
 - **Le boss.** La Pompe de reprise n'est qu'une esquisse écrite
   ([`docs/boss-pompe.md`](docs/boss-pompe.md)) : rien n'est implémenté.
-- **Les orbes et le marchand du hub** : les cadenas de la carte lisent
-  encore le cycle des mémoires (une transformation tissée vaut son orbe) ;
-  la monnaie des orbes, le marchand qui les vend contre de la mémoire et
-  l'orbe trouvable en cache sont à faire, puis le réétiquetage des tableaux
-  par biome ([`docs/carte-station.md`](docs/carte-station.md)).
+- **Le réétiquetage des tableaux par biome** : les tableaux livrés ne
+  portent pas encore de code de biome (ils sont universels), et l'éditeur
+  de tableaux n'expose pas le champ ([`docs/carte-station.md`](docs/carte-station.md)).
 - **Les cinq décisions ouvertes** du §14, à commencer par l'intensité de la
   cohésion — le curseur d'identité du jeu.
 - **L'empaquetage Steam** : les visuels de boutique sont dessinés

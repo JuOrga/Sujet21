@@ -83,7 +83,8 @@ dépôt (annulable).
   `niveaux` (**un module est un biome** : le nombre de salles qu'on y joue
   avant que la carte ne s'ouvre à nouveau ; 0 pour un lieu sans salle,
   hub ou nœud), `biome` (le code du biome dans la nomenclature atelier,
-  la pioche ne tirera que des tableaux qui le portent), `desc`.
+  la pioche ne tirera que des tableaux qui le portent), `orbe` (optionnel :
+  l'orbe que le module recèle — une cache), `desc`.
 - `liens[]` : `de`, `vers`, `type`. **Orientés** : le joueur avance de
   `de` vers `vers`. Une clé de `typesLiens`.
 - `typesLiens` : par type, `couleur`, `epaisseur` (la ligne de route),
@@ -190,11 +191,40 @@ Dans l'ordre, une PR vers `dev` par étape :
 1. ~~Le JSON de la carte : niveaux par module, code de biome, condition lue
    sur les orbes. Éditeur mis à jour.~~ Fait.
 2. ~~**La descente pilotée par la carte**~~ Fait — voir ci-dessous.
-3. **Les orbes** : la monnaie, l'écran des mémoires qui les dépense, le
-   marchand du hub qui les vend contre de la mémoire (et d'autres
-   améliorations durables), l'orbe trouvable en cache.
+3. ~~**Les orbes**~~ Fait — voir ci-dessous.
 4. **Le réétiquetage des tableaux existants par biome**, et le code de
-   biome dans la nomenclature atelier.
+   biome dans la nomenclature atelier (champ `biome` dans l'éditeur de
+   tableaux, tableaux livrés étiquetés, tableaux manquants par biome).
+5. **Retirer** `src/game/station.ts`, `planStation.ts` et
+   `station.spec.ts` : plus importés, leur suppression a été refusée à
+   l'outil.
+
+## Les orbes d'essence de conscience (`src/game/marchand.ts`, `records.ts`)
+
+- **L'inventaire** vit dans les registres (`records.orbes()`), durable
+  comme la mémoire. `acheteOrbe` (mémoire → orbe, atomique),
+  `tisseAvecOrbe` (l'orbe quitte la poche, le lien se grave),
+  `gagneOrbe` / `videCache` (une cache ne se pille qu'une fois par poste),
+  `reinitialiseCycle` rend les orbes, plus la mémoire.
+- **L'écran des mémoires** ne dépense plus de mémoire : une transformation
+  se tisse avec SON orbe. La ligne dit « ORBE EN POCHE » ou « ORBE
+  MANQUANT · 10 AU MARCHAND ». Le prix d'un orbe est le `cout` de la
+  transformation dans `cycle.ts` : une seule table de valeurs.
+- **Le marchand** (`#marchand`) : le Semblable du comptoir. Le voile
+  s'ouvre au hub au contact de l'étal (la boîte qui englobe ses alcôves,
+  élargie de 140 unités), ou depuis l'accueil en mode concepteur (bouton
+  MARCHAND). Trois étals : les orbes (transformations non mystères), les
+  **améliorations durables** (`AMELIORATIONS` : réserve élargie +0,5 L,
+  second échantillon +1 vie, flair de cachette — trois pour commencer, à
+  étoffer), les provisions du comptoir (les mêmes que les alcôves).
+- **Les caches** : un module de la carte porte un champ `orbe` (éditeur :
+  « Orbe recelé »). Quand le module est épuisé, l'orbe est pris — une fois
+  par poste, jamais sous un outil de conception. Sur la carte livrée, S1b
+  recèle la sublimation et S3b la condensation : deux valeurs par défaut, à
+  changer dans l'éditeur.
+- **Les cadenas** lisent `orbesAcquis()` : les orbes en poche, plus ce que
+  le cycle tient (une transformation tissée vaut son orbe, un état atteint
+  vaut le sien).
 - Les vignettes bitmap par module (`docs/carte-station/assets-prompts.md`)
   si l'on quitte le tout-vectoriel — le champ `img` de la maquette n'est pas
   repris dans le JSON tant qu'elles n'existent pas.

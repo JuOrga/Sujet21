@@ -399,6 +399,10 @@ export class EditeurCarte {
       this.champ(P + 'h', 'hauteur', m.h, 'type="number" step="1" min="32"') +
       `</div>` +
       this.champ(P + 'temp', 'Température (°C)', m.temp, 'type="number" step="1"') +
+      `<label class="ce-f" title="Une cache : l’orbe pris quand le module est épuisé, une fois par poste"><span>Orbe recelé</span><select id="ce-orbe">` +
+      `<option value=""${m.orbe ? '' : ' selected'}>— aucun —</option>` +
+      ORBES.map((o) => `<option value="${esc(o.id)}"${m.orbe === o.id ? ' selected' : ''}>${esc(o.id)} · ${esc(o.nom)}</option>`).join('') +
+      `</select></label>` +
       `<label class="ce-f"><span>Description</span><textarea data-chemin="${P}desc" rows="3">${esc(m.desc)}</textarea></label>` +
       `</div>` +
       `<div class="ce-group"><span class="k">Coursives depuis ${esc(m.id)}</span>` +
@@ -880,6 +884,15 @@ export class EditeurCarte {
     })
     this.host.addEventListener('change', (e) => {
       const el = e.target as HTMLInputElement
+      if (el.id === 'ce-orbe') {
+        const m = this.selection !== null ? moduleParId(this.carte, this.selection) : undefined
+        if (!m) return
+        this.memorise()
+        if (el.value) m.orbe = el.value
+        else delete m.orbe
+        this.change()
+        return
+      }
       if (el.id === 'ce-id') {
         this.memorise()
         const err = renommeModule(this.carte, this.selection ?? '', el.value)

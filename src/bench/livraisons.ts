@@ -31,6 +31,19 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '03/09/2026 21:30',
+    title: 'LES ORBES D’ESSENCE DE CONSCIENCE : le marchand du hub les vend, l’écran des mémoires les dépense, les caches les recèlent',
+    notes: [
+      'L’ÉTAPE 3 DE LA CARTE (docs/carte-station.md), la décision du concepteur : le condensat se perd à la fin de la run ; la MÉMOIRE est la monnaie durable ; chaque ORBE est une transformation ou un état du cycle ; il s’achète au marchand du hub contre de la mémoire ou se trouve en run ; l’écran des mémoires le dépense pour tisser ; et le marchand vend aussi d’autres améliorations durables.',
+      'L’INVENTAIRE VIT DANS LES REGISTRES, durable comme la mémoire : orbes en poche, améliorations acquises, caches vidées. Les achats sont ATOMIQUES (acheteOrbe débite ET met en poche ; tisseAvecOrbe sort de la poche ET grave le lien ; videCache grave le module ET donne l’orbe) — jamais une mémoire débitée sans son orbe, jamais un orbe compté deux fois : un orbe déjà en poche ou déjà tissé ne se rachète pas, une cache ne se pille qu’une fois par poste. Dix tests le gravent.',
+      'L’ÉCRAN DES MÉMOIRES NE DÉPENSE PLUS DE MÉMOIRE. Une transformation se tisse avec SON orbe ; la ligne dit « ▸ TISSER · ORBE EN POCHE » ou « ORBE MANQUANT · 10 AU MARCHAND ». Le prix d’un orbe est le coût de la transformation dans cycle.ts — UNE table de valeurs, pas deux qui divergent. La jauge de mémoire s’efface ; le compteur dit les orbes en poche, et une ligne dit où l’on en trouve. L’outil « réinitialiser » rend désormais les ORBES, plus la mémoire.',
+      'LE MARCHAND : le Semblable du comptoir, dans un voile. Il s’ouvre AU HUB, au contact de l’étal (la boîte qui englobe les alcôves du comptoir, élargie de 140 unités — les alcôves vendent toujours au contact, les deux se cumulent), et depuis l’accueil en mode concepteur (bouton MARCHAND) pour le régler sans nager. Trois étals : les orbes (les transformations non mystères, dans l’ordre du cycle — un orbe offert d’origine y figure, marqué tel, il ne sert que sous verrou narratif), les AMÉLIORATIONS DURABLES (réserve élargie +0,5 L, second échantillon +1 vie, flair de cachette — trois pour commencer, rendues permanentes depuis les provisions que le joueur connaît, à étoffer avec le concepteur ; elles s’appliquent au départ de chaque descente), et les provisions du comptoir d’à côté. Un article trop cher dit combien il manque.',
+      'LES CACHES : un module de la carte porte un champ `orbe` (l’éditeur l’expose, « Orbe recelé », un sélecteur parmi les orbes connus ; la vérification refuse un orbe inconnu). Quand le module est épuisé, l’orbe est pris — une fois par poste, jamais sous un outil de conception. Sur la carte livrée, S1b recèle la sublimation et S3b la condensation : deux valeurs par défaut, à changer dans l’éditeur. Un toast le dit : « ORBE D’ESSENCE — SUBLIMATION · TROUVÉ DANS MODULE ? ».',
+      'LES CADENAS DE LA CARTE lisent désormais les orbes en poche EN PLUS de ce que le cycle tient (une transformation tissée vaut son orbe, un état atteint vaut le sien) : la lecture d’attente de l’étape 2 reste vraie, elle s’enrichit.',
+      'VÉRIFIÉ : 858 tests verts dans 75 fichiers (huit de plus : catalogue, prix, achats, tissage, cache, réinitialisation, persistance), type-check à 0, build propre. Pas vu au navigateur : le jeu complet ne monte pas dans le Chromium sans tête de l’environnement — à regarder en vrai : l’étal qui ouvre le voile, un achat, le tissage à l’écran des mémoires, une cache vidée.',
+    ],
+  },
+  {
     date: '03/09/2026 20:59',
     title: 'LA DESCENTE EST PILOTÉE PAR LA CARTE : au bout d’un module, le plan s’ouvre et la coursive se choisit',
     notes: [

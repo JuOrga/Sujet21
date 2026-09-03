@@ -10,8 +10,10 @@
 // Statuts d'un lien :
 //   · acquis d'origine — fusion et liquéfaction : le retour au liquide
 //     n'est pas un achat… TANT QUE le scénario ne les VERROUILLE pas ;
-//   · à tisser — un coût en mémoire, l'achat se fait à l'écran des
-//     mémoires (aucun prérequis : chaque lien est sa propre mémoire) ;
+//   · à tisser — il faut SON ORBE d'essence de conscience : acheté au
+//     marchand du hub contre de la mémoire (le coût ci-dessous), ou trouvé
+//     en cache ; l'écran des mémoires le dépense (aucun prérequis : chaque
+//     lien est sa propre mémoire) ;
 //   · mystère — les liens du quatrième état : montrés voilés (« ??? »),
 //     rien à acheter tant que le chantier moteur n'existe pas.
 //
@@ -45,7 +47,7 @@ export interface TransfoCycle {
   vers: EtatCycle
   nom: string
   desc: string
-  cout: number // en mémoire (0 : acquis d'origine)
+  cout: number // le PRIX DE L'ORBE au marchand du hub, en mémoire (0 : acquis d'origine)
   etat?: 'acquis-depart' | 'mystere'
 }
 

@@ -90,6 +90,9 @@ export interface ModuleCarte {
   /** le code du biome dans la nomenclature atelier — la pioche ne tirera
    *  que des tableaux qui le portent. Vide : à définir. */
   biome: string
+  /** L'ORBE QUE LE MODULE RECÈLE (une cache) : pris quand le module est
+   *  épuisé, une seule fois par poste — un id d'ORBES. Absent : rien. */
+  orbe?: string
   desc: string
 }
 
@@ -216,7 +219,9 @@ export function parseCarte(entree: unknown): {
       for (const k of ['x', 'y', 'w', 'h', 'temp', 'niveaux'] as const)
         if (!estNombre(m[k])) erreurs.push(`${ou} : ${k} (nombre) requis`)
       if (!FORMES_MODULE.includes(m.forme as FormeModule)) erreurs.push(`${ou} : forme inconnue « ${String(m.forme)} »`)
+      if (m.orbe !== undefined && m.orbe !== null && !estChaine(m.orbe)) erreurs.push(`${ou} : orbe doit être une chaîne`)
       if (erreurs.some((e) => e.startsWith(ou))) return
+      const orbe = estChaine(m.orbe) && m.orbe.trim() !== '' ? m.orbe.trim() : undefined
       modules.push({
         id: (m.id as string).trim(),
         nom: m.nom as string,
@@ -230,6 +235,7 @@ export function parseCarte(entree: unknown): {
         forme: m.forme as FormeModule,
         niveaux: m.niveaux as number,
         biome: estChaine(m.biome) ? m.biome.trim() : '',
+        ...(orbe ? { orbe } : {}),
         desc: estChaine(m.desc) ? m.desc : '',
       })
     })
@@ -334,7 +340,8 @@ export function serialiseCarte(c: CarteStation): string {
     types: Object.fromEntries(TYPES_MODULE.map((t) => [t, c.types[t]])) as Record<TypeModule, string>,
     modules: c.modules.map((m) => ({
       id: m.id, nom: m.nom, type: m.type, zone: m.zone, x: m.x, y: m.y, w: m.w, h: m.h,
-      temp: m.temp, forme: m.forme, niveaux: m.niveaux, biome: m.biome, desc: m.desc,
+      temp: m.temp, forme: m.forme, niveaux: m.niveaux, biome: m.biome,
+      ...(m.orbe ? { orbe: m.orbe } : {}), desc: m.desc,
     })),
     liens: c.liens.map((l) => ({ de: l.de, vers: l.vers, type: l.type })),
     typesLiens: Object.fromEntries(
@@ -551,6 +558,8 @@ export function verifieCarte(c: CarteStation): VerdictCarte[] {
     if (m.w < 24 || m.h < 24) v.push({ niveau: 'attention', message: `${m.id} : module trop petit pour être lu (${m.w}×${m.h})`, module: m.id })
     if (!Number.isInteger(m.niveaux) || m.niveaux < 0)
       v.push({ niveau: 'erreur', message: `${m.id} : niveaux doit être un entier positif ou nul (${m.niveaux})`, module: m.id })
+    if (m.orbe && !orbeConnu(m.orbe))
+      v.push({ niveau: 'erreur', message: `${m.id} : orbe inconnu « ${m.orbe} » — ids : ${ORBES.map((o) => o.id).join(', ')}`, module: m.id })
     if (m.niveaux > 0 && m.biome.trim() === '')
       v.push({ niveau: 'attention', message: `${m.id} : ${m.niveaux} niveau${m.niveaux > 1 ? 'x' : ''} sans code de biome — la pioche ne saura pas quels tableaux lui donner`, module: m.id })
     if (m.x - m.w / 2 < 0 || m.y - m.h / 2 < 0 || m.x + m.w / 2 > c.scene.width || m.y + m.h / 2 > c.scene.height)

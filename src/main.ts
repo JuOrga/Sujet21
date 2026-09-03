@@ -10,6 +10,7 @@ import { CODEX, Codex, type CodexGroupe } from './game/codex'
 import { niveauExpanse } from './game/structures'
 import {
   TABLEAU_HUB,
+  ARTICLES_COMPTOIR,
   articleComptoir,
   zonesDuHub,
   type ArticleHub,
@@ -61,11 +62,13 @@ import {
 } from './game/voie'
 import {
   CARTE_LIVREE,
+  ORBES,
   couleurTemperature,
   moduleParId,
   zoneDe,
   type ModuleCarte,
 } from './game/carteStation'
+import { AMELIORATIONS, amelioration, orbesEnVente } from './game/marchand'
 import { dessinCarteSVG, type OptionsDessin } from './game/dessinCarte'
 import {
   choixModules,
@@ -482,6 +485,8 @@ const records = new Records()
 function majMemoireUI(): void {
   const dd = document.getElementById('home-memoire')
   if (dd) dd.textContent = String(records.memoire())
+  const orbes = document.getElementById('home-orbes')
+  if (orbes) orbes.textContent = String(records.orbes().length)
 }
 /** Grave la mémoire ET tient le compteur de butin de la run courante.
  * La fiole de SOUVENIR majore chaque gain de 25 %. */
@@ -779,10 +784,13 @@ const voiePlan: PlanVoie = (() => {
 // postures, pioche — il reçoit simplement la longueur vraie (planEffectif).
 const carte = CARTE_LIVREE
 let carteRun: EtatCarteRun = departCarte(carte)
-/** Les orbes tenus pour acquis — lus dans le cycle des mémoires tant que la
- *  monnaie des orbes (étape 3) n'existe pas. */
+/** Les orbes ACQUIS, pour les cadenas de la carte : ceux en poche, plus
+ *  ceux que le cycle tient déjà (une transformation tissée vaut son orbe —
+ *  on l'a dépensé pour elle — et un état atteint vaut le sien). */
 function orbesAcquis(): string[] {
-  return orbesDuCycle(records.eveilAcquis(), records.verrousCycle())
+  const out = new Set(orbesDuCycle(records.eveilAcquis(), records.verrousCycle()))
+  for (const o of records.orbes()) out.add(o)
+  return [...out]
 }
 function longueurRun(): number {
   return longueurRunCarte(carte, carteRun, voieRang)
@@ -2259,20 +2267,23 @@ const cycleScene = document.getElementById('cycle-scene') as HTMLDivElement
 const cycleRegListe = document.getElementById(
   'cycle-reg-liste',
 ) as HTMLDivElement
-/** Le STATUT d'un lien : offert d'origine · tissé · à tisser payable · à
- * tisser, solde insuffisant · mystère. Il pilote le trait, la plaque ET la
- * ligne du registre. Les deux premiers sont ACQUIS — même vert, même
+/** Le STATUT d'un lien : offert d'origine · tissé · à tisser, l'orbe en
+ * poche · à tisser, l'orbe manque · mystère. Il pilote le trait, la plaque
+ * ET la ligne du registre. Les deux premiers sont ACQUIS — même vert, même
  * lien qui coule : ce qui compte, c'est de l'avoir, pas de l'avoir payé.
- * Un VERROU narratif referme même un lien offert : il redevient à tisser. */
+ * Un VERROU narratif referme même un lien offert : il redevient à tisser.
+ * DEPUIS LES ORBES (03/09), tisser ne coûte plus de mémoire : il faut
+ * l'orbe de la transformation, acheté au marchand du hub ou trouvé en
+ * cache — la mémoire se dépense là-bas, pas ici. */
 function statutTransfo(
   t: (typeof TRANSFOS_CYCLE)[number],
   acquis: readonly string[],
-  solde: number,
+  orbes: readonly string[],
   verrous: readonly string[],
 ): 'origine' | 'tenue' | 'payable' | 'verrou' | 'mystere' {
   if (t.etat === 'mystere') return 'mystere'
   if (!transfoTenue(t.id, acquis, verrous))
-    return solde >= t.cout ? 'payable' : 'verrou'
+    return orbes.includes(t.id) ? 'payable' : 'verrou'
   return t.etat === 'acquis-depart' && !acquis.includes(t.id)
     ? 'origine'
     : 'tenue'
@@ -2287,21 +2298,15 @@ const CY_STATUTS = [
 function renderCycleVoile(): void {
   const acquis = records.eveilAcquis()
   const verrous = records.verrousCycle()
-  const solde = records.memoire()
+  const orbes = records.orbes()
   const soldeEl = document.getElementById('cycle-solde-n')
-  if (soldeEl) soldeEl.textContent = String(solde)
-  // la jauge se remplit vers le lien à tisser le plus cher : pleine, tout
-  // ce qui reste est payable (ou tout est tissé)
-  const restants = TRANSFOS_CYCLE.filter(
-    (t) => statutTransfo(t, acquis, solde, verrous) === 'verrou',
-  ).map((t) => t.cout)
-  const cible = restants.length > 0 ? Math.max(...restants) : 0
-  const jauge = document.querySelector<HTMLElement>('#cycle-jauge b')
-  if (jauge)
-    jauge.style.width = `${cible > 0 ? Math.min(100, (solde / cible) * 100) : 100}%`
+  if (soldeEl) soldeEl.textContent = String(orbes.length)
+  const memEl = document.getElementById('cycle-memoire')
+  if (memEl)
+    memEl.textContent = `mémoire ${records.memoire()} — les orbes s’achètent au marchand du hub, ou se trouvent en cache`
   let registre = ''
   for (const t of TRANSFOS_CYCLE) {
-    const statut = statutTransfo(t, acquis, solde, verrous)
+    const statut = statutTransfo(t, acquis, orbes, verrous)
     const sous =
       statut === 'mystere'
         ? '???'
@@ -2310,8 +2315,8 @@ function renderCycleVoile(): void {
           : statut === 'tenue'
             ? 'TISSÉE'
             : statut === 'payable'
-              ? `▸ TISSER · ${t.cout}`
-              : `TISSER · ${t.cout}`
+              ? '▸ TISSER · ORBE EN POCHE'
+              : `ORBE MANQUANT · ${t.cout} AU MARCHAND`
     const plaque = cycleScene.querySelector<HTMLElement>(
       `.cy-transfo[data-transfo="${t.id}"]`,
     )
@@ -2367,8 +2372,8 @@ cycleEcran.addEventListener('click', (e) => {
     !transfoAchetable(t.id, records.eveilAcquis(), records.verrousCycle())
   )
     return
-  if (!records.acquiertEveil(t.id, t.cout)) {
-    // solde insuffisant : la jauge le rappelle, la plaque proteste
+  if (!records.tisseAvecOrbe(t.id)) {
+    // l'orbe manque : le registre le dit, la plaque proteste
     renderCycleVoile()
     const rendu = document.querySelector<HTMLElement>(
       `.cy-reg[data-transfo="${t.id}"]`,
@@ -2397,16 +2402,124 @@ document.getElementById('cycle-fermer')?.addEventListener('click', () => {
 // narratifs, eux, ne bougent pas : ils appartiennent au scénario. Le
 // bouton n'existe qu'en mode concepteur (CSS body.concepteur).
 document.getElementById('cycle-reset')?.addEventListener('click', () => {
-  const rembourse = records
-    .eveilAcquis()
-    .reduce((somme, id) => somme + (transfoCycle(id)?.cout ?? 0), 0)
-  records.reinitialiseCycle(rembourse)
+  records.reinitialiseCycle() // les orbes reviennent en poche
   majMemoireUI()
   renderCycleVoile()
   audio.collect()
 })
 cycleEl.addEventListener('pointerdown', (e) => {
   if (e.target === cycleEl) cycleEl.hidden = true
+})
+
+// ---- LE MARCHAND DU HUB : le Semblable du comptoir vend ce qui DURE ----
+// Les ORBES d'essence de conscience (contre de la mémoire ; l'écran des
+// mémoires les dépense), les AMÉLIORATIONS DURABLES (une fois pour toutes,
+// à chaque descente), et les provisions du comptoir d'à côté. Le voile
+// s'ouvre AU CONTACT de l'étal du comptoir, au hub — et depuis l'accueil
+// en mode concepteur, pour le régler sans nager.
+const marchandEl = document.getElementById('marchand') as HTMLDivElement
+const marchandCorps = document.getElementById(
+  'marchand-corps',
+) as HTMLDivElement
+let marchandDedans = false
+function renderMarchandVoile(): void {
+  const solde = records.memoire()
+  const soldeEl = document.getElementById('marchand-solde')
+  if (soldeEl) soldeEl.textContent = String(solde)
+  const acquis = records.eveilAcquis()
+  const verrous = records.verrousCycle()
+  const article = (
+    donnee: string,
+    icone: string,
+    nom: string,
+    detail: string,
+    etat: string,
+    achetable: boolean,
+  ): string =>
+    `<button type="button" class="mr-article${achetable ? '' : ' mr-tenu'}" ${donnee}${achetable ? '' : ' disabled'}>` +
+    `<i>${icone}</i><b>${htmlSafe(nom)}</b><small>${htmlSafe(detail)}</small><em>${htmlSafe(etat)}</em></button>`
+  let html =
+    '<section class="mr-sec"><h3>LES ORBES D’ESSENCE DE CONSCIENCE</h3>' +
+    '<p>Chaque orbe est une transformation. En poche, il se dépense à l’écran des mémoires pour la tisser ; tissée, elle ouvre les coursives de la carte qui l’exigent.</p><div class="mr-grille">'
+  for (const o of orbesEnVente()) {
+    const etat = acquis.includes(o.id)
+      ? 'TISSÉE'
+      : records.aOrbe(o.id)
+        ? 'EN POCHE'
+        : transfoTenue(o.id, acquis, verrous)
+          ? 'OFFERTE D’ORIGINE'
+          : `${o.prix} MÉMOIRE`
+    const achetable = etat === `${o.prix} MÉMOIRE`
+    html += article(
+      `data-orbe="${o.id}"`,
+      '🔮',
+      o.nom.toUpperCase(),
+      o.desc,
+      achetable && solde < o.prix ? `${o.prix} MÉMOIRE — IL EN MANQUE ${o.prix - solde}` : etat,
+      achetable && solde >= o.prix,
+    )
+  }
+  html +=
+    '</div></section><section class="mr-sec"><h3>LES AMÉLIORATIONS DURABLES</h3>' +
+    '<p>Une fois pour toutes : elles valent au départ de chaque descente.</p><div class="mr-grille">'
+  for (const a of AMELIORATIONS) {
+    const tenue = records.aAmelioration(a.id)
+    html += article(
+      `data-amelioration="${a.id}"`,
+      a.icone,
+      a.nom,
+      a.detail,
+      tenue ? 'ACQUISE' : solde < a.prix ? `${a.prix} MÉMOIRE — IL EN MANQUE ${a.prix - solde}` : `${a.prix} MÉMOIRE`,
+      !tenue && solde >= a.prix,
+    )
+  }
+  html +=
+    '</div></section><section class="mr-sec"><h3>LES PROVISIONS DE LA PROCHAINE DESCENTE</h3>' +
+    '<p>Le comptoir d’à côté les vend aussi, au contact des alcôves — elles ne valent qu’une descente.</p><div class="mr-grille">'
+  for (const a of ARTICLES_COMPTOIR) {
+    const servi = achatsHub.has(a.id)
+    html += article(
+      `data-provision="${a.id}"`,
+      a.icone,
+      a.nom,
+      a.detail,
+      servi ? 'DÉJÀ SERVI' : solde < a.prix ? `${a.prix} MÉMOIRE — IL EN MANQUE ${a.prix - solde}` : `${a.prix} MÉMOIRE`,
+      !servi && solde >= a.prix,
+    )
+  }
+  html += '</div></section>'
+  marchandCorps.innerHTML = html
+}
+marchandCorps.addEventListener('click', (e) => {
+  const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null
+  if (!b || b.disabled) return
+  if (b.dataset.orbe) {
+    const o = orbesEnVente().find((x) => x.id === b.dataset.orbe)
+    if (!o || !records.acheteOrbe(o.id, o.prix)) return
+    toastFile.push({ nom: `ORBE — ${o.nom.toUpperCase()}`, icone: '🔮', sur: 'LE MARCHAND' })
+  } else if (b.dataset.amelioration) {
+    const a = amelioration(b.dataset.amelioration)
+    if (!a || !records.acheteAmelioration(a.id, a.prix)) return
+    toastFile.push({ nom: `${a.nom} — ${a.detail}`, icone: a.icone, sur: 'LE MARCHAND' })
+  } else if (b.dataset.provision) {
+    const a = articleComptoir(b.dataset.provision)
+    if (!a) return
+    tenteAchatHub({ ...a, plot: { minX: 0, minY: 0, maxX: 0, maxY: 0 } })
+  } else return
+  audio.collect()
+  majMemoireUI()
+  renderMarchandVoile()
+})
+function ouvreMarchand(): void {
+  marchandEl.hidden = false
+  renderMarchandVoile()
+}
+document.getElementById('home-marchand')?.addEventListener('click', ouvreMarchand)
+document.getElementById('marchand-fermer')?.addEventListener('click', () => {
+  marchandEl.hidden = true
+})
+marchandEl.addEventListener('pointerdown', (e) => {
+  if (e.target === marchandEl) marchandEl.hidden = true
 })
 
 // ---- Le voile FIOLES : la collection d'échantillons scellés ------------
@@ -5679,7 +5792,8 @@ window.addEventListener('keydown', (e) => {
         editeurCarte.close()
         openHome()
       }
-    } else if (!recsEl.hidden)
+    } else if (!marchandEl.hidden) marchandEl.hidden = true
+    else if (!recsEl.hidden)
       fermerRecs() // les voiles d'abord
     else if (!cmdsEl.hidden) cmdsEl.hidden = true
     else if (!sallesEl.hidden) sallesEl.hidden = true
@@ -5815,6 +5929,7 @@ const COUCHES_MENU: CoucheMenu[] = [
   { id: 'planche', retour: 'planche-fermer' },
   { id: 'regles', retour: 'regles-fermer' },
   { id: 'cycle', retour: 'cycle-fermer' }, // les mémoires — ouvertes au banc du hub aussi
+  { id: 'marchand', retour: 'marchand-fermer' }, // le marchand — ouvert à l'étal du hub aussi
   { id: 'salles', retour: 'salles-fermer' },
   { id: 'records', retour: 'records-fermer' },
   { id: 'livraisons', retour: 'livraisons-fermer' },
@@ -9896,6 +10011,10 @@ function tenteAchatPlot(p: PlotMeta): void {
 /** Les PROVISIONS achetées au comptoir se livrent au départ de la
  * descente — puis la besace se vide (elles valent UNE expédition). */
 function appliqueProvisions(): void {
+  // LES AMÉLIORATIONS DURABLES du marchand : à chaque descente, pour toujours
+  if (records.aAmelioration('souffle')) provisionsRun.vies += 1
+  if (records.aAmelioration('reserve')) provisionsRun.bonbonne += 0.5
+  if (records.aAmelioration('flair')) provisionsRun.clef = true
   if (provisionsRun.vies > 0)
     run.vies = Math.min(VIES_MAX, run.vies + provisionsRun.vies)
   if (provisionsRun.bonbonne > 0)
@@ -13073,6 +13192,29 @@ function frame(now: number): void {
     }
     bancMemoiresDedans = surBanc
   }
+  // ---- LE MARCHAND : au contact de l'ÉTAL du comptoir (la boîte qui
+  // englobe ses alcôves, élargie), le voile s'ouvre — une fois par entrée.
+  // Les alcôves, elles, vendent toujours au contact : les deux se cumulent.
+  if (auHub && !sim.dispersed) {
+    const plots = level.plots?.length
+      ? level.plots.filter((p) => p.monnaie === 'memoire')
+      : (zonesHub?.etal ?? []).map((a) => a.plot)
+    if (plots.length > 0) {
+      const marge = 140
+      const boite = {
+        minX: Math.min(...plots.map((p) => p.minX)) - marge,
+        minY: Math.min(...plots.map((p) => p.minY)) - marge,
+        maxX: Math.max(...plots.map((p) => p.maxX)) + marge,
+        maxY: Math.max(...plots.map((p) => p.maxY)) + marge,
+      }
+      const dedans = pointInBox(sim.stats.centroidX, sim.stats.centroidY, boite)
+      if (dedans && !marchandDedans && marchandEl.hidden) {
+        ouvreMarchand()
+        audio.collect()
+      }
+      marchandDedans = dedans
+    }
+  }
 
   // ---- Lasers : traçage, cibles, portes ----
   const lasers = level.lasers ?? []
@@ -13465,6 +13607,23 @@ function frame(now: number): void {
     // suit en direct (profondeur record, descentes entamées)
     voieRang += 1 // la descente avance : c'est la progression, pas un titre
     carteRun = franchitSalle(carteRun) // et le module se vide d'une salle
+    // LA CACHE : un module qui recèle un orbe le donne quand il est épuisé,
+    // une fois par poste — jamais sous un outil (rien de mérité ne s'écrit)
+    const modFini = moduleEnCours()
+    if (
+      modFini?.orbe &&
+      moduleFini(carte, carteRun) &&
+      !sasOutil &&
+      records.videCache(modFini.id, modFini.orbe)
+    ) {
+      const nomOrbe = ORBES.find((o) => o.id === modFini.orbe)?.nom ?? modFini.orbe
+      toastFile.push({
+        nom: `ORBE D’ESSENCE — ${nomOrbe.toUpperCase()}`,
+        icone: '🔮',
+        sur: `TROUVÉ DANS ${modFini.nom}`,
+      })
+      majMemoireUI()
+    }
     voieVues.add(level.code) // la pioche ne la reproposera pas de la run
     if (!sasOutil) {
       const p = chargePalmaresVoie()

@@ -171,7 +171,8 @@
       "forme": "octogone",
       "niveaux": 1,
       "biome": "S1b",
-      "desc": "Cul-de-sac."
+      "orbe": "sublimation",
+      "desc": "Cul-de-sac. Un orbe d’essence y dort."
     },
     {
       "id": "S3b",
@@ -186,7 +187,8 @@
       "forme": "octogone",
       "niveaux": 1,
       "biome": "S3b",
-      "desc": "Cul-de-sac."
+      "orbe": "condensation",
+      "desc": "Cul-de-sac. Un orbe d’essence y dort."
     },
     {
       "id": "OBS",

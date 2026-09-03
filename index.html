@@ -5831,6 +5831,43 @@
         .cs-route.cs-active, .cs-mod.cs-courant { animation: none; }
       }
 
+      /* ==== LE MARCHAND DU HUB (main.ts) — un voile comme LA STATION ==== */
+      #marchand {
+        position: fixed; inset: 0; z-index: 59;
+        background: radial-gradient(120% 90% at 50% 0%, rgba(30, 58, 88, 0.5), transparent 62%), rgba(2, 5, 10, 0.94);
+        display: flex; align-items: center; justify-content: center; padding: 16px;
+      }
+      #marchand[hidden] { display: none; }
+      .mr-boite { width: min(1100px, 100%); max-height: 100%; display: flex; flex-direction: column; gap: 10px; }
+      .mr-tete { display: flex; align-items: flex-start; gap: 16px; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+      .mr-titres { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+      .mr-titres b { font-family: var(--font-display); font-size: calc(15px * var(--ui)); letter-spacing: 0.16em; color: #eaf6ff; }
+      .mr-titres span { font-size: calc(10.5px * var(--ui)); letter-spacing: 0.1em; color: var(--dim); text-transform: uppercase; }
+      .mr-solde { margin: 0; align-self: center; font-size: calc(10px * var(--ui)); letter-spacing: 0.2em; color: var(--dim); }
+      .mr-solde strong { font-size: calc(16px * var(--ui)); color: var(--specimen); margin-left: 6px; }
+      #marchand-fermer {
+        flex: none; width: 34px; height: 34px; border-radius: 6px; background: rgba(20, 32, 46, 0.8);
+        border: 1px solid var(--line); color: inherit; font: inherit; font-size: calc(14px * var(--ui)); cursor: pointer;
+      }
+      #marchand-fermer:hover { border-color: var(--specimen); }
+      .mr-corps { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 18px; padding-right: 4px; }
+      .mr-sec h3 { margin: 0 0 4px; font-family: var(--font-display); font-size: calc(11px * var(--ui)); letter-spacing: 0.2em; color: var(--specimen); }
+      .mr-sec p { margin: 0 0 8px; font-size: calc(11.5px * var(--ui)); line-height: 1.5; color: var(--dim); }
+      .mr-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+      .mr-article {
+        display: grid; grid-template-columns: 28px 1fr; grid-template-rows: auto auto auto; column-gap: 10px; align-items: start;
+        text-align: left; padding: 10px 12px; border: 1px solid var(--line); background: rgba(9, 18, 30, 0.82);
+        color: var(--ink); font-family: var(--font-mono); cursor: pointer;
+      }
+      .mr-article:hover:not(:disabled) { border-color: var(--specimen); background: rgba(99, 183, 230, 0.12); }
+      .mr-article i { grid-row: 1 / span 3; font-style: normal; font-size: 20px; line-height: 1; }
+      .mr-article b { font-size: calc(12px * var(--ui)); letter-spacing: 0.08em; }
+      .mr-article small { font-size: calc(10.5px * var(--ui)); line-height: 1.4; color: var(--dim); }
+      .mr-article em { font-style: normal; font-size: calc(10.5px * var(--ui)); letter-spacing: 0.14em; color: var(--valid); margin-top: 4px; }
+      .mr-article.mr-tenu { opacity: 0.6; cursor: default; }
+      .mr-article.mr-tenu em { color: var(--dim); }
+      #cycle-solde small { display: block; font-size: calc(9.5px * var(--ui)); letter-spacing: 0.06em; color: var(--dim); text-transform: none; }
+
       /* ---- Éditeur de tableaux : plan de travail, pas vitrine ---- */
       #editor {
         position: fixed;
@@ -7325,6 +7362,7 @@
         <div><dt>ÉTAT</dt><dd id="home-state">en dérive</dd></div>
         <div><dt>CONDENSAT (RUN)</dt><dd id="home-condensat">0 cL</dd></div>
         <div><dt>MÉMOIRE</dt><dd id="home-memoire">0</dd></div>
+        <div><dt>ORBES</dt><dd id="home-orbes">0</dd></div>
       </dl>
       <button id="start" type="button">COMMENCER L'ESSAI</button>
       <button id="home-restart" type="button" hidden>RECOMMENCER LE TABLEAU</button>
@@ -7332,6 +7370,7 @@
       <div class="home-duo" role="group" aria-label="Outils du protocole">
         <button id="home-station" type="button" title="LA STATION : le plan général du complexe orbital — les modules et leurs coursives, tels que la descente les traverse. On y voit d'où l'on vient, où l'on est, ce qui est ouvert et ce qui attend un orbe"><i>🛰&#xFE0E;</i><span>LA STATION</span></button>
         <button id="start-editor" type="button" data-dev title="Créer ou modifier un tableau"><i>✎</i><span>ÉDITEUR</span></button>
+        <button id="home-marchand" type="button" data-dev title="LE MARCHAND du hub, sans nager jusqu'à l'étal : les orbes d'essence de conscience, les améliorations durables, les provisions — payés en mémoire"><i>🔮</i><span>MARCHAND</span></button>
         <button id="home-carte" type="button" data-dev title="L'ÉDITEUR DE LA CARTE : le plan à routes ramifiées de la station — modules, coursives, zones, conditions d'accès. Se glisse, se lie, s'exporte en carteStation.json ; un aperçu jeu rejoue la traversée"><i>⌬</i><span>CARTE</span></button>
         <button id="home-regles" type="button" data-dev title="Le cahier des règles de la génération procédurale : ce que le générateur fait (annotable), ce qu'un level designer en attend (propositions), et vos règles nouvelles en texte libre — partagé entre concepteurs, relu au moment d'implémenter"><i>§</i><span>RÈGLES DE GÉN.</span></button>
         <button id="home-descente" type="button" data-dev title="LA DESCENTE : le déroulement d'une run réglé de bout en bout — longueur, rampe de difficulté, posture des salles, et les quatre poids de l'algorithme qui choisit les tableaux. Le plan se déroule rang par rang sous les yeux, et se tire à blanc sans jouer"><i>▼</i><span>LA DESCENTE</span></button>
@@ -8064,8 +8103,8 @@
         <header id="cycle-tete">
           <h2>LES MÉMOIRES</h2>
           <span class="cy-soustitre">PROJECTEUR VOLUMÉTRIQUE · CYCLE DES ÉTATS</span>
-          <div id="cycle-solde"><span>MÉMOIRE DISPONIBLE</span><i id="cycle-jauge"><b></b></i><strong id="cycle-solde-n">0</strong></div>
-          <button type="button" id="cycle-reset" title="Outil concepteur : détisse tous les liens du cycle et rembourse la mémoire dépensée">⟲ RÉINITIALISER</button>
+          <div id="cycle-solde"><span>ORBES EN POCHE</span><strong id="cycle-solde-n">0</strong><small id="cycle-memoire"></small></div>
+          <button type="button" id="cycle-reset" title="Outil concepteur : détisse tous les liens du cycle et rend les orbes dépensés">⟲ RÉINITIALISER</button>
           <button type="button" id="cycle-fermer" aria-label="Fermer">✕</button>
         </header>
         <div id="cycle-corps">
@@ -8564,6 +8603,17 @@
           <div class="mb-cartes" id="mb-cartes"></div>
         </div>
         <p class="mb-passer" id="mb-passer">toucher pour passer</p>
+      </div>
+    </div>
+    <!-- LE MARCHAND DU HUB : le Semblable du comptoir vend ce qui dure (main.ts) -->
+    <div id="marchand" hidden aria-label="Le marchand">
+      <div class="mr-boite">
+        <div class="mr-tete">
+          <div class="mr-titres"><b>LE MARCHAND</b><span>le Semblable du comptoir — ce qui dure se paie en mémoire</span></div>
+          <p class="mr-solde">MÉMOIRE <strong id="marchand-solde">0</strong></p>
+          <button type="button" id="marchand-fermer" aria-label="Fermer le marchand">✕</button>
+        </div>
+        <div class="mr-corps" id="marchand-corps"></div>
       </div>
     </div>
     <div id="cine" hidden aria-label="Cinématique"></div>
