@@ -552,6 +552,13 @@ function createSim(level: LevelDef): FluidSim {
   sim.perteGrilleFactor = lev('perteGrille')
   sim.priseSasGlaceFactor = lev('priseSasGlace')
   sim.glisseGlaceFactor = lev('glisseGlace')
+  // LES CAPACITÉS : des gestes qu'une carte ouvre — à zéro, ils n'existent
+  // pas, et le solveur joue exactement comme avant la carte
+  sim.esquilleFrac = lev('esquille')
+  sim.gouvernail = lev('gouvernail')
+  sim.surfusion = lev('surfusion') >= 1
+  sim.leidenfrost = Math.min(0.8, lev('leidenfrost'))
+  sim.ricochet = Math.min(1, lev('ricochet'))
   const naitVapeur =
     zoneForceAt(level, level.spawn.x, level.spawn.y) === 'vapeur'
   sim.dashBudget = sim.dashBudgetMax
@@ -5666,6 +5673,7 @@ if (!localStorage.getItem(CLE_EVEIL)) input.freezeIntent = true
 const manette = new Manette()
 const manetteCurseur = { x: 0, y: 0 }
 let manetteTenait = false // le « doigt » manette était posé à l'image d'avant
+let aimTenueAvant = false // le pointeur (doigt, souris, manette) était posé à l'image d'avant
 
 function boutonVisible(el: HTMLElement | null): el is HTMLElement {
   if (!el || (el as HTMLButtonElement).hidden) return false
@@ -12463,6 +12471,13 @@ function frame(now: number): void {
   }
   sim.freezeIntent = input.freezeIntent
   sim.gasIntent = input.gasIntent
+  // SURFUSION (capacité) : elle ne vaut que pour une glace DÉCIDÉE — une
+  // zone qui impose la glace, ou la dernière impulsion, figent sur place
+  sim.surfusionLibre = zoneActive === 'libre' && !endgame.spent
+  if (sim.surfusionPrise) {
+    sim.surfusionPrise = false
+    manette.rumble(0.8, 140) // la cristallisation se sent : un claquement
+  }
   // La BASCULE en vapeur — G, chaudière à 95 %, zone forcée : toute cause —
   // se règle à l'instant du basculement : péage de 20 % du volume actif
   // (gerbe de gouttes récupérables). Le compteur de dashs, lui, dépend de
@@ -12526,6 +12541,20 @@ function frame(now: number): void {
       corpsSousLePointeur(aim.x, aim.y))
   ;(window as unknown as { __rass: boolean }).__rass = rassembler // sonde de test
 
+  // ---- ESQUILLE (capacité) : en glace, TOUCHER détache un éclat ----
+  // Au front de la touche seulement — maintenir, c'est le gouvernail (dans
+  // le pas physique, plus bas) ; toucher, c'est l'esquille. Sur le corps
+  // lui-même, rien : la direction n'aurait pas de sens.
+  const toucheGlace =
+    vif &&
+    input.aimActive &&
+    !aimTenueAvant &&
+    input.freezeIntent &&
+    !input.gasIntent &&
+    !rassembler
+  aimTenueAvant = input.aimActive
+  if (toucheGlace && sim.esquille(aim.x, aim.y) > 0) manette.rumble(0.5, 70)
+
   if (!input.paused && !tableauDone) {
     // Budget CPU des pas physiques : ~60 % du temps d'image, borné à 5-12 ms.
     // Sans cette borne, une image en retard impose plus de pas, coûte plus
@@ -12587,6 +12616,11 @@ function frame(now: number): void {
           // Sans direction (stick neutre, doigt sur le corps) : on se reforme.
           if (rassembler) sim.rassemble(params.dt)
           else sim.eject(aim.x, aim.y, params.dt)
+          // GOUVERNAIL (capacité) : en glace, maintenir infléchit la course
+          // du palet vers le pointeur — l'éjection n'a rien à mordre sur un
+          // bloc, c'est ce geste-là qui le pilote
+          if (input.freezeIntent && !rassembler)
+            sim.gouverneGlace(aim.x, aim.y, params.dt)
         }
         if (vortex.timer > 0) {
           const life = Math.min(1, vortex.timer / params.vortexDuration)

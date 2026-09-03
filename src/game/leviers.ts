@@ -28,6 +28,12 @@ export type LevierId =
   | 'visee'
   | 'froid'
   | 'rosee'
+  // les CAPACITÉS : des gestes qui n'existent pas sans la carte
+  | 'esquille'
+  | 'gouvernail'
+  | 'surfusion'
+  | 'leidenfrost'
+  | 'ricochet'
   // la collecte et la bourse
   | 'sasPortee'
   | 'priseSasGlace'
@@ -263,6 +269,77 @@ export const LEVIERS: LevierDef[] = [
     bon: 1,
     phrase: (v) =>
       `La rosée recondensée rend ${Math.round(v * 100)} points de rendement en plus.`,
+  },
+
+  // ——— les CAPACITÉS : un geste de plus, pas un réglage ——————————
+  // Ces leviers sont différents des précédents : à leur valeur neutre le
+  // geste N'EXISTE PAS. Ils ne modulent pas une règle du jeu, ils en
+  // ouvrent une — c'est la famille des « transformations qui n'existeraient
+  // pas » (demande du 03/09) : de la physique des fluides qu'on ne voit
+  // jamais dans un jeu, et qui se paie en carte. Le solveur les lit comme
+  // les autres (une valeur posée au chargement du tableau), et l'atelier
+  // peut les combiner à n'importe quel prix.
+  {
+    id: 'esquille',
+    nom: 'Esquille de glace',
+    famille: 'etats',
+    mode: 'add',
+    min: 0,
+    max: 0.3,
+    pas: 0.05,
+    bon: 1,
+    phrase: (v) =>
+      `En glace, toucher détache une esquille de ${Math.round(v * 100)} % du bloc vers le point visé : le palet part à l’opposé — l’esquille peut revenir le percuter.`,
+  },
+  {
+    id: 'gouvernail',
+    nom: 'Gouvernail de glace',
+    famille: 'etats',
+    mode: 'add',
+    min: 0,
+    max: 3,
+    pas: 0.25,
+    bon: 1,
+    phrase: (v) =>
+      v >= 2.5
+        ? `En glace, maintenir infléchit la course du palet vers le pointeur, ${v} rad/s : de quoi tourner en rond.`
+        : `En glace, maintenir infléchit la course du palet vers le pointeur, ${v} rad/s, sans rien dépenser.`,
+  },
+  {
+    id: 'surfusion',
+    nom: 'Surfusion',
+    famille: 'etats',
+    mode: 'add',
+    min: 0,
+    max: 1,
+    pas: 1,
+    bon: 1,
+    phrase: () =>
+      'Le bouton GLACE n’immobilise plus sur place : le corps reste liquide et pilotable, et prend en glace D’UN COUP au premier choc.',
+  },
+  {
+    id: 'leidenfrost',
+    nom: 'Coussin de Leidenfrost',
+    famille: 'etats',
+    mode: 'add',
+    min: 0,
+    max: 0.8,
+    pas: 0.1,
+    bon: 1,
+    phrase: (v) =>
+      `Le liquide flotte sur sa propre vapeur près des chaudières : leur aura le repousse, et n’enclenche la vaporisation qu’à ${Math.round(v * 100)} % de profondeur.`,
+  },
+  {
+    id: 'ricochet',
+    nom: 'Ricochet du souffle',
+    famille: 'etats',
+    mode: 'add',
+    min: 0,
+    max: 1,
+    pas: 0.1,
+    bon: 1,
+    phrase: (v) =>
+      `Un dash lancé contre une paroi REBONDIT, ${Math.round(v * 100)} % de l’élan gardé — et rebondit encore tant qu’il touche.`,
   },
 
   // ——— la collecte et la bourse ——————————————————————————————

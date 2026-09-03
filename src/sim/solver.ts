@@ -113,6 +113,26 @@ const LIVRAISON_VITESSE = 150
 // sens cette fois (peint à 75, il n'arrêtait la vapeur qu'à 27).
 export const COEUR_PART = 0.9
 
+// ---- LES CAPACITÉS : les constantes des gestes qu'une carte ouvre --------
+// (leviers de capacité, leviers.ts — à zéro, le geste n'existe pas)
+/** SURFUSION : le givre d'armement — juste sous le gel, le corps reste eau */
+const SURFUSION_ARME = 0.95
+/** SURFUSION : vitesse normale d'impact (u/s) qui fait germer le cristal */
+const SURFUSION_CHOC = 60
+/** LEIDENFROST : la poussée du coussin à pleine aura et coussin plein (u/s²) —
+ *  du même ordre que la répulsion hydrophobe, c'est un bumper de chaleur */
+const LEIDENFROST_POUSSEE = 1800
+/** RICOCHET : la fenêtre (s) après un dash où le nuage rebondit */
+const RICOCHET_FENETRE = 0.8
+/** RICOCHET : sous cette vitesse d'impact (u/s), le nuage s'écrase, il ne rebondit pas */
+const RICOCHET_SEUIL = 50
+/** ESQUILLE : vitesse de l'éclat, en fraction de la vitesse d'éjection liquide */
+const ESQUILLE_VITESSE = 0.7
+/** ESQUILLE : sous ce nombre de particules gelées, rien ne se détache */
+const ESQUILLE_MIN_BLOC = 8
+/** ESQUILLE : le cœur de palet qui reste toujours */
+const ESQUILLE_COEUR = 6
+
 export class FluidSim {
   readonly params: SimParams
   readonly bounds: Bounds
@@ -317,6 +337,22 @@ export class FluidSim {
   perteGrilleFactor = 1 // vapeur perdue dans les mailles d'un évent
   priseSasGlaceFactor = 1 // prise du courant du sas sur un palet
   glisseGlaceFactor = 1 // prise de l'hydrophile sur la glace
+  // LES CAPACITÉS (leviers de capacité, leviers.ts) : à zéro, le geste
+  // n'existe pas. Posées par le jeu au chargement du tableau, comme les
+  // facteurs ci-dessus — et lues ici seulement.
+  esquilleFrac = 0 // « esquille » : part du bloc qu'une touche détache
+  gouvernail = 0 // « gouvernail » : rad/s d'inflexion du palet vers le pointeur
+  surfusion = false // « surfusion » : le gel volontaire prend AU CHOC
+  // La surfusion ne vaut que pour une glace DÉCIDÉE : une zone qui impose
+  // la glace, ou la dernière impulsion, figent sur place — le jeu le dit.
+  surfusionLibre = true
+  // Un front, à consommer par le jeu : le corps surfondu vient de cristalliser.
+  surfusionPrise = false
+  leidenfrost = 0 // « coussin de Leidenfrost » : 0..0,8, la part d'aura isolée
+  ricochet = 0 // « ricochet » : restitution du nuage en dash contre une paroi
+  private ricochetTimer = 0 // s de fenêtre de rebond restantes après un dash
+  private heatNX = 0 // normale de la chaudière la plus exposante (heatExposureAt)
+  private heatNY = 0
   // Surchauffeurs déjà déchargés (indices de boîtes) — remis à neuf au
   // chargement du tableau. Le rendu lit ce même état pour le manomètre.
   readonly surchauffesVides = new Set<number>()
@@ -911,6 +947,8 @@ export class FluidSim {
     const rp = this.params.particleSpacing * 0.5
     const cp = this.scratchCP
     let heat = 0
+    this.heatNX = 0
+    this.heatNY = 0
     for (const b of this.heatBoxes) {
       // chaque chaudière règle la portée de sa propre aura (éditeur) :
       // un gros bloc à petite aura, un petit bloc qui chauffe loin
@@ -919,7 +957,12 @@ export class FluidSim {
       if (horsBoite(b, x, y, bandB + rp)) continue
       boxContact(x, y, b, cp)
       const f = 1 - Math.max(0, cp.dist - rp) / bandB
-      if (f > heat) heat = Math.min(1, f)
+      if (f > heat) {
+        heat = Math.min(1, f)
+        // la normale sert au coussin de Leidenfrost : la plaque repousse
+        this.heatNX = cp.nx
+        this.heatNY = cp.ny
+      }
     }
     return heat
   }
@@ -1464,6 +1507,8 @@ export class FluidSim {
       return 0 // à sec : condenser et se retransformer, ou un surchauffeur
     }
     this.dashBudget--
+    // RICOCHET : la fenêtre s'ouvre au dash — un nuage qui flotte ne rebondit pas
+    if (this.ricochet > 0) this.ricochetTimer = RICOCHET_FENETRE
 
     // ——— LE SOUFFLE : on avance parce qu'on REJETTE ————————————————
     // La queue du nuage (le plus loin DERRIÈRE, dans l'axe du dash) est
@@ -1512,6 +1557,168 @@ export class FluidSim {
       this.velY[i] = dy * p.gasDashSpeed * power
     }
     return 1
+  }
+
+  // ---- LES CAPACITÉS : des gestes que seule une carte ouvre ---------------
+
+  /** ESQUILLE : en glace, une touche détache un éclat du bloc vers le point
+   *  visé, et le palet part à l'opposé — réaction exacte, comme l'éjection
+   *  liquide (§3.3 : se déplacer, c'est rétrécir, en glace aussi). L'éclat
+   *  est un vrai petit palet : rigide, balistique, il rebondit — et peut
+   *  revenir percuter le bloc, ou s'y ressouder au contact. Hors du corps
+   *  il fond comme toute glace, et ses gouttes se récupèrent. Rend le
+   *  nombre de particules parties (0 : rien à détacher, ou pas de carte). */
+  esquille(aimX: number, aimY: number): number {
+    if (this.dispersed || this.esquilleFrac <= 0) return 0
+    const p = this.params
+    let n = 0
+    let cx = 0
+    let cy = 0
+    let vx = 0
+    let vy = 0
+    for (let i = 0; i < this.count; i++) {
+      if (this.kind[i] !== KIND_PLAYER || this.frozen[i] !== 1) continue
+      n++
+      cx += this.posX[i]
+      cy += this.posY[i]
+      vx += this.velX[i]
+      vy += this.velY[i]
+    }
+    if (n < ESQUILLE_MIN_BLOC) return 0
+    cx /= n
+    cy /= n
+    vx /= n
+    vy /= n
+    let dx = aimX - cx
+    let dy = aimY - cy
+    const d = Math.hypot(dx, dy)
+    if (d < 1e-3) return 0
+    dx /= d
+    dy /= d
+    // jamais au point de dissoudre le palet : un cœur reste toujours
+    const prise = Math.min(
+      n - ESQUILLE_COEUR,
+      Math.max(3, Math.round(n * this.esquilleFrac)),
+    )
+    if (prise <= 0) return 0
+    // le flanc qui regarde le doigt part : les particules classées par
+    // projection sur la direction visée (un geste rare : le tri s'alloue)
+    const flanc: { i: number; s: number }[] = []
+    for (let i = 0; i < this.count; i++) {
+      if (this.kind[i] !== KIND_PLAYER || this.frozen[i] !== 1) continue
+      flanc.push({
+        i,
+        s: (this.posX[i] - cx) * dx + (this.posY[i] - cy) * dy,
+      })
+    }
+    flanc.sort((a, b) => b.s - a.s)
+    const vE = p.ejectSpeed * ESQUILLE_VITESSE
+    // l'éclat décolle HORS du rayon de lien des blocs : sinon l'étiquetage
+    // des amas le recolle au palet dès le pas suivant, et rien ne part
+    const decol = p.linkRadiusFactor * p.kernelRadius * 1.5
+    for (let k = 0; k < prise; k++) {
+      const i = flanc[k].i
+      this.velX[i] = vx + dx * vE
+      this.velY[i] = vy + dy * vE
+      this.posX[i] += dx * decol
+      this.posY[i] += dy * decol
+      this.kind[i] = KIND_FREE
+      this.cooldown[i] = p.reabsorbCooldown * this.reabsorbFactor
+      this.duCorps[i] = 2 // de la matière du corps : vivante tant qu'elle est à portée
+      this.enPretCount++
+      this.playerCount--
+    }
+    // réaction : le reste du bloc encaisse l'opposé (conservation exacte)
+    const reste = n - prise
+    const rx = -(dx * vE * prise) / reste
+    const ry = -(dy * vE * prise) / reste
+    for (let i = 0; i < this.count; i++) {
+      if (this.kind[i] !== KIND_PLAYER || this.frozen[i] !== 1) continue
+      this.velX[i] += rx
+      this.velY[i] += ry
+    }
+    this.iceDirty = true // la structure des amas vient de changer
+    this.updatePlayerStats()
+    return prise
+  }
+
+  /** GOUVERNAIL : en glace, maintenir le pointeur infléchit la course du
+   *  palet vers lui — la vitesse TOURNE, elle ne change pas de norme : rien
+   *  n'est dépensé, rien ne s'accélère, l'élan reste celui qu'on a choisi.
+   *  À 3 rad/s, un tour en deux secondes : le palet fait des cercles. Le
+   *  bloc entier tourne d'un même angle (la rotation propre est laissée à
+   *  icePass, qui la lit des vitesses). */
+  gouverneGlace(aimX: number, aimY: number, dt: number): void {
+    if (this.dispersed || this.gouvernail <= 0) return
+    let n = 0
+    let cx = 0
+    let cy = 0
+    let vx = 0
+    let vy = 0
+    for (let i = 0; i < this.count; i++) {
+      if (this.kind[i] !== KIND_PLAYER || this.frozen[i] !== 1) continue
+      n++
+      cx += this.posX[i]
+      cy += this.posY[i]
+      vx += this.velX[i]
+      vy += this.velY[i]
+    }
+    if (n === 0) return
+    cx /= n
+    cy /= n
+    vx /= n
+    vy /= n
+    if (Math.hypot(vx, vy) < 5) return // sans course, rien à infléchir
+    const cap = Math.atan2(vy, vx)
+    const vise = Math.atan2(aimY - cy, aimX - cx)
+    let ecart = vise - cap
+    while (ecart > Math.PI) ecart -= Math.PI * 2
+    while (ecart < -Math.PI) ecart += Math.PI * 2
+    const borne = this.gouvernail * dt
+    const pas = Math.max(-borne, Math.min(borne, ecart))
+    if (Math.abs(pas) < 1e-9) return
+    const co = Math.cos(pas)
+    const si = Math.sin(pas)
+    for (let i = 0; i < this.count; i++) {
+      if (this.kind[i] !== KIND_PLAYER || this.frozen[i] !== 1) continue
+      const ox = this.velX[i]
+      const oy = this.velY[i]
+      this.velX[i] = ox * co - oy * si
+      this.velY[i] = ox * si + oy * co
+    }
+  }
+
+  /** RICOCHET : dans la fenêtre qui suit un dash, le nuage qui frappe une
+   *  paroi REPART — la composante normale que la résolution de contact a
+   *  effacée lui est rendue, à la restitution près. Chaque rebond rouvre la
+   *  fenêtre : tant que ça touche, ça rebondit, et c'est le flottement du
+   *  gaz qui finit par l'éteindre. Le souffle chassé (plus à vous) ne
+   *  rebondit pas : il perle, comme avant. */
+  private applyRicochet(dt: number): void {
+    if (this.ricochetTimer <= 0) return
+    this.ricochetTimer = Math.max(0, this.ricochetTimer - dt)
+    const e = this.ricochet
+    if (e <= 0) return
+    let rebond = false
+    for (let i = 0; i < this.count; i++) {
+      if (
+        this.gaseous[i] !== 1 ||
+        this.kind[i] !== KIND_PLAYER ||
+        this.contactMat[i] < 0
+      )
+        continue
+      const vIn = this.contactVn[i] // négative en entrant
+      if (vIn > -RICOCHET_SEUIL) continue
+      const nx = this.contactNX[i]
+      const ny = this.contactNY[i]
+      const vn = this.velX[i] * nx + this.velY[i] * ny
+      const vise = -vIn * e
+      if (vn >= vise) continue
+      this.velX[i] += (vise - vn) * nx
+      this.velY[i] += (vise - vn) * ny
+      rebond = true
+    }
+    if (rebond) this.ricochetTimer = RICOCHET_FENETRE
   }
 
   // Vortex de regroupement (clic droit) : l'eau est entraînée vers un champ
@@ -1975,11 +2182,17 @@ export class FluidSim {
         prdY[i] = b.maxY - inset
         ny = -1
       }
-      if ((nx !== 0 || ny !== 0) && frozen[i] === 1) {
+      if (
+        (nx !== 0 || ny !== 0) &&
+        (frozen[i] === 1 ||
+          (this.gaseous[i] === 1 && this.ricochetTimer > 0))
+      ) {
         const inv = 1 / Math.hypot(nx, ny)
         this.contactMat[i] = MAT_WALL
         this.contactNX[i] = nx * inv
         this.contactNY[i] = ny * inv
+        // la vitesse d'entrée, pour le ricochet (la glace ne la lit pas)
+        this.contactVn[i] = (velX[i] * nx + velY[i] * ny) * inv
       }
     }
 
@@ -2059,6 +2272,8 @@ export class FluidSim {
     // 4quater. Vapeur : expansion douce et flottement
     this.applyGasDynamics(dt)
     this.fadeIonise(dt)
+    // 4quinquies. RICOCHET (capacité) : le nuage en dash repart des parois
+    this.applyRicochet(dt)
 
     // 5. Validation des positions, cooldowns, identité du corps
     for (let i = 0; i < n; i++) {
@@ -3044,6 +3259,32 @@ export class FluidSim {
     const kAgit = 0.06
     let joueursEnChauffe = 0
     let joueursAuFroid = 0
+    // SURFUSION (capacité) : le gel volontaire hors d'une aura froide ne
+    // prend pas sur place — il s'ARME (givre plafonné juste sous le gel, le
+    // corps reste eau, pilotable) et cristallise AU CHOC. C'est la
+    // nucléation de l'eau surfondue : un seul germe, et tout le corps prend
+    // d'un coup, dans l'élan qu'il avait. Le germe : une particule armée du
+    // corps qui frappe une paroi à vitesse franche, ce pas-ci.
+    const surf = this.surfusion && this.surfusionLibre && intent
+    let germe = false
+    if (surf) {
+      for (let i = 0; i < this.count; i++) {
+        if (
+          this.kind[i] !== KIND_PLAYER ||
+          this.frozen[i] === 1 ||
+          this.gaseous[i] === 1
+        )
+          continue
+        if (
+          this.frost[i] >= SURFUSION_ARME - 0.01 &&
+          this.contactMat[i] >= 0 &&
+          this.contactVn[i] < -SURFUSION_CHOC
+        ) {
+          germe = true
+          break
+        }
+      }
+    }
     for (let i = 0; i < this.count; i++) {
       const x = this.posX[i]
       const y = this.posY[i]
@@ -3062,7 +3303,25 @@ export class FluidSim {
       this.welded[i] = this.frozen[i] === 1 && minSep <= 1 ? 1 : 0
 
       // Radiateur (tableau 4) : l'aura de chaleur, symétrique de l'aura de gel
-      const heat = this.heatExposureAt(x, y)
+      let heat = this.heatExposureAt(x, y)
+      if (
+        heat > 0 &&
+        this.leidenfrost > 0 &&
+        this.kind[i] === KIND_PLAYER &&
+        this.frozen[i] === 0 &&
+        this.gaseous[i] === 0
+      ) {
+        // LEIDENFROST (capacité) : la goutte danse sur sa propre vapeur.
+        // Le coussin PORTE — la plaque repousse le liquide, comme un bumper
+        // de chaleur — et ISOLE : seule l'exposition qui le perce compte,
+        // pour la chauffe comme pour le seuil des 95 % (chauffeFrac). Un
+        // corps qui frôle l'aura n'y bascule plus ; un corps qu'on y
+        // enfonce, si.
+        const pousse = LEIDENFROST_POUSSEE * this.leidenfrost * heat * dt
+        this.velX[i] += this.heatNX * pousse
+        this.velY[i] += this.heatNY * pousse
+        heat = Math.max(0, (heat - this.leidenfrost) / (1 - this.leidenfrost))
+      }
       if (heat > 0 && this.kind[i] === KIND_PLAYER) joueursEnChauffe++
       if (exposure > 0.05 && this.kind[i] === KIND_PLAYER) joueursAuFroid++
 
@@ -3125,7 +3384,21 @@ export class FluidSim {
         ? Math.max(exposure * freeze, wanted ? freezeSelf : 0)
         : 0
       if (rate > 0) {
-        this.frost[i] = Math.min(1, this.frost[i] + rate)
+        // surfondu : le givre s'arrête sous le gel tant qu'aucun germe n'a
+        // pris — une plaque froide (exposure), elle, gèle comme toujours
+        const armee =
+          surf &&
+          exposure <= 0 &&
+          this.kind[i] === KIND_PLAYER &&
+          this.frozen[i] === 0
+        this.frost[i] = Math.min(
+          armee && !germe ? SURFUSION_ARME : 1,
+          this.frost[i] + rate,
+        )
+        if (armee && germe && this.frost[i] >= SURFUSION_ARME - 0.01) {
+          this.frost[i] = 1 // la cristallisation est instantanée
+          this.surfusionPrise = true
+        }
         if (this.frost[i] >= 1 && this.frozen[i] === 0) {
           this.frozen[i] = 1 // la vitesse est conservée
           this.iceDirty = true // la structure des amas vient de changer

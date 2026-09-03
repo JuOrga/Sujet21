@@ -204,6 +204,84 @@ export const INSTRUMENTS: InstrumentDef[] = [
     ],
   },
 
+  // ——— LES CAPACITÉS : des gestes qui n'existent pas sans la carte ————
+  // (demande du 03/09 : « des transformations qui n'existeraient pas
+  //  forcément mais qui seraient hyper fun à jouer »). Chacune tire un
+  //  levier de capacité (leviers.ts) — à sa valeur neutre, le geste n'est
+  //  pas dans le jeu. Toutes tiennent dans la physique du corps : une
+  //  esquille se détache par réaction, la surfusion est un état RÉEL de
+  //  l'eau, le coussin de Leidenfrost est celui de la goutte sur la plaque
+  //  chaude, et le ricochet est ce que fait un jet qui frappe une paroi.)
+  {
+    id: 'esquille',
+    nom: 'Esquille',
+    desc: 'En glace, toucher détache un éclat du bloc vers le point visé : le palet part à l’opposé. Attention au retour — l’esquille rebondit, et peut vous percuter.',
+    icone: '💠',
+    effets: [{ levier: 'esquille', valeur: 0.15 }],
+  },
+  {
+    id: 'gouvernail',
+    nom: 'Gouvernail',
+    desc: 'En glace, maintenir le pointeur infléchit la course du palet vers lui, sans rien dépenser : la glace se pilote, elle ne se subit plus.',
+    icone: '🧭',
+    effets: [{ levier: 'gouvernail', valeur: 1.5 }],
+  },
+  {
+    id: 'surfusion',
+    nom: 'Surfusion',
+    desc: 'Le bouton GLACE n’immobilise plus sur place : le corps reste liquide et pilotable, et cristallise D’UN COUP au premier choc, dans l’élan qu’il avait.',
+    icone: '🌡️',
+    effets: [{ levier: 'surfusion', valeur: 1 }],
+  },
+  {
+    id: 'coussin-de-leidenfrost',
+    nom: 'Coussin de Leidenfrost',
+    desc: 'Le liquide danse sur sa propre vapeur : l’aura des chaudières le repousse comme un bumper, et ne le vaporise qu’enfoncé à mi-profondeur.',
+    icone: '🍳',
+    effets: [{ levier: 'leidenfrost', valeur: 0.5 }],
+  },
+  {
+    id: 'ricochet',
+    nom: 'Ricochet',
+    desc: 'Un dash lancé contre une paroi rebondit avec les deux tiers de son élan — et rebondit encore tant qu’il touche : le nuage se joue à la bande.',
+    icone: '🎱',
+    effets: [{ levier: 'ricochet', valeur: 0.65 }],
+  },
+  // ——— Les capacités à CONTREPARTIE ————————————————————————————
+  {
+    id: 'grelon',
+    nom: 'Grêlon',
+    desc: 'Tout le pilotage de la glace d’un coup — esquilles et gouvernail — mais le palet rebondit plus mou, et la bonbonne emporte deux litres de moins.',
+    icone: '🌨️',
+    effets: [
+      { levier: 'esquille', valeur: 0.2 },
+      { levier: 'gouvernail', valeur: 2.5 },
+      { levier: 'rebondGlace', valeur: 0.7 },
+      { levier: 'bonbonne', valeur: -2 },
+    ],
+  },
+  {
+    id: 'trempe',
+    nom: 'Trempe',
+    desc: 'La surfusion, et un palet plus vif au rebond — mais l’acier se paie : se figer ou se vaporiser prend un tiers de temps en plus.',
+    icone: '🔩',
+    effets: [
+      { levier: 'surfusion', valeur: 1 },
+      { levier: 'rebondGlace', valeur: 1.2 },
+      { levier: 'bascule', valeur: 1.35 },
+    ],
+  },
+  {
+    id: 'bille-de-vapeur',
+    nom: 'Bille de vapeur',
+    desc: 'Le ricochet entier, sans perte d’élan — mais le nuage s’évapore moitié plus vite au repos : on joue la bande, on ne flâne pas.',
+    icone: '🪩',
+    effets: [
+      { levier: 'ricochet', valeur: 1 },
+      { levier: 'perteVapeur', valeur: 1.5 },
+    ],
+  },
+
   // ——— Le protocole lui-même ————————————————————————————————
   {
     id: 'carnet-du-semblable',
