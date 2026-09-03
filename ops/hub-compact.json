@@ -557,6 +557,31 @@
       }
     }
   ],
+  "pupitres": [
+    {
+      "minX": -780,
+      "minY": 320,
+      "maxX": -540,
+      "maxY": 480,
+      "ecran": "records"
+    },
+    {
+      "minX": 0,
+      "minY": 200,
+      "maxX": 240,
+      "maxY": 350,
+      "ecran": "reparations",
+      "titre": "TABLEAU DES AVARIES"
+    },
+    {
+      "minX": 320,
+      "minY": 200,
+      "maxX": 560,
+      "maxY": 350,
+      "ecran": "station",
+      "titre": "PLAN DU COMPLEXE"
+    }
+  ],
   "plots": [
     {
       "minX": 1360,

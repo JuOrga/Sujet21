@@ -508,6 +508,36 @@ export const TABLEAU_HUB: LevelDef = {
   ],
   // LE MARCHAND : le Semblable, derrière son étal
   marchand: { x: 1640, y: -60 },
+  // LES CONSOLES DU MODULE : des surfaces de contact qui ouvrent un écran
+  // (pupitres.ts). Elles sont posées EN DONNÉES, comme tout le reste du
+  // méta — l'éditeur en pose autant qu'il veut, dans n'importe quel
+  // tableau ; ici, les trois du module Méduse.
+  pupitres: [
+    // LE MUR DES RECORDS : la moitié EST du banc optique. On répare en
+    // entrant par l'ouest (le plot de la station couvre tout le couloir) —
+    // la console, elle, attend plus loin : la réparation et la consultation
+    // ne se déclenchent pas du même pas.
+    { minX: 430, minY: -80, maxX: 700, maxY: 80, ecran: 'records' as const },
+    // LE CENTRE DE CONTRÔLE, sous son pupitre : la conduite de l'étage.
+    // Le tableau des avaries n'est PAS gardé par une réparation — c'est
+    // précisément quand le module est en panne qu'on vient le lire.
+    {
+      minX: -540,
+      minY: 245,
+      maxX: -310,
+      maxY: 330,
+      ecran: 'reparations' as const,
+      titre: 'TABLEAU DES AVARIES',
+    },
+    {
+      minX: -290,
+      minY: 245,
+      maxX: -60,
+      maxY: 330,
+      ecran: 'station' as const,
+      titre: 'PLAN DU COMPLEXE',
+    },
+  ],
   // le méta EN DONNÉES : plots, banc et ANCRES suivent le chemin commun
   ...metaEnDonnees(ZONES_HUB_GRAND),
 }
@@ -899,6 +929,34 @@ export const TABLEAU_HUB_COMPACT: LevelDef = {
       text: '',
       tone: 'grille',
       picto: { couleur: '#39c8d8', eau: 1, glace: 1, vapeur: 0 },
+    },
+  ],
+  // LES CONSOLES DU MODULE (pupitres.ts) — et c'est CE module que les
+  // joueurs voient : la bibliothèque sert le tableau de code « HUB », semé
+  // depuis ici par ops/maj-hub.mjs. Des consoles posées dans le seul grand
+  // module n'atteindraient personne.
+  pupitres: [
+    // LE MUR DES RECORDS : au NORD de son plot, la réparation se paie en
+    // entrant par le sud — deux pas différents, deux gestes différents.
+    { minX: -780, minY: 320, maxX: -540, maxY: 480, ecran: 'records' as const },
+    // LE POSTE DE GESTION : la conduite de l'étage. Le tableau des avaries
+    // n'est PAS gardé par une réparation — c'est quand tout est en panne
+    // qu'on vient le lire.
+    {
+      minX: 0,
+      minY: 200,
+      maxX: 240,
+      maxY: 350,
+      ecran: 'reparations' as const,
+      titre: 'TABLEAU DES AVARIES',
+    },
+    {
+      minX: 320,
+      minY: 200,
+      maxX: 560,
+      maxY: 350,
+      ecran: 'station' as const,
+      titre: 'PLAN DU COMPLEXE',
     },
   ],
   ...metaEnDonnees(ZONES_HUB_COMPACT),

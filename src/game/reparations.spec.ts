@@ -203,3 +203,39 @@ describe('les réparations — le hub accidenté', () => {
     expect(reparationDef('inconnue')).toBe(null)
   })
 })
+
+describe('une station en panne éteint sa console', () => {
+  // LES DEUX MODULES : le grand ET le compact — c'est le compact que la
+  // bibliothèque sert aux joueurs (code « HUB »), un test sur le seul
+  // grand module ne dirait rien de ce qui est joué.
+  const MODULES = [TABLEAU_HUB, TABLEAU_HUB_COMPACT] as const
+  const ecransDe = (lv: (typeof MODULES)[number], faites: string[]): string[] =>
+    (appliqueReparations(lv, faites).pupitres ?? []).map((q) => q.ecran)
+
+  it('le MUR DES RECORDS en panne retire son pupitre — réparé, il revient', () => {
+    // Un mur mort qui ouvrirait quand même le palmarès dirait le
+    // contraire de sa pancarte « EN PANNE ». Le pupitre disparaît avec
+    // l'écran (même station), et revient à la réparation.
+    for (const lv of MODULES) {
+      expect(ecransDe(lv, []), lv.code).not.toContain('records')
+      expect(ecransDe(lv, ['mur-records']), lv.code).toContain('records')
+      expect(ecransDe(lv, TOUTES), lv.code).toContain('records')
+    }
+  })
+
+  it('le tableau des avaries et le plan, eux, tiennent debout module éteint', () => {
+    // c'est justement quand tout est en panne qu'on vient les lire
+    for (const lv of MODULES) {
+      const rien = ecransDe(lv, [])
+      expect(rien, lv.code).toContain('reparations')
+      expect(rien, lv.code).toContain('station')
+    }
+  })
+
+  it('la base n’est jamais mutée : le tableau CIBLE garde ses trois consoles', () => {
+    for (const lv of MODULES) {
+      appliqueReparations(lv, [])
+      expect((lv.pupitres ?? []).length, lv.code).toBe(3)
+    }
+  })
+})

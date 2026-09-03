@@ -2188,7 +2188,7 @@
         letter-spacing: 0.14em;
         margin-right: 8px;
       }
-      #records[hidden], #codex[hidden], #fioles[hidden], #cycle[hidden] { display: none; }
+      #records[hidden], #codex[hidden], #fioles[hidden], #cycle[hidden], #reparations[hidden] { display: none; }
       /* ---- L'écran des MÉMOIRES : le PROJECTEUR VOLUMÉTRIQUE (maquette du
          concepteur). Cibles : PC, console, Steam Deck — un écran-instrument
          PLEIN CADRE en paysage ; le mobile est mis de côté (choix
@@ -2710,14 +2710,14 @@
       #fioles { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(4, 8, 14, 0.72); }
       #fioles .salles-boite { max-height: 86vh; overflow: auto; width: min(980px, 96vw); }
       #fioles-corps { padding: 6px 12px 14px; }
-      #records, #codex {
+      #records, #codex, #reparations {
         position: fixed; inset: 0; z-index: 40;
         background: rgba(2, 6, 12, 0.72);
         display: flex; align-items: center; justify-content: center;
         padding: 18px;
       }
-      #records .salles-boite, #codex .salles-boite { max-height: 86vh; overflow: auto; width: min(980px, 96vw); }
-      #records-corps { padding: 6px 12px 14px; }
+      #records .salles-boite, #codex .salles-boite, #reparations .salles-boite { max-height: 86vh; overflow: auto; width: min(980px, 96vw); }
+      #records-corps, #repar-corps { padding: 6px 12px 14px; }
       /* ---- Le voile CODEX : fiches par état, cartes « ? » verrouillées ---- */
       #codex-corps { padding: 6px 12px 14px; }
       .cdx-groupe {
@@ -7465,6 +7465,7 @@
           <button type="button" class="ed-tool" data-tool="plot:condensat" title="PLOT D'ARTICLE payé en CONDENSAT (la bourse de la run) : tracez le rectangle d'achat — le corps qui s'y glisse paie et l'effet agit immédiatement, comme à l'étal de l'Économat. Article et prix dans le panneau."><i style="background:transparent;border:2px dashed #8cd7ff"></i>Plot d'article (condensat)</button>
           <button type="button" class="ed-tool" data-tool="plot:memoire" title="PLOT D'ARTICLE payé en MÉMOIRE (la monnaie générale) : l'achat au contact provisionne la PROCHAINE descente, comme au comptoir du hub — où que le plot soit posé. Article et prix dans le panneau."><i style="background:transparent;border:2px dashed #6dffb8"></i>Plot d'article (mémoire)</button>
           <button type="button" class="ed-tool" data-tool="banc" title="LE BANC DES MÉMOIRES (un seul par tableau) : le rectangle dont le contact ouvre l'écran du cycle des états. Retracer le déplace."><i style="background:#123528;border:1px solid #6dffb8"></i>Banc des mémoires</button>
+          <button type="button" class="ed-tool" data-tool="pupitre" title="UN PUPITRE : une surface de contact qui OUVRE UN ÉCRAN. Tracez le rectangle — le corps qui s'y glisse ouvre les RECORDS, le PLAN DE LA STATION (la carte), le TABLEAU DES AVARIES (récap des réparations), les MÉMOIRES, le CODEX, les FIOLES ou la TABLE DE DÉPART. L'écran et la plaque se choisissent dans le panneau ; autant de pupitres qu'on veut."><i style="background:#0d2634;border:1px solid #5fd0ff"></i>Pupitre (écran au contact)</button>
           <button type="button" class="ed-tool" data-tool="ancre" title="ANCRE MÉTA du module : le rectangle d'une STATION DE RÉPARATION (on y paie la remise en état), d'une BARRIÈRE d'aile condamnée, de la TABLE DE DÉPART, de l'ALCÔVE DU SECTEUR 4, du SCEAU, de la PORTE DE LA CUVE ou d'une SORTIE GARDÉE (givre, vapeur). Le rôle se choisit dans le panneau — c'est ainsi qu'un module rebâti à la main porte tout son méta."><i style="background:transparent;border:2px dashed #ecb25a"></i>Ancre méta (réparations, sas)</button>
           <button type="button" class="ed-tool" data-tool="marchand" title="LE MARCHAND (un seul par tableau) : une présence — l'anneau rose pulse à ce point. Le commerce passe par les plots d'article."><i style="border-radius:50%;background:#ffbedd"></i>Marchand</button>
           <button type="button" class="ed-tool" data-tool="eclat" title="ÉCLAT DE MÉMOIRE : gravé au contact (+N mémoire aux registres), UNE FOIS PAR RUN — Recommencer ne re-farme pas. Rien ne se grave aux essais d'éditeur. Valeur dans le panneau."><i style="background:#8effcd;transform:rotate(45deg);border-radius:2px"></i>Éclat de mémoire</button>
@@ -8143,6 +8144,20 @@
           ses effets valent pour toute la run.
         </div>
         <div id="fioles-corps"></div>
+      </div>
+    </div>
+    <!-- Le voile TABLEAU DES AVARIES : l'état des stations du module —
+         ouvert au menu par aucun bouton, c'est un PUPITRE qui l'appelle. -->
+    <div id="reparations" hidden aria-label="Tableau des avaries">
+      <div class="salles-boite">
+        <div class="salles-tete"><span id="repar-titre">TABLEAU DES AVARIES — l’état du module</span>
+          <button type="button" id="repar-fermer" aria-label="Fermer">✕</button></div>
+        <div class="params-desc" style="padding: 8px 12px 0">
+          L’accident du télescope a laissé le module en panne. Chaque station se
+          remet en état AU CONTACT de son plot, payée en MÉMOIRE — la monnaie qui
+          survit à la purge. Ce tableau ne répare rien : il dit où l’on en est.
+        </div>
+        <div id="repar-corps"></div>
       </div>
     </div>
     <div id="records" hidden aria-label="Records">
