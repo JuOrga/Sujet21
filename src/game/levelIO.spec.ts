@@ -1031,6 +1031,46 @@ describe('levelIO — les décalques de LA SERRE', () => {
     expect(aCote.filter((x) => x.message.includes('pupitre')).length).toBe(0)
   })
 
+  it('…y compris dans la paroi d’une COQUE, qui n’est posée nulle part', () => {
+    // Le vrai piège : un module bâti au kit n'a AUCUNE paroi dans ses
+    // boîtes — elles naissent de l'expansion des structures. checkLevel
+    // travaille déjà sur le tableau expansé ; si l'on jugeait sur les
+    // boîtes du fichier, une console plantée dans un mur de coque passerait
+    // inaperçue (et le double appel à niveauExpanse, lui, reposerait les
+    // mêmes murs une seconde fois pour rien).
+    const coque = {
+      ...parseLevel({
+        ...base,
+        boxes: [],
+        coque: 'structures',
+        structures: [
+          { type: 0, minX: 0, minY: 0, maxX: 1200, maxY: 1200, ep: 100 },
+        ],
+      }).level!,
+    }
+    expect(coque.boxes.length).toBe(0) // rien n'est posé : tout est structure
+    const dansLaCoque = checkLevel({
+      ...coque,
+      // le pan ouest de la chambre : x 0..100
+      pupitres: [
+        { minX: 10, minY: 500, maxX: 90, maxY: 700, ecran: 'records' },
+      ],
+    })
+    expect(
+      dansLaCoque.filter((x) => x.message.includes('pupitre')).length,
+    ).toBe(1)
+    // et au milieu du vide de la même chambre, rien à signaler
+    const dansLeVide = checkLevel({
+      ...coque,
+      pupitres: [
+        { minX: 500, minY: 500, maxX: 700, maxY: 700, ecran: 'records' },
+      ],
+    })
+    expect(dansLeVide.filter((x) => x.message.includes('pupitre')).length).toBe(
+      0,
+    )
+  })
+
   it('les ancres méta font l’aller-retour ; rôle ou station inconnus écartés', () => {
     const { level, rejets } = parseLevel({
       ...base,

@@ -171,6 +171,7 @@ import {
   zoneShape,
   type DecalDef,
   type LevelDef,
+  type PupitreDef,
   type LumiereDef,
   type ObstacleBox,
   type PlotMeta,
@@ -759,6 +760,12 @@ let pupitreAPose = false
 // l'écran s'ouvre au FRONT D'ENTRÉE, jamais tant qu'on reste posé dessus
 // (sans quoi il se rouvrirait à chaque image dès qu'on le referme).
 let pupitresDedans: boolean[] = []
+// …et le drapeau qui demande de les RESEMER depuis la position du corps.
+// Repartir de « false » rouvrait l'écran sous les pieds du joueur : réparer
+// le mur des records repose le tableau à chaud (applyLevel), la console
+// reparaît, et le corps qui l'occupait déjà passait pour y entrer. Le semis
+// dit « on y est déjà » — l'écran attend qu'on sorte et qu'on revienne.
+let pupitresASemer = false
 const provisionsRun = { bonbonne: 0, vies: 0, clef: false, condensat: 0 }
 let plotsDedans: boolean[] = []
 
@@ -5838,6 +5845,11 @@ const COUCHES_MENU: CoucheMenu[] = [
   { id: 'cycle', retour: 'cycle-fermer' }, // les mémoires — ouvertes au banc du hub aussi
   { id: 'salles', retour: 'salles-fermer' },
   { id: 'records', retour: 'records-fermer' },
+  // ouvrables AU CONTACT d'un pupitre, donc en pleine partie : sans elles
+  // ici, la manette n'avait aucun bouton pour refermer un voile qui fige
+  // l'essai — Échap ouvrait la fiche par-dessus, et B ne faisait rien
+  { id: 'reparations', retour: 'repar-fermer' },
+  { id: 'fioles', retour: 'fioles-fermer' },
   { id: 'livraisons', retour: 'livraisons-fermer' },
   // l'écran des commandes se pose SUR les paramètres : il passe donc avant
   { id: 'touches', retour: 'touches-fermer' },
@@ -9746,6 +9758,7 @@ function resetLasers(): void {
   eclatsPrisEssai = eclatsEssai.map(() => false)
   bancMemoiresDedans = false
   pupitresDedans = (level.pupitres ?? []).map(() => false)
+  pupitresASemer = true
   rebuildRenderBoxes() // les parois factices reprennent leur poste
 }
 
@@ -12957,19 +12970,28 @@ function frame(now: number): void {
   // même voile est déjà levé — sinon refermer le rouvrirait aussitôt.
   const pupitres = level.pupitres ?? []
   if (pupitres.length > 0 && !sim.dispersed) {
-    if (pupitresDedans.length !== pupitres.length)
-      pupitresDedans = pupitres.map(() => false)
-    for (let i = 0; i < pupitres.length; i++) {
-      const q = pupitres[i]
-      const dedans = pointInBox(sim.stats.centroidX, sim.stats.centroidY, q)
-      if (dedans && !pupitresDedans[i] && !pupitreOuvert(q.ecran)) {
-        ouvrePupitre(q.ecran)
-        audio.collect()
+    const dedansDe = (q: PupitreDef): boolean =>
+      pointInBox(sim.stats.centroidX, sim.stats.centroidY, q)
+    if (pupitresASemer || pupitresDedans.length !== pupitres.length) {
+      // le semis ne DÉCLENCHE rien : il photographie
+      pupitresDedans = pupitres.map(dedansDe)
+      pupitresASemer = false
+    } else
+      for (let i = 0; i < pupitres.length; i++) {
+        const q = pupitres[i]
+        const dedans = dedansDe(q)
+        if (dedans && !pupitresDedans[i] && !pupitreOuvert(q.ecran)) {
+          ouvrePupitre(q.ecran)
+          audio.collect()
+        }
+        pupitresDedans[i] = dedans
       }
-      pupitresDedans[i] = dedans
-    }
   }
-  // le voile d'un pupitre est retombé : on rend l'essai
+  // le voile d'un pupitre est retombé : on rend l'essai. Sauf si la FICHE
+  // s'est ouverte entre-temps (Échap par-dessus le voile) : elle a figé la
+  // cuve pour son propre compte, et la relancer dans son dos ferait avancer
+  // la simulation derrière le menu. On lâche alors le drapeau sans toucher
+  // à la pause — c'est closeHome qui la rendra.
   if (
     pupitreAPose &&
     recordsEl.hidden &&
@@ -12978,7 +13000,8 @@ function frame(now: number): void {
     codexEl.hidden &&
     fiolesEl.hidden
   ) {
-    if (input.paused) input.togglePause()
+    if (input.paused && document.body.classList.contains('playing'))
+      input.togglePause()
     pupitreAPose = false
   }
 

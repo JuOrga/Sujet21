@@ -931,5 +931,33 @@ export const TABLEAU_HUB_COMPACT: LevelDef = {
       picto: { couleur: '#39c8d8', eau: 1, glace: 1, vapeur: 0 },
     },
   ],
+  // LES CONSOLES DU MODULE (pupitres.ts) — et c'est CE module que les
+  // joueurs voient : la bibliothèque sert le tableau de code « HUB », semé
+  // depuis ici par ops/maj-hub.mjs. Des consoles posées dans le seul grand
+  // module n'atteindraient personne.
+  pupitres: [
+    // LE MUR DES RECORDS : au NORD de son plot, la réparation se paie en
+    // entrant par le sud — deux pas différents, deux gestes différents.
+    { minX: -780, minY: 320, maxX: -540, maxY: 480, ecran: 'records' as const },
+    // LE POSTE DE GESTION : la conduite de l'étage. Le tableau des avaries
+    // n'est PAS gardé par une réparation — c'est quand tout est en panne
+    // qu'on vient le lire.
+    {
+      minX: 0,
+      minY: 200,
+      maxX: 240,
+      maxY: 350,
+      ecran: 'reparations' as const,
+      titre: 'TABLEAU DES AVARIES',
+    },
+    {
+      minX: 320,
+      minY: 200,
+      maxX: 560,
+      maxY: 350,
+      ecran: 'station' as const,
+      titre: 'PLAN DU COMPLEXE',
+    },
+  ],
   ...metaEnDonnees(ZONES_HUB_COMPACT),
 }

@@ -1198,13 +1198,14 @@ export function checkLevel(brut: LevelDef): Verdict[] {
   }
 
   // Un PUPITRE dans une paroi ne s'ouvrira JAMAIS : le corps ne peut pas
-  // entrer dans un mur, et rien à l'écran ne dirait pourquoi. On juge sur
-  // le tableau EXPANSÉ (un module bâti au kit n'a ses murs que là) et sur
-  // le CENTRE seulement : un pupitre calé contre sa console mord forcément
-  // un peu — c'est même ainsi qu'on le pose.
+  // entrer dans un mur, et rien à l'écran ne dirait pourquoi. `level` est
+  // DÉJÀ le tableau expansé (en tête de fonction) : ses boîtes portent les
+  // parois des coques — le ré-expanser les poserait une seconde fois. On
+  // juge sur le CENTRE seulement : un pupitre calé contre sa console mord
+  // forcément un peu — c'est même ainsi qu'on le pose.
   const pupitres = level.pupitres ?? []
   if (pupitres.length > 0) {
-    const murs = niveauExpanse(level).boxes
+    const murs = level.boxes
     for (const q of pupitres) {
       const cx = (q.minX + q.maxX) / 2
       const cy = (q.minY + q.maxY) / 2

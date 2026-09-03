@@ -5374,7 +5374,18 @@ export class LevelEditor {
                                       : s.kind === 'ancre'
                                       ? `Ancre — ${ANCRE_NOMS[(this.level.ancres ?? [])[s.index]?.role ?? 'station']}`
                                       : s.kind === 'pupitre'
-                                        ? `Pupitre — ${plaquePupitre((this.level.pupitres ?? [])[s.index] ?? { ecran: 'records' })}`
+                                        ? // LA PLAQUE EST DU TEXTE D'AUTEUR, et ce titre part en
+                                          // innerHTML : un tableau venu de la bibliothèque partagée
+                                          // porterait sinon le balisage qu'il veut, exécuté au simple
+                                          // clic de sélection. Seule branche de cette cascade à citer
+                                          // autre chose qu'une constante du code — d'où l'échappement.
+                                          `Pupitre — ${plaquePupitre(
+                                            (this.level.pupitres ?? [])[s.index] ?? {
+                                              ecran: 'records',
+                                            },
+                                          )
+                                            .replace(/&/g, '&amp;')
+                                            .replace(/</g, '&lt;')}`
                                       : s.kind === 'banc'
                                         ? 'Banc des mémoires'
                                       : s.kind === 'marchand'
