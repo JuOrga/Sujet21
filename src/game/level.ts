@@ -4,6 +4,7 @@
 
 import type { Bounds } from '../sim/solver'
 import { dansForme } from './formes'
+import type { EcranPupitre } from './pupitres'
 
 export const MAT_WALL = 0
 export const MAT_HYDROPHILE = 1
@@ -564,6 +565,25 @@ export interface AncreMeta {
   id?: string
 }
 
+// UN PUPITRE : une SURFACE DE CONTACT qui ouvre un ÉCRAN. Le corps se pose
+// dessus, l'écran s'ouvre — records, plan de la station, tableau des
+// avaries, cycle des mémoires… Le catalogue des écrans (liste fermée) vit
+// dans pupitres.ts ; ici, seulement la géométrie et l'id.
+//
+// C'est la forme générale de ce que `bancMemoires` faisait pour un seul
+// écran. Le banc reste (les tableaux livrés le portent) : un pupitre
+// d'écran « cycle » fait exactement la même chose, en plusieurs
+// exemplaires et n'importe où.
+export interface PupitreDef {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+  ecran: EcranPupitre
+  /** La plaque gravée sur la console — absente : le nom du catalogue. */
+  titre?: string
+}
+
 // Un ÉCLAT DE MÉMOIRE : de l'information cristallisée — gravée aux
 // registres au contact, une fois par RUN. Jamais semé automatiquement.
 export interface EclatPose {
@@ -640,6 +660,11 @@ export interface LevelDef {
   plots?: PlotMeta[]
   // LE BANC DES MÉMOIRES : le contact du corps ouvre l'écran du cycle.
   bancMemoires?: { minX: number; minY: number; maxX: number; maxY: number }
+  // LES PUPITRES : les surfaces dont le contact OUVRE UN ÉCRAN (records,
+  // plan de la station, tableau des avaries, mémoires…). L'écran s'ouvre à
+  // l'ENTRÉE dans le rectangle, une fois — on ressort et on revient pour
+  // le rouvrir. La forme générale du banc, posable partout et en nombre.
+  pupitres?: PupitreDef[]
   // LE MARCHAND (un Semblable en capsule) : décor-repère de boutique,
   // aucune physique — la silhouette luit derrière sa grille.
   marchand?: { x: number; y: number }

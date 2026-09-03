@@ -81,6 +81,33 @@ describe('les décalques du méta', () => {
     expect(b!.h).toBeLessThanOrEqual(banc.maxY - banc.minY + 1e-6)
   })
 
+  it('chaque pupitre posé a un corps : la console du banc, à son rapport', () => {
+    // un pupitre est du MOBILIER : sans décalque, l'éditeur montrerait un
+    // rectangle et le jeu, rien du tout — on se poserait sur du vide
+    const lv: LevelDef = {
+      ...nu,
+      pupitres: [
+        { minX: 0, minY: 0, maxX: 600, maxY: 200, ecran: 'records' },
+        { minX: 800, minY: 0, maxX: 1400, maxY: 200, ecran: 'station' },
+      ],
+    }
+    const consoles = decalsDuMeta(lv).filter((d) => d.kind === 'meta-banc')
+    expect(consoles.length).toBe(2)
+    for (let i = 0; i < consoles.length; i++) {
+      const d = consoles[i]
+      const q = lv.pupitres![i]
+      expect(d.w / d.h).toBeCloseTo(RAPPORT_BANC, 5)
+      expect(d.w).toBeLessThanOrEqual(q.maxX - q.minX + 1e-6)
+      expect(d.h).toBeLessThanOrEqual(q.maxY - q.minY + 1e-6)
+      expect(d.x).toBeCloseTo((q.minX + q.maxX) / 2, 6)
+      expect(d.y).toBeCloseTo((q.minY + q.maxY) / 2, 6)
+    }
+    // sans pupitre, rien ne s'ajoute — le cas de l'immense majorité
+    expect(decalsDuMeta(nu).filter((d) => d.kind === 'meta-banc').length).toBe(
+      0,
+    )
+  })
+
   it('les pièces du méta ne sont jamais posables à la main (hors du format)', async () => {
     // levelIO écarte une sorte inconnue : les sortes « meta-* » n'existent
     // qu'à l'exécution, un fichier ne peut pas en porter

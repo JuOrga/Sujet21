@@ -91,7 +91,7 @@ station, `?tableau=N` démarre à la salle N,
 ## Qualité
 
 ```bash
-pnpm test        # 861 tests dans 75 fichiers, ~23 s
+pnpm test        # 874 tests dans 76 fichiers, ~23 s
 pnpm type-check
 pnpm build
 ```

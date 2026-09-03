@@ -186,6 +186,7 @@ import {
   zoneShape,
   type DecalDef,
   type LevelDef,
+  type PupitreDef,
   type LumiereDef,
   type ObstacleBox,
   type PlotMeta,
@@ -267,6 +268,11 @@ import {
   sauveScenario,
 } from './game/scenario'
 import { Records } from './game/records'
+import {
+  fichePupitre,
+  plaquePupitre,
+  type EcranPupitre,
+} from './game/pupitres'
 import {
   RAYON_PASTILLE,
   absorbePastilles,
@@ -765,6 +771,23 @@ const eclatsPrisRun = new Set<string>()
 let eclatsEssai: { x: number; y: number; memoire: number; cle: string }[] = []
 let eclatsPrisEssai: boolean[] = []
 let bancMemoiresDedans = false
+// LA PAUSE D'UN PUPITRE : un voile plein écran par-dessus une simulation
+// qui continue, c'est une dispersion qu'on ne voit pas venir — on fige donc
+// l'essai à l'ouverture. La main se rend dès que le voile retombe, QUEL QUE
+// SOIT le geste qui l'a fermé (la croix, le clic à côté) : chaque voile a
+// ses propres sorties, et les brancher une à une serait un piège à oublis.
+// La frame tourne même en pause : ce guet ne coûte qu'un booléen par image.
+let pupitreAPose = false
+// LES PUPITRES du tableau courant : un drapeau « dedans » par pupitre —
+// l'écran s'ouvre au FRONT D'ENTRÉE, jamais tant qu'on reste posé dessus
+// (sans quoi il se rouvrirait à chaque image dès qu'on le referme).
+let pupitresDedans: boolean[] = []
+// …et le drapeau qui demande de les RESEMER depuis la position du corps.
+// Repartir de « false » rouvrait l'écran sous les pieds du joueur : réparer
+// le mur des records repose le tableau à chaud (applyLevel), la console
+// reparaît, et le corps qui l'occupait déjà passait pour y entrer. Le semis
+// dit « on y est déjà » — l'écran attend qu'on sorte et qu'on revienne.
+let pupitresASemer = false
 const provisionsRun = { bonbonne: 0, vies: 0, clef: false, condensat: 0 }
 let plotsDedans: boolean[] = []
 
@@ -2567,6 +2590,115 @@ document.getElementById('fioles-fermer')?.addEventListener('click', () => {
 fiolesEl.addEventListener('pointerdown', (e) => {
   if (e.target === fiolesEl) fiolesEl.hidden = true
 })
+
+// ---- Le voile TABLEAU DES AVARIES : l'état du module ------------------
+// Aucun bouton du menu ne l'ouvre : c'est un PUPITRE posé dans le module
+// qui l'appelle. Il ne répare rien (la réparation se paie au contact du
+// plot de sa station) — il dit ce qui est debout, ce qui est en panne, et
+// ce que coûte le reste. Une console de diagnostic, pas une boutique.
+const reparEl = document.getElementById('reparations') as HTMLDivElement
+const reparCorps = document.getElementById('repar-corps') as HTMLDivElement
+function renderReparationsVoile(): void {
+  const faites = REPARATIONS.filter((r) => records.estRepare(r.id))
+  const titre = document.getElementById('repar-titre')
+  if (titre)
+    titre.textContent = `TABLEAU DES AVARIES — ${faites.length}/${REPARATIONS.length} stations rétablies · ${records.memoire()} en mémoire`
+  let html = '<div class="cdx-grille">'
+  for (const r of REPARATIONS) {
+    if (records.estRepare(r.id)) {
+      html += `<div class="cdx-carte"><i>${r.icone}</i><div><b>${htmlSafe(r.nom)} · RÉTABLIE</b><span>${htmlSafe(r.detail)}</span></div></div>`
+    } else {
+      // en panne : le prix D'ABORD — c'est l'information qu'on vient
+      // chercher devant la console, avant même le nom de la station
+      const payable = records.memoire() >= r.prix
+      html += `<div class="cdx-carte cdx-verrou"><i>${r.icone}</i><div><b>${htmlSafe(r.nom)} · EN PANNE — ${r.prix} MÉM.${payable ? '' : ' (SOLDE COURT)'}</b><span>${htmlSafe(r.detail)}</span></div></div>`
+    }
+  }
+  html += '</div>'
+  reparCorps.innerHTML = html
+}
+document.getElementById('repar-fermer')?.addEventListener('click', () => {
+  reparEl.hidden = true
+})
+reparEl.addEventListener('pointerdown', (e) => {
+  if (e.target === reparEl) reparEl.hidden = true
+})
+
+// ---- LES PUPITRES : le contact ouvre l'écran --------------------------
+// Un seul aiguillage pour tous les écrans posables. Chaque branche fait
+// exactement ce que fait le bouton du menu d'accueil : ouvrir le voile
+// après l'avoir rendu (un voile rendu à l'ouverture ne montre jamais un
+// état périmé — la mémoire dépensée entre deux visites, par exemple).
+function ouvrePupitre(ecran: EcranPupitre): void {
+  // le plan de la station fige déjà de lui-même ; la table de départ n'est
+  // qu'un toast — les autres voiles, eux, cachent la cuve : on fige
+  if (
+    ecran !== 'station' &&
+    ecran !== 'table-depart' &&
+    hasPlayed &&
+    !input.paused
+  ) {
+    input.togglePause()
+    pupitreAPose = true
+  }
+  switch (ecran) {
+    case 'records':
+      recordsEl.hidden = false
+      renderRecordsVoile()
+      break
+    case 'station':
+      ouvreStation(true)
+      break
+    case 'reparations':
+      reparEl.hidden = false
+      renderReparationsVoile()
+      break
+    case 'cycle':
+      cycleEl.hidden = false
+      renderCycleVoile()
+      break
+    case 'codex':
+      codexEl.hidden = false
+      renderCodexVoile()
+      break
+    case 'fioles':
+      fiolesEl.hidden = false
+      renderFiolesVoile()
+      break
+    case 'table-depart':
+      // le seul écran qui n'en est pas un : un toast, comme au plan de
+      // travail du hub — rien à fermer, on continue de jouer
+      montreTableDepart()
+      break
+    case 'marchand':
+      ouvreMarchand()
+      break
+  }
+}
+
+/** Un écran de pupitre est-il DÉJÀ ouvert ? On ne rouvre pas par-dessus :
+ *  deux voiles empilés se ferment l'un après l'autre, ce qui donne
+ *  l'impression que le premier clic n'a pas pris. */
+function pupitreOuvert(ecran: EcranPupitre): boolean {
+  switch (ecran) {
+    case 'records':
+      return !recordsEl.hidden
+    case 'station':
+      return !!stationEl && !stationEl.hidden
+    case 'reparations':
+      return !reparEl.hidden
+    case 'cycle':
+      return !cycleEl.hidden
+    case 'codex':
+      return !codexEl.hidden
+    case 'fioles':
+      return !fiolesEl.hidden
+    case 'table-depart':
+      return false // un toast ne se « ferme » pas : il s'empile
+    case 'marchand':
+      return !marchandEl.hidden
+  }
+}
 
 // ---- Le voile CODEX : le manuel écrit par la partie elle-même ----------
 // Chaque fiche se débloque en VIVANT l'interaction (toucher une surface
@@ -6016,6 +6148,11 @@ const COUCHES_MENU: CoucheMenu[] = [
   { id: 'marchand', retour: 'marchand-fermer' }, // le marchand — ouvert à l'étal du hub aussi
   { id: 'salles', retour: 'salles-fermer' },
   { id: 'records', retour: 'records-fermer' },
+  // ouvrables AU CONTACT d'un pupitre, donc en pleine partie : sans elles
+  // ici, la manette n'avait aucun bouton pour refermer un voile qui fige
+  // l'essai — Échap ouvrait la fiche par-dessus, et B ne faisait rien
+  { id: 'reparations', retour: 'repar-fermer' },
+  { id: 'fioles', retour: 'fioles-fermer' },
   { id: 'livraisons', retour: 'livraisons-fermer' },
   // l'écran des commandes se pose SUR les paramètres : il passe donc avant
   { id: 'touches', retour: 'touches-fermer' },
@@ -6526,6 +6663,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       pastilles.length +
       eclatsEssai.length +
       (level.plots?.length ?? 0) +
+      (level.pupitres?.length ?? 0) +
       (level.bancMemoires ? 1 : 0) +
       (level.marchand ? 1 : 0) +
       (fiolePastille ? 1 : 0) >
@@ -7586,6 +7724,38 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       g.fillStyle = '#bdffdf'
       g.fillText('⚛', cx, cy)
     }
+  }
+  // les PUPITRES : une console bleue qui respire, l'icône de SON écran au
+  // centre et sa plaque au-dessus — on doit savoir ce qu'on va ouvrir
+  // AVANT de s'y poser, sans quoi le contact est une surprise, pas un
+  // geste. (Même dessin que le banc, à la teinte et au titre près.)
+  for (const q of level.pupitres ?? []) {
+    if (dansCacheVoilee((q.minX + q.maxX) / 2, (q.minY + q.maxY) / 2)) continue
+    const a = S(q.minX, q.maxY)
+    const b = S(q.maxX, q.minY)
+    const cx = (a.sx + b.sx) / 2
+    const cy = (a.sy + b.sy) / 2
+    const pouls = 0.6 + 0.4 * Math.sin(nowPastilles * 1.3)
+    const ray = Math.max(8, Math.max(b.sx - a.sx, b.sy - a.sy) * 0.6)
+    const grad = g.createRadialGradient(cx, cy, 0, cx, cy, ray)
+    grad.addColorStop(0, `rgba(95,208,255,${0.08 + 0.16 * pouls})`)
+    grad.addColorStop(1, 'rgba(95,208,255,0)')
+    g.fillStyle = grad
+    g.fillRect(cx - ray, cy - ray, ray * 2, ray * 2)
+    g.setLineDash([4, 7])
+    g.strokeStyle = `rgba(95,208,255,${0.35 + 0.3 * pouls})`
+    g.lineWidth = 1.4
+    g.strokeRect(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy)
+    g.setLineDash([])
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    const t = Math.max(12, Math.min(30, 100 * z))
+    g.font = `${t}px system-ui`
+    g.fillStyle = '#bfe8ff'
+    g.fillText(fichePupitre(q.ecran)?.icone ?? '?', cx, cy)
+    g.font = `600 ${Math.max(9, Math.round(t * 0.34))}px ui-monospace, monospace`
+    g.fillStyle = `rgba(191,232,255,${0.5 + 0.3 * pouls})`
+    g.fillText(plaquePupitre(q), cx, a.sy - t * 0.35)
   }
   // le MARCHAND : une présence — l'anneau rose pâle pulse autour du point
   if (level.marchand && !dansCacheVoilee(level.marchand.x, level.marchand.y)) {
@@ -9890,6 +10060,8 @@ function resetLasers(): void {
     .filter((e) => !eclatsPrisRun.has(e.cle))
   eclatsPrisEssai = eclatsEssai.map(() => false)
   bancMemoiresDedans = false
+  pupitresDedans = (level.pupitres ?? []).map(() => false)
+  pupitresASemer = true
   rebuildRenderBoxes() // les parois factices reprennent leur poste
 }
 
@@ -13296,7 +13468,7 @@ function frame(now: number): void {
   // ---- LE MARCHAND : au contact de l'ÉTAL du comptoir (la boîte qui
   // englobe ses alcôves, élargie), le voile s'ouvre — une fois par entrée.
   // Les alcôves, elles, vendent toujours au contact : les deux se cumulent.
-  if (auHub && !sim.dispersed) {
+  if (auHub && !sim.dispersed && !(level.pupitres ?? []).some((q) => q.ecran === 'marchand')) {
     const plots = level.plots?.length
       ? level.plots.filter((p) => p.monnaie === 'memoire')
       : (zonesHub?.etal ?? []).map((a) => a.plot)
@@ -13315,6 +13487,46 @@ function frame(now: number): void {
       }
       marchandDedans = dedans
     }
+  }
+  // ---- LES PUPITRES : le contact du corps ouvre l'écran nommé. Front
+  // d'entrée par pupitre (rester posé ne rouvre pas), et rien tant que le
+  // même voile est déjà levé — sinon refermer le rouvrirait aussitôt.
+  const pupitres = level.pupitres ?? []
+  if (pupitres.length > 0 && !sim.dispersed) {
+    const dedansDe = (q: PupitreDef): boolean =>
+      pointInBox(sim.stats.centroidX, sim.stats.centroidY, q)
+    if (pupitresASemer || pupitresDedans.length !== pupitres.length) {
+      // le semis ne DÉCLENCHE rien : il photographie
+      pupitresDedans = pupitres.map(dedansDe)
+      pupitresASemer = false
+    } else
+      for (let i = 0; i < pupitres.length; i++) {
+        const q = pupitres[i]
+        const dedans = dedansDe(q)
+        if (dedans && !pupitresDedans[i] && !pupitreOuvert(q.ecran)) {
+          ouvrePupitre(q.ecran)
+          audio.collect()
+        }
+        pupitresDedans[i] = dedans
+      }
+  }
+  // le voile d'un pupitre est retombé : on rend l'essai. Sauf si la FICHE
+  // s'est ouverte entre-temps (Échap par-dessus le voile) : elle a figé la
+  // cuve pour son propre compte, et la relancer dans son dos ferait avancer
+  // la simulation derrière le menu. On lâche alors le drapeau sans toucher
+  // à la pause — c'est closeHome qui la rendra.
+  if (
+    pupitreAPose &&
+    recordsEl.hidden &&
+    reparEl.hidden &&
+    cycleEl.hidden &&
+    codexEl.hidden &&
+    fiolesEl.hidden &&
+    marchandEl.hidden
+  ) {
+    if (input.paused && document.body.classList.contains('playing'))
+      input.togglePause()
+    pupitreAPose = false
   }
 
   // ---- Lasers : traçage, cibles, portes ----

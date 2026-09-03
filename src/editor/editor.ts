@@ -52,6 +52,12 @@ import {
 } from '../game/hub'
 import { REPARATIONS } from '../game/reparations'
 import {
+  PUPITRES,
+  fichePupitre,
+  plaquePupitre,
+  type EcranPupitre,
+} from '../game/pupitres'
+import {
   COQUE_COTES,
   COQUE_COTE_NOMS,
   FORME_COQUE,
@@ -269,6 +275,7 @@ type Tool =
   // l'éclat de mémoire (+N gravés au contact, une fois par run)
   | { kind: 'plot'; monnaie: MonnaiePlot }
   | { kind: 'banc' }
+  | { kind: 'pupitre' }
   | { kind: 'marchand' }
   | { kind: 'eclat' }
   // L'ANCRE MÉTA : station de réparation, barrière d'aile, table de départ,
@@ -298,6 +305,7 @@ type Sel =
   | { kind: 'fiole' }
   | { kind: 'plot'; index: number }
   | { kind: 'banc' }
+  | { kind: 'pupitre'; index: number }
   | { kind: 'marchand' }
   | { kind: 'eclat'; index: number }
   | { kind: 'ancre'; index: number }
@@ -772,6 +780,8 @@ export class LevelEditor {
     if (s.kind === 'porte') return (this.level.portes ?? [])[s.index] ?? null
     if (s.kind === 'plot') return (this.level.plots ?? [])[s.index] ?? null
     if (s.kind === 'banc') return this.level.bancMemoires ?? null
+    if (s.kind === 'pupitre')
+      return (this.level.pupitres ?? [])[s.index] ?? null
     if (s.kind === 'ancre') return (this.level.ancres ?? [])[s.index] ?? null
     if (s.kind === 'structure')
       return (this.level.structures ?? [])[s.index] ?? null
@@ -819,6 +829,8 @@ export class LevelEditor {
       Object.assign((this.level.plots ?? [])[s.index], norm)
     else if (s.kind === 'ancre')
       Object.assign((this.level.ancres ?? [])[s.index], norm)
+    else if (s.kind === 'pupitre')
+      Object.assign((this.level.pupitres ?? [])[s.index], norm)
     else if (s.kind === 'structure') {
       // une coque doit garder son intérieur : sous deux parois plus le
       // passage minimal, on refuse la nouvelle taille
@@ -1236,6 +1248,12 @@ export class LevelEditor {
     const plots = this.level.plots ?? []
     for (let i = plots.length - 1; i >= 0; i--) {
       if (inside(plots[i])) return { kind: 'plot', index: i }
+    }
+    // les PUPITRES avant le banc : le banc est unique et large — un
+    // pupitre posé dedans doit rester attrapable
+    const pupitres = this.level.pupitres ?? []
+    for (let i = pupitres.length - 1; i >= 0; i--) {
+      if (inside(pupitres[i])) return { kind: 'pupitre', index: i }
     }
     if (this.level.bancMemoires && inside(this.level.bancMemoires)) {
       return { kind: 'banc' }
@@ -3245,6 +3263,15 @@ export class LevelEditor {
       this.commit(
         'ANCRE MÉTA posée — station de réparation par défaut. Le rôle (barrière d’aile, table de départ, secteur scellé, porte de cuve, sortie gardée) se choisit à droite.',
       )
+    } else if (t.kind === 'pupitre') {
+      if (!this.level.pupitres) this.level.pupitres = []
+      // tout pupitre naît sur le PREMIER écran du catalogue (les records) —
+      // l'écran se choisit ensuite dans le panneau
+      this.level.pupitres.push({ ...r, ecran: PUPITRES[0].id })
+      this.sel = { kind: 'pupitre', index: this.level.pupitres.length - 1 }
+      this.commit(
+        'PUPITRE posé — le contact du corps ouvrira LES RECORDS. L’écran (plan de la station, tableau des avaries, mémoires, codex, fioles, table de départ) se choisit à droite.',
+      )
     } else if (t.kind === 'banc') {
       // un seul banc par tableau : retracer le déplace
       this.level.bancMemoires = { ...r }
@@ -3336,6 +3363,8 @@ export class LevelEditor {
     else if (s.kind === 'fiole') delete this.level.fiole
     else if (s.kind === 'plot') (this.level.plots ?? []).splice(s.index, 1)
     else if (s.kind === 'ancre') (this.level.ancres ?? []).splice(s.index, 1)
+    else if (s.kind === 'pupitre')
+      (this.level.pupitres ?? []).splice(s.index, 1)
     else if (s.kind === 'structure')
       (this.level.structures ?? []).splice(s.index, 1)
     else if (s.kind === 'banc') delete this.level.bancMemoires
@@ -3436,6 +3465,14 @@ export class LevelEditor {
       const a = (this.level.ancres ?? [])[s.index]
       this.level.ancres!.push({ ...a, minX: a.minX + off, maxX: a.maxX + off })
       this.sel = { kind: 'ancre', index: this.level.ancres!.length - 1 }
+    } else if (s.kind === 'pupitre') {
+      const q = (this.level.pupitres ?? [])[s.index]
+      this.level.pupitres!.push({
+        ...q,
+        minX: q.minX + off,
+        maxX: q.maxX + off,
+      })
+      this.sel = { kind: 'pupitre', index: this.level.pupitres!.length - 1 }
     } else if (s.kind === 'banc') {
       this.status('Un seul banc des mémoires par tableau.')
       return
@@ -3577,6 +3614,7 @@ export class LevelEditor {
             monnaie: key.slice(5) === 'memoire' ? 'memoire' : 'condensat',
           })
         else if (key === 'banc') this.setTool({ kind: 'banc' })
+        else if (key === 'pupitre') this.setTool({ kind: 'pupitre' })
         else if (key === 'ancre') this.setTool({ kind: 'ancre' })
         else if (key.startsWith('struct:'))
           this.setTool({
@@ -5185,6 +5223,25 @@ export class LevelEditor {
         )
       }
       rows.push(`<p class="ed-empty">${ANCRE_NOTES[a.role]}</p>`)
+    } else if (s.kind === 'pupitre') {
+      const q = (this.level.pupitres ?? [])[s.index]
+      rows.push(
+        `<label class="ed-f"><span>Écran</span><select id="p-puecran">` +
+          PUPITRES.map(
+            (f) =>
+              `<option value="${f.id}"${f.id === q.ecran ? ' selected' : ''}>${f.icone} ${f.nom}</option>`,
+          ).join('') +
+          `</select></label>`,
+      )
+      rows.push(
+        `<label class="ed-f"><span>Plaque</span><input type="text" id="p-putitre" maxlength="40" placeholder="${fichePupitre(q.ecran)?.nom ?? ''}" value="${(q.titre ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')}" /></label>`,
+      )
+      rows.push(
+        `<p class="ed-empty">${fichePupitre(q.ecran)?.note ?? ''}</p>`,
+      )
+      rows.push(
+        `<p class="ed-empty">UN PUPITRE : le corps qui ENTRE dans ce rectangle ouvre l’écran — une fois par entrée (ressortir et revenir le rouvre). La plaque est le titre gravé sur la console ; laissée vide, c’est le nom du catalogue. Autant de pupitres qu’on veut, dans n’importe quel tableau.</p>`,
+      )
     } else if (s.kind === 'banc') {
       rows.push(
         `<p class="ed-empty">LE BANC DES MÉMOIRES (un seul par tableau) : en jeu, le corps qui glisse dans ce rectangle ouvre l’écran du cycle des états — on y tisse les transformations contre de la mémoire. Les poignées le redimensionnent.</p>`,
@@ -5349,6 +5406,19 @@ export class LevelEditor {
                                       ? `Structure — ${(this.level.structures ?? [])[s.index]?.type === STRUCT_COULOIR ? 'couloir' : 'chambre'}`
                                       : s.kind === 'ancre'
                                       ? `Ancre — ${ANCRE_NOMS[(this.level.ancres ?? [])[s.index]?.role ?? 'station']}`
+                                      : s.kind === 'pupitre'
+                                        ? // LA PLAQUE EST DU TEXTE D'AUTEUR, et ce titre part en
+                                          // innerHTML : un tableau venu de la bibliothèque partagée
+                                          // porterait sinon le balisage qu'il veut, exécuté au simple
+                                          // clic de sélection. Seule branche de cette cascade à citer
+                                          // autre chose qu'une constante du code — d'où l'échappement.
+                                          `Pupitre — ${plaquePupitre(
+                                            (this.level.pupitres ?? [])[s.index] ?? {
+                                              ecran: 'records',
+                                            },
+                                          )
+                                            .replace(/&/g, '&amp;')
+                                            .replace(/</g, '&lt;')}`
                                       : s.kind === 'banc'
                                         ? 'Banc des mémoires'
                                       : s.kind === 'marchand'
@@ -5789,6 +5859,13 @@ export class LevelEditor {
           val('p-maxY'),
         ),
       )
+    } else if (s.kind === 'pupitre') {
+      const q = (this.level.pupitres ?? [])[s.index]
+      const ecran = text('p-puecran') as EcranPupitre
+      if (fichePupitre(ecran)) q.ecran = ecran
+      const titre = text('p-putitre').toUpperCase().replace(/\s+/g, ' ').slice(0, 40).trim()
+      if (titre) q.titre = titre
+      else delete q.titre
     } else if (s.kind === 'label') {
       const l = this.level.labels[s.index]
       // les sauts de ligne SURVIVENT (ils sont le geste demandé) ; le reste
@@ -6782,6 +6859,30 @@ export class LevelEditor {
         cx,
         p0.sy - 5,
       )
+      g.textAlign = 'left'
+    }
+    // LES PUPITRES : bleu console — la famille du banc (même mobilier),
+    // mais chacun porte l'icône de SON écran, pour qu'un module truffé de
+    // consoles se lise d'un coup d'œil.
+    for (const q of this.level.pupitres ?? []) {
+      const a = this.toScreen(q.minX, q.maxY)
+      const b = this.toScreen(q.maxX, q.minY)
+      const fiche = fichePupitre(q.ecran)
+      g.fillStyle = 'rgba(95,208,255,0.10)'
+      g.fillRect(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy)
+      g.setLineDash([4, 7])
+      g.strokeStyle = 'rgba(95,208,255,0.85)'
+      g.lineWidth = 1.5
+      g.strokeRect(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy)
+      g.setLineDash([])
+      const cx = (a.sx + b.sx) / 2
+      g.textAlign = 'center'
+      g.fillStyle = 'rgba(95,208,255,0.95)'
+      g.font = `${Math.max(10, Math.min(24, 80 * this.zoom))}px system-ui`
+      g.fillText(fiche?.icone ?? '?', cx, (a.sy + b.sy) / 2 + 4)
+      g.fillStyle = '#a9e4ff'
+      g.font = '600 9px ui-monospace, monospace'
+      g.fillText(plaquePupitre(q), cx, a.sy - 5)
       g.textAlign = 'left'
     }
     if (this.level.bancMemoires) {
