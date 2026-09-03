@@ -712,6 +712,11 @@ export interface LevelDef {
   // dans l'éditeur) : la voie ne propose pas sa « suite écrite » tant que
   // le lien manuel correspondant n'est pas tissé à l'écran des mémoires.
   exige?: ('glace' | 'vapeur')[]
+  // LE BIOME du tableau : le code du module de la carte qui peut le
+  // proposer (carteStation.json, champ `biome`). Sans biome, le tableau
+  // est UNIVERSEL — tout module peut le piocher : c'est ce qui laisse la
+  // bibliothèque jouable tant que le réétiquetage n'est pas fait.
+  biome?: string
   // Lit musical imposé par le tableau. Sans valeur, la cuve suit le
   // refroidissement de la coque (tiède → glaciale) : c'est le cas général,
   // les tableaux n'ont pas à choisir une musique pour exister.

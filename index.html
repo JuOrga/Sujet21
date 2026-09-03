@@ -606,6 +606,23 @@
       .pl-ord button:hover:not(:disabled) { border-color: var(--specimen); color: var(--specimen); }
       .pl-ord button:disabled { opacity: 0.3; cursor: default; }
       .pl-carte .salle-chips { margin-top: 6px; }
+      /* le biome de la carte, et les filtres par biome en tête de planche */
+      .pl-biome {
+        width: 100%; margin-top: 6px; padding: 3px 5px; min-width: 0;
+        font-family: var(--font-mono); font-size: calc(11px * var(--ui)); color: var(--ink);
+        background: rgba(3, 7, 16, 0.6); border: 1px solid var(--line);
+      }
+      #planche-filtres { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+      #planche-filtres button {
+        font-family: var(--font-mono); font-size: calc(11px * var(--ui)); letter-spacing: 0.08em;
+        text-transform: uppercase; color: var(--ink); background: rgba(99, 183, 230, 0.07);
+        border: 1px solid var(--line); padding: 5px 9px; cursor: pointer; white-space: nowrap;
+      }
+      #planche-filtres button b { color: var(--specimen); margin-left: 4px; }
+      #planche-filtres button.on { border-color: var(--specimen); background: rgba(99, 183, 230, 0.18); }
+      #planche-filtres button.vide { border-style: dashed; }
+      #planche-filtres button.vide b { color: var(--alert); }
+      #planche-filtres button:hover { border-color: var(--specimen); }
       /* le bouton d'ESSAI de la carte : lancer le tableau depuis la planche */
       .pl-jouer {
         position: absolute; top: 12px; right: 12px;
@@ -1140,116 +1157,8 @@
         background: linear-gradient(180deg, #060c14, #030710);
         overflow: hidden;
       }
-      .ps-svg { display: block; width: 100%; height: 100%; }
-      .ps-ciel circle { pointer-events: none; }
-
-      /* la poutre, les panneaux, les radiateurs : le décor qui fait station */
-      .ps-poutre rect { fill: #1b2734; stroke: #2f4356; stroke-width: 1; }
-      .ps-radiateur { fill: #223244 !important; }
-      .ps-panneau rect {
-        fill: #16233d; stroke: #2c4468; stroke-width: 1;
-      }
-      .ps-cellules line { stroke: #2c4468; stroke-width: 1; }
-      .ps-manchon { fill: #16212e; stroke: #2b3d4e; stroke-width: 1; }
-      .ps-manchon-trait { stroke: #33485c; stroke-width: 1; }
-
-      /* ---- LA ROUTE PARCOURUE ---- */
-      .ps-route-trait {
-        stroke: var(--specimen); stroke-width: 2.5; stroke-linecap: round;
-        stroke-dasharray: 9 7; opacity: 0.85;
-        filter: drop-shadow(0 0 6px rgba(99, 183, 230, 0.55));
-        animation: ps-file 1.6s linear infinite;
-      }
-      @keyframes ps-file { to { stroke-dashoffset: -16; } }
-      .ps-sujet {
-        fill: #d8f1ff;
-        filter: drop-shadow(0 0 9px rgba(99, 183, 230, 0.95));
-        animation: ps-battement 2.4s ease-in-out infinite;
-      }
-      @keyframes ps-battement {
-        0%, 100% { r: 5.6; opacity: 0.95; }
-        50% { r: 7.4; opacity: 1; }
-      }
-
-      /* ---- UN MODULE ---- */
-      .ps-mod { cursor: pointer; }
-      .ps-fut {
-        fill: #101c28;
-        stroke: color-mix(in srgb, var(--t) 40%, #2b3d4e);
-        stroke-width: 1.5;
-        transition: fill 0.2s ease, stroke 0.2s ease;
-      }
-      .ps-bande { fill: var(--t); opacity: 0.35; transition: opacity 0.2s ease; }
-      .ps-nervures line { stroke: #22344a; stroke-width: 1; }
-      .ps-hublot {
-        fill: #0a141e; stroke: color-mix(in srgb, var(--t) 55%, #2b3d4e); stroke-width: 1.5;
-        transition: fill 0.2s ease;
-      }
-      .ps-halo { fill: none; stroke: none; }
-      .ps-badge {
-        fill: var(--dim); font-family: var(--font-display);
-        font-size: 13px; text-anchor: middle; letter-spacing: 0.06em;
-      }
-      .ps-nom {
-        fill: #9fbdd2; font-family: var(--font-display);
-        font-size: 11px; text-anchor: middle; letter-spacing: 0.05em;
-        transition: fill 0.2s ease;
-      }
-      .ps-sous {
-        fill: #5f778b; font-family: var(--font-mono);
-        font-size: 10.5px; text-anchor: middle;
-      }
-      /* la flèche du marqueur : elle pointe le fût sans le recouvrir */
-      .ps-fleche { fill: #d8f1ff; opacity: 0.9; }
-
-      /* à venir : la coque est là, la teinte dort */
-      .ps-avenir .ps-bande { opacity: 0.16; }
-
-      /* franchi : la teinte s'allume, le hublot est éclairé */
-      .ps-franchi .ps-fut { fill: #142334; }
-      .ps-franchi .ps-bande { opacity: 0.7; }
-      .ps-franchi .ps-hublot { fill: color-mix(in srgb, var(--t) 30%, #0a141e); }
-      .ps-franchi .ps-nom { fill: #c3dced; }
-
-      /* courant : le seul module qui respire */
-      .ps-courant .ps-fut {
-        fill: #17293c;
-        stroke: var(--t); stroke-width: 2;
-      }
-      .ps-courant .ps-bande { opacity: 1; }
-      .ps-courant .ps-hublot { fill: color-mix(in srgb, var(--t) 62%, #0a141e); }
-      .ps-courant .ps-nom { fill: #eef8ff; }
-      .ps-courant .ps-badge { fill: var(--t); }
-      .ps-courant .ps-halo {
-        fill: none;
-        stroke: var(--t); stroke-width: 1.5; opacity: 0.42;
-        animation: ps-souffle 3.2s ease-in-out infinite;
-      }
-      @keyframes ps-souffle {
-        0%, 100% { opacity: 0.16; }
-        50% { opacity: 0.5; }
-      }
-
-      /* le hub : toujours connu, jamais « courant » */
-      .ps-hub .ps-fut { fill: #12261f; stroke: color-mix(in srgb, var(--t) 45%, #2b3d4e); }
-      .ps-hub .ps-bande { opacity: 0.6; }
-      .ps-hub .ps-nom { fill: #b6dcc7; }
-
-      /* visé au pointeur ou au clavier : le contour, rien d'autre */
-      .ps-mod:hover .ps-fut, .ps-vise .ps-fut, .ps-mod:focus-visible .ps-fut {
-        stroke: color-mix(in srgb, var(--t) 85%, white);
-      }
-      .ps-mod:focus { outline: none; }
-      .ps-mod:focus-visible .ps-halo { stroke: #eef8ff; opacity: 0.8; animation: none; }
-
-      /* le fanion du record, et le sceau du secteur 4 */
-      .ps-record line { stroke: #f2c98e; stroke-width: 1.5; }
-      .ps-record path { fill: #f2c98e; }
-      .ps-sceau line { stroke: rgba(224, 138, 106, 0.75); stroke-width: 3; stroke-linecap: round; }
-      .ps-sceau text {
-        fill: #e08a6a; font-family: var(--font-display); font-size: 10.5px;
-        text-anchor: middle; letter-spacing: 0.2em;
-      }
+      /* le dessin (game/dessinCarte.ts, règles .cs-* plus bas) remplit le cadre */
+      .st-plan .cs-svg { display: block; width: 100%; height: 100%; }
 
       /* ---- LA FICHE DU MODULE, sous le plan ---- */
       .st-bas { display: flex; gap: 14px; align-items: stretch; flex: none; }
@@ -5795,6 +5704,187 @@
         outline-offset: 6px;
       }
 
+      /* ==== L'ÉDITEUR DE LA CARTE DE LA STATION (editor/editeurCarte.ts) ====
+         Même architecture que l'éditeur de tableaux : une barre qui
+         s'enroule, deux colonnes bornées au tiers de l'écran, la scène au
+         milieu. Le SVG de la carte (game/dessinCarte.ts) garde son viewBox :
+         c'est le navigateur qui le met à l'échelle, pas nous. */
+      #carte-editeur {
+        position: fixed; inset: 0; z-index: 41; display: none;
+        grid-template-columns: min(calc(236px * var(--ui)), 26vw) 1fr min(calc(312px * var(--ui)), 34vw);
+        grid-template-rows: auto 1fr;
+        background: var(--void); color: var(--ink); font-family: var(--font-mono);
+      }
+      #carte-editeur.visible { display: grid; }
+      .ce-bar {
+        grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center;
+        gap: 8px 10px; padding: 7px 14px;
+        border-bottom: 1px solid var(--line); background: rgba(9, 18, 30, 0.9);
+      }
+      .ce-bar .sp { flex: 1; }
+      @media (max-width: 1320px) { .ce-bar .sp { flex: 0 0 0; } }
+      .ce-title {
+        font-family: var(--font-display); font-size: calc(12.5px * var(--ui));
+        letter-spacing: 0.2em; color: var(--specimen); white-space: nowrap;
+      }
+      #carte-editeur button {
+        font-family: var(--font-mono); font-size: calc(12px * var(--ui)); letter-spacing: 0.1em;
+        text-transform: uppercase; color: var(--ink); background: rgba(99, 183, 230, 0.07);
+        border: 1px solid var(--line); padding: 7px 11px; cursor: pointer; white-space: nowrap;
+      }
+      #carte-editeur button:hover { border-color: var(--specimen); }
+      #carte-editeur button:disabled { opacity: 0.45; cursor: default; }
+      #carte-editeur button.primary { color: var(--void); background: var(--valid); border-color: var(--valid); font-weight: 600; }
+      #carte-editeur button.active { border-color: var(--specimen); background: rgba(99, 183, 230, 0.2); }
+      #carte-editeur button.ce-danger { color: var(--alert); border-color: var(--alert); background: transparent; }
+      #carte-editeur input, #carte-editeur select, #carte-editeur textarea {
+        font-family: var(--font-mono); font-size: calc(12px * var(--ui)); color: var(--ink);
+        background: rgba(3, 7, 16, 0.6); border: 1px solid var(--line); padding: 5px 7px; min-width: 0;
+      }
+      #carte-editeur input[type="color"] { padding: 0 2px; width: 40px; height: 26px; }
+      #carte-editeur input[type="checkbox"] { width: auto; }
+      #carte-editeur input.ce-invalide { border-color: var(--alert); }
+      #carte-editeur textarea { resize: vertical; }
+      .ce-f { display: flex; flex-direction: column; gap: 3px; }
+      .ce-f > span { font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+      .ce-f--ligne { flex-direction: row; align-items: center; gap: 6px; }
+      .ce-signal { font-size: calc(11px * var(--ui)); color: var(--valid); opacity: 0; transition: opacity 0.3s; }
+      .ce-signal.on { opacity: 1; }
+      .ce-side {
+        border-right: 1px solid var(--line); overflow-y: auto; overscroll-behavior: contain;
+        padding: 12px; display: flex; flex-direction: column; gap: 14px;
+      }
+      .ce-side--droite { border-right: none; border-left: 1px solid var(--line); }
+      .ce-group { display: flex; flex-direction: column; gap: 6px; }
+      .ce-group > .k {
+        font-size: calc(11px * var(--ui)); letter-spacing: 0.18em; text-transform: uppercase;
+        color: var(--dim); padding-bottom: 2px; border-bottom: 1px solid var(--line);
+      }
+      .ce-group > .k b { color: var(--z, var(--ink)); }
+      .ce-liste { display: flex; flex-direction: column; gap: 3px; }
+      #carte-editeur .ce-item {
+        display: grid; grid-template-columns: 10px 1fr auto; column-gap: 8px; align-items: center;
+        text-align: left; text-transform: none; letter-spacing: 0.02em; padding: 5px 8px;
+      }
+      .ce-item i { width: 8px; height: 8px; border-radius: 2px; background: var(--z, var(--dim)); }
+      .ce-item b { font-weight: 600; color: var(--ink); grid-column: 2; }
+      .ce-item span { grid-column: 2; font-size: calc(10.5px * var(--ui)); color: var(--dim); }
+      .ce-item em { grid-column: 3; grid-row: 1 / span 2; font-style: normal; color: var(--z, var(--dim)); }
+      .ce-item.active { border-color: var(--specimen); background: rgba(99, 183, 230, 0.16); }
+      .ce-ok { margin: 0; font-size: calc(11px * var(--ui)); color: var(--valid); }
+      #carte-editeur .ce-verdict { text-align: left; text-transform: none; letter-spacing: 0; padding: 5px 8px; white-space: normal; font-size: calc(11px * var(--ui)); }
+      #carte-editeur .ce-erreur { color: var(--alert); border-color: rgba(224, 104, 92, 0.5); }
+      #carte-editeur .ce-attention { color: #f2c98e; border-color: rgba(242, 201, 142, 0.4); }
+      .ce-note { margin: 0; font-size: calc(11px * var(--ui)); line-height: 1.5; color: var(--dim); }
+      p.ce-erreur { margin: 0; font-size: calc(11px * var(--ui)); color: var(--alert); }
+      p.ce-erreur:empty { display: none; }
+      .ce-grille2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+      .ce-ligne { display: flex; align-items: center; gap: 6px; }
+      .ce-ligne input, .ce-ligne select { flex: 1; }
+      .ce-pastille { width: 10px; height: 10px; flex: none; border-radius: 50%; background: var(--z, var(--dim)); }
+      .ce-type summary { cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: calc(12px * var(--ui)); }
+      .ce-type[open] { display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+      /* la scène : le SVG prend toute la place, en gardant ses proportions */
+      .ce-cadre { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: #020509; }
+      .ce-scene { flex: 1; min-height: 0; touch-action: none; outline: none; }
+      .ce-legende {
+        display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; padding: 6px 12px;
+        font-size: calc(10px * var(--ui)); letter-spacing: 0.12em; color: var(--dim); border-top: 1px solid var(--line);
+      }
+      .ce-legende span { display: flex; align-items: center; gap: 7px; }
+      .ce-legende i { width: 22px; height: 3px; display: inline-block; }
+      /* la fiche de l'aperçu jeu : la maquette du concepteur, en lecture */
+      .ce-fiche { border: 1px solid rgba(99, 183, 230, 0.28); background: var(--panel); padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+      .ce-fiche-tete { display: flex; justify-content: space-between; font-size: calc(9px * var(--ui)); letter-spacing: 0.3em; color: var(--dim); }
+      .ce-fiche-type { color: var(--z); }
+      .ce-fiche-vignette { height: 120px; border: 1px solid var(--line); background: var(--panel-solid); display: grid; place-items: center; font-size: 34px; color: var(--z); }
+      .ce-fiche h3 { margin: 4px 0 0; font-family: var(--font-display); font-size: calc(13px * var(--ui)); letter-spacing: 0.12em; line-height: 1.4; font-weight: 400; }
+      .ce-fiche-zone { font-size: calc(11px * var(--ui)); letter-spacing: 0.14em; color: var(--z); }
+      .ce-fiche p { margin: 0; font-size: calc(11.5px * var(--ui)); line-height: 1.55; color: var(--dim); }
+      .ce-case { border: 1px solid var(--line); padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+      .ce-case small { font-size: calc(9px * var(--ui)); letter-spacing: 0.2em; color: var(--dim); }
+      .ce-case b { font-size: calc(13px * var(--ui)); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #carte-editeur .ce-entrer { width: 100%; padding: 12px; font-family: var(--font-display); font-size: calc(11px * var(--ui)); letter-spacing: 0.28em; border-color: var(--specimen); background: rgba(99, 183, 230, 0.18); }
+      #carte-editeur .ce-entrer:disabled { border-color: var(--line); background: transparent; color: var(--dim); opacity: 1; }
+      #carte-editeur .ce-etat { flex: 1; padding: 8px 0; }
+      .ce-orbes { display: flex; flex-wrap: wrap; gap: 4px; }
+      #carte-editeur .ce-orbes .ce-etat { flex: none; padding: 5px 8px; font-size: calc(10.5px * var(--ui)); text-transform: none; letter-spacing: 0.04em; }
+      .cs-niv { font-size: 10px; letter-spacing: 0.12em; text-anchor: middle; pointer-events: none; }
+
+      /* ==== LE DESSIN DE LA CARTE (game/dessinCarte.ts) — vaut pour l'éditeur
+         comme pour un futur écran de jeu. Les couleurs de la carte voyagent
+         en attributs (elles viennent des données) ; ici, les états. */
+      .cs-svg { display: block; width: 100%; height: 100%; font-family: var(--font-mono); }
+      .cs-badge text { font-size: 12px; letter-spacing: 0.1em; text-anchor: middle; }
+      .cs-decor-nom { font-family: var(--font-display); font-size: 10px; letter-spacing: 0.14em; fill: #7f9cb0; text-anchor: middle; }
+      .cs-decor-sous { font-size: 10px; letter-spacing: 0.18em; fill: #4a6478; text-anchor: middle; }
+      .cs-lumieres { filter: drop-shadow(0 0 5px #63b7e6); }
+      .cs-route.cs-active { filter: drop-shadow(0 0 6px var(--c)); animation: cs-flux 1.2s linear infinite; }
+      .cs-route.cs-principale:not(.cs-active):not(.cs-parcourue) { filter: drop-shadow(0 0 6px var(--c)); }
+      .cs-route.cs-lien-sel { stroke: #eef8ff; filter: drop-shadow(0 0 8px #eef8ff); }
+      .cs-sens { fill: none; opacity: 0.85; }
+      .cs-lien-prise { cursor: pointer; }
+      .cs-brouillon { stroke: #eef8ff; stroke-width: 2; stroke-dasharray: 8 6; fill: none; pointer-events: none; }
+      @keyframes cs-flux { to { stroke-dashoffset: -28; } }
+      .cs-mod { cursor: pointer; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.7)); transition: filter 0.15s; }
+      .cs-mod:focus { outline: none; }
+      .cs-mod.cs-cible { filter: drop-shadow(0 0 8px var(--z)); }
+      .cs-mod.cs-sel, .cs-mod:focus-visible { filter: drop-shadow(0 0 10px rgba(217, 236, 247, 0.6)); }
+      .cs-mod.cs-courant { filter: drop-shadow(0 0 14px rgba(99, 183, 230, 0.9)); animation: cs-pulse 1.8s ease-out infinite; }
+      .cs-editable { cursor: grab; }
+      .cs-editable:active { cursor: grabbing; }
+      .cs-jeu .cs-mod:hover { filter: drop-shadow(0 0 10px var(--z)); }
+      @keyframes cs-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+      .cs-glyphe { text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
+      .cs-cadenas { text-anchor: middle; dominant-baseline: central; font-size: 15px; }
+      .cs-coche { text-anchor: middle; dominant-baseline: central; font-size: 10px; fill: #63b7e6; }
+      .cs-nom { font-family: var(--font-display); font-size: 11px; letter-spacing: 0.1em; text-anchor: middle; pointer-events: none; }
+      .cs-temp text { font-size: 12px; text-anchor: start; }
+      .cs-temp { pointer-events: none; }
+      .cs-poignee { fill: #eef8ff; stroke: #030710; stroke-width: 1.5; cursor: nwse-resize; }
+      .cs-poignee[data-poignee="ne"], .cs-poignee[data-poignee="sw"] { cursor: nesw-resize; }
+      .cs-grille { pointer-events: none; }
+      @media (prefers-reduced-motion: reduce) {
+        .cs-route.cs-active, .cs-mod.cs-courant { animation: none; }
+      }
+
+      /* ==== LE MARCHAND DU HUB (main.ts) — un voile comme LA STATION ==== */
+      #marchand {
+        position: fixed; inset: 0; z-index: 59;
+        background: radial-gradient(120% 90% at 50% 0%, rgba(30, 58, 88, 0.5), transparent 62%), rgba(2, 5, 10, 0.94);
+        display: flex; align-items: center; justify-content: center; padding: 16px;
+      }
+      #marchand[hidden] { display: none; }
+      .mr-boite { width: min(1100px, 100%); max-height: 100%; display: flex; flex-direction: column; gap: 10px; }
+      .mr-tete { display: flex; align-items: flex-start; gap: 16px; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+      .mr-titres { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+      .mr-titres b { font-family: var(--font-display); font-size: calc(15px * var(--ui)); letter-spacing: 0.16em; color: #eaf6ff; }
+      .mr-titres span { font-size: calc(10.5px * var(--ui)); letter-spacing: 0.1em; color: var(--dim); text-transform: uppercase; }
+      .mr-solde { margin: 0; align-self: center; font-size: calc(10px * var(--ui)); letter-spacing: 0.2em; color: var(--dim); }
+      .mr-solde strong { font-size: calc(16px * var(--ui)); color: var(--specimen); margin-left: 6px; }
+      #marchand-fermer {
+        flex: none; width: 34px; height: 34px; border-radius: 6px; background: rgba(20, 32, 46, 0.8);
+        border: 1px solid var(--line); color: inherit; font: inherit; font-size: calc(14px * var(--ui)); cursor: pointer;
+      }
+      #marchand-fermer:hover { border-color: var(--specimen); }
+      .mr-corps { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 18px; padding-right: 4px; }
+      .mr-sec h3 { margin: 0 0 4px; font-family: var(--font-display); font-size: calc(11px * var(--ui)); letter-spacing: 0.2em; color: var(--specimen); }
+      .mr-sec p { margin: 0 0 8px; font-size: calc(11.5px * var(--ui)); line-height: 1.5; color: var(--dim); }
+      .mr-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+      .mr-article {
+        display: grid; grid-template-columns: 28px 1fr; grid-template-rows: auto auto auto; column-gap: 10px; align-items: start;
+        text-align: left; padding: 10px 12px; border: 1px solid var(--line); background: rgba(9, 18, 30, 0.82);
+        color: var(--ink); font-family: var(--font-mono); cursor: pointer;
+      }
+      .mr-article:hover:not(:disabled) { border-color: var(--specimen); background: rgba(99, 183, 230, 0.12); }
+      .mr-article i { grid-row: 1 / span 3; font-style: normal; font-size: 20px; line-height: 1; }
+      .mr-article b { font-size: calc(12px * var(--ui)); letter-spacing: 0.08em; }
+      .mr-article small { font-size: calc(10.5px * var(--ui)); line-height: 1.4; color: var(--dim); }
+      .mr-article em { font-style: normal; font-size: calc(10.5px * var(--ui)); letter-spacing: 0.14em; color: var(--valid); margin-top: 4px; }
+      .mr-article.mr-tenu { opacity: 0.6; cursor: default; }
+      .mr-article.mr-tenu em { color: var(--dim); }
+      #cycle-solde small { display: block; font-size: calc(9.5px * var(--ui)); letter-spacing: 0.06em; color: var(--dim); text-transform: none; }
+
       /* ---- Éditeur de tableaux : plan de travail, pas vitrine ---- */
       #editor {
         position: fixed;
@@ -6979,6 +7069,32 @@
         color: #cfe2ef; cursor: pointer; letter-spacing: 0.1em;
       }
       .mb-continuer:hover { border-color: #6dffb8; }
+      /* ---- LA CARTE DANS LA CÉRÉMONIE : le module épuisé, le plan se
+         déploie ; le panneau s'élargit le temps du choix, le module élu
+         S'AGRANDIT (la scène zoome sur lui) puis ses salles arrivent ---- */
+      .mb-panneau.mb-large { width: min(1180px, 96vw); }
+      .mb-cartes.mb-station { grid-template-columns: 1fr; gap: 4px; }
+      .mb-station-carte {
+        aspect-ratio: 1600 / 804; max-height: 62vh; width: 100%; margin: 0 auto;
+        border: 1px solid #27405a; border-radius: 8px; overflow: hidden; background: #020509;
+        transition: transform 0.42s cubic-bezier(0.2, 0.7, 0.2, 1), opacity 0.42s ease;
+      }
+      .mb-station-carte .cs-svg { width: 100%; height: 100%; }
+      .mb-station-carte.mb-station-zoom { transform: scale(2.4); opacity: 0; }
+      .mb-station-carte.mb-station-refus { animation: mb-secousse 0.32s ease; }
+      @keyframes mb-secousse {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-6px); }
+        75% { transform: translateX(6px); }
+      }
+      .mb-station-fiche {
+        margin: 6px 0 0; min-height: 1.5em; text-align: center;
+        font-size: calc(12px * var(--ui)); letter-spacing: 0.06em; color: #8ba3b8;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .mb-station-carte { transition: none; }
+        .mb-station-carte.mb-station-refus { animation: none; }
+      }
       .mb-carte.mb-dest { min-height: 108px; }
       .mb-cartes:has(.mb-dest) { grid-template-columns: 1fr 1fr; }
       /* Le CHOIX DE SALLE (pool « 21XX-MMD ») : deux propositions,
@@ -7263,13 +7379,16 @@
         <div><dt>ÉTAT</dt><dd id="home-state">en dérive</dd></div>
         <div><dt>CONDENSAT (RUN)</dt><dd id="home-condensat">0 cL</dd></div>
         <div><dt>MÉMOIRE</dt><dd id="home-memoire">0</dd></div>
+        <div><dt>ORBES</dt><dd id="home-orbes">0</dd></div>
       </dl>
       <button id="start" type="button">COMMENCER L'ESSAI</button>
       <button id="home-restart" type="button" hidden>RECOMMENCER LE TABLEAU</button>
       <button id="start-abandon" type="button" hidden>ABANDONNER LA RUN — RETOUR AU LABO</button>
       <div class="home-duo" role="group" aria-label="Outils du protocole">
-        <button id="home-station" type="button" title="LA STATION : le plan général du complexe orbital — six modules amarrés à la poutre, traversés au fil de la descente. On y voit d'où l'on vient, où l'on est, et ce qui attend"><i>🛰&#xFE0E;</i><span>LA STATION</span></button>
+        <button id="home-station" type="button" title="LA STATION : le plan général du complexe orbital — les modules et leurs coursives, tels que la descente les traverse. On y voit d'où l'on vient, où l'on est, ce qui est ouvert et ce qui attend un orbe"><i>🛰&#xFE0E;</i><span>LA STATION</span></button>
         <button id="start-editor" type="button" data-dev title="Créer ou modifier un tableau"><i>✎</i><span>ÉDITEUR</span></button>
+        <button id="home-marchand" type="button" data-dev title="LE MARCHAND du hub, sans nager jusqu'à l'étal : les orbes d'essence de conscience, les améliorations durables, les provisions — payés en mémoire"><i>🔮</i><span>MARCHAND</span></button>
+        <button id="home-carte" type="button" data-dev title="L'ÉDITEUR DE LA CARTE : le plan à routes ramifiées de la station — modules, coursives, zones, conditions d'accès. Se glisse, se lie, s'exporte en carteStation.json ; un aperçu jeu rejoue la traversée"><i>⌬</i><span>CARTE</span></button>
         <button id="home-regles" type="button" data-dev title="Le cahier des règles de la génération procédurale : ce que le générateur fait (annotable), ce qu'un level designer en attend (propositions), et vos règles nouvelles en texte libre — partagé entre concepteurs, relu au moment d'implémenter"><i>§</i><span>RÈGLES DE GÉN.</span></button>
         <button id="home-descente" type="button" data-dev title="LA DESCENTE : le déroulement d'une run réglé de bout en bout — longueur, rampe de difficulté, posture des salles, et les quatre poids de l'algorithme qui choisit les tableaux. Le plan se déroule rang par rang sous les yeux, et se tire à blanc sans jouer"><i>▼</i><span>LA DESCENTE</span></button>
         <button id="open-montage" type="button" data-dev title="La table de montage des cinématiques : planches, effets, sons — et lecture immédiate"><i>▤</i><span>MONTAGE</span></button>
@@ -7386,6 +7505,9 @@
       </button>
       <div id="state-zone" hidden></div>
     </div>
+
+    <!-- L'ÉDITEUR DE LA CARTE DE LA STATION : le gabarit est bâti par editor/editeurCarte.ts -->
+    <div id="carte-editeur" aria-label="Éditeur de la carte de la station"></div>
 
     <div id="editor" aria-label="Éditeur de tableaux">
       <div class="ed-bar">
@@ -7626,6 +7748,7 @@
           <label class="ed-f"><span>Nom</span><input id="ed-name" /></label>
           <label class="ed-f"><span>Code</span><input id="ed-code" /></label>
           <p class="ed-code-lecture" id="ed-code-lecture"></p>
+          <label class="ed-f" title="Le BIOME : le module de la carte de la station qui peut proposer ce tableau. Universel : tout module le pioche. La liste vient de carteStation.json."><span>Biome</span><select id="ed-biome"><option value="">— universel (tout module) —</option></select></label>
           <p class="ed-astuce">Le code DÉCRIT la salle — la convention ATELIER tient en trois chiffres, « 111 » : le MOMENT de la run (1 début · 2 milieu · 3 fin), la MÉCANIQUE requise (0 aucune · 1 glace · 2 vapeur · 3 toutes), la DIFFICULTÉ. Plusieurs salles peuvent porter le même code : c'est le NUMÉRO du tableau, en tête du NOM (« 12 … », lettre pour départager : « 12a … »), qui donne l'ordre de jeu. Un seul code est réservé : <b>HUB</b> — le tableau qui le porte devient le LABORATOIRE (le hub), remplace celui du jeu et sort de la séquence de l'expédition.</p>
           <label class="ed-f"><span>Par (impulsions)</span><input type="number" id="ed-par" min="1" step="1" /></label>
           <label class="ed-f"><span>Dashs vapeur / écran</span><input type="number" id="ed-dashs" min="0" step="1" placeholder="banc" /></label>
@@ -7779,7 +7902,10 @@
         <p class="salles-legende">Glissez une carte (ou ◀ ▶) pour changer l'<b>ordre de jeu</b> —
           c'est le même que la séquence de l'éditeur : chaque geste s'enregistre aussitôt
           dans la bibliothèque partagée. Le champ code accepte la nomenclature
-          (« <b>111</b> » : moment · mécanique · difficulté) et s'enregistre à la validation.</p>
+          (« <b>111</b> » : moment · mécanique · difficulté) et s'enregistre à la validation.
+          Le menu <b>biome</b> sous chaque carte dit quel module de la carte de la station
+          peut proposer la salle ; les filtres du haut comptent les salles par module.</p>
+        <div id="planche-filtres" aria-label="Filtrer par biome"></div>
         <div id="planche-corps"></div>
         <p class="pup-etat" id="planche-etat"></p>
       </div>
@@ -7875,7 +8001,7 @@
       </div>
     </div>
 
-    <!-- LA STATION : le plan général — six modules, traversés au fil de la run -->
+    <!-- LA STATION : le plan général — la carte à routes ramifiées, en lecture -->
     <div id="station" hidden aria-label="Plan de la station">
       <div class="st-boite">
         <div class="st-tete">
@@ -7889,12 +8015,8 @@
         <div class="st-plan" id="station-plan"></div>
         <div class="st-bas">
           <div class="st-fiche" id="station-fiche"></div>
-          <ul class="st-legende">
-            <li><i class="st-p-franchi"></i>franchi</li>
-            <li><i class="st-p-courant"></i>vous êtes ici</li>
-            <li><i class="st-p-avenir"></i>à venir</li>
-            <li><i class="st-p-record"></i>votre record</li>
-          </ul>
+          <!-- la légende suit les types de coursive de la carte (main.ts) -->
+          <ul class="st-legende" id="station-legende"></ul>
         </div>
       </div>
     </div>
@@ -8003,8 +8125,8 @@
         <header id="cycle-tete">
           <h2>LES MÉMOIRES</h2>
           <span class="cy-soustitre">PROJECTEUR VOLUMÉTRIQUE · CYCLE DES ÉTATS</span>
-          <div id="cycle-solde"><span>MÉMOIRE DISPONIBLE</span><i id="cycle-jauge"><b></b></i><strong id="cycle-solde-n">0</strong></div>
-          <button type="button" id="cycle-reset" title="Outil concepteur : détisse tous les liens du cycle et rembourse la mémoire dépensée">⟲ RÉINITIALISER</button>
+          <div id="cycle-solde"><span>ORBES EN POCHE</span><strong id="cycle-solde-n">0</strong><small id="cycle-memoire"></small></div>
+          <button type="button" id="cycle-reset" title="Outil concepteur : détisse tous les liens du cycle et rend les orbes dépensés">⟲ RÉINITIALISER</button>
           <button type="button" id="cycle-fermer" aria-label="Fermer">✕</button>
         </header>
         <div id="cycle-corps">
@@ -8517,6 +8639,17 @@
           <div class="mb-cartes" id="mb-cartes"></div>
         </div>
         <p class="mb-passer" id="mb-passer">toucher pour passer</p>
+      </div>
+    </div>
+    <!-- LE MARCHAND DU HUB : le Semblable du comptoir vend ce qui dure (main.ts) -->
+    <div id="marchand" hidden aria-label="Le marchand">
+      <div class="mr-boite">
+        <div class="mr-tete">
+          <div class="mr-titres"><b>LE MARCHAND</b><span>le Semblable du comptoir — ce qui dure se paie en mémoire</span></div>
+          <p class="mr-solde">MÉMOIRE <strong id="marchand-solde">0</strong></p>
+          <button type="button" id="marchand-fermer" aria-label="Fermer le marchand">✕</button>
+        </div>
+        <div class="mr-corps" id="marchand-corps"></div>
       </div>
     </div>
     <div id="cine" hidden aria-label="Cinématique"></div>

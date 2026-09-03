@@ -490,6 +490,7 @@ export function parseLevel(input: unknown): {
         )[])
       : undefined,
     raccourciVers: str(o.raccourciVers).slice(0, 16) || undefined,
+    biome: str(o.biome).trim() || undefined,
     cineAvant: str(o.cineAvant).trim().slice(0, 24) || undefined,
     cineApres: str(o.cineApres).trim().slice(0, 24) || undefined,
     sequence: str(o.sequence).trim().slice(0, 24) || undefined,
@@ -935,6 +936,7 @@ export function serializeLevel(level: LevelDef): string {
   if (level.etats === 'libres') out.etats = 'libres'
   if (level.exige?.length) out.exige = level.exige
   if (level.raccourciVers) out.raccourciVers = level.raccourciVers
+  if (level.biome) out.biome = level.biome
   if (level.cineAvant) out.cineAvant = level.cineAvant
   if (level.cineApres) out.cineApres = level.cineApres
   if (level.sequence) out.sequence = level.sequence

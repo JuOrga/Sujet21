@@ -169,15 +169,18 @@ describe('Records — les registres du labo', () => {
     expect(r.repare('eclairage', 0)).toBe(true) // et les accès écrivent sans casser
   })
 
-  it('réinitialiser le cycle (outil concepteur) : détisse et rembourse', () => {
+  it('réinitialiser le cycle (outil concepteur) : détisse et rend les orbes', () => {
     const r = new Records(memoryStorage())
     r.gagneMemoire(30)
     expect(r.acquiertEveil('solidification', 10)).toBe(true)
     expect(r.acquiertEveil('vaporisation', 15)).toBe(true)
     expect(r.memoire()).toBe(5)
-    r.reinitialiseCycle(25)
+    r.reinitialiseCycle()
     expect(r.eveilAcquis()).toEqual([])
-    expect(r.memoire()).toBe(30) // la mémoire dépensée est revenue
+    // depuis les orbes, ce qui revient n'est plus la mémoire : ce sont les
+    // orbes des transformations détissées, prêts à être retissés
+    expect(r.orbes().sort()).toEqual(['solidification', 'vaporisation'])
+    expect(r.memoire()).toBe(5)
   })
 
   it('la dispersion clôt l’essai : le n° d’échantillon avance', () => {

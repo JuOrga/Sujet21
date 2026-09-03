@@ -66,6 +66,18 @@ interface RecordsData {
   // LES DÉCOUVERTES : les jalons du récit déjà servis (ids de
   // decouvertes.ts), un par retour de run — l'ordre de la file fait foi.
   decouvertes: string[]
+  // LES ORBES D'ESSENCE DE CONSCIENCE en poche (ids de carteStation.ORBES :
+  // une transformation ou un état du cycle). Un orbe s'achète au marchand
+  // du hub contre de la mémoire, ou se trouve en cache ; l'écran des
+  // mémoires le DÉPENSE pour tisser la transformation qu'il nomme. Un orbe
+  // d'état ne se dépense pas : c'est une clé, il reste.
+  orbes: string[]
+  // LES AMÉLIORATIONS DURABLES achetées au marchand (ids de marchand.ts) :
+  // elles valent à chaque descente, pour toujours.
+  ameliorations: string[]
+  // LES CACHES VIDÉES : les modules de la carte dont l'orbe a été pris
+  // (ids de modules) — une cache ne se pille qu'une fois.
+  cachesVidees: string[]
 }
 
 // Les nœuds utilitaires de l'ANCIEN arbre de l'Éveil (remplacé par le
@@ -104,6 +116,9 @@ function blank(): RecordsData {
     cycleVerrous: [],
     reparations: [],
     decouvertes: [],
+    orbes: [],
+    ameliorations: [],
+    cachesVidees: [],
   }
 }
 
@@ -157,6 +172,9 @@ export class Records {
           if (!Array.isArray(d.cycleVerrous)) d.cycleVerrous = [] // avant les verrous
           if (!Array.isArray(d.reparations)) d.reparations = [] // avant l'accident
           if (!Array.isArray(d.decouvertes)) d.decouvertes = [] // avant le récit
+          if (!Array.isArray(d.orbes)) d.orbes = [] // avant les orbes
+          if (!Array.isArray(d.ameliorations)) d.ameliorations = []
+          if (!Array.isArray(d.cachesVidees)) d.cachesVidees = []
           // Migration : les registres d'avant la refonte (un seul record par
           // salle) sèment leurs deux records avec la même entrée.
           for (const code of Object.keys(d.tableaux)) {
@@ -269,21 +287,106 @@ export class Records {
     return i < 0
   }
 
-  /** OUTIL CONCEPTEUR : détisse TOUS les liens du cycle et rembourse la
-   * somme indiquée — l'écran des mémoires revient à son état d'origine.
-   * Les verrous narratifs, eux, ne bougent pas : ils sont au scénario. */
-  reinitialiseCycle(remboursement: number): void {
+  /** OUTIL CONCEPTEUR : détisse TOUS les liens du cycle et REND LES ORBES
+   * dépensés — l'écran des mémoires revient à son état d'origine, la poche
+   * se remplit de ce qu'on y avait pris. Les verrous narratifs, eux, ne
+   * bougent pas : ils sont au scénario. */
+  reinitialiseCycle(): void {
+    for (const id of this.data.eveil)
+      if (!this.data.orbes.includes(id)) this.data.orbes.push(id)
     this.data.eveil = []
-    if (remboursement > 0) this.data.memoire += Math.round(remboursement)
     this.save()
   }
 
   /** Achète un nœud : débite la mémoire ET grave le nœud, atomiquement.
-   * false si le solde ne suffit pas ou que le nœud est déjà tenu. */
+   * false si le solde ne suffit pas ou que le nœud est déjà tenu. (Le
+   * chemin d'avant les orbes — le scénario et les outils s'en servent.) */
   acquiertEveil(id: string, cout: number): boolean {
     if (this.data.eveil.includes(id)) return false
     if (!this.depenseMemoire(cout)) return false
     this.data.eveil.push(id)
+    this.save()
+    return true
+  }
+
+  // ---- LES ORBES D'ESSENCE DE CONSCIENCE -----------------------------------
+
+  /** Les orbes en poche (ids), non dépensés. */
+  orbes(): string[] {
+    return [...this.data.orbes]
+  }
+
+  aOrbe(id: string): boolean {
+    return this.data.orbes.includes(id)
+  }
+
+  /** Reçoit un orbe (cache, scénario). Un orbe déjà en poche, ou dont la
+   * transformation est déjà tissée, ne s'ajoute pas : false. */
+  gagneOrbe(id: string): boolean {
+    if (this.data.orbes.includes(id) || this.data.eveil.includes(id)) return false
+    this.data.orbes.push(id)
+    this.save()
+    return true
+  }
+
+  /** Achète un orbe au marchand : débite la mémoire ET met l'orbe en
+   * poche, atomiquement. false si déjà en poche ou tissé, ou solde
+   * insuffisant. */
+  acheteOrbe(id: string, prix: number): boolean {
+    if (this.data.orbes.includes(id) || this.data.eveil.includes(id)) return false
+    if (!this.depenseMemoire(prix)) return false
+    this.data.orbes.push(id)
+    this.save()
+    return true
+  }
+
+  /** Tisse une transformation avec son orbe : l'orbe quitte la poche, le
+   * lien se grave — atomiquement. false sans l'orbe, ou déjà tissé. */
+  tisseAvecOrbe(id: string): boolean {
+    if (this.data.eveil.includes(id)) return false
+    const i = this.data.orbes.indexOf(id)
+    if (i < 0) return false
+    this.data.orbes.splice(i, 1)
+    this.data.eveil.push(id)
+    this.save()
+    return true
+  }
+
+  // ---- LES AMÉLIORATIONS DURABLES du marchand ------------------------------
+
+  ameliorations(): string[] {
+    return [...this.data.ameliorations]
+  }
+
+  aAmelioration(id: string): boolean {
+    return this.data.ameliorations.includes(id)
+  }
+
+  /** Achète une amélioration durable : débite la mémoire ET la grave,
+   * atomiquement. false si déjà acquise ou solde insuffisant. */
+  acheteAmelioration(id: string, prix: number): boolean {
+    if (this.data.ameliorations.includes(id)) return false
+    if (!this.depenseMemoire(prix)) return false
+    this.data.ameliorations.push(id)
+    this.save()
+    return true
+  }
+
+  // ---- LES CACHES de la carte ------------------------------------------------
+
+  cacheVidee(module: string): boolean {
+    return this.data.cachesVidees.includes(module)
+  }
+
+  /** Pille une cache : grave le module ET donne son orbe, atomiquement.
+   * false si la cache est déjà vidée. L'orbe peut ne pas s'ajouter (déjà
+   * en poche, ou tissé) : la cache est vidée quand même — on ne repasse
+   * pas la piller pour un doublon. */
+  videCache(module: string, orbe: string): boolean {
+    if (this.data.cachesVidees.includes(module)) return false
+    this.data.cachesVidees.push(module)
+    if (!this.data.orbes.includes(orbe) && !this.data.eveil.includes(orbe))
+      this.data.orbes.push(orbe)
     this.save()
     return true
   }

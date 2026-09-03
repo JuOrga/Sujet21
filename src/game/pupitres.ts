@@ -24,6 +24,7 @@ export type EcranPupitre =
   | 'codex' // le manuel écrit par la partie
   | 'fioles' // la collection d'échantillons scellés
   | 'table-depart' // le récapitulatif de ce qu'on emporte
+  | 'marchand' // le Semblable du comptoir : orbes, améliorations durables, provisions
 
 export interface FichePupitre {
   id: EcranPupitre
@@ -44,7 +45,7 @@ export const PUPITRES: readonly FichePupitre[] = [
     id: 'station',
     nom: 'PLAN DE LA STATION',
     icone: '🛰️',
-    note: 'LA CARTE : le complexe orbital et ses six modules amarrés à la poutre — d’où l’on vient, où l’on est, ce qui attend.',
+    note: 'LA CARTE : le plan à routes ramifiées de la station — d’où l’on vient, où l’on est, les coursives ouvertes et celles qui attendent un orbe.',
   },
   {
     id: 'reparations',
@@ -56,7 +57,7 @@ export const PUPITRES: readonly FichePupitre[] = [
     id: 'cycle',
     nom: 'BANC DES MÉMOIRES',
     icone: '⚛',
-    note: 'L’écran du cycle des états : chaque transformation manuelle est un lien à tisser contre de la mémoire.',
+    note: 'L’écran du cycle des états : chaque transformation manuelle est un lien à tisser avec son orbe d’essence de conscience.',
   },
   {
     id: 'codex',
@@ -75,6 +76,12 @@ export const PUPITRES: readonly FichePupitre[] = [
     nom: 'TABLE DE DÉPART',
     icone: '🗺️',
     note: 'Le récapitulatif de ce qu’on emporte à la prochaine descente (vies, réserve, fioles, provisions). Un simple toast : rien à fermer.',
+  },
+  {
+    id: 'marchand',
+    nom: 'LE MARCHAND',
+    icone: '🔮',
+    note: 'Le Semblable du comptoir : les orbes d’essence de conscience, les améliorations durables et les provisions — payés en mémoire. Posé dans le hub, il remplace le contact de l’étal.',
   },
 ]
 

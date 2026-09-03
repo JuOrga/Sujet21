@@ -10,6 +10,7 @@ import { CODEX, Codex, type CodexGroupe } from './game/codex'
 import { niveauExpanse } from './game/structures'
 import {
   TABLEAU_HUB,
+  ARTICLES_COMPTOIR,
   articleComptoir,
   zonesDuHub,
   type ArticleHub,
@@ -60,15 +61,29 @@ import {
   type PlanVoie,
 } from './game/voie'
 import {
-  CASES,
-  MODULES,
-  MODULE_HUB,
-  caseDuRang,
-  moduleDuRang,
-  pasRegulier,
-  rangsDeCase,
-} from './game/station'
-import { planStationSVG, type OptionsPlan } from './game/planStation'
+  CARTE_LIVREE,
+  ORBES,
+  biomesDeCarte,
+  couleurTemperature,
+  moduleParId,
+  zoneDe,
+  type ModuleCarte,
+} from './game/carteStation'
+import { AMELIORATIONS, amelioration, orbesEnVente } from './game/marchand'
+import { dessinCarteSVG, type OptionsDessin } from './game/dessinCarte'
+import {
+  choixModules,
+  departCarte,
+  entreModule,
+  franchitSalle,
+  litEtatCarteRun,
+  longueurRun as longueurRunCarte,
+  moduleCourant,
+  moduleFini,
+  objectifAtteint,
+  orbesDuCycle,
+  type EtatCarteRun,
+} from './game/descenteCarte'
 import {
   apercuDescente,
   bilanDescentes,
@@ -179,6 +194,7 @@ import {
   AMBIANTE_DEFAUT,
 } from './game/level'
 import { LevelEditor } from './editor/editor'
+import { EditeurCarte } from './editor/editeurCarte'
 import {
   traceLaser,
   creerEtatRecepteurs,
@@ -476,6 +492,8 @@ const records = new Records()
 function majMemoireUI(): void {
   const dd = document.getElementById('home-memoire')
   if (dd) dd.textContent = String(records.memoire())
+  const orbes = document.getElementById('home-orbes')
+  if (orbes) orbes.textContent = String(records.orbes().length)
 }
 /** Grave la mémoire ET tient le compteur de butin de la run courante.
  * La fiole de SOUVENIR majore chaque gain de 25 %. */
@@ -702,6 +720,10 @@ function descenteDuJour(): boolean {
 }
 let voieGenereeChoisie: LevelDef | null = null
 let voieIntercalaire: LevelDef | null = null
+// LA PREMIÈRE SALLE d'une run lancée par la carte : rien n'a encore été
+// joué — le choix vise l'index 0, pas l'index suivant (revue du 03/09 :
+// sans salles générées, la salle 1 de la bibliothèque était sautée)
+let premiereSalleDeLaRun = false
 // le RANG de la descente en cours : combien de salles FRANCHIES — la voie
 // se boucle quand il atteint la longueur du plan, quelle que soit la
 // séquence écrite (épuisée, elle cède la place aux salles générées)
@@ -780,6 +802,33 @@ const voiePlan: PlanVoie = (() => {
     return clampPlanVoie(null)
   }
 })()
+// ---- LA CARTE DE LA STATION : la descente est pilotée par le plan ------
+// Un module est un BIOME (des salles, réglées dans carteStation.json) ; au
+// bout de ses salles, la carte s'ouvre dans la cérémonie et la coursive
+// suivante se choisit. La LONGUEUR d'une run n'est plus le réglage du plan
+// de voie : elle DÉCOULE du trajet — salles franchies, salles restantes du
+// module, plus court chemin en niveaux jusqu'à l'objectif (descenteCarte.ts).
+// Le plan de voie garde tout le reste : rampe de difficulté, moments,
+// postures, pioche — il reçoit simplement la longueur vraie (planEffectif).
+const carte = CARTE_LIVREE
+let carteRun: EtatCarteRun = departCarte(carte)
+/** Les orbes ACQUIS, pour les cadenas de la carte : ceux en poche, plus
+ *  ceux que le cycle tient déjà (une transformation tissée vaut son orbe —
+ *  on l'a dépensé pour elle — et un état atteint vaut le sien). */
+function orbesAcquis(): string[] {
+  const out = new Set(orbesDuCycle(records.eveilAcquis(), records.verrousCycle()))
+  for (const o of records.orbes()) out.add(o)
+  return [...out]
+}
+function longueurRun(): number {
+  return longueurRunCarte(carte, carteRun, voieRang)
+}
+function planEffectif(): PlanVoie {
+  return { ...voiePlan, longueur: longueurRun() }
+}
+function moduleEnCours(): ModuleCarte | undefined {
+  return moduleCourant(carte, carteRun)
+}
 function sauvePlanVoie(): void {
   try {
     localStorage.setItem(CLE_PLAN_VOIE, JSON.stringify(clampPlanVoie(voiePlan)))
@@ -2246,20 +2295,23 @@ const cycleScene = document.getElementById('cycle-scene') as HTMLDivElement
 const cycleRegListe = document.getElementById(
   'cycle-reg-liste',
 ) as HTMLDivElement
-/** Le STATUT d'un lien : offert d'origine · tissé · à tisser payable · à
- * tisser, solde insuffisant · mystère. Il pilote le trait, la plaque ET la
- * ligne du registre. Les deux premiers sont ACQUIS — même vert, même
+/** Le STATUT d'un lien : offert d'origine · tissé · à tisser, l'orbe en
+ * poche · à tisser, l'orbe manque · mystère. Il pilote le trait, la plaque
+ * ET la ligne du registre. Les deux premiers sont ACQUIS — même vert, même
  * lien qui coule : ce qui compte, c'est de l'avoir, pas de l'avoir payé.
- * Un VERROU narratif referme même un lien offert : il redevient à tisser. */
+ * Un VERROU narratif referme même un lien offert : il redevient à tisser.
+ * DEPUIS LES ORBES (03/09), tisser ne coûte plus de mémoire : il faut
+ * l'orbe de la transformation, acheté au marchand du hub ou trouvé en
+ * cache — la mémoire se dépense là-bas, pas ici. */
 function statutTransfo(
   t: (typeof TRANSFOS_CYCLE)[number],
   acquis: readonly string[],
-  solde: number,
+  orbes: readonly string[],
   verrous: readonly string[],
 ): 'origine' | 'tenue' | 'payable' | 'verrou' | 'mystere' {
   if (t.etat === 'mystere') return 'mystere'
   if (!transfoTenue(t.id, acquis, verrous))
-    return solde >= t.cout ? 'payable' : 'verrou'
+    return orbes.includes(t.id) ? 'payable' : 'verrou'
   return t.etat === 'acquis-depart' && !acquis.includes(t.id)
     ? 'origine'
     : 'tenue'
@@ -2274,21 +2326,15 @@ const CY_STATUTS = [
 function renderCycleVoile(): void {
   const acquis = records.eveilAcquis()
   const verrous = records.verrousCycle()
-  const solde = records.memoire()
+  const orbes = records.orbes()
   const soldeEl = document.getElementById('cycle-solde-n')
-  if (soldeEl) soldeEl.textContent = String(solde)
-  // la jauge se remplit vers le lien à tisser le plus cher : pleine, tout
-  // ce qui reste est payable (ou tout est tissé)
-  const restants = TRANSFOS_CYCLE.filter(
-    (t) => statutTransfo(t, acquis, solde, verrous) === 'verrou',
-  ).map((t) => t.cout)
-  const cible = restants.length > 0 ? Math.max(...restants) : 0
-  const jauge = document.querySelector<HTMLElement>('#cycle-jauge b')
-  if (jauge)
-    jauge.style.width = `${cible > 0 ? Math.min(100, (solde / cible) * 100) : 100}%`
+  if (soldeEl) soldeEl.textContent = String(orbes.length)
+  const memEl = document.getElementById('cycle-memoire')
+  if (memEl)
+    memEl.textContent = `mémoire ${records.memoire()} — les orbes s’achètent au marchand du hub, ou se trouvent en cache`
   let registre = ''
   for (const t of TRANSFOS_CYCLE) {
-    const statut = statutTransfo(t, acquis, solde, verrous)
+    const statut = statutTransfo(t, acquis, orbes, verrous)
     const sous =
       statut === 'mystere'
         ? '???'
@@ -2297,8 +2343,8 @@ function renderCycleVoile(): void {
           : statut === 'tenue'
             ? 'TISSÉE'
             : statut === 'payable'
-              ? `▸ TISSER · ${t.cout}`
-              : `TISSER · ${t.cout}`
+              ? '▸ TISSER · ORBE EN POCHE'
+              : `ORBE MANQUANT · ${t.cout} AU MARCHAND`
     const plaque = cycleScene.querySelector<HTMLElement>(
       `.cy-transfo[data-transfo="${t.id}"]`,
     )
@@ -2354,8 +2400,8 @@ cycleEcran.addEventListener('click', (e) => {
     !transfoAchetable(t.id, records.eveilAcquis(), records.verrousCycle())
   )
     return
-  if (!records.acquiertEveil(t.id, t.cout)) {
-    // solde insuffisant : la jauge le rappelle, la plaque proteste
+  if (!records.tisseAvecOrbe(t.id)) {
+    // l'orbe manque : le registre le dit, la plaque proteste
     renderCycleVoile()
     const rendu = document.querySelector<HTMLElement>(
       `.cy-reg[data-transfo="${t.id}"]`,
@@ -2384,16 +2430,126 @@ document.getElementById('cycle-fermer')?.addEventListener('click', () => {
 // narratifs, eux, ne bougent pas : ils appartiennent au scénario. Le
 // bouton n'existe qu'en mode concepteur (CSS body.concepteur).
 document.getElementById('cycle-reset')?.addEventListener('click', () => {
-  const rembourse = records
-    .eveilAcquis()
-    .reduce((somme, id) => somme + (transfoCycle(id)?.cout ?? 0), 0)
-  records.reinitialiseCycle(rembourse)
+  records.reinitialiseCycle() // les orbes reviennent en poche
   majMemoireUI()
   renderCycleVoile()
   audio.collect()
 })
 cycleEl.addEventListener('pointerdown', (e) => {
   if (e.target === cycleEl) cycleEl.hidden = true
+})
+
+// ---- LE MARCHAND DU HUB : le Semblable du comptoir vend ce qui DURE ----
+// Les ORBES d'essence de conscience (contre de la mémoire ; l'écran des
+// mémoires les dépense), les AMÉLIORATIONS DURABLES (une fois pour toutes,
+// à chaque descente), et les provisions du comptoir d'à côté. Le voile
+// s'ouvre AU CONTACT de l'étal du comptoir, au hub — et depuis l'accueil
+// en mode concepteur, pour le régler sans nager.
+const marchandEl = document.getElementById('marchand') as HTMLDivElement
+const marchandCorps = document.getElementById(
+  'marchand-corps',
+) as HTMLDivElement
+let marchandDedans = false
+function renderMarchandVoile(): void {
+  const solde = records.memoire()
+  const soldeEl = document.getElementById('marchand-solde')
+  if (soldeEl) soldeEl.textContent = String(solde)
+  const acquis = records.eveilAcquis()
+  const verrous = records.verrousCycle()
+  const article = (
+    donnee: string,
+    icone: string,
+    nom: string,
+    detail: string,
+    etat: string,
+    achetable: boolean,
+  ): string =>
+    `<button type="button" class="mr-article${achetable ? '' : ' mr-tenu'}" ${donnee}${achetable ? '' : ' disabled'}>` +
+    `<i>${icone}</i><b>${htmlSafe(nom)}</b><small>${htmlSafe(detail)}</small><em>${htmlSafe(etat)}</em></button>`
+  let html =
+    '<section class="mr-sec"><h3>LES ORBES D’ESSENCE DE CONSCIENCE</h3>' +
+    '<p>Chaque orbe est une transformation. En poche, il se dépense à l’écran des mémoires pour la tisser ; tissée, elle ouvre les coursives de la carte qui l’exigent.</p><div class="mr-grille">'
+  for (const o of orbesEnVente()) {
+    const etat = acquis.includes(o.id)
+      ? 'TISSÉE'
+      : records.aOrbe(o.id)
+        ? 'EN POCHE'
+        : transfoTenue(o.id, acquis, verrous)
+          ? 'OFFERTE D’ORIGINE'
+          : `${o.prix} MÉMOIRE`
+    const achetable = etat === `${o.prix} MÉMOIRE`
+    html += article(
+      `data-orbe="${o.id}"`,
+      '🔮',
+      o.nom.toUpperCase(),
+      o.desc,
+      achetable && solde < o.prix ? `${o.prix} MÉMOIRE — IL EN MANQUE ${o.prix - solde}` : etat,
+      achetable && solde >= o.prix,
+    )
+  }
+  html +=
+    '</div></section><section class="mr-sec"><h3>LES AMÉLIORATIONS DURABLES</h3>' +
+    '<p>Une fois pour toutes : elles valent au départ de chaque descente.</p><div class="mr-grille">'
+  for (const a of AMELIORATIONS) {
+    const tenue = records.aAmelioration(a.id)
+    html += article(
+      `data-amelioration="${a.id}"`,
+      a.icone,
+      a.nom,
+      a.detail,
+      tenue ? 'ACQUISE' : solde < a.prix ? `${a.prix} MÉMOIRE — IL EN MANQUE ${a.prix - solde}` : `${a.prix} MÉMOIRE`,
+      !tenue && solde >= a.prix,
+    )
+  }
+  html +=
+    '</div></section><section class="mr-sec"><h3>LES PROVISIONS DE LA PROCHAINE DESCENTE</h3>' +
+    '<p>Le comptoir d’à côté les vend aussi, au contact des alcôves — elles ne valent qu’une descente.</p><div class="mr-grille">'
+  for (const a of ARTICLES_COMPTOIR) {
+    const servi = achatsHub.has(a.id)
+    html += article(
+      `data-provision="${a.id}"`,
+      a.icone,
+      a.nom,
+      a.detail,
+      servi ? 'DÉJÀ SERVI' : solde < a.prix ? `${a.prix} MÉMOIRE — IL EN MANQUE ${a.prix - solde}` : `${a.prix} MÉMOIRE`,
+      !servi && solde >= a.prix,
+    )
+  }
+  html += '</div></section>'
+  marchandCorps.innerHTML = html
+}
+marchandCorps.addEventListener('click', (e) => {
+  const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null
+  if (!b || b.disabled) return
+  if (b.dataset.orbe) {
+    const o = orbesEnVente().find((x) => x.id === b.dataset.orbe)
+    if (!o || !records.acheteOrbe(o.id, o.prix)) return
+    toastFile.push({ nom: `ORBE — ${o.nom.toUpperCase()}`, icone: '🔮', sur: 'LE MARCHAND' })
+  } else if (b.dataset.amelioration) {
+    const a = amelioration(b.dataset.amelioration)
+    if (!a || !records.acheteAmelioration(a.id, a.prix)) return
+    toastFile.push({ nom: `${a.nom} — ${a.detail}`, icone: a.icone, sur: 'LE MARCHAND' })
+  } else if (b.dataset.provision) {
+    // le comptoir sonne et compte lui-même : on ne repeint que l'étal
+    const a = articleComptoir(b.dataset.provision)
+    if (!a || !tenteAchatHub({ ...a, plot: { minX: 0, minY: 0, maxX: 0, maxY: 0 } })) return
+    renderMarchandVoile()
+    return
+  } else return
+  audio.collect()
+  majMemoireUI()
+  renderMarchandVoile()
+})
+function ouvreMarchand(): void {
+  marchandEl.hidden = false
+  renderMarchandVoile()
+}
+document.getElementById('home-marchand')?.addEventListener('click', ouvreMarchand)
+document.getElementById('marchand-fermer')?.addEventListener('click', () => {
+  marchandEl.hidden = true
+})
+marchandEl.addEventListener('pointerdown', (e) => {
+  if (e.target === marchandEl) marchandEl.hidden = true
 })
 
 // ---- Le voile FIOLES : la collection d'échantillons scellés ------------
@@ -2514,6 +2670,9 @@ function ouvrePupitre(ecran: EcranPupitre): void {
       // travail du hub — rien à fermer, on continue de jouer
       montreTableDepart()
       break
+    case 'marchand':
+      ouvreMarchand()
+      break
   }
 }
 
@@ -2536,6 +2695,8 @@ function pupitreOuvert(ecran: EcranPupitre): boolean {
       return !fiolesEl.hidden
     case 'table-depart':
       return false // un toast ne se « ferme » pas : il s'empile
+    case 'marchand':
+      return !marchandEl.hidden
   }
 }
 
@@ -3502,6 +3663,7 @@ interface RunSauvee {
   condensat?: number // la bourse de la run (absente : anciennes sauvegardes)
   memoireGagnee?: number // le butin de mémoire déjà gravé cette run
   economatVisite?: boolean // l'annexe du Semblable a-t-elle déjà servi ?
+  carte?: unknown // où l'on en est sur la carte (descenteCarte.ts)
 }
 function runSauvee(): RunSauvee | null {
   try {
@@ -3521,6 +3683,13 @@ function runSauvee(): RunSauvee | null {
         : [],
       xp: Math.max(0, Number(d.xp) || 0),
       livreTotal: Math.max(0, Number(d.livreTotal) || 0),
+      // ces champs s'écrivaient sans jamais être RELUS : la reprise repartait
+      // au rang de l'index, bourse vide, Économat oublié — ils reviennent
+      rang: typeof d.rang === 'number' ? d.rang : undefined,
+      condensat: typeof d.condensat === 'number' ? d.condensat : undefined,
+      memoireGagnee: typeof d.memoireGagnee === 'number' ? d.memoireGagnee : undefined,
+      economatVisite: typeof d.economatVisite === 'boolean' ? d.economatVisite : undefined,
+      carte: d.carte,
     }
   } catch {
     return null
@@ -3549,6 +3718,7 @@ function sauveRun(): void {
           condensat,
           memoireGagnee: run.memoireGagnee,
           economatVisite: economatVisiteCetteRun,
+          carte: carteRun,
         }),
       )
   } catch {
@@ -3583,6 +3753,7 @@ function reprendreRun(save: RunSauvee): void {
   run.memoireGagnee = Math.max(0, Math.round(save.memoireGagnee ?? 0))
   economatIntercalaire = null
   economatVisiteCetteRun = save.economatVisite ?? false
+  carteRun = litEtatCarteRun(save.carte, carte)
   hasPlayed = true
   document.body.classList.add('playing')
   input.paused = false
@@ -3595,7 +3766,7 @@ function reprendreRun(save: RunSauvee): void {
 }
 function majBoutonsRun(): void {
   const save = runSauvee()
-  const total = voiePlan.longueur // la descente dure ce que le plan dit
+  const total = longueurRun() // la descente dure ce que la carte dit
   const btnAband = document.getElementById(
     'start-abandon',
   ) as HTMLButtonElement | null
@@ -3899,6 +4070,8 @@ const editor = new LevelEditor(el('editor'), {
     [SEQUENCE_ALERTE, ...chargeSequences()]
       .filter((s, i, t) => t.findIndex((o) => o.code === s.code) === i)
       .map((s) => ({ code: s.code, titre: s.titre })),
+  // les biomes de la carte de la station : le champ Biome du tableau
+  biomes: () => biomesDeCarte(carte),
   libraryChanged: (levels) => {
     libraryLevels = levels.map((s) => s.level)
     renderRegistres()
@@ -4164,6 +4337,37 @@ async function plancheCode(id: string, brut: string): Promise<void> {
     void ouvrePlanche() // repart de l'état serveur
   }
 }
+/** LE BIOME D'UNE CARTE DE LA PLANCHE : le module de la carte de la station
+ *  qui peut proposer ce tableau — vide, le tableau est universel. Même
+ *  chemin que le code : la bibliothèque partagée le retient. */
+async function plancheBiome(id: string, biome: string): Promise<void> {
+  if (plancheBusy) return
+  const entry = plancheTous.find((s) => s.id === id)
+  if (!entry) return
+  const v = biome.trim()
+  if ((entry.level.biome ?? '') === v) return
+  plancheBusy = true
+  if (v) entry.level.biome = v
+  else delete entry.level.biome
+  plancheDit(v ? `Enregistrement du biome « ${v} »…` : 'Le tableau redevient universel…')
+  const saved = await saveLevel(entry.level, id, records.operator() || 'anonyme')
+  plancheBusy = false
+  if (saved) {
+    plancheSync(saved.levels)
+    const b = biomesDeCarte(carte).find((x) => x.code === v)
+    plancheDit(
+      v
+        ? `Biome « ${v} » enregistré — ${b ? b.nom : 'module absent de la carte'} : seul ce module proposera ce tableau.`
+        : 'Tableau universel enregistré : tout module peut le proposer.',
+    )
+  } else {
+    plancheDit(`Enregistrement refusé : ${raisonDuRefus() || 'bibliothèque injoignable'}.`)
+    void ouvrePlanche()
+  }
+}
+/** Le filtre de la planche : null = tout, '' = sans biome, sinon un code. */
+let plancheFiltre: string | null = null
+
 // ---- Les MOLETTES du code : chaque chiffre se règle sur place ----------
 // Un cran ▴ au-dessus, la valeur au centre (une liste déroulante : le
 // picker natif sur iPad), un cran ▾ en dessous — sobre, au doigt comme à
@@ -4222,7 +4426,35 @@ function plancheCodePlusTard(id: string, code: string): void {
 function renderPlanche(): void {
   const corps = document.getElementById('planche-corps')
   if (!corps) return
-  const visibles = plancheTous.filter((s) => !estCodeHub(s.level.code))
+  const toutes = plancheTous.filter((s) => !estCodeHub(s.level.code))
+  // LES BIOMES : un filtre par module de la carte, avec le COMPTE de
+  // salles — d'un regard, quels biomes sont vides. L'ordre de jeu (◀ ▶,
+  // glisser) ne se règle que sur la vue complète : un rang n'a de sens
+  // que dans la liste entière.
+  const biomes = biomesDeCarte(carte)
+  const filtres = document.getElementById('planche-filtres')
+  if (filtres) {
+    const nb = (code: string): number => toutes.filter((s) => (s.level.biome ?? '') === code).length
+    const bouton = (val: string | null, libelle: string, n: number, titre: string): string =>
+      `<button type="button" data-filtre="${val === null ? '*' : val}" class="${plancheFiltre === val ? 'on' : ''}${n === 0 && val ? ' vide' : ''}" title="${titre}">${libelle} <b>${n}</b></button>`
+    filtres.innerHTML =
+      bouton(null, 'TOUTES', toutes.length, 'Toutes les salles de la bibliothèque — la seule vue où l’ordre de jeu se règle') +
+      bouton('', 'SANS BIOME', nb(''), 'Les salles universelles : tout module de la carte peut les proposer') +
+      biomes
+        .map((b) => bouton(b.code, `${b.code} · ${b.nom}`, nb(b.code), `Les salles que seul le module ${b.nom} propose — 0 : un biome vide, le module n’aura que des salles générées et universelles`))
+        .join('')
+    for (const b of Array.from(filtres.querySelectorAll<HTMLButtonElement>('[data-filtre]')))
+      b.addEventListener('click', () => {
+        const v = b.dataset.filtre ?? '*'
+        plancheFiltre = v === '*' ? null : v
+        renderPlanche()
+      })
+  }
+  const visibles =
+    plancheFiltre === null
+      ? toutes
+      : toutes.filter((s) => (s.level.biome ?? '') === plancheFiltre)
+  const ordonnable = plancheFiltre === null
   corps.innerHTML = ''
   visibles.forEach((s, i) => {
     const carte = document.createElement('div')
@@ -4230,8 +4462,7 @@ function renderPlanche(): void {
     carte.draggable = true
     carte.dataset.id = s.id
     const d = decodeCodeAtelier(s.level.code)
-    const esc = (t: string): string =>
-      t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    const esc = htmlSafe
     // le code, molette par molette : « 123 » nu, ou la codification
     // complète « 21AB-123 » — le préfixe ET les lettres d'ordre sont
     // GRAVÉS (l'ordre de jeu se règle en glissant les cartes, pas dans le
@@ -4290,15 +4521,28 @@ function renderPlanche(): void {
         : `<input class="pl-code" maxlength="16" value="${esc(s.level.code)}" title="Le code nomenclature (« 111 ») — Entrée ou sortir du champ enregistre" />`) +
       `<span class="pl-nom" title="${esc(s.level.name)}">${esc(s.level.name)}</span>` +
       `<span class="pl-ord">` +
-      `<button type="button" data-tot="-1" title="Jouer plus tôt"${i === 0 ? ' disabled' : ''}>◀</button>` +
-      `<button type="button" data-tot="1" title="Jouer plus tard"${i === visibles.length - 1 ? ' disabled' : ''}>▶</button>` +
+      `<button type="button" data-tot="-1" title="Jouer plus tôt"${i === 0 || !ordonnable ? ' disabled' : ''}>◀</button>` +
+      `<button type="button" data-tot="1" title="Jouer plus tard"${i === visibles.length - 1 || !ordonnable ? ' disabled' : ''}>▶</button>` +
       `</span></div>` +
       (roues ? '' : saisi) +
-      (d ? `<span class="salle-chips">${chipsHtml(s.level.code)}</span>` : '')
+      (d ? `<span class="salle-chips">${chipsHtml(s.level.code)}</span>` : '') +
+      // LE BIOME : le module de la carte qui propose ce tableau
+      `<select class="pl-biome" title="Le BIOME : le module de la carte de la station qui peut proposer ce tableau. Universel : tout module le pioche. La liste vient de carteStation.json — un module ajouté dans l'éditeur de carte apparaît ici.">` +
+      `<option value=""${s.level.biome ? '' : ' selected'}>— universel —</option>` +
+      biomes
+        .map((b) => `<option value="${esc(b.code)}"${s.level.biome === b.code ? ' selected' : ''}>${esc(b.code)} · ${esc(b.nom)}</option>`)
+        .join('') +
+      (s.level.biome && !biomes.some((b) => b.code === s.level.biome)
+        ? `<option value="${esc(s.level.biome)}" selected>${esc(s.level.biome)} (plus sur la carte)</option>`
+        : '') +
+      `</select>`
     dessineMiniCarte(
       carte.querySelector('canvas') as HTMLCanvasElement,
       s.level,
     )
+    const biomeSel = carte.querySelector('.pl-biome') as HTMLSelectElement
+    biomeSel.addEventListener('change', () => void plancheBiome(s.id, biomeSel.value))
+    biomeSel.addEventListener('pointerdown', (e) => e.stopPropagation())
     // ◀ ▶ : l'échange avec la voisine
     for (const b of Array.from(
       carte.querySelectorAll<HTMLButtonElement>('[data-tot]'),
@@ -4430,7 +4674,7 @@ function renderPlanche(): void {
       carte.classList.remove('drag-over')
       const id = e.dataTransfer?.getData('text/plain') ?? ''
       const from = visibles.findIndex((x) => x.id === id)
-      if (id === '' || from < 0 || from === i) return
+      if (!ordonnable || id === '' || from < 0 || from === i) return
       const next = [...visibles]
       const [prise] = next.splice(from, 1)
       next.splice(i, 0, prise)
@@ -4651,88 +4895,116 @@ function zoneNoteRegle(id: string, conteneur: HTMLElement): void {
 // n'est rendue qu'à la fermeture, et SEULEMENT si c'est le plan qui l'a
 // posée : on ne réveille pas une partie que le joueur avait figée exprès.
 const stationEl = document.getElementById('station') as HTMLDivElement | null
-let stationVise: number | null = null
+let stationVise: string | null = null
 let stationAPose = false
+const enRunCarte = (): boolean => hasPlayed && !auHub && testLevel === null
 
-function optionsStation(): OptionsPlan {
+function optionsStation(): OptionsDessin {
   return {
-    rang: voieRang,
-    longueur: voiePlan.longueur,
-    record: chargePalmaresVoie().profondeurRecord,
-    scelle: !finOuverte(),
+    mode: 'jeu',
+    courant: enRunCarte() ? carteRun.module : carte.regles.depart,
+    visites: enRunCarte() ? carteRun.visites : [],
     selection: stationVise,
+    lienSelection: null,
+    orbes: orbesAcquis(),
+    afficherTemp: true,
+    retour: enRunCarte()
+      ? (choixModules(carte, carteRun, orbesAcquis()).find((x) => x.retour)?.module.id ?? null)
+      : null,
   }
 }
 
 /** LA FICHE DU BAS : le module lu — celui qu'on vise, ou celui où l'on est
- *  quand rien n'est visé. Elle porte la teinte du module, comme le plan. */
+ *  quand rien n'est visé. Elle porte la teinte de sa zone, comme le plan. */
 function peintFicheStation(): void {
   const fiche = document.getElementById('station-fiche')
   if (!fiche) return
-  const courant = caseDuRang(voieRang, voiePlan.longueur)
-  const i = stationVise ?? (courant > 0 ? courant - 1 : -1)
-  const m = i < 0 ? MODULE_HUB : MODULES[i]
-  fiche.style.setProperty('--t', m.teinte)
-  const rangs =
-    i < 0
-      ? 'hors descente — on n’y risque rien'
-      : (() => {
-          const { premier, dernier } = rangsDeCase(i + 1, voiePlan.longueur)
-          const n = dernier - premier + 1
-          return `salles ${premier} à ${dernier} · ${n} salle${n > 1 ? 's' : ''} · ${MOMENT_COURT[m.moment].toLowerCase()} de descente`
-        })()
-  const esc = (t: string): string =>
-    t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  const id = stationVise ?? (enRunCarte() ? carteRun.module : carte.regles.depart)
+  const m = moduleParId(carte, id)
+  if (!m) {
+    fiche.innerHTML = ''
+    return
+  }
+  const z = zoneDe(carte, m)
+  fiche.style.setProperty('--t', z?.couleur ?? '#7f9cb0')
+  const esc = htmlSafe
+  const ici = enRunCarte() && id === carteRun.module
+  const choix = enRunCarte()
+    ? choixModules(carte, carteRun, orbesAcquis()).find((x) => x.module.id === id)
+    : undefined
+  const salles =
+    m.niveaux > 0 ? `${m.niveaux} salle${m.niveaux > 1 ? 's' : ''}` : 'sans salle'
+  const etat = ici
+    ? `vous êtes ici · salle ${Math.min(m.niveaux, carteRun.niveau + 1)} / ${m.niveaux}`
+    : enRunCarte() && carteRun.visites.includes(id)
+      ? 'traversé'
+      : choix
+        ? choix.orbeManquant
+          ? `verrouillé — orbe nécessaire : ${choix.orbeManquant}`
+          : choix.retour
+            ? 'revenir sur ses pas — l’objectif est hors de portée d’ici'
+            : 'accessible depuis votre position'
+        : salles
   fiche.innerHTML =
     `<h3>${esc(m.nom)}</h3>` +
-    `<span class="st-rangs">${esc(rangs)}</span>` +
-    `<p>${esc(m.ambiance)}</p>` +
-    `<div class="st-matieres">${m.matieres.map((x) => `<i>${esc(x)}</i>`).join('')}</div>`
+    `<span class="st-rangs">${esc(`${z ? `${z.code} · ${z.nom}` : ''} · ${etat}`)}</span>` +
+    `<p>${esc(m.desc)}</p>` +
+    `<div class="st-matieres"><i>${esc(carte.types[m.type])}</i>` +
+    `<i style="color:${couleurTemperature(carte, m.temp)}">${m.temp}°C</i>` +
+    (m.niveaux > 0 ? `<i>${esc(salles)}</i>` : '') +
+    `</div>`
 }
 
-/** LA LIGNE D'AVANCE, en haut à droite : où l'on en est, en deux temps —
- *  le module d'abord (c'est le lieu), la salle ensuite (c'est le compte). */
+/** LA LIGNE D'AVANCE, en haut à droite : le module d'abord (c'est le
+ *  lieu), la salle ensuite (c'est le compte). */
 function peintAvanceStation(): void {
   const e = document.getElementById('station-etat')
   if (!e) return
-  const total = voiePlan.longueur
-  const c = caseDuRang(voieRang, total)
-  const pas = pasRegulier(total)
-  // le PAS n'est un chiffre rond que si la longueur se coupe en six ; sinon
-  // la répartition tient toujours, mais l'annoncer serait mentir
-  const cadence = pas
-    ? `${pas} salle${pas > 1 ? 's' : ''} par module`
-    : `${total} salles réparties au plus juste sur ${CASES} modules`
-  if (c === 0) {
-    const record = chargePalmaresVoie().profondeurRecord
-    const rc = caseDuRang(record, total)
+  const objectif = moduleParId(carte, carte.regles.objectif)?.nom ?? '?'
+  if (!enRunCarte()) {
     e.innerHTML =
-      `AU MODULE D’ACCUEIL<small>${cadence}` +
-      (rc > 0 ? ` · le plus loin atteint : ${MODULES[rc - 1].nom}` : '') +
-      `</small>`
+      `AU MODULE D’ACCUEIL<small>${carte.modules.length} modules · objectif : ${objectif}</small>`
     return
   }
+  const total = longueurRun()
+  const m = moduleEnCours()
   e.innerHTML =
-    `MODULE ${c} / ${CASES} — ${MODULES[c - 1].nom}` +
-    `<small>salle ${Math.min(total, voieRang + 1)} / ${total} · ${cadence}</small>`
+    `${m?.nom ?? '?'}` +
+    `<small>salle ${Math.min(total, voieRang + 1)} / ${total} de la descente · objectif : ${objectif}</small>`
+}
+
+/** La légende suit les types de coursive de la carte, jamais une liste en dur. */
+function peintLegendeStation(): void {
+  const l = document.getElementById('station-legende')
+  if (!l) return
+  const esc = htmlSafe
+  l.innerHTML =
+    Object.entries(carte.typesLiens)
+      .map(
+        ([k, st]) =>
+          `<li><i style="${st.tirets ? `height:0;border-top:2px dashed ${st.couleur};background:none` : `background:${st.couleur}`}"></i>` +
+          `${esc((st.badge ?? k).toLowerCase())}${st.condition ? ' 🔒' : ''}</li>`,
+      )
+      .join('') + `<li><i class="st-p-courant"></i>vous êtes ici</li>`
 }
 
 function renderStation(): void {
   const hote = document.getElementById('station-plan')
   if (!hote) return
-  hote.innerHTML = planStationSVG(optionsStation())
+  hote.innerHTML = dessinCarteSVG(carte, optionsStation())
   peintAvanceStation()
   peintFicheStation()
+  peintLegendeStation()
 }
 
 /** Le module visé change : on ne repeint que ce qui bouge. */
-function viseStation(i: number | null): void {
-  if (stationVise === i) return
-  stationVise = i
+function viseStation(id: string | null): void {
+  if (stationVise === id) return
+  stationVise = id
   const plan = document.getElementById('station-plan')
-  plan?.querySelectorAll('.ps-vise').forEach((g) => g.classList.remove('ps-vise'))
-  if (i !== null)
-    plan?.querySelector(`[data-mod="${i}"]`)?.classList.add('ps-vise')
+  plan?.querySelectorAll('.cs-sel').forEach((g) => g.classList.remove('cs-sel'))
+  if (id !== null)
+    plan?.querySelector(`[data-mod="${CSS.escape(id)}"]`)?.classList.add('cs-sel')
   peintFicheStation()
 }
 
@@ -4767,11 +5039,9 @@ stationEl?.addEventListener('pointerdown', (e) => {
 // se lirait qu'à la souris laisserait la manette et le clavier dehors
 {
   const plan = document.getElementById('station-plan')
-  const lit = (e: Event): number | null => {
-    const g = (e.target as Element | null)?.closest?.('[data-mod]')
-    const i = g?.getAttribute('data-mod')
-    return i === null || i === undefined || Number(i) < 0 ? null : Number(i)
-  }
+  const lit = (e: Event): string | null =>
+    (e.target as Element | null)?.closest?.('[data-mod]')?.getAttribute('data-mod') ??
+    null
   plan?.addEventListener('pointermove', (e) => viseStation(lit(e)))
   plan?.addEventListener('pointerleave', () => viseStation(null))
   plan?.addEventListener('focusin', (e) => viseStation(lit(e)))
@@ -5162,19 +5432,19 @@ function dscOutils(): HTMLElement {
     'Pose la profondeur de la descente en cours au rang voulu : la prochaine fin de salle proposera ce que CE rang commande. Rien d’autre ne bouge — ni réserve, ni registres.',
     () => {
       const rep = window.prompt(
-        `Se poser à quel rang ? (1 à ${voiePlan.longueur}, la descente en est au rang ${voieRang})`,
-        String(Math.min(voiePlan.longueur, voieRang + 1)),
+        `Se poser à quel rang ? (1 à ${longueurRun()}, la descente en est au rang ${voieRang})`,
+        String(Math.min(longueurRun(), voieRang + 1)),
       )
       if (rep === null) return
       const n = Math.round(Number(rep))
-      if (!Number.isFinite(n) || n < 0 || n > voiePlan.longueur) {
-        descenteDit(`Rang hors du plan : gardez-vous entre 0 et ${voiePlan.longueur}.`)
+      if (!Number.isFinite(n) || n < 0 || n > longueurRun()) {
+        descenteDit(`Rang hors du plan : gardez-vous entre 0 et ${longueurRun()}.`)
         return
       }
       voieRang = n
       majVoieHud()
       descenteDit(
-        `Descente posée au rang ${n} — la prochaine fin de salle proposera le rang ${Math.min(voiePlan.longueur, n + 1)}.`,
+        `Descente posée au rang ${n} — la prochaine fin de salle proposera le rang ${Math.min(longueurRun(), n + 1)}.`,
       )
     },
   )
@@ -5652,6 +5922,27 @@ function openEditor(): void {
 document
   .getElementById('start-editor')!
   .addEventListener('click', () => openEditor())
+// ---- L'ÉDITEUR DE LA CARTE DE LA STATION (editor/editeurCarte.ts) ----
+// Même porte que l'éditeur de tableaux : mode concepteur, ou ?carte dans
+// l'URL. Il couvre l'écran et fige la partie derrière lui.
+const editeurCarte = new EditeurCarte(el('carte-editeur'), {
+  quit: () => {
+    editeurCarte.close()
+    openHome()
+  },
+})
+function openEditeurCarte(): void {
+  overlay.classList.remove('visible')
+  document.body.classList.remove('playing')
+  input.paused = true
+  editeurCarte.open()
+}
+document
+  .getElementById('home-carte')
+  ?.addEventListener('click', () => openEditeurCarte())
+// Sonde de test : la carte en cours d'édition
+;(window as unknown as { __carte: () => unknown }).__carte = () =>
+  editeurCarte.carteCourante()
 // ---- Le panneau COMMANDES : trois onglets (PC, manette, tactile) ----
 // Les commandes ont quitté la fiche : un bouton, un panneau, trois écrans.
 const cmdsEl = document.getElementById('cmds') as HTMLDivElement
@@ -5711,6 +6002,13 @@ window.addEventListener('keydown', (e) => {
     // le plan de la station passe AVANT tout : c'est le voile du dessus, et
     // il a figé la partie — Échap doit d'abord la rendre
     if (stationEl && !stationEl.hidden) ouvreStation(false)
+    else if (editeurCarte.visible) {
+      // le geste, puis la sélection, puis l'écran : Échap défait dans l'ordre
+      if (!editeurCarte.echap()) {
+        editeurCarte.close()
+        openHome()
+      }
+    } else if (!marchandEl.hidden) marchandEl.hidden = true
     else if (!recsEl.hidden)
       fermerRecs() // les voiles d'abord
     else if (!cmdsEl.hidden) cmdsEl.hidden = true
@@ -5782,6 +6080,10 @@ if (new URLSearchParams(location.search).has('editeur')) {
   hasPlayed = true
   openEditor()
 }
+if (new URLSearchParams(location.search).has('carte')) {
+  hasPlayed = true
+  openEditeurCarte()
+}
 // CRYOSTASE : tant que l'éveil n'a pas été joué, l'échantillon attend GELÉ
 // dès le premier pixel — même en dérive derrière la fiche. Le premier
 // contact visuel avec le sujet 21, c'est un bloc de glace.
@@ -5843,6 +6145,7 @@ const COUCHES_MENU: CoucheMenu[] = [
   { id: 'planche', retour: 'planche-fermer' },
   { id: 'regles', retour: 'regles-fermer' },
   { id: 'cycle', retour: 'cycle-fermer' }, // les mémoires — ouvertes au banc du hub aussi
+  { id: 'marchand', retour: 'marchand-fermer' }, // le marchand — ouvert à l'étal du hub aussi
   { id: 'salles', retour: 'salles-fermer' },
   { id: 'records', retour: 'records-fermer' },
   // ouvrables AU CONTACT d'un pupitre, donc en pleine partie : sans elles
@@ -9888,7 +10191,7 @@ function montreTableDepart(): void {
   })
 }
 
-function tenteAchatHub(a: ArticleHub): void {
+function tenteAchatHub(a: ArticleHub): boolean {
   if (achatsHub.has(a.id)) {
     toastFile.push({
       nom: `${a.nom} — DÉJÀ SERVI`,
@@ -9896,7 +10199,7 @@ function tenteAchatHub(a: ArticleHub): void {
       article: a.id,
       sur: 'LE COMPTOIR',
     })
-    return
+    return false
   }
   if (!records.depenseMemoire(a.prix)) {
     toastFile.push({
@@ -9904,7 +10207,7 @@ function tenteAchatHub(a: ArticleHub): void {
       icone: '🚫',
       sur: 'LE COMPTOIR',
     })
-    return
+    return false
   }
   achatsHub.add(a.id)
   audio.collect()
@@ -9941,6 +10244,7 @@ function tenteAchatHub(a: ArticleHub): void {
     article: a.id,
     sur: 'LE COMPTOIR',
   })
+  return true
 }
 
 // ---- L'ACHAT sur un PLOT POSÉ : le méta en données. La monnaie choisit
@@ -9964,6 +10268,10 @@ function tenteAchatPlot(p: PlotMeta): void {
 /** Les PROVISIONS achetées au comptoir se livrent au départ de la
  * descente — puis la besace se vide (elles valent UNE expédition). */
 function appliqueProvisions(): void {
+  // LES AMÉLIORATIONS DURABLES du marchand : à chaque descente, pour toujours
+  if (records.aAmelioration('souffle')) provisionsRun.vies += 1
+  if (records.aAmelioration('reserve')) provisionsRun.bonbonne += 0.5
+  if (records.aAmelioration('flair')) provisionsRun.clef = true
   if (provisionsRun.vies > 0)
     run.vies = Math.min(VIES_MAX, run.vies + provisionsRun.vies)
   if (provisionsRun.bonbonne > 0)
@@ -9992,20 +10300,28 @@ const mbTimers: number[] = []
 // Le fil de la cérémonie : bilan (temps 1-3, sautables) → versement (le
 // surplus choisit sa destination) → draft (un tirage par palier franchi)
 // → fin (jauge et CONTINUER). Le versement et la suite ne se sautent pas.
-let mbEtape: 'bilan' | 'versement' | 'etalonnage' | 'draft' | 'salles' | 'fin' =
-  'bilan'
+let mbEtape:
+  | 'bilan'
+  | 'versement'
+  | 'etalonnage'
+  | 'draft'
+  | 'carte'
+  | 'salles'
+  | 'fin' = 'bilan'
 let mbDraftsRestants = 0
 let mbBilanCourant: BilanSalle | null = null
 
 /** Le sas mène à la salle suivante (raccourci éventuel compris). */
 function avanceSalle(): void {
   overlay.classList.remove('visible')
+  const premiere = premiereSalleDeLaRun
+  premiereSalleDeLaRun = false
   // la salle GÉNÉRÉE élue s'INTERCALE : elle prend la place du rang suivant
   // de la séquence — franchie, la séquence reprend après ce rang
   if (voieGenereeChoisie) {
     voieIntercalaire = voieGenereeChoisie
     voieGenereeChoisie = null
-    levelIndex += 1
+    if (!premiere) levelIndex += 1
     restart()
     return
   }
@@ -10019,7 +10335,7 @@ function avanceSalle(): void {
     !testLevel &&
     (economatForce || !economatVisiteCetteRun)
   ) {
-    const total = voiePlan.longueur
+    const total = longueurRun()
     const rang = voieRang
     if (economatForce || (total >= 4 && rang >= Math.floor(total / 2))) {
       economatForce = false // il a servi
@@ -10052,7 +10368,9 @@ function avanceSalle(): void {
       ? choix
       : cible > levelIndex
         ? cible
-        : levelIndex + 1
+        : premiere
+          ? levelIndex // la salle 1 n'a pas été jouée : elle vient
+          : levelIndex + 1
   // garde-fou : séquence écrite épuisée sans salle élue — on ne REboucle
   // jamais sur la salle 1 en pleine descente (la dernière écrite tient)
   levelIndex = Math.min(levelIndex, Math.max(0, playedLevels().length - 1))
@@ -10081,6 +10399,7 @@ function fermeMiseEnBonbonne(): void {
   for (const t of mbTimers) clearTimeout(t)
   mbTimers.length = 0
   mbVeil.hidden = true
+  mbVeil.querySelector('.mb-panneau')?.classList.remove('mb-large')
   miseEnBonbonne = false
   mbBilanCourant = null
 }
@@ -10309,7 +10628,7 @@ function mbVerseXp(litres: number): void {
  * l'étape précédente — ni disposition, ni mise en scène en cours. */
 function mbCartes(): HTMLElement {
   const h = mbEl('mb-cartes')
-  h.classList.remove('mb-draft', 'mb-isole', 'mb-elu')
+  h.classList.remove('mb-draft', 'mb-isole', 'mb-elu', 'mb-station')
   h.style.removeProperty('--n')
   return h
 }
@@ -10413,6 +10732,17 @@ let salleChoisie: LevelDef | null = null
  * le pool face aux salles générées ; sinon le choix du pool au rang, si
  * celui-ci offre deux tableaux — à défaut, la fin ordinaire. */
 function mbApresRecompense(): void {
+  // LA CARTE : le module épuisé, la coursive suivante se choisit sur le plan
+  if (moduleFini(carte, carteRun)) {
+    mbMontreCarte('suite')
+    return
+  }
+  mbMontreSallesDuModule()
+}
+
+/** Les salles du module en cours : la voie (générées + pioche du biome),
+ *  ou le vieux choix du pool, ou la fin ordinaire. */
+function mbMontreSallesDuModule(): void {
   const seq = playedLevels()
   if (sallesGenerees()) {
     const duo = propositionsVoie(seq)
@@ -10421,9 +10751,141 @@ function mbApresRecompense(): void {
       return
     }
   }
-  const props = propositionsSalles(seq, levelIndex + 2, seq.length)
+  const props = propositionsSalles(seq, levelIndex + (premiereSalleDeLaRun ? 1 : 2), seq.length)
   if (props.length === 2) mbMontreSalles(props)
   else mbMontreFin()
+}
+
+/** LA CARTE DANS LA CÉRÉMONIE. Le module épuisé (ou le sas de lancement
+ *  franchi), le plan de la station se déploie et la coursive suivante se
+ *  choisit d'un clic — un module fermé dit l'orbe qui manque, un module
+ *  hors de portée dit qu'aucune coursive n'y mène. Le module élu
+ *  S'AGRANDIT (la scène zoome sur lui), puis ses salles se présentent en
+ *  vignettes : un écran, deux temps, comme le concepteur l'a voulu. Un
+ *  NŒUD (module sans salle) rouvre la carte aussitôt. */
+function montreCarteRun(raison: 'depart' | 'suite'): void {
+  miseEnBonbonne = true // tableauDone en découle : le sas du hub se tait
+  mbBilanCourant = null
+  mbVeil.hidden = false
+  mbVeil.querySelector('.mb-panneau')?.classList.add('mb-compact')
+  mbEl('mb-etal').hidden = true
+  mbEl('mb-passer').hidden = true
+  mbEl('mb-choix').hidden = false
+  mbMontreCarte(raison)
+}
+
+function mbMontreCarte(raison: 'depart' | 'suite'): void {
+  mbEtape = 'carte'
+  mbVeil.querySelector('.mb-panneau')?.classList.add('mb-large')
+  mbEl('mb-etal').hidden = true
+  mbEl('mb-passer').hidden = true
+  const m = moduleEnCours()
+  mbEl('mb-choix-titre').textContent =
+    raison === 'depart'
+      ? 'LE SAS EST FRANCHI — CHOISISSEZ UNE COURSIVE'
+      : m && choixModules(carte, carteRun, orbesAcquis()).every((x) => x.retour)
+        ? `${m.nom} — CUL-DE-SAC : ON REVIENT SUR SES PAS`
+        : m && m.niveaux > 0
+          ? `${m.nom} TRAVERSÉ — CHOISISSEZ LA COURSIVE SUIVANTE`
+          : `${m?.nom ?? 'NŒUD'} — UNE COURSIVE À CHOISIR`
+  const host = mbCartes()
+  host.innerHTML = ''
+  host.classList.add('mb-station')
+  const orbes = orbesAcquis()
+  const choix = choixModules(carte, carteRun, orbes)
+  const scene = document.createElement('div')
+  scene.className = 'mb-station-carte'
+  scene.innerHTML = dessinCarteSVG(carte, {
+    mode: 'jeu',
+    courant: carteRun.module,
+    visites: carteRun.visites,
+    selection: null,
+    lienSelection: null,
+    orbes,
+    afficherTemp: true,
+    retour: choix.find((x) => x.retour)?.module.id ?? null,
+  })
+  const fiche = document.createElement('p')
+  fiche.className = 'mb-station-fiche'
+  const ouvertes = choix.filter((x) => !x.orbeManquant).length
+  const defaut = `${ouvertes} coursive${ouvertes > 1 ? 's' : ''} ouverte${ouvertes > 1 ? 's' : ''} · descente ${voieRang} / ${longueurRun()} salles`
+  const litId = (e: Event): string | null =>
+    (e.target as Element | null)?.closest?.('[data-mod]')?.getAttribute('data-mod') ?? null
+  const dit = (id: string | null): void => {
+    const mod = id ? moduleParId(carte, id) : undefined
+    if (!mod) {
+      fiche.textContent = defaut
+      return
+    }
+    const x = choix.find((c) => c.module.id === id)
+    const acces = x
+      ? x.orbeManquant
+        ? `verrouillé — orbe nécessaire : ${x.orbeManquant}`
+        : x.retour
+          ? 'revenir sur ses pas — l’objectif est hors de portée d’ici'
+          : `coursive « ${x.lien.type} » ouverte`
+      : id === carteRun.module
+        ? 'vous êtes ici'
+        : 'aucune coursive n’y mène d’ici'
+    fiche.textContent =
+      `${mod.nom} · ${mod.niveaux > 0 ? `${mod.niveaux} salle${mod.niveaux > 1 ? 's' : ''}` : 'sans salle'} · ${mod.temp}°C · ${acces}`
+  }
+  dit(null)
+  scene.addEventListener('pointerover', (e) => dit(litId(e)))
+  scene.addEventListener('pointerout', () => dit(null))
+  scene.addEventListener('focusin', (e) => dit(litId(e)))
+  let elu = false
+  const elit = (x: (typeof choix)[number]): void => {
+    if (elu) return
+    elu = true
+    const mod = x.module
+    scene.style.transformOrigin = `${((mod.x / carte.scene.width) * 100).toFixed(1)}% ${((mod.y / carte.scene.height) * 100).toFixed(1)}%`
+    scene.querySelector(`[data-mod="${CSS.escape(mod.id)}"]`)?.classList.add('cs-sel')
+    scene.classList.add('mb-station-zoom')
+    dit(mod.id)
+    bande.ponctuation('sting-collecte', 0.7)
+    window.setTimeout(() => entreModuleRun(mod.id), sansAnimation() ? 0 : 420)
+  }
+  const choisit = (id: string | null): void => {
+    if (!id) return
+    const x = choix.find((c) => c.module.id === id)
+    if (!x) {
+      dit(id)
+      return
+    }
+    if (x.orbeManquant) {
+      dit(id)
+      scene.classList.remove('mb-station-refus')
+      void scene.offsetWidth
+      scene.classList.add('mb-station-refus')
+      return
+    }
+    elit(x)
+  }
+  scene.addEventListener('click', (e) => choisit(litId(e)))
+  scene.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      choisit(litId(e))
+    }
+  })
+  host.appendChild(scene)
+  host.appendChild(fiche)
+}
+
+/** Entrer dans un module de la carte : un nœud rouvre la carte, un biome
+ *  présente ses salles. */
+function entreModuleRun(id: string): void {
+  const suivant = entreModule(carte, carteRun, id, orbesAcquis())
+  if (!suivant) return
+  carteRun = suivant
+  if (moduleFini(carte, carteRun)) {
+    mbMontreCarte('suite')
+    return
+  }
+  mbVeil.querySelector('.mb-panneau')?.classList.remove('mb-large')
+  mbCartes() // ôte mb-station : la grille des vignettes reprend ses colonnes
+  mbMontreSallesDuModule()
 }
 
 /** Une carte du choix de la voie. */
@@ -10443,9 +10905,9 @@ interface CarteVoie {
  * viennent de la date : les mêmes salles pour tous les postes ce jour-là. */
 function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   const rangSuivant = voieRang + 1 // la salle que le choix désigne, dans le plan
-  if (rangSuivant > voiePlan.longueur) return null // la fin se joue au sas
-  const moment = momentAuRang(rangSuivant, voiePlan)
-  const difficulte = diffAuRang(rangSuivant, voiePlan)
+  if (rangSuivant > longueurRun()) return null // la fin se joue au sas
+  const moment = momentAuRang(rangSuivant, planEffectif())
+  const difficulte = diffAuRang(rangSuivant, planEffectif())
   const jour = new Date().toISOString().slice(0, 10)
   const alea = descenteDuJour()
     ? aleaDeGraine(`${jour}@${rangSuivant}`)
@@ -10467,6 +10929,12 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   // suite. Coupée au banc (« tableaux écrits »), la descente est TOUT
   // PROCÉDURALE : aucun tableau fait main ne se propose.
   const jouee = identiteAtelier(level)?.mecanique ?? null
+  // LE BIOME du module : un tableau qui en porte un autre ne se propose pas
+  // ici ; un tableau sans biome est universel (bibliothèque pas encore
+  // réétiquetée) ; une salle générée prend le biome du module
+  const biomeCourant = moduleEnCours()?.biome ?? ''
+  const marqueBiome = (lv: LevelDef): LevelDef =>
+    biomeCourant ? { ...lv, biome: biomeCourant } : lv
   const ecrite = voiePlan.ecrites
     ? piocheEcrite(
         seq,
@@ -10474,6 +10942,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
         voieVues,
         // un tableau qui EXIGE un état non tissé n'est pas jouable
         (lv) =>
+          (!lv.biome || !biomeCourant || lv.biome === biomeCourant) &&
           (lv.exige ?? []).every((e) =>
             e === 'glace' ? solidTenue : vapoTenue,
           ),
@@ -10493,7 +10962,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   // le RÉGLAGE DU RANG (enseigner · éprouver · tordre) : la posture de la
   // salle générée — pureté du début, laby du milieu, contraste de la fin,
   // dangers différés — voyage dans le code (suffixe ~), l'identité tient
-  const regl = reglageAuRang(rangSuivant, voiePlan)
+  const regl = reglageAuRang(rangSuivant, planEffectif())
   // LE MÉLANGE DES DEUX GÉNÉRATEURS : les salles à compartiments (le
   // système historique) et les FIGURES — dont les familles tirées des
   // tableaux de BOIZ. Le choix du rang en montre les deux : une figure au
@@ -10523,7 +10992,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
       vapoTenue,
       alea,
     ),
-    ampleur: ampleurAuRang(rangSuivant, voiePlan),
+    ampleur: ampleurAuRang(rangSuivant, planEffectif()),
   })
   const variante = (n: number): string =>
     descenteDuJour()
@@ -10548,7 +11017,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
       for (let essai = 0; essai < 3; essai++) {
         try {
           return {
-            lv: genereNiveauAtelier(cahier, variante(n + essai * 3), o),
+            lv: marqueBiome(genereNiveauAtelier(cahier, variante(n + essai * 3), o)),
             cahier,
             figure: o.figure,
           }
@@ -10624,14 +11093,17 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
   const rangSuivant = voieRang + 1
   const stadeNeuf =
     voieRang >= 1 &&
-    momentAuRang(rangSuivant, voiePlan) !==
-      momentAuRang(Math.max(1, voieRang), voiePlan)
-      ? momentAuRang(rangSuivant, voiePlan) === 2
+    momentAuRang(rangSuivant, planEffectif()) !==
+      momentAuRang(Math.max(1, voieRang), planEffectif())
+      ? momentAuRang(rangSuivant, planEffectif()) === 2
         ? ' · LE MILIEU S’OUVRE'
         : ' · LA FIN S’OUVRE'
       : ''
   mbEl('mb-choix-titre').textContent =
-    `LA VOIE SE SÉPARE — SALLE ${rangSuivant} / ${voiePlan.longueur}` +
+    // le MODULE se nomme en tête : c'est son biome qu'on traverse, et la
+    // salle se compte dans le module avant de se compter dans la descente
+    `${moduleEnCours()?.nom ?? 'LA VOIE SE SÉPARE'} — SALLE ${Math.min(moduleEnCours()?.niveaux ?? 1, carteRun.niveau + 1)} / ${moduleEnCours()?.niveaux ?? '?'}` +
+    ` · DESCENTE ${rangSuivant} / ${longueurRun()}` +
     (descenteDuJour() ? ' · DESCENTE DU JOUR' : '') +
     stadeNeuf
   // les JAUGES restent en scène, comme à la fin ordinaire : le choix se
@@ -10646,7 +11118,7 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
   host.classList.toggle('mb-trio', cartes.length === 3)
   const jauges = document.createElement('div')
   jauges.className = 'mb-jauges'
-  jauges.innerHTML = `<span>🫙 réserve <b>${run.bonbonneLiters.toFixed(2)} / ${capBonbonne()} L</b></span><span>💠 ×${run.vies} · profondeur ${voieRang} / ${voiePlan.longueur}</span>`
+  jauges.innerHTML = `<span>🫙 réserve <b>${run.bonbonneLiters.toFixed(2)} / ${capBonbonne()} L</b></span><span>💠 ×${run.vies} · profondeur ${voieRang} / ${longueurRun()}</span>`
   host.appendChild(jauges)
   const esc = (t: string): string =>
     t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -10860,7 +11332,7 @@ function identiteAtelier(lv: LevelDef): CodeAtelier | null {
  *  salle n'a pas de progression à montrer. */
 function voieHudVisible(): boolean {
   if (!hasPlayed || auHub || testLevel !== null) return false
-  return voiePlan.longueur > 1
+  return longueurRun() > 1
 }
 
 /** Reconstruit le rail : appelé à chaque entrée de salle (restart). */
@@ -10868,11 +11340,15 @@ function majVoieHud(): void {
   const montre = voieHudVisible()
   voieHudEl.hidden = !montre
   if (!montre) return
-  const total = voiePlan.longueur
+  const total = longueurRun()
   const rang = Math.min(total, voieRang + 1) // la salle en cours
   el('vh-rang').textContent = `${rang} / ${total}`
   const id = identiteAtelier(level)
+  const mod = moduleEnCours()
   el('vh-stade').textContent =
+    (mod && mod.niveaux > 0
+      ? `${mod.nom} · ${Math.min(mod.niveaux, carteRun.niveau + 1)}/${mod.niveaux} · `
+      : '') +
     MOMENT_COURT[momentDuRang(rang, total)] +
     (id ? ` · DIFF ${id.difficulte}` : '')
   const rail = el('vh-rail')
@@ -10904,13 +11380,13 @@ function majVoieHud(): void {
 function annonceVoieCarte(): void {
   if (auHub || testLevel !== null) return
   clearTimeout(voieCarteTimer)
-  const total = voiePlan.longueur
+  const total = longueurRun()
   const rang = Math.min(total, voieRang + 1)
   el('vc-rang').textContent =
     `SALLE ${rang} / ${total}` +
     // LE MODULE se nomme à l'entrée de chaque salle : sans lui, la station
     // n'existerait que dans son écran, et le biome ne serait qu'un dessin.
-    ` · ${moduleDuRang(rang, total).nom}` +
+    ` · ${moduleEnCours()?.nom ?? 'HORS CARTE'}` +
     (estEconomat(level) ? ' · L’ÉCONOMAT' : '') +
     (voieIntercalaire ? ' · SALLE GÉNÉRÉE' : '') +
     (descenteDuJour() ? ' · DESCENTE DU JOUR' : '')
@@ -11043,7 +11519,7 @@ function restart(): void {
   restart()
 }
 
-function newExpedition(): void {
+function newExpedition(avecCarte = false): void {
   levelIndex = 0
   voieRang = 0 // une descente neuve repart du premier rang du plan
   voieVues.clear()
@@ -11065,6 +11541,24 @@ function newExpedition(): void {
   // les PROVISIONS du comptoir se livrent maintenant — après la remise à
   // zéro (le viatique s'ajoute à une bonbonne vide), avant la première salle
   appliqueProvisions()
+  carteRun = departCarte(carte)
+  premiereSalleDeLaRun = avecCarte
+  if (avecCarte) {
+    // AU SAS DE LANCEMENT, la carte s'ouvre : le premier module se choisit
+    // sur le plan, puis ses salles en vignettes — la première salle de la
+    // run n'est plus la première de la bibliothèque
+    montreCarteRun('depart')
+    return
+  }
+  // sans carte (outils, essais automatisés) : on entre d'office par la
+  // première coursive ouverte, et la salle 1 se joue comme avant
+  const premiere = choixModules(carte, carteRun, orbesAcquis()).find(
+    (x) => !x.orbeManquant,
+  )
+  if (premiere)
+    carteRun =
+      entreModule(carte, carteRun, premiere.module.id, orbesAcquis()) ??
+      carteRun
   restart()
 }
 
@@ -11695,7 +12189,7 @@ const doTuile = (icone: string, val: string, quoi: string, cls = ''): string =>
  *  dit. Au-delà de soixante salles, le rail ne veut plus rien dire : on
  *  l'omet plutôt que d'aligner des cheveux. */
 function momentDuRang(r: number, total: number): 1 | 2 | 3 {
-  if (voiePlan.longueur > 0) return momentAuRang(r, voiePlan)
+  if (voiePlan.longueur > 0) return momentAuRang(r, planEffectif())
   const lv = playedLevels()[r - 1]
   const id = lv ? identiteAtelier(lv) : null
   if (id) return id.moment
@@ -11727,7 +12221,7 @@ function majDossier(): void {
 
   // ---- TA MISSION : où l'on est, et ce qu'on vient chercher
   const id = identiteAtelier(level)
-  const total = voiePlan.longueur
+  const total = longueurRun()
   const rang = Math.min(total, voieRang + 1)
   let mission = '<section class="do-sec do-salle"><h4><u>🎯</u>TA MISSION</h4>'
   if (enRun && total > 1) {
@@ -12309,8 +12803,14 @@ function updateTutor(dtReal: number): void {
   }
 }
 
+/** L'échappement HTML de la maison — texte ET attributs : le guillemet
+ *  aussi, sinon un code de biome qui en porte un casse un `value="…"`. */
 function htmlSafe(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 function showOverlay(
@@ -12965,6 +13465,29 @@ function frame(now: number): void {
     }
     bancMemoiresDedans = surBanc
   }
+  // ---- LE MARCHAND : au contact de l'ÉTAL du comptoir (la boîte qui
+  // englobe ses alcôves, élargie), le voile s'ouvre — une fois par entrée.
+  // Les alcôves, elles, vendent toujours au contact : les deux se cumulent.
+  if (auHub && !sim.dispersed && !(level.pupitres ?? []).some((q) => q.ecran === 'marchand')) {
+    const plots = level.plots?.length
+      ? level.plots.filter((p) => p.monnaie === 'memoire')
+      : (zonesHub?.etal ?? []).map((a) => a.plot)
+    if (plots.length > 0) {
+      const marge = 140
+      const boite = {
+        minX: Math.min(...plots.map((p) => p.minX)) - marge,
+        minY: Math.min(...plots.map((p) => p.minY)) - marge,
+        maxX: Math.max(...plots.map((p) => p.maxX)) + marge,
+        maxY: Math.max(...plots.map((p) => p.maxY)) + marge,
+      }
+      const dedans = pointInBox(sim.stats.centroidX, sim.stats.centroidY, boite)
+      if (dedans && !marchandDedans && marchandEl.hidden) {
+        ouvreMarchand()
+        audio.collect()
+      }
+      marchandDedans = dedans
+    }
+  }
   // ---- LES PUPITRES : le contact du corps ouvre l'écran nommé. Front
   // d'entrée par pupitre (rester posé ne rouvre pas), et rien tant que le
   // même voile est déjà levé — sinon refermer le rouvrirait aussitôt.
@@ -12998,7 +13521,8 @@ function frame(now: number): void {
     reparEl.hidden &&
     cycleEl.hidden &&
     codexEl.hidden &&
-    fiolesEl.hidden
+    fiolesEl.hidden &&
+    marchandEl.hidden
   ) {
     if (input.paused && document.body.classList.contains('playing'))
       input.togglePause()
@@ -13273,7 +13797,7 @@ function frame(now: number): void {
       if (save) {
         reprendreRun(save)
       } else {
-        newExpedition()
+        newExpedition(true)
       }
     })
   } else if (
@@ -13395,6 +13919,32 @@ function frame(now: number): void {
     // LA VOIE : chaque sas bu creuse la descente d'un rang — le palmarès
     // suit en direct (profondeur record, descentes entamées)
     voieRang += 1 // la descente avance : c'est la progression, pas un titre
+    carteRun = franchitSalle(carteRun) // et le module se vide d'une salle
+    // LA CACHE : un module qui recèle un orbe le donne quand il est épuisé,
+    // une fois par poste — jamais sous un outil (rien de mérité ne s'écrit)
+    const modFini = moduleEnCours()
+    if (modFini?.orbe && moduleFini(carte, carteRun) && !sasOutil) {
+      // un orbe déjà en poche ou déjà tissé ne se gagne pas deux fois : la
+      // cache se vide quand même, et le toast le dit tel quel
+      const dejaTenu = records.aOrbe(modFini.orbe) || records.eveilTient(modFini.orbe)
+      if (records.videCache(modFini.id, modFini.orbe)) {
+        const nomOrbe = ORBES.find((o) => o.id === modFini.orbe)?.nom ?? modFini.orbe
+        toastFile.push(
+          dejaTenu
+            ? {
+                nom: `LA CACHE EST VIDE — l’orbe ${nomOrbe}, vous l’aviez déjà`,
+                icone: '🔮',
+                sur: modFini.nom,
+              }
+            : {
+                nom: `ORBE D’ESSENCE — ${nomOrbe.toUpperCase()}`,
+                icone: '🔮',
+                sur: `TROUVÉ DANS ${modFini.nom}`,
+              },
+        )
+        majMemoireUI()
+      }
+    }
     voieVues.add(level.code) // la pioche ne la reproposera pas de la run
     if (!sasOutil) {
       const p = chargePalmaresVoie()
@@ -13404,7 +13954,8 @@ function frame(now: number): void {
     }
     // la fin : la descente se boucle au bout du PLAN — c'est le réglage de
     // longueur qui dit combien de salles fait une descente
-    const finExpedition = voieRang >= voiePlan.longueur
+    // LA FIN : le module objectif de la carte, épuisé — plus la longueur du plan
+    const finExpedition = objectifAtteint(carte, carteRun)
     if (finExpedition) {
       // Dernier sas : l'expédition est achevée — bilan, et registres à jour
       run.ended = true

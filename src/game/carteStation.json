@@ -1,0 +1,346 @@
+{
+  "scene": {
+    "width": 1600,
+    "height": 804
+  },
+  "zones": [
+    {
+      "id": 0,
+      "code": "Z-01",
+      "nom": "Hub",
+      "couleur": "#63b7e6"
+    },
+    {
+      "id": 1,
+      "code": "Z-02",
+      "nom": "Transformateurs",
+      "couleur": "#3fd69b"
+    },
+    {
+      "id": 2,
+      "code": "Z-03",
+      "nom": "Nœud",
+      "couleur": "#a7ddf5"
+    },
+    {
+      "id": 3,
+      "code": "Z-04",
+      "nom": "Observatoire",
+      "couleur": "#c99aff"
+    }
+  ],
+  "types": {
+    "sas": "HUB",
+    "jonction": "NŒUD",
+    "combat": "COMBAT",
+    "enigme": "ÉNIGME",
+    "coffre": "CACHE",
+    "boss": "TERMINAL"
+  },
+  "modules": [
+    {
+      "id": "HUB",
+      "nom": "HUB",
+      "type": "sas",
+      "zone": 0,
+      "x": 263,
+      "y": 380,
+      "w": 112,
+      "h": 292,
+      "temp": 15,
+      "forme": "octogone",
+      "niveaux": 0,
+      "biome": "",
+      "desc": "Cœur de la station, amarré à l’arc de coque."
+    },
+    {
+      "id": "T1",
+      "nom": "TRANSFO GLACE",
+      "type": "enigme",
+      "zone": 1,
+      "x": 507,
+      "y": 231,
+      "w": 136,
+      "h": 136,
+      "temp": -25,
+      "forme": "octogone",
+      "niveaux": 3,
+      "biome": "T1",
+      "desc": "Ne s’ouvre qu’avec l’orbe de solidification."
+    },
+    {
+      "id": "T2",
+      "nom": "AUCUNE TRANSFO",
+      "type": "combat",
+      "zone": 1,
+      "x": 507,
+      "y": 385,
+      "w": 136,
+      "h": 136,
+      "temp": 18,
+      "forme": "octogone",
+      "niveaux": 3,
+      "biome": "T2",
+      "desc": "Voie libre."
+    },
+    {
+      "id": "T3",
+      "nom": "TRANSFO GAZ",
+      "type": "combat",
+      "zone": 1,
+      "x": 507,
+      "y": 539,
+      "w": 136,
+      "h": 136,
+      "temp": 72,
+      "forme": "octogone",
+      "niveaux": 3,
+      "biome": "T3",
+      "desc": "Ne s’ouvre qu’avec l’orbe de vaporisation."
+    },
+    {
+      "id": "N",
+      "nom": "NŒUD ?",
+      "type": "jonction",
+      "zone": 2,
+      "x": 666,
+      "y": 385,
+      "w": 66,
+      "h": 66,
+      "temp": 20,
+      "forme": "rond",
+      "niveaux": 0,
+      "biome": "",
+      "desc": "Les trois voies convergent."
+    },
+    {
+      "id": "S1",
+      "nom": "MODULE ?",
+      "type": "combat",
+      "zone": 2,
+      "x": 801,
+      "y": 249,
+      "w": 100,
+      "h": 100,
+      "temp": 5,
+      "forme": "octogone",
+      "niveaux": 3,
+      "biome": "S1",
+      "desc": "À définir."
+    },
+    {
+      "id": "S2",
+      "nom": "MODULE ?",
+      "type": "combat",
+      "zone": 2,
+      "x": 801,
+      "y": 385,
+      "w": 100,
+      "h": 100,
+      "temp": 30,
+      "forme": "octogone",
+      "niveaux": 3,
+      "biome": "S2",
+      "desc": "À définir."
+    },
+    {
+      "id": "S3",
+      "nom": "MODULE ?",
+      "type": "combat",
+      "zone": 2,
+      "x": 801,
+      "y": 525,
+      "w": 100,
+      "h": 100,
+      "temp": 50,
+      "forme": "octogone",
+      "niveaux": 3,
+      "biome": "S3",
+      "desc": "À définir."
+    },
+    {
+      "id": "S1b",
+      "nom": "MODULE ?",
+      "type": "coffre",
+      "zone": 2,
+      "x": 1032,
+      "y": 131,
+      "w": 92,
+      "h": 92,
+      "temp": -10,
+      "forme": "octogone",
+      "niveaux": 1,
+      "biome": "S1b",
+      "orbe": "sublimation",
+      "desc": "Cul-de-sac. Un orbe d’essence y dort."
+    },
+    {
+      "id": "S3b",
+      "nom": "MODULE ?",
+      "type": "coffre",
+      "zone": 2,
+      "x": 1032,
+      "y": 643,
+      "w": 92,
+      "h": 92,
+      "temp": 60,
+      "forme": "octogone",
+      "niveaux": 1,
+      "biome": "S3b",
+      "orbe": "condensation",
+      "desc": "Cul-de-sac. Un orbe d’essence y dort."
+    },
+    {
+      "id": "OBS",
+      "nom": "OBSERVATOIRE",
+      "type": "boss",
+      "zone": 3,
+      "x": 1028,
+      "y": 385,
+      "w": 166,
+      "h": 166,
+      "temp": 40,
+      "forme": "octogone-dome",
+      "niveaux": 3,
+      "biome": "OBS",
+      "desc": "Module terminal. Un télescope spatial y est amarré."
+    }
+  ],
+  "liens": [
+    {
+      "de": "HUB",
+      "vers": "T1",
+      "type": "glace"
+    },
+    {
+      "de": "HUB",
+      "vers": "T2",
+      "type": "main"
+    },
+    {
+      "de": "HUB",
+      "vers": "T3",
+      "type": "vapeur"
+    },
+    {
+      "de": "T1",
+      "vers": "N",
+      "type": "alt"
+    },
+    {
+      "de": "T2",
+      "vers": "N",
+      "type": "main"
+    },
+    {
+      "de": "T3",
+      "vers": "N",
+      "type": "alt"
+    },
+    {
+      "de": "N",
+      "vers": "S1",
+      "type": "alt"
+    },
+    {
+      "de": "N",
+      "vers": "S2",
+      "type": "main"
+    },
+    {
+      "de": "N",
+      "vers": "S3",
+      "type": "alt"
+    },
+    {
+      "de": "S1",
+      "vers": "S1b",
+      "type": "alt"
+    },
+    {
+      "de": "S3",
+      "vers": "S3b",
+      "type": "alt"
+    },
+    {
+      "de": "S2",
+      "vers": "OBS",
+      "type": "main"
+    }
+  ],
+  "typesLiens": {
+    "main": {
+      "couleur": "#63b7e6",
+      "epaisseur": 4,
+      "coque": 26,
+      "condition": null
+    },
+    "alt": {
+      "couleur": "#7f9cb0",
+      "epaisseur": 2.5,
+      "coque": 18,
+      "tirets": "6 8",
+      "condition": null
+    },
+    "glace": {
+      "couleur": "#a7ddf5",
+      "epaisseur": 2.5,
+      "coque": 18,
+      "condition": "orbe == solidification",
+      "badge": "❄ GLACE"
+    },
+    "vapeur": {
+      "couleur": "#f2c98e",
+      "epaisseur": 2.5,
+      "coque": 18,
+      "condition": "orbe == vaporisation",
+      "badge": "💨 GAZ"
+    }
+  },
+  "decor": [
+    {
+      "id": "arc",
+      "type": "coque-croissant",
+      "ancrage": "HUB",
+      "exterieur": "M330 14 C -60 224, -60 534, 330 754",
+      "interieur": "C 130 534, 130 224, 330 14"
+    },
+    {
+      "id": "telescope",
+      "type": "telescope-hubble",
+      "ancrage": "OBS",
+      "x": 1222,
+      "y": 426,
+      "rotation": -33,
+      "tube": "M1105 385 H1160 C 1196 385, 1196 426, 1226 426"
+    }
+  ],
+  "palette": {
+    "fond": "#030710",
+    "plaque": "#1b2838",
+    "plaqueSombre": "#0b1420",
+    "bord": "#324a62",
+    "couloirParoi": "#2a3d52",
+    "couloirSol": "#0b131e",
+    "couloirAnneau": "#3a5470",
+    "texte": "#d9ecf7",
+    "texteSecondaire": "#7f9cb0",
+    "chaud": "#e0685c",
+    "dome": [
+      "#8fb4ff",
+      "#3a52c4",
+      "#101a48"
+    ]
+  },
+  "regles": {
+    "depart": "HUB",
+    "objectif": "OBS",
+    "couloirHub": "un lien partant du HUB sort à y = clamp(cible.y, HUB.y-110, HUB.y+110) puis va en ligne droite vers la cible",
+    "temperatureCouleur": {
+      "<=0": "#a7ddf5",
+      "<30": "#63b7e6",
+      "<60": "#f2c98e",
+      "sinon": "#e0685c"
+    }
+  }
+}
