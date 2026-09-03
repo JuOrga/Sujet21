@@ -31,6 +31,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '03/09/2026 23:53',
+    title: 'LES POIGNÉES DE CÔTÉ D’UNE PAROI INCLINÉE : on allonge un mur penché sans toucher à son épaisseur',
+    notes: [
+      'LA DEMANDE : « dans l’éditeur il faut pouvoir redimensionner les surfaces penchées ». Elles se redimensionnaient déjà par leurs quatre coins pivotés (le coin opposé cloué, la boîte étirée dans son repère) — mais rien sur les côtés : les deux dimensions bougeaient ensemble, et garder l’épaisseur exacte d’un mur incliné en tirant un coin demandait une précision de chirurgien. Sur une paroi droite, on tire un bord seul ; sur une penchée, on ne pouvait pas.',
+      'QUATRE MILIEUX DE CÔTÉ s’ajoutent aux quatre coins, dessinés à leur vraie place une fois pivotés (plus petits que les coins, pour se lire). Tirer un côté n’étire qu’un axe local : le côté opposé reste cloué, l’épaisseur ne bouge pas, et tirer en biais n’emporte pas l’autre axe — seule la projection sur l’axe tiré compte. Le même geste que pour une surface droite, dans le repère de la boîte.',
+      'LA GÉOMÉTRIE SORT DE L’ÉDITEUR : editor/oblique.ts, pur — la table des huit poignées, le point d’une poignée, son pivot (le point d’en face), et redimensionneOblique qui rend la boîte. L’éditeur (7 000 lignes de canvas) ne fait plus qu’appeler ; les coins passent par le même chemin que les côtés. Sept tests : une boîte droite, une tournée de 90°, un mur à 30° allongé de 100 à 160 avec son épaisseur de 20 intacte et son bout W immobile, le biais qui ne déborde pas, le coin qui tire les deux axes, la dimension minimale.',
+      'VÉRIFIÉ : 881 tests verts dans 77 fichiers (sept de plus), type-check à 0, build propre. À voir dans l’éditeur : une paroi tournée, ses huit poignées, un côté tiré.',
+    ],
+  },
+  {
     date: '03/09/2026 22:13',
     title: 'LA REVUE DE LA PR CARTE : une cache n’est plus un piège, et huit défauts de moindre taille',
     notes: [
