@@ -178,6 +178,7 @@ import {
   AMBIANTE_DEFAUT,
 } from './game/level'
 import { LevelEditor } from './editor/editor'
+import { EditeurCarte } from './editor/editeurCarte'
 import {
   traceLaser,
   creerEtatRecepteurs,
@@ -5525,6 +5526,27 @@ function openEditor(): void {
 document
   .getElementById('start-editor')!
   .addEventListener('click', () => openEditor())
+// ---- L'ÉDITEUR DE LA CARTE DE LA STATION (editor/editeurCarte.ts) ----
+// Même porte que l'éditeur de tableaux : mode concepteur, ou ?carte dans
+// l'URL. Il couvre l'écran et fige la partie derrière lui.
+const editeurCarte = new EditeurCarte(el('carte-editeur'), {
+  quit: () => {
+    editeurCarte.close()
+    openHome()
+  },
+})
+function openEditeurCarte(): void {
+  overlay.classList.remove('visible')
+  document.body.classList.remove('playing')
+  input.paused = true
+  editeurCarte.open()
+}
+document
+  .getElementById('home-carte')
+  ?.addEventListener('click', () => openEditeurCarte())
+// Sonde de test : la carte en cours d'édition
+;(window as unknown as { __carte: () => unknown }).__carte = () =>
+  editeurCarte.carteCourante()
 // ---- Le panneau COMMANDES : trois onglets (PC, manette, tactile) ----
 // Les commandes ont quitté la fiche : un bouton, un panneau, trois écrans.
 const cmdsEl = document.getElementById('cmds') as HTMLDivElement
@@ -5584,7 +5606,13 @@ window.addEventListener('keydown', (e) => {
     // le plan de la station passe AVANT tout : c'est le voile du dessus, et
     // il a figé la partie — Échap doit d'abord la rendre
     if (stationEl && !stationEl.hidden) ouvreStation(false)
-    else if (!recsEl.hidden)
+    else if (editeurCarte.visible) {
+      // le geste, puis la sélection, puis l'écran : Échap défait dans l'ordre
+      if (!editeurCarte.echap()) {
+        editeurCarte.close()
+        openHome()
+      }
+    } else if (!recsEl.hidden)
       fermerRecs() // les voiles d'abord
     else if (!cmdsEl.hidden) cmdsEl.hidden = true
     else if (!sallesEl.hidden) sallesEl.hidden = true
@@ -5654,6 +5682,10 @@ const input = new Input()
 if (new URLSearchParams(location.search).has('editeur')) {
   hasPlayed = true
   openEditor()
+}
+if (new URLSearchParams(location.search).has('carte')) {
+  hasPlayed = true
+  openEditeurCarte()
 }
 // CRYOSTASE : tant que l'éveil n'a pas été joué, l'échantillon attend GELÉ
 // dès le premier pixel — même en dérive derrière la fiche. Le premier

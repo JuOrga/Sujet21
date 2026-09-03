@@ -5795,6 +5795,149 @@
         outline-offset: 6px;
       }
 
+      /* ==== L'ÉDITEUR DE LA CARTE DE LA STATION (editor/editeurCarte.ts) ====
+         Même architecture que l'éditeur de tableaux : une barre qui
+         s'enroule, deux colonnes bornées au tiers de l'écran, la scène au
+         milieu. Le SVG de la carte (game/dessinCarte.ts) garde son viewBox :
+         c'est le navigateur qui le met à l'échelle, pas nous. */
+      #carte-editeur {
+        position: fixed; inset: 0; z-index: 41; display: none;
+        grid-template-columns: min(calc(236px * var(--ui)), 26vw) 1fr min(calc(312px * var(--ui)), 34vw);
+        grid-template-rows: auto 1fr;
+        background: var(--void); color: var(--ink); font-family: var(--font-mono);
+      }
+      #carte-editeur.visible { display: grid; }
+      .ce-bar {
+        grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center;
+        gap: 8px 10px; padding: 7px 14px;
+        border-bottom: 1px solid var(--line); background: rgba(9, 18, 30, 0.9);
+      }
+      .ce-bar .sp { flex: 1; }
+      @media (max-width: 1320px) { .ce-bar .sp { flex: 0 0 0; } }
+      .ce-title {
+        font-family: var(--font-display); font-size: calc(12.5px * var(--ui));
+        letter-spacing: 0.2em; color: var(--specimen); white-space: nowrap;
+      }
+      #carte-editeur button {
+        font-family: var(--font-mono); font-size: calc(12px * var(--ui)); letter-spacing: 0.1em;
+        text-transform: uppercase; color: var(--ink); background: rgba(99, 183, 230, 0.07);
+        border: 1px solid var(--line); padding: 7px 11px; cursor: pointer; white-space: nowrap;
+      }
+      #carte-editeur button:hover { border-color: var(--specimen); }
+      #carte-editeur button:disabled { opacity: 0.45; cursor: default; }
+      #carte-editeur button.primary { color: var(--void); background: var(--valid); border-color: var(--valid); font-weight: 600; }
+      #carte-editeur button.active { border-color: var(--specimen); background: rgba(99, 183, 230, 0.2); }
+      #carte-editeur button.ce-danger { color: var(--alert); border-color: var(--alert); background: transparent; }
+      #carte-editeur input, #carte-editeur select, #carte-editeur textarea {
+        font-family: var(--font-mono); font-size: calc(12px * var(--ui)); color: var(--ink);
+        background: rgba(3, 7, 16, 0.6); border: 1px solid var(--line); padding: 5px 7px; min-width: 0;
+      }
+      #carte-editeur input[type="color"] { padding: 0 2px; width: 40px; height: 26px; }
+      #carte-editeur input[type="checkbox"] { width: auto; }
+      #carte-editeur input.ce-invalide { border-color: var(--alert); }
+      #carte-editeur textarea { resize: vertical; }
+      .ce-f { display: flex; flex-direction: column; gap: 3px; }
+      .ce-f > span { font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+      .ce-f--ligne { flex-direction: row; align-items: center; gap: 6px; }
+      .ce-signal { font-size: calc(11px * var(--ui)); color: var(--valid); opacity: 0; transition: opacity 0.3s; }
+      .ce-signal.on { opacity: 1; }
+      .ce-jeu-seul { display: none; }
+      #carte-editeur.ce-jeu .ce-jeu-seul { display: flex; }
+      .ce-side {
+        border-right: 1px solid var(--line); overflow-y: auto; overscroll-behavior: contain;
+        padding: 12px; display: flex; flex-direction: column; gap: 14px;
+      }
+      .ce-side--droite { border-right: none; border-left: 1px solid var(--line); }
+      .ce-group { display: flex; flex-direction: column; gap: 6px; }
+      .ce-group > .k {
+        font-size: calc(11px * var(--ui)); letter-spacing: 0.18em; text-transform: uppercase;
+        color: var(--dim); padding-bottom: 2px; border-bottom: 1px solid var(--line);
+      }
+      .ce-group > .k b { color: var(--z, var(--ink)); }
+      .ce-liste { display: flex; flex-direction: column; gap: 3px; }
+      #carte-editeur .ce-item {
+        display: grid; grid-template-columns: 10px 1fr auto; column-gap: 8px; align-items: center;
+        text-align: left; text-transform: none; letter-spacing: 0.02em; padding: 5px 8px;
+      }
+      .ce-item i { width: 8px; height: 8px; border-radius: 2px; background: var(--z, var(--dim)); }
+      .ce-item b { font-weight: 600; color: var(--ink); grid-column: 2; }
+      .ce-item span { grid-column: 2; font-size: calc(10.5px * var(--ui)); color: var(--dim); }
+      .ce-item em { grid-column: 3; grid-row: 1 / span 2; font-style: normal; color: var(--z, var(--dim)); }
+      .ce-item.active { border-color: var(--specimen); background: rgba(99, 183, 230, 0.16); }
+      .ce-ok { margin: 0; font-size: calc(11px * var(--ui)); color: var(--valid); }
+      #carte-editeur .ce-verdict { text-align: left; text-transform: none; letter-spacing: 0; padding: 5px 8px; white-space: normal; font-size: calc(11px * var(--ui)); }
+      #carte-editeur .ce-erreur { color: var(--alert); border-color: rgba(224, 104, 92, 0.5); }
+      #carte-editeur .ce-attention { color: #f2c98e; border-color: rgba(242, 201, 142, 0.4); }
+      .ce-note { margin: 0; font-size: calc(11px * var(--ui)); line-height: 1.5; color: var(--dim); }
+      p.ce-erreur { margin: 0; font-size: calc(11px * var(--ui)); color: var(--alert); }
+      p.ce-erreur:empty { display: none; }
+      .ce-grille2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+      .ce-ligne { display: flex; align-items: center; gap: 6px; }
+      .ce-ligne input, .ce-ligne select { flex: 1; }
+      .ce-pastille { width: 10px; height: 10px; flex: none; border-radius: 50%; background: var(--z, var(--dim)); }
+      .ce-type summary { cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: calc(12px * var(--ui)); }
+      .ce-type[open] { display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+      /* la scène : le SVG prend toute la place, en gardant ses proportions */
+      .ce-cadre { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: #020509; }
+      .ce-scene { flex: 1; min-height: 0; touch-action: none; outline: none; }
+      .ce-legende {
+        display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; padding: 6px 12px;
+        font-size: calc(10px * var(--ui)); letter-spacing: 0.12em; color: var(--dim); border-top: 1px solid var(--line);
+      }
+      .ce-legende span { display: flex; align-items: center; gap: 7px; }
+      .ce-legende i { width: 22px; height: 3px; display: inline-block; }
+      /* la fiche de l'aperçu jeu : la maquette du concepteur, en lecture */
+      .ce-fiche { border: 1px solid rgba(99, 183, 230, 0.28); background: var(--panel); padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+      .ce-fiche-tete { display: flex; justify-content: space-between; font-size: calc(9px * var(--ui)); letter-spacing: 0.3em; color: var(--dim); }
+      .ce-fiche-type { color: var(--z); }
+      .ce-fiche-vignette { height: 120px; border: 1px solid var(--line); background: var(--panel-solid); display: grid; place-items: center; font-size: 34px; color: var(--z); }
+      .ce-fiche h3 { margin: 4px 0 0; font-family: var(--font-display); font-size: calc(13px * var(--ui)); letter-spacing: 0.12em; line-height: 1.4; font-weight: 400; }
+      .ce-fiche-zone { font-size: calc(11px * var(--ui)); letter-spacing: 0.14em; color: var(--z); }
+      .ce-fiche p { margin: 0; font-size: calc(11.5px * var(--ui)); line-height: 1.55; color: var(--dim); }
+      .ce-case { border: 1px solid var(--line); padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+      .ce-case small { font-size: calc(9px * var(--ui)); letter-spacing: 0.2em; color: var(--dim); }
+      .ce-case b { font-size: calc(13px * var(--ui)); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #carte-editeur .ce-entrer { width: 100%; padding: 12px; font-family: var(--font-display); font-size: calc(11px * var(--ui)); letter-spacing: 0.28em; border-color: var(--specimen); background: rgba(99, 183, 230, 0.18); }
+      #carte-editeur .ce-entrer:disabled { border-color: var(--line); background: transparent; color: var(--dim); opacity: 1; }
+      #carte-editeur .ce-etat { flex: 1; padding: 8px 0; }
+
+      /* ==== LE DESSIN DE LA CARTE (game/dessinCarte.ts) — vaut pour l'éditeur
+         comme pour un futur écran de jeu. Les couleurs de la carte voyagent
+         en attributs (elles viennent des données) ; ici, les états. */
+      .cs-svg { display: block; width: 100%; height: 100%; font-family: var(--font-mono); }
+      .cs-badge text { font-size: 12px; letter-spacing: 0.1em; text-anchor: middle; }
+      .cs-decor-nom { font-family: var(--font-display); font-size: 10px; letter-spacing: 0.14em; fill: #7f9cb0; text-anchor: middle; }
+      .cs-decor-sous { font-size: 10px; letter-spacing: 0.18em; fill: #4a6478; text-anchor: middle; }
+      .cs-lumieres { filter: drop-shadow(0 0 5px #63b7e6); }
+      .cs-route.cs-active { filter: drop-shadow(0 0 6px var(--c)); animation: cs-flux 1.2s linear infinite; }
+      .cs-route.cs-principale:not(.cs-active):not(.cs-parcourue) { filter: drop-shadow(0 0 6px var(--c)); }
+      .cs-route.cs-lien-sel { stroke: #eef8ff; filter: drop-shadow(0 0 8px #eef8ff); }
+      .cs-sens { fill: none; opacity: 0.85; }
+      .cs-lien-prise { cursor: pointer; }
+      .cs-brouillon { stroke: #eef8ff; stroke-width: 2; stroke-dasharray: 8 6; fill: none; pointer-events: none; }
+      @keyframes cs-flux { to { stroke-dashoffset: -28; } }
+      .cs-mod { cursor: pointer; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.7)); transition: filter 0.15s; }
+      .cs-mod:focus { outline: none; }
+      .cs-mod.cs-cible { filter: drop-shadow(0 0 8px var(--z)); }
+      .cs-mod.cs-sel, .cs-mod:focus-visible { filter: drop-shadow(0 0 10px rgba(217, 236, 247, 0.6)); }
+      .cs-mod.cs-courant { filter: drop-shadow(0 0 14px rgba(99, 183, 230, 0.9)); animation: cs-pulse 1.8s ease-out infinite; }
+      .cs-editable { cursor: grab; }
+      .cs-editable:active { cursor: grabbing; }
+      .cs-jeu .cs-mod:hover { filter: drop-shadow(0 0 10px var(--z)); }
+      @keyframes cs-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+      .cs-glyphe { text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
+      .cs-cadenas { text-anchor: middle; dominant-baseline: central; font-size: 15px; }
+      .cs-coche { text-anchor: middle; dominant-baseline: central; font-size: 10px; fill: #63b7e6; }
+      .cs-nom { font-family: var(--font-display); font-size: 11px; letter-spacing: 0.1em; text-anchor: middle; pointer-events: none; }
+      .cs-temp text { font-size: 12px; text-anchor: start; }
+      .cs-temp { pointer-events: none; }
+      .cs-poignee { fill: #eef8ff; stroke: #030710; stroke-width: 1.5; cursor: nwse-resize; }
+      .cs-poignee[data-poignee="ne"], .cs-poignee[data-poignee="sw"] { cursor: nesw-resize; }
+      .cs-grille { pointer-events: none; }
+      @media (prefers-reduced-motion: reduce) {
+        .cs-route.cs-active, .cs-mod.cs-courant { animation: none; }
+      }
+
       /* ---- Éditeur de tableaux : plan de travail, pas vitrine ---- */
       #editor {
         position: fixed;
@@ -7270,6 +7413,7 @@
       <div class="home-duo" role="group" aria-label="Outils du protocole">
         <button id="home-station" type="button" title="LA STATION : le plan général du complexe orbital — six modules amarrés à la poutre, traversés au fil de la descente. On y voit d'où l'on vient, où l'on est, et ce qui attend"><i>🛰&#xFE0E;</i><span>LA STATION</span></button>
         <button id="start-editor" type="button" data-dev title="Créer ou modifier un tableau"><i>✎</i><span>ÉDITEUR</span></button>
+        <button id="home-carte" type="button" data-dev title="L'ÉDITEUR DE LA CARTE : le plan à routes ramifiées de la station — modules, coursives, zones, conditions d'accès. Se glisse, se lie, s'exporte en carteStation.json ; un aperçu jeu rejoue la traversée"><i>⌬</i><span>CARTE</span></button>
         <button id="home-regles" type="button" data-dev title="Le cahier des règles de la génération procédurale : ce que le générateur fait (annotable), ce qu'un level designer en attend (propositions), et vos règles nouvelles en texte libre — partagé entre concepteurs, relu au moment d'implémenter"><i>§</i><span>RÈGLES DE GÉN.</span></button>
         <button id="home-descente" type="button" data-dev title="LA DESCENTE : le déroulement d'une run réglé de bout en bout — longueur, rampe de difficulté, posture des salles, et les quatre poids de l'algorithme qui choisit les tableaux. Le plan se déroule rang par rang sous les yeux, et se tire à blanc sans jouer"><i>▼</i><span>LA DESCENTE</span></button>
         <button id="open-montage" type="button" data-dev title="La table de montage des cinématiques : planches, effets, sons — et lecture immédiate"><i>▤</i><span>MONTAGE</span></button>
@@ -7386,6 +7530,9 @@
       </button>
       <div id="state-zone" hidden></div>
     </div>
+
+    <!-- L'ÉDITEUR DE LA CARTE DE LA STATION : le gabarit est bâti par editor/editeurCarte.ts -->
+    <div id="carte-editeur" aria-label="Éditeur de la carte de la station"></div>
 
     <div id="editor" aria-label="Éditeur de tableaux">
       <div class="ed-bar">
