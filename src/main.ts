@@ -6,7 +6,7 @@ import { FluidSim, KIND_PLAYER, COEUR_PART } from './sim/solver'
 import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
 import { evenementsPlasma } from './game/plasmaFx'
-import { CODEX, Codex, type CodexGroupe } from './game/codex'
+import { Codex } from './game/codex'
 import { niveauExpanse } from './game/structures'
 import {
   TABLEAU_HUB,
@@ -195,6 +195,7 @@ import {
 } from './game/level'
 import { LevelEditor } from './editor/editor'
 import { EditeurCarte } from './editor/editeurCarte'
+import { EcranCodex } from './game/ecranCodex'
 import {
   traceLaser,
   creerEtatRecepteurs,
@@ -2658,8 +2659,7 @@ function ouvrePupitre(ecran: EcranPupitre): void {
       renderCycleVoile()
       break
     case 'codex':
-      codexEl.hidden = false
-      renderCodexVoile()
+      ecranCodex.open()
       break
     case 'fioles':
       fiolesEl.hidden = false
@@ -2705,50 +2705,25 @@ function pupitreOuvert(ecran: EcranPupitre): boolean {
 // hydrophile en liquide, écarter un rideau en glace…). Verrouillée, une
 // fiche n'affiche qu'un « ? » : la question donne envie d'aller essayer.
 const codexEl = document.getElementById('codex') as HTMLDivElement
-const codexCorps = document.getElementById('codex-corps') as HTMLDivElement
-const codexCompte = document.getElementById('codex-compte') as HTMLSpanElement
+// L'ÉCRAN DU CODEX (game/ecranCodex.ts) : la maquette « Codex v2 » — il ne
+// connaît pas les registres, il reçoit ce qu'il lit par ces crochets
+const ecranCodex = new EcranCodex(codexEl, {
+  connu: (id) => codex.connu(id),
+  quand: (id) => codex.quand(id),
+  lu: (d) => codexLu(d),
+  fermer: () => fermeCodex(),
+})
 function renderCodexVoile(): void {
-  if (!codexCorps) return
-  const groupes: { cle: CodexGroupe; nom: string; icone: string }[] = [
-    { cle: 'eau', nom: 'LIQUIDE', icone: '💧' },
-    { cle: 'glace', nom: 'GLACE', icone: '❄' },
-    { cle: 'vapeur', nom: 'VAPEUR', icone: '💨' },
-    { cle: 'phenomenes', nom: 'PHÉNOMÈNES', icone: '✦' },
-    { cle: 'recit', nom: 'LE RÉCIT', icone: '🛰️' },
-  ]
-  let html = ''
-  for (const g of groupes) {
-    const fiches = CODEX.filter((d) => d.groupe === g.cle)
-    const connues = fiches.filter((d) => codex.connu(d.id)).length
-    html += `<div class="cdx-groupe"><span>${g.icone} ${g.nom}</span><i>${connues}/${fiches.length}</i></div>`
-    html += '<div class="cdx-grille">'
-    for (const d of fiches) {
-      if (codex.connu(d.id)) {
-        // le titre et le corps viennent du CATALOGUE : ce que le
-        // concepteur a réécrit sur l'écran TEXTES paraît ici, dans la
-        // langue du moment — et se voit donc échapper, comme tout texte
-        // qui n'est plus une constante du code
-        const lu = codexLu(d)
-        html += `<div class="cdx-carte" data-fiche="${d.id}"><i>${d.icone}</i><div><b>${htmlSafe(lu.titre)}</b><span>${htmlSafe(lu.texte)}</span></div></div>`
-      } else {
-        html += `<div class="cdx-carte cdx-verrou"><i>?</i><div><b>FICHE À DÉCOUVRIR</b><span>Une interaction du protocole reste à vivre…</span></div></div>`
-      }
-    }
-    html += '</div>'
-  }
-  codexCorps.innerHTML = html
-  if (codexCompte)
-    codexCompte.textContent = `${codex.compte()}/${CODEX.length} fiches consignées`
+  ecranCodex.render()
 }
 document.getElementById('home-codex')?.addEventListener('click', () => {
-  codexEl.hidden = false
-  renderCodexVoile()
+  ecranCodex.open()
 })
 // Ouvert DEPUIS LE TOAST en pleine partie, le codex fige l'essai (lecture au
 // calme) et le rend en se fermant — ouvert depuis la fiche, rien à figer.
 let codexAPause = false
 function fermeCodex(): void {
-  codexEl.hidden = true
+  ecranCodex.close()
   if (codexAPause) {
     codexAPause = false
     input.paused = false
@@ -2761,19 +2736,8 @@ function ouvreCodexSur(fiche: string): void {
     input.paused = true
     codexAPause = true
   }
-  codexEl.hidden = false
-  renderCodexVoile()
-  const carte = codexCorps.querySelector<HTMLElement>(`[data-fiche="${fiche}"]`)
-  if (carte) {
-    carte.scrollIntoView({ block: 'center' })
-    carte.classList.add('cdx-neuve')
-    window.setTimeout(() => carte.classList.remove('cdx-neuve'), 3200)
-  }
+  ecranCodex.open(fiche)
 }
-document.getElementById('codex-fermer')?.addEventListener('click', fermeCodex)
-codexEl.addEventListener('pointerdown', (e) => {
-  if (e.target === codexEl) fermeCodex()
-})
 
 document.getElementById('salles-fermer')?.addEventListener('click', () => {
   sallesEl.hidden = true
