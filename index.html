@@ -1025,6 +1025,56 @@
       #vc-nom { font-family: var(--font-display); font-size: calc(17px * var(--ui)); color: #eaf6ff; }
       #vc-code { font-size: calc(12px * var(--ui)); letter-spacing: 0.12em; color: var(--specimen); }
       /* ---- LE CAHIER DES RÈGLES : la génération, noir sur blanc ---- */
+      /* LA RÉGIE : la console du concepteur — sous les outils (57+), au-dessus de l'accueil */
+      #regie { position: fixed; inset: 0; z-index: 56; background: rgba(2, 6, 12, 0.82); display: flex; align-items: center; justify-content: center; padding: 18px; }
+      #regie[hidden] { display: none; }
+      .home-regie { border-color: var(--specimen) !important; }
+      .rg-boite { width: min(1180px, 96vw); height: min(820px, 92vh); display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--specimen); border-radius: 12px; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); overflow: hidden; }
+      .rg-tete { display: flex; align-items: baseline; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+      .rg-tete h2 { margin: 0; font-family: var(--font-display); font-size: calc(15px * var(--ui)); letter-spacing: 0.24em; color: var(--specimen); }
+      .rg-tete span { flex: 1 1 auto; font-size: calc(11px * var(--ui)); letter-spacing: 0.08em; color: var(--dim); }
+      .rg-tete button { font: inherit; background: transparent; border: 1px solid var(--line); border-radius: 6px; color: var(--dim); padding: 4px 9px; cursor: pointer; }
+      .rg-corps { display: grid; grid-template-columns: 250px minmax(0, 1fr); flex: 1 1 auto; min-height: 0; }
+      .rg-rail { display: flex; flex-direction: column; gap: 4px; padding: 10px; border-right: 1px solid var(--line); overflow-y: auto; }
+      .rg-rail hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+      .rg-item { position: relative; display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px 10px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: #eaf6ff; cursor: pointer; font: inherit; }
+      .rg-item:hover { background: rgba(99, 183, 230, 0.08); }
+      .rg-item.on { border-color: var(--specimen); background: rgba(99, 183, 230, 0.12); }
+      .rg-item i { font-style: normal; width: 22px; text-align: center; font-size: calc(14px * var(--ui)); }
+      .rg-item span { display: flex; flex-direction: column; font-family: var(--font-display); font-size: calc(9.5px * var(--ui)); letter-spacing: 0.16em; }
+      .rg-item small { font-family: var(--font-mono, inherit); font-size: calc(9px * var(--ui)); letter-spacing: 0.04em; color: var(--dim); text-transform: none; }
+      .rg-p { position: absolute; right: 10px; top: 50%; width: 8px; height: 8px; border-radius: 50%; transform: translateY(-50%); }
+      .rg-p--ok { background: #8fd8b0; box-shadow: 0 0 6px #8fd8b0; }
+      .rg-p--partiel { background: #ffd24a; }
+      .rg-p--rien { border: 1px solid var(--dim); }
+      .rg-p--muet { background: var(--dim); opacity: 0.4; }
+      .rg-pane { display: flex; flex-direction: column; gap: 12px; padding: 16px 20px; min-height: 0; overflow-y: auto; }
+      .rg-pane h3 { margin: 0; font-family: var(--font-display); font-size: calc(13px * var(--ui)); letter-spacing: 0.2em; color: #eaf6ff; }
+      .rg-pane h3 i { font-style: normal; margin-right: 6px; }
+      .rg-pane h3 small { margin-left: 10px; font-family: inherit; font-size: calc(10px * var(--ui)); letter-spacing: 0.06em; color: var(--dim); text-transform: none; }
+      .rg-texte { margin: 0; font-size: calc(12px * var(--ui)); line-height: 1.55; color: #b9cede; }
+      .rg-partage { display: flex; flex-direction: column; gap: 4px; padding: 10px 14px; border: 1px dashed var(--line); border-radius: 8px; }
+      .rg-partage > span { font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.2em; color: var(--dim); }
+      .rg-partage p { margin: 0; font-size: calc(11.5px * var(--ui)); color: #b9cede; }
+      .rg-ok { color: #8fd8b0; letter-spacing: 0.1em; }
+      .rg-rien { font-style: normal; color: #ffd24a; }
+      .rg-muet { color: var(--dim); }
+      .rg-outils { display: flex; gap: 8px; }
+      .rg-outils button { font-family: var(--font-display); font-size: calc(9px * var(--ui)); letter-spacing: 0.16em; padding: 9px 14px; border-radius: 6px; border: 1px solid var(--line); background: rgba(99, 183, 230, 0.08); color: #eaf6ff; cursor: pointer; }
+      .rg-outils button.primary { border-color: var(--specimen); background: rgba(99, 183, 230, 0.2); }
+      .rg-outils button:disabled { opacity: 0.4; cursor: default; }
+      .rg-defil { overflow: auto; min-height: 0; }
+      .rg-table { width: 100%; border-collapse: collapse; font-size: calc(11.5px * var(--ui)); }
+      .rg-table th { text-align: left; font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.16em; color: var(--dim); padding: 6px 8px; border-bottom: 1px solid var(--line); }
+      .rg-table td { padding: 6px 8px; border-bottom: 1px solid rgba(150, 200, 235, 0.08); vertical-align: top; }
+      .rg-lien { font: inherit; font-size: calc(10px * var(--ui)); letter-spacing: 0.08em; background: transparent; border: 0; color: var(--specimen); cursor: pointer; padding: 0; }
+      .rg-combien { display: flex; align-items: baseline; gap: 8px; font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; color: var(--dim); }
+      .rg-combien input { width: 4.5em; font: inherit; font-size: calc(13px * var(--ui)); color: #ffd24a; background: rgba(10, 18, 28, 0.85); border: 1px solid var(--line); border-radius: 5px; padding: 4px 6px; }
+      .rg-reperes { margin: 0; padding-left: 20px; font-size: calc(11.5px * var(--ui)); line-height: 1.55; color: #eaf6ff; }
+      .rg-table--tir tr.rg-rev td { background: rgba(143, 216, 176, 0.06); }
+      .rg-table--tir tr.rg-den td:nth-child(7) { color: #8fd8b0; }
+      .rg-cine { display: inline-block; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--line); font-size: calc(10px * var(--ui)); letter-spacing: 0.1em; color: #ffdda6; }
+      @media (max-width: 800px) { .rg-corps { grid-template-columns: 1fr; } .rg-rail { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--line); } .rg-item small { display: none; } }
       /* L'ATELIER DU JOURNAL (récit & fins) : même voile que le cahier des règles */
       #journal-atelier {
         position: fixed; inset: 0; z-index: 57;
@@ -7613,6 +7663,7 @@
         <button id="home-station" type="button" title="LA STATION : le plan général du complexe orbital — les modules et leurs coursives, tels que la descente les traverse. On y voit d'où l'on vient, où l'on est, ce qui est ouvert et ce qui attend un orbe"><i>🛰&#xFE0E;</i><span>LA STATION</span></button>
         <button id="start-editor" type="button" data-dev title="Créer ou modifier un tableau"><i>✎</i><span>ÉDITEUR</span></button>
         <button id="home-marchand" type="button" data-dev title="LE MARCHAND du hub, sans nager jusqu'à l'étal : les orbes d'essence de conscience, les améliorations durables, les provisions — payés en mémoire"><i>🔮</i><span>MARCHAND</span></button>
+        <button id="home-regie" type="button" data-dev class="home-regie" title="LA RÉGIE : la console du concepteur — la carte, la descente, la planche, le récit et les fins, le scénario, le codex, le marchand, les récompenses, les textes ; ce qui est publié pour tout le monde ; et le tir à blanc du système de run"><i>◎</i><span>RÉGIE</span></button>
         <button id="home-carte" type="button" data-dev title="L'ÉDITEUR DE LA CARTE : le plan à routes ramifiées de la station — modules, coursives, zones, conditions d'accès. Se glisse, se lie, s'exporte en carteStation.json ; un aperçu jeu rejoue la traversée"><i>⌬</i><span>CARTE</span></button>
         <button id="home-regles" type="button" data-dev title="Le cahier des règles de la génération procédurale : ce que le générateur fait (annotable), ce qu'un level designer en attend (propositions), et vos règles nouvelles en texte libre — partagé entre concepteurs, relu au moment d'implémenter"><i>§</i><span>RÈGLES DE GÉN.</span></button>
         <button id="home-descente" type="button" data-dev title="LA DESCENTE : le déroulement d'une run réglé de bout en bout — longueur, rampe de difficulté, posture des salles, et les quatre poids de l'algorithme qui choisit les tableaux. Le plan se déroule rang par rang sous les yeux, et se tire à blanc sans jouer"><i>▼</i><span>LA DESCENTE</span></button>
@@ -8142,6 +8193,11 @@
          fins servis par l'expédition bouclée, leurs textes, les deux seuils.
          Gabarit et gestes dans src/editor/atelierJournal.ts -->
     <div id="journal-atelier" hidden aria-label="L’atelier du journal : récit et fins"></div>
+
+    <!-- LA RÉGIE : la console du concepteur — un rail, tous les outils du
+         système de run, la vue d'ensemble du partage et le tir à blanc.
+         Gabarit et gestes dans src/editor/regie.ts -->
+    <div id="regie" hidden aria-label="La régie : la console du concepteur"></div>
 
     <div id="regles" hidden aria-label="Le cahier des règles de génération">
       <div class="salles-boite regles-boite">

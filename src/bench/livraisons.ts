@@ -31,6 +31,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '04/09/2026 12:41',
+    title: 'LA RÉGIE : la console du concepteur — un rail vers tout le système de run, la vue d’ensemble du partage, et le tir à blanc',
+    notes: [
+      'LA DEMANDE, rappelée par le concepteur : le plan LA RÉGIE avait trois étapes, et seule la première (le journal en données) puis le partage étaient faits — « notamment le bouton régie ? ». Voici les étapes 2 et 3.',
+      'LA COQUE (editor/regie.ts) : un seul bouton RÉGIE sur l’accueil, en mode concepteur. Un rail à gauche — LA CARTE, LA DESCENTE, LA PLANCHE, RÉCIT & FINS, SCÉNARIO & MONTAGE, LE CODEX, MARCHAND & ORBES, LES RÉCOMPENSES, LES TEXTES — et, pour chaque section, ce qu’elle règle, l’état de son partage (publié par qui, quand ; ou « le livré joue ») et OUVRIR. Elle n’héberge pas les outils dans son cadre : ce sont des voiles plein écran, chacun avec sa porte ; elle les ouvre et reste dessous, on y revient en fermant l’outil (l’éditeur de carte, lui, vit sous la régie : elle se ferme pour lui laisser la place). Les anciens boutons de l’accueil restent des raccourcis vers les mêmes outils.',
+      'LA VUE D’ENSEMBLE, que rien ne montrait : une table de tous les domaines partagés — plan de la descente, carte, cartes de l’atelier, textes, séquences, récit et fins, réglages du codex — avec ce qui est publié et par qui, et une pastille par section sur le rail (verte : publié ; ambre : le livré joue ; grise : magasin injoignable). RECHARGER relit le magasin.',
+      'LE TIR À BLANC (game/tirABlanc.ts, pur, testé) : pour N expéditions BOUCLÉES d’affilée, ce que chacune révèle — le fragment du récit, la fin —, les seuils qu’elle franchit — révélation, dénouement — et les cinématiques que le scénario déclenche au retour au hub puis au lancement suivant (règles « une seule fois » comprises). Des repères en tête (« la révélation tombe à la run 10 », « le dénouement est atteint à la run 1 ») ; le journal et le scénario COURANTS, donc un brouillon essayé sur ce poste se tire aussi. Ce que le tir ne sait pas, il ne l’invente pas : aucun trophée ne tombe, et la révélation suppose la passerelle 4 réparée.',
+      'CE QUI DIFFÈRE DU PLAN ANNONCÉ, dit tel quel : la mémoire, la rareté et la vidéo d’un fragment ou d’une fin se règlent dans l’atelier du CODEX (sous la fiche), pas dans RÉCIT & FINS — un seul endroit par nature de réglage, et la régie le rappelle. Les anciens boutons ne disparaissent pas encore : ils partiront quand la régie aura fait ses preuves.',
+      'VÉRIFIÉ : 910 tests verts dans 81 fichiers (le tir avec le journal et le scénario livrés : un fragment par run, la fin à la première, la révélation et sa cinématique à la dixième, une seule fois ; un seuil abaissé qui avance la révélation ; les bornes ; les repères), type-check à 0, build propre ; au navigateur (page d’essai de la régie, statuts simulés) : le rail, la vue d’ensemble à quatre lignes et ses pastilles, une section et son partage, OUVRIR qui appelle la porte, le tir à 12 puis à 4 runs, le lien d’une ligne vers sa section — zéro erreur. La régie dans le jeu complet reste à voir en prévisualisation.',
+    ],
+  },
+  {
     date: '04/09/2026 12:14',
     title: 'TOUT CE QUI RESTAIT PAR POSTE SE PUBLIE : la carte, les cartes de l’atelier, les textes, les séquences — pour tout le monde',
     notes: [

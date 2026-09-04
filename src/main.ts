@@ -8,6 +8,8 @@ import { TROPHEES, Trophees } from './game/trophees'
 import { evenementsPlasma } from './game/plasmaFx'
 import { Codex } from './game/codex'
 import { AtelierJournal } from './editor/atelierJournal'
+import { Regie } from './editor/regie'
+import { tirABlanc } from './game/tirABlanc'
 import { deleteReglage, fetchReglage, pushReglage } from './game/reglagesPartages'
 import { etatPlan, litPlanPublie, planAuDemarrage } from './game/planPartage'
 import { documentCarte, litCartePubliee } from './game/cartePartage'
@@ -6188,6 +6190,141 @@ function openEditeurCarte(): void {
 document
   .getElementById('home-carte')
   ?.addEventListener('click', () => openEditeurCarte())
+
+// ---- LA RÉGIE : la console du concepteur (editor/regie.ts) ----------------
+// Un seul bouton sur l'accueil ; chaque section ouvre l'outil existant, la
+// régie reste dessous et on y revient en fermant l'outil. Les anciens
+// boutons de l'accueil restent des raccourcis vers les mêmes outils.
+const regieEl = document.getElementById('regie') as HTMLDivElement
+const regie = new Regie(regieEl, {
+  sections: [
+    {
+      id: 'carte',
+      nom: 'LA CARTE',
+      icone: '⌬',
+      sous: 'modules, coursives, cadenas',
+      description:
+        'Le plan à routes ramifiées de la station : un module est un biome, ses salles, ses coursives et leurs conditions d’accès. L’éditeur se glisse, se lie, se vérifie, se rejoue en aperçu ; PUBLIER fait jouer la carte à tout le monde (refusé si elle a une erreur).',
+      domaines: ['carte'],
+      ouvre: () => {
+        // l'éditeur de carte vit SOUS la régie (z-index) : on la ferme, sa
+        // porte ↩ Accueil ramène à la fiche
+        regie.close()
+        openEditeurCarte()
+      },
+    },
+    {
+      id: 'descente',
+      nom: 'LA DESCENTE',
+      icone: '▼',
+      sous: 'rampe, posture, pioche',
+      description:
+        'Le déroulement d’une run réglé de bout en bout : le plafond de difficulté, la forme de la rampe, la posture des rangs et les quatre poids de l’algorithme qui choisit les tableaux. Le plan se déroule rang par rang sous les yeux et se tire à blanc ; PUBLIER le fait jouer à tout le monde.',
+      domaines: ['plan-voie'],
+      ouvre: () => ouvreDescente(),
+    },
+    {
+      id: 'planche',
+      nom: 'LA PLANCHE',
+      icone: '▧',
+      sous: 'les salles, leur ordre, leur biome',
+      description:
+        'Toutes les salles de la bibliothèque partagée en vignettes : glisser pour réordonner la séquence, régler le code atelier et le biome, essayer d’un clic. La bibliothèque est partagée d’office.',
+      domaines: [],
+      ouvre: () => void ouvrePlanche(),
+    },
+    {
+      id: 'journal',
+      nom: 'RÉCIT & FINS',
+      icone: '🚪',
+      sous: 'fragments, fins, seuils',
+      description:
+        'Le récit et les fins que chaque expédition bouclée révèle, dans l’ordre du concepteur ; le seuil de la révélation et celui du dénouement. Brouillon par poste, PUBLIER pour tous. La mémoire, la rareté et la vidéo de chaque entrée se règlent dans le codex.',
+      domaines: ['journal'],
+      ouvre: () => void atelierJournal.open(),
+    },
+    {
+      id: 'scenario',
+      nom: 'SCÉNARIO & MONTAGE',
+      icone: '▤',
+      sous: 'cinématiques, règles, séquences',
+      description:
+        'La table de montage : les cinématiques, le scénario qui les déclenche (avant le hub, au lancement, à la révélation, au dénouement…) et les séquences jouées dans le tableau. Cinématiques et scénario se partagent par la bibliothèque ; les séquences se publient depuis leur onglet.',
+      domaines: ['sequences'],
+      ouvre: () => montage.open(),
+    },
+    {
+      id: 'codex',
+      nom: 'LE CODEX',
+      icone: '◉',
+      sous: 'fiches, mémoire, rareté, vidéo',
+      description:
+        'Le manuel écrit par la partie : les fiches d’expérience et le journal. Sous chaque fiche, l’atelier règle la mémoire gravée à la découverte, la rareté et la vidéo de l’effet — publiés pour tous dès l’enregistrement.',
+      domaines: ['codex'],
+      ouvre: () => ecranCodex.open(),
+    },
+    {
+      id: 'marchand',
+      nom: 'MARCHAND & ORBES',
+      icone: '🔮',
+      sous: 'ce qui s’achète en mémoire',
+      description:
+        'Le marchand du hub : les orbes d’essence de conscience (une transformation ou un état chacun, ils ouvrent les cadenas de la carte), les améliorations durables, les provisions — payés en mémoire. Les prix et le catalogue vivent dans le code pour l’instant.',
+      domaines: [],
+      ouvre: () => ouvreMarchand(),
+    },
+    {
+      id: 'recompenses',
+      nom: 'LES RÉCOMPENSES',
+      icone: '❖',
+      sous: 'les cartes du tirage',
+      description:
+        'Le catalogue des instruments et la forge : une carte fabriquée ici se tire, s’emporte et agit comme une carte gravée. PUBLIER POUR TOUS la met au tirage de tout le monde.',
+      domaines: ['recompenses'],
+      ouvre: () => ouvreRecompenses(),
+    },
+    {
+      id: 'textes',
+      nom: 'LES TEXTES',
+      icone: '¶',
+      sous: 'tout ce que le joueur lit',
+      description:
+        'Le catalogue des textes, chaque entrée avec sa clé et l’endroit où elle paraît : le plan de travail de la réécriture et le socle d’une traduction. PUBLIER fait lire les retouches à tout le monde.',
+      domaines: ['textes'],
+      ouvre: () => ouvreTextes(),
+    },
+  ],
+  statuts: async () => {
+    const [plan, carte, rec, tx, seq, jr, cx] = await Promise.all([
+      fetchReglage('plan-voie'),
+      fetchReglage('carte'),
+      fetchReglage('recompenses'),
+      fetchReglage('textes'),
+      fetchReglage('sequences'),
+      fetchJournal(),
+      fetchReglagesCodex(),
+    ])
+    const de = (nom: string, p: { document: unknown; auteur: string; date: string } | null, detail?: string) =>
+      p ? { nom, publie: p.document !== null, auteur: p.auteur, date: p.date, detail } : { nom, publie: false, auteur: '', date: '', injoignable: true }
+    const nCx = cx ? Object.keys(cx).length : 0
+    return {
+      'plan-voie': de('Le plan de la descente', plan),
+      carte: de('La carte de la station', carte),
+      recompenses: de('Les cartes de l’atelier', rec, rec?.document ? `${(rec.document as { cartes?: unknown[] }).cartes?.length ?? 0} carte(s)` : undefined),
+      textes: de('Les retouches de textes', tx),
+      sequences: de('Les séquences', seq, seq?.document ? `${(seq.document as { sequences?: unknown[] }).sequences?.length ?? 0} séquence(s)` : undefined),
+      journal: jr
+        ? { nom: 'Le récit et les fins', publie: jr.journal !== null, auteur: jr.auteur, date: jr.date, detail: jr.journal ? `${jr.journal.recit.length} fragments, ${jr.journal.fins.length} fin(s)` : undefined }
+        : { nom: 'Le récit et les fins', publie: false, auteur: '', date: '', injoignable: true },
+      codex: cx
+        ? { nom: 'Les réglages du codex', publie: nCx > 0, auteur: '', date: '', detail: `${nCx} fiche(s) réglée(s)` }
+        : { nom: 'Les réglages du codex', publie: false, auteur: '', date: '', injoignable: true },
+    }
+  },
+  tir: (n) => tirABlanc(journalCourant(), scenario, n),
+  fermer: () => regie.close(),
+})
+document.getElementById('home-regie')?.addEventListener('click', () => regie.open())
 // Sonde de test : la carte en cours d'édition
 ;(window as unknown as { __carte: () => unknown }).__carte = () =>
   editeurCarte.carteCourante()
@@ -6393,6 +6530,7 @@ const COUCHES_MENU: CoucheMenu[] = [
   { id: 'planche', retour: 'planche-fermer' },
   { id: 'regles', retour: 'regles-fermer' },
   { id: 'journal-atelier', retour: 'aj-fermer' }, // l'atelier du journal (récit & fins)
+  { id: 'regie', retour: 'regie-fermer' }, // la console du concepteur — sous les outils, donc après eux
   { id: 'cycle', retour: 'cycle-fermer' }, // les mémoires — ouvertes au banc du hub aussi
   { id: 'marchand', retour: 'marchand-fermer' }, // le marchand — ouvert à l'étal du hub aussi
   { id: 'salles', retour: 'salles-fermer' },
