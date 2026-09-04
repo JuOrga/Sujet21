@@ -16,6 +16,8 @@ function etat(p: Partial<EtatScenario> = {}): EtatScenario {
     salleMax: 0,
     condensat: 0,
     decouvertes: 0,
+    revelation: false,
+    denouement: false,
     trophee: () => false,
     ...p,
   }

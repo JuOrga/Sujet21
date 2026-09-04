@@ -20,6 +20,7 @@
 // manque, ENTRER) — sans quitter l'éditeur, pour vérifier qu'une
 // carte se traverse avant de la livrer.
 
+import { memeCarte, refusPublication } from '../game/cartePartage'
 import {
   CARTE_LIVREE,
   FORMES_MODULE,
@@ -57,6 +58,13 @@ import {
 export interface HooksEditeurCarte {
   /** Quitter l'éditeur et revenir à la fiche d'essai. */
   quit(): void
+  /** LE PARTAGE : la carte publiée joue pour tout le monde (cartePartage.ts) ;
+   *  l'éditeur la lit, la publie, la retire. Absent : l'export seul. */
+  partage?: {
+    charge(): Promise<{ carte: CarteStation | null; auteur: string; date: string } | null>
+    publie(c: CarteStation): Promise<boolean>
+    retire(): Promise<boolean>
+  }
 }
 
 /** Le document en cours, retenu d'une séance à l'autre sur ce poste. */
@@ -95,6 +103,11 @@ export class EditeurCarte {
   private svg: SVGSVGElement | null = null
   private image = 0
   visible = false
+  // la carte publiée, telle que le magasin l'a donnée — pour dire ce que
+  // l'éditeur montre par rapport à ce que les joueurs jouent
+  private publiee: CarteStation | null = null
+  private publieeInfo = { auteur: '', date: '', charge: false }
+  private partageOccupe = false
 
   constructor(
     private host: HTMLElement,
@@ -112,6 +125,7 @@ export class EditeurCarte {
 
   open(): void {
     this.restaure()
+    void this.chargePubliee()
     this.visible = true
     this.host.classList.add('visible')
     this.courant = this.carte.regles.depart
@@ -332,6 +346,7 @@ export class EditeurCarte {
   }
 
   private peintVerdicts(): void {
+    this.peintPartage()
     const v = verifieCarte(this.carte)
     const hote = this.el('ce-verdicts')
     const t = longueursTrajet(this.carte)
@@ -591,6 +606,18 @@ export class EditeurCarte {
       this.dessine()
     })
     this.el('ce-export').addEventListener('click', () => this.exporte())
+    this.el('ce-publier').addEventListener('click', () => this.publie())
+    this.el('ce-publiee').addEventListener('click', () => {
+      if (!this.publiee) return
+      if (!window.confirm('Ouvrir la carte publiée dans l’éditeur ? Le document en cours est remplacé (annulable par ↶).')) return
+      this.memorise()
+      this.carte = cloneCarte(this.publiee)
+      this.selection = null
+      this.lienSel = null
+      this.garantitSelection()
+      this.change()
+    })
+    this.el('ce-retirer').addEventListener('click', () => this.retirePubliee())
     this.el('ce-copier').addEventListener('click', () => {
       void navigator.clipboard?.writeText(serialiseCarte(this.carte)).then(
         () => this.signale('JSON copié dans le presse-papiers'),
@@ -624,6 +651,82 @@ export class EditeurCarte {
     return this.aimant ? this.grille : 0
   }
 
+  // ---- LE PARTAGE ----------------------------------------------------------------
+
+  private async chargePubliee(): Promise<void> {
+    const p = await this.hooks.partage?.charge()
+    if (p) {
+      this.publiee = p.carte
+      this.publieeInfo = { auteur: p.auteur, date: p.date, charge: true }
+    }
+    this.peintPartage()
+  }
+
+  private peintPartage(): void {
+    const hote = this.host.querySelector<HTMLElement>('#ce-partage')
+    if (!hote) return
+    if (!this.hooks.partage) {
+      hote.innerHTML = `<p class="ce-partage">Pas de magasin partagé ici : l’export seul.</p>`
+      return
+    }
+    const quand = this.publieeInfo.date ? formateDate(this.publieeInfo.date) : ''
+    const montre = memeCarte(this.carte, this.publiee)
+      ? 'la carte publiée'
+      : memeCarte(this.carte, CARTE_LIVREE)
+        ? 'la carte livrée'
+        : `<i>un brouillon différent ${this.publiee ? 'de la publiée' : 'de la livrée'}, non publié</i>`
+    hote.innerHTML =
+      `<p class="ce-partage">` +
+      (this.publiee
+        ? `<b>PUBLIÉE</b> par ${esc(this.publieeInfo.auteur || 'anonyme')}${quand ? `, ${quand}` : ''} — c’est elle que les joueurs jouent`
+        : this.publieeInfo.charge
+          ? `<b>RIEN DE PUBLIÉ</b> — les joueurs jouent la carte livrée`
+          : `<b>MAGASIN NON LU</b> — hors-ligne, ou pas encore`) +
+      `<br>l’éditeur montre ${montre}</p>`
+    const off = (id: string, v: boolean): void => {
+      const b = this.host.querySelector<HTMLButtonElement>(`#${id}`)
+      if (b) b.disabled = v || this.partageOccupe
+    }
+    off('ce-publier', memeCarte(this.carte, this.publiee))
+    off('ce-publiee', this.publiee === null)
+    off('ce-retirer', this.publiee === null)
+  }
+
+  private publie(): void {
+    const partage = this.hooks.partage
+    if (!partage) return
+    const refus = refusPublication(this.carte)
+    if (refus.length > 0) {
+      this.signale(`publication refusée : ${refus[0]}`)
+      return
+    }
+    this.partageOccupe = true
+    this.peintPartage()
+    void partage.publie(cloneCarte(this.carte)).then(async (ok) => {
+      this.partageOccupe = false
+      if (ok) await this.chargePubliee()
+      else this.peintPartage()
+      this.signale(ok ? 'carte publiée — elle joue pour tout le monde' : 'échec : le magasin partagé ne répond pas')
+    })
+  }
+
+  private retirePubliee(): void {
+    const partage = this.hooks.partage
+    if (!partage || !this.publiee) return
+    if (!window.confirm('Retirer la carte publiée ? La carte livrée avec le jeu reprend pour tout le monde.')) return
+    this.partageOccupe = true
+    this.peintPartage()
+    void partage.retire().then((ok) => {
+      this.partageOccupe = false
+      if (ok) {
+        this.publiee = null
+        this.publieeInfo = { auteur: '', date: '', charge: true }
+      }
+      this.peintPartage()
+      this.signale(ok ? 'carte publiée retirée — la livrée joue pour tous' : 'échec : le magasin partagé ne répond pas')
+    })
+  }
+
   private signale(texte: string): void {
     const s = this.el('ce-signal')
     s.textContent = texte
@@ -638,7 +741,7 @@ export class EditeurCarte {
     a.download = 'carteStation.json'
     a.click()
     window.setTimeout(() => URL.revokeObjectURL(a.href), 1000)
-    this.signale('carteStation.json exporté — à déposer dans src/game/')
+    this.signale('carteStation.json exporté — le filet du code (src/game/) ; pour jouer partout : Publier')
   }
 
   private importe(texte: string): void {
@@ -1107,8 +1210,11 @@ function gabarit(): string {
     `<input type="file" id="ce-fichier" accept="application/json,.json" hidden/>` +
     `<button type="button" id="ce-coller" title="Coller le JSON d'une carte">Coller</button>` +
     `<button type="button" id="ce-copier" title="Copier le JSON de la carte dans le presse-papiers">Copier</button>` +
-    `<button type="button" id="ce-export" class="primary" title="Télécharge carteStation.json — à déposer dans src/game/ pour que le jeu la lise">Exporter</button>` +
+    `<button type="button" id="ce-export" title="Télécharge carteStation.json — la carte livrée avec le code, le filet sous la publiée">Exporter</button>` +
+    `<button type="button" id="ce-publier" class="primary" title="Publie cette carte au magasin partagé : elle joue pour tout le monde (refusée si elle a une erreur)">⇪ Publier</button>` +
     `<button type="button" id="ce-reset" title="Revenir à la carte livrée avec le jeu">Carte livrée</button>` +
+    `<button type="button" id="ce-publiee" title="Ouvrir la carte publiée dans l’éditeur">Carte publiée</button>` +
+    `<button type="button" id="ce-retirer" title="Retirer la carte publiée : la livrée reprend pour tout le monde">Retirer la publiée</button>` +
     `<span class="sp"></span>` +
     `<span id="ce-signal" class="ce-signal"></span>` +
     `<label class="ce-f ce-f--ligne"><span>Grille</span><input type="number" id="ce-grille" value="8" min="0" step="1" style="width:52px"/></label>` +
@@ -1119,10 +1225,16 @@ function gabarit(): string {
     `<aside class="ce-side">` +
     `<div class="ce-group"><span class="k">Modules</span><div id="ce-liste-modules" class="ce-liste"></div></div>` +
     `<div class="ce-group"><span class="k">Coursives</span><div id="ce-liste-liens" class="ce-liste"></div></div>` +
+    `<div class="ce-group"><span class="k">Partage</span><div id="ce-partage" class="ce-liste"></div></div>` +
     `<div class="ce-group"><span class="k">Vérification</span><div id="ce-verdicts" class="ce-liste"></div></div>` +
     `</aside>` +
     `<div class="ce-cadre"><div id="ce-scene" class="ce-scene" tabindex="-1"></div>` +
     `<div class="ce-legende" id="ce-legende"></div></div>` +
     `<aside class="ce-side ce-side--droite" id="ce-panneau"></aside>`
   )
+}
+
+function formateDate(iso: string): string {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }

@@ -1025,6 +1025,108 @@
       #vc-nom { font-family: var(--font-display); font-size: calc(17px * var(--ui)); color: #eaf6ff; }
       #vc-code { font-size: calc(12px * var(--ui)); letter-spacing: 0.12em; color: var(--specimen); }
       /* ---- LE CAHIER DES RÈGLES : la génération, noir sur blanc ---- */
+      /* LA RÉGIE : la console du concepteur — sous les outils (57+), au-dessus de l'accueil */
+      #regie { position: fixed; inset: 0; z-index: 56; background: rgba(2, 6, 12, 0.82); display: flex; align-items: center; justify-content: center; padding: 18px; }
+      #regie[hidden] { display: none; }
+      .home-regie { border-color: var(--specimen) !important; }
+      .rg-boite { width: min(1180px, 96vw); height: min(820px, 92vh); display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--specimen); border-radius: 12px; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); overflow: hidden; }
+      .rg-tete { display: flex; align-items: baseline; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+      .rg-tete h2 { margin: 0; font-family: var(--font-display); font-size: calc(15px * var(--ui)); letter-spacing: 0.24em; color: var(--specimen); }
+      .rg-tete span { flex: 1 1 auto; font-size: calc(11px * var(--ui)); letter-spacing: 0.08em; color: var(--dim); }
+      .rg-tete button { font: inherit; background: transparent; border: 1px solid var(--line); border-radius: 6px; color: var(--dim); padding: 4px 9px; cursor: pointer; }
+      .rg-corps { display: grid; grid-template-columns: 250px minmax(0, 1fr); flex: 1 1 auto; min-height: 0; }
+      .rg-rail { display: flex; flex-direction: column; gap: 4px; padding: 10px; border-right: 1px solid var(--line); overflow-y: auto; }
+      .rg-rail hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+      .rg-item { position: relative; display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px 10px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: #eaf6ff; cursor: pointer; font: inherit; }
+      .rg-item:hover { background: rgba(99, 183, 230, 0.08); }
+      .rg-item.on { border-color: var(--specimen); background: rgba(99, 183, 230, 0.12); }
+      .rg-item i { font-style: normal; width: 22px; text-align: center; font-size: calc(14px * var(--ui)); }
+      .rg-item span { display: flex; flex-direction: column; font-family: var(--font-display); font-size: calc(9.5px * var(--ui)); letter-spacing: 0.16em; }
+      .rg-item small { font-family: var(--font-mono, inherit); font-size: calc(9px * var(--ui)); letter-spacing: 0.04em; color: var(--dim); text-transform: none; }
+      .rg-p { position: absolute; right: 10px; top: 50%; width: 8px; height: 8px; border-radius: 50%; transform: translateY(-50%); }
+      .rg-p--ok { background: #8fd8b0; box-shadow: 0 0 6px #8fd8b0; }
+      .rg-p--partiel { background: #ffd24a; }
+      .rg-p--rien { border: 1px solid var(--dim); }
+      .rg-p--muet { background: var(--dim); opacity: 0.4; }
+      .rg-pane { display: flex; flex-direction: column; gap: 12px; padding: 16px 20px; min-height: 0; overflow-y: auto; }
+      .rg-pane h3 { margin: 0; font-family: var(--font-display); font-size: calc(13px * var(--ui)); letter-spacing: 0.2em; color: #eaf6ff; }
+      .rg-pane h3 i { font-style: normal; margin-right: 6px; }
+      .rg-pane h3 small { margin-left: 10px; font-family: inherit; font-size: calc(10px * var(--ui)); letter-spacing: 0.06em; color: var(--dim); text-transform: none; }
+      .rg-texte { margin: 0; font-size: calc(12px * var(--ui)); line-height: 1.55; color: #b9cede; }
+      .rg-partage { display: flex; flex-direction: column; gap: 4px; padding: 10px 14px; border: 1px dashed var(--line); border-radius: 8px; }
+      .rg-partage > span { font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.2em; color: var(--dim); }
+      .rg-partage p { margin: 0; font-size: calc(11.5px * var(--ui)); color: #b9cede; }
+      .rg-ok { color: #8fd8b0; letter-spacing: 0.1em; }
+      .rg-rien { font-style: normal; color: #ffd24a; }
+      .rg-muet { color: var(--dim); }
+      .rg-outils { display: flex; gap: 8px; }
+      .rg-outils button { font-family: var(--font-display); font-size: calc(9px * var(--ui)); letter-spacing: 0.16em; padding: 9px 14px; border-radius: 6px; border: 1px solid var(--line); background: rgba(99, 183, 230, 0.08); color: #eaf6ff; cursor: pointer; }
+      .rg-outils button.primary { border-color: var(--specimen); background: rgba(99, 183, 230, 0.2); }
+      .rg-outils button:disabled { opacity: 0.4; cursor: default; }
+      .rg-defil { overflow: auto; min-height: 0; }
+      .rg-table { width: 100%; border-collapse: collapse; font-size: calc(11.5px * var(--ui)); }
+      .rg-table th { text-align: left; font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.16em; color: var(--dim); padding: 6px 8px; border-bottom: 1px solid var(--line); }
+      .rg-table td { padding: 6px 8px; border-bottom: 1px solid rgba(150, 200, 235, 0.08); vertical-align: top; }
+      .rg-lien { font: inherit; font-size: calc(10px * var(--ui)); letter-spacing: 0.08em; background: transparent; border: 0; color: var(--specimen); cursor: pointer; padding: 0; }
+      .rg-combien { display: flex; align-items: baseline; gap: 8px; font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; color: var(--dim); }
+      .rg-combien input { width: 4.5em; font: inherit; font-size: calc(13px * var(--ui)); color: #ffd24a; background: rgba(10, 18, 28, 0.85); border: 1px solid var(--line); border-radius: 5px; padding: 4px 6px; }
+      .rg-reperes { margin: 0; padding-left: 20px; font-size: calc(11.5px * var(--ui)); line-height: 1.55; color: #eaf6ff; }
+      .rg-table--tir tr.rg-rev td { background: rgba(143, 216, 176, 0.06); }
+      .rg-table--tir tr.rg-den td:nth-child(7) { color: #8fd8b0; }
+      .rg-cine { display: inline-block; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--line); font-size: calc(10px * var(--ui)); letter-spacing: 0.1em; color: #ffdda6; }
+      @media (max-width: 800px) { .rg-corps { grid-template-columns: 1fr; } .rg-rail { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--line); } .rg-item small { display: none; } }
+      /* L'ATELIER DU JOURNAL (récit & fins) : même voile que le cahier des règles */
+      #journal-atelier {
+        position: fixed; inset: 0; z-index: 57;
+        background: rgba(2, 6, 12, 0.78);
+        display: flex; align-items: center; justify-content: center;
+        padding: 18px;
+      }
+      #journal-atelier[hidden] { display: none; }
+      .aj-boite { max-width: min(1180px, 96vw); width: 100%; max-height: 94vh; display: flex; flex-direction: column; }
+      .aj-boite > .salles-tete, .aj-boite > .salles-legende, .aj-boite > .aj-barre, .aj-boite > .aj-seuils, .aj-boite > .pup-etat { flex: 0 0 auto; }
+      .aj-barre { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+      .aj-statut { margin: 0; font-size: calc(11px * var(--ui)); letter-spacing: 0.06em; color: var(--dim); }
+      .aj-statut b { color: #8fd8b0; letter-spacing: 0.14em; }
+      .aj-statut i { font-style: normal; }
+      .aj-statut .aj-modifie { color: #ffd24a; }
+      .aj-boutons { display: flex; flex-wrap: wrap; gap: 6px; }
+      .aj-boutons button, .aj-ajout button {
+        font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.16em;
+        padding: 7px 10px; border-radius: 6px; border: 1px solid var(--line);
+        background: rgba(99, 183, 230, 0.08); color: #eaf6ff; cursor: pointer;
+      }
+      .aj-boutons button:hover:not(:disabled), .aj-ajout button:hover { background: rgba(99, 183, 230, 0.2); }
+      .aj-boutons button:disabled { opacity: 0.4; cursor: default; }
+      .aj-boutons #aj-publier:not(:disabled) { border-color: #3f7a5e; background: rgba(63, 122, 94, 0.25); }
+      .aj-boutons .aj-danger:not(:disabled) { border-color: #7a3f3f; }
+      .aj-seuils { display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+      .aj-seuils label { display: flex; align-items: baseline; gap: 8px; font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; color: var(--dim); }
+      .aj-seuils input { width: 4.5em; font: inherit; font-size: calc(13px * var(--ui)); color: #ffd24a; background: rgba(10, 18, 28, 0.85); border: 1px solid var(--line); border-radius: 5px; padding: 4px 6px; }
+      .aj-seuils small { letter-spacing: 0.04em; }
+      .aj-colonnes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px; overflow-y: auto; min-height: 0; flex: 1 1 auto; }
+      @media (max-width: 860px) { .aj-colonnes { grid-template-columns: 1fr; } }
+      .aj-col h3 { margin: 0 0 8px; font-family: var(--font-display); font-size: calc(12px * var(--ui)); letter-spacing: 0.18em; color: var(--specimen); padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+      .aj-col h3 small { margin-left: 8px; color: var(--dim); font-family: inherit; letter-spacing: 0.08em; }
+      .aj-liste { display: flex; flex-direction: column; gap: 8px; }
+      .aj-carte { background: rgba(20, 32, 46, 0.6); border: 1px solid var(--line); border-left: 3px solid var(--specimen); border-radius: 7px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+      .aj-ligne { display: flex; align-items: center; gap: 6px; }
+      .aj-poignee { color: var(--dim); cursor: grab; user-select: none; }
+      .aj-num { font-family: var(--font-display); font-size: calc(10px * var(--ui)); color: var(--dim); min-width: 1.6em; }
+      .aj-carte input, .aj-carte textarea { font: inherit; font-size: calc(12px * var(--ui)); color: #eaf6ff; background: rgba(10, 18, 28, 0.85); border: 1px solid var(--line); border-radius: 5px; padding: 5px 7px; }
+      .aj-icone { width: 3em; text-align: center; }
+      .aj-titre { flex: 1 1 auto; min-width: 0; font-weight: 600; }
+      .aj-texte { width: 100%; resize: vertical; line-height: 1.45; color: #b9cede; }
+      .aj-ligne button { font-size: calc(11px * var(--ui)); padding: 4px 7px; border-radius: 5px; border: 1px solid var(--line); background: transparent; color: var(--dim); cursor: pointer; }
+      .aj-ligne button:hover:not(:disabled) { color: #eaf6ff; background: rgba(99, 183, 230, 0.15); }
+      .aj-ligne button:disabled { opacity: 0.3; cursor: default; }
+      .aj-id { font-size: calc(9px * var(--ui)); letter-spacing: 0.08em; color: var(--dim); }
+      .aj-ajout { display: flex; gap: 6px; margin-top: 8px; }
+      .aj-ajout input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: calc(12px * var(--ui)); color: #eaf6ff; background: rgba(10, 18, 28, 0.85); border: 1px dashed var(--line); border-radius: 5px; padding: 5px 7px; }
+      .aj-verdicts { flex: 0 0 auto; margin: 0; padding: 8px 12px 6px 28px; font-size: calc(11px * var(--ui)); line-height: 1.5; border-top: 1px solid var(--line); max-height: 18vh; overflow-y: auto; }
+      .aj-verdicts .aj-erreur { color: #ff9a8a; }
+      .aj-verdicts .aj-attention { color: #ffd24a; }
+      .aj-verdicts .aj-ok { color: #8fd8b0; list-style: none; margin-left: -16px; }
       #regles {
         position: fixed; inset: 0; z-index: 57;
         background: rgba(2, 6, 12, 0.78);
@@ -1238,6 +1340,17 @@
         font-size: calc(11.5px * var(--ui));
       }
       .dsc-aide b { color: #cfe2ef; }
+      /* LE PARTAGE, dit en clair dans chaque atelier : ce que les joueurs jouent, ce que ce poste joue */
+      .at-partage { width: 100%; }
+      .at-partage b, .tx-partage b, .ce-partage b { color: #8fd8b0; letter-spacing: 0.14em; }
+      .at-partage i, .tx-partage i, .ce-partage i { font-style: normal; color: #ffd24a; }
+      .tx-partage { font-size: calc(10px * var(--ui)); letter-spacing: 0.06em; color: var(--dim); margin-right: 6px; }
+      .ce-partage { margin: 0; font-size: calc(11px * var(--ui)); line-height: 1.5; color: var(--dim); }
+      .at-lien:disabled, .tx-lien:disabled { opacity: 0.4; cursor: default; }
+      .dsc-partage { margin: 0 0 8px; font-size: calc(11px * var(--ui)); letter-spacing: 0.06em; color: var(--dim); }
+      .dsc-partage b { color: #8fd8b0; letter-spacing: 0.14em; }
+      .dsc-partage .dsc-modifie { font-style: normal; color: #ffd24a; }
+      .dsc-outils button:disabled { opacity: 0.4; cursor: default; }
       .dsc-sec {
         margin: 14px 0 7px; font-family: var(--font-display);
         font-size: calc(10px * var(--ui)); letter-spacing: 0.16em; color: var(--dim);
@@ -2633,33 +2746,187 @@
         display: flex; align-items: center; justify-content: center;
         padding: 18px;
       }
-      #records .salles-boite, #codex .salles-boite, #reparations .salles-boite { max-height: 86vh; overflow: auto; width: min(980px, 96vw); }
+      #records .salles-boite, #reparations .salles-boite { max-height: 86vh; overflow: auto; width: min(980px, 96vw); }
       #records-corps, #repar-corps { padding: 6px 12px 14px; }
-      /* ---- Le voile CODEX : fiches par état, cartes « ? » verrouillées ---- */
-      #codex-corps { padding: 6px 12px 14px; }
-      .cdx-groupe {
-        display: flex; justify-content: space-between; align-items: baseline;
-        margin-top: 14px; padding-bottom: 4px;
-        border-bottom: 1px solid var(--line);
-        font-family: var(--font-display); font-size: calc(11px * var(--ui));
-        letter-spacing: 0.16em; color: var(--specimen);
+      /* ==== LE CODEX (game/ecranCodex.ts) — la maquette « Codex v2 » ====
+         Trois colonnes : le rail des états, la grille des fiches, la fiche
+         lue avec sa vidéo. Les teintes des rayons voyagent en --t. */
+      #codex {
+        position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 18px;
+        background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(99, 183, 230, 0.12), transparent 60%), rgba(2, 5, 10, 0.94);
       }
-      .cdx-groupe i { font-style: normal; font-family: var(--font-mono); font-size: calc(11px * var(--ui)); color: var(--ink-dim); }
-      .cdx-grille { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
-      @media (max-width: 900px) { .cdx-grille { grid-template-columns: repeat(2, 1fr); } }
-      @media (max-width: 620px) { .cdx-grille { grid-template-columns: 1fr; } }
-      .cdx-carte {
-        display: flex; gap: 10px; align-items: flex-start;
-        border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px;
+      #codex[hidden] { display: none; }
+      .cx-boite {
+        width: min(1240px, 100%); height: min(860px, 100%); display: grid; grid-template-rows: auto minmax(0, 1fr);
+        border: 1px solid rgba(150, 200, 235, 0.2); border-radius: 14px; overflow: hidden;
+        background: linear-gradient(180deg, rgba(9, 18, 30, 0.94), rgba(6, 12, 22, 0.97));
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(167, 221, 245, 0.12);
       }
-      .cdx-carte i { font-style: normal; font-size: calc(20px * var(--ui)); line-height: 1.3; }
-      .cdx-carte b {
-        display: block; font-family: var(--font-display); font-size: calc(10px * var(--ui));
-        letter-spacing: 0.1em; margin-bottom: 3px;
+      .cx-tete {
+        display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 16px 22px 14px;
+        border-bottom: 1px solid rgba(150, 200, 235, 0.14); background: linear-gradient(180deg, rgba(99, 183, 230, 0.06), transparent);
       }
-      .cdx-carte span { font-family: var(--font-mono); font-size: calc(11.5px * var(--ui)); color: var(--ink-dim); line-height: 1.45; }
-      .cdx-verrou { opacity: 0.5; border-style: dashed; }
-      .cdx-verrou i { color: var(--ink-dim); }
+      .cx-titres { display: flex; flex-direction: column; gap: 8px; flex: 1 1 380px; min-width: 0; }
+      .cx-titre-ligne { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+      .cx-titre-ligne h2 { margin: 0; font-family: var(--font-display); font-size: calc(17px * var(--ui)); letter-spacing: 0.22em; color: #eaf6ff; text-shadow: 0 0 18px rgba(99, 183, 230, 0.45); font-weight: 400; }
+      .cx-titre-ligne span { font-size: calc(10.5px * var(--ui)); letter-spacing: 0.18em; color: var(--dim); }
+      .cx-progression { display: flex; align-items: center; gap: 14px; }
+      .cx-compte { font-family: var(--font-display); font-size: calc(22px * var(--ui)); color: #eaf6ff; white-space: nowrap; }
+      .cx-compte small { font-size: calc(12px * var(--ui)); color: var(--dim); margin-left: 4px; }
+      .cx-barre { position: relative; flex: 1; height: 12px; border-radius: 6px; background: rgba(3, 7, 16, 0.8); border: 1px solid rgba(150, 200, 235, 0.2); }
+      .cx-barre i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; background: linear-gradient(90deg, #2e7fb0, #63b7e6 60%, #a7ddf5); box-shadow: 0 0 14px rgba(99, 183, 230, 0.6); transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1); }
+      .cx-barre u { position: absolute; top: -3px; bottom: -3px; width: 1px; background: rgba(150, 200, 235, 0.35); }
+      #codex .cx-suivi {
+        display: flex; align-items: center; gap: 12px; padding: 9px 14px; max-width: 380px; text-align: left; cursor: default;
+        border: 1px solid rgba(255, 210, 74, 0.3); border-radius: 10px; color: var(--ink); font: inherit;
+        background: linear-gradient(135deg, rgba(255, 210, 74, 0.08), rgba(255, 210, 74, 0.02));
+      }
+      #codex .cx-suivi.on { cursor: pointer; border-color: rgba(255, 210, 74, 0.5); }
+      #codex .cx-suivi.on:hover { background: rgba(255, 210, 74, 0.14); }
+      .cx-suivi i { font-style: normal; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 16px; color: #ffd24a; background: radial-gradient(circle, rgba(255, 210, 74, 0.35), rgba(255, 210, 74, 0.05)); border: 1px solid rgba(255, 210, 74, 0.5); }
+      .cx-suivi div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+      .cx-suivi span { font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.2em; color: #ffd24a; }
+      .cx-suivi b { font-weight: 400; font-size: calc(11.5px * var(--ui)); line-height: 1.4; color: #eaf6ff; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+      #codex-fermer {
+        flex: none; width: 34px; height: 34px; border-radius: 6px; background: rgba(20, 32, 46, 0.8);
+        border: 1px solid var(--line); color: inherit; font: inherit; font-size: calc(14px * var(--ui)); cursor: pointer;
+      }
+      #codex-fermer:hover { border-color: var(--specimen); }
+      .cx-corps { display: grid; grid-template-columns: minmax(170px, 200px) minmax(0, 1fr) minmax(250px, 330px); min-height: 0; min-width: 0; }
+      @media (max-width: 900px) { .cx-corps { grid-template-columns: minmax(0, 1fr) minmax(220px, 300px); } .cx-nav { display: none !important; } }
+      /* le rail des états */
+      .cx-nav { display: flex; flex-direction: column; gap: 8px; padding: 14px 12px; min-height: 0; overflow: auto; border-right: 1px solid rgba(150, 200, 235, 0.12); background: rgba(3, 7, 16, 0.35); }
+      .cx-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 8px; background: rgba(3, 7, 16, 0.7); border: 1px solid rgba(150, 200, 235, 0.14); margin-bottom: 4px; }
+      #codex .cx-modes button { font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.16em; padding: 7px 4px; border-radius: 6px; border: 0; color: var(--dim); background: transparent; cursor: pointer; }
+      #codex .cx-modes button.on { color: #eaf6ff; background: rgba(99, 183, 230, 0.22); box-shadow: 0 0 12px rgba(99, 183, 230, 0.35); }
+      .cx-rayons { display: flex; flex-direction: column; gap: 8px; }
+      #codex .cx-rayon {
+        display: grid; grid-template-columns: 44px 1fr; gap: 10px; align-items: center; padding: 9px 10px; border-radius: 10px;
+        border: 1px solid rgba(150, 200, 235, 0.14); background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: all 0.25s ease;
+      }
+      #codex .cx-rayon:hover { background: rgba(99, 183, 230, 0.1); border-color: rgba(150, 200, 235, 0.4); }
+      #codex .cx-rayon.on { border-color: var(--t); background: linear-gradient(90deg, color-mix(in srgb, var(--t) 14%, transparent), transparent); box-shadow: inset 3px 0 0 var(--t), 0 0 18px color-mix(in srgb, var(--t) 20%, transparent); }
+      #codex .cx-rayon.cx-scelle { opacity: 0.7; }
+      .cx-anneau { position: relative; width: 44px; height: 44px; display: grid; place-items: center; }
+      .cx-anneau svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+      .cx-anneau circle { fill: none; stroke: rgba(150, 200, 235, 0.12); stroke-width: 3; }
+      .cx-anneau .cx-arc { stroke: var(--t); stroke-linecap: round; filter: drop-shadow(0 0 4px var(--t)); transition: stroke-dashoffset 0.8s ease; }
+      .cx-anneau i { font-style: normal; font-size: 18px; position: relative; }
+      .cx-rayon-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+      .cx-rayon-txt b { font-family: var(--font-display); font-size: calc(9.5px * var(--ui)); letter-spacing: 0.14em; font-weight: 400; color: #a7ddf5; }
+      #codex .cx-rayon.on .cx-rayon-txt b { color: #eaf6ff; }
+      .cx-rayon-txt small { font-size: calc(10.5px * var(--ui)); color: var(--dim); }
+      .cx-note { margin: auto 0 0; padding: 10px; border-radius: 8px; border: 1px dashed rgba(150, 200, 235, 0.18); font-size: calc(10.5px * var(--ui)); line-height: 1.5; color: var(--dim); }
+      /* la grille des fiches */
+      .cx-centre { display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 14px 16px; gap: 12px; }
+      .cx-entete { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+      .cx-entete-nom { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+      .cx-entete-nom span { font-family: var(--font-display); font-size: calc(12px * var(--ui)); letter-spacing: 0.2em; }
+      .cx-entete-nom small { font-size: calc(11px * var(--ui)); color: var(--dim); }
+      .cx-filtres { display: flex; gap: 6px; }
+      #codex .cx-filtres button { font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(150, 200, 235, 0.18); color: var(--dim); background: transparent; cursor: pointer; font-family: var(--font-mono); }
+      #codex .cx-filtres button.on { color: #eaf6ff; border-color: var(--t); background: color-mix(in srgb, var(--t) 14%, transparent); }
+      .cx-defil { overflow: auto; min-height: 0; padding-right: 4px; }
+      .cx-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+      .cx-grille--vide { display: block; }
+      .cx-vide { margin: 20px 0; text-align: center; font-size: calc(12px * var(--ui)); color: var(--dim); line-height: 1.6; }
+      #codex .cx-carte {
+        position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 12px 14px; border-radius: 12px;
+        border: 1px solid rgba(150, 200, 235, 0.22); background: linear-gradient(160deg, color-mix(in srgb, var(--t) 12%, transparent), rgba(9, 18, 30, 0.6));
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35); color: var(--ink); font: inherit; cursor: pointer; overflow: hidden; transition: transform 0.25s ease, box-shadow 0.25s ease;
+      }
+      #codex .cx-carte:hover { transform: translateY(-3px); }
+      #codex .cx-carte.on { border-color: var(--t); box-shadow: 0 0 0 1px var(--t), 0 0 24px color-mix(in srgb, var(--t) 33%, transparent); transform: translateY(-2px); }
+      #codex .cx-carte.cx-verrou { border-style: dashed; border-color: rgba(150, 200, 235, 0.16); background: rgba(3, 7, 16, 0.5); box-shadow: none; opacity: 0.6; }
+      #codex .cx-carte.cx-verrou.on { opacity: 0.9; border-color: var(--t); }
+      #codex .cx-carte.cx-cible { border-color: rgba(255, 210, 74, 0.5); opacity: 0.85; }
+      .cx-hex { width: 64px; height: 64px; display: grid; place-items: center; clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%); background: linear-gradient(160deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.02)); }
+      .cx-hex i { font-style: normal; font-size: 30px; line-height: 1; text-shadow: 0 0 14px color-mix(in srgb, var(--t) 55%, transparent); }
+      .cx-verrou .cx-hex { background: rgba(150, 200, 235, 0.06); }
+      .cx-verrou .cx-hex i { filter: grayscale(1) opacity(0.5); color: var(--dim); }
+      .cx-hex--grand { width: 118px; height: 118px; }
+      .cx-hex--grand i { font-size: 56px; }
+      #codex .cx-carte b { font-family: var(--font-display); font-size: calc(9.5px * var(--ui)); letter-spacing: 0.1em; text-align: center; color: #eaf6ff; line-height: 1.4; font-weight: 400; }
+      #codex .cx-carte.cx-verrou b { color: var(--dim); }
+      #codex .cx-carte small { font-size: calc(10.5px * var(--ui)); color: var(--dim); text-align: center; min-height: 15px; }
+      #codex .cx-carte.cx-cible small { color: #ffd24a; }
+      /* la frise du journal */
+      .cx-frise { display: flex; flex-direction: column; gap: 10px; padding-left: 34px; position: relative; }
+      .cx-frise::before { content: ''; position: absolute; left: 13px; top: 8px; bottom: 8px; width: 2px; background: linear-gradient(180deg, var(--t), rgba(150, 200, 235, 0.08)); }
+      #codex .cx-fragment {
+        position: relative; display: grid; grid-template-columns: 1fr auto; gap: 4px 14px; padding: 12px 14px; border-radius: 10px; text-align: left;
+        border: 1px solid rgba(150, 200, 235, 0.22); background: linear-gradient(160deg, color-mix(in srgb, var(--t) 10%, transparent), rgba(9, 18, 30, 0.6));
+        color: var(--ink); font: inherit; cursor: pointer; transition: all 0.25s;
+      }
+      #codex .cx-fragment:hover { transform: translateX(4px); }
+      #codex .cx-fragment.on { border-color: var(--t); box-shadow: 0 0 0 1px var(--t), 0 0 20px color-mix(in srgb, var(--t) 27%, transparent); }
+      #codex .cx-fragment.cx-verrou { border-style: dashed; border-color: rgba(150, 200, 235, 0.16); background: rgba(3, 7, 16, 0.5); opacity: 0.65; }
+      .cx-point { position: absolute; left: -27px; top: 16px; width: 14px; height: 14px; border-radius: 50%; background: var(--t); border: 2px solid #eaf6ff; box-shadow: 0 0 10px var(--t); }
+      .cx-verrou .cx-point { background: #0a1420; border-color: rgba(150, 200, 235, 0.3); box-shadow: none; }
+      .cx-fragment .cx-tag { font-family: var(--font-display); font-size: calc(8px * var(--ui)); letter-spacing: 0.2em; color: var(--t); }
+      .cx-fragment.cx-verrou .cx-tag { color: var(--dim); }
+      .cx-fragment .cx-quand { font-size: calc(10px * var(--ui)); color: var(--dim); letter-spacing: 0.1em; text-align: right; }
+      .cx-fragment b { grid-column: 1 / -1; font-family: var(--font-display); font-size: calc(10.5px * var(--ui)); letter-spacing: 0.08em; color: #eaf6ff; line-height: 1.45; font-weight: 400; }
+      .cx-fragment .cx-extrait { grid-column: 1 / -1; font-size: calc(11.5px * var(--ui)); line-height: 1.55; color: #b9d3e3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+      .cx-fragment.cx-verrou .cx-extrait { color: var(--dim); }
+      /* la fiche lue */
+      .cx-fiche { position: relative; display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; min-height: 0; min-width: 0; overflow: auto; border-left: 1px solid rgba(150, 200, 235, 0.12); background: linear-gradient(180deg, rgba(3, 7, 16, 0.5), rgba(3, 7, 16, 0.2)); }
+      .cx-video { position: relative; aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden; background: #020509; border: 1px solid rgba(150, 200, 235, 0.16); display: grid; place-items: center; }
+      .cx-video video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.4s; }
+      .cx-video.cx-video--prete video { opacity: 1; }
+      .cx-video .cx-hex--grand, .cx-video em { position: relative; z-index: 1; }
+      .cx-video em { position: absolute; bottom: 8px; font-style: normal; font-family: var(--font-display); font-size: calc(8px * var(--ui)); letter-spacing: 0.2em; color: var(--dim); display: none; }
+      .cx-video.cx-video--absente video { display: none; }
+      .cx-video.cx-video--absente em { display: block; }
+      .cx-video.cx-video--prete .cx-hex--grand, .cx-video.cx-video--prete em { display: none; }
+      .cx-video.cx-video--verrou { border-style: dashed; }
+      .cx-fiche-titres { display: flex; flex-direction: column; gap: 6px; text-align: center; }
+      .cx-etiquette { font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.24em; }
+      .cx-fiche-titres h3 { margin: 0; font-family: var(--font-display); font-size: calc(13px * var(--ui)); letter-spacing: 0.1em; color: #eaf6ff; line-height: 1.4; font-weight: 400; }
+      .cx-fiche-titres small { font-size: calc(11px * var(--ui)); color: var(--dim); }
+      .cx-texte { margin: 0; font-size: calc(12.5px * var(--ui)); line-height: 1.6; color: var(--ink); padding: 12px 14px; border-radius: 10px; background: rgba(3, 7, 16, 0.55); border: 1px solid rgba(150, 200, 235, 0.12); }
+      .cx-texte--muet { color: var(--dim); }
+      .cx-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .cx-stats div { padding: 10px; border-radius: 8px; border: 1px solid rgba(150, 200, 235, 0.12); display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+      .cx-stats span { font-size: calc(9px * var(--ui)); letter-spacing: 0.18em; color: var(--dim); }
+      .cx-stats b { font-size: calc(12px * var(--ui)); font-weight: 400; color: #eaf6ff; }
+      .cx-indice { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(255, 210, 74, 0.3); background: rgba(255, 210, 74, 0.05); }
+      .cx-indice span { font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.2em; color: #ffd24a; }
+      .cx-indice p { margin: 0; font-size: calc(12px * var(--ui)); line-height: 1.55; color: #eaf6ff; }
+      #codex #cx-cibler { margin-top: 4px; text-align: center; font-family: var(--font-display); font-size: calc(9px * var(--ui)); letter-spacing: 0.18em; padding: 9px 12px; border-radius: 6px; border: 1px solid rgba(255, 210, 74, 0.5); color: #ffd24a; background: rgba(255, 210, 74, 0.08); cursor: pointer; transition: all 0.2s; }
+      #codex #cx-cibler:hover { background: rgba(255, 210, 74, 0.25); }
+      #codex #cx-cibler.on { color: #1a1200; background: #ffd24a; border-color: #ffd24a; }
+      .cx-fiche-vide { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 30px 0; color: var(--dim); font-size: calc(12px * var(--ui)); }
+      .cx-atelier-journal { margin: 8px 0 0; font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.16em; padding: 8px 10px; border-radius: 6px; border: 1px dashed rgba(150, 200, 235, 0.35); background: transparent; color: #eaf6ff; cursor: pointer; }
+      .cx-atelier-journal:hover { background: rgba(99, 183, 230, 0.15); }
+      .cx-memoire { color: #ffd24a !important; }
+      .cx-gain { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255, 210, 74, 0.18); background: rgba(255, 210, 74, 0.04); }
+      .cx-gain span { font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.2em; color: var(--dim); }
+      .cx-gain b { font-size: calc(12px * var(--ui)); font-weight: 400; letter-spacing: 0.08em; }
+      .cx-gain small { margin-left: auto; font-size: calc(9px * var(--ui)); letter-spacing: 0.18em; }
+      /* L'ATELIER DU CONCEPTEUR : sous la fiche, mode concepteur seulement */
+      .cx-atelier { border: 1px dashed rgba(150, 200, 235, 0.3); border-radius: 10px; background: rgba(3, 7, 16, 0.5); }
+      .cx-atelier summary { cursor: pointer; padding: 9px 14px; font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.2em; color: var(--dim); list-style: none; }
+      .cx-atelier summary::before { content: '▸ '; }
+      .cx-atelier[open] summary::before { content: '▾ '; }
+      .cx-atelier summary i { font-style: normal; color: #ffd24a; }
+      .cx-atelier-corps { display: flex; flex-direction: column; gap: 10px; padding: 4px 14px 12px; }
+      .cx-atelier label { display: flex; flex-direction: column; gap: 4px; }
+      .cx-atelier label span { font-size: calc(9px * var(--ui)); letter-spacing: 0.18em; color: var(--dim); }
+      .cx-atelier label small { font-size: calc(10px * var(--ui)); color: var(--dim); }
+      .cx-atelier input, .cx-atelier select { font: inherit; font-size: calc(12px * var(--ui)); color: #eaf6ff; background: rgba(3, 7, 16, 0.7); border: 1px solid rgba(150, 200, 235, 0.25); border-radius: 6px; padding: 6px 8px; max-width: 100%; }
+      .cx-atelier input[type='file'] { font-size: calc(10px * var(--ui)); padding: 4px; }
+      .cx-atelier-boutons { display: flex; flex-wrap: wrap; gap: 6px; }
+      .cx-atelier-boutons button { font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.16em; padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(150, 200, 235, 0.35); background: rgba(99, 183, 230, 0.08); color: #eaf6ff; cursor: pointer; }
+      .cx-atelier-boutons button:hover:not(:disabled) { background: rgba(99, 183, 230, 0.2); }
+      .cx-atelier-boutons button:disabled { opacity: 0.5; cursor: wait; }
+      .cx-atelier-etat { margin: 0; min-height: 1em; font-size: calc(11px * var(--ui)); color: #ffd24a; }
+      .cx-atelier-etat:empty { display: none; }
+      .cx-atelier-note { margin: 0; font-size: calc(10px * var(--ui)); line-height: 1.5; color: var(--dim); }
+      .cx-pied { margin-top: auto; display: flex; justify-content: space-between; font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; color: var(--dim); padding-top: 8px; border-top: 1px solid rgba(150, 200, 235, 0.1); }
+      @media (prefers-reduced-motion: reduce) {
+        #codex .cx-carte, #codex .cx-fragment, .cx-barre i, .cx-anneau .cx-arc { transition: none; }
+      }
       .rec-salle {
         margin-top: 12px; padding-top: 6px;
         font-family: var(--font-display); font-size: calc(11px * var(--ui)); letter-spacing: 0.16em;
@@ -2816,8 +3083,8 @@
         #trophee-toast.visible .tt-cartouche { animation: none; }
       }
       /* la fiche fraîchement visitée s'illumine le temps d'un regard */
-      .cdx-carte.cdx-neuve {
-        border-color: var(--specimen);
+      #codex .cx-neuve {
+        border-color: var(--specimen) !important;
         animation: cdx-neuve 1.1s ease-in-out 3;
       }
       @keyframes cdx-neuve {
@@ -7396,12 +7663,14 @@
         <button id="home-station" type="button" title="LA STATION : le plan général du complexe orbital — les modules et leurs coursives, tels que la descente les traverse. On y voit d'où l'on vient, où l'on est, ce qui est ouvert et ce qui attend un orbe"><i>🛰&#xFE0E;</i><span>LA STATION</span></button>
         <button id="start-editor" type="button" data-dev title="Créer ou modifier un tableau"><i>✎</i><span>ÉDITEUR</span></button>
         <button id="home-marchand" type="button" data-dev title="LE MARCHAND du hub, sans nager jusqu'à l'étal : les orbes d'essence de conscience, les améliorations durables, les provisions — payés en mémoire"><i>🔮</i><span>MARCHAND</span></button>
+        <button id="home-regie" type="button" data-dev class="home-regie" title="LA RÉGIE : la console du concepteur — la carte, la descente, la planche, le récit et les fins, le scénario, le codex, le marchand, les récompenses, les textes ; ce qui est publié pour tout le monde ; et le tir à blanc du système de run"><i>◎</i><span>RÉGIE</span></button>
         <button id="home-carte" type="button" data-dev title="L'ÉDITEUR DE LA CARTE : le plan à routes ramifiées de la station — modules, coursives, zones, conditions d'accès. Se glisse, se lie, s'exporte en carteStation.json ; un aperçu jeu rejoue la traversée"><i>⌬</i><span>CARTE</span></button>
         <button id="home-regles" type="button" data-dev title="Le cahier des règles de la génération procédurale : ce que le générateur fait (annotable), ce qu'un level designer en attend (propositions), et vos règles nouvelles en texte libre — partagé entre concepteurs, relu au moment d'implémenter"><i>§</i><span>RÈGLES DE GÉN.</span></button>
         <button id="home-descente" type="button" data-dev title="LA DESCENTE : le déroulement d'une run réglé de bout en bout — longueur, rampe de difficulté, posture des salles, et les quatre poids de l'algorithme qui choisit les tableaux. Le plan se déroule rang par rang sous les yeux, et se tire à blanc sans jouer"><i>▼</i><span>LA DESCENTE</span></button>
         <button id="open-montage" type="button" data-dev title="La table de montage des cinématiques : planches, effets, sons — et lecture immédiate"><i>▤</i><span>MONTAGE</span></button>
         <button id="home-salles" type="button" data-dev><i>▦</i><span>SALLES</span></button>
         <button id="home-planche" type="button" data-dev title="La planche d'ordonnancement : toutes les salles de la bibliothèque en cartes visuelles — glisser pour réordonner la séquence, régler le code cran par cran, essayer d'un ⏵"><i>▧</i><span>LA PLANCHE</span></button>
+        <button id="home-journal" type="button" data-dev title="RÉCIT & FINS : l'atelier du journal — l'ordre des fragments du récit et des fins que chaque expédition bouclée révèle, leurs textes, et les seuils de la révélation et du dénouement. Publié pour tous, sans passer par le dépôt"><i>🚪</i><span>RÉCIT &amp; FINS</span></button>
         <button id="home-textes" type="button" data-dev title="LE CATALOGUE DES TEXTES : tout ce que le joueur peut lire, en un endroit — chaque texte avec sa clé et l'endroit où il apparaît. Le plan de travail de la réécriture, et le socle d'une future traduction"><i>¶</i><span>TEXTES</span></button>
         <button id="home-recompenses" type="button" data-dev title="L'atelier des récompenses : le catalogue complet des instruments, ce que chaque carte tire comme levier — et de quoi en fabriquer de nouvelles avec les mêmes pièces"><i>❖</i><span>RÉCOMPENSES</span></button>
         <button id="home-pupitre" type="button" data-dev title="Le pupitre d'essais : simuler les événements du jeu (cérémonie, bonbonne, paliers, sons) au doigt — sans console navigateur"><i>▚</i><span>PUPITRE</span></button>
@@ -7920,6 +8189,16 @@
     </div>
 
     <!-- LE CAHIER DES RÈGLES : la génération procédurale, écrite noir sur blanc -->
+    <!-- L'ATELIER DU JOURNAL (RÉCIT & FINS) : l'ordre des fragments et des
+         fins servis par l'expédition bouclée, leurs textes, les deux seuils.
+         Gabarit et gestes dans src/editor/atelierJournal.ts -->
+    <div id="journal-atelier" hidden aria-label="L’atelier du journal : récit et fins"></div>
+
+    <!-- LA RÉGIE : la console du concepteur — un rail, tous les outils du
+         système de run, la vue d'ensemble du partage et le tir à blanc.
+         Gabarit et gestes dans src/editor/regie.ts -->
+    <div id="regie" hidden aria-label="La régie : la console du concepteur"></div>
+
     <div id="regles" hidden aria-label="Le cahier des règles de génération">
       <div class="salles-boite regles-boite">
         <div class="salles-tete"><span>LE CAHIER DES RÈGLES — la génération procédurale</span>
@@ -7947,6 +8226,10 @@
             <span class="tx-cpt"><b id="tx-n-faits">0</b><i>rendus</i></span>
             <span class="tx-cpt"><b id="tx-n-signes">0</b><i>signes</i></span>
           </div>
+          <span id="tx-partage" class="tx-partage"></span>
+          <button type="button" id="tx-publier" class="tx-lien" title="Publie le brouillon de ce poste (toutes langues) au magasin partagé : tout le monde le lit">⇪ Publier</button>
+          <button type="button" id="tx-reprendre" class="tx-lien" title="Remplace le brouillon de ce poste par le publié">Reprendre le publié</button>
+          <button type="button" id="tx-retirer" class="tx-lien" title="Retire les retouches publiées : les joueurs lisent le code">Retirer le publié</button>
           <button type="button" id="tx-md" class="tx-lien" title="Copie les entrées affichées en Markdown, clés comprises — de quoi relire hors ligne">Markdown</button>
           <button type="button" id="tx-exp" class="tx-lien" title="Copie VOS RETOUCHES de cette langue en JSON — c'est ce fichier qu'on grave dans le code, ou qu'on envoie à un traducteur">Exporter</button>
           <button type="button" id="tx-imp" class="tx-lien" title="Reprend un export de retouches. La langue du document fait foi, quelle que soit celle affichée">Importer</button>
@@ -8000,6 +8283,10 @@
               <button type="button" id="rec-annuler" class="at-lien">vider le formulaire</button>
             </div>
             <div class="at-io">
+              <p id="rec-partage" class="at-dit at-partage"></p>
+              <button type="button" id="rec-publier" class="at-lien" title="Publie les cartes de cet atelier au magasin partagé : elles entrent au tirage pour tout le monde">⇪ publier pour tous</button>
+              <button type="button" id="rec-reprendre" class="at-lien" title="Remplace les cartes de cet atelier par les publiées">reprendre les publiées</button>
+              <button type="button" id="rec-retirer" class="at-lien" title="Retire les cartes publiées : les livrées seules restent">retirer les publiées</button>
               <button type="button" id="rec-exporter" class="at-lien">exporter en JSON</button>
               <button type="button" id="rec-importer" class="at-lien">importer ce JSON</button>
               <textarea id="rec-json" hidden rows="6" spellcheck="false" aria-label="JSON des cartes fabriquées"></textarea>
@@ -8115,18 +8402,8 @@
     <!-- Le voile RECORDS : le palmarès partagé — trois podiums par salle -->
     <!-- Le voile CODEX : le manuel du jeu, écrit par la partie — chaque
          interaction état × élément vécue en jeu débloque sa fiche -->
-    <div id="codex" hidden aria-label="Codex">
-      <div class="salles-boite">
-        <div class="salles-tete"><span>CODEX DU PROTOCOLE — <span id="codex-compte"></span></span>
-          <button type="button" id="codex-fermer" aria-label="Fermer">✕</button></div>
-        <div class="params-desc" style="padding: 8px 12px 0">
-          Le vaisseau consigne ce que le sujet apprend de lui-même. Chaque
-          interaction découverte EN JOUANT — un état, un élément, un contact —
-          débloque sa fiche. Les « ? » sont autant d'expériences à tenter.
-        </div>
-        <div id="codex-corps"></div>
-      </div>
-    </div>
+    <!-- LE CODEX : la maquette « Codex v2 » — le gabarit est bâti par game/ecranCodex.ts -->
+    <div id="codex" hidden aria-label="Codex"></div>
 
     <div id="cycle" hidden aria-label="Les mémoires">
       <div id="cycle-ecran">

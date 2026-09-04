@@ -10,6 +10,7 @@
 | Fichier | Rôle |
 | --- | --- |
 | `src/game/carteStation.json` | **La source de vérité.** Ce que l'éditeur exporte, ce que le jeu lit. Rien de la carte n'est écrit en dur ailleurs. |
+| `src/game/cartePartage.ts` | Le partage : la carte PUBLIÉE (magasin `/api/reglages`, domaine `carte`) joue pour tout le monde si elle est lisible et sans erreur ; la livrée reste le filet. |
 | `src/game/carteStation.ts` | Le modèle : types, lecture (`parseCarte`), sérialisation à l'identique, vérification de fond (`verifieCarte`), et les questions pures — où passe une coursive (`traceLien`), quel module est atteignable, quelle couleur pour cette température. |
 | `src/game/dessinCarte.ts` | Le dessin, en une chaîne SVG (`dessinCarteSVG`). Pur : il sert à l'éditeur aujourd'hui, et servira tel quel à l'écran de jeu. |
 | `src/editor/carteOperations.ts` | Les gestes, purs : déplacer, redimensionner, lier, renommer, supprimer, l'historique. |
@@ -201,9 +202,9 @@ Dans l'ordre, une PR vers `dev` par étape :
 4. ~~**Le champ biome dans la planche et l'éditeur de tableaux**~~ Fait —
    voir ci-dessous. L'étiquetage lui-même est un choix de conception par
    salle : il se fait dans la planche, les compteurs disent où il manque.
-5. **Retirer** `src/game/station.ts`, `planStation.ts` et
-   `station.spec.ts` : plus importés, leur suppression a été refusée à
-   l'outil.
+5. ~~**Retirer** `src/game/station.ts`, `planStation.ts` et
+   `station.spec.ts`~~ Fait — retirés avec le codex refait, sur accord du
+   concepteur.
 
 ## Étiqueter les tableaux par biome
 

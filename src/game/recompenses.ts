@@ -4,9 +4,13 @@
 // à côte : même forme, même grammaire d'effets, même chemin dans le jeu.
 // Une carte d'atelier n'est pas une maquette — elle se tire au hasard, elle
 // s'emporte, elle agit, exactement comme une carte gravée dans le code.
-// Ce qui les sépare tient en un drapeau (`perso`) et en un lieu de rangement
-// (le stockage du poste, pas le dépôt) — c'est le passage à l'acte : quand
-// une carte fabriquée fait ses preuves, on l'exporte et on la grave.
+// Ce qui les sépare tient en un drapeau (`perso`) et en un lieu de rangement.
+// Les cartes du POSTE sont le BROUILLON du concepteur ; les cartes PUBLIÉES
+// (magasin partagé, /api/reglages) jouent pour tout le monde. Un joueur ne
+// fabrique rien : il joue les publiées ; un concepteur joue son brouillon
+// s'il en a un, sinon les publiées — comme le plan de la descente. Graver
+// dans le code (exporter, coller dans instruments.ts) reste possible : c'est
+// le filet, plus la seule voie.
 
 import {
   INSTRUMENTS,
@@ -43,9 +47,55 @@ export function recompensesPerso(): InstrumentDef[] {
   return perso
 }
 
-/** Le catalogue COMPLET : les cartes livrées, puis celles de l'atelier. */
+// ---- LES PUBLIÉES, ET CE QUI SE JOUE -----------------------------------------
+
+let publiees: InstrumentDef[] | null = null // null : rien de publié, ou pas lu
+let concepteur = false
+
+/** Le mode concepteur décide si le brouillon du poste prime. */
+export function poseConcepteurRecompenses(on: boolean): void {
+  concepteur = on
+}
+
+/** Pose les cartes publiées (le document du magasin) — null les retire. */
+export function poseRecompensesPubliees(brut: unknown): InstrumentDef[] | null {
+  const liste = (brut && typeof brut === 'object' ? (brut as { cartes?: unknown }).cartes : null) ?? brut
+  publiees = Array.isArray(liste) ? (liste.map(nettoie).filter((x) => x !== null) as InstrumentDef[]) : null
+  return publiees
+}
+
+export function recompensesPubliees(): InstrumentDef[] | null {
+  return publiees
+}
+
+/** Le brouillon du poste est-il ce qui se joue ici ? Oui tant que rien
+ *  n'est publié (rien ne change pour un poste hors-ligne), et pour un
+ *  concepteur qui a des cartes en atelier. */
+export function brouillonRecompensesActif(): boolean {
+  return publiees === null || (concepteur && recompensesPerso().length > 0)
+}
+
+/** Les cartes JOUÉES au-delà des livrées : le brouillon s'il prime, sinon
+ *  les publiées. */
+export function recompensesJouees(): InstrumentDef[] {
+  return brouillonRecompensesActif() ? recompensesPerso() : (publiees ?? [])
+}
+
+/** Le document à publier : les cartes du poste, telles quelles. */
+export function documentRecompenses(): { cartes: InstrumentDef[] } {
+  return { cartes: recompensesPerso().map((c) => ({ ...c, effets: c.effets.map((e) => ({ ...e })) })) }
+}
+
+/** Reprend les publiées comme brouillon (le poste repart de ce qui joue). */
+export function reprendRecompensesPubliees(): number {
+  perso = (publiees ?? []).map((c) => ({ ...c, effets: c.effets.map((e) => ({ ...e })) }))
+  ecrit()
+  return perso.length
+}
+
+/** Le catalogue COMPLET : les cartes livrées, puis celles qui se jouent. */
 export function catalogueRecompenses(): InstrumentDef[] {
-  return [...INSTRUMENTS, ...recompensesPerso()]
+  return [...INSTRUMENTS, ...recompensesJouees()]
 }
 
 function ecrit(): void {

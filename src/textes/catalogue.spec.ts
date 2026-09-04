@@ -6,7 +6,7 @@ import {
   comptesParDomaine,
   enCle,
 } from './catalogue'
-import { CODEX } from '../game/codex'
+import { CODEX_EXPERIENCES } from '../game/codex'
 import { TABLEAUX } from '../game/level'
 import { INSTRUMENTS } from '../game/instruments'
 import { TROPHEES } from '../game/trophees'
@@ -64,14 +64,14 @@ describe('Le catalogue des textes', () => {
   // ---- COUVERTURE : le catalogue suit les modules, il ne les devine pas ----
 
   it('couvre TOUTES les fiches du codex, titre et corps', () => {
-    for (const f of CODEX) {
+    for (const f of CODEX_EXPERIENCES) {
       const k = enCle(f.id)
       expect(CAT.find((e) => e.cle === `codex.${k}.titre`)?.texte).toBe(f.titre)
       expect(CAT.find((e) => e.cle === `codex.${k}.texte`)?.texte).toBe(
         f.texte.trim(),
       )
     }
-    expect(CAT.filter((e) => e.domaine === 'codex').length).toBe(CODEX.length * 2)
+    expect(CAT.filter((e) => e.domaine === 'codex').length).toBe(CODEX_EXPERIENCES.length * 2)
   })
 
   it('couvre TOUS les tableaux : nom, journal et chaque pancarte', () => {
@@ -142,9 +142,11 @@ describe('Le catalogue des textes', () => {
   it('pèse ce que l’inventaire annonçait : quelques centaines d’entrées', () => {
     // garde-fou d'ordre de grandeur : si le catalogue tombe à cent entrées,
     // c'est qu'une source a cessé d'être parcourue sans que rien ne crie
-    expect(CAT.length).toBeGreaterThan(500)
+    // (le journal — récit et fins, 22 entrées — s'écrit dans son atelier,
+    // hors catalogue : le seuil en tient compte)
+    expect(CAT.length).toBeGreaterThan(450)
     const car = CAT.reduce((s, e) => s + e.texte.length, 0)
-    expect(car).toBeGreaterThan(25_000)
+    expect(car).toBeGreaterThan(20_000)
   })
 
   it('se range par domaine, du plus lourd au plus léger', () => {

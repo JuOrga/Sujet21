@@ -6,7 +6,20 @@ import { FluidSim, KIND_PLAYER, COEUR_PART } from './sim/solver'
 import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
 import { evenementsPlasma } from './game/plasmaFx'
-import { CODEX, Codex, type CodexGroupe } from './game/codex'
+import { Codex } from './game/codex'
+import { AtelierJournal } from './editor/atelierJournal'
+import { Regie } from './editor/regie'
+import { tirABlanc } from './game/tirABlanc'
+import { deleteReglage, fetchReglage, pushReglage } from './game/reglagesPartages'
+import { etatPlan, litPlanPublie, planAuDemarrage } from './game/planPartage'
+import { documentCarte, litCartePubliee } from './game/cartePartage'
+import {
+  deleteReglageCodex,
+  fetchReglagesCodex,
+  pushReglageCodex,
+  reglageDe,
+  type ReglagesCodex,
+} from './game/codexReglages'
 import { niveauExpanse } from './game/structures'
 import {
   TABLEAU_HUB,
@@ -21,10 +34,18 @@ import {
   reparationDef,
 } from './game/reparations'
 import {
-  DECOUVERTES,
-  prochaineDecouverte,
-  recitAcheve,
-} from './game/decouvertes'
+  denouementAtteint,
+  fetchJournal,
+  finsVues,
+  fragmentsVus,
+  journalCourant,
+  poseJournal,
+  prochainFragment,
+  prochaineFin,
+  pushJournal,
+  deleteJournal,
+  revelationAtteinte,
+} from './game/journal'
 import {
   MECANIQUE_NOMS,
   codeCanon,
@@ -62,6 +83,7 @@ import {
 } from './game/voie'
 import {
   CARTE_LIVREE,
+  type CarteStation,
   ORBES,
   biomesDeCarte,
   couleurTemperature,
@@ -94,8 +116,14 @@ import { FIGURE_FAMILLES, FIGURE_NOMS } from './game/figures'
 import { CIRCUITS } from './game/circuits'
 import type { LevierId } from './game/leviers'
 import {
+  brouillonRecompensesActif,
   catalogueRecompenses,
+  documentRecompenses,
   exporteRecompenses,
+  poseConcepteurRecompenses,
+  poseRecompensesPubliees,
+  recompensesPubliees,
+  reprendRecompensesPubliees,
   idDepuisNom,
   importeRecompenses,
   poseRecompense,
@@ -147,8 +175,16 @@ import {
   LANGUE_SOURCE,
   applique,
   avance,
+  brouillonTextesActif,
+  brouillonTextesVide,
+  documentTextes,
   exporteTextes,
   importeTextes,
+  nombreRetouches,
+  poseConcepteurTextes,
+  poseTextesPublies,
+  reprendTextesPublies,
+  textesPublies,
   langueDef,
   poseTexte,
   retireTexte,
@@ -195,6 +231,7 @@ import {
 } from './game/level'
 import { LevelEditor } from './editor/editor'
 import { EditeurCarte } from './editor/editeurCarte'
+import { EcranCodex } from './game/ecranCodex'
 import {
   traceLaser,
   creerEtatRecepteurs,
@@ -253,7 +290,9 @@ import { fetchBibliotheque } from './game/netCines'
 import {
   SEQUENCE_ALERTE,
   Sequenceur,
-  chargeSequences,
+  poseSequencesPubliees,
+  sequencesJouees,
+  sequencesPubliees,
   type SequenceDef,
 } from './game/sequence'
 import {
@@ -655,7 +694,8 @@ let hubMemo: { base: LevelDef; cle: string; lv: LevelDef } | null = null
  * niveau est comparé par référence un peu partout). */
 function finOuverte(): boolean {
   return (
-    recitAcheve(records.decouvertesVues()) && records.estRepare('passerelle-4')
+    revelationAtteinte(journalCourant(), records.decouvertesVues()) &&
+    records.estRepare('passerelle-4')
   )
 }
 function hubJoue(): LevelDef {
@@ -791,17 +831,38 @@ let pupitresASemer = false
 const provisionsRun = { bonbonne: 0, vies: 0, clef: false, condensat: 0 }
 let plotsDedans: boolean[] = []
 
-// Le PLAN de la voie : paramétrable au banc, mémorisé par poste.
+// Le PLAN de la voie : réglé dans l'écran LA DESCENTE. Le BROUILLON du
+// poste (localStorage) est l'outil de réglage ; le plan PUBLIÉ (magasin
+// partagé, /api/reglages) joue pour tout le monde — la règle « qui joue
+// quel plan » vit dans planPartage.ts. Au démarrage, le brouillon du poste
+// s'il y en a un (le publié arrive ensuite et tranche, voir plus bas).
 const CLE_PLAN_VOIE = 'sujet21-voie-plan-v1'
-const voiePlan: PlanVoie = (() => {
+const planBrouillonInitial: PlanVoie | null = (() => {
   try {
-    return clampPlanVoie(
-      JSON.parse(localStorage.getItem(CLE_PLAN_VOIE) ?? 'null') as PlanVoie,
-    )
+    const brut = localStorage.getItem(CLE_PLAN_VOIE)
+    return brut ? clampPlanVoie(JSON.parse(brut) as Partial<PlanVoie>) : null
   } catch {
-    return clampPlanVoie(null)
+    return null
   }
 })()
+const voiePlan: PlanVoie = clampPlanVoie(planBrouillonInitial)
+let planPublie: PlanVoie | null = null
+let planPublieInfo = { auteur: '', date: '', charge: false }
+// LE PLAN PUBLIÉ arrive du magasin : un joueur le joue tel quel (son poste
+// ne règle jamais le plan) ; un concepteur garde son brouillon s'il en a
+// un — l'écran LA DESCENTE lui dit lequel joue
+void fetchReglage('plan-voie').then((p) => {
+  if (!p) return
+  planPublie = litPlanPublie(p.document)
+  planPublieInfo = { auteur: p.auteur, date: p.date, charge: true }
+  const r = planAuDemarrage({
+    brouillon: planBrouillonInitial,
+    publie: planPublie,
+    concepteur: document.body.classList.contains('concepteur'),
+  })
+  Object.assign(voiePlan, r.plan)
+  if (descenteEl && !descenteEl.hidden) renderDescente()
+})
 // ---- LA CARTE DE LA STATION : la descente est pilotée par le plan ------
 // Un module est un BIOME (des salles, réglées dans carteStation.json) ; au
 // bout de ses salles, la carte s'ouvre dans la cérémonie et la coursive
@@ -810,8 +871,41 @@ const voiePlan: PlanVoie = (() => {
 // module, plus court chemin en niveaux jusqu'à l'objectif (descenteCarte.ts).
 // Le plan de voie garde tout le reste : rampe de difficulté, moments,
 // postures, pioche — il reçoit simplement la longueur vraie (planEffectif).
-const carte = CARTE_LIVREE
+// La carte JOUÉE : la livrée, ou la PUBLIÉE par le concepteur dès qu'elle
+// arrive du magasin (cartePartage.ts : lisible et sans erreur, sinon la
+// livrée reste). Le brouillon de l'éditeur ne joue jamais : il a son aperçu.
+let carte: CarteStation = CARTE_LIVREE
 let carteRun: EtatCarteRun = departCarte(carte)
+let cartePubliee: CarteStation | null = null
+function appliqueCartePubliee(c: CarteStation | null): void {
+  carte = c ?? CARTE_LIVREE
+  // l'état de run se relit contre la carte neuve : un module disparu
+  // ramène au départ, tout le reste tient
+  carteRun = litEtatCarteRun(carteRun, carte)
+  hubMemo = null
+}
+void fetchReglage('carte').then((p) => {
+  if (!p) return
+  cartePubliee = litCartePubliee(p.document)
+  if (cartePubliee) appliqueCartePubliee(cartePubliee)
+})
+// LES RÉCOMPENSES, LES TEXTES, LES SÉQUENCES publiés : même règle que le
+// plan — un joueur joue le publié, un concepteur son brouillon s'il en a un
+let recPublieInfo = { auteur: '', date: '', charge: false }
+let txPublieInfo = { auteur: '', date: '', charge: false }
+void fetchReglage('recompenses').then((p) => {
+  if (!p) return
+  poseRecompensesPubliees(p.document)
+  recPublieInfo = { auteur: p.auteur, date: p.date, charge: true }
+})
+void fetchReglage('textes').then((p) => {
+  if (!p) return
+  poseTextesPublies(p.document)
+  txPublieInfo = { auteur: p.auteur, date: p.date, charge: true }
+})
+void fetchReglage('sequences').then((p) => {
+  if (p) poseSequencesPubliees(p.document)
+})
 /** Les orbes ACQUIS, pour les cadenas de la carte : ceux en poche, plus
  *  ceux que le cycle tient déjà (une transformation tissée vaut son orbe —
  *  on l'a dépensé pour elle — et un état atteint vaut le sien). */
@@ -1856,12 +1950,18 @@ const livraisonsEl = document.getElementById('livraisons') as HTMLDivElement
       // stockage refusé : le mode ne tiendra que la session — sans gravité
     }
     document.body.classList.toggle('concepteur', on)
+    poseConcepteurRecompenses(on)
+    poseConcepteurTextes(on)
   }
   {
     const q = new URLSearchParams(location.search)
     if (q.get('dev') === '0') poseConcepteur(false)
     else if (q.has('dev')) poseConcepteur(true)
-    else document.body.classList.toggle('concepteur', concepteurActif())
+    else {
+      document.body.classList.toggle('concepteur', concepteurActif())
+      poseConcepteurRecompenses(concepteurActif())
+      poseConcepteurTextes(concepteurActif())
+    }
   }
   let tapsVersion = 0
   let dernierTapVersion = 0
@@ -2030,9 +2130,29 @@ trophees.onDebloque = (t) => {
 // Le CODEX partage la fanfare des trophées : même toast, autre étiquette —
 // et sa page (fiche d'essai, bouton CODEX) se remplit au fil des découvertes
 const codex = new Codex()
+// LES RÉGLAGES DU CODEX (mémoire à la découverte, rareté, vidéo envoyée) :
+// le magasin partagé les donne, le code porte les défauts — hors-ligne,
+// chaque fiche vaut dix de mémoire et sa vidéo est celle du dossier
+let reglagesCodex: ReglagesCodex = {}
+void fetchReglagesCodex().then((r) => {
+  if (!r) return
+  reglagesCodex = r
+  renderCodexVoile()
+})
+// LE JOURNAL (récit, fins, seuils) : celui publié par le concepteur, s'il y
+// en a un — le livré joue en attendant, et hors-ligne
+void fetchJournal().then((p) => {
+  if (!p?.journal) return
+  poseJournal(p.journal)
+  renderCodexVoile()
+})
 codex.onDecouverte = (d) => {
+  // chaque fiche grave sa mémoire — le montant est réglé par le concepteur,
+  // fiche par fiche ; une seule fois, Codex.marque le garantit
+  const gain = reglageDe(reglagesCodex, d.id).memoire
+  gagneMemoireRun(gain)
   toastFile.push({
-    nom: codexLu(d).titre,
+    nom: gain > 0 ? `${codexLu(d).titre} · +${gain} mémoire` : codexLu(d).titre,
     icone: d.icone,
     sur: 'CODEX — NOUVELLE FICHE',
     fiche: d.id,
@@ -2658,8 +2778,7 @@ function ouvrePupitre(ecran: EcranPupitre): void {
       renderCycleVoile()
       break
     case 'codex':
-      codexEl.hidden = false
-      renderCodexVoile()
+      ecranCodex.open()
       break
     case 'fioles':
       fiolesEl.hidden = false
@@ -2705,50 +2824,61 @@ function pupitreOuvert(ecran: EcranPupitre): boolean {
 // hydrophile en liquide, écarter un rideau en glace…). Verrouillée, une
 // fiche n'affiche qu'un « ? » : la question donne envie d'aller essayer.
 const codexEl = document.getElementById('codex') as HTMLDivElement
-const codexCorps = document.getElementById('codex-corps') as HTMLDivElement
-const codexCompte = document.getElementById('codex-compte') as HTMLSpanElement
+// L'ÉCRAN DU CODEX (game/ecranCodex.ts) : la maquette « Codex v2 » — il ne
+// connaît pas les registres, il reçoit ce qu'il lit par ces crochets
+const ecranCodex = new EcranCodex(codexEl, {
+  connu: (id) => codex.connu(id),
+  quand: (id) => codex.quand(id),
+  lu: (d) => codexLu(d),
+  fermer: () => fermeCodex(),
+  reglage: (id) => reglageDe(reglagesCodex, id),
+  // le mode concepteur se lit sur le body (data-dev) : c'est lui qui montre
+  // ou cache les outils, l'atelier suit la même règle
+  concepteur: () => document.body.classList.contains('concepteur'),
+  atelierJournal: () => {
+    fermeCodex()
+    void atelierJournal.open()
+  },
+  sauve: async (id, r, video) => {
+    const res = await pushReglageCodex(id, r, records.operator() || 'anonyme', video)
+    if (res) reglagesCodex = res
+    return res !== null
+  },
+  retablit: async (id) => {
+    const res = await deleteReglageCodex(id)
+    if (res) reglagesCodex = res
+    return res !== null
+  },
+})
 function renderCodexVoile(): void {
-  if (!codexCorps) return
-  const groupes: { cle: CodexGroupe; nom: string; icone: string }[] = [
-    { cle: 'eau', nom: 'LIQUIDE', icone: '💧' },
-    { cle: 'glace', nom: 'GLACE', icone: '❄' },
-    { cle: 'vapeur', nom: 'VAPEUR', icone: '💨' },
-    { cle: 'phenomenes', nom: 'PHÉNOMÈNES', icone: '✦' },
-    { cle: 'recit', nom: 'LE RÉCIT', icone: '🛰️' },
-  ]
-  let html = ''
-  for (const g of groupes) {
-    const fiches = CODEX.filter((d) => d.groupe === g.cle)
-    const connues = fiches.filter((d) => codex.connu(d.id)).length
-    html += `<div class="cdx-groupe"><span>${g.icone} ${g.nom}</span><i>${connues}/${fiches.length}</i></div>`
-    html += '<div class="cdx-grille">'
-    for (const d of fiches) {
-      if (codex.connu(d.id)) {
-        // le titre et le corps viennent du CATALOGUE : ce que le
-        // concepteur a réécrit sur l'écran TEXTES paraît ici, dans la
-        // langue du moment — et se voit donc échapper, comme tout texte
-        // qui n'est plus une constante du code
-        const lu = codexLu(d)
-        html += `<div class="cdx-carte" data-fiche="${d.id}"><i>${d.icone}</i><div><b>${htmlSafe(lu.titre)}</b><span>${htmlSafe(lu.texte)}</span></div></div>`
-      } else {
-        html += `<div class="cdx-carte cdx-verrou"><i>?</i><div><b>FICHE À DÉCOUVRIR</b><span>Une interaction du protocole reste à vivre…</span></div></div>`
-      }
-    }
-    html += '</div>'
-  }
-  codexCorps.innerHTML = html
-  if (codexCompte)
-    codexCompte.textContent = `${codex.compte()}/${CODEX.length} fiches consignées`
+  ecranCodex.render()
 }
+// L'ATELIER DU JOURNAL (editor/atelierJournal.ts) : récit, fins, seuils —
+// publié pour tous au magasin partagé ; « essayer sur ce poste » fait
+// jouer le brouillon ici, tout de suite
+const atelierJournalEl = document.getElementById('journal-atelier') as HTMLDivElement
+const atelierJournal = new AtelierJournal(atelierJournalEl, {
+  auteur: () => records.operator() || 'anonyme',
+  charge: () => fetchJournal(),
+  publie: (j) => pushJournal(j, records.operator() || 'anonyme'),
+  retire: () => deleteJournal(),
+  applique: (j) => {
+    poseJournal(j)
+    renderCodexVoile()
+  },
+  fermer: () => atelierJournal.close(),
+})
+document.getElementById('home-journal')?.addEventListener('click', () => {
+  void atelierJournal.open()
+})
 document.getElementById('home-codex')?.addEventListener('click', () => {
-  codexEl.hidden = false
-  renderCodexVoile()
+  ecranCodex.open()
 })
 // Ouvert DEPUIS LE TOAST en pleine partie, le codex fige l'essai (lecture au
 // calme) et le rend en se fermant — ouvert depuis la fiche, rien à figer.
 let codexAPause = false
 function fermeCodex(): void {
-  codexEl.hidden = true
+  ecranCodex.close()
   if (codexAPause) {
     codexAPause = false
     input.paused = false
@@ -2761,19 +2891,8 @@ function ouvreCodexSur(fiche: string): void {
     input.paused = true
     codexAPause = true
   }
-  codexEl.hidden = false
-  renderCodexVoile()
-  const carte = codexCorps.querySelector<HTMLElement>(`[data-fiche="${fiche}"]`)
-  if (carte) {
-    carte.scrollIntoView({ block: 'center' })
-    carte.classList.add('cdx-neuve')
-    window.setTimeout(() => carte.classList.remove('cdx-neuve'), 3200)
-  }
+  ecranCodex.open(fiche)
 }
-document.getElementById('codex-fermer')?.addEventListener('click', fermeCodex)
-codexEl.addEventListener('pointerdown', (e) => {
-  if (e.target === codexEl) fermeCodex()
-})
 
 document.getElementById('salles-fermer')?.addEventListener('click', () => {
   sallesEl.hidden = true
@@ -3869,10 +3988,10 @@ function etatScenario(): EtatScenario {
     runs: Math.max(0, records.essaiNumber() - 1),
     salleMax: records.expedition()?.tableaux ?? 0,
     condensat,
-    // seuls les jalons du RÉCIT comptent (les marqueurs annexes, non)
-    decouvertes: records
-      .decouvertesVues()
-      .filter((id) => DECOUVERTES.includes(id)).length,
+    // seuls les fragments du RÉCIT comptent (les fins, les marqueurs, non)
+    decouvertes: fragmentsVus(journalCourant(), records.decouvertesVues()),
+    revelation: revelationAtteinte(journalCourant(), records.decouvertesVues()),
+    denouement: denouementAtteint(journalCourant(), records.decouvertesVues()),
     trophee: (id) => trophees.gagne(id),
   }
 }
@@ -3904,7 +4023,7 @@ const sequenceur = new Sequenceur({
 function trouveSequence(code: string): SequenceDef | null {
   const cible = code.trim().toLowerCase()
   return (
-    [SEQUENCE_ALERTE, ...chargeSequences()].find(
+    [SEQUENCE_ALERTE, ...sequencesJouees()].find(
       (s) => s.code.trim().toLowerCase() === cible,
     ) ?? null
   )
@@ -4016,6 +4135,19 @@ const montage = new TableMontage(el('montage'), {
     scenario = s
   },
   trophees: TROPHEES.map((t) => ({ id: t.id, nom: t.nom })),
+  sequencesPartage: {
+    publiees: () => sequencesPubliees(),
+    publie: async (seqs) => {
+      const p = await pushReglage('sequences', { sequences: seqs }, records.operator() || 'anonyme')
+      if (p) poseSequencesPubliees(p.document)
+      return p !== null
+    },
+    retire: async () => {
+      const ok = await deleteReglage('sequences')
+      if (ok) poseSequencesPubliees(null)
+      return ok
+    },
+  },
 })
 document
   .getElementById('open-montage')
@@ -4067,7 +4199,7 @@ const editor = new LevelEditor(el('editor'), {
       .filter((c, i, t) => t.findIndex((o) => o.code === c.code) === i)
       .map((c) => ({ code: c.code, titre: c.titre })),
   sequences: () =>
-    [SEQUENCE_ALERTE, ...chargeSequences()]
+    [SEQUENCE_ALERTE, ...sequencesJouees()]
       .filter((s, i, t) => t.findIndex((o) => o.code === s.code) === i)
       .map((s) => ({ code: s.code, titre: s.titre })),
   // les biomes de la carte de la station : le champ Biome du tableau
@@ -5451,6 +5583,97 @@ function dscOutils(): HTMLElement {
   return d
 }
 
+/** LE PLAN PARTAGÉ : d'où vient le plan qui joue sur ce poste, et les
+ *  quatre gestes — publier le brouillon pour tous, revenir au publié,
+ *  relire le magasin, retirer le publié (le livré reprend pour tous). */
+function dscPartage(): HTMLElement {
+  const d = document.createElement('div')
+  const etat = etatPlan({ courant: voiePlan, publie: planPublie })
+  const statut = document.createElement('p')
+  statut.className = 'dsc-partage'
+  const quand = planPublieInfo.date ? formateDateCourte(planPublieInfo.date) : ''
+  statut.innerHTML =
+    (planPublie
+      ? `<b>PUBLIÉ</b> par ${htmlSafe(planPublieInfo.auteur || 'anonyme')}${quand ? `, ${quand}` : ''}`
+      : planPublieInfo.charge
+        ? `<b>LE LIVRÉ JOUE</b> pour les joueurs — rien de publié`
+        : `<b>MAGASIN NON LU</b> — hors-ligne, ou pas encore`) +
+    ' · ce poste joue ' +
+    (etat.source === 'publie'
+      ? 'le publié'
+      : etat.source === 'livre'
+        ? 'le livré'
+        : `<i class="dsc-modifie">un brouillon ${planPublie ? 'différent du publié' : 'différent du livré'}, non publié</i>`)
+  d.appendChild(statut)
+  const outils = document.createElement('div')
+  outils.className = 'dsc-outils'
+  const bouton = (txt: string, titre: string, off: boolean, fait: () => void): void => {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.textContent = txt
+    b.title = titre
+    b.disabled = off
+    b.addEventListener('click', fait)
+    outils.appendChild(b)
+  }
+  bouton('⬆ PUBLIER', 'Publie le plan de ce poste au magasin partagé : il joue pour tout le monde dès leur prochaine descente.', etat.identiqueAuPublie, () => {
+    descenteDit('Publication…')
+    void pushReglage('plan-voie', clampPlanVoie(voiePlan), records.operator() || 'anonyme').then((p) => {
+      if (!p) {
+        descenteDit('Échec : le magasin partagé ne répond pas — rien n’a été publié.')
+        return
+      }
+      planPublie = litPlanPublie(p.document)
+      planPublieInfo = { auteur: p.auteur, date: p.date, charge: true }
+      renderDescente()
+      descenteDit('Plan publié : il joue pour tout le monde.')
+    })
+  })
+  bouton('↩ REVENIR AU PUBLIÉ', 'Abandonne le brouillon de ce poste : reprend le plan publié.', planPublie === null || etat.identiqueAuPublie, () => {
+    if (!planPublie) return
+    Object.assign(voiePlan, clampPlanVoie(planPublie))
+    sauvePlanVoie()
+    descenteTirage = null
+    descenteBilanFait = null
+    renderDescente()
+    descenteDit('Brouillon remis sur le plan publié.')
+  })
+  bouton('⟳ RECHARGER', 'Relit le plan publié (le brouillon de ce poste est gardé).', false, () => {
+    descenteDit('Lecture du magasin…')
+    void fetchReglage('plan-voie').then((p) => {
+      if (!p) {
+        descenteDit('Magasin injoignable.')
+        return
+      }
+      planPublie = litPlanPublie(p.document)
+      planPublieInfo = { auteur: p.auteur, date: p.date, charge: true }
+      renderDescente()
+      descenteDit(planPublie ? 'Plan publié relu.' : 'Rien de publié : le livré joue pour les joueurs.')
+    })
+  })
+  bouton('✕ RETIRER LE PUBLIÉ', 'Retire le plan publié : le plan livré avec le code reprend pour tout le monde.', planPublie === null, () => {
+    if (!window.confirm('Retirer le plan publié ? Le plan livré avec le code reprendra pour tout le monde.')) return
+    descenteDit('Retrait…')
+    void deleteReglage('plan-voie').then((ok) => {
+      if (!ok) {
+        descenteDit('Échec : le magasin partagé ne répond pas.')
+        return
+      }
+      planPublie = null
+      planPublieInfo = { auteur: '', date: '', charge: true }
+      renderDescente()
+      descenteDit('Plan publié retiré : le livré joue pour tout le monde.')
+    })
+  })
+  d.appendChild(outils)
+  return d
+}
+
+function formateDateCourte(iso: string): string {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
 /** LE PLAN EN CLAIR : le JSON, à copier d'un poste à l'autre. Un réglage
  *  qui ne se transmet pas n'existe que sur la machine qui l'a trouvé. */
 function dscEchange(): HTMLElement {
@@ -5497,9 +5720,13 @@ function renderDescente(): void {
     'Tout ce qui décide du <b>déroulement d’une run</b> se règle ici, et se lit tout de suite dans la table du bas : ' +
     'le <b>plan</b> (longueur, plafond de difficulté, ce qui se propose), la <b>forme de la rampe</b>, la <b>posture</b> ' +
     'des rangs et les <b>quatre poids</b> de l’algorithme qui choisit les tableaux du pool. Chaque réglage s’enregistre ' +
-    'aussitôt sur ce poste et prend effet à la <b>prochaine descente</b>. Rien n’est généré ici : on déroule les décisions, ' +
+    'aussitôt sur ce poste (le <b>brouillon</b>) et prend effet à la <b>prochaine descente</b> ; <b>PUBLIER</b> le fait jouer ' +
+    'pour tout le monde. Rien n’est généré ici : on déroule les décisions, ' +
     'pas les salles — c’est ce qui rend l’aperçu instantané et honnête.'
   corps.appendChild(aide)
+
+  corps.appendChild(dscSec('LE PLAN PARTAGÉ — ce que les joueurs jouent'))
+  corps.appendChild(dscPartage())
 
   corps.appendChild(dscSec('LE PLAN'))
   const g1 = document.createElement('div')
@@ -5726,7 +5953,7 @@ function renderDescente(): void {
   )
   corps.appendChild(dscTable())
 
-  corps.appendChild(dscSec('LE PLAN, EN CLAIR — à emporter d’un poste à l’autre'))
+  corps.appendChild(dscSec('LE PLAN, EN CLAIR — à garder en note, ou à coller ailleurs'))
   corps.appendChild(dscEchange())
   corps.scrollTop = haut
 }
@@ -5930,6 +6157,29 @@ const editeurCarte = new EditeurCarte(el('carte-editeur'), {
     editeurCarte.close()
     openHome()
   },
+  partage: {
+    charge: async () => {
+      const p = await fetchReglage('carte')
+      if (!p) return null
+      cartePubliee = litCartePubliee(p.document)
+      return { carte: cartePubliee, auteur: p.auteur, date: p.date }
+    },
+    publie: async (c) => {
+      const p = await pushReglage('carte', documentCarte(c), records.operator() || 'anonyme')
+      if (!p) return false
+      cartePubliee = litCartePubliee(p.document)
+      appliqueCartePubliee(cartePubliee)
+      return cartePubliee !== null
+    },
+    retire: async () => {
+      const ok = await deleteReglage('carte')
+      if (ok) {
+        cartePubliee = null
+        appliqueCartePubliee(null)
+      }
+      return ok
+    },
+  },
 })
 function openEditeurCarte(): void {
   overlay.classList.remove('visible')
@@ -5940,6 +6190,141 @@ function openEditeurCarte(): void {
 document
   .getElementById('home-carte')
   ?.addEventListener('click', () => openEditeurCarte())
+
+// ---- LA RÉGIE : la console du concepteur (editor/regie.ts) ----------------
+// Un seul bouton sur l'accueil ; chaque section ouvre l'outil existant, la
+// régie reste dessous et on y revient en fermant l'outil. Les anciens
+// boutons de l'accueil restent des raccourcis vers les mêmes outils.
+const regieEl = document.getElementById('regie') as HTMLDivElement
+const regie = new Regie(regieEl, {
+  sections: [
+    {
+      id: 'carte',
+      nom: 'LA CARTE',
+      icone: '⌬',
+      sous: 'modules, coursives, cadenas',
+      description:
+        'Le plan à routes ramifiées de la station : un module est un biome, ses salles, ses coursives et leurs conditions d’accès. L’éditeur se glisse, se lie, se vérifie, se rejoue en aperçu ; PUBLIER fait jouer la carte à tout le monde (refusé si elle a une erreur).',
+      domaines: ['carte'],
+      ouvre: () => {
+        // l'éditeur de carte vit SOUS la régie (z-index) : on la ferme, sa
+        // porte ↩ Accueil ramène à la fiche
+        regie.close()
+        openEditeurCarte()
+      },
+    },
+    {
+      id: 'descente',
+      nom: 'LA DESCENTE',
+      icone: '▼',
+      sous: 'rampe, posture, pioche',
+      description:
+        'Le déroulement d’une run réglé de bout en bout : le plafond de difficulté, la forme de la rampe, la posture des rangs et les quatre poids de l’algorithme qui choisit les tableaux. Le plan se déroule rang par rang sous les yeux et se tire à blanc ; PUBLIER le fait jouer à tout le monde.',
+      domaines: ['plan-voie'],
+      ouvre: () => ouvreDescente(),
+    },
+    {
+      id: 'planche',
+      nom: 'LA PLANCHE',
+      icone: '▧',
+      sous: 'les salles, leur ordre, leur biome',
+      description:
+        'Toutes les salles de la bibliothèque partagée en vignettes : glisser pour réordonner la séquence, régler le code atelier et le biome, essayer d’un clic. La bibliothèque est partagée d’office.',
+      domaines: [],
+      ouvre: () => void ouvrePlanche(),
+    },
+    {
+      id: 'journal',
+      nom: 'RÉCIT & FINS',
+      icone: '🚪',
+      sous: 'fragments, fins, seuils',
+      description:
+        'Le récit et les fins que chaque expédition bouclée révèle, dans l’ordre du concepteur ; le seuil de la révélation et celui du dénouement. Brouillon par poste, PUBLIER pour tous. La mémoire, la rareté et la vidéo de chaque entrée se règlent dans le codex.',
+      domaines: ['journal'],
+      ouvre: () => void atelierJournal.open(),
+    },
+    {
+      id: 'scenario',
+      nom: 'SCÉNARIO & MONTAGE',
+      icone: '▤',
+      sous: 'cinématiques, règles, séquences',
+      description:
+        'La table de montage : les cinématiques, le scénario qui les déclenche (avant le hub, au lancement, à la révélation, au dénouement…) et les séquences jouées dans le tableau. Cinématiques et scénario se partagent par la bibliothèque ; les séquences se publient depuis leur onglet.',
+      domaines: ['sequences'],
+      ouvre: () => montage.open(),
+    },
+    {
+      id: 'codex',
+      nom: 'LE CODEX',
+      icone: '◉',
+      sous: 'fiches, mémoire, rareté, vidéo',
+      description:
+        'Le manuel écrit par la partie : les fiches d’expérience et le journal. Sous chaque fiche, l’atelier règle la mémoire gravée à la découverte, la rareté et la vidéo de l’effet — publiés pour tous dès l’enregistrement.',
+      domaines: ['codex'],
+      ouvre: () => ecranCodex.open(),
+    },
+    {
+      id: 'marchand',
+      nom: 'MARCHAND & ORBES',
+      icone: '🔮',
+      sous: 'ce qui s’achète en mémoire',
+      description:
+        'Le marchand du hub : les orbes d’essence de conscience (une transformation ou un état chacun, ils ouvrent les cadenas de la carte), les améliorations durables, les provisions — payés en mémoire. Les prix et le catalogue vivent dans le code pour l’instant.',
+      domaines: [],
+      ouvre: () => ouvreMarchand(),
+    },
+    {
+      id: 'recompenses',
+      nom: 'LES RÉCOMPENSES',
+      icone: '❖',
+      sous: 'les cartes du tirage',
+      description:
+        'Le catalogue des instruments et la forge : une carte fabriquée ici se tire, s’emporte et agit comme une carte gravée. PUBLIER POUR TOUS la met au tirage de tout le monde.',
+      domaines: ['recompenses'],
+      ouvre: () => ouvreRecompenses(),
+    },
+    {
+      id: 'textes',
+      nom: 'LES TEXTES',
+      icone: '¶',
+      sous: 'tout ce que le joueur lit',
+      description:
+        'Le catalogue des textes, chaque entrée avec sa clé et l’endroit où elle paraît : le plan de travail de la réécriture et le socle d’une traduction. PUBLIER fait lire les retouches à tout le monde.',
+      domaines: ['textes'],
+      ouvre: () => ouvreTextes(),
+    },
+  ],
+  statuts: async () => {
+    const [plan, carte, rec, tx, seq, jr, cx] = await Promise.all([
+      fetchReglage('plan-voie'),
+      fetchReglage('carte'),
+      fetchReglage('recompenses'),
+      fetchReglage('textes'),
+      fetchReglage('sequences'),
+      fetchJournal(),
+      fetchReglagesCodex(),
+    ])
+    const de = (nom: string, p: { document: unknown; auteur: string; date: string } | null, detail?: string) =>
+      p ? { nom, publie: p.document !== null, auteur: p.auteur, date: p.date, detail } : { nom, publie: false, auteur: '', date: '', injoignable: true }
+    const nCx = cx ? Object.keys(cx).length : 0
+    return {
+      'plan-voie': de('Le plan de la descente', plan),
+      carte: de('La carte de la station', carte),
+      recompenses: de('Les cartes de l’atelier', rec, rec?.document ? `${(rec.document as { cartes?: unknown[] }).cartes?.length ?? 0} carte(s)` : undefined),
+      textes: de('Les retouches de textes', tx),
+      sequences: de('Les séquences', seq, seq?.document ? `${(seq.document as { sequences?: unknown[] }).sequences?.length ?? 0} séquence(s)` : undefined),
+      journal: jr
+        ? { nom: 'Le récit et les fins', publie: jr.journal !== null, auteur: jr.auteur, date: jr.date, detail: jr.journal ? `${jr.journal.recit.length} fragments, ${jr.journal.fins.length} fin(s)` : undefined }
+        : { nom: 'Le récit et les fins', publie: false, auteur: '', date: '', injoignable: true },
+      codex: cx
+        ? { nom: 'Les réglages du codex', publie: nCx > 0, auteur: '', date: '', detail: `${nCx} fiche(s) réglée(s)` }
+        : { nom: 'Les réglages du codex', publie: false, auteur: '', date: '', injoignable: true },
+    }
+  },
+  tir: (n) => tirABlanc(journalCourant(), scenario, n),
+  fermer: () => regie.close(),
+})
+document.getElementById('home-regie')?.addEventListener('click', () => regie.open())
 // Sonde de test : la carte en cours d'édition
 ;(window as unknown as { __carte: () => unknown }).__carte = () =>
   editeurCarte.carteCourante()
@@ -6144,6 +6529,8 @@ const COUCHES_MENU: CoucheMenu[] = [
   { id: 'cmds', retour: 'cmds-fermer' },
   { id: 'planche', retour: 'planche-fermer' },
   { id: 'regles', retour: 'regles-fermer' },
+  { id: 'journal-atelier', retour: 'aj-fermer' }, // l'atelier du journal (récit & fins)
+  { id: 'regie', retour: 'regie-fermer' }, // la console du concepteur — sous les outils, donc après eux
   { id: 'cycle', retour: 'cycle-fermer' }, // les mémoires — ouvertes au banc du hub aussi
   { id: 'marchand', retour: 'marchand-fermer' }, // le marchand — ouvert à l'étal du hub aussi
   { id: 'salles', retour: 'salles-fermer' },
@@ -9117,7 +9504,37 @@ const TX_ETAT_MOT: Record<EtatTexte, string> = {
   'a-traduire': 'À TRADUIRE',
 }
 
+/** Ce que les joueurs lisent, et ce que CE poste lit — dit en clair. */
+function renderTxPartage(): void {
+  const e = document.getElementById('tx-partage')
+  if (!e) return
+  const pub = textesPublies()
+  const nPub = nombreRetouches(pub)
+  const nBrouillon = nombreRetouches(documentTextes())
+  const quand = txPublieInfo.date ? formateDateCourte(txPublieInfo.date) : ''
+  e.innerHTML =
+    (pub
+      ? `<b>PUBLIÉ</b> : ${nPub} retouche${nPub > 1 ? 's' : ''} par ${htmlSafe(txPublieInfo.auteur || 'anonyme')}${quand ? `, ${quand}` : ''}`
+      : txPublieInfo.charge
+        ? `<b>RIEN DE PUBLIÉ</b> — les joueurs lisent le code`
+        : `<b>MAGASIN NON LU</b>`) +
+    ' · ce poste lit ' +
+    (brouillonTextesActif()
+      ? pub
+        ? `<i>son brouillon (${nBrouillon}) à la place du publié — non publié</i>`
+        : `son brouillon (${nBrouillon})`
+      : 'le publié')
+  const off = (id: string, v: boolean): void => {
+    const b = document.getElementById(id) as HTMLButtonElement | null
+    if (b) b.disabled = v
+  }
+  off('tx-publier', brouillonTextesVide())
+  off('tx-reprendre', !pub)
+  off('tx-retirer', !pub)
+}
+
 function renderTextes(): void {
+  renderTxPartage()
   const host = document.getElementById('tx-liste')
   if (!host) return
   const toutes = txToutes()
@@ -9223,9 +9640,9 @@ function ouvreTextes(): void {
   const lus = [...DOMAINES_LUS].map((d) => DOMAINE_NOMS[d].toLowerCase())
   txDit(
     `Cliquez un texte pour le réécrire — ${lus.join(', ')} : ce que vous écrivez ` +
-      `PARAÎT EN JEU tout de suite. Les autres domaines attendent leur bascule. ` +
-      `Dans tous les cas les retouches vivent SUR CE POSTE : exportez-les pour ` +
-      `qu’elles soient gravées dans le dépôt.`,
+      `PARAÎT EN JEU tout de suite, sur ce poste. Les autres domaines attendent leur bascule. ` +
+      `Les retouches sont un BROUILLON de ce poste : PUBLIER les fait lire par tout le monde ; ` +
+      `exporter reste la voie pour les graver dans le dépôt.`,
   )
 }
 document.getElementById('home-textes')?.addEventListener('click', ouvreTextes)
@@ -9292,6 +9709,39 @@ document.getElementById('tx-exp')?.addEventListener('click', () => {
         : 'Presse-papier refusé — l’export est dans la console (F12).',
     ),
   )
+})
+document.getElementById('tx-publier')?.addEventListener('click', () => {
+  txDit('Publication…')
+  void pushReglage('textes', documentTextes(), records.operator() || 'anonyme').then((p) => {
+    if (!p) {
+      txDit('Échec : le magasin partagé ne répond pas — rien n’a été publié.')
+      return
+    }
+    poseTextesPublies(p.document)
+    txPublieInfo = { auteur: p.auteur, date: p.date, charge: true }
+    renderTextes()
+    txDit(`${nombreRetouches(textesPublies())} retouche(s) publiée(s) : tout le monde les lit.`)
+  })
+})
+document.getElementById('tx-reprendre')?.addEventListener('click', () => {
+  if (!window.confirm('Remplacer le brouillon de ce poste par le publié ?')) return
+  reprendTextesPublies()
+  renderTxLangues()
+  renderTextes()
+  txDit('Brouillon remis sur le publié.')
+})
+document.getElementById('tx-retirer')?.addEventListener('click', () => {
+  if (!window.confirm('Retirer les retouches publiées ? Les joueurs liront de nouveau les textes du code.')) return
+  void deleteReglage('textes').then((ok) => {
+    if (!ok) {
+      txDit('Échec : le magasin partagé ne répond pas.')
+      return
+    }
+    poseTextesPublies(null)
+    txPublieInfo = { auteur: '', date: '', charge: true }
+    renderTextes()
+    txDit('Retouches publiées retirées : les joueurs lisent le code.')
+  })
 })
 document.getElementById('tx-imp')?.addEventListener('click', () => {
   const ta = document.getElementById('tx-io') as HTMLTextAreaElement
@@ -9371,6 +9821,35 @@ function renderRecCompteurs(): void {
   mets('at-n-livrees', INSTRUMENTS.length)
   mets('at-n-atelier', recompensesPerso().length)
   mets('at-n-poche', run.instruments.length)
+  renderRecPartage()
+}
+
+/** Ce que les joueurs jouent, et ce que CE poste joue — dit en clair. */
+function renderRecPartage(): void {
+  const e = document.getElementById('rec-partage')
+  if (!e) return
+  const pub = recompensesPubliees()
+  const n = recompensesPerso().length
+  const quand = recPublieInfo.date ? formateDateCourte(recPublieInfo.date) : ''
+  e.innerHTML =
+    (pub
+      ? `<b>PUBLIÉES</b> : ${pub.length} carte${pub.length > 1 ? 's' : ''} par ${htmlSafe(recPublieInfo.auteur || 'anonyme')}${quand ? `, ${quand}` : ''}`
+      : recPublieInfo.charge
+        ? `<b>RIEN DE PUBLIÉ</b> — les joueurs n’ont que les cartes livrées`
+        : `<b>MAGASIN NON LU</b> — hors-ligne, ou pas encore`) +
+    ' · ce poste joue ' +
+    (brouillonRecompensesActif()
+      ? `<i class="at-modifie">ses ${n} carte${n > 1 ? 's' : ''} d’atelier à la place des publiées — non publiées</i>`
+      : pub
+        ? 'les publiées'
+        : 'les livrées seules')
+  const off = (id: string, v: boolean): void => {
+    const b = document.getElementById(id) as HTMLButtonElement | null
+    if (b) b.disabled = v
+  }
+  off('rec-publier', n === 0)
+  off('rec-reprendre', !pub)
+  off('rec-retirer', !pub)
 }
 
 /** La vitrine : les cartes du catalogue, groupées par FAMILLE de leviers
@@ -9663,6 +10142,38 @@ document.getElementById('rec-exporter')?.addEventListener('click', () => {
     ['Le JSON est prêt : à coller dans instruments.ts pour graver ces cartes.'],
     true,
   )
+})
+document.getElementById('rec-publier')?.addEventListener('click', () => {
+  recDit(['Publication…'])
+  void pushReglage('recompenses', documentRecompenses(), records.operator() || 'anonyme').then((p) => {
+    if (!p) {
+      recDit(['Échec : le magasin partagé ne répond pas — rien n’a été publié.'])
+      return
+    }
+    poseRecompensesPubliees(p.document)
+    recPublieInfo = { auteur: p.auteur, date: p.date, charge: true }
+    renderRecListe()
+    recDit(['Cartes publiées : elles entrent au tirage pour tout le monde.'], true)
+  })
+})
+document.getElementById('rec-reprendre')?.addEventListener('click', () => {
+  if (!window.confirm('Remplacer les cartes de cet atelier par les publiées ?')) return
+  const n = reprendRecompensesPubliees()
+  renderRecListe()
+  recDit([`${n} carte(s) reprise(s) des publiées : l’atelier repart de ce qui joue.`], true)
+})
+document.getElementById('rec-retirer')?.addEventListener('click', () => {
+  if (!window.confirm('Retirer les cartes publiées ? Les joueurs n’auront plus que les cartes livrées.')) return
+  void deleteReglage('recompenses').then((ok) => {
+    if (!ok) {
+      recDit(['Échec : le magasin partagé ne répond pas.'])
+      return
+    }
+    poseRecompensesPubliees(null)
+    recPublieInfo = { auteur: '', date: '', charge: true }
+    renderRecListe()
+    recDit(['Cartes publiées retirées : les livrées seules restent au tirage.'], true)
+  })
 })
 document.getElementById('rec-importer')?.addEventListener('click', () => {
   const ta = document.getElementById('rec-json') as HTMLTextAreaElement
@@ -11565,16 +12076,8 @@ function newExpedition(avecCarte = false): void {
 // Fin de run (dernier échantillon dispersé, ou expédition conclue) : le
 // laboratoire rappelle — on se réveille AU HUB, prêt à relancer par le sas.
 function retourAuLabo(): void {
-  // ---- L'ARC DES DÉCOUVERTES : chaque retour de run (bouclée, dispersée
-  // ou abandonnée) livre le prochain jalon du récit — la fiche se
-  // consigne au codex (groupe RÉCIT), le toast est celui des fiches.
-  // (jamais depuis un ESSAI d'éditeur ni avant l'acte 0 : le récit ne se
-  // livre qu'aux vraies descentes)
-  const jalon = prochaineDecouverte(records.decouvertesVues())
-  if (jalon && eveilJoue() && !testLevel) {
-    records.noteDecouverte(jalon)
-    codex.marque(`recit-${jalon}`)
-  }
+  // (le récit et les fins ne se livrent plus ici : une run perdue ou
+  // abandonnée ne raconte rien — c'est l'expédition BOUCLÉE qui les sert)
   // LE DISTILLATEUR (réparé) : la prime du retour — le delta garanti
   if (records.estRepare('distillateur') && !testLevel) {
     gagneMemoireRun(2)
@@ -13436,8 +13939,20 @@ function frame(now: number): void {
       finOuverte() &&
       pointInBox(sim.stats.centroidX, sim.stats.centroidY, zonesHub.sasScelle)
     if (surScelle && !sasScelleDedans) {
-      records.noteDecouverte('fin-jouee') // le marqueur de la fin vue
-      void lireCineParCode('MIROIR')
+      // le DÉNOUEMENT demande son compte de fins (seuil du journal) : tant
+      // qu'il manque, l'alcôve le dit au lieu de rester muette
+      const journal = journalCourant()
+      if (denouementAtteint(journal, records.decouvertesVues())) {
+        records.noteDecouverte('fin-jouee') // le marqueur de la fin vue
+        void lireCineParCode('MIROIR')
+      } else {
+        const reste = journal.denouementApres - finsVues(journal, records.decouvertesVues())
+        toastFile.push({
+          nom: `ENCORE ${reste} FIN${reste > 1 ? 'S' : ''} À ATTEINDRE — bouclez des expéditions`,
+          icone: '🚪',
+          sur: 'LE SECTEUR 4',
+        })
+      }
     }
     sasScelleDedans = surScelle
     // LA TABLE DE DÉPART (une fois réparée) : le récapitulatif de ce
@@ -13961,6 +14476,25 @@ function frame(now: number): void {
       run.ended = true
       if (!sasOutil) trophees.debloque('integrale')
       gagneMemoireRun(10) // l'expédition bouclée grave son souvenir
+      // L'ARC DES DÉCOUVERTES ET LES FINS : une expédition BOUCLÉE livre
+      // le prochain fragment du récit, puis la prochaine fin — chacun dans
+      // sa file, dans l'ordre. La fiche se consigne au codex (groupes
+      // RÉCIT et FINS), le toast est celui des fiches. Jamais depuis
+      // l'outil, un ESSAI d'éditeur, ni avant l'acte 0 : le récit ne se
+      // livre qu'aux vraies descentes.
+      if (!sasOutil && eveilJoue() && !testLevel) {
+        const journal = journalCourant()
+        const fragment = prochainFragment(journal, records.decouvertesVues())
+        if (fragment) {
+          records.noteDecouverte(fragment)
+          codex.marque(fragment)
+        }
+        const fin = prochaineFin(journal, records.decouvertesVues())
+        if (fin) {
+          records.noteDecouverte(fin)
+          codex.marque(fin)
+        }
+      }
       const sallesFranchies = voieRang
       // une expédition CONCLUE PAR L'OUTIL ne s'inscrit nulle part : ni
       // record d'expédition, ni tableau partagé

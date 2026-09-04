@@ -125,6 +125,58 @@ semblables, douche/mutations.
   journaux encore présents dans les données des tableaux sont un héritage
   à purger/remplacer quand la nouvelle voix sera choisie.)
 - Les textes système (fin de tableau, défaite) dans la nouvelle voix.
-- Le nombre de runs avant la révélation du miroir spatial.
-- La fin du jeu (l'acte d'évasion hérité de la v1 est écarté ; rien ne le
-  remplace encore).
+- ~~Le nombre de runs avant la révélation du miroir spatial.~~ Tranché :
+  le récit se livre **un fragment par expédition bouclée** (dix fragments,
+  `src/game/decouvertes.ts`) ; une run perdue ou abandonnée ne raconte
+  rien. La révélation vient donc à la dixième expédition bouclée.
+- **Les fins** : chaque expédition bouclée révèle aussi **la prochaine fin**,
+  dans l'ordre, comme une fiche du codex (groupe `fins`, rayon LES FINS du
+  journal). La première est « Le miroir » (la cinématique MIROIR du
+  secteur 4).
+- **Le journal est en données** (`src/game/journal.ts`) : le récit, les
+  fins, et les deux seuils — la **révélation** après N fragments (le sceau
+  du secteur 4 tombe), le **dénouement** après N fins (l'alcôve du
+  secteur 4 joue la cinématique ; avant, elle dit combien de fins
+  manquent). Le concepteur tient tout cela dans l'atelier **RÉCIT & FINS**
+  (accueil, mode concepteur, ou depuis le rayon du journal au codex) :
+  ordre par glisser ou ▲ ▼, titre, icône, texte, ajout, retrait, seuils ;
+  un brouillon par poste, PUBLIER pour tous (`/api/journal`, Vercel Blob),
+  ESSAYER SUR CE POSTE pour jouer un brouillon sans publier, RETIRER LE
+  PUBLIÉ pour revenir au livré. Le journal livré avec le code est le
+  filet : il joue tant que rien n'est publié, et hors-ligne. Un identifiant
+  ne se réattribue jamais (les registres des joueurs s'en souviennent) ;
+  `fin-jouee` est réservé. Les fins alternatives prévues (« evil »,
+  « semi-evil »…) s'écrivent donc dans l'atelier, sans toucher au code. La
+  mémoire, la rareté et la vidéo de chaque entrée se règlent dans le codex.
+  Le scénario dispose de deux conditions, `revelation` et `denouement`, qui
+  lisent ces seuils : aucun N à tenir en double dans une règle.
+- **Le plan de la descente est partagé** (`src/game/planPartage.ts`,
+  `/api/reglages?domaine=plan-voie`) : l'écran LA DESCENTE règle le
+  brouillon du poste, PUBLIER le fait jouer pour tout le monde, REVENIR AU
+  PUBLIÉ, RECHARGER, RETIRER LE PUBLIÉ (le livré reprend). Un joueur joue
+  toujours le publié, sinon le livré — un brouillon sur son poste ne compte
+  pas ; un concepteur joue son brouillon s'il en a un, et l'écran lui dit
+  lequel joue. Le magasin `/api/reglages` est générique par domaine.
+- **La même règle pour tout ce qui restait par poste** :
+  - la **carte de la station** (`src/game/cartePartage.ts`, domaine `carte`) :
+    l'éditeur PUBLIE (refusé si la carte a une erreur), ouvre la publiée,
+    la retire ; la carte publiée joue pour tout le monde, la livrée est le
+    filet, le brouillon de l'éditeur ne joue jamais (il a son aperçu) ;
+  - les **cartes de l'atelier des récompenses** (domaine `recompenses`) :
+    publier pour tous, reprendre les publiées, retirer ; tant que rien
+    n'est publié, le brouillon joue (rien ne change hors-ligne) ;
+  - les **retouches de textes** (domaine `textes`, toutes langues) : même
+    trio de gestes dans l'écran TEXTES ;
+  - les **séquences** du montage (domaine `sequences`) : publier celles du
+    poste, reprendre une publiée (même code) pour la retoucher, retirer ;
+    le poste prime par code.
+  Partout, l'écran dit ce que les joueurs jouent et ce que ce poste joue.
+- **LA RÉGIE** (`src/editor/regie.ts`, bouton RÉGIE de l'accueil) : la
+  console du concepteur. Un rail vers chaque outil du système de run, la
+  VUE D'ENSEMBLE de ce qui est publié domaine par domaine (pastilles sur le
+  rail), et le TIR À BLANC (`src/game/tirABlanc.ts`, pur, testé) : pour N
+  expéditions bouclées, ce que chacune révèle (fragment, fin), les seuils
+  franchis (révélation, dénouement) et les cinématiques que le scénario
+  déclenche au retour au hub puis au lancement — c'est là qu'on voit si dix
+  runs avant le secteur 4, c'est trop ou pas assez. Le tir ne fait tomber
+  aucun trophée et suppose la passerelle 4 réparée.
