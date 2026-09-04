@@ -12168,7 +12168,7 @@
     {
       "id": "nouveau-tableau-6",
       "auteur": "BOIZ",
-      "majAt": "2026-09-01T16:18:55.009Z",
+      "majAt": "2026-09-03T15:50:18.428Z",
       "codeAuteur": "BOIZ",
       "codeAt": "2026-09-01T13:43:28.868Z",
       "level": {
@@ -12178,18 +12178,18 @@
         "bounds": {
           "minX": -1200,
           "minY": -1700,
-          "maxX": 1200,
+          "maxX": 1150,
           "maxY": 750
         },
         "spawn": {
-          "x": -1080,
-          "y": 377,
+          "x": -1094,
+          "y": 362,
           "n": 900
         },
         "exit": {
-          "minX": -1107.5,
+          "minX": -1077.75,
           "minY": -149,
-          "maxX": -967.5,
+          "maxX": -937.75,
           "maxY": -1
         },
         "boxes": [
@@ -12201,14 +12201,7 @@
             "angle": -90,
             "forme": 4,
             "p0": 0.2,
-            "material": 0
-          },
-          {
-            "minX": -309,
-            "minY": 778,
-            "maxX": -249,
-            "maxY": 838,
-            "material": 0
+            "material": 2
           },
           {
             "minX": -671.75,
@@ -12291,7 +12284,7 @@
             "angle": 180,
             "forme": 4,
             "p0": 0.2,
-            "material": 0
+            "material": 1
           },
           {
             "minX": 634,
@@ -12325,7 +12318,7 @@
             "angle": 90,
             "forme": 4,
             "p0": 0.2,
-            "material": 0
+            "material": 2
           },
           {
             "minX": -338,
@@ -12350,7 +12343,7 @@
             "maxX": 662,
             "maxY": 81,
             "angle": -45,
-            "material": 0
+            "material": 8
           },
           {
             "minX": 561,
@@ -12385,7 +12378,7 @@
             "minX": -875,
             "minY": -944,
             "maxX": -815.5,
-            "maxY": 102,
+            "maxY": -90,
             "material": 0
           },
           {
@@ -12394,7 +12387,7 @@
             "maxX": -676,
             "maxY": -861.75,
             "angle": 45,
-            "material": 0
+            "material": 8
           },
           {
             "minX": -363.5,
@@ -12409,7 +12402,7 @@
           {
             "minX": -277.5,
             "minY": 502,
-            "maxX": 319,
+            "maxX": 460,
             "maxY": 562,
             "material": 0
           },
@@ -12417,37 +12410,101 @@
             "minX": 897,
             "minY": -282,
             "maxX": 957,
-            "maxY": -75,
+            "maxY": 62,
             "material": 0
           },
           {
-            "minX": 604,
-            "minY": -277.75,
-            "maxX": 664,
-            "maxY": 685.25,
-            "material": 0,
-            "angle": 45
+            "minX": 657,
+            "minY": -61,
+            "maxX": 717,
+            "maxY": 644.40625,
+            "angle": 45,
+            "material": 0
+          },
+          {
+            "minX": -1200,
+            "minY": -1083,
+            "maxX": -1140.25,
+            "maxY": 102,
+            "material": 0
+          },
+          {
+            "minX": -1269,
+            "minY": -1299,
+            "maxX": -676.75,
+            "maxY": -1239,
+            "angle": -45,
+            "material": 0
+          },
+          {
+            "minX": -786,
+            "minY": -1501.5,
+            "maxX": -477,
+            "maxY": -1441.5,
+            "material": 0
+          },
+          {
+            "minX": 897,
+            "minY": -1087,
+            "maxX": 957,
+            "maxY": -818,
+            "material": 0
+          },
+          {
+            "minX": 433,
+            "minY": -1303,
+            "maxX": 1022,
+            "maxY": -1243,
+            "angle": 45,
+            "material": 0
+          },
+          {
+            "minX": 50,
+            "minY": -1501.5,
+            "maxX": 539,
+            "maxY": -1441.5,
+            "material": 0
+          },
+          {
+            "minX": -875,
+            "minY": -29,
+            "maxX": -815.5,
+            "maxY": 101,
+            "material": 0
           }
         ],
         "sponges": [],
         "labels": [
           {
-            "x": -1043,
-            "y": -102,
+            "x": -1009,
+            "y": -85,
             "text": "SAS",
             "tone": "sas"
           }
         ],
         "par": 3,
-        "structures": [
+        "lasers": [
           {
-            "type": 0,
-            "minX": -1979,
-            "minY": -2300,
-            "maxX": -779,
-            "maxY": -1100,
-            "ep": 60,
-            "chanfrein": 0.5
+            "x": 354,
+            "y": -542,
+            "angle": 180
+          }
+        ],
+        "cibles": [
+          {
+            "x": -788,
+            "y": -542,
+            "r": 26,
+            "mode": "nor"
+          }
+        ],
+        "portes": [
+          {
+            "minX": -537,
+            "minY": -1441.5,
+            "maxX": -477,
+            "maxY": -1243,
+            "canal": 1
           }
         ],
         "caches": [
@@ -12456,6 +12513,77 @@
             "minY": -1377,
             "maxX": -335,
             "maxY": -1308
+          }
+        ],
+        "condensats": [
+          {
+            "x": -229,
+            "y": -1353,
+            "cl": 8
+          },
+          {
+            "x": -204,
+            "y": -1336,
+            "cl": 8
+          },
+          {
+            "x": -231,
+            "y": -1323,
+            "cl": 8
+          },
+          {
+            "x": -213,
+            "y": -1149,
+            "cl": 8
+          },
+          {
+            "x": -378,
+            "y": 260,
+            "cl": 8
+          },
+          {
+            "x": 665,
+            "y": -739,
+            "cl": 8
+          },
+          {
+            "x": 317,
+            "y": -200,
+            "cl": 8
+          },
+          {
+            "x": -551,
+            "y": -946,
+            "cl": 8
+          }
+        ],
+        "structures": [
+          {
+            "type": 0,
+            "minX": -3191,
+            "minY": -3359,
+            "maxX": -1389,
+            "maxY": -2001,
+            "ep": 60,
+            "chanfrein": 0.5
+          }
+        ],
+        "rails": [
+          {
+            "points": [
+              {
+                "x": -574,
+                "y": -542
+              },
+              {
+                "x": -575,
+                "y": -58
+              },
+              {
+                "x": -926,
+                "y": -60
+              }
+            ]
           }
         ]
       }
