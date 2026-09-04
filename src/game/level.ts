@@ -64,6 +64,24 @@ export function versLocalBoite(
   return { x: cx + rx * ca + ry * sa, y: cy - rx * sa + ry * ca }
 }
 
+/** Le chemin inverse : un point du repère LOCAL d'une boîte oblique
+ *  (offsets depuis son centre, +x vers l'est local, +y vers le nord local)
+ *  ramené dans le MONDE. Une seule convention d'angle pour la physique,
+ *  les coques et les poignées de l'éditeur : elle vit ici, et nulle part
+ *  ailleurs. */
+export function versMondeBoite(
+  b: { minX: number; minY: number; maxX: number; maxY: number; angle?: number },
+  ox: number,
+  oy: number,
+): { x: number; y: number } {
+  const cx = (b.minX + b.maxX) / 2
+  const cy = (b.minY + b.maxY) / 2
+  const rad = ((b.angle ?? 0) * Math.PI) / 180
+  const co = Math.cos(rad)
+  const si = Math.sin(rad)
+  return { x: cx + co * ox - si * oy, y: cy + si * ox + co * oy }
+}
+
 /** Le point (x, y) est-il dans la pièce, rotation et FORME comprises ? */
 export function dansBoite(
   b: {

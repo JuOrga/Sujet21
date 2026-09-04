@@ -21,6 +21,7 @@
 // pivoté à ±45°. Même prix, forme juste.
 
 import {
+  versMondeBoite,
   dansBoite,
   MAT_WALL,
   type LevelDef,
@@ -152,11 +153,8 @@ function versMonde(
   px: number,
   py: number,
 ): { x: number; y: number } {
-  const c = centreDe(s)
-  const a = (s.angle ?? 0) * RAD
-  const co = Math.cos(a)
-  const si = Math.sin(a)
-  return { x: c.x + co * px - si * py, y: c.y + si * px + co * py }
+  // la même rotation que la physique et les poignées de l'éditeur
+  return versMondeBoite(s, px, py)
 }
 
 /** …et le chemin inverse. */

@@ -89,6 +89,8 @@ import {
   type Surcharges,
 } from './fiches'
 import {
+  COINS_OBLIQUES,
+  COTES_OBLIQUES,
   POIGNEES_OBLIQUES,
   pivotPoignee,
   pointPoignee,
@@ -1949,7 +1951,10 @@ export class LevelEditor {
     const cx = (b.minX + b.maxX) / 2
     const cy = (b.minY + b.maxY) / 2
     const rad = ((b.angle ?? 0) * Math.PI) / 180
-    const bras = (b.maxY - b.minY) / 2 + 30 / this.zoom
+    // le bras tient la poignée de rotation HORS du disque de la poignée N :
+    // deux rayons de prise et une marge — au doigt (prise large) l'ancien
+    // 30 px laissait les deux disques se recouvrir, et la rotation gagnait
+    const bras = (b.maxY - b.minY) / 2 + (this.prise * 2 + 6) / this.zoom
     return this.toScreen(cx - Math.sin(rad) * bras, cy + Math.cos(rad) * bras)
   }
 
@@ -1989,6 +1994,17 @@ export class LevelEditor {
     return { minX: el.minX, minY: el.minY, maxX: el.maxX, maxY: el.maxY, angle: el.angle }
   }
 
+  /** Le curseur d'une poignée : un côté dit son axe, un coin sa diagonale —
+   *  la seule annonce, avant de tirer, qu'un côté et non un coin est sous
+   *  le pointeur. */
+  private static curseurPoignee(code: string | null): string {
+    if (!code) return 'default'
+    if (code === 'N' || code === 'S') return 'ns-resize'
+    if (code === 'E' || code === 'W') return 'ew-resize'
+    if (code === 'NE' || code === 'SW') return 'nesw-resize'
+    return 'nwse-resize'
+  }
+
   private hitHandle(sx: number, sy: number): string | null {
     const r = this.selRect()
     if (!r) return null
@@ -1998,12 +2014,22 @@ export class LevelEditor {
     // clouée, tout se joue dans son repère (editor/oblique.ts)
     const ob = this.selOblique()
     if (ob) {
+      // LA PLUS PROCHE, pas la première : sur un mur fin, le milieu d'un
+      // côté est à quelques pixels des deux coins — servir le premier coin
+      // rencontré rendait les poignées de côté inaccessibles là même où
+      // elles servent (revue du 04/09)
+      let meilleure: string | null = null
+      let dist = p
       for (const poignee of POIGNEES_OBLIQUES) {
         const c = pointPoignee(ob, poignee)
         const ecran = this.toScreen(c.x, c.y)
-        if (Math.hypot(sx - ecran.sx, sy - ecran.sy) <= p) return poignee.code
+        const d = Math.hypot(sx - ecran.sx, sy - ecran.sy)
+        if (d <= dist) {
+          dist = d
+          meilleure = poignee.code
+        }
       }
-      return null
+      return meilleure
     }
     const a = this.toScreen(r.minX, r.maxY)
     const b = this.toScreen(r.maxX, r.minY)
@@ -2622,9 +2648,7 @@ export class LevelEditor {
           this.tool.kind === 'select'
             ? this.sel?.kind === 'box' && this.hitRotateHandle(sx, sy)
               ? 'grab'
-              : this.hitHandle(sx, sy)
-                ? 'nwse-resize'
-                : 'default'
+              : LevelEditor.curseurPoignee(this.hitHandle(sx, sy))
             : 'crosshair'
         // la bulle savante n'existe qu'en mode Sélection, souris posée
         if (this.tool.kind === 'select' && this.pointeur === 'mouse')
@@ -7064,11 +7088,11 @@ export class LevelEditor {
       // milieux de côté, plus petits, tirent un seul axe
       const hx = (obSel.maxX - obSel.minX) / 2
       const hy = (obSel.maxY - obSel.minY) / 2
-      const coins = POIGNEES_OBLIQUES.slice(0, 4).map((q) => {
+      const coins = COINS_OBLIQUES.map((q) => {
         const c = pointPoignee(obSel, q)
         return this.toScreen(c.x, c.y)
       })
-      const cotes = POIGNEES_OBLIQUES.slice(4).map((q) => {
+      const cotes = COTES_OBLIQUES.map((q) => {
         const c = pointPoignee(obSel, q)
         return this.toScreen(c.x, c.y)
       })
@@ -7076,7 +7100,7 @@ export class LevelEditor {
       g.lineWidth = 1.5
       g.setLineDash([4, 3])
       g.beginPath()
-      // COINS est rangé NW, NE, SW, SE : le tracé passe NW → NE → SE → SW
+      // COINS_OBLIQUES est rangé NW, NE, SW, SE : le tracé passe NW → NE → SE → SW
       g.moveTo(coins[0].sx, coins[0].sy)
       g.lineTo(coins[1].sx, coins[1].sy)
       g.lineTo(coins[3].sx, coins[3].sy)

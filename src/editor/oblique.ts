@@ -8,7 +8,11 @@
 // toucher à son épaisseur, comme pour une paroi droite.
 //
 // Ce fichier ne connaît ni l'éditeur ni l'écran : des points, des offsets,
-// des degrés. C'est ce qui le rend testable au millimètre.
+// des degrés. C'est ce qui le rend testable au millimètre. La rotation
+// elle-même vient de level.ts (versMondeBoite) : la convention d'angle
+// n'est écrite qu'une fois, la même que la physique.
+
+import { versMondeBoite } from '../game/level'
 
 export interface BoiteOblique {
   minX: number
@@ -48,12 +52,7 @@ export function estCote(p: Poignee): boolean {
 /** Un point du repère LOCAL (offsets depuis le centre, en unités monde)
  *  ramené dans le monde. */
 export function pointOblique(b: BoiteOblique, ox: number, oy: number): { x: number; y: number } {
-  const rad = ((b.angle ?? 0) * Math.PI) / 180
-  const co = Math.cos(rad)
-  const si = Math.sin(rad)
-  const cx = (b.minX + b.maxX) / 2
-  const cy = (b.minY + b.maxY) / 2
-  return { x: cx + co * ox - si * oy, y: cy + si * ox + co * oy }
+  return versMondeBoite(b, ox, oy)
 }
 
 /** Le point MONDE d'une poignée sur la boîte. */
@@ -93,13 +92,16 @@ export function redimensionneOblique(
   const dy = pointeur.y - pivot.y
   let du = dx * co + dy * si // le long de l'axe local x
   let dv = -dx * si + dy * co // le long de l'axe local y
-  if (Math.abs(du) < minS) du = (du < 0 ? -1 : 1) * minS
-  if (Math.abs(dv) < minS) dv = (dv < 0 ? -1 : 1) * minS
-  // un CÔTÉ ne tire qu'un axe : l'autre garde sa mesure, centré sur le pivot
-  const etendU = poignee.ux !== 0 ? du : depart.w
-  const etendV = poignee.uy !== 0 ? dv : depart.h
-  const decU = poignee.ux !== 0 ? du / 2 : 0
-  const decV = poignee.uy !== 0 ? dv / 2 : 0
+  // un CÔTÉ ne tire qu'un axe : seul l'axe tiré se borne au minimum, l'autre
+  // garde sa mesure, centré sur le pivot
+  const tireU = poignee.ux !== 0
+  const tireV = poignee.uy !== 0
+  if (tireU && Math.abs(du) < minS) du = (du < 0 ? -1 : 1) * minS
+  if (tireV && Math.abs(dv) < minS) dv = (dv < 0 ? -1 : 1) * minS
+  const etendU = tireU ? du : depart.w
+  const etendV = tireV ? dv : depart.h
+  const decU = tireU ? du / 2 : 0
+  const decV = tireV ? dv / 2 : 0
   const cx = pivot.x + co * decU - si * decV
   const cy = pivot.y + si * decU + co * decV
   const hx = Math.abs(etendU) / 2

@@ -77,5 +77,8 @@ describe('les poignées d’une boîte oblique', () => {
     const pivot = pivotPoignee(b, E)
     const r = redimensionneOblique(pivot, 0, { x: 1, y: 10 }, E, { w: 100, h: 20 }, 8)
     expect(pres(r)).toEqual({ minX: 0, minY: 0, maxX: 8, maxY: 20 })
+    // l'axe NON tiré n'est jamais borné : un mur de 2 d'épaisseur reste à 2
+    const fin = redimensionneOblique(pivotPoignee({ ...b, maxY: 2 }, E), 0, { x: 50, y: 1 }, E, { w: 100, h: 2 }, 8)
+    expect(pres(fin)).toEqual({ minX: 0, minY: 0, maxX: 50, maxY: 2 })
   })
 })
