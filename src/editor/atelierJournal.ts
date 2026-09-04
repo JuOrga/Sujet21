@@ -78,6 +78,24 @@ export class AtelierJournal {
     host.innerHTML = gabarit()
     host.addEventListener('click', (e) => this.clic(e))
     host.addEventListener('input', (e) => this.saisie(e))
+    // la carte ne se glisse QUE par sa poignée : une carte toujours
+    // « draggable » vole la sélection de texte dans ses champs (Firefox)
+    host.addEventListener('pointerdown', (e) => {
+      const poignee = (e.target as HTMLElement).closest('.aj-poignee')
+      const carte = poignee?.closest<HTMLElement>('.aj-carte')
+      if (carte) carte.draggable = true
+    })
+    host.addEventListener('dragend', (e) => {
+      const carte = (e.target as HTMLElement).closest<HTMLElement>('.aj-carte')
+      if (carte) carte.draggable = false
+      this.glisse = null
+    })
+    // un seuil laissé vide ou hors bornes reprend, au blur, ce que le
+    // brouillon a retenu
+    host.addEventListener('change', (e) => {
+      const t = e.target as HTMLInputElement
+      if (t.dataset.seuil) t.value = String(this.brouillon[t.dataset.seuil as 'revelationApres' | 'denouementApres'])
+    })
     host.addEventListener('dragstart', (e) => this.dragstart(e))
     host.addEventListener('dragover', (e) => {
       if (this.glisse && (e.target as HTMLElement).closest('.aj-carte')) e.preventDefault()
@@ -201,7 +219,7 @@ export class AtelierJournal {
       liste
         .map(
           (e, i) =>
-            `<article class="aj-carte" draggable="true" data-groupe="${G.g}" data-i="${i}" data-id="${esc(e.id)}">` +
+            `<article class="aj-carte" data-groupe="${G.g}" data-i="${i}" data-id="${esc(e.id)}">` +
             `<div class="aj-ligne"><span class="aj-poignee" title="Glisser pour réordonner">☰</span><b class="aj-num">${i + 1}</b>` +
             `<input class="aj-icone" data-champ="icone" value="${esc(e.icone)}" aria-label="Icône" maxlength="8">` +
             `<input class="aj-titre" data-champ="titre" value="${esc(e.titre)}" placeholder="Titre" aria-label="Titre" maxlength="80">` +

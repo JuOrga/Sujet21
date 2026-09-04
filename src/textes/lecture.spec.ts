@@ -39,6 +39,13 @@ describe('Le jeu lit le catalogue', () => {
     expect(UNE.titre).not.toBe('Le liquide boude la paroi')
   })
 
+  it('le récit et les fins ne lisent jamais une retouche : ils s’écrivent dans l’atelier du journal', () => {
+    const fin = { id: 'fin-miroir', groupe: 'fins' as const, icone: '🪞', titre: 'Le miroir', texte: 'Le sas s’ouvre.' }
+    poseTexte('fr', cleTexte('codex', fin.id, 'titre'), 'Retouche d’avant', fin.titre)
+    expect(codexLu(fin).titre).toBe('Le miroir')
+    expect(codexLu({ ...fin, id: 'recit-x', groupe: 'recit' }).titre).toBe('Le miroir')
+  })
+
   it('en anglais, la traduction l’emporte', () => {
     poseTexte('en', CLE_TITRE, 'The liquid hugs the wall', UNE.titre)
     poseLangueLue('en')
