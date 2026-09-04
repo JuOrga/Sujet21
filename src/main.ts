@@ -2835,6 +2835,13 @@ const ecranCodex = new EcranCodex(codexEl, {
     fermeCodex()
     void atelierJournal.open()
   },
+  // LE PASSE-PARTOUT DU CONCEPTEUR : voir le codex plein sans jouer trente
+  // parties. Ce qu'il avait vraiment découvert part de côté et lui revient
+  // au reverrouillage — le bouton ne mange pas sa partie.
+  basculeTout: (debloquer) => {
+    if (debloquer) codex.debloqueTout()
+    else codex.reverrouille()
+  },
   sauve: async (id, r, video) => {
     const res = await pushReglageCodex(id, r, records.operator() || 'anonyme', video)
     if (res) reglagesCodex = res
