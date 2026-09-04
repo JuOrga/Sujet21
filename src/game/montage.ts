@@ -71,6 +71,14 @@ export interface MontageOptions {
   surScenario?: (s: ScenarioDef) => void
   /** Les trophées connus, pour la condition « trophée débloqué ». */
   trophees?: { id: string; nom: string }[]
+  /** LES SÉQUENCES PUBLIÉES pour tous (elles jouent au-delà du poste, une
+   *  cinématique partagée peut les nommer) — et les deux gestes : publier
+   *  celles du poste, retirer les publiées. */
+  sequencesPartage?: {
+    publiees: () => SequenceDef[]
+    publie: (seqs: SequenceDef[]) => Promise<boolean>
+    retire: () => Promise<boolean>
+  }
 }
 
 function copie(c: CinematiqueDef): CinematiqueDef {
@@ -521,18 +529,30 @@ export class TableMontage {
       `<label>SÉQUENCE <select class="mt-seq-choix"></select></label>` +
       `<button type="button" class="mt-btn-seq" data-sq-op="nouvelle">NOUVELLE</button>` +
       `<button type="button" class="mt-btn-seq" data-sq-op="dupliquer">DUPLIQUER</button>` +
-      `<button type="button" class="mt-btn-seq" data-sq-op="supprimer">SUPPRIMER</button>`
+      `<button type="button" class="mt-btn-seq" data-sq-op="supprimer">SUPPRIMER</button>` +
+      (this.opts.sequencesPartage
+        ? `<button type="button" class="mt-btn-seq" data-sq-op="reprendre" title="Copie la séquence publiée sur ce poste, même code — pour la retoucher puis la republier">REPRENDRE</button>` +
+          `<button type="button" class="mt-btn-seq" data-sq-op="publier" title="Publie les séquences de ce poste pour tout le monde (une publiée du même code est remplacée)">⇪ PUBLIER</button>` +
+          `<button type="button" class="mt-btn-seq" data-sq-op="retirer" title="Retire toutes les séquences publiées">RETIRER LES PUBLIÉES</button>` +
+          `<span class="mt-seq-statut"></span>`
+        : '')
     this.corpsEl.appendChild(intro)
 
     const livrees = [SEQUENCE_ALERTE]
-    const toutes = [...livrees, ...this.sequences]
+    // les publiées que le poste ne redéfinit pas (même code : le poste prime)
+    const codesPoste = new Set(this.sequences.map((s) => s.code))
+    const publiees = (this.opts.sequencesPartage?.publiees() ?? []).filter((p) => !codesPoste.has(p.code))
+    const toutes = [...livrees, ...publiees, ...this.sequences]
+    const statut = intro.querySelector('.mt-seq-statut')
+    if (statut)
+      statut.textContent = `${this.opts.sequencesPartage?.publiees().length ?? 0} publiée(s) · ${this.sequences.length} sur ce poste`
     if (!this.seqCourante || !toutes.includes(this.seqCourante)) this.seqCourante = toutes[0] ?? null
     const choix = intro.querySelector('.mt-seq-choix') as HTMLSelectElement
     choix.innerHTML = toutes
       .map(
         (s, i) =>
           `<option value="${i}"${s === this.seqCourante ? ' selected' : ''}>${
-            i < livrees.length ? '◆ ' : ''
+            i < livrees.length ? '◆ ' : publiees.includes(s) ? '⇪ ' : ''
           }${s.titre} [${s.code}]</option>`,
       )
       .join('')
@@ -556,22 +576,47 @@ export class TableMontage {
         this.editeSeqs(() => this.sequences.push(neuve))
         this.seqCourante = neuve
       } else if (op === 'supprimer') {
-        if (!this.seqCourante || livrees.includes(this.seqCourante)) return
+        if (!this.seqCourante || livrees.includes(this.seqCourante) || publiees.includes(this.seqCourante)) return
         this.editeSeqs(() => {
           this.sequences = this.sequences.filter((s) => s !== this.seqCourante)
         })
         this.seqCourante = null
+      } else if (op === 'reprendre') {
+        if (!this.seqCourante || !publiees.includes(this.seqCourante)) return
+        const copie: SequenceDef = JSON.parse(JSON.stringify(this.seqCourante)) as SequenceDef
+        this.editeSeqs(() => this.sequences.push(copie))
+        this.seqCourante = copie
+      } else if (op === 'publier') {
+        const partage = this.opts.sequencesPartage
+        if (!partage) return
+        if (statut) statut.textContent = 'Publication…'
+        void partage.publie(this.sequences).then((ok) => {
+          if (statut) statut.textContent = ok ? 'Séquences publiées : elles jouent pour tout le monde.' : 'Échec : le magasin partagé ne répond pas.'
+          if (ok) this.dessineSequences()
+        })
+        return
+      } else if (op === 'retirer') {
+        const partage = this.opts.sequencesPartage
+        if (!partage) return
+        if (!window.confirm('Retirer toutes les séquences publiées ?')) return
+        void partage.retire().then((ok) => {
+          if (statut) statut.textContent = ok ? 'Séquences publiées retirées.' : 'Échec : le magasin partagé ne répond pas.'
+          if (ok) this.dessineSequences()
+        })
+        return
       }
       this.dessineSequences()
     })
 
     const s = this.seqCourante
     if (!s) return
-    const gel = livrees.includes(s)
+    const gel = livrees.includes(s) || publiees.includes(s)
     const fiche = document.createElement('div')
     fiche.className = 'mt-fiche'
     fiche.innerHTML = gel
-      ? `<em>Séquence livrée avec le jeu — en lecture seule. DUPLIQUER pour la retoucher.</em>`
+      ? publiees.includes(s)
+        ? `<em>Séquence publiée — en lecture seule sur ce poste. REPRENDRE la copie ici (même code) pour la retoucher, puis PUBLIER.</em>`
+        : `<em>Séquence livrée avec le jeu — en lecture seule. DUPLIQUER pour la retoucher.</em>`
       : `<label>CODE <input data-sq="code" maxlength="24" /></label>
          <label>TITRE <input data-sq="titre" maxlength="80" /></label>`
     this.corpsEl.appendChild(fiche)

@@ -1290,6 +1290,13 @@
         font-size: calc(11.5px * var(--ui));
       }
       .dsc-aide b { color: #cfe2ef; }
+      /* LE PARTAGE, dit en clair dans chaque atelier : ce que les joueurs jouent, ce que ce poste joue */
+      .at-partage { width: 100%; }
+      .at-partage b, .tx-partage b, .ce-partage b { color: #8fd8b0; letter-spacing: 0.14em; }
+      .at-partage i, .tx-partage i, .ce-partage i { font-style: normal; color: #ffd24a; }
+      .tx-partage { font-size: calc(10px * var(--ui)); letter-spacing: 0.06em; color: var(--dim); margin-right: 6px; }
+      .ce-partage { margin: 0; font-size: calc(11px * var(--ui)); line-height: 1.5; color: var(--dim); }
+      .at-lien:disabled, .tx-lien:disabled { opacity: 0.4; cursor: default; }
       .dsc-partage { margin: 0 0 8px; font-size: calc(11px * var(--ui)); letter-spacing: 0.06em; color: var(--dim); }
       .dsc-partage b { color: #8fd8b0; letter-spacing: 0.14em; }
       .dsc-partage .dsc-modifie { font-style: normal; color: #ffd24a; }
@@ -8163,6 +8170,10 @@
             <span class="tx-cpt"><b id="tx-n-faits">0</b><i>rendus</i></span>
             <span class="tx-cpt"><b id="tx-n-signes">0</b><i>signes</i></span>
           </div>
+          <span id="tx-partage" class="tx-partage"></span>
+          <button type="button" id="tx-publier" class="tx-lien" title="Publie le brouillon de ce poste (toutes langues) au magasin partagé : tout le monde le lit">⇪ Publier</button>
+          <button type="button" id="tx-reprendre" class="tx-lien" title="Remplace le brouillon de ce poste par le publié">Reprendre le publié</button>
+          <button type="button" id="tx-retirer" class="tx-lien" title="Retire les retouches publiées : les joueurs lisent le code">Retirer le publié</button>
           <button type="button" id="tx-md" class="tx-lien" title="Copie les entrées affichées en Markdown, clés comprises — de quoi relire hors ligne">Markdown</button>
           <button type="button" id="tx-exp" class="tx-lien" title="Copie VOS RETOUCHES de cette langue en JSON — c'est ce fichier qu'on grave dans le code, ou qu'on envoie à un traducteur">Exporter</button>
           <button type="button" id="tx-imp" class="tx-lien" title="Reprend un export de retouches. La langue du document fait foi, quelle que soit celle affichée">Importer</button>
@@ -8216,6 +8227,10 @@
               <button type="button" id="rec-annuler" class="at-lien">vider le formulaire</button>
             </div>
             <div class="at-io">
+              <p id="rec-partage" class="at-dit at-partage"></p>
+              <button type="button" id="rec-publier" class="at-lien" title="Publie les cartes de cet atelier au magasin partagé : elles entrent au tirage pour tout le monde">⇪ publier pour tous</button>
+              <button type="button" id="rec-reprendre" class="at-lien" title="Remplace les cartes de cet atelier par les publiées">reprendre les publiées</button>
+              <button type="button" id="rec-retirer" class="at-lien" title="Retire les cartes publiées : les livrées seules restent">retirer les publiées</button>
               <button type="button" id="rec-exporter" class="at-lien">exporter en JSON</button>
               <button type="button" id="rec-importer" class="at-lien">importer ce JSON</button>
               <textarea id="rec-json" hidden rows="6" spellcheck="false" aria-label="JSON des cartes fabriquées"></textarea>

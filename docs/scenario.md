@@ -156,5 +156,18 @@ semblables, douche/mutations.
   PUBLIÉ, RECHARGER, RETIRER LE PUBLIÉ (le livré reprend). Un joueur joue
   toujours le publié, sinon le livré — un brouillon sur son poste ne compte
   pas ; un concepteur joue son brouillon s'il en a un, et l'écran lui dit
-  lequel joue. Le magasin `/api/reglages` est générique par domaine : la
-  carte et les récompenses y viendront (LA RÉGIE).
+  lequel joue. Le magasin `/api/reglages` est générique par domaine.
+- **La même règle pour tout ce qui restait par poste** :
+  - la **carte de la station** (`src/game/cartePartage.ts`, domaine `carte`) :
+    l'éditeur PUBLIE (refusé si la carte a une erreur), ouvre la publiée,
+    la retire ; la carte publiée joue pour tout le monde, la livrée est le
+    filet, le brouillon de l'éditeur ne joue jamais (il a son aperçu) ;
+  - les **cartes de l'atelier des récompenses** (domaine `recompenses`) :
+    publier pour tous, reprendre les publiées, retirer ; tant que rien
+    n'est publié, le brouillon joue (rien ne change hors-ligne) ;
+  - les **retouches de textes** (domaine `textes`, toutes langues) : même
+    trio de gestes dans l'écran TEXTES ;
+  - les **séquences** du montage (domaine `sequences`) : publier celles du
+    poste, reprendre une publiée (même code) pour la retoucher, retirer ;
+    le poste prime par code.
+  Partout, l'écran dit ce que les joueurs jouent et ce que ce poste joue.

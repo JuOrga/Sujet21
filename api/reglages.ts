@@ -1,5 +1,6 @@
 // LES RÉGLAGES PARTAGÉS du concepteur, par DOMAINE : le plan de la
-// descente aujourd'hui ; la carte, les récompenses demain (LA RÉGIE). Un
+// descente, la carte de la station, les cartes de l'atelier des
+// récompenses, les retouches de textes, les séquences (LA RÉGIE). Un
 // document JSON par domaine, publié pour tous depuis l'écran qui le règle —
 // le code du jeu porte la version livrée comme filet, ce magasin porte
 // celle du concepteur.
@@ -18,7 +19,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { ecritDocument, litDocument } from './_magasin.js'
 
-const DOMAINES = ['plan-voie']
+const DOMAINES = ['plan-voie', 'carte', 'recompenses', 'textes', 'sequences']
 const MAX_OCTETS = 200_000
 
 interface Magasin {

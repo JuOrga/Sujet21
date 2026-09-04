@@ -4,7 +4,7 @@
 // ramène dans ses bornes (planPartage.ts pour le plan de la descente). Tout
 // échec réseau rend null : l'appelant garde ce qu'il a.
 
-export type DomaineReglage = 'plan-voie'
+export type DomaineReglage = 'plan-voie' | 'carte' | 'recompenses' | 'textes' | 'sequences'
 
 export interface ReglagePublie {
   document: unknown

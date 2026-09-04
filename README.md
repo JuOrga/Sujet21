@@ -6,10 +6,10 @@ une partie de soi-même — **se déplacer, c'est rétrécir**.
 
 Le document de référence est [`docs/doc-fonctionnel.md`](docs/doc-fonctionnel.md).
 
-## État — version 0.21.422, une run jouable de bout en bout
+## État — version 0.21.423, une run jouable de bout en bout
 
 Le jeu tourne dans le navigateur, sur ordinateur, tablette et téléphone.
-**422 livraisons consignées entre le 08/08/2026 et le 04/09/2026** — le journal
+**423 livraisons consignées entre le 08/08/2026 et le 04/09/2026** — le journal
 complet se lit dans l'écran NOTES DE VERSION, les données sont dans
 [`src/bench/livraisons.ts`](src/bench/livraisons.ts).
 
@@ -66,10 +66,11 @@ l'ordre du concepteur, avec les seuils de la révélation et du dénouement
 ([`docs/scenario.md`](docs/scenario.md)) —, et un
 générateur qui refuse tout tirage dont la traversée ne se démontre pas.
 Bibliothèque, palmarès, présets, cinématiques, images, journal (récit et
-fins), réglages du codex et plan de la descente sont partagés entre
-concepteurs — et joués par tout le monde — par une API sur Vercel Blob ; le
-code porte la version livrée de chacun comme filet, l'écran qui le règle a
-son bouton PUBLIER.
+fins), réglages du codex, plan de la descente, carte de la station, cartes
+de l'atelier des récompenses, retouches de textes et séquences sont partagés
+entre concepteurs — et joués par tout le monde — par une API sur Vercel
+Blob ; le code porte la version livrée de chacun comme filet, l'écran qui le
+règle a son bouton PUBLIER.
 
 **Le rendu et le son.** Métaballes WebGL2 en deux passes, éclairage et ombres,
 parallaxe, sprites, palette froide. Sons synthétisés en Web Audio (seule la
@@ -99,7 +100,7 @@ station, `?tableau=N` démarre à la salle N,
 ## Qualité
 
 ```bash
-pnpm test        # 894 tests dans 79 fichiers, ~23 s
+pnpm test        # 906 tests dans 80 fichiers, ~23 s
 pnpm type-check
 pnpm build
 ```

@@ -26,7 +26,7 @@
 
 import type { CodexDef } from '../game/codex'
 import { cleTexte, type DomaineTexte } from './catalogue'
-import { LANGUE_SOURCE, langueDef, surcharges, type Langue } from './atelier'
+import { LANGUE_SOURCE, langueDef, surchargesJouees, type Langue } from './atelier'
 
 const CLE_LANGUE = 'projet21.langue.v1'
 
@@ -63,12 +63,12 @@ export function poseLangueLue(l: Langue): void {
  */
 export function texteDe(cle: string, defaut: string): string {
   const l = langueLue()
-  const mien = surcharges(l)[cle]
+  const mien = surchargesJouees(l)[cle]
   if (mien) return mien
   if (l === LANGUE_SOURCE) return defaut
   // repli : la retouche française d'abord — si le concepteur a réécrit un
   // texte, c'est CETTE version qu'il faut montrer, pas celle d'avant
-  return surcharges(LANGUE_SOURCE)[cle] ?? defaut
+  return surchargesJouees(LANGUE_SOURCE)[cle] ?? defaut
 }
 
 /** Une fiche du codex telle que le joueur la lit. Le RÉCIT et les FINS

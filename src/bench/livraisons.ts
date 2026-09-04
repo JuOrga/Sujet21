@@ -31,6 +31,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '04/09/2026 12:14',
+    title: 'TOUT CE QUI RESTAIT PAR POSTE SE PUBLIE : la carte, les cartes de l’atelier, les textes, les séquences — pour tout le monde',
+    notes: [
+      'LA DEMANDE : « enchaîne avec le reste ». Après le plan de la descente, quatre choses ne valaient encore que sur le poste du concepteur : la CARTE de la station (export JSON à commiter), les cartes de l’ATELIER DES RÉCOMPENSES, les retouches de TEXTES (export/import), les SÉQUENCES du montage. Une cinématique partagée pouvait même nommer une séquence que seul son auteur avait.',
+      'UNE SEULE RÈGLE, la même que le plan : le code livre, le concepteur publie, le magasin partagé (/api/reglages, un domaine par chose) joue pour tout le monde. Un joueur joue le publié ; un concepteur joue son brouillon s’il en a un ; et tant que RIEN n’est publié, le brouillon joue — rien ne change pour un poste hors-ligne ni pour les tests. Partout, l’écran dit ce que les joueurs jouent et ce que ce poste joue.',
+      'LA CARTE (game/cartePartage.ts, testé) : l’éditeur PUBLIE (refusé en clair si la carte a une erreur — deux modules du même id, par exemple), ouvre la CARTE PUBLIÉE, la RETIRE ; le panneau PARTAGE dit qui l’a publiée et ce que l’éditeur montre (la publiée, la livrée, un brouillon différent). La carte publiée joue dès qu’elle arrive du magasin : l’état de run se relit contre elle (un module disparu ramène au départ, le reste tient). Le brouillon de l’éditeur ne joue jamais — il a son aperçu. Exporter reste : c’est le filet du code.',
+      'LES RÉCOMPENSES (game/recompenses.ts, testé) : PUBLIER POUR TOUS, REPRENDRE LES PUBLIÉES, RETIRER, et le statut dans l’atelier ; les cartes publiées entrent au tirage de tout le monde, les fabriquées du poste priment pour le concepteur. LES TEXTES (textes/atelier.ts, testé) : même trio dans l’en-tête de l’écran, toutes langues d’un coup ; le jeu lit surchargesJouees, plus le brouillon brut. LES SÉQUENCES (game/sequence.ts, testé) : dans l’onglet du montage, PUBLIER celles du poste, REPRENDRE une publiée (même code) pour la retoucher, RETIRER ; le poste prime par code (fusionneSequences).',
+      'VÉRIFIÉ : 906 tests verts dans 80 fichiers, type-check à 0, build propre, l’API type-checkée à part ; au navigateur (page d’essai de l’éditeur de carte, magasin simulé) : rien de publié au départ, brouillon différent après un module ajouté, publier puis relecture, carte livrée puis carte publiée rouverte, publication REFUSÉE sur un id en double, retrait — zéro erreur. Les écrans RÉCOMPENSES, TEXTES et l’onglet SÉQUENCES vivent dans main.ts et le montage : non vus au navigateur, à contrôler en prévisualisation avec le magasin réel.',
+    ],
+  },
+  {
     date: '04/09/2026 12:00',
     title: 'LE PLAN DE LA DESCENTE SE PUBLIE : ce que le concepteur règle joue pour tout le monde, plus seulement sur son poste',
     notes: [

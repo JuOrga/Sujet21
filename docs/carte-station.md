@@ -10,6 +10,7 @@
 | Fichier | Rôle |
 | --- | --- |
 | `src/game/carteStation.json` | **La source de vérité.** Ce que l'éditeur exporte, ce que le jeu lit. Rien de la carte n'est écrit en dur ailleurs. |
+| `src/game/cartePartage.ts` | Le partage : la carte PUBLIÉE (magasin `/api/reglages`, domaine `carte`) joue pour tout le monde si elle est lisible et sans erreur ; la livrée reste le filet. |
 | `src/game/carteStation.ts` | Le modèle : types, lecture (`parseCarte`), sérialisation à l'identique, vérification de fond (`verifieCarte`), et les questions pures — où passe une coursive (`traceLien`), quel module est atteignable, quelle couleur pour cette température. |
 | `src/game/dessinCarte.ts` | Le dessin, en une chaîne SVG (`dessinCarteSVG`). Pur : il sert à l'éditeur aujourd'hui, et servira tel quel à l'écran de jeu. |
 | `src/editor/carteOperations.ts` | Les gestes, purs : déplacer, redimensionner, lier, renommer, supprimer, l'historique. |

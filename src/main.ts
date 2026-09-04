@@ -10,6 +10,7 @@ import { Codex } from './game/codex'
 import { AtelierJournal } from './editor/atelierJournal'
 import { deleteReglage, fetchReglage, pushReglage } from './game/reglagesPartages'
 import { etatPlan, litPlanPublie, planAuDemarrage } from './game/planPartage'
+import { documentCarte, litCartePubliee } from './game/cartePartage'
 import {
   deleteReglageCodex,
   fetchReglagesCodex,
@@ -80,6 +81,7 @@ import {
 } from './game/voie'
 import {
   CARTE_LIVREE,
+  type CarteStation,
   ORBES,
   biomesDeCarte,
   couleurTemperature,
@@ -112,8 +114,14 @@ import { FIGURE_FAMILLES, FIGURE_NOMS } from './game/figures'
 import { CIRCUITS } from './game/circuits'
 import type { LevierId } from './game/leviers'
 import {
+  brouillonRecompensesActif,
   catalogueRecompenses,
+  documentRecompenses,
   exporteRecompenses,
+  poseConcepteurRecompenses,
+  poseRecompensesPubliees,
+  recompensesPubliees,
+  reprendRecompensesPubliees,
   idDepuisNom,
   importeRecompenses,
   poseRecompense,
@@ -165,8 +173,16 @@ import {
   LANGUE_SOURCE,
   applique,
   avance,
+  brouillonTextesActif,
+  brouillonTextesVide,
+  documentTextes,
   exporteTextes,
   importeTextes,
+  nombreRetouches,
+  poseConcepteurTextes,
+  poseTextesPublies,
+  reprendTextesPublies,
+  textesPublies,
   langueDef,
   poseTexte,
   retireTexte,
@@ -272,7 +288,9 @@ import { fetchBibliotheque } from './game/netCines'
 import {
   SEQUENCE_ALERTE,
   Sequenceur,
-  chargeSequences,
+  poseSequencesPubliees,
+  sequencesJouees,
+  sequencesPubliees,
   type SequenceDef,
 } from './game/sequence'
 import {
@@ -851,8 +869,41 @@ void fetchReglage('plan-voie').then((p) => {
 // module, plus court chemin en niveaux jusqu'à l'objectif (descenteCarte.ts).
 // Le plan de voie garde tout le reste : rampe de difficulté, moments,
 // postures, pioche — il reçoit simplement la longueur vraie (planEffectif).
-const carte = CARTE_LIVREE
+// La carte JOUÉE : la livrée, ou la PUBLIÉE par le concepteur dès qu'elle
+// arrive du magasin (cartePartage.ts : lisible et sans erreur, sinon la
+// livrée reste). Le brouillon de l'éditeur ne joue jamais : il a son aperçu.
+let carte: CarteStation = CARTE_LIVREE
 let carteRun: EtatCarteRun = departCarte(carte)
+let cartePubliee: CarteStation | null = null
+function appliqueCartePubliee(c: CarteStation | null): void {
+  carte = c ?? CARTE_LIVREE
+  // l'état de run se relit contre la carte neuve : un module disparu
+  // ramène au départ, tout le reste tient
+  carteRun = litEtatCarteRun(carteRun, carte)
+  hubMemo = null
+}
+void fetchReglage('carte').then((p) => {
+  if (!p) return
+  cartePubliee = litCartePubliee(p.document)
+  if (cartePubliee) appliqueCartePubliee(cartePubliee)
+})
+// LES RÉCOMPENSES, LES TEXTES, LES SÉQUENCES publiés : même règle que le
+// plan — un joueur joue le publié, un concepteur son brouillon s'il en a un
+let recPublieInfo = { auteur: '', date: '', charge: false }
+let txPublieInfo = { auteur: '', date: '', charge: false }
+void fetchReglage('recompenses').then((p) => {
+  if (!p) return
+  poseRecompensesPubliees(p.document)
+  recPublieInfo = { auteur: p.auteur, date: p.date, charge: true }
+})
+void fetchReglage('textes').then((p) => {
+  if (!p) return
+  poseTextesPublies(p.document)
+  txPublieInfo = { auteur: p.auteur, date: p.date, charge: true }
+})
+void fetchReglage('sequences').then((p) => {
+  if (p) poseSequencesPubliees(p.document)
+})
 /** Les orbes ACQUIS, pour les cadenas de la carte : ceux en poche, plus
  *  ceux que le cycle tient déjà (une transformation tissée vaut son orbe —
  *  on l'a dépensé pour elle — et un état atteint vaut le sien). */
@@ -1897,12 +1948,18 @@ const livraisonsEl = document.getElementById('livraisons') as HTMLDivElement
       // stockage refusé : le mode ne tiendra que la session — sans gravité
     }
     document.body.classList.toggle('concepteur', on)
+    poseConcepteurRecompenses(on)
+    poseConcepteurTextes(on)
   }
   {
     const q = new URLSearchParams(location.search)
     if (q.get('dev') === '0') poseConcepteur(false)
     else if (q.has('dev')) poseConcepteur(true)
-    else document.body.classList.toggle('concepteur', concepteurActif())
+    else {
+      document.body.classList.toggle('concepteur', concepteurActif())
+      poseConcepteurRecompenses(concepteurActif())
+      poseConcepteurTextes(concepteurActif())
+    }
   }
   let tapsVersion = 0
   let dernierTapVersion = 0
@@ -3964,7 +4021,7 @@ const sequenceur = new Sequenceur({
 function trouveSequence(code: string): SequenceDef | null {
   const cible = code.trim().toLowerCase()
   return (
-    [SEQUENCE_ALERTE, ...chargeSequences()].find(
+    [SEQUENCE_ALERTE, ...sequencesJouees()].find(
       (s) => s.code.trim().toLowerCase() === cible,
     ) ?? null
   )
@@ -4076,6 +4133,19 @@ const montage = new TableMontage(el('montage'), {
     scenario = s
   },
   trophees: TROPHEES.map((t) => ({ id: t.id, nom: t.nom })),
+  sequencesPartage: {
+    publiees: () => sequencesPubliees(),
+    publie: async (seqs) => {
+      const p = await pushReglage('sequences', { sequences: seqs }, records.operator() || 'anonyme')
+      if (p) poseSequencesPubliees(p.document)
+      return p !== null
+    },
+    retire: async () => {
+      const ok = await deleteReglage('sequences')
+      if (ok) poseSequencesPubliees(null)
+      return ok
+    },
+  },
 })
 document
   .getElementById('open-montage')
@@ -4127,7 +4197,7 @@ const editor = new LevelEditor(el('editor'), {
       .filter((c, i, t) => t.findIndex((o) => o.code === c.code) === i)
       .map((c) => ({ code: c.code, titre: c.titre })),
   sequences: () =>
-    [SEQUENCE_ALERTE, ...chargeSequences()]
+    [SEQUENCE_ALERTE, ...sequencesJouees()]
       .filter((s, i, t) => t.findIndex((o) => o.code === s.code) === i)
       .map((s) => ({ code: s.code, titre: s.titre })),
   // les biomes de la carte de la station : le champ Biome du tableau
@@ -6084,6 +6154,29 @@ const editeurCarte = new EditeurCarte(el('carte-editeur'), {
   quit: () => {
     editeurCarte.close()
     openHome()
+  },
+  partage: {
+    charge: async () => {
+      const p = await fetchReglage('carte')
+      if (!p) return null
+      cartePubliee = litCartePubliee(p.document)
+      return { carte: cartePubliee, auteur: p.auteur, date: p.date }
+    },
+    publie: async (c) => {
+      const p = await pushReglage('carte', documentCarte(c), records.operator() || 'anonyme')
+      if (!p) return false
+      cartePubliee = litCartePubliee(p.document)
+      appliqueCartePubliee(cartePubliee)
+      return cartePubliee !== null
+    },
+    retire: async () => {
+      const ok = await deleteReglage('carte')
+      if (ok) {
+        cartePubliee = null
+        appliqueCartePubliee(null)
+      }
+      return ok
+    },
   },
 })
 function openEditeurCarte(): void {
@@ -9273,7 +9366,37 @@ const TX_ETAT_MOT: Record<EtatTexte, string> = {
   'a-traduire': 'À TRADUIRE',
 }
 
+/** Ce que les joueurs lisent, et ce que CE poste lit — dit en clair. */
+function renderTxPartage(): void {
+  const e = document.getElementById('tx-partage')
+  if (!e) return
+  const pub = textesPublies()
+  const nPub = nombreRetouches(pub)
+  const nBrouillon = nombreRetouches(documentTextes())
+  const quand = txPublieInfo.date ? formateDateCourte(txPublieInfo.date) : ''
+  e.innerHTML =
+    (pub
+      ? `<b>PUBLIÉ</b> : ${nPub} retouche${nPub > 1 ? 's' : ''} par ${htmlSafe(txPublieInfo.auteur || 'anonyme')}${quand ? `, ${quand}` : ''}`
+      : txPublieInfo.charge
+        ? `<b>RIEN DE PUBLIÉ</b> — les joueurs lisent le code`
+        : `<b>MAGASIN NON LU</b>`) +
+    ' · ce poste lit ' +
+    (brouillonTextesActif()
+      ? pub
+        ? `<i>son brouillon (${nBrouillon}) à la place du publié — non publié</i>`
+        : `son brouillon (${nBrouillon})`
+      : 'le publié')
+  const off = (id: string, v: boolean): void => {
+    const b = document.getElementById(id) as HTMLButtonElement | null
+    if (b) b.disabled = v
+  }
+  off('tx-publier', brouillonTextesVide())
+  off('tx-reprendre', !pub)
+  off('tx-retirer', !pub)
+}
+
 function renderTextes(): void {
+  renderTxPartage()
   const host = document.getElementById('tx-liste')
   if (!host) return
   const toutes = txToutes()
@@ -9379,9 +9502,9 @@ function ouvreTextes(): void {
   const lus = [...DOMAINES_LUS].map((d) => DOMAINE_NOMS[d].toLowerCase())
   txDit(
     `Cliquez un texte pour le réécrire — ${lus.join(', ')} : ce que vous écrivez ` +
-      `PARAÎT EN JEU tout de suite. Les autres domaines attendent leur bascule. ` +
-      `Dans tous les cas les retouches vivent SUR CE POSTE : exportez-les pour ` +
-      `qu’elles soient gravées dans le dépôt.`,
+      `PARAÎT EN JEU tout de suite, sur ce poste. Les autres domaines attendent leur bascule. ` +
+      `Les retouches sont un BROUILLON de ce poste : PUBLIER les fait lire par tout le monde ; ` +
+      `exporter reste la voie pour les graver dans le dépôt.`,
   )
 }
 document.getElementById('home-textes')?.addEventListener('click', ouvreTextes)
@@ -9448,6 +9571,39 @@ document.getElementById('tx-exp')?.addEventListener('click', () => {
         : 'Presse-papier refusé — l’export est dans la console (F12).',
     ),
   )
+})
+document.getElementById('tx-publier')?.addEventListener('click', () => {
+  txDit('Publication…')
+  void pushReglage('textes', documentTextes(), records.operator() || 'anonyme').then((p) => {
+    if (!p) {
+      txDit('Échec : le magasin partagé ne répond pas — rien n’a été publié.')
+      return
+    }
+    poseTextesPublies(p.document)
+    txPublieInfo = { auteur: p.auteur, date: p.date, charge: true }
+    renderTextes()
+    txDit(`${nombreRetouches(textesPublies())} retouche(s) publiée(s) : tout le monde les lit.`)
+  })
+})
+document.getElementById('tx-reprendre')?.addEventListener('click', () => {
+  if (!window.confirm('Remplacer le brouillon de ce poste par le publié ?')) return
+  reprendTextesPublies()
+  renderTxLangues()
+  renderTextes()
+  txDit('Brouillon remis sur le publié.')
+})
+document.getElementById('tx-retirer')?.addEventListener('click', () => {
+  if (!window.confirm('Retirer les retouches publiées ? Les joueurs liront de nouveau les textes du code.')) return
+  void deleteReglage('textes').then((ok) => {
+    if (!ok) {
+      txDit('Échec : le magasin partagé ne répond pas.')
+      return
+    }
+    poseTextesPublies(null)
+    txPublieInfo = { auteur: '', date: '', charge: true }
+    renderTextes()
+    txDit('Retouches publiées retirées : les joueurs lisent le code.')
+  })
 })
 document.getElementById('tx-imp')?.addEventListener('click', () => {
   const ta = document.getElementById('tx-io') as HTMLTextAreaElement
@@ -9527,6 +9683,35 @@ function renderRecCompteurs(): void {
   mets('at-n-livrees', INSTRUMENTS.length)
   mets('at-n-atelier', recompensesPerso().length)
   mets('at-n-poche', run.instruments.length)
+  renderRecPartage()
+}
+
+/** Ce que les joueurs jouent, et ce que CE poste joue — dit en clair. */
+function renderRecPartage(): void {
+  const e = document.getElementById('rec-partage')
+  if (!e) return
+  const pub = recompensesPubliees()
+  const n = recompensesPerso().length
+  const quand = recPublieInfo.date ? formateDateCourte(recPublieInfo.date) : ''
+  e.innerHTML =
+    (pub
+      ? `<b>PUBLIÉES</b> : ${pub.length} carte${pub.length > 1 ? 's' : ''} par ${htmlSafe(recPublieInfo.auteur || 'anonyme')}${quand ? `, ${quand}` : ''}`
+      : recPublieInfo.charge
+        ? `<b>RIEN DE PUBLIÉ</b> — les joueurs n’ont que les cartes livrées`
+        : `<b>MAGASIN NON LU</b> — hors-ligne, ou pas encore`) +
+    ' · ce poste joue ' +
+    (brouillonRecompensesActif()
+      ? `<i class="at-modifie">ses ${n} carte${n > 1 ? 's' : ''} d’atelier à la place des publiées — non publiées</i>`
+      : pub
+        ? 'les publiées'
+        : 'les livrées seules')
+  const off = (id: string, v: boolean): void => {
+    const b = document.getElementById(id) as HTMLButtonElement | null
+    if (b) b.disabled = v
+  }
+  off('rec-publier', n === 0)
+  off('rec-reprendre', !pub)
+  off('rec-retirer', !pub)
 }
 
 /** La vitrine : les cartes du catalogue, groupées par FAMILLE de leviers
@@ -9819,6 +10004,38 @@ document.getElementById('rec-exporter')?.addEventListener('click', () => {
     ['Le JSON est prêt : à coller dans instruments.ts pour graver ces cartes.'],
     true,
   )
+})
+document.getElementById('rec-publier')?.addEventListener('click', () => {
+  recDit(['Publication…'])
+  void pushReglage('recompenses', documentRecompenses(), records.operator() || 'anonyme').then((p) => {
+    if (!p) {
+      recDit(['Échec : le magasin partagé ne répond pas — rien n’a été publié.'])
+      return
+    }
+    poseRecompensesPubliees(p.document)
+    recPublieInfo = { auteur: p.auteur, date: p.date, charge: true }
+    renderRecListe()
+    recDit(['Cartes publiées : elles entrent au tirage pour tout le monde.'], true)
+  })
+})
+document.getElementById('rec-reprendre')?.addEventListener('click', () => {
+  if (!window.confirm('Remplacer les cartes de cet atelier par les publiées ?')) return
+  const n = reprendRecompensesPubliees()
+  renderRecListe()
+  recDit([`${n} carte(s) reprise(s) des publiées : l’atelier repart de ce qui joue.`], true)
+})
+document.getElementById('rec-retirer')?.addEventListener('click', () => {
+  if (!window.confirm('Retirer les cartes publiées ? Les joueurs n’auront plus que les cartes livrées.')) return
+  void deleteReglage('recompenses').then((ok) => {
+    if (!ok) {
+      recDit(['Échec : le magasin partagé ne répond pas.'])
+      return
+    }
+    poseRecompensesPubliees(null)
+    recPublieInfo = { auteur: '', date: '', charge: true }
+    renderRecListe()
+    recDit(['Cartes publiées retirées : les livrées seules restent au tirage.'], true)
+  })
 })
 document.getElementById('rec-importer')?.addEventListener('click', () => {
   const ta = document.getElementById('rec-json') as HTMLTextAreaElement

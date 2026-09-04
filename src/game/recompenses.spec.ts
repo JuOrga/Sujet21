@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
+  brouillonRecompensesActif,
   catalogueRecompenses,
+  documentRecompenses,
+  poseConcepteurRecompenses,
+  poseRecompensesPubliees,
+  recompensesJouees,
+  reprendRecompensesPubliees,
   exporteRecompenses,
   idDepuisNom,
   importeRecompenses,
@@ -133,5 +139,43 @@ describe('L’atelier des récompenses', () => {
         expect(p).not.toContain('undefined')
       }
     }
+  })
+})
+
+describe('Les récompenses publiées — qui joue quoi', () => {
+  beforeEach(() => {
+    videAtelier()
+    poseRecompensesPubliees(null)
+    poseConcepteurRecompenses(false)
+  })
+
+  it('un joueur joue les publiées, jamais un brouillon qui traînerait sur son poste', () => {
+    expect(poseRecompense(carte())).toEqual([])
+    // tant que rien n'est publié, le brouillon joue : rien ne change hors-ligne
+    expect(recompensesJouees().map((c) => c.id)).toEqual(['membrane-de-tension'])
+    expect(brouillonRecompensesActif()).toBe(true)
+    poseRecompensesPubliees({ cartes: [carte({ id: 'publiee', nom: 'Publiée', icone: '🧿' })] })
+    expect(recompensesJouees().map((c) => c.id)).toEqual(['publiee'])
+    expect(catalogueRecompenses().length).toBe(INSTRUMENTS.length + 1)
+    expect(brouillonRecompensesActif()).toBe(false)
+  })
+
+  it('un concepteur joue son brouillon s’il en a un, sinon les publiées', () => {
+    poseConcepteurRecompenses(true)
+    poseRecompensesPubliees({ cartes: [carte({ id: 'publiee', nom: 'Publiée', icone: '🧿' })] })
+    expect(recompensesJouees().map((c) => c.id)).toEqual(['publiee'])
+    expect(poseRecompense(carte())).toEqual([])
+    expect(recompensesJouees().map((c) => c.id)).toEqual(['membrane-de-tension'])
+    expect(brouillonRecompensesActif()).toBe(true)
+  })
+
+  it('le document publié se relit propre, et se reprend comme brouillon', () => {
+    poseRecompensesPubliees({ cartes: [carte({ id: 'publiee', nom: 'Publiée', icone: '🧿' }), { id: 'cassee' }] })
+    expect(recompensesJouees().map((c) => c.id)).toEqual(['publiee'])
+    expect(reprendRecompensesPubliees()).toBe(1)
+    expect(recompensesPerso().map((c) => c.id)).toEqual(['publiee'])
+    expect(documentRecompenses().cartes.map((c) => c.id)).toEqual(['publiee'])
+    // un document sans forme ne publie rien
+    expect(poseRecompensesPubliees('rien')).toBeNull()
   })
 })
