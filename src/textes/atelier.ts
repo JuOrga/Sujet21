@@ -9,10 +9,11 @@
 // vide. Même stockage, même export, même écran. Ajouter une langue ne
 // demande donc rien d'autre qu'une ligne dans LANGUES — pas une refonte.
 //
-// OÙ VIVENT CES RETOUCHES : dans le stockage du poste, comme les cartes de
-// l'atelier des récompenses. Elles ne sont pas dans le dépôt tant qu'on ne
-// les a pas exportées et gravées — et l'écran le dit sans détour, pour que
-// personne ne réécrive cinq cents textes en croyant les avoir livrés.
+// OÙ VIVENT CES RETOUCHES : le BROUILLON, dans le stockage du poste ; et
+// le PUBLIÉ, au magasin partagé (/api/reglages), qui joue pour tout le
+// monde. Un joueur lit le publié ; un concepteur lit son brouillon s'il en
+// a un, sinon le publié — comme le plan de la descente. Graver dans le
+// code (exporter) reste possible : c'est le filet, plus la seule voie.
 
 import type { EntreeTexte } from './catalogue'
 
@@ -81,11 +82,80 @@ function ecrit(): void {
   }
 }
 
-/** Les retouches d'une langue, par clé. */
+/** Les retouches d'une langue, par clé — le BROUILLON du poste. */
 export function surcharges(langue: Langue): Record<string, string> {
   const r = lu()
   if (!r[langue]) r[langue] = {}
   return r[langue]
+}
+
+// ---- LE PUBLIÉ, ET CE QUE LE JEU LIT ------------------------------------------
+
+let publie: Registre | null = null // null : rien de publié, ou pas lu
+let concepteur = false
+
+export function poseConcepteurTextes(on: boolean): void {
+  concepteur = on
+}
+
+/** Un registre tel qu'il arrive (magasin, brouillon) : langue par langue,
+ *  seules les chaînes comptent. */
+export function litRegistre(brut: unknown): Registre | null {
+  if (!brut || typeof brut !== 'object') return null
+  const out: Registre = {}
+  for (const l of LANGUES) {
+    const bloc = (brut as Registre)[l.code]
+    if (!bloc || typeof bloc !== 'object') continue
+    const propre: Record<string, string> = {}
+    for (const [k, v] of Object.entries(bloc)) if (typeof v === 'string' && v.trim()) propre[k] = v
+    out[l.code] = propre
+  }
+  return out
+}
+
+/** Pose le registre publié — null le retire. */
+export function poseTextesPublies(brut: unknown): Registre | null {
+  publie = litRegistre(brut)
+  return publie
+}
+
+export function textesPublies(): Registre | null {
+  return publie
+}
+
+export function brouillonTextesVide(): boolean {
+  return Object.values(lu()).every((bloc) => !bloc || Object.keys(bloc).length === 0)
+}
+
+/** Le brouillon du poste est-il ce que le jeu lit ici ? */
+export function brouillonTextesActif(): boolean {
+  return publie === null || (concepteur && !brouillonTextesVide())
+}
+
+/** Les retouches que le JEU lit : le brouillon du concepteur s'il en a un,
+ *  sinon le publié — et, tant que rien n'est publié, le brouillon (rien ne
+ *  change pour un poste hors-ligne). */
+export function surchargesJouees(langue: Langue): Record<string, string> {
+  if (brouillonTextesActif()) return surcharges(langue)
+  return publie?.[langue] ?? {}
+}
+
+/** Le document à publier : tout le brouillon, toutes langues. */
+export function documentTextes(): Registre {
+  const out: Registre = {}
+  for (const [l, bloc] of Object.entries(lu())) if (bloc && Object.keys(bloc).length) out[l as Langue] = { ...bloc }
+  return out
+}
+
+/** Reprend le publié comme brouillon. */
+export function reprendTextesPublies(): void {
+  registre = {}
+  for (const [l, bloc] of Object.entries(publie ?? {})) if (bloc) registre[l as Langue] = { ...bloc }
+  ecrit()
+}
+
+export function nombreRetouches(r: Registre | null): number {
+  return Object.values(r ?? {}).reduce((n, bloc) => n + (bloc ? Object.keys(bloc).length : 0), 0)
 }
 
 /**

@@ -31,6 +31,29 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '04/09/2026 12:14',
+    title: 'TOUT CE QUI RESTAIT PAR POSTE SE PUBLIE : la carte, les cartes de l’atelier, les textes, les séquences — pour tout le monde',
+    notes: [
+      'LA DEMANDE : « enchaîne avec le reste ». Après le plan de la descente, quatre choses ne valaient encore que sur le poste du concepteur : la CARTE de la station (export JSON à commiter), les cartes de l’ATELIER DES RÉCOMPENSES, les retouches de TEXTES (export/import), les SÉQUENCES du montage. Une cinématique partagée pouvait même nommer une séquence que seul son auteur avait.',
+      'UNE SEULE RÈGLE, la même que le plan : le code livre, le concepteur publie, le magasin partagé (/api/reglages, un domaine par chose) joue pour tout le monde. Un joueur joue le publié ; un concepteur joue son brouillon s’il en a un ; et tant que RIEN n’est publié, le brouillon joue — rien ne change pour un poste hors-ligne ni pour les tests. Partout, l’écran dit ce que les joueurs jouent et ce que ce poste joue.',
+      'LA CARTE (game/cartePartage.ts, testé) : l’éditeur PUBLIE (refusé en clair si la carte a une erreur — deux modules du même id, par exemple), ouvre la CARTE PUBLIÉE, la RETIRE ; le panneau PARTAGE dit qui l’a publiée et ce que l’éditeur montre (la publiée, la livrée, un brouillon différent). La carte publiée joue dès qu’elle arrive du magasin : l’état de run se relit contre elle (un module disparu ramène au départ, le reste tient). Le brouillon de l’éditeur ne joue jamais — il a son aperçu. Exporter reste : c’est le filet du code.',
+      'LES RÉCOMPENSES (game/recompenses.ts, testé) : PUBLIER POUR TOUS, REPRENDRE LES PUBLIÉES, RETIRER, et le statut dans l’atelier ; les cartes publiées entrent au tirage de tout le monde, les fabriquées du poste priment pour le concepteur. LES TEXTES (textes/atelier.ts, testé) : même trio dans l’en-tête de l’écran, toutes langues d’un coup ; le jeu lit surchargesJouees, plus le brouillon brut. LES SÉQUENCES (game/sequence.ts, testé) : dans l’onglet du montage, PUBLIER celles du poste, REPRENDRE une publiée (même code) pour la retoucher, RETIRER ; le poste prime par code (fusionneSequences).',
+      'VÉRIFIÉ : 906 tests verts dans 80 fichiers, type-check à 0, build propre, l’API type-checkée à part ; au navigateur (page d’essai de l’éditeur de carte, magasin simulé) : rien de publié au départ, brouillon différent après un module ajouté, publier puis relecture, carte livrée puis carte publiée rouverte, publication REFUSÉE sur un id en double, retrait — zéro erreur. Les écrans RÉCOMPENSES, TEXTES et l’onglet SÉQUENCES vivent dans main.ts et le montage : non vus au navigateur, à contrôler en prévisualisation avec le magasin réel.',
+    ],
+  },
+  {
+    date: '04/09/2026 12:00',
+    title: 'LE PLAN DE LA DESCENTE SE PUBLIE : ce que le concepteur règle joue pour tout le monde, plus seulement sur son poste',
+    notes: [
+      'LA QUESTION : « toutes les modifications faites sur les runs sont bien prises en compte pour tout le monde ? » Non : le plan de LA DESCENTE (longueur, rampe, posture, poids de la pioche) ne vivait que dans le stockage du poste qui l’avait réglé — les joueurs jouaient le plan livré avec le code, quoi que le concepteur ait trouvé. C’est le cœur des runs, et le premier morceau du regroupement LA RÉGIE.',
+      'LE MAGASIN GÉNÉRIQUE (/api/reglages, Vercel Blob) : un document JSON par DOMAINE (plan-voie aujourd’hui ; la carte, les récompenses demain), publié pour tous — GET, POST, DELETE par domaine, une seule fonction Vercel pour tous les domaines (le plan Hobby en compte douze, on en est à douze fichiers dont trois modules). Le serveur ne connaît pas la forme des documents : chaque domaine la relit et la ramène dans ses bornes côté jeu (clampPlanVoie), le serveur garde la taille, le domaine et l’auteur.',
+      'QUI JOUE QUEL PLAN (game/planPartage.ts, testé) : un JOUEUR joue le publié, sinon le livré — un brouillon qui traînerait sur son poste ne compte pas, il ne règle jamais le plan ; un CONCEPTEUR joue son brouillon s’il en a un (il est en train de régler), sinon le publié, sinon le livré. Le publié arrive du magasin au démarrage et tranche ; hors-ligne, le poste garde ce qu’il a.',
+      'DANS L’ÉCRAN LA DESCENTE, en tête : LE PLAN PARTAGÉ — qui l’a publié et quand, et ce que CE poste joue (le publié, le livré, ou « un brouillon différent du publié, non publié ») ; PUBLIER (grisé si le brouillon vaut le publié), REVENIR AU PUBLIÉ, RECHARGER, RETIRER LE PUBLIÉ (confirmation : le livré reprend pour tous). Le JSON « en clair » reste, à garder en note. L’aide de l’écran dit la nouvelle règle : le réglage s’enregistre sur ce poste, PUBLIER le fait jouer pour tout le monde.',
+      'CE QUI RESTE PAR POSTE, dit tel quel : l’atelier des RÉCOMPENSES, les TEXTES (export/import), les séquences ; la CARTE passe par le dépôt (export JSON). Ils suivront le même schéma — le code livre, le concepteur publie — dans LA RÉGIE.',
+      'VÉRIFIÉ : 894 tests verts dans 79 fichiers (le plan publié relu dans ses bornes, la comparaison de deux plans, qui joue quel plan pour un joueur et pour un concepteur, ce que l’écran dit), type-check à 0, build propre, l’API type-checkée à part. L’écran LA DESCENTE vit dans main.ts et le jeu ne se monte pas en Chromium headless : la section LE PLAN PARTAGÉ n’a PAS été vue au navigateur — à contrôler en prévisualisation, avec le magasin réel.',
+    ],
+  },
+  {
     date: '04/09/2026 11:39',
     title: 'LE JOURNAL EN DONNÉES : le récit, les fins et leurs seuils se tiennent dans l’atelier RÉCIT & FINS, publié pour tous',
     notes: [

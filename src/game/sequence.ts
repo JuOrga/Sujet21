@@ -288,6 +288,43 @@ export function chargeSequences(): SequenceDef[] {
   }
 }
 
+// ---- Les séquences PUBLIÉES (magasin partagé) : elles jouent pour tout le
+// monde — une cinématique partagée peut les nommer par leur code. Le poste
+// prime, code par code : une séquence du poste remplace la publiée du même
+// code, le temps de la retoucher, puis on publie.
+
+let publiees: SequenceDef[] = []
+
+export function poseSequencesPubliees(brut: unknown): SequenceDef[] {
+  const liste = (brut && typeof brut === 'object' ? (brut as { sequences?: unknown }).sequences : null) ?? brut
+  publiees = []
+  if (Array.isArray(liste)) for (const e of liste) {
+    const s = parseSequence(e)
+    if (s) publiees.push(s)
+  }
+  return publiees
+}
+
+export function sequencesPubliees(): SequenceDef[] {
+  return publiees
+}
+
+/** Les publiées, puis celles du poste — qui priment par code. */
+export function fusionneSequences(publiees: SequenceDef[], locales: SequenceDef[]): SequenceDef[] {
+  const codes = new Set(locales.map((s) => s.code))
+  return [...publiees.filter((p) => !codes.has(p.code)), ...locales]
+}
+
+/** Les séquences JOUÉES sur ce poste. (La livrée s'ajoute en tête chez
+ *  l'appelant.) */
+export function sequencesJouees(): SequenceDef[] {
+  return fusionneSequences(publiees, chargeSequences())
+}
+
+export function documentSequences(): { sequences: SequenceDef[] } {
+  return { sequences: chargeSequences() }
+}
+
 export function sauveSequences(seqs: SequenceDef[]): void {
   try {
     localStorage.setItem(CLE_SEQS, JSON.stringify(seqs))

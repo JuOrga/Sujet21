@@ -4,7 +4,10 @@ import {
   type EtapeSeq,
   SEQUENCE_ALERTE,
   Sequenceur,
+  fusionneSequences,
   parseSequence,
+  poseSequencesPubliees,
+  sequencesJouees,
   serializeSequence,
 } from './sequence'
 
@@ -232,5 +235,20 @@ describe('les séquences — le format de données', () => {
     }
     expect(virages).toEqual(['teinte:#e8433c', 'secousse', 'breche', 'teinte:#e8843c'])
     expect(s.actif).toBe(false) // tout est joué en moins de 15 s
+  })
+})
+
+describe('les séquences publiées — le poste prime, par code', () => {
+  const seq = (code: string, titre: string) => ({ code, titre, etapes: [{ action: 'attendre', texte: '', valeur: 100, duree: 1 }] })
+
+  it('les publiées se relisent propres et jouent ; une séquence du poste remplace la publiée du même code', () => {
+    const publiees = poseSequencesPubliees({ sequences: [seq('A', 'publiée A'), seq('B', 'publiée B'), { code: '' }] })
+    expect(publiees.map((s) => s.titre)).toEqual(['publiée A', 'publiée B'])
+    // sans stockage (ici), le poste n'a rien : les publiées jouent seules
+    expect(sequencesJouees().map((s) => s.titre)).toEqual(['publiée A', 'publiée B'])
+    const locales = [parseSequence(seq('B', 'poste B'))!, parseSequence(seq('C', 'poste C'))!]
+    expect(fusionneSequences(publiees, locales).map((s) => s.titre)).toEqual(['publiée A', 'poste B', 'poste C'])
+    expect(poseSequencesPubliees(null)).toEqual([])
+    expect(fusionneSequences([], locales).map((s) => s.code)).toEqual(['B', 'C'])
   })
 })

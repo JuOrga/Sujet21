@@ -4,6 +4,14 @@ import {
   LANGUE_SOURCE,
   applique,
   avance,
+  brouillonTextesActif,
+  documentTextes,
+  litRegistre,
+  nombreRetouches,
+  poseConcepteurTextes,
+  poseTextesPublies,
+  reprendTextesPublies,
+  surchargesJouees,
   exporteTextes,
   importeTextes,
   poseTexte,
@@ -145,5 +153,46 @@ describe('L’atelier des textes', () => {
     const r = importeTextes('{"langue":"en","textes":{"a.b.c":42,"d.e.f":"ok"}}')
     expect(r.repris).toBe(1)
     expect(surcharges('en')['d.e.f']).toBe('ok')
+  })
+})
+
+describe('Les textes publiés — qui lit quoi', () => {
+  beforeEach(() => {
+    for (const l of LANGUES) videLangue(l.code)
+    poseTextesPublies(null)
+    poseConcepteurTextes(false)
+  })
+
+  it('tant que rien n’est publié, le brouillon du poste se lit (rien ne change hors-ligne)', () => {
+    poseTexte('fr', UNE.cle, 'Retouche du poste', UNE.texte)
+    expect(surchargesJouees('fr')[UNE.cle]).toBe('Retouche du poste')
+    expect(brouillonTextesActif()).toBe(true)
+  })
+
+  it('un joueur lit le publié, jamais un brouillon qui traînerait sur son poste', () => {
+    poseTexte('fr', UNE.cle, 'Retouche du poste', UNE.texte)
+    poseTextesPublies({ fr: { [UNE.cle]: 'Retouche publiée' }, xx: { a: 'b' }, en: { k: 3 } })
+    expect(surchargesJouees('fr')[UNE.cle]).toBe('Retouche publiée')
+    expect(surchargesJouees('en')).toEqual({})
+    expect(brouillonTextesActif()).toBe(false)
+  })
+
+  it('un concepteur lit son brouillon s’il en a un, sinon le publié', () => {
+    poseConcepteurTextes(true)
+    poseTextesPublies({ fr: { [UNE.cle]: 'Retouche publiée' } })
+    expect(surchargesJouees('fr')[UNE.cle]).toBe('Retouche publiée')
+    poseTexte('fr', UNE.cle, 'Retouche du poste', UNE.texte)
+    expect(surchargesJouees('fr')[UNE.cle]).toBe('Retouche du poste')
+  })
+
+  it('le document à publier ne porte que les langues retouchées ; le publié se reprend comme brouillon', () => {
+    poseTexte('fr', UNE.cle, 'Retouche du poste', UNE.texte)
+    expect(Object.keys(documentTextes())).toEqual(['fr'])
+    expect(nombreRetouches(documentTextes())).toBe(1)
+    poseTextesPublies({ fr: { a: 'A', b: 'B' } })
+    reprendTextesPublies()
+    expect(surcharges('fr')).toEqual({ a: 'A', b: 'B' })
+    expect(litRegistre('rien')).toBeNull()
+    expect(nombreRetouches(null)).toBe(0)
   })
 })
