@@ -61,6 +61,8 @@ export interface HooksCodex {
   retablit(id: string): Promise<boolean>
   /** ouvre l'atelier du journal (récit & fins) — mode concepteur */
   atelierJournal?(): void
+  /** débloque TOUT le codex, ou rend l'état d'avant — mode concepteur */
+  basculeTout?(debloquer: boolean): void
 }
 
 const esc = (t: string): string =>
@@ -211,6 +213,20 @@ export class EcranCodex {
     // règlent dans leur atelier, à un clic du rayon
     const atelier = this.el('cx-atelier-journal')
     atelier.hidden = !(this.mode === 'journal' && this.hooks.concepteur() && this.hooks.atelierJournal)
+    // LE PASSE-PARTOUT DU CONCEPTEUR : regarder le codex plein sans jouer
+    // trente parties — et le rendre à l'état d'avant, sinon le bouton
+    // effacerait sa partie sans retour.
+    const passe = this.el('cx-tout')
+    passe.hidden = !(this.hooks.concepteur() && this.hooks.basculeTout)
+    const plein = this.toutConnu()
+    passe.textContent = plein ? '✦ REVERROUILLER LE CODEX' : '✦ TOUT DÉBLOQUER'
+    passe.classList.toggle('on', plein)
+  }
+
+  /** Tout le codex est-il consigné, les deux modes confondus ? */
+  private toutConnu(): boolean {
+    const toutes = [...rayonsDe('fiches'), ...rayonsDe('journal')].flatMap(fichesDuRayon)
+    return toutes.length > 0 && toutes.every((d) => this.hooks.connu(d.id))
   }
 
   private peintGrille(r: RayonCodex, liste: CodexDef[]): void {
@@ -438,6 +454,11 @@ export class EcranCodex {
       this.hooks.atelierJournal?.()
       return
     }
+    if (b.id === 'cx-tout') {
+      this.hooks.basculeTout?.(!this.toutConnu())
+      this.render()
+      return
+    }
     if (b.dataset.mode) {
       this.mode = b.dataset.mode as ModeCodex
       this.rayon = rayonsDe(this.mode)[0].id
@@ -534,7 +555,8 @@ function gabarit(): string {
     `<button type="button" id="codex-fermer" aria-label="Fermer le codex">✕</button>` +
     `</header>` +
     `<div class="cx-corps">` +
-    `<nav class="cx-nav"><div class="cx-modes" id="cx-modes"></div><div id="cx-rayons" class="cx-rayons"></div><p class="cx-note" id="cx-note"></p><button type="button" id="cx-atelier-journal" class="cx-atelier-journal" hidden>✎ ATELIER RÉCIT &amp; FINS</button></nav>` +
+    `<nav class="cx-nav"><div class="cx-modes" id="cx-modes"></div><div id="cx-rayons" class="cx-rayons"></div><p class="cx-note" id="cx-note"></p><button type="button" id="cx-atelier-journal" class="cx-atelier-journal" hidden>✎ ATELIER RÉCIT &amp; FINS</button>` +
+    `<button type="button" id="cx-tout" class="cx-atelier-journal cx-tout" hidden></button></nav>` +
     `<section class="cx-centre"><div class="cx-entete" id="cx-entete"></div><div class="cx-defil"><div id="cx-grille" class="cx-grille"></div></div></section>` +
     `<aside class="cx-fiche" id="cx-fiche"></aside>` +
     `</div></div>`

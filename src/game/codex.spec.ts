@@ -119,3 +119,53 @@ describe('Codex — découvertes', () => {
     expect(c.compte()).toBe(2)
   })
 })
+
+describe('le passe-partout du concepteur', () => {
+  it('débloque tout, sans tirer un toast par fiche', () => {
+    const st = stockage()
+    const c = new Codex(st)
+    let toasts = 0
+    c.onDecouverte = () => void toasts++
+    expect(c.toutConnu()).toBe(false)
+    c.debloqueTout()
+    expect(c.toutConnu()).toBe(true)
+    expect(c.compte()).toBe(fichesCodex().length)
+    expect(toasts).toBe(0)
+    // et ça tient au rechargement
+    expect(new Codex(st).toutConnu()).toBe(true)
+  })
+
+  it('le reverrouillage rend EXACTEMENT ce qui était découvert avant', () => {
+    const st = stockage()
+    const c = new Codex(st)
+    c.marque('eau-mur')
+    const avant = c.quand('eau-mur')
+    expect(c.aUnRetour()).toBe(false)
+    c.debloqueTout()
+    expect(c.aUnRetour()).toBe(true)
+    c.reverrouille()
+    expect(c.compte()).toBe(1)
+    expect(c.connu('eau-mur')).toBe(true)
+    expect(c.quand('eau-mur')).toBe(avant)
+    expect(c.connu('eau-froid')).toBe(false)
+    expect(c.aUnRetour()).toBe(false)
+  })
+
+  it('deux déblocages d’affilée ne perdent pas le filet du premier', () => {
+    const st = stockage()
+    const c = new Codex(st)
+    c.marque('eau-mur')
+    c.debloqueTout()
+    c.debloqueTout()
+    c.reverrouille()
+    expect(c.compte()).toBe(1)
+  })
+
+  it('sans filet, le reverrouillage remet le codex à zéro', () => {
+    const st = stockage()
+    const c = new Codex(st)
+    c.marque('eau-mur')
+    c.reverrouille()
+    expect(c.compte()).toBe(0)
+  })
+})
