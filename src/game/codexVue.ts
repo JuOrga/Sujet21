@@ -53,8 +53,8 @@ export const RAYONS_FICHES: readonly RayonCodex[] = [
   { id: 'scelle', groupe: null, nom: 'SCELLÉ', icone: '⚛', teinte: '#b48cff', sous: 'Le quatrième état. Secteur sous clé.', scelle: true },
 ]
 
-/** Le JOURNAL : le récit, une frise de fragments — et les FINS, une par
- *  expédition bouclée, dans l'ordre. */
+/** Le JOURNAL : le récit et les FINS, des paliers numérotés servis dans
+ *  l'ordre, une entrée par expédition bouclée. */
 export const RAYONS_JOURNAL: readonly RayonCodex[] = [
   { id: 'recit', groupe: 'recit', nom: 'LE RÉCIT', icone: '🛰', teinte: '#ffdda6', sous: 'Ce que le laboratoire a laissé derrière lui' },
   { id: 'fins', groupe: 'fins', nom: 'LES FINS', icone: '🚪', teinte: '#b48cff', sous: 'Ce que devient le sujet quand l’expédition se boucle' },
@@ -120,6 +120,50 @@ export function indice(d: CodexDef): string {
   if (d.groupe === 'fins')
     return 'Une fin reste à atteindre — elle se révèle quand une expédition se boucle, dans l’ordre.'
   return 'Un phénomène du protocole reste à provoquer en jouant.'
+}
+
+// ---- LE JOURNAL, EN JALONS ---------------------------------------------------
+// Le récit et les fins ne se lisent pas comme des fiches d'expérience : ce
+// sont des ÉTAPES, numérotées, servies dans l'ordre. Le concepteur les
+// voulait présentées comme des jalons — « FIN I », « FIN II »… — avec, sous
+// une entrée encore scellée, ce qui l'ouvre. D'où ces trois calculs.
+
+const ROMAINS: readonly [number, string][] = [
+  [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'],
+  [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I'],
+]
+
+/** Un rang en chiffres romains — 0 ou moins : le chiffre nu (garde-fou). */
+export function romain(n: number): string {
+  let reste = Math.floor(n)
+  if (!Number.isFinite(reste) || reste < 1) return String(n)
+  let out = ''
+  for (const [v, s] of ROMAINS) {
+    while (reste >= v) {
+      out += s
+      reste -= v
+    }
+  }
+  return out
+}
+
+/** L'ordinal français d'un rang : 1re, 2e, 3e… */
+export function ordinal(n: number): string {
+  return n === 1 ? '1re' : `${n}e`
+}
+
+/** Ce qui ouvre une entrée du journal encore scellée. Récit et fins se
+ *  servent DANS L'ORDRE, une par expédition bouclée (journal.ts) : le rang
+ *  dit donc combien d'expéditions il reste à boucler. */
+export function conditionJournal(groupe: CodexGroupe | null, rang: number): string {
+  return groupe === 'fins'
+    ? `Se révèle à la ${ordinal(rang)} expédition bouclée.`
+    : `Se livre au ${ordinal(rang)} fragment servi.`
+}
+
+/** L'étiquette de rang d'une entrée du journal : « FIN III », « FRAGMENT V ». */
+export function rangJournal(groupe: CodexGroupe | null, rang: number): string {
+  return `${groupe === 'fins' ? 'FIN' : 'FRAGMENT'} ${romain(rang)}`
 }
 
 /** Une date ISO de découverte, lisible — vide si inconnue. */

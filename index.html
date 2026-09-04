@@ -2827,7 +2827,11 @@
       .cx-filtres { display: flex; gap: 6px; }
       #codex .cx-filtres button { font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(150, 200, 235, 0.18); color: var(--dim); background: transparent; cursor: pointer; font-family: var(--font-mono); }
       #codex .cx-filtres button.on { color: #eaf6ff; border-color: var(--t); background: color-mix(in srgb, var(--t) 14%, transparent); }
-      .cx-defil { overflow: auto; min-height: 0; padding-right: 4px; }
+      /* LE DÉFILEMENT ROGNAIT LE HAUT DES CARTES : la carte lue (et celle
+         survolée) se soulève de 2 à 3 px et porte un halo — sans marge
+         intérieure, la boîte qui défile coupait ce liseré du haut, dans
+         chaque catégorie, puisque la première carte est lue d'office. */
+      .cx-defil { overflow: auto; min-height: 0; padding: 6px 8px 12px 6px; }
       .cx-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
       .cx-grille--vide { display: block; }
       .cx-vide { margin: 20px 0; text-align: center; font-size: calc(12px * var(--ui)); color: var(--dim); line-height: 1.6; }
@@ -2852,24 +2856,38 @@
       #codex .cx-carte small { font-size: calc(10.5px * var(--ui)); color: var(--dim); text-align: center; min-height: 15px; }
       #codex .cx-carte.cx-cible small { color: #ffd24a; }
       /* la frise du journal */
-      .cx-frise { display: flex; flex-direction: column; gap: 10px; padding-left: 34px; position: relative; }
-      .cx-frise::before { content: ''; position: absolute; left: 13px; top: 8px; bottom: 8px; width: 2px; background: linear-gradient(180deg, var(--t), rgba(150, 200, 235, 0.08)); }
-      #codex .cx-fragment {
-        position: relative; display: grid; grid-template-columns: 1fr auto; gap: 4px 14px; padding: 12px 14px; border-radius: 10px; text-align: left;
-        border: 1px solid rgba(150, 200, 235, 0.22); background: linear-gradient(160deg, color-mix(in srgb, var(--t) 10%, transparent), rgba(9, 18, 30, 0.6));
-        color: var(--ink); font: inherit; cursor: pointer; transition: all 0.25s;
+      /* LE JOURNAL EN JALONS (maquette « les fins », 04/09) : le récit et
+         les fins sont des paliers numérotés, servis dans l'ordre — une
+         médaille par entrée, l'entrée scellée disant ce qui l'ouvre. */
+      .cx-jalons { display: grid; grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); gap: 14px; align-content: start; }
+      #codex .cx-jalon {
+        position: relative; display: flex; flex-direction: column; align-items: center; gap: 9px; padding: 14px 12px 16px; border-radius: 14px; text-align: center;
+        border: 1px solid rgba(150, 200, 235, 0.22); background: linear-gradient(170deg, color-mix(in srgb, var(--t) 13%, transparent), rgba(9, 18, 30, 0.66));
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35); color: var(--ink); font: inherit; cursor: pointer; transition: transform 0.25s ease, box-shadow 0.25s ease;
       }
-      #codex .cx-fragment:hover { transform: translateX(4px); }
-      #codex .cx-fragment.on { border-color: var(--t); box-shadow: 0 0 0 1px var(--t), 0 0 20px color-mix(in srgb, var(--t) 27%, transparent); }
-      #codex .cx-fragment.cx-verrou { border-style: dashed; border-color: rgba(150, 200, 235, 0.16); background: rgba(3, 7, 16, 0.5); opacity: 0.65; }
-      .cx-point { position: absolute; left: -27px; top: 16px; width: 14px; height: 14px; border-radius: 50%; background: var(--t); border: 2px solid #eaf6ff; box-shadow: 0 0 10px var(--t); }
-      .cx-verrou .cx-point { background: #0a1420; border-color: rgba(150, 200, 235, 0.3); box-shadow: none; }
-      .cx-fragment .cx-tag { font-family: var(--font-display); font-size: calc(8px * var(--ui)); letter-spacing: 0.2em; color: var(--t); }
-      .cx-fragment.cx-verrou .cx-tag { color: var(--dim); }
-      .cx-fragment .cx-quand { font-size: calc(10px * var(--ui)); color: var(--dim); letter-spacing: 0.1em; text-align: right; }
-      .cx-fragment b { grid-column: 1 / -1; font-family: var(--font-display); font-size: calc(10.5px * var(--ui)); letter-spacing: 0.08em; color: #eaf6ff; line-height: 1.45; font-weight: 400; }
-      .cx-fragment .cx-extrait { grid-column: 1 / -1; font-size: calc(11.5px * var(--ui)); line-height: 1.55; color: #b9d3e3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-      .cx-fragment.cx-verrou .cx-extrait { color: var(--dim); }
+      #codex .cx-jalon:hover { transform: translateY(-3px); }
+      #codex .cx-jalon.on { border-color: var(--t); box-shadow: 0 0 0 1px var(--t), 0 0 26px color-mix(in srgb, var(--t) 33%, transparent); transform: translateY(-2px); }
+      #codex .cx-jalon.cx-verrou { border-style: dashed; border-color: rgba(150, 200, 235, 0.16); background: rgba(3, 7, 16, 0.5); box-shadow: none; }
+      #codex .cx-jalon.cx-verrou.on { border-color: var(--t); }
+      .cx-jalon .cx-rang { font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.26em; color: var(--dim); }
+      #codex .cx-jalon.on .cx-rang { color: var(--t); }
+      .cx-medaille {
+        width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center;
+        border: 1px solid color-mix(in srgb, var(--t) 45%, transparent);
+        background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--t) 26%, transparent), rgba(3, 7, 16, 0.7));
+        box-shadow: inset 0 0 22px color-mix(in srgb, var(--t) 22%, transparent);
+      }
+      .cx-medaille i { font-style: normal; font-size: 34px; line-height: 1; text-shadow: 0 0 16px color-mix(in srgb, var(--t) 55%, transparent); }
+      .cx-verrou .cx-medaille { border-color: rgba(150, 200, 235, 0.2); background: rgba(150, 200, 235, 0.05); box-shadow: none; }
+      .cx-verrou .cx-medaille i { color: var(--dim); text-shadow: none; }
+      #codex .cx-jalon b { font-family: var(--font-display); font-size: calc(10px * var(--ui)); letter-spacing: 0.12em; font-weight: 400; color: #eaf6ff; line-height: 1.4; }
+      #codex .cx-jalon.cx-verrou b { color: var(--dim); letter-spacing: 0.22em; }
+      #codex .cx-jalon small { font-size: calc(10.5px * var(--ui)); line-height: 1.5; color: var(--dim); }
+      /* le fanion d'une entrée du journal : ce qu'elle a rapporté, en une ligne */
+      .cx-fanion { display: flex; align-items: baseline; gap: 8px; padding: 10px 14px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--t) 35%, transparent); background: color-mix(in srgb, var(--t) 8%, transparent); }
+      .cx-fanion span { color: var(--t); }
+      .cx-fanion b { font-weight: 400; font-size: calc(11.5px * var(--ui)); color: #eaf6ff; }
+      .cx-fanion u { margin-left: auto; text-decoration: none; font-size: calc(13px * var(--ui)); }
       /* la fiche lue */
       .cx-fiche { position: relative; display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; min-height: 0; min-width: 0; overflow: auto; border-left: 1px solid rgba(150, 200, 235, 0.12); background: linear-gradient(180deg, rgba(3, 7, 16, 0.5), rgba(3, 7, 16, 0.2)); }
       .cx-video { position: relative; aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden; background: #020509; border: 1px solid rgba(150, 200, 235, 0.16); display: grid; place-items: center; }
@@ -2926,7 +2944,7 @@
       .cx-atelier-note { margin: 0; font-size: calc(10px * var(--ui)); line-height: 1.5; color: var(--dim); }
       .cx-pied { margin-top: auto; display: flex; justify-content: space-between; font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; color: var(--dim); padding-top: 8px; border-top: 1px solid rgba(150, 200, 235, 0.1); }
       @media (prefers-reduced-motion: reduce) {
-        #codex .cx-carte, #codex .cx-fragment, .cx-barre i, .cx-anneau .cx-arc { transition: none; }
+        #codex .cx-carte, #codex .cx-jalon, .cx-barre i, .cx-anneau .cx-arc { transition: none; }
       }
       .rec-salle {
         margin-top: 12px; padding-top: 6px;

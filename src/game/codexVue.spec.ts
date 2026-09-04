@@ -3,13 +3,17 @@ import { fichesCodex } from './codex'
 import {
   RAYONS_FICHES,
   RAYONS_JOURNAL,
+  conditionJournal,
   ecritCibles,
   fichesDuRayon,
   formateQuand,
   indice,
   litCibles,
+  ordinal,
   progression,
+  rangJournal,
   rayonsDe,
+  romain,
   visibles,
   voisine,
 } from './codexVue'
@@ -76,5 +80,27 @@ describe('la navigation et les indices', () => {
     expect(litCibles(null).size).toBe(0)
     m.set('projet21.codex.cibles.v1', '{pas une liste')
     expect(litCibles(st).size).toBe(0)
+  })
+})
+
+describe('le journal en jalons', () => {
+  it('le rang se lit en chiffres romains, et un rang absurde ne casse rien', () => {
+    expect([1, 4, 6, 9, 14, 40, 60].map(romain)).toEqual(['I', 'IV', 'VI', 'IX', 'XIV', 'XL', 'LX'])
+    expect(romain(0)).toBe('0')
+    expect(romain(-3)).toBe('-3')
+  })
+
+  it('l’étiquette d’un palier dit la nature et le rang', () => {
+    expect(rangJournal('fins', 1)).toBe('FIN I')
+    expect(rangJournal('recit', 4)).toBe('FRAGMENT IV')
+    // un rayon sans groupe (le secteur scellé) n'a pas de fins à annoncer
+    expect(rangJournal(null, 2)).toBe('FRAGMENT II')
+  })
+
+  it('l’entrée scellée dit ce qui l’ouvre, sans rien révéler de son texte', () => {
+    expect(ordinal(1)).toBe('1re')
+    expect(ordinal(3)).toBe('3e')
+    expect(conditionJournal('fins', 1)).toBe('Se révèle à la 1re expédition bouclée.')
+    expect(conditionJournal('recit', 5)).toBe('Se livre au 5e fragment servi.')
   })
 })
