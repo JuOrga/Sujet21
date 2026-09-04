@@ -2758,7 +2758,7 @@
       }
       #codex[hidden] { display: none; }
       .cx-boite {
-        width: min(1240px, 100%); height: min(860px, 100%); display: grid; grid-template-rows: auto minmax(0, 1fr);
+        width: min(1240px, 100%); height: min(860px, 100%); display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
         border: 1px solid rgba(150, 200, 235, 0.2); border-radius: 14px; overflow: hidden;
         background: linear-gradient(180deg, rgba(9, 18, 30, 0.94), rgba(6, 12, 22, 0.97));
         box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(167, 221, 245, 0.12);
@@ -2947,7 +2947,6 @@
       .cx-atelier-etat { margin: 0; min-height: 1em; font-size: calc(11px * var(--ui)); color: #ffd24a; }
       .cx-atelier-etat:empty { display: none; }
       .cx-atelier-note { margin: 0; font-size: calc(10px * var(--ui)); line-height: 1.5; color: var(--dim); }
-      .cx-pied { margin-top: auto; display: flex; justify-content: space-between; font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; color: var(--dim); padding-top: 8px; border-top: 1px solid rgba(150, 200, 235, 0.1); }
       @media (prefers-reduced-motion: reduce) {
         #codex .cx-carte, #codex .cx-jalon, .cx-barre i, .cx-anneau .cx-arc { transition: none; }
       }
@@ -6147,41 +6146,165 @@
         .cs-route.cs-active, .cs-mod.cs-courant { animation: none; }
       }
 
-      /* ==== LE MARCHAND DU HUB (main.ts) — un voile comme LA STATION ==== */
+      /* ==== LE MARCHAND DU HUB (game/ecranMarchand.ts) — la maquette « Marchand v2 » ====
+         Trois colonnes comme le codex : le rail des rayons, l'étal, la fiche
+         de l'article. La teinte du rayon voyage en --t ; le rose est celle
+         du marchand lui-même. */
       #marchand {
-        position: fixed; inset: 0; z-index: 59;
-        background: radial-gradient(120% 90% at 50% 0%, rgba(30, 58, 88, 0.5), transparent 62%), rgba(2, 5, 10, 0.94);
-        display: flex; align-items: center; justify-content: center; padding: 16px;
+        position: fixed; inset: 0; z-index: 59; display: flex; align-items: center; justify-content: center; padding: 18px;
+        background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(255, 190, 221, 0.1), transparent 60%), radial-gradient(ellipse 40% 40% at 90% 100%, rgba(140, 215, 255, 0.07), transparent 60%), rgba(2, 5, 10, 0.94);
       }
       #marchand[hidden] { display: none; }
-      .mr-boite { width: min(1100px, 100%); max-height: 100%; display: flex; flex-direction: column; gap: 10px; }
-      .mr-tete { display: flex; align-items: flex-start; gap: 16px; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
-      .mr-titres { display: flex; flex-direction: column; gap: 2px; flex: 1; }
-      .mr-titres b { font-family: var(--font-display); font-size: calc(15px * var(--ui)); letter-spacing: 0.16em; color: #eaf6ff; }
-      .mr-titres span { font-size: calc(10.5px * var(--ui)); letter-spacing: 0.1em; color: var(--dim); text-transform: uppercase; }
-      .mr-solde { margin: 0; align-self: center; font-size: calc(10px * var(--ui)); letter-spacing: 0.2em; color: var(--dim); }
-      .mr-solde strong { font-size: calc(16px * var(--ui)); color: var(--specimen); margin-left: 6px; }
+      .mr-boite {
+        width: min(1240px, 100%); height: min(860px, 100%); display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+        border: 1px solid rgba(255, 190, 221, 0.22); border-radius: 14px; overflow: hidden;
+        background: linear-gradient(180deg, rgba(9, 18, 30, 0.94), rgba(6, 12, 22, 0.97));
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 190, 221, 0.12);
+      }
+      .mr-tete {
+        display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 16px 22px 12px;
+        border-bottom: 1px solid rgba(150, 200, 235, 0.14); background: linear-gradient(180deg, rgba(255, 190, 221, 0.05), transparent);
+      }
+      .mr-identite { display: flex; align-items: center; gap: 16px; flex: 1 1 280px; min-width: 0; }
+      .mr-avatar {
+        width: 56px; height: 56px; flex: none; border-radius: 50%; display: grid; place-items: center;
+        background: radial-gradient(circle at 40% 35%, rgba(255, 190, 221, 0.55), rgba(255, 190, 221, 0.08) 60%, transparent);
+        border: 2px solid #ffbedd; animation: mr-ring 2.6s ease-in-out infinite;
+      }
+      .mr-avatar i { font-style: normal; font-size: 22px; }
+      .mr-titres { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+      .mr-titre-ligne { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+      .mr-titre-ligne h2 { margin: 0; font-family: var(--font-display); font-size: calc(17px * var(--ui)); letter-spacing: 0.22em; color: #ffe3f0; text-shadow: 0 0 18px rgba(255, 190, 221, 0.45); font-weight: 400; }
+      .mr-titre-ligne span { font-size: calc(10.5px * var(--ui)); letter-spacing: 0.18em; color: var(--dim); }
+      .mr-titres p { margin: 0; font-size: calc(12px * var(--ui)); line-height: 1.5; color: #c9b3c0; font-style: italic; }
+      .mr-bourses { display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap; }
+      .mr-bourse { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 10px; border: 1px solid; }
+      .mr-bourse--memoire { border-color: rgba(180, 140, 255, 0.35); background: linear-gradient(135deg, rgba(180, 140, 255, 0.12), rgba(180, 140, 255, 0.02)); --b: #b48cff; }
+      .mr-bourse--orbes { border-color: rgba(255, 190, 221, 0.35); background: linear-gradient(135deg, rgba(255, 190, 221, 0.12), rgba(255, 190, 221, 0.02)); --b: #ffbedd; }
+      .mr-bourse i { font-style: normal; font-size: 20px; color: var(--b); filter: drop-shadow(0 0 8px var(--b)); }
+      .mr-bourse div { display: flex; flex-direction: column; gap: 2px; }
+      .mr-bourse span { font-family: var(--font-display); font-size: calc(8px * var(--ui)); letter-spacing: 0.2em; color: var(--b); }
+      .mr-bourse b { font-family: var(--font-display); font-size: calc(18px * var(--ui)); color: #eaf6ff; font-weight: 400; font-variant-numeric: tabular-nums; }
       #marchand-fermer {
         flex: none; width: 34px; height: 34px; border-radius: 6px; background: rgba(20, 32, 46, 0.8);
         border: 1px solid var(--line); color: inherit; font: inherit; font-size: calc(14px * var(--ui)); cursor: pointer;
       }
-      #marchand-fermer:hover { border-color: var(--specimen); }
-      .mr-corps { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 18px; padding-right: 4px; }
-      .mr-sec h3 { margin: 0 0 4px; font-family: var(--font-display); font-size: calc(11px * var(--ui)); letter-spacing: 0.2em; color: var(--specimen); }
-      .mr-sec p { margin: 0 0 8px; font-size: calc(11.5px * var(--ui)); line-height: 1.5; color: var(--dim); }
-      .mr-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
-      .mr-article {
-        display: grid; grid-template-columns: 28px 1fr; grid-template-rows: auto auto auto; column-gap: 10px; align-items: start;
-        text-align: left; padding: 10px 12px; border: 1px solid var(--line); background: rgba(9, 18, 30, 0.82);
-        color: var(--ink); font-family: var(--font-mono); cursor: pointer;
+      #marchand-fermer:hover { border-color: #ffbedd; }
+      .mr-corps { display: grid; grid-template-columns: minmax(200px, 224px) minmax(0, 1fr) minmax(260px, 340px); min-height: 0; min-width: 0; }
+      @media (max-width: 900px) { .mr-corps { grid-template-columns: minmax(0, 1fr) minmax(220px, 300px); } .mr-nav { display: none !important; } }
+      /* le rail des rayons */
+      .mr-nav { display: flex; flex-direction: column; gap: 8px; padding: 14px 12px; min-height: 0; overflow: auto; border-right: 1px solid rgba(150, 200, 235, 0.12); background: rgba(3, 7, 16, 0.35); }
+      .mr-rayons { display: flex; flex-direction: column; gap: 8px; }
+      #marchand .mr-rayon {
+        display: grid; grid-template-columns: 40px 1fr; gap: 10px; align-items: center; padding: 10px; border-radius: 10px;
+        border: 1px solid rgba(150, 200, 235, 0.14); background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: all 0.25s ease;
       }
-      .mr-article:hover:not(:disabled) { border-color: var(--specimen); background: rgba(99, 183, 230, 0.12); }
-      .mr-article i { grid-row: 1 / span 3; font-style: normal; font-size: 20px; line-height: 1; }
-      .mr-article b { font-size: calc(12px * var(--ui)); letter-spacing: 0.08em; }
-      .mr-article small { font-size: calc(10.5px * var(--ui)); line-height: 1.4; color: var(--dim); }
-      .mr-article em { font-style: normal; font-size: calc(10.5px * var(--ui)); letter-spacing: 0.14em; color: var(--valid); margin-top: 4px; }
-      .mr-article.mr-tenu { opacity: 0.6; cursor: default; }
-      .mr-article.mr-tenu em { color: var(--dim); }
+      #marchand .mr-rayon:hover { background: rgba(255, 190, 221, 0.08); border-color: rgba(255, 190, 221, 0.4); }
+      #marchand .mr-rayon.on { border-color: var(--t); background: linear-gradient(90deg, color-mix(in srgb, var(--t) 14%, transparent), transparent); box-shadow: inset 3px 0 0 var(--t), 0 0 18px color-mix(in srgb, var(--t) 20%, transparent); }
+      .mr-rayon-ico { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(150, 200, 235, 0.12); }
+      .mr-rayon-ico i { font-style: normal; font-size: 18px; color: var(--t); }
+      .mr-rayon-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+      .mr-rayon-txt b { font-family: var(--font-display); font-size: calc(9px * var(--ui)); letter-spacing: 0.1em; font-weight: 400; color: #a7ddf5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #marchand .mr-rayon.on .mr-rayon-txt b { color: #eaf6ff; }
+      .mr-rayon-txt small { font-size: calc(10.5px * var(--ui)); color: var(--dim); }
+      .mr-note { margin: auto 0 0; padding: 10px; border-radius: 8px; border: 1px dashed rgba(150, 200, 235, 0.18); font-size: calc(10.5px * var(--ui)); line-height: 1.5; color: var(--dim); }
+      /* l'étal */
+      .mr-centre { display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 14px 16px; gap: 12px; }
+      .mr-entete { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+      .mr-entete-nom { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+      .mr-entete-nom span { font-family: var(--font-display); font-size: calc(12px * var(--ui)); letter-spacing: 0.2em; }
+      .mr-entete-nom small { font-size: calc(11px * var(--ui)); color: var(--dim); }
+      .mr-filtres { display: flex; gap: 6px; }
+      #marchand .mr-filtres button { font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(150, 200, 235, 0.18); color: var(--dim); background: transparent; cursor: pointer; font-family: var(--font-mono); white-space: nowrap; }
+      #marchand .mr-filtres button.on { color: #eaf6ff; border-color: var(--t); background: color-mix(in srgb, var(--t) 14%, transparent); }
+      /* la carte lue se soulève : la boîte qui défile garde une marge, sinon
+         elle rogne le liseré du haut (leçon du codex) */
+      .mr-defil { overflow: auto; min-height: 0; padding: 6px 8px 12px 6px; }
+      .mr-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+      .mr-grille--vide { display: block; }
+      .mr-vide { margin: 20px 0; text-align: center; font-size: calc(12px * var(--ui)); color: var(--dim); line-height: 1.6; }
+      #marchand .mr-article {
+        position: relative; display: flex; flex-direction: column; gap: 8px; padding: 14px 14px 12px; min-height: 190px; border-radius: 12px; text-align: left;
+        border: 1px solid rgba(150, 200, 235, 0.18); color: var(--ink); font: inherit; cursor: pointer; overflow: hidden;
+        background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.013) 0 1px, transparent 1px 3px), radial-gradient(130% 80% at 50% -10%, color-mix(in srgb, var(--t) 13%, transparent), transparent 62%), linear-gradient(180deg, #14202f, #101825);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35); transition: transform 0.25s ease, box-shadow 0.25s ease;
+      }
+      #marchand .mr-article::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: linear-gradient(90deg, var(--t), #ffbedd); opacity: 0.85; }
+      #marchand .mr-article:hover { transform: translateY(-4px); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5), 0 0 22px color-mix(in srgb, var(--t) 50%, transparent); }
+      #marchand .mr-article.on { border-color: var(--t); box-shadow: 0 0 0 1px var(--t), 0 0 24px color-mix(in srgb, var(--t) 33%, transparent); transform: translateY(-2px); }
+      #marchand .mr-article.mr-tenu { opacity: 0.55; }
+      #marchand .mr-article.mr-cher { opacity: 0.6; }
+      #marchand .mr-article.on.mr-tenu, #marchand .mr-article.on.mr-cher { opacity: 0.85; }
+      .mr-article-tete { display: flex; gap: 10px; align-items: flex-start; }
+      .mr-article-tete > i { font-style: normal; font-size: 26px; line-height: 1; filter: drop-shadow(0 0 8px color-mix(in srgb, var(--t) 55%, transparent)); }
+      .mr-article-tete > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+      .mr-article-tete b { font-size: calc(12.5px * var(--ui)); line-height: 1.25; color: #e6f3ff; font-weight: 600; }
+      .mr-tenu .mr-article-tete b { color: var(--dim); }
+      .mr-article-tete small { font-family: var(--font-display); font-size: calc(7.5px * var(--ui)); letter-spacing: 0.16em; color: var(--t); }
+      .mr-article-txt { font-size: calc(11px * var(--ui)); line-height: 1.45; color: #93aabf; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+      .mr-badge { align-self: flex-start; margin-top: auto; font-family: var(--font-display); font-size: calc(7.5px * var(--ui)); letter-spacing: 0.14em; padding: 3px 6px; border-radius: 4px; white-space: nowrap; background: rgba(150, 200, 235, 0.15); color: #a7ddf5; border: 1px solid rgba(150, 200, 235, 0.4); }
+      .mr-badge--vide { visibility: hidden; }
+      /* le prix et l'état se partagent la ligne — et passent à la ligne
+         plutôt que de se tronquer (« 60 MÉMOIRE · TROP CHER » sur 190 px) */
+      .mr-article-pied { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; padding-top: 6px; border-top: 1px solid rgba(150, 200, 235, 0.1); }
+      .mr-article-pied u { text-decoration: none; font-family: var(--font-display); font-size: calc(11px * var(--ui)); letter-spacing: 0.08em; color: #ffd977; white-space: nowrap; }
+      .mr-tenu .mr-article-pied u { color: var(--dim); }
+      .mr-article-pied em { margin-left: auto; font-style: normal; font-size: calc(10px * var(--ui)); letter-spacing: 0.12em; color: var(--dim); white-space: nowrap; }
+      #marchand .mr-rouge { color: #e0685c !important; }
+      #marchand .mr-vert { color: #6dffb8 !important; }
+      /* la fiche de l'article */
+      .mr-fiche { position: relative; display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; min-height: 0; min-width: 0; overflow: auto; border-left: 1px solid rgba(150, 200, 235, 0.12); background: linear-gradient(180deg, rgba(3, 7, 16, 0.5), rgba(3, 7, 16, 0.2)); }
+      .mr-fiche::before { content: ''; position: absolute; left: 0; right: 0; height: 60px; background: linear-gradient(180deg, transparent, rgba(255, 190, 221, 0.05), transparent); animation: mr-scan 7s linear infinite; pointer-events: none; }
+      .mr-apercu {
+        position: relative; aspect-ratio: 16 / 9; flex: none; border-radius: 10px; overflow: hidden; display: grid; place-items: center;
+        border: 1px solid color-mix(in srgb, var(--t) 35%, transparent); background: radial-gradient(ellipse at 50% 100%, color-mix(in srgb, var(--t) 20%, transparent), rgba(3, 7, 16, 0.9) 70%);
+      }
+      .mr-apercu i { font-style: normal; font-size: 54px; line-height: 1; filter: drop-shadow(0 0 22px var(--t)); animation: mr-breathe 3s ease-in-out infinite; }
+      .mr-apercu small { position: absolute; right: 10px; bottom: 8px; font-family: var(--font-display); font-size: calc(7.5px * var(--ui)); letter-spacing: 0.18em; color: var(--dim); }
+      .mr-fiche-titres { display: flex; flex-direction: column; gap: 4px; }
+      .mr-etiquette { font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.24em; }
+      .mr-fiche-titres h3 { margin: 0; font-family: var(--font-display); font-size: calc(13px * var(--ui)); letter-spacing: 0.08em; color: #eaf6ff; line-height: 1.4; font-weight: 400; }
+      .mr-texte { margin: 0; font-size: calc(12px * var(--ui)); line-height: 1.6; color: var(--ink); }
+      .mr-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .mr-stats div { padding: 9px 10px; border-radius: 8px; border: 1px solid rgba(150, 200, 235, 0.12); display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+      .mr-stats span { font-size: calc(9px * var(--ui)); letter-spacing: 0.18em; color: var(--dim); }
+      .mr-stats b { font-size: calc(11.5px * var(--ui)); font-weight: 400; color: #eaf6ff; }
+      #marchand #mr-acheter {
+        margin-top: auto; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 14px; border-radius: 10px;
+        font-family: var(--font-display); font-size: calc(10.5px * var(--ui)); letter-spacing: 0.18em; text-align: center; line-height: 1.4; cursor: pointer; transition: filter 0.2s;
+      }
+      #marchand #mr-acheter.mr-ok { color: #1a1200; background: linear-gradient(180deg, #ffe39a, #ffd977); border: 1px solid #ffd977; box-shadow: 0 6px 24px rgba(255, 217, 119, 0.35); animation: mr-pulse 2.2s ease-in-out infinite; }
+      #marchand #mr-acheter.mr-ok:hover { filter: brightness(1.15); }
+      #marchand #mr-acheter.mr-fait { color: #6dffb8; background: rgba(109, 255, 184, 0.08); border: 1px solid rgba(109, 255, 184, 0.4); cursor: default; }
+      #marchand #mr-acheter.mr-non { color: var(--dim); background: rgba(3, 7, 16, 0.5); border: 1px solid rgba(150, 200, 235, 0.2); cursor: default; }
+      .mr-fiche-vide { display: flex; flex-direction: column; gap: 12px; color: var(--dim); font-size: calc(12px * var(--ui)); text-align: center; }
+      @keyframes mr-ring { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 190, 221, 0.6), 0 0 18px rgba(255, 190, 221, 0.3); } 50% { box-shadow: 0 0 0 10px rgba(255, 190, 221, 0), 0 0 30px rgba(255, 190, 221, 0.5); } }
+      @keyframes mr-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 217, 119, 0); } 50% { box-shadow: 0 0 12px 3px rgba(255, 217, 119, 0.55); } }
+      @keyframes mr-breathe { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+      @keyframes mr-scan { 0% { top: -10%; } 100% { top: 110%; } }
+      @media (prefers-reduced-motion: reduce) {
+        .mr-avatar, .mr-apercu i, .mr-fiche::before, #marchand #mr-acheter.mr-ok { animation: none; }
+        #marchand .mr-article { transition: none; }
+      }
+      /* ==== LA LÉGENDE MANETTE (game/padEcran.ts) — le pied du codex et du marchand ====
+         Chaque bouton avec ce qu'il fait ici ; A vert, B rouge, X bleu, Y
+         jaune, comme sur la manette. En creux : le bouton ne fait rien. */
+      .pe-legende { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; padding: 9px 22px; border-top: 1px solid rgba(150, 200, 235, 0.14); background: rgba(3, 7, 16, 0.6); }
+      .pe-touche { display: flex; align-items: center; gap: 7px; }
+      .pe-b {
+        min-width: 22px; height: 22px; padding: 0 6px; display: grid; place-items: center; border-radius: 5px;
+        font-family: var(--font-display); font-size: calc(9px * var(--ui)); letter-spacing: 0.04em;
+        background: rgba(150, 200, 235, 0.16); color: var(--ink); border: 1px solid rgba(255, 255, 255, 0.18); box-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+      }
+      .pe-b.pe-ronde { border-radius: 11px; }
+      .pe-b--A { background: #6dffb8; color: #06101a; }
+      .pe-b--B { background: #e0685c; color: #06101a; }
+      .pe-b--X { background: #63b7e6; color: #06101a; }
+      .pe-b--Y { background: #ffd977; color: #06101a; }
+      .pe-touche i { font-style: normal; font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; color: #a7ddf5; }
+      .pe-muette .pe-b { opacity: 0.45; }
+      .pe-muette i { color: var(--dim); }
+      .pe-source { margin-left: auto; font-style: normal; font-size: calc(9.5px * var(--ui)); letter-spacing: 0.16em; color: var(--dim); }
       #cycle-solde small { display: block; font-size: calc(9.5px * var(--ui)); letter-spacing: 0.06em; color: var(--dim); text-transform: none; }
 
       /* ---- Éditeur de tableaux : plan de travail, pas vitrine ---- */
@@ -8944,17 +9067,8 @@
         <p class="mb-passer" id="mb-passer">toucher pour passer</p>
       </div>
     </div>
-    <!-- LE MARCHAND DU HUB : le Semblable du comptoir vend ce qui dure (main.ts) -->
-    <div id="marchand" hidden aria-label="Le marchand">
-      <div class="mr-boite">
-        <div class="mr-tete">
-          <div class="mr-titres"><b>LE MARCHAND</b><span>le Semblable du comptoir — ce qui dure se paie en mémoire</span></div>
-          <p class="mr-solde">MÉMOIRE <strong id="marchand-solde">0</strong></p>
-          <button type="button" id="marchand-fermer" aria-label="Fermer le marchand">✕</button>
-        </div>
-        <div class="mr-corps" id="marchand-corps"></div>
-      </div>
-    </div>
+    <!-- LE MARCHAND DU HUB : le Semblable du comptoir vend ce qui dure — la maquette « Marchand v2 » (game/ecranMarchand.ts) -->
+    <div id="marchand" hidden aria-label="Le marchand"></div>
     <div id="cine" hidden aria-label="Cinématique"></div>
     <div id="montage" aria-label="Table de montage des cinématiques"></div>
     <div id="imagerie" aria-label="Bibliothèque d'images"></div>

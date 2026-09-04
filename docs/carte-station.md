@@ -237,13 +237,21 @@ Dans l'ordre, une PR vers `dev` par étape :
   se tisse avec SON orbe. La ligne dit « ORBE EN POCHE » ou « ORBE
   MANQUANT · 10 AU MARCHAND ». Le prix d'un orbe est le `cout` de la
   transformation dans `cycle.ts` : une seule table de valeurs.
-- **Le marchand** (`#marchand`) : le Semblable du comptoir. Le voile
-  s'ouvre au hub au contact de l'étal (la boîte qui englobe ses alcôves,
-  élargie de 140 unités), ou depuis l'accueil en mode concepteur (bouton
-  MARCHAND). Trois étals : les orbes (transformations non mystères), les
-  **améliorations durables** (`AMELIORATIONS` : réserve élargie +0,5 L,
-  second échantillon +1 vie, flair de cachette — trois pour commencer, à
-  étoffer), les provisions du comptoir (les mêmes que les alcôves).
+- **Le marchand** (`#marchand`, `src/game/ecranMarchand.ts`, la vue pure
+  dans `marchandVue.ts`) : le Semblable du comptoir, peint sur la maquette
+  « Marchand v2 » du concepteur. Le voile s'ouvre au hub au contact de
+  l'étal (la boîte qui englobe ses alcôves, élargie de 140 unités), ou
+  depuis la régie en mode concepteur. Trois rayons, tous payés en
+  mémoire : les orbes (transformations non mystères), les **améliorations
+  durables** (`AMELIORATIONS` : réserve élargie +0,5 L, second échantillon
+  +1 vie, flair de cachette — trois pour commencer, à étoffer), les
+  provisions du comptoir (les mêmes que les alcôves). Le rail des rayons
+  à gauche, l'étal au centre (filtre TOUS / ABORDABLES / ACQUIS), la fiche
+  de l'article à droite avec le bouton d'achat. À la manette
+  (`padEcran.ts`, le même schéma que le codex) : croix ou stick pour
+  parcourir, LB/RB pour changer de rayon, A pour acheter, X pour le
+  filtre, B pour quitter — au clavier, flèches, Q/E, ⏎, F, Échap ; la
+  légende en pied le dit dans la langue de ce qui a la main.
 - **Les caches** : un module de la carte porte un champ `orbe` (éditeur :
   « Orbe recelé »). Quand le module est épuisé, l'orbe est pris — une fois
   par poste, jamais sous un outil de conception. Sur la carte livrée, S1b

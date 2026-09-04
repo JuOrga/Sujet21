@@ -14,6 +14,12 @@
 // Tout ce qui se calcule vit dans codexVue.ts (testé) ; ici, le DOM. La
 // classe ne connaît ni les registres ni le Codex : elle reçoit ce qu'elle
 // lit par des crochets, comme l'éditeur reçoit les biomes.
+//
+// LA MANETTE (maquette « Marchand v2 », reprise ici à la demande du
+// concepteur) : la croix parcourt la grille, LB/RB changent d'état ou de
+// chapitre, X bascule FICHES/JOURNAL, Y tourne le filtre, A marque
+// l'objectif, B ferme — et la légende en pied dit les touches dans la
+// langue de ce qui a la main (padEcran.ts). Le clavier suit le même schéma.
 
 import type { CodexDef } from './codex'
 import {
@@ -38,11 +44,19 @@ import {
   romain,
   videoDe,
   visibles,
-  voisine,
   type FiltreCodex,
   type ModeCodex,
   type RayonCodex,
 } from './codexVue'
+import {
+  PiloteEcran,
+  colonnesDe,
+  gesteClavier,
+  legendeHTML,
+  voisinGrille,
+  type Geste,
+  type LectureManette,
+} from './padEcran'
 
 export interface HooksCodex {
   connu(id: string): boolean
@@ -63,6 +77,8 @@ export interface HooksCodex {
   atelierJournal?(): void
   /** débloque TOUT le codex, ou rend l'état d'avant — mode concepteur */
   basculeTout?(debloquer: boolean): void
+  /** une manette est branchée : la légende parle ses boutons */
+  manette(): boolean
 }
 
 const esc = (t: string): string =>
@@ -83,6 +99,8 @@ export class EcranCodex {
   private atelierEtat = ''
   private envoiEnCours = false
   private fichePeinte: string | null = null
+  private pilote = new PiloteEcran()
+  private legendeManette: boolean | null = null
 
   constructor(
     private host: HTMLElement,
@@ -161,6 +179,26 @@ export class EcranCodex {
     this.peintNav()
     this.peintGrille(r, liste)
     this.peintFiche(r)
+    this.peintLegende(r)
+  }
+
+  /** La barre du pied : ce que chaque bouton fait ICI, maintenant. */
+  private peintLegende(r: RayonCodex): void {
+    const manette = this.hooks.manette()
+    this.legendeManette = manette
+    const d = this.sel ? fichesDuRayon(r).find((x) => x.id === this.sel) : undefined
+    const journal = this.mode === 'journal'
+    this.el('cx-legende').innerHTML = legendeHTML(
+      [
+        { b: 'LBRB', t: journal ? 'CHAPITRE' : 'ÉTAT' },
+        { b: 'CROIX', t: 'PARCOURIR' },
+        { b: 'A', t: d && !this.hooks.connu(d.id) ? 'OBJECTIF' : '' },
+        { b: 'X', t: journal ? 'FICHES' : 'JOURNAL' },
+        { b: 'Y', t: 'FILTRE' },
+        { b: 'B', t: 'FERMER' },
+      ],
+      manette,
+    )
   }
 
   private peintTete(): void {
@@ -304,7 +342,7 @@ export class EcranCodex {
     panneau.querySelectorAll('video').forEach((v) => v.pause())
     const d = this.sel ? fichesDuRayon(r).find((x) => x.id === this.sel) : undefined
     if (!d) {
-      panneau.innerHTML = `<div class="cx-fiche-vide"><span class="cx-hex cx-hex--grand"><i>${r.icone}</i></span><p>${esc(r.scelle ? 'Secteur sous clé.' : 'Choisissez une fiche.')}</p></div>` + piedFiche()
+      panneau.innerHTML = `<div class="cx-fiche-vide"><span class="cx-hex cx-hex--grand"><i>${r.icone}</i></span><p>${esc(r.scelle ? 'Secteur sous clé.' : 'Choisissez une fiche.')}</p></div>`
       return
     }
     // le message de l'atelier parle d'UNE fiche : il ne suit pas la suivante
@@ -355,8 +393,7 @@ export class EcranCodex {
           // ce que la découverte rapporte se lit AVANT de tenter : c'est
           // l'appât de l'expérience (demande du concepteur)
           `<div class="cx-gain"><span>À LA DÉCOUVERTE</span><b class="cx-memoire">${reg.memoire > 0 ? `+${reg.memoire} MÉMOIRE` : 'RIEN À GAGNER'}</b><small style="color:${rar.teinte}">RARETÉ ${rar.nom}</small></div>`) +
-      (this.hooks.concepteur() ? this.gabaritAtelier(d, reg) : '') +
-      piedFiche()
+      (this.hooks.concepteur() ? this.gabaritAtelier(d, reg) : '')
     // la vidéo absente ne casse rien : le glyphe reste, avec « aperçu à venir »
     const v = panneau.querySelector<HTMLVideoElement>('.cx-video video')
     const boite = panneau.querySelector<HTMLElement>('.cx-video')
@@ -484,10 +521,7 @@ export class EcranCodex {
       return
     }
     if (b.id === 'cx-cibler' && this.sel) {
-      if (this.cibles.has(this.sel)) this.cibles.delete(this.sel)
-      else this.cibles.add(this.sel)
-      ecritCibles(this.stockage, this.cibles)
-      this.render()
+      this.bascule(this.sel)
       return
     }
     const id = this.sel
@@ -501,23 +535,83 @@ export class EcranCodex {
     }
   }
 
+  /** Marque ou démarque une fiche comme objectif suivi. */
+  private bascule(id: string): void {
+    if (this.cibles.has(id)) this.cibles.delete(id)
+    else this.cibles.add(id)
+    ecritCibles(this.stockage, this.cibles)
+    this.render()
+  }
+
+  private choisitRayon(id: string): void {
+    this.rayon = id
+    this.sel = null
+    this.render()
+  }
+
+  /** Un geste du schéma — manette ou clavier, le même aiguillage. */
+  private geste(g: Geste): void {
+    switch (g) {
+      case 'B':
+        this.hooks.fermer()
+        return
+      case 'A':
+        // A marque l'objectif d'une fiche verrouillée ; une fiche connue
+        // n'a rien à marquer
+        if (this.sel && !this.hooks.connu(this.sel)) this.bascule(this.sel)
+        return
+      case 'X':
+        this.mode = this.mode === 'journal' ? 'fiches' : 'journal'
+        this.rayon = rayonsDe(this.mode)[0].id
+        this.filtre = 'tous'
+        this.sel = null
+        this.render()
+        return
+      case 'Y': {
+        const ordre: FiltreCodex[] = ['tous', 'ok', 'non']
+        this.filtre = ordre[(ordre.indexOf(this.filtre) + 1) % ordre.length]
+        this.render()
+        return
+      }
+      case 'LB':
+      case 'RB': {
+        const rs = rayonsDe(this.mode)
+        const i = rs.findIndex((r) => r.id === this.rayon)
+        this.choisitRayon(rs[(i + (g === 'RB' ? 1 : -1) + rs.length) % rs.length].id)
+        return
+      }
+      default: {
+        const liste = visibles(this.rayonCourant(), this.filtre, (id) => this.hooks.connu(id))
+        const i = liste.findIndex((d) => d.id === this.sel)
+        const dx = g === 'gauche' ? -1 : g === 'droite' ? 1 : 0
+        const dy = g === 'haut' ? -1 : g === 'bas' ? 1 : 0
+        const v = voisinGrille(liste.length, i, dx, dy, colonnesDe(this.host.querySelector('#cx-grille')))
+        if (v === null) return
+        this.sel = liste[v].id
+        this.render()
+        this.host.querySelector<HTMLElement>(`[data-fiche="${CSS.escape(this.sel)}"]`)?.scrollIntoView({ block: 'nearest' })
+      }
+    }
+  }
+
+  /** La manette, une image : relevée par la boucle de jeu (main.ts) tant
+   *  que le codex est au-dessus. */
+  manette(m: LectureManette, now: number): void {
+    if (this.host.hidden) return
+    for (const g of this.pilote.lit(m, now)) this.geste(g)
+    // la manette vient d'être branchée (ou débranchée) : la légende change de langue
+    if (this.legendeManette !== this.hooks.manette()) this.peintLegende(this.rayonCourant())
+  }
+
   private clavier(e: KeyboardEvent): void {
     if (this.host.hidden) return
     const t = e.target as HTMLElement | null
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return
-    if (e.key === 'Escape') {
-      e.stopImmediatePropagation()
-      this.hooks.fermer()
-      return
-    }
-    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
-    const liste = visibles(this.rayonCourant(), this.filtre, (id) => this.hooks.connu(id))
-    const v = voisine(liste, this.sel, e.key === 'ArrowRight' ? 1 : -1)
-    if (!v) return
+    const g = gesteClavier(e.key)
+    if (!g) return
     e.preventDefault()
-    this.sel = v.id
-    this.render()
-    this.host.querySelector<HTMLElement>(`[data-fiche="${CSS.escape(v.id)}"]`)?.scrollIntoView({ block: 'nearest' })
+    e.stopImmediatePropagation()
+    this.geste(g)
   }
 
   private el(id: string): HTMLElement {
@@ -540,10 +634,6 @@ function enBase64(f: Blob): Promise<string> {
   })
 }
 
-function piedFiche(): string {
-  return `<div class="cx-pied"><span>◀ ▶ NAVIGUER</span><span>ÉCHAP FERMER</span></div>`
-}
-
 function gabarit(): string {
   return (
     `<div class="cx-boite">` +
@@ -559,6 +649,8 @@ function gabarit(): string {
     `<button type="button" id="cx-tout" class="cx-atelier-journal cx-tout" hidden></button></nav>` +
     `<section class="cx-centre"><div class="cx-entete" id="cx-entete"></div><div class="cx-defil"><div id="cx-grille" class="cx-grille"></div></div></section>` +
     `<aside class="cx-fiche" id="cx-fiche"></aside>` +
-    `</div></div>`
+    `</div>` +
+    `<footer class="pe-legende" id="cx-legende"></footer>` +
+    `</div>`
   )
 }

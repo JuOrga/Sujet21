@@ -31,6 +31,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '04/09/2026 15:14',
+    title: 'LE MARCHAND REFAIT sur la maquette « Marchand v2 » — et la manette pilote le marchand comme le codex',
+    notes: [
+      'LA DEMANDE : « refais l’écran Récompenses avec ce qu’il y a en PJ » — la maquette Marchand v2 (rayons, étal, fiche article, légende manette) et Codex v2 — « si des données ne sont pas utilisées par le jeu ne les mets pas », et « l’implémentation manette est à mettre également sur l’écran codex ». La maquette est celle du MARCHAND, le seul écran du jeu où l’on achète : c’est lui qui est refait. L’atelier des récompenses (la forge des cartes du tirage) ne bouge pas.',
+      'L’ÉCRAN (game/ecranMarchand.ts, la vue pure dans marchandVue.ts, testée) : en tête, le Semblable et la bourse — la MÉMOIRE, seule monnaie ici, et les orbes en poche. Le rail des RAYONS à gauche : ORBES, AMÉLIORATIONS, PROVISIONS — exactement ce que le catalogue vend (marchand.ts, hub.ts), avec le compte d’acquis par rayon. L’étal au centre : une carte par article (glyphe, nom, effet, badge d’état, prix), le filtre TOUS / ABORDABLES / ACQUIS. La fiche à droite : l’aperçu, le texte, la TENUE (jusqu’au tissage, pour toujours, prochaine descente), le solde APRÈS ACHAT ou ce qui manque, et le bouton — ACHETER, MÉMOIRE INSUFFISANTE, ou l’état déjà tenu (en poche, tissée, offerte d’origine, acquise, servie). La caisse ne change pas : les registres pour les orbes et les améliorations, le comptoir pour les provisions.',
+      'PAS D’INVENTION : la maquette montrait des cartes payées en condensat, une jauge de fidélité, un étal qui se renouvelle (Y), des fioles à vendre, des effets chiffrés et une vidéo par article — rien de cela n’existe au marchand du hub. Écarté, sans placeholder.',
+      'LA MANETTE (game/padEcran.ts, pur, testé) : le schéma des maquettes, le même sur les deux écrans — croix ou stick gauche pour parcourir la grille (un cran, une attente, puis la répétition douce, comme le parcours générique), LB/RB pour le rayon (l’état ou le chapitre au codex), A pour l’action (acheter ; marquer l’objectif au codex), X et Y pour les bascules (le filtre au marchand ; FICHES/JOURNAL et le filtre au codex), B pour quitter. Le clavier suit : flèches, Q/E, ⏎, F/R, Échap. En pied, la LÉGENDE dit les touches dans la langue de ce qui a la main — les boutons colorés de la manette dès qu’elle est branchée, les touches sinon. Dans main.ts, une couche de menu peut désormais CONDUIRE sa manette elle-même (pilote) : le parcours générique la laisse faire, B reste la porte de sortie partout.',
+      'VÉRIFIÉ : 934 tests verts dans 83 fichiers (le pilote : fronts, cran du stick, répétition, réarmement, axe dominant ; la grille : boucle horizontale, bords verticaux, dernière rangée incomplète ; la légende dans les deux langues ; les rayons et les états du marchand face à des registres simulés, les filtres, les libellés), type-check à 0, build propre. Au navigateur (page d’essai, registres simulés) : le marchand parcouru au clavier, un achat au ⏎, un à la souris, un au bouton A d’une manette simulée, la légende qui change de langue, la version étroite ; le codex parcouru, le chapitre, le filtre, la bascule JOURNAL, l’objectif — zéro erreur. Le marchand DANS le jeu (contact de l’étal, toasts, mémoire du HUD) reste à voir en prévisualisation.',
+    ],
+  },
+  {
     date: '04/09/2026 13:33',
     title: 'L’ACCUEIL DU CONCEPTEUR N’A PLUS QU’UNE PORTE : la régie — les douze anciens boutons sont partis',
     notes: [
