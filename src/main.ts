@@ -8,6 +8,8 @@ import { TROPHEES, Trophees } from './game/trophees'
 import { evenementsPlasma } from './game/plasmaFx'
 import { Codex } from './game/codex'
 import { AtelierJournal } from './editor/atelierJournal'
+import { deleteReglage, fetchReglage, pushReglage } from './game/reglagesPartages'
+import { etatPlan, litPlanPublie, planAuDemarrage } from './game/planPartage'
 import {
   deleteReglageCodex,
   fetchReglagesCodex,
@@ -809,17 +811,38 @@ let pupitresASemer = false
 const provisionsRun = { bonbonne: 0, vies: 0, clef: false, condensat: 0 }
 let plotsDedans: boolean[] = []
 
-// Le PLAN de la voie : paramétrable au banc, mémorisé par poste.
+// Le PLAN de la voie : réglé dans l'écran LA DESCENTE. Le BROUILLON du
+// poste (localStorage) est l'outil de réglage ; le plan PUBLIÉ (magasin
+// partagé, /api/reglages) joue pour tout le monde — la règle « qui joue
+// quel plan » vit dans planPartage.ts. Au démarrage, le brouillon du poste
+// s'il y en a un (le publié arrive ensuite et tranche, voir plus bas).
 const CLE_PLAN_VOIE = 'sujet21-voie-plan-v1'
-const voiePlan: PlanVoie = (() => {
+const planBrouillonInitial: PlanVoie | null = (() => {
   try {
-    return clampPlanVoie(
-      JSON.parse(localStorage.getItem(CLE_PLAN_VOIE) ?? 'null') as PlanVoie,
-    )
+    const brut = localStorage.getItem(CLE_PLAN_VOIE)
+    return brut ? clampPlanVoie(JSON.parse(brut) as Partial<PlanVoie>) : null
   } catch {
-    return clampPlanVoie(null)
+    return null
   }
 })()
+const voiePlan: PlanVoie = clampPlanVoie(planBrouillonInitial)
+let planPublie: PlanVoie | null = null
+let planPublieInfo = { auteur: '', date: '', charge: false }
+// LE PLAN PUBLIÉ arrive du magasin : un joueur le joue tel quel (son poste
+// ne règle jamais le plan) ; un concepteur garde son brouillon s'il en a
+// un — l'écran LA DESCENTE lui dit lequel joue
+void fetchReglage('plan-voie').then((p) => {
+  if (!p) return
+  planPublie = litPlanPublie(p.document)
+  planPublieInfo = { auteur: p.auteur, date: p.date, charge: true }
+  const r = planAuDemarrage({
+    brouillon: planBrouillonInitial,
+    publie: planPublie,
+    concepteur: document.body.classList.contains('concepteur'),
+  })
+  Object.assign(voiePlan, r.plan)
+  if (descenteEl && !descenteEl.hidden) renderDescente()
+})
 // ---- LA CARTE DE LA STATION : la descente est pilotée par le plan ------
 // Un module est un BIOME (des salles, réglées dans carteStation.json) ; au
 // bout de ses salles, la carte s'ouvre dans la cérémonie et la coursive
@@ -5488,6 +5511,97 @@ function dscOutils(): HTMLElement {
   return d
 }
 
+/** LE PLAN PARTAGÉ : d'où vient le plan qui joue sur ce poste, et les
+ *  quatre gestes — publier le brouillon pour tous, revenir au publié,
+ *  relire le magasin, retirer le publié (le livré reprend pour tous). */
+function dscPartage(): HTMLElement {
+  const d = document.createElement('div')
+  const etat = etatPlan({ courant: voiePlan, publie: planPublie })
+  const statut = document.createElement('p')
+  statut.className = 'dsc-partage'
+  const quand = planPublieInfo.date ? formateDateCourte(planPublieInfo.date) : ''
+  statut.innerHTML =
+    (planPublie
+      ? `<b>PUBLIÉ</b> par ${htmlSafe(planPublieInfo.auteur || 'anonyme')}${quand ? `, ${quand}` : ''}`
+      : planPublieInfo.charge
+        ? `<b>LE LIVRÉ JOUE</b> pour les joueurs — rien de publié`
+        : `<b>MAGASIN NON LU</b> — hors-ligne, ou pas encore`) +
+    ' · ce poste joue ' +
+    (etat.source === 'publie'
+      ? 'le publié'
+      : etat.source === 'livre'
+        ? 'le livré'
+        : `<i class="dsc-modifie">un brouillon ${planPublie ? 'différent du publié' : 'différent du livré'}, non publié</i>`)
+  d.appendChild(statut)
+  const outils = document.createElement('div')
+  outils.className = 'dsc-outils'
+  const bouton = (txt: string, titre: string, off: boolean, fait: () => void): void => {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.textContent = txt
+    b.title = titre
+    b.disabled = off
+    b.addEventListener('click', fait)
+    outils.appendChild(b)
+  }
+  bouton('⬆ PUBLIER', 'Publie le plan de ce poste au magasin partagé : il joue pour tout le monde dès leur prochaine descente.', etat.identiqueAuPublie, () => {
+    descenteDit('Publication…')
+    void pushReglage('plan-voie', clampPlanVoie(voiePlan), records.operator() || 'anonyme').then((p) => {
+      if (!p) {
+        descenteDit('Échec : le magasin partagé ne répond pas — rien n’a été publié.')
+        return
+      }
+      planPublie = litPlanPublie(p.document)
+      planPublieInfo = { auteur: p.auteur, date: p.date, charge: true }
+      renderDescente()
+      descenteDit('Plan publié : il joue pour tout le monde.')
+    })
+  })
+  bouton('↩ REVENIR AU PUBLIÉ', 'Abandonne le brouillon de ce poste : reprend le plan publié.', planPublie === null || etat.identiqueAuPublie, () => {
+    if (!planPublie) return
+    Object.assign(voiePlan, clampPlanVoie(planPublie))
+    sauvePlanVoie()
+    descenteTirage = null
+    descenteBilanFait = null
+    renderDescente()
+    descenteDit('Brouillon remis sur le plan publié.')
+  })
+  bouton('⟳ RECHARGER', 'Relit le plan publié (le brouillon de ce poste est gardé).', false, () => {
+    descenteDit('Lecture du magasin…')
+    void fetchReglage('plan-voie').then((p) => {
+      if (!p) {
+        descenteDit('Magasin injoignable.')
+        return
+      }
+      planPublie = litPlanPublie(p.document)
+      planPublieInfo = { auteur: p.auteur, date: p.date, charge: true }
+      renderDescente()
+      descenteDit(planPublie ? 'Plan publié relu.' : 'Rien de publié : le livré joue pour les joueurs.')
+    })
+  })
+  bouton('✕ RETIRER LE PUBLIÉ', 'Retire le plan publié : le plan livré avec le code reprend pour tout le monde.', planPublie === null, () => {
+    if (!window.confirm('Retirer le plan publié ? Le plan livré avec le code reprendra pour tout le monde.')) return
+    descenteDit('Retrait…')
+    void deleteReglage('plan-voie').then((ok) => {
+      if (!ok) {
+        descenteDit('Échec : le magasin partagé ne répond pas.')
+        return
+      }
+      planPublie = null
+      planPublieInfo = { auteur: '', date: '', charge: true }
+      renderDescente()
+      descenteDit('Plan publié retiré : le livré joue pour tout le monde.')
+    })
+  })
+  d.appendChild(outils)
+  return d
+}
+
+function formateDateCourte(iso: string): string {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
 /** LE PLAN EN CLAIR : le JSON, à copier d'un poste à l'autre. Un réglage
  *  qui ne se transmet pas n'existe que sur la machine qui l'a trouvé. */
 function dscEchange(): HTMLElement {
@@ -5534,9 +5648,13 @@ function renderDescente(): void {
     'Tout ce qui décide du <b>déroulement d’une run</b> se règle ici, et se lit tout de suite dans la table du bas : ' +
     'le <b>plan</b> (longueur, plafond de difficulté, ce qui se propose), la <b>forme de la rampe</b>, la <b>posture</b> ' +
     'des rangs et les <b>quatre poids</b> de l’algorithme qui choisit les tableaux du pool. Chaque réglage s’enregistre ' +
-    'aussitôt sur ce poste et prend effet à la <b>prochaine descente</b>. Rien n’est généré ici : on déroule les décisions, ' +
+    'aussitôt sur ce poste (le <b>brouillon</b>) et prend effet à la <b>prochaine descente</b> ; <b>PUBLIER</b> le fait jouer ' +
+    'pour tout le monde. Rien n’est généré ici : on déroule les décisions, ' +
     'pas les salles — c’est ce qui rend l’aperçu instantané et honnête.'
   corps.appendChild(aide)
+
+  corps.appendChild(dscSec('LE PLAN PARTAGÉ — ce que les joueurs jouent'))
+  corps.appendChild(dscPartage())
 
   corps.appendChild(dscSec('LE PLAN'))
   const g1 = document.createElement('div')
@@ -5763,7 +5881,7 @@ function renderDescente(): void {
   )
   corps.appendChild(dscTable())
 
-  corps.appendChild(dscSec('LE PLAN, EN CLAIR — à emporter d’un poste à l’autre'))
+  corps.appendChild(dscSec('LE PLAN, EN CLAIR — à garder en note, ou à coller ailleurs'))
   corps.appendChild(dscEchange())
   corps.scrollTop = haut
 }

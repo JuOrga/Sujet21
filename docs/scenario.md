@@ -150,3 +150,11 @@ semblables, douche/mutations.
   mémoire, la rareté et la vidéo de chaque entrée se règlent dans le codex.
   Le scénario dispose de deux conditions, `revelation` et `denouement`, qui
   lisent ces seuils : aucun N à tenir en double dans une règle.
+- **Le plan de la descente est partagé** (`src/game/planPartage.ts`,
+  `/api/reglages?domaine=plan-voie`) : l'écran LA DESCENTE règle le
+  brouillon du poste, PUBLIER le fait jouer pour tout le monde, REVENIR AU
+  PUBLIÉ, RECHARGER, RETIRER LE PUBLIÉ (le livré reprend). Un joueur joue
+  toujours le publié, sinon le livré — un brouillon sur son poste ne compte
+  pas ; un concepteur joue son brouillon s'il en a un, et l'écran lui dit
+  lequel joue. Le magasin `/api/reglages` est générique par domaine : la
+  carte et les récompenses y viendront (LA RÉGIE).

@@ -31,6 +31,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '04/09/2026 12:00',
+    title: 'LE PLAN DE LA DESCENTE SE PUBLIE : ce que le concepteur règle joue pour tout le monde, plus seulement sur son poste',
+    notes: [
+      'LA QUESTION : « toutes les modifications faites sur les runs sont bien prises en compte pour tout le monde ? » Non : le plan de LA DESCENTE (longueur, rampe, posture, poids de la pioche) ne vivait que dans le stockage du poste qui l’avait réglé — les joueurs jouaient le plan livré avec le code, quoi que le concepteur ait trouvé. C’est le cœur des runs, et le premier morceau du regroupement LA RÉGIE.',
+      'LE MAGASIN GÉNÉRIQUE (/api/reglages, Vercel Blob) : un document JSON par DOMAINE (plan-voie aujourd’hui ; la carte, les récompenses demain), publié pour tous — GET, POST, DELETE par domaine, une seule fonction Vercel pour tous les domaines (le plan Hobby en compte douze, on en est à douze fichiers dont trois modules). Le serveur ne connaît pas la forme des documents : chaque domaine la relit et la ramène dans ses bornes côté jeu (clampPlanVoie), le serveur garde la taille, le domaine et l’auteur.',
+      'QUI JOUE QUEL PLAN (game/planPartage.ts, testé) : un JOUEUR joue le publié, sinon le livré — un brouillon qui traînerait sur son poste ne compte pas, il ne règle jamais le plan ; un CONCEPTEUR joue son brouillon s’il en a un (il est en train de régler), sinon le publié, sinon le livré. Le publié arrive du magasin au démarrage et tranche ; hors-ligne, le poste garde ce qu’il a.',
+      'DANS L’ÉCRAN LA DESCENTE, en tête : LE PLAN PARTAGÉ — qui l’a publié et quand, et ce que CE poste joue (le publié, le livré, ou « un brouillon différent du publié, non publié ») ; PUBLIER (grisé si le brouillon vaut le publié), REVENIR AU PUBLIÉ, RECHARGER, RETIRER LE PUBLIÉ (confirmation : le livré reprend pour tous). Le JSON « en clair » reste, à garder en note. L’aide de l’écran dit la nouvelle règle : le réglage s’enregistre sur ce poste, PUBLIER le fait jouer pour tout le monde.',
+      'CE QUI RESTE PAR POSTE, dit tel quel : l’atelier des RÉCOMPENSES, les TEXTES (export/import), les séquences ; la CARTE passe par le dépôt (export JSON). Ils suivront le même schéma — le code livre, le concepteur publie — dans LA RÉGIE.',
+      'VÉRIFIÉ : 894 tests verts dans 79 fichiers (le plan publié relu dans ses bornes, la comparaison de deux plans, qui joue quel plan pour un joueur et pour un concepteur, ce que l’écran dit), type-check à 0, build propre, l’API type-checkée à part. L’écran LA DESCENTE vit dans main.ts et le jeu ne se monte pas en Chromium headless : la section LE PLAN PARTAGÉ n’a PAS été vue au navigateur — à contrôler en prévisualisation, avec le magasin réel.',
+    ],
+  },
+  {
     date: '04/09/2026 11:39',
     title: 'LE JOURNAL EN DONNÉES : le récit, les fins et leurs seuils se tiennent dans l’atelier RÉCIT & FINS, publié pour tous',
     notes: [
