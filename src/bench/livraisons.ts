@@ -31,6 +31,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '03/09/2026 23:53',
+    title: 'LES POIGNÉES DE CÔTÉ D’UNE PAROI INCLINÉE : on allonge un mur penché sans toucher à son épaisseur',
+    notes: [
+      'LA DEMANDE : « dans l’éditeur il faut pouvoir redimensionner les surfaces penchées ». Elles se redimensionnaient déjà par leurs quatre coins pivotés (le coin opposé cloué, la boîte étirée dans son repère) — mais rien sur les côtés : les deux dimensions bougeaient ensemble, et garder l’épaisseur exacte d’un mur incliné en tirant un coin demandait une précision de chirurgien. Sur une paroi droite, on tire un bord seul ; sur une penchée, on ne pouvait pas.',
+      'QUATRE MILIEUX DE CÔTÉ s’ajoutent aux quatre coins, dessinés à leur vraie place une fois pivotés (plus petits que les coins, pour se lire). Tirer un côté n’étire qu’un axe local : le côté opposé reste cloué, l’épaisseur ne bouge pas, et tirer en biais n’emporte pas l’autre axe — seule la projection sur l’axe tiré compte. Le même geste que pour une surface droite, dans le repère de la boîte.',
+      'LA GÉOMÉTRIE SORT DE L’ÉDITEUR : editor/oblique.ts, pur — la table des huit poignées, le point d’une poignée, son pivot (le point d’en face), et redimensionneOblique qui rend la boîte. L’éditeur (7 000 lignes de canvas) ne fait plus qu’appeler ; les coins passent par le même chemin que les côtés. Sept tests : une boîte droite, une tournée de 90°, un mur à 30° allongé de 100 à 160 avec son épaisseur de 20 intacte et son bout W immobile, le biais qui ne déborde pas, le coin qui tire les deux axes, la dimension minimale.',
+      'LES CACHETTES ET LES COQUES AUSSI. Une cachette (la zone voilée qui cache des objets) et une coque (chambre, couloir) ont un angle comme une paroi — et leurs poignées restaient celles du rectangle droit, donc mal placées dès qu’elles penchaient. Les trois sortes passent par la même sélection oblique : huit poignées pivotées, le pivot en face, et le rectangle posé selon la sorte — une coque garde sa garde d’intérieur (structureViable).',
+      'LA REVUE A TROUVÉ SIX POINTS, corrigés. Le vrai : la poignée servie était la PREMIÈRE dans le rayon de prise, et les coins passaient avant les côtés — sur un mur fin, le milieu d’un côté est à quelques pixels des deux coins, donc les poignées de côté étaient inaccessibles là même où elles servent ; c’est désormais la PLUS PROCHE. Au doigt, le disque de la poignée de rotation recouvrait celui de la poignée N et la rotation gagnait : le bras s’écarte de deux rayons de prise. Le curseur dit l’axe (ns, ew, nesw, nwse) au lieu d’une diagonale partout. La rotation locale → monde n’est plus écrite qu’une fois, dans level.ts (versMondeBoite), servie à la physique, aux coques et aux poignées. Le dessin nomme COINS_OBLIQUES et COTES_OBLIQUES au lieu de découper la table. Et seul l’axe TIRÉ se borne au minimum : un mur de 2 d’épaisseur reste à 2.',
+      'VÉRIFIÉ : 881 tests verts dans 77 fichiers (sept de plus), type-check à 0, build propre. À voir dans l’éditeur : une paroi, une cachette et une coque tournées, leurs huit poignées, un côté tiré — sur un mur FIN en particulier.',
+    ],
+  },
+  {
     date: '03/09/2026 22:13',
     title: 'LA REVUE DE LA PR CARTE : une cache n’est plus un piège, et huit défauts de moindre taille',
     notes: [

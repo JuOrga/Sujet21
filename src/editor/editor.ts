@@ -89,6 +89,15 @@ import {
   type Surcharges,
 } from './fiches'
 import {
+  COINS_OBLIQUES,
+  COTES_OBLIQUES,
+  POIGNEES_OBLIQUES,
+  pivotPoignee,
+  pointPoignee,
+  redimensionneOblique,
+  type Poignee,
+} from './oblique'
+import {
   ARC_EPAISSEUR_DEFAUT,
   ARC_OUVERTURE_DEFAUT,
   FORME_ARC,
@@ -485,7 +494,7 @@ export class LevelEditor {
         mode: 'resize'
         edge: string
         start: Rect
-        pivot?: { x: number; y: number; angle: number }
+        pivot?: { x: number; y: number; angle: number; poignee: Poignee }
       }
     | { mode: 'rotate'; index: number } = null
 
@@ -1942,7 +1951,10 @@ export class LevelEditor {
     const cx = (b.minX + b.maxX) / 2
     const cy = (b.minY + b.maxY) / 2
     const rad = ((b.angle ?? 0) * Math.PI) / 180
-    const bras = (b.maxY - b.minY) / 2 + 30 / this.zoom
+    // le bras tient la poignée de rotation HORS du disque de la poignée N :
+    // deux rayons de prise et une marge — au doigt (prise large) l'ancien
+    // 30 px laissait les deux disques se recouvrir, et la rotation gagnait
+    const bras = (b.maxY - b.minY) / 2 + (this.prise * 2 + 6) / this.zoom
     return this.toScreen(cx - Math.sin(rad) * bras, cy + Math.cos(rad) * bras)
   }
 
@@ -1952,50 +1964,72 @@ export class LevelEditor {
     return Math.hypot(sx - h.sx, sy - h.sy) <= this.prise + 2
   }
 
-  /** Le coin (ox, oy) d'une boîte oblique, en coordonnées MONDE — offsets
-   * dans le repère local (±demi-largeur, ±demi-hauteur). */
-  private coinOblique(
-    b: ObstacleBox,
-    ox: number,
-    oy: number,
-  ): { x: number; y: number } {
-    const rad = ((b.angle ?? 0) * Math.PI) / 180
-    const co = Math.cos(rad)
-    const si = Math.sin(rad)
-    const cx = (b.minX + b.maxX) / 2
-    const cy = (b.minY + b.maxY) / 2
-    return { x: cx + co * ox - si * oy, y: cy + si * ox + co * oy }
-  }
-
-  // Les 4 coins d'une boîte oblique, code + offsets locaux : N = +y, E = +x
-  private static readonly COINS: [string, number, number][] = [
-    ['NW', -1, 1],
-    ['NE', 1, 1],
-    ['SW', -1, -1],
-    ['SE', 1, -1],
-  ]
 
   /** Rayon sensible d'une poignée : large au doigt et au stylet. */
   private get prise(): number {
     return this.pointeur === 'mouse' ? HANDLE_PX : HANDLE_PX * 2.4
   }
 
+  /** L'élément sélectionné s'il est OBLIQUE — une paroi, une cachette ou
+   *  une coque tournée : ses poignées se pivotent et se tiennent dans son
+   *  repère (editor/oblique.ts). Null : une pièce droite, ou rien. */
+  private selOblique(): {
+    minX: number
+    minY: number
+    maxX: number
+    maxY: number
+    angle: number
+  } | null {
+    const s = this.sel
+    if (!s) return null
+    const el =
+      s.kind === 'box'
+        ? this.level.boxes[s.index]
+        : s.kind === 'cache'
+          ? (this.level.caches ?? [])[s.index]
+          : s.kind === 'structure'
+            ? (this.level.structures ?? [])[s.index]
+            : null
+    if (!el || !el.angle) return null
+    return { minX: el.minX, minY: el.minY, maxX: el.maxX, maxY: el.maxY, angle: el.angle }
+  }
+
+  /** Le curseur d'une poignée : un côté dit son axe, un coin sa diagonale —
+   *  la seule annonce, avant de tirer, qu'un côté et non un coin est sous
+   *  le pointeur. */
+  private static curseurPoignee(code: string | null): string {
+    if (!code) return 'default'
+    if (code === 'N' || code === 'S') return 'ns-resize'
+    if (code === 'E' || code === 'W') return 'ew-resize'
+    if (code === 'NE' || code === 'SW') return 'nesw-resize'
+    return 'nwse-resize'
+  }
+
   private hitHandle(sx: number, sy: number): string | null {
     const r = this.selRect()
     if (!r) return null
     const p = this.prise
-    // une boîte OBLIQUE se redimensionne par ses 4 coins PIVOTÉS : le coin
-    // opposé reste cloué, tout se joue dans le repère de la boîte
-    if (this.sel?.kind === 'box' && this.level.boxes[this.sel.index]?.angle) {
-      const b = this.level.boxes[this.sel.index]
-      const hx = (b.maxX - b.minX) / 2
-      const hy = (b.maxY - b.minY) / 2
-      for (const [code, ux, uy] of LevelEditor.COINS) {
-        const c = this.coinOblique(b, ux * hx, uy * hy)
+    // un élément OBLIQUE (paroi, cachette, coque) se redimensionne par ses
+    // 4 coins et ses 4 milieux de côté, PIVOTÉS : la poignée opposée reste
+    // clouée, tout se joue dans son repère (editor/oblique.ts)
+    const ob = this.selOblique()
+    if (ob) {
+      // LA PLUS PROCHE, pas la première : sur un mur fin, le milieu d'un
+      // côté est à quelques pixels des deux coins — servir le premier coin
+      // rencontré rendait les poignées de côté inaccessibles là même où
+      // elles servent (revue du 04/09)
+      let meilleure: string | null = null
+      let dist = p
+      for (const poignee of POIGNEES_OBLIQUES) {
+        const c = pointPoignee(ob, poignee)
         const ecran = this.toScreen(c.x, c.y)
-        if (Math.hypot(sx - ecran.sx, sy - ecran.sy) <= p) return code
+        const d = Math.hypot(sx - ecran.sx, sy - ecran.sy)
+        if (d <= dist) {
+          dist = d
+          meilleure = poignee.code
+        }
       }
-      return null
+      return meilleure
     }
     const a = this.toScreen(r.minX, r.maxY)
     const b = this.toScreen(r.maxX, r.minY)
@@ -2097,18 +2131,15 @@ export class LevelEditor {
         if (edge) {
           const r = this.selRect()
           if (r) {
-            // boîte oblique : on cloue le coin OPPOSÉ à celui qu'on saisit
-            let pivot: { x: number; y: number; angle: number } | undefined
-            if (this.sel?.kind === 'box') {
-              const b = this.level.boxes[this.sel.index]
-              if (b?.angle) {
-                const coin = LevelEditor.COINS.find(([code]) => code === edge)
-                if (coin) {
-                  const hx = (b.maxX - b.minX) / 2
-                  const hy = (b.maxY - b.minY) / 2
-                  const p = this.coinOblique(b, -coin[1] * hx, -coin[2] * hy)
-                  pivot = { x: p.x, y: p.y, angle: b.angle }
-                }
+            // élément oblique : on cloue la poignée OPPOSÉE à celle qu'on
+            // saisit — le coin d'en face, ou le milieu du côté d'en face
+            let pivot: { x: number; y: number; angle: number; poignee: Poignee } | undefined
+            const ob = this.selOblique()
+            if (ob) {
+              const poignee = POIGNEES_OBLIQUES.find((q) => q.code === edge)
+              if (poignee) {
+                const p = pivotPoignee(ob, poignee)
+                pivot = { x: p.x, y: p.y, angle: ob.angle, poignee }
               }
             }
             this.drag = { mode: 'resize', edge, start: { ...r }, pivot }
@@ -2617,9 +2648,7 @@ export class LevelEditor {
           this.tool.kind === 'select'
             ? this.sel?.kind === 'box' && this.hitRotateHandle(sx, sy)
               ? 'grab'
-              : this.hitHandle(sx, sy)
-                ? 'nwse-resize'
-                : 'default'
+              : LevelEditor.curseurPoignee(this.hitHandle(sx, sy))
             : 'crosshair'
         // la bulle savante n'existe qu'en mode Sélection, souris posée
         if (this.tool.kind === 'select' && this.pointeur === 'mouse')
@@ -2778,32 +2807,23 @@ export class LevelEditor {
           }
         }
       } else if (d.mode === 'resize') {
-        if (d.pivot && this.sel?.kind === 'box') {
-          // Boîte OBLIQUE : le pointeur et le pivot se projettent sur les
-          // axes locaux — le coin opposé reste cloué au monde, la boîte
-          // s'étire dans son propre repère (pas d'aimantation à la grille :
-          // elle est droite, la boîte ne l'est pas).
-          const b = this.level.boxes[this.sel.index]
-          if (b) {
-            const rad = (d.pivot.angle * Math.PI) / 180
-            const uxX = Math.cos(rad)
-            const uxY = Math.sin(rad)
-            const dx = w.x - d.pivot.x
-            const dy = w.y - d.pivot.y
-            let du = dx * uxX + dy * uxY // le long de l'axe local x
-            let dv = -dx * uxY + dy * uxX // le long de l'axe local y
-            const minS = Math.max(4, this.grid)
-            if (Math.abs(du) < minS) du = (du < 0 ? -1 : 1) * minS
-            if (Math.abs(dv) < minS) dv = (dv < 0 ? -1 : 1) * minS
-            const cx = d.pivot.x + (uxX * du - uxY * dv) / 2
-            const cy = d.pivot.y + (uxY * du + uxX * dv) / 2
-            const hx = Math.abs(du) / 2
-            const hy = Math.abs(dv) / 2
-            b.minX = cx - hx
-            b.maxX = cx + hx
-            b.minY = cy - hy
-            b.maxY = cy + hy
-          }
+        if (d.pivot) {
+          // Élément OBLIQUE (paroi, cachette, coque) : le pointeur et le
+          // pivot se projettent sur les axes locaux — la poignée opposée
+          // reste clouée au monde, l'élément s'étire dans son propre repère
+          // (pas d'aimantation à la grille : elle est droite, lui ne l'est
+          // pas). Un coin tire les deux axes ; un côté n'en tire qu'un,
+          // l'épaisseur reste (oblique.ts). applyRect pose le rectangle
+          // selon la sorte — une coque garde sa garde d'intérieur.
+          const r = redimensionneOblique(
+            d.pivot,
+            d.pivot.angle,
+            w,
+            d.pivot.poignee,
+            { w: d.start.maxX - d.start.minX, h: d.start.maxY - d.start.minY },
+            Math.max(4, this.grid),
+          )
+          this.applyRect(r)
         } else {
           // le bord tiré s'aimante lui aussi (bords, centres, salle) —
           // même langage qu'au déplacement, la grille en repli
@@ -7061,22 +7081,26 @@ export class LevelEditor {
 
     // sélection et poignées
     const r = this.selRect()
-    const boxSel =
-      this.sel?.kind === 'box' ? this.level.boxes[this.sel.index] : null
-    if (r && boxSel?.angle) {
-      // boîte OBLIQUE : contour et poignées aux VRAIS coins, pivotés — les
-      // poignées droites mentiraient
-      const hx = (boxSel.maxX - boxSel.minX) / 2
-      const hy = (boxSel.maxY - boxSel.minY) / 2
-      const coins = LevelEditor.COINS.map(([, ux, uy]) => {
-        const c = this.coinOblique(boxSel, ux * hx, uy * hy)
+    const obSel = this.selOblique()
+    if (r && obSel) {
+      // élément OBLIQUE (paroi, cachette, coque) : contour et poignées aux
+      // VRAIS coins, pivotés — les poignées droites mentiraient ; les
+      // milieux de côté, plus petits, tirent un seul axe
+      const hx = (obSel.maxX - obSel.minX) / 2
+      const hy = (obSel.maxY - obSel.minY) / 2
+      const coins = COINS_OBLIQUES.map((q) => {
+        const c = pointPoignee(obSel, q)
+        return this.toScreen(c.x, c.y)
+      })
+      const cotes = COTES_OBLIQUES.map((q) => {
+        const c = pointPoignee(obSel, q)
         return this.toScreen(c.x, c.y)
       })
       g.strokeStyle = '#ffffff'
       g.lineWidth = 1.5
       g.setLineDash([4, 3])
       g.beginPath()
-      // COINS est rangé NW, NE, SW, SE : le tracé passe NW → NE → SE → SW
+      // COINS_OBLIQUES est rangé NW, NE, SW, SE : le tracé passe NW → NE → SE → SW
       g.moveTo(coins[0].sx, coins[0].sy)
       g.lineTo(coins[1].sx, coins[1].sy)
       g.lineTo(coins[3].sx, coins[3].sy)
@@ -7086,6 +7110,7 @@ export class LevelEditor {
       g.setLineDash([])
       g.fillStyle = '#ffffff'
       for (const c of coins) g.fillRect(c.sx - 4, c.sy - 4, 8, 8)
+      for (const c of cotes) g.fillRect(c.sx - 3, c.sy - 3, 6, 6)
       g.fillStyle = '#a9c0d2'
       g.font = '11px ui-monospace, monospace'
       const bas = coins.reduce((a, c) => (c.sy > a.sy ? c : a))
