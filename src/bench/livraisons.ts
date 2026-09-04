@@ -31,6 +31,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '04/09/2026 13:33',
+    title: 'L’ACCUEIL DU CONCEPTEUR N’A PLUS QU’UNE PORTE : la régie — les douze anciens boutons sont partis',
+    notes: [
+      'LA DEMANDE : « retire les anciens boutons de l’accueil ». La régie livrée la veille les doublait : douze portes pour douze outils, plus la sienne, c’était l’accueil du concepteur qui débordait.',
+      'CE QUI PART : ÉDITEUR, MARCHAND, CARTE, RÈGLES DE GÉN., LA DESCENTE, MONTAGE, SALLES, LA PLANCHE, RÉCIT & FINS, TEXTES, RÉCOMPENSES, PUPITRE — et leurs écouteurs dans main.ts. En mode concepteur, l’accueil ne montre plus que RÉGIE et NOTES DE VERSION. ?editeur et ?carte dans l’URL restent des raccourcis, et les portes des autres écrans (pupitres du hub, éditeur → montage, codex → atelier du journal) ne bougent pas.',
+      'LA RÉGIE GAGNE LES QUATRE OUTILS qu’elle ne couvrait pas encore, dans un groupe AUTRES OUTILS sous les sections du système de run : ÉDITEUR DE TABLEAUX, RÈGLES DE GÉNÉRATION, SALLES, PUPITRE D’ESSAIS. Les deux éditeurs plein écran (tableaux, carte) vivent sous la régie : elle se ferme pour eux, leur porte ↩ ramène à l’accueil ; les autres s’ouvrent par-dessus et on revient à la régie en les fermant.',
+      'LE TEST QUI GARDAIT LA PORTE de LA DESCENTE (descente.spec.ts) garde désormais celle de la régie : l’ancien bouton doit avoir disparu, le bouton RÉGIE doit être réservé au concepteur (data-dev), et la section descente doit exister dans main.ts.',
+      'VÉRIFIÉ : 910 tests verts dans 81 fichiers, type-check à 0, build propre ; l’accueil ne porte plus que deux boutons data-dev (relevé dans index.html). Pas vu au navigateur : l’accueil vit dans le jeu complet — à contrôler en prévisualisation.',
+    ],
+  },
+  {
     date: '04/09/2026 12:41',
     title: 'LA RÉGIE : la console du concepteur — un rail vers tout le système de run, la vue d’ensemble du partage, et le tir à blanc',
     notes: [

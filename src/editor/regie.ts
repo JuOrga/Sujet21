@@ -22,6 +22,8 @@ export interface SectionRegie {
   description: string
   /** les domaines de partage que cette section règle (clés des statuts) */
   domaines: string[]
+  /** un intitulé de groupe : le rail le pose avant la première section qui le porte */
+  groupe?: string
   ouvre(): void
 }
 
@@ -106,10 +108,13 @@ export class Regie {
       fixes.map(([id, ic, nom]) => `<button type="button" class="rg-item${id === this.courante ? ' on' : ''}" data-section="${id}"><i>${ic}</i><span>${nom}</span></button>`).join('') +
       `<hr>` +
       this.hooks.sections
-        .map(
-          (s) =>
-            `<button type="button" class="rg-item${s.id === this.courante ? ' on' : ''}" data-section="${esc(s.id)}"><i>${s.icone}</i><span>${esc(s.nom)}<small>${esc(s.sous)}</small></span>${this.pastille(s)}</button>`,
-        )
+        .map((s, i, all) => {
+          const tete = s.groupe && s.groupe !== all[i - 1]?.groupe ? `<hr><small class="rg-groupe">${esc(s.groupe)}</small>` : ''
+          return (
+            tete +
+            `<button type="button" class="rg-item${s.id === this.courante ? ' on' : ''}" data-section="${esc(s.id)}"><i>${s.icone}</i><span>${esc(s.nom)}<small>${esc(s.sous)}</small></span>${this.pastille(s)}</button>`
+          )
+        })
         .join('')
     if (this.courante === 'ensemble') this.peintEnsemble()
     else if (this.courante === 'tir') this.peintTir()

@@ -1914,9 +1914,6 @@ renderSalles()
     renderSalles()
   })
 }
-document.getElementById('home-salles')?.addEventListener('click', () => {
-  sallesEl.hidden = false
-})
 // ---- Le voile NOTES DE VERSION : le journal du chantier, sorti du banc ----
 // Chaque entrée peut porter une illustration (champ figure) et affiche la
 // version qu'elle a inaugurée ; le bouton TÉLÉCHARGER exporte tout le
@@ -2664,7 +2661,6 @@ function ouvreMarchand(): void {
   marchandEl.hidden = false
   renderMarchandVoile()
 }
-document.getElementById('home-marchand')?.addEventListener('click', ouvreMarchand)
 document.getElementById('marchand-fermer')?.addEventListener('click', () => {
   marchandEl.hidden = true
 })
@@ -2867,9 +2863,6 @@ const atelierJournal = new AtelierJournal(atelierJournalEl, {
     renderCodexVoile()
   },
   fermer: () => atelierJournal.close(),
-})
-document.getElementById('home-journal')?.addEventListener('click', () => {
-  void atelierJournal.open()
 })
 document.getElementById('home-codex')?.addEventListener('click', () => {
   ecranCodex.open()
@@ -4149,9 +4142,6 @@ const montage = new TableMontage(el('montage'), {
     },
   },
 })
-document
-  .getElementById('open-montage')
-  ?.addEventListener('click', () => montage.open())
 // …et depuis l'éditeur aussi : la table s'ouvre PAR-DESSUS lui (z-index),
 // on compose la cinématique puis on branche son code dans le tableau
 document
@@ -4820,9 +4810,6 @@ document
   ?.addEventListener('click', () => void ouvrePlanche())
 // la planche s'ouvre aussi depuis l'ACCUEIL (mode concepteur) et depuis
 // l'ÉDITEUR : le voile se pose par-dessus, le fermer rend l'écran d'avant
-document
-  .getElementById('home-planche')
-  ?.addEventListener('click', () => void ouvrePlanche())
 document
   .getElementById('ed-planche')
   ?.addEventListener('click', () => void ouvrePlanche())
@@ -5965,9 +5952,6 @@ function ouvreDescente(): void {
   descenteDit('')
   renderDescente()
 }
-document
-  .getElementById('home-descente')
-  ?.addEventListener('click', () => ouvreDescente())
 document.getElementById('descente-fermer')?.addEventListener('click', () => {
   if (descenteEl) descenteEl.hidden = true
 })
@@ -6097,9 +6081,6 @@ function renderRegles(): void {
     }
   }
 }
-document
-  .getElementById('home-regles')
-  ?.addEventListener('click', () => void ouvreRegles())
 document.getElementById('regles-fermer')?.addEventListener('click', () => {
   reglesEl.hidden = true
 })
@@ -6146,9 +6127,6 @@ function openEditor(): void {
   input.paused = true
   editor.open()
 }
-document
-  .getElementById('start-editor')!
-  .addEventListener('click', () => openEditor())
 // ---- L'ÉDITEUR DE LA CARTE DE LA STATION (editor/editeurCarte.ts) ----
 // Même porte que l'éditeur de tableaux : mode concepteur, ou ?carte dans
 // l'URL. Il couvre l'écran et fige la partie derrière lui.
@@ -6187,14 +6165,15 @@ function openEditeurCarte(): void {
   input.paused = true
   editeurCarte.open()
 }
-document
-  .getElementById('home-carte')
-  ?.addEventListener('click', () => openEditeurCarte())
 
 // ---- LA RÉGIE : la console du concepteur (editor/regie.ts) ----------------
-// Un seul bouton sur l'accueil ; chaque section ouvre l'outil existant, la
-// régie reste dessous et on y revient en fermant l'outil. Les anciens
-// boutons de l'accueil restent des raccourcis vers les mêmes outils.
+// LA SEULE PORTE des outils du concepteur sur l'accueil (les anciens boutons
+// sont partis : douze portes pour douze outils, c'était l'accueil du
+// concepteur qui débordait). Chaque section ouvre l'outil existant, la
+// régie reste dessous et on y revient en fermant l'outil — sauf les deux
+// éditeurs plein écran (tableaux, carte), qui vivent sous elle : elle se
+// ferme pour eux, et leur porte ↩ ramène à l'accueil. ?editeur et ?carte
+// dans l'URL restent des raccourcis.
 const regieEl = document.getElementById('regie') as HTMLDivElement
 const regie = new Regie(regieEl, {
   sections: [
@@ -6292,6 +6271,58 @@ const regie = new Regie(regieEl, {
         'Le catalogue des textes, chaque entrée avec sa clé et l’endroit où elle paraît : le plan de travail de la réécriture et le socle d’une traduction. PUBLIER fait lire les retouches à tout le monde.',
       domaines: ['textes'],
       ouvre: () => ouvreTextes(),
+    },
+    // ---- les autres outils : ils ne règlent pas le système de run, mais
+    // ils avaient un bouton sur l'accueil — la régie est leur seule porte
+    {
+      id: 'editeur',
+      groupe: 'AUTRES OUTILS',
+      nom: 'ÉDITEUR DE TABLEAUX',
+      icone: '✎',
+      sous: 'créer ou modifier une salle',
+      description:
+        'L’éditeur de tableaux : les surfaces, les mécanismes, les zones, le biome et le code atelier d’une salle — publiée dans la bibliothèque partagée, elle entre dans la planche et dans la pioche.',
+      domaines: [],
+      ouvre: () => {
+        regie.close()
+        openEditor()
+      },
+    },
+    {
+      id: 'regles',
+      groupe: 'AUTRES OUTILS',
+      nom: 'RÈGLES DE GÉNÉRATION',
+      icone: '§',
+      sous: 'le cahier du générateur',
+      description:
+        'Ce que le générateur fait (annotable), ce qu’un level designer en attend (propositions), et vos règles nouvelles en texte libre — partagé entre concepteurs, relu au moment d’implémenter.',
+      domaines: [],
+      ouvre: () => void ouvreRegles(),
+    },
+    {
+      id: 'salles',
+      groupe: 'AUTRES OUTILS',
+      nom: 'SALLES',
+      icone: '▦',
+      sous: 'la réserve du poste',
+      description: 'Les salles de ce poste : rejouables, publiables dans la bibliothèque partagée d’un geste.',
+      domaines: [],
+      ouvre: () => {
+        sallesEl.hidden = false
+      },
+    },
+    {
+      id: 'pupitre',
+      groupe: 'AUTRES OUTILS',
+      nom: 'PUPITRE D’ESSAIS',
+      icone: '▚',
+      sous: 'simuler les événements',
+      description: 'Simuler les événements du jeu au doigt — cérémonie, bonbonne, paliers, sons — sans console navigateur.',
+      domaines: [],
+      ouvre: () => {
+        pupitreEl.hidden = false
+        pupDit('')
+      },
     },
   ],
   statuts: async () => {
@@ -9645,7 +9676,6 @@ function ouvreTextes(): void {
       `exporter reste la voie pour les graver dans le dépôt.`,
   )
 }
-document.getElementById('home-textes')?.addEventListener('click', ouvreTextes)
 document.getElementById('textes-fermer')?.addEventListener('click', () => {
   textesEl.hidden = true
 })
@@ -10072,9 +10102,6 @@ function ouvreRecompenses(): void {
   renderRecEffets()
   recApercu()
 }
-document
-  .getElementById('home-recompenses')
-  ?.addEventListener('click', ouvreRecompenses)
 document.getElementById('recompenses-fermer')?.addEventListener('click', () => {
   recEl.hidden = true
 })
@@ -10239,10 +10266,6 @@ function pupDit(msg: string): void {
   const e = document.getElementById('pup-etat')
   if (e) e.textContent = msg
 }
-document.getElementById('home-pupitre')?.addEventListener('click', () => {
-  pupitreEl.hidden = false
-  pupDit('')
-})
 document.getElementById('pupitre-fermer')?.addEventListener('click', () => {
   pupitreEl.hidden = true
 })

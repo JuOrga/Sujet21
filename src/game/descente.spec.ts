@@ -187,7 +187,7 @@ describe('l’écran LA DESCENTE — la coque et sa porte', () => {
 
   it('porte tous les identifiants que main.ts va chercher', () => {
     for (const id of [
-      'home-descente',
+      'home-regie', // la seule porte des outils : la régie
       'descente',
       'descente-corps',
       'descente-etat',
@@ -196,9 +196,12 @@ describe('l’écran LA DESCENTE — la coque et sa porte', () => {
       expect(HTML, `id="${id}" manque à index.html`).toContain(`id="${id}"`)
   })
 
-  it('reste un OUTIL DE CONCEPTEUR : l’accueil public ne le montre pas', () => {
-    const bouton = /<button id="home-descente"[^>]*>/.exec(HTML)?.[0] ?? ''
+  it('reste un OUTIL DE CONCEPTEUR : sa porte est la régie, que l’accueil public ne montre pas', () => {
+    // l'ancien bouton home-descente est parti : la régie est la seule porte
+    expect(HTML).not.toContain('id="home-descente"')
+    const bouton = /<button id="home-regie"[^>]*>/.exec(HTML)?.[0] ?? ''
     expect(bouton).toContain('data-dev')
+    expect(MAIN).toContain("id: 'descente'")
   })
 
   it('ne laisse qu’UNE porte : le cahier des règles ne règle plus le plan', () => {
