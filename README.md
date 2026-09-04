@@ -6,10 +6,10 @@ une partie de soi-même — **se déplacer, c'est rétrécir**.
 
 Le document de référence est [`docs/doc-fonctionnel.md`](docs/doc-fonctionnel.md).
 
-## État — version 0.21.424, une run jouable de bout en bout
+## État — version 0.21.425, une run jouable de bout en bout
 
 Le jeu tourne dans le navigateur, sur ordinateur, tablette et téléphone.
-**424 livraisons consignées entre le 08/08/2026 et le 04/09/2026** — le journal
+**425 livraisons consignées entre le 08/08/2026 et le 04/09/2026** — le journal
 complet se lit dans l'écran NOTES DE VERSION, les données sont dans
 [`src/bench/livraisons.ts`](src/bench/livraisons.ts).
 
@@ -98,7 +98,8 @@ planche, le récit et les fins, le scénario et le montage, le codex, le
 marchand, les récompenses, les textes —, la vue d'ensemble de ce qui est
 publié pour tout le monde, et le tir à blanc du système de run (pour N
 expéditions bouclées : fragment, fin, révélation, dénouement, cinématiques).
-Les autres boutons de l'accueil restent des raccourcis vers les mêmes outils.
+C'est la seule porte des outils sur l'accueil (les anciens boutons sont
+partis) ; `?editeur` et `?carte` dans l'URL restent des raccourcis.
 `?editeur` ouvre l'éditeur directement, `?carte` l'éditeur de la carte de la
 station, `?tableau=N` démarre à la salle N,
 `?spawn=x,y` place le corps.

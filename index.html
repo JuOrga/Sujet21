@@ -1037,6 +1037,7 @@
       .rg-corps { display: grid; grid-template-columns: 250px minmax(0, 1fr); flex: 1 1 auto; min-height: 0; }
       .rg-rail { display: flex; flex-direction: column; gap: 4px; padding: 10px; border-right: 1px solid var(--line); overflow-y: auto; }
       .rg-rail hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+      .rg-groupe { display: block; padding: 2px 10px 4px; font-family: var(--font-display); font-size: calc(8px * var(--ui)); letter-spacing: 0.2em; color: var(--dim); }
       .rg-item { position: relative; display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px 10px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: #eaf6ff; cursor: pointer; font: inherit; }
       .rg-item:hover { background: rgba(99, 183, 230, 0.08); }
       .rg-item.on { border-color: var(--specimen); background: rgba(99, 183, 230, 0.12); }
@@ -7661,19 +7662,13 @@
       <button id="start-abandon" type="button" hidden>ABANDONNER LA RUN — RETOUR AU LABO</button>
       <div class="home-duo" role="group" aria-label="Outils du protocole">
         <button id="home-station" type="button" title="LA STATION : le plan général du complexe orbital — les modules et leurs coursives, tels que la descente les traverse. On y voit d'où l'on vient, où l'on est, ce qui est ouvert et ce qui attend un orbe"><i>🛰&#xFE0E;</i><span>LA STATION</span></button>
-        <button id="start-editor" type="button" data-dev title="Créer ou modifier un tableau"><i>✎</i><span>ÉDITEUR</span></button>
-        <button id="home-marchand" type="button" data-dev title="LE MARCHAND du hub, sans nager jusqu'à l'étal : les orbes d'essence de conscience, les améliorations durables, les provisions — payés en mémoire"><i>🔮</i><span>MARCHAND</span></button>
-        <button id="home-regie" type="button" data-dev class="home-regie" title="LA RÉGIE : la console du concepteur — la carte, la descente, la planche, le récit et les fins, le scénario, le codex, le marchand, les récompenses, les textes ; ce qui est publié pour tout le monde ; et le tir à blanc du système de run"><i>◎</i><span>RÉGIE</span></button>
-        <button id="home-carte" type="button" data-dev title="L'ÉDITEUR DE LA CARTE : le plan à routes ramifiées de la station — modules, coursives, zones, conditions d'accès. Se glisse, se lie, s'exporte en carteStation.json ; un aperçu jeu rejoue la traversée"><i>⌬</i><span>CARTE</span></button>
-        <button id="home-regles" type="button" data-dev title="Le cahier des règles de la génération procédurale : ce que le générateur fait (annotable), ce qu'un level designer en attend (propositions), et vos règles nouvelles en texte libre — partagé entre concepteurs, relu au moment d'implémenter"><i>§</i><span>RÈGLES DE GÉN.</span></button>
-        <button id="home-descente" type="button" data-dev title="LA DESCENTE : le déroulement d'une run réglé de bout en bout — longueur, rampe de difficulté, posture des salles, et les quatre poids de l'algorithme qui choisit les tableaux. Le plan se déroule rang par rang sous les yeux, et se tire à blanc sans jouer"><i>▼</i><span>LA DESCENTE</span></button>
-        <button id="open-montage" type="button" data-dev title="La table de montage des cinématiques : planches, effets, sons — et lecture immédiate"><i>▤</i><span>MONTAGE</span></button>
-        <button id="home-salles" type="button" data-dev><i>▦</i><span>SALLES</span></button>
-        <button id="home-planche" type="button" data-dev title="La planche d'ordonnancement : toutes les salles de la bibliothèque en cartes visuelles — glisser pour réordonner la séquence, régler le code cran par cran, essayer d'un ⏵"><i>▧</i><span>LA PLANCHE</span></button>
-        <button id="home-journal" type="button" data-dev title="RÉCIT & FINS : l'atelier du journal — l'ordre des fragments du récit et des fins que chaque expédition bouclée révèle, leurs textes, et les seuils de la révélation et du dénouement. Publié pour tous, sans passer par le dépôt"><i>🚪</i><span>RÉCIT &amp; FINS</span></button>
-        <button id="home-textes" type="button" data-dev title="LE CATALOGUE DES TEXTES : tout ce que le joueur peut lire, en un endroit — chaque texte avec sa clé et l'endroit où il apparaît. Le plan de travail de la réécriture, et le socle d'une future traduction"><i>¶</i><span>TEXTES</span></button>
-        <button id="home-recompenses" type="button" data-dev title="L'atelier des récompenses : le catalogue complet des instruments, ce que chaque carte tire comme levier — et de quoi en fabriquer de nouvelles avec les mêmes pièces"><i>❖</i><span>RÉCOMPENSES</span></button>
-        <button id="home-pupitre" type="button" data-dev title="Le pupitre d'essais : simuler les événements du jeu (cérémonie, bonbonne, paliers, sons) au doigt — sans console navigateur"><i>▚</i><span>PUPITRE</span></button>
+        <!-- LES OUTILS DU CONCEPTEUR ont une seule porte : LA RÉGIE. Les
+             anciens boutons (éditeur, carte, descente, planche, montage,
+             récit & fins, textes, récompenses, marchand, règles, salles,
+             pupitre) sont devenus ses sections — un seul endroit, et l'état
+             du partage à côté de chaque outil. ?editeur et ?carte dans
+             l'URL restent des raccourcis. -->
+        <button id="home-regie" type="button" data-dev class="home-regie" title="LA RÉGIE : la console du concepteur — tous les outils du système de run (carte, descente, planche, récit et fins, scénario, codex, marchand, récompenses, textes, éditeur de tableaux, règles, salles, pupitre), ce qui est publié pour tout le monde, et le tir à blanc"><i>◎</i><span>RÉGIE</span></button>
         <button id="home-records" type="button"><i>✦</i><span>RECORDS</span></button>
         <button id="home-codex" type="button" title="Le manuel écrit par la partie : chaque interaction découverte débloque sa fiche"><i>◉</i><span>CODEX</span></button>
         <button id="home-fioles" type="button" title="La collection d’échantillons scellés : deux fioles s’équipent pour la run"><i>⚗&#xFE0E;</i><span>FIOLES</span></button>
