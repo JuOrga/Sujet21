@@ -29,7 +29,7 @@ describe('dessinCarteSVG — le plan, depuis les données', () => {
     expect(octogone(0, 0, 100, 50)).toBe('22,0 78,0 100,14 100,36 78,50 22,50 0,36 0,14')
     const svg = dessinCarteSVG(CARTE_LIVREE, base)
     expect(svg).toMatch(/data-mod="N"[^>]*>.*?<circle cx="666" cy="385"/s)
-    expect(svg).toMatch(/data-mod="OBS"[^>]*>.*?url\(#cs-dome\)/s)
+    expect(svg).toMatch(/data-mod="OBS"[^>]*>.*?url\(#cs-dome-editeur\)/s)
   })
 
   it('pose les badges des transfos, et les coursives en trois traits', () => {
@@ -72,7 +72,7 @@ describe('dessinCarteSVG — le plan, depuis les données', () => {
 
   it('le mode éditeur ajoute grille, flèches de sens et poignées du module choisi', () => {
     const svg = dessinCarteSVG(CARTE_LIVREE, { ...base, selection: 'T2' })
-    expect(svg).toContain('id="cs-grille"')
+    expect(svg).toContain('id="cs-grille-editeur"')
     expect(compte(svg, /class="cs-sens"/g)).toBe(12)
     expect(compte(svg, /data-poignee="/g)).toBe(4)
     const jeu = dessinCarteSVG(CARTE_LIVREE, { ...base, mode: 'jeu', courant: 'HUB' })
@@ -92,6 +92,29 @@ describe('dessinCarteSVG — le plan, depuis les données', () => {
     const sans = cloneCarte(CARTE_LIVREE)
     sans.decor = []
     expect(dessinCarteSVG(sans, base)).not.toContain('data-decor')
+  })
+
+  it('deux plans dans la même page ne partagent aucun identifiant, et chacun se suffit', () => {
+    // VÉCU : l'arc de coque et le télescope disparaissaient de LA STATION
+    // après un passage par l'éditeur de carte. Les deux SVG portaient les
+    // mêmes id ; url(#cs-ombre) se résolvait sur le premier du document,
+    // enfoui dans l'éditeur fermé (display:none), et Chrome ne dessine pas
+    // un élément dont le filtre n'est pas rendu. Mesuré au navigateur sur
+    // une page de deux rectangles : le filtré s'efface, l'autre reste.
+    const ids = (s: string): Set<string> => new Set([...s.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]))
+    const refs = (s: string): Set<string> => new Set([...s.matchAll(/url\(#([^)]+)\)/g)].map((m) => m[1]))
+    const station = dessinCarteSVG(CARTE_LIVREE, { ...base, mode: 'jeu', courant: 'HUB', cle: 'station' })
+    const editeur = dessinCarteSVG(CARTE_LIVREE, { ...base, selection: 'T2' })
+    expect(ids(station).size).toBeGreaterThan(5)
+    for (const id of ids(station)) expect(ids(editeur)).not.toContain(id)
+    // chaque référence trouve sa définition DANS SON PROPRE SVG
+    for (const r of refs(station)) expect(ids(station)).toContain(r)
+    for (const r of refs(editeur)) expect(ids(editeur)).toContain(r)
+    // sans clé, le mode fait l'espace de noms ; le même état redonne le même dessin
+    expect(dessinCarteSVG(CARTE_LIVREE, { ...base, selection: 'T2' })).toBe(editeur)
+    expect(ids(dessinCarteSVG(CARTE_LIVREE, { ...base, mode: 'jeu', courant: 'HUB' }))).toContain('cs-ombre-jeu')
+    // une clé exotique reste un id valide dans url(#…)
+    expect(dessinCarteSVG(CARTE_LIVREE, { ...base, cle: 'a b)c' })).toContain('url(#cs-ombre-a_b_c)')
   })
 
   it('échappe les noms : un « < » dans un nom ne casse pas le SVG', () => {

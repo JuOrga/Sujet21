@@ -55,6 +55,14 @@ export interface OptionsDessin {
   /** le module joignable EN REVENANT SUR SES PAS (l'objectif est hors de
    *  portée d'ici) : il s'allume comme une cible, sans coursive */
   retour?: string | null
+  /** L'ESPACE DE NOMS des identifiants internes (dégradés, motifs, ombre,
+   *  découpes). Deux plans dans la même page DOIVENT en porter deux
+   *  différents : `url(#id)` se résout dans TOUT le document et le premier
+   *  élément trouvé gagne — s'il est dans un écran fermé (display:none),
+   *  Chrome ne dessine pas ce qui s'y réfère. Vécu : l'arc de coque et le
+   *  télescope disparaissaient de LA STATION après un passage par l'éditeur
+   *  de carte, dont le SVG reste dans la page, plus haut. Par défaut : le mode. */
+  cle?: string
 }
 
 /** Les glyphes des natures de module — le dessin, pas la donnée : un
@@ -117,7 +125,7 @@ const nombres = (d: string): number[] => (d.match(/-?\d+(?:\.\d+)?/g) ?? []).map
 /** L'ARC DE COQUE : un croissant en deux courbes (extérieure, intérieure),
  *  ses nervures et ses lumières CALCULÉES sur les courbes — la maquette les
  *  posait à la main ; ici l'arc peut changer de forme sans qu'on les refasse. */
-function arcDeCoque(c: CarteStation, d: DecorCarte): string {
+function arcDeCoque(c: CarteStation, d: DecorCarte, ns: string): string {
   const e = nombres(d.exterieur ?? '')
   const i = nombres(d.interieur ?? '')
   if (e.length < 8 || i.length < 6) return ''
@@ -147,8 +155,8 @@ function arcDeCoque(c: CarteStation, d: DecorCarte): string {
     ? `<path d="M${n1(anc.x - anc.w / 2 - 44)} ${n1(anc.y)} H${n1(anc.x - anc.w / 2 + 4)}" stroke="${P.couloirParoi}" stroke-width="22"/>`
     : ''
   return (
-    `<g class="cs-arc" data-decor="${esc(d.id)}" filter="url(#cs-ombre)">` +
-    `<path d="${esc(chemin)}" fill="url(#cs-plaque)" stroke="${P.bord}" stroke-width="3"/>` +
+    `<g class="cs-arc" data-decor="${esc(d.id)}" filter="url(#cs-ombre-${ns})">` +
+    `<path d="${esc(chemin)}" fill="url(#cs-plaque-${ns})" stroke="${P.bord}" stroke-width="3"/>` +
     `<path d="${esc(chemin)}" fill="none" stroke="${c.zones[0]?.couleur ?? COURANT}" stroke-width="1" opacity=".5"/>` +
     `<path d="${nervures}" stroke="${P.bord}" stroke-width="3"/>` +
     `<g fill="${c.zones[0]?.couleur ?? COURANT}" class="cs-lumieres">${lumieres}</g>` +
@@ -159,7 +167,7 @@ function arcDeCoque(c: CarteStation, d: DecorCarte): string {
 
 /** LE TÉLESCOPE AMARRÉ : les vecteurs de la maquette, en repère local —
  *  la position, la rotation et le tube coudé viennent des données. */
-function telescope(c: CarteStation, d: DecorCarte): string {
+function telescope(c: CarteStation, d: DecorCarte, ns: string): string {
   const P = c.palette
   const x = d.x ?? 0
   const y = d.y ?? 0
@@ -172,15 +180,15 @@ function telescope(c: CarteStation, d: DecorCarte): string {
   return (
     `<g class="cs-telescope" data-decor="${esc(d.id)}">` +
     tube +
-    `<g transform="translate(${n1(x)} ${n1(y)}) rotate(${n1(d.rotation ?? 0)})" filter="url(#cs-ombre)">` +
+    `<g transform="translate(${n1(x)} ${n1(y)}) rotate(${n1(d.rotation ?? 0)})" filter="url(#cs-ombre-${ns})">` +
     `<rect x="0" y="-14" width="40" height="28" rx="3" fill="${P.plaque}" stroke="#4a6478" stroke-width="2"/>` +
     `<path d="M8 -14V14 M20 -14V14 M32 -14V14" stroke="${P.bord}" stroke-width="1.5"/>` +
     `<path d="M200 -36 V-150 M200 36 V150" stroke="#5a7a96" stroke-width="4"/>` +
     `<g stroke="#3f5c85" stroke-width="2">` +
-    `<rect x="110" y="-150" width="180" height="96" fill="url(#cs-cellules)"/>` +
-    `<rect x="110" y="54" width="180" height="96" fill="url(#cs-cellules)"/></g>` +
+    `<rect x="110" y="-150" width="180" height="96" fill="url(#cs-cellules-${ns})"/>` +
+    `<rect x="110" y="54" width="180" height="96" fill="url(#cs-cellules-${ns})"/></g>` +
     `<path d="M200 -150 V-54 M200 54 V150 M110 -102 H290 M110 102 H290" stroke="#5a7a96" stroke-width="2"/>` +
-    `<rect x="40" y="-38" width="330" height="76" rx="6" fill="url(#cs-plaque)" stroke="#4a6478" stroke-width="2.5"/>` +
+    `<rect x="40" y="-38" width="330" height="76" rx="6" fill="url(#cs-plaque-${ns})" stroke="#4a6478" stroke-width="2.5"/>` +
     `<rect x="40" y="-38" width="330" height="76" rx="6" fill="none" stroke="rgba(150,200,235,.3)" stroke-width="1"/>` +
     `<path d="M40 -12 H370 M40 12 H370" stroke="rgba(150,200,235,.14)" stroke-width="1"/>` +
     `<path d="M120 -38 V38 M170 -38 V38 M230 -38 V38 M300 -38 V38" stroke="${P.bord}" stroke-width="2.5"/>` +
@@ -200,10 +208,10 @@ function telescope(c: CarteStation, d: DecorCarte): string {
   )
 }
 
-function decor(c: CarteStation): string {
+function decor(c: CarteStation, ns: string): string {
   return c.decor
     .map((d) =>
-      d.type === 'coque-croissant' ? arcDeCoque(c, d) : d.type === 'telescope-hubble' ? telescope(c, d) : '',
+      d.type === 'coque-croissant' ? arcDeCoque(c, d, ns) : d.type === 'telescope-hubble' ? telescope(c, d, ns) : '',
     )
     .join('')
 }
@@ -309,13 +317,13 @@ function badges(c: CarteStation, L: LienDessine[]): string {
 
 // ---- LES MODULES ---------------------------------------------------------------
 
-function vecteurs(m: ModuleCarte, accent: string, P: CarteStation['palette']): string {
+function vecteurs(m: ModuleCarte, accent: string, P: CarteStation['palette'], espace: string): string {
   // les détails du fût, en repère 0-100 étiré au module (comme la maquette) ;
   // le trait ne s'étire pas (vector-effect), la géométrie si
   const rond = m.forme === 'rond'
   const dome = m.forme === 'octogone-dome'
   const ns = 'vector-effect="non-scaling-stroke"'
-  let corps = `<rect width="100" height="100" fill="url(#cs-plaque)"/>`
+  let corps = `<rect width="100" height="100" fill="url(#cs-plaque-${espace})"/>`
   if (rond)
     corps +=
       `<circle cx="50" cy="50" r="40" fill="none" stroke="rgba(150,200,235,.35)" stroke-width="2" ${ns}/>` +
@@ -323,7 +331,7 @@ function vecteurs(m: ModuleCarte, accent: string, P: CarteStation['palette']): s
       `<path d="M50 10V28M50 72V90M10 50H28M72 50H90" stroke="rgba(150,200,235,.35)" stroke-width="1.5" ${ns}/>`
   else if (dome)
     corps +=
-      `<circle cx="50" cy="50" r="28" fill="url(#cs-dome)" stroke="#a7b8ff" stroke-width="1.5" ${ns}/>` +
+      `<circle cx="50" cy="50" r="28" fill="url(#cs-dome-${espace})" stroke="#a7b8ff" stroke-width="1.5" ${ns}/>` +
       `<path d="M22 50H78M50 22V78M30 30L70 70M70 30L30 70" stroke="rgba(200,215,255,.35)" stroke-width="1" ${ns}/>` +
       `<circle cx="50" cy="50" r="16" fill="none" stroke="rgba(200,215,255,.35)" stroke-width="1" ${ns}/>`
   else
@@ -336,7 +344,7 @@ function vecteurs(m: ModuleCarte, accent: string, P: CarteStation['palette']): s
   return corps
 }
 
-function module(c: CarteStation, m: ModuleCarte, k: number, o: OptionsDessin): string {
+function module(c: CarteStation, m: ModuleCarte, k: number, o: OptionsDessin, ns: string): string {
   const P = c.palette
   const zc = zoneDe(c, m)?.couleur ?? P.texteSecondaire
   const rond = m.forme === 'rond'
@@ -370,7 +378,7 @@ function module(c: CarteStation, m: ModuleCarte, k: number, o: OptionsDessin): s
     (estCourant ? ' cs-courant' : '') + (visite && !estCourant ? ' cs-visite' : '') +
     (cliquable ? (verrou ? ' cs-verrou' : ' cs-cible') : '') + (sel ? ' cs-sel' : '') +
     (edition ? ' cs-editable' : '')
-  const clip = `cs-clip-${k}`
+  const clip = `cs-clip-${ns}-${k}`
 
   let s =
     `<g class="${classes}" data-mod="${esc(m.id)}" tabindex="0" role="button" style="--z:${zc};--bord:${bord}" opacity="${opacite}" aria-label="${esc(m.nom)} — ${esc(c.types[m.type])}">` +
@@ -386,7 +394,7 @@ function module(c: CarteStation, m: ModuleCarte, k: number, o: OptionsDessin): s
     // la scène), et l'étirement sur un groupe dedans.
     `<g class="cs-vecteurs" clip-path="url(#${clip})" opacity="${estCourant ? 0.7 : visite ? 0.75 : 1}">` +
     `<g transform="translate(${n1(l + 3)} ${n1(t + 3)}) scale(${n4((m.w - 6) / 100)} ${n4((m.h - 6) / 100)})">` +
-    vecteurs(m, accent, P) +
+    vecteurs(m, accent, P, ns) +
     `</g></g>`
   if (fonte > 0 && glyphe)
     s += `<text class="cs-glyphe" x="${n1(m.x)}" y="${n1(m.y)}" font-size="${fonte}" fill="${estCourant ? P.texte : zc}">${glyphe}</text>`
@@ -432,33 +440,40 @@ function module(c: CarteStation, m: ModuleCarte, k: number, o: OptionsDessin): s
 
 // ---- LE TOUT ---------------------------------------------------------------------
 
-function defs(c: CarteStation): string {
+function defs(c: CarteStation, ns: string): string {
   const P = c.palette
   const [d0, d1, d2] = [P.dome[0], P.dome[1] ?? P.dome[0], P.dome[2] ?? P.dome[P.dome.length - 1]]
   return (
     `<defs>` +
-    `<linearGradient id="cs-plaque" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${P.plaque}"/><stop offset="1" stop-color="${P.plaqueSombre}"/></linearGradient>` +
-    `<radialGradient id="cs-dome" cx="38%" cy="32%" r="70%"><stop offset="0" stop-color="${d0}"/><stop offset=".45" stop-color="${d1}"/><stop offset="1" stop-color="${d2}"/></radialGradient>` +
-    `<pattern id="cs-cellules" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="10" height="10" fill="#0f1a36"/><path d="M10 0H0V10" fill="none" stroke="#2c4a8a" stroke-width="1"/></pattern>` +
-    `<pattern id="cs-hex" width="28" height="48.5" patternUnits="userSpaceOnUse"><path d="M14 0 L28 8 L28 24 L14 32 L0 24 L0 8 Z M14 32 L14 48.5" fill="none" stroke="rgba(150,200,235,.06)" stroke-width="1"/></pattern>` +
-    `<filter id="cs-ombre" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000" flood-opacity=".75"/></filter>` +
+    `<linearGradient id="cs-plaque-${ns}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${P.plaque}"/><stop offset="1" stop-color="${P.plaqueSombre}"/></linearGradient>` +
+    `<radialGradient id="cs-dome-${ns}" cx="38%" cy="32%" r="70%"><stop offset="0" stop-color="${d0}"/><stop offset=".45" stop-color="${d1}"/><stop offset="1" stop-color="${d2}"/></radialGradient>` +
+    `<pattern id="cs-cellules-${ns}" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="10" height="10" fill="#0f1a36"/><path d="M10 0H0V10" fill="none" stroke="#2c4a8a" stroke-width="1"/></pattern>` +
+    `<pattern id="cs-hex-${ns}" width="28" height="48.5" patternUnits="userSpaceOnUse"><path d="M14 0 L28 8 L28 24 L14 32 L0 24 L0 8 Z M14 32 L14 48.5" fill="none" stroke="rgba(150,200,235,.06)" stroke-width="1"/></pattern>` +
+    `<filter id="cs-ombre-${ns}" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000" flood-opacity=".75"/></filter>` +
     `</defs>`
   )
 }
 
-function grille(c: CarteStation, pas: number): string {
+function grille(c: CarteStation, pas: number, ns: string): string {
   if (pas <= 0) return ''
   const gros = pas * 6
   return (
-    `<pattern id="cs-grille" width="${n1(pas)}" height="${n1(pas)}" patternUnits="userSpaceOnUse"><path d="M${n1(pas)} 0H0V${n1(pas)}" fill="none" stroke="rgba(150,200,235,.05)" stroke-width="1"/></pattern>` +
-    `<pattern id="cs-grille-6" width="${n1(gros)}" height="${n1(gros)}" patternUnits="userSpaceOnUse"><path d="M${n1(gros)} 0H0V${n1(gros)}" fill="none" stroke="rgba(150,200,235,.1)" stroke-width="1"/></pattern>` +
-    `<rect class="cs-grille" width="${c.scene.width}" height="${c.scene.height}" fill="url(#cs-grille)"/>` +
-    `<rect class="cs-grille" width="${c.scene.width}" height="${c.scene.height}" fill="url(#cs-grille-6)"/>`
+    `<pattern id="cs-grille-${ns}" width="${n1(pas)}" height="${n1(pas)}" patternUnits="userSpaceOnUse"><path d="M${n1(pas)} 0H0V${n1(pas)}" fill="none" stroke="rgba(150,200,235,.05)" stroke-width="1"/></pattern>` +
+    `<pattern id="cs-grille-6-${ns}" width="${n1(gros)}" height="${n1(gros)}" patternUnits="userSpaceOnUse"><path d="M${n1(gros)} 0H0V${n1(gros)}" fill="none" stroke="rgba(150,200,235,.1)" stroke-width="1"/></pattern>` +
+    `<rect class="cs-grille" width="${c.scene.width}" height="${c.scene.height}" fill="url(#cs-grille-${ns})"/>` +
+    `<rect class="cs-grille" width="${c.scene.width}" height="${c.scene.height}" fill="url(#cs-grille-6-${ns})"/>`
   )
+}
+
+/** L'espace de noms des identifiants, assaini : seuls lettres, chiffres,
+ *  « _ » et « - » tiennent dans un `url(#…)`. */
+export function espaceDeNoms(o: OptionsDessin): string {
+  return (o.cle || o.mode).replace(/[^\w-]/g, '_')
 }
 
 /** LA CARTE COMPLÈTE, en une chaîne SVG. */
 export function dessinCarteSVG(c: CarteStation, o: OptionsDessin): string {
+  const ns = espaceDeNoms(o)
   const L = liensDessines(c, o)
   const W = c.scene.width
   const H = c.scene.height
@@ -469,14 +484,14 @@ export function dessinCarteSVG(c: CarteStation, o: OptionsDessin): string {
     `<svg class="cs-svg cs-${o.mode}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" ` +
     `role="group" aria-label="Carte de la station : ${c.modules.length} modules, ${c.liens.length} coursives" ` +
     `style="background:${c.palette.fond}">` +
-    defs(c) +
-    `<rect class="cs-fond" width="${W}" height="${H}" fill="url(#cs-hex)"/>` +
-    (o.mode === 'editeur' ? grille(c, o.grille ?? 0) : '') +
-    decor(c) +
+    defs(c, ns) +
+    `<rect class="cs-fond" width="${W}" height="${H}" fill="url(#cs-hex-${ns})"/>` +
+    (o.mode === 'editeur' ? grille(c, o.grille ?? 0, ns) : '') +
+    decor(c, ns) +
     coursives(c, L) +
     routes(L, o) +
     badges(c, L) +
-    `<g class="cs-modules">${c.modules.map((m, k) => module(c, m, k, o)).join('')}</g>` +
+    `<g class="cs-modules">${c.modules.map((m, k) => module(c, m, k, o, ns)).join('')}</g>` +
     brouillon +
     `</svg>`
   )
