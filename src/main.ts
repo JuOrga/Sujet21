@@ -4902,6 +4902,10 @@ const enRunCarte = (): boolean => hasPlayed && !auHub && testLevel === null
 function optionsStation(): OptionsDessin {
   return {
     mode: 'jeu',
+    // son propre espace de noms : l'éditeur de carte, plus haut dans la
+    // page, garde son SVG une fois fermé — sans cela l'arc et le télescope
+    // disparaissaient du plan (voir OptionsDessin.cle)
+    cle: 'station',
     courant: enRunCarte() ? carteRun.module : carte.regles.depart,
     visites: enRunCarte() ? carteRun.visites : [],
     selection: stationVise,
@@ -10797,6 +10801,7 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
   scene.className = 'mb-station-carte'
   scene.innerHTML = dessinCarteSVG(carte, {
     mode: 'jeu',
+    cle: 'run', // un troisième plan dans la page : ses identifiants à lui
     courant: carteRun.module,
     visites: carteRun.visites,
     selection: null,

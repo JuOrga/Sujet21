@@ -256,6 +256,7 @@ export class EditeurCarte {
       lienSelection: jeu ? null : this.lienSel,
       orbes: [...this.orbes],
       mode: jeu ? 'jeu' : 'editeur',
+      cle: 'editeur', // l'aperçu jeu remplace le plan dans la même scène : une seule clé suffit
       afficherTemp: true,
       grille: this.grille,
       brouillon: this.brouillon,
