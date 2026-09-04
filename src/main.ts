@@ -7,6 +7,7 @@ import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
 import { evenementsPlasma } from './game/plasmaFx'
 import { Codex } from './game/codex'
+import { AtelierJournal } from './editor/atelierJournal'
 import {
   deleteReglageCodex,
   fetchReglagesCodex,
@@ -28,11 +29,18 @@ import {
   reparationDef,
 } from './game/reparations'
 import {
-  DECOUVERTES,
-  prochaineDecouverte,
-  recitAcheve,
+  denouementAtteint,
+  fetchJournal,
+  finsVues,
+  fragmentsVus,
+  journalCourant,
+  poseJournal,
+  prochainFragment,
   prochaineFin,
-} from './game/decouvertes'
+  pushJournal,
+  deleteJournal,
+  revelationAtteinte,
+} from './game/journal'
 import {
   MECANIQUE_NOMS,
   codeCanon,
@@ -664,7 +672,8 @@ let hubMemo: { base: LevelDef; cle: string; lv: LevelDef } | null = null
  * niveau est comparé par référence un peu partout). */
 function finOuverte(): boolean {
   return (
-    recitAcheve(records.decouvertesVues()) && records.estRepare('passerelle-4')
+    revelationAtteinte(journalCourant(), records.decouvertesVues()) &&
+    records.estRepare('passerelle-4')
   )
 }
 function hubJoue(): LevelDef {
@@ -2048,6 +2057,13 @@ void fetchReglagesCodex().then((r) => {
   reglagesCodex = r
   renderCodexVoile()
 })
+// LE JOURNAL (récit, fins, seuils) : celui publié par le concepteur, s'il y
+// en a un — le livré joue en attendant, et hors-ligne
+void fetchJournal().then((p) => {
+  if (!p?.journal) return
+  poseJournal(p.journal)
+  renderCodexVoile()
+})
 codex.onDecouverte = (d) => {
   // chaque fiche grave sa mémoire — le montant est réglé par le concepteur,
   // fiche par fiche ; une seule fois, Codex.marque le garantit
@@ -2737,6 +2753,10 @@ const ecranCodex = new EcranCodex(codexEl, {
   // le mode concepteur se lit sur le body (data-dev) : c'est lui qui montre
   // ou cache les outils, l'atelier suit la même règle
   concepteur: () => document.body.classList.contains('concepteur'),
+  atelierJournal: () => {
+    fermeCodex()
+    void atelierJournal.open()
+  },
   sauve: async (id, r, video) => {
     const res = await pushReglageCodex(id, r, records.operator() || 'anonyme', video)
     if (res) reglagesCodex = res
@@ -2751,6 +2771,24 @@ const ecranCodex = new EcranCodex(codexEl, {
 function renderCodexVoile(): void {
   ecranCodex.render()
 }
+// L'ATELIER DU JOURNAL (editor/atelierJournal.ts) : récit, fins, seuils —
+// publié pour tous au magasin partagé ; « essayer sur ce poste » fait
+// jouer le brouillon ici, tout de suite
+const atelierJournalEl = document.getElementById('journal-atelier') as HTMLDivElement
+const atelierJournal = new AtelierJournal(atelierJournalEl, {
+  auteur: () => records.operator() || 'anonyme',
+  charge: () => fetchJournal(),
+  publie: (j) => pushJournal(j, records.operator() || 'anonyme'),
+  retire: () => deleteJournal(),
+  applique: (j) => {
+    poseJournal(j)
+    renderCodexVoile()
+  },
+  fermer: () => atelierJournal.close(),
+})
+document.getElementById('home-journal')?.addEventListener('click', () => {
+  void atelierJournal.open()
+})
 document.getElementById('home-codex')?.addEventListener('click', () => {
   ecranCodex.open()
 })
@@ -3868,10 +3906,10 @@ function etatScenario(): EtatScenario {
     runs: Math.max(0, records.essaiNumber() - 1),
     salleMax: records.expedition()?.tableaux ?? 0,
     condensat,
-    // seuls les jalons du RÉCIT comptent (les marqueurs annexes, non)
-    decouvertes: records
-      .decouvertesVues()
-      .filter((id) => DECOUVERTES.includes(id)).length,
+    // seuls les fragments du RÉCIT comptent (les fins, les marqueurs, non)
+    decouvertes: fragmentsVus(journalCourant(), records.decouvertesVues()),
+    revelation: revelationAtteinte(journalCourant(), records.decouvertesVues()),
+    denouement: denouementAtteint(journalCourant(), records.decouvertesVues()),
     trophee: (id) => trophees.gagne(id),
   }
 }
@@ -6143,6 +6181,7 @@ const COUCHES_MENU: CoucheMenu[] = [
   { id: 'cmds', retour: 'cmds-fermer' },
   { id: 'planche', retour: 'planche-fermer' },
   { id: 'regles', retour: 'regles-fermer' },
+  { id: 'journal-atelier', retour: 'aj-fermer' }, // l'atelier du journal (récit & fins)
   { id: 'cycle', retour: 'cycle-fermer' }, // les mémoires — ouvertes au banc du hub aussi
   { id: 'marchand', retour: 'marchand-fermer' }, // le marchand — ouvert à l'étal du hub aussi
   { id: 'salles', retour: 'salles-fermer' },
@@ -13427,8 +13466,20 @@ function frame(now: number): void {
       finOuverte() &&
       pointInBox(sim.stats.centroidX, sim.stats.centroidY, zonesHub.sasScelle)
     if (surScelle && !sasScelleDedans) {
-      records.noteDecouverte('fin-jouee') // le marqueur de la fin vue
-      void lireCineParCode('MIROIR')
+      // le DÉNOUEMENT demande son compte de fins (seuil du journal) : tant
+      // qu'il manque, l'alcôve le dit au lieu de rester muette
+      const journal = journalCourant()
+      if (denouementAtteint(journal, records.decouvertesVues())) {
+        records.noteDecouverte('fin-jouee') // le marqueur de la fin vue
+        void lireCineParCode('MIROIR')
+      } else {
+        const reste = journal.denouementApres - finsVues(journal, records.decouvertesVues())
+        toastFile.push({
+          nom: `ENCORE ${reste} FIN${reste > 1 ? 'S' : ''} À ATTEINDRE — bouclez des expéditions`,
+          icone: '🚪',
+          sur: 'LE SECTEUR 4',
+        })
+      }
     }
     sasScelleDedans = surScelle
     // LA TABLE DE DÉPART (une fois réparée) : le récapitulatif de ce
@@ -13959,12 +14010,13 @@ function frame(now: number): void {
       // l'outil, un ESSAI d'éditeur, ni avant l'acte 0 : le récit ne se
       // livre qu'aux vraies descentes.
       if (!sasOutil && eveilJoue() && !testLevel) {
-        const jalon = prochaineDecouverte(records.decouvertesVues())
-        if (jalon) {
-          records.noteDecouverte(jalon)
-          codex.marque(`recit-${jalon}`)
+        const journal = journalCourant()
+        const fragment = prochainFragment(journal, records.decouvertesVues())
+        if (fragment) {
+          records.noteDecouverte(fragment)
+          codex.marque(fragment)
         }
-        const fin = prochaineFin(records.decouvertesVues())
+        const fin = prochaineFin(journal, records.decouvertesVues())
         if (fin) {
           records.noteDecouverte(fin)
           codex.marque(fin)

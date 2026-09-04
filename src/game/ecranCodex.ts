@@ -55,6 +55,8 @@ export interface HooksCodex {
   sauve(id: string, r: { memoire: number; rarete: RareteFiche }, video?: EnvoiVideo | 'retirer'): Promise<boolean>
   /** rétablit les défauts d'une fiche — false : l'envoi a échoué */
   retablit(id: string): Promise<boolean>
+  /** ouvre l'atelier du journal (récit & fins) — mode concepteur */
+  atelierJournal?(): void
 }
 
 const esc = (t: string): string =>
@@ -201,6 +203,10 @@ export class EcranCodex {
       this.mode === 'journal'
         ? 'Chaque expédition bouclée révèle un fragment du récit — et une fin.'
         : 'Les ? sont des expériences à tenter. Chaque fiche se gagne en jouant.'
+    // le concepteur a la main sur le journal : l'ordre et les textes se
+    // règlent dans leur atelier, à un clic du rayon
+    const atelier = this.el('cx-atelier-journal')
+    atelier.hidden = !(this.mode === 'journal' && this.hooks.concepteur() && this.hooks.atelierJournal)
   }
 
   private peintGrille(r: RayonCodex, liste: CodexDef[]): void {
@@ -397,6 +403,10 @@ export class EcranCodex {
       this.hooks.fermer()
       return
     }
+    if (b.id === 'cx-atelier-journal') {
+      this.hooks.atelierJournal?.()
+      return
+    }
     if (b.dataset.mode) {
       this.mode = b.dataset.mode as ModeCodex
       this.rayon = rayonsDe(this.mode)[0].id
@@ -493,7 +503,7 @@ function gabarit(): string {
     `<button type="button" id="codex-fermer" aria-label="Fermer le codex">✕</button>` +
     `</header>` +
     `<div class="cx-corps">` +
-    `<nav class="cx-nav"><div class="cx-modes" id="cx-modes"></div><div id="cx-rayons" class="cx-rayons"></div><p class="cx-note" id="cx-note"></p></nav>` +
+    `<nav class="cx-nav"><div class="cx-modes" id="cx-modes"></div><div id="cx-rayons" class="cx-rayons"></div><p class="cx-note" id="cx-note"></p><button type="button" id="cx-atelier-journal" class="cx-atelier-journal" hidden>✎ ATELIER RÉCIT &amp; FINS</button></nav>` +
     `<section class="cx-centre"><div class="cx-entete" id="cx-entete"></div><div class="cx-defil"><div id="cx-grille" class="cx-grille"></div></div></section>` +
     `<aside class="cx-fiche" id="cx-fiche"></aside>` +
     `</div></div>`

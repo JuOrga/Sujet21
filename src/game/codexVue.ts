@@ -15,7 +15,7 @@
 // la combinaison matériau × état. Le reste est une décision de conception
 // à prendre, pas un chiffre à afficher.
 
-import { CODEX, type CodexDef, type CodexGroupe } from './codex'
+import { fichesCodex, type CodexDef, type CodexGroupe } from './codex'
 import {
   MAT_CHAUD,
   MAT_FROID,
@@ -65,7 +65,7 @@ export function rayonsDe(mode: ModeCodex): readonly RayonCodex[] {
 }
 
 export function fichesDuRayon(r: RayonCodex): CodexDef[] {
-  return r.groupe ? CODEX.filter((d) => d.groupe === r.groupe) : []
+  return r.groupe ? fichesCodex().filter((d) => d.groupe === r.groupe) : []
 }
 
 export function visibles(r: RayonCodex, filtre: FiltreCodex, connu: (id: string) => boolean): CodexDef[] {

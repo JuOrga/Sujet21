@@ -1025,6 +1025,58 @@
       #vc-nom { font-family: var(--font-display); font-size: calc(17px * var(--ui)); color: #eaf6ff; }
       #vc-code { font-size: calc(12px * var(--ui)); letter-spacing: 0.12em; color: var(--specimen); }
       /* ---- LE CAHIER DES RÈGLES : la génération, noir sur blanc ---- */
+      /* L'ATELIER DU JOURNAL (récit & fins) : même voile que le cahier des règles */
+      #journal-atelier {
+        position: fixed; inset: 0; z-index: 57;
+        background: rgba(2, 6, 12, 0.78);
+        display: flex; align-items: center; justify-content: center;
+        padding: 18px;
+      }
+      #journal-atelier[hidden] { display: none; }
+      .aj-boite { max-width: min(1180px, 96vw); width: 100%; max-height: 94vh; display: flex; flex-direction: column; }
+      .aj-boite > .salles-tete, .aj-boite > .salles-legende, .aj-boite > .aj-barre, .aj-boite > .aj-seuils, .aj-boite > .pup-etat { flex: 0 0 auto; }
+      .aj-barre { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+      .aj-statut { margin: 0; font-size: calc(11px * var(--ui)); letter-spacing: 0.06em; color: var(--dim); }
+      .aj-statut b { color: #8fd8b0; letter-spacing: 0.14em; }
+      .aj-statut i { font-style: normal; }
+      .aj-statut .aj-modifie { color: #ffd24a; }
+      .aj-boutons { display: flex; flex-wrap: wrap; gap: 6px; }
+      .aj-boutons button, .aj-ajout button {
+        font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.16em;
+        padding: 7px 10px; border-radius: 6px; border: 1px solid var(--line);
+        background: rgba(99, 183, 230, 0.08); color: #eaf6ff; cursor: pointer;
+      }
+      .aj-boutons button:hover:not(:disabled), .aj-ajout button:hover { background: rgba(99, 183, 230, 0.2); }
+      .aj-boutons button:disabled { opacity: 0.4; cursor: default; }
+      .aj-boutons #aj-publier:not(:disabled) { border-color: #3f7a5e; background: rgba(63, 122, 94, 0.25); }
+      .aj-boutons .aj-danger:not(:disabled) { border-color: #7a3f3f; }
+      .aj-seuils { display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+      .aj-seuils label { display: flex; align-items: baseline; gap: 8px; font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; color: var(--dim); }
+      .aj-seuils input { width: 4.5em; font: inherit; font-size: calc(13px * var(--ui)); color: #ffd24a; background: rgba(10, 18, 28, 0.85); border: 1px solid var(--line); border-radius: 5px; padding: 4px 6px; }
+      .aj-seuils small { letter-spacing: 0.04em; }
+      .aj-colonnes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px; overflow-y: auto; min-height: 0; flex: 1 1 auto; }
+      @media (max-width: 860px) { .aj-colonnes { grid-template-columns: 1fr; } }
+      .aj-col h3 { margin: 0 0 8px; font-family: var(--font-display); font-size: calc(12px * var(--ui)); letter-spacing: 0.18em; color: var(--specimen); padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+      .aj-col h3 small { margin-left: 8px; color: var(--dim); font-family: inherit; letter-spacing: 0.08em; }
+      .aj-liste { display: flex; flex-direction: column; gap: 8px; }
+      .aj-carte { background: rgba(20, 32, 46, 0.6); border: 1px solid var(--line); border-left: 3px solid var(--specimen); border-radius: 7px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+      .aj-ligne { display: flex; align-items: center; gap: 6px; }
+      .aj-poignee { color: var(--dim); cursor: grab; user-select: none; }
+      .aj-num { font-family: var(--font-display); font-size: calc(10px * var(--ui)); color: var(--dim); min-width: 1.6em; }
+      .aj-carte input, .aj-carte textarea { font: inherit; font-size: calc(12px * var(--ui)); color: #eaf6ff; background: rgba(10, 18, 28, 0.85); border: 1px solid var(--line); border-radius: 5px; padding: 5px 7px; }
+      .aj-icone { width: 3em; text-align: center; }
+      .aj-titre { flex: 1 1 auto; min-width: 0; font-weight: 600; }
+      .aj-texte { width: 100%; resize: vertical; line-height: 1.45; color: #b9cede; }
+      .aj-ligne button { font-size: calc(11px * var(--ui)); padding: 4px 7px; border-radius: 5px; border: 1px solid var(--line); background: transparent; color: var(--dim); cursor: pointer; }
+      .aj-ligne button:hover:not(:disabled) { color: #eaf6ff; background: rgba(99, 183, 230, 0.15); }
+      .aj-ligne button:disabled { opacity: 0.3; cursor: default; }
+      .aj-id { font-size: calc(9px * var(--ui)); letter-spacing: 0.08em; color: var(--dim); }
+      .aj-ajout { display: flex; gap: 6px; margin-top: 8px; }
+      .aj-ajout input { flex: 1 1 auto; min-width: 0; font: inherit; font-size: calc(12px * var(--ui)); color: #eaf6ff; background: rgba(10, 18, 28, 0.85); border: 1px dashed var(--line); border-radius: 5px; padding: 5px 7px; }
+      .aj-verdicts { flex: 0 0 auto; margin: 0; padding: 8px 12px 6px 28px; font-size: calc(11px * var(--ui)); line-height: 1.5; border-top: 1px solid var(--line); max-height: 18vh; overflow-y: auto; }
+      .aj-verdicts .aj-erreur { color: #ff9a8a; }
+      .aj-verdicts .aj-attention { color: #ffd24a; }
+      .aj-verdicts .aj-ok { color: #8fd8b0; list-style: none; margin-left: -16px; }
       #regles {
         position: fixed; inset: 0; z-index: 57;
         background: rgba(2, 6, 12, 0.78);
@@ -2784,6 +2836,8 @@
       #codex #cx-cibler:hover { background: rgba(255, 210, 74, 0.25); }
       #codex #cx-cibler.on { color: #1a1200; background: #ffd24a; border-color: #ffd24a; }
       .cx-fiche-vide { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 30px 0; color: var(--dim); font-size: calc(12px * var(--ui)); }
+      .cx-atelier-journal { margin: 8px 0 0; font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.16em; padding: 8px 10px; border-radius: 6px; border: 1px dashed rgba(150, 200, 235, 0.35); background: transparent; color: #eaf6ff; cursor: pointer; }
+      .cx-atelier-journal:hover { background: rgba(99, 183, 230, 0.15); }
       .cx-memoire { color: #ffd24a !important; }
       .cx-gain { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255, 210, 74, 0.18); background: rgba(255, 210, 74, 0.04); }
       .cx-gain span { font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.2em; color: var(--dim); }
@@ -7554,6 +7608,7 @@
         <button id="open-montage" type="button" data-dev title="La table de montage des cinématiques : planches, effets, sons — et lecture immédiate"><i>▤</i><span>MONTAGE</span></button>
         <button id="home-salles" type="button" data-dev><i>▦</i><span>SALLES</span></button>
         <button id="home-planche" type="button" data-dev title="La planche d'ordonnancement : toutes les salles de la bibliothèque en cartes visuelles — glisser pour réordonner la séquence, régler le code cran par cran, essayer d'un ⏵"><i>▧</i><span>LA PLANCHE</span></button>
+        <button id="home-journal" type="button" data-dev title="RÉCIT & FINS : l'atelier du journal — l'ordre des fragments du récit et des fins que chaque expédition bouclée révèle, leurs textes, et les seuils de la révélation et du dénouement. Publié pour tous, sans passer par le dépôt"><i>🚪</i><span>RÉCIT &amp; FINS</span></button>
         <button id="home-textes" type="button" data-dev title="LE CATALOGUE DES TEXTES : tout ce que le joueur peut lire, en un endroit — chaque texte avec sa clé et l'endroit où il apparaît. Le plan de travail de la réécriture, et le socle d'une future traduction"><i>¶</i><span>TEXTES</span></button>
         <button id="home-recompenses" type="button" data-dev title="L'atelier des récompenses : le catalogue complet des instruments, ce que chaque carte tire comme levier — et de quoi en fabriquer de nouvelles avec les mêmes pièces"><i>❖</i><span>RÉCOMPENSES</span></button>
         <button id="home-pupitre" type="button" data-dev title="Le pupitre d'essais : simuler les événements du jeu (cérémonie, bonbonne, paliers, sons) au doigt — sans console navigateur"><i>▚</i><span>PUPITRE</span></button>
@@ -8072,6 +8127,11 @@
     </div>
 
     <!-- LE CAHIER DES RÈGLES : la génération procédurale, écrite noir sur blanc -->
+    <!-- L'ATELIER DU JOURNAL (RÉCIT & FINS) : l'ordre des fragments et des
+         fins servis par l'expédition bouclée, leurs textes, les deux seuils.
+         Gabarit et gestes dans src/editor/atelierJournal.ts -->
+    <div id="journal-atelier" hidden aria-label="L’atelier du journal : récit et fins"></div>
+
     <div id="regles" hidden aria-label="Le cahier des règles de génération">
       <div class="salles-boite regles-boite">
         <div class="salles-tete"><span>LE CAHIER DES RÈGLES — la génération procédurale</span>

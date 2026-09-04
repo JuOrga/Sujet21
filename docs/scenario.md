@@ -130,10 +130,23 @@ semblables, douche/mutations.
   `src/game/decouvertes.ts`) ; une run perdue ou abandonnée ne raconte
   rien. La révélation vient donc à la dixième expédition bouclée.
 - **Les fins** : chaque expédition bouclée révèle aussi **la prochaine fin**,
-  dans l'ordre fixe de `FINS` (`decouvertes.ts`), comme une fiche du codex
-  (groupe `fins`, rayon LES FINS du journal). La première est « Le miroir »
-  (la cinématique MIROIR du secteur 4). Les fins alternatives prévues
-  (« evil », « semi-evil »…) restent à écrire : chacune est une entrée de
-  plus en queue de `FINS` et sa fiche dans `codex.ts` — rien d'autre à
-  brancher. La mémoire, la rareté et la vidéo de chaque fin se règlent
-  dans l'atelier du codex, comme pour toute fiche.
+  dans l'ordre, comme une fiche du codex (groupe `fins`, rayon LES FINS du
+  journal). La première est « Le miroir » (la cinématique MIROIR du
+  secteur 4).
+- **Le journal est en données** (`src/game/journal.ts`) : le récit, les
+  fins, et les deux seuils — la **révélation** après N fragments (le sceau
+  du secteur 4 tombe), le **dénouement** après N fins (l'alcôve du
+  secteur 4 joue la cinématique ; avant, elle dit combien de fins
+  manquent). Le concepteur tient tout cela dans l'atelier **RÉCIT & FINS**
+  (accueil, mode concepteur, ou depuis le rayon du journal au codex) :
+  ordre par glisser ou ▲ ▼, titre, icône, texte, ajout, retrait, seuils ;
+  un brouillon par poste, PUBLIER pour tous (`/api/journal`, Vercel Blob),
+  ESSAYER SUR CE POSTE pour jouer un brouillon sans publier, RETIRER LE
+  PUBLIÉ pour revenir au livré. Le journal livré avec le code est le
+  filet : il joue tant que rien n'est publié, et hors-ligne. Un identifiant
+  ne se réattribue jamais (les registres des joueurs s'en souviennent) ;
+  `fin-jouee` est réservé. Les fins alternatives prévues (« evil »,
+  « semi-evil »…) s'écrivent donc dans l'atelier, sans toucher au code. La
+  mémoire, la rareté et la vidéo de chaque entrée se règlent dans le codex.
+  Le scénario dispose de deux conditions, `revelation` et `denouement`, qui
+  lisent ces seuils : aucun N à tenir en double dans une règle.

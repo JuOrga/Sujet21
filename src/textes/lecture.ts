@@ -71,8 +71,13 @@ export function texteDe(cle: string, defaut: string): string {
   return surcharges(LANGUE_SOURCE)[cle] ?? defaut
 }
 
-/** Une fiche du codex telle que le joueur la lit. */
+/** Une fiche du codex telle que le joueur la lit. Le RÉCIT et les FINS
+ *  s'écrivent dans l'atelier du journal, pas dans celui des textes : une
+ *  retouche d'avant (quand ils étaient au catalogue) ne doit pas passer
+ *  par-dessus ce que le concepteur y a écrit — elle serait invisible et
+ *  impossible à retirer. */
 export function codexLu(d: CodexDef): { titre: string; texte: string } {
+  if (d.groupe === 'recit' || d.groupe === 'fins') return { titre: d.titre.trim(), texte: d.texte.trim() }
   return {
     titre: texteDe(cleTexte('codex', d.id, 'titre'), d.titre.trim()),
     texte: texteDe(cleTexte('codex', d.id, 'texte'), d.texte.trim()),

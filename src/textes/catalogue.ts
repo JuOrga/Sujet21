@@ -20,7 +20,7 @@
 // montage, cartes de l'atelier) : ces textes vivent hors du dépôt, ils
 // resteront dans la langue de leur auteur.
 
-import { CODEX } from '../game/codex'
+import { CODEX_EXPERIENCES } from '../game/codex'
 import { TABLEAUX, type LevelDef } from '../game/level'
 import { ARTICLES_COMPTOIR, TABLEAU_HUB, TABLEAU_HUB_COMPACT } from '../game/hub'
 import { ETAL_ECONOMAT, TABLEAU_ECONOMAT } from '../game/economat'
@@ -174,8 +174,11 @@ function textesDuTableau(
 export function catalogueTextes(): EntreeTexte[] {
   const out: EntreeTexte[] = []
 
-  // ——— LE CODEX : le plus gros gisement, et il porte l'arc du récit ———
-  for (const f of CODEX) {
+  // ——— LE CODEX : le plus gros gisement. Les fiches d'EXPÉRIENCE seulement :
+  // le récit et les fins vivent en données (journal.ts) et s'écrivent dans
+  // l'atelier du journal — comme les tableaux de la bibliothèque, ils
+  // restent dans la langue de leur auteur ———
+  for (const f of CODEX_EXPERIENCES) {
     const ou = `Écran CODEX — groupe ${f.groupe}`
     pousse(out, {
       cle: cleTexte('codex', f.id, 'titre'),
