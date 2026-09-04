@@ -31,6 +31,19 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '04/09/2026 10:16',
+    title: 'LE CODEX REFAIT : le rail des états, les fiches en hexagones, la fiche lue — et la vidéo de l’effet',
+    notes: [
+      'LA DEMANDE : la maquette « Codex v2 » du concepteur, avec une consigne de plus — pour chaque fiche, quand on clique dessus, le panneau de droite montre une VIDÉO de l’effet. L’ancien voile alignait des cartes par groupe, texte compris ; il n’y avait rien à lire, rien à viser, rien à regarder.',
+      'L’ÉCRAN (game/ecranCodex.ts) suit la maquette : en tête la progression du mode (n / total, la barre, ses quarts) et l’objectif suivi ; à gauche le rail des ÉTATS — LIQUIDE, SOLIDE, GAZ, PHÉNOMÈNES, et SCELLÉ, le quatrième état sous clé, annoncé sans mentir (zéro fiche) — chacun avec son anneau de complétion et sa teinte ; au centre la grille des fiches du rayon, hexagone-glyphe et titre, les verrouillées en « ? » et tirets ; à droite la fiche lue. Deux modes : FICHES, et JOURNAL — le récit en frise, un point par fragment, révélés ou sous clé.',
+      'LA VIDÉO : une par fiche, nommée par l’id, dans public/assets/codex/ (LISEZ-MOI : webm muet en boucle, 3 à 6 s, ≤ 1 Mo, poster webp facultatif). Le panneau la joue en tête pour une fiche connue ; ABSENTE, rien ne casse — le glyphe reste, avec « aperçu à venir » ; une fiche verrouillée ne montre jamais la sienne. Aucun manifeste à tenir : déposer le fichier suffit. Les vidéos elles-mêmes restent à produire.',
+      'PAS D’INVENTION. La maquette montrait des récompenses par palier, des raretés en pourcentage de sujets, des fins — rien de cela n’existe dans le jeu, et rien n’est affiché de faux. On montre ce que le jeu sait : la date de découverte (Codex.quand), le rayon, et l’INDICE d’une fiche verrouillée, déduit de sa combinaison matériau × état (« Toucher un rideau lamellaire à l’état glace ») — sans jamais dire le titre, qui donnerait la réponse. Les phénomènes et le récit ont leur indice générique. Les récompenses par palier sont une décision de conception à prendre, pas un chiffre à peindre.',
+      'L’OBJECTIF SUIVI : une fiche verrouillée se MARQUE ; son indice reste en tête du codex jusqu’à la découverte, survit au rechargement (projet21.codex.cibles.v1), et un clic sur le cartouche rouvre la fiche. Les flèches naviguent dans le rayon, Échap ferme, le toast d’une découverte ouvre le codex sur la fiche neuve qui s’illumine, et un pupitre « codex » posé dans un tableau ouvre le même écran.',
+      'TOUT CE QUI SE CALCULE VIT DANS codexVue.ts, testé (sept tests) : les rayons couvrent tout le codex sans doublon ni oubli, le filtre, la progression par mode, la voisine en boucle, l’indice qui ne trahit pas le titre, la date lisible ou muette, les objectifs qui survivent à un stockage muet. L’écran ne connaît ni les registres ni le Codex : il reçoit ce qu’il lit par des crochets (connu, quand, lu, fermer), comme l’éditeur reçoit ses biomes.',
+      'VÉRIFIÉ : 888 tests verts dans 78 fichiers, type-check à 0, build propre ; et au navigateur (Chromium, page d’essai n’important que l’écran) : progression 6 / 33, rail des cinq rayons, neuf cartes dont quatre verrouillées, fiche lue avec « aperçu à venir », indice d’une fiche verrouillée et objectif marqué puis affiché en tête, flèches, filtre DÉCOUVERTES, journal en dix fragments, ouverture sur une fiche depuis le toast, Échap — zéro erreur console.',
+    ],
+  },
+  {
     date: '03/09/2026 23:53',
     title: 'LES POIGNÉES DE CÔTÉ D’UNE PAROI INCLINÉE : on allonge un mur penché sans toucher à son épaisseur',
     notes: [
