@@ -1,14 +1,21 @@
-// L'ARC DES DÉCOUVERTES — le récit se livre UN JALON PAR RETOUR de run
-// (bouclée, dispersée ou abandonnée : le sujet apprend de tout). La file
-// est ORDONNÉE : chaque retour au module sert la prochaine non-vue, les
-// registres (records.decouvertes) tiennent le compte. Le CONTENU des
-// jalons vit au codex (groupe « recit », fiches `recit-<id>`) : le toast,
-// la date et la lecture passent par le mécanisme des fiches — ici, on ne
-// garde que l'ordre du récit.
+// L'ARC DES DÉCOUVERTES — le récit se livre UN JALON PAR EXPÉDITION
+// BOUCLÉE (décision du concepteur : une run perdue ou abandonnée ne
+// raconte rien ; boucler la descente, si). La file est ORDONNÉE : chaque
+// expédition bouclée sert la prochaine non-vue, les registres
+// (records.decouvertes) tiennent le compte. Le CONTENU des jalons vit au
+// codex (groupe « recit », fiches `recit-<id>`) : le toast, la date et la
+// lecture passent par le mécanisme des fiches — ici, on ne garde que
+// l'ordre du récit.
 //
 // Quand TOUT est raconté, la fin s'ouvre : le sceau du secteur 4 tombe
 // (l'arc du télescope — voir la condition « decouvertes-min » du
 // scénario).
+//
+// LES FINS suivent la même règle, dans leur propre file : chaque
+// expédition bouclée révèle aussi la prochaine fin non-vue (fiches du
+// groupe « fins », ids `fin-<nom>`), jusqu'à ce que toutes soient
+// débloquées. Les fins alternatives que le concepteur prévoit (« evil »,
+// « semi-evil »…) s'ajoutent en QUEUE de FINS, avec leur fiche au codex.
 
 /** Les jalons, dans l'ordre où le récit se livre. Le dernier ouvre la
  * fin. Ne JAMAIS réordonner ni réattribuer un id : les registres des
@@ -36,4 +43,16 @@ export function prochaineDecouverte(
 /** Tout est-il raconté ? (la condition d'ouverture de la fin) */
 export function recitAcheve(vues: readonly string[]): boolean {
   return DECOUVERTES.every((id) => vues.includes(id))
+}
+
+/** Les fins, dans l'ordre où elles se révèlent — les ids sont ceux des
+ * fiches du codex. Ne JAMAIS réordonner ni réattribuer un id, et jamais
+ * `fin-jouee` : c'est le marqueur de la cinématique de fin vue. */
+export const FINS: readonly string[] = [
+  'fin-miroir', // la fin de l'arc : devenir l'œil du télescope, ou rester
+]
+
+/** La prochaine fin à révéler — null : toutes le sont. */
+export function prochaineFin(vues: readonly string[]): string | null {
+  return FINS.find((id) => !vues.includes(id)) ?? null
 }

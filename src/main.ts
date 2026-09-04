@@ -6,7 +6,14 @@ import { FluidSim, KIND_PLAYER, COEUR_PART } from './sim/solver'
 import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
 import { evenementsPlasma } from './game/plasmaFx'
-import { CODEX, Codex, type CodexGroupe } from './game/codex'
+import { Codex } from './game/codex'
+import {
+  deleteReglageCodex,
+  fetchReglagesCodex,
+  pushReglageCodex,
+  reglageDe,
+  type ReglagesCodex,
+} from './game/codexReglages'
 import { niveauExpanse } from './game/structures'
 import {
   TABLEAU_HUB,
@@ -24,6 +31,7 @@ import {
   DECOUVERTES,
   prochaineDecouverte,
   recitAcheve,
+  prochaineFin,
 } from './game/decouvertes'
 import {
   MECANIQUE_NOMS,
@@ -195,6 +203,7 @@ import {
 } from './game/level'
 import { LevelEditor } from './editor/editor'
 import { EditeurCarte } from './editor/editeurCarte'
+import { EcranCodex } from './game/ecranCodex'
 import {
   traceLaser,
   creerEtatRecepteurs,
@@ -2030,9 +2039,22 @@ trophees.onDebloque = (t) => {
 // Le CODEX partage la fanfare des trophées : même toast, autre étiquette —
 // et sa page (fiche d'essai, bouton CODEX) se remplit au fil des découvertes
 const codex = new Codex()
+// LES RÉGLAGES DU CODEX (mémoire à la découverte, rareté, vidéo envoyée) :
+// le magasin partagé les donne, le code porte les défauts — hors-ligne,
+// chaque fiche vaut dix de mémoire et sa vidéo est celle du dossier
+let reglagesCodex: ReglagesCodex = {}
+void fetchReglagesCodex().then((r) => {
+  if (!r) return
+  reglagesCodex = r
+  renderCodexVoile()
+})
 codex.onDecouverte = (d) => {
+  // chaque fiche grave sa mémoire — le montant est réglé par le concepteur,
+  // fiche par fiche ; une seule fois, Codex.marque le garantit
+  const gain = reglageDe(reglagesCodex, d.id).memoire
+  gagneMemoireRun(gain)
   toastFile.push({
-    nom: codexLu(d).titre,
+    nom: gain > 0 ? `${codexLu(d).titre} · +${gain} mémoire` : codexLu(d).titre,
     icone: d.icone,
     sur: 'CODEX — NOUVELLE FICHE',
     fiche: d.id,
@@ -2658,8 +2680,7 @@ function ouvrePupitre(ecran: EcranPupitre): void {
       renderCycleVoile()
       break
     case 'codex':
-      codexEl.hidden = false
-      renderCodexVoile()
+      ecranCodex.open()
       break
     case 'fioles':
       fiolesEl.hidden = false
@@ -2705,50 +2726,39 @@ function pupitreOuvert(ecran: EcranPupitre): boolean {
 // hydrophile en liquide, écarter un rideau en glace…). Verrouillée, une
 // fiche n'affiche qu'un « ? » : la question donne envie d'aller essayer.
 const codexEl = document.getElementById('codex') as HTMLDivElement
-const codexCorps = document.getElementById('codex-corps') as HTMLDivElement
-const codexCompte = document.getElementById('codex-compte') as HTMLSpanElement
+// L'ÉCRAN DU CODEX (game/ecranCodex.ts) : la maquette « Codex v2 » — il ne
+// connaît pas les registres, il reçoit ce qu'il lit par ces crochets
+const ecranCodex = new EcranCodex(codexEl, {
+  connu: (id) => codex.connu(id),
+  quand: (id) => codex.quand(id),
+  lu: (d) => codexLu(d),
+  fermer: () => fermeCodex(),
+  reglage: (id) => reglageDe(reglagesCodex, id),
+  // le mode concepteur se lit sur le body (data-dev) : c'est lui qui montre
+  // ou cache les outils, l'atelier suit la même règle
+  concepteur: () => document.body.classList.contains('concepteur'),
+  sauve: async (id, r, video) => {
+    const res = await pushReglageCodex(id, r, records.operator() || 'anonyme', video)
+    if (res) reglagesCodex = res
+    return res !== null
+  },
+  retablit: async (id) => {
+    const res = await deleteReglageCodex(id)
+    if (res) reglagesCodex = res
+    return res !== null
+  },
+})
 function renderCodexVoile(): void {
-  if (!codexCorps) return
-  const groupes: { cle: CodexGroupe; nom: string; icone: string }[] = [
-    { cle: 'eau', nom: 'LIQUIDE', icone: '💧' },
-    { cle: 'glace', nom: 'GLACE', icone: '❄' },
-    { cle: 'vapeur', nom: 'VAPEUR', icone: '💨' },
-    { cle: 'phenomenes', nom: 'PHÉNOMÈNES', icone: '✦' },
-    { cle: 'recit', nom: 'LE RÉCIT', icone: '🛰️' },
-  ]
-  let html = ''
-  for (const g of groupes) {
-    const fiches = CODEX.filter((d) => d.groupe === g.cle)
-    const connues = fiches.filter((d) => codex.connu(d.id)).length
-    html += `<div class="cdx-groupe"><span>${g.icone} ${g.nom}</span><i>${connues}/${fiches.length}</i></div>`
-    html += '<div class="cdx-grille">'
-    for (const d of fiches) {
-      if (codex.connu(d.id)) {
-        // le titre et le corps viennent du CATALOGUE : ce que le
-        // concepteur a réécrit sur l'écran TEXTES paraît ici, dans la
-        // langue du moment — et se voit donc échapper, comme tout texte
-        // qui n'est plus une constante du code
-        const lu = codexLu(d)
-        html += `<div class="cdx-carte" data-fiche="${d.id}"><i>${d.icone}</i><div><b>${htmlSafe(lu.titre)}</b><span>${htmlSafe(lu.texte)}</span></div></div>`
-      } else {
-        html += `<div class="cdx-carte cdx-verrou"><i>?</i><div><b>FICHE À DÉCOUVRIR</b><span>Une interaction du protocole reste à vivre…</span></div></div>`
-      }
-    }
-    html += '</div>'
-  }
-  codexCorps.innerHTML = html
-  if (codexCompte)
-    codexCompte.textContent = `${codex.compte()}/${CODEX.length} fiches consignées`
+  ecranCodex.render()
 }
 document.getElementById('home-codex')?.addEventListener('click', () => {
-  codexEl.hidden = false
-  renderCodexVoile()
+  ecranCodex.open()
 })
 // Ouvert DEPUIS LE TOAST en pleine partie, le codex fige l'essai (lecture au
 // calme) et le rend en se fermant — ouvert depuis la fiche, rien à figer.
 let codexAPause = false
 function fermeCodex(): void {
-  codexEl.hidden = true
+  ecranCodex.close()
   if (codexAPause) {
     codexAPause = false
     input.paused = false
@@ -2761,19 +2771,8 @@ function ouvreCodexSur(fiche: string): void {
     input.paused = true
     codexAPause = true
   }
-  codexEl.hidden = false
-  renderCodexVoile()
-  const carte = codexCorps.querySelector<HTMLElement>(`[data-fiche="${fiche}"]`)
-  if (carte) {
-    carte.scrollIntoView({ block: 'center' })
-    carte.classList.add('cdx-neuve')
-    window.setTimeout(() => carte.classList.remove('cdx-neuve'), 3200)
-  }
+  ecranCodex.open(fiche)
 }
-document.getElementById('codex-fermer')?.addEventListener('click', fermeCodex)
-codexEl.addEventListener('pointerdown', (e) => {
-  if (e.target === codexEl) fermeCodex()
-})
 
 document.getElementById('salles-fermer')?.addEventListener('click', () => {
   sallesEl.hidden = true
@@ -11565,16 +11564,8 @@ function newExpedition(avecCarte = false): void {
 // Fin de run (dernier échantillon dispersé, ou expédition conclue) : le
 // laboratoire rappelle — on se réveille AU HUB, prêt à relancer par le sas.
 function retourAuLabo(): void {
-  // ---- L'ARC DES DÉCOUVERTES : chaque retour de run (bouclée, dispersée
-  // ou abandonnée) livre le prochain jalon du récit — la fiche se
-  // consigne au codex (groupe RÉCIT), le toast est celui des fiches.
-  // (jamais depuis un ESSAI d'éditeur ni avant l'acte 0 : le récit ne se
-  // livre qu'aux vraies descentes)
-  const jalon = prochaineDecouverte(records.decouvertesVues())
-  if (jalon && eveilJoue() && !testLevel) {
-    records.noteDecouverte(jalon)
-    codex.marque(`recit-${jalon}`)
-  }
+  // (le récit et les fins ne se livrent plus ici : une run perdue ou
+  // abandonnée ne raconte rien — c'est l'expédition BOUCLÉE qui les sert)
   // LE DISTILLATEUR (réparé) : la prime du retour — le delta garanti
   if (records.estRepare('distillateur') && !testLevel) {
     gagneMemoireRun(2)
@@ -13961,6 +13952,24 @@ function frame(now: number): void {
       run.ended = true
       if (!sasOutil) trophees.debloque('integrale')
       gagneMemoireRun(10) // l'expédition bouclée grave son souvenir
+      // L'ARC DES DÉCOUVERTES ET LES FINS : une expédition BOUCLÉE livre
+      // le prochain fragment du récit, puis la prochaine fin — chacun dans
+      // sa file, dans l'ordre. La fiche se consigne au codex (groupes
+      // RÉCIT et FINS), le toast est celui des fiches. Jamais depuis
+      // l'outil, un ESSAI d'éditeur, ni avant l'acte 0 : le récit ne se
+      // livre qu'aux vraies descentes.
+      if (!sasOutil && eveilJoue() && !testLevel) {
+        const jalon = prochaineDecouverte(records.decouvertesVues())
+        if (jalon) {
+          records.noteDecouverte(jalon)
+          codex.marque(`recit-${jalon}`)
+        }
+        const fin = prochaineFin(records.decouvertesVues())
+        if (fin) {
+          records.noteDecouverte(fin)
+          codex.marque(fin)
+        }
+      }
       const sallesFranchies = voieRang
       // une expédition CONCLUE PAR L'OUTIL ne s'inscrit nulle part : ni
       // record d'expédition, ni tableau partagé

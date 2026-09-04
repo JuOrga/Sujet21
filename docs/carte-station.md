@@ -201,9 +201,9 @@ Dans l'ordre, une PR vers `dev` par étape :
 4. ~~**Le champ biome dans la planche et l'éditeur de tableaux**~~ Fait —
    voir ci-dessous. L'étiquetage lui-même est un choix de conception par
    salle : il se fait dans la planche, les compteurs disent où il manque.
-5. **Retirer** `src/game/station.ts`, `planStation.ts` et
-   `station.spec.ts` : plus importés, leur suppression a été refusée à
-   l'outil.
+5. ~~**Retirer** `src/game/station.ts`, `planStation.ts` et
+   `station.spec.ts`~~ Fait — retirés avec le codex refait, sur accord du
+   concepteur.
 
 ## Étiqueter les tableaux par biome
 

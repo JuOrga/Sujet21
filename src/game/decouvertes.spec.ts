@@ -4,6 +4,8 @@ import {
   DECOUVERTES,
   prochaineDecouverte,
   recitAcheve,
+  FINS,
+  prochaineFin,
 } from './decouvertes'
 
 describe('l’arc des découvertes — un jalon par retour', () => {
@@ -38,5 +40,22 @@ describe('l’arc des découvertes — un jalon par retour', () => {
     expect(recitAcheve(DECOUVERTES.slice(0, 9))).toBe(false)
     expect(recitAcheve([...DECOUVERTES])).toBe(true)
     expect(recitAcheve([...DECOUVERTES, 'bonus'])).toBe(true)
+  })
+
+  it('chaque fin a sa fiche au codex (groupe fins), et réciproquement — jamais le marqueur fin-jouee', () => {
+    const fiches = CODEX.filter((d) => d.groupe === 'fins')
+    expect(fiches.map((d) => d.id).sort()).toEqual([...FINS].sort())
+    expect(FINS.every((id) => id.startsWith('fin-'))).toBe(true)
+    expect(FINS.includes('fin-jouee')).toBe(false)
+    expect(new Set(FINS).size).toBe(FINS.length)
+  })
+
+  it('les fins se révèlent dans l’ordre, une par expédition bouclée, puis plus rien', () => {
+    const vues: string[] = ['livraison', 'fin-jouee'] // le récit et le marqueur n’y changent rien
+    for (const id of FINS) {
+      expect(prochaineFin(vues)).toBe(id)
+      vues.push(id)
+    }
+    expect(prochaineFin(vues)).toBeNull()
   })
 })
