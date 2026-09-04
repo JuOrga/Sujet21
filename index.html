@@ -181,39 +181,6 @@
         outline-offset: 2px;
       }
 
-      /* ---- Accueil : la fiche d'expérience, en dossier LARGE sur l'essai
-         vivant — elle occupe une bonne partie de l'écran, en deux colonnes :
-         le protocole (titre, consigne, boutons) et le dossier (figure,
-         registres, commandes). Sur écran étroit, les colonnes s'empilent. ---- */
-      #home {
-        position: fixed;
-        inset: 0 auto 0 0;
-        width: min(1060px, 100vw);
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        gap: 22px;
-        padding: 28px clamp(20px, 4vw, 56px);
-        box-sizing: border-box;
-        background: linear-gradient(100deg, rgba(6, 13, 23, 0.96) 72%, rgba(6, 13, 23, 0.62));
-        border-right: 1px solid var(--line);
-        backdrop-filter: blur(6px);
-        overflow-y: auto;
-        z-index: 20;
-        transition: opacity 0.45s ease, transform 0.45s ease;
-      }
-      .home-cols {
-        display: flex;
-        gap: clamp(26px, 4vw, 52px);
-        align-items: flex-start;
-      }
-      .home-col {
-        flex: 1 1 0;
-        min-width: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 22px;
-      }
       /* Le bouton visé à la manette : un liseré net, visible de loin */
       /* Le liseré du focus MANETTE — partout où la croix navigue : la
          fiche, mais aussi tous les panneaux et sous-menus. */
@@ -224,94 +191,6 @@
         outline: 2px solid #63b7e6 !important;
         outline-offset: 2px;
         box-shadow: 0 0 14px rgba(99, 183, 230, 0.45);
-      }
-
-      /* ---- Boutons jumeaux de la fiche : commandes + records + plein écran ---- */
-      /* La rangée d'outils : une CONSOLE — chips uniformes, grille qui
-         s'adapte seule (1 rangée sur grand écran, 2-3 colonnes sur téléphone),
-         cibles tactiles généreuses. Le glyphe est tinté échantillon : la
-         rangée appartient au labo, pas au navigateur. */
-      .home-duo {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
-        gap: 8px;
-        margin-top: 14px;
-      }
-      #home .home-duo button {
-        appearance: none;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 5px;
-        min-height: 54px;
-        padding: 8px 4px;
-        background: linear-gradient(180deg, rgba(18, 32, 50, 0.72), rgba(8, 16, 28, 0.88));
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        color: var(--ink);
-        font-family: var(--font-display);
-        font-size: calc(9px * var(--ui));
-        letter-spacing: 0.13em;
-        line-height: 1.15;
-        cursor: pointer;
-        transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.08s ease;
-      }
-      #home .home-duo button i {
-        font-style: normal;
-        font-size: calc(17px * var(--ui));
-        line-height: 1;
-        color: var(--specimen);
-        text-shadow: 0 0 10px rgba(46, 198, 201, 0.35);
-      }
-      #home .home-duo button span { text-align: center; }
-      #home .home-duo button:hover {
-        border-color: var(--specimen);
-        box-shadow: 0 0 14px rgba(46, 198, 201, 0.16), inset 0 0 18px rgba(46, 198, 201, 0.05);
-      }
-      #home .home-duo button:active { transform: translateY(1px); }
-      #home .home-duo button:focus-visible {
-        outline: 2px solid var(--specimen);
-        outline-offset: 2px;
-      }
-      /* LA VOIE SEMI-PROCÉDURALE : le seul bouton de la rangée à porter un
-         liséré vert-menthe — la couleur des salles GÉNÉRÉES, celle de son
-         étiquette dans la cérémonie. Il respire lentement pour attirer
-         l'œil sans clignoter (le mouvement se coupe si la machine demande
-         qu'on l'épargne). */
-      #home .home-duo button#home-voie {
-        border-color: var(--valid);
-        box-shadow: 0 0 0 1px rgba(63, 214, 155, 0.22),
-          0 0 12px rgba(63, 214, 155, 0.16);
-        animation: voie-liseret 3s ease-in-out infinite;
-      }
-      #home .home-duo button#home-voie i { color: #6dffb8; }
-      #home .home-duo button#home-voie:hover {
-        border-color: #8affd0;
-        box-shadow: 0 0 0 1px rgba(109, 255, 184, 0.55),
-          0 0 22px rgba(63, 214, 155, 0.34);
-      }
-      @keyframes voie-liseret {
-        0%, 100% {
-          box-shadow: 0 0 0 1px rgba(63, 214, 155, 0.2),
-            0 0 10px rgba(63, 214, 155, 0.12);
-        }
-        50% {
-          box-shadow: 0 0 0 1px rgba(63, 214, 155, 0.5),
-            0 0 20px rgba(63, 214, 155, 0.3);
-        }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        #home .home-duo button#home-voie { animation: none; }
-      }
-      @media (pointer: coarse) {
-        #home .home-duo { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
-        #home #home .home-duo button { min-height: 62px; font-size: calc(9.5px * var(--ui)); }
-        #home #home .home-duo button i { font-size: calc(20px * var(--ui)); }
-      }
-      /* le bouton RECORDS n'existe que là où les registres sont cachés */
-      #home-recs {
-        display: none;
       }
 
       /* ---- Le voile RECORDS (mobile) : les registres, à la demande ---- */
@@ -4163,195 +4042,370 @@
         box-shadow: 0 0 12px rgba(255, 122, 106, 0.4);
       }
 
-      /* La fiche défile si elle déborde, mais sans ascenseur visible :
-         sur Steam Deck la barre s'affichait pour trois pixels de trop. */
+      /* ==================== L'ACCUEIL ==================================
+         QUATRE BANDES EMPILÉES : le bandeau (qui plonge, où en est
+         l'échantillon), la scène (le titre — la seule bande élastique), la
+         rampe (le sas, les tuiles, les réglages) et le pied (les touches).
+         Seule la scène se serre quand l'écran est bas : les tuiles gardent
+         leur taille et leur place, on vise toujours au même endroit.
+         L'ancienne fiche à deux colonnes alignait onze boutons de même
+         poids : la hiérarchie est maintenant dans la SURFACE. */
       #home {
-        scrollbar-width: none;
-      }
-      #home::-webkit-scrollbar {
-        display: none;
-      }
-      @media (max-width: 1080px) {
-        #home {
-          width: min(520px, 100vw);
-        }
-        .home-cols {
-          flex-direction: column;
-          align-items: stretch;
-        }
+        position: fixed;
+        inset: 0;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto auto;
+        box-sizing: border-box;
+        overflow: hidden;
+        z-index: 20;
+        /* TRANSLUCIDE À DESSEIN : l'échantillon dérive derrière, et le relevé
+           du bandeau le lit en direct — un fond opaque ferait mentir l'écran. */
+        background: radial-gradient(
+          ellipse 80% 55% at 50% 28%,
+          rgba(11, 26, 44, 0.82),
+          rgba(3, 7, 16, 0.95) 72%
+        );
+        backdrop-filter: blur(7px);
+        transition: opacity 0.45s ease, transform 0.45s ease;
       }
       body.playing #home {
         opacity: 0;
-        transform: translateX(-24px);
+        transform: scale(1.015);
         pointer-events: none;
       }
-      .home-eyebrow {
+      /* L'accueil ne quitte pas la page pendant la partie : il ne fait que
+         s'effacer. Sans cette ligne, ses étoiles, son sas qui respire et son
+         titre à trois états continueraient de tourner DERRIÈRE la
+         simulation — du calcul pour personne. */
+      body.playing #home,
+      body.playing #home * {
+        animation-play-state: paused !important;
+      }
+
+      /* ---- Le décor : trois couches qui ne captent aucun geste ---- */
+      .ac-etoiles {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background-image: radial-gradient(1px 1px at 20% 30%, rgba(255, 255, 255, 0.35), transparent),
+          radial-gradient(1px 1px at 70% 60%, rgba(255, 255, 255, 0.25), transparent),
+          radial-gradient(1.5px 1.5px at 40% 80%, rgba(167, 221, 245, 0.35), transparent),
+          radial-gradient(1px 1px at 85% 20%, rgba(255, 255, 255, 0.3), transparent),
+          radial-gradient(1px 1px at 55% 45%, rgba(255, 255, 255, 0.2), transparent);
+        background-size: 700px 700px;
+        animation: ac-derive 110s linear infinite;
+      }
+      @keyframes ac-derive {
+        from { background-position: 0 0; }
+        to { background-position: 0 -700px; }
+      }
+      .ac-fond {
+        position: absolute;
+        left: 50%;
+        top: 40%;
+        transform: translate(-50%, -50%);
+        width: min(124vw, 1400px);
+        height: min(58vw, 680px);
+        background: url('/assets/home.webp') center / contain no-repeat;
+        opacity: 0.28;
+        pointer-events: none;
+        /* le masque évite le rectangle net de l'image : elle se fond au noir */
+        mask-image: radial-gradient(ellipse 58% 58% at 50% 50%, #000 32%, transparent 100%);
+        -webkit-mask-image: radial-gradient(ellipse 58% 58% at 50% 50%, #000 32%, transparent 100%);
+      }
+      .ac-degrade {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(
+          180deg,
+          rgba(3, 7, 16, 0.5),
+          rgba(3, 7, 16, 0.08) 32%,
+          rgba(3, 7, 16, 0.32) 58%,
+          rgba(3, 7, 16, 0.88) 88%
+        );
+      }
+
+      /* ---- LE BANDEAU : l'opérateur à gauche, le relevé à droite ---- */
+      .ac-bandeau {
+        position: relative;
+        min-width: 0;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 14px;
-        font-size: calc(11px * var(--ui));
-        letter-spacing: 0.22em;
-        color: var(--dim);
+        gap: 16px;
+        flex-wrap: wrap;
+        padding: calc(11px + env(safe-area-inset-top)) clamp(16px, 3vw, 34px) 11px;
         border-bottom: 1px solid var(--line);
-        padding-bottom: 14px;
+      }
+      .ac-operateur {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
       }
       /* Écusson de mission : l'image est carrée à fond plein, le cercle CSS la détoure */
-      .home-badge {
-        width: 58px;
-        height: 58px;
+      .ac-ecusson {
+        width: 42px;
+        height: 42px;
         flex: none;
         border-radius: 50%;
         border: 1px solid var(--line-strong);
         box-shadow: 0 0 14px rgba(99, 183, 230, 0.18);
       }
-      .home-figure {
+      .ac-ident {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+      }
+      .ac-ident-titre {
+        font-family: var(--font-display);
+        font-size: calc(8px * var(--ui));
+        letter-spacing: 0.2em;
+        color: var(--dim);
+      }
+      /* la version reprend sa place dans la colonne : sa marge de fiche
+         (négative, pour se coller au titre) n'a plus lieu d'être ici */
+      .ac-ident #version-jeu {
         margin: 0;
+        cursor: pointer;
+      }
+      /* Le nom estampillé sur les records, façon borne d'arcade — et
+         obligatoire : le protocole n'admet pas d'opérateur anonyme. Il vit
+         désormais DANS le bandeau : il ne voyage plus avec le palmarès, et
+         on ne peut plus le chercher. */
+      #rec-name {
+        width: 17ch;
+        max-width: 100%;
+        background: rgba(3, 7, 16, 0.6);
         border: 1px solid var(--line);
-        background: #04080f;
+        border-radius: 4px;
+        color: var(--valid);
+        font-family: var(--font-mono);
+        font-size: calc(11px * var(--ui));
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 3px 7px;
       }
-      .home-figure img {
-        display: block;
-        width: 100%;
-        height: clamp(170px, 24vh, 240px);
-        object-fit: cover;
-        object-position: center 30%;
+      #rec-name::placeholder {
+        color: var(--dim);
+        opacity: 0.7;
       }
-      .home-figure figcaption {
-        font-size: calc(9.5px * var(--ui));
+      #rec-name:focus-visible {
+        outline: 1px solid var(--valid);
+        outline-offset: 1px;
+      }
+      #rec-name.need {
+        border-color: var(--alert);
+        animation: nameShake 0.35s ease;
+      }
+      @keyframes nameShake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-4px); }
+        50% { transform: translateX(4px); }
+        75% { transform: translateX(-2px); }
+      }
+      #rec-need {
+        flex: 1 1 100%;
+        order: 3;
+        color: var(--alert);
+        font-size: calc(11px * var(--ui));
+        letter-spacing: 0.06em;
+      }
+      #rec-need[hidden] {
+        display: none;
+      }
+      /* Relevé vivant : l'accueil lit l'échantillon qui dérive derrière */
+      .ac-releve {
+        display: flex;
+        min-width: 0;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 7px;
+        margin: 0;
+      }
+      .ac-releve div {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        padding: 5px 11px;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: rgba(3, 7, 16, 0.5);
+      }
+      .ac-releve dt {
+        font-size: calc(8.5px * var(--ui));
         letter-spacing: 0.16em;
         color: var(--dim);
-        padding: 7px 10px;
-        border-top: 1px solid var(--line);
+        margin: 0;
       }
-      .home-title {
+      .ac-releve dd {
         font-family: var(--font-display);
-        font-size: clamp(26px, 5.2vw, 52px);
-        line-height: 1.24;
-        letter-spacing: 0.08em;
-        margin: 0;
-        color: var(--ink);
-      }
-      .home-title em {
-        font-style: normal;
+        font-size: calc(10px * var(--ui));
         color: var(--specimen);
-      }
-      .home-pitch {
-        font-size: calc(13px * var(--ui));
-        line-height: 1.7;
-        color: var(--dim);
         margin: 0;
-        max-width: 34ch;
       }
-      .home-pitch strong {
+
+      /* ---- LA SCÈNE : le titre et sa consigne ---- */
+      .ac-scene {
+        position: relative;
+        min-height: 0;
+        /* `safe center` et non `center` : quand la scène est plus courte que
+           son contenu, un centrage ordinaire déborde des DEUX côtés et le
+           titre se fait rogner par le haut, hors d'atteinte. Là, il repart du
+           haut et le reste se défile (sans ascenseur : trois pixels de trop
+           faisaient apparaître la barre système sur Steam Deck). */
+        overflow-y: auto;
+        scrollbar-width: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: safe center;
+        gap: 10px;
+        padding: 10px clamp(16px, 3vw, 34px);
+        text-align: center;
+      }
+      .ac-scene::-webkit-scrollbar {
+        display: none;
+      }
+      .ac-surtitre {
+        flex: none;
+        font-family: var(--font-display);
+        font-size: calc(8.5px * var(--ui));
+        letter-spacing: 0.3em;
+        color: var(--dim);
+      }
+      .ac-filtres {
+        position: absolute;
+        width: 0;
+        height: 0;
+      }
+      /* LE TITRE À TROIS ÉTATS : liquide → solide → gaz, en boucle de 15 s.
+         Trois calques dans la même case de grille, un seul visible à la
+         fois — c'est tout le jeu dit en trois secondes. Les turbulences des
+         filtres sont FIGÉES : une turbulence animée fait recalculer le
+         filtre à chaque image, au-dessus d'une simulation qui tourne déjà. */
+      .ac-titre {
+        flex: none;
+        position: relative;
+        display: grid;
+        margin: 2px 0 0;
+        font-family: var(--font-display);
+        font-size: clamp(32px, min(8vw, 11vh), 104px);
+        line-height: 1.14;
+        letter-spacing: 0.06em;
+      }
+      .ac-etat {
+        grid-area: 1 / 1;
+      }
+      .ac-etat em {
+        font-style: normal;
+      }
+      .ac-etat-l {
+        color: var(--specimen);
+        text-shadow: 0 0 40px rgba(99, 183, 230, 0.55), 0 0 120px rgba(99, 183, 230, 0.22);
+        filter: url(#ac-liquide);
+        animation: ac-phase-l 15s linear infinite;
+      }
+      .ac-etat-l em { color: var(--glow); }
+      .ac-etat-s {
+        opacity: 0;
+        color: #eaf6ff;
+        -webkit-text-stroke: 1px rgba(167, 221, 245, 0.7);
+        text-shadow: 0 0 2px #fff, 0 0 22px rgba(167, 221, 245, 0.75);
+        filter: url(#ac-givre);
+        animation: ac-phase-s 15s linear infinite;
+      }
+      .ac-etat-s em { color: #cfefff; }
+      .ac-etat-g {
+        opacity: 0;
+        color: #ffdda6;
+        text-shadow: 0 0 30px rgba(255, 221, 166, 0.6), 0 0 90px rgba(255, 221, 166, 0.25);
+        animation: ac-phase-g 15s linear infinite, ac-gaz 15s linear infinite;
+      }
+      .ac-etat-g em { color: #ffe9c4; }
+      @keyframes ac-phase-l {
+        0%, 30% { opacity: 1; }
+        37%, 90% { opacity: 0; }
+        100% { opacity: 1; }
+      }
+      @keyframes ac-phase-s {
+        0%, 30% { opacity: 0; }
+        37%, 62% { opacity: 1; }
+        69%, 100% { opacity: 0; }
+      }
+      @keyframes ac-phase-g {
+        0%, 62% { opacity: 0; }
+        69%, 86% { opacity: 1; }
+        94%, 100% { opacity: 0; }
+      }
+      @keyframes ac-gaz {
+        0%, 62% { letter-spacing: 0.06em; filter: blur(0); transform: translateY(0); }
+        69% { letter-spacing: 0.1em; filter: blur(1px); }
+        94%, 100% { letter-spacing: 0.3em; filter: blur(10px); transform: translateY(-24px); }
+      }
+      .ac-pitch {
+        flex: none;
+        margin: 0;
+        max-width: 56ch;
+        font-size: calc(12.5px * var(--ui));
+        line-height: 1.65;
+        color: #a9c0d2;
+        text-wrap: balance;
+      }
+      .ac-pitch strong {
         color: var(--ink);
         font-weight: 600;
       }
-
-      /* Relevé vivant : l'accueil lit l'échantillon qui dérive derrière */
-      .home-readout {
+      /* Le journal : ce que la partie a retenu de la dernière fois */
+      .ac-journal {
+        flex: none;
         display: flex;
-        gap: 26px;
-        padding: 12px 14px;
+        align-items: center;
+        gap: 9px;
+        max-width: 100%;
+        padding: 6px 13px;
         border: 1px solid var(--line);
-        border-left: 2px solid var(--specimen);
-        background: rgba(99, 183, 230, 0.05);
+        border-radius: 20px;
+        background: rgba(3, 7, 16, 0.5);
+        font-size: calc(10.5px * var(--ui));
+        letter-spacing: 0.05em;
+        color: var(--glow);
       }
-      .home-readout div {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
+      .ac-journal i {
+        width: 6px;
+        height: 6px;
+        flex: none;
+        border-radius: 50%;
+        background: var(--valid);
+        box-shadow: 0 0 8px var(--valid);
+        animation: ac-souffle 1.8s ease-in-out infinite;
       }
-      .home-readout dt {
-        font-size: calc(10px * var(--ui));
-        letter-spacing: 0.18em;
-        color: var(--dim);
-        margin: 0;
+      .ac-journal span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
-      .home-readout dd {
-        font-size: calc(17px * var(--ui));
-        color: var(--specimen);
-        margin: 0;
+      @keyframes ac-souffle {
+        0%, 100% { opacity: 0.45; }
+        50% { opacity: 1; }
       }
-
-      #start {
-        font-family: var(--font-display);
-        font-size: calc(13px * var(--ui));
-        letter-spacing: 0.14em;
-        padding: 15px 22px;
-        color: var(--void);
-        background: var(--specimen);
-        border: none;
-        cursor: pointer;
-        transition: background 0.2s ease, transform 0.15s ease;
-      }
-      #start:hover {
-        background: var(--glow);
-        transform: translateY(-1px);
-      }
-      /* Abandonner la run : le geste qui arrête tout et renvoie au labo.
-         Ton danger, en retrait — il ne rivalise pas avec REPRENDRE. */
-      #start-abandon {
-        font-family: var(--font-display);
-        font-size: calc(11px * var(--ui));
-        letter-spacing: 0.12em;
-        padding: 11px 16px;
-        color: #e8927c;
-        background: rgba(232, 146, 124, 0.07);
-        border: 1px solid rgba(232, 146, 124, 0.4);
-        border-radius: 4px;
-        cursor: pointer;
-        transition: background 0.2s ease, border-color 0.2s ease;
-      }
-      #start-abandon:hover {
-        background: rgba(232, 146, 124, 0.16);
-        border-color: #e8927c;
-      }
-      #start-abandon.arme {
-        color: #06121e;
-        background: #e8927c;
-        border-color: #e8927c;
-      }
-
-      /* L'éditeur et les autres outils vivent dans la grille de la console
-         (mêmes tuiles que SALLES/RECORDS) : des outils, pas des actions de
-         jeu — fini les boutons pointillés qui faisaient tache. */
-      /* Le son ne peut pas naître tout seul : le navigateur exige un geste.
-         Plutôt que d'attendre le clic sur COMMENCER — qui ferait entendre
-         l'accueil une demi-seconde avant de basculer en cuve — la fiche
-         propose d'ouvrir le son ici. Le bouton disparaît dès qu'il a servi,
-         ou dès qu'un autre geste a réveillé la bande-son. */
-      #home-son {
-        font-family: var(--font-display);
-        font-size: calc(13px * var(--ui));
-        letter-spacing: 0.14em;
-        padding: 13px 16px;
-        margin-bottom: -4px;
-        color: #06121e;
-        background: #63b7e6;
-        border: 1px solid #63b7e6;
-        border-radius: 5px;
-        cursor: pointer;
-        transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
-        animation: son-appel 2.2s ease-in-out infinite;
-      }
-      @keyframes son-appel {
-        0%, 100% { box-shadow: 0 0 0 rgba(99, 183, 230, 0); }
-        50% { box-shadow: 0 0 22px rgba(99, 183, 230, 0.65); }
-      }
-      #home-son:hover {
-        background: rgba(99, 183, 230, 0.14);
-        border-color: #63b7e6;
-      }
-      #home-son[hidden] {
-        display: none;
-      }
-      /* Registres du labo : l'écran record de la fiche d'expérience */
-      .home-records {
+      /* Registres du labo : le condensé du palmarès. Il n'apparaît que sur
+         les écrans qui ont la place — ailleurs, c'est la tuile RECORDS qui
+         l'ouvre en grand (le détail y est de toute façon plus complet). */
+      #home .home-records {
+        flex: none;
+        width: min(1000px, 100%);
+        max-height: min(29vh, 290px);
+        overflow: hidden;
+        text-align: left;
         border: 1px solid var(--line);
         border-left: 2px solid var(--valid);
+        border-radius: 8px;
         background: rgba(63, 214, 155, 0.04);
-        padding: 10px 14px 11px;
+        padding: 8px 14px 10px;
       }
       .rec-head {
         display: flex;
@@ -4367,44 +4421,390 @@
         color: var(--specimen);
         white-space: nowrap;
       }
-      /* Le nom estampillé sur les records, façon borne d'arcade */
-      #rec-name {
-        flex: 1 1 auto;
-        min-width: 0;
-        max-width: 130px;
-        background: rgba(3, 7, 16, 0.6);
-        border: 1px solid var(--line);
-        color: var(--valid);
-        font-family: var(--font-mono);
-        font-size: calc(10px * var(--ui));
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        padding: 2px 7px;
+
+      /* ---- LA RAMPE : le sas, les tuiles, les réglages ---- */
+      .ac-rampe {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+        padding: 0 clamp(16px, 3vw, 34px) 8px;
       }
-      #rec-name::placeholder {
-        color: var(--dim);
+      /* LE SAS tient 1,55 part contre 1 par tuile : c'est le seul bouton
+         large de l'écran, et sa largeur EST la hiérarchie. */
+      .ac-tuiles {
+        display: grid;
+        grid-template-columns: minmax(230px, 1.55fr) repeat(5, minmax(0, 1fr));
+        gap: 9px;
+      }
+      .ac-sas,
+      .ac-tuile {
+        position: relative;
+        appearance: none;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        overflow: hidden;
+        min-height: clamp(126px, 21vh, 186px);
+        border-radius: 14px;
+        cursor: pointer;
+        color: var(--ink);
+        text-align: left;
+        transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+      }
+      .ac-art {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        transition: opacity 0.18s ease;
+      }
+      /* le voile de lecture : sans lui, un libellé clair posé sur un dessin
+         clair devient illisible dès que le dessin bouge */
+      .ac-voile {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      .ac-sas {
+        gap: 7px;
+        padding: 16px 18px;
+        background: #06101a;
+        border: 1px solid rgba(63, 214, 155, 0.55);
+        box-shadow: 0 10px 34px rgba(0, 0, 0, 0.45), 0 0 26px rgba(63, 214, 155, 0.16);
+        animation: ac-battement 2.8s ease-in-out infinite;
+      }
+      @keyframes ac-battement {
+        0%, 100% { box-shadow: 0 10px 34px rgba(0, 0, 0, 0.45), 0 0 26px rgba(63, 214, 155, 0.16); }
+        50% { box-shadow: 0 10px 42px rgba(0, 0, 0, 0.5), 0 0 40px rgba(63, 214, 155, 0.4); }
+      }
+      .ac-sas .ac-art {
+        color: #6dffb8;
+        background: radial-gradient(ellipse at 70% 40%, rgba(63, 214, 155, 0.22), rgba(6, 16, 26, 0) 60%), #06101a;
+      }
+      .ac-sas .ac-goutte {
+        fill: rgba(99, 183, 230, 0.55);
+        stroke: #a7ddf5;
+        stroke-width: 1.2;
+      }
+      .ac-sas .ac-voile {
+        background: linear-gradient(180deg, rgba(6, 16, 26, 0) 38%, rgba(6, 16, 26, 0.78) 68%, rgba(6, 16, 26, 0.97));
+      }
+      .ac-touche {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        /* le mono, pas la police d'affichage : Michroma n'a ni ⏎ ni ◀ ▶,
+           et la lettre de repli sortait deux fois trop petite */
+        font-family: var(--font-mono);
+        font-size: calc(9px * var(--ui));
+        padding: 4px 8px;
+        border-radius: 12px;
+        border: 1px solid rgba(109, 255, 184, 0.5);
+        background: rgba(6, 16, 26, 0.85);
+        color: #6dffb8;
+        pointer-events: none;
+      }
+      .ac-sas-l {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        pointer-events: none;
+      }
+      .ac-sas-fleche {
+        font-size: calc(17px * var(--ui));
+        color: #6dffb8;
+        text-shadow: 0 0 16px rgba(109, 255, 184, 0.6);
+      }
+      #start-titre {
+        font-family: var(--font-display);
+        font-size: calc(13px * var(--ui));
+        letter-spacing: 0.16em;
+        color: #eaf6ff;
+        text-shadow: 0 1px 10px rgba(3, 7, 16, 0.9);
+      }
+      .ac-sas-sous {
+        position: relative;
+        font-size: calc(11px * var(--ui));
+        line-height: 1.5;
+        color: #b9f0dc;
+        text-shadow: 0 1px 8px rgba(3, 7, 16, 0.9);
+        pointer-events: none;
+      }
+      .ac-sas:hover,
+      .ac-sas:focus-visible {
+        transform: translateY(-5px);
+        border-color: #6dffb8;
+      }
+      .ac-sas:active {
+        transform: translateY(-1px);
+      }
+
+      .ac-tuile {
+        gap: 4px;
+        padding: 13px 13px 12px;
+        background: var(--panel-solid);
+        border: 1px solid var(--line);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+      }
+      .ac-tuile .ac-art {
+        color: var(--teinte);
         opacity: 0.7;
       }
-      #rec-name:focus-visible {
-        outline: 1px solid var(--valid);
-        outline-offset: 1px;
+      .ac-tuile .ac-voile {
+        background: linear-gradient(180deg, rgba(10, 20, 32, 0) 40%, rgba(10, 20, 32, 0.8) 68%, rgba(10, 20, 32, 0.97));
       }
-      /* Nom obligatoire : la plongée exige un opérateur identifié */
-      #rec-name.need {
-        border-color: var(--alert);
-        animation: nameShake 0.35s ease;
+      .ac-ico {
+        position: absolute;
+        top: 10px;
+        left: 11px;
+        width: 28px;
+        height: 28px;
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        background: rgba(6, 16, 26, 0.75);
+        border: 1px solid var(--teinte);
+        font-style: normal;
+        font-size: calc(15px * var(--ui));
+        line-height: 1;
+        color: var(--teinte);
+        pointer-events: none;
       }
-      @keyframes nameShake {
-        0%, 100% { transform: translateX(0); }
-        25% { transform: translateX(-4px); }
-        50% { transform: translateX(4px); }
-        75% { transform: translateX(-2px); }
+      .ac-label {
+        position: relative;
+        font-family: var(--font-display);
+        font-size: calc(9px * var(--ui));
+        letter-spacing: 0.1em;
+        color: #eaf6ff;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-shadow: 0 1px 10px rgba(3, 7, 16, 0.9);
+        pointer-events: none;
       }
-      #rec-need {
-        color: var(--alert);
+      .ac-sous {
+        position: relative;
+        font-size: calc(10px * var(--ui));
+        line-height: 1.4;
+        color: #a7bccd;
+        text-shadow: 0 1px 8px rgba(3, 7, 16, 0.9);
+        pointer-events: none;
+      }
+      .ac-tuile:hover,
+      .ac-tuile:focus-visible {
+        transform: translateY(-5px);
+        border-color: var(--teinte);
+        box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5), 0 0 22px -4px var(--teinte);
+      }
+      .ac-tuile:hover .ac-art {
+        opacity: 1;
+      }
+      .ac-tuile:active {
+        transform: translateY(-1px);
+      }
+      .ac-sas:focus-visible,
+      .ac-tuile:focus-visible {
+        outline: 2px solid var(--specimen);
+        outline-offset: 2px;
+      }
+
+      /* Les deux gestes qui n'existent QUE pendant une descente */
+      .ac-actions {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .ac-actions button[hidden] {
+        display: none;
+      }
+      #home-restart {
+        font-family: var(--font-display);
+        font-size: calc(10px * var(--ui));
+        letter-spacing: 0.12em;
+        padding: 9px 16px;
+        color: var(--ink);
+        background: rgba(99, 183, 230, 0.08);
+        border: 1px solid var(--line-strong);
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background 0.2s ease, border-color 0.2s ease;
+      }
+      #home-restart:hover {
+        background: rgba(99, 183, 230, 0.18);
+        border-color: var(--specimen);
+      }
+      /* Abandonner la run : le geste qui arrête tout et renvoie au labo.
+         Ton danger, en retrait — il ne rivalise pas avec le sas. */
+      #start-abandon {
+        font-family: var(--font-display);
+        font-size: calc(10px * var(--ui));
+        letter-spacing: 0.12em;
+        padding: 9px 16px;
+        color: #e8927c;
+        background: rgba(232, 146, 124, 0.07);
+        border: 1px solid rgba(232, 146, 124, 0.4);
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background 0.2s ease, border-color 0.2s ease;
+      }
+      #start-abandon:hover {
+        background: rgba(232, 146, 124, 0.16);
+        border-color: #e8927c;
+      }
+      #start-abandon.arme {
+        color: #06121e;
+        background: #e8927c;
+        border-color: #e8927c;
+      }
+
+      /* La rangée des réglages : des libellés, pas des tuiles — ce n'est pas
+         là qu'on va en arrivant. */
+      .ac-reglages {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+      .ac-reglages > button,
+      .ac-dev button {
+        appearance: none;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 7px 12px;
+        border: 1px solid transparent;
+        border-radius: 6px;
+        background: none;
+        color: var(--dim);
+        font-family: var(--font-display);
+        font-size: calc(8.5px * var(--ui));
+        letter-spacing: 0.16em;
+        line-height: 1;
+        cursor: pointer;
+        transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+      }
+      .ac-reglages > button i,
+      .ac-dev button i {
+        font-style: normal;
+        font-size: calc(12px * var(--ui));
+        line-height: 1;
+        color: var(--specimen);
+      }
+      .ac-reglages > button:hover {
+        color: var(--ink);
+        background: rgba(99, 183, 230, 0.09);
+        border-color: var(--line);
+      }
+      .ac-reglages > button:focus-visible,
+      .ac-dev button:focus-visible {
+        outline: 2px solid var(--specimen);
+        outline-offset: 2px;
+      }
+      /* L'ENCLOS DU CONCEPTEUR : le liseré pointillé ambre dit d'un coup
+         d'œil que ces portes ne sont pas celles du jeu. Le bloc entier porte
+         data-dev — sans le mode concepteur, ni les boutons ni l'étiquette
+         qui trahirait leur existence n'apparaissent. */
+      .ac-dev {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        flex-wrap: wrap;
+        margin-left: 8px;
+        padding: 4px 8px 4px 11px;
+        border: 1px dashed rgba(255, 210, 74, 0.32);
+        border-radius: 9px;
+        background: rgba(255, 210, 74, 0.03);
+      }
+      .ac-dev-titre {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-right: 3px;
+        font-family: var(--font-display);
+        font-size: calc(7.5px * var(--ui));
+        letter-spacing: 0.14em;
+        color: #c9b98a;
+      }
+      .ac-dev-titre i {
+        font-style: normal;
         font-size: calc(11px * var(--ui));
-        letter-spacing: 0.06em;
-        margin: 6px 0 2px;
+        color: #ffd24a;
+      }
+      .ac-dev button {
+        color: #c9b98a;
+        font-size: calc(8px * var(--ui));
+      }
+      .ac-dev button i {
+        color: #ffd24a;
+      }
+      .ac-dev button:hover {
+        color: #ffe9a8;
+        background: rgba(255, 210, 74, 0.09);
+        border-color: rgba(255, 210, 74, 0.5);
+      }
+
+      /* ---- LE PIED : ce que font les touches, ici et maintenant ---- */
+      .ac-pied {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        flex-wrap: wrap;
+        padding: 8px clamp(16px, 3vw, 34px) calc(8px + env(safe-area-inset-bottom));
+        border-top: 1px solid var(--line);
+        background: rgba(3, 7, 16, 0.55);
+      }
+      .ac-legende {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .ac-legende span {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: calc(9.5px * var(--ui));
+        letter-spacing: 0.14em;
+        color: var(--glow);
+      }
+      .ac-legende kbd {
+        font-family: var(--font-mono);
+        font-size: calc(9.5px * var(--ui));
+        min-width: 20px;
+        padding: 3px 6px;
+        display: grid;
+        place-items: center;
+        border-radius: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(150, 200, 235, 0.16);
+        color: var(--ink);
+        box-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+      }
+      /* les pastilles de manette sont RONDES et colorées comme sur la croix :
+         on reconnaît A et B sans lire */
+      .ac-legende .ac-pad {
+        border-radius: 11px;
+        border-color: transparent;
+        background: #6dffb8;
+        color: #06101a;
+      }
+      .ac-legende .ac-pad-b {
+        background: var(--alert);
+      }
+      .ac-pied-note {
+        margin-left: auto;
+        max-width: 62ch;
+        font-size: calc(9.5px * var(--ui));
+        letter-spacing: 0.04em;
+        color: var(--dim);
+        opacity: 0.7;
       }
       .rec-note {
         color: var(--dim);
@@ -4573,64 +4973,84 @@
           display: none;
         }
       }
-      .home-foot {
-        font-size: calc(10.5px * var(--ui));
-        letter-spacing: 0.06em;
-        color: var(--dim);
-        opacity: 0.75;
-      }
 
+      /* ---- Écrans étroits : les tuiles se replient, le sas prend sa propre
+         ligne — il reste le plus grand, donc le premier lu. ---- */
+      @media (max-width: 1180px) {
+        .ac-tuiles {
+          grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+        }
+        .ac-sas {
+          grid-column: 1 / -1;
+          min-height: clamp(104px, 15vh, 140px);
+        }
+      }
       @media (max-width: 700px) {
-        /* Au doigt : la fiche occupe tout l'écran — un bout de cuve vide qui
-           dépasse en haut n'apporte rien, l'essai reprend au bouton */
-        #home {
-          inset: 0;
-          width: 100vw;
-          gap: 13px;
-          padding: calc(14px + env(safe-area-inset-top)) 18px calc(14px + env(safe-area-inset-bottom));
-          border-right: none;
-          justify-content: safe center; /* centré si court, défilable si long */
-          background: linear-gradient(180deg, rgba(6, 13, 23, 0.96), rgba(6, 13, 23, 0.99));
-        }
-        body.playing #home {
-          transform: translateY(24px);
-        }
-        #home .home-records {
-          display: none; /* derrière le bouton RECORDS */
-        }
-        #home-recs {
-          display: block;
-        }
-        .home-eyebrow {
-          font-size: calc(9px * var(--ui));
-          letter-spacing: 0.16em;
-          padding-bottom: 10px;
-        }
-        .home-badge {
-          width: 40px;
-          height: 40px;
-        }
-        .home-title {
-          font-size: calc(23px * var(--ui));
-        }
-        .home-pitch {
-          font-size: calc(12px * var(--ui));
-          line-height: 1.6;
-          max-width: none;
-        }
-        .home-figure {
-          display: none; /* au doigt, la fiche va à l'essentiel */
-        }
-        .home-readout {
-          justify-content: space-between;
+        .ac-bandeau {
           gap: 10px;
-          padding: 10px 12px;
+          padding-bottom: 9px;
         }
-        .home-readout dd {
-          font-size: calc(15px * var(--ui));
+        .ac-ecusson {
+          width: 34px;
+          height: 34px;
         }
-        #start {
-          padding: 14px 18px;
+        /* le relevé garde ses SIX pastilles mais tient sur une seule ligne
+           qu'on fait glisser : replié, il mangeait trois rangées du bandeau
+           et poussait le titre hors de l'écran */
+        .ac-releve {
+          flex: 1 1 100%;
+          min-width: 0;
+          flex-wrap: nowrap;
+          justify-content: flex-start;
+          overflow-x: auto;
+          scrollbar-width: none;
+        }
+        .ac-releve::-webkit-scrollbar {
+          display: none;
+        }
+        .ac-releve div {
+          flex: none;
+        }
+        .ac-scene {
+          gap: 7px;
+        }
+        .ac-surtitre {
+          font-size: calc(7.5px * var(--ui));
+          letter-spacing: 0.22em;
+        }
+        .ac-pitch {
+          font-size: calc(11.5px * var(--ui));
+          line-height: 1.55;
+        }
+        .ac-tuiles {
+          grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+          gap: 7px;
+        }
+        .ac-tuile {
+          min-height: 92px;
+          padding: 10px 10px 9px;
+        }
+        .ac-tuile .ac-sous {
+          display: none; /* au doigt, le libellé suffit — la place manque */
+        }
+        /* « LES MÉMOIRES » ne tient pas en 104 px : plutôt deux lignes
+           qu'un libellé coupé aux points de suspension */
+        .ac-label {
+          white-space: normal;
+          line-height: 1.25;
+        }
+        .ac-ico {
+          top: 8px;
+          left: 8px;
+          width: 24px;
+          height: 24px;
+        }
+        .ac-sas {
+          min-height: 98px;
+          padding: 13px 14px;
+        }
+        .ac-pied-note {
+          display: none; /* le méta-texte du prototype n'aide pas au doigt */
         }
         .rec-row {
           font-size: calc(10.5px * var(--ui));
@@ -4640,26 +5060,38 @@
         .rec-chr {
           width: 142px;
         }
-        .home-commands {
-          font-size: calc(10.5px * var(--ui));
-          line-height: 2;
-          padding-top: 10px;
-        }
-        .home-foot {
-          display: none; /* le méta-texte du prototype n'aide pas au doigt */
+      }
+      /* Cibles tactiles généreuses : la rangée des réglages est la plus fine
+         de l'écran, c'est elle qu'on rate au doigt. */
+      @media (pointer: coarse) {
+        .ac-reglages > button,
+        .ac-dev button {
+          padding: 10px 12px;
         }
       }
-      @media (max-height: 720px) {
-        .home-figure {
-          display: none; /* petits écrans : la fiche reste lisible sans la planche */
-        }
-        /* scopé à la fiche : déplacés dans le voile RECORDS, les
-           registres redeviennent visibles */
+      /* Le palmarès condensé s'efface dès que la place manque — en hauteur
+         (le titre et les tuiles passent avant) comme en largeur (ses cinq
+         colonnes ne se lisent plus). La tuile RECORDS l'ouvre en grand, et
+         le détail y est de toute façon plus complet. */
+      @media (max-height: 820px), (max-width: 1080px) {
         #home .home-records {
-          display: none; /* derrière le bouton RECORDS : la fiche respire */
+          display: none;
         }
-        #home-recs {
-          display: block;
+      }
+      /* Téléphone étroit : le sur-titre passait sur deux lignes pour ne rien
+         dire de plus que le titre juste en dessous. */
+      @media (max-width: 480px) {
+        .ac-surtitre {
+          display: none;
+        }
+      }
+      @media (max-height: 660px) {
+        .ac-pitch {
+          display: none;
+        }
+        .ac-tuile,
+        .ac-sas {
+          min-height: clamp(96px, 17vh, 150px);
         }
       }
 
@@ -6787,91 +7219,95 @@
           animation: none;
         }
       }
-      /* Écrans bas (Steam Deck : 1280 × 800) : la fiche se resserre pour
-         tenir sans défiler */
-      @media (max-height: 840px) and (min-width: 700px) {
-        #home {
-          gap: 12px;
-          padding-top: 16px;
-          padding-bottom: 16px;
+      /* Écrans bas (Steam Deck : 1280 × 800 ; téléphone tourné) : l'accueil
+         tient en UNE page — les quatre bandes se serrent, rien ne défile. */
+      @media (max-height: 560px) {
+        .ac-bandeau {
+          padding-top: calc(7px + env(safe-area-inset-top));
+          padding-bottom: 7px;
         }
-        .home-col {
-          gap: 12px;
+        .ac-ecusson {
+          display: none;
         }
-        .home-title {
-          font-size: clamp(24px, 3.6vw, 38px);
-        }
-        .home-figure img {
-          height: clamp(110px, 16vh, 160px);
-        }
-      }
-      /* ---- Paysage bas (téléphone tourné) : la fiche tient en UNE page ---- */
-      @media (max-height: 520px) {
-        #home {
-          width: 100vw;
-          gap: 6px;
-          padding: calc(8px + env(safe-area-inset-top)) 22px calc(8px + env(safe-area-inset-bottom));
-          border-right: none;
-          justify-content: safe center;
-        }
-        .home-cols {
+        /* le bandeau tient sur UNE ligne : chaque rangée gagnée ici est une
+           rangée rendue aux tuiles, et l'écran fait 390 px de haut */
+        .ac-ident {
           flex-direction: row;
-          gap: 24px;
-          align-items: stretch;
-          flex: 1 1 0;
-          min-height: 0;
-          overflow: hidden;
+          align-items: baseline;
+          gap: 9px;
         }
-        .home-col {
-          gap: 7px;
-          min-height: 0;
-          overflow-y: auto;
+        .ac-ident-titre {
+          display: none;
+        }
+        .ac-releve {
+          min-width: 0;
+          flex-wrap: nowrap;
+          overflow-x: auto;
           scrollbar-width: none;
         }
-        .home-col::-webkit-scrollbar {
+        .ac-surtitre,
+        .ac-journal {
           display: none;
         }
-        .home-figure {
+        .ac-scene {
+          gap: 6px;
+          padding: 6px clamp(16px, 3vw, 34px);
+        }
+        .ac-titre {
+          font-size: clamp(26px, min(6vw, 13vh), 60px);
+        }
+        .ac-rampe {
+          gap: 6px;
+          padding-bottom: 5px;
+        }
+        .ac-tuiles {
+          gap: 6px;
+        }
+        .ac-tuile,
+        .ac-sas {
+          min-height: clamp(74px, 20vh, 120px);
+        }
+        /* sur une tuile de 80 px, le dessin de fond passe DERRIÈRE le nom :
+           il s'efface, et le voile de lecture remonte */
+        .ac-tuile .ac-art {
+          opacity: 0.3;
+        }
+        .ac-tuile .ac-voile {
+          background: linear-gradient(180deg, rgba(10, 20, 32, 0.2), rgba(10, 20, 32, 0.88) 42%, rgba(10, 20, 32, 0.98));
+        }
+        .ac-sas .ac-voile {
+          background: linear-gradient(180deg, rgba(6, 16, 26, 0.2), rgba(6, 16, 26, 0.86) 40%, rgba(6, 16, 26, 0.98));
+        }
+        .ac-pied {
+          padding-top: 5px;
+          padding-bottom: calc(5px + env(safe-area-inset-bottom));
+        }
+        .ac-pied-note {
           display: none;
         }
-        .home-title {
-          font-size: calc(19px * var(--ui));
+      }
+      /* Le décor et le titre se figent pour qui a demandé qu'on l'épargne :
+         un menu n'a aucune raison de bouger tout seul. */
+      @media (prefers-reduced-motion: reduce) {
+        .ac-etoiles,
+        .ac-sas,
+        .ac-journal i,
+        .ac-etat-l,
+        .ac-etat-s,
+        .ac-etat-g {
+          animation: none;
         }
-        /* au téléphone tourné, la fiche est un MENU : le texte de
-           présentation cède sa place aux boutons */
-        .home-pitch {
-          display: none;
+        .ac-etat-l {
+          opacity: 1;
         }
-        .home-eyebrow {
-          font-size: calc(8.5px * var(--ui));
-          padding-bottom: 6px;
+        .ac-etat-s,
+        .ac-etat-g {
+          opacity: 0;
         }
-        .home-badge {
-          width: 30px;
-          height: 30px;
-        }
-        /* les boutons se resserrent : cinq tiennent dans la colonne */
-        #home button {
-          padding: 8px 10px;
-          font-size: calc(10.5px * var(--ui));
-          letter-spacing: 0.1em;
-        }
-        .home-readout {
-          font-size: calc(11px * var(--ui));
-        }
-        /* les registres passent derrière le bouton RECORDS : la colonne
-           de droite se retire, la fiche est un menu plein cadre */
-        .home-cols > .home-col:last-child {
-          display: none;
-        }
-        #home-recs {
-          display: block;
-        }
-        .home-foot {
-          display: none;
-        }
-        #home-seq {
-          display: none;
+        .ac-sas,
+        .ac-tuile,
+        .ac-art {
+          transition: none;
         }
       }
     
@@ -7634,74 +8070,245 @@
     <canvas id="fx-canvas"></canvas>
     <div id="world-labels" aria-hidden="true"></div>
 
-    <aside id="home" aria-label="Fiche d'essai">
-      <div class="home-eyebrow">
-        <span>COMPLEXE ORBITAL MÉDUSE — PROTOCOLE «&nbsp;TENSION DE SURFACE&nbsp;»</span>
-        <img class="home-badge" src="/assets/badge.webp" alt="Écusson de la mission Sujet 21" />
-      </div>
-      <div class="home-cols">
-      <div class="home-col">
-      <h1 class="home-title">SUJET <em>21</em></h1>
-      <div id="version-jeu" aria-label="Version du jeu"></div>
-      <p class="home-pitch">
-        Vous êtes un volume de fluide spéculaire en apesanteur. La seule façon d'avancer&nbsp;:
-        éjecter une partie de vous-même. <strong>Se déplacer, c'est rétrécir.</strong>
-        Rejoignez le sas avant de vous disperser. Le laboratoire consigne chaque
-        essai — personne ne se demande encore pourquoi l'échantillon insiste.
-      </p>
-      <dl class="home-readout" aria-label="Relevé de l'échantillon">
-        <div><dt>ÉCHANTILLON</dt><dd id="home-volume">— L</dd></div>
-        <div><dt>PARTICULES</dt><dd id="home-particles">—</dd></div>
-        <div><dt>ÉTAT</dt><dd id="home-state">en dérive</dd></div>
-        <div><dt>CONDENSAT (RUN)</dt><dd id="home-condensat">0 cL</dd></div>
-        <div><dt>MÉMOIRE</dt><dd id="home-memoire">0</dd></div>
-        <div><dt>ORBES</dt><dd id="home-orbes">0</dd></div>
-      </dl>
-      <button id="start" type="button">COMMENCER L'ESSAI</button>
-      <button id="home-restart" type="button" hidden>RECOMMENCER LE TABLEAU</button>
-      <button id="start-abandon" type="button" hidden>ABANDONNER LA RUN — RETOUR AU LABO</button>
-      <div class="home-duo" role="group" aria-label="Outils du protocole">
-        <button id="home-station" type="button" title="LA STATION : le plan général du complexe orbital — les modules et leurs coursives, tels que la descente les traverse. On y voit d'où l'on vient, où l'on est, ce qui est ouvert et ce qui attend un orbe"><i>🛰&#xFE0E;</i><span>LA STATION</span></button>
-        <!-- LES OUTILS DU CONCEPTEUR ont une seule porte : LA RÉGIE. Les
-             anciens boutons (éditeur, carte, descente, planche, montage,
-             récit & fins, textes, récompenses, marchand, règles, salles,
-             pupitre) sont devenus ses sections — un seul endroit, et l'état
-             du partage à côté de chaque outil. ?editeur et ?carte dans
-             l'URL restent des raccourcis. -->
-        <button id="home-regie" type="button" data-dev class="home-regie" title="LA RÉGIE : la console du concepteur — tous les outils du système de run (carte, descente, planche, récit et fins, scénario, codex, marchand, récompenses, textes, éditeur de tableaux, règles, salles, pupitre), ce qui est publié pour tout le monde, et le tir à blanc"><i>◎</i><span>RÉGIE</span></button>
-        <button id="home-records" type="button"><i>✦</i><span>RECORDS</span></button>
-        <button id="home-codex" type="button" title="Le manuel écrit par la partie : chaque interaction découverte débloque sa fiche"><i>◉</i><span>CODEX</span></button>
-        <button id="home-fioles" type="button" title="La collection d’échantillons scellés : deux fioles s’équipent pour la run"><i>⚗&#xFE0E;</i><span>FIOLES</span></button>
-        <button id="home-cycle" type="button" title="L’écran des mémoires : le cycle des états — chaque transformation manuelle est un lien à tisser en mémoire"><i>⚛</i><span>LES MÉMOIRES</span></button>
-        <button id="home-livraisons" type="button" data-dev><i>◈</i><span>NOTES DE VERSION</span></button>
-        <button id="home-cmds" type="button"><i>⌘</i><span>COMMANDES</span></button>
-        <button id="home-params" type="button"><i>⚙&#xFE0E;</i><span>PARAMÈTRES</span></button>
-        <button id="home-mute" type="button"><i>♪</i><span>SON</span></button>
-        <button id="home-plein" type="button"><i>⛶</i><span>PLEIN ÉCRAN</span></button>
-      </div>
-      <div id="home-seq" class="rec-note"></div>
-      </div>
-      <div class="home-col">
-      <figure class="home-figure">
-        <img src="/assets/home.webp" alt="Échantillon de fluide spéculaire en lévitation dans la cuve d'essai" loading="lazy" />
-        <figcaption>FIG. 1 — ÉCHANTILLON EN SUSPENSION, CUVE D'ESSAI</figcaption>
-      </figure>
-      <div class="home-records" aria-label="Registres du labo">
-        <div class="rec-head"><span>PALMARÈS DU PROTOCOLE</span>
-          <input id="rec-name" maxlength="12" placeholder="VOTRE NOM — REQUIS"
-            aria-label="Nom d'opérateur, obligatoire pour plonger" autocomplete="nickname" required />
-          <span id="rec-essai"></span></div>
+    <!-- ================= L'ACCUEIL : LA PASSERELLE ==========================
+         L'ancienne fiche posait ONZE boutons de même taille sur deux
+         colonnes : rien ne disait par où commencer, et le geste qu'on vient
+         faire — jouer — se cherchait au milieu des outils. La hiérarchie est
+         désormais dans la SURFACE : un seul GROS bouton (le sas), cinq
+         tuiles moyennes pour les destinations, une rangée de libellés
+         discrets pour les réglages. Les outils du concepteur gardent leur
+         enclos (data-dev) : l'accueil public ne les voit pas.
+         Le fond reste TRANSLUCIDE : l'échantillon continue de dériver
+         derrière, et le relevé du bandeau le lit en direct — c'est ce qui
+         distingue cet écran d'un menu de titre ordinaire. -->
+    <aside id="home" aria-label="Accueil — protocole Tension de surface">
+      <!-- Le décor, en trois couches qui ne captent aucun geste : la
+           poussière d'étoiles qui dérive, l'échantillon en fond de scène, et
+           le dégradé qui rend le bas de l'écran lisible sous les tuiles. -->
+      <div class="ac-etoiles" aria-hidden="true"></div>
+      <div class="ac-fond" aria-hidden="true"></div>
+      <div class="ac-degrade" aria-hidden="true"></div>
+
+      <!-- ===== BANDEAU : qui plonge, et où en est l'échantillon ===== -->
+      <header class="ac-bandeau">
+        <div class="ac-operateur">
+          <img class="ac-ecusson" src="/assets/badge.webp" alt="Écusson de la mission Sujet 21" />
+          <div class="ac-ident">
+            <label class="ac-ident-titre" for="rec-name">OPÉRATEUR</label>
+            <input id="rec-name" maxlength="12" placeholder="VOTRE NOM — REQUIS"
+              aria-label="Nom d'opérateur, obligatoire pour plonger" autocomplete="nickname" required />
+            <!-- la version se tape SEPT FOIS pour ouvrir le mode concepteur :
+                 sur Steam Deck et au téléphone, il n'y a pas de barre
+                 d'adresse où écrire ?dev -->
+            <div id="version-jeu" aria-label="Version du jeu"></div>
+          </div>
+        </div>
         <div id="rec-need" hidden>Renseignez votre nom d'opérateur pour plonger — il signera vos records.</div>
-        <div class="rec-note">Records partagés entre tous les opérateurs du protocole.</div>
-        <div id="rec-rows"></div>
-      </div>
-      </div>
-      </div>
-      <div class="home-foot">
-        Prototype de travail — le bouton BANC (barre du bas) ouvre le banc de réglage :
-        la physique se modifie en direct, et les NOTES DE VERSION consignent
-        chaque mise à jour.
-      </div>
+        <dl class="ac-releve" aria-label="Relevé de l'échantillon">
+          <div><dt>ÉCHANTILLON</dt><dd id="home-volume">— L</dd></div>
+          <div><dt>PARTICULES</dt><dd id="home-particles">—</dd></div>
+          <div><dt>ÉTAT</dt><dd id="home-state">en dérive</dd></div>
+          <div><dt>CONDENSAT</dt><dd id="home-condensat">0 cL</dd></div>
+          <div><dt>MÉMOIRE</dt><dd id="home-memoire">0</dd></div>
+          <div><dt>ORBES</dt><dd id="home-orbes">0</dd></div>
+        </dl>
+      </header>
+
+      <!-- ===== LA SCÈNE : le titre, la consigne, le journal ===== -->
+      <section class="ac-scene">
+        <span class="ac-surtitre">COMPLEXE ORBITAL MÉDUSE · PROTOCOLE «&nbsp;TENSION DE SURFACE&nbsp;»</span>
+        <!-- LE TITRE CHANGE D'ÉTAT — liquide, solide, gaz — parce que c'est
+             tout le jeu en trois secondes : trois calques superposés, un seul
+             visible à la fois. Les filtres sont FIGÉS (aucun <animate> dans
+             la turbulence) : une turbulence animée fait recalculer le filtre
+             à chaque image, sur un écran posé au-dessus d'une simulation qui
+             tourne déjà. -->
+        <svg class="ac-filtres" aria-hidden="true" width="0" height="0">
+          <defs>
+            <filter id="ac-liquide" x="-10%" y="-20%" width="120%" height="140%">
+              <feTurbulence type="fractalNoise" baseFrequency="0.012 0.03" numOctaves="2" seed="3" result="n" />
+              <feDisplacementMap in="SourceGraphic" in2="n" scale="9" xChannelSelector="R" yChannelSelector="G" />
+            </filter>
+            <filter id="ac-givre" x="-5%" y="-10%" width="110%" height="120%">
+              <feTurbulence type="turbulence" baseFrequency="0.9" numOctaves="1" seed="7" result="g" />
+              <feColorMatrix in="g" type="matrix" values="0 0 0 0 .8  0 0 0 0 .95  0 0 0 0 1  0 0 0 .9 0" result="gc" />
+              <feComposite in="gc" in2="SourceAlpha" operator="in" result="frost" />
+              <feBlend in="SourceGraphic" in2="frost" mode="screen" />
+            </filter>
+          </defs>
+        </svg>
+        <h1 class="ac-titre">
+          <span class="ac-etat ac-etat-l" aria-hidden="true">SUJET <em>21</em></span>
+          <span class="ac-etat ac-etat-s" aria-hidden="true">SUJET <em>21</em></span>
+          <span class="ac-etat ac-etat-g">SUJET <em>21</em></span>
+        </h1>
+        <p class="ac-pitch">
+          Vous êtes un volume de fluide spéculaire en apesanteur.
+          <strong>Se déplacer, c'est rétrécir.</strong>
+          Rejoignez le sas avant de vous disperser — le laboratoire consigne chaque essai.
+        </p>
+        <div class="ac-journal"><i aria-hidden="true"></i><span id="home-seq"></span></div>
+        <!-- Le palmarès condensé ne tient QUE sur les grands écrans : partout
+             ailleurs il cède la place au titre et aux tuiles, et c'est la
+             tuile RECORDS qui l'ouvre en grand. -->
+        <div class="home-records" aria-label="Registres du labo">
+          <div class="rec-head"><span>PALMARÈS DU PROTOCOLE</span><span id="rec-essai"></span></div>
+          <div class="rec-note">Records partagés entre tous les opérateurs du protocole.</div>
+          <div id="rec-rows"></div>
+        </div>
+      </section>
+
+      <!-- ===== LA RAMPE : le sas, les destinations, les réglages ===== -->
+      <section class="ac-rampe">
+        <div class="ac-tuiles">
+          <!-- LE SAS : le seul bouton large de l'écran. Son intitulé vit dans
+               un <span> — main.ts le réécrit sans emporter le dessin. -->
+          <button id="start" type="button" class="ac-sas">
+            <svg class="ac-art" viewBox="0 0 200 120" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+              <g fill="none" stroke="currentColor" stroke-width="1.2" opacity=".9">
+                <circle cx="138" cy="52" r="40" opacity=".35" />
+                <circle cx="138" cy="52" r="30" opacity=".7" />
+                <circle cx="138" cy="52" r="20" stroke-width="2" />
+                <path d="M138 12v10M138 82v10M98 52h10M168 52h10M110 24l7 7M166 24l-7 7M110 80l7-7M166 80l-7-7" opacity=".6" />
+                <path d="M104 52a34 34 0 0 1 12-26" stroke-width="3" opacity=".5" />
+              </g>
+              <path class="ac-goutte" d="M44 30c-9 12-16 22-16 31a16 16 0 0 0 32 0c0-9-7-19-16-31z" />
+              <path d="M66 58h30" stroke="currentColor" stroke-width="1.4" stroke-dasharray="3 5" fill="none" opacity=".8" />
+              <path d="M90 54l7 4-7 4" fill="none" stroke="currentColor" stroke-width="1.4" />
+              <circle cx="138" cy="52" r="7" fill="currentColor" opacity=".25" />
+            </svg>
+            <span class="ac-voile" aria-hidden="true"></span>
+            <span class="ac-touche" aria-hidden="true">⏎</span>
+            <span class="ac-sas-l"><span class="ac-sas-fleche" aria-hidden="true">▶</span><span id="start-titre">COMMENCER L'ESSAI</span></span>
+            <span id="start-sous" class="ac-sas-sous">Le module d'accueil, puis son sas : la descente part de là.</span>
+          </button>
+
+          <button id="home-station" type="button" class="ac-tuile" style="--teinte: #63b7e6"
+            title="LA STATION : le plan général du complexe orbital — les modules et leurs coursives, tels que la descente les traverse. On y voit d'où l'on vient, où l'on est, ce qui est ouvert et ce qui attend un orbe">
+            <svg class="ac-art" viewBox="0 0 120 120" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+              <g fill="none" stroke="currentColor" stroke-width="1.3">
+                <path d="M-10 60h140" opacity=".5" />
+                <path d="M60 60L30 30M60 60L30 90M60 60L90 30M60 60L90 90" opacity=".35" />
+                <path d="M53 50h14l7 7v6l-7 7H53l-7-7v-6z" fill="rgba(10,20,32,.9)" stroke-width="1.8" />
+                <path d="M25 24h10l5 5v4l-5 5H25l-5-5v-4zM25 84h10l5 5v4l-5 5H25l-5-5v-4zM85 24h10l5 5v4l-5 5H85l-5-5v-4zM85 84h10l5 5v4l-5 5H85l-5-5v-4z" fill="rgba(10,20,32,.9)" opacity=".8" />
+                <path d="M-6 30q-14 30 0 60" opacity=".5" stroke-width="3" />
+                <circle cx="112" cy="60" r="4" fill="currentColor" opacity=".8" />
+              </g>
+            </svg>
+            <span class="ac-voile" aria-hidden="true"></span>
+            <i class="ac-ico" aria-hidden="true">🛰&#xFE0E;</i>
+            <span class="ac-label">LA STATION</span>
+            <span class="ac-sous">Le plan du complexe</span>
+          </button>
+
+          <button id="home-codex" type="button" class="ac-tuile" style="--teinte: #7fd2ff"
+            title="Le manuel écrit par la partie : chaque interaction découverte débloque sa fiche">
+            <svg class="ac-art" viewBox="0 0 120 120" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+              <g fill="none" stroke="currentColor" stroke-width="1.2">
+                <path d="M60 14l13 7.5v15L60 44l-13-7.5v-15z" fill="currentColor" fill-opacity=".35" />
+                <path d="M32 30l13 7.5v15L32 60l-13-7.5v-15zM88 30l13 7.5v15L88 60l-13-7.5v-15zM60 46l13 7.5v15L60 76l-13-7.5v-15z" opacity=".7" />
+                <path d="M32 62l13 7.5v15L32 92l-13-7.5v-15zM88 62l13 7.5v15L88 92l-13-7.5v-15z" opacity=".4" stroke-dasharray="3 3" />
+              </g>
+            </svg>
+            <span class="ac-voile" aria-hidden="true"></span>
+            <i class="ac-ico" aria-hidden="true">◉</i>
+            <span class="ac-label">CODEX</span>
+            <span class="ac-sous">Le manuel de la partie</span>
+          </button>
+
+          <button id="home-cycle" type="button" class="ac-tuile" style="--teinte: #b48cff"
+            title="L’écran des mémoires : le cycle des états — chaque transformation manuelle est un lien à tisser en mémoire">
+            <svg class="ac-art" viewBox="0 0 120 120" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+              <g fill="none" stroke="currentColor" stroke-width="1.3">
+                <path d="M60 30c-26 6-34 22-30 30M60 30c26 6 34 22 30 30M30 60c-4 8 4 24 30 30M90 60c4 8-4 24-30 30" opacity=".6" />
+                <path d="M60 30c-14-10-10-24 0-26 10 2 14 16 0 26z" opacity=".35" />
+                <circle cx="60" cy="30" r="7" fill="currentColor" fill-opacity=".5" />
+                <circle cx="30" cy="60" r="5" fill="rgba(10,20,32,1)" />
+                <circle cx="90" cy="60" r="5" fill="rgba(10,20,32,1)" />
+                <circle cx="60" cy="90" r="5" fill="rgba(10,20,32,1)" />
+              </g>
+            </svg>
+            <span class="ac-voile" aria-hidden="true"></span>
+            <i class="ac-ico" aria-hidden="true">⚛</i>
+            <span class="ac-label">LES MÉMOIRES</span>
+            <span class="ac-sous">Le cycle des états</span>
+          </button>
+
+          <button id="home-fioles" type="button" class="ac-tuile" style="--teinte: #5fd3e6"
+            title="La collection d’échantillons scellés : deux fioles s’équipent pour la run">
+            <svg class="ac-art" viewBox="0 0 120 120" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+              <g fill="none" stroke="currentColor" stroke-width="1.3">
+                <path d="M46 18h12v20l16 34a10 10 0 0 1-9 15H39a10 10 0 0 1-9-15l16-34z" opacity=".8" />
+                <path d="M34 74h36a10 10 0 0 1-3 13H37a10 10 0 0 1-3-13z" fill="currentColor" fill-opacity=".45" stroke="none" />
+                <path d="M43 16h18" stroke-width="2.4" />
+                <path d="M86 44h14v10l8 22a7 7 0 0 1-6 10H84a7 7 0 0 1-6-10l8-22z" opacity=".45" />
+                <path d="M80 82h26a7 7 0 0 1-2 9H82a7 7 0 0 1-2-9z" fill="currentColor" fill-opacity=".25" stroke="none" />
+                <circle cx="52" cy="60" r="2.6" fill="currentColor" stroke="none" opacity=".8" />
+                <circle cx="60" cy="52" r="1.8" fill="currentColor" stroke="none" opacity=".6" />
+              </g>
+            </svg>
+            <span class="ac-voile" aria-hidden="true"></span>
+            <i class="ac-ico" aria-hidden="true">⚗&#xFE0E;</i>
+            <span class="ac-label">FIOLES</span>
+            <span class="ac-sous">Deux scellés par run</span>
+          </button>
+
+          <button id="home-records" type="button" class="ac-tuile" style="--teinte: #ffd977"
+            title="Le palmarès partagé entre tous les opérateurs du protocole : note, volume et chrono, salle par salle">
+            <svg class="ac-art" viewBox="0 0 120 120" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+              <g fill="none" stroke="currentColor" stroke-width="1.3">
+                <path d="M22 96V66h22v30M48 96V46h24v50M74 96V58h22v38" />
+                <path d="M48 46h24" stroke-width="2" />
+                <path d="M60 14l4 9 10 1-7 7 2 10-9-5-9 5 2-10-7-7 10-1z" fill="currentColor" fill-opacity=".5" />
+              </g>
+            </svg>
+            <span class="ac-voile" aria-hidden="true"></span>
+            <i class="ac-ico" aria-hidden="true">✦</i>
+            <span class="ac-label">RECORDS</span>
+            <span class="ac-sous">Le palmarès partagé</span>
+          </button>
+        </div>
+
+        <!-- Les deux gestes qui n'existent QUE pendant une descente : ils
+             n'apparaissent pas au labo (main.ts les découvre). -->
+        <div class="ac-actions">
+          <button id="home-restart" type="button" hidden>RECOMMENCER LE TABLEAU</button>
+          <button id="start-abandon" type="button" hidden>ABANDONNER LA RUN — RETOUR AU LABO</button>
+        </div>
+
+        <!-- La rangée des réglages : des libellés, pas des tuiles — ce n'est
+             pas là qu'on va en arrivant. -->
+        <div class="ac-reglages" role="group" aria-label="Réglages">
+          <button id="home-params" type="button"><i>⚙&#xFE0E;</i><span>PARAMÈTRES</span></button>
+          <button id="home-cmds" type="button"><i>⌘</i><span>COMMANDES</span></button>
+          <button id="home-mute" type="button"><i>♪</i><span>SON</span></button>
+          <button id="home-plein" type="button"><i>⛶</i><span>PLEIN ÉCRAN</span></button>
+          <!-- L'ENCLOS DU CONCEPTEUR : liseré pointillé ambre, à part de la
+               rangée publique. Tout le bloc porte data-dev — sans le mode
+               concepteur, l'accueil ne montre ni les boutons ni l'étiquette
+               qui trahirait leur existence. -->
+          <!-- data-dev est porté par l'enclos ET par chaque bouton : si l'un
+               d'eux ressort un jour de son cadre, il reste privé. -->
+          <div class="ac-dev" data-dev>
+            <span class="ac-dev-titre"><i>⚒</i>OUTILS CONCEPTEUR</span>
+            <button id="home-regie" type="button" data-dev title="LA RÉGIE : la console du concepteur — tous les outils du système de run (carte, descente, planche, récit et fins, scénario, codex, marchand, récompenses, textes, éditeur de tableaux, règles, salles, pupitre), ce qui est publié pour tout le monde, et le tir à blanc"><i>◎</i><span>RÉGIE</span></button>
+            <button id="home-livraisons" type="button" data-dev title="Le journal des livraisons : ce que chaque version a changé"><i>◈</i><span>NOTES DE VERSION</span></button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== LE PIED : ce que font les touches, ici et maintenant ===== -->
+      <footer class="ac-pied">
+        <div class="ac-legende">
+          <span><kbd>◀ ▶</kbd>PARCOURIR</span>
+          <span><kbd>ENTRÉE</kbd><kbd class="ac-pad">A</kbd>VALIDER</span>
+          <span><kbd>ÉCHAP</kbd><kbd class="ac-pad ac-pad-b">B</kbd>LANCER L'ESSAI</span>
+        </div>
+        <div class="ac-pied-note">
+          Prototype de travail — le bouton BANC (barre du bas) ouvre le banc de
+          réglage, et les NOTES DE VERSION consignent chaque mise à jour.
+        </div>
+      </footer>
     </aside>
 
     <!-- La bande de vie : le volume et sa jauge quasi pleine largeur — on

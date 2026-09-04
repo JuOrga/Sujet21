@@ -1510,6 +1510,19 @@ document.getElementById('card-fermer')?.addEventListener('click', () => {
 // Fiche d'essai : visible au chargement ; « échap » ou ≡ pour y revenir.
 // L'essai continue de dériver derrière la fiche — elle observe, elle ne fige pas.
 const startBtn = document.getElementById('start') as HTMLButtonElement
+// LE SAS — le gros bouton de l'accueil — porte un dessin et DEUX lignes :
+// son intitulé vit dans un <span>, pas dans le bouton. Écrire directement
+// dans `startBtn.textContent` effaçait le dessin, le voile et la pastille
+// de touche : il ne restait qu'un rectangle vert avec un mot dessus.
+const startTitre = document.getElementById('start-titre') as HTMLElement
+const startSous = document.getElementById('start-sous') as HTMLElement
+function poseSas(titre: string, sous: string): void {
+  startTitre.textContent = titre
+  startSous.textContent = sous
+}
+const SAS_REPRENDRE = "REPRENDRE L'ESSAI"
+const SAS_REPRENDRE_SOUS =
+  "L'échantillon dérive dans la cuve — l'accueil l'a mis en pause."
 let hasPlayed = false
 // ---- Onboarding tactile : trois gestes, montrés une fois, au premier
 // lancement sur écran tactile. Le voile intercepte les touchers (il couvre
@@ -1593,7 +1606,11 @@ document.getElementById('tourner-quand-meme')?.addEventListener('click', () => {
   document.body.classList.add('portrait-ok')
 })
 
-// ---- Le voile RECORDS (mobile) : les registres se déplacent dedans ----
+// ---- Le voile RECORDS : les registres se déplacent dedans ----
+// Depuis que le nom d'opérateur vit dans le BANDEAU de l'accueil (il ne
+// voyage plus avec le palmarès, on ne peut plus le chercher), ce voile n'est
+// plus qu'un filet : il ne s'ouvre que si le champ se trouvait masqué. Le
+// palmarès complet, lui, est derrière la tuile RECORDS.
 const recsEl = document.getElementById('recs') as HTMLDivElement
 const recsBoite = recsEl.querySelector('.recs-boite') as HTMLDivElement
 const recsBloc = document.querySelector('.home-records') as HTMLDivElement
@@ -3630,7 +3647,7 @@ document.getElementById('proto-rejouer')?.addEventListener('click', () => {
   document.body.classList.add('playing')
   input.paused = false
   hasPlayed = true
-  startBtn.textContent = "REPRENDRE L'ESSAI"
+  poseSas(SAS_REPRENDRE, SAS_REPRENDRE_SOUS)
   homeRestartBtn.hidden = false
   restart()
   lanceEveil()
@@ -3694,7 +3711,7 @@ function closeHome(): void {
     hasPlayed = true
     document.body.classList.add('playing')
     input.paused = false
-    startBtn.textContent = "REPRENDRE L'ESSAI"
+    poseSas(SAS_REPRENDRE, SAS_REPRENDRE_SOUS)
     homeRestartBtn.hidden = false
     restart()
     return
@@ -3715,7 +3732,7 @@ function closeHome(): void {
   }
   document.body.classList.add('playing')
   input.paused = false // la fiche figeait l'essai : il repart
-  startBtn.textContent = "REPRENDRE L'ESSAI"
+  poseSas(SAS_REPRENDRE, SAS_REPRENDRE_SOUS)
   homeRestartBtn.hidden = false
 }
 
@@ -3728,7 +3745,7 @@ function entrerHub(): void {
   hasPlayed = true
   document.body.classList.add('playing')
   input.paused = false
-  startBtn.textContent = "REPRENDRE L'ESSAI"
+  poseSas(SAS_REPRENDRE, SAS_REPRENDRE_SOUS)
   homeRestartBtn.hidden = false
   restart()
   montrerOnboard()
@@ -3869,7 +3886,7 @@ function reprendreRun(save: RunSauvee): void {
   hasPlayed = true
   document.body.classList.add('playing')
   input.paused = false
-  startBtn.textContent = "REPRENDRE L'ESSAI"
+  poseSas(SAS_REPRENDRE, SAS_REPRENDRE_SOUS)
   homeRestartBtn.hidden = false
   appliqueProvisions() // les provisions du comptoir valent aussi à la reprise
   restart()
@@ -3894,9 +3911,18 @@ function majBoutonsRun(): void {
   if (!hasPlayed) {
     // hors partie, le bouton dit ce qu'il fera : reprendre la descente
     // sauvée, ou en commencer une (par le module et son sas)
-    startBtn.textContent = save
-      ? `REPRENDRE LA DESCENTE — SALLE ${(save.rang ?? save.index) + 1}/${total}`
-      : "COMMENCER L'ESSAI"
+    // le titre reste COURT — il est énorme, une phrase y devient illisible :
+    // le détail (la salle où l'on reprend) descend dans la sous-ligne
+    if (save)
+      poseSas(
+        'REPRENDRE LA DESCENTE',
+        `Salle ${(save.rang ?? save.index) + 1}/${total} — l'expédition reprend au début de sa salle.`,
+      )
+    else
+      poseSas(
+        "COMMENCER L'ESSAI",
+        "Le module d'accueil, puis son sas : la descente part de là.",
+      )
   }
 }
 // Abandonner : en DEUX temps (l'expédition en cours se perd — un clic de
@@ -3920,7 +3946,7 @@ homeRestartBtn.addEventListener('click', () => {
   if (requireName()) return
   document.body.classList.add('playing')
   input.paused = false
-  startBtn.textContent = "REPRENDRE L'ESSAI"
+  poseSas(SAS_REPRENDRE, SAS_REPRENDRE_SOUS)
   resetAction()
 })
 // Un essai HORS EXPÉDITION : un tableau (ou une file de tableaux) joué à
@@ -4087,7 +4113,7 @@ function startTest(etapes: (LevelDef | CinematiqueDef)[]): void {
   // du carton de journal — sinon les deux se jouaient en double, en décalé.
   document.body.classList.add('playing')
   input.paused = false
-  startBtn.textContent = "REPRENDRE L'ESSAI"
+  poseSas(SAS_REPRENDRE, SAS_REPRENDRE_SOUS)
   homeRestartBtn.hidden = false
   joueCinesEnTete(() => {
     const lv = testQueue.shift()
