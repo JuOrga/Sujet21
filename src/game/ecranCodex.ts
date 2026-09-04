@@ -6,8 +6,9 @@
 // « ? »), et la FICHE LUE — avec, pour une fiche connue, la VIDÉO de
 // l'effet en tête du panneau (demande du concepteur : « quand on clique
 // dessus, dans le panneau à droite il y a une vidéo de l'effet »). En
-// tête, la progression du mode ; deux modes, FICHES et JOURNAL (le récit,
-// en frise). Une fiche verrouillée montre son indice et se MARQUE comme
+// tête, la progression du mode ; deux modes, FICHES et JOURNAL (le récit
+// et les fins, en JALONS numérotés). Une fiche verrouillée montre son
+// indice — une entrée du journal, ce qui l'ouvre — et se MARQUE comme
 // objectif : l'objectif suivi s'affiche en tête, et survit au rechargement.
 //
 // Tout ce qui se calcule vit dans codexVue.ts (testé) ; ici, le DOM. La
@@ -25,13 +26,16 @@ import {
   type ReglageFiche,
 } from './codexReglages'
 import {
+  conditionJournal,
   ecritCibles,
   fichesDuRayon,
   formateQuand,
   indice,
   litCibles,
   progression,
+  rangJournal,
   rayonsDe,
+  romain,
   videoDe,
   visibles,
   voisine,
@@ -232,21 +236,30 @@ export class EcranCodex {
       grille.innerHTML = `<p class="cx-vide">${this.filtre === 'ok' ? 'Rien de découvert dans ce rayon — pas encore.' : 'Tout est découvert ici.'}</p>`
       return
     }
+    // LE JOURNAL EN JALONS : le récit et les fins sont des ÉTAPES numérotées,
+    // servies dans l'ordre — le concepteur les voulait présentées comme des
+    // paliers (« FIN I », « FIN II »…), l'entrée scellée disant ce qui l'ouvre,
+    // et non comme la frise d'extraits d'avant.
     if (this.mode === 'journal') {
-      const fins = r.groupe === 'fins'
-      grille.className = 'cx-grille cx-frise'
+      const rangs = fichesDuRayon(r)
+      grille.className = 'cx-grille cx-jalons'
       grille.innerHTML = liste
         .map((d) => {
           const ok = this.hooks.connu(d.id)
           const on = d.id === this.sel
           const lu = ok ? this.hooks.lu(d) : null
-          const quand = ok ? formateQuand(this.hooks.quand(d.id)) : '?'
+          // par ID, jamais par identité : les entrées du journal sont
+          // reconstruites à chaque lecture (journal.ts), deux appels ne
+          // rendent pas les mêmes objets — indexOf y répondait -1
+          const rang = rangs.findIndex((x) => x.id === d.id) + 1
+          const bas = ok ? formateQuand(this.hooks.quand(d.id)) || '—' : conditionJournal(r.groupe, rang)
+          const scelle = r.groupe === 'fins' ? 'SCELLÉE' : 'SCELLÉ'
           return (
-            `<button type="button" class="cx-fragment${ok ? '' : ' cx-verrou'}${on ? ' on' : ''}${this.neuve === d.id ? ' cx-neuve' : ''}" data-fiche="${esc(d.id)}">` +
-            `<span class="cx-point"></span>` +
-            `<span class="cx-tag">${fins ? (ok ? 'FIN ATTEINTE' : 'FIN VERROUILLÉE') : ok ? 'FRAGMENT RÉVÉLÉ' : 'FRAGMENT VERROUILLÉ'}</span><span class="cx-quand">${esc(quand)}</span>` +
-            `<b>${ok ? esc(lu!.titre) : '— — —'}</b>` +
-            `<span class="cx-extrait">${ok ? esc(lu!.texte) : esc(indice(d))}</span></button>`
+            `<button type="button" class="cx-jalon${ok ? '' : ' cx-verrou'}${on ? ' on' : ''}${this.neuve === d.id ? ' cx-neuve' : ''}" data-fiche="${esc(d.id)}">` +
+            `<span class="cx-rang">${esc(rangJournal(r.groupe, rang))}</span>` +
+            `<span class="cx-medaille"><i>${ok ? d.icone : '?'}</i></span>` +
+            `<b>${ok ? esc(lu!.titre) : scelle}</b>` +
+            `<small>${esc(bas)}</small></button>`
           )
         })
         .join('')
@@ -283,12 +296,26 @@ export class EcranCodex {
     this.fichePeinte = d.id
     const ok = this.hooks.connu(d.id)
     const lu = ok ? this.hooks.lu(d) : null
-    const numero = String(fichesDuRayon(r).indexOf(d) + 1).padStart(2, '0')
+    const rangs = fichesDuRayon(r)
+    const rang = rangs.findIndex((x) => x.id === d.id) + 1
+    const numero = String(rang).padStart(2, '0')
     const cible = this.cibles.has(d.id)
     const reg = this.hooks.reglage(d.id)
     const rar = rareteDef(reg.rarete)
     const src = videoDe(d.id, reg.video)
-    const sousCle = r.groupe === 'fins' ? ['FIN VERROUILLÉE', 'FIN SOUS CLÉ'] : ['FRAGMENT VERROUILLÉ', 'FRAGMENT SOUS CLÉ']
+    // le journal se lit en JALONS : « FIN I / VI », et non « FICHE N° 01 »
+    const journal = this.mode === 'journal'
+    const fins = r.groupe === 'fins'
+    const quand = formateQuand(this.hooks.quand(d.id))
+    const etiquette = journal
+      ? `${rangJournal(r.groupe, rang)} / ${romain(rangs.length)}`
+      : ok
+        ? `FICHE N° ${numero}`
+        : 'EXPÉRIENCE À TENTER'
+    const titre = ok ? esc(lu!.titre) : journal ? (fins ? 'SCELLÉE' : 'SCELLÉ') : 'FICHE VERROUILLÉE'
+    const sous = journal
+      ? `${fins ? 'Dénouement' : 'Fragment du récit'} · ${ok ? esc(quand || '—') : 'à révéler'}`
+      : `${esc(r.nom)}${ok && d.etat !== undefined ? ' × contact' : ''}`
     const video = ok
       ? `<div class="cx-video" data-video="${esc(d.id)}">` +
         `<video muted loop autoplay playsinline preload="metadata"${src.poster ? ` poster="${esc(src.poster)}"` : ''}><source src="${esc(src.src)}"></video>` +
@@ -296,14 +323,18 @@ export class EcranCodex {
       : `<div class="cx-video cx-video--absente cx-video--verrou"><span class="cx-hex cx-hex--grand"><i>?</i></span></div>`
     panneau.innerHTML =
       video +
-      `<div class="cx-fiche-titres"><span class="cx-etiquette" style="color:${r.teinte}">${ok ? `FICHE N° ${numero}` : this.mode === 'journal' ? sousCle[0] : 'EXPÉRIENCE À TENTER'}</span>` +
-      `<h3>${ok ? esc(lu!.titre) : this.mode === 'journal' ? sousCle[1] : 'FICHE VERROUILLÉE'}</h3>` +
-      `<small>${esc(r.nom)}${ok && d.etat !== undefined ? ' × contact' : ''}</small></div>` +
-      `<p class="cx-texte${ok ? '' : ' cx-texte--muet'}">${ok ? esc(lu!.texte) : 'Le vaisseau n’a rien consigné. Ce que le fluide fait ici reste à observer de vos propres yeux.'}</p>` +
+      `<div class="cx-fiche-titres"><span class="cx-etiquette" style="color:${r.teinte}">${esc(etiquette)}</span>` +
+      `<h3>${titre}</h3>` +
+      `<small>${sous}</small></div>` +
+      `<p class="cx-texte${ok ? '' : ' cx-texte--muet'}">${ok ? esc(lu!.texte) : journal ? 'Rien n’est encore consigné à ce palier. Le vaisseau écrira cette page quand l’expédition l’aura méritée.' : 'Le vaisseau n’a rien consigné. Ce que le fluide fait ici reste à observer de vos propres yeux.'}</p>` +
       (ok
-        ? `<div class="cx-stats"><div><span>DÉCOUVERT</span><b>${esc(formateQuand(this.hooks.quand(d.id)) || '—')}</b></div><div><span>RAYON</span><b style="color:${r.teinte}">${esc(r.nom)}</b></div>` +
-          `<div><span>RARETÉ</span><b style="color:${rar.teinte}">${rar.nom}</b></div><div><span>MÉMOIRE GAGNÉE</span><b class="cx-memoire">${reg.memoire > 0 ? `+${reg.memoire}` : '—'}</b></div></div>`
-        : `<div class="cx-indice"><span>INDICE</span><p>${esc(indice(d))}</p>` +
+        ? journal
+          ? // une entrée du journal n'a ni rareté ni contact : un seul fanion,
+            // ce qu'elle a rapporté (maquette « les fins », 04/09)
+            `<div class="cx-fanion" style="--t:${r.teinte}"><span>◈</span><b>${fins ? 'Fin atteinte' : 'Fragment révélé'} · mémoire :</b><u class="cx-memoire">${reg.memoire > 0 ? `+${reg.memoire}` : '—'}</u></div>`
+          : `<div class="cx-stats"><div><span>DÉCOUVERT</span><b>${esc(quand || '—')}</b></div><div><span>RAYON</span><b style="color:${r.teinte}">${esc(r.nom)}</b></div>` +
+            `<div><span>RARETÉ</span><b style="color:${rar.teinte}">${rar.nom}</b></div><div><span>MÉMOIRE GAGNÉE</span><b class="cx-memoire">${reg.memoire > 0 ? `+${reg.memoire}` : '—'}</b></div></div>`
+        : `<div class="cx-indice"><span>${journal ? 'CE QUI L’OUVRE' : 'INDICE'}</span><p>${esc(journal ? conditionJournal(r.groupe, rang) : indice(d))}</p>` +
           `<button type="button" id="cx-cibler" class="${cible ? 'on' : ''}">${cible ? '◎ OBJECTIF SUIVI' : 'MARQUER COMME OBJECTIF'}</button></div>` +
           // ce que la découverte rapporte se lit AVANT de tenter : c'est
           // l'appât de l'expérience (demande du concepteur)
