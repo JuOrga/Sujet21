@@ -23,7 +23,6 @@ import {
 import { niveauExpanse } from './game/structures'
 import {
   TABLEAU_HUB,
-  ARTICLES_COMPTOIR,
   articleComptoir,
   zonesDuHub,
   type ArticleHub,
@@ -91,7 +90,6 @@ import {
   zoneDe,
   type ModuleCarte,
 } from './game/carteStation'
-import { AMELIORATIONS, amelioration, orbesEnVente } from './game/marchand'
 import { dessinCarteSVG, type OptionsDessin } from './game/dessinCarte'
 import {
   choixModules,
@@ -232,6 +230,7 @@ import {
 import { LevelEditor } from './editor/editor'
 import { EditeurCarte } from './editor/editeurCarte'
 import { EcranCodex } from './game/ecranCodex'
+import { EcranMarchand } from './game/ecranMarchand'
 import {
   traceLaser,
   creerEtatRecepteurs,
@@ -2560,113 +2559,47 @@ cycleEl.addEventListener('pointerdown', (e) => {
 // Les ORBES d'essence de conscience (contre de la mémoire ; l'écran des
 // mémoires les dépense), les AMÉLIORATIONS DURABLES (une fois pour toutes,
 // à chaque descente), et les provisions du comptoir d'à côté. Le voile
-// s'ouvre AU CONTACT de l'étal du comptoir, au hub — et depuis l'accueil
+// s'ouvre AU CONTACT de l'étal du comptoir, au hub — et depuis la régie
 // en mode concepteur, pour le régler sans nager.
 const marchandEl = document.getElementById('marchand') as HTMLDivElement
-const marchandCorps = document.getElementById(
-  'marchand-corps',
-) as HTMLDivElement
 let marchandDedans = false
-function renderMarchandVoile(): void {
-  const solde = records.memoire()
-  const soldeEl = document.getElementById('marchand-solde')
-  if (soldeEl) soldeEl.textContent = String(solde)
-  const acquis = records.eveilAcquis()
-  const verrous = records.verrousCycle()
-  const article = (
-    donnee: string,
-    icone: string,
-    nom: string,
-    detail: string,
-    etat: string,
-    achetable: boolean,
-  ): string =>
-    `<button type="button" class="mr-article${achetable ? '' : ' mr-tenu'}" ${donnee}${achetable ? '' : ' disabled'}>` +
-    `<i>${icone}</i><b>${htmlSafe(nom)}</b><small>${htmlSafe(detail)}</small><em>${htmlSafe(etat)}</em></button>`
-  let html =
-    '<section class="mr-sec"><h3>LES ORBES D’ESSENCE DE CONSCIENCE</h3>' +
-    '<p>Chaque orbe est une transformation. En poche, il se dépense à l’écran des mémoires pour la tisser ; tissée, elle ouvre les coursives de la carte qui l’exigent.</p><div class="mr-grille">'
-  for (const o of orbesEnVente()) {
-    const etat = acquis.includes(o.id)
-      ? 'TISSÉE'
-      : records.aOrbe(o.id)
-        ? 'EN POCHE'
-        : transfoTenue(o.id, acquis, verrous)
-          ? 'OFFERTE D’ORIGINE'
-          : `${o.prix} MÉMOIRE`
-    const achetable = etat === `${o.prix} MÉMOIRE`
-    html += article(
-      `data-orbe="${o.id}"`,
-      '🔮',
-      o.nom.toUpperCase(),
-      o.desc,
-      achetable && solde < o.prix ? `${o.prix} MÉMOIRE — IL EN MANQUE ${o.prix - solde}` : etat,
-      achetable && solde >= o.prix,
-    )
-  }
-  html +=
-    '</div></section><section class="mr-sec"><h3>LES AMÉLIORATIONS DURABLES</h3>' +
-    '<p>Une fois pour toutes : elles valent au départ de chaque descente.</p><div class="mr-grille">'
-  for (const a of AMELIORATIONS) {
-    const tenue = records.aAmelioration(a.id)
-    html += article(
-      `data-amelioration="${a.id}"`,
-      a.icone,
-      a.nom,
-      a.detail,
-      tenue ? 'ACQUISE' : solde < a.prix ? `${a.prix} MÉMOIRE — IL EN MANQUE ${a.prix - solde}` : `${a.prix} MÉMOIRE`,
-      !tenue && solde >= a.prix,
-    )
-  }
-  html +=
-    '</div></section><section class="mr-sec"><h3>LES PROVISIONS DE LA PROCHAINE DESCENTE</h3>' +
-    '<p>Le comptoir d’à côté les vend aussi, au contact des alcôves — elles ne valent qu’une descente.</p><div class="mr-grille">'
-  for (const a of ARTICLES_COMPTOIR) {
-    const servi = achatsHub.has(a.id)
-    html += article(
-      `data-provision="${a.id}"`,
-      a.icone,
-      a.nom,
-      a.detail,
-      servi ? 'DÉJÀ SERVI' : solde < a.prix ? `${a.prix} MÉMOIRE — IL EN MANQUE ${a.prix - solde}` : `${a.prix} MÉMOIRE`,
-      !servi && solde >= a.prix,
-    )
-  }
-  html += '</div></section>'
-  marchandCorps.innerHTML = html
-}
-marchandCorps.addEventListener('click', (e) => {
-  const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null
-  if (!b || b.disabled) return
-  if (b.dataset.orbe) {
-    const o = orbesEnVente().find((x) => x.id === b.dataset.orbe)
-    if (!o || !records.acheteOrbe(o.id, o.prix)) return
-    toastFile.push({ nom: `ORBE — ${o.nom.toUpperCase()}`, icone: '🔮', sur: 'LE MARCHAND' })
-  } else if (b.dataset.amelioration) {
-    const a = amelioration(b.dataset.amelioration)
-    if (!a || !records.acheteAmelioration(a.id, a.prix)) return
-    toastFile.push({ nom: `${a.nom} — ${a.detail}`, icone: a.icone, sur: 'LE MARCHAND' })
-  } else if (b.dataset.provision) {
-    // le comptoir sonne et compte lui-même : on ne repeint que l'étal
-    const a = articleComptoir(b.dataset.provision)
-    if (!a || !tenteAchatHub({ ...a, plot: { minX: 0, minY: 0, maxX: 0, maxY: 0 } })) return
-    renderMarchandVoile()
-    return
-  } else return
-  audio.collect()
-  majMemoireUI()
-  renderMarchandVoile()
+// L'ÉCRAN DU MARCHAND (game/ecranMarchand.ts) : la maquette « Marchand v2 »
+// — il ne connaît ni les registres ni la caisse, il reçoit ce qu'il lit et
+// remet l'achat ici, par ces crochets. La caisse reste celle d'avant : les
+// registres pour les orbes et les améliorations, le comptoir (tenteAchatHub)
+// pour les provisions — un seul chemin par article, quel que soit l'écran.
+const ecranMarchand = new EcranMarchand(marchandEl, {
+  registres: () => ({
+    memoire: records.memoire(),
+    orbes: records.orbes(),
+    tissees: records.eveilAcquis(),
+    verrous: records.verrousCycle(),
+    ameliorations: records.ameliorations(),
+    servies: [...achatsHub],
+  }),
+  achete: (a) => {
+    if (a.rayon === 'provisions') {
+      // le comptoir sonne, compte et fait le toast lui-même
+      const base = articleComptoir(a.id)
+      return !!base && tenteAchatHub({ ...base, plot: { minX: 0, minY: 0, maxX: 0, maxY: 0 } })
+    }
+    if (a.rayon === 'orbes') {
+      if (!records.acheteOrbe(a.id, a.prix)) return false
+      toastFile.push({ nom: a.nom, icone: '🔮', sur: 'LE MARCHAND' })
+    } else {
+      if (!records.acheteAmelioration(a.id, a.prix)) return false
+      toastFile.push({ nom: `${a.nom} — ${a.detail}`, icone: a.icone, sur: 'LE MARCHAND' })
+    }
+    audio.collect()
+    majMemoireUI()
+    return true
+  },
+  fermer: () => ecranMarchand.close(),
+  manette: () => manette.connectee,
 })
 function ouvreMarchand(): void {
-  marchandEl.hidden = false
-  renderMarchandVoile()
+  ecranMarchand.open()
 }
-document.getElementById('marchand-fermer')?.addEventListener('click', () => {
-  marchandEl.hidden = true
-})
-marchandEl.addEventListener('pointerdown', (e) => {
-  if (e.target === marchandEl) marchandEl.hidden = true
-})
 
 // ---- Le voile FIOLES : la collection d'échantillons scellés ------------
 // Deux logements ; cliquer une fiole possédée l'équipe ou la range — les
@@ -2831,6 +2764,7 @@ const ecranCodex = new EcranCodex(codexEl, {
   // le mode concepteur se lit sur le body (data-dev) : c'est lui qui montre
   // ou cache les outils, l'atelier suit la même règle
   concepteur: () => document.body.classList.contains('concepteur'),
+  manette: () => manette.connectee,
   atelierJournal: () => {
     fermeCodex()
     void atelierJournal.open()
@@ -6560,17 +6494,21 @@ interface CoucheMenu {
   legere?: boolean
   /** condition d'activation supplémentaire (défaut : le conteneur est visible) */
   actif?: () => boolean
+  /** l'écran CONDUIT sa manette lui-même (le schéma des maquettes : croix
+   * = grille, LB/RB = rayon, A/X/Y = actions) — le parcours générique
+   * ne s'y applique pas, B reste la porte de sortie */
+  pilote?: () => void
 }
 const COUCHES_MENU: CoucheMenu[] = [
   { id: 'mb-veil' }, // la cérémonie : pas de porte de sortie — on choisit
-  { id: 'codex', retour: 'codex-fermer' },
+  { id: 'codex', retour: 'codex-fermer', pilote: () => ecranCodex.manette(manette, manettePollNow) },
   { id: 'cmds', retour: 'cmds-fermer' },
   { id: 'planche', retour: 'planche-fermer' },
   { id: 'regles', retour: 'regles-fermer' },
   { id: 'journal-atelier', retour: 'aj-fermer' }, // l'atelier du journal (récit & fins)
   { id: 'regie', retour: 'regie-fermer' }, // la console du concepteur — sous les outils, donc après eux
   { id: 'cycle', retour: 'cycle-fermer' }, // les mémoires — ouvertes au banc du hub aussi
-  { id: 'marchand', retour: 'marchand-fermer' }, // le marchand — ouvert à l'étal du hub aussi
+  { id: 'marchand', retour: 'marchand-fermer', pilote: () => ecranMarchand.manette(manette, manettePollNow) }, // le marchand — ouvert à l'étal du hub aussi
   { id: 'salles', retour: 'salles-fermer' },
   { id: 'records', retour: 'records-fermer' },
   // ouvrables AU CONTACT d'un pupitre, donc en pleine partie : sans elles
@@ -6742,6 +6680,11 @@ function navigueMenu(couche: CoucheMenu, dt: number): void {
     (manette.edge(BOUTON.START) || manette.edge(BOUTON.SELECT))
   ) {
     document.getElementById('codex-fermer')?.click()
+    return
+  }
+  // l'écran qui conduit sa manette lui-même : à lui la croix et les boutons
+  if (couche.pilote) {
+    couche.pilote()
     return
   }
   const els = actionnables(host)
