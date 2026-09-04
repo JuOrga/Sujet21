@@ -53,9 +53,11 @@ export const RAYONS_FICHES: readonly RayonCodex[] = [
   { id: 'scelle', groupe: null, nom: 'SCELLÉ', icone: '⚛', teinte: '#b48cff', sous: 'Le quatrième état. Secteur sous clé.', scelle: true },
 ]
 
-/** Le JOURNAL : le récit, une frise de fragments. */
+/** Le JOURNAL : le récit, une frise de fragments — et les FINS, une par
+ *  expédition bouclée, dans l'ordre. */
 export const RAYONS_JOURNAL: readonly RayonCodex[] = [
   { id: 'recit', groupe: 'recit', nom: 'LE RÉCIT', icone: '🛰', teinte: '#ffdda6', sous: 'Ce que le laboratoire a laissé derrière lui' },
+  { id: 'fins', groupe: 'fins', nom: 'LES FINS', icone: '🚪', teinte: '#b48cff', sous: 'Ce que devient le sujet quand l’expédition se boucle' },
 ]
 
 export function rayonsDe(mode: ModeCodex): readonly RayonCodex[] {
@@ -114,7 +116,9 @@ export function indice(d: CodexDef): string {
     return `Toucher ${mat} à l’état ${ETATS[d.etat]}.`
   }
   if (d.groupe === 'recit')
-    return 'Un fragment du récit reste à révéler — il se livre au fil des retours au laboratoire.'
+    return 'Un fragment du récit reste à révéler — il se livre à chaque expédition bouclée.'
+  if (d.groupe === 'fins')
+    return 'Une fin reste à atteindre — elle se révèle quand une expédition se boucle, dans l’ordre.'
   return 'Un phénomène du protocole reste à provoquer en jouant.'
 }
 

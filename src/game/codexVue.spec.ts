@@ -38,7 +38,7 @@ describe('les rayons du codex', () => {
   it('la progression compte par mode', () => {
     const c = connu(['eau-mur', 'recit-livraison'])
     expect(progression('fiches', c)).toMatchObject({ faites: 1 })
-    expect(progression('journal', c)).toMatchObject({ faites: 1, total: 10, pct: 10 })
+    expect(progression('journal', c)).toMatchObject({ faites: 1, total: 11, pct: 9 })
     expect(progression('fiches', () => false).pct).toBe(0)
   })
 })
@@ -58,6 +58,8 @@ describe('la navigation et les indices', () => {
     expect(indice(d)).not.toContain(d.titre)
     expect(indice(CODEX.find((x) => x.id === 'rosee')!)).toContain('phénomène')
     expect(indice(CODEX.find((x) => x.id === 'recit-alerte')!)).toContain('récit')
+    expect(indice(CODEX.find((x) => x.id === 'fin-miroir')!)).toContain('fin')
+    expect(indice(CODEX.find((x) => x.id === 'fin-miroir')!)).not.toContain('miroir')
   })
 
   it('la date de découverte se lit, ou se tait', () => {

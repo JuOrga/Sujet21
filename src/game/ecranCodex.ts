@@ -112,7 +112,7 @@ export class EcranCodex {
         fichesDuRayon(x).some((d) => d.id === fiche),
       )
       if (r) {
-        this.mode = r.groupe === 'recit' ? 'journal' : 'fiches'
+        this.mode = rayonsDe('journal').includes(r) ? 'journal' : 'fiches'
         this.rayon = r.id
         this.filtre = 'tous'
         this.sel = fiche
@@ -199,7 +199,7 @@ export class EcranCodex {
       .join('')
     this.el('cx-note').textContent =
       this.mode === 'journal'
-        ? 'Chaque retour au laboratoire peut révéler un fragment.'
+        ? 'Chaque expédition bouclée révèle un fragment du récit — et une fin.'
         : 'Les ? sont des expériences à tenter. Chaque fiche se gagne en jouant.'
   }
 
@@ -227,6 +227,7 @@ export class EcranCodex {
       return
     }
     if (this.mode === 'journal') {
+      const fins = r.groupe === 'fins'
       grille.className = 'cx-grille cx-frise'
       grille.innerHTML = liste
         .map((d) => {
@@ -237,7 +238,7 @@ export class EcranCodex {
           return (
             `<button type="button" class="cx-fragment${ok ? '' : ' cx-verrou'}${on ? ' on' : ''}${this.neuve === d.id ? ' cx-neuve' : ''}" data-fiche="${esc(d.id)}">` +
             `<span class="cx-point"></span>` +
-            `<span class="cx-tag">${ok ? 'FRAGMENT RÉVÉLÉ' : 'FRAGMENT VERROUILLÉ'}</span><span class="cx-quand">${esc(quand)}</span>` +
+            `<span class="cx-tag">${fins ? (ok ? 'FIN ATTEINTE' : 'FIN VERROUILLÉE') : ok ? 'FRAGMENT RÉVÉLÉ' : 'FRAGMENT VERROUILLÉ'}</span><span class="cx-quand">${esc(quand)}</span>` +
             `<b>${ok ? esc(lu!.titre) : '— — —'}</b>` +
             `<span class="cx-extrait">${ok ? esc(lu!.texte) : esc(indice(d))}</span></button>`
           )
@@ -281,6 +282,7 @@ export class EcranCodex {
     const reg = this.hooks.reglage(d.id)
     const rar = rareteDef(reg.rarete)
     const src = videoDe(d.id, reg.video)
+    const sousCle = r.groupe === 'fins' ? ['FIN VERROUILLÉE', 'FIN SOUS CLÉ'] : ['FRAGMENT VERROUILLÉ', 'FRAGMENT SOUS CLÉ']
     const video = ok
       ? `<div class="cx-video" data-video="${esc(d.id)}">` +
         `<video muted loop autoplay playsinline preload="metadata"${src.poster ? ` poster="${esc(src.poster)}"` : ''}><source src="${esc(src.src)}"></video>` +
@@ -288,8 +290,8 @@ export class EcranCodex {
       : `<div class="cx-video cx-video--absente cx-video--verrou"><span class="cx-hex cx-hex--grand"><i>?</i></span></div>`
     panneau.innerHTML =
       video +
-      `<div class="cx-fiche-titres"><span class="cx-etiquette" style="color:${r.teinte}">${ok ? `FICHE N° ${numero}` : this.mode === 'journal' ? 'FRAGMENT VERROUILLÉ' : 'EXPÉRIENCE À TENTER'}</span>` +
-      `<h3>${ok ? esc(lu!.titre) : this.mode === 'journal' ? 'FRAGMENT SOUS CLÉ' : 'FICHE VERROUILLÉE'}</h3>` +
+      `<div class="cx-fiche-titres"><span class="cx-etiquette" style="color:${r.teinte}">${ok ? `FICHE N° ${numero}` : this.mode === 'journal' ? sousCle[0] : 'EXPÉRIENCE À TENTER'}</span>` +
+      `<h3>${ok ? esc(lu!.titre) : this.mode === 'journal' ? sousCle[1] : 'FICHE VERROUILLÉE'}</h3>` +
       `<small>${esc(r.nom)}${ok && d.etat !== undefined ? ' × contact' : ''}</small></div>` +
       `<p class="cx-texte${ok ? '' : ' cx-texte--muet'}">${ok ? esc(lu!.texte) : 'Le vaisseau n’a rien consigné. Ce que le fluide fait ici reste à observer de vos propres yeux.'}</p>` +
       (ok

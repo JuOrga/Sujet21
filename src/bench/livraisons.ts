@@ -31,6 +31,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '04/09/2026 10:59',
+    title: 'LES FINS : chaque expédition bouclée révèle un fragment du récit et la fin suivante, dans l’ordre',
+    notes: [
+      'LA DEMANDE, après l’état des lieux : « ordre fixe pour les fins, fragments à chaque run terminée ; on pense faire une ou plusieurs fins alternatives, evil, semi-evil… ». Jusqu’ici le récit se livrait à CHAQUE retour au laboratoire — run bouclée, dispersée ou abandonnée —, et il n’existait ni fins au codex, ni lien entre boucler une expédition et quoi que ce soit du récit.',
+      'LA RÈGLE : une expédition BOUCLÉE (le module objectif de la carte épuisé) sert le prochain fragment du récit ET la prochaine fin non-vue, chacun dans sa file ordonnée (decouvertes.ts : DECOUVERTES, FINS). Une run perdue ou abandonnée ne raconte plus rien. Jamais depuis l’outil, un essai d’éditeur, ni avant l’acte 0. Conséquence assumée : la révélation du secteur 4 vient à la dixième expédition bouclée (docs/scenario.md tranché).',
+      'LES FINS SONT DES FICHES DU CODEX (groupe fins, ids fin-<nom>) : toast, date, lecture, mémoire, rareté et vidéo passent par le mécanisme des fiches — l’atelier du concepteur les règle comme les autres. La première est LE MIROIR, la fin de l’arc (la cinématique du secteur 4). Les fins alternatives prévues s’ajoutent en queue de FINS avec leur fiche, rien d’autre à brancher ; jamais réordonner, et jamais « fin-jouee », le marqueur de la cinématique vue (testé).',
+      'AU CODEX : le journal a deux rayons, LE RÉCIT et LES FINS (« ce que devient le sujet quand l’expédition se boucle ») ; une fin verrouillée se dit FIN SOUS CLÉ avec son indice (« se révèle quand une expédition se boucle, dans l’ordre »), une fin révélée FIN ATTEINTE ; la progression du journal les compte. La note du rail dit la nouvelle règle.',
+      'VÉRIFIÉ : 877 tests verts dans 78 fichiers (les fins ↔ fiches, l’ordre des fins, l’indice qui ne dit pas le titre, la progression du journal à 11), type-check à 0, build propre ; au navigateur (page d’essai) : rayon LES FINS 0 / 1, fin sous clé et indice, fin atteinte ouverte depuis le toast dans le bon mode et le bon rayon — zéro erreur. Le déclenchement en jeu (expédition bouclée) n’a pas été joué d’ici.',
+    ],
+  },
+  {
     date: '04/09/2026 10:42',
     title: 'CHAQUE FICHE RAPPORTE DE LA MÉMOIRE : le montant, la rareté et la vidéo se règlent fiche par fiche, dans le codex même',
     notes: [

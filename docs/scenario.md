@@ -125,6 +125,15 @@ semblables, douche/mutations.
   journaux encore présents dans les données des tableaux sont un héritage
   à purger/remplacer quand la nouvelle voix sera choisie.)
 - Les textes système (fin de tableau, défaite) dans la nouvelle voix.
-- Le nombre de runs avant la révélation du miroir spatial.
-- La fin du jeu (l'acte d'évasion hérité de la v1 est écarté ; rien ne le
-  remplace encore).
+- ~~Le nombre de runs avant la révélation du miroir spatial.~~ Tranché :
+  le récit se livre **un fragment par expédition bouclée** (dix fragments,
+  `src/game/decouvertes.ts`) ; une run perdue ou abandonnée ne raconte
+  rien. La révélation vient donc à la dixième expédition bouclée.
+- **Les fins** : chaque expédition bouclée révèle aussi **la prochaine fin**,
+  dans l'ordre fixe de `FINS` (`decouvertes.ts`), comme une fiche du codex
+  (groupe `fins`, rayon LES FINS du journal). La première est « Le miroir »
+  (la cinématique MIROIR du secteur 4). Les fins alternatives prévues
+  (« evil », « semi-evil »…) restent à écrire : chacune est une entrée de
+  plus en queue de `FINS` et sa fiche dans `codex.ts` — rien d'autre à
+  brancher. La mémoire, la rareté et la vidéo de chaque fin se règlent
+  dans l'atelier du codex, comme pour toute fiche.

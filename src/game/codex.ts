@@ -17,7 +17,7 @@ import {
   MAT_WALL,
 } from './level'
 
-export type CodexGroupe = 'eau' | 'glace' | 'vapeur' | 'phenomenes' | 'recit'
+export type CodexGroupe = 'eau' | 'glace' | 'vapeur' | 'phenomenes' | 'recit' | 'fins'
 
 export interface CodexDef {
   id: string
@@ -438,6 +438,18 @@ export const CODEX: CodexDef[] = [
     titre: 'Le choix',
     texte:
       'Tout est raconté. Le sceau du secteur 4 n’a plus de raison de tenir : la route du plasma mène au convoyeur, le convoyeur mène là-haut. Devenir l’œil du télescope — ou rester ce que vous êtes devenu. Personne n’a jamais eu ce choix avant vous. Le sas s’ouvre.',
+  },
+  // ---- LES FINS 🚪 — une par expédition BOUCLÉE, dans l'ordre de
+  // decouvertes.ts (FINS). La première est la fin de l'arc (la cinématique
+  // MIROIR) ; les fins alternatives (le concepteur en prévoit — « evil »,
+  // « semi-evil »…) s'ajoutent ici ET dans FINS, jamais ailleurs -------
+  {
+    id: 'fin-miroir',
+    groupe: 'fins',
+    icone: '🪞',
+    titre: 'Le miroir',
+    texte:
+      'La route du plasma mène au convoyeur, le convoyeur mène là-haut. Un télescope achevé à un miroir près attend son œil. Devenir l’œil qui regarde l’univers — ou rester ce que vous êtes devenu. Le sas s’ouvre : cette fois, c’est vous qui décidez.',
   },
 ]
 

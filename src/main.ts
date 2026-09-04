@@ -31,6 +31,7 @@ import {
   DECOUVERTES,
   prochaineDecouverte,
   recitAcheve,
+  prochaineFin,
 } from './game/decouvertes'
 import {
   MECANIQUE_NOMS,
@@ -11563,16 +11564,8 @@ function newExpedition(avecCarte = false): void {
 // Fin de run (dernier échantillon dispersé, ou expédition conclue) : le
 // laboratoire rappelle — on se réveille AU HUB, prêt à relancer par le sas.
 function retourAuLabo(): void {
-  // ---- L'ARC DES DÉCOUVERTES : chaque retour de run (bouclée, dispersée
-  // ou abandonnée) livre le prochain jalon du récit — la fiche se
-  // consigne au codex (groupe RÉCIT), le toast est celui des fiches.
-  // (jamais depuis un ESSAI d'éditeur ni avant l'acte 0 : le récit ne se
-  // livre qu'aux vraies descentes)
-  const jalon = prochaineDecouverte(records.decouvertesVues())
-  if (jalon && eveilJoue() && !testLevel) {
-    records.noteDecouverte(jalon)
-    codex.marque(`recit-${jalon}`)
-  }
+  // (le récit et les fins ne se livrent plus ici : une run perdue ou
+  // abandonnée ne raconte rien — c'est l'expédition BOUCLÉE qui les sert)
   // LE DISTILLATEUR (réparé) : la prime du retour — le delta garanti
   if (records.estRepare('distillateur') && !testLevel) {
     gagneMemoireRun(2)
@@ -13959,6 +13952,24 @@ function frame(now: number): void {
       run.ended = true
       if (!sasOutil) trophees.debloque('integrale')
       gagneMemoireRun(10) // l'expédition bouclée grave son souvenir
+      // L'ARC DES DÉCOUVERTES ET LES FINS : une expédition BOUCLÉE livre
+      // le prochain fragment du récit, puis la prochaine fin — chacun dans
+      // sa file, dans l'ordre. La fiche se consigne au codex (groupes
+      // RÉCIT et FINS), le toast est celui des fiches. Jamais depuis
+      // l'outil, un ESSAI d'éditeur, ni avant l'acte 0 : le récit ne se
+      // livre qu'aux vraies descentes.
+      if (!sasOutil && eveilJoue() && !testLevel) {
+        const jalon = prochaineDecouverte(records.decouvertesVues())
+        if (jalon) {
+          records.noteDecouverte(jalon)
+          codex.marque(`recit-${jalon}`)
+        }
+        const fin = prochaineFin(records.decouvertesVues())
+        if (fin) {
+          records.noteDecouverte(fin)
+          codex.marque(fin)
+        }
+      }
       const sallesFranchies = voieRang
       // une expédition CONCLUE PAR L'OUTIL ne s'inscrit nulle part : ni
       // record d'expédition, ni tableau partagé
