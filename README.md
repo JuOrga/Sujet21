@@ -6,10 +6,10 @@ une partie de soi-même — **se déplacer, c'est rétrécir**.
 
 Le document de référence est [`docs/doc-fonctionnel.md`](docs/doc-fonctionnel.md).
 
-## État — version 0.21.423, une run jouable de bout en bout
+## État — version 0.21.424, une run jouable de bout en bout
 
 Le jeu tourne dans le navigateur, sur ordinateur, tablette et téléphone.
-**423 livraisons consignées entre le 08/08/2026 et le 04/09/2026** — le journal
+**424 livraisons consignées entre le 08/08/2026 et le 04/09/2026** — le journal
 complet se lit dans l'écran NOTES DE VERSION, les données sont dans
 [`src/bench/livraisons.ts`](src/bench/livraisons.ts).
 
@@ -93,6 +93,12 @@ Objectif : rejoindre le sas avec le plus de volume possible.
 
 **Les outils du concepteur** sont derrière le mode concepteur : `?dev` dans
 l'URL, ou sept tapes rapides sur le numéro de version (tactile compris).
+Le bouton RÉGIE ouvre leur console : un rail — la carte, la descente, la
+planche, le récit et les fins, le scénario et le montage, le codex, le
+marchand, les récompenses, les textes —, la vue d'ensemble de ce qui est
+publié pour tout le monde, et le tir à blanc du système de run (pour N
+expéditions bouclées : fragment, fin, révélation, dénouement, cinématiques).
+Les autres boutons de l'accueil restent des raccourcis vers les mêmes outils.
 `?editeur` ouvre l'éditeur directement, `?carte` l'éditeur de la carte de la
 station, `?tableau=N` démarre à la salle N,
 `?spawn=x,y` place le corps.
@@ -100,7 +106,7 @@ station, `?tableau=N` démarre à la salle N,
 ## Qualité
 
 ```bash
-pnpm test        # 906 tests dans 80 fichiers, ~23 s
+pnpm test        # 910 tests dans 81 fichiers, ~23 s
 pnpm type-check
 pnpm build
 ```

@@ -171,3 +171,12 @@ semblables, douche/mutations.
     poste, reprendre une publiée (même code) pour la retoucher, retirer ;
     le poste prime par code.
   Partout, l'écran dit ce que les joueurs jouent et ce que ce poste joue.
+- **LA RÉGIE** (`src/editor/regie.ts`, bouton RÉGIE de l'accueil) : la
+  console du concepteur. Un rail vers chaque outil du système de run, la
+  VUE D'ENSEMBLE de ce qui est publié domaine par domaine (pastilles sur le
+  rail), et le TIR À BLANC (`src/game/tirABlanc.ts`, pur, testé) : pour N
+  expéditions bouclées, ce que chacune révèle (fragment, fin), les seuils
+  franchis (révélation, dénouement) et les cinématiques que le scénario
+  déclenche au retour au hub puis au lancement — c'est là qu'on voit si dix
+  runs avant le secteur 4, c'est trop ou pas assez. Le tir ne fait tomber
+  aucun trophée et suppose la passerelle 4 réparée.
