@@ -372,6 +372,10 @@ export function fichesCodex(): CodexDef[] {
 }
 
 const CLE = 'sujet21-codex'
+// LE FILET DU DÉBLOCAGE : ce que le concepteur avait vraiment découvert,
+// mis de côté le temps qu'il regarde le codex complet. Sans lui, « tout
+// débloquer » effacerait sa partie sans retour possible.
+const CLE_AVANT = 'sujet21-codex-avant-deblocage'
 
 /** Découvertes (id → date ISO), persistées en local. `onDecouverte` reçoit
  * chaque fiche NOUVELLEMENT consignée — le toast s'y accroche. */
@@ -412,6 +416,58 @@ export class Codex {
       // stockage refusé : la découverte restera en mémoire de session
     }
     this.onDecouverte(def)
+  }
+
+  /** Tout est-il consigné ? (le bouton du concepteur bascule là-dessus) */
+  toutConnu(): boolean {
+    const f = fichesCodex()
+    return f.length > 0 && f.every((d) => this.connu(d.id))
+  }
+
+  /** LE DÉBLOCAGE DU CONCEPTEUR : toutes les fiches consignées d'un coup,
+   *  pour regarder l'écran plein sans jouer trente parties. L'état d'avant
+   *  part de côté — `reverrouille()` le rend. Aucun `onDecouverte` n'est
+   *  tiré : trente toasts d'affilée ne servent personne. */
+  debloqueTout(): void {
+    if (!this.aUnRetour()) this.ecrit(CLE_AVANT, this.etat)
+    const quand = new Date().toISOString()
+    for (const d of fichesCodex()) if (!(d.id in this.etat)) this.etat[d.id] = quand
+    this.ecrit(CLE, this.etat)
+  }
+
+  /** Rend l'état d'avant le déblocage — sans filet, tout se reverrouille. */
+  reverrouille(): void {
+    let avant: Record<string, string> = {}
+    try {
+      const s = this.storage ?? localStorage
+      avant = JSON.parse(s.getItem(CLE_AVANT) ?? '{}') as Record<string, string>
+    } catch {
+      avant = {}
+    }
+    this.etat = avant && typeof avant === 'object' ? avant : {}
+    this.ecrit(CLE, this.etat)
+    try {
+      ;(this.storage ?? localStorage).removeItem(CLE_AVANT)
+    } catch {
+      // stockage refusé : le filet ne survivra pas à la session, tant pis
+    }
+  }
+
+  /** Un état d'avant attend-il d'être rendu ? */
+  aUnRetour(): boolean {
+    try {
+      return (this.storage ?? localStorage).getItem(CLE_AVANT) !== null
+    } catch {
+      return false
+    }
+  }
+
+  private ecrit(cle: string, valeur: Record<string, string>): void {
+    try {
+      ;(this.storage ?? localStorage).setItem(cle, JSON.stringify(valeur))
+    } catch {
+      // stockage refusé : la découverte restera en mémoire de session
+    }
   }
 
   /** Consigne toutes les combinaisons vues dans le tableau de contacts du
