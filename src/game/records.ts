@@ -100,6 +100,21 @@ export interface StorageLike {
 }
 
 const KEY = 'projet21.registres.v1'
+// Le récit se notait par son nom court (« livraison ») ; il se note par
+// l'id de sa fiche (« recit-livraison »), comme les fins — une seule clé,
+// celle du codex. Les registres d'avant se relisent à l'identique.
+const ANCIENS_JALONS = [
+  'livraison',
+  'cahier-charges',
+  'note-vega',
+  'calibrations',
+  'endormis',
+  'semblable',
+  'alerte',
+  'la-haut',
+  'precurseurs',
+  'le-choix',
+]
 const HISTORY_MAX = 40
 
 function blank(): RecordsData {
@@ -172,6 +187,9 @@ export class Records {
           if (!Array.isArray(d.cycleVerrous)) d.cycleVerrous = [] // avant les verrous
           if (!Array.isArray(d.reparations)) d.reparations = [] // avant l'accident
           if (!Array.isArray(d.decouvertes)) d.decouvertes = [] // avant le récit
+          d.decouvertes = (d.decouvertes as unknown[])
+            .filter((id): id is string => typeof id === 'string')
+            .map((id) => (ANCIENS_JALONS.includes(id) ? `recit-${id}` : id))
           if (!Array.isArray(d.orbes)) d.orbes = [] // avant les orbes
           if (!Array.isArray(d.ameliorations)) d.ameliorations = []
           if (!Array.isArray(d.cachesVidees)) d.cachesVidees = []

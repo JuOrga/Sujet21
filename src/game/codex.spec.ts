@@ -3,7 +3,7 @@
 // écrites, la découverte persiste, et la lecture des contacts du solveur
 // débloque la bonne fiche — jamais une autre.
 import { describe, expect, it } from 'vitest'
-import { CODEX, Codex, codexCle } from './codex'
+import { CODEX_EXPERIENCES, Codex, codexCle, fichesCodex } from './codex'
 import {
   MAT_CHAUD,
   MAT_FROID,
@@ -44,12 +44,12 @@ const MATS_PHYSIQUES = [
 
 describe('Codex — la table des fiches', () => {
   it('les identifiants sont uniques', () => {
-    const ids = CODEX.map((d) => d.id)
+    const ids = fichesCodex().map((d) => d.id)
     expect(new Set(ids).size).toBe(ids.length)
   })
 
   it('chaque fiche est écrite : titre et texte non vides, une icône', () => {
-    for (const d of CODEX) {
+    for (const d of fichesCodex()) {
       expect(d.titre.length, d.id).toBeGreaterThan(4)
       expect(d.texte.length, d.id).toBeGreaterThan(30)
       expect(d.icone.length, d.id).toBeGreaterThan(0)
@@ -59,18 +59,21 @@ describe('Codex — la table des fiches', () => {
   it('la matrice est complète : chaque matériau physique × chaque état', () => {
     for (const mat of MATS_PHYSIQUES) {
       for (const etat of [0, 1, 2] as const) {
-        const fiches = CODEX.filter((d) => d.mat === mat && d.etat === etat)
+        const fiches = CODEX_EXPERIENCES.filter((d) => d.mat === mat && d.etat === etat)
         expect(fiches.length, `mat ${mat} × état ${etat}`).toBe(1)
       }
     }
     // 27 combinaisons + les fiches « phénomènes »
-    const combos = CODEX.filter((d) => d.mat !== undefined)
+    const combos = CODEX_EXPERIENCES.filter((d) => d.mat !== undefined)
     expect(combos.length).toBe(27)
-    expect(CODEX.length).toBeGreaterThan(combos.length)
+    expect(CODEX_EXPERIENCES.length).toBeGreaterThan(combos.length)
+    // le journal (récit, fins) s'ajoute aux expériences, jamais parmi elles
+    expect(CODEX_EXPERIENCES.some((d) => d.groupe === 'recit' || d.groupe === 'fins')).toBe(false)
+    expect(fichesCodex().length).toBeGreaterThan(CODEX_EXPERIENCES.length)
   })
 
   it('les groupes suivent l’état de la combinaison', () => {
-    for (const d of CODEX) {
+    for (const d of fichesCodex()) {
       if (d.etat === undefined) {
         // sans combinaison : un phénomène (événement), un jalon du RÉCIT, une FIN
         expect(['phenomenes', 'recit', 'fins'].includes(d.groupe), d.id).toBe(true)

@@ -8,7 +8,7 @@ import {
 } from './atelier'
 import { catalogueTextes, cleTexte, enCle } from './catalogue'
 import { codexLu, langueLue, poseLangueLue, texteDe } from './lecture'
-import { CODEX } from '../game/codex'
+import { CODEX_EXPERIENCES } from '../game/codex'
 
 // LA BASCULE : LE JEU LIT LE CATALOGUE.
 // Tant que le jeu affichait les chaînes du code, l'atelier des textes ne
@@ -17,7 +17,7 @@ import { CODEX } from '../game/codex'
 // ne laisse JAMAIS un blanc au joueur.
 
 const CAT = catalogueTextes()
-const UNE = CODEX[0]
+const UNE = CODEX_EXPERIENCES[0]
 const CLE_TITRE = cleTexte('codex', UNE.id, 'titre')
 
 describe('Le jeu lit le catalogue', () => {
@@ -50,7 +50,7 @@ describe('Le jeu lit le catalogue', () => {
     expect(codexLu(UNE).titre).toBe(UNE.titre)
     expect(codexLu(UNE).texte.length).toBeGreaterThan(0)
     // aucune fiche du codex ne peut sortir blanche, même à 0 % traduit
-    for (const d of CODEX) {
+    for (const d of CODEX_EXPERIENCES) {
       expect(codexLu(d).titre.trim().length, d.id).toBeGreaterThan(0)
       expect(codexLu(d).texte.trim().length, d.id).toBeGreaterThan(0)
     }
@@ -83,7 +83,7 @@ describe('Le jeu lit le catalogue', () => {
     // le piège que ce test ferme : deux fabrications de clé qui divergent.
     // La retouche se rangerait sous un nom que le jeu n'irait pas chercher,
     // et l'écran des textes montrerait « RETOUCHÉ » sans que rien ne change.
-    for (const d of CODEX) {
+    for (const d of CODEX_EXPERIENCES) {
       for (const [champ, defaut] of [
         ['titre', d.titre],
         ['texte', d.texte.trim()],

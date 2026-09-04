@@ -6,10 +6,10 @@ une partie de soi-même — **se déplacer, c'est rétrécir**.
 
 Le document de référence est [`docs/doc-fonctionnel.md`](docs/doc-fonctionnel.md).
 
-## État — version 0.21.420, une run jouable de bout en bout
+## État — version 0.21.421, une run jouable de bout en bout
 
 Le jeu tourne dans le navigateur, sur ordinateur, tablette et téléphone.
-**420 livraisons consignées entre le 08/08/2026 et le 04/09/2026** — le journal
+**421 livraisons consignées entre le 08/08/2026 et le 04/09/2026** — le journal
 complet se lit dans l'écran NOTES DE VERSION, les données sont dans
 [`src/bench/livraisons.ts`](src/bench/livraisons.ts).
 
@@ -60,7 +60,10 @@ complet (~7 000 lignes) ; l'**éditeur de la carte** de la station — le plan
 s'exporte en `carteStation.json`, la source de vérité que le jeu lit
 ([`docs/carte-station.md`](docs/carte-station.md)) ; la
 PLANCHE — toutes les salles de la bibliothèque partagée en vignettes dessinées
-depuis leur géométrie, l'ordre y est la séquence de l'expédition —, et un
+depuis leur géométrie, l'ordre y est la séquence de l'expédition —, l'atelier
+RÉCIT & FINS — le récit et les fins que chaque expédition bouclée révèle, dans
+l'ordre du concepteur, avec les seuils de la révélation et du dénouement
+([`docs/scenario.md`](docs/scenario.md)) —, et un
 générateur qui refuse tout tirage dont la traversée ne se démontre pas.
 Bibliothèque, palmarès, présets, cinématiques et images sont partagés entre
 concepteurs par une API sur Vercel Blob.
@@ -93,7 +96,7 @@ station, `?tableau=N` démarre à la salle N,
 ## Qualité
 
 ```bash
-pnpm test        # 877 tests dans 78 fichiers, ~23 s
+pnpm test        # 888 tests dans 78 fichiers, ~23 s
 pnpm type-check
 pnpm build
 ```

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CODEX } from './codex'
+import { fichesCodex } from './codex'
 import {
   RAYONS_FICHES,
   RAYONS_JOURNAL,
@@ -20,8 +20,8 @@ describe('les rayons du codex', () => {
   it('les fiches et le journal se partagent tout le codex, sans doublon ni oubli', () => {
     const fiches = RAYONS_FICHES.flatMap(fichesDuRayon)
     const journal = RAYONS_JOURNAL.flatMap(fichesDuRayon)
-    expect(fiches.length + journal.length).toBe(CODEX.length)
-    expect(new Set([...fiches, ...journal].map((d) => d.id)).size).toBe(CODEX.length)
+    expect(fiches.length + journal.length).toBe(fichesCodex().length)
+    expect(new Set([...fiches, ...journal].map((d) => d.id)).size).toBe(fichesCodex().length)
     // le rayon scellé n'a rien : il annonce, il ne ment pas
     expect(fichesDuRayon(RAYONS_FICHES.find((r) => r.scelle)!)).toEqual([])
     expect(rayonsDe('journal')).toBe(RAYONS_JOURNAL)
@@ -53,13 +53,13 @@ describe('la navigation et les indices', () => {
   })
 
   it('l’indice dit le matériau et l’état, jamais le titre', () => {
-    const d = CODEX.find((x) => x.id === 'glace-rideau')!
+    const d = fichesCodex().find((x) => x.id === 'glace-rideau')!
     expect(indice(d)).toBe('Toucher un rideau lamellaire à l’état glace.')
     expect(indice(d)).not.toContain(d.titre)
-    expect(indice(CODEX.find((x) => x.id === 'rosee')!)).toContain('phénomène')
-    expect(indice(CODEX.find((x) => x.id === 'recit-alerte')!)).toContain('récit')
-    expect(indice(CODEX.find((x) => x.id === 'fin-miroir')!)).toContain('fin')
-    expect(indice(CODEX.find((x) => x.id === 'fin-miroir')!)).not.toContain('miroir')
+    expect(indice(fichesCodex().find((x) => x.id === 'rosee')!)).toContain('phénomène')
+    expect(indice(fichesCodex().find((x) => x.id === 'recit-alerte')!)).toContain('récit')
+    expect(indice(fichesCodex().find((x) => x.id === 'fin-miroir')!)).toContain('fin')
+    expect(indice(fichesCodex().find((x) => x.id === 'fin-miroir')!)).not.toContain('miroir')
   })
 
   it('la date de découverte se lit, ou se tait', () => {

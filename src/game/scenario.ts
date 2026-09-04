@@ -44,6 +44,8 @@ export type ConditionScenario =
   | 'trophee'
   | 'condensat-min'
   | 'decouvertes-min'
+  | 'revelation'
+  | 'denouement'
 
 export const CONDITIONS: ConditionScenario[] = [
   'toujours',
@@ -53,6 +55,8 @@ export const CONDITIONS: ConditionScenario[] = [
   'trophee',
   'condensat-min',
   'decouvertes-min',
+  'revelation',
+  'denouement',
 ]
 
 export const CONDITION_NOMS: Record<ConditionScenario, string> = {
@@ -62,7 +66,11 @@ export const CONDITION_NOMS: Record<ConditionScenario, string> = {
   'salle-min': 'meilleure salle atteinte ≥ N',
   trophee: 'trophée débloqué',
   'condensat-min': 'condensat ≥ N',
-  'decouvertes-min': 'jalons du récit servis ≥ N',
+  'decouvertes-min': 'fragments du récit servis ≥ N',
+  // les deux seuils vivent dans le JOURNAL (atelier RÉCIT & FINS) : la
+  // règle n'a pas de N à tenir en double
+  revelation: 'la révélation est atteinte (seuil de fragments du journal)',
+  denouement: 'le dénouement est atteint (seuil de fins du journal)',
 }
 
 /** La condition a-t-elle besoin du seuil N ? (l'éditeur masque le reste) */
@@ -96,7 +104,9 @@ export interface EtatScenario {
   runs: number // runs terminées
   salleMax: number // meilleure salle atteinte
   condensat: number
-  decouvertes: number // jalons du récit déjà servis
+  decouvertes: number // fragments du récit déjà servis
+  revelation: boolean // le seuil de fragments du journal est atteint
+  denouement: boolean // le seuil de fins du journal est atteint
   trophee: (id: string) => boolean
 }
 
@@ -140,6 +150,10 @@ function conditionRemplie(r: RegleScenario, etat: EtatScenario): boolean {
       return etat.condensat >= r.valeur
     case 'decouvertes-min':
       return etat.decouvertes >= r.valeur
+    case 'revelation':
+      return etat.revelation
+    case 'denouement':
+      return etat.denouement
     case 'trophee':
       return !!r.trophee && etat.trophee(r.trophee)
     default:
@@ -242,8 +256,8 @@ export const SCENARIO_LIVRE: ScenarioDef = {
     {
       id: 'livre-revelation',
       moment: 'avant-hub',
-      condition: 'decouvertes-min',
-      valeur: 10,
+      condition: 'revelation', // le seuil de fragments est celui du journal
+      valeur: 0,
       trophee: '',
       cine: 'REVELATION', // le sceau tombe : la route du télescope
       uneFois: true,
