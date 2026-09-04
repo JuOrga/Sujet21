@@ -16,6 +16,15 @@
 
 import type { CodexDef } from './codex'
 import {
+  RARETES,
+  estDefaut,
+  litFichierVideo,
+  rareteDef,
+  type EnvoiVideo,
+  type RareteFiche,
+  type ReglageFiche,
+} from './codexReglages'
+import {
   ecritCibles,
   fichesDuRayon,
   formateQuand,
@@ -38,6 +47,14 @@ export interface HooksCodex {
   /** le titre et le texte tels que le catalogue des textes les lit */
   lu(d: CodexDef): { titre: string; texte: string }
   fermer(): void
+  /** le réglage effectif d'une fiche : mémoire, rareté, vidéo envoyée */
+  reglage(id: string): ReglageFiche
+  /** le mode concepteur est-il actif ? (l'atelier ne se montre qu'à lui) */
+  concepteur(): boolean
+  /** enregistre un réglage au magasin partagé — false : l'envoi a échoué */
+  sauve(id: string, r: { memoire: number; rarete: RareteFiche }, video?: EnvoiVideo | 'retirer'): Promise<boolean>
+  /** rétablit les défauts d'une fiche — false : l'envoi a échoué */
+  retablit(id: string): Promise<boolean>
 }
 
 const esc = (t: string): string =>
@@ -52,6 +69,12 @@ export class EcranCodex {
   private cibles: Set<string>
   private neuve: string | null = null
   private stockage: Storage | null
+  // l'atelier du concepteur reste déplié d'une fiche à l'autre — on règle
+  // dix fiches d'affilée, on ne rouvre pas dix fois le volet
+  private atelierOuvert = false
+  private atelierEtat = ''
+  private envoiEnCours = false
+  private fichePeinte: string | null = null
 
   constructor(
     private host: HTMLElement,
@@ -67,6 +90,10 @@ export class EcranCodex {
     this.cibles = litCibles(st)
     host.innerHTML = gabarit()
     host.addEventListener('click', (e) => this.clic(e))
+    host.addEventListener('toggle', (e) => {
+      const t = e.target as HTMLElement
+      if (t.classList.contains('cx-atelier')) this.atelierOuvert = (t as HTMLDetailsElement).open
+    }, true)
     host.addEventListener('pointerdown', (e) => {
       if (e.target === host) this.hooks.fermer()
     })
@@ -244,13 +271,19 @@ export class EcranCodex {
       panneau.innerHTML = `<div class="cx-fiche-vide"><span class="cx-hex cx-hex--grand"><i>${r.icone}</i></span><p>${esc(r.scelle ? 'Secteur sous clé.' : 'Choisissez une fiche.')}</p></div>` + piedFiche()
       return
     }
+    // le message de l'atelier parle d'UNE fiche : il ne suit pas la suivante
+    if (this.fichePeinte !== d.id) this.atelierEtat = ''
+    this.fichePeinte = d.id
     const ok = this.hooks.connu(d.id)
     const lu = ok ? this.hooks.lu(d) : null
     const numero = String(fichesDuRayon(r).indexOf(d) + 1).padStart(2, '0')
     const cible = this.cibles.has(d.id)
+    const reg = this.hooks.reglage(d.id)
+    const rar = rareteDef(reg.rarete)
+    const src = videoDe(d.id, reg.video)
     const video = ok
       ? `<div class="cx-video" data-video="${esc(d.id)}">` +
-        `<video muted loop autoplay playsinline preload="metadata" poster="${esc(videoDe(d.id).poster)}"><source src="${esc(videoDe(d.id).src)}" type="video/webm"></video>` +
+        `<video muted loop autoplay playsinline preload="metadata"${src.poster ? ` poster="${esc(src.poster)}"` : ''}><source src="${esc(src.src)}"></video>` +
         `<span class="cx-hex cx-hex--grand"><i>${d.icone}</i></span><em>APERÇU À VENIR</em></div>`
       : `<div class="cx-video cx-video--absente cx-video--verrou"><span class="cx-hex cx-hex--grand"><i>?</i></span></div>`
     panneau.innerHTML =
@@ -260,9 +293,14 @@ export class EcranCodex {
       `<small>${esc(r.nom)}${ok && d.etat !== undefined ? ' × contact' : ''}</small></div>` +
       `<p class="cx-texte${ok ? '' : ' cx-texte--muet'}">${ok ? esc(lu!.texte) : 'Le vaisseau n’a rien consigné. Ce que le fluide fait ici reste à observer de vos propres yeux.'}</p>` +
       (ok
-        ? `<div class="cx-stats"><div><span>DÉCOUVERT</span><b>${esc(formateQuand(this.hooks.quand(d.id)) || '—')}</b></div><div><span>RAYON</span><b style="color:${r.teinte}">${esc(r.nom)}</b></div></div>`
+        ? `<div class="cx-stats"><div><span>DÉCOUVERT</span><b>${esc(formateQuand(this.hooks.quand(d.id)) || '—')}</b></div><div><span>RAYON</span><b style="color:${r.teinte}">${esc(r.nom)}</b></div>` +
+          `<div><span>RARETÉ</span><b style="color:${rar.teinte}">${rar.nom}</b></div><div><span>MÉMOIRE GAGNÉE</span><b class="cx-memoire">${reg.memoire > 0 ? `+${reg.memoire}` : '—'}</b></div></div>`
         : `<div class="cx-indice"><span>INDICE</span><p>${esc(indice(d))}</p>` +
-          `<button type="button" id="cx-cibler" class="${cible ? 'on' : ''}">${cible ? '◎ OBJECTIF SUIVI' : 'MARQUER COMME OBJECTIF'}</button></div>`) +
+          `<button type="button" id="cx-cibler" class="${cible ? 'on' : ''}">${cible ? '◎ OBJECTIF SUIVI' : 'MARQUER COMME OBJECTIF'}</button></div>` +
+          // ce que la découverte rapporte se lit AVANT de tenter : c'est
+          // l'appât de l'expérience (demande du concepteur)
+          `<div class="cx-gain"><span>À LA DÉCOUVERTE</span><b class="cx-memoire">${reg.memoire > 0 ? `+${reg.memoire} MÉMOIRE` : 'RIEN À GAGNER'}</b><small style="color:${rar.teinte}">RARETÉ ${rar.nom}</small></div>`) +
+      (this.hooks.concepteur() ? this.gabaritAtelier(d, reg) : '') +
       piedFiche()
     // la vidéo absente ne casse rien : le glyphe reste, avec « aperçu à venir »
     const v = panneau.querySelector<HTMLVideoElement>('.cx-video video')
@@ -276,6 +314,70 @@ export class EcranCodex {
         // lecture refusée (politique du navigateur) : le poster suffit
       })
     }
+  }
+
+  // ---- L'ATELIER DU CONCEPTEUR ----------------------------------------------
+  // Sous la fiche, en mode concepteur seulement : la mémoire gravée à la
+  // découverte, la rareté, la vidéo — enregistrés au magasin partagé, pour
+  // tous. Le titre et le texte se réécrivent dans l'atelier des TEXTES :
+  // un seul endroit par nature de retouche.
+
+  private gabaritAtelier(d: CodexDef, reg: ReglageFiche): string {
+    const retouche = !estDefaut(reg)
+    return (
+      `<details class="cx-atelier"${this.atelierOuvert ? ' open' : ''}><summary>ATELIER · CONCEPTEUR${retouche ? ' <i>réglée</i>' : ''}</summary>` +
+      `<div class="cx-atelier-corps">` +
+      `<label><span>MÉMOIRE À LA DÉCOUVERTE</span><input type="number" id="cx-at-memoire" min="0" max="500" step="1" value="${reg.memoire}"></label>` +
+      `<label><span>RARETÉ</span><select id="cx-at-rarete">` +
+      RARETES.map((r) => `<option value="${r.id}"${r.id === reg.rarete ? ' selected' : ''}>${r.nom}</option>`).join('') +
+      `</select></label>` +
+      `<label><span>VIDÉO DE L’EFFET</span><small>${reg.video ? 'envoyée depuis l’atelier' : `celle du dossier (assets/codex/${esc(d.id)}.webm), si elle existe`}</small>` +
+      `<input type="file" id="cx-at-video" accept="video/webm,video/mp4"></label>` +
+      `<div class="cx-atelier-boutons">` +
+      `<button type="button" id="cx-at-sauver"${this.envoiEnCours ? ' disabled' : ''}>ENREGISTRER</button>` +
+      (reg.video ? `<button type="button" id="cx-at-retirer-video"${this.envoiEnCours ? ' disabled' : ''}>RETIRER LA VIDÉO</button>` : '') +
+      (retouche ? `<button type="button" id="cx-at-retablir"${this.envoiEnCours ? ' disabled' : ''}>RÉTABLIR LES DÉFAUTS</button>` : '') +
+      `</div>` +
+      `<p class="cx-atelier-etat">${esc(this.atelierEtat)}</p>` +
+      `<p class="cx-atelier-note">Titre et texte se réécrivent dans l’atelier des TEXTES (accueil, mode concepteur).${reg.auteur ? ` Dernier réglage : ${esc(reg.auteur)}${reg.date ? `, ${esc(formateQuand(reg.date))}` : ''}.` : ''}</p>` +
+      `</div></details>`
+    )
+  }
+
+  private lectureAtelier(): { memoire: number; rarete: RareteFiche } | null {
+    const m = this.host.querySelector<HTMLInputElement>('#cx-at-memoire')
+    const r = this.host.querySelector<HTMLSelectElement>('#cx-at-rarete')
+    if (!m || !r) return null
+    const memoire = Math.max(0, Math.min(500, Math.round(Number(m.value) || 0)))
+    const rarete = RARETES.some((x) => x.id === r.value) ? (r.value as RareteFiche) : 'normale'
+    return { memoire, rarete }
+  }
+
+  /** ENREGISTRER : le réglage, et la vidéo choisie s'il y en a une. */
+  private async sauveAtelier(id: string): Promise<void> {
+    const lu = this.lectureAtelier()
+    if (!lu || this.envoiEnCours) return
+    const fichier = this.host.querySelector<HTMLInputElement>('#cx-at-video')?.files?.[0]
+    let video: EnvoiVideo | undefined
+    if (fichier) {
+      if (!litFichierVideo(fichier)) {
+        this.atelierEtat = 'Vidéo refusée : webm ou mp4, 3 Mo au plus.'
+        this.render()
+        return
+      }
+      video = { type: fichier.type, data: await enBase64(fichier) }
+    }
+    await this.envoie(id, () => this.hooks.sauve(id, lu, video), video ? 'Réglage et vidéo enregistrés.' : 'Réglage enregistré.')
+  }
+
+  private async envoie(id: string, action: () => Promise<boolean>, succes: string): Promise<void> {
+    this.envoiEnCours = true
+    this.atelierEtat = 'Envoi…'
+    this.render()
+    const ok = await action()
+    this.envoiEnCours = false
+    this.atelierEtat = ok ? succes : 'Échec de l’envoi : le magasin partagé ne répond pas.'
+    if (this.sel === id) this.render()
   }
 
   // ---- LES GESTES ------------------------------------------------------------
@@ -322,6 +424,16 @@ export class EcranCodex {
       else this.cibles.add(this.sel)
       ecritCibles(this.stockage, this.cibles)
       this.render()
+      return
+    }
+    const id = this.sel
+    if (!id) return
+    if (b.id === 'cx-at-sauver') void this.sauveAtelier(id)
+    else if (b.id === 'cx-at-retirer-video') {
+      const lu = this.lectureAtelier()
+      if (lu) void this.envoie(id, () => this.hooks.sauve(id, lu, 'retirer'), 'Vidéo retirée : celle du dossier reprend, si elle existe.')
+    } else if (b.id === 'cx-at-retablir') {
+      void this.envoie(id, () => this.hooks.retablit(id), 'Défauts rétablis.')
     }
   }
 
@@ -349,6 +461,19 @@ export class EcranCodex {
     if (!e) throw new Error(`codex : #${id} manque dans le gabarit`)
     return e
   }
+}
+
+/** Le fichier en base64 nu, prêt pour le corps JSON de l'envoi. */
+function enBase64(f: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader()
+    r.onerror = () => reject(r.error)
+    r.onload = () => {
+      const s = String(r.result)
+      resolve(s.slice(s.indexOf(',') + 1))
+    }
+    r.readAsDataURL(f)
+  })
 }
 
 function piedFiche(): string {

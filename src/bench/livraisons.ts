@@ -31,6 +31,20 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '04/09/2026 10:42',
+    title: 'CHAQUE FICHE RAPPORTE DE LA MÉMOIRE : le montant, la rareté et la vidéo se règlent fiche par fiche, dans le codex même',
+    notes: [
+      'LA DEMANDE : « garder un système de récompenses en mémoire au déblocage des fiches, cela donne envie au joueur de faire des expériences ; définir ce nombre par fiche côté admin ; gérer les entrées du codex pour les admins ; la rareté — tout à normal, je modifierai plus tard ; oublie pas la vidéo ». Et pas de paliers : la barre de progression reste une information, pas une récompense.',
+      'CE QUI MANQUAIT : une fiche découverte déclenchait le toast et le son, et rien d’autre — seuls les trophées gravaient de la mémoire (dix chacun, en dur). Aucun réglage n’existait par fiche, et la vidéo ne pouvait venir que du dépôt.',
+      'LE RÉGLAGE D’UNE FICHE (game/codexReglages.ts, testé) : la MÉMOIRE gravée à la découverte (dix par défaut, zéro possible, cinq cents au plus), la RARETÉ (normale pour toutes, rare, légendaire — un nom et une teinte chacune), et la VIDÉO envoyée. Le code ne porte que les défauts ; le magasin partagé (/api/codex, Vercel Blob, même mécanique que les images : document JSON + blob binaire par vidéo) ne garde que les écarts. Hors-ligne ou magasin muet, chaque fiche vaut ses défauts : jamais une mémoire NaN, jamais une fiche muette.',
+      'À LA DÉCOUVERTE, la fiche grave sa mémoire — une seule fois, Codex.marque le garantit — et le toast le dit (« … · +10 mémoire »), comme les trophées. La fiole de SOUVENIR majore ce gain comme les autres. Une fiche à zéro ne grave rien et son toast ne promet rien.',
+      'DANS LE PANNEAU DE DROITE : sur une fiche connue, RARETÉ et MÉMOIRE GAGNÉE rejoignent la date et le rayon ; sur une fiche verrouillée, un cartouche « À LA DÉCOUVERTE +10 MÉMOIRE · RARETÉ NORMALE » se lit AVANT de tenter — c’est l’appât de l’expérience. Rien de faux : pas de pourcentage de sujets (il faudrait un serveur qui compte les joueurs), pas de récompense de palier.',
+      'L’ATELIER DU CONCEPTEUR : en mode concepteur seulement, un volet ATELIER sous chaque fiche — mémoire, rareté, envoi d’une vidéo (webm ou mp4, 3 Mo au plus : le corps d’une fonction Vercel plafonne à 4,5 Mo base64 compris), RETIRER LA VIDÉO (le dossier reprend la main), RÉTABLIR LES DÉFAUTS. Le volet reste déplié d’une fiche à l’autre (on en règle dix d’affilée), son message ne suit pas la fiche suivante, et il rappelle que le titre et le texte se réécrivent dans l’atelier des TEXTES — un seul endroit par nature de retouche. La vidéo envoyée prime sur celle du dossier (LISEZ-MOI mis à jour).',
+      'CE QUI N’EST PAS FAIT, ET POURQUOI : créer une fiche NOUVELLE depuis l’atelier. Une fiche se découvre par un contact matériau × état ou par un événement du jeu : sans son détecteur dans le code, une fiche créée en données ne se débloquerait jamais. La liste des fiches reste dans codex.ts ; tout ce qui se règle dessus est à la main du concepteur.',
+      'VÉRIFIÉ : 875 tests verts dans 78 fichiers, type-check à 0, build propre, l’API type-checkée à part (api/ n’est pas dans le tsconfig du jeu) ; et au navigateur (Chromium, page d’essai n’important que l’écran, envoi simulé) : stats rareté et mémoire, cartouche de gain sur une fiche verrouillée, atelier absent hors mode concepteur, enregistrer 40 / légendaire puis relecture, vidéo envoyée puis retirée (source du dossier de retour), fichier .mov refusé, défauts rétablis, flèches et Échap inertes dans un champ de l’atelier — zéro erreur console. Le magasin réel (Vercel Blob) n’a pas été appelé d’ici : à contrôler en prévisualisation.',
+    ],
+  },
+  {
     date: '04/09/2026 10:16',
     title: 'LE CODEX REFAIT : le rail des états, les fiches en hexagones, la fiche lue — et la vidéo de l’effet',
     notes: [

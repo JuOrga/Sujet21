@@ -2784,6 +2784,30 @@
       #codex #cx-cibler:hover { background: rgba(255, 210, 74, 0.25); }
       #codex #cx-cibler.on { color: #1a1200; background: #ffd24a; border-color: #ffd24a; }
       .cx-fiche-vide { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 30px 0; color: var(--dim); font-size: calc(12px * var(--ui)); }
+      .cx-memoire { color: #ffd24a !important; }
+      .cx-gain { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255, 210, 74, 0.18); background: rgba(255, 210, 74, 0.04); }
+      .cx-gain span { font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.2em; color: var(--dim); }
+      .cx-gain b { font-size: calc(12px * var(--ui)); font-weight: 400; letter-spacing: 0.08em; }
+      .cx-gain small { margin-left: auto; font-size: calc(9px * var(--ui)); letter-spacing: 0.18em; }
+      /* L'ATELIER DU CONCEPTEUR : sous la fiche, mode concepteur seulement */
+      .cx-atelier { border: 1px dashed rgba(150, 200, 235, 0.3); border-radius: 10px; background: rgba(3, 7, 16, 0.5); }
+      .cx-atelier summary { cursor: pointer; padding: 9px 14px; font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.2em; color: var(--dim); list-style: none; }
+      .cx-atelier summary::before { content: '▸ '; }
+      .cx-atelier[open] summary::before { content: '▾ '; }
+      .cx-atelier summary i { font-style: normal; color: #ffd24a; }
+      .cx-atelier-corps { display: flex; flex-direction: column; gap: 10px; padding: 4px 14px 12px; }
+      .cx-atelier label { display: flex; flex-direction: column; gap: 4px; }
+      .cx-atelier label span { font-size: calc(9px * var(--ui)); letter-spacing: 0.18em; color: var(--dim); }
+      .cx-atelier label small { font-size: calc(10px * var(--ui)); color: var(--dim); }
+      .cx-atelier input, .cx-atelier select { font: inherit; font-size: calc(12px * var(--ui)); color: #eaf6ff; background: rgba(3, 7, 16, 0.7); border: 1px solid rgba(150, 200, 235, 0.25); border-radius: 6px; padding: 6px 8px; max-width: 100%; }
+      .cx-atelier input[type='file'] { font-size: calc(10px * var(--ui)); padding: 4px; }
+      .cx-atelier-boutons { display: flex; flex-wrap: wrap; gap: 6px; }
+      .cx-atelier-boutons button { font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.16em; padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(150, 200, 235, 0.35); background: rgba(99, 183, 230, 0.08); color: #eaf6ff; cursor: pointer; }
+      .cx-atelier-boutons button:hover:not(:disabled) { background: rgba(99, 183, 230, 0.2); }
+      .cx-atelier-boutons button:disabled { opacity: 0.5; cursor: wait; }
+      .cx-atelier-etat { margin: 0; min-height: 1em; font-size: calc(11px * var(--ui)); color: #ffd24a; }
+      .cx-atelier-etat:empty { display: none; }
+      .cx-atelier-note { margin: 0; font-size: calc(10px * var(--ui)); line-height: 1.5; color: var(--dim); }
       .cx-pied { margin-top: auto; display: flex; justify-content: space-between; font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; color: var(--dim); padding-top: 8px; border-top: 1px solid rgba(150, 200, 235, 0.1); }
       @media (prefers-reduced-motion: reduce) {
         #codex .cx-carte, #codex .cx-fragment, .cx-barre i, .cx-anneau .cx-arc { transition: none; }

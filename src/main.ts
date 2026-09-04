@@ -7,6 +7,13 @@ import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
 import { evenementsPlasma } from './game/plasmaFx'
 import { Codex } from './game/codex'
+import {
+  deleteReglageCodex,
+  fetchReglagesCodex,
+  pushReglageCodex,
+  reglageDe,
+  type ReglagesCodex,
+} from './game/codexReglages'
 import { niveauExpanse } from './game/structures'
 import {
   TABLEAU_HUB,
@@ -2031,9 +2038,22 @@ trophees.onDebloque = (t) => {
 // Le CODEX partage la fanfare des trophées : même toast, autre étiquette —
 // et sa page (fiche d'essai, bouton CODEX) se remplit au fil des découvertes
 const codex = new Codex()
+// LES RÉGLAGES DU CODEX (mémoire à la découverte, rareté, vidéo envoyée) :
+// le magasin partagé les donne, le code porte les défauts — hors-ligne,
+// chaque fiche vaut dix de mémoire et sa vidéo est celle du dossier
+let reglagesCodex: ReglagesCodex = {}
+void fetchReglagesCodex().then((r) => {
+  if (!r) return
+  reglagesCodex = r
+  renderCodexVoile()
+})
 codex.onDecouverte = (d) => {
+  // chaque fiche grave sa mémoire — le montant est réglé par le concepteur,
+  // fiche par fiche ; une seule fois, Codex.marque le garantit
+  const gain = reglageDe(reglagesCodex, d.id).memoire
+  gagneMemoireRun(gain)
   toastFile.push({
-    nom: codexLu(d).titre,
+    nom: gain > 0 ? `${codexLu(d).titre} · +${gain} mémoire` : codexLu(d).titre,
     icone: d.icone,
     sur: 'CODEX — NOUVELLE FICHE',
     fiche: d.id,
@@ -2712,6 +2732,20 @@ const ecranCodex = new EcranCodex(codexEl, {
   quand: (id) => codex.quand(id),
   lu: (d) => codexLu(d),
   fermer: () => fermeCodex(),
+  reglage: (id) => reglageDe(reglagesCodex, id),
+  // le mode concepteur se lit sur le body (data-dev) : c'est lui qui montre
+  // ou cache les outils, l'atelier suit la même règle
+  concepteur: () => document.body.classList.contains('concepteur'),
+  sauve: async (id, r, video) => {
+    const res = await pushReglageCodex(id, r, records.operator() || 'anonyme', video)
+    if (res) reglagesCodex = res
+    return res !== null
+  },
+  retablit: async (id) => {
+    const res = await deleteReglageCodex(id)
+    if (res) reglagesCodex = res
+    return res !== null
+  },
 })
 function renderCodexVoile(): void {
   ecranCodex.render()

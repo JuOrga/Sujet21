@@ -147,7 +147,10 @@ export function ecritCibles(storage: { setItem(k: string, v: string): void } | n
 
 // ---- LA VIDÉO D'UNE FICHE ----------------------------------------------------
 // Une vidéo par fiche, nommée par son id, dans public/assets/codex/ (voir le
-// LISEZ-MOI du dossier). Absente, l'écran montre le glyphe : rien ne casse.
-export function videoDe(id: string): { src: string; poster: string } {
+// LISEZ-MOI du dossier) — ou ENVOYÉE depuis l'atelier du codex, et alors
+// c'est elle qui prime (codexReglages.ts). Absente, l'écran montre le
+// glyphe : rien ne casse.
+export function videoDe(id: string, envoyee = ''): { src: string; poster: string } {
+  if (envoyee) return { src: envoyee, poster: '' }
   return { src: `/assets/codex/${id}.webm`, poster: `/assets/codex/${id}.webp` }
 }

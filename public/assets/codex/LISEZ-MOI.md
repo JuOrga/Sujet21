@@ -15,3 +15,10 @@ jamais sa vidéo.
 
 Ce dossier est servi tel quel par Vite (`public/`) ; aucun manifeste à
 tenir : déposer le fichier suffit.
+
+**L'autre chemin, sans passer par le dépôt** : en mode concepteur, chaque
+fiche du codex a un volet ATELIER sous son texte — la mémoire gravée à la
+découverte, la rareté, et l'envoi d'une vidéo (webm ou mp4, 3 Mo au plus).
+La vidéo envoyée est rangée dans le magasin partagé (`/api/codex`, Vercel
+Blob) et **prime sur celle du dossier** ; « retirer la vidéo » rend la main
+au dossier.
