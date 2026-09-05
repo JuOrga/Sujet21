@@ -308,6 +308,15 @@ import {
 import { Records } from './game/records'
 import { coffre } from './game/coffre'
 import {
+  ETAT_EAU,
+  ETAT_GLACE,
+  ETAT_VAPEUR,
+  EnregistreurFantome,
+  Fantomes,
+  LecteurFantome,
+  type CategorieFantome,
+} from './game/fantome'
+import {
   fichePupitre,
   plaquePupitre,
   type EcranPupitre,
@@ -2074,6 +2083,68 @@ function majFpsCoin(dtReal: number): void {
 // Les déblocages passent par un toast (la petite fanfare) ; la page vit
 // dans le voile RECORDS. Détection par échantillonnage léger (4 Hz).
 const trophees = new Trophees(coffre.stockage)
+
+// ---- LES FANTÔMES (game/fantome.ts) : la trace du corps, rejouée -----------
+// À chaque salle, la course s'enregistre (dix échantillons par seconde de
+// temps simulé) ; au sas, si un record tombe, sa trace prend la place de
+// l'ancienne — VOLUME et CHRONO, chacun sa silhouette. Les fantômes de la
+// salle se relisent à l'entrée et se dessinent sur le canvas d'effets, au
+// temps simulé du tableau : la pause les fige, le time warp les presse.
+// Rangés dans l'emplacement de sauvegarde, donc dans le fichier que le
+// Steam Cloud synchronise.
+const fantomes = new Fantomes(coffre.stockage)
+let fantomeRec: EnregistreurFantome | null = null
+let fantomesLus: { cat: CategorieFantome; lecteur: LecteurFantome }[] = []
+// le réglage de l'appareil : voir ou non les fantômes (PARAMÈTRES)
+let fantomesVisibles = localStorage.getItem('sujet21-fantomes') !== 'off'
+// ce qui vient d'être dessiné (position écran, rayon) : lu par la sonde de test
+let fantomesDessines: { cat: CategorieFantome; sx: number; sy: number; r: number }[] = []
+function armeFantomes(): void {
+  fantomeRec = null
+  fantomesLus = []
+  // ni le hub ni l'essai d'éditeur ne consignent de record : pas de fantôme
+  if (testLevel || auHub) return
+  fantomeRec = new EnregistreurFantome()
+  const f = fantomes.pour(level.code)
+  if (f.volume) fantomesLus.push({ cat: 'volume', lecteur: new LecteurFantome(f.volume) })
+  // la même course détient les deux records : une seule silhouette
+  const meme = f.volume && f.chrono && f.volume.donnees === f.chrono.donnees
+  if (f.chrono && !meme) fantomesLus.push({ cat: 'chrono', lecteur: new LecteurFantome(f.chrono) })
+}
+/** Au pas de simulation : un échantillon par cran de cadence, pas plus —
+ *  le parcours des particules n'a lieu que dix fois par seconde simulée. */
+function echantillonneFantome(): void {
+  if (!fantomeRec || sim.dispersed || !fantomeRec.aBesoin(run.tableauTime)) return
+  sim.updatePlayerStats()
+  let gel = 0
+  let gaz = 0
+  for (let i = 0; i < sim.count; i++) {
+    if (sim.kind[i] !== KIND_PLAYER) continue
+    if (sim.frozen[i] === 1) gel++
+    else if (sim.gaseous[i] === 1) gaz++
+  }
+  const n = sim.playerCount
+  const etat =
+    n > 0 && gel * 2 >= n ? ETAT_GLACE : n > 0 && gaz * 2 >= n ? ETAT_VAPEUR : ETAT_EAU
+  fantomeRec.note(run.tableauTime, {
+    x: sim.stats.centroidX,
+    y: sim.stats.centroidY,
+    r: sim.stats.rmsRadius,
+    cl: sim.liters() * 100,
+    etat,
+  })
+}
+// Sonde de test : suivre les fantômes depuis la console (comme __sim, __eveil)
+;(window as unknown as { __fantomes: unknown }).__fantomes = {
+  rangement: fantomes,
+  rec: () => fantomeRec,
+  lus: () => fantomesLus,
+  code: () => level.code,
+  dessines: () => fantomesDessines,
+  montre: (v: boolean) => {
+    fantomesVisibles = v
+  },
+}
 const tropheeToast = document.getElementById('trophee-toast') as HTMLDivElement
 // LE GENRE D'UNE RÉCOMPENSE : six natures partageaient un seul bandeau
 // gris — trophée, fiche de codex, éclat de mémoire, fiole, achat. Le genre
@@ -3517,6 +3588,31 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     renderFleche()
   }
 
+  const choixFantomes = document.getElementById(
+    'params-fantomes',
+  ) as HTMLDivElement | null
+  if (choixFantomes) {
+    const renderFantomes = (): void => {
+      choixFantomes.innerHTML = ''
+      for (const [visibles, cle, label] of [
+        [true, 'on', 'VISIBLES'],
+        [false, 'off', 'MASQUÉS'],
+      ] as const) {
+        const b = document.createElement('button')
+        b.type = 'button'
+        b.textContent = label
+        b.className = fantomesVisibles === visibles ? 'actif' : ''
+        b.addEventListener('click', () => {
+          fantomesVisibles = visibles
+          localStorage.setItem('sujet21-fantomes', cle)
+          renderFantomes()
+        })
+        choixFantomes.appendChild(b)
+      }
+    }
+    renderFantomes()
+  }
+
   const choixLumiere = document.getElementById(
     'params-lumiere',
   ) as HTMLDivElement | null
@@ -3761,6 +3857,7 @@ protoReset?.addEventListener('click', () => {
   try {
     coffre.stockage.removeItem('projet21.registres.v1')
     coffre.stockage.removeItem('sujet21-signature-v1')
+    coffre.stockage.removeItem('sujet21-fantomes-v1') // les fantômes suivent les records
   } catch {
     // stockage indisponible : rien à effacer non plus
   }
@@ -8415,6 +8512,46 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
 // Tout est lissé (naissance, cap, longueur) : la flèche glisse, elle ne
 // saute pas. En visée de dash, la ligne du dash prend le relais.
 const fleche = { alpha: 0, ang: 0, len: 60 }
+/** Les silhouettes des fantômes de la salle, au temps simulé du tableau.
+ *  Le rayon quadratique moyen d'un disque plein vaut R/√2 : on dessine à
+ *  1,4 fois le rms pour retrouver le bord du corps. */
+function drawFantomes(vw: number, vh: number, dpr: number): void {
+  fantomesDessines = []
+  if (!fantomesVisibles || fantomesLus.length === 0) return
+  if (!document.body.classList.contains('playing')) return
+  const dprC = Math.min(dpr, 2)
+  const g = fxCtx
+  g.setTransform(dprC, 0, 0, dprC, 0, 0)
+  for (const { cat, lecteur } of fantomesLus) {
+    const e = lecteur.a(run.tableauTime)
+    if (!e) continue
+    const sx = vw * 0.5 + (e.x - camera.x) * camera.zoom
+    const sy = vh * 0.5 - (e.y - camera.y) * camera.zoom
+    const r = Math.max(4, e.r * 1.41 * camera.zoom)
+    fantomesDessines.push({ cat, sx, sy, r })
+    const teinte =
+      e.etat === ETAT_GLACE ? '205,236,255' : e.etat === ETAT_VAPEUR ? '236,226,255' : '120,200,255'
+    const grad = g.createRadialGradient(sx, sy, r * 0.15, sx, sy, r)
+    grad.addColorStop(0, `rgba(${teinte},0.2)`)
+    grad.addColorStop(1, `rgba(${teinte},0.02)`)
+    g.fillStyle = grad
+    g.beginPath()
+    g.arc(sx, sy, r, 0, Math.PI * 2)
+    g.fill()
+    g.strokeStyle = `rgba(${teinte},0.5)`
+    g.lineWidth = 1.2
+    g.setLineDash([4, 5])
+    g.stroke()
+    g.setLineDash([])
+    // l'étiquette : quel record, et qui l'a posé
+    g.font = '9px Michroma, "Arial Black", sans-serif'
+    g.textAlign = 'center'
+    g.fillStyle = `rgba(${teinte},0.7)`
+    const qui = lecteur.def.nom ? ` · ${lecteur.def.nom}` : ''
+    g.fillText(`${cat === 'volume' ? 'VOLUME' : 'CHRONO'}${qui}`, sx, sy - r - 6)
+  }
+}
+
 function drawFleche(dtReal: number, dpr: number): void {
   const enJeu = document.body.classList.contains('playing')
   const aMain =
@@ -12093,6 +12230,7 @@ function restart(): void {
   majVoieHud()
   sim = createSim(level)
   exposeSim()
+  armeFantomes()
   resetLasers()
   loop.reset()
   overlay.classList.remove('visible')
@@ -13902,6 +14040,7 @@ function frame(now: number): void {
         // finir dans le sas — c'est au joueur de décider quand y renoncer.
         sim.step(params.dt)
         run.tableauTime += params.dt // temps simulé : le time warp ne fausse pas les records
+        echantillonneFantome()
         run.runTime += params.dt // le vaisseau refroidit au fil de l'expédition
         // la mise en scène avance au TEMPS DE JEU : une pause la suspend,
         // une cinématique aussi (la boucle physique ne tourne plus)
@@ -14524,6 +14663,13 @@ function frame(now: number): void {
     const { newVolume, newChrono } = sasOutil
       ? { newVolume: false, newChrono: false }
       : records.noteCollection(level.code, surplus, run.tableauTime)
+    // le record tombe : sa trace devient le fantôme de la salle
+    if (fantomeRec && (newVolume || newChrono)) {
+      const trace = fantomeRec.fin(records.operator(), surplus, run.tableauTime)
+      if (newVolume) fantomes.pose(level.code, 'volume', trace)
+      if (newChrono) fantomes.pose(level.code, 'chrono', trace)
+    }
+    fantomeRec = null
     // LA MÉMOIRE se grave à chaque sas — l'information survit à la purge :
     // +5 la traversée, +5 la toute première de ce tableau, +2 par record ;
     // LE MUR DES RECORDS réparé double la part des records (le banc
@@ -14782,6 +14928,7 @@ function frame(now: number): void {
   updateWorldLabels(vw, vh)
   appliqueSequence() // carte et secousse de la mise en scène
   drawMecanismes(vw, vh, dpr)
+  drawFantomes(vw, vh, dpr)
   drawFleche(dtReal, dpr)
   majIdle(dtReal)
   majPresence(dtReal, aim.x, aim.y)
