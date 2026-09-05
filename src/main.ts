@@ -306,6 +306,7 @@ import {
   sauveScenario,
 } from './game/scenario'
 import { Records } from './game/records'
+import { coffre } from './game/coffre'
 import {
   fichePupitre,
   plaquePupitre,
@@ -521,7 +522,7 @@ const sfx = {
 }
 
 // Registres du labo (§10) : records par tableau et historique des essais.
-const records = new Records()
+const records = new Records(coffre.stockage)
 
 // ---- LA MÉMOIRE : la monnaie PERSISTANTE de l'Éveil, gravée dans les
 // registres. De l'information, pas de la matière : la purge de fin de run
@@ -546,11 +547,11 @@ function gagneMemoireRun(n: number): void {
 // la mémoire, une fois pour toutes — 10 cL de matière = 1 souvenir. La clé
 // disparaît ensuite : rien ne se migre deux fois.
 try {
-  const brut = Math.floor(Number(localStorage.getItem(CLE_CONDENSAT)))
+  const brut = Math.floor(Number(coffre.stockage.getItem(CLE_CONDENSAT)))
   if (Number.isFinite(brut) && brut > 0) {
     records.gagneMemoire(Math.max(1, Math.floor(brut / 10)))
   }
-  localStorage.removeItem(CLE_CONDENSAT)
+  coffre.stockage.removeItem(CLE_CONDENSAT)
 } catch {
   // stockage indisponible : rien à migrer
 }
@@ -936,7 +937,7 @@ const CLE_PALMARES_VOIE = 'sujet21-voie-palmares-v1'
 function chargePalmaresVoie(): PalmaresVoie {
   let brut: string | null = null
   try {
-    brut = localStorage.getItem(CLE_PALMARES_VOIE)
+    brut = coffre.stockage.getItem(CLE_PALMARES_VOIE)
   } catch {
     brut = null
   }
@@ -944,7 +945,7 @@ function chargePalmaresVoie(): PalmaresVoie {
 }
 function sauvePalmaresVoie(p: PalmaresVoie): void {
   try {
-    localStorage.setItem(CLE_PALMARES_VOIE, JSON.stringify(p))
+    coffre.stockage.setItem(CLE_PALMARES_VOIE, JSON.stringify(p))
   } catch {
     // stockage refusé : tant pis pour cette fois
   }
@@ -963,7 +964,7 @@ interface SalleElue {
 function chargeButin(): SalleElue[] {
   try {
     const arr = JSON.parse(
-      localStorage.getItem(CLE_BUTIN_VOIE) ?? '[]',
+      coffre.stockage.getItem(CLE_BUTIN_VOIE) ?? '[]',
     ) as unknown
     return Array.isArray(arr)
       ? (arr as SalleElue[]).filter(
@@ -976,7 +977,7 @@ function chargeButin(): SalleElue[] {
 }
 function sauveButin(butin: SalleElue[]): void {
   try {
-    localStorage.setItem(CLE_BUTIN_VOIE, JSON.stringify(butin.slice(0, 20)))
+    coffre.stockage.setItem(CLE_BUTIN_VOIE, JSON.stringify(butin.slice(0, 20)))
   } catch {
     // stockage refusé : le butin ne tiendra que la session — sans gravité
   }
@@ -1447,7 +1448,7 @@ requestAnimationFrame(() => {
     majInviteSon()
     renderRegistres()
     try {
-      localStorage.setItem('sujet21-signature-v1', '1')
+      coffre.stockage.setItem('sujet21-signature-v1', '1')
     } catch {
       // sans gravité : le voile se remontrerait, simple re-clic
     }
@@ -1465,7 +1466,7 @@ requestAnimationFrame(() => {
   // clic suffit) et le son s'éveille par la même occasion. La clé versionnée
   // garantit « une fois » ; la re-signature n'efface aucun record.
   const CLE_SIGNATURE = 'sujet21-signature-v1'
-  if (!records.operator() || !localStorage.getItem(CLE_SIGNATURE)) {
+  if (!records.operator() || !coffre.stockage.getItem(CLE_SIGNATURE)) {
     sigNom.value = records.operator()
     sigEl.hidden = false
     // le focus attend une image : le champ existe et la fiche est posée —
@@ -1529,7 +1530,7 @@ const obCle = (): string =>
 const CLE_EVEIL = 'sujet21-eveil-v3' // v3 : l'accident du télescope — l'acte 0 se rejoue pour tous
 function eveilJoue(): boolean {
   try {
-    return !!localStorage.getItem(CLE_EVEIL)
+    return !!coffre.stockage.getItem(CLE_EVEIL)
   } catch {
     return true // stockage muet : ne jamais enfermer le joueur
   }
@@ -2072,7 +2073,7 @@ function majFpsCoin(dtReal: number): void {
 // ---- Trophées du protocole : succès internes, prêts pour Steam ----
 // Les déblocages passent par un toast (la petite fanfare) ; la page vit
 // dans le voile RECORDS. Détection par échantillonnage léger (4 Hz).
-const trophees = new Trophees()
+const trophees = new Trophees(coffre.stockage)
 const tropheeToast = document.getElementById('trophee-toast') as HTMLDivElement
 // LE GENRE D'UNE RÉCOMPENSE : six natures partageaient un seul bandeau
 // gris — trophée, fiche de codex, éclat de mémoire, fiole, achat. Le genre
@@ -2125,7 +2126,7 @@ trophees.onDebloque = (t) => {
 }
 // Le CODEX partage la fanfare des trophées : même toast, autre étiquette —
 // et sa page (fiche d'essai, bouton CODEX) se remplit au fil des découvertes
-const codex = new Codex()
+const codex = new Codex(coffre.stockage)
 // LES RÉGLAGES DU CODEX (mémoire à la découverte, rareté, vidéo envoyée) :
 // le magasin partagé les donne, le code porte les défauts — hors-ligne,
 // chaque fiche vaut dix de mémoire et sa vidéo est celle du dossier
@@ -2638,6 +2639,164 @@ document.getElementById('fioles-fermer')?.addEventListener('click', () => {
 })
 fiolesEl.addEventListener('pointerdown', (e) => {
   if (e.target === fiolesEl) fiolesEl.hidden = true
+})
+
+// ---- Le voile SAUVEGARDES : les trois emplacements du coffre ---------------
+// Trois cartes, une par emplacement : le résumé lu sans ouvrir la partie
+// (game/coffre.ts), l'actif marqué. JOUER écrit le pointeur et RECHARGE —
+// tout l'état de ce fichier se construit à l'ouverture depuis l'emplacement
+// actif, on ne le rebâtit pas à chaud. EFFACER se confirme en deux clics
+// (comme la réinitialisation de l'opérateur). EXPORTER livre le document tel
+// qu'écrit — le fichier que le Steam Cloud synchronisera — et IMPORTER le
+// repose dans l'emplacement visé.
+const sauvegardesEl = document.getElementById('sauvegardes') as HTMLDivElement
+const svCorps = document.getElementById('sv-corps') as HTMLDivElement
+const svFichier = document.getElementById('sv-fichier') as HTMLInputElement
+let svEffaceArme: { n: number; t: number } | null = null
+let svImportVers = 0
+let svDit: { n: number; texte: string } | null = null
+function fmtQuandCoffre(iso: string): string {
+  const d = iso ? new Date(iso) : null
+  if (!d || Number.isNaN(d.getTime())) return ''
+  const p = (v: number): string => String(v).padStart(2, '0')
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+function renderSauvegardesVoile(): void {
+  const cartes = coffre.resumes().map((r) => {
+    const actif = r.n === coffre.actif
+    const arme = svEffaceArme?.n === r.n
+    let corps: string
+    if (r.vide) {
+      corps = '<div class="sv-vide">Vide — une nouvelle partie commence ici.</div>'
+    } else {
+      corps =
+        `<div class="sv-nom">${htmlSafe(r.operateur || 'SANS NOM')}</div>` +
+        '<dl class="sv-releve">' +
+        `<dt>ESSAIS</dt><dd>${r.essais}</dd>` +
+        `<dt>MÉMOIRE</dt><dd>${r.memoire}</dd>` +
+        `<dt>SALLES AU RECORD</dt><dd>${r.salles}</dd>` +
+        `<dt>FIOLES</dt><dd>${r.fioles}</dd>` +
+        `<dt>TROPHÉES</dt><dd>${r.trophees}</dd>` +
+        `<dt>RUN EN COURS</dt><dd>${r.runEnCours ? 'oui' : '—'}</dd>` +
+        '</dl>'
+      const quand = fmtQuandCoffre(r.majAt)
+      if (quand)
+        corps += `<div class="sv-quand">enregistré le ${quand}${r.machine ? ` · poste ${htmlSafe(r.machine)}` : ''}</div>`
+      if (r.lectureSeule)
+        corps +=
+          '<div class="sv-quand">Écrit par une version plus récente du jeu : lisible, jamais réécrit ici.</div>'
+    }
+    const actions =
+      (actif
+        ? ''
+        : `<button type="button" class="appel" data-sv="jouer" data-n="${r.n}">${r.vide ? 'COMMENCER ICI' : 'JOUER'}</button>`) +
+      (r.vide
+        ? ''
+        : `<button type="button" data-sv="exporter" data-n="${r.n}">EXPORTER</button>` +
+          `<button type="button" class="${arme ? 'danger' : ''}" data-sv="effacer" data-n="${r.n}">${arme ? 'EFFACER — CONFIRMER' : 'EFFACER'}</button>`) +
+      (r.lectureSeule
+        ? ''
+        : `<button type="button" data-sv="importer" data-n="${r.n}">IMPORTER</button>`)
+    const dit = svDit?.n === r.n ? htmlSafe(svDit.texte) : ''
+    return (
+      `<div class="sv-carte${actif ? ' actif' : ''}${r.lectureSeule ? ' lecture' : ''}">` +
+      `<div class="sv-tete"><span>EMPLACEMENT ${r.n}</span>${actif ? '<span class="sv-badge">EN COURS</span>' : ''}</div>` +
+      corps +
+      `<div class="sv-actions">${actions}</div>` +
+      `<div class="sv-dit">${dit}</div>` +
+      '</div>'
+    )
+  })
+  svCorps.innerHTML = cartes.join('')
+}
+function ouvreSauvegardes(): void {
+  svEffaceArme = null
+  svDit = null
+  sauvegardesEl.hidden = false
+  renderSauvegardesVoile()
+}
+document.getElementById('home-sauvegardes')?.addEventListener('click', ouvreSauvegardes)
+document.getElementById('sauvegardes-fermer')?.addEventListener('click', () => {
+  sauvegardesEl.hidden = true
+})
+sauvegardesEl.addEventListener('pointerdown', (e) => {
+  if (e.target === sauvegardesEl) sauvegardesEl.hidden = true
+})
+svCorps.addEventListener('click', (e) => {
+  const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-sv]')
+  if (!btn) return
+  const n = Number(btn.dataset.n)
+  const geste = btn.dataset.sv
+  if (geste === 'jouer') {
+    // la run en cours est déjà écrite au fil de l'eau (sauveRun) : rien à
+    // sauver de plus avant de partir
+    coffre.choisit(n)
+    location.reload()
+    return
+  }
+  if (geste === 'effacer') {
+    const now = performance.now()
+    if (!svEffaceArme || svEffaceArme.n !== n || now - svEffaceArme.t > 6000) {
+      svEffaceArme = { n, t: now }
+      svDit = { n, texte: 'Définitif. Cliquez de nouveau pour confirmer.' }
+      renderSauvegardesVoile()
+      window.setTimeout(() => {
+        // non confirmé à temps : le bouton se désarme, rien n'est perdu
+        if (svEffaceArme && svEffaceArme.n === n && performance.now() - svEffaceArme.t >= 5900) {
+          svEffaceArme = null
+          svDit = null
+          renderSauvegardesVoile()
+        }
+      }, 6000)
+      return
+    }
+    svEffaceArme = null
+    coffre.efface(n)
+    // l'actif effacé : les modules chargés tiennent encore l'ancienne partie
+    // en mémoire — on recharge pour repartir d'une page blanche, vraiment
+    if (n === coffre.actif) {
+      location.reload()
+      return
+    }
+    svDit = { n, texte: 'Emplacement effacé.' }
+    renderSauvegardesVoile()
+    return
+  }
+  if (geste === 'exporter') {
+    const texte = coffre.exporte(n)
+    if (!texte) return
+    const url = URL.createObjectURL(new Blob([texte], { type: 'application/json' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `sujet21-sauvegarde-${n}.json`
+    a.click()
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    return
+  }
+  if (geste === 'importer') {
+    svImportVers = n
+    svFichier.value = ''
+    svFichier.click()
+  }
+})
+svFichier.addEventListener('change', () => {
+  const f = svFichier.files?.[0]
+  const n = svImportVers
+  if (!f || n < 1) return
+  void f.text().then((texte) => {
+    if (!coffre.importe(n, texte)) {
+      svDit = { n, texte: 'Ce fichier n’est pas une sauvegarde de Sujet 21.' }
+      renderSauvegardesVoile()
+      return
+    }
+    // l'actif importé : les modules chargés relisent tout au rechargement
+    if (n === coffre.actif) {
+      location.reload()
+      return
+    }
+    svDit = { n, texte: 'Sauvegarde importée.' }
+    renderSauvegardesVoile()
+  })
 })
 
 // ---- Le voile TABLEAU DES AVARIES : l'état du module ------------------
@@ -3561,7 +3720,7 @@ document.getElementById('params-fermer')?.addEventListener('click', () => {
 // ---- PROTOCOLE : rejouer l'éveil, réinitialiser l'opérateur ----
 document.getElementById('proto-rejouer')?.addEventListener('click', () => {
   try {
-    localStorage.removeItem(CLE_EVEIL)
+    coffre.stockage.removeItem(CLE_EVEIL)
   } catch {
     // sans gravité : lanceEveil rejouera quand même cette session
   }
@@ -3600,8 +3759,8 @@ protoReset?.addEventListener('click', () => {
     return
   }
   try {
-    localStorage.removeItem('projet21.registres.v1')
-    localStorage.removeItem('sujet21-signature-v1')
+    coffre.stockage.removeItem('projet21.registres.v1')
+    coffre.stockage.removeItem('sujet21-signature-v1')
   } catch {
     // stockage indisponible : rien à effacer non plus
   }
@@ -3721,7 +3880,7 @@ interface RunSauvee {
 function runSauvee(): RunSauvee | null {
   try {
     const d = JSON.parse(
-      localStorage.getItem(CLE_RUN) ?? 'null',
+      coffre.stockage.getItem(CLE_RUN) ?? 'null',
     ) as RunSauvee | null
     if (!d || typeof d.index !== 'number' || d.index < 1) return null
     return {
@@ -3754,9 +3913,9 @@ function sauveRun(): void {
   // Le hub, hors run, ne touche jamais à la sauvegarde.
   if (testLevel || auHub) return
   try {
-    if (levelIndex < 1) localStorage.removeItem(CLE_RUN)
+    if (levelIndex < 1) coffre.stockage.removeItem(CLE_RUN)
     else
-      localStorage.setItem(
+      coffre.stockage.setItem(
         CLE_RUN,
         JSON.stringify({
           index: levelIndex,
@@ -3781,7 +3940,7 @@ function sauveRun(): void {
 }
 function effaceRun(): void {
   try {
-    localStorage.removeItem(CLE_RUN)
+    coffre.stockage.removeItem(CLE_RUN)
   } catch {
     // sans gravité
   }
@@ -6444,7 +6603,7 @@ if (new URLSearchParams(location.search).has('carte')) {
 // CRYOSTASE : tant que l'éveil n'a pas été joué, l'échantillon attend GELÉ
 // dès le premier pixel — même en dérive derrière la fiche. Le premier
 // contact visuel avec le sujet 21, c'est un bloc de glace.
-if (!localStorage.getItem(CLE_EVEIL)) input.freezeIntent = true
+if (!coffre.stockage.getItem(CLE_EVEIL)) input.freezeIntent = true
 
 // ---- Manette (Steam Deck, Xbox, DualSense) ----
 // Elle pilote le même pointeur que le doigt : un curseur en orbite autour du
@@ -6516,6 +6675,7 @@ const COUCHES_MENU: CoucheMenu[] = [
   // l'essai — Échap ouvrait la fiche par-dessus, et B ne faisait rien
   { id: 'reparations', retour: 'repar-fermer' },
   { id: 'fioles', retour: 'fioles-fermer' },
+  { id: 'sauvegardes', retour: 'sauvegardes-fermer' },
   { id: 'livraisons', retour: 'livraisons-fermer' },
   // l'écran des commandes se pose SUR les paramètres : il passe donc avant
   { id: 'touches', retour: 'touches-fermer' },
@@ -12946,7 +13106,7 @@ const eveil = {
 // Sonde de test : suivre l'éveil depuis la console (comme __sim, __cam)
 ;(window as unknown as { __eveil: typeof eveil }).__eveil = eveil
 function lanceEveil(): void {
-  if (localStorage.getItem(CLE_EVEIL)) return
+  if (coffre.stockage.getItem(CLE_EVEIL)) return
   // relance propre (restart en plein éveil) : tout voile retombe d'abord
   for (const carte of [eveil1El, eveil2El]) {
     carte.hidden = true
@@ -12994,7 +13154,7 @@ function avanceEveil(): void {
     eveil.cible = 1
     eveil.etape = 'off'
     try {
-      localStorage.setItem(CLE_EVEIL, '1')
+      coffre.stockage.setItem(CLE_EVEIL, '1')
     } catch {
       // stockage refusé : l'éveil se rejouera, sans gravité
     }
@@ -13162,7 +13322,7 @@ const TUTOR_KEY = 'projet21.tutoriel.v1'
 const tutorEl = el('tutor')
 let tutorActive = true
 try {
-  tutorActive = localStorage.getItem(TUTOR_KEY) !== 'ok'
+  tutorActive = coffre.stockage.getItem(TUTOR_KEY) !== 'ok'
 } catch {
   // stockage indisponible : le tutoriel s'affiche à chaque visite, sans gravité
 }
@@ -13190,7 +13350,7 @@ const TUTOR_TEXTS = [
 
 function tutorPersist(): void {
   try {
-    localStorage.setItem(TUTOR_KEY, 'ok')
+    coffre.stockage.setItem(TUTOR_KEY, 'ok')
   } catch {
     // sans gravité
   }

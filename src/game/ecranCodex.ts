@@ -58,6 +58,13 @@ import {
   type LectureManette,
 } from './padEcran'
 
+/** Où vivent les objectifs suivis : le coffre de sauvegarde, ou le
+ *  stockage du navigateur — les deux ont ces deux gestes. */
+export interface StockageCibles {
+  getItem(k: string): string | null
+  setItem(k: string, v: string): void
+}
+
 export interface HooksCodex {
   connu(id: string): boolean
   /** la date ISO de découverte — vide si inconnue */
@@ -79,6 +86,9 @@ export interface HooksCodex {
   basculeTout?(debloquer: boolean): void
   /** une manette est branchée : la légende parle ses boutons */
   manette(): boolean
+  /** où vivent les objectifs suivis : l'emplacement de sauvegarde (le
+   *  coffre) — absent, le stockage du navigateur, comme avant */
+  stockage?: StockageCibles | null
 }
 
 const esc = (t: string): string =>
@@ -92,7 +102,7 @@ export class EcranCodex {
   private sel: string | null = null
   private cibles: Set<string>
   private neuve: string | null = null
-  private stockage: Storage | null
+  private stockage: StockageCibles | null
   // l'atelier du concepteur reste déplié d'une fiche à l'autre — on règle
   // dix fiches d'affilée, on ne rouvre pas dix fois le volet
   private atelierOuvert = false
@@ -106,11 +116,14 @@ export class EcranCodex {
     private host: HTMLElement,
     private hooks: HooksCodex,
   ) {
-    let st: Storage | null = null
-    try {
-      st = localStorage
-    } catch {
-      st = null
+    let st: StockageCibles | null = null
+    if (hooks.stockage !== undefined) st = hooks.stockage
+    else {
+      try {
+        st = localStorage
+      } catch {
+        st = null
+      }
     }
     this.stockage = st
     this.cibles = litCibles(st)

@@ -49,7 +49,9 @@ du surplus au sas, la purge de fin de run. Le codex se remplit de ce que le
 sujet découvre en jouant, les trophées de ce qu'il réussit.
 
 **Les écrans.** Cinématiques en planches illustrées (le montage compose, il ne
-code pas), accueil, notes de version, palmarès partagé, le codex (rail des
+code pas), accueil, les SAUVEGARDES (trois emplacements, un document par
+emplacement fait pour le Steam Cloud — `src/game/coffre.ts`), notes de
+version, palmarès partagé, le codex (rail des
 états, fiches en hexagones, fiche lue avec la vidéo de l'effet quand elle
 existe — `public/assets/codex/LISEZ-MOI.md`), cycle.
 

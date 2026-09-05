@@ -2219,7 +2219,7 @@
         letter-spacing: 0.14em;
         margin-right: 8px;
       }
-      #records[hidden], #codex[hidden], #fioles[hidden], #cycle[hidden], #reparations[hidden] { display: none; }
+      #records[hidden], #codex[hidden], #fioles[hidden], #cycle[hidden], #reparations[hidden], #sauvegardes[hidden] { display: none; }
       /* ---- L'écran des MÉMOIRES : le PROJECTEUR VOLUMÉTRIQUE (maquette du
          concepteur). Cibles : PC, console, Steam Deck — un écran-instrument
          PLEIN CADRE en paysage ; le mobile est mis de côté (choix
@@ -2748,6 +2748,27 @@
         padding: 18px;
       }
       #records .salles-boite, #reparations .salles-boite { max-height: 86vh; overflow: auto; width: min(980px, 96vw); }
+      /* ==== SAUVEGARDES (game/coffre.ts) : trois cartes, l'active marquée ==== */
+      #sauvegardes { position: fixed; inset: 0; z-index: 40; background: rgba(2, 6, 12, 0.72); display: flex; align-items: center; justify-content: center; padding: 18px; }
+      #sauvegardes .salles-boite { max-height: 86vh; overflow: auto; width: min(980px, 96vw); }
+      #sv-corps { padding: 10px 12px 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+      .sv-carte { border: 1px solid var(--line); background: rgba(10, 20, 34, 0.6); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+      .sv-carte.actif { border-color: var(--specimen); box-shadow: 0 0 18px rgba(99, 183, 230, 0.12); }
+      .sv-carte.lecture { border-style: dashed; }
+      .sv-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-family: var(--font-display); font-size: calc(11px * var(--ui)); letter-spacing: 0.16em; color: var(--ink); }
+      .sv-badge { font-size: calc(8.5px * var(--ui)); letter-spacing: 0.2em; color: var(--specimen); }
+      .sv-nom { font-family: var(--font-display); font-size: calc(15px * var(--ui)); letter-spacing: 0.14em; color: var(--specimen); }
+      .sv-vide { font-size: calc(12px * var(--ui)); color: var(--dim); font-style: italic; }
+      .sv-releve { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; margin: 0; font-size: calc(11.5px * var(--ui)); }
+      .sv-releve dt { color: var(--dim); letter-spacing: 0.08em; }
+      .sv-releve dd { margin: 0; color: var(--ink); text-align: right; }
+      .sv-quand { font-size: calc(10.5px * var(--ui)); color: var(--dim); }
+      .sv-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+      .sv-actions button { padding: 8px 10px; background: rgba(20, 32, 46, 0.75); border: 1px solid var(--line); color: var(--ink); font-family: var(--font-display); font-size: calc(10.5px * var(--ui)); letter-spacing: 0.1em; cursor: pointer; }
+      .sv-actions button:hover { border-color: var(--specimen); }
+      .sv-actions button.appel { border-color: var(--specimen); background: rgba(56, 130, 160, 0.3); color: #cfeffb; }
+      .sv-actions button.danger { border-color: #ff7a6a !important; color: #ffb3a8 !important; box-shadow: 0 0 12px rgba(255, 122, 106, 0.4); }
+      .sv-dit { font-size: calc(11px * var(--ui)); color: var(--dim); min-height: 1.2em; }
       #records-corps, #repar-corps { padding: 6px 12px 14px; }
       /* ==== LE CODEX (game/ecranCodex.ts) — la maquette « Codex v2 » ====
          Trois colonnes : le rail des états, la grille des fiches, la fiche
@@ -7816,6 +7837,7 @@
              l'URL restent des raccourcis. -->
         <button id="home-regie" type="button" data-dev class="home-regie" title="LA RÉGIE : la console du concepteur — tous les outils du système de run (carte, descente, planche, récit et fins, scénario, codex, marchand, récompenses, textes, éditeur de tableaux, règles, salles, pupitre), ce qui est publié pour tout le monde, et le tir à blanc"><i>◎</i><span>RÉGIE</span></button>
         <button id="home-records" type="button"><i>✦</i><span>RECORDS</span></button>
+        <button id="home-sauvegardes" type="button" title="SAUVEGARDES : les trois emplacements — chacun est une partie entière (records, codex, trophées, mémoires, run en cours). Changer d’emplacement recharge le jeu"><i>▤</i><span>SAUVEGARDES</span></button>
         <button id="home-codex" type="button" title="Le manuel écrit par la partie : chaque interaction découverte débloque sa fiche"><i>◉</i><span>CODEX</span></button>
         <button id="home-fioles" type="button" title="La collection d’échantillons scellés : deux fioles s’équipent pour la run"><i>⚗&#xFE0E;</i><span>FIOLES</span></button>
         <button id="home-cycle" type="button" title="L’écran des mémoires : le cycle des états — chaque transformation manuelle est un lien à tisser en mémoire"><i>⚛</i><span>LES MÉMOIRES</span></button>
@@ -8706,6 +8728,22 @@
           survit à la purge. Ce tableau ne répare rien : il dit où l’on en est.
         </div>
         <div id="repar-corps"></div>
+      </div>
+    </div>
+    <!-- Le voile SAUVEGARDES : les trois emplacements du coffre (game/coffre.ts) -->
+    <div id="sauvegardes" hidden aria-label="Sauvegardes">
+      <div class="salles-boite">
+        <div class="salles-tete"><span id="sv-titre">SAUVEGARDES — les trois emplacements</span>
+          <button type="button" id="sauvegardes-fermer" aria-label="Fermer">✕</button></div>
+        <div class="params-desc" style="padding: 8px 12px 0">
+          Chaque emplacement est une partie entière : records, codex, trophées,
+          mémoires, run en cours. Les réglages de l’appareil et les commandes
+          restent communs. Changer d’emplacement recharge le jeu. Un emplacement
+          s’exporte en fichier et se réimporte ailleurs : c’est ce fichier que
+          le Steam Cloud synchronisera.
+        </div>
+        <div id="sv-corps"></div>
+        <input type="file" id="sv-fichier" accept="application/json,.json" hidden aria-label="Fichier de sauvegarde à importer" />
       </div>
     </div>
     <div id="records" hidden aria-label="Records">
