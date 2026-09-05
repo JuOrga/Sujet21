@@ -1,10 +1,10 @@
 # Sauvegarde des documents partagés
 
-Prise le **2026-09-04T08:01:50.453Z** depuis `https://sujet21.vercel.app/api`.
+Prise le **2026-09-05T07:43:00.938Z** depuis `https://sujet21.vercel.app/api`.
 
 | Famille | Fichier | Entrées | Détail |
 | --- | --- | ---: | --- |
-| tableaux | `levels.json` | 56 | séquence : HUB2 → 21AA-100 → 21AB-100 → 21AC-100 → 21AD-131 → 21AF-101 → 21AG-111 → 101 → 101 → 101 → 121 → 212 → 111 → 111 → 101 → 101 → 101 → 21TY-232 → 21T-112 → 21GE-112 → 21AC-111 → AH → 21AE-131 → 21E-102 → 21 AB-101 → 21AC-102 → 21-? → 531 → 21AA-122 → 21-S1 → 21-S2 → 21-S3 → 21-B → 21-C → 21-F → 21-D → 21-H → 21-I → 21-J → 21-K → 21-L → 21-100 → 21-G → 21-101 → 21-A bis → 21-? → 21-? → 21-? → 21-? → 21-01 → AH-2 → 21-101 → 21-07 → 21AE-111 → 21-502 → 21-? |
+| tableaux | `levels.json` | 58 | séquence : HUB2 → 21AA-100 → 21AB-100 → 21AC-100 → 21AD-131 → 21AF-101 → 21AG-111 → 101 → 101 → 101 → 121 → 212 → 111 → 111 → 101 → 101 → 101 → 21TY-232 → 21T-112 → 21GE-112 → 21AC-111 → AH → 21AE-131 → 21E-102 → 21 AB-101 → 21AC-102 → 21-? → 531 → 21AA-122 → 21-S1 → 21-S2 → 21-S3 → 21-B → 21-C → 21-F → 21-D → 21-H → 21-I → 21-J → 21-K → 21-L → 21-100 → 21-G → 21-101 → 21-A bis → 21-? → 21-? → 21-? → 21-? → 21-01 → AH-2 → 21-101 → 21-07 → 21AE-111 → 21-502 → 21-? → 21-? → 21-? |
 | présets | `presets.json` | 7 | défaut : ⚙ Ballet orbital · ⚙ Ballet orbital, boizcohesioncontrole1, boizessai1, boizessai2, boizvapeur1, Julian-ReculLocalise-propulsion, Julian2-ReculLocalise-propulsion |
 | cahier des règles | `regles.json` | 0 | 0 note(s), 0 ajout(s) |
 | fiches réécrites | `fiches.json` | 0 | 0 fiche(s) réécrite(s) |

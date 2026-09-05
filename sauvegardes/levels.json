@@ -12168,11 +12168,11 @@
     {
       "id": "nouveau-tableau-6",
       "auteur": "BOIZ",
-      "majAt": "2026-09-03T15:50:18.428Z",
+      "majAt": "2026-09-04T13:20:44.448Z",
       "codeAuteur": "BOIZ",
       "codeAt": "2026-09-01T13:43:28.868Z",
       "level": {
-        "name": "travail en cours",
+        "name": "hydrohemicycle ",
         "code": "21-?",
         "journal": "Entrée de journal du protocole : ce que le laboratoire a observé dans cette cuve.",
         "bounds": {
@@ -12586,6 +12586,454 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "id": "travailencours-4",
+      "auteur": "BOIZ",
+      "majAt": "2026-09-04T20:10:38.442Z",
+      "codeAuteur": "BOIZ",
+      "codeAt": "2026-09-04T14:11:59.812Z",
+      "level": {
+        "name": "travailencours",
+        "code": "21-?",
+        "journal": "Entrée de journal du protocole : ce que le laboratoire a observé dans cette cuve.",
+        "bounds": {
+          "minX": -1200,
+          "minY": -750,
+          "maxX": 1200,
+          "maxY": 950
+        },
+        "spawn": {
+          "x": -887,
+          "y": 433,
+          "n": 900
+        },
+        "exit": {
+          "minX": 1040,
+          "minY": -120,
+          "maxX": 1180,
+          "maxY": 120
+        },
+        "boxes": [
+          {
+            "minX": -2180,
+            "minY": 177,
+            "maxX": -1680,
+            "maxY": 428,
+            "material": 0
+          },
+          {
+            "minX": -1140,
+            "minY": -123,
+            "maxX": -986,
+            "maxY": 177,
+            "material": 0
+          },
+          {
+            "minX": -986,
+            "minY": -123,
+            "maxX": -786,
+            "maxY": 177,
+            "material": 7
+          },
+          {
+            "minX": -1140,
+            "minY": -303,
+            "maxX": -786,
+            "maxY": -123,
+            "material": 7
+          },
+          {
+            "minX": -1140,
+            "minY": -649,
+            "maxX": -976,
+            "maxY": -303,
+            "material": 7
+          },
+          {
+            "minX": -786,
+            "minY": -303,
+            "maxX": -636,
+            "maxY": 177,
+            "material": 0
+          },
+          {
+            "minX": -636,
+            "minY": -303,
+            "maxX": -576,
+            "maxY": -188,
+            "material": 0
+          },
+          {
+            "minX": -636,
+            "minY": 62,
+            "maxX": -576,
+            "maxY": 177,
+            "material": 0
+          },
+          {
+            "minX": -976,
+            "minY": -649,
+            "maxX": -576,
+            "maxY": -509,
+            "material": 7
+          },
+          {
+            "minX": -636,
+            "minY": -509,
+            "maxX": -576,
+            "maxY": -303,
+            "material": 0
+          },
+          {
+            "minX": -736,
+            "minY": -356,
+            "maxX": -636,
+            "maxY": -303,
+            "material": 0
+          },
+          {
+            "minX": -976,
+            "minY": -509,
+            "maxX": -736,
+            "maxY": -456,
+            "material": 0
+          },
+          {
+            "minX": -976,
+            "minY": -356,
+            "maxX": -736,
+            "maxY": -303,
+            "material": 0
+          },
+          {
+            "minX": -636,
+            "minY": 177,
+            "maxX": -576,
+            "maxY": 690,
+            "material": 5
+          },
+          {
+            "minX": -376,
+            "minY": -649,
+            "maxX": -256,
+            "maxY": -349,
+            "material": 6
+          },
+          {
+            "minX": -553,
+            "minY": -874,
+            "maxX": -353,
+            "maxY": -787,
+            "material": 0
+          },
+          {
+            "minX": -636,
+            "minY": -188,
+            "maxX": -576,
+            "maxY": 62,
+            "material": 9
+          },
+          {
+            "minX": -24,
+            "minY": 690,
+            "maxX": 226,
+            "maxY": 750,
+            "material": 9
+          },
+          {
+            "minX": -256,
+            "minY": -649,
+            "maxX": -122,
+            "maxY": 62,
+            "material": 0
+          },
+          {
+            "minX": -1200,
+            "minY": 690,
+            "maxX": -453,
+            "maxY": 750,
+            "material": 0
+          },
+          {
+            "minX": -89,
+            "minY": 690,
+            "maxX": -24,
+            "maxY": 750,
+            "material": 0
+          },
+          {
+            "minX": -1200,
+            "minY": -709,
+            "maxX": -1140,
+            "maxY": 690,
+            "material": 0
+          },
+          {
+            "minX": -1140,
+            "minY": -709,
+            "maxX": 303,
+            "maxY": -649,
+            "material": 0
+          },
+          {
+            "minX": -256,
+            "minY": 62,
+            "maxX": -122,
+            "maxY": 177,
+            "forme": 3,
+            "p0": 1,
+            "material": 10
+          },
+          {
+            "minX": -453,
+            "minY": 690,
+            "maxX": -153,
+            "maxY": 750,
+            "material": 4
+          },
+          {
+            "minX": -576,
+            "minY": -248,
+            "maxX": -256,
+            "maxY": -188,
+            "material": 5
+          },
+          {
+            "minX": -976,
+            "minY": -456,
+            "maxX": -736,
+            "maxY": -356,
+            "material": 7
+          },
+          {
+            "minX": -736,
+            "minY": -509,
+            "maxX": -636,
+            "maxY": -356,
+            "material": 7
+          }
+        ],
+        "sponges": [],
+        "labels": [
+          {
+            "x": 1110,
+            "y": 0,
+            "text": "SAS",
+            "tone": "sas"
+          }
+        ],
+        "par": 3,
+        "lasers": [
+          {
+            "x": -580,
+            "y": 167,
+            "angle": 0
+          }
+        ],
+        "caches": [
+          {
+            "minX": -976,
+            "minY": -509,
+            "maxX": -636,
+            "maxY": -355
+          }
+        ],
+        "rails": [
+          {
+            "points": [
+              {
+                "x": -119,
+                "y": 687
+              },
+              {
+                "x": -122,
+                "y": 917
+              },
+              {
+                "x": 249,
+                "y": 914
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "hardglace",
+      "auteur": "BOIZ",
+      "majAt": "2026-09-04T21:34:12.093Z",
+      "codeAuteur": "BOIZ",
+      "codeAt": "2026-09-04T20:19:18.388Z",
+      "level": {
+        "name": "hardglace",
+        "code": "21-?",
+        "journal": "Entrée de journal du protocole : ce que le laboratoire a observé dans cette cuve.",
+        "bounds": {
+          "minX": -1300,
+          "minY": -960,
+          "maxX": 1200,
+          "maxY": 1839
+        },
+        "spawn": {
+          "x": -1000,
+          "y": 1618,
+          "n": 900
+        },
+        "exit": {
+          "minX": 458,
+          "minY": 1547,
+          "maxX": 598,
+          "maxY": 1787
+        },
+        "boxes": [
+          {
+            "minX": -1300,
+            "minY": -750,
+            "maxX": -1240,
+            "maxY": 1839,
+            "material": 0
+          },
+          {
+            "minX": -1240,
+            "minY": -850,
+            "maxX": -840,
+            "maxY": -450,
+            "forme": 3,
+            "material": 2
+          },
+          {
+            "minX": -38,
+            "minY": -3226,
+            "maxX": 437,
+            "maxY": -825,
+            "angle": -45,
+            "material": 0
+          },
+          {
+            "minX": -679,
+            "minY": 71,
+            "maxX": 321,
+            "maxY": 221,
+            "forme": 3,
+            "p0": 3,
+            "material": 2
+          },
+          {
+            "minX": -740,
+            "minY": 71,
+            "maxX": -679,
+            "maxY": 1839,
+            "material": 0
+          },
+          {
+            "minX": -1140,
+            "minY": 71,
+            "maxX": -840,
+            "maxY": 271,
+            "material": 8
+          },
+          {
+            "minX": 381,
+            "minY": -900,
+            "maxX": 1088,
+            "maxY": -600,
+            "forme": 3,
+            "p0": 1,
+            "material": 2
+          },
+          {
+            "minX": 321,
+            "minY": -960,
+            "maxX": 381,
+            "maxY": -900,
+            "material": 0
+          },
+          {
+            "minX": -679,
+            "minY": 221,
+            "maxX": 321,
+            "maxY": 281,
+            "material": 0
+          },
+          {
+            "minX": -840,
+            "minY": 271,
+            "maxX": -740,
+            "maxY": 371,
+            "forme": 3,
+            "p0": 1,
+            "material": 0
+          },
+          {
+            "minX": -840,
+            "minY": 71,
+            "maxX": -740,
+            "maxY": 271,
+            "material": 0
+          },
+          {
+            "minX": -1240,
+            "minY": 771,
+            "maxX": -1015,
+            "maxY": 1021,
+            "material": 0
+          },
+          {
+            "minX": -1090,
+            "minY": 1279,
+            "maxX": -740,
+            "maxY": 1339,
+            "material": 0
+          },
+          {
+            "minX": -1240,
+            "minY": 1021,
+            "maxX": -890,
+            "maxY": 1129,
+            "material": 0
+          },
+          {
+            "minX": -865,
+            "minY": 771,
+            "maxX": -740,
+            "maxY": 871,
+            "material": 0
+          },
+          {
+            "minX": 1088,
+            "minY": 221,
+            "maxX": 1200,
+            "maxY": 461,
+            "material": 0
+          },
+          {
+            "minX": -1240,
+            "minY": 71,
+            "maxX": -1140,
+            "maxY": 271,
+            "material": 0
+          },
+          {
+            "minX": -1240,
+            "minY": 271,
+            "maxX": -1140,
+            "maxY": 371,
+            "forme": 3,
+            "material": 0
+          }
+        ],
+        "sponges": [],
+        "labels": [
+          {
+            "x": 524,
+            "y": 1637,
+            "text": "SAS",
+            "tone": "sas"
+          }
+        ],
+        "par": 3
       }
     }
   ]
