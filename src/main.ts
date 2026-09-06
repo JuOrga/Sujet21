@@ -364,6 +364,7 @@ import {
   type SharedBoard,
 } from './game/netRecords'
 import { createBench, type BenchMonitor } from './bench/bench'
+import { appelle } from './game/reseau'
 
 const CAPACITY = 4096
 // (l'ancien délai d'affichage du bilan a cédé la place à la MISE EN
@@ -3779,7 +3780,7 @@ async function copiePerf(): Promise<string> {
 }
 async function envoiePerf(): Promise<string> {
   try {
-    const r = await fetch('/api/perf', {
+    const r = await appelle('/api/perf', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -5058,7 +5059,7 @@ async function ouvreRegles(): Promise<void> {
   if (corps) corps.innerHTML = ''
   reglesDit('Chargement du cahier partagé…')
   try {
-    const r = await fetch('/api/regles')
+    const r = await appelle('/api/regles')
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
     const d = (await r.json()) as { notes?: NoteRegle[]; ajouts?: AjoutRegle[] }
     reglesNotes = Array.isArray(d.notes) ? d.notes : []
@@ -5088,7 +5089,7 @@ async function posteNoteRegle(id: string, note: string): Promise<void> {
   reglesBusy = true
   reglesDit('Enregistrement de la note…')
   try {
-    const r = await fetch('/api/regles', {
+    const r = await appelle('/api/regles', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -5120,7 +5121,7 @@ async function posteAjoutRegle(texte: string, id?: string): Promise<void> {
   reglesBusy = true
   reglesDit('Consignation de la règle…')
   try {
-    const r = await fetch('/api/regles', {
+    const r = await appelle('/api/regles', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -5155,7 +5156,7 @@ async function oteAjoutRegle(id: string): Promise<void> {
   reglesBusy = true
   reglesDit('Retrait de la règle…')
   try {
-    const r = await fetch(`/api/regles?id=${encodeURIComponent(id)}`, {
+    const r = await appelle(`/api/regles?id=${encodeURIComponent(id)}`, {
       method: 'DELETE',
     })
     if (!r.ok) throw new Error(`HTTP ${r.status}`)

@@ -105,7 +105,8 @@ C'est la seule porte des outils sur l'accueil (les anciens boutons sont
 partis) ; `?editeur` et `?carte` dans l'URL restent des raccourcis.
 `?editeur` ouvre l'éditeur directement, `?carte` l'éditeur de la carte de la
 station, `?tableau=N` démarre à la salle N,
-`?spawn=x,y` place le corps.
+`?spawn=x,y` place le corps. `?horsligne` coupe tout appel à l'API (la
+posture du build Steam : le contenu livré fait foi — `src/game/reseau.ts`).
 
 ## Qualité
 

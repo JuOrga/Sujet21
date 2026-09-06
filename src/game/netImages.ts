@@ -2,6 +2,8 @@
 // suppression. L'import RECOMPRIME côté client (WebP, plus grand côté
 // borné) : le serveur ne reçoit jamais un original de 20 Mo.
 
+import { appelle } from './reseau'
+
 export interface SharedImage {
   nom: string
   url: string
@@ -36,7 +38,7 @@ function readList(data: unknown): SharedImage[] {
 
 export async function fetchImages(): Promise<SharedImage[] | null> {
   try {
-    const r = await fetch(ENDPOINT, { cache: 'no-store' })
+    const r = await appelle(ENDPOINT, { cache: 'no-store' })
     if (!r.ok) return null
     return readList(await r.json())
   } catch {
@@ -78,7 +80,7 @@ export async function pushImage(
   const data = await recomprime(fichier)
   if (!data) return null
   try {
-    const r = await fetch(ENDPOINT, {
+    const r = await appelle(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nom, type: 'image/webp', data, auteur }),
@@ -92,7 +94,7 @@ export async function pushImage(
 
 export async function deleteImage(nom: string): Promise<SharedImage[] | null> {
   try {
-    const r = await fetch(`${ENDPOINT}?nom=${encodeURIComponent(nom)}`, { method: 'DELETE' })
+    const r = await appelle(`${ENDPOINT}?nom=${encodeURIComponent(nom)}`, { method: 'DELETE' })
     if (!r.ok) return null
     return readList(await r.json())
   } catch {

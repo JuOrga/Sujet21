@@ -4,6 +4,7 @@
 // réglages entre testeurs.
 
 import type { SimParams } from '../sim/params'
+import { appelle } from '../game/reseau'
 
 export interface Preset {
   title: string
@@ -279,14 +280,14 @@ export function parseSharedPayload(data: unknown): SharedLibrary {
 }
 
 export async function fetchSharedPresets(): Promise<SharedLibrary> {
-  const r = await fetch('/api/presets', { cache: 'no-store' })
+  const r = await appelle('/api/presets', { cache: 'no-store' })
   if (!r.ok) throw new Error(`bibliothèque partagée : ${r.status}`)
   return parseSharedPayload((await r.json()) as unknown)
 }
 
 // Définit (ou retire, avec null) le préset par défaut pour tous les testeurs.
 export async function setSharedDefault(title: string | null): Promise<void> {
-  const r = await fetch('/api/presets', {
+  const r = await appelle('/api/presets', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ defaultTitle: title }),
@@ -308,7 +309,7 @@ export function storeStoredDefault(title: string | null): void {
 }
 
 export async function pushSharedPreset(preset: Preset): Promise<void> {
-  const r = await fetch('/api/presets', {
+  const r = await appelle('/api/presets', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(preset),
@@ -317,7 +318,7 @@ export async function pushSharedPreset(preset: Preset): Promise<void> {
 }
 
 export async function deleteSharedPreset(title: string): Promise<void> {
-  const r = await fetch(`/api/presets?title=${encodeURIComponent(title)}`, { method: 'DELETE' })
+  const r = await appelle(`/api/presets?title=${encodeURIComponent(title)}`, { method: 'DELETE' })
   if (!r.ok) throw new Error(`bibliothèque partagée : ${r.status}`)
 }
 

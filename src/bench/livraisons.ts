@@ -31,6 +31,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '06/09/2026 11:47',
+    title: 'LA CLOISON RÉSEAU : un seul chemin du jeu vers l’API — et le mode hors ligne, la posture du build Steam',
+    notes: [
+      'LA DEMANDE : la suite du plan Steam, après le coffre et le fantôme — « ensuite enchaîne ». Le constat d’avant : treize modules appelaient fetch(\'/api/…\') en direct (records, bibliothèque, présets, images, cinématiques, journal, codex, réglages, fiches, règles, rapport de performance). Ça marche tant que le jeu vit sur Vercel avec son API à côté ; le jour où il part dans une coquille, ZÉRO appel doit sortir à l’exécution — le contenu livré fait foi, les records iront aux classements Steam, les sauvegardes au Steam Cloud. Sans cloison, ce jour-là demandait de retoucher treize modules dans l’urgence.',
+      'LA CLOISON (game/reseau.ts, pur, testé) : `appelle(chemin, init)` au contrat exact de fetch — chaque site d’appel change UN mot et rien d’autre, ni la lecture de la réponse ni la gestion d’échec (35 appels dans 10 fichiers, aucun fetch hors API touché : les sons et le noyau WASM restent en direct). Trois poignées : horsLigne (aucun appel ne part — `?horsligne` dans l’URL, ou l’hôte natif qui le déclare par window.sujet21Hote.horsLigne), base (le préfixe d’URL, vide sur Vercel, à poser si une coquille sert le jeu d’ailleurs), dos (le transport, fetch par défaut, injectable). Et deux journaux de diagnostic plafonnés : ce qui est parti, ce qui a été refusé.',
+      'HORS LIGNE, LE JEU NE CHANGE PAS DE VISAGE : l’appel rejette AVANT de partir, l’appelant tombe dans son catch — et tous savaient déjà échouer en silence (« hors ligne ou en développement local, tout échoue en silence et l’écran retombe sur le livré »). C’est exactement la posture du build Steam, vérifiable dès aujourd’hui avec `?horsligne`.',
+      'VÉRIFIÉ : 955 tests verts dans 86 fichiers (5 neufs : le transport injecté reçoit l’appel tel quel, le préfixe d’URL, le refus hors ligne qui ne touche pas le transport, l’appelant écrit comme les modules du jeu qui rend null, les journaux plafonnés), type-check à 0, build propre. Au navigateur (Chromium, jeu construit) : en ligne, l’accueil appelle l’API (réglages des cinq domaines, records, présets…) ; avec `?horsligne`, ZÉRO requête vers /api sort de la page, l’accueil est debout, zéro erreur console.',
+    ],
+  },
+  {
     date: '06/09/2026 00:28',
     title: 'LE FANTÔME : vos records rejoués en silhouette — la trace du corps, rangée dans l’emplacement de sauvegarde',
     notes: [
