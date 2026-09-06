@@ -4881,6 +4881,12 @@
         from { opacity: 1; }
         to { opacity: 0.4; }
       }
+      /* l'écart au fantôme (game/fantome.ts) : la ligne de course du HUD */
+      #hud-fantome { font-family: var(--font-mono); font-size: calc(11px * var(--ui)); letter-spacing: 0.06em; color: #b9d6ea; white-space: nowrap; }
+      #hud-fantome:empty { display: none; }
+      #hud-fantome b { font-weight: 600; color: #dcefff; }
+      #hud-fantome .retard { color: #ffb3a8; }
+      #hud-fantome .avance { color: #9be7c4; }
       #hud-perte {
         font-size: calc(10.5px * var(--ui));
         color: #f2a98f;
@@ -7924,7 +7930,7 @@
           <button type="button" class="hud-chip" data-nom="coque du vaisseau"><i>❄</i><span class="v" id="hud-coque">+21°</span></button>
         </div>
       </div>
-      <div class="hud-sous"><span id="hud-perte"></span><span id="hud-rosee"></span></div>
+      <div class="hud-sous"><span id="hud-perte"></span><span id="hud-rosee"></span><span id="hud-fantome"></span></div>
       <!-- relevés secondaires : encore alimentés par le jeu, plus affichés -->
       <div class="hud-restes" hidden>
         <i id="coque-bar"><b></b></i>

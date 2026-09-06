@@ -311,9 +311,12 @@ import {
   ETAT_EAU,
   ETAT_GLACE,
   ETAT_VAPEUR,
+  EV_DASH,
   EnregistreurFantome,
   Fantomes,
   LecteurFantome,
+  SECTEURS,
+  profilDe,
   type CategorieFantome,
 } from './game/fantome'
 import {
@@ -2098,11 +2101,17 @@ let fantomeRec: EnregistreurFantome | null = null
 let fantomesLus: { cat: CategorieFantome; lecteur: LecteurFantome }[] = []
 // le réglage de l'appareil : voir ou non les fantômes (PARAMÈTRES)
 let fantomesVisibles = localStorage.getItem('sujet21-fantomes') !== 'off'
+// la direction de poussée du pas en cours (null : le joueur n'éjecte pas)
+let pousseeFantome: number | null = null
 // ce qui vient d'être dessiné (position écran, rayon) : lu par la sonde de test
 let fantomesDessines: { cat: CategorieFantome; sx: number; sy: number; r: number }[] = []
 function armeFantomes(): void {
   fantomeRec = null
   fantomesLus = []
+  fantomesFx = []
+  fantomesEtat = []
+  fantomesT = 0
+  if (hudFantome) hudFantome.textContent = ''
   // ni le hub ni l'essai d'éditeur ne consignent de record : pas de fantôme
   if (testLevel || auHub) return
   fantomeRec = new EnregistreurFantome()
@@ -2127,12 +2136,17 @@ function echantillonneFantome(): void {
   const n = sim.playerCount
   const etat =
     n > 0 && gel * 2 >= n ? ETAT_GLACE : n > 0 && gaz * 2 >= n ? ETAT_VAPEUR : ETAT_EAU
+  const cx = sim.stats.centroidX
+  const cy = sim.stats.centroidY
   fantomeRec.note(run.tableauTime, {
-    x: sim.stats.centroidX,
-    y: sim.stats.centroidY,
+    x: cx,
+    y: cy,
     r: sim.stats.rmsRadius,
     cl: sim.liters() * 100,
     etat,
+    poussee: pousseeFantome,
+    // la FORME : l'étendue du corps dans seize secteurs — dix fois par seconde simulée
+    profil: profilDe(cx, cy, sim.posX, sim.posY, (i) => sim.kind[i] === KIND_PLAYER, sim.count),
   })
 }
 // Sonde de test : suivre les fantômes depuis la console (comme __sim, __eveil)
@@ -8513,43 +8527,221 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
 // Tout est lissé (naissance, cap, longueur) : la flèche glisse, elle ne
 // saute pas. En visée de dash, la ligne du dash prend le relais.
 const fleche = { alpha: 0, ang: 0, len: 60 }
+// ---- Le dessin des fantômes : la forme, le geste, la ligne de course ------
+// Les effets éphémères : le trait d'un dash, l'éclair d'une bascule d'état.
+// Datés en temps RÉEL (ils habillent l'image, ils ne sont pas la trace).
+let fantomesFx: { t0: number; type: 'dash' | 'gel' | 'vapeur' | 'eau'; x: number; y: number; angle: number }[] = []
+let fantomesT = 0 // le temps simulé lu à l'image d'avant : chaque événement se joue une fois
+let fantomesEtat: number[] = [] // l'état de chaque lecteur à l'image d'avant (les bascules)
+const hudFantome = document.getElementById('hud-fantome') as HTMLElement | null
+
+function teinteFantome(etat: number): string {
+  return etat === ETAT_GLACE ? '205,236,255' : etat === ETAT_VAPEUR ? '236,226,255' : '120,200,255'
+}
+
 /** Les silhouettes des fantômes de la salle, au temps simulé du tableau.
- *  Le rayon quadratique moyen d'un disque plein vaut R/√2 : on dessine à
- *  1,4 fois le rms pour retrouver le bord du corps. */
+ *  La FORME vient du profil en seize secteurs (une courbe lissée par les
+ *  milieux des côtés) ; à défaut, un cercle à 1,4 fois le rayon quadratique
+ *  moyen — le rms d'un disque plein vaut R/√2. Le GESTE : les gouttelettes
+ *  du jet dans la direction de poussée, le trait du dash, l'éclair des
+ *  bascules. La LIGNE DE COURSE : toute la trace en filigrane, colorée par
+ *  état. Et l'écart au fantôme dans le HUD, façon jeu de course. */
 function drawFantomes(vw: number, vh: number, dpr: number): void {
   fantomesDessines = []
-  if (!fantomesVisibles || fantomesLus.length === 0) return
-  if (!document.body.classList.contains('playing')) return
+  const t = run.tableauTime
+  if (t < fantomesT) {
+    // la salle est repartie : les événements se rejoueront, les effets tombent
+    fantomesFx = []
+    fantomesEtat = []
+  }
+  if (!fantomesVisibles || fantomesLus.length === 0 || !document.body.classList.contains('playing')) {
+    fantomesT = t
+    if (hudFantome && hudFantome.textContent) hudFantome.textContent = ''
+    return
+  }
   const dprC = Math.min(dpr, 2)
   const g = fxCtx
   g.setTransform(dprC, 0, 0, dprC, 0, 0)
-  for (const { cat, lecteur } of fantomesLus) {
-    const e = lecteur.a(run.tableauTime)
-    if (!e) continue
-    const sx = vw * 0.5 + (e.x - camera.x) * camera.zoom
-    const sy = vh * 0.5 - (e.y - camera.y) * camera.zoom
-    const r = Math.max(4, e.r * 1.41 * camera.zoom)
-    fantomesDessines.push({ cat, sx, sy, r })
-    const teinte =
-      e.etat === ETAT_GLACE ? '205,236,255' : e.etat === ETAT_VAPEUR ? '236,226,255' : '120,200,255'
-    const grad = g.createRadialGradient(sx, sy, r * 0.15, sx, sy, r)
-    grad.addColorStop(0, `rgba(${teinte},0.2)`)
+  const z = camera.zoom
+  const S = (x: number, y: number): [number, number] => [
+    vw * 0.5 + (x - camera.x) * z,
+    vh * 0.5 - (y - camera.y) * z,
+  ]
+  const maintenant = performance.now() / 1000
+  const hud: string[] = []
+  fantomesLus.forEach(({ cat, lecteur }, idx) => {
+    const teinteCat = cat === 'volume' ? '120,200,255' : '255,214,120'
+    // ---- la ligne de course : un point sur k, colorée par état
+    const pts = lecteur.pts
+    if (pts.length > 1) {
+      const k = Math.max(1, Math.ceil(pts.length / 600))
+      g.lineWidth = 1
+      g.setLineDash([3, 6])
+      let etatTrait = -1
+      for (let i = 0; i < pts.length; i += k) {
+        const p = pts[i]
+        const [sx, sy] = S(p.x, p.y)
+        if (p.etat !== etatTrait) {
+          if (etatTrait >= 0) g.stroke()
+          g.beginPath()
+          if (i > 0) {
+            const q = pts[Math.max(0, i - k)]
+            const [qx, qy] = S(q.x, q.y)
+            g.moveTo(qx, qy)
+          }
+          g.strokeStyle = `rgba(${teinteFantome(p.etat)},0.22)`
+          etatTrait = p.etat
+        }
+        g.lineTo(sx, sy)
+      }
+      g.stroke()
+      g.setLineDash([])
+    }
+    const e = lecteur.a(t)
+    // ---- les événements de l'intervalle, joués une fois
+    for (const ev of lecteur.evenementsEntre(fantomesT, t)) {
+      const ou = e ?? lecteur.a(Math.min(lecteur.duree, ev.t))
+      if (ou) fantomesFx.push({ t0: maintenant, type: 'dash', x: ou.x, y: ou.y, angle: ev.angle })
+    }
+    // ---- les bascules d'état : un éclair au changement
+    const etatAvant = fantomesEtat[idx]
+    if (e && etatAvant !== undefined && etatAvant >= 0 && etatAvant !== e.etat) {
+      fantomesFx.push({
+        t0: maintenant,
+        type: e.etat === ETAT_GLACE ? 'gel' : e.etat === ETAT_VAPEUR ? 'vapeur' : 'eau',
+        x: e.x,
+        y: e.y,
+        angle: 0,
+      })
+    }
+    fantomesEtat[idx] = e ? e.etat : -1
+    // ---- l'écart au fantôme, dans le HUD
+    const nom = lecteur.def.nom ? ` ${htmlSafe(lecteur.def.nom)}` : ''
+    const etiquette = `<b>${cat === 'volume' ? 'VOLUME' : 'CHRONO'}${nom}</b>`
+    if (e) {
+      const maDist = Math.hypot(sim.stats.centroidX - exitMouth.x, sim.stats.centroidY - exitMouth.y)
+      const ecart = lecteur.ecartTemps(t, maDist, exitMouth.x, exitMouth.y)
+      const dl = sim.liters() - e.cl / 100
+      const signe = (v: number, dec = 1): string =>
+        Math.abs(v) < 0.5 * 10 ** -dec ? (0).toFixed(dec) : (v > 0 ? '+' : '−') + Math.abs(v).toFixed(dec)
+      const tempsTxt =
+        ecart === null
+          ? '<span class="avance">devant</span>'
+          : `<span class="${ecart > 0.05 ? 'retard' : 'avance'}">${signe(ecart)} s</span>`
+      const volTxt = `<span class="${dl < -0.005 ? 'retard' : 'avance'}">${signe(dl, 2)} L</span>`
+      hud.push(`${etiquette} ${tempsTxt} · ${volTxt}`)
+    } else if (t > lecteur.duree) {
+      hud.push(`${etiquette} au sas en ${fmtTime(lecteur.def.temps)} · ${lecteur.def.litres.toFixed(2)} L`)
+    }
+    if (!e) return
+    // ---- la silhouette
+    const [sx, sy] = S(e.x, e.y)
+    const teinte = teinteFantome(e.etat)
+    const profil = e.profil.length === SECTEURS ? e.profil : null
+    const rayonMax = Math.max(4, (profil ? Math.max(...profil) : e.r * 1.41) * z)
+    fantomesDessines.push({ cat, sx, sy, r: rayonMax })
+    const grad = g.createRadialGradient(sx, sy, rayonMax * 0.1, sx, sy, rayonMax)
+    grad.addColorStop(0, `rgba(${teinte},${e.etat === ETAT_VAPEUR ? 0.14 : 0.22})`)
     grad.addColorStop(1, `rgba(${teinte},0.02)`)
     g.fillStyle = grad
     g.beginPath()
-    g.arc(sx, sy, r, 0, Math.PI * 2)
+    if (profil) {
+      // la courbe passe par les milieux des côtés, chaque sommet tire un arc
+      const P: [number, number][] = []
+      for (let s = 0; s < SECTEURS; s++) {
+        const a = ((s + 0.5) / SECTEURS) * Math.PI * 2
+        const d = Math.max(3, profil[s]) * z
+        P.push([sx + Math.cos(a) * d, sy - Math.sin(a) * d])
+      }
+      const M = (i: number): [number, number] => {
+        const a = P[i % SECTEURS]
+        const b = P[(i + 1) % SECTEURS]
+        return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
+      }
+      const m0 = M(0)
+      g.moveTo(m0[0], m0[1])
+      for (let i = 1; i <= SECTEURS; i++) {
+        const p = P[i % SECTEURS]
+        const m = M(i)
+        g.quadraticCurveTo(p[0], p[1], m[0], m[1])
+      }
+      g.closePath()
+    } else {
+      g.arc(sx, sy, rayonMax, 0, Math.PI * 2)
+    }
     g.fill()
-    g.strokeStyle = `rgba(${teinte},0.5)`
-    g.lineWidth = 1.2
-    g.setLineDash([4, 5])
+    g.strokeStyle = `rgba(${teinte},${e.etat === ETAT_VAPEUR ? 0.3 : 0.55})`
+    g.lineWidth = e.etat === ETAT_GLACE ? 1.6 : 1.2
+    if (e.etat !== ETAT_GLACE) g.setLineDash([4, 5])
     g.stroke()
     g.setLineDash([])
-    // l'étiquette : quel record, et qui l'a posé
+    // ---- le jet : les gouttelettes qui partent vers le point visé (le corps recule)
+    if (e.poussee !== null && e.etat !== ETAT_VAPEUR) {
+      const a = e.poussee
+      const tour = Math.PI * 2
+      const s = Math.min(SECTEURS - 1, Math.floor((((a % tour) + tour) % tour) / tour * SECTEURS))
+      const bord = (profil ? profil[s] : e.r * 1.41) * z
+      const ux = Math.cos(a)
+      const uy = -Math.sin(a)
+      const ech = Math.max(0.5, Math.min(1.6, z))
+      for (let k = 0; k < 5; k++) {
+        const phase = (elapsed * 3.2 + k / 5) % 1 // les gouttes défilent
+        const dist = bord + (6 + phase * 46) * ech
+        const ecart = Math.sin(k * 2.1 + elapsed * 5) * 4 * ech
+        const gx = sx + ux * dist - uy * ecart
+        const gy = sy + uy * dist + ux * ecart
+        g.fillStyle = `rgba(${teinte},${(0.6 * (1 - phase)).toFixed(3)})`
+        g.beginPath()
+        g.arc(gx, gy, Math.max(1, (2.6 - phase * 1.6) * ech), 0, Math.PI * 2)
+        g.fill()
+      }
+    }
+    // ---- l'étiquette : quel record, et qui l'a posé
     g.font = '9px Michroma, "Arial Black", sans-serif'
     g.textAlign = 'center'
-    g.fillStyle = `rgba(${teinte},0.7)`
+    g.fillStyle = `rgba(${teinteCat},0.75)`
     const qui = lecteur.def.nom ? ` · ${lecteur.def.nom}` : ''
-    g.fillText(`${cat === 'volume' ? 'VOLUME' : 'CHRONO'}${qui}`, sx, sy - r - 6)
+    g.fillText(`${cat === 'volume' ? 'VOLUME' : 'CHRONO'}${qui}`, sx, sy - rayonMax - 6)
+  })
+  fantomesT = t
+  // ---- les effets éphémères : 0,7 s de vie en temps réel
+  const VIE = 0.7
+  fantomesFx = fantomesFx.filter((fx) => maintenant - fx.t0 < VIE)
+  const ech = Math.max(0.5, Math.min(1.5, z))
+  for (const fx of fantomesFx) {
+    const age = (maintenant - fx.t0) / VIE
+    const [sx, sy] = S(fx.x, fx.y)
+    const alpha = 1 - age
+    if (fx.type === 'dash') {
+      const ux = Math.cos(fx.angle)
+      const uy = -Math.sin(fx.angle)
+      const L = (40 + 160 * age) * ech
+      const gr = g.createLinearGradient(sx, sy, sx + ux * L, sy + uy * L)
+      gr.addColorStop(0, `rgba(236,226,255,${(0.7 * alpha).toFixed(3)})`)
+      gr.addColorStop(1, 'rgba(236,226,255,0)')
+      g.strokeStyle = gr
+      g.lineWidth = 3
+      g.beginPath()
+      g.moveTo(sx, sy)
+      g.lineTo(sx + ux * L, sy + uy * L)
+      g.stroke()
+    } else {
+      const teinte = fx.type === 'gel' ? '205,236,255' : fx.type === 'vapeur' ? '236,226,255' : '120,200,255'
+      const r = (10 + 70 * age) * ech
+      g.strokeStyle = `rgba(${teinte},${(0.8 * alpha).toFixed(3)})`
+      g.lineWidth = fx.type === 'gel' ? 2.2 : 1.4
+      g.beginPath()
+      g.arc(sx, sy, r, 0, Math.PI * 2)
+      g.stroke()
+      if (fx.type === 'vapeur') {
+        g.fillStyle = `rgba(${teinte},${(0.18 * alpha).toFixed(3)})`
+        g.fill()
+      }
+    }
+  }
+  if (hudFantome) {
+    const html = hud.join('   ')
+    if (hudFantome.innerHTML !== html) hudFantome.innerHTML = html
   }
 }
 
@@ -13951,6 +14143,12 @@ function frame(now: number): void {
     // conclut pas. Sans ça, dézoomer en vapeur lâchait le dash.
     if (vif && input.gasIntent && !input.aimActive && !input.aimAnnulee) {
       const spent = sim.gasDash(aim.x, aim.y)
+      if (spent > 0)
+        fantomeRec?.evenement(
+          run.tableauTime,
+          EV_DASH,
+          Math.atan2(aim.y - sim.stats.centroidY, aim.x - sim.stats.centroidX),
+        )
       if (spent > 0) manette.rumble(0.6, 90) // le dash se voit, il ne souffle plus
     }
   }
@@ -14018,6 +14216,7 @@ function frame(now: number): void {
       warpNow,
       params.dt,
       () => {
+        pousseeFantome = null
         if (
           input.aimActive &&
           !input.gasIntent &&
@@ -14028,7 +14227,11 @@ function frame(now: number): void {
           // le dash part au relâchement (voir plus haut), rien ne se pilote.
           // Sans direction (stick neutre, doigt sur le corps) : on se reforme.
           if (rassembler) sim.rassemble(params.dt)
-          else sim.eject(aim.x, aim.y, params.dt)
+          else {
+            sim.eject(aim.x, aim.y, params.dt)
+            // le geste du fantôme : vers où l'on éjecte (le corps part à l'opposé)
+            pousseeFantome = Math.atan2(aim.y - sim.stats.centroidY, aim.x - sim.stats.centroidX)
+          }
         }
         if (vortex.timer > 0) {
           const life = Math.min(1, vortex.timer / params.vortexDuration)
