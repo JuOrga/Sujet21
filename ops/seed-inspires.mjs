@@ -8,6 +8,7 @@
 // resemé (la version du joueur prime).
 
 import { readFileSync } from 'node:fs'
+import { enTetesEcriture } from './_cle.mjs'
 
 const API = process.env.API ?? 'https://sujet21.vercel.app/api/levels'
 const seeds = JSON.parse(readFileSync(new URL('./inspires-crop.json', import.meta.url), 'utf8'))
@@ -26,7 +27,7 @@ for (const s of seeds) {
   }
   const r = await fetch(API, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: enTetesEcriture(),
     body: JSON.stringify({ level: s.level, id: '', auteur: 'Claude' }),
   })
   if (!r.ok) throw new Error(`POST ${code} → ${r.status}`)

@@ -32,10 +32,12 @@
 // USAGE
 //   node ops/restaure.mjs sauvegardes            # à blanc
 //   CONFIRME=oui node ops/restaure.mjs sauvegardes
-//   API=https://…/api CONFIRME=oui node ops/restaure.mjs sauvegardes
+//   CLE_CONCEPTEUR=… CONFIRME=oui node ops/restaure.mjs sauvegardes
+//   (la clé concepteur est exigée par l'API pour écrire — ops/_cle.mjs)
 
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { enTetesEcriture } from './_cle.mjs'
 
 const BASE = (process.env.API ?? 'https://sujet21.vercel.app/api').replace(/\/$/, '')
 const DOSSIER = process.argv[2] ?? 'sauvegardes'
@@ -56,7 +58,7 @@ async function poste(route, corps, quoi) {
   }
   const r = await fetch(`${BASE}/${route}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: enTetesEcriture(),
     body: JSON.stringify(corps),
   })
   const texte = await r.text()

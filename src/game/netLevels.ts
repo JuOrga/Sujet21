@@ -5,6 +5,7 @@
 
 import { parseLevel } from './levelIO'
 import type { LevelDef } from './level'
+import { fetchConcepteur } from './cleConcepteur'
 
 export interface StoredLevel {
   id: string
@@ -81,7 +82,7 @@ export function raisonDuRefus(): string {
 
 async function post(body: object): Promise<{ levels: StoredLevel[]; id: string } | null> {
   try {
-    const r = await fetch(ENDPOINT, {
+    const r = await fetchConcepteur(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -133,7 +134,7 @@ export async function reorderLibrary(order: string[]): Promise<StoredLevel[] | n
 
 export async function deleteLevel(id: string): Promise<StoredLevel[] | null> {
   try {
-    const r = await fetch(`${ENDPOINT}?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+    const r = await fetchConcepteur(`${ENDPOINT}?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
     if (!r.ok) return null
     return readList(await r.json())
   } catch {

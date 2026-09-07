@@ -11,6 +11,32 @@ le runner GitHub l'atteint.
 
 ---
 
+## La clé concepteur
+
+**Tout ce qui écrit vers `/api/*` la joint ; lire ne demande rien.** Le
+dépôt est public et l'adresse de l'API se lit ici même : sans clé,
+n'importe qui pouvait vider la bibliothèque ou la carte publiée d'un
+`DELETE` en boucle, et le magasin ne garde que quatre versions. Une seule
+clé, partagée entre concepteurs — pas des comptes.
+
+- **Côté serveur** : la variable d'environnement `CLE_CONCEPTEUR` du projet
+  Vercel (`api/_garde.ts` la compare à l'en-tête `X-Cle-Concepteur`).
+  **Sans variable, le serveur refuse d'écrire** (503) — un déploiement
+  oublié ne rouvre jamais la porte en silence. À régler AVANT la première
+  mise en ligne de cette règle, sinon plus rien ne se publie.
+- **Dans le jeu** : la première écriture d'un onglet la demande (invite du
+  navigateur) et la garde en `sessionStorage` — elle meurt avec l'onglet,
+  exprès. Une clé refusée est oubliée et redemandée une fois.
+- **Les gâchettes qui écrivent** (`seed-levels-go`, `seed-inspires-go`,
+  `maj-hub-go`) la lisent du secret GitHub `CLE_CONCEPTEUR` ; à la main,
+  `CLE_CONCEPTEUR=… node ops/restaure.mjs …`. Un script sans clé s'arrête
+  avant le premier appel.
+- **Deux endpoints n'en veulent pas** : `/api/records` (les scores des
+  joueurs) et `/api/perf` (leurs rapports). La sauvegarde (`sauvegarde-go`)
+  ne fait que lire : rien à régler.
+
+---
+
 ## Sauvegarder les documents partagés
 
 `sauvegarde.mjs` · workflow `sauvegarde` · branche `sauvegardes`
@@ -110,8 +136,8 @@ l'exécute, et c'est délibéré.
 # 1. voir ce qui SERAIT écrit — rien n'est envoyé (c'est le défaut)
 node ops/restaure.mjs sauvegardes
 
-# 2. écrire pour de bon
-CONFIRME=oui node ops/restaure.mjs sauvegardes
+# 2. écrire pour de bon (la clé concepteur est obligatoire)
+CLE_CONCEPTEUR=… CONFIRME=oui node ops/restaure.mjs sauvegardes
 ```
 
 **Elle ne peut que rendre, jamais retirer.** Elle repose chaque tableau par

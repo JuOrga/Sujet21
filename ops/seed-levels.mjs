@@ -11,6 +11,7 @@
 // dans la bibliothèque n'est jamais resemé (la version du joueur prime).
 
 import { readFileSync } from 'node:fs'
+import { enTetesEcriture } from './_cle.mjs'
 
 const API = process.env.API ?? 'https://sujet21.vercel.app/api/levels'
 const seeds = JSON.parse(readFileSync(new URL('./seed-levels.json', import.meta.url), 'utf8'))
@@ -33,7 +34,7 @@ for (const s of seeds) {
   }
   const r = await fetch(API, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: enTetesEcriture(),
     body: JSON.stringify({ level: s.level, id: '', auteur: 'expédition livrée' }),
   })
   if (!r.ok) throw new Error(`POST ${code} → ${r.status}`)
@@ -53,7 +54,7 @@ const ordre = [
 ]
 const ro = await fetch(API, {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+  headers: enTetesEcriture(),
   body: JSON.stringify({ order: ordre }),
 })
 if (!ro.ok) throw new Error(`reorder → ${ro.status}`)

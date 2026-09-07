@@ -18,6 +18,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { ecritDocument, litDocument } from './_magasin.js'
+import { exigeCle } from './_garde.js'
 
 const DOMAINES = ['plan-voie', 'carte', 'recompenses', 'textes', 'sequences']
 const MAX_OCTETS = 200_000
@@ -64,12 +65,14 @@ export default async function handler(
         res.status(200).json(await readAll(domaine))
         return
       }
+      if (!exigeCle(req, res)) return
       const mag: Magasin = { domaine, document: null, auteur: '', date: new Date().toISOString() }
       await ecritDocument(`reglages-${domaine}/`, mag)
       res.status(200).json(mag)
       return
     }
     if (req.method === 'POST') {
+      if (!exigeCle(req, res)) return
       const body = (req.body ?? {}) as Record<string, unknown>
       const domaine = domaineDe(body.domaine)
       if (!domaine) {

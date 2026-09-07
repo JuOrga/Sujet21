@@ -18,6 +18,7 @@
 //     retirer une entrée déjà vue par un joueur ne lui retire rien.
 
 import type { CodexDef } from './codex'
+import { fetchConcepteur } from './cleConcepteur'
 
 export interface EntreeJournal {
   /** `recit-…` ou `fin-…` : c'est l'id de la fiche du codex */
@@ -390,7 +391,7 @@ function litPublie(data: unknown): JournalPublie {
 
 export async function pushJournal(j: JournalDef, auteur: string): Promise<JournalPublie | null> {
   try {
-    const r = await fetch(ENDPOINT, {
+    const r = await fetchConcepteur(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ journal: j, auteur }),
@@ -405,7 +406,7 @@ export async function pushJournal(j: JournalDef, auteur: string): Promise<Journa
 /** Retire le journal publié : le livré reprend, pour tout le monde. */
 export async function deleteJournal(): Promise<boolean> {
   try {
-    const r = await fetch(ENDPOINT, { method: 'DELETE' })
+    const r = await fetchConcepteur(ENDPOINT, { method: 'DELETE' })
     return r.ok
   } catch {
     return false

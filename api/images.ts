@@ -15,6 +15,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { del, put } from '@vercel/blob'
 import { ecritDocument, litDocument } from './_magasin.js'
+import { exigeCle } from './_garde.js'
 
 const PREFIX = 'imagerie/'
 const BLOBS = 'imagerie-blobs/'
@@ -73,6 +74,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
     if (req.method === 'POST') {
+      if (!exigeCle(req, res)) return
       const body = (req.body ?? {}) as {
         nom?: unknown
         type?: unknown
@@ -124,6 +126,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
     if (req.method === 'DELETE') {
+      if (!exigeCle(req, res)) return
       const nom = typeof req.query.nom === 'string' ? req.query.nom : ''
       if (!nom) {
         res.status(400).json({ error: 'nom requis' })

@@ -10,6 +10,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { ecritDocument, litDocument } from './_magasin.js'
+import { exigeCle } from './_garde.js'
 
 const PREFIX = 'cinematiques/'
 const MAX_CINES = 100
@@ -125,6 +126,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
     if (req.method === 'POST') {
+      if (!exigeCle(req, res)) return
       const body = (req.body ?? {}) as { cine?: unknown; scenario?: unknown; auteur?: unknown }
       const auteur = typeof body.auteur === 'string' ? body.auteur.slice(0, 12) : ''
       // publier LE scénario (il n'y en a qu'un : il remplace le précédent)
@@ -158,6 +160,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
     if (req.method === 'DELETE') {
+      if (!exigeCle(req, res)) return
       const code = typeof req.query.code === 'string' ? req.query.code.toLowerCase() : ''
       if (!code) {
         res.status(400).json({ error: 'code requis' })

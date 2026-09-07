@@ -13,4 +13,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Semer les tableaux inspirés
+        env:
+          CLE_CONCEPTEUR: ${{ secrets.CLE_CONCEPTEUR }}
         run: node ops/seed-inspires.mjs

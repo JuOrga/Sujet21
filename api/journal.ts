@@ -14,6 +14,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { ecritDocument, litDocument } from './_magasin.js'
+import { exigeCle } from './_garde.js'
 
 const PREFIX = 'journal/'
 const MAX_ENTREES = 60
@@ -115,6 +116,7 @@ export default async function handler(
       return
     }
     if (req.method === 'POST') {
+      if (!exigeCle(req, res)) return
       const body = (req.body ?? {}) as Record<string, unknown>
       const journal = litJournal(body.journal)
       if (!journal) {
@@ -131,6 +133,7 @@ export default async function handler(
       return
     }
     if (req.method === 'DELETE') {
+      if (!exigeCle(req, res)) return
       const mag: Magasin = { journal: null, auteur: '', date: new Date().toISOString() }
       await ecritDocument(PREFIX, mag)
       res.status(200).json(mag)

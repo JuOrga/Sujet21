@@ -1,3 +1,4 @@
+import { fetchConcepteur } from './cleConcepteur'
 // LE MAGASIN DES RÉGLAGES PARTAGÉS (/api/reglages), côté jeu : un document
 // JSON par domaine, publié par le concepteur pour tous. Ce module ne
 // connaît pas la forme des documents — chaque domaine la relit et la
@@ -41,7 +42,7 @@ export async function pushReglage(
   auteur: string,
 ): Promise<ReglagePublie | null> {
   try {
-    const r = await fetch(ENDPOINT, {
+    const r = await fetchConcepteur(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ domaine, document, auteur }),
@@ -56,7 +57,7 @@ export async function pushReglage(
 /** Retire le document publié : le livré reprend, pour tout le monde. */
 export async function deleteReglage(domaine: DomaineReglage): Promise<boolean> {
   try {
-    const r = await fetch(`${ENDPOINT}?domaine=${encodeURIComponent(domaine)}`, { method: 'DELETE' })
+    const r = await fetchConcepteur(`${ENDPOINT}?domaine=${encodeURIComponent(domaine)}`, { method: 'DELETE' })
     return r.ok
   } catch {
     return false

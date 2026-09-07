@@ -354,6 +354,7 @@ import {
   type SharedBoard,
 } from './game/netRecords'
 import { createBench, type BenchMonitor } from './bench/bench'
+import { fetchConcepteur } from './game/cleConcepteur'
 
 const CAPACITY = 4096
 // (l'ancien délai d'affichage du bilan a cédé la place à la MISE EN
@@ -4832,7 +4833,7 @@ async function posteNoteRegle(id: string, note: string): Promise<void> {
   reglesBusy = true
   reglesDit('Enregistrement de la note…')
   try {
-    const r = await fetch('/api/regles', {
+    const r = await fetchConcepteur('/api/regles', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -4864,7 +4865,7 @@ async function posteAjoutRegle(texte: string, id?: string): Promise<void> {
   reglesBusy = true
   reglesDit('Consignation de la règle…')
   try {
-    const r = await fetch('/api/regles', {
+    const r = await fetchConcepteur('/api/regles', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -4899,7 +4900,7 @@ async function oteAjoutRegle(id: string): Promise<void> {
   reglesBusy = true
   reglesDit('Retrait de la règle…')
   try {
-    const r = await fetch(`/api/regles?id=${encodeURIComponent(id)}`, {
+    const r = await fetchConcepteur(`/api/regles?id=${encodeURIComponent(id)}`, {
       method: 'DELETE',
     })
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
