@@ -6942,7 +6942,12 @@
         #editor {
           /* même règle en écran étroit : la palette suit l'échelle */
           grid-template-columns: min(calc(150px * var(--ui)), 34vw) 1fr;
-          grid-template-rows: 46px 1fr 210px;
+          /* la barre s'enroule ici plus qu'ailleurs (deux colonnes, écran
+             court) : une rangée FIXÉE à 46 px la faisait déborder sur le
+             haut des panneaux, qu'elle recouvrait — jusqu'à 3 lignes de
+             boutons en ÉNORME sur iPad portrait. Elle prend sa hauteur,
+             comme en grand écran. */
+          grid-template-rows: auto 1fr 210px;
         }
         .ed-side--right {
           grid-column: 1 / -1;
