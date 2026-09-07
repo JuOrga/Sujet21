@@ -146,6 +146,7 @@ import { MAX_LUMIERES,
 import { canalDeCible, traceLaser } from '../game/laser'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
 import { PISTES, PISTE_NOMS, type Piste } from '../game/soundtrack'
+import { htmlSafe } from '../game/html'
 import {
   deleteLevel,
   fetchLibrary,
@@ -4450,25 +4451,25 @@ export class LevelEditor {
           const hub = estCodeHub(s.level.code)
           if (!hub) rang++
           return (
-            `<div class="ed-lib-row${s.id === this.openId ? ' open' : ''}" data-id="${s.id}">` +
+            `<div class="ed-lib-row${s.id === this.openId ? ' open' : ''}" data-id="${htmlSafe(s.id)}">` +
             `<span class="ed-lib-rang" title="${hub ? 'Hors séquence' : 'Rang dans la séquence — se règle dans LA PLANCHE'}">${hub ? '·' : rang}</span>` +
-            `<button type="button" class="ed-lib-open" data-id="${s.id}" title="${
+            `<button type="button" class="ed-lib-open" data-id="${htmlSafe(s.id)}" title="${
               s.level.code === CODE_HUB
                 ? 'Le LABORATOIRE : ce tableau remplace le hub et ne compte pas dans la séquence'
                 : hub
                   ? 'Un chantier de hub : hors séquence — publiez-le sous le code HUB pour qu’il devienne le laboratoire joué'
                   : 'Ouvrir ce tableau'
             }">` +
-            `<b>${s.level.code}</b> ${s.level.name}` +
+            `<b>${htmlSafe(s.level.code)}</b> ${htmlSafe(s.level.name)}` +
             (s.level.code === CODE_HUB
               ? `<em class="ed-lib-hub">LABORATOIRE</em>`
               : hub
                 ? `<em class="ed-lib-hub">HORS SÉQUENCE</em>`
                 : '') +
-            `<small>${s.auteur ? s.auteur + ' · ' : ''}par ${s.level.par ?? '?'}${errs ? ' · ' + errs + ' erreur(s)' : ''}</small>` +
+            `<small>${s.auteur ? htmlSafe(s.auteur) + ' · ' : ''}par ${htmlSafe(String(s.level.par ?? '?'))}${errs ? ' · ' + errs + ' erreur(s)' : ''}</small>` +
             `</button>` +
             `<span class="ed-lib-ord">` +
-            `<button type="button" data-del="${s.id}" title="Supprimer de la bibliothèque">✕</button>` +
+            `<button type="button" data-del="${htmlSafe(s.id)}" title="Supprimer de la bibliothèque">✕</button>` +
             `</span></div>`
           )
         })

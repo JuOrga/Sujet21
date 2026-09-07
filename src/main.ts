@@ -319,6 +319,7 @@ import {
   type CondensatDef,
 } from './game/condensat'
 import { FIOLES, FIOLES_SLOTS, fioleDef } from './game/fioles'
+import { htmlSafe } from './game/html'
 import {
   ETATS_CYCLE,
   TRANSFOS_CYCLE,
@@ -1338,7 +1339,7 @@ function renderRegistres(): void {
     const v0 = top.volume[0]
     const c0 = top.chrono[0]
     rows.push(
-      `<div class="rec-row"><span class="rec-code">${t.code}</span><span class="rec-name">${t.name}</span>` +
+      `<div class="rec-row"><span class="rec-code">${htmlSafe(t.code)}</span><span class="rec-name">${htmlSafe(t.name)}</span>` +
         `<span class="rec-val rec-note"><b>${n0.note} pts</b> ${signe(n0.name)}</span>` +
         `<span class="rec-val rec-vol"><b>${fmtL(v0?.liters ?? 0)}</b> ${signe(v0?.name ?? '')}</span>` +
         `<span class="rec-val rec-chr"><b>${fmtTime(c0?.time ?? 0)}</b> ${signe(c0?.name ?? '')}</span></div>`,
@@ -8875,7 +8876,7 @@ function majInstrumentsUI(): void {
         : defs
             .map(
               (d) =>
-                `<div class="ip-row"><span class="ip-ico">${d.icone}</span><div><b>${d.nom}</b><small>${d.desc}</small></div></div>`,
+                `<div class="ip-row"><span class="ip-ico">${htmlSafe(d.icone)}</span><div><b>${htmlSafe(d.nom)}</b><small>${htmlSafe(d.desc)}</small></div></div>`,
             )
             .join('')) +
       `<p class="ip-note">valables jusqu'à la fin de la run</p>`
@@ -12708,8 +12709,8 @@ function majDossier(): void {
   }
   mission +=
     '<div class="do-mission">' +
-    `<div class="do-nom">${auHub ? 'LE LABORATOIRE' : level.name}</div>` +
-    `<div class="do-code">${level.code}${estEconomat(level) ? ' · L’ÉCONOMAT' : ''}</div>`
+    `<div class="do-nom">${auHub ? 'LE LABORATOIRE' : htmlSafe(level.name)}</div>` +
+    `<div class="do-code">${htmlSafe(level.code)}${estEconomat(level) ? ' · L’ÉCONOMAT' : ''}</div>`
   if (id)
     mission +=
       `<div class="do-chips"><i>${MOMENT_COURT[id.moment]}</i>` +
@@ -12880,13 +12881,13 @@ function majDossier(): void {
       : instrs
           .map(
             (d) =>
-              `<div class="do-objet"><i>${d.icone}</i><div><b>${d.nom}</b><small>${d.desc}</small></div></div>`,
+              `<div class="do-objet"><i>${htmlSafe(d.icone)}</i><div><b>${htmlSafe(d.nom)}</b><small>${htmlSafe(d.desc)}</small></div></div>`,
           )
           .join('') +
         fioles
           .map(
             (d) =>
-              `<div class="do-objet"><i>⚗</i><div><b>${d.nom}</b><small>${d.desc}</small></div></div>`,
+              `<div class="do-objet"><i>⚗</i><div><b>${htmlSafe(d.nom)}</b><small>${htmlSafe(d.desc)}</small></div></div>`,
           )
           .join('')) +
     '</section>'
@@ -13277,16 +13278,6 @@ function updateTutor(dtReal: number): void {
       tutorEl.classList.remove('visible')
     }
   }
-}
-
-/** L'échappement HTML de la maison — texte ET attributs : le guillemet
- *  aussi, sinon un code de biome qui en porte un casse un `value="…"`. */
-function htmlSafe(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
 }
 
 function showOverlay(

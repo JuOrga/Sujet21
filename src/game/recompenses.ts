@@ -121,9 +121,12 @@ function nettoie(x: unknown): InstrumentDef | null {
   if (typeof o.id !== 'string' || !o.id || effets.length === 0) return null
   return {
     id: o.id,
-    nom: typeof o.nom === 'string' && o.nom ? o.nom : o.id,
-    desc: typeof o.desc === 'string' ? o.desc : '',
-    icone: typeof o.icone === 'string' && o.icone ? o.icone : '✦',
+    // les mêmes bornes que les champs de l'atelier (index.html : icône 4,
+    // nom 28, texte 140) — une carte PUBLIÉE arrive du magasin partagé, pas
+    // des champs, et rien ne l'avait encore ramenée dans ses limites
+    nom: (typeof o.nom === 'string' && o.nom ? o.nom : o.id).slice(0, 28),
+    desc: (typeof o.desc === 'string' ? o.desc : '').slice(0, 140),
+    icone: (typeof o.icone === 'string' && o.icone ? o.icone : '✦').slice(0, 4),
     effets: effets as Effet[],
     perso: true,
   }
