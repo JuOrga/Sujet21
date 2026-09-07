@@ -6402,6 +6402,16 @@
       .ed-side {
         border-right: 1px solid var(--line);
         overflow-y: auto;
+        /* Le panneau DÉFILAIT DE CÔTÉ : « overflow-y: auto » seul vaut aussi
+           « overflow-x: auto », et les libellés longs de la palette (PLOT
+           D'ARTICLE (CONDENSAT), PUPITRE (ÉCRAN AU CONTACT)…), écrits sur
+           une ligne, dépassaient de leur bouton — 59 px de trop mesurés
+           dans une colonne de 232, 183 px sur iPad en ÉNORME. Un coup de
+           molette latérale ou un doigt qui dérive, et toute la palette
+           partait à gauche. Une colonne d'outils n'a aucune raison de
+           défiler de côté : on le lui interdit, et les libellés s'enroulent
+           (voir .ed-tool) au lieu de déborder. */
+        overflow-x: hidden;
         overscroll-behavior: contain;
         padding: 12px;
         display: flex;
@@ -6436,6 +6446,15 @@
         display: flex;
         align-items: center;
         gap: 8px;
+      }
+      /* Un libellé trop long pour la colonne passe sur DEUX LIGNES plutôt
+         que de déborder (les boutons de l'éditeur sont sur une ligne par
+         défaut, d'où la spécificité). « anywhere » ne casse un mot qu'en
+         dernier recours : quand il ne tient pas seul sur sa ligne. */
+      #editor button.ed-tool {
+        white-space: normal;
+        overflow-wrap: anywhere;
+        line-height: 1.35;
       }
       .ed-tool i {
         width: 10px;
@@ -6686,6 +6705,13 @@
          de large chacune, et la ligne « Exige au bouton » sortait de trente
          millimètres hors du panneau (365 px mesurés dans une colonne de
          321). Une case à cocher fait la taille d'une case à cocher. */
+      /* et un champ peut se resserrer quand l'intitulé et lui ne tiennent
+         pas sur la ligne (colonne étroite en grande échelle) : sinon il
+         garde ses 128 px et sort du panneau */
+      .ed-f input,
+      .ed-f select {
+        min-width: 0;
+      }
       .ed-f input[type='checkbox'],
       .ed-f input[type='radio'] {
         width: auto;
@@ -6693,6 +6719,9 @@
       }
       #editor textarea {
         width: 100%;
+        /* bordure comprise dans les 100 % : sans cela la zone dépassait de
+           2 px et suffisait à faire défiler le panneau de droite de côté */
+        box-sizing: border-box;
         min-height: 70px;
         resize: vertical;
       }
@@ -6912,7 +6941,12 @@
         #editor {
           /* même règle en écran étroit : la palette suit l'échelle */
           grid-template-columns: min(calc(150px * var(--ui)), 34vw) 1fr;
-          grid-template-rows: 46px 1fr 210px;
+          /* la barre s'enroule ici plus qu'ailleurs (deux colonnes, écran
+             court) : une rangée FIXÉE à 46 px la faisait déborder sur le
+             haut des panneaux, qu'elle recouvrait — jusqu'à 3 lignes de
+             boutons en ÉNORME sur iPad portrait. Elle prend sa hauteur,
+             comme en grand écran. */
+          grid-template-rows: auto 1fr 210px;
         }
         .ed-side--right {
           grid-column: 1 / -1;
