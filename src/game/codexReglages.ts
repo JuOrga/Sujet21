@@ -12,6 +12,8 @@
 // Ce module ne touche pas au DOM : la partie pure se teste, la partie
 // réseau (fetch…) rend null sur tout échec — l'appelant garde ce qu'il a.
 
+import { appelle } from './reseau'
+
 export type RareteFiche = 'normale' | 'rare' | 'legendaire'
 
 /** Les raretés, dans l'ordre de l'atelier. Toutes les fiches naissent
@@ -107,7 +109,7 @@ const ENDPOINT = '/api/codex'
 /** Les réglages du magasin — null : pas de réseau, on garde les défauts. */
 export async function fetchReglagesCodex(): Promise<ReglagesCodex | null> {
   try {
-    const r = await fetch(ENDPOINT, { cache: 'no-store' })
+    const r = await appelle(ENDPOINT, { cache: 'no-store' })
     if (!r.ok) return null
     return litReglages(await r.json())
   } catch {
@@ -134,7 +136,7 @@ export async function pushReglageCodex(
     const corps: Record<string, unknown> = { id, memoire: reglage.memoire, rarete: reglage.rarete, auteur }
     if (video === 'retirer') corps.retirerVideo = true
     else if (video) corps.video = video
-    const r = await fetch(ENDPOINT, {
+    const r = await appelle(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(corps),
@@ -149,7 +151,7 @@ export async function pushReglageCodex(
 /** Rétablit les défauts d'une fiche (et retire sa vidéo envoyée). */
 export async function deleteReglageCodex(id: string): Promise<ReglagesCodex | null> {
   try {
-    const r = await fetch(`${ENDPOINT}?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+    const r = await appelle(`${ENDPOINT}?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
     if (!r.ok) return null
     return litReglages(await r.json())
   } catch {

@@ -372,6 +372,13 @@ export function fichesCodex(): CodexDef[] {
 }
 
 const CLE = 'sujet21-codex'
+/** Le stockage du codex : les trois gestes du stockage local — le coffre de
+ *  sauvegarde les offre, `localStorage` aussi. */
+export interface StockageCodex {
+  getItem(k: string): string | null
+  setItem(k: string, v: string): void
+  removeItem(k: string): void
+}
 // LE FILET DU DÉBLOCAGE : ce que le concepteur avait vraiment découvert,
 // mis de côté le temps qu'il regarde le codex complet. Sans lui, « tout
 // débloquer » effacerait sa partie sans retour possible.
@@ -383,7 +390,7 @@ export class Codex {
   private etat: Record<string, string> = {}
   onDecouverte: (d: CodexDef) => void = () => {}
 
-  constructor(private readonly storage: Storage | null = null) {
+  constructor(private readonly storage: StockageCodex | null = null) {
     try {
       const s = this.storage ?? localStorage
       this.etat = JSON.parse(s.getItem(CLE) ?? '{}') as Record<string, string>

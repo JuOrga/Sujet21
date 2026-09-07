@@ -4,6 +4,8 @@
 // ramène dans ses bornes (planPartage.ts pour le plan de la descente). Tout
 // échec réseau rend null : l'appelant garde ce qu'il a.
 
+import { appelle } from './reseau'
+
 export type DomaineReglage = 'plan-voie' | 'carte' | 'recompenses' | 'textes' | 'sequences'
 
 export interface ReglagePublie {
@@ -27,7 +29,7 @@ function litPublie(data: unknown): ReglagePublie {
  *  résultat null : pas de réseau. */
 export async function fetchReglage(domaine: DomaineReglage): Promise<ReglagePublie | null> {
   try {
-    const r = await fetch(`${ENDPOINT}?domaine=${encodeURIComponent(domaine)}`, { cache: 'no-store' })
+    const r = await appelle(`${ENDPOINT}?domaine=${encodeURIComponent(domaine)}`, { cache: 'no-store' })
     if (!r.ok) return null
     return litPublie(await r.json())
   } catch {
@@ -41,7 +43,7 @@ export async function pushReglage(
   auteur: string,
 ): Promise<ReglagePublie | null> {
   try {
-    const r = await fetch(ENDPOINT, {
+    const r = await appelle(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ domaine, document, auteur }),
@@ -56,7 +58,7 @@ export async function pushReglage(
 /** Retire le document publié : le livré reprend, pour tout le monde. */
 export async function deleteReglage(domaine: DomaineReglage): Promise<boolean> {
   try {
-    const r = await fetch(`${ENDPOINT}?domaine=${encodeURIComponent(domaine)}`, { method: 'DELETE' })
+    const r = await appelle(`${ENDPOINT}?domaine=${encodeURIComponent(domaine)}`, { method: 'DELETE' })
     return r.ok
   } catch {
     return false

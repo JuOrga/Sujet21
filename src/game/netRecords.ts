@@ -3,6 +3,8 @@
 // hors ligne ou en développement local, le jeu retombe sur les registres
 // locaux sans une erreur en console.
 
+import { appelle } from './reseau'
+
 export interface SharedTableauRecord {
   liters: number
   time: number
@@ -43,7 +45,7 @@ const ENDPOINT = '/api/records'
 
 export async function fetchSharedBoard(): Promise<SharedBoard | null> {
   try {
-    const r = await fetch(ENDPOINT, { cache: 'no-store' })
+    const r = await appelle(ENDPOINT, { cache: 'no-store' })
     if (!r.ok) return null
     const data = (await r.json()) as SharedBoard
     if (typeof data !== 'object' || data === null || typeof data.tableaux !== 'object') return null
@@ -57,7 +59,7 @@ export async function fetchSharedBoard(): Promise<SharedBoard | null> {
 // gagne » que les registres locaux et renvoie le tableau d'honneur à jour.
 async function push(body: object): Promise<SharedBoard | null> {
   try {
-    const r = await fetch(ENDPOINT, {
+    const r = await appelle(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

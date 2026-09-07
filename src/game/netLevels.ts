@@ -5,6 +5,7 @@
 
 import { parseLevel } from './levelIO'
 import type { LevelDef } from './level'
+import { appelle } from './reseau'
 
 export interface StoredLevel {
   id: string
@@ -58,7 +59,7 @@ export function readList(data: unknown): StoredLevel[] {
 
 export async function fetchLibrary(): Promise<StoredLevel[] | null> {
   try {
-    const r = await fetch(ENDPOINT, { cache: 'no-store' })
+    const r = await appelle(ENDPOINT, { cache: 'no-store' })
     if (!r.ok) return null
     return readList(await r.json())
   } catch {
@@ -81,7 +82,7 @@ export function raisonDuRefus(): string {
 
 async function post(body: object): Promise<{ levels: StoredLevel[]; id: string } | null> {
   try {
-    const r = await fetch(ENDPOINT, {
+    const r = await appelle(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -133,7 +134,7 @@ export async function reorderLibrary(order: string[]): Promise<StoredLevel[] | n
 
 export async function deleteLevel(id: string): Promise<StoredLevel[] | null> {
   try {
-    const r = await fetch(`${ENDPOINT}?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+    const r = await appelle(`${ENDPOINT}?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
     if (!r.ok) return null
     return readList(await r.json())
   } catch {

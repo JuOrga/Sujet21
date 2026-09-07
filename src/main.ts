@@ -306,6 +306,26 @@ import {
   sauveScenario,
 } from './game/scenario'
 import { Records } from './game/records'
+import { coffre } from './game/coffre'
+import {
+  ETAT_EAU,
+  ETAT_GLACE,
+  ETAT_VAPEUR,
+  EV_DASH,
+  EnregistreurFantome,
+  Fantomes,
+  LecteurFantome,
+  SECTEURS,
+  profilDe,
+  type CategorieFantome,
+  type EchantillonFantome,
+  type FantomeDef,
+} from './game/fantome'
+import {
+  fetchFantomesPartages,
+  fetchIndexFantomes,
+  pushFantomePartage,
+} from './game/netFantomes'
 import {
   fichePupitre,
   plaquePupitre,
@@ -354,6 +374,7 @@ import {
   type SharedBoard,
 } from './game/netRecords'
 import { createBench, type BenchMonitor } from './bench/bench'
+import { appelle } from './game/reseau'
 
 const CAPACITY = 4096
 // (l'ancien délai d'affichage du bilan a cédé la place à la MISE EN
@@ -521,7 +542,7 @@ const sfx = {
 }
 
 // Registres du labo (§10) : records par tableau et historique des essais.
-const records = new Records()
+const records = new Records(coffre.stockage)
 
 // ---- LA MÉMOIRE : la monnaie PERSISTANTE de l'Éveil, gravée dans les
 // registres. De l'information, pas de la matière : la purge de fin de run
@@ -546,11 +567,11 @@ function gagneMemoireRun(n: number): void {
 // la mémoire, une fois pour toutes — 10 cL de matière = 1 souvenir. La clé
 // disparaît ensuite : rien ne se migre deux fois.
 try {
-  const brut = Math.floor(Number(localStorage.getItem(CLE_CONDENSAT)))
+  const brut = Math.floor(Number(coffre.stockage.getItem(CLE_CONDENSAT)))
   if (Number.isFinite(brut) && brut > 0) {
     records.gagneMemoire(Math.max(1, Math.floor(brut / 10)))
   }
-  localStorage.removeItem(CLE_CONDENSAT)
+  coffre.stockage.removeItem(CLE_CONDENSAT)
 } catch {
   // stockage indisponible : rien à migrer
 }
@@ -936,7 +957,7 @@ const CLE_PALMARES_VOIE = 'sujet21-voie-palmares-v1'
 function chargePalmaresVoie(): PalmaresVoie {
   let brut: string | null = null
   try {
-    brut = localStorage.getItem(CLE_PALMARES_VOIE)
+    brut = coffre.stockage.getItem(CLE_PALMARES_VOIE)
   } catch {
     brut = null
   }
@@ -944,7 +965,7 @@ function chargePalmaresVoie(): PalmaresVoie {
 }
 function sauvePalmaresVoie(p: PalmaresVoie): void {
   try {
-    localStorage.setItem(CLE_PALMARES_VOIE, JSON.stringify(p))
+    coffre.stockage.setItem(CLE_PALMARES_VOIE, JSON.stringify(p))
   } catch {
     // stockage refusé : tant pis pour cette fois
   }
@@ -963,7 +984,7 @@ interface SalleElue {
 function chargeButin(): SalleElue[] {
   try {
     const arr = JSON.parse(
-      localStorage.getItem(CLE_BUTIN_VOIE) ?? '[]',
+      coffre.stockage.getItem(CLE_BUTIN_VOIE) ?? '[]',
     ) as unknown
     return Array.isArray(arr)
       ? (arr as SalleElue[]).filter(
@@ -976,7 +997,7 @@ function chargeButin(): SalleElue[] {
 }
 function sauveButin(butin: SalleElue[]): void {
   try {
-    localStorage.setItem(CLE_BUTIN_VOIE, JSON.stringify(butin.slice(0, 20)))
+    coffre.stockage.setItem(CLE_BUTIN_VOIE, JSON.stringify(butin.slice(0, 20)))
   } catch {
     // stockage refusé : le butin ne tiendra que la session — sans gravité
   }
@@ -1447,7 +1468,7 @@ requestAnimationFrame(() => {
     majInviteSon()
     renderRegistres()
     try {
-      localStorage.setItem('sujet21-signature-v1', '1')
+      coffre.stockage.setItem('sujet21-signature-v1', '1')
     } catch {
       // sans gravité : le voile se remontrerait, simple re-clic
     }
@@ -1465,7 +1486,7 @@ requestAnimationFrame(() => {
   // clic suffit) et le son s'éveille par la même occasion. La clé versionnée
   // garantit « une fois » ; la re-signature n'efface aucun record.
   const CLE_SIGNATURE = 'sujet21-signature-v1'
-  if (!records.operator() || !localStorage.getItem(CLE_SIGNATURE)) {
+  if (!records.operator() || !coffre.stockage.getItem(CLE_SIGNATURE)) {
     sigNom.value = records.operator()
     sigEl.hidden = false
     // le focus attend une image : le champ existe et la fiche est posée —
@@ -1529,7 +1550,7 @@ const obCle = (): string =>
 const CLE_EVEIL = 'sujet21-eveil-v3' // v3 : l'accident du télescope — l'acte 0 se rejoue pour tous
 function eveilJoue(): boolean {
   try {
-    return !!localStorage.getItem(CLE_EVEIL)
+    return !!coffre.stockage.getItem(CLE_EVEIL)
   } catch {
     return true // stockage muet : ne jamais enfermer le joueur
   }
@@ -2072,7 +2093,107 @@ function majFpsCoin(dtReal: number): void {
 // ---- Trophées du protocole : succès internes, prêts pour Steam ----
 // Les déblocages passent par un toast (la petite fanfare) ; la page vit
 // dans le voile RECORDS. Détection par échantillonnage léger (4 Hz).
-const trophees = new Trophees()
+const trophees = new Trophees(coffre.stockage)
+
+// ---- LES FANTÔMES (game/fantome.ts) : la trace du corps, rejouée -----------
+// À chaque salle, la course s'enregistre (dix échantillons par seconde de
+// temps simulé) ; au sas, si un record tombe, sa trace prend la place de
+// l'ancienne — VOLUME et CHRONO, chacun sa silhouette. Les fantômes de la
+// salle se relisent à l'entrée et se dessinent sur le canvas d'effets, au
+// temps simulé du tableau : la pause les fige, le time warp les presse.
+// Rangés dans l'emplacement de sauvegarde, donc dans le fichier que le
+// Steam Cloud synchronise.
+const fantomes = new Fantomes(coffre.stockage)
+let fantomeRec: EnregistreurFantome | null = null
+let fantomesLus: { cat: CategorieFantome; lecteur: LecteurFantome; partage?: boolean }[] = []
+// chaque armement a son jeton : la réponse du palmarès d'une salle quittée
+// entre-temps ne se pose pas dans la suivante
+let fantomesJeton = 0
+// le réglage de l'appareil : voir ou non les fantômes (PARAMÈTRES)
+let fantomesVisibles = localStorage.getItem('sujet21-fantomes') !== 'off'
+// TOUS : les miens et ceux du palmarès partagé ; LES MIENS : sans le palmarès
+let fantomesPartagesVoulus = localStorage.getItem('sujet21-fantomes') !== 'miens'
+// la direction de poussée du pas en cours (null : le joueur n'éjecte pas)
+let pousseeFantome: number | null = null
+// ce qui vient d'être dessiné (position écran, rayon) : lu par la sonde de test
+let fantomesDessines: { cat: CategorieFantome; sx: number; sy: number; r: number }[] = []
+function armeFantomes(): void {
+  fantomeRec = null
+  fantomesLus = []
+  fantomesFx = []
+  fantomesEtat = []
+  fantomesT = 0
+  if (hudFantome) hudFantome.textContent = ''
+  // le REJEU : une seule course, à regarder — et rien à enregistrer
+  if (rejeu) {
+    fantomesLus = [{ cat: rejeu.cat, lecteur: rejeu.lecteur }]
+    return
+  }
+  // ni le hub ni l'essai d'éditeur ne consignent de record : pas de fantôme
+  if (testLevel || auHub) return
+  fantomeRec = new EnregistreurFantome()
+  const f = fantomes.pour(level.code)
+  if (f.volume) fantomesLus.push({ cat: 'volume', lecteur: new LecteurFantome(f.volume) })
+  // la même course détient les deux records : une seule silhouette
+  const meme = f.volume && f.chrono && f.volume.donnees === f.chrono.donnees
+  if (f.chrono && !meme) fantomesLus.push({ cat: 'chrono', lecteur: new LecteurFantome(f.chrono) })
+  // LE PALMARÈS : la course du détenteur de chaque record partagé, quand
+  // ce n'est pas déjà l'une des miennes — elle arrive après l'entrée, le
+  // temps d'une lecture, et seulement si l'on est toujours dans cette salle
+  if (!fantomesPartagesVoulus || !fantomesVisibles) return
+  const jeton = ++fantomesJeton
+  const code = level.code
+  void fetchFantomesPartages(code).then((p) => {
+    if (!p || jeton !== fantomesJeton || rejeu) return
+    const dejaLa = new Set(fantomesLus.map((l) => l.lecteur.def.donnees))
+    for (const cat of ['volume', 'chrono'] as const) {
+      const d = p[cat]
+      if (!d || dejaLa.has(d.donnees)) continue
+      dejaLa.add(d.donnees)
+      fantomesLus.push({ cat, lecteur: new LecteurFantome(d), partage: true })
+    }
+  })
+}
+/** Au pas de simulation : un échantillon par cran de cadence, pas plus —
+ *  le parcours des particules n'a lieu que dix fois par seconde simulée. */
+function echantillonneFantome(): void {
+  if (!fantomeRec || sim.dispersed || !fantomeRec.aBesoin(run.tableauTime)) return
+  sim.updatePlayerStats()
+  let gel = 0
+  let gaz = 0
+  for (let i = 0; i < sim.count; i++) {
+    if (sim.kind[i] !== KIND_PLAYER) continue
+    if (sim.frozen[i] === 1) gel++
+    else if (sim.gaseous[i] === 1) gaz++
+  }
+  const n = sim.playerCount
+  const etat =
+    n > 0 && gel * 2 >= n ? ETAT_GLACE : n > 0 && gaz * 2 >= n ? ETAT_VAPEUR : ETAT_EAU
+  const cx = sim.stats.centroidX
+  const cy = sim.stats.centroidY
+  fantomeRec.note(run.tableauTime, {
+    x: cx,
+    y: cy,
+    r: sim.stats.rmsRadius,
+    cl: sim.liters() * 100,
+    etat,
+    poussee: pousseeFantome,
+    // la FORME : l'étendue du corps dans seize secteurs — dix fois par seconde simulée
+    profil: profilDe(cx, cy, sim.posX, sim.posY, (i) => sim.kind[i] === KIND_PLAYER, sim.count),
+  })
+}
+// Sonde de test : suivre les fantômes depuis la console (comme __sim, __eveil)
+;(window as unknown as { __fantomes: unknown }).__fantomes = {
+  rangement: fantomes,
+  Enregistreur: EnregistreurFantome,
+  rec: () => fantomeRec,
+  lus: () => fantomesLus,
+  code: () => level.code,
+  dessines: () => fantomesDessines,
+  montre: (v: boolean) => {
+    fantomesVisibles = v
+  },
+}
 const tropheeToast = document.getElementById('trophee-toast') as HTMLDivElement
 // LE GENRE D'UNE RÉCOMPENSE : six natures partageaient un seul bandeau
 // gris — trophée, fiche de codex, éclat de mémoire, fiole, achat. Le genre
@@ -2125,7 +2246,7 @@ trophees.onDebloque = (t) => {
 }
 // Le CODEX partage la fanfare des trophées : même toast, autre étiquette —
 // et sa page (fiche d'essai, bouton CODEX) se remplit au fil des découvertes
-const codex = new Codex()
+const codex = new Codex(coffre.stockage)
 // LES RÉGLAGES DU CODEX (mémoire à la découverte, rareté, vidéo envoyée) :
 // le magasin partagé les donne, le code porte les défauts — hors-ligne,
 // chaque fiche vaut dix de mémoire et sa vidéo est celle du dossier
@@ -2310,7 +2431,10 @@ function renderRecordsVoile(): void {
   void fetchSharedBoard().then((board) => {
     if (!board) {
       recordsCorps.innerHTML =
-        '<div class="rec-vide">Palmarès injoignable (hors ligne ou serveur local).</div>'
+        '<div class="rec-vide">Palmarès injoignable (hors ligne ou serveur local).</div>' +
+        blocFantomes() +
+        '<div id="rec-fant-palmares"></div>'
+      remplitPalmaresFantomes()
       return
     }
     const moi = records.operator()
@@ -2353,6 +2477,8 @@ function renderRecordsVoile(): void {
       html += `<div class="tro-carte${ok ? '' : ' verrou'}"><i>${t.icone}</i><div><b>${t.nom}</b><span>${t.desc}</span>${ok ? `<em>débloqué le ${date}</em>` : ''}</div></div>`
     }
     html += '</div>'
+    html += blocFantomes()
+    html += '<div id="rec-fant-palmares"></div>'
     const tops = board.tops ?? {}
     for (const lv of playedLevels()) {
       const t = tops[lv.code]
@@ -2387,8 +2513,67 @@ function renderRecordsVoile(): void {
       html += '</div>'
     }
     recordsCorps.innerHTML = html || '<div class="rec-vide">Aucune salle.</div>'
+    remplitPalmaresFantomes()
   })
 }
+/** VOS FANTÔMES : une ligne par salle, un bouton par course — ▶ lance le rejeu. */
+function blocFantomes(): string {
+  const codes = fantomes.codes()
+  if (codes.length === 0) return ''
+  let h = '<div class="rec-salle">VOS FANTÔMES — rejouer une course</div><div class="rec-fantomes">'
+  for (const code of codes) {
+    const lv = levelParCode(code)
+    const f = fantomes.pour(code)
+    h += `<div class="rec-fant"><span class="code">${htmlSafe(code)}${lv ? ` — ${htmlSafe(lv.name)}` : ' — salle inconnue'}</span>`
+    for (const cat of ['volume', 'chrono'] as const) {
+      const d = f[cat]
+      if (!d) continue
+      h += `<button type="button" class="rec-rejouer" data-code="${htmlSafe(code)}" data-cat="${cat}"${lv ? '' : ' disabled'}>▶ ${cat === 'volume' ? 'VOLUME' : 'CHRONO'} · ${htmlSafe(d.nom || 'anonyme')} · ${fmtL(d.litres)} · ${fmtDuree(d.temps)}</button>`
+    }
+    h += '</div>'
+  }
+  return h + '</div>'
+}
+/** FANTÔMES DU PALMARÈS : la course du détenteur de chaque record partagé,
+ *  à rejouer — l'index se lit en une fois, la trace au clic. */
+function remplitPalmaresFantomes(): void {
+  const hote = document.getElementById('rec-fant-palmares')
+  if (!hote) return
+  void fetchIndexFantomes().then((index) => {
+    if (!index || hote !== document.getElementById('rec-fant-palmares')) return
+    const codes = Object.keys(index)
+    if (codes.length === 0) return
+    let h = '<div class="rec-salle">FANTÔMES DU PALMARÈS — la course de chaque record partagé</div><div class="rec-fantomes">'
+    for (const code of codes) {
+      const lv = levelParCode(code)
+      h += `<div class="rec-fant"><span class="code">${htmlSafe(code)}${lv ? ` — ${htmlSafe(lv.name)}` : ' — salle inconnue'}</span>`
+      for (const cat of ['volume', 'chrono'] as const) {
+        const m = index[code][cat]
+        if (!m) continue
+        h += `<button type="button" class="rec-rejouer" data-partage="1" data-code="${htmlSafe(code)}" data-cat="${cat}"${lv ? '' : ' disabled'}>▶ ${cat === 'volume' ? 'VOLUME' : 'CHRONO'} · ${htmlSafe(m.nom || 'anonyme')} · ${fmtL(m.litres)} · ${fmtDuree(m.temps)}</button>`
+      }
+      h += '</div>'
+    }
+    hote.innerHTML = h + '</div>'
+  })
+}
+recordsCorps.addEventListener('click', (e) => {
+  const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button.rec-rejouer')
+  if (!b || b.disabled) return
+  const code = b.dataset.code ?? ''
+  const cat = (b.dataset.cat as CategorieFantome) ?? 'volume'
+  if (b.dataset.partage) {
+    // la trace du palmarès se lit au clic : elle pèse, on ne la lit pas pour rien
+    b.disabled = true
+    void fetchFantomesPartages(code).then((p) => {
+      b.disabled = false
+      const def = p?.[cat]
+      if (def) lanceRejeu(code, cat, def)
+    })
+    return
+  }
+  lanceRejeu(code, cat)
+})
 document.getElementById('home-records')?.addEventListener('click', () => {
   recordsEl.hidden = false
   renderRecordsVoile()
@@ -2638,6 +2823,164 @@ document.getElementById('fioles-fermer')?.addEventListener('click', () => {
 })
 fiolesEl.addEventListener('pointerdown', (e) => {
   if (e.target === fiolesEl) fiolesEl.hidden = true
+})
+
+// ---- Le voile SAUVEGARDES : les trois emplacements du coffre ---------------
+// Trois cartes, une par emplacement : le résumé lu sans ouvrir la partie
+// (game/coffre.ts), l'actif marqué. JOUER écrit le pointeur et RECHARGE —
+// tout l'état de ce fichier se construit à l'ouverture depuis l'emplacement
+// actif, on ne le rebâtit pas à chaud. EFFACER se confirme en deux clics
+// (comme la réinitialisation de l'opérateur). EXPORTER livre le document tel
+// qu'écrit — le fichier que le Steam Cloud synchronisera — et IMPORTER le
+// repose dans l'emplacement visé.
+const sauvegardesEl = document.getElementById('sauvegardes') as HTMLDivElement
+const svCorps = document.getElementById('sv-corps') as HTMLDivElement
+const svFichier = document.getElementById('sv-fichier') as HTMLInputElement
+let svEffaceArme: { n: number; t: number } | null = null
+let svImportVers = 0
+let svDit: { n: number; texte: string } | null = null
+function fmtQuandCoffre(iso: string): string {
+  const d = iso ? new Date(iso) : null
+  if (!d || Number.isNaN(d.getTime())) return ''
+  const p = (v: number): string => String(v).padStart(2, '0')
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+function renderSauvegardesVoile(): void {
+  const cartes = coffre.resumes().map((r) => {
+    const actif = r.n === coffre.actif
+    const arme = svEffaceArme?.n === r.n
+    let corps: string
+    if (r.vide) {
+      corps = '<div class="sv-vide">Vide — une nouvelle partie commence ici.</div>'
+    } else {
+      corps =
+        `<div class="sv-nom">${htmlSafe(r.operateur || 'SANS NOM')}</div>` +
+        '<dl class="sv-releve">' +
+        `<dt>ESSAIS</dt><dd>${r.essais}</dd>` +
+        `<dt>MÉMOIRE</dt><dd>${r.memoire}</dd>` +
+        `<dt>SALLES AU RECORD</dt><dd>${r.salles}</dd>` +
+        `<dt>FIOLES</dt><dd>${r.fioles}</dd>` +
+        `<dt>TROPHÉES</dt><dd>${r.trophees}</dd>` +
+        `<dt>RUN EN COURS</dt><dd>${r.runEnCours ? 'oui' : '—'}</dd>` +
+        '</dl>'
+      const quand = fmtQuandCoffre(r.majAt)
+      if (quand)
+        corps += `<div class="sv-quand">enregistré le ${quand}${r.machine ? ` · poste ${htmlSafe(r.machine)}` : ''}</div>`
+      if (r.lectureSeule)
+        corps +=
+          '<div class="sv-quand">Écrit par une version plus récente du jeu : lisible, jamais réécrit ici.</div>'
+    }
+    const actions =
+      (actif
+        ? ''
+        : `<button type="button" class="appel" data-sv="jouer" data-n="${r.n}">${r.vide ? 'COMMENCER ICI' : 'JOUER'}</button>`) +
+      (r.vide
+        ? ''
+        : `<button type="button" data-sv="exporter" data-n="${r.n}">EXPORTER</button>` +
+          `<button type="button" class="${arme ? 'danger' : ''}" data-sv="effacer" data-n="${r.n}">${arme ? 'EFFACER — CONFIRMER' : 'EFFACER'}</button>`) +
+      (r.lectureSeule
+        ? ''
+        : `<button type="button" data-sv="importer" data-n="${r.n}">IMPORTER</button>`)
+    const dit = svDit?.n === r.n ? htmlSafe(svDit.texte) : ''
+    return (
+      `<div class="sv-carte${actif ? ' actif' : ''}${r.lectureSeule ? ' lecture' : ''}">` +
+      `<div class="sv-tete"><span>EMPLACEMENT ${r.n}</span>${actif ? '<span class="sv-badge">EN COURS</span>' : ''}</div>` +
+      corps +
+      `<div class="sv-actions">${actions}</div>` +
+      `<div class="sv-dit">${dit}</div>` +
+      '</div>'
+    )
+  })
+  svCorps.innerHTML = cartes.join('')
+}
+function ouvreSauvegardes(): void {
+  svEffaceArme = null
+  svDit = null
+  sauvegardesEl.hidden = false
+  renderSauvegardesVoile()
+}
+document.getElementById('home-sauvegardes')?.addEventListener('click', ouvreSauvegardes)
+document.getElementById('sauvegardes-fermer')?.addEventListener('click', () => {
+  sauvegardesEl.hidden = true
+})
+sauvegardesEl.addEventListener('pointerdown', (e) => {
+  if (e.target === sauvegardesEl) sauvegardesEl.hidden = true
+})
+svCorps.addEventListener('click', (e) => {
+  const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-sv]')
+  if (!btn) return
+  const n = Number(btn.dataset.n)
+  const geste = btn.dataset.sv
+  if (geste === 'jouer') {
+    // la run en cours est déjà écrite au fil de l'eau (sauveRun) : rien à
+    // sauver de plus avant de partir
+    coffre.choisit(n)
+    location.reload()
+    return
+  }
+  if (geste === 'effacer') {
+    const now = performance.now()
+    if (!svEffaceArme || svEffaceArme.n !== n || now - svEffaceArme.t > 6000) {
+      svEffaceArme = { n, t: now }
+      svDit = { n, texte: 'Définitif. Cliquez de nouveau pour confirmer.' }
+      renderSauvegardesVoile()
+      window.setTimeout(() => {
+        // non confirmé à temps : le bouton se désarme, rien n'est perdu
+        if (svEffaceArme && svEffaceArme.n === n && performance.now() - svEffaceArme.t >= 5900) {
+          svEffaceArme = null
+          svDit = null
+          renderSauvegardesVoile()
+        }
+      }, 6000)
+      return
+    }
+    svEffaceArme = null
+    coffre.efface(n)
+    // l'actif effacé : les modules chargés tiennent encore l'ancienne partie
+    // en mémoire — on recharge pour repartir d'une page blanche, vraiment
+    if (n === coffre.actif) {
+      location.reload()
+      return
+    }
+    svDit = { n, texte: 'Emplacement effacé.' }
+    renderSauvegardesVoile()
+    return
+  }
+  if (geste === 'exporter') {
+    const texte = coffre.exporte(n)
+    if (!texte) return
+    const url = URL.createObjectURL(new Blob([texte], { type: 'application/json' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `sujet21-sauvegarde-${n}.json`
+    a.click()
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    return
+  }
+  if (geste === 'importer') {
+    svImportVers = n
+    svFichier.value = ''
+    svFichier.click()
+  }
+})
+svFichier.addEventListener('change', () => {
+  const f = svFichier.files?.[0]
+  const n = svImportVers
+  if (!f || n < 1) return
+  void f.text().then((texte) => {
+    if (!coffre.importe(n, texte)) {
+      svDit = { n, texte: 'Ce fichier n’est pas une sauvegarde de Sujet 21.' }
+      renderSauvegardesVoile()
+      return
+    }
+    // l'actif importé : les modules chargés relisent tout au rechargement
+    if (n === coffre.actif) {
+      location.reload()
+      return
+    }
+    svDit = { n, texte: 'Sauvegarde importée.' }
+    renderSauvegardesVoile()
+  })
 })
 
 // ---- Le voile TABLEAU DES AVARIES : l'état du module ------------------
@@ -3358,6 +3701,34 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     renderFleche()
   }
 
+  const choixFantomes = document.getElementById(
+    'params-fantomes',
+  ) as HTMLDivElement | null
+  if (choixFantomes) {
+    const renderFantomes = (): void => {
+      choixFantomes.innerHTML = ''
+      const courant = !fantomesVisibles ? 'off' : fantomesPartagesVoulus ? 'on' : 'miens'
+      for (const [cle, label] of [
+        ['on', 'TOUS'],
+        ['miens', 'LES MIENS'],
+        ['off', 'MASQUÉS'],
+      ] as const) {
+        const b = document.createElement('button')
+        b.type = 'button'
+        b.textContent = label
+        b.className = courant === cle ? 'actif' : ''
+        b.addEventListener('click', () => {
+          fantomesVisibles = cle !== 'off'
+          fantomesPartagesVoulus = cle === 'on'
+          localStorage.setItem('sujet21-fantomes', cle)
+          renderFantomes()
+        })
+        choixFantomes.appendChild(b)
+      }
+    }
+    renderFantomes()
+  }
+
   const choixLumiere = document.getElementById(
     'params-lumiere',
   ) as HTMLDivElement | null
@@ -3524,7 +3895,7 @@ async function copiePerf(): Promise<string> {
 }
 async function envoiePerf(): Promise<string> {
   try {
-    const r = await fetch('/api/perf', {
+    const r = await appelle('/api/perf', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -3561,7 +3932,7 @@ document.getElementById('params-fermer')?.addEventListener('click', () => {
 // ---- PROTOCOLE : rejouer l'éveil, réinitialiser l'opérateur ----
 document.getElementById('proto-rejouer')?.addEventListener('click', () => {
   try {
-    localStorage.removeItem(CLE_EVEIL)
+    coffre.stockage.removeItem(CLE_EVEIL)
   } catch {
     // sans gravité : lanceEveil rejouera quand même cette session
   }
@@ -3600,8 +3971,9 @@ protoReset?.addEventListener('click', () => {
     return
   }
   try {
-    localStorage.removeItem('projet21.registres.v1')
-    localStorage.removeItem('sujet21-signature-v1')
+    coffre.stockage.removeItem('projet21.registres.v1')
+    coffre.stockage.removeItem('sujet21-signature-v1')
+    coffre.stockage.removeItem('sujet21-fantomes-v1') // les fantômes suivent les records
   } catch {
     // stockage indisponible : rien à effacer non plus
   }
@@ -3721,7 +4093,7 @@ interface RunSauvee {
 function runSauvee(): RunSauvee | null {
   try {
     const d = JSON.parse(
-      localStorage.getItem(CLE_RUN) ?? 'null',
+      coffre.stockage.getItem(CLE_RUN) ?? 'null',
     ) as RunSauvee | null
     if (!d || typeof d.index !== 'number' || d.index < 1) return null
     return {
@@ -3754,9 +4126,9 @@ function sauveRun(): void {
   // Le hub, hors run, ne touche jamais à la sauvegarde.
   if (testLevel || auHub) return
   try {
-    if (levelIndex < 1) localStorage.removeItem(CLE_RUN)
+    if (levelIndex < 1) coffre.stockage.removeItem(CLE_RUN)
     else
-      localStorage.setItem(
+      coffre.stockage.setItem(
         CLE_RUN,
         JSON.stringify({
           index: levelIndex,
@@ -3781,7 +4153,7 @@ function sauveRun(): void {
 }
 function effaceRun(): void {
   try {
-    localStorage.removeItem(CLE_RUN)
+    coffre.stockage.removeItem(CLE_RUN)
   } catch {
     // sans gravité
   }
@@ -4818,7 +5190,7 @@ async function ouvreRegles(): Promise<void> {
   if (corps) corps.innerHTML = ''
   reglesDit('Chargement du cahier partagé…')
   try {
-    const r = await fetch('/api/regles')
+    const r = await appelle('/api/regles')
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
     const d = (await r.json()) as { notes?: NoteRegle[]; ajouts?: AjoutRegle[] }
     reglesNotes = Array.isArray(d.notes) ? d.notes : []
@@ -4848,7 +5220,7 @@ async function posteNoteRegle(id: string, note: string): Promise<void> {
   reglesBusy = true
   reglesDit('Enregistrement de la note…')
   try {
-    const r = await fetch('/api/regles', {
+    const r = await appelle('/api/regles', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -4880,7 +5252,7 @@ async function posteAjoutRegle(texte: string, id?: string): Promise<void> {
   reglesBusy = true
   reglesDit('Consignation de la règle…')
   try {
-    const r = await fetch('/api/regles', {
+    const r = await appelle('/api/regles', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -4915,7 +5287,7 @@ async function oteAjoutRegle(id: string): Promise<void> {
   reglesBusy = true
   reglesDit('Retrait de la règle…')
   try {
-    const r = await fetch(`/api/regles?id=${encodeURIComponent(id)}`, {
+    const r = await appelle(`/api/regles?id=${encodeURIComponent(id)}`, {
       method: 'DELETE',
     })
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
@@ -6460,7 +6832,7 @@ if (new URLSearchParams(location.search).has('carte')) {
 // CRYOSTASE : tant que l'éveil n'a pas été joué, l'échantillon attend GELÉ
 // dès le premier pixel — même en dérive derrière la fiche. Le premier
 // contact visuel avec le sujet 21, c'est un bloc de glace.
-if (!localStorage.getItem(CLE_EVEIL)) input.freezeIntent = true
+if (!coffre.stockage.getItem(CLE_EVEIL)) input.freezeIntent = true
 
 // ---- Manette (Steam Deck, Xbox, DualSense) ----
 // Elle pilote le même pointeur que le doigt : un curseur en orbite autour du
@@ -6532,6 +6904,8 @@ const COUCHES_MENU: CoucheMenu[] = [
   // l'essai — Échap ouvrait la fiche par-dessus, et B ne faisait rien
   { id: 'reparations', retour: 'repar-fermer' },
   { id: 'fioles', retour: 'fioles-fermer' },
+  { id: 'sauvegardes', retour: 'sauvegardes-fermer' },
+  { id: 'rejeu-barre', retour: 'rejeu-quitter' }, // le rejeu d'un fantôme : B quitte
   { id: 'livraisons', retour: 'livraisons-fermer' },
   // l'écran des commandes se pose SUR les paramètres : il passe donc avant
   { id: 'touches', retour: 'touches-fermer' },
@@ -8271,6 +8645,331 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
 // Tout est lissé (naissance, cap, longueur) : la flèche glisse, elle ne
 // saute pas. En visée de dash, la ligne du dash prend le relais.
 const fleche = { alpha: 0, ang: 0, len: 60 }
+// ---- LE REJEU : regarder une course sans la jouer ---------------------------
+// Depuis l'écran des records, ▶ sur un fantôme charge sa salle par le même
+// chemin qu'un essai hors expédition (testLevel), mais SANS corps : les
+// particules du spawn sont retirées, la simulation ne fait pas un pas — le
+// temps du tableau avance au rythme choisi, la caméra suit le fantôme, et
+// les registres ne bougent pas (rien ne bout le sas). À la fin de la trace,
+// une seconde et demie de silence, puis la course repart du début.
+interface Rejeu {
+  code: string
+  cat: CategorieFantome
+  lecteur: LecteurFantome
+  vitesse: number
+  pause: boolean
+  partage: boolean // une course du palmarès partagé, pas l'une des miennes
+  dernier: EchantillonFantome | null // où la caméra reste quand le fantôme a bu le sas
+}
+let rejeu: Rejeu | null = null
+const rejeuBarre = document.getElementById('rejeu-barre') as HTMLDivElement
+const rejeuTemps = document.getElementById('rejeu-temps') as HTMLElement
+const rejeuPause = document.getElementById('rejeu-pause') as HTMLButtonElement
+
+/** La salle d'un code : la séquence jouée, puis toute la bibliothèque, puis
+ *  les tableaux livrés — un fantôme survit à un réordonnancement. */
+function levelParCode(code: string): LevelDef | null {
+  return (
+    playedLevels().find((l) => l.code === code) ??
+    libraryLevels.find((l) => l.code === code) ??
+    TABLEAUX.find((l) => l.code === code) ??
+    null
+  )
+}
+function majBarreRejeu(): void {
+  if (!rejeu) return
+  rejeuPause.textContent = rejeu.pause ? '▶' : '⏸'
+  for (const b of Array.from(rejeuBarre.querySelectorAll<HTMLButtonElement>('button[data-vitesse]'))) {
+    b.classList.toggle('actif', Number(b.dataset.vitesse) === rejeu.vitesse)
+  }
+  const titre = document.getElementById('rejeu-titre')
+  if (titre)
+    titre.textContent = `REJEU${rejeu.partage ? ' · PALMARÈS' : ''} · ${rejeu.cat === 'volume' ? 'VOLUME' : 'CHRONO'}${rejeu.lecteur.def.nom ? ` · ${rejeu.lecteur.def.nom}` : ''}`
+}
+function lanceRejeu(code: string, cat: CategorieFantome, defDonnee?: FantomeDef): void {
+  const lv = levelParCode(code)
+  const def = defDonnee ?? fantomes.pour(code)[cat]
+  if (!lv || !def) return
+  recordsEl.hidden = true
+  rejeu = { code, cat, lecteur: new LecteurFantome(def), vitesse: 1, pause: false, partage: !!defDonnee, dernier: null }
+  testLevel = lv
+  testQueue = []
+  fromEditor = false
+  fromPlanche = false
+  document.getElementById('planche-retour')?.setAttribute('hidden', '')
+  run.bonbonneLiters = 0
+  run.runTime = 0
+  hasPlayed = true
+  document.body.classList.add('playing')
+  document.body.classList.add('rejeu')
+  input.paused = false
+  homeRestartBtn.hidden = false
+  restart()
+  majBarreRejeu()
+  rejeuBarre.hidden = false
+}
+function quitteRejeu(): void {
+  if (!rejeu) return
+  rejeu = null
+  rejeuBarre.hidden = true
+  document.body.classList.remove('rejeu')
+  testLevel = null
+  openHome()
+  restart()
+  recordsEl.hidden = false
+  renderRecordsVoile()
+}
+/** Le temps du tableau avance à la vitesse du rejeu — pas de simulation. */
+function avanceRejeu(dtReal: number): void {
+  if (!rejeu || input.paused || rejeu.pause) return
+  run.tableauTime += dtReal * rejeu.vitesse
+  if (run.tableauTime > rejeu.lecteur.duree + 1.5) run.tableauTime = 0
+}
+rejeuPause.addEventListener('click', () => {
+  if (!rejeu) return
+  rejeu.pause = !rejeu.pause
+  majBarreRejeu()
+})
+document.getElementById('rejeu-debut')?.addEventListener('click', () => {
+  if (rejeu) run.tableauTime = 0
+})
+document.getElementById('rejeu-quitter')?.addEventListener('click', quitteRejeu)
+rejeuBarre.addEventListener('click', (e) => {
+  const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-vitesse]')
+  if (!b || !rejeu) return
+  rejeu.vitesse = Number(b.dataset.vitesse) || 1
+  majBarreRejeu()
+})
+// Sonde de test : lancer et lire le rejeu depuis la console
+;(window as unknown as { __rejeu: unknown }).__rejeu = {
+  lance: (code: string, cat: CategorieFantome) => lanceRejeu(code, cat),
+  quitte: () => quitteRejeu(),
+  etat: () => (rejeu ? { code: rejeu.code, cat: rejeu.cat, vitesse: rejeu.vitesse, pause: rejeu.pause, t: run.tableauTime, duree: rejeu.lecteur.duree } : null),
+}
+
+// ---- Le dessin des fantômes : la forme, le geste, la ligne de course ------
+// Les effets éphémères : le trait d'un dash, l'éclair d'une bascule d'état.
+// Datés en temps RÉEL (ils habillent l'image, ils ne sont pas la trace).
+let fantomesFx: { t0: number; type: 'dash' | 'gel' | 'vapeur' | 'eau'; x: number; y: number; angle: number }[] = []
+let fantomesT = 0 // le temps simulé lu à l'image d'avant : chaque événement se joue une fois
+let fantomesEtat: number[] = [] // l'état de chaque lecteur à l'image d'avant (les bascules)
+const hudFantome = document.getElementById('hud-fantome') as HTMLElement | null
+
+function teinteFantome(etat: number): string {
+  return etat === ETAT_GLACE ? '205,236,255' : etat === ETAT_VAPEUR ? '236,226,255' : '120,200,255'
+}
+
+/** Les silhouettes des fantômes de la salle, au temps simulé du tableau.
+ *  La FORME vient du profil en seize secteurs (une courbe lissée par les
+ *  milieux des côtés) ; à défaut, un cercle à 1,4 fois le rayon quadratique
+ *  moyen — le rms d'un disque plein vaut R/√2. Le GESTE : les gouttelettes
+ *  du jet dans la direction de poussée, le trait du dash, l'éclair des
+ *  bascules. La LIGNE DE COURSE : toute la trace en filigrane, colorée par
+ *  état. Et l'écart au fantôme dans le HUD, façon jeu de course. */
+function drawFantomes(vw: number, vh: number, dpr: number): void {
+  fantomesDessines = []
+  const t = run.tableauTime
+  if (t < fantomesT) {
+    // la salle est repartie : les événements se rejoueront, les effets tombent
+    fantomesFx = []
+    fantomesEtat = []
+  }
+  if (!fantomesVisibles || fantomesLus.length === 0 || !document.body.classList.contains('playing')) {
+    fantomesT = t
+    if (hudFantome && hudFantome.textContent) hudFantome.textContent = ''
+    return
+  }
+  const dprC = Math.min(dpr, 2)
+  const g = fxCtx
+  g.setTransform(dprC, 0, 0, dprC, 0, 0)
+  const z = camera.zoom
+  const S = (x: number, y: number): [number, number] => [
+    vw * 0.5 + (x - camera.x) * z,
+    vh * 0.5 - (y - camera.y) * z,
+  ]
+  const maintenant = performance.now() / 1000
+  const hud: string[] = []
+  fantomesLus.forEach(({ cat, lecteur, partage }, idx) => {
+    const teinteCat = partage ? '255,214,120' : cat === 'volume' ? '120,200,255' : '160,225,190'
+    const prefixe = partage ? 'PALMARÈS ' : ''
+    // ---- la ligne de course : un point sur k, colorée par état
+    const pts = lecteur.pts
+    if (pts.length > 1) {
+      const k = Math.max(1, Math.ceil(pts.length / 600))
+      g.lineWidth = 1
+      g.setLineDash([3, 6])
+      let etatTrait = -1
+      for (let i = 0; i < pts.length; i += k) {
+        const p = pts[i]
+        const [sx, sy] = S(p.x, p.y)
+        if (p.etat !== etatTrait) {
+          if (etatTrait >= 0) g.stroke()
+          g.beginPath()
+          if (i > 0) {
+            const q = pts[Math.max(0, i - k)]
+            const [qx, qy] = S(q.x, q.y)
+            g.moveTo(qx, qy)
+          }
+          g.strokeStyle = `rgba(${teinteFantome(p.etat)},0.22)`
+          etatTrait = p.etat
+        }
+        g.lineTo(sx, sy)
+      }
+      g.stroke()
+      g.setLineDash([])
+    }
+    const e = lecteur.a(t)
+    // ---- les événements de l'intervalle, joués une fois
+    for (const ev of lecteur.evenementsEntre(fantomesT, t)) {
+      const ou = e ?? lecteur.a(Math.min(lecteur.duree, ev.t))
+      if (ou) fantomesFx.push({ t0: maintenant, type: 'dash', x: ou.x, y: ou.y, angle: ev.angle })
+    }
+    // ---- les bascules d'état : un éclair au changement
+    const etatAvant = fantomesEtat[idx]
+    if (e && etatAvant !== undefined && etatAvant >= 0 && etatAvant !== e.etat) {
+      fantomesFx.push({
+        t0: maintenant,
+        type: e.etat === ETAT_GLACE ? 'gel' : e.etat === ETAT_VAPEUR ? 'vapeur' : 'eau',
+        x: e.x,
+        y: e.y,
+        angle: 0,
+      })
+    }
+    fantomesEtat[idx] = e ? e.etat : -1
+    // ---- l'écart au fantôme, dans le HUD
+    const nom = lecteur.def.nom ? ` ${htmlSafe(lecteur.def.nom)}` : ''
+    const etiquette = `<b>${prefixe}${cat === 'volume' ? 'VOLUME' : 'CHRONO'}${nom}</b>`
+    if (rejeu) {
+      const txt = `${fmtDuree(Math.min(t, lecteur.duree))} / ${fmtDuree(lecteur.duree)}`
+      if (rejeuTemps.textContent !== txt) rejeuTemps.textContent = txt
+      hud.push(`${etiquette} ${txt} · ×${rejeu.vitesse}`)
+    } else if (e) {
+      const maDist = Math.hypot(sim.stats.centroidX - exitMouth.x, sim.stats.centroidY - exitMouth.y)
+      const ecart = lecteur.ecartTemps(t, maDist, exitMouth.x, exitMouth.y)
+      const dl = sim.liters() - e.cl / 100
+      const signe = (v: number, dec = 1): string =>
+        Math.abs(v) < 0.5 * 10 ** -dec ? (0).toFixed(dec) : (v > 0 ? '+' : '−') + Math.abs(v).toFixed(dec)
+      const tempsTxt =
+        ecart === null
+          ? '<span class="avance">devant</span>'
+          : `<span class="${ecart > 0.05 ? 'retard' : 'avance'}">${signe(ecart)} s</span>`
+      const volTxt = `<span class="${dl < -0.005 ? 'retard' : 'avance'}">${signe(dl, 2)} L</span>`
+      hud.push(`${etiquette} ${tempsTxt} · ${volTxt}`)
+    } else if (t > lecteur.duree) {
+      hud.push(`${etiquette} au sas en ${fmtTime(lecteur.def.temps)} · ${lecteur.def.litres.toFixed(2)} L`)
+    }
+    if (!e) return
+    // ---- la silhouette
+    const [sx, sy] = S(e.x, e.y)
+    const teinte = teinteFantome(e.etat)
+    const profil = e.profil.length === SECTEURS ? e.profil : null
+    const rayonMax = Math.max(4, (profil ? Math.max(...profil) : e.r * 1.41) * z)
+    fantomesDessines.push({ cat, sx, sy, r: rayonMax })
+    const grad = g.createRadialGradient(sx, sy, rayonMax * 0.1, sx, sy, rayonMax)
+    grad.addColorStop(0, `rgba(${teinte},${e.etat === ETAT_VAPEUR ? 0.14 : 0.22})`)
+    grad.addColorStop(1, `rgba(${teinte},0.02)`)
+    g.fillStyle = grad
+    g.beginPath()
+    if (profil) {
+      // la courbe passe par les milieux des côtés, chaque sommet tire un arc
+      const P: [number, number][] = []
+      for (let s = 0; s < SECTEURS; s++) {
+        const a = ((s + 0.5) / SECTEURS) * Math.PI * 2
+        const d = Math.max(3, profil[s]) * z
+        P.push([sx + Math.cos(a) * d, sy - Math.sin(a) * d])
+      }
+      const M = (i: number): [number, number] => {
+        const a = P[i % SECTEURS]
+        const b = P[(i + 1) % SECTEURS]
+        return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
+      }
+      const m0 = M(0)
+      g.moveTo(m0[0], m0[1])
+      for (let i = 1; i <= SECTEURS; i++) {
+        const p = P[i % SECTEURS]
+        const m = M(i)
+        g.quadraticCurveTo(p[0], p[1], m[0], m[1])
+      }
+      g.closePath()
+    } else {
+      g.arc(sx, sy, rayonMax, 0, Math.PI * 2)
+    }
+    g.fill()
+    g.strokeStyle = `rgba(${teinte},${e.etat === ETAT_VAPEUR ? 0.3 : 0.55})`
+    g.lineWidth = e.etat === ETAT_GLACE ? 1.6 : 1.2
+    if (e.etat !== ETAT_GLACE) g.setLineDash([4, 5])
+    g.stroke()
+    g.setLineDash([])
+    // ---- le jet : les gouttelettes qui partent vers le point visé (le corps recule)
+    if (e.poussee !== null && e.etat !== ETAT_VAPEUR) {
+      const a = e.poussee
+      const tour = Math.PI * 2
+      const s = Math.min(SECTEURS - 1, Math.floor((((a % tour) + tour) % tour) / tour * SECTEURS))
+      const bord = (profil ? profil[s] : e.r * 1.41) * z
+      const ux = Math.cos(a)
+      const uy = -Math.sin(a)
+      const ech = Math.max(0.5, Math.min(1.6, z))
+      for (let k = 0; k < 5; k++) {
+        const phase = (elapsed * 3.2 + k / 5) % 1 // les gouttes défilent
+        const dist = bord + (6 + phase * 46) * ech
+        const ecart = Math.sin(k * 2.1 + elapsed * 5) * 4 * ech
+        const gx = sx + ux * dist - uy * ecart
+        const gy = sy + uy * dist + ux * ecart
+        g.fillStyle = `rgba(${teinte},${(0.6 * (1 - phase)).toFixed(3)})`
+        g.beginPath()
+        g.arc(gx, gy, Math.max(1, (2.6 - phase * 1.6) * ech), 0, Math.PI * 2)
+        g.fill()
+      }
+    }
+    // ---- l'étiquette : quel record, et qui l'a posé
+    g.font = '9px Michroma, "Arial Black", sans-serif'
+    g.textAlign = 'center'
+    g.fillStyle = `rgba(${teinteCat},0.75)`
+    const qui = lecteur.def.nom ? ` · ${lecteur.def.nom}` : ''
+    g.fillText(`${prefixe}${cat === 'volume' ? 'VOLUME' : 'CHRONO'}${qui}`, sx, sy - rayonMax - 6)
+  })
+  fantomesT = t
+  // ---- les effets éphémères : 0,7 s de vie en temps réel
+  const VIE = 0.7
+  fantomesFx = fantomesFx.filter((fx) => maintenant - fx.t0 < VIE)
+  const ech = Math.max(0.5, Math.min(1.5, z))
+  for (const fx of fantomesFx) {
+    const age = (maintenant - fx.t0) / VIE
+    const [sx, sy] = S(fx.x, fx.y)
+    const alpha = 1 - age
+    if (fx.type === 'dash') {
+      const ux = Math.cos(fx.angle)
+      const uy = -Math.sin(fx.angle)
+      const L = (40 + 160 * age) * ech
+      const gr = g.createLinearGradient(sx, sy, sx + ux * L, sy + uy * L)
+      gr.addColorStop(0, `rgba(236,226,255,${(0.7 * alpha).toFixed(3)})`)
+      gr.addColorStop(1, 'rgba(236,226,255,0)')
+      g.strokeStyle = gr
+      g.lineWidth = 3
+      g.beginPath()
+      g.moveTo(sx, sy)
+      g.lineTo(sx + ux * L, sy + uy * L)
+      g.stroke()
+    } else {
+      const teinte = fx.type === 'gel' ? '205,236,255' : fx.type === 'vapeur' ? '236,226,255' : '120,200,255'
+      const r = (10 + 70 * age) * ech
+      g.strokeStyle = `rgba(${teinte},${(0.8 * alpha).toFixed(3)})`
+      g.lineWidth = fx.type === 'gel' ? 2.2 : 1.4
+      g.beginPath()
+      g.arc(sx, sy, r, 0, Math.PI * 2)
+      g.stroke()
+      if (fx.type === 'vapeur') {
+        g.fillStyle = `rgba(${teinte},${(0.18 * alpha).toFixed(3)})`
+        g.fill()
+      }
+    }
+  }
+  if (hudFantome) {
+    const html = hud.slice(0, 2).join('   ')
+    if (hudFantome.innerHTML !== html) hudFantome.innerHTML = html
+  }
+}
+
 function drawFleche(dtReal: number, dpr: number): void {
   const enJeu = document.body.classList.contains('playing')
   const aMain =
@@ -11949,6 +12648,9 @@ function restart(): void {
   majVoieHud()
   sim = createSim(level)
   exposeSim()
+  armeFantomes()
+  // le REJEU se regarde sans corps : le spawn est retiré, la salle reste
+  if (rejeu) while (sim.count > 0) sim.removeParticle(sim.count - 1)
   resetLasers()
   loop.reset()
   overlay.classList.remove('visible')
@@ -12962,7 +13664,7 @@ const eveil = {
 // Sonde de test : suivre l'éveil depuis la console (comme __sim, __cam)
 ;(window as unknown as { __eveil: typeof eveil }).__eveil = eveil
 function lanceEveil(): void {
-  if (localStorage.getItem(CLE_EVEIL)) return
+  if (coffre.stockage.getItem(CLE_EVEIL)) return
   // relance propre (restart en plein éveil) : tout voile retombe d'abord
   for (const carte of [eveil1El, eveil2El]) {
     carte.hidden = true
@@ -13010,7 +13712,7 @@ function avanceEveil(): void {
     eveil.cible = 1
     eveil.etape = 'off'
     try {
-      localStorage.setItem(CLE_EVEIL, '1')
+      coffre.stockage.setItem(CLE_EVEIL, '1')
     } catch {
       // stockage refusé : l'éveil se rejouera, sans gravité
     }
@@ -13178,7 +13880,7 @@ const TUTOR_KEY = 'projet21.tutoriel.v1'
 const tutorEl = el('tutor')
 let tutorActive = true
 try {
-  tutorActive = localStorage.getItem(TUTOR_KEY) !== 'ok'
+  tutorActive = coffre.stockage.getItem(TUTOR_KEY) !== 'ok'
 } catch {
   // stockage indisponible : le tutoriel s'affiche à chaque visite, sans gravité
 }
@@ -13206,7 +13908,7 @@ const TUTOR_TEXTS = [
 
 function tutorPersist(): void {
   try {
-    localStorage.setItem(TUTOR_KEY, 'ok')
+    coffre.stockage.setItem(TUTOR_KEY, 'ok')
   } catch {
     // sans gravité
   }
@@ -13668,6 +14370,12 @@ function frame(now: number): void {
     // conclut pas. Sans ça, dézoomer en vapeur lâchait le dash.
     if (vif && input.gasIntent && !input.aimActive && !input.aimAnnulee) {
       const spent = sim.gasDash(aim.x, aim.y)
+      if (spent > 0)
+        fantomeRec?.evenement(
+          run.tableauTime,
+          EV_DASH,
+          Math.atan2(aim.y - sim.stats.centroidY, aim.x - sim.stats.centroidX),
+        )
       if (spent > 0) manette.rumble(0.6, 90) // le dash se voit, il ne souffle plus
     }
   }
@@ -13685,7 +14393,9 @@ function frame(now: number): void {
       corpsSousLePointeur(aim.x, aim.y))
   ;(window as unknown as { __rass: boolean }).__rass = rassembler // sonde de test
 
-  if (!input.paused && !tableauDone) {
+  if (rejeu) {
+    avanceRejeu(dtReal)
+  } else if (!input.paused && !tableauDone) {
     // Budget CPU des pas physiques : ~60 % du temps d'image, borné à 5-12 ms.
     // Sans cette borne, une image en retard impose plus de pas, coûte plus
     // cher, prend plus de retard — et la machine s'installe à 15-20 fps.
@@ -13735,6 +14445,7 @@ function frame(now: number): void {
       warpNow,
       params.dt,
       () => {
+        pousseeFantome = null
         if (
           input.aimActive &&
           !input.gasIntent &&
@@ -13745,7 +14456,11 @@ function frame(now: number): void {
           // le dash part au relâchement (voir plus haut), rien ne se pilote.
           // Sans direction (stick neutre, doigt sur le corps) : on se reforme.
           if (rassembler) sim.rassemble(params.dt)
-          else sim.eject(aim.x, aim.y, params.dt)
+          else {
+            sim.eject(aim.x, aim.y, params.dt)
+            // le geste du fantôme : vers où l'on éjecte (le corps part à l'opposé)
+            pousseeFantome = Math.atan2(aim.y - sim.stats.centroidY, aim.x - sim.stats.centroidX)
+          }
         }
         if (vortex.timer > 0) {
           const life = Math.min(1, vortex.timer / params.vortexDuration)
@@ -13758,6 +14473,7 @@ function frame(now: number): void {
         // finir dans le sas — c'est au joueur de décider quand y renoncer.
         sim.step(params.dt)
         run.tableauTime += params.dt // temps simulé : le time warp ne fausse pas les records
+        echantillonneFantome()
         run.runTime += params.dt // le vaisseau refroidit au fil de l'expédition
         // la mise en scène avance au TEMPS DE JEU : une pause la suspend,
         // une cinématique aussi (la boucle physique ne tourne plus)
@@ -14380,6 +15096,15 @@ function frame(now: number): void {
     const { newVolume, newChrono } = sasOutil
       ? { newVolume: false, newChrono: false }
       : records.noteCollection(level.code, surplus, run.tableauTime)
+    // la trace de la course : le record local qui tombe la range, et la
+    // tête du palmarès partagé (plus bas) l'envoie à tous
+    const traceCourse =
+      fantomeRec && !sasOutil ? fantomeRec.fin(records.operator(), surplus, run.tableauTime) : null
+    if (traceCourse) {
+      if (newVolume) fantomes.pose(level.code, 'volume', traceCourse)
+      if (newChrono) fantomes.pose(level.code, 'chrono', traceCourse)
+    }
+    fantomeRec = null
     // LA MÉMOIRE se grave à chaque sas — l'information survit à la purge :
     // +5 la traversée, +5 la toute première de ce tableau, +2 par record ;
     // LE MUR DES RECORDS réparé double la part des records (le banc
@@ -14409,6 +15134,16 @@ function frame(now: number): void {
           const top = b.tops?.[level.code]?.note?.[0]
           if (top && top.name === records.operator())
             trophees.debloque('ligne-de-crete')
+          // LE FANTÔME DU PALMARÈS : en tête du volume ou du chrono, la
+          // trace part pour tous — le serveur ne la garde que si elle bat
+          // celle en place (la même règle que les registres)
+          if (traceCourse) {
+            for (const cat of ['volume', 'chrono'] as const) {
+              const tete = b.tops?.[level.code]?.[cat]?.[0]
+              if (tete && tete.name === records.operator())
+                void pushFantomePartage(level.code, cat, traceCourse)
+            }
+          }
         }
       })
     // sous un outil, la salle peut n'avoir aucun record : le bilan le dit
@@ -14620,6 +15355,13 @@ function frame(now: number): void {
     const fitZoom =
       Math.min(vw / (b.maxX - b.minX), vh / (b.maxY - b.minY)) * 0.94
     camera.snapTo((b.minX + b.maxX) * 0.5, (b.minY + b.maxY) * 0.5, fitZoom)
+  } else if (rejeu) {
+    // le rejeu : la caméra suit le fantôme, et reste où il a bu le sas
+    const e = rejeu.lecteur.a(run.tableauTime) ?? rejeu.dernier
+    if (e) {
+      rejeu.dernier = e
+      camera.update(dtReal, e.x, e.y, Math.max(e.r, 40), vw, vh, params)
+    }
   } else {
     camera.update(
       dtReal,
@@ -14638,6 +15380,7 @@ function frame(now: number): void {
   updateWorldLabels(vw, vh)
   appliqueSequence() // carte et secousse de la mise en scène
   drawMecanismes(vw, vh, dpr)
+  drawFantomes(vw, vh, dpr)
   drawFleche(dtReal, dpr)
   majIdle(dtReal)
   majPresence(dtReal, aim.x, aim.y)

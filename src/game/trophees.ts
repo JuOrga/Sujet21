@@ -64,6 +64,13 @@ export const TROPHEES: TropheeDef[] = [
 ]
 
 const CLE = 'sujet21-trophees'
+/** Le stockage des trophées : les trois gestes du stockage local — le
+ *  coffre de sauvegarde les offre, `localStorage` aussi. */
+export interface StockageTrophees {
+  getItem(k: string): string | null
+  setItem(k: string, v: string): void
+  removeItem(k: string): void
+}
 const CLE_COMPTEURS = 'sujet21-trophees-compteurs'
 
 /** Déblocages (id → date ISO) et compteurs cumulés, persistés en local.
@@ -74,7 +81,7 @@ export class Trophees {
   private compteurs: Record<string, number> = {}
   onDebloque: (t: TropheeDef) => void = () => {}
 
-  constructor(private readonly storage: Storage | null = null) {
+  constructor(private readonly storage: StockageTrophees | null = null) {
     try {
       const s = this.storage ?? localStorage
       this.etat = JSON.parse(s.getItem(CLE) ?? '{}') as Record<string, string>
