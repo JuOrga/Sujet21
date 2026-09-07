@@ -2664,7 +2664,13 @@ export class LevelEditor {
           }
         }
         if (index < 0) {
-          const jonction = accrocheRail(rails, w.x, w.y, tol)
+          // l'accroche suit la case ALIGNEMENT et se suspend à Alt, comme
+          // partout ailleurs : sans quoi on ne pouvait plus poser le départ
+          // d'un rail PRÈS d'un nœud existant sans lui sauter dessus
+          const jonction =
+            this.alignAuto && !e.altKey
+              ? accrocheRail(rails, w.x, w.y, tol)
+              : null
           const depart = jonction ?? {
             x: this.snapped(w.x),
             y: this.snapped(w.y),
@@ -2679,7 +2685,7 @@ export class LevelEditor {
           point = 1
           if (jonction) {
             this.status(
-              'Nouveau rail accroché au bout du voisin — deux rails distincts, chacun réglable.',
+              'Nouveau rail accroché au bout du voisin — deux rails distincts, chacun réglable (Alt : sans accroche).',
             )
           }
         }
@@ -2874,12 +2880,17 @@ export class LevelEditor {
       } else if (d.mode === 'move') {
         if (this.sel?.kind === 'rail' && d.pts) {
           const r = (this.level.rails ?? [])[this.sel.index]
-          const dxw = w.x - d.ox
-          const dyw = w.y - d.oy
+          // L'AIMANT PORTE SUR L'ÉCART, PAS SUR CHAQUE POINT. Arrondir les
+          // points un à un ré-alignait TOUT le tracé sur la grille au
+          // premier pixel de glissement : les longueurs réglées au chiffre
+          // près et les jonctions accrochées se perdaient en déplaçant
+          // simplement le rail. Le groupe (multimove) fait déjà ainsi.
+          const dxw = this.snapped(w.x - d.ox)
+          const dyw = this.snapped(w.y - d.oy)
           if (r) {
             for (let k = 0; k < r.points.length; k++) {
-              r.points[k].x = this.snapped(d.pts[k].x + dxw)
-              r.points[k].y = this.snapped(d.pts[k].y + dyw)
+              r.points[k].x = d.pts[k].x + dxw
+              r.points[k].y = d.pts[k].y + dyw
             }
           }
         } else if (this.sel?.kind === 'laser') {
@@ -3001,6 +3012,10 @@ export class LevelEditor {
 
     const doigtParti = (e: PointerEvent): void => {
       this.annuleAppuiLong() // relâché avant 480 ms : simple clic
+      // le halo d'accroche s'efface ICI : le relâcher n'est pas le seul
+      // moyen de finir un geste — un pincement qui s'invite ou une
+      // annulation du pointeur le laissaient peint à sa dernière position
+      this.railAccroche = null
       this.doigts.delete(e.pointerId)
       if (this.doigts.size < 2) {
         this.pinceEcart = null
@@ -5712,12 +5727,19 @@ export class LevelEditor {
         ?.addEventListener('click', () => this.deplaceOrdre(sens))
     }
     host.querySelector('#p-railrev')?.addEventListener('click', () => {
-      if (this.sel?.kind === 'rail') {
-        ;(this.level.rails ?? [])[this.sel.index]?.points.reverse()
-        this.commit(
-          'Sens du rail inversé — les chevrons montrent la circulation de l’arc.',
-        )
-      }
+      const sel = this.sel
+      const r = this.railCourant()
+      if (sel?.kind !== 'rail' || !r) return
+      // le POINT RÉGLÉ suit SON point : le tracé retourné, le rang k devient
+      // n − 1 − k. Sans ce report, le panneau continuait de régler le rang,
+      // donc l'autre bout du rail — et le X, la suppression ou la coupe
+      // tombaient sur un point qu'on n'avait pas choisi.
+      const k = this.noeudActif()
+      r.points.reverse()
+      this.viseNoeud(sel.index, r.points.length - 1 - k)
+      this.commit(
+        'Sens du rail inversé — les chevrons montrent la circulation de l’arc.',
+      )
     })
     // AJOUTER un point : après le point courant s'il a un aval, sinon avant
     // lui (au bout du rail, le tronçon à couper en deux est l'amont).
