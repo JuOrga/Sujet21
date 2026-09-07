@@ -31,6 +31,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '07/09/2026 14:43',
+    title: 'LE REJEU : regarder une course depuis l’écran des records — la salle sans corps, la caméra qui suit, la vitesse au choix',
+    notes: [
+      'LA DEMANDE : « enchaîne sur le rejeu depuis l’écran des records ». Le fantôme se regardait seulement en jouant ; il se regarde maintenant sans jouer — c’est la version qu’on partage.',
+      'L’ÉCRAN DES RECORDS gagne un bloc VOS FANTÔMES, en ligne comme hors ligne (le palmarès injoignable ne le cache plus) : une ligne par salle, un bouton par course — « ▶ VOLUME · REX · 3,40 L · 1:12 ». La salle d’un code se cherche dans la séquence jouée, puis dans toute la bibliothèque, puis dans les tableaux livrés : un fantôme survit à un réordonnancement ; une salle disparue laisse son bouton grisé.',
+      'LE REJEU charge la salle par le même chemin qu’un essai hors expédition (testLevel), mais SANS CORPS : les particules du spawn sont retirées, la simulation ne fait pas un pas — le temps du tableau avance au rythme choisi (×½, ×1, ×2, ×4, pause, retour au départ), la caméra suit le fantôme (et reste où il a bu le sas), les mécanismes de la salle vivent comme d’habitude, et les registres ne bougent pas puisque rien ne boit le sas. À la fin de la trace, une seconde et demie de silence, puis la course repart. Une barre de lecture remplace la barre d’état ; QUITTER (ou B à la manette) ramène à l’écran des records. Le HUD dit où l’on en est : « VOLUME REX 0:12 / 1:12 · ×2 ».',
+      'VÉRIFIÉ : 958 tests verts dans 86 fichiers, type-check à 0, build propre. Au navigateur (Chromium, jeu construit) : un fantôme rangé sur 21-01, l’écran des records qui le liste hors ligne, ▶ qui charge la salle avec ZÉRO particule et la barre visible, le temps qui avance et s’affiche, ×4 qui accélère, la pause qui fige, QUITTER qui rend l’écran des records et une salle à 900 particules — zéro erreur console. Non vu d’ici : la caméra en mouvement sur une vraie durée (le plan large d’entrée occupe les premières secondes de l’essai), à voir en prévisualisation.',
+    ],
+  },
+  {
     date: '06/09/2026 20:23',
     title: 'LE FANTÔME PREND FORME : la silhouette du corps, le geste du joueur, la ligne de course et l’écart en direct',
     notes: [

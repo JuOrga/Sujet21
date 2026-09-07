@@ -318,6 +318,7 @@ import {
   SECTEURS,
   profilDe,
   type CategorieFantome,
+  type EchantillonFantome,
 } from './game/fantome'
 import {
   fichePupitre,
@@ -2112,6 +2113,11 @@ function armeFantomes(): void {
   fantomesEtat = []
   fantomesT = 0
   if (hudFantome) hudFantome.textContent = ''
+  // le REJEU : une seule course, à regarder — et rien à enregistrer
+  if (rejeu) {
+    fantomesLus = [{ cat: rejeu.cat, lecteur: rejeu.lecteur }]
+    return
+  }
   // ni le hub ni l'essai d'éditeur ne consignent de record : pas de fantôme
   if (testLevel || auHub) return
   fantomeRec = new EnregistreurFantome()
@@ -2152,6 +2158,7 @@ function echantillonneFantome(): void {
 // Sonde de test : suivre les fantômes depuis la console (comme __sim, __eveil)
 ;(window as unknown as { __fantomes: unknown }).__fantomes = {
   rangement: fantomes,
+  Enregistreur: EnregistreurFantome,
   rec: () => fantomeRec,
   lus: () => fantomesLus,
   code: () => level.code,
@@ -2397,7 +2404,8 @@ function renderRecordsVoile(): void {
   void fetchSharedBoard().then((board) => {
     if (!board) {
       recordsCorps.innerHTML =
-        '<div class="rec-vide">Palmarès injoignable (hors ligne ou serveur local).</div>'
+        '<div class="rec-vide">Palmarès injoignable (hors ligne ou serveur local).</div>' +
+        blocFantomes()
       return
     }
     const moi = records.operator()
@@ -2440,6 +2448,7 @@ function renderRecordsVoile(): void {
       html += `<div class="tro-carte${ok ? '' : ' verrou'}"><i>${t.icone}</i><div><b>${t.nom}</b><span>${t.desc}</span>${ok ? `<em>débloqué le ${date}</em>` : ''}</div></div>`
     }
     html += '</div>'
+    html += blocFantomes()
     const tops = board.tops ?? {}
     for (const lv of playedLevels()) {
       const t = tops[lv.code]
@@ -2476,6 +2485,29 @@ function renderRecordsVoile(): void {
     recordsCorps.innerHTML = html || '<div class="rec-vide">Aucune salle.</div>'
   })
 }
+/** VOS FANTÔMES : une ligne par salle, un bouton par course — ▶ lance le rejeu. */
+function blocFantomes(): string {
+  const codes = fantomes.codes()
+  if (codes.length === 0) return ''
+  let h = '<div class="rec-salle">VOS FANTÔMES — rejouer une course</div><div class="rec-fantomes">'
+  for (const code of codes) {
+    const lv = levelParCode(code)
+    const f = fantomes.pour(code)
+    h += `<div class="rec-fant"><span class="code">${htmlSafe(code)}${lv ? ` — ${htmlSafe(lv.name)}` : ' — salle inconnue'}</span>`
+    for (const cat of ['volume', 'chrono'] as const) {
+      const d = f[cat]
+      if (!d) continue
+      h += `<button type="button" class="rec-rejouer" data-code="${htmlSafe(code)}" data-cat="${cat}"${lv ? '' : ' disabled'}>▶ ${cat === 'volume' ? 'VOLUME' : 'CHRONO'} · ${htmlSafe(d.nom || 'anonyme')} · ${fmtL(d.litres)} · ${fmtDuree(d.temps)}</button>`
+    }
+    h += '</div>'
+  }
+  return h + '</div>'
+}
+recordsCorps.addEventListener('click', (e) => {
+  const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button.rec-rejouer')
+  if (!b || b.disabled) return
+  lanceRejeu(b.dataset.code ?? '', (b.dataset.cat as CategorieFantome) ?? 'volume')
+})
 document.getElementById('home-records')?.addEventListener('click', () => {
   recordsEl.hidden = false
   renderRecordsVoile()
@@ -6788,6 +6820,7 @@ const COUCHES_MENU: CoucheMenu[] = [
   { id: 'reparations', retour: 'repar-fermer' },
   { id: 'fioles', retour: 'fioles-fermer' },
   { id: 'sauvegardes', retour: 'sauvegardes-fermer' },
+  { id: 'rejeu-barre', retour: 'rejeu-quitter' }, // le rejeu d'un fantôme : B quitte
   { id: 'livraisons', retour: 'livraisons-fermer' },
   // l'écran des commandes se pose SUR les paramètres : il passe donc avant
   { id: 'touches', retour: 'touches-fermer' },
@@ -8527,6 +8560,107 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
 // Tout est lissé (naissance, cap, longueur) : la flèche glisse, elle ne
 // saute pas. En visée de dash, la ligne du dash prend le relais.
 const fleche = { alpha: 0, ang: 0, len: 60 }
+// ---- LE REJEU : regarder une course sans la jouer ---------------------------
+// Depuis l'écran des records, ▶ sur un fantôme charge sa salle par le même
+// chemin qu'un essai hors expédition (testLevel), mais SANS corps : les
+// particules du spawn sont retirées, la simulation ne fait pas un pas — le
+// temps du tableau avance au rythme choisi, la caméra suit le fantôme, et
+// les registres ne bougent pas (rien ne bout le sas). À la fin de la trace,
+// une seconde et demie de silence, puis la course repart du début.
+interface Rejeu {
+  code: string
+  cat: CategorieFantome
+  lecteur: LecteurFantome
+  vitesse: number
+  pause: boolean
+  dernier: EchantillonFantome | null // où la caméra reste quand le fantôme a bu le sas
+}
+let rejeu: Rejeu | null = null
+const rejeuBarre = document.getElementById('rejeu-barre') as HTMLDivElement
+const rejeuTemps = document.getElementById('rejeu-temps') as HTMLElement
+const rejeuPause = document.getElementById('rejeu-pause') as HTMLButtonElement
+
+/** La salle d'un code : la séquence jouée, puis toute la bibliothèque, puis
+ *  les tableaux livrés — un fantôme survit à un réordonnancement. */
+function levelParCode(code: string): LevelDef | null {
+  return (
+    playedLevels().find((l) => l.code === code) ??
+    libraryLevels.find((l) => l.code === code) ??
+    TABLEAUX.find((l) => l.code === code) ??
+    null
+  )
+}
+function majBarreRejeu(): void {
+  if (!rejeu) return
+  rejeuPause.textContent = rejeu.pause ? '▶' : '⏸'
+  for (const b of Array.from(rejeuBarre.querySelectorAll<HTMLButtonElement>('button[data-vitesse]'))) {
+    b.classList.toggle('actif', Number(b.dataset.vitesse) === rejeu.vitesse)
+  }
+  const titre = document.getElementById('rejeu-titre')
+  if (titre)
+    titre.textContent = `REJEU · ${rejeu.cat === 'volume' ? 'VOLUME' : 'CHRONO'}${rejeu.lecteur.def.nom ? ` · ${rejeu.lecteur.def.nom}` : ''}`
+}
+function lanceRejeu(code: string, cat: CategorieFantome): void {
+  const lv = levelParCode(code)
+  const def = fantomes.pour(code)[cat]
+  if (!lv || !def) return
+  recordsEl.hidden = true
+  rejeu = { code, cat, lecteur: new LecteurFantome(def), vitesse: 1, pause: false, dernier: null }
+  testLevel = lv
+  testQueue = []
+  fromEditor = false
+  fromPlanche = false
+  document.getElementById('planche-retour')?.setAttribute('hidden', '')
+  run.bonbonneLiters = 0
+  run.runTime = 0
+  hasPlayed = true
+  document.body.classList.add('playing')
+  document.body.classList.add('rejeu')
+  input.paused = false
+  homeRestartBtn.hidden = false
+  restart()
+  majBarreRejeu()
+  rejeuBarre.hidden = false
+}
+function quitteRejeu(): void {
+  if (!rejeu) return
+  rejeu = null
+  rejeuBarre.hidden = true
+  document.body.classList.remove('rejeu')
+  testLevel = null
+  openHome()
+  restart()
+  recordsEl.hidden = false
+  renderRecordsVoile()
+}
+/** Le temps du tableau avance à la vitesse du rejeu — pas de simulation. */
+function avanceRejeu(dtReal: number): void {
+  if (!rejeu || input.paused || rejeu.pause) return
+  run.tableauTime += dtReal * rejeu.vitesse
+  if (run.tableauTime > rejeu.lecteur.duree + 1.5) run.tableauTime = 0
+}
+rejeuPause.addEventListener('click', () => {
+  if (!rejeu) return
+  rejeu.pause = !rejeu.pause
+  majBarreRejeu()
+})
+document.getElementById('rejeu-debut')?.addEventListener('click', () => {
+  if (rejeu) run.tableauTime = 0
+})
+document.getElementById('rejeu-quitter')?.addEventListener('click', quitteRejeu)
+rejeuBarre.addEventListener('click', (e) => {
+  const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-vitesse]')
+  if (!b || !rejeu) return
+  rejeu.vitesse = Number(b.dataset.vitesse) || 1
+  majBarreRejeu()
+})
+// Sonde de test : lancer et lire le rejeu depuis la console
+;(window as unknown as { __rejeu: unknown }).__rejeu = {
+  lance: (code: string, cat: CategorieFantome) => lanceRejeu(code, cat),
+  quitte: () => quitteRejeu(),
+  etat: () => (rejeu ? { code: rejeu.code, cat: rejeu.cat, vitesse: rejeu.vitesse, pause: rejeu.pause, t: run.tableauTime, duree: rejeu.lecteur.duree } : null),
+}
+
 // ---- Le dessin des fantômes : la forme, le geste, la ligne de course ------
 // Les effets éphémères : le trait d'un dash, l'éclair d'une bascule d'état.
 // Datés en temps RÉEL (ils habillent l'image, ils ne sont pas la trace).
@@ -8618,7 +8752,11 @@ function drawFantomes(vw: number, vh: number, dpr: number): void {
     // ---- l'écart au fantôme, dans le HUD
     const nom = lecteur.def.nom ? ` ${htmlSafe(lecteur.def.nom)}` : ''
     const etiquette = `<b>${cat === 'volume' ? 'VOLUME' : 'CHRONO'}${nom}</b>`
-    if (e) {
+    if (rejeu) {
+      const txt = `${fmtDuree(Math.min(t, lecteur.duree))} / ${fmtDuree(lecteur.duree)}`
+      if (rejeuTemps.textContent !== txt) rejeuTemps.textContent = txt
+      hud.push(`${etiquette} ${txt} · ×${rejeu.vitesse}`)
+    } else if (e) {
       const maDist = Math.hypot(sim.stats.centroidX - exitMouth.x, sim.stats.centroidY - exitMouth.y)
       const ecart = lecteur.ecartTemps(t, maDist, exitMouth.x, exitMouth.y)
       const dl = sim.liters() - e.cl / 100
@@ -12424,6 +12562,8 @@ function restart(): void {
   sim = createSim(level)
   exposeSim()
   armeFantomes()
+  // le REJEU se regarde sans corps : le spawn est retiré, la salle reste
+  if (rejeu) while (sim.count > 0) sim.removeParticle(sim.count - 1)
   resetLasers()
   loop.reset()
   overlay.classList.remove('visible')
@@ -14166,7 +14306,9 @@ function frame(now: number): void {
       corpsSousLePointeur(aim.x, aim.y))
   ;(window as unknown as { __rass: boolean }).__rass = rassembler // sonde de test
 
-  if (!input.paused && !tableauDone) {
+  if (rejeu) {
+    avanceRejeu(dtReal)
+  } else if (!input.paused && !tableauDone) {
     // Budget CPU des pas physiques : ~60 % du temps d'image, borné à 5-12 ms.
     // Sans cette borne, une image en retard impose plus de pas, coûte plus
     // cher, prend plus de retard — et la machine s'installe à 15-20 fps.
@@ -15114,6 +15256,13 @@ function frame(now: number): void {
     const fitZoom =
       Math.min(vw / (b.maxX - b.minX), vh / (b.maxY - b.minY)) * 0.94
     camera.snapTo((b.minX + b.maxX) * 0.5, (b.minY + b.maxY) * 0.5, fitZoom)
+  } else if (rejeu) {
+    // le rejeu : la caméra suit le fantôme, et reste où il a bu le sas
+    const e = rejeu.lecteur.a(run.tableauTime) ?? rejeu.dernier
+    if (e) {
+      rejeu.dernier = e
+      camera.update(dtReal, e.x, e.y, Math.max(e.r, 40), vw, vh, params)
+    }
   } else {
     camera.update(
       dtReal,
