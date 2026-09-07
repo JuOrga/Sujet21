@@ -26,6 +26,7 @@ import {
   pushScenario,
   type SharedCine,
 } from './netCines'
+import { htmlSafe } from './html'
 import {
   ACTION_NOMS,
   ACTIONS,
@@ -318,16 +319,16 @@ export class TableMontage {
     this.selectEl.innerHTML = [
       ...this.opts.livrees.map(
         (c) =>
-          `<option value="livree:${c.code}">◆ ${c.titre} (livrée)</option>`,
+          `<option value="livree:${htmlSafe(c.code)}">◆ ${htmlSafe(c.titre)} (livrée)</option>`,
       ),
       ...this.cines.map(
         (c) =>
-          `<option value="poste:${c.code}">${c.titre} [${c.code}]</option>`,
+          `<option value="poste:${htmlSafe(c.code)}">${htmlSafe(c.titre)} [${htmlSafe(c.code)}]</option>`,
       ),
       ...this.partagees.map(
         (s) =>
-          `<option value="partagee:${s.cine.code}">◇ ${s.cine.titre} [${s.cine.code}]${
-            s.auteur ? ' — ' + s.auteur : ''
+          `<option value="partagee:${htmlSafe(s.cine.code)}">◇ ${htmlSafe(s.cine.titre)} [${htmlSafe(s.cine.code)}]${
+            s.auteur ? ' — ' + htmlSafe(s.auteur) : ''
           } (partagée)</option>`,
       ),
     ].join('')
@@ -396,10 +397,10 @@ export class TableMontage {
       connues
         .map(
           (c) =>
-            `<option value="${c.code}"${c.code === courant ? ' selected' : ''}>${c.titre} [${c.code}]</option>`,
+            `<option value="${htmlSafe(c.code)}"${c.code === courant ? ' selected' : ''}>${htmlSafe(c.titre)} [${htmlSafe(c.code)}]</option>`,
         )
         .join('') +
-      (orphelin ? `<option value="${courant}" selected>${courant} (introuvable)</option>` : '') +
+      (orphelin ? `<option value="${htmlSafe(courant)}" selected>${htmlSafe(courant)} (introuvable)</option>` : '') +
       `</select>`
     )
   }
