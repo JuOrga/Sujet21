@@ -42,6 +42,7 @@ import {
   type ZoneForce,
   type MonnaiePlot,
   type PlotMeta,
+  type RailDef,
   type RoleAncre,
 } from '../game/level'
 import {
@@ -97,6 +98,18 @@ import {
   redimensionneOblique,
   type Poignee,
 } from './oblique'
+import {
+  accroche as accrocheRail,
+  coupeRail,
+  insereNoeud,
+  longueurRail,
+  longueurTroncon,
+  noeudProche,
+  railProche,
+  regleLongueurTroncon,
+  retireNoeud,
+  tronconProche,
+} from './rails'
 import {
   ARC_EPAISSEUR_DEFAUT,
   ARC_OUVERTURE_DEFAUT,
@@ -394,23 +407,6 @@ function optionsCodes(
   )
 }
 
-/** Distance d'un point au segment [a, b] — pour attraper un rail au clic. */
-function distSeg(
-  x: number,
-  y: number,
-  a: { x: number; y: number },
-  b: { x: number; y: number },
-): number {
-  const abx = b.x - a.x
-  const aby = b.y - a.y
-  const len2 = abx * abx + aby * aby
-  const t =
-    len2 < 1e-9
-      ? 0
-      : Math.max(0, Math.min(1, ((x - a.x) * abx + (y - a.y) * aby) / len2))
-  return Math.hypot(x - (a.x + abx * t), y - (a.y + aby * t))
-}
-
 function blankLevel(): LevelDef {
   return {
     name: 'Nouveau tableau',
@@ -444,6 +440,14 @@ export class LevelEditor {
   private sel: Sel = null
   private grid = 20
   private snap = true
+  // LE NŒUD ACTIF du rail sélectionné : celui que le panneau décrit et
+  // règle. Sans lui, un rail à plusieurs points n'offrait qu'un bloc à
+  // pousser — impossible d'en reprendre un seul coude.
+  private railNoeud = 0
+  private railNoeudDe = -1 // le rail auquel ce rang se rapporte
+  // L'ACCROCHE en cours (le nœud voisin où le point tiré va se poser) :
+  // dessinée en halo, elle annonce la jonction AVANT le relâcher.
+  private railAccroche: { x: number; y: number } | null = null
   // L'ALIGNEMENT AUTOMATIQUE (magnétisme aux voisins : bords, centres,
   // écarts égaux) est distinct de l'aimant de GRILLE. Il rend service la
   // plupart du temps, mais il tire parfois une pièce là où on ne veut pas
@@ -487,7 +491,10 @@ export class LevelEditor {
         prevDy: number
       }
     | { mode: 'aim'; index: number }
-    | { mode: 'railpt'; index: number; point: number }
+    // un nœud de rail au bout du doigt. `trace` : le point vient d'être
+    // POSÉ à l'outil Rail (le relâcher juge alors s'il compte) ; sans lui,
+    // c'est un coude existant qu'on reprend, et il reste où on le laisse.
+    | { mode: 'railpt'; index: number; point: number; trace?: boolean }
     // pivot : le coin OPPOSÉ d'une boîte oblique — il reste cloué au monde,
     // le redimensionnement se calcule dans le repère local de la boîte
     | {
@@ -1271,15 +1278,12 @@ export class LevelEditor {
     for (let i = ancres.length - 1; i >= 0; i--) {
       if (inside(ancres[i])) return { kind: 'ancre', index: i }
     }
-    const rails = this.level.rails ?? []
-    const tol = Math.max(10, 12 / this.zoom)
-    for (let i = rails.length - 1; i >= 0; i--) {
-      const pts = rails[i].points
-      for (let k = 0; k + 1 < pts.length; k++) {
-        if (distSeg(x, y, pts[k], pts[k + 1]) < tol)
-          return { kind: 'rail', index: i }
-      }
-    }
+    // LE RAIL SE VISE LARGE : un pointillé d'un pixel et demi se manquait
+    // au doigt comme à la souris — on ratait la ligne, on attrapait la
+    // paroi derrière (plainte du concepteur, 06/09). La prise est celle
+    // des poignées, qui s'élargit déjà d'elle-même au tactile.
+    const proche = railProche(this.level.rails ?? [], x, y, this.priseMonde)
+    if (proche !== null) return { kind: 'rail', index: proche }
     const sr = 70
     if (Math.hypot(this.level.spawn.x - x, this.level.spawn.y - y) < sr)
       return { kind: 'spawn' }
@@ -1970,6 +1974,51 @@ export class LevelEditor {
     return this.pointeur === 'mouse' ? HANDLE_PX : HANDLE_PX * 2.4
   }
 
+  /** La même prise, mais MESURÉE DANS LE MONDE : ce qui se vise en pixels
+   *  d'écran doit se chercher en unités de cuve. Le plancher évite qu'un
+   *  zoom arrière ne rende un rail intouchable. */
+  private get priseMonde(): number {
+    return Math.max(12, (this.prise + 8) / this.zoom)
+  }
+
+  /** Le rail sélectionné, s'il y en a un. */
+  private railCourant(): RailDef | null {
+    const s = this.sel
+    if (s?.kind !== 'rail') return null
+    return (this.level.rails ?? [])[s.index] ?? null
+  }
+
+  /** Le rang du nœud actif, ramené dans le tracé. Changer de rail remet
+   *  la main sur son DERNIER point : c'est celui qu'on vient de poser. */
+  private noeudActif(): number {
+    const s = this.sel
+    const r = this.railCourant()
+    if (s?.kind !== 'rail' || !r) return 0
+    if (this.railNoeudDe !== s.index) {
+      this.railNoeudDe = s.index
+      this.railNoeud = r.points.length - 1
+    }
+    return Math.max(0, Math.min(this.railNoeud, r.points.length - 1))
+  }
+
+  /** Désigne le nœud actif (clic sur une poignée, choix au panneau). */
+  private viseNoeud(rail: number, noeud: number): void {
+    this.railNoeudDe = rail
+    this.railNoeud = Math.max(0, noeud)
+  }
+
+  /** La poignée de nœud sous le pointeur, dans le rail SÉLECTIONNÉ : c'est
+   *  elle qui rend chaque coude — donc chaque longueur — réglable à part. */
+  private hitRailNoeud(sx: number, sy: number): number | null {
+    const r = this.railCourant()
+    if (!r) return null
+    // la prise se pense en PIXELS (le carré dessiné) et se cherche dans le
+    // monde : le zoom fait la conversion, la poignée garde donc la même
+    // taille apparente d'un bout à l'autre de la molette
+    const w = this.toWorld(sx, sy)
+    return noeudProche(r.points, w.x, w.y, (this.prise + 3) / this.zoom)
+  }
+
   /** L'élément sélectionné s'il est OBLIQUE — une paroi, une cachette ou
    *  une coque tournée : ses poignées se pivotent et se tiennent dans son
    *  repère (editor/oblique.ts). Null : une pièce droite, ou rien. */
@@ -2051,6 +2100,42 @@ export class LevelEditor {
 
     c.addEventListener('contextmenu', (e) => e.preventDefault())
 
+    // DOUBLE-CLIC SUR LE RAIL SÉLECTIONNÉ : sur un nœud, il se retire (le
+    // coude se déplie) ; sur la ligne, un nœud naît là où l'on montre.
+    // Deux gestes que le panneau propose aussi — mais qu'on veut sous la
+    // main quand on ajuste un tracé, sans quitter la carte des yeux.
+    c.addEventListener('dblclick', (e) => {
+      if (this.tool.kind !== 'select') return
+      const sel = this.sel
+      const rail = this.railCourant()
+      if (sel?.kind !== 'rail' || !rail) return
+      const rect = c.getBoundingClientRect()
+      const sx = e.clientX - rect.left
+      const sy = e.clientY - rect.top
+      const w = this.toWorld(sx, sy)
+      const noeud = this.hitRailNoeud(sx, sy)
+      if (noeud !== null) {
+        const reste = retireNoeud(rail.points, noeud)
+        if (!reste) {
+          this.status(
+            'Un rail garde au moins deux points — supprimez le rail entier (Suppr) pour l’effacer.',
+          )
+          return
+        }
+        rail.points = reste
+        this.viseNoeud(sel.index, Math.max(0, noeud - 1))
+        this.commit(`Point retiré — le rail tient en ${reste.length} points.`)
+        return
+      }
+      const troncon = tronconProche(rail.points, w.x, w.y, this.priseMonde)
+      if (troncon === null) return
+      rail.points = insereNoeud(rail.points, troncon)
+      this.viseNoeud(sel.index, troncon + 1)
+      this.commit(
+        'Point ajouté au milieu du tronçon — tirez-le pour plier le rail.',
+      )
+    })
+
     c.addEventListener('pointerdown', (e) => {
       this.cacheBulle() // un geste commence : la bulle s'efface
       try {
@@ -2126,6 +2211,20 @@ export class LevelEditor {
         if (this.sel?.kind === 'box' && this.hitRotateHandle(sx, sy)) {
           this.drag = { mode: 'rotate', index: this.sel.index }
           return
+        }
+        // LES POIGNÉES DE NŒUD du rail sélectionné, avant les autres : tirer
+        // UN coude allonge UN tronçon, et lui seul. Sans elles, un rail à
+        // plusieurs points ne se déplaçait qu'en bloc — deux tracés mis
+        // bout à bout devenaient une pièce coulée (plainte du 06/09).
+        if (this.sel?.kind === 'rail') {
+          const noeud = this.hitRailNoeud(sx, sy)
+          if (noeud !== null) {
+            this.viseNoeud(this.sel.index, noeud)
+            this.drag = { mode: 'railpt', index: this.sel.index, point: noeud }
+            this.syncProps()
+            this.draw()
+            return
+          }
         }
         const edge = this.hitHandle(sx, sy)
         if (edge) {
@@ -2534,46 +2633,65 @@ export class LevelEditor {
         return
       }
       if (this.tool.kind === 'rail') {
-        // presser près d'une extrémité PROLONGE ce rail — par la fin (aval)
-        // ou par le début (amont), SANS changer le sens de circulation ;
-        // ailleurs, un nouveau rail commence. Le point posé suit le doigt.
+        // UN RAIL NE SE SOUDE PLUS À SON VOISIN. Auparavant, presser près
+        // de l'extrémité de N'IMPORTE QUEL rail prolongeait ce rail : deux
+        // tracés posés bout à bout ne faisaient plus qu'une polyligne,
+        // qu'on ne pouvait plus régler qu'en bloc (plainte du 06/09).
+        //
+        // Désormais on ne PROLONGE que le rail SÉLECTIONNÉ — celui qu'on
+        // vient de tracer, donc le chaînage naturel du tracé en cours.
+        // Sur l'extrémité d'un autre rail, un NOUVEAU rail commence, dont
+        // le premier point s'ACCROCHE exactement à ce nœud : la jonction
+        // est au pixel près, et les deux rails restent deux objets.
         if (!this.level.rails) this.level.rails = []
         const rails = this.level.rails
-        const tol = Math.max(14, 16 / this.zoom)
+        const tol = Math.max(16, (this.prise + 10) / this.zoom)
         let index = -1
         let point = -1
-        for (let i = rails.length - 1; i >= 0; i--) {
-          const pts = rails[i].points
-          if (
-            Math.hypot(
-              pts[pts.length - 1].x - w.x,
-              pts[pts.length - 1].y - w.y,
-            ) < tol
-          ) {
+        const encours =
+          this.sel?.kind === 'rail' ? (rails[this.sel.index] ?? null) : null
+        if (encours && this.sel?.kind === 'rail') {
+          const pts = encours.points
+          const fin = pts[pts.length - 1]
+          if (Math.hypot(fin.x - w.x, fin.y - w.y) < tol) {
             pts.push({ x: this.snapped(w.x), y: this.snapped(w.y) })
-            index = i
+            index = this.sel.index
             point = pts.length - 1
-            break
-          }
-          if (Math.hypot(pts[0].x - w.x, pts[0].y - w.y) < tol) {
+          } else if (Math.hypot(pts[0].x - w.x, pts[0].y - w.y) < tol) {
             pts.unshift({ x: this.snapped(w.x), y: this.snapped(w.y) })
-            index = i
+            index = this.sel.index
             point = 0
-            break
           }
         }
         if (index < 0) {
+          // l'accroche suit la case ALIGNEMENT et se suspend à Alt, comme
+          // partout ailleurs : sans quoi on ne pouvait plus poser le départ
+          // d'un rail PRÈS d'un nœud existant sans lui sauter dessus
+          const jonction =
+            this.alignAuto && !e.altKey
+              ? accrocheRail(rails, w.x, w.y, tol)
+              : null
+          const depart = jonction ?? {
+            x: this.snapped(w.x),
+            y: this.snapped(w.y),
+          }
           rails.push({
             points: [
-              { x: this.snapped(w.x), y: this.snapped(w.y) },
+              { x: depart.x, y: depart.y },
               { x: this.snapped(w.x), y: this.snapped(w.y) },
             ],
           })
           index = rails.length - 1
           point = 1
+          if (jonction) {
+            this.status(
+              'Nouveau rail accroché au bout du voisin — deux rails distincts, chacun réglable (Alt : sans accroche).',
+            )
+          }
         }
         this.sel = { kind: 'rail', index }
-        this.drag = { mode: 'railpt', index, point }
+        this.viseNoeud(index, point)
+        this.drag = { mode: 'railpt', index, point, trace: true }
         this.draw()
         return
       }
@@ -2645,11 +2763,14 @@ export class LevelEditor {
 
       if (!this.drag) {
         c.style.cursor =
-          this.tool.kind === 'select'
-            ? this.sel?.kind === 'box' && this.hitRotateHandle(sx, sy)
+          this.tool.kind !== 'select'
+            ? 'crosshair'
+            : this.sel?.kind === 'box' && this.hitRotateHandle(sx, sy)
               ? 'grab'
-              : LevelEditor.curseurPoignee(this.hitHandle(sx, sy))
-            : 'crosshair'
+              : // une poignée de nœud sous le pointeur : elle se tire
+                this.sel?.kind === 'rail' && this.hitRailNoeud(sx, sy) !== null
+                ? 'grab'
+                : LevelEditor.curseurPoignee(this.hitHandle(sx, sy))
         // la bulle savante n'existe qu'en mode Sélection, souris posée
         if (this.tool.kind === 'select' && this.pointeur === 'mouse')
           this.majBulle(e.clientX, e.clientY, w.x, w.y)
@@ -2706,8 +2827,27 @@ export class LevelEditor {
         const r = (this.level.rails ?? [])[d.index]
         const p = r?.points[d.point]
         if (p) {
-          p.x = this.snapped(w.x)
-          p.y = this.snapped(w.y)
+          // le nœud tiré se COLLE au nœud voisin qu'il approche : deux
+          // rails se raccordent au pixel près sans viser à la main. Le
+          // point tiré et ses voisins de tracé sont hors jeu (il se
+          // collerait à lui-même). Alt suspend l'accroche, comme ailleurs.
+          const acc =
+            this.alignAuto && !e.altKey
+              ? accrocheRail(
+                  this.level.rails ?? [],
+                  w.x,
+                  w.y,
+                  this.priseMonde,
+                  [
+                    { rail: d.index, noeud: d.point },
+                    { rail: d.index, noeud: d.point - 1 },
+                    { rail: d.index, noeud: d.point + 1 },
+                  ],
+                )
+              : null
+          this.railAccroche = acc
+          p.x = acc ? acc.x : this.snapped(w.x)
+          p.y = acc ? acc.y : this.snapped(w.y)
         }
       } else if (d.mode === 'multimove') {
         // délta aimanté à la grille, appliqué en incrément : pas de dérive
@@ -2740,12 +2880,17 @@ export class LevelEditor {
       } else if (d.mode === 'move') {
         if (this.sel?.kind === 'rail' && d.pts) {
           const r = (this.level.rails ?? [])[this.sel.index]
-          const dxw = w.x - d.ox
-          const dyw = w.y - d.oy
+          // L'AIMANT PORTE SUR L'ÉCART, PAS SUR CHAQUE POINT. Arrondir les
+          // points un à un ré-alignait TOUT le tracé sur la grille au
+          // premier pixel de glissement : les longueurs réglées au chiffre
+          // près et les jonctions accrochées se perdaient en déplaçant
+          // simplement le rail. Le groupe (multimove) fait déjà ainsi.
+          const dxw = this.snapped(w.x - d.ox)
+          const dyw = this.snapped(w.y - d.oy)
           if (r) {
             for (let k = 0; k < r.points.length; k++) {
-              r.points[k].x = this.snapped(d.pts[k].x + dxw)
-              r.points[k].y = this.snapped(d.pts[k].y + dyw)
+              r.points[k].x = d.pts[k].x + dxw
+              r.points[k].y = d.pts[k].y + dyw
             }
           }
         } else if (this.sel?.kind === 'laser') {
@@ -2867,6 +3012,10 @@ export class LevelEditor {
 
     const doigtParti = (e: PointerEvent): void => {
       this.annuleAppuiLong() // relâché avant 480 ms : simple clic
+      // le halo d'accroche s'efface ICI : le relâcher n'est pas le seul
+      // moyen de finir un geste — un pincement qui s'invite ou une
+      // annulation du pointeur le laissaient peint à sa dernière position
+      this.railAccroche = null
       this.doigts.delete(e.pointerId)
       if (this.doigts.size < 2) {
         this.pinceEcart = null
@@ -2890,6 +3039,7 @@ export class LevelEditor {
       this.drag = null
       this.guides = []
       this.ecarts = []
+      this.railAccroche = null
       if (!d) return
       if (d.mode === 'aim') {
         this.setTool({ kind: 'select' })
@@ -2909,10 +3059,12 @@ export class LevelEditor {
       }
       if (d.mode === 'railpt') {
         const r = (this.level.rails ?? [])[d.index]
-        if (r) {
+        if (r && d.trace) {
           const p = r.points[d.point]
           const voisin = r.points[d.point - 1] ?? r.points[d.point + 1]
-          // un tronçon quasi nul ne compte pas : on retire le point posé
+          // un tronçon quasi nul ne compte pas : on retire le point posé.
+          // Seulement à la POSE : un coude qu'on reprend reste où on le
+          // laisse, même collé à son voisin (c'est parfois voulu).
           if (
             voisin &&
             Math.hypot(p.x - voisin.x, p.y - voisin.y) < this.grid
@@ -2928,9 +3080,22 @@ export class LevelEditor {
             }
           }
         }
-        // l'outil reste actif : reposez sur une extrémité pour prolonger
+        if (!d.trace) {
+          // un coude repris : on annonce la longueur obtenue — c'est la
+          // mesure qu'on cherchait en tirant
+          const amont = d.point > 0 ? longueurTroncon(r?.points ?? [], d.point - 1) : 0
+          const aval = longueurTroncon(r?.points ?? [], d.point)
+          this.commit(
+            `Point ${d.point + 1} déplacé — tronçons ${amont ? Math.round(amont) : '—'} / ${
+              aval ? Math.round(aval) : '—'
+            } (le reste du rail n'a pas bougé).`,
+          )
+          return
+        }
+        // l'outil reste actif : reposez sur l'extrémité du rail EN COURS
+        // pour le prolonger — sur celle d'un autre, un rail neuf s'accroche
         this.commit(
-          'Rail tracé — les chevrons donnent le SENS de l’arc. Reposez sur une extrémité pour prolonger, Échap pour finir.',
+          'Rail tracé — les chevrons donnent le SENS de l’arc. Reposez sur une extrémité de CE rail pour le prolonger, Échap pour finir.',
         )
         return
       }
@@ -5311,9 +5476,62 @@ export class LevelEditor {
       )
     } else if (s.kind === 'rail') {
       const r = (this.level.rails ?? [])[s.index]
+      const k = this.noeudActif()
+      const pt = r.points[k]
       rows.push(
-        `<p class="ed-empty">Ligne de champ en ${r.points.length} points. Un faisceau IONISÉ (passé dans la vapeur) qui frôle la ligne — n’importe où — s’y accroche et la suit DANS LE SENS DES CHEVRONS. Glissez pour déplacer le rail entier ; outil « Rail » sur une extrémité pour le prolonger.</p>`,
+        `<p class="ed-empty">Ligne de champ en ${r.points.length} points, ${Math.round(
+          longueurRail(r.points),
+        )} de long. Un faisceau IONISÉ (passé dans la vapeur) qui frôle la ligne — n’importe où — s’y accroche et la suit DANS LE SENS DES CHEVRONS.</p>`,
       )
+      rows.push(
+        `<p class="ed-empty">Sur la carte : les CARRÉS sont les points du tracé — tirez-en un et lui seul bouge, le reste du rail ne suit pas. Glissez la LIGNE (entre deux points) pour déplacer le rail entier. Double-clic sur la ligne : un point de plus ; sur un point : il s’en va. Un point tiré près du bout d’un autre rail s’y COLLE (Alt pour l’en empêcher).</p>`,
+      )
+      // LE POINT COURANT : celui qu'on règle au chiffre près, et sur lequel
+      // agissent les boutons. Le choix se fait aussi en cliquant sa poignée.
+      rows.push(
+        `<label class="ed-f"><span>Point réglé</span><select id="p-railnoeud">` +
+          r.points
+            .map(
+              (_, i) =>
+                `<option value="${i}"${i === k ? ' selected' : ''}>Point ${i + 1}${
+                  i === 0
+                    ? ' (départ de l’arc)'
+                    : i === r.points.length - 1
+                      ? ' (bout du rail)'
+                      : ''
+                }</option>`,
+            )
+            .join('') +
+          `</select></label>`,
+      )
+      if (pt) {
+        rows.push(
+          `<label class="ed-f"><span>X du point</span><input type="number" step="10" id="p-railx" data-noeud="${k}" data-ref="${+pt.x.toFixed(3)}" value="${+pt.x.toFixed(3)}" /></label>`,
+          `<label class="ed-f"><span>Y du point</span><input type="number" step="10" id="p-raily" data-noeud="${k}" data-ref="${+pt.y.toFixed(3)}" value="${+pt.y.toFixed(3)}" /></label>`,
+        )
+      }
+      rows.push(
+        `<button type="button" class="ed-btn" id="p-railadd">Ajouter un point après</button>`,
+        `<button type="button" class="ed-btn" id="p-raildel">Supprimer ce point</button>`,
+        `<button type="button" class="ed-btn" id="p-railcut">Couper le rail ici (deux rails)</button>`,
+      )
+      rows.push(
+        `<p class="ed-empty">COUPER sépare le tracé en deux rails distincts, qui se touchent au point choisi — la sortie de secours quand un rail en a prolongé un autre par mégarde. Attention : l’arc ne SAUTE PAS la coupure (il quitte un rail à son bout et repart tout droit) — couper change donc le tableau, pas seulement sa manipulation.</p>`,
+      )
+      // LES LONGUEURS, TRONÇON PAR TRONÇON : régler l'une fait glisser
+      // l'aval d'un bloc — les autres tronçons gardent leur mesure.
+      for (let t = 0; t + 1 < r.points.length; t++) {
+        rows.push(
+          `<label class="ed-f"><span>Longueur tronçon ${t + 1}</span><input type="number" step="10" min="1" id="p-raillong-${t}" data-ref="${Math.round(
+            longueurTroncon(r.points, t),
+          )}" value="${Math.round(longueurTroncon(r.points, t))}" /></label>`,
+        )
+      }
+      if (r.points.length > 2) {
+        rows.push(
+          `<p class="ed-empty">Régler une longueur pousse tout l’AVAL du même écart : la forme du reste du tracé ne bouge pas.</p>`,
+        )
+      }
       rows.push(
         `<button type="button" class="ed-btn" id="p-railrev">Inverser le sens</button>`,
       )
@@ -5509,12 +5727,75 @@ export class LevelEditor {
         ?.addEventListener('click', () => this.deplaceOrdre(sens))
     }
     host.querySelector('#p-railrev')?.addEventListener('click', () => {
-      if (this.sel?.kind === 'rail') {
-        ;(this.level.rails ?? [])[this.sel.index]?.points.reverse()
-        this.commit(
-          'Sens du rail inversé — les chevrons montrent la circulation de l’arc.',
+      const sel = this.sel
+      const r = this.railCourant()
+      if (sel?.kind !== 'rail' || !r) return
+      // le POINT RÉGLÉ suit SON point : le tracé retourné, le rang k devient
+      // n − 1 − k. Sans ce report, le panneau continuait de régler le rang,
+      // donc l'autre bout du rail — et le X, la suppression ou la coupe
+      // tombaient sur un point qu'on n'avait pas choisi.
+      const k = this.noeudActif()
+      r.points.reverse()
+      this.viseNoeud(sel.index, r.points.length - 1 - k)
+      this.commit(
+        'Sens du rail inversé — les chevrons montrent la circulation de l’arc.',
+      )
+    })
+    // AJOUTER un point : après le point courant s'il a un aval, sinon avant
+    // lui (au bout du rail, le tronçon à couper en deux est l'amont).
+    host.querySelector('#p-railadd')?.addEventListener('click', () => {
+      const sel = this.sel
+      const r = this.railCourant()
+      if (sel?.kind !== 'rail' || !r) return
+      const k = this.noeudActif()
+      const troncon = k + 1 < r.points.length ? k : k - 1
+      if (troncon < 0) return
+      r.points = insereNoeud(r.points, troncon)
+      this.viseNoeud(sel.index, troncon + 1)
+      this.commit(
+        'Point ajouté au milieu du tronçon — tirez-le sur la carte pour plier le rail.',
+      )
+    })
+    host.querySelector('#p-raildel')?.addEventListener('click', () => {
+      const sel = this.sel
+      const r = this.railCourant()
+      if (sel?.kind !== 'rail' || !r) return
+      const k = this.noeudActif()
+      const reste = retireNoeud(r.points, k)
+      if (!reste) {
+        this.status(
+          'Un rail garde au moins deux points — supprimez le rail entier pour l’effacer.',
         )
+        return
       }
+      r.points = reste
+      this.viseNoeud(sel.index, Math.max(0, k - 1))
+      this.commit(`Point retiré — le rail tient en ${reste.length} points.`)
+    })
+    // COUPER : deux rails qui se touchent, chacun réglable pour lui-même.
+    host.querySelector('#p-railcut')?.addEventListener('click', () => {
+      const sel = this.sel
+      const r = this.railCourant()
+      if (sel?.kind !== 'rail' || !r) return
+      const k = this.noeudActif()
+      const paire = coupeRail(r.points, k)
+      if (!paire) {
+        this.status(
+          'On ne coupe pas à une extrémité : choisissez un point du milieu.',
+        )
+        return
+      }
+      const rails = this.level.rails ?? []
+      r.points = paire[0]
+      // le second morceau se pose EN BOUT DE LISTE : l'insérer au milieu
+      // décalerait le rang de tous les rails suivants, et une sélection
+      // multiple en cours ne montrerait plus les mêmes. Il garde les
+      // réglages du premier (conduit compris).
+      rails.push({ ...r, points: paire[1] })
+      this.viseNoeud(sel.index, paire[0].length - 1)
+      this.commit(
+        'Rail coupé en deux — chacun se déplace et se règle pour lui-même. L’arc, lui, ne saute pas la coupure.',
+      )
     })
     for (const input of Array.from(
       host.querySelectorAll('input, select, textarea'),
@@ -5572,6 +5853,34 @@ export class LevelEditor {
         // gagnent pas un champ dont ils n'ont que faire
         if (c?.checked) r.conduit = true
         else delete r.conduit
+        // ON NE RELIT QUE CE QUI A CHANGÉ (`data-ref` porte la valeur
+        // affichée au rendu) : réécrire aveuglément tous les champs
+        // annulerait le réglage qu'on vient de faire — régler une LONGUEUR
+        // déplace l'aval, et le X du point, resté à sa vieille valeur,
+        // l'aurait aussitôt ramené en arrière.
+        const change = (id: string): number | null => {
+          const e = this.host.querySelector('#' + id) as HTMLInputElement | null
+          if (!e) return null
+          const v = Number(e.value)
+          if (!Number.isFinite(v)) return null
+          return Math.abs(v - Number(e.dataset.ref ?? NaN)) < 1e-6 ? null : v
+        }
+        for (let t = 0; t + 1 < r.points.length; t++) {
+          const l = change(`p-raillong-${t}`)
+          if (l !== null) r.points = regleLongueurTroncon(r.points, t, l)
+        }
+        const champX = this.host.querySelector('#p-railx') as HTMLInputElement | null
+        const k = Number(champX?.dataset.noeud ?? -1)
+        const p = r.points[k]
+        if (p) {
+          const nx = change('p-railx')
+          const ny = change('p-raily')
+          if (nx !== null) p.x = nx
+          if (ny !== null) p.y = ny
+        }
+        // le POINT RÉGLÉ : le choix du menu vaut celui de la poignée
+        const menu = this.host.querySelector('#p-railnoeud') as HTMLSelectElement | null
+        if (menu) this.viseNoeud(s.index, Number(menu.value) || 0)
       }
       return
     }
@@ -6713,19 +7022,6 @@ export class LevelEditor {
       chemin()
       g.stroke()
       g.setLineDash([])
-      for (let k = 0; k < pts.length; k++) {
-        const p = this.toScreen(pts[k].x, pts[k].y)
-        g.fillStyle = selRail ? '#e6dcff' : '#b8a0f5'
-        g.beginPath()
-        g.arc(
-          p.sx,
-          p.sy,
-          k === 0 || k === pts.length - 1 ? 4 : 2.5,
-          0,
-          Math.PI * 2,
-        )
-        g.fill()
-      }
       g.strokeStyle = selRail ? '#e6dcff' : 'rgba(190,160,255,0.8)'
       g.lineWidth = 1.6
       for (let k = 0; k + 1 < pts.length; k++) {
@@ -6755,6 +7051,75 @@ export class LevelEditor {
           g.stroke()
         }
       }
+      // LES NŒUDS. Au repos, de simples pastilles ; sur le rail
+      // SÉLECTIONNÉ, de vraies POIGNÉES CARRÉES à la taille de la prise —
+      // c'est ce qui dit qu'un point se tire tout seul, et c'est ce qui
+      // manquait pour régler un tronçon sans emporter le rail entier.
+      const actif = selRail ? this.noeudActif() : -1
+      for (let k = 0; k < pts.length; k++) {
+        const p = this.toScreen(pts[k].x, pts[k].y)
+        if (!selRail) {
+          g.fillStyle = '#b8a0f5'
+          g.beginPath()
+          g.arc(p.sx, p.sy, k === 0 || k === pts.length - 1 ? 4 : 2.5, 0, Math.PI * 2)
+          g.fill()
+          continue
+        }
+        const c = Math.max(4, Math.min(9, this.prise * 0.7))
+        g.fillStyle = k === actif ? '#fff2b0' : '#e6dcff'
+        g.strokeStyle = '#2a1c47'
+        g.lineWidth = 1.4
+        g.beginPath()
+        g.rect(p.sx - c, p.sy - c, c * 2, c * 2)
+        g.fill()
+        g.stroke()
+        // le DÉPART du tracé porte un point : c'est par là que l'arc entre
+        if (k === 0) {
+          g.fillStyle = '#2a1c47'
+          g.beginPath()
+          g.arc(p.sx, p.sy, Math.max(1.5, c * 0.3), 0, Math.PI * 2)
+          g.fill()
+        }
+      }
+      // LES MESURES du rail tenu : chaque tronçon dit sa longueur, à
+      // l'endroit où on la règle — sans quoi « allonger un peu » se fait
+      // à l'œil, et le concepteur repasse par le panneau à chaque essai.
+      if (selRail) {
+        g.font = '600 10px ui-monospace, monospace'
+        g.textAlign = 'center'
+        g.textBaseline = 'middle'
+        for (let k = 0; k + 1 < pts.length; k++) {
+          const a = pts[k]
+          const b = pts[k + 1]
+          const len = Math.hypot(b.x - a.x, b.y - a.y)
+          if (len * this.zoom < 26) continue
+          // décalée d'un cheveu SUR LE CÔTÉ : au milieu pile, l'étiquette
+          // recouvrait le chevron qui dit le sens de l'arc
+          const m = this.toScreen((a.x + b.x) / 2, (a.y + b.y) / 2)
+          const nx = ((b.y - a.y) / len) * 14
+          const ny = ((b.x - a.x) / len) * 14
+          m.sx += nx
+          m.sy += ny
+          const txt = String(Math.round(len))
+          const l = g.measureText(txt).width + 8
+          g.fillStyle = 'rgba(20,14,36,0.78)'
+          g.fillRect(m.sx - l / 2, m.sy - 8, l, 15)
+          g.fillStyle = '#e6dcff'
+          g.fillText(txt, m.sx, m.sy)
+        }
+        g.textAlign = 'left'
+        g.textBaseline = 'alphabetic'
+      }
+    }
+    // L'ACCROCHE ANNONCÉE : le nœud voisin où le point tiré va se poser
+    // s'entoure d'un halo — on voit la jonction se faire AVANT de lâcher.
+    if (this.railAccroche) {
+      const a = this.toScreen(this.railAccroche.x, this.railAccroche.y)
+      g.strokeStyle = '#ffe58a'
+      g.lineWidth = 2
+      g.beginPath()
+      g.arc(a.sx, a.sy, Math.max(8, this.prise), 0, Math.PI * 2)
+      g.stroke()
     }
     // l'aperçu des faisceaux d'abord : les pastilles se dessinent par-dessus
     const touchees = new Set<number>()

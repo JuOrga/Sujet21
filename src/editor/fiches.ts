@@ -292,6 +292,10 @@ export const FICHES_GENRES: Record<string, Fiche> = {
         cle: '·',
         txt: 'Le plasma se PROVOQUE : être vapeur dans la lumière, au bon endroit.',
       },
+      {
+        cle: '·',
+        txt: 'À l’édition : chaque point du tracé se tire à part (les carrés) — un tronçon s’allonge sans emporter le rail.',
+      },
     ],
   },
   'genre:lampe': {
