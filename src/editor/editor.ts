@@ -1565,15 +1565,9 @@ export class LevelEditor {
         this.status('Il faut au moins un titre et une ligne.')
         return
       }
-      let auteur = ''
-      try {
-        const reg = JSON.parse(
-          localStorage.getItem('projet21.registres.v1') ?? '{}',
-        ) as { operator?: string }
-        auteur = reg.operator ?? ''
-      } catch {
-        // sans signature : la fiche part anonyme
-      }
+      // l'opérateur vient des registres via le hook : la clé à plat d'avant
+      // le coffre n'existe plus (balayée), une fiche partait anonyme
+      const auteur = this.hooks.operator()
       void (async () => {
         try {
           const r = await appelle('/api/fiches', {

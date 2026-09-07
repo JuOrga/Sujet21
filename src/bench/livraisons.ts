@@ -31,6 +31,20 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '07/09/2026 22:00',
+    title: 'LA REVUE DE LA LIVRAISON : cinq défauts relevés sur le diff dev → prod, corrigés avant de publier',
+    notes: [
+      'LA DEMANDE : « PR de dev vers prod et review ». La relecture du diff entier (29 fichiers, le coffre, les fantômes, la cloison, l’éditeur, la glace) a relevé sept constats ; cinq étaient de vrais défauts, deux des observations sans suite (le solveur de la glace et un vieux libellé de commit). Les cinq sont corrigés ici, avant la publication.',
+      'LE REJEU NE FINISSAIT QUE PAR QUITTER : toute autre sortie (Échap puis le hub, ESSAYER depuis l’éditeur, l’éveil rejoué) relançait restart() avec le rejeu encore posé — la salle se chargeait SANS corps, la simulation ne faisait plus un pas, la barre du rejeu restait à l’écran. Et lancer un rejeu en pleine expédition remettait la réserve et l’horloge de la run à zéro. Le correctif : finRejeu(), appelée par QUITTER et par restart() dès qu’une AUTRE salle que celle du rejeu se charge — avant sauveRun, qui graverait sinon une réserve vide —, et qui rend à la run sa bonbonne et son horloge, mises de côté au lancement.',
+      'LE JETON DU PALMARÈS montait après les sorties anticipées d’armeFantomes : la réponse du palmarès d’une salle quittée aussitôt se posait au hub ou dans un essai d’éditeur. Il monte désormais à chaque armement, en tête.',
+      'LES OBJECTIFS SUIVIS DU CODEX vivaient encore dans le stockage à plat : le hook stockage de l’écran existait mais main.ts ne le passait pas — le coffre en avait migré une copie, et le balayage aurait effacé la clé vivante. L’écran lit et écrit désormais dans l’emplacement, comme le reste de la progression.',
+      'L’AUTEUR D’UNE FICHE (éditeur, publication des fiches) se lisait dans la clé des registres à plat, que le coffre balaie : toute fiche serait partie anonyme. Il vient du hook operator(), déjà là.',
+      'L’ENVOI AU PALMARÈS partait à chaque sas d’un détenteur en tête, même sans battre son record : trente courses ratées, trente traces de 60 Ko refusées, chacune contre une lecture fraîche du magasin. La trace ne part que si le record LOCAL vient de tomber dans cette catégorie.',
+      'L’IMPORT D’UN DOCUMENT PLUS RÉCENT dans l’emplacement actif laissait la mémoire sur l’ancienne partie avec l’écriture ouverte : entre l’import et le rechargement, un trophée ou une run pouvait reposer l’ancienne partie par-dessus le fichier importé. L’écriture se verrouille jusqu’au rechargement (testé : une écriture après l’import ne touche pas le fichier).',
+      'VÉRIFIÉ : 987 tests verts dans 89 fichiers (le verrou d’import ajouté au test de l’aller-retour), type-check à 0, build propre. Au navigateur (Chromium, jeu construit) : le rejeu — ▶, zéro particule, ×4, pause, QUITTER qui rend une salle à 900 particules — et le fantôme partagé avec l’API simulée — lu en salle, listé, rejoué — zéro erreur console. Non vu d’ici : la sortie du rejeu par le hub ou l’éditeur (le mode concepteur n’est pas armé dans l’essai), à voir en prévisualisation.',
+    ],
+  },
+  {
     date: '07/09/2026 16:23',
     title: 'LE BALAYAGE DES CLÉS D’AVANT : au démarrage qui suit la migration, sous la preuve que l’emplacement se relit',
     notes: [

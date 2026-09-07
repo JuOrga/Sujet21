@@ -300,6 +300,9 @@ export class Coffre {
 
   private readonly cles = new Map<string, string>()
   private readonly maintenant: () => string
+  // posé quand un document PLUS RÉCENT vient d'être importé dans l'actif :
+  // la mémoire tient encore l'ancienne partie, une écriture l'écraserait
+  private verrou = false
 
   constructor(
     private readonly dos: Stockage,
@@ -372,7 +375,7 @@ export class Coffre {
   }
 
   private persiste(): void {
-    if (this.lectureSeule) return
+    if (this.lectureSeule || this.verrou) return
     try {
       if (this.cles.size === 0) this.dos.removeItem(cleEmplacement(this.actif))
       else
@@ -460,11 +463,16 @@ export class Coffre {
     }
     // l'actif importé : la mémoire suit, sinon la prochaine écriture d'un
     // module reposerait l'ancien contenu par-dessus le fichier importé.
-    // Un document trop récent ne monte pas en mémoire : ce coffre n'est
-    // pas en lecture seule, il l'écraserait — le rechargement le lira bien.
-    if (n === this.actif && !tropRecent) {
-      this.cles.clear()
-      for (const [k, v] of Object.entries(doc.cles)) this.cles.set(k, v)
+    // Un document trop récent ne monte pas en mémoire, et l'écriture se
+    // VERROUILLE jusqu'au rechargement : entre l'import et le rechargement,
+    // une image ou un événement peut encore écrire — un trophée, une run —
+    // et reposer l'ancienne partie par-dessus le fichier importé.
+    if (n === this.actif) {
+      if (tropRecent) this.verrou = true
+      else {
+        this.cles.clear()
+        for (const [k, v] of Object.entries(doc.cles)) this.cles.set(k, v)
+      }
     }
     return true
   }
