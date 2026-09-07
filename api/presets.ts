@@ -5,6 +5,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { ecritDocument, litDocument } from './_magasin.js'
+import { exigeCle } from './_garde.js'
 
 const PREFIX = 'presets/'
 const MAX_PRESETS = 200
@@ -72,6 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
     if (req.method === 'POST') {
+      if (!exigeCle(req, res)) return
       const body = req.body as Record<string, unknown> | null
       // Deux actions : définir le préset par défaut (body { defaultTitle }),
       // ou publier un préset (body préset complet avec params).
@@ -105,6 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
     if (req.method === 'DELETE') {
+      if (!exigeCle(req, res)) return
       const title = String(req.query.title ?? '')
       if (!title) {
         res.status(400).json({ error: 'titre manquant' })

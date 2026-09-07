@@ -17,6 +17,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { del, put } from '@vercel/blob'
 import { ecritDocument, litDocument } from './_magasin.js'
+import { exigeCle } from './_garde.js'
 
 const PREFIX = 'codex/'
 const BLOBS = 'codex-blobs/'
@@ -88,6 +89,7 @@ export default async function handler(
       return
     }
     if (req.method === 'POST') {
+      if (!exigeCle(req, res)) return
       const body = (req.body ?? {}) as Record<string, unknown>
       if (!idValide(body.id)) {
         res.status(400).json({ error: 'id de fiche invalide' })
@@ -140,6 +142,7 @@ export default async function handler(
       return
     }
     if (req.method === 'DELETE') {
+      if (!exigeCle(req, res)) return
       const id = req.query.id
       if (!idValide(id)) {
         res.status(400).json({ error: 'id de fiche invalide' })

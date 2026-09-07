@@ -11,6 +11,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { ecritDocument, litDocument } from './_magasin.js'
+import { exigeCle } from './_garde.js'
 
 const PREFIX = 'fiches/'
 const MAX_SURCHARGES = 200
@@ -92,6 +93,7 @@ export default async function handler(
       return
     }
     if (req.method === 'POST') {
+      if (!exigeCle(req, res)) return
       const s = sanitize(req.body)
       if (!s) {
         res
@@ -109,6 +111,7 @@ export default async function handler(
       return
     }
     if (req.method === 'DELETE') {
+      if (!exigeCle(req, res)) return
       const cle = String(req.query.cle ?? '')
       if (!cle) {
         res.status(400).json({ error: 'clé manquante' })

@@ -14,6 +14,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { ecritDocument, litDocument } from './_magasin.js'
+import { exigeCle } from './_garde.js'
 
 const PREFIX = 'regles/'
 const MAX_NOTES = 300
@@ -112,6 +113,7 @@ export default async function handler(
       return
     }
     if (req.method === 'POST') {
+      if (!exigeCle(req, res)) return
       const corps = req.body as Record<string, unknown> | null
       const type = corps?.type
       if (type === 'note') {
@@ -148,6 +150,7 @@ export default async function handler(
       return
     }
     if (req.method === 'DELETE') {
+      if (!exigeCle(req, res)) return
       const id = String(req.query.id ?? '')
       if (!ID_OK.test(id)) {
         res.status(400).json({ error: 'identifiant manquant' })

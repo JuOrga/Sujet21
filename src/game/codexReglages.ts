@@ -1,3 +1,4 @@
+import { fetchConcepteur } from './cleConcepteur'
 // LES RÉGLAGES D'UNE FICHE DU CODEX, tenus par le concepteur : la MÉMOIRE
 // qu'elle rapporte à la découverte, sa RARETÉ, et sa VIDÉO envoyée depuis
 // l'atelier. Le code ne porte que les défauts — dix de mémoire, rareté
@@ -134,7 +135,7 @@ export async function pushReglageCodex(
     const corps: Record<string, unknown> = { id, memoire: reglage.memoire, rarete: reglage.rarete, auteur }
     if (video === 'retirer') corps.retirerVideo = true
     else if (video) corps.video = video
-    const r = await fetch(ENDPOINT, {
+    const r = await fetchConcepteur(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(corps),
@@ -149,7 +150,7 @@ export async function pushReglageCodex(
 /** Rétablit les défauts d'une fiche (et retire sa vidéo envoyée). */
 export async function deleteReglageCodex(id: string): Promise<ReglagesCodex | null> {
   try {
-    const r = await fetch(`${ENDPOINT}?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+    const r = await fetchConcepteur(`${ENDPOINT}?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
     if (!r.ok) return null
     return litReglages(await r.json())
   } catch {

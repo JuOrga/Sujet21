@@ -11,6 +11,7 @@
 // réécrit.
 
 import { readFileSync } from 'node:fs'
+import { enTetesEcriture } from './_cle.mjs'
 
 const API = process.env.API ?? 'https://sujet21.vercel.app/api/levels'
 const v4 = JSON.parse(readFileSync(new URL('./hub-compact.json', import.meta.url), 'utf8'))
@@ -43,7 +44,7 @@ if (JSON.stringify(entree.level) === JSON.stringify(cible)) {
 
 const r = await fetch(API, {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
+  headers: enTetesEcriture(),
   body: JSON.stringify({ level: cible, id: entree.id, auteur: 'Claude' }),
 })
 if (!r.ok) throw new Error(`POST ${entree.id} → ${r.status}`)

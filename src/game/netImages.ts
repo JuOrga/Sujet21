@@ -1,3 +1,4 @@
+import { fetchConcepteur } from './cleConcepteur'
 // Bibliothèque d'images partagée (/api/images) : catalogue, import,
 // suppression. L'import RECOMPRIME côté client (WebP, plus grand côté
 // borné) : le serveur ne reçoit jamais un original de 20 Mo.
@@ -78,7 +79,7 @@ export async function pushImage(
   const data = await recomprime(fichier)
   if (!data) return null
   try {
-    const r = await fetch(ENDPOINT, {
+    const r = await fetchConcepteur(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nom, type: 'image/webp', data, auteur }),
@@ -92,7 +93,7 @@ export async function pushImage(
 
 export async function deleteImage(nom: string): Promise<SharedImage[] | null> {
   try {
-    const r = await fetch(`${ENDPOINT}?nom=${encodeURIComponent(nom)}`, { method: 'DELETE' })
+    const r = await fetchConcepteur(`${ENDPOINT}?nom=${encodeURIComponent(nom)}`, { method: 'DELETE' })
     if (!r.ok) return null
     return readList(await r.json())
   } catch {

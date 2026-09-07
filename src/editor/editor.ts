@@ -146,6 +146,7 @@ import { MAX_LUMIERES,
 import { canalDeCible, traceLaser } from '../game/laser'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
 import { PISTES, PISTE_NOMS, type Piste } from '../game/soundtrack'
+import { fetchConcepteur } from '../game/cleConcepteur'
 import {
   deleteLevel,
   fetchLibrary,
@@ -1524,7 +1525,7 @@ export class LevelEditor {
     voile.querySelector('#fm-retablir')?.addEventListener('click', () => {
       void (async () => {
         try {
-          const r = await fetch(`/api/fiches?cle=${encodeURIComponent(cleF)}`, {
+          const r = await fetchConcepteur(`/api/fiches?cle=${encodeURIComponent(cleF)}`, {
             method: 'DELETE',
           })
           if (!r.ok) throw new Error(String(r.status))
@@ -1575,7 +1576,7 @@ export class LevelEditor {
       }
       void (async () => {
         try {
-          const r = await fetch('/api/fiches', {
+          const r = await fetchConcepteur('/api/fiches', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1687,7 +1688,7 @@ export class LevelEditor {
         const cleF = ret.dataset.ret
         void (async () => {
           try {
-            const r = await fetch(
+            const r = await fetchConcepteur(
               `/api/fiches?cle=${encodeURIComponent(cleF)}`,
               { method: 'DELETE' },
             )

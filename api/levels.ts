@@ -8,6 +8,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { list } from '@vercel/blob'
 import { ecritDocument, litDocument } from './_magasin.js'
+import { exigeCle } from './_garde.js'
 import { provenanceCode } from './_provenance.js'
 import { refusDeBudget } from './_budget.js'
 
@@ -91,6 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     if (req.method === 'POST') {
+      if (!exigeCle(req, res)) return
       const body = (req.body ?? {}) as Record<string, unknown>
 
       // Réordonner : la séquence de l'expédition, du premier au dernier
@@ -170,6 +172,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     if (req.method === 'DELETE') {
+      if (!exigeCle(req, res)) return
       const id = String(req.query.id ?? '')
       if (!id) {
         res.status(400).json({ error: 'identifiant manquant' })

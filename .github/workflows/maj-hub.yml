@@ -14,4 +14,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Remplacer l'instantané du hub
+        env:
+          CLE_CONCEPTEUR: ${{ secrets.CLE_CONCEPTEUR }}
         run: node ops/maj-hub.mjs
