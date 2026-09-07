@@ -4520,6 +4520,13 @@ const editor = new LevelEditor(el('editor'), {
   modMulti: () => manette.ltVal > 0.5,
 })
 
+// Un élément ne défile de côté que s'il l'a déclaré : « hidden » (ou
+// « visible ») refuse la molette et l'ascenseur, mais PAS l'écriture de
+// scrollLeft — la garde est donc à faire ici, avant chaque écriture.
+function defileDeCote(el: HTMLElement): boolean {
+  return /(auto|scroll)/.test(getComputedStyle(el).overflowX)
+}
+
 // ---- Les panneaux de l'éditeur se TIRENT au doigt --------------------------
 // Steam Deck, trackpad gauche en souris : presser n'importe où dans le
 // panneau et GLISSER — le contenu suit le geste, convention tactile (on tire
@@ -4534,6 +4541,11 @@ function glisseAuDoigt(zone: HTMLElement): void {
     cible: HTMLElement
     top0: number
     left0: number
+    // le panneau accepte-t-il de défiler DE CÔTÉ ? Un panneau en
+    // « overflow-x: hidden » n'a ni ascenseur ni molette pour revenir, mais
+    // scrollLeft s'y écrit quand même : c'est ainsi qu'un glisser un peu
+    // oblique poussait la palette hors champ — et rien ne la ramenait.
+    lateral: boolean
     engage: boolean
   } | null = null
   let avaleClic = false
@@ -4563,10 +4575,12 @@ function glisseAuDoigt(zone: HTMLElement): void {
       cible: defilable(t),
       top0: 0,
       left0: 0,
+      lateral: false,
       engage: false,
     }
     suivi.top0 = suivi.cible.scrollTop
     suivi.left0 = suivi.cible.scrollLeft
+    suivi.lateral = defileDeCote(suivi.cible)
   })
   zone.addEventListener('pointermove', (e) => {
     if (!suivi || e.pointerId !== suivi.id) return
@@ -4582,7 +4596,7 @@ function glisseAuDoigt(zone: HTMLElement): void {
       }
     }
     suivi.cible.scrollTop = suivi.top0 - dy
-    suivi.cible.scrollLeft = suivi.left0 - dx
+    if (suivi.lateral) suivi.cible.scrollLeft = suivi.left0 - dx
     e.preventDefault()
   })
   const finit = (e: PointerEvent): void => {
@@ -4643,7 +4657,9 @@ function defileEditeur(dt: number): void {
       : document.querySelector<HTMLElement>('#editor .ed-side--right')
   if (!sc) return
   sc.scrollTop += vy * 1100 * dt
-  sc.scrollLeft += vx * 1100 * dt
+  // même garde que le glisser au doigt : un panneau qui interdit le
+  // défilement latéral ne se pousse pas de côté au stick
+  if (defileDeCote(sc)) sc.scrollLeft += vx * 1100 * dt
 }
 
 // ---- LA PLANCHE : l'ordonnancement de l'expédition, en cartes visuelles --
