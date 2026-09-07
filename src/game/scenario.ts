@@ -11,6 +11,8 @@
 // « une seule fois » — indispensable en roguelike : l'ouverture ne se
 // rejoue pas au deuxième run.
 
+import { coffre } from './coffre'
+
 export type MomentScenario =
   | 'premier-lancement'
   | 'avant-hub'
@@ -306,7 +308,7 @@ export function sauveScenario(s: ScenarioDef): void {
 
 export function chargeVues(): Set<string> {
   try {
-    const arr = JSON.parse(localStorage.getItem(CLE_VUES) ?? '[]') as unknown
+    const arr = JSON.parse(coffre.stockage.getItem(CLE_VUES) ?? '[]') as unknown
     return new Set(Array.isArray(arr) ? arr.filter((v): v is string => typeof v === 'string') : [])
   } catch {
     return new Set()
@@ -317,7 +319,7 @@ export function noteVue(id: string): void {
   try {
     const vues = chargeVues()
     vues.add(id)
-    localStorage.setItem(CLE_VUES, JSON.stringify([...vues]))
+    coffre.stockage.setItem(CLE_VUES, JSON.stringify([...vues]))
   } catch {
     // sans gravité : la règle se rejouera, elle ne bloquera rien
   }
@@ -325,7 +327,7 @@ export function noteVue(id: string): void {
 
 export function oublieVues(): void {
   try {
-    localStorage.removeItem(CLE_VUES)
+    coffre.stockage.removeItem(CLE_VUES)
   } catch {
     // sans gravité
   }

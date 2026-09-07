@@ -4,6 +4,7 @@
 
 import { parseCinematique, type CinematiqueDef } from './cinematique'
 import { parseScenario, type ScenarioDef } from './scenario'
+import { appelle } from './reseau'
 
 export interface SharedCine {
   cine: CinematiqueDef
@@ -40,7 +41,7 @@ function readList(data: unknown): SharedCine[] {
 
 export async function fetchCines(): Promise<SharedCine[] | null> {
   try {
-    const r = await fetch(ENDPOINT, { cache: 'no-store' })
+    const r = await appelle(ENDPOINT, { cache: 'no-store' })
     if (!r.ok) return null
     return readList(await r.json())
   } catch {
@@ -55,7 +56,7 @@ export async function fetchBibliotheque(): Promise<{
   scenario: ScenarioDef | null
 } | null> {
   try {
-    const r = await fetch(ENDPOINT, { cache: 'no-store' })
+    const r = await appelle(ENDPOINT, { cache: 'no-store' })
     if (!r.ok) return null
     const data = await r.json()
     return { cines: readList(data), scenario: readScenario(data) }
@@ -70,7 +71,7 @@ export async function pushScenario(
   auteur: string,
 ): Promise<ScenarioDef | null> {
   try {
-    const r = await fetch(ENDPOINT, {
+    const r = await appelle(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ scenario, auteur }),
@@ -85,7 +86,7 @@ export async function pushScenario(
 /** Publie (ou remplace, même code) une cinématique dans la bibliothèque. */
 export async function pushCine(cine: CinematiqueDef, auteur: string): Promise<SharedCine[] | null> {
   try {
-    const r = await fetch(ENDPOINT, {
+    const r = await appelle(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cine, auteur }),
@@ -99,7 +100,7 @@ export async function pushCine(cine: CinematiqueDef, auteur: string): Promise<Sh
 
 export async function deleteCine(code: string): Promise<SharedCine[] | null> {
   try {
-    const r = await fetch(`${ENDPOINT}?code=${encodeURIComponent(code)}`, { method: 'DELETE' })
+    const r = await appelle(`${ENDPOINT}?code=${encodeURIComponent(code)}`, { method: 'DELETE' })
     if (!r.ok) return null
     return readList(await r.json())
   } catch {

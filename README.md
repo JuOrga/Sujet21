@@ -49,7 +49,13 @@ du surplus au sas, la purge de fin de run. Le codex se remplit de ce que le
 sujet découvre en jouant, les trophées de ce qu'il réussit.
 
 **Les écrans.** Cinématiques en planches illustrées (le montage compose, il ne
-code pas), accueil, notes de version, palmarès partagé, le codex (rail des
+code pas), accueil, les SAUVEGARDES (trois emplacements, un document par
+emplacement fait pour le Steam Cloud — `src/game/coffre.ts`), les FANTÔMES
+(vos records rejoués dans la salle : la forme du corps, le jet, les dashs,
+la ligne de course et l'écart en direct — `src/game/fantome.ts` — et le
+REJEU depuis l'écran des records, la salle sans corps et la caméra qui suit,
+et le fantôme PARTAGÉ du palmarès — `api/fantomes.ts`, `src/game/netFantomes.ts`),
+notes de version, palmarès partagé, le codex (rail des
 états, fiches en hexagones, fiche lue avec la vidéo de l'effet quand elle
 existe — `public/assets/codex/LISEZ-MOI.md`), cycle.
 
@@ -102,7 +108,8 @@ C'est la seule porte des outils sur l'accueil (les anciens boutons sont
 partis) ; `?editeur` et `?carte` dans l'URL restent des raccourcis.
 `?editeur` ouvre l'éditeur directement, `?carte` l'éditeur de la carte de la
 station, `?tableau=N` démarre à la salle N,
-`?spawn=x,y` place le corps.
+`?spawn=x,y` place le corps. `?horsligne` coupe tout appel à l'API (la
+posture du build Steam : le contenu livré fait foi — `src/game/reseau.ts`).
 
 ## Qualité
 

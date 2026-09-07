@@ -154,6 +154,7 @@ import {
   saveLevel,
   type StoredLevel,
 } from '../game/netLevels'
+import { appelle } from '../game/reseau'
 
 const STORE_KEY = 'projet21.editeur.v1'
 // À côté du brouillon : le LIEN avec la bibliothèque — quelle entrée est
@@ -1465,7 +1466,7 @@ export class LevelEditor {
    * la bulle garde son texte d'origine, rien ne casse. */
   private async chargeSurcharges(): Promise<void> {
     try {
-      const r = await fetch('/api/fiches')
+      const r = await appelle('/api/fiches')
       if (!r.ok) return
       const data = (await r.json()) as { surcharges?: FicheSurcharge[] }
       const map: Surcharges = {}
@@ -1524,7 +1525,7 @@ export class LevelEditor {
     voile.querySelector('#fm-retablir')?.addEventListener('click', () => {
       void (async () => {
         try {
-          const r = await fetch(`/api/fiches?cle=${encodeURIComponent(cleF)}`, {
+          const r = await appelle(`/api/fiches?cle=${encodeURIComponent(cleF)}`, {
             method: 'DELETE',
           })
           if (!r.ok) throw new Error(String(r.status))
@@ -1564,18 +1565,12 @@ export class LevelEditor {
         this.status('Il faut au moins un titre et une ligne.')
         return
       }
-      let auteur = ''
-      try {
-        const reg = JSON.parse(
-          localStorage.getItem('projet21.registres.v1') ?? '{}',
-        ) as { operator?: string }
-        auteur = reg.operator ?? ''
-      } catch {
-        // sans signature : la fiche part anonyme
-      }
+      // l'opérateur vient des registres via le hook : la clé à plat d'avant
+      // le coffre n'existe plus (balayée), une fiche partait anonyme
+      const auteur = this.hooks.operator()
       void (async () => {
         try {
-          const r = await fetch('/api/fiches', {
+          const r = await appelle('/api/fiches', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1687,7 +1682,7 @@ export class LevelEditor {
         const cleF = ret.dataset.ret
         void (async () => {
           try {
-            const r = await fetch(
+            const r = await appelle(
               `/api/fiches?cle=${encodeURIComponent(cleF)}`,
               { method: 'DELETE' },
             )
