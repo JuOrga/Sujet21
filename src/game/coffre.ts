@@ -220,8 +220,9 @@ export function resumeDocument(
 
 /** Une seule fois par appareil : si aucun emplacement n'existe encore, les
  *  clés de progression d'avant le coffre sont copiées dans l'emplacement 1.
- *  Les clés d'origine RESTENT en place une version (une sauvegarde qu'on
- *  aurait mal migrée se retrouverait) ; une version ultérieure les balaiera.
+ *  Les clés d'origine restent en place CE démarrage-là (une sauvegarde
+ *  qu'on aurait mal migrée se retrouverait) ; le démarrage suivant les
+ *  balaie, une fois le document relu — voir balaieHeritage.
  *  Renvoie le nombre de clés emportées. */
 export function migreHeritage(dos: Stockage, majAt: string, machine: string): number {
   if (dos.getItem(CLE_MIGRE) !== null) return 0
@@ -243,6 +244,26 @@ export function migreHeritage(dos: Stockage, majAt: string, machine: string): nu
   }
   dos.setItem(CLE_MIGRE, '1')
   return emportees
+}
+
+/** LE BALAYAGE des clés d'avant : au démarrage SUIVANT la migration, et
+ *  seulement sous la preuve que l'emplacement 1 se relit (un document
+ *  valide, pas un texte tronqué), les clés de progression à plat quittent
+ *  le stockage — elles ne servaient plus qu'un ancien jeu, et deux copies
+ *  d'une même partie finissent toujours par mentir l'une sur l'autre. Les
+ *  préférences et les brouillons ne sont pas des clés de progression : ils
+ *  restent. Renvoie le nombre de clés effacées. */
+export function balaieHeritage(dos: Stockage): number {
+  if (dos.getItem(CLE_MIGRE) === null) return 0
+  const { doc } = litDocument(dos.getItem(cleEmplacement(1)))
+  if (!doc) return 0
+  let effacees = 0
+  for (const k of CLES_PROGRESSION) {
+    if (dos.getItem(k) === null) continue
+    dos.removeItem(k)
+    effacees++
+  }
+  return effacees
 }
 
 // ---- Le coffre ---------------------------------------------------------------
@@ -297,7 +318,9 @@ export class Coffre {
     }
     this.machine = machine
     try {
-      migreHeritage(dos, this.maintenant(), machine)
+      // la migration ce démarrage-ci, le balayage le suivant : jamais les
+      // deux d'un coup — une migration ratée doit laisser ses sources
+      if (migreHeritage(dos, this.maintenant(), machine) === 0) balaieHeritage(dos)
     } catch {
       // un dos qui refuse d'écrire : on jouera sans migrer, sans rien casser
     }

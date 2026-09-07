@@ -31,6 +31,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '07/09/2026 16:23',
+    title: 'LE BALAYAGE DES CLÉS D’AVANT : au démarrage qui suit la migration, sous la preuve que l’emplacement se relit',
+    notes: [
+      'LA DEMANDE : « enchaîne sur le balayage des anciennes clés ». Depuis le coffre, la progression d’un joueur d’avant est copiée dans l’emplacement 1 au premier démarrage, et ses clés à plat restaient en place — un filet contre une migration ratée, promis « une version plus tard ». Le voici.',
+      'LA RÈGLE (game/coffre.ts, balaieHeritage, testé) : jamais dans la foulée de la migration — le démarrage qui la fait laisse ses sources en place ; c’est le démarrage SUIVANT qui balaie, et seulement sous la preuve que l’emplacement 1 se relit (un document valide, pas un texte tronqué). Sans marqueur de migration, rien ne bouge ; sur un document cassé, rien ne bouge — les sources restent lisibles par un ancien jeu. Seules les clés de PROGRESSION partent : les préférences de l’appareil et les brouillons du concepteur ne sont pas de la partie.',
+      'POURQUOI BALAYER : deux copies d’une même partie finissent toujours par mentir l’une sur l’autre — la clé à plat gardait la partie d’avant la migration, l’emplacement la partie d’après, et un retour à un ancien jeu aurait ressuscité l’ancienne. Une fois l’emplacement prouvé lisible, la copie à plat ne sert plus qu’à tromper.',
+      'VÉRIFIÉ : 981 tests verts dans 88 fichiers (2 neufs sur le coffre : le second démarrage balaie les clés de progression et laisse préférences et brouillons ; le balayage refuse avant migration et sur un document cassé, et ne compte que ce qu’il efface), type-check à 0, build propre. Au navigateur (Chromium, jeu construit) : un joueur d’avant — premier démarrage, le nom JU est là, la signature n’est pas redemandée, les trois clés à plat restent ; second démarrage, les trois clés sont parties, JU est toujours là, la préférence de résolution aussi — zéro erreur console.',
+    ],
+  },
+  {
     date: '07/09/2026 15:04',
     title: 'LE FANTÔME PARTAGÉ : la course du détenteur de chaque record, servie à tous — en salle, au palmarès, au rejeu',
     notes: [

@@ -8,6 +8,7 @@ import {
   CLES_PROGRESSION,
   Coffre,
   FORMAT_COFFRE,
+  balaieHeritage,
   cleEmplacement,
   litDocument,
   migreHeritage,
@@ -92,13 +93,44 @@ describe('Le coffre — trois emplacements', () => {
     expect(Object.keys(doc.cles).sort()).toEqual(
       ['projet21.registres.v1', 'sujet21-run-v1', 'sujet21-trophees'].sort(),
     )
-    // les clés d'origine restent une version (filet), et la migration ne se rejoue pas :
-    // l'emplacement 1 vidé puis un coffre neuf → toujours vide
+    // les clés d'origine restent CE démarrage-là (filet) : le suivant les balaie,
+    // et la migration ne se rejoue pas
     expect(dos.getItem('projet21.registres.v1')).not.toBeNull()
-    c.efface(1)
     const { c: c2 } = neuf(dos)
-    expect(c2.resume(1).vide).toBe(true)
+    expect(c2.resume(1).operateur).toBe('JU')
+    expect(dos.getItem('projet21.registres.v1')).toBeNull()
+    expect(dos.getItem('sujet21-trophees')).toBeNull()
+    expect(dos.getItem('sujet21-run-v1')).toBeNull()
+    // les préférences et les brouillons ne sont pas balayés
+    expect(dos.getItem('sujet21-res')).toBe('faible')
+    expect(dos.getItem('projet21.editeur.v1')).toBe('{}')
+    // l'emplacement 1 vidé puis un coffre neuf → toujours vide, rien ne revient
+    c2.efface(1)
+    const { c: c3 } = neuf(dos)
+    expect(c3.resume(1).vide).toBe(true)
     expect(migreHeritage(dos, HORLOGE(), 'x')).toBe(0)
+  })
+
+  it('le balayage n’a lieu que sous la preuve d’un emplacement 1 lisible — jamais sur un document cassé ni avant la migration', () => {
+    // avant toute migration : rien ne bouge
+    const dos = stockageMemoire()
+    dos.setItem('projet21.registres.v1', registres('JU'))
+    expect(balaieHeritage(dos)).toBe(0)
+    expect(dos.getItem('projet21.registres.v1')).not.toBeNull()
+    // migré, mais l'emplacement 1 est un texte tronqué : les sources restent
+    neuf(dos)
+    dos.setItem(cleEmplacement(1), '{"format":1,"cles":{"projet21.registres.v1":"…')
+    expect(balaieHeritage(dos)).toBe(0)
+    expect(dos.getItem('projet21.registres.v1')).not.toBeNull()
+    const { c } = neuf(dos)
+    expect(dos.getItem('projet21.registres.v1')).not.toBeNull()
+    expect(c.resume(1).vide).toBe(true) // le document cassé se lit vide, sans écraser les sources
+    // l'emplacement 1 relisible : le balayage passe, et ne compte que ce qu'il efface
+    dos.setItem(cleEmplacement(1), JSON.stringify({ format: 1, majAt: '', machine: '', cles: { 'projet21.registres.v1': registres('JU') } }))
+    dos.setItem('sujet21-eveil-v3', '1')
+    expect(balaieHeritage(dos)).toBe(2)
+    expect(balaieHeritage(dos)).toBe(0)
+    expect(dos.getItem('sujet21-eveil-v3')).toBeNull()
   })
 
   it('l’héritage ne touche pas un coffre qui a déjà un emplacement', () => {
