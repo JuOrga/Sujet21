@@ -214,6 +214,14 @@ export class FluidSim {
   // et l'hydrophile — le tableau des règles se joue à l'échelle du PALET.
   private readonly icePhobe: Int32Array
   private readonly icePhile: Int32Array
+  // Poussées de contact du pas (écart entre la position prédite et la
+  // prédiction rigide) : la somme, et la plus grande (vecteur et norme²).
+  // Voir la remise en forme rigide dans icePass.
+  private readonly icePushSumX: Float32Array
+  private readonly icePushSumY: Float32Array
+  private readonly icePushX: Float32Array
+  private readonly icePushY: Float32Array
+  private readonly icePushMax: Float32Array
   // Étiquettes des amas de GLACE, en CACHE : la structure d'un bloc rigide
   // ne change que sur un événement (gel, dégel, retrait) ou une fusion de
   // blocs — refaire le parcours en profondeur à chaque pas était LE poste
@@ -405,6 +413,11 @@ export class FluidSim {
     this.iceOmega = new Float32Array(capacity)
     this.icePhobe = new Int32Array(capacity)
     this.icePhile = new Int32Array(capacity)
+    this.icePushSumX = new Float32Array(capacity)
+    this.icePushSumY = new Float32Array(capacity)
+    this.icePushX = new Float32Array(capacity)
+    this.icePushY = new Float32Array(capacity)
+    this.icePushMax = new Float32Array(capacity)
     this.iceLabels = new Int32Array(capacity)
     this.compScratch = new Int32Array(capacity)
     this.relabelScratch = new Int32Array(2048)
@@ -3303,6 +3316,12 @@ export class FluidSim {
     this.iceOmega.fill(0, 0, comps)
     this.icePhobe.fill(0, 0, comps)
     this.icePhile.fill(0, 0, comps)
+    this.icePushSumX.fill(0, 0, comps)
+    this.icePushSumY.fill(0, 0, comps)
+    this.icePushX.fill(0, 0, comps)
+    this.icePushY.fill(0, 0, comps)
+    this.icePushMax.fill(0, 0, comps)
+    const { posX, posY } = this
 
     // 1. masse, centre de masse, vitesse moyenne, et point de contact moyen
     for (let i = 0; i < n; i++) {
@@ -3313,6 +3332,18 @@ export class FluidSim {
       this.iceCxSum[c] += prdX[i]
       this.iceCySum[c] += prdY[i]
       this.iceCnt[c]++
+      // la poussée subie par cette particule (obstacles, bords, éponge) :
+      // tout ce qui l'a écartée de la prédiction rigide pos + v·dt
+      const pushX = prdX[i] - posX[i] - velX[i] * dt
+      const pushY = prdY[i] - posY[i] - velY[i] * dt
+      const push2 = pushX * pushX + pushY * pushY
+      this.icePushSumX[c] += pushX
+      this.icePushSumY[c] += pushY
+      if (push2 > this.icePushMax[c]) {
+        this.icePushMax[c] = push2
+        this.icePushX[c] = pushX
+        this.icePushY[c] = pushY
+      }
       if (this.contactMat[i] >= 0) {
         // CODEX : la glace consigne aussi ses contacts (matériau × état 1)
         this.codexContacts[this.contactMat[i] * 3 + 1] = 1
@@ -3417,8 +3448,16 @@ export class FluidSim {
 
       this.iceVxSum[c] = vx // réutilisés : mouvement final du bloc
       this.iceVySum[c] = vy
-      this.iceCxSum[c] = cx
-      this.iceCySum[c] = cy
+      // LE BLOC RESTE RIGIDE EN POSITION AUSSI. Les contacts ont poussé ses
+      // particules une à une (chacune hors de SA paroi, de SA profondeur) :
+      // à chaque choc, le premier rang se tassait sur le reste, et rien ne
+      // le redressait — la pression ignore le gel. Ici on retire ces
+      // poussées et on déplace le bloc D'UN SEUL TENANT, de la plus grande
+      // d'entre elles : la particule la plus enfoncée ressort, les autres
+      // suivent sans se rapprocher. Le centre suit le même chemin.
+      const cnt1 = 1 / cnt
+      this.iceCxSum[c] = cx - this.icePushSumX[c] * cnt1 + this.icePushX[c]
+      this.iceCySum[c] = cy - this.icePushSumY[c] * cnt1 + this.icePushY[c]
       this.iceOmega[c] = omega
     }
 
@@ -3440,13 +3479,32 @@ export class FluidSim {
       this.gelAngle = 0
     }
 
-    // 3. projection sur un mouvement de corps rigide : translation + rotation
+    // 3. projection sur un mouvement de corps rigide : translation + rotation.
+    //    La rotation est EXACTE, pas tangente : la vitesse ω × r intégrée
+    //    sur un pas allonge le rayon de √(1 + (ω·dt)²) à chaque pas — un
+    //    palet à 8 rad/s enflait de moitié en 4 s, jusqu'à ce que ses
+    //    particules dépassent le rayon de liaison : il ÉCLATAIT (mesuré :
+    //    47 amas après quelques rebonds, puis dégel des éclats détachés du
+    //    corps). On vise donc la position tournée de ω·dt, sur le cercle.
+    for (let c = 0; c < comps; c++) {
+      const th = this.iceOmega[c] * dt
+      this.icePushSumX[c] = (Math.cos(th) - 1) / dt // réutilisés : la
+      this.icePushSumY[c] = Math.sin(th) / dt // rotation exacte du pas
+    }
     for (let i = 0; i < n; i++) {
       if (frozen[i] === 0) continue
       const c = labels[i]
-      const w = this.iceOmega[c]
-      velX[i] = this.iceVxSum[c] - w * (prdY[i] - this.iceCySum[c])
-      velY[i] = this.iceVySum[c] + w * (prdX[i] - this.iceCxSum[c])
+      // remise en forme : la prédiction rigide, puis le déplacement du bloc
+      const px = posX[i] + velX[i] * dt + this.icePushX[c]
+      const py = posY[i] + velY[i] * dt + this.icePushY[c]
+      prdX[i] = px
+      prdY[i] = py
+      const rx = px - this.iceCxSum[c]
+      const ry = py - this.iceCySum[c]
+      const cm1 = this.icePushSumX[c]
+      const sn = this.icePushSumY[c]
+      velX[i] = this.iceVxSum[c] + cm1 * rx - sn * ry
+      velY[i] = this.iceVySum[c] + sn * rx + cm1 * ry
     }
   }
 
