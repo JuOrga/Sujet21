@@ -2118,6 +2118,9 @@ let pousseeFantome: number | null = null
 // ce qui vient d'être dessiné (position écran, rayon) : lu par la sonde de test
 let fantomesDessines: { cat: CategorieFantome; sx: number; sy: number; r: number }[] = []
 function armeFantomes(): void {
+  // le jeton monte à CHAQUE armement, sorties anticipées comprises : la
+  // réponse du palmarès d'une salle quittée ne se pose ni au hub ni à l'essai
+  fantomesJeton++
   fantomeRec = null
   fantomesLus = []
   fantomesFx = []
@@ -2141,7 +2144,7 @@ function armeFantomes(): void {
   // ce n'est pas déjà l'une des miennes — elle arrive après l'entrée, le
   // temps d'une lecture, et seulement si l'on est toujours dans cette salle
   if (!fantomesPartagesVoulus || !fantomesVisibles) return
-  const jeton = ++fantomesJeton
+  const jeton = fantomesJeton
   const code = level.code
   void fetchFantomesPartages(code).then((p) => {
     if (!p || jeton !== fantomesJeton || rejeu) return
@@ -3099,6 +3102,8 @@ const codexEl = document.getElementById('codex') as HTMLDivElement
 // L'ÉCRAN DU CODEX (game/ecranCodex.ts) : la maquette « Codex v2 » — il ne
 // connaît pas les registres, il reçoit ce qu'il lit par ces crochets
 const ecranCodex = new EcranCodex(codexEl, {
+  // les objectifs suivis sont de la progression : l'emplacement de sauvegarde
+  stockage: coffre.stockage,
   connu: (id) => codex.connu(id),
   quand: (id) => codex.quand(id),
   lu: (d) => codexLu(d),
@@ -8659,6 +8664,9 @@ interface Rejeu {
   vitesse: number
   pause: boolean
   partage: boolean // une course du palmarès partagé, pas l'une des miennes
+  niveau: LevelDef // la salle regardée : un restart vers une autre salle met fin au rejeu
+  // la run en cours, mise de côté le temps du rejeu et rendue à la sortie
+  sauve: { bonbonneLiters: number; runTime: number }
   dernier: EchantillonFantome | null // où la caméra reste quand le fantôme a bu le sas
 }
 let rejeu: Rejeu | null = null
@@ -8691,7 +8699,19 @@ function lanceRejeu(code: string, cat: CategorieFantome, defDonnee?: FantomeDef)
   const def = defDonnee ?? fantomes.pour(code)[cat]
   if (!lv || !def) return
   recordsEl.hidden = true
-  rejeu = { code, cat, lecteur: new LecteurFantome(def), vitesse: 1, pause: false, partage: !!defDonnee, dernier: null }
+  rejeu = {
+    code,
+    cat,
+    lecteur: new LecteurFantome(def),
+    vitesse: 1,
+    pause: false,
+    partage: !!defDonnee,
+    niveau: lv,
+    // RECORDS s'ouvre aussi en pleine expédition : la réserve et l'horloge de
+    // la run ne doivent pas se perdre dans un rejeu
+    sauve: { bonbonneLiters: run.bonbonneLiters, runTime: run.runTime },
+    dernier: null,
+  }
   testLevel = lv
   testQueue = []
   fromEditor = false
@@ -8708,11 +8728,22 @@ function lanceRejeu(code: string, cat: CategorieFantome, defDonnee?: FantomeDef)
   majBarreRejeu()
   rejeuBarre.hidden = false
 }
-function quitteRejeu(): void {
+/** La fin du rejeu, quel que soit le chemin : la barre tombe, la run
+ *  retrouve sa réserve et son horloge. Appelée par QUITTER — et par restart()
+ *  quand une AUTRE salle se charge (le hub, l'éditeur, l'éveil rejoué) : sans
+ *  ça, on arrivait au hub sans corps, la simulation figée, avec la barre du
+ *  rejeu encore à l'écran. */
+function finRejeu(): void {
   if (!rejeu) return
+  run.bonbonneLiters = rejeu.sauve.bonbonneLiters
+  run.runTime = rejeu.sauve.runTime
   rejeu = null
   rejeuBarre.hidden = true
   document.body.classList.remove('rejeu')
+}
+function quitteRejeu(): void {
+  if (!rejeu) return
+  finRejeu()
   testLevel = null
   openHome()
   restart()
@@ -12609,6 +12640,9 @@ function annonceVoieCarte(): void {
 }
 
 function restart(): void {
+  // un rejeu ne survit qu'à SA salle : toute autre salle chargée y met fin
+  // (avant sauveRun, qui graverait sinon une réserve à zéro)
+  if (rejeu && testLevel !== rejeu.niveau) finRejeu()
   run.exitTimer = 0
   run.tableauTime = 0
   // remis à zéro AVEC l'horloge qu'il mesure : sans cela, après un versement
@@ -15137,8 +15171,12 @@ function frame(now: number): void {
           // LE FANTÔME DU PALMARÈS : en tête du volume ou du chrono, la
           // trace part pour tous — le serveur ne la garde que si elle bat
           // celle en place (la même règle que les registres)
+          // — et seulement quand le record LOCAL vient de tomber : un
+          // détenteur qui refait sa salle sans la battre n'envoie rien (chaque
+          // envoi refusé coûterait une lecture fraîche au magasin)
           if (traceCourse) {
             for (const cat of ['volume', 'chrono'] as const) {
+              if (!(cat === 'volume' ? newVolume : newChrono)) continue
               const tete = b.tops?.[level.code]?.[cat]?.[0]
               if (tete && tete.name === records.operator())
                 void pushFantomePartage(level.code, cat, traceCourse)

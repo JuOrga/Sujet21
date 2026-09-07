@@ -211,6 +211,15 @@ describe('Le coffre — trois emplacements', () => {
     d.stockage.setItem('projet21.registres.v1', registres('AVANT'))
     expect(d.importe(1, fichier)).toBe(true)
     expect(d.stockage.getItem('projet21.registres.v1')).toBe(registres('PORTE'))
+    // un document PLUS RÉCENT importé dans l'actif : la mémoire garde l'ancienne
+    // partie, mais l'écriture se verrouille — rien n'écrase le fichier importé
+    const { dos: dosF, c: f } = neuf()
+    f.stockage.setItem('projet21.registres.v1', registres('VIEILLE'))
+    const futur = JSON.stringify({ format: FORMAT_COFFRE + 1, majAt: '', machine: 'deck', cles: { 'projet21.registres.v1': registres('FUTUR') } })
+    expect(f.importe(1, futur)).toBe(true)
+    f.stockage.setItem('sujet21-eveil-v3', '1') // une écriture entre l'import et le rechargement
+    f.stockage.removeItem('projet21.registres.v1')
+    expect(dosF.getItem(cleEmplacement(1))).toBe(futur)
   })
 
   it('effacer l’actif vide aussi la mémoire : les modules continuent sur du vide', () => {
