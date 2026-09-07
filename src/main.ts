@@ -319,7 +319,13 @@ import {
   profilDe,
   type CategorieFantome,
   type EchantillonFantome,
+  type FantomeDef,
 } from './game/fantome'
+import {
+  fetchFantomesPartages,
+  fetchIndexFantomes,
+  pushFantomePartage,
+} from './game/netFantomes'
 import {
   fichePupitre,
   plaquePupitre,
@@ -2099,9 +2105,14 @@ const trophees = new Trophees(coffre.stockage)
 // Steam Cloud synchronise.
 const fantomes = new Fantomes(coffre.stockage)
 let fantomeRec: EnregistreurFantome | null = null
-let fantomesLus: { cat: CategorieFantome; lecteur: LecteurFantome }[] = []
+let fantomesLus: { cat: CategorieFantome; lecteur: LecteurFantome; partage?: boolean }[] = []
+// chaque armement a son jeton : la réponse du palmarès d'une salle quittée
+// entre-temps ne se pose pas dans la suivante
+let fantomesJeton = 0
 // le réglage de l'appareil : voir ou non les fantômes (PARAMÈTRES)
 let fantomesVisibles = localStorage.getItem('sujet21-fantomes') !== 'off'
+// TOUS : les miens et ceux du palmarès partagé ; LES MIENS : sans le palmarès
+let fantomesPartagesVoulus = localStorage.getItem('sujet21-fantomes') !== 'miens'
 // la direction de poussée du pas en cours (null : le joueur n'éjecte pas)
 let pousseeFantome: number | null = null
 // ce qui vient d'être dessiné (position écran, rayon) : lu par la sonde de test
@@ -2126,6 +2137,22 @@ function armeFantomes(): void {
   // la même course détient les deux records : une seule silhouette
   const meme = f.volume && f.chrono && f.volume.donnees === f.chrono.donnees
   if (f.chrono && !meme) fantomesLus.push({ cat: 'chrono', lecteur: new LecteurFantome(f.chrono) })
+  // LE PALMARÈS : la course du détenteur de chaque record partagé, quand
+  // ce n'est pas déjà l'une des miennes — elle arrive après l'entrée, le
+  // temps d'une lecture, et seulement si l'on est toujours dans cette salle
+  if (!fantomesPartagesVoulus || !fantomesVisibles) return
+  const jeton = ++fantomesJeton
+  const code = level.code
+  void fetchFantomesPartages(code).then((p) => {
+    if (!p || jeton !== fantomesJeton || rejeu) return
+    const dejaLa = new Set(fantomesLus.map((l) => l.lecteur.def.donnees))
+    for (const cat of ['volume', 'chrono'] as const) {
+      const d = p[cat]
+      if (!d || dejaLa.has(d.donnees)) continue
+      dejaLa.add(d.donnees)
+      fantomesLus.push({ cat, lecteur: new LecteurFantome(d), partage: true })
+    }
+  })
 }
 /** Au pas de simulation : un échantillon par cran de cadence, pas plus —
  *  le parcours des particules n'a lieu que dix fois par seconde simulée. */
@@ -2405,7 +2432,9 @@ function renderRecordsVoile(): void {
     if (!board) {
       recordsCorps.innerHTML =
         '<div class="rec-vide">Palmarès injoignable (hors ligne ou serveur local).</div>' +
-        blocFantomes()
+        blocFantomes() +
+        '<div id="rec-fant-palmares"></div>'
+      remplitPalmaresFantomes()
       return
     }
     const moi = records.operator()
@@ -2449,6 +2478,7 @@ function renderRecordsVoile(): void {
     }
     html += '</div>'
     html += blocFantomes()
+    html += '<div id="rec-fant-palmares"></div>'
     const tops = board.tops ?? {}
     for (const lv of playedLevels()) {
       const t = tops[lv.code]
@@ -2483,6 +2513,7 @@ function renderRecordsVoile(): void {
       html += '</div>'
     }
     recordsCorps.innerHTML = html || '<div class="rec-vide">Aucune salle.</div>'
+    remplitPalmaresFantomes()
   })
 }
 /** VOS FANTÔMES : une ligne par salle, un bouton par course — ▶ lance le rejeu. */
@@ -2503,10 +2534,45 @@ function blocFantomes(): string {
   }
   return h + '</div>'
 }
+/** FANTÔMES DU PALMARÈS : la course du détenteur de chaque record partagé,
+ *  à rejouer — l'index se lit en une fois, la trace au clic. */
+function remplitPalmaresFantomes(): void {
+  const hote = document.getElementById('rec-fant-palmares')
+  if (!hote) return
+  void fetchIndexFantomes().then((index) => {
+    if (!index || hote !== document.getElementById('rec-fant-palmares')) return
+    const codes = Object.keys(index)
+    if (codes.length === 0) return
+    let h = '<div class="rec-salle">FANTÔMES DU PALMARÈS — la course de chaque record partagé</div><div class="rec-fantomes">'
+    for (const code of codes) {
+      const lv = levelParCode(code)
+      h += `<div class="rec-fant"><span class="code">${htmlSafe(code)}${lv ? ` — ${htmlSafe(lv.name)}` : ' — salle inconnue'}</span>`
+      for (const cat of ['volume', 'chrono'] as const) {
+        const m = index[code][cat]
+        if (!m) continue
+        h += `<button type="button" class="rec-rejouer" data-partage="1" data-code="${htmlSafe(code)}" data-cat="${cat}"${lv ? '' : ' disabled'}>▶ ${cat === 'volume' ? 'VOLUME' : 'CHRONO'} · ${htmlSafe(m.nom || 'anonyme')} · ${fmtL(m.litres)} · ${fmtDuree(m.temps)}</button>`
+      }
+      h += '</div>'
+    }
+    hote.innerHTML = h + '</div>'
+  })
+}
 recordsCorps.addEventListener('click', (e) => {
   const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button.rec-rejouer')
   if (!b || b.disabled) return
-  lanceRejeu(b.dataset.code ?? '', (b.dataset.cat as CategorieFantome) ?? 'volume')
+  const code = b.dataset.code ?? ''
+  const cat = (b.dataset.cat as CategorieFantome) ?? 'volume'
+  if (b.dataset.partage) {
+    // la trace du palmarès se lit au clic : elle pèse, on ne la lit pas pour rien
+    b.disabled = true
+    void fetchFantomesPartages(code).then((p) => {
+      b.disabled = false
+      const def = p?.[cat]
+      if (def) lanceRejeu(code, cat, def)
+    })
+    return
+  }
+  lanceRejeu(code, cat)
 })
 document.getElementById('home-records')?.addEventListener('click', () => {
   recordsEl.hidden = false
@@ -3641,16 +3707,19 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
   if (choixFantomes) {
     const renderFantomes = (): void => {
       choixFantomes.innerHTML = ''
-      for (const [visibles, cle, label] of [
-        [true, 'on', 'VISIBLES'],
-        [false, 'off', 'MASQUÉS'],
+      const courant = !fantomesVisibles ? 'off' : fantomesPartagesVoulus ? 'on' : 'miens'
+      for (const [cle, label] of [
+        ['on', 'TOUS'],
+        ['miens', 'LES MIENS'],
+        ['off', 'MASQUÉS'],
       ] as const) {
         const b = document.createElement('button')
         b.type = 'button'
         b.textContent = label
-        b.className = fantomesVisibles === visibles ? 'actif' : ''
+        b.className = courant === cle ? 'actif' : ''
         b.addEventListener('click', () => {
-          fantomesVisibles = visibles
+          fantomesVisibles = cle !== 'off'
+          fantomesPartagesVoulus = cle === 'on'
           localStorage.setItem('sujet21-fantomes', cle)
           renderFantomes()
         })
@@ -8573,6 +8642,7 @@ interface Rejeu {
   lecteur: LecteurFantome
   vitesse: number
   pause: boolean
+  partage: boolean // une course du palmarès partagé, pas l'une des miennes
   dernier: EchantillonFantome | null // où la caméra reste quand le fantôme a bu le sas
 }
 let rejeu: Rejeu | null = null
@@ -8598,14 +8668,14 @@ function majBarreRejeu(): void {
   }
   const titre = document.getElementById('rejeu-titre')
   if (titre)
-    titre.textContent = `REJEU · ${rejeu.cat === 'volume' ? 'VOLUME' : 'CHRONO'}${rejeu.lecteur.def.nom ? ` · ${rejeu.lecteur.def.nom}` : ''}`
+    titre.textContent = `REJEU${rejeu.partage ? ' · PALMARÈS' : ''} · ${rejeu.cat === 'volume' ? 'VOLUME' : 'CHRONO'}${rejeu.lecteur.def.nom ? ` · ${rejeu.lecteur.def.nom}` : ''}`
 }
-function lanceRejeu(code: string, cat: CategorieFantome): void {
+function lanceRejeu(code: string, cat: CategorieFantome, defDonnee?: FantomeDef): void {
   const lv = levelParCode(code)
-  const def = fantomes.pour(code)[cat]
+  const def = defDonnee ?? fantomes.pour(code)[cat]
   if (!lv || !def) return
   recordsEl.hidden = true
-  rejeu = { code, cat, lecteur: new LecteurFantome(def), vitesse: 1, pause: false, dernier: null }
+  rejeu = { code, cat, lecteur: new LecteurFantome(def), vitesse: 1, pause: false, partage: !!defDonnee, dernier: null }
   testLevel = lv
   testQueue = []
   fromEditor = false
@@ -8703,8 +8773,9 @@ function drawFantomes(vw: number, vh: number, dpr: number): void {
   ]
   const maintenant = performance.now() / 1000
   const hud: string[] = []
-  fantomesLus.forEach(({ cat, lecteur }, idx) => {
-    const teinteCat = cat === 'volume' ? '120,200,255' : '255,214,120'
+  fantomesLus.forEach(({ cat, lecteur, partage }, idx) => {
+    const teinteCat = partage ? '255,214,120' : cat === 'volume' ? '120,200,255' : '160,225,190'
+    const prefixe = partage ? 'PALMARÈS ' : ''
     // ---- la ligne de course : un point sur k, colorée par état
     const pts = lecteur.pts
     if (pts.length > 1) {
@@ -8751,7 +8822,7 @@ function drawFantomes(vw: number, vh: number, dpr: number): void {
     fantomesEtat[idx] = e ? e.etat : -1
     // ---- l'écart au fantôme, dans le HUD
     const nom = lecteur.def.nom ? ` ${htmlSafe(lecteur.def.nom)}` : ''
-    const etiquette = `<b>${cat === 'volume' ? 'VOLUME' : 'CHRONO'}${nom}</b>`
+    const etiquette = `<b>${prefixe}${cat === 'volume' ? 'VOLUME' : 'CHRONO'}${nom}</b>`
     if (rejeu) {
       const txt = `${fmtDuree(Math.min(t, lecteur.duree))} / ${fmtDuree(lecteur.duree)}`
       if (rejeuTemps.textContent !== txt) rejeuTemps.textContent = txt
@@ -8839,7 +8910,7 @@ function drawFantomes(vw: number, vh: number, dpr: number): void {
     g.textAlign = 'center'
     g.fillStyle = `rgba(${teinteCat},0.75)`
     const qui = lecteur.def.nom ? ` · ${lecteur.def.nom}` : ''
-    g.fillText(`${cat === 'volume' ? 'VOLUME' : 'CHRONO'}${qui}`, sx, sy - rayonMax - 6)
+    g.fillText(`${prefixe}${cat === 'volume' ? 'VOLUME' : 'CHRONO'}${qui}`, sx, sy - rayonMax - 6)
   })
   fantomesT = t
   // ---- les effets éphémères : 0,7 s de vie en temps réel
@@ -8878,7 +8949,7 @@ function drawFantomes(vw: number, vh: number, dpr: number): void {
     }
   }
   if (hudFantome) {
-    const html = hud.join('   ')
+    const html = hud.slice(0, 2).join('   ')
     if (hudFantome.innerHTML !== html) hudFantome.innerHTML = html
   }
 }
@@ -15009,11 +15080,13 @@ function frame(now: number): void {
     const { newVolume, newChrono } = sasOutil
       ? { newVolume: false, newChrono: false }
       : records.noteCollection(level.code, surplus, run.tableauTime)
-    // le record tombe : sa trace devient le fantôme de la salle
-    if (fantomeRec && (newVolume || newChrono)) {
-      const trace = fantomeRec.fin(records.operator(), surplus, run.tableauTime)
-      if (newVolume) fantomes.pose(level.code, 'volume', trace)
-      if (newChrono) fantomes.pose(level.code, 'chrono', trace)
+    // la trace de la course : le record local qui tombe la range, et la
+    // tête du palmarès partagé (plus bas) l'envoie à tous
+    const traceCourse =
+      fantomeRec && !sasOutil ? fantomeRec.fin(records.operator(), surplus, run.tableauTime) : null
+    if (traceCourse) {
+      if (newVolume) fantomes.pose(level.code, 'volume', traceCourse)
+      if (newChrono) fantomes.pose(level.code, 'chrono', traceCourse)
     }
     fantomeRec = null
     // LA MÉMOIRE se grave à chaque sas — l'information survit à la purge :
@@ -15045,6 +15118,16 @@ function frame(now: number): void {
           const top = b.tops?.[level.code]?.note?.[0]
           if (top && top.name === records.operator())
             trophees.debloque('ligne-de-crete')
+          // LE FANTÔME DU PALMARÈS : en tête du volume ou du chrono, la
+          // trace part pour tous — le serveur ne la garde que si elle bat
+          // celle en place (la même règle que les registres)
+          if (traceCourse) {
+            for (const cat of ['volume', 'chrono'] as const) {
+              const tete = b.tops?.[level.code]?.[cat]?.[0]
+              if (tete && tete.name === records.operator())
+                void pushFantomePartage(level.code, cat, traceCourse)
+            }
+          }
         }
       })
     // sous un outil, la salle peut n'avoir aucun record : le bilan le dit

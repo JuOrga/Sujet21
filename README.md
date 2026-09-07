@@ -53,7 +53,8 @@ code pas), accueil, les SAUVEGARDES (trois emplacements, un document par
 emplacement fait pour le Steam Cloud — `src/game/coffre.ts`), les FANTÔMES
 (vos records rejoués dans la salle : la forme du corps, le jet, les dashs,
 la ligne de course et l'écart en direct — `src/game/fantome.ts` — et le
-REJEU depuis l'écran des records, la salle sans corps et la caméra qui suit),
+REJEU depuis l'écran des records, la salle sans corps et la caméra qui suit,
+et le fantôme PARTAGÉ du palmarès — `api/fantomes.ts`, `src/game/netFantomes.ts`),
 notes de version, palmarès partagé, le codex (rail des
 états, fiches en hexagones, fiche lue avec la vidéo de l'effet quand elle
 existe — `public/assets/codex/LISEZ-MOI.md`), cycle.

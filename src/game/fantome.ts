@@ -382,7 +382,26 @@ interface StockageFantomes {
   setItem(k: string, v: string): void
 }
 
-function litFantome(brut: unknown): FantomeDef | null {
+/** LA RÈGLE DU PALMARÈS : le nouveau fantôme prend-il la place de l'ancien ?
+ *  Le VOLUME : plus de litres, à égalité le plus rapide. Le CHRONO : plus
+ *  rapide, à égalité le plus de litres. Sans ancien, oui. La même règle
+ *  vaut côté serveur (api/fantomes.ts) — la copier là-bas plutôt que
+ *  d'importer le jeu depuis l'API. */
+export function batLeFantome(
+  cat: CategorieFantome,
+  nouveau: { litres: number; temps: number },
+  ancien: { litres: number; temps: number } | null | undefined,
+): boolean {
+  if (!ancien) return true
+  if (cat === 'volume')
+    return nouveau.litres > ancien.litres || (nouveau.litres === ancien.litres && nouveau.temps < ancien.temps)
+  return nouveau.temps < ancien.temps || (nouveau.temps === ancien.temps && nouveau.litres > ancien.litres)
+}
+
+/** Lit un fantôme tel qu'écrit (rangement local ou magasin partagé) :
+ *  null si ce n'en est pas un. Tolérant sur les nombres, strict sur la
+ *  version et la trace. */
+export function litFantomeDef(brut: unknown): FantomeDef | null {
   if (typeof brut !== 'object' || brut === null) return null
   const o = brut as Record<string, unknown>
   if ((o.v !== 1 && o.v !== 2) || typeof o.donnees !== 'string') return null
@@ -415,8 +434,8 @@ export class Fantomes {
         for (const [code, salle] of Object.entries(brut as Record<string, unknown>)) {
           if (typeof salle !== 'object' || salle === null) continue
           const s = salle as Record<string, unknown>
-          const volume = litFantome(s.volume)
-          const chrono = litFantome(s.chrono)
+          const volume = litFantomeDef(s.volume)
+          const chrono = litFantomeDef(s.chrono)
           if (volume || chrono) {
             this.table[code] = {}
             if (volume) this.table[code].volume = volume

@@ -31,6 +31,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '07/09/2026 15:04',
+    title: 'LE FANTÔME PARTAGÉ : la course du détenteur de chaque record, servie à tous — en salle, au palmarès, au rejeu',
+    notes: [
+      'LA DEMANDE : « enchaîne sur le fantôme partagé ». Jusqu’ici, un fantôme n’était que le mien ; le voici accroché au PALMARÈS partagé : la course qui tient le record de volume, celle qui tient le chrono, pour tout le monde.',
+      'LA ROUTE (api/fantomes.ts, sur le magasin Blob comme les records) : un document par salle (le volume et le chrono, traces comprises — une centaine de Ko) et un INDEX (par salle, qui tient quoi, sans les traces) pour que l’écran des records liste tout en UNE lecture. La règle est celle des registres, le meilleur gagne : le volume d’abord et le temps départage, le chrono d’abord et les litres départagent — une trace qui ne bat pas celle en place ne s’écrit pas, c’est ce qui rend l’écriture RARE sous le régime d’opérations du magasin (chaque prise de record coûte deux documents, six opérations). Une trace de plus de 400 Ko est refusée. La règle est copiée côté jeu (batLeFantome, testée) plutôt que d’importer le jeu depuis l’API.',
+      'CÔTÉ JEU (game/netFantomes.ts, testé, à travers la cloison réseau) : la lecture d’une salle, de l’index, et l’envoi. AU SAS : la trace de la course se calcule une fois — le record local qui tombe la range, et si le palmarès partagé me met EN TÊTE du volume ou du chrono, elle part pour tous (le serveur revérifie). EN SALLE : après les miens, le palmarès se lit — la course arrive après l’entrée, le temps d’une lecture, seulement si l’on est toujours dans cette salle (un jeton par armement), et seulement si ce n’est pas déjà l’une des miennes (même trace). Elle se dessine avec l’étiquette « PALMARÈS VOLUME · ZED » en doré ; le HUD garde deux lignes au plus, les miennes d’abord.',
+      'L’ÉCRAN DES RECORDS : un bloc FANTÔMES DU PALMARÈS sous les miens, rempli après lecture de l’index ; ▶ lit la trace au clic (elle pèse, on ne la lit pas pour rien) et lance le rejeu, titré « REJEU · PALMARÈS · VOLUME · ZED ». PARAMÈTRES › LES FANTÔMES passe à trois états : TOUS (les miens et le palmarès), LES MIENS, MASQUÉS.',
+      'VÉRIFIÉ : 979 tests verts dans 88 fichiers (4 neufs : la lecture tolérante de l’index et d’une salle, les lectures par la cloison avec le code et le repli hors ligne, l’envoi et son refus, la règle du palmarès dans les deux catégories), type-check à 0, l’API type-checkée à part, build propre. Au navigateur (Chromium, jeu construit, l’API simulée par Playwright) : la course de ZED lue à l’entrée de 21-01 et ajoutée aux miennes (HUD « PALMARÈS VOLUME ZED −0,1 s · +1,70 L »), l’écran des records qui la liste après l’index, ▶ qui lit la trace et lance le rejeu titré PALMARÈS avec zéro particule — trois appels à l’API, zéro erreur console. Non vu d’ici : le magasin Blob réel (l’environnement ne le joint pas) — à contrôler en prévisualisation avec deux postes.',
+    ],
+  },
+  {
     date: '07/09/2026 14:43',
     title: 'LE REJEU : regarder une course depuis l’écran des records — la salle sans corps, la caméra qui suit, la vitesse au choix',
     notes: [
