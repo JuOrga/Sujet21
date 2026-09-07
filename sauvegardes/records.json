@@ -199,6 +199,11 @@
       "liters": 4.26,
       "time": 198.6,
       "name": "BOIZ"
+    },
+    "G-100-94VT~1K74G": {
+      "liters": 3.12,
+      "time": 29.4,
+      "name": "JU"
     }
   },
   "expedition": {
@@ -1433,6 +1438,35 @@
           "name": "BOIZ",
           "note": 99,
           "quand": "2026-08-31T01:31:45.559Z"
+        }
+      ]
+    },
+    "G-100-94VT~1K74G": {
+      "volume": [
+        {
+          "liters": 3.12,
+          "time": 29.4,
+          "name": "JU",
+          "note": 209,
+          "quand": "2026-09-06T09:45:27.009Z"
+        }
+      ],
+      "chrono": [
+        {
+          "liters": 3.12,
+          "time": 29.4,
+          "name": "JU",
+          "note": 209,
+          "quand": "2026-09-06T09:45:27.009Z"
+        }
+      ],
+      "note": [
+        {
+          "liters": 3.12,
+          "time": 29.4,
+          "name": "JU",
+          "note": 209,
+          "quand": "2026-09-06T09:45:27.009Z"
         }
       ]
     }
