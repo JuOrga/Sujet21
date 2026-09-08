@@ -1,8 +1,17 @@
 # Projet 21 — assets images à générer par IA
 
 Prompts complets, prêts à copier-coller (en anglais : les générateurs y répondent mieux).
-Une fois générées, déposez les images dans `public/assets/` (ou envoyez-les moi) —
-j'assure l'intégration WebGL (raccords, étirement, animation de l'iris du sas…).
+
+**Avant tout prompt, lire [`charte-visuelle.md`](charte-visuelle.md)** : le monde, la
+lumière, la palette et le préambule commun s'y tiennent une fois pour toutes — chaque
+prompt ci-dessous **commence par ce préambule**, puis ne dit que ce qui est propre à la
+pièce. La référence de style de la famille (§6 de la charte) se passe au générateur avec.
+
+Une fois générées, déposez les sources dans `masters/images/` (même nom, même chemin
+que dans `public/assets/`) et lancez `python3 tools/images/prepare.py` : il livre
+`public/assets/` à la bonne taille et **mesure** l'image (raccord, luminance, palette,
+bord, poids). Une image hors mesure n'est pas livrée. J'assure l'intégration WebGL
+(raccords, étirement, animation de l'iris du sas…).
 
 ## Conseils selon le générateur
 
