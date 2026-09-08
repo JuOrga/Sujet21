@@ -31,6 +31,19 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: 'DATE-A-POSER',
+    title: 'LA CHASSE : un courant de poussée qui éjecte le corps d’une salle — sans le couper comme une porte',
+    notes: [
+      'LA DEMANDE : « pour éjecter le volume jouable, nous pensions utiliser les portes lorsqu’elles s’activent, mais cela ne marche pas bien — que proposes-tu ? » Le diagnostic d’abord : une porte, dans le solveur, est une paroi qui APPARAÎT d’un coup. Les particules prises dedans sont repoussées vers la face la plus proche : un corps à cheval sur la porte est coupé en deux, et le cœur de la boîte part avec une vitesse de contact violente. La porte ne pousse jamais, elle téléporte. D’où la proposition retenue (« ok pour la chasse uniquement ») : un CHAMP DE VITESSES, pas une paroi.',
+      'LA CHASSE (game/level.ts, ChasseDef) : un rectangle droit, une direction en degrés (0 est, 90 nord), une allure. Tant qu’elle souffle, tout ce qui est dedans est entraîné dans sa direction — le même modèle que l’aspiration du sas et le vortex, et pour la même raison : une force pure s’ajouterait à l’élan du corps et le ferait rebondir contre le courant ; l’entraînement vers une vitesse cible l’emporte quoi qu’il faisait avant. Rien n’est déchiré : tout part du même côté, à la même allure. La glace y a prise avec l’inertie d’un bloc, la vapeur suit comme l’eau.',
+      'TROIS FAÇONS DE SOUFFLER, qui se cumulent : PERMANENTE (sans canal — un tapis, un siphon de couloir) ; ASSERVIE (canal ≥ 1 : tant que ses pastilles l’alimentent, la règle ET/OU des portes) ; SCÉNARISÉE (une séquence in-map la déclenche pour une BOUFFÉE de `duree` secondes — l’action « chasse » du montage, nouvelle, qui vise son indice comme la brèche vise une porte ; un événement consommé par le jeu, pas un état).',
+      'L’ALLURE PAR DÉFAUT EST DE 350 u/s, un peu au-dessus de l’aspiration du sas (300). Essayé à 700 : le corps traversait la salle en deux secondes, s’écrasait sur la paroi d’en face et se dispersait — un éjecteur qui tue n’éjecte rien.',
+      'DANS L’ÉDITEUR : un outil CHASSE dans les mécanismes, à côté de la porte. Panneau : direction, allure, canal (0 permanente, −1 séquence seule), règle, durée de bouffée, rectangle. Le calque de jeu la dessine en chevrons qui FILENT dans le sens du souffle quand elle est active, en cadre pointillé et chevrons immobiles quand elle se tait — le sens se lit avant d’y entrer. Le fichier ne porte que ce qui est réglé (les défauts vivent dans le code) ; une chasse asservie à un canal qu’aucune cible ne porte est une erreur, comme pour une porte.',
+      'RELEVÉ EN PASSANT : le calque des mécanismes ne se dessinait que si le tableau avait un laser, une cible, une porte, un rail ou une cachette — un tableau qui n’a QU’une chasse la taisait. Il compte désormais.',
+      'VÉRIFIÉ : 999 tests verts dans 90 fichiers (un fichier neuf, sim/chasse.spec.ts : la goutte balayée sort du rectangle, la direction trigonométrique, l’élan contraire vaincu, rien hors du rectangle, l’allure et son défaut, la glace entraînée avec inertie, un corps à cheval sur le bord qui reste un corps ; l’aller-retour JSON avec bornes remises d’aplomb et taille nulle écartée, la validation du canal ; l’action de séquence), type-check à 0, build propre. Au navigateur (Chromium logiciel, jeu construit) : un tableau d’essai à deux chasses, la permanente en chevrons vifs autour du départ, la scénarisée en cadre pointillé ; aucune erreur console.',
+    ],
+  },
+  {
     date: '08/09/2026 18:59',
     title: 'LE DEHORS SOUS LE PLANCHER : deux ouvertures sur les étoiles (vide, baie vitrée) — et la pastille de champ passe à 6 cL',
     notes: [

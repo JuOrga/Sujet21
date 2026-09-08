@@ -31,7 +31,8 @@ avec juste de quoi redevenir liquide.
 **Le vaisseau.** Des obstacles de chimie, pas de géométrie : parois
 hydrophobes et hydrophiles, éponge à saturation, membranes, rideaux, grilles,
 plaques chaudes et froides, surchauffeurs, évents — et des ouvertures sur le
-dehors, vides ou vitrées, qui montrent les étoiles sous le plancher. Des faisceaux laser, des
+dehors, vides ou vitrées, qui montrent les étoiles sous le plancher. Des chasses,
+courants de poussée qui balaient le corps hors d'une salle. Des faisceaux laser, des
 pastilles mémoire et des portes qui forment une algèbre complète — le cabinet
 logique en fait cinq salles de démonstration sans ajouter un seul mécanisme.
 Des rails à champ qui convoient la vapeur et l'ionisent en plasma.

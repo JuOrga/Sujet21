@@ -47,6 +47,7 @@ import {
   type RailDef,
   type RoleAncre,
 } from '../game/level'
+import { CHASSE_ALLURE_DEFAUT, CHASSE_DUREE_DEFAUT } from '../game/level'
 import {
   ARTICLES_COMPTOIR,
   ROLES_ANCRE,
@@ -293,6 +294,7 @@ type Tool =
   | { kind: 'laser' }
   | { kind: 'cible' }
   | { kind: 'porte' }
+  | { kind: 'chasse' }
   // Le MÉTA : la pastille de condensat (la monnaie de run, bue au contact)
   // et l'emplacement de FIOLE (un seul par tableau)
   | { kind: 'condensat' }
@@ -328,6 +330,7 @@ type Sel =
   | { kind: 'laser'; index: number }
   | { kind: 'cible'; index: number }
   | { kind: 'porte'; index: number }
+  | { kind: 'chasse'; index: number }
   | { kind: 'condensat'; index: number }
   | { kind: 'fiole' }
   | { kind: 'plot'; index: number }
@@ -799,6 +802,7 @@ export class LevelEditor {
     if (s.kind === 'zone') return (this.level.zones ?? [])[s.index] ?? null
     if (s.kind === 'cache') return (this.level.caches ?? [])[s.index] ?? null
     if (s.kind === 'porte') return (this.level.portes ?? [])[s.index] ?? null
+    if (s.kind === 'chasse') return (this.level.chasses ?? [])[s.index] ?? null
     if (s.kind === 'plot') return (this.level.plots ?? [])[s.index] ?? null
     if (s.kind === 'banc') return this.level.bancMemoires ?? null
     if (s.kind === 'pupitre')
@@ -846,6 +850,8 @@ export class LevelEditor {
       Object.assign((this.level.caches ?? [])[s.index], norm)
     else if (s.kind === 'porte')
       Object.assign((this.level.portes ?? [])[s.index], norm)
+    else if (s.kind === 'chasse')
+      Object.assign((this.level.chasses ?? [])[s.index], norm)
     else if (s.kind === 'plot')
       Object.assign((this.level.plots ?? [])[s.index], norm)
     else if (s.kind === 'ancre')
@@ -1265,6 +1271,10 @@ export class LevelEditor {
     const portes = this.level.portes ?? []
     for (let i = portes.length - 1; i >= 0; i--) {
       if (inside(portes[i])) return { kind: 'porte', index: i }
+    }
+    const chasses = this.level.chasses ?? []
+    for (let i = chasses.length - 1; i >= 0; i--) {
+      if (inside(chasses[i])) return { kind: 'chasse', index: i }
     }
     const plots = this.level.plots ?? []
     for (let i = plots.length - 1; i >= 0; i--) {
@@ -3477,6 +3487,18 @@ export class LevelEditor {
       this.commit(
         `Décor « ${DECAL_NOMS[t.sorte] ?? t.sorte} » posé — pur décalque : aucune physique, l'eau passe devant.`,
       )
+    } else if (t.kind === 'chasse') {
+      if (!this.level.chasses) this.level.chasses = []
+      // la poussée part le long du grand côté — vers l'est ou vers le nord ;
+      // le panneau règle le reste
+      this.level.chasses.push({
+        ...r,
+        angle: r.maxX - r.minX >= r.maxY - r.minY ? 0 : 90,
+      })
+      this.sel = { kind: 'chasse', index: this.level.chasses.length - 1 }
+      this.commit(
+        'Chasse posée — PERMANENTE tant qu’elle n’a pas de canal. Direction, allure, canal et bouffée se règlent à droite.',
+      )
     } else if (t.kind === 'porte') {
       if (!this.level.portes) this.level.portes = []
       // asservie au canal de la cible la plus proche — modifiable au panneau
@@ -3541,6 +3563,8 @@ export class LevelEditor {
     else if (s.kind === 'lumiere')
       (this.level.lumieres ?? []).splice(s.index, 1)
     else if (s.kind === 'porte') (this.level.portes ?? []).splice(s.index, 1)
+    else if (s.kind === 'chasse')
+      (this.level.chasses ?? []).splice(s.index, 1)
     else if (s.kind === 'rail') (this.level.rails ?? []).splice(s.index, 1)
     else if (s.kind === 'condensat')
       (this.level.condensats ?? []).splice(s.index, 1)
@@ -3670,6 +3694,10 @@ export class LevelEditor {
       const q = (this.level.portes ?? [])[s.index]
       this.level.portes!.push({ ...q, minX: q.minX + off, maxX: q.maxX + off })
       this.sel = { kind: 'porte', index: this.level.portes!.length - 1 }
+    } else if (s.kind === 'chasse') {
+      const q = (this.level.chasses ?? [])[s.index]
+      this.level.chasses!.push({ ...q, minX: q.minX + off, maxX: q.maxX + off })
+      this.sel = { kind: 'chasse', index: this.level.chasses!.length - 1 }
     } else if (s.kind === 'rail') {
       const r = (this.level.rails ?? [])[s.index]
       this.level.rails!.push({
@@ -3808,6 +3836,7 @@ export class LevelEditor {
         else if (key === 'marchand') this.setTool({ kind: 'marchand' })
         else if (key === 'eclat') this.setTool({ kind: 'eclat' })
         else if (key === 'porte') this.setTool({ kind: 'porte' })
+        else if (key === 'chasse') this.setTool({ kind: 'chasse' })
         else if (key === 'cache') this.setTool({ kind: 'cache' })
         else if (key === 'rail') this.setTool({ kind: 'rail' })
         else if (key === 'lumiere') this.setTool({ kind: 'lumiere' })
@@ -5445,6 +5474,31 @@ export class LevelEditor {
       rows.push(
         `<p class="ed-empty">Un ÉCLAT DE MÉMOIRE : l’information cristallisée. Le contact grave +N mémoire aux registres, UNE FOIS PAR RUN — Recommencer la salle ne le fait pas repousser, la run suivante si. Aux essais d’éditeur, il se prend mais rien ne se grave.</p>`,
       )
+    } else if (s.kind === 'chasse') {
+      const q = (this.level.chasses ?? [])[s.index]
+      rows.push(rangeField('Direction (°) — 0 est, 90 nord', 'p-chang', q.angle, -180, 180, 1))
+      rows.push(numField('Allure (u/s)', 'p-chall', q.allure ?? CHASSE_ALLURE_DEFAUT, 10))
+      // même pas de 1 que le canal d'une porte (cf. ci-dessous) : 0 est la
+      // chasse PERMANENTE, −1 celle que seule une séquence déclenche
+      rows.push(numField('Canal (0 permanente · −1 séquence seule)', 'p-chc', q.canal ?? 0, 1))
+      rows.push(
+        `<label class="ed-f"><span>Règle</span><select id="p-chregle">` +
+          `<option value="ou"${q.regle !== 'et' ? ' selected' : ''}>OU — une cible du canal suffit</option>` +
+          `<option value="et"${q.regle === 'et' ? ' selected' : ''}>ET — toutes les cibles du canal</option>` +
+          `</select></label>`,
+      )
+      rows.push(numField('Bouffée par séquence (s)', 'p-chd', q.duree ?? CHASSE_DUREE_DEFAUT, 0.5))
+      rows.push(
+        numField('X min', 'p-minX', q.minX),
+        numField('X max', 'p-maxX', q.maxX),
+      )
+      rows.push(
+        numField('Y min', 'p-minY', q.minY),
+        numField('Y max', 'p-maxY', q.maxY),
+      )
+      rows.push(
+        `<p class="ed-empty">Une CHASSE entraîne tout ce qui est dans son rectangle à l’allure réglée, dans sa direction — l’éjection sans déchirure. Sans canal elle souffle toujours ; avec un canal, tant que ses pastilles l’alimentent ; une séquence (action « chasse », valeur = son indice ${s.index}) la déclenche pour une bouffée.</p>`,
+      )
     } else if (s.kind === 'porte') {
       const q = (this.level.portes ?? [])[s.index]
       // LE CANAL COMPTE PAR UN. Sans le pas explicite, le champ retombait
@@ -5635,6 +5689,8 @@ export class LevelEditor {
                             ? 'Emplacement de fiole'
                             : s.kind === 'porte'
                               ? 'Porte asservie'
+                              : s.kind === 'chasse'
+                                ? 'Chasse (courant de poussée)'
                               : s.kind === 'rail'
                                 ? 'Rail magnétique'
                                 : s.kind === 'decal'
@@ -6174,6 +6230,30 @@ export class LevelEditor {
         e.y = val('p-ey')
         e.memoire = Math.max(1, Math.min(99, Math.round(val('p-emem') || 2)))
       }
+    } else if (s.kind === 'chasse') {
+      const q = (this.level.chasses ?? [])[s.index]
+      q.angle = Math.round(val('p-chang'))
+      const allure = Math.round(val('p-chall'))
+      if (allure > 0 && allure !== CHASSE_ALLURE_DEFAUT) q.allure = allure
+      else delete q.allure
+      const canal = Math.round(val('p-chc'))
+      if (canal >= 1) q.canal = canal
+      else if (canal < 0) q.canal = -1
+      else delete q.canal
+      if (text('p-chregle') === 'et') q.regle = 'et'
+      else delete q.regle
+      const duree = val('p-chd')
+      if (duree > 0 && duree !== CHASSE_DUREE_DEFAUT) q.duree = duree
+      else delete q.duree
+      Object.assign(
+        q,
+        this.normalized(
+          val('p-minX'),
+          val('p-minY'),
+          val('p-maxX'),
+          val('p-maxY'),
+        ),
+      )
     } else if (s.kind === 'porte') {
       const q = (this.level.portes ?? [])[s.index]
       const canal = Math.round(val('p-pc'))
@@ -6990,6 +7070,59 @@ export class LevelEditor {
         q.canal < 0
           ? 'PORTE SCÉNARISÉE'
           : `PORTE → CANAL ${q.canal}${q.regle === 'et' ? ' (ET)' : ''}`,
+        p.sx + 4,
+        p.sy - 4,
+      )
+    }
+    // chasses : le rectangle, et des chevrons dans le sens du souffle — le
+    // même dessin qu'en jeu, immobile
+    const chasses = this.level.chasses ?? []
+    for (let i = 0; i < chasses.length; i++) {
+      const q = chasses[i]
+      const p = this.toScreen(q.minX, q.maxY)
+      const r = this.toScreen(q.maxX, q.minY)
+      const w = r.sx - p.sx
+      const h = r.sy - p.sy
+      g.save()
+      g.beginPath()
+      g.rect(p.sx, p.sy, w, h)
+      g.clip()
+      g.fillStyle = 'rgba(79,200,255,0.10)'
+      g.fillRect(p.sx, p.sy, w, h)
+      const rad = (q.angle * Math.PI) / 180
+      const ux = Math.cos(rad)
+      const uy = -Math.sin(rad)
+      const pas = Math.max(14, 90 * this.zoom)
+      const taille = Math.max(5, 22 * this.zoom)
+      const L = Math.hypot(w, h)
+      const cx = (p.sx + r.sx) / 2
+      const cy = (p.sy + r.sy) / 2
+      g.strokeStyle = 'rgba(120,225,255,0.6)'
+      g.lineWidth = 1.5
+      g.beginPath()
+      for (let rr = -L / 2; rr <= L / 2; rr += pas * 1.4) {
+        for (let t = -L / 2; t <= L / 2; t += pas) {
+          const x = cx + ux * t - uy * rr
+          const y = cy + uy * t + ux * rr
+          g.moveTo(x - ux * taille + uy * taille * 0.6, y - uy * taille - ux * taille * 0.6)
+          g.lineTo(x, y)
+          g.lineTo(x - ux * taille - uy * taille * 0.6, y - uy * taille + ux * taille * 0.6)
+        }
+      }
+      g.stroke()
+      g.restore()
+      g.strokeStyle = '#4fc8ff'
+      g.lineWidth = 1.5
+      g.strokeRect(p.sx, p.sy, w, h)
+      g.fillStyle = '#9fe0ff'
+      g.font = '600 10px ui-monospace, monospace'
+      g.fillText(
+        `CHASSE ${i} → ${q.angle}°` +
+          (q.canal === undefined
+            ? ' · PERMANENTE'
+            : q.canal < 0
+              ? ' · SÉQUENCE'
+              : ` · CANAL ${q.canal}${q.regle === 'et' ? ' (ET)' : ''}`),
         p.sx + 4,
         p.sy - 4,
       )

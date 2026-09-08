@@ -1227,6 +1227,40 @@ describe('LE MIROIR SURVIT À L’ENREGISTREMENT', () => {
     expect(encore.level!.boxes).toEqual(level!.boxes)
   })
 
+  it('une CHASSE fait l’aller-retour — les réglages absents restent absents, le canal 0 ne s’écrit pas', () => {
+    const { level, rejets } = parseLevel({
+      name: 'Essai chasse',
+      code: '21-TEST',
+      bounds: { minX: -1000, minY: -600, maxX: 1000, maxY: 600 },
+      spawn: { x: -800, y: 0, n: 700 },
+      exit: { minX: 860, minY: -60, maxX: 940, maxY: 60 },
+      boxes: [],
+      cibles: [{ x: 0, y: 0, r: 26, canal: 4 }],
+      chasses: [
+        { minX: 100, minY: -100, maxX: 0, maxY: 100, angle: 90 }, // bornes à l'envers : remises d'aplomb
+        { minX: 200, minY: -100, maxX: 400, maxY: 100, angle: -45, allure: 300, canal: 4, regle: 'et', duree: 1.5 },
+        { minX: 500, minY: -100, maxX: 600, maxY: 100, angle: 0, canal: 0 },
+        { minX: 700, minY: -100, maxX: 800, maxY: 100, angle: 0, canal: -3 },
+        { minX: 900, minY: 0, maxX: 900, maxY: 100, angle: 0 }, // taille nulle : écartée
+      ],
+    })
+    expect(rejets).toEqual(['une chasse a été écartée (taille nulle)'])
+    expect(level!.chasses).toEqual([
+      { minX: 0, minY: -100, maxX: 100, maxY: 100, angle: 90 },
+      { minX: 200, minY: -100, maxX: 400, maxY: 100, angle: -45, allure: 300, canal: 4, regle: 'et', duree: 1.5 },
+      { minX: 500, minY: -100, maxX: 600, maxY: 100, angle: 0 },
+      { minX: 700, minY: -100, maxX: 800, maxY: 100, angle: 0, canal: -1 },
+    ])
+    const relu = parseLevel(JSON.parse(serializeLevel(level!)))
+    expect(relu.level!.chasses).toEqual(level!.chasses)
+    // asservie à un canal qu'aucune cible ne porte : une erreur, comme pour une porte
+    const verdicts = checkLevel({
+      ...level!,
+      chasses: [{ minX: 0, minY: 0, maxX: 100, maxY: 100, angle: 0, canal: 9 }],
+    })
+    expect(verdicts.some((v) => v.niveau === 'erreur' && /chasse.*canal nº 9/.test(v.message))).toBe(true)
+  })
+
   it('le VIDE et la BAIE (ouvertures sur le dehors) font l’aller-retour, forme comprise', () => {
     // le même piège que le miroir : un matériau offert par la palette mais
     // absent de MATERIALS disparaîtrait à la relecture, sans un mot

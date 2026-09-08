@@ -255,6 +255,16 @@ export const FICHES_GENRES: Record<string, Fiche> = {
       { cle: '·', txt: 'Ouverte, elle devient traversante — en pointillé.' },
     ],
   },
+  'genre:chasse': {
+    titre: 'Chasse (courant de poussée)',
+    resume: 'Tout ce qui entre dans son rectangle est entraîné dans sa direction.',
+    lignes: [
+      { cle: 'EAU', txt: 'balayée à l’allure de la chasse — rien n’est déchiré.' },
+      { cle: 'GLACE', txt: 'entraînée aussi, avec l’inertie d’un bloc.' },
+      { cle: 'VAPEUR', txt: 'soufflée comme l’eau.' },
+      { cle: '·', txt: 'Sans canal : permanente. Avec un canal : souffle tant que ses pastilles l’alimentent. Une séquence (action « chasse ») la déclenche pour une bouffée.' },
+    ],
+  },
   'genre:porte-scenarisee': {
     titre: 'Porte scénarisée',
     resume: 'Aucun faisceau ne l’ouvre : une séquence du tableau s’en charge.',
@@ -391,6 +401,8 @@ export function cleFiche(sel: SelFiche, level: LevelDef): string | null {
       const p = (level.portes ?? [])[sel.index ?? -1]
       return p && p.canal < 0 ? 'genre:porte-scenarisee' : 'genre:porte'
     }
+    case 'chasse':
+      return 'genre:chasse'
     case 'zone':
       return 'genre:zone'
     case 'cache': {

@@ -469,6 +469,48 @@ export interface PorteDef {
   regle?: 'et'
 }
 
+// UNE CHASSE : un courant de poussée posé dans le tableau — le moyen
+// d'ÉJECTER le volume jouable d'une salle. Une porte qui se ferme ne pousse
+// pas, elle apparaît : les particules prises dedans sont repoussées vers la
+// face la plus proche, le corps est coupé en deux. La chasse, elle, est un
+// CHAMP DE VITESSES (le même modèle que l'aspiration du sas) : tant qu'elle
+// souffle, tout ce qui est dans son rectangle est entraîné dans sa direction
+// et balayé hors de la salle, sans jamais être déchiré.
+//
+// Trois façons de souffler, et elles se cumulent :
+//  · PERMANENTE (pas de canal) : un courant qui ne s'arrête jamais — un
+//    tapis, un siphon de couloir ;
+//  · ASSERVIE (canal ≥ 1) : souffle TANT QUE ses pastilles l'alimentent,
+//    la règle ET/OU des portes ;
+//  · SCÉNARISÉE (canal < 0, ou n'importe laquelle) : une séquence in-map la
+//    déclenche pour une BOUFFÉE de `duree` secondes — l'action « chasse »
+//    (sequence.ts), qui vise son indice comme la brèche vise une porte.
+export interface ChasseDef {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+  // La DIRECTION de la poussée, en degrés trigonométriques : 0 vers l'est
+  // (+x), 90 vers le nord (+y). Rien à voir avec l'angle d'une boîte —
+  // le rectangle, lui, reste droit.
+  angle: number
+  // La VITESSE d'entraînement visée (u/s). Absente : CHASSE_ALLURE_DEFAUT.
+  allure?: number
+  // Le CANAL des pastilles qui l'alimentent (comme une porte). Absent :
+  // permanente. Négatif : que la séquence.
+  canal?: number
+  regle?: 'et'
+  // La durée d'une bouffée déclenchée par séquence (s). Absente :
+  // CHASSE_DUREE_DEFAUT.
+  duree?: number
+}
+// 350 u/s : un courant franc, un peu au-dessus de l'aspiration du sas
+// (exitPull, 300). Essayé à 700 : le corps traversait la salle en deux
+// secondes et s'écrasait sur la paroi d'en face jusqu'à se disperser —
+// un éjecteur qui tue n'éjecte rien.
+export const CHASSE_ALLURE_DEFAUT = 350
+export const CHASSE_DUREE_DEFAUT = 3
+
 // Une CACHETTE : un pan de la carte voilé tant que l'échantillon n'y est
 // pas entré — le voile se dissipe à l'entrée du corps et reste levé pour
 // l'essai (Recommencer re-voile). Purement visuel : la physique du tableau
@@ -676,6 +718,7 @@ export interface LevelDef {
   lasers?: LaserDef[]
   cibles?: CibleDef[]
   portes?: PorteDef[]
+  chasses?: ChasseDef[] // courants de poussée : l'éjection sans déchirure
   rails?: RailDef[]
   caches?: CacheDef[] // cachettes voilées (brouillard levé à l'entrée du corps)
   condensats?: CondensatPose[] // pastilles posées main (sinon : semis auto)

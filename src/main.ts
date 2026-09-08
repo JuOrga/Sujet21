@@ -208,6 +208,8 @@ import { Input } from './game/input'
 import {
   MAT_EXIT,
   sansPhysique,
+  CHASSE_ALLURE_DEFAUT,
+  CHASSE_DUREE_DEFAUT,
   MAT_FROID,
   TABLEAU_1BIS,
   TABLEAUX,
@@ -7245,6 +7247,10 @@ const laserEtat = {
   recepteurs: creerEtatRecepteurs(0),
   portesOuvertes: [] as boolean[],
   doorsKey: '', // signature des portes fermées envoyées au solveur
+  // LES CHASSES : qui souffle en cet instant, et le reste de bouffée (s)
+  // d'une chasse déclenchée par séquence
+  chassesActives: [] as boolean[],
+  chasseBouffee: [] as number[],
   // LE SURSAUT DE VICTOIRE : à l'allumage d'une pastille, la trajectoire
   // du rayon vainqueur est GELÉE un court instant et rejouée en flash —
   // même si la physique l'a déjà emporté ailleurs. Un balayage éclair sur
@@ -7424,6 +7430,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       portes.length +
       rails.length +
       caches.length +
+      (level.chasses?.length ?? 0) + // un tableau qui n'a QU'une chasse se dessine aussi
       pastilles.length +
       eclatsEssai.length +
       (level.plots?.length ?? 0) +
@@ -7489,6 +7496,60 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
         }
       }
       g.stroke()
+    }
+  }
+
+  // chasses : des courants de poussée — des chevrons qui FILENT dans le sens
+  // du souffle tant qu'elle est active, un cadre discret et des chevrons
+  // immobiles quand elle se tait. Le sens se lit avant d'y entrer.
+  {
+    const chasses = level.chasses ?? []
+    for (let i = 0; i < chasses.length; i++) {
+      const c = chasses[i]
+      if (dansCacheVoilee((c.minX + c.maxX) / 2, (c.minY + c.maxY) / 2)) continue
+      const a = S(c.minX, c.maxY)
+      const b = S(c.maxX, c.minY)
+      const w = b.sx - a.sx
+      const h = b.sy - a.sy
+      const active = laserEtat.chassesActives[i] === true
+      const rad = (c.angle * Math.PI) / 180
+      const ux = Math.cos(rad)
+      const uy = -Math.sin(rad) // l'écran a l'axe y vers le bas
+      const px = -uy
+      const py = ux
+      g.save()
+      g.beginPath()
+      g.rect(a.sx, a.sy, w, h)
+      g.clip()
+      if (active) {
+        g.fillStyle = 'rgba(80,200,255,0.10)'
+        g.fillRect(a.sx, a.sy, w, h)
+      }
+      const pas = Math.max(14, 90 * z)
+      const decal = active ? ((elapsed * (c.allure ?? CHASSE_ALLURE_DEFAUT) * z) % pas) : 0
+      const cx = (a.sx + b.sx) / 2
+      const cy = (a.sy + b.sy) / 2
+      const L = Math.hypot(w, h)
+      const taille = Math.max(5, 22 * z)
+      g.strokeStyle = active ? 'rgba(120,225,255,0.75)' : 'rgba(120,180,220,0.28)'
+      g.lineWidth = active ? 2 : 1.2
+      g.beginPath()
+      for (let r = -L / 2; r <= L / 2; r += pas * 1.4) {
+        for (let t = -L / 2 - pas + decal; t <= L / 2; t += pas) {
+          const x = cx + ux * t + px * r
+          const y = cy + uy * t + py * r
+          g.moveTo(x - ux * taille - px * taille * 0.6, y - uy * taille - py * taille * 0.6)
+          g.lineTo(x, y)
+          g.lineTo(x - ux * taille + px * taille * 0.6, y - uy * taille + py * taille * 0.6)
+        }
+      }
+      g.stroke()
+      g.restore()
+      g.strokeStyle = active ? 'rgba(120,225,255,0.8)' : 'rgba(120,180,220,0.35)'
+      g.setLineDash(active ? [] : [5, 7])
+      g.lineWidth = 1.5
+      g.strokeRect(a.sx, a.sy, w, h)
+      g.setLineDash([])
     }
   }
 
@@ -11245,6 +11306,8 @@ function resetLasers(): void {
   laserEtat.recepteurs = creerEtatRecepteurs((level.cibles ?? []).length)
   laserEtat.portesOuvertes = (level.portes ?? []).map(() => false)
   laserEtat.doorsKey = ''
+  laserEtat.chassesActives = (level.chasses ?? []).map(() => false)
+  laserEtat.chasseBouffee = (level.chasses ?? []).map(() => 0)
   lastRailTime = 0
   railsEngages.clear()
   // LA BASCULE NE SE TRANSMET PAS D'UN TABLEAU À L'AUTRE. Sans cela, le
@@ -14504,6 +14567,15 @@ function frame(now: number): void {
           vortex.timer -= params.dt
         }
         sim.applyExitSuction(exitMouth.x, exitMouth.y, params.dt)
+        // les CHASSES qui soufflent : le courant s'applique au pas, comme le
+        // sas — et la bouffée d'une chasse déclenchée s'épuise au temps de jeu
+        {
+          const chasses = level.chasses ?? []
+          for (let i = 0; i < chasses.length; i++) {
+            if (laserEtat.chasseBouffee[i] > 0) laserEtat.chasseBouffee[i] -= params.dt
+            if (laserEtat.chassesActives[i]) sim.applyChasse(chasses[i], params.dt)
+          }
+        }
         // Rien ne freine le corps figé : dans le vide, une dérive reste une
         // trajectoire. Elle peut encore rencontrer une paroi, rebondir, et
         // finir dans le sas — c'est au joueur de décider quand y renoncer.
@@ -14544,6 +14616,34 @@ function frame(now: number): void {
       if (cle !== laserEtat.doorsKey) {
         laserEtat.doorsKey = cle
         sim.setDoors(closes)
+      }
+    }
+  }
+
+  // ---- LES CHASSES : qui souffle. HORS du bloc des lasers pour la même
+  // raison que les portes — une chasse permanente ou scénarisée n'a pas
+  // besoin d'un émetteur. Une bouffée déclenchée par séquence est un
+  // ÉVÉNEMENT : consommée ici, une fois, elle devient un compte à rebours.
+  {
+    const chasses = level.chasses ?? []
+    if (chasses.length > 0) {
+      if (laserEtat.chassesActives.length !== chasses.length) {
+        laserEtat.chassesActives = chasses.map(() => false)
+        laserEtat.chasseBouffee = chasses.map(() => 0)
+      }
+      for (const i of sequenceur.etat.chassesDeclenchees) {
+        if (i < chasses.length)
+          laserEtat.chasseBouffee[i] = chasses[i].duree ?? CHASSE_DUREE_DEFAUT
+      }
+      sequenceur.etat.chassesDeclenchees.clear()
+      const cibles = level.cibles ?? []
+      const now = performance.now() / 1000
+      for (let i = 0; i < chasses.length; i++) {
+        const c = chasses[i]
+        laserEtat.chassesActives[i] =
+          laserEtat.chasseBouffee[i] > 0 ||
+          c.canal === undefined ||
+          canalActif(cibles, c.canal, c.regle, laserEtat.recepteurs, now)
       }
     }
   }
