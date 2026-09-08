@@ -10,14 +10,16 @@ import {
   serializeLevel,
 } from './levelIO'
 import {
+  MAT_BAIE,
   MAT_MIROIR,
+  MAT_VIDE,
   MAT_WALL,
   TABLEAU_1BIS,
   TABLEAUX,
   zoneForceAt,
   type LevelDef,
 } from './level'
-import { FORME_COIN } from './formes'
+import { FORME_COIN, FORME_DISQUE } from './formes'
 
 describe('levelIO — aller-retour JSON', () => {
   it('un tableau livré se sérialise et se relit à l’identique', () => {
@@ -1221,6 +1223,21 @@ describe('LE MIROIR SURVIT À L’ENREGISTREMENT', () => {
     expect(level!.boxes[0].forme).toBe(FORME_COIN)
     expect(level!.boxes[0].p0).toBe(2)
     // et il tient un SECOND aller-retour : c'est là que la perte se voyait
+    const encore = parseLevel(JSON.parse(serializeLevel(level!)))
+    expect(encore.level!.boxes).toEqual(level!.boxes)
+  })
+
+  it('le VIDE et la BAIE (ouvertures sur le dehors) font l’aller-retour, forme comprise', () => {
+    // le même piège que le miroir : un matériau offert par la palette mais
+    // absent de MATERIALS disparaîtrait à la relecture, sans un mot
+    const { level, rejets } = avec([
+      { minX: -300, minY: -300, maxX: 300, maxY: 300, material: MAT_VIDE, forme: FORME_DISQUE },
+      { minX: 400, minY: -100, maxX: 800, maxY: 100, material: MAT_BAIE, angle: 30 },
+    ])
+    expect(rejets).toEqual([])
+    expect(level!.boxes.map((b) => b.material)).toEqual([MAT_VIDE, MAT_BAIE])
+    expect(level!.boxes[0].forme).toBe(FORME_DISQUE)
+    expect(level!.boxes[1].angle).toBe(30)
     const encore = parseLevel(JSON.parse(serializeLevel(level!)))
     expect(encore.level!.boxes).toEqual(level!.boxes)
   })

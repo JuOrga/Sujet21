@@ -207,6 +207,7 @@ import { FixedLoop } from './game/loop'
 import { Input } from './game/input'
 import {
   MAT_EXIT,
+  sansPhysique,
   MAT_FROID,
   TABLEAU_1BIS,
   TABLEAUX,
@@ -9291,6 +9292,7 @@ function majIdle(dtReal: number): void {
     let murY = 0
     let best = Infinity
     for (const b of level.boxes) {
+      if (sansPhysique(b.material)) continue // on ne toque pas sur le vide
       const px = Math.max(b.minX, Math.min(cx, b.maxX))
       const py = Math.max(b.minY, Math.min(cy, b.maxY))
       const d = Math.hypot(px - cx, py - cy)

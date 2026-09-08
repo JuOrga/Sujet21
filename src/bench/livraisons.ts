@@ -31,6 +31,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '08/09/2026 18:59',
+    title: 'LE DEHORS SOUS LE PLANCHER : deux ouvertures sur les étoiles (vide, baie vitrée) — et la pastille de champ passe à 6 cL',
+    notes: [
+      'LA DEMANDE : « laisser des zones transparentes qui afficheraient le fond, donc les étoiles — soit un vide, soit une fenêtre ». Deux SURFACES de plus dans la palette de l’éditeur : VIDE (le dehors, à nu) et BAIE VITRÉE. On les trace comme une paroi — rectangle, disque, capsule, coin, arc, oblique — et, à l’endroit tracé, le plancher de la cuve s’efface : on voit le vide au travers. Un disque en baie fait un hublot.',
+      'CE QU’ON VOIT EST LE VRAI DEHORS. Le shader ne peint pas une image posée sur le sol : il substitue au fond de cuve la couleur du VIDE qu’il calcule déjà autour des modules (render/renderer.ts, voidCol) — même plaque de ciel, même semis d’étoiles, même parallaxe. Rien de la cuve n’y subsiste : ni trame, ni caustiques, ni lumière de lampe. Le vide nu montre la tranche du plancher au bord du trou ; la baie ajoute une monture rivée qui suit la forme, une teinte de verre et un balayage lent — le reflet des lampes sur la vitre.',
+      'SANS PHYSIQUE, ET LE SOLVEUR LE SAIT LUI-MÊME. Le corps passe dessus comme sur le sol, le faisceau les traverse, la carte de lumière n’y couche aucune ombre. Le tri est fait DANS setLevel (sim/solver.ts) et non chez l’appelant : tout matériau inconnu du solveur bute — sans ce tri, une ouverture serait un mur invisible au milieu du sol, quel que soit le chemin (jeu, essai d’éditeur, banc). Le prédicat est unique (level.ts, sansPhysique : sas, vide, baie) et partagé avec le traceur de faisceau et le toc-toc du corps au repos.',
+      'LE PIÈGE DU MIROIR, ÉVITÉ D’EMBLÉE : les deux matériaux figurent dans MATERIALS (levelIO.ts), la liste qui décide de la survie d’une surface à l’enregistrement, et un test fait l’aller-retour forme et angle compris.',
+      'LA PASTILLE DE CHAMP VAUT 6 cL (elle valait 8) : le semis automatique, le défaut de l’éditeur à la pose et le défaut de relecture d’un fichier sans valeur disent le même chiffre. La pastille de cachette reste à 12.',
+      'VÉRIFIÉ : 990 tests verts dans 89 fichiers (quatre neufs ou étendus : le solveur écarte les ouvertures et le témoin en paroi arrête bien la goutte, le faisceau les traverse, l’aller-retour JSON, la valeur du champ), type-check à 0, build propre ; les deux tests de physique tombent sans le tri et le passage du faisceau. Au navigateur (Chromium logiciel, jeu construit) : le shader compile sans une erreur, l’éditeur offre les deux surfaces et charge un tableau qui les porte.',
+    ],
+  },
+  {
     date: '07/09/2026 22:00',
     title: 'LA REVUE DE LA LIVRAISON : cinq défauts relevés sur le diff dev → prod, corrigés avant de publier',
     notes: [

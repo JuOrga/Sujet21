@@ -25,6 +25,7 @@ import {
   MAT_RIDEAU,
   MAT_SURCHAUFFEUR,
   dansBoite,
+  sansPhysique,
   MAT_WALL,
   type ObstacleBox,
   type SpongeDef,
@@ -523,8 +524,13 @@ export class FluidSim {
   criticalTimer = 0
 
   setLevel(boxes: ObstacleBox[], sponges: SpongeDef[]): void {
-    this.baseBoxes = boxes
-    this.boxes = boxes
+    // Le VIDE et la BAIE (ouvertures sur le dehors) sont du décor : sans
+    // ce tri, le solveur les prendrait pour des parois — tout matériau qu'il
+    // ne connaît pas bute. Le tri se fait ICI et non chez l'appelant, pour
+    // qu'aucun chemin (jeu, essai d'éditeur, banc) ne puisse l'oublier.
+    const physiques = boxes.filter((b) => !sansPhysique(b.material))
+    this.baseBoxes = physiques
+    this.boxes = physiques
     this.sponges = sponges.map((d) => new Sponge(d))
     this.refreshBoxCaches()
     this.surchauffesVides.clear()

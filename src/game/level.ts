@@ -17,6 +17,22 @@ export const MAT_MEMBRANE = 7 // membrane gorgée d'eau : seule l'EAU la travers
 export const MAT_RIDEAU = 8 // rideau lamellaire : seule la GLACE l'écarte (eau et vapeur butent)
 export const MAT_SURCHAUFFEUR = 9 // surchauffeur : mur pour eau et glace ; frôlé en VAPEUR, il rend UN dash — une seule fois
 export const MAT_MIROIR = 10 // miroir fixe : mur poli qui RÉFLÉCHIT le faisceau laser — le corps y bute comme sur une paroi
+// LES OUVERTURES SUR LE DEHORS — rendu seulement, pas de physique, comme le
+// sas. Le plancher de la cuve s'efface et l'on voit le VIDE (le ciel du
+// dehors, ses étoiles) au travers : un trou franc, ou une baie vitrée avec
+// sa monture. Le corps passe dessus comme sur le sol, la lumière les ignore
+// (rien n'y fait d'ombre), le faisceau les traverse. Ce sont des zones à
+// regarder, pas des pièges — le vide n'aspire rien.
+export const MAT_VIDE = 11 // le plancher manque : le dehors, à nu
+export const MAT_BAIE = 12 // une verrière : le dehors derrière une vitre encadrée
+
+/** Les matériaux que le SOLVEUR ne voit jamais — le sas est un champ à
+ *  part, le vide et la baie sont du décor. Un seul prédicat, partagé par le
+ *  solveur, le traceur de faisceau et le rendu : ce qui n'a pas de physique
+ *  ici n'en a nulle part. */
+export function sansPhysique(material: number): boolean {
+  return material === MAT_EXIT || material === MAT_VIDE || material === MAT_BAIE
+}
 
 export interface ObstacleBox {
   minX: number
@@ -770,6 +786,8 @@ export const MATERIAL_NAMES: Record<number, string> = {
   [MAT_RIDEAU]: 'Rideau (glace)',
   [MAT_SURCHAUFFEUR]: 'Surchauffeur',
   [MAT_MIROIR]: 'Miroir',
+  [MAT_VIDE]: 'Vide (le dehors, à nu)',
+  [MAT_BAIE]: 'Baie vitrée',
 }
 
 // La CAUSE de chaque zone : une zone n'impose pas un état par convention, elle

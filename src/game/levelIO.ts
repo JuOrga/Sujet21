@@ -9,6 +9,8 @@ import {
   MAT_GRILLE,
   MAT_MEMBRANE,
   MAT_MIROIR,
+  MAT_VIDE,
+  MAT_BAIE,
   MAT_RIDEAU,
   MAT_SURCHAUFFEUR,
   MAT_HYDROPHILE,
@@ -74,6 +76,9 @@ import {
 // sans erreur, et le retrouver disparu à la relecture : le seul endroit qui
 // l'ignorait était celui qui décide de sa survie. MAT_EXIT reste dehors, lui,
 // et c'est voulu : le sas est un champ à part, pas une surface qu'on trace.
+// Le VIDE et la BAIE, eux, y figurent bien qu'ils n'aient pas de physique :
+// ce sont des surfaces qu'on trace dans l'éditeur, et c'est le solveur qui
+// les écarte (sansPhysique), pas la lecture.
 export const MATERIALS = [
   MAT_WALL,
   MAT_HYDROPHILE,
@@ -85,6 +90,8 @@ export const MATERIALS = [
   MAT_RIDEAU,
   MAT_SURCHAUFFEUR,
   MAT_MIROIR,
+  MAT_VIDE,
+  MAT_BAIE,
 ] as const
 
 const FORCES: ZoneForce[] = ['libre', 'eau', 'glace', 'vapeur']
