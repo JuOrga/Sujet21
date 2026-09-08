@@ -2547,7 +2547,7 @@ export class LevelEditor {
         this.level.condensats.push({
           x: this.snapped(w.x),
           y: this.snapped(w.y),
-          cl: 8,
+          cl: 6,
         })
         this.sel = {
           kind: 'condensat',

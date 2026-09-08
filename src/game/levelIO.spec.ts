@@ -851,7 +851,7 @@ describe('levelIO — les décalques de LA SERRE', () => {
       condensats: [
         { x: 100, y: -200, cl: 12 },
         { x: 500, y: 300, cl: 999 }, // borné à 200
-        { x: 800, y: 0 }, // valeur par défaut : 8 cL
+        { x: 800, y: 0 }, // valeur par défaut : 6 cL (le même défaut que le semis)
       ],
       fiole: { x: -400, y: 250 },
     })
@@ -859,7 +859,7 @@ describe('levelIO — les décalques de LA SERRE', () => {
     expect(level!.condensats).toEqual([
       { x: 100, y: -200, cl: 12 },
       { x: 500, y: 300, cl: 200 },
-      { x: 800, y: 0, cl: 8 },
+      { x: 800, y: 0, cl: 6 },
     ])
     expect(level!.fiole).toEqual({ x: -400, y: 250 })
     const relu = parseLevel(JSON.parse(serializeLevel(level!)))

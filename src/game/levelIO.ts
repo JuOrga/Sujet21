@@ -646,7 +646,7 @@ export function parseLevel(input: unknown): {
     condensats.push({
       x: num(p.x, 0),
       y: num(p.y, 0),
-      cl: Math.max(1, Math.min(200, Math.round(num(p.cl, 8)))),
+      cl: Math.max(1, Math.min(200, Math.round(num(p.cl, 6)))),
     })
   }
   if (condensats.length > 0) level.condensats = condensats
