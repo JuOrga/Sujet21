@@ -31,6 +31,19 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '08/09/2026 18:35',
+    title: 'LE TABLEAU DES AVARIES REFAIT sur le dessin du codex et du marchand — secteurs, stations, fiche et consigne',
+    notes: [
+      'LA DEMANDE : « refais l’écran avaries en t’inspirant des nouveaux designs des écrans récompense et codex, adapté aux avaries ». Le tableau des avaries était le dernier écran de pupitre au vieux gabarit (une liste de cartes dans une boîte) ; il prend le dessin des maquettes « Codex v2 » et « Marchand v2 » : trois colonnes, une tête, une légende manette.',
+      'L’ÉCRAN (game/ecranAvaries.ts, la vue pure dans avariesVue.ts, testée) : en tête, la progression du module (stations rétablies, la barre qui passe au vert au complet) et la bourse — la MÉMOIRE, seule monnaie de la réparation. Le rail des SECTEURS à gauche : TOUT LE MODULE, ÉNERGIE, CONSOLES, ACCÈS, un anneau de complétion chacun. La grille au centre : une carte par station (glyphe, nom, numéro, ce qu’elle rend, badge d’état, prix), le filtre TOUTES / EN PANNE / RÉTABLIES. La fiche à droite : l’illustration, ce qu’elle rend, ce que la panne fait (déduit des drapeaux de reparations.ts : la brume, les écrans, la porte), le prix, le solde APRÈS RÉPARATION ou ce qui manque — et la CONSIGNE : réparer au plot, solde court, ou station rétablie.',
+      'CE N’EST TOUJOURS PAS UNE BOUTIQUE : la réparation se paie au contact du plot de la station (tenteReparation), rien ne change à la caisse. L’écran dit où l’on en est et où aller ; le bouton d’achat de la maquette devient une consigne, A ne fait rien et la légende le dit en creux.',
+      'PAS D’INVENTION : les secteurs ne sont pas une donnée de plus à tenir — ils se déduisent de ce que la panne fait (une porte condamne un accès, un écran éteint est une console, le reste est de l’énergie). Réécrire une station la range toute seule ; un test garde la partition.',
+      'L’ILLUSTRATION : une image par station, public/assets/avaries/<id>.webp — la même dans les deux états, l’écran l’éteint lui-même en panne (grise, sombre, le tampon EN PANNE) et l’allume rétablie. Absente, le glyphe reste, rien ne casse. Les images restent à peindre : le dossier porte son LISEZ-MOI.',
+      'LA MANETTE : le schéma des maquettes, comme au codex et au marchand — croix pour parcourir, LB/RB pour le secteur, X pour le filtre, B pour quitter ; au clavier, flèches, Q/E, F, Échap. Échap ferme désormais le tableau au lieu d’ouvrir la fiche par-dessus ; la couche de menu conduit sa manette elle-même (pilote).',
+      'VÉRIFIÉ : 998 tests verts dans 90 fichiers (11 neufs : la partition des secteurs, l’état d’une station, les effets de panne, les filtres, les libellés, le compte du rail), type-check à 0, build propre. Au navigateur, sur une page d’essai à registres simulés : les huit situations (module en panne, deux stations rétablies, tout rétabli, filtre EN PANNE, clavier, manette simulée, Échap, largeur étroite) sans une erreur console. Le tableau DANS le jeu (contact du pupitre du centre de contrôle) reste à voir en prévisualisation.',
+    ],
+  },
+  {
     date: '07/09/2026 22:00',
     title: 'LA REVUE DE LA LIVRAISON : cinq défauts relevés sur le diff dev → prod, corrigés avant de publier',
     notes: [
