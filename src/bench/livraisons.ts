@@ -31,6 +31,39 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '08/09/2026 19:28',
+    title: 'LA CAPTURE POUR LE CODEX : la vidéo d’une fiche se filme dans le jeu, en mode concepteur',
+    notes: [
+      'LA DEMANDE : « que proposes-tu pour avoir de bons assets ? pourquoi les animés également » — et l’ordre convenu : la charte et la chaîne d’abord, la capture des vidéos du codex ensuite, les planches de vues en dernier. Ceci est le deuxième temps.',
+      'LE CONSTAT : chaque fiche du codex est faite pour une vidéo de son effet (3 à 6 s, muette, en boucle) et le dossier public/assets/codex était vide — aucune livrée. La fabriquer ailleurs donnerait une imitation de l’effet, quand le jeu sait le produire.',
+      'LE BOUTON ⏺ CAPTURER du HUD (mode concepteur seulement) enregistre quatre secondes de la scène, cadrées au 4:3 sur le centre, en WebM VP9 à 600 kbit/s — VP8 puis MP4 en repli, Safari n’enregistrant pas de WebM. Les deux canvas (le fluide WebGL, le calque 2D des mécanismes) sont composés dans un troisième, dans le rappel d’animation du rendu : c’est ce qui permet de relire le canvas WebGL sans preserveDrawingBuffer, dont renderer.ts dit le coût sur les GPU à tuiles.',
+      'LE PANNEAU qui suit montre la boucle et son poids, l’ENVOIE à la fiche choisie par le chemin de l’atelier du codex (le réglage de la fiche est renvoyé tel quel : l’envoi ne remet ni la mémoire ni la rareté à zéro), ou la TÉLÉCHARGE sous le nom que le dossier attend (<id>.webm), pour la déposer dans le dépôt.',
+      'L’ENREGISTREUR NE S’ARRÊTE JAMAIS SUR LA PREMIÈRE IMAGE COMPOSÉE : le flux du canvas livre l’image à l’encodeur après le dessin, un stop dans la foulée rend un fichier vide — vu sur un rendu à moins d’une image par seconde (quatre secondes, une image, zéro octet).',
+      'VÉRIFIÉ : dix tests sur la partie pure (cadre 4:3 centré, 640 de large, hauteur paire, jamais agrandi ; type ; nom ; verdict). La classe compilée à part a tourné dans Chromium sans tête sur une scène WebGL + 2D à 60 images par seconde : 4 s, 96 Ko, 100 images de 640×480 en VP9 décodées par ffmpeg, les deux calques visibles dans l’image extraite, envoi reçu par la fiche choisie, téléchargement nommé glace-rideau.webm, zéro erreur console. Dans le jeu complet, ce Chromium rend une image toutes les dix secondes (rendu logiciel) : on y a vu le bouton, le compte à rebours et le panneau « rien n’a été enregistré » — la capture pleine reste à voir sur un poste avec GPU, en prévisualisation.',
+    ],
+  },
+  {
+    date: '08/09/2026 19:06',
+    title: 'LES PLANCHES DE VUES : un décalque s’anime avec une bande d’images posée à côté de la fixe',
+    notes: [
+      'LE CONSTAT : le jeu est un fluide où tout bouge sauf le décor — une vanne peinte sur une eau vivante se lit comme un autocollant. Le moteur anime par shader ce qui se calcule ; ce qui se dessine n’avait aucune voie.',
+      'LA FORME : <fichier>-anime.webp à côté de <fichier>.webp, les vues côte à côte dans une bande horizontale, et le renderer y puise la vue du moment (12 par seconde, décalée d’une pièce à l’autre pour que deux vannes ne tournent pas à l’unisson) en n’envoyant au quad que la tranche de la bande — le shader ne change pas. Le nombre de vues se déduit du rapport entre la bande et l’image fixe (render/planche.ts) : pas de manifeste, pas de nombre dans le nom, et une bande mal taillée (5,9 vues) est ignorée. La liste des bandes livrées vient du glob de Vite : sans elle, quatorze sortes de décalques feraient quatorze requêtes en 404 à chaque démarrage, pour tous les joueurs.',
+      'L’OUTIL tools/images/planche.py fabrique le master de la bande depuis un dossier de vues ou une vidéo (ffmpeg ; l’alpha d’un WebM VP9 décodé par libvpx), vérifie le rapport de chaque vue et la transparence, réduit pour tenir dans 4096 px — le plancher de MAX_TEXTURE_SIZE sur téléphone — et prepare.py livre. La recette côté générateur (image-vers-vidéo depuis l’image fixe livrée, caméra fixe, boucle) est au §17 d’assets-ia.md, avec l’ordre de ce qui vaut la peine : la vanne, l’écran allumé, la gouttière de la serre, le blé nain.',
+      'VÉRIFIÉ : six tests (dont la bande de 10 vues réduites à 409×614 qui fait 9,99 vues, acceptée, et celle de 5,9 vues, refusée) ; planche.py essayé sur dix vues PNG, sur un WebM VP9 à alpha (coins transparents, centre opaque) et sur un MP4 opaque (refusé sans --sans-alpha) ; la bande livrée par prepare.py mesure 4096×768 en RGBA. Aucune bande n’est livrée ici : le rendu reste au pixel près tant que le dossier n’en contient pas.',
+    ],
+  },
+  {
+    date: '08/09/2026 18:37',
+    title: 'LA CHARTE VISUELLE ET LA CHAÎNE DES IMAGES : les masters, prepare.py, et des mesures qui refusent',
+    notes: [
+      'LE CONSTAT : les images arrivaient une à une, à la taille que le générateur avait bien voulu donner (1254², 1024², 1536×614 dans la même famille), chaque prompt recopiait sa palette et sa lumière avec des écarts, et rien ne vérifiait un raccord, une transparence ou un poids. L’audio, lui, a depuis le début ses masters, un script et une règle mesurable (rien au-dessus de 3 kHz).',
+      'LA CHARTE (docs/charte-visuelle.md) tient une fois ce que toute image partage : le monde (un laboratoire orbital de 1970, vu à plat du dessus), la lumière (froide, égale, venue du haut — et la hiérarchie lumineuse, qui est une règle du jeu), la palette (froide, un seul accent cyan, l’ambre aux veilleuses), les interdits, le PRÉAMBULE à coller en tête de chaque prompt, la référence de style par famille (--sref, IP-Adapter, image jointe), et les trois voies du mouvement. Les prompts d’assets-ia.md renvoient à elle.',
+      'LA CHAÎNE : les sources en pleine résolution vont dans masters/images/ (non versionnées — un PNG de 2048² pèse 5 à 8 Mo, cinquante font le poids du dépôt), et tools/images/prepare.py livre public/assets/ à la taille et à la qualité de la famille, en MESURANT : le raccord d’une texture répétée (la couture rapportée au grain), la luminance moyenne, la part de pixels chauds, le bord d’une pièce détourée, le poids. Ce qui sort n’est pas livré.',
+      'LES SEUILS SONT CEUX QUE LES IMAGES RÉUSSIES RESPECTENT, relevés par `prepare.py --audit` sur les 52 livrées : raccords des textures propres entre 1,0 et 2,5, la grille à 4,6 (sa couture se voit) ; quatre images hors mesure — la grille et le vieux mur (couture visible), le fond de cuve (à la limite), et la vanne, coupée par son cadre sur 11 % de son bord. L’éponge (ocre par nature), la planche de l’alerte (rouge voulu) et la chaufferie (ambre) sont des exceptions écrites dans le script, pas des tolérances tacites.',
+      'VÉRIFIÉ : la fabrication essayée sur des masters synthétiques — recadrage refusé puis accepté avec --recadre, alpha exigé sur un décalque, bord plein détecté, taille ramenée à celle de la famille.',
+    ],
+  },
+  {
     date: '07/09/2026 22:00',
     title: 'LA REVUE DE LA LIVRAISON : cinq défauts relevés sur le diff dev → prod, corrigés avant de publier',
     notes: [
