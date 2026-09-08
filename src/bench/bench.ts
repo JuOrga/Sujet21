@@ -101,7 +101,21 @@ export interface BenchMonitor {
 
 const HINT_DEFAULT = 'Survolez un réglage pour voir à quoi il sert.'
 
-export function createBench(params: SimParams, monitor: BenchMonitor, actions: BenchActions): Pane {
+export interface BenchOptions {
+  /** Le préset par défaut a DÉJÀ été appliqué au lancement (amorcePresets.ts) :
+   *  le banc l'affiche sans le recopier — le recopier à l'ouverture, plus
+   *  tard dans la partie, écraserait ce qui a bougé depuis (cadence de
+   *  simulation, time warp…), un préset enregistré portant TOUS les
+   *  paramètres. */
+  defautDejaApplique?: boolean
+}
+
+export function createBench(
+  params: SimParams,
+  monitor: BenchMonitor,
+  actions: BenchActions,
+  options: BenchOptions = {},
+): Pane {
   // Le banc n'apparaît qu'à la demande (bouton BANC de la barre, main.ts) :
   // quand on l'ouvre, il est déplié — l'écran appartient au jeu le reste du temps
   const pane = new Pane({ title: 'Banc de réglage', expanded: true })
@@ -144,11 +158,16 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
   const presetState = { title: '', description: '' }
   const fPresets = pane.addFolder({ title: 'Présets', expanded: true })
 
-  const applyPreset = (p: Preset): void => {
-    copyParams(p.params, params)
+  // MONTRER un préset : son titre et sa note dans les champs, sans toucher
+  // aux paramètres — l'APPLIQUER, c'est en plus recopier ses valeurs.
+  const montrePreset = (p: Preset): void => {
     presetState.title = p.title
     presetState.description = p.description
     pane.refresh()
+  }
+  const applyPreset = (p: Preset): void => {
+    copyParams(p.params, params)
+    montrePreset(p)
   }
 
   describe(
@@ -227,7 +246,13 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
       storeStoredDefault(defaultTitle)
       rebuildList(list?.value)
       const def = changed ? presets.find((q) => q.title === defaultTitle) : undefined
-      if (def) {
+      if (def && options.defautDejaApplique) {
+        // le banc s'ouvre EN COURS DE PARTIE : un défaut partagé qui a
+        // changé depuis le lancement se montre, il ne s'applique pas —
+        // recopier tous les paramètres maintenant écraserait ce qui a bougé
+        montrePreset(def)
+        hint.textContent = `Le préset par défaut partagé a changé : « ${def.title} » — « Charger » pour l’appliquer.`
+      } else if (def) {
         applyPreset(def)
         hint.textContent = `Bibliothèque synchronisée — préset par défaut « ${def.title} » appliqué.`
       } else if (lib.presets.length > 0) {
@@ -1046,10 +1071,12 @@ export function createBench(params: SimParams, monitor: BenchMonitor, actions: B
 
   // Préset par défaut : appliqué dès l'ouverture depuis le cache local — la
   // bibliothèque partagée, quand elle répond, confirme ou corrige ce choix.
+  // Quand l'amorce l'a déjà fait au lancement, on se contente de le montrer.
   {
     const def = presets.find((q) => q.title === defaultTitle)
     if (def) {
-      applyPreset(def)
+      if (options.defautDejaApplique) montrePreset(def)
+      else applyPreset(def)
       hint.textContent = `Préset par défaut « ${def.title} » appliqué.`
     }
   }
