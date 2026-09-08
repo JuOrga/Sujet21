@@ -31,7 +31,7 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
-    date: 'DATE-A-POSER',
+    date: '08/09/2026 22:34',
     title: 'LA CHASSE : un courant de poussée qui éjecte le corps d’une salle — sans le couper comme une porte',
     notes: [
       'LA DEMANDE : « pour éjecter le volume jouable, nous pensions utiliser les portes lorsqu’elles s’activent, mais cela ne marche pas bien — que proposes-tu ? » Le diagnostic d’abord : une porte, dans le solveur, est une paroi qui APPARAÎT d’un coup. Les particules prises dedans sont repoussées vers la face la plus proche : un corps à cheval sur la porte est coupé en deux, et le cœur de la boîte part avec une vitesse de contact violente. La porte ne pousse jamais, elle téléporte. D’où la proposition retenue (« ok pour la chasse uniquement ») : un CHAMP DE VITESSES, pas une paroi.',
