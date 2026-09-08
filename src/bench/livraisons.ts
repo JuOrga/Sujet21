@@ -31,6 +31,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '08/09/2026 21:19',
+    title: 'LES AVARIES ILLUSTRÉES : cinq stations sur sept peintes, et le catalogue des images qui les range',
+    notes: [
+      'LES IMAGES : le réseau d’éclairage, la table de départ, le mur des records, le bac d’essai et le distillateur de primes, peintes par le concepteur sur les prompts de la livraison précédente, recadrées au 16:9 et livrées en WebP 640 × 360 (35 à 47 Ko chacune) sous public/assets/avaries/. L’aile des endormis et la passerelle du secteur 4 restent à peindre : leur glyphe tient la place.',
+      'LE CATALOGUE DES IMAGES LIVRÉES (assetsLivres.ts) refusait les nouvelles : nommées par l’id de la station (« eclairage.webp »), aucune règle de préfixe ne les attrapait, elles tombaient dans « Autres » — et le test qui garde cette rubrique vide tombait avec. Le dossier fait désormais foi : /avaries/ a sa rubrique AVARIES — STATIONS et le nom lisible de chaque station ; /codex/ (les images d’attente des vidéos) a la sienne, pour ne pas retomber dans le même piège au premier aperçu déposé. Deux tests neufs.',
+      'LA FICHE : l’étiquette du secteur, en bas de l’illustration, se lisait mal sur une image allumée — elle porte un fond sombre.',
+      'VÉRIFIÉ : 1000 tests verts dans 90 fichiers, type-check à 0, build propre ; la table de départ vue au navigateur dans les deux états, éteinte (grise, sombre, tampon EN PANNE) et allumée.',
+    ],
+  },
+  {
     date: '08/09/2026 18:35',
     title: 'LE TABLEAU DES AVARIES REFAIT sur le dessin du codex et du marchand — secteurs, stations, fiche et consigne',
     notes: [

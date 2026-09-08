@@ -6484,7 +6484,8 @@
       .av-apercu > i { position: relative; font-style: normal; font-size: 54px; line-height: 1; filter: drop-shadow(0 0 22px var(--t)); animation: av-breathe 3s ease-in-out infinite; }
       .av-apercu--panne > i { filter: grayscale(0.6) drop-shadow(0 0 16px rgba(255, 179, 92, 0.6)); }
       .av-apercu.av-apercu--prete > i { display: none; }
-      .av-apercu small { position: absolute; right: 10px; bottom: 8px; font-family: var(--font-display); font-size: calc(7.5px * var(--ui)); letter-spacing: 0.18em; color: var(--dim); }
+      /* sur une illustration allumée, l'étiquette se lisait mal : un fond sombre sous elle */
+      .av-apercu small { position: absolute; right: 10px; bottom: 8px; padding: 2px 6px; border-radius: 3px; font-family: var(--font-display); font-size: calc(7.5px * var(--ui)); letter-spacing: 0.18em; color: #a7ddf5; background: rgba(3, 7, 16, 0.65); }
       .av-apercu em { position: absolute; left: 10px; top: 8px; font-style: normal; font-family: var(--font-display); font-size: calc(8px * var(--ui)); letter-spacing: 0.22em; padding: 3px 8px; border-radius: 4px; border: 1px solid; }
       .av-apercu--panne em { color: #ffd2a0; border-color: rgba(255, 179, 92, 0.6); background: rgba(3, 7, 16, 0.6); animation: av-clignote 1.6s steps(2, start) infinite; }
       .av-apercu--allume em { color: #6dffb8; border-color: rgba(109, 255, 184, 0.5); background: rgba(3, 7, 16, 0.5); }

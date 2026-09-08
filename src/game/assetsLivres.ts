@@ -24,6 +24,8 @@ export const RUBRIQUES = [
   'Zones d’état',
   'Machinerie & décalques',
   'Méta & commerce',
+  'Avaries — stations',
+  'Codex — aperçus',
   'Serre & cultures',
   'Coque & fonds',
   'Objets & emblèmes',
@@ -79,6 +81,15 @@ const NOMS: Record<string, string> = {
   'sas-raccord-v.webp': 'Sas de raccord (quart de tour)',
   'meta-eclat.webp': 'Méta — éclat de mémoire',
   'meta-icones.webp': 'Méta — planche d’icônes (4×2)',
+  // les illustrations du tableau des avaries (public/assets/avaries/<id>.webp),
+  // une par station de reparations.ts — la même image éteinte ou allumée
+  'eclairage.webp': 'Avarie — réseau d’éclairage',
+  'table-depart.webp': 'Avarie — table de départ',
+  'mur-records.webp': 'Avarie — mur des records',
+  'bac-sable.webp': 'Avarie — bac d’essai',
+  'distillateur.webp': 'Avarie — distillateur de primes',
+  'aile-endormis.webp': 'Avarie — aile des endormis',
+  'passerelle-4.webp': 'Avarie — passerelle du secteur 4',
 }
 
 /** La rubrique d'un fichier, d'après son chemin. Tout finit classé : ce qui
@@ -86,6 +97,11 @@ const NOMS: Record<string, string> = {
 export function rubriqueDe(url: string): string {
   const f = url.slice(url.lastIndexOf('/') + 1)
   if (url.includes('/cine/')) return 'Cinématiques — planches'
+  // les sous-dossiers des écrans : leurs images se nomment par un id du
+  // jeu (« eclairage.webp »), aucune règle de préfixe ne les attraperait —
+  // le dossier fait foi, sinon elles tombaient dans « Autres »
+  if (url.includes('/avaries/')) return 'Avaries — stations'
+  if (url.includes('/codex/')) return 'Codex — aperçus'
   if (/^(wall|paroi|phile|phobe|froid|chaud|grille|sponge)/.test(f))
     return 'Surfaces & matériaux'
   if (f.startsWith('zone-')) return 'Zones d’état'
