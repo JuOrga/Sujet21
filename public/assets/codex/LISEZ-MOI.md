@@ -16,6 +16,15 @@ jamais sa vidéo.
 Ce dossier est servi tel quel par Vite (`public/`) ; aucun manifeste à
 tenir : déposer le fichier suffit.
 
+**Le chemin le plus court : la filmer dans le jeu.** En mode concepteur, le
+HUD porte un bouton ⏺ CAPTURER : quatre secondes de la scène, cadrées au
+4:3 sur le centre, en WebM VP9 à 600 kbit/s (MP4 sur Safari, qui
+n'enregistre pas de WebM). Le panneau qui suit montre la boucle, son poids,
+et l'envoie à la fiche choisie — ou la télécharge sous le nom que ce
+dossier attend (`<id>.webm`), pour la déposer ici. La vraie simulation
+vaut mieux qu'une vidéo fabriquée ailleurs : c'est l'effet lui-même, pas
+son imitation.
+
 **L'autre chemin, sans passer par le dépôt** : en mode concepteur, chaque
 fiche du codex a un volet ATELIER sous son texte — la mémoire gravée à la
 découverte, la rareté, et l'envoi d'une vidéo (webm ou mp4, 3 Mo au plus).

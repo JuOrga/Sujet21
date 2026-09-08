@@ -2965,6 +2965,25 @@
       .cx-atelier-boutons button { font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.16em; padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(150, 200, 235, 0.35); background: rgba(99, 183, 230, 0.08); color: #eaf6ff; cursor: pointer; }
       .cx-atelier-boutons button:hover:not(:disabled) { background: rgba(99, 183, 230, 0.2); }
       .cx-atelier-boutons button:disabled { opacity: 0.5; cursor: wait; }
+      /* LA CAPTURE POUR LE CODEX : la pastille du HUD (ambre comme tout ce
+         qui touche au concepteur) et le panneau du résultat */
+      .hud-capture { color: #ffd24a; border-color: rgba(255, 210, 74, 0.45); font-family: var(--font-display); letter-spacing: 0.12em; }
+      .hud-capture.enregistre { color: #ff6a5a; border-color: rgba(255, 106, 90, 0.7); animation: cc-pulse 1s ease-in-out infinite; }
+      @keyframes cc-pulse { 50% { background: rgba(255, 106, 90, 0.18); } }
+      #capture-codex { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(3, 7, 16, 0.72); }
+      #capture-codex[hidden] { display: none; }
+      .cc-boite { display: flex; flex-direction: column; gap: 10px; width: min(92vw, 560px); max-height: 92vh; overflow: auto; padding: 16px 18px; border: 1px dashed rgba(255, 210, 74, 0.45); border-radius: 10px; background: rgba(3, 7, 16, 0.92); color: #eaf6ff; }
+      .cc-boite h2 { margin: 0; font-family: var(--font-display); font-size: calc(9px * var(--ui)); letter-spacing: 0.22em; color: #ffd24a; }
+      .cc-video { width: 100%; aspect-ratio: 4 / 3; background: #000; border-radius: 6px; }
+      .cc-etat { margin: 0; font-size: calc(12px * var(--ui)); }
+      .cc-note { margin: 0; font-size: calc(10px * var(--ui)); color: var(--dim); }
+      .cc-boite label { display: flex; flex-direction: column; gap: 4px; }
+      .cc-boite label span { font-size: calc(9px * var(--ui)); letter-spacing: 0.18em; color: var(--dim); }
+      .cc-boite select { font: inherit; font-size: calc(12px * var(--ui)); color: #eaf6ff; background: rgba(3, 7, 16, 0.7); border: 1px solid rgba(150, 200, 235, 0.25); border-radius: 6px; padding: 6px 8px; max-width: 100%; }
+      .cc-boutons { display: flex; flex-wrap: wrap; gap: 6px; }
+      .cc-boutons button { font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.16em; padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(150, 200, 235, 0.35); background: rgba(99, 183, 230, 0.08); color: #eaf6ff; cursor: pointer; }
+      .cc-boutons button:hover:not(:disabled) { background: rgba(99, 183, 230, 0.2); }
+      .cc-boutons button:disabled { opacity: 0.5; cursor: wait; }
       .cx-atelier-etat { margin: 0; min-height: 1em; font-size: calc(11px * var(--ui)); color: #ffd24a; }
       .cx-atelier-etat:empty { display: none; }
       .cx-atelier-note { margin: 0; font-size: calc(10px * var(--ui)); line-height: 1.5; color: var(--dim); }
@@ -7991,6 +8010,10 @@
           <button type="button" class="hud-chip" data-nom="condensat de la run — la matière ramassée, purgée en fin de run" id="hud-cond-chip"><i class="ico-meta" style="--ic-x:2;--ic-y:1"></i><span class="v" id="hud-cond">0 cL</span></button>
           <button type="button" class="hud-chip" data-nom="instruments embarqués — toucher pour le détail" id="hud-instr-chip" hidden><i>🧰</i><span class="v" id="hud-instr">—</span></button>
           <button type="button" class="hud-chip" data-nom="coque du vaisseau"><i>❄</i><span class="v" id="hud-coque">+21°</span></button>
+          <!-- LA CAPTURE POUR LE CODEX (mode concepteur) : quatre secondes de
+               la scène, cadrées 4:3, envoyées à la fiche choisie — la vidéo
+               de l'effet se filme dans le jeu, elle ne se fabrique pas -->
+          <button type="button" class="hud-chip hud-capture" data-dev id="hud-capture" data-nom="capture pour le codex : 4 s de la scène, à envoyer à une fiche">⏺ CAPTURER</button>
         </div>
       </div>
       <div class="hud-sous"><span id="hud-perte"></span><span id="hud-rosee"></span><span id="hud-fantome"></span></div>
@@ -8650,6 +8673,8 @@
          interaction état × élément vécue en jeu débloque sa fiche -->
     <!-- LE CODEX : la maquette « Codex v2 » — le gabarit est bâti par game/ecranCodex.ts -->
     <div id="codex" hidden aria-label="Codex"></div>
+    <!-- LA CAPTURE POUR LE CODEX : le panneau bâti par game/captureCodex.ts -->
+    <div id="capture-codex" hidden></div>
 
     <div id="cycle" hidden aria-label="Les mémoires">
       <div id="cycle-ecran">
