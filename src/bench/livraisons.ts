@@ -31,6 +31,19 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '08/09/2026 21:32',
+    title: 'LA REVUE DE LA BRANCHE : six constats sur le diff des assets, corrigés avant la PR vers dev',
+    notes: [
+      'LA DEMANDE : « PR sur dev et review ». La relecture du diff entier (17 fichiers : la chaîne des images, les planches de vues, la capture) a relevé six constats ; tous corrigés ici, avant d’ouvrir la PR.',
+      'LA CAPTURE COMPTAIT À L’HORLOGE MURALE : un onglet caché pendant l’enregistrement aurait cousu vingt secondes de la dernière image figée dans une boucle annoncée « 4 s ». Le temps est désormais celui des images COMPOSÉES (la somme des écarts entre images, chacun plafonné à 100 ms), et l’enregistreur marque une pause quand l’onglet se cache. Vérifié : la classe compilée à part enregistre toujours 4 s (89 Ko, 85 images en VP9) et envoie à la fiche choisie.',
+      'LE CADRE : la hauteur se calculait depuis la largeur AVANT qu’elle soit rendue paire — 335 donnait 334×252, plus tout à fait du 4:3. Test ajouté (335 → 334×250), qui tombe sans le correctif (252).',
+      'LA PLANCHE MORDAIT SUR LA VUE VOISINE : la bande était chargée avec mipmaps et le quad posé sur la frontière exacte des vues — à un niveau réduit, un texel moyenne des colonnes de la vue d’à côté, le bord de la pièce aurait scintillé à chaque vue. Sans mipmaps désormais, et le quad rentre d’un demi-texel dans la vue.',
+      'QUATORZE CHAMPS, UN SWITCH ET UNE TABLE disaient trois fois la même chose (une texture par sorte de décalque), et la planche relisait l’image fixe pour connaître sa taille. Une seule table par sorte — la texture fixe et sa taille, remplies par le chargeur qui reçoit maintenant l’image — remplace les champs et le switch ; la planche se charge à la suite de sa fixe, sans seconde requête. Ajouter une sorte, c’est une ligne dans FICHIER_DECAL, exigée par le compilateur.',
+      'planche.py PLANTAIT SUR UN WEBM DU NAVIGATEUR : un enregistrement de MediaRecorder n’écrit pas sa durée dans l’en-tête (« Duration: N/A ») et la lecture levait une exception au lieu du message prévu. Sans durée, toutes les images sont tirées et huit sont choisies dedans. Vérifié sur la capture d’essai : 8 vues de 512×384.',
+      'LA NOTE DE L’ATLAS promettait un raccord mesuré case par case qui n’existait pas : elle dit désormais que le raccord des cases n’est pas mesuré.',
+    ],
+  },
+  {
     date: '08/09/2026 19:28',
     title: 'LA CAPTURE POUR LE CODEX : la vidéo d’une fiche se filme dans le jeu, en mode concepteur',
     notes: [

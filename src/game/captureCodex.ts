@@ -59,16 +59,18 @@ export function cadreCapture(vw: number, vh: number): CadreCapture {
   let h = vh
   if (vw / vh > RAPPORT_CAPTURE) w = vh * RAPPORT_CAPTURE
   else h = vw / RAPPORT_CAPTURE
-  const largeur = Math.min(LARGEUR_CAPTURE, Math.floor(w))
-  // hauteur PAIRE : les encodeurs vidéo travaillent par blocs de deux
-  // lignes, une hauteur impaire est refusée ou arrondie en silence
+  // largeur et hauteur PAIRES : les encodeurs vidéo travaillent par blocs
+  // de deux lignes, une dimension impaire est refusée ou arrondie en
+  // silence — et la hauteur se calcule depuis la largeur DÉJÀ rendue
+  // paire, sinon 335 donnait 334×252, plus tout à fait du 4:3
+  const largeur = Math.max(2, Math.min(LARGEUR_CAPTURE, Math.floor(w)) & ~1)
   const hauteur = Math.max(2, Math.round(largeur / RAPPORT_CAPTURE / 2) * 2)
   return {
     x: (vw - w) / 2 / vw,
     y: (vh - h) / 2 / vh,
     w: w / vw,
     h: h / vh,
-    largeur: Math.max(2, largeur - (largeur % 2)),
+    largeur,
     hauteur,
   }
 }
@@ -133,8 +135,13 @@ export class CaptureCodex {
   private cadre: CadreCapture | null = null
   private enregistreur: MediaRecorder | null = null
   private morceaux: Blob[] = []
-  private debut = 0
+  // le temps COMPOSÉ : la somme des écarts entre images, chacun plafonné —
+  // pas l'horloge murale. Un onglet caché ou un rendu qui cale ne compte
+  // pas : les quatre secondes promises sont quatre secondes d'images
+  private dureeComposee = 0
+  private derniereImage = 0
   private imagesComposees = 0
+  private readonly surVisibilite = (): void => this.visibilite()
   private resultat: Blob | null = null
   private urlResultat = ''
   private ficheChoisie = ''
@@ -199,12 +206,26 @@ export class CaptureCodex {
     }
     enregistreur.onstop = () => this.termine(mime)
     this.enregistreur = enregistreur
-    this.debut = performance.now()
+    this.dureeComposee = 0
+    this.derniereImage = performance.now()
     this.imagesComposees = 0
     this.etape = 'enregistre'
     this.host.hidden = true
+    document.addEventListener('visibilitychange', this.surVisibilite)
     enregistreur.start(250)
     this.majBouton()
+  }
+
+  /** L'onglet se cache : l'enregistreur marque une pause, sinon il coudrait
+   *  des secondes de la dernière image figée dans la boucle. */
+  private visibilite(): void {
+    const r = this.enregistreur
+    if (!r || this.etape !== 'enregistre') return
+    if (document.hidden && r.state === 'recording') r.pause()
+    else if (!document.hidden && r.state === 'paused') {
+      r.resume()
+      this.derniereImage = performance.now()
+    }
   }
 
   /** À appeler à CHAQUE image, après le rendu des deux canvas : compose la
@@ -217,18 +238,23 @@ export class CaptureCodex {
     g.drawImage(gl, c.x * gl.width, c.y * gl.height, c.w * gl.width, c.h * gl.height, 0, 0, c.largeur, c.hauteur)
     g.drawImage(fx, c.x * fx.width, c.y * fx.height, c.w * fx.width, c.h * fx.height, 0, 0, c.largeur, c.hauteur)
     this.imagesComposees++
-    const ecoule = performance.now() - this.debut
-    this.majBouton(ecoule)
+    const maintenant = performance.now()
+    // un écart plafonné à 100 ms : une image qui a mis dix secondes à venir
+    // ne vaut pas dix secondes de boucle
+    this.dureeComposee += Math.min(100, maintenant - this.derniereImage)
+    this.derniereImage = maintenant
+    this.majBouton(this.dureeComposee)
     // On n'arrête jamais sur la PREMIÈRE image composée : le flux du canvas
     // livre une image à l'encodeur après le dessin, et un stop() dans la
     // foulée du seul dessin rend un fichier vide (vu sur un rendu à moins
     // d'une image par seconde : quatre secondes, une image, zéro octet).
-    if (ecoule >= DUREE_CAPTURE_MS && this.imagesComposees >= 2 && this.enregistreur?.state === 'recording') {
+    if (this.dureeComposee >= DUREE_CAPTURE_MS && this.imagesComposees >= 2 && this.enregistreur?.state === 'recording') {
       this.enregistreur.stop()
     }
   }
 
   private termine(mime: string): void {
+    document.removeEventListener('visibilitychange', this.surVisibilite)
     const blob = new Blob(this.morceaux, { type: typeNu(mime) })
     this.etape = 'pret'
     this.resultat = blob
@@ -330,6 +356,7 @@ export class CaptureCodex {
   }
 
   private libere(): void {
+    document.removeEventListener('visibilitychange', this.surVisibilite)
     if (this.enregistreur && this.enregistreur.state !== 'inactive') this.enregistreur.stop()
     this.enregistreur = null
     this.resultat = null

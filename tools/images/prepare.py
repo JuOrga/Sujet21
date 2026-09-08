@@ -118,7 +118,7 @@ FAMILLES: list[Famille] = [
     ),
     Famille(
         'atlas des habillages', ('paroi-atlas',), taille=(4096, 2048), luma_max=0.30, qualite=80,
-        poids_max_ko=1200, note='grille 4×2 de cases 1024² — le raccord se mesure case par case',
+        poids_max_ko=1200, note='grille 4×2 de cases 1024² — le raccord des cases n’est PAS mesuré ici (à l’œil, dans le jeu)',
     ),
     Famille(
         'surface répétée',

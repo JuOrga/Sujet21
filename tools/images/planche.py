@@ -73,10 +73,14 @@ def vues_de_la_video(chemin: str, n: int) -> list[Image.Image]:
     duree = 0.0
     for ligne in sonde.splitlines():
         if 'Duration:' in ligne:
-            h, m, s_ = ligne.split('Duration:')[1].split(',')[0].strip().split(':')
-            duree = int(h) * 3600 + int(m) * 60 + float(s_)
-    if duree <= 0:
-        sys.exit(f'durée illisible pour {chemin}')
+            brut = ligne.split('Duration:')[1].split(',')[0].strip()
+            # « N/A » : un WebM enregistré par le navigateur (la capture du
+            # codex) n'écrit pas sa durée dans l'en-tête — on prendra toutes
+            # les images et on choisira dedans
+            morceaux = brut.split(':')
+            if len(morceaux) == 3:
+                h, m, s_ = morceaux
+                duree = int(h) * 3600 + int(m) * 60 + float(s_)
     # Un WebM VP9/VP8 porte sa transparence dans une piste à côté que le
     # décodeur natif d'ffmpeg ignore : il faut demander celui de libvpx,
     # AVANT l'entrée, pour que les vues sortent détourées. Un MP4 n'a pas
@@ -88,13 +92,17 @@ def vues_de_la_video(chemin: str, n: int) -> list[Image.Image]:
             decodeur = ['-c:v', 'libvpx-vp9']
     with tempfile.TemporaryDirectory() as tmp:
         # fps = n / durée : ffmpeg pose une vue tous les durée/n — n vues,
-        # la première à 0, la dernière à durée × (n-1)/n
+        # la première à 0, la dernière à durée × (n-1)/n. Sans durée : toutes
+        # les images, et `choisit` en garde n réparties.
+        cadence = ['-vf', f'fps={n}/{duree:.6f}', '-frames:v', str(n)] if duree > 0 else []
         subprocess.run(
-            [ffmpeg, '-v', 'error', *decodeur, '-i', chemin, '-vf', f'fps={n}/{duree:.6f}', '-frames:v', str(n),
-             os.path.join(tmp, 'vue-%03d.png')],
+            [ffmpeg, '-v', 'error', *decodeur, '-i', chemin, *cadence, os.path.join(tmp, 'vue-%03d.png')],
             check=True,
         )
-        return vues_du_dossier(tmp)
+        vues = vues_du_dossier(tmp)
+        if not vues:
+            sys.exit(f'aucune image lisible dans {chemin}')
+        return vues
 
 
 def choisit(vues: list[Image.Image], n: int) -> list[Image.Image]:

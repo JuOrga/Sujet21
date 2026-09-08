@@ -39,6 +39,12 @@ describe('cadreCapture', () => {
     expect(c.hauteur).toBe(Math.round(332 / (4 / 3) / 2) * 2)
   })
 
+  it('calcule la hauteur depuis la largeur rendue paire : 335 donne 334×250, pas 334×252', () => {
+    const c = cadreCapture(335, 600)
+    expect(c.largeur).toBe(334)
+    expect(c.hauteur).toBe(250)
+  })
+
   it('tient sur une scène sans taille', () => {
     const c = cadreCapture(0, 0)
     expect(c.w).toBe(1)
