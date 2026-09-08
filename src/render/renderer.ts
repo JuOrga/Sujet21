@@ -14,6 +14,7 @@ import {
   zonePhases,
 } from '../game/level'
 import type { DecalDef, LumiereDef, ObstacleBox, ZoneDef } from '../game/level'
+import { decalageDe, planchesLivrees, vueCourante, vuesPlanche } from './planche'
 import {
   ARC_EPAISSEUR_DEFAUT,
   ARC_OUVERTURE_DEFAUT,
@@ -2627,6 +2628,25 @@ void main() {
   outColor = vec4(c, t.a * uFade * (1.0 - fluide));
 }`
 
+/** Le fichier de chaque sorte de décalque (sans dossier ni extension) :
+ *  c'est le nom que la planche de vues reprend (`<fichier>-anime.webp`). */
+const FICHIER_DECAL: Record<DecalDef['kind'], string> = {
+  tuyaux: 'decal-tuyaux',
+  vanne: 'decal-vanne',
+  'ecran-off': 'decal-ecran-off',
+  'ecran-on': 'decal-ecran-on',
+  'fiole-pleine': 'fiole-pleine',
+  'fiole-vide': 'fiole-vide',
+  'serre-ble-nain': 'serre-ble-nain',
+  'serre-rampe': 'serre-rampe',
+  'serre-rampe-a': 'serre-rampe-a',
+  'meta-alcove': 'meta-alcove',
+  'meta-banc': 'meta-banc',
+  'meta-marchand': 'meta-marchand',
+  'sas-raccord': 'sas-raccord',
+  'sas-raccord-v': 'sas-raccord-v',
+}
+
 function compile(
   gl: WebGL2RenderingContext,
   type: number,
@@ -2679,6 +2699,9 @@ export class Renderer {
   private readonly zoneForceScratch = new Float32Array(MAX_ZONES)
   private readonly zonePhaseScratch = new Float32Array(MAX_ZONES * 3)
   private texDecalTuyaux: WebGLTexture | null = null
+  // LES PLANCHES DE VUES (planche.ts) : par sorte, la bande animée et son
+  // nombre de vues — absente, la pièce garde son image fixe
+  private readonly planches = new Map<DecalDef['kind'], { tex: WebGLTexture; vues: number }>()
   private texDecalVanne: WebGLTexture | null = null
   // LA SERRE : les cultures hydroponiques du niveau serre
   private texSerreBle: WebGLTexture | null = null
@@ -2776,8 +2799,11 @@ export class Renderer {
   constructor(canvas: HTMLCanvasElement, capacity: number) {
     this.canvas = canvas
     // PAS de preserveDrawingBuffer. Il était là pour que les captures du
-    // canvas marchent — mais RIEN dans le jeu ne capture ce canvas, et une
-    // capture d'écran système n'en a pas besoin. Sur les GPU à TUILES
+    // canvas marchent — mais rien dans le jeu ne relit ce canvas HORS de
+    // l'image en cours (la capture pour le codex, game/captureCodex.ts, le
+    // compose dans le même rappel que le rendu, avant que le navigateur ne
+    // compose l'écran : le tampon est encore là), et une capture d'écran
+    // système n'en a pas besoin. Sur les GPU à TUILES
     // (Apple : iPhone, iPad, M1/M2), demander à conserver le contenu d'une
     // image à l'autre interdit au pilote de jeter la tuile en fin de rendu :
     // il doit RELIRE tout l'écran au début de chaque image et le RÉÉCRIRE à
@@ -3090,6 +3116,27 @@ export class Renderer {
     // par la surface miroitante du fluide — poutrelles, conduites, et des
     // verrières éclairées qui font les reflets lumineux
     this.loadZoneLayer('/assets/plafond.webp', 3)
+    this.chargePlanches()
+  }
+
+  /** Les planches de vues livrées (`<fichier>-anime.webp`), une par sorte
+   *  de décalque qui en a une. Le nombre de vues se déduit de l'image
+   *  fixe : on la relit (le cache du navigateur la rend aussitôt) pour
+   *  connaître son rapport. */
+  private chargePlanches(): void {
+    const livrees = planchesLivrees()
+    for (const [kind, fichier] of Object.entries(FICHIER_DECAL) as [DecalDef['kind'], string][]) {
+      if (!livrees.has(fichier)) continue
+      const fixe = new Image()
+      fixe.onload = () => {
+        this.loadTexture(`/assets/${fichier}-anime.webp`, false, true, (tex, bande) => {
+          const vues = vuesPlanche(bande.naturalWidth, bande.naturalHeight, fixe.naturalWidth, fixe.naturalHeight)
+          // une bande mal taillée ne s'anime pas : l'image fixe reste
+          if (vues > 1) this.planches.set(kind, { tex, vues })
+        })
+      }
+      fixe.src = `/assets/${fichier}.webp`
+    }
   }
 
   // Charge une image de zone dans SON calque du tableau de textures. Le
@@ -3233,7 +3280,7 @@ export class Renderer {
     url: string,
     repeat: boolean,
     mips: boolean,
-    assign: (t: WebGLTexture) => void,
+    assign: (t: WebGLTexture, img: HTMLImageElement) => void,
     mirrored = false,
   ): void {
     const img = new Image()
@@ -3263,7 +3310,7 @@ export class Renderer {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
       }
       gl.bindTexture(gl.TEXTURE_2D, null)
-      assign(tex)
+      assign(tex, img)
     }
     img.src = url
   }
@@ -3884,7 +3931,7 @@ export class Renderer {
     if (!this.solModules) this.drawHull(sim, camera, viewportW, viewportH)
 
     // Passe B ter — décalques de décor (tuyaux, vannes), effacés sous l'eau
-    this.drawDecals(decals, camera, viewportW, viewportH, params)
+    this.drawDecals(decals, camera, viewportW, viewportH, params, timeSec)
     this.drawLampes(lampes, camera, viewportW, viewportH, params)
 
     // Passe C — cellules d'éponge
@@ -4089,15 +4136,27 @@ export class Renderer {
     viewportW: number,
     viewportH: number,
     params: SimParams,
+    timeSec: number,
   ): void {
     if (decals.length === 0) return
     const gl = this.gl
     const du = this.uniforms['decal']
     let started = false
     for (const d of decals) {
-      const tex = this.textureDecal(d.kind)
+      const fixe = this.textureDecal(d.kind)
       // texture pas encore chargée (ou fichier absent) : la pièce se saute
-      if (!tex) continue
+      if (!fixe) continue
+      // la planche de vues prime sur l'image fixe : le quad ne montre que
+      // la vue du moment, une tranche de la bande — le shader ne sait rien
+      const planche = this.planches.get(d.kind)
+      const tex = planche ? planche.tex : fixe
+      let uA = 0
+      let uB = 1
+      if (planche) {
+        const k = vueCourante(timeSec, planche.vues, decalageDe(d.x, d.y))
+        uA = k / planche.vues
+        uB = (k + 1) / planche.vues
+      }
       if (!started) {
         started = true
         gl.useProgram(this.decalProgram)
@@ -4122,8 +4181,8 @@ export class Renderer {
       }
       const hw = d.w * 0.5
       const hh = d.h * 0.5
-      const u0 = d.flip ? 1 : 0
-      const u1 = d.flip ? 0 : 1
+      const u0 = d.flip ? uB : uA
+      const u1 = d.flip ? uA : uB
       // v inversé : les textures sont chargées avec UNPACK_FLIP_Y
       const q = this.decalScratch
       let o = 0

@@ -143,8 +143,11 @@ FAMILLES: list[Famille] = [
         note='1600×900 paysage, marge sur les bords (docs/assets-ia.md §11) ; l’alerte rouge y a droit',
     ),
     Famille(
-        'planche de vues', ('*-anime', 'meta-eclat', 'meta-icones'), alpha=True, cote_max=8192,
-        poids_max_ko=600, note='une bande de vues côte à côte (docs/charte-visuelle.md)',
+        'planche de vues', ('*-anime', 'meta-eclat', 'meta-icones'), alpha=True, cote_max=4096,
+        poids_max_ko=600,
+        # 4096 : le plancher de MAX_TEXTURE_SIZE sur les téléphones encore en
+        # service — plus large, la bande ne se charge pas (render/planche.ts)
+        note='une bande de vues côte à côte (tools/images/planche.py, docs/charte-visuelle.md §8)',
     ),
     Famille(
         'décalque',

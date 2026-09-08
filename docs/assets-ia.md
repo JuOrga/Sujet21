@@ -614,3 +614,48 @@ fonds ». **Tant que les fichiers manquent, les jonctions restent telles
 qu'elles sont** : rien ne casse, la pièce s'ajoute quand elle arrive.
 Vérification en jeu : `__decor()` dans la console liste les décalques
 envoyés au rendu — les sas y apparaissent sous `sas-raccord`.
+
+---
+
+## 17. LES DÉCALQUES ANIMÉS — `<fichier>-anime.webp`
+
+**Une bande horizontale de vues côte à côte · WebP TRANSPARENT · ≤ 4096 px de large**
+
+Une planche de vues posée à côté de l'image fixe (`decal-vanne-anime.webp`
+à côté de `decal-vanne.webp`) et la pièce s'anime dans le jeu — absente, la
+pièce reste fixe. Le nombre de vues n'est écrit nulle part : il se déduit du
+rapport entre la bande et l'image fixe, donc **chaque vue a exactement le
+rapport de l'image fixe**. Le moteur joue 12 vues par seconde ; 8 vues font
+une boucle de deux tiers de seconde (une vanne qui tourne, une vapeur qui
+sort), 12 un mouvement plus long. Détail : `docs/charte-visuelle.md` §8,
+`src/render/planche.ts`.
+
+**Comment on la fabrique.** Pas d'image par vue au générateur d'images : deux
+tirages du même prompt ne se ressemblent pas. On part de l'image fixe LIVRÉE
+et on demande une vidéo à un générateur image-vers-vidéo (Kling, Runway,
+Luma, Veo…) :
+
+```
+Animate this exact image as a seamless loop: static camera, no zoom, no pan,
+nothing enters or leaves the frame, the background stays perfectly still and
+transparent; only the <valve wheel> moves — <one slow full rotation>. 2 seconds,
+loop the first and last frames identically. Keep the exact colors and lighting.
+```
+
+Puis, sur votre poste :
+
+```bash
+python3 tools/images/planche.py decal-vanne vanne.webm          # ou un dossier de PNG
+python3 tools/images/prepare.py decal-vanne-anime               # livre public/assets/
+```
+
+`planche.py` vérifie le rapport de chaque vue, exige la transparence (un
+WebM VP9 la porte ; un MP4 ne le peut pas : `--sans-alpha`, et il faudra
+détourer les vues avant), réduit les vues pour que la bande tienne dans
+4096 px, et écrit le master dans `masters/images/`. `prepare.py` le livre
+comme le reste.
+
+**Ce qui vaut la peine d'être animé** (dans cet ordre) : la vanne (elle
+tourne), l'écran allumé (il scintille), la gouttière de la serre (l'eau y
+coule), le blé nain (il ondule). Pas le sas de raccord ni les fioles : rien
+n'y bouge par nature.
