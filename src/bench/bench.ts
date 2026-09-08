@@ -246,7 +246,13 @@ export function createBench(
       storeStoredDefault(defaultTitle)
       rebuildList(list?.value)
       const def = changed ? presets.find((q) => q.title === defaultTitle) : undefined
-      if (def) {
+      if (def && options.defautDejaApplique) {
+        // le banc s'ouvre EN COURS DE PARTIE : un défaut partagé qui a
+        // changé depuis le lancement se montre, il ne s'applique pas —
+        // recopier tous les paramètres maintenant écraserait ce qui a bougé
+        montrePreset(def)
+        hint.textContent = `Le préset par défaut partagé a changé : « ${def.title} » — « Charger » pour l’appliquer.`
+      } else if (def) {
         applyPreset(def)
         hint.textContent = `Bibliothèque synchronisée — préset par défaut « ${def.title} » appliqué.`
       } else if (lib.presets.length > 0) {

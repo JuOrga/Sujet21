@@ -3055,8 +3055,8 @@
         font-family: var(--font-mono); font-size: calc(12px * var(--ui)); letter-spacing: 0.04em;
         color: var(--specimen); background: rgba(4, 10, 18, 0.82);
         border: 1px solid rgba(120, 200, 255, 0.35); border-radius: 6px;
-        padding: 6px 12px; pointer-events: none; white-space: nowrap; max-width: calc(100vw - 28px);
-        overflow: hidden; text-overflow: ellipsis;
+        padding: 6px 12px; pointer-events: none; max-width: calc(100vw - 28px);
+        text-align: center; /* sur un téléphone le mot passe à la ligne : la fin (« rechargez la page ») doit se lire */
       }
       #atelier-chargement::before {
         content: ''; flex: none; width: 8px; height: 8px; border-radius: 50%;
