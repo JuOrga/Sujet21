@@ -3045,6 +3045,33 @@
       .liv-e ul { margin: 6px 0 0; padding-left: 18px; }
       .liv-e li { font-family: var(--font-mono); font-size: calc(12px * var(--ui)); color: var(--ink); margin-top: 4px; line-height: 1.45; }
       #fps-coin[hidden] { display: none; }
+      /* ---- LE MOT DU CHARGEMENT DE L'ATELIER ----
+         Un cartouche centré en haut, au-dessus de tout : l'outil demandé
+         arrive (point qui respire), ou n'est pas venu (liseré chaud). */
+      #atelier-chargement[hidden] { display: none; }
+      #atelier-chargement {
+        position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 90;
+        display: flex; align-items: center; gap: 9px;
+        font-family: var(--font-mono); font-size: calc(12px * var(--ui)); letter-spacing: 0.04em;
+        color: var(--specimen); background: rgba(4, 10, 18, 0.82);
+        border: 1px solid rgba(120, 200, 255, 0.35); border-radius: 6px;
+        padding: 6px 12px; pointer-events: none; white-space: nowrap; max-width: calc(100vw - 28px);
+        overflow: hidden; text-overflow: ellipsis;
+      }
+      #atelier-chargement::before {
+        content: ''; flex: none; width: 8px; height: 8px; border-radius: 50%;
+        background: rgba(120, 200, 255, 0.95);
+        animation: atelier-respire 1.1s ease-in-out infinite;
+      }
+      #atelier-chargement.echec { border-color: rgba(255, 140, 90, 0.6); color: #ffd2b8; }
+      #atelier-chargement.echec::before { background: rgba(255, 140, 90, 0.95); animation: none; }
+      @keyframes atelier-respire {
+        0%, 100% { opacity: 0.25; transform: scale(0.7); }
+        50% { opacity: 1; transform: scale(1); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #atelier-chargement::before { animation: none; }
+      }
       #fps-coin {
         position: fixed; left: 10px; bottom: 10px; z-index: 30;
         font-family: var(--font-mono); font-size: calc(12px * var(--ui)); color: var(--specimen);
@@ -8856,6 +8883,10 @@
 
     <!-- Compteur FPS permanent (réglage AFFICHER LES FPS du voile PARAMÈTRES) -->
     <div id="fps-coin" hidden></div>
+    <!-- Le mot du chargement de l'atelier : les outils du concepteur
+         viennent à la demande (main.ts, chargeAtelier), ce cartouche dit
+         qu'ils arrivent — ou qu'ils ne sont pas venus. -->
+    <div id="atelier-chargement" hidden role="status" aria-live="polite"></div>
 
     <!-- Toast de trophée : la petite fanfare qui glisse depuis le bord -->
     <div id="trophee-toast" aria-live="polite"></div>

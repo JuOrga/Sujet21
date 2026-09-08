@@ -227,8 +227,8 @@ import {
   type ZoneForce,
   AMBIANTE_DEFAUT,
 } from './game/level'
-import { LevelEditor } from './editor/editor'
-import { EditeurCarte } from './editor/editeurCarte'
+import type { LevelEditor } from './editor/editor'
+import type { EditeurCarte } from './editor/editeurCarte'
 import { EcranCodex } from './game/ecranCodex'
 import { EcranMarchand } from './game/ecranMarchand'
 import {
@@ -373,7 +373,9 @@ import {
   pushTableauRecord,
   type SharedBoard,
 } from './game/netRecords'
-import { createBench, type BenchMonitor } from './bench/bench'
+import type { BenchMonitor } from './bench/bench'
+import type { Pane } from 'tweakpane'
+import { amorcePresets } from './bench/amorcePresets'
 import { appelle } from './game/reseau'
 
 const CAPACITY = 4096
@@ -4478,52 +4480,124 @@ document
 // « Essayer » vient-il de l'éditeur ? Si oui, on doit pouvoir y retourner
 // d'un geste, à tout instant — y compris depuis l'écran de fin d'essai.
 let fromEditor = false
-const editor = new LevelEditor(el('editor'), {
-  // les portées dessinées (aspiration du sas, auras, rails) suivent le banc
-  params: () => params,
-  play: (lvl) => {
-    testLevel = lvl
-    fromEditor = true
-    run.bonbonneLiters = 0
-    run.runTime = 0
-    hasPlayed = true
-    editor.close()
-    document.body.classList.add('playing')
-    input.paused = false
-    restart()
-  },
-  quit: () => {
-    editor.close()
-    fromEditor = false
-    testLevel = null
-    openHome()
-    restart()
-  },
-  operator: () => records.operator(),
-  // les menus déroulants de l'éditeur : les VRAIES cinématiques et séquences
-  // connues du poste — livrées, composées ici, et partagées en ligne
-  cines: () =>
-    [...CINEMATIQUES_LIVREES, ...chargeCinematiques(), ...cinesPartagees]
-      .filter((c, i, t) => t.findIndex((o) => o.code === c.code) === i)
-      .map((c) => ({ code: c.code, titre: c.titre })),
-  sequences: () =>
-    [SEQUENCE_ALERTE, ...sequencesJouees()]
-      .filter((s, i, t) => t.findIndex((o) => o.code === s.code) === i)
-      .map((s) => ({ code: s.code, titre: s.titre })),
-  // les biomes de la carte de la station : le champ Biome du tableau
-  biomes: () => biomesDeCarte(carte),
-  libraryChanged: (levels) => {
-    libraryLevels = levels.map((s) => s.level)
-    renderRegistres()
-    updateLibraryButton()
-    renderSalles()
-  },
-  // l'éditeur n'ordonne plus lui-même : son bouton renvoie à LA PLANCHE
-  planche: () => void ouvrePlanche(),
-  // L2 tenu = Maj : la multi-sélection au Steam Deck (trackpad droit en
-  // souris, aucune touche Maj sous la main)
-  modMulti: () => manette.ltVal > 0.5,
-})
+
+// ---- LE CHARGEMENT DE L'ATELIER ------------------------------------------
+// Les outils du concepteur — l'éditeur de tableaux, l'éditeur de la carte,
+// le banc de réglage (Tweakpane) — ne sont plus dans le paquet de départ :
+// import() les fait venir à la PREMIÈRE demande, en morceaux séparés par
+// Vite. Avant, ils étaient importés et construits au chargement du module :
+// un joueur qui n'ouvrait jamais le mode concepteur téléchargeait et
+// exécutait quand même dix mille lignes (paquet principal mesuré à 1 269 ko
+// avant, voir le commit). Entre le clic et l'outil, un mot à l'écran dit ce
+// qui se passe : sur un réseau lent, un bouton qui ne répond pas est un
+// bouton cassé. Et si le morceau ne vient pas (réseau coupé, cache
+// périmé), on le dit au lieu de se taire. Le mot demande de RECHARGER LA
+// PAGE, pas de réessayer : un module dont la lecture a échoué reste noté
+// en échec par le navigateur pour toute la vie de la page — un second
+// import() de la même adresse retombe aussitôt sur la même erreur, sans
+// rien redemander au réseau (vérifié en navigateur : le second appui
+// rendait le même mot, le rechargement ouvrait l'outil).
+const atelierChargementEl = document.getElementById('atelier-chargement') as HTMLDivElement | null
+let atelierChargementTimer = 0
+let atelierEnVol = 0 // chargements en cours : le mot ne s'efface qu'au dernier
+async function chargeAtelier<T>(quoi: string, charge: () => Promise<T>): Promise<T | null> {
+  window.clearTimeout(atelierChargementTimer)
+  atelierEnVol++
+  // « l’éditeur de tableaux » → « L’éditeur de tableaux se charge… » : le
+  // nom garde son article, la phrase commence par lui
+  const Quoi = quoi.charAt(0).toUpperCase() + quoi.slice(1)
+  if (atelierChargementEl) {
+    atelierChargementEl.textContent = `${Quoi} se charge…`
+    atelierChargementEl.classList.remove('echec')
+    atelierChargementEl.hidden = false
+  }
+  try {
+    const r = await charge()
+    atelierEnVol--
+    if (atelierChargementEl && atelierEnVol === 0) atelierChargementEl.hidden = true
+    return r
+  } catch (e) {
+    atelierEnVol--
+    console.error(`chargement de ${quoi}`, e)
+    if (atelierChargementEl) {
+      atelierChargementEl.textContent = `${Quoi} n’a pas pu se charger — vérifiez le réseau, puis rechargez la page.`
+      atelierChargementEl.classList.add('echec')
+      atelierChargementTimer = window.setTimeout(() => {
+        atelierChargementEl.hidden = true
+      }, 6000)
+    }
+    return null
+  }
+}
+
+let editor: LevelEditor | null = null
+let editorEnCours: Promise<LevelEditor | null> | null = null
+/** L'éditeur de tableaux, construit au premier appel — null si le morceau
+ *  n'a pas pu venir (le mot d'échec est déjà à l'écran). */
+function chargeEditeur(): Promise<LevelEditor | null> {
+  if (editor) return Promise.resolve(editor)
+  if (editorEnCours) return editorEnCours
+  editorEnCours = chargeAtelier('l’éditeur de tableaux', async () => {
+    const { LevelEditor } = await import('./editor/editor')
+    const ed = new LevelEditor(el('editor'), {
+      // les portées dessinées (aspiration du sas, auras, rails) suivent le banc
+      params: () => params,
+      play: (lvl) => {
+        testLevel = lvl
+        fromEditor = true
+        run.bonbonneLiters = 0
+        run.runTime = 0
+        hasPlayed = true
+        ed.close()
+        document.body.classList.add('playing')
+        input.paused = false
+        restart()
+      },
+      quit: () => {
+        ed.close()
+        fromEditor = false
+        testLevel = null
+        openHome()
+        restart()
+      },
+      operator: () => records.operator(),
+      // les menus déroulants de l'éditeur : les VRAIES cinématiques et séquences
+      // connues du poste — livrées, composées ici, et partagées en ligne
+      cines: () =>
+        [...CINEMATIQUES_LIVREES, ...chargeCinematiques(), ...cinesPartagees]
+          .filter((c, i, t) => t.findIndex((o) => o.code === c.code) === i)
+          .map((c) => ({ code: c.code, titre: c.titre })),
+      sequences: () =>
+        [SEQUENCE_ALERTE, ...sequencesJouees()]
+          .filter((s, i, t) => t.findIndex((o) => o.code === s.code) === i)
+          .map((s) => ({ code: s.code, titre: s.titre })),
+      // les biomes de la carte de la station : le champ Biome du tableau
+      biomes: () => biomesDeCarte(carte),
+      libraryChanged: (levels) => {
+        libraryLevels = levels.map((s) => s.level)
+        renderRegistres()
+        updateLibraryButton()
+        renderSalles()
+      },
+      // l'éditeur n'ordonne plus lui-même : son bouton renvoie à LA PLANCHE
+      planche: () => void ouvrePlanche(),
+      // L2 tenu = Maj : la multi-sélection au Steam Deck (trackpad droit en
+      // souris, aucune touche Maj sous la main)
+      modMulti: () => manette.ltVal > 0.5,
+    })
+    editor = ed
+    // la bibliothèque que la planche a déjà reçue du serveur : l'éditeur
+    // l'adopte telle quelle (re-télécharger tomberait sur le cache, 60 s)
+    if (plancheTous.length > 0) ed.adopteBibliotheque(plancheTous)
+    return ed
+  }).then((ed) => {
+    // échec : le chargeur s'oublie — un prochain clic redira le mot (le
+    // navigateur, lui, garde l'échec du module : voir chargeAtelier)
+    if (!ed) editorEnCours = null
+    return ed
+  })
+  return editorEnCours
+}
 
 // Un élément ne défile de côté que s'il l'a déclaré : « hidden » (ou
 // « visible ») refuse la molette et l'ascenseur, mais PAS l'écriture de
@@ -4705,7 +4779,7 @@ function plancheSync(saved: StoredLevel[]): void {
   renderRegistres()
   updateLibraryButton()
   renderSalles()
-  editor.adopteBibliotheque(saved)
+  editor?.adopteBibliotheque(saved)
   renderPlanche()
 }
 async function ouvrePlanche(): Promise<void> {
@@ -5079,8 +5153,7 @@ function renderPlanche(): void {
       e.stopPropagation()
       plancheEl.hidden = true
       sallesEl.hidden = true
-      openEditor()
-      editor.ouvreTableau(s.id)
+      void openEditor().then((ed) => ed?.ouvreTableau(s.id))
     })
     // l'ESSAI : la carte se joue, et on saura revenir ici même
     carte.querySelector('.pl-jouer')?.addEventListener('click', (e) => {
@@ -5088,7 +5161,7 @@ function renderPlanche(): void {
       plancheScroll = corps.scrollTop
       plancheEl.hidden = true
       sallesEl.hidden = true
-      editor.close() // la planche peut être posée sur l'éditeur : on le replie
+      editor?.close() // la planche peut être posée sur l'éditeur : on le replie
       startTest([s.level])
       // startTest peut rendre la main à la fiche (nom d'opérateur manquant) :
       // le retour ne s'arme que si l'essai a vraiment démarré
@@ -6449,55 +6522,77 @@ fetchLibrary().then((lib) => {
 })
 
 // Sonde de débogage/test : le tableau en cours d'édition
-;(window as unknown as { __editorLevel: () => LevelDef }).__editorLevel = () =>
-  editor.currentLevel()
+;(window as unknown as { __editorLevel: () => LevelDef | null }).__editorLevel = () =>
+  editor?.currentLevel() ?? null
 // L'éditeur possède son document : on le rouvre tel qu'on l'a laissé, sans
 // écraser le travail en cours par le tableau qu'on vient d'essayer.
-function openEditor(): void {
+// Il se charge au premier appel : l'écran ne bascule qu'une fois l'outil
+// là — un échec de chargement laisse le jeu exactement où il était.
+async function openEditor(): Promise<LevelEditor | null> {
+  const ed = await chargeEditeur()
+  if (!ed) return null
   overlay.classList.remove('visible')
   document.body.classList.remove('playing')
   // l'éditeur a la main : le jeu se met en PAUSE derrière lui — la physique
   // ne tourne plus dans son dos (« Essayer » relance, quitter rend la fiche)
   input.paused = true
-  editor.open()
+  ed.open()
+  return ed
 }
 // ---- L'ÉDITEUR DE LA CARTE DE LA STATION (editor/editeurCarte.ts) ----
 // Même porte que l'éditeur de tableaux : mode concepteur, ou ?carte dans
 // l'URL. Il couvre l'écran et fige la partie derrière lui.
-const editeurCarte = new EditeurCarte(el('carte-editeur'), {
-  quit: () => {
-    editeurCarte.close()
-    openHome()
-  },
-  partage: {
-    charge: async () => {
-      const p = await fetchReglage('carte')
-      if (!p) return null
-      cartePubliee = litCartePubliee(p.document)
-      return { carte: cartePubliee, auteur: p.auteur, date: p.date }
-    },
-    publie: async (c) => {
-      const p = await pushReglage('carte', documentCarte(c), records.operator() || 'anonyme')
-      if (!p) return false
-      cartePubliee = litCartePubliee(p.document)
-      appliqueCartePubliee(cartePubliee)
-      return cartePubliee !== null
-    },
-    retire: async () => {
-      const ok = await deleteReglage('carte')
-      if (ok) {
-        cartePubliee = null
-        appliqueCartePubliee(null)
-      }
-      return ok
-    },
-  },
-})
-function openEditeurCarte(): void {
+let editeurCarte: EditeurCarte | null = null
+let editeurCarteEnCours: Promise<EditeurCarte | null> | null = null
+function chargeEditeurCarte(): Promise<EditeurCarte | null> {
+  if (editeurCarte) return Promise.resolve(editeurCarte)
+  if (editeurCarteEnCours) return editeurCarteEnCours
+  editeurCarteEnCours = chargeAtelier('l’éditeur de la carte', async () => {
+    const { EditeurCarte } = await import('./editor/editeurCarte')
+    const ec = new EditeurCarte(el('carte-editeur'), {
+      quit: () => {
+        ec.close()
+        openHome()
+      },
+      partage: {
+        charge: async () => {
+          const p = await fetchReglage('carte')
+          if (!p) return null
+          cartePubliee = litCartePubliee(p.document)
+          return { carte: cartePubliee, auteur: p.auteur, date: p.date }
+        },
+        publie: async (c) => {
+          const p = await pushReglage('carte', documentCarte(c), records.operator() || 'anonyme')
+          if (!p) return false
+          cartePubliee = litCartePubliee(p.document)
+          appliqueCartePubliee(cartePubliee)
+          return cartePubliee !== null
+        },
+        retire: async () => {
+          const ok = await deleteReglage('carte')
+          if (ok) {
+            cartePubliee = null
+            appliqueCartePubliee(null)
+          }
+          return ok
+        },
+      },
+    })
+    editeurCarte = ec
+    return ec
+  }).then((ec) => {
+    if (!ec) editeurCarteEnCours = null
+    return ec
+  })
+  return editeurCarteEnCours
+}
+async function openEditeurCarte(): Promise<void> {
+  const ec = await chargeEditeurCarte()
+  if (!ec) return
   overlay.classList.remove('visible')
   document.body.classList.remove('playing')
   input.paused = true
-  editeurCarte.open()
+  ec.open()
 }
 
 // ---- LA RÉGIE : la console du concepteur (editor/regie.ts) ----------------
@@ -6523,7 +6618,7 @@ const regie = new Regie(regieEl, {
         // l'éditeur de carte vit SOUS la régie (z-index) : on la ferme, sa
         // porte ↩ Accueil ramène à la fiche
         regie.close()
-        openEditeurCarte()
+        void openEditeurCarte()
       },
     },
     {
@@ -6619,7 +6714,7 @@ const regie = new Regie(regieEl, {
       domaines: [],
       ouvre: () => {
         regie.close()
-        openEditor()
+        void openEditor()
       },
     },
     {
@@ -6692,7 +6787,7 @@ const regie = new Regie(regieEl, {
 document.getElementById('home-regie')?.addEventListener('click', () => regie.open())
 // Sonde de test : la carte en cours d'édition
 ;(window as unknown as { __carte: () => unknown }).__carte = () =>
-  editeurCarte.carteCourante()
+  editeurCarte?.carteCourante() ?? null
 // ---- Le panneau COMMANDES : trois onglets (PC, manette, tactile) ----
 // Les commandes ont quitté la fiche : un bouton, un panneau, trois écrans.
 const cmdsEl = document.getElementById('cmds') as HTMLDivElement
@@ -6752,7 +6847,7 @@ window.addEventListener('keydown', (e) => {
     // le plan de la station passe AVANT tout : c'est le voile du dessus, et
     // il a figé la partie — Échap doit d'abord la rendre
     if (stationEl && !stationEl.hidden) ouvreStation(false)
-    else if (editeurCarte.visible) {
+    else if (editeurCarte?.visible) {
       // le geste, puis la sélection, puis l'écran : Échap défait dans l'ordre
       if (!editeurCarte.echap()) {
         editeurCarte.close()
@@ -6828,11 +6923,11 @@ const input = new Input()
 // module au premier lancement (TDZ) et laissait une page à moitié câblée.
 if (new URLSearchParams(location.search).has('editeur')) {
   hasPlayed = true
-  openEditor()
+  void openEditor()
 }
 if (new URLSearchParams(location.search).has('carte')) {
   hasPlayed = true
-  openEditeurCarte()
+  void openEditeurCarte()
 }
 // CRYOSTASE : tant que l'éveil n'a pas été joué, l'échantillon attend GELÉ
 // dès le premier pixel — même en dérive derrière la fiche. Le premier
@@ -12952,7 +13047,7 @@ function resetAction(): void {
   if (testLevel) {
     if (run.ended) {
       if (fromEditor) {
-        openEditor() // l'essai vient de l'éditeur : on y retourne
+        void openEditor() // l'essai vient de l'éditeur : on y retourne
         return
       }
       if (fromPlanche) {
@@ -13021,643 +13116,667 @@ function resetAction(): void {
 
 document.getElementById('overlay-btn')!.addEventListener('click', resetAction)
 
-const pane = createBench(params, monitor, {
-  reset: resetAction,
-  autoZoom: () => camera.resetAutoZoom(),
-  oeil: { regl: oeilRegl, defauts: OEIL_DEFAUTS, sauve: sauveOeil },
-  // le PUPITRE au banc : mêmes manœuvres, catalogue lu sur le panneau
-  pupitre: { sections: cataloguePupitre(), lance: actionPupitre },
-  perf: { copier: copiePerf, envoyer: envoiePerf },
-  ciel: cielReglages,
-  parallaxe: parallaxeReglages,
-  tableaux: TABLEAUX.map((t) => t.name),
-  gotoTableau: (index) => {
-    testLevel = null // le banc navigue dans l'expédition, pas dans le prototype
-    auHub = false
-    fromEditor = false
-    levelIndex = index
-    restart()
-  },
-  gotoBis: () => startBisTest(),
-  sound: {
-    get actif() {
-      return audio.enabled
-    },
-    set actif(v: boolean) {
-      audio.resume()
-      audio.setEnabled(v)
-      if (v) {
-        bande.eveiller()
+// L'AMORCE des présets reste au démarrage, pour tout le monde : le préset
+// par défaut des testeurs s'applique ici, sans le banc (amorcePresets.ts).
+amorcePresets(params)
+let pane: Pane | null = null
+let benchHost: HTMLElement | null = null
+let benchEnCours: Promise<Pane | null> | null = null
+function chargeBanc(): Promise<Pane | null> {
+  if (pane) return Promise.resolve(pane)
+  if (benchEnCours) return benchEnCours
+  benchEnCours = chargeAtelier('le banc de réglage', async () => {
+    const { createBench } = await import('./bench/bench')
+    const p = createBench(params, monitor, {
+      reset: resetAction,
+      autoZoom: () => camera.resetAutoZoom(),
+      oeil: { regl: oeilRegl, defauts: OEIL_DEFAUTS, sauve: sauveOeil },
+      // le PUPITRE au banc : mêmes manœuvres, catalogue lu sur le panneau
+      pupitre: { sections: cataloguePupitre(), lance: actionPupitre },
+      perf: { copier: copiePerf, envoyer: envoiePerf },
+      ciel: cielReglages,
+      parallaxe: parallaxeReglages,
+      tableaux: TABLEAUX.map((t) => t.name),
+      gotoTableau: (index) => {
+        testLevel = null // le banc navigue dans l'expédition, pas dans le prototype
+        auHub = false
+        fromEditor = false
+        levelIndex = index
+        restart()
+      },
+      gotoBis: () => startBisTest(),
+      sound: {
+        get actif() {
+          return audio.enabled
+        },
+        set actif(v: boolean) {
+          audio.resume()
+          audio.setEnabled(v)
+          if (v) {
+            bande.eveiller()
+          }
+          majInviteSon()
+        },
+        get volume() {
+          return audio.volume
+        },
+        set volume(v: number) {
+          audio.setVolume(v)
+        },
+      },
+    }, { defautDejaApplique: true })
+        pane = p
+        benchHost = p.element.closest('.tp-dfwv') as HTMLElement | null
+        return p
+      }).then((p) => {
+        if (!p) benchEnCours = null
+        return p
+      })
+      return benchEnCours
+    }
+    input.onReset = resetAction
+    input.onZoom = (factor, cx, cy) =>
+      camera.zoomAt(factor, cx, cy, window.innerWidth, window.innerHeight, params)
+    input.onPan = (dx, dy) => camera.panBy(dx, dy)
+    input.onPanEnd = (vx, vy) => camera.flingBy(vx, vy)
+    input.onVortex = (clientX, clientY) => {
+      if (params.vortexEnabled < 0.5) return // outil de test, coupé dans le protocole
+      const w = camera.screenToWorld(
+        clientX,
+        clientY,
+        window.innerWidth,
+        window.innerHeight,
+      )
+      vortex.x = w.x
+      vortex.y = w.y
+      vortex.timer = params.vortexDuration
+      audio.vortex()
+      bande.bruitage('vortex-sas', 0.55)
+    }
+
+    // Barre tactile : les commandes clavier/souris accessibles au doigt
+    const touchbar = document.getElementById('touchbar') as HTMLDivElement
+    function touchButton(
+      label: string,
+      title: string,
+      onTap: () => void,
+      cls = '',
+    ): HTMLButtonElement {
+      const b = document.createElement('button')
+      b.textContent = label
+      b.title = title
+      if (cls) b.className = cls
+      b.addEventListener('click', onTap)
+      touchbar.appendChild(b)
+      return b
+    }
+
+    // Panneaux de lecture : la légende des surfaces et les trois états (qui
+    // bloque quoi). Chips étiquetées en tête de barre — mises en évidence, sans
+    // rivaliser avec le sélecteur d'état. Un seul panneau ouvert à la fois.
+    const legend = document.getElementById('legend') as HTMLDivElement
+    const statesPanel = document.getElementById('states') as HTMLDivElement
+    function togglePanel(el: HTMLDivElement, other: HTMLDivElement): void {
+      const show = !el.classList.contains('visible')
+      other.classList.remove('visible')
+      el.classList.toggle('visible', show)
+    }
+    const toggleLegend = (): void => togglePanel(legend, statesPanel)
+    const toggleStates = (): void => togglePanel(statesPanel, legend)
+    document.getElementById('legend-close')!.addEventListener('click', toggleLegend)
+    document.getElementById('states-close')!.addEventListener('click', toggleStates)
+
+    // Banc de réglage : plus de panneau flottant permanent en haut — le bouton
+    // BANC de la barre le montre et le masque. Le premier appui le CHARGE
+    // (Tweakpane et le banc ne sont pas dans le paquet de départ), puis le
+    // montre : Tweakpane pose son panneau ouvert, c'est ce qu'on a demandé.
+    function toggleBench(): void {
+      if (benchHost) {
+        benchHost.style.display = benchHost.style.display === 'none' ? '' : 'none'
+        return
       }
-      majInviteSon()
-    },
-    get volume() {
-      return audio.volume
-    },
-    set volume(v: number) {
-      audio.setVolume(v)
-    },
-  },
-})
-input.onReset = resetAction
-input.onZoom = (factor, cx, cy) =>
-  camera.zoomAt(factor, cx, cy, window.innerWidth, window.innerHeight, params)
-input.onPan = (dx, dy) => camera.panBy(dx, dy)
-input.onPanEnd = (vx, vy) => camera.flingBy(vx, vy)
-input.onVortex = (clientX, clientY) => {
-  if (params.vortexEnabled < 0.5) return // outil de test, coupé dans le protocole
-  const w = camera.screenToWorld(
-    clientX,
-    clientY,
-    window.innerWidth,
-    window.innerHeight,
-  )
-  vortex.x = w.x
-  vortex.y = w.y
-  vortex.timer = params.vortexDuration
-  audio.vortex()
-  bande.bruitage('vortex-sas', 0.55)
-}
+      if (benchEnCours) return // en route : un second appui n'empile rien
+      void chargeBanc()
+    }
 
-// Barre tactile : les commandes clavier/souris accessibles au doigt
-const touchbar = document.getElementById('touchbar') as HTMLDivElement
-function touchButton(
-  label: string,
-  title: string,
-  onTap: () => void,
-  cls = '',
-): HTMLButtonElement {
-  const b = document.createElement('button')
-  b.textContent = label
-  b.title = title
-  if (cls) b.className = cls
-  b.addEventListener('click', onTap)
-  touchbar.appendChild(b)
-  return b
-}
+    const chipLegend = touchButton(
+      'LÉGENDE',
+      'légende des surfaces (L)',
+      toggleLegend,
+      'tb-chip',
+    )
+    const chipStates = touchButton(
+      'ÉTATS',
+      'les trois états : qui bloque quoi (E)',
+      toggleStates,
+      'tb-chip',
+    )
+    const chipBench = touchButton(
+      'BANC',
+      'banc de réglage : la physique en direct',
+      toggleBench,
+      'tb-chip',
+    )
+    // Retour à l'éditeur : n'apparaît que pendant l'essai d'un tableau édité
+    const chipEditor = touchButton(
+      '↩ ÉDITEUR',
+      'revenir à l’éditeur (le tableau est retrouvé tel qu’il était)',
+      () => void openEditor(),
+      'tb-chip tb-editor',
+    )
+    chipEditor.style.display = 'none'
+    // LE HUB À TOUT MOMENT (outil de conception) : le module d'accueil est
+    // atteignable depuis n'importe quelle salle, sans repasser par la fiche ni
+    // abandonner la run. Réservé au mode concepteur (data-dev, comme les autres
+    // outils) : en partie publique, quitter une salle d'un doigt casserait la
+    // descente. La run n'est pas purgée — bonbonne, XP et instruments restent ;
+    // c'est le sas du hub qui relance une descente.
+    const chipHub = touchButton(
+      '⌂ HUB',
+      'aller au hub tout de suite (mode concepteur) — la salle en cours est quittée, la run n’est pas purgée',
+      () => {
+        if (miseEnBonbonne) fermeMiseEnBonbonne()
+        entrerHub()
+      },
+      'tb-chip tb-hub',
+    )
+    chipHub.dataset.dev = ''
 
-// Panneaux de lecture : la légende des surfaces et les trois états (qui
-// bloque quoi). Chips étiquetées en tête de barre — mises en évidence, sans
-// rivaliser avec le sélecteur d'état. Un seul panneau ouvert à la fois.
-const legend = document.getElementById('legend') as HTMLDivElement
-const statesPanel = document.getElementById('states') as HTMLDivElement
-function togglePanel(el: HTMLDivElement, other: HTMLDivElement): void {
-  const show = !el.classList.contains('visible')
-  other.classList.remove('visible')
-  el.classList.toggle('visible', show)
-}
-const toggleLegend = (): void => togglePanel(legend, statesPanel)
-const toggleStates = (): void => togglePanel(statesPanel, legend)
-document.getElementById('legend-close')!.addEventListener('click', toggleLegend)
-document.getElementById('states-close')!.addEventListener('click', toggleStates)
-
-// Banc de réglage : plus de panneau flottant permanent en haut — le bouton
-// BANC de la barre le montre et le masque.
-const benchHost = pane.element.closest('.tp-dfwv') as HTMLElement | null
-if (benchHost) benchHost.style.display = 'none'
-function toggleBench(): void {
-  if (!benchHost) return
-  benchHost.style.display = benchHost.style.display === 'none' ? '' : 'none'
-}
-
-const chipLegend = touchButton(
-  'LÉGENDE',
-  'légende des surfaces (L)',
-  toggleLegend,
-  'tb-chip',
-)
-const chipStates = touchButton(
-  'ÉTATS',
-  'les trois états : qui bloque quoi (E)',
-  toggleStates,
-  'tb-chip',
-)
-const chipBench = touchButton(
-  'BANC',
-  'banc de réglage : la physique en direct',
-  toggleBench,
-  'tb-chip',
-)
-// Retour à l'éditeur : n'apparaît que pendant l'essai d'un tableau édité
-const chipEditor = touchButton(
-  '↩ ÉDITEUR',
-  'revenir à l’éditeur (le tableau est retrouvé tel qu’il était)',
-  () => openEditor(),
-  'tb-chip tb-editor',
-)
-chipEditor.style.display = 'none'
-// LE HUB À TOUT MOMENT (outil de conception) : le module d'accueil est
-// atteignable depuis n'importe quelle salle, sans repasser par la fiche ni
-// abandonner la run. Réservé au mode concepteur (data-dev, comme les autres
-// outils) : en partie publique, quitter une salle d'un doigt casserait la
-// descente. La run n'est pas purgée — bonbonne, XP et instruments restent ;
-// c'est le sas du hub qui relance une descente.
-const chipHub = touchButton(
-  '⌂ HUB',
-  'aller au hub tout de suite (mode concepteur) — la salle en cours est quittée, la run n’est pas purgée',
-  () => {
-    if (miseEnBonbonne) fermeMiseEnBonbonne()
-    entrerHub()
-  },
-  'tb-chip tb-hub',
-)
-chipHub.dataset.dev = ''
-
-// La barre du bas passe sur deux lignes quand elle se remplit (le bouton de
-// retour à l'éditeur, par exemple). On publie sa hauteur réelle en variable
-// CSS : le sélecteur d'état se recale dessus au lieu de la chevaucher.
-function publishTouchbarHeight(): void {
-  const h = Math.round(touchbar.getBoundingClientRect().height)
-  if (h > 0) document.documentElement.style.setProperty('--tb-h', `${h}px`)
-}
-if (typeof ResizeObserver !== 'undefined') {
-  new ResizeObserver(publishTouchbarHeight).observe(touchbar)
-} else {
-  window.addEventListener('resize', publishTouchbarHeight)
-}
-publishTouchbarHeight()
-{
-  // au doigt, les chips ont leur rangée, les glyphes la leur
-  const brk = document.createElement('i')
-  brk.className = 'tb-break'
-  touchbar.appendChild(brk)
-}
-const btnPause = touchButton('⏸', 'pause (espace)', () => input.togglePause())
-// Le TEMPS en un seul bloc : ralentir · la vitesse courante · accélérer.
-// La vitesse est une INFO permanente (elle s'allume dès qu'on quitte ×1),
-// et le groupe reste au doigt — savoir à quelle vitesse on joue n'est pas
-// un réglage de banc.
-const tbTime = document.createElement('div')
-tbTime.id = 'tb-time'
-touchbar.appendChild(tbTime)
-const timeButton = (
-  label: string,
-  title: string,
-  onTap: () => void,
-): HTMLButtonElement => {
-  const b = document.createElement('button')
-  b.textContent = label
-  b.title = title
-  b.addEventListener('click', onTap)
-  tbTime.appendChild(b)
-  return b
-}
-timeButton('‹', 'ralentir le temps (,)', () => input.stepWarp(-1))
-const tbSpeed = document.createElement('span')
-tbSpeed.id = 'tb-speed'
-tbSpeed.textContent = '×1'
-tbSpeed.title = 'vitesse du temps simulé'
-tbTime.appendChild(tbSpeed)
-timeButton('›', 'accélérer le temps (.)', () => input.stepWarp(1))
-// le DOSSIER a son bouton dans la barre : au doigt comme au Deck, on n'a
-// pas toujours un clavier sous la main
-touchButton('▤', 'dossier de descente (Tab)', () =>
-  ouvreDossier(!dossierOuvert),
-)
-touchButton('🛰\uFE0E', 'le plan de la station (C)', () => ouvreStation(true))
-const btnVortex = touchButton(
-  '🌀',
-  'vortex : armer puis toucher l’écran (clic droit)',
-  () => {
-    input.vortexArmed = !input.vortexArmed
-  },
-  'tb-vortex',
-)
-
-// ---- LE CADRAN DU CYCLE (refonte du sélecteur d'état) -------------------
-// Trois LOGEMENTS fixes — ❄ à gauche, 💧 au centre, 💨 à droite : la
-// mémoire musculaire tient, au doigt comme à la manette (X / B / Y). Mais
-// ce qu'ils montrent a changé : le logement de l'état COURANT devient le
-// MÉDAILLON (l'identité, pas une commande), et les autres ne paraissent
-// que si la TRANSFORMATION qui y mène est tissée — ils portent alors son
-// NOM (FUSION, SOLIDIFICATION…), le vocabulaire de l'écran des mémoires.
-// Au tout début de partie : le médaillon seul, AUCUN bouton — c'est voulu.
-// Le médaillon reste cliquable : re-toucher son état, c'est demander le
-// retour au liquide (le geste historique du dégel ne se perd pas).
-const stateEau = document.getElementById('state-eau') as HTMLButtonElement
-const stateGlace = document.getElementById('state-glace') as HTMLButtonElement
-const stateVapeur = document.getElementById('state-vapeur') as HTMLButtonElement
-const stateZoneEl = document.getElementById('state-zone') as HTMLDivElement
-const statebarEl = document.getElementById('statebar') as HTMLDivElement
-stateEau.addEventListener('click', () => input.demande('eau'))
-stateGlace.addEventListener('click', () => input.demande('glace'))
-stateVapeur.addEventListener('click', () => input.demande('vapeur'))
-
-// Le GARDE du cycle : en descente (hors tableau d'atelier et tableaux
-// « états libres »), une transformation MANUELLE exige son lien tissé.
-// Les régimes du décor (zones, chaudière, cryostase) n'y passent pas.
-const CYCLE_PAR_ETAT = {
-  eau: 'liquide',
-  glace: 'solide',
-  vapeur: 'gaz',
-} as const
-function cycleGateActif(): boolean {
-  return testLevel === null && level.etats !== 'libres'
-}
-input.peutDevenir = (vers) => {
-  if (!cycleGateActif()) return true
-  const t = transfoEntre(
-    CYCLE_PAR_ETAT[input.etatManuel()],
-    CYCLE_PAR_ETAT[vers],
-  )
-  return (
-    t !== null &&
-    transfoTenue(t.id, records.eveilAcquis(), records.verrousCycle())
-  )
-}
-// Un refus MONTRE le verrou : le logement visé paraît quelques secondes,
-// cadenassé, le nom du lien à tisser dessus — l'envie se sème là.
-const verrouEtat = { slot: null as EtatManuel | null, jusqua: 0 }
-input.onDevenirRefuse = (vers) => {
-  verrouEtat.slot = vers
-  verrouEtat.jusqua = performance.now() / 1000 + 2.6
-}
-
-// Le cadran ne réécrit le DOM que quand sa SIGNATURE change — pas à
-// chaque image. La zone forcée verrouille tout et s'annonce en badge.
-let cadranSignature = ''
-function majCadranEtats(zoneActive: ZoneForce): void {
-  const cur = input.etatManuel()
-  const manetteActive = manette.lastActivity > input.lastPointerAt
-  const verrou =
-    verrouEtat.slot !== null && performance.now() / 1000 < verrouEtat.jusqua
-      ? verrouEtat.slot
-      : null
-  const acquis = records.eveilAcquis()
-  const verrousCycle = records.verrousCycle()
-  const gate = cycleGateActif()
-  const zone = zoneActive !== 'libre'
-  const sig = [
-    cur,
-    manetteActive,
-    verrou,
-    zoneActive,
-    gate,
-    acquis.join('+'),
-    verrousCycle.join('+'),
-  ].join('|')
-  if (sig === cadranSignature) return
-  cadranSignature = sig
-  const NOMS_ETAT = {
-    eau: 'LIQUIDE',
-    glace: 'GLACE',
-    vapeur: 'VAPEUR',
-  } as const
-  const slots = [
-    { el: stateGlace, etat: 'glace' as const, kbd: 'F', pad: 'X' },
-    {
-      el: stateEau,
-      etat: 'eau' as const,
-      kbd: cur === 'vapeur' ? 'G' : 'F',
-      pad: 'B',
-    },
-    { el: stateVapeur, etat: 'vapeur' as const, kbd: 'G', pad: 'Y' },
-  ]
-  for (const s of slots) {
-    const label = s.el.querySelector('.st-label') as HTMLElement | null
-    const kbd = s.el.querySelector('kbd') as HTMLElement | null
-    if (!label || !kbd) continue
-    const estCur = s.etat === cur
-    const t = estCur
-      ? null
-      : transfoEntre(CYCLE_PAR_ETAT[cur], CYCLE_PAR_ETAT[s.etat])
-    const tenue =
-      t !== null && (!gate || transfoTenue(t.id, acquis, verrousCycle))
-    const montreVerrou = !estCur && !tenue && t !== null && verrou === s.etat
-    s.el.hidden = !estCur && !tenue && !montreVerrou
-    s.el.classList.toggle('active', estCur)
-    s.el.classList.toggle('st-cur', estCur)
-    s.el.classList.toggle('st-verrou', montreVerrou)
-    s.el.disabled = zone || montreVerrou
-    label.textContent = !estCur && t ? t.nom : NOMS_ETAT[s.etat]
-    kbd.textContent = montreVerrou ? '🔒' : manetteActive ? s.pad : s.kbd
-    kbd.hidden = estCur
-    s.el.title = estCur
-      ? 're-toucher : revenir liquide'
-      : montreVerrou
-        ? `${t?.nom} — mémoire non tissée. Passez par le liquide, ou tissez le lien à l’écran des MÉMOIRES.`
-        : (t?.desc ?? '')
-  }
-  statebarEl.classList.toggle('st-zone', zone)
-  stateZoneEl.hidden = !zone
-  if (zone)
-    stateZoneEl.textContent = `🔒 ${ZONE_CAUSES[zoneActive]} — RÉGIME IMPOSÉ`
-}
-
-// ---- LE DOSSIER DE DESCENTE : tout le relevé, d'un seul geste -----------
-// TAB (le bouton ▤ de la barre, R3 à la manette) fait glisser le panneau
-// depuis la droite : la salle et son identité, le corps et ses réserves,
-// le cycle et ce qu'il permet ICI, le butin, l'équipement embarqué. Il ne
-// fige RIEN — la descente continue derrière, c'est un dossier qu'on
-// consulte en jouant. Rafraîchi quatre fois par seconde tant qu'il est
-// ouvert ; fermé, il ne coûte pas une instruction.
-const dossierEl = document.getElementById('dossier') as HTMLElement
-const doCorps = document.getElementById('do-corps') as HTMLDivElement
-const doChrono = document.getElementById('do-chrono') as HTMLElement
-dossierEl.hidden = false // le panneau vit hors-champ : c'est le glissement qui le montre
-dossierEl.setAttribute('aria-hidden', 'true')
-let dossierOuvert = false
-let dossierProchainMaj = 0
-
-// Les briques du dossier : une barre, une rangée de pastilles, une tuile.
-// Elles disent toutes la même chose de la même façon — une icône, un mot en
-// capitales, la mesure à droite —, pour que l'œil apprenne la grammaire du
-// panneau en une lecture.
-const doPastilles = (n: number, max: number, cls = ''): string => {
-  let h = ''
-  for (let i = 0; i < max; i++)
-    h += `<i class="${cls}${i < n ? ' plein' : ''}"></i>`
-  return h
-}
-
-/** Une BARRE : l'icône, le mot, la valeur, la jauge — et sous elle, la
- *  précision chiffrée pour qui veut la lire (elle éclaire la barre, elle ne
- *  la remplace pas). */
-function doBarre(
-  icone: string,
-  nom: string,
-  valeur: string,
-  frac: number,
-  o: { cls?: string; jauge?: string; note?: string } = {},
-): string {
-  const p = Math.max(0, Math.min(1, frac)) * 100
-  return (
-    '<div class="do-barre">' +
-    `<div><u>${icone}</u>${nom}<b class="${o.cls ?? ''}">${valeur}</b></div>` +
-    `<div class="do-jauge ${o.jauge ?? ''}"><i style="width:${p}%"></i></div>` +
-    '</div>' +
-    (o.note ? `<p class="do-note">${o.note}</p>` : '')
-  )
-}
-
-/** Une RÉSERVE qui se compte sur les doigts : des pastilles, pas un ratio. */
-function doPastilleLigne(
-  icone: string,
-  nom: string,
-  n: number,
-  max: number,
-  cls: string,
-  note: string,
-): string {
-  return (
-    '<div class="do-barre">' +
-    `<div><u>${icone}</u>${nom}<div class="do-pastilles">${doPastilles(n, max, cls)}</div></div>` +
-    '</div>' +
-    `<p class="do-note">${note}</p>`
-  )
-}
-
-/** Une TUILE de butin : le gain se regarde, il ne se lit pas dans un tableau. */
-const doTuile = (icone: string, val: string, quoi: string, cls = ''): string =>
-  `<div class="do-tuile ${cls}"><u>${icone}</u><b>${val}</b><span>${quoi}</span></div>`
-
-/** LE RAIL de la descente, en crans — une couture à chaque changement de
- *  moment (début · milieu · fin). En VOIE le plan donne le moment de chaque
- *  rang ; en descente ordinaire, c'est le code de la salle elle-même qui le
- *  dit. Au-delà de soixante salles, le rail ne veut plus rien dire : on
- *  l'omet plutôt que d'aligner des cheveux. */
-function momentDuRang(r: number, total: number): 1 | 2 | 3 {
-  if (voiePlan.longueur > 0) return momentAuRang(r, planEffectif())
-  const lv = playedLevels()[r - 1]
-  const id = lv ? identiteAtelier(lv) : null
-  if (id) return id.moment
-  // sans code lisible, on retombe sur les tiers de la séquence
-  return r <= total / 3 ? 1 : r <= (2 * total) / 3 ? 2 : 3
-}
-
-function railDescente(rang: number, total: number): string {
-  if (total < 2 || total > 60) return ''
-  let h = '<div class="do-rail">'
-  for (let r = 1; r <= total; r++) {
-    if (r > 1 && momentDuRang(r, total) !== momentDuRang(r - 1, total))
-      h += '<i class="coupe"></i>'
-    h += `<i class="${r < rang ? 'franchi' : r === rang ? 'courant' : ''}"></i>`
-  }
-  return h + '</div>'
-}
-
-/** LE DOSSIER, ÉCRIT POUR CELUI QUI DESCEND. Il répond à trois questions,
- *  dans cet ordre : qu'est-ce que je dois faire ICI, qu'est-ce qu'il me
- *  RESTE, qu'est-ce que j'EMPORTE. D'où un objectif en tête avec sa jauge,
- *  des barres et des pastilles plutôt que des colonnes de chiffres, et des
- *  mots de joueur. Les mesures fines (compte de gouttes, degrés de coque)
- *  restent là, mais en second rang : elles éclairent la barre. */
-function majDossier(): void {
-  const enRun = !auHub && testLevel === null
-  doChrono.textContent = enRun ? fmtTime(run.tableauTime) : '—'
-  const litres = sim.liters()
-
-  // ---- TA MISSION : où l'on est, et ce qu'on vient chercher
-  const id = identiteAtelier(level)
-  const total = longueurRun()
-  const rang = Math.min(total, voieRang + 1)
-  let mission = '<section class="do-sec do-salle"><h4><u>🎯</u>TA MISSION</h4>'
-  if (enRun && total > 1) {
-    mission +=
-      `<div class="do-place">SALLE <b>${rang} / ${total}</b>` +
-      `${descenteDuJour() ? ' · DESCENTE DU JOUR' : ''}</div>` +
-      railDescente(rang, total)
-  }
-  mission +=
-    '<div class="do-mission">' +
-    `<div class="do-nom">${auHub ? 'LE LABORATOIRE' : level.name}</div>` +
-    `<div class="do-code">${level.code}${estEconomat(level) ? ' · L’ÉCONOMAT' : ''}</div>`
-  if (id)
-    mission +=
-      `<div class="do-chips"><i>${MOMENT_COURT[id.moment]}</i>` +
-      `<i>${MECANIQUE_NOMS[id.mecanique].toUpperCase()}</i>` +
-      `<i>DIFF ${id.difficulte}</i></div>`
-  if (enRun) {
-    // L'OBJECTIF, en clair : le volume à ramener, et ce qu'il en manque —
-    // c'est LA question du joueur, elle passe donc avant tout le reste
-    if (level.par) {
-      const atteint = litres >= level.par
-      const reste = Math.max(0, level.par - litres)
-      mission +=
-        `<div class="do-objectif${atteint ? ' atteint' : ''}">` +
-        `<b>RAMENER<em>${fmtL(level.par)}</em></b>` +
-        `<div class="do-jauge j-but${atteint ? ' plein' : ''}" style="margin-top:8px">` +
-        `<i style="width:${Math.min(100, (litres / level.par) * 100)}%"></i></div>` +
-        `<p>${
-          atteint
-            ? 'Tu as de quoi. Le sas t’attend — tout litre en plus part à la bonbonne.'
-            : `Il t’en manque ${fmtL(reste)} : ne laisse pas de gouttes derrière toi.`
-        }</p></div>`
+    // La barre du bas passe sur deux lignes quand elle se remplit (le bouton de
+    // retour à l'éditeur, par exemple). On publie sa hauteur réelle en variable
+    // CSS : le sélecteur d'état se recale dessus au lieu de la chevaucher.
+    function publishTouchbarHeight(): void {
+      const h = Math.round(touchbar.getBoundingClientRect().height)
+      if (h > 0) document.documentElement.style.setProperty('--tb-h', `${h}px`)
+    }
+    if (typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(publishTouchbarHeight).observe(touchbar)
     } else {
+      window.addEventListener('resize', publishTouchbarHeight)
+    }
+    publishTouchbarHeight()
+    {
+      // au doigt, les chips ont leur rangée, les glyphes la leur
+      const brk = document.createElement('i')
+      brk.className = 'tb-break'
+      touchbar.appendChild(brk)
+    }
+    const btnPause = touchButton('⏸', 'pause (espace)', () => input.togglePause())
+    // Le TEMPS en un seul bloc : ralentir · la vitesse courante · accélérer.
+    // La vitesse est une INFO permanente (elle s'allume dès qu'on quitte ×1),
+    // et le groupe reste au doigt — savoir à quelle vitesse on joue n'est pas
+    // un réglage de banc.
+    const tbTime = document.createElement('div')
+    tbTime.id = 'tb-time'
+    touchbar.appendChild(tbTime)
+    const timeButton = (
+      label: string,
+      title: string,
+      onTap: () => void,
+    ): HTMLButtonElement => {
+      const b = document.createElement('button')
+      b.textContent = label
+      b.title = title
+      b.addEventListener('click', onTap)
+      tbTime.appendChild(b)
+      return b
+    }
+    timeButton('‹', 'ralentir le temps (,)', () => input.stepWarp(-1))
+    const tbSpeed = document.createElement('span')
+    tbSpeed.id = 'tb-speed'
+    tbSpeed.textContent = '×1'
+    tbSpeed.title = 'vitesse du temps simulé'
+    tbTime.appendChild(tbSpeed)
+    timeButton('›', 'accélérer le temps (.)', () => input.stepWarp(1))
+    // le DOSSIER a son bouton dans la barre : au doigt comme au Deck, on n'a
+    // pas toujours un clavier sous la main
+    touchButton('▤', 'dossier de descente (Tab)', () =>
+      ouvreDossier(!dossierOuvert),
+    )
+    touchButton('🛰\uFE0E', 'le plan de la station (C)', () => ouvreStation(true))
+    const btnVortex = touchButton(
+      '🌀',
+      'vortex : armer puis toucher l’écran (clic droit)',
+      () => {
+        input.vortexArmed = !input.vortexArmed
+      },
+      'tb-vortex',
+    )
+
+    // ---- LE CADRAN DU CYCLE (refonte du sélecteur d'état) -------------------
+    // Trois LOGEMENTS fixes — ❄ à gauche, 💧 au centre, 💨 à droite : la
+    // mémoire musculaire tient, au doigt comme à la manette (X / B / Y). Mais
+    // ce qu'ils montrent a changé : le logement de l'état COURANT devient le
+    // MÉDAILLON (l'identité, pas une commande), et les autres ne paraissent
+    // que si la TRANSFORMATION qui y mène est tissée — ils portent alors son
+    // NOM (FUSION, SOLIDIFICATION…), le vocabulaire de l'écran des mémoires.
+    // Au tout début de partie : le médaillon seul, AUCUN bouton — c'est voulu.
+    // Le médaillon reste cliquable : re-toucher son état, c'est demander le
+    // retour au liquide (le geste historique du dégel ne se perd pas).
+    const stateEau = document.getElementById('state-eau') as HTMLButtonElement
+    const stateGlace = document.getElementById('state-glace') as HTMLButtonElement
+    const stateVapeur = document.getElementById('state-vapeur') as HTMLButtonElement
+    const stateZoneEl = document.getElementById('state-zone') as HTMLDivElement
+    const statebarEl = document.getElementById('statebar') as HTMLDivElement
+    stateEau.addEventListener('click', () => input.demande('eau'))
+    stateGlace.addEventListener('click', () => input.demande('glace'))
+    stateVapeur.addEventListener('click', () => input.demande('vapeur'))
+
+    // Le GARDE du cycle : en descente (hors tableau d'atelier et tableaux
+    // « états libres »), une transformation MANUELLE exige son lien tissé.
+    // Les régimes du décor (zones, chaudière, cryostase) n'y passent pas.
+    const CYCLE_PAR_ETAT = {
+      eau: 'liquide',
+      glace: 'solide',
+      vapeur: 'gaz',
+    } as const
+    function cycleGateActif(): boolean {
+      return testLevel === null && level.etats !== 'libres'
+    }
+    input.peutDevenir = (vers) => {
+      if (!cycleGateActif()) return true
+      const t = transfoEntre(
+        CYCLE_PAR_ETAT[input.etatManuel()],
+        CYCLE_PAR_ETAT[vers],
+      )
+      return (
+        t !== null &&
+        transfoTenue(t.id, records.eveilAcquis(), records.verrousCycle())
+      )
+    }
+    // Un refus MONTRE le verrou : le logement visé paraît quelques secondes,
+    // cadenassé, le nom du lien à tisser dessus — l'envie se sème là.
+    const verrouEtat = { slot: null as EtatManuel | null, jusqua: 0 }
+    input.onDevenirRefuse = (vers) => {
+      verrouEtat.slot = vers
+      verrouEtat.jusqua = performance.now() / 1000 + 2.6
+    }
+
+    // Le cadran ne réécrit le DOM que quand sa SIGNATURE change — pas à
+    // chaque image. La zone forcée verrouille tout et s'annonce en badge.
+    let cadranSignature = ''
+    function majCadranEtats(zoneActive: ZoneForce): void {
+      const cur = input.etatManuel()
+      const manetteActive = manette.lastActivity > input.lastPointerAt
+      const verrou =
+        verrouEtat.slot !== null && performance.now() / 1000 < verrouEtat.jusqua
+          ? verrouEtat.slot
+          : null
+      const acquis = records.eveilAcquis()
+      const verrousCycle = records.verrousCycle()
+      const gate = cycleGateActif()
+      const zone = zoneActive !== 'libre'
+      const sig = [
+        cur,
+        manetteActive,
+        verrou,
+        zoneActive,
+        gate,
+        acquis.join('+'),
+        verrousCycle.join('+'),
+      ].join('|')
+      if (sig === cadranSignature) return
+      cadranSignature = sig
+      const NOMS_ETAT = {
+        eau: 'LIQUIDE',
+        glace: 'GLACE',
+        vapeur: 'VAPEUR',
+      } as const
+      const slots = [
+        { el: stateGlace, etat: 'glace' as const, kbd: 'F', pad: 'X' },
+        {
+          el: stateEau,
+          etat: 'eau' as const,
+          kbd: cur === 'vapeur' ? 'G' : 'F',
+          pad: 'B',
+        },
+        { el: stateVapeur, etat: 'vapeur' as const, kbd: 'G', pad: 'Y' },
+      ]
+      for (const s of slots) {
+        const label = s.el.querySelector('.st-label') as HTMLElement | null
+        const kbd = s.el.querySelector('kbd') as HTMLElement | null
+        if (!label || !kbd) continue
+        const estCur = s.etat === cur
+        const t = estCur
+          ? null
+          : transfoEntre(CYCLE_PAR_ETAT[cur], CYCLE_PAR_ETAT[s.etat])
+        const tenue =
+          t !== null && (!gate || transfoTenue(t.id, acquis, verrousCycle))
+        const montreVerrou = !estCur && !tenue && t !== null && verrou === s.etat
+        s.el.hidden = !estCur && !tenue && !montreVerrou
+        s.el.classList.toggle('active', estCur)
+        s.el.classList.toggle('st-cur', estCur)
+        s.el.classList.toggle('st-verrou', montreVerrou)
+        s.el.disabled = zone || montreVerrou
+        label.textContent = !estCur && t ? t.nom : NOMS_ETAT[s.etat]
+        kbd.textContent = montreVerrou ? '🔒' : manetteActive ? s.pad : s.kbd
+        kbd.hidden = estCur
+        s.el.title = estCur
+          ? 're-toucher : revenir liquide'
+          : montreVerrou
+            ? `${t?.nom} — mémoire non tissée. Passez par le liquide, ou tissez le lien à l’écran des MÉMOIRES.`
+            : (t?.desc ?? '')
+      }
+      statebarEl.classList.toggle('st-zone', zone)
+      stateZoneEl.hidden = !zone
+      if (zone)
+        stateZoneEl.textContent = `🔒 ${ZONE_CAUSES[zoneActive]} — RÉGIME IMPOSÉ`
+    }
+
+    // ---- LE DOSSIER DE DESCENTE : tout le relevé, d'un seul geste -----------
+    // TAB (le bouton ▤ de la barre, R3 à la manette) fait glisser le panneau
+    // depuis la droite : la salle et son identité, le corps et ses réserves,
+    // le cycle et ce qu'il permet ICI, le butin, l'équipement embarqué. Il ne
+    // fige RIEN — la descente continue derrière, c'est un dossier qu'on
+    // consulte en jouant. Rafraîchi quatre fois par seconde tant qu'il est
+    // ouvert ; fermé, il ne coûte pas une instruction.
+    const dossierEl = document.getElementById('dossier') as HTMLElement
+    const doCorps = document.getElementById('do-corps') as HTMLDivElement
+    const doChrono = document.getElementById('do-chrono') as HTMLElement
+    dossierEl.hidden = false // le panneau vit hors-champ : c'est le glissement qui le montre
+    dossierEl.setAttribute('aria-hidden', 'true')
+    let dossierOuvert = false
+    let dossierProchainMaj = 0
+
+    // Les briques du dossier : une barre, une rangée de pastilles, une tuile.
+    // Elles disent toutes la même chose de la même façon — une icône, un mot en
+    // capitales, la mesure à droite —, pour que l'œil apprenne la grammaire du
+    // panneau en une lecture.
+    const doPastilles = (n: number, max: number, cls = ''): string => {
+      let h = ''
+      for (let i = 0; i < max; i++)
+        h += `<i class="${cls}${i < n ? ' plein' : ''}"></i>`
+      return h
+    }
+
+    /** Une BARRE : l'icône, le mot, la valeur, la jauge — et sous elle, la
+     *  précision chiffrée pour qui veut la lire (elle éclaire la barre, elle ne
+     *  la remplace pas). */
+    function doBarre(
+      icone: string,
+      nom: string,
+      valeur: string,
+      frac: number,
+      o: { cls?: string; jauge?: string; note?: string } = {},
+    ): string {
+      const p = Math.max(0, Math.min(1, frac)) * 100
+      return (
+        '<div class="do-barre">' +
+        `<div><u>${icone}</u>${nom}<b class="${o.cls ?? ''}">${valeur}</b></div>` +
+        `<div class="do-jauge ${o.jauge ?? ''}"><i style="width:${p}%"></i></div>` +
+        '</div>' +
+        (o.note ? `<p class="do-note">${o.note}</p>` : '')
+      )
+    }
+
+    /** Une RÉSERVE qui se compte sur les doigts : des pastilles, pas un ratio. */
+    function doPastilleLigne(
+      icone: string,
+      nom: string,
+      n: number,
+      max: number,
+      cls: string,
+      note: string,
+    ): string {
+      return (
+        '<div class="do-barre">' +
+        `<div><u>${icone}</u>${nom}<div class="do-pastilles">${doPastilles(n, max, cls)}</div></div>` +
+        '</div>' +
+        `<p class="do-note">${note}</p>`
+      )
+    }
+
+    /** Une TUILE de butin : le gain se regarde, il ne se lit pas dans un tableau. */
+    const doTuile = (icone: string, val: string, quoi: string, cls = ''): string =>
+      `<div class="do-tuile ${cls}"><u>${icone}</u><b>${val}</b><span>${quoi}</span></div>`
+
+    /** LE RAIL de la descente, en crans — une couture à chaque changement de
+     *  moment (début · milieu · fin). En VOIE le plan donne le moment de chaque
+     *  rang ; en descente ordinaire, c'est le code de la salle elle-même qui le
+     *  dit. Au-delà de soixante salles, le rail ne veut plus rien dire : on
+     *  l'omet plutôt que d'aligner des cheveux. */
+    function momentDuRang(r: number, total: number): 1 | 2 | 3 {
+      if (voiePlan.longueur > 0) return momentAuRang(r, planEffectif())
+      const lv = playedLevels()[r - 1]
+      const id = lv ? identiteAtelier(lv) : null
+      if (id) return id.moment
+      // sans code lisible, on retombe sur les tiers de la séquence
+      return r <= total / 3 ? 1 : r <= (2 * total) / 3 ? 2 : 3
+    }
+
+    function railDescente(rang: number, total: number): string {
+      if (total < 2 || total > 60) return ''
+      let h = '<div class="do-rail">'
+      for (let r = 1; r <= total; r++) {
+        if (r > 1 && momentDuRang(r, total) !== momentDuRang(r - 1, total))
+          h += '<i class="coupe"></i>'
+        h += `<i class="${r < rang ? 'franchi' : r === rang ? 'courant' : ''}"></i>`
+      }
+      return h + '</div>'
+    }
+
+    /** LE DOSSIER, ÉCRIT POUR CELUI QUI DESCEND. Il répond à trois questions,
+     *  dans cet ordre : qu'est-ce que je dois faire ICI, qu'est-ce qu'il me
+     *  RESTE, qu'est-ce que j'EMPORTE. D'où un objectif en tête avec sa jauge,
+     *  des barres et des pastilles plutôt que des colonnes de chiffres, et des
+     *  mots de joueur. Les mesures fines (compte de gouttes, degrés de coque)
+     *  restent là, mais en second rang : elles éclairent la barre. */
+    function majDossier(): void {
+      const enRun = !auHub && testLevel === null
+      doChrono.textContent = enRun ? fmtTime(run.tableauTime) : '—'
+      const litres = sim.liters()
+
+      // ---- TA MISSION : où l'on est, et ce qu'on vient chercher
+      const id = identiteAtelier(level)
+      const total = longueurRun()
+      const rang = Math.min(total, voieRang + 1)
+      let mission = '<section class="do-sec do-salle"><h4><u>🎯</u>TA MISSION</h4>'
+      if (enRun && total > 1) {
+        mission +=
+          `<div class="do-place">SALLE <b>${rang} / ${total}</b>` +
+          `${descenteDuJour() ? ' · DESCENTE DU JOUR' : ''}</div>` +
+          railDescente(rang, total)
+      }
       mission +=
-        '<div class="do-objectif"><b>ATTEINDRE LE SAS</b>' +
-        '<p>Aucun volume minimum ici : ressors, simplement — mais ce que tu ramènes compte quand même.</p></div>'
+        '<div class="do-mission">' +
+        `<div class="do-nom">${auHub ? 'LE LABORATOIRE' : level.name}</div>` +
+        `<div class="do-code">${level.code}${estEconomat(level) ? ' · L’ÉCONOMAT' : ''}</div>`
+      if (id)
+        mission +=
+          `<div class="do-chips"><i>${MOMENT_COURT[id.moment]}</i>` +
+          `<i>${MECANIQUE_NOMS[id.mecanique].toUpperCase()}</i>` +
+          `<i>DIFF ${id.difficulte}</i></div>`
+      if (enRun) {
+        // L'OBJECTIF, en clair : le volume à ramener, et ce qu'il en manque —
+        // c'est LA question du joueur, elle passe donc avant tout le reste
+        if (level.par) {
+          const atteint = litres >= level.par
+          const reste = Math.max(0, level.par - litres)
+          mission +=
+            `<div class="do-objectif${atteint ? ' atteint' : ''}">` +
+            `<b>RAMENER<em>${fmtL(level.par)}</em></b>` +
+            `<div class="do-jauge j-but${atteint ? ' plein' : ''}" style="margin-top:8px">` +
+            `<i style="width:${Math.min(100, (litres / level.par) * 100)}%"></i></div>` +
+            `<p>${
+              atteint
+                ? 'Tu as de quoi. Le sas t’attend — tout litre en plus part à la bonbonne.'
+                : `Il t’en manque ${fmtL(reste)} : ne laisse pas de gouttes derrière toi.`
+            }</p></div>`
+        } else {
+          mission +=
+            '<div class="do-objectif"><b>ATTEINDRE LE SAS</b>' +
+            '<p>Aucun volume minimum ici : ressors, simplement — mais ce que tu ramènes compte quand même.</p></div>'
+        }
+      }
+      mission += '</div>'
+      // LES RECORDS, en défis à battre
+      if (enRun) {
+        const rec = records.tableauRecord(level.code)
+        mission +=
+          '<div class="do-defis">' +
+          (rec
+            ? `<div class="do-defi"><span>✦ TON VOLUME</span><b>${fmtL(rec.volume.liters)}</b></div>` +
+              `<div class="do-defi"><span>✦ TON CHRONO</span><b>${fmtTime(rec.chrono.time)}</b></div>`
+            : '<div class="do-defi vierge"><span>AUCUN RECORD</span><b>à écrire</b></div>') +
+          '</div>'
+      }
+      mission += '</section>'
+
+      // ---- TON CORPS : ce qu'il reste, et ce qui presse
+      const depart = sim.baseVolume > 0 ? sim.baseVolume : level.spawn.n
+      const frac = depart > 0 ? sim.playerCount / depart : 0
+      const coque = Math.round(21 - 81 * chillNow())
+      const critique = litres < params.criticalVolumeLiters * 1.7
+      const motCoque =
+        coque <= -40
+          ? 'glaciale'
+          : coque <= -10
+            ? 'froide'
+            : coque <= 5
+              ? 'fraîche'
+              : 'tiède'
+      const corps =
+        '<section class="do-sec do-corps"><h4><u>💧</u>TON CORPS</h4>' +
+        doBarre('💧', 'VOLUME', fmtL(litres), frac, {
+          cls: critique ? 'chaud' : '',
+          jauge: critique ? 'j-alerte' : '',
+          note:
+            `${sim.playerCount} gouttes sur ${depart}` +
+            (critique ? ' — sous ce seuil, le protocole conclut. Ramasse.' : ''),
+        }) +
+        doBarre('❄', 'COQUE', `${coque > 0 ? '+' : ''}${coque}°`, chillNow(), {
+          cls: coque < -20 ? 'froid' : '',
+          jauge: 'j-froid',
+          note: `Coque ${motCoque} : elle ne se rembobine pas d’une salle à l’autre.`,
+        }) +
+        doPastilleLigne(
+          '⚡',
+          'DASHS',
+          sim.dashBudget,
+          Math.max(sim.dashBudgetMax, sim.dashBudget),
+          '',
+          'Trois par salle. Se changer en vapeur SOI-MÊME les rend ; les subir, non.',
+        ) +
+        (enRun
+          ? doPastilleLigne(
+              '🧪',
+              'SECOURS',
+              run.vies,
+              VIES_MAX,
+              'vie',
+              'Un échantillon te relève d’une dispersion, une seule fois chacun.',
+            )
+          : '') +
+        '</section>'
+
+      // ---- TES ÉTATS : ce que les mémoires permettent ICI, à cet instant
+      const cur = input.etatManuel()
+      const acquis = records.eveilAcquis()
+      const verrous = records.verrousCycle()
+      const gate = cycleGateActif()
+      const NOMS: Record<EtatManuel, string> = {
+        eau: 'LIQUIDE',
+        glace: 'GLACE',
+        vapeur: 'VAPEUR',
+      }
+      const ICO: Record<EtatManuel, string> = {
+        eau: '💧',
+        glace: '❄',
+        vapeur: '💨',
+      }
+      let cycle = '<section class="do-sec do-cycle"><h4><u>🔄</u>TES ÉTATS</h4>'
+      for (const e of ['glace', 'eau', 'vapeur'] as EtatManuel[]) {
+        if (e === cur) {
+          cycle += `<div class="do-etat actuel"><i>${ICO[e]}</i><em>${NOMS[e]}</em><small>TU Y ES</small></div>`
+          continue
+        }
+        const t = transfoEntre(CYCLE_PAR_ETAT[cur], CYCLE_PAR_ETAT[e])
+        const tenue = t !== null && (!gate || transfoTenue(t.id, acquis, verrous))
+        // LA COMMANDE VRAIE : celle de la table, redéfinie ou non — l'écrire en
+        // dur, c'était mentir dès que le joueur change une touche
+        const k = toucheDe(e)
+        const b = boutonDe(e)
+        const geste = k !== null ? nomTouche(k) : b !== null ? nomBouton(b) : '—'
+        cycle +=
+          `<div class="do-etat${tenue ? '' : ' verrou'}"><i>${ICO[e]}</i>` +
+          `<em>${t ? t.nom : NOMS[e]}</em>` +
+          (tenue
+            ? `<small>D’UN GESTE</small><kbd>${geste}</kbd>`
+            : `<small>🔒 MÉMOIRE À TISSER</small>`) +
+          '</div>'
+      }
+      cycle +=
+        '<p class="do-vide">Un lien non tissé se contourne : repasse par le LIQUIDE. ' +
+        'Les régimes imposés par le décor, eux, te transforment de toute façon.</p></section>'
+
+      // ---- TON BUTIN : ce que la descente t'a déjà rapporté
+      const butin = enRun
+        ? '<section class="do-sec do-butin"><h4><u>💎</u>TON BUTIN</h4>' +
+          '<div class="do-tuiles">' +
+          doTuile('🫙', `${run.bonbonneLiters.toFixed(1)} L`, 'BONBONNE', 'or') +
+          doTuile(
+            iconeMetaHTML('condensat', '💠'),
+            `${condensat}`,
+            'CONDENSAT cL',
+            'or',
+          ) +
+          doTuile(
+            iconeMetaHTML('memoire', '🧠'),
+            `+${run.memoireGagnee}`,
+            'MÉMOIRE',
+            'vert',
+          ) +
+          '</div>' +
+          `<div class="do-jauge j-but"><i style="width:${Math.min(100, (run.bonbonneLiters / capBonbonne()) * 100)}%"></i></div>` +
+          `<p class="do-note" style="margin-top:6px">Bonbonne : ${run.bonbonneLiters.toFixed(2)} L sur ${capBonbonne()} — le surplus de chaque salle s’y range, et se reverse d’un geste.</p>` +
+          '<div class="do-tuiles">' +
+          doTuile('🔹', `${run.pastillesCl}`, 'PASTILLES cL') +
+          doTuile('🚪', `${run.conclues}`, 'SALLES') +
+          doTuile('⏱', fmtDuree(run.runTime), 'DESCENTE') +
+          '</div></section>'
+        : ''
+
+      // ---- TON ÉQUIPEMENT : ce que tu portes sur toi
+      const instrs = run.instruments
+        .map((i) => carteDef(i))
+        .filter((d): d is NonNullable<typeof d> => d !== null)
+      const fioles = records
+        .fiolesEquipees()
+        .map((f) => fioleDef(f))
+        .filter((d): d is NonNullable<typeof d> => d !== null)
+      const equip =
+        '<section class="do-sec do-equip"><h4><u>🎒</u>TON ÉQUIPEMENT</h4>' +
+        (instrs.length === 0 && fioles.length === 0
+          ? '<p class="do-vide">Les mains vides. Les instruments se gagnent aux paliers d’étalonnage, en fin de salle ; les fioles s’équipent au placard du laboratoire.</p>'
+          : instrs
+              .map(
+                (d) =>
+                  `<div class="do-objet"><i>${d.icone}</i><div><b>${d.nom}</b><small>${d.desc}</small></div></div>`,
+              )
+              .join('') +
+            fioles
+              .map(
+                (d) =>
+                  `<div class="do-objet"><i>⚗</i><div><b>${d.nom}</b><small>${d.desc}</small></div></div>`,
+              )
+              .join('')) +
+        '</section>'
+
+      doCorps.innerHTML = mission + corps + cycle + butin + equip
     }
-  }
-  mission += '</div>'
-  // LES RECORDS, en défis à battre
-  if (enRun) {
-    const rec = records.tableauRecord(level.code)
-    mission +=
-      '<div class="do-defis">' +
-      (rec
-        ? `<div class="do-defi"><span>✦ TON VOLUME</span><b>${fmtL(rec.volume.liters)}</b></div>` +
-          `<div class="do-defi"><span>✦ TON CHRONO</span><b>${fmtTime(rec.chrono.time)}</b></div>`
-        : '<div class="do-defi vierge"><span>AUCUN RECORD</span><b>à écrire</b></div>') +
-      '</div>'
-  }
-  mission += '</section>'
 
-  // ---- TON CORPS : ce qu'il reste, et ce qui presse
-  const depart = sim.baseVolume > 0 ? sim.baseVolume : level.spawn.n
-  const frac = depart > 0 ? sim.playerCount / depart : 0
-  const coque = Math.round(21 - 81 * chillNow())
-  const critique = litres < params.criticalVolumeLiters * 1.7
-  const motCoque =
-    coque <= -40
-      ? 'glaciale'
-      : coque <= -10
-        ? 'froide'
-        : coque <= 5
-          ? 'fraîche'
-          : 'tiède'
-  const corps =
-    '<section class="do-sec do-corps"><h4><u>💧</u>TON CORPS</h4>' +
-    doBarre('💧', 'VOLUME', fmtL(litres), frac, {
-      cls: critique ? 'chaud' : '',
-      jauge: critique ? 'j-alerte' : '',
-      note:
-        `${sim.playerCount} gouttes sur ${depart}` +
-        (critique ? ' — sous ce seuil, le protocole conclut. Ramasse.' : ''),
-    }) +
-    doBarre('❄', 'COQUE', `${coque > 0 ? '+' : ''}${coque}°`, chillNow(), {
-      cls: coque < -20 ? 'froid' : '',
-      jauge: 'j-froid',
-      note: `Coque ${motCoque} : elle ne se rembobine pas d’une salle à l’autre.`,
-    }) +
-    doPastilleLigne(
-      '⚡',
-      'DASHS',
-      sim.dashBudget,
-      Math.max(sim.dashBudgetMax, sim.dashBudget),
-      '',
-      'Trois par salle. Se changer en vapeur SOI-MÊME les rend ; les subir, non.',
-    ) +
-    (enRun
-      ? doPastilleLigne(
-          '🧪',
-          'SECOURS',
-          run.vies,
-          VIES_MAX,
-          'vie',
-          'Un échantillon te relève d’une dispersion, une seule fois chacun.',
-        )
-      : '') +
-    '</section>'
-
-  // ---- TES ÉTATS : ce que les mémoires permettent ICI, à cet instant
-  const cur = input.etatManuel()
-  const acquis = records.eveilAcquis()
-  const verrous = records.verrousCycle()
-  const gate = cycleGateActif()
-  const NOMS: Record<EtatManuel, string> = {
-    eau: 'LIQUIDE',
-    glace: 'GLACE',
-    vapeur: 'VAPEUR',
-  }
-  const ICO: Record<EtatManuel, string> = {
-    eau: '💧',
-    glace: '❄',
-    vapeur: '💨',
-  }
-  let cycle = '<section class="do-sec do-cycle"><h4><u>🔄</u>TES ÉTATS</h4>'
-  for (const e of ['glace', 'eau', 'vapeur'] as EtatManuel[]) {
-    if (e === cur) {
-      cycle += `<div class="do-etat actuel"><i>${ICO[e]}</i><em>${NOMS[e]}</em><small>TU Y ES</small></div>`
-      continue
+    function ouvreDossier(v: boolean): void {
+      dossierOuvert = v
+      dossierEl.classList.toggle('ouvert', v)
+      dossierEl.setAttribute('aria-hidden', v ? 'false' : 'true')
+      if (v) {
+        majDossier()
+        dossierProchainMaj = performance.now() / 1000 + 0.25
+      }
     }
-    const t = transfoEntre(CYCLE_PAR_ETAT[cur], CYCLE_PAR_ETAT[e])
-    const tenue = t !== null && (!gate || transfoTenue(t.id, acquis, verrous))
-    // LA COMMANDE VRAIE : celle de la table, redéfinie ou non — l'écrire en
-    // dur, c'était mentir dès que le joueur change une touche
-    const k = toucheDe(e)
-    const b = boutonDe(e)
-    const geste = k !== null ? nomTouche(k) : b !== null ? nomBouton(b) : '—'
-    cycle +=
-      `<div class="do-etat${tenue ? '' : ' verrou'}"><i>${ICO[e]}</i>` +
-      `<em>${t ? t.nom : NOMS[e]}</em>` +
-      (tenue
-        ? `<small>D’UN GESTE</small><kbd>${geste}</kbd>`
-        : `<small>🔒 MÉMOIRE À TISSER</small>`) +
-      '</div>'
-  }
-  cycle +=
-    '<p class="do-vide">Un lien non tissé se contourne : repasse par le LIQUIDE. ' +
-    'Les régimes imposés par le décor, eux, te transforment de toute façon.</p></section>'
-
-  // ---- TON BUTIN : ce que la descente t'a déjà rapporté
-  const butin = enRun
-    ? '<section class="do-sec do-butin"><h4><u>💎</u>TON BUTIN</h4>' +
-      '<div class="do-tuiles">' +
-      doTuile('🫙', `${run.bonbonneLiters.toFixed(1)} L`, 'BONBONNE', 'or') +
-      doTuile(
-        iconeMetaHTML('condensat', '💠'),
-        `${condensat}`,
-        'CONDENSAT cL',
-        'or',
-      ) +
-      doTuile(
-        iconeMetaHTML('memoire', '🧠'),
-        `+${run.memoireGagnee}`,
-        'MÉMOIRE',
-        'vert',
-      ) +
-      '</div>' +
-      `<div class="do-jauge j-but"><i style="width:${Math.min(100, (run.bonbonneLiters / capBonbonne()) * 100)}%"></i></div>` +
-      `<p class="do-note" style="margin-top:6px">Bonbonne : ${run.bonbonneLiters.toFixed(2)} L sur ${capBonbonne()} — le surplus de chaque salle s’y range, et se reverse d’un geste.</p>` +
-      '<div class="do-tuiles">' +
-      doTuile('🔹', `${run.pastillesCl}`, 'PASTILLES cL') +
-      doTuile('🚪', `${run.conclues}`, 'SALLES') +
-      doTuile('⏱', fmtDuree(run.runTime), 'DESCENTE') +
-      '</div></section>'
-    : ''
-
-  // ---- TON ÉQUIPEMENT : ce que tu portes sur toi
-  const instrs = run.instruments
-    .map((i) => carteDef(i))
-    .filter((d): d is NonNullable<typeof d> => d !== null)
-  const fioles = records
-    .fiolesEquipees()
-    .map((f) => fioleDef(f))
-    .filter((d): d is NonNullable<typeof d> => d !== null)
-  const equip =
-    '<section class="do-sec do-equip"><h4><u>🎒</u>TON ÉQUIPEMENT</h4>' +
-    (instrs.length === 0 && fioles.length === 0
-      ? '<p class="do-vide">Les mains vides. Les instruments se gagnent aux paliers d’étalonnage, en fin de salle ; les fioles s’équipent au placard du laboratoire.</p>'
-      : instrs
-          .map(
-            (d) =>
-              `<div class="do-objet"><i>${d.icone}</i><div><b>${d.nom}</b><small>${d.desc}</small></div></div>`,
-          )
-          .join('') +
-        fioles
-          .map(
-            (d) =>
-              `<div class="do-objet"><i>⚗</i><div><b>${d.nom}</b><small>${d.desc}</small></div></div>`,
-          )
-          .join('')) +
-    '</section>'
-
-  doCorps.innerHTML = mission + corps + cycle + butin + equip
-}
-
-function ouvreDossier(v: boolean): void {
-  dossierOuvert = v
-  dossierEl.classList.toggle('ouvert', v)
-  dossierEl.setAttribute('aria-hidden', v ? 'false' : 'true')
-  if (v) {
-    majDossier()
-    dossierProchainMaj = performance.now() / 1000 + 0.25
-  }
-}
-document.getElementById('do-fermer')?.addEventListener('click', () => {
-  ouvreDossier(false)
-})
+    document.getElementById('do-fermer')?.addEventListener('click', () => {
+      ouvreDossier(false)
+    })
 // sonde d'essai : ouvrir/fermer le dossier depuis la console (comme __sim)
 ;(window as unknown as { __dossier: (v: boolean) => void }).__dossier =
   ouvreDossier
@@ -13843,7 +13962,7 @@ const btnSound = touchButton(
       bande.eveiller()
     }
     majInviteSon()
-    pane.refresh()
+    pane?.refresh()
   },
   'tb-snd', // masqué au doigt : la bascule du son reste au banc (dossier Son)
 )
@@ -13852,7 +13971,7 @@ touchButton('≡', 'fiche d’essai (échap)', openHome)
 input.onTimeWarpChange = (warp) => {
   params.timeWarp = warp
   majVitesse()
-  pane.refresh()
+  pane?.refresh()
 }
 // La vitesse affichée (barre + HUD) : mise à jour au changement ET à chaque
 // image (le banc peut aussi changer timeWarp par ses curseurs)
