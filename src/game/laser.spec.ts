@@ -10,7 +10,7 @@ import {
   LASER_MAX_BOUNCES,
   type TraceMonde,
 } from './laser'
-import { MAT_GRILLE, MAT_MIROIR, MAT_WALL } from './level'
+import { MAT_BAIE, MAT_GRILLE, MAT_MIROIR, MAT_VIDE, MAT_WALL } from './level'
 import { DEFAULT_PARAMS } from '../sim/params'
 import { FluidSim, KIND_FREE, KIND_PLAYER, type Bounds } from '../sim/solver'
 
@@ -76,6 +76,19 @@ describe('traceLaser — les règles optiques du palier 1', () => {
       }),
     )
     expect(t.touchees).toEqual([0])
+  })
+
+  it('le VIDE et la BAIE laissent passer le faisceau : un trou n’a rien à opposer', () => {
+    for (const material of [MAT_VIDE, MAT_BAIE]) {
+      const t = traceLaser(
+        { x: -900, y: 0, angle: 0 },
+        monde({
+          boxes: [{ minX: 0, minY: -200, maxX: 60, maxY: 200, material }],
+          cibles: [{ x: 700, y: 0, r: 26 }],
+        }),
+      )
+      expect(t.touchees).toEqual([0])
+    }
   })
 
   it('une porte fermée absorbe ; retirée (ouverte), le faisceau passe', () => {

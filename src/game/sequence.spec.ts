@@ -102,6 +102,22 @@ describe('le séquenceur — la mise en scène dans le tableau', () => {
     expect([...s.etat.brechesOuvertes]).toEqual([2]) // même la séquence finie
   })
 
+  it('l’action « chasse » DÉCLENCHE (un événement que le jeu consomme), elle ne tient pas comme la brèche', () => {
+    const s = new Sequenceur(echoMuet())
+    s.demarre({
+      code: 'T',
+      titre: 'T',
+      etapes: [et({ action: 'chasse', valeur: 1, duree: 0.5 }), et({ duree: 1 })],
+    })
+    expect([...s.etat.chassesDeclenchees]).toEqual([1])
+    // le jeu consomme l'événement ; la séquence ne le repose pas
+    s.etat.chassesDeclenchees.clear()
+    s.avance(1)
+    expect(s.etat.chassesDeclenchees.size).toBe(0)
+    s.reinitialise()
+    expect(s.etat.chassesDeclenchees.size).toBe(0)
+  })
+
   it('la carte et la secousse ne durent QUE leur étape', () => {
     const s = new Sequenceur(echoMuet())
     s.demarre({

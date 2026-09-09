@@ -26,6 +26,8 @@ import {
   MAT_MIROIR,
   MAT_RIDEAU,
   MAT_SURCHAUFFEUR,
+  MAT_VIDE,
+  MAT_BAIE,
   MAT_WALL,
 } from './level'
 
@@ -105,6 +107,8 @@ const MATERIAUX: Record<number, string> = {
   [MAT_RIDEAU]: 'un rideau lamellaire',
   [MAT_SURCHAUFFEUR]: 'une borne surchauffeur',
   [MAT_MIROIR]: 'un miroir',
+  [MAT_VIDE]: 'une ouverture sur le vide',
+  [MAT_BAIE]: 'une baie vitrée',
 }
 
 /** L'INDICE d'une fiche verrouillée : déduit de la combinaison matériau ×

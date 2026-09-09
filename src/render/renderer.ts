@@ -1216,6 +1216,7 @@ void main() {
     if (bi >= uBoxCount) break;
     float mc = decodeAux(uBoxAux[bi].x).x;
     if (mc > 2.5 && mc < 3.5) continue; // le sas est une bouche, il n'enterre rien
+    if (mc > 10.5) continue;             // le vide et la baie sont des trous : rien à enterrer
     float dc = sdfVisible(bi, world - relDisp);
     if (dc < dCouv) {
       dCouv = dc;
@@ -1243,6 +1244,10 @@ void main() {
     // matière, et la matière obéit à la lumière.
     bool matActif = (mat > 3.5 && mat < 4.5) || (mat > 5.5 && mat < 6.5) ||
                     (mat > 8.5 && mat < 9.5);
+    // Ce qui a un CORPS : tout, sauf le sas (une bouche) et les ouvertures
+    // sur le dehors (vide, baie — des trous dans le plancher). Sans corps,
+    // ni court-circuit d'aura, ni relief, ni ombre portée, ni biseau.
+    bool solide = (mat < 2.5 || mat > 3.5) && mat < 10.5;
     vec3 eclMat = matActif ? eclActif : eclSolide;
     // Court-circuit : au-delà de toute influence visuelle (ombre 56 u, arête,
     // aura selon le matériau), la boîte ne peut plus teinter ce pixel — on
@@ -1250,7 +1255,7 @@ void main() {
     // chaque pixel n'en paie plus que les 1-2 qui le concernent. Le SAS garde
     // son grand rayon d'aspiration : jamais coupé. Le rejet se fait sur la
     // BOÎTE englobante : toute forme y est inscrite, il reste conservateur.
-    if (mat < 2.5 || mat > 3.5) {
+    if (solide) {
       float reachMax = 56.0;
       if (mat > 0.5 && mat < 2.5) reachMax = max(reachMax, uHydroBand);
       else if (mat > 5.5 && mat < 6.5) reachMax = max(reachMax, uHeatBand * uBoxAux[bi].w);
@@ -1278,7 +1283,7 @@ void main() {
     float dV = d;
     vec2 wbV = wb;
     float flanc = 0.0;
-    if (uRelief > 0.0 && (mat < 2.5 || mat > 3.5)) {
+    if (uRelief > 0.0 && solide) {
       vec2 wT = world - relDisp;
       vec2 wbT = wT;
       float bAngR = uBoxAux[bi].y;
@@ -1314,7 +1319,7 @@ void main() {
     // Ombre portée douce autour de chaque solide (sauf le sas) : les blocs
     // se détachent du fond au lieu de flotter — la cuve prend de la
     // profondeur, les rectangles cessent d'être des aplats.
-    if (mat < 2.5 || mat > 3.5) {
+    if (solide) {
       float shade = 1.0 - smoothstep(0.0, 56.0, max(d, 0.0));
       col = mix(col, col * vec3(0.50, 0.56, 0.70), shade * shade * 0.5);
     }
@@ -1505,6 +1510,53 @@ void main() {
         vec3 auraCol = mat < 1.5 ? vec3(0.12, 0.42, 0.45) : vec3(0.38, 0.20, 0.52);
         col += auraCol * aura * (0.45 + 0.55 * mist);
       }
+    } else if (mat > 10.5) {
+      // LE DEHORS, VU D'ICI. Le plancher s'efface et le vide paraît — le
+      // MÊME ciel que celui qui entoure les modules (voidCol) : mêmes
+      // étoiles, même parallaxe, même plaque. Ce n'est pas une image posée
+      // sur le sol, c'est un trou dedans. Rien de la cuve n'y subsiste :
+      // ni trame, ni caustiques, ni lumière de lampe — le vide n'est
+      // éclairé par rien, et c'est ce qui le fait lire comme un dehors.
+      // Ce que le SDF signé donne gratuitement : la forme (un disque fait
+      // un hublot), le liseré et la monture qui la suivent.
+      float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
+      if (mat < 11.5) {
+        // VIDE, à nu : le trou franc. La tranche du plancher se lit au
+        // bord, côté dedans — sombre, puis un fil clair sur l'arête, qui
+        // prend la lumière de la salle : le sol a une épaisseur, le vide
+        // est DESSOUS, pas peint dessus.
+        col = mix(col, voidCol, fill);
+        float tranche = (1.0 - smoothstep(0.0, edgeW * 3.0, -d)) * fill;
+        col = mix(col, vec3(0.016, 0.024, 0.036) * eclSolide, tranche * 0.85);
+        float edge = (1.0 - smoothstep(0.0, edgeW, abs(d))) * libre;
+        col = mix(col, vec3(0.30, 0.38, 0.48) * eclSolide, edge * 0.6);
+      } else {
+        // BAIE VITRÉE : le vide derrière une vitre, dans sa monture. La
+        // monture est une bande large sur le pourtour INTÉRIEUR (elle suit
+        // la forme), métal froid rivé ; la vitre au centre teinte à peine le
+        // ciel et renvoie un balayage lent — le reflet des lampes de la
+        // salle sur le verre, ce qui la distingue du trou nu d'à côté.
+        float montW = max(14.0, edgeW * 5.0);
+        float verre = 1.0 - smoothstep(-montW - edgeW, -montW, d);
+        float monture = fill - verre;
+        vec3 ciel = voidCol + vec3(0.025, 0.040, 0.065);
+        float band = 0.5 + 0.5 * sin((world.x + world.y) * 0.016 - uTime * 0.22);
+        float sweep = smoothstep(0.88, 0.995, band);
+        ciel += vec3(0.10, 0.13, 0.17) * sweep * eclSolide;
+        // un reflet fixe sur le bord intérieur de la vitre : le verre a une épaisseur
+        float lisere = (1.0 - smoothstep(0.0, edgeW * 1.5, abs(d + montW))) * fill;
+        col = mix(col, ciel, verre);
+        col = mix(col, vec3(0.55, 0.70, 0.86) * eclSolide, lisere * 0.5);
+        // la monture : métal brossé, une strie fine, des rivets sur une
+        // grille monde (ils suivent la bande quelle que soit la forme)
+        float grain = dnoise(world * 0.05);
+        vec3 metal = vec3(0.22, 0.28, 0.35) * (0.82 + 0.18 * grain);
+        float rivet = smoothstep(0.80, 0.96, sin(world.x * 0.14) * sin(world.y * 0.14));
+        metal += vec3(0.16, 0.20, 0.24) * rivet;
+        col = mix(col, metal * eclSolide, monture);
+        float edge = (1.0 - smoothstep(0.0, edgeW, abs(d))) * libre;
+        col = mix(col, vec3(0.42, 0.52, 0.64) * eclSolide, edge * 0.7);
+      }
     } else if (mat > 9.5) {
       // MIROIR FIXE : la paroi polie qui plie le faisceau (laser.ts fait la
       // vraie optique — ici, le POLI se voit) : métal froid presque blanc,
@@ -1674,7 +1726,7 @@ void main() {
     // solide — la face tournée vers la lampe s'éclaire, l'opposée plonge.
     // Le gradient du SDF vient des dérivées d'écran : gratuit, et il suit
     // n'importe quelle forme. (Le sas, une bouche, ne se biseaute pas.)
-    if (uLumiere > 0.5 && (mat < 2.5 || mat > 3.5)) {
+    if (uLumiere > 0.5 && solide) {
       vec2 gd = vec2(dFdx(d), dFdy(d));
       float gn = length(gd);
       if (gn > 1e-6) {
@@ -2346,6 +2398,7 @@ float sceneSdf(vec2 p, float alt) {
     if (i >= uBoxCount) break;
     vec4 dec = decodeAux(uBoxAux[i].x);
     if (dec.x > 2.5 && dec.x < 3.5) continue; // sas : une bouche, pas un mur
+    if (dec.x > 10.5) continue;              // vide, baie : un trou dans le plancher, pas un mur
     if (dec.x > 4.5 && dec.x < 5.5) continue; // évent : tamisé à part (grilleTrans)
     if (dec.x < 0.5 && uBoxAux[i].z > 8.5) continue; // vitre : tamisée (vitreTrans)
     if (alt > (dec.y > 4.5 ? HAUTEUR_COQUE : HAUTEUR_BLOCS)) continue;

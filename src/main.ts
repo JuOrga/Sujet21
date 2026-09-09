@@ -208,6 +208,9 @@ import { FixedLoop } from './game/loop'
 import { Input } from './game/input'
 import {
   MAT_EXIT,
+  sansPhysique,
+  CHASSE_ALLURE_DEFAUT,
+  CHASSE_DUREE_DEFAUT,
   MAT_FROID,
   TABLEAU_1BIS,
   TABLEAUX,
@@ -228,8 +231,8 @@ import {
   type ZoneForce,
   AMBIANTE_DEFAUT,
 } from './game/level'
-import { LevelEditor } from './editor/editor'
-import { EditeurCarte } from './editor/editeurCarte'
+import type { LevelEditor } from './editor/editor'
+import type { EditeurCarte } from './editor/editeurCarte'
 import { EcranCodex } from './game/ecranCodex'
 import { EcranMarchand } from './game/ecranMarchand'
 import {
@@ -374,7 +377,9 @@ import {
   pushTableauRecord,
   type SharedBoard,
 } from './game/netRecords'
-import { createBench, type BenchMonitor } from './bench/bench'
+import type { BenchMonitor } from './bench/bench'
+import type { Pane } from 'tweakpane'
+import { amorcePresets } from './bench/amorcePresets'
 import { appelle } from './game/reseau'
 
 const CAPACITY = 4096
@@ -4500,51 +4505,143 @@ document
 // « Essayer » vient-il de l'éditeur ? Si oui, on doit pouvoir y retourner
 // d'un geste, à tout instant — y compris depuis l'écran de fin d'essai.
 let fromEditor = false
-const editor = new LevelEditor(el('editor'), {
-  // les portées dessinées (aspiration du sas, auras, rails) suivent le banc
-  params: () => params,
-  play: (lvl) => {
-    testLevel = lvl
-    fromEditor = true
-    run.bonbonneLiters = 0
-    run.runTime = 0
-    hasPlayed = true
-    editor.close()
-    document.body.classList.add('playing')
-    input.paused = false
-    restart()
-  },
-  quit: () => {
-    editor.close()
-    fromEditor = false
-    testLevel = null
-    openHome()
-    restart()
-  },
-  operator: () => records.operator(),
-  // les menus déroulants de l'éditeur : les VRAIES cinématiques et séquences
-  // connues du poste — livrées, composées ici, et partagées en ligne
-  cines: () =>
-    [...CINEMATIQUES_LIVREES, ...chargeCinematiques(), ...cinesPartagees]
-      .filter((c, i, t) => t.findIndex((o) => o.code === c.code) === i)
-      .map((c) => ({ code: c.code, titre: c.titre })),
-  sequences: () =>
-    [SEQUENCE_ALERTE, ...sequencesJouees()]
-      .filter((s, i, t) => t.findIndex((o) => o.code === s.code) === i)
-      .map((s) => ({ code: s.code, titre: s.titre })),
-  // les biomes de la carte de la station : le champ Biome du tableau
-  biomes: () => biomesDeCarte(carte),
-  libraryChanged: (levels) => {
-    libraryLevels = levels.map((s) => s.level)
-    renderRegistres()
-    updateLibraryButton()
-    renderSalles()
-  },
-  // l'éditeur n'ordonne plus lui-même : son bouton renvoie à LA PLANCHE
-  planche: () => void ouvrePlanche(),
-  // L2 tenu = Maj : la multi-sélection au Steam Deck (trackpad droit en
-  // souris, aucune touche Maj sous la main)
-  modMulti: () => manette.ltVal > 0.5,
+
+// ---- LE CHARGEMENT DE L'ATELIER ------------------------------------------
+// Les outils du concepteur — l'éditeur de tableaux, l'éditeur de la carte,
+// le banc de réglage (Tweakpane) — ne sont plus dans le paquet de départ :
+// import() les fait venir à la PREMIÈRE demande, en morceaux séparés par
+// Vite. Avant, ils étaient importés et construits au chargement du module :
+// un joueur qui n'ouvrait jamais le mode concepteur téléchargeait et
+// exécutait quand même dix mille lignes (paquet principal mesuré à 1 269 ko
+// avant, voir le commit). Entre le clic et l'outil, un mot à l'écran dit ce
+// qui se passe : sur un réseau lent, un bouton qui ne répond pas est un
+// bouton cassé. Et si le morceau ne vient pas (réseau coupé, cache
+// périmé), on le dit au lieu de se taire. Le mot demande de RECHARGER LA
+// PAGE, pas de réessayer : un module dont la lecture a échoué reste noté
+// en échec par le navigateur pour toute la vie de la page — un second
+// import() de la même adresse retombe aussitôt sur la même erreur, sans
+// rien redemander au réseau (vérifié en navigateur : le second appui
+// rendait le même mot, le rechargement ouvrait l'outil).
+const atelierChargementEl = document.getElementById('atelier-chargement') as HTMLDivElement | null
+let atelierChargementTimer = 0
+// les chargements EN VOL, par nom : le cartouche est unique, il dit celui qui
+// reste quand un autre a fini, et ne s'efface qu'au dernier
+const atelierEnVol = new Set<string>()
+// « l’éditeur de tableaux » → « L’éditeur de tableaux se charge… » : le nom
+// garde son article, la phrase commence par lui
+const majuscule = (quoi: string): string => quoi.charAt(0).toUpperCase() + quoi.slice(1)
+/** Peint l'état courant : un échec affiché garde la main (son minuteur
+ *  l'effacera), sinon le prochain chargement en vol, sinon rien. */
+function peintAtelierChargement(): void {
+  if (!atelierChargementEl || atelierChargementEl.classList.contains('echec')) return
+  const suivant = atelierEnVol.values().next()
+  if (suivant.done) {
+    atelierChargementEl.hidden = true
+    return
+  }
+  atelierChargementEl.textContent = `${majuscule(suivant.value)} se charge…`
+  atelierChargementEl.hidden = false
+}
+async function chargeAtelier<T>(quoi: string, charge: () => Promise<T>): Promise<T | null> {
+  // une nouvelle demande efface un échec affiché : c'est un nouveau geste
+  window.clearTimeout(atelierChargementTimer)
+  atelierChargementEl?.classList.remove('echec')
+  atelierEnVol.add(quoi)
+  peintAtelierChargement()
+  try {
+    const r = await charge()
+    atelierEnVol.delete(quoi)
+    peintAtelierChargement()
+    return r
+  } catch (e) {
+    atelierEnVol.delete(quoi)
+    console.error(`chargement de ${quoi}`, e)
+    if (atelierChargementEl) {
+      atelierChargementEl.textContent = `${majuscule(quoi)} n’a pas pu se charger — vérifiez le réseau, puis rechargez la page.`
+      atelierChargementEl.classList.add('echec')
+      atelierChargementEl.hidden = false
+      atelierChargementTimer = window.setTimeout(() => {
+        atelierChargementEl.classList.remove('echec')
+        peintAtelierChargement()
+      }, 6000)
+    }
+    return null
+  }
+}
+/** Un outil chargé UNE FOIS : la première demande le fabrique, les suivantes
+ *  rendent la même instance ; une demande pendant le chargement rejoint la
+ *  promesse en cours ; un échec oublie le chargeur (le mot est déjà dit). */
+function chargeUneFois<T>(quoi: string, fabrique: () => Promise<T>): () => Promise<T | null> {
+  let instance: T | null = null
+  let enCours: Promise<T | null> | null = null
+  return () => {
+    if (instance) return Promise.resolve(instance)
+    if (enCours) return enCours
+    enCours = chargeAtelier(quoi, fabrique).then((x) => {
+      if (x) instance = x
+      else enCours = null
+      return x
+    })
+    return enCours
+  }
+}
+
+let editor: LevelEditor | null = null
+/** L'éditeur de tableaux, construit au premier appel — null si le morceau
+ *  n'a pas pu venir (le mot d'échec est déjà à l'écran). */
+const chargeEditeur = chargeUneFois('l’éditeur de tableaux', async () => {
+    const { LevelEditor } = await import('./editor/editor')
+    const ed = new LevelEditor(el('editor'), {
+      // les portées dessinées (aspiration du sas, auras, rails) suivent le banc
+      params: () => params,
+      play: (lvl) => {
+        testLevel = lvl
+        fromEditor = true
+        run.bonbonneLiters = 0
+        run.runTime = 0
+        hasPlayed = true
+        ed.close()
+        document.body.classList.add('playing')
+        input.paused = false
+        restart()
+      },
+      quit: () => {
+        ed.close()
+        fromEditor = false
+        testLevel = null
+        openHome()
+        restart()
+      },
+      operator: () => records.operator(),
+      // les menus déroulants de l'éditeur : les VRAIES cinématiques et séquences
+      // connues du poste — livrées, composées ici, et partagées en ligne
+      cines: () =>
+        [...CINEMATIQUES_LIVREES, ...chargeCinematiques(), ...cinesPartagees]
+          .filter((c, i, t) => t.findIndex((o) => o.code === c.code) === i)
+          .map((c) => ({ code: c.code, titre: c.titre })),
+      sequences: () =>
+        [SEQUENCE_ALERTE, ...sequencesJouees()]
+          .filter((s, i, t) => t.findIndex((o) => o.code === s.code) === i)
+          .map((s) => ({ code: s.code, titre: s.titre })),
+      // les biomes de la carte de la station : le champ Biome du tableau
+      biomes: () => biomesDeCarte(carte),
+      libraryChanged: (levels) => {
+        libraryLevels = levels.map((s) => s.level)
+        renderRegistres()
+        updateLibraryButton()
+        renderSalles()
+      },
+      // l'éditeur n'ordonne plus lui-même : son bouton renvoie à LA PLANCHE
+      planche: () => void ouvrePlanche(),
+      // L2 tenu = Maj : la multi-sélection au Steam Deck (trackpad droit en
+      // souris, aucune touche Maj sous la main)
+      modMulti: () => manette.ltVal > 0.5,
+    })
+    editor = ed
+    // la bibliothèque que la planche a déjà reçue du serveur : l'éditeur
+    // l'adopte telle quelle (re-télécharger tomberait sur le cache, 60 s)
+    if (plancheTous.length > 0) ed.adopteBibliotheque(plancheTous)
+    return ed
 })
 
 // Un élément ne défile de côté que s'il l'a déclaré : « hidden » (ou
@@ -4727,7 +4824,7 @@ function plancheSync(saved: StoredLevel[]): void {
   renderRegistres()
   updateLibraryButton()
   renderSalles()
-  editor.adopteBibliotheque(saved)
+  editor?.adopteBibliotheque(saved)
   renderPlanche()
 }
 async function ouvrePlanche(): Promise<void> {
@@ -5099,10 +5196,14 @@ function renderPlanche(): void {
     // bien plus commode au doigt que la liste du panneau (Steam Deck)
     carte.querySelector('.pl-editer')?.addEventListener('click', (e) => {
       e.stopPropagation()
-      plancheEl.hidden = true
-      sallesEl.hidden = true
-      openEditor()
-      editor.ouvreTableau(s.id)
+      // la planche ne se replie qu'une fois l'éditeur LÀ : un chargement
+      // manqué la laisse ouverte, avec sa bibliothèque et son défilement
+      void openEditor().then((ed) => {
+        if (!ed) return
+        plancheEl.hidden = true
+        sallesEl.hidden = true
+        ed.ouvreTableau(s.id)
+      })
     })
     // l'ESSAI : la carte se joue, et on saura revenir ici même
     carte.querySelector('.pl-jouer')?.addEventListener('click', (e) => {
@@ -5110,7 +5211,7 @@ function renderPlanche(): void {
       plancheScroll = corps.scrollTop
       plancheEl.hidden = true
       sallesEl.hidden = true
-      editor.close() // la planche peut être posée sur l'éditeur : on le replie
+      editor?.close() // la planche peut être posée sur l'éditeur : on le replie
       startTest([s.level])
       // startTest peut rendre la main à la fiche (nom d'opérateur manquant) :
       // le retour ne s'arme que si l'essai a vraiment démarré
@@ -6471,55 +6572,69 @@ fetchLibrary().then((lib) => {
 })
 
 // Sonde de débogage/test : le tableau en cours d'édition
-;(window as unknown as { __editorLevel: () => LevelDef }).__editorLevel = () =>
-  editor.currentLevel()
+;(window as unknown as { __editorLevel: () => LevelDef | null }).__editorLevel = () =>
+  editor?.currentLevel() ?? null
 // L'éditeur possède son document : on le rouvre tel qu'on l'a laissé, sans
 // écraser le travail en cours par le tableau qu'on vient d'essayer.
-function openEditor(): void {
+// Il se charge au premier appel : l'écran ne bascule qu'une fois l'outil
+// là — un échec de chargement laisse le jeu exactement où il était.
+async function openEditor(): Promise<LevelEditor | null> {
+  const ed = await chargeEditeur()
+  if (!ed) return null
   overlay.classList.remove('visible')
   document.body.classList.remove('playing')
   // l'éditeur a la main : le jeu se met en PAUSE derrière lui — la physique
   // ne tourne plus dans son dos (« Essayer » relance, quitter rend la fiche)
   input.paused = true
-  editor.open()
+  ed.open()
+  return ed
 }
 // ---- L'ÉDITEUR DE LA CARTE DE LA STATION (editor/editeurCarte.ts) ----
 // Même porte que l'éditeur de tableaux : mode concepteur, ou ?carte dans
 // l'URL. Il couvre l'écran et fige la partie derrière lui.
-const editeurCarte = new EditeurCarte(el('carte-editeur'), {
-  quit: () => {
-    editeurCarte.close()
-    openHome()
-  },
-  partage: {
-    charge: async () => {
-      const p = await fetchReglage('carte')
-      if (!p) return null
-      cartePubliee = litCartePubliee(p.document)
-      return { carte: cartePubliee, auteur: p.auteur, date: p.date }
-    },
-    publie: async (c) => {
-      const p = await pushReglage('carte', documentCarte(c), records.operator() || 'anonyme')
-      if (!p) return false
-      cartePubliee = litCartePubliee(p.document)
-      appliqueCartePubliee(cartePubliee)
-      return cartePubliee !== null
-    },
-    retire: async () => {
-      const ok = await deleteReglage('carte')
-      if (ok) {
-        cartePubliee = null
-        appliqueCartePubliee(null)
-      }
-      return ok
-    },
-  },
+let editeurCarte: EditeurCarte | null = null
+const chargeEditeurCarte = chargeUneFois('l’éditeur de la carte', async () => {
+    const { EditeurCarte } = await import('./editor/editeurCarte')
+    const ec = new EditeurCarte(el('carte-editeur'), {
+      quit: () => {
+        ec.close()
+        openHome()
+      },
+      partage: {
+        charge: async () => {
+          const p = await fetchReglage('carte')
+          if (!p) return null
+          cartePubliee = litCartePubliee(p.document)
+          return { carte: cartePubliee, auteur: p.auteur, date: p.date }
+        },
+        publie: async (c) => {
+          const p = await pushReglage('carte', documentCarte(c), records.operator() || 'anonyme')
+          if (!p) return false
+          cartePubliee = litCartePubliee(p.document)
+          appliqueCartePubliee(cartePubliee)
+          return cartePubliee !== null
+        },
+        retire: async () => {
+          const ok = await deleteReglage('carte')
+          if (ok) {
+            cartePubliee = null
+            appliqueCartePubliee(null)
+          }
+          return ok
+        },
+      },
+    })
+    editeurCarte = ec
+    return ec
 })
-function openEditeurCarte(): void {
+async function openEditeurCarte(): Promise<EditeurCarte | null> {
+  const ec = await chargeEditeurCarte()
+  if (!ec) return null
   overlay.classList.remove('visible')
   document.body.classList.remove('playing')
   input.paused = true
-  editeurCarte.open()
+  ec.open()
+  return ec
 }
 
 // ---- LA RÉGIE : la console du concepteur (editor/regie.ts) ----------------
@@ -6542,10 +6657,9 @@ const regie = new Regie(regieEl, {
         'Le plan à routes ramifiées de la station : un module est un biome, ses salles, ses coursives et leurs conditions d’accès. L’éditeur se glisse, se lie, se vérifie, se rejoue en aperçu ; PUBLIER fait jouer la carte à tout le monde (refusé si elle a une erreur).',
       domaines: ['carte'],
       ouvre: () => {
-        // l'éditeur de carte vit SOUS la régie (z-index) : on la ferme, sa
-        // porte ↩ Accueil ramène à la fiche
-        regie.close()
-        openEditeurCarte()
+        // l'éditeur de carte vit SOUS la régie (z-index) : on la ferme une
+        // fois l'outil là, sa porte ↩ Accueil ramène à la fiche
+        void openEditeurCarte().then((ec) => ec && regie.close())
       },
     },
     {
@@ -6640,8 +6754,7 @@ const regie = new Regie(regieEl, {
         'L’éditeur de tableaux : les surfaces, les mécanismes, les zones, le biome et le code atelier d’une salle — publiée dans la bibliothèque partagée, elle entre dans la planche et dans la pioche.',
       domaines: [],
       ouvre: () => {
-        regie.close()
-        openEditor()
+        void openEditor().then((ed) => ed && regie.close())
       },
     },
     {
@@ -6714,7 +6827,7 @@ const regie = new Regie(regieEl, {
 document.getElementById('home-regie')?.addEventListener('click', () => regie.open())
 // Sonde de test : la carte en cours d'édition
 ;(window as unknown as { __carte: () => unknown }).__carte = () =>
-  editeurCarte.carteCourante()
+  editeurCarte?.carteCourante() ?? null
 // ---- Le panneau COMMANDES : trois onglets (PC, manette, tactile) ----
 // Les commandes ont quitté la fiche : un bouton, un panneau, trois écrans.
 const cmdsEl = document.getElementById('cmds') as HTMLDivElement
@@ -6774,7 +6887,7 @@ window.addEventListener('keydown', (e) => {
     // le plan de la station passe AVANT tout : c'est le voile du dessus, et
     // il a figé la partie — Échap doit d'abord la rendre
     if (stationEl && !stationEl.hidden) ouvreStation(false)
-    else if (editeurCarte.visible) {
+    else if (editeurCarte?.visible) {
       // le geste, puis la sélection, puis l'écran : Échap défait dans l'ordre
       if (!editeurCarte.echap()) {
         editeurCarte.close()
@@ -6850,11 +6963,11 @@ const input = new Input()
 // module au premier lancement (TDZ) et laissait une page à moitié câblée.
 if (new URLSearchParams(location.search).has('editeur')) {
   hasPlayed = true
-  openEditor()
+  void openEditor()
 }
 if (new URLSearchParams(location.search).has('carte')) {
   hasPlayed = true
-  openEditeurCarte()
+  void openEditeurCarte()
 }
 // CRYOSTASE : tant que l'éveil n'a pas été joué, l'échantillon attend GELÉ
 // dès le premier pixel — même en dérive derrière la fiche. Le premier
@@ -7266,6 +7379,10 @@ const laserEtat = {
   recepteurs: creerEtatRecepteurs(0),
   portesOuvertes: [] as boolean[],
   doorsKey: '', // signature des portes fermées envoyées au solveur
+  // LES CHASSES : qui souffle en cet instant, et le reste de bouffée (s)
+  // d'une chasse déclenchée par séquence
+  chassesActives: [] as boolean[],
+  chasseBouffee: [] as number[],
   // LE SURSAUT DE VICTOIRE : à l'allumage d'une pastille, la trajectoire
   // du rayon vainqueur est GELÉE un court instant et rejouée en flash —
   // même si la physique l'a déjà emporté ailleurs. Un balayage éclair sur
@@ -7445,6 +7562,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       portes.length +
       rails.length +
       caches.length +
+      (level.chasses?.length ?? 0) + // un tableau qui n'a QU'une chasse se dessine aussi
       pastilles.length +
       eclatsEssai.length +
       (level.plots?.length ?? 0) +
@@ -7510,6 +7628,60 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
         }
       }
       g.stroke()
+    }
+  }
+
+  // chasses : des courants de poussée — des chevrons qui FILENT dans le sens
+  // du souffle tant qu'elle est active, un cadre discret et des chevrons
+  // immobiles quand elle se tait. Le sens se lit avant d'y entrer.
+  {
+    const chasses = level.chasses ?? []
+    for (let i = 0; i < chasses.length; i++) {
+      const c = chasses[i]
+      if (dansCacheVoilee((c.minX + c.maxX) / 2, (c.minY + c.maxY) / 2)) continue
+      const a = S(c.minX, c.maxY)
+      const b = S(c.maxX, c.minY)
+      const w = b.sx - a.sx
+      const h = b.sy - a.sy
+      const active = laserEtat.chassesActives[i] === true
+      const rad = (c.angle * Math.PI) / 180
+      const ux = Math.cos(rad)
+      const uy = -Math.sin(rad) // l'écran a l'axe y vers le bas
+      const px = -uy
+      const py = ux
+      g.save()
+      g.beginPath()
+      g.rect(a.sx, a.sy, w, h)
+      g.clip()
+      if (active) {
+        g.fillStyle = 'rgba(80,200,255,0.10)'
+        g.fillRect(a.sx, a.sy, w, h)
+      }
+      const pas = Math.max(14, 90 * z)
+      const decal = active ? ((elapsed * (c.allure ?? CHASSE_ALLURE_DEFAUT) * z) % pas) : 0
+      const cx = (a.sx + b.sx) / 2
+      const cy = (a.sy + b.sy) / 2
+      const L = Math.hypot(w, h)
+      const taille = Math.max(5, 22 * z)
+      g.strokeStyle = active ? 'rgba(120,225,255,0.75)' : 'rgba(120,180,220,0.28)'
+      g.lineWidth = active ? 2 : 1.2
+      g.beginPath()
+      for (let r = -L / 2; r <= L / 2; r += pas * 1.4) {
+        for (let t = -L / 2 - pas + decal; t <= L / 2; t += pas) {
+          const x = cx + ux * t + px * r
+          const y = cy + uy * t + py * r
+          g.moveTo(x - ux * taille - px * taille * 0.6, y - uy * taille - py * taille * 0.6)
+          g.lineTo(x, y)
+          g.lineTo(x - ux * taille + px * taille * 0.6, y - uy * taille + py * taille * 0.6)
+        }
+      }
+      g.stroke()
+      g.restore()
+      g.strokeStyle = active ? 'rgba(120,225,255,0.8)' : 'rgba(120,180,220,0.35)'
+      g.setLineDash(active ? [] : [5, 7])
+      g.lineWidth = 1.5
+      g.strokeRect(a.sx, a.sy, w, h)
+      g.setLineDash([])
     }
   }
 
@@ -9313,6 +9485,7 @@ function majIdle(dtReal: number): void {
     let murY = 0
     let best = Infinity
     for (const b of level.boxes) {
+      if (sansPhysique(b.material)) continue // on ne toque pas sur le vide
       const px = Math.max(b.minX, Math.min(cx, b.maxX))
       const py = Math.max(b.minY, Math.min(cy, b.maxY))
       const d = Math.hypot(px - cx, py - cy)
@@ -11265,6 +11438,8 @@ function resetLasers(): void {
   laserEtat.recepteurs = creerEtatRecepteurs((level.cibles ?? []).length)
   laserEtat.portesOuvertes = (level.portes ?? []).map(() => false)
   laserEtat.doorsKey = ''
+  laserEtat.chassesActives = (level.chasses ?? []).map(() => false)
+  laserEtat.chasseBouffee = (level.chasses ?? []).map(() => 0)
   lastRailTime = 0
   railsEngages.clear()
   // LA BASCULE NE SE TRANSMET PAS D'UN TABLEAU À L'AUTRE. Sans cela, le
@@ -12974,7 +13149,7 @@ function resetAction(): void {
   if (testLevel) {
     if (run.ended) {
       if (fromEditor) {
-        openEditor() // l'essai vient de l'éditeur : on y retourne
+        void openEditor() // l'essai vient de l'éditeur : on y retourne
         return
       }
       if (fromPlanche) {
@@ -13043,43 +13218,54 @@ function resetAction(): void {
 
 document.getElementById('overlay-btn')!.addEventListener('click', resetAction)
 
-const pane = createBench(params, monitor, {
-  reset: resetAction,
-  autoZoom: () => camera.resetAutoZoom(),
-  oeil: { regl: oeilRegl, defauts: OEIL_DEFAUTS, sauve: sauveOeil },
-  // le PUPITRE au banc : mêmes manœuvres, catalogue lu sur le panneau
-  pupitre: { sections: cataloguePupitre(), lance: actionPupitre },
-  perf: { copier: copiePerf, envoyer: envoiePerf },
-  ciel: cielReglages,
-  parallaxe: parallaxeReglages,
-  tableaux: TABLEAUX.map((t) => t.name),
-  gotoTableau: (index) => {
-    testLevel = null // le banc navigue dans l'expédition, pas dans le prototype
-    auHub = false
-    fromEditor = false
-    levelIndex = index
-    restart()
-  },
-  gotoBis: () => startBisTest(),
-  sound: {
-    get actif() {
-      return audio.enabled
-    },
-    set actif(v: boolean) {
-      audio.resume()
-      audio.setEnabled(v)
-      if (v) {
-        bande.eveiller()
-      }
-      majInviteSon()
-    },
-    get volume() {
-      return audio.volume
-    },
-    set volume(v: number) {
-      audio.setVolume(v)
-    },
-  },
+// L'AMORCE des présets reste au démarrage, pour tout le monde : le préset
+// par défaut des testeurs s'applique ici, sans le banc (amorcePresets.ts).
+amorcePresets(params)
+let pane: Pane | null = null
+let benchHost: HTMLElement | null = null
+const chargeBanc = chargeUneFois('le banc de réglage', async () => {
+    const { createBench } = await import('./bench/bench')
+    const p = createBench(params, monitor, {
+      reset: resetAction,
+      autoZoom: () => camera.resetAutoZoom(),
+      oeil: { regl: oeilRegl, defauts: OEIL_DEFAUTS, sauve: sauveOeil },
+      // le PUPITRE au banc : mêmes manœuvres, catalogue lu sur le panneau
+      pupitre: { sections: cataloguePupitre(), lance: actionPupitre },
+      perf: { copier: copiePerf, envoyer: envoiePerf },
+      ciel: cielReglages,
+      parallaxe: parallaxeReglages,
+      tableaux: TABLEAUX.map((t) => t.name),
+      gotoTableau: (index) => {
+        testLevel = null // le banc navigue dans l'expédition, pas dans le prototype
+        auHub = false
+        fromEditor = false
+        levelIndex = index
+        restart()
+      },
+      gotoBis: () => startBisTest(),
+      sound: {
+        get actif() {
+          return audio.enabled
+        },
+        set actif(v: boolean) {
+          audio.resume()
+          audio.setEnabled(v)
+          if (v) {
+            bande.eveiller()
+          }
+          majInviteSon()
+        },
+        get volume() {
+          return audio.volume
+        },
+        set volume(v: number) {
+          audio.setVolume(v)
+        },
+      },
+    }, { defautDejaApplique: true })
+    pane = p
+    benchHost = p.element.closest('.tp-dfwv') as HTMLElement | null
+    return p
 })
 input.onReset = resetAction
 input.onZoom = (factor, cx, cy) =>
@@ -13134,12 +13320,15 @@ document.getElementById('legend-close')!.addEventListener('click', toggleLegend)
 document.getElementById('states-close')!.addEventListener('click', toggleStates)
 
 // Banc de réglage : plus de panneau flottant permanent en haut — le bouton
-// BANC de la barre le montre et le masque.
-const benchHost = pane.element.closest('.tp-dfwv') as HTMLElement | null
-if (benchHost) benchHost.style.display = 'none'
+// BANC de la barre le montre et le masque. Le premier appui le CHARGE
+// (Tweakpane et le banc ne sont pas dans le paquet de départ), puis le
+// montre : Tweakpane pose son panneau ouvert, c'est ce qu'on a demandé.
 function toggleBench(): void {
-  if (!benchHost) return
-  benchHost.style.display = benchHost.style.display === 'none' ? '' : 'none'
+  if (benchHost) {
+    benchHost.style.display = benchHost.style.display === 'none' ? '' : 'none'
+    return
+  }
+  void chargeBanc() // en route : un second appui rejoint le même chargement
 }
 
 const chipLegend = touchButton(
@@ -13164,7 +13353,7 @@ const chipBench = touchButton(
 const chipEditor = touchButton(
   '↩ ÉDITEUR',
   'revenir à l’éditeur (le tableau est retrouvé tel qu’il était)',
-  () => openEditor(),
+  () => void openEditor(),
   'tb-chip tb-editor',
 )
 chipEditor.style.display = 'none'
@@ -13865,7 +14054,7 @@ const btnSound = touchButton(
       bande.eveiller()
     }
     majInviteSon()
-    pane.refresh()
+    pane?.refresh()
   },
   'tb-snd', // masqué au doigt : la bascule du son reste au banc (dossier Son)
 )
@@ -13874,7 +14063,7 @@ touchButton('≡', 'fiche d’essai (échap)', openHome)
 input.onTimeWarpChange = (warp) => {
   params.timeWarp = warp
   majVitesse()
-  pane.refresh()
+  pane?.refresh()
 }
 // La vitesse affichée (barre + HUD) : mise à jour au changement ET à chaque
 // image (le banc peut aussi changer timeWarp par ses curseurs)
@@ -14524,6 +14713,15 @@ function frame(now: number): void {
           vortex.timer -= params.dt
         }
         sim.applyExitSuction(exitMouth.x, exitMouth.y, params.dt)
+        // les CHASSES qui soufflent : le courant s'applique au pas, comme le
+        // sas — et la bouffée d'une chasse déclenchée s'épuise au temps de jeu
+        {
+          const chasses = level.chasses ?? []
+          for (let i = 0; i < chasses.length; i++) {
+            if (laserEtat.chasseBouffee[i] > 0) laserEtat.chasseBouffee[i] -= params.dt
+            if (laserEtat.chassesActives[i]) sim.applyChasse(chasses[i], params.dt)
+          }
+        }
         // Rien ne freine le corps figé : dans le vide, une dérive reste une
         // trajectoire. Elle peut encore rencontrer une paroi, rebondir, et
         // finir dans le sas — c'est au joueur de décider quand y renoncer.
@@ -14564,6 +14762,34 @@ function frame(now: number): void {
       if (cle !== laserEtat.doorsKey) {
         laserEtat.doorsKey = cle
         sim.setDoors(closes)
+      }
+    }
+  }
+
+  // ---- LES CHASSES : qui souffle. HORS du bloc des lasers pour la même
+  // raison que les portes — une chasse permanente ou scénarisée n'a pas
+  // besoin d'un émetteur. Une bouffée déclenchée par séquence est un
+  // ÉVÉNEMENT : consommée ici, une fois, elle devient un compte à rebours.
+  {
+    const chasses = level.chasses ?? []
+    if (chasses.length > 0) {
+      if (laserEtat.chassesActives.length !== chasses.length) {
+        laserEtat.chassesActives = chasses.map(() => false)
+        laserEtat.chasseBouffee = chasses.map(() => 0)
+      }
+      for (const i of sequenceur.etat.chassesDeclenchees) {
+        if (i < chasses.length)
+          laserEtat.chasseBouffee[i] = chasses[i].duree ?? CHASSE_DUREE_DEFAUT
+      }
+      sequenceur.etat.chassesDeclenchees.clear()
+      const cibles = level.cibles ?? []
+      const now = performance.now() / 1000
+      for (let i = 0; i < chasses.length; i++) {
+        const c = chasses[i]
+        laserEtat.chassesActives[i] =
+          laserEtat.chasseBouffee[i] > 0 ||
+          c.canal === undefined ||
+          canalActif(cibles, c.canal, c.regle, laserEtat.recepteurs, now)
       }
     }
   }

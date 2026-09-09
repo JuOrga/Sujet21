@@ -18,6 +18,7 @@ export type ActionSeq =
   | 'ponctuation'
   | 'piste'
   | 'breche'
+  | 'chasse'
   | 'carte'
   | 'secousse'
   | 'cinematique'
@@ -29,6 +30,7 @@ export const ACTIONS: ActionSeq[] = [
   'ponctuation',
   'piste',
   'breche',
+  'chasse',
   'carte',
   'secousse',
   'cinematique',
@@ -41,6 +43,7 @@ export const ACTION_NOMS: Record<ActionSeq, string> = {
   ponctuation: 'Ponctuation musicale',
   piste: 'Changer la musique',
   breche: 'Ouvrir une porte (la brèche)',
+  chasse: 'Déclencher une chasse (une bouffée)',
   carte: 'Afficher une carte',
   secousse: "Secouer l'écran",
   cinematique: 'Jouer une cinématique',
@@ -67,15 +70,16 @@ export function champTexte(a: ActionSeq): 'aucun' | 'couleur' | 'bruitage' | 'po
   }
 }
 
-/** L'action se sert-elle du nombre ? (intensité des lampes, n° de porte) */
+/** L'action se sert-elle du nombre ? (intensité des lampes, n° de porte
+ *  ou de chasse) */
 export function champValeur(a: ActionSeq): boolean {
-  return a === 'lampes' || a === 'breche'
+  return a === 'lampes' || a === 'breche' || a === 'chasse'
 }
 
 export interface EtapeSeq {
   action: ActionSeq
   texte: string // couleur, nom de son, texte de carte, code de cinématique
-  valeur: number // intensité des lampes (×100) ou indice de porte
+  valeur: number // intensité des lampes (×100), indice de porte ou de chasse
   duree: number // secondes avant l'étape suivante
 }
 
@@ -102,6 +106,11 @@ export interface EtatVivant {
   /** Portes forcées ouvertes (indices) — la brèche, une fois ouverte, le
    *  reste : c'est un événement, pas un interrupteur. */
   brechesOuvertes: Set<number>
+  /** Chasses DÉCLENCHÉES (indices) — un ÉVÉNEMENT, pas un état : le jeu
+   *  les consomme à l'image suivante et lance la bouffée (sa durée est
+   *  celle de la chasse, pas celle de l'étape). Une brèche reste ouverte ;
+   *  une chasse souffle un temps, puis se tait. */
+  chassesDeclenchees: Set<number>
   /** L'écran tremble-t-il en ce moment ? */
   secousse: boolean
   /** La carte affichée, ou '' : aucune. */
@@ -109,7 +118,14 @@ export interface EtatVivant {
 }
 
 export function etatVivantNeutre(): EtatVivant {
-  return { teinte: null, gain: 1, brechesOuvertes: new Set(), secousse: false, carte: '' }
+  return {
+    teinte: null,
+    gain: 1,
+    brechesOuvertes: new Set(),
+    chassesDeclenchees: new Set(),
+    secousse: false,
+    carte: '',
+  }
 }
 
 /** Les actions ponctuelles que le jeu exécute (sons, cinématique). */
@@ -149,6 +165,7 @@ export class Sequenceur {
     this.etat.teinte = null
     this.etat.gain = 1
     this.etat.brechesOuvertes.clear()
+    this.etat.chassesDeclenchees.clear()
     this.etat.secousse = false
     this.etat.carte = ''
   }
@@ -201,6 +218,9 @@ export class Sequenceur {
         break
       case 'breche':
         this.etat.brechesOuvertes.add(Math.max(0, Math.round(e.valeur)))
+        break
+      case 'chasse':
+        this.etat.chassesDeclenchees.add(Math.max(0, Math.round(e.valeur)))
         break
       case 'carte':
         this.etat.carte = e.texte
