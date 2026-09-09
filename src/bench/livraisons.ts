@@ -31,6 +31,19 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '09/09/2026 23:09',
+    title: 'LES AVARIES DANS LA RÉGIE : l’accident du télescope se règle et se publie pour tout le monde',
+    notes: [
+      'LA DEMANDE : « l’écran avaries n’est pas présent dans la régie, il faudrait qu’il soit en édition en mode concepteur, avec enregistrement global au jeu, pour tout le monde ».',
+      'CE QUI MANQUAIT : le TABLEAU DES AVARIES existait comme écran de jeu (le pupitre du centre de contrôle l’ouvre), mais il ne lisait qu’un catalogue gravé dans le code — sept stations, leurs prix, leurs pannes. Trouver la passerelle trop chère à 60 mémoire demandait de rouvrir le dépôt, et aucune porte de la régie n’y menait.',
+      'L’ÉCRAN (editor/regieAvaries.ts, section LES AVARIES de la régie) : une ligne par station — son pictogramme, sa plaque, son prix en mémoire, la ligne du toast à la remise en état, et les trois effets de sa panne (le module s’assombrit, les écrans du plot s’éteignent, une porte condamne l’aile). Les flèches réordonnent le tableau que le joueur lit ; une bascule RETIRE une station de l’accident (elle naît debout, sans rien à payer). Ce qu’on règle joue TOUT DE SUITE sur le poste — le hub se remodèle à chaud, comme après une réparation payée.',
+      'LE PARTAGE (game/avariesPartage.ts, domaine « avaries » du magasin /api/reglages) : PUBLIER POUR TOUS fait jouer ces avaries partout, REPRENDRE LE PUBLIÉ, RETIRER LE PUBLIÉ (le livré reprend), REVENIR AU LIVRÉ. Même règle que le plan de la descente : un joueur joue le publié sinon le livré, un concepteur son brouillon de poste s’il en a un — et la ligne du bas dit lequel joue. La régie porte la pastille du domaine et sa ligne dans la VUE D’ENSEMBLE.',
+      'CE QUI NE SE RÈGLE PAS, et pourquoi : l’IDENTIFIANT d’une station. C’est la clé du plot dans le hub, de l’ancre dans l’éditeur et de la réparation payée dans la sauvegarde — en inventer un depuis la régie donnerait une avarie sans plot, une panne que personne ne peut réparer. Un id inconnu est écarté à la lecture, un id livré absent du document revient tel qu’il est livré : un document d’hier ne fait pas disparaître en silence une station d’aujourd’hui.',
+      'AU PASSAGE : le TABLEAU DES AVARIES (game/avariesVue.ts) lisait le catalogue LIVRÉ : il aurait annoncé des prix que le module ne fait plus payer. Il lit celui qui joue. Et le front d’entrée des plots de réparation était repéré par RANG dans le catalogue. Réordonner les stations aurait fait qu’un rang gardé d’une image à l’autre désigne une autre panne — et déclenche une réparation que personne n’a demandée. Il est désormais repéré par identifiant.',
+      'VÉRIFIÉ : dix essais sur la lecture du document (bornes du prix, plaque vide rendue au livré, pictogramme coupé aux deux signes, ordre, doublons, id inconnu, station retirée, catalogue posé). 1057 tests verts dans 97 fichiers, type-check à 0, build propre. L’écran monté seul dans Chromium sans tête : 4200 mémoire ramené à 999, plaque vidée rendue au livré, station retirée (6 en avarie, 1184 mémoire pour tout rétablir), ordre déplacé, publication puis retour au livré — zéro erreur console.',
+    ],
+  },
+  {
     date: '09/09/2026 22:16',
     title: 'LES AVARIES ILLUSTRÉES, SUITE ET FIN : les sept stations ont leur image',
     notes: [

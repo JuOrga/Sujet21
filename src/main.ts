@@ -30,10 +30,19 @@ import {
   type ArticleHub,
 } from './game/hub'
 import {
-  REPARATIONS,
   appliqueReparations,
+  avaries,
+  poseAvaries,
   reparationDef,
 } from './game/reparations'
+import { RegieAvaries, detailAvaries } from './editor/regieAvaries'
+import {
+  avariesAuDemarrage,
+  catalogueAvaries,
+  documentAvaries,
+  lisAvaries,
+  type FicheAvarie,
+} from './game/avariesPartage'
 import {
   denouementAtteint,
   fetchJournal,
@@ -825,9 +834,12 @@ const achatsEconomat = new Set<string>()
 // au lancement de l'expédition suivante — le temps de la session.
 const achatsHub = new Set<string>()
 let plotsHubDedans: boolean[] = []
-// les STATIONS DE RÉPARATION du hub accidenté : front montant par station
-// (l'ordre du catalogue REPARATIONS fait foi)
-let plotsReparDedans: boolean[] = []
+// les STATIONS DE RÉPARATION du hub accidenté : front montant par station.
+// Repéré par IDENTIFIANT et non par rang — la régie réordonne le catalogue
+// et en retire des stations : un rang gardé d'une image à l'autre aurait
+// désigné une autre panne, et déclenché une réparation que personne n'a
+// demandée.
+const plotsReparDedans = new Set<string>()
 let sasScelleDedans = false
 // les PLOTS POSÉS du tableau courant (le méta en données — hub et Économat
 // modernes compris) : un drapeau « dedans » par plot, l'achat se tente au
@@ -933,6 +945,57 @@ void fetchReglage('textes').then((p) => {
 })
 void fetchReglage('sequences').then((p) => {
   if (p) poseSequencesPubliees(p.document)
+})
+// ---- LES AVARIES DU MODULE : l'accident du télescope, réglable ---------
+// Le catalogue des stations (prix, plaques, pictogrammes, effets de la
+// panne, ordre du tableau) se règle dans LA RÉGIE et se publie pour tout le
+// monde. Même règle que le plan de la descente : un JOUEUR joue le publié,
+// sinon le livré ; un CONCEPTEUR garde son brouillon de poste s'il en a un —
+// la règle vit dans avariesPartage.ts.
+const CLE_AVARIES = 'sujet21-avaries-v1'
+const avBrouillonInitial: FicheAvarie[] | null = (() => {
+  try {
+    const brut = localStorage.getItem(CLE_AVARIES)
+    return brut ? lisAvaries(JSON.parse(brut)) : null
+  } catch {
+    return null
+  }
+})()
+let avFiches: FicheAvarie[] = avBrouillonInitial ?? lisAvaries(null)
+let avPubliees: FicheAvarie[] | null = null
+let avPublieInfo = { auteur: '', date: '', charge: false }
+// au démarrage, le catalogue se pose SANS repeindre : le premier tableau
+// n'est pas encore monté (applyLevel vient plus bas)
+poseAvaries(catalogueAvaries(avFiches))
+/** Le concepteur vient de retoucher (ou le magasin de répondre) : le
+ *  catalogue joue, le hub se remodèle À CHAUD s'il est sous les pieds. */
+function appliqueAvaries(fiches: FicheAvarie[], garde: boolean): void {
+  avFiches = fiches
+  poseAvaries(catalogueAvaries(fiches))
+  hubMemo = null // les pannes ont changé : le hub mémoïsé est périmé
+  if (garde) {
+    try {
+      localStorage.setItem(CLE_AVARIES, JSON.stringify(documentAvaries(fiches)))
+    } catch {
+      // stockage refusé : le réglage ne tiendra que la session
+    }
+  }
+  if (auHub) applyLevel()
+  ecranAvaries.render() // le tableau du joueur, s'il est ouvert
+}
+void fetchReglage('avaries').then((p) => {
+  if (!p) return
+  avPubliees = p.document ? lisAvaries(p.document) : null
+  avPublieInfo = { auteur: p.auteur, date: p.date, charge: true }
+  appliqueAvaries(
+    avariesAuDemarrage({
+      brouillon: avBrouillonInitial,
+      publie: avPubliees,
+      concepteur: document.body.classList.contains('concepteur'),
+    }).fiches,
+    false,
+  )
+  regieAvaries.rafraichit()
 })
 /** Les orbes ACQUIS, pour les cadenas de la carte : ceux en poche, plus
  *  ceux que le cycle tient déjà (une transformation tissée vaut son orbe —
@@ -6652,6 +6715,35 @@ async function openEditeurCarte(): Promise<EditeurCarte | null> {
   return ec
 }
 
+// ---- LE RÉGLAGE DES AVARIES (editor/regieAvaries.ts) --------------------
+// Le réglage de l'accident du télescope : prix, plaques, pictogrammes,
+// effets de la panne et ordre du tableau, station par station. Il s'ouvre
+// depuis la régie et vit AU-DESSUS d'elle : la fermer ramène à la console.
+// À ne pas confondre avec le TABLEAU DES AVARIES (game/ecranAvaries.ts),
+// l'écran que le joueur lit au pupitre du centre de contrôle : celui-ci le
+// RÈGLE, celui-là le montre.
+const regieAvariesEl = document.getElementById('regie-avaries') as HTMLDivElement
+const regieAvaries = new RegieAvaries(regieAvariesEl, {
+  // une COPIE : l'écran retouche la sienne et la rend par pose()
+  courantes: () => avFiches.map((f) => ({ ...f })),
+  pose: (fiches) => appliqueAvaries(fiches, true),
+  publie: () => ({ fiches: avPubliees, ...avPublieInfo }),
+  publier: async () => {
+    const p = await pushReglage('avaries', documentAvaries(avFiches), records.operator() || 'anonyme')
+    if (!p) return null
+    avPubliees = p.document ? lisAvaries(p.document) : null
+    avPublieInfo = { auteur: p.auteur, date: p.date, charge: true }
+    return { fiches: avPubliees, ...avPublieInfo }
+  },
+  retirer: async () => {
+    if (!(await deleteReglage('avaries'))) return false
+    avPubliees = null
+    avPublieInfo = { auteur: '', date: '', charge: true }
+    return true
+  },
+  fermer: () => regieAvaries.close(),
+})
+
 // ---- LA RÉGIE : la console du concepteur (editor/regie.ts) ----------------
 // LA SEULE PORTE des outils du concepteur sur l'accueil (les anciens boutons
 // sont partis : douze portes pour douze outils, c'était l'accueil du
@@ -6738,6 +6830,16 @@ const regie = new Regie(regieEl, {
       ouvre: () => ouvreMarchand(),
     },
     {
+      id: 'avaries',
+      nom: 'LES AVARIES',
+      icone: '🛠️',
+      sous: 'l’accident du télescope',
+      description:
+        'Les stations du module laissées en panne par l’accident : le prix en mémoire de chacune, sa plaque, son pictogramme, la ligne de sa remise en état, les trois effets de sa panne (le module s’assombrit, les écrans du plot s’éteignent, une porte condamne l’aile) et l’ordre du TABLEAU DES AVARIES. PUBLIER POUR TOUS fait jouer ces avaries à tout le monde.',
+      domaines: ['avaries'],
+      ouvre: () => regieAvaries.open(),
+    },
+    {
       id: 'recompenses',
       nom: 'LES RÉCOMPENSES',
       icone: '❖',
@@ -6810,12 +6912,13 @@ const regie = new Regie(regieEl, {
     },
   ],
   statuts: async () => {
-    const [plan, carte, rec, tx, seq, jr, cx] = await Promise.all([
+    const [plan, carte, rec, tx, seq, av, jr, cx] = await Promise.all([
       fetchReglage('plan-voie'),
       fetchReglage('carte'),
       fetchReglage('recompenses'),
       fetchReglage('textes'),
       fetchReglage('sequences'),
+      fetchReglage('avaries'),
       fetchJournal(),
       fetchReglagesCodex(),
     ])
@@ -6828,6 +6931,7 @@ const regie = new Regie(regieEl, {
       recompenses: de('Les cartes de l’atelier', rec, rec?.document ? `${(rec.document as { cartes?: unknown[] }).cartes?.length ?? 0} carte(s)` : undefined),
       textes: de('Les retouches de textes', tx),
       sequences: de('Les séquences', seq, seq?.document ? `${(seq.document as { sequences?: unknown[] }).sequences?.length ?? 0} séquence(s)` : undefined),
+      avaries: de('Les avaries du module', av, av?.document ? detailAvaries(lisAvaries(av.document)) : undefined),
       journal: jr
         ? { nom: 'Le récit et les fins', publie: jr.journal !== null, auteur: jr.auteur, date: jr.date, detail: jr.journal ? `${jr.journal.recit.length} fragments, ${jr.journal.fins.length} fin(s)` : undefined }
         : { nom: 'Le récit et les fins', publie: false, auteur: '', date: '', injoignable: true },
@@ -11492,7 +11596,7 @@ function resetLasers(): void {
   // réarmement suit la géométrie du hub joué, pas un compte figé
   achatsHub.clear()
   plotsHubDedans = (zonesDuHub(level)?.etal ?? []).map(() => false)
-  plotsReparDedans = REPARATIONS.map(() => false)
+  plotsReparDedans.clear()
   sasScelleDedans = false
   // les plots POSÉS du tableau (le méta en données)
   plotsPosesDedans = (level.plots ?? []).map(() => false)
@@ -14926,13 +15030,13 @@ function frame(now: number): void {
   // ---- LES STATIONS DE RÉPARATION : le corps se pose sur la station en
   // panne, la mémoire se débite, le module se rallume À CHAUD ----
   if (zonesHub) {
-    for (let i = 0; i < REPARATIONS.length; i++) {
-      const r = REPARATIONS[i]
+    for (const r of avaries()) {
       const plot = zonesHub.stations[r.id]
       if (!plot) continue
       const dedans = pointInBox(sim.stats.centroidX, sim.stats.centroidY, plot)
-      if (dedans && !plotsReparDedans[i]) tenteReparation(r.id)
-      plotsReparDedans[i] = dedans
+      if (dedans && !plotsReparDedans.has(r.id)) tenteReparation(r.id)
+      if (dedans) plotsReparDedans.add(r.id)
+      else plotsReparDedans.delete(r.id)
     }
     // LE SECTEUR 4 (fin ouverte) : entrer dans l'alcôve joue la fin de
     // l'arc — le convoyeur, la montée, le choix. Rejouable à chaque

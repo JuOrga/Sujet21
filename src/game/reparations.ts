@@ -104,8 +104,36 @@ export const REPARATIONS: ReparationDef[] = [
   },
 ]
 
+// ---- LE CATALOGUE QUI JOUE ------------------------------------------------
+// REPARATIONS est le LIVRÉ : le filet, et la liste fermée des identifiants
+// (un id est une clé structurelle — le plot du hub le nomme, l'ancre de
+// l'éditeur le choisit, la sauvegarde le garde une fois payé). Ce qui JOUE,
+// lui, peut venir de la régie : prix, plaques, effets et ordre se publient
+// pour tout le monde (avariesPartage.ts). Ce module ne connaît ni le
+// magasin ni l'écran — main.ts lui POSE le catalogue courant au démarrage,
+// et à chaque retouche du concepteur.
+let courantes: readonly ReparationDef[] = REPARATIONS
+
+/** Le catalogue joué ici : le publié (ou le brouillon du concepteur), sinon
+ *  le livré. Poser null rend la main au livré. */
+export function poseAvaries(catalogue: readonly ReparationDef[] | null): void {
+  courantes = catalogue ?? REPARATIONS
+}
+
+export function avaries(): readonly ReparationDef[] {
+  return courantes
+}
+
 export function reparationDef(id: string): ReparationDef | null {
-  return REPARATIONS.find((r) => r.id === id) ?? null
+  return courantes.find((r) => r.id === id) ?? null
+}
+
+/** La fiche à AFFICHER pour une station : celle qui joue si la station est
+ *  encore de l'accident, sinon celle du code. L'éditeur en a besoin — on
+ *  doit pouvoir poser l'ancre d'une station que la régie a retirée des
+ *  avaries, et la panneau doit la nommer. */
+export function ficheReparation(id: string): ReparationDef | null {
+  return reparationDef(id) ?? REPARATIONS.find((r) => r.id === id) ?? null
 }
 
 // le canal des portes de dégât : négatif (scénarisé), un cran par station
@@ -128,10 +156,11 @@ export function appliqueReparations(
   base: LevelDef,
   faites: readonly string[],
   opts: OptionsHub = {},
+  catalogue: readonly ReparationDef[] = courantes,
 ): LevelDef {
   const zones = zonesDuHub(base)
   if (!zones) return base
-  const manquantes = REPARATIONS.filter((r) => !faites.includes(r.id))
+  const manquantes = catalogue.filter((r) => !faites.includes(r.id))
   // tout est réparé : le hub cible, avec son seul SCEAU du secteur 4
   const labels: WorldLabel[] = [...(base.labels ?? [])]
   let decals = base.decals ? [...base.decals] : undefined

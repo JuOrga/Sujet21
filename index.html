@@ -1799,6 +1799,113 @@
         .tx-tete h2 { font-size: calc(15px * var(--ui)); letter-spacing: 0.22em; }
       }
       /* ---- L'ATELIER DES RÉCOMPENSES : plein cadre, comme les mémoires ---- */
+      /* ---- LES AVARIES : le réglage de l'accident, plein cadre ---- */
+      #regie-avaries { position: fixed; inset: 0; z-index: 60; background: #04080e; }
+      #regie-avaries[hidden] { display: none; }
+      .rav-ecran {
+        position: absolute; inset: 0; display: flex; flex-direction: column;
+        background:
+          repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.014) 0 1px, transparent 1px 3px),
+          radial-gradient(ellipse at 46% 40%, #101a20 0%, #04080e 78%);
+        color: #cfe2ef;
+      }
+      .rav-tete {
+        display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+        padding: 13px 22px; border-bottom: 1px solid rgba(232, 132, 60, 0.24);
+        background: rgba(6, 12, 20, 0.85);
+      }
+      .rav-tete h2 {
+        margin: 0; font-family: var(--font-display); font-weight: 600;
+        font-size: calc(19px * var(--ui)); letter-spacing: 0.32em;
+        color: #f0c08a; white-space: nowrap;
+      }
+      /* base 0 : le sous-titre ne réclame aucune largeur propre, il prend ce
+         qui reste — les gestes du partage ont leur propre rangée dessous,
+         sinon le titre se réduisait à « l'ac… » */
+      .rav-soustitre {
+        flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+        white-space: nowrap; font-size: calc(11px * var(--ui)); color: var(--dim);
+      }
+      .rav-barre {
+        display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+        padding: 8px 22px; border-bottom: 1px solid rgba(99, 183, 230, 0.12);
+      }
+      .rav-partage { flex: 1 1 auto; font-size: calc(10.5px * var(--ui)); color: var(--dim); }
+      .rav-lien {
+        flex: none; white-space: nowrap; background: none; border: none;
+        color: #7fc6ff; font: inherit; font-size: calc(11px * var(--ui));
+        text-decoration: underline; cursor: pointer; padding: 4px 0; min-height: 30px;
+      }
+      .rav-lien:hover { color: #cfe9ff; }
+      .rav-lien:disabled { color: var(--dim); text-decoration: none; cursor: default; }
+      #rav-fermer {
+        font-family: var(--font-display); font-size: calc(9.5px * var(--ui));
+        letter-spacing: 0.16em; padding: 8px 13px; min-height: 36px;
+        background: rgba(10, 22, 36, 0.8); border: 1px solid rgba(99, 183, 230, 0.3);
+        border-radius: 6px; color: #9ed8ff; cursor: pointer;
+      }
+      #rav-fermer:hover { border-color: var(--specimen); color: #eaf6ff; }
+      .rav-note {
+        margin: 0; padding: 10px 22px; font-size: calc(11px * var(--ui));
+        line-height: 1.5; color: var(--dim);
+        border-bottom: 1px solid rgba(99, 183, 230, 0.12);
+      }
+      .rav-note b { color: #f0c08a; }
+      .rav-corps { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px 22px 18px; display: flex; flex-direction: column; gap: 10px; }
+      .rav-carte {
+        display: flex; align-items: flex-start; gap: 14px; padding: 10px 14px;
+        background: rgba(10, 20, 34, 0.55); border: 1px solid rgba(99, 183, 230, 0.18);
+        border-radius: 8px;
+      }
+      /* hors accident : la station est debout d'emblée — la ligne s'efface
+         sans disparaître, on doit pouvoir la remettre */
+      .rav-carte.rav-hors { opacity: 0.55; border-style: dashed; }
+      .rav-rang { display: flex; flex-direction: column; align-items: center; gap: 3px; flex: none; }
+      .rav-rang b {
+        font-family: var(--font-display); font-size: calc(12px * var(--ui)); color: #9ed8ff;
+      }
+      .rav-rang button {
+        font: inherit; line-height: 1; padding: 3px 7px; min-height: 26px;
+        background: rgba(10, 22, 36, 0.8); border: 1px solid rgba(99, 183, 230, 0.24);
+        border-radius: 5px; color: #9ed8ff; cursor: pointer;
+      }
+      .rav-rang button:disabled { opacity: 0.3; cursor: default; }
+      .rav-champs { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; gap: 8px 12px; }
+      .rav-f { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+      .rav-f span {
+        font-family: var(--font-display); font-size: calc(7.5px * var(--ui));
+        letter-spacing: 0.14em; color: var(--dim);
+      }
+      .rav-f input {
+        background: rgba(4, 10, 18, 0.9); border: 1px solid rgba(120, 180, 230, 0.24);
+        color: #d8ecff; border-radius: 6px; padding: 6px 9px; min-height: 32px;
+        font-family: var(--font-mono); font-size: calc(12px * var(--ui));
+      }
+      .rav-f input:focus { outline: none; border-color: var(--specimen); }
+      .rav-f--ic { flex: 0 0 62px; }
+      .rav-f--ic input { text-align: center; }
+      .rav-f--nom { flex: 1 1 220px; }
+      .rav-f--prix { flex: 0 0 110px; }
+      .rav-f--det { flex: 1 1 100%; }
+      .rav-effets { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 6px 16px; }
+      .rav-eff, .rav-bascule { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+      .rav-eff span { font-size: calc(10.5px * var(--ui)); color: #cfe2ef; }
+      .rav-cle { flex: 1 1 100%; margin: 0; font-size: calc(10px * var(--ui)); color: var(--dim); }
+      .rav-cle code { font-family: var(--font-mono); color: #9ed8ff; }
+      .rav-bascule { flex: none; align-self: center; }
+      .rav-bascule span {
+        font-family: var(--font-display); font-size: calc(8px * var(--ui));
+        letter-spacing: 0.16em; color: #f0c08a; white-space: nowrap;
+      }
+      .rav-carte.rav-hors .rav-bascule span { color: var(--dim); }
+      .rav-etat {
+        margin: 0; padding: 9px 22px; font-size: calc(11px * var(--ui));
+        color: var(--dim); border-top: 1px solid rgba(99, 183, 230, 0.12);
+        background: rgba(6, 12, 20, 0.85);
+      }
+      .rav-etat b { color: #cfe2ef; }
+      .rav-etat .rav-ok { color: #6dffb8; }
+      .rav-etat .rav-brouillon { color: #f0c08a; }
       #recompenses { position: fixed; inset: 0; z-index: 60; background: #04080e; }
       #recompenses[hidden] { display: none; }
       .at-ecran {
@@ -8727,6 +8834,35 @@
         <div class="tx-corps" id="tx-liste"></div>
         <textarea id="tx-io" hidden rows="5" spellcheck="false" aria-label="Import de retouches"></textarea>
         <p class="tx-etat" id="tx-etat"></p>
+      </div>
+    </div>
+
+    <!-- LES AVARIES : la console du concepteur pour l'accident du télescope
+         — une ligne par station du module, son prix, sa plaque, ses effets.
+         Gabarit ici, gestes dans src/editor/ecranAvaries.ts -->
+    <div id="regie-avaries" hidden aria-label="Les avaries du module">
+      <div class="rav-ecran">
+        <header class="rav-tete">
+          <h2>AVARIES</h2>
+          <span class="rav-soustitre">l'accident du télescope — ce que chaque station coûte, et ce que sa panne fait au module</span>
+          <button type="button" id="rav-fermer" aria-label="Fermer">✕ FERMER</button>
+        </header>
+        <div class="rav-barre">
+          <span id="rav-partage" class="rav-partage"></span>
+          <button type="button" id="rav-publier" class="rav-lien" title="Publie ces avaries au magasin partagé : tout le monde les joue">⇪ Publier pour tous</button>
+          <button type="button" id="rav-reprendre" class="rav-lien" title="Remplace le brouillon de ce poste par le publié">Reprendre le publié</button>
+          <button type="button" id="rav-retirer" class="rav-lien" title="Retire les avaries publiées : les joueurs jouent celles du code">Retirer le publié</button>
+          <button type="button" id="rav-livre" class="rav-lien" title="Rend les avaries de ce poste à celles du code (rien n'est publié)">Revenir au livré</button>
+        </div>
+        <p class="rav-note">
+          Chaque station du module se remet en état AU CONTACT de son plot, payée en
+          MÉMOIRE. L'ordre des lignes est l'ordre du TABLEAU DES AVARIES que le joueur
+          lit au centre de contrôle. Ce que vous réglez joue TOUT DE SUITE sur ce poste ;
+          <b>PUBLIER POUR TOUS</b> le fait jouer partout — sinon c'est le catalogue livré
+          avec le code qui joue.
+        </p>
+        <div class="rav-corps" id="rav-liste"></div>
+        <p class="rav-etat" id="rav-etat"></p>
       </div>
     </div>
 

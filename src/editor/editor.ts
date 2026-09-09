@@ -54,7 +54,7 @@ import {
   TABLEAU_HUB,
   TABLEAU_HUB_COMPACT,
 } from '../game/hub'
-import { REPARATIONS } from '../game/reparations'
+import { REPARATIONS, ficheReparation } from '../game/reparations'
 import {
   PUPITRES,
   fichePupitre,
@@ -5430,10 +5430,12 @@ export class LevelEditor {
       if (a.role === 'station' || a.role === 'degat') {
         rows.push(
           `<label class="ed-f"><span>Station</span><select id="p-anid">` +
-            REPARATIONS.map(
-              (r) =>
-                `<option value="${r.id}"${r.id === a.id ? ' selected' : ''}>${r.icone} ${r.nom} — ${r.prix} mém.</option>`,
-            ).join('') +
+            REPARATIONS.map((r) => ficheReparation(r.id) ?? r)
+              .map(
+                (r) =>
+                  `<option value="${r.id}"${r.id === a.id ? ' selected' : ''}>${r.icone} ${r.nom} — ${r.prix} mém.</option>`,
+              )
+              .join('') +
             `</select></label>`,
         )
       }
@@ -7362,7 +7364,7 @@ export class LevelEditor {
       const cy = (p0.sy + p1.sy) / 2
       const fiche =
         a.role === 'station' || a.role === 'degat'
-          ? REPARATIONS.find((r) => r.id === a.id)
+          ? ficheReparation(a.id ?? '')
           : null
       g.textAlign = 'center'
       if (fiche) {

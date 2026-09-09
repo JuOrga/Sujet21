@@ -106,9 +106,10 @@ Objectif : rejoindre le sas avec le plus de volume possible.
 l'URL, ou sept tapes rapides sur le numéro de version (tactile compris).
 Le bouton RÉGIE ouvre leur console : un rail — la carte, la descente, la
 planche, le récit et les fins, le scénario et le montage, le codex, le
-marchand, les récompenses, les textes —, la vue d'ensemble de ce qui est
-publié pour tout le monde, et le tir à blanc du système de run (pour N
-expéditions bouclées : fragment, fin, révélation, dénouement, cinématiques).
+marchand, les avaries du module, les récompenses, les textes —, la vue
+d'ensemble de ce qui est publié pour tout le monde, et le tir à blanc du
+système de run (pour N expéditions bouclées : fragment, fin, révélation,
+dénouement, cinématiques).
 C'est la seule porte des outils sur l'accueil (les anciens boutons sont
 partis) ; `?editeur` et `?carte` dans l'URL restent des raccourcis.
 `?editeur` ouvre l'éditeur directement, `?carte` l'éditeur de la carte de la
@@ -119,7 +120,7 @@ posture du build Steam : le contenu livré fait foi — `src/game/reseau.ts`).
 ## Qualité
 
 ```bash
-pnpm test        # 910 tests dans 81 fichiers, ~23 s
+pnpm test        # 1057 tests dans 97 fichiers, ~33 s (mesuré le 10/09/2026)
 pnpm type-check
 pnpm build
 ```
