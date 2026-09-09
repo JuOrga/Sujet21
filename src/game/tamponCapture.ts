@@ -59,14 +59,26 @@ export function elague(morceaux: MorceauVideo[], dureeMaxUs: number): MorceauVid
   return debut > 0 ? morceaux.slice(debut) : morceaux
 }
 
-/** L'image du moment doit-elle partir à l'encodeur ? À 30 images par
- *  seconde sur un rendu à 60, une sur deux ; la décision se prend sur le
- *  temps écoulé depuis la dernière envoyée, avec une marge d'un tiers de
- *  période — un rendu à 58 Hz ne doit pas en laisser passer une sur trois. */
-export function aEncoder(depuisDerniereMs: number, ips: number): boolean {
-  if (ips <= 0) return false
-  return depuisDerniereMs >= (1000 / ips) * (2 / 3)
+/** Le cadenceur : l'image du moment part-elle à l'encodeur, et quand part
+ *  la suivante ? Une ÉCHÉANCE qui avance d'une période à chaque envoi,
+ *  pas « le temps depuis la dernière » : à 240 Hz, un seuil relatif
+ *  laissait passer une image sur trois pour 60 demandées (80 i/s), et un
+ *  rendu à 90 Hz alternait entre 90 et 45. Avec l'échéance, c'est un vrai
+ *  diviseur à toute fréquence d'écran. Une échéance trop loin derrière
+ *  (l'onglet a dormi) se recale sur maintenant plutôt que de rattraper. */
+export function cadence(maintenantMs: number, echeanceMs: number, ips: number): { envoie: boolean; echeance: number } {
+  if (ips <= 0) return { envoie: false, echeance: echeanceMs }
+  const periode = 1000 / ips
+  if (maintenantMs < echeanceMs - 0.5) return { envoie: false, echeance: echeanceMs }
+  const suivante = maintenantMs - echeanceMs > periode ? maintenantMs + periode : echeanceMs + periode
+  return { envoie: true, echeance: suivante }
 }
+
+/** Au-delà de cette pause entre deux images composées, la mémoire repart
+ *  de zéro : un onglet caché, un enregistrement de quatre secondes ou un
+ *  figeage n'ont pas d'images, et les coudre à la suite ferait un fichier
+ *  de trente secondes dont vingt-six d'une image figée. */
+export const COUPURE_MS = 1000
 
 /** Le tampon est-il disponible sur cet appareil ? PC et Steam Deck : un
  *  pointeur fin et l'encodeur WebCodecs. Le tactile reste dehors — c'est
@@ -91,12 +103,15 @@ export class TamponCapture {
   private largeur = 0
   private hauteur = 0
   private ips: CadenceTampon = 0
+  private echeanceMs = -Infinity
   private derniereEnvoyeeMs = -Infinity
   private derniereCleUs = -Infinity
   private origineMs = 0
   private enPanne = false
-  /** images sautées parce que l'encodeur était en retard — pour le panneau */
-  sautees = 0
+  // les images sautées (l'encodeur en retard), datées : seules celles qui
+  // tombent dans la fenêtre gardée comptent — un à-coup d'il y a dix
+  // minutes ne doit pas faire dire au panneau que ce fichier en souffre
+  private sauts: number[] = []
 
   get armee(): boolean {
     return this.ips > 0 && this.encodeur !== null && !this.enPanne
@@ -104,6 +119,11 @@ export class TamponCapture {
 
   get cadence(): CadenceTampon {
     return this.ips
+  }
+
+  /** Les images sautées dans la fenêtre gardée — pour le panneau. */
+  get sautees(): number {
+    return this.sauts.length
   }
 
   /** Les secondes en mémoire, pour le bouton du HUD. */
@@ -115,7 +135,9 @@ export class TamponCapture {
   /** Arme (ou re-arme à une autre cadence ou taille) — un changement vide
    *  la mémoire : l'encodeur ne change pas de taille en cours de route. */
   arme(ips: CadenceTampon, largeur: number, hauteur: number): void {
-    if (ips === this.ips && largeur === this.largeur && hauteur === this.hauteur && this.encodeur) return
+    // en panne, on ré-arme une fois par appel : si l'encodeur retombe,
+    // enPanne reste posé et le bouton retombe sur la capture ordinaire
+    if (ips === this.ips && largeur === this.largeur && hauteur === this.hauteur && this.encodeur && !this.enPanne) return
     this.eteint()
     if (ips === 0 || typeof VideoEncoder === 'undefined') return
     this.ips = ips
@@ -159,10 +181,19 @@ export class TamponCapture {
     this.encodeur = null
     this.morceaux = []
     this.ips = 0
+    this.echeanceMs = -Infinity
     this.derniereEnvoyeeMs = -Infinity
     this.derniereCleUs = -Infinity
-    this.sautees = 0
+    this.sauts = []
     this.enPanne = false
+  }
+
+  /** La mémoire repart de zéro (après une coupure) : la prochaine image
+   *  sera une clé, rien d'avant ne sera cousu à la suite. */
+  private recommence(): void {
+    this.morceaux = []
+    this.sauts = []
+    this.derniereCleUs = -Infinity
   }
 
   /** À chaque image composée : l'envoie à l'encodeur si la cadence le
@@ -171,30 +202,39 @@ export class TamponCapture {
     const enc = this.encodeur
     if (!enc || this.enPanne || enc.state !== 'configured') return
     const maintenant = performance.now()
-    if (!aEncoder(maintenant - this.derniereEnvoyeeMs, this.ips)) return
+    if (maintenant - this.derniereEnvoyeeMs > COUPURE_MS && this.morceaux.length > 0) this.recommence()
+    const c = cadence(maintenant, this.echeanceMs, this.ips)
+    this.echeanceMs = c.echeance
+    if (!c.envoie) return
+    const tempsUs = Math.round((maintenant - this.origineMs) * 1000)
     // encode() ne bloque pas : la file est celle de l'encodeur, hors du fil
     // du jeu. On la laisse absorber un à-coup (six images, un dixième de
     // seconde à 60) ; au-delà, l'encodeur ne suit pas et l'on saute plutôt
     // que de laisser la file enfler
     if (enc.encodeQueueSize > 6) {
-      this.sautees++
+      this.sauts.push(tempsUs)
       return
     }
-    this.derniereEnvoyeeMs = maintenant
-    const tempsUs = Math.round((maintenant - this.origineMs) * 1000)
     const cle = tempsUs - this.derniereCleUs >= INTERVALLE_CLE_MS * 1000
-    if (cle) this.derniereCleUs = tempsUs
     let image: VideoFrame
     try {
       image = new VideoFrame(toile, { timestamp: tempsUs })
     } catch {
+      // une toile à 0×0 le temps d'un redimensionnement : rien de compté,
+      // la prochaine image reprend là où on en était
       return
     }
     try {
       enc.encode(image, { keyFrame: cle })
+    } catch {
+      return
     } finally {
       image.close()
     }
+    // la comptabilité APRÈS le succès : une image qui n'est pas partie ne
+    // repousse ni la prochaine clé ni la détection d'une coupure
+    this.derniereEnvoyeeMs = maintenant
+    if (cle) this.derniereCleUs = tempsUs
   }
 
   private recoit(morceau: EncodedVideoChunk): void {
@@ -202,11 +242,13 @@ export class TamponCapture {
     morceau.copyTo(donnees)
     this.morceaux.push({ donnees, cle: morceau.type === 'key', tempsUs: morceau.timestamp })
     this.morceaux = elague(this.morceaux, DUREE_TAMPON_MS * 1000)
+    const depuis = this.morceaux[0].tempsUs
+    if (this.sauts.length > 0 && this.sauts[0] < depuis) this.sauts = this.sauts.filter((t) => t >= depuis)
   }
 
   /** Fige la mémoire : vide l'encodeur, assemble le fichier. Null quand
    *  rien n'est prêt (moins d'une image clé). La mémoire continue ensuite. */
-  async fige(): Promise<{ fichier: Uint8Array; secondes: number } | null> {
+  async fige(): Promise<{ fichier: Uint8Array<ArrayBuffer>; secondes: number } | null> {
     const enc = this.encodeur
     if (!enc || enc.state !== 'configured') return null
     try {

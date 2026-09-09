@@ -31,6 +31,19 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '09/09/2026 21:44',
+    title: 'LA REVUE DE LA MÉMOIRE DE CAPTURE : sept constats, corrigés avant la PR vers dev',
+    notes: [
+      'LA DEMANDE : « PR sur dev et review ». La relecture du diff propre à la branche (onze fichiers) a relevé sept constats, tous corrigés ici.',
+      'LA COUPURE : les horodatages étaient ceux de l’horloge murale et l’élagage gardait l’image clé d’avant une pause — un onglet caché trente secondes, un enregistrement de quatre secondes ou un figeage auraient été cousus dans le fichier comme trente secondes d’image figée, annoncées « 34 s ». Au-delà d’une seconde sans image composée, la mémoire repart de zéro sur une clé neuve. Vérifié au navigateur : 5 s de mémoire, 3 s de pause, 3 s de reprise, clic — un fichier de 3,0 s, pas de 11.',
+      'LE CADENCEUR : un seuil « deux tiers de période depuis la dernière image » laissait passer une image sur trois à 240 Hz pour 60 demandées (80 i/s), et faisait alterner 90 et 45 sur un écran à 90 Hz. Une ÉCHÉANCE qui avance d’une période à chaque envoi fait un vrai diviseur à toute fréquence : testé à 58, 60, 90 et 240 Hz.',
+      'LA PANNE de l’encodeur laissait la mémoire muette jusqu’à un changement de réglage : l’armement se retente, et si l’encodeur retombe le bouton revient à la capture ordinaire. La comptabilité (prochaine clé, détection de coupure) se fait APRÈS le succès de l’envoi, plus avant : une image refusée ne repousse plus la clé suivante d’une seconde.',
+      'LES IMAGES SAUTÉES se comptaient depuis l’armement, sans jamais retomber : un à-coup d’il y a dix minutes faisait dire au panneau que ce fichier en souffrait. Elles sont datées, et seules celles de la fenêtre gardée comptent.',
+      'LE FIL DU RENDU : la disponibilité (une MediaQueryList) se lisait à chaque image, et le bouton du HUD se réécrivait à chaque image même sans changement. Lue une fois ; écrit au changement seulement. La copie du fichier assemblé avant le Blob, et sa conversion de type, disparaissent : l’assembleur dit par son type que son tampon est franc.',
+      'VÉRIFIÉ : 1018 tests verts dans 93 fichiers, type-check à 0, build propre. Au navigateur sans tête, à 60 puis 30 : fichiers de 8,0 s et 8,9 s décodés par ffmpeg sans erreur, envoi reçu, zéro erreur console ; composition mesurée entre 0,3 et 0,55 ms par image sur cette machine sans GPU.',
+    ],
+  },
+  {
     date: '09/09/2026 18:00',
     title: 'LA MÉMOIRE DE CAPTURE : les huit dernières secondes, à 30 ou 60 images par seconde, figées d’un clic',
     notes: [

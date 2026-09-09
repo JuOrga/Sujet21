@@ -166,6 +166,12 @@ export class CaptureCodex {
   private ctxTampon: CanvasRenderingContext2D | null = null
   private cadreTampon: CadreCapture | null = null
   private figeEnCours = false
+  // la disponibilité ne change pas en cours de route : lue une fois, pas
+  // une MediaQueryList par image
+  private disponible: boolean | null = null
+  // le dernier libellé écrit : le bouton ne se réécrit qu'au changement,
+  // sinon c'est une mutation du DOM à chaque image sur le fil du rendu
+  private libelleBouton = ''
   private etat = ''
   private envoiEnCours = false
 
@@ -285,7 +291,8 @@ export class CaptureCodex {
    *  et que l'appareil le permet, éteinte sinon — et jamais pendant qu'un
    *  enregistrement de quatre secondes tourne, ni pendant le figeage. */
   private alimenteTampon(): void {
-    const ips = this.hooks.concepteur() && tamponDisponible() ? this.hooks.cadenceTampon() : 0
+    if (this.disponible === null) this.disponible = tamponDisponible()
+    const ips = this.hooks.concepteur() && this.disponible ? this.hooks.cadenceTampon() : 0
     if (ips === 0) {
       if (this.tampon.cadence !== 0) {
         this.tampon.eteint()
@@ -331,13 +338,7 @@ export class CaptureCodex {
       this.montre('La mémoire de capture est encore vide : jouez une seconde, puis réessayez.')
       return
     }
-    // le Blob veut un ArrayBuffer franc : celui du fichier assemblé l'est
-    // (une Uint8Array neuve), le type seul ne le sait pas
-    const octets = resultat.fichier.buffer.slice(
-      resultat.fichier.byteOffset,
-      resultat.fichier.byteOffset + resultat.fichier.byteLength,
-    ) as ArrayBuffer
-    this.presente(new Blob([octets], { type: 'video/webm' }), 'video/webm', resultat.secondes)
+    this.presente(new Blob([resultat.fichier], { type: 'video/webm' }), 'video/webm', resultat.secondes)
   }
 
   private termine(mime: string): void {
@@ -369,20 +370,26 @@ export class CaptureCodex {
   private majBouton(ecouleMs = 0): void {
     const b = this.bouton
     if (!b) return
+    let texte: string
+    let enregistre = false
+    let sautees = false
     if (this.etape === 'enregistre') {
       const reste = Math.max(0, DUREE_CAPTURE_MS - ecouleMs) / 1000
-      b.textContent = `⏺ ${reste.toFixed(1).replace('.', ',')} s`
-      b.classList.add('enregistre')
+      texte = `⏺ ${reste.toFixed(1).replace('.', ',')} s`
+      enregistre = true
     } else if (this.tampon.armee) {
       // la mémoire se remplit : le bouton dit ce qu'il sauvera
-      const s = Math.min(this.tampon.secondes, 8)
-      b.textContent = `⏺ ${s.toFixed(0)} s`
-      b.classList.remove('enregistre')
-      b.classList.toggle('sautees', this.tampon.sautees > 30)
+      texte = `⏺ ${Math.min(this.tampon.secondes, 8).toFixed(0)} s`
+      sautees = this.tampon.sautees > 30
     } else {
-      b.textContent = '⏺ CAPTURER'
-      b.classList.remove('enregistre', 'sautees')
+      texte = '⏺ CAPTURER'
     }
+    const libelle = `${texte}|${enregistre}|${sautees}`
+    if (libelle === this.libelleBouton) return
+    this.libelleBouton = libelle
+    b.textContent = texte
+    b.classList.toggle('enregistre', enregistre)
+    b.classList.toggle('sautees', sautees)
   }
 
   private render(): void {

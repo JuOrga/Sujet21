@@ -2,7 +2,7 @@
 // cadence, la disponibilité selon l'appareil, le débit.
 
 import { describe, expect, it } from 'vitest'
-import { CADENCES_TAMPON, DUREE_TAMPON_MS, aEncoder, debitPour, elague, tamponDisponible } from './tamponCapture'
+import { CADENCES_TAMPON, DUREE_TAMPON_MS, cadence, debitPour, elague, tamponDisponible } from './tamponCapture'
 import type { MorceauVideo } from './webm'
 
 const m = (tempsMs: number, cle: boolean): MorceauVideo => ({ donnees: new Uint8Array(1), cle, tempsUs: tempsMs * 1000 })
@@ -39,21 +39,43 @@ describe('elague', () => {
   })
 })
 
-describe('aEncoder', () => {
+/** Un rendu à `hz` pendant `secondes`, cadencé à `ips` : combien d'images partent. */
+function envoyees(hz: number, ips: number, secondes = 2): number {
+  let echeance = -Infinity
+  let n = 0
+  const periode = 1000 / hz
+  for (let i = 0; i * periode < secondes * 1000; i++) {
+    const c = cadence(i * periode, echeance, ips)
+    echeance = c.echeance
+    if (c.envoie) n++
+  }
+  return n
+}
+
+describe('cadence', () => {
   it('à 30 images par seconde sur un rendu à 60, une image sur deux', () => {
-    // 16,7 ms depuis la dernière : trop tôt ; 33 ms : oui
-    expect(aEncoder(16.7, 30)).toBe(false)
-    expect(aEncoder(33.3, 30)).toBe(true)
+    expect(envoyees(60, 30)).toBe(60)
   })
 
-  it('à 60, chaque image d’un rendu à 60 — même un peu en avance (58 Hz)', () => {
-    expect(aEncoder(16.7, 60)).toBe(true)
-    expect(aEncoder(11.2, 60)).toBe(true)
-    expect(aEncoder(8, 60)).toBe(false)
+  it('à 60 sur un rendu à 60, chaque image ; sur 240, une sur quatre ; sur 90, deux sur trois', () => {
+    expect(envoyees(60, 60)).toBe(120)
+    expect(envoyees(240, 60)).toBe(120)
+    expect(envoyees(90, 60)).toBe(120)
+    expect(envoyees(240, 30)).toBe(60)
+  })
+
+  it('tolère un rendu un peu en avance (58 Hz pour 60 demandées) sans en perdre', () => {
+    expect(envoyees(58, 60)).toBe(116)
+  })
+
+  it('après une pause, l’échéance se recale au lieu de rattraper', () => {
+    const c = cadence(10_000, 100, 60)
+    expect(c.envoie).toBe(true)
+    expect(c.echeance).toBeCloseTo(10_000 + 1000 / 60)
   })
 
   it('jamais quand la mémoire est éteinte', () => {
-    expect(aEncoder(1000, 0)).toBe(false)
+    expect(cadence(1000, -Infinity, 0).envoie).toBe(false)
   })
 })
 

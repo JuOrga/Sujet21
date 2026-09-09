@@ -63,7 +63,7 @@ function id(code: number): Uint8Array {
   return new Uint8Array(out)
 }
 
-function concat(parts: Uint8Array[]): Uint8Array {
+function concat(parts: Uint8Array[]): Uint8Array<ArrayBuffer> {
   let n = 0
   for (const p of parts) n += p.length
   const out = new Uint8Array(n)
@@ -150,7 +150,7 @@ export function assembleWebm(
   largeur: number,
   hauteur: number,
   codec: CodecWebm = 'V_VP9',
-): Uint8Array {
+): Uint8Array<ArrayBuffer> {
   if (morceaux.length === 0) throw new Error('WebM : aucun morceau')
   if (!morceaux[0].cle) throw new Error('WebM : le premier morceau doit être une image clé')
   const origine = morceaux[0].tempsUs
