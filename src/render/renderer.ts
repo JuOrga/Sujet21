@@ -14,6 +14,7 @@ import {
   zonePhases,
 } from '../game/level'
 import type { DecalDef, LumiereDef, ObstacleBox, ZoneDef } from '../game/level'
+import { decalageDe, planchesLivrees, vueCourante, vuesPlanche } from './planche'
 import {
   ARC_EPAISSEUR_DEFAUT,
   ARC_OUVERTURE_DEFAUT,
@@ -1215,6 +1216,7 @@ void main() {
     if (bi >= uBoxCount) break;
     float mc = decodeAux(uBoxAux[bi].x).x;
     if (mc > 2.5 && mc < 3.5) continue; // le sas est une bouche, il n'enterre rien
+    if (mc > 10.5) continue;             // le vide et la baie sont des trous : rien à enterrer
     float dc = sdfVisible(bi, world - relDisp);
     if (dc < dCouv) {
       dCouv = dc;
@@ -1242,6 +1244,10 @@ void main() {
     // matière, et la matière obéit à la lumière.
     bool matActif = (mat > 3.5 && mat < 4.5) || (mat > 5.5 && mat < 6.5) ||
                     (mat > 8.5 && mat < 9.5);
+    // Ce qui a un CORPS : tout, sauf le sas (une bouche) et les ouvertures
+    // sur le dehors (vide, baie — des trous dans le plancher). Sans corps,
+    // ni court-circuit d'aura, ni relief, ni ombre portée, ni biseau.
+    bool solide = (mat < 2.5 || mat > 3.5) && mat < 10.5;
     vec3 eclMat = matActif ? eclActif : eclSolide;
     // Court-circuit : au-delà de toute influence visuelle (ombre 56 u, arête,
     // aura selon le matériau), la boîte ne peut plus teinter ce pixel — on
@@ -1249,7 +1255,7 @@ void main() {
     // chaque pixel n'en paie plus que les 1-2 qui le concernent. Le SAS garde
     // son grand rayon d'aspiration : jamais coupé. Le rejet se fait sur la
     // BOÎTE englobante : toute forme y est inscrite, il reste conservateur.
-    if (mat < 2.5 || mat > 3.5) {
+    if (solide) {
       float reachMax = 56.0;
       if (mat > 0.5 && mat < 2.5) reachMax = max(reachMax, uHydroBand);
       else if (mat > 5.5 && mat < 6.5) reachMax = max(reachMax, uHeatBand * uBoxAux[bi].w);
@@ -1277,7 +1283,7 @@ void main() {
     float dV = d;
     vec2 wbV = wb;
     float flanc = 0.0;
-    if (uRelief > 0.0 && (mat < 2.5 || mat > 3.5)) {
+    if (uRelief > 0.0 && solide) {
       vec2 wT = world - relDisp;
       vec2 wbT = wT;
       float bAngR = uBoxAux[bi].y;
@@ -1313,7 +1319,7 @@ void main() {
     // Ombre portée douce autour de chaque solide (sauf le sas) : les blocs
     // se détachent du fond au lieu de flotter — la cuve prend de la
     // profondeur, les rectangles cessent d'être des aplats.
-    if (mat < 2.5 || mat > 3.5) {
+    if (solide) {
       float shade = 1.0 - smoothstep(0.0, 56.0, max(d, 0.0));
       col = mix(col, col * vec3(0.50, 0.56, 0.70), shade * shade * 0.5);
     }
@@ -1504,6 +1510,53 @@ void main() {
         vec3 auraCol = mat < 1.5 ? vec3(0.12, 0.42, 0.45) : vec3(0.38, 0.20, 0.52);
         col += auraCol * aura * (0.45 + 0.55 * mist);
       }
+    } else if (mat > 10.5) {
+      // LE DEHORS, VU D'ICI. Le plancher s'efface et le vide paraît — le
+      // MÊME ciel que celui qui entoure les modules (voidCol) : mêmes
+      // étoiles, même parallaxe, même plaque. Ce n'est pas une image posée
+      // sur le sol, c'est un trou dedans. Rien de la cuve n'y subsiste :
+      // ni trame, ni caustiques, ni lumière de lampe — le vide n'est
+      // éclairé par rien, et c'est ce qui le fait lire comme un dehors.
+      // Ce que le SDF signé donne gratuitement : la forme (un disque fait
+      // un hublot), le liseré et la monture qui la suivent.
+      float fill = 1.0 - smoothstep(-edgeW, 0.0, d);
+      if (mat < 11.5) {
+        // VIDE, à nu : le trou franc. La tranche du plancher se lit au
+        // bord, côté dedans — sombre, puis un fil clair sur l'arête, qui
+        // prend la lumière de la salle : le sol a une épaisseur, le vide
+        // est DESSOUS, pas peint dessus.
+        col = mix(col, voidCol, fill);
+        float tranche = (1.0 - smoothstep(0.0, edgeW * 3.0, -d)) * fill;
+        col = mix(col, vec3(0.016, 0.024, 0.036) * eclSolide, tranche * 0.85);
+        float edge = (1.0 - smoothstep(0.0, edgeW, abs(d))) * libre;
+        col = mix(col, vec3(0.30, 0.38, 0.48) * eclSolide, edge * 0.6);
+      } else {
+        // BAIE VITRÉE : le vide derrière une vitre, dans sa monture. La
+        // monture est une bande large sur le pourtour INTÉRIEUR (elle suit
+        // la forme), métal froid rivé ; la vitre au centre teinte à peine le
+        // ciel et renvoie un balayage lent — le reflet des lampes de la
+        // salle sur le verre, ce qui la distingue du trou nu d'à côté.
+        float montW = max(14.0, edgeW * 5.0);
+        float verre = 1.0 - smoothstep(-montW - edgeW, -montW, d);
+        float monture = fill - verre;
+        vec3 ciel = voidCol + vec3(0.025, 0.040, 0.065);
+        float band = 0.5 + 0.5 * sin((world.x + world.y) * 0.016 - uTime * 0.22);
+        float sweep = smoothstep(0.88, 0.995, band);
+        ciel += vec3(0.10, 0.13, 0.17) * sweep * eclSolide;
+        // un reflet fixe sur le bord intérieur de la vitre : le verre a une épaisseur
+        float lisere = (1.0 - smoothstep(0.0, edgeW * 1.5, abs(d + montW))) * fill;
+        col = mix(col, ciel, verre);
+        col = mix(col, vec3(0.55, 0.70, 0.86) * eclSolide, lisere * 0.5);
+        // la monture : métal brossé, une strie fine, des rivets sur une
+        // grille monde (ils suivent la bande quelle que soit la forme)
+        float grain = dnoise(world * 0.05);
+        vec3 metal = vec3(0.22, 0.28, 0.35) * (0.82 + 0.18 * grain);
+        float rivet = smoothstep(0.80, 0.96, sin(world.x * 0.14) * sin(world.y * 0.14));
+        metal += vec3(0.16, 0.20, 0.24) * rivet;
+        col = mix(col, metal * eclSolide, monture);
+        float edge = (1.0 - smoothstep(0.0, edgeW, abs(d))) * libre;
+        col = mix(col, vec3(0.42, 0.52, 0.64) * eclSolide, edge * 0.7);
+      }
     } else if (mat > 9.5) {
       // MIROIR FIXE : la paroi polie qui plie le faisceau (laser.ts fait la
       // vraie optique — ici, le POLI se voit) : métal froid presque blanc,
@@ -1673,7 +1726,7 @@ void main() {
     // solide — la face tournée vers la lampe s'éclaire, l'opposée plonge.
     // Le gradient du SDF vient des dérivées d'écran : gratuit, et il suit
     // n'importe quelle forme. (Le sas, une bouche, ne se biseaute pas.)
-    if (uLumiere > 0.5 && (mat < 2.5 || mat > 3.5)) {
+    if (uLumiere > 0.5 && solide) {
       vec2 gd = vec2(dFdx(d), dFdy(d));
       float gn = length(gd);
       if (gn > 1e-6) {
@@ -2345,6 +2398,7 @@ float sceneSdf(vec2 p, float alt) {
     if (i >= uBoxCount) break;
     vec4 dec = decodeAux(uBoxAux[i].x);
     if (dec.x > 2.5 && dec.x < 3.5) continue; // sas : une bouche, pas un mur
+    if (dec.x > 10.5) continue;              // vide, baie : un trou dans le plancher, pas un mur
     if (dec.x > 4.5 && dec.x < 5.5) continue; // évent : tamisé à part (grilleTrans)
     if (dec.x < 0.5 && uBoxAux[i].z > 8.5) continue; // vitre : tamisée (vitreTrans)
     if (alt > (dec.y > 4.5 ? HAUTEUR_COQUE : HAUTEUR_BLOCS)) continue;
@@ -2627,6 +2681,34 @@ void main() {
   outColor = vec4(c, t.a * uFade * (1.0 - fluide));
 }`
 
+/** Le fichier de chaque sorte de décalque (sans dossier ni extension) :
+ *  c'est le nom que la planche de vues reprend (`<fichier>-anime.webp`). */
+const FICHIER_DECAL: Record<DecalDef['kind'], string> = {
+  tuyaux: 'decal-tuyaux',
+  vanne: 'decal-vanne',
+  // l'écran de contrôle de la salle d'observation : éteint aujourd'hui
+  // (HORS TENSION), allumé quand la méta-progression prendra ses quartiers
+  'ecran-off': 'decal-ecran-off',
+  'ecran-on': 'decal-ecran-on',
+  'fiole-pleine': 'fiole-pleine',
+  'fiole-vide': 'fiole-vide',
+  // LA SERRE : cultures hydroponiques, décor du niveau serre
+  'serre-ble-nain': 'serre-ble-nain',
+  'serre-rampe': 'serre-rampe',
+  'serre-rampe-a': 'serre-rampe-a',
+  // LE MÉTA (alcôve d'achat, pupitre du banc, masse du Sujet 12) : les
+  // décalques sont SYNTHÉTISÉS depuis les données du tableau — un plot EST
+  // son alcôve
+  'meta-alcove': 'meta-alcove',
+  'meta-banc': 'meta-banc',
+  'meta-marchand': 'meta-marchand',
+  'sas-raccord': 'sas-raccord',
+  'sas-raccord-v': 'sas-raccord-v',
+}
+
+/** Les planches de vues livrées, lues une fois : le glob de Vite. */
+const PLANCHES_LIVREES = planchesLivrees()
+
 function compile(
   gl: WebGL2RenderingContext,
   type: number,
@@ -2678,28 +2760,19 @@ export class Renderer {
   private readonly zoneScratch = new Float32Array(MAX_ZONES * 4)
   private readonly zoneForceScratch = new Float32Array(MAX_ZONES)
   private readonly zonePhaseScratch = new Float32Array(MAX_ZONES * 3)
-  private texDecalTuyaux: WebGLTexture | null = null
-  private texDecalVanne: WebGLTexture | null = null
-  // LA SERRE : les cultures hydroponiques du niveau serre
-  private texSerreBle: WebGLTexture | null = null
-  private texSerreRampe: WebGLTexture | null = null
-  private texSerreRampeA: WebGLTexture | null = null
+  // LES DÉCALQUES, par sorte : l'image fixe et sa taille (la planche en
+  // déduit son nombre de vues). Absente tant que le fichier n'est pas
+  // déposé — le décalque se saute, et pour le méta le tracé vectoriel du
+  // fx-canvas tient seul la place.
+  private readonly decalsFixes = new Map<DecalDef['kind'], { tex: WebGLTexture; largeur: number; hauteur: number }>()
+  // LES PLANCHES DE VUES (planche.ts) : par sorte, la bande animée, son
+  // nombre de vues et sa largeur en texels (le quad rentre d'un demi-texel
+  // dans la vue, sinon le filtrage linéaire mord sur la vue voisine)
+  private readonly planches = new Map<DecalDef['kind'], { tex: WebGLTexture; vues: number; largeur: number }>()
   // sprites de luminaires (optionnels : tant que les fichiers n'existent
   // pas, le dessin procédural du shader reste en place)
   private texLampeRonde: WebGLTexture | null = null
   private texLampeBande: WebGLTexture | null = null
-  private texDecalEcranOff: WebGLTexture | null = null
-  private texDecalEcranOn: WebGLTexture | null = null
-  private texDecalFiolePleine: WebGLTexture | null = null
-  private texDecalFioleVide: WebGLTexture | null = null
-  // LE MÉTA : alcôve d'achat, pupitre du banc, masse du Sujet 12. Tant que le
-  // fichier n'est pas déposé, la texture reste nulle et le décalque se saute —
-  // le tracé vectoriel du fx-canvas tient seul la place.
-  private texSasRaccord: WebGLTexture | null = null
-  private texSasRaccordV: WebGLTexture | null = null
-  private texMetaAlcove: WebGLTexture | null = null
-  private texMetaBanc: WebGLTexture | null = null
-  private texMetaMarchand: WebGLTexture | null = null
   // Tableau de textures des zones (calques : 0 buses/eau, 1 hublot/glace,
   // 2 conduite/vapeur) : une seule unité de texture pour les trois images.
   private texZones: WebGLTexture | null = null
@@ -2776,8 +2849,11 @@ export class Renderer {
   constructor(canvas: HTMLCanvasElement, capacity: number) {
     this.canvas = canvas
     // PAS de preserveDrawingBuffer. Il était là pour que les captures du
-    // canvas marchent — mais RIEN dans le jeu ne capture ce canvas, et une
-    // capture d'écran système n'en a pas besoin. Sur les GPU à TUILES
+    // canvas marchent — mais rien dans le jeu ne relit ce canvas HORS de
+    // l'image en cours (la capture pour le codex, game/captureCodex.ts, le
+    // compose dans le même rappel que le rendu, avant que le navigateur ne
+    // compose l'écran : le tampon est encore là), et une capture d'écran
+    // système n'en a pas besoin. Sur les GPU à TUILES
     // (Apple : iPhone, iPad, M1/M2), demander à conserver le contenu d'une
     // image à l'autre interdit au pilote de jeter la tuile en fin de rendu :
     // il doit RELIRE tout l'écran au début de chaque image et le RÉÉCRIRE à
@@ -2976,13 +3052,16 @@ export class Renderer {
       true,
       (t) => (this.texSpongeWet = t),
     )
-    // Décalques : pièces détourées (alpha), donc bord franc — pas de répétition
-    this.loadTexture(
-      '/assets/decal-tuyaux.webp',
-      false,
-      true,
-      (t) => (this.texDecalTuyaux = t),
-    )
+    // Décalques : pièces détourées (alpha), donc bord franc — pas de
+    // répétition. Une table et une boucle : ajouter une sorte, c'est une
+    // ligne dans FICHIER_DECAL (le compilateur exige qu'elle y soit), et la
+    // planche animée s'y accroche sans autre geste.
+    for (const [kind, fichier] of Object.entries(FICHIER_DECAL) as [DecalDef['kind'], string][]) {
+      this.loadTexture(`/assets/${fichier}.webp`, false, true, (tex, img) => {
+        this.decalsFixes.set(kind, { tex, largeur: img.naturalWidth, hauteur: img.naturalHeight })
+        this.chargePlanche(kind, fichier, img.naturalWidth, img.naturalHeight)
+      })
+    }
     this.loadTexture(
       '/assets/lampe-plafonnier.webp',
       false,
@@ -2995,91 +3074,6 @@ export class Renderer {
       true,
       (t) => (this.texLampeBande = t),
     )
-    this.loadTexture(
-      '/assets/decal-vanne.webp',
-      false,
-      true,
-      (t) => (this.texDecalVanne = t),
-    )
-    // L'écran de contrôle de la salle d'observation : éteint aujourd'hui
-    // (HORS TENSION), allumé quand la méta-progression prendra ses quartiers
-    this.loadTexture(
-      '/assets/decal-ecran-off.webp',
-      false,
-      true,
-      (t) => (this.texDecalEcranOff = t),
-    )
-    this.loadTexture(
-      '/assets/decal-ecran-on.webp',
-      false,
-      true,
-      (t) => (this.texDecalEcranOn = t),
-    )
-    // LE MÉTA (commerce, banc, marchand) : les décalques sont SYNTHÉTISÉS
-    // depuis les données du tableau — un plot EST son alcôve. Tant qu'un
-    // fichier n'est pas déposé, la texture reste nulle, le décalque se saute,
-    // et le tracé vectoriel du fx-canvas tient seul la place.
-    this.loadTexture(
-      '/assets/sas-raccord.webp',
-      false,
-      true,
-      (t) => (this.texSasRaccord = t),
-    )
-    this.loadTexture(
-      '/assets/sas-raccord-v.webp',
-      false,
-      true,
-      (t) => (this.texSasRaccordV = t),
-    )
-    this.loadTexture(
-      '/assets/meta-alcove.webp',
-      false,
-      true,
-      (t) => (this.texMetaAlcove = t),
-    )
-    this.loadTexture(
-      '/assets/meta-banc.webp',
-      false,
-      true,
-      (t) => (this.texMetaBanc = t),
-    )
-    this.loadTexture(
-      '/assets/meta-marchand.webp',
-      false,
-      true,
-      (t) => (this.texMetaMarchand = t),
-    )
-    // LA SERRE : cultures hydroponiques, décor du niveau serre
-    this.loadTexture(
-      '/assets/serre-ble-nain.webp',
-      false,
-      true,
-      (t) => (this.texSerreBle = t),
-    )
-    this.loadTexture(
-      '/assets/serre-rampe.webp',
-      false,
-      true,
-      (t) => (this.texSerreRampe = t),
-    )
-    this.loadTexture(
-      '/assets/serre-rampe-a.webp',
-      false,
-      true,
-      (t) => (this.texSerreRampeA = t),
-    )
-    this.loadTexture(
-      '/assets/fiole-pleine.webp',
-      false,
-      true,
-      (t) => (this.texDecalFiolePleine = t),
-    )
-    this.loadTexture(
-      '/assets/fiole-vide.webp',
-      false,
-      true,
-      (t) => (this.texDecalFioleVide = t),
-    )
     // Images de zones : la cause peinte (voir zoneDecor). Sans mipmaps —
     // échantillonnées dans une branche non uniforme du shader. En calques
     // d'un même tableau de textures : une seule unité pour les trois.
@@ -3090,6 +3084,20 @@ export class Renderer {
     // par la surface miroitante du fluide — poutrelles, conduites, et des
     // verrières éclairées qui font les reflets lumineux
     this.loadZoneLayer('/assets/plafond.webp', 3)
+  }
+
+  /** La planche de vues d'une sorte (`<fichier>-anime.webp`), chargée quand
+   *  son image fixe est là : le nombre de vues se déduit du rapport des
+   *  deux. Seules les planches LIVRÉES (le glob de Vite) sont demandées.
+   *  Sans mipmaps : à un niveau réduit, un texel moyenne des colonnes de
+   *  la vue voisine — le bord de la pièce scintillerait à chaque vue. */
+  private chargePlanche(kind: DecalDef['kind'], fichier: string, largeurFixe: number, hauteurFixe: number): void {
+    if (!PLANCHES_LIVREES.has(fichier)) return
+    this.loadTexture(`/assets/${fichier}-anime.webp`, false, false, (tex, bande) => {
+      const vues = vuesPlanche(bande.naturalWidth, bande.naturalHeight, largeurFixe, hauteurFixe)
+      // une bande mal taillée ne s'anime pas : l'image fixe reste
+      if (vues > 1) this.planches.set(kind, { tex, vues, largeur: bande.naturalWidth })
+    })
   }
 
   // Charge une image de zone dans SON calque du tableau de textures. Le
@@ -3233,7 +3241,7 @@ export class Renderer {
     url: string,
     repeat: boolean,
     mips: boolean,
-    assign: (t: WebGLTexture) => void,
+    assign: (t: WebGLTexture, img: HTMLImageElement) => void,
     mirrored = false,
   ): void {
     const img = new Image()
@@ -3263,7 +3271,7 @@ export class Renderer {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
       }
       gl.bindTexture(gl.TEXTURE_2D, null)
-      assign(tex)
+      assign(tex, img)
     }
     img.src = url
   }
@@ -3884,7 +3892,7 @@ export class Renderer {
     if (!this.solModules) this.drawHull(sim, camera, viewportW, viewportH)
 
     // Passe B ter — décalques de décor (tuyaux, vannes), effacés sous l'eau
-    this.drawDecals(decals, camera, viewportW, viewportH, params)
+    this.drawDecals(decals, camera, viewportW, viewportH, params, timeSec)
     this.drawLampes(lampes, camera, viewportW, viewportH, params)
 
     // Passe C — cellules d'éponge
@@ -4046,41 +4054,10 @@ export class Renderer {
   // Décalques : un quad par pièce, dessinés en transparence. Le décor n'a pas
   // de physique — il ne coûte qu'un appel de dessin par pièce, et un tableau
   // n'en porte qu'une poignée.
-  /** La texture d'une sorte de décalque. Une table plutôt qu'une cascade de
-   *  ternaires : à onze sortes, la cascade ne se relisait plus — et le switch
-   *  exhaustif fait dire au compilateur ce qu'on a oublié en ajoutant une
-   *  sorte. Null : image pas encore là, l'appelant saute la pièce. */
+  /** La texture fixe d'une sorte de décalque — null : image pas encore là
+   *  (ou fichier absent), l'appelant saute la pièce. */
   private textureDecal(kind: DecalDef['kind']): WebGLTexture | null {
-    switch (kind) {
-      case 'vanne':
-        return this.texDecalVanne
-      case 'ecran-off':
-        return this.texDecalEcranOff
-      case 'ecran-on':
-        return this.texDecalEcranOn
-      case 'fiole-pleine':
-        return this.texDecalFiolePleine
-      case 'fiole-vide':
-        return this.texDecalFioleVide
-      case 'serre-ble-nain':
-        return this.texSerreBle
-      case 'serre-rampe':
-        return this.texSerreRampe
-      case 'serre-rampe-a':
-        return this.texSerreRampeA
-      case 'meta-alcove':
-        return this.texMetaAlcove
-      case 'meta-banc':
-        return this.texMetaBanc
-      case 'meta-marchand':
-        return this.texMetaMarchand
-      case 'sas-raccord':
-        return this.texSasRaccord
-      case 'sas-raccord-v':
-        return this.texSasRaccordV
-      case 'tuyaux':
-        return this.texDecalTuyaux
-    }
+    return this.decalsFixes.get(kind)?.tex ?? null
   }
 
   private drawDecals(
@@ -4089,15 +4066,30 @@ export class Renderer {
     viewportW: number,
     viewportH: number,
     params: SimParams,
+    timeSec: number,
   ): void {
     if (decals.length === 0) return
     const gl = this.gl
     const du = this.uniforms['decal']
     let started = false
     for (const d of decals) {
-      const tex = this.textureDecal(d.kind)
+      const fixe = this.textureDecal(d.kind)
       // texture pas encore chargée (ou fichier absent) : la pièce se saute
-      if (!tex) continue
+      if (!fixe) continue
+      // la planche de vues prime sur l'image fixe : le quad ne montre que
+      // la vue du moment, une tranche de la bande — le shader ne sait rien
+      const planche = this.planches.get(d.kind)
+      const tex = planche ? planche.tex : fixe
+      let uA = 0
+      let uB = 1
+      if (planche) {
+        const k = vueCourante(timeSec, planche.vues, decalageDe(d.x, d.y))
+        // un demi-texel en dedans : sur la frontière exacte, le filtrage
+        // linéaire mélange la colonne de bord avec celle de la vue voisine
+        const demi = 0.5 / planche.largeur
+        uA = k / planche.vues + demi
+        uB = (k + 1) / planche.vues - demi
+      }
       if (!started) {
         started = true
         gl.useProgram(this.decalProgram)
@@ -4122,8 +4114,8 @@ export class Renderer {
       }
       const hw = d.w * 0.5
       const hh = d.h * 0.5
-      const u0 = d.flip ? 1 : 0
-      const u1 = d.flip ? 0 : 1
+      const u0 = d.flip ? uB : uA
+      const u1 = d.flip ? uA : uB
       // v inversé : les textures sont chargées avec UNPACK_FLIP_Y
       const q = this.decalScratch
       let o = 0

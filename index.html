@@ -2965,6 +2965,27 @@
       .cx-atelier-boutons button { font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.16em; padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(150, 200, 235, 0.35); background: rgba(99, 183, 230, 0.08); color: #eaf6ff; cursor: pointer; }
       .cx-atelier-boutons button:hover:not(:disabled) { background: rgba(99, 183, 230, 0.2); }
       .cx-atelier-boutons button:disabled { opacity: 0.5; cursor: wait; }
+      /* LA CAPTURE POUR LE CODEX : la pastille du HUD (ambre comme tout ce
+         qui touche au concepteur) et le panneau du résultat */
+      .hud-capture { color: #ffd24a; border-color: rgba(255, 210, 74, 0.45); font-family: var(--font-display); letter-spacing: 0.12em; }
+      .hud-capture.enregistre { color: #ff6a5a; border-color: rgba(255, 106, 90, 0.7); animation: cc-pulse 1s ease-in-out infinite; }
+      /* la mémoire saute des images : l'encodeur ne suit pas — le bouton le dit */
+      .hud-capture.sautees { border-style: dashed; }
+      @keyframes cc-pulse { 50% { background: rgba(255, 106, 90, 0.18); } }
+      #capture-codex { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(3, 7, 16, 0.72); }
+      #capture-codex[hidden] { display: none; }
+      .cc-boite { display: flex; flex-direction: column; gap: 10px; width: min(92vw, 560px); max-height: 92vh; overflow: auto; padding: 16px 18px; border: 1px dashed rgba(255, 210, 74, 0.45); border-radius: 10px; background: rgba(3, 7, 16, 0.92); color: #eaf6ff; }
+      .cc-boite h2 { margin: 0; font-family: var(--font-display); font-size: calc(9px * var(--ui)); letter-spacing: 0.22em; color: #ffd24a; }
+      .cc-video { width: 100%; aspect-ratio: 4 / 3; background: #000; border-radius: 6px; }
+      .cc-etat { margin: 0; font-size: calc(12px * var(--ui)); }
+      .cc-note { margin: 0; font-size: calc(10px * var(--ui)); color: var(--dim); }
+      .cc-boite label { display: flex; flex-direction: column; gap: 4px; }
+      .cc-boite label span { font-size: calc(9px * var(--ui)); letter-spacing: 0.18em; color: var(--dim); }
+      .cc-boite select { font: inherit; font-size: calc(12px * var(--ui)); color: #eaf6ff; background: rgba(3, 7, 16, 0.7); border: 1px solid rgba(150, 200, 235, 0.25); border-radius: 6px; padding: 6px 8px; max-width: 100%; }
+      .cc-boutons { display: flex; flex-wrap: wrap; gap: 6px; }
+      .cc-boutons button { font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.16em; padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(150, 200, 235, 0.35); background: rgba(99, 183, 230, 0.08); color: #eaf6ff; cursor: pointer; }
+      .cc-boutons button:hover:not(:disabled) { background: rgba(99, 183, 230, 0.2); }
+      .cc-boutons button:disabled { opacity: 0.5; cursor: wait; }
       .cx-atelier-etat { margin: 0; min-height: 1em; font-size: calc(11px * var(--ui)); color: #ffd24a; }
       .cx-atelier-etat:empty { display: none; }
       .cx-atelier-note { margin: 0; font-size: calc(10px * var(--ui)); line-height: 1.5; color: var(--dim); }
@@ -3045,6 +3066,33 @@
       .liv-e ul { margin: 6px 0 0; padding-left: 18px; }
       .liv-e li { font-family: var(--font-mono); font-size: calc(12px * var(--ui)); color: var(--ink); margin-top: 4px; line-height: 1.45; }
       #fps-coin[hidden] { display: none; }
+      /* ---- LE MOT DU CHARGEMENT DE L'ATELIER ----
+         Un cartouche centré en haut, au-dessus de tout : l'outil demandé
+         arrive (point qui respire), ou n'est pas venu (liseré chaud). */
+      #atelier-chargement[hidden] { display: none; }
+      #atelier-chargement {
+        position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 90;
+        display: flex; align-items: center; gap: 9px;
+        font-family: var(--font-mono); font-size: calc(12px * var(--ui)); letter-spacing: 0.04em;
+        color: var(--specimen); background: rgba(4, 10, 18, 0.82);
+        border: 1px solid rgba(120, 200, 255, 0.35); border-radius: 6px;
+        padding: 6px 12px; pointer-events: none; max-width: calc(100vw - 28px);
+        text-align: center; /* sur un téléphone le mot passe à la ligne : la fin (« rechargez la page ») doit se lire */
+      }
+      #atelier-chargement::before {
+        content: ''; flex: none; width: 8px; height: 8px; border-radius: 50%;
+        background: rgba(120, 200, 255, 0.95);
+        animation: atelier-respire 1.1s ease-in-out infinite;
+      }
+      #atelier-chargement.echec { border-color: rgba(255, 140, 90, 0.6); color: #ffd2b8; }
+      #atelier-chargement.echec::before { background: rgba(255, 140, 90, 0.95); animation: none; }
+      @keyframes atelier-respire {
+        0%, 100% { opacity: 0.25; transform: scale(0.7); }
+        50% { opacity: 1; transform: scale(1); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #atelier-chargement::before { animation: none; }
+      }
       #fps-coin {
         position: fixed; left: 10px; bottom: 10px; z-index: 30;
         font-family: var(--font-mono); font-size: calc(12px * var(--ui)); color: var(--specimen);
@@ -8175,6 +8223,10 @@
           <button type="button" class="hud-chip" data-nom="condensat de la run — la matière ramassée, purgée en fin de run" id="hud-cond-chip"><i class="ico-meta" style="--ic-x:2;--ic-y:1"></i><span class="v" id="hud-cond">0 cL</span></button>
           <button type="button" class="hud-chip" data-nom="instruments embarqués — toucher pour le détail" id="hud-instr-chip" hidden><i>🧰</i><span class="v" id="hud-instr">—</span></button>
           <button type="button" class="hud-chip" data-nom="coque du vaisseau"><i>❄</i><span class="v" id="hud-coque">+21°</span></button>
+          <!-- LA CAPTURE POUR LE CODEX (mode concepteur) : quatre secondes de
+               la scène, cadrées 4:3, envoyées à la fiche choisie — la vidéo
+               de l'effet se filme dans le jeu, elle ne se fabrique pas -->
+          <button type="button" class="hud-chip hud-capture" data-dev id="hud-capture" data-nom="capture pour le codex : 4 s de la scène, à envoyer à une fiche">⏺ CAPTURER</button>
         </div>
       </div>
       <div class="hud-sous"><span id="hud-perte"></span><span id="hud-rosee"></span><span id="hud-fantome"></span></div>
@@ -8262,6 +8314,8 @@
           <button type="button" class="ed-tool" data-tool="box:7"><i style="background:#35c9a0"></i>Membrane</button>
           <button type="button" class="ed-tool" data-tool="box:8"><i style="background:#9fb9d8"></i>Rideau lamellaire</button>
           <button type="button" class="ed-tool" data-tool="box:9"><i style="background:#29d8ff"></i>Surchauffeur</button>
+          <button type="button" class="ed-tool" data-tool="box:11"><i style="background:#1a2a44"></i>Vide (le dehors)</button>
+          <button type="button" class="ed-tool" data-tool="box:12"><i style="background:#5a7fb0"></i>Baie vitrée</button>
           <button type="button" class="ed-tool" data-tool="sponge"><i style="background:#d7ad55"></i>Éponge</button>
           <button type="button" class="ed-tool" data-tool="gomme" title="Effacer : glissez pour tracer une zone, tout ce qu'elle couvre disparaît. Une paroi à cheval est rognée ; une forme ou une oblique s'efface entière si son centre est dedans. Une COQUE (chambre, couloir) ne se rogne pas : elle part d'un bloc dès que la zone mord ses murs ET atteint son cœur — une zone tracée dans son vide ne gomme que le mobilier. La gomme reste en main : on gomme en série."><i style="background:#ffd24a"></i>Gomme</button>
           <button type="button" class="ed-tool" data-tool="cut" title="DEUX PAROIS QUI SE CHEVAUCHENT : cliquez celle qui prend le dessus, puis celle qui s'efface dessous — seule leur zone COMMUNE est rongée. Ne sert qu'à cela ; pour effacer librement, prenez la Gomme."><i style="background:#e86a6a"></i>Superposition</button>
@@ -8289,6 +8343,7 @@
           <button type="button" class="ed-tool" data-tool="laser"><i style="background:#ff6a5a"></i>Émetteur laser</button>
           <button type="button" class="ed-tool" data-tool="cible"><i style="background:#6dffb8"></i>Cible</button>
           <button type="button" class="ed-tool" data-tool="porte"><i style="background:#ff5a5a"></i>Porte asservie</button>
+          <button type="button" class="ed-tool" data-tool="chasse" title="Un COURANT DE POUSSÉE : tout ce qui est dans le rectangle est entraîné dans sa direction — le moyen d'éjecter le corps d'une salle sans le couper comme le ferait une porte qui se ferme. Permanente sans canal ; asservie à ses pastilles avec un canal ; une séquence peut la déclencher pour une bouffée."><i style="background:#4fc8ff"></i>Chasse</button>
           <button type="button" class="ed-tool" data-tool="condensat"><i style="background:#8cd7ff"></i>Pastille de condensat</button>
           <button type="button" class="ed-tool" data-tool="fiole"><i style="background:#c99aff"></i>Fiole (emplacement)</button>
           <button type="button" class="ed-tool" data-tool="plot:condensat" title="PLOT D'ARTICLE payé en CONDENSAT (la bourse de la run) : tracez le rectangle d'achat — le corps qui s'y glisse paie et l'effet agit immédiatement, comme à l'étal de l'Économat. Article et prix dans le panneau."><i style="background:transparent;border:2px dashed #8cd7ff"></i>Plot d'article (condensat)</button>
@@ -8834,6 +8889,8 @@
          interaction état × élément vécue en jeu débloque sa fiche -->
     <!-- LE CODEX : la maquette « Codex v2 » — le gabarit est bâti par game/ecranCodex.ts -->
     <div id="codex" hidden aria-label="Codex"></div>
+    <!-- LA CAPTURE POUR LE CODEX : le panneau bâti par game/captureCodex.ts -->
+    <div id="capture-codex" hidden></div>
 
     <div id="cycle" hidden aria-label="Les mémoires">
       <div id="cycle-ecran">
@@ -9030,6 +9087,10 @@
 
     <!-- Compteur FPS permanent (réglage AFFICHER LES FPS du voile PARAMÈTRES) -->
     <div id="fps-coin" hidden></div>
+    <!-- Le mot du chargement de l'atelier : les outils du concepteur
+         viennent à la demande (main.ts, chargeAtelier), ce cartouche dit
+         qu'ils arrivent — ou qu'ils ne sont pas venus. -->
+    <div id="atelier-chargement" hidden role="status" aria-live="polite"></div>
 
     <!-- Toast de trophée : la petite fanfare qui glisse depuis le bord -->
     <div id="trophee-toast" aria-live="polite"></div>
@@ -9068,6 +9129,22 @@
             jamais dégradée.
           </div>
           <div id="params-fps" class="params-choix" role="group" aria-label="Fréquence d'images"></div>
+          <!-- LA MÉMOIRE DE CAPTURE (concepteur, PC et Steam Deck seulement) :
+               les huit dernières secondes encodées en continu, que le bouton
+               ⏺ du HUD fige — on n'a jamais le doigt dessus au moment où
+               l'effet se produit. game/tamponCapture.ts -->
+          <div id="params-tampon-bloc" data-dev hidden>
+            <div class="params-nom" style="margin-top: 16px">MÉMOIRE DE CAPTURE — LES 8 DERNIÈRES SECONDES (CONCEPTEUR)</div>
+            <div class="params-desc">
+              Armée, la scène s'encode en continu et le bouton ⏺ du HUD sauve les
+              huit dernières secondes au lieu de filmer quatre secondes à partir du
+              clic. L'encodage tourne hors du fil du jeu ; ce qui reste sur le fil du
+              rendu, c'est la composition d'une petite image à chaque rappel — à
+              mesurer au compteur ci-dessous, armée puis éteinte. 60 images par
+              seconde demandent un rendu qui les tient. PC et Steam Deck seulement.
+            </div>
+            <div id="params-tampon" class="params-choix" role="group" aria-label="Mémoire de capture"></div>
+          </div>
           <div class="params-nom" style="margin-top: 16px">RÉSOLUTION DE RENDU</div>
           <div class="params-desc">
             Élevée (défaut) : la cuve se dessine en résolution native. Moyenne et

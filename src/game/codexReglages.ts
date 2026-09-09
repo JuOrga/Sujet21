@@ -168,6 +168,21 @@ export const VIDEO_TYPES: Record<string, string> = {
   'video/mp4': '.mp4',
 }
 
+/** Le fichier en base64 nu, prêt pour le corps JSON de l'envoi. Partagé
+ *  entre l'atelier du codex (un fichier choisi) et la capture en jeu (un
+ *  enregistrement) : le magasin ne connaît qu'une forme. */
+export function blobEnBase64(f: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader()
+    r.onerror = () => reject(r.error)
+    r.onload = () => {
+      const s = String(r.result)
+      resolve(s.slice(s.indexOf(',') + 1))
+    }
+    r.readAsDataURL(f)
+  })
+}
+
 /** Lit un fichier vidéo pour l'envoi — null : type inconnu ou trop lourd. */
 export function litFichierVideo(f: { type: string; size: number }): string | null {
   if (!VIDEO_TYPES[f.type]) return null

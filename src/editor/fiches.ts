@@ -21,6 +21,8 @@ import {
   MAT_MEMBRANE,
   MAT_RIDEAU,
   MAT_SURCHAUFFEUR,
+  MAT_VIDE,
+  MAT_BAIE,
 } from '../game/level'
 
 export interface FicheLigne {
@@ -143,6 +145,28 @@ export const FICHES_MATERIAUX: Record<number, Fiche> = {
       { cle: '·', txt: 'Une seule charge par essai — le serpentin le montre.' },
     ],
   },
+  [MAT_VIDE]: {
+    titre: 'Vide (le dehors, à nu)',
+    resume: 'Le plancher manque : on voit le ciel du dehors au travers.',
+    lignes: [
+      { cle: 'EAU', txt: 'passe dessus comme sur le sol — rien n’aspire.' },
+      { cle: 'GLACE', txt: 'glisse dessus, pareil.' },
+      { cle: 'VAPEUR', txt: 'flotte dessus, pareil.' },
+      { cle: 'LASER', txt: 'traverse.' },
+      { cle: '·', txt: 'Purement visuel : une fenêtre sur les étoiles, sans monture. Prend toutes les formes.' },
+    ],
+  },
+  [MAT_BAIE]: {
+    titre: 'Baie vitrée',
+    resume: 'Une verrière encadrée : le dehors derrière une vitre.',
+    lignes: [
+      { cle: 'EAU', txt: 'passe dessus comme sur le sol.' },
+      { cle: 'GLACE', txt: 'glisse dessus, pareil.' },
+      { cle: 'VAPEUR', txt: 'flotte dessus, pareil.' },
+      { cle: 'LASER', txt: 'traverse.' },
+      { cle: '·', txt: 'Purement visuel : la monture et le reflet de la vitre en plus du vide. Prend toutes les formes — un disque fait un hublot.' },
+    ],
+  },
 }
 
 // ——— Les MÉCANISMES et repères : le texte statique par genre ————————
@@ -229,6 +253,16 @@ export const FICHES_GENRES: Record<string, Fiche> = {
     lignes: [
       { cle: '·', txt: 'Fermée tant que sa pastille est éteinte.' },
       { cle: '·', txt: 'Ouverte, elle devient traversante — en pointillé.' },
+    ],
+  },
+  'genre:chasse': {
+    titre: 'Chasse (courant de poussée)',
+    resume: 'Tout ce qui entre dans son rectangle est entraîné dans sa direction.',
+    lignes: [
+      { cle: 'EAU', txt: 'balayée à l’allure de la chasse — rien n’est déchiré.' },
+      { cle: 'GLACE', txt: 'entraînée aussi, avec l’inertie d’un bloc.' },
+      { cle: 'VAPEUR', txt: 'soufflée comme l’eau.' },
+      { cle: '·', txt: 'Sans canal : permanente. Avec un canal : souffle tant que ses pastilles l’alimentent. Une séquence (action « chasse ») la déclenche pour une bouffée.' },
     ],
   },
   'genre:porte-scenarisee': {
@@ -367,6 +401,8 @@ export function cleFiche(sel: SelFiche, level: LevelDef): string | null {
       const p = (level.portes ?? [])[sel.index ?? -1]
       return p && p.canal < 0 ? 'genre:porte-scenarisee' : 'genre:porte'
     }
+    case 'chasse':
+      return 'genre:chasse'
     case 'zone':
       return 'genre:zone'
     case 'cache': {

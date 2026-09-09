@@ -7,6 +7,8 @@ import {
   MAT_HYDROPHOBE,
   MAT_MEMBRANE,
   MAT_RIDEAU,
+  MAT_VIDE,
+  MAT_BAIE,
   MAT_WALL,
   pointInBox,
   dansBoite,
@@ -83,6 +85,32 @@ describe('FluidSim — matériaux (§6)', () => {
     for (let s = 0; s < 120; s++) sim.step(sim.params.dt)
     expect(sim.count).toBe(1)
     expect(sim.posX[0]).toBeLessThan(50 + 1) // arrêtée devant la cellule
+  })
+
+  it('le VIDE et la BAIE ne sont pas des parois : le solveur les écarte lui-même', () => {
+    // Tout matériau inconnu du solveur bute (il ne laisse passer que la
+    // grille, la membrane et le rideau) : sans le tri de setLevel, une
+    // ouverture sur le dehors serait un mur invisible au milieu du sol.
+    const ouverture = { minX: 100, minY: -200, maxX: 140, maxY: 200 }
+    for (const material of [MAT_VIDE, MAT_BAIE]) {
+      const sim = makeSim()
+      sim.setLevel([{ ...ouverture, material }], [])
+      expect(sim.boxes).toHaveLength(0)
+      const i = sim.addParticle(0, 0, KIND_PLAYER)
+      sim.velX[i] = 400
+      sim.baseVolume = 1
+      for (let s = 0; s < 90; s++) sim.step(sim.params.dt)
+      expect(sim.posX[0]).toBeGreaterThan(140) // passée au travers
+    }
+    // le témoin : la même boîte en paroi arrête bel et bien la goutte
+    const sim = makeSim()
+    sim.setLevel([{ ...ouverture, material: MAT_WALL }], [])
+    expect(sim.boxes).toHaveLength(1)
+    const i = sim.addParticle(0, 0, KIND_PLAYER)
+    sim.velX[i] = 400
+    sim.baseVolume = 1
+    for (let s = 0; s < 90; s++) sim.step(sim.params.dt)
+    expect(sim.posX[0]).toBeLessThan(100)
   })
 
   it('une paroi hydrophobe fait rebondir', () => {
