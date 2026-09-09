@@ -10,14 +10,16 @@ import {
   serializeLevel,
 } from './levelIO'
 import {
+  MAT_BAIE,
   MAT_MIROIR,
+  MAT_VIDE,
   MAT_WALL,
   TABLEAU_1BIS,
   TABLEAUX,
   zoneForceAt,
   type LevelDef,
 } from './level'
-import { FORME_COIN } from './formes'
+import { FORME_COIN, FORME_DISQUE } from './formes'
 
 describe('levelIO — aller-retour JSON', () => {
   it('un tableau livré se sérialise et se relit à l’identique', () => {
@@ -851,7 +853,7 @@ describe('levelIO — les décalques de LA SERRE', () => {
       condensats: [
         { x: 100, y: -200, cl: 12 },
         { x: 500, y: 300, cl: 999 }, // borné à 200
-        { x: 800, y: 0 }, // valeur par défaut : 8 cL
+        { x: 800, y: 0 }, // valeur par défaut : 6 cL (le même défaut que le semis)
       ],
       fiole: { x: -400, y: 250 },
     })
@@ -859,7 +861,7 @@ describe('levelIO — les décalques de LA SERRE', () => {
     expect(level!.condensats).toEqual([
       { x: 100, y: -200, cl: 12 },
       { x: 500, y: 300, cl: 200 },
-      { x: 800, y: 0, cl: 8 },
+      { x: 800, y: 0, cl: 6 },
     ])
     expect(level!.fiole).toEqual({ x: -400, y: 250 })
     const relu = parseLevel(JSON.parse(serializeLevel(level!)))
@@ -1221,6 +1223,55 @@ describe('LE MIROIR SURVIT À L’ENREGISTREMENT', () => {
     expect(level!.boxes[0].forme).toBe(FORME_COIN)
     expect(level!.boxes[0].p0).toBe(2)
     // et il tient un SECOND aller-retour : c'est là que la perte se voyait
+    const encore = parseLevel(JSON.parse(serializeLevel(level!)))
+    expect(encore.level!.boxes).toEqual(level!.boxes)
+  })
+
+  it('une CHASSE fait l’aller-retour — les réglages absents restent absents, le canal 0 ne s’écrit pas', () => {
+    const { level, rejets } = parseLevel({
+      name: 'Essai chasse',
+      code: '21-TEST',
+      bounds: { minX: -1000, minY: -600, maxX: 1000, maxY: 600 },
+      spawn: { x: -800, y: 0, n: 700 },
+      exit: { minX: 860, minY: -60, maxX: 940, maxY: 60 },
+      boxes: [],
+      cibles: [{ x: 0, y: 0, r: 26, canal: 4 }],
+      chasses: [
+        { minX: 100, minY: -100, maxX: 0, maxY: 100, angle: 90 }, // bornes à l'envers : remises d'aplomb
+        { minX: 200, minY: -100, maxX: 400, maxY: 100, angle: -45, allure: 300, canal: 4, regle: 'et', duree: 1.5 },
+        { minX: 500, minY: -100, maxX: 600, maxY: 100, angle: 0, canal: 0 },
+        { minX: 700, minY: -100, maxX: 800, maxY: 100, angle: 0, canal: -3 },
+        { minX: 900, minY: 0, maxX: 900, maxY: 100, angle: 0 }, // taille nulle : écartée
+      ],
+    })
+    expect(rejets).toEqual(['une chasse a été écartée (taille nulle)'])
+    expect(level!.chasses).toEqual([
+      { minX: 0, minY: -100, maxX: 100, maxY: 100, angle: 90 },
+      { minX: 200, minY: -100, maxX: 400, maxY: 100, angle: -45, allure: 300, canal: 4, regle: 'et', duree: 1.5 },
+      { minX: 500, minY: -100, maxX: 600, maxY: 100, angle: 0 },
+      { minX: 700, minY: -100, maxX: 800, maxY: 100, angle: 0, canal: -1 },
+    ])
+    const relu = parseLevel(JSON.parse(serializeLevel(level!)))
+    expect(relu.level!.chasses).toEqual(level!.chasses)
+    // asservie à un canal qu'aucune cible ne porte : une erreur, comme pour une porte
+    const verdicts = checkLevel({
+      ...level!,
+      chasses: [{ minX: 0, minY: 0, maxX: 100, maxY: 100, angle: 0, canal: 9 }],
+    })
+    expect(verdicts.some((v) => v.niveau === 'erreur' && /chasse.*canal nº 9/.test(v.message))).toBe(true)
+  })
+
+  it('le VIDE et la BAIE (ouvertures sur le dehors) font l’aller-retour, forme comprise', () => {
+    // le même piège que le miroir : un matériau offert par la palette mais
+    // absent de MATERIALS disparaîtrait à la relecture, sans un mot
+    const { level, rejets } = avec([
+      { minX: -300, minY: -300, maxX: 300, maxY: 300, material: MAT_VIDE, forme: FORME_DISQUE },
+      { minX: 400, minY: -100, maxX: 800, maxY: 100, material: MAT_BAIE, angle: 30 },
+    ])
+    expect(rejets).toEqual([])
+    expect(level!.boxes.map((b) => b.material)).toEqual([MAT_VIDE, MAT_BAIE])
+    expect(level!.boxes[0].forme).toBe(FORME_DISQUE)
+    expect(level!.boxes[1].angle).toBe(30)
     const encore = parseLevel(JSON.parse(serializeLevel(level!)))
     expect(encore.level!.boxes).toEqual(level!.boxes)
   })

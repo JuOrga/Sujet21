@@ -9,6 +9,8 @@ import {
   MAT_GRILLE,
   MAT_MEMBRANE,
   MAT_MIROIR,
+  MAT_VIDE,
+  MAT_BAIE,
   MAT_RIDEAU,
   MAT_SURCHAUFFEUR,
   MAT_HYDROPHILE,
@@ -40,6 +42,7 @@ import {
   type ZoneDef,
   type ZoneForce,
 } from './level'
+import type { ChasseDef } from './level'
 import { ARTICLES_ETAL_IDS } from './economat'
 import { ARTICLES_COMPTOIR_IDS, ROLES_ANCRE } from './hub'
 import { REPARATIONS } from './reparations'
@@ -74,6 +77,9 @@ import {
 // sans erreur, et le retrouver disparu à la relecture : le seul endroit qui
 // l'ignorait était celui qui décide de sa survie. MAT_EXIT reste dehors, lui,
 // et c'est voulu : le sas est un champ à part, pas une surface qu'on trace.
+// Le VIDE et la BAIE, eux, y figurent bien qu'ils n'aient pas de physique :
+// ce sont des surfaces qu'on trace dans l'éditeur, et c'est le solveur qui
+// les écarte (sansPhysique), pas la lecture.
 export const MATERIALS = [
   MAT_WALL,
   MAT_HYDROPHILE,
@@ -85,6 +91,8 @@ export const MATERIALS = [
   MAT_RIDEAU,
   MAT_SURCHAUFFEUR,
   MAT_MIROIR,
+  MAT_VIDE,
+  MAT_BAIE,
 ] as const
 
 const FORCES: ZoneForce[] = ['libre', 'eau', 'glace', 'vapeur']
@@ -599,6 +607,36 @@ export function parseLevel(input: unknown): {
   }
   if (portes.length > 0) level.portes = portes
 
+  // Les CHASSES : rectangle droit, direction, et les réglages optionnels —
+  // absents, ils restent absents (le défaut vit dans le code, pas dans le
+  // fichier). Le canal 0 est « permanente » : il ne s'écrit pas.
+  const chasses: ChasseDef[] = []
+  for (const raw of Array.isArray(o.chasses) ? o.chasses : []) {
+    const q = (raw ?? {}) as Record<string, unknown>
+    const chasse: ChasseDef = {
+      minX: Math.min(num(q.minX), num(q.maxX)),
+      minY: Math.min(num(q.minY), num(q.maxY)),
+      maxX: Math.max(num(q.minX), num(q.maxX)),
+      maxY: Math.max(num(q.minY), num(q.maxY)),
+      angle: Math.round(num(q.angle, 0)),
+    }
+    if (q.allure !== undefined && num(q.allure) > 0)
+      chasse.allure = Math.round(num(q.allure))
+    if (q.canal !== undefined) {
+      const brut = Math.round(num(q.canal, 0))
+      if (brut >= 1) chasse.canal = brut
+      else if (brut < 0) chasse.canal = -1
+    }
+    if (q.regle === 'et') chasse.regle = 'et'
+    if (q.duree !== undefined && num(q.duree) > 0) chasse.duree = num(q.duree)
+    if (chasse.maxX - chasse.minX < 1 || chasse.maxY - chasse.minY < 1) {
+      rejets.push('une chasse a été écartée (taille nulle)')
+      continue
+    }
+    chasses.push(chasse)
+  }
+  if (chasses.length > 0) level.chasses = chasses
+
   // Cachettes : des pans voilés (brouillard ou paroi factice), levés à
   // l'entrée du corps. Formes et rotation : les mêmes règles que les boîtes.
   const caches: CacheDef[] = []
@@ -646,7 +684,7 @@ export function parseLevel(input: unknown): {
     condensats.push({
       x: num(p.x, 0),
       y: num(p.y, 0),
-      cl: Math.max(1, Math.min(200, Math.round(num(p.cl, 8)))),
+      cl: Math.max(1, Math.min(200, Math.round(num(p.cl, 6)))),
     })
   }
   if (condensats.length > 0) level.condensats = condensats
@@ -916,6 +954,7 @@ export function serializeLevel(level: LevelDef): string {
     })
   }
   if (level.portes && level.portes.length > 0) out.portes = level.portes
+  if (level.chasses && level.chasses.length > 0) out.chasses = level.chasses
   if (level.rails && level.rails.length > 0) out.rails = level.rails
   if (level.caches && level.caches.length > 0) out.caches = level.caches
   if (level.condensats && level.condensats.length > 0)
@@ -1086,6 +1125,15 @@ export function checkLevel(brut: LevelDef): Verdict[] {
       v.push({
         niveau: 'erreur',
         message: `Une porte est asservie au canal nº ${porte.canal} — aucune cible ne porte ce numéro.`,
+      })
+    }
+  }
+  // même contrat pour une chasse asservie : son canal doit exister
+  for (const chasse of level.chasses ?? []) {
+    if (chasse.canal !== undefined && chasse.canal >= 1 && !canaux.has(chasse.canal)) {
+      v.push({
+        niveau: 'erreur',
+        message: `Une chasse est asservie au canal nº ${chasse.canal} — aucune cible ne porte ce numéro.`,
       })
     }
   }

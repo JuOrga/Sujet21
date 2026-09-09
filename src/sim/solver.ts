@@ -25,6 +25,8 @@ import {
   MAT_RIDEAU,
   MAT_SURCHAUFFEUR,
   dansBoite,
+  sansPhysique,
+  CHASSE_ALLURE_DEFAUT,
   MAT_WALL,
   type ObstacleBox,
   type SpongeDef,
@@ -523,8 +525,13 @@ export class FluidSim {
   criticalTimer = 0
 
   setLevel(boxes: ObstacleBox[], sponges: SpongeDef[]): void {
-    this.baseBoxes = boxes
-    this.boxes = boxes
+    // Le VIDE et la BAIE (ouvertures sur le dehors) sont du décor : sans
+    // ce tri, le solveur les prendrait pour des parois — tout matériau qu'il
+    // ne connaît pas bute. Le tri se fait ICI et non chez l'appelant, pour
+    // qu'aucun chemin (jeu, essai d'éditeur, banc) ne puisse l'oublier.
+    const physiques = boxes.filter((b) => !sansPhysique(b.material))
+    this.baseBoxes = physiques
+    this.boxes = physiques
     this.sponges = sponges.map((d) => new Sponge(d))
     this.refreshBoxCaches()
     this.surchauffesVides.clear()
@@ -1652,6 +1659,46 @@ export class FluidSim {
         continue // l'indice i contient maintenant une autre particule
       }
       i++
+    }
+  }
+
+  // LA CHASSE : un courant de poussée rectiligne dans un rectangle — ce qui
+  // ÉJECTE le corps d'une salle. Même modèle en champ de vitesses que le
+  // sas et le vortex, et pour la même raison : une force pure s'ajouterait
+  // à l'élan du corps et le ferait rebondir contre le courant ; l'entraînement
+  // vers une vitesse cible l'emporte, quoi qu'il faisait avant. Contrairement
+  // à une porte qui se ferme (une paroi qui APPARAÎT, et coupe ce qu'elle
+  // trouve dedans), rien n'est jamais déchiré : tout ce qui est dans le
+  // rectangle part du même côté, à la même allure.
+  //
+  // La glace y a prise comme au sas — avec inertie (un bloc ne bondit pas) ;
+  // icePass moyenne les tractions par particule en une dérive de bloc. La
+  // vapeur suit comme l'eau : un nuage se balaie plus vite encore, mais le
+  // même coefficient suffit à le vider de la salle.
+  applyChasse(
+    c: {
+      minX: number
+      minY: number
+      maxX: number
+      maxY: number
+      angle: number
+      allure?: number
+    },
+    dt: number,
+  ): void {
+    const rad = (c.angle * Math.PI) / 180
+    const allure = c.allure ?? CHASSE_ALLURE_DEFAUT
+    const tx = Math.cos(rad) * allure
+    const ty = Math.sin(rad) * allure
+    const blend = 1 - Math.exp(-6 * dt)
+    const grip = 1 - Math.exp(-2.5 * dt)
+    for (let i = 0; i < this.count; i++) {
+      const x = this.posX[i]
+      const y = this.posY[i]
+      if (x < c.minX || x > c.maxX || y < c.minY || y > c.maxY) continue
+      const k = this.frozen[i] === 1 ? grip : blend
+      this.velX[i] += (tx - this.velX[i]) * k
+      this.velY[i] += (ty - this.velY[i]) * k
     }
   }
 
