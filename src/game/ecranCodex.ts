@@ -24,6 +24,7 @@
 import type { CodexDef } from './codex'
 import {
   RARETES,
+  blobEnBase64,
   estDefaut,
   litFichierVideo,
   rareteDef,
@@ -470,7 +471,7 @@ export class EcranCodex {
         this.render()
         return
       }
-      video = { type: fichier.type, data: await enBase64(fichier) }
+      video = { type: fichier.type, data: await blobEnBase64(fichier) }
     }
     await this.envoie(id, () => this.hooks.sauve(id, lu, video), video ? 'Réglage et vidéo enregistrés.' : 'Réglage enregistré.')
   }
@@ -632,19 +633,6 @@ export class EcranCodex {
     if (!e) throw new Error(`codex : #${id} manque dans le gabarit`)
     return e
   }
-}
-
-/** Le fichier en base64 nu, prêt pour le corps JSON de l'envoi. */
-function enBase64(f: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader()
-    r.onerror = () => reject(r.error)
-    r.onload = () => {
-      const s = String(r.result)
-      resolve(s.slice(s.indexOf(',') + 1))
-    }
-    r.readAsDataURL(f)
-  })
 }
 
 function gabarit(): string {
