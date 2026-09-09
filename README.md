@@ -59,7 +59,10 @@ REJEU depuis l'écran des records, la salle sans corps et la caméra qui suit,
 et le fantôme PARTAGÉ du palmarès — `api/fantomes.ts`, `src/game/netFantomes.ts`),
 notes de version, palmarès partagé, le codex (rail des
 états, fiches en hexagones, fiche lue avec la vidéo de l'effet quand elle
-existe — `public/assets/codex/LISEZ-MOI.md`), cycle.
+existe — `public/assets/codex/LISEZ-MOI.md`), le tableau des avaries sur le
+même dessin (rail des secteurs, cartes des stations, fiche avec l'illustration
+éteinte tant que la station est en panne — `src/game/ecranAvaries.ts`,
+`public/assets/avaries/LISEZ-MOI.md`), cycle.
 
 **La fabrication.** L'écran LA DESCENTE, où le déroulement d'une run se
 règle, se déroule à blanc et se met en statistiques ; un éditeur de tableaux
