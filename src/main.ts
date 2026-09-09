@@ -12908,7 +12908,10 @@ function restart(): void {
   if (document.body.classList.contains('playing')) {
     camera.startIntro(sim.bounds, window.innerWidth, window.innerHeight)
     // le RÉVEIL : tirage du petit scénario joué pendant l'intro caméra —
-    // chronométré en temps RÉEL, comme le zoom qu'il accompagne
+    // chronométré en temps RÉEL. Le plan d'ouverture, lui, tolère les
+    // accrocs (une image longue ne le fait pas sauter, voir camera.ts) : sur
+    // une machine qui traîne, il dure un peu plus que le réveil — sans
+    // conséquence, le réveil s'éteint de lui-même à la fin du plan.
     reveil.actif = true
     reveil.t0 = performance.now() / 1000
     reveil.frissonT = Math.random() < 0.7 ? 0.4 + Math.random() * 1.2 : -1

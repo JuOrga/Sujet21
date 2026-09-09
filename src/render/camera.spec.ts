@@ -12,9 +12,15 @@ const VH = 720
 const BOUNDS = { minX: -1200, minY: -750, maxX: 1200, maxY: 750 }
 const CORPS = { x: -950, y: 0, r: 73 }
 
+// Le plan tenu puis la plongée, posés explicitement : le test dit ses
+// hypothèses au lieu de dépendre des valeurs par défaut de startIntro.
+const TENUE = 0.9
+const PLONGEE = 1.7
+const IPS = 60
+
 function ouvre(): Camera {
   const cam = new Camera()
-  cam.startIntro(BOUNDS, VW, VH)
+  cam.startIntro(BOUNDS, VW, VH, TENUE, PLONGEE)
   return cam
 }
 
@@ -36,9 +42,9 @@ describe('caméra — le plan d’ouverture', () => {
     const cam = ouvre()
     let precedent = 0
     let plusGrand = 0
-    for (let i = 0; i < 240; i++) {
+    for (let i = 0; i < (TENUE + PLONGEE + 1.4) * IPS; i++) {
       const introAvant = cam.introEnCours
-      const d = image(cam, 1 / 60)
+      const d = image(cam, 1 / IPS)
       // le pas d'une image ne bondit jamais d'un coup par rapport au précédent
       expect(Math.abs(d - precedent)).toBeLessThan(0.35)
       // …et la remise au suivi (fin du plan) ne se voit pas non plus
@@ -62,7 +68,9 @@ describe('caméra — le plan d’ouverture', () => {
     // d'une image ordinaire, et à peine plus.
     const cam = ouvre()
     let ordinaire = 0
-    for (let i = 0; i < 105; i++) ordinaire = image(cam, 1 / 60) // milieu de plongée
+    // jusqu'au milieu de la plongée, là où la caméra va le plus vite
+    const milieu = Math.round((TENUE + PLONGEE / 2) * IPS)
+    for (let i = 0; i < milieu; i++) ordinaire = image(cam, 1 / IPS)
     expect(ordinaire).toBeGreaterThan(4)
     const accroc = image(cam, 0.1)
     expect(accroc).toBeLessThan(ordinaire * 2.2)
