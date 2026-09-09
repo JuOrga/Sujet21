@@ -72,6 +72,13 @@ describe('le condensat ramassable', () => {
     )
     expect(enCache.length).toBeGreaterThanOrEqual(1)
     for (const p of enCache) expect(p.cl).toBe(12)
+    // et le champ vaut 6 cL la pastille — c'était 8, jugé trop généreux
+    // pour une monnaie de run qu'on ramasse en passant
+    const auChamp = semePastilles(lv).filter(
+      (p) => !(p.x > 900 && p.x < 1500 && p.y > -1100 && p.y < -500),
+    )
+    expect(auChamp.length).toBeGreaterThanOrEqual(2)
+    for (const p of auChamp) expect(p.cl).toBe(6)
   })
 
   it('les pastilles posées main remplacent le semis', () => {

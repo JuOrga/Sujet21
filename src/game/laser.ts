@@ -27,9 +27,9 @@
 //     il ne se choisit pas : ce n'est pas un quatrième état.
 
 import {
-  MAT_EXIT,
   MAT_GRILLE,
   MAT_MIROIR,
+  sansPhysique,
   type LaserDef,
   type ObstacleBox,
 } from './level'
@@ -131,11 +131,12 @@ function dansRectAxe(x: number, y: number, r: Rect): boolean {
   return x >= r.minX && x <= r.maxX && y >= r.minY && y <= r.maxY
 }
 
-/** Une boîte absorbe-t-elle la lumière ? Grille et sas laissent passer.
+/** Une boîte absorbe-t-elle la lumière ? La grille laisse passer, et tout
+ * ce qui n'a pas de physique (sas, vide, baie) n'a pas de matière à opposer.
  * (Le MIROIR FIXE « absorbe » aussi au sens des rails — l'arc guidé s'y
  * éteint — mais la marche libre le RÉFLÉCHIT avant d'en arriver là.) */
 function absorbe(b: ObstacleBox): boolean {
-  return b.material !== MAT_GRILLE && b.material !== MAT_EXIT
+  return b.material !== MAT_GRILLE && !sansPhysique(b.material)
 }
 
 // ---- Le MIROIR FIXE : la paroi polie qui réfléchit le faisceau ----------
