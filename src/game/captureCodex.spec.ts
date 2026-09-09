@@ -82,7 +82,9 @@ describe('verdictCapture', () => {
     const v = verdictCapture(400 * 1024, 'video/webm;codecs=vp9')
     expect(v.ok).toBe(true)
     expect(v.texte).toContain('400 Ko')
-    expect(v.texte).toContain(`${DUREE_CAPTURE_MS / 1000} s`)
+    expect(v.texte).toContain(`${DUREE_CAPTURE_MS / 1000},0 s`)
+    // la mémoire de capture dit sa durée réelle, à la décimale
+    expect(verdictCapture(1000, 'video/webm', 8.37).texte).toContain('8,4 s')
   })
 
   it('refuse le vide, l’inconnu et le trop lourd', () => {
