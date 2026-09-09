@@ -31,6 +31,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '09/09/2026 22:16',
+    title: 'LES AVARIES ILLUSTRÉES, SUITE ET FIN : les sept stations ont leur image',
+    notes: [
+      'LES DEUX DERNIÈRES : l’aile des endormis (les capsules et leurs semblables) et la passerelle du secteur 4 (la coursive dégagée, le sas scellé au bout, le télescope par le hublot), peintes par le concepteur, recadrées au 16:9 et livrées en WebP 640 × 360 sous public/assets/avaries/. Le tableau des avaries n’a plus aucun glyphe de remplacement : chaque station montre son illustration, éteinte tant qu’elle est en panne.',
+      'VÉRIFIÉ : 1000 tests verts dans 90 fichiers (le catalogue des images livrées les range dans AVARIES — STATIONS avec leur nom), type-check à 0, build propre.',
+    ],
+  },
+  {
     date: '08/09/2026 21:19',
     title: 'LES AVARIES ILLUSTRÉES : cinq stations sur sept peintes, et le catalogue des images qui les range',
     notes: [
