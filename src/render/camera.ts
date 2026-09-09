@@ -7,6 +7,16 @@ import type { SimParams } from '../sim/params'
 const MANUAL_MIN_FACTOR = 0.2
 const MANUAL_MAX_FACTOR = 5
 
+// L'horloge du plan d'ouverture ne compte jamais plus qu'une image « lente »
+// par image réelle. Le début d'un tableau est précisément le moment des
+// accrocs (le tableau se charge, la salle se dessine pour la première fois,
+// la physique du corps fraîchement empilé chauffe, le ramasse-miettes passe
+// derrière) : mesurée au vrai temps, une image de 100 ms faisait bondir la
+// caméra de six images d'un coup, en pleine plongée — le zoom d'ouverture
+// « n'était pas fluide du tout ». Plafonnée, la plongée ralentit d'un souffle
+// le temps de l'accroc, ce que l'œil ne voit pas, au lieu de sauter.
+const INTRO_DT_MAX = 1 / 30
+
 export class Camera {
   x = 0
   y = 0
@@ -173,7 +183,7 @@ export class Camera {
 
     // Zoom d'ouverture : plan large tenu, puis plongée adoucie vers le corps
     if (this.introTimer > 0) {
-      this.introTimer -= dtReal
+      this.introTimer -= Math.min(dtReal, INTRO_DT_MAX)
       const elapsed = this.introTotal - this.introTimer
       const t = Math.min(
         1,
