@@ -6,7 +6,7 @@ import { FluidSim, KIND_PLAYER, COEUR_PART } from './sim/solver'
 import { NoyauxWasm } from './sim/wasm'
 import { TROPHEES, Trophees } from './game/trophees'
 import { evenementsPlasma } from './game/plasmaFx'
-import { Codex } from './game/codex'
+import { Codex, fichesCodex } from './game/codex'
 import { AtelierJournal } from './editor/atelierJournal'
 import { Regie } from './editor/regie'
 import { tirABlanc } from './game/tirABlanc'
@@ -20,6 +20,8 @@ import {
   reglageDe,
   type ReglagesCodex,
 } from './game/codexReglages'
+import { CaptureCodex } from './game/captureCodex'
+import { CADENCES_TAMPON, tamponDisponible, type CadenceTampon } from './game/tamponCapture'
 import { niveauExpanse } from './game/structures'
 import {
   TABLEAU_HUB,
@@ -3143,6 +3145,28 @@ const ecranCodex = new EcranCodex(codexEl, {
 function renderCodexVoile(): void {
   ecranCodex.render()
 }
+// LA CAPTURE POUR LE CODEX (game/captureCodex.ts) : en mode concepteur, le
+// bouton ⏺ du HUD filme quatre secondes de la scène et les envoie à une
+// fiche — par le même chemin que l'atelier du codex, réglage compris, pour
+// que l'envoi de la vidéo ne remette pas la mémoire ou la rareté à zéro.
+// Les canvas sont lus au moment d'enregistrer : fxCanvas est déclaré plus
+// bas dans ce fichier, une lecture ici même le trouverait avant sa lettre.
+const captureCodex = new CaptureCodex(
+  document.getElementById('capture-codex') as HTMLDivElement,
+  document.getElementById('hud-capture') as HTMLButtonElement | null,
+  {
+    sources: () => ({ gl: canvas, fx: fxCanvas }),
+    fiches: () => fichesCodex().map((f) => ({ id: f.id, titre: codexLu(f).titre, groupe: f.groupe })),
+    concepteur: () => document.body.classList.contains('concepteur'),
+    cadenceTampon: () => cadenceTampon,
+    envoie: async (id, video) => {
+      const r = reglageDe(reglagesCodex, id)
+      const res = await pushReglageCodex(id, { memoire: r.memoire, rarete: r.rarete }, records.operator() || 'anonyme', video)
+      if (res) reglagesCodex = res
+      return res !== null
+    },
+  },
+)
 // L'ATELIER DU JOURNAL (editor/atelierJournal.ts) : récit, fins, seuils —
 // publié pour tous au magasin partagé ; « essayer sur ce poste » fait
 // jouer le brouillon ici, tout de suite
@@ -3204,6 +3228,13 @@ let fpsCap = ((): number => {
   return FPS_CHOIX.includes(v) ? v : 60
 })()
 let fpsCapPrecedent = 0 // horloge du limiteur (dernière image RENDUE)
+// LA MÉMOIRE DE CAPTURE (game/tamponCapture.ts) : sa cadence, 0 = éteinte.
+// Un réglage de concepteur, sur PC et Steam Deck seulement — ailleurs il
+// n'est ni montré ni lu, et la mémoire ne tourne jamais.
+let cadenceTampon: CadenceTampon = ((): CadenceTampon => {
+  const v = Number(localStorage.getItem('sujet21-capture-tampon'))
+  return (CADENCES_TAMPON as readonly number[]).includes(v) ? (v as CadenceTampon) : 0
+})()
 // Résolution dynamique : DÉSACTIVÉE par défaut — le rendu reste en
 // résolution native constante, aucune surprise visuelle. Sur une machine
 // borderline, la qualité qui descendait « pour tenir 60 » se voyait plus
@@ -3416,6 +3447,30 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     }
   }
   renderFps()
+
+  // la mémoire de capture : le bloc ne se montre que là où elle tourne
+  const blocTampon = document.getElementById('params-tampon-bloc') as HTMLDivElement | null
+  const choixTampon = document.getElementById('params-tampon') as HTMLDivElement | null
+  if (blocTampon && choixTampon && tamponDisponible()) {
+    blocTampon.hidden = false
+    const renderTampon = (): void => {
+      choixTampon.innerHTML = ''
+      for (const ips of CADENCES_TAMPON) {
+        const b = document.createElement('button')
+        b.type = 'button'
+        b.textContent = ips === 0 ? 'ÉTEINTE' : `${ips} i/s`
+        b.className = ips === cadenceTampon ? 'actif' : ''
+        b.addEventListener('click', () => {
+          cadenceTampon = ips
+          localStorage.setItem('sujet21-capture-tampon', String(ips))
+          perf.reset() // la fenêtre de mesure repart : armée ou éteinte, un rapport chacune
+          renderTampon()
+        })
+        choixTampon.appendChild(b)
+      }
+    }
+    renderTampon()
+  }
 
   const choixRes = document.getElementById('params-resdyn') as HTMLDivElement
   const renderRes = (): void => {
@@ -15722,6 +15777,10 @@ function frame(now: number): void {
   // le collecteur note CHAQUE image rendue — c'est la matière du rapport.
   // Le CPU total inclut tout le rappel jusqu'ici : laser, étiquettes,
   // panneau 2D, HUD — ce que « autreJsMs » isole dans le rapport.
+  // la capture pour le codex compose les deux canvas ICI, dans le même
+  // rappel que le rendu : après, le navigateur aura composé l'image et le
+  // tampon WebGL (sans preserveDrawingBuffer) ne se relit plus
+  captureCodex.compose()
   perf.note(
     dtBrutMs,
     performance.now() - frameT0,

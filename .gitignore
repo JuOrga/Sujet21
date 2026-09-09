@@ -7,8 +7,11 @@ dist/
 .env*
 
 # Originaux IA lourds (sources locales — seuls les WebP optimisés de public/assets
-# et les MP3 de public/sound sont versionnés)
+# et les MP3 de public/sound sont versionnés). Les masters des images vont dans
+# masters/images/ (tools/images/prepare.py les livre) ; seul son LISEZ-MOI voyage.
 assets-src/
+masters/images/*
+!masters/images/LISEZ-MOI.md
 
 # Résidus NTFS de WSL
 *:Zone.Identifier
