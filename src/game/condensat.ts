@@ -15,7 +15,7 @@ export type CondensatDef = CondensatPose
 
 export const RAYON_PASTILLE = 26 // le rayon de contact (unités monde)
 const CL_CACHETTE = 12
-const CL_CHAMP = 8
+const CL_CHAMP = 6
 const ECART_MIN = 260 // deux pastilles ne se serrent pas
 
 /** Le hachage du code (FNV-1a) : la graine du semis. */
