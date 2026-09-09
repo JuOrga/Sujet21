@@ -130,7 +130,23 @@ export class EcranAvaries {
   }
 
   private peintNav(s: EtatAvaries): void {
-    this.el('av-secteurs').innerHTML = SECTEURS.map((sec) => {
+    const rail = this.el('av-secteurs')
+    // Le rail existe déjà : on le retouche EN PLACE (le secteur lu, l'arc,
+    // le compte) plutôt que de le rebâtir — rebâti, l'anneau sautait à sa
+    // nouvelle part au lieu d'y glisser, la transition CSS ne servait à rien
+    const boutons = rail.querySelectorAll<HTMLButtonElement>('button[data-secteur]')
+    if (boutons.length === SECTEURS.length) {
+      boutons.forEach((b, i) => {
+        const sec = SECTEURS[i]
+        const liste = stationsDuSecteur(sec.id, s)
+        b.classList.toggle('on', sec.id === this.secteur)
+        b.querySelector<SVGCircleElement>('.av-arc')?.setAttribute('stroke-dashoffset', (RAYON * (1 - partRetablie(liste))).toFixed(1))
+        const compte = b.querySelector('small')
+        if (compte) compte.textContent = compteSecteur(liste)
+      })
+      return
+    }
+    rail.innerHTML = SECTEURS.map((sec) => {
       const liste = stationsDuSecteur(sec.id, s)
       const part = partRetablie(liste)
       const on = sec.id === this.secteur
@@ -308,6 +324,10 @@ export class EcranAvaries {
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return
     const g = gesteClavier(e.key)
     if (!g) return
+    // A ne fait rien sur cette console : Entrée sur un bouton focalisé
+    // (Tab jusqu'au ✕, à une station) doit rester le clic natif — au
+    // marchand, A achète, la touche a un sens ; ici elle serait avalée
+    if (g === 'A' && t && t.tagName === 'BUTTON' && this.host.contains(t)) return
     e.preventDefault()
     e.stopImmediatePropagation()
     this.geste(g)
