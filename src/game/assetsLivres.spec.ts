@@ -49,6 +49,20 @@ describe('catalogue des images livrées', () => {
   })
 })
 
+describe('catalogue — les images des écrans se rangent par leur dossier', () => {
+  it('une illustration du tableau des avaries a sa rubrique et le nom de sa station', () => {
+    // nommée par l’id de la station : aucun préfixe ne la distingue, le dossier si
+    expect(rubriqueDe('/assets/avaries/eclairage.webp')).toBe('Avaries — stations')
+    expect(nomDe('/assets/avaries/eclairage.webp')).toBe('Avarie — réseau d’éclairage')
+    expect(rubriqueDe('/assets/avaries/passerelle-4.webp')).toBe('Avaries — stations')
+  })
+
+  it('un aperçu du codex (l’image d’attente de la vidéo) ne tombe pas dans « Autres »', () => {
+    expect(rubriqueDe('/assets/codex/eau-hydrophile.webp')).toBe('Codex — aperçus')
+    expect(nomDe('/assets/codex/eau-hydrophile.webp')).toBe('Eau hydrophile')
+  })
+})
+
 describe('catalogue — LA SERRE accueille ses cultures avant même les fichiers', () => {
   it('range toute image « serre- » dans sa rubrique, et la nomme', () => {
     // les quatre pièces annoncées aux concepteurs (docs/assets-ia.md)

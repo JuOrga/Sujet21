@@ -2741,13 +2741,13 @@
       #fioles { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(4, 8, 14, 0.72); }
       #fioles .salles-boite { max-height: 86vh; overflow: auto; width: min(980px, 96vw); }
       #fioles-corps { padding: 6px 12px 14px; }
-      #records, #codex, #reparations {
+      #records, #codex {
         position: fixed; inset: 0; z-index: 40;
         background: rgba(2, 6, 12, 0.72);
         display: flex; align-items: center; justify-content: center;
         padding: 18px;
       }
-      #records .salles-boite, #reparations .salles-boite { max-height: 86vh; overflow: auto; width: min(980px, 96vw); }
+      #records .salles-boite { max-height: 86vh; overflow: auto; width: min(980px, 96vw); }
       /* ==== SAUVEGARDES (game/coffre.ts) : trois cartes, l'active marquée ==== */
       #sauvegardes { position: fixed; inset: 0; z-index: 40; background: rgba(2, 6, 12, 0.72); display: flex; align-items: center; justify-content: center; padding: 18px; }
       #sauvegardes .salles-boite { max-height: 86vh; overflow: auto; width: min(980px, 96vw); }
@@ -2769,7 +2769,7 @@
       .sv-actions button.appel { border-color: var(--specimen); background: rgba(56, 130, 160, 0.3); color: #cfeffb; }
       .sv-actions button.danger { border-color: #ff7a6a !important; color: #ffb3a8 !important; box-shadow: 0 0 12px rgba(255, 122, 106, 0.4); }
       .sv-dit { font-size: calc(11px * var(--ui)); color: var(--dim); min-height: 1.2em; }
-      #records-corps, #repar-corps { padding: 6px 12px 14px; }
+      #records-corps { padding: 6px 12px 14px; }
       /* ==== LE CODEX (game/ecranCodex.ts) — la maquette « Codex v2 » ====
          Trois colonnes : le rail des états, la grille des fiches, la fiche
          lue avec sa vidéo. Les teintes des rayons voyagent en --t. */
@@ -6390,7 +6390,191 @@
         .mr-avatar, .mr-apercu i, .mr-fiche::before, #marchand #mr-acheter.mr-ok { animation: none; }
         #marchand .mr-article { transition: none; }
       }
-      /* ==== LA LÉGENDE MANETTE (game/padEcran.ts) — le pied du codex et du marchand ====
+      /* ==== LE TABLEAU DES AVARIES (game/ecranAvaries.ts) — le dessin du codex et du marchand ====
+         Trois colonnes : le rail des secteurs, la grille des stations, la
+         fiche de la station lue. La teinte du secteur voyage en --t ;
+         l'ambre est celle de la panne (le ton « chaud » des pancartes du
+         module) — rien ne se paie ici, la fiche finit sur une consigne. */
+      #reparations {
+        position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 18px;
+        background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(255, 179, 92, 0.1), transparent 60%), radial-gradient(ellipse 40% 40% at 90% 100%, rgba(224, 104, 92, 0.07), transparent 60%), rgba(2, 5, 10, 0.94);
+      }
+      #reparations[hidden] { display: none; }
+      .av-boite {
+        width: min(1240px, 100%); height: min(860px, 100%); display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+        border: 1px solid rgba(255, 179, 92, 0.22); border-radius: 14px; overflow: hidden;
+        background: linear-gradient(180deg, rgba(9, 18, 30, 0.94), rgba(6, 12, 22, 0.97));
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 179, 92, 0.12);
+      }
+      .av-tete {
+        display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 16px 22px 12px;
+        border-bottom: 1px solid rgba(150, 200, 235, 0.14); background: linear-gradient(180deg, rgba(255, 179, 92, 0.05), transparent);
+      }
+      .av-identite { display: flex; align-items: center; gap: 16px; flex: 1 1 300px; min-width: 0; }
+      .av-avatar {
+        width: 56px; height: 56px; flex: none; border-radius: 50%; display: grid; place-items: center;
+        background: radial-gradient(circle at 40% 35%, rgba(255, 179, 92, 0.5), rgba(255, 179, 92, 0.08) 60%, transparent);
+        border: 2px solid #ffb35c; animation: av-ring 2.6s ease-in-out infinite;
+      }
+      .av-avatar i { font-style: normal; font-size: 24px; color: #ffe3c2; }
+      .av-titres { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+      .av-titre-ligne { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+      .av-titre-ligne h2 { margin: 0; font-family: var(--font-display); font-size: calc(17px * var(--ui)); letter-spacing: 0.22em; color: #ffe9d2; text-shadow: 0 0 18px rgba(255, 179, 92, 0.45); font-weight: 400; }
+      .av-titre-ligne span { font-size: calc(10.5px * var(--ui)); letter-spacing: 0.18em; color: var(--dim); }
+      .av-titres p { margin: 0; font-size: calc(12px * var(--ui)); line-height: 1.5; color: #c9bcb0; font-style: italic; }
+      /* la progression du module : le compte, la barre, l'étiquette */
+      .av-progression { display: flex; align-items: center; gap: 12px; flex: 1 1 220px; max-width: 360px; min-width: 0; }
+      .av-compte { font-family: var(--font-display); font-size: calc(22px * var(--ui)); color: #eaf6ff; white-space: nowrap; }
+      .av-compte small { font-size: calc(12px * var(--ui)); color: var(--dim); margin-left: 4px; }
+      .av-barre { position: relative; flex: 1; height: 12px; border-radius: 6px; background: rgba(3, 7, 16, 0.8); border: 1px solid rgba(150, 200, 235, 0.2); }
+      .av-barre i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; background: linear-gradient(90deg, #b8642a, #ffb35c 60%, #ffd977); box-shadow: 0 0 14px rgba(255, 179, 92, 0.6); transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1); }
+      .av-progression-txt { font-family: var(--font-display); font-size: calc(8px * var(--ui)); letter-spacing: 0.2em; color: var(--dim); white-space: nowrap; }
+      .av-progression.av-complet .av-barre i { background: linear-gradient(90deg, #2f9a68, #6dffb8); box-shadow: 0 0 14px rgba(109, 255, 184, 0.6); }
+      .av-progression.av-complet .av-progression-txt { color: #6dffb8; }
+      .av-bourse { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 10px; border: 1px solid rgba(180, 140, 255, 0.35); background: linear-gradient(135deg, rgba(180, 140, 255, 0.12), rgba(180, 140, 255, 0.02)); --b: #b48cff; }
+      .av-bourse i { font-style: normal; font-size: 20px; color: var(--b); filter: drop-shadow(0 0 8px var(--b)); }
+      .av-bourse div { display: flex; flex-direction: column; gap: 2px; }
+      .av-bourse span { font-family: var(--font-display); font-size: calc(8px * var(--ui)); letter-spacing: 0.2em; color: var(--b); }
+      .av-bourse b { font-family: var(--font-display); font-size: calc(18px * var(--ui)); color: #eaf6ff; font-weight: 400; font-variant-numeric: tabular-nums; }
+      #repar-fermer {
+        flex: none; width: 34px; height: 34px; border-radius: 6px; background: rgba(20, 32, 46, 0.8);
+        border: 1px solid var(--line); color: inherit; font: inherit; font-size: calc(14px * var(--ui)); cursor: pointer;
+      }
+      #repar-fermer:hover { border-color: #ffb35c; }
+      .av-corps { display: grid; grid-template-columns: minmax(200px, 224px) minmax(0, 1fr) minmax(260px, 340px); min-height: 0; min-width: 0; }
+      /* en écran étroit : le rail se replie (LB/RB et le filtre restent), la
+         citation et l'étiquette de la barre s'effacent pour que la tête
+         tienne sur deux lignes */
+      @media (max-width: 900px) { .av-corps { grid-template-columns: minmax(0, 1fr) minmax(220px, 300px); } .av-nav { display: none !important; } .av-titres p, .av-progression-txt { display: none; } .av-progression { flex-basis: 160px; } }
+      /* le rail des secteurs, un anneau de complétion chacun */
+      .av-nav { display: flex; flex-direction: column; gap: 8px; padding: 14px 12px; min-height: 0; overflow: auto; border-right: 1px solid rgba(150, 200, 235, 0.12); background: rgba(3, 7, 16, 0.35); }
+      .av-secteurs { display: flex; flex-direction: column; gap: 8px; }
+      #reparations .av-secteur {
+        display: grid; grid-template-columns: 44px 1fr; gap: 10px; align-items: center; padding: 9px 10px; border-radius: 10px;
+        border: 1px solid rgba(150, 200, 235, 0.14); background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; transition: all 0.25s ease;
+      }
+      #reparations .av-secteur:hover { background: rgba(255, 179, 92, 0.08); border-color: rgba(255, 179, 92, 0.4); }
+      #reparations .av-secteur.on { border-color: var(--t); background: linear-gradient(90deg, color-mix(in srgb, var(--t) 14%, transparent), transparent); box-shadow: inset 3px 0 0 var(--t), 0 0 18px color-mix(in srgb, var(--t) 20%, transparent); }
+      .av-anneau { position: relative; width: 44px; height: 44px; display: grid; place-items: center; }
+      .av-anneau svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+      .av-anneau circle { fill: none; stroke: rgba(150, 200, 235, 0.12); stroke-width: 3; }
+      .av-anneau .av-arc { stroke: var(--t); stroke-linecap: round; filter: drop-shadow(0 0 4px var(--t)); transition: stroke-dashoffset 0.8s ease; }
+      .av-anneau i { font-style: normal; font-size: 18px; position: relative; color: var(--t); }
+      .av-secteur-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+      .av-secteur-txt b { font-family: var(--font-display); font-size: calc(9px * var(--ui)); letter-spacing: 0.12em; font-weight: 400; color: #a7ddf5; line-height: 1.3; }
+      #reparations .av-secteur.on .av-secteur-txt b { color: #eaf6ff; }
+      .av-secteur-txt small { font-size: calc(10.5px * var(--ui)); color: var(--dim); }
+      .av-note { margin: auto 0 0; padding: 10px; border-radius: 8px; border: 1px dashed rgba(150, 200, 235, 0.18); font-size: calc(10.5px * var(--ui)); line-height: 1.5; color: var(--dim); }
+      /* la grille des stations */
+      .av-centre { display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 14px 16px; gap: 12px; }
+      .av-entete { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+      .av-entete-nom { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+      .av-entete-nom span { font-family: var(--font-display); font-size: calc(12px * var(--ui)); letter-spacing: 0.2em; }
+      .av-entete-nom small { font-size: calc(11px * var(--ui)); color: var(--dim); }
+      .av-filtres { display: flex; gap: 6px; }
+      #reparations .av-filtres button { font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(150, 200, 235, 0.18); color: var(--dim); background: transparent; cursor: pointer; font-family: var(--font-mono); white-space: nowrap; }
+      #reparations .av-filtres button.on { color: #eaf6ff; border-color: var(--t); background: color-mix(in srgb, var(--t) 14%, transparent); }
+      /* la carte lue se soulève : la boîte qui défile garde une marge, sinon
+         elle rogne le liseré du haut (leçon du codex) */
+      .av-defil { overflow: auto; min-height: 0; padding: 6px 8px 12px 6px; }
+      .av-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+      .av-grille--vide { display: block; }
+      .av-vide { margin: 20px 0; text-align: center; font-size: calc(12px * var(--ui)); color: var(--dim); line-height: 1.6; }
+      #reparations .av-station {
+        position: relative; display: flex; flex-direction: column; gap: 8px; padding: 14px 14px 12px; min-height: 190px; border-radius: 12px; text-align: left;
+        border: 1px solid rgba(150, 200, 235, 0.18); color: var(--ink); font: inherit; cursor: pointer; overflow: hidden;
+        background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.013) 0 1px, transparent 1px 3px), radial-gradient(130% 80% at 50% -10%, color-mix(in srgb, var(--t) 13%, transparent), transparent 62%), linear-gradient(180deg, #14202f, #101825);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35); transition: transform 0.25s ease, box-shadow 0.25s ease;
+      }
+      /* le liseré du haut dit l'état avant tout : ambre en panne, rouge si le
+         solde ne suit pas, vert une fois rétablie — la couleur du secteur reste
+         dans le fond et le glyphe */
+      #reparations .av-station::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: linear-gradient(90deg, #ffb35c, var(--t)); opacity: 0.85; }
+      #reparations .av-station.av-court::before { background: linear-gradient(90deg, #e0685c, var(--t)); }
+      #reparations .av-station.av-ok::before { background: linear-gradient(90deg, #6dffb8, var(--t)); }
+      #reparations .av-station:hover { transform: translateY(-4px); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5), 0 0 22px color-mix(in srgb, var(--t) 50%, transparent); }
+      #reparations .av-station.on { border-color: var(--t); box-shadow: 0 0 0 1px var(--t), 0 0 24px color-mix(in srgb, var(--t) 33%, transparent); transform: translateY(-2px); }
+      #reparations .av-station.av-ok { opacity: 0.6; }
+      #reparations .av-station.on.av-ok { opacity: 0.9; }
+      .av-station-tete { display: flex; gap: 10px; align-items: flex-start; }
+      .av-station-tete > i { font-style: normal; font-size: 26px; line-height: 1; filter: drop-shadow(0 0 8px color-mix(in srgb, var(--t) 55%, transparent)); }
+      .av-panne .av-station-tete > i { filter: grayscale(0.5) drop-shadow(0 0 8px rgba(255, 179, 92, 0.45)); }
+      .av-station-tete > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+      .av-station-tete b { font-size: calc(12.5px * var(--ui)); line-height: 1.25; color: #e6f3ff; font-weight: 600; }
+      .av-ok .av-station-tete b { color: var(--dim); }
+      .av-station-tete small { font-family: var(--font-display); font-size: calc(7.5px * var(--ui)); letter-spacing: 0.16em; color: var(--t); }
+      .av-station-txt { font-size: calc(11px * var(--ui)); line-height: 1.45; color: #93aabf; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+      .av-badge { align-self: flex-start; margin-top: auto; font-family: var(--font-display); font-size: calc(7.5px * var(--ui)); letter-spacing: 0.14em; padding: 3px 6px; border-radius: 4px; white-space: nowrap; border: 1px solid; }
+      .av-badge--panne { background: rgba(255, 179, 92, 0.12); color: #ffd2a0; border-color: rgba(255, 179, 92, 0.5); }
+      .av-badge--court { background: rgba(224, 104, 92, 0.12); color: #ffb3a8; border-color: rgba(224, 104, 92, 0.5); }
+      .av-badge--ok { background: rgba(109, 255, 184, 0.1); color: #6dffb8; border-color: rgba(109, 255, 184, 0.45); }
+      .av-station-pied { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; padding-top: 6px; border-top: 1px solid rgba(150, 200, 235, 0.1); }
+      .av-station-pied u { text-decoration: none; font-family: var(--font-display); font-size: calc(11px * var(--ui)); letter-spacing: 0.08em; color: #ffd977; white-space: nowrap; }
+      .av-ok .av-station-pied u { color: var(--dim); }
+      .av-station-pied em { margin-left: auto; font-style: normal; font-size: calc(10px * var(--ui)); letter-spacing: 0.12em; color: var(--dim); white-space: nowrap; }
+      #reparations .av-rouge { color: #e0685c !important; }
+      #reparations .av-vert { color: #6dffb8 !important; }
+      #reparations .av-or { color: #ffd977 !important; }
+      /* la fiche de la station */
+      .av-fiche { position: relative; display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; min-height: 0; min-width: 0; overflow: auto; border-left: 1px solid rgba(150, 200, 235, 0.12); background: linear-gradient(180deg, rgba(3, 7, 16, 0.5), rgba(3, 7, 16, 0.2)); }
+      .av-fiche::before { content: ''; position: absolute; left: 0; right: 0; height: 60px; background: linear-gradient(180deg, transparent, rgba(255, 179, 92, 0.05), transparent); animation: av-scan 7s linear infinite; pointer-events: none; }
+      /* l'illustration : la même image, éteinte en panne (grise, sombre, le
+         tampon EN PANNE), allumée une fois rétablie — absente, le glyphe */
+      .av-apercu {
+        position: relative; aspect-ratio: 16 / 9; flex: none; border-radius: 10px; overflow: hidden; display: grid; place-items: center;
+        border: 1px solid color-mix(in srgb, var(--t) 35%, transparent); background: radial-gradient(ellipse at 50% 100%, color-mix(in srgb, var(--t) 20%, transparent), rgba(3, 7, 16, 0.9) 70%);
+      }
+      .av-apercu img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.4s, filter 0.6s; }
+      .av-apercu.av-apercu--prete img { opacity: 1; }
+      .av-apercu.av-apercu--absente img { display: none; }
+      .av-apercu--panne img { filter: grayscale(0.75) brightness(0.45) contrast(1.15); }
+      .av-apercu--allume img { filter: none; }
+      .av-apercu > i { position: relative; font-style: normal; font-size: 54px; line-height: 1; filter: drop-shadow(0 0 22px var(--t)); animation: av-breathe 3s ease-in-out infinite; }
+      .av-apercu--panne > i { filter: grayscale(0.6) drop-shadow(0 0 16px rgba(255, 179, 92, 0.6)); }
+      .av-apercu.av-apercu--prete > i { display: none; }
+      /* sur une illustration allumée, l'étiquette se lisait mal : un fond sombre sous elle */
+      .av-apercu small { position: absolute; right: 10px; bottom: 8px; padding: 2px 6px; border-radius: 3px; font-family: var(--font-display); font-size: calc(7.5px * var(--ui)); letter-spacing: 0.18em; color: #a7ddf5; background: rgba(3, 7, 16, 0.65); }
+      .av-apercu em { position: absolute; left: 10px; top: 8px; font-style: normal; font-family: var(--font-display); font-size: calc(8px * var(--ui)); letter-spacing: 0.22em; padding: 3px 8px; border-radius: 4px; border: 1px solid; }
+      .av-apercu--panne em { color: #ffd2a0; border-color: rgba(255, 179, 92, 0.6); background: rgba(3, 7, 16, 0.6); animation: av-clignote 1.6s steps(2, start) infinite; }
+      .av-apercu--allume em { color: #6dffb8; border-color: rgba(109, 255, 184, 0.5); background: rgba(3, 7, 16, 0.5); }
+      .av-fiche-titres { display: flex; flex-direction: column; gap: 4px; }
+      .av-etiquette { font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.24em; }
+      .av-fiche-titres h3 { margin: 0; font-family: var(--font-display); font-size: calc(13px * var(--ui)); letter-spacing: 0.08em; color: #eaf6ff; line-height: 1.4; font-weight: 400; }
+      .av-bloc { display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(150, 200, 235, 0.12); background: rgba(3, 7, 16, 0.45); }
+      .av-bloc span { font-family: var(--font-display); font-size: calc(8.5px * var(--ui)); letter-spacing: 0.2em; color: var(--dim); }
+      .av-bloc p, .av-bloc ul { margin: 0; font-size: calc(12px * var(--ui)); line-height: 1.55; color: var(--ink); }
+      .av-bloc ul { padding-left: 16px; display: flex; flex-direction: column; gap: 4px; }
+      .av-bloc--rend span { color: #6dffb8; }
+      .av-bloc--panne { border-color: rgba(255, 179, 92, 0.3); background: rgba(255, 179, 92, 0.05); }
+      .av-bloc--panne span { color: #ffb35c; }
+      .av-bloc--passe { opacity: 0.7; }
+      .av-bloc--passe ul { color: var(--dim); text-decoration: line-through; text-decoration-color: rgba(150, 200, 235, 0.35); }
+      .av-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .av-stats div { padding: 9px 10px; border-radius: 8px; border: 1px solid rgba(150, 200, 235, 0.12); display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+      .av-stats span { font-size: calc(9px * var(--ui)); letter-spacing: 0.18em; color: var(--dim); }
+      .av-stats b { font-size: calc(11.5px * var(--ui)); font-weight: 400; color: #eaf6ff; }
+      /* la consigne : ce que serait le bouton d'une boutique — mais on ne paie
+         pas ici, on dit où aller. Ambre et pulsée quand la mémoire suffit. */
+      .av-consigne { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 14px; border-radius: 10px; text-align: center; }
+      .av-consigne b { font-family: var(--font-display); font-size: calc(10px * var(--ui)); letter-spacing: 0.16em; line-height: 1.4; font-weight: 400; }
+      .av-consigne small { font-size: calc(10.5px * var(--ui)); line-height: 1.5; }
+      .av-consigne--ok { color: #1a1200; background: linear-gradient(180deg, #ffd2a0, #ffb35c); border: 1px solid #ffb35c; box-shadow: 0 6px 24px rgba(255, 179, 92, 0.35); animation: av-pulse 2.2s ease-in-out infinite; }
+      .av-consigne--ok small { color: #3a2410; }
+      .av-consigne--fait { color: #6dffb8; background: rgba(109, 255, 184, 0.08); border: 1px solid rgba(109, 255, 184, 0.4); }
+      .av-consigne--fait small { color: var(--dim); }
+      .av-consigne--non { color: #ffb3a8; background: rgba(224, 104, 92, 0.08); border: 1px solid rgba(224, 104, 92, 0.4); }
+      .av-consigne--non small { color: var(--dim); }
+      .av-fiche-vide { display: flex; flex-direction: column; gap: 12px; color: var(--dim); font-size: calc(12px * var(--ui)); text-align: center; }
+      @keyframes av-ring { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 179, 92, 0.6), 0 0 18px rgba(255, 179, 92, 0.3); } 50% { box-shadow: 0 0 0 10px rgba(255, 179, 92, 0), 0 0 30px rgba(255, 179, 92, 0.5); } }
+      @keyframes av-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 179, 92, 0); } 50% { box-shadow: 0 0 12px 3px rgba(255, 179, 92, 0.55); } }
+      @keyframes av-breathe { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+      @keyframes av-scan { 0% { top: -10%; } 100% { top: 110%; } }
+      @keyframes av-clignote { 0% { opacity: 1; } 100% { opacity: 0.35; } }
+      @media (prefers-reduced-motion: reduce) {
+        .av-avatar, .av-apercu > i, .av-apercu em, .av-fiche::before, .av-consigne--ok { animation: none; }
+        #reparations .av-station, .av-barre i, .av-anneau .av-arc { transition: none; }
+      }
+      /* ==== LA LÉGENDE MANETTE (game/padEcran.ts) — le pied du codex, du marchand et des avaries ====
          Chaque bouton avec ce qu'il fait ici ; A vert, B rouge, X bleu, Y
          jaune, comme sur la manette. En creux : le bouton ne fait rien. */
       .pe-legende { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; padding: 9px 22px; border-top: 1px solid rgba(150, 200, 235, 0.14); background: rgba(3, 7, 16, 0.6); }
@@ -8856,20 +9040,10 @@
         <div id="fioles-corps"></div>
       </div>
     </div>
-    <!-- Le voile TABLEAU DES AVARIES : l'état des stations du module —
-         ouvert au menu par aucun bouton, c'est un PUPITRE qui l'appelle. -->
-    <div id="reparations" hidden aria-label="Tableau des avaries">
-      <div class="salles-boite">
-        <div class="salles-tete"><span id="repar-titre">TABLEAU DES AVARIES — l’état du module</span>
-          <button type="button" id="repar-fermer" aria-label="Fermer">✕</button></div>
-        <div class="params-desc" style="padding: 8px 12px 0">
-          L’accident du télescope a laissé le module en panne. Chaque station se
-          remet en état AU CONTACT de son plot, payée en MÉMOIRE — la monnaie qui
-          survit à la purge. Ce tableau ne répare rien : il dit où l’on en est.
-        </div>
-        <div id="repar-corps"></div>
-      </div>
-    </div>
+    <!-- Le voile TABLEAU DES AVARIES (game/ecranAvaries.ts) : l'état des
+         stations du module — ouvert au menu par aucun bouton, c'est un
+         PUPITRE qui l'appelle. Le gabarit est peint par l'écran. -->
+    <div id="reparations" hidden aria-label="Tableau des avaries"></div>
     <!-- Le voile SAUVEGARDES : les trois emplacements du coffre (game/coffre.ts) -->
     <div id="sauvegardes" hidden aria-label="Sauvegardes">
       <div class="salles-boite">

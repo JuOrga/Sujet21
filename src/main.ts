@@ -236,6 +236,7 @@ import type { LevelEditor } from './editor/editor'
 import type { EditeurCarte } from './editor/editeurCarte'
 import { EcranCodex } from './game/ecranCodex'
 import { EcranMarchand } from './game/ecranMarchand'
+import { EcranAvaries } from './game/ecranAvaries'
 import {
   traceLaser,
   creerEtatRecepteurs,
@@ -2998,32 +2999,14 @@ svFichier.addEventListener('change', () => {
 // qui l'appelle. Il ne répare rien (la réparation se paie au contact du
 // plot de sa station) — il dit ce qui est debout, ce qui est en panne, et
 // ce que coûte le reste. Une console de diagnostic, pas une boutique.
+// L'ÉCRAN (game/ecranAvaries.ts ; la vue pure dans avariesVue.ts) : le
+// dessin du codex et du marchand — il ne connaît pas les registres, il
+// reçoit ce qu'il lit par ces crochets, et ne débite jamais rien.
 const reparEl = document.getElementById('reparations') as HTMLDivElement
-const reparCorps = document.getElementById('repar-corps') as HTMLDivElement
-function renderReparationsVoile(): void {
-  const faites = REPARATIONS.filter((r) => records.estRepare(r.id))
-  const titre = document.getElementById('repar-titre')
-  if (titre)
-    titre.textContent = `TABLEAU DES AVARIES — ${faites.length}/${REPARATIONS.length} stations rétablies · ${records.memoire()} en mémoire`
-  let html = '<div class="cdx-grille">'
-  for (const r of REPARATIONS) {
-    if (records.estRepare(r.id)) {
-      html += `<div class="cdx-carte"><i>${r.icone}</i><div><b>${htmlSafe(r.nom)} · RÉTABLIE</b><span>${htmlSafe(r.detail)}</span></div></div>`
-    } else {
-      // en panne : le prix D'ABORD — c'est l'information qu'on vient
-      // chercher devant la console, avant même le nom de la station
-      const payable = records.memoire() >= r.prix
-      html += `<div class="cdx-carte cdx-verrou"><i>${r.icone}</i><div><b>${htmlSafe(r.nom)} · EN PANNE — ${r.prix} MÉM.${payable ? '' : ' (SOLDE COURT)'}</b><span>${htmlSafe(r.detail)}</span></div></div>`
-    }
-  }
-  html += '</div>'
-  reparCorps.innerHTML = html
-}
-document.getElementById('repar-fermer')?.addEventListener('click', () => {
-  reparEl.hidden = true
-})
-reparEl.addEventListener('pointerdown', (e) => {
-  if (e.target === reparEl) reparEl.hidden = true
+const ecranAvaries = new EcranAvaries(reparEl, {
+  registres: () => ({ memoire: records.memoire(), faites: records.reparationsFaites() }),
+  fermer: () => ecranAvaries.close(),
+  manette: () => manette.connectee,
 })
 
 // ---- LES PUPITRES : le contact ouvre l'écran --------------------------
@@ -3052,8 +3035,7 @@ function ouvrePupitre(ecran: EcranPupitre): void {
       ouvreStation(true)
       break
     case 'reparations':
-      reparEl.hidden = false
-      renderReparationsVoile()
+      ecranAvaries.open()
       break
     case 'cycle':
       cycleEl.hidden = false
@@ -7075,7 +7057,7 @@ const COUCHES_MENU: CoucheMenu[] = [
   // ouvrables AU CONTACT d'un pupitre, donc en pleine partie : sans elles
   // ici, la manette n'avait aucun bouton pour refermer un voile qui fige
   // l'essai — Échap ouvrait la fiche par-dessus, et B ne faisait rien
-  { id: 'reparations', retour: 'repar-fermer' },
+  { id: 'reparations', retour: 'repar-fermer', pilote: () => ecranAvaries.manette(manette, manettePollNow) },
   { id: 'fioles', retour: 'fioles-fermer' },
   { id: 'sauvegardes', retour: 'sauvegardes-fermer' },
   { id: 'rejeu-barre', retour: 'rejeu-quitter' }, // le rejeu d'un fantôme : B quitte

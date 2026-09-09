@@ -31,6 +31,14 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '09/09/2026 22:16',
+    title: 'LES AVARIES ILLUSTRÉES, SUITE ET FIN : les sept stations ont leur image',
+    notes: [
+      'LES DEUX DERNIÈRES : l’aile des endormis (les capsules et leurs semblables) et la passerelle du secteur 4 (la coursive dégagée, le sas scellé au bout, le télescope par le hublot), peintes par le concepteur, recadrées au 16:9 et livrées en WebP 640 × 360 sous public/assets/avaries/. Le tableau des avaries n’a plus aucun glyphe de remplacement : chaque station montre son illustration, éteinte tant qu’elle est en panne.',
+      'VÉRIFIÉ : 1000 tests verts dans 90 fichiers (le catalogue des images livrées les range dans AVARIES — STATIONS avec leur nom), type-check à 0, build propre.',
+    ],
+  },
+  {
     date: '09/09/2026 21:44',
     title: 'LA REVUE DE LA MÉMOIRE DE CAPTURE : sept constats, corrigés avant la PR vers dev',
     notes: [
@@ -80,6 +88,16 @@ export const DELIVERIES: Delivery[] = [
     ],
   },
   {
+    date: '08/09/2026 21:19',
+    title: 'LES AVARIES ILLUSTRÉES : cinq stations sur sept peintes, et le catalogue des images qui les range',
+    notes: [
+      'LES IMAGES : le réseau d’éclairage, la table de départ, le mur des records, le bac d’essai et le distillateur de primes, peintes par le concepteur sur les prompts de la livraison précédente, recadrées au 16:9 et livrées en WebP 640 × 360 (35 à 47 Ko chacune) sous public/assets/avaries/. L’aile des endormis et la passerelle du secteur 4 restent à peindre : leur glyphe tient la place.',
+      'LE CATALOGUE DES IMAGES LIVRÉES (assetsLivres.ts) refusait les nouvelles : nommées par l’id de la station (« eclairage.webp »), aucune règle de préfixe ne les attrapait, elles tombaient dans « Autres » — et le test qui garde cette rubrique vide tombait avec. Le dossier fait désormais foi : /avaries/ a sa rubrique AVARIES — STATIONS et le nom lisible de chaque station ; /codex/ (les images d’attente des vidéos) a la sienne, pour ne pas retomber dans le même piège au premier aperçu déposé. Deux tests neufs.',
+      'LA FICHE : l’étiquette du secteur, en bas de l’illustration, se lisait mal sur une image allumée — elle porte un fond sombre.',
+      'VÉRIFIÉ : 1000 tests verts dans 90 fichiers, type-check à 0, build propre ; la table de départ vue au navigateur dans les deux états, éteinte (grise, sombre, tampon EN PANNE) et allumée.',
+    ],
+  },
+  {
     date: '08/09/2026 19:28',
     title: 'LA CAPTURE POUR LE CODEX : la vidéo d’une fiche se filme dans le jeu, en mode concepteur',
     notes: [
@@ -122,6 +140,19 @@ export const DELIVERIES: Delivery[] = [
       'LA CHAÎNE : les sources en pleine résolution vont dans masters/images/ (non versionnées — un PNG de 2048² pèse 5 à 8 Mo, cinquante font le poids du dépôt), et tools/images/prepare.py livre public/assets/ à la taille et à la qualité de la famille, en MESURANT : le raccord d’une texture répétée (la couture rapportée au grain), la luminance moyenne, la part de pixels chauds, le bord d’une pièce détourée, le poids. Ce qui sort n’est pas livré.',
       'LES SEUILS SONT CEUX QUE LES IMAGES RÉUSSIES RESPECTENT, relevés par `prepare.py --audit` sur les 52 livrées : raccords des textures propres entre 1,0 et 2,5, la grille à 4,6 (sa couture se voit) ; quatre images hors mesure — la grille et le vieux mur (couture visible), le fond de cuve (à la limite), et la vanne, coupée par son cadre sur 11 % de son bord. L’éponge (ocre par nature), la planche de l’alerte (rouge voulu) et la chaufferie (ambre) sont des exceptions écrites dans le script, pas des tolérances tacites.',
       'VÉRIFIÉ : la fabrication essayée sur des masters synthétiques — recadrage refusé puis accepté avec --recadre, alpha exigé sur un décalque, bord plein détecté, taille ramenée à celle de la famille.',
+    ],
+  },
+  {
+    date: '08/09/2026 18:35',
+    title: 'LE TABLEAU DES AVARIES REFAIT sur le dessin du codex et du marchand — secteurs, stations, fiche et consigne',
+    notes: [
+      'LA DEMANDE : « refais l’écran avaries en t’inspirant des nouveaux designs des écrans récompense et codex, adapté aux avaries ». Le tableau des avaries était le dernier écran de pupitre au vieux gabarit (une liste de cartes dans une boîte) ; il prend le dessin des maquettes « Codex v2 » et « Marchand v2 » : trois colonnes, une tête, une légende manette.',
+      'L’ÉCRAN (game/ecranAvaries.ts, la vue pure dans avariesVue.ts, testée) : en tête, la progression du module (stations rétablies, la barre qui passe au vert au complet) et la bourse — la MÉMOIRE, seule monnaie de la réparation. Le rail des SECTEURS à gauche : TOUT LE MODULE, ÉNERGIE, CONSOLES, ACCÈS, un anneau de complétion chacun. La grille au centre : une carte par station (glyphe, nom, numéro, ce qu’elle rend, badge d’état, prix), le filtre TOUTES / EN PANNE / RÉTABLIES. La fiche à droite : l’illustration, ce qu’elle rend, ce que la panne fait (déduit des drapeaux de reparations.ts : la brume, les écrans, la porte), le prix, le solde APRÈS RÉPARATION ou ce qui manque — et la CONSIGNE : réparer au plot, solde court, ou station rétablie.',
+      'CE N’EST TOUJOURS PAS UNE BOUTIQUE : la réparation se paie au contact du plot de la station (tenteReparation), rien ne change à la caisse. L’écran dit où l’on en est et où aller ; le bouton d’achat de la maquette devient une consigne, A ne fait rien et la légende le dit en creux.',
+      'PAS D’INVENTION : les secteurs ne sont pas une donnée de plus à tenir — ils se déduisent de ce que la panne fait (une porte condamne un accès, un écran éteint est une console, le reste est de l’énergie). Réécrire une station la range toute seule ; un test garde la partition.',
+      'L’ILLUSTRATION : une image par station, public/assets/avaries/<id>.webp — la même dans les deux états, l’écran l’éteint lui-même en panne (grise, sombre, le tampon EN PANNE) et l’allume rétablie. Absente, le glyphe reste, rien ne casse. Les images restent à peindre : le dossier porte son LISEZ-MOI.',
+      'LA MANETTE : le schéma des maquettes, comme au codex et au marchand — croix pour parcourir, LB/RB pour le secteur, X pour le filtre, B pour quitter ; au clavier, flèches, Q/E, F, Échap. Échap ferme désormais le tableau au lieu d’ouvrir la fiche par-dessus ; la couche de menu conduit sa manette elle-même (pilote).',
+      'VÉRIFIÉ : 998 tests verts dans 90 fichiers (11 neufs : la partition des secteurs, l’état d’une station, les effets de panne, les filtres, les libellés, le compte du rail), type-check à 0, build propre. Au navigateur, sur une page d’essai à registres simulés : les huit situations (module en panne, deux stations rétablies, tout rétabli, filtre EN PANNE, clavier, manette simulée, Échap, largeur étroite) sans une erreur console. Le tableau DANS le jeu (contact du pupitre du centre de contrôle) reste à voir en prévisualisation.',
     ],
   },
   {
