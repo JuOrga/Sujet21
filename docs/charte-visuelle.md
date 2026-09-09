@@ -167,9 +167,11 @@ chère à la plus chère, et rien d'autre :
    vues se déduit du rapport entre la bande et l'image fixe. Se fabrique
    par `tools/images/planche.py` depuis des vues extraites d'une vidéo
    (image-vers-vidéo depuis l'image fixe, puis `ffmpeg` pour les vues).
-3. **La vidéo.** Réservée au codex : une boucle de 3 à 6 s par fiche,
-   **capturée dans le jeu** (mode concepteur, bouton CAPTURER), jamais
-   générée — la vraie simulation vaut mieux qu'une imitation.
+3. **La vidéo.** Réservée au codex : une boucle de quelques secondes par
+   fiche, **capturée dans le jeu** (mode concepteur : le bouton CAPTURER,
+   ou la MÉMOIRE DE CAPTURE de PARAMÈTRES qui garde les huit dernières
+   secondes à 30 ou 60 images par seconde), jamais générée — la vraie
+   simulation vaut mieux qu'une imitation.
 
 Les cinématiques ne s'animent pas en vidéo : le lecteur leur donne déjà
 un mouvement, et sept boucles ajouteraient environ 7 Mo au téléchargement.

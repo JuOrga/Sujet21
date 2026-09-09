@@ -2969,6 +2969,8 @@
          qui touche au concepteur) et le panneau du résultat */
       .hud-capture { color: #ffd24a; border-color: rgba(255, 210, 74, 0.45); font-family: var(--font-display); letter-spacing: 0.12em; }
       .hud-capture.enregistre { color: #ff6a5a; border-color: rgba(255, 106, 90, 0.7); animation: cc-pulse 1s ease-in-out infinite; }
+      /* la mémoire saute des images : l'encodeur ne suit pas — le bouton le dit */
+      .hud-capture.sautees { border-style: dashed; }
       @keyframes cc-pulse { 50% { background: rgba(255, 106, 90, 0.18); } }
       #capture-codex { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(3, 7, 16, 0.72); }
       #capture-codex[hidden] { display: none; }
@@ -8919,6 +8921,22 @@
             jamais dégradée.
           </div>
           <div id="params-fps" class="params-choix" role="group" aria-label="Fréquence d'images"></div>
+          <!-- LA MÉMOIRE DE CAPTURE (concepteur, PC et Steam Deck seulement) :
+               les huit dernières secondes encodées en continu, que le bouton
+               ⏺ du HUD fige — on n'a jamais le doigt dessus au moment où
+               l'effet se produit. game/tamponCapture.ts -->
+          <div id="params-tampon-bloc" data-dev hidden>
+            <div class="params-nom" style="margin-top: 16px">MÉMOIRE DE CAPTURE — LES 8 DERNIÈRES SECONDES (CONCEPTEUR)</div>
+            <div class="params-desc">
+              Armée, la scène s'encode en continu et le bouton ⏺ du HUD sauve les
+              huit dernières secondes au lieu de filmer quatre secondes à partir du
+              clic. L'encodage tourne hors du fil du jeu ; ce qui reste sur le fil du
+              rendu, c'est la composition d'une petite image à chaque rappel — à
+              mesurer au compteur ci-dessous, armée puis éteinte. 60 images par
+              seconde demandent un rendu qui les tient. PC et Steam Deck seulement.
+            </div>
+            <div id="params-tampon" class="params-choix" role="group" aria-label="Mémoire de capture"></div>
+          </div>
           <div class="params-nom" style="margin-top: 16px">RÉSOLUTION DE RENDU</div>
           <div class="params-desc">
             Élevée (défaut) : la cuve se dessine en résolution native. Moyenne et

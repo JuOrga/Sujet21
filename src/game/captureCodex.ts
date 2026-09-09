@@ -17,10 +17,17 @@
 // coûte ce drapeau sur les GPU à tuiles) : le tampon est encore là tant que
 // le navigateur n'a pas composé l'image.
 //
+// LA MÉMOIRE DE CAPTURE (tamponCapture.ts) : armée par un réglage du
+// concepteur (PC seulement), elle encode en continu les huit dernières
+// secondes ; le même bouton les fige alors au lieu de filmer quatre
+// secondes à partir du clic — on n'a jamais le doigt dessus au moment où
+// l'effet se produit. Les deux chemins aboutissent au même panneau.
+//
 // La partie pure (cadrage, type, nom) est ici pour être testée sans
 // navigateur ; la classe en dessous ne vit qu'avec un DOM.
 
 import { VIDEO_MAX_OCTETS, VIDEO_TYPES, blobEnBase64, type EnvoiVideo } from './codexReglages'
+import { TamponCapture, tamponDisponible, type CadenceTampon } from './tamponCapture'
 
 /** Quatre secondes : dans la fourchette du LISEZ-MOI (3 à 6 s), assez pour
  *  une boucle qui montre l'effet, court pour rester sous le mégaoctet. */
@@ -99,12 +106,16 @@ export function nomFichierCapture(id: string, mime: string): string {
 }
 
 /** Ce qu'on dit d'un enregistrement fini : son poids, et s'il passe. */
-export function verdictCapture(octets: number, mime: string): { ok: boolean; texte: string } {
+export function verdictCapture(
+  octets: number,
+  mime: string,
+  secondes: number = DUREE_CAPTURE_MS / 1000,
+): { ok: boolean; texte: string } {
   const ko = Math.round(octets / 1024)
   if (octets <= 0) return { ok: false, texte: 'Rien n’a été enregistré.' }
   if (!VIDEO_TYPES[typeNu(mime)]) return { ok: false, texte: `Type ${typeNu(mime)} inconnu du magasin.` }
   if (octets > VIDEO_MAX_OCTETS) return { ok: false, texte: `${ko} Ko : trop lourd pour le magasin (3 Mo au plus).` }
-  return { ok: true, texte: `${ko} Ko, ${DUREE_CAPTURE_MS / 1000} s, ${mime}.` }
+  return { ok: true, texte: `${ko} Ko, ${secondes.toFixed(1).replace('.', ',')} s, ${mime}.` }
 }
 
 // ---- LA CLASSE : ne vit qu'avec un DOM ------------------------------------------
@@ -124,6 +135,8 @@ export interface HooksCapture {
   envoie(id: string, video: EnvoiVideo): Promise<boolean>
   /** le mode concepteur est-il actif ? (le bouton ne se montre qu'à lui) */
   concepteur(): boolean
+  /** la cadence de la mémoire de capture (PARAMÈTRES) — 0 : éteinte */
+  cadenceTampon(): CadenceTampon
 }
 
 type Etape = 'repos' | 'enregistre' | 'pret'
@@ -145,6 +158,14 @@ export class CaptureCodex {
   private resultat: Blob | null = null
   private urlResultat = ''
   private ficheChoisie = ''
+  // la mémoire de capture et SA toile de composition, qui vit tant que le
+  // réglage est armé (celle de la capture de quatre secondes ne vit que
+  // pendant l'enregistrement)
+  private readonly tampon = new TamponCapture()
+  private toileTampon: HTMLCanvasElement | null = null
+  private ctxTampon: CanvasRenderingContext2D | null = null
+  private cadreTampon: CadreCapture | null = null
+  private figeEnCours = false
   private etat = ''
   private envoiEnCours = false
 
@@ -170,6 +191,10 @@ export class CaptureCodex {
    *  navigateur ne sait pas enregistrer. */
   demarre(): void {
     if (this.etape === 'enregistre' || !this.hooks.concepteur()) return
+    if (this.tampon.armee) {
+      void this.figeTampon()
+      return
+    }
     if (typeof MediaRecorder === 'undefined') {
       this.montre('Ce navigateur n’enregistre pas de vidéo.')
       return
@@ -231,12 +256,10 @@ export class CaptureCodex {
   /** À appeler à CHAQUE image, après le rendu des deux canvas : compose la
    *  découpe dans la toile de capture. Ne coûte rien hors enregistrement. */
   compose(): void {
+    this.alimenteTampon()
     if (this.etape !== 'enregistre' || !this.ctx || !this.toile || !this.cadre) return
     const { gl, fx } = this.hooks.sources()
-    const c = this.cadre
-    const g = this.ctx
-    g.drawImage(gl, c.x * gl.width, c.y * gl.height, c.w * gl.width, c.h * gl.height, 0, 0, c.largeur, c.hauteur)
-    g.drawImage(fx, c.x * fx.width, c.y * fx.height, c.w * fx.width, c.h * fx.height, 0, 0, c.largeur, c.hauteur)
+    this.composeDans(this.ctx, this.cadre, gl, fx)
     this.imagesComposees++
     const maintenant = performance.now()
     // un écart plafonné à 100 ms : une image qui a mis dix secondes à venir
@@ -253,14 +276,82 @@ export class CaptureCodex {
     }
   }
 
+  private composeDans(g: CanvasRenderingContext2D, c: CadreCapture, gl: HTMLCanvasElement, fx: HTMLCanvasElement): void {
+    g.drawImage(gl, c.x * gl.width, c.y * gl.height, c.w * gl.width, c.h * gl.height, 0, 0, c.largeur, c.hauteur)
+    g.drawImage(fx, c.x * fx.width, c.y * fx.height, c.w * fx.width, c.h * fx.height, 0, 0, c.largeur, c.hauteur)
+  }
+
+  /** La mémoire de capture, à chaque image : armée si le réglage le dit
+   *  et que l'appareil le permet, éteinte sinon — et jamais pendant qu'un
+   *  enregistrement de quatre secondes tourne, ni pendant le figeage. */
+  private alimenteTampon(): void {
+    const ips = this.hooks.concepteur() && tamponDisponible() ? this.hooks.cadenceTampon() : 0
+    if (ips === 0) {
+      if (this.tampon.cadence !== 0) {
+        this.tampon.eteint()
+        this.toileTampon = null
+        this.majBouton()
+      }
+      return
+    }
+    if (this.etape === 'enregistre' || this.figeEnCours) return
+    const { gl, fx } = this.hooks.sources()
+    const cadre = cadreCapture(gl.width, gl.height)
+    // une taille qui change (fenêtre redimensionnée) recrée la toile et
+    // ré-arme l'encodeur : la mémoire repart de zéro, c'est le prix
+    if (!this.toileTampon || !this.cadreTampon || this.cadreTampon.largeur !== cadre.largeur || this.cadreTampon.hauteur !== cadre.hauteur) {
+      const toile = document.createElement('canvas')
+      toile.width = cadre.largeur
+      toile.height = cadre.hauteur
+      this.ctxTampon = toile.getContext('2d')
+      this.toileTampon = toile
+      this.cadreTampon = cadre
+    }
+    this.tampon.arme(ips, cadre.largeur, cadre.hauteur)
+    if (!this.tampon.armee || !this.ctxTampon) return
+    this.composeDans(this.ctxTampon, cadre, gl, fx)
+    this.tampon.pousse(this.toileTampon)
+    this.majBouton()
+  }
+
+  /** Le clic, mémoire armée : on fige ce qu'elle tient, et le fichier prend
+   *  le chemin de tout enregistrement. */
+  private async figeTampon(): Promise<void> {
+    if (this.figeEnCours) return
+    this.figeEnCours = true
+    this.host.hidden = true
+    let resultat: Awaited<ReturnType<TamponCapture['fige']>> = null
+    try {
+      resultat = await this.tampon.fige()
+    } catch {
+      resultat = null
+    }
+    this.figeEnCours = false
+    if (!resultat) {
+      this.montre('La mémoire de capture est encore vide : jouez une seconde, puis réessayez.')
+      return
+    }
+    // le Blob veut un ArrayBuffer franc : celui du fichier assemblé l'est
+    // (une Uint8Array neuve), le type seul ne le sait pas
+    const octets = resultat.fichier.buffer.slice(
+      resultat.fichier.byteOffset,
+      resultat.fichier.byteOffset + resultat.fichier.byteLength,
+    ) as ArrayBuffer
+    this.presente(new Blob([octets], { type: 'video/webm' }), 'video/webm', resultat.secondes)
+  }
+
   private termine(mime: string): void {
     document.removeEventListener('visibilitychange', this.surVisibilite)
-    const blob = new Blob(this.morceaux, { type: typeNu(mime) })
+    this.presente(new Blob(this.morceaux, { type: typeNu(mime) }), mime, DUREE_CAPTURE_MS / 1000)
+  }
+
+  /** Un enregistrement prêt, d'où qu'il vienne : le panneau. */
+  private presente(blob: Blob, mime: string, secondes: number): void {
     this.etape = 'pret'
     this.resultat = blob
     if (this.urlResultat) URL.revokeObjectURL(this.urlResultat)
     this.urlResultat = URL.createObjectURL(blob)
-    const v = verdictCapture(blob.size, mime)
+    const v = verdictCapture(blob.size, mime, secondes)
     this.etat = v.texte
     const fiches = this.hooks.fiches()
     if (!fiches.some((f) => f.id === this.ficheChoisie)) this.ficheChoisie = fiches[0]?.id ?? ''
@@ -282,9 +373,15 @@ export class CaptureCodex {
       const reste = Math.max(0, DUREE_CAPTURE_MS - ecouleMs) / 1000
       b.textContent = `⏺ ${reste.toFixed(1).replace('.', ',')} s`
       b.classList.add('enregistre')
+    } else if (this.tampon.armee) {
+      // la mémoire se remplit : le bouton dit ce qu'il sauvera
+      const s = Math.min(this.tampon.secondes, 8)
+      b.textContent = `⏺ ${s.toFixed(0)} s`
+      b.classList.remove('enregistre')
+      b.classList.toggle('sautees', this.tampon.sautees > 30)
     } else {
       b.textContent = '⏺ CAPTURER'
-      b.classList.remove('enregistre')
+      b.classList.remove('enregistre', 'sautees')
     }
   }
 
@@ -310,7 +407,7 @@ export class CaptureCodex {
           `<button type="button" id="cc-fermer">FERMER</button>` +
           `</div>`
         : `<div class="cc-boutons"><button type="button" id="cc-fermer">FERMER</button></div>`) +
-      `<p class="cc-note">Envoyée, la vidéo prime sur celle du dossier pour tout le monde (magasin partagé). Téléchargée, elle porte le nom que public/assets/codex/ attend.</p>` +
+      `<p class="cc-note">Envoyée, la vidéo prime sur celle du dossier pour tout le monde (magasin partagé). Téléchargée, elle porte le nom que public/assets/codex/ attend.${this.tampon.sautees > 0 ? ` La mémoire a sauté ${this.tampon.sautees} image${this.tampon.sautees > 1 ? 's' : ''} : l’encodeur ne suivait pas — baissez la cadence dans PARAMÈTRES.` : ''}</p>` +
       `</div>`
   }
 

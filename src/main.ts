@@ -21,6 +21,7 @@ import {
   type ReglagesCodex,
 } from './game/codexReglages'
 import { CaptureCodex } from './game/captureCodex'
+import { CADENCES_TAMPON, tamponDisponible, type CadenceTampon } from './game/tamponCapture'
 import { niveauExpanse } from './game/structures'
 import {
   TABLEAU_HUB,
@@ -3152,6 +3153,7 @@ const captureCodex = new CaptureCodex(
     sources: () => ({ gl: canvas, fx: fxCanvas }),
     fiches: () => fichesCodex().map((f) => ({ id: f.id, titre: codexLu(f).titre, groupe: f.groupe })),
     concepteur: () => document.body.classList.contains('concepteur'),
+    cadenceTampon: () => cadenceTampon,
     envoie: async (id, video) => {
       const r = reglageDe(reglagesCodex, id)
       const res = await pushReglageCodex(id, { memoire: r.memoire, rarete: r.rarete }, records.operator() || 'anonyme', video)
@@ -3221,6 +3223,13 @@ let fpsCap = ((): number => {
   return FPS_CHOIX.includes(v) ? v : 60
 })()
 let fpsCapPrecedent = 0 // horloge du limiteur (dernière image RENDUE)
+// LA MÉMOIRE DE CAPTURE (game/tamponCapture.ts) : sa cadence, 0 = éteinte.
+// Un réglage de concepteur, sur PC et Steam Deck seulement — ailleurs il
+// n'est ni montré ni lu, et la mémoire ne tourne jamais.
+let cadenceTampon: CadenceTampon = ((): CadenceTampon => {
+  const v = Number(localStorage.getItem('sujet21-capture-tampon'))
+  return (CADENCES_TAMPON as readonly number[]).includes(v) ? (v as CadenceTampon) : 0
+})()
 // Résolution dynamique : DÉSACTIVÉE par défaut — le rendu reste en
 // résolution native constante, aucune surprise visuelle. Sur une machine
 // borderline, la qualité qui descendait « pour tenir 60 » se voyait plus
@@ -3433,6 +3442,30 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     }
   }
   renderFps()
+
+  // la mémoire de capture : le bloc ne se montre que là où elle tourne
+  const blocTampon = document.getElementById('params-tampon-bloc') as HTMLDivElement | null
+  const choixTampon = document.getElementById('params-tampon') as HTMLDivElement | null
+  if (blocTampon && choixTampon && tamponDisponible()) {
+    blocTampon.hidden = false
+    const renderTampon = (): void => {
+      choixTampon.innerHTML = ''
+      for (const ips of CADENCES_TAMPON) {
+        const b = document.createElement('button')
+        b.type = 'button'
+        b.textContent = ips === 0 ? 'ÉTEINTE' : `${ips} i/s`
+        b.className = ips === cadenceTampon ? 'actif' : ''
+        b.addEventListener('click', () => {
+          cadenceTampon = ips
+          localStorage.setItem('sujet21-capture-tampon', String(ips))
+          perf.reset() // la fenêtre de mesure repart : armée ou éteinte, un rapport chacune
+          renderTampon()
+        })
+        choixTampon.appendChild(b)
+      }
+    }
+    renderTampon()
+  }
 
   const choixRes = document.getElementById('params-resdyn') as HTMLDivElement
   const renderRes = (): void => {

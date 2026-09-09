@@ -31,6 +31,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '09/09/2026 18:00',
+    title: 'LA MÉMOIRE DE CAPTURE : les huit dernières secondes, à 30 ou 60 images par seconde, figées d’un clic',
+    notes: [
+      'LA DEMANDE : « un bouton qui sauvegarde les x secondes d’avant », PC et Steam Deck seulement, activable dans les paramètres par le concepteur, avec le choix entre 30 et 60 images par seconde — on n’a jamais le doigt sur CAPTURER au moment où l’effet se produit.',
+      'LE RÉGLAGE : dans PARAMÈTRES, mode concepteur, MÉMOIRE DE CAPTURE — éteinte, 30 ou 60 i/s. Le bloc ne se montre que sur un pointeur fin avec WebCodecs (PC, Steam Deck) ; sur tactile la mémoire n’est ni montrée ni lue, et rien ne tourne. Éteinte, rien ne tourne non plus : le joueur ne paie jamais rien.',
+      'LE MÉCANISME (game/tamponCapture.ts) : chaque image composée part dans l’encodeur vidéo du navigateur (VideoEncoder, VP9, mode temps réel), hors du fil du jeu ; on ne garde que les morceaux encodés des huit dernières secondes, élagués par images clés (une par seconde) pour qu’un fichier commence toujours sur une clé. Le bouton ⏺ du HUD affiche ce que la mémoire tient et, au clic, la fige : l’assembleur WebM maison (game/webm.ts, cent lignes, une piste, pas de bibliothèque) en fait le fichier, présenté dans le panneau ordinaire — envoi à la fiche, téléchargement. Si l’encodeur ne suit pas, on saute des images plutôt que d’attendre : le bouton passe en pointillés et le panneau dit combien.',
+      'VÉRIFIÉ : douze tests sur l’assembleur (structure relue élément par élément : en-tête webm, piste VP9, un cluster par clé, tailles exactes) et sur l’élagage, la cadence, la disponibilité, le débit. La classe compilée à part a tourné dans Chromium sans tête à 60 puis à 30 : mémoire remplie douze secondes, fichiers de 8,1 s et 9,0 s (523 Ko et 611 Ko) décodés par ffmpeg sans erreur, envoi reçu, zéro erreur console. Le coût de la composition sur le fil du rendu y mesure 0,18 ms par image (0,36 ms à 60 avant le relâchement de la file). Ce Chromium n’a que l’encodeur logiciel VP9 sur un processeur partagé : il saute 253 images sur 8 s à 60 i/s, 81 à 30 — ce sont les chiffres d’une machine sans encodeur matériel, pas ceux d’un bon PC, à mesurer là-bas au compteur de PARAMÈTRES.',
+    ],
+  },
+  {
     date: '08/09/2026 21:32',
     title: 'LA REVUE DE LA BRANCHE : six constats sur le diff des assets, corrigés avant la PR vers dev',
     notes: [
