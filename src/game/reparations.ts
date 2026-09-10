@@ -104,8 +104,58 @@ export const REPARATIONS: ReparationDef[] = [
   },
 ]
 
+// ---- LE CATALOGUE QUI JOUE ------------------------------------------------
+// REPARATIONS est le LIVRÉ : le filet, et la liste fermée des identifiants
+// (un id est une clé structurelle — le plot du hub le nomme, l'ancre de
+// l'éditeur le choisit, la sauvegarde le garde une fois payé). Ce qui JOUE,
+// lui, peut venir de la régie : prix, plaques, effets et ordre se publient
+// pour tout le monde (avariesPartage.ts). Ce module ne connaît ni le
+// magasin ni l'écran — main.ts lui POSE le catalogue courant au démarrage,
+// et à chaque retouche du concepteur.
+let courantes: readonly ReparationDef[] = REPARATIONS
+
+/** Le catalogue joué ici : le publié (ou le brouillon du concepteur), sinon
+ *  le livré. Poser null rend la main au livré. */
+export function poseAvaries(catalogue: readonly ReparationDef[] | null): void {
+  courantes = catalogue ?? REPARATIONS
+}
+
+export function avaries(): readonly ReparationDef[] {
+  return courantes
+}
+
 export function reparationDef(id: string): ReparationDef | null {
-  return REPARATIONS.find((r) => r.id === id) ?? null
+  return courantes.find((r) => r.id === id) ?? null
+}
+
+/**
+ * La station REND-ELLE SON SERVICE ? Deux façons d'être debout : la
+ * réparation a été payée (`paye`), ou la station ne fait plus partie de
+ * l'accident — la régie l'en a retirée, elle naît intacte.
+ *
+ * La seconde branche n'est pas un confort : sans elle, une station retirée
+ * des avaries n'était plus réparable (le plot ne débite plus rien) et son
+ * service restait éteint POUR TOUJOURS, alors que le tableau l'annonçait
+ * debout. Retirer la passerelle du secteur 4 scellait ainsi la fin de
+ * l'arc ; retirer le distillateur supprimait la prime du retour.
+ */
+export function stationDebout(id: string, paye: boolean): boolean {
+  return paye || reparationDef(id) === null
+}
+
+/** La fiche à AFFICHER pour une station : celle qui joue si la station est
+ *  encore de l'accident, sinon celle du code. L'éditeur en a besoin — on
+ *  doit pouvoir poser l'ancre d'une station que la régie a retirée des
+ *  avaries, et le panneau doit la nommer. */
+export function ficheReparation(id: string): ReparationDef | null {
+  return reparationDef(id) ?? REPARATIONS.find((r) => r.id === id) ?? null
+}
+
+/** Toutes les fiches à AFFICHER, une par station connue (le catalogue
+ *  livré, la liste fermée des ids), avec les valeurs qui jouent quand elles
+ *  jouent : la liste que l'éditeur déroule pour poser une ancre. */
+export function fichesReparations(): ReparationDef[] {
+  return REPARATIONS.map((r) => reparationDef(r.id) ?? r)
 }
 
 // le canal des portes de dégât : négatif (scénarisé), un cran par station
@@ -128,10 +178,11 @@ export function appliqueReparations(
   base: LevelDef,
   faites: readonly string[],
   opts: OptionsHub = {},
+  catalogue: readonly ReparationDef[] = courantes,
 ): LevelDef {
   const zones = zonesDuHub(base)
   if (!zones) return base
-  const manquantes = REPARATIONS.filter((r) => !faites.includes(r.id))
+  const manquantes = catalogue.filter((r) => !faites.includes(r.id))
   // tout est réparé : le hub cible, avec son seul SCEAU du secteur 4
   const labels: WorldLabel[] = [...(base.labels ?? [])]
   let decals = base.decals ? [...base.decals] : undefined

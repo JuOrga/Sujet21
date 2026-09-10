@@ -782,7 +782,10 @@ export function parseLevel(input: unknown): {
 
   // LES ANCRES MÉTA du module : rôle dans la liste fermée, id de station
   // au catalogue des réparations (un rôle ou un id inconnu est écarté —
-  // une ancre muette vaut mieux qu'une ancre qui s'active à tort)
+  // une ancre muette vaut mieux qu'une ancre qui s'active à tort). Le
+  // catalogue LIVRÉ fait foi, jamais celui que la régie joue : une station
+  // retirée des avaries (avariesPartage.ts) doit garder son ancre, sans
+  // quoi la remettre en avarie demanderait de la reposer dans l'éditeur.
   const ancres: AncreMeta[] = []
   const idsStation = REPARATIONS.map((r) => r.id)
   for (const raw of Array.isArray(o.ancres) ? o.ancres : []) {
