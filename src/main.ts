@@ -30,10 +30,11 @@ import {
   type ArticleHub,
 } from './game/hub'
 import {
+  REPARATIONS,
   appliqueReparations,
-  avaries,
   poseAvaries,
   reparationDef,
+  stationDebout,
 } from './game/reparations'
 import { RegieAvaries, detailAvaries } from './editor/regieAvaries'
 import {
@@ -732,7 +733,7 @@ let hubMemo: { base: LevelDef; cle: string; lv: LevelDef } | null = null
 function finOuverte(): boolean {
   return (
     revelationAtteinte(journalCourant(), records.decouvertesVues()) &&
-    records.estRepare('passerelle-4')
+    stationDebout('passerelle-4', records.estRepare('passerelle-4'))
   )
 }
 function hubJoue(): LevelDef {
@@ -13120,7 +13121,7 @@ function retourAuLabo(): void {
   // (le récit et les fins ne se livrent plus ici : une run perdue ou
   // abandonnée ne raconte rien — c'est l'expédition BOUCLÉE qui les sert)
   // LE DISTILLATEUR (réparé) : la prime du retour — le delta garanti
-  if (records.estRepare('distillateur') && !testLevel) {
+  if (stationDebout('distillateur', records.estRepare('distillateur')) && !testLevel) {
     gagneMemoireRun(2)
     toastFile.push({
       nom: '+2 MÉMOIRE — la prime du retour',
@@ -15030,7 +15031,14 @@ function frame(now: number): void {
   // ---- LES STATIONS DE RÉPARATION : le corps se pose sur la station en
   // panne, la mémoire se débite, le module se rallume À CHAUD ----
   if (zonesHub) {
-    for (const r of avaries()) {
+    // Le drapeau « dedans » se tient pour TOUTES les stations connues (le
+    // catalogue LIVRÉ, la liste fermée des ids), pas seulement pour celles
+    // qui sont en avarie : une station retirée de l'accident garde le
+    // sien. Sans quoi, la remettre en avarie pendant que le corps est posé
+    // sur son plot devenu inerte aurait débité la mémoire à l'image
+    // suivante, sans un geste du joueur. tenteReparation, lui, ne fait
+    // rien pour une station hors accident.
+    for (const r of REPARATIONS) {
       const plot = zonesHub.stations[r.id]
       if (!plot) continue
       const dedans = pointInBox(sim.stats.centroidX, sim.stats.centroidY, plot)
@@ -15064,7 +15072,7 @@ function frame(now: number): void {
     // LA TABLE DE DÉPART (une fois réparée) : le récapitulatif de ce
     // qu'on emporte, au moment où on longe le plan de travail
     const surTable =
-      records.estRepare('table-depart') &&
+      stationDebout('table-depart', records.estRepare('table-depart')) &&
       pointInBox(sim.stats.centroidX, sim.stats.centroidY, zonesHub.tableDepart)
     if (surTable && !tableDepartDedans) montreTableDepart()
     tableDepartDedans = surTable
@@ -15511,7 +15519,7 @@ function frame(now: number): void {
     // LE MUR DES RECORDS réparé double la part des records (le banc
     // optique consigne mieux)
     const primeMur =
-      records.estRepare('mur-records') && (newVolume || newChrono) ? 2 : 0
+      stationDebout('mur-records', records.estRepare('mur-records')) && (newVolume || newChrono) ? 2 : 0
     gagneMemoireRun(
       5 +
         (premiereFois ? 5 : 0) +

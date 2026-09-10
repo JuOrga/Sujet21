@@ -54,7 +54,7 @@ import {
   TABLEAU_HUB,
   TABLEAU_HUB_COMPACT,
 } from '../game/hub'
-import { REPARATIONS, ficheReparation } from '../game/reparations'
+import { REPARATIONS, ficheReparation, fichesReparations } from '../game/reparations'
 import {
   PUPITRES,
   fichePupitre,
@@ -5430,7 +5430,7 @@ export class LevelEditor {
       if (a.role === 'station' || a.role === 'degat') {
         rows.push(
           `<label class="ed-f"><span>Station</span><select id="p-anid">` +
-            REPARATIONS.map((r) => ficheReparation(r.id) ?? r)
+            fichesReparations()
               .map(
                 (r) =>
                   `<option value="${r.id}"${r.id === a.id ? ' selected' : ''}>${r.icone} ${r.nom} — ${r.prix} mém.</option>`,

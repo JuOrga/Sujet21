@@ -120,7 +120,7 @@ posture du build Steam : le contenu livré fait foi — `src/game/reseau.ts`).
 ## Qualité
 
 ```bash
-pnpm test        # 1057 tests dans 97 fichiers, ~33 s (mesuré le 10/09/2026)
+pnpm test        # 1058 tests dans 97 fichiers, ~30 s (mesuré le 10/09/2026)
 pnpm type-check
 pnpm build
 ```

@@ -31,6 +31,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '10/09/2026 13:31',
+    title: 'LA REVUE DES AVARIES RÉGLABLES : deux constats, corrigés avant la PR vers dev',
+    notes: [
+      'LA DEMANDE : « PR sur dev et review ». La relecture du diff propre à la branche a relevé deux constats, tous deux corrigés ici.',
+      'LE SERVICE ÉTEINT POUR TOUJOURS : une station RETIRÉE de l’accident quittait le catalogue joué — donc son plot ne débitait plus rien, donc records.estRepare restait faux à jamais. Or quatre services y sont accrochés, et le pire est la fin de l’arc : retirer la passerelle du secteur 4 scellait le sas DÉFINITIVEMENT, alors que le tableau annonçait la station debout. Idem pour la prime du distillateur, le récapitulatif de la table de départ et la double part du mur des records. Une station est désormais DEBOUT de deux façons : payée, ou hors accident (reparations.ts, stationDebout, testé dans les deux sens).',
+      'LA RÉPARATION FANTÔME : le front d’entrée des plots ne visitait que les stations EN AVARIE. Le corps posé sur le plot devenu inerte d’une station retirée n’y laissait plus de drapeau — et la remettre en avarie (ou recevoir un document publié qui la remet) débitait la mémoire à l’image suivante, sans un geste du joueur. Le drapeau se tient maintenant pour toutes les stations connues ; tenteReparation, lui, ne fait rien pour une station hors accident.',
+      'AU PASSAGE : le titre CSS de l’atelier des récompenses coiffait le bloc des avaries (déplacé), le gabarit renvoyait à un fichier qui n’existe pas (editor/regieAvaries.ts, à ne pas confondre avec l’écran du joueur game/ecranAvaries.ts), PUBLIER et RETIRER se ferment le temps de l’appel (deux clics publiaient deux fois), et la liste des stations du panneau d’ancre passe par fichesReparations() — plus de repli mort.',
+      'VÉRIFIÉ : 1058 tests verts dans 97 fichiers, type-check à 0, build propre. Le test de la station debout tombe sans le correctif et passe avec. L’écran remonté seul dans Chromium sans tête : bornes, ordre, retrait, publication et retour au livré — zéro erreur console.',
+    ],
+  },
+  {
     date: '09/09/2026 23:09',
     title: 'LES AVARIES DANS LA RÉGIE : l’accident du télescope se règle et se publie pour tout le monde',
     notes: [

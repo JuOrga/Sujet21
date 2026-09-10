@@ -128,12 +128,34 @@ export function reparationDef(id: string): ReparationDef | null {
   return courantes.find((r) => r.id === id) ?? null
 }
 
+/**
+ * La station REND-ELLE SON SERVICE ? Deux façons d'être debout : la
+ * réparation a été payée (`paye`), ou la station ne fait plus partie de
+ * l'accident — la régie l'en a retirée, elle naît intacte.
+ *
+ * La seconde branche n'est pas un confort : sans elle, une station retirée
+ * des avaries n'était plus réparable (le plot ne débite plus rien) et son
+ * service restait éteint POUR TOUJOURS, alors que le tableau l'annonçait
+ * debout. Retirer la passerelle du secteur 4 scellait ainsi la fin de
+ * l'arc ; retirer le distillateur supprimait la prime du retour.
+ */
+export function stationDebout(id: string, paye: boolean): boolean {
+  return paye || reparationDef(id) === null
+}
+
 /** La fiche à AFFICHER pour une station : celle qui joue si la station est
  *  encore de l'accident, sinon celle du code. L'éditeur en a besoin — on
  *  doit pouvoir poser l'ancre d'une station que la régie a retirée des
- *  avaries, et la panneau doit la nommer. */
+ *  avaries, et le panneau doit la nommer. */
 export function ficheReparation(id: string): ReparationDef | null {
   return reparationDef(id) ?? REPARATIONS.find((r) => r.id === id) ?? null
+}
+
+/** Toutes les fiches à AFFICHER, une par station connue (le catalogue
+ *  livré, la liste fermée des ids), avec les valeurs qui jouent quand elles
+ *  jouent : la liste que l'éditeur déroule pour poser une ancre. */
+export function fichesReparations(): ReparationDef[] {
+  return REPARATIONS.map((r) => reparationDef(r.id) ?? r)
 }
 
 // le canal des portes de dégât : négatif (scénarisé), un cran par station

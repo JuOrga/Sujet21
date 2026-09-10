@@ -1798,7 +1798,6 @@
       @media (max-width: 760px) {
         .tx-tete h2 { font-size: calc(15px * var(--ui)); letter-spacing: 0.22em; }
       }
-      /* ---- L'ATELIER DES RÉCOMPENSES : plein cadre, comme les mémoires ---- */
       /* ---- LES AVARIES : le réglage de l'accident, plein cadre ---- */
       #regie-avaries { position: fixed; inset: 0; z-index: 60; background: #04080e; }
       #regie-avaries[hidden] { display: none; }
@@ -1906,6 +1905,7 @@
       .rav-etat b { color: #cfe2ef; }
       .rav-etat .rav-ok { color: #6dffb8; }
       .rav-etat .rav-brouillon { color: #f0c08a; }
+      /* ---- L'ATELIER DES RÉCOMPENSES : plein cadre, comme les mémoires ---- */
       #recompenses { position: fixed; inset: 0; z-index: 60; background: #04080e; }
       #recompenses[hidden] { display: none; }
       .at-ecran {
@@ -8839,7 +8839,9 @@
 
     <!-- LES AVARIES : la console du concepteur pour l'accident du télescope
          — une ligne par station du module, son prix, sa plaque, ses effets.
-         Gabarit ici, gestes dans src/editor/ecranAvaries.ts -->
+         Gabarit ici, gestes dans src/editor/regieAvaries.ts. À ne pas
+         confondre avec #reparations : le TABLEAU des avaries que le joueur
+         lit au pupitre (src/game/ecranAvaries.ts) -->
     <div id="regie-avaries" hidden aria-label="Les avaries du module">
       <div class="rav-ecran">
         <header class="rav-tete">

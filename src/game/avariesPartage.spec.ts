@@ -9,7 +9,7 @@ import {
   memesAvaries,
   PRIX_MAX,
 } from './avariesPartage'
-import { appliqueReparations, avaries, ficheReparation, poseAvaries, REPARATIONS, reparationDef } from './reparations'
+import { appliqueReparations, avaries, ficheReparation, poseAvaries, REPARATIONS, reparationDef, stationDebout } from './reparations'
 import { TABLEAU_HUB } from './hub'
 import { stations } from './avariesVue'
 
@@ -94,6 +94,22 @@ describe('les avaries publiées', () => {
       // retirée de l'accident, la station quitte aussi le tableau
       poseAvaries(catalogueAvaries(lisAvaries({ stations: [{ id: dernier, enAvarie: false }] })))
       expect(stations({ memoire: 0, faites: [] }).map((v) => v.id)).not.toContain(dernier)
+    } finally {
+      poseAvaries(null)
+    }
+  })
+
+  it('une station RETIRÉE de l’accident rend son service sans être payée', () => {
+    // sans cette règle, une station hors accident n'était plus réparable
+    // (le plot ne débite plus rien) et son service restait éteint pour
+    // toujours : retirer la passerelle scellait la fin de l'arc
+    try {
+      expect(stationDebout('passerelle-4', false)).toBe(false)
+      poseAvaries(catalogueAvaries(lisAvaries({ stations: [{ id: 'passerelle-4', enAvarie: false }] })))
+      expect(stationDebout('passerelle-4', false)).toBe(true)
+      // celle qui reste dans l'accident, elle, se paie toujours
+      expect(stationDebout('distillateur', false)).toBe(false)
+      expect(stationDebout('distillateur', true)).toBe(true)
     } finally {
       poseAvaries(null)
     }

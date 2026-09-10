@@ -238,6 +238,9 @@ export class RegieAvaries {
       return
     }
     if (b.id === 'rav-publier') {
+      // le bouton se ferme le temps de l'appel : deux clics pendant que le
+      // magasin répond publiaient deux fois
+      b.disabled = true
       this.dit('Publication…')
       void this.hooks.publier().then((p) => {
         this.render()
@@ -247,6 +250,7 @@ export class RegieAvaries {
     }
     if (b.id === 'rav-retirer') {
       if (!window.confirm('Retirer les avaries publiées ? Les joueurs joueront de nouveau celles du code.')) return
+      b.disabled = true
       void this.hooks.retirer().then((ok) => {
         this.render()
         this.dit(ok ? 'Publication retirée : les joueurs jouent les avaries du code.' : 'Échec : le magasin partagé ne répond pas.')
