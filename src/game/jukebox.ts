@@ -37,6 +37,9 @@ export const PISTES_ECOUTE: readonly PisteEcoute[] = [
   { fichier: 'cuve-glaciale-v2', titre: 'Desolate Laboratory — cuve glaciale, candidate', famille: 'lit', enJeu: false },
   { fichier: 'zone-hublot-v2', titre: 'Frozen Hiss — hublot fendu, candidate', famille: 'ambiance', enJeu: false },
   { fichier: 'zone-conduite-v2', titre: 'Warm Pressure — conduite rompue, candidate', famille: 'ambiance', enJeu: false },
+  { fichier: 'zone-chambre-v2', titre: 'Warm Dark Rest — chambre pressurisée, candidate', famille: 'ambiance', enJeu: false },
+  { fichier: 'temps-suspendu-v2', titre: 'Tension Held — temps suspendu, candidate', famille: 'ambiance', enJeu: false },
+  { fichier: 'hub', titre: 'Quiet Resting Atmosphere — lit du hub, candidate', famille: 'lit', enJeu: false },
 ]
 
 export class Jukebox {

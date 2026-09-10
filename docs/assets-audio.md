@@ -250,8 +250,11 @@ doit être refait.
 Le 10/09/2026, cinq lits ont été regénérés sous Suno et livrés **à côté** des
 lits qui jouent, sous `masters/sound/<nom>-v2.mp3` : `accueil-v2` (M1),
 `cuve-tiede-v2` (M2), `cuve-glaciale-v2` (Desolate Laboratory),
-`zone-hublot-v2` (Frozen Hiss), `zone-conduite-v2` (Warm Pressure). Rien ne
-remplace rien tant que l'oreille n'a pas tranché.
+`zone-hublot-v2` (Frozen Hiss), `zone-conduite-v2` (Warm Pressure) ; puis
+trois le soir même : `zone-chambre-v2` (Warm Dark Rest), `temps-suspendu-v2`
+(Tension Held) et `hub` (Quiet Resting Atmosphere, pour un lit du hub qui
+n'existe pas encore dans la bande-son). Rien ne remplace rien tant que
+l'oreille n'a pas tranché.
 
 Mesuré sur les cinq masters (mêmes sondes que les lits livrés) : 0 % d'énergie
 au-dessus de 3 kHz, enveloppe entre ±2,1 et ±3,9 dB. Le point de coupe de

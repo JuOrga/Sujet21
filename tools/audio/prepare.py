@@ -48,6 +48,14 @@ BOUCLES = [
     ('cuve-glaciale-v2.mp3', 'cuve-glaciale-v2.mp3', 21.0, 40.0, -23.0, 56),
     ('zone-hublot-v2.mp3', 'zone-hublot-v2.mp3', 56.0, 30.0, -24.0, 48),
     ('zone-conduite-v2.mp3', 'zone-conduite-v2.mp3', 74.0, 30.0, -24.0, 48),
+    # Trois de plus le soir même. Le titre Suno reste dans l'écoute ; le nom
+    # de fichier est le tiroir où l'oreille les entend : Warm Dark Rest pour
+    # la chambre pressurisée, Tension Held pour le temps suspendu (ici en
+    # boucle de 30 s pour l'écoute — le jeu, lui, n'en garde que 10,6 s),
+    # Quiet Resting Atmosphere pour un lit du hub, qui n'existe pas encore.
+    ('zone-chambre-v2.mp3', 'zone-chambre-v2.mp3', 15.0, 30.0, -24.0, 48),
+    ('temps-suspendu-v2.mp3', 'temps-suspendu-v2.mp3', 23.0, 30.0, -22.0, 48),
+    ('hub.mp3', 'hub.mp3', 62.0, 40.0, -23.0, 56),
     # La nappe de vapeur : la seule boucle pilotée à la frame par le jeu
     # (setGasLevel). Tout son contenu tient sous 800 Hz — pas un souffle
     # d'aigu — donc 48 kbps suffisent largement. Elle est livrée déjà bouclée

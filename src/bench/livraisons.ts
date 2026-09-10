@@ -31,6 +31,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '10/09/2026 20:20',
+    title: 'TROIS CANDIDATES DE PLUS dans l’écoute : la chambre, le temps suspendu, un lit pour le hub',
+    notes: [
+      'LA DEMANDE : « 3 musiques supplémentaires » — Tension Held, Warm Dark Rest, Quiet Resting Atmosphere, générées sur les prompts M6 à M10.',
+      'MESURÉES avant d’être rangées : 0 % au-dessus de 3 kHz sur les trois ; Tension Held est la plus sourde du lot (92 % de l’énergie sous 200 Hz, centroïde à 97 Hz) — le tiroir du temps suspendu, un drone ; Warm Dark Rest (175 Hz, enveloppe ±2,0 dB) va à la chambre pressurisée ; Quiet Resting Atmosphere, la plus plate de toutes les candidates (±1,5 dB), est proposée comme lit du hub, un tiroir que la bande-son n’a pas encore. Le titre Suno reste dans l’écoute : si le tiroir est mal deviné, rien n’est perdu.',
+      'L’ÉCOUTE passe à quatorze pistes. Le temps suspendu s’y entend en boucle de 30 s pour juger la matière ; le jeu, lui, n’en garderait que 10,6 s.',
+      'VÉRIFIÉ : les trois boucles fabriquées par la chaîne (176, 176 et 274 Ko), 1067 tests verts dans 99 fichiers, type-check à 0, build propre.',
+    ],
+  },
+  {
     date: '10/09/2026 18:31',
     title: 'L’ÉCOUTE : cinq musiques candidates, et un mini-lecteur sur l’accueil pour se faire une oreille',
     notes: [
