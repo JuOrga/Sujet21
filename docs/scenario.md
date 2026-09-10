@@ -169,7 +169,18 @@ semblables, douche/mutations.
     trio de gestes dans l'écran TEXTES ;
   - les **séquences** du montage (domaine `sequences`) : publier celles du
     poste, reprendre une publiée (même code) pour la retoucher, retirer ;
-    le poste prime par code.
+    le poste prime par code ;
+  - les **avaries du module** (`src/game/avariesPartage.ts`, domaine
+    `avaries`) : l'écran LES AVARIES de la régie (`src/editor/regieAvaries.ts`)
+    règle le prix en mémoire de chaque station, sa plaque, son pictogramme,
+    la ligne de sa remise en état, les trois effets de sa panne (le module
+    s'assombrit, les écrans du plot s'éteignent, une porte condamne l'aile),
+    l'ordre du TABLEAU DES AVARIES et si la station fait encore partie de
+    l'accident. Ce qui se règle joue tout de suite sur le poste (le hub se
+    remodèle à chaud, le tableau du joueur suit) ;
+    PUBLIER POUR TOUS le fait jouer partout. L'IDENTIFIANT d'une station,
+    lui, ne se règle pas : c'est la clé du plot dans le hub, de l'ancre
+    dans l'éditeur et de la réparation payée dans la sauvegarde.
   Partout, l'écran dit ce que les joueurs jouent et ce que ce poste joue.
 - **LA RÉGIE** (`src/editor/regie.ts`, bouton RÉGIE de l'accueil) : la
   console du concepteur. Un rail vers chaque outil du système de run, la

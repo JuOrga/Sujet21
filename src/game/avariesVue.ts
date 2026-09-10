@@ -21,7 +21,7 @@
 // CONSOLE, le reste est de l'ÉNERGIE. Réécrire une station la range
 // toute seule.
 
-import { REPARATIONS, type ReparationDef } from './reparations'
+import { avaries, type ReparationDef } from './reparations'
 
 export type SecteurId = 'tout' | 'energie' | 'consoles' | 'acces'
 
@@ -120,10 +120,13 @@ function etatDe(r: ReparationDef, s: EtatAvaries): EtatStation {
   return s.memoire >= r.prix ? 'payable' : 'solde-court'
 }
 
-/** Toutes les stations du catalogue, lues face aux registres, dans
- *  l'ordre du catalogue (c'est aussi l'ordre des plots du module). */
+/** Toutes les stations du catalogue JOUÉ, lues face aux registres, dans
+ *  l'ordre du catalogue (c'est aussi l'ordre des plots du module). Joué et
+ *  non livré : la régie règle les prix et les plaques, et les publie pour
+ *  tout le monde (avariesPartage.ts) — le tableau doit dire ce que le
+ *  module fait payer, pas ce que le code portait. */
 export function stations(s: EtatAvaries): StationVue[] {
-  return REPARATIONS.map((r, i) => ({
+  return avaries().map((r, i) => ({
     id: r.id,
     secteur: secteurDe(r),
     rang: i + 1,
