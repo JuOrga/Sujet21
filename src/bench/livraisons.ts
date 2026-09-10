@@ -31,6 +31,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '10/09/2026 23:18',
+    title: 'L’AVIS SUR UNE MUSIQUE : +1, −1 ou neutre au bout de la ligne ÉCOUTE, partagé',
+    notes: [
+      'LA DEMANDE : sur le lecteur de l’accueil, « pouvoir mettre un +1 ou −1 ou neutre » — pour qu’au fil des musiques le concepteur marque celles qui sont bien et celles qu’on ne veut pas, et que ce tri soit partagé.',
+      'TROIS TOUCHES au bout de la ligne ÉCOUTE (−1, ○, +1), éteintes tant que rien ne joue. La touche enfoncée porte la couleur de son verdict (vert : retenue, rouge : écartée) et le titre le rappelle : « 4/14 · Cuve tiède (coque chaude) · retenue par JULIEN ». À l’arrêt, le titre donne le bilan : « 3 retenues, 2 écartées ».',
+      'UN VERDICT PAR PISTE, le dernier fait foi, signé du nom de la borne (celui des records, « anonyme » sans nom) et daté. Le NEUTRE n’est pas une valeur rangée : c’est l’absence de ligne — remettre au neutre la retire. Ce n’est pas un vote à dépouiller, c’est une note de tri qu’on pose et qu’on reprend.',
+      'PARTAGÉ (game/ecouteAvis.ts, domaine « ecoute » du magasin /api/reglages — pas de fonction Vercel de plus, le plan Hobby en compte douze) : chargé à l’ouverture de l’accueil en mode concepteur, jamais par un joueur. La publication est différée de 800 ms et regroupée : trois touches coup sur coup ne coûtent qu’une écriture au magasin (2 put + 1 list). Avant d’écrire, on relit le publié pour poser nos avis PAR-DESSUS : deux concepteurs qui trient en même temps ne s’effacent pas — à la fenêtre près du cache de lecture, 15 s, accepté. Hors ligne ou refusé, les avis restent en main, le titre dit « avis non publié », la prochaine touche retente.',
+      'LE SERVEUR ne connaît pas la forme : la relecture ramène le document dans ses bornes — seules les pistes que l’écoute connaît comptent (un avis sur un fichier disparu ne survit pas), seuls +1 et −1 sont des avis, l’auteur tient en quarante signes.',
+      'VÉRIFIÉ : cinq tests sur l’avis (pose, neutre qui retire, dernier qui fait foi, bornes de relecture, aller-retour JSON, bilan et lignes du titre). 1072 tests verts dans 100 fichiers, type-check à 0, build propre. Comme pour le lecteur, le jeu complet ne se monte pas dans le Chromium sans tête de l’environnement : les touches n’ont pas été cliquées dans un navigateur ici — à voir sur l’aperçu (previsu-go).',
+    ],
+  },
+  {
     date: '10/09/2026 20:26',
     title: 'LA REVUE DE LA BRANCHE : un constat sur l’écoute, corrigé avant la PR vers dev',
     notes: [
