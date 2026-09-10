@@ -141,6 +141,8 @@ la famille. Elle **mesure** chaque image et refuse ce qui sort :
 | planche de cinématique | 1600×900 | luminance ≤ 0,50, poids ≤ 260 Ko |
 | décalque (pièces détourées) | côté ≤ 1600 | couche alpha exigée, bord transparent, poids ≤ 350 Ko |
 | planche de vues (animation) | libre | couche alpha, poids ≤ 600 Ko |
+| illustration d'avarie (`avaries/`) | 640×360 | luminance ≤ 0,45, poids ≤ 120 Ko — une image d'écran, la charte de la cuve ne s'y applique pas |
+| aperçu du codex (`codex/`) | côté ≤ 640 | luminance ≤ 0,55, poids ≤ 120 Ko |
 
 Le sens de chaque mesure est dans l'en-tête du script. Les seuils sont
 ceux que les images **réussies** respectent, relevés le jour où le script
@@ -148,9 +150,10 @@ est entré : une texture dont le raccord se voit mesure 4,6, celles qu'on
 ne voit pas se répéter tiennent entre 1,0 et 2,5.
 
 `python3 tools/images/prepare.py --audit` mesure ce qui est déjà livré :
-au 08/09/2026, 52 images, 4 hors mesure (la grille et le vieux mur, dont
+au 10/09/2026, 59 images, 4 hors mesure (la grille et le vieux mur, dont
 la couture se voit ; le fond de cuve, à la limite ; la vanne, coupée par
-son cadre sur 11 % du bord).
+son cadre sur 11 % du bord). Ce qu'il en faut faire, et dans quel ordre,
+est dans [`assets-chantier.md`](assets-chantier.md).
 
 ## 8. Le mouvement
 

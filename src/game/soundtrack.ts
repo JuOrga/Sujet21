@@ -174,6 +174,14 @@ export class Soundtrack {
   private zone: Piste | null = null
   private ambiance: Piste | null = null
   private eveille = false
+  // L'ÉCOUTE (le mini-lecteur de l'accueil) : une piste jouée à la demande,
+  // à la place du lit d'accueil, par le même bus — on entend ce que le
+  // joueur entendrait, au même volume et sous le même passe-bas.
+  private ecouteNom: string | null = null
+  private ecouteVoix: Voix | null = null
+  /** Appelé quand l'écoute change de piste ou s'arrête — y compris quand
+   * c'est le jeu qui l'arrête en quittant l'accueil. */
+  onEcoute: ((fichier: string | null) => void) | null = null
 
   constructor(private readonly fx: AudioFx) {}
 
@@ -194,6 +202,12 @@ export class Soundtrack {
     this.post = g.post
     this.eveille = true
     this.applique()
+    // une écoute demandée son coupé (le titre le disait) part dès que le son
+    // revient — sans ce rattrapage elle restait muette jusqu'au clic suivant
+    if (this.ecouteNom) {
+      void this.ouvrirEcoute(this.ecouteNom)
+      this.onEcoute?.(this.ecouteNom)
+    }
   }
 
   // ---- Pilotage (appelé par le jeu) ----
@@ -201,7 +215,36 @@ export class Soundtrack {
   setScene(s: Scene): void {
     if (this.scene === s) return
     this.scene = s
+    // l'écoute n'a de sens que sur l'accueil : la cuve reprend sa bande-son
+    if (s !== 'accueil') this.ecoute(null)
     this.applique()
+  }
+
+  /** L'écoute : joue `fichier` (public/sound/<fichier>.mp3) en boucle à la
+   * place du lit d'accueil ; null l'arrête et rend le lit. Sans effet tant
+   * que la bande-son n'est pas éveillée (son coupé) : rien n'est téléchargé. */
+  ecoute(fichier: string | null): void {
+    if (fichier === this.ecouteNom) return
+    this.ecouteNom = fichier
+    this.ecouteVoix?.stop()
+    this.ecouteVoix = null
+    this.applique()
+    this.onEcoute?.(fichier)
+    if (fichier) void this.ouvrirEcoute(fichier)
+  }
+
+  /** La piste en écoute, ou null. */
+  ecouteEnCours(): string | null {
+    return this.ecouteNom
+  }
+
+  private async ouvrirEcoute(fichier: string): Promise<void> {
+    if (!this.eveille) return
+    const buf = await this.charge(fichier)
+    // le temps du chargement, on a pu passer à une autre piste ou s'arrêter
+    if (!buf || !this.ctx || !this.musique || this.ecouteNom !== fichier || this.ecouteVoix) return
+    this.ecouteVoix = new Voix(this.ctx, this.musique, buf)
+    this.ecouteVoix.niveau(0.85, XFADE)
   }
 
   /** Refroidissement de la coque, 0 (tiède) → 1 (glaciale). */
@@ -238,7 +281,8 @@ export class Soundtrack {
     const lit: Piste | 'paire' | null = jeu ? (this.ambiance ?? 'paire') : null
     for (const p of PISTES) {
       let v = 0
-      if (p === 'accueil') v = this.scene === 'accueil' ? 0.85 : 0
+      // le lit d'accueil se tait pendant une écoute : c'est sa place qu'elle prend
+      if (p === 'accueil') v = this.scene === 'accueil' && !this.ecouteNom ? 0.85 : 0
       else if (lit === 'paire' && p === 'cuve-tiede') v = (1 - this.chill) * attenue
       else if (lit === 'paire' && p === 'cuve-glaciale') v = this.chill * attenue
       else if (lit === p) v = attenue

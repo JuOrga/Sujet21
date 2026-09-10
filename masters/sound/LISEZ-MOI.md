@@ -39,6 +39,15 @@ matière plutôt que sur les fondus.
 `vaporisation.wav` (la floraison chaude) a remplacé le jet sous pression :
 l'ancien master est gardé sous `vaporisation-v1-jet.mp3`, plus référencé.
 
+## Les candidates (`-v2`)
+
+Un master en `-v2` est une piste **regénérée à côté** de celle qui joue,
+sans la remplacer : le jeu la livre sous le même suffixe dans `public/sound/`
+et le mini-lecteur ÉCOUTE de l'accueil (mode concepteur) la fait entendre en
+face de l'originale. Promouvoir une candidate, c'est lui donner le nom de
+sortie du lit qu'elle remplace dans `BOUCLES` et garder l'ancien master sous
+`-v1`. Détail dans `docs/assets-audio.md`, « Les candidates, et l'écoute ».
+
 ## Ce qui manque encore
 
 Les deux finales (`finale-pure`, `finale-souillee`) ne sont pas générées.
