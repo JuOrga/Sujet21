@@ -13,6 +13,9 @@ que dans `public/assets/`) et lancez `python3 tools/images/prepare.py` : il livr
 bord, poids). Une image hors mesure n'est pas livrée. J'assure l'intégration WebGL
 (raccords, étirement, animation de l'iris du sas…).
 
+**Par où commencer** : [`assets-chantier.md`](assets-chantier.md) tient l'état des
+lieux mesuré et la commande dans l'ordre — quoi refaire, quoi générer, quoi filmer.
+
 ## Conseils selon le générateur
 
 - **Midjourney** : ajoutez `--tile` aux textures répétées, `--ar 1:1` par défaut,
@@ -51,8 +54,12 @@ edges, flat 2D game texture, no perspective, no text
 ```
 Négatif : `perspective, depth of field, bright lighting, warm colors, logo, text, watermark`
 
-## 3. Coin de coque
+## 3. Coin de coque — SANS EMPLOI, ne pas générer
 **512×512 · PNG transparent**
+
+Aucune ligne du moteur ne charge une pièce de coin (10/09/2026) : la coque se
+dessine en bande (§2) et le raccord entre deux modules revient au sas de
+raccord (§16). Le prompt reste pour mémoire.
 
 ```
 Corner junction piece of a spaceship hull frame, 90 degree L-shape, flat orthographic
@@ -63,28 +70,44 @@ no text
 ```
 Négatif : `background, floor, shadow on ground, perspective, text`
 
-## 4. Bouche du sas (iris mécanique) — PRIORITAIRE
+## 4. Bouche du sas (iris mécanique) ✗ À REFAIRE
 **1024×1024 · PNG transparent · parfaitement centré**
 
-```
-Circular sci-fi airlock iris seen perfectly from the front, centered in frame,
-mechanical shutter blades arranged radially like a camera aperture, deep black center
-hole, glowing emerald green ring (#3fd69b) around the opening, dark brushed steel
-outer frame with bolts, retro-futuristic 1970s laboratory style, muted cold palette,
-subtle rim light, symmetrical, orthographic, isolated on transparent background,
-flat 2D game sprite, no text
-```
-Négatif : `perspective, tilt, off-center, motion blur, bright colors, text`
-
-## 5. Texture mur neutre
-**512×512 · PNG · tileable**
+L'iris livré est **opaque sur un fond brun** (33 % de pixels chauds, la
+famille ne le tolère qu'à moitié) et son anneau est **vert** — la charte
+réserve le vert à la serre et fait de l'iris l'accent **cyan** (§3 de la
+charte) ; ses veilleuses, elles, sont **ambre**, comme celles du sas de
+raccord (§16), dont il doit se lire comme le frère. À refaire **après** le
+sas de raccord, avec celui-ci en référence de style.
 
 ```
-Seamless tileable texture of a dark brushed metal wall panel, steel blue-grey
-(#10151c), fine directional brushing, subtle plate seams and small screws, matte
-finish, low contrast, evenly lit, flat 2D game texture, perfect tiling, no text
+[PRÉAMBULE — charte §5]
+Circular mechanical airlock iris seen perfectly from the front, centered in
+frame, shutter blades arranged radially like a camera aperture, deep black
+centre hole, one thin glowing cyan ring (#63b7e6) around the opening, dark
+riveted steel outer frame with bolts and weld seams, four small square amber
+indicator lamps (#e8951f) evenly spaced on the frame, worn paint, symmetrical,
+orthographic, isolated on transparent background, flat 2D game sprite
 ```
-Négatif : `rust, warm tones, strong highlights, perspective, text`
+Négatif : négatif commun + `green, emerald, brown background, perspective,
+tilt, off-center, motion blur`
+
+## 5. Texture mur neutre — `wall.webp` ✗ À REFAIRE
+**1024×1024 · PNG · tileable sur les deux axes**
+
+Le mur par défaut montre sa couture : raccord vertical **4,7** (seuil 3,0),
+mesuré le 10/09. La seconde paroi (`wall-a.webp`, 1,0 / 1,7) tient, elle :
+c'est **la référence de style** de cette famille, à passer au générateur.
+
+```
+[PRÉAMBULE — charte §5]
+Seamless tileable texture of a dark brushed steel wall panel seen flat, steel
+blue-grey (#10151c), fine directional brushing, subtle plate seams and small
+screws, matte finish, low contrast, the seams and brushing continuing exactly
+across all four edges so the texture repeats on both axes with no visible
+join, in the exact style of the attached reference (wall-a.webp)
+```
+Négatif : négatif commun + `rust, strong highlights, panel border, frame`
 
 ## 6. Texture paroi hydrophobe
 **512×512 · PNG · tileable**
@@ -141,8 +164,13 @@ with pale highlights (#a7ddf5), one small emerald green indicator light (#3fd69b
 ```
 Négatif : `text, letters, numbers, labels, astronaut, faces, warm colors`
 
-## 10. Écusson de mission (optionnel)
+## 10. Écusson de mission — livré OPAQUE, à détourer
 **1024×1024 · PNG transparent · sans texte (je pose « PROJET 21 » en typo par-dessus)**
+
+L'écusson livré (`badge.webp`, l'accueil) est **opaque sur un fond brun**
+(21 % de pixels chauds) alors que le prompt le voulait détouré. Priorité
+basse : une version transparente, ou le même master rendu sur fond noir,
+et je détoure.
 
 ```
 Circular embroidered space mission patch, a stylized water droplet floating in zero
@@ -361,7 +389,8 @@ Gouttière, Gouttière (2) et Machinerie. On trace un rectangle, la pièce s'y
 loge ; la sorte se rechange ensuite dans le panneau.
 
 Restent à générer : la ROQUETTE (14a) et les TOMATES (14c). Mêmes règles, même
-traitement à l'arrivée — envoyez les images, je les intègre.
+traitement à l'arrivée — envoyez les images, je les intègre. **Toujours
+manquantes au 10/09/2026** (`docs/assets-chantier.md`).
 
 **Un mot sur le détourage** : les fonds transparents arrivent souvent avec un
 liséré vert (fond incrusté) et des poussières de pixels. Je les nettoie à
@@ -537,7 +566,11 @@ Vecteurs SVG (logo, cadres, icônes, écusson au trait) et textures procédurale
 shader (le décor actuel : étoiles, nébulosité, caustiques, métal brossé…). Les
 prompts ci-dessus visent Midjourney, DALL·E, Flux, Stable Diffusion, etc.
 
-## 16. LE SAS DE RACCORD — `sas-raccord.webp` et `sas-raccord-v.webp` — PRIORITAIRE
+## 16. LE SAS DE RACCORD — `sas-raccord.webp` et `sas-raccord-v.webp` — PRIORITÉ 1
+
+**Toujours manquant au 10/09/2026.** Le moteur pose déjà la pièce à chaque
+jonction (quatorze sur le module Méduse) et n'attend que le fichier : c'est
+l'image qui change le plus le jeu pour un seul prompt.
 
 **Référence fournie par le concepteur : `docs/reference/sas-raccord-reference.png`.**
 C'est elle qui fait foi — les lignes ci-dessous ne font que la traduire en
@@ -658,4 +691,488 @@ comme le reste.
 **Ce qui vaut la peine d'être animé** (dans cet ordre) : la vanne (elle
 tourne), l'écran allumé (il scintille), la gouttière de la serre (l'eau y
 coule), le blé nain (il ondule). Pas le sas de raccord ni les fioles : rien
-n'y bouge par nature.
+n'y bouge par nature. **Aucune bande n'est livrée au 10/09/2026.**
+
+**La phrase du mouvement, pièce par pièce** (à substituer dans le gabarit
+ci-dessus ; la vanne a la sienne en §19, après sa reprise) :
+
+| bande | seulement ceci bouge | durée · vues |
+| --- | --- | --- |
+| `decal-ecran-on-anime.webp` | `the glowing screen content: faint scanlines drift downward, the pale diagram on the screen redraws itself slowly, one small indicator lamp blinks twice; the housing, cables and knobs do not move` | 2 s · 12 vues |
+| `serre-rampe-anime.webp` (et `-a`) | `the faint cyan nutrient water inside the gutter: it flows steadily from left to right with small ripples; the LED bar, brackets and gutter body do not move` | 2 s · 12 vues |
+| `serre-ble-nain-anime.webp` | `the wheat stalks and ears: they sway very gently as in a slow draft, a few millimetres, returning to rest; the tray and pebbles do not move` | 2 s · 12 vues |
+
+Une bande est **transparente** : demandez la vidéo sur fond uni noir ou
+vert si le générateur ne sort pas d'alpha, `planche.py` détoure ensuite les
+vues (`--sans-alpha`), et vérifiez la première et la dernière vue côte à
+côte — si elles diffèrent, la boucle saute.
+
+---
+
+## 18. LES SURFACES À REFAIRE — `grille.webp`, `tank-bg.webp` (et `wall.webp`, §5)
+
+Trois textures répétées montrent leur couture : `prepare.py --audit` du
+10/09 mesure la grille à **4,6 / 4,7**, le vieux mur à **1,9 / 4,7**, le
+fond de cuve à **3,2 / 1,9** — le seuil est 3,0. On les voit se répéter
+dans toute cuve un peu large. Les trois sont des tuiles de 1024², sans
+transparence, `--tile` chez Midjourney, *seamless* ailleurs. Avant d'envoyer,
+`python3 tools/images/prepare.py --verifie <nom>` dit le raccord ; si le
+générateur ne tient pas la couture de la grille, envoyez quand même : un
+panneau perforé se recadre à un nombre entier de trous, je le fais.
+
+### 18a. L'évent — `grille.webp` ✗ À REFAIRE
+**1024×1024 · tileable · pas de transparence · luminance ≤ 0,32**
+
+```
+[PRÉAMBULE — charte §5]
+Seamless tileable texture of a dark perforated steel vent panel seen flat
+from directly above: a strictly regular square grid of small round holes
+punched through dull blue-grey sheet metal (#10151c to #2a3542), each hole
+a pure black void with a faint countersunk rim, the hole pattern continuing
+EXACTLY across all four edges so the texture repeats with no visible seam,
+matte finish, low contrast, uniform grain
+```
+Négatif : négatif commun + `rust, hexagonal mesh, warped grid, uneven holes,
+large holes, bright reflections, panel border`
+
+### 18b. Le fond de cuve — `tank-bg.webp` ✗ À REFAIRE
+**1024×1024 · tileable · pas de transparence · luminance visée 0,10 à 0,15**
+
+Le fond est ce qu'on voit sous l'eau : il doit rester **plus sombre que les
+parois** (0,17). Le liséré cyan tourne aujourd'hui en boucle sans retomber
+sur lui-même au bord ; c'est lui qui trahit la couture.
+
+```
+[PRÉAMBULE — charte §5]
+Seamless tileable texture of the floor of a laboratory containment tank
+seen flat from directly above: large dark riveted steel plates (#0a1420)
+with thin recessed seams, a few flush conduit covers and small square drain
+grilles, two thin straight cyan trim lines (#63b7e6) crossing the whole
+tile and meeting their own ends exactly at the edges, very low brightness,
+uniform grain, perfect tiling on both axes
+```
+Négatif : négatif commun + `water, puddles, reflections, rust, diagonal
+lines, bright lines, panel border`
+
+---
+
+## 19. LA VANNE, REPRISE — `decal-vanne.webp` ✗ À REFAIRE, puis `decal-vanne-anime.webp`
+
+**1024×1536 (rapport 2:3, imposé) · PNG/WebP TRANSPARENT · décalque**
+
+La vanne livrée est **coupée par son cadre sur 11 % du bord** : son tuyau
+file hors de l'image en haut et en bas, et la pièce se lit comme une
+vignette collée dès qu'on la pose seule. Le rapport 2:3 ne se discute pas :
+les tableaux la posent en 190×285 et 150×225, une autre forme se
+centrerait plus petite. C'est aussi la **première pièce à animer** (§17) —
+refaire la fixe d'abord, la bande ensuite, depuis la fixe livrée.
+
+```
+[PRÉAMBULE — charte §5]
+Flat orthographic FRONT elevation of a large industrial valve on a short
+vertical pipe section: a heavy cast-iron handwheel with six spokes seen
+exactly face on, mounted on a bonnet with a packing nut, the pipe ending
+ABOVE and BELOW in bolted flanges that sit fully INSIDE the frame with a
+clear transparent margin all around, one thin cyan trim ring (#63b7e6) on
+the bonnet, riveted wall brackets, worn paint, isolated on transparent
+background, flat 2D game sprite, no ground shadow
+```
+Négatif : négatif commun + `pipe leaving the frame, cropped, cut off,
+background, ground shadow, tilt, three-quarter view`
+
+**La bande animée**, depuis la fixe livrée (image-vers-vidéo) :
+
+```
+Animate this exact image as a seamless loop: static camera, no zoom, no pan,
+nothing enters or leaves the frame, the background stays perfectly still and
+transparent; only the HANDWHEEL turns — one slow full clockwise rotation,
+constant speed, the pipe and brackets do not move. 2 seconds, loop the first
+and last frames identically. Keep the exact colors and lighting.
+```
+Puis `planche.py decal-vanne <vidéo>` et `prepare.py decal-vanne-anime` :
+huit vues suffisent à une roue à six rayons (le mouvement se referme).
+
+---
+
+## 20. LES STATIONS DU HUB — cinq décalques pour le module Méduse
+
+Le hub est le tableau le plus joué, et ses **stations** (celles du tableau
+des avaries) n'y sont que des plots nus : un rectangle au sol que le corps
+touche pour payer la réparation. Leur illustration existe pour l'écran
+(`public/assets/avaries/`), pas pour la cuve. Cinq pièces de machinerie,
+dans la famille de l'écran de contrôle et de la vanne (**vue de FACE
+orthographique**, détourée, sans ombre au sol), posées sur le plot de
+chaque station. Les rapports sont **ceux des plots** (`src/game/hub.ts`) :
+un décalque se centre à son rapport, une autre forme se poserait plus
+petite.
+
+L'aile des endormis a déjà ses fioles ; la passerelle est un passage : pas
+de pièce pour ces deux-là. **Une seule image par station**, en état de
+marche — comme pour l'écran des avaries, c'est le moteur qui assombrit le
+module en panne.
+
+Déposez sous ces noms exacts ; j'ajoute les sortes à l'éditeur (groupe
+« Décor (sans physique) ») et je les pose sur les plots à la livraison.
+
+### 20a. Le réseau d'éclairage — `hub-eclairage.webp`
+**1024×1024 (1:1) · transparent**
+
+```
+[PRÉAMBULE — charte §5]
+Flat orthographic front view of a wall-mounted electrical distribution
+cabinet with its door open: rows of large lever switches and ceramic fuse
+cartridges on a dark steel backplate, bundled cables leaving through the
+top in a tray, one small unlit indicator lamp per row, engraved blank
+plates (no letters), worn paint and grime in the recesses, isolated on
+transparent background, flat 2D game sprite, no ground shadow
+```
+Négatif : négatif commun + `text, numbers, glowing, sparks, background,
+ground shadow, three-quarter view`
+
+### 20b. La table de départ — `hub-table-depart.webp`
+**1536×512 (3:1) · transparent**
+
+```
+[PRÉAMBULE — charte §5]
+Flat orthographic front view of a long low launch console bench: a dark
+steel body with a slanted top carrying a row of round pressure gauges with
+blank dials, a brass hand rail along the front edge, a chart table surface
+with faint grid lines on the right, a few rotary knobs and toggle switches,
+one thin cyan trim line (#63b7e6) along the base, rivets and worn edges,
+isolated on transparent background, flat 2D game sprite, no ground shadow
+```
+Négatif : négatif commun + `text, numbers, screen content, chair, glowing,
+background, ground shadow`
+
+### 20c. Le mur des records — `hub-mur-records.webp`
+**1536×439 (3,5:1) · transparent**
+
+```
+[PRÉAMBULE — charte §5]
+Flat orthographic front view of a long wall panel of mechanical record
+counters: rows of split-flap display windows all BLANK (no digits, no
+letters), small engraved nameplates left empty, a few round dial gauges
+with plain needles, a brass frame around the whole panel, dark riveted
+steel, one thin cyan trim line (#63b7e6) along the top edge, worn paint,
+isolated on transparent background, flat 2D game sprite, no ground shadow
+```
+Négatif : négatif commun + `text, numbers, letters, digits, screen,
+glowing, background, ground shadow`
+
+### 20d. Le bac d'essai — `hub-bac-sable.webp`
+**1024×1024 (1:1) · transparent**
+
+```
+[PRÉAMBULE — charte §5]
+Flat orthographic front view of a square laboratory test basin: a shallow
+open steel tray on a riveted stand, a grid of calibration marks etched on
+the inner back wall (plain ticks, no digits), four small adjustable
+nozzles on the rim, a drain valve underneath, a faint film of cyan-tinted
+water (#63b7e6) at the bottom of the tray, dark blue-grey metal, worn
+edges, isolated on transparent background, flat 2D game sprite, no ground
+shadow
+```
+Négatif : négatif commun + `text, numbers, sand, soil, glowing,
+background, ground shadow`
+
+### 20e. Le distillateur de primes — `hub-distillateur.webp`
+**1024×1024 (1:1) · transparent**
+
+```
+[PRÉAMBULE — charte §5]
+Flat orthographic front view of a laboratory distillation column: a squat
+boiler at the base, a tall riveted steel column with three glass bulbs
+holding pale blue liquid (#a7ddf5), a condenser coil of dull copper on the
+side, small valves and a round pressure gauge with a blank dial, one small
+amber pilot lamp (#e8951f) near the base, weld seams and worn paint,
+isolated on transparent background, flat 2D game sprite, no ground shadow
+```
+Négatif : négatif commun + `text, numbers, purple neon, glowing liquid,
+bright colors, background, ground shadow`
+
+---
+
+## 21. DEUX PLAFONDS DE PLUS — `plafond-serre.webp`, `plafond-hub.webp`
+
+Six variantes sont livrées (§13) et **aucun tableau n'en demande une** au
+10/09 — je les attribue de mon côté (givre → chambre froide et dépôt de
+givre, chaufferie → cuve thermique, hélice → conduit et évent, brèche →
+galerie noyée, planète → dérive, observatoire → miroirs et prisme). Manquent
+les deux salles qui ont le plus de caractère : la serre, et le hub.
+
+Même famille que §13 : 1024² vu du DESSOUS, sombre (luminance ≤ 0,24), les
+verrières et barres plus claires que tout le reste, répété en miroir (pas
+de raccord à tenir).
+
+### 21a. `plafond-serre.webp`
+
+```
+[PRÉAMBULE — charte §5]
+Looking straight UP at the ceiling of a hydroponic greenhouse bay in a
+1970s orbital laboratory, orthographic view from below: dark crossing
+beams and cable trays, several long horticultural light bars glowing cold
+white (#d6e8f5) with a faint green cast (#3fd69b) at their ends, hanging
+drip lines and misting nozzles, condensation beads on the dark metal, a
+few round portholes showing black space, the lit bars clearly brighter
+than everything else, flat 2D game texture
+```
+Négatif : négatif commun + `plants hanging into view, leaves, sunlight,
+warm light, pink, magenta, floor, people`
+
+### 21b. `plafond-hub.webp` — le module Méduse
+
+```
+[PRÉAMBULE — charte §5]
+Looking straight UP at the ceiling of the central hub module of a 1970s
+orbital laboratory, orthographic view from below: one large round skylight
+in the middle with radial mullions like the ribs of a jellyfish bell, glass
+glowing cold white (#d6e8f5) over black space with sparse stars, a ring of
+small round portholes around it, dark riveted structure with cable trays
+and thick pipes between them, the glass clearly brighter than everything
+else, flat 2D game texture
+```
+Négatif : négatif commun + `floor, furniture, people, warm colors, planet,
+sun, moon, lens flare`
+
+---
+
+## 22. LES PLANCHES DE LA RÉVÉLATION ET DU MIROIR — six planches de cinématique
+
+Deux cinématiques jouent aujourd'hui sur des planches **recyclées** de
+l'ouverture (`src/game/cinematique.ts`) : LA RÉVÉLATION (le sceau tombe,
+trois battements) et LE MIROIR (la fin de l'arc, quatre battements). Six
+planches, trois par cinématique, même famille que §11 : **1600×900**, marge
+sur les bords, aucun texte, luminance ≤ 0,50, ≤ 260 Ko. Elles ne se
+chargent qu'à la lecture de leur cinématique.
+
+Les répliques posées par le lecteur (rappel, pour l'image, pas pour le
+prompt) :
+
+| fichier | battement | réplique |
+| --- | --- | --- |
+| `revelation-1.webp` | tout est consigné, tout est lu | « Il ne reste rien à cacher. » |
+| `revelation-2.webp` | la porte scellée | « Quelqu'un avait scellé cette porte en sachant ce qu'il faisait. » |
+| `revelation-3.webp` | le secteur 4 s'ouvre | « Le sceau n'a plus de raison de tenir. » |
+| `miroir-1.webp` | le convoyeur | « La route du plasma mène au convoyeur. Le convoyeur mène là-haut. » |
+| `miroir-2.webp` | le télescope sans son miroir | « Un télescope achevé à un miroir près attend son œil. » |
+| `miroir-3.webp` | le choix (deux battements) | « Devenir l'œil qui regarde l'univers… » |
+
+### 22a. `revelation-1.webp`
+```
+[PRÉAMBULE — charte §5]
+Wide cinematic frame, 16:9: the archive room of the laboratory, walls of
+reel-to-reel tape decks and rows of bulbous cathode screens all lit with
+pale cyan static, stacks of bound logbooks and pinned charts with no
+readable writing, a single reading lamp off, dust in the still air, quiet
+and exposed, cold palette
+```
+Négatif : négatif commun + `readable text, letters, numbers, people,
+modern computers, flat screens`
+
+### 22b. `revelation-2.webp`
+```
+[PRÉAMBULE — charte §5]
+Wide cinematic frame, 16:9: a heavy bulkhead door seen from the front,
+welded shut with a thick steel seal plate and crossed bars, a single
+hand-painted diagonal stripe of dull red (#c8524a) across the seal, chains
+and a padlock, frost at the joints, the corridor around it dark and still,
+cold palette
+```
+Négatif : négatif commun + `text, symbols, people, open door, bright
+light`
+
+### 22c. `revelation-3.webp`
+```
+[PRÉAMBULE — charte §5]
+Wide cinematic frame, 16:9: the same bulkhead now OPEN, its seal plate
+fallen on the grating, cold pale light pouring through onto a long catwalk
+beyond, and far at the end a round porthole framing a distant space
+telescope against the stars, the sample as a faint glossy pool of water
+at the threshold, cold palette
+```
+Négatif : négatif commun + `text, people, warm light, lens flare`
+
+### 22d. `miroir-1.webp`
+```
+[PRÉAMBULE — charte §5]
+Wide cinematic frame, 16:9: a long inclined conveyor tube rising through
+the station, two field rails glowing dim violet (#9e6bc7) along its floor,
+thin plasma arcs jumping between them, riveted ribs receding upward, a
+hatch of cold light at the very top, cold palette with the single violet
+accent
+```
+Négatif : négatif commun + `text, people, bright neon, pink, warm colors`
+
+### 22e. `miroir-2.webp`
+```
+[PRÉAMBULE — charte §5]
+Wide cinematic frame, 16:9: inside the observatory dome of a 1970s orbital
+laboratory, a huge telescope tube seen from behind, its primary mirror cell
+EMPTY — a bare circular cradle of steel spokes where the mirror should be —
+stars and a faint nebula through the glass dome above, cables and a
+maintenance gantry, cold blue-violet palette (#c99aff accents)
+```
+Négatif : négatif commun + `text, people, a mirror in place, bright
+light, sun, planet`
+
+### 22f. `miroir-3.webp`
+```
+[PRÉAMBULE — charte §5]
+Wide cinematic frame, 16:9: the empty mirror cradle of the great telescope
+now holding a perfect wobbling disc of water, its glossy surface reflecting
+the whole starfield and the nebula like a liquid mirror, one small mint
+green core (#a9ffd6) glowing quietly inside the water, the dome and the
+stars beyond, calm and immense, cold palette
+```
+Négatif : négatif commun + `text, people, face, eye, warm colors, lens
+flare`
+
+---
+
+## 23. LES PLANCHES D'ICÔNES DU CYCLE ET DES TROPHÉES — `cycle-icones.webp`, `trophees-icones.webp`
+
+Même raison que la planche du méta (§15e) : les états du cycle, les
+transformations et les trophées sont des **emoji**, qui changent de dessin
+d'une machine à l'autre. Ces glyphes sont partout — le cycle des mémoires,
+les cadenas de la carte de la station (❄ GLACE, ♨ VAPEUR), les trophées.
+Même famille que `meta-icones.webp` : la passer en référence de style
+(`--sref`), pour que les trois planches se lisent comme une seule série.
+
+**Si la grille sort mal** (c'est toujours le prompt le plus dur) : les
+icônes une par une en 512², nommées `cycle-icone-1.webp`… et
+`trophee-icone-1.webp`… dans l'ordre des tableaux, j'assemble.
+
+### 23a. Le cycle — `cycle-icones.webp`
+**1024×768 · transparent · grille 4×3 de cases 256 · 2D**
+
+| | 1 | 2 | 3 | 4 |
+|---|---|---|---|---|
+| **haut** — les états | SOLIDE (cristal) | LIQUIDE (goutte) | GAZ (nuée) | PLASMA (arc) |
+| **milieu** | FUSION (cristal → goutte) | LIQUÉFACTION (nuée → goutte) | SOLIDIFICATION (goutte → cristal) | VAPORISATION (goutte → nuée) |
+| **bas** | SUBLIMATION (cristal → nuée) | CONDENSATION (nuée → cristal) | IONISATION (nuée → arc) | DÉIONISATION (arc → nuée) |
+
+```
+[PRÉAMBULE — charte §5]
+Sheet of 12 video game icons arranged in a strict 4 by 3 grid on a fully
+transparent background, each icon centred in its own equal square cell
+with generous even margins, identical style and identical visual weight
+across all twelve. Top row, the four states: a faceted ice crystal
+(#a7ddf5), a single fat water droplet (#63b7e6), a soft rounded puff of
+vapour (#f2c98e), a small forked plasma arc (#c99aff). Middle and bottom
+rows, eight transformations, each drawn as a SMALL source symbol on the
+left turning into a SMALL target symbol on the right with a thin curved
+arrow between them: crystal→droplet, puff→droplet, droplet→crystal,
+droplet→puff, crystal→puff, puff→crystal, puff→arc, arc→puff. Flat
+orthographic 2D icons, thin crisp outlines, low saturation, subtle inner
+shading, no cell borders, no grid lines, no labels
+```
+Négatif : négatif commun + `text, letters, numbers, labels, grid lines,
+cell borders, frames, photorealism, 3d render, gold, bright neon, rainbow`
+
+### 23b. Les trophées — `trophees-icones.webp`
+**1024×512 · transparent · grille 4×2 de cases 256 · 2D**
+
+| | 1 | 2 | 3 | 4 |
+|---|---|---|---|---|
+| **haut** | SANS UNE GOUTTE (une goutte entière dans un anneau) | PALET PARFAIT (un palet de glace) | TROIS ÉTATS (cristal, goutte et nuée en triangle) | LA LIGNE DE CRÊTE (une ligne de crête, un fanion au sommet) |
+| **bas** | MIROIR VIVANT (un rayon brisé sur un cristal) | RECONDENSÉ (cinq perles sur une plaque) | L'INTÉGRALE (une orbite bouclée autour d'une station) | OPÉRATEUR DE NUIT (un croissant de lune sur un pupitre) |
+
+```
+[PRÉAMBULE — charte §5]
+Sheet of 8 video game achievement icons arranged in a strict 4 by 2 grid
+on a fully transparent background, each icon centred in its own equal
+square cell with generous even margins, identical style and identical
+visual weight across all eight: a whole water droplet inside a thin ring,
+a flat round ice puck, a crystal, a droplet and a puff of vapour arranged
+in a small triangle, a mountain ridge line with a tiny flag on the peak, a
+thin beam of light bending off a crystal, five small dew beads on a flat
+plate, a closed orbit ring around a tiny space station, a crescent moon
+over a small console. Flat orthographic 2D icons, thin crisp outlines,
+cold muted palette with cyan (#63b7e6) and ice (#a7ddf5) accents, subtle
+inner shading, no cell borders, no grid lines, no labels
+```
+Négatif : négatif commun + `text, letters, numbers, labels, grid lines,
+cell borders, frames, photorealism, 3d render, gold, trophy cup, medal,
+bright neon`
+
+---
+
+## 24. L'ATLAS DES PAROIS N° 2 — les biomes (phase 2)
+
+L'atlas livré (`paroi-atlas.webp`, huit habillages : caissons, conduites,
+poutrelle, blindage, aération, hublot, écrans, câbles) est **neutre** : la
+même paroi de la chambre froide à la cuve thermique. La carte de la station
+va de −25 °C à 72 °C, et un module se reconnaît d'abord à ses murs. Huit
+habillages de plus, trois par climat et deux pour l'observatoire.
+
+**Huit textures séparées**, `paroi-b-1.webp` à `paroi-b-8.webp`, 1024²,
+**chacune tileable sur les deux axes** (`--tile`), sans transparence,
+luminance ≤ 0,32 ; j'assemble l'atlas et j'ouvre les habillages 9 à 16 dans
+le moteur (c'est un chantier shader de mon côté : ne les générez pas avant
+que je l'aie ouvert — d'où la phase 2).
+
+| n° | climat | la pièce |
+| --- | --- | --- |
+| 1 | givre | panneaux de tôle sous une pellicule de givre, cristaux aux joints |
+| 2 | givre | conduites calorifugées prises dans la glace, stalactites courtes |
+| 3 | givre | hublot rond gelé de l'intérieur, fougères de givre sur le verre |
+| 4 | chaufferie | tôle brûlée, peinture cloquée, traces de suie |
+| 5 | chaufferie | rangée de manomètres à cadran vide, une veilleuse ambre `#e8951f` |
+| 6 | chaufferie | calorifuge matelassé, sangles et brides |
+| 7 | observatoire | nervures d'un dôme, verre sombre entre elles, étoiles rares |
+| 8 | observatoire | baie vitrée à meneaux fins sur le noir, un liséré violet `#9e6bc7` |
+
+Gabarit de prompt (remplacer la ligne de la pièce) :
+
+```
+[PRÉAMBULE — charte §5]
+Seamless tileable texture of <la pièce>, flat orthographic view, dark
+riveted steel base (#0a1420 to #2a3542), matching edges so the texture
+repeats on both axes with no visible seam, low brightness, flat 2D game
+texture
+```
+Négatif : négatif commun + `panel border, frame, warm colors` (sauf la
+veilleuse de la pièce 5, qui est ambre).
+
+---
+
+## 25. LES CARTONS DE JOURNAL — une illustration par tableau (phase 3)
+
+Chaque tableau porte une ligne de journal du Dr Véga ; un seul (la galerie
+noyée) a son carton (`card-galerie.webp`, 1672×941, l'écran LIVRAISONS le
+montre au-dessus des notes). Seize tableaux n'en ont pas. C'est du
+**volume** (seize images, ~60 Ko chacune) pour un écran de concepteur : à
+faire en dernier, et dans la famille des illustrations d'avaries
+(`public/assets/avaries/`), qui a déjà son style — celui-là, pas celui de la
+cuve.
+
+**1672×941 · 16:9 · WebP · luminance ≤ 0,55 · ≤ 160 Ko**, nommé
+`card-<code>.webp` (le code du tableau : `card-21-s1.webp`…). Gabarit :
+
+```
+[PRÉAMBULE — charte §5]
+Wide illustration, 16:9, in the exact style of the attached reference
+(avaries/table-depart.webp): a laboratory observation card of <le tableau>,
+seen from the observation gallery through thick glass, the containment
+tank below with <ce que le journal raconte>, instruments and a clipboard
+with no readable writing, cold palette
+```
+
+| code | tableau | ce que le journal raconte |
+| --- | --- | --- |
+| 21-S1 | L'école des parois | trois parois côte à côte : mate, cireuse, mouillée |
+| 21-S2 | L'école des climats | une plaque givrée, une chaudière, un évent, une éponge |
+| 21-S3 | L'école des zones | un hublot fendu, une conduite rompue |
+| 21-A | Le sas | l'iris du collecteur, sept trajectoires identiques tracées à la craie |
+| 21-B | La chambre froide | des plaques cryogéniques fraîchement boulonnées |
+| 21-C | Le conduit | un évent, un panache qui le traverse |
+| 21-E | La serre | des gouttières hydroponiques, le corps accroché à une paroi mouillée |
+| 21-F | Le dépôt de givre | des perles de givre sur une plaque, revenues dans l'eau |
+| 21-D | La cuve thermique | une chaudière et une cryobaie dans la même cuve |
+| 21-H | La salle des miroirs | un émetteur laser, un récepteur, un corps gelé qui renvoie le faisceau |
+| 21-I | Le prisme | un faisceau plié à travers une masse d'eau |
+| 21-J | La voie de plasma | des rails de champ, un arc violet qui les suit |
+| 21-K | Les deux verrous | deux récepteurs, un faisceau renvoyé, un faisceau plié |
+| 21-L | À travers l'évent | un évent, une nuée qui le traverse sur un rail |
+| 21-M | La traversée des états | trois portes, trois verrous en enfilade |
+| 21-G | La dérive | une cuve sans cloisons, deux ricochets tracés |

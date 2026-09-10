@@ -31,6 +31,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '10/09/2026 14:01',
+    title: 'LE CHANTIER DES IMAGES : l’état des lieux mesuré, et la commande dans l’ordre',
+    notes: [
+      'LA DEMANDE : le concepteur a du temps pour générer des images ; analyser le jeu et proposer ce qui manque et ce qui est à refaire, avec les prompts.',
+      'L’ÉTAT DES LIEUX (docs/assets-chantier.md) : prepare.py --audit mesure 59 images, 4 hors mesure — la grille (raccord 4,6 / 4,7) et le mur par défaut (4,7 à la verticale) montrent leur couture, le fond de cuve est à la limite (3,2), la vanne est coupée par son cadre (11 % du bord). L’œil ajoute l’iris et l’écusson, livrés opaques sur un fond brun (33 % et 21 % de pixels chauds) avec un anneau vert que la charte réserve à la serre. Et la lecture du code ajoute ce qu’aucune mesure ne voit : le sas de raccord toujours absent alors que le moteur le pose à quatorze jonctions, aucune bande animée livrée, aucune vidéo du codex, six variantes de plafond qu’aucun tableau ne demande, deux cinématiques sur des planches recyclées, les stations du hub réduites à des plots nus, et les emoji encore en place sur le cycle, les cadenas et les trophées.',
+      'LA COMMANDE : trois blocs dans l’ordre de l’effet en jeu par prompt — A, ce qui change le plus (le sas, la vanne reprise puis animée, les trois surfaces à refaire) ; B, les manques déjà spécifiés (l’iris, la roquette, les tomates, trois bandes animées, l’écusson) ; C, les nouveaux assets (cinq décalques pour les stations du hub, deux plafonds, six planches pour la révélation et le miroir, deux planches d’icônes pour le cycle et les trophées) ; D, les trente-deux captures du codex, à filmer dans le jeu, tableau par tableau. Deux phases suivantes, à n’ouvrir qu’après le moteur : l’atlas de parois des biomes, les cartons de journal.',
+      'LES PROMPTS (docs/assets-ia.md, §18 à §25 et les sections reprises) : chacun commence par le préambule de la charte et ne dit que la pièce — sa vue, son rapport, sa transparence, sa luminance. Le coin de coque (§3) est marqué sans emploi : aucune ligne du moteur ne le charge.',
+      'LA CHAÎNE : les illustrations d’avaries tombaient dans la famille « (inconnue) » de prepare.py, rien ne les mesurait. Deux familles de plus — l’illustration d’avarie (640×360, ≤ 120 Ko, luminance ≤ 0,45) et l’aperçu du codex — et la table de la charte les cite. Le motif des illustrations accepte désormais card-* : les cartons de journal à venir y entreront sans retouche.',
+      'VÉRIFIÉ : prepare.py --audit range les sept avaries dans leur famille, toutes en mesure, et le total reste à 59 images, 4 hors mesure. 1061 tests verts dans 98 fichiers, type-check à 0, build propre.',
+    ],
+  },
+  {
     date: '10/09/2026 13:31',
     title: 'LA REVUE DES AVARIES RÉGLABLES : deux constats, corrigés avant la PR vers dev',
     notes: [
