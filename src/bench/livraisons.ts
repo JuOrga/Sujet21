@@ -31,6 +31,49 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '10/09/2026 20:26',
+    title: 'LA REVUE DE LA BRANCHE : un constat sur l’écoute, corrigé avant la PR vers dev',
+    notes: [
+      'LA DEMANDE : « PR sur dev, review, fusionne ». La relecture du diff des trois livraisons (le chantier des images, l’écoute, les trois candidates) a relevé un constat, corrigé ici.',
+      'L’ÉCOUTE MUETTE : une piste demandée le son coupé — le titre disait bien « son coupé » — restait muette quand le son revenait : la bande-son s’éveillait, rouvrait ses lits, mais pas l’écoute, jusqu’au clic suivant sur une touche du lecteur. L’éveil rouvre désormais l’écoute en cours et prévient le lecteur, dont le titre cesse de dire « son coupé ».',
+      'RELU SANS CONSTAT : la course entre deux pistes demandées coup sur coup (la première, arrivée en retard, est écartée par le nom attendu), l’arrêt par le lancement du jeu, la permutation du lecteur, les familles d’avaries et de codex de la chaîne des images, les points de coupe des huit candidates. Accepté tel quel : les tampons décodés des pistes écoutées restent en mémoire (7 à 8 Mo chacune, mode concepteur seulement).',
+      'VÉRIFIÉ : 1067 tests verts dans 99 fichiers, type-check à 0, build propre.',
+    ],
+  },
+  {
+    date: '10/09/2026 20:20',
+    title: 'TROIS CANDIDATES DE PLUS dans l’écoute : la chambre, le temps suspendu, un lit pour le hub',
+    notes: [
+      'LA DEMANDE : « 3 musiques supplémentaires » — Tension Held, Warm Dark Rest, Quiet Resting Atmosphere, générées sur les prompts M6 à M10.',
+      'MESURÉES avant d’être rangées : 0 % au-dessus de 3 kHz sur les trois ; Tension Held est la plus sourde du lot (92 % de l’énergie sous 200 Hz, centroïde à 97 Hz) — le tiroir du temps suspendu, un drone ; Warm Dark Rest (175 Hz, enveloppe ±2,0 dB) va à la chambre pressurisée ; Quiet Resting Atmosphere, la plus plate de toutes les candidates (±1,5 dB), est proposée comme lit du hub, un tiroir que la bande-son n’a pas encore. Le titre Suno reste dans l’écoute : si le tiroir est mal deviné, rien n’est perdu.',
+      'L’ÉCOUTE passe à quatorze pistes. Le temps suspendu s’y entend en boucle de 30 s pour juger la matière ; le jeu, lui, n’en garderait que 10,6 s.',
+      'VÉRIFIÉ : les trois boucles fabriquées par la chaîne (176, 176 et 274 Ko), 1067 tests verts dans 99 fichiers, type-check à 0, build propre.',
+    ],
+  },
+  {
+    date: '10/09/2026 18:31',
+    title: 'L’ÉCOUTE : cinq musiques candidates, et un mini-lecteur sur l’accueil pour se faire une oreille',
+    notes: [
+      'LA DEMANDE : cinq lits regénérés sous Suno sur les prompts de la veille (M1, M2, Desolate Laboratory, Frozen Hiss, Warm Pressure), et « je ne sais pas trop pour l’instant » : plutôt que de trancher, un lecteur sur l’accueil qui joue les musiques du projet au hasard, avec le titre, précédent, suivant, stop — pour écouter et se faire un avis en tant que concepteur.',
+      'LES CANDIDATES : mesurées avant d’être rangées (mêmes sondes que les lits livrés) — 0 % d’énergie au-dessus de 3 kHz sur les cinq, enveloppe entre ±2,1 et ±3,9 dB, là où l’accueil actuel bouge de ±9,7 dB. Livrées sous `-v2` À CÔTÉ des lits qui jouent (masters/sound, public/sound) : rien ne remplace rien. Le point de coupe de chaque boucle est la fenêtre de 40 s la plus plate du master, mesurée seconde par seconde, pas choisie à l’oreille. prepare.py accepte désormais une liste de noms : ajouter une candidate ne ré-encode plus les vingt autres fichiers.',
+      'LE LECTEUR (game/jukebox.ts, la ligne ÉCOUTE de l’accueil, mode concepteur) : les six lits et les cinq candidates dans un ordre tiré au sort à l’ouverture puis fixe — précédent rend bien ce qu’on vient d’entendre, un tour passe par toutes sans en répéter une. La lecture passe par la bande-son elle-même (Soundtrack.ecoute) : même bus, même volume, même passe-bas que le jeu, à la place du lit d’accueil, qui se tait le temps de l’écoute et revient à l’arrêt. Lancer le jeu arrête l’écoute et le lecteur suit. Son coupé : rien n’est téléchargé, le titre le dit.',
+      'CE QUI N’EST PAS FAIT, et pourquoi : le mixage automatique par température de module, état du corps et tension reste une proposition — le jeu a déjà son mix (scène, refroidissement, zone, lit imposé) et vos cinq fichiers y entrent sans une ligne de code le jour où l’oreille aura tranché. Promouvoir une candidate est écrit dans docs/assets-audio.md.',
+      'VÉRIFIÉ : six tests sur l’écoute (permutation complète et déterministe sous graine, suivant et précédent qui rebouclent, arrêt, liste vide, noms de fichiers sûrs et les six lits en tête). 1067 tests verts dans 99 fichiers, type-check à 0, build propre, les cinq boucles fabriquées par la chaîne (274 et 176 Ko). Le jeu complet ne se monte pas dans le Chromium sans tête de l’environnement (page fermée au chargement, rendu logiciel compris) : le lecteur n’a pas été cliqué dans un navigateur ici — à voir sur l’aperçu (previsu-go).',
+    ],
+  },
+  {
+    date: '10/09/2026 14:01',
+    title: 'LE CHANTIER DES IMAGES : l’état des lieux mesuré, et la commande dans l’ordre',
+    notes: [
+      'LA DEMANDE : le concepteur a du temps pour générer des images ; analyser le jeu et proposer ce qui manque et ce qui est à refaire, avec les prompts.',
+      'L’ÉTAT DES LIEUX (docs/assets-chantier.md) : prepare.py --audit mesure 59 images, 4 hors mesure — la grille (raccord 4,6 / 4,7) et le mur par défaut (4,7 à la verticale) montrent leur couture, le fond de cuve est à la limite (3,2), la vanne est coupée par son cadre (11 % du bord). L’œil ajoute l’iris et l’écusson, livrés opaques sur un fond brun (33 % et 21 % de pixels chauds) avec un anneau vert que la charte réserve à la serre. Et la lecture du code ajoute ce qu’aucune mesure ne voit : le sas de raccord toujours absent alors que le moteur le pose à quatorze jonctions, aucune bande animée livrée, aucune vidéo du codex, six variantes de plafond qu’aucun tableau ne demande, deux cinématiques sur des planches recyclées, les stations du hub réduites à des plots nus, et les emoji encore en place sur le cycle, les cadenas et les trophées.',
+      'LA COMMANDE : trois blocs dans l’ordre de l’effet en jeu par prompt — A, ce qui change le plus (le sas, la vanne reprise puis animée, les trois surfaces à refaire) ; B, les manques déjà spécifiés (l’iris, la roquette, les tomates, trois bandes animées, l’écusson) ; C, les nouveaux assets (cinq décalques pour les stations du hub, deux plafonds, six planches pour la révélation et le miroir, deux planches d’icônes pour le cycle et les trophées) ; D, les trente-deux captures du codex, à filmer dans le jeu, tableau par tableau. Deux phases suivantes, à n’ouvrir qu’après le moteur : l’atlas de parois des biomes, les cartons de journal.',
+      'LES PROMPTS (docs/assets-ia.md, §18 à §25 et les sections reprises) : chacun commence par le préambule de la charte et ne dit que la pièce — sa vue, son rapport, sa transparence, sa luminance. Le coin de coque (§3) est marqué sans emploi : aucune ligne du moteur ne le charge.',
+      'LA CHAÎNE : les illustrations d’avaries tombaient dans la famille « (inconnue) » de prepare.py, rien ne les mesurait. Deux familles de plus — l’illustration d’avarie (640×360, ≤ 120 Ko, luminance ≤ 0,45) et l’aperçu du codex — et la table de la charte les cite. Le motif des illustrations accepte désormais card-* : les cartons de journal à venir y entreront sans retouche.',
+      'VÉRIFIÉ : prepare.py --audit range les sept avaries dans leur famille, toutes en mesure, et le total reste à 59 images, 4 hors mesure. 1061 tests verts dans 98 fichiers, type-check à 0, build propre.',
+    ],
+  },
+  {
     date: '10/09/2026 13:31',
     title: 'LA REVUE DES AVARIES RÉGLABLES : deux constats, corrigés avant la PR vers dev',
     notes: [

@@ -13,11 +13,13 @@ Les bords sont fondus sur 40 ms : le décodeur MP3 ajoute quelques millisecondes
 de silence en tête, autant qu'elles tombent dans le fondu. Le raccord de boucle,
 lui, est fait à la lecture (deux voix qui se croisent), pas ici.
 
-Usage : python3 tools/audio/prepare.py
+Usage : python3 tools/audio/prepare.py               # tout
+        python3 tools/audio/prepare.py accueil-v2    # seulement ces sorties (nom sans .mp3)
 Dépendances : soundfile, numpy, lameenc
 """
 
 import os
+import sys
 import numpy as np
 import soundfile as sf
 import lameenc
@@ -34,6 +36,26 @@ BOUCLES = [
     ('zone-hublot.mp3', 'zone-hublot.mp3', 24.0, 30.0, -24.0, 48),
     ('zone-conduite.mp3', 'zone-conduite.mp3', 24.0, 30.0, -24.0, 48),
     ('zone-chambre.mp3', 'zone-chambre.mp3', 22.0, 30.0, -24.0, 48),
+    # LES CANDIDATES (10/09/2026) : cinq lits regénérés sous Suno sur les
+    # prompts de docs/assets-audio.md, livrés en `-v2` À CÔTÉ des lits qui
+    # jouent — rien ne remplace rien tant que l'oreille n'a pas tranché.
+    # Elles s'écoutent depuis l'accueil (mode concepteur, le mini-lecteur
+    # ÉCOUTE). Le point de coupe est la fenêtre de 40 s la plus plate de
+    # chaque master (enveloppe seconde par seconde, écart-type minimal,
+    # hors quinze premières et dernières secondes) — mesuré, pas choisi.
+    ('accueil-v2.mp3', 'accueil-v2.mp3', 65.0, 40.0, -22.0, 56),
+    ('cuve-tiede-v2.mp3', 'cuve-tiede-v2.mp3', 16.0, 40.0, -23.0, 56),
+    ('cuve-glaciale-v2.mp3', 'cuve-glaciale-v2.mp3', 21.0, 40.0, -23.0, 56),
+    ('zone-hublot-v2.mp3', 'zone-hublot-v2.mp3', 56.0, 30.0, -24.0, 48),
+    ('zone-conduite-v2.mp3', 'zone-conduite-v2.mp3', 74.0, 30.0, -24.0, 48),
+    # Trois de plus le soir même. Le titre Suno reste dans l'écoute ; le nom
+    # de fichier est le tiroir où l'oreille les entend : Warm Dark Rest pour
+    # la chambre pressurisée, Tension Held pour le temps suspendu (ici en
+    # boucle de 30 s pour l'écoute — le jeu, lui, n'en garde que 10,6 s),
+    # Quiet Resting Atmosphere pour un lit du hub, qui n'existe pas encore.
+    ('zone-chambre-v2.mp3', 'zone-chambre-v2.mp3', 15.0, 30.0, -24.0, 48),
+    ('temps-suspendu-v2.mp3', 'temps-suspendu-v2.mp3', 23.0, 30.0, -22.0, 48),
+    ('hub.mp3', 'hub.mp3', 62.0, 40.0, -23.0, 56),
     # La nappe de vapeur : la seule boucle pilotée à la frame par le jeu
     # (setGasLevel). Tout son contenu tient sous 800 Hz — pas un souffle
     # d'aigu — donc 48 kbps suffisent largement. Elle est livrée déjà bouclée
@@ -128,7 +150,16 @@ def encode(sig: np.ndarray, sr: int, debit: int, sortie: str) -> None:
 def main() -> None:
     os.makedirs(DST, exist_ok=True)
     total = 0
+    # une liste de noms sur la ligne de commande restreint la fabrication :
+    # ajouter une candidate ne ré-encode pas les vingt autres fichiers
+    seulement = {a.removesuffix('.mp3') for a in sys.argv[1:]}
+
+    def voulu(out: str) -> bool:
+        return not seulement or out.removesuffix('.mp3') in seulement
+
     for nom, out, t0, duree, cible, debit in BOUCLES:
+        if not voulu(out):
+            continue
         x, sr = lire_mono(nom)
         a, b = int(t0 * sr), int((t0 + duree) * sr)
         seg = cale_rms(fondu(x[a:b], sr, 0.04, 0.04), cible)
@@ -137,6 +168,8 @@ def main() -> None:
         total += taille
         print(f'boucle    {out:30s} {duree:5.1f} s  {taille/1024:6.0f} ko')
     for nom, out, t0, duree, fin, cible, debit in PONCTUATIONS:
+        if not voulu(out):
+            continue
         x, sr = lire_mono(nom)
         a, b = int(t0 * sr), int((t0 + duree) * sr)
         seg = cale_rms(fondu(x[a:b], sr, 0.01, fin), cible)
@@ -145,6 +178,8 @@ def main() -> None:
         total += taille
         print(f'ponctuat. {out:30s} {duree:5.1f} s  {taille/1024:6.0f} ko')
     for nom, out, t0, duree, cible, debit in COUPS:
+        if not voulu(out):
+            continue
         x, sr = lire_mono(nom)
         a, b = int(t0 * sr), int((t0 + duree) * sr)
         seg = cale_crete(fondu(x[a:b], sr, 0.002, 0.05), cible)
@@ -153,6 +188,8 @@ def main() -> None:
         total += taille
         print(f'coup      {out:30s} {duree:5.2f} s  {taille/1024:6.0f} ko')
     for nom, out, cible, debit in COURTS:
+        if not voulu(out):
+            continue
         x, sr = lire_mono(nom)
         seg = cale_crete(fondu(x, sr, 0.004, 0.03), cible)
         encode(seg, sr, debit, out)

@@ -156,7 +156,21 @@ FAMILLES: list[Famille] = [
         note='pièce détourée, bord transparent',
     ),
     Famille('emblème', ('badge',), taille=(512, 512), chaud_max=1.0, poids_max_ko=100),
-    Famille('illustration', ('home', 'card-galerie'), cote_max=1800, luma_max=0.55, poids_max_ko=160),
+    Famille('illustration', ('home', 'card-*'), cote_max=1800, luma_max=0.55, poids_max_ko=160),
+    # les images des ÉCRANS, nommées par un id du jeu et rangées par dossier :
+    # elles tombaient dans « (inconnue) », et rien ne les mesurait. Ce sont
+    # des illustrations (perspective, lumière visible) : la charte de la cuve
+    # ne s'y applique pas, la taille, le poids et la luminance, si. Mesuré le
+    # 10/09/2026 sur les sept avaries livrées : 640×360, 0,15 à 0,34 de
+    # luminance, 34 à 50 Ko.
+    Famille(
+        'illustration d’avarie', ('avaries/*',), taille=(640, 360), luma_max=0.45, chaud_max=0.25,
+        poids_max_ko=120, note='16:9, une par station (public/assets/avaries/LISEZ-MOI.md)',
+    ),
+    Famille(
+        'aperçu du codex', ('codex/*',), cote_max=640, luma_max=0.55, chaud_max=0.25, poids_max_ko=120,
+        note='l’image d’attente d’une vidéo : sa première image (public/assets/codex/LISEZ-MOI.md)',
+    ),
 ]
 
 FAMILLE_INCONNUE = Famille('(inconnue)', (), cote_max=1536, poids_max_ko=350)

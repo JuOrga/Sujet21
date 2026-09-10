@@ -274,6 +274,55 @@
         outline: 2px solid var(--specimen);
         outline-offset: 2px;
       }
+      /* L'ÉCOUTE : une seule ligne sous la rangée d'outils — l'étiquette,
+         quatre touches de magnétophone, le titre. Le titre se coupe plutôt
+         que de replier la ligne. */
+      .home-ecoute {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 10px;
+        padding: 6px 8px;
+        border: 1px dashed var(--line);
+        border-radius: 8px;
+        min-width: 0;
+      }
+      .home-ecoute-etiq {
+        font-family: var(--font-display);
+        font-size: calc(8px * var(--ui));
+        letter-spacing: 0.16em;
+        color: var(--specimen);
+        margin-right: 2px;
+      }
+      #home .home-ecoute button {
+        appearance: none;
+        flex: 0 0 auto;
+        min-width: 34px;
+        height: 30px;
+        padding: 0 8px;
+        background: linear-gradient(180deg, rgba(18, 32, 50, 0.72), rgba(8, 16, 28, 0.88));
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        color: var(--specimen);
+        font-size: calc(13px * var(--ui));
+        line-height: 1;
+        cursor: pointer;
+      }
+      #home .home-ecoute button:hover { border-color: var(--specimen); }
+      #home .home-ecoute button:focus-visible { outline: 2px solid var(--specimen); outline-offset: 2px; }
+      #home .home-ecoute button.actif { box-shadow: inset 0 0 12px rgba(46, 198, 201, 0.25); }
+      .home-ecoute-titre {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-family: var(--font-display);
+        font-size: calc(9px * var(--ui));
+        letter-spacing: 0.08em;
+        color: var(--ink);
+        opacity: 0.85;
+      }
       /* LA VOIE SEMI-PROCÉDURALE : le seul bouton de la rangée à porter un
          liséré vert-menthe — la couleur des salles GÉNÉRÉES, celle de son
          étiquette dans la cérémonie. Il respire lentement pour attirer
@@ -8254,6 +8303,17 @@
         <button id="home-params" type="button"><i>⚙&#xFE0E;</i><span>PARAMÈTRES</span></button>
         <button id="home-mute" type="button"><i>♪</i><span>SON</span></button>
         <button id="home-plein" type="button"><i>⛶</i><span>PLEIN ÉCRAN</span></button>
+      </div>
+      <!-- L'ÉCOUTE (concepteur) : les musiques du projet, dans un ordre tiré au
+           sort, telles que le jeu les joue — pour se faire une oreille avant
+           de trancher entre un lit et sa candidate. -->
+      <div id="home-ecoute" class="home-ecoute" data-dev role="group" aria-label="Écoute des musiques du projet">
+        <span class="home-ecoute-etiq">ÉCOUTE</span>
+        <button id="ecoute-prec" type="button" title="Piste précédente" aria-label="Piste précédente">⏮&#xFE0E;</button>
+        <button id="ecoute-lecture" type="button" title="Lecture, dans un ordre tiré au sort" aria-label="Lecture">▶&#xFE0E;</button>
+        <button id="ecoute-stop" type="button" title="Arrêt : le lit d'accueil reprend" aria-label="Arrêt">■</button>
+        <button id="ecoute-suiv" type="button" title="Piste suivante" aria-label="Piste suivante">⏭&#xFE0E;</button>
+        <span id="ecoute-titre" class="home-ecoute-titre" aria-live="polite">les musiques du projet, au hasard</span>
       </div>
       <div id="home-seq" class="rec-note"></div>
       </div>

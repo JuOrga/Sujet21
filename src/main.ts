@@ -293,6 +293,7 @@ import {
   type Piste,
   type Ponctuation,
 } from './game/soundtrack'
+import { Jukebox, PISTES_ECOUTE } from './game/jukebox'
 import {
   CINEMATIQUES_LIVREES,
   chargeCinematiques,
@@ -4106,6 +4107,49 @@ function appelOeil(): void {
   }
 }
 window.setTimeout(appelOeil, 600)
+
+// ---- L'ÉCOUTE : le mini-lecteur des musiques du projet (accueil, concepteur)
+// Les lits et leurs candidates, dans un ordre tiré au sort à l'ouverture,
+// joués par la bande-son elle-même (même bus, même volume que le jeu) à la
+// place du lit d'accueil. Lancer le jeu arrête l'écoute : la cuve reprend.
+const jukebox = new Jukebox(PISTES_ECOUTE)
+const ecouteTitre = document.getElementById('ecoute-titre')
+const ecouteLecture = document.getElementById('ecoute-lecture') as HTMLButtonElement | null
+function majEcoute(): void {
+  const p = jukebox.enCours()
+  if (ecouteTitre) {
+    ecouteTitre.textContent = !p
+      ? 'les musiques du projet, au hasard'
+      : !audio.enabled
+        ? `${p.titre} — son coupé`
+        : `${jukebox.rang()}/${jukebox.total} · ${p.titre}${p.enJeu ? '' : ' (candidate)'}`
+  }
+  ecouteLecture?.classList.toggle('actif', !!p)
+}
+function joueEcoute(sens: 'suivant' | 'precedent'): void {
+  eveilAudio()
+  const p = sens === 'suivant' ? jukebox.suivant() : jukebox.precedent()
+  bande.ecoute(p?.fichier ?? null)
+  majEcoute()
+}
+document.getElementById('ecoute-lecture')?.addEventListener('click', () => {
+  // lecture depuis l'arrêt : la première de l'ordre ; en cours : rien à faire
+  if (!jukebox.enCours()) joueEcoute('suivant')
+})
+document.getElementById('ecoute-suiv')?.addEventListener('click', () => joueEcoute('suivant'))
+document.getElementById('ecoute-prec')?.addEventListener('click', () => joueEcoute('precedent'))
+document.getElementById('ecoute-stop')?.addEventListener('click', () => {
+  jukebox.stop()
+  bande.ecoute(null)
+  majEcoute()
+})
+// la bande-son peut arrêter l'écoute d'elle-même (le jeu démarre) : le
+// lecteur suit, sinon il afficherait une piste que personne n'entend — et
+// quand le son revient, le titre cesse de dire « son coupé »
+bande.onEcoute = (fichier) => {
+  if (fichier === null && jukebox.enCours()) jukebox.stop()
+  majEcoute()
+}
 
 const homeRestartBtn = document.getElementById(
   'home-restart',
