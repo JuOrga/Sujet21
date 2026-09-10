@@ -244,3 +244,31 @@ Les six lits musicaux (`accueil`, `cuve-tiede`, `cuve-glaciale`, `zone-hublot`,
 `zone-conduite`, `zone-chambre`) ne sont pas dans ce document : ils viennent de
 Suno et tiennent la route. Leurs prompts peuvent être ajoutés ici si l'un d'eux
 doit être refait.
+
+# Les candidates, et l'écoute
+
+Le 10/09/2026, cinq lits ont été regénérés sous Suno et livrés **à côté** des
+lits qui jouent, sous `masters/sound/<nom>-v2.mp3` : `accueil-v2` (M1),
+`cuve-tiede-v2` (M2), `cuve-glaciale-v2` (Desolate Laboratory),
+`zone-hublot-v2` (Frozen Hiss), `zone-conduite-v2` (Warm Pressure). Rien ne
+remplace rien tant que l'oreille n'a pas tranché.
+
+Mesuré sur les cinq masters (mêmes sondes que les lits livrés) : 0 % d'énergie
+au-dessus de 3 kHz, enveloppe entre ±2,1 et ±3,9 dB. Le point de coupe de
+chaque boucle (dans `tools/audio/prepare.py`) est la fenêtre de 40 s la plus
+plate du master — écart-type de l'enveloppe seconde par seconde minimal, hors
+quinze premières et dernières secondes.
+
+**L'écoute** : sur l'accueil, en mode concepteur, une ligne ÉCOUTE sous la
+rangée d'outils joue les musiques du projet — les six lits et les candidates —
+dans un ordre tiré au sort à l'ouverture, **telles que le jeu les joue** (la
+boucle taillée, le même bus, le même volume), à la place du lit d'accueil.
+Précédent, lecture, arrêt, suivant ; le titre dit le rang et si la piste joue
+dans le jeu ou n'est qu'une candidate. Lancer le jeu arrête l'écoute. Une
+nouvelle candidate s'ajoute en deux lignes : son master dans `BOUCLES`
+(`prepare.py`, puis `python3 tools/audio/prepare.py <nom>`), et sa ligne dans
+`PISTES_ECOUTE` (`src/game/jukebox.ts`).
+
+Quand une candidate l'emporte, on la promeut : son entrée de `BOUCLES` prend
+le nom de sortie du lit qu'elle remplace, et l'ancien master reste sous un
+suffixe `-v1` (comme `vaporisation-v1-jet.mp3`).

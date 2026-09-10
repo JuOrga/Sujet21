@@ -31,6 +31,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '10/09/2026 18:31',
+    title: 'L’ÉCOUTE : cinq musiques candidates, et un mini-lecteur sur l’accueil pour se faire une oreille',
+    notes: [
+      'LA DEMANDE : cinq lits regénérés sous Suno sur les prompts de la veille (M1, M2, Desolate Laboratory, Frozen Hiss, Warm Pressure), et « je ne sais pas trop pour l’instant » : plutôt que de trancher, un lecteur sur l’accueil qui joue les musiques du projet au hasard, avec le titre, précédent, suivant, stop — pour écouter et se faire un avis en tant que concepteur.',
+      'LES CANDIDATES : mesurées avant d’être rangées (mêmes sondes que les lits livrés) — 0 % d’énergie au-dessus de 3 kHz sur les cinq, enveloppe entre ±2,1 et ±3,9 dB, là où l’accueil actuel bouge de ±9,7 dB. Livrées sous `-v2` À CÔTÉ des lits qui jouent (masters/sound, public/sound) : rien ne remplace rien. Le point de coupe de chaque boucle est la fenêtre de 40 s la plus plate du master, mesurée seconde par seconde, pas choisie à l’oreille. prepare.py accepte désormais une liste de noms : ajouter une candidate ne ré-encode plus les vingt autres fichiers.',
+      'LE LECTEUR (game/jukebox.ts, la ligne ÉCOUTE de l’accueil, mode concepteur) : les six lits et les cinq candidates dans un ordre tiré au sort à l’ouverture puis fixe — précédent rend bien ce qu’on vient d’entendre, un tour passe par toutes sans en répéter une. La lecture passe par la bande-son elle-même (Soundtrack.ecoute) : même bus, même volume, même passe-bas que le jeu, à la place du lit d’accueil, qui se tait le temps de l’écoute et revient à l’arrêt. Lancer le jeu arrête l’écoute et le lecteur suit. Son coupé : rien n’est téléchargé, le titre le dit.',
+      'CE QUI N’EST PAS FAIT, et pourquoi : le mixage automatique par température de module, état du corps et tension reste une proposition — le jeu a déjà son mix (scène, refroidissement, zone, lit imposé) et vos cinq fichiers y entrent sans une ligne de code le jour où l’oreille aura tranché. Promouvoir une candidate est écrit dans docs/assets-audio.md.',
+      'VÉRIFIÉ : six tests sur l’écoute (permutation complète et déterministe sous graine, suivant et précédent qui rebouclent, arrêt, liste vide, noms de fichiers sûrs et les six lits en tête). 1067 tests verts dans 99 fichiers, type-check à 0, build propre, les cinq boucles fabriquées par la chaîne (274 et 176 Ko). Le jeu complet ne se monte pas dans le Chromium sans tête de l’environnement (page fermée au chargement, rendu logiciel compris) : le lecteur n’a pas été cliqué dans un navigateur ici — à voir sur l’aperçu (previsu-go).',
+    ],
+  },
+  {
     date: '10/09/2026 14:01',
     title: 'LE CHANTIER DES IMAGES : l’état des lieux mesuré, et la commande dans l’ordre',
     notes: [
