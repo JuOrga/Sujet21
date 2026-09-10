@@ -13905,6 +13905,318 @@
           }
         ]
       }
+    },
+    {
+      "id": "nouveau-tableau-8",
+      "auteur": "BOIZ",
+      "majAt": "2026-09-09T19:52:59.008Z",
+      "codeAuteur": "BOIZ",
+      "codeAt": "2026-09-09T19:39:56.922Z",
+      "level": {
+        "name": "déminur",
+        "code": "21-?",
+        "journal": "Entrée de journal du protocole : ce que le laboratoire a observé dans cette cuve.",
+        "bounds": {
+          "minX": -1200,
+          "minY": -750,
+          "maxX": 1200,
+          "maxY": 750
+        },
+        "spawn": {
+          "x": -681,
+          "y": 245,
+          "n": 900
+        },
+        "exit": {
+          "minX": 1040,
+          "minY": -20,
+          "maxX": 1180,
+          "maxY": 120
+        },
+        "boxes": [
+          {
+            "minX": 227,
+            "minY": -337,
+            "maxX": 527,
+            "maxY": -37,
+            "material": 0
+          },
+          {
+            "minX": -1200,
+            "minY": 390,
+            "maxX": -1140,
+            "maxY": 450,
+            "material": 0
+          },
+          {
+            "minX": -960,
+            "minY": 390,
+            "maxX": -900,
+            "maxY": 450,
+            "material": 0
+          },
+          {
+            "minX": -840,
+            "minY": 390,
+            "maxX": -780,
+            "maxY": 450,
+            "material": 0
+          },
+          {
+            "minX": -900,
+            "minY": 330,
+            "maxX": -840,
+            "maxY": 510,
+            "material": 0
+          },
+          {
+            "minX": -71,
+            "minY": -337,
+            "maxX": 109,
+            "maxY": -157,
+            "material": 0
+          },
+          {
+            "minX": -900,
+            "minY": 690,
+            "maxX": -840,
+            "maxY": 750,
+            "material": 0
+          },
+          {
+            "minX": -600,
+            "minY": 390,
+            "maxX": -420,
+            "maxY": 450,
+            "material": 0
+          },
+          {
+            "minX": -540,
+            "minY": 450,
+            "maxX": -480,
+            "maxY": 510,
+            "material": 0
+          },
+          {
+            "minX": -540,
+            "minY": 690,
+            "maxX": -480,
+            "maxY": 750,
+            "material": 0
+          },
+          {
+            "minX": -240,
+            "minY": 390,
+            "maxX": -60,
+            "maxY": 450,
+            "material": 0
+          },
+          {
+            "minX": -180,
+            "minY": 450,
+            "maxX": -120,
+            "maxY": 510,
+            "material": 0
+          },
+          {
+            "minX": -180,
+            "minY": 690,
+            "maxX": -120,
+            "maxY": 750,
+            "material": 0
+          },
+          {
+            "minX": -900,
+            "minY": -30,
+            "maxX": -840,
+            "maxY": 150,
+            "material": 0
+          },
+          {
+            "minX": -960,
+            "minY": 30,
+            "maxX": -900,
+            "maxY": 90,
+            "material": 0
+          },
+          {
+            "minX": -840,
+            "minY": 30,
+            "maxX": -780,
+            "maxY": 90,
+            "material": 0
+          },
+          {
+            "minX": -600,
+            "minY": 30,
+            "maxX": -540,
+            "maxY": 90,
+            "material": 0
+          },
+          {
+            "minX": -480,
+            "minY": 30,
+            "maxX": -420,
+            "maxY": 90,
+            "material": 0
+          },
+          {
+            "minX": -540,
+            "minY": -30,
+            "maxX": -480,
+            "maxY": 150,
+            "material": 0
+          },
+          {
+            "minX": -540,
+            "minY": 330,
+            "maxX": -480,
+            "maxY": 390,
+            "material": 0
+          },
+          {
+            "minX": -180,
+            "minY": 330,
+            "maxX": -120,
+            "maxY": 390,
+            "material": 0
+          },
+          {
+            "minX": -180,
+            "minY": -30,
+            "maxX": -120,
+            "maxY": 150,
+            "material": 0
+          },
+          {
+            "minX": -240,
+            "minY": 30,
+            "maxX": -180,
+            "maxY": 90,
+            "material": 0
+          },
+          {
+            "minX": -120,
+            "minY": 30,
+            "maxX": -60,
+            "maxY": 90,
+            "material": 0
+          },
+          {
+            "minX": 120,
+            "minY": 30,
+            "maxX": 180,
+            "maxY": 90,
+            "material": 0
+          },
+          {
+            "minX": 240,
+            "minY": 30,
+            "maxX": 300,
+            "maxY": 90,
+            "material": 0
+          },
+          {
+            "minX": 180,
+            "minY": -30,
+            "maxX": 240,
+            "maxY": 150,
+            "material": 0
+          },
+          {
+            "minX": 120,
+            "minY": 390,
+            "maxX": 300,
+            "maxY": 450,
+            "material": 0
+          },
+          {
+            "minX": 180,
+            "minY": 330,
+            "maxX": 240,
+            "maxY": 390,
+            "material": 0
+          },
+          {
+            "minX": 180,
+            "minY": 450,
+            "maxX": 240,
+            "maxY": 510,
+            "material": 0
+          }
+        ],
+        "sponges": [],
+        "labels": [
+          {
+            "x": 1110,
+            "y": 0,
+            "text": "SAS",
+            "tone": "sas"
+          }
+        ],
+        "par": 3,
+        "lasers": [
+          {
+            "x": -188,
+            "y": 375,
+            "angle": 270
+          },
+          {
+            "x": -465,
+            "y": 98,
+            "angle": 0
+          },
+          {
+            "x": -196,
+            "y": 383,
+            "angle": 180
+          },
+          {
+            "x": -473,
+            "y": 105,
+            "angle": 90
+          }
+        ],
+        "cibles": [
+          {
+            "x": -239,
+            "y": 97,
+            "r": 26,
+            "mode": "nor",
+            "canal": 2
+          },
+          {
+            "x": -474,
+            "y": 323,
+            "r": 26,
+            "mode": "nor",
+            "canal": 1
+          },
+          {
+            "x": -187,
+            "y": 157,
+            "r": 26,
+            "mode": "nor",
+            "canal": 3
+          },
+          {
+            "x": -420,
+            "y": 383,
+            "r": 26,
+            "mode": "nor",
+            "canal": 4
+          }
+        ],
+        "portes": [
+          {
+            "minX": -580,
+            "minY": 174,
+            "maxX": -300,
+            "maxY": 287,
+            "canal": 1
+          }
+        ]
+      }
     }
   ]
 }
