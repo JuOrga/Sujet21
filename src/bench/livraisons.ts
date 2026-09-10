@@ -31,6 +31,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '10/09/2026 20:26',
+    title: 'LA REVUE DE LA BRANCHE : un constat sur l’écoute, corrigé avant la PR vers dev',
+    notes: [
+      'LA DEMANDE : « PR sur dev, review, fusionne ». La relecture du diff des trois livraisons (le chantier des images, l’écoute, les trois candidates) a relevé un constat, corrigé ici.',
+      'L’ÉCOUTE MUETTE : une piste demandée le son coupé — le titre disait bien « son coupé » — restait muette quand le son revenait : la bande-son s’éveillait, rouvrait ses lits, mais pas l’écoute, jusqu’au clic suivant sur une touche du lecteur. L’éveil rouvre désormais l’écoute en cours et prévient le lecteur, dont le titre cesse de dire « son coupé ».',
+      'RELU SANS CONSTAT : la course entre deux pistes demandées coup sur coup (la première, arrivée en retard, est écartée par le nom attendu), l’arrêt par le lancement du jeu, la permutation du lecteur, les familles d’avaries et de codex de la chaîne des images, les points de coupe des huit candidates. Accepté tel quel : les tampons décodés des pistes écoutées restent en mémoire (7 à 8 Mo chacune, mode concepteur seulement).',
+      'VÉRIFIÉ : 1067 tests verts dans 99 fichiers, type-check à 0, build propre.',
+    ],
+  },
+  {
     date: '10/09/2026 20:20',
     title: 'TROIS CANDIDATES DE PLUS dans l’écoute : la chambre, le temps suspendu, un lit pour le hub',
     notes: [

@@ -4144,12 +4144,11 @@ document.getElementById('ecoute-stop')?.addEventListener('click', () => {
   majEcoute()
 })
 // la bande-son peut arrêter l'écoute d'elle-même (le jeu démarre) : le
-// lecteur suit, sinon il afficherait une piste que personne n'entend
+// lecteur suit, sinon il afficherait une piste que personne n'entend — et
+// quand le son revient, le titre cesse de dire « son coupé »
 bande.onEcoute = (fichier) => {
-  if (fichier === null && jukebox.enCours()) {
-    jukebox.stop()
-    majEcoute()
-  }
+  if (fichier === null && jukebox.enCours()) jukebox.stop()
+  majEcoute()
 }
 
 const homeRestartBtn = document.getElementById(

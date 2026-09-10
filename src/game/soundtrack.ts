@@ -202,6 +202,12 @@ export class Soundtrack {
     this.post = g.post
     this.eveille = true
     this.applique()
+    // une écoute demandée son coupé (le titre le disait) part dès que le son
+    // revient — sans ce rattrapage elle restait muette jusqu'au clic suivant
+    if (this.ecouteNom) {
+      void this.ouvrirEcoute(this.ecouteNom)
+      this.onEcoute?.(this.ecouteNom)
+    }
   }
 
   // ---- Pilotage (appelé par le jeu) ----
