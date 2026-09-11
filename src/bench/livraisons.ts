@@ -31,6 +31,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '11/09/2026 14:49',
+    title: 'LE LECTEUR EST LA MUSIQUE DE L’ACCUEIL : tirée au sort à l’ouverture, notable telle quelle',
+    notes: [
+      'LA DEMANDE : « il faut que le lecteur gère la musique de l’accueil, pas par-dessus ; musique aléatoire à l’ouverture du jeu ; possibilité de noter directement dans le lecteur la musique chargée ». Le lecteur livré la veille se posait à côté du lit d’accueil gravé : il fallait appuyer sur lecture pour entendre une piste de la liste, et rien n’était notable tant qu’on n’avait pas appuyé.',
+      'LA MUSIQUE DE L’ACCUEIL EST CELLE DU LECTEUR (game/soundtrack.ts, litAccueil) : à l’ouverture du jeu, une piste est tirée au sort parmi les musiques du projet — les six lits et les candidates — chargée tout de suite et jouée dès que le son est permis, par le même bus et au même volume que le jeu. Le lit « accueil » gravé ne joue plus d’office : il n’est qu’une piste de la liste comme les autres. En jeu la piste s’efface, et revient telle quelle à l’accueil — le lecteur ne s’arrête plus quand le jeu démarre.',
+      'LE LECTEUR (game/jukebox.ts) : une piste est TOUJOURS chargée — la première de l’ordre dès la création. Précédent et suivant la changent et la font jouer ; arrêt tait l’accueil sans la décharger ; lecture la fait repartir. Le titre dit le rang, la piste, « à l’arrêt » ou « son coupé » s’il y a lieu, puis les avis.',
+      'NOTER LA PISTE CHARGÉE : les trois touches d’avis sont toujours actives — même à l’arrêt, même son coupé — puisqu’il y a toujours une piste chargée. Rien ne change au partage des avis.',
+      'CE QUE LES JOUEURS ENTENDENT : la même musique tirée au sort à l’accueil, candidates comprises — sans les touches, qui restent au mode concepteur. C’est le choix pris ici (« à l’ouverture du jeu ») ; le restreindre au concepteur tient en une ligne si les joueurs doivent garder le lit livré.',
+      'VÉRIFIÉ : les six tests du lecteur réécrits (piste chargée dès la création, tour complet, précédent, arrêt qui tait sans décharger et lecture qui relance, liste vide, noms sûrs). 1073 tests verts dans 100 fichiers, type-check à 0, build propre. Le jeu ne se monte pas dans le Chromium sans tête de l’environnement : pas cliqué dans un navigateur ici — à voir sur l’aperçu (previsu-go).',
+    ],
+  },
+  {
     date: '11/09/2026 11:51',
     title: 'L’AVIS SUR UNE MUSIQUE : +1, −1 ou neutre au bout de la ligne ÉCOUTE, un par personne, partagé',
     notes: [
