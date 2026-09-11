@@ -147,6 +147,17 @@ import { MAX_LUMIERES,
   MAX_BOXES,
 } from '../render/renderer'
 import { canalDeCible, traceLaser } from '../game/laser'
+import {
+  motifDeSelection,
+  motifDeStructure,
+  pave,
+  PAVAGE_MAX,
+  phrasePavage,
+  REGLAGES_PAVAGE_DEFAUT,
+  tailleMotif,
+  type Jointure,
+  type ReglagesPavage,
+} from './pavage'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
 import { PISTES, PISTE_NOMS, type Piste } from '../game/soundtrack'
 import {
@@ -516,6 +527,10 @@ export class LevelEditor {
   // Sélection MULTIPLE (Maj + clic) : déplacée d'un bloc, supprimée d'un
   // coup, ou passée aux outils d'alignement du panneau.
   private multi: Sel[] = []
+  /** Les réglages du PAVAGE (répéter un motif en grille), gardés d'un
+   *  panneau à l'autre : le panneau se redessine à chaque commit, un champ
+   *  qui ne vivrait que dans le DOM perdrait sa valeur au premier clic. */
+  private pavage: ReglagesPavage = { ...REGLAGES_PAVAGE_DEFAUT }
   // l'APPUI LONG tactile en cours : il vaudra Maj + clic s'il tient 480 ms
   private appuiLong: { timer: number; sx: number; sy: number } | null = null
 
@@ -3596,6 +3611,99 @@ export class LevelEditor {
     this.commit('Supprimé.')
   }
 
+  // ——— LE PAVAGE : un motif répété en grille, jointures comprises ————
+  // Le geste du démineur : une cellule faite main (chambre, cachette,
+  // pastille, portes), et « quatre par tableau ». La géométrie des
+  // jointures — recouvrement des coques, faces en regard percées à la
+  // largeur de la porte, portes à cheval, canaux par cellule, portes de
+  // bord retirées — vit dans pavage.ts, pur et testé. Ici : le panneau.
+  private blocPavage(motif: string): string {
+    const r = this.pavage
+    const j = (v: Jointure, texte: string): string =>
+      `<option value="${v}"${r.jointure === v ? ' selected' : ''}>${texte}</option>`
+    return (
+      `<div class="ed-props-head">Pavage — répéter en grille</div>` +
+      `<p class="ed-astuce">Le MOTIF : ${motif}. Les colonnes vont vers l’est, les rangées vers le sud, le motif reste la première cellule. Sur une jointure, les faces en regard s’ouvrent des deux côtés à la largeur de la porte qui la traverse ; les portes du motif qui tomberaient sur le bord sont retirées. Chaque cellule reçoit ses numéros de canal, ses portes suivent.</p>` +
+      `<div class="ed-fields">` +
+      `<label class="ed-f"><span>Colonnes</span><input type="number" id="p-pav-c" min="1" max="${PAVAGE_MAX}" step="1" value="${r.colonnes}" /></label>` +
+      `<label class="ed-f"><span>Rangées</span><input type="number" id="p-pav-r" min="1" max="${PAVAGE_MAX}" step="1" value="${r.rangees}" /></label>` +
+      `<label class="ed-f"><span>Jointure</span><select id="p-pav-j">` +
+      j('partagee', 'Paroi commune — les coques se recouvrent d’une épaisseur') +
+      j('accolee', 'Parois accolées — dos à dos, la porte traverse les deux') +
+      j('espacee', 'Espacées — un écart, à relier soi-même (rien n’est percé)') +
+      `</select></label>` +
+      (r.jointure === 'espacee'
+        ? `<label class="ed-f"><span>Écart (u)</span><input type="number" id="p-pav-e" min="0" step="10" value="${r.ecart}" /></label>`
+        : '') +
+      `<div class="ed-f"><span>Canaux</span><span><label class="ed-chk"><input type="checkbox" id="p-pav-k"${r.canaux ? ' checked' : ''} /> Numéroter par cellule</label></span></div>` +
+      `<button type="button" class="ed-btn" id="p-pav-go" title="Répète le motif en grille, jointures comprises. Ctrl+Z défait tout d’un coup.">⊞ Paver ${r.colonnes} × ${r.rangees}</button>` +
+      `</div>`
+    )
+  }
+
+  /** Les champs du pavage mettent à jour les réglages AVANT l'écouteur
+   *  générique du panneau (qui relit, committe et redessine) : enregistrés
+   *  d'abord, ils passent d'abord. */
+  private bindPavage(host: HTMLElement): void {
+    // chaque réglage redessine le panneau : le bouton dit « Paver 3 × 2 »,
+    // et l'écart n'apparaît que pour la jointure espacée
+    const num = (id: string, f: (v: number) => void): void => {
+      host.querySelector<HTMLInputElement>('#' + id)?.addEventListener('change', (e) => {
+        f(Number((e.target as HTMLInputElement).value))
+        this.syncProps()
+      })
+    }
+    num('p-pav-c', (v) => {
+      this.pavage.colonnes = Math.max(1, Math.min(PAVAGE_MAX, Math.round(v) || 1))
+    })
+    num('p-pav-r', (v) => {
+      this.pavage.rangees = Math.max(1, Math.min(PAVAGE_MAX, Math.round(v) || 1))
+    })
+    num('p-pav-e', (v) => {
+      this.pavage.ecart = Math.max(0, Math.round(v) || 0)
+    })
+    host.querySelector<HTMLSelectElement>('#p-pav-j')?.addEventListener('change', (e) => {
+      const v = (e.target as HTMLSelectElement).value
+      this.pavage.jointure =
+        v === 'accolee' || v === 'espacee' ? v : 'partagee'
+      this.syncProps()
+    })
+    host.querySelector<HTMLInputElement>('#p-pav-k')?.addEventListener('change', (e) => {
+      this.pavage.canaux = (e.target as HTMLInputElement).checked
+    })
+    host.querySelector('#p-pav-go')?.addEventListener('click', () => this.lancePavage())
+  }
+
+  private lancePavage(): void {
+    const s = this.sel
+    let motif
+    let ignores: string[] = []
+    if (this.multi.length > 1) {
+      const refs = this.multi.filter((m): m is NonNullable<Sel> => m !== null)
+      ;({ motif, ignores } = motifDeSelection(refs))
+    } else if (s?.kind === 'structure') motif = motifDeStructure(this.level, s.index)
+    else return
+    if (tailleMotif(motif) === 0) {
+      this.status('Rien à paver : la sélection ne contient que des éléments uniques.')
+      return
+    }
+    const r: ReglagesPavage = { ...this.pavage }
+    const bilan = pave(this.level, motif, r)
+    if (bilan.cellules === 0) {
+      this.status(phrasePavage(bilan, r))
+      return
+    }
+    // les indices ont bougé (portes retirées, listes allongées) : la
+    // sélection ne désigne plus ce qu'elle désignait
+    this.sel = null
+    this.multi = []
+    if (bilan.bornesEtendues) this.fitView()
+    this.commit(
+      phrasePavage(bilan, r) +
+        (ignores.length > 0 ? ` Non copié : ${ignores.join(', ')}.` : ''),
+    )
+  }
+
   private duplicateSel(): void {
     const s = this.sel
     if (!s) return
@@ -4902,7 +5010,9 @@ export class LevelEditor {
         `<button type="button" class="ed-btn" id="p-rep-x">Répartir dans la largeur (salle)</button>` +
         `<button type="button" class="ed-btn" id="p-rep-y">Répartir dans la hauteur (salle)</button>` +
         `</div>` +
+        this.blocPavage('la sélection, telle quelle') +
         `<button type="button" class="ed-danger" id="p-del">Tout supprimer</button>`
+      this.bindPavage(host)
       host
         .querySelector('#p-al-g')
         ?.addEventListener('click', () => this.alignMulti('gauche'))
@@ -5748,6 +5858,9 @@ export class LevelEditor {
     host.innerHTML =
       `<div class="ed-props-head">${kindName}</div><div class="ed-fields">${rows.join('')}</div>` +
       blocOrdre +
+      (s.kind === 'structure'
+        ? this.blocPavage('cette coque et tout ce qui est centré dans son emprise')
+        : '') +
       (s.kind === 'exit' || s.kind === 'spawn'
         ? ''
         : `<button type="button" class="ed-danger" id="p-del">Supprimer</button>`)
@@ -5775,6 +5888,7 @@ export class LevelEditor {
     host
       .querySelector('#p-del')
       ?.addEventListener('click', () => this.deleteSel())
+    this.bindPavage(host)
     for (const [id, sens] of [
       ['p-ord-fond', 'fond'],
       ['p-ord-derriere', 'derriere'],
