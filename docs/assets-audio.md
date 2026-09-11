@@ -288,3 +288,142 @@ bornes : `src/game/ecouteAvis.ts`.
 Quand une candidate l'emporte, on la promeut : son entrée de `BOUCLES` prend
 le nom de sortie du lit qu'elle remplace, et l'ancien master reste sous un
 suffixe `-v1` (comme `vaporisation-v1-jet.mp3`).
+
+# La bande son — les prompts, lot par lot
+
+Les prompts M1 à M10 (les candidates ci-dessus) ont été donnés dans la
+conversation et **ne sont pas dans le dépôt** : à partir d'ici, chaque lot
+s'écrit **ici d'abord**, pour qu'un prompt se retrouve et se regénère. La
+numérotation reprend à M11.
+
+Ce que tous les lits partagent, et qui n'est pas répété dans chaque prompt :
+**Suno, morceau instrumental** (cocher *Instrumental*), 3 à 4 minutes,
+**intensité stable** d'un bout à l'autre — la chaîne garde la fenêtre de 40 s
+la plus plate, un morceau qui « monte » perd sa montée. Une ponctuation, au
+contraire, doit **s'ouvrir sur un événement franc** : la chaîne coupe autour
+de l'attaque. La phrase de recalage de la page (« dark warm timbre, all energy
+below 3 kHz… ») se colle en fin de prompt si le résultat sort trop clair.
+
+Le fil rouge, celui des lits qui jouent : un module spatial de 1970, des nappes
+analogiques chaudes, une bande magnétique, rien de brillant, rien de rythmé au
+sens d'une batterie — le pouls, quand il y en a un, est celui d'une machine ou
+d'un corps.
+
+## Lot 1 — le fil d'une expédition (11/09/2026)
+
+Où ces cinq lits se branchent : un tableau les impose par `ambiance`
+(éditeur), une séquence par `piste` ou `ponctuation`
+(`src/game/sequence.ts`), une planche de cinématique par la table de montage.
+Rien n'est câblé tant que l'oreille n'a pas tranché — ils entrent d'abord
+dans l'ÉCOUTE, comme les candidates.
+
+### M11. `eveil.mp3` — l'éveil dans la cuve · boucle 40 s
+
+Les planches « Qui êtes-vous ? Où êtes-vous ? » de l'ouverture, et la
+naissance dans la cuve avant l'alerte. Une conscience qui se forme : de la
+curiosité, aucune peur, et **rien ne se résout** — pas encore de mélodie.
+Titre de travail : *First Light in the Tank*.
+
+```
+Slow ambient instrumental, the first minutes of a consciousness waking inside
+a glass tank in a 1970s orbital laboratory. A deep warm analog pad breathing
+very slowly, one soft submerged piano note every few bars like a thought
+forming, faint liquid movement underneath, tape warmth, muted and close,
+curiosity without fear, nothing resolves, no melody yet, no drums, no
+percussion, no vocals, no bright synth, no hi-hats, no cymbals, dark warm
+timbre, everything in the low and mid range, static mood that could loop
+forever, 60 bpm feel
+```
+Négatif : `vocals, drums, percussion, hi-hats, cymbals, bright synth lead, arpeggio, piano melody, strings crescendo, choir, reverb shimmer`
+
+### M12. `alerte.mp3` — l'alerte et la brèche · boucle 40 s
+
+Les planches « Pas le temps de philosopher » et « Le confinement cède », puis
+le lit du **premier tableau**, celui où les commandes s'apprennent. Même
+famille que `sting-derniere-impulsion` (le drone qui monte d'un demi-ton, le
+cœur de basse) : la ponctuation doit pouvoir tomber dessus sans jurer.
+L'urgence est **tenue**, jamais hurlée — pas de sirène, le jeu en a déjà.
+Titre de travail : *Red Lights, Empty Module*.
+
+```
+Tense dark ambient instrumental, an orbital laboratory module evacuating under
+red emergency lights, 1970s space program. A slow heavy sub bass pulse like a
+heartbeat at 70 bpm, a low sustained drone that slowly rises and falls by a
+semitone, distant muffled machinery thuds, a cold analog pad holding one
+dissonant interval, dread and urgency kept under control, no siren, no alarm
+beeps, no drums, no percussion hits, no vocals, no bright synth, no screech,
+dark warm timbre, all energy low, steady intensity throughout so it can loop
+```
+Négatif : `siren, alarm, beeps, drums, percussion, orchestral stab, brass, vocals, choir, bright synth, screech, glitch, riser`
+
+### M13. `depart.mp3` — le sas et la carte de la station · boucle 40 s
+
+Le sas de lancement (planches `depart-1..3`), l'écran LA STATION où l'on
+choisit la coursive, et l'entre-deux modules. Le seul lit **un peu porteur**
+de la bande son : on va quelque part. Espoir retenu, incertitude, le
+contrôle de mission de 1970 plutôt que l'épopée.
+Titre de travail : *Airlock, Station Chart*.
+
+```
+Calm contemplative ambient instrumental, standing at an airlock studying a
+chart of a space station before setting out, 1970s mission control optimism
+held quietly. A warm analog pad in slow motion, a soft muted electric piano
+playing a sparse two-chord figure every eight bars, a gentle low pulse
+suggesting forward motion, the distant hum of the station, hopeful but
+uncertain, spacious, tape warmth, no drums, no percussion, no vocals, no
+bright synth, no cymbals, dark warm timbre, mostly low and mid frequencies,
+steady and loopable, 66 bpm
+```
+Négatif : `drums, percussion, vocals, choir, bright synth lead, arpeggiator, cymbals, hi-hats, epic build, orchestra, fanfare`
+
+### M14. `pompe.mp3` — la Pompe de reprise (boss) · boucle 40 s
+
+La salle qui se défend (`docs/boss-pompe.md`) : une machine patiente qui
+aspire par cycles. Le lit tourne pendant tout le combat, phases comprises ;
+le climax — la cuve de rétention qui crève — sera une **ponctuation à part**
+(lot 2), pour que la boucle reste plate. Menace mécanique, pas de batterie :
+le pouls est celui d'une turbine.
+Titre de travail : *Protocol 21-R*.
+
+```
+Dark mechanical ambient instrumental, a huge industrial pump awakening to
+reclaim an escaped fluid inside a 1970s space station, a room that defends
+itself. A relentless low rotating pulse at 84 bpm like a slow turbine, deep
+sub bass throbbing in cycles of suction, a cold analog pad in a minor mode
+holding tension, distant metallic groans and pressure surges felt more than
+heard, menacing, patient, machine-like, no drum kit, no cymbals, no hi-hats,
+no vocals, no bright synth lead, no orchestral hits, dark warm timbre, all
+energy low and mid, constant intensity that loops without a climax
+```
+Négatif : `drum kit, cymbals, hi-hats, snare, vocals, choir, orchestral hits, brass, bright synth, dubstep, distortion guitar, riser, drop`
+
+### M15. `corps-defait.mp3` — la dispersion · ponctuation 10 à 12 s
+
+Le corps qui passe sous le volume critique et le sursis qui suit : la
+défaite, sans le mot. Comme `fin-de-course`, un extrait coupé dans un morceau
+long — d'où l'ouverture sur **une note grave franche**, puis tout se défait.
+Acceptation, pas tragédie ; surtout pas de jingle de game over.
+Titre de travail : *Below Critical Volume*.
+
+```
+Slow ambient instrumental, a body of water scattering into droplets too small
+to hold together, a consciousness thinning out in zero gravity, 1970s space
+program melancholy. Opens on one deep soft low piano note with a warm analog
+pad underneath, then everything slowly disperses, notes drifting apart,
+detuning slightly, thinning to almost nothing, quiet acceptance rather than
+tragedy, sparse, no drums, no percussion, no vocals, no bright synth, no
+strings swell, dark warm timbre, low and mid frequencies only, long natural
+fades
+```
+Négatif : `drums, percussion, vocals, choir, game over jingle, strings swell, bright synth, bells, reverb shimmer, sad piano melody`
+
+## Les lots à venir
+
+- **Lot 2 — les écrans et les fins** : les mémoires et le CYCLE (tisser une
+  transformation), le marchand et l'économat, la cuve crevée (ponctuation du
+  boss), et les deux finales qui manquent depuis le début, `finale-pure` et
+  `finale-souillee`.
+- **Lot 3 — les lieux** : l'observatoire (module boss, froid, les étoiles
+  sous le plancher), une zone plasma (les rails à champ — la bande son n'a
+  que glace, vapeur et eau), la révélation du miroir (secteur 4), le
+  palmarès et les fantômes, le codex.
