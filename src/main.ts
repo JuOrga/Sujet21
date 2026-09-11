@@ -294,6 +294,7 @@ import {
   type Ponctuation,
 } from './game/soundtrack'
 import { Jukebox, PISTES_ECOUTE } from './game/jukebox'
+import { auteurAvis, avisDe, ligneAvis, ligneBilan, lisAvisEcoute, poseAvis, type Avis, type DocumentAvis } from './game/ecouteAvis'
 import {
   CINEMATIQUES_LIVREES,
   chargeCinematiques,
@@ -4115,19 +4116,111 @@ window.setTimeout(appelOeil, 600)
 const jukebox = new Jukebox(PISTES_ECOUTE)
 const ecouteTitre = document.getElementById('ecoute-titre')
 const ecouteLecture = document.getElementById('ecoute-lecture') as HTMLButtonElement | null
+const ecouteAvisBoutons: { [K in Avis | 0]: HTMLButtonElement | null } = {
+  1: document.getElementById('ecoute-plus') as HTMLButtonElement | null,
+  0: document.getElementById('ecoute-neutre') as HTMLButtonElement | null,
+  [-1]: document.getElementById('ecoute-moins') as HTMLButtonElement | null,
+}
+// L'AVIS PARTAGÉ (game/ecouteAvis.ts, domaine « ecoute » du magasin des
+// réglages) : un avis par personne et par piste, le total en face. Ce
+// qu'on tient en main, et ce qui attend d'être publié.
+let avisEcoute: DocumentAvis = lisAvisEcoute(null)
+let avisEcouteCharge = false
+let avisEcouteRefuse = false
+/** Les avis posés ici et pas encore au magasin, par fichier — ils priment
+ *  sur tout ce qu'on relit, y compris un neutre (0) qui retire le sien. */
+let avisEcouteModifies = new Map<string, { avis: Avis | 0; auteur: string; date: string }>()
+function superposeAvis(base: DocumentAvis, modifs: typeof avisEcouteModifies): DocumentAvis {
+  let doc = base
+  for (const [f, m] of modifs) doc = poseAvis(doc, f, m.avis, m.auteur, m.date)
+  return doc
+}
 function majEcoute(): void {
   const p = jukebox.enCours()
+  // MON avis (celui de la borne) enfonce sa touche ; le titre dit le total
+  // et qui pense quoi — la ligne se coupe, l'infobulle la garde entière
+  const mien: Avis | 0 = p ? avisDe(avisEcoute, p.fichier, records.operator()) : 0
+  const avis = p ? ligneAvis(avisEcoute, p.fichier) : ''
   if (ecouteTitre) {
+    const suffixe = avisEcouteRefuse ? ' — avis non publié' : avisEcouteModifies.size > 0 ? ' …' : ''
+    const bilan = ligneBilan(avisEcoute)
     ecouteTitre.textContent = !p
-      ? 'les musiques du projet, au hasard'
+      ? `les musiques du projet, au hasard${bilan ? ` · ${bilan}` : ''}${suffixe}`
       : !audio.enabled
         ? `${p.titre} — son coupé`
-        : `${jukebox.rang()}/${jukebox.total} · ${p.titre}${p.enJeu ? '' : ' (candidate)'}`
+        : `${jukebox.rang()}/${jukebox.total} · ${p.titre}${p.enJeu ? '' : ' (candidate)'}${avis ? ` · ${avis}` : ''}${suffixe}`
+    ecouteTitre.title = p && avis ? `${p.titre}\n${avis}` : ''
   }
   ecouteLecture?.classList.toggle('actif', !!p)
+  const courant = mien
+  for (const v of [1, 0, -1] as const) {
+    const b = ecouteAvisBoutons[v]
+    if (!b) continue
+    b.disabled = !p
+    b.setAttribute('aria-pressed', p && courant === v ? 'true' : 'false')
+  }
 }
+/** Le document publié, une fois : au démarrage en mode concepteur, sinon à
+ *  la première touche du lecteur — un joueur ne le télécharge jamais. */
+async function chargeAvisEcoute(): Promise<void> {
+  if (avisEcouteCharge) return
+  avisEcouteCharge = true
+  const p = await fetchReglage('ecoute')
+  if (!p) {
+    avisEcouteCharge = false // pas de réseau : on réessaiera à la prochaine touche
+    return
+  }
+  avisEcoute = superposeAvis(lisAvisEcoute(p.document), avisEcouteModifies)
+  majEcoute()
+}
+if (document.body.classList.contains('concepteur')) void chargeAvisEcoute()
+// LA PUBLICATION est différée et regroupée : trois touches coup sur coup
+// (+1, non −1, finalement neutre) ne coûtent qu'une écriture au magasin
+// (2 put + 1 list, cf. api/_magasin.ts). Avant d'écrire, on relit le
+// document publié pour poser nos avis PAR-DESSUS — deux concepteurs qui
+// trient en même temps ne s'effacent pas l'un l'autre (à la fenêtre près
+// du cache de lecture du magasin, 15 s : accepté, ce sont des notes de
+// tri, pas un registre).
+let avisEcouteMinuterie = 0
+let avisEcouteEnVol = false
+async function publieAvisEcoute(): Promise<void> {
+  if (avisEcouteEnVol || avisEcouteModifies.size === 0) return
+  avisEcouteEnVol = true
+  const posees = avisEcouteModifies
+  avisEcouteModifies = new Map()
+  const distant = await fetchReglage('ecoute')
+  const doc = superposeAvis(distant ? lisAvisEcoute(distant.document) : avisEcoute, posees)
+  const r = await pushReglage('ecoute', doc, auteurAvis(records.operator()))
+  avisEcouteEnVol = false
+  if (r) {
+    // ce qui a été posé pendant l'écriture reste par-dessus le publié
+    avisEcoute = superposeAvis(lisAvisEcoute(r.document), avisEcouteModifies)
+    avisEcouteRefuse = false
+    avisEcouteCharge = true
+  } else {
+    // refusé ou hors ligne : nos avis restent en main, le titre le dit, et
+    // la prochaine touche retentera — sans écraser un avis posé depuis
+    for (const [f, m] of posees) if (!avisEcouteModifies.has(f)) avisEcouteModifies.set(f, m)
+    avisEcouteRefuse = true
+  }
+  majEcoute()
+  if (r && avisEcouteModifies.size > 0) void publieAvisEcoute()
+}
+function voteEcoute(avis: Avis | 0): void {
+  const p = jukebox.enCours()
+  if (!p) return
+  const m = { avis, auteur: auteurAvis(records.operator()), date: new Date().toISOString() }
+  avisEcoute = poseAvis(avisEcoute, p.fichier, m.avis, m.auteur, m.date)
+  avisEcouteModifies.set(p.fichier, m)
+  avisEcouteRefuse = false
+  majEcoute()
+  window.clearTimeout(avisEcouteMinuterie)
+  avisEcouteMinuterie = window.setTimeout(() => void publieAvisEcoute(), 800)
+}
+for (const v of [1, 0, -1] as const) ecouteAvisBoutons[v]?.addEventListener('click', () => voteEcoute(v))
 function joueEcoute(sens: 'suivant' | 'precedent'): void {
   eveilAudio()
+  void chargeAvisEcoute()
   const p = sens === 'suivant' ? jukebox.suivant() : jukebox.precedent()
   bande.ecoute(p?.fichier ?? null)
   majEcoute()
