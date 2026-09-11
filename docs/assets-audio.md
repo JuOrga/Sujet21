@@ -427,3 +427,142 @@ Négatif : `drums, percussion, vocals, choir, game over jingle, strings swell, b
   sous le plancher), une zone plasma (les rails à champ — la bande son n'a
   que glace, vapeur et eau), la révélation du miroir (secteur 4), le
   palmarès et les fantômes, le codex.
+
+# Le parti pris : un thème, quatre états, une révélation
+
+Ce qui rend une bande son mémorable n'est presque jamais la qualité d'un
+lit : c'est **un thème qu'on peut fredonner en sortant**, entendu sous
+plusieurs visages jusqu'à ce qu'il soit reconnu. Des nappes sombres et
+chaudes, si belles soient-elles, s'oublient toutes de la même façon. Les
+lits d'aujourd'hui et le lot 1 sont bons pour le confort ; ils ne laissent
+rien dans la tête. Le parti pris ci-dessous ne les jette pas : il leur donne
+une colonne vertébrale.
+
+## 1. Un seul thème, court, qui pose une question
+
+Le thème de Sujet 21 est **une question, jamais résolue** — celle des cartes
+de l'éveil, « Qui êtes-vous ? ». Musicalement : six notes lentes, une montée
+qui s'ouvre puis redescend par degrés **sans retomber sur la tonique**. Un
+**choral** sur un orgue analogique chaud, le modèle est le *Solaris* de
+Tarkovski (un choral de Bach rendu au synthétiseur par Artemiev) : sacré et
+mécanique, 1970 et hors du temps, tout dans le grave et le médium — il tient
+naturellement sous la règle des 3 kHz. Il se joue **très lentement** : quatre
+notes par minute suffisent à le faire exister en fond de tableau.
+
+Le thème se génère **une fois**, en master (`theme.mp3`, prompt T0 ci-dessous),
+et **tout le reste en dérive** : sous Suno, la fonction *Cover* réinterprète
+un morceau existant dans un autre style **en gardant sa mélodie**. Chaque lit
+devient donc « *Cover* du thème + une ligne de style », au lieu d'un prompt
+indépendant qui n'a aucune chance de citer la même mélodie. C'est le geste
+qui fait tenir l'ensemble, et il change l'ordre des choses : **le thème
+d'abord**, puis le lot 1 (M11 à M15) regénéré comme covers, puis la suite.
+
+### T0. `theme.mp3` — le thème de Sujet 21 · master, 3 min
+
+```
+Slow solemn chorale for a warm 1970s analog organ, in the spirit of a Bach
+chorale played on an early synthesizer for a Soviet science fiction film. A
+simple six note theme, a question that rises and opens then steps back down
+without ever resolving to the home note, repeated with small variations in
+the harmony, very slow, four notes per minute at most, sustained voicing in
+the low and mid register, tape warmth, reverent and strange, intimate rather
+than grand, no drums, no percussion, no vocals, no strings, no bright synth
+lead, no high register, dark warm timbre
+```
+Négatif : `drums, percussion, vocals, choir, strings, brass, bright synth lead, arpeggiator, high register, cathedral reverb, epic`
+
+On en génère plusieurs, on garde **celui qu'on fredonne le lendemain** — c'est
+le seul test qui vaille, et il ne se mesure pas. L'avis de l'ÉCOUTE est là
+pour ça.
+
+## 2. Le thème a quatre états, comme le corps
+
+Le cœur du jeu est le cycle des états ; la musique le suit. Le même thème,
+quatre matières — c'est ce qui fait qu'un joueur **entend** dans quel état il
+est, et qu'une transformation s'entend comme une transformation du thème.
+Quatre covers du master T0 :
+
+| État | `cover` du thème, ligne de style | où |
+| --- | --- | --- |
+| **EAU** | `the same chorale on a muted underwater electric piano and a warm pad, notes slightly bending as if heard through water, slow, dark warm timbre, no drums, no vocals` | `zone-chambre`, lit des tableaux d'eau |
+| **GLACE** | `the same theme frozen: every note held twice as long, played on low bowed glass bowls and a sub bass, almost motionless, cold and dark, no high register, no drums, no vocals` | `zone-hublot`, `cuve-glaciale` |
+| **VAPEUR** | `the same theme dissolved into breath: only the contour remains, played by a soft blurred analog flute-like voice inside a warm pad, blurry and weightless, no drums, no vocals` | `zone-conduite`, `cuve-tiede` |
+| **PLASMA** | `the same theme electrified: a low analog sawtooth organ with a slow electric pulse, charged and humming like a field coil, still dark, no high hi-hats, no drums, no vocals` | une zone plasma, qui n'existe pas encore dans la bande son |
+
+La glace joue le thème **deux fois plus lent**, le plasma **avec un pouls** :
+la vitesse et le pouls disent l'état avant le timbre.
+
+## 3. Le thème se révèle comme le récit : un fragment par expédition
+
+Le scénario livre **un fragment par expédition bouclée**, dix fragments
+jusqu'à la révélation du miroir (`docs/scenario.md`). La musique peut faire
+**exactement la même chose** : dans les runs, on n'entend jamais le thème en
+entier — les lits n'en citent que les **trois premières notes**, enfouies. Le
+lit du hub, lui, **gagne une note par expédition bouclée** ; à la dixième, la
+cinématique MIROIR joue le choral complet, pour la première fois, et le
+joueur reconnaît ce qu'il entendait par bribes depuis le début. C'est le
+genre de chose dont on parle après.
+
+Techniquement : le hub en **pistes superposées** (Suno exporte les stems ; ou
+un cover « pad seul » et un cover « thème seul » que la bande-son mélange), et
+un niveau du thème indexé sur le compteur d'expéditions bouclées — la
+bande-son mélange déjà deux lits selon la température (`soundtrack.ts`, le
+`chill`), c'est le même mécanisme avec une autre variable.
+
+## 4. La règle physique du jeu s'entend : rétrécir, c'est perdre des voix
+
+« Se déplacer, c'est rétrécir. » Le lit d'un tableau **perd des voix avec la
+masse** : à pleine masse, le pad, la basse et le thème ; sous la moitié, le
+thème s'éteint ; près du volume critique, il ne reste que la basse et le
+souffle. Le joueur l'entend sans qu'on le lui dise, et la dispersion (M15)
+tombe sur un silence déjà presque fait. Même mécanisme que ci-dessus, avec la
+masse comme variable ; cela demande les lits en deux ou trois pistes plutôt
+qu'une.
+
+Et les **ouvertures sur le dehors** (vides, vitrées, les étoiles sous le
+plancher) : le son ne se propage pas dans le vide. Près d'une ouverture, tout
+s'efface sauf le sub — un silence qui a un sens dans la fiction est plus
+mémorable qu'une musique.
+
+## 5. Une seule voix, une seule fois
+
+Aucune voix dans tout le jeu — c'est la règle de toutes les pages ci-dessus.
+**Sauf une fois** : la finale pure. Le thème, chanté sans paroles, par une
+seule voix humaine, basse, proche, sans effet — la voix d'un Créateur, ou
+celle du sujet qui devient miroir, on ne le dit pas. L'exception n'est
+mémorable que parce que la règle a tenu trois heures. La finale souillée est
+son envers : le thème **retourné** (les intervalles inversés) et joué par la
+Pompe, la machine, sans aucune chaleur.
+
+### F1. `finale-pure.mp3` — cover de T0
+
+```
+the same chorale hummed by a single low human voice, wordless, very close to
+the microphone, unaccompanied at first then joined by the warm analog organ,
+intimate, fragile, slow, no reverb, no choir, no drums, no lyrics
+```
+Négatif : `choir, lyrics, drums, percussion, strings, reverb, epic, autotune`
+
+### F2. `finale-souillee.mp3` — cover de T0
+
+```
+the same theme inverted and played by a cold industrial machine, low rotating
+pulse, metallic organ tones slightly out of tune, no warmth, no humanity,
+relentless and slow, no drums kit, no vocals, no bright synth
+```
+Négatif : `vocals, drum kit, warmth, strings, choir, bright synth, orchestra`
+
+## Ce que cela change à l'ordre des lots
+
+1. **T0 d'abord**, plusieurs prises, une retenue à l'oreille.
+2. **Les quatre états** en cover de T0, mesurés, dans l'ÉCOUTE en face des
+   lits actuels.
+3. **Le lot 1** (M11 à M15) regénéré en cover de T0 avec les mêmes lignes de
+   style — l'éveil cite les trois premières notes, le boss le thème
+   retourné, la dispersion le thème qui se défait.
+4. Puis les écrans, les lieux, et les deux finales.
+
+Ce que Suno ne garantit pas : une mélodie **exactement** identique d'un cover
+à l'autre — on écoute, on rejette ce qui ne cite pas le thème, et on mesure
+le reste comme d'habitude. Le mélange par masse et par expéditions bouclées
+est du code (`soundtrack.ts`), à faire une fois les pistes retenues.
