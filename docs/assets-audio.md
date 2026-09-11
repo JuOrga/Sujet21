@@ -442,52 +442,80 @@ une colonne vertébrale.
 
 Le thème de Sujet 21 est **une question, jamais résolue** — celle des cartes
 de l'éveil, « Qui êtes-vous ? ». Musicalement : six notes lentes, une montée
-qui s'ouvre puis redescend par degrés **sans retomber sur la tonique**. Un
-**choral** sur un orgue analogique chaud, le modèle est le *Solaris* de
-Tarkovski (un choral de Bach rendu au synthétiseur par Artemiev) : sacré et
-mécanique, 1970 et hors du temps, tout dans le grave et le médium — il tient
-naturellement sous la règle des 3 kHz. Il se joue **très lentement** : quatre
-notes par minute suffisent à le faire exister en fond de tableau.
+qui s'ouvre puis redescend par degrés **sans retomber sur la tonique**.
 
-Le thème se génère **une fois**, en master (`theme.mp3`, prompt T0 ci-dessous),
-et **tout le reste en dérive** : sous Suno, la fonction *Cover* réinterprète
-un morceau existant dans un autre style **en gardant sa mélodie**. Chaque lit
-devient donc « *Cover* du thème + une ligne de style », au lieu d'un prompt
-indépendant qui n'a aucune chance de citer la même mélodie. C'est le geste
-qui fait tenir l'ensemble, et il change l'ordre des choses : **le thème
-d'abord**, puis le lot 1 (M11 à M15) regénéré comme covers, puis la suite.
+**Pas un choral.** Le premier essai (un orgue analogique façon *Solaris*)
+sonnait église : sacré, vertical, trop grand pour une cuve. Le thème est une
+**berceuse de laboratoire** — ce qu'un Créateur fredonnerait distraitement à
+la substance dans sa cuve, sans savoir qu'elle écoute. Les berceuses sont les
+mélodies qu'on retient le mieux, et l'idée colle au récit : la conscience
+est un accident, la berceuse aussi. Deux matières à essayer, toutes deux
+de 1970, toutes deux sous 3 kHz par nature, aucune ne renvoie à un lieu de
+culte :
 
-### T0. `theme.mp3` — le thème de Sujet 21 · master, 3 min
+- **T0a, le piano électrique.** Un Rhodes au grave, à travers une bande qui
+  ondule, et un lead analogique doux et légèrement désaccordé qui double la
+  mélodie (le CS-80 de Vangelis, la mélancolie de Boards of Canada). Chaud,
+  nostalgique, domestique — le son d'un magnétophone oublié dans un module.
+- **T0b, la corde sèche.** La mélodie sur une **basse électrique étouffée**
+  (la paume sur les cordes, l'attaque mate) ou une guitare nylon proche du
+  micro, presque sans réverbération, sur un pad tenu. Sec, intime, un peu
+  inquiétant — la lenteur d'un thème de Badalamenti. C'est l'opposé exact de
+  l'église : rien ne résonne, tout est à portée de main.
+
+Le thème se génère **une fois**, en master (`theme.mp3`), et **tout le reste
+en dérive** : sous Suno, la fonction *Cover* réinterprète un morceau existant
+dans un autre style **en gardant sa mélodie**. Chaque lit devient donc
+« *Cover* du thème + une ligne de style », au lieu d'un prompt indépendant
+qui n'a aucune chance de citer la même mélodie. C'est le geste qui fait
+tenir l'ensemble, et il change l'ordre des choses : **le thème d'abord**,
+puis le lot 1 (M11 à M15) regénéré comme covers, puis la suite.
+
+### T0a. `theme.mp3` — la berceuse, piano électrique · master, 3 min
 
 ```
-Slow solemn chorale for a warm 1970s analog organ, in the spirit of a Bach
-chorale played on an early synthesizer for a Soviet science fiction film. A
-simple six note theme, a question that rises and opens then steps back down
-without ever resolving to the home note, repeated with small variations in
-the harmony, very slow, four notes per minute at most, sustained voicing in
-the low and mid register, tape warmth, reverent and strange, intimate rather
-than grand, no drums, no percussion, no vocals, no strings, no bright synth
-lead, no high register, dark warm timbre
+Slow instrumental lullaby for a 1970s space laboratory, a simple six note
+melody that rises and opens then steps back down without ever resolving,
+like a question hummed absent-mindedly to something asleep in a tank. Played
+on a warm Fender Rhodes electric piano in its low register through wobbling
+tape, the melody doubled by a soft slightly detuned analog synth lead, a slow
+round bass note underneath, tape hiss removed, very slow, sparse, intimate
+and nostalgic, no drums, no percussion, no vocals, no organ, no strings, no
+bright high register, dark warm timbre
 ```
-Négatif : `drums, percussion, vocals, choir, strings, brass, bright synth lead, arpeggiator, high register, cathedral reverb, epic`
+Négatif : `organ, church, choir, vocals, drums, percussion, strings, brass, arpeggiator, high register, reverb hall, epic, hymn`
 
-On en génère plusieurs, on garde **celui qu'on fredonne le lendemain** — c'est
-le seul test qui vaille, et il ne se mesure pas. L'avis de l'ÉCOUTE est là
-pour ça.
+### T0b. `theme.mp3` — la berceuse, corde sèche · master, 3 min
+
+```
+Slow instrumental lullaby for a 1970s space laboratory, a simple six note
+melody that rises and opens then steps back down without ever resolving,
+like a question hummed absent-mindedly to something asleep in a tank. The
+melody played on a palm-muted electric bass, close to the microphone, dry
+and dull with almost no reverb, each note left to die on its own, over a
+quiet sustained analog pad, very slow, sparse, intimate and slightly uneasy,
+no drums, no percussion, no vocals, no organ, no strings, no bright high
+register, dark warm timbre
+```
+Négatif : `organ, church, choir, vocals, drums, percussion, strings, brass, arpeggiator, high register, reverb hall, epic, hymn, slap bass`
+
+On en génère plusieurs de chaque, on garde **celui qu'on fredonne le
+lendemain** — c'est le seul test qui vaille, et il ne se mesure pas. L'avis
+de l'ÉCOUTE est là pour ça.
 
 ## 2. Le thème a quatre états, comme le corps
 
 Le cœur du jeu est le cycle des états ; la musique le suit. Le même thème,
 quatre matières — c'est ce qui fait qu'un joueur **entend** dans quel état il
 est, et qu'une transformation s'entend comme une transformation du thème.
-Quatre covers du master T0 :
+Quatre covers du master T0, aucune sur un instrument d'église :
 
 | État | `cover` du thème, ligne de style | où |
 | --- | --- | --- |
-| **EAU** | `the same chorale on a muted underwater electric piano and a warm pad, notes slightly bending as if heard through water, slow, dark warm timbre, no drums, no vocals` | `zone-chambre`, lit des tableaux d'eau |
-| **GLACE** | `the same theme frozen: every note held twice as long, played on low bowed glass bowls and a sub bass, almost motionless, cold and dark, no high register, no drums, no vocals` | `zone-hublot`, `cuve-glaciale` |
-| **VAPEUR** | `the same theme dissolved into breath: only the contour remains, played by a soft blurred analog flute-like voice inside a warm pad, blurry and weightless, no drums, no vocals` | `zone-conduite`, `cuve-tiede` |
-| **PLASMA** | `the same theme electrified: a low analog sawtooth organ with a slow electric pulse, charged and humming like a field coil, still dark, no high hi-hats, no drums, no vocals` | une zone plasma, qui n'existe pas encore dans la bande son |
+| **EAU** | `the same lullaby on a muted electric piano heard through water, notes slightly bending and wobbling, a slow round bass, warm and submerged, no drums, no vocals, no organ` | `zone-chambre`, lit des tableaux d'eau |
+| **GLACE** | `the same lullaby frozen: every note held twice as long on a felt piano recorded very close, tape slowed down and slightly detuned, a sub bass, almost motionless, cold and dry, no reverb, no drums, no vocals, no organ` | `zone-hublot`, `cuve-glaciale` |
+| **VAPEUR** | `the same lullaby dissolved into breath: only the contour remains, played by a soft blurred analog flute-like synth inside a warm pad, blurry and weightless, no drums, no vocals, no organ` | `zone-conduite`, `cuve-tiede` |
+| **PLASMA** | `the same lullaby electrified: a low analog sawtooth synth with a slow electric pulse, charged and humming like a field coil, still dark, no hi-hats, no drums, no vocals, no organ` | une zone plasma, qui n'existe pas encore dans la bande son |
 
 La glace joue le thème **deux fois plus lent**, le plasma **avec un pouls** :
 la vitesse et le pouls disent l'état avant le timbre.
@@ -527,7 +555,7 @@ mémorable qu'une musique.
 ## 5. Une seule voix, une seule fois
 
 Aucune voix dans tout le jeu — c'est la règle de toutes les pages ci-dessus.
-**Sauf une fois** : la finale pure. Le thème, chanté sans paroles, par une
+**Sauf une fois** : la finale pure. La berceuse, fredonnée sans paroles, par une
 seule voix humaine, basse, proche, sans effet — la voix d'un Créateur, ou
 celle du sujet qui devient miroir, on ne le dit pas. L'exception n'est
 mémorable que parce que la règle a tenu trois heures. La finale souillée est
@@ -537,18 +565,18 @@ Pompe, la machine, sans aucune chaleur.
 ### F1. `finale-pure.mp3` — cover de T0
 
 ```
-the same chorale hummed by a single low human voice, wordless, very close to
-the microphone, unaccompanied at first then joined by the warm analog organ,
-intimate, fragile, slow, no reverb, no choir, no drums, no lyrics
+the same lullaby hummed by a single low human voice, wordless, very close to
+the microphone, unaccompanied at first then joined by the warm electric
+piano, intimate, fragile, slow, no reverb, no choir, no drums, no lyrics
 ```
 Négatif : `choir, lyrics, drums, percussion, strings, reverb, epic, autotune`
 
 ### F2. `finale-souillee.mp3` — cover de T0
 
 ```
-the same theme inverted and played by a cold industrial machine, low rotating
-pulse, metallic organ tones slightly out of tune, no warmth, no humanity,
-relentless and slow, no drums kit, no vocals, no bright synth
+the same lullaby inverted and played by a cold industrial machine, low
+rotating pulse, metallic synth tones slightly out of tune, no warmth, no
+humanity, relentless and slow, no drums kit, no vocals, no bright synth
 ```
 Négatif : `vocals, drum kit, warmth, strings, choir, bright synth, orchestra`
 
