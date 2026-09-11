@@ -274,7 +274,136 @@ rendu (le poids `player` ne couvre que l'amas principal).
   sur chaque appareil (survol, doigt posé, stick effleuré sans force).
 - **Le laboratoire reste froid** (E4).
 
-## 7. Comment on saura que ça marche
+## 7. Les graphismes — ce qu'il faut voir
+
+Le rendu actuel dessine une **matière** superbe : une teinte qui suit la
+vitesse (`slow` → `fast`), un cœur plus sombre, un liseré clair, un relief
+sur champ flouté, le miroir mercure, les étincelles, l'éclairage de la
+pièce. Mais tout cela dit « de l'eau », pas « quelqu'un » :
+
+- **la couleur obéit à la physique, jamais à l'état** — le corps est de la
+  même teinte qu'il ait peur, qu'il dorme ou qu'il agonise ;
+- **l'intérieur est vide** — un cœur uniforme un peu plus sombre ; rien
+  à y lire, rien qui y vive ;
+- **l'œil est une lumière sans corps** — une lueur posée sur la matière,
+  qui n'appartient à rien ;
+- **les gouttes perdues cessent d'être lui** — « eau libre plus sombre »
+  (`water * 0.40`) : dès qu'elles se détachent, elles deviennent du
+  décor. Rien ne dit qu'on vient d'en perdre un morceau.
+
+La référence graphique est dans le canon : le module s'appelle **Méduse**.
+Une méduse est un être sans visage, transparent, dont on voit les organes
+et dont la vie se lit à sa pulsation lumineuse. C'est exactement le
+Sujet : ne pas lui dessiner un visage, mais lui donner un **intérieur
+visible** et une **lumière qui vit**. Tout ce qui suit reste dans la
+charte : l'accent cyan unique, les émotions comme variations de valeur, de
+saturation et de forme — jamais une teinte nouvelle —, et la hiérarchie
+lumineuse (le corps reste plus clair que la cuve, même effrayé).
+
+**G1. L'intérieur habité : les motes.** Quelques dizaines de grains en
+suspension dans le corps, portés par l'écoulement, dessinés dans une passe
+de sprites masquée par le corps. Ils *se comportent* : ils se rassemblent
+autour du noyau du regard sous la peur (un banc de poissons qui se
+resserre), s'étalent au calme, ralentissent et sombrent à la fatigue, se
+figent dans la glace, tourbillonnent dans la vapeur, s'éparpillent et
+s'éteignent un à un à la mort. C'est le fil de l'identité à travers les
+trois états, et la piste graphique qui rapporte le plus. Aucun visage ;
+une vie qu'on voit à travers la peau.
+*Accroche* : un système de particules de rendu (pas de simulation), en
+JS, advecté par le champ de vitesse lissé ; sprites masqués par le poids
+`player` du champ ; leur « humeur » lue dans le pack présence.
+
+**G2. La teinte vitale.** Un second axe de couleur, à côté de la vitesse :
+au calme, le cyan profond de la charte ; sous la peur, plus pâle et plus
+froid (le sang qui se retire) ; à la fatigue, désaturé, laiteux — la
+lecture que le gel a déjà (« la teinte pâlit ») ; endormi, plus sombre et
+plus saturé (le repos) ; à l'agonie, le gris, puis la transparence. Pas
+une teinte nouvelle : des glissements de valeur et de saturation.
+*Accroche* : un uniforme `uVital` (stress, fatigue, sommeil) mêlé à
+`water` après le mélange `slow`/`fast`.
+
+**G3. La peau : le ménisque.** Le liseré clair est la peau du Sujet. En
+faire une peau vraie : plus épaisse et plus vive quand il est tendu (peur,
+visée), fine et douce quand il se relâche ou dort, hérissée d'une
+ondulation fine au frisson (la chair de poule), rompue à l'endroit d'une
+blessure. La largeur du liseré devient un canal émotionnel.
+*Accroche* : les seuils du `rim` (`th + s` → `th * 1.9`) pilotés par le
+stress ; la rupture par le point `uBlessure`.
+
+**G4. Le regard : un puits dans le miroir.** Aujourd'hui l'œil est une
+lueur, une pénombre et un dôme. Ce qui fait un œil dans le monde
+physique, c'est une *absence de reflet* — la pupille est noire parce
+qu'elle absorbe. Proposition : là où le regard se pose, la couche miroir
+s'annule et l'on voit **dans** le corps — le puits sombre où les motes se
+rassemblent, cerné par le reflet qui se courbe autour du dôme. Un œil par
+la physique, pas par le dessin : la décision du 26/08 est respectée, et
+l'œil se lit à toutes les distances parce que le contraste vient du
+miroir, pas d'une teinte.
+*Accroche* : masque `miroir *= 1 - puits` dans le bloc mercure ; le dôme
+existant reste.
+
+**G5. La lumière qu'il émet.** Un halo doux sur le plancher sous le corps,
+qui pulse avec la respiration : il devient une *source* dans la pièce, pas
+un objet éclairé. Sous la peur, le halo se rétracte (il se cache) ;
+endormi, il respire lentement, plus bas ; à la mort, il se resserre en un
+point et s'éteint *avant* que le corps finisse de se défaire. Un pas plus
+loin : des caustiques — les lignes de lumière dansantes qu'une eau vivante
+jette sur le fond — qui se calment quand il dort.
+*Accroche* : un terme radial autour de `uCentroide` dans la composition
+du sol (comme l'œil du sas), modulé par `uRespiration` ; les caustiques
+par une nappe de bruit (`vnoise`) masquée sous le corps.
+
+**G6. Les gouttes perdues restent lui.** Une goutte qui se détache garde
+la teinte du corps quelques secondes, avec un grain de lueur qui
+s'éteint lentement à mesure qu'elle s'éloigne — on la voit *mourir* ; et
+tant qu'elle est proche, un filament de lumière fin comme un cheveu la
+relie encore au corps. C'est la tension de surface, littéralement le
+titre du jeu, rendue visible au moment où elle cède.
+*Accroche* : un canal « perdu » à décroissance dans le champ (au lieu du
+poids `player` à 0), le filament dans la passe des sprites entre le bord
+du corps et la goutte à moins de ~80 unités.
+
+**G7. Les bleus.** Après une morsure d'éponge ou un gel partiel, une
+tache plus pâle sur la peau, à l'endroit du coup, qui s'efface en une
+dizaine de secondes. Le mal qu'on lui fait laisse une trace lisible.
+*Accroche* : les mêmes points `uBlessure` que le sursaut (B2), lus dans
+la teinte.
+
+**G8. La posture.** Un volume n'a pas de posture ; le seuil du champ peut
+lui en donner une, comme la respiration et l'ondulation le font déjà :
+rond et ramassé au calme, aplati du côté du danger (le recul de B1),
+étiré vers la cible juste avant le jet (l'anticipation), dentelé au
+frisson, affaissé vers le bas à la fatigue. Le *squash and stretch* de
+l'animateur, calculé dans le shader.
+*Accroche* : des termes directionnels sur `field2` à côté de `respire`,
+`frisson`, `ondule`.
+
+**G9. Lisible à toutes les distances.** La caméra dézoome dans les
+grandes salles et le corps devient un point. La lueur du regard et le
+halo doivent garder une taille minimale *à l'écran* — un voyant qu'on
+voit de loin — et les motes s'effacer plutôt que grouiller en bouillie.
+*Accroche* : un plancher en pixels sur `sigOeil` selon `uZoom` ; les
+motes fondus sous un seuil de zoom.
+
+**G10. La mort chorégraphiée.** Les pistes ci-dessus donnent à la
+dispersion une partition : le halo se rétracte, le puits du regard se
+ferme, les motes s'éparpillent et s'éteignent un à un, la teinte vitale
+passe au gris, les gouttes gardent sa couleur une seconde puis
+deviennent de l'eau libre. Puis l'écran froid.
+
+**Ce qu'il ne faut pas faire** : aucun visage, aucune bouche, aucun œil
+dessiné, aucune mascotte ; pas de teinte nouvelle (l'ambre reste au
+laboratoire, le violet au méta) ; pas de halo qui écrase la hiérarchie
+lumineuse (le halo au sol reste sous la luminance de la cuve) ; rien qui
+se lise comme une interface (ni jauge, ni icône sur le corps).
+
+**Ordre de chantier graphique** : G1 les motes · G3 la peau · G2 la
+teinte vitale · G5 le halo · G6 les gouttes perdues · G4 le puits · G7
+les bleus · G8 la posture · G9 le zoom · G10 la mort. Chacun se règle au
+banc, dossier « L'œil du Sujet », avec un curseur par piste — comme les
+sept curseurs existants.
+
+## 8. Comment on saura que ça marche
 
 Pas une mesure, un test : faire jouer une salle à quelqu'un qui ne connaît
 pas le jeu, corps réduit à quelques gouttes, et lui demander après coup
