@@ -527,7 +527,7 @@ jusqu'à la révélation du miroir (`docs/scenario.md`). La musique peut faire
 **exactement la même chose** : dans les runs, on n'entend jamais le thème en
 entier — les lits n'en citent que les **trois premières notes**, enfouies. Le
 lit du hub, lui, **gagne une note par expédition bouclée** ; à la dixième, la
-cinématique MIROIR joue le choral complet, pour la première fois, et le
+cinématique MIROIR joue la berceuse entière, pour la première fois, et le
 joueur reconnaît ce qu'il entendait par bribes depuis le début. C'est le
 genre de chose dont on parle après.
 
