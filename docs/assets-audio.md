@@ -272,6 +272,19 @@ nouvelle candidate s'ajoute en deux lignes : son master dans `BOUCLES`
 (`prepare.py`, puis `python3 tools/audio/prepare.py <nom>`), et sa ligne dans
 `PISTES_ECOUTE` (`src/game/jukebox.ts`).
 
+**L'avis** : au bout de la ligne ÉCOUTE, trois touches — `−1`, `○` (neutre),
+`+1` — posent **mon** avis sur la piste en cours ; le titre donne le total et
+qui pense quoi (« +1 · JULIEN +1, MARIE +1, PAUL −1 », entier dans
+l'infobulle). Un avis par personne et par piste — la personne est le nom de la
+borne, celui des records ; sans nom, « anonyme », et tous les anonymes ne font
+qu'un. Le neutre retire le sien et rien d'autre. Le document est **partagé** :
+il vit au magasin des réglages (`/api/reglages`, domaine `ecoute`), chargé à
+l'ouverture de l'accueil en mode concepteur et publié 800 ms après la dernière
+touche (une écriture pour une rafale). À l'arrêt, le titre donne le bilan
+(« 3 retenues, 2 écartées, 1 partagée » — retenue si la somme est positive,
+écartée si négative, partagée si les avis se neutralisent). La forme et ses
+bornes : `src/game/ecouteAvis.ts`.
+
 Quand une candidate l'emporte, on la promeut : son entrée de `BOUCLES` prend
 le nom de sortie du lit qu'elle remplace, et l'ancien master reste sous un
 suffixe `-v1` (comme `vaporisation-v1-jet.mp3`).

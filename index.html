@@ -323,6 +323,27 @@
         color: var(--ink);
         opacity: 0.85;
       }
+      /* L'AVIS : trois touches au bout de la ligne — −1, neutre, +1 — pour
+         trier au fil des pistes. La touche enfoncée est MON avis (le total
+         et celui des autres se lisent dans le titre) ; elle porte la couleur
+         de son verdict (vert : retenue, rouge : écartée). Sans piste en
+         cours, il n'y a rien à juger, elles s'éteignent. */
+      .home-ecoute-avis {
+        display: flex;
+        flex: 0 0 auto;
+        gap: 4px;
+        margin-left: 2px;
+      }
+      #home .home-ecoute-avis button {
+        min-width: 30px;
+        padding: 0 6px;
+        font-family: var(--font-mono);
+        font-size: calc(11px * var(--ui));
+      }
+      #home .home-ecoute-avis button:disabled { opacity: 0.35; cursor: default; }
+      #home .home-ecoute-avis button[aria-pressed="true"] { border-color: var(--specimen); box-shadow: inset 0 0 12px rgba(99, 183, 230, 0.25); }
+      #home .home-ecoute-avis #ecoute-plus[aria-pressed="true"] { color: var(--valid); border-color: var(--valid); box-shadow: inset 0 0 12px rgba(63, 214, 155, 0.3); }
+      #home .home-ecoute-avis #ecoute-moins[aria-pressed="true"] { color: var(--alert); border-color: var(--alert); box-shadow: inset 0 0 12px rgba(224, 104, 92, 0.3); }
       /* LA VOIE SEMI-PROCÉDURALE : le seul bouton de la rangée à porter un
          liséré vert-menthe — la couleur des salles GÉNÉRÉES, celle de son
          étiquette dans la cérémonie. Il respire lentement pour attirer
@@ -8314,6 +8335,14 @@
         <button id="ecoute-stop" type="button" title="Arrêt : le lit d'accueil reprend" aria-label="Arrêt">■</button>
         <button id="ecoute-suiv" type="button" title="Piste suivante" aria-label="Piste suivante">⏭&#xFE0E;</button>
         <span id="ecoute-titre" class="home-ecoute-titre" aria-live="polite">les musiques du projet, au hasard</span>
+        <!-- L'AVIS, partagé : un avis par personne (le nom de la borne) et
+             par piste, le total dans le titre, publié au magasin des
+             réglages pour tous les postes. -->
+        <span class="home-ecoute-avis" role="group" aria-label="Mon avis sur la piste en cours">
+          <button id="ecoute-moins" type="button" title="On n'en veut pas (mon −1)" aria-label="Écarter la piste" aria-pressed="false" disabled>−1</button>
+          <button id="ecoute-neutre" type="button" title="Sans avis (retire le mien)" aria-label="Sans avis" aria-pressed="false" disabled>○</button>
+          <button id="ecoute-plus" type="button" title="Elle est bien (mon +1)" aria-label="Retenir la piste" aria-pressed="false" disabled>+1</button>
+        </span>
       </div>
       <div id="home-seq" class="rec-note"></div>
       </div>

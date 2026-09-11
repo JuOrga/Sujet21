@@ -19,7 +19,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { ecritDocument, litDocument } from './_magasin.js'
 
-const DOMAINES = ['plan-voie', 'carte', 'recompenses', 'textes', 'sequences', 'avaries']
+const DOMAINES = ['plan-voie', 'carte', 'recompenses', 'textes', 'sequences', 'avaries', 'ecoute']
 const MAX_OCTETS = 200_000
 
 interface Magasin {
