@@ -294,7 +294,7 @@ import {
   type Ponctuation,
 } from './game/soundtrack'
 import { Jukebox, PISTES_ECOUTE } from './game/jukebox'
-import { avisDe, ligneAvis, ligneBilan, lisAvisEcoute, poseAvis, type Avis, type DocumentAvis } from './game/ecouteAvis'
+import { auteurAvis, avisDe, ligneAvis, ligneBilan, lisAvisEcoute, poseAvis, type Avis, type DocumentAvis } from './game/ecouteAvis'
 import {
   CINEMATIQUES_LIVREES,
   chargeCinematiques,
@@ -4122,12 +4122,13 @@ const ecouteAvisBoutons: { [K in Avis | 0]: HTMLButtonElement | null } = {
   [-1]: document.getElementById('ecoute-moins') as HTMLButtonElement | null,
 }
 // L'AVIS PARTAGÉ (game/ecouteAvis.ts, domaine « ecoute » du magasin des
-// réglages) : ce qu'on tient en main, et ce qui attend d'être publié.
+// réglages) : un avis par personne et par piste, le total en face. Ce
+// qu'on tient en main, et ce qui attend d'être publié.
 let avisEcoute: DocumentAvis = lisAvisEcoute(null)
 let avisEcouteCharge = false
 let avisEcouteRefuse = false
 /** Les avis posés ici et pas encore au magasin, par fichier — ils priment
- *  sur tout ce qu'on relit, y compris un neutre (0) qui retire une ligne. */
+ *  sur tout ce qu'on relit, y compris un neutre (0) qui retire le sien. */
 let avisEcouteModifies = new Map<string, { avis: Avis | 0; auteur: string; date: string }>()
 function superposeAvis(base: DocumentAvis, modifs: typeof avisEcouteModifies): DocumentAvis {
   let doc = base
@@ -4136,7 +4137,10 @@ function superposeAvis(base: DocumentAvis, modifs: typeof avisEcouteModifies): D
 }
 function majEcoute(): void {
   const p = jukebox.enCours()
-  const a = p ? avisDe(avisEcoute, p.fichier) : null
+  // MON avis (celui de la borne) enfonce sa touche ; le titre dit le total
+  // et qui pense quoi — la ligne se coupe, l'infobulle la garde entière
+  const mien: Avis | 0 = p ? avisDe(avisEcoute, p.fichier, records.operator()) : 0
+  const avis = p ? ligneAvis(avisEcoute, p.fichier) : ''
   if (ecouteTitre) {
     const suffixe = avisEcouteRefuse ? ' — avis non publié' : avisEcouteModifies.size > 0 ? ' …' : ''
     const bilan = ligneBilan(avisEcoute)
@@ -4144,10 +4148,11 @@ function majEcoute(): void {
       ? `les musiques du projet, au hasard${bilan ? ` · ${bilan}` : ''}${suffixe}`
       : !audio.enabled
         ? `${p.titre} — son coupé`
-        : `${jukebox.rang()}/${jukebox.total} · ${p.titre}${p.enJeu ? '' : ' (candidate)'}${a ? ` · ${ligneAvis(a)}` : ''}${suffixe}`
+        : `${jukebox.rang()}/${jukebox.total} · ${p.titre}${p.enJeu ? '' : ' (candidate)'}${avis ? ` · ${avis}` : ''}${suffixe}`
+    ecouteTitre.title = p && avis ? `${p.titre}\n${avis}` : ''
   }
   ecouteLecture?.classList.toggle('actif', !!p)
-  const courant: Avis | 0 = a ? a.avis : 0
+  const courant = mien
   for (const v of [1, 0, -1] as const) {
     const b = ecouteAvisBoutons[v]
     if (!b) continue
@@ -4185,7 +4190,7 @@ async function publieAvisEcoute(): Promise<void> {
   avisEcouteModifies = new Map()
   const distant = await fetchReglage('ecoute')
   const doc = superposeAvis(distant ? lisAvisEcoute(distant.document) : avisEcoute, posees)
-  const r = await pushReglage('ecoute', doc, records.operator() || 'anonyme')
+  const r = await pushReglage('ecoute', doc, auteurAvis(records.operator()))
   avisEcouteEnVol = false
   if (r) {
     // ce qui a été posé pendant l'écriture reste par-dessus le publié
@@ -4204,7 +4209,7 @@ async function publieAvisEcoute(): Promise<void> {
 function voteEcoute(avis: Avis | 0): void {
   const p = jukebox.enCours()
   if (!p) return
-  const m = { avis, auteur: records.operator() || 'anonyme', date: new Date().toISOString() }
+  const m = { avis, auteur: auteurAvis(records.operator()), date: new Date().toISOString() }
   avisEcoute = poseAvis(avisEcoute, p.fichier, m.avis, m.auteur, m.date)
   avisEcouteModifies.set(p.fichier, m)
   avisEcouteRefuse = false

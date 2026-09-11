@@ -1,8 +1,10 @@
-// Le contrat de l'avis sur une musique : un verdict par piste, le dernier
-// fait foi, le neutre retire la ligne, et un document d'ailleurs ne casse
-// rien — seules les pistes connues, à +1 ou −1, survivent à la relecture.
+// Le contrat de l'avis sur une musique : un avis par personne et par
+// piste, le total en face, le neutre qui retire le sien et rien d'autre —
+// et un document d'ailleurs ne casse rien : seules les pistes connues, à
+// +1 ou −1, sous un nom non vide, survivent à la relecture.
 import { describe, expect, it } from 'vitest'
 import {
+  auteurAvis,
   avisDe,
   bilanAvis,
   ligneAvis,
@@ -10,6 +12,7 @@ import {
   lisAvisEcoute,
   memesAvis,
   poseAvis,
+  totalDe,
 } from './ecouteAvis'
 import { PISTES_ECOUTE, type PisteEcoute } from './jukebox'
 
@@ -20,80 +23,110 @@ const pistes: PisteEcoute[] = [
 ]
 
 describe('L’avis sur une musique de l’écoute', () => {
-  it('un document neuf n’a d’avis sur rien ; +1 et −1 se posent, le neutre retire la ligne', () => {
+  it('un document neuf n’a d’avis sur rien ; chacun pose le sien, et le total les somme', () => {
     const vide = lisAvisEcoute(null, pistes)
     expect(vide.avis).toEqual({})
-    expect(avisDe(vide, 'a')).toBeNull()
+    expect(avisDe(vide, 'a', 'JULIEN')).toBe(0)
+    expect(totalDe(vide, 'a')).toEqual({ pour: 0, contre: 0, total: 0 })
 
-    const d1 = poseAvis(vide, 'a', 1, 'JULIEN', '2026-09-10T20:00:00Z')
-    expect(avisDe(d1, 'a')).toEqual({ avis: 1, auteur: 'JULIEN', date: '2026-09-10T20:00:00Z' })
+    const d1 = poseAvis(vide, 'a', 1, 'JULIEN', 'd1')
+    expect(avisDe(d1, 'a', 'JULIEN')).toBe(1)
+    expect(avisDe(d1, 'a', 'MARIE')).toBe(0)
     // l'ancien document n'est pas touché : le lecteur garde ce qu'il a
-    expect(avisDe(vide, 'a')).toBeNull()
+    expect(avisDe(vide, 'a', 'JULIEN')).toBe(0)
 
-    const d2 = poseAvis(d1, 'b', -1, 'JULIEN', '2026-09-10T20:01:00Z')
-    expect(avisDe(d2, 'b')!.avis).toBe(-1)
-    expect(avisDe(d2, 'a')!.avis).toBe(1)
-
-    const d3 = poseAvis(d2, 'a', 0, 'JULIEN', '2026-09-10T20:02:00Z')
-    expect(avisDe(d3, 'a')).toBeNull()
-    expect('a' in d3.avis).toBe(false)
-    expect(avisDe(d3, 'b')!.avis).toBe(-1)
+    const d2 = poseAvis(poseAvis(d1, 'a', 1, 'MARIE', 'd2'), 'a', -1, 'PAUL', 'd3')
+    expect(totalDe(d2, 'a')).toEqual({ pour: 2, contre: 1, total: 1 })
+    // changer d'avis remplace le sien, sans toucher aux autres
+    const d3 = poseAvis(d2, 'a', -1, 'JULIEN', 'd4')
+    expect(avisDe(d3, 'a', 'JULIEN')).toBe(-1)
+    expect(d3.avis.a.JULIEN).toEqual({ avis: -1, date: 'd4' })
+    expect(totalDe(d3, 'a')).toEqual({ pour: 1, contre: 2, total: -1 })
   })
 
-  it('le dernier avis fait foi, signé de son auteur', () => {
-    const d = poseAvis(
-      poseAvis(lisAvisEcoute(null, pistes), 'a', 1, 'JULIEN', '2026-09-10T20:00:00Z'),
-      'a',
-      -1,
-      'MARIE',
-      '2026-09-11T08:00:00Z',
-    )
-    expect(avisDe(d, 'a')).toEqual({ avis: -1, auteur: 'MARIE', date: '2026-09-11T08:00:00Z' })
+  it('le neutre retire SON avis et rien d’autre ; la dernière ligne partie, la piste disparaît du document', () => {
+    let d = poseAvis(poseAvis(lisAvisEcoute(null, pistes), 'a', 1, 'JULIEN', 'x'), 'a', -1, 'MARIE', 'x')
+    d = poseAvis(d, 'a', 0, 'JULIEN', 'x')
+    expect(avisDe(d, 'a', 'JULIEN')).toBe(0)
+    expect(avisDe(d, 'a', 'MARIE')).toBe(-1)
+    expect('JULIEN' in d.avis.a).toBe(false)
+    d = poseAvis(d, 'a', 0, 'MARIE', 'x')
+    expect('a' in d.avis).toBe(false)
+    // se remettre au neutre sans avoir d'avis ne crée rien
+    expect(poseAvis(d, 'b', 0, 'JULIEN', 'x').avis).toEqual({})
   })
 
-  it('la relecture ramène le document dans ses bornes : pistes connues, +1 ou −1, auteur court', () => {
+  it('sans nom de borne, l’avis se range sous « anonyme » — et tous les anonymes ne font qu’un', () => {
+    expect(auteurAvis('')).toBe('anonyme')
+    expect(auteurAvis('  ')).toBe('anonyme')
+    expect(auteurAvis(' JULIEN ')).toBe('JULIEN')
+    expect(auteurAvis('X'.repeat(60))).toBe('X'.repeat(40))
+    const d = poseAvis(poseAvis(lisAvisEcoute(null, pistes), 'a', 1, '', 'x'), 'a', -1, '   ', 'y')
+    expect(d.avis.a).toEqual({ anonyme: { avis: -1, date: 'y' } })
+    expect(avisDe(d, 'a', '')).toBe(-1)
+  })
+
+  it('la relecture ramène le document dans ses bornes : pistes connues, auteurs non vides, +1 ou −1', () => {
     const d = lisAvisEcoute(
       {
         avis: {
-          a: { avis: 1, auteur: '  ' + 'X'.repeat(60) + '  ', date: '2026-09-10' },
-          b: { avis: 0, auteur: 'JULIEN', date: '2026-09-10' }, // le neutre ne se range pas
-          c: { avis: 'oui', auteur: 'JULIEN' }, // pas un avis
-          disparue: { avis: -1, auteur: 'JULIEN', date: '2026-09-10' }, // piste inconnue
+          a: {
+            JULIEN: { avis: 1, date: '2026-09-10' },
+            ['  ' + 'X'.repeat(60) + '  ']: { avis: -1, date: 7 }, // nom trop long, date absurde
+            '   ': { avis: 1, date: 'x' }, // nom vide
+            MARIE: { avis: 0, date: 'x' }, // le neutre ne se range pas
+            PAUL: { avis: 'oui' }, // pas un avis
+            LUC: 1, // pas une entrée
+          },
+          b: { MARIE: { avis: 0 } }, // plus aucune ligne valable : la piste s'efface
+          disparue: { JULIEN: { avis: -1, date: 'x' } }, // piste inconnue
         },
       },
       pistes,
     )
     expect(Object.keys(d.avis)).toEqual(['a'])
-    expect(d.avis.a.auteur).toBe('X'.repeat(40))
-    expect(d.avis.a.date).toBe('2026-09-10')
-    // un champ absent ou absurde ne casse rien
-    expect(lisAvisEcoute({ avis: { a: { avis: -1 } } }, pistes).avis.a).toEqual({ avis: -1, auteur: '', date: '' })
-    for (const brut of [undefined, 42, 'avis', [], { avis: [] }, { avis: 'a' }, { avis: { a: 1 } }, { avis: { a: null } }]) {
+    expect(d.avis.a).toEqual({
+      JULIEN: { avis: 1, date: '2026-09-10' },
+      ['X'.repeat(40)]: { avis: -1, date: '' },
+    })
+    for (const brut of [undefined, 42, 'avis', [], { avis: [] }, { avis: 'a' }, { avis: { a: 1 } }, { avis: { a: null } }, { avis: { a: [] } }]) {
       expect(lisAvisEcoute(brut, pistes).avis).toEqual({})
     }
   })
 
   it('un avis posé se relit à l’identique après un aller-retour JSON', () => {
-    const d = poseAvis(poseAvis(lisAvisEcoute(null), PISTES_ECOUTE[0].fichier, 1, 'JULIEN', 'd1'), PISTES_ECOUTE[6].fichier, -1, 'JULIEN', 'd2')
+    const f0 = PISTES_ECOUTE[0].fichier
+    const f6 = PISTES_ECOUTE[6].fichier
+    const d = poseAvis(poseAvis(lisAvisEcoute(null), f0, 1, 'JULIEN', 'd1'), f6, -1, 'MARIE', 'd2')
     const relu = lisAvisEcoute(JSON.parse(JSON.stringify(d)))
     expect(relu).toEqual(d)
     expect(memesAvis(relu, d)).toBe(true)
-    expect(memesAvis(relu, poseAvis(d, PISTES_ECOUTE[6].fichier, 1, 'JULIEN', 'd3'))).toBe(false)
-    expect(memesAvis(relu, poseAvis(d, PISTES_ECOUTE[6].fichier, 0, 'JULIEN', 'd3'))).toBe(false)
+    // les dates ne comptent pas, les avis si
+    expect(memesAvis(relu, poseAvis(d, f6, -1, 'MARIE', 'd3'))).toBe(true)
+    expect(memesAvis(relu, poseAvis(d, f6, 1, 'MARIE', 'd3'))).toBe(false)
+    expect(memesAvis(relu, poseAvis(d, f6, -1, 'PAUL', 'd3'))).toBe(false)
+    expect(memesAvis(relu, poseAvis(d, f6, 0, 'MARIE', 'd3'))).toBe(false)
   })
 
-  it('le bilan compte les retenues et les écartées, et les lignes du titre le disent', () => {
+  it('le bilan classe les pistes (retenue, écartée, partagée) et les lignes du titre disent qui pense quoi', () => {
     let d = lisAvisEcoute(null, pistes)
-    expect(bilanAvis(d)).toEqual({ retenues: 0, ecartees: 0 })
+    expect(bilanAvis(d)).toEqual({ retenues: 0, ecartees: 0, partagees: 0 })
     expect(ligneBilan(d)).toBe('')
-    expect(ligneAvis(null)).toBe('')
+    expect(ligneAvis(d, 'a')).toBe('')
     d = poseAvis(d, 'a', 1, 'JULIEN', 'x')
-    d = poseAvis(d, 'b', 1, '', 'x')
+    d = poseAvis(d, 'a', 1, 'MARIE', 'x')
+    d = poseAvis(d, 'a', -1, 'PAUL', 'x')
+    d = poseAvis(d, 'b', -1, '', 'x')
+    d = poseAvis(d, 'c', 1, 'JULIEN', 'x')
     d = poseAvis(d, 'c', -1, 'MARIE', 'x')
-    expect(bilanAvis(d)).toEqual({ retenues: 2, ecartees: 1 })
-    expect(ligneBilan(d)).toBe('2 retenues, 1 écartée')
-    expect(ligneAvis(avisDe(d, 'a'))).toBe('retenue par JULIEN')
-    expect(ligneAvis(avisDe(d, 'b'))).toBe('retenue par anonyme')
-    expect(ligneAvis(avisDe(d, 'c'))).toBe('écartée par MARIE')
+    expect(bilanAvis(d)).toEqual({ retenues: 1, ecartees: 1, partagees: 1 })
+    expect(ligneBilan(d)).toBe('1 retenue, 1 écartée, 1 partagée')
+    // la somme d'abord, puis les pour, puis les contre, par nom
+    expect(ligneAvis(d, 'a')).toBe('+1 · JULIEN +1, MARIE +1, PAUL −1')
+    expect(ligneAvis(d, 'b')).toBe('−1 · anonyme −1')
+    expect(ligneAvis(d, 'c')).toBe('±0 · JULIEN +1, MARIE −1')
+    d = poseAvis(d, 'a', 1, 'PAUL', 'x')
+    expect(ligneBilan(poseAvis(d, 'a', 1, 'ZOÉ', 'x'))).toBe('1 retenue, 1 écartée, 1 partagée')
+    expect(ligneAvis(d, 'a')).toBe('+3 · JULIEN +1, MARIE +1, PAUL +1')
   })
 })

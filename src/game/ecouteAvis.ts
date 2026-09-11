@@ -1,38 +1,44 @@
-// L'AVIS SUR UNE MUSIQUE — ce que le concepteur pense d'une piste de
+// L'AVIS SUR UNE MUSIQUE — ce que les concepteurs pensent d'une piste de
 // l'écoute, PARTAGÉ. L'écoute fait entendre les lits et leurs candidates
-// dans un ordre tiré au sort ; au fil des pistes, le concepteur veut poser
-// un verdict simple — celle-ci est bien, celle-là on n'en veut pas — et le
-// retrouver à la prochaine ouverture, sur n'importe quel poste. Trois
-// positions, comme demandé : +1, −1, ou neutre.
+// dans un ordre tiré au sort ; au fil des pistes, chacun veut poser un
+// verdict simple — celle-ci est bien, celle-là on n'en veut pas — et
+// retrouver, à la prochaine ouverture et sur n'importe quel poste, le sien
+// et celui des autres. Trois positions, comme demandé : +1, −1, ou neutre.
 //
-// UN VERDICT PAR PISTE, le dernier fait foi, signé de son auteur et daté :
-// ce n'est pas un vote à dépouiller, c'est une note de tri qu'on pose et
-// qu'on peut reprendre. Le NEUTRE n'est pas une valeur rangée : c'est
-// l'absence d'entrée — remettre une piste au neutre retire sa ligne, et un
-// document neuf n'a d'avis sur rien.
+// UN AVIS PAR PERSONNE ET PAR PISTE, et le TOTAL en face : « +2 −1 » se lit
+// d'un coup d'œil, et on voit qui pense quoi. La personne, c'est le nom de
+// la borne (celui des records) — sans nom, « anonyme », et tous les
+// anonymes ne font qu'un : c'est le prix d'un nom qu'on n'a pas donné. Le
+// NEUTRE n'est pas une valeur rangée : c'est l'absence d'entrée — se
+// remettre au neutre retire SON avis et rien d'autre, et un document neuf
+// n'a d'avis sur rien.
 //
 // Le document vit dans le magasin des réglages partagés (/api/reglages,
 // domaine « ecoute »). Le serveur n'en connaît pas la forme : ce module la
 // relit et la ramène dans ses bornes — seules les pistes que l'écoute
 // connaît comptent (un avis sur un fichier disparu ne survit pas), seuls
-// +1 et −1 sont des avis, l'auteur est un mot court.
+// +1 et −1 sont des avis, un auteur est un mot court et non vide.
 
 import { PISTES_ECOUTE, type PisteEcoute } from './jukebox'
 
 export type Avis = 1 | -1
 
-export interface AvisPiste {
+export interface AvisPose {
   avis: Avis
-  auteur: string
   date: string
 }
 
 export interface DocumentAvis {
-  /** par nom de fichier de la piste (PisteEcoute.fichier) */
-  avis: Record<string, AvisPiste>
+  /** par nom de fichier de la piste (PisteEcoute.fichier), puis par auteur */
+  avis: Record<string, Record<string, AvisPose>>
 }
 
-const AUTEUR_MAX = 40
+export const AUTEUR_MAX = 40
+
+/** Le nom sous lequel un avis se range : un mot court, jamais vide. */
+export function auteurAvis(brut: string): string {
+  return brut.trim().slice(0, AUTEUR_MAX) || 'anonyme'
+}
 
 function avisDeBrut(brut: unknown): Avis | null {
   return brut === 1 || brut === -1 ? brut : null
@@ -40,38 +46,42 @@ function avisDeBrut(brut: unknown): Avis | null {
 
 /**
  * Le document tel qu'il arrive (magasin, ou rien), ramené dans ses bornes :
- * une entrée par piste connue, +1 ou −1, un auteur court, une date texte.
- * Tout ce qui ne rentre pas est écarté sans bruit — un document d'hier ne
- * casse pas l'écoute d'aujourd'hui.
+ * par piste connue, par auteur non vide, +1 ou −1, une date texte. Tout ce
+ * qui ne rentre pas est écarté sans bruit — un document d'hier ne casse
+ * pas l'écoute d'aujourd'hui.
  */
 export function lisAvisEcoute(document: unknown, pistes: readonly PisteEcoute[] = PISTES_ECOUTE): DocumentAvis {
-  const o = (typeof document === 'object' && document !== null ? document : {}) as Record<string, unknown>
-  const brutes = (typeof o.avis === 'object' && o.avis !== null && !Array.isArray(o.avis) ? o.avis : {}) as Record<string, unknown>
-  const out: Record<string, AvisPiste> = {}
+  const objet = (v: unknown): Record<string, unknown> | null =>
+    typeof v === 'object' && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : null
+  const brutes = objet(objet(document)?.avis) ?? {}
+  const out: Record<string, Record<string, AvisPose>> = {}
   for (const p of pistes) {
-    const e = brutes[p.fichier]
-    if (typeof e !== 'object' || e === null) continue
-    const r = e as Record<string, unknown>
-    const avis = avisDeBrut(r.avis)
-    if (avis === null) continue
-    out[p.fichier] = {
-      avis,
-      auteur: typeof r.auteur === 'string' ? r.auteur.trim().slice(0, AUTEUR_MAX) : '',
-      date: typeof r.date === 'string' ? r.date : '',
+    const parAuteur = objet(brutes[p.fichier])
+    if (!parAuteur) continue
+    const entrees: Record<string, AvisPose> = {}
+    for (const [nom, e] of Object.entries(parAuteur)) {
+      const r = objet(e)
+      const avis = r ? avisDeBrut(r.avis) : null
+      if (avis === null) continue
+      const auteur = nom.trim().slice(0, AUTEUR_MAX)
+      if (!auteur) continue
+      entrees[auteur] = { avis, date: typeof r!.date === 'string' ? r!.date : '' }
     }
+    if (Object.keys(entrees).length > 0) out[p.fichier] = entrees
   }
   return { avis: out }
 }
 
-/** L'avis posé sur une piste, ou null : neutre. */
-export function avisDe(doc: DocumentAvis, fichier: string): AvisPiste | null {
-  return doc.avis[fichier] ?? null
+/** L'avis d'une personne sur une piste : +1, −1, ou 0 au neutre. */
+export function avisDe(doc: DocumentAvis, fichier: string, auteur: string): Avis | 0 {
+  return doc.avis[fichier]?.[auteurAvis(auteur)]?.avis ?? 0
 }
 
 /**
- * Pose un avis — et rend un document NEUF, l'ancien n'est pas touché (le
- * lecteur garde l'ancien tant que le magasin n'a pas répondu). `0` remet
- * la piste au neutre : sa ligne disparaît.
+ * Pose l'avis d'une personne — et rend un document NEUF, l'ancien n'est
+ * pas touché (le lecteur garde l'ancien tant que le magasin n'a pas
+ * répondu). `0` la remet au neutre : son entrée disparaît, celles des
+ * autres restent.
  */
 export function poseAvis(
   doc: DocumentAvis,
@@ -80,44 +90,86 @@ export function poseAvis(
   auteur: string,
   date: string,
 ): DocumentAvis {
-  const out: Record<string, AvisPiste> = { ...doc.avis }
-  if (avis === 0) delete out[fichier]
-  else out[fichier] = { avis, auteur: auteur.trim().slice(0, AUTEUR_MAX), date }
+  const nom = auteurAvis(auteur)
+  const entrees = { ...(doc.avis[fichier] ?? {}) }
+  if (avis === 0) delete entrees[nom]
+  else entrees[nom] = { avis, date }
+  const out = { ...doc.avis }
+  if (Object.keys(entrees).length === 0) delete out[fichier]
+  else out[fichier] = entrees
   return { avis: out }
 }
 
-/** Le compte, pour la ligne d'attente du lecteur : combien de retenues,
- *  combien d'écartées — le reste est sans avis. */
-export function bilanAvis(doc: DocumentAvis): { retenues: number; ecartees: number } {
-  let retenues = 0
-  let ecartees = 0
-  for (const e of Object.values(doc.avis)) {
-    if (e.avis === 1) retenues++
-    else ecartees++
+export interface TotalAvis {
+  pour: number
+  contre: number
+  /** pour − contre */
+  total: number
+}
+
+/** Le décompte d'une piste : combien pour, combien contre, et la somme. */
+export function totalDe(doc: DocumentAvis, fichier: string): TotalAvis {
+  let pour = 0
+  let contre = 0
+  for (const e of Object.values(doc.avis[fichier] ?? {})) {
+    if (e.avis === 1) pour++
+    else contre++
   }
-  return { retenues, ecartees }
+  return { pour, contre, total: pour - contre }
 }
 
-/** Deux documents disent-ils les mêmes avis ? (comparés dans leurs bornes) */
+/** Le bilan de toutes les pistes, pour la ligne d'attente du lecteur : une
+ *  piste est RETENUE si sa somme est positive, ÉCARTÉE si elle est négative,
+ *  PARTAGÉE si des avis se neutralisent — les autres sont sans avis. */
+export function bilanAvis(doc: DocumentAvis): { retenues: number; ecartees: number; partagees: number } {
+  const b = { retenues: 0, ecartees: 0, partagees: 0 }
+  for (const fichier of Object.keys(doc.avis)) {
+    const { total } = totalDe(doc, fichier)
+    if (total > 0) b.retenues++
+    else if (total < 0) b.ecartees++
+    else b.partagees++
+  }
+  return b
+}
+
+/** Deux documents disent-ils les mêmes avis ? (les dates ne comptent pas) */
 export function memesAvis(a: DocumentAvis, b: DocumentAvis): boolean {
-  const cles = (d: DocumentAvis) => Object.keys(d.avis).sort()
-  const ka = cles(a)
-  const kb = cles(b)
-  if (ka.length !== kb.length) return false
-  return ka.every((k, i) => k === kb[i] && a.avis[k].avis === b.avis[k].avis)
+  const plat = (d: DocumentAvis): string =>
+    Object.keys(d.avis)
+      .sort()
+      .map((f) =>
+        `${f}:${Object.keys(d.avis[f])
+          .sort()
+          .map((n) => `${n}=${d.avis[f][n].avis}`)
+          .join(',')}`,
+      )
+      .join(';')
+  return plat(a) === plat(b)
 }
 
-/** Ce que le titre dit de la piste en cours : « retenue par JULIEN »,
- *  « écartée par JULIEN », ou rien au neutre. */
-export function ligneAvis(a: AvisPiste | null): string {
-  if (!a) return ''
-  return `${a.avis === 1 ? 'retenue' : 'écartée'} par ${a.auteur || 'anonyme'}`
+function signe(n: number): string {
+  return n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '±0'
+}
+
+/** Ce que le titre dit de la piste en cours : la somme, puis qui pense
+ *  quoi — « +1 · JULIEN +1, MARIE +1, PAUL −1 » — ou rien au neutre. */
+export function ligneAvis(doc: DocumentAvis, fichier: string): string {
+  const entrees = doc.avis[fichier]
+  if (!entrees) return ''
+  const qui = Object.keys(entrees)
+    .sort((a, b) => entrees[b].avis - entrees[a].avis || a.localeCompare(b))
+    .map((n) => `${n} ${signe(entrees[n].avis)}`)
+    .join(', ')
+  return `${signe(totalDe(doc, fichier).total)} · ${qui}`
 }
 
 /** Ce que le titre dit à l'arrêt : le bilan, s'il y a le moindre avis. */
 export function ligneBilan(doc: DocumentAvis): string {
-  const { retenues, ecartees } = bilanAvis(doc)
-  if (retenues === 0 && ecartees === 0) return ''
+  const { retenues, ecartees, partagees } = bilanAvis(doc)
   const s = (n: number) => (n > 1 ? 's' : '')
-  return `${retenues} retenue${s(retenues)}, ${ecartees} écartée${s(ecartees)}`
+  const parts: string[] = []
+  if (retenues > 0) parts.push(`${retenues} retenue${s(retenues)}`)
+  if (ecartees > 0) parts.push(`${ecartees} écartée${s(ecartees)}`)
+  if (partagees > 0) parts.push(`${partagees} partagée${s(partagees)}`)
+  return parts.join(', ')
 }
