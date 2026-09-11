@@ -24,6 +24,7 @@ import {
   FORME_COQUE,
 } from '../game/formes'
 import type { Camera } from './camera'
+import { VIE_STRIDE } from './vie'
 
 // Budgets de rendu : au-delà, les éléments excédentaires ne sont plus
 // dessinés (la physique, elle, les voit tous) — l'éditeur avertit quand un
@@ -462,6 +463,10 @@ uniform vec4 uOeilRegl;
 uniform vec2 uRespiration; // x amplitude (fraction du seuil) · y pulsation
 uniform float uFrisson; // 0..1 : tremblement bref (le froid le saisit)
 uniform float uOndule; // 0..1 : ondulation du contour à l'abandon (idle)
+// LE HALO DU SUJET (docs/sujet-vivant.md, G5) : le corps est une SOURCE —
+// une lueur douce au sol sous lui, qui pulse au rythme de sa respiration.
+// 0 : aucun halo (le banc, le rendu historique).
+uniform float uHalo;
 // Le mode MERCURE (uMiroirEau = 2) organise son reflet autour du CORPS :
 // centre et rayon efficace lus dans les stats de la simulation.
 uniform vec2 uCentroide;
@@ -1801,6 +1806,21 @@ void main() {
   // La fumée est trouée et translucide par endroits
   body *= 1.0 - vap * (0.2 + 0.4 * smokeN);
 
+  // LE HALO DU SUJET : il éclaire le sol sous lui. Une gaussienne autour
+  // du centroïde, large comme le corps et demi, au MÊME rythme que le
+  // contour (uRespiration.y) : la lumière respire avec lui. Versée AVANT
+  // l'eau, elle n'existe qu'autour du corps — dessous, l'eau la recouvre.
+  // Discrète : la hiérarchie lumineuse de la charte (le corps plus clair
+  // que la cuve) ne doit pas se lire à l'envers. Sous la peur, le jeu la
+  // rétracte (uHalo baisse) ; défait, elle s'éteint.
+  if (uHalo > 0.003) {
+    float rH = distance(world, uCentroide);
+    float sigH = max(uRayonCorps, 40.0) * 1.15;
+    float souffleH = 1.0 + 0.30 * sin(uTime * uRespiration.y);
+    float halo = exp(-rH * rH / (2.0 * sigH * sigH)) * inRoom * uHalo * souffleH;
+    col += vec3(0.11, 0.26, 0.36) * halo * 0.6;
+  }
+
   // Tout l'habillage de l'eau ne se calcule que LÀ OÙ IL Y A DE L'EAU : le
   // liquide couvre une fraction de l'écran, le reste des pixels sortait déjà
   // avec body = 0 — mais payait quand même relief, miroir et teintes. La
@@ -2615,6 +2635,77 @@ void main() {
   outColor = vec4(col, 1.0);
 }`
 
+// LA PASSE DE VIE (render/vie.ts) : les MOTES en suspension dans le corps
+// et la LUEUR des gouttes perdues — des points additifs par-dessus la
+// composition. Les motes n'existent que DANS le corps principal : le
+// fragment relit le champ (uField) et s'efface hors de l'épaisseur — une
+// mote dont l'hôte est au bord se voile derrière la peau, c'est voulu.
+const VIE_VS = `#version 300 es
+layout(location = 0) in vec2 aPos;
+layout(location = 1) in float aRayon; // unités monde
+layout(location = 2) in float aGenre; // 0 mote, 1 lueur de goutte perdue
+layout(location = 3) in float aAlpha;
+uniform vec2 uCenter;
+uniform vec2 uViewport;
+uniform float uZoom;
+uniform float uDpr;
+out float vGenre;
+out float vAlpha;
+void main() {
+  vec2 clip = (aPos - uCenter) * uZoom / (uViewport * 0.5);
+  gl_Position = vec4(clip, 0.0, 1.0);
+  float px = aRayon * 2.0 * uZoom * uDpr;
+  gl_PointSize = max(px, 2.0);
+  // LISIBLE À TOUTES LES DISTANCES (G9) : au plan large, les motes
+  // s'effacent au lieu de grouiller en bouillie ; la lueur d'une goutte,
+  // elle, reste un voyant qu'on voit de loin.
+  float fondu = smoothstep(0.45, 1.3, aRayon * uZoom);
+  vAlpha = aAlpha * mix(fondu, 1.0, aGenre);
+  vGenre = aGenre;
+}`
+
+const VIE_FS = `#version 300 es
+precision highp float;
+in float vGenre;
+in float vAlpha;
+uniform sampler2D uField;
+uniform vec2 uCanvasSize;
+uniform float uThreshold;
+uniform float uFieldScale;
+out vec4 outColor;
+void main() {
+  vec2 d = gl_PointCoord * 2.0 - 1.0;
+  float r2 = dot(d, d);
+  if (r2 > 1.0) discard;
+  float t = 1.0 - r2;
+  vec4 tex = texture(uField, gl_FragCoord.xy / uCanvasSize);
+  float field = tex.r / uFieldScale;
+  float player = tex.b / max(tex.r, 1e-5);
+  float stateS = tex.a / max(tex.r, 1e-5);
+  float icy = clamp(stateS, 0.0, 1.0);
+  float vap = clamp(-stateS, 0.0, 1.0);
+  vec3 col;
+  float a;
+  if (vGenre < 0.5) {
+    // LA MOTE : un grain vu à travers l'épaisseur — pâle, doux, plus blanc
+    // dans la glace (pris dans le givre), voilé dans la vapeur
+    float dedans = smoothstep(uThreshold * 1.1, uThreshold * 2.2, field) * clamp(player, 0.0, 1.0);
+    float grain = t * t;
+    col = mix(vec3(0.62, 0.86, 1.0), vec3(0.82, 0.93, 1.0), icy);
+    a = grain * dedans * (1.0 - 0.6 * vap) * vAlpha * 0.55;
+  } else {
+    // LA LUEUR D'UNE GOUTTE PERDUE : un grain de SA lumière, posé sur la
+    // goutte tant qu'elle existe (le champ la porte), cœur net et halo
+    // faible — elle s'éteint avec le délai de réabsorption (vie.ts)
+    float surGoutte = smoothstep(uThreshold * 0.35, uThreshold * 1.0, field);
+    float coeur = t * t * t;
+    float halo = t * 0.30;
+    col = vec3(0.70, 0.92, 1.0);
+    a = (coeur + halo) * surGoutte * vAlpha * 0.9;
+  }
+  outColor = vec4(col * a, 0.0); // additif (ONE, ONE)
+}`
+
 // Coque texturée : quatre bandes autour de la cuve, tube lumineux côté
 // intérieur. Dessinée par-dessus la composition (le liquide reste dedans).
 const HULL_VS = `#version 300 es
@@ -2747,6 +2838,13 @@ export class Renderer {
   private readonly hullProgram: WebGLProgram
   private readonly decalProgram: WebGLProgram
   private readonly lightProgram: WebGLProgram
+  private readonly vieProgram: WebGLProgram
+  private readonly vieVao: WebGLVertexArrayObject
+  private readonly vieVbo: WebGLBuffer
+  // les points de vie de l'image (render/vie.ts) : posés par setVie avant
+  // render, dessinés après la composition — vides, la passe ne coûte rien
+  private vieData: Float32Array | null = null
+  private vieCount = 0
   private readonly splatVao: WebGLVertexArrayObject
   private readonly splatVbo: WebGLBuffer
   private readonly spongeVao: WebGLVertexArrayObject
@@ -2881,6 +2979,7 @@ export class Renderer {
     this.hullProgram = link(gl, HULL_VS, HULL_FS)
     this.decalProgram = link(gl, DECAL_VS, DECAL_FS)
     this.lightProgram = link(gl, COMPOSE_VS, LIGHT_FS)
+    this.vieProgram = link(gl, VIE_VS, VIE_FS)
     for (const [name, program] of [
       ['splat', this.splatProgram],
       ['compose', this.composeProgram],
@@ -2888,6 +2987,7 @@ export class Renderer {
       ['hull', this.hullProgram],
       ['decal', this.decalProgram],
       ['light', this.lightProgram],
+      ['vie', this.vieProgram],
     ] as const) {
       const map: Record<string, WebGLUniformLocation | null> = {}
       const count = gl.getProgramParameter(
@@ -2929,6 +3029,27 @@ export class Renderer {
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, spongeStride, 0)
     gl.enableVertexAttribArray(1)
     gl.vertexAttribPointer(1, 1, gl.FLOAT, false, spongeStride, 8)
+    gl.bindVertexArray(null)
+
+    // la passe de vie : au plus une lueur par goutte, plus les motes
+    this.vieVao = gl.createVertexArray()!
+    this.vieVbo = gl.createBuffer()!
+    gl.bindVertexArray(this.vieVao)
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.vieVbo)
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      (capacity + 128) * VIE_STRIDE * 4,
+      gl.DYNAMIC_DRAW,
+    )
+    const vieStride = VIE_STRIDE * 4
+    gl.enableVertexAttribArray(0)
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, vieStride, 0)
+    gl.enableVertexAttribArray(1)
+    gl.vertexAttribPointer(1, 1, gl.FLOAT, false, vieStride, 8)
+    gl.enableVertexAttribArray(2)
+    gl.vertexAttribPointer(2, 1, gl.FLOAT, false, vieStride, 12)
+    gl.enableVertexAttribArray(3)
+    gl.vertexAttribPointer(3, 1, gl.FLOAT, false, vieStride, 16)
     gl.bindVertexArray(null)
 
     this.hullVao = gl.createVertexArray()!
@@ -3580,6 +3701,7 @@ export class Renderer {
       oeilOmbre?: number
       oeilTaille?: number
       oeilRelief?: number
+      halo?: number // 0..1 : la lueur au sol sous le corps (0 : aucune)
     } | null = null,
   ): void {
     const gl = this.gl
@@ -3769,6 +3891,7 @@ export class Renderer {
     )
     gl.uniform1f(cu['uFrisson'], presence?.frisson ?? 0)
     gl.uniform1f(cu['uOndule'], presence?.ondule ?? 0)
+    gl.uniform1f(cu['uHalo'], presence?.halo ?? 0)
     gl.uniform4f(
       cu['uOeilRegl'],
       presence?.oeilLueur ?? 1,
@@ -3886,6 +4009,9 @@ export class Renderer {
     gl.activeTexture(gl.TEXTURE0)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
 
+    // Passe B vie — les motes dans le corps, la lueur des gouttes perdues
+    this.drawVie(camera, viewportW, viewportH, dpr, params)
+
     // Passe B bis — coque texturée autour de la cuve. Un tableau bâti en
     // MODULES n'a pas de cuve : ses parois sont celles de ses coques, et
     // le dehors doit rester le vide.
@@ -3897,6 +4023,50 @@ export class Renderer {
 
     // Passe C — cellules d'éponge
     this.drawSponges(sim, camera, viewportW, viewportH, dpr)
+  }
+
+  /** Les points de vie de l'image (render/vie.ts, remplitVie) : à poser
+   *  AVANT render. Sans appel, la passe ne dessine rien — le banc et le
+   *  rendu historique restent au pixel près. */
+  setVie(data: Float32Array | null, count: number): void {
+    this.vieData = data
+    this.vieCount = data ? count : 0
+  }
+
+  private drawVie(
+    camera: Camera,
+    viewportW: number,
+    viewportH: number,
+    dpr: number,
+    params: SimParams,
+  ): void {
+    const n = this.vieCount
+    const data = this.vieData
+    if (n <= 0 || !data) return
+    const gl = this.gl
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.vieVbo)
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, data, 0, n * VIE_STRIDE)
+    gl.enable(gl.BLEND)
+    gl.blendFunc(gl.ONE, gl.ONE)
+    gl.useProgram(this.vieProgram)
+    const vu = this.uniforms['vie']
+    gl.uniform2f(vu['uCenter'], camera.x, camera.y)
+    gl.uniform2f(vu['uViewport'], viewportW, viewportH)
+    gl.uniform1f(vu['uZoom'], camera.zoom)
+    gl.uniform1f(vu['uDpr'], dpr)
+    gl.uniform2f(vu['uCanvasSize'], this.canvas.width, this.canvas.height)
+    gl.uniform1f(vu['uThreshold'], params.fieldThreshold)
+    gl.uniform1f(vu['uFieldScale'], this.fieldScale)
+    gl.activeTexture(gl.TEXTURE0)
+    gl.bindTexture(gl.TEXTURE_2D, this.fieldTex)
+    gl.uniform1i(vu['uField'], 0)
+    gl.bindVertexArray(this.vieVao)
+    gl.drawArrays(gl.POINTS, 0, n)
+    gl.bindVertexArray(null)
+    gl.disable(gl.BLEND)
+    // la passe consomme ses points : une image sans setVie ne redessine
+    // pas ceux de la précédente
+    this.vieCount = 0
   }
 
   // Quatre bandes de coque autour de la cuve, tube lumineux (bas de l'image,

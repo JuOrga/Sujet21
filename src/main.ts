@@ -215,6 +215,7 @@ import {
 } from './bench/changelog'
 import { Camera } from './render/camera'
 import { MAX_BOXES, Renderer } from './render/renderer'
+import { Motes, VIE_STRIDE, remplitVie } from './render/vie'
 import { FixedLoop } from './game/loop'
 import { Input } from './game/input'
 import {
@@ -9596,8 +9597,45 @@ const presence = {
   t0Frisson: -9,
   armeFrisson: true,
   ondule: 0, // 0..1 : l'ondulation du contour, quand on le laisse tranquille
+  halo: 0, // 0..1 : la lueur au sol sous le corps — il est une source
 }
 ;(window as unknown as { __presence: typeof presence }).__presence = presence
+// LA VIE VISIBLE (render/vie.ts, docs/sujet-vivant.md G1 et G6) : les motes
+// en suspension dans le corps et la lueur des gouttes perdues. Rendu
+// seulement — les motes sont portées par les gouttes, rien n'est simulé.
+const motes = new Motes()
+const vieTampon = new Float32Array((CAPACITY + 128) * VIE_STRIDE)
+;(window as unknown as { __motes: Motes }).__motes = motes
+/** L'humeur de l'image, pour les motes et le halo : ce que le corps
+ *  ressent se lit déjà dans l'état du jeu (péril, visée, abandon). */
+function majVie(dtReal: number): void {
+  const peril = endgame.lastCall || endgame.spent
+  motes.update(
+    dtReal,
+    sim,
+    {
+      regardX: presence.x,
+      regardY: presence.y,
+      // sous la peur, les grains se serrent autour du regard ; en visée, un
+      // peu ; laissé tranquille, ils s'étalent
+      rassemble: peril ? 0.8 : input.aimActive ? 0.3 : 0,
+      agite: peril ? 1 : input.aimActive ? 0.5 : idle.t > 4 ? 0 : 0.2,
+      dispersed: sim.dispersed,
+    },
+  )
+  const n = remplitVie(
+    vieTampon,
+    motes,
+    sim,
+    params.reabsorbCooldown * sim.reabsorbFactor,
+  )
+  renderer.setVie(vieTampon, n)
+  // le halo : plein au calme, il se rétracte sous la peur (il se cache) et
+  // s'éteint quand le corps se défait
+  const haloCible = sim.dispersed ? 0 : peril ? 0.45 : input.aimActive ? 0.8 : 1
+  presence.halo += (haloCible - presence.halo) * (1 - Math.exp(-2.5 * dtReal))
+  presence.halo = Math.max(0, Math.min(1, presence.halo))
+}
 
 // ---- LES CURSEURS DE L'ŒIL : la présence se règle (banc → L'œil) ----
 // Sept curseurs, mémorisés par appareil. Les DÉFAUTS ci-dessous sont
@@ -11705,6 +11743,9 @@ function resetLasers(): void {
   // chaque chargement, pour un rail qui n'avait rien changé.
   railBascule.length = 0
   railEtincelle.length = 0
+  // les motes renaissent sur le corps neuf : sans cela, celles de l'ancien
+  // tableau se raccrochaient au hasard depuis l'autre bout de la salle
+  motes.reset()
   cachesLevee = (level.caches ?? []).map(() => Infinity)
   // la CLEF DE CACHETTE se consomme ici : les voiles du tableau tombent
   // d'emblée (le hub et l'Économat ne l'usent pas)
@@ -15937,6 +15978,7 @@ function frame(now: number): void {
   drawFleche(dtReal, dpr)
   majIdle(dtReal)
   majPresence(dtReal, aim.x, aim.y)
+  majVie(dtReal)
   // LE SOL DES MODULES : un tableau bâti en coques n'a pas de cuve — son
   // fond ne se peint qu'à l'intérieur des modules, et le dehors est le vide.
   // Le réglage se pose ICI, à l'image, et non dans applyLevel : applyLevel
@@ -16004,6 +16046,7 @@ function frame(now: number): void {
       oeilOmbre: oeilRegl.ombre,
       oeilTaille: oeilRegl.taille,
       oeilRelief: oeilRegl.relief,
+      halo: presence.halo,
     },
   )
   const rendRaw = performance.now() - renderT0
