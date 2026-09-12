@@ -216,6 +216,7 @@ import {
 import { Camera } from './render/camera'
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { Motes, VIE_STRIDE, remplitVie } from './render/vie'
+import { panDepuis } from './game/ouie'
 import { FixedLoop } from './game/loop'
 import { Input } from './game/input'
 import {
@@ -9635,7 +9636,35 @@ function majVie(dtReal: number): void {
   const haloCible = sim.dispersed ? 0 : peril ? 0.45 : input.aimActive ? 0.8 : 1
   presence.halo += (haloCible - presence.halo) * (1 - Math.exp(-2.5 * dtReal))
   presence.halo = Math.max(0, Math.min(1, presence.halo))
+  // LE CŒUR DANS LA MANETTE (docs/sujet-vivant.md, II1) : sous la peur, un
+  // battement dans les mains — deux coups, le second plus faible, à un
+  // rythme de cœur qui s'affole ; au calme, rien. Et LE FRISSON (II2) : le
+  // tremblement du contour passe aussi dans la manette. Le corps du joueur
+  // reçoit ce que le corps du Sujet reçoit. Sans manette, rien ne se passe.
+  const enVie =
+    document.body.classList.contains('playing') &&
+    !input.paused &&
+    !sim.dispersed &&
+    !run.ended
+  if (peril && enVie && manette.connectee) {
+    coeur.t += dtReal
+    if (coeur.t >= COEUR_PERIODE) {
+      coeur.t = 0
+      manette.rumble(0.55, 70)
+      setTimeout(() => manette.rumble(0.35, 55), 160)
+    }
+  } else {
+    coeur.t = COEUR_PERIODE * 0.7 // le premier battement vient vite
+  }
+  if (presence.t0Frisson !== coeur.dernierFrisson) {
+    coeur.dernierFrisson = presence.t0Frisson
+    if (enVie && manette.connectee) manette.rumble(0.3, 140)
+  }
 }
+// un cœur qui s'affole : ~100 battements par minute
+const COEUR_PERIODE = 0.6
+const coeur = { t: 0, dernierFrisson: -9 }
+const craqueGlace = { t: 2 }
 
 // ---- LES CURSEURS DE L'ŒIL : la présence se règle (banc → L'œil) ----
 // Sept curseurs, mémorisés par appareil. Les DÉFAUTS ci-dessous sont
@@ -9849,8 +9878,9 @@ function majIdle(dtReal: number): void {
         sim.velY[i] += ay
       }
     }
-    if (age >= 0.14 && age < 0.14 + dtReal) audio.iceImpact(0.16)
-    if (age >= 0.59 && age < 0.59 + dtReal) audio.iceImpact(0.12)
+    const panMur = panDepuis(sim.stats.centroidX, idle.murX, 300)
+    if (age >= 0.14 && age < 0.14 + dtReal) audio.iceImpact(0.16, panMur)
+    if (age >= 0.59 && age < 0.59 + dtReal) audio.iceImpact(0.12, panMur)
   } else if (idle.type === 'tentacule') {
     // le PSEUDOPODE : un aimant au bout du doigt tire les gouttes en
     // chaîne — il sort du flanc, s'étire jusqu'à la paroi, l'effleure,
@@ -9935,7 +9965,8 @@ function majIdle(dtReal: number): void {
         sim.velY[i] += ry
       }
     }
-    if (age >= 1.25 && age < 1.25 + dtReal) audio.iceImpact(0.09)
+    if (age >= 1.25 && age < 1.25 + dtReal)
+      audio.iceImpact(0.09, panDepuis(sim.stats.centroidX, idle.murX, 300))
   }
 }
 function majPresence(dtReal: number, aimX: number, aimY: number): void {
@@ -15104,7 +15135,7 @@ function frame(now: number): void {
       const cl = pastilles[i].cl
       gagneCondensat(cl)
       run.pastillesCl += cl
-      audio.collect()
+      audio.collect(panDepuis(sim.stats.centroidX, pastilles[i].x))
     }
   }
   // ---- Les ÉCLATS DE MÉMOIRE : l'information cristallisée, gravée au
@@ -16422,6 +16453,13 @@ function frame(now: number): void {
   }
   const allFrozen = sim.playerCount > 0 && frozenCount >= sim.playerCount
   const allGas = sim.playerCount > 0 && gasCount >= sim.playerCount
+  // L'OREILLE DU SUJET (game/ouie.ts) : le corps est le point d'écoute, et
+  // chaque état est une oreille — l'eau voile à peine, la glace assourdit,
+  // la vapeur ouvre. Au prorata du corps : une transformation se SENT venir.
+  audio.setOuie(
+    sim.playerCount > 0 ? frozenCount / sim.playerCount : 0,
+    sim.playerCount > 0 ? gasCount / sim.playerCount : 0,
+  )
   // Chaudière (règle du 12/08) : l'échauffement n'est qu'un effet visuel —
   // la TRANSFORMATION se déclenche quand 95 % du corps actif baigne dans
   // l'aura. Réarmement quand le corps en ressort (présence sous 50 %) :
@@ -16443,6 +16481,17 @@ function frame(now: number): void {
 
   // ---- Sons : boucles continues et fronts d'état ----
   const audible = !input.paused && !tableauDone && !sim.dispersed
+  // LA GLACE CRAQUE DE L'INTÉRIEUR : entièrement gelé, le bloc travaille de
+  // loin en loin — on est dedans, on l'entend de dedans (ouie.ts)
+  if (audible && allFrozen) {
+    craqueGlace.t -= dtReal
+    if (craqueGlace.t <= 0) {
+      audio.craque()
+      craqueGlace.t = 2 + Math.random() * 4
+    }
+  } else {
+    craqueGlace.t = 1 + Math.random() * 2
+  }
   // Le souffle continu d'éjection est retiré (la voix elle-même n'existe
   // plus) : l'eau se signale par la goutte qui « ploc » à chaque impulsion.
   audio.setGasLevel(
@@ -16499,6 +16548,8 @@ function frame(now: number): void {
     sim.stats.centroidX - exitMouth.x,
     sim.stats.centroidY - exitMouth.y,
   )
+  // l'aspiration s'entend DU CÔTÉ du sas, depuis le corps
+  audio.setDrainPan(panDepuis(sim.stats.centroidX, exitMouth.x))
   audio.setDrainLevel(
     audible && drainOn
       ? Math.max(0, 1 - mouthDist / Math.max(1, params.exitRadius))

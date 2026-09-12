@@ -31,6 +31,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '12/09/2026 15:41',
+    title: 'SE METTRE À SA PLACE, PREMIER CHANTIER : le cœur dans la manette, une oreille par état, le monde entendu depuis le corps',
+    notes: [
+      'LA DEMANDE : après la compassion (les motes, le halo, la lueur des gouttes), l’identification — « qu’on se mette à sa place ». Le chapitre 9 de docs/sujet-vivant.md pose les pistes ; les trois premières, à coût faible, sont livrées. Rendu et son seulement : aucun paramètre de simulation, aucun préset.',
+      'LE CŒUR DANS LA MANETTE (II1) : réserve à sec (dernière impulsion, sursis), un battement dans les mains toutes les 0,6 s — deux coups, le second plus faible, ~100 par minute, le rythme d’un cœur qui s’affole ; au calme, rien. LE FRISSON (II2) passe aussi dans la manette : quand le froid saisit le corps (ou au frisson de réveil), une secousse brève de 140 ms. Sans manette, rien ne change.',
+      'UNE OREILLE PAR ÉTAT (I2, game/ouie.ts) : le corps est le point d’écoute. Un étage de plus sur TOUT le mixage, après le passe-bas du temps suspendu : l’eau voile à peine (7 500 Hz — les lits musicaux n’ont rien au-dessus de 3 kHz, seul l’air des bruitages est touché), la glace assourdit (1 500 Hz, niveau 0,82) et CRAQUE de l’intérieur de loin en loin (2 à 6 s) quand tout le corps est pris, la vapeur ouvre (19 500 Hz, +2,5 dB d’aigus : on est de l’air). Au prorata du corps, mêlé en octaves, lissé en 0,3 s : une transformation se SENT venir avant de se lire.',
+      'LE MONDE ENTENDU DEPUIS LE CORPS (I1) : l’aspiration du sas se place en stéréo du côté où elle est par rapport au corps (un panoramique sur la boucle, borné à ±0,85, portée d’une demi-cuve) ; la pastille de condensat bue s’entend là où elle était ; le toc-toc et le tentacule de l’idle sonnent du côté de la paroi touchée. Les écrans (collectes d’inventaire, marchand) restent au centre. Sans StereoPanner (navigateur ancien), tout reste au centre comme avant.',
+      'VÉRIFIÉ : 6 tests neufs sur l’oreille (l’eau nue, la glace qui assourdit et la vapeur qui ouvre, la moitié en octaves, les bornes) et le panoramique (côté, centre, jamais tout à fait dans une oreille) — 1088 verts dans 102 fichiers, type-check à 0, build propre. NON VU D’ICI : l’oreille et le cœur ne s’entendent et ne se sentent qu’en jouant — à juger en prévisualisation, manette en main.',
+    ],
+  },
+  {
     date: '11/09/2026 16:25',
     title: 'LE SUJET VIVANT, PREMIER CHANTIER GRAPHIQUE : les motes dans le corps, le halo au sol, la lueur des gouttes perdues',
     notes: [
