@@ -4109,7 +4109,7 @@ function appelOeil(): void {
 }
 window.setTimeout(appelOeil, 600)
 
-// ---- LE LECTEUR : la musique de l'accueil (les touches, en mode concepteur)
+// ---- LE LECTEUR : la musique de l'accueil, ses touches pour tout le monde
 // Les lits et leurs candidates, dans un ordre tiré au sort à l'ouverture :
 // la première de l'ordre est LA musique de l'accueil — chargée tout de
 // suite, jouée dès que le son est permis, notable telle quelle. Les touches
@@ -4163,8 +4163,9 @@ function majEcoute(): void {
     b.setAttribute('aria-pressed', p && courant === v ? 'true' : 'false')
   }
 }
-/** Le document publié, une fois : au démarrage en mode concepteur, sinon à
- *  la première touche du lecteur — un joueur ne le télécharge jamais. */
+/** Le document publié, une fois, au démarrage — le lecteur est à tout le
+ *  monde, ses avis aussi (deux fetch publics, aucune opération du magasin) ;
+ *  et à la première touche si le réseau manquait. */
 async function chargeAvisEcoute(): Promise<void> {
   if (avisEcouteCharge) return
   avisEcouteCharge = true
@@ -4176,7 +4177,7 @@ async function chargeAvisEcoute(): Promise<void> {
   avisEcoute = superposeAvis(lisAvisEcoute(p.document), avisEcouteModifies)
   majEcoute()
 }
-if (document.body.classList.contains('concepteur')) void chargeAvisEcoute()
+void chargeAvisEcoute()
 // LA PUBLICATION est différée et regroupée : trois touches coup sur coup
 // (+1, non −1, finalement neutre) ne coûtent qu'une écriture au magasin
 // (2 put + 1 list, cf. api/_magasin.ts). Avant d'écrire, on relit le

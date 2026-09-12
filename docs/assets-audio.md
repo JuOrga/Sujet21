@@ -267,8 +267,8 @@ c'est la piste que le lecteur (`src/game/jukebox.ts`) a chargée — tirée au
 sort à l'ouverture du jeu parmi les musiques du projet (les six lits et les
 candidates), jouée dès que le son est permis, **telle que le jeu la joue** (la
 boucle taillée, le même bus, le même volume). En jeu elle s'efface, et revient
-à l'accueil. En mode concepteur, une ligne ÉCOUTE sous la rangée d'outils la
-pilote : précédent, lecture, arrêt (l'accueil se tait, la piste reste chargée),
+à l'accueil. Une ligne ÉCOUTE sous la rangée d'outils — pour tout le monde,
+joueurs compris — la pilote : précédent, lecture, arrêt (l'accueil se tait, la piste reste chargée),
 suivant ; le titre dit le rang et si la piste joue dans le jeu ou n'est qu'une
 candidate. Une nouvelle candidate s'ajoute en deux lignes : son master dans
 `BOUCLES` (`prepare.py`, puis `python3 tools/audio/prepare.py <nom>`), et sa
@@ -282,7 +282,8 @@ l'infobulle). Un avis par personne et par piste — la personne est le nom de la
 borne, celui des records ; sans nom, « anonyme », et tous les anonymes ne font
 qu'un. Le neutre retire le sien et rien d'autre. Le document est **partagé** :
 il vit au magasin des réglages (`/api/reglages`, domaine `ecoute`), chargé à
-l'ouverture de l'accueil en mode concepteur et publié 800 ms après la dernière
+l'ouverture de l'accueil par tout le monde (les joueurs notent aussi, sous le
+nom de leur borne) et publié 800 ms après la dernière
 touche (une écriture pour une rafale). À l'arrêt, le titre donne le bilan
 (« 3 retenues, 2 écartées, 1 partagée » — retenue si la somme est positive,
 écartée si négative, partagée si les avis se neutralisent). La forme et ses
