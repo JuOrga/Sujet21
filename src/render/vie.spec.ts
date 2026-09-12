@@ -6,6 +6,7 @@ import {
   VIE_STRIDE,
   lueurGoutte,
   remplitVie,
+  toucheLeCorps,
   type Hotes,
   type Humeur,
 } from './vie'
@@ -162,5 +163,14 @@ describe('le tampon de vie', () => {
     for (let k = 0; k < 60; k++) motes.update(1 / 60, h, calme, tirage())
     const out = new Float32Array(2 * VIE_STRIDE)
     expect(remplitVie(out, motes, h, 1.2)).toBe(2)
+  })
+})
+
+describe('le toucher du corps', () => {
+  it('vaut sur une goutte du corps, pas sur l’eau libre ni le vide', () => {
+    const h = corps()
+    expect(toucheLeCorps(120, 100, h, 14)).toBe(true) // la goutte 0 est en (120, 100)
+    expect(toucheLeCorps(900, 900, h, 14)).toBe(false) // eau libre
+    expect(toucheLeCorps(500, 500, h, 14)).toBe(false) // rien
   })
 })

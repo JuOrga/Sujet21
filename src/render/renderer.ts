@@ -468,6 +468,19 @@ uniform float uOndule; // 0..1 : ondulation du contour à l'abandon (idle)
 // une lueur douce au sol sous lui, qui pulse au rythme de sa respiration.
 // 0 : aucun halo (le banc, le rendu historique).
 uniform float uHalo;
+// LA CARESSE (docs/sujet-vivant.md, D1) : le pointeur posé sur le corps
+// sans cliquer — une fossette sous le doigt et des rides qui s'en
+// écartent. x, y le point (monde), z l'intensité 0..1, w l'instant du
+// début (uTime), pour que les rides partent du toucher.
+uniform vec4 uCaresse;
+// LA PEAU (G3) : la tension du liseré, -1 (relâché : fin, doux) à +1
+// (tendu : épais, vif). 0 : le liseré historique.
+uniform float uPeau;
+// LA TEINTE VITALE (G2) : x le stress (pâle, plus froid), y la fatigue
+// (désaturé, laiteux — la lecture du gel), z le sommeil (plus sombre, plus
+// saturé). Des glissements de valeur et de saturation, jamais une teinte
+// nouvelle : la charte garde son seul accent. Tout à 0 : rendu historique.
+uniform vec3 uVital;
 // Le mode MERCURE (uMiroirEau = 2) organise son reflet autour du CORPS :
 // centre et rayon efficace lus dans les stats de la simulation.
 uniform vec2 uCentroide;
@@ -1831,6 +1844,19 @@ void main() {
     vec3 slow = vec3(0.07, 0.30, 0.48);
     vec3 fast = vec3(0.55, 0.85, 0.95);
     vec3 water = mix(slow, fast, speedT);
+    // LA TEINTE VITALE : l'état se lit dans la matière, pas seulement dans
+    // le regard. Le stress retire le sang (plus pâle, un rien plus froid) ;
+    // la fatigue délave (laiteux, comme le givre) ; le sommeil assombrit et
+    // sature (le repos). Versé sur la teinte de vitesse, avant tout relief.
+    if (uVital.x + uVital.y + uVital.z > 0.003) {
+      vec3 pale = water * vec3(0.90, 1.0, 1.05) + vec3(0.07, 0.08, 0.09);
+      water = mix(water, pale, 0.55 * clamp(uVital.x, 0.0, 1.0));
+      float gris = dot(water, vec3(0.3333));
+      vec3 laiteux = vec3(gris) * 1.1 + vec3(0.06);
+      water = mix(water, laiteux, 0.6 * clamp(uVital.y, 0.0, 1.0));
+      vec3 repos = water * vec3(0.72, 0.84, 1.0) * 0.82;
+      water = mix(water, repos, 0.55 * clamp(uVital.z, 0.0, 1.0));
+    }
     water = mix(water * 0.40, water, clamp(player, 0.0, 1.0)); // eau libre plus sombre
 
     // Relief : pseudo-normale sur un champ FLOUTÉ (4 prélèvements écartés) —
@@ -1868,8 +1894,11 @@ void main() {
     // Cœur plus dense légèrement plus sombre, liseré plus clair
     float core = smoothstep(th * 1.8, th * 3.2, field2);
     water = mix(water, water * 0.75, core * 0.5);
-    float rim = body * (1.0 - smoothstep(th + s, th * 1.9, field2));
-    water += vec3(0.20, 0.45, 0.55) * rim * 0.55 * (1.0 - vap);
+    // LA PEAU : le liseré est un ménisque — tendu, il épaissit et s'avive ;
+    // relâché (sommeil, caresse), il s'amincit et s'adoucit
+    float tension = clamp(uPeau, -1.0, 1.0);
+    float rim = body * (1.0 - smoothstep(th + s, th * (1.9 + 0.7 * tension), field2));
+    water += vec3(0.20, 0.45, 0.55) * rim * 0.55 * (1.0 + 0.55 * tension) * (1.0 - vap);
 
     // Le relief n'éclaire que la zone de surface : à l'intérieur, les
     // fluctuations de densité ne sont pas du relief — sans ce masque, l'eau
@@ -2073,6 +2102,22 @@ void main() {
       }
     }
     water += vec3(0.30, 0.55, 0.65) * waveGlow * 0.45 * (1.0 - icy) * (1.0 - vap);
+
+    // LA CARESSE : sous le doigt, une FOSSETTE (l'eau s'assombrit, comme
+    // pressée) et des RIDES concentriques qui partent du toucher et
+    // s'éteignent en s'éloignant — la mathématique du dôme du regard, en
+    // négatif. Liquide seulement : ni le gel ni le nuage ne se laissent
+    // toucher ainsi.
+    if (uCaresse.z > 0.003) {
+      vec2 relC = world - uCaresse.xy;
+      float dC = length(relC);
+      float masqueC = uCaresse.z * (1.0 - vap) * (1.0 - icy) * clamp(player, 0.0, 1.0);
+      float fossette = exp(-dC * dC / (2.0 * 22.0 * 22.0));
+      water *= 1.0 - 0.22 * fossette * masqueC;
+      float age = max(0.0, uTime - uCaresse.w);
+      float rides = sin(dC * 0.32 - age * 7.0) * exp(-dC / 90.0) * smoothstep(0.0, 0.6, age);
+      water += vec3(0.24, 0.44, 0.54) * rides * 0.14 * masqueC * (1.0 - fossette * 0.6);
+    }
 
     // Gel (tableau 2) : la teinte pâlit vers la glace mate — le givre se lit
     // sur le corps avant même la prise, la partie gelée devient blême et fixe.
@@ -3720,6 +3765,15 @@ export class Renderer {
       oeilTaille?: number
       oeilRelief?: number
       halo?: number // 0..1 : la lueur au sol sous le corps (0 : aucune)
+      // la caresse (point monde, intensité, instant de début en uTime)
+      caresseX?: number
+      caresseY?: number
+      caresse?: number
+      caresseT0?: number
+      peau?: number // -1..1 : la tension du liseré (0 : historique)
+      vitalStress?: number // la teinte vitale, 0 partout : historique
+      vitalFatigue?: number
+      vitalSommeil?: number
     } | null = null,
   ): void {
     // rien à dessiner tant que les programmes ne sont pas liés — la boucle
@@ -3913,6 +3967,20 @@ export class Renderer {
     gl.uniform1f(cu['uFrisson'], presence?.frisson ?? 0)
     gl.uniform1f(cu['uOndule'], presence?.ondule ?? 0)
     gl.uniform1f(cu['uHalo'], presence?.halo ?? 0)
+    gl.uniform4f(
+      cu['uCaresse'],
+      presence?.caresseX ?? 0,
+      presence?.caresseY ?? 0,
+      presence?.caresse ?? 0,
+      presence?.caresseT0 ?? 0,
+    )
+    gl.uniform1f(cu['uPeau'], presence?.peau ?? 0)
+    gl.uniform3f(
+      cu['uVital'],
+      presence?.vitalStress ?? 0,
+      presence?.vitalFatigue ?? 0,
+      presence?.vitalSommeil ?? 0,
+    )
     gl.uniform4f(
       cu['uOeilRegl'],
       presence?.oeilLueur ?? 1,
