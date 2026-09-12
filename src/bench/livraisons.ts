@@ -31,6 +31,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '12/09/2026 23:11',
+    title: 'PLUS DE BLOCS : le budget de rendu passe de 96 à 160 boîtes — 159 blocs dessinés par tableau',
+    notes: [
+      'LA DEMANDE : « est-ce possible de pouvoir mettre plus de blocs ? » — un tableau standard de 2400 × 1500, bien bâti (chambres, couloirs, cachettes voilées, portes asservies), atteignait 112 blocs posés et le panneau CONTRÔLE le refusait à 95 : « les derniers seraient des murs invisibles ».',
+      'D’OÙ VIENT LA LIMITE : une constante du moteur, MAX_BOXES, écrite trois fois dans render/renderer.ts — en TypeScript (les tampons, la jauge et le refus de l’éditeur) et en #define dans les deux shaders qui parcourent les boîtes (la composition et le cuiseur de carte de lumière). Le moteur dessine MAX_BOXES − 1 blocs, le sas gardant sa place. Ce n’est pas la boucle par pixel qui borne : elle s’arrête au nombre de boîtes réellement posées. Ce sont les CASES D’UNIFORMES du fragment shader — deux vec4 par boîte.',
+      'CE QUI CHANGE : MAX_BOXES passe à 160, soit 159 blocs dessinés (structures expansées comprises). La jauge, le refus de l’éditeur, l’aide du panneau Tableau et le test des structures suivent la constante au lieu d’un chiffre en dur — ce dernier, resté à 120, ne testait plus rien une fois le plafond monté.',
+      'CE QUE ÇA COÛTE, MESURÉ SUR LA SOURCE : la composition occupe 460 cases d’uniformes (332 à 96), le cuiseur de lumière 359 (231 à 96). WebGL2 n’en garantit que 224 : le shader les dépassait déjà à 96, on ne s’appuie donc sur aucune limite nouvelle — les GPU courants en annoncent 1024. Un tableau qui ne pose pas plus de blocs qu’avant ne paie rien de plus par pixel ; un tableau qui en pose 150 paie ses 150, comme il payait ses 95.',
+      'VÉRIFIÉ : un test neuf (render/budgets.spec.ts) garde les trois définitions alignées — TypeScript et les deux #define — et vérifie que le refus tombe exactement au 160ᵉ bloc ; retirer un #define le fait tomber (rouge), le remettre le relève (vert). 1158 verts dans 110 fichiers, type-check à 0, build propre. Les deux fragment shaders compilés et liés à 160 dans un WebGL2 réel (Chromium sans écran, SwiftShader — 4096 cases annoncées, ce n’est pas un mobile). À juger en prévisualisation sur téléphone : un tableau à 150 blocs, cadence et ombres.',
+    ],
+  },
+  {
     date: '12/09/2026 17:42',
     title: 'LA CARESSE, LA PEAU ET LA TEINTE VITALE — et le temps qui s’étire aux dernières gouttes',
     notes: [

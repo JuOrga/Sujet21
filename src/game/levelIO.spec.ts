@@ -20,6 +20,7 @@ import {
   type LevelDef,
 } from './level'
 import { FORME_COIN, FORME_DISQUE } from './formes'
+import { MAX_BOXES } from '../render/renderer'
 
 describe('levelIO — aller-retour JSON', () => {
   it('un tableau livré se sérialise et se relit à l’identique', () => {
@@ -1152,8 +1153,11 @@ describe('levelIO — les décalques de LA SERRE', () => {
   })
 
   it('le verdict compte les parois des structures dans le budget de blocs', () => {
+    // une chambre de plus que le budget : le test suit MAX_BOXES au lieu
+    // d'un chiffre en dur, qui s'est déjà retrouvé SOUS le plafond quand
+    // celui-ci a monté (96 → 160) — et le test ne testait plus rien
     const chambres = []
-    for (let i = 0; i < 120; i++)
+    for (let i = 0; i < MAX_BOXES; i++)
       chambres.push({
         type: 0,
         minX: -3000 + (i % 12) * 460,
