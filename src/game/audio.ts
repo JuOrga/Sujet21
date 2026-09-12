@@ -73,6 +73,9 @@ export class AudioFx {
   private oreilleG: GainNode | null = null
   // le panoramique de l'aspiration du sas : elle s'entend DU CÔTÉ où elle est
   private drainPan: StereoPannerNode | null = null
+  // LE RONRON de la caresse (D1) : une voix grave à peine audible, qui
+  // tremble lentement — bâtie à la première caresse, éteinte entre deux
+  private ronronG: GainNode | null = null
 
   constructor(prefs: AudioPrefs) {
     this.enabled = prefs.on
@@ -392,6 +395,41 @@ export class AudioFx {
   }
 
   // ---- Boucles pilotées chaque frame par le jeu (niveaux 0..1) ----
+
+  /** Le ronron : 0..1, à poser chaque image ; monte et descend en douceur. */
+  setRonron(v: number): void {
+    if (!this.ctx || !this.master) return
+    if (!this.ronronG) {
+      if (v <= 0.003) return
+      const ctx = this.ctx
+      const o = ctx.createOscillator()
+      o.type = 'triangle'
+      o.frequency.value = 74
+      const bas = ctx.createBiquadFilter()
+      bas.type = 'lowpass'
+      bas.frequency.value = 220
+      const g = ctx.createGain()
+      g.gain.value = 0
+      // le tremblement : un LFO à 5,5 Hz module le niveau (±45 %)
+      const lfo = ctx.createOscillator()
+      lfo.type = 'sine'
+      lfo.frequency.value = 5.5
+      const prof = ctx.createGain()
+      prof.gain.value = 0.45
+      const trem = ctx.createGain()
+      trem.gain.value = 1
+      lfo.connect(prof)
+      prof.connect(trem.gain)
+      o.connect(bas)
+      bas.connect(trem)
+      trem.connect(g)
+      g.connect(this.master)
+      o.start()
+      lfo.start()
+      this.ronronG = g
+    }
+    this.ronronG.gain.setTargetAtTime(Math.max(0, Math.min(1, v)) * 0.05, this.ctx.currentTime, 0.25)
+  }
 
   setGasLevel(v: number): void {
     // Le fichier est calé à -20 dBFS RMS : × 0,6 le pose une paire de dB

@@ -31,6 +31,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '12/09/2026 17:42',
+    title: 'LA CARESSE, LA PEAU ET LA TEINTE VITALE — et le temps qui s’étire aux dernières gouttes',
+    notes: [
+      'LA DEMANDE : « ok ça marche pour la suite » — la caresse au survol pour l’attachement, la peau et la teinte vitale pour que l’état se lise dans la matière, le temps qui s’étire aux dernières gouttes (docs/sujet-vivant.md, D1, G3, G2, III1). Rendu et son seulement : aucun paramètre de simulation, aucun préset.',
+      'LA CARESSE (D1) : la souris posée SUR le corps sans cliquer — une goutte du corps à moins de 16 unités du pointeur (render/vie.ts, toucheLeCorps), pas l’eau libre ni le vide. Sous le doigt, une FOSSETTE (l’eau s’assombrit, comme pressée) et des RIDES concentriques qui partent du toucher et s’éteignent en s’éloignant (la mathématique du dôme du regard, en négatif) ; le regard vient sous le doigt et y reste ; le souffle s’apaise (0,010 · 1,2) ; les motes se rassemblent un peu ; un RONRON à peine audible (une voix grave qui tremble à 5,5 Hz). Cliquer éjecte ; survoler est libre. Souris seulement : au tactile, poser le doigt vise ; à la manette, rien à poser.',
+      'LA PEAU (G3) : le liseré est un ménisque. Tendu (stress, visée), il épaissit (jusqu’à +70 % de largeur) et s’avive (+55 %) ; relâché (sommeil, caresse), il s’amincit et s’adoucit. Un uniforme de tension, −1 à +1, lissé ; 0 est le liseré historique.',
+      'LA TEINTE VITALE (G2) : l’état se lit dans la matière, pas seulement dans le regard. Le stress retire le sang (plus pâle, un rien plus froid), la fatigue (réserve à sec, agonie) délave — laiteux, la lecture que le gel a déjà —, le sommeil assombrit et sature. Des glissements de valeur et de saturation sur la teinte de vitesse, avant tout relief ; jamais une teinte nouvelle : la charte garde son seul accent. Tout à zéro, le rendu est celui d’avant.',
+      'LE TEMPS QUI S’ÉTIRE (III1) : pendant l’agonie, le monde ralentit (×0,3 sur le time warp d’affichage, comme le ralenti de l’éveil — jamais le pas physique) et l’ouïe se ferme (le passe-bas du temps suspendu). Les gouttes dérivent au ralenti tandis que l’œil les cherche. Le temps réel — la scène, l’écran froid — n’est pas touché.',
+      'VÉRIFIÉ : un test neuf (le toucher vaut sur une goutte du corps, pas sur l’eau libre ni le vide) — 1154 verts dans 109 fichiers, type-check à 0, build propre, les cinq programmes GLSL compilés et liés dans un WebGL2 réel. À juger en prévisualisation : poser la souris sur le corps sans cliquer, regarder le liseré en visée puis endormi, et la matière à sec.',
+    ],
+  },
+  {
     date: '12/09/2026 17:09',
     title: 'LA PAUPIÈRE : le clignement, le sommeil et le sursaut, l’agonie — et des motes aux trajets courbes',
     notes: [

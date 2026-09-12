@@ -213,6 +213,20 @@ export class Motes {
   }
 }
 
+/** Le point (x, y) touche-t-il le corps ? Oui si une goutte DU CORPS est
+ *  à moins de `rayon` — la caresse (D1) ne vaut que sur lui, pas sur l'eau
+ *  libre de la salle ni sur le vide. */
+export function toucheLeCorps(x: number, y: number, h: Hotes, rayon: number): boolean {
+  const r2 = rayon * rayon
+  for (let i = 0; i < h.count; i++) {
+    if (h.kind[i] !== KIND_PLAYER) continue
+    const dx = h.posX[i] - x
+    const dy = h.posY[i] - y
+    if (dx * dx + dy * dy <= r2) return true
+  }
+  return false
+}
+
 /**
  * La lueur d'une goutte détachée du corps, 0..1.
  * `cooldown` : le délai de réabsorption restant (s) ; `cooldownMax` : sa
