@@ -88,9 +88,13 @@ describe('les motes', () => {
       h.kind[i] = 0
       h.posX[i] = 700
     }
-    for (let k = 0; k < 120; k++) motes.update(1 / 60, h, calme, tirage())
+    // un seul tirage pour toute la suite : recréé à chaque image, il
+    // rejouait les mêmes nombres et pouvait manquer l'hôte à chaque fois
+    const rand = tirage()
+    for (let k = 0; k < 120; k++) motes.update(1 / 60, h, calme, rand)
     for (let m = 0; m < motes.n; m++) {
-      expect(Math.abs(motes.x[m] - h.posX[0])).toBeLessThan(12)
+      // l'hôte, à son rayon de vagabondage près (16 au plus)
+      expect(Math.abs(motes.x[m] - h.posX[0])).toBeLessThan(20)
       expect(motes.alpha[m]).toBeGreaterThan(0.5)
     }
   })
