@@ -196,7 +196,9 @@ export class FluidSim {
   // collectables s'attrapent au contact, pas à l'aimant.)
   // Valeurs : 0 = sans marque · 1 = du corps, SORTIE du halo (perdue, mais
   // reprise si on repasse à portée) · 2 = du corps, DANS le halo (vivante).
-  private readonly duCorps: Uint8Array
+  // lue par le rendu (render/vie.ts) : la lueur d'une goutte perdue suit
+  // cette marque — publique en LECTURE, le solveur seul l'écrit
+  readonly duCorps: Uint8Array
   private readonly iceVxSum: Float32Array
   private readonly iceVySum: Float32Array
   private readonly iceCnt: Int32Array
