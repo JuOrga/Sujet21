@@ -397,6 +397,17 @@ import { amorcePresets } from './bench/amorcePresets'
 import { appelle } from './game/reseau'
 
 const CAPACITY = 4096
+
+// L'AMORÇAGE, RACONTÉ À LA PAGE. index.html affiche un mot de chargement dès
+// le premier pixel et tient une veille (la garde d'amorçage) ; chaque étape
+// franchie ici lui est dite, pour que le mot avance et que la veille ne
+// prenne pas un démarrage lent pour une panne — c'est ainsi que le panneau
+// « met trop longtemps » recouvrait un jeu qui tournait déjà.
+function etapeAmorce(etape: 'ouverture' | 'rendu'): void {
+  const w = window as unknown as { __sujet21Etape?: (e: string) => void }
+  w.__sujet21Etape?.(etape)
+}
+etapeAmorce('ouverture')
 // (l'ancien délai d'affichage du bilan a cédé la place à la MISE EN
 // BONBONNE : c'est le choix d'instrument qui mène au tableau suivant)
 
@@ -3955,6 +3966,10 @@ function rapportPerf(): Record<string, unknown> {
       timeWarp: params.timeWarp,
       downsampleChamp: params.renderDownsample,
     },
+    amorcage: {
+      ...amorce,
+      compileParallele: renderer.compileEnParallele,
+    },
     session: {
       tableau: `${level.code} — ${level.name}`,
       particules: sim.count,
@@ -7211,6 +7226,7 @@ fetch('/noyaux.wasm')
   })
 
 const renderer = new Renderer(canvas, CAPACITY)
+const rendererNe = performance.now() // pour dater l'attente de compilation
 const loop = new FixedLoop()
 const input = new Input()
 // Ouverture directe par ?editeur — APRÈS la naissance d'input : openEditor
@@ -14603,10 +14619,33 @@ let tickPrecedent = 0
 // jamais tourner. Une seule fois, puis plus rien : un incident en cours de
 // partie n'a pas à recouvrir le jeu d'un panneau.
 let amorceSignalee = false
+// CE QUE L'AMORÇAGE A COÛTÉ, pour le rapport de performance : l'attente de
+// la compilation du rendu (le poste qu'on soupçonne sur les cartes
+// ordinaires, sans pouvoir le mesurer d'ici) et la date de la première
+// image depuis l'ouverture de la page. Un chiffre mesuré sur la machine du
+// joueur vaut mieux qu'une estimation.
+const amorce = { compileRenduMs: -1, premiereImageMs: -1 }
+let attenteRenduDite = false
 
 function frame(now: number): void {
+  // LE RENDU SE COMPILE EN COULISSE (render/programmes.ts). Tant que ses
+  // programmes ne sont pas liés, on ne simule ni ne dessine : la page reste
+  // vivante, le mot du chargement le dit, et la première image — celle qui
+  // désarme la garde — sera une vraie image. L'étape n'est dite qu'UNE fois :
+  // la redire à chaque image réarmerait la veille sans fin, et un pilote qui
+  // ne finit jamais sa compilation doit finir par être signalé.
+  if (!renderer.pret()) {
+    if (!attenteRenduDite) {
+      attenteRenduDite = true
+      etapeAmorce('rendu')
+    }
+    requestAnimationFrame(frame)
+    return
+  }
   if (!amorceSignalee) {
     amorceSignalee = true
+    amorce.compileRenduMs = Math.round(performance.now() - rendererNe)
+    amorce.premiereImageMs = Math.round(performance.now())
     const w = window as unknown as { __sujet21Demarre?: () => void }
     w.__sujet21Demarre?.()
   }
