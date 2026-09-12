@@ -218,6 +218,7 @@ import { MAX_BOXES, Renderer } from './render/renderer'
 import { Motes, VIE_STRIDE, remplitVie } from './render/vie'
 import { panDepuis } from './game/ouie'
 import { dangerDevant, directionDeMarche, saccade, type Saccade } from './game/regard'
+import { AGONIE_DUREE, agonie, clignement, intervalleClignement } from './game/paupiere'
 import { FixedLoop } from './game/loop'
 import { Input } from './game/input'
 import {
@@ -9615,6 +9616,16 @@ const presence = {
   armeFrisson: true,
   ondule: 0, // 0..1 : l'ondulation du contour, quand on le laisse tranquille
   halo: 0, // 0..1 : la lueur au sol sous le corps — il est une source
+  // LA PAUPIÈRE (game/paupiere.ts) : le clignement, le stress qui le
+  // rapproche et resserre la lueur, le sommeil qui l'éteint presque,
+  // l'agonie qui la ferme pour de bon
+  stress: 0, // 0..1 : la peur lisible (réserve à sec, danger devant)
+  cligne: 0, // 0..1 : la fermeture de la lueur
+  tCligne: 0, // l'instant du prochain clignement (elapsed)
+  cligneT0: -9, // le début du clignement en cours
+  sommeil: 0, // 0..1 : endormi
+  eveilT0: -9, // le sursaut du réveil : la lueur monte un instant
+  agonieT0: -1, // le début de l'agonie (elapsed), -1 hors dispersion
 }
 ;(window as unknown as { __presence: typeof presence }).__presence = presence
 // LA VIE VISIBLE (render/vie.ts, docs/sujet-vivant.md G1 et G6) : les motes
@@ -9638,6 +9649,7 @@ function majVie(dtReal: number): void {
       rassemble: peril ? 0.8 : input.aimActive ? 0.3 : 0,
       agite: peril ? 1 : input.aimActive ? 0.5 : idle.t > 4 ? 0 : 0.2,
       dispersed: sim.dispersed,
+      sommeil: presence.sommeil,
     },
   )
   const n = remplitVie(
@@ -9649,9 +9661,30 @@ function majVie(dtReal: number): void {
   renderer.setVie(vieTampon, n)
   // le halo : plein au calme, il se rétracte sous la peur (il se cache) et
   // s'éteint quand le corps se défait
-  const haloCible = sim.dispersed ? 0 : peril ? 0.45 : input.aimActive ? 0.8 : 1
+  const haloCible =
+    (sim.dispersed ? 0 : peril ? 0.45 : input.aimActive ? 0.8 : 1) *
+    (1 - 0.6 * presence.sommeil)
   presence.halo += (haloCible - presence.halo) * (1 - Math.exp(-2.5 * dtReal))
   presence.halo = Math.max(0, Math.min(1, presence.halo))
+  // LE SOMMEIL (docs/sujet-vivant.md, C4) : sans geste pendant longtemps,
+  // il s'endort — lentement (quelques secondes) ; au premier geste, LE
+  // SURSAUT (D2) : un frisson (contour et manette), la lueur qui bondit,
+  // et le réveil est vif. Une seule fois par réveil.
+  const enVieSommeil =
+    document.body.classList.contains('playing') &&
+    !input.paused &&
+    !sim.dispersed &&
+    !run.ended
+  const sommeilCible = enVieSommeil && idle.t >= SOMMEIL_APRES ? 1 : 0
+  if (presence.sommeil > 0.3 && sommeilCible === 0 && !coeur.sursautFait) {
+    coeur.sursautFait = true
+    presence.t0Frisson = elapsed
+    presence.eveilT0 = elapsed
+  }
+  if (presence.sommeil > 0.9) coeur.sursautFait = false
+  presence.sommeil +=
+    (sommeilCible - presence.sommeil) *
+    (1 - Math.exp(-(sommeilCible ? 0.7 : 6) * dtReal))
   // LE CŒUR DANS LA MANETTE (docs/sujet-vivant.md, II1) : sous la peur, un
   // battement dans les mains — deux coups, le second plus faible, à un
   // rythme de cœur qui s'affole ; au calme, rien. Et LE FRISSON (II2) : le
@@ -9679,7 +9712,9 @@ function majVie(dtReal: number): void {
 }
 // un cœur qui s'affole : ~100 battements par minute
 const COEUR_PERIODE = 0.6
-const coeur = { t: 0, dernierFrisson: -9 }
+const coeur = { t: 0, dernierFrisson: -9, sursautFait: false }
+// sans geste pendant ce temps, il s'endort
+const SOMMEIL_APRES = 25
 const craqueGlace = { t: 2 }
 
 // ---- LES CURSEURS DE L'ŒIL : la présence se règle (banc → L'œil) ----
@@ -9817,8 +9852,9 @@ function majIdle(dtReal: number): void {
       idle.type = ''
       idle.prochaine = idle.t + (4 + Math.random() * 5) / oeilRegl.curiosite
     }
-  } else if (idle.t >= idle.prochaine) {
+  } else if (idle.t >= idle.prochaine && presence.sommeil < 0.2) {
     // choisir la vignette — tapoter seulement si une paroi est à portée
+    // (endormi, il ne fait rien : les vignettes attendent le réveil)
     const cx = sim.stats.centroidX
     const cy = sim.stats.centroidY
     let murX = 0
@@ -9995,6 +10031,7 @@ const regardEtat = {
   tLache: -9,
   aimX: 0,
   aimY: 0,
+  danger: false, // un danger dans la marche, cette image (le stress le lit)
 }
 // les DANGERS du tableau (chaudières, plaques froides, éponges) : les
 // points que le regard fixe quand la marche y mène — recalculés au
@@ -10018,6 +10055,7 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
   const cx = sim.stats.centroidX
   const cy = sim.stats.centroidY
   const now = performance.now() / 1000
+  const peril = endgame.lastCall || endgame.spent
   // les fronts de l'éjection : l'amorce et le relâcher (le dernier point
   // de visée est gardé pour le coup d'œil du relâcher)
   if (input.aimActive) {
@@ -10028,6 +10066,17 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
     regardEtat.tLache = now
   }
   regardEtat.aimAvant = input.aimActive
+  regardEtat.danger = false
+  // L'AGONIE (E3) : à la dispersion, l'œil ne s'éteint plus d'un coup —
+  // il CHERCHE ses fragments, la lueur se resserre en un point, un dernier
+  // clignement lent la ferme, et la note tenue se coupe. L'écran froid
+  // du laboratoire attend la fin de la scène (DELAI_DISPERSION).
+  if (sim.dispersed && presence.agonieT0 < 0) {
+    presence.agonieT0 = elapsed
+    audio.dernierSouffle()
+  }
+  if (!sim.dispersed) presence.agonieT0 = -1
+  const ag = presence.agonieT0 >= 0 ? agonie(elapsed - presence.agonieT0) : null
   // le réveil ne vit que le temps de l'intro caméra
   if (reveil.actif && (!camera.introEnCours || sim.dispersed))
     reveil.actif = false
@@ -10037,7 +10086,24 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
   let tx = 0
   let ty = 0
   let vise = false
-  if (reveil.actif) {
+  if (ag && ag.cherche) {
+    // il cherche ses fragments : le regard balaie autour de ce qu'il reste
+    // de lui (les gouttes marquées du corps), par petits sauts
+    let sx = 0
+    let sy = 0
+    let n = 0
+    for (let i = 0; i < sim.count; i++) {
+      if (sim.duCorps[i] === 0) continue
+      sx += sim.posX[i]
+      sy += sim.posY[i]
+      n++
+    }
+    const pas = Math.floor((elapsed - presence.agonieT0) / 0.22)
+    const ang = pas * 2.4
+    tx = (n > 0 ? sx / n : cx) + Math.cos(ang) * 90
+    ty = (n > 0 ? sy / n : cy) + Math.sin(ang) * 90
+    vise = true
+  } else if (reveil.actif) {
     // le RÉVEIL : le regard visite un coin de la salle, puis glisse au sas
     if (tReveil < reveil.bascule) {
       tx = reveil.balayageX
@@ -10071,6 +10137,7 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
       // plaque froide ou une éponge, c'est LUI qu'il fixe — il a peur, et
       // il y va quand même
       const danger = dangerDevant(cx, cy, m.dx, m.dy, pointsDanger(), sim.stats.rmsRadius + 300)
+      regardEtat.danger = danger !== null
       if (danger) {
         tx = danger.x
         ty = danger.y
@@ -10126,6 +10193,8 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
     }
     regarde(exitMouth.x, exitMouth.y, 1100)
   }
+  // endormi, rien ne l'appelle : le regard s'immobilise presque
+  if (presence.sommeil > 0.5) vise = false
   // le noyau vit DANS le corps : à mi-chemin du bord, du côté regardé —
   // la VIVACITÉ (curseur) règle la vitesse du glissement
   const k = 1 - Math.exp(-4.5 * oeilRegl.vivacite * dtReal)
@@ -10145,7 +10214,11 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
   } else {
     // l'ERRANCE (curseur) : rien ne l'appelle — au lieu de rentrer se
     // poser au centre, le regard vagabonde lentement dans le corps
-    const port = sim.stats.rmsRadius * 0.3 * Math.min(1.6, oeilRegl.errance)
+    const port =
+      sim.stats.rmsRadius *
+      0.3 *
+      Math.min(1.6, oeilRegl.errance) *
+      (1 - 0.85 * presence.sommeil)
     const tw = elapsed * 0.33
     const wx = Math.sin(tw + 1.7) * 0.7 + Math.sin(tw * 2.3) * 0.3
     const wy = Math.cos(tw * 0.83) * 0.7 + Math.sin(tw * 1.9 + 4.2) * 0.3
@@ -10154,18 +10227,33 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
   }
   // sans cible, l'œil ne s'éteint plus tout à fait : l'errance se VOIT
   // (elle garde une demi-présence — 0 sur le curseur la rend invisible)
-  const intCible = sim.dispersed
-    ? 0
-    : vise
-      ? 1
-      : Math.min(0.65, 0.65 * oeilRegl.errance)
+  const intCible =
+    (ag ? ag.int : vise ? 1 : Math.min(0.65, 0.65 * oeilRegl.errance)) *
+    (1 - 0.85 * presence.sommeil)
   presence.int += (intCible - presence.int) * k
+  // LA PAUPIÈRE (game/paupiere.ts) : le stress rapproche les clignements
+  // et resserre la lueur ; le clignement est un dixième de seconde, à
+  // intervalle tiré au sort ; l'agonie impose son dernier clignement lent
+  const stressCible = sim.dispersed ? 0 : peril ? 1 : regardEtat.danger ? 0.6 : 0
+  presence.stress += (stressCible - presence.stress) * (1 - Math.exp(-3 * dtReal))
+  if (ag) {
+    presence.cligne = ag.cligne
+  } else {
+    if (elapsed >= presence.tCligne) {
+      presence.cligneT0 = elapsed
+      presence.tCligne = elapsed + intervalleClignement(presence.stress)
+    }
+    presence.cligne = clignement(elapsed - presence.cligneT0)
+  }
   // 2. la RESPIRATION : le rythme raconte l'état intérieur
-  const peril = endgame.lastCall || endgame.spent
-  // l'idle approfondit le souffle ; l'ÉTIREMENT est une grande inspiration
+  // l'idle approfondit le souffle ; l'ÉTIREMENT est une grande inspiration ;
+  // le SOMMEIL est ample et lent
+  const dort = presence.sommeil > 0.5
   const ampCible = reveil.actif
     ? 0.03 // la grande inspiration du réveil
-    : input.aimActive
+    : dort
+      ? 0.03
+      : input.aimActive
       ? 0.004
       : peril
         ? 0.022
@@ -10176,7 +10264,9 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
             : 0.013
   const vitCible = reveil.actif
     ? 1.0
-    : peril
+    : dort
+      ? 0.6
+      : peril
       ? 4.8
       : idle.type === 'etire'
         ? 0.9
@@ -10187,7 +10277,7 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
   presence.vit += (vitCible - presence.vit) * k
   // l'ONDULATION de l'abandon : un court répit et le contour se met à
   // onduler franchement (le shader la dessine) — un geste, et elle s'efface
-  const ondCible = idle.t > 1.5 ? 1 : 0
+  const ondCible = idle.t > 1.5 && !dort ? 1 : 0
   presence.ondule +=
     (ondCible - presence.ondule) * (1 - Math.exp(-2.0 * dtReal))
   // 3. le FRISSON : armé hors du froid, déclenché quand il saisit
@@ -13469,7 +13559,8 @@ let perduAvant = false
 //   protocole conclut. Sans lui, la run ne se terminait JAMAIS : le palet
 //   dérivait sans fin et « ÉCHANTILLON PERDU » n'arrivait pas — c'était le
 //   game over qui « ne fonctionnait pas ».
-const DELAI_DISPERSION = 1.1
+// l'agonie joue d'abord (game/paupiere.ts) : l'écran ne paraît qu'après
+const DELAI_DISPERSION = AGONIE_DUREE + 0.4
 const SURSIS_EPUISE = 6
 
 // Sonde de test : l'état de la fin de run depuis la console (comme __run)
@@ -16187,9 +16278,20 @@ function corpsImage(now: number): boolean {
       respVit: presence.vit,
       frisson: presence.frisson,
       ondule: presence.ondule,
-      oeilLueur: oeilRegl.lueur,
+      // la paupière module les curseurs : le clignement éteint, le stress
+      // avive et resserre, le sommeil éteint presque, le sursaut avive, et
+      // l'agonie resserre en un point
+      oeilLueur:
+        oeilRegl.lueur *
+        (1 - presence.cligne) *
+        (1 + 0.45 * presence.stress) *
+        (1 - 0.8 * presence.sommeil) *
+        (1 + 0.6 * Math.max(0, 1 - (elapsed - presence.eveilT0) / 0.6)),
       oeilOmbre: oeilRegl.ombre,
-      oeilTaille: oeilRegl.taille,
+      oeilTaille:
+        oeilRegl.taille *
+        (1 - 0.3 * presence.stress) *
+        (presence.agonieT0 >= 0 ? agonie(elapsed - presence.agonieT0).taille : 1),
       oeilRelief: oeilRegl.relief,
       halo: presence.halo,
     },

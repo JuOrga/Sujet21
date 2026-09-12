@@ -33,6 +33,7 @@ export type Humeur = {
   rassemble: number // 0..1 : les motes se resserrent autour du regard
   agite: number // 0..1 : la nervosité du frétillement
   dispersed: boolean // le corps est défait : tout s'éparpille et s'éteint
+  sommeil?: number // 0..1 : endormi, les grains s'immobilisent presque
 }
 
 /** Un point de vie envoyé au rendu : position, rayon monde, genre, alpha. */
@@ -51,6 +52,17 @@ export class Motes {
   readonly rayon: Float32Array
   private readonly hote: Int32Array
   private readonly phase: Float32Array
+  // LE TRAJET : chaque mote a sa propre dérive autour de son hôte — un cap
+  // qui tourne au gré d'une courbure qui se promène, une allure qui enfle
+  // et retombe, un rayon de vagabondage à elle. Le premier jet tournait en
+  // rond (un cosinus, un sinus) : ça se voyait, c'était une horloge. Ici,
+  // aucune mote ne suit le même chemin deux fois.
+  private readonly ox: Float32Array // l'écart à l'hôte
+  private readonly oy: Float32Array
+  private readonly cap: Float32Array // la direction du trajet (rad)
+  private readonly courbure: Float32Array // la vitesse de rotation du cap
+  private readonly allure: Float32Array // l'allure de base (u/s)
+  private readonly rayonErrance: Float32Array // jusqu'où elle s'écarte
   // l'instant où la mote changera d'hôte d'elle-même : elle circule dans
   // le corps au lieu de rester rivée à la même goutte toute la run
   private readonly releve: Float32Array
@@ -65,11 +77,20 @@ export class Motes {
     this.hote = new Int32Array(n).fill(-1)
     this.phase = new Float32Array(n)
     this.releve = new Float32Array(n)
+    this.ox = new Float32Array(n)
+    this.oy = new Float32Array(n)
+    this.cap = new Float32Array(n)
+    this.courbure = new Float32Array(n)
+    this.allure = new Float32Array(n)
+    this.rayonErrance = new Float32Array(n)
     for (let m = 0; m < n; m++) {
       this.phase[m] = rand() * 6.2832
       // trois tailles : la plupart petites, quelques-unes plus grosses
       this.rayon[m] = 1.6 + rand() * rand() * 3.2
       this.releve[m] = rand() * 8
+      this.cap[m] = rand() * 6.2832
+      this.allure[m] = 4 + rand() * 8
+      this.rayonErrance[m] = 6 + rand() * 10
     }
   }
 
@@ -121,12 +142,42 @@ export class Motes {
       }
       const gele = h.frozen[i] === 1
       const gaz = h.gaseous[i] === 1
-      // le frétillement : un petit cercle autour de l'hôte, plus vif quand
-      // il est nerveux — figé dans la glace, élargi dans la vapeur
-      if (!gele) this.phase[m] += dt * (0.7 + 1.6 * hu.agite) * (gaz ? 2.2 : 1)
-      const r = gele ? 0 : (2.5 + 2.5 * hu.agite) * (gaz ? 3 : 1)
-      let tx = h.posX[i] + Math.cos(this.phase[m]) * r
-      let ty = h.posY[i] + Math.sin(this.phase[m] * 0.9) * r
+      const sommeil = hu.sommeil ?? 0
+      // LA DÉRIVE : la courbure du cap se promène (une marche au hasard
+      // rappelée vers zéro : des virages, puis des lignes, puis des
+      // virages), l'allure enfle et retombe lentement, et un rappel doux
+      // ramène la mote quand elle s'écarte trop de son hôte — figée dans
+      // la glace, élargie et plus vive dans la vapeur, presque immobile
+      // dans le sommeil
+      if (!gele) {
+        this.courbure[m] += (rand() - 0.5) * 9 * dt
+        this.courbure[m] *= Math.exp(-0.9 * dt)
+        this.cap[m] += this.courbure[m] * dt * (1 + 1.5 * hu.agite)
+        this.phase[m] += dt * 0.6
+        const souffle = 0.55 + 0.45 * Math.sin(this.phase[m])
+        const v =
+          this.allure[m] *
+          souffle *
+          (1 + 1.6 * hu.agite) *
+          (gaz ? 2.4 : 1) *
+          (1 - 0.92 * sommeil)
+        this.ox[m] += Math.cos(this.cap[m]) * v * dt
+        this.oy[m] += Math.sin(this.cap[m]) * v * dt
+        const R = this.rayonErrance[m] * (gaz ? 2.5 : 1)
+        const r = Math.hypot(this.ox[m], this.oy[m])
+        if (r > R) {
+          // trop loin : le cap se retourne vers l'hôte, en douceur
+          const versHote = Math.atan2(-this.oy[m], -this.ox[m])
+          let ecart = versHote - this.cap[m]
+          ecart = Math.atan2(Math.sin(ecart), Math.cos(ecart))
+          this.cap[m] += ecart * Math.min(1, 4 * dt)
+          const rappel = Math.min(1, ((r - R) / R) * 3 * dt)
+          this.ox[m] -= this.ox[m] * rappel
+          this.oy[m] -= this.oy[m] * rappel
+        }
+      }
+      let tx = h.posX[i] + this.ox[m]
+      let ty = h.posY[i] + this.oy[m]
       // le rassemblement : sous la peur, les grains se serrent vers le
       // regard — sans jamais le rejoindre tout à fait (un banc, pas un tas)
       if (hu.rassemble > 0.001 && !gele) {
@@ -147,6 +198,15 @@ export class Motes {
     if (h.count <= 0) return -1
     for (let essai = 0; essai < 12; essai++) {
       const i = Math.floor(rand() * h.count)
+      if (h.kind[i] === KIND_PLAYER) return i
+    }
+    // un corps réduit à quelques gouttes parmi l'eau libre de la salle :
+    // les tirages manquent — on prend la première goutte du corps à partir
+    // d'un point tiré au sort, sinon les motes s'éteignaient quand il est
+    // petit, précisément quand on a besoin de les voir
+    const depart = Math.floor(rand() * h.count)
+    for (let k = 0; k < h.count; k++) {
+      const i = (depart + k) % h.count
       if (h.kind[i] === KIND_PLAYER) return i
     }
     return -1
