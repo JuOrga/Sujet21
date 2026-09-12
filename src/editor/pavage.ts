@@ -140,7 +140,7 @@ export interface BilanPavage {
 const R_CIBLE_DEFAUT = 30
 const R_POINT = 26
 
-function normalise(r: Rect): Rect {
+export function normalise(r: Rect): Rect {
   return {
     minX: Math.min(r.minX, r.maxX),
     minY: Math.min(r.minY, r.maxY),
@@ -225,7 +225,7 @@ export function rectDe(level: LevelDef, f: FamilleMotif, i: number): Rect | null
   }
 }
 
-function union(a: Rect | null, b: Rect | null): Rect | null {
+export function union(a: Rect | null, b: Rect | null): Rect | null {
   if (!a) return b
   if (!b) return a
   return {
@@ -429,14 +429,14 @@ interface Cellule {
   canaux: Map<number, number>
 }
 
-const decaleRect = <T extends Rect>(o: T, dx: number, dy: number): T => ({
+export const decaleRect = <T extends Rect>(o: T, dx: number, dy: number): T => ({
   ...o,
   minX: o.minX + dx,
   minY: o.minY + dy,
   maxX: o.maxX + dx,
   maxY: o.maxY + dy,
 })
-const decalePt = <T extends { x: number; y: number }>(
+export const decalePt = <T extends { x: number; y: number }>(
   o: T,
   dx: number,
   dy: number,

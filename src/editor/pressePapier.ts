@@ -24,11 +24,16 @@
 import type { LevelDef } from '../game/level'
 import { canalDeCible } from '../game/laser'
 import { MAX_LUMIERES } from '../render/renderer'
+import { COINS_OBLIQUES, pointPoignee } from './oblique'
 import {
+  decalePt,
+  decaleRect,
   FAMILLE_DE_SORTE,
   FAMILLES_MOTIF,
-  NOMS_UNIQUES,
+  motifDeSelection,
+  normalise,
   rectDe,
+  union,
   type FamilleMotif,
   type Rect,
   type RefSelection,
@@ -53,16 +58,9 @@ const SORTE_DE_FAMILLE: Record<FamilleMotif, string> = (() => {
 })()
 
 /** Les demi-tailles des éléments uniques, telles que l'éditeur les dessine
- *  (boundsOf) — pour que le cadre retienne ce qu'on voit. */
-const DEMI_FIOLE = 30
-const DEMI_MARCHAND = 40
-
-const normalise = (r: Rect): Rect => ({
-  minX: Math.min(r.minX, r.maxX),
-  minY: Math.min(r.minY, r.maxY),
-  maxX: Math.max(r.minX, r.maxX),
-  maxY: Math.max(r.minY, r.maxY),
-})
+ *  — pour que le cadre retienne ce qu'on voit. L'éditeur les lit ici. */
+export const DEMI_FIOLE = 30
+export const DEMI_MARCHAND = 40
 
 const contient = (cadre: Rect, r: Rect): boolean =>
   r.minX >= cadre.minX &&
@@ -70,15 +68,25 @@ const contient = (cadre: Rect, r: Rect): boolean =>
   r.minY >= cadre.minY &&
   r.maxY <= cadre.maxY
 
-function union(a: Rect | null, b: Rect | null): Rect | null {
-  if (!a) return b
-  if (!b) return a
-  return {
-    minX: Math.min(a.minX, b.minX),
-    minY: Math.min(a.minY, b.minY),
-    maxX: Math.max(a.maxX, b.maxX),
-    maxY: Math.max(a.maxY, b.maxY),
+/** Les familles qui peuvent être TOURNÉES : leur rectangle est un repère
+ *  local, ce qu'on voit est son image pivotée. */
+const TOURNABLES: ReadonlySet<FamilleMotif> = new Set(['boxes', 'caches', 'structures'])
+
+/** L'emprise VUE d'un élément : pour une pièce tournée, la boîte englobante
+ *  de ses quatre coins pivotés — le cadre juge ce qu'on voit, pas le repère
+ *  local (une paroi de 200 × 20 à 45° couvre un carré de 155). */
+export function empriseVue(level: LevelDef, f: FamilleMotif, i: number): Rect | null {
+  const r = rectDe(level, f, i)
+  if (!r || !TOURNABLES.has(f)) return r
+  const o = (level[f] ?? [])[i] as { angle?: number } | undefined
+  if (!o?.angle) return r
+  const b = { ...r, angle: o.angle }
+  let out: Rect | null = null
+  for (const coin of COINS_OBLIQUES) {
+    const p = pointPoignee(b, coin)
+    out = union(out, { minX: p.x, minY: p.y, maxX: p.x, maxY: p.y })
   }
+  return out
 }
 
 // ——— Le cadre ———————————————————————————————————————————————————————
@@ -91,7 +99,7 @@ export function elementsDansCadre(level: LevelDef, cadre: Rect): RefSelection[] 
   for (const f of FAMILLES_MOTIF) {
     const n = (level[f] ?? []).length
     for (let i = 0; i < n; i++) {
-      const r = rectDe(level, f, i)
+      const r = empriseVue(level, f, i)
       if (r && contient(c, r)) refs.push({ kind: SORTE_DE_FAMILLE[f], index: i })
     }
   }
@@ -120,28 +128,19 @@ export function copie(
   level: LevelDef,
   refs: readonly RefSelection[],
 ): { presse: PressePapier | null; ignores: string[] } {
-  const ignores: string[] = []
-  const parFamille = new Map<FamilleMotif, Set<number>>()
-  for (const r of refs) {
-    const f = FAMILLE_DE_SORTE[r.kind]
-    if (f && r.index !== undefined) {
-      const s = parFamille.get(f) ?? new Set<number>()
-      s.add(r.index)
-      parFamille.set(f, s)
-    } else if (NOMS_UNIQUES[r.kind] && !ignores.includes(NOMS_UNIQUES[r.kind]))
-      ignores.push(NOMS_UNIQUES[r.kind])
-  }
+  // le motif du pavage fait déjà le tri : indices par famille, sans
+  // doublon, uniques nommés
+  const { motif, ignores } = motifDeSelection(refs)
   const copies: Copies = {}
   let emprise: Rect | null = null
   let total = 0
   for (const f of FAMILLES_MOTIF) {
-    const indices = parFamille.get(f)
-    if (!indices) continue
+    if (motif[f].length === 0) continue
     const src = (level[f] ?? []) as readonly Element<typeof f>[]
     const items: Element<typeof f>[] = []
     // dans l'ordre du tableau : l'ordre de peinture des originaux se
     // retrouve chez les copies
-    for (const i of [...indices].sort((a, b) => a - b)) {
+    for (const i of [...motif[f]].sort((a, b) => a - b)) {
       const o = src[i]
       if (!o) continue
       const clone = structuredClone(o) as Element<typeof f>
@@ -156,7 +155,7 @@ export function copie(
         delete (clone as Element<'labels'>).cle
       }
       items.push(clone)
-      emprise = union(emprise, rectDe(level, f, i))
+      emprise = union(emprise, empriseVue(level, f, i))
       total++
     }
     if (items.length > 0) (copies as Record<string, unknown[]>)[f] = items
@@ -214,24 +213,14 @@ export function colle(
       (o) => structuredClone(o) as Element<F>,
     )
   for (const f of RECTS) {
-    const items = clones(f)
-    if (items.length === 0) continue
-    for (const o of items) {
-      o.minX += dx
-      o.maxX += dx
-      o.minY += dy
-      o.maxY += dy
-    }
-    ;(level as Record<typeof f, unknown[]>)[f] = ajoute(f, level[f], items)
+    const items = clones(f).map((o) => decaleRect(o, dx, dy))
+    if (items.length > 0)
+      (level as Record<typeof f, unknown[]>)[f] = ajoute(f, level[f], items)
   }
   for (const f of POINTS) {
-    const items = clones(f)
-    if (items.length === 0) continue
-    for (const o of items) {
-      o.x += dx
-      o.y += dy
-    }
-    ;(level as Record<typeof f, unknown[]>)[f] = ajoute(f, level[f], items)
+    const items = clones(f).map((o) => decalePt(o, dx, dy))
+    if (items.length > 0)
+      (level as Record<typeof f, unknown[]>)[f] = ajoute(f, level[f], items)
   }
   const sponges = clones('sponges')
   if (sponges.length > 0) {
@@ -243,22 +232,14 @@ export function colle(
   }
   const rails = clones('rails')
   if (rails.length > 0) {
-    for (const r of rails)
-      for (const p of r.points) {
-        p.x += dx
-        p.y += dy
-      }
+    for (const r of rails) r.points = r.points.map((p) => decalePt(p, dx, dy))
     level.rails = ajoute('rails', level.rails, rails)
   }
   const lumieres = clones('lumieres')
   if (lumieres.length > 0) {
     const place = Math.max(0, MAX_LUMIERES - (level.lumieres ?? []).length)
     const refusees = lumieres.length - place
-    const gardees = lumieres.slice(0, place)
-    for (const l of gardees) {
-      l.x += dx
-      l.y += dy
-    }
+    const gardees = lumieres.slice(0, place).map((l) => decalePt(l, dx, dy))
     if (gardees.length > 0)
       level.lumieres = ajoute('lumieres', level.lumieres, gardees)
     if (refusees > 0)

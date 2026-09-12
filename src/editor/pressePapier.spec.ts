@@ -58,6 +58,21 @@ describe('le cadre de sélection', () => {
     expect(elementsDansCadre(tableau(), { minX: 330, minY: 330, maxX: 370, maxY: 370 })).toEqual([])
   })
 
+  it('juge une pièce TOURNÉE sur ce qu’on voit, pas sur son repère local', () => {
+    // la paroi 1 : 300 × 100 centrée en (550, 150), tournée de 15° — ses
+    // coins pivotés couvrent ≈ [392, 708] × [63, 237]
+    const tournee = { kind: 'box', index: 1 }
+    // un cadre juste autour de ce qu'on voit la retient…
+    expect(elementsDansCadre(tableau(), { minX: 380, minY: 50, maxX: 720, maxY: 250 })).toContainEqual(tournee)
+    // … un cadre qui n'entoure que son repère local (400..700 × 100..200),
+    // dont les bouts pivotés dépassent, ne la retient pas
+    expect(elementsDansCadre(tableau(), { minX: 395, minY: 90, maxX: 705, maxY: 210 })).not.toContainEqual(tournee)
+    // droite, le même cadre suffit
+    const droite = tableau()
+    delete droite.boxes[1].angle
+    expect(elementsDansCadre(droite, { minX: 395, minY: 90, maxX: 705, maxY: 210 })).toContainEqual(tournee)
+  })
+
   it('se trace dans n’importe quel sens', () => {
     const inverse = { minX: 500, minY: 500, maxX: 0, maxY: 0 }
     expect(elementsDansCadre(tableau(), inverse)).toEqual(
