@@ -4109,11 +4109,14 @@ function appelOeil(): void {
 }
 window.setTimeout(appelOeil, 600)
 
-// ---- L'ÉCOUTE : le mini-lecteur des musiques du projet (accueil, concepteur)
-// Les lits et leurs candidates, dans un ordre tiré au sort à l'ouverture,
-// joués par la bande-son elle-même (même bus, même volume que le jeu) à la
-// place du lit d'accueil. Lancer le jeu arrête l'écoute : la cuve reprend.
+// ---- LE LECTEUR : la musique de l'accueil, ses touches pour tout le monde
+// Les lits et leurs candidates, dans un ordre tiré au sort à l'ouverture :
+// la première de l'ordre est LA musique de l'accueil — chargée tout de
+// suite, jouée dès que le son est permis, notable telle quelle. Les touches
+// la changent, l'arrêtent, la relancent. En jeu elle s'efface, et revient
+// à l'accueil ; la bande-son ne repose plus sur un lit d'accueil gravé.
 const jukebox = new Jukebox(PISTES_ECOUTE)
+bande.litAccueil(jukebox.enCours()?.fichier ?? null)
 const ecouteTitre = document.getElementById('ecoute-titre')
 const ecouteLecture = document.getElementById('ecoute-lecture') as HTMLButtonElement | null
 const ecouteAvisBoutons: { [K in Avis | 0]: HTMLButtonElement | null } = {
@@ -4137,21 +4140,21 @@ function superposeAvis(base: DocumentAvis, modifs: typeof avisEcouteModifies): D
 }
 function majEcoute(): void {
   const p = jukebox.enCours()
-  // MON avis (celui de la borne) enfonce sa touche ; le titre dit le total
-  // et qui pense quoi — la ligne se coupe, l'infobulle la garde entière
+  // MON avis (celui de la borne) enfonce sa touche ; le titre dit la piste
+  // chargée, son état (à l'arrêt, son coupé), le total et qui pense quoi —
+  // la ligne se coupe, l'infobulle la garde entière
   const mien: Avis | 0 = p ? avisDe(avisEcoute, p.fichier, records.operator()) : 0
   const avis = p ? ligneAvis(avisEcoute, p.fichier) : ''
   if (ecouteTitre) {
     const suffixe = avisEcouteRefuse ? ' — avis non publié' : avisEcouteModifies.size > 0 ? ' …' : ''
+    const etat = !jukebox.enLecture ? ' — à l’arrêt' : !audio.enabled ? ' — son coupé' : ''
     const bilan = ligneBilan(avisEcoute)
     ecouteTitre.textContent = !p
-      ? `les musiques du projet, au hasard${bilan ? ` · ${bilan}` : ''}${suffixe}`
-      : !audio.enabled
-        ? `${p.titre} — son coupé`
-        : `${jukebox.rang()}/${jukebox.total} · ${p.titre}${p.enJeu ? '' : ' (candidate)'}${avis ? ` · ${avis}` : ''}${suffixe}`
-    ecouteTitre.title = p && avis ? `${p.titre}\n${avis}` : ''
+      ? 'aucune musique'
+      : `${jukebox.rang()}/${jukebox.total} · ${p.titre}${p.enJeu ? '' : ' (candidate)'}${etat}${avis ? ` · ${avis}` : ''}${suffixe}`
+    ecouteTitre.title = p ? [p.titre, avis, bilan].filter(Boolean).join('\n') : ''
   }
-  ecouteLecture?.classList.toggle('actif', !!p)
+  ecouteLecture?.classList.toggle('actif', jukebox.enLecture)
   const courant = mien
   for (const v of [1, 0, -1] as const) {
     const b = ecouteAvisBoutons[v]
@@ -4160,8 +4163,9 @@ function majEcoute(): void {
     b.setAttribute('aria-pressed', p && courant === v ? 'true' : 'false')
   }
 }
-/** Le document publié, une fois : au démarrage en mode concepteur, sinon à
- *  la première touche du lecteur — un joueur ne le télécharge jamais. */
+/** Le document publié, une fois, au démarrage — le lecteur est à tout le
+ *  monde, ses avis aussi (deux fetch publics, aucune opération du magasin) ;
+ *  et à la première touche si le réseau manquait. */
 async function chargeAvisEcoute(): Promise<void> {
   if (avisEcouteCharge) return
   avisEcouteCharge = true
@@ -4173,7 +4177,7 @@ async function chargeAvisEcoute(): Promise<void> {
   avisEcoute = superposeAvis(lisAvisEcoute(p.document), avisEcouteModifies)
   majEcoute()
 }
-if (document.body.classList.contains('concepteur')) void chargeAvisEcoute()
+void chargeAvisEcoute()
 // LA PUBLICATION est différée et regroupée : trois touches coup sur coup
 // (+1, non −1, finalement neutre) ne coûtent qu'une écriture au magasin
 // (2 put + 1 list, cf. api/_magasin.ts). Avant d'écrire, on relit le
@@ -4218,31 +4222,25 @@ function voteEcoute(avis: Avis | 0): void {
   avisEcouteMinuterie = window.setTimeout(() => void publieAvisEcoute(), 800)
 }
 for (const v of [1, 0, -1] as const) ecouteAvisBoutons[v]?.addEventListener('click', () => voteEcoute(v))
-function joueEcoute(sens: 'suivant' | 'precedent'): void {
+/** Une touche du lecteur : la bande-son suit la piste chargée (ou se tait
+ *  à l'arrêt), et le titre le dit. */
+function joueEcoute(geste: 'suivant' | 'precedent' | 'lecture' | 'stop'): void {
   eveilAudio()
   void chargeAvisEcoute()
-  const p = sens === 'suivant' ? jukebox.suivant() : jukebox.precedent()
-  bande.ecoute(p?.fichier ?? null)
+  if (geste === 'suivant') jukebox.suivant()
+  else if (geste === 'precedent') jukebox.precedent()
+  else if (geste === 'lecture') jukebox.joue()
+  else jukebox.stop()
+  bande.litAccueil(jukebox.enLecture ? (jukebox.enCours()?.fichier ?? null) : null)
   majEcoute()
 }
-document.getElementById('ecoute-lecture')?.addEventListener('click', () => {
-  // lecture depuis l'arrêt : la première de l'ordre ; en cours : rien à faire
-  if (!jukebox.enCours()) joueEcoute('suivant')
-})
+document.getElementById('ecoute-lecture')?.addEventListener('click', () => joueEcoute('lecture'))
 document.getElementById('ecoute-suiv')?.addEventListener('click', () => joueEcoute('suivant'))
 document.getElementById('ecoute-prec')?.addEventListener('click', () => joueEcoute('precedent'))
-document.getElementById('ecoute-stop')?.addEventListener('click', () => {
-  jukebox.stop()
-  bande.ecoute(null)
-  majEcoute()
-})
-// la bande-son peut arrêter l'écoute d'elle-même (le jeu démarre) : le
-// lecteur suit, sinon il afficherait une piste que personne n'entend — et
-// quand le son revient, le titre cesse de dire « son coupé »
-bande.onEcoute = (fichier) => {
-  if (fichier === null && jukebox.enCours()) jukebox.stop()
-  majEcoute()
-}
+document.getElementById('ecoute-stop')?.addEventListener('click', () => joueEcoute('stop'))
+// quand le son revient, la piste part et le titre cesse de dire « son coupé »
+bande.onLitAccueil = () => majEcoute()
+majEcoute()
 
 const homeRestartBtn = document.getElementById(
   'home-restart',

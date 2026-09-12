@@ -262,24 +262,28 @@ chaque boucle (dans `tools/audio/prepare.py`) est la fenêtre de 40 s la plus
 plate du master — écart-type de l'enveloppe seconde par seconde minimal, hors
 quinze premières et dernières secondes.
 
-**L'écoute** : sur l'accueil, en mode concepteur, une ligne ÉCOUTE sous la
-rangée d'outils joue les musiques du projet — les six lits et les candidates —
-dans un ordre tiré au sort à l'ouverture, **telles que le jeu les joue** (la
-boucle taillée, le même bus, le même volume), à la place du lit d'accueil.
-Précédent, lecture, arrêt, suivant ; le titre dit le rang et si la piste joue
-dans le jeu ou n'est qu'une candidate. Lancer le jeu arrête l'écoute. Une
-nouvelle candidate s'ajoute en deux lignes : son master dans `BOUCLES`
-(`prepare.py`, puis `python3 tools/audio/prepare.py <nom>`), et sa ligne dans
-`PISTES_ECOUTE` (`src/game/jukebox.ts`).
+**Le lecteur** : la musique de l'accueil n'est plus le lit `accueil` gravé,
+c'est la piste que le lecteur (`src/game/jukebox.ts`) a chargée — tirée au
+sort à l'ouverture du jeu parmi les musiques du projet (les six lits et les
+candidates), jouée dès que le son est permis, **telle que le jeu la joue** (la
+boucle taillée, le même bus, le même volume). En jeu elle s'efface, et revient
+à l'accueil. Une ligne ÉCOUTE sous la rangée d'outils — pour tout le monde,
+joueurs compris — la pilote : précédent, lecture, arrêt (l'accueil se tait, la piste reste chargée),
+suivant ; le titre dit le rang et si la piste joue dans le jeu ou n'est qu'une
+candidate. Une nouvelle candidate s'ajoute en deux lignes : son master dans
+`BOUCLES` (`prepare.py`, puis `python3 tools/audio/prepare.py <nom>`), et sa
+ligne dans `PISTES_ECOUTE`.
 
 **L'avis** : au bout de la ligne ÉCOUTE, trois touches — `−1`, `○` (neutre),
-`+1` — posent **mon** avis sur la piste en cours ; le titre donne le total et
+`+1` — posent **mon** avis sur la piste chargée (celle que l'accueil joue, ou
+tient prête à l'arrêt) ; le titre donne le total et
 qui pense quoi (« +1 · JULIEN +1, MARIE +1, PAUL −1 », entier dans
 l'infobulle). Un avis par personne et par piste — la personne est le nom de la
 borne, celui des records ; sans nom, « anonyme », et tous les anonymes ne font
 qu'un. Le neutre retire le sien et rien d'autre. Le document est **partagé** :
 il vit au magasin des réglages (`/api/reglages`, domaine `ecoute`), chargé à
-l'ouverture de l'accueil en mode concepteur et publié 800 ms après la dernière
+l'ouverture de l'accueil par tout le monde (les joueurs notent aussi, sous le
+nom de leur borne) et publié 800 ms après la dernière
 touche (une écriture pour une rafale). À l'arrêt, le titre donne le bilan
 (« 3 retenues, 2 écartées, 1 partagée » — retenue si la somme est positive,
 écartée si négative, partagée si les avis se neutralisent). La forme et ses
