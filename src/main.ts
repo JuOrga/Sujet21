@@ -394,6 +394,7 @@ import {
 import type { BenchMonitor } from './bench/bench'
 import type { Pane } from 'tweakpane'
 import { amorcePresets } from './bench/amorcePresets'
+import { creeGardeImage, type PanneImage } from './game/gardeBoucle'
 import { appelle } from './game/reseau'
 
 const CAPACITY = 4096
@@ -14627,7 +14628,12 @@ let amorceSignalee = false
 const amorce = { compileRenduMs: -1, premiereImageMs: -1 }
 let attenteRenduDite = false
 
-function frame(now: number): void {
+// LE CORPS DE L'IMAGE. Il ne réarme rien : c'est `frame`, l'enveloppe
+// (tout en bas), qui garde la chaîne de requestAnimationFrame — une
+// exception ici ne doit plus figer le jeu pour de bon (voir gardeBoucle.ts).
+// Renvoie `false` pour une image sautée (le rendu pas encore compilé, le
+// plafond de cadence) : la garde ne la compte pas comme une image saine.
+function corpsImage(now: number): boolean {
   // LE RENDU SE COMPILE EN COULISSE (render/programmes.ts). Tant que ses
   // programmes ne sont pas liés, on ne simule ni ne dessine : la page reste
   // vivante, le mot du chargement le dit, et la première image — celle qui
@@ -14639,8 +14645,7 @@ function frame(now: number): void {
       attenteRenduDite = true
       etapeAmorce('rendu')
     }
-    requestAnimationFrame(frame)
-    return
+    return false
   }
   if (!amorceSignalee) {
     amorceSignalee = true
@@ -14659,10 +14664,7 @@ function frame(now: number): void {
   // sur un sous-multiple de l'écran (60 demandés sur un 144 Hz donnaient
   // 48 im/s : chaque image « en avance » repoussait toute la grille).
   const periode = 1000 / fpsCap
-  if (now - fpsCapPrecedent < periode - 1) {
-    requestAnimationFrame(frame)
-    return
-  }
+  if (now - fpsCapPrecedent < periode - 1) return false // image sautée
   fpsCapPrecedent += periode
   // jamais plus d'une période de dette : une pause (onglet caché) ne
   // déclenche pas une rafale de rattrapage
@@ -16613,7 +16615,47 @@ function frame(now: number): void {
   if (run.exitTimer <= 0 && !run.ended && ecranDispersion === 'aucun') {
     overlay.classList.remove('visible')
   }
+  return true
+}
 
+// LA PANNE D'UNE IMAGE, SIGNALÉE : la console (avec la pile), une bannière
+// à l'écran — le joueur sait ce qui vient d'arriver et quoi transmettre —,
+// et le dernier incident gardé au poste pour le rapport. Avant la garde, le
+// symptôme était un écran figé sans un mot : la chaîne de
+// requestAnimationFrame cassée par l'exception, l'interface HTML toujours
+// vivante par-dessus (la carte, la fiche de la salle), la cuve immobile.
+const CLE_DERNIERE_PANNE = 'sujet21-derniere-panne'
+const panneBoucleEl = document.getElementById('panne-boucle') as HTMLDivElement
+let panneBoucleTimer = 0
+function signalePanneImage(p: PanneImage): void {
+  console.error(`[boucle] une image a levé une exception — ${p.message}\n${p.pile}`)
+  panneBoucleEl.textContent =
+    `⚠ AVARIE DE LA BOUCLE — ${p.message}\n` +
+    'Le jeu continue. Le détail est dans la console du navigateur (F12) — c’est lui qu’il faut transmettre.'
+  panneBoucleEl.hidden = false
+  clearTimeout(panneBoucleTimer)
+  panneBoucleTimer = window.setTimeout(() => {
+    panneBoucleEl.hidden = true
+  }, 20000)
+  try {
+    localStorage.setItem(
+      CLE_DERNIERE_PANNE,
+      JSON.stringify({
+        date: new Date().toISOString(),
+        message: p.message,
+        pile: p.pile.slice(0, 4000),
+        tableau: level.code,
+        auHub,
+      }),
+    )
+  } catch {
+    // stockage refusé : la console a déjà tout
+  }
+}
+const image = creeGardeImage(corpsImage, signalePanneImage)
+// L'ENVELOPPE : la seule à réarmer la chaîne, image réussie ou non.
+function frame(now: number): void {
+  image(now)
   requestAnimationFrame(frame)
 }
 
