@@ -403,6 +403,132 @@ les bleus · G8 la posture · G9 le zoom · G10 la mort. Chacun se règle au
 banc, dossier « L'œil du Sujet », avec un curseur par piste — comme les
 sept curseurs existants.
 
+## 9. Se mettre à sa place — l'identification, après la compassion
+
+Tout ce qui précède fait qu'on a de la peine *pour* lui : on le regarde
+de l'extérieur. Se mettre à sa place est autre chose : le monde doit
+arriver au joueur *par ses sens à lui*, et ce que le Sujet subit doit
+arriver dans les mains, les oreilles et le temps du joueur. Le jeu tient
+déjà deux leviers d'identification très forts, à cultiver avant d'en
+ajouter : **l'éjection est le geste du joueur** (c'est lui qui appuie, c'est
+lui qui rétrécit), et **la caméra à zoom automatique** fait grandir la
+salle à mesure qu'il perd du volume — rétrécir se ressent comme un monde
+qui devient immense. Et le laboratoire lui dit déjà « vous » (« Vingt
+tentatives. Vingt échecs. Puis vous. »).
+
+Quatre familles de pistes.
+
+### I. Ses sens : le monde perçu depuis le corps
+
+**I1. Entendre depuis l'intérieur.** Le corps est le point d'écoute : les
+sons de la salle sont placés en stéréo *par rapport à lui* (le sas qui
+aspire à droite s'entend à droite, la chasse qui souffle derrière vient de
+derrière). Aujourd'hui tout est au centre. Un `StereoPannerNode` par
+source, la position relative au centroïde ; rien d'autre ne change.
+
+**I2. Chaque état est une ouïe.** L'eau entend étouffé (le passe-bas du
+temps suspendu existe déjà), la glace entend sourd et craque de
+l'intérieur, la vapeur entend *clair et large* — on est de l'air. Changer
+d'état, c'est changer d'oreilles : le joueur *sent* l'état sans lire la
+légende. Trois réglages du filtre maître selon la fraction d'état.
+
+**I3. La température au bord de l'image.** Dans une aura froide, le givre
+gagne les bords de l'écran et l'image s'alourdit ; près d'une chaudière,
+l'air tremble aux bords (le miroitement de la chaleur). Ce n'est plus la
+carte thermique qu'on lit, c'est le froid qu'on a. Un terme de bord dans
+la composition, piloté par `sim.froidFrac` et la fraction chaude.
+
+**I4. La vue qui se resserre.** Sous la dernière impulsion, la périphérie
+s'assombrit doucement et le cadrage se serre d'un rien : la vision en
+tunnel de la peur. Le monde rétrécit autour de ce qui compte. Un léger
+vignettage sur `peril`, et un facteur sur la fraction de cadrage de la
+caméra.
+
+**I5. La respiration dans la vue.** Le contour respire ; la caméra
+pourrait respirer avec lui, imperceptiblement (un demi-pour-cent de zoom
+au rythme de `presence.vit`). Le joueur respire alors au rythme du Sujet
+sans le savoir. À essayer, et à retirer si ça gêne la visée.
+
+### II. Son corps dans les mains
+
+**II1. Le cœur dans la manette.** Sous la peur, un battement de cœur dans
+les mains (`manette.rumble`, deux coups brefs par cycle, au rythme de la
+respiration courte) ; au calme, rien. La dernière impulsion vibre déjà
+(260 ms) : la généraliser en un pouls tant que la réserve est à sec. Sur
+Steam Deck et DualSense, c'est le levier d'identification le plus direct
+qui existe.
+
+**II2. Le frisson dans les mains.** Le frisson visuel (froid saisi) devient
+un tremblement bref de la manette ; la morsure d'éponge (B2), un à-coup.
+Le corps du joueur reçoit ce que le corps du Sujet reçoit.
+
+**II3. Le geste qui coûte.** Le clic maintenu éjecte : faire sentir la
+dépense au bout du doigt — le curseur de visée s'amincit et tremble à
+mesure que le corps rétrécit, et sous le seuil critique il *hésite* (un
+demi-cran de retard au départ du jet, visuel seulement, la physique ne
+change pas). Au tactile, une vibration courte (`navigator.vibrate`) à
+chaque impulsion sous le seuil.
+
+### III. Son temps
+
+**III1. Le temps qui s'étire au bord de la mort.** Le temps suspendu
+existe (dash, éveil). Aux toutes dernières gouttes, le monde ralentit de
+lui-même un court instant et l'ouïe se ferme (le passe-bas) : la
+perception d'un être qui s'éteint. Purement rendu et son : `setSlowMo`
+et le time warp d'affichage, jamais le pas physique (règle du moteur).
+
+**III2. Le réveil comme premier souvenir.** Le réveil à l'entrée d'une
+salle est déjà un petit scénario ; au *tout premier* réveil de la run,
+l'ouïe est bouchée et s'ouvre lentement, la vue est floue puis nette (le
+flou de l'eau qui se rassemble) : on *naît* dans la salle. Deux secondes,
+une seule fois par run.
+
+**III3. La mémoire des salles.** Une salle déjà traversée dans une run
+précédente n'est pas nouvelle pour lui : le réveil y est plus court, le
+regard va droit au mécanisme qu'il connaît. Le joueur découvre que le
+Sujet se souvient, et donc qu'il a vécu ce que le joueur lui a fait vivre.
+Une trace par salle dans le coffre (`src/game/coffre.ts`), lue par le
+réveil.
+
+### IV. Sa condition
+
+**IV1. Les vingt d'avant.** Le canon le dit (« Vingt tentatives. Vingt
+échecs. ») ; le hub pourrait le montrer sans un mot : vingt emplacements
+de cuve, vides, numérotés, le vingt-et-unième est le sien. Compassion
+pour eux, identification pour soi : *je suis le suivant*. Un décalque
+dans le hub, zéro mécanique.
+
+**IV2. Payer de soi.** Au marchand et à l'Économat, le prix se voit
+partir *du corps* : les gouttes coulent de lui vers le comptoir, comme la
+mise en bonbonne coule déjà. Le joueur ne dépense pas une monnaie, il se
+dépense.
+
+**IV3. Être observé.** La station le voit comme une fuite (doc
+fonctionnel : « aucun ennemi, une infrastructure »). Des caméras de
+décor qui pivotent vers le corps, un voyant qui s'allume quand il entre
+dans une salle, un « ÉCHANTILLON LOCALISÉ » dans la voix froide du
+laboratoire — le joueur se sent traqué parce que le Sujet l'est.
+
+**IV4. Jamais un narrateur.** Le canon a retiré le Dr Véga : c'est
+juste. L'intériorité du Sujet ne passe *jamais* par du texte à la
+première personne ; elle passe par ses sens (I), ses mains (II), son
+temps (III). Le seul texte reste celui du laboratoire, qui dit « vous »
+en parlant d'un échantillon — et c'est ce « vous » qui fait qu'on est à
+sa place.
+
+### L'ordre proposé
+
+| rang | piste | coût | pourquoi d'abord |
+| --- | --- | --- | --- |
+| 1 | II1 le cœur dans la manette | faible | le corps du joueur, tout de suite |
+| 2 | I2 chaque état est une ouïe | faible | on sent l'état au lieu de le lire |
+| 3 | I1 entendre depuis l'intérieur | faible | le monde arrive par lui |
+| 4 | I3 + I4 le froid au bord, la vue qui se resserre | moyen | la peur dans la vue |
+| 5 | III2 le réveil comme naissance | faible | le premier souvenir |
+| 6 | IV1 les vingt d'avant | décalque | « je suis le suivant » |
+| 7 | II3 le geste qui coûte | faible | la dépense au bout du doigt |
+| 8 | III3 la mémoire des salles | moyen | il a vécu ce qu'on lui a fait vivre |
+
 ## 8. Comment on saura que ça marche
 
 Pas une mesure, un test : faire jouer une salle à quelqu'un qui ne connaît
