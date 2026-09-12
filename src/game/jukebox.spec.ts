@@ -1,5 +1,6 @@
-// Le contrat de l'écoute : un ordre tiré une fois puis fixe, suivant et
-// précédent qui rebouclent, l'arrêt qui rend la main, et une liste de pistes
+// Le contrat du lecteur : un ordre tiré une fois puis fixe, une piste
+// chargée dès la création (la musique de l'accueil), suivant et précédent
+// qui rebouclent, l'arrêt qui tait sans décharger, et une liste de pistes
 // qui ne cite que des fichiers dont le nom est sûr.
 import { describe, expect, it } from 'vitest'
 import { Jukebox, PISTES_ECOUTE, type PisteEcoute } from './jukebox'
@@ -33,46 +34,58 @@ describe('L’écoute — le mini-lecteur des musiques', () => {
     expect(new Jukebox(pistes(11), alea(1)).sequence).toEqual(a.sequence)
   })
 
-  it('à la création rien ne joue ; « suivant » démarre à la première de l’ordre et un tour passe par toutes sans répétition', () => {
+  it('à la création, la première de l’ordre est chargée et joue ; « suivant » fait le tour sans répétition puis reboucle', () => {
     const j = new Jukebox(pistes(5), alea(7))
-    expect(j.enCours()).toBeNull()
-    expect(j.rang()).toBe(0)
-    const vus: string[] = []
-    for (let i = 0; i < 5; i++) vus.push(j.suivant()!.fichier)
+    expect(j.enCours()!.fichier).toBe(`p${j.sequence[0]}`)
+    expect(j.enLecture).toBe(true)
+    expect(j.rang()).toBe(1)
+    const vus = [j.enCours()!.fichier]
+    for (let i = 1; i < 5; i++) vus.push(j.suivant()!.fichier)
     expect(new Set(vus).size).toBe(5)
-    expect(vus[0]).toBe(`p${j.sequence[0]}`)
     expect(j.rang()).toBe(5)
     // après la dernière, on reboucle sur la première
     expect(j.suivant()!.fichier).toBe(vus[0])
     expect(j.rang()).toBe(1)
   })
 
-  it('« précédent » rend la piste qu’on vient d’entendre, et depuis l’arrêt, la dernière de l’ordre', () => {
+  it('« précédent » rend la piste qu’on vient d’entendre, et en tête, la dernière de l’ordre', () => {
     const j = new Jukebox(pistes(4), alea(3))
     expect(j.precedent()!.fichier).toBe(`p${j.sequence[3]}`)
-    j.stop()
-    const a = j.suivant()!
+    expect(j.rang()).toBe(4)
+    j.suivant() // retour en tête
+    const a = j.enCours()!
     const b = j.suivant()!
     expect(b).not.toBe(a)
     expect(j.precedent()).toBe(a)
-    // en tête, précédent reboucle sur la dernière
-    expect(j.precedent()!.fichier).toBe(`p${j.sequence[3]}`)
   })
 
-  it('l’arrêt rend la main : plus de piste en cours, le rang retombe à 0', () => {
+  it('l’arrêt tait la piste sans la décharger : on peut encore la noter, et lecture la fait repartir', () => {
     const j = new Jukebox(pistes(3), alea(5))
-    j.suivant()
+    const p = j.suivant()!
     j.stop()
-    expect(j.enCours()).toBeNull()
-    expect(j.rang()).toBe(0)
+    expect(j.enLecture).toBe(false)
+    expect(j.enCours()).toBe(p)
+    expect(j.rang()).toBe(2)
+    expect(j.joue()).toBe(p)
+    expect(j.enLecture).toBe(true)
+    // suivant et précédent relancent la lecture d'eux-mêmes
+    j.stop()
+    j.suivant()
+    expect(j.enLecture).toBe(true)
+    j.stop()
+    j.precedent()
+    expect(j.enLecture).toBe(true)
     expect(j.total).toBe(3)
   })
 
-  it('une liste vide ne casse rien', () => {
+  it('une liste vide ne casse rien : rien de chargé, rien ne joue', () => {
     const j = new Jukebox([], alea(1))
+    expect(j.enCours()).toBeNull()
+    expect(j.enLecture).toBe(false)
+    expect(j.rang()).toBe(0)
     expect(j.suivant()).toBeNull()
     expect(j.precedent()).toBeNull()
-    expect(j.enCours()).toBeNull()
+    expect(j.joue()).toBeNull()
   })
 
   it('les pistes du projet : des noms de fichier sûrs, uniques, et les six lits qui jouent en tête', () => {

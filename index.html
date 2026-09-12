@@ -274,9 +274,10 @@
         outline: 2px solid var(--specimen);
         outline-offset: 2px;
       }
-      /* L'ÉCOUTE : une seule ligne sous la rangée d'outils — l'étiquette,
-         quatre touches de magnétophone, le titre. Le titre se coupe plutôt
-         que de replier la ligne. */
+      /* LE LECTEUR (joueurs et concepteur) : une seule ligne sous la rangée d'outils — l'étiquette,
+         quatre touches de magnétophone, le titre de la musique de l'accueil,
+         les trois touches d'avis. Le titre se coupe plutôt que de replier
+         la ligne. */
       .home-ecoute {
         display: flex;
         align-items: center;
@@ -326,8 +327,8 @@
       /* L'AVIS : trois touches au bout de la ligne — −1, neutre, +1 — pour
          trier au fil des pistes. La touche enfoncée est MON avis (le total
          et celui des autres se lisent dans le titre) ; elle porte la couleur
-         de son verdict (vert : retenue, rouge : écartée). Sans piste en
-         cours, il n'y a rien à juger, elles s'éteignent. */
+         de son verdict (vert : retenue, rouge : écartée). Une piste est
+         toujours chargée — même à l'arrêt, on peut la noter. */
       .home-ecoute-avis {
         display: flex;
         flex: 0 0 auto;
@@ -8325,16 +8326,18 @@
         <button id="home-mute" type="button"><i>♪</i><span>SON</span></button>
         <button id="home-plein" type="button"><i>⛶</i><span>PLEIN ÉCRAN</span></button>
       </div>
-      <!-- L'ÉCOUTE (concepteur) : les musiques du projet, dans un ordre tiré au
-           sort, telles que le jeu les joue — pour se faire une oreille avant
-           de trancher entre un lit et sa candidate. -->
-      <div id="home-ecoute" class="home-ecoute" data-dev role="group" aria-label="Écoute des musiques du projet">
+      <!-- LE LECTEUR, pour tout le monde : la musique de l'accueil elle-même
+           — une piste tirée au sort à l'ouverture parmi les musiques du
+           projet, telle que le jeu la joue — pour se faire une oreille et la
+           noter sans la chercher. Les avis des joueurs comptent comme ceux
+           du concepteur, sous le nom de leur borne. -->
+      <div id="home-ecoute" class="home-ecoute" role="group" aria-label="La musique de l’accueil">
         <span class="home-ecoute-etiq">ÉCOUTE</span>
         <button id="ecoute-prec" type="button" title="Piste précédente" aria-label="Piste précédente">⏮&#xFE0E;</button>
-        <button id="ecoute-lecture" type="button" title="Lecture, dans un ordre tiré au sort" aria-label="Lecture">▶&#xFE0E;</button>
-        <button id="ecoute-stop" type="button" title="Arrêt : le lit d'accueil reprend" aria-label="Arrêt">■</button>
+        <button id="ecoute-lecture" type="button" title="Lecture de la piste chargée" aria-label="Lecture">▶&#xFE0E;</button>
+        <button id="ecoute-stop" type="button" title="Arrêt : l'accueil se tait, la piste reste chargée" aria-label="Arrêt">■</button>
         <button id="ecoute-suiv" type="button" title="Piste suivante" aria-label="Piste suivante">⏭&#xFE0E;</button>
-        <span id="ecoute-titre" class="home-ecoute-titre" aria-live="polite">les musiques du projet, au hasard</span>
+        <span id="ecoute-titre" class="home-ecoute-titre" aria-live="polite">la musique de l’accueil</span>
         <!-- L'AVIS, partagé : un avis par personne (le nom de la borne) et
              par piste, le total dans le titre, publié au magasin des
              réglages pour tous les postes. -->

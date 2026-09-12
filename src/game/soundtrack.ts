@@ -174,14 +174,17 @@ export class Soundtrack {
   private zone: Piste | null = null
   private ambiance: Piste | null = null
   private eveille = false
-  // L'ÉCOUTE (le mini-lecteur de l'accueil) : une piste jouée à la demande,
-  // à la place du lit d'accueil, par le même bus — on entend ce que le
-  // joueur entendrait, au même volume et sous le même passe-bas.
-  private ecouteNom: string | null = null
-  private ecouteVoix: Voix | null = null
-  /** Appelé quand l'écoute change de piste ou s'arrête — y compris quand
-   * c'est le jeu qui l'arrête en quittant l'accueil. */
-  onEcoute: ((fichier: string | null) => void) | null = null
+  // LE LIT DE L'ACCUEIL n'est pas gravé : c'est la piste que le lecteur
+  // (game/jukebox.ts) a chargée — tirée au sort à l'ouverture, changée par
+  // ses touches. Elle passe par le même bus que le jeu, au même volume,
+  // sous le même passe-bas : on entend ce que le joueur entendra. Elle ne
+  // joue que sur l'accueil et s'efface en jeu, comme le lit d'avant ;
+  // null : l'accueil se tait (la touche « arrêt »).
+  private litNom: string | null = null
+  private litVoix: Voix | null = null
+  /** Appelé quand le lit d'accueil (re)part — dont au réveil du son : une
+   * piste demandée son coupé part alors, et le lecteur doit le savoir. */
+  onLitAccueil: ((fichier: string | null) => void) | null = null
 
   constructor(private readonly fx: AudioFx) {}
 
@@ -202,11 +205,11 @@ export class Soundtrack {
     this.post = g.post
     this.eveille = true
     this.applique()
-    // une écoute demandée son coupé (le titre le disait) part dès que le son
-    // revient — sans ce rattrapage elle restait muette jusqu'au clic suivant
-    if (this.ecouteNom) {
-      void this.ouvrirEcoute(this.ecouteNom)
-      this.onEcoute?.(this.ecouteNom)
+    // un lit demandé son coupé (le titre le disait) part dès que le son
+    // revient — sans ce rattrapage il restait muet jusqu'au clic suivant
+    if (this.litNom) {
+      void this.ouvrirLit(this.litNom)
+      this.onLitAccueil?.(this.litNom)
     }
   }
 
@@ -215,36 +218,41 @@ export class Soundtrack {
   setScene(s: Scene): void {
     if (this.scene === s) return
     this.scene = s
-    // l'écoute n'a de sens que sur l'accueil : la cuve reprend sa bande-son
-    if (s !== 'accueil') this.ecoute(null)
     this.applique()
   }
 
-  /** L'écoute : joue `fichier` (public/sound/<fichier>.mp3) en boucle à la
-   * place du lit d'accueil ; null l'arrête et rend le lit. Sans effet tant
-   * que la bande-son n'est pas éveillée (son coupé) : rien n'est téléchargé. */
-  ecoute(fichier: string | null): void {
-    if (fichier === this.ecouteNom) return
-    this.ecouteNom = fichier
-    this.ecouteVoix?.stop()
-    this.ecouteVoix = null
+  /** Le lit de l'accueil : `fichier` (public/sound/<fichier>.mp3) en boucle
+   * tant qu'on est sur l'accueil ; null tait l'accueil. Sans téléchargement
+   * tant que la bande-son n'est pas éveillée (son coupé) : la piste partira
+   * au réveil. */
+  litAccueil(fichier: string | null): void {
+    if (fichier === this.litNom) return
+    this.litNom = fichier
+    this.litVoix?.stop()
+    this.litVoix = null
     this.applique()
-    this.onEcoute?.(fichier)
-    if (fichier) void this.ouvrirEcoute(fichier)
+    this.onLitAccueil?.(fichier)
+    if (fichier) void this.ouvrirLit(fichier)
   }
 
-  /** La piste en écoute, ou null. */
-  ecouteEnCours(): string | null {
-    return this.ecouteNom
+  /** Le lit d'accueil demandé, ou null. */
+  litAccueilEnCours(): string | null {
+    return this.litNom
   }
 
-  private async ouvrirEcoute(fichier: string): Promise<void> {
+  private async ouvrirLit(fichier: string): Promise<void> {
     if (!this.eveille) return
     const buf = await this.charge(fichier)
     // le temps du chargement, on a pu passer à une autre piste ou s'arrêter
-    if (!buf || !this.ctx || !this.musique || this.ecouteNom !== fichier || this.ecouteVoix) return
-    this.ecouteVoix = new Voix(this.ctx, this.musique, buf)
-    this.ecouteVoix.niveau(0.85, XFADE)
+    if (!buf || !this.ctx || !this.musique || this.litNom !== fichier || this.litVoix) return
+    this.litVoix = new Voix(this.ctx, this.musique, buf)
+    this.litVoix.niveau(this.niveauLit(), XFADE)
+  }
+
+  /** Le lit d'accueil ne joue que sur l'accueil : en jeu il s'efface sans
+   * disparaître, et revient tel quel quand on remonte. */
+  private niveauLit(): number {
+    return this.scene === 'accueil' ? 0.85 : 0
   }
 
   /** Refroidissement de la coque, 0 (tiède) → 1 (glaciale). */
@@ -279,11 +287,13 @@ export class Soundtrack {
     // disparaître — on reste dans la cuve, on est juste passé sous un accident.
     const attenue = jeu && this.zone ? 0.3 : 1
     const lit: Piste | 'paire' | null = jeu ? (this.ambiance ?? 'paire') : null
+    // sur l'accueil, la musique est celle du lecteur (litVoix) — aucune des
+    // pistes gravées n'y joue, pas même « accueil » : elle n'est qu'une
+    // piste de la liste comme les autres
+    this.litVoix?.niveau(this.niveauLit(), XFADE)
     for (const p of PISTES) {
       let v = 0
-      // le lit d'accueil se tait pendant une écoute : c'est sa place qu'elle prend
-      if (p === 'accueil') v = this.scene === 'accueil' && !this.ecouteNom ? 0.85 : 0
-      else if (lit === 'paire' && p === 'cuve-tiede') v = (1 - this.chill) * attenue
+      if (lit === 'paire' && p === 'cuve-tiede') v = (1 - this.chill) * attenue
       else if (lit === 'paire' && p === 'cuve-glaciale') v = this.chill * attenue
       else if (lit === p) v = attenue
       if (jeu && p === this.zone) v = Math.max(v, 0.85)
