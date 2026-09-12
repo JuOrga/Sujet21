@@ -3917,7 +3917,8 @@ export class Renderer {
       cu['uOeilRegl'],
       presence?.oeilLueur ?? 1,
       presence?.oeilOmbre ?? 1,
-      Math.max(0.4, presence?.oeilTaille ?? 1),
+      // plancher 0,12 : l'agonie resserre la lueur en un point (E3)
+      Math.max(0.12, presence?.oeilTaille ?? 1),
       presence?.oeilRelief ?? 1,
     )
     gl.uniform2f(cu['uGelCentre'], sim.gelCentreX, sim.gelCentreY)

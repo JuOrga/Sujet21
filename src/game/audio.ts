@@ -522,6 +522,28 @@ export class AudioFx {
     this.blip(1320, 1320, 0.4, 0.045, 'sine', 0.36, pan)
   }
 
+  // LE DERNIER SOUFFLE (agonie, E3) : une note mince tenue le temps que
+  // l'œil cherche ses fragments, puis COUPÉE net quand il se ferme — pas
+  // un fondu : la lumière s'arrête
+  dernierSouffle(): void {
+    if (!this.ctx || !this.master) return
+    const ctx = this.ctx
+    const t = ctx.currentTime
+    const o = ctx.createOscillator()
+    o.type = 'sine'
+    o.frequency.setValueAtTime(330, t)
+    o.frequency.linearRampToValueAtTime(296, t + 1.3)
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0, t)
+    g.gain.linearRampToValueAtTime(0.03, t + 0.35)
+    g.gain.setValueAtTime(0.03, t + 1.28)
+    g.gain.linearRampToValueAtTime(0, t + 1.31)
+    o.connect(g)
+    g.connect(this.master)
+    o.start(t)
+    o.stop(t + 1.35)
+  }
+
   // DISPERSION : masse grave qui s'effondre
   disperse(): void {
     this.blip(90, 34, 1.1, 0.14, 'sine')

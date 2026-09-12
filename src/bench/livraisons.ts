@@ -31,6 +31,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '12/09/2026 17:09',
+    title: 'LA PAUPIÈRE : le clignement, le sommeil et le sursaut, l’agonie — et des motes aux trajets courbes',
+    notes: [
+      'LA DEMANDE : « oui pour les 3 » (le clignement, le sommeil, la mort) et, sur les motes, « les faire moins linéaires, qu’elles se déplacent dans différentes directions, courbées, de façon plus naturelle ». Rendu et son seulement : aucun paramètre de simulation, aucun préset.',
+      'LES MOTES (render/vie.ts) : le premier jet tournait en rond autour de sa goutte hôte (un cosinus, un sinus) — une horloge. Chaque mote a maintenant SA dérive : un cap qui tourne au gré d’une courbure en marche au hasard rappelée vers zéro (des virages, puis des lignes, puis des virages), une allure de base à elle (4 à 12 u/s) qui enfle et retombe lentement, un rayon de vagabondage à elle (6 à 16 u) avec un rappel doux vers l’hôte quand elle s’écarte — figée dans la glace, élargie et plus vive dans la vapeur, presque immobile dans le sommeil. Aucune mote ne suit le même chemin deux fois. Et un corps réduit à quelques gouttes parmi l’eau libre ne les éteint plus : quand les tirages manquent une goutte du corps, un balayage en trouve une.',
+      'LE CLIGNEMENT (game/paupiere.ts, B3) : la lueur s’éteint un dixième de seconde (une bosse en sinus), à intervalle tiré au sort — 5 à 9 s au calme, 1,5 à 3 s sous la peur, mêlés par le STRESS (réserve à sec : 1 ; un danger dans la marche : 0,6 ; lissé). Le stress avive la lueur (+45 %) et la resserre (−30 %) : le baromètre, sans un trait dessiné.',
+      'LE SOMMEIL ET LE SURSAUT (C4, D2) : sans geste pendant 25 s, il s’endort en quelques secondes — lueur presque éteinte (−80 %), regard immobile, respiration ample et lente (0,03 · 0,6), plus d’ondulation ni de vignette, halo baissé, motes quasi immobiles. Au premier geste, le sursaut : un frisson (contour et manette), la lueur qui bondit (+60 % sur 0,6 s), le réveil vif — une seule fois par réveil.',
+      'L’AGONIE (E3, G10) : à la dispersion, l’œil ne s’éteint plus d’un coup. Pendant 0,8 s il CHERCHE ses fragments (le regard balaie par petits sauts autour des gouttes marquées du corps) ; de 0,4 à 1,4 s la lueur se resserre en un point (le plancher de taille passe de 0,4 à 0,12) ; de 1,0 à 1,5 s un dernier clignement lent la ferme, sans réveil ; une note mince (330 Hz) tenue depuis la dispersion se COUPE net à 1,3 s. Le halo se rétracte, les motes s’éparpillent et s’éteignent une à une (déjà en place). L’écran froid du laboratoire n’arrive qu’après : le délai passe de 1,1 à 2,0 s — le texte, lui, ne change pas d’un mot.',
+      'VÉRIFIÉ : 5 tests neufs sur la paupière (le clignement fermé à mi-course, l’intervalle qui se rapproche sous la peur, l’agonie qui cherche puis se resserre puis se ferme éteinte) et un test des motes corrigé (un seul tirage pour toute la suite : recréé à chaque image, il rejouait les mêmes nombres) — 1153 verts dans 109 fichiers, type-check à 0, build propre, les cinq programmes GLSL compilés et liés dans un WebGL2 réel. À juger en prévisualisation : la courbe des motes, le rythme du clignement, l’endormissement au bout de 25 s, et une dispersion.',
+    ],
+  },
+  {
     date: '12/09/2026 16:18',
     title: 'LE REGARD, VERSION ŒIL : des saccades, un coup d’œil au lieu d’une garde, la perte et le danger avant le curseur',
     notes: [
