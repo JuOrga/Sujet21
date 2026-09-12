@@ -5163,6 +5163,30 @@
         backdrop-filter: blur(3px);
         white-space: nowrap;
       }
+      /* LA BANNIÈRE DE PANNE DE LA BOUCLE (src/game/gardeBoucle.ts) : une
+         image qui a levé une exception. Elle se pose au-dessus du voile de
+         la cérémonie (z 50) mais sous la cinématique (z 70), sans jamais
+         prendre la main — elle informe, la boucle continue. */
+      #panne-boucle {
+        position: fixed;
+        top: 96px;
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: min(92vw, 720px);
+        background: rgba(46, 12, 14, 0.92);
+        border: 1px solid var(--alert);
+        border-left: 3px solid var(--alert);
+        color: #ffb9ad;
+        font-size: calc(11px * var(--ui));
+        letter-spacing: 0.06em;
+        line-height: 1.45;
+        padding: 8px 14px;
+        z-index: 60;
+        pointer-events: none;
+        backdrop-filter: blur(3px);
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
       #hud-danger.spent {
         background: rgba(12, 30, 46, 0.9);
         border-color: #8fc8ee;
@@ -9690,6 +9714,8 @@
     <!-- La carte d'une séquence in-map : un bandeau qui n'arrête pas le jeu -->
     <div id="carte-seq" aria-live="polite"></div>
     <div id="hud-danger" aria-live="assertive"></div>
+    <!-- Une image de la boucle a levé une exception : la garde l'annonce ici, le jeu continue -->
+    <div id="panne-boucle" role="alert" hidden></div>
     <div id="obj-arrow" aria-hidden="true"><i>➤</i><span id="obj-dist"></span></div>
 
     <div id="tableau-card" aria-live="polite">
