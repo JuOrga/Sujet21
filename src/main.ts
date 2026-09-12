@@ -215,7 +215,7 @@ import {
 } from './bench/changelog'
 import { Camera } from './render/camera'
 import { MAX_BOXES, Renderer } from './render/renderer'
-import { Motes, VIE_STRIDE, remplitVie } from './render/vie'
+import { Motes, VIE_STRIDE, remplitVie, toucheLeCorps } from './render/vie'
 import { panDepuis } from './game/ouie'
 import { dangerDevant, directionDeMarche, saccade, type Saccade } from './game/regard'
 import { AGONIE_DUREE, agonie, clignement, intervalleClignement } from './game/paupiere'
@@ -9626,6 +9626,14 @@ const presence = {
   sommeil: 0, // 0..1 : endormi
   eveilT0: -9, // le sursaut du réveil : la lueur monte un instant
   agonieT0: -1, // le début de l'agonie (elapsed), -1 hors dispersion
+  // LA CARESSE (D1) : le pointeur posé sur le corps sans cliquer
+  caresse: 0, // 0..1, lissé
+  caresseX: 0,
+  caresseY: 0,
+  caresseT0: -9, // le début du toucher (elapsed) : les rides en partent
+  // LA PEAU (G3) et LA TEINTE VITALE (G2), lissées
+  peau: 0, // -1 relâché .. +1 tendu
+  fatigue: 0, // 0..1 : réserve à sec, agonie
 }
 ;(window as unknown as { __presence: typeof presence }).__presence = presence
 // LA VIE VISIBLE (render/vie.ts, docs/sujet-vivant.md G1 et G6) : les motes
@@ -9646,7 +9654,7 @@ function majVie(dtReal: number): void {
       regardY: presence.y,
       // sous la peur, les grains se serrent autour du regard ; en visée, un
       // peu ; laissé tranquille, ils s'étalent
-      rassemble: peril ? 0.8 : input.aimActive ? 0.3 : 0,
+      rassemble: peril ? 0.8 : input.aimActive ? 0.3 : 0.25 * presence.caresse,
       agite: peril ? 1 : input.aimActive ? 0.5 : idle.t > 4 ? 0 : 0.2,
       dispersed: sim.dispersed,
       sommeil: presence.sommeil,
@@ -9666,6 +9674,48 @@ function majVie(dtReal: number): void {
     (1 - 0.6 * presence.sommeil)
   presence.halo += (haloCible - presence.halo) * (1 - Math.exp(-2.5 * dtReal))
   presence.halo = Math.max(0, Math.min(1, presence.halo))
+  // LA CARESSE (D1) : la souris posée SUR le corps, sans cliquer — il la
+  // sent : une fossette et des rides sous le doigt (shader), le regard qui
+  // vient dessous, le souffle qui s'apaise, un ronron. Cliquer éjecte ;
+  // survoler est libre : la place était prise par rien. Souris seulement —
+  // au tactile, poser le doigt vise ; à la manette, rien à poser.
+  const enVieCaresse =
+    document.body.classList.contains('playing') &&
+    !input.paused &&
+    !sim.dispersed &&
+    !run.ended
+  const sourisPresente =
+    performance.now() / 1000 - input.sourisAt < 8 &&
+    input.lastPointerAt >= manette.lastActivity
+  const touche =
+    enVieCaresse &&
+    sourisPresente &&
+    !input.aimActive &&
+    toucheLeCorps(aimMonde.x, aimMonde.y, sim, 16)
+  if (touche) {
+    if (presence.caresse < 0.05) presence.caresseT0 = elapsed
+    presence.caresseX = aimMonde.x
+    presence.caresseY = aimMonde.y
+  }
+  presence.caresse +=
+    ((touche ? 1 : 0) - presence.caresse) * (1 - Math.exp(-(touche ? 4 : 3) * dtReal))
+  audio.setRonron(presence.caresse)
+  // LA PEAU (G3) : tendue sous le stress et en visée, relâchée dans le
+  // sommeil et sous la caresse
+  const peauCible = Math.max(
+    -1,
+    Math.min(
+      1,
+      presence.stress + (input.aimActive ? 0.4 : 0) - 0.8 * presence.sommeil - 0.5 * presence.caresse,
+    ),
+  )
+  presence.peau += (peauCible - presence.peau) * (1 - Math.exp(-4 * dtReal))
+  // LA FATIGUE (G2) : la réserve à sec délave la matière ; l'agonie la
+  // grise tout à fait, vite
+  const fatigueCible = presence.agonieT0 >= 0 ? 1 : peril ? 1 : 0
+  presence.fatigue +=
+    (fatigueCible - presence.fatigue) *
+    (1 - Math.exp(-(presence.agonieT0 >= 0 ? 4 : 1.2) * dtReal))
   // LE SOMMEIL (docs/sujet-vivant.md, C4) : sans geste pendant longtemps,
   // il s'endort — lentement (quelques secondes) ; au premier geste, LE
   // SURSAUT (D2) : un frisson (contour et manette), la lueur qui bondit,
@@ -9715,6 +9765,8 @@ const COEUR_PERIODE = 0.6
 const coeur = { t: 0, dernierFrisson: -9, sursautFait: false }
 // sans geste pendant ce temps, il s'endort
 const SOMMEIL_APRES = 25
+// le point de visée en monde, mémorisé à l'image pour la caresse
+const aimMonde = { x: 0, y: 0 }
 const craqueGlace = { t: 2 }
 
 // ---- LES CURSEURS DE L'ŒIL : la présence se règle (banc → L'œil) ----
@@ -10147,6 +10199,11 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
       }
       vise = true
     }
+  } else if (!sim.dispersed && presence.caresse > 0.3 && !input.aimActive) {
+    // LA CARESSE : le regard vient sous le doigt et y reste
+    tx = presence.caresseX
+    ty = presence.caresseY
+    vise = true
   } else if (
     !sim.dispersed &&
     now - input.sourisAt < 1.5 &&
@@ -10249,11 +10306,14 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
   // l'idle approfondit le souffle ; l'ÉTIREMENT est une grande inspiration ;
   // le SOMMEIL est ample et lent
   const dort = presence.sommeil > 0.5
+  const caresse = presence.caresse > 0.5
   const ampCible = reveil.actif
     ? 0.03 // la grande inspiration du réveil
     : dort
       ? 0.03
-      : input.aimActive
+      : caresse
+        ? 0.01 // sous la caresse, le souffle s'apaise
+        : input.aimActive
       ? 0.004
       : peril
         ? 0.022
@@ -10266,7 +10326,9 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
     ? 1.0
     : dort
       ? 0.6
-      : peril
+      : caresse
+        ? 1.2
+        : peril
       ? 4.8
       : idle.type === 'etire'
         ? 0.9
@@ -15143,8 +15205,10 @@ function corpsImage(now: number): boolean {
   // baisse de moitié), un cœur au ralenti bat, la texture du temps suspendu
   // s'ouvre — seule à rester nette —, et l'air revient au dash.
   // (le ralenti d'annonce de l'éveil s'entend aussi : même texture suspendue)
-  audio.setSlowMo(dashAiming || eveil.ralenti < 0.7)
-  bande.setSuspendu(dashAiming || eveil.ralenti < 0.7)
+  // l'agonie ferme l'ouïe comme le temps suspendu : le monde s'éloigne
+  const suspendu = dashAiming || eveil.ralenti < 0.7 || presence.agonieT0 >= 0
+  audio.setSlowMo(suspendu)
+  bande.setSuspendu(suspendu)
   if (dash.aiming && !dashAiming) {
     // Relâcher déclenche ; changer d'état ou perdre la main en pleine visée
     // annule sans frais — la visée n'engage à rien tant qu'on n'a pas lâché.
@@ -15186,10 +15250,16 @@ function corpsImage(now: number): boolean {
     // machine au taquet, le HUD affichait ×4 et la cuve restait à ×1.
     // le ralenti d'annonce de l'éveil multiplie le temps comme le slow-mo
     // de visée : physique, chrono, refroidissement — tout décélère ensemble
+    // L'AGONIE ÉTIRE LE TEMPS (docs/sujet-vivant.md, III1) : le monde
+    // ralentit pendant la scène — les gouttes dérivent au ralenti tandis
+    // que l'œil les cherche. Le temps réel (elapsed, la scène, l'écran)
+    // n'est pas touché : seul le monde décélère.
     const warpNow =
       (dashAiming
         ? params.timeWarp * params.gasAimSlow * lev('visee')
-        : params.timeWarp) * eveil.ralenti
+        : params.timeWarp) *
+      eveil.ralenti *
+      (presence.agonieT0 >= 0 ? 0.3 : 1)
     const boost = Math.max(1, warpNow)
     // Troisième borne (retour joueur : « en accélérant, chutes drastiques ») :
     // la physique ne dépasse JAMAIS ~70 % de la période du verrou, même
@@ -16214,6 +16284,8 @@ function corpsImage(now: number): boolean {
   drawFleche(dtReal, dpr)
   majIdle(dtReal)
   majPresence(dtReal, aim.x, aim.y)
+  aimMonde.x = aim.x
+  aimMonde.y = aim.y
   majVie(dtReal)
   // LE SOL DES MODULES : un tableau bâti en coques n'a pas de cuve — son
   // fond ne se peint qu'à l'intérieur des modules, et le dehors est le vide.
@@ -16294,6 +16366,14 @@ function corpsImage(now: number): boolean {
         (presence.agonieT0 >= 0 ? agonie(elapsed - presence.agonieT0).taille : 1),
       oeilRelief: oeilRegl.relief,
       halo: presence.halo,
+      caresseX: presence.caresseX,
+      caresseY: presence.caresseY,
+      caresse: presence.caresse,
+      caresseT0: presence.caresseT0,
+      peau: presence.peau,
+      vitalStress: presence.stress,
+      vitalFatigue: presence.fatigue,
+      vitalSommeil: presence.sommeil,
     },
   )
   const rendRaw = performance.now() - renderT0
