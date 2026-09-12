@@ -158,6 +158,13 @@ import {
   type Jointure,
   type ReglagesPavage,
 } from './pavage'
+import {
+  colle,
+  copie,
+  decalageDeCollage,
+  elementsDansCadre,
+  type PressePapier,
+} from './pressePapier'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
 import { PISTES, PISTE_NOMS, type Piste } from '../game/soundtrack'
 import {
@@ -495,6 +502,10 @@ export class LevelEditor {
     | null
     | { mode: 'pan'; sx: number; sy: number; camX: number; camY: number }
     | { mode: 'create'; x0: number; y0: number; x1: number; y1: number }
+    // LE CADRE DE SÉLECTION : tracé dans le vide à l'outil Sélection, il
+    // retient tout ce qu'il entoure entièrement. `ajout` (Maj tenue) :
+    // le cadre s'ajoute à la sélection en cours au lieu de la remplacer.
+    | { mode: 'lasso'; x0: number; y0: number; x1: number; y1: number; ajout: boolean }
     | {
         mode: 'move'
         ox: number
@@ -533,6 +544,12 @@ export class LevelEditor {
   private pavage: ReglagesPavage = { ...REGLAGES_PAVAGE_DEFAUT }
   // l'APPUI LONG tactile en cours : il vaudra Maj + clic s'il tient 480 ms
   private appuiLong: { timer: number; sx: number; sy: number } | null = null
+  // LE PRESSE-PAPIER (Ctrl+C / Ctrl+X / Ctrl+V) : des clones, pas des
+  // indices — une suppression entre la copie et le collage ne le fausse pas
+  private pressePapier: PressePapier | null = null
+  // La souris sur la carte (monde), pour coller SOUS LE CURSEUR ; nulle
+  // quand elle est sortie (le collage retombe alors sur un pas fixe)
+  private souris: { x: number; y: number } | null = null
 
   private hint = ''
 
@@ -2210,8 +2227,13 @@ export class LevelEditor {
             }, 480),
           }
         }
-        // Maj + clic (ou L2 + clic à la manette) : la sélection MULTIPLE
+        // Maj + clic (ou L2 + clic à la manette) : la sélection MULTIPLE —
+        // dans le vide, un CADRE qui s'ajoute à ce qui est déjà retenu
         if (e.shiftKey || (this.hooks.modMulti?.() ?? false)) {
+          if (this.pick(w.x, w.y) === null) {
+            this.drag = { mode: 'lasso', x0: w.x, y0: w.y, x1: w.x, y1: w.y, ajout: true }
+            return
+          }
           this.basculeMulti(w.x, w.y)
           return
         }
@@ -2280,6 +2302,13 @@ export class LevelEditor {
           hit !== null && this.sel !== null && this.sameSel(this.sel, hit)
         this.sel = hit
         this.syncProps()
+        if (!hit) {
+          // le vide : le geste qui suit est un CADRE DE SÉLECTION — relâché
+          // sans bouger, ce n'est qu'un clic qui a tout désélectionné
+          this.drag = { mode: 'lasso', x0: w.x, y0: w.y, x1: w.x, y1: w.y, ajout: false }
+          this.draw()
+          return
+        }
         if (auDoigt && hit && !dejaVise) {
           this.status(
             'Élément sélectionné — reposez le doigt dessus pour le déplacer (les poignées redimensionnent).',
@@ -2748,6 +2777,7 @@ export class LevelEditor {
       const sy = e.clientY - rect.top
       const w = this.toWorld(sx, sy)
       this.showCoords(w.x, w.y)
+      if (e.pointerType === 'mouse') this.souris = { x: w.x, y: w.y }
       // le doigt bouge : ce n'est plus un appui long
       if (
         this.appuiLong &&
@@ -2841,6 +2871,10 @@ export class LevelEditor {
       } else if (d.mode === 'create') {
         d.x1 = this.snapped(w.x)
         d.y1 = this.snapped(w.y)
+      } else if (d.mode === 'lasso') {
+        // libre, sans aimant : on entoure, on ne pose rien
+        d.x1 = w.x
+        d.y1 = w.y
       } else if (d.mode === 'aim') {
         const l = (this.level.lasers ?? [])[d.index]
         if (l) {
@@ -3054,6 +3088,7 @@ export class LevelEditor {
       )
         return // la souris va cliquer le ✎ : la bulle reste
       this.cacheBulle()
+      this.souris = null
     })
     c.addEventListener('pointerup', (e) => {
       const pincait = this.pinceEcart !== null
@@ -3121,6 +3156,10 @@ export class LevelEditor {
         this.commit(
           'Rail tracé — les chevrons donnent le SENS de l’arc. Reposez sur une extrémité de CE rail pour le prolonger, Échap pour finir.',
         )
+        return
+      }
+      if (d.mode === 'lasso') {
+        this.finLasso(d)
         return
       }
       if (d.mode === 'create') {
@@ -3197,6 +3236,26 @@ export class LevelEditor {
       if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
         e.preventDefault()
         this.redo()
+        return
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
+        // sans sélection, on laisse le raccourci au navigateur (copier du
+        // texte de la page)
+        if (this.sel === null && this.multi.length === 0) return
+        e.preventDefault()
+        this.copier()
+        return
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'x' || e.key === 'X')) {
+        if (this.sel === null && this.multi.length === 0) return
+        e.preventDefault()
+        this.couper()
+        return
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
+        if (!this.pressePapier) return
+        e.preventDefault()
+        this.coller()
         return
       }
       if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -3701,6 +3760,111 @@ export class LevelEditor {
     this.commit(
       phrasePavage(bilan, r) +
         (ignores.length > 0 ? ` Non copié : ${ignores.join(', ')}.` : ''),
+    )
+  }
+
+  // ——— Le cadre de sélection et le presse-papier ——————————————————
+  /** Le cadre relâché : ce qu'il entoure devient la sélection (ou s'y
+   *  ajoute, Maj tenue). Relâché sans bouger, c'est un clic dans le vide —
+   *  la désélection a déjà eu lieu à l'appui. */
+  private finLasso(d: { x0: number; y0: number; x1: number; y1: number; ajout: boolean }): void {
+    // en pixels d'écran : un tremblement de souris n'est pas un cadre
+    if (
+      Math.abs(d.x1 - d.x0) * this.zoom < 4 &&
+      Math.abs(d.y1 - d.y0) * this.zoom < 4
+    ) {
+      this.draw()
+      return
+    }
+    const cadre = { minX: d.x0, minY: d.y0, maxX: d.x1, maxY: d.y1 }
+    const pris = elementsDansCadre(this.level, cadre) as NonNullable<Sel>[]
+    let retenus: NonNullable<Sel>[] = []
+    if (d.ajout) {
+      const base: NonNullable<Sel>[] =
+        this.multi.length > 1
+          ? this.multi.filter((m): m is NonNullable<Sel> => m !== null)
+          : this.sel
+            ? [this.sel]
+            : []
+      retenus = [...base]
+      for (const p of pris)
+        if (!retenus.some((m) => this.sameSel(m, p))) retenus.push(p)
+    } else retenus = pris
+    if (retenus.length > 1) {
+      this.multi = retenus
+      this.sel = retenus[retenus.length - 1]
+    } else {
+      this.multi = []
+      this.sel = retenus[0] ?? null
+    }
+    this.syncProps()
+    this.status(
+      retenus.length === 0
+        ? 'Rien dans le cadre — il retient ce qu’il entoure entièrement.'
+        : retenus.length === 1
+          ? 'Un élément retenu. Ctrl+C le copie, Ctrl+V le colle sous la souris.'
+          : `${retenus.length} éléments retenus — glissez l’un d’eux pour tout déplacer, Ctrl+C copie, Ctrl+V colle sous la souris.`,
+    )
+  }
+
+  /** La sélection courante, sous forme de références (une ou plusieurs). */
+  private refsSelection(): NonNullable<Sel>[] {
+    if (this.multi.length > 1)
+      return this.multi.filter((m): m is NonNullable<Sel> => m !== null)
+    return this.sel ? [this.sel] : []
+  }
+
+  private copier(): void {
+    const refs = this.refsSelection()
+    if (refs.length === 0) return
+    const { presse, ignores } = copie(this.level, refs)
+    if (!presse) {
+      this.status(
+        `Rien à copier : ${ignores.join(', ')} ${ignores.length > 1 ? 'sont uniques' : 'est unique'} au tableau.`,
+      )
+      return
+    }
+    this.pressePapier = presse
+    this.status(
+      `${presse.total} élément${presse.total > 1 ? 's' : ''} copié${presse.total > 1 ? 's' : ''} — Ctrl+V colle sous la souris.` +
+        (ignores.length > 0 ? ` Non copié : ${ignores.join(', ')}.` : ''),
+    )
+  }
+
+  private couper(): void {
+    const avant = this.pressePapier
+    this.copier()
+    if (this.pressePapier === avant) return // rien de copiable : rien ne part
+    this.deleteSel()
+    this.status(
+      `${this.pressePapier?.total ?? 0} élément(s) coupé(s) — Ctrl+V les colle sous la souris.`,
+    )
+  }
+
+  /** Colle sous le curseur (le centre du groupe s'y aimante à la grille),
+   *  ou d'un pas vers l'est sans souris sur la carte. Les nouveaux venus
+   *  deviennent LA sélection : la souris les emporte aussitôt. */
+  private coller(): void {
+    const presse = this.pressePapier
+    if (!presse) return
+    const brut = decalageDeCollage(presse.emprise, this.souris, this.grid * 4)
+    const dx = this.snapped(brut.dx)
+    const dy = this.snapped(brut.dy)
+    const { refs, ignores } = colle(this.level, presse, dx, dy)
+    const neufs = refs as NonNullable<Sel>[]
+    if (neufs.length > 1) {
+      this.multi = neufs
+      this.sel = neufs[neufs.length - 1]
+    } else {
+      this.multi = []
+      this.sel = neufs[0] ?? null
+    }
+    this.setTool({ kind: 'select' })
+    this.commit(
+      neufs.length === 0
+        ? `Rien collé${ignores.length > 0 ? ` : ${ignores.join(', ')}` : ''}.`
+        : `${neufs.length} élément${neufs.length > 1 ? 's' : ''} collé${neufs.length > 1 ? 's' : ''} et sélectionné${neufs.length > 1 ? 's' : ''} — glissez pour placer, Ctrl+V colle encore.` +
+            (ignores.length > 0 ? ` Non collé : ${ignores.join(', ')}.` : ''),
     )
   }
 
@@ -4997,8 +5161,9 @@ export class LevelEditor {
     if (this.multi.length > 1) {
       host.innerHTML =
         `<div class="ed-props-head">${this.multi.length} éléments sélectionnés</div>` +
-        `<p class="ed-empty">Maj + clic pour ajouter ou retirer. Glissez l’un d’eux : tout se déplace ensemble.</p>` +
+        `<p class="ed-empty">Maj + clic pour ajouter ou retirer (Maj + glisser dans le vide : un cadre de plus). Glissez l’un d’eux : tout se déplace ensemble. Ctrl+C copie, Ctrl+V colle sous la souris.</p>` +
         `<div class="ed-fields">` +
+        `<button type="button" class="ed-btn" id="p-copier" title="Ctrl+C — puis Ctrl+V colle le groupe sous la souris, déjà sélectionné pour le déplacer">Copier (Ctrl+C)</button>` +
         `<button type="button" class="ed-btn" id="p-al-g">Aligner à gauche</button>` +
         `<button type="button" class="ed-btn" id="p-al-d">Aligner à droite</button>` +
         `<button type="button" class="ed-btn" id="p-al-h">Aligner en haut</button>` +
@@ -5013,6 +5178,9 @@ export class LevelEditor {
         this.blocPavage('la sélection, telle quelle') +
         `<button type="button" class="ed-danger" id="p-del">Tout supprimer</button>`
       this.bindPavage(host)
+      host
+        .querySelector('#p-copier')
+        ?.addEventListener('click', () => this.copier())
       host
         .querySelector('#p-al-g')
         ?.addEventListener('click', () => this.alignMulti('gauche'))
@@ -5051,7 +5219,7 @@ export class LevelEditor {
     const s = this.sel
     if (!s) {
       host.innerHTML =
-        '<p class="ed-empty">Rien de sélectionné. Cliquez un élément (Maj + clic : sélection multiple), ou choisissez un outil et glissez pour en tracer un.</p>'
+        '<p class="ed-empty">Rien de sélectionné. Cliquez un élément (Maj + clic : sélection multiple), ou glissez dans le vide pour tracer un CADRE qui retient tout ce qu’il entoure. Ctrl+C / Ctrl+V copie et colle sous la souris. Ou choisissez un outil et glissez pour tracer un élément.</p>'
       return
     }
     const rows: string[] = []
@@ -7675,6 +7843,25 @@ export class LevelEditor {
       g.setLineDash([5, 4])
       g.strokeStyle = efface ? '#ffd24a' : '#ffffff'
       g.lineWidth = efface ? 1.5 : 1
+      g.strokeRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
+      g.setLineDash([])
+    }
+
+    // le CADRE DE SÉLECTION en cours : un voile clair, liseré pointillé
+    if (this.drag?.mode === 'lasso') {
+      const p = this.toScreen(
+        Math.min(this.drag.x0, this.drag.x1),
+        Math.max(this.drag.y0, this.drag.y1),
+      )
+      const q = this.toScreen(
+        Math.max(this.drag.x0, this.drag.x1),
+        Math.min(this.drag.y0, this.drag.y1),
+      )
+      g.fillStyle = 'rgba(255,215,106,0.08)'
+      g.fillRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
+      g.setLineDash([5, 4])
+      g.strokeStyle = '#ffd76a'
+      g.lineWidth = 1
       g.strokeRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
       g.setLineDash([])
     }

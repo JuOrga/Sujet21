@@ -149,7 +149,8 @@ function normalise(r: Rect): Rect {
   }
 }
 
-function rectDe(level: LevelDef, f: FamilleMotif, i: number): Rect | null {
+/** L'emprise (monde) d'un élément d'une famille — partagée avec le presse-papier. */
+export function rectDe(level: LevelDef, f: FamilleMotif, i: number): Rect | null {
   const pt = (
     p: { x: number; y: number } | undefined,
     r: number,
@@ -272,7 +273,7 @@ export interface RefSelection {
   index?: number
 }
 
-const FAMILLE_DE_SORTE: Record<string, FamilleMotif> = {
+export const FAMILLE_DE_SORTE: Record<string, FamilleMotif> = {
   structure: 'structures',
   box: 'boxes',
   sponge: 'sponges',
@@ -293,7 +294,7 @@ const FAMILLE_DE_SORTE: Record<string, FamilleMotif> = {
   decal: 'decals',
 }
 
-const NOMS_UNIQUES: Record<string, string> = {
+export const NOMS_UNIQUES: Record<string, string> = {
   spawn: 'le départ',
   exit: 'le sas',
   fiole: 'la fiole',

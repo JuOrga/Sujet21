@@ -31,6 +31,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '12/09/2026 11:52',
+    title: 'ÉDITEUR : le CADRE de sélection, et copier-coller (Ctrl+C / Ctrl+X / Ctrl+V) — le collage tombe sous la souris, déjà sélectionné',
+    notes: [
+      'LA DEMANDE : « avec un rectangle de sélection, sélectionner plein d’éléments et copier-coller — et quand ça colle, il faut que le sélecteur soit sur ce qui a collé, afin de le déplacer immédiatement à la souris ». La sélection multiple se faisait élément par élément (Maj + clic), et Dupliquer (D) ne reproduisait qu’UN élément, décalé d’un pas fixe.',
+      'LE CADRE : à l’outil Sélection, glisser dans le vide trace un cadre (voile doré, liseré pointillé) ; au relâcher, tout ce qu’il entoure ENTIÈREMENT est retenu — parois, éponges, zones, mécanismes, rails, étiquettes, lampes, décors, et les uniques (départ, sas, fiole, banc, marchand) qui se déplacent avec le groupe. Une paroi que le cadre ne fait qu’effleurer reste dehors : on vise ce qu’on entoure. Maj + glisser dans le vide : le cadre s’AJOUTE à la sélection en cours. Un clic sans bouger reste un clic dans le vide (tout désélectionné). Dès deux éléments, le panneau d’alignement et de pavage s’ouvre, et glisser l’un d’eux déplace tout.',
+      'COPIER, COUPER, COLLER : Ctrl+C copie la sélection (une ou plusieurs), Ctrl+X la copie et la supprime, Ctrl+V colle — le CENTRE du groupe se pose SOUS LA SOURIS, aimanté à la grille (sans souris sur la carte : un pas vers l’est, comme Dupliquer), et les nouveaux venus deviennent LA sélection : on les prend aussitôt et on les glisse. Ctrl+V encore : un autre groupe, indépendant. Ctrl+Z défait un collage d’un coup. Le panneau de sélection multiple gagne un bouton Copier. Sans sélection, Ctrl+C reste au navigateur.',
+      'LE PRESSE-PAPIER (editor/pressePapier.ts, pur et testé) tient des CLONES, pas des indices : supprimer entre la copie et le collage ne le fausse pas. Une pastille copiée porte son numéro logique en clair (une « cible 1 » collée reste une cible 1, comme au Dupliquer), une étiquette copiée perd sa clé (elle désigne UN panneau que le jeu manipule), les lampes au-delà du plafond de quatre sont refusées et comptées, les uniques sont nommés dans la barre d’état plutôt que copiés.',
+      'VÉRIFIÉ : douze tests sur le cadre (entièrement dedans, effleuré dehors, tracé dans n’importe quel sens), la copie (clones, emprise, uniques nommés, numéro de pastille, clé d’étiquette, doublons, ordre de peinture), le collage (décalage, références des nouveaux venus, originaux intacts, deux collages indépendants, plafond des lampes) et le décalage sous le curseur. 1104 tests verts dans 102 fichiers, type-check à 0, build propre. Le jeu ne se monte pas dans le Chromium sans tête de l’environnement : le cadre n’a pas été tracé à la souris ici — à voir sur l’aperçu (previsu-go).',
+    ],
+  },
+  {
     date: '11/09/2026 17:29',
     title: 'LE PAVAGE : une cellule faite main répétée en grille, jointures comprises — le démineur à quatre cases',
     notes: [
