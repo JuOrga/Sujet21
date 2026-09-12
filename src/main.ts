@@ -397,9 +397,21 @@ import {
 import type { BenchMonitor } from './bench/bench'
 import type { Pane } from 'tweakpane'
 import { amorcePresets } from './bench/amorcePresets'
+import { creeGardeImage, type PanneImage } from './game/gardeBoucle'
 import { appelle } from './game/reseau'
 
 const CAPACITY = 4096
+
+// L'AMORÇAGE, RACONTÉ À LA PAGE. index.html affiche un mot de chargement dès
+// le premier pixel et tient une veille (la garde d'amorçage) ; chaque étape
+// franchie ici lui est dite, pour que le mot avance et que la veille ne
+// prenne pas un démarrage lent pour une panne — c'est ainsi que le panneau
+// « met trop longtemps » recouvrait un jeu qui tournait déjà.
+function etapeAmorce(etape: 'ouverture' | 'rendu'): void {
+  const w = window as unknown as { __sujet21Etape?: (e: string) => void }
+  w.__sujet21Etape?.(etape)
+}
+etapeAmorce('ouverture')
 // (l'ancien délai d'affichage du bilan a cédé la place à la MISE EN
 // BONBONNE : c'est le choix d'instrument qui mène au tableau suivant)
 
@@ -3958,6 +3970,10 @@ function rapportPerf(): Record<string, unknown> {
       timeWarp: params.timeWarp,
       downsampleChamp: params.renderDownsample,
     },
+    amorcage: {
+      ...amorce,
+      compileParallele: renderer.compileEnParallele,
+    },
     session: {
       tableau: `${level.code} — ${level.name}`,
       particules: sim.count,
@@ -4112,11 +4128,14 @@ function appelOeil(): void {
 }
 window.setTimeout(appelOeil, 600)
 
-// ---- L'ÉCOUTE : le mini-lecteur des musiques du projet (accueil, concepteur)
-// Les lits et leurs candidates, dans un ordre tiré au sort à l'ouverture,
-// joués par la bande-son elle-même (même bus, même volume que le jeu) à la
-// place du lit d'accueil. Lancer le jeu arrête l'écoute : la cuve reprend.
+// ---- LE LECTEUR : la musique de l'accueil, ses touches pour tout le monde
+// Les lits et leurs candidates, dans un ordre tiré au sort à l'ouverture :
+// la première de l'ordre est LA musique de l'accueil — chargée tout de
+// suite, jouée dès que le son est permis, notable telle quelle. Les touches
+// la changent, l'arrêtent, la relancent. En jeu elle s'efface, et revient
+// à l'accueil ; la bande-son ne repose plus sur un lit d'accueil gravé.
 const jukebox = new Jukebox(PISTES_ECOUTE)
+bande.litAccueil(jukebox.enCours()?.fichier ?? null)
 const ecouteTitre = document.getElementById('ecoute-titre')
 const ecouteLecture = document.getElementById('ecoute-lecture') as HTMLButtonElement | null
 const ecouteAvisBoutons: { [K in Avis | 0]: HTMLButtonElement | null } = {
@@ -4140,21 +4159,21 @@ function superposeAvis(base: DocumentAvis, modifs: typeof avisEcouteModifies): D
 }
 function majEcoute(): void {
   const p = jukebox.enCours()
-  // MON avis (celui de la borne) enfonce sa touche ; le titre dit le total
-  // et qui pense quoi — la ligne se coupe, l'infobulle la garde entière
+  // MON avis (celui de la borne) enfonce sa touche ; le titre dit la piste
+  // chargée, son état (à l'arrêt, son coupé), le total et qui pense quoi —
+  // la ligne se coupe, l'infobulle la garde entière
   const mien: Avis | 0 = p ? avisDe(avisEcoute, p.fichier, records.operator()) : 0
   const avis = p ? ligneAvis(avisEcoute, p.fichier) : ''
   if (ecouteTitre) {
     const suffixe = avisEcouteRefuse ? ' — avis non publié' : avisEcouteModifies.size > 0 ? ' …' : ''
+    const etat = !jukebox.enLecture ? ' — à l’arrêt' : !audio.enabled ? ' — son coupé' : ''
     const bilan = ligneBilan(avisEcoute)
     ecouteTitre.textContent = !p
-      ? `les musiques du projet, au hasard${bilan ? ` · ${bilan}` : ''}${suffixe}`
-      : !audio.enabled
-        ? `${p.titre} — son coupé`
-        : `${jukebox.rang()}/${jukebox.total} · ${p.titre}${p.enJeu ? '' : ' (candidate)'}${avis ? ` · ${avis}` : ''}${suffixe}`
-    ecouteTitre.title = p && avis ? `${p.titre}\n${avis}` : ''
+      ? 'aucune musique'
+      : `${jukebox.rang()}/${jukebox.total} · ${p.titre}${p.enJeu ? '' : ' (candidate)'}${etat}${avis ? ` · ${avis}` : ''}${suffixe}`
+    ecouteTitre.title = p ? [p.titre, avis, bilan].filter(Boolean).join('\n') : ''
   }
-  ecouteLecture?.classList.toggle('actif', !!p)
+  ecouteLecture?.classList.toggle('actif', jukebox.enLecture)
   const courant = mien
   for (const v of [1, 0, -1] as const) {
     const b = ecouteAvisBoutons[v]
@@ -4163,8 +4182,9 @@ function majEcoute(): void {
     b.setAttribute('aria-pressed', p && courant === v ? 'true' : 'false')
   }
 }
-/** Le document publié, une fois : au démarrage en mode concepteur, sinon à
- *  la première touche du lecteur — un joueur ne le télécharge jamais. */
+/** Le document publié, une fois, au démarrage — le lecteur est à tout le
+ *  monde, ses avis aussi (deux fetch publics, aucune opération du magasin) ;
+ *  et à la première touche si le réseau manquait. */
 async function chargeAvisEcoute(): Promise<void> {
   if (avisEcouteCharge) return
   avisEcouteCharge = true
@@ -4176,7 +4196,7 @@ async function chargeAvisEcoute(): Promise<void> {
   avisEcoute = superposeAvis(lisAvisEcoute(p.document), avisEcouteModifies)
   majEcoute()
 }
-if (document.body.classList.contains('concepteur')) void chargeAvisEcoute()
+void chargeAvisEcoute()
 // LA PUBLICATION est différée et regroupée : trois touches coup sur coup
 // (+1, non −1, finalement neutre) ne coûtent qu'une écriture au magasin
 // (2 put + 1 list, cf. api/_magasin.ts). Avant d'écrire, on relit le
@@ -4221,31 +4241,25 @@ function voteEcoute(avis: Avis | 0): void {
   avisEcouteMinuterie = window.setTimeout(() => void publieAvisEcoute(), 800)
 }
 for (const v of [1, 0, -1] as const) ecouteAvisBoutons[v]?.addEventListener('click', () => voteEcoute(v))
-function joueEcoute(sens: 'suivant' | 'precedent'): void {
+/** Une touche du lecteur : la bande-son suit la piste chargée (ou se tait
+ *  à l'arrêt), et le titre le dit. */
+function joueEcoute(geste: 'suivant' | 'precedent' | 'lecture' | 'stop'): void {
   eveilAudio()
   void chargeAvisEcoute()
-  const p = sens === 'suivant' ? jukebox.suivant() : jukebox.precedent()
-  bande.ecoute(p?.fichier ?? null)
+  if (geste === 'suivant') jukebox.suivant()
+  else if (geste === 'precedent') jukebox.precedent()
+  else if (geste === 'lecture') jukebox.joue()
+  else jukebox.stop()
+  bande.litAccueil(jukebox.enLecture ? (jukebox.enCours()?.fichier ?? null) : null)
   majEcoute()
 }
-document.getElementById('ecoute-lecture')?.addEventListener('click', () => {
-  // lecture depuis l'arrêt : la première de l'ordre ; en cours : rien à faire
-  if (!jukebox.enCours()) joueEcoute('suivant')
-})
+document.getElementById('ecoute-lecture')?.addEventListener('click', () => joueEcoute('lecture'))
 document.getElementById('ecoute-suiv')?.addEventListener('click', () => joueEcoute('suivant'))
 document.getElementById('ecoute-prec')?.addEventListener('click', () => joueEcoute('precedent'))
-document.getElementById('ecoute-stop')?.addEventListener('click', () => {
-  jukebox.stop()
-  bande.ecoute(null)
-  majEcoute()
-})
-// la bande-son peut arrêter l'écoute d'elle-même (le jeu démarre) : le
-// lecteur suit, sinon il afficherait une piste que personne n'entend — et
-// quand le son revient, le titre cesse de dire « son coupé »
-bande.onEcoute = (fichier) => {
-  if (fichier === null && jukebox.enCours()) jukebox.stop()
-  majEcoute()
-}
+document.getElementById('ecoute-stop')?.addEventListener('click', () => joueEcoute('stop'))
+// quand le son revient, la piste part et le titre cesse de dire « son coupé »
+bande.onLitAccueil = () => majEcoute()
+majEcoute()
 
 const homeRestartBtn = document.getElementById(
   'home-restart',
@@ -7216,6 +7230,7 @@ fetch('/noyaux.wasm')
   })
 
 const renderer = new Renderer(canvas, CAPACITY)
+const rendererNe = performance.now() // pour dater l'attente de compilation
 const loop = new FixedLoop()
 const input = new Input()
 // Ouverture directe par ?editeur — APRÈS la naissance d'input : openEditor
@@ -14752,10 +14767,37 @@ let tickPrecedent = 0
 // jamais tourner. Une seule fois, puis plus rien : un incident en cours de
 // partie n'a pas à recouvrir le jeu d'un panneau.
 let amorceSignalee = false
+// CE QUE L'AMORÇAGE A COÛTÉ, pour le rapport de performance : l'attente de
+// la compilation du rendu (le poste qu'on soupçonne sur les cartes
+// ordinaires, sans pouvoir le mesurer d'ici) et la date de la première
+// image depuis l'ouverture de la page. Un chiffre mesuré sur la machine du
+// joueur vaut mieux qu'une estimation.
+const amorce = { compileRenduMs: -1, premiereImageMs: -1 }
+let attenteRenduDite = false
 
-function frame(now: number): void {
+// LE CORPS DE L'IMAGE. Il ne réarme rien : c'est `frame`, l'enveloppe
+// (tout en bas), qui garde la chaîne de requestAnimationFrame — une
+// exception ici ne doit plus figer le jeu pour de bon (voir gardeBoucle.ts).
+// Renvoie `false` pour une image sautée (le rendu pas encore compilé, le
+// plafond de cadence) : la garde ne la compte pas comme une image saine.
+function corpsImage(now: number): boolean {
+  // LE RENDU SE COMPILE EN COULISSE (render/programmes.ts). Tant que ses
+  // programmes ne sont pas liés, on ne simule ni ne dessine : la page reste
+  // vivante, le mot du chargement le dit, et la première image — celle qui
+  // désarme la garde — sera une vraie image. L'étape n'est dite qu'UNE fois :
+  // la redire à chaque image réarmerait la veille sans fin, et un pilote qui
+  // ne finit jamais sa compilation doit finir par être signalé.
+  if (!renderer.pret()) {
+    if (!attenteRenduDite) {
+      attenteRenduDite = true
+      etapeAmorce('rendu')
+    }
+    return false
+  }
   if (!amorceSignalee) {
     amorceSignalee = true
+    amorce.compileRenduMs = Math.round(performance.now() - rendererNe)
+    amorce.premiereImageMs = Math.round(performance.now())
     const w = window as unknown as { __sujet21Demarre?: () => void }
     w.__sujet21Demarre?.()
   }
@@ -14769,10 +14811,7 @@ function frame(now: number): void {
   // sur un sous-multiple de l'écran (60 demandés sur un 144 Hz donnaient
   // 48 im/s : chaque image « en avance » repoussait toute la grille).
   const periode = 1000 / fpsCap
-  if (now - fpsCapPrecedent < periode - 1) {
-    requestAnimationFrame(frame)
-    return
-  }
+  if (now - fpsCapPrecedent < periode - 1) return false // image sautée
   fpsCapPrecedent += periode
   // jamais plus d'une période de dette : une pause (onglet caché) ne
   // déclenche pas une rafale de rattrapage
@@ -16745,7 +16784,47 @@ function frame(now: number): void {
   if (run.exitTimer <= 0 && !run.ended && ecranDispersion === 'aucun') {
     overlay.classList.remove('visible')
   }
+  return true
+}
 
+// LA PANNE D'UNE IMAGE, SIGNALÉE : la console (avec la pile), une bannière
+// à l'écran — le joueur sait ce qui vient d'arriver et quoi transmettre —,
+// et le dernier incident gardé au poste pour le rapport. Avant la garde, le
+// symptôme était un écran figé sans un mot : la chaîne de
+// requestAnimationFrame cassée par l'exception, l'interface HTML toujours
+// vivante par-dessus (la carte, la fiche de la salle), la cuve immobile.
+const CLE_DERNIERE_PANNE = 'sujet21-derniere-panne'
+const panneBoucleEl = document.getElementById('panne-boucle') as HTMLDivElement
+let panneBoucleTimer = 0
+function signalePanneImage(p: PanneImage): void {
+  console.error(`[boucle] une image a levé une exception — ${p.message}\n${p.pile}`)
+  panneBoucleEl.textContent =
+    `⚠ AVARIE DE LA BOUCLE — ${p.message}\n` +
+    'Le jeu continue. Le détail est dans la console du navigateur (F12) — c’est lui qu’il faut transmettre.'
+  panneBoucleEl.hidden = false
+  clearTimeout(panneBoucleTimer)
+  panneBoucleTimer = window.setTimeout(() => {
+    panneBoucleEl.hidden = true
+  }, 20000)
+  try {
+    localStorage.setItem(
+      CLE_DERNIERE_PANNE,
+      JSON.stringify({
+        date: new Date().toISOString(),
+        message: p.message,
+        pile: p.pile.slice(0, 4000),
+        tableau: level.code,
+        auHub,
+      }),
+    )
+  } catch {
+    // stockage refusé : la console a déjà tout
+  }
+}
+const image = creeGardeImage(corpsImage, signalePanneImage)
+// L'ENVELOPPE : la seule à réarmer la chaîne, image réussie ou non.
+function frame(now: number): void {
+  image(now)
   requestAnimationFrame(frame)
 }
 

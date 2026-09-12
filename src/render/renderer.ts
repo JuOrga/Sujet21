@@ -25,6 +25,7 @@ import {
 } from '../game/formes'
 import type { Camera } from './camera'
 import { VIE_STRIDE } from './vie'
+import { Programmes } from './programmes'
 
 // Budgets de rendu : au-delà, les éléments excédentaires ne sont plus
 // dessinés (la physique, elle, les voit tous) — l'éditeur avertit quand un
@@ -2800,35 +2801,6 @@ const FICHIER_DECAL: Record<DecalDef['kind'], string> = {
 /** Les planches de vues livrées, lues une fois : le glob de Vite. */
 const PLANCHES_LIVREES = planchesLivrees()
 
-function compile(
-  gl: WebGL2RenderingContext,
-  type: number,
-  src: string,
-): WebGLShader {
-  const shader = gl.createShader(type)!
-  gl.shaderSource(shader, src)
-  gl.compileShader(shader)
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    throw new Error(`Shader: ${gl.getShaderInfoLog(shader)}`)
-  }
-  return shader
-}
-
-function link(
-  gl: WebGL2RenderingContext,
-  vs: string,
-  fs: string,
-): WebGLProgram {
-  const program = gl.createProgram()!
-  gl.attachShader(program, compile(gl, gl.VERTEX_SHADER, vs))
-  gl.attachShader(program, compile(gl, gl.FRAGMENT_SHADER, fs))
-  gl.linkProgram(program)
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    throw new Error(`Program: ${gl.getProgramInfoLog(program)}`)
-  }
-  return program
-}
-
 export class Renderer {
   private readonly gl: WebGL2RenderingContext
   private readonly canvas: HTMLCanvasElement
@@ -2943,6 +2915,11 @@ export class Renderer {
     string,
     Record<string, WebGLUniformLocation | null>
   > = {}
+  // Les programmes se compilent EN COULISSE (render/programmes.ts) : le
+  // constructeur ne les attend pas, c'est `pret()` qui le dit, image après
+  // image, et le rendu ne commence qu'à son premier oui.
+  private readonly programmes: Programmes
+  private programmesPrets = false
 
   constructor(canvas: HTMLCanvasElement, capacity: number) {
     this.canvas = canvas
@@ -2973,33 +2950,25 @@ export class Renderer {
     this.floatField = gl.getExtension('EXT_color_buffer_float') !== null
     this.fieldScale = this.floatField ? 1.0 : 0.02
 
-    this.splatProgram = link(gl, SPLAT_VS, SPLAT_FS)
-    this.composeProgram = link(gl, COMPOSE_VS, COMPOSE_FS)
-    this.spongeProgram = link(gl, SPONGE_VS, SPONGE_FS)
-    this.hullProgram = link(gl, HULL_VS, HULL_FS)
-    this.decalProgram = link(gl, DECAL_VS, DECAL_FS)
-    this.lightProgram = link(gl, COMPOSE_VS, LIGHT_FS)
-    this.vieProgram = link(gl, VIE_VS, VIE_FS)
-    for (const [name, program] of [
-      ['splat', this.splatProgram],
-      ['compose', this.composeProgram],
-      ['sponge', this.spongeProgram],
-      ['hull', this.hullProgram],
-      ['decal', this.decalProgram],
-      ['light', this.lightProgram],
-      ['vie', this.vieProgram],
-    ] as const) {
-      const map: Record<string, WebGLUniformLocation | null> = {}
-      const count = gl.getProgramParameter(
-        program,
-        gl.ACTIVE_UNIFORMS,
-      ) as number
-      for (let i = 0; i < count; i++) {
-        const info = gl.getActiveUniform(program, i)
-        if (info) map[info.name] = gl.getUniformLocation(program, info.name)
-      }
-      this.uniforms[name] = map
-    }
+    // Lancés, pas attendus : le shader de composition pèse plus de cent
+    // kilo-octets et son édition de liens prenait des secondes de fil
+    // principal. Le verdict et les uniformes viennent dans `pret()`.
+    this.programmes = new Programmes(gl, [
+      { nom: 'splat', vs: SPLAT_VS, fs: SPLAT_FS },
+      { nom: 'compose', vs: COMPOSE_VS, fs: COMPOSE_FS },
+      { nom: 'sponge', vs: SPONGE_VS, fs: SPONGE_FS },
+      { nom: 'hull', vs: HULL_VS, fs: HULL_FS },
+      { nom: 'decal', vs: DECAL_VS, fs: DECAL_FS },
+      { nom: 'light', vs: COMPOSE_VS, fs: LIGHT_FS },
+      { nom: 'vie', vs: VIE_VS, fs: VIE_FS },
+    ])
+    this.splatProgram = this.programmes.programme('splat')
+    this.composeProgram = this.programmes.programme('compose')
+    this.spongeProgram = this.programmes.programme('sponge')
+    this.hullProgram = this.programmes.programme('hull')
+    this.decalProgram = this.programmes.programme('decal')
+    this.lightProgram = this.programmes.programme('light')
+    this.vieProgram = this.programmes.programme('vie')
 
     this.scratch = new Float32Array(capacity * 7)
     this.splatVao = gl.createVertexArray()!
@@ -3290,6 +3259,26 @@ export class Renderer {
   private solModules = false
 
   /**
+   * Les programmes sont-ils liés ? À demander à chaque image avant de
+   * dessiner : non tant que le pilote compile (le fil principal reste libre,
+   * l'écran garde le mot du chargement), oui pour de bon ensuite. Un shader
+   * refusé se dit ici, en exception, comme il se disait au constructeur.
+   */
+  pret(): boolean {
+    if (this.programmesPrets) return true
+    if (!this.programmes.pret()) return false
+    for (const nom of ['splat', 'compose', 'sponge', 'hull', 'decal', 'light', 'vie'])
+      this.uniforms[nom] = this.programmes.uniformes(nom)
+    this.programmesPrets = true
+    return true
+  }
+
+  /** L'extension de compilation parallèle est-elle là ? (rapport de perf) */
+  get compileEnParallele(): boolean {
+    return this.programmes.enParallele
+  }
+
+  /**
    * LE CIEL DU DEHORS. 0 procédural · 1 tuilé (l'intérim) · 2 la plaque.
    * Appelé À L'IMAGE, comme tout ce qui pilote le renderer : une fonction
    * lancée au chargement du module ne peut pas le toucher — il n'existe pas
@@ -3366,12 +3355,15 @@ export class Renderer {
     mirrored = false,
   ): void {
     const img = new Image()
-    img.onload = () => {
+    // L'ENVOI AU GPU, une fois les pixels prêts. `source` est de préférence
+    // un ImageBitmap DÉJÀ décodé et retourné hors du fil principal ; à
+    // défaut l'<img> lui-même, que texImage2D décode et retourne sur place.
+    const envoie = (source: TexImageSource, retourne: boolean) => {
       const gl = this.gl
       const tex = gl.createTexture()!
-      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, retourne)
       gl.bindTexture(gl.TEXTURE_2D, tex)
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, img)
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, source)
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
       const wrap = repeat
         ? mirrored
@@ -3393,6 +3385,32 @@ export class Renderer {
       }
       gl.bindTexture(gl.TEXTURE_2D, null)
       assign(tex, img)
+    }
+    img.onload = () => {
+      // LE DÉCODAGE HORS DU FIL PRINCIPAL. Donner l'<img> à texImage2D
+      // oblige le navigateur à décoder l'image ET à la retourner (FLIP_Y)
+      // dans le fil principal, au moment où elle arrive — pour le ciel
+      // (4096 × 4096, 64 Mo de pixels) et l'atlas des parois (4096 × 2048),
+      // c'est un gel de plusieurs centaines de millisecondes pendant que le
+      // joueur lit la fiche, et la vingtaine d'autres textures s'y ajoute.
+      // createImageBitmap fait le décodage dans un fil du navigateur ; il
+      // reste ici le retournement et la copie vers le GPU. Le retournement
+      // est laissé à WebGL (FLIP_Y) plutôt que demandé au bitmap
+      // (imageOrientation) : un navigateur qui ignore l'option en silence
+      // livrerait des textures à l'envers, alors que FLIP_Y est le même
+      // partout. Même alpha non prémultiplié qu'avant : le rendu est le
+      // même au pixel près. Un navigateur qui refuse repasse par l'<img>.
+      if (typeof createImageBitmap === 'function') {
+        createImageBitmap(img, { premultiplyAlpha: 'none' }).then(
+          (bitmap) => {
+            envoie(bitmap, true)
+            bitmap.close()
+          },
+          () => envoie(img, true),
+        )
+      } else {
+        envoie(img, true)
+      }
     }
     img.src = url
   }
@@ -3704,6 +3722,9 @@ export class Renderer {
       halo?: number // 0..1 : la lueur au sol sous le corps (0 : aucune)
     } | null = null,
   ): void {
+    // rien à dessiner tant que les programmes ne sont pas liés — la boucle
+    // de rendu le sait déjà (main.ts), ceci garde les autres appelants
+    if (!this.pret()) return
     const gl = this.gl
     const devW = Math.max(1, Math.round(viewportW * dpr))
     const devH = Math.max(1, Math.round(viewportH * dpr))

@@ -147,6 +147,26 @@ import { MAX_LUMIERES,
   MAX_BOXES,
 } from '../render/renderer'
 import { canalDeCible, traceLaser } from '../game/laser'
+import {
+  motifDeSelection,
+  motifDeStructure,
+  pave,
+  PAVAGE_MAX,
+  phrasePavage,
+  REGLAGES_PAVAGE_DEFAUT,
+  tailleMotif,
+  type Jointure,
+  type ReglagesPavage,
+} from './pavage'
+import {
+  colle,
+  copie,
+  decalageDeCollage,
+  DEMI_FIOLE,
+  DEMI_MARCHAND,
+  elementsDansCadre,
+  type PressePapier,
+} from './pressePapier'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
 import { PISTES, PISTE_NOMS, type Piste } from '../game/soundtrack'
 import {
@@ -484,6 +504,10 @@ export class LevelEditor {
     | null
     | { mode: 'pan'; sx: number; sy: number; camX: number; camY: number }
     | { mode: 'create'; x0: number; y0: number; x1: number; y1: number }
+    // LE CADRE DE SÉLECTION : tracé dans le vide à l'outil Sélection, il
+    // retient tout ce qu'il entoure entièrement. `ajout` (Maj tenue) :
+    // le cadre s'ajoute à la sélection en cours au lieu de la remplacer.
+    | { mode: 'lasso'; x0: number; y0: number; x1: number; y1: number; ajout: boolean }
     | {
         mode: 'move'
         ox: number
@@ -516,8 +540,18 @@ export class LevelEditor {
   // Sélection MULTIPLE (Maj + clic) : déplacée d'un bloc, supprimée d'un
   // coup, ou passée aux outils d'alignement du panneau.
   private multi: Sel[] = []
+  /** Les réglages du PAVAGE (répéter un motif en grille), gardés d'un
+   *  panneau à l'autre : le panneau se redessine à chaque commit, un champ
+   *  qui ne vivrait que dans le DOM perdrait sa valeur au premier clic. */
+  private pavage: ReglagesPavage = { ...REGLAGES_PAVAGE_DEFAUT }
   // l'APPUI LONG tactile en cours : il vaudra Maj + clic s'il tient 480 ms
   private appuiLong: { timer: number; sx: number; sy: number } | null = null
+  // LE PRESSE-PAPIER (Ctrl+C / Ctrl+X / Ctrl+V) : des clones, pas des
+  // indices — une suppression entre la copie et le collage ne le fausse pas
+  private pressePapier: PressePapier | null = null
+  // La souris sur la carte (monde), pour coller SOUS LE CURSEUR ; nulle
+  // quand elle est sortie (le collage retombe alors sur un pas fixe)
+  private souris: { x: number; y: number } | null = null
 
   private hint = ''
 
@@ -945,13 +979,23 @@ export class LevelEditor {
     if (s.kind === 'fiole') {
       const f = this.level.fiole
       return f
-        ? { minX: f.x - 30, minY: f.y - 30, maxX: f.x + 30, maxY: f.y + 30 }
+        ? {
+            minX: f.x - DEMI_FIOLE,
+            minY: f.y - DEMI_FIOLE,
+            maxX: f.x + DEMI_FIOLE,
+            maxY: f.y + DEMI_FIOLE,
+          }
         : null
     }
     if (s.kind === 'marchand') {
       const m = this.level.marchand
       return m
-        ? { minX: m.x - 40, minY: m.y - 40, maxX: m.x + 40, maxY: m.y + 40 }
+        ? {
+            minX: m.x - DEMI_MARCHAND,
+            minY: m.y - DEMI_MARCHAND,
+            maxX: m.x + DEMI_MARCHAND,
+            maxY: m.y + DEMI_MARCHAND,
+          }
         : null
     }
     if (s.kind === 'eclat') {
@@ -2195,8 +2239,13 @@ export class LevelEditor {
             }, 480),
           }
         }
-        // Maj + clic (ou L2 + clic à la manette) : la sélection MULTIPLE
+        // Maj + clic (ou L2 + clic à la manette) : la sélection MULTIPLE —
+        // dans le vide, un CADRE qui s'ajoute à ce qui est déjà retenu
         if (e.shiftKey || (this.hooks.modMulti?.() ?? false)) {
+          if (this.pick(w.x, w.y) === null) {
+            this.drag = { mode: 'lasso', x0: w.x, y0: w.y, x1: w.x, y1: w.y, ajout: true }
+            return
+          }
           this.basculeMulti(w.x, w.y)
           return
         }
@@ -2265,6 +2314,13 @@ export class LevelEditor {
           hit !== null && this.sel !== null && this.sameSel(this.sel, hit)
         this.sel = hit
         this.syncProps()
+        if (!hit) {
+          // le vide : le geste qui suit est un CADRE DE SÉLECTION — relâché
+          // sans bouger, ce n'est qu'un clic qui a tout désélectionné
+          this.drag = { mode: 'lasso', x0: w.x, y0: w.y, x1: w.x, y1: w.y, ajout: false }
+          this.draw()
+          return
+        }
         if (auDoigt && hit && !dejaVise) {
           this.status(
             'Élément sélectionné — reposez le doigt dessus pour le déplacer (les poignées redimensionnent).',
@@ -2733,6 +2789,8 @@ export class LevelEditor {
       const sy = e.clientY - rect.top
       const w = this.toWorld(sx, sy)
       this.showCoords(w.x, w.y)
+      // souris et stylet pointent : on colle sous eux ; le doigt, non
+      if (e.pointerType !== 'touch') this.souris = { x: w.x, y: w.y }
       // le doigt bouge : ce n'est plus un appui long
       if (
         this.appuiLong &&
@@ -2826,6 +2884,10 @@ export class LevelEditor {
       } else if (d.mode === 'create') {
         d.x1 = this.snapped(w.x)
         d.y1 = this.snapped(w.y)
+      } else if (d.mode === 'lasso') {
+        // libre, sans aimant : on entoure, on ne pose rien
+        d.x1 = w.x
+        d.y1 = w.y
       } else if (d.mode === 'aim') {
         const l = (this.level.lasers ?? [])[d.index]
         if (l) {
@@ -3039,6 +3101,7 @@ export class LevelEditor {
       )
         return // la souris va cliquer le ✎ : la bulle reste
       this.cacheBulle()
+      this.souris = null
     })
     c.addEventListener('pointerup', (e) => {
       const pincait = this.pinceEcart !== null
@@ -3106,6 +3169,10 @@ export class LevelEditor {
         this.commit(
           'Rail tracé — les chevrons donnent le SENS de l’arc. Reposez sur une extrémité de CE rail pour le prolonger, Échap pour finir.',
         )
+        return
+      }
+      if (d.mode === 'lasso') {
+        this.finLasso(d)
         return
       }
       if (d.mode === 'create') {
@@ -3182,6 +3249,27 @@ export class LevelEditor {
       if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
         e.preventDefault()
         this.redo()
+        return
+      }
+      if ((e.ctrlKey || e.metaKey) && 'cxvCXV'.includes(e.key)) {
+        // une touche tenue se répète : trente collages en une seconde —
+        // un seul par pression
+        if (e.repeat) return
+        const k = e.key.toLowerCase()
+        if (k === 'v') {
+          if (!this.pressePapier) return
+          e.preventDefault()
+          this.coller()
+          return
+        }
+        // sans sélection d'élément, ou avec du TEXTE sélectionné dans la
+        // page, on laisse le raccourci au navigateur : c'est ce texte que
+        // l'on veut copier
+        if (this.sel === null && this.multi.length === 0) return
+        if (window.getSelection()?.isCollapsed === false) return
+        e.preventDefault()
+        if (k === 'c') this.copier()
+        else this.couper()
         return
       }
       if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -3530,24 +3618,9 @@ export class LevelEditor {
   }
 
   private deleteSel(): void {
-    // sélection multiple : tout part d'un coup, indices décroissants pour
-    // que les suppressions ne se décalent pas entre elles
+    // sélection multiple : tout part d'un coup — UN pas d'annulation
     if (this.multi.length > 1) {
-      const parKind = new Map<string, number[]>()
-      for (const m of this.multi) {
-        if (!m || !('index' in m)) continue
-        const liste = parKind.get(m.kind) ?? []
-        liste.push(m.index)
-        parKind.set(m.kind, liste)
-      }
-      for (const [kind, indices] of parKind) {
-        indices.sort((a, b) => b - a)
-        for (const i of indices) {
-          this.sel = { kind: kind as 'box', index: i } as Sel
-          this.multi = []
-          this.deleteSel()
-        }
-      }
+      this.supprimeRefs(this.refsSelection())
       this.sel = null
       this.multi = []
       this.commit('Sélection supprimée.')
@@ -3555,6 +3628,36 @@ export class LevelEditor {
     }
     const s = this.sel
     if (!s) return
+    if (!this.retire(s)) {
+      this.commit('Le sas et le point de départ ne se suppriment pas.')
+      return
+    }
+    this.sel = null
+    this.commit('Supprimé.')
+  }
+
+  /** Retire un groupe, sans commit : indices décroissants par famille pour
+   *  que les suppressions ne se décalent pas entre elles. Les uniques
+   *  restent. Rend le nombre d'éléments partis. */
+  private supprimeRefs(refs: readonly NonNullable<Sel>[]): number {
+    const parKind = new Map<string, number[]>()
+    for (const m of refs) {
+      if (!('index' in m)) continue
+      const liste = parKind.get(m.kind) ?? []
+      liste.push(m.index)
+      parKind.set(m.kind, liste)
+    }
+    let n = 0
+    for (const [kind, indices] of parKind) {
+      for (const i of [...new Set(indices)].sort((a, b) => b - a))
+        if (this.retire({ kind: kind as 'box', index: i } as NonNullable<Sel>)) n++
+    }
+    return n
+  }
+
+  /** Retire UN élément du tableau, sans commit ; faux pour le sas et le
+   *  départ, qui ne se suppriment pas. */
+  private retire(s: NonNullable<Sel>): boolean {
     if (s.kind === 'box') this.level.boxes.splice(s.index, 1)
     else if (s.kind === 'sponge') this.level.sponges.splice(s.index, 1)
     else if (s.kind === 'zone') (this.level.zones ?? []).splice(s.index, 1)
@@ -3588,12 +3691,227 @@ export class LevelEditor {
       cs.splice(s.index, 1)
     } else if (s.kind === 'label') this.level.labels.splice(s.index, 1)
     else if (s.kind === 'decal') (this.level.decals ?? []).splice(s.index, 1)
-    else {
-      this.commit('Le sas et le point de départ ne se suppriment pas.')
+    else return false
+    return true
+  }
+
+  // ——— LE PAVAGE : un motif répété en grille, jointures comprises ————
+  // Le geste du démineur : une cellule faite main (chambre, cachette,
+  // pastille, portes), et « quatre par tableau ». La géométrie des
+  // jointures — recouvrement des coques, faces en regard percées à la
+  // largeur de la porte, portes à cheval, canaux par cellule, portes de
+  // bord retirées — vit dans pavage.ts, pur et testé. Ici : le panneau.
+  /** Les boutons du presse-papier : Copier dès qu'un élément est retenu,
+   *  Coller dès que le presse-papier est plein — au doigt, sans clavier,
+   *  c'est le seul chemin (le collage tombe alors d'un pas vers l'est). */
+  private blocPressePapier(): string {
+    const n = this.pressePapier?.total ?? 0
+    return (
+      (this.refsSelection().length > 0
+        ? `<button type="button" class="ed-btn" id="p-copier" title="Ctrl+C — puis Coller pose le groupe, déjà sélectionné pour le déplacer">Copier (Ctrl+C)</button>`
+        : '') +
+      (n > 0
+        ? `<button type="button" class="ed-btn" id="p-coller" title="Ctrl+V — sous la souris quand elle est sur la carte, sinon d'un pas vers l'est">Coller ${n} élément${n > 1 ? 's' : ''} (Ctrl+V)</button>`
+        : '')
+    )
+  }
+
+  private bindPressePapier(host: HTMLElement): void {
+    host.querySelector('#p-copier')?.addEventListener('click', () => {
+      this.copier()
+      this.syncProps() // le bouton Coller apparaît
+    })
+    host.querySelector('#p-coller')?.addEventListener('click', () => this.coller())
+  }
+
+  private blocPavage(motif: string): string {
+    const r = this.pavage
+    const j = (v: Jointure, texte: string): string =>
+      `<option value="${v}"${r.jointure === v ? ' selected' : ''}>${texte}</option>`
+    return (
+      `<div class="ed-props-head">Pavage — répéter en grille</div>` +
+      `<p class="ed-astuce">Le MOTIF : ${motif}. Les colonnes vont vers l’est, les rangées vers le sud, le motif reste la première cellule. Sur une jointure, les faces en regard s’ouvrent des deux côtés à la largeur de la porte qui la traverse ; les portes du motif qui tomberaient sur le bord sont retirées. Chaque cellule reçoit ses numéros de canal, ses portes suivent.</p>` +
+      `<div class="ed-fields">` +
+      `<label class="ed-f"><span>Colonnes</span><input type="number" id="p-pav-c" min="1" max="${PAVAGE_MAX}" step="1" value="${r.colonnes}" /></label>` +
+      `<label class="ed-f"><span>Rangées</span><input type="number" id="p-pav-r" min="1" max="${PAVAGE_MAX}" step="1" value="${r.rangees}" /></label>` +
+      `<label class="ed-f"><span>Jointure</span><select id="p-pav-j">` +
+      j('partagee', 'Paroi commune — les coques se recouvrent d’une épaisseur') +
+      j('accolee', 'Parois accolées — dos à dos, la porte traverse les deux') +
+      j('espacee', 'Espacées — un écart, à relier soi-même (rien n’est percé)') +
+      `</select></label>` +
+      (r.jointure === 'espacee'
+        ? `<label class="ed-f"><span>Écart (u)</span><input type="number" id="p-pav-e" min="0" step="10" value="${r.ecart}" /></label>`
+        : '') +
+      `<div class="ed-f"><span>Canaux</span><span><label class="ed-chk"><input type="checkbox" id="p-pav-k"${r.canaux ? ' checked' : ''} /> Numéroter par cellule</label></span></div>` +
+      `<button type="button" class="ed-btn" id="p-pav-go" title="Répète le motif en grille, jointures comprises. Ctrl+Z défait tout d’un coup.">⊞ Paver ${r.colonnes} × ${r.rangees}</button>` +
+      `</div>`
+    )
+  }
+
+  /** Les champs du pavage mettent à jour les réglages AVANT l'écouteur
+   *  générique du panneau (qui relit, committe et redessine) : enregistrés
+   *  d'abord, ils passent d'abord. */
+  private bindPavage(host: HTMLElement): void {
+    // chaque réglage redessine le panneau : le bouton dit « Paver 3 × 2 »,
+    // et l'écart n'apparaît que pour la jointure espacée
+    const num = (id: string, f: (v: number) => void): void => {
+      host.querySelector<HTMLInputElement>('#' + id)?.addEventListener('change', (e) => {
+        f(Number((e.target as HTMLInputElement).value))
+        this.syncProps()
+      })
+    }
+    num('p-pav-c', (v) => {
+      this.pavage.colonnes = Math.max(1, Math.min(PAVAGE_MAX, Math.round(v) || 1))
+    })
+    num('p-pav-r', (v) => {
+      this.pavage.rangees = Math.max(1, Math.min(PAVAGE_MAX, Math.round(v) || 1))
+    })
+    num('p-pav-e', (v) => {
+      this.pavage.ecart = Math.max(0, Math.round(v) || 0)
+    })
+    host.querySelector<HTMLSelectElement>('#p-pav-j')?.addEventListener('change', (e) => {
+      const v = (e.target as HTMLSelectElement).value
+      this.pavage.jointure =
+        v === 'accolee' || v === 'espacee' ? v : 'partagee'
+      this.syncProps()
+    })
+    host.querySelector<HTMLInputElement>('#p-pav-k')?.addEventListener('change', (e) => {
+      this.pavage.canaux = (e.target as HTMLInputElement).checked
+    })
+    host.querySelector('#p-pav-go')?.addEventListener('click', () => this.lancePavage())
+  }
+
+  private lancePavage(): void {
+    const s = this.sel
+    let motif
+    let ignores: string[] = []
+    if (this.multi.length > 1) {
+      const refs = this.multi.filter((m): m is NonNullable<Sel> => m !== null)
+      ;({ motif, ignores } = motifDeSelection(refs))
+    } else if (s?.kind === 'structure') motif = motifDeStructure(this.level, s.index)
+    else return
+    if (tailleMotif(motif) === 0) {
+      this.status('Rien à paver : la sélection ne contient que des éléments uniques.')
       return
     }
+    const r: ReglagesPavage = { ...this.pavage }
+    const bilan = pave(this.level, motif, r)
+    if (bilan.cellules === 0) {
+      this.status(phrasePavage(bilan, r))
+      return
+    }
+    // les indices ont bougé (portes retirées, listes allongées) : la
+    // sélection ne désigne plus ce qu'elle désignait
     this.sel = null
-    this.commit('Supprimé.')
+    this.multi = []
+    if (bilan.bornesEtendues) this.fitView()
+    this.commit(
+      phrasePavage(bilan, r) +
+        (ignores.length > 0 ? ` Non copié : ${ignores.join(', ')}.` : ''),
+    )
+  }
+
+  // ——— Le cadre de sélection et le presse-papier ——————————————————
+  /** Le cadre relâché : ce qu'il entoure devient la sélection (ou s'y
+   *  ajoute, Maj tenue). Relâché sans bouger, c'est un clic dans le vide —
+   *  la désélection a déjà eu lieu à l'appui. */
+  private finLasso(d: { x0: number; y0: number; x1: number; y1: number; ajout: boolean }): void {
+    // en pixels d'écran : un tremblement de souris n'est pas un cadre
+    if (
+      Math.abs(d.x1 - d.x0) * this.zoom < 4 &&
+      Math.abs(d.y1 - d.y0) * this.zoom < 4
+    ) {
+      this.draw()
+      return
+    }
+    const cadre = { minX: d.x0, minY: d.y0, maxX: d.x1, maxY: d.y1 }
+    const pris = elementsDansCadre(this.level, cadre) as NonNullable<Sel>[]
+    let retenus: NonNullable<Sel>[] = pris
+    if (d.ajout) {
+      retenus = this.refsSelection()
+      for (const p of pris)
+        if (!retenus.some((m) => this.sameSel(m, p))) retenus.push(p)
+    }
+    this.poseSelection(retenus)
+    this.syncProps()
+    this.status(
+      retenus.length === 0
+        ? 'Rien dans le cadre — il retient ce qu’il entoure entièrement.'
+        : retenus.length === 1
+          ? 'Un élément retenu. Ctrl+C le copie, Ctrl+V le colle sous la souris.'
+          : `${retenus.length} éléments retenus — glissez l’un d’eux pour tout déplacer, Ctrl+C copie, Ctrl+V colle sous la souris.`,
+    )
+  }
+
+  /** La sélection courante, sous forme de références (une ou plusieurs) —
+   *  un tableau NEUF, qu'on peut allonger. */
+  private refsSelection(): NonNullable<Sel>[] {
+    if (this.multi.length > 1)
+      return this.multi.filter((m): m is NonNullable<Sel> => m !== null)
+    return this.sel ? [this.sel] : []
+  }
+
+  /** Fait de ces références LA sélection : multiple dès deux, simple sinon. */
+  private poseSelection(refs: NonNullable<Sel>[]): void {
+    if (refs.length > 1) {
+      this.multi = refs
+      this.sel = refs[refs.length - 1]
+    } else {
+      this.multi = []
+      this.sel = refs[0] ?? null
+    }
+  }
+
+  private copier(): void {
+    const refs = this.refsSelection()
+    if (refs.length === 0) return
+    const { presse, ignores } = copie(this.level, refs)
+    if (!presse) {
+      this.status(
+        `Rien à copier : ${ignores.join(', ')} ${ignores.length > 1 ? 'sont uniques' : 'est unique'} au tableau.`,
+      )
+      return
+    }
+    this.pressePapier = presse
+    this.status(
+      `${presse.total} élément${presse.total > 1 ? 's' : ''} copié${presse.total > 1 ? 's' : ''} — Ctrl+V colle sous la souris.` +
+        (ignores.length > 0 ? ` Non copié : ${ignores.join(', ')}.` : ''),
+    )
+  }
+
+  /** Copie, puis retire — en UN pas d'annulation, comme le collage qu'il
+   *  prépare (le sas et le départ restent : ils ne se copient pas). */
+  private couper(): void {
+    const avant = this.pressePapier
+    this.copier()
+    if (this.pressePapier === avant) return // rien de copiable : rien ne part
+    const n = this.supprimeRefs(this.refsSelection())
+    this.sel = null
+    this.multi = []
+    this.commit(
+      `${n} élément${n > 1 ? 's' : ''} coupé${n > 1 ? 's' : ''} — Ctrl+V colle sous la souris.`,
+    )
+  }
+
+  /** Colle sous le curseur (le centre du groupe s'y aimante à la grille),
+   *  ou d'un pas vers l'est sans souris sur la carte. Les nouveaux venus
+   *  deviennent LA sélection : la souris les emporte aussitôt. */
+  private coller(): void {
+    const presse = this.pressePapier
+    if (!presse) return
+    const brut = decalageDeCollage(presse.emprise, this.souris, this.grid * 4)
+    const dx = this.snapped(brut.dx)
+    const dy = this.snapped(brut.dy)
+    const { refs, ignores } = colle(this.level, presse, dx, dy)
+    const neufs = refs as NonNullable<Sel>[]
+    this.poseSelection(neufs)
+    this.setTool({ kind: 'select' })
+    this.commit(
+      neufs.length === 0
+        ? `Rien collé${ignores.length > 0 ? ` : ${ignores.join(', ')}` : ''}.`
+        : `${neufs.length} élément${neufs.length > 1 ? 's' : ''} collé${neufs.length > 1 ? 's' : ''} et sélectionné${neufs.length > 1 ? 's' : ''} — glissez pour placer, Ctrl+V colle encore.` +
+            (ignores.length > 0 ? ` Non collé : ${ignores.join(', ')}.` : ''),
+    )
   }
 
   private duplicateSel(): void {
@@ -4889,8 +5207,9 @@ export class LevelEditor {
     if (this.multi.length > 1) {
       host.innerHTML =
         `<div class="ed-props-head">${this.multi.length} éléments sélectionnés</div>` +
-        `<p class="ed-empty">Maj + clic pour ajouter ou retirer. Glissez l’un d’eux : tout se déplace ensemble.</p>` +
+        `<p class="ed-empty">Maj + clic pour ajouter ou retirer (Maj + glisser dans le vide : un cadre de plus). Glissez l’un d’eux : tout se déplace ensemble. Ctrl+C copie, Ctrl+V colle sous la souris.</p>` +
         `<div class="ed-fields">` +
+        this.blocPressePapier() +
         `<button type="button" class="ed-btn" id="p-al-g">Aligner à gauche</button>` +
         `<button type="button" class="ed-btn" id="p-al-d">Aligner à droite</button>` +
         `<button type="button" class="ed-btn" id="p-al-h">Aligner en haut</button>` +
@@ -4902,7 +5221,10 @@ export class LevelEditor {
         `<button type="button" class="ed-btn" id="p-rep-x">Répartir dans la largeur (salle)</button>` +
         `<button type="button" class="ed-btn" id="p-rep-y">Répartir dans la hauteur (salle)</button>` +
         `</div>` +
+        this.blocPavage('la sélection, telle quelle') +
         `<button type="button" class="ed-danger" id="p-del">Tout supprimer</button>`
+      this.bindPavage(host)
+      this.bindPressePapier(host)
       host
         .querySelector('#p-al-g')
         ?.addEventListener('click', () => this.alignMulti('gauche'))
@@ -4941,7 +5263,11 @@ export class LevelEditor {
     const s = this.sel
     if (!s) {
       host.innerHTML =
-        '<p class="ed-empty">Rien de sélectionné. Cliquez un élément (Maj + clic : sélection multiple), ou choisissez un outil et glissez pour en tracer un.</p>'
+        '<p class="ed-empty">Rien de sélectionné. Cliquez un élément (Maj + clic : sélection multiple), ou glissez dans le vide pour tracer un CADRE qui retient tout ce qu’il entoure. Ctrl+C / Ctrl+V copie et colle sous la souris. Ou choisissez un outil et glissez pour tracer un élément.</p>' +
+        (this.pressePapier
+          ? `<div class="ed-fields">${this.blocPressePapier()}</div>`
+          : '')
+      this.bindPressePapier(host)
       return
     }
     const rows: string[] = []
@@ -5748,9 +6074,14 @@ export class LevelEditor {
     host.innerHTML =
       `<div class="ed-props-head">${kindName}</div><div class="ed-fields">${rows.join('')}</div>` +
       blocOrdre +
+      (s.kind === 'structure'
+        ? this.blocPavage('cette coque et tout ce qui est centré dans son emprise')
+        : '') +
+      `<div class="ed-fields">${this.blocPressePapier()}</div>` +
       (s.kind === 'exit' || s.kind === 'spawn'
         ? ''
         : `<button type="button" class="ed-danger" id="p-del">Supprimer</button>`)
+    this.bindPressePapier(host)
 
     for (const [id, part] of [
       ['p-stRect', 0],
@@ -5775,6 +6106,7 @@ export class LevelEditor {
     host
       .querySelector('#p-del')
       ?.addEventListener('click', () => this.deleteSel())
+    this.bindPavage(host)
     for (const [id, sens] of [
       ['p-ord-fond', 'fond'],
       ['p-ord-derriere', 'derriere'],
@@ -7561,6 +7893,25 @@ export class LevelEditor {
       g.setLineDash([5, 4])
       g.strokeStyle = efface ? '#ffd24a' : '#ffffff'
       g.lineWidth = efface ? 1.5 : 1
+      g.strokeRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
+      g.setLineDash([])
+    }
+
+    // le CADRE DE SÉLECTION en cours : un voile clair, liseré pointillé
+    if (this.drag?.mode === 'lasso') {
+      const p = this.toScreen(
+        Math.min(this.drag.x0, this.drag.x1),
+        Math.max(this.drag.y0, this.drag.y1),
+      )
+      const q = this.toScreen(
+        Math.max(this.drag.x0, this.drag.x1),
+        Math.min(this.drag.y0, this.drag.y1),
+      )
+      g.fillStyle = 'rgba(255,215,106,0.08)'
+      g.fillRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
+      g.setLineDash([5, 4])
+      g.strokeStyle = '#ffd76a'
+      g.lineWidth = 1
       g.strokeRect(p.sx, p.sy, q.sx - p.sx, q.sy - p.sy)
       g.setLineDash([])
     }

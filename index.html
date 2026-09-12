@@ -274,9 +274,10 @@
         outline: 2px solid var(--specimen);
         outline-offset: 2px;
       }
-      /* L'ÉCOUTE : une seule ligne sous la rangée d'outils — l'étiquette,
-         quatre touches de magnétophone, le titre. Le titre se coupe plutôt
-         que de replier la ligne. */
+      /* LE LECTEUR (joueurs et concepteur) : une seule ligne sous la rangée d'outils — l'étiquette,
+         quatre touches de magnétophone, le titre de la musique de l'accueil,
+         les trois touches d'avis. Le titre se coupe plutôt que de replier
+         la ligne. */
       .home-ecoute {
         display: flex;
         align-items: center;
@@ -326,8 +327,8 @@
       /* L'AVIS : trois touches au bout de la ligne — −1, neutre, +1 — pour
          trier au fil des pistes. La touche enfoncée est MON avis (le total
          et celui des autres se lisent dans le titre) ; elle porte la couleur
-         de son verdict (vert : retenue, rouge : écartée). Sans piste en
-         cours, il n'y a rien à juger, elles s'éteignent. */
+         de son verdict (vert : retenue, rouge : écartée). Une piste est
+         toujours chargée — même à l'arrêt, on peut la noter. */
       .home-ecoute-avis {
         display: flex;
         flex: 0 0 auto;
@@ -5162,6 +5163,30 @@
         backdrop-filter: blur(3px);
         white-space: nowrap;
       }
+      /* LA BANNIÈRE DE PANNE DE LA BOUCLE (src/game/gardeBoucle.ts) : une
+         image qui a levé une exception. Elle se pose au-dessus du voile de
+         la cérémonie (z 50) mais sous la cinématique (z 70), sans jamais
+         prendre la main — elle informe, la boucle continue. */
+      #panne-boucle {
+        position: fixed;
+        top: 96px;
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: min(92vw, 720px);
+        background: rgba(46, 12, 14, 0.92);
+        border: 1px solid var(--alert);
+        border-left: 3px solid var(--alert);
+        color: #ffb9ad;
+        font-size: calc(11px * var(--ui));
+        letter-spacing: 0.06em;
+        line-height: 1.45;
+        padding: 8px 14px;
+        z-index: 60;
+        pointer-events: none;
+        backdrop-filter: blur(3px);
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
       #hud-danger.spent {
         background: rgba(12, 30, 46, 0.9);
         border-color: #8fc8ee;
@@ -8272,6 +8297,124 @@
         margin: 14px 0 0;
         letter-spacing: 0.06em;
       }
+
+      /* ---- L'ÉCRAN DE CHARGEMENT ----
+         Un voile sur toute la fenêtre, visible dès le premier pixel, SANS
+         JavaScript : c'est le document lui-même qui le porte, et c'est la
+         première image du jeu qui le retire (__sujet21Demarre, ci-dessous),
+         en fondu. Avant lui, rien ne bougeait entre la requête et la
+         première image — plusieurs secondes sur une carte ordinaire, le
+         temps de compiler le rendu — et le joueur prenait le jeu pour
+         planté. Il voile la fiche tant que le jeu n'est pas prêt derrière :
+         un bouton COMMENCER qu'on peut voir mais pas presser mentirait.
+         Couleurs littérales, comme le panneau de panne : il doit tenir
+         avant que le reste n'ait eu lieu. */
+      #amorce[hidden] { display: none; }
+      #amorce {
+        position: fixed;
+        inset: 0;
+        z-index: 9990;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        padding: 24px;
+        box-sizing: border-box;
+        text-align: center;
+        background:
+          radial-gradient(ellipse at 50% 58%, rgba(99, 183, 230, 0.09), rgba(3, 7, 16, 0) 58%),
+          #030710;
+        color: #d9ecf7;
+        font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+        transition: opacity 0.45s ease;
+      }
+      #amorce.fini {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #amorce-sur {
+        font-family: 'Michroma', 'Arial Black', sans-serif;
+        font-size: 9px;
+        letter-spacing: 0.22em;
+        color: #7f9cb0;
+      }
+      #amorce-titre {
+        font-family: 'Michroma', 'Arial Black', sans-serif;
+        font-size: clamp(30px, 6vw, 60px);
+        line-height: 1.2;
+        letter-spacing: 0.1em;
+        margin: 0;
+        color: #d9ecf7;
+        font-weight: 400;
+      }
+      #amorce-titre em {
+        font-style: normal;
+        color: #63b7e6;
+      }
+      /* la barre : un balayage sans fin, le temps n'est pas connu d'avance */
+      #amorce-barre {
+        position: relative;
+        width: min(320px, 70vw);
+        height: 2px;
+        margin-top: 6px;
+        background: rgba(150, 200, 235, 0.16);
+        overflow: hidden;
+      }
+      #amorce-barre::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: -40%;
+        width: 40%;
+        background: linear-gradient(90deg, rgba(99, 183, 230, 0), #a7ddf5, rgba(99, 183, 230, 0));
+        animation: amorce-balaie 1.6s ease-in-out infinite;
+      }
+      #amorce-mot {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-family: 'Michroma', 'Arial Black', sans-serif;
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        color: #63b7e6;
+      }
+      #amorce-mot::before {
+        content: '';
+        flex: none;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #a7ddf5;
+        animation: amorce-respire 1.1s ease-in-out infinite;
+      }
+      #amorce-etape {
+        font-size: 12.5px;
+        letter-spacing: 0.04em;
+        color: #7f9cb0;
+        min-height: 1.6em;
+      }
+      #amorce .sous {
+        position: absolute;
+        bottom: 22px;
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        color: #7f9cb0;
+        opacity: 0.8;
+      }
+      @keyframes amorce-respire {
+        0%, 100% { opacity: 0.25; transform: scale(0.7); }
+        50% { opacity: 1; transform: scale(1); }
+      }
+      @keyframes amorce-balaie {
+        0% { left: -40%; }
+        100% { left: 100%; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #amorce::before, #amorce-mot::before, #amorce-barre::before { animation: none; }
+        #amorce { transition: none; }
+      }
     </style>
   </head>
   <body>
@@ -8325,16 +8468,18 @@
         <button id="home-mute" type="button"><i>♪</i><span>SON</span></button>
         <button id="home-plein" type="button"><i>⛶</i><span>PLEIN ÉCRAN</span></button>
       </div>
-      <!-- L'ÉCOUTE (concepteur) : les musiques du projet, dans un ordre tiré au
-           sort, telles que le jeu les joue — pour se faire une oreille avant
-           de trancher entre un lit et sa candidate. -->
-      <div id="home-ecoute" class="home-ecoute" data-dev role="group" aria-label="Écoute des musiques du projet">
+      <!-- LE LECTEUR, pour tout le monde : la musique de l'accueil elle-même
+           — une piste tirée au sort à l'ouverture parmi les musiques du
+           projet, telle que le jeu la joue — pour se faire une oreille et la
+           noter sans la chercher. Les avis des joueurs comptent comme ceux
+           du concepteur, sous le nom de leur borne. -->
+      <div id="home-ecoute" class="home-ecoute" role="group" aria-label="La musique de l’accueil">
         <span class="home-ecoute-etiq">ÉCOUTE</span>
         <button id="ecoute-prec" type="button" title="Piste précédente" aria-label="Piste précédente">⏮&#xFE0E;</button>
-        <button id="ecoute-lecture" type="button" title="Lecture, dans un ordre tiré au sort" aria-label="Lecture">▶&#xFE0E;</button>
-        <button id="ecoute-stop" type="button" title="Arrêt : le lit d'accueil reprend" aria-label="Arrêt">■</button>
+        <button id="ecoute-lecture" type="button" title="Lecture de la piste chargée" aria-label="Lecture">▶&#xFE0E;</button>
+        <button id="ecoute-stop" type="button" title="Arrêt : l'accueil se tait, la piste reste chargée" aria-label="Arrêt">■</button>
         <button id="ecoute-suiv" type="button" title="Piste suivante" aria-label="Piste suivante">⏭&#xFE0E;</button>
-        <span id="ecoute-titre" class="home-ecoute-titre" aria-live="polite">les musiques du projet, au hasard</span>
+        <span id="ecoute-titre" class="home-ecoute-titre" aria-live="polite">la musique de l’accueil</span>
         <!-- L'AVIS, partagé : un avis par personne (le nom de la borne) et
              par piste, le total dans le titre, publié au magasin des
              réglages pour tous les postes. -->
@@ -8526,7 +8671,7 @@
         </div>
         <div class="ed-group">
           <span class="k">Structures — le terrain de jeu</span>
-          <button type="button" class="ed-tool" data-tool="struct:0" title="UNE CHAMBRE : une coque VIDE, à remplir de gameplay. Le chanfrein (panneau de droite) la fait passer du rectangle à l'octogone, jusqu'au chanfrein maximal. Elle reste VIVANTE : les poignées la redimensionnent et ses parois se refabriquent. Pour ouvrir une porte, RECOUVREZ une autre structure d'au moins une épaisseur — juxtaposer ne suffit pas."><i style="background:transparent;border:3px solid #5fd0ff"></i>Chambre</button>
+          <button type="button" class="ed-tool" data-tool="struct:0" title="UNE CHAMBRE : une coque VIDE, à remplir de gameplay. Le chanfrein (panneau de droite) la fait passer du rectangle à l'octogone, jusqu'au chanfrein maximal. Elle reste VIVANTE : les poignées la redimensionnent et ses parois se refabriquent. Pour ouvrir une porte, RECOUVREZ une autre structure d'au moins une épaisseur — juxtaposer ne suffit pas. Pour en poser PLUSIEURS d'un coup (le démineur : quatre cellules identiques), sélectionnez la chambre et PAVEZ dans le panneau : les jointures — paroi commune, faces percées, portes à cheval, numéros de canal — sont faites."><i style="background:transparent;border:3px solid #5fd0ff"></i>Chambre</button>
           <button type="button" class="ed-tool" data-tool="struct:1" title="UN COULOIR : un tube ouvert aux deux bouts, qui relie deux modules. Faites-le MORDRE dans la coque d'à côté : la porte se perce toute seule. L'angle l'incline (branches obliques), et une PORTE DE MATIÈRE peut le barrer — rideau (seule la glace l'écarte), grille (seul le souffle passe), membrane (seule l'eau)."><i style="background:transparent;border:3px solid #5fd0ff;border-top:none;border-bottom:none"></i>Couloir</button>
         </div>
         <div class="ed-group">
@@ -8572,7 +8717,9 @@
         </div>
         <p class="ed-empty">
           Glissez pour tracer · clic droit pour déplacer la vue · molette pour zoomer ·
-          <b>Suppr</b> efface · <b>D</b> duplique · <b>Échap</b> désélectionne.
+          en Sélection, glisser dans le vide trace un <b>cadre</b> qui retient tout ce qu'il entoure (Maj : en ajout) ·
+          <b>Ctrl+C</b> copie · <b>Ctrl+X</b> coupe · <b>Ctrl+V</b> colle sous la souris, collage déjà sélectionné pour le déplacer ·
+          <b>Suppr</b> efface · <b>D</b> duplique · <b>Échap</b> désélectionne · une chambre sélectionnée se <b>pave</b> en grille depuis le panneau.
         </p>
       </aside>
 
@@ -9685,6 +9832,8 @@
     <!-- La carte d'une séquence in-map : un bandeau qui n'arrête pas le jeu -->
     <div id="carte-seq" aria-live="polite"></div>
     <div id="hud-danger" aria-live="assertive"></div>
+    <!-- Une image de la boucle a levé une exception : la garde l'annonce ici, le jeu continue -->
+    <div id="panne-boucle" role="alert" hidden></div>
     <div id="obj-arrow" aria-hidden="true"><i>➤</i><span id="obj-dist"></span></div>
 
     <div id="tableau-card" aria-live="polite">
@@ -9833,6 +9982,17 @@
     <button id="continuer" type="button">CONTINUER — CONCLURE L'ESSAI</button>
     <div id="touchbar"></div>
 
+    <!-- L'écran de chargement : voir la garde ci-dessous, qui le fait
+         avancer, et la première image du jeu, qui le retire -->
+    <div id="amorce" role="status" aria-live="polite">
+      <span id="amorce-sur">COMPLEXE ORBITAL MÉDUSE — PROTOCOLE «&nbsp;TENSION DE SURFACE&nbsp;»</span>
+      <h1 id="amorce-titre">SUJET <em>21</em></h1>
+      <div id="amorce-barre"></div>
+      <span id="amorce-mot">OUVERTURE DU PROTOCOLE</span>
+      <span id="amorce-etape">le fichier arrive…</span>
+      <p class="sous">SUJET 21 — COMPLEXE ORBITAL MÉDUSE</p>
+    </div>
+
     <div id="panne" role="alert" aria-live="assertive">
       <div class="dedans">
         <h2 id="panne-titre">LE PROTOCOLE N'A PAS PU S'OUVRIR</h2>
@@ -9842,18 +10002,22 @@
       </div>
     </div>
 
-    <!-- LA GARDE D'AMORÇAGE. Script CLASSIQUE, placé AVANT le module : il
-         s'exécute pendant l'analyse du document, donc ses écouteurs sont en
-         place avant que main.ts (différé, comme tout module) ne commence.
-         C'est toute la raison de sa position ici, et non dans le module.
+    <!-- LA GARDE D'AMORÇAGE. Script CLASSIQUE, exécuté pendant l'analyse du
+         document, donc avant que main.ts (différé, comme tout module) ne
+         commence : ses écouteurs et ses deux crochets (__sujet21Etape,
+         __sujet21Demarre) sont en place quand le jeu en a besoin.
 
          Trois filets, du plus précis au plus grossier :
            1. le SONDAGE WebGL2, avant même de charger le jeu — c'est la
               panne connue, et la seule qu'on sache nommer exactement ;
            2. les ERREURS d'amorçage (exception ou promesse rejetée) tant
               que le jeu n'a pas signalé qu'il tourne ;
-           3. la VEILLE : si rien n'a démarré au bout de douze secondes,
-              on cesse d'attendre en silence.
+           3. la VEILLE : douze secondes SANS SIGNE DE VIE, et on cesse
+              d'attendre en silence. Chaque étape franchie (le module
+              s'ouvre, le rendu se compile) la réarme : un démarrage lent
+              mais vivant n'est pas une panne. Et si elle a sonné trop tôt,
+              la première image du jeu retire son panneau — il est resté
+              affiché par-dessus un jeu qui tournait, c'est arrivé.
          Après le premier passage de la boucle de rendu, plus rien de tout
          cela ne se déclenche : un incident en cours de partie n'a pas à
          recouvrir le jeu d'un panneau. -->
@@ -9861,22 +10025,46 @@
       (function () {
         var demarre = false
         var montre = false
+        var parVeille = false // le panneau visible est celui de la veille, pas d'une erreur
         var veille = 0
+        var depuis = Date.now()
+        var etape = 'telechargement'
+        var ETAPES = {
+          telechargement: 'le fichier arrive…',
+          ouverture: 'le module s’ouvre…',
+          rendu: 'le rendu se compile…',
+        }
+        var VEILLE_MS = 12000
+        // Un fichier qui n'est toujours pas là au bout de ce délai : on cesse
+        // de mettre la lenteur sur le compte de la connexion.
+        var PATIENCE_MS = 90000
 
-        function affiche(titre, corps, detail) {
+        function el(id) {
+          return document.getElementById(id)
+        }
+
+        function ditEtape(texte) {
+          try {
+            var e = el('amorce-etape')
+            if (e) e.textContent = texte
+          } catch (e) {}
+        }
+
+        function affiche(titre, corps, detail, veilleSeule) {
           if (montre || demarre) return
           montre = true
+          parVeille = !!veilleSeule
           if (veille) clearTimeout(veille)
           try {
-            var el = document.getElementById('panne')
-            document.getElementById('panne-titre').textContent = titre
-            document.getElementById('panne-corps').innerHTML = corps
+            var el_ = el('panne')
+            el('panne-titre').textContent = titre
+            el('panne-corps').innerHTML = corps
             if (detail) {
-              var d = document.getElementById('panne-detail')
+              var d = el('panne-detail')
               d.textContent = String(detail).slice(0, 800)
               d.hidden = false
             }
-            el.classList.add('visible')
+            el_.classList.add('visible')
           } catch (e) {
             // Le panneau lui-même est hors d'usage : il reste le texte brut,
             // qui vaut toujours mieux qu'un écran noir.
@@ -9891,10 +10079,80 @@
         }
 
         // Le jeu appelle ceci à sa première image : la preuve qu'il tourne,
-        // pas seulement que son module s'est évalué.
+        // pas seulement que son module s'est évalué. L'écran de chargement
+        // s'efface ; et si la veille avait sonné pendant un démarrage lent,
+        // son panneau se retire — une vraie erreur, elle, reste affichée.
         window.__sujet21Demarre = function () {
           demarre = true
           if (veille) clearTimeout(veille)
+          try {
+            var a = el('amorce')
+            if (a) {
+              // en fondu (0,45 s, voir le style), puis hors du flux
+              a.classList.add('fini')
+              setTimeout(function () {
+                a.hidden = true
+              }, 500)
+            }
+            if (montre && parVeille) {
+              el('panne').classList.remove('visible')
+              montre = false
+              parVeille = false
+            }
+          } catch (e) {}
+        }
+
+        // Le jeu dit où il en est : le mot avance, la veille repart de zéro.
+        window.__sujet21Etape = function (nom) {
+          if (demarre || montre) return
+          etape = nom
+          ditEtape(ETAPES[nom] || nom)
+          arme()
+        }
+
+        // Le module est-il arrivé ? Son entrée de ressource n'existe qu'une
+        // fois le fichier reçu : avant, la lenteur est celle de la connexion.
+        function moduleArrive() {
+          try {
+            var m = document.querySelector('script[type="module"][src]')
+            if (!m) return true
+            return performance.getEntriesByName(m.src).length > 0
+          } catch (e) {
+            return true
+          }
+        }
+
+        function arme() {
+          if (veille) clearTimeout(veille)
+          veille = setTimeout(sonne, VEILLE_MS)
+        }
+
+        function sonne() {
+          veille = 0
+          if (demarre || montre) return
+          if (
+            etape === 'telechargement' &&
+            !moduleArrive() &&
+            Date.now() - depuis < PATIENCE_MS
+          ) {
+            ditEtape('le fichier arrive… la connexion est lente, on patiente')
+            arme()
+            return
+          }
+          affiche(
+            'LE PROTOCOLE MET TROP LONGTEMPS À S’OUVRIR',
+            '<p>Le jeu n’a plus donné signe de vie depuis douze secondes, et' +
+              ' n’a signalé aucune erreur. Dernière étape franchie&nbsp;: ' +
+              (ETAPES[etape] || etape).replace(/…$/, '') +
+              '. C’est en général un fichier qui n’est pas arrivé.</p>' +
+              '<ul>' +
+              '<li>Vérifiez la connexion, puis rechargez.</li>' +
+              '<li>Un rechargement forcé (Ctrl/Cmd + Maj + R) écarte un cache' +
+              ' abîmé.</li>' +
+              '</ul>',
+            null,
+            true,
+          )
         }
 
         // 1. WebGL2 — la panne qu'on sait nommer.
@@ -9943,23 +10201,10 @@
           )
         })
 
-        // 3. La veille. Douze secondes : large pour un premier chargement sur
-        // une connexion lente, court comparé à l'attente devant un écran noir.
-        if (aWebGL2) {
-          veille = setTimeout(function () {
-            affiche(
-              'LE PROTOCOLE MET TROP LONGTEMPS À S’OUVRIR',
-              '<p>Le jeu n’a pas démarré au bout de douze secondes, et n’a' +
-                ' signalé aucune erreur. C’est en général un fichier qui n’est' +
-                ' pas arrivé.</p>' +
-                '<ul>' +
-                '<li>Vérifiez la connexion, puis rechargez.</li>' +
-                '<li>Un rechargement forcé (Ctrl/Cmd + Maj + R) écarte un cache' +
-                ' abîmé.</li>' +
-                '</ul>',
-            )
-          }, 12000)
-        }
+        // 3. La veille, armée dès maintenant : douze secondes sans signe de
+        // vie — large pour une étape, court comparé à l'attente devant un
+        // écran noir. Sans WebGL2, le panneau est déjà là.
+        if (aWebGL2) arme()
       })()
     </script>
     <script type="module" src="/src/main.ts"></script>
