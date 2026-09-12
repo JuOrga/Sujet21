@@ -8,6 +8,8 @@
 // geste utilisateur (politique navigateur) : resume() est appelé au premier
 // clic et reste sans effet ensuite.
 
+import { type Ouie, ouieDe } from './ouie'
+
 export interface AudioPrefs {
   on: boolean
   volume: number
@@ -61,6 +63,16 @@ export class AudioFx {
   private postMaster: GainNode | null = null
   private slowSubG: GainNode | null = null
   private slowActive = false
+  // L'OREILLE DU SUJET (game/ouie.ts) : le corps est le point d'écoute —
+  // un passe-bas, un plateau d'aigus et un niveau que l'état du corps
+  // règle image par image (l'eau voile à peine, la glace assourdit, la
+  // vapeur ouvre). Sur le trajet de TOUT le mixage, après le passe-bas du
+  // temps suspendu : les deux se composent, ils ne se disputent pas.
+  private oreilleLp: BiquadFilterNode | null = null
+  private oreilleShelf: BiquadFilterNode | null = null
+  private oreilleG: GainNode | null = null
+  // le panoramique de l'aspiration du sas : elle s'entend DU CÔTÉ où elle est
+  private drainPan: StereoPannerNode | null = null
 
   constructor(prefs: AudioPrefs) {
     this.enabled = prefs.on
@@ -122,7 +134,24 @@ export class AudioFx {
     const slowDuck = ctx.createGain()
     slowDuck.gain.value = 1
     master.connect(slowLp)
-    slowLp.connect(slowDuck)
+    // l'oreille du Sujet, entre le temps suspendu et la sortie (ouie.ts)
+    const oreilleLp = ctx.createBiquadFilter()
+    oreilleLp.type = 'lowpass'
+    oreilleLp.frequency.value = ouieDe(0, 0).coupure
+    oreilleLp.Q.value = 0.5
+    const oreilleShelf = ctx.createBiquadFilter()
+    oreilleShelf.type = 'highshelf'
+    oreilleShelf.frequency.value = 3200
+    oreilleShelf.gain.value = 0
+    const oreilleG = ctx.createGain()
+    oreilleG.gain.value = 1
+    slowLp.connect(oreilleLp)
+    oreilleLp.connect(oreilleShelf)
+    oreilleShelf.connect(oreilleG)
+    oreilleG.connect(slowDuck)
+    this.oreilleLp = oreilleLp
+    this.oreilleShelf = oreilleShelf
+    this.oreilleG = oreilleG
     slowDuck.connect(ctx.destination)
     this.slowLp = slowLp
     this.slowDuck = slowDuck
@@ -154,9 +183,10 @@ export class AudioFx {
       this.gasG = g
       void this.chargeNappe(ctx, g)
     }
-    const drain = this.noiseLoop(220, 2.6)
+    const drain = this.noiseLoop(220, 2.6, true)
     this.drainG = drain.gain
     this.drainF = drain.filter
+    this.drainPan = drain.pan
 
     // Voix du temps suspendu, branchée APRÈS le passe-bas (elle doit rester
     // nette quand tout le reste s'étouffe) : un battement grave qui pulse
@@ -262,7 +292,11 @@ export class AudioFx {
     this.gasDepth = depA
   }
 
-  private noiseLoop(freq: number, q: number): { gain: GainNode; filter: BiquadFilterNode } {
+  private noiseLoop(
+    freq: number,
+    q: number,
+    place = false, // true : la boucle se place en stéréo (setDrainPan)
+  ): { gain: GainNode; filter: BiquadFilterNode; pan: StereoPannerNode | null } {
     const ctx = this.ctx!
     const src = ctx.createBufferSource()
     src.buffer = this.noise
@@ -275,9 +309,49 @@ export class AudioFx {
     gain.gain.value = 0
     src.connect(filter)
     filter.connect(gain)
-    gain.connect(this.master!)
+    const pan = place ? this.panneau(0) : null
+    if (pan) {
+      gain.connect(pan)
+      pan.connect(this.master!)
+    } else {
+      gain.connect(this.master!)
+    }
     src.start()
-    return { gain, filter }
+    return { gain, filter, pan }
+  }
+
+  // Un panoramique, si le navigateur en a (tous les navigateurs de bureau
+  // et mobiles courants ; sans lui, tout reste au centre, comme avant).
+  private panneau(pan: number): StereoPannerNode | null {
+    const ctx = this.ctx
+    if (!ctx || typeof ctx.createStereoPanner !== 'function') return null
+    const p = ctx.createStereoPanner()
+    p.pan.value = Math.max(-1, Math.min(1, pan))
+    return p
+  }
+
+  /** L'aspiration du sas s'entend du côté où elle est (−1 gauche, 1 droite). */
+  setDrainPan(pan: number): void {
+    if (!this.ctx || !this.drainPan) return
+    this.drainPan.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), this.ctx.currentTime, 0.15)
+  }
+
+  /** L'oreille du Sujet suit l'état du corps : fractions gelée et gazeuse. */
+  setOuie(glace: number, vapeur: number): void {
+    if (!this.ctx || !this.oreilleLp || !this.oreilleShelf || !this.oreilleG) return
+    const o: Ouie = ouieDe(glace, vapeur)
+    const t = this.ctx.currentTime
+    // lent (0,3 s) : une oreille qui change, pas un interrupteur
+    this.oreilleLp.frequency.setTargetAtTime(o.coupure, t, 0.3)
+    this.oreilleShelf.gain.setTargetAtTime(o.aigus, t, 0.3)
+    this.oreilleG.gain.setTargetAtTime(o.niveau, t, 0.3)
+  }
+
+  // La glace craque DE L'INTÉRIEUR : un bloc gelé travaille — une note très
+  // grave qui descend et un souffle sourd, de loin en loin (le jeu cadence).
+  craque(): void {
+    this.blip(64, 38, 0.35, 0.03, 'triangle')
+    this.noiseBurst(140, 1.2, 0.25, 0.02, 'lowpass')
   }
 
   // Le bourdon de la station a été retiré : le fond est silencieux, seuls
@@ -339,7 +413,7 @@ export class AudioFx {
 
   // ---- One-shots ----
 
-  private blip(f0: number, f1: number, dur: number, peak: number, type: OscillatorType = 'sine', delay = 0): void {
+  private blip(f0: number, f1: number, dur: number, peak: number, type: OscillatorType = 'sine', delay = 0, pan = 0): void {
     if (!this.ctx || !this.master) return
     const ctx = this.ctx
     const t = ctx.currentTime + delay
@@ -352,12 +426,23 @@ export class AudioFx {
     g.gain.linearRampToValueAtTime(peak, t + 0.012)
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
     o.connect(g)
-    g.connect(this.master)
+    this.versMaster(g, pan)
     o.start(t)
     o.stop(t + dur + 0.05)
   }
 
-  private noiseBurst(freq: number, q: number, dur: number, peak: number, type: BiquadFilterType = 'bandpass', delay = 0): void {
+  // Branche une voix sur le maître, placée en stéréo si on le demande
+  private versMaster(g: GainNode, pan: number): void {
+    const p = Math.abs(pan) > 0.01 ? this.panneau(pan) : null
+    if (p) {
+      g.connect(p)
+      p.connect(this.master!)
+    } else {
+      g.connect(this.master!)
+    }
+  }
+
+  private noiseBurst(freq: number, q: number, dur: number, peak: number, type: BiquadFilterType = 'bandpass', delay = 0, pan = 0): void {
     if (!this.ctx || !this.master || !this.noise) return
     const ctx = this.ctx
     const t = ctx.currentTime + delay
@@ -374,7 +459,7 @@ export class AudioFx {
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
     src.connect(f)
     f.connect(g)
-    g.connect(this.master)
+    this.versMaster(g, pan)
     src.start(t, Math.random())
     src.stop(t + dur + 0.05)
   }
@@ -406,11 +491,12 @@ export class AudioFx {
     this.blip(800, 260, 0.45, 0.025, 'sine')
   }
 
-  // Impact d'un bloc de glace : coup sourd, force ∝ vitesse d'impact
-  iceImpact(speed: number): void {
+  // Impact d'un bloc de glace : coup sourd, force ∝ vitesse d'impact —
+  // placé du côté du contact quand on le connaît (le toc-toc de l'idle)
+  iceImpact(speed: number, pan = 0): void {
     const s = Math.min(1, speed / 700)
-    this.blip(130, 55, 0.16, 0.12 * s + 0.02, 'sine')
-    this.noiseBurst(900, 1.5, 0.06, 0.05 * s, 'lowpass')
+    this.blip(130, 55, 0.16, 0.12 * s + 0.02, 'sine', 0, pan)
+    this.noiseBurst(900, 1.5, 0.06, 0.05 * s, 'lowpass', 0, pan)
   }
 
   // Avalement par le sas : glouglous, plus denses quand ça boit fort
@@ -427,12 +513,13 @@ export class AudioFx {
     this.blip(200, 640, 0.6, 0.02, 'sine')
   }
 
-  // ÉCHANTILLON COLLECTÉ : tampon mécanique puis carillon d'inventaire
-  collect(): void {
-    this.blip(95, 45, 0.14, 0.16, 'square')
-    this.blip(660, 660, 0.22, 0.05, 'sine', 0.12)
-    this.blip(880, 880, 0.24, 0.05, 'sine', 0.24)
-    this.blip(1320, 1320, 0.4, 0.045, 'sine', 0.36)
+  // ÉCHANTILLON COLLECTÉ : tampon mécanique puis carillon d'inventaire —
+  // une pastille bue s'entend là où elle était (pan), un écran, au centre
+  collect(pan = 0): void {
+    this.blip(95, 45, 0.14, 0.16, 'square', 0, pan)
+    this.blip(660, 660, 0.22, 0.05, 'sine', 0.12, pan)
+    this.blip(880, 880, 0.24, 0.05, 'sine', 0.24, pan)
+    this.blip(1320, 1320, 0.4, 0.045, 'sine', 0.36, pan)
   }
 
   // DISPERSION : masse grave qui s'effondre

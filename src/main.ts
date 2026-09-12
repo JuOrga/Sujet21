@@ -215,6 +215,9 @@ import {
 } from './bench/changelog'
 import { Camera } from './render/camera'
 import { MAX_BOXES, Renderer } from './render/renderer'
+import { Motes, VIE_STRIDE, remplitVie } from './render/vie'
+import { panDepuis } from './game/ouie'
+import { dangerDevant, directionDeMarche, saccade, type Saccade } from './game/regard'
 import { FixedLoop } from './game/loop'
 import { Input } from './game/input'
 import {
@@ -9611,8 +9614,73 @@ const presence = {
   t0Frisson: -9,
   armeFrisson: true,
   ondule: 0, // 0..1 : l'ondulation du contour, quand on le laisse tranquille
+  halo: 0, // 0..1 : la lueur au sol sous le corps — il est une source
 }
 ;(window as unknown as { __presence: typeof presence }).__presence = presence
+// LA VIE VISIBLE (render/vie.ts, docs/sujet-vivant.md G1 et G6) : les motes
+// en suspension dans le corps et la lueur des gouttes perdues. Rendu
+// seulement — les motes sont portées par les gouttes, rien n'est simulé.
+const motes = new Motes()
+const vieTampon = new Float32Array((CAPACITY + 128) * VIE_STRIDE)
+;(window as unknown as { __motes: Motes }).__motes = motes
+/** L'humeur de l'image, pour les motes et le halo : ce que le corps
+ *  ressent se lit déjà dans l'état du jeu (péril, visée, abandon). */
+function majVie(dtReal: number): void {
+  const peril = endgame.lastCall || endgame.spent
+  motes.update(
+    dtReal,
+    sim,
+    {
+      regardX: presence.x,
+      regardY: presence.y,
+      // sous la peur, les grains se serrent autour du regard ; en visée, un
+      // peu ; laissé tranquille, ils s'étalent
+      rassemble: peril ? 0.8 : input.aimActive ? 0.3 : 0,
+      agite: peril ? 1 : input.aimActive ? 0.5 : idle.t > 4 ? 0 : 0.2,
+      dispersed: sim.dispersed,
+    },
+  )
+  const n = remplitVie(
+    vieTampon,
+    motes,
+    sim,
+    params.reabsorbCooldown * sim.reabsorbFactor,
+  )
+  renderer.setVie(vieTampon, n)
+  // le halo : plein au calme, il se rétracte sous la peur (il se cache) et
+  // s'éteint quand le corps se défait
+  const haloCible = sim.dispersed ? 0 : peril ? 0.45 : input.aimActive ? 0.8 : 1
+  presence.halo += (haloCible - presence.halo) * (1 - Math.exp(-2.5 * dtReal))
+  presence.halo = Math.max(0, Math.min(1, presence.halo))
+  // LE CŒUR DANS LA MANETTE (docs/sujet-vivant.md, II1) : sous la peur, un
+  // battement dans les mains — deux coups, le second plus faible, à un
+  // rythme de cœur qui s'affole ; au calme, rien. Et LE FRISSON (II2) : le
+  // tremblement du contour passe aussi dans la manette. Le corps du joueur
+  // reçoit ce que le corps du Sujet reçoit. Sans manette, rien ne se passe.
+  const enVie =
+    document.body.classList.contains('playing') &&
+    !input.paused &&
+    !sim.dispersed &&
+    !run.ended
+  if (peril && enVie && manette.connectee) {
+    coeur.t += dtReal
+    if (coeur.t >= COEUR_PERIODE) {
+      coeur.t = 0
+      manette.rumble(0.55, 70)
+      setTimeout(() => manette.rumble(0.35, 55), 160)
+    }
+  } else {
+    coeur.t = COEUR_PERIODE * 0.7 // le premier battement vient vite
+  }
+  if (presence.t0Frisson !== coeur.dernierFrisson) {
+    coeur.dernierFrisson = presence.t0Frisson
+    if (enVie && manette.connectee) manette.rumble(0.3, 140)
+  }
+}
+// un cœur qui s'affole : ~100 battements par minute
+const COEUR_PERIODE = 0.6
+const coeur = { t: 0, dernierFrisson: -9 }
+const craqueGlace = { t: 2 }
 
 // ---- LES CURSEURS DE L'ŒIL : la présence se règle (banc → L'œil) ----
 // Sept curseurs, mémorisés par appareil. Les DÉFAUTS ci-dessous sont
@@ -9826,8 +9894,9 @@ function majIdle(dtReal: number): void {
         sim.velY[i] += ay
       }
     }
-    if (age >= 0.14 && age < 0.14 + dtReal) audio.iceImpact(0.16)
-    if (age >= 0.59 && age < 0.59 + dtReal) audio.iceImpact(0.12)
+    const panMur = panDepuis(sim.stats.centroidX, idle.murX, 300)
+    if (age >= 0.14 && age < 0.14 + dtReal) audio.iceImpact(0.16, panMur)
+    if (age >= 0.59 && age < 0.59 + dtReal) audio.iceImpact(0.12, panMur)
   } else if (idle.type === 'tentacule') {
     // le PSEUDOPODE : un aimant au bout du doigt tire les gouttes en
     // chaîne — il sort du flanc, s'étire jusqu'à la paroi, l'effleure,
@@ -9912,16 +9981,57 @@ function majIdle(dtReal: number): void {
         sim.velY[i] += ry
       }
     }
-    if (age >= 1.25 && age < 1.25 + dtReal) audio.iceImpact(0.09)
+    if (age >= 1.25 && age < 1.25 + dtReal)
+      audio.iceImpact(0.09, panDepuis(sim.stats.centroidX, idle.murX, 300))
   }
+}
+// LA MÉCANIQUE DU REGARD (game/regard.ts) : les saccades, et les deux
+// coups d'œil de l'éjection — à l'amorce vers ce qu'il éjecte, au relâcher
+// vers les gouttes parties (la perte, docs/sujet-vivant.md A1)
+const regardEtat = {
+  sacc: { x: 0, y: 0, t0: 0, duree: 0.8 } as Saccade,
+  aimAvant: false,
+  tClic: -9,
+  tLache: -9,
+  aimX: 0,
+  aimY: 0,
+}
+// les DANGERS du tableau (chaudières, plaques froides, éponges) : les
+// points que le regard fixe quand la marche y mène — recalculés au
+// changement de tableau seulement
+let dangerNiveau: unknown = null
+let dangerPoints: { x: number; y: number }[] = []
+function pointsDanger(): { x: number; y: number }[] {
+  if (dangerNiveau !== level) {
+    dangerNiveau = level
+    dangerPoints = []
+    for (const b of level.boxes) {
+      if (b.material === MAT_CHAUD || b.material === MAT_FROID)
+        dangerPoints.push({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 })
+    }
+    for (const sp of sim.sponges)
+      dangerPoints.push({ x: (sp.def.minX + sp.maxX) / 2, y: (sp.def.minY + sp.maxY) / 2 })
+  }
+  return dangerPoints
 }
 function majPresence(dtReal: number, aimX: number, aimY: number): void {
   const cx = sim.stats.centroidX
   const cy = sim.stats.centroidY
+  const now = performance.now() / 1000
+  // les fronts de l'éjection : l'amorce et le relâcher (le dernier point
+  // de visée est gardé pour le coup d'œil du relâcher)
+  if (input.aimActive) {
+    if (!regardEtat.aimAvant) regardEtat.tClic = now
+    regardEtat.aimX = aimX
+    regardEtat.aimY = aimY
+  } else if (regardEtat.aimAvant) {
+    regardEtat.tLache = now
+  }
+  regardEtat.aimAvant = input.aimActive
   // le réveil ne vit que le temps de l'intro caméra
   if (reveil.actif && (!camera.introEnCours || sim.dispersed))
     reveil.actif = false
-  const tReveil = performance.now() / 1000 - reveil.t0
+  const tReveil = now - reveil.t0
   // 1. l'ATTENTION : la visée d'abord ; sinon le mécanisme notable le plus
   // proche — chaudière, cible laser, cachette encore voilée — puis le sas
   let tx = 0
@@ -9937,21 +10047,47 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
       ty = exitMouth.y
     }
     vise = true
-  } else if (stickVise()) {
-    // à la manette, le point de visée est le point d'ÉJECTION — derrière le
-    // corps en eau : le regard, lui, suit le STICK — là où l'on veut aller
-    // (axe Y du stick vers le bas, monde vers le haut)
-    tx = cx + manette.dirX * 400
-    ty = cy - manette.dirY * 400
-    vise = true
   } else if (
-    input.aimActive ||
-    // la souris retient le regard SANS clic : tant qu'elle a la main et
-    // qu'elle a bougé il y a peu — immobile trop longtemps, la curiosité
-    // reprend (mécanismes, sas, vignettes d'idle)
-    (performance.now() / 1000 - input.sourisAt < 6 &&
-      input.lastPointerAt >= manette.lastActivity)
+    !sim.dispersed &&
+    (now - regardEtat.tClic < 0.3 || (!input.aimActive && now - regardEtat.tLache < 0.4))
   ) {
+    // LA PERTE (A1) : à l'amorce du jet, un regard bref vers ce qu'il
+    // éjecte ; au relâcher, il suit un instant les gouttes parties. Le
+    // même scénario à la souris et à la manette.
+    tx = regardEtat.aimX
+    ty = regardEtat.aimY
+    vise = true
+  } else if (!sim.dispersed && (input.aimActive || stickVise())) {
+    // L'INTENTION : là où il VA — la vitesse du corps, ou l'opposé du jet
+    // à l'arrêt ; au stick seul, la direction du stick (axe Y du stick vers
+    // le bas, monde vers le haut). À la souris comme à la manette, il
+    // regarde devant lui, plus derrière.
+    const m =
+      stickVise() && !input.aimActive
+        ? { dx: manette.dirX, dy: -manette.dirY }
+        : directionDeMarche(sim.stats.velX, sim.stats.velY, cx, cy, aimX, aimY)
+    if (m) {
+      // LE DANGER GAGNE (B1) : si la marche mène vers une chaudière, une
+      // plaque froide ou une éponge, c'est LUI qu'il fixe — il a peur, et
+      // il y va quand même
+      const danger = dangerDevant(cx, cy, m.dx, m.dy, pointsDanger(), sim.stats.rmsRadius + 300)
+      if (danger) {
+        tx = danger.x
+        ty = danger.y
+      } else {
+        tx = cx + m.dx * 400
+        ty = cy + m.dy * 400
+      }
+      vise = true
+    }
+  } else if (
+    !sim.dispersed &&
+    now - input.sourisAt < 1.5 &&
+    input.lastPointerAt >= manette.lastActivity
+  ) {
+    // LE COUP D'ŒIL : une souris qui bouge, il la remarque ; arrêtée, il
+    // décroche au bout d'une seconde et demie et retourne à ses affaires
+    // (mécanismes, sas, vignettes d'idle) — la reconnaissance, pas la garde
     tx = aimX
     ty = aimY
     vise = true
@@ -9994,10 +10130,18 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
   // la VIVACITÉ (curseur) règle la vitesse du glissement
   const k = 1 - Math.exp(-4.5 * oeilRegl.vivacite * dtReal)
   if (vise) {
-    const d = Math.hypot(tx - cx, ty - cy) || 1
+    // EN SACCADES : le regard se pose sur un point du monde et n'en bouge
+    // que si la cible s'est déplacée assez, ou après une fixation — et
+    // alors il SAUTE (~60 ms). La poursuite lisse d'avant lisait comme un
+    // réticule ; le saut, comme un œil.
+    saccade(regardEtat.sacc, tx, ty, now)
+    const sx = regardEtat.sacc.x
+    const sy = regardEtat.sacc.y
+    const d = Math.hypot(sx - cx, sy - cy) || 1
     const portee = Math.min(d, sim.stats.rmsRadius * 0.55)
-    presence.x += (cx + ((tx - cx) / d) * portee - presence.x) * k
-    presence.y += (cy + ((ty - cy) / d) * portee - presence.y) * k
+    const kSaut = 1 - Math.exp(-14 * oeilRegl.vivacite * dtReal)
+    presence.x += (cx + ((sx - cx) / d) * portee - presence.x) * kSaut
+    presence.y += (cy + ((sy - cy) / d) * portee - presence.y) * kSaut
   } else {
     // l'ERRANCE (curseur) : rien ne l'appelle — au lieu de rentrer se
     // poser au centre, le regard vagabonde lentement dans le corps
@@ -11720,6 +11864,9 @@ function resetLasers(): void {
   // chaque chargement, pour un rail qui n'avait rien changé.
   railBascule.length = 0
   railEtincelle.length = 0
+  // les motes renaissent sur le corps neuf : sans cela, celles de l'ancien
+  // tableau se raccrochaient au hasard depuis l'autre bout de la salle
+  motes.reset()
   cachesLevee = (level.caches ?? []).map(() => Infinity)
   // la CLEF DE CACHETTE se consomme ici : les voiles du tableau tombent
   // d'emblée (le hub et l'Économat ne l'usent pas)
@@ -15102,7 +15249,7 @@ function corpsImage(now: number): boolean {
       const cl = pastilles[i].cl
       gagneCondensat(cl)
       run.pastillesCl += cl
-      audio.collect()
+      audio.collect(panDepuis(sim.stats.centroidX, pastilles[i].x))
     }
   }
   // ---- Les ÉCLATS DE MÉMOIRE : l'information cristallisée, gravée au
@@ -15976,6 +16123,7 @@ function corpsImage(now: number): boolean {
   drawFleche(dtReal, dpr)
   majIdle(dtReal)
   majPresence(dtReal, aim.x, aim.y)
+  majVie(dtReal)
   // LE SOL DES MODULES : un tableau bâti en coques n'a pas de cuve — son
   // fond ne se peint qu'à l'intérieur des modules, et le dehors est le vide.
   // Le réglage se pose ICI, à l'image, et non dans applyLevel : applyLevel
@@ -16043,6 +16191,7 @@ function corpsImage(now: number): boolean {
       oeilOmbre: oeilRegl.ombre,
       oeilTaille: oeilRegl.taille,
       oeilRelief: oeilRegl.relief,
+      halo: presence.halo,
     },
   )
   const rendRaw = performance.now() - renderT0
@@ -16418,6 +16567,13 @@ function corpsImage(now: number): boolean {
   }
   const allFrozen = sim.playerCount > 0 && frozenCount >= sim.playerCount
   const allGas = sim.playerCount > 0 && gasCount >= sim.playerCount
+  // L'OREILLE DU SUJET (game/ouie.ts) : le corps est le point d'écoute, et
+  // chaque état est une oreille — l'eau voile à peine, la glace assourdit,
+  // la vapeur ouvre. Au prorata du corps : une transformation se SENT venir.
+  audio.setOuie(
+    sim.playerCount > 0 ? frozenCount / sim.playerCount : 0,
+    sim.playerCount > 0 ? gasCount / sim.playerCount : 0,
+  )
   // Chaudière (règle du 12/08) : l'échauffement n'est qu'un effet visuel —
   // la TRANSFORMATION se déclenche quand 95 % du corps actif baigne dans
   // l'aura. Réarmement quand le corps en ressort (présence sous 50 %) :
@@ -16439,6 +16595,17 @@ function corpsImage(now: number): boolean {
 
   // ---- Sons : boucles continues et fronts d'état ----
   const audible = !input.paused && !tableauDone && !sim.dispersed
+  // LA GLACE CRAQUE DE L'INTÉRIEUR : entièrement gelé, le bloc travaille de
+  // loin en loin — on est dedans, on l'entend de dedans (ouie.ts)
+  if (audible && allFrozen) {
+    craqueGlace.t -= dtReal
+    if (craqueGlace.t <= 0) {
+      audio.craque()
+      craqueGlace.t = 2 + Math.random() * 4
+    }
+  } else {
+    craqueGlace.t = 1 + Math.random() * 2
+  }
   // Le souffle continu d'éjection est retiré (la voix elle-même n'existe
   // plus) : l'eau se signale par la goutte qui « ploc » à chaque impulsion.
   audio.setGasLevel(
@@ -16495,6 +16662,8 @@ function corpsImage(now: number): boolean {
     sim.stats.centroidX - exitMouth.x,
     sim.stats.centroidY - exitMouth.y,
   )
+  // l'aspiration s'entend DU CÔTÉ du sas, depuis le corps
+  audio.setDrainPan(panDepuis(sim.stats.centroidX, exitMouth.x))
   audio.setDrainLevel(
     audible && drainOn
       ? Math.max(0, 1 - mouthDist / Math.max(1, params.exitRadius))
