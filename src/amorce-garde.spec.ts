@@ -125,13 +125,16 @@ describe('La garde d’amorçage', () => {
     expect(m.corps.innerHTML).toMatch(/le rendu se compile/)
   })
 
-  it('la première image retire le mot du chargement et un panneau posé par la veille', () => {
+  it('la première image retire l’écran de chargement (en fondu) et un panneau posé par la veille', () => {
     const m = monde()
     vi.advanceTimersByTime(12_100)
     expect(m.panne.classList.contains('visible')).toBe(true)
     m.demarre()
     expect(m.panne.classList.contains('visible')).toBe(false)
-    expect(m.amorce.hidden).toBe(true)
+    expect(m.amorce.classList.contains('fini')).toBe(true) // le fondu part
+    expect(m.amorce.hidden).toBe(false)
+    vi.advanceTimersByTime(600)
+    expect(m.amorce.hidden).toBe(true) // et l'écran sort du flux
     // et plus rien ne sonne ensuite
     vi.advanceTimersByTime(60_000)
     expect(m.panne.classList.contains('visible')).toBe(false)

@@ -8274,37 +8274,89 @@
         letter-spacing: 0.06em;
       }
 
-      /* ---- LE MOT DE L'AMORÇAGE ----
-         Visible dès le premier pixel, SANS JavaScript : c'est le document
-         lui-même qui le porte, et c'est la première image du jeu qui le
-         retire (__sujet21Demarre, ci-dessous). Avant lui, rien ne bougeait
-         entre la requête et la première image — plusieurs secondes sur une
-         carte ordinaire, le temps de compiler le rendu — et le joueur
-         prenait le jeu pour planté. Couleurs littérales, comme le panneau
-         de panne : il doit tenir avant que le reste n'ait eu lieu. */
+      /* ---- L'ÉCRAN DE CHARGEMENT ----
+         Un voile sur toute la fenêtre, visible dès le premier pixel, SANS
+         JavaScript : c'est le document lui-même qui le porte, et c'est la
+         première image du jeu qui le retire (__sujet21Demarre, ci-dessous),
+         en fondu. Avant lui, rien ne bougeait entre la requête et la
+         première image — plusieurs secondes sur une carte ordinaire, le
+         temps de compiler le rendu — et le joueur prenait le jeu pour
+         planté. Il voile la fiche tant que le jeu n'est pas prêt derrière :
+         un bouton COMMENCER qu'on peut voir mais pas presser mentirait.
+         Couleurs littérales, comme le panneau de panne : il doit tenir
+         avant que le reste n'ait eu lieu. */
       #amorce[hidden] { display: none; }
       #amorce {
         position: fixed;
-        left: 50%;
-        bottom: 26px;
-        transform: translateX(-50%);
+        inset: 0;
         z-index: 9990;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        padding: 24px;
+        box-sizing: border-box;
+        text-align: center;
+        background:
+          radial-gradient(ellipse at 50% 58%, rgba(99, 183, 230, 0.09), rgba(3, 7, 16, 0) 58%),
+          #030710;
+        color: #d9ecf7;
+        font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+        transition: opacity 0.45s ease;
+      }
+      #amorce.fini {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #amorce-sur {
+        font-family: 'Michroma', 'Arial Black', sans-serif;
+        font-size: 9px;
+        letter-spacing: 0.22em;
+        color: #7f9cb0;
+      }
+      #amorce-titre {
+        font-family: 'Michroma', 'Arial Black', sans-serif;
+        font-size: clamp(30px, 6vw, 60px);
+        line-height: 1.2;
+        letter-spacing: 0.1em;
+        margin: 0;
+        color: #d9ecf7;
+        font-weight: 400;
+      }
+      #amorce-titre em {
+        font-style: normal;
+        color: #63b7e6;
+      }
+      /* la barre : un balayage sans fin, le temps n'est pas connu d'avance */
+      #amorce-barre {
+        position: relative;
+        width: min(320px, 70vw);
+        height: 2px;
+        margin-top: 6px;
+        background: rgba(150, 200, 235, 0.16);
+        overflow: hidden;
+      }
+      #amorce-barre::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: -40%;
+        width: 40%;
+        background: linear-gradient(90deg, rgba(99, 183, 230, 0), #a7ddf5, rgba(99, 183, 230, 0));
+        animation: amorce-balaie 1.6s ease-in-out infinite;
+      }
+      #amorce-mot {
         display: flex;
         align-items: center;
         gap: 10px;
-        max-width: calc(100vw - 32px);
-        box-sizing: border-box;
-        padding: 8px 14px;
-        border: 1px solid rgba(150, 200, 235, 0.38);
-        border-radius: 6px;
-        background: rgba(10, 20, 32, 0.92);
+        font-family: 'Michroma', 'Arial Black', sans-serif;
+        font-size: 11px;
+        letter-spacing: 0.16em;
         color: #63b7e6;
-        font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
-        font-size: 12px;
-        letter-spacing: 0.04em;
-        pointer-events: none;
       }
-      #amorce::before {
+      #amorce-mot::before {
         content: '';
         flex: none;
         width: 8px;
@@ -8313,19 +8365,31 @@
         background: #a7ddf5;
         animation: amorce-respire 1.1s ease-in-out infinite;
       }
-      #amorce-mot {
-        font-family: 'Michroma', 'Arial Black', sans-serif;
-        font-size: 10px;
-        letter-spacing: 0.14em;
-        white-space: nowrap;
+      #amorce-etape {
+        font-size: 12.5px;
+        letter-spacing: 0.04em;
+        color: #7f9cb0;
+        min-height: 1.6em;
       }
-      #amorce-etape { color: #7f9cb0; }
+      #amorce .sous {
+        position: absolute;
+        bottom: 22px;
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        color: #7f9cb0;
+        opacity: 0.8;
+      }
       @keyframes amorce-respire {
         0%, 100% { opacity: 0.25; transform: scale(0.7); }
         50% { opacity: 1; transform: scale(1); }
       }
+      @keyframes amorce-balaie {
+        0% { left: -40%; }
+        100% { left: 100%; }
+      }
       @media (prefers-reduced-motion: reduce) {
-        #amorce::before { animation: none; }
+        #amorce::before, #amorce-mot::before, #amorce-barre::before { animation: none; }
+        #amorce { transition: none; }
       }
     </style>
   </head>
@@ -9892,10 +9956,15 @@
     <button id="continuer" type="button">CONTINUER — CONCLURE L'ESSAI</button>
     <div id="touchbar"></div>
 
-    <!-- Le mot de l'amorçage : voir la garde ci-dessous, qui le fait avancer -->
+    <!-- L'écran de chargement : voir la garde ci-dessous, qui le fait
+         avancer, et la première image du jeu, qui le retire -->
     <div id="amorce" role="status" aria-live="polite">
+      <span id="amorce-sur">COMPLEXE ORBITAL MÉDUSE — PROTOCOLE «&nbsp;TENSION DE SURFACE&nbsp;»</span>
+      <h1 id="amorce-titre">SUJET <em>21</em></h1>
+      <div id="amorce-barre"></div>
       <span id="amorce-mot">OUVERTURE DU PROTOCOLE</span>
       <span id="amorce-etape">le fichier arrive…</span>
+      <p class="sous">SUJET 21 — COMPLEXE ORBITAL MÉDUSE</p>
     </div>
 
     <div id="panne" role="alert" aria-live="assertive">
@@ -9984,7 +10053,7 @@
         }
 
         // Le jeu appelle ceci à sa première image : la preuve qu'il tourne,
-        // pas seulement que son module s'est évalué. Le mot du chargement
+        // pas seulement que son module s'est évalué. L'écran de chargement
         // s'efface ; et si la veille avait sonné pendant un démarrage lent,
         // son panneau se retire — une vraie erreur, elle, reste affichée.
         window.__sujet21Demarre = function () {
@@ -9992,7 +10061,13 @@
           if (veille) clearTimeout(veille)
           try {
             var a = el('amorce')
-            if (a) a.hidden = true
+            if (a) {
+              // en fondu (0,45 s, voir le style), puis hors du flux
+              a.classList.add('fini')
+              setTimeout(function () {
+                a.hidden = true
+              }, 500)
+            }
             if (montre && parVeille) {
               el('panne').classList.remove('visible')
               montre = false
