@@ -31,6 +31,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '12/09/2026 16:18',
+    title: 'LE REGARD, VERSION ŒIL : des saccades, un coup d’œil au lieu d’une garde, la perte et le danger avant le curseur',
+    notes: [
+      'LA QUESTION DU CONCEPTEUR : « que penses-tu de l’œil qui suit le curseur ou la direction à la manette ? » Le constat : la bonne idée avec le mauvais mouvement. La POURSUITE LISSE du curseur lisait comme un réticule ; la souris posée sans clic retenait le regard six secondes (une garde, pas une reconnaissance) ; et à la souris il regardait le point du jet, derrière lui, quand à la manette il regardait devant — deux Sujets selon la prise en main.',
+      'LES SACCADES (game/regard.ts) : le regard se pose sur un point du monde et n’en bouge que si la cible s’est déplacée de plus de 60 unités, ou après une fixation de 0,4 à 1,5 s tirée au sort — et alors il SAUTE (~60 ms) au lieu de glisser. Le même suivi, mais un œil. Les curseurs vivacité et errance restent valables.',
+      'LE MÊME SCÉNARIO AUX DEUX PRISES EN MAIN : à l’amorce du jet, un regard bref (0,3 s) vers ce qu’il éjecte ; au relâcher, il suit un instant (0,4 s) les gouttes parties — c’est la piste A1, la perte regardée. Entre les deux, il regarde là où il VA : la vitesse du corps, ou l’opposé du jet à l’arrêt ; au stick seul, la direction du stick. La manette garde son retour de direction, la souris cesse de le faire regarder en arrière.',
+      'LE DANGER GAGNE (B1) : si la marche mène vers une chaudière, une plaque froide ou une éponge à moins de 300 unités du bord (cône de ~35°), c’est le danger qu’il fixe, pas le curseur — il a peur, et il y va quand même. Les points de danger se recalculent au changement de tableau seulement.',
+      'LE COUP D’ŒIL : une souris qui bouge, il la remarque ; arrêtée, il décroche au bout d’une seconde et demie et retourne à ses affaires (mécanismes, sas, vignettes d’idle). La reconnaissance plutôt que la garde.',
+      'VÉRIFIÉ : 9 tests neufs (la saccade qui tient, qui saute à l’écart et à la fin de pose ; la direction de marche par la vitesse ou l’opposé du jet ; le danger devant, le plus proche dans le cône, ni de côté ni derrière, borné par la portée) — 1097 verts dans 103 fichiers, type-check à 0, build propre. Rien dans la simulation. À juger en prévisualisation, souris puis manette.',
+    ],
+  },
+  {
     date: '12/09/2026 15:41',
     title: 'SE METTRE À SA PLACE, PREMIER CHANTIER : le cœur dans la manette, une oreille par état, le monde entendu depuis le corps',
     notes: [

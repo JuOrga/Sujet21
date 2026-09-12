@@ -217,6 +217,7 @@ import { Camera } from './render/camera'
 import { MAX_BOXES, Renderer } from './render/renderer'
 import { Motes, VIE_STRIDE, remplitVie } from './render/vie'
 import { panDepuis } from './game/ouie'
+import { dangerDevant, directionDeMarche, saccade, type Saccade } from './game/regard'
 import { FixedLoop } from './game/loop'
 import { Input } from './game/input'
 import {
@@ -9969,13 +9970,53 @@ function majIdle(dtReal: number): void {
       audio.iceImpact(0.09, panDepuis(sim.stats.centroidX, idle.murX, 300))
   }
 }
+// LA MÉCANIQUE DU REGARD (game/regard.ts) : les saccades, et les deux
+// coups d'œil de l'éjection — à l'amorce vers ce qu'il éjecte, au relâcher
+// vers les gouttes parties (la perte, docs/sujet-vivant.md A1)
+const regardEtat = {
+  sacc: { x: 0, y: 0, t0: 0, duree: 0.8 } as Saccade,
+  aimAvant: false,
+  tClic: -9,
+  tLache: -9,
+  aimX: 0,
+  aimY: 0,
+}
+// les DANGERS du tableau (chaudières, plaques froides, éponges) : les
+// points que le regard fixe quand la marche y mène — recalculés au
+// changement de tableau seulement
+let dangerNiveau: unknown = null
+let dangerPoints: { x: number; y: number }[] = []
+function pointsDanger(): { x: number; y: number }[] {
+  if (dangerNiveau !== level) {
+    dangerNiveau = level
+    dangerPoints = []
+    for (const b of level.boxes) {
+      if (b.material === MAT_CHAUD || b.material === MAT_FROID)
+        dangerPoints.push({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 })
+    }
+    for (const sp of sim.sponges)
+      dangerPoints.push({ x: (sp.def.minX + sp.maxX) / 2, y: (sp.def.minY + sp.maxY) / 2 })
+  }
+  return dangerPoints
+}
 function majPresence(dtReal: number, aimX: number, aimY: number): void {
   const cx = sim.stats.centroidX
   const cy = sim.stats.centroidY
+  const now = performance.now() / 1000
+  // les fronts de l'éjection : l'amorce et le relâcher (le dernier point
+  // de visée est gardé pour le coup d'œil du relâcher)
+  if (input.aimActive) {
+    if (!regardEtat.aimAvant) regardEtat.tClic = now
+    regardEtat.aimX = aimX
+    regardEtat.aimY = aimY
+  } else if (regardEtat.aimAvant) {
+    regardEtat.tLache = now
+  }
+  regardEtat.aimAvant = input.aimActive
   // le réveil ne vit que le temps de l'intro caméra
   if (reveil.actif && (!camera.introEnCours || sim.dispersed))
     reveil.actif = false
-  const tReveil = performance.now() / 1000 - reveil.t0
+  const tReveil = now - reveil.t0
   // 1. l'ATTENTION : la visée d'abord ; sinon le mécanisme notable le plus
   // proche — chaudière, cible laser, cachette encore voilée — puis le sas
   let tx = 0
@@ -9991,21 +10032,47 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
       ty = exitMouth.y
     }
     vise = true
-  } else if (stickVise()) {
-    // à la manette, le point de visée est le point d'ÉJECTION — derrière le
-    // corps en eau : le regard, lui, suit le STICK — là où l'on veut aller
-    // (axe Y du stick vers le bas, monde vers le haut)
-    tx = cx + manette.dirX * 400
-    ty = cy - manette.dirY * 400
-    vise = true
   } else if (
-    input.aimActive ||
-    // la souris retient le regard SANS clic : tant qu'elle a la main et
-    // qu'elle a bougé il y a peu — immobile trop longtemps, la curiosité
-    // reprend (mécanismes, sas, vignettes d'idle)
-    (performance.now() / 1000 - input.sourisAt < 6 &&
-      input.lastPointerAt >= manette.lastActivity)
+    !sim.dispersed &&
+    (now - regardEtat.tClic < 0.3 || (!input.aimActive && now - regardEtat.tLache < 0.4))
   ) {
+    // LA PERTE (A1) : à l'amorce du jet, un regard bref vers ce qu'il
+    // éjecte ; au relâcher, il suit un instant les gouttes parties. Le
+    // même scénario à la souris et à la manette.
+    tx = regardEtat.aimX
+    ty = regardEtat.aimY
+    vise = true
+  } else if (!sim.dispersed && (input.aimActive || stickVise())) {
+    // L'INTENTION : là où il VA — la vitesse du corps, ou l'opposé du jet
+    // à l'arrêt ; au stick seul, la direction du stick (axe Y du stick vers
+    // le bas, monde vers le haut). À la souris comme à la manette, il
+    // regarde devant lui, plus derrière.
+    const m =
+      stickVise() && !input.aimActive
+        ? { dx: manette.dirX, dy: -manette.dirY }
+        : directionDeMarche(sim.stats.velX, sim.stats.velY, cx, cy, aimX, aimY)
+    if (m) {
+      // LE DANGER GAGNE (B1) : si la marche mène vers une chaudière, une
+      // plaque froide ou une éponge, c'est LUI qu'il fixe — il a peur, et
+      // il y va quand même
+      const danger = dangerDevant(cx, cy, m.dx, m.dy, pointsDanger(), sim.stats.rmsRadius + 300)
+      if (danger) {
+        tx = danger.x
+        ty = danger.y
+      } else {
+        tx = cx + m.dx * 400
+        ty = cy + m.dy * 400
+      }
+      vise = true
+    }
+  } else if (
+    !sim.dispersed &&
+    now - input.sourisAt < 1.5 &&
+    input.lastPointerAt >= manette.lastActivity
+  ) {
+    // LE COUP D'ŒIL : une souris qui bouge, il la remarque ; arrêtée, il
+    // décroche au bout d'une seconde et demie et retourne à ses affaires
+    // (mécanismes, sas, vignettes d'idle) — la reconnaissance, pas la garde
     tx = aimX
     ty = aimY
     vise = true
@@ -10048,10 +10115,18 @@ function majPresence(dtReal: number, aimX: number, aimY: number): void {
   // la VIVACITÉ (curseur) règle la vitesse du glissement
   const k = 1 - Math.exp(-4.5 * oeilRegl.vivacite * dtReal)
   if (vise) {
-    const d = Math.hypot(tx - cx, ty - cy) || 1
+    // EN SACCADES : le regard se pose sur un point du monde et n'en bouge
+    // que si la cible s'est déplacée assez, ou après une fixation — et
+    // alors il SAUTE (~60 ms). La poursuite lisse d'avant lisait comme un
+    // réticule ; le saut, comme un œil.
+    saccade(regardEtat.sacc, tx, ty, now)
+    const sx = regardEtat.sacc.x
+    const sy = regardEtat.sacc.y
+    const d = Math.hypot(sx - cx, sy - cy) || 1
     const portee = Math.min(d, sim.stats.rmsRadius * 0.55)
-    presence.x += (cx + ((tx - cx) / d) * portee - presence.x) * k
-    presence.y += (cy + ((ty - cy) / d) * portee - presence.y) * k
+    const kSaut = 1 - Math.exp(-14 * oeilRegl.vivacite * dtReal)
+    presence.x += (cx + ((sx - cx) / d) * portee - presence.x) * kSaut
+    presence.y += (cy + ((sy - cy) / d) * portee - presence.y) * kSaut
   } else {
     // l'ERRANCE (curseur) : rien ne l'appelle — au lieu de rentrer se
     // poser au centre, le regard vagabonde lentement dans le corps
