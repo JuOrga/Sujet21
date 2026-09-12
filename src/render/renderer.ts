@@ -34,8 +34,19 @@ import { Programmes } from './programmes'
 // Élargis pour les GRANDES CARTES (3-4 tableaux en une) : le court-circuit
 // par boîte dans le shader (reachMax) fait que seules les 1-2 boîtes qui
 // concernent un pixel se paient vraiment — le plafond peut monter sans que
-// chaque pixel paie les 96.
-export const MAX_BOXES = 96
+// chaque pixel paie les 160.
+// De 96 à 160 (12/09/2026) : un tableau STANDARD de 2400 × 1500 bien bâti
+// (chambres, couloirs, cachettes voilées, portes) atteignait déjà 112 blocs
+// posés pour 95 dessinés. Ce que coûte le plafond, ce n'est pas la boucle —
+// elle s'arrête à uBoxCount — mais les CASES D'UNIFORMES du fragment shader
+// (uBoxes + uBoxAux : deux vec4 par boîte) : comptées sur la source, la
+// composition en occupe 460 à 160 boîtes (332 à 96) et le cuiseur de lumière
+// 359 (231 à 96). WebGL2 n'en garantit que 224 — le shader les dépassait
+// déjà à 96, on ne s'appuie donc pas sur une limite nouvelle ; les GPU
+// courants en annoncent 1024. Un tableau qui n'en pose pas plus qu'avant ne
+// paie rien de plus par pixel. Le même chiffre est écrit dans les deux
+// shaders (#define) — budgets.spec.ts vérifie qu'ils ne dérivent pas.
+export const MAX_BOXES = 160
 export const MAX_ZONES = 16
 // Lampes par tableau : au-delà, les excédentaires ne s'allument pas —
 // l'éditeur avertit (même contrat que MAX_BOXES).
@@ -326,7 +337,7 @@ float formeSdf(vec2 w, vec4 b, float forme, float q0, float q1) {
 
 const COMPOSE_FS = `#version 300 es
 precision highp float;
-#define MAX_BOXES 96
+#define MAX_BOXES 160
 #define MAX_WAVES 8
 #define MAX_ZONES 16
 uniform sampler2D uField;
@@ -2357,7 +2368,7 @@ void main() {
 // Par image, le coût retombe à UNE lecture de texture dans la composition.
 const LIGHT_FS = `#version 300 es
 precision highp float;
-#define MAX_BOXES 96
+#define MAX_BOXES 160
 #define MAX_LUMIERES 4
 #define HAUTEUR_BLOCS 140.0
 // UNE COQUE N'EST PAS UN BLOC : c'est une cloison qui monte au PLAFOND.

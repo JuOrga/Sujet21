@@ -348,7 +348,9 @@ describe('hub v5 — le module accidenté et ses stations', () => {
       }
       expect(dedans(zones.tableDepart, b)).toBe(true)
       expect(dedans(zones.sasScelle, b)).toBe(true)
-      // le budget du moteur : 96 boîtes rendues, sas et parois comprises
+      // le budget du moteur (160 boîtes rendues, sas et parois comprises) — le
+      // hub reste loin dessous : il doit tourner partout, pas seulement là où
+      // le budget passe
       expect(tableau.boxes.length).toBeLessThanOrEqual(90)
     }
   })
