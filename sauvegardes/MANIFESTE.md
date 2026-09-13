@@ -1,16 +1,16 @@
 # Sauvegarde des documents partagés
 
-Prise le **2026-09-12T07:57:59.617Z** depuis `https://sujet21.vercel.app/api`.
+Prise le **2026-09-13T08:22:12.096Z** depuis `https://sujet21.vercel.app/api`.
 
 | Famille | Fichier | Entrées | Détail |
 | --- | --- | ---: | --- |
-| tableaux | `levels.json` | 61 | séquence : HUB2 → 21AA-100 → 21AB-100 → 21AC-100 → 21AD-131 → 21AF-101 → 21AG-111 → 101 → 101 → 101 → 121 → 212 → 111 → 111 → 101 → 101 → 101 → 21TY-232 → 21T-112 → 21GE-112 → 21AC-111 → AH → 21AE-131 → 21E-102 → 21 AB-101 → 21AC-102 → 21-? → 531 → 21AA-122 → 21-S1 → 21-S2 → 21-S3 → 21-B → 21-C → 21-F → 21-D → 21-H → 21-I → 21-J → 21-K → 21-L → 21-100 → 21-G → 21-101 → 21-A bis → 21-? → 21-? → 21-? → 21-? → 21-01 → AH-2 → 21-101 → 21-07 → 21AE-111 → 21-502 → 21-? → 21SE-202 → 21-313 → 21-? → 21-? → 21-? |
+| tableaux | `levels.json` | 61 | séquence : HUB2 → 21AA-100 → 21AB-100 → 21AF-101 → 21AC-100 → 21AD-131 → 21AG-111 → 101 → 101 → 101 → 121 → 212 → 111 → 111 → 101 → 101 → 101 → 21TY-232 → 21T-112 → 21GE-112 → 21AC-111 → AH → 21AE-131 → 21E-102 → 21 AB-101 → 21AC-102 → 21-? → 531 → 21AA-122 → 21-S1 → 21-S2 → 21-S3 → 21-B → 21-C → 21-F → 21-D → 21-H → 21-I → 21-J → 21-K → 21-L → 21-100 → 21-G → 21-101 → 21-A bis → 21-? → 21-? → 21-? → 21-? → 21-01 → AH-2 → 21-101 → 21-07 → 21AE-111 → 21-502 → 21-? → 21SE-202 → 21-313 → 21-? → 21-? → 21-? |
 | présets | `presets.json` | 7 | défaut : ⚙ Ballet orbital · ⚙ Ballet orbital, boizcohesioncontrole1, boizessai1, boizessai2, boizvapeur1, Julian-ReculLocalise-propulsion, Julian2-ReculLocalise-propulsion |
 | cahier des règles | `regles.json` | 0 | 0 note(s), 0 ajout(s) |
 | fiches réécrites | `fiches.json` | 0 | 0 fiche(s) réécrite(s) |
 | cinématiques | `cinematiques.json` | 2 | SONDE-CI, ESSAI-3 |
 | catalogue d’images | `images.json` | 0 | 0 entrée(s) — URL seulement, pas les pixels |
-| registres | `records.json` | 80 | 41 tableau(x), 39 top(s), expédition : oui |
+| registres | `records.json` | 96 | 49 tableau(x), 47 top(s), expédition : oui |
 
 ## Ce que cette sauvegarde contient — et ce qu’elle ne contient pas
 

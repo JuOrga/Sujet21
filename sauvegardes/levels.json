@@ -979,6 +979,152 @@
       }
     },
     {
+      "id": "la-membrane",
+      "auteur": "JU",
+      "majAt": "2026-08-26T22:03:54.367Z",
+      "level": {
+        "name": "La membrane",
+        "code": "21AF-101",
+        "journal": "Cellule 7, cloison osmotique. Gelé, il a heurté la membrane comme un poing frappe une porte. Redevenu liquide, il l’a traversée comme si elle n’existait pas. La cloison choisit son état à sa place — c’est la première paroi qui lui donne un ordre, et il a obéi en trois secondes. — Dr N. Véga",
+        "bounds": {
+          "minX": -1200,
+          "minY": -750,
+          "maxX": 1200,
+          "maxY": 750
+        },
+        "spawn": {
+          "x": -950,
+          "y": 0,
+          "n": 900
+        },
+        "exit": {
+          "minX": 1040,
+          "minY": -120,
+          "maxX": 1180,
+          "maxY": 120
+        },
+        "boxes": [
+          {
+            "minX": -620,
+            "minY": 280,
+            "maxX": -580,
+            "maxY": 520,
+            "material": 7
+          },
+          {
+            "minX": -700,
+            "minY": -400,
+            "maxX": -600,
+            "maxY": -300,
+            "material": 4
+          },
+          {
+            "minX": -40,
+            "minY": -750,
+            "maxX": 0,
+            "maxY": 750,
+            "material": 7
+          },
+          {
+            "minX": 560,
+            "minY": -750,
+            "maxX": 640,
+            "maxY": 180,
+            "material": 0
+          },
+          {
+            "minX": 560,
+            "minY": 180,
+            "maxX": 640,
+            "maxY": 420,
+            "material": 7
+          },
+          {
+            "minX": 560,
+            "minY": 420,
+            "maxX": 640,
+            "maxY": 750,
+            "material": 0
+          }
+        ],
+        "sponges": [],
+        "labels": [
+          {
+            "x": -600,
+            "y": 600,
+            "text": "MEMBRANE — SEUL LE LIQUIDE PASSE",
+            "tone": "phile",
+            "picto": {
+              "couleur": "#4fae8e",
+              "eau": 3,
+              "glace": 0,
+              "vapeur": 0
+            }
+          },
+          {
+            "x": -650,
+            "y": -480,
+            "text": "PLAQUE FROIDE",
+            "tone": "froid"
+          },
+          {
+            "x": 600,
+            "y": 500,
+            "text": "LA PORTE D’EAU",
+            "tone": "phile",
+            "rang": "secteur"
+          },
+          {
+            "x": 1110,
+            "y": 180,
+            "text": "SAS",
+            "tone": "sas"
+          }
+        ],
+        "par": 6,
+        "ambiante": 0,
+        "decals": [
+          {
+            "x": 1090,
+            "y": -560,
+            "w": 150,
+            "h": 225,
+            "kind": "vanne",
+            "fade": 0.42
+          }
+        ],
+        "lumieres": [
+          {
+            "x": -100,
+            "y": 0,
+            "h": 160,
+            "portee": 880,
+            "intensite": 1.1,
+            "couleur": "#4fae8e",
+            "forme": "bandeau",
+            "longueur": 940,
+            "angle": 90
+          },
+          {
+            "x": 520,
+            "y": 300,
+            "h": 150,
+            "portee": 620,
+            "forme": "bandeau",
+            "longueur": 480,
+            "angle": 90
+          },
+          {
+            "x": 1110,
+            "y": 0,
+            "h": 300,
+            "portee": 500,
+            "couleur": "#3fd69b"
+          }
+        ]
+      }
+    },
+    {
       "id": "l-ancrage",
       "auteur": "JU",
       "majAt": "2026-08-31T13:58:38.172Z",
@@ -1282,152 +1428,6 @@
             "couleur": "#8fc8ee",
             "forme": "bandeau",
             "longueur": 560,
-            "angle": 90
-          },
-          {
-            "x": 1110,
-            "y": 0,
-            "h": 300,
-            "portee": 500,
-            "couleur": "#3fd69b"
-          }
-        ]
-      }
-    },
-    {
-      "id": "la-membrane",
-      "auteur": "JU",
-      "majAt": "2026-08-26T22:03:54.367Z",
-      "level": {
-        "name": "La membrane",
-        "code": "21AF-101",
-        "journal": "Cellule 7, cloison osmotique. Gelé, il a heurté la membrane comme un poing frappe une porte. Redevenu liquide, il l’a traversée comme si elle n’existait pas. La cloison choisit son état à sa place — c’est la première paroi qui lui donne un ordre, et il a obéi en trois secondes. — Dr N. Véga",
-        "bounds": {
-          "minX": -1200,
-          "minY": -750,
-          "maxX": 1200,
-          "maxY": 750
-        },
-        "spawn": {
-          "x": -950,
-          "y": 0,
-          "n": 900
-        },
-        "exit": {
-          "minX": 1040,
-          "minY": -120,
-          "maxX": 1180,
-          "maxY": 120
-        },
-        "boxes": [
-          {
-            "minX": -620,
-            "minY": 280,
-            "maxX": -580,
-            "maxY": 520,
-            "material": 7
-          },
-          {
-            "minX": -700,
-            "minY": -400,
-            "maxX": -600,
-            "maxY": -300,
-            "material": 4
-          },
-          {
-            "minX": -40,
-            "minY": -750,
-            "maxX": 0,
-            "maxY": 750,
-            "material": 7
-          },
-          {
-            "minX": 560,
-            "minY": -750,
-            "maxX": 640,
-            "maxY": 180,
-            "material": 0
-          },
-          {
-            "minX": 560,
-            "minY": 180,
-            "maxX": 640,
-            "maxY": 420,
-            "material": 7
-          },
-          {
-            "minX": 560,
-            "minY": 420,
-            "maxX": 640,
-            "maxY": 750,
-            "material": 0
-          }
-        ],
-        "sponges": [],
-        "labels": [
-          {
-            "x": -600,
-            "y": 600,
-            "text": "MEMBRANE — SEUL LE LIQUIDE PASSE",
-            "tone": "phile",
-            "picto": {
-              "couleur": "#4fae8e",
-              "eau": 3,
-              "glace": 0,
-              "vapeur": 0
-            }
-          },
-          {
-            "x": -650,
-            "y": -480,
-            "text": "PLAQUE FROIDE",
-            "tone": "froid"
-          },
-          {
-            "x": 600,
-            "y": 500,
-            "text": "LA PORTE D’EAU",
-            "tone": "phile",
-            "rang": "secteur"
-          },
-          {
-            "x": 1110,
-            "y": 180,
-            "text": "SAS",
-            "tone": "sas"
-          }
-        ],
-        "par": 6,
-        "ambiante": 0,
-        "decals": [
-          {
-            "x": 1090,
-            "y": -560,
-            "w": 150,
-            "h": 225,
-            "kind": "vanne",
-            "fade": 0.42
-          }
-        ],
-        "lumieres": [
-          {
-            "x": -100,
-            "y": 0,
-            "h": 160,
-            "portee": 880,
-            "intensite": 1.1,
-            "couleur": "#4fae8e",
-            "forme": "bandeau",
-            "longueur": 940,
-            "angle": 90
-          },
-          {
-            "x": 520,
-            "y": 300,
-            "h": 150,
-            "portee": 620,
-            "forme": "bandeau",
-            "longueur": 480,
             "angle": 90
           },
           {
