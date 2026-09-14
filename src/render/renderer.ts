@@ -3385,6 +3385,12 @@ export class Renderer {
     return this.programmes.enParallele
   }
 
+  /** Où en est la compilation : programmes liés / programmes en tout (à
+   *  lire à l'image, tant que `pret()` répond non — voir programmes.ts). */
+  avancementCompilation(): { fait: number; total: number } {
+    return this.programmes.avancement()
+  }
+
   /**
    * LE CIEL DU DEHORS. 0 procédural · 1 tuilé (l'intérim) · 2 la plaque.
    * Appelé À L'IMAGE, comme tout ce qui pilote le renderer : une fonction
