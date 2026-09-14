@@ -15274,6 +15274,7 @@ function corpsImage(now: number): boolean {
   // mesures brutes de CETTE image, pour le collecteur de performance
   let physRaw = 0
   let stepsFaits = 0
+  let laserRaw = 0 // le traçage des faisceaux : un poste à part dans le rapport
 
   // ---- Manette : elle écrit dans le même pointeur que le doigt ----
   manettePolls++
@@ -15946,6 +15947,10 @@ function corpsImage(now: number): boolean {
     const rIce = params.particleSpacing * 1.3
     // le rayon du champ qui DÉFINIT la surface du liquide (dioptres)
     const rEau = params.laserMirrorSmooth * 0.6
+    // chronométré à part : le rapport de performance du 14/09/2026 (salle
+    // démineur, Firefox) montrait 97 ms d'« autre JS » par image sans dire
+    // d'où ils venaient — c'était ici. Le poste a maintenant son nom.
+    const laserT0 = performance.now()
     laserEtat.vues = lasers.map((em) =>
       traceLaser(em, {
         bounds: sim.bounds,
@@ -15974,10 +15979,14 @@ function corpsImage(now: number): boolean {
         // palier 3 : la vapeur ionise le faisceau en arc de plasma, que
         // les rails magnétiques capturent et guident
         vapeur: (x, y) => sim.gasAt(x, y, rIce),
+        // le raccourci de la boucle chaude : les trois questions du pas en
+        // un seul parcours de voisins (mêmes rayons, mêmes règles)
+        milieu: (x, y) => sim.milieuAt(x, y, rIce, rEau),
         rails: level.rails ?? [],
         railRadius: params.plasmaRailRadius,
       }),
     )
+    laserRaw = performance.now() - laserT0
     // Récepteurs : TOR à verrou (un passage allume pour de bon), NOR à
     // maintien (ouvert sous le faisceau ; la première coupure scelle la
     // porte fermée, définitivement) — machine à états dans laser.ts.
@@ -16682,6 +16691,7 @@ function corpsImage(now: number): boolean {
     stepsFaits,
     sim.count,
     Math.round(echelleRendue() * 100),
+    laserRaw,
   )
   majPerfVif()
 

@@ -34,6 +34,11 @@ import {
 
 export const KIND_FREE = 0
 export const KIND_PLAYER = 1
+// Les bits du MILIEU rendus par milieuAt (le traceur laser les lit) :
+// la glace au contact, l'eau liquide (au sens de liquidAt), la vapeur.
+export const MILIEU_GLACE = 1
+export const MILIEU_EAU = 2
+export const MILIEU_VAPEUR = 4
 
 // Voisins retenus par particule et par pas (au-delà : ignorés — les zones
 // aussi denses sont déjà sur-contraintes)
@@ -652,6 +657,42 @@ export class FluidSim {
     const h = this.params.particleSpacing
     const plein = (Math.PI * r * r) / (3 * Math.sqrt(3) * h * h)
     return somme > plein * 0.5
+  }
+
+  // LE MILIEU EN UN SEUL PASSAGE — la boucle chaude du traceur laser. À
+  // chaque pas de 5 u, le faisceau demandait trois fois les voisins du même
+  // point (glace au contact ? eau liquide ? vapeur ?) : trois parcours de
+  // grille et trois fermetures par pas, ~4 000 pas par image sur un tableau
+  // à sept émetteurs. Ici, UN parcours au plus grand des deux rayons répond
+  // aux trois questions, avec exactement les mêmes règles que iceNormalAt
+  // (contact dans rIce), liquidAt (noyau dans rEau, seuil du demi-plein) et
+  // gasAt (contact dans rIce). Bits : MILIEU_GLACE, MILIEU_EAU, MILIEU_VAPEUR.
+  milieuAt(x: number, y: number, rIce: number, rEau: number): number {
+    let glace = false
+    let vapeur = false
+    let somme = 0
+    const rIce2 = rIce * rIce
+    const rEau2 = rEau * rEau
+    this.grid.forEachNeighbor(x, y, Math.max(rIce, rEau), (j) => {
+      const dx = x - this.posX[j]
+      const dy = y - this.posY[j]
+      const d2 = dx * dx + dy * dy
+      if (this.frozen[j] === 1) {
+        if (d2 < rIce2) glace = true
+      } else if (this.gaseous[j] === 1) {
+        if (d2 < rIce2) vapeur = true
+      } else if (d2 < rEau2) {
+        const t = 1 - Math.sqrt(d2) / rEau
+        somme += t * t
+      }
+    })
+    const h = this.params.particleSpacing
+    const plein = (Math.PI * rEau * rEau) / (3 * Math.sqrt(3) * h * h)
+    return (
+      (glace ? MILIEU_GLACE : 0) |
+      (somme > plein * 0.5 ? MILIEU_EAU : 0) |
+      (vapeur ? MILIEU_VAPEUR : 0)
+    )
   }
 
   // Le point (x, y) baigne-t-il dans la VAPEUR du joueur ? Test d'ionisation

@@ -8,9 +8,16 @@ import {
   canalDeCible,
   canalActif,
   LASER_MAX_BOUNCES,
+  LASER_STEP,
+  MILIEU_EAU,
+  MILIEU_GLACE,
+  MILIEU_VAPEUR,
+  enveloppeBoite,
+  intervalleRayon,
+  statsTrace,
   type TraceMonde,
 } from './laser'
-import { MAT_BAIE, MAT_GRILLE, MAT_MIROIR, MAT_VIDE, MAT_WALL } from './level'
+import { MAT_BAIE, MAT_GRILLE, MAT_MIROIR, MAT_VIDE, MAT_WALL, type ObstacleBox } from './level'
 import { DEFAULT_PARAMS } from '../sim/params'
 import { FluidSim, KIND_FREE, KIND_PLAYER, type Bounds } from '../sim/solver'
 
@@ -562,5 +569,182 @@ describe('traceLaser — le MIROIR FIXE réfléchit', () => {
     }
     const res = traceLaser({ x: 0, y: 0, angle: -90 }, monde)
     expect(res.rebondsGlace).toBe(LASER_MAX_BOUNCES)
+  })
+})
+
+// ---- Le filtre des boîtes (perf) : le rapport du 14/09/2026, salle
+// démineur sur Firefox — 97 ms d'« autre JS » par image, c'était le traceur
+// qui testait toutes les boîtes du tableau à chaque pas de 5 u.
+describe('traceLaser — le filtre des boîtes : un pas ne teste que ce qui est sur sa route', () => {
+  it('l’intervalle du rayon dans une enveloppe : devant, dedans, à côté, derrière', () => {
+    const e = { minX: 100, minY: -50, maxX: 200, maxY: 50 }
+    const out = { tIn: 0, tOut: 0 }
+    // devant, en plein dedans : entre à 100, sort à 200
+    expect(intervalleRayon(0, 0, 1, 0, e, out)).toBe(true)
+    expect(out.tIn).toBeCloseTo(100)
+    expect(out.tOut).toBeCloseTo(200)
+    // parti DE L'INTÉRIEUR : l'intervalle commence à 0
+    expect(intervalleRayon(150, 0, 1, 0, e, out)).toBe(true)
+    expect(out.tIn).toBe(0)
+    expect(out.tOut).toBeCloseTo(50)
+    // à côté (le rayon passe au-dessus) : rien
+    expect(intervalleRayon(0, 80, 1, 0, e, out)).toBe(false)
+    // derrière (le rayon s'en éloigne) : rien
+    expect(intervalleRayon(300, 0, 1, 0, e, out)).toBe(false)
+    // un rayon VERTICAL (dx = 0) : la colonne compte, pas la division par zéro
+    expect(intervalleRayon(150, -300, 0, 1, e, out)).toBe(true)
+    expect(out.tIn).toBeCloseTo(250)
+    expect(out.tOut).toBeCloseTo(350)
+    expect(intervalleRayon(50, -300, 0, 1, e, out)).toBe(false)
+    // en diagonale : les deux bornes viennent des deux axes
+    expect(intervalleRayon(0, -100, Math.SQRT1_2, Math.SQRT1_2, e, out)).toBe(true)
+    expect(out.tIn).toBeCloseTo(100 * Math.SQRT2) // x atteint 100 en même temps que y atteint 0
+    expect(out.tOut).toBeCloseTo(150 * Math.SQRT2) // y sort à 50 avant que x sorte à 200
+  })
+
+  it('l’enveloppe d’une boîte PIVOTÉE est celle du rectangle tourné, pas de min/max', () => {
+    // une barre de 300 × 40 couchée, pivotée de 90° : elle occupe 40 × 300
+    const e = enveloppeBoite({ minX: -150, minY: -20, maxX: 150, maxY: 20, angle: 90 }, 0)
+    expect(e.minX).toBeCloseTo(-20)
+    expect(e.maxX).toBeCloseTo(20)
+    expect(e.minY).toBeCloseTo(-150)
+    expect(e.maxY).toBeCloseTo(150)
+    // à 45°, la diagonale déborde des deux côtés
+    const d = enveloppeBoite({ minX: -150, minY: -20, maxX: 150, maxY: 20, angle: 45 }, 0)
+    expect(d.maxX).toBeCloseTo(170 * Math.SQRT1_2)
+    expect(d.maxY).toBeCloseTo(170 * Math.SQRT1_2)
+    // droite : min/max, gonflée de la marge
+    const r = enveloppeBoite({ minX: -150, minY: -20, maxX: 150, maxY: 20 }, 5)
+    expect(r).toEqual({ minX: -155, minY: -25, maxX: 155, maxY: 25 })
+  })
+
+  it('une barre PIVOTÉE absorbe là où sa boîte min/max ne passe pas', () => {
+    // la barre 300 × 40 pivotée de 90° se dresse de y = −150 à 150 ; un rayon
+    // à y = 100 est loin au-dessus de min/max (±20) mais doit s'y éteindre —
+    // c'est ce qui tomberait si le filtre lisait min/max sans la rotation
+    const t = traceLaser(
+      { x: -900, y: 100, angle: 0 },
+      monde({ boxes: [{ minX: -150, minY: -20, maxX: 150, maxY: 20, material: MAT_WALL, angle: 90 }] }),
+    )
+    const fin = t.points[t.points.length - 1]
+    expect(fin.x).toBeGreaterThan(-20 - LASER_STEP)
+    expect(fin.x).toBeLessThan(20)
+  })
+
+  it('un tableau de 112 boîtes ne coûte pas 112 tests par pas', () => {
+    // un damier de parois entre lesquelles le rayon file (c'est la salle
+    // démineur : beaucoup de blocs, de longs couloirs) ; le rayon frôle une
+    // rangée sans jamais y entrer
+    const boxes: ObstacleBox[] = []
+    for (let i = 0; i < 14; i++)
+      for (let j = 0; j < 8; j++)
+        boxes.push({
+          minX: -900 + i * 130,
+          minY: -560 + j * 150,
+          maxX: -900 + i * 130 + 60,
+          maxY: -560 + j * 150 + 60,
+          material: MAT_WALL,
+        })
+    expect(boxes.length).toBe(112)
+    const t = traceLaser({ x: -990, y: -480, angle: 0 }, monde({ boxes }))
+    const fin = t.points[t.points.length - 1]
+    expect(fin.x).toBeGreaterThan(990) // traversée complète : ~400 pas
+    expect(statsTrace.pas).toBeGreaterThan(350)
+    // AVANT le filtre : 112 boîtes × 2 passes × ~400 pas ≈ 90 000 tests. Le
+    // rayon longe une rangée de 14 boîtes à 10 u sous leur enveloppe gonflée :
+    // seules celles-ci sont candidates, et seulement sur leur intervalle
+    expect(statsTrace.testsBoites).toBeLessThan(statsTrace.pas * 4)
+    // et l'absorption est intacte : le même rayon 30 u plus haut meurt
+    // dans la première boîte de la rangée
+    const bloque = traceLaser({ x: -990, y: -530, angle: 0 }, monde({ boxes }))
+    const stop = bloque.points[bloque.points.length - 1]
+    expect(stop.x).toBeGreaterThan(-900 - LASER_STEP)
+    expect(stop.x).toBeLessThan(-840)
+  })
+
+  it('le miroir garde la main sur la paroi qui le chevauche, dans l’ordre du tableau', () => {
+    // un miroir posé SUR une paroi : avant le filtre, le miroir était testé
+    // d'abord — le faisceau réfléchit au lieu de s'éteindre. Toujours vrai.
+    const res = traceLaser(
+      { x: 0, y: 200, angle: -90 },
+      monde({
+        boxes: [
+          { minX: -100, minY: -220, maxX: 100, maxY: -160, material: MAT_WALL },
+          { minX: -100, minY: -220, maxX: 100, maxY: -160, material: MAT_MIROIR },
+        ],
+        cibles: [{ x: 0, y: 400, r: 26 }],
+      }),
+    )
+    expect(res.touchees).toEqual([0])
+  })
+
+  it('le MILIEU en un passage répond comme les trois requêtes séparées', () => {
+    const sim = new FluidSim({ ...DEFAULT_PARAMS }, BOUNDS, 4096)
+    // un corps liquide, un bloc de glace, un nuage de vapeur — côte à côte
+    sim.spawnDisc(-300, 0, 300, KIND_PLAYER)
+    for (let k = -8; k <= 8; k++)
+      for (let c = 0; c < 4; c++) {
+        const i = sim.addParticle(100 + c * 6, k * 6, KIND_FREE)
+        sim.frost[i] = 1
+        sim.frozen[i] = 1
+      }
+    // le nuage : la vapeur se tient (le pas ne la recondense pas d'un coup)
+    sim.gasIntent = true
+    for (let k = 0; k < 40; k++) {
+      const i = sim.addParticle(400 + (k % 8) * 9, -30 + Math.floor(k / 8) * 9, KIND_FREE)
+      sim.vapor[i] = 1
+      sim.gaseous[i] = 1
+      sim.gasLink[i] = 1
+    }
+    sim.relabel()
+    sim.step(sim.params.dt) // construit la grille de voisinage
+    const rIce = sim.params.particleSpacing * 1.3
+    const rEau = sim.params.laserMirrorSmooth * 0.6
+    let glace = 0
+    let eau = 0
+    let vapeur = 0
+    // un peigne de points qui traverse les trois corps et leurs lisières
+    for (let x = -450; x <= 500; x += 3)
+      for (const y of [-60, -20, 0, 15, 45]) {
+        const m = sim.milieuAt(x, y, rIce, rEau)
+        expect((m & MILIEU_GLACE) !== 0).toBe(sim.iceNormalAt(x, y, rIce, sim.params.laserMirrorSmooth) !== null)
+        expect((m & MILIEU_EAU) !== 0).toBe(sim.liquidAt(x, y, rEau))
+        expect((m & MILIEU_VAPEUR) !== 0).toBe(sim.gasAt(x, y, rIce))
+        if (m & MILIEU_GLACE) glace++
+        if (m & MILIEU_EAU) eau++
+        if (m & MILIEU_VAPEUR) vapeur++
+      }
+    // le peigne a bien rencontré les trois milieux (sinon le test ne prouve rien)
+    expect(glace).toBeGreaterThan(0)
+    expect(eau).toBeGreaterThan(0)
+    expect(vapeur).toBeGreaterThan(0)
+  })
+
+  it('avec le raccourci du milieu, le tracé dans le corps simulé est le même', () => {
+    const sim = new FluidSim({ ...DEFAULT_PARAMS }, BOUNDS, 4096)
+    sim.spawnDisc(0, 0, 700, KIND_PLAYER)
+    sim.relabel()
+    sim.step(sim.params.dt)
+    const rIce = sim.params.particleSpacing * 1.3
+    const rEau = sim.params.laserMirrorSmooth * 0.6
+    const separe: TraceMonde = monde({
+      iceNormal: (x, y) => sim.iceNormalAt(x, y, rIce, sim.params.laserMirrorSmooth),
+      eau: {
+        dedans: (x, y) => sim.liquidAt(x, y, rEau),
+        normale: (x, y) => sim.liquidNormalAt(x, y, rEau),
+      },
+      vapeur: (x, y) => sim.gasAt(x, y, rIce),
+    })
+    const raccourci: TraceMonde = { ...separe, milieu: (x, y) => sim.milieuAt(x, y, rIce, rEau) }
+    for (const em of [
+      { x: -600, y: -45, angle: 0 },
+      { x: -600, y: -30, angle: 5 },
+      { x: 20, y: -590, angle: 88 },
+    ]) {
+      const a = traceLaser(em, separe)
+      const b = traceLaser(em, raccourci)
+      expect(b.points).toEqual(a.points)
+      expect(a.points.length).toBeGreaterThan(2) // le corps a bien été traversé
+    }
   })
 })
