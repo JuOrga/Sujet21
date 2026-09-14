@@ -416,6 +416,19 @@ function etapeAmorce(etape: 'ouverture' | 'rendu'): void {
   w.__sujet21Etape?.(etape)
 }
 etapeAmorce('ouverture')
+// LE POULS DE LA COMPILATION. L'étape « rendu » n'est dite qu'une fois,
+// mais tant que le pilote compile en coulisse, la boucle tourne et
+// l'interroge à chaque image : c'est un signe de vie, et la garde doit le
+// recevoir — sinon, sur une carte où la compilation dépasse douze secondes
+// (Chrome sur Windows : c'est le compilateur Direct3D qui travaille, dans
+// ses fils), elle sonnait « trop longtemps » par-dessus un chargement qui
+// avançait, et son conseil de RECHARGER relançait tout de zéro : le
+// panneau revenait, encore et encore. La garde borne elle-même la patience
+// (index.html) : un pilote qui n'en finit jamais finit par être signalé.
+function poulsAmorce(fait: number, total: number): void {
+  const w = window as unknown as { __sujet21Compile?: (f: number, t: number) => void }
+  w.__sujet21Compile?.(fait, total)
+}
 // (l'ancien délai d'affichage du bilan a cédé la place à la MISE EN
 // BONBONNE : c'est le choix d'instrument qui mène au tableau suivant)
 
@@ -15306,6 +15319,8 @@ function corpsImage(now: number): boolean {
       attenteRenduDite = true
       etapeAmorce('rendu')
     }
+    const av = renderer.avancementCompilation()
+    poulsAmorce(av.fait, av.total)
     return false
   }
   if (!amorceSignalee) {
