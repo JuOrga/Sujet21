@@ -804,6 +804,51 @@ float sdfVisible(int bi, vec2 p) {
   return dec.y > 0.5 ? formeSdf(wb, uBoxes[bi], dec.y, dec.z, dec.w) : db;
 }
 
+// ---- PAS D'OPÉRATION DE GRADIENT DANS LA BOUCLE DES BOÎTES ---------------
+//
+// POURQUOI. Le rapport de performance du 14/09/2026 (Firefox 155 sur
+// Windows) donnait 118,6 s entre la naissance du rendu et la première image
+// (compileRenduMs), sans compilation parallèle (compileParallele : false —
+// Firefox n'expose pas KHR_parallel_shader_compile, bug Mozilla 1736076) :
+// deux minutes de page noire, à chaque chargement, le fil principal gelé.
+//
+// Sur Windows, le GLSL passe par ANGLE puis par le compilateur Direct3D
+// (fxc). Celui-ci ne tolère pas une opération de GRADIENT (un texture()
+// sans niveau de détail explicite, dFdx, dFdy, fwidth) dans une boucle à
+// flot divergent (break, continue) : il DÉROULE alors la boucle entière
+// pour s'en sortir. La boucle des boîtes en avait quatre — deux
+// échantillonnages (l'atlas des habillages, l'iris du sas) et deux
+// dFdx/dFdy du SDF (la tranche du relief, le biseau d'éclairage) — pour une
+// borne de MAX_BOXES = 160 et un corps de cinq cents lignes où formeSdf
+// s'inline trois fois : cent soixante copies d'un corps énorme, et fxc y
+// passe ses deux minutes avant de rendre les armes. Chrome souffre du même
+// compilateur mais compile en parallèle et garde un cache disque : le prix
+// s'y paie une fois, en coulisse. Firefox le paie à chaque visite, devant.
+//
+// LA RÈGLE, GARDÉE PAR gradientBoucles.spec.ts : dans les boucles sur les
+// boîtes, jamais de texture() implicite ni de dFdx/dFdy — textureGrad avec
+// la dérivée écrite à la main (pxMonde), et le gradient du SDF par
+// différences finies ci-dessous. Et la borne de ces boucles est uBoxCount,
+// pas MAX_BOXES : un nombre que le compilateur ne connaît pas ne se déroule
+// pas. Le résultat à l'écran est le même : les deux usages du gradient n'en
+// prennent que la DIRECTION, et la différence finie sur un champ de
+// distance vaut la dérivée d'écran à un facteur positif près — mieux, même :
+// dFdx lisait la valeur du pixel voisin, indéfinie quand ce voisin avait
+// sauté la boîte d'un continue.
+
+// le gradient du SDF de base d'une boîte, au point wb de son repère local
+// (dépivoté), par différences finies : d est la distance déjà calculée en
+// wb, (bca, bsa) le cosinus et le sinus de l'angle de la boîte — les axes du
+// MONDE se lisent (bca, -bsa) et (bsa, bca) dans le repère local
+vec2 gradSdfBoite(int bi, vec2 wb, float d, vec4 dec, float bca, float bsa) {
+  const float e = 0.5;
+  vec2 wx = wb + vec2(bca, -bsa) * e;
+  vec2 wy = wb + vec2(bsa, bca) * e;
+  float dx = dec.y > 0.5 ? formeSdf(wx, uBoxes[bi], dec.y, dec.z, dec.w) : boxSdf(wx, uBoxes[bi]);
+  float dy = dec.y > 0.5 ? formeSdf(wy, uBoxes[bi], dec.y, dec.z, dec.w) : boxSdf(wy, uBoxes[bi]);
+  return vec2(dx - d, dy - d) / e;
+}
+
 // ---- L'OMBRE PORTÉE DU VOLUME (dynamique) --------------------------------
 // La carte de lumière est CUITE : elle ne connaît que les obstacles, qui ne
 // bougent pas. Le corps, lui, se déplace à chaque image — il ne peut pas y
@@ -920,6 +965,9 @@ void main() {
   // Reconstruction monde (repère y vers le haut, cohérent avec la passe A)
   vec2 css = gl_FragCoord.xy / uDpr;
   vec2 world = uCenter + (css - uViewport * 0.5) / uZoom;
+  // la largeur d'un pixel de la toile en unités monde : c'est la dérivée
+  // d'écran de world, écrite explicitement pour les textureGrad des boucles
+  float pxMonde = 1.0 / (uDpr * uZoom);
 
   // La cuve d'essai flotte dans le vide : le décor se scinde en deux mondes
   // de part et d'autre de la coque (roomD < 0 : intérieur).
@@ -929,8 +977,7 @@ void main() {
     // rectangle de la toile, c'est l'union des creux des COQUES posées.
     // Aucun uniforme de plus : les coques sont déjà là, dans uBoxes.
     roomD = 1.0e9;
-    for (int bi = 0; bi < MAX_BOXES; bi++) {
-      if (bi >= uBoxCount) break;
+    for (int bi = 0; bi < min(uBoxCount, MAX_BOXES); bi++) {
       vec4 dec = decodeAux(uBoxAux[bi].x);
       if (dec.y < 4.5) continue; // seule une COQUE fait salle
       vec2 c = (uBoxes[bi].xy + uBoxes[bi].zw) * 0.5;
@@ -1242,8 +1289,7 @@ void main() {
   // comprise : on n'écrase que sur un STRICTEMENT plus petit.
   float dCouv = 1.0e9;
   int iCouv = -1;
-  for (int bi = 0; bi < MAX_BOXES; bi++) {
-    if (bi >= uBoxCount) break;
+  for (int bi = 0; bi < min(uBoxCount, MAX_BOXES); bi++) {
     float mc = decodeAux(uBoxAux[bi].x).x;
     if (mc > 2.5 && mc < 3.5) continue; // le sas est une bouche, il n'enterre rien
     if (mc > 10.5) continue;             // le vide et la baie sont des trous : rien à enterrer
@@ -1253,17 +1299,18 @@ void main() {
       iCouv = bi;
     }
   }
-  for (int bi = 0; bi < MAX_BOXES; bi++) {
-    if (bi >= uBoxCount) break;
+  for (int bi = 0; bi < min(uBoxCount, MAX_BOXES); bi++) {
     // boîte oblique : le monde pivote dans le repère local de la boîte —
     // la distance signée (remplissage, arête, aura) suit la rotation
     vec2 wb = world;
     float bAng = uBoxAux[bi].y;
+    float bca = 1.0;
+    float bsa = 0.0;
     if (abs(bAng) > 0.0005) {
       vec2 bc = 0.5 * (uBoxes[bi].xy + uBoxes[bi].zw);
       vec2 rel = world - bc;
-      float bca = cos(bAng);
-      float bsa = sin(bAng);
+      bca = cos(bAng);
+      bsa = sin(bAng);
       wb = bc + vec2(bca * rel.x + bsa * rel.y, -bsa * rel.x + bca * rel.y);
     }
     float d = boxSdf(wb, uBoxes[bi]);
@@ -1359,7 +1406,7 @@ void main() {
     // sur sa tranche : turquoise mouillé, violet cireux, vert de membrane,
     // ambre de borne… Le sommet (déplacé) se peint ensuite par-dessus.
     if (flanc > 0.003) {
-      vec2 gB = vec2(dFdx(d), dFdy(d));
+      vec2 gB = gradSdfBoite(bi, wb, d, dec, bca, bsa);
       float gn2 = max(length(gB), 1e-5);
       vec2 nrm = gB / gn2;
       // la hauteur RÉELLE le long de la tranche : 0 au pied (la silhouette
@@ -1476,7 +1523,11 @@ void main() {
           // BAS — sans cette inversion, chaque habillage affichait la tuile
           // de l'AUTRE rangée (caissons devenait aération, écrans poutrelle…)
           uvp.y = 1.0 - uvp.y;
-          fillCol = texture(uTexParoi, uvp).rgb * 0.92;
+          // niveau de détail écrit explicitement (pas de gradient en boucle) :
+          // une tuile de l'atlas fait 0,25 × 0,5 d'UV pour pas unités monde
+          fillCol = textureGrad(uTexParoi, uvp,
+                                vec2(0.25 / pas.x, 0.0) * pxMonde,
+                                vec2(0.0, 0.5 / pas.y) * pxMonde).rgb * 0.92;
           edgeCol = vec3(0.32, 0.40, 0.48);
         } else if (skin > 3.5) {
           // BLINDAGE : plaque lourde mate, chevrons d'avertissement au bord
@@ -1731,7 +1782,10 @@ void main() {
         float cs = cos(rot);
         float sn = sin(rot);
         vec2 cuv = mat2(cs, -sn, sn, cs) * (rel / (2.0 * frameR));
-        vec3 irisCol = texture(uTexIris, cuv + 0.5).rgb;
+        // niveau de détail écrit explicitement : l'image couvre 2 · frameR
+        vec3 irisCol = textureGrad(uTexIris, cuv + 0.5,
+                                   vec2(pxMonde / (2.0 * frameR), 0.0),
+                                   vec2(0.0, pxMonde / (2.0 * frameR))).rgb;
         // Détourage serré : le cadre touche le bord de l'image, on coupe juste
         // à l'intérieur pour que le fond brun ne déborde jamais.
         float aMask = 1.0 - smoothstep(0.435, 0.465, length(rel) / (2.0 * frameR));
@@ -1757,7 +1811,7 @@ void main() {
     // Le gradient du SDF vient des dérivées d'écran : gratuit, et il suit
     // n'importe quelle forme. (Le sas, une bouche, ne se biseaute pas.)
     if (uLumiere > 0.5 && solide) {
-      vec2 gd = vec2(dFdx(d), dFdy(d));
+      vec2 gd = gradSdfBoite(bi, wb, d, dec, bca, bsa);
       float gn = length(gd);
       if (gn > 1e-6) {
         float facing = dot(gd / gn, lampeDir);
@@ -2471,8 +2525,7 @@ vec2 pointLampe(int li, vec2 p) {
 // d'une salle (jusqu'au plafond, jamais enjambée).
 float sceneSdf(vec2 p, float alt) {
   float d = 1e9;
-  for (int i = 0; i < MAX_BOXES; i++) {
-    if (i >= uBoxCount) break;
+  for (int i = 0; i < min(uBoxCount, MAX_BOXES); i++) {
     vec4 dec = decodeAux(uBoxAux[i].x);
     if (dec.x > 2.5 && dec.x < 3.5) continue; // sas : une bouche, pas un mur
     if (dec.x > 10.5) continue;              // vide, baie : un trou dans le plancher, pas un mur
@@ -2502,8 +2555,7 @@ float sceneSdf(vec2 p, float alt) {
 // traverse vraiment leur silhouette (SDF au point de passage).
 float grilleTrans(vec2 p, vec2 dir, float tMax) {
   float trans = 1.0;
-  for (int i = 0; i < MAX_BOXES; i++) {
-    if (i >= uBoxCount) break;
+  for (int i = 0; i < min(uBoxCount, MAX_BOXES); i++) {
     vec4 dec = decodeAux(uBoxAux[i].x);
     if (dec.x < 4.5 || dec.x > 5.5) continue; // seuls les évents
     vec2 lp = p;
@@ -2548,8 +2600,7 @@ float grilleTrans(vec2 p, vec2 dir, float tMax) {
 // derrière une vitre, la lumière de l'autre côté.
 float vitreTrans(vec2 p, vec2 dir, float tMax) {
   float trans = 1.0;
-  for (int i = 0; i < MAX_BOXES; i++) {
-    if (i >= uBoxCount) break;
+  for (int i = 0; i < min(uBoxCount, MAX_BOXES); i++) {
     vec4 dec = decodeAux(uBoxAux[i].x);
     if (dec.x > 0.5) continue; // seules les parois neutres…
     if (uBoxAux[i].z < 8.5) continue; // … habillées en vitre
