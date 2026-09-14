@@ -18,6 +18,10 @@ export class PerfCollector {
   private readonly cpu = new Float32Array(CAP) // ms CPU TOTAL de la frame (tout le rappel)
   private readonly phys = new Float32Array(CAP) // ms de pas physiques dans l'image
   private readonly rend = new Float32Array(CAP) // ms de soumission du rendu (CPU)
+  // ms de traçage des faisceaux laser — un morceau de l'« autre JS », nommé
+  // depuis qu'il a mangé 97 ms par image sur une salle à sept émetteurs
+  // (rapport du 14/09/2026) sans que le rapport puisse le désigner
+  private readonly laser = new Float32Array(CAP)
   private readonly steps = new Uint8Array(CAP) // pas physiques consommés
   private readonly parts = new Uint16Array(CAP) // particules simulées
   // l'ÉCHELLE DE RENDU de l'image, en centièmes (100 = natif). C'était
@@ -61,6 +65,7 @@ export class PerfCollector {
     steps: number,
     particles: number,
     echelleX100: number,
+    laserMs = 0,
   ): void {
     // Une « image » de plus d'1,5 s n'est pas une image : c'est un onglet
     // endormi, un écran éteint, une appli passée derrière — le navigateur
@@ -74,6 +79,7 @@ export class PerfCollector {
     this.cpu[i] = cpuMs
     this.phys[i] = physMs
     this.rend[i] = rendMs
+    this.laser[i] = laserMs
     this.steps[i] = Math.min(255, steps)
     this.parts[i] = Math.min(65535, particles)
     this.qual[i] = echelleX100
@@ -126,13 +132,15 @@ export class PerfCollector {
     // parlent. `horsCpuMs` = dt − cpu total : du temps où NOTRE code ne
     // tourne pas — file GPU pleine, compositeur, gel du système. `autreJsMs`
     // = cpu − physique − rendu : notre code HORS des deux gros postes
-    // (laser, étiquettes DOM, panneau 2D, HUD…).
+    // (laser, étiquettes DOM, panneau 2D, HUD…) — dont `laserMs`, le traçage
+    // des faisceaux, dit à part.
     const pires: {
       dtMs: number
       cpuMs: number
       physMs: number
       rendMs: number
       autreJsMs: number
+      laserMs: number
       horsCpuMs: number
       pas: number
       particules: number
@@ -148,6 +156,7 @@ export class PerfCollector {
           physMs: Math.round(this.phys[k] * 100) / 100,
           rendMs: Math.round(this.rend[k] * 100) / 100,
           autreJsMs: Math.round((cpu - this.phys[k] - this.rend[k]) * 100) / 100,
+          laserMs: Math.round(this.laser[k] * 100) / 100,
           horsCpuMs: Math.round((d - cpu) * 100) / 100,
           pas: this.steps[k],
           particules: this.parts[k],
@@ -160,6 +169,7 @@ export class PerfCollector {
     let physSum = 0
     let rendSum = 0
     let cpuSum = 0
+    let laserSum = 0
     let sup20 = 0
     let sup33 = 0
     let sup50 = 0
@@ -167,6 +177,7 @@ export class PerfCollector {
       physSum += this.phys[k]
       rendSum += this.rend[k]
       cpuSum += this.cpu[k]
+      laserSum += this.laser[k]
       if (this.dt[k] > 20) sup20++
       if (this.dt[k] > 33.4) sup33++
       if (this.dt[k] > 50) sup50++
@@ -185,6 +196,7 @@ export class PerfCollector {
       let sr = 0
       let sa = 0
       let sh = 0
+      let sl = 0
       const dominante = { physique: 0, rendu: 0, autreJs: 0, horsCpu: 0 }
       for (let k = 0; k < n; k++) {
         const d = this.dt[k]
@@ -198,6 +210,7 @@ export class PerfCollector {
         sr += rend
         sa += autre
         sh += hors
+        sl += this.laser[k]
         const m = Math.max(phys, rend, autre, hors)
         if (m === hors) dominante.horsCpu++
         else if (m === phys) dominante.physique++
@@ -208,7 +221,7 @@ export class PerfCollector {
       return {
         plage: b.plage,
         images,
-        moyennes: { physMs: r(sp), renduCpuMs: r(sr), autreJsMs: r(sa), horsCpuMs: r(sh) },
+        moyennes: { physMs: r(sp), renduCpuMs: r(sr), autreJsMs: r(sa), laserMs: r(sl), horsCpuMs: r(sh) },
         dominante,
       }
     })
@@ -235,7 +248,7 @@ export class PerfCollector {
     const perfMem = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory
     return {
       quoi: 'sujet21-rapport-perf',
-      version: 4,
+      version: 5, // 5 : le poste « laser » (traçage des faisceaux) dit à part
       quand: new Date().toISOString(),
       appareil: {
         userAgent: navigator.userAgent,
@@ -265,6 +278,7 @@ export class PerfCollector {
           renduCpuMs: Math.round((rendSum / Math.max(1, n)) * 100) / 100,
           cpuTotalMs: Math.round((cpuSum / Math.max(1, n)) * 100) / 100,
           autreJsMs: Math.round(((cpuSum - physSum - rendSum) / Math.max(1, n)) * 100) / 100,
+          laserMs: Math.round((laserSum / Math.max(1, n)) * 100) / 100,
         },
         memoireJsMo: perfMem ? Math.round(perfMem.usedJSHeapSize / 1048576) : null,
       },
