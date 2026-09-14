@@ -64,7 +64,9 @@ function gradientDans(corps: string, vus = new Set<string>()): string | null {
 const boucles: { ligne: number; entete: string; corps: string }[] = []
 for (let i = 0; i < lignes.length; i++) {
   const m = lignes[i].match(/^\s*for \(int \w+ = 0; (.*?); \w+\+\+\) \{/)
-  if (!m || !/uBoxCount|MAX_BOXES/.test(m[1])) continue
+  // (nBoites : la liste de la case dans la grille de repérage — le shader de
+  // composition ne parcourt plus que celle-ci, cf. grilleBoites.ts)
+  if (!m || !/uBoxCount|MAX_BOXES|nBoites/.test(m[1])) continue
   boucles.push({ ligne: i + 1, entete: m[1], corps: lignes.slice(i, finDuBloc(i) + 1).join('\n') })
 }
 
@@ -73,9 +75,9 @@ describe('Les boucles sur les boîtes des shaders — ce que fxc ne déroule pas
     expect(boucles.map((b) => b.ligne)).toHaveLength(6)
   })
 
-  it('leur borne est uBoxCount, jamais la constante MAX_BOXES seule', () => {
+  it('leur borne est uBoxCount (ou la liste de la case), jamais la constante MAX_BOXES seule', () => {
     for (const b of boucles) {
-      expect(b.entete, `ligne ${b.ligne}`).toContain('uBoxCount')
+      expect(b.entete, `ligne ${b.ligne}`).toMatch(/uBoxCount|nBoites/)
     }
   })
 

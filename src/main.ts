@@ -3991,6 +3991,9 @@ function rapportPerf(): Record<string, unknown> {
       ...amorce,
       compileParallele: renderer.compileEnParallele,
     },
+    // la grille de repérage des boîtes (render/grilleBoites.ts) : active ou
+    // débranchée (?grille=0), et si une case a débordé sur ce tableau
+    grille: renderer.etatGrille(),
     session: {
       tableau: `${level.code} — ${level.name}`,
       particules: sim.count,
@@ -7257,6 +7260,10 @@ if (new URLSearchParams(location.search).has('editeur')) {
   hasPlayed = true
   void openEditor()
 }
+// ?grille=0 : la grille de repérage des boîtes débranchée (render/
+// grilleBoites.ts) — l'A/B de performance en prévisualisation : même
+// adresse, deux rapports, le chiffre hors processeur dit le gain réel.
+if (new URLSearchParams(location.search).get('grille') === '0') renderer.grilleActive = false
 if (new URLSearchParams(location.search).has('carte')) {
   hasPlayed = true
   void openEditeurCarte()

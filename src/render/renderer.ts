@@ -3,6 +3,7 @@
 //      résolution (R = champ, G = champ·vitesse, B = champ·appartenance) ;
 //   B. seuillage du champ plein écran + trame de repère procédurale du décor.
 
+import { construitGrille, margeInfluence, type BoiteGrille, type Grille, GRILLE_CASES, GRILLE_TOUT } from './grilleBoites'
 import type { FluidSim } from '../sim/solver'
 import { KIND_PLAYER, etatRendu } from '../sim/solver'
 import type { SimParams } from '../sim/params'
@@ -10,6 +11,10 @@ import {
   LAMPE_HAUTEUR_DEFAUT,
   LAMPE_HAUTEUR_MAX,
   LAMPE_HAUTEUR_MIN,
+  MAT_BAIE,
+  MAT_CHAUD,
+  MAT_EXIT,
+  MAT_VIDE,
   lampeCouleurRVB,
   zonePhases,
 } from '../game/level'
@@ -362,6 +367,17 @@ uniform vec4 uBoxes[MAX_BOXES];   // minX, minY, maxX, maxY
 // 1 plein, 0 déchargé) ; w : portée d'aura propre (chaudière, 1 = banc).
 // Empaquetés par boîte pour tenir dans le budget des GPU mobiles.
 uniform vec4 uBoxAux[MAX_BOXES];
+// LA GRILLE DE REPÉRAGE (render/grilleBoites.ts) : pour chaque case du
+// tableau, la liste des boîtes qui peuvent teinter ses pixels — un ivec4
+// par case, l'octet 0 le compte (255 : toutes), puis quinze indices, dans
+// l'ordre du tableau. Les trois boucles sur les boîtes ne parcourent plus
+// que cette liste : 112 boîtes par pixel sur la salle démineur, c'était
+// 56 ms par image sur l'iPad (rapport du 14/09/2026).
+#define GRILLE_CASES 128
+uniform highp ivec4 uGrille[GRILLE_CASES];
+uniform vec2 uGrilleMin;
+uniform vec2 uGrilleInv;
+uniform ivec2 uGrilleN;
 uniform float uTime;
 uniform float uExitRadius; // portée de l'aspiration du sas (halo de courant)
 uniform float uColdBand;   // portée de l'aura de gel des plaques froides
@@ -969,6 +985,14 @@ void main() {
   // d'écran de world, écrite explicitement pour les textureGrad des boucles
   float pxMonde = 1.0 / (uDpr * uZoom);
 
+  // la case de ce pixel dans la grille de repérage, et sa liste de boîtes :
+  // nBoites entrées, lues octet par octet (voir les boucles) — ou, si la
+  // case a débordé (255), toutes les boîtes comme avant
+  ivec2 gCel = clamp(ivec2(floor((world - uGrilleMin) * uGrilleInv)), ivec2(0), uGrilleN - 1);
+  highp ivec4 gCase = uGrille[gCel.y * uGrilleN.x + gCel.x];
+  bool gTout = (gCase.x & 255) == 255;
+  int nBoites = gTout ? min(uBoxCount, MAX_BOXES) : (gCase.x & 255);
+
   // La cuve d'essai flotte dans le vide : le décor se scinde en deux mondes
   // de part et d'autre de la coque (roomD < 0 : intérieur).
   float roomD;
@@ -977,7 +1001,8 @@ void main() {
     // rectangle de la toile, c'est l'union des creux des COQUES posées.
     // Aucun uniforme de plus : les coques sont déjà là, dans uBoxes.
     roomD = 1.0e9;
-    for (int bi = 0; bi < min(uBoxCount, MAX_BOXES); bi++) {
+    for (int k = 0; k < nBoites; k++) {
+      highp int bi = gTout ? k : ((gCase[(k + 1) >> 2] >> (((k + 1) & 3) * 8)) & 255);
       vec4 dec = decodeAux(uBoxAux[bi].x);
       if (dec.y < 4.5) continue; // seule une COQUE fait salle
       vec2 c = (uBoxes[bi].xy + uBoxes[bi].zw) * 0.5;
@@ -1289,7 +1314,8 @@ void main() {
   // comprise : on n'écrase que sur un STRICTEMENT plus petit.
   float dCouv = 1.0e9;
   int iCouv = -1;
-  for (int bi = 0; bi < min(uBoxCount, MAX_BOXES); bi++) {
+  for (int k = 0; k < nBoites; k++) {
+    highp int bi = gTout ? k : ((gCase[(k + 1) >> 2] >> (((k + 1) & 3) * 8)) & 255);
     float mc = decodeAux(uBoxAux[bi].x).x;
     if (mc > 2.5 && mc < 3.5) continue; // le sas est une bouche, il n'enterre rien
     if (mc > 10.5) continue;             // le vide et la baie sont des trous : rien à enterrer
@@ -1299,7 +1325,8 @@ void main() {
       iCouv = bi;
     }
   }
-  for (int bi = 0; bi < min(uBoxCount, MAX_BOXES); bi++) {
+  for (int k = 0; k < nBoites; k++) {
+    highp int bi = gTout ? k : ((gCase[(k + 1) >> 2] >> (((k + 1) & 3) * 8)) & 255);
     // boîte oblique : le monde pivote dans le repère local de la boîte —
     // la distance signée (remplissage, arête, aura) suit la rotation
     vec2 wb = world;
@@ -2993,6 +3020,17 @@ export class Renderer {
   private readonly scratch: Float32Array
   private readonly boxScratch = new Float32Array(MAX_BOXES * 4)
   private readonly auxScratch = new Float32Array(MAX_BOXES * 4) // matériau, angle, charge, aura
+  // LA GRILLE DE REPÉRAGE (grilleBoites.ts) : les boîtes vues par la grille
+  // (mutées en place, pas d'allocation par image), les cases empaquetées
+  // (un ivec4 par case) et la géométrie envoyée au shader
+  private readonly grilleBoites: BoiteGrille[] = Array.from({ length: MAX_BOXES }, () => ({
+    minX: 0, minY: 0, maxX: 0, maxY: 0, angle: 0, partout: false,
+  }))
+  private readonly grilleScratch = new Int32Array(GRILLE_CASES * 4)
+  private grille: Grille = { nx: 1, ny: 1, minX: 0, minY: 0, invX: 0, invY: 0, debordements: 0, maxEntrees: 0 }
+  /** Débranchable (?grille=0) pour l'A/B de performance : chaque case dit
+   *  alors « toutes les boîtes », et le shader fait comme avant. */
+  grilleActive = true
   private readonly floatField: boolean
   private fieldScale: number
   private fbo: WebGLFramebuffer | null = null
@@ -3378,6 +3416,18 @@ export class Renderer {
       this.uniforms[nom] = this.programmes.uniformes(nom)
     this.programmesPrets = true
     return true
+  }
+
+  /** La grille de repérage de la dernière image (rapport de perf) : active,
+   *  nombre de cases, cases qui ont débordé, plus longue liste. */
+  etatGrille(): { active: boolean; cases: number; debordements: number; maxEntrees: number } {
+    const g = this.grille
+    return {
+      active: this.grilleActive,
+      cases: g.nx * g.ny,
+      debordements: g.debordements,
+      maxEntrees: g.maxEntrees,
+    }
   }
 
   /** L'extension de compilation parallèle est-elle là ? (rapport de perf) */
@@ -3896,6 +3946,47 @@ export class Renderer {
         bx.material === 0 ? (bx.skin ?? 0) : sim.surchauffesVides.has(i) ? 0 : 1
       this.auxScratch[i * 4 + 3] = bx.aura ?? 1
     }
+    // LA GRILLE DE REPÉRAGE : quelles boîtes chaque case du tableau doit
+    // regarder. Reconstruite à chaque image (112 boîtes, quelques cases
+    // chacune : bien moins qu'une milliseconde), avec la marge de l'image —
+    // les auras suivent le refroidissement, le relief suit le zoom.
+    const coldBandEff = params.coldBand * (1 + params.chillColdGrowth * chill)
+    const heatBandEff = Math.max(0, params.heatBand * (1 - params.chillHeatFade * chill))
+    if (this.grilleActive) {
+      let auraMax = 1
+      for (let i = 0; i < boxCount; i++) {
+        const bx = boxes[i]
+        const g = this.grilleBoites[i]
+        g.minX = bx.minX
+        g.minY = bx.minY
+        g.maxX = bx.maxX
+        g.maxY = bx.maxY
+        g.angle = bx.angle ?? 0
+        // le sas aspire de loin, le vide et la baie montrent le dehors : pas
+        // de court-circuit de distance dans le shader, donc dans toutes les cases
+        g.partout = bx.material === MAT_EXIT || bx.material === MAT_VIDE || bx.material === MAT_BAIE
+        if (bx.material === MAT_CHAUD) auraMax = Math.max(auraMax, bx.aura ?? 1)
+      }
+      this.grille = construitGrille(
+        this.grilleBoites,
+        boxCount,
+        margeInfluence({
+          hydroBand: params.hydroBand,
+          coldBand: coldBandEff,
+          heatBand: heatBandEff,
+          auraMax,
+          zoom: camera.zoom,
+          relief,
+          viewportW,
+          viewportH,
+        }),
+        this.grilleScratch,
+      )
+    } else {
+      this.grilleScratch.fill(0)
+      this.grilleScratch[0] = GRILLE_TOUT
+      this.grille = { nx: 1, ny: 1, minX: 0, minY: 0, invX: 0, invY: 0, debordements: 0, maxEntrees: 0 }
+    }
     // La carte de lumière recuit si le décor ou les lampes ont changé
     const lampes = this.lampesEffectives(sim.bounds, lumieres)
     if (lumiere > 0.5)
@@ -3995,18 +4086,16 @@ export class Renderer {
     gl.uniform1i(cu['uBoxCount'], boxCount)
     gl.uniform4fv(cu['uBoxes[0]'], this.boxScratch)
     gl.uniform4fv(cu['uBoxAux[0]'], this.auxScratch)
+    gl.uniform4iv(cu['uGrille[0]'], this.grilleScratch)
+    gl.uniform2f(cu['uGrilleMin'], this.grille.minX, this.grille.minY)
+    gl.uniform2f(cu['uGrilleInv'], this.grille.invX, this.grille.invY)
+    gl.uniform2i(cu['uGrilleN'], this.grille.nx, this.grille.ny)
     gl.uniform1f(cu['uTime'], timeSec)
     gl.uniform1f(cu['uExitRadius'], params.exitRadius)
     // les auras dessinées suivent la physique refroidie (mêmes formules que
     // le solveur) : le danger se lit toujours à sa vraie portée
-    gl.uniform1f(
-      cu['uColdBand'],
-      params.coldBand * (1 + params.chillColdGrowth * chill),
-    )
-    gl.uniform1f(
-      cu['uHeatBand'],
-      Math.max(0, params.heatBand * (1 - params.chillHeatFade * chill)),
-    )
+    gl.uniform1f(cu['uColdBand'], coldBandEff)
+    gl.uniform1f(cu['uHeatBand'], heatBandEff)
     gl.uniform1f(cu['uHydroBand'], params.hydroBand)
     gl.uniform1f(cu['uChill'], chill)
     gl.uniform1f(cu['uDecor'], decor)
