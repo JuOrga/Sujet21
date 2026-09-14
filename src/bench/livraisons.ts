@@ -31,6 +31,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '14/09/2026 22:14',
+    title: 'LE VOILE DES CACHETTES MÉMOÏSÉ : le brouillard fermé se rend une fois par cachette et se pose en un drawImage',
+    notes: [
+      'LA DEMANDE : « est-ce que les performances sont impactées par ces changements ? » — mesuré plutôt qu’estimé, sur un banc 2D qui dessine les quatre cachettes du démineur avec l’ancien voile et le nouveau (Chromium sans tête, 1600 × 900). Réponse honnête : oui, le voile livré le soir même coûtait quatre fois l’ancien par image sur le canevas logiciel (10,1 ms contre 2,5 pour quatre cachettes), et soixante fois sur le canevas accéléré émulé — douze traits larges pour le fondu, une recomposition source-in de tout le calque, la hachure et quatre dégradés, à chaque image, pour un voile qui ne change pourtant pas d’une image à l’autre.',
+      'CE QUI CHANGE (render/voileCache.ts) : le voile FERMÉ se rend UNE FOIS dans un bitmap mémoïsé par cachette (main.ts en garde un par cachette du tableau, vidés au changement de tableau), repeint seulement quand sa signature change — le zoom, la forme, la place du contour dans l’emprise, et le pas de dérive des nappes, un quart de seconde, décalé d’une cachette à l’autre pour ne pas repeindre les quatre sur la même image — et se pose en UN drawImage par image. Le masque se peint directement dans la teinte du brouillard : plus de source-in, qui recompose tout le canevas. L’emprise est flottante : arrondie au pixel, la place du contour changeait à chaque glissement de caméra et le mémo se rebâtissait sans cesse. Seule la LEVÉE, une seconde par cachette, passe encore par le calque où le front se creuse.',
+      'MESURÉ, sous charge (24 cachettes par image, cadence requestAnimationFrame, médiane ; une image vide fait 16,7 ms, le plafond de la cadence) : canevas logiciel, zoom 1,1 — ancien 45 ms, nouveau fermé 18,5 ms, nouveau en levée 56 ms ; zoom 0,5 à dpr 2 — ancien 56 ms, nouveau fermé 16,7 ms (au plancher), en levée 66 ms. Canevas accéléré émulé (SwiftShader, pas un vrai GPU), zoom 0,5 — ancien 142 ms, nouveau fermé 28 ms, en levée 91 ms. Le voile fermé coûte donc MOINS que l’ancien ; la levée coûte à peu près l’ancien, une seconde par cachette. Sur un vrai GPU les valeurs absolues n’ont pas de sens, seuls les rapports comptent — et le rapport de PARAMÈTRES (autreJsMs) tranchera en vraie salle.',
+      'VÉRIFIÉ : dix-neuf tests (render/voileCache.spec.ts) — la signature du mémo ne dépend pas de la place à l’écran et change avec le zoom, la forme et le pas des nappes ; les pas sont décalés d’une cachette à l’autre ; mémo à jour, rien ne se repeint ; en levée, le mémo passe par le calque où le front se creuse ; plus de source-in. 1210 verts dans 114 fichiers, type-check à 0, build propre. Le rendu de la page d’aperçu du démineur est identique au pixel près à l’œil, avant et après le mémo.',
+    ],
+  },
+  {
     date: '14/09/2026 21:02',
     title: 'LE VOILE DES CACHETTES REFAIT : un brouillard sans bord, pas un trou noir — et une levée qui part du corps',
     notes: [

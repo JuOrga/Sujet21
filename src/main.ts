@@ -9038,7 +9038,15 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     cachesLevee = caches.map(() => Infinity)
     cachesEntree = caches.map(() => null)
   }
-  const vue = { vw, vh, zoom: z, dpr: dprC, versEcran: S, calque: calqueVoileCtx }
+  const vue = {
+    vw,
+    vh,
+    zoom: z,
+    dpr: dprC,
+    versEcran: S,
+    calque: calqueVoileCtx,
+    memo: memoVoile,
+  }
   for (let i = 0; i < caches.length; i++) {
     const c = caches[i]
     if (
@@ -9525,6 +9533,35 @@ function calqueVoileCtx(w: number, h: number): CanvasRenderingContext2D {
   c.setTransform(1, 0, 0, 1, 0, 0)
   c.clearRect(0, 0, w, h)
   return c
+}
+// LES MÉMOS DU VOILE : le voile fermé de chaque cachette, rendu une fois
+// dans son bitmap et posé en un drawImage par image — repeint seulement
+// quand sa signature change (zoom, forme, emprise, pas des nappes). Un
+// canevas par cachette du tableau, vidés au changement de tableau.
+const memosVoile: { canvas: HTMLCanvasElement; signature: string }[] = []
+function memoVoile(
+  indice: number,
+  signature: string,
+  w: number,
+  h: number,
+): { c: CanvasRenderingContext2D; neuf: boolean } {
+  let m = memosVoile[indice]
+  if (!m) {
+    m = { canvas: document.createElement('canvas'), signature: '' }
+    memosVoile[indice] = m
+  }
+  const c = m.canvas.getContext('2d')!
+  if (m.signature === signature) return { c, neuf: false }
+  m.signature = signature
+  // redimensionner vide le canevas ; à taille égale, on le vide soi-même
+  if (m.canvas.width !== w || m.canvas.height !== h) {
+    m.canvas.width = w
+    m.canvas.height = h
+  } else {
+    c.setTransform(1, 0, 0, 1, 0, 0)
+    c.clearRect(0, 0, w, h)
+  }
+  return { c, neuf: true }
 }
 // LES PASTILLES DE CONDENSAT : semées à l'entrée du tableau (condensat.ts,
 // semis déterministe par code — les cachettes ont les leurs), bues au
@@ -11987,6 +12024,7 @@ function resetLasers(): void {
   motes.reset()
   cachesLevee = (level.caches ?? []).map(() => Infinity)
   cachesEntree = (level.caches ?? []).map(() => null)
+  memosVoile.length = 0 // les bitmaps de l'ancien tableau ne servent plus
   // la CLEF DE CACHETTE se consomme ici : les voiles du tableau tombent
   // d'emblée (le hub et l'Économat ne l'usent pas)
   if (clefCachette && !estEconomat(level) && !auHub) {
