@@ -10,6 +10,7 @@ import {
   mesures,
   nappes,
   pochoir,
+  TRAITS_FONDU,
   VOILE_DUREE,
   type EtatVoile,
   type VueVoile,
@@ -17,7 +18,8 @@ import {
 import { FORME_ARC } from '../game/formes'
 
 /** Un contexte 2D factice : il note chaque appel (et les textes écrits),
- *  accepte toute affectation, et rend un dégradé muet quand on en crée. */
+ *  note les changements de mode de composition, accepte toute autre
+ *  affectation, et rend un dégradé muet quand on en crée. */
 function contexteFactice(largeurTexte = 100): {
   g: CanvasRenderingContext2D
   appels: string[]
@@ -52,17 +54,39 @@ function contexteFactice(largeurTexte = 100): {
         appels.push(prop)
       }
     },
-    set: () => true,
+    set: (_cible, prop, valeur) => {
+      if (prop === 'globalCompositeOperation') appels.push(`gco:${String(valeur)}`)
+      return true
+    },
   })
   return { g: g as unknown as CanvasRenderingContext2D, appels, textes }
 }
 
-const vue = (zoom = 0.5, vw = 1600, vh = 900): VueVoile => ({
+/** La vue, et le calque qu'elle fournit : un second contexte factice. */
+const vue = (
+  calque: CanvasRenderingContext2D,
+  zoom = 0.5,
+  vw = 1600,
+  vh = 900,
+): VueVoile => ({
   vw,
   vh,
   zoom,
+  dpr: 1,
   versEcran: (x, y) => ({ sx: vw / 2 + x * zoom, sy: vh / 2 - y * zoom }),
+  calque: () => calque,
 })
+
+/** La scène d'un test : le canevas des effets (g), le calque (c), la vue. */
+function scene(zoom = 0.5, largeurTexte = 100): {
+  g: ReturnType<typeof contexteFactice>
+  c: ReturnType<typeof contexteFactice>
+  vue: VueVoile
+} {
+  const g = contexteFactice()
+  const c = contexteFactice(largeurTexte)
+  return { g, c, vue: vue(c.g, zoom) }
+}
 
 // la cachette du démineur : un carré de 400 au milieu d'une chambre de 800
 const CACHE = { minX: 200, minY: 200, maxX: 600, maxY: 600 }
@@ -130,83 +154,107 @@ describe('les nappes, l’estampille, les mesures', () => {
   })
 
   it('la hachure et la lisière suivent le zoom sans sortir de leur fourchette', () => {
-    expect(mesures(0.01)).toEqual({ hachure: 7, lisiere: 8 })
-    expect(mesures(0.5)).toEqual({ hachure: 15, lisiere: 28 })
-    expect(mesures(10)).toEqual({ hachure: 16, lisiere: 44 })
+    expect(mesures(0.01)).toEqual({ hachure: 7, lisiere: 12 })
+    expect(mesures(0.5)).toEqual({ hachure: 15, lisiere: 45 })
+    expect(mesures(10)).toEqual({ hachure: 16, lisiere: 72 })
   })
 })
 
 describe('le dessin du brouillard', () => {
-  it('voilé : le pan se remplit dans sa forme, hachuré, estampillé — sans front', () => {
-    const { g, appels, textes } = contexteFactice()
-    expect(dessineVoile(g, CACHE, voile, 5, vue(), 0)).toBe(true)
-    // la lisière (dehors, pair-impair) puis le pan (dans la forme)
-    expect(compte(appels, 'clip:evenodd')).toBe(1)
-    expect(compte(appels, 'clip')).toBe(1)
-    expect(appels).toContain('fillRect')
-    expect(appels).toContain('setLineDash')
-    expect(appels).not.toContain('arc')
-    expect(textes).toEqual([pochoir(ESTAMPILLE)])
+  it('voilé : le pan se remplit dans sa forme, hachuré, estampillé, et se pose d’un coup', () => {
+    const { g, c, vue } = scene()
+    expect(dessineVoile(g.g, CACHE, voile, 5, vue, 0)).toBe(true)
+    expect(c.appels).toContain('clip')
+    expect(c.appels).toContain('fillRect')
+    // quatre nappes, et pas de front : aucun cinquième dégradé
+    expect(compte(c.appels, 'createRadialGradient')).toBe(4)
+    expect(c.textes).toEqual([pochoir(ESTAMPILLE)])
+    // le canevas des effets ne reçoit que le calque, une fois
+    expect(compte(g.appels, 'drawImage')).toBe(1)
+    expect(g.appels).not.toContain('fillRect')
   })
 
-  it('en cours de levée : le front est un disque, le pan se dessine hors de lui', () => {
-    const { g, appels } = contexteFactice()
-    expect(dessineVoile(g, CACHE, leve(VOILE_DUREE * 0.4), 10, vue(), 0)).toBe(true)
-    // la lisière, puis « forme ou disque » pour le pan
-    expect(compte(appels, 'clip:evenodd')).toBe(2)
-    // la bande douce : au moins deux disques tracés (le clip du pan, le clip de la bande)
-    expect(compte(appels, 'arc')).toBeGreaterThanOrEqual(2)
-    expect(appels).toContain('createRadialGradient')
+  it('le bord se fond des deux côtés : un masque effacé dedans, prolongé dehors, et le brouillard dessiné dedans', () => {
+    const { g, c, vue } = scene()
+    dessineVoile(g.g, CACHE, voile, 5, vue, 0)
+    // dedans : la forme, et l’effacement ; dehors : l’emprise moins la
+    // forme, en pair-impair
+    expect(compte(c.appels, 'clip')).toBe(1)
+    expect(compte(c.appels, 'clip:evenodd')).toBe(1)
+    expect(compte(c.appels, 'gco:destination-out')).toBe(1)
+    // N traits de chaque côté, puis la hachure — et rien d’autre : plus de
+    // liseré pointillé sur le contour
+    expect(compte(c.appels, 'stroke')).toBe(1 + 2 * TRAITS_FONDU)
+    expect(c.appels).not.toContain('setLineDash')
+    // le brouillard prend l’opacité du masque, les textures celle du brouillard
+    expect(c.appels).toContain('gco:source-in')
+    expect(c.appels).toContain('gco:source-atop')
+    // l’ordre : le masque avant le brouillard, le brouillard avant les textures
+    expect(c.appels.indexOf('gco:destination-out')).toBeLessThan(c.appels.indexOf('gco:source-in'))
+    expect(c.appels.indexOf('gco:source-in')).toBeLessThan(c.appels.indexOf('gco:source-atop'))
   })
 
-  it('levé : plus rien ne se dessine', () => {
-    const { g, appels } = contexteFactice()
-    expect(dessineVoile(g, CACHE, leve(VOILE_DUREE + 0.01), 10, vue(), 0)).toBe(false)
-    expect(appels).toEqual([])
+  it('en cours de levée : le front se creuse en dégradé depuis le point d’entrée', () => {
+    const { g, c, vue } = scene()
+    expect(dessineVoile(g.g, CACHE, leve(VOILE_DUREE * 0.4), 10, vue, 0)).toBe(true)
+    // les quatre nappes, plus le dégradé du front
+    expect(compte(c.appels, 'createRadialGradient')).toBe(5)
+    expect(compte(c.appels, 'gco:destination-out')).toBe(2)
+    expect(compte(g.appels, 'drawImage')).toBe(1)
+  })
+
+  it('levé : plus rien ne se dessine, ni sur le calque ni sur le canevas', () => {
+    const { g, c, vue } = scene()
+    expect(dessineVoile(g.g, CACHE, leve(VOILE_DUREE + 0.01), 10, vue, 0)).toBe(false)
+    expect(g.appels).toEqual([])
+    expect(c.appels).toEqual([])
   })
 
   it('hors champ : rien, pas même un chemin', () => {
-    const { g, appels } = contexteFactice()
+    const { g, c, vue } = scene()
     const loin = { minX: 9000, minY: 9000, maxX: 9400, maxY: 9400 }
-    expect(dessineVoile(g, loin, voile, 5, vue(), 0)).toBe(false)
-    expect(appels).toEqual([])
+    expect(dessineVoile(g.g, loin, voile, 5, vue, 0)).toBe(false)
+    expect(g.appels).toEqual([])
+    expect(c.appels).toEqual([])
   })
 
   it('un pan trop petit à l’écran garde le brouillard mais tait l’estampille', () => {
-    const { g, appels, textes } = contexteFactice()
-    expect(dessineVoile(g, CACHE, voile, 5, vue(0.2), 0)).toBe(true)
-    expect(appels).toContain('fillRect')
-    expect(textes).toEqual([])
+    const { g, c, vue } = scene(0.2)
+    expect(dessineVoile(g.g, CACHE, voile, 5, vue, 0)).toBe(true)
+    expect(c.appels).toContain('fillRect')
+    expect(c.textes).toEqual([])
   })
 
   it('une estampille plus large que son pan ne se pose pas', () => {
     // le pan fait 200 px à l’écran ; le texte en ferait 190 : il déborderait
-    const { g, appels, textes } = contexteFactice(190)
-    expect(dessineVoile(g, CACHE, voile, 5, vue(), 0)).toBe(true)
-    expect(appels).toContain('measureText')
-    expect(textes).toEqual([])
+    const { g, c, vue } = scene(0.5, 190)
+    expect(dessineVoile(g.g, CACHE, voile, 5, vue, 0)).toBe(true)
+    expect(c.appels).toContain('measureText')
+    expect(c.textes).toEqual([])
   })
 
   it('un arc a son centre dehors : pas d’estampille dans le vide', () => {
-    const { g, textes } = contexteFactice()
+    const { g, c, vue } = scene()
     const arc = { ...CACHE, forme: FORME_ARC, p0: 0.3, p1: 120 }
-    expect(dessineVoile(g, arc, voile, 5, vue(), 0)).toBe(true)
-    expect(textes).toEqual([])
+    expect(dessineVoile(g.g, arc, voile, 5, vue, 0)).toBe(true)
+    expect(c.textes).toEqual([])
   })
 
   it('la paroi factice ne dessine que sa dissolution, jamais tant qu’elle est voilée', () => {
-    const fermee = contexteFactice()
-    expect(dessineDissolutionParoi(fermee.g, CACHE, voile, 5, vue())).toBe(false)
-    expect(fermee.appels).toEqual([])
-    const ouverte = contexteFactice()
+    const fermee = scene()
+    expect(dessineDissolutionParoi(fermee.g.g, CACHE, voile, 5, fermee.vue)).toBe(false)
+    expect(fermee.g.appels).toEqual([])
+    expect(fermee.c.appels).toEqual([])
+    const ouverte = scene()
     expect(
-      dessineDissolutionParoi(ouverte.g, CACHE, leve(VOILE_DUREE * 0.3), 10, vue()),
+      dessineDissolutionParoi(ouverte.g.g, CACHE, leve(VOILE_DUREE * 0.3), 10, ouverte.vue),
     ).toBe(true)
-    expect(ouverte.appels).toContain('arc')
-    expect(ouverte.appels).toContain('fillRect')
-    const finie = contexteFactice()
+    expect(ouverte.c.appels).toContain('fillRect')
+    expect(ouverte.c.appels).toContain('gco:destination-out')
+    expect(compte(ouverte.g.appels, 'drawImage')).toBe(1)
+    const finie = scene()
     expect(
-      dessineDissolutionParoi(finie.g, CACHE, leve(VOILE_DUREE + 1), 10, vue()),
+      dessineDissolutionParoi(finie.g.g, CACHE, leve(VOILE_DUREE + 1), 10, finie.vue),
     ).toBe(false)
   })
 })

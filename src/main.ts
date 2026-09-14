@@ -9038,7 +9038,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     cachesLevee = caches.map(() => Infinity)
     cachesEntree = caches.map(() => null)
   }
-  const vue = { vw, vh, zoom: z, versEcran: S }
+  const vue = { vw, vh, zoom: z, dpr: dprC, versEcran: S, calque: calqueVoileCtx }
   for (let i = 0; i < caches.length; i++) {
     const c = caches[i]
     if (
@@ -9512,6 +9512,20 @@ let cachesLevee: number[] = []
 // le point du monde où le corps est entré dans chaque pan — le brouillard
 // se dissipe de là ; null : pas encore entré (ou levé par la clef)
 let cachesEntree: ({ x: number; y: number } | null)[] = []
+// LE CALQUE DU VOILE : chaque cachette se compose dessus (le fondu du bord
+// et le front se creusent en effacement) puis se pose d'un coup sur le
+// canevas des effets. Un seul canevas, gardé, agrandi au besoin, vidé à
+// chaque voile — jamais alloué dans la boucle d'image.
+let calqueVoile: HTMLCanvasElement | null = null
+function calqueVoileCtx(w: number, h: number): CanvasRenderingContext2D {
+  if (!calqueVoile) calqueVoile = document.createElement('canvas')
+  if (calqueVoile.width < w) calqueVoile.width = w
+  if (calqueVoile.height < h) calqueVoile.height = h
+  const c = calqueVoile.getContext('2d')!
+  c.setTransform(1, 0, 0, 1, 0, 0)
+  c.clearRect(0, 0, w, h)
+  return c
+}
 // LES PASTILLES DE CONDENSAT : semées à l'entrée du tableau (condensat.ts,
 // semis déterministe par code — les cachettes ont les leurs), bues au
 // contact du corps. « Recommencer » re-sème tout : la cueillette se rejoue.
