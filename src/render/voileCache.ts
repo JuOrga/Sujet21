@@ -14,11 +14,20 @@
 // d'un bloc : le brouillard se DISSIPE depuis le point où le corps est
 // entré, en un front circulaire à bord doux — on voit d'où l'on vient.
 //
-// Chaque voile se compose sur un CALQUE à part (fourni par la vue) puis se
-// pose d'un coup sur le canevas des effets : le masque au bord fondu et le
-// front creusé demandent d'EFFACER (destination-out) et de dessiner DANS
-// une opacité existante (source-in, source-atop) — sur le calque commun,
-// cela aurait emporté les portes et pastilles déjà dessinées sous le voile.
+// LE COÛT, MESURÉ (banc 2D, quatre cachettes du démineur, canevas logiciel
+// de Chromium sans tête) : dessiner ce brouillard image par image coûtait
+// quatre fois l'ancien voile — douze traits larges pour le fondu, une
+// recomposition source-in de tout le calque, la hachure, quatre dégradés —
+// et sur le canevas accéléré émulé, soixante fois. Le voile FERMÉ ne change
+// pourtant pas d'une image à l'autre, hors la dérive lente des nappes : il
+// se rend donc UNE FOIS dans un BITMAP MÉMOÏSÉ par cachette (fourni par la
+// vue), rebâti quand sa signature change (zoom, forme, emprise) et au plus
+// quatre fois par seconde pour les nappes — et se pose en UN drawImage par
+// image. Le masque se peint directement dans la teinte du brouillard : pas
+// de source-in, qui recompose tout le canevas. Seule la LEVÉE, une seconde
+// par cachette, passe par un CALQUE : le front s'y creuse en effacement
+// (destination-out) — sur le calque commun, cela aurait emporté les portes
+// et pastilles déjà dessinées sous le voile.
 //
 // Ce module ne lit pas le DOM : il reçoit un contexte 2D, la forme, l'état
 // du voile et la vue (dont le calque), et dessine. Il se teste avec des
@@ -34,6 +43,7 @@ export const ESTAMPILLE = 'NON CARTOGRAPHIÉ'
 // la palette de la charte : l'acier des coques pour le brouillard, le cyan
 // d'accent pour la hachure et le liseré, le gris des pièces pour l'estampille
 const BROUILLARD = '#0c1420'
+const BROUILLARD_RGB = '12,20,32'
 const NAPPE_RGB = '70,92,120'
 const CYAN_RGB = '99,183,230'
 const GRIS_RGB = '154,163,171'
@@ -52,10 +62,35 @@ export interface VueVoile {
   zoom: number // pixels par unité du monde
   dpr: number // pixels physiques par pixel CSS du canevas des effets
   versEcran: (x: number, y: number) => { sx: number; sy: number }
-  /** Le calque de composition : un contexte 2D vierge d'au moins w × h
+  /** Le calque de la levée : un contexte 2D vierge d'au moins w × h
    *  pixels PHYSIQUES, transformation identité. Réutilisé d'un voile à
    *  l'autre — l'appelant le garde et le vide. */
   calque: (w: number, h: number) => CanvasRenderingContext2D
+  /** Le bitmap mémoïsé de la cachette `indice` : s'il porte déjà cette
+   *  signature, le même contexte, intact (neuf : false) ; sinon un
+   *  contexte vierge de w × h pixels physiques, transformation identité,
+   *  à repeindre (neuf : true). L'appelant le garde par indice. */
+  memo: (
+    indice: number,
+    signature: string,
+    w: number,
+    h: number,
+  ) => { c: CanvasRenderingContext2D; neuf: boolean }
+}
+
+/** Le pas de la dérive des nappes dans le bitmap mémoïsé (s) : rebâti au
+ *  plus quatre fois par seconde. À la vitesse des nappes (0,07 rad/s sur
+ *  0,38 de la largeur), un quart de seconde déplace une nappe de 300 px de
+ *  2 px — invisible sur un dégradé de cent pixels de rayon. */
+export const NAPPES_PAS = 0.25
+
+/** L'instant quantifié des nappes d'une cachette : le début de son pas
+ *  courant. Les pas sont DÉCALÉS d'une cachette à l'autre — sinon les
+ *  quatre mémos du démineur se repeignaient sur la même image, un pic
+ *  toutes les 250 ms au lieu de quatre petits. */
+export function instantNappes(indice: number, elapsed: number): number {
+  const decal = ((indice * 0.37) % 1) * NAPPES_PAS
+  return Math.floor((elapsed + decal) / NAPPES_PAS) * NAPPES_PAS - decal
 }
 
 /** L'opacité globale de ce qui reste du voile : 1 tant qu'il est fermé,
@@ -130,8 +165,10 @@ export const TRAITS_FONDU = 6
 
 interface Trace {
   pts: { sx: number; sy: number }[]
-  // la boîte du contour à l'écran, élargie de la lisière et rognée au
-  // champ : c'est l'emprise du calque
+  // l'emprise à l'écran : la boîte du contour élargie de la lisière et
+  // rognée au champ — FLOTTANTE, pour que le contour garde la même place
+  // dans l'emprise d'une image à l'autre quand la caméra glisse (arrondie,
+  // elle changeait à chaque image et le bitmap mémoïsé se rebâtissait)
   minX: number
   minY: number
   maxX: number
@@ -154,10 +191,10 @@ function tracer(cache: FormeBox, vue: VueVoile, marge: number): Trace | null {
     if (p.sx > maxX) maxX = p.sx
     if (p.sy > maxY) maxY = p.sy
   }
-  minX = Math.floor(Math.max(-marge, minX - marge))
-  minY = Math.floor(Math.max(-marge, minY - marge))
-  maxX = Math.ceil(Math.min(vue.vw + marge, maxX + marge))
-  maxY = Math.ceil(Math.min(vue.vh + marge, maxY + marge))
+  minX = Math.max(-marge, minX - marge)
+  minY = Math.max(-marge, minY - marge)
+  maxX = Math.min(vue.vw + marge, maxX + marge)
+  maxY = Math.min(vue.vh + marge, maxY + marge)
   if (maxX <= minX || maxY <= minY) return null
   const chemin = (g: CanvasRenderingContext2D): void => {
     g.beginPath()
@@ -168,6 +205,33 @@ function tracer(cache: FormeBox, vue: VueVoile, marge: number): Trace | null {
     g.closePath()
   }
   return { pts, minX, minY, maxX, maxY, chemin }
+}
+
+/** La signature du bitmap mémoïsé : tout ce qui change son contenu — la
+ *  place du contour dans l'emprise (le zoom, la forme, le rognage au champ)
+ *  et le pas de dérive des nappes. La position à l'écran n'en fait pas
+ *  partie : le bitmap se pose où l'on veut. */
+export function signatureVoile(
+  cache: FormeBox,
+  t: { minX: number; minY: number; maxX: number; maxY: number; pts: { sx: number; sy: number }[] },
+  vue: { zoom: number; dpr: number },
+  elapsed: number,
+  indice = 0,
+): string {
+  return [
+    (t.maxX - t.minX).toFixed(2),
+    (t.maxY - t.minY).toFixed(2),
+    (t.pts[0].sx - t.minX).toFixed(2),
+    (t.pts[0].sy - t.minY).toFixed(2),
+    vue.zoom.toFixed(4),
+    vue.dpr,
+    cache.angle ?? 0,
+    cache.forme ?? 0,
+    cache.p0 ?? '',
+    cache.p1 ?? '',
+    cache.p2 ?? '',
+    instantNappes(indice, elapsed).toFixed(3),
+  ].join('|')
 }
 
 /** Le front de dissipation à l'écran : son centre, son rayon et la largeur
@@ -194,20 +258,15 @@ function front(
   }
 }
 
-/** Ouvre le calque pour ce voile : de la taille de l'emprise, en pixels
- *  physiques, avec le repère de l'écran (les coordonnées du contour s'y
- *  emploient telles quelles). */
-function ouvrirCalque(t: Trace, vue: VueVoile): CanvasRenderingContext2D {
-  const w = Math.ceil((t.maxX - t.minX) * vue.dpr)
-  const h = Math.ceil((t.maxY - t.minY) * vue.dpr)
-  const c = vue.calque(w, h)
+/** Le repère de l'emprise sur un contexte : les coordonnées du contour
+ *  (écran) s'y emploient telles quelles, en pixels physiques. */
+function repere(c: CanvasRenderingContext2D, t: Trace, vue: VueVoile): void {
   c.setTransform(vue.dpr, 0, 0, vue.dpr, -t.minX * vue.dpr, -t.minY * vue.dpr)
-  return c
 }
 
-/** Pose le calque sur le canevas des effets, à l'emprise, à l'opacité
- *  donnée — un seul drawImage par voile. */
-function poserCalque(
+/** Pose un bitmap (le mémo ou le calque) sur un contexte, à l'emprise, à
+ *  l'opacité donnée — un seul drawImage. */
+function poser(
   g: CanvasRenderingContext2D,
   c: CanvasRenderingContext2D,
   t: Trace,
@@ -232,15 +291,15 @@ function poserCalque(
   g.restore()
 }
 
-/** LE MASQUE du voile : plein au cœur du pan, il se fond des deux côtés
- *  du contour. Dedans, des traits emboîtés en EFFACEMENT, de plus en plus
- *  larges et aussi ténus, amincissent le pan vers son bord ; dehors, les
- *  mêmes traits en ajout le prolongent en s'éparpillant. Au contour même,
- *  les deux côtés se rejoignent à mi-opacité : aucune marche, aucune ligne.
- *  Le brouillard et ses textures se dessinent ENSUITE, dans ce masque
- *  (source-in, source-atop) : la hachure et les nappes s'estompent avec
- *  lui au lieu de s'arrêter net au contour — c'est ce qui redessinait le
- *  carré. */
+/** LE MASQUE du voile, peint dans la teinte du brouillard : plein au cœur
+ *  du pan, il se fond des deux côtés du contour. Dedans, des traits
+ *  emboîtés en EFFACEMENT, de plus en plus larges et aussi ténus,
+ *  amincissent le pan vers son bord ; dehors, les mêmes traits en ajout le
+ *  prolongent en s'éparpillant. Au contour même, les deux côtés se
+ *  rejoignent à mi-opacité : aucune marche, aucune ligne. Les textures se
+ *  dessinent ENSUITE, dans cette opacité (source-atop) : la hachure et les
+ *  nappes s'estompent avec elle au lieu de s'arrêter net au contour —
+ *  c'est ce qui redessinait le carré. */
 function masque(c: CanvasRenderingContext2D, t: Trace, lisiere: number): void {
   const w = t.maxX - t.minX
   const h = t.maxY - t.minY
@@ -250,7 +309,7 @@ function masque(c: CanvasRenderingContext2D, t: Trace, lisiere: number): void {
   c.save()
   t.chemin(c)
   c.clip()
-  c.fillStyle = '#000'
+  c.fillStyle = BROUILLARD
   c.fillRect(t.minX, t.minY, w, h)
   c.globalCompositeOperation = 'destination-out'
   c.lineJoin = 'round'
@@ -271,11 +330,78 @@ function masque(c: CanvasRenderingContext2D, t: Trace, lisiere: number): void {
   c.closePath()
   c.clip('evenodd')
   c.lineJoin = 'round'
-  c.strokeStyle = `rgba(0,0,0,${a.toFixed(4)})`
+  c.strokeStyle = `rgba(${BROUILLARD_RGB},${a.toFixed(4)})`
   for (let k = TRAITS_FONDU; k >= 1; k--) {
     c.lineWidth = (lisiere * 2 * k) / TRAITS_FONDU
     t.chemin(c)
     c.stroke()
+  }
+  c.restore()
+}
+
+/** Le voile FERMÉ, complet, dans le bitmap mémoïsé : le masque, la
+ *  hachure, les nappes, l'estampille. */
+function peindreVoile(
+  c: CanvasRenderingContext2D,
+  cache: FormeBox,
+  t: Trace,
+  vue: VueVoile,
+  elapsed: number,
+  indice: number,
+  hachure: number,
+  lisiere: number,
+): void {
+  const w = t.maxX - t.minX
+  const h = t.maxY - t.minY
+  repere(c, t, vue)
+  masque(c, t, lisiere)
+
+  // LES TEXTURES, sur le brouillard et à son opacité : la hachure oblique
+  // des zones non relevées, à 45°, et les nappes qui dérivent — le voile
+  // se lit comme du brouillard, pas comme un rectangle mort. Les nappes se
+  // prennent à l'instant quantifié du mémo : la même image tant qu'il vit.
+  c.save()
+  c.globalCompositeOperation = 'source-atop'
+  c.strokeStyle = `rgba(${CYAN_RGB},0.09)`
+  c.lineWidth = 1
+  c.beginPath()
+  for (let d = -h; d < w; d += hachure) {
+    c.moveTo(t.minX + d, t.minY)
+    c.lineTo(t.minX + d + h, t.minY + h)
+  }
+  c.stroke()
+  for (const n of nappes(indice, instantNappes(indice, elapsed))) {
+    const nx = t.minX + w * n.u
+    const ny = t.minY + h * n.v
+    const r = Math.max(8, Math.max(w, h) * n.r)
+    const grad = c.createRadialGradient(nx, ny, 0, nx, ny, r)
+    grad.addColorStop(0, `rgba(${NAPPE_RGB},0.30)`)
+    grad.addColorStop(1, `rgba(${NAPPE_RGB},0)`)
+    c.fillStyle = grad
+    c.fillRect(t.minX, t.minY, w, h)
+  }
+
+  // L'ESTAMPILLE, au centre — seulement si elle tient, et seulement si le
+  // centre est bien DANS la forme (un arc ou un coin ont leur centre
+  // dehors : l'estampille flotterait dans le vide). Mesurée avant d'être
+  // posée : à l'échelle d'une salle entière, un pan de 200 px ne la
+  // contient pas, et une estampille qui déborde de son pan trahit plus
+  // qu'elle n'explique.
+  const cxM = (cache.minX + cache.maxX) / 2
+  const cyM = (cache.minY + cache.maxY) / 2
+  const wPan = w - 2 * lisiere
+  if (estampilleVisible(wPan, h - 2 * lisiere) && dansForme(cache, cxM, cyM)) {
+    const p = vue.versEcran(cxM, cyM)
+    const taille = Math.max(9, Math.min(13, wPan / 22))
+    c.font = `600 ${taille}px ui-monospace, monospace`
+    const texte = pochoir(ESTAMPILLE)
+    if (c.measureText(texte).width <= wPan * 0.85) {
+      c.globalAlpha = 0.7
+      c.fillStyle = `rgba(${GRIS_RGB},0.5)`
+      c.textAlign = 'center'
+      c.textBaseline = 'middle'
+      c.fillText(texte, p.sx, p.sy)
+    }
   }
   c.restore()
 }
@@ -319,81 +445,34 @@ export function dessineVoile(
   const { hachure, lisiere } = mesures(vue.zoom)
   const t = tracer(cache, vue, lisiere)
   if (!t) return false
-  const w = t.maxX - t.minX
-  const h = t.maxY - t.minY
-  const f = front(t, etat, elapsed, vue, lisiere)
-  const c = ouvrirCalque(t, vue)
+  const wP = Math.ceil((t.maxX - t.minX) * vue.dpr)
+  const hP = Math.ceil((t.maxY - t.minY) * vue.dpr)
 
-  // 1. LE MASQUE, puis le brouillard DANS le masque
-  masque(c, t, lisiere)
-  c.save()
-  c.globalCompositeOperation = 'source-in'
-  c.fillStyle = BROUILLARD
-  c.fillRect(t.minX, t.minY, w, h)
-  c.restore()
+  // 1. LE MÉMO : le voile fermé, repeint seulement si sa signature a changé
+  const m = vue.memo(indice, signatureVoile(cache, t, vue, elapsed, indice), wP, hP)
+  if (m.neuf) peindreVoile(m.c, cache, t, vue, elapsed, indice, hachure, lisiere)
 
-  // 2. LES TEXTURES, sur le brouillard et à son opacité : la hachure
-  // oblique des zones non relevées, à 45°, et les nappes qui dérivent —
-  // le voile se lit comme du brouillard, pas comme un rectangle mort
-  c.save()
-  c.globalCompositeOperation = 'source-atop'
-  c.strokeStyle = `rgba(${CYAN_RGB},0.09)`
-  c.lineWidth = 1
-  c.beginPath()
-  for (let d = -h; d < w; d += hachure) {
-    c.moveTo(t.minX + d, t.minY)
-    c.lineTo(t.minX + d + h, t.minY + h)
-  }
-  c.stroke()
-  for (const n of nappes(indice, elapsed)) {
-    const nx = t.minX + w * n.u
-    const ny = t.minY + h * n.v
-    const r = Math.max(8, Math.max(w, h) * n.r)
-    const grad = c.createRadialGradient(nx, ny, 0, nx, ny, r)
-    grad.addColorStop(0, `rgba(${NAPPE_RGB},0.30)`)
-    grad.addColorStop(1, `rgba(${NAPPE_RGB},0)`)
-    c.fillStyle = grad
-    c.fillRect(t.minX, t.minY, w, h)
-  }
-  c.restore()
-
-  // 3. L'ESTAMPILLE, au centre — seulement si elle tient, et seulement si
-  // le centre est bien DANS la forme (un arc ou un coin ont leur centre
-  // dehors : l'estampille flotterait dans le vide). Mesurée avant d'être
-  // posée : à l'échelle d'une salle entière, un pan de 200 px ne la
-  // contient pas, et une estampille qui déborde de son pan trahit plus
-  // qu'elle n'explique. Elle s'efface avec le front : dès que le
-  // brouillard se dissipe, elle n'a plus rien à nommer.
-  const cxM = (cache.minX + cache.maxX) / 2
-  const cyM = (cache.minY + cache.maxY) / 2
-  const wPan = w - 2 * lisiere
-  if (estampilleVisible(wPan, h - 2 * lisiere) && dansForme(cache, cxM, cyM)) {
-    const p = vue.versEcran(cxM, cyM)
-    const taille = Math.max(9, Math.min(13, wPan / 22))
-    c.font = `600 ${taille}px ui-monospace, monospace`
-    const texte = pochoir(ESTAMPILLE)
-    if (c.measureText(texte).width <= wPan * 0.85) {
-      c.save()
-      c.globalCompositeOperation = 'source-atop'
-      c.globalAlpha = (1 - avanceFront(etat.levee, elapsed)) * 0.7
-      c.fillStyle = `rgba(${GRIS_RGB},0.5)`
-      c.textAlign = 'center'
-      c.textBaseline = 'middle'
-      c.fillText(texte, p.sx, p.sy)
-      c.restore()
-    }
+  // 2. FERMÉ : le mémo se pose tel quel, un drawImage
+  if (etat.levee === Infinity) {
+    poser(g, m.c, t, vue, 1)
+    return true
   }
 
-  // 4. LE FRONT, puis le calque se pose d'un coup
-  creuserFront(c, t, f)
-  poserCalque(g, c, t, vue, alphaReste(etat.levee, elapsed))
+  // 3. EN LEVÉE : le mémo passe par le calque, où le front se creuse
+  const c = vue.calque(wP, hP)
+  c.setTransform(1, 0, 0, 1, 0, 0)
+  c.drawImage(m.c.canvas, 0, 0, wP, hP, 0, 0, wP, hP)
+  repere(c, t, vue)
+  creuserFront(c, t, front(t, etat, elapsed, vue, lisiere))
+  poser(g, c, t, vue, alphaReste(etat.levee, elapsed))
   return true
 }
 
 /** La PAROI FACTICE : voilée, c'est le moteur qui la rend (vraie paroi,
  *  vraies ombres) — ici on ne dessine que sa DISSOLUTION une fois révélée :
  *  la teinte de paroi s'évapore du contour exact, par le même front que le
- *  brouillard. Rend false si rien n'a été dessiné. */
+ *  brouillard. Une seconde par cachette : le calque suffit, sans mémo.
+ *  Rend false si rien n'a été dessiné. */
 export function dessineDissolutionParoi(
   g: CanvasRenderingContext2D,
   cache: FormeBox,
@@ -407,8 +486,8 @@ export function dessineDissolutionParoi(
   if (!t) return false
   const w = t.maxX - t.minX
   const h = t.maxY - t.minY
-  const f = front(t, etat, elapsed, vue, 0)
-  const c = ouvrirCalque(t, vue)
+  const c = vue.calque(Math.ceil(w * vue.dpr), Math.ceil(h * vue.dpr))
+  repere(c, t, vue)
   c.save()
   t.chemin(c)
   c.clip()
@@ -419,7 +498,7 @@ export function dessineDissolutionParoi(
   c.fillStyle = PAROI_HAUT
   c.fillRect(t.minX, t.minY, w, h * 0.5)
   c.restore()
-  creuserFront(c, t, f)
-  poserCalque(g, c, t, vue, 1)
+  creuserFront(c, t, front(t, etat, elapsed, vue, 0))
+  poser(g, c, t, vue, 1)
   return true
 }
