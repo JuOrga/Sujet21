@@ -10382,7 +10382,7 @@ function majInstrumentsUI(): void {
     instrPanel.innerHTML =
       `<h4>INSTRUMENTS EMBARQUÉS</h4>` +
       (defs.length === 0
-        ? `<p class="ip-vide">Aucun pour l'instant — les paliers d'étalonnage (XP) ouvrent les tirages.</p>`
+        ? `<p class="ip-vide">Aucun pour l'instant — les paliers de maîtrise (XP) ouvrent les tirages.</p>`
         : defs
             .map(
               (d) =>
@@ -12501,7 +12501,7 @@ function fermeMiseEnBonbonne(): void {
   for (const t of mbTimers) clearTimeout(t)
   mbTimers.length = 0
   mbVeil.hidden = true
-  mbScene.classList.remove('mb-large', 'mb-compact', 'mb-secousse')
+  mbScene.classList.remove('mb-large', 'mb-compact', 'mb-secousse', 'mb-question')
   mbEl('mb-palier-eclair').hidden = true
   mbFeu.vide()
   miseEnBonbonne = false
@@ -12551,7 +12551,9 @@ function mbMontreVersement(): void {
   if (!b) return
   const bloc = mbEl('mb-choix')
   bloc.hidden = false
-  mbEl('mb-choix-titre').textContent = 'OÙ VERSER LE SURPLUS ?'
+  const titre = mbEl('mb-choix-titre')
+  titre.textContent = 'OÙ VERSER LE SURPLUS ?'
+  titre.classList.add('mb-grande')
   const host = mbCartes()
   host.innerHTML = ''
   const cap = capBonbonne()
@@ -12559,33 +12561,6 @@ function mbMontreVersement(): void {
   const verse = Math.min(b.surplus, espace)
   const spill = b.surplus - verse
   const pleine = espace < 0.01
-
-  // chaque destination montre CE QUE LE VERSEMENT FERA : la jauge de la
-  // réserve avec la part qui s'ajoute, celle de l'étalonnage avec le
-  // chemin qu'il reste jusqu'au palier — on choisit en voyant
-  const cb = document.createElement('button')
-  cb.type = 'button'
-  cb.className = 'mb-carte mb-dest' + (pleine ? ' mb-pauvre' : '')
-  cb.style.setProperty('--i', '0')
-  cb.disabled = pleine
-  cb.innerHTML =
-    `<span class="mb-ico">🫙</span><b>RÉSERVE</b>` +
-    `<small>${
-      pleine
-        ? 'bonbonne PLEINE — tout va à l’étalonnage'
-        : `+${verse.toFixed(2)} L en bonbonne (${run.bonbonneLiters.toFixed(1)} / ${cap} L)` +
-          (spill > 0.01 ? ` · excédent +${spill.toFixed(2)} L → XP` : '')
-    }</small>` +
-    `<span class="mb-dest-jauge" style="--a:${(run.bonbonneLiters / Math.max(0.01, cap)).toFixed(3)};--g:${(verse / Math.max(0.01, cap)).toFixed(3)}"></span>` +
-    `<em class="mb-prix mb-offert">se reverse dans le corps, en jeu</em>`
-  cb.addEventListener('click', () => {
-    run.bonbonneLiters = Math.min(cap, run.bonbonneLiters + verse)
-    bande.ponctuation('sting-collecte', 0.55)
-    mbEclate(cb, { n: 36, teintes: MB_EAU, vitesse: 320, gravite: 700 })
-    mbVerseXp(spill)
-  })
-  host.appendChild(cb)
-
   const prochain = prochainPalier(run.xp)
   const seg = mbSegmentXp(run.xp)
   // table des paliers épuisée : la jauge est pleine et le reste (comme
@@ -12593,27 +12568,89 @@ function mbMontreVersement(): void {
   const largeur = seg.cible === null ? 1 : seg.cible - seg.base
   const acquis = seg.cible === null ? 1 : (run.xp - seg.base) / largeur
   const gain = seg.cible === null ? 0 : Math.min(1, b.surplus / largeur)
+  const franchit = prochain !== null && run.xp + b.surplus >= prochain
+  const fmt = (l: number): string => l.toFixed(2).replace('.', ',')
+
+  // LA SCÈNE DU VERSEMENT : la goutte du surplus au centre, une plaque de
+  // chaque côté. Viser une plaque fait COULER le flux de la goutte vers
+  // elle et montre, en chiffres et en jauge, ce que le versement fera.
+  const scene = document.createElement('div')
+  scene.className = 'mb-versement'
+  const goutte = document.createElement('div')
+  goutte.className = 'mb-goutte'
+  goutte.innerHTML =
+    `<span class="mb-flux mb-flux-g" aria-hidden="true"></span>` +
+    `<span class="mb-flux mb-flux-d" aria-hidden="true"></span>` +
+    `<span class="mb-goutte-corps"><b>${fmt(b.surplus)} L</b><i>SURPLUS</i></span>`
+
+  // la RÉSERVE : le bocal, son niveau d'avant et la part qui s'ajoute
+  const niveauAvant = run.bonbonneLiters / Math.max(0.01, cap)
+  const niveauApres = Math.min(1, (run.bonbonneLiters + verse) / Math.max(0.01, cap))
+  const cb = document.createElement('button')
+  cb.type = 'button'
+  cb.className = 'mb-carte mb-dest mb-dest-reserve' + (pleine ? ' mb-pauvre' : '')
+  cb.style.setProperty('--i', '0')
+  cb.disabled = pleine
+  cb.innerHTML =
+    `<span class="mb-dest-tete">` +
+    `<svg class="mb-bocal" viewBox="0 0 48 64" aria-hidden="true">` +
+    `<rect x="12" y="2" width="24" height="7" rx="2" class="mb-bocal-bouchon"/>` +
+    `<rect x="4" y="9" width="40" height="53" rx="9" class="mb-bocal-verre"/>` +
+    `<rect x="6" y="${(11 + 49 * (1 - niveauApres)).toFixed(1)}" width="36" height="${(49 * niveauApres).toFixed(1)}" rx="6" class="mb-bocal-gain"/>` +
+    `<rect x="6" y="${(11 + 49 * (1 - niveauAvant)).toFixed(1)}" width="36" height="${(49 * niveauAvant).toFixed(1)}" rx="6" class="mb-bocal-eau"/>` +
+    `</svg><b>RÉSERVE</b></span>` +
+    (pleine
+      ? `<span class="mb-dest-chiffres"><b>PLEINE</b><small>${cap} / ${cap} L</small></span>` +
+        `<small class="mb-dest-mot">tout le surplus ira à la maîtrise</small>`
+      : `<span class="mb-dest-chiffres"><i>${fmt(run.bonbonneLiters)}</i><em>→</em><b>${fmt(run.bonbonneLiters + verse)} L</b><small>/ ${cap} L</small></span>` +
+        `<span class="mb-dest-jauge" style="--a:${niveauAvant.toFixed(3)};--g:${(niveauApres - niveauAvant).toFixed(3)}"></span>` +
+        `<small class="mb-dest-mot">à reverser dans le corps, en pleine salle</small>` +
+        (spill > 0.01 ? `<em class="mb-dest-plus">+ ${fmt(spill)} L d’excédent vers la maîtrise</em>` : ''))
+  cb.addEventListener('click', () => {
+    run.bonbonneLiters = Math.min(cap, run.bonbonneLiters + verse)
+    bande.ponctuation('sting-collecte', 0.55)
+    mbEclate(cb, { n: 36, teintes: MB_EAU, vitesse: 320, gravite: 700 })
+    mbVerseXp(spill)
+  })
+
+  // la MAÎTRISE : l'anneau du palier, le chemin fait et celui qui s'ajoute
+  const C = (2 * Math.PI * 27).toFixed(2)
   const cx = document.createElement('button')
   cx.type = 'button'
-  cx.className = 'mb-carte mb-dest'
+  cx.className = 'mb-carte mb-dest mb-dest-maitrise' + (franchit ? ' mb-dest-palier' : '')
   cx.style.setProperty('--i', '1')
   cx.innerHTML =
-    `<span class="mb-ico">🧰</span><b>ÉTALONNAGE</b>` +
-    `<small>+${b.surplus.toFixed(2)} L d’XP (jauge : ${run.xp.toFixed(1)} L${
-      prochain !== null ? ` · palier à ${prochain} L` : ''
-    })</small>` +
+    `<span class="mb-dest-tete">` +
+    `<svg class="mb-anneau" viewBox="0 0 64 64" aria-hidden="true">` +
+    `<circle cx="32" cy="32" r="27" class="mb-anneau-fond"/>` +
+    `<circle cx="32" cy="32" r="27" class="mb-anneau-gain" style="stroke-dasharray:${C};stroke-dashoffset:${(Number(C) * (1 - Math.min(1, acquis + gain))).toFixed(2)}"/>` +
+    `<circle cx="32" cy="32" r="27" class="mb-anneau-fait" style="stroke-dasharray:${C};stroke-dashoffset:${(Number(C) * (1 - acquis)).toFixed(2)}"/>` +
+    `<text x="32" y="37" class="mb-anneau-no">${paliersAtteints(run.xp)}</text>` +
+    `</svg><b>MAÎTRISE</b></span>` +
+    `<span class="mb-dest-chiffres"><i>${run.xp.toFixed(1).replace('.', ',')}</i><em>→</em><b>${(run.xp + b.surplus).toFixed(1).replace('.', ',')} L</b>` +
+    `<small>${prochain !== null ? `palier à ${prochain} L` : 'table complète'}</small></span>` +
     `<span class="mb-dest-jauge" style="--a:${acquis.toFixed(3)};--g:${gain.toFixed(3)}"></span>` +
-    `<em class="mb-prix mb-offert">${
-      prochain !== null && run.xp + b.surplus >= prochain
-        ? 'UN PALIER SE FRANCHIT — TIRAGE OUVERT'
-        : 'chaque palier ouvre un tirage'
-    }</em>`
+    `<small class="mb-dest-mot">chaque palier ouvre un tirage d’instrument</small>` +
+    (franchit ? `<em class="mb-dest-plus mb-dest-ouvre">UN PALIER SE FRANCHIT — TIRAGE OUVERT</em>` : '')
   cx.addEventListener('click', () => {
     bande.ponctuation('sting-collecte', 0.55)
     mbEclate(cx, { n: 36, teintes: MB_MENTHE, vitesse: 320, gravite: 700 })
     mbVerseXp(b.surplus)
   })
-  host.appendChild(cx)
+
+  // la visée fait couler le flux vers la plaque (souris, clavier, manette)
+  const vise = (cote: 'g' | 'd' | ''): void => {
+    if (cote) scene.dataset.vers = cote
+    else delete scene.dataset.vers
+  }
+  for (const [btn, cote] of [[cb, 'g'], [cx, 'd']] as const) {
+    for (const ev of ['pointerenter', 'focusin'] as const)
+      btn.addEventListener(ev, () => { if (!btn.disabled) vise(cote) })
+    for (const ev of ['pointerleave', 'focusout'] as const)
+      btn.addEventListener(ev, () => vise(''))
+  }
+  scene.append(cb, goutte, cx)
+  host.appendChild(scene)
 }
 
 // ---- LA JAUGE D'ÉTALONNAGE : l'XP se VOIT couler, palier par palier ----
@@ -12767,7 +12804,7 @@ function mbVerseXp(litres: number): void {
   mbScene.classList.add('mb-compact')
   // les cartes du versement s'effacent : la jauge prend la scène
   mbEl('mb-choix-titre').textContent =
-    litres > 0.005 ? 'L’ÉTALONNAGE SE CHARGE' : 'ÉTALONNAGE'
+    litres > 0.005 ? 'LA MAÎTRISE MONTE' : 'MAÎTRISE'
   mbCartes().innerHTML = ''
   mbAnimeEtalonnage(avantXp, run.xp, () => {
     if (mbDraftsRestants > 0) mbMontreDraft()
@@ -12782,6 +12819,10 @@ function mbCartes(): HTMLElement {
   const h = mbEl('mb-cartes')
   h.classList.remove('mb-draft', 'mb-isole', 'mb-elu', 'mb-station', 'mb-trio')
   h.style.removeProperty('--n')
+  // le titre du choix redevient une ligne de contexte ; l'étape qui pose
+  // une QUESTION le regrossit elle-même
+  mbEl('mb-choix-titre').classList.remove('mb-grande')
+  mbScene.classList.remove('mb-question')
   return h
 }
 
@@ -12791,7 +12832,7 @@ function mbMontreDraft(): void {
   mbEtape = 'draft'
   const palierNo = paliersAtteints(run.xp) - mbDraftsRestants + 1
   mbEl('mb-choix-titre').textContent =
-    `PALIER D'ÉTALONNAGE ${palierNo} — EMPORTEZ UN INSTRUMENT`
+    `PALIER DE MAÎTRISE ${palierNo} — EMPORTEZ UN INSTRUMENT`
   const host = mbCartes()
   host.innerHTML = ''
   // le CARNET DU SEMBLABLE ouvre une quatrième carte
@@ -12944,7 +12985,7 @@ function montreCarteRun(raison: 'depart' | 'suite'): void {
   // pas de bilan au sas de lancement : le relevé n'a rien à dire, seul le
   // plan se montre — la bannière annonce la station
   mbEl('mb-releve').hidden = true
-  mbEl('mb-titre').textContent = 'LE PLAN DE LA STATION'
+  mbQuestion('CHOISISSEZ LA COURSIVE')
   mbEl('mb-etal').hidden = true
   mbEl('mb-passer').hidden = true
   mbEl('mb-choix').hidden = false
@@ -12953,6 +12994,7 @@ function montreCarteRun(raison: 'depart' | 'suite'): void {
 
 function mbMontreCarte(raison: 'depart' | 'suite'): void {
   mbEtape = 'carte'
+  mbQuestion('CHOISISSEZ LA COURSIVE')
   mbScene.classList.add('mb-large')
   mbEl('mb-etal').hidden = true
   mbEl('mb-passer').hidden = true
@@ -13278,6 +13320,10 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
         ? ' · LE MILIEU S’OUVRE'
         : ' · LA FIN S’OUVRE'
       : ''
+  // LA QUESTION en tête de scène : c'est la salle SUIVANTE qu'on choisit,
+  // et il faut que ça se lise avant tout — le module et le rang de la
+  // descente passent en ligne de contexte sous elle
+  mbQuestion('CHOISISSEZ LA SALLE SUIVANTE')
   mbEl('mb-choix-titre').textContent =
     // le MODULE se nomme en tête : c'est son biome qu'on traverse, et la
     // salle se compte dans le module avant de se compter dans la descente
@@ -13296,6 +13342,7 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
   // trois portes : trois colonnes ; quatre (l'écrite en plus) : en rang
   host.classList.toggle('mb-trio', cartes.length === 3)
   host.appendChild(mbJauges())
+  host.appendChild(mbConsignePortes(cartes.length))
   cartes.forEach((c, i) => {
     host.appendChild(
       mbPorte(
@@ -13319,11 +13366,12 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
 
 function mbMontreSalles(props: LevelDef[]): void {
   mbEtape = 'salles'
-  mbEl('mb-choix-titre').textContent =
-    'PAROI DU SAS OUVERTE — CHOISISSEZ LA PROCHAINE SALLE'
+  mbQuestion('CHOISISSEZ LA SALLE SUIVANTE')
+  mbEl('mb-choix-titre').textContent = 'PAROI DU SAS OUVERTE — DEUX SALLES SE PROPOSENT'
   mbScene.classList.add('mb-compact')
   const host = mbCartes()
   host.innerHTML = ''
+  host.appendChild(mbConsignePortes(props.length))
   props.forEach((lv, i) => {
     const c21 = decodeCode21(lv.code)
     host.appendChild(
@@ -13332,6 +13380,27 @@ function mbMontreSalles(props: LevelDef[]): void {
       }),
     )
   })
+}
+
+/** LA QUESTION de l'étape, en tête de scène : elle remplace « SALLE
+ *  FRANCHIE » le temps du choix, en grand et en clair — ce qu'on attend du
+ *  joueur doit se lire avant le reste. */
+function mbQuestion(texte: string): void {
+  mbEl('mb-titre').textContent = texte
+  mbScene.classList.add('mb-question')
+  mbEl('mb-choix-titre').classList.remove('mb-grande')
+}
+
+/** LA CONSIGNE des portes : une ligne qui dit ce que sont ces vignettes —
+ *  des salles, une par porte, et qu'on va jouer celle qu'on ouvre. Sans
+ *  elle, le choix se lisait comme une galerie. */
+function mbConsignePortes(n: number): HTMLElement {
+  const p = document.createElement('p')
+  p.className = 'mb-portes-consigne'
+  p.innerHTML =
+    `<i>▸</i> ${n > 1 ? `${n} portes, ${n} salles différentes` : 'une seule porte'} — ` +
+    `ouvrez celle que vous voulez jouer ensuite`
+  return p
 }
 
 /** Les jauges en tête du choix de salle : la réserve, les vies, la
@@ -13433,7 +13502,7 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
   mbVeil.hidden = false
   mbFeuDimensionne()
   mbCartes() // la disposition du choix repart à neuf
-  mbScene.classList.remove('mb-compact', 'mb-large')
+  mbScene.classList.remove('mb-compact', 'mb-large', 'mb-question')
   mbScene.scrollTop = 0
   // état de départ : tout est replié, la bannière claque seule
   const verdict = rangDeSalle(b.pct)
@@ -14703,7 +14772,7 @@ function majDossier(): void {
   const equip =
     '<section class="do-sec do-equip"><h4><u>🎒</u>TON ÉQUIPEMENT</h4>' +
     (instrs.length === 0 && fioles.length === 0
-      ? '<p class="do-vide">Les mains vides. Les instruments se gagnent aux paliers d’étalonnage, en fin de salle ; les fioles s’équipent au placard du laboratoire.</p>'
+      ? '<p class="do-vide">Les mains vides. Les instruments se gagnent aux paliers de maîtrise, en fin de salle ; les fioles s’équipent au placard du laboratoire.</p>'
       : instrs
           .map(
             (d) =>
@@ -16462,7 +16531,7 @@ function corpsImage(now: number): boolean {
       const butinVoie =
         `<br>Butin de la descente : ` +
         `${run.instruments.length > 0 ? `${glyphes} ${run.instruments.length} instrument(s)` : 'aucun instrument'} · ` +
-        `palier d'étalonnage ${paliersAtteints(run.xp)} · ` +
+        `palier de maîtrise ${paliersAtteints(run.xp)} · ` +
         `+${run.memoireGagnee} MÉMOIRE gravée — la purge confisque le condensat restant (${condensat} cL).`
       showOverlay(
         'LA DESCENTE EST BOUCLÉE',

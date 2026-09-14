@@ -7732,7 +7732,7 @@
          compteur. Elle est devenue une SCÈNE : le fond respire (grille qui
          dérive, balayage lumineux), la bannière CLAQUE, le RANG tombe en
          médaille, les compteurs ROULENT, chaque ligne du relevé arrive
-         avec sa barre, le condensat s'égrène, la jauge d'étalonnage coule
+         avec sa barre, le condensat s'égrène, la jauge de maîtrise coule
          et un palier franchi traverse l'écran en bande. Les cartes du
          tirage se RETOURNENT (dos, puis face), s'inclinent sous le
          pointeur ; les salles sont des PORTES qui s'ouvrent quand on les
@@ -8365,42 +8365,170 @@
         letter-spacing: 0.24em; line-height: 1.3; color: var(--mb-encre);
       }
       .mb-carte small { color: #8ba3b8; font-size: calc(12px * var(--ui)); line-height: 1.4; }
-      .mb-ico {
-        font-size: calc(40px * var(--ui)); line-height: 1;
-        filter: drop-shadow(0 0 14px rgba(109, 255, 184, 0.35));
-        animation: mb-flotte 3s ease-in-out infinite;
-      }
-      @keyframes mb-flotte {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-5px); }
-      }
       .mb-prix {
         margin-top: auto; font-style: normal; font-size: calc(11.5px * var(--ui));
         color: var(--mb-or); letter-spacing: 0.08em;
       }
       .mb-prix.mb-offert { color: var(--mb-menthe); }
       .mb-carte.mb-pauvre { opacity: 0.45; cursor: not-allowed; }
-      /* la barre d'aperçu sous une destination : ce que le versement fera */
+      /* ---- LE VERSEMENT : la goutte du surplus au centre, une plaque de
+         chaque côté (la RÉSERVE et son bocal, la MAÎTRISE et son anneau).
+         Viser une plaque fait COULER le flux de la goutte vers elle ; la
+         plaque dit en chiffres « avant → après » et le montre en jauge. ---- */
+      .mb-versement {
+        grid-column: 1 / -1; width: 100%; max-width: 980px; margin: 0 auto;
+        display: grid; grid-template-columns: 1fr auto 1fr; gap: 18px; align-items: center;
+      }
+      .mb-goutte {
+        position: relative; width: 132px; height: 132px; flex: none;
+        display: flex; align-items: center; justify-content: center;
+        animation: mb-carte-monte 0.45s cubic-bezier(0.2, 1, 0.3, 1) backwards;
+      }
+      .mb-goutte-corps {
+        position: relative; z-index: 1; width: 108px; height: 108px; border-radius: 50%;
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+        background: radial-gradient(circle at 50% 35%, #6fc8f0, #2b7fb4 55%, #174a70);
+        border: 2px solid rgba(167, 221, 245, 0.7);
+        box-shadow: 0 0 0 8px rgba(99, 183, 230, 0.12), 0 0 44px rgba(99, 183, 230, 0.45), inset 0 -10px 24px rgba(0, 0, 0, 0.35);
+        animation: mb-goutte-bat 2.4s ease-in-out infinite;
+        transition: transform 0.25s ease;
+      }
+      @keyframes mb-goutte-bat {
+        0%, 100% { box-shadow: 0 0 0 8px rgba(99, 183, 230, 0.12), 0 0 44px rgba(99, 183, 230, 0.45), inset 0 -10px 24px rgba(0, 0, 0, 0.35); }
+        50% { box-shadow: 0 0 0 14px rgba(99, 183, 230, 0.08), 0 0 64px rgba(99, 183, 230, 0.65), inset 0 -10px 24px rgba(0, 0, 0, 0.35); }
+      }
+      .mb-goutte-corps b {
+        font-family: var(--font-display); font-size: calc(17px * var(--ui)); color: var(--mb-encre);
+        font-variant-numeric: tabular-nums; text-shadow: 0 0 12px rgba(234, 246, 255, 0.6);
+      }
+      .mb-goutte-corps i {
+        font-style: normal; font-family: var(--font-display); font-size: calc(7px * var(--ui));
+        letter-spacing: 0.3em; color: rgba(234, 246, 255, 0.8);
+      }
+      /* la goutte penche vers la plaque visée */
+      .mb-versement[data-vers='g'] .mb-goutte-corps { transform: translateX(-10px) scale(0.96); }
+      .mb-versement[data-vers='d'] .mb-goutte-corps { transform: translateX(10px) scale(0.96); }
+      /* LE FLUX : des gouttes qui filent de la goutte vers la plaque visée */
+      .mb-flux {
+        position: absolute; top: 50%; height: 8px; width: 90px; margin-top: -4px;
+        background: radial-gradient(circle, rgba(167, 221, 245, 0.95) 0 2.5px, transparent 3px);
+        background-size: 18px 8px; opacity: 0; transition: opacity 0.2s ease;
+        filter: drop-shadow(0 0 6px rgba(99, 183, 230, 0.8));
+      }
+      .mb-flux-g { right: 100%; margin-right: -16px; animation: mb-flux-gauche 0.7s linear infinite; }
+      .mb-flux-d { left: 100%; margin-left: -16px; animation: mb-flux-droite 0.7s linear infinite; }
+      .mb-versement[data-vers='g'] .mb-flux-g { opacity: 1; }
+      .mb-versement[data-vers='d'] .mb-flux-d { opacity: 1; }
+      .mb-versement[data-vers='d'] .mb-flux-d { background-image: radial-gradient(circle, rgba(169, 255, 214, 0.95) 0 2.5px, transparent 3px); filter: drop-shadow(0 0 6px rgba(109, 255, 184, 0.8)); }
+      @keyframes mb-flux-gauche {
+        from { background-position: 0 0; }
+        to { background-position: -18px 0; }
+      }
+      @keyframes mb-flux-droite {
+        from { background-position: 0 0; }
+        to { background-position: 18px 0; }
+      }
+      /* LES PLAQUES : chacune a sa teinte (l'eau pour la réserve, la menthe
+         pour la maîtrise) qui prend le bord, le halo et la jauge */
+      .mb-carte.mb-dest {
+        --t: var(--mb-bleu);
+        min-height: 210px; padding: 18px 18px 16px; gap: 10px; align-items: stretch; text-align: left;
+      }
+      .mb-carte.mb-dest-maitrise { --t: var(--mb-menthe); }
+      .mb-carte.mb-dest::before { --mb-teal: var(--t); }
+      .mb-carte.mb-dest:hover:not(:disabled), .mb-carte.mb-dest:focus-visible {
+        border-color: var(--t);
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5), 0 0 34px color-mix(in srgb, var(--t) 30%, transparent);
+      }
+      .mb-dest-tete { display: flex; align-items: center; gap: 14px; }
+      .mb-dest-tete b {
+        font-family: var(--font-display); font-size: calc(13px * var(--ui)); letter-spacing: 0.3em;
+        color: var(--mb-encre);
+      }
+      /* le BOCAL de la réserve : le niveau d'avant en plein, la part qui
+         s'ajoute en clair par-dessus */
+      .mb-bocal { width: 44px; height: 58px; flex: none; filter: drop-shadow(0 0 10px rgba(99, 183, 230, 0.35)); }
+      .mb-bocal-bouchon { fill: #3d5a78; }
+      .mb-bocal-verre { fill: rgba(18, 28, 42, 0.7); stroke: #4a7096; stroke-width: 2; }
+      .mb-bocal-eau { fill: #3f98cf; }
+      .mb-bocal-gain { fill: rgba(167, 221, 245, 0.55); animation: mb-dest-pulse 1.4s ease-in-out infinite; }
+      /* l'ANNEAU de la maîtrise : le chemin fait en plein, celui qui
+         s'ajoute en clair, le numéro du palier au centre */
+      .mb-anneau { width: 58px; height: 58px; flex: none; transform: rotate(-90deg); filter: drop-shadow(0 0 10px rgba(109, 255, 184, 0.35)); }
+      .mb-anneau circle { fill: none; stroke-width: 6; stroke-linecap: round; }
+      .mb-anneau-fond { stroke: #223447; }
+      .mb-anneau-fait { stroke: var(--mb-menthe); }
+      .mb-anneau-gain { stroke: rgba(169, 255, 214, 0.45); animation: mb-dest-pulse 1.4s ease-in-out infinite; }
+      .mb-anneau-no {
+        fill: var(--mb-encre); font-family: var(--font-display); font-size: 19px; text-anchor: middle;
+        transform: rotate(90deg); transform-origin: 32px 32px;
+      }
+      /* AVANT → APRÈS, en chiffres */
+      .mb-dest-chiffres {
+        display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+        font-variant-numeric: tabular-nums;
+      }
+      .mb-dest-chiffres i { font-style: normal; font-size: calc(15px * var(--ui)); color: #7b93a8; }
+      .mb-dest-chiffres em { font-style: normal; color: var(--t); font-size: calc(15px * var(--ui)); }
+      .mb-dest-chiffres b {
+        font-family: var(--font-display); font-size: calc(22px * var(--ui)); color: var(--mb-encre);
+        text-shadow: 0 0 14px color-mix(in srgb, var(--t) 40%, transparent);
+      }
+      .mb-dest-chiffres small { color: #7b93a8; font-size: calc(11px * var(--ui)); }
+      /* la jauge : l'acquis en plein, le gain en clair qui pulse */
       .mb-dest-jauge {
-        width: 100%; height: 7px; border-radius: 4px; margin-top: 4px;
+        width: 100%; height: 8px; border-radius: 4px;
         background: rgba(255, 255, 255, 0.08); overflow: hidden; position: relative;
       }
       .mb-dest-jauge::before {
         content: ''; position: absolute; inset: 0 auto 0 0; width: calc(var(--a, 0) * 100%);
-        background: rgba(120, 200, 240, 0.5);
+        background: color-mix(in srgb, var(--t) 70%, #ffffff 10%);
       }
       .mb-dest-jauge::after {
         content: ''; position: absolute; inset: 0 auto 0 calc(var(--a, 0) * 100%);
         width: calc(var(--g, 0) * 100%);
-        background: linear-gradient(90deg, var(--mb-teal), var(--mb-menthe));
-        box-shadow: 0 0 10px rgba(109, 255, 184, 0.6);
+        background: color-mix(in srgb, var(--t) 60%, #ffffff);
+        box-shadow: 0 0 10px color-mix(in srgb, var(--t) 70%, transparent);
         animation: mb-dest-pulse 1.4s ease-in-out infinite;
       }
       @keyframes mb-dest-pulse {
-        0%, 100% { opacity: 0.7; }
+        0%, 100% { opacity: 0.6; }
         50% { opacity: 1; }
       }
-      .mb-cartes:has(.mb-dest) { grid-template-columns: 1fr 1fr; max-width: 760px; margin: 0 auto; width: 100%; }
+      .mb-dest-mot { color: #8ba3b8; font-size: calc(11.5px * var(--ui)); line-height: 1.4; }
+      .mb-dest-plus {
+        margin-top: auto; font-style: normal; font-size: calc(11px * var(--ui)); letter-spacing: 0.06em;
+        color: var(--t);
+      }
+      /* la plaque qui FRANCHIT un palier le dit en tampon, et son bord respire */
+      .mb-dest-plus.mb-dest-ouvre {
+        font-family: var(--font-display); font-size: calc(8px * var(--ui)); letter-spacing: 0.2em;
+        color: var(--mb-or); border: 1px solid rgba(255, 217, 119, 0.6); border-radius: 4px;
+        padding: 5px 9px; width: fit-content; text-shadow: 0 0 12px rgba(255, 217, 119, 0.5);
+      }
+      .mb-carte.mb-dest-palier { animation: mb-carte-monte 0.45s cubic-bezier(0.2, 1, 0.3, 1) backwards, mb-dest-respire 2s 0.6s ease-in-out infinite; }
+      @keyframes mb-dest-respire {
+        0%, 100% { border-color: #2d4258; }
+        50% { border-color: rgba(109, 255, 184, 0.7); box-shadow: 0 0 26px rgba(109, 255, 184, 0.2); }
+      }
+      /* LA QUESTION : le titre de scène qui demande quelque chose au joueur
+         se lit en grand et en clair, même en compact */
+      .mb-scene.mb-question .mb-titre,
+      .mb-scene.mb-compact.mb-question .mb-titre {
+        font-size: calc(clamp(18px, 2.6vw, 26px) * var(--ui)); letter-spacing: 0.3em;
+        color: var(--mb-encre); text-shadow: 0 0 22px rgba(109, 255, 184, 0.45);
+      }
+      .mb-scene.mb-question .mb-choix-titre { color: #7f9cb0; }
+      .mb-choix-titre.mb-grande {
+        font-size: calc(14px * var(--ui)); letter-spacing: 0.34em; color: var(--mb-encre);
+        text-shadow: 0 0 18px rgba(99, 183, 230, 0.45);
+      }
+      /* LA CONSIGNE des portes : ce que sont ces vignettes, et ce qu'on en fait */
+      .mb-portes-consigne {
+        grid-column: 1 / -1; margin: -4px 0 2px; text-align: center;
+        font-size: calc(12px * var(--ui)); letter-spacing: 0.06em; color: #a9c3de;
+      }
+      .mb-portes-consigne i { font-style: normal; color: var(--mb-menthe); margin-right: 4px; }
       /* LE BOUTON DE SUITE : une pastille qui respire et qu'on presse */
       .mb-continuer {
         grid-column: 1 / -1; justify-self: center; min-width: min(360px, 100%);
@@ -8491,7 +8619,7 @@
         position: absolute; right: 16px; top: 16px; z-index: 1;
         font-family: var(--font-display); font-size: calc(8px * var(--ui)); letter-spacing: 0.26em;
         color: #071018; background: var(--mb-menthe); border-radius: 999px; padding: 5px 11px;
-        opacity: 0; transform: translateX(8px); transition: opacity 0.16s ease, transform 0.16s ease;
+        opacity: 0.6; transform: scale(0.94); transition: opacity 0.16s ease, transform 0.16s ease;
         box-shadow: 0 0 16px rgba(109, 255, 184, 0.5);
       }
       .mb-porte:hover, .mb-porte:focus-visible {
@@ -8572,10 +8700,15 @@
         .mb-litres b { font-size: calc(32px * var(--ui)); }
         .mb-ligne { grid-template-columns: auto 1fr; }
         .mb-ligne-val { grid-column: 1 / -1; justify-self: start; }
-        .mb-cartes, .mb-cartes.mb-draft, .mb-cartes:has(.mb-dest), .mb-cartes.mb-trio,
+        .mb-cartes, .mb-cartes.mb-draft, .mb-cartes.mb-trio,
         .mb-cartes:has(.mb-porte) { grid-template-columns: 1fr; }
         .mb-pli, .mb-pli .crt-draft { min-height: 0; }
         .mb-carte { min-height: 0; padding: 14px 12px; }
+        .mb-versement { grid-template-columns: 1fr; gap: 12px; }
+        .mb-goutte { order: -1; width: 100px; height: 100px; margin: 0 auto; }
+        .mb-goutte-corps { width: 92px; height: 92px; }
+        .mb-flux { display: none; }
+        .mb-versement[data-vers] .mb-goutte-corps { transform: none; }
         .mb-scene.mb-compact .mb-releve { grid-template-columns: auto 1fr; justify-items: start; }
         .mb-scene.mb-compact .mb-corps { gap: 12px; }
       }
@@ -8600,7 +8733,8 @@
         .mb-etal-fluide, .mb-etal-fluide::after, .mb-etal-tube.eclair, .mb-etal-tampon,
         .mb-palier-eclair, .mb-choix, .mb-pli, .mb-pli .crt-draft::after,
         .mb-cartes.mb-elu .mb-pli:not(.mb-elu-c), .mb-pli.mb-elu-c, .mb-carte, .mb-ico,
-        .mb-dest-jauge::after, .mb-continuer, .mb-continuer::after, .mb-porte,
+        .mb-dest-jauge::after, .mb-goutte, .mb-goutte-corps, .mb-flux, .mb-bocal-gain, .mb-anneau-gain,
+        .mb-carte.mb-dest-palier, .mb-continuer, .mb-continuer::after, .mb-porte,
         .mb-porte-vue::after, .mb-cartes.mb-elu .mb-porte:not(.mb-elue), .mb-porte.mb-elue,
         .mb-station-carte, .mb-passer { animation: none; }
         .mb-filet { animation: none; width: min(560px, 82%); }
@@ -10303,7 +10437,7 @@
         <!-- La JAUGE D'ÉTALONNAGE : l'XP se voit couler, palier par palier -->
         <div class="mb-etal" id="mb-etal" hidden>
           <div class="mb-etal-tete">
-            <span class="mb-etal-nom">ÉTALONNAGE</span>
+            <span class="mb-etal-nom">MAÎTRISE</span>
             <span class="mb-etal-xp"><b id="mb-etal-l">0,0</b> L<i id="mb-etal-gain" hidden></i></span>
           </div>
           <div class="mb-etal-jauge">
