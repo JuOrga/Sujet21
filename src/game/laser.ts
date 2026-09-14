@@ -34,7 +34,9 @@ import {
   type ObstacleBox,
 } from './level'
 import { dansForme } from './formes'
-import type { Bounds } from '../sim/solver'
+import { MILIEU_EAU, MILIEU_GLACE, MILIEU_VAPEUR, type Bounds } from '../sim/solver'
+
+export { MILIEU_EAU, MILIEU_GLACE, MILIEU_VAPEUR }
 
 export const LASER_STEP = 5 // u par pas de marche — sous le rayon de glace
 export const LASER_MAX_BOUNCES = 8
@@ -90,6 +92,14 @@ export interface TraceMonde {
   rails: { points: { x: number; y: number }[] }[]
   /** Rayon de capture autour de la ligne du rail (défaut LASER_RAIL_RADIUS). */
   railRadius?: number
+  /** LE MILIEU EN UN PASSAGE — le raccourci de la boucle chaude : les bits
+   * MILIEU_GLACE (glace au contact), MILIEU_EAU (eau liquide, au sens de
+   * `eau.dedans`) et MILIEU_VAPEUR (vapeur, au sens de `vapeur`) en (x, y).
+   * Fourni, le traceur ne demande plus à chaque pas que lui, et ne calcule
+   * la normale de glace (`iceNormal`, coûteuse) qu'où la glace est là.
+   * Absent (l'éditeur, les tests), les trois requêtes séparées répondent
+   * — même résultat, trois parcours de voisins au lieu d'un. */
+  milieu?: (x: number, y: number) => number
 }
 
 export interface TraceResultat {
@@ -137,6 +147,184 @@ function dansRectAxe(x: number, y: number, r: Rect): boolean {
  * éteint — mais la marche libre le RÉFLÉCHIT avant d'en arriver là.) */
 function absorbe(b: ObstacleBox): boolean {
   return b.material !== MAT_GRILLE && !sansPhysique(b.material)
+}
+
+// ---- LE FILTRE DES BOÎTES : un pas ne teste que celles qui sont sur sa
+// route ------------------------------------------------------------------
+//
+// POURQUOI. Le rapport de performance du 14/09/2026 (Firefox sur Windows,
+// salle « démineur » : 112 boîtes, 7 émetteurs, 7 cibles) montrait 10 im/s
+// avec 97 ms d'« autre JS » par image — ni la physique (12 ms) ni le rendu
+// (0,4 ms). C'était ce traceur : à CHAQUE pas de 5 u, chaque faisceau
+// testait TOUTES les boîtes du tableau, deux fois (le miroir, puis la
+// paroi), plus les portes. Sept faisceaux qui traversent un tableau de
+// 2 800 u : ~4 000 pas × 230 tests de rectangle par image — 12 ms au banc
+// dans Node, et bien plus sur un moteur JS moins prompt à optimiser ces
+// boucles. Le coût grimpait avec le NOMBRE de boîtes, pas avec ce que le
+// faisceau rencontrait.
+//
+// COMMENT. Entre deux événements (rebond, dioptre, rail), le faisceau court
+// en ligne droite. Au départ de chaque segment droit, on calcule pour
+// chaque boîte l'intervalle de distance [tIn, tOut] pendant lequel le rayon
+// peut se trouver dans son ENVELOPPE (test des « slabs » sur la boîte
+// englobante alignée — rotation comprise —, gonflée d'un pas et demi) ; un
+// pas ne teste alors au contact près (dansRect : la forme, la rotation) que
+// les boîtes dont l'intervalle contient sa distance parcourue. Le résultat
+// est LE MÊME au pas près : le filtre n'écarte que les boîtes que le pas
+// ne pouvait pas toucher. Les boîtes transparentes (grille, sas, vide,
+// baie) ne sont même plus dans la liste.
+
+/** Compteurs du DERNIER tracé : le nombre de pas de marche et le nombre de
+ * tests de rectangle qu'ils ont coûté. Diagnostic et test — c'est ce qui
+ * garde le filtre honnête (un tracé ne doit pas coûter plus de quelques
+ * tests par pas, quel que soit le nombre de boîtes du tableau). */
+export const statsTrace = { pas: 0, testsBoites: 0 }
+
+const CONTACT_RIEN = -1
+const CONTACT_OPAQUE = -2
+// l'enveloppe est gonflée d'un pas et demi : le point testé avance par pas
+// de LASER_STEP le long du segment, l'intervalle doit l'attraper à coup sûr
+const GONFLE_ENVELOPPE = LASER_STEP * 1.5
+
+export interface Enveloppe {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+}
+
+/** L'enveloppe ALIGNÉE d'une boîte, gonflée de `marge` : pour une boîte
+ * pivotée, c'est la boîte englobante du rectangle tourné — plus large que
+ * min/max, qui décrivent le rectangle AVANT rotation (une barre de 300 × 40
+ * pivotée de 90° occupe 40 × 300). Une forme (disque, capsule, coin, arc)
+ * tient dans sa boîte min/max : l'enveloppe est la même. */
+export function enveloppeBoite(b: Rect & { angle?: number }, marge: number): Enveloppe {
+  if (b.angle) {
+    const cx = (b.minX + b.maxX) / 2
+    const cy = (b.minY + b.maxY) / 2
+    const hw = (b.maxX - b.minX) / 2
+    const hh = (b.maxY - b.minY) / 2
+    const rad = (b.angle * Math.PI) / 180
+    const ca = Math.abs(Math.cos(rad))
+    const sa = Math.abs(Math.sin(rad))
+    const ex = hw * ca + hh * sa
+    const ey = hw * sa + hh * ca
+    return { minX: cx - ex - marge, minY: cy - ey - marge, maxX: cx + ex + marge, maxY: cy + ey + marge }
+  }
+  return { minX: b.minX - marge, minY: b.minY - marge, maxX: b.maxX + marge, maxY: b.maxY + marge }
+}
+
+/** L'intervalle de distance [tIn, tOut] (t ≥ 0) pendant lequel le rayon
+ * (ox, oy) + t · (dx, dy) est dans l'enveloppe — écrit dans `out`. Faux si
+ * le rayon ne la rencontre pas devant lui (à côté, ou déjà derrière). Un
+ * départ DANS l'enveloppe donne tIn = 0. */
+export function intervalleRayon(
+  ox: number,
+  oy: number,
+  dx: number,
+  dy: number,
+  e: Enveloppe,
+  out: { tIn: number; tOut: number },
+): boolean {
+  let tIn = 0
+  let tOut = Infinity
+  if (Math.abs(dx) < 1e-9) {
+    if (ox < e.minX || ox > e.maxX) return false
+  } else {
+    const a = (e.minX - ox) / dx
+    const b = (e.maxX - ox) / dx
+    if (a < b) {
+      if (a > tIn) tIn = a
+      if (b < tOut) tOut = b
+    } else {
+      if (b > tIn) tIn = b
+      if (a < tOut) tOut = a
+    }
+  }
+  if (Math.abs(dy) < 1e-9) {
+    if (oy < e.minY || oy > e.maxY) return false
+  } else {
+    const a = (e.minY - oy) / dy
+    const b = (e.maxY - oy) / dy
+    if (a < b) {
+      if (a > tIn) tIn = a
+      if (b < tOut) tOut = b
+    } else {
+      if (b > tIn) tIn = b
+      if (a < tOut) tOut = a
+    }
+  }
+  if (tOut < tIn) return false
+  out.tIn = tIn
+  out.tOut = tOut
+  return true
+}
+
+class FiltreBoites {
+  // les boîtes qui comptent (parois, miroirs, portes fermées), dans l'ordre
+  // du tableau — l'ordre départage deux miroirs superposés comme avant
+  private readonly boites: (Rect & { angle?: number; forme?: number; p0?: number; p1?: number })[] = []
+  private readonly env: Enveloppe[] = []
+  private readonly miroir: boolean[] = []
+  // les candidats du segment droit courant, et leur intervalle de distance
+  private readonly cand: number[] = []
+  private readonly tIn: number[] = []
+  private readonly tOut: number[] = []
+  private n = 0
+  private readonly scratch = { tIn: 0, tOut: 0 }
+
+  constructor(boxes: ObstacleBox[], portesFermees: Rect[]) {
+    for (const b of boxes) {
+      if (!absorbe(b)) continue // transparente : jamais testée
+      this.boites.push(b)
+      this.env.push(enveloppeBoite(b, GONFLE_ENVELOPPE))
+      this.miroir.push(b.material === MAT_MIROIR)
+    }
+    for (const p of portesFermees) {
+      this.boites.push(p)
+      this.env.push(enveloppeBoite(p, GONFLE_ENVELOPPE))
+      this.miroir.push(false)
+    }
+  }
+
+  /** Un nouveau segment droit part de (ox, oy) dans la direction (dx, dy) :
+   * on retient les boîtes qu'il peut rencontrer, et quand. */
+  segment(ox: number, oy: number, dx: number, dy: number): void {
+    this.n = 0
+    const sc = this.scratch
+    for (let i = 0; i < this.boites.length; i++) {
+      if (!intervalleRayon(ox, oy, dx, dy, this.env[i], sc)) continue
+      this.cand[this.n] = i
+      this.tIn[this.n] = sc.tIn
+      this.tOut[this.n] = sc.tOut
+      this.n++
+    }
+  }
+
+  /** Ce que touche le point (x, y), à la distance `s` du départ du segment :
+   * l'index d'un MIROIR (le premier dans l'ordre du tableau), CONTACT_OPAQUE
+   * (paroi ou porte fermée), ou CONTACT_RIEN. */
+  contact(s: number, x: number, y: number): number {
+    let miroir = CONTACT_RIEN
+    let opaque = false
+    for (let k = 0; k < this.n; k++) {
+      if (s < this.tIn[k] || s > this.tOut[k]) continue
+      const i = this.cand[k]
+      statsTrace.testsBoites++
+      if (!dansRect(x, y, this.boites[i])) continue
+      if (this.miroir[i]) {
+        if (miroir === CONTACT_RIEN) miroir = i
+      } else opaque = true
+    }
+    if (miroir !== CONTACT_RIEN) return miroir
+    return opaque ? CONTACT_OPAQUE : CONTACT_RIEN
+  }
+
+  /** La boîte d'un index rendu par `contact` (un miroir : toujours une boîte
+   * du tableau, jamais une porte). */
+  boite(i: number): ObstacleBox {
+    return this.boites[i] as ObstacleBox
+  }
 }
 
 // ---- Le MIROIR FIXE : la paroi polie qui réfléchit le faisceau ----------
@@ -229,6 +417,13 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
   if (dansVapeur) points[0].plasma = true
   let railsPris = 0
   let capSursis = 0 // distance à parcourir avant de pouvoir reprendre un rail
+  // le filtre des boîtes (voir plus haut) : un segment droit démarre ici,
+  // et redémarre à chaque changement de direction ou de position
+  const filtre = new FiltreBoites(monde.boxes, monde.portesFermees)
+  filtre.segment(x, y, dx, dy)
+  let sSeg = 0 // distance parcourue depuis le départ du segment droit courant
+  statsTrace.pas = 0
+  statsTrace.testsBoites = 0
 
   // Marche GUIDÉE le long d'un rail capturé : l'arc suit la polyligne nœud
   // par nœud, mais reste de la lumière — cibles, parois et portes fermées
@@ -241,6 +436,8 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
       const uy = (noeud.y - y) / restant
       dx = ux
       dy = uy
+      filtre.segment(x, y, ux, uy)
+      let sRail = 0
       while (restant > 0) {
         if (course >= LASER_MAX_LENGTH) {
           points.push({ x, y, plasma: true })
@@ -251,6 +448,8 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
         y += uy * pas
         course += pas
         restant -= pas
+        sRail += pas
+        statsTrace.pas++
         for (let c = 0; c < monde.cibles.length; c++) {
           const t = monde.cibles[c]
           const ddx = x - t.x
@@ -261,17 +460,10 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
             return true
           }
         }
-        for (const b of monde.boxes) {
-          if (absorbe(b) && dansRect(x, y, b)) {
-            points.push({ x, y })
-            return true
-          }
-        }
-        for (const p of monde.portesFermees) {
-          if (dansRect(x, y, p)) {
-            points.push({ x, y })
-            return true
-          }
+        // paroi, porte fermée — ou miroir : l'arc guidé s'y éteint
+        if (filtre.contact(sRail, x, y) !== CONTACT_RIEN) {
+          points.push({ x, y })
+          return true
         }
       }
       points.push({ x: noeud.x, y: noeud.y, plasma: true })
@@ -285,6 +477,8 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
     x += dx * LASER_STEP
     y += dy * LASER_STEP
     course += LASER_STEP
+    sSeg += LASER_STEP
+    statsTrace.pas++
 
     // hors de la cuve : le faisceau se perd dans la coque
     if (x < monde.bounds.minX || x > monde.bounds.maxX || y < monde.bounds.minY || y > monde.bounds.maxY) {
@@ -306,13 +500,8 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
 
     // un MIROIR FIXE : la paroi polie réfléchit — même plafond de rebonds
     // que la glace (contre les couloirs de miroirs infinis)
-    let miroirTouche: ObstacleBox | null = null
-    for (const b of monde.boxes) {
-      if (b.material === MAT_MIROIR && dansRect(x, y, b)) {
-        miroirTouche = b
-        break
-      }
-    }
+    const contact = filtre.contact(sSeg, x, y)
+    const miroirTouche = contact >= 0 ? filtre.boite(contact) : null
     if (miroirTouche) {
       if (bounces >= LASER_MAX_BOUNCES) {
         points.push({ x, y })
@@ -334,6 +523,8 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
         y += n.ny * LASER_STEP
         course += LASER_STEP
       }
+      filtre.segment(x, y, dx, dy)
+      sSeg = 0
       if (refracte) dansEau = monde.eau!.dedans(x, y)
       if (monde.vapeur) dansVapeur = monde.vapeur(x, y)
       points[points.length - 1].eau = dansEau
@@ -342,29 +533,21 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
     }
 
     // une paroi pleine ou une porte fermée : absorbé
-    let stoppe = false
-    for (const b of monde.boxes) {
-      if (absorbe(b) && dansRect(x, y, b)) {
-        stoppe = true
-        break
-      }
-    }
-    if (!stoppe) {
-      for (const p of monde.portesFermees) {
-        if (dansRect(x, y, p)) {
-          stoppe = true
-          break
-        }
-      }
-    }
-    if (stoppe) {
+    if (contact === CONTACT_OPAQUE) {
       points.push({ x, y })
       return { points, touchees, railsSuivis, rebondsGlace: bounces }
     }
 
+    // le milieu du pas, en un passage quand la simulation sait le dire
+    // (−1 : pas de raccourci, chaque question se pose à part)
+    const milieu = monde.milieu ? monde.milieu(x, y) : -1
+
     // la glace : miroir. On réfléchit sur la normale locale, puis on ressort
     // du champ de la surface pour ne pas se re-cogner au pas suivant.
-    const n = monde.iceNormal ? monde.iceNormal(x, y) : null
+    const n =
+      monde.iceNormal && (milieu < 0 || (milieu & MILIEU_GLACE) !== 0)
+        ? monde.iceNormal(x, y)
+        : null
     if (n) {
       if (bounces >= LASER_MAX_BOUNCES) {
         points.push({ x, y })
@@ -385,6 +568,8 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
         y += n.ny * LASER_STEP
         course += LASER_STEP
       }
+      filtre.segment(x, y, dx, dy)
+      sSeg = 0
       // le dégagement a pu nous déposer dans l'eau ou la vapeur (la glace
       // baigne dans le corps) : on resynchronise SANS déclencher de dioptre
       if (refracte) dansEau = monde.eau!.dedans(x, y)
@@ -397,7 +582,7 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
     // l'eau : dioptre. Changer de milieu plie le rayon (Snell-Descartes) ;
     // sortir trop à plat le RÉFLÉCHIT sous la surface (réflexion totale).
     if (refracte) {
-      const la = monde.eau!.dedans(x, y)
+      const la = milieu < 0 ? monde.eau!.dedans(x, y) : (milieu & MILIEU_EAU) !== 0
       if (la !== dansEau) {
         if (dioptres >= LASER_MAX_REFRACT) {
           points.push({ x, y })
@@ -436,6 +621,8 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
         const inv = 1 / Math.max(1e-6, Math.hypot(dx, dy))
         dx *= inv
         dy *= inv
+        filtre.segment(x, y, dx, dy)
+        sSeg = 0
       }
     }
 
@@ -445,7 +632,7 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
     // tout droit, désionisé (sauf à ressortir dans un nuage).
     if (capSursis > 0) capSursis -= LASER_STEP
     if (monde.vapeur) {
-      const ion = monde.vapeur(x, y)
+      const ion = milieu < 0 ? monde.vapeur(x, y) : (milieu & MILIEU_VAPEUR) !== 0
       if (ion !== dansVapeur) {
         dansVapeur = ion
         points.push({ x, y, eau: dansEau, plasma: dansVapeur })
@@ -490,6 +677,8 @@ export function traceLaser(em: LaserDef, monde: TraceMonde): TraceResultat {
           // qu'on y trouve — et un court sursis évite de reprendre le
           // même rail par son extrémité de sortie.
           capSursis = rr + LASER_STEP * 2
+          filtre.segment(x, y, dx, dy)
+          sSeg = 0
           if (refracte) dansEau = monde.eau!.dedans(x, y)
           dansVapeur = monde.vapeur(x, y)
           const dernier = points[points.length - 1]
