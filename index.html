@@ -7727,155 +7727,447 @@
           grid-template-columns: 1fr calc(92px * var(--ui)) calc(92px * var(--ui));
         }
       }
-      /* ---- La MISE EN BONBONNE : l'écran de récompense de fin de salle ---- */
+      /* ==== LA CÉRÉMONIE DE FIN DE SALLE : un plein écran de jeu vidéo ====
+         Elle était une boîte modale de 560 px, sobre comme un relevé de
+         compteur. Elle est devenue une SCÈNE : le fond respire (grille qui
+         dérive, balayage lumineux), la bannière CLAQUE, le RANG tombe en
+         médaille, les compteurs ROULENT, chaque ligne du relevé arrive
+         avec sa barre, le condensat s'égrène, la jauge d'étalonnage coule
+         et un palier franchi traverse l'écran en bande. Les cartes du
+         tirage se RETOURNENT (dos, puis face), s'inclinent sous le
+         pointeur ; les salles sont des PORTES qui s'ouvrent quand on les
+         élit. Le feu (canvas) jette ses éclats à chaque grand instant.
+         Tout ce qui bouge a son repli « moins d'animations » : le jeu
+         reste le même, sans le spectacle. Les identifiants sont ceux que
+         main.ts va chercher (ceremonie.spec.ts les garde). */
       #mb-veil {
-        position: fixed; inset: 0; z-index: 50; padding: 10px;
-        display: flex; align-items: center; justify-content: center;
-        background: rgba(4, 8, 14, 0.72);
-        backdrop-filter: blur(3px);
-        -webkit-backdrop-filter: blur(3px);
+        --mb-menthe: #6dffb8;
+        --mb-teal: #8fd8c8;
+        --mb-or: #ffd977;
+        --mb-bleu: #63b7e6;
+        --mb-encre: #eaf6ff;
+        --mb-rang: #ffd977;
+        position: fixed; inset: 0; z-index: 50; overflow: hidden;
+        display: grid; place-items: center;
+        font-family: var(--font-mono); color: #cfe2ef;
       }
       #mb-veil[hidden] { display: none; }
-      .mb-panneau {
-        width: min(560px, 92vw);
-        /* le panneau ne DÉPASSE jamais l'écran : il défile plutôt que de
-           couper (Steam Deck, 800 px de haut) */
-        max-height: 96vh; overflow-y: auto;
-        background: linear-gradient(180deg, #0d141f, #0a0f18);
-        border: 1px solid #27405a; border-radius: 12px;
-        padding: 18px 20px 16px;
-        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6);
-        font-family: 'IBM Plex Mono', ui-monospace, monospace;
-        color: #cfe2ef;
+      /* LE FOND : un dégradé profond, une grille qui dérive lentement et
+         un balayage de lumière — l'écran vit avant même que le titre
+         n'arrive. Le vignettage ramène l'œil au centre. */
+      .mb-fond {
+        position: absolute; inset: 0;
+        background: radial-gradient(ellipse at 50% 38%, rgba(18, 44, 66, 0.96) 0%, rgba(5, 10, 18, 0.98) 58%, #02050a 100%);
       }
-      /* L'ÉTAPE DU CHOIX en COMPACT : le bilan déjà lu (flacon, lignes,
-         condensat, tampon de palier) se replie — les cartes prennent la
-         scène et tiennent dans l'écran du Deck. L'étalonnage reste, serré. */
-      .mb-panneau.mb-compact .mb-haut,
-      .mb-panneau.mb-compact .mb-lignes,
-      .mb-panneau.mb-compact .mb-cond,
-      .mb-panneau.mb-compact .mb-etal-tampon { display: none; }
-      .mb-panneau.mb-compact .mb-titre { margin-bottom: 4px; }
-      .mb-panneau.mb-compact .mb-etal { margin-top: 4px; padding-top: 8px; }
-      @media (max-height: 860px) {
-        .mb-panneau.mb-compact .mb-salle canvas { max-width: 185px; }
+      .mb-fond::before {
+        content: ''; position: absolute; inset: -60px;
+        background:
+          linear-gradient(rgba(99, 183, 230, 0.06) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(99, 183, 230, 0.06) 1px, transparent 1px);
+        background-size: 64px 64px;
+        mask-image: radial-gradient(ellipse at 50% 45%, #000 20%, transparent 75%);
+        -webkit-mask-image: radial-gradient(ellipse at 50% 45%, #000 20%, transparent 75%);
+        animation: mb-derive 18s linear infinite;
+      }
+      @keyframes mb-derive {
+        from { transform: translate(0, 0); }
+        to { transform: translate(64px, 64px); }
+      }
+      .mb-fond::after {
+        content: ''; position: absolute; inset: 0;
+        background:
+          linear-gradient(115deg, transparent 40%, rgba(143, 216, 200, 0.07) 50%, transparent 60%),
+          radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.6) 100%);
+        background-size: 300% 100%, 100% 100%;
+        animation: mb-balaye 7s ease-in-out infinite;
+      }
+      @keyframes mb-balaye {
+        0% { background-position: 120% 0, 0 0; }
+        100% { background-position: -120% 0, 0 0; }
+      }
+      .mb-feu {
+        position: absolute; inset: 0; width: 100%; height: 100%;
+        pointer-events: none; z-index: 3;
+      }
+      /* LE FLASH : l'écran blanchit un instant aux grands moments */
+      .mb-flash {
+        position: absolute; inset: 0; z-index: 4; pointer-events: none;
+        background: var(--mb-encre); opacity: 0;
+      }
+      .mb-flash.mb-on { animation: mb-flash 0.5s ease-out; }
+      @keyframes mb-flash {
+        0% { opacity: 0.55; }
+        100% { opacity: 0; }
+      }
+      /* LA SCÈNE : la colonne des temps, jamais plus haute que l'écran
+         (Steam Deck, 800 px) — elle défile plutôt que de couper */
+      .mb-scene {
+        position: relative; z-index: 2;
+        width: min(1180px, 96vw); max-height: 96vh; overflow-y: auto;
+        padding: 12px 22px 18px; display: flex; flex-direction: column; gap: 14px;
+      }
+      .mb-scene.mb-secousse { animation: mb-secousse-scene 0.42s ease-out; }
+      @keyframes mb-secousse-scene {
+        0% { transform: translate(0, 0); }
+        15% { transform: translate(-7px, 4px); }
+        30% { transform: translate(6px, -3px); }
+        45% { transform: translate(-4px, 2px); }
+        60% { transform: translate(3px, -2px); }
+        100% { transform: translate(0, 0); }
+      }
+      /* ---- LA BANNIÈRE : le titre claque, le filet s'étire ---- */
+      .mb-banniere { position: relative; text-align: center; padding: 4px 0 6px; }
+      .mb-sur {
+        display: block; font-family: var(--font-display);
+        font-size: calc(9px * var(--ui)); letter-spacing: 0.5em; color: var(--mb-teal);
+        animation: mb-monte 0.5s 0.2s ease-out backwards;
       }
       .mb-titre {
-        margin: 0 0 12px; font-family: Michroma, ui-monospace, monospace;
-        font-size: calc(15px * var(--ui)); letter-spacing: 0.24em; color: #8fd8c8;
+        margin: 6px 0 0; font-family: var(--font-display); font-weight: 600;
+        font-size: calc(clamp(24px, 4.6vw, 50px) * var(--ui)); line-height: 1.05;
+        letter-spacing: 0.22em; color: var(--mb-encre);
+        text-shadow: 0 0 22px rgba(143, 216, 200, 0.5), 0 0 64px rgba(99, 183, 230, 0.3);
+        animation: mb-claque 0.6s cubic-bezier(0.16, 1.3, 0.3, 1) both;
       }
-      .mb-haut { display: flex; align-items: center; gap: 16px; }
+      @keyframes mb-claque {
+        0% { transform: scale(2.4); opacity: 0; filter: blur(10px); letter-spacing: 0.6em; }
+        55% { transform: scale(0.97); opacity: 1; filter: blur(0); letter-spacing: 0.22em; }
+        100% { transform: scale(1); }
+      }
+      .mb-filet {
+        display: block; height: 2px; margin: 10px auto 0; width: 0;
+        background: linear-gradient(90deg, transparent, var(--mb-teal), var(--mb-menthe), var(--mb-teal), transparent);
+        box-shadow: 0 0 14px rgba(109, 255, 184, 0.6);
+        animation: mb-filet 0.7s 0.35s ease-out forwards;
+      }
+      @keyframes mb-filet { to { width: min(560px, 82%); } }
+      @keyframes mb-monte {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: none; }
+      }
+      /* ---- LE RELEVÉ : la médaille du rang, le flacon, les lignes ---- */
+      .mb-releve {
+        display: grid; grid-template-columns: auto 1fr; gap: 10px 30px; align-items: center;
+      }
+      .mb-releve[hidden] { display: none; }
+      /* LA MÉDAILLE : un anneau qui tourne, un disque qui luit, la lettre
+         qui TOMBE dessus — l'instant que le joueur attend */
+      .mb-rang {
+        position: relative; width: 172px; height: 172px; flex: none;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+      }
+      /* la médaille ATTEND sa place sans la lâcher : cachée, elle garde son
+         volume — sinon le flacon sauterait à gauche quand elle tombe */
+      .mb-rang[hidden] { display: flex; visibility: hidden; }
+      .mb-rang::before {
+        content: ''; position: absolute; inset: 12px; border-radius: 50%;
+        background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--mb-rang) 30%, #0a1420), #070d15 72%);
+        border: 1px solid color-mix(in srgb, var(--mb-rang) 50%, transparent);
+        box-shadow:
+          inset 0 0 34px color-mix(in srgb, var(--mb-rang) 20%, transparent),
+          0 0 44px color-mix(in srgb, var(--mb-rang) 26%, transparent);
+        animation: mb-monte 0.4s ease-out backwards;
+      }
+      .mb-rang-anneau {
+        position: absolute; inset: 0; border-radius: 50%;
+        background: conic-gradient(from 0deg, var(--mb-rang), transparent 28%, var(--mb-rang) 50%, transparent 78%, var(--mb-rang));
+        -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+        mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+        filter: drop-shadow(0 0 8px color-mix(in srgb, var(--mb-rang) 70%, transparent));
+        animation: mb-tourne 5s linear infinite;
+      }
+      @keyframes mb-tourne { to { transform: rotate(360deg); } }
+      .mb-rang-lettre {
+        position: relative; font-family: var(--font-display); font-weight: 600;
+        font-size: calc(76px * var(--ui)); line-height: 1; color: var(--mb-rang);
+        text-shadow:
+          0 0 16px color-mix(in srgb, var(--mb-rang) 75%, transparent),
+          0 0 46px color-mix(in srgb, var(--mb-rang) 40%, transparent);
+        animation: mb-tombe 0.62s cubic-bezier(0.2, 1.5, 0.3, 1) both;
+      }
+      @keyframes mb-tombe {
+        0% { transform: scale(3.6) rotate(-16deg); opacity: 0; filter: blur(8px); }
+        55% { transform: scale(0.92) rotate(2deg); opacity: 1; filter: blur(0); }
+        100% { transform: none; }
+      }
+      .mb-rang-mot {
+        position: relative; font-style: normal; font-family: var(--font-display);
+        font-size: calc(7.5px * var(--ui)); letter-spacing: 0.32em; color: var(--mb-encre);
+        margin-top: 8px; white-space: nowrap;
+        animation: mb-monte 0.4s 0.4s ease-out backwards;
+      }
+      .mb-etoiles { position: relative; display: flex; gap: 3px; margin-top: 6px; }
+      .mb-etoiles i {
+        font-style: normal; font-size: calc(13px * var(--ui)); color: #24364a;
+        transition: color 0.2s ease;
+      }
+      .mb-etoiles i.mb-on {
+        color: var(--mb-rang); text-shadow: 0 0 10px var(--mb-rang);
+        animation: mb-etoile 0.38s cubic-bezier(0.2, 2.2, 0.4, 1);
+      }
+      @keyframes mb-etoile {
+        0% { transform: scale(0) rotate(-90deg); }
+        100% { transform: scale(1) rotate(0); }
+      }
+      /* le corps du relevé : le flacon et le grand chiffre à gauche, les
+         lignes à droite, le condensat en pied */
+      .mb-corps {
+        display: grid; grid-template-columns: auto 1fr; gap: 12px 26px; align-items: center;
+        min-width: 0; opacity: 0; transition: opacity 0.4s ease;
+      }
+      .mb-corps.mb-on, .mb-scene.mb-compact .mb-corps { opacity: 1; }
+      .mb-haut { display: flex; align-items: center; gap: 18px; grid-row: 1 / 3; }
       .mb-flacon {
-        position: relative; width: 54px; height: 96px; flex: 0 0 54px;
-        border: 2px solid #3d5a78; border-top-width: 8px; border-radius: 10px 10px 14px 14px;
+        position: relative; width: 66px; height: 118px; flex: 0 0 66px;
+        border: 2px solid #3d5a78; border-top-width: 9px; border-radius: 12px 12px 18px 18px;
         background: rgba(18, 28, 42, 0.6); overflow: hidden;
+        box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.5), 0 0 24px rgba(99, 183, 230, 0.12);
+      }
+      /* les graduations du flacon : on lit le niveau, on ne le devine pas */
+      .mb-flacon::after {
+        content: ''; position: absolute; top: 0; bottom: 0; right: 4px; width: 8px;
+        background: repeating-linear-gradient(180deg, rgba(200, 230, 255, 0.35) 0 1px, transparent 1px 12px);
+        pointer-events: none;
       }
       .mb-eau {
         position: absolute; left: 0; right: 0; bottom: 0; height: 0%;
-        background: linear-gradient(180deg, #4fa8d8, #1d5f8c);
+        background: linear-gradient(180deg, #6fc8f0, #2b7fb4 40%, #1d5f8c);
         transition: height 1.3s cubic-bezier(0.2, 0.7, 0.3, 1);
+      }
+      /* la surface qui ondule et les bulles qui montent : le liquide vit */
+      .mb-eau::before {
+        content: ''; position: absolute; left: -20%; right: -20%; top: -5px; height: 10px;
+        background: radial-gradient(ellipse at 50% 50%, rgba(220, 245, 255, 0.55), transparent 70%);
+        animation: mb-ondule 1.6s ease-in-out infinite;
+      }
+      @keyframes mb-ondule {
+        0%, 100% { transform: translateX(-4px) scaleY(1); }
+        50% { transform: translateX(4px) scaleY(0.6); }
+      }
+      .mb-eau::after {
+        content: ''; position: absolute; inset: 0;
+        background:
+          radial-gradient(circle, rgba(255, 255, 255, 0.5) 0 1.5px, transparent 2px) 30% 80% / 100% 100% no-repeat,
+          radial-gradient(circle, rgba(255, 255, 255, 0.4) 0 1px, transparent 1.5px) 65% 60% / 100% 100% no-repeat,
+          radial-gradient(circle, rgba(255, 255, 255, 0.45) 0 1.2px, transparent 1.8px) 50% 95% / 100% 100% no-repeat;
+        animation: mb-bulles 2.4s linear infinite;
+      }
+      @keyframes mb-bulles {
+        from { background-position: 30% 100%, 65% 100%, 50% 100%; opacity: 0.9; }
+        to { background-position: 34% 0%, 62% 10%, 52% 5%; opacity: 0; }
       }
       .mb-glace {
         position: absolute; left: 0; right: 0; top: 4px; text-align: center;
-        font-size: calc(15px * var(--ui)); filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));
+        font-size: calc(16px * var(--ui)); filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));
         animation: mb-plonge 0.5s ease-out;
       }
       @keyframes mb-plonge {
         from { transform: translateY(-26px); opacity: 0; }
         to { transform: translateY(0); opacity: 1; }
       }
-      .mb-litres { font-size: calc(34px * var(--ui)); }
-      .mb-litres b { color: #eaf6ff; }
-      .mb-prime {
-        display: block; margin-top: 6px; font-size: calc(12.5px * var(--ui)); color: #a8d8f0;
-        animation: mb-plonge 0.4s ease-out;
+      .mb-litres { display: flex; flex-direction: column; gap: 2px; }
+      .mb-litres small {
+        font-family: var(--font-display); font-size: calc(7.5px * var(--ui));
+        letter-spacing: 0.3em; color: var(--mb-teal);
       }
-      .mb-lignes { margin-top: 14px; display: grid; gap: 7px; }
+      .mb-litres b {
+        font-family: var(--font-display); font-size: calc(40px * var(--ui)); line-height: 1;
+        color: var(--mb-encre); font-variant-numeric: tabular-nums;
+        text-shadow: 0 0 22px rgba(109, 255, 184, 0.35);
+      }
+      .mb-prime {
+        display: block; margin-top: 6px; font-size: calc(12px * var(--ui)); color: #a8d8f0;
+        letter-spacing: 0.06em; animation: mb-plonge 0.4s ease-out;
+      }
+      /* LES LIGNES : chacune est une plaque qui glisse en place, avec sa
+         barre, son chiffre en grand et, s'il y a lieu, le tampon du record */
+      .mb-lignes { display: grid; gap: 7px; min-width: 0; }
       .mb-ligne {
-        display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
-        font-size: calc(14px * var(--ui)); opacity: 0; transform: translateY(7px);
-        transition: opacity 0.28s ease, transform 0.28s ease;
+        display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px;
+        padding: 8px 12px; border-radius: 8px; min-width: 0;
+        background: rgba(12, 22, 34, 0.72); border: 1px solid rgba(150, 200, 235, 0.12);
+        opacity: 0; transform: translateX(-28px);
+        transition: opacity 0.34s ease, transform 0.34s cubic-bezier(0.2, 1, 0.3, 1);
       }
       .mb-ligne.mb-on { opacity: 1; transform: none; }
-      .mb-ligne small { color: #7b93a8; font-size: calc(13px * var(--ui)); }
+      .mb-ligne-nom {
+        display: flex; align-items: center; gap: 8px; white-space: nowrap;
+        font-family: var(--font-display); font-size: calc(7.5px * var(--ui));
+        letter-spacing: 0.22em; color: #9fb6c8;
+      }
+      .mb-ligne-nom i { font-style: normal; font-size: calc(15px * var(--ui)); }
+      .mb-ligne-barre {
+        position: relative; height: 6px; border-radius: 3px; min-width: 40px;
+        background: rgba(255, 255, 255, 0.08); overflow: hidden;
+      }
+      .mb-ligne-barre::after {
+        content: ''; position: absolute; inset: 0 auto 0 0; width: 0;
+        border-radius: 3px; background: linear-gradient(90deg, var(--mb-bleu), var(--mb-menthe));
+        box-shadow: 0 0 10px rgba(109, 255, 184, 0.5);
+        transition: width 0.9s 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      .mb-ligne.mb-on .mb-ligne-barre::after { width: calc(var(--f, 0) * 100%); }
+      .mb-ligne-val {
+        display: flex; align-items: baseline; gap: 8px; white-space: nowrap; justify-self: end;
+      }
+      .mb-ligne-val b {
+        font-family: var(--font-display); font-size: calc(17px * var(--ui));
+        color: var(--mb-encre); font-variant-numeric: tabular-nums;
+      }
+      .mb-ligne-val small { color: #7b93a8; font-size: calc(11px * var(--ui)); }
+      /* le record à battre, sous la ligne, quand celle-ci ne le bat pas */
+      .mb-ligne-rec {
+        grid-column: 1 / -1; color: #5f7890; font-size: calc(10.5px * var(--ui));
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
       .mb-record {
-        font-style: normal; font-size: calc(11.5px * var(--ui)); letter-spacing: 0.12em;
-        color: #ffd977; border: 1px solid #ffd977; border-radius: 3px;
-        padding: 2px 6px; transform: rotate(-3deg);
-        animation: mb-tampon 0.35s cubic-bezier(0.2, 2.2, 0.4, 1);
+        grid-column: 1 / -1; justify-self: end;
+        font-style: normal; font-family: var(--font-display); font-size: calc(8px * var(--ui));
+        letter-spacing: 0.2em; color: var(--mb-or);
+        border: 2px solid var(--mb-or); border-radius: 4px; padding: 3px 8px;
+        transform: rotate(-3deg); text-shadow: 0 0 14px rgba(255, 217, 119, 0.6);
+        box-shadow: 0 0 18px rgba(255, 217, 119, 0.25);
+        animation: mb-tampon 0.4s cubic-bezier(0.2, 2.2, 0.4, 1) backwards;
+        animation-delay: 0.35s;
       }
       @keyframes mb-tampon {
-        from { transform: rotate(-3deg) scale(2.1); opacity: 0; }
+        from { transform: rotate(-3deg) scale(2.6); opacity: 0; }
         to { transform: rotate(-3deg) scale(1); opacity: 1; }
       }
+      /* LE CONDENSAT : la bourse, en pied du relevé */
       .mb-cond {
-        margin-top: 14px; padding-top: 12px; border-top: 1px solid #1d2c3e;
-        font-size: calc(14px * var(--ui)); letter-spacing: 0.08em; color: #9fd8c8;
-        opacity: 0; transition: opacity 0.3s ease;
+        grid-column: 1 / -1; display: flex; align-items: baseline; gap: 8px;
+        padding: 10px 14px; border-radius: 8px;
+        background: linear-gradient(90deg, rgba(109, 255, 184, 0.1), transparent);
+        border: 1px solid rgba(109, 255, 184, 0.22);
+        font-size: calc(12px * var(--ui)); letter-spacing: 0.08em; color: #9fd8c8;
+        opacity: 0; transform: translateY(8px); transition: opacity 0.3s ease, transform 0.3s ease;
       }
-      .mb-cond.mb-on { opacity: 1; }
-      .mb-cond b { font-size: calc(22px * var(--ui)); color: #d5f3e8; }
-      .mb-cond-gain { margin-left: 8px; color: #6dffb8; font-size: calc(13.5px * var(--ui)); }
+      .mb-cond.mb-on { opacity: 1; transform: none; }
+      .mb-cond-ico { color: var(--mb-menthe); font-size: calc(16px * var(--ui)); align-self: center; }
+      .mb-cond-nom { font-family: var(--font-display); font-size: calc(7.5px * var(--ui)); letter-spacing: 0.26em; }
+      .mb-cond b {
+        font-family: var(--font-display); font-size: calc(24px * var(--ui)); color: #d5f3e8;
+        font-variant-numeric: tabular-nums; margin-left: 6px;
+      }
+      .mb-cond small { color: #7fb8a8; }
+      .mb-cond-gain {
+        margin-left: auto; color: var(--mb-menthe); font-size: calc(13px * var(--ui));
+        font-weight: 600; animation: mb-plonge 0.4s ease-out;
+      }
+      /* ---- LE COMPACT : le relevé lu se replie en BANDEAU — rang, litres
+         et condensat en une ligne — et la scène revient aux cartes ---- */
+      .mb-scene.mb-compact { gap: 10px; }
+      .mb-scene.mb-compact .mb-banniere { padding: 0; }
+      .mb-scene.mb-compact .mb-sur,
+      .mb-scene.mb-compact .mb-filet { display: none; }
+      .mb-scene.mb-compact .mb-titre {
+        font-size: calc(15px * var(--ui)); letter-spacing: 0.3em; animation: none;
+        color: var(--mb-teal); text-shadow: none;
+      }
+      .mb-scene.mb-compact .mb-releve {
+        grid-template-columns: auto 1fr; gap: 16px; padding: 6px 14px;
+        border: 1px solid rgba(150, 200, 235, 0.12); border-radius: 10px;
+        background: rgba(10, 18, 30, 0.72);
+      }
+      .mb-scene.mb-compact .mb-rang { width: 56px; height: 56px; }
+      .mb-scene.mb-compact .mb-rang::before { inset: 5px; }
+      .mb-scene.mb-compact .mb-rang-lettre { font-size: calc(26px * var(--ui)); animation: none; }
+      .mb-scene.mb-compact .mb-rang-mot,
+      .mb-scene.mb-compact .mb-etoiles,
+      .mb-scene.mb-compact .mb-flacon,
+      .mb-scene.mb-compact .mb-lignes,
+      .mb-scene.mb-compact .mb-prime,
+      .mb-scene.mb-compact .mb-cond-gain { display: none; }
+      .mb-scene.mb-compact .mb-corps {
+        display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+      }
+      .mb-scene.mb-compact .mb-haut { gap: 0; }
+      .mb-scene.mb-compact .mb-litres { flex-direction: row; align-items: baseline; gap: 10px; }
+      .mb-scene.mb-compact .mb-litres b { font-size: calc(20px * var(--ui)); text-shadow: none; }
+      .mb-scene.mb-compact .mb-cond {
+        margin: 0; padding: 4px 10px; border: 0; background: none; opacity: 1; transform: none;
+      }
+      .mb-scene.mb-compact .mb-cond b { font-size: calc(18px * var(--ui)); }
+      .mb-scene.mb-compact .mb-etal { margin-top: 0; padding-top: 0; border-top: 0; }
       /* ---- La JAUGE D'ÉTALONNAGE : l'XP se VOIT couler ---- */
       .mb-etal {
-        margin-top: 16px; padding-top: 14px; border-top: 1px solid #1d2c3e;
+        padding: 12px 14px; border-radius: 10px;
+        background: rgba(10, 18, 30, 0.72); border: 1px solid rgba(150, 200, 235, 0.12);
+        animation: mb-monte 0.4s ease-out;
       }
       .mb-etal[hidden] { display: none; }
       .mb-etal-tete {
         display: flex; justify-content: space-between; align-items: baseline;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
       }
       .mb-etal-nom {
-        font-family: Michroma, ui-monospace, monospace;
-        font-size: calc(13.5px * var(--ui)); letter-spacing: 0.22em; color: #8fd8c8;
+        font-family: var(--font-display);
+        font-size: calc(9px * var(--ui)); letter-spacing: 0.3em; color: var(--mb-teal);
       }
-      .mb-etal-xp { font-size: calc(15px * var(--ui)); color: #9fb6c8; }
-      .mb-etal-xp b { font-size: calc(28px * var(--ui)); color: #eaf6ff; }
+      .mb-etal-xp { font-size: calc(13px * var(--ui)); color: #9fb6c8; }
+      .mb-etal-xp b {
+        font-family: var(--font-display); font-size: calc(24px * var(--ui)); color: var(--mb-encre);
+        font-variant-numeric: tabular-nums;
+      }
       .mb-etal-xp i {
-        font-style: normal; margin-left: 8px; font-size: calc(15px * var(--ui)); color: #6dffb8;
-        animation: mb-plonge 0.4s ease-out;
+        font-style: normal; margin-left: 8px; font-size: calc(14px * var(--ui)); color: var(--mb-menthe);
+        font-weight: 600; animation: mb-plonge 0.4s ease-out;
       }
       .mb-etal-jauge { display: flex; align-items: center; gap: 12px; }
       /* les deux bornes : le palier ATTEINT (gros chiffre) et le PROCHAIN */
       .mb-etal-palier {
         flex: 0 0 58px; width: 58px; height: 58px; border-radius: 50%;
-        border: 2px solid #2d4a63; background: rgba(18, 30, 44, 0.8);
+        border: 2px solid #2d4a63; background: radial-gradient(circle at 50% 40%, #16283a, #0a1420);
         display: flex; flex-direction: column; align-items: center; justify-content: center;
-        gap: 0;
+        box-shadow: 0 0 0 4px rgba(45, 74, 99, 0.25);
       }
       .mb-etal-palier b {
         font-size: calc(21px * var(--ui)); line-height: 1; color: #d5f3e8;
-        font-family: Michroma, ui-monospace, monospace;
+        font-family: var(--font-display);
       }
       .mb-etal-palier small {
-        font-size: calc(11px * var(--ui)); letter-spacing: 0.12em; color: #6d8aa5; margin-top: 3px;
+        font-size: calc(9px * var(--ui)); letter-spacing: 0.14em; color: #6d8aa5; margin-top: 3px;
       }
-      .mb-etal-palier.d b { color: #8fd8c8; font-size: calc(16px * var(--ui)); }
+      .mb-etal-palier.d b { color: var(--mb-teal); font-size: calc(15px * var(--ui)); }
       .mb-etal-palier.saute {
-        animation: mb-palier-pop 0.55s cubic-bezier(0.2, 2.4, 0.4, 1);
-        border-color: #6dffb8;
+        animation: mb-palier-pop 0.6s cubic-bezier(0.2, 2.4, 0.4, 1);
+        border-color: var(--mb-menthe);
       }
       @keyframes mb-palier-pop {
         0% { transform: scale(1); }
-        35% { transform: scale(1.35); box-shadow: 0 0 30px rgba(109, 255, 184, 0.7); }
+        35% { transform: scale(1.45); box-shadow: 0 0 40px rgba(109, 255, 184, 0.8); }
         100% { transform: scale(1); }
       }
-      /* le tube gradué : le fluide y monte, la lueur marque le ménisque */
+      /* le tube gradué : le fluide y monte, les crans marquent le chemin,
+         la lueur marque le ménisque */
       .mb-etal-tube {
-        position: relative; flex: 1; height: 30px; border-radius: 15px;
-        border: 1px solid #2d4a63; background: rgba(10, 18, 28, 0.9);
+        position: relative; flex: 1; height: 34px; border-radius: 17px;
+        border: 1px solid #2d4a63; background: rgba(6, 12, 20, 0.95);
         overflow: hidden;
-        box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.55);
+        box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.6);
+      }
+      .mb-etal-crans {
+        position: absolute; inset: 0; pointer-events: none;
+        background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgba(200, 230, 255, 0.14) calc(10% - 1px) 10%);
       }
       .mb-etal-fluide {
         position: absolute; top: 0; bottom: 0; left: 0; width: 0%;
-        background: linear-gradient(180deg, #52e0c0, #1d8c74 62%, #14705e);
-        border-radius: 0 6px 6px 0;
+        background:
+          repeating-linear-gradient(-60deg, rgba(255, 255, 255, 0.08) 0 8px, transparent 8px 18px),
+          linear-gradient(180deg, #6dffcf, #1d8c74 60%, #14705e);
+        background-size: 60px 100%, 100% 100%;
+        border-radius: 0 8px 8px 0;
+        animation: mb-etal-rayures 1.2s linear infinite;
+      }
+      @keyframes mb-etal-rayures {
+        from { background-position: 0 0, 0 0; }
+        to { background-position: 60px 0, 0 0; }
       }
       /* la vaguelette qui court sur le fluide : la jauge VIT même immobile */
       .mb-etal-fluide::after {
         content: ''; position: absolute; inset: 0;
-        background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.22) 46%, transparent 62%);
+        background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.28) 46%, transparent 62%);
         background-size: 220% 100%;
         animation: mb-etal-reflet 2.6s linear infinite;
       }
@@ -7884,146 +8176,368 @@
         to { background-position: -90% 0; }
       }
       .mb-etal-lueur {
-        position: absolute; top: -4px; bottom: -4px; left: 0%; width: 10px;
-        margin-left: -5px; border-radius: 5px;
-        background: rgba(140, 255, 220, 0.9);
-        filter: blur(4px); opacity: 0;
+        position: absolute; top: -4px; bottom: -4px; left: 0%; width: 12px;
+        margin-left: -6px; border-radius: 6px;
+        background: rgba(160, 255, 225, 0.95);
+        filter: blur(5px); opacity: 0;
       }
       .mb-etal.coule .mb-etal-lueur { opacity: 1; }
       /* palier franchi : le tube entier s'embrase un instant */
-      .mb-etal-tube.eclair {
-        animation: mb-etal-eclair 0.6s ease-out;
-      }
+      .mb-etal-tube.eclair { animation: mb-etal-eclair 0.7s ease-out; }
       @keyframes mb-etal-eclair {
-        0% { box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.55), 0 0 0 rgba(109, 255, 184, 0); }
-        30% { box-shadow: inset 0 0 18px rgba(140, 255, 220, 0.8), 0 0 34px rgba(109, 255, 184, 0.85); border-color: #6dffb8; }
-        100% { box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.55), 0 0 0 rgba(109, 255, 184, 0); }
+        0% { box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.6), 0 0 0 rgba(109, 255, 184, 0); }
+        30% { box-shadow: inset 0 0 22px rgba(160, 255, 225, 0.9), 0 0 44px rgba(109, 255, 184, 0.9); border-color: var(--mb-menthe); }
+        100% { box-shadow: inset 0 3px 10px rgba(0, 0, 0, 0.6), 0 0 0 rgba(109, 255, 184, 0); }
       }
       .mb-etal-tampon {
         margin: 12px auto 0; width: fit-content;
-        font-family: Michroma, ui-monospace, monospace;
-        font-size: calc(14px * var(--ui)); letter-spacing: 0.18em; color: #ffd977;
-        border: 2px solid #ffd977; border-radius: 5px; padding: 7px 14px;
+        font-family: var(--font-display);
+        font-size: calc(12px * var(--ui)); letter-spacing: 0.22em; color: var(--mb-or);
+        border: 2px solid var(--mb-or); border-radius: 5px; padding: 7px 14px;
         transform: rotate(-2deg);
         animation: mb-tampon 0.4s cubic-bezier(0.2, 2.2, 0.4, 1);
         text-shadow: 0 0 18px rgba(255, 217, 119, 0.5);
       }
       .mb-etal-tampon[hidden] { display: none; }
-      .mb-choix { margin-top: 16px; }
+      /* LE PALIER TRAVERSE L'ÉCRAN : une bande menthe qui s'ouvre de la
+         gauche, tient une seconde et se referme à droite — le « level up » */
+      .mb-palier-eclair {
+        position: absolute; left: 0; right: 0; top: 50%; z-index: 5; pointer-events: none;
+        transform: translateY(-50%) skewY(-3deg); text-align: center; padding: 22px 0 18px;
+        background: linear-gradient(90deg, transparent, rgba(109, 255, 184, 0.16) 18%, rgba(109, 255, 184, 0.3) 50%, rgba(109, 255, 184, 0.16) 82%, transparent);
+        border-top: 1px solid rgba(109, 255, 184, 0.55);
+        border-bottom: 1px solid rgba(109, 255, 184, 0.55);
+        backdrop-filter: blur(2px);
+        animation: mb-eclair-passe 1.6s cubic-bezier(0.2, 1, 0.3, 1) both;
+      }
+      .mb-palier-eclair[hidden] { display: none; }
+      .mb-palier-eclair b {
+        display: block; font-family: var(--font-display); font-weight: 600;
+        font-size: calc(clamp(28px, 5vw, 52px) * var(--ui)); letter-spacing: 0.34em;
+        color: var(--mb-encre); text-shadow: 0 0 34px var(--mb-menthe), 0 0 70px rgba(109, 255, 184, 0.5);
+      }
+      .mb-palier-eclair i {
+        display: block; font-style: normal; font-family: var(--font-display);
+        font-size: calc(10px * var(--ui)); letter-spacing: 0.5em; color: var(--mb-menthe);
+        margin-top: 6px;
+      }
+      @keyframes mb-eclair-passe {
+        0% { clip-path: inset(0 100% 0 0); }
+        22% { clip-path: inset(0 0 0 0); }
+        78% { clip-path: inset(0 0 0 0); }
+        100% { clip-path: inset(0 0 0 100%); }
+      }
+      /* ---- LA SCÈNE DU CHOIX ---- */
+      .mb-choix { animation: mb-monte 0.4s ease-out; }
+      .mb-choix[hidden] { display: none; }
       .mb-choix-titre {
-        margin: 0 0 10px; font-size: calc(14px * var(--ui)); letter-spacing: 0.18em; color: #a9c3de;
+        margin: 0 0 12px; text-align: center; font-family: var(--font-display);
+        font-size: calc(10px * var(--ui)); letter-spacing: 0.3em; color: #a9c3de;
+        display: flex; align-items: center; gap: 14px;
       }
-      .mb-cartes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-      /* ---- LE TIRAGE DE FIN DE SALLE : trois cartes, un petit spectacle
-         d'une seconde. Les cartes sont des `.crt` — le composant partagé
-         avec l'atelier — posées en cascade sur cette grille. `.mb-carte`
-         reste intacte : elle sert encore au versement et au choix de
-         salle, qu'on ne repeint pas. */
-      /* les colonnes suivent le NOMBRE de cartes (le Carnet du Semblable
-         en ouvre une quatrième, qui passait seule à la ligne) */
-      .mb-cartes.mb-draft { grid-template-columns: repeat(var(--n, 3), 1fr); }
-      .mb-cartes.mb-draft .crt-draft {
-        min-height: 168px; cursor: pointer; align-items: stretch;
-        animation: crt-pose 0.42s cubic-bezier(0.22, 1, 0.36, 1) backwards;
-        animation-delay: calc(0.1s + var(--i, 0) * 0.12s);
-        transition: transform 0.16s ease, opacity 0.16s ease, border-color 0.16s ease;
+      .mb-choix-titre::before, .mb-choix-titre::after {
+        content: ''; height: 1px; flex: 1;
+        background: linear-gradient(90deg, transparent, rgba(150, 200, 235, 0.3));
       }
-      @keyframes crt-pose {
-        0% { opacity: 0; transform: translateY(-26px) rotateX(24deg); }
-        100% { opacity: 1; transform: translateY(0) rotateX(0); }
+      .mb-choix-titre::after { background: linear-gradient(90deg, rgba(150, 200, 235, 0.3), transparent); }
+      .mb-cartes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+      /* ---- LE TIRAGE : les cartes arrivent DOS VISIBLE et se retournent
+         une à une ; sous le pointeur, elles s'inclinent (--rx/--ry posés
+         par main.ts) ; l'élue s'embrase et grandit, les autres tombent.
+         La face est le composant `.crt` partagé avec l'atelier : ce que le
+         concepteur fabrique a exactement la tête de ce que le joueur tire. */
+      .mb-cartes.mb-draft { grid-template-columns: repeat(var(--n, 3), 1fr); perspective: 1400px; }
+      .mb-pli {
+        position: relative; transform-style: preserve-3d; min-height: 176px;
+        transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+        transition: transform 0.16s ease, opacity 0.2s ease;
+        animation: mb-retourne 0.8s cubic-bezier(0.3, 1, 0.3, 1) backwards;
+        animation-delay: calc(0.15s + var(--i, 0) * 0.2s);
+      }
+      @keyframes mb-retourne {
+        0% { transform: translateY(-48px) rotateY(180deg); opacity: 0; }
+        30% { opacity: 1; transform: translateY(-10px) rotateY(180deg); }
+        100% { transform: translateY(0) rotateY(0); opacity: 1; }
+      }
+      /* le DOS de la carte : un motif de stries et l'emblème du protocole */
+      .mb-pli::before {
+        content: '◈'; position: absolute; inset: 0; border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: calc(44px * var(--ui)); color: rgba(143, 216, 200, 0.55);
+        background:
+          repeating-linear-gradient(45deg, rgba(143, 216, 200, 0.07) 0 6px, transparent 6px 14px),
+          radial-gradient(circle at 50% 50%, #14283a, #0a1420 70%);
+        border: 1px solid rgba(143, 216, 200, 0.35);
+        box-shadow: inset 0 0 0 5px #0a1420, inset 0 0 0 6px rgba(143, 216, 200, 0.25);
+        transform: rotateY(180deg); backface-visibility: hidden;
+      }
+      .mb-pli .crt-draft {
+        position: relative; width: 100%; height: 100%; min-height: 176px;
+        cursor: pointer; align-items: stretch; backface-visibility: hidden;
+        transition: border-color 0.16s ease, box-shadow 0.16s ease;
       }
       /* l'ÉCLAT qui balaie la carte à la pose : la carte se révèle */
-      .mb-cartes.mb-draft .crt-draft::after {
+      .mb-pli .crt-draft::after {
         content: ''; position: absolute; inset: 0; pointer-events: none;
-        background: linear-gradient(102deg, transparent 38%, rgba(226, 246, 255, 0.13) 50%, transparent 62%);
+        background: linear-gradient(102deg, transparent 38%, rgba(226, 246, 255, 0.16) 50%, transparent 62%);
         transform: translateX(-120%);
-        animation: crt-eclat 0.75s ease-out backwards;
-        animation-delay: calc(0.24s + var(--i, 0) * 0.12s);
+        animation: crt-eclat 0.8s ease-out backwards;
+        animation-delay: calc(0.75s + var(--i, 0) * 0.2s);
       }
       @keyframes crt-eclat {
         0% { transform: translateX(-120%); }
         100% { transform: translateX(120%); }
       }
-      /* L'ISOLEMENT AU SURVOL — le motif de l'écran des mémoires : celle
-         qu'on regarde monte et s'allume, les autres s'effacent. Le focus
-         fait le même office : à la manette, on voit ce qu'on désigne. */
-      .mb-cartes.mb-isole .crt-draft:not(.crt-survol) { opacity: 0.25; }
-      .mb-cartes.mb-draft .crt-draft.crt-survol {
-        transform: translateY(-5px);
-        border-color: color-mix(in srgb, var(--fam) 85%, transparent);
+      /* L'ISOLEMENT sous le pointeur ou le focus : celle qu'on regarde
+         s'incline, s'allume et grandit ; les autres s'effacent */
+      .mb-cartes.mb-isole .mb-pli:not(.mb-vise) { opacity: 0.3; }
+      .mb-pli.mb-vise { z-index: 2; transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(-8px) scale(1.04); }
+      .mb-pli.mb-vise .crt-draft {
+        border-color: color-mix(in srgb, var(--fam) 90%, transparent);
+        box-shadow: 0 22px 44px rgba(0, 0, 0, 0.55), 0 0 30px color-mix(in srgb, var(--fam) 28%, transparent);
       }
-      .mb-cartes.mb-draft .crt-draft.crt-survol .crt-halo {
+      .mb-pli.mb-vise .crt-halo {
         opacity: 1;
         box-shadow:
-          inset 0 0 30px color-mix(in srgb, var(--fam) 24%, transparent),
-          0 0 22px color-mix(in srgb, var(--fam) 20%, transparent);
+          inset 0 0 34px color-mix(in srgb, var(--fam) 26%, transparent),
+          0 0 26px color-mix(in srgb, var(--fam) 24%, transparent);
       }
-      .mb-cartes.mb-draft .crt-draft:focus-visible { outline: 2px solid var(--fam); outline-offset: 2px; }
-      .mb-cartes.mb-draft .crt-draft.mb-pauvre { opacity: 0.4; cursor: not-allowed; }
+      .mb-pli .crt-draft:focus-visible { outline: 2px solid var(--fam); outline-offset: 3px; }
+      .mb-pli .crt-draft.mb-pauvre { opacity: 0.4; cursor: not-allowed; }
       /* LE CHOIX : l'élue s'embrase et grandit, les autres tombent */
-      .mb-cartes.mb-elu .crt-draft:not(.crt-elue) {
-        animation: crt-refus 0.3s ease-in forwards; pointer-events: none;
+      .mb-cartes.mb-elu .mb-pli:not(.mb-elu-c) {
+        animation: crt-refus 0.32s ease-in forwards; pointer-events: none;
       }
-      .mb-cartes.mb-draft .crt-draft.crt-elue {
-        animation: crt-elue 0.34s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-        border-color: var(--fam); z-index: 2;
+      .mb-pli.mb-elu-c { z-index: 3; animation: crt-elue 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+      .mb-pli.mb-elu-c .crt-draft {
+        border-color: var(--fam);
+        box-shadow: 0 0 40px color-mix(in srgb, var(--fam) 45%, transparent);
       }
       @keyframes crt-elue {
-        0% { transform: translateY(-5px) scale(1); }
-        45% { transform: translateY(-9px) scale(1.06); box-shadow: 0 0 34px color-mix(in srgb, var(--fam) 40%, transparent); }
-        100% { transform: translateY(-6px) scale(1.03); box-shadow: 0 0 20px color-mix(in srgb, var(--fam) 26%, transparent); }
+        0% { transform: translateY(-8px) scale(1.04); }
+        45% { transform: translateY(-14px) scale(1.12); filter: brightness(1.5); }
+        100% { transform: translateY(-8px) scale(1.06); filter: brightness(1.1); }
       }
       @keyframes crt-refus {
-        0% { opacity: 0.25; transform: translateY(0); }
-        100% { opacity: 0; transform: translateY(12px) scale(0.96); }
+        0% { opacity: 0.3; transform: translateY(0); }
+        100% { opacity: 0; transform: translateY(18px) scale(0.94); }
       }
-      @media (max-width: 700px) {
-        .mb-cartes.mb-draft { grid-template-columns: 1fr; }
-        .mb-cartes.mb-draft .crt-draft { min-height: 0; }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        .mb-cartes.mb-draft .crt-draft,
-        .mb-cartes.mb-draft .crt-draft::after,
-        .mb-cartes.mb-draft .crt-draft.crt-elue,
-        .mb-cartes.mb-elu .crt-draft:not(.crt-elue) { animation: none; }
-        .mb-cartes.mb-elu .crt-draft:not(.crt-elue) { opacity: 0; }
-      }
+      /* ---- LES CARTES DE DESTINATION (versement) et de FIN ---- */
       .mb-carte {
-        display: flex; flex-direction: column; align-items: center; gap: 5px;
-        padding: 12px 8px 10px; min-height: 122px;
-        background: linear-gradient(180deg, #14202f, #101825);
-        border: 1px solid #2d4258; border-radius: 9px; color: #cfe2ef;
-        font: inherit; font-size: calc(12.5px * var(--ui)); cursor: pointer; text-align: center;
-        animation: mb-plonge 0.35s ease-out backwards;
-        transition: transform 0.12s ease, border-color 0.12s ease;
+        position: relative; overflow: hidden;
+        display: flex; flex-direction: column; align-items: center; gap: 6px;
+        padding: 18px 14px 14px; min-height: 150px;
+        background:
+          radial-gradient(120% 70% at 50% -10%, rgba(255, 255, 255, 0.06), transparent 60%),
+          linear-gradient(180deg, #14202f, #0e1724);
+        border: 1px solid #2d4258; border-radius: 12px; color: #cfe2ef;
+        font: inherit; font-size: calc(12px * var(--ui)); cursor: pointer; text-align: center;
+        animation: mb-carte-monte 0.45s cubic-bezier(0.2, 1, 0.3, 1) backwards;
+        animation-delay: calc(var(--i, 0) * 0.1s);
+        transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
       }
-      .mb-carte:nth-child(2) { animation-delay: 0.08s; }
-      .mb-carte:nth-child(3) { animation-delay: 0.16s; }
-      .mb-carte:hover:not(:disabled) { transform: translateY(-3px); border-color: #6dffb8; }
-      .mb-carte b { font-size: calc(13.5px * var(--ui)); line-height: 1.25; }
-      .mb-carte small { color: #8ba3b8; font-size: calc(12.5px * var(--ui)); line-height: 1.35; }
-      .mb-ico { font-size: calc(26px * var(--ui)); }
+      @keyframes mb-carte-monte {
+        from { opacity: 0; transform: translateY(28px) scale(0.96); }
+        to { opacity: 1; transform: none; }
+      }
+      /* les ÉQUERRES d'angle : le cadre d'une cible de jeu */
+      .mb-carte::before {
+        content: ''; position: absolute; inset: 6px; pointer-events: none; border-radius: 6px;
+        background:
+          linear-gradient(90deg, var(--mb-teal), var(--mb-teal)) 0 0 / 14px 1px no-repeat,
+          linear-gradient(90deg, var(--mb-teal), var(--mb-teal)) 0 0 / 1px 14px no-repeat,
+          linear-gradient(90deg, var(--mb-teal), var(--mb-teal)) 100% 0 / 14px 1px no-repeat,
+          linear-gradient(90deg, var(--mb-teal), var(--mb-teal)) 100% 0 / 1px 14px no-repeat,
+          linear-gradient(90deg, var(--mb-teal), var(--mb-teal)) 0 100% / 14px 1px no-repeat,
+          linear-gradient(90deg, var(--mb-teal), var(--mb-teal)) 0 100% / 1px 14px no-repeat,
+          linear-gradient(90deg, var(--mb-teal), var(--mb-teal)) 100% 100% / 14px 1px no-repeat,
+          linear-gradient(90deg, var(--mb-teal), var(--mb-teal)) 100% 100% / 1px 14px no-repeat;
+        opacity: 0.35; transition: opacity 0.16s ease, inset 0.16s ease;
+      }
+      .mb-carte:hover:not(:disabled), .mb-carte:focus-visible {
+        transform: translateY(-6px) scale(1.02); border-color: var(--mb-menthe);
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(109, 255, 184, 0.22);
+        outline: none;
+      }
+      .mb-carte:hover:not(:disabled)::before, .mb-carte:focus-visible::before { opacity: 1; inset: 3px; }
+      .mb-carte b {
+        font-family: var(--font-display); font-size: calc(11px * var(--ui));
+        letter-spacing: 0.24em; line-height: 1.3; color: var(--mb-encre);
+      }
+      .mb-carte small { color: #8ba3b8; font-size: calc(12px * var(--ui)); line-height: 1.4; }
+      .mb-ico {
+        font-size: calc(40px * var(--ui)); line-height: 1;
+        filter: drop-shadow(0 0 14px rgba(109, 255, 184, 0.35));
+        animation: mb-flotte 3s ease-in-out infinite;
+      }
+      @keyframes mb-flotte {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-5px); }
+      }
       .mb-prix {
-        margin-top: auto; font-style: normal; font-size: calc(12.5px * var(--ui));
-        color: #ffd977; letter-spacing: 0.08em;
+        margin-top: auto; font-style: normal; font-size: calc(11.5px * var(--ui));
+        color: var(--mb-or); letter-spacing: 0.08em;
       }
-      .mb-prix.mb-offert { color: #6dffb8; }
+      .mb-prix.mb-offert { color: var(--mb-menthe); }
       .mb-carte.mb-pauvre { opacity: 0.45; cursor: not-allowed; }
-      .mb-continuer {
-        grid-column: 1 / -1; padding: 14px; font: inherit; font-size: calc(14px * var(--ui));
-        background: #14202f; border: 1px solid #2d4258; border-radius: 9px;
-        color: #cfe2ef; cursor: pointer; letter-spacing: 0.1em;
+      /* la barre d'aperçu sous une destination : ce que le versement fera */
+      .mb-dest-jauge {
+        width: 100%; height: 7px; border-radius: 4px; margin-top: 4px;
+        background: rgba(255, 255, 255, 0.08); overflow: hidden; position: relative;
       }
-      .mb-continuer:hover { border-color: #6dffb8; }
+      .mb-dest-jauge::before {
+        content: ''; position: absolute; inset: 0 auto 0 0; width: calc(var(--a, 0) * 100%);
+        background: rgba(120, 200, 240, 0.5);
+      }
+      .mb-dest-jauge::after {
+        content: ''; position: absolute; inset: 0 auto 0 calc(var(--a, 0) * 100%);
+        width: calc(var(--g, 0) * 100%);
+        background: linear-gradient(90deg, var(--mb-teal), var(--mb-menthe));
+        box-shadow: 0 0 10px rgba(109, 255, 184, 0.6);
+        animation: mb-dest-pulse 1.4s ease-in-out infinite;
+      }
+      @keyframes mb-dest-pulse {
+        0%, 100% { opacity: 0.7; }
+        50% { opacity: 1; }
+      }
+      .mb-cartes:has(.mb-dest) { grid-template-columns: 1fr 1fr; max-width: 760px; margin: 0 auto; width: 100%; }
+      /* LE BOUTON DE SUITE : une pastille qui respire et qu'on presse */
+      .mb-continuer {
+        grid-column: 1 / -1; justify-self: center; min-width: min(360px, 100%);
+        padding: 16px 34px; font-family: var(--font-display); font-size: calc(12px * var(--ui));
+        letter-spacing: 0.32em; color: #071018; cursor: pointer; position: relative; overflow: hidden;
+        background: linear-gradient(180deg, #8fffcf, var(--mb-menthe) 55%, #3fd69b);
+        border: 0; border-radius: 999px;
+        box-shadow: 0 0 0 2px rgba(109, 255, 184, 0.35), 0 10px 30px rgba(109, 255, 184, 0.25);
+        animation: mb-carte-monte 0.45s cubic-bezier(0.2, 1, 0.3, 1) backwards, mb-respire 2.2s 0.5s ease-in-out infinite;
+        transition: transform 0.12s ease;
+      }
+      .mb-continuer::after {
+        content: ''; position: absolute; inset: 0;
+        background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.5) 50%, transparent 65%);
+        background-size: 250% 100%; animation: mb-etal-reflet 2.4s linear infinite;
+      }
+      @keyframes mb-respire {
+        0%, 100% { box-shadow: 0 0 0 2px rgba(109, 255, 184, 0.35), 0 10px 30px rgba(109, 255, 184, 0.25); }
+        50% { box-shadow: 0 0 0 6px rgba(109, 255, 184, 0.18), 0 10px 44px rgba(109, 255, 184, 0.45); }
+      }
+      .mb-continuer:hover, .mb-continuer:focus-visible { transform: translateY(-3px) scale(1.03); outline: none; }
+      .mb-continuer:active { transform: scale(0.97); }
+      /* ---- LES PORTES : le choix de la prochaine salle. Chaque salle est
+         une porte — le plan dedans, balayé d'une ligne de lecture ; sous
+         le pointeur elle s'avance et s'allume ; élue, elle S'OUVRE (elle
+         grandit, blanchit, et l'on passe) pendant que les autres se
+         referment ---- */
+      .mb-porte {
+        --i: 0;
+        position: relative; overflow: hidden;
+        display: flex; flex-direction: column; gap: 7px; min-width: 0;
+        padding: 10px 10px 12px; text-align: left;
+        background: linear-gradient(180deg, #101b2a, #0a1220);
+        border: 1px solid rgba(150, 200, 235, 0.18); border-radius: 12px;
+        color: #cfe2ef; font: inherit; cursor: pointer;
+        animation: mb-porte-monte 0.5s cubic-bezier(0.2, 1, 0.3, 1) backwards;
+        animation-delay: calc(0.05s + var(--i) * 0.12s);
+        transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+      }
+      @keyframes mb-porte-monte {
+        from { opacity: 0; transform: translateY(34px) scale(0.94); }
+        to { opacity: 1; transform: none; }
+      }
+      .mb-porte-vue {
+        position: relative; border-radius: 8px; overflow: hidden;
+        border: 1px solid #223447; background: #0c141d;
+      }
+      .mb-porte-vue canvas { width: 100%; display: block; }
+      /* la ligne de lecture qui balaie le plan : la porte SCRUTE la salle */
+      .mb-porte-vue::after {
+        content: ''; position: absolute; left: 0; right: 0; top: -30%; height: 30%;
+        background: linear-gradient(180deg, transparent, rgba(109, 255, 184, 0.16), rgba(109, 255, 184, 0.35) 92%, transparent);
+        animation: mb-scan 3.2s linear infinite;
+        animation-delay: calc(var(--i) * 0.7s);
+        pointer-events: none;
+      }
+      @keyframes mb-scan {
+        from { top: -30%; }
+        to { top: 100%; }
+      }
+      /* le numéro de porte dans l'angle du plan */
+      .mb-porte-no {
+        position: absolute; top: 6px; left: 6px; z-index: 1;
+        font-family: var(--font-display); font-size: calc(8px * var(--ui)); letter-spacing: 0.16em;
+        padding: 3px 7px; border-radius: 4px; color: var(--mb-encre);
+        background: rgba(4, 10, 18, 0.75); border: 1px solid rgba(150, 200, 235, 0.25);
+      }
+      .mb-porte-tag {
+        font-style: normal; font-family: var(--font-display); font-size: calc(7px * var(--ui));
+        letter-spacing: 0.18em; color: var(--dim);
+        border: 1px solid var(--line); border-radius: 4px; padding: 3px 7px; width: fit-content;
+        max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .mb-porte-tag.mb-voie-gen { color: var(--mb-menthe); border-color: rgba(109, 255, 184, 0.4); }
+      .mb-porte-tag.mb-voie-pool { color: var(--mb-or); border-color: rgba(255, 217, 119, 0.4); }
+      .mb-porte b {
+        font-family: var(--font-display); font-size: calc(11px * var(--ui));
+        letter-spacing: 0.12em; color: var(--mb-encre); line-height: 1.3;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .mb-porte small {
+        color: #8ba3b8; font-size: calc(11.5px * var(--ui)); line-height: 1.35;
+        display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+      }
+      .mb-porte .salle-chips { margin-top: auto; }
+      /* la mention ENTRER, qui n'apparaît qu'à la visée */
+      .mb-porte-entrer {
+        position: absolute; right: 16px; top: 16px; z-index: 1;
+        font-family: var(--font-display); font-size: calc(8px * var(--ui)); letter-spacing: 0.26em;
+        color: #071018; background: var(--mb-menthe); border-radius: 999px; padding: 5px 11px;
+        opacity: 0; transform: translateX(8px); transition: opacity 0.16s ease, transform 0.16s ease;
+        box-shadow: 0 0 16px rgba(109, 255, 184, 0.5);
+      }
+      .mb-porte:hover, .mb-porte:focus-visible {
+        transform: translateY(-7px) scale(1.02); border-color: var(--mb-menthe); outline: none;
+        box-shadow: 0 22px 44px rgba(0, 0, 0, 0.55), 0 0 30px rgba(109, 255, 184, 0.25);
+      }
+      .mb-porte:hover .mb-porte-entrer, .mb-porte:focus-visible .mb-porte-entrer { opacity: 1; transform: none; }
+      .mb-cartes.mb-elu .mb-porte:not(.mb-elue) {
+        animation: mb-porte-ferme 0.38s ease-in forwards; pointer-events: none;
+      }
+      .mb-porte.mb-elue {
+        z-index: 3; animation: mb-porte-ouvre 0.55s cubic-bezier(0.3, 1, 0.3, 1) forwards;
+        pointer-events: none;
+      }
+      @keyframes mb-porte-ouvre {
+        0% { transform: translateY(-7px) scale(1.02); }
+        50% { transform: scale(1.08); box-shadow: 0 0 70px rgba(109, 255, 184, 0.6); filter: brightness(1.4); }
+        100% { transform: scale(1.16); opacity: 0; filter: brightness(2.4); }
+      }
+      @keyframes mb-porte-ferme {
+        to { opacity: 0; transform: translateY(20px) scale(0.92); }
+      }
+      .mb-cartes:has(.mb-porte) { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+      .mb-cartes.mb-trio { grid-template-columns: repeat(3, 1fr); max-width: 940px; margin: 0 auto; width: 100%; }
+      /* les jauges en tête du choix : on décide en voyant ce qu'on possède */
+      .mb-jauges {
+        grid-column: 1 / -1; display: flex; justify-content: center; align-items: center;
+        gap: 22px; flex-wrap: wrap; font-size: calc(12px * var(--ui)); color: #9fb6c8;
+        letter-spacing: 0.06em; padding: 0 2px 2px;
+      }
+      .mb-jauges span { display: flex; align-items: baseline; gap: 6px; }
+      .mb-jauges b {
+        font-family: var(--font-display); color: #d5f3e8; font-size: calc(13px * var(--ui));
+        font-variant-numeric: tabular-nums;
+      }
       /* ---- LA CARTE DANS LA CÉRÉMONIE : le module épuisé, le plan se
-         déploie ; le panneau s'élargit le temps du choix, le module élu
+         déploie ; la scène s'élargit le temps du choix, le module élu
          S'AGRANDIT (la scène zoome sur lui) puis ses salles arrivent ---- */
-      .mb-panneau.mb-large { width: min(1180px, 96vw); }
-      .mb-cartes.mb-station { grid-template-columns: 1fr; gap: 4px; }
+      .mb-scene.mb-large { width: min(1240px, 97vw); }
+      .mb-cartes.mb-station { grid-template-columns: 1fr; gap: 6px; }
       .mb-station-carte {
-        aspect-ratio: 1600 / 804; max-height: 62vh; width: 100%; margin: 0 auto;
-        border: 1px solid #27405a; border-radius: 8px; overflow: hidden; background: #020509;
+        aspect-ratio: 1600 / 804; max-height: 64vh; width: 100%; margin: 0 auto;
+        border: 1px solid #27405a; border-radius: 10px; overflow: hidden; background: #020509;
+        box-shadow: 0 0 0 1px rgba(99, 183, 230, 0.1), 0 20px 60px rgba(0, 0, 0, 0.6), inset 0 0 60px rgba(99, 183, 230, 0.06);
         transition: transform 0.42s cubic-bezier(0.2, 0.7, 0.2, 1), opacity 0.42s ease;
+        animation: mb-carte-monte 0.5s cubic-bezier(0.2, 1, 0.3, 1) backwards;
       }
       .mb-station-carte .cs-svg { width: 100%; height: 100%; }
       .mb-station-carte.mb-station-zoom { transform: scale(2.4); opacity: 0; }
@@ -8037,106 +8551,67 @@
         margin: 6px 0 0; min-height: 1.5em; text-align: center;
         font-size: calc(12px * var(--ui)); letter-spacing: 0.06em; color: #8ba3b8;
       }
-      @media (prefers-reduced-motion: reduce) {
-        .mb-station-carte { transition: none; }
-        .mb-station-carte.mb-station-refus { animation: none; }
-      }
-      .mb-carte.mb-dest { min-height: 108px; }
-      .mb-cartes:has(.mb-dest) { grid-template-columns: 1fr 1fr; }
-      /* Le CHOIX DE SALLE (pool « 21XX-MMD ») : deux propositions,
-         mini-carte en tête, code + nom + chips dessous */
-      .mb-cartes:has(.mb-salle) { grid-template-columns: 1fr 1fr; }
-      /* le TRIO de la voie : suite écrite + DEUX générées, côte à côte */
-      .mb-cartes.mb-trio { grid-template-columns: 1fr 1fr 1fr; }
-      @media (max-width: 900px) {
-        .mb-cartes.mb-trio { grid-template-columns: 1fr 1fr; }
-      }
-      .mb-carte.mb-salle { min-height: 0; padding-top: 8px; }
-      /* la VOIE SEMI-PROCÉDURALE : l'étiquette qui distingue la suite
-         écrite de la salle générée sur les cartes du choix */
-      .mb-voie-tag {
-        font-style: normal; font-size: calc(8px * var(--ui)); letter-spacing: 0.16em;
-        color: var(--dim); border: 1px solid var(--line);
-        border-radius: 4px; padding: 2px 6px; margin: 4px 0 2px;
-      }
-      .mb-voie-tag.mb-voie-gen { color: #6dffb8; border-color: #2d6a4d; }
-      .mb-salle canvas {
-        width: 100%; max-width: 240px; border-radius: 6px;
-        border: 1px solid #223447; background: #0c141d;
-      }
-      .mb-salle .salle-chips { justify-content: center; }
-      @media (max-width: 560px) {
-        .mb-carte.mb-salle { flex-direction: column; text-align: center; }
-      }
-      .mb-jauges {
-        grid-column: 1 / -1; display: flex; justify-content: space-between;
-        gap: 12px; flex-wrap: wrap; font-size: calc(14px * var(--ui)); color: #9fb6c8;
-        padding: 4px 2px 2px;
-      }
-      .mb-jauges b { color: #d5f3e8; font-size: calc(16px * var(--ui)); }
-      /* ---- L'ÉCRAN LARGE (PC, console, Steam Deck) : la mise en bonbonne
-         cesse d'être une colonne. Le même panneau se DÉPLIE en instrument
-         paysage — le flacon et le relevé à gauche, l'étalonnage à droite,
-         les cartes de choix en pleine largeur dessous. Rien ne bouge dans
-         le HTML ni dans le jeu : c'est la grille qui replace les blocs, et
-         le portrait (mobile) garde exactement sa mise en page. */
-      @media (min-width: 900px) and (orientation: landscape) {
-        .mb-panneau {
-          width: min(1180px, 94vw);
-          padding: 22px 26px 18px;
-          display: grid;
-          grid-template-columns: minmax(300px, 0.95fr) minmax(320px, 1.05fr);
-          grid-template-areas:
-            'titre  titre'
-            'haut   etal'
-            'lignes etal'
-            'cond   etal'
-            'choix  choix'
-            'passer passer';
-          column-gap: 30px;
-          align-content: start;
-          /* jamais plus haut que l'écran : sur un Deck (800 px de haut) la
-             cérémonie doit tenir d'un seul tenant, sans ascenseur */
-          max-height: 92vh;
-          overflow-y: auto;
-        }
-        /* l'étalonnage absent (pas de palier ce coup-ci) : une seule colonne,
-           le panneau se resserre plutôt que de laisser un vide à droite */
-        .mb-panneau:has(.mb-etal[hidden]) {
-          width: min(940px, 92vw);
-          grid-template-columns: 1fr;
-          grid-template-areas: 'titre' 'haut' 'lignes' 'cond' 'choix' 'passer';
-        }
-        /* LE CHOIX DE SALLE mérite toute la place : on décide sur ce qu'on
-           voit du plan, pas sur deux vignettes de timbre-poste */
-        .mb-panneau:has(.mb-carte.mb-salle) { width: min(1180px, 94vw); }
-        .mb-titre { grid-area: titre; font-size: calc(17px * var(--ui)); }
-        .mb-haut { grid-area: haut; }
-        .mb-lignes { grid-area: lignes; align-content: start; }
-        .mb-cond { grid-area: cond; }
-        .mb-etal { grid-area: etal; margin-top: 14px; }
-        .mb-choix { grid-area: choix; }
-        .mb-passer { grid-area: passer; }
-        /* le flacon prend de la présence : c'est la récompense qu'on regarde */
-        .mb-flacon { width: 76px; height: 132px; flex: 0 0 76px; }
-        .mb-litres b { font-size: calc(34px * var(--ui)); }
-        /* LE CHOIX DE SALLE : les mini-cartes cessent d'être des vignettes —
-           on choisit sur ce qu'on VOIT du plan */
-        .mb-cartes:has(.mb-salle) { gap: 18px; }
-        /* le plan grandit — mais pas au point de chasser le reste de
-           l'écran : 380 px suffisent à LIRE une salle */
-        .mb-salle canvas { max-width: 380px; }
-        .mb-carte { min-height: 132px; padding: 14px 12px 12px; }
-        .mb-carte b { font-size: calc(14px * var(--ui)); }
-        .mb-carte small { font-size: calc(13px * var(--ui)); }
-      }
       .mb-passer {
-        margin: 12px 0 0; text-align: center; font-size: calc(11.5px * var(--ui));
-        letter-spacing: 0.14em; color: #55708c;
+        margin: 4px 0 0; text-align: center; font-family: var(--font-display);
+        font-size: calc(8px * var(--ui)); letter-spacing: 0.3em; color: #55708c;
+        animation: mb-clignote 1.8s ease-in-out infinite;
       }
-      @media (max-width: 560px) {
-        .mb-cartes { grid-template-columns: 1fr; }
-        .mb-carte { min-height: 0; flex-direction: row; text-align: left; flex-wrap: wrap; }
+      .mb-passer[hidden] { display: none; }
+      @keyframes mb-clignote {
+        0%, 100% { opacity: 0.45; }
+        50% { opacity: 1; }
+      }
+      /* ---- LES PETITS ÉCRANS : une colonne, la médaille en tête ---- */
+      @media (max-width: 760px) {
+        .mb-scene { padding: 10px 12px 14px; gap: 10px; }
+        .mb-releve { grid-template-columns: 1fr; justify-items: center; gap: 8px; }
+        .mb-rang { width: 136px; height: 136px; }
+        .mb-rang-lettre { font-size: calc(60px * var(--ui)); }
+        .mb-corps { grid-template-columns: 1fr; width: 100%; }
+        .mb-haut { grid-row: auto; justify-content: center; }
+        .mb-litres b { font-size: calc(32px * var(--ui)); }
+        .mb-ligne { grid-template-columns: auto 1fr; }
+        .mb-ligne-val { grid-column: 1 / -1; justify-self: start; }
+        .mb-cartes, .mb-cartes.mb-draft, .mb-cartes:has(.mb-dest), .mb-cartes.mb-trio,
+        .mb-cartes:has(.mb-porte) { grid-template-columns: 1fr; }
+        .mb-pli, .mb-pli .crt-draft { min-height: 0; }
+        .mb-carte { min-height: 0; padding: 14px 12px; }
+        .mb-scene.mb-compact .mb-releve { grid-template-columns: auto 1fr; justify-items: start; }
+        .mb-scene.mb-compact .mb-corps { gap: 12px; }
+      }
+      /* ---- LE STEAM DECK (1280 × 800) : tout doit tenir sans ascenseur ---- */
+      @media (max-height: 820px) and (min-width: 761px) {
+        .mb-scene { gap: 10px; padding-top: 8px; }
+        .mb-rang { width: 140px; height: 140px; }
+        .mb-rang-lettre { font-size: calc(62px * var(--ui)); }
+        .mb-flacon { width: 56px; height: 100px; flex-basis: 56px; }
+        .mb-litres b { font-size: calc(32px * var(--ui)); }
+        .mb-pli, .mb-pli .crt-draft { min-height: 160px; }
+        .mb-porte-vue canvas { max-height: 132px; object-fit: contain; }
+        .mb-station-carte { max-height: 58vh; }
+      }
+      /* ---- MOINS D'ANIMATIONS : le jeu reste le même, sans le spectacle.
+         Chaque mise en scène retombe sur son état final. ---- */
+      @media (prefers-reduced-motion: reduce) {
+        .mb-fond::before, .mb-fond::after, .mb-flash.mb-on, .mb-scene.mb-secousse,
+        .mb-sur, .mb-titre, .mb-rang::before, .mb-rang-anneau, .mb-rang-lettre,
+        .mb-rang-mot, .mb-etoiles i.mb-on, .mb-eau::before, .mb-eau::after, .mb-glace,
+        .mb-prime, .mb-record, .mb-cond-gain, .mb-etal, .mb-etal-palier.saute,
+        .mb-etal-fluide, .mb-etal-fluide::after, .mb-etal-tube.eclair, .mb-etal-tampon,
+        .mb-palier-eclair, .mb-choix, .mb-pli, .mb-pli .crt-draft::after,
+        .mb-cartes.mb-elu .mb-pli:not(.mb-elu-c), .mb-pli.mb-elu-c, .mb-carte, .mb-ico,
+        .mb-dest-jauge::after, .mb-continuer, .mb-continuer::after, .mb-porte,
+        .mb-porte-vue::after, .mb-cartes.mb-elu .mb-porte:not(.mb-elue), .mb-porte.mb-elue,
+        .mb-station-carte, .mb-passer { animation: none; }
+        .mb-filet { animation: none; width: min(560px, 82%); }
+        .mb-eau, .mb-ligne, .mb-ligne-barre::after, .mb-cond, .mb-pli, .mb-carte, .mb-porte,
+        .mb-station-carte { transition: none; }
+        .mb-pli { transform: none; }
+        .mb-pli.mb-vise { transform: translateY(-4px); }
+        .mb-cartes.mb-elu .mb-pli:not(.mb-elu-c), .mb-cartes.mb-elu .mb-porte:not(.mb-elue) { opacity: 0; }
+        .mb-porte.mb-elue { opacity: 0; }
+        .mb-palier-eclair[hidden] { display: none; }
+        .mb-station-carte.mb-station-refus { animation: none; }
       }
       /* ---- Le panneau du GÉNÉRATEUR (⚄) : les réglages qui voyagent ---- */
       #edg-voile {
@@ -9792,15 +10267,39 @@
     <!-- LES CINÉMATIQUES : le lecteur plein écran (cinelecteur.ts remplit)
          et la table de montage (montage.ts remplit) -->
     <div id="instr-panel" hidden aria-label="Instruments embarqués"></div>
+    <!-- LA CÉRÉMONIE DE FIN DE SALLE : un plein écran, pas une boîte. La
+         bannière claque, le rang tombe, les compteurs roulent, la jauge
+         coule, les cartes se retournent, la porte s'ouvre. Le feu (canvas)
+         jette ses éclats par-dessus tout ; le flash blanchit l'écran un
+         instant aux grands moments. main.ts remplit et enchaîne. -->
     <div id="mb-veil" hidden aria-label="Mise en bonbonne">
-      <div class="mb-panneau">
-        <h3 class="mb-titre">MISE EN BONBONNE</h3>
-        <div class="mb-haut">
-          <div class="mb-flacon"><div class="mb-eau" id="mb-eau"></div><div class="mb-glace" id="mb-glace" hidden>🧊</div></div>
-          <div class="mb-litres"><b id="mb-l">0,00 L</b><span class="mb-prime" id="mb-prime" hidden></span></div>
-        </div>
-        <div class="mb-lignes" id="mb-lignes"></div>
-        <div class="mb-cond" id="mb-cond" hidden>CONDENSAT <b id="mb-cond-n">0</b> cL<span class="mb-cond-gain" id="mb-cond-gain"></span></div>
+      <div class="mb-fond" aria-hidden="true"></div>
+      <canvas class="mb-feu" id="mb-feu" aria-hidden="true"></canvas>
+      <div class="mb-flash" id="mb-flash" aria-hidden="true"></div>
+      <div class="mb-scene" id="mb-scene">
+        <header class="mb-banniere" id="mb-banniere">
+          <span class="mb-sur" id="mb-sur">MISE EN BONBONNE</span>
+          <h3 class="mb-titre" id="mb-titre">SALLE FRANCHIE</h3>
+          <span class="mb-filet" aria-hidden="true"></span>
+        </header>
+        <!-- LE RELEVÉ : le rang à gauche, le flacon et les lignes à droite.
+             Lu, il se replie en bandeau pour laisser la scène aux cartes. -->
+        <section class="mb-releve" id="mb-releve">
+          <div class="mb-rang" id="mb-rang" hidden>
+            <span class="mb-rang-anneau" aria-hidden="true"></span>
+            <b class="mb-rang-lettre" id="mb-rang-lettre">S</b>
+            <i class="mb-rang-mot" id="mb-rang-mot">IMPECCABLE</i>
+            <span class="mb-etoiles" id="mb-etoiles" aria-hidden="true"></span>
+          </div>
+          <div class="mb-corps" id="mb-corps">
+            <div class="mb-haut">
+              <div class="mb-flacon"><div class="mb-eau" id="mb-eau"></div><div class="mb-glace" id="mb-glace" hidden>🧊</div></div>
+              <div class="mb-litres"><small>SURPLUS LIVRÉ</small><b id="mb-l">0,00 L</b><span class="mb-prime" id="mb-prime" hidden></span></div>
+            </div>
+            <div class="mb-lignes" id="mb-lignes"></div>
+            <div class="mb-cond" id="mb-cond" hidden><span class="mb-cond-ico" aria-hidden="true">◈</span><span class="mb-cond-nom">CONDENSAT</span><b id="mb-cond-n">0</b><small>cL</small><span class="mb-cond-gain" id="mb-cond-gain"></span></div>
+          </div>
+        </section>
         <!-- La JAUGE D'ÉTALONNAGE : l'XP se voit couler, palier par palier -->
         <div class="mb-etal" id="mb-etal" hidden>
           <div class="mb-etal-tete">
@@ -9812,17 +10311,21 @@
             <div class="mb-etal-tube" id="mb-etal-tube">
               <div class="mb-etal-fluide" id="mb-etal-fluide"></div>
               <div class="mb-etal-lueur" id="mb-etal-lueur"></div>
+              <div class="mb-etal-crans" aria-hidden="true"></div>
             </div>
             <div class="mb-etal-palier d" id="mb-etal-pd"><b>3 L</b><small>prochain</small></div>
           </div>
           <div class="mb-etal-tampon" id="mb-etal-tampon" hidden>PALIER 1 — TIRAGE OUVERT</div>
         </div>
+        <!-- LA SCÈNE DU CHOIX : versement, tirage, portes, plan -->
         <div class="mb-choix" id="mb-choix" hidden>
           <p class="mb-choix-titre" id="mb-choix-titre">OÙ VERSER LE SURPLUS ?</p>
           <div class="mb-cartes" id="mb-cartes"></div>
         </div>
         <p class="mb-passer" id="mb-passer">toucher pour passer</p>
       </div>
+      <!-- LE PALIER FRANCHI traverse l'écran : une bande, pas une ligne -->
+      <div class="mb-palier-eclair" id="mb-palier-eclair" hidden><b id="mb-palier-eclair-no">PALIER 1</b><i>TIRAGE OUVERT</i></div>
     </div>
     <!-- LE MARCHAND DU HUB : le Semblable du comptoir vend ce qui dure — la maquette « Marchand v2 » (game/ecranMarchand.ts) -->
     <div id="marchand" hidden aria-label="Le marchand"></div>
