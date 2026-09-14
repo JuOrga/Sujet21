@@ -65,6 +65,10 @@ export class Programmes {
   private readonly uniformesParNom: Record<string, Uniformes> = {}
   private prets = false
   private imagesAttendues = 0
+  // combien de programmes le pilote a finis (compilation parallèle) : c'est
+  // l'AVANCEMENT que l'écran de chargement montre, et le signe de vie que
+  // la garde d'amorçage attend — voir avancement()
+  private fait = 0
 
   constructor(gl: GLProgrammes, sources: SourceProgramme[]) {
     this.gl = gl
@@ -105,6 +109,20 @@ export class Programmes {
   }
 
   /**
+   * OÙ EN EST LE PILOTE : combien de programmes sont liés, sur combien.
+   * Avec la compilation parallèle, le compte avance programme par
+   * programme à mesure que `pret()` interroge COMPLETION_STATUS_KHR ; sans
+   * elle, il reste à zéro jusqu'au verdict — le fil est figé, il n'y a
+   * rien à montrer. C'est ce que l'écran de chargement affiche (« 3/7 »),
+   * et ce que main.ts redit à la garde d'amorçage à chaque image : un
+   * pilote qui avance n'est pas une panne, même lent.
+   */
+  avancement(): { fait: number; total: number } {
+    const total = this.entrees.length
+    return { fait: this.prets ? total : this.fait, total }
+  }
+
+  /**
    * Oui quand tous les programmes sont liés et leurs uniformes relevés.
    * À demander à chaque image : la réponse ne bloque jamais tant que le
    * pilote travaille encore, et le verdict (erreur de compilation comprise)
@@ -114,10 +132,15 @@ export class Programmes {
     if (this.prets) return true
     const gl = this.gl
     if (this.parallele) {
+      // TOUS les programmes sont interrogés, pas seulement jusqu'au premier
+      // qui travaille encore : le compte des finis est l'avancement montré
+      // pendant l'attente (sept questions par image, pas une de plus)
+      let fait = 0
       for (const e of this.entrees) {
-        if (!gl.getProgramParameter(e.program, this.parallele.COMPLETION_STATUS_KHR))
-          return false
+        if (gl.getProgramParameter(e.program, this.parallele.COMPLETION_STATUS_KHR)) fait++
       }
+      this.fait = fait
+      if (fait < this.entrees.length) return false
     } else if (this.imagesAttendues++ < 1) {
       // Sans l'extension, LINK_STATUS bloque le fil le temps de la
       // compilation : on laisse passer une image, que l'écran ait peint le

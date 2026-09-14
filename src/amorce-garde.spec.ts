@@ -89,6 +89,8 @@ function monde(options: { webgl2?: boolean; moduleArrive?: boolean } = {}) {
     amorce: el('amorce'),
     demarre: () => (w.__sujet21Demarre as () => void)(),
     franchit: (nom: string) => (w.__sujet21Etape as (n: string) => void)(nom),
+    pouls: (fait: number, total: number) =>
+      (w.__sujet21Compile as (f: number, t: number) => void)(fait, total),
     erreur: (message: string) => {
       for (const f of ecouteurs.get('error') ?? []) f({ message })
     },
@@ -147,6 +149,66 @@ describe('La garde d’amorçage', () => {
     m.demarre()
     expect(m.panne.classList.contains('visible')).toBe(true)
     expect(m.titre.textContent).toMatch(/N’A PAS PU/)
+  })
+
+  // LA PANNE VÉCUE (Chrome, 14/09/2026) : la compilation du rendu dépassait
+  // douze secondes, en coulisse, pendant que la boucle tournait et
+  // l'interrogeait à chaque image. La veille ne savait rien de ce pouls :
+  // elle sonnait « trop longtemps » par-dessus un chargement qui avançait,
+  // et conseillait de RECHARGER — ce qui relançait la compilation de zéro,
+  // panneau à nouveau douze secondes plus tard, et un navigateur figé le
+  // temps que le pilote lâche l'ancien contexte.
+  it('tant que la compilation du rendu bat le pouls, la veille patiente et montre l’avancement', () => {
+    const m = monde()
+    m.franchit('ouverture')
+    m.franchit('rendu')
+    // une image toutes les 16 ms, comme la boucle : le pilote lie ses
+    // programmes un à un
+    for (let t = 0; t < 40_000; t += 16) {
+      m.pouls(t < 20_000 ? 2 : 5, 7)
+      vi.advanceTimersByTime(16)
+      if (t === 10_000) expect(m.etape.textContent).toBe('le rendu se compile… 2/7')
+    }
+    expect(m.panne.classList.contains('visible')).toBe(false)
+    expect(m.etape.textContent).toMatch(/5\/7 — la carte graphique est lente/)
+    expect(m.etape.textContent).toMatch(/ne rechargez pas/)
+  })
+
+  it('un pouls qui s’arrête, c’est un fil figé : la veille sonne douze secondes après', () => {
+    const m = monde()
+    m.franchit('rendu')
+    for (let t = 0; t < 30_000; t += 16) {
+      m.pouls(1, 7)
+      vi.advanceTimersByTime(16)
+    }
+    expect(m.panne.classList.contains('visible')).toBe(false)
+    vi.advanceTimersByTime(11_000) // silence
+    expect(m.panne.classList.contains('visible')).toBe(false)
+    vi.advanceTimersByTime(1_100)
+    expect(m.panne.classList.contains('visible')).toBe(true)
+    expect(m.titre.textContent).toMatch(/RENDU MET TROP LONGTEMPS À SE COMPILER/)
+    expect(m.corps.innerHTML).toMatch(/1 programmes liés sur 7/)
+  })
+
+  it('deux minutes de pouls sans image : la patience a une fin, et la première image retire le panneau', () => {
+    const m = monde()
+    m.franchit('rendu')
+    for (let t = 0; t < 119_000; t += 16) {
+      m.pouls(6, 7)
+      vi.advanceTimersByTime(16)
+    }
+    expect(m.panne.classList.contains('visible')).toBe(false)
+    for (let t = 0; t < 13_000; t += 16) {
+      m.pouls(6, 7)
+      vi.advanceTimersByTime(16)
+    }
+    expect(m.panne.classList.contains('visible')).toBe(true)
+    expect(m.titre.textContent).toMatch(/SE COMPILER/)
+    expect(m.corps.innerHTML).toMatch(/depuis 120 secondes/)
+    expect(m.corps.innerHTML).toMatch(/Recharger la relancerait de zéro/)
+    // le pilote finit enfin : le jeu tourne, le panneau part
+    m.demarre()
+    expect(m.panne.classList.contains('visible')).toBe(false)
   })
 
   it('un fichier qui met du temps à arriver n’est pas une panne : on patiente', () => {

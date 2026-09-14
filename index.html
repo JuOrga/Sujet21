@@ -10656,6 +10656,16 @@
               mais vivant n'est pas une panne. Et si elle a sonné trop tôt,
               la première image du jeu retire son panneau — il est resté
               affiché par-dessus un jeu qui tournait, c'est arrivé.
+              Pendant la compilation du rendu, le jeu envoie un POULS à
+              chaque image (__sujet21Compile, avec l'avancement) : tant
+              qu'il bat, la veille patiente — jusqu'à deux minutes, le pire
+              mesuré (Firefox sur Windows, 14/09/2026). Sans ce pouls, sur
+              un Chrome dont la carte compilait plus de douze secondes, le
+              panneau sonnait par-dessus un chargement qui avançait, et
+              son conseil de recharger relançait la compilation de zéro :
+              le panneau revenait à chaque essai, et recharger en pleine
+              compilation gèle le navigateur le temps que le pilote lâche
+              l'ancien contexte.
          Après le premier passage de la boucle de rendu, plus rien de tout
          cela ne se déclenche : un incident en cours de partie n'a pas à
          recouvrir le jeu d'un panneau. -->
@@ -10676,6 +10686,14 @@
         // Un fichier qui n'est toujours pas là au bout de ce délai : on cesse
         // de mettre la lenteur sur le compte de la connexion.
         var PATIENCE_MS = 90000
+        // Un rendu qui se compile toujours au bout de ce délai, pouls ou
+        // pas : on cesse de mettre la lenteur sur le compte du pilote.
+        var PATIENCE_COMPILE_MS = 120000
+        var pouls = 0 // la date du dernier pouls de compilation
+        var compileDepuis = 0 // la date du premier
+        var compileFait = 0 // programmes liés, sur…
+        var compileTotal = 0 // …ce total
+        var motCompile = '' // le dernier mot affiché, pour ne pas récrire à chaque image
 
         function el(id) {
           return document.getElementById(id)
@@ -10748,6 +10766,26 @@
           arme()
         }
 
+        // Le pouls de la compilation, à chaque image tant que le pilote
+        // travaille : l'avancement s'affiche (« 3/7 »), et la veille sait
+        // (dans sonne) que le jeu est vivant. Pas de réarmement ici — une
+        // minuterie par image serait du gaspillage ; la date suffit.
+        window.__sujet21Compile = function (fait, total) {
+          if (demarre || montre) return
+          pouls = Date.now()
+          if (!compileDepuis) compileDepuis = pouls
+          compileFait = fait
+          compileTotal = total
+          var mot = ETAPES.rendu + (total > 0 ? ' ' + fait + '/' + total : '')
+          if (pouls - compileDepuis >= VEILLE_MS) {
+            mot += ' — la carte graphique est lente, on patiente (ne rechargez pas)'
+          }
+          if (mot !== motCompile) {
+            motCompile = mot
+            ditEtape(mot)
+          }
+        }
+
         // Le module est-il arrivé ? Son entrée de ressource n'existe qu'une
         // fois le fichier reçu : avant, la lenteur est celle de la connexion.
         function moduleArrive() {
@@ -10760,21 +10798,68 @@
           }
         }
 
-        function arme() {
+        function arme(delai) {
           if (veille) clearTimeout(veille)
-          veille = setTimeout(sonne, VEILLE_MS)
+          veille = setTimeout(sonne, delai || VEILLE_MS)
         }
 
         function sonne() {
           veille = 0
           if (demarre || montre) return
+          var maintenant = Date.now()
           if (
             etape === 'telechargement' &&
             !moduleArrive() &&
-            Date.now() - depuis < PATIENCE_MS
+            maintenant - depuis < PATIENCE_MS
           ) {
             ditEtape('le fichier arrive… la connexion est lente, on patiente')
             arme()
+            return
+          }
+          // Le rendu se compile et le pouls bat encore : le jeu est vivant,
+          // le pilote travaille. On patiente, jusqu'à la borne — et la
+          // prochaine sonnerie tombe douze secondes après le DERNIER pouls,
+          // pas sur une grille : un fil qui se fige est signalé à l'heure.
+          if (
+            etape === 'rendu' &&
+            maintenant - pouls < VEILLE_MS &&
+            maintenant - compileDepuis < PATIENCE_COMPILE_MS
+          ) {
+            arme(
+              Math.max(
+                250,
+                Math.min(
+                  VEILLE_MS - (maintenant - pouls),
+                  PATIENCE_COMPILE_MS - (maintenant - compileDepuis),
+                ),
+              ),
+            )
+            return
+          }
+          if (etape === 'rendu' && compileDepuis) {
+            // Deux minutes de pouls, et toujours pas d'image : c'est le
+            // pilote graphique qui n'en finit pas, pas un fichier. Recharger
+            // ne ferait que tout relancer — et figer le navigateur.
+            affiche(
+              'LE RENDU MET TROP LONGTEMPS À SE COMPILER',
+              '<p>La carte graphique compile le rendu depuis ' +
+                Math.round((maintenant - compileDepuis) / 1000) +
+                ' secondes et n’a pas fini (' +
+                compileFait +
+                ' programmes liés sur ' +
+                compileTotal +
+                '). Le jeu, lui, est vivant&nbsp;: rien n’est cassé, c’est le' +
+                ' pilote graphique qui est lent.</p>' +
+                '<ul>' +
+                '<li>Attendez encore&nbsp;: dès que la compilation finit, le jeu' +
+                ' s’ouvre tout seul. Recharger la relancerait de zéro, et peut' +
+                ' figer le navigateur le temps qu’elle finisse.</li>' +
+                '<li>Si ça revient à chaque visite, mettez à jour le pilote' +
+                ' graphique, ou essayez un autre navigateur.</li>' +
+                '</ul>',
+              null,
+              true,
+            )
             return
           }
           affiche(
