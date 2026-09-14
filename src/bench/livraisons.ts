@@ -31,6 +31,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '14/09/2026 20:08',
+    title: 'LE VOILE DES CACHETTES REFAIT : une zone non cartographiée, pas un trou noir — et une levée qui part du corps',
+    notes: [
+      'LA DEMANDE : « le système de cachette n’est vraiment pas très beau je trouve, si tu regardes la map démineur je trouve que ça fait pas fini ». Dans la salle démineur, chaque chambre porte une cachette carrée en son milieu : le voile était un rectangle plein (#0d1320), quatre nappes à 24 % d’opacité qu’on distinguait à peine, et un liseré d’un pixel — quatre trous noirs découpés au cutter dans quatre chambres identiques.',
+      'CE QUI CHANGE (render/voileCache.ts, un module neuf sorti de main.ts) : le voile est une ZONE NON RELEVÉE de plan de station — la hachure oblique à 45° des relevés (le cyan de la charte, à 9 %), des nappes de brume plus franches (30 %) qui dérivent lentement, une LISIÈRE qui déborde du contour et s’effiloche sur 8 à 44 px selon le zoom (cinq traits emboîtés, restreints au DEHORS du pan : le brouillard déborde, il ne coupe plus), un liseré pointillé cyan, et l’estampille « NON CARTOGRAPHIÉ » en pochoir au centre — seulement si elle tient dans le pan (mesurée avant d’être posée : à l’échelle d’une salle entière, un pan de 200 px ne la contient pas) et si le centre est bien dans la forme (jamais dans le vide d’un arc).',
+      'LA LEVÉE : le brouillard ne fond plus d’un bloc en 0,9 s. Il se DISSIPE depuis le point où le corps est entré, en un front circulaire à bord doux (1,1 s — vite au départ, lent à la fin) : on voit d’où l’on vient. Le front se découpe par deux clips emboîtés (la forme, puis « forme ou disque » en pair-impair) et la bande douce se pose PAR-DESSUS ce qui se révèle — pas de destination-out, qui aurait emporté les portes et pastilles déjà dessinées sur le même calque. La clef de cachette, qui lève tout d’emblée, dissipe depuis le centre du pan. La paroi factice s’évapore par le même front.',
+      'CE QUI NE CHANGE PAS : la physique, le semis des pastilles, la fiole, le masquage des étiquettes et mécanismes sous le voile (dansCacheVoilee), Recommencer qui re-voile, l’éditeur.',
+      'VÉRIFIÉ : quatorze tests neufs (render/voileCache.spec.ts) sur les courbes de la levée, les nappes, l’estampille (pan trop petit, texte trop large, centre hors forme), le front (pas de disque tant que c’est voilé, un disque pendant la levée, rien après) et la paroi factice. 1205 verts dans 114 fichiers, type-check à 0, build propre. Le jeu ne se monte pas dans le Chromium sans tête de l’environnement (l’éditeur n’apparaît pas en 400 s) : le rendu a été jugé sur une page d’aperçu qui rejoue la salle démineur en 2 × 2 avec le module réel, avant et après — à voir en vrai sur l’aperçu (previsu-go).',
+    ],
+  },
+  {
     date: '14/09/2026 15:34',
     title: 'DEUX MINUTES DE PAGE NOIRE SUR FIREFOX : la boucle des boîtes du shader ne se déroule plus',
     notes: [

@@ -166,7 +166,8 @@ import {
   valeurLevier,
   valeurProposee,
 } from './game/leviers'
-import { dansForme, formeOutline } from './game/formes'
+import { dansForme } from './game/formes'
+import { dessineDissolutionParoi, dessineVoile } from './render/voileCache'
 import {
   DOMAINE_NOMS,
   catalogueMarkdown,
@@ -9030,13 +9031,14 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
 
   // LES CACHETTES, EN DERNIER : le brouillard « non cartographié » couvre
   // TOUT — parois, fluide, mécanismes, décor. Le centre du corps qui entre
-  // lève le voile en fondu ; il reste levé pour l'essai (Recommencer
-  // re-voile, la découverte se rejoue). Des nappes de brume dérivent
-  // lentement dans le voile pour qu'il se lise comme du brouillard, pas
-  // comme un rectangle mort.
+  // lève le voile : le brouillard se dissipe depuis ce point d'entrée
+  // (voileCache.ts) et reste levé pour l'essai (Recommencer re-voile, la
+  // découverte se rejoue).
   if (cachesLevee.length !== caches.length) {
     cachesLevee = caches.map(() => Infinity)
+    cachesEntree = caches.map(() => null)
   }
+  const vue = { vw, vh, zoom: z, versEcran: S }
   for (let i = 0; i < caches.length; i++) {
     const c = caches[i]
     if (
@@ -9045,75 +9047,20 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       dansForme(c, sim.stats.centroidX, sim.stats.centroidY)
     ) {
       cachesLevee[i] = elapsed
+      cachesEntree[i] = { x: sim.stats.centroidX, y: sim.stats.centroidY }
       // la PAROI FACTICE sort du décor à l'instant de la révélation — la
       // dissolution 2D ci-dessous couvre la transition
       if (c.style === 'paroi') rebuildRenderBoxes()
     }
-    const alpha =
-      cachesLevee[i] === Infinity
-        ? 1
-        : Math.max(0, 1 - (elapsed - cachesLevee[i]) / 0.9)
-    if (alpha <= 0) continue
-    const a = S(c.minX, c.maxY)
-    const b = S(c.maxX, c.minY)
-    const w = b.sx - a.sx
-    const h = b.sy - a.sy
-    if (b.sx < 0 || a.sx > vw || b.sy < 0 || a.sy > vh) continue
-    // le chemin ÉPOUSE la forme de la cachette (disque, capsule, coin,
-    // arc, rotation…) — le rectangle n'est qu'un cas particulier
-    const chemin = (): void => {
-      const pts = formeOutline(c, 56)
-      g.beginPath()
-      for (let k = 0; k < pts.length; k++) {
-        const sp = S(pts[k].x, pts[k].y)
-        if (k === 0) g.moveTo(sp.sx, sp.sy)
-        else g.lineTo(sp.sx, sp.sy)
-      }
-      g.closePath()
+    // sans point d'entrée (la CLEF DE CACHETTE lève tout d'emblée), le
+    // brouillard se dissipe depuis le centre du pan
+    const entree = cachesEntree[i] ?? {
+      x: (c.minX + c.maxX) / 2,
+      y: (c.minY + c.maxY) / 2,
     }
-    if (c.style === 'paroi') {
-      // PAROI FACTICE : voilée, c'est le MOTEUR qui la rend (vraie paroi,
-      // vraies ombres) — ici on ne dessine que sa DISSOLUTION une fois
-      // révélée : la teinte de paroi s'évapore du contour exact
-      if (cachesLevee[i] === Infinity) continue
-      g.save()
-      chemin()
-      g.clip()
-      g.globalAlpha = alpha * 0.92
-      g.fillStyle = '#3a4450'
-      g.fillRect(a.sx, a.sy, w, h)
-      g.globalAlpha = alpha * 0.5
-      g.fillStyle = '#232b36'
-      g.fillRect(a.sx, a.sy, w, h * 0.5)
-      g.restore()
-      g.globalAlpha = 1
-      continue
-    }
-    g.save()
-    chemin()
-    g.clip()
-    g.globalAlpha = alpha
-    g.fillStyle = '#0d1320'
-    g.fillRect(a.sx, a.sy, w, h)
-    for (let k = 0; k < 4; k++) {
-      const ph = i * 7.3 + k * 2.1
-      const nx = a.sx + w * (0.5 + 0.42 * Math.sin(elapsed * 0.11 + ph * 1.7))
-      const ny = a.sy + h * (0.5 + 0.42 * Math.cos(elapsed * 0.089 + ph))
-      const r = Math.max(w, h) * (0.3 + 0.1 * Math.sin(ph * 3.7))
-      const grad = g.createRadialGradient(nx, ny, 0, nx, ny, Math.max(8, r))
-      grad.addColorStop(0, 'rgba(52,68,92,0.24)')
-      grad.addColorStop(1, 'rgba(52,68,92,0)')
-      g.fillStyle = grad
-      g.fillRect(a.sx, a.sy, w, h)
-    }
-    g.restore()
-    // le liseré, à peine plus clair : le pan se devine sans se trahir
-    g.globalAlpha = alpha * 0.45
-    g.strokeStyle = 'rgba(74,94,120,0.55)'
-    g.lineWidth = 1
-    chemin()
-    g.stroke()
-    g.globalAlpha = 1
+    const etat = { levee: cachesLevee[i], entreeX: entree.x, entreeY: entree.y }
+    if (c.style === 'paroi') dessineDissolutionParoi(g, c, etat, elapsed, vue)
+    else dessineVoile(g, c, etat, elapsed, vue, i)
   }
 }
 
@@ -9562,6 +9509,9 @@ const railsEngages = new Set<number>()
 // (Infinity : encore voilé). Le corps qui entre lève le voile — et
 // Recommencer re-voile tout : la découverte se rejoue à chaque essai.
 let cachesLevee: number[] = []
+// le point du monde où le corps est entré dans chaque pan — le brouillard
+// se dissipe de là ; null : pas encore entré (ou levé par la clef)
+let cachesEntree: ({ x: number; y: number } | null)[] = []
 // LES PASTILLES DE CONDENSAT : semées à l'entrée du tableau (condensat.ts,
 // semis déterministe par code — les cachettes ont les leurs), bues au
 // contact du corps. « Recommencer » re-sème tout : la cueillette se rejoue.
@@ -12022,6 +11972,7 @@ function resetLasers(): void {
   // tableau se raccrochaient au hasard depuis l'autre bout de la salle
   motes.reset()
   cachesLevee = (level.caches ?? []).map(() => Infinity)
+  cachesEntree = (level.caches ?? []).map(() => null)
   // la CLEF DE CACHETTE se consomme ici : les voiles du tableau tombent
   // d'emblée (le hub et l'Économat ne l'usent pas)
   if (clefCachette && !estEconomat(level) && !auHub) {
