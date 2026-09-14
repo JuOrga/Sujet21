@@ -35,7 +35,7 @@ describe('le rang d’une salle', () => {
   })
 
   it('accompagne chaque lettre d’un mot, d’une teinte et d’étoiles décroissantes', () => {
-    const rangs = SEUILS_RANG.map(([r]) => rangDeSalle(r === 'D' ? 0 : SEUILS_RANG.find(([x]) => x === r)![1]))
+    const rangs = SEUILS_RANG.map(([, seuil]) => rangDeSalle(seuil))
     for (const v of rangs) {
       expect(v.mot.length).toBeGreaterThan(0)
       expect(v.teinte).toMatch(/^#[0-9a-f]{6}$/i)

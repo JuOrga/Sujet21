@@ -299,7 +299,7 @@ import {
 } from './game/soundtrack'
 import { Jukebox, PISTES_ECOUTE } from './game/jukebox'
 import { auteurAvis, avisDe, ligneAvis, ligneBilan, lisAvisEcoute, poseAvis, type Avis, type DocumentAvis } from './game/ecouteAvis'
-import { compteur, motDeNote, PAS_LIGNE_MS, rangDeSalle, TEMPS_BILAN } from './game/ceremonie'
+import { compteur, douce, motDeNote, PAS_LIGNE_MS, rangDeSalle, TEMPS_BILAN } from './game/ceremonie'
 import { Feu, type Rafale } from './game/ceremonieFx'
 import {
   CINEMATIQUES_LIVREES,
@@ -12516,7 +12516,11 @@ function mbFigeBilan(): void {
   if (b) {
     mbEl('mb-rang').hidden = false
     mbEl('mb-corps').classList.add('mb-on')
-    for (const e of Array.from(mbEl('mb-etoiles').children)) e.classList.add('mb-on')
+    // les étoiles du rang, pas les cinq : un D sauté reste un D
+    const etoiles = rangDeSalle(b.pct).etoiles
+    Array.from(mbEl('mb-etoiles').children).forEach((e, i) => {
+      if (i < etoiles) e.classList.add('mb-on')
+    })
     mbEl('mb-eau').style.height = `${Math.min(100, b.pct * 100).toFixed(0)}%`
     mbEl('mb-l').textContent = `${b.surplus.toFixed(2)} L`
     if (b.prime >= 0.01) {
@@ -12584,7 +12588,11 @@ function mbMontreVersement(): void {
 
   const prochain = prochainPalier(run.xp)
   const seg = mbSegmentXp(run.xp)
+  // table des paliers épuisée : la jauge est pleine et le reste (comme
+  // mbPeintEtal la peint) — rien ne s'ajoute à l'aperçu
   const largeur = seg.cible === null ? 1 : seg.cible - seg.base
+  const acquis = seg.cible === null ? 1 : (run.xp - seg.base) / largeur
+  const gain = seg.cible === null ? 0 : Math.min(1, b.surplus / largeur)
   const cx = document.createElement('button')
   cx.type = 'button'
   cx.className = 'mb-carte mb-dest'
@@ -12594,7 +12602,7 @@ function mbMontreVersement(): void {
     `<small>+${b.surplus.toFixed(2)} L d’XP (jauge : ${run.xp.toFixed(1)} L${
       prochain !== null ? ` · palier à ${prochain} L` : ''
     })</small>` +
-    `<span class="mb-dest-jauge" style="--a:${((run.xp - seg.base) / largeur).toFixed(3)};--g:${Math.min(1, b.surplus / largeur).toFixed(3)}"></span>` +
+    `<span class="mb-dest-jauge" style="--a:${acquis.toFixed(3)};--g:${gain.toFixed(3)}"></span>` +
     `<em class="mb-prix mb-offert">${
       prochain !== null && run.xp + b.surplus >= prochain
         ? 'UN PALIER SE FRANCHIT — TIRAGE OUVERT'
@@ -12682,8 +12690,7 @@ function mbAnimeEtalonnage(
     const anime = (): void => {
       if (!miseEnBonbonne || mbEtape !== 'etalonnage') return // cérémonie fermée
       const t = Math.min(1, (performance.now() - t0) / duree)
-      const e = t * t * (3 - 2 * t) // douce au départ ET à l'arrivée
-      mbPeintEtal(xp + (cible - xp) * e)
+      mbPeintEtal(xp + (cible - xp) * douce(t))
       if (t < 1) {
         requestAnimationFrame(anime)
         return
@@ -12875,8 +12882,11 @@ function mbMontreDraft(): void {
       majInstrumentsUI()
       bande.ponctuation('sting-record', 0.6)
       // l'embrasement dure 400 ms ; sans animation (réglage système), la
-      // suite s'enchaîne quand même — le tirage reste jouable
-      window.setTimeout(suite, sansAnimation() ? 0 : 420)
+      // suite s'enchaîne quand même — le tirage reste jouable. Une
+      // cérémonie fermée entre-temps (retour au hub) n'a plus de suite.
+      window.setTimeout(() => {
+        if (miseEnBonbonne) suite()
+      }, sansAnimation() ? 0 : 420)
     })
     host.appendChild(pli)
   })
@@ -13485,9 +13495,12 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
     mbEl('mb-eau').style.height = `${Math.min(100, b.pct * 100).toFixed(0)}%`
     const t0 = performance.now()
     const litres = (): void => {
+      // l'image déjà demandée quand on SAUTE ne doit pas repasser derrière
+      // la valeur finale : on vérifie l'étape avant d'écrire
+      if (mbEtape !== 'bilan') return
       const t = Math.min(1, (performance.now() - t0) / 1300)
       mbEl('mb-l').textContent = `${compteur(0, b.surplus, t).toFixed(2)} L`
-      if (t < 1 && mbEtape === 'bilan') requestAnimationFrame(litres)
+      if (t < 1) requestAnimationFrame(litres)
     }
     requestAnimationFrame(litres)
   })
@@ -13544,11 +13557,12 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
     mbEclate(mbEl('mb-cond-n'), { n: 26, teintes: MB_MENTHE, vitesse: 220, gravite: 420, duree: 0.8, taille: 3 })
     const c0 = performance.now()
     const roule = (): void => {
+      if (mbEtape !== 'bilan') return // même garde que les litres
       const t = Math.min(1, (performance.now() - c0) / 1100)
       mbEl('mb-cond-n').textContent = String(
         Math.round(compteur(b.totalCl - b.gainCl, b.totalCl, t)),
       )
-      if (t < 1 && mbEtape === 'bilan') requestAnimationFrame(roule)
+      if (t < 1) requestAnimationFrame(roule)
     }
     requestAnimationFrame(roule)
   })
