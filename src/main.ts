@@ -105,6 +105,9 @@ import {
 import { dessinCarteSVG, type OptionsDessin } from './game/dessinCarte'
 import {
   choixModules,
+  difficulteSousCran,
+  postureDuModule,
+  primeMemoire,
   departCarte,
   entreModule,
   franchitSalle,
@@ -13103,7 +13106,9 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
         ? 'vous êtes ici'
         : 'aucune coursive n’y mène d’ici'
     fiche.textContent =
-      `${mod.nom} · ${mod.niveaux > 0 ? `${mod.niveaux} salle${mod.niveaux > 1 ? 's' : ''}` : 'sans salle'} · ${mod.temp}°C · ${acces}`
+      `${mod.nom} · ${carte.types[mod.type].toLowerCase()} · ${mod.niveaux > 0 ? `${mod.niveaux} salle${mod.niveaux > 1 ? 's' : ''}` : 'sans salle'}` +
+      (mod.cran > 0 ? ` · confinement +${mod.cran}, mémoire ×${primeMemoire(mod)}` : '') +
+      ` · ${mod.temp}°C · ${acces}`
   }
   dit(null)
   scene.addEventListener('pointerover', (e) => dit(litId(e)))
@@ -13184,7 +13189,10 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   const rangSuivant = voieRang + 1 // la salle que le choix désigne, dans le plan
   if (rangSuivant > longueurRun()) return null // la fin se joue au sas
   const moment = momentAuRang(rangSuivant, planEffectif())
-  const difficulte = diffAuRang(rangSuivant, planEffectif())
+  // LE MODULE fait la salle : son cran monte la rampe, sa nature pose la
+  // posture (dangers, faisceaux, cachette) — voir descenteCarte.ts
+  const module = moduleEnCours()
+  const difficulte = difficulteSousCran(diffAuRang(rangSuivant, planEffectif()), module)
   const jour = new Date().toISOString().slice(0, 10)
   const alea = descenteDuJour()
     ? aleaDeGraine(`${jour}@${rangSuivant}`)
@@ -13270,6 +13278,9 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
       alea,
     ),
     ampleur: ampleurAuRang(rangSuivant, planEffectif()),
+    // la nature du module prime sur le réglage du rang — sauf les premiers
+    // rangs sans danger, que la posture respecte (sansDanger)
+    ...postureDuModule(module, regl.dangers === 1),
   })
   const variante = (n: number): string =>
     descenteDuJour()
@@ -13385,6 +13396,8 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
     // salle se compte dans le module avant de se compter dans la descente
     `${moduleEnCours()?.nom ?? 'LA VOIE SE SÉPARE'} — SALLE ${Math.min(moduleEnCours()?.niveaux ?? 1, carteRun.niveau + 1)} / ${moduleEnCours()?.niveaux ?? '?'}` +
     ` · DESCENTE ${rangSuivant} / ${longueurRun()}` +
+    // le CONFINEMENT SUPÉRIEUR s'annonce : plus dur, plus généreux
+    ((moduleEnCours()?.cran ?? 0) > 0 ? ` · CONFINEMENT +${moduleEnCours()!.cran} · MÉMOIRE ×${primeMemoire(moduleEnCours())}` : '') +
     (descenteDuJour() ? ' · DESCENTE DU JOUR' : '') +
     stadeNeuf
   // les JAUGES restent en scène, comme à la fin ordinaire : le choix se
@@ -16432,12 +16445,15 @@ function corpsImage(now: number): boolean {
     // optique consigne mieux)
     const primeMur =
       stationDebout('mur-records', records.estRepare('mur-records')) && (newVolume || newChrono) ? 2 : 0
+    // LE CONFINEMENT SUPÉRIEUR paie : la mémoire du sas se multiplie par
+    // 1 + cran du module — « plus difficile, plus généreux » (§9.3)
     gagneMemoireRun(
-      5 +
+      (5 +
         (premiereFois ? 5 : 0) +
         (newVolume ? 2 : 0) +
         (newChrono ? 2 : 0) +
-        primeMur,
+        primeMur) *
+        primeMemoire(moduleEnCours()),
     )
     // Publication au tableau d'honneur partagé : le serveur ne garde que le
     // meilleur — la réponse remet les registres affichés à jour.

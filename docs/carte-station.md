@@ -219,6 +219,14 @@ HUB ─vapeur T3 ─┘        └─ S3 CHAUFFERIE (+1) ┴─ REP ALCÔVE ─�
 - **Un module traversé est épuisé pour la run**, au retour comme par une
   coursive ordinaire : ses salles ne se rejouent pas (ni leur mémoire), la
   carte se rouvre aussitôt.
+- **La nature du module commande la salle** (`postureDuModule`) : un
+  COMBAT place ses dangers en fréquents (sauf les premiers rangs sans
+  danger, la leçon du début) et n'a pas d'énigme au faisceau ; une ÉNIGME
+  n'a aucun danger et une énigme au faisceau ; une CACHE a toujours sa
+  cachette ; le terminal et les haltes laissent l'auto. **Le cran** monte
+  la difficulté du rang d'autant (`difficulteSousCran`, borné à 9) et
+  multiplie la mémoire gravée au sas par 1 + cran (`primeMemoire`) ; le
+  titre du choix de salle et la fiche de la carte l'annoncent.
 - **La pioche suit le biome** : un tableau qui porte un `biome` ne se
   propose que dans le module de ce biome ; un tableau sans biome est
   universel (la bibliothèque n'est pas encore réétiquetée) ; une salle

@@ -29,6 +29,7 @@ import {
   type ModuleCarte,
 } from './carteStation'
 import { TRANSFOS_CYCLE, transfoTenue } from './cycle'
+import type { OptionsGen } from './generateur'
 
 /** Où en est la run sur la carte. */
 export interface EtatCarteRun {
@@ -177,4 +178,46 @@ export function litEtatCarteRun(brut: unknown, c: CarteStation): EtatCarteRun {
     ? o.visites.filter((v): v is string => typeof v === 'string' && !!moduleParId(c, v))
     : []
   return { module: o.module, niveau, visites }
+}
+
+// ---- LA NATURE DU MODULE COMMANDE LA SALLE -------------------------------
+// Sur le plan, la nature (combat, énigme, cache) n'était qu'un glyphe : la
+// pioche tirait la même salle sous n'importe quel fût. Un nœud typé n'a de
+// sens que s'il tient sa promesse — c'est ce qui fait qu'un joueur de Slay
+// the Spire choisit sa route en lisant les icônes. Ici la nature POSE la
+// salle générée : ses dangers, ses faisceaux, sa cachette.
+
+/** LA POSTURE DU MODULE : ce que sa nature impose aux options du
+ *  générateur, par-dessus le réglage du rang.
+ *  · COMBAT — les dangers sont FRÉQUENTS (sauf les premiers rangs sans
+ *    danger, qui restent la leçon du début), aucune énigme au faisceau ;
+ *  · ÉNIGME — aucun danger, une énigme au faisceau garde le passage ;
+ *  · CACHE — la cachette est toujours là : c'est ce qu'on vient chercher ;
+ *  · le reste (le terminal, un module d'avant les natures) — l'auto. */
+export function postureDuModule(
+  m: ModuleCarte | undefined,
+  sansDanger: boolean,
+): Partial<OptionsGen> {
+  switch (m?.type) {
+    case 'combat':
+      return { dangers: sansDanger ? 1 : 3, mecanismes: 1 }
+    case 'enigme':
+      return { dangers: 1, mecanismes: 2 }
+    case 'coffre':
+      return { cachette: 2 }
+    default:
+      return {}
+  }
+}
+
+/** LA DIFFICULTÉ SOUS CONFINEMENT : la rampe du plan, plus le cran du
+ *  module — borné à 9, le plafond de la nomenclature atelier. */
+export function difficulteSousCran(difficulte: number, m: ModuleCarte | undefined): number {
+  return Math.max(0, Math.min(9, Math.round(difficulte) + Math.max(0, m?.cran ?? 0)))
+}
+
+/** LA PRIME DE MÉMOIRE d'un module : « plus difficile, plus généreux » —
+ *  la mémoire gravée au sas de ses salles se multiplie par 1 + cran. */
+export function primeMemoire(m: ModuleCarte | undefined): number {
+  return 1 + Math.max(0, m?.cran ?? 0)
 }

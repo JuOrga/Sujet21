@@ -3,6 +3,9 @@ import { CARTE_LIVREE, cloneCarte, plusCourtVers } from './carteStation'
 import {
   choixModules,
   departCarte,
+  difficulteSousCran,
+  postureDuModule,
+  primeMemoire,
   entreModule,
   franchitSalle,
   litEtatCarteRun,
@@ -150,5 +153,37 @@ describe('la descente sur la carte', () => {
     const c2 = cloneCarte(c)
     c2.regles.depart = 'N'
     expect(departCarte(c2).module).toBe('N')
+  })
+})
+
+describe('la nature du module commande la salle', () => {
+  const m = (type: (typeof c.modules)[number]['type'], cran = 0) => ({ ...c.modules[5], type, cran })
+
+  it('combat : dangers fréquents et aucune énigme — sauf les premiers rangs sans danger', () => {
+    expect(postureDuModule(m('combat'), false)).toEqual({ dangers: 3, mecanismes: 1 })
+    expect(postureDuModule(m('combat'), true)).toEqual({ dangers: 1, mecanismes: 1 })
+  })
+
+  it('énigme : aucun danger, une énigme au faisceau ; cache : la cachette toujours', () => {
+    expect(postureDuModule(m('enigme'), false)).toEqual({ dangers: 1, mecanismes: 2 })
+    expect(postureDuModule(m('coffre'), false)).toEqual({ cachette: 2 })
+  })
+
+  it('le terminal, une halte ou l’absence de module laissent l’auto', () => {
+    expect(postureDuModule(m('boss'), false)).toEqual({})
+    expect(postureDuModule(m('economat'), false)).toEqual({})
+    expect(postureDuModule(undefined, false)).toEqual({})
+  })
+
+  it('le cran monte la difficulté, borné à 9, et multiplie la mémoire', () => {
+    expect(difficulteSousCran(2, m('combat'))).toBe(2)
+    expect(difficulteSousCran(2, m('combat', 1))).toBe(3)
+    expect(difficulteSousCran(9, m('combat', 2))).toBe(9)
+    expect(difficulteSousCran(1, undefined)).toBe(1)
+    expect(primeMemoire(m('combat'))).toBe(1)
+    expect(primeMemoire(m('combat', 1))).toBe(2)
+    expect(primeMemoire(undefined)).toBe(1)
+    // la carte livrée : les secteurs du bord paient double
+    expect(c.modules.filter((x) => primeMemoire(x) === 2).map((x) => x.id)).toEqual(['S1', 'S3'])
   })
 })
