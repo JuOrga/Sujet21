@@ -65,10 +65,10 @@ export class Programmes {
   private readonly uniformesParNom: Record<string, Uniformes> = {}
   private prets = false
   private imagesAttendues = 0
-  // combien de programmes le pilote a finis (compilation parallèle) : c'est
-  // l'AVANCEMENT que l'écran de chargement montre, et le signe de vie que
-  // la garde d'amorçage attend — voir avancement()
-  private fait = 0
+  // quels programmes le pilote a finis (compilation parallèle) : leur
+  // compte est l'AVANCEMENT que l'écran de chargement montre, et le signe
+  // de vie que la garde d'amorçage attend — voir avancement()
+  private finis = new Set<string>()
 
   constructor(gl: GLProgrammes, sources: SourceProgramme[]) {
     this.gl = gl
@@ -116,10 +116,17 @@ export class Programmes {
    * rien à montrer. C'est ce que l'écran de chargement affiche (« 3/7 »),
    * et ce que main.ts redit à la garde d'amorçage à chaque image : un
    * pilote qui avance n'est pas une panne, même lent.
+   *
+   * `restants` nomme ce qui n'est pas encore lié, dans l'ordre des sources :
+   * le compte s'arrête des minutes sur le dernier (le shader de
+   * composition, le plus gros), et l'écran de chargement doit pouvoir dire
+   * sur QUOI le compilateur travaille plutôt que laisser un « 6/7 » figé.
    */
-  avancement(): { fait: number; total: number } {
+  avancement(): { fait: number; total: number; restants: string[] } {
     const total = this.entrees.length
-    return { fait: this.prets ? total : this.fait, total }
+    if (this.prets) return { fait: total, total, restants: [] }
+    const restants = this.entrees.filter((e) => !this.finis.has(e.nom)).map((e) => e.nom)
+    return { fait: total - restants.length, total, restants }
   }
 
   /**
@@ -135,12 +142,12 @@ export class Programmes {
       // TOUS les programmes sont interrogés, pas seulement jusqu'au premier
       // qui travaille encore : le compte des finis est l'avancement montré
       // pendant l'attente (sept questions par image, pas une de plus)
-      let fait = 0
       for (const e of this.entrees) {
-        if (gl.getProgramParameter(e.program, this.parallele.COMPLETION_STATUS_KHR)) fait++
+        if (gl.getProgramParameter(e.program, this.parallele.COMPLETION_STATUS_KHR)) {
+          this.finis.add(e.nom)
+        }
       }
-      this.fait = fait
-      if (fait < this.entrees.length) return false
+      if (this.finis.size < this.entrees.length) return false
     } else if (this.imagesAttendues++ < 1) {
       // Sans l'extension, LINK_STATUS bloque le fil le temps de la
       // compilation : on laisse passer une image, que l'écran ait peint le

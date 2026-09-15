@@ -3387,7 +3387,7 @@ export class Renderer {
 
   /** Où en est la compilation : programmes liés / programmes en tout (à
    *  lire à l'image, tant que `pret()` répond non — voir programmes.ts). */
-  avancementCompilation(): { fait: number; total: number } {
+  avancementCompilation(): { fait: number; total: number; restants: string[] } {
     return this.programmes.avancement()
   }
 

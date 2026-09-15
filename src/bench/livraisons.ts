@@ -31,6 +31,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/09/2026 10:42',
+    title: 'LE MOT DU CHARGEMENT N’ACCUSE PLUS LA CARTE GRAPHIQUE : il dit le temps, ce qui reste, et qui travaille',
+    notes: [
+      'LA DEMANDE : « J’ai ce message lors du chargement, cela m’étonne car j’ai une RTX 4060 Ti » — « le rendu se compile… 6/7 — la carte graphique est lente, on patiente ». Puis : « le chargement peut prendre plusieurs minutes, est-ce que cela le gère bien ? Peut-être avoir un avancement plus clair dans l’étape la plus longue, une fois qu’on est à 6/7 ».',
+      'D’OÙ ÇA VIENT. Le mot était FAUX. Sur Windows, le GLSL passe par ANGLE puis par le compilateur Direct3D (fxc), qui tourne sur le PROCESSEUR, dans le pilote, en un seul fil : la carte graphique n’entre en jeu qu’une fois les programmes liés, et une RTX 4060 Ti n’y change rien. Le seuil de douze secondes est fixe, sans détection du matériel. Et le compte s’arrêtait des minutes sur « 6/7 » — le dernier programme est la composition, cent kilo-octets de GLSL — sans que rien ne bouge : un chiffre immobile ressemble à une panne. Pire, la patience de la garde était bornée à deux minutes (le pire mesuré sur Firefox, 14/09) : un chargement de « plusieurs minutes » se voyait coiffé du panneau LE RENDU MET TROP LONGTEMPS À SE COMPILER, qui accusait lui aussi la carte.',
+      'CE QUI CHANGE (index.html, la garde d’amorçage). Passé douze secondes, le mot VIT : « le rendu se compile… 6/7 — 1 min 42 s — reste la composition (le plus gros des sept). C’est le compilateur de shaders du pilote qui travaille, sur le processeur : la carte graphique n’y est pour rien. On patiente, ne rechargez pas. » Le temps écoulé avance à la seconde (le pouls bat à chaque image, le mot n’est récrit que s’il change) ; ce qui reste est nommé par le jeu — Programmes (render/programmes.ts) retient QUELS programmes sont liés, pas seulement combien (avancement().restants), et main.ts traduit leurs noms en mots de joueur. La patience passe à CINQ minutes — une marge, pas une mesure : le rapport de PARAMÈTRES (compileRenduMs) dira le vrai chiffre. Le panneau de la borne, quand il tombe, dit la durée en minutes et que ce travail se fait sur le processeur, pas sur la carte. Le mot se replie en paragraphe (62 caractères de large) au lieu de traverser l’écran.',
+      'CE QU’ON NE PEUT PAS FAIRE : un avancement plus fin que « fini / pas fini » par programme. Le pilote ne dit rien de plus (COMPLETION_STATUS_KHR est un booléen), et le dernier programme est de loin le plus gros : la seule barre honnête est le temps qui passe. Sur Chrome, le résultat va au cache disque : le prix se paie à la première visite après chaque livraison, pas à chaque ouverture.',
+      'VÉRIFIÉ : un test neuf sur la garde (amorce-garde.spec.ts : sur le dernier programme, le mot dit le temps écoulé à la seconde et ce qui reste), deux réécrits (le mot ne contient plus « carte graphique est lente » et nomme le compilateur ; la borne à cinq minutes, avec le nouveau panneau), un réécrit sur Programmes (programmes.spec.ts : les restants sont nommés) — rouges sans le correctif (4 sur 15), verts avec. 1215 verts dans 114 fichiers, type-check à 0, build propre. Écran de chargement capturé avec le mot long, à 1570 et 400 px de large : il se replie sur quatre à six lignes, centré.',
+    ],
+  },
+  {
     date: '14/09/2026 23:17',
     title: 'LE PANNEAU « MET TROP LONGTEMPS » SUR CHROME : la garde entend désormais le pouls de la compilation',
     notes: [
