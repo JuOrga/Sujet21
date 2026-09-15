@@ -93,15 +93,17 @@ describe('Programmes — la compilation en coulisse', () => {
   it('compte les programmes liés un à un, et interroge chacun à chaque image', () => {
     const { gl, questions, finitUn } = glDeCarton({ parallele: true })
     const p = new Programmes(gl, SOURCES)
-    expect(p.avancement()).toEqual({ fait: 0, total: 2 })
+    expect(p.avancement()).toEqual({ fait: 0, total: 2, restants: ['compose', 'splat'] })
     expect(p.pret()).toBe(false)
     expect(questions.filter((q) => q === 'COMPLETION')).toHaveLength(2)
     finitUn()
     expect(p.pret()).toBe(false)
-    expect(p.avancement()).toEqual({ fait: 1, total: 2 })
+    // ce qui reste est NOMMÉ : l'écran de chargement dit sur quoi le
+    // compilateur travaille quand le compte s'arrête des minutes sur le dernier
+    expect(p.avancement()).toEqual({ fait: 1, total: 2, restants: ['splat'] })
     finitUn()
     expect(p.pret()).toBe(true)
-    expect(p.avancement()).toEqual({ fait: 2, total: 2 })
+    expect(p.avancement()).toEqual({ fait: 2, total: 2, restants: [] })
   })
 
   it('sans l’extension, laisse passer UNE image avant de se figer sur le verdict', () => {
