@@ -44,7 +44,9 @@ tant que l'orbe manque ; la longueur d'une run découle du trajet ; trois
 secteurs à distance égale de l'objectif, les haltes — économat, alcôve de
 repos — et les caches placées une par route, le confinement supérieur qui
 paie double, la nature et la température du module qui font la salle, le
-survol qui projette la route jusqu'à l'observatoire), la
+survol qui projette la route jusqu'à l'observatoire, le module « ? » qui
+ne se révèle qu'à l'entrée, et dans chaque module une mini-carte à trois
+voies où chaque porte ouverte ferme les autres), la
 descente semi-procédurale (rampe de difficulté réglable, graine du jour
 commune à tous les postes), le choix de la salle suivante en vignettes,
 les orbes d'essence de conscience (achetés au marchand du hub contre de la

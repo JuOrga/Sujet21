@@ -258,7 +258,7 @@ export class EditeurCarte {
   /** L'état de l'aperçu, dans les termes de la descente : le module courant
    *  y est toujours tenu pour épuisé (l'aperçu ne joue pas les salles). */
   private etatApercu(module = this.courant): EtatCarteRun {
-    return { module, niveau: moduleParId(this.carte, module)?.niveaux ?? 0, visites: this.visites, revelations: {} }
+    return { module, niveau: moduleParId(this.carte, module)?.niveaux ?? 0, visites: this.visites, revelations: {}, tissage: '', trace: [] }
   }
 
   private options(): OptionsDessin {

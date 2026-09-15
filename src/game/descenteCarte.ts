@@ -47,10 +47,30 @@ export interface EtatCarteRun {
   /** LES RÉVÉLATIONS : la nature tirée pour chaque module « ? » entré —
    *  par id. Écrite dans la sauvegarde : un « ? » révélé ne se retire pas. */
   revelations: Record<string, TypeModule>
+  /** LA MINI-CARTE À VOIES du module (voiesModule.ts) : la graine de son
+   *  tissage — vide : pas de voies (un outil, une carte d'avant) — et la
+   *  voie ouverte à chaque salle, dans l'ordre. */
+  tissage: string
+  trace: number[]
 }
 
 export function departCarte(c: CarteStation): EtatCarteRun {
-  return { module: c.regles.depart, niveau: 0, visites: [], revelations: {} }
+  return { module: c.regles.depart, niveau: 0, visites: [], revelations: {}, tissage: '', trace: [] }
+}
+
+/** OUVRIR UNE PORTE de la mini-carte : la voie choisie pour la salle qui
+ *  vient s'ajoute à la trace — la salle suivante ne s'ouvrira que depuis
+ *  ce nœud. */
+export function choisitVoie(e: EtatCarteRun, voie: number): EtatCarteRun {
+  return { ...e, trace: [...e.trace.slice(0, e.niveau), Math.max(0, Math.floor(voie))] }
+}
+
+/** La voie d'où l'on vient pour la salle `niveau` : null au premier rang,
+ *  ou quand la trace n'en sait rien (sauvegarde d'avant les voies). */
+export function derniereVoie(e: EtatCarteRun): number | null {
+  if (e.niveau === 0) return null
+  const v = e.trace[e.niveau - 1]
+  return typeof v === 'number' && Number.isFinite(v) ? v : null
 }
 
 /** LE MODULE TEL QU'IL SE JOUE : un « ? » révélé prend sa nature tirée
@@ -164,6 +184,7 @@ export function entreModule(
   e: EtatCarteRun,
   id: string,
   orbes: readonly string[],
+  tissage = '',
 ): EtatCarteRun | null {
   const choix = choixModules(c, e, orbes).find((x) => x.module.id === id)
   if (!choix || choix.orbeManquant) return null
@@ -173,7 +194,7 @@ export function entreModule(
   // (et leur mémoire). La carte se rouvre aussitôt sur ses coursives.
   const dejaTraverse = choix.retour || e.visites.includes(id)
   const niveau = dejaTraverse ? Math.max(0, choix.module.niveaux) : 0
-  return { module: id, niveau, visites: [...e.visites, e.module], revelations: e.revelations }
+  return { module: id, niveau, visites: [...e.visites, e.module], revelations: e.revelations, tissage, trace: [] }
 }
 
 /** LA LONGUEUR DE LA RUN, déduite du trajet : les salles déjà franchies,
@@ -218,7 +239,11 @@ export function litEtatCarteRun(brut: unknown, c: CarteStation): EtatCarteRun {
     for (const [id, nature] of Object.entries(o.revelations as Record<string, unknown>))
       if (moduleParId(c, id)?.type === 'inconnu' && REVELATIONS.includes(nature as TypeModule))
         revelations[id] = nature as TypeModule
-  return { module: o.module, niveau, visites, revelations }
+  const tissage = typeof o.tissage === 'string' ? o.tissage : ''
+  const trace = Array.isArray(o.trace)
+    ? o.trace.filter((v): v is number => typeof v === 'number' && Number.isFinite(v)).map((v) => Math.max(0, Math.floor(v)))
+    : []
+  return { module: o.module, niveau, visites, revelations, tissage, trace }
 }
 
 // ---- LA NATURE DU MODULE COMMANDE LA SALLE -------------------------------

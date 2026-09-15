@@ -8651,6 +8651,25 @@
       }
       .mb-cartes:has(.mb-porte) { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
       .mb-cartes.mb-trio { grid-template-columns: repeat(3, 1fr); max-width: 940px; margin: 0 auto; width: 100%; }
+      /* la mini-carte à voies du module (game/voiesModule.ts) : rangs de
+         gauche à droite, voies de haut en bas, les portes du rang allumées */
+      .mb-voies { grid-column: 1 / -1; display: flex; justify-content: center; padding: 2px 0 4px; overflow-x: auto; }
+      .mv-svg { max-width: 100%; height: auto; font-family: var(--font-mono); }
+      .mv-lien { stroke: #2d4258; stroke-width: 2; }
+      .mv-lien.mv-joue { stroke: var(--mb-menthe); opacity: 0.8; }
+      .mv-lien.mv-ouvre { stroke: #9fb6c8; stroke-dasharray: 4 4; animation: cs-flux 1.2s linear infinite; }
+      .mv-noeud circle { fill: #0e1724; stroke: #2d4258; stroke-width: 1.5; }
+      .mv-noeud text { fill: #7f9cb0; font-size: 12px; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+      .mv-noeud.mv-ferme { opacity: 0.35; }
+      .mv-noeud.mv-joue circle { fill: rgba(109, 255, 184, 0.18); stroke: var(--mb-menthe); }
+      .mv-noeud.mv-joue text { fill: var(--mb-menthe); }
+      .mv-noeud.mv-porte circle { stroke: #d5f3e8; stroke-width: 2; filter: drop-shadow(0 0 6px rgba(109, 255, 184, 0.55)); }
+      .mv-noeud.mv-porte text { fill: #eaf6ff; }
+      .mv-noeud.mv-vise circle { fill: var(--mb-menthe); stroke: #eaf6ff; }
+      .mv-noeud.mv-vise text { fill: #071018; }
+      .mv-titre { fill: #55708c; font-size: 8px; letter-spacing: 0.2em; text-anchor: middle; font-family: var(--font-display); }
+      .mv-titre.mv-courant { fill: #d5f3e8; }
+      @media (prefers-reduced-motion: reduce) { .mv-lien.mv-ouvre { animation: none; } }
       /* les jauges en tête du choix : on décide en voyant ce qu'on possède */
       .mb-jauges {
         grid-column: 1 / -1; display: flex; justify-content: center; align-items: center;

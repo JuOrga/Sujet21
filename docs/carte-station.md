@@ -255,6 +255,19 @@ HUB ─vapeur T3 ─┘        └─ S3 CHAUFFERIE (+1) ┴─ REP ALCÔVE ─�
   bonbonne est pleine). Un module `inconnu` se révèle à l'entrée
   (`reveleInconnu`) et se joue sous sa nature (`moduleCourant` rend le
   module révélé) ; le plan le dessine ensuite sous cette nature.
+- **La mini-carte à voies** (`src/game/voiesModule.ts`) : à l'entrée d'un
+  module de N salles, N rangs sur trois voies se tissent depuis une graine
+  (la descente du jour en donne une par module, la même pour tous les
+  postes ; sinon le poste en tire une, écrite dans la sauvegarde). Chaque
+  nœud est une salle décidée d'avance — mécanique, figure ou non, tableau
+  du pool ou générée — et mène tout droit, plus une voisine une fois sur
+  deux. Les portes d'un rang sont les nœuds que celui qu'on vient d'ouvrir
+  annonce (`portesDuRang`) : on choisit une porte en voyant où elle mène,
+  la grille se dessine au-dessus des portes (`dessinMiniCarteSVG`), viser
+  une porte allume son nœud. La salle ne se fabrique qu'à l'ouverture ; un
+  nœud du pool sans tableau jouable se génère avec sa mécanique. Sans
+  graine (un outil, une sauvegarde d'avant), le choix historique tient :
+  trois générées et le pool en quatrième.
 - **La pioche suit le biome** : un tableau qui porte un `biome` ne se
   propose que dans le module de ce biome ; un tableau sans biome est
   universel (la bibliothèque n'est pas encore réétiquetée) ; une salle

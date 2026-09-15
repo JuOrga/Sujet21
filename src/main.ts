@@ -102,10 +102,19 @@ import {
   zoneDe,
   type ModuleCarte,
 } from './game/carteStation'
+import {
+  dessinMiniCarteSVG,
+  portesDuRang,
+  tisseMiniCarte,
+  type MiniCarte,
+  type NoeudVoie,
+} from './game/voiesModule'
 import { dessinCarteSVG, type OptionsDessin } from './game/dessinCarte'
 import {
+  choisitVoie,
   choixModules,
   climatDuModule,
+  derniereVoie,
   difficulteSousCran,
   ditProjection,
   moduleEffectif,
@@ -1070,6 +1079,37 @@ function planEffectif(): PlanVoie {
 }
 function moduleEnCours(): ModuleCarte | undefined {
   return moduleCourant(carte, carteRun)
+}
+/** LA GRAINE DU TISSAGE d'un module : la descente du jour en donne une par
+ *  module, la même pour tous les postes ; sinon le poste en tire une à
+ *  l'entrée — elle s'écrit dans la sauvegarde, la mini-carte se retisse. */
+function graineTissage(id: string): string {
+  return descenteDuJour()
+    ? `${new Date().toISOString().slice(0, 10)}@${id}`
+    : `${id}#${Math.floor(Math.random() * 36 ** 6).toString(36)}`
+}
+/** LA MINI-CARTE À VOIES du module en cours, retissée depuis sa graine —
+ *  null sans graine (un outil, une carte d'avant) ou sans salle. */
+function miniCarteDuModule(): MiniCarte | null {
+  const m = moduleEnCours()
+  if (!m || m.niveaux <= 0 || !carteRun.tissage) return null
+  const acquis = records.eveilAcquis()
+  const verrous = records.verrousCycle()
+  const permises = mecaniquesPermises(
+    transfoTenue('solidification', acquis, verrous),
+    transfoTenue('vaporisation', acquis, verrous),
+  )
+  // le rang de la descente à l'entrée du module : les salles déjà
+  // franchies dedans se retranchent du rang courant
+  const rangEntree = voieRang - carteRun.niveau
+  return tisseMiniCarte(
+    m.niveaux,
+    aleaDeGraine(carteRun.tissage),
+    permises,
+    (r) => momentAuRang(rangEntree + 1 + r, planEffectif()),
+    { debut: voiePlan.figuresDebut, suite: voiePlan.figuresSuite },
+    voiePlan.ecrites,
+  )
 }
 function sauvePlanVoie(): void {
   try {
@@ -13209,7 +13249,7 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
 function entreModuleRun(id: string): void {
   const suivant = entreModule(carte, carteRun, id, orbesAcquis())
   if (!suivant) return
-  carteRun = suivant
+  carteRun = { ...suivant, tissage: graineTissage(id) }
   // LE « ? » SE RÉVÈLE à l'entrée — le même tirage pour tous les postes le
   // jour d'une descente du jour, sinon le hasard du poste
   carteRun = reveleInconnu(
@@ -13333,6 +13373,8 @@ interface CarteVoie {
   cahier: CodeAtelier | null
   generee: boolean
   etiquette: string
+  /** la voie de la mini-carte que cette porte ouvre — absente sans voies */
+  voie?: number
 }
 
 /** LA VOIE SEMI-PROCÉDURALE : le choix du rang suivant, tiré du PLAN de
@@ -13377,22 +13419,20 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   const biomeCourant = moduleEnCours()?.biome ?? ''
   const marqueBiome = (lv: LevelDef): LevelDef =>
     biomeCourant ? { ...lv, biome: biomeCourant } : lv
-  const ecrite = voiePlan.ecrites
-    ? piocheEcrite(
-        seq,
-        { moment, mecanique: 3, difficulte },
-        voieVues,
-        // un tableau qui EXIGE un état non tissé n'est pas jouable
-        (lv) =>
-          (!lv.biome || !biomeCourant || lv.biome === biomeCourant) &&
-          (lv.exige ?? []).every((e) =>
-            e === 'glace' ? solidTenue : vapoTenue,
-          ),
-        alea,
-        jouee,
-        voiePlan.poids,
-      )
-    : null
+  // un tableau qui EXIGE un état non tissé n'est pas jouable
+  const jouable = (lv: LevelDef): boolean =>
+    (!lv.biome || !biomeCourant || lv.biome === biomeCourant) &&
+    (lv.exige ?? []).every((e) => (e === 'glace' ? solidTenue : vapoTenue))
+  const pioche = (): LevelDef | null =>
+    piocheEcrite(seq, { moment, mecanique: 3, difficulte }, voieVues, jouable, alea, jouee, voiePlan.poids)
+  // LA MINI-CARTE À VOIES : les portes du rang sont les nœuds joignables
+  // depuis celui qu'on vient d'ouvrir — chacun décidé au tissage (sa
+  // mécanique, figure ou non, tableau du pool ou générée). Sans voies (un
+  // outil, une carte d'avant), le choix historique tient : trois générées
+  // et le pool en quatrième
+  const mini = miniCarteDuModule()
+  const portes: NoeudVoie[] = mini ? portesDuRang(mini, carteRun.niveau, derniereVoie(carteRun)) : []
+  const ecrite = voiePlan.ecrites && portes.length === 0 ? pioche() : null
   const aEcrite = ecrite ? decodeCodeAtelier(ecrite.code) : null
   // la mécanique de la salle qu'on VIENT de jouer s'évite : la foulée varie
   const [mecaA, mecaB, mecaC] = mecaniquesDuChoix(
@@ -13419,7 +13459,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   )
   const optionsDuRang = (
     mec: CodeAtelier['mecanique'],
-    carte: number,
+    estFigure: boolean,
   ): OptionsGen => ({
     ...OPTIONS_DEFAUT,
     dangers: regl.dangers,
@@ -13427,7 +13467,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
     contraste: regl.contraste,
     familles: (regl.purete ? masqueMecanique(mec) : 127) & masqueCycle,
     figure: figureDeLaCarte(
-      modesFigure[carte] ?? false,
+      estFigure,
       moment,
       mec,
       solidTenue,
@@ -13451,13 +13491,13 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   const genere = (
     mecanique: CodeAtelier['mecanique'],
     n: number,
-    carte: number,
+    estFigure: boolean,
   ): { lv: LevelDef; cahier: CodeAtelier; figure: number } | null => {
     const cahier: CodeAtelier = { moment, mecanique, difficulte }
     // les options se tirent UNE FOIS par carte (la famille de figure est un
     // tirage) : les variantes de secours redonnent la même salle, pas une
     // autre famille — et l'étiquette de la carte reste vraie
-    const opts = optionsDuRang(mecanique, carte)
+    const opts = optionsDuRang(mecanique, estFigure)
     // une figure qui ne se prouve pas ne coûte pas la carte : le repli est
     // la salle à compartiments, le système historique
     for (const o of opts.figure !== 0 ? [opts, { ...opts, figure: 0 }] : [opts])
@@ -13474,9 +13514,54 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
       }
     return null
   }
-  // Le choix porte TOUJOURS TROIS salles générées, trois mécaniques — la
-  // suite écrite (si la séquence en offre une) s'y ajoute en quatrième
-  // carte : la voie reste procédurale d'abord, l'écrite est une option.
+  // une figure s'annonce PAR SA FAMILLE : le joueur apprend à les
+  // reconnaître d'un rang à l'autre, et le choix se prend sur la forme
+  // autant que sur la mécanique
+  const etiquettesGen = [
+    'SALLE GÉNÉRÉE — INÉDITE, PROUVÉE',
+    'SALLE GÉNÉRÉE — L’AUTRE MÉCANIQUE',
+    'SALLE GÉNÉRÉE — LA TROISIÈME MÉCANIQUE',
+  ]
+  const etiquetteGeneree = (figure: number, i: number): string => {
+    const fam = FIGURE_FAMILLES[figure - 2]
+    return fam
+      ? `SALLE GÉNÉRÉE — FIGURE : ${FIGURE_NOMS[fam].toUpperCase()}`
+      : etiquettesGen[Math.min(i, etiquettesGen.length - 1)]
+  }
+  // LES PORTES DE LA MINI-CARTE : une carte par nœud joignable. Le nœud du
+  // pool pioche à l'instant ; pool vide (tout vu, rien de jouable), il se
+  // génère avec sa mécanique — la voie ne meurt jamais sur un pool sec
+  if (portes.length > 0) {
+    const cartes: CarteVoie[] = []
+    for (const p of portes) {
+      const ecr = p.ecrite && voiePlan.ecrites ? pioche() : null
+      if (ecr) {
+        cartes.push({
+          lv: ecr,
+          cahier: decodeCodeAtelier(ecr.code),
+          generee: false,
+          etiquette: `VOIE ${p.voie + 1} · TABLEAU DU POOL`,
+          voie: p.voie,
+        })
+        continue
+      }
+      const g = genere(p.mecanique, 1 + p.voie, p.figure)
+      if (g)
+        cartes.push({
+          lv: g.lv,
+          cahier: g.cahier,
+          generee: true,
+          etiquette: `VOIE ${p.voie + 1} · ${etiquetteGeneree(g.figure, p.voie)}`,
+          voie: p.voie,
+        })
+    }
+    // une porte au moins : sinon le filet historique ci-dessous
+    if (cartes.length >= 1) return cartes
+  }
+  // Sans voies, le choix porte TOUJOURS TROIS salles générées, trois
+  // mécaniques — la suite écrite (si la séquence en offre une) s'y ajoute
+  // en quatrième carte : la voie reste procédurale d'abord, l'écrite est
+  // une option.
   const cartes: CarteVoie[] = []
   // le tableau pioché (déjà filtré sur ce qu'il EXIGE) ouvre le choix :
   // la voie reste procédurale d'abord, l'écrit est une option
@@ -13487,22 +13572,8 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
       generee: false,
       etiquette: 'TABLEAU DU POOL',
     })
-  const etiquettesGen = [
-    'SALLE GÉNÉRÉE — INÉDITE, PROUVÉE',
-    'SALLE GÉNÉRÉE — L’AUTRE MÉCANIQUE',
-    'SALLE GÉNÉRÉE — LA TROISIÈME MÉCANIQUE',
-  ]
-  // une figure s'annonce PAR SA FAMILLE : le joueur apprend à les
-  // reconnaître d'un rang à l'autre, et le choix se prend sur la forme
-  // autant que sur la mécanique
-  const etiquetteGeneree = (figure: number, i: number): string => {
-    const fam = FIGURE_FAMILLES[figure - 2]
-    return fam
-      ? `SALLE GÉNÉRÉE — FIGURE : ${FIGURE_NOMS[fam].toUpperCase()}`
-      : etiquettesGen[Math.min(i, etiquettesGen.length - 1)]
-  }
   ;[mecaA, mecaB, mecaC].forEach((mec, i) => {
-    const g = genere(mec, i + 1, i)
+    const g = genere(mec, i + 1, modesFigure[i] ?? false)
     if (g)
       cartes.push({
         lv: g.lv,
@@ -13518,7 +13589,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
     for (const mec of permises) {
       if (cartes.filter((c) => c.generee).length >= 3) break
       if (cartes.some((c) => c.generee && c.cahier?.mecanique === mec)) continue
-      const gx = genere(mec, 5 + mec, cartes.filter((c) => c.generee).length)
+      const gx = genere(mec, 5 + mec, modesFigure[cartes.filter((c) => c.generee).length] ?? false)
       if (gx)
         cartes.push({
           lv: gx.lv,
@@ -13570,25 +13641,50 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
   // trois portes : trois colonnes ; quatre (l'écrite en plus) : en rang
   host.classList.toggle('mb-trio', cartes.length === 3)
   host.appendChild(mbJauges())
+  // LA MINI-CARTE À VOIES du module, au-dessus des portes : le chemin déjà
+  // ouvert, les portes de ce rang allumées, et ce qu'elles ouvrent ensuite
+  // — on choisit une porte en voyant où elle mène
+  const mini = miniCarteDuModule()
+  if (mini && cartes.some((c) => c.voie !== undefined)) {
+    const voies = document.createElement('div')
+    voies.className = 'mb-voies'
+    voies.innerHTML = dessinMiniCarteSVG(mini, {
+      rang: carteRun.niveau,
+      trace: carteRun.trace,
+      portes: cartes.map((c) => c.voie).filter((v): v is number => v !== undefined),
+    })
+    host.appendChild(voies)
+  }
   host.appendChild(mbConsignePortes(cartes.length))
   cartes.forEach((c, i) => {
-    host.appendChild(
-      mbPorte(
-        c.lv,
-        i,
-        {
-          etiquette: c.etiquette,
-          classe: c.generee ? 'mb-voie-gen' : 'mb-voie-pool',
-          cahier: c.cahier,
-        },
-        () => {
-          if (c.generee) {
-            voieGenereeChoisie = c.lv
-            noteSalleElue(c.lv) // le butin retient l'élue : rejouable, publiable
-          } else salleChoisie = c.lv
-        },
-      ),
+    const porte = mbPorte(
+      c.lv,
+      i,
+      {
+        etiquette: c.etiquette,
+        classe: c.generee ? 'mb-voie-gen' : 'mb-voie-pool',
+        cahier: c.cahier,
+      },
+      () => {
+        // la porte ouverte s'inscrit dans la trace : la salle suivante ne
+        // s'ouvrira que depuis ce nœud de la mini-carte
+        if (c.voie !== undefined) carteRun = choisitVoie(carteRun, c.voie)
+        if (c.generee) {
+          voieGenereeChoisie = c.lv
+          noteSalleElue(c.lv) // le butin retient l'élue : rejouable, publiable
+        } else salleChoisie = c.lv
+      },
     )
+    // viser une porte allume son nœud sur la mini-carte
+    if (c.voie !== undefined) {
+      const noeud = (): Element | null =>
+        host.querySelector(`.mv-noeud[data-rang="${carteRun.niveau}"][data-voie="${c.voie}"]`)
+      for (const ev of ['pointerenter', 'focusin'] as const)
+        porte.addEventListener(ev, () => noeud()?.classList.add('mv-vise'))
+      for (const ev of ['pointerleave', 'focusout'] as const)
+        porte.addEventListener(ev, () => noeud()?.classList.remove('mv-vise'))
+    }
+    host.appendChild(porte)
   })
 }
 
