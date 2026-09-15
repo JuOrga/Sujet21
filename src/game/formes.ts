@@ -94,6 +94,22 @@ export const ARC_BOUT_DROIT = 1 // coupe franche à 90° de la courbe (radiale)
 export const ARC_BOUT_POINTE = 2 // griffe : l'anneau s'effile en pointe
 export const ARC_BOUT_NOMS = ['Arrondis', 'Droits (90°)', 'En pointe']
 
+// UNE COUPE : un demi-plan qui TRONQUE la forme, en coordonnées monde. Ce
+// qui reste est l'intersection de la forme et du demi-plan « derrière » la
+// ligne : (p − o)·n ≤ 0, n étant la normale SORTANTE de la coupe. C'est ce
+// qui fait une porte à moitié matérialisée (porte.ts) : un rectangle dont
+// un front droit avance ou pivote. Le champ signé d'une intersection est le
+// MAX des deux champs — exact pour le signe, et la normale est celle du
+// terme qui l'emporte : une particule prise juste derrière le front est
+// poussée PAR le front, pas vers le bord du rectangle. Jamais empaquetée
+// pour le shader : les portes ne passent pas par la carte de lumière.
+export interface Coupe {
+  x: number
+  y: number
+  nx: number
+  ny: number
+}
+
 export interface FormeBox {
   minX: number
   minY: number
@@ -104,6 +120,7 @@ export interface FormeBox {
   p0?: number // COIN : orientation 0..3 · ARC : épaisseur relative 0..1
   p1?: number // ARC : demi-ouverture en degrés
   p2?: number // ARC : bouts (0 arrondis, 1 droits, 2 en pointe)
+  coupe?: Coupe // un demi-plan qui tronque la forme (monde, hors rotation)
 }
 
 export interface FormeContact {
@@ -780,9 +797,20 @@ export function formeContact(
     const ny = out.nx * sa + out.ny * ca
     out.nx = nx
     out.ny = ny
-    return
+  } else {
+    formeContactAxe(x, y, b, out)
   }
-  formeContactAxe(x, y, b, out)
+  // la coupe se lit en MONDE, après la rotation : l'intersection prend le
+  // champ le plus grand des deux, et sa normale avec
+  const c = b.coupe
+  if (c) {
+    const d = (x - c.x) * c.nx + (y - c.y) * c.ny
+    if (d > out.dist) {
+      out.dist = d
+      out.nx = c.nx
+      out.ny = c.ny
+    }
+  }
 }
 
 const scratch: FormeContact = { dist: 0, nx: 0, ny: 1 }
@@ -790,7 +818,7 @@ const scratch: FormeContact = { dist: 0, nx: 0, ny: 1 }
 /** Le point (x, y) est-il dans la forme ? Rectangle : le chemin rapide
  *  historique (bornes strictes) ; autres formes : le signe du SDF. */
 export function dansForme(b: FormeBox, x: number, y: number): boolean {
-  if (!(b.forme ?? FORME_RECT)) {
+  if (!(b.forme ?? FORME_RECT) && !b.coupe) {
     if (!b.angle) return x > b.minX && x < b.maxX && y > b.minY && y < b.maxY
     const cx = (b.minX + b.maxX) / 2
     const cy = (b.minY + b.maxY) / 2
