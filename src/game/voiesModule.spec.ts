@@ -78,3 +78,40 @@ describe('dessinMiniCarteSVG — la grille dessinée', () => {
     expect(dessinMiniCarteSVG(tisse('d', 0), { rang: 0, trace: [], portes: [] })).toBe('')
   })
 })
+
+describe('les nœuds ÉVÉNEMENT dans la grille', () => {
+  it('jamais au premier rang, jamais les trois d’un rang — il reste toujours une salle', () => {
+    for (let i = 0; i < 60; i++) {
+      const mc = tisse(`e${i}`, 6)
+      expect(mc.rangs[0].every((n) => n.nature === 'salle')).toBe(true)
+      for (const r of mc.rangs) expect(r.some((n) => n.nature === 'salle')).toBe(true)
+    }
+  })
+
+  it('un nœud événement n’a pas de tableau du pool : il n’a pas de salle', () => {
+    for (let i = 0; i < 60; i++)
+      for (const r of tisse(`f${i}`, 6).rangs)
+        for (const n of r) if (n.nature === 'evenement') expect(n.ecrite).toBe(false)
+  })
+
+  it('il en sort, sans noyer le module : entre un dixième et la moitié des nœuds', () => {
+    let evs = 0
+    let total = 0
+    for (let i = 0; i < 200; i++)
+      for (const r of tisse(`g${i}`, 6).rangs)
+        for (const n of r) {
+          total++
+          if (n.nature === 'evenement') evs++
+        }
+    expect(evs / total).toBeGreaterThan(0.1)
+    expect(evs / total).toBeLessThan(0.5)
+  })
+
+  it('le dessin marque le nœud événement, et son titre ne dit pas laquelle', () => {
+    const mc = tisse('h', 6)
+    const svg = dessinMiniCarteSVG(mc, { rang: 0, trace: [], portes: [0, 1, 2] })
+    const evs = mc.rangs.flat().filter((n) => n.nature === 'evenement').length
+    expect((svg.match(/mv-noeud mv-evenement/g) ?? []).length).toBe(evs)
+    if (evs > 0) expect(svg).toContain('une rencontre — on ne sait pas laquelle')
+  })
+})

@@ -23,6 +23,16 @@ import { figuresDuChoix, mecaniquesDuChoix } from './voie'
 /** Le nombre de voies d'un module — trois, comme les trois portes d'avant. */
 export const VOIES = 3
 
+/** LA PART DE NŒUDS ÉVÉNEMENT, passé le premier rang. Six salles de suite,
+ *  c'est six fois le même geste ; un nœud sur trois environ n'est donc pas
+ *  une salle mais une RENCONTRE (evenements.ts) — du texte, un choix, un
+ *  prix. Le joueur peut toujours l'éviter en prenant une autre voie : c'est
+ *  ce qui en fait un choix et non une interruption. */
+export const PART_EVENEMENT = 0.32
+
+/** La nature d'un nœud : une salle à jouer, ou une rencontre à traverser. */
+export type NatureNoeud = 'salle' | 'evenement'
+
 export interface NoeudVoie {
   /** la salle du module, 0-based */
   rang: number
@@ -33,6 +43,8 @@ export interface NoeudVoie {
   figure: boolean
   /** la porte est un TABLEAU DU POOL — pioché à l'ouverture ; à défaut, générée */
   ecrite: boolean
+  /** salle à jouer, ou ÉVÉNEMENT (aucune salle : un écran, un choix) */
+  nature: NatureNoeud
   /** les voies joignables au rang suivant (vide au dernier rang) */
   suivants: number[]
 }
@@ -67,6 +79,14 @@ export function tisseMiniCarte(
     const mecaniques = mecaniquesDuChoix(null, alea, null, permises)
     const modes = figuresDuChoix(momentAuRang(r), alea, figures.debut, figures.suite)
     const voieEcrite = ecrites ? Math.min(VOIES - 1, Math.floor(alea() * VOIES)) : -1
+    // LES NŒUDS ÉVÉNEMENT. Le tirage se fait à CHAQUE rang, le premier
+    // compris, pour que la graine reste alignée quel que soit le tracé —
+    // mais le rang 0 n'en porte jamais : on entre dans un biome par une
+    // salle, sinon le module ne se présente pas. Et jamais les TROIS d'un
+    // rang : il doit toujours rester une voie qui se joue.
+    const evs = [0, 1, 2].map(() => alea() < PART_EVENEMENT)
+    if (r === 0 || evs.every(Boolean)) evs[0] = false
+    if (r === 0) evs[1] = evs[2] = false
     const rang: NoeudVoie[] = []
     for (let v = 0; v < VOIES; v++) {
       const suivants: number[] = []
@@ -85,7 +105,9 @@ export function tisseMiniCarte(
         voie: v,
         mecanique: mecaniques[v] ?? mecaniques[0],
         figure: modes[v] ?? false,
-        ecrite: v === voieEcrite,
+        // un nœud événement n'a pas de tableau : il n'a pas de salle
+        ecrite: v === voieEcrite && !evs[v],
+        nature: evs[v] ? 'evenement' : 'salle',
         suivants,
       })
     }
@@ -127,9 +149,13 @@ export function dessinMiniCarteSVG(
   const x = (r: number): number => X0 + r * PAS_X
   const y = (v: number): number => Y0 + v * PAS_Y
   const glyphe = (nd: NoeudVoie): string =>
-    nd.ecrite ? '▤' : nd.figure ? '✧' : ['○', '❄', '♨', '◎'][nd.mecanique] ?? '○'
+    nd.nature === 'evenement' ? '?' : nd.ecrite ? '▤' : nd.figure ? '✧' : ['○', '❄', '♨', '◎'][nd.mecanique] ?? '○'
   const nom = (nd: NoeudVoie): string =>
-    nd.ecrite ? 'tableau du pool' : `${nd.figure ? 'figure' : 'salle'} · ${['eau', 'glace', 'vapeur', 'toutes'][nd.mecanique] ?? 'eau'}`
+    nd.nature === 'evenement'
+      ? 'une rencontre — on ne sait pas laquelle'
+      : nd.ecrite
+        ? 'tableau du pool'
+        : `${nd.figure ? 'figure' : 'salle'} · ${['eau', 'glace', 'vapeur', 'toutes'][nd.mecanique] ?? 'eau'}`
   let liens = ''
   let noeuds = ''
   for (const rang of mc.rangs)
@@ -142,7 +168,8 @@ export function dessinMiniCarteSVG(
       }
       const porte = nd.rang === o.rang && o.portes.includes(nd.voie)
       const cl =
-        'mv-noeud' + (joueIci ? ' mv-joue' : '') + (porte ? ' mv-porte' : '') +
+        'mv-noeud' + (nd.nature === 'evenement' ? ' mv-evenement' : '') +
+        (joueIci ? ' mv-joue' : '') + (porte ? ' mv-porte' : '') +
         (nd.rang < o.rang && !joueIci ? ' mv-ferme' : '')
       noeuds +=
         `<g class="${cl}" data-rang="${nd.rang}" data-voie="${nd.voie}" transform="translate(${x(nd.rang)} ${y(nd.voie)})">` +

@@ -8375,6 +8375,52 @@
       }
       .mb-prix.mb-offert { color: var(--mb-menthe); }
       .mb-carte.mb-pauvre { opacity: 0.45; cursor: not-allowed; }
+      /* ---- LES SALLES ÉVÉNEMENT (game/evenements.ts) ---- */
+      /* la porte d'une rencontre : pas de plan, un point d'interrogation */
+      .mb-ev-vue { display: grid; place-items: center; background: linear-gradient(180deg, #16233a, #0b1220); }
+      .mb-ev-vue i {
+        font-style: normal; font-family: var(--font-display);
+        font-size: calc(46px * var(--ui)); color: var(--mb-or, #ffd977);
+        text-shadow: 0 0 18px rgba(255, 217, 119, 0.45); animation: mb-ev-bat 2.6s ease-in-out infinite;
+      }
+      @keyframes mb-ev-bat { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
+      .mb-porte-tag.mb-voie-ev { color: var(--mb-or, #ffd977); border-color: rgba(255, 217, 119, 0.4); }
+      .mb-porte-ev:hover, .mb-porte-ev:focus-visible {
+        border-color: var(--mb-or, #ffd977);
+        box-shadow: 0 22px 44px rgba(0, 0, 0, 0.55), 0 0 30px rgba(255, 217, 119, 0.25);
+      }
+      /* le récit : le lieu en italique, le lore dessous — la seule prose du jeu */
+      .mb-ev-recit {
+        grid-column: 1 / -1; max-width: 62ch; margin: 0 auto; text-align: left;
+        border-left: 2px solid rgba(255, 217, 119, 0.5); padding: 2px 0 2px 16px;
+      }
+      .mb-ev-recit em {
+        display: block; font-style: normal; font-family: var(--font-display);
+        font-size: calc(9.5px * var(--ui)); letter-spacing: 0.22em; color: var(--mb-or, #ffd977);
+      }
+      .mb-ev-recit p {
+        margin: 8px 0 0; font-size: calc(13px * var(--ui)); line-height: 1.65; color: #cfe2ef;
+      }
+      .mb-ev-gains {
+        margin: 12px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 5px;
+      }
+      .mb-ev-gains li {
+        font-size: calc(12.5px * var(--ui)); color: #d5f3e8; letter-spacing: 0.03em;
+      }
+      .mb-ev-issue { border-left-color: var(--mb-menthe); }
+      .mb-ev-issue em { color: var(--mb-menthe); }
+      .mb-carte.mb-ev-offre {
+        min-height: 128px; justify-content: center; gap: 7px; text-align: center;
+      }
+      .mb-ev-offre b { font-family: var(--font-display); letter-spacing: 0.14em; }
+      .mb-ev-pari, .mb-ev-sur {
+        font-style: normal; font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; color: #7f9cb0;
+      }
+      .mb-ev-pari { color: var(--mb-or, #ffd977); }
+      /* le nœud événement sur la mini-carte à voies */
+      .mv-noeud.mv-evenement circle { stroke: rgba(255, 217, 119, 0.7); }
+      .mv-noeud.mv-evenement text { fill: var(--mb-or, #ffd977); }
+      .mv-noeud.mv-evenement.mv-joue circle { fill: rgba(255, 217, 119, 0.18); stroke: var(--mb-or, #ffd977); }
       /* l'alcôve de repos : trois offres, l'icône en tête */
       .mb-carte.mb-repos { min-height: 170px; justify-content: center; gap: 8px; }
       .mb-repos-icone { font-style: normal; font-size: calc(30px * var(--ui)); line-height: 1; }

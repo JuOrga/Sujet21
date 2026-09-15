@@ -268,6 +268,21 @@ HUB ─vapeur T3 ─┘        └─ S3 CHAUFFERIE (+1) ┴─ REP ALCÔVE ─�
   nœud du pool sans tableau jouable se génère avec sa mécanique. Sans
   graine (un outil, une sauvegarde d'avant), le choix historique tient :
   trois générées et le pool en quatrième.
+- **Les salles ÉVÉNEMENT** (`src/game/evenements.ts`) : un nœud sur trois
+  environ, passé le premier rang du module, n'est pas une salle mais une
+  RENCONTRE — aucun tableau à jouer, un écran dans la cérémonie. La porte
+  ne dit pas laquelle : l'événement se tire à l'ouverture parmi ceux que la
+  run n'a pas encore vus (la descente du jour en donne le même à tous les
+  postes). Chaque rencontre porte un lieu, du lore, et deux ou trois
+  offres ; une offre peut avoir PLUSIEURS ISSUES pesées — le joueur voit
+  qu'il parie. Les effets sont un vocabulaire court (`EffetEvenement`) que
+  `appliqueEffets` traduit en leviers réels : réserve, condensat, mémoire,
+  échantillon de secours, **essence maximale** (le sacrifice : le volume
+  avec lequel le corps naît à chaque salle, jamais sous
+  `ESSENCE_PLANCHER`), instrument embarqué, **contrepartie** (une carte qui
+  coûte — `CONTREPARTIES` d'`instruments.ts`, jamais proposée au tirage
+  d'un palier), orbe, révélation des « ? », confinement promis à la salle
+  suivante. Une rencontre consomme son rang comme une salle.
 - **La pioche suit le biome** : un tableau qui porte un `biome` ne se
   propose que dans le module de ce biome ; un tableau sans biome est
   universel (la bibliothèque n'est pas encore réétiquetée) ; une salle
