@@ -233,6 +233,14 @@ HUB ─vapeur T3 ─┘        └─ S3 CHAUFFERIE (+1) ┴─ REP ALCÔVE ─�
   Le climat voyage dans le code de la salle (option `climat`, bits hauts
   du suffixe `~`) : un ancien code se décode inchangé. Une route froide
   se joue en glace, une route chaude en vapeur — la route est le build.
+- **Les haltes** : entrer dans un module `economat` ferme la cérémonie et
+  intercale la salle du Semblable tout de suite (`economatForce`) ; à sa
+  sortie, la carte se rouvre. Quand le plan porte un économat,
+  l'intercalation automatique de mi-descente se tait — c'est la route
+  qui décide. Entrer dans un module `repos` ouvre l'ALCÔVE dans la
+  cérémonie (`offresRepos`) : un second souffle (+1 vie), de la réserve
+  (+0,5 L en bonbonne) ou du condensat (+40 cL), une seule des trois, les
+  offres sans effet grisées ; puis la carte se rouvre.
 - **La pioche suit le biome** : un tableau qui porte un `biome` ne se
   propose que dans le module de ce biome ; un tableau sans biome est
   universel (la bibliothèque n'est pas encore réétiquetée) ; une salle

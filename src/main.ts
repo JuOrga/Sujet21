@@ -107,6 +107,9 @@ import {
   choixModules,
   climatDuModule,
   difficulteSousCran,
+  offresRepos,
+  REPOS_CONDENSAT_CL,
+  REPOS_RESERVE_L,
   postureDuModule,
   primeMemoire,
   departCarte,
@@ -861,6 +864,11 @@ const voieVues = new Set<string>()
 // se font au contact des alcôves de l'étal.
 let economatIntercalaire: LevelDef | null = null
 let economatVisiteCetteRun = false
+// L'ÉCONOMAT COMME NŒUD DE LA CARTE : quand le plan porte un module
+// économat, c'est lui qui décide — on y entre par sa coursive, et
+// l'intercalation automatique de mi-descente se tait. Une carte sans
+// économat (un outil, une carte d'avant les haltes) garde l'ancien réflexe.
+const carteAUnEconomat = (): boolean => carte.modules.some((m) => m.type === 'economat')
 // APPELER LE SEMBLABLE (outil de conception, banc et pupitre) : l'Économat
 // s'intercale d'ordinaire tout seul, une fois par run et à mi-descente —
 // impossible à convoquer pour l'essayer. Armé ici, il prend la prochaine
@@ -12468,6 +12476,7 @@ let mbEtape:
   | 'etalonnage'
   | 'draft'
   | 'carte'
+  | 'repos'
   | 'salles'
   | 'fin' = 'bilan'
 let mbDraftsRestants = 0
@@ -12492,10 +12501,17 @@ function avanceSalle(): void {
   // à la cérémonie (salleChoisie) attend sagement la sortie de l'annexe.
   if (economatIntercalaire && estEconomat(level)) {
     economatIntercalaire = null
+    // on SORT de l'économat-nœud : la halte n'a pas de salle, la carte se
+    // rouvre sur ses coursives — rien d'autre ne se joue ici
+    const m = moduleEnCours()
+    if (m && m.type === 'economat' && moduleFini(carte, carteRun)) {
+      montreCarteRun('suite')
+      return
+    }
   } else if (
     !auHub &&
     !testLevel &&
-    (economatForce || !economatVisiteCetteRun)
+    (economatForce || (!economatVisiteCetteRun && !carteAUnEconomat()))
   ) {
     const total = longueurRun()
     const rang = voieRang
@@ -13162,6 +13178,22 @@ function entreModuleRun(id: string): void {
   const suivant = entreModule(carte, carteRun, id, orbesAcquis())
   if (!suivant) return
   carteRun = suivant
+  const m = moduleEnCours()
+  // LES HALTES, à la manière du marchand et du feu de camp de Slay the
+  // Spire : l'ÉCONOMAT est une salle qu'on joue (la cérémonie se ferme, le
+  // Semblable s'intercale tout de suite — economatForce prend la prochaine
+  // salle quoi qu'il arrive), l'ALCÔVE DE REPOS pose son choix dans la
+  // cérémonie même. Dans les deux cas, la carte se rouvre ensuite.
+  if (m?.type === 'economat') {
+    economatForce = true
+    fermeMiseEnBonbonne()
+    avanceSalle()
+    return
+  }
+  if (m?.type === 'repos') {
+    mbMontreRepos(m)
+    return
+  }
   if (moduleFini(carte, carteRun)) {
     mbMontreCarte('suite')
     return
@@ -13169,6 +13201,51 @@ function entreModuleRun(id: string): void {
   mbScene.classList.remove('mb-large')
   mbCartes() // ôte mb-station : la grille des vignettes reprend ses colonnes
   mbMontreSallesDuModule()
+}
+
+/** L'ALCÔVE DE REPOS : trois offres, une seule se prend — un second
+ *  souffle (une vie), de la réserve (la bonbonne), du condensat (la
+ *  bourse). Le choix se juge sur ce qu'on possède : une offre qui ne
+ *  donnerait rien reste visible mais grisée. Puis la carte se rouvre. */
+function mbMontreRepos(m: ModuleCarte): void {
+  mbEtape = 'repos'
+  mbScene.classList.remove('mb-large')
+  mbQuestion('UNE HALTE — UNE SEULE OFFRE')
+  mbEl('mb-choix-titre').textContent = `${m.nom} — ${carte.types[m.type]} : PRENEZ UNE OFFRE, PUIS LA CARTE SE ROUVRE`
+  mbEl('mb-etal').hidden = true
+  mbEl('mb-passer').hidden = true
+  const host = mbCartes()
+  host.innerHTML = ''
+  host.classList.add('mb-trio')
+  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  const offres = offresRepos({
+    vies: run.vies,
+    viesMax: VIES_MAX,
+    bonbonne: run.bonbonneLiters,
+    cap: capBonbonne(),
+  })
+  let elu = false
+  offres.forEach((o, i) => {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'mb-carte mb-repos' + (o.possible ? '' : ' mb-pauvre')
+    btn.disabled = !o.possible
+    btn.style.setProperty('--i', String(i))
+    btn.innerHTML = `<i class="mb-repos-icone">${o.icone}</i><b>${esc(o.nom)}</b><small>${esc(o.detail)}</small>`
+    btn.addEventListener('click', () => {
+      if (elu) return
+      elu = true
+      if (o.id === 'souffle') run.vies = Math.min(VIES_MAX, run.vies + 1)
+      else if (o.id === 'reserve')
+        run.bonbonneLiters = Math.min(capBonbonne(), run.bonbonneLiters + REPOS_RESERVE_L)
+      else gagneCondensat(REPOS_CONDENSAT_CL)
+      majBoutonsRun()
+      sauveRun() // la halte prise s'écrit : une reprise ne la rejoue pas
+      bande.ponctuation('sting-record', 0.6)
+      mbMontreCarte('suite')
+    })
+    host.appendChild(btn)
+  })
 }
 
 /** Une carte du choix de la voie. */

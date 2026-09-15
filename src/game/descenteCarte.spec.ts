@@ -3,6 +3,7 @@ import { CARTE_LIVREE, cloneCarte, plusCourtVers } from './carteStation'
 import {
   choixModules,
   climatDuModule,
+  offresRepos,
   departCarte,
   difficulteSousCran,
   postureDuModule,
@@ -200,5 +201,23 @@ describe('climatDuModule — la température fait le climat des dangers', () => 
     // chaufferie et la cache sud au chaud, les conduits en auto
     expect(c.modules.filter((m) => climatDuModule(m) === 1).map((m) => m.id)).toEqual(['T1', 'S1', 'S1b'])
     expect(c.modules.filter((m) => climatDuModule(m) === 2).map((m) => m.id)).toEqual(['T3', 'S3', 'S3b'])
+  })
+})
+
+describe('offresRepos — l’alcôve, une seule offre', () => {
+  it('trois offres, dans l’ordre souffle · réserve · condensat, toutes possibles quand il y a de la place', () => {
+    const o = offresRepos({ vies: 1, viesMax: 3, bonbonne: 0.2, cap: 2 })
+    expect(o.map((x) => `${x.id}:${x.possible}`)).toEqual(['souffle:true', 'reserve:true', 'condensat:true'])
+    expect(o[1].detail).toBe('+0,5 L en bonbonne')
+    expect(o[2].detail).toBe('+40 cL dans la bourse')
+  })
+
+  it('une offre qui ne donnerait rien reste visible mais impossible, et le dit', () => {
+    const o = offresRepos({ vies: 3, viesMax: 3, bonbonne: 2, cap: 2 })
+    expect(o[0].possible).toBe(false)
+    expect(o[0].detail).toBe('échantillons au plafond')
+    expect(o[1].possible).toBe(false)
+    expect(o[1].detail).toBe('bonbonne pleine')
+    expect(o[2].possible).toBe(true) // la bourse n'a pas de plafond
   })
 })

@@ -231,3 +231,55 @@ export function climatDuModule(m: ModuleCarte | undefined): OptionsGen['climat']
   if (!m) return 0
   return m.temp < 10 ? 1 : m.temp >= 45 ? 2 : 0
 }
+
+// ---- L'ALCÔVE DE REPOS -----------------------------------------------------
+// Une halte de la carte, un choix — comme le feu de camp de Slay the Spire
+// oppose soigner et améliorer. Trois offres, une seule se prend : le
+// souffle (une vie, la survie), la réserve (la bonbonne, la livraison), le
+// condensat (la bourse, l'achat). Puis la carte se rouvre.
+
+export const REPOS_RESERVE_L = 0.5
+export const REPOS_CONDENSAT_CL = 40
+
+export interface OffreRepos {
+  id: 'souffle' | 'reserve' | 'condensat'
+  nom: string
+  detail: string
+  icone: string
+  /** false : l'offre ne peut rien donner (vies au plafond, bonbonne pleine) */
+  possible: boolean
+}
+
+/** Les trois offres de l'alcôve, jugées sur ce que la run possède : une
+ *  offre qui ne donnerait rien se montre grisée — le choix reste lisible,
+ *  il ne ment pas. */
+export function offresRepos(run: {
+  vies: number
+  viesMax: number
+  bonbonne: number
+  cap: number
+}): OffreRepos[] {
+  return [
+    {
+      id: 'souffle',
+      nom: 'SECOND SOUFFLE',
+      detail: run.vies < run.viesMax ? '+1 échantillon de secours' : 'échantillons au plafond',
+      icone: '💠',
+      possible: run.vies < run.viesMax,
+    },
+    {
+      id: 'reserve',
+      nom: 'RÉSERVE',
+      detail: run.bonbonne < run.cap ? `+${REPOS_RESERVE_L.toFixed(1).replace('.', ',')} L en bonbonne` : 'bonbonne pleine',
+      icone: '🫙',
+      possible: run.bonbonne < run.cap,
+    },
+    {
+      id: 'condensat',
+      nom: 'CONDENSAT',
+      detail: `+${REPOS_CONDENSAT_CL} cL dans la bourse`,
+      icone: '💧',
+      possible: true,
+    },
+  ]
+}
