@@ -400,7 +400,7 @@ function module(c: CarteStation, m: ModuleCarte, k: number, o: OptionsDessin): s
   // joueur pèse la route en voyant la marque, comme l'élite d'un Slay the
   // Spire — plus dur, plus généreux
   if (m.cran > 0)
-    s += `<text class="cs-cran" x="${n1(l + 14)}" y="${n1(t + 12)}" fill="${P.chaud}">+${m.cran}</text>`
+    s += `<text class="cs-cran" x="${n1(l + m.w - 16)}" y="${n1(t + m.h - 14)}" fill="${P.chaud}">+${m.cran}</text>`
 
   // l'étiquette : le nom sous le fût, puis la température
   const etiquette = !jonction || sel || estCourant || edition

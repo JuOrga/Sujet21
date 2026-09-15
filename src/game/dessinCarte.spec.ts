@@ -18,11 +18,13 @@ describe('dessinCarteSVG — le plan, depuis les données', () => {
   it('dessine chaque module et chaque coursive, dans un seul SVG', () => {
     const svg = dessinCarteSVG(CARTE_LIVREE, base)
     expect(svg.startsWith('<svg')).toBe(true)
-    expect(svg).toContain('viewBox="0 0 1600 804"')
-    expect(compte(svg, /class="cs-mod /g)).toBe(11)
+    expect(svg).toContain('viewBox="0 0 1800 804"')
+    expect(compte(svg, /class="cs-mod /g)).toBe(13)
+    // le cran se marque sur les deux secteurs du bord, et nulle part ailleurs
+    expect(compte(svg, /class="cs-cran"/g)).toBe(2)
     // la ligne de route colorée : une par coursive (les prises en plus en édition)
-    expect(compte(svg, /class="cs-route[ "]/g)).toBe(12)
-    expect(compte(svg, /class="cs-lien-prise"/g)).toBe(12)
+    expect(compte(svg, /class="cs-route[ "]/g)).toBe(19)
+    expect(compte(svg, /class="cs-lien-prise"/g)).toBe(19)
   })
 
   it('reprend la maquette : octogone 22/78/28/72, rond pour la jonction, dôme pour le terminal', () => {
@@ -37,7 +39,7 @@ describe('dessinCarteSVG — le plan, depuis les données', () => {
     expect(svg).toContain('❄ GLACE')
     expect(svg).toContain('💨 GAZ')
     // paroi, sol, anneaux « 4 44 » — pour les 12 coursives
-    expect(compte(svg, /stroke-dasharray="4 44"/g)).toBe(12)
+    expect(compte(svg, /stroke-dasharray="4 44"/g)).toBe(19)
   })
 
   it('applique la règle du hub au tracé (sortie bornée à ±110)', () => {
@@ -73,7 +75,7 @@ describe('dessinCarteSVG — le plan, depuis les données', () => {
   it('le mode éditeur ajoute grille, flèches de sens et poignées du module choisi', () => {
     const svg = dessinCarteSVG(CARTE_LIVREE, { ...base, selection: 'T2' })
     expect(svg).toContain('id="cs-grille"')
-    expect(compte(svg, /class="cs-sens"/g)).toBe(12)
+    expect(compte(svg, /class="cs-sens"/g)).toBe(19)
     expect(compte(svg, /data-poignee="/g)).toBe(4)
     const jeu = dessinCarteSVG(CARTE_LIVREE, { ...base, mode: 'jeu', courant: 'HUB' })
     expect(jeu).not.toContain('cs-grille')
@@ -88,7 +90,7 @@ describe('dessinCarteSVG — le plan, depuis les données', () => {
     const svg = dessinCarteSVG(CARTE_LIVREE, base)
     expect(svg).toContain('data-decor="arc"')
     expect(svg).toContain('data-decor="telescope"')
-    expect(svg).toContain('translate(1222 426) rotate(-33)')
+    expect(svg).toContain('translate(1422 426) rotate(-33)')
     const sans = cloneCarte(CARTE_LIVREE)
     sans.decor = []
     expect(dessinCarteSVG(sans, base)).not.toContain('data-decor')

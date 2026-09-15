@@ -38,10 +38,10 @@ describe('carteStation.json — la source de vérité', () => {
     expect(carte).not.toBeNull()
   })
 
-  it('est la carte du concepteur : 11 modules, 12 coursives, 4 zones', () => {
-    expect(CARTE_LIVREE.modules).toHaveLength(11)
-    expect(CARTE_LIVREE.liens).toHaveLength(12)
-    expect(CARTE_LIVREE.zones).toHaveLength(4)
+  it('est la carte à routes : 13 modules, 19 coursives, 5 zones', () => {
+    expect(CARTE_LIVREE.modules).toHaveLength(13)
+    expect(CARTE_LIVREE.liens).toHaveLength(19)
+    expect(CARTE_LIVREE.zones).toHaveLength(5)
     expect(CARTE_LIVREE.regles.depart).toBe('HUB')
     expect(CARTE_LIVREE.regles.objectif).toBe('OBS')
   })
@@ -204,18 +204,23 @@ describe('biomesDeCarte — la liste que la planche et l’éditeur proposent', 
 })
 
 describe('un module est un biome — niveaux et trajet', () => {
-  it('la carte livrée compte ses niveaux : 9 salles au plus court, 12 au plus long', () => {
-    // HUB(0) → T2(3) → N(0) → S2(3) → OBS(3) = 9 ; les caches sont des culs-de-sac, hors trajet
-    expect(longueursTrajet(CARTE_LIVREE)).toEqual({ min: 9, max: 9 })
+  it('la carte livrée compte ses niveaux : 9 salles au plus court, 10 par une cache', () => {
+    // HUB(0) → T2(3) → N(0) → S2(3) → ECO(0) → OBS(3) = 9 ; par une cache
+    // (1 salle), 10 : l'orbe se paie d'une salle, jamais d'un cul-de-sac
+    expect(longueursTrajet(CARTE_LIVREE)).toEqual({ min: 9, max: 10 })
     const c = cloneCarte(CARTE_LIVREE)
-    c.liens.push({ de: 'S1b', vers: 'OBS', type: 'alt' })
-    // HUB → T1(3) → N → S1(3) → S1b(1) → OBS(3) = 10
-    expect(longueursTrajet(c)).toEqual({ min: 9, max: 10 })
+    c.modules[8].niveaux = 0 // la cache nord devient une halte
+    c.modules[11].niveaux = 0
+    expect(longueursTrajet(c)).toEqual({ min: 9, max: 9 })
   })
 
   it('un module d’où l’objectif est hors de portée se signale — le joueur reviendra sur ses pas', () => {
-    const v = verifieCarte(CARTE_LIVREE).filter((x) => x.message.includes('hors de portée'))
-    expect(v.map((x) => x.module).sort()).toEqual(['S1', 'S1b', 'S3', 'S3b'])
+    // la carte livrée n'a plus de cul-de-sac : chaque cache mène à l'observatoire
+    expect(verifieCarte(CARTE_LIVREE).some((x) => x.message.includes('hors de portée'))).toBe(false)
+    const c = cloneCarte(CARTE_LIVREE)
+    c.liens = c.liens.filter((l) => !(l.de === 'S1b' && l.vers === 'OBS'))
+    const v = verifieCarte(c).filter((x) => x.message.includes('hors de portée'))
+    expect(v.map((x) => x.module)).toEqual(['S1b'])
     expect(v.every((x) => x.niveau === 'attention')).toBe(true)
   })
 
@@ -289,14 +294,26 @@ describe('couleurTemperature — l’échelle par seuils', () => {
 })
 
 describe('les routes', () => {
-  it('depuis le HUB, trois coursives ; depuis un cul-de-sac, aucune', () => {
+  it('depuis le HUB, trois coursives ; depuis une cache, la route continue', () => {
     expect(liensDepuis(CARTE_LIVREE, 'HUB').map((l) => l.vers)).toEqual(['T1', 'T2', 'T3'])
-    expect(liensDepuis(CARTE_LIVREE, 'S1b')).toEqual([])
+    expect(liensDepuis(CARTE_LIVREE, 'S1b').map((l) => l.vers)).toEqual(['OBS'])
   })
 
   it('tout est atteignable depuis le départ', () => {
     const vus = accessibles(CARTE_LIVREE, 'HUB')
-    expect(vus.size).toBe(11)
+    expect(vus.size).toBe(13)
+  })
+
+  it('les trois secteurs sont à distance égale de l’observatoire, une halte différente sur chaque route', () => {
+    // le contrat du §9.3 : sortir hors protocole ne raccourcit pas le
+    // parcours, il le déplace — trois secteurs, six salles chacun jusqu'au bout
+    for (const s of ['S1', 'S2', 'S3']) expect(plusCourtVers(CARTE_LIVREE, s, 'OBS')).toBe(3)
+    expect(liensDepuis(CARTE_LIVREE, 'S1').map((l) => l.vers)).toEqual(['S1b', 'ECO'])
+    expect(liensDepuis(CARTE_LIVREE, 'S2').map((l) => l.vers)).toEqual(['ECO', 'REP'])
+    expect(liensDepuis(CARTE_LIVREE, 'S3').map((l) => l.vers)).toEqual(['REP', 'S3b'])
+    // les haltes n'ont pas de salle ; les secteurs du bord portent le cran
+    expect(CARTE_LIVREE.modules.filter(estHalte).map((m) => `${m.id}:${m.niveaux}`)).toEqual(['ECO:0', 'REP:0'])
+    expect(CARTE_LIVREE.modules.filter((m) => m.cran > 0).map((m) => m.id)).toEqual(['S1', 'S3'])
   })
 })
 

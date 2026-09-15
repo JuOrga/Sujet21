@@ -1,9 +1,11 @@
 # La carte de la station — données, dessin, éditeur
 
-> Le plan à routes ramifiées du §9 du document fonctionnel, tel que le
-> concepteur l'a dessiné (handoff « Carte de la station », septembre 2026,
-> copié dans `docs/carte-station/`). Onze modules, douze coursives, quatre
-> zones, des conditions d'accès selon l'état du sujet (eau · glace · vapeur).
+> Le plan à routes ramifiées du §9 du document fonctionnel, parti du dessin
+> du concepteur (handoff « Carte de la station », septembre 2026, copié dans
+> `docs/carte-station/`) et refait le 15/09 pour que les routes se
+> distinguent (voir « Les routes »). Treize modules, dix-neuf coursives,
+> cinq zones, des conditions d'accès selon l'état du sujet (eau · glace ·
+> vapeur), deux haltes et deux secteurs sous confinement supérieur.
 
 ## Où sont les choses
 
@@ -78,14 +80,21 @@ dépôt (annulable).
 - `scene` : la taille de la scène (1600 × 804), le repère de tout le reste.
 - `zones[]` : `id`, `code` (« Z-02 »), `nom`, `couleur`.
 - `types` : le libellé de chaque nature de module — `sas`, `jonction`,
-  `combat`, `enigme`, `coffre`, `boss`.
+  `combat`, `enigme`, `coffre`, `boss`, et les deux HALTES sans salle,
+  `economat` (la salle du Semblable, intercalée à l'entrée) et `repos` (un
+  choix, puis la carte se rouvre). Une carte d'avant les haltes ne les
+  nomme pas : la lecture leur donne un libellé par défaut.
 - `modules[]` : `id`, `nom`, `type`, `zone`, `x`, `y` (**le centre**),
   `w`, `h`, `temp` (°C), `forme` (`octogone` | `rond` | `octogone-dome`),
   `niveaux` (**un module est un biome** : le nombre de salles qu'on y joue
   avant que la carte ne s'ouvre à nouveau ; 0 pour un lieu sans salle,
   hub ou nœud), `biome` (le code du biome dans la nomenclature atelier,
   la pioche ne tirera que des tableaux qui le portent), `orbe` (optionnel :
-  l'orbe que le module recèle — une cache), `desc`.
+  l'orbe que le module recèle — une cache), `cran` (optionnel, 0 à 3 : le
+  **confinement supérieur** du §9.3, « plus difficile, plus généreux » —
+  chaque cran monte la difficulté des salles du module d'un cran de rampe
+  et multiplie la mémoire gravée à leur sas ; le dessin le marque « +1 »
+  au coin du fût), `desc`.
 - `liens[]` : `de`, `vers`, `type`. **Orientés** : le joueur avance de
   `de` vers `vers`. Une clé de `typesLiens`.
 - `typesLiens` : par type, `couleur`, `epaisseur` (la ligne de route),
@@ -121,6 +130,36 @@ conséquence de la carte : sur la carte livrée, 9 niveaux.
 y = clamp(cible.y, HUB.y − 110, HUB.y + 110) ». Le 110 est h/2 − 36 pour
 un fût de 292 : `traceLien` l'applique à tout module plus haut que large,
 à chaque bout. Un second hub se comportera comme le premier.
+
+## Les routes (15/09/2026)
+
+Le plan du 03/09 n'avait qu'une route réelle (seul S2 menait à
+l'observatoire ; S1 et S3 étaient des détours vers une cache, puis
+retour) et rien ne distinguait un module d'un autre en jeu : la nature
+n'était qu'un glyphe, la température qu'un chiffre. Le plan refait
+emprunte à Slay the Spire ce qui fait la matière d'un choix de route :
+
+```
+HUB ─glace─ T1 ─┐        ┌─ S1 CRYOSTAT (+1) ──┬─ S1b CACHE NORD ─┐
+HUB ─main── T2 ─┼─ N ────┼─ S2 CONDUITS ───────┼─ ECO ÉCONOMAT ───┼─ OBS
+HUB ─vapeur T3 ─┘        └─ S3 CHAUFFERIE (+1) ┴─ REP ALCÔVE ─────┘
+                                                └─ S3b CACHE SUD ─┘
+```
+
+- **Trois secteurs à distance égale** de l'observatoire depuis le nœud
+  (le contrat du §9.3 : sortir hors protocole ne raccourcit pas le
+  parcours, il le déplace). Dix-huit routes simples, 9 salles chacune —
+  10 par une cache : l'orbe se paie d'une salle, jamais d'un cul-de-sac.
+- **Les secteurs du bord portent le cran** (S1 froid, S3 chaud : le
+  confinement supérieur, plus dur et plus généreux) ; le secteur du
+  milieu est la voie sûre.
+- **Une halte différente sur chaque route.** S1 mène à la cache nord ou
+  à l'économat ; S2 à l'économat ou à l'alcôve de repos ; S3 à l'alcôve ou
+  à la cache sud. Les coursives se croisent comme les voies d'un acte de
+  Slay the Spire : on choisit la halte autant que le secteur.
+- **La scène passe à 1800 de large** pour loger la colonne des haltes
+  sans toucher aux fûts du concepteur ; l'observatoire et le télescope
+  glissent de 200 vers la droite.
 
 ## La conception retenue (concepteur, 03/09/2026)
 

@@ -1,6 +1,6 @@
 {
   "scene": {
-    "width": 1600,
+    "width": 1800,
     "height": 804
   },
   "zones": [
@@ -19,7 +19,7 @@
     {
       "id": 2,
       "code": "Z-03",
-      "nom": "Nœud",
+      "nom": "Secteurs",
       "couleur": "#a7ddf5"
     },
     {
@@ -27,6 +27,12 @@
       "code": "Z-04",
       "nom": "Observatoire",
       "couleur": "#c99aff"
+    },
+    {
+      "id": 4,
+      "code": "Z-05",
+      "nom": "Haltes",
+      "couleur": "#f2c98e"
     }
   ],
   "types": {
@@ -68,7 +74,7 @@
       "forme": "octogone",
       "niveaux": 3,
       "biome": "T1",
-      "desc": "Ne s’ouvre qu’avec l’orbe de solidification."
+      "desc": "Ne s’ouvre qu’avec l’orbe de solidification. Les faisceaux gardent les passages ; le froid, lui, vient de la coque."
     },
     {
       "id": "T2",
@@ -83,7 +89,7 @@
       "forme": "octogone",
       "niveaux": 3,
       "biome": "T2",
-      "desc": "Voie libre."
+      "desc": "Voie libre. Les dangers y sont fréquents, sans énigme à lire."
     },
     {
       "id": "T3",
@@ -98,11 +104,11 @@
       "forme": "octogone",
       "niveaux": 3,
       "biome": "T3",
-      "desc": "Ne s’ouvre qu’avec l’orbe de vaporisation."
+      "desc": "Ne s’ouvre qu’avec l’orbe de vaporisation. Chaudières à chaque bord."
     },
     {
       "id": "N",
-      "nom": "NŒUD ?",
+      "nom": "NŒUD",
       "type": "jonction",
       "zone": 2,
       "x": 666,
@@ -113,11 +119,11 @@
       "forme": "rond",
       "niveaux": 0,
       "biome": "",
-      "desc": "Les trois voies convergent."
+      "desc": "Les trois voies convergent — et trois secteurs s’ouvrent, à distance égale de l’observatoire."
     },
     {
       "id": "S1",
-      "nom": "MODULE ?",
+      "nom": "CRYOSTAT",
       "type": "combat",
       "zone": 2,
       "x": 801,
@@ -128,11 +134,12 @@
       "forme": "octogone",
       "niveaux": 3,
       "biome": "S1",
-      "desc": "À définir."
+      "cran": 1,
+      "desc": "Confinement supérieur : plus dur d’un cran, la mémoire y vaut double. Le froid mord depuis la coque."
     },
     {
       "id": "S2",
-      "nom": "MODULE ?",
+      "nom": "CONDUITS",
       "type": "combat",
       "zone": 2,
       "x": 801,
@@ -143,61 +150,92 @@
       "forme": "octogone",
       "niveaux": 3,
       "biome": "S2",
-      "desc": "À définir."
+      "desc": "La voie sûre : ni prime, ni piège. Elle mène à l’économat comme à l’alcôve."
     },
     {
       "id": "S3",
-      "nom": "MODULE ?",
-      "type": "combat",
+      "nom": "CHAUFFERIE",
+      "type": "enigme",
       "zone": 2,
       "x": 801,
       "y": 525,
       "w": 100,
       "h": 100,
-      "temp": 50,
+      "temp": 55,
       "forme": "octogone",
       "niveaux": 3,
       "biome": "S3",
-      "desc": "À définir."
+      "cran": 1,
+      "desc": "Confinement supérieur : les faisceaux gardent chaque passage, la mémoire y vaut double. Les chaudières tournent."
     },
     {
       "id": "S1b",
-      "nom": "MODULE ?",
+      "nom": "CACHE NORD",
       "type": "coffre",
-      "zone": 2,
-      "x": 1032,
-      "y": 131,
-      "w": 92,
-      "h": 92,
+      "zone": 4,
+      "x": 1000,
+      "y": 130,
+      "w": 84,
+      "h": 84,
       "temp": -10,
       "forme": "octogone",
       "niveaux": 1,
       "biome": "S1b",
       "orbe": "sublimation",
-      "desc": "Cul-de-sac. Un orbe d’essence y dort."
+      "desc": "Une salle de plus, et un orbe d’essence qui y dort. Puis l’observatoire."
+    },
+    {
+      "id": "ECO",
+      "nom": "ÉCONOMAT",
+      "type": "economat",
+      "zone": 4,
+      "x": 1000,
+      "y": 300,
+      "w": 84,
+      "h": 84,
+      "temp": 22,
+      "forme": "octogone",
+      "niveaux": 0,
+      "biome": "",
+      "desc": "Le Semblable troque contre du condensat. Une halte sans salle, puis l’observatoire."
+    },
+    {
+      "id": "REP",
+      "nom": "ALCÔVE",
+      "type": "repos",
+      "zone": 4,
+      "x": 1000,
+      "y": 470,
+      "w": 84,
+      "h": 84,
+      "temp": 20,
+      "forme": "octogone",
+      "niveaux": 0,
+      "biome": "",
+      "desc": "Une halte : un second souffle, de la réserve ou du condensat — un seul des trois. Puis l’observatoire."
     },
     {
       "id": "S3b",
-      "nom": "MODULE ?",
+      "nom": "CACHE SUD",
       "type": "coffre",
-      "zone": 2,
-      "x": 1032,
-      "y": 643,
-      "w": 92,
-      "h": 92,
+      "zone": 4,
+      "x": 1000,
+      "y": 640,
+      "w": 84,
+      "h": 84,
       "temp": 60,
       "forme": "octogone",
       "niveaux": 1,
       "biome": "S3b",
       "orbe": "condensation",
-      "desc": "Cul-de-sac. Un orbe d’essence y dort."
+      "desc": "Une salle de plus, et un orbe d’essence qui y dort. Puis l’observatoire."
     },
     {
       "id": "OBS",
       "nom": "OBSERVATOIRE",
       "type": "boss",
       "zone": 3,
-      "x": 1028,
+      "x": 1228,
       "y": 385,
       "w": 166,
       "h": 166,
@@ -260,14 +298,49 @@
       "type": "alt"
     },
     {
+      "de": "S1",
+      "vers": "ECO",
+      "type": "alt"
+    },
+    {
+      "de": "S2",
+      "vers": "ECO",
+      "type": "main"
+    },
+    {
+      "de": "S2",
+      "vers": "REP",
+      "type": "alt"
+    },
+    {
+      "de": "S3",
+      "vers": "REP",
+      "type": "alt"
+    },
+    {
       "de": "S3",
       "vers": "S3b",
       "type": "alt"
     },
     {
-      "de": "S2",
+      "de": "S1b",
+      "vers": "OBS",
+      "type": "alt"
+    },
+    {
+      "de": "ECO",
       "vers": "OBS",
       "type": "main"
+    },
+    {
+      "de": "REP",
+      "vers": "OBS",
+      "type": "alt"
+    },
+    {
+      "de": "S3b",
+      "vers": "OBS",
+      "type": "alt"
     }
   ],
   "typesLiens": {
@@ -311,10 +384,10 @@
       "id": "telescope",
       "type": "telescope-hubble",
       "ancrage": "OBS",
-      "x": 1222,
+      "x": 1422,
       "y": 426,
       "rotation": -33,
-      "tube": "M1105 385 H1160 C 1196 385, 1196 426, 1226 426"
+      "tube": "M1305 385 H1360 C 1396 385, 1396 426, 1426 426"
     }
   ],
   "palette": {

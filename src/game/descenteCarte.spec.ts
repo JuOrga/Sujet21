@@ -13,6 +13,11 @@ import {
 } from './descenteCarte'
 
 const c = CARTE_LIVREE
+// LA CARTE AVEC UN CUL-DE-SAC : la carte livrée n'en a plus (chaque cache
+// mène à l'observatoire), mais une carte de l'éditeur peut en avoir — le
+// retour sur ses pas reste une règle du jeu, et se teste sur celle-ci
+const sansSuite = cloneCarte(CARTE_LIVREE)
+sansSuite.liens = sansSuite.liens.filter((l) => !(l.de === 'S1b' && l.vers === 'OBS'))
 
 describe('plusCourtVers — le plus court chemin en niveaux', () => {
   it('du HUB à l’observatoire : 9 salles (T2 3, N 0, S2 3, OBS 3)', () => {
@@ -22,7 +27,8 @@ describe('plusCourtVers — le plus court chemin en niveaux', () => {
     expect(plusCourtVers(c, 'OBS', 'OBS')).toBe(0)
   })
   it('un cul-de-sac ne mène nulle part ; un module inconnu non plus', () => {
-    expect(plusCourtVers(c, 'S1b', 'OBS')).toBeNull()
+    expect(plusCourtVers(c, 'S1b', 'OBS')).toBe(3) // la cache livrée continue
+    expect(plusCourtVers(sansSuite, 'S1b', 'OBS')).toBeNull()
     expect(plusCourtVers(c, 'X', 'OBS')).toBeNull()
   })
 })
@@ -55,21 +61,19 @@ describe('la descente sur la carte', () => {
   })
 
   it('une cache n’est pas un piège : quand l’objectif est hors de portée, on revient sur ses pas', () => {
-    // HUB → T1 → N → S1 → S1b : de la cache, rien ne repart — sauf le retour
+    // HUB → T1 → N → S1 → S1b, sur la carte au cul-de-sac : de la cache,
+    // rien ne repart — sauf le retour
     const e = { module: 'S1b', niveau: 1, visites: ['HUB', 'T1', 'N', 'S1'] }
-    const choix = choixModules(c, e, [])
+    const choix = choixModules(sansSuite, e, [])
     expect(choix.map((x) => `${x.module.id}:${x.retour ? 'retour' : x.lien.type}`)).toEqual(['S1:retour'])
-    const r = entreModule(c, e, 'S1', [])!
+    const r = entreModule(sansSuite, e, 'S1', [])!
     // S1 est déjà épuisé : la carte se rouvre sans rejouer ses salles
     expect(r).toEqual({ module: 'S1', niveau: 3, visites: ['HUB', 'T1', 'N', 'S1', 'S1b'] })
-    // de S1, l'objectif reste hors de portée (S1 ne mène qu'à S1b) : retour
-    // vers N — le module d'où l'on VIENT, pas le dernier traversé (la cache)
-    const c2 = choixModules(c, r, [])
-    expect(c2.map((x) => `${x.module.id}:${x.retour ? 'retour' : x.lien.type}`)).toEqual(['S1b:alt', 'N:retour'])
-    const n = entreModule(c, r, 'N', [])!
-    // de N, l'objectif est atteignable : aucun retour offert
-    expect(choixModules(c, n, []).some((x) => x.retour)).toBe(false)
-    expect(choixModules(c, n, []).map((x) => x.module.id)).toEqual(['S1', 'S2', 'S3'])
+    // de S1, l'objectif est atteignable par l'économat : aucun retour offert
+    const c2 = choixModules(sansSuite, r, [])
+    expect(c2.map((x) => `${x.module.id}:${x.retour ? 'retour' : x.lien.type}`)).toEqual(['S1b:alt', 'ECO:alt'])
+    // sur la carte livrée, la cache continue : la coursive vers l'observatoire
+    expect(choixModules(c, e, []).map((x) => `${x.module.id}:${x.retour ? 'retour' : x.lien.type}`)).toEqual(['OBS:alt'])
   })
 
   it('un module se finit salle par salle ; l’objectif s’atteint au bout du sien', () => {
@@ -82,11 +86,13 @@ describe('la descente sur la carte', () => {
     e = entreModule(c, e, 'N', [])!
     expect(moduleFini(c, e)).toBe(true) // le nœud n'a pas de salle
     e = entreModule(c, e, 'S2', [])!
-    e = entreModule(c, franchitSalle(franchitSalle(franchitSalle(e))), 'OBS', [])!
+    e = entreModule(c, franchitSalle(franchitSalle(franchitSalle(e))), 'ECO', [])!
+    expect(moduleFini(c, e)).toBe(true) // une halte n'a pas de salle
+    e = entreModule(c, e, 'OBS', [])!
     expect(objectifAtteint(c, e)).toBe(false)
     e = franchitSalle(franchitSalle(franchitSalle(e)))
     expect(objectifAtteint(c, e)).toBe(true)
-    expect(e.visites).toEqual(['HUB', 'T2', 'N', 'S2'])
+    expect(e.visites).toEqual(['HUB', 'T2', 'N', 'S2', 'ECO'])
   })
 
   it('la longueur de la run découle du trajet et s’affine en route', () => {
@@ -96,10 +102,13 @@ describe('la descente sur la carte', () => {
     expect(longueurRun(c, e, 0)).toBe(9)
     e = franchitSalle(e)
     expect(longueurRun(c, e, 1)).toBe(9) // 1 franchie + 2 restantes + 6
-    // un détour par T1 (3) puis S1 (3) puis S1b (1) : l'objectif n'est plus
-    // atteignable — il ne reste que le module
+    // un détour par T1 (3) puis S1 (3) puis la cache S1b (1) : la salle de
+    // la cache s'ajoute, puis l'observatoire (3) — 10
     const d = { module: 'S1b', niveau: 0, visites: ['HUB', 'T1', 'N', 'S1'] }
-    expect(longueurRun(c, d, 6)).toBe(7)
+    expect(longueurRun(c, d, 6)).toBe(10)
+    // sur une carte au cul-de-sac, l'objectif n'est plus atteignable d'ici :
+    // il ne reste que le module
+    expect(longueurRun(sansSuite, d, 6)).toBe(7)
     // jamais plus petite que le rang
     expect(longueurRun(c, { module: 'OBS', niveau: 3, visites: [] }, 12)).toBe(12)
   })
