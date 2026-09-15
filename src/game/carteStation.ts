@@ -537,9 +537,13 @@ export function cheminLePlusCourt(c: CarteStation, de: string, vers: string): st
   const niv = new Map(c.modules.map((m) => [m.id, Math.max(0, m.niveaux)]))
   if (!niv.has(de) || !niv.has(vers)) return null
   if (de === vers) return [de]
-  // Dijkstra sur une dizaine de sommets : la file est une liste triée. À
-  // poids égal, l'ordre des coursives dans le JSON départage — la
-  // projection ne saute pas d'une route à l'autre entre deux survols.
+  // Dijkstra sur une dizaine de sommets : la file est une liste triée. Le
+  // poids est en salles ; à salles égales, la route qui porte le MOINS de
+  // confinement passe devant (le cran vaut une fraction de salle) — la
+  // projection montre la voie sûre, pas l'élite, quand les deux font le
+  // même compte ; à égalité parfaite, l'ordre des coursives du JSON.
+  const poids = (id: string): number =>
+    (niv.get(id) ?? 0) * 64 + Math.max(0, moduleParId(c, id)?.cran ?? 0)
   const dist = new Map<string, number>([[de, 0]])
   const avant = new Map<string, string>()
   const file: string[] = [de]
@@ -552,7 +556,7 @@ export function cheminLePlusCourt(c: CarteStation, de: string, vers: string): st
     if (id === vers) break
     for (const l of liensDepuis(c, id)) {
       if (!niv.has(l.vers)) continue
-      const d = (dist.get(id) ?? 0) + (niv.get(l.vers) ?? 0)
+      const d = (dist.get(id) ?? 0) + poids(l.vers)
       if (d < (dist.get(l.vers) ?? Infinity)) {
         dist.set(l.vers, d)
         avant.set(l.vers, id)

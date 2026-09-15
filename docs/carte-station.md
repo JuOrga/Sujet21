@@ -200,7 +200,11 @@ HUB ─vapeur T3 ─┘        └─ S3 CHAUFFERIE (+1) ┴─ REP ALCÔVE ─�
 - **Au sas de lancement**, la carte s'ouvre dans la cérémonie : le premier
   module se choisit sur le plan. Au bout des salles d'un module, elle se
   rouvre. Un module fermé dit l'orbe qui manque (et secoue la scène), un
-  module hors de portée dit qu'aucune coursive n'y mène. Le module élu
+  module hors de portée dit qu'aucune coursive n'y mène. **Survoler un
+  module joignable projette** la route la plus courte qui en part jusqu'à
+  l'objectif (`projectionDepuis`) : modules et coursives s'allument, la
+  fiche mesure — « par ici : 6 salles jusqu'à OBSERVATOIRE · ÉCONOMAT ·
+  confinement +1 sur la route ». Le module élu
   s'agrandit (la scène zoome sur lui), puis ses salles arrivent en
   vignettes — le choix habituel de la voie, titré du nom du module et de la
   salle dans le module. Un nœud (module sans salle) rouvre la carte aussitôt.

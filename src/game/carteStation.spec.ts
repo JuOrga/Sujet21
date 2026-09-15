@@ -247,6 +247,9 @@ describe('cheminLePlusCourt et routesVersObjectif — la matière des règles de
     expect(chemin[chemin.length - 1]).toBe('OBS')
     expect(longueurRoute(CARTE_LIVREE, chemin.slice(1))).toBe(plusCourtVers(CARTE_LIVREE, 'HUB', 'OBS'))
     expect(cheminLePlusCourt(CARTE_LIVREE, 'OBS', 'OBS')).toEqual(['OBS'])
+    // à salles égales, la voie sans confinement passe devant : depuis le
+    // nœud, CONDUITS plutôt que le CRYOSTAT, l'économat plutôt qu'une cache
+    expect(cheminLePlusCourt(CARTE_LIVREE, 'N', 'OBS')).toEqual(['N', 'S2', 'ECO', 'OBS'])
     expect(cheminLePlusCourt(CARTE_LIVREE, 'OBS', 'HUB')).toBeNull()
     expect(cheminLePlusCourt(CARTE_LIVREE, 'X', 'OBS')).toBeNull()
   })

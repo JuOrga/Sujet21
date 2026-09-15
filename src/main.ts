@@ -107,6 +107,8 @@ import {
   choixModules,
   climatDuModule,
   difficulteSousCran,
+  ditProjection,
+  projectionDepuis,
   offresRepos,
   REPOS_CONDENSAT_CL,
   REPOS_RESERVE_L,
@@ -13106,8 +13108,26 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
   const defaut = `${ouvertes} coursive${ouvertes > 1 ? 's' : ''} ouverte${ouvertes > 1 ? 's' : ''} · descente ${voieRang} / ${longueurRun()} salles`
   const litId = (e: Event): string | null =>
     (e.target as Element | null)?.closest?.('[data-mod]')?.getAttribute('data-mod') ?? null
+  // LE SURVOL QUI PROJETTE : la route la plus courte depuis le module visé
+  // jusqu'à l'objectif s'allume sur le plan — modules et coursives — et la
+  // fiche la mesure. Le SVG n'est pas rebâti : des classes basculent, comme
+  // sur l'écran LA STATION (rebâtir relancerait le halo et volerait le focus).
+  const projette = (id: string | null): void => {
+    for (const el of scene.querySelectorAll('.cs-projet')) el.classList.remove('cs-projet')
+    if (!id) return
+    const p = projectionDepuis(carte, id)
+    if (!p) return
+    p.chemin.forEach((m, i) => {
+      scene.querySelector(`[data-mod="${CSS.escape(m)}"]`)?.classList.add('cs-projet')
+      if (i === 0) return
+      const k = carte.liens.findIndex((l) => l.de === p.chemin[i - 1] && l.vers === m)
+      if (k >= 0) scene.querySelector(`.cs-route[data-lien="${k}"]`)?.classList.add('cs-projet')
+    })
+  }
   const dit = (id: string | null): void => {
     const mod = id ? moduleParId(carte, id) : undefined
+    const vise = mod && choix.some((c) => c.module.id === id) ? mod.id : null
+    projette(vise)
     if (!mod) {
       fiche.textContent = defaut
       return
@@ -13122,10 +13142,12 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
       : id === carteRun.module
         ? 'vous êtes ici'
         : 'aucune coursive n’y mène d’ici'
+    const projection = vise ? projectionDepuis(carte, vise) : null
     fiche.textContent =
       `${mod.nom} · ${carte.types[mod.type].toLowerCase()} · ${mod.niveaux > 0 ? `${mod.niveaux} salle${mod.niveaux > 1 ? 's' : ''}` : 'sans salle'}` +
       (mod.cran > 0 ? ` · confinement +${mod.cran}, mémoire ×${primeMemoire(mod)}` : '') +
-      ` · ${mod.temp}°C · ${acces}`
+      ` · ${mod.temp}°C · ${acces}` +
+      (projection ? ` — ${ditProjection(carte, projection)}` : '')
   }
   dit(null)
   scene.addEventListener('pointerover', (e) => dit(litId(e)))

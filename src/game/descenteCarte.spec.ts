@@ -3,7 +3,9 @@ import { CARTE_LIVREE, cloneCarte, plusCourtVers } from './carteStation'
 import {
   choixModules,
   climatDuModule,
+  ditProjection,
   offresRepos,
+  projectionDepuis,
   departCarte,
   difficulteSousCran,
   postureDuModule,
@@ -219,5 +221,30 @@ describe('offresRepos — l’alcôve, une seule offre', () => {
     expect(o[1].possible).toBe(false)
     expect(o[1].detail).toBe('bonbonne pleine')
     expect(o[2].possible).toBe(true) // la bourse n'a pas de plafond
+  })
+})
+
+describe('projectionDepuis — le survol qui projette', () => {
+  it('mesure la route la plus courte depuis un module : salles, arrêts, confinements', () => {
+    const p = projectionDepuis(c, 'S1')!
+    expect(p.chemin).toEqual(['S1', 'ECO', 'OBS'])
+    expect(p.salles).toBe(6) // S1 (3) + ECO (0) + OBS (3)
+    expect(p.arrets).toEqual(['ÉCONOMAT'])
+    expect(p.crans).toBe(1)
+    expect(ditProjection(c, p)).toBe('par ici : 6 salles jusqu’à OBSERVATOIRE · ÉCONOMAT · confinement +1 sur la route')
+    // depuis le nœud, la voie sûre par l'économat : aucun confinement
+    const n = projectionDepuis(c, 'N')!
+    expect(n.chemin).toEqual(['N', 'S2', 'ECO', 'OBS'])
+    expect(n.crans).toBe(0)
+    expect(ditProjection(c, n)).toBe('par ici : 6 salles jusqu’à OBSERVATOIRE · ÉCONOMAT')
+  })
+
+  it('une cache compte comme arrêt ; sans arrêt, la fiche le dit ; un cul-de-sac n’a pas de projection', () => {
+    const p = projectionDepuis(c, 'S1b')!
+    expect(p.arrets).toEqual(['CACHE NORD'])
+    expect(p.salles).toBe(4)
+    expect(ditProjection(c, projectionDepuis(c, 'OBS')!)).toBe('par ici : 3 salles jusqu’à OBSERVATOIRE · sans arrêt')
+    expect(projectionDepuis(sansSuite, 'S1b')).toBeNull()
+    expect(projectionDepuis(c, 'X')).toBeNull()
   })
 })

@@ -40,7 +40,11 @@ Des rails à champ qui convoient la vapeur et l'ionisent en plasma.
 **La boucle.** Le hub du laboratoire Méduse, le sas de lancement, la carte
 de la station à routes ramifiées (un module est un biome ; au bout de ses
 salles la carte s'ouvre et la coursive suivante se choisit, sous cadenas
-tant que l'orbe manque ; la longueur d'une run découle du trajet), la
+tant que l'orbe manque ; la longueur d'une run découle du trajet ; trois
+secteurs à distance égale de l'objectif, les haltes — économat, alcôve de
+repos — et les caches placées une par route, le confinement supérieur qui
+paie double, la nature et la température du module qui font la salle, le
+survol qui projette la route jusqu'à l'observatoire), la
 descente semi-procédurale (rampe de difficulté réglable, graine du jour
 commune à tous les postes), le choix de la salle suivante en vignettes,
 les orbes d'essence de conscience (achetés au marchand du hub contre de la

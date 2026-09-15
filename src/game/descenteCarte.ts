@@ -20,6 +20,8 @@
 // transformation non tissée » — appliquée aux coursives.
 
 import {
+  cheminLePlusCourt,
+  estHalte,
   liensDepuis,
   moduleParId,
   orbeRequis,
@@ -282,4 +284,45 @@ export function offresRepos(run: {
       possible: true,
     },
   ]
+}
+
+// ---- LE SURVOL QUI PROJETTE ------------------------------------------------
+// Compter les étages avant le boss est le geste réflexe du joueur de Slay
+// the Spire. Ici, survoler un module projette la route la plus courte
+// qui en part jusqu'à l'objectif : combien de salles, quels arrêts, quels
+// confinements — la fiche le dit, le dessin l'allume.
+
+export interface ProjectionRoute {
+  /** la suite des modules, du module survolé à l'objectif */
+  chemin: string[]
+  /** les salles à jouer, module survolé compris */
+  salles: number
+  /** les arrêts sur la route (haltes et caches), par leur nom */
+  arrets: string[]
+  /** la somme des crans de confinement sur la route */
+  crans: number
+}
+
+/** La route la plus courte depuis un module jusqu'à l'objectif, mesurée.
+ *  Null : l'objectif est hors de portée d'ici (un cul-de-sac). */
+export function projectionDepuis(c: CarteStation, id: string): ProjectionRoute | null {
+  const chemin = cheminLePlusCourt(c, id, c.regles.objectif)
+  if (!chemin) return null
+  const modules = chemin.map((m) => moduleParId(c, m)).filter((m): m is ModuleCarte => !!m)
+  return {
+    chemin,
+    salles: modules.reduce((t, m) => t + Math.max(0, m.niveaux), 0),
+    arrets: modules.filter((m) => estHalte(m) || m.type === 'coffre').map((m) => m.nom),
+    crans: modules.reduce((t, m) => t + Math.max(0, m.cran), 0),
+  }
+}
+
+/** La projection en une ligne, pour la fiche de la carte. */
+export function ditProjection(c: CarteStation, p: ProjectionRoute): string {
+  const objectif = moduleParId(c, c.regles.objectif)?.nom ?? c.regles.objectif
+  return (
+    `par ici : ${p.salles} salle${p.salles > 1 ? 's' : ''} jusqu’à ${objectif}` +
+    (p.arrets.length ? ` · ${p.arrets.join(', ')}` : ' · sans arrêt') +
+    (p.crans > 0 ? ` · confinement +${p.crans} sur la route` : '')
+  )
 }
