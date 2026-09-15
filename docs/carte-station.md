@@ -1,9 +1,11 @@
 # La carte de la station — données, dessin, éditeur
 
-> Le plan à routes ramifiées du §9 du document fonctionnel, tel que le
-> concepteur l'a dessiné (handoff « Carte de la station », septembre 2026,
-> copié dans `docs/carte-station/`). Onze modules, douze coursives, quatre
-> zones, des conditions d'accès selon l'état du sujet (eau · glace · vapeur).
+> Le plan à routes ramifiées du §9 du document fonctionnel, parti du dessin
+> du concepteur (handoff « Carte de la station », septembre 2026, copié dans
+> `docs/carte-station/`) et refait le 15/09 pour que les routes se
+> distinguent (voir « Les routes »). Treize modules, dix-neuf coursives,
+> cinq zones, des conditions d'accès selon l'état du sujet (eau · glace ·
+> vapeur), deux haltes et deux secteurs sous confinement supérieur.
 
 ## Où sont les choses
 
@@ -49,7 +51,12 @@ coursive** (couleur, trait, coque, tirets, condition, badge).
 Le panneau de gauche liste modules et coursives, et la **vérification** :
 un identifiant en double, une coursive vers un module inconnu, un module
 que nul ne peut atteindre, un objectif hors de portée, deux modules qui se
-chevauchent. Cliquer un verdict sélectionne le fautif.
+chevauchent, une halte avec des salles. Puis **les règles de route**
+(`verifieRoutes`), celles que le générateur de carte de Slay the Spire
+garantit à chaque acte, en attentions : au moins deux routes vers
+l'objectif ; des routes à distance équivalente, à une salle près (§9.3) ;
+jamais deux confinements supérieurs d'affilée ; un arrêt (halte ou cache)
+sur chaque route. Cliquer un verdict sélectionne le fautif.
 
 **Aperçu jeu** rejoue le comportement voulu in-game : le sujet part du
 module de départ, seuls les modules au bout d'une coursive partant de sa
@@ -78,14 +85,27 @@ dépôt (annulable).
 - `scene` : la taille de la scène (1600 × 804), le repère de tout le reste.
 - `zones[]` : `id`, `code` (« Z-02 »), `nom`, `couleur`.
 - `types` : le libellé de chaque nature de module — `sas`, `jonction`,
-  `combat`, `enigme`, `coffre`, `boss`.
+  `combat`, `enigme`, `coffre`, `boss`, les trois HALTES sans salle,
+  `economat` (la salle du Semblable, intercalée à l'entrée), `repos` (un
+  choix, puis la carte se rouvre) et `don` (une bonbonne oubliée : on la
+  prend), et `inconnu`, le **module « ? »** dont la nature ne se révèle
+  qu'à l'entrée — économat, repos, don, cache, ou combat surchauffé (un
+  cran de plus que le module n'en porte), tirée à parts égales, la même
+  pour tous les postes un jour de descente du jour, gravée dans la
+  sauvegarde (`revelations`). Ses `niveaux` ne jouent que s'il se révèle
+  cache ou combat. Une carte d'avant ces natures ne les nomme pas : la
+  lecture leur donne un libellé par défaut.
 - `modules[]` : `id`, `nom`, `type`, `zone`, `x`, `y` (**le centre**),
   `w`, `h`, `temp` (°C), `forme` (`octogone` | `rond` | `octogone-dome`),
   `niveaux` (**un module est un biome** : le nombre de salles qu'on y joue
   avant que la carte ne s'ouvre à nouveau ; 0 pour un lieu sans salle,
   hub ou nœud), `biome` (le code du biome dans la nomenclature atelier,
   la pioche ne tirera que des tableaux qui le portent), `orbe` (optionnel :
-  l'orbe que le module recèle — une cache), `desc`.
+  l'orbe que le module recèle — une cache), `cran` (optionnel, 0 à 3 : le
+  **confinement supérieur** du §9.3, « plus difficile, plus généreux » —
+  chaque cran monte la difficulté des salles du module d'un cran de rampe
+  et multiplie la mémoire gravée à leur sas ; le dessin le marque « +1 »
+  au coin du fût), `desc`.
 - `liens[]` : `de`, `vers`, `type`. **Orientés** : le joueur avance de
   `de` vers `vers`. Une clé de `typesLiens`.
 - `typesLiens` : par type, `couleur`, `epaisseur` (la ligne de route),
@@ -122,6 +142,38 @@ y = clamp(cible.y, HUB.y − 110, HUB.y + 110) ». Le 110 est h/2 − 36 pour
 un fût de 292 : `traceLien` l'applique à tout module plus haut que large,
 à chaque bout. Un second hub se comportera comme le premier.
 
+## Les routes et les cinq biomes (15/09/2026)
+
+Le plan du 03/09 n'avait qu'une route réelle et trois salles par module.
+Le plan refait tient en **trois actes de six salles, une approche et un
+terminal** — cinq biomes, trente salles au plus court :
+
+```
+                 ACTE 1            halte        ACTE 2         halte         ACTE 3        halte
+HUB ─glace─ T1 TRANSFO GLACE ─┐  ┌ ÉCONOMAT ┐ ┌ C1 CRYOSTAT(+1) ┐ ┌ CACHE N ┐ ┌ P1 PUITS FROID(+1) ┐ ┌ ÉCONOMAT ┐
+HUB ─main── T2 AUCUNE TRANSFO ─┼N1┼ « ? »    ┼─┼ C2 CONDUITS     ┼─┼ BONBONNE ┼─┼ P2 SOUTES          ┼─┤          ├ ANTICHAMBRE ─ OBSERVATOIRE
+HUB ─vapeur T3 TRANSFO GAZ ───┘  └ ALCÔVE   ┘ └ C3 CHAUFFERIE(+1)┘ └ CACHE S ┘ └ P3 RÉACTEUR(+1)    ┘ └ ALCÔVE   ┘
+```
+
+- **Cinq biomes de six salles** sur la route la plus courte : les
+  transformateurs, les coursives, les profondeurs, l'antichambre et
+  l'observatoire — 30 salles, 31 par le « ? » (la seule halte qui porte
+  une salle). Quatre-vingt-seize routes simples, toutes à une salle près :
+  le contrat du §9.3 est tenu.
+- **Une colonne de haltes entre deux actes**, et chaque module d'acte
+  ouvre sur DEUX haltes voisines — jamais la même paire que son voisin :
+  on choisit la halte autant que le secteur, comme les voies d'un acte de
+  Slay the Spire.
+- **Quatre modules sous confinement supérieur** (cryostat, chaufferie,
+  puits froid, réacteur) : la route froide et la route chaude sont les
+  élites, la route du milieu est sûre.
+- **Les caches n'ont plus de salle** : on ouvre, on prend l'orbe, la carte
+  se rouvre — d'où `prendOrbeDuModule`, appelé à l'entrée d'une cache sans
+  salle autant qu'au sas de la dernière salle d'un module qui en a.
+- **La scène passe à 2500 × 804** pour loger dix colonnes ; l'arc de coque
+  ne bouge pas (le HUB reste à x = 263), l'observatoire et le télescope
+  glissent à droite.
+
 ## La conception retenue (concepteur, 03/09/2026)
 
 1. **Un module = un biome = un ensemble de niveaux.** Le nombre de salles
@@ -156,7 +208,11 @@ un fût de 292 : `traceLien` l'applique à tout module plus haut que large,
 - **Au sas de lancement**, la carte s'ouvre dans la cérémonie : le premier
   module se choisit sur le plan. Au bout des salles d'un module, elle se
   rouvre. Un module fermé dit l'orbe qui manque (et secoue la scène), un
-  module hors de portée dit qu'aucune coursive n'y mène. Le module élu
+  module hors de portée dit qu'aucune coursive n'y mène. **Survoler un
+  module joignable projette** la route la plus courte qui en part jusqu'à
+  l'objectif (`projectionDepuis`) : modules et coursives s'allument, la
+  fiche mesure — « par ici : 6 salles jusqu'à OBSERVATOIRE · ÉCONOMAT ·
+  confinement +1 sur la route ». Le module élu
   s'agrandit (la scène zoome sur lui), puis ses salles arrivent en
   vignettes — le choix habituel de la voie, titré du nom du module et de la
   salle dans le module. Un nœud (module sans salle) rouvre la carte aussitôt.
@@ -170,9 +226,65 @@ un fût de 292 : `traceLien` l'applique à tout module plus haut que large,
 - **Une cache n'est pas un piège.** D'un module d'où l'objectif est hors
   de portée (un cul-de-sac), la carte offre le **retour** vers le module
   d'où l'on vient — le dernier traversé qui y mène par une coursive, pas
-  la cache qu'on quitte. Au retour, le module est déjà épuisé : ses salles
-  ne se rejouent pas, la carte se rouvre aussitôt. La vérification de
-  l'éditeur signale chaque module d'où l'objectif est hors de portée.
+  la cache qu'on quitte. La vérification de l'éditeur signale chaque
+  module d'où l'objectif est hors de portée (la carte livrée n'en a plus).
+- **Un module traversé est épuisé pour la run**, au retour comme par une
+  coursive ordinaire : ses salles ne se rejouent pas (ni leur mémoire), la
+  carte se rouvre aussitôt.
+- **La nature du module commande la salle** (`postureDuModule`) : un
+  COMBAT place ses dangers en fréquents (sauf les premiers rangs sans
+  danger, la leçon du début) et n'a pas d'énigme au faisceau ; une ÉNIGME
+  n'a aucun danger et une énigme au faisceau ; une CACHE a toujours sa
+  cachette ; le terminal et les haltes laissent l'auto. **Le cran** monte
+  la difficulté du rang d'autant (`difficulteSousCran`, borné à 9) et
+  multiplie la mémoire gravée au sas par 1 + cran (`primeMemoire`) ; le
+  titre du choix de salle et la fiche de la carte l'annoncent.
+- **La température fait le climat** (`climatDuModule`) : sous 10 °C les
+  dangers des salles générées sont des hublots fendus (le froid), dès
+  45 °C des chaudières (le chaud), entre les deux le pile ou face d'avant.
+  Le climat voyage dans le code de la salle (option `climat`, bits hauts
+  du suffixe `~`) : un ancien code se décode inchangé. Une route froide
+  se joue en glace, une route chaude en vapeur — la route est le build.
+- **Les haltes** : entrer dans un module `economat` ferme la cérémonie et
+  intercale la salle du Semblable tout de suite (`economatForce`) ; à sa
+  sortie, la carte se rouvre. Quand le plan porte un économat,
+  l'intercalation automatique de mi-descente se tait — c'est la route
+  qui décide. Entrer dans un module `repos` ouvre l'ALCÔVE dans la
+  cérémonie (`offresRepos`) : un second souffle (+1 vie), de la réserve
+  (+0,5 L en bonbonne) ou du condensat (+40 cL), une seule des trois, les
+  offres sans effet grisées ; puis la carte se rouvre. Un module `don`
+  offre une bonbonne oubliée (+0,5 L, ou +40 cL de condensat si la
+  bonbonne est pleine). Un module `inconnu` se révèle à l'entrée
+  (`reveleInconnu`) et se joue sous sa nature (`moduleCourant` rend le
+  module révélé) ; le plan le dessine ensuite sous cette nature.
+- **La mini-carte à voies** (`src/game/voiesModule.ts`) : à l'entrée d'un
+  module de N salles, N rangs sur trois voies se tissent depuis une graine
+  (la descente du jour en donne une par module, la même pour tous les
+  postes ; sinon le poste en tire une, écrite dans la sauvegarde). Chaque
+  nœud est une salle décidée d'avance — mécanique, figure ou non, tableau
+  du pool ou générée — et mène tout droit, plus une voisine une fois sur
+  deux. Les portes d'un rang sont les nœuds que celui qu'on vient d'ouvrir
+  annonce (`portesDuRang`) : on choisit une porte en voyant où elle mène,
+  la grille se dessine au-dessus des portes (`dessinMiniCarteSVG`), viser
+  une porte allume son nœud. La salle ne se fabrique qu'à l'ouverture ; un
+  nœud du pool sans tableau jouable se génère avec sa mécanique. Sans
+  graine (un outil, une sauvegarde d'avant), le choix historique tient :
+  trois générées et le pool en quatrième.
+- **Les salles ÉVÉNEMENT** (`src/game/evenements.ts`) : un nœud sur trois
+  environ, passé le premier rang du module, n'est pas une salle mais une
+  RENCONTRE — aucun tableau à jouer, un écran dans la cérémonie. La porte
+  ne dit pas laquelle : l'événement se tire à l'ouverture parmi ceux que la
+  run n'a pas encore vus (la descente du jour en donne le même à tous les
+  postes). Chaque rencontre porte un lieu, du lore, et deux ou trois
+  offres ; une offre peut avoir PLUSIEURS ISSUES pesées — le joueur voit
+  qu'il parie. Les effets sont un vocabulaire court (`EffetEvenement`) que
+  `appliqueEffets` traduit en leviers réels : réserve, condensat, mémoire,
+  échantillon de secours, **essence maximale** (le sacrifice : le volume
+  avec lequel le corps naît à chaque salle, jamais sous
+  `ESSENCE_PLANCHER`), instrument embarqué, **contrepartie** (une carte qui
+  coûte — `CONTREPARTIES` d'`instruments.ts`, jamais proposée au tirage
+  d'un palier), orbe, révélation des « ? », confinement promis à la salle
+  suivante. Une rencontre consomme son rang comme une salle.
 - **La pioche suit le biome** : un tableau qui porte un `biome` ne se
   propose que dans le module de ce biome ; un tableau sans biome est
   universel (la bibliothèque n'est pas encore réétiquetée) ; une salle

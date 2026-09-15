@@ -164,6 +164,11 @@ export interface OptionsGen {
   // compartiments il promeut (ou rabat) les maillons à faisceau — miroir
   // de glace, double ET, rail plasma, barrière NOR.
   mecanismes: 0 | 1 | 2 | 3
+  // le CLIMAT des dangers — 0 auto (pile ou face) · 1 froid (hublots
+  // fendus, sur la coque) · 2 chaud (chaudières). C'est la température du
+  // module de la carte qui le pose : une route froide se joue en glace,
+  // une route chaude en vapeur — la route est le build.
+  climat: 0 | 1 | 2
 }
 
 export const OPTIONS_DEFAUT: OptionsGen = {
@@ -177,6 +182,7 @@ export const OPTIONS_DEFAUT: OptionsGen = {
   figure: 0,
   ampleur: 0,
   mecanismes: 0,
+  climat: 0,
 }
 
 /** Le suffixe des options — vide quand tout est « auto ». Les réglages du
@@ -196,7 +202,8 @@ export function encodeOptions(o: OptionsGen): string {
     ((o.figure & 7) << 18) |
     (o.ampleur << 21) |
     (o.mecanismes << 23) |
-    (((o.figure >> 3) & 1) << 25)
+    (((o.figure >> 3) & 1) << 25) |
+    (o.climat << 26)
   const defaut = 0 | (127 << 2)
   return paquet === defaut ? '' : paquet.toString(36).toUpperCase()
 }
@@ -204,7 +211,7 @@ export function encodeOptions(o: OptionsGen): string {
 export function decodeOptions(txt: string): OptionsGen | null {
   if (!/^[0-9A-Z]{1,6}$/i.test(txt.trim())) return null
   const paquet = parseInt(txt.trim(), 36)
-  if (!Number.isFinite(paquet) || paquet < 0 || paquet >= 1 << 26) return null
+  if (!Number.isFinite(paquet) || paquet < 0 || paquet >= 1 << 28) return null
   const sallesIdx = paquet & 3
   return {
     salles: (sallesIdx === 0 ? 0 : sallesIdx + 2) as OptionsGen['salles'],
@@ -217,6 +224,7 @@ export function decodeOptions(txt: string): OptionsGen | null {
     figure: ((paquet >> 18) & 7) | (((paquet >> 25) & 1) << 3),
     ampleur: ((paquet >> 21) & 3) as OptionsGen['ampleur'],
     mecanismes: ((paquet >> 23) & 3) as OptionsGen['mecanismes'],
+    climat: Math.min(2, (paquet >> 26) & 3) as OptionsGen['climat'],
   }
 }
 
@@ -1623,12 +1631,16 @@ function essaieNiveau(
       const bordsCoque = (['haut', 'bas', 'gauche', 'droite'] as const).filter(
         (b) => surCoque[b],
       )
-      let chaud = rng() < 0.5
-      if (!chaud && bordsCoque.length === 0) chaud = true // salle sans coque
+      // le CLIMAT tranche le pile ou face quand la carte l'impose ; en auto,
+      // le tirage reste le même qu'avant (les codes rejouent à l'identique)
+      let chaud = o.climat === 2 ? true : o.climat === 1 ? false : rng() < 0.5
+      // salle sans coque : le froid n'a d'où venir — en auto on chauffe, en
+      // climat froid on renonce au danger plutôt que de trahir la route
+      if (!chaud && bordsCoque.length === 0 && o.climat !== 1) chaud = true
       const bords = chaud
         ? (['haut', 'bas', 'gauche', 'droite'] as const)
         : bordsCoque
-      for (let essai = 0; essai < 18; essai++) {
+      for (let essai = 0; essai < (bords.length > 0 ? 18 : 0); essai++) {
         const bord = parmi(rng, bords)
         const long = entre(rng, 140, 240)
         const ep = entre(rng, 50, 70)

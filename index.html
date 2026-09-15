@@ -6426,6 +6426,9 @@
       .cs-route.cs-active { filter: drop-shadow(0 0 6px var(--c)); animation: cs-flux 1.2s linear infinite; }
       .cs-route.cs-principale:not(.cs-active):not(.cs-parcourue) { filter: drop-shadow(0 0 6px var(--c)); }
       .cs-route.cs-lien-sel { stroke: #eef8ff; filter: drop-shadow(0 0 8px #eef8ff); }
+      /* le survol qui projette : la route la plus courte jusqu'à l'objectif */
+      .cs-route.cs-projet { stroke: #eef8ff; opacity: 1; filter: drop-shadow(0 0 7px #eef8ff); }
+      .cs-mod.cs-projet { filter: drop-shadow(0 0 10px rgba(238, 248, 255, 0.75)); }
       .cs-sens { fill: none; opacity: 0.85; }
       .cs-lien-prise { cursor: pointer; }
       .cs-brouillon { stroke: #eef8ff; stroke-width: 2; stroke-dasharray: 8 6; fill: none; pointer-events: none; }
@@ -6442,6 +6445,7 @@
       .cs-glyphe { text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
       .cs-cadenas { text-anchor: middle; dominant-baseline: central; font-size: 15px; }
       .cs-coche { text-anchor: middle; dominant-baseline: central; font-size: 10px; fill: #63b7e6; }
+      .cs-cran { text-anchor: middle; dominant-baseline: central; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
       .cs-nom { font-family: var(--font-display); font-size: 11px; letter-spacing: 0.1em; text-anchor: middle; pointer-events: none; }
       .cs-temp text { font-size: 12px; text-anchor: start; }
       .cs-temp { pointer-events: none; }
@@ -8371,6 +8375,55 @@
       }
       .mb-prix.mb-offert { color: var(--mb-menthe); }
       .mb-carte.mb-pauvre { opacity: 0.45; cursor: not-allowed; }
+      /* ---- LES SALLES ÉVÉNEMENT (game/evenements.ts) ---- */
+      /* la porte d'une rencontre : pas de plan, un point d'interrogation */
+      .mb-ev-vue { display: grid; place-items: center; background: linear-gradient(180deg, #16233a, #0b1220); }
+      .mb-ev-vue i {
+        font-style: normal; font-family: var(--font-display);
+        font-size: calc(46px * var(--ui)); color: var(--mb-or, #ffd977);
+        text-shadow: 0 0 18px rgba(255, 217, 119, 0.45); animation: mb-ev-bat 2.6s ease-in-out infinite;
+      }
+      @keyframes mb-ev-bat { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
+      .mb-porte-tag.mb-voie-ev { color: var(--mb-or, #ffd977); border-color: rgba(255, 217, 119, 0.4); }
+      .mb-porte-ev:hover, .mb-porte-ev:focus-visible {
+        border-color: var(--mb-or, #ffd977);
+        box-shadow: 0 22px 44px rgba(0, 0, 0, 0.55), 0 0 30px rgba(255, 217, 119, 0.25);
+      }
+      /* le récit : le lieu en italique, le lore dessous — la seule prose du jeu */
+      .mb-ev-recit {
+        grid-column: 1 / -1; max-width: 62ch; margin: 0 auto; text-align: left;
+        border-left: 2px solid rgba(255, 217, 119, 0.5); padding: 2px 0 2px 16px;
+      }
+      .mb-ev-recit em {
+        display: block; font-style: normal; font-family: var(--font-display);
+        font-size: calc(9.5px * var(--ui)); letter-spacing: 0.22em; color: var(--mb-or, #ffd977);
+      }
+      .mb-ev-recit p {
+        margin: 8px 0 0; font-size: calc(13px * var(--ui)); line-height: 1.65; color: #cfe2ef;
+      }
+      .mb-ev-gains {
+        margin: 12px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 5px;
+      }
+      .mb-ev-gains li {
+        font-size: calc(12.5px * var(--ui)); color: #d5f3e8; letter-spacing: 0.03em;
+      }
+      .mb-ev-issue { border-left-color: var(--mb-menthe); }
+      .mb-ev-issue em { color: var(--mb-menthe); }
+      .mb-carte.mb-ev-offre {
+        min-height: 128px; justify-content: center; gap: 7px; text-align: center;
+      }
+      .mb-ev-offre b { font-family: var(--font-display); letter-spacing: 0.14em; }
+      .mb-ev-pari, .mb-ev-sur {
+        font-style: normal; font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; color: #7f9cb0;
+      }
+      .mb-ev-pari { color: var(--mb-or, #ffd977); }
+      /* le nœud événement sur la mini-carte à voies */
+      .mv-noeud.mv-evenement circle { stroke: rgba(255, 217, 119, 0.7); }
+      .mv-noeud.mv-evenement text { fill: var(--mb-or, #ffd977); }
+      .mv-noeud.mv-evenement.mv-joue circle { fill: rgba(255, 217, 119, 0.18); stroke: var(--mb-or, #ffd977); }
+      /* l'alcôve de repos : trois offres, l'icône en tête */
+      .mb-carte.mb-repos { min-height: 170px; justify-content: center; gap: 8px; }
+      .mb-repos-icone { font-style: normal; font-size: calc(30px * var(--ui)); line-height: 1; }
       /* ---- LE VERSEMENT : la goutte du surplus au centre, une plaque de
          chaque côté (la RÉSERVE et son bocal, la MAÎTRISE et son anneau).
          Viser une plaque fait COULER le flux de la goutte vers elle ; la
@@ -8644,6 +8697,25 @@
       }
       .mb-cartes:has(.mb-porte) { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
       .mb-cartes.mb-trio { grid-template-columns: repeat(3, 1fr); max-width: 940px; margin: 0 auto; width: 100%; }
+      /* la mini-carte à voies du module (game/voiesModule.ts) : rangs de
+         gauche à droite, voies de haut en bas, les portes du rang allumées */
+      .mb-voies { grid-column: 1 / -1; display: flex; justify-content: center; padding: 2px 0 4px; overflow-x: auto; }
+      .mv-svg { max-width: 100%; height: auto; font-family: var(--font-mono); }
+      .mv-lien { stroke: #2d4258; stroke-width: 2; }
+      .mv-lien.mv-joue { stroke: var(--mb-menthe); opacity: 0.8; }
+      .mv-lien.mv-ouvre { stroke: #9fb6c8; stroke-dasharray: 4 4; animation: cs-flux 1.2s linear infinite; }
+      .mv-noeud circle { fill: #0e1724; stroke: #2d4258; stroke-width: 1.5; }
+      .mv-noeud text { fill: #7f9cb0; font-size: 12px; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+      .mv-noeud.mv-ferme { opacity: 0.35; }
+      .mv-noeud.mv-joue circle { fill: rgba(109, 255, 184, 0.18); stroke: var(--mb-menthe); }
+      .mv-noeud.mv-joue text { fill: var(--mb-menthe); }
+      .mv-noeud.mv-porte circle { stroke: #d5f3e8; stroke-width: 2; filter: drop-shadow(0 0 6px rgba(109, 255, 184, 0.55)); }
+      .mv-noeud.mv-porte text { fill: #eaf6ff; }
+      .mv-noeud.mv-vise circle { fill: var(--mb-menthe); stroke: #eaf6ff; }
+      .mv-noeud.mv-vise text { fill: #071018; }
+      .mv-titre { fill: #55708c; font-size: 8px; letter-spacing: 0.2em; text-anchor: middle; font-family: var(--font-display); }
+      .mv-titre.mv-courant { fill: #d5f3e8; }
+      @media (prefers-reduced-motion: reduce) { .mv-lien.mv-ouvre { animation: none; } }
       /* les jauges en tête du choix : on décide en voyant ce qu'on possède */
       .mb-jauges {
         grid-column: 1 / -1; display: flex; justify-content: center; align-items: center;
@@ -9414,6 +9486,12 @@
               <option value="1">Aucun</option>
               <option value="2">Rares</option>
               <option value="3">Fréquents</option>
+            </select></label>
+          <label class="ed-f" title="Le climat des dangers : la température du module de la carte le pose en run — froid : hublots fendus sur la coque ; chaud : chaudières"><span>Climat</span>
+            <select id="edg-climat">
+              <option value="0">Auto</option>
+              <option value="1">Froid</option>
+              <option value="2">Chaud</option>
             </select></label>
           <label class="ed-f"><span>Cachette</span>
             <select id="edg-cachette">

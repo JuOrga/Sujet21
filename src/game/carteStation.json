@@ -1,6 +1,6 @@
 {
   "scene": {
-    "width": 1600,
+    "width": 2500,
     "height": 804
   },
   "zones": [
@@ -19,12 +19,24 @@
     {
       "id": 2,
       "code": "Z-03",
-      "nom": "Nœud",
+      "nom": "Coursives",
       "couleur": "#a7ddf5"
     },
     {
       "id": 3,
       "code": "Z-04",
+      "nom": "Profondeurs",
+      "couleur": "#8fb4ff"
+    },
+    {
+      "id": 4,
+      "code": "Z-05",
+      "nom": "Haltes",
+      "couleur": "#f2c98e"
+    },
+    {
+      "id": 5,
+      "code": "Z-06",
       "nom": "Observatoire",
       "couleur": "#c99aff"
     }
@@ -35,7 +47,11 @@
     "combat": "COMBAT",
     "enigme": "ÉNIGME",
     "coffre": "CACHE",
-    "boss": "TERMINAL"
+    "boss": "TERMINAL",
+    "economat": "ÉCONOMAT",
+    "repos": "REPOS",
+    "don": "BONBONNE",
+    "inconnu": "INCONNU"
   },
   "modules": [
     {
@@ -44,166 +60,320 @@
       "type": "sas",
       "zone": 0,
       "x": 263,
-      "y": 380,
+      "y": 402,
       "w": 112,
       "h": 292,
       "temp": 15,
       "forme": "octogone",
       "niveaux": 0,
       "biome": "",
-      "desc": "Cœur de la station, amarré à l’arc de coque."
+      "desc": "Cœur de la station, amarré à l’arc de coque. On en part, on n’y revient qu’à la fin."
     },
     {
       "id": "T1",
       "nom": "TRANSFO GLACE",
       "type": "enigme",
       "zone": 1,
-      "x": 507,
-      "y": 231,
-      "w": 136,
-      "h": 136,
+      "x": 500,
+      "y": 210,
+      "w": 128,
+      "h": 128,
       "temp": -25,
       "forme": "octogone",
-      "niveaux": 3,
+      "niveaux": 6,
       "biome": "T1",
-      "desc": "Ne s’ouvre qu’avec l’orbe de solidification."
+      "desc": "Ne s’ouvre qu’avec l’orbe de solidification. Les faisceaux gardent les passages ; le froid vient de la coque."
     },
     {
       "id": "T2",
       "nom": "AUCUNE TRANSFO",
       "type": "combat",
       "zone": 1,
-      "x": 507,
-      "y": 385,
-      "w": 136,
-      "h": 136,
+      "x": 500,
+      "y": 402,
+      "w": 128,
+      "h": 128,
       "temp": 18,
       "forme": "octogone",
-      "niveaux": 3,
+      "niveaux": 6,
       "biome": "T2",
-      "desc": "Voie libre."
+      "desc": "Voie libre. Les dangers y sont fréquents, sans énigme à lire."
     },
     {
       "id": "T3",
       "nom": "TRANSFO GAZ",
       "type": "combat",
       "zone": 1,
-      "x": 507,
-      "y": 539,
-      "w": 136,
-      "h": 136,
+      "x": 500,
+      "y": 594,
+      "w": 128,
+      "h": 128,
       "temp": 72,
       "forme": "octogone",
-      "niveaux": 3,
+      "niveaux": 6,
       "biome": "T3",
-      "desc": "Ne s’ouvre qu’avec l’orbe de vaporisation."
+      "desc": "Ne s’ouvre qu’avec l’orbe de vaporisation. Chaudières à chaque bord."
     },
     {
-      "id": "N",
-      "nom": "NŒUD ?",
+      "id": "N1",
+      "nom": "NŒUD",
       "type": "jonction",
       "zone": 2,
-      "x": 666,
-      "y": 385,
-      "w": 66,
-      "h": 66,
+      "x": 650,
+      "y": 402,
+      "w": 60,
+      "h": 60,
       "temp": 20,
       "forme": "rond",
       "niveaux": 0,
       "biome": "",
-      "desc": "Les trois voies convergent."
+      "desc": "Les trois transformateurs convergent. Trois haltes s’ouvrent."
     },
     {
-      "id": "S1",
-      "nom": "MODULE ?",
+      "id": "ECO1",
+      "nom": "ÉCONOMAT",
+      "type": "economat",
+      "zone": 4,
+      "x": 790,
+      "y": 230,
+      "w": 76,
+      "h": 76,
+      "temp": 22,
+      "forme": "octogone",
+      "niveaux": 0,
+      "biome": "",
+      "desc": "Le Semblable du comptoir troque contre du condensat."
+    },
+    {
+      "id": "INC1",
+      "nom": "?",
+      "type": "inconnu",
+      "zone": 4,
+      "x": 790,
+      "y": 402,
+      "w": 76,
+      "h": 76,
+      "temp": 20,
+      "forme": "octogone",
+      "niveaux": 1,
+      "biome": "INC1",
+      "desc": "Nature inconnue : une halte, une cache, un don ou un combat surchauffé — on ne le sait qu’en entrant."
+    },
+    {
+      "id": "REP1",
+      "nom": "ALCÔVE",
+      "type": "repos",
+      "zone": 4,
+      "x": 790,
+      "y": 574,
+      "w": 76,
+      "h": 76,
+      "temp": 20,
+      "forme": "octogone",
+      "niveaux": 0,
+      "biome": "",
+      "desc": "Un second souffle, de la réserve ou du condensat — un seul des trois."
+    },
+    {
+      "id": "C1",
+      "nom": "CRYOSTAT",
       "type": "combat",
       "zone": 2,
-      "x": 801,
-      "y": 249,
-      "w": 100,
-      "h": 100,
-      "temp": 5,
-      "forme": "octogone",
-      "niveaux": 3,
-      "biome": "S1",
-      "desc": "À définir."
-    },
-    {
-      "id": "S2",
-      "nom": "MODULE ?",
-      "type": "combat",
-      "zone": 2,
-      "x": 801,
-      "y": 385,
-      "w": 100,
-      "h": 100,
-      "temp": 30,
-      "forme": "octogone",
-      "niveaux": 3,
-      "biome": "S2",
-      "desc": "À définir."
-    },
-    {
-      "id": "S3",
-      "nom": "MODULE ?",
-      "type": "combat",
-      "zone": 2,
-      "x": 801,
-      "y": 525,
-      "w": 100,
-      "h": 100,
-      "temp": 50,
-      "forme": "octogone",
-      "niveaux": 3,
-      "biome": "S3",
-      "desc": "À définir."
-    },
-    {
-      "id": "S1b",
-      "nom": "MODULE ?",
-      "type": "coffre",
-      "zone": 2,
-      "x": 1032,
-      "y": 131,
-      "w": 92,
-      "h": 92,
+      "x": 960,
+      "y": 210,
+      "w": 112,
+      "h": 112,
       "temp": -10,
       "forme": "octogone",
-      "niveaux": 1,
-      "biome": "S1b",
-      "orbe": "sublimation",
-      "desc": "Cul-de-sac. Un orbe d’essence y dort."
+      "niveaux": 6,
+      "biome": "C1",
+      "cran": 1,
+      "desc": "Confinement supérieur : plus dur d’un cran, la mémoire y vaut double. Le froid mord depuis la coque."
     },
     {
-      "id": "S3b",
-      "nom": "MODULE ?",
-      "type": "coffre",
+      "id": "C2",
+      "nom": "CONDUITS",
+      "type": "enigme",
       "zone": 2,
-      "x": 1032,
-      "y": 643,
-      "w": 92,
-      "h": 92,
-      "temp": 60,
+      "x": 960,
+      "y": 402,
+      "w": 112,
+      "h": 112,
+      "temp": 26,
       "forme": "octogone",
-      "niveaux": 1,
-      "biome": "S3b",
+      "niveaux": 6,
+      "biome": "C2",
+      "desc": "La voie sûre : ni prime, ni piège. Les faisceaux gardent les passages."
+    },
+    {
+      "id": "C3",
+      "nom": "CHAUFFERIE",
+      "type": "combat",
+      "zone": 2,
+      "x": 960,
+      "y": 594,
+      "w": 112,
+      "h": 112,
+      "temp": 58,
+      "forme": "octogone",
+      "niveaux": 6,
+      "biome": "C3",
+      "cran": 1,
+      "desc": "Confinement supérieur : plus dur d’un cran, la mémoire y vaut double. Les chaudières tournent encore."
+    },
+    {
+      "id": "CN",
+      "nom": "CACHE NORD",
+      "type": "coffre",
+      "zone": 4,
+      "x": 1150,
+      "y": 230,
+      "w": 76,
+      "h": 76,
+      "temp": -12,
+      "forme": "octogone",
+      "niveaux": 0,
+      "biome": "",
+      "orbe": "sublimation",
+      "desc": "Une chambre close. Un orbe d’essence y dort depuis onze ans."
+    },
+    {
+      "id": "DON",
+      "nom": "BONBONNE OUBLIÉE",
+      "type": "don",
+      "zone": 4,
+      "x": 1150,
+      "y": 402,
+      "w": 76,
+      "h": 76,
+      "temp": 20,
+      "forme": "octogone",
+      "niveaux": 0,
+      "biome": "",
+      "desc": "Quelqu’un a laissé sa réserve là et n’est jamais revenu la chercher."
+    },
+    {
+      "id": "CS",
+      "nom": "CACHE SUD",
+      "type": "coffre",
+      "zone": 4,
+      "x": 1150,
+      "y": 574,
+      "w": 76,
+      "h": 76,
+      "temp": 62,
+      "forme": "octogone",
+      "niveaux": 0,
+      "biome": "",
       "orbe": "condensation",
-      "desc": "Cul-de-sac. Un orbe d’essence y dort."
+      "desc": "Une chambre close. Un orbe d’essence y dort depuis onze ans."
+    },
+    {
+      "id": "P1",
+      "nom": "PUITS FROID",
+      "type": "combat",
+      "zone": 3,
+      "x": 1330,
+      "y": 210,
+      "w": 112,
+      "h": 112,
+      "temp": -40,
+      "forme": "octogone",
+      "niveaux": 6,
+      "biome": "P1",
+      "cran": 1,
+      "desc": "Confinement supérieur. Le plus froid de la station : la coque n’y est plus chauffée depuis onze ans."
+    },
+    {
+      "id": "P2",
+      "nom": "SOUTES",
+      "type": "combat",
+      "zone": 3,
+      "x": 1330,
+      "y": 402,
+      "w": 112,
+      "h": 112,
+      "temp": 12,
+      "forme": "octogone",
+      "niveaux": 6,
+      "biome": "P2",
+      "desc": "Ce que le laboratoire n’a jamais déchargé. Vaste, tiède, encombré."
+    },
+    {
+      "id": "P3",
+      "nom": "RÉACTEUR",
+      "type": "enigme",
+      "zone": 3,
+      "x": 1330,
+      "y": 594,
+      "w": 112,
+      "h": 112,
+      "temp": 80,
+      "forme": "octogone",
+      "niveaux": 6,
+      "biome": "P3",
+      "cran": 1,
+      "desc": "Confinement supérieur. La chaleur de la station vient d’ici, et elle ne s’arrête pas."
+    },
+    {
+      "id": "ECO2",
+      "nom": "ÉCONOMAT DU FOND",
+      "type": "economat",
+      "zone": 4,
+      "x": 1520,
+      "y": 336,
+      "w": 76,
+      "h": 76,
+      "temp": 18,
+      "forme": "octogone",
+      "niveaux": 0,
+      "biome": "",
+      "desc": "Le Semblable a un second comptoir. Il descend plus bas que vous ne croyez."
+    },
+    {
+      "id": "REP2",
+      "nom": "ALCÔVE PROFONDE",
+      "type": "repos",
+      "zone": 4,
+      "x": 1520,
+      "y": 468,
+      "w": 76,
+      "h": 76,
+      "temp": 20,
+      "forme": "octogone",
+      "niveaux": 0,
+      "biome": "",
+      "desc": "La dernière halte avant l’approche."
+    },
+    {
+      "id": "ANTI",
+      "nom": "ANTICHAMBRE",
+      "type": "enigme",
+      "zone": 5,
+      "x": 1700,
+      "y": 402,
+      "w": 120,
+      "h": 120,
+      "temp": 5,
+      "forme": "octogone",
+      "niveaux": 6,
+      "biome": "ANTI",
+      "desc": "L’approche de l’observatoire. Les portes y sont toutes logiques, et le froid de l’espace passe le plancher."
     },
     {
       "id": "OBS",
       "nom": "OBSERVATOIRE",
       "type": "boss",
-      "zone": 3,
-      "x": 1028,
-      "y": 385,
+      "zone": 5,
+      "x": 1920,
+      "y": 402,
       "w": 166,
       "h": 166,
       "temp": 40,
       "forme": "octogone-dome",
-      "niveaux": 3,
+      "niveaux": 6,
       "biome": "OBS",
-      "desc": "Module terminal. Un télescope spatial y est amarré."
+      "desc": "Module terminal. Un télescope spatial y est amarré, et le sas du dehors est derrière."
     }
   ],
   "liens": [
@@ -224,46 +394,156 @@
     },
     {
       "de": "T1",
-      "vers": "N",
+      "vers": "N1",
       "type": "alt"
     },
     {
       "de": "T2",
-      "vers": "N",
+      "vers": "N1",
       "type": "main"
     },
     {
       "de": "T3",
-      "vers": "N",
+      "vers": "N1",
       "type": "alt"
     },
     {
-      "de": "N",
-      "vers": "S1",
+      "de": "N1",
+      "vers": "ECO1",
       "type": "alt"
     },
     {
-      "de": "N",
-      "vers": "S2",
+      "de": "N1",
+      "vers": "INC1",
       "type": "main"
     },
     {
-      "de": "N",
-      "vers": "S3",
+      "de": "N1",
+      "vers": "REP1",
       "type": "alt"
     },
     {
-      "de": "S1",
-      "vers": "S1b",
+      "de": "ECO1",
+      "vers": "C1",
       "type": "alt"
     },
     {
-      "de": "S3",
-      "vers": "S3b",
+      "de": "ECO1",
+      "vers": "C2",
       "type": "alt"
     },
     {
-      "de": "S2",
+      "de": "INC1",
+      "vers": "C1",
+      "type": "alt"
+    },
+    {
+      "de": "INC1",
+      "vers": "C3",
+      "type": "alt"
+    },
+    {
+      "de": "REP1",
+      "vers": "C2",
+      "type": "alt"
+    },
+    {
+      "de": "REP1",
+      "vers": "C3",
+      "type": "alt"
+    },
+    {
+      "de": "C1",
+      "vers": "CN",
+      "type": "alt"
+    },
+    {
+      "de": "C1",
+      "vers": "DON",
+      "type": "alt"
+    },
+    {
+      "de": "C2",
+      "vers": "CN",
+      "type": "main"
+    },
+    {
+      "de": "C2",
+      "vers": "CS",
+      "type": "alt"
+    },
+    {
+      "de": "C3",
+      "vers": "DON",
+      "type": "alt"
+    },
+    {
+      "de": "C3",
+      "vers": "CS",
+      "type": "alt"
+    },
+    {
+      "de": "CN",
+      "vers": "P1",
+      "type": "alt"
+    },
+    {
+      "de": "CN",
+      "vers": "P2",
+      "type": "alt"
+    },
+    {
+      "de": "DON",
+      "vers": "P1",
+      "type": "main"
+    },
+    {
+      "de": "DON",
+      "vers": "P3",
+      "type": "alt"
+    },
+    {
+      "de": "CS",
+      "vers": "P2",
+      "type": "alt"
+    },
+    {
+      "de": "CS",
+      "vers": "P3",
+      "type": "alt"
+    },
+    {
+      "de": "P1",
+      "vers": "ECO2",
+      "type": "alt"
+    },
+    {
+      "de": "P2",
+      "vers": "ECO2",
+      "type": "main"
+    },
+    {
+      "de": "P2",
+      "vers": "REP2",
+      "type": "alt"
+    },
+    {
+      "de": "P3",
+      "vers": "REP2",
+      "type": "alt"
+    },
+    {
+      "de": "ECO2",
+      "vers": "ANTI",
+      "type": "main"
+    },
+    {
+      "de": "REP2",
+      "vers": "ANTI",
+      "type": "alt"
+    },
+    {
+      "de": "ANTI",
       "vers": "OBS",
       "type": "main"
     }
@@ -309,10 +589,10 @@
       "id": "telescope",
       "type": "telescope-hubble",
       "ancrage": "OBS",
-      "x": 1222,
-      "y": 426,
+      "x": 2114,
+      "y": 443,
       "rotation": -33,
-      "tube": "M1105 385 H1160 C 1196 385, 1196 426, 1226 426"
+      "tube": "M1997 402 H2052 C 2088 402, 2088 443, 2118 443"
     }
   ],
   "palette": {

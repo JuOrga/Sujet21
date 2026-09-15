@@ -2,7 +2,17 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   CARTE_LIVREE,
+  CRAN_MAX,
+  HALTES,
   accessibles,
+  cheminLePlusCourt,
+  estHalte,
+  longueurRoute,
+  plusCourtVers,
+  routesVersObjectif,
+  REVELATIONS,
+  moduleRevele,
+  verifieRoutes,
   cloneCarte,
   couleurTemperature,
   orbeRequis,
@@ -31,10 +41,10 @@ describe('carteStation.json — la source de vérité', () => {
     expect(carte).not.toBeNull()
   })
 
-  it('est la carte du concepteur : 11 modules, 12 coursives, 4 zones', () => {
-    expect(CARTE_LIVREE.modules).toHaveLength(11)
-    expect(CARTE_LIVREE.liens).toHaveLength(12)
-    expect(CARTE_LIVREE.zones).toHaveLength(4)
+  it('est la carte à cinq biomes : 21 modules, 34 coursives, 6 zones', () => {
+    expect(CARTE_LIVREE.modules).toHaveLength(21)
+    expect(CARTE_LIVREE.liens).toHaveLength(34)
+    expect(CARTE_LIVREE.zones).toHaveLength(6)
     expect(CARTE_LIVREE.regles.depart).toBe('HUB')
     expect(CARTE_LIVREE.regles.objectif).toBe('OBS')
   })
@@ -76,6 +86,39 @@ describe('parseCarte — la lecture dit ce qui manque', () => {
     expect(erreurs).toContain('modules[3] (T3) : type inconnu « donjon »')
   })
 
+  it('une carte d’avant les haltes et le cran reste lisible : libellés par défaut, cran à zéro', () => {
+    // la carte PUBLIÉE (magasin) peut dater d'avant ces natures : la refuser
+    // ferait jouer tout le monde sur la carte livrée sans que rien le dise
+    const brut = JSON.parse(serialiseCarte(CARTE_LIVREE)) as Record<string, unknown>
+    const types = { ...(brut.types as Record<string, string>) }
+    delete types.economat
+    delete types.repos
+    const modules = (brut.modules as Record<string, unknown>[]).map((m) => {
+      const { cran: _cran, ...reste } = m
+      return reste
+    })
+    const { carte, erreurs } = parseCarte({ ...brut, types, modules })
+    expect(erreurs).toEqual([])
+    expect(carte!.types.economat).toBe('ÉCONOMAT')
+    expect(carte!.types.repos).toBe('REPOS')
+    expect(carte!.modules.every((m) => m.cran === 0)).toBe(true)
+  })
+
+  it('le cran de confinement se lit borné, et ne s’écrit que s’il compte', () => {
+    const brut = JSON.parse(serialiseCarte(CARTE_LIVREE)) as { modules: Record<string, unknown>[] }
+    brut.modules[1].cran = 2.4
+    brut.modules[2].cran = 9
+    brut.modules[3].cran = -1
+    const { carte, erreurs } = parseCarte(brut)
+    expect(erreurs).toEqual([])
+    expect(carte!.modules.slice(1, 4).map((m) => m.cran)).toEqual([2, CRAN_MAX, 0])
+    const relu = JSON.parse(serialiseCarte(carte!)) as { modules: Record<string, unknown>[] }
+    expect(relu.modules[1].cran).toBe(2)
+    expect('cran' in relu.modules[3]).toBe(false)
+    brut.modules[1].cran = 'fort'
+    expect(parseCarte(brut).erreurs.some((e) => /T1.*cran/.test(e))).toBe(true)
+  })
+
   it('accepte une carte sans décor, et une condition vide comme un passage libre', () => {
     const brut = JSON.parse(serialiseCarte(CARTE_LIVREE))
     delete brut.decor
@@ -93,21 +136,21 @@ describe('traceLien — la règle des coursives du hub', () => {
   it('sort du flanc du HUB, à hauteur de la cible quand elle est en face', () => {
     // T2 est à y=385, le HUB aussi : la coursive part droit
     const t = traceLien(CARTE_LIVREE, lien('HUB', 'T2'))!
-    expect(t.y1).toBe(385)
-    expect(t.d).toBe('M263 385 L507 385')
+    expect(t.y1).toBe(402)
+    expect(t.d).toBe('M263 402 L500 402')
   })
 
   it('borne la sortie à ±110 du centre du hub (h/2 − 36 pour un fût de 292)', () => {
-    // T1 est à y=231, trop haut : la sortie se cale à 380 − 110 = 270
-    expect(traceLien(CARTE_LIVREE, lien('HUB', 'T1'))!.y1).toBe(270)
-    // T3 à 539 : 380 + 110 = 490
-    expect(traceLien(CARTE_LIVREE, lien('HUB', 'T3'))!.y1).toBe(490)
+    // T1 est à y=210, trop haut : la sortie se cale à 402 − 110 = 292
+    expect(traceLien(CARTE_LIVREE, lien('HUB', 'T1'))!.y1).toBe(292)
+    // T3 à 594 : 402 + 110 = 512
+    expect(traceLien(CARTE_LIVREE, lien('HUB', 'T3'))!.y1).toBe(512)
   })
 
   it('un module plus large que haut part de son centre', () => {
-    const t = traceLien(CARTE_LIVREE, lien('T1', 'N'))!
-    expect(t.y1).toBe(231)
-    expect(t.y2).toBe(385)
+    const t = traceLien(CARTE_LIVREE, lien('T1', 'N1'))!
+    expect(t.y1).toBe(210)
+    expect(t.y2).toBe(402)
   })
 
   it('rend null quand un bout manque', () => {
@@ -153,29 +196,35 @@ describe('les conditions d’accès — un orbe acquis, pas l’état du corps',
 describe('biomesDeCarte — la liste que la planche et l’éditeur proposent', () => {
   it('un biome par code, seuls les modules à salles, sans doublon', () => {
     expect(biomesDeCarte(CARTE_LIVREE).map((b) => b.code)).toEqual([
-      'T1', 'T2', 'T3', 'S1', 'S2', 'S3', 'S1b', 'S3b', 'OBS',
+      'T1', 'T2', 'T3', 'INC1', 'C1', 'C2', 'C3', 'P1', 'P2', 'P3', 'ANTI', 'OBS',
     ])
     const c = cloneCarte(CARTE_LIVREE)
     c.modules[1].biome = 'T2' // T1 rejoint le biome de T2
-    c.modules[5].niveaux = 0 // S1 n’a plus de salle
-    expect(biomesDeCarte(c).map((b) => b.code)).toEqual(['T2', 'T3', 'S2', 'S3', 'S1b', 'S3b', 'OBS'])
+    c.modules.find((m) => m.id === 'INC1')!.niveaux = 0 // le « ? » n’a plus de salle
+    expect(biomesDeCarte(c).map((b) => b.code)).toEqual([
+      'T2', 'T3', 'C1', 'C2', 'C3', 'P1', 'P2', 'P3', 'ANTI', 'OBS',
+    ])
     expect(biomesDeCarte(c)[0].nom).toBe('TRANSFO GLACE') // le premier qui le porte nomme le biome
   })
 })
 
 describe('un module est un biome — niveaux et trajet', () => {
-  it('la carte livrée compte ses niveaux : 9 salles au plus court, 12 au plus long', () => {
-    // HUB(0) → T2(3) → N(0) → S2(3) → OBS(3) = 9 ; les caches sont des culs-de-sac, hors trajet
-    expect(longueursTrajet(CARTE_LIVREE)).toEqual({ min: 9, max: 9 })
+  it('la carte livrée compte ses niveaux : 30 salles — cinq biomes de six', () => {
+    // HUB(0) T(6) N1(0) halte(0) C(6) halte(0) P(6) halte(0) ANTI(6) OBS(6)
+    // = 30 ; 31 par le « ? », la seule halte qui porte une salle
+    expect(longueursTrajet(CARTE_LIVREE)).toEqual({ min: 30, max: 31 })
     const c = cloneCarte(CARTE_LIVREE)
-    c.liens.push({ de: 'S1b', vers: 'OBS', type: 'alt' })
-    // HUB → T1(3) → N → S1(3) → S1b(1) → OBS(3) = 10
-    expect(longueursTrajet(c)).toEqual({ min: 9, max: 10 })
+    c.modules.find((m) => m.id === 'INC1')!.niveaux = 0
+    expect(longueursTrajet(c)).toEqual({ min: 30, max: 30 })
   })
 
   it('un module d’où l’objectif est hors de portée se signale — le joueur reviendra sur ses pas', () => {
-    const v = verifieCarte(CARTE_LIVREE).filter((x) => x.message.includes('hors de portée'))
-    expect(v.map((x) => x.module).sort()).toEqual(['S1', 'S1b', 'S3', 'S3b'])
+    // la carte livrée n'a plus de cul-de-sac : toute halte continue
+    expect(verifieCarte(CARTE_LIVREE).some((x) => x.message.includes('hors de portée'))).toBe(false)
+    const c = cloneCarte(CARTE_LIVREE)
+    c.liens = c.liens.filter((l) => l.de !== 'CN')
+    const v = verifieCarte(c).filter((x) => x.message.includes('hors de portée'))
+    expect(v.map((x) => x.module)).toEqual(['CN'])
     expect(v.every((x) => x.niveau === 'attention')).toBe(true)
   })
 
@@ -191,6 +240,63 @@ describe('un module est un biome — niveaux et trajet', () => {
     expect(verifieCarte(c).some((v) => v.niveau === 'attention' && v.module === 'T1' && v.message.includes('biome'))).toBe(true)
     c.modules[1].niveaux = -2
     expect(verifieCarte(c).some((v) => v.niveau === 'erreur' && v.module === 'T1')).toBe(true)
+  })
+})
+
+describe('cheminLePlusCourt et routesVersObjectif — la matière des règles de route', () => {
+  it('le chemin va du départ à l’arrivée, pesé en niveaux, et s’accorde avec plusCourtVers', () => {
+    const chemin = cheminLePlusCourt(CARTE_LIVREE, 'HUB', 'OBS')!
+    expect(chemin[0]).toBe('HUB')
+    expect(chemin[chemin.length - 1]).toBe('OBS')
+    expect(longueurRoute(CARTE_LIVREE, chemin.slice(1))).toBe(plusCourtVers(CARTE_LIVREE, 'HUB', 'OBS'))
+    expect(cheminLePlusCourt(CARTE_LIVREE, 'OBS', 'OBS')).toEqual(['OBS'])
+    // à salles égales, la voie sans confinement passe devant : la route
+    // projetée depuis le nœud ne traverse aucun module sous cran
+    const n1 = cheminLePlusCourt(CARTE_LIVREE, 'N1', 'OBS')!
+    expect(n1[0]).toBe('N1')
+    expect(n1[n1.length - 1]).toBe('OBS')
+    expect(n1.reduce((t, id) => t + (CARTE_LIVREE.modules.find((m) => m.id === id)?.cran ?? 0), 0)).toBe(0)
+    expect(cheminLePlusCourt(CARTE_LIVREE, 'OBS', 'HUB')).toBeNull()
+    expect(cheminLePlusCourt(CARTE_LIVREE, 'X', 'OBS')).toBeNull()
+  })
+
+  it('énumère les routes simples du départ à l’objectif, et les mesure', () => {
+    const routes = routesVersObjectif(CARTE_LIVREE)
+    expect(routes.length).toBeGreaterThan(0)
+    for (const r of routes) {
+      expect(r[0]).toBe('HUB')
+      expect(r[r.length - 1]).toBe('OBS')
+      expect(new Set(r).size).toBe(r.length) // simple : aucun module deux fois
+    }
+    const lt = longueursTrajet(CARTE_LIVREE)!
+    expect(Math.min(...routes.map((r) => longueurRoute(CARTE_LIVREE, r)))).toBe(lt.min)
+    expect(Math.max(...routes.map((r) => longueurRoute(CARTE_LIVREE, r)))).toBe(lt.max)
+    // un objectif coupé du reste : aucune route
+    const c = cloneCarte(CARTE_LIVREE)
+    c.liens = c.liens.filter((l) => l.vers !== 'OBS')
+    expect(routesVersObjectif(c)).toEqual([])
+    // la borne tient une carte en plat de nouilles
+    expect(routesVersObjectif(CARTE_LIVREE, 1)).toHaveLength(1)
+  })
+
+  it('les haltes sont les natures sans salle où l’on s’arrête', () => {
+    expect(HALTES).toEqual(['economat', 'repos', 'don'])
+    expect(estHalte({ type: 'economat' })).toBe(true)
+    expect(estHalte({ type: 'combat' })).toBe(false)
+  })
+
+  it('moduleRevele — le « ? » sous sa nature : le nom la dit, une halte perd ses salles, un combat prend un cran', () => {
+    const inc = CARTE_LIVREE.modules.find((m) => m.id === 'INC1')!
+    expect(inc.type).toBe('inconnu')
+    expect(REVELATIONS).toEqual(['economat', 'repos', 'don', 'coffre', 'combat'])
+    const eco = moduleRevele(CARTE_LIVREE, inc, 'economat')
+    expect(eco.type).toBe('economat')
+    expect(eco.nom).toBe('? — ÉCONOMAT')
+    expect(eco.niveaux).toBe(0)
+    const combat = moduleRevele(CARTE_LIVREE, inc, 'combat')
+    expect(combat.niveaux).toBe(1)
+    expect(combat.cran).toBe(1) // surchauffé : un cran de plus que le module
+    expect(moduleRevele(CARTE_LIVREE, inc, 'coffre').cran).toBe(0)
   })
 })
 
@@ -212,14 +318,89 @@ describe('couleurTemperature — l’échelle par seuils', () => {
 })
 
 describe('les routes', () => {
-  it('depuis le HUB, trois coursives ; depuis un cul-de-sac, aucune', () => {
+  it('depuis le HUB, trois coursives ; depuis une cache, la route continue', () => {
     expect(liensDepuis(CARTE_LIVREE, 'HUB').map((l) => l.vers)).toEqual(['T1', 'T2', 'T3'])
-    expect(liensDepuis(CARTE_LIVREE, 'S1b')).toEqual([])
+    expect(liensDepuis(CARTE_LIVREE, 'CN').map((l) => l.vers)).toEqual(['P1', 'P2'])
   })
 
   it('tout est atteignable depuis le départ', () => {
     const vus = accessibles(CARTE_LIVREE, 'HUB')
-    expect(vus.size).toBe(11)
+    expect(vus.size).toBe(21)
+  })
+
+  it('les trois actes sont à distance égale de l’objectif, et chacun ouvre sur deux haltes', () => {
+    // le contrat du §9.3 : sortir hors protocole ne raccourcit pas le
+    // parcours, il le déplace — trois voies par acte, même compte de salles
+    // plusCourtVers ne compte pas les salles du module où l'on EST : depuis
+    // un transformateur il reste quatre biomes, depuis une coursive trois
+    expect(plusCourtVers(CARTE_LIVREE, 'HUB', 'OBS')).toBe(30)
+    for (const t of ['T1', 'T2', 'T3']) expect(plusCourtVers(CARTE_LIVREE, t, 'OBS')).toBe(24)
+    for (const s of ['C1', 'C2', 'C3']) expect(plusCourtVers(CARTE_LIVREE, s, 'OBS')).toBe(18)
+    for (const s of ['P1', 'P2', 'P3']) expect(plusCourtVers(CARTE_LIVREE, s, 'OBS')).toBe(12)
+    // chaque module d'acte ouvre sur DEUX haltes, et deux voisins n'offrent
+    // jamais la même paire : la halte se choisit autant que le secteur
+    expect(liensDepuis(CARTE_LIVREE, 'C1').map((l) => l.vers)).toEqual(['CN', 'DON'])
+    expect(liensDepuis(CARTE_LIVREE, 'C2').map((l) => l.vers)).toEqual(['CN', 'CS'])
+    expect(liensDepuis(CARTE_LIVREE, 'C3').map((l) => l.vers)).toEqual(['DON', 'CS'])
+    // les haltes n'ont pas de salle ; quatre modules portent le cran
+    expect(CARTE_LIVREE.modules.filter(estHalte).map((m) => `${m.id}:${m.niveaux}`)).toEqual([
+      'ECO1:0', 'REP1:0', 'DON:0', 'ECO2:0', 'REP2:0',
+    ])
+    expect(CARTE_LIVREE.modules.filter((m) => m.cran > 0).map((m) => m.id)).toEqual(['C1', 'C3', 'P1', 'P3'])
+  })
+})
+
+describe('verifieRoutes — les règles de route, à la Slay the Spire', () => {
+  it('la carte livrée les respecte toutes', () => {
+    expect(verifieRoutes(CARTE_LIVREE)).toEqual([])
+  })
+
+  it('une seule route vers l’objectif : le plan n’offre aucun choix', () => {
+    const c = cloneCarte(CARTE_LIVREE)
+    // on ne laisse qu'une voie par acte : une seule route mène au bout
+    c.liens = c.liens.filter(
+      (l) => !['T1', 'T3', 'INC1', 'REP1', 'C1', 'C3', 'CS', 'P1', 'P3', 'REP2'].includes(l.vers),
+    )
+    const v = verifieRoutes(c)
+    expect(v.some((x) => /une seule route/.test(x.message))).toBe(true)
+  })
+
+  it('des routes à distance inéquivalente se signalent (§9.3) — à une salle près, non', () => {
+    const c = cloneCarte(CARTE_LIVREE)
+    c.modules.find((m) => m.id === 'C2')!.niveaux = 1 // CONDUITS perd cinq salles
+    expect(verifieRoutes(c).some((x) => /distance équivalente.*de 25 à 31/.test(x.message))).toBe(true)
+    // la carte livrée va de 30 à 31 : toléré
+    expect(verifieRoutes(CARTE_LIVREE).some((x) => /distance équivalente/.test(x.message))).toBe(false)
+  })
+
+  it('deux confinements supérieurs d’affilée se signalent, la paire nommée', () => {
+    const c = cloneCarte(CARTE_LIVREE)
+    c.modules.find((m) => m.id === 'CN')!.cran = 1 // la cache nord prend un cran
+    const v = verifieRoutes(c).filter((x) => /d’affilée/.test(x.message))
+    // elle est prise en sandwich : le cryostat avant, le puits froid après
+    expect(v.map((x) => x.module).sort()).toEqual(['CN', 'P1'])
+    expect(v.some((x) => x.message.includes('C1 → CN'))).toBe(true)
+  })
+
+  it('une route sans arrêt se signale ; une carte sans halte aussi', () => {
+    const c = cloneCarte(CARTE_LIVREE)
+    c.liens.push({ de: 'T2', vers: 'OBS', type: 'alt' }) // un raccourci sans arrêt
+    const v = verifieRoutes(c)
+    expect(v.some((x) => /1 route sur \d+ sans arrêt/.test(x.message))).toBe(true)
+    // une cache est un arrêt : les routes qui y passent ne se signalent pas
+    expect(verifieRoutes(CARTE_LIVREE).some((x) => /sans arrêt/.test(x.message))).toBe(false)
+    const nue = cloneCarte(CARTE_LIVREE)
+    for (const m of nue.modules) if (estHalte(m)) m.type = 'jonction'
+    expect(verifieRoutes(nue).some((x) => /aucune halte/.test(x.message))).toBe(true)
+  })
+
+  it('une halte avec des salles est une erreur de fond', () => {
+    const c = cloneCarte(CARTE_LIVREE)
+    c.modules.find((m) => m.id === 'ECO1')!.niveaux = 2 // l'économat
+    const v = verifieCarte(c)
+    expect(v.some((x) => x.niveau === 'erreur' && x.module === 'ECO1' && /halte/.test(x.message))).toBe(true)
+    // sans réclamer de biome : une halte n'en a pas
+    expect(v.some((x) => x.module === 'ECO1' && /biome/.test(x.message))).toBe(false)
   })
 })
 
@@ -243,9 +424,9 @@ describe('verifieCarte — les défauts de fond', () => {
     const c = cloneCarte(CARTE_LIVREE)
     c.modules[6].x = c.modules[5].x
     c.modules[6].y = c.modules[5].y
-    c.modules[7].id = 'S1'
+    c.modules[7].id = c.modules[5].id
     const v = verifieCarte(c)
     expect(v.some((x) => /se chevauchent/.test(x.message))).toBe(true)
-    expect(v.some((x) => x.niveau === 'erreur' && /« S1 » est porté par 2/.test(x.message))).toBe(true)
+    expect(v.some((x) => x.niveau === 'erreur' && /est porté par 2 modules/.test(x.message))).toBe(true)
   })
 })

@@ -25,6 +25,7 @@ import {
   orbeRequis,
   liensDepuis,
   moduleParId,
+  moduleRevele,
   traceLien,
   zoneDe,
   type CarteStation,
@@ -55,6 +56,8 @@ export interface OptionsDessin {
   /** le module joignable EN REVENANT SUR SES PAS (l'objectif est hors de
    *  portée d'ici) : il s'allume comme une cible, sans coursive */
   retour?: string | null
+  /** les « ? » révélés de la run : le plan les dessine sous leur nature */
+  revelations?: Record<string, TypeModule>
 }
 
 /** Les glyphes des natures de module — le dessin, pas la donnée : un
@@ -66,6 +69,10 @@ export const GLYPHES: Record<TypeModule, string> = {
   enigme: '▦',
   coffre: '◆',
   boss: '⬢',
+  economat: '⚖',
+  repos: '☾',
+  don: '✦',
+  inconnu: '?',
 }
 
 const COURANT = '#a7ddf5' // le givre : la couleur du « vous êtes ici »
@@ -336,8 +343,11 @@ function vecteurs(m: ModuleCarte, accent: string, P: CarteStation['palette']): s
   return corps
 }
 
-function module(c: CarteStation, m: ModuleCarte, k: number, o: OptionsDessin): string {
+function module(c: CarteStation, m0: ModuleCarte, k: number, o: OptionsDessin): string {
   const P = c.palette
+  // un « ? » révélé se dessine sous sa nature — glyphe, nom, cran
+  const nature = o.revelations?.[m0.id]
+  const m = m0.type === 'inconnu' && nature ? moduleRevele(c, m0, nature) : m0
   const zc = zoneDe(c, m)?.couleur ?? P.texteSecondaire
   const rond = m.forme === 'rond'
   const boss = m.type === 'boss'
@@ -373,8 +383,8 @@ function module(c: CarteStation, m: ModuleCarte, k: number, o: OptionsDessin): s
   const clip = `cs-clip-${k}`
 
   let s =
-    `<g class="${classes}" data-mod="${esc(m.id)}" tabindex="0" role="button" style="--z:${zc};--bord:${bord}" opacity="${opacite}" aria-label="${esc(m.nom)} — ${esc(c.types[m.type])}">` +
-    `<title>${esc(m.nom)} — ${esc(c.types[m.type])}</title>` +
+    `<g class="${classes}" data-mod="${esc(m.id)}" tabindex="0" role="button" style="--z:${zc};--bord:${bord}" opacity="${opacite}" aria-label="${esc(m.nom)} — ${esc(c.types[m.type])}${m.cran > 0 ? ` — confinement +${m.cran}` : ''}">` +
+    `<title>${esc(m.nom)} — ${esc(c.types[m.type])}${m.cran > 0 ? ` — confinement +${m.cran}` : ''}</title>` +
     `<clipPath id="${clip}">${forme(3)}/></clipPath>` +
     `${forme(0)} class="cs-bord" fill="${bord}"/>` +
     `${forme(3)} class="cs-fond" fill="${fond}"/>` +
@@ -394,6 +404,11 @@ function module(c: CarteStation, m: ModuleCarte, k: number, o: OptionsDessin): s
     s += `${forme(0)} class="cs-voile" fill="rgba(3,7,16,.55)"/><text class="cs-cadenas" x="${n1(m.x)}" y="${n1(m.y)}">🔒</text>`
   if (visite && !estCourant)
     s += `<text class="cs-coche" x="${n1(l + m.w - 12)}" y="${n1(t + 12)}">✓</text>`
+  // LE CONFINEMENT SUPÉRIEUR se lit sur le plan avant qu'on s'y engage : le
+  // joueur pèse la route en voyant la marque, comme l'élite d'un Slay the
+  // Spire — plus dur, plus généreux
+  if (m.cran > 0)
+    s += `<text class="cs-cran" x="${n1(l + m.w - 16)}" y="${n1(t + m.h - 14)}" fill="${P.chaud}">+${m.cran}</text>`
 
   // l'étiquette : le nom sous le fût, puis la température
   const etiquette = !jonction || sel || estCourant || edition

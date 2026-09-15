@@ -22,6 +22,10 @@ export interface InstrumentDef {
   effets: Effet[]
   /** Carte fabriquée à l'écran des récompenses (jamais livrée en dur). */
   perso?: boolean
+  /** UNE CONTREPARTIE : une carte qui COÛTE. Elle ne se propose jamais au
+   *  tirage d'un palier — on ne « choisit » pas un malus — mais une salle
+   *  événement peut vous en coller une, et le jeu la lit comme une autre. */
+  contrepartie?: boolean
 }
 
 export const INSTRUMENTS: InstrumentDef[] = [
@@ -332,6 +336,8 @@ export function tirageInstruments(
   catalogue: InstrumentDef[] = INSTRUMENTS,
 ): CarteTirage[] {
   const pool = catalogue.filter((d) => {
+    // une CONTREPARTIE ne se propose jamais : elle s'attrape, elle ne se choisit pas
+    if (d.contrepartie) return false
     // une carte qui donne une VIE ne paraît que s'il en manque une — peu
     // importe son nom : c'est son levier qui la range là
     if (d.effets.some((e) => e.levier === 'vies')) return vies < viesMax
@@ -376,3 +382,69 @@ export function prochainPalier(xp: number): number | null {
   for (const p of PALIERS_XP) if (xp < p) return p
   return null
 }
+
+// ---- LES CONTREPARTIES ----------------------------------------------------
+// Ce que les salles événement peuvent vous coller quand un pari tourne mal,
+// ou quand une offre généreuse se paie. Ce sont des cartes comme les
+// autres — mêmes leviers, même lecture — à ceci près qu'elles ne paraissent
+// JAMAIS au tirage d'un palier : on ne choisit pas un malus, on l'attrape.
+// Elles portent un nom de panne, pas un nom de punition : le jeu raconte
+// une station qui se dégrade, pas un arbitre qui sanctionne.
+export const CONTREPARTIES: InstrumentDef[] = [
+  {
+    id: 'fuite-lente',
+    nom: 'Fuite lente',
+    desc: 'Une part de vous s’échappe en continu : le corps lâche plus tôt.',
+    icone: '💧',
+    effets: [{ levier: 'seuilDispersion', valeur: 1.2 }],
+    contrepartie: true,
+  },
+  {
+    id: 'residu-collant',
+    nom: 'Résidu collant',
+    desc: 'Vous avez pris quelque chose de gras : les éponges vous tiennent mieux.',
+    icone: '🩹',
+    effets: [{ levier: 'priseEponge', valeur: 1.5 }],
+    contrepartie: true,
+  },
+  {
+    id: 'gaine-fendue',
+    nom: 'Gaine fendue',
+    desc: 'Le froid du vaisseau vous atteint plus vite.',
+    icone: '❄️',
+    effets: [{ levier: 'froid', valeur: 0.7 }],
+    contrepartie: true,
+  },
+  {
+    id: 'buse-encrassee',
+    nom: 'Buse encrassée',
+    desc: 'Un dash de moins dans la réserve de chaque tableau.',
+    icone: '🕳️',
+    effets: [{ levier: 'dashs', valeur: -1 }],
+    contrepartie: true,
+  },
+  {
+    id: 'bonbonne-percee',
+    nom: 'Bonbonne percée',
+    desc: 'La réserve tient deux litres de moins.',
+    icone: '🫙',
+    effets: [{ levier: 'bonbonne', valeur: -2 }],
+    contrepartie: true,
+  },
+  {
+    id: 'fuite-prioritaire',
+    nom: 'Classé fuite prioritaire',
+    desc: 'Le vaisseau vous suit à la trace : la visée se dérègle.',
+    icone: '📡',
+    effets: [{ levier: 'visee', valeur: 0.7 }],
+    contrepartie: true,
+  },
+  {
+    id: 'vapeur-eventee',
+    nom: 'Vapeur éventée',
+    desc: 'Votre gaz se dissipe nettement plus vite.',
+    icone: '💨',
+    effets: [{ levier: 'perteVapeur', valeur: 1.5 }],
+    contrepartie: true,
+  },
+]

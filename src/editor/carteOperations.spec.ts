@@ -38,15 +38,15 @@ describe('déplacer et redimensionner', () => {
 
   it('tient le coin opposé fixe, et ne descend pas sous la taille minimale', () => {
     const c = carte()
-    const o = { x: 507, y: 385, w: 136, h: 136 } // T2 : de 439 à 575
+    const o = { x: 500, y: 402, w: 128, h: 128 } // T2 : de 436 à 564
     redimensionneModule(c, 'T2', 'se', o, 40, -8, 8)
     const m = moduleParId(c, 'T2')!
-    // le coin nord-ouest (439, 317) n'a pas bougé
-    expect(m.x - m.w / 2).toBe(439)
-    expect(m.y - m.h / 2).toBe(317)
-    // le coin tenu, lui, s'aimante à la grille : 615 → 616, 445 → 448
-    expect(m.x + m.w / 2).toBe(616)
-    expect(m.y + m.h / 2).toBe(448)
+    // le coin nord-ouest (436, 338) n'a pas bougé
+    expect(m.x - m.w / 2).toBe(436)
+    expect(m.y - m.h / 2).toBe(338)
+    // le coin tenu, lui, s'aimante à la grille : 604 → 608, 458 → 456
+    expect(m.x + m.w / 2).toBe(608)
+    expect(m.y + m.h / 2).toBe(456)
     // tirer le coin au-delà du coin opposé : la taille s'arrête au minimum
     redimensionneModule(c, 'T2', 'nw', o, 500, 500, 8)
     expect(moduleParId(c, 'T2')!.w).toBe(32)
@@ -55,10 +55,10 @@ describe('déplacer et redimensionner', () => {
 
   it('recalcule depuis l’origine du geste : l’aimant ne dérive pas', () => {
     const c = carte()
-    const o = { x: 507, y: 385, w: 136, h: 136 }
+    const o = { x: 500, y: 402, w: 128, h: 128 }
     for (let i = 1; i <= 30; i++) redimensionneModule(c, 'T2', 'se', o, i * 0.5, 0, 8)
-    // 15 unités au total : le bord droit 575 va à 592 (aimanté à 8), pas plus loin
-    expect(moduleParId(c, 'T2')!.x + moduleParId(c, 'T2')!.w / 2).toBe(592)
+    // 15 unités au total : le bord droit 564 va à 576 (aimanté à 8), pas plus loin
+    expect(moduleParId(c, 'T2')!.x + moduleParId(c, 'T2')!.w / 2).toBe(576)
   })
 })
 
@@ -67,20 +67,21 @@ describe('ajouter, dupliquer, supprimer, renommer', () => {
     const c = carte()
     expect(identifiantLibre(c)).toBe('M1')
     expect(identifiantLibre(c, 'T2')).toBe('T2-2')
-    const m = ajouteModule(c, 1030, 400, 8)
+    const m = ajouteModule(c, 1930, 300, 8)
     expect(m.id).toBe('M1')
-    expect(m.zone).toBe(3) // à côté de l'observatoire
-    expect(c.modules).toHaveLength(12)
+    expect(m.zone).toBe(5) // à côté de l'observatoire
+    expect(m.cran).toBe(0) // l'ordinaire, jamais un confinement par mégarde
+    expect(c.modules).toHaveLength(22)
     expect(ajouteModule(c, 0, 0, 8).id).toBe('M2')
   })
 
   it('supprimer un module emporte ses coursives', () => {
     const c = carte()
-    expect(supprimeModule(c, 'N')).toBe(true)
-    expect(c.modules.some((m) => m.id === 'N')).toBe(false)
-    expect(c.liens.some((l) => l.de === 'N' || l.vers === 'N')).toBe(false)
-    expect(c.liens).toHaveLength(6)
-    expect(supprimeModule(c, 'N')).toBe(false)
+    expect(supprimeModule(c, 'N1')).toBe(true)
+    expect(c.modules.some((m) => m.id === 'N1')).toBe(false)
+    expect(c.liens.some((l) => l.de === 'N1' || l.vers === 'N1')).toBe(false)
+    expect(c.liens).toHaveLength(28) // 34 moins trois entrantes et trois sortantes
+    expect(supprimeModule(c, 'N1')).toBe(false)
   })
 
   it('renommer suit partout : coursives, décor, règles', () => {
@@ -105,12 +106,12 @@ describe('ajouter, dupliquer, supprimer, renommer', () => {
 describe('les coursives', () => {
   it('trace, refuse le doublon, le lien sur soi et le bout inconnu', () => {
     const c = carte()
-    expect(ajouteLien(c, 'S1b', 'OBS', 'alt')).toBe(12)
-    expect(ajouteLien(c, 'S1b', 'OBS', 'main')).toBe(-1) // même départ, même arrivée
-    expect(ajouteLien(c, 'OBS', 'S1b', 'alt')).toBe(13) // l'inverse est un autre lien
+    expect(ajouteLien(c, 'CN', 'ECO1', 'alt')).toBe(34)
+    expect(ajouteLien(c, 'CN', 'ECO1', 'main')).toBe(-1) // même départ, même arrivée
+    expect(ajouteLien(c, 'ECO1', 'CN', 'alt')).toBe(35) // l'inverse est un autre lien
     expect(ajouteLien(c, 'OBS', 'OBS', 'main')).toBe(-1)
     expect(ajouteLien(c, 'OBS', 'X', 'main')).toBe(-1)
-    expect(ajouteLien(c, 'OBS', 'S3b', 'teleport')).toBe(-1)
+    expect(ajouteLien(c, 'OBS', 'CS', 'teleport')).toBe(-1)
   })
 
   it('inverse le sens, sauf si l’inverse existe déjà', () => {
@@ -123,11 +124,11 @@ describe('les coursives', () => {
 
   it('modifie un bout ou le type, en refusant ce qui ferait doublon', () => {
     const c = carte()
-    expect(modifieLien(c, 3, { type: 'main' })).toBe(true) // T1 → N
+    expect(modifieLien(c, 3, { type: 'main' })).toBe(true) // T1 → N1
     expect(modifieLien(c, 3, { vers: 'T1' })).toBe(false) // sur soi
-    expect(modifieLien(c, 3, { de: 'T2' })).toBe(false) // T2 → N existe
+    expect(modifieLien(c, 3, { de: 'T2' })).toBe(false) // T2 → N1 existe
     expect(supprimeLien(c, 3)).toBe(true)
-    expect(c.liens).toHaveLength(11)
+    expect(c.liens).toHaveLength(33)
     expect(supprimeLien(c, 40)).toBe(false)
   })
 })
@@ -175,7 +176,7 @@ describe('l’historique', () => {
     deplaceModule(c, 'T2', 600, 400, 0)
     expect(h.peutAnnuler).toBe(true)
     const avant = h.annule(c)!
-    expect(moduleParId(avant, 'T2')!.x).toBe(507)
+    expect(moduleParId(avant, 'T2')!.x).toBe(500)
     expect(h.peutRetablir).toBe(true)
     const apres = h.retablit(avant)!
     expect(moduleParId(apres, 'T2')!.x).toBe(600)
