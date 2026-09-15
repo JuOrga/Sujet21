@@ -216,7 +216,9 @@ export function sauveCinematiques(cines: CinematiqueDef[]): void {
 // L'approche est muette parce que la première réplique doit tomber sur la
 // cuve, juste après le hublot : c'est là qu'elle porte. Six zooms enchaînés
 // font un seul travelling ; seule la planche 3 panote, pour lire la
-// station d'un bout à l'autre.
+// station d'un bout à l'autre. Côté son : le lit glacial dès la planète
+// (la bande-son n'a aucun son d'espace, et le silence y est juste), la
+// condensation sur la vitre du hublot, puis le lit tiède avec la cuve.
 // Les SVG essai-*.svg restent en place : ils servent de planches
 // provisoires aux cinématiques qui attendent leurs images.
 
@@ -225,7 +227,10 @@ export const CINEMATIQUE_ESSAI: CinematiqueDef = {
   titre: "L'ouverture — la planète, la station, la cuve, l'alerte, la brèche, le sas",
   planches: [
     {
-      // la planète à anneau, seule : le vide avant tout
+      // la planète à anneau, seule : le vide avant tout — et le lit glacial
+      // dès la première image : dehors, c'est froid ; la cuve, tiède, ne
+      // vient qu'après le hublot (le miroir de la bascule tiède → glacial
+      // du module vide, plus loin)
       image: '/assets/cine/approche-1.webp',
       texte: '',
       duree: 6,
@@ -233,7 +238,7 @@ export const CINEMATIQUE_ESSAI: CinematiqueDef = {
       fondu: 'noir',
       bruitage: '',
       ponctuation: '',
-      piste: '',
+      piste: 'cuve-glaciale',
     },
     {
       // le limbe, et un point brillant : la station, trop loin pour une forme
@@ -287,7 +292,7 @@ export const CINEMATIQUE_ESSAI: CinematiqueDef = {
       duree: 4,
       effet: 'zoom-avant',
       fondu: 'aucun',
-      bruitage: '',
+      bruitage: 'condensation', // la buée sur la vitre, le seul son du dehors
       ponctuation: '',
       piste: '',
     },
