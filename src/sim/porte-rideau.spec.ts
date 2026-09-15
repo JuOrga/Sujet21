@@ -55,6 +55,30 @@ describe('FluidSim.setDoors — la matérialisation d’une porte', () => {
     expect(Math.abs(s.posY[haut] - s.posY[bas])).toBeLessThan(60)
   })
 
+  it('MÊME TRÈS VITE, le front n’abandonne personne derrière lui', () => {
+    // Mesuré le 15/09/2026 : un amas de 5×5 au milieu de la porte, rideau
+    // tombant. À 150, 300, 500, 800, 1200, 2000 et 4000 u/s, les 25
+    // particules ressortent PAR LE BAS — aucune ne reste au-dessus. Le
+    // demi-plan y est pour tout : une particule rattrapée par le front est
+    // DANS la part matérialisée, et le champ l'y pousse vers le front (la
+    // coupe est plus proche que la face opposée), si vite qu'il aille.
+    // 4000 u/s, c'est 33 u par sous-pas, cinq fois l'espacement du réseau.
+    const s = sim()
+    const idx: number[] = []
+    for (let a = -2; a <= 2; a++)
+      for (let b = -2; b <= 2; b++) idx.push(s.addParticle(a * 6.6, b * 6.6, KIND_PLAYER))
+    const porte: PorteDef = { ...PORTE, materialisation: 'rideau', allure: 4000 }
+    let avance = 0
+    for (let k = 0; k < 120; k++) {
+      avance = porteAvance(porte, avance, false, s.params.dt)
+      const b = porteBoite(porte, avance)
+      s.setDoors(b ? [b] : [])
+      s.step(s.params.dt)
+    }
+    expect(avance).toBe(1)
+    for (const i of idx) expect(s.posY[i]).toBeLessThan(-60)
+  })
+
   it('une goutte hors de la porte ne sent rien passer', () => {
     const s = sim()
     const i = s.addParticle(0, 200, KIND_PLAYER)
