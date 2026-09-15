@@ -15,6 +15,7 @@ import {
   porteCourse,
   porteCoupe,
   porteDuree,
+  portePart,
   portePolygone,
 } from './porte'
 
@@ -101,6 +102,37 @@ describe('porte — l’éventail', () => {
     const rMax = Math.hypot(40, 300)
     expect(porteCourse(EVENTAIL)).toBeCloseTo((Math.PI / 2) * rMax, 6)
     expect(porteCourse({ ...EVENTAIL, pivot: 1 })).toBeCloseTo(Math.PI * Math.hypot(20, 300), 6)
+  })
+})
+
+describe('porte — la part matérialisée, et l’allure', () => {
+  it('le RIDEAU est régulier : sa part vaut son avancement', () => {
+    for (const s of [0.1, 0.25, 0.5, 0.75, 0.9]) {
+      expect(portePart(RIDEAU, s)).toBeCloseTo(s, 6)
+    }
+  })
+
+  it('l’ÉVENTAIL ne l’est pas, et c’est mesurable : 6 % à mi-course sur le gabarit courant', () => {
+    // 40 × 340 pivotée sur un coin : le gabarit des portes du dépôt. À
+    // mi-course, le front est à 45° et n'a découpé qu'un triangle de 40 ×
+    // 40 dans un panneau de 13 600 — d'où l'avertissement de l'éditeur.
+    const p: PorteDef = { minX: 0, minY: 0, maxX: 40, maxY: 340, canal: 1, materialisation: 'eventail' }
+    expect(portePart(p, 0.5) * 100).toBeCloseTo(5.88, 1)
+    expect(portePart(p, 1)).toBe(1)
+    expect(portePart(p, 0)).toBe(0)
+    // une porte CARRÉE pivotée pareil reste honnête : la moitié du temps
+    // matérialise la moitié du panneau, à quelques points près
+    const carre: PorteDef = { minX: 0, minY: 0, maxX: 200, maxY: 200, canal: 1, materialisation: 'eventail' }
+    expect(portePart(carre, 0.5)).toBeCloseTo(0.5, 1)
+  })
+
+  it('une allure nulle ou absente retombe sur le défaut — jamais sur une porte qui pope', () => {
+    // `allure: 0` entrait par un fichier dont la valeur s'arrondissait à
+    // zéro : la durée devenait nulle, et le rideau sautait à sa cible.
+    expect(porteDuree({ ...RIDEAU, allure: 0 })).toBeCloseTo(1, 6)
+    expect(porteDuree({ ...RIDEAU, allure: undefined })).toBeCloseTo(1, 6)
+    expect(porteDuree({ ...RIDEAU, allure: 150 })).toBeCloseTo(2, 6)
+    expect(porteAvance({ ...RIDEAU, allure: 0 }, 0, false, 0.25)).toBeCloseTo(0.25, 9)
   })
 })
 

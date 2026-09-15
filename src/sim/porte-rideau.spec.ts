@@ -79,6 +79,47 @@ describe('FluidSim.setDoors — la matérialisation d’une porte', () => {
     for (const i of idx) expect(s.posY[i]).toBeLessThan(-60)
   })
 
+  it('LA POUSSÉE NE DÉPEND PAS DE LA CADENCE : le front doit avancer au sous-pas, pas par image', () => {
+    // Le front avançait d'un coup de toute l'image, puis la physique
+    // jouait ses sous-pas sur une porte figée : le saut était encaissé par
+    // un seul sous-pas, et PBD traduit une position corrigée en vitesse
+    // (v = déplacement / dt). La propulsion valait donc l'allure
+    // multipliée par le nombre de sous-pas — elle changeait avec la
+    // cadence de la machine. Mesuré le 15/09/2026 à 300 u/s : 488 u/s au
+    // sous-pas quelle que soit la cadence, contre 488 / 559 / 1 480 /
+    // 2 243 par image à 1, 2, 4 et 8 sous-pas. Pour mémoire, la note de
+    // CHASSE_ALLURE_DEFAUT : à 700 u/s le corps s'écrase et se disperse.
+    const porte: PorteDef = { ...PORTE, materialisation: 'rideau' }
+    const joue = (sousPas: number, parSousPas: boolean): number => {
+      const s = sim()
+      const idx: number[] = []
+      for (let a = -2; a <= 2; a++)
+        for (let b = -2; b <= 2; b++) idx.push(s.addParticle(a * 6.6, b * 6.6, KIND_PLAYER))
+      let av = 0
+      let crete = 0
+      const pose = (dt: number): void => {
+        av = porteAvance(porte, av, false, dt)
+        const b = porteBoite(porte, av)
+        s.setDoors(b ? [b] : [])
+      }
+      for (let image = 0; image < 200 && av < 1; image++) {
+        if (!parSousPas) pose(sousPas * s.params.dt)
+        for (let k = 0; k < sousPas; k++) {
+          if (parSousPas) pose(s.params.dt)
+          s.step(s.params.dt)
+          for (const i of idx) crete = Math.max(crete, Math.abs(s.velY[i]))
+        }
+      }
+      return crete
+    }
+    const auSousPas = [1, 2, 4, 8].map((n) => joue(n, true))
+    // la même poussée aux quatre cadences, à 5 % près
+    for (const v of auSousPas) expect(v).toBeCloseTo(auSousPas[0], -1.5)
+    for (const v of auSousPas) expect(v).toBeLessThan(700)
+    // et le piège, gardé sous les yeux : par image, la poussée s'envole
+    expect(joue(8, false)).toBeGreaterThan(2 * auSousPas[0])
+  })
+
   it('une goutte hors de la porte ne sent rien passer', () => {
     const s = sim()
     const i = s.addParticle(0, 200, KIND_PLAYER)

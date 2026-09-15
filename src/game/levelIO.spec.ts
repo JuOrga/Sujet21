@@ -430,6 +430,28 @@ it('la matérialisation d’une porte survit à l’aller-retour, et une façon 
   expect(again.level!.portes![2]).toEqual({ minX: 300, minY: -200, maxX: 340, maxY: 200, canal: 1 })
 })
 
+it('matérialisation : le sens se normalise, et l’allure ne tombe jamais à zéro', () => {
+  const base = { minX: 100, minY: -200, maxX: 140, maxY: 200, canal: 1, materialisation: 'rideau' as const }
+  const lu = (p: Record<string, unknown>): Record<string, unknown> =>
+    parseLevel({ ...TABLEAUX[0], cibles: [{ x: 700, y: -300, r: 30 }], portes: [p] })
+      .level!.portes![0] as unknown as Record<string, unknown>
+  // 270° est parfaitement jouable (« vers le bas »), mais le curseur de la
+  // fiche est borné à ±180 : sans normalisation il l'écrasait à 180 — le
+  // rideau changeait de côté — à la première retouche venue
+  expect(lu({ ...base, sens: 270 }).sens).toBe(-90)
+  expect(lu({ ...base, sens: -270 }).sens).toBe(90)
+  expect(lu({ ...base, sens: 540 }).sens).toBe(180)
+  expect(lu({ ...base, sens: 45 }).sens).toBe(45)
+  // une allure qui s'arrondit à zéro donnait une porte qui pope en se
+  // disant rideau, et disparaissait à la relecture suivante
+  expect(lu({ ...base, allure: 0.4 }).allure).toBe(1)
+  expect(lu({ ...base, allure: -5 }).allure).toBeUndefined()
+  // et l'aller-retour converge : ce qu'on écrit est ce qu'on relit
+  const unTour = lu({ ...base, allure: 0.4, sens: 270 })
+  const deuxTours = lu(unTour)
+  expect(deuxTours).toEqual(unTour)
+})
+
 it('canaux : le n° d’une cible survit, l’héritage porte.cible (indice) se traduit', () => {
   const src = {
     ...TABLEAUX[0],

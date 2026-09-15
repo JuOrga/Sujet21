@@ -59,6 +59,7 @@ import {
   PORTE_PIVOT_NOMS,
   porteCoupe,
   porteDuree,
+  portePart,
   portePolygone,
 } from '../game/porte'
 import {
@@ -5903,9 +5904,22 @@ export class LevelEditor {
       }
       if (mat) {
         rows.push(numField('Allure du front (u/s)', 'p-pall', q.allure ?? PORTE_ALLURE_DEFAUT, 10))
+        // LA PART À MI-COURSE dit ce que la durée ne dit pas. Le rideau est
+        // régulier (50 % à mi-course, toujours) ; l'éventail balaie un
+        // angle, et sur une porte étroite et longue pivotée sur un coin il
+        // ne matérialise presque rien pendant la première moitié du temps
+        // avant de se remplir d'un coup — le défaut même qu'on corrige.
+        // Mieux vaut le chiffre sous les yeux de l'auteur qu'une surprise
+        // en jeu : il lui reste à choisir une autre charnière.
+        const part = Math.round(portePart(q, 0.5) * 100)
         rows.push(
-          `<p class="ed-empty">Fermeture complète en ${porteDuree(q).toFixed(2)} s à cette allure.</p>`,
+          `<p class="ed-empty">Fermeture complète en ${porteDuree(q).toFixed(2)} s à cette allure. À mi-course, ${part} % du panneau est matérialisé.</p>`,
         )
+        if (part < 25 || part > 75) {
+          rows.push(
+            `<div class="ed-v warn">! Matérialisation très irrégulière : l’essentiel du panneau apparaît d’un coup. Une charnière sur le milieu d’un côté, ou une porte moins allongée, répartissent mieux — la poussée sur le corps, elle, reste bornée à l’allure.</div>`,
+          )
+        }
       }
       rows.push(
         numField('X min', 'p-minX', q.minX),
@@ -6666,20 +6680,30 @@ export class LevelEditor {
       const mat = text('p-pmat')
       if (mat === 'rideau' || mat === 'eventail') {
         q.materialisation = mat
-        if (this.host.querySelector('#p-psens')) {
-          const sens = Math.round(val('p-psens'))
-          if (sens !== PORTE_SENS_DEFAUT) q.sens = sens
-          else delete q.sens
-        }
-        if (this.host.querySelector('#p-ppivot')) {
-          const pivot = Math.round(val('p-ppivot'))
-          if (pivot >= 1 && pivot <= 7) q.pivot = pivot
-          else delete q.pivot
-          if (text('p-prot') === 'horaire') q.horaire = true
-          else delete q.horaire
+        if (mat === 'rideau') {
+          // les réglages de l'AUTRE façon s'en vont : sans ce ménage, un
+          // aller-retour éventail → rideau → éventail ressuscitait une
+          // charnière que l'auteur croyait abandonnée, et le fichier
+          // gardait des champs que rien ne lit.
+          delete q.pivot
+          delete q.horaire
+          if (this.host.querySelector('#p-psens')) {
+            const sens = Math.round(val('p-psens'))
+            if (sens !== PORTE_SENS_DEFAUT) q.sens = sens
+            else delete q.sens
+          }
+        } else {
+          delete q.sens
+          if (this.host.querySelector('#p-ppivot')) {
+            const pivot = Math.round(val('p-ppivot'))
+            if (pivot >= 1 && pivot <= 7) q.pivot = pivot
+            else delete q.pivot
+            if (text('p-prot') === 'horaire') q.horaire = true
+            else delete q.horaire
+          }
         }
         const allure = Math.round(val('p-pall'))
-        if (allure > 0 && allure !== PORTE_ALLURE_DEFAUT) q.allure = allure
+        if (allure >= 1 && allure !== PORTE_ALLURE_DEFAUT) q.allure = allure
         else delete q.allure
       } else {
         delete q.materialisation
@@ -7505,7 +7529,19 @@ export class LevelEditor {
       // mi-course, et son front en trait vif — la flèche dit où il va. On
       // voit d'un coup d'œil de quel côté le corps sera poussé.
       if (q.materialisation) {
-        const { contour, front } = portePolygone(q, 0.5)
+        // l'aperçu se prend à MI-AIRE, pas à mi-course : sur un éventail
+        // étroit, la mi-course ne montre qu'un éclat dans un coin (6 % sur
+        // une porte 40 × 340 pivotée sur un angle) et ne dit rien de la
+        // forme balayée. On cherche l'avancement qui en matérialise la
+        // moitié — vingt pas de dichotomie, c'est un dessin d'éditeur.
+        let lo = 0
+        let hi = 1
+        for (let k = 0; k < 20; k++) {
+          const mid = (lo + hi) / 2
+          if (portePart(q, mid) < 0.5) lo = mid
+          else hi = mid
+        }
+        const { contour, front } = portePolygone(q, (lo + hi) / 2)
         g.fillStyle = 'rgba(255,90,90,0.22)'
         g.beginPath()
         for (let k = 0; k < contour.length; k++) {
@@ -7525,7 +7561,7 @@ export class LevelEditor {
           g.lineTo(f1.sx, f1.sy)
           g.stroke()
           // la flèche : du milieu du front, vers ce qui reste à combler
-          const k = porteCoupe(q, 0.5)
+          const k = porteCoupe(q, (lo + hi) / 2)
           const mx = (front[0].x + front[1].x) / 2
           const my = (front[0].y + front[1].y) / 2
           const L = Math.min(40, Math.hypot(q.maxX - q.minX, q.maxY - q.minY) / 4)

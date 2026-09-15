@@ -109,12 +109,53 @@ export function porteCourse(p: PorteDef): number {
   return tMax - tMin
 }
 
+/** L'allure retenue : une valeur absente OU nulle retombe sur le défaut.
+ *  Le `?? ` seul ne suffisait pas — un fichier portant `allure: 0` (une
+ *  fraction arrondie à zéro par la lecture) donnait une durée nulle, donc
+ *  une porte qui POPE en se prétendant rideau. */
+function allureDe(p: PorteDef): number {
+  return p.allure !== undefined && p.allure > 0 ? p.allure : PORTE_ALLURE_DEFAUT
+}
+
 /** La durée (s) d'une fermeture complète — 0 pour une porte d'un coup. */
 export function porteDuree(p: PorteDef): number {
   if (!p.materialisation) return 0
-  const allure = p.allure ?? PORTE_ALLURE_DEFAUT
-  if (!(allure > 0)) return 0
-  return porteCourse(p) / allure
+  const course = porteCourse(p)
+  if (!(course > 0)) return 0
+  return course / allureDe(p)
+}
+
+/** La PART de la porte déjà matérialisée à l'avancement s, en 0..1 (l'aire
+ *  du polygone sur celle du rectangle, par la formule du lacet — exacte).
+ *
+ *  ELLE NE SUIT PAS s, et c'est ce qu'il faut savoir avant de choisir un
+ *  éventail. Le rideau, lui, est régulier : sa part vaut son avancement.
+ *  L'éventail balaie un ANGLE à vitesse constante, et l'aire prise dans un
+ *  secteur croît comme le carré de la distance à la charnière : sur une
+ *  porte étroite et longue (40 × 340, le gabarit courant du dépôt) pivotée
+ *  sur un coin, la moitié de l'animation ne matérialise que 6 % du panneau,
+ *  et les deux tiers tombent dans les dernières 90 ms.
+ *
+ *  POURQUOI NE PAS PARAMÉTRER PAR L'AIRE, justement ? Parce que le remède
+ *  serait pire : pour que l'aire croisse régulièrement, le front devrait
+ *  tourner d'autant plus vite que le secteur est mince — infiniment vite au
+ *  départ d'une charnière d'angle. Or la vitesse du front EST la vitesse à
+ *  laquelle il pousse le corps. L'angle constant borne la poussée à
+ *  l'allure réglée, partout et à tout instant ; c'est ce qui compte, et
+ *  c'est pourquoi l'éditeur affiche la part à mi-course plutôt que de
+ *  corriger la courbe en douce. */
+export function portePart(p: PorteDef, s: number): number {
+  const total = (p.maxX - p.minX) * (p.maxY - p.minY)
+  if (!(total > 0)) return 0
+  const { contour } = portePolygone(p, s)
+  if (contour.length < 3) return 0
+  let aire = 0
+  for (let i = 0; i < contour.length; i++) {
+    const a = contour[i]
+    const b = contour[(i + 1) % contour.length]
+    aire += a.x * b.y - b.x * a.y
+  }
+  return Math.min(1, Math.abs(aire) / 2 / total)
 }
 
 /** La COUPE à l'avancement s (strictement entre 0 et 1) : le demi-plan

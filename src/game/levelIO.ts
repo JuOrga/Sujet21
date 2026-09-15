@@ -604,12 +604,24 @@ export function parseLevel(input: unknown): {
     // d'une chasse, le défaut vit dans le code.
     if (q.materialisation === 'rideau' || q.materialisation === 'eventail') {
       porte.materialisation = q.materialisation
-      if (q.sens !== undefined) porte.sens = Math.round(num(q.sens, PORTE_SENS_DEFAUT))
+      // le SENS se ramène dans (−180, 180] : la fiche de l'éditeur est un
+      // curseur borné là, et sans normalisation un fichier portant 270°
+      // (parfaitement jouable : c'est « vers le bas ») se faisait écraser à
+      // 180° — le rideau changeait de côté — à la première retouche venue.
+      if (q.sens !== undefined) {
+        let sens = Math.round(num(q.sens, PORTE_SENS_DEFAUT))
+        sens = ((((sens + 180) % 360) + 360) % 360) - 180
+        porte.sens = sens === -180 ? 180 : sens
+      }
       if (q.pivot !== undefined)
         porte.pivot = Math.max(0, Math.min(7, Math.round(num(q.pivot, 0))))
       if (q.horaire === true) porte.horaire = true
+      // plancher à 1 u/s : `allure: 0.4` s'arrondissait à 0, ce que porte.ts
+      // lisait comme « pas d'animation » — une porte qui pope en se disant
+      // rideau — et que la relecture suivante effaçait (0 n'est pas > 0),
+      // d'où deux comportements pour le même fichier.
       if (q.allure !== undefined && num(q.allure) > 0)
-        porte.allure = Math.round(num(q.allure))
+        porte.allure = Math.max(1, Math.round(num(q.allure)))
     }
     if (porte.maxX - porte.minX < 1 || porte.maxY - porte.minY < 1) {
       rejets.push('une porte a été écartée (taille nulle)')
