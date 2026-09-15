@@ -89,8 +89,8 @@ function monde(options: { webgl2?: boolean; moduleArrive?: boolean } = {}) {
     amorce: el('amorce'),
     demarre: () => (w.__sujet21Demarre as () => void)(),
     franchit: (nom: string) => (w.__sujet21Etape as (n: string) => void)(nom),
-    pouls: (fait: number, total: number, reste = '') =>
-      (w.__sujet21Compile as (f: number, t: number, r: string) => void)(fait, total, reste),
+    pouls: (fait: number, total: number) =>
+      (w.__sujet21Compile as (f: number, t: number) => void)(fait, total),
     erreur: (message: string) => {
       for (const f of ecouteurs.get('error') ?? []) f({ message })
     },
@@ -170,37 +170,33 @@ describe('La garde d’amorçage', () => {
       if (t === 10_000) expect(m.etape.textContent).toBe('le rendu se compile… 2/7')
     }
     expect(m.panne.classList.contains('visible')).toBe(false)
-    expect(m.etape.textContent).toMatch(/5\/7 — 40 s\./)
-    expect(m.etape.textContent).toMatch(/ne rechargez pas/)
+    expect(m.etape.textContent).toBe('chargement toujours en cours… 5/7 — 40 s')
     // le mot ne met plus la lenteur sur le dos de la carte graphique : c'est
     // faux (le compilateur de shaders tourne sur le processeur), et un joueur
     // avec une RTX 4060 Ti ne pouvait qu'en douter (15/09/2026)
-    expect(m.etape.textContent).not.toMatch(/carte graphique est lente/)
-    expect(m.etape.textContent).toMatch(/compilateur de shaders/)
+    expect(m.etape.textContent).not.toMatch(/carte graphique/)
   })
 
   // LE COMPTE FIGÉ (Chrome, RTX 4060 Ti, 15/09/2026) : « 6/7 » pendant
   // plusieurs minutes — le dernier programme est le plus gros — et rien ne
   // bougeait à l'écran. Le mot doit VIVRE : le temps écoulé avance à la
-  // seconde, et ce qui reste à lier est nommé.
-  it('sur le dernier programme, le mot dit le temps écoulé, à la seconde, et ce qui reste', () => {
+  // seconde. Et il reste COURT — le paragraphe d'explication essayé le
+  // même jour a été refusé par le concepteur.
+  it('sur le dernier programme, le mot dit « chargement toujours en cours » et le temps, à la seconde', () => {
     const m = monde()
     m.franchit('rendu')
-    const reste = 'la composition (le plus gros des sept)'
     for (let t = 0; t < 11_000; t += 16) {
-      m.pouls(6, 7, reste)
+      m.pouls(6, 7)
       vi.advanceTimersByTime(16)
     }
     expect(m.etape.textContent).toBe('le rendu se compile… 6/7') // encore court : rien à dire
     for (let t = 11_000; t < 65_000; t += 16) {
-      m.pouls(6, 7, reste)
+      m.pouls(6, 7)
       vi.advanceTimersByTime(16)
-      if (t === 12_000 + 16) expect(m.etape.textContent).toMatch(/6\/7 — 12 s — reste la composition/)
-      if (t === 30_000 + 16) expect(m.etape.textContent).toMatch(/— 30 s —/)
+      if (t === 12_000 + 16) expect(m.etape.textContent).toBe('chargement toujours en cours… 6/7 — 12 s')
+      if (t === 30_000 + 16) expect(m.etape.textContent).toBe('chargement toujours en cours… 6/7 — 30 s')
     }
-    expect(m.etape.textContent).toMatch(/6\/7 — 1 min 05 s — reste la composition \(le plus gros des sept\)\./)
-    expect(m.etape.textContent).toMatch(/sur le processeur/)
-    expect(m.etape.textContent).toMatch(/ne rechargez pas/)
+    expect(m.etape.textContent).toBe('chargement toujours en cours… 6/7 — 1 min 05 s')
     expect(m.panne.classList.contains('visible')).toBe(false)
   })
 

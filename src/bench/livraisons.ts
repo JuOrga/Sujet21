@@ -31,6 +31,15 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/09/2026 10:58',
+    title: 'LE MOT DU CHARGEMENT, COURT : « chargement toujours en cours… 6/7 — 57 s »',
+    notes: [
+      'LA DEMANDE : « Je n’aime pas ce texte, mets plutôt chargement toujours en cours, avec le temps » — sur le paragraphe livré une heure plus tôt (« reste la composition (le plus gros des sept). C’est le compilateur de shaders du pilote qui travaille, sur le processeur… »).',
+      'CE QUI CHANGE (index.html, la garde d’amorçage). Passé douze secondes, le mot devient « chargement toujours en cours… 6/7 — 57 s », le temps avançant à la seconde, et rien de plus. Le nom du programme restant n’est plus dit (main.ts ne le traduit plus ; Programmes le garde dans avancement().restants pour le diagnostic). L’explication — le compilateur de shaders tourne sur le processeur, pas sur la carte — reste dans le panneau de la borne, cinq minutes plus loin, là où elle a sa place.',
+      'VÉRIFIÉ : deux tests réécrits (amorce-garde.spec.ts : le mot exact à 40 s, puis à 12 s, 30 s et 1 min 05 s sur le dernier programme). 1215 verts dans 114 fichiers, type-check à 0, build propre.',
+    ],
+  },
+  {
     date: '15/09/2026 10:42',
     title: 'LE MOT DU CHARGEMENT N’ACCUSE PLUS LA CARTE GRAPHIQUE : il dit le temps, ce qui reste, et qui travaille',
     notes: [
