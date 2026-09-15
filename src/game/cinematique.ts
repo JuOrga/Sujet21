@@ -205,19 +205,99 @@ export function sauveCinematiques(cines: CinematiqueDef[]): void {
   }
 }
 
-// ---- L'OUVERTURE : la cinématique livrée, sur les SEPT planches générées
-// par le concepteur — l'acte 0 d'une traite. Onze temps : naissance, regard,
-// alerte, fuite, brèche, module vide, couloir, seuil du sas. La même planche
-// sert souvent DEUX battements (nouveau cadrage, nouvelle réplique) : c'est
-// du montage, pas du gaspillage d'images.
+// ---- L'OUVERTURE : la cinématique livrée, sur les TREIZE planches générées
+// par le concepteur — l'acte 0 d'une traite. D'abord l'APPROCHE, six planches
+// muettes, dehors : la planète à anneau, la station de plus en plus près,
+// le module Méduse, son hublot — et la coupe sur la cuve (docs/assets-ia.md
+// §26). Puis les onze temps de l'intérieur : naissance, regard, alerte,
+// fuite, brèche, module vide, couloir, seuil du sas. La même planche sert
+// souvent DEUX battements (nouveau cadrage, nouvelle réplique) : c'est du
+// montage, pas du gaspillage d'images.
+// L'approche est muette parce que la première réplique doit tomber sur la
+// cuve, juste après le hublot : c'est là qu'elle porte. Six zooms enchaînés
+// font un seul travelling ; seule la planche 3 panote, pour lire la
+// station d'un bout à l'autre. Côté son : le lit glacial dès la planète
+// (la bande-son n'a aucun son d'espace, et le silence y est juste), la
+// condensation sur la vitre du hublot, puis le lit tiède avec la cuve.
 // Les SVG essai-*.svg restent en place : ils servent de planches
 // provisoires aux cinématiques qui attendent leurs images.
 
 export const CINEMATIQUE_ESSAI: CinematiqueDef = {
   code: 'ESSAI',
-  titre: "L'ouverture — la cuve, l'alerte, la brèche, le sas",
+  titre: "L'ouverture — la planète, la station, la cuve, l'alerte, la brèche, le sas",
   planches: [
     {
+      // la planète à anneau, seule : le vide avant tout — et le lit glacial
+      // dès la première image : dehors, c'est froid ; la cuve, tiède, ne
+      // vient qu'après le hublot (le miroir de la bascule tiède → glacial
+      // du module vide, plus loin)
+      image: '/assets/cine/approche-1.webp',
+      texte: '',
+      duree: 6,
+      effet: 'zoom-avant',
+      fondu: 'noir',
+      bruitage: '',
+      ponctuation: '',
+      piste: 'cuve-glaciale',
+    },
+    {
+      // le limbe, et un point brillant : la station, trop loin pour une forme
+      image: '/assets/cine/approche-2.webp',
+      texte: '',
+      duree: 5,
+      effet: 'zoom-avant',
+      fondu: 'aucun',
+      bruitage: '',
+      ponctuation: '',
+      piste: '',
+    },
+    {
+      // la station entière, lisible comme la carte : le panoramique la parcourt
+      image: '/assets/cine/approche-3.webp',
+      texte: '',
+      duree: 6,
+      effet: 'pan-droite',
+      fondu: 'aucun',
+      bruitage: '',
+      ponctuation: '',
+      piste: '',
+    },
+    {
+      // l'arc et le hub au premier plan, l'observatoire et le mât au fond
+      image: '/assets/cine/approche-4.webp',
+      texte: '',
+      duree: 5,
+      effet: 'zoom-avant',
+      fondu: 'aucun',
+      bruitage: '',
+      ponctuation: '',
+      piste: '',
+    },
+    {
+      // le module Méduse seul, son hublot allumé
+      image: '/assets/cine/approche-5.webp',
+      texte: '',
+      duree: 4.5,
+      effet: 'zoom-avant',
+      fondu: 'aucun',
+      bruitage: '',
+      ponctuation: '',
+      piste: '',
+    },
+    {
+      // le hublot plein cadre, la lueur de la cuve derrière la vitre :
+      // la planche suivante est l'intérieur de ce qu'on vient de voir
+      image: '/assets/cine/approche-6.webp',
+      texte: '',
+      duree: 4,
+      effet: 'zoom-avant',
+      fondu: 'aucun',
+      bruitage: 'condensation', // la buée sur la vitre, le seul son du dehors
+      ponctuation: '',
+      piste: '',
+    },
+    {
+      // la coupe du hublot à la cuve passe par le noir
       image: '/assets/cine/ouverture-1.webp',
       texte: 'Module Méduse. Une cuve, une substance.',
       duree: 6,
