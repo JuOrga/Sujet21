@@ -119,8 +119,9 @@ export class Programmes {
    *
    * `restants` nomme ce qui n'est pas encore lié, dans l'ordre des sources :
    * le compte s'arrête des minutes sur le dernier (le shader de
-   * composition, le plus gros), et l'écran de chargement doit pouvoir dire
-   * sur QUOI le compilateur travaille plutôt que laisser un « 6/7 » figé.
+   * composition, le plus gros). L'écran de chargement ne l'affiche pas —
+   * le concepteur a voulu un mot court (15/09/2026) — mais le diagnostic
+   * sait ainsi lequel traîne.
    */
   avancement(): { fait: number; total: number; restants: string[] } {
     const total = this.entrees.length

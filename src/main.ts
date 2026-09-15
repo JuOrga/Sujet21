@@ -425,30 +425,9 @@ etapeAmorce('ouverture')
 // avançait, et son conseil de RECHARGER relançait tout de zéro : le
 // panneau revenait, encore et encore. La garde borne elle-même la patience
 // (index.html) : un pilote qui n'en finit jamais finit par être signalé.
-//
-// Le pouls dit aussi CE QUI RESTE à lier, en mots de joueur : le compte
-// passe des minutes sur le dernier programme (la composition, cent
-// kilo-octets de GLSL), et « 6/7 » immobile ressemblait à une panne
-// (Chrome, RTX 4060 Ti, 15/09/2026). Nommer le morceau, et dire qu'il est
-// le plus gros, c'est le seul avancement qu'on ait : le pilote ne donne
-// rien de plus fin qu'un fini/pas fini par programme.
-const NOMS_PROGRAMMES: Record<string, string> = {
-  splat: 'l’injection',
-  compose: 'la composition (le plus gros des sept)',
-  sponge: 'l’éponge',
-  hull: 'la coque',
-  decal: 'les habillages',
-  light: 'la lumière',
-  vie: 'le voile de vie',
-}
-function resteAmorce(restants: string[]): string {
-  return restants.map((n) => NOMS_PROGRAMMES[n] ?? n).join(', ')
-}
-function poulsAmorce(fait: number, total: number, restants: string[]): void {
-  const w = window as unknown as {
-    __sujet21Compile?: (f: number, t: number, reste: string) => void
-  }
-  w.__sujet21Compile?.(fait, total, resteAmorce(restants))
+function poulsAmorce(fait: number, total: number): void {
+  const w = window as unknown as { __sujet21Compile?: (f: number, t: number) => void }
+  w.__sujet21Compile?.(fait, total)
 }
 // (l'ancien délai d'affichage du bilan a cédé la place à la MISE EN
 // BONBONNE : c'est le choix d'instrument qui mène au tableau suivant)
@@ -15341,7 +15320,7 @@ function corpsImage(now: number): boolean {
       etapeAmorce('rendu')
     }
     const av = renderer.avancementCompilation()
-    poulsAmorce(av.fait, av.total, av.restants)
+    poulsAmorce(av.fait, av.total)
     return false
   }
   if (!amorceSignalee) {
