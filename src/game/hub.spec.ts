@@ -29,7 +29,25 @@ const dedans = (r: Rect, b: Rect): boolean =>
 const chevauche = (a: Rect, b: Rect): boolean =>
   a.minX < b.maxX && a.maxX > b.minX && a.minY < b.maxY && a.maxY > b.minY
 
-describe('hub v4 — le méta a pris ses murs (grand module)', () => {
+describe('hub v9 — la rotonde : le méta a pris ses quartiers', () => {
+  // Une zone posée dans une paroi ne s'activerait jamais : le corps ne
+  // peut pas entrer dans un mur. Le module est bâti au KIT : les murs sont
+  // ceux que les structures fabriquent — c'est sur EUX qu'on juge, au
+  // champ de la forme (une coque enveloppe TOUTE sa salle).
+  const murs = niveauExpanse(TABLEAU_HUB).boxes
+  const dansLeVide = (zone: Rect, nom: string): void => {
+    expect(dedans(zone, TABLEAU_HUB.bounds), nom).toBe(true)
+    for (const [px, py] of [
+      [zone.minX, zone.minY],
+      [zone.maxX, zone.minY],
+      [zone.minX, zone.maxY],
+      [zone.maxX, zone.maxY],
+      [(zone.minX + zone.maxX) / 2, (zone.minY + zone.maxY) / 2],
+    ])
+      for (const box of murs)
+        expect(dansBoite(box, px, py), `${nom} ${JSON.stringify(zone)}`).toBe(false)
+  }
+
   it('le tableau reste valide et le sas principal se rejoint', () => {
     const erreurs = checkLevel(TABLEAU_HUB).filter((v) => v.niveau === 'erreur')
     expect(erreurs.map((e) => e.message)).toEqual([])
@@ -37,136 +55,186 @@ describe('hub v4 — le méta a pris ses murs (grand module)', () => {
     expect(accessible(TABLEAU_HUB, new Set())).toBe(true)
   })
 
-  it('les trois sas et le banc tiennent dans les bornes, hors des murs', () => {
-    const b = TABLEAU_HUB.bounds
-    // le module est bâti au KIT : les murs sont ceux que les structures
-    // fabriquent, pas ceux qu'on pose — c'est sur EUX qu'on juge
-    const murs = niveauExpanse(TABLEAU_HUB).boxes
-    // une coque enveloppe TOUTE sa salle : c'est le champ qui tranche, pas
-    // la boîte englobante — on demande donc que la zone soit dans le VIDE
-    for (const zone of [
-      TABLEAU_HUB.exit,
-      ZONES_HUB_GRAND.sasGivre,
-      ZONES_HUB_GRAND.sasVapeur,
-      ...ZONES_HUB_GRAND.etal.map((a) => a.plot),
-    ]) {
-      expect(dedans(zone, b)).toBe(true)
-      for (const [px, py] of [
-        [zone.minX, zone.minY],
-        [zone.maxX, zone.minY],
-        [zone.minX, zone.maxY],
-        [zone.maxX, zone.maxY],
-        [(zone.minX + zone.maxX) / 2, (zone.minY + zone.maxY) / 2],
-      ])
-        for (const box of murs)
-          expect(dansBoite(box, px, py), JSON.stringify(zone)).toBe(false)
-    }
-    // la zone du banc, elle, ENVELOPPE la console : le corps qui frôle
-    // l'un des deux rails du couloir ouvre l'écran des mémoires
-    expect(dedans(ZONES_HUB_GRAND.banc, b)).toBe(true)
-    const rails = TABLEAU_HUB.boxes.filter(
-      (bx) => bx.minX === -1200 && bx.maxX === -640,
-    )
-    expect(rails.length).toBe(2)
-    for (const rail of rails)
-      expect(dedans(rail, ZONES_HUB_GRAND.banc)).toBe(true)
-  })
-
-  it('les trois consoles sont posées dans le VIDE, dans LES DEUX modules', () => {
-    // Une console dans une paroi ne s'ouvrirait jamais : le corps ne peut
-    // pas entrer dans un mur. Et le module COMPACT compte autant que le
-    // grand — c'est LUI que la bibliothèque sert (code « HUB », semé par
-    // ops/maj-hub.mjs) : des consoles posées dans le seul grand module
-    // n'atteindraient aucun joueur.
-    for (const [lv, zones] of [
-      [TABLEAU_HUB, ZONES_HUB_GRAND],
-      [TABLEAU_HUB_COMPACT, ZONES_HUB_COMPACT],
-    ] as const) {
-      const murs = niveauExpanse(lv).boxes
-      const consoles = lv.pupitres ?? []
-      expect(consoles.map((q) => q.ecran), lv.code).toEqual([
-        'records',
-        'reparations',
-        'station',
-      ])
-      for (const q of consoles) {
-        expect(dedans(q, lv.bounds), JSON.stringify(q)).toBe(true)
-        for (const [px, py] of [
-          [q.minX, q.minY],
-          [q.maxX, q.minY],
-          [q.minX, q.maxY],
-          [q.maxX, q.maxY],
-          [(q.minX + q.maxX) / 2, (q.minY + q.maxY) / 2],
-        ])
-          for (const box of murs)
-            expect(dansBoite(box, px, py), JSON.stringify(q)).toBe(false)
+  it('les trois sas, le scellé, l’étal et les stations tiennent dans le VIDE', () => {
+    dansLeVide(TABLEAU_HUB.exit, 'exit')
+    dansLeVide(ZONES_HUB_GRAND.sasGivre, 'sasGivre')
+    dansLeVide(ZONES_HUB_GRAND.sasVapeur, 'sasVapeur')
+    dansLeVide(ZONES_HUB_GRAND.sasScelle, 'sasScelle')
+    for (const a of ZONES_HUB_GRAND.etal) dansLeVide(a.plot, a.id)
+    for (const [id, plot] of Object.entries(ZONES_HUB_GRAND.stations)) {
+      // la table de départ ENVELOPPE son plan de travail (comme le banc) :
+      // on la juge sur les coques seules, pas sur le meuble
+      if (id === 'table-depart') {
+        for (const coque of murs.slice(0, STRUCTURES_HUB.length))
+          expect(dansBoite(coque, (plot.minX + plot.maxX) / 2, (plot.minY + plot.maxY) / 2)).toBe(false)
+        continue
       }
-      // deux consoles ne se recouvrent pas : un seul pas, un seul écran
-      for (let i = 0; i < consoles.length; i++)
-        for (let k = i + 1; k < consoles.length; k++)
-          expect(chevauche(consoles[i], consoles[k])).toBe(false)
-      // ni un plot d'achat : un pas ne doit pas payer ET ouvrir un écran
-      for (const q of consoles)
-        for (const a of zones.etal)
-          expect(chevauche(q, a.plot), `${lv.code} ${q.ecran}`).toBe(false)
-      // LE MUR DES RECORDS : la console est DANS le plot de sa station —
-      // elle s'éteint donc avec elle — mais jamais sur tout le plot : la
-      // réparation se paie en entrant, la consultation vient après
-      const plot = zones.stations['mur-records']
-      const rec = consoles.find((q) => q.ecran === 'records')!
-      expect(dedans(rec, plot), lv.code).toBe(true)
-      const aire = (r: typeof plot): number =>
-        (r.maxX - r.minX) * (r.maxY - r.minY)
-      expect(aire(rec) / aire(plot), lv.code).toBeLessThan(0.75)
-      // le tableau des avaries, lui, ne dépend d'AUCUNE station : c'est
-      // quand tout est en panne qu'on vient le lire
-      const av = consoles.find((q) => q.ecran === 'reparations')!
-      for (const [id, r] of Object.entries(zones.stations))
-        expect(chevauche(av, r), `${lv.code} avaries sur ${id}`).toBe(false)
+      dansLeVide(plot, id)
     }
+    // la zone du banc, elle, ENVELOPPE le banc : le corps qui s'y frotte
+    // ouvre l'écran des mémoires
+    expect(dedans(ZONES_HUB_GRAND.banc, TABLEAU_HUB.bounds)).toBe(true)
+    const banc = TABLEAU_HUB.boxes.find((bx) => bx.minX === -620 && bx.minY === 700)
+    expect(banc && dedans(banc, ZONES_HUB_GRAND.banc)).toBe(true)
   })
 
-  it('le module est bâti AU KIT : dix-sept coques, et rien n’est posé à la main', () => {
+  // LA LIGNE DE VOL : la promesse du plan. Une seule chose est obligatoire
+  // au hub — aller de la cuve au sas — et ce trajet ne doit ni débiter la
+  // mémoire, ni ouvrir un écran, ni vendre quoi que ce soit à l'insu du
+  // joueur. Toutes les portes obligées sont centrées sur y = 0 ; rien de
+  // ce qui réagit au contact ne mord sur la bande que le corps balaie.
+  it('la ligne de vol est droite, et rien ne réagit au contact dessus', () => {
+    expect(TABLEAU_HUB.spawn.y).toBe(0)
+    expect((TABLEAU_HUB.exit.minY + TABLEAU_HUB.exit.maxY) / 2).toBe(0)
+    const demi = (TABLEAU_HUB.exit.maxY - TABLEAU_HUB.exit.minY) / 2
+    const ligne: Rect = {
+      minX: TABLEAU_HUB.spawn.x,
+      minY: -demi,
+      maxX: TABLEAU_HUB.exit.minX,
+      maxY: demi,
+    }
+    // les couloirs de la ligne (cuve → rotonde → sas) sont sur y = 0
+    for (const i of [1, 3]) {
+      const c = STRUCTURES_HUB[i]
+      expect((c.minY + c.maxY) / 2, `couloir ${i}`).toBe(0)
+    }
+    for (const [id, plot] of Object.entries(ZONES_HUB_GRAND.stations))
+      expect(chevauche(plot, ligne), `station ${id} sur la ligne`).toBe(false)
+    for (const a of ZONES_HUB_GRAND.etal)
+      expect(chevauche(a.plot, ligne), `alcôve ${a.id} sur la ligne`).toBe(false)
+    for (const q of TABLEAU_HUB.pupitres ?? [])
+      expect(chevauche(q, ligne), `pupitre ${q.ecran} sur la ligne`).toBe(false)
+    expect(chevauche(ZONES_HUB_GRAND.banc, ligne)).toBe(false)
+    for (const rects of Object.values(ZONES_HUB_GRAND.portesDegat))
+      for (const r of rects) expect(chevauche(r, ligne)).toBe(false)
+    expect(chevauche(ZONES_HUB_GRAND.sceau, ligne)).toBe(false)
+    // seule exception voulue : la LECTURE de la table de départ, un toast
+    // qu'on longe avant de partir — rien à payer, rien à fermer
+    expect(chevauche(ZONES_HUB_GRAND.tableDepart, ligne)).toBe(true)
+    // et le mobilier laisse passer le corps : aucun meuble sur la bande
+    for (const bx of TABLEAU_HUB.boxes)
+      expect(chevauche(bx, ligne), JSON.stringify(bx)).toBe(false)
+  })
+
+  it('un détour est perpendiculaire : chaque aile se paie à sa porte, depuis la rotonde', () => {
+    const rotonde = STRUCTURES_HUB[2]
+    for (const id of ['aile-endormis', 'bac-sable']) {
+      // le plot de la station est DANS la rotonde, dans l'axe de sa porte
+      const plot = ZONES_HUB_GRAND.stations[id]
+      expect(dedans(plot, rotonde), id).toBe(true)
+      expect((plot.minX + plot.maxX) / 2, id).toBe(0)
+      // et sa porte de dégât barre le couloir, HORS de la rotonde
+      for (const r of ZONES_HUB_GRAND.portesDegat[id]) {
+        expect(chevauche(r, rotonde), id).toBe(false)
+        expect(r.minX).toBe(-210)
+        expect(r.maxX).toBe(210)
+      }
+    }
+    // l'aile des endormis au nord, le bac au sud
+    expect(ZONES_HUB_GRAND.stations['aile-endormis'].minY).toBeGreaterThan(0)
+    expect(ZONES_HUB_GRAND.stations['bac-sable'].maxY).toBeLessThan(0)
+  })
+
+  it('les consoles sont posées dans le VIDE, sans se recouvrir ni recouvrir un plot', () => {
+    const consoles = TABLEAU_HUB.pupitres ?? []
+    expect(consoles.map((q) => q.ecran)).toEqual([
+      'records',
+      'reparations',
+      'station',
+      'codex',
+      'fioles',
+      'marchand',
+    ])
+    for (const q of consoles) dansLeVide(q, q.ecran)
+    // deux consoles ne se recouvrent pas : un seul pas, un seul écran
+    for (let i = 0; i < consoles.length; i++)
+      for (let k = i + 1; k < consoles.length; k++)
+        expect(chevauche(consoles[i], consoles[k])).toBe(false)
+    // ni un plot d'achat : un pas ne doit pas payer ET ouvrir un écran
+    for (const q of consoles)
+      for (const a of ZONES_HUB_GRAND.etal)
+        expect(chevauche(q, a.plot), q.ecran).toBe(false)
+    // LE MUR DES RECORDS : la console est DANS le plot de sa station —
+    // elle s'éteint donc avec elle — mais jamais sur tout le plot : la
+    // réparation se paie en entrant, la consultation vient après
+    const plot = ZONES_HUB_GRAND.stations['mur-records']
+    const rec = consoles.find((q) => q.ecran === 'records')!
+    expect(dedans(rec, plot)).toBe(true)
+    const aire = (r: Rect): number => (r.maxX - r.minX) * (r.maxY - r.minY)
+    expect(aire(rec) / aire(plot)).toBeLessThan(0.75)
+    // le tableau des avaries, lui, ne dépend d'AUCUNE station : c'est
+    // quand tout est en panne qu'on vient le lire
+    const av = consoles.find((q) => q.ecran === 'reparations')!
+    for (const [id, r] of Object.entries(ZONES_HUB_GRAND.stations))
+      expect(chevauche(av, r), `avaries sur ${id}`).toBe(false)
+    // LE SEMBLABLE est un pupitre : c'est lui qui ouvre le marchand, pas la
+    // boîte englobante des alcôves (élargie de 140, elle mordait la ligne)
+    expect(consoles.some((q) => q.ecran === 'marchand')).toBe(true)
+  })
+
+  it('le module est bâti AU KIT : quinze coques, et rien n’est posé à la main', () => {
     // la promesse du chantier : le terrain de jeu vient des structures —
     // les boîtes posées ne sont plus que du mobilier
-    expect(STRUCTURES_HUB.length).toBe(17)
+    expect(STRUCTURES_HUB.length).toBe(15)
     expect(TABLEAU_HUB.structures).toBe(STRUCTURES_HUB)
     expect(TABLEAU_HUB.coque).toBe('structures')
-    for (const bx of TABLEAU_HUB.boxes) expect(bx.material === MAT_WALL || true).toBe(true)
-    // le budget du moteur, structures comprises
     // UNE boîte par coque (plus les deux portes de matière) : le terrain
-    // de jeu entier tient dans un cinquième du budget du moteur
+    // de jeu entier tient dans un quart du budget du moteur
     expect(niveauExpanse(TABLEAU_HUB).boxes.length).toBeLessThanOrEqual(45)
+    // le trajet obligé : trois chambres — la cuve, la rotonde, le sas
+    const [cuve, , rotonde, , sas] = STRUCTURES_HUB
+    expect(dansBoite(cuve, TABLEAU_HUB.spawn.x, TABLEAU_HUB.spawn.y)).toBe(true)
+    expect(dansBoite(sas, TABLEAU_HUB.exit.minX, 0)).toBe(true)
+    expect(rotonde.maxX - rotonde.minX).toBe(rotonde.maxY - rotonde.minY)
   })
 
-  it('les deux routes gardées sont bouchées par LEUR matière', () => {
+  it('les deux routes gardées sont bouchées par LEUR matière, côte à côte au seuil', () => {
     const tubes = STRUCTURES_HUB.filter((s) => s.bouchon !== undefined)
     expect(tubes.length).toBe(2)
     expect(tubes.map((s) => s.bouchon).sort()).toEqual(
       [MAT_GRILLE, MAT_RIDEAU].sort(),
     )
-    // le gaz au nord (la grille), la glace au sud (le rideau)
+    // le gaz au nord (la grille), la glace au sud (le rideau), sur le même
+    // axe que le sas : les trois bouches se lisent d'un regard
     const gaz = tubes.find((s) => s.bouchon === MAT_GRILLE)!
     const glace = tubes.find((s) => s.bouchon === MAT_RIDEAU)!
     expect(gaz.minY).toBeGreaterThan(0)
     expect(glace.maxY).toBeLessThan(0)
-    // et la sortie gardée se tient DERRIÈRE sa matière, dans sa branche
-    expect(ZONES_HUB_GRAND.sasVapeur.minY).toBeGreaterThan(0)
-    expect(ZONES_HUB_GRAND.sasGivre.maxY).toBeLessThan(0)
+    const sas = STRUCTURES_HUB[4]
+    for (const t of [gaz, glace])
+      expect((t.minX + t.maxX) / 2).toBe((sas.minX + sas.maxX) / 2)
+    // et la sortie gardée se tient DERRIÈRE sa matière : la lame est posée
+    // au milieu du couloir (structures.ts), c'est elle qu'on dépasse
+    expect(ZONES_HUB_GRAND.sasVapeur.minY).toBeGreaterThan((gaz.minY + gaz.maxY) / 2)
+    expect(ZONES_HUB_GRAND.sasGivre.maxY).toBeLessThan((glace.minY + glace.maxY) / 2)
     // les bouchons se retrouvent bien dans les parois fabriquées
     const mats = niveauExpanse(TABLEAU_HUB).boxes.map((b) => b.material)
     expect(mats).toContain(MAT_GRILLE)
     expect(mats).toContain(MAT_RIDEAU)
+    // la route du télescope part du pod de vapeur : le corps qui y va ne
+    // doit pas LANCER une descente en traversant — la sortie est à l'ouest,
+    // la passerelle à l'est
+    const plot = ZONES_HUB_GRAND.stations['passerelle-4']
+    expect(ZONES_HUB_GRAND.sasVapeur.maxX).toBeLessThan(plot.minX)
+    expect(chevauche(ZONES_HUB_GRAND.sasVapeur, plot)).toBe(false)
   })
 
-  it('la signalétique annonce les routes et le banc', () => {
+  it('la signalétique annonce les routes, le banc et les quartiers', () => {
     const textes = TABLEAU_HUB.labels.map((l) => l.text).join(' · ')
     expect(textes).toContain('SORTIE DE GIVRE|LA VOIE SEMI-PROCÉDURALE')
     expect(textes).toContain('SORTIE DE VAPEUR|LA DESCENTE DU JOUR')
     expect(textes).toContain('LE BANC DES MÉMOIRES|TISSER LES LIENS')
     expect(textes).toContain('LE COMPTOIR|TOUT SE PAIE EN MÉMOIRE')
+    expect(textes).toContain('LA ROTONDE|LE POSTE DE GESTION')
+    expect(textes).toContain('CUVES 1 À 21|VINGT SONT VIDES')
     // l'écran de contrôle est SOUS TENSION : le méta est branché
     expect(TABLEAU_HUB.decals?.some((d) => d.kind === 'ecran-on')).toBe(true)
+    // les sept pictogrammes d'état du poste de gestion (bible v3.1)
+    expect(TABLEAU_HUB.labels.filter((l) => l.picto).length).toBe(7)
+    // les vingt alvéoles de la cuve, plus les six endormis et la vitrine
+    expect(
+      TABLEAU_HUB.decals?.filter((d) => d.kind.startsWith('fiole-')).length,
+    ).toBe(20 + 6 + 3)
   })
 })
 
@@ -254,7 +322,7 @@ describe('hub compact v4 — le module JOUÉ reçoit le même méta', () => {
 // l'est du module ne vivait que de la lumière qui fuyait par-dessus les
 // murs de l'ouest. Depuis que les coques montent au plafond, cette fuite
 // n'existe plus — le plan doit donc tenir en quatre lampes, et ces quatre
-// doivent atteindre les deux bouts du module.
+// doivent atteindre les ailes et les pods.
 describe('hub — les lampes posées sont les lampes allumées', () => {
   const lampes = TABLEAU_HUB.lumieres ?? []
 
@@ -278,18 +346,20 @@ describe('hub — les lampes posées sont les lampes allumées', () => {
   }
   const coque = (i: number) => STRUCTURES_HUB[i]
 
-  it('les deux bandeaux de l’ouest atteignent chacun leurs deux chambres', () => {
+  it('les deux bandeaux verticaux descendent la rotonde et le sas jusqu’à leurs branches', () => {
     const bandeaux = lampes.filter((l) => l.forme === 'bandeau')
     expect(bandeaux).toHaveLength(2)
-    // 0 : la cuve → 2 : l'aile des endormis · 4 : le bac → 6 : le contrôle
-    for (const [b, ouest, est] of [
-      [bandeaux[0], coque(0), coque(2)],
-      [bandeaux[1], coque(4), coque(6)],
-    ] as const) {
-      const [g, d] = bouts(b)
-      expect(dansBoite(ouest, g.x, g.y)).toBe(true)
-      expect(dansBoite(est, d.x, d.y)).toBe(true)
-    }
+    // 2 : la rotonde, ses bouts au bord des couloirs des ailes (5 et 7) ;
+    // 4 : le sas, ses bouts dans les montées du gaz (9) et de la glace (11)
+    const [rotonde, sas] = bandeaux
+    const [rSud, rNord] = bouts(rotonde)
+    expect(dansBoite(coque(2), rSud.x, rSud.y)).toBe(true)
+    expect(dansBoite(coque(2), rNord.x, rNord.y)).toBe(true)
+    expect(dansBoite(coque(5), rNord.x, rNord.y + 60)).toBe(true)
+    expect(dansBoite(coque(7), rSud.x, rSud.y - 60)).toBe(true)
+    const [sSud, sNord] = bouts(sas)
+    expect(dansBoite(coque(9), sNord.x, sNord.y)).toBe(true)
+    expect(dansBoite(coque(11), sSud.x, sSud.y)).toBe(true)
   })
 
   // Un bandeau traverse les cloisons : dessiné, son luminaire se coucherait
@@ -299,9 +369,15 @@ describe('hub — les lampes posées sont les lampes allumées', () => {
       expect(l.taille).toBe(0)
   })
 
-  it('l’est du module garde ses deux lampes, l’étal et le sas', () => {
+  it('la cuve garde sa lampe froide, le comptoir sa lampe chaude', () => {
     const rondes = lampes.filter((l) => l.forme !== 'bandeau')
-    expect(rondes.map((l) => l.x)).toEqual([1640, 3650])
+    expect(rondes).toHaveLength(2)
+    const [cuve, comptoir] = rondes
+    expect(dansBoite(coque(0), cuve.x, cuve.y)).toBe(true)
+    // le comptoir : dans le quartier sud-ouest de la rotonde
+    expect(dansBoite(coque(2), comptoir.x, comptoir.y)).toBe(true)
+    expect(comptoir.x).toBeLessThan(0)
+    expect(comptoir.y).toBeLessThan(0)
   })
 })
 

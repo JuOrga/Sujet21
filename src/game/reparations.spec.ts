@@ -232,10 +232,12 @@ describe('une station en panne éteint sa console', () => {
     }
   })
 
-  it('la base n’est jamais mutée : le tableau CIBLE garde ses trois consoles', () => {
+  it('la base n’est jamais mutée : le tableau CIBLE garde toutes ses consoles', () => {
     for (const lv of MODULES) {
+      const avant = (lv.pupitres ?? []).length
+      expect(avant, lv.code).toBeGreaterThanOrEqual(3)
       appliqueReparations(lv, [])
-      expect((lv.pupitres ?? []).length, lv.code).toBe(3)
+      expect((lv.pupitres ?? []).length, lv.code).toBe(avant)
     }
   })
 })

@@ -1,10 +1,11 @@
 # Le hub — proposition de structure (v1, 15/09/2026)
 
-> Une proposition, pas un chantier : rien n'est construit. Elle repart de
-> ce que le hub DOIT faire (la bible, les zones méta, les pupitres, les
-> avaries) et non de son plan actuel. Ce qui est chiffré ici est une
-> **cible**, pas une mesure — sauf la ligne « aujourd'hui », lue dans
-> `src/game/hub.ts`.
+> Écrite d'abord comme une proposition, puis **bâtie le même jour** dans
+> `src/game/hub.ts` (module v9, code `HUB`). La section « Ce qui est bâti »
+> en fin de document dit ce qui a été construit et mesuré ; le reste est
+> la proposition telle qu'elle a été soumise. Elle repart de ce que le hub
+> DOIT faire (la bible, les zones méta, les pupitres, les avaries) et non
+> de son plan précédent.
 
 ## Ce que le hub doit tenir (le cahier des charges, tel qu'il existe)
 
@@ -189,3 +190,43 @@ fichiers, `assets-ia.md` §20), ne fixe pas les coordonnées, et ne juge pas
 le hub compact v4 autrement que par sa forme. Si la proposition convient,
 l'étape suivante est un module posé dans l'éditeur, joué dix fois de la
 cuve au sas, et le nombre de gestes du trajet obligé compté avant et après.
+
+## Ce qui est bâti (module v9, `src/game/hub.ts`)
+
+Le plan ci-dessus, à trois écarts près, tous dus au kit — une seule porte
+par face, au centre de la face :
+
+- **Le secteur 4 part du pod de vapeur**, pas du rideau : la chambre du
+  sas n'a que quatre faces (le couloir de la rotonde, la bouche d'eau, la
+  grille au nord, le rideau au sud). La passerelle prend donc la face est
+  du pod de vapeur ; la sortie de vapeur est rangée à l'ouest du pod pour
+  que le corps qui va au secteur 4 ne lance pas une descente en passant.
+  **Conséquence à valider** : la fin de l'arc demande d'avoir tissé la
+  vaporisation. Le gaz reste au nord et la glace au sud, comme avant.
+- **Les stations sur les pans obliques** étaient trop courtes pour un étal
+  (un pan de chanfrein fait ~300 unités) : les quatre quartiers de la
+  rotonde les portent, contre les parois droites — le banc au nord-ouest,
+  l'étal en L au sud-ouest avec le Semblable debout devant, le mur des
+  records et les deux consoles au nord-est, la vitrine et le codex au
+  sud-est. Sept pictogrammes d'état sous le banc.
+- **Le Semblable est un pupitre** (`marchand`) : la boîte englobante des
+  alcôves, élargie de 140, mordait sur la ligne de vol et aurait ouvert le
+  voile en plein trajet. Les alcôves vendent toujours au contact.
+
+Ce qui est ajouté par rapport à la proposition : la table de départ se
+**longe** (sa zone de lecture couvre la ligne, le récapitulatif s'affiche
+à chaque départ, sa station reste au sud de la ligne) ; les vingt alvéoles
+de la cuve ; la vitrine de trois semblables ; un pupitre `codex` et un
+pupitre `fioles`. Un test neuf (`hub.spec.ts`, « la ligne de vol ») tient
+la promesse : rien de ce qui réagit au contact — station, alcôve, pupitre,
+banc, porte — ne mord sur la bande que le corps balaie de la cuve au sas.
+
+| Mesuré dans le code | v8 (file) | v9 (rotonde) |
+| --- | --- | --- |
+| trajet obligé, naissance → bouche d'eau | 8 330 u | 4 270 u |
+| chambres traversées sur ce trajet | 6 | 3 |
+| coques | 17 | 15 |
+| emprise des coques | 8 800 × 2 360 | 5 450 × 3 560 |
+
+Non mesuré : le nombre de gestes du trajet obligé, qui se compte en
+jouant. C'est la vérification qui reste à faire sur l'aperçu.

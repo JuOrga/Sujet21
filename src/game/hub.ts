@@ -20,11 +20,13 @@ import {
   MAT_SURCHAUFFEUR,
   MAT_WALL,
   type AncreMeta,
+  type DecalDef,
   type LevelDef,
   type ObstacleBox,
   type PlotMeta,
   type RoleAncre,
   type StructureDef,
+  type WorldLabel,
 } from './level'
 import { STRUCT_CHAMBRE, STRUCT_COULOIR } from './structures'
 
@@ -199,26 +201,37 @@ export interface ZonesHub {
   porteCuve: RectHub
 }
 
-// ─── LE MODULE MÉDUSE (v8) — DES COQUES D'UN SEUL TENANT ─────────────────
+// ─── LE MODULE MÉDUSE (v9) — UNE ROTONDE, PAS UNE FILE ───────────────────
 //
-// Le plan du concepteur, bâti au KIT : chaque lieu est UNE forme creuse du
-// moteur (FORME_COQUE), pas un assemblage de pavés. Un module = une boîte.
+// Le plan v8 était une FILE : six chambres alignées sur 9 000 unités, et
+// le trajet obligé de chaque run — la cuve au sas — traversait tout, y
+// compris deux ailes condamnées. Or une seule chose est obligatoire au hub :
+// aller de la naissance à la sortie. Tout le reste est un détour CHOISI.
+// C'est le fait qui commande ce plan (docs/hub-proposition.md).
+//
+// Une LIGNE DE VOL droite et courte — la cuve, la rotonde, le sas — et des
+// alcôves qui s'ouvrent dessus. Toutes les portes du trajet obligé sont
+// centrées sur y = 0 : une seule éjection bien visée porte de la cuve au
+// sas. Un détour est perpendiculaire, d'un couloir de profondeur, et l'on
+// en ressort par où l'on est entré : on ne TRAVERSE jamais une aile.
+//
+//                        ⬡ ENDORMIS              ⬡ VAPEUR ═[passerelle]═ ⬡ SECTEUR 4
+//                             ║                  (grille)               (scellé)
+//   ⬡ CUVE ═══ ⬡ ROTONDE ═══════════ ⬡ SAS À TROIS BOUCHES ──▶ EAU (le sas)
+//                             ║                  (rideau)
+//                        ⬡ BAC D'ESSAI           ⬡ GIVRE
+//
+// LA ROTONDE tient tout ce qu'on fait avant de partir, sur ses quatre
+// quartiers — rien à retenir, tout se voit du centre : le banc des mémoires
+// au nord-ouest, le comptoir du Semblable au sud-ouest, le mur des records
+// et les consoles au nord-est, la vitrine et le codex au sud-est. LE SAS est
+// le seuil : on y longe la table de départ et l'on choisit sa sortie par son
+// état, les trois bouches côte à côte. La route du télescope (secteur 4)
+// part de la sortie de vapeur : c'est une décision de ce plan, pas du canon
+// — le kit ne perce qu'une porte par face, et le sas n'en a plus de libre.
 //
 // LA RÈGLE DU KIT : les modules se rejoignent CENTRE DE FACE contre CENTRE
-// DE FACE. Toutes les liaisons ont le même gabarit (couloir de 420, passage
-// de 300) — c'est ce qui fait qu'un assemblage se lit comme une station et
-// non comme un bricolage, et c'est ce qui permet aux portes d'être de
-// simples fentes centrées, taillées dans le champ de la forme.
-//
-//   ouest ───────────────────────────────────────────────────────────► est
-//                                             ⬡ GAZ (grille)   ⬡ SECTEUR 4
-//                                                  │                 │
-//   ⬡ CUVE ─ ⬡ ENDORMIS ─ ⬡ BAC ─[MÉM]─ ⬡ CENTRE ─[REC]─ ⬡ CARREFOUR ─ ⬡ SAS
-//                                                  │
-//                                             ⬡ GLACE (rideau)
-//
-// Dix-sept coques, dix-neuf blocs (deux portes de matière en plus) : le
-// terrain de jeu entier tient dans un cinquième du budget du moteur.
+// DE FACE, couloir de 420, passage de 300. Quinze coques, dix-sept blocs.
 
 const EP_HUB = 60 // l'épaisseur de coque, partout la même
 const CHANF = 0.26 // le chanfrein des chambres : l'octogone du dessin
@@ -254,289 +267,343 @@ const couloir = (
   ...(bouchon !== undefined ? { bouchon } : {}),
 })
 
-/** LE PLAN DU MODULE : dix-sept coques. Les couloirs MORDENT dans les
+/** LE PLAN DU MODULE : quinze coques. Les couloirs MORDENT de 80 dans les
  * chambres qu'ils relient, au MILIEU de leur face — ne pas les décaler
  * sans vérifier la traversée : une porte ne s'ouvre qu'au centre. */
 export const STRUCTURES_HUB: StructureDef[] = [
-  chambre(-4400, -460, -3800, 460), // LA CUVE : la naissance
-  couloir(-3880, -210, -3400, 210),
-  chambre(-3480, -1100, -2400, 1100), // L'AILE DES ENDORMIS
-  couloir(-2480, -210, -2000, 210),
-  chambre(-2080, -960, -1200, 960), // LE BAC D'ESSAI
-  couloir(-1280, -210, -560, 210), // le couloir des MÉMOIRES
-  chambre(-640, -520, 60, 520), // LE CENTRE DE CONTRÔLE
-  couloir(-20, -210, 800, 210), // le couloir des RECORDS
-  chambre(720, -560, 2560, 560), // LE CARREFOUR ET SON ÉTAL
-  couloir(1430, 480, 1850, 980, MAT_GRILLE), // la montée du GAZ
-  chambre(1300, 860, 1980, 1180), // LA SORTIE DE VAPEUR
-  couloir(1430, -980, 1850, -480, MAT_RIDEAU), // la descente de la GLACE
-  chambre(1300, -1180, 1980, -860), // LA SORTIE DE GIVRE
-  couloir(2500, -210, 2980, 210),
-  chambre(2900, -600, 4400, 600), // LE SAS DE LANCEMENT
-  couloir(3440, 540, 3860, 1000), // la passerelle du secteur 4
-  chambre(3300, 860, 4000, 1180), // LE SECTEUR 4, SCELLÉ
+  // ─── la ligne de vol (y = 0)
+  chambre(-2120, -500, -1220, 500), // 0 LA CUVE : la naissance
+  couloir(-1300, -210, -820, 210), // 1 la porte de la cuve
+  chambre(-900, -900, 900, 900), // 2 LA ROTONDE : le poste de gestion
+  couloir(820, -210, 1300, 210), // 3 vers le seuil
+  chambre(1220, -700, 2720, 700), // 4 LE SAS À TROIS BOUCHES
+  // ─── les deux ailes de la rotonde
+  couloir(-210, 820, 210, 1300), // 5 la montée vers les endormis
+  chambre(-600, 1220, 600, 1780), // 6 L'AILE DES ENDORMIS
+  couloir(-210, -1300, 210, -820), // 7 la descente vers le bac
+  chambre(-600, -1780, 600, -1220), // 8 LE BAC D'ESSAI
+  // ─── les deux sorties gardées par leur matière
+  couloir(1760, 620, 2180, 1120, MAT_GRILLE), // 9 la montée du GAZ
+  chambre(1630, 1000, 2310, 1400), // 10 LA SORTIE DE VAPEUR
+  couloir(1760, -1120, 2180, -620, MAT_RIDEAU), // 11 la descente de la GLACE
+  chambre(1630, -1400, 2310, -1000), // 12 LA SORTIE DE GIVRE
+  // ─── la route du télescope, au-delà de la vapeur
+  couloir(2230, 990, 2710, 1410), // 13 la passerelle du secteur 4
+  chambre(2630, 990, 3330, 1410), // 14 LE SECTEUR 4, SCELLÉ
 ]
 
-
 export const ZONES_HUB_GRAND: ZonesHub = {
-  // l'ÉTAL : quatre alcôves au sud du carrefour
+  // L'ÉTAL : quatre alcôves en L dans le quartier sud-ouest de la rotonde,
+  // deux contre la paroi ouest, deux contre la paroi sud — le Semblable se
+  // tient devant, dans l'angle (marchand)
   etal: etalAvecPlots([
-    { minX: 1000, minY: -480, maxX: 1260, maxY: -330 },
-    { minX: 1320, minY: -480, maxX: 1580, maxY: -330 },
-    { minX: 1640, minY: -480, maxX: 1900, maxY: -330 },
-    { minX: 1960, minY: -480, maxX: 2220, maxY: -330 },
+    { minX: -830, minY: -565, maxX: -690, maxY: -425 },
+    { minX: -830, minY: -355, maxX: -690, maxY: -215 },
+    { minX: -565, minY: -830, maxX: -425, maxY: -690 },
+    { minX: -355, minY: -830, maxX: -215, maxY: -690 },
   ]),
-  // LE BANC DES MÉMOIRES : le couloir entre ses deux rails
-  banc: { minX: -1220, minY: -160, maxX: -620, maxY: 160 },
-  // les deux sorties gardées, au fond de leur pod, derrière leur matière
-  sasGivre: { minX: 1480, minY: -1110, maxX: 1800, maxY: -1000 },
-  sasVapeur: { minX: 1480, minY: 1000, maxX: 1800, maxY: 1110 },
+  // LE BANC DES MÉMOIRES : contre la paroi nord, quartier nord-ouest — la
+  // zone ENVELOPPE le banc, le corps qui s'y frotte ouvre l'écran
+  banc: { minX: -660, minY: 540, maxX: -160, maxY: 800 },
+  // les deux sorties gardées : au fond du pod de givre (le bout sud) ; à
+  // l'OUEST du pod de vapeur — l'est y mène à la passerelle, et le corps qui
+  // va au secteur 4 ne doit pas lancer une descente en passant
+  sasGivre: { minX: 1830, minY: -1330, maxX: 2110, maxY: -1230 },
+  sasVapeur: { minX: 1720, minY: 1090, maxX: 1850, maxY: 1310 },
+  // LES STATIONS : aucune sur la ligne de vol. Une station se paie AU
+  // CONTACT — le trajet obligé ne doit jamais débiter la mémoire à l'insu
+  // du joueur (le mur des records du v8 barrait tout son couloir)
   stations: {
-    eclairage: { minX: -420, minY: -100, maxX: -220, maxY: 100 },
-    'table-depart': { minX: 3280, minY: 50, maxX: 3720, maxY: 200 },
-    'mur-records': { minX: 160, minY: -80, maxX: 720, maxY: 80 },
-    'bac-sable': { minX: -1980, minY: -520, maxX: -1780, maxY: -320 },
-    distillateur: { minX: -420, minY: -400, maxX: -220, maxY: -200 },
-    'aile-endormis': { minX: -3040, minY: -100, maxX: -2840, maxY: 100 },
-    'passerelle-4': { minX: 2240, minY: 200, maxX: 2440, maxY: 400 },
+    eclairage: { minX: 330, minY: 200, maxX: 490, maxY: 360 },
+    'table-depart': { minX: 1620, minY: -340, maxX: 2120, maxY: -180 },
+    'mur-records': { minX: 200, minY: 540, maxX: 560, maxY: 690 },
+    // les ailes se paient à leur porte, DEPUIS la rotonde : on répare en
+    // entrant, et la plaque « EN PANNE » se lit du centre
+    'bac-sable': { minX: -100, minY: -800, maxX: 100, maxY: -640 },
+    'aile-endormis': { minX: -100, minY: 640, maxX: 100, maxY: 800 },
+    // le distillateur est dans la cuve : la prime du retour tombe là où
+    // l'on renaît
+    distillateur: { minX: -1540, minY: -400, maxX: -1360, maxY: -240 },
+    'passerelle-4': { minX: 2100, minY: 1110, maxX: 2240, maxY: 1290 },
   },
-  tableDepart: { minX: 3280, minY: 50, maxX: 3720, maxY: 200 },
-  sasScelle: { minX: 3450, minY: 960, maxX: 3850, maxY: 1120 },
-  // les ailes condamnées ont DEUX bouches : la salle-passage garde ses
-  // deux moitiés, au nord et au sud du couloir qui la traverse
+  // LA TABLE DE DÉPART se LONGE : sa zone de lecture couvre la ligne de vol,
+  // le récapitulatif s'affiche à chaque départ (un toast, rien à fermer) —
+  // sa station, elle, reste au sud de la ligne
+  tableDepart: { minX: 1560, minY: -340, maxX: 2180, maxY: 60 },
+  sasScelle: { minX: 3080, minY: 1100, maxX: 3230, maxY: 1300 },
+  // les portes de dégât barrent le couloir de l'aile, hors de la chambre
   portesDegat: {
-    'aile-endormis': [
-      { minX: -3420, minY: 220, maxX: -2460, maxY: 270 },
-      { minX: -3420, minY: -270, maxX: -2460, maxY: -220 },
-    ],
-    'bac-sable': [
-      { minX: -2020, minY: 220, maxX: -1260, maxY: 270 },
-      { minX: -2020, minY: -270, maxX: -1260, maxY: -220 },
-    ],
-    'passerelle-4': [{ minX: 3440, minY: 620, maxX: 3860, maxY: 670 }],
+    'aile-endormis': [{ minX: -210, minY: 930, maxX: 210, maxY: 980 }],
+    'bac-sable': [{ minX: -210, minY: -980, maxX: 210, maxY: -930 }],
+    'passerelle-4': [{ minX: 2330, minY: 990, maxX: 2380, maxY: 1410 }],
   },
-  sceau: { minX: 3440, minY: 700, maxX: 3860, maxY: 750 },
-  porteCuve: { minX: -3880, minY: -210, maxX: -3800, maxY: 210 },
+  sceau: { minX: 2410, minY: 990, maxX: 2460, maxY: 1410 },
+  porteCuve: { minX: -1300, minY: -210, maxX: -1220, maxY: 210 },
 }
+
+// LES PICTOGRAMMES D'ÉTAT du poste de gestion (bible v3.1) : les VRAIES
+// règles du jeu, sans un mot — 0 inefficace · 1 confine · 2 efficace ·
+// 3 l'outil idéal. Le joueur les lit à l'envers : 3, c'est mortel.
+const PICTOS: { tone: WorldLabel['tone']; couleur: string; eau: number; glace: number; vapeur: number }[] = [
+  { tone: 'eponge', couleur: '#d9a441', eau: 3, glace: 1, vapeur: 1 }, // l'éponge boit
+  { tone: 'froid', couleur: '#8fc8ee', eau: 3, glace: 1, vapeur: 2 }, // la plaque froide fige
+  { tone: 'chaud', couleur: '#e8843c', eau: 2, glace: 3, vapeur: 0 }, // la chaudière vaporise
+  { tone: 'grille', couleur: '#9aa3ab', eau: 1, glace: 1, vapeur: 0 }, // l'évent laisse passer
+  { tone: 'phile', couleur: '#63b7e6', eau: 0, glace: 1, vapeur: 1 }, // la membrane laisse passer l'eau
+  { tone: 'froid', couleur: '#d6e8f5', eau: 1, glace: 0, vapeur: 1 }, // le rideau s'écarte devant la glace
+  { tone: 'chaud', couleur: '#e8951f', eau: 1, glace: 1, vapeur: 0 }, // le surchauffeur frôle la vapeur
+]
+// deux rangées sous le banc : quatre, puis trois en quinconce
+const PICTOS_POSES: WorldLabel[] = PICTOS.map((p, i) => ({
+  x: i < 4 ? -700 + i * 120 : -640 + (i - 4) * 120,
+  y: i < 4 ? 430 : 320,
+  text: '',
+  tone: p.tone,
+  picto: { couleur: p.couleur, eau: p.eau, glace: p.glace, vapeur: p.vapeur },
+}))
+
+// LES VINGT ET UNE CUVES (sujet-vivant IV1) : vingt alvéoles sur les parois
+// de la cuve, dix-neuf vides — la vingtième, au milieu de la paroi ouest,
+// est celle devant laquelle le sujet naît : la vingt-et-unième tentative. Compassion pour eux, identification pour
+// soi — un décalque, zéro mécanique.
+const ALVEOLES: DecalDef[] = [
+  ...Array.from({ length: 10 }, (_, i) => ({
+    x: -1960 + i * 60,
+    y: 300,
+    w: 56,
+    h: 200,
+    kind: 'fiole-vide' as const,
+    fade: 0.9,
+    ...(i % 2 ? { flip: true } : {}),
+  })),
+  ...Array.from({ length: 7 }, (_, i) => ({
+    x: -1960 + i * 60,
+    y: -300,
+    w: 56,
+    h: 200,
+    kind: 'fiole-vide' as const,
+    fade: 0.9,
+    ...(i % 2 ? {} : { flip: true }),
+  })),
+  ...[-200, 0, 200].map((y) => ({
+    x: -1900,
+    y,
+    w: 56,
+    h: 200,
+    kind: 'fiole-vide' as const,
+    fade: 0.9,
+  })),
+]
+
+// LE BAC D'ESSAI : les huit surfaces, dans l'ordre des pictogrammes — ce
+// que le poste dit en points, le bac le fait toucher, sans enjeu
+const SURFACES_BAC: { mat: number; text: string; tone: WorldLabel['tone'] }[] = [
+  { mat: MAT_CHAUD, text: 'CHAUDIÈRE|ELLE VAPORISE', tone: 'chaud' },
+  { mat: MAT_MEMBRANE, text: 'MEMBRANE|SEULE L’EAU PASSE', tone: 'phile' },
+  { mat: MAT_RIDEAU, text: 'RIDEAU|SEULE LA GLACE', tone: 'froid' },
+  { mat: MAT_SURCHAUFFEUR, text: 'SURCHAUFFEUR|UN DASH EN VAPEUR', tone: 'chaud' },
+  { mat: MAT_HYDROPHILE, text: 'HYDROPHILE|ELLE RETIENT', tone: 'phile' },
+  { mat: MAT_HYDROPHOBE, text: 'HYDROPHOBE|ELLE REPOUSSE', tone: 'phobe' },
+  { mat: MAT_FROID, text: 'PLAQUE FROIDE|ELLE FIGE', tone: 'froid' },
+  { mat: MAT_GRILLE, text: 'ÉVENT|LE SOUFFLE TRAVERSE', tone: 'grille' },
+]
+const xBac = (i: number): number => -505 + i * 130
 
 export const TABLEAU_HUB: LevelDef = {
   name: 'Le module Méduse',
   code: 'HUB',
   journal:
-    'Module d’accueil. Depuis l’accident, l’étage tient sur une file de chambres reliées par des couloirs : la cuve, l’aile des endormis, le bac d’essai, les consoles, le carrefour et ses trois routes. Le sujet le parcourt sans jamais hésiter. — Dr N. Véga',
+    'Module d’accueil. Une rotonde au centre, la cuve à l’ouest, le sas à l’est : le sujet va droit de sa naissance à la sortie, et tout le reste s’ouvre sur son chemin — le banc, le comptoir, les consoles, deux ailes, trois bouches.',
   par: 3,
   ambiante: 0.5,
-  bounds: { minX: -4500, minY: -1200, maxX: 4500, maxY: 1200 },
-  spawn: { x: -4100, y: 0, n: 900 },
-  exit: { minX: 4150, minY: -140, maxX: 4310, maxY: 140 },
-  // LE TERRAIN DE JEU : dix-sept coques. Les parois viennent de là — ici,
+  bounds: { minX: -2250, minY: -1900, maxX: 3450, maxY: 1900 },
+  spawn: { x: -1720, y: 0, n: 900 },
+  // LA BOUCHE D'EAU : au fond du sas, sur la ligne de vol
+  exit: { minX: 2470, minY: -140, maxX: 2630, maxY: 140 },
+  // LE TERRAIN DE JEU : quinze coques. Les parois viennent de là — ici,
   // on ne pose plus que le MOBILIER.
   structures: STRUCTURES_HUB,
   coque: 'structures',
   boxes: [
+    // ═══ LA ROTONDE ════════════════════════════════════════════════════
+    // nord-ouest : LE BANC DES MÉMOIRES, contre la paroi nord
+    box(-620, 700, -200, 760, MAT_WALL, 2),
+    // nord-est : LE MUR DES RECORDS (paroi nord) et LES CONSOLES (paroi est)
+    box(200, 700, 560, 760, MAT_WALL, 2),
+    box(760, 220, 800, 560, MAT_WALL, 4),
+    // sud-est : LE CODEX, contre la paroi est
+    box(760, -560, 800, -220, MAT_WALL, 7),
+    // sud-ouest : L'ÉTAL en L — trois cloisons par paroi, deux alcôves
+    box(-840, -630, -680, -570, MAT_WALL, 2),
+    box(-840, -420, -680, -360, MAT_WALL, 2),
+    box(-840, -210, -680, -150, MAT_WALL, 2),
+    box(-630, -840, -570, -680, MAT_WALL, 2),
+    box(-420, -840, -360, -680, MAT_WALL, 2),
+    box(-210, -840, -150, -680, MAT_WALL, 2),
+
+    // ═══ LE SAS : LA TABLE DE DÉPART, qu'on longe ═══════════════════════
+    box(1620, -300, 2120, -230, MAT_WALL, 7),
+
     // ═══ LE BAC D'ESSAI : toutes les surfaces, sans enjeu ══════════════
-    box(-2000, 700, -1860, 780, MAT_CHAUD),
-    box(-1820, 700, -1680, 780, MAT_MEMBRANE),
-    box(-1640, 700, -1500, 780, MAT_RIDEAU),
-    box(-1460, 700, -1320, 780, MAT_SURCHAUFFEUR),
-    box(-2000, -780, -1860, -700, MAT_HYDROPHILE),
-    box(-1820, -780, -1680, -700, MAT_HYDROPHOBE),
-    box(-1640, -780, -1500, -700, MAT_FROID),
-    box(-1460, -780, -1320, -700, MAT_GRILLE),
-
-    // ═══ LES CONSOLES DES COULOIRS ═════════════════════════════════════
-    // MÉMOIRES : deux rails qui encadrent le passage — le corps qui les
-    // frôle ouvre l'écran du cycle des états
-    box(-1200, 100, -640, 140, MAT_WALL, 2),
-    box(-1200, -140, -640, -100, MAT_WALL, 2),
-    // le pupitre du CENTRE DE CONTRÔLE
-    box(-540, 330, -60, 400, MAT_WALL, 4),
-    // RECORDS : le banc optique des calibrations
-    box(40, 100, 740, 140, MAT_WALL, 2),
-    box(40, -140, 740, -100, MAT_WALL, 2),
-    // LA TABLE DE DÉPART, dans le sas
-    box(3300, 90, 3700, 160, MAT_WALL, 7),
-
-    // ═══ L'ÉTAL DU COMPTOIR : cinq cloisons, quatre alcôves ════════════
-    box(940, -500, 1000, -320, MAT_WALL, 2),
-    box(1260, -500, 1320, -320, MAT_WALL, 2),
-    box(1580, -500, 1640, -320, MAT_WALL, 2),
-    box(1900, -500, 1960, -320, MAT_WALL, 2),
-    box(2220, -500, 2280, -320, MAT_WALL, 2),
+    ...SURFACES_BAC.map((s, i) => box(xBac(i), -1600, xBac(i) + 100, -1520, s.mat)),
   ],
   sponges: [],
-  // QUATRE LAMPES, PAS SIX. Le moteur n'en allume que MAX_LUMIERES (4) : les
-  // six posées ici laissaient les deux dernières — l'étal et le sas —
-  // ÉTEINTES, et tout l'est du module vivait de la lumière qui fuyait par
-  // dessus les murs de l'ouest. Depuis que les coques montent au plafond,
-  // cette fuite n'existe plus : mesuré coque par coque, le sas tombait à
-  // 0,33, la passerelle à 0,26, le secteur 4 à 0,26.
-  //
-  // Les deux lampes de l'ouest deviennent donc des BANDEAUX de 1600 u (le
-  // maximum que le moteur tient : la demi-longueur est bornée à 800). Un
-  // bandeau éclaire depuis le point de son segment le plus proche du texel —
-  // un seul en couvre trois coques d'affilée, chambre-couloir-chambre, et
-  // l'ouest garde exactement son clair d'avant avec deux lampes au lieu de
-  // quatre. Elles sont posées SANS CORPS (taille 0) : le segment traverse
-  // les cloisons, un luminaire dessiné se coucherait en travers des murs.
+  // QUATRE LAMPES, le maximum que le moteur allume. Deux BANDEAUX verticaux
+  // (1600 u, sans corps) : l'un descend la rotonde et éclaire ses deux
+  // ailes par ses bouts, l'autre descend le sas et atteint ses deux pods.
+  // La cuve garde sa lampe froide, le comptoir sa lampe chaude. Le secteur
+  // scellé reste dans la pénombre : il l'est.
   lumieres: [
-    // la cuve → l'aile des endormis : x de -4050 à -2450
-    {
-      x: -3250,
-      y: 0,
-      h: 640,
-      intensite: 0.9,
-      couleur: '#9fd4ee',
-      forme: 'bandeau',
-      longueur: 1600,
-      taille: 0,
-    },
-    // le bac d'essai → le couloir des MÉMOIRES → le centre de contrôle
-    {
-      x: -900,
-      y: 0,
-      h: 640,
-      intensite: 1.0,
-      forme: 'bandeau',
-      longueur: 1600,
-      taille: 0,
-    },
-    { x: 1640, y: -120, h: 620, intensite: 0.95, couleur: '#ffd9a8' }, // l'étal
-    { x: 3650, y: 0, h: 560, intensite: 0.95, couleur: '#8fe6b0' }, // le sas
+    { x: -1670, y: 0, h: 640, intensite: 0.9, couleur: '#9fd4ee' }, // la cuve : froide
+    { x: 0, y: 0, h: 640, intensite: 1.0, forme: 'bandeau', longueur: 1600, angle: 90, taille: 0 }, // la rotonde
+    { x: 1970, y: 0, h: 600, intensite: 0.95, couleur: '#8fe6b0', forme: 'bandeau', longueur: 1600, angle: 90, taille: 0 }, // le sas
+    { x: -520, y: -520, h: 520, intensite: 0.9, couleur: '#ffd9a8' }, // le comptoir : chaud
   ],
   decals: [
-    // LES SIX ENDORMIS : une fiole par alcôve. Celle du centre-nord est
-    // VIDE — sous « NE PAS RÉVEILLER », la question s'impose d'elle-même.
-    { x: -3260, y: 700, w: 90, h: 300, kind: 'fiole-pleine', fade: 0.98 },
-    { x: -2940, y: 700, w: 90, h: 300, kind: 'fiole-vide', fade: 0.98 },
-    { x: -2620, y: 700, w: 90, h: 300, kind: 'fiole-pleine', fade: 0.98, flip: true },
-    { x: -3260, y: -700, w: 90, h: 300, kind: 'fiole-pleine', fade: 0.98 },
-    { x: -2940, y: -700, w: 90, h: 300, kind: 'fiole-pleine', fade: 0.98, flip: true },
-    { x: -2620, y: -700, w: 90, h: 300, kind: 'fiole-pleine', fade: 0.98 },
+    // LA CUVE : les vingt et une alvéoles
+    ...ALVEOLES,
+    { x: -1450, y: -320, w: 150, h: 150, kind: 'tuyaux', fade: 0.85 }, // le distillateur
+    // LES SIX ENDORMIS : une fiole par alcôve, celle du milieu VIDE — sous
+    // « NE PAS RÉVEILLER », la question s'impose d'elle-même
+    { x: -420, y: 1560, w: 90, h: 300, kind: 'fiole-pleine', fade: 0.98 },
+    { x: -252, y: 1560, w: 90, h: 300, kind: 'fiole-pleine', fade: 0.98, flip: true },
+    { x: -84, y: 1560, w: 90, h: 300, kind: 'fiole-vide', fade: 0.98 },
+    { x: 84, y: 1560, w: 90, h: 300, kind: 'fiole-pleine', fade: 0.98 },
+    { x: 252, y: 1560, w: 90, h: 300, kind: 'fiole-pleine', fade: 0.98, flip: true },
+    { x: 420, y: 1560, w: 90, h: 300, kind: 'fiole-pleine', fade: 0.98 },
+    // LA VITRINE de la rotonde : trois semblables sous verre, dont un parti
+    { x: 300, y: -650, w: 80, h: 260, kind: 'fiole-pleine', fade: 0.98 },
+    { x: 420, y: -650, w: 80, h: 260, kind: 'fiole-vide', fade: 0.98 },
+    { x: 540, y: -650, w: 80, h: 260, kind: 'fiole-pleine', fade: 0.98, flip: true },
     // les écrans du méta : sous tension une fois les stations réparées
-    { x: -300, y: 365, w: 440, h: 130, kind: 'ecran-on', fade: 0.95 },
-    { x: 390, y: 120, w: 620, h: 70, kind: 'ecran-on', fade: 0.95 },
-    { x: -920, y: 120, w: 520, h: 70, kind: 'ecran-on', fade: 0.95 },
-    { x: 3500, y: 125, w: 380, h: 70, kind: 'ecran-on', fade: 0.95 },
-    // la machinerie du carrefour
-    { x: 1000, y: 320, w: 420, h: 300, kind: 'tuyaux', fade: 0.9 },
-    { x: 2280, y: 320, w: 420, h: 300, kind: 'vanne', fade: 0.9 },
+    { x: 380, y: 730, w: 340, h: 70, kind: 'ecran-on', fade: 0.95 }, // le mur des records
+    { x: 740, y: 300, w: 120, h: 60, kind: 'ecran-on', fade: 0.95 }, // les avaries
+    { x: 740, y: 480, w: 120, h: 60, kind: 'ecran-on', fade: 0.95 }, // le plan
+    { x: 740, y: -390, w: 120, h: 60, kind: 'ecran-on', fade: 0.95 }, // le codex
+    { x: 1870, y: -265, w: 380, h: 70, kind: 'ecran-on', fade: 0.95 }, // la table
+    // l'armoire d'éclairage, et la machinerie du seuil
+    { x: 410, y: 280, w: 130, h: 195, kind: 'vanne', fade: 0.9 },
+    { x: 1450, y: 420, w: 300, h: 220, kind: 'tuyaux', fade: 0.85 },
+    { x: 2500, y: -440, w: 300, h: 220, kind: 'tuyaux', fade: 0.85, flip: true },
   ],
   labels: [
-    // ─── les lieux, dans l'ordre de la file
-    { x: -4100, y: 300, text: 'MODULE MÉDUSE|LA CUVE', tone: 'mur', rang: 'secteur' },
+    // ─── la cuve
+    { x: -1670, y: 470, text: 'MODULE MÉDUSE|LA CUVE', tone: 'mur', rang: 'secteur' },
+    { x: -1800, y: -470, text: 'CUVES 1 À 21|VINGT SONT VIDES', tone: 'froid' },
     {
-      x: -2940,
-      y: 380,
+      x: -1450,
+      y: -470,
+      text: 'LE DISTILLATEUR|LA PRIME DU RETOUR',
+      cle: 'hub.distillateur',
+      tone: 'grille',
+    },
+    // ─── la rotonde
+    { x: 0, y: -480, text: 'LA ROTONDE|LE POSTE DE GESTION', tone: 'mur', rang: 'secteur' },
+    { x: -410, y: 620, text: 'LE BANC DES MÉMOIRES|TISSER LES LIENS', tone: 'froid' },
+    ...PICTOS_POSES,
+    {
+      x: 380,
+      y: 470,
+      text: 'LE MUR DES RECORDS|BANC OPTIQUE DES CALIBRATIONS',
+      cle: 'hub.mur-records',
+      tone: 'froid',
+    },
+    { x: 680, y: 620, text: 'LES CONSOLES|AVARIES · PLAN DE LA STATION', tone: 'mur' },
+    { x: 420, y: -480, text: 'LA VITRINE|DES SEMBLABLES SOUS VERRE', tone: 'froid' },
+    { x: 680, y: -640, text: 'LE CODEX|LE MANUEL ÉCRIT PAR LA PARTIE', tone: 'froid' },
+    // ─── le comptoir et ses quatre alcôves
+    { x: -330, y: -400, text: 'LE COMPTOIR|TOUT SE PAIE EN MÉMOIRE', tone: 'chaud', rang: 'secteur' },
+    { x: -760, y: -495, text: 'VIATIQUE DE GOUTTES|3 MÉMOIRE', tone: 'phile' },
+    { x: -760, y: -285, text: 'CLEF DE CACHETTE|4 MÉMOIRE', tone: 'phobe' },
+    { x: -495, y: -760, text: 'SAC SURPRISE|3 MÉMOIRE', tone: 'chaud' },
+    { x: -285, y: -760, text: 'ÉCHANTILLON DE SECOURS|8 MÉMOIRE', tone: 'froid' },
+    // ─── les deux ailes
+    {
+      x: 0,
+      y: 1400,
       text: 'L’AILE DES ENDORMIS|NE PAS RÉVEILLER',
       cle: 'hub.aile-endormis',
       tone: 'froid',
       rang: 'secteur',
     },
     {
-      x: -1640,
-      y: 420,
+      x: 0,
+      y: -1340,
       text: 'LE BAC D’ESSAI|TOUTES LES SURFACES, SANS ENJEU',
       cle: 'hub.bac-sable',
       tone: 'mur',
       rang: 'secteur',
     },
-    { x: -920, y: -300, text: 'LE BANC DES MÉMOIRES|TISSER LES LIENS', tone: 'froid' },
-    { x: -290, y: -300, text: 'CENTRE DE CONTRÔLE|LA CONDUITE DE L’ÉTAGE', tone: 'mur', rang: 'secteur' },
+    ...SURFACES_BAC.map((s, i) => ({
+      x: xBac(i) + 50,
+      y: i % 2 ? -1670 : -1450,
+      text: s.text,
+      tone: s.tone,
+    })),
+    // ─── le seuil : la table, le sas, les deux routes gardées
+    { x: 2350, y: 400, text: 'PROTOCOLE 21|SAS DE LANCEMENT', tone: 'sas', rang: 'secteur' },
     {
-      x: 390,
-      y: -300,
-      text: 'LE MUR DES RECORDS|BANC OPTIQUE DES CALIBRATIONS',
-      cle: 'hub.mur-records',
-      tone: 'froid',
+      x: 1870,
+      y: -440,
+      text: 'LA TABLE DE DÉPART|CE QUE VOUS EMPORTEZ',
+      cle: 'hub.table-depart',
+      tone: 'sas',
     },
-    { x: 3650, y: -320, text: 'PROTOCOLE 21|SAS DE LANCEMENT', tone: 'sas', rang: 'secteur' },
-    // ─── les surfaces du bac
-    { x: -1930, y: 620, text: 'CHAUDIÈRE|ELLE VAPORISE', tone: 'chaud' },
-    { x: -1750, y: 850, text: 'MEMBRANE|SEULE L’EAU PASSE', tone: 'phile' },
-    { x: -1570, y: 620, text: 'RIDEAU|SEULE LA GLACE', tone: 'froid' },
-    { x: -1390, y: 850, text: 'SURCHAUFFEUR|UN DASH EN VAPEUR', tone: 'chaud' },
-    { x: -1930, y: -620, text: 'HYDROPHILE|ELLE RETIENT', tone: 'phile' },
-    { x: -1750, y: -850, text: 'HYDROPHOBE|ELLE REPOUSSE', tone: 'phobe' },
-    { x: -1570, y: -620, text: 'PLAQUE FROIDE|ELLE FIGE', tone: 'froid' },
-    { x: -1390, y: -850, text: 'ÉVENT|LE SOUFFLE TRAVERSE', tone: 'grille' },
-    // ─── le comptoir et ses quatre alcôves
-    { x: 1640, y: -180, text: 'LE COMPTOIR|TOUT SE PAIE EN MÉMOIRE', tone: 'chaud', rang: 'secteur' },
-    { x: 1130, y: -250, text: 'VIATIQUE DE GOUTTES|3 MÉMOIRE', tone: 'phile' },
-    { x: 1450, y: -250, text: 'CLEF DE CACHETTE|4 MÉMOIRE', tone: 'phobe' },
-    { x: 1770, y: -250, text: 'SAC SURPRISE|3 MÉMOIRE', tone: 'chaud' },
-    { x: 2090, y: -250, text: 'ÉCHANTILLON DE SECOURS|8 MÉMOIRE', tone: 'froid' },
-    // ─── les deux routes gardées, au bout de leur montée
-    { x: 1640, y: 1100, text: 'SORTIE DE VAPEUR|LA DESCENTE DU JOUR', tone: 'grille', rang: 'secteur' },
-    { x: 1640, y: 760, text: 'GRILLE|SEUL LE SOUFFLE PASSE', tone: 'grille' },
-    { x: 1640, y: -1100, text: 'SORTIE DE GIVRE|LA VOIE SEMI-PROCÉDURALE', tone: 'froid', rang: 'secteur' },
-    { x: 1640, y: -760, text: 'RIDEAU|SEULE LA GLACE L’ÉCARTE', tone: 'froid' },
-    // ─── le méta v5 : l'après-accident
+    { x: 1970, y: 780, text: 'GRILLE|SEUL LE SOUFFLE PASSE', tone: 'grille' },
+    { x: 1780, y: 1360, text: 'SORTIE DE VAPEUR|LA DESCENTE DU JOUR', tone: 'grille', rang: 'secteur' },
+    { x: 1970, y: -780, text: 'RIDEAU|SEULE LA GLACE L’ÉCARTE', tone: 'froid' },
+    { x: 1970, y: -1360, text: 'SORTIE DE GIVRE|LA VOIE SEMI-PROCÉDURALE', tone: 'froid', rang: 'secteur' },
+    // ─── la route du télescope
     {
-      x: 3650,
-      y: 1100,
+      x: 2980,
+      y: 1200,
       text: 'LE SECTEUR SCELLÉ|CE QUI DOIT PARTIR',
       cle: 'hub.secteur-scelle',
       tone: 'sas',
       rang: 'secteur',
     },
     {
-      x: 3650,
-      y: 420,
+      x: 2480,
+      y: 1200,
       text: 'ACCÈS CONDAMNÉ|DEPUIS L’ACCIDENT',
       cle: 'hub.acces-condamne',
       tone: 'mur',
     },
-    {
-      x: 3500,
-      y: 260,
-      text: 'LA TABLE DE DÉPART|CE QUE VOUS EMPORTEZ',
-      cle: 'hub.table-depart',
-      tone: 'sas',
-    },
-    {
-      x: -320,
-      y: -460,
-      text: 'LE DISTILLATEUR|LA PRIME DU RETOUR',
-      cle: 'hub.distillateur',
-      tone: 'grille',
-    },
-    // ─── les pictogrammes d'état, au pupitre du centre de contrôle
-    { x: -420, y: 200, text: '', tone: 'eponge', picto: { couleur: '#d9a441', eau: 3, glace: 1, vapeur: 1 } },
-    { x: -300, y: 200, text: '', tone: 'froid', picto: { couleur: '#8fc8ee', eau: 3, glace: 1, vapeur: 2 } },
-    { x: -180, y: 200, text: '', tone: 'chaud', picto: { couleur: '#e8843c', eau: 2, glace: 3, vapeur: 0 } },
   ],
-  // LE MARCHAND : le Semblable, derrière son étal
-  marchand: { x: 1640, y: -60 },
+  // LE MARCHAND : le Semblable, debout devant ses alcôves, dans l'angle
+  marchand: { x: -540, y: -490 },
   // LES CONSOLES DU MODULE : des surfaces de contact qui ouvrent un écran
-  // (pupitres.ts). Elles sont posées EN DONNÉES, comme tout le reste du
-  // méta — l'éditeur en pose autant qu'il veut, dans n'importe quel
-  // tableau ; ici, les trois du module Méduse.
+  // (pupitres.ts), toutes dans la rotonde, aucune sur la ligne de vol.
   pupitres: [
-    // LE MUR DES RECORDS : la moitié EST du banc optique. On répare en
-    // entrant par l'ouest (le plot de la station couvre tout le couloir) —
-    // la console, elle, attend plus loin : la réparation et la consultation
-    // ne se déclenchent pas du même pas.
-    { minX: 430, minY: -80, maxX: 700, maxY: 80, ecran: 'records' as const },
-    // LE CENTRE DE CONTRÔLE, sous son pupitre : la conduite de l'étage.
-    // Le tableau des avaries n'est PAS gardé par une réparation — c'est
-    // précisément quand le module est en panne qu'on vient le lire.
+    // LE MUR DES RECORDS : la moitié EST du banc optique, DANS le plot de
+    // sa station — elle s'éteint avec elle — mais jamais sur tout le plot :
+    // la réparation se paie en entrant, la consultation vient après
+    { minX: 380, minY: 560, maxX: 560, maxY: 680, ecran: 'records' as const },
+    // LES CONSOLES de la paroi est. Le tableau des avaries n'est gardé par
+    // AUCUNE réparation : c'est quand le module est en panne qu'on le lit.
     {
-      minX: -540,
-      minY: 245,
-      maxX: -310,
-      maxY: 330,
+      minX: 600,
+      minY: 220,
+      maxX: 760,
+      maxY: 380,
       ecran: 'reparations' as const,
       titre: 'TABLEAU DES AVARIES',
     },
     {
-      minX: -290,
-      minY: 245,
-      maxX: -60,
-      maxY: 330,
+      minX: 600,
+      minY: 400,
+      maxX: 760,
+      maxY: 560,
       ecran: 'station' as const,
       titre: 'PLAN DU COMPLEXE',
     },
+    // LE CODEX, en face, sur la même paroi
+    { minX: 600, minY: -560, maxX: 760, maxY: -220, ecran: 'codex' as const, titre: 'LE CODEX' },
+    // LA VITRINE : la collection de fioles, sous les trois semblables
+    { minX: 240, minY: -800, maxX: 600, maxY: -560, ecran: 'fioles' as const, titre: 'LA VITRINE' },
+    // LE SEMBLABLE : posé en pupitre, il remplace le contact de l'étal —
+    // la boîte englobante des alcôves, élargie, mordait sur la ligne de vol
+    { minX: -660, minY: -620, maxX: -420, maxY: -380, ecran: 'marchand' as const, titre: 'LE COMPTOIR' },
   ],
   // le méta EN DONNÉES : plots, banc et ANCRES suivent le chemin commun
   ...metaEnDonnees(ZONES_HUB_GRAND),
@@ -636,7 +703,7 @@ export function zonesPosees(lv: {
 
 /** Les zones méta du hub JOUÉ. Les ANCRES POSÉES font foi (le module
  * rebâti à l'éditeur porte les siennes) ; à défaut, la géométrie tranche
- * pour les vieux instantanés : le grand module, le compact v4, ou null —
+ * pour les vieux instantanés : la rotonde (v9), le compact v4, ou null —
  * aucune zone ne s'active à tort. */
 export function zonesDuHub(lv: {
   bounds: { maxX: number }
@@ -645,7 +712,7 @@ export function zonesDuHub(lv: {
 }): ZonesHub | null {
   const posees = zonesPosees(lv)
   if (posees) return posees
-  if (lv.bounds.maxX >= 3500) return ZONES_HUB_GRAND
+  if (lv.bounds.maxX >= 3000) return ZONES_HUB_GRAND
   if (lv.bounds.maxX >= 2600) return ZONES_HUB_COMPACT
   return null
 }
