@@ -2,7 +2,14 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   CARTE_LIVREE,
+  CRAN_MAX,
+  HALTES,
   accessibles,
+  cheminLePlusCourt,
+  estHalte,
+  longueurRoute,
+  plusCourtVers,
+  routesVersObjectif,
   cloneCarte,
   couleurTemperature,
   orbeRequis,
@@ -74,6 +81,39 @@ describe('parseCarte — la lecture dit ce qui manque', () => {
     expect(carte).toBeNull()
     expect(erreurs).toContain('modules[2] (T2) : x (nombre) requis')
     expect(erreurs).toContain('modules[3] (T3) : type inconnu « donjon »')
+  })
+
+  it('une carte d’avant les haltes et le cran reste lisible : libellés par défaut, cran à zéro', () => {
+    // la carte PUBLIÉE (magasin) peut dater d'avant ces natures : la refuser
+    // ferait jouer tout le monde sur la carte livrée sans que rien le dise
+    const brut = JSON.parse(serialiseCarte(CARTE_LIVREE)) as Record<string, unknown>
+    const types = { ...(brut.types as Record<string, string>) }
+    delete types.economat
+    delete types.repos
+    const modules = (brut.modules as Record<string, unknown>[]).map((m) => {
+      const { cran: _cran, ...reste } = m
+      return reste
+    })
+    const { carte, erreurs } = parseCarte({ ...brut, types, modules })
+    expect(erreurs).toEqual([])
+    expect(carte!.types.economat).toBe('ÉCONOMAT')
+    expect(carte!.types.repos).toBe('REPOS')
+    expect(carte!.modules.every((m) => m.cran === 0)).toBe(true)
+  })
+
+  it('le cran de confinement se lit borné, et ne s’écrit que s’il compte', () => {
+    const brut = JSON.parse(serialiseCarte(CARTE_LIVREE)) as { modules: Record<string, unknown>[] }
+    brut.modules[1].cran = 2.4
+    brut.modules[2].cran = 9
+    brut.modules[3].cran = -1
+    const { carte, erreurs } = parseCarte(brut)
+    expect(erreurs).toEqual([])
+    expect(carte!.modules.slice(1, 4).map((m) => m.cran)).toEqual([2, CRAN_MAX, 0])
+    const relu = JSON.parse(serialiseCarte(carte!)) as { modules: Record<string, unknown>[] }
+    expect(relu.modules[1].cran).toBe(2)
+    expect('cran' in relu.modules[3]).toBe(false)
+    brut.modules[1].cran = 'fort'
+    expect(parseCarte(brut).erreurs.some((e) => /T1.*cran/.test(e))).toBe(true)
   })
 
   it('accepte une carte sans décor, et une condition vide comme un passage libre', () => {
@@ -191,6 +231,43 @@ describe('un module est un biome — niveaux et trajet', () => {
     expect(verifieCarte(c).some((v) => v.niveau === 'attention' && v.module === 'T1' && v.message.includes('biome'))).toBe(true)
     c.modules[1].niveaux = -2
     expect(verifieCarte(c).some((v) => v.niveau === 'erreur' && v.module === 'T1')).toBe(true)
+  })
+})
+
+describe('cheminLePlusCourt et routesVersObjectif — la matière des règles de route', () => {
+  it('le chemin va du départ à l’arrivée, pesé en niveaux, et s’accorde avec plusCourtVers', () => {
+    const chemin = cheminLePlusCourt(CARTE_LIVREE, 'HUB', 'OBS')!
+    expect(chemin[0]).toBe('HUB')
+    expect(chemin[chemin.length - 1]).toBe('OBS')
+    expect(longueurRoute(CARTE_LIVREE, chemin.slice(1))).toBe(plusCourtVers(CARTE_LIVREE, 'HUB', 'OBS'))
+    expect(cheminLePlusCourt(CARTE_LIVREE, 'OBS', 'OBS')).toEqual(['OBS'])
+    expect(cheminLePlusCourt(CARTE_LIVREE, 'OBS', 'HUB')).toBeNull()
+    expect(cheminLePlusCourt(CARTE_LIVREE, 'X', 'OBS')).toBeNull()
+  })
+
+  it('énumère les routes simples du départ à l’objectif, et les mesure', () => {
+    const routes = routesVersObjectif(CARTE_LIVREE)
+    expect(routes.length).toBeGreaterThan(0)
+    for (const r of routes) {
+      expect(r[0]).toBe('HUB')
+      expect(r[r.length - 1]).toBe('OBS')
+      expect(new Set(r).size).toBe(r.length) // simple : aucun module deux fois
+    }
+    const lt = longueursTrajet(CARTE_LIVREE)!
+    expect(Math.min(...routes.map((r) => longueurRoute(CARTE_LIVREE, r)))).toBe(lt.min)
+    expect(Math.max(...routes.map((r) => longueurRoute(CARTE_LIVREE, r)))).toBe(lt.max)
+    // un objectif coupé du reste : aucune route
+    const c = cloneCarte(CARTE_LIVREE)
+    c.liens = c.liens.filter((l) => l.vers !== 'OBS')
+    expect(routesVersObjectif(c)).toEqual([])
+    // la borne tient une carte en plat de nouilles
+    expect(routesVersObjectif(CARTE_LIVREE, 1)).toHaveLength(1)
+  })
+
+  it('les haltes sont les natures sans salle où l’on s’arrête', () => {
+    expect(HALTES).toEqual(['economat', 'repos'])
+    expect(estHalte({ type: 'economat' })).toBe(true)
+    expect(estHalte({ type: 'combat' })).toBe(false)
   })
 })
 

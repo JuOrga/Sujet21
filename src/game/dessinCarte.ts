@@ -66,6 +66,8 @@ export const GLYPHES: Record<TypeModule, string> = {
   enigme: '▦',
   coffre: '◆',
   boss: '⬢',
+  economat: '⚖',
+  repos: '☾',
 }
 
 const COURANT = '#a7ddf5' // le givre : la couleur du « vous êtes ici »
@@ -373,8 +375,8 @@ function module(c: CarteStation, m: ModuleCarte, k: number, o: OptionsDessin): s
   const clip = `cs-clip-${k}`
 
   let s =
-    `<g class="${classes}" data-mod="${esc(m.id)}" tabindex="0" role="button" style="--z:${zc};--bord:${bord}" opacity="${opacite}" aria-label="${esc(m.nom)} — ${esc(c.types[m.type])}">` +
-    `<title>${esc(m.nom)} — ${esc(c.types[m.type])}</title>` +
+    `<g class="${classes}" data-mod="${esc(m.id)}" tabindex="0" role="button" style="--z:${zc};--bord:${bord}" opacity="${opacite}" aria-label="${esc(m.nom)} — ${esc(c.types[m.type])}${m.cran > 0 ? ` — confinement +${m.cran}` : ''}">` +
+    `<title>${esc(m.nom)} — ${esc(c.types[m.type])}${m.cran > 0 ? ` — confinement +${m.cran}` : ''}</title>` +
     `<clipPath id="${clip}">${forme(3)}/></clipPath>` +
     `${forme(0)} class="cs-bord" fill="${bord}"/>` +
     `${forme(3)} class="cs-fond" fill="${fond}"/>` +
@@ -394,6 +396,11 @@ function module(c: CarteStation, m: ModuleCarte, k: number, o: OptionsDessin): s
     s += `${forme(0)} class="cs-voile" fill="rgba(3,7,16,.55)"/><text class="cs-cadenas" x="${n1(m.x)}" y="${n1(m.y)}">🔒</text>`
   if (visite && !estCourant)
     s += `<text class="cs-coche" x="${n1(l + m.w - 12)}" y="${n1(t + 12)}">✓</text>`
+  // LE CONFINEMENT SUPÉRIEUR se lit sur le plan avant qu'on s'y engage : le
+  // joueur pèse la route en voyant la marque, comme l'élite d'un Slay the
+  // Spire — plus dur, plus généreux
+  if (m.cran > 0)
+    s += `<text class="cs-cran" x="${n1(l + 14)}" y="${n1(t + 12)}" fill="${P.chaud}">+${m.cran}</text>`
 
   // l'étiquette : le nom sous le fût, puis la température
   const etiquette = !jonction || sel || estCourant || edition

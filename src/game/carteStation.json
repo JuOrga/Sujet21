@@ -35,7 +35,9 @@
     "combat": "COMBAT",
     "enigme": "ÉNIGME",
     "coffre": "CACHE",
-    "boss": "TERMINAL"
+    "boss": "TERMINAL",
+    "economat": "ÉCONOMAT",
+    "repos": "REPOS"
   },
   "modules": [
     {

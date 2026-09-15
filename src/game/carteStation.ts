@@ -56,8 +56,24 @@ export interface ZoneCarte {
   couleur: string
 }
 
-/** Les six natures de module — les clés de `types`, qui donne leurs libellés. */
-export type TypeModule = 'sas' | 'jonction' | 'combat' | 'enigme' | 'coffre' | 'boss'
+/** LES NATURES DE MODULE — les clés de `types`, qui donne leurs libellés.
+ *  Une nature n'est pas qu'un glyphe : elle COMMANDE ce qu'on y joue
+ *  (descenteCarte.ts, postureDuModule) — un combat place ses dangers, une
+ *  énigme ses faisceaux, une cache sa cachette. Deux natures sont des
+ *  HALTES sans salle, à la manière du feu de camp et du marchand d'un
+ *  Slay the Spire : l'ÉCONOMAT (la salle du Semblable, intercalée à
+ *  l'entrée) et le REPOS (un choix, puis la carte se rouvre). Placées sur
+ *  une branche et pas sur l'autre, elles font la route : « par là je
+ *  passe par l'économat, par ici j'ai la cache ». */
+export type TypeModule =
+  | 'sas'
+  | 'jonction'
+  | 'combat'
+  | 'enigme'
+  | 'coffre'
+  | 'boss'
+  | 'economat'
+  | 'repos'
 export const TYPES_MODULE: readonly TypeModule[] = [
   'sas',
   'jonction',
@@ -65,7 +81,22 @@ export const TYPES_MODULE: readonly TypeModule[] = [
   'enigme',
   'coffre',
   'boss',
+  'economat',
+  'repos',
 ]
+/** Les natures SANS SALLE où l'on s'arrête : la carte les exige à zéro niveau. */
+export const HALTES: readonly TypeModule[] = ['economat', 'repos']
+export function estHalte(m: { type: TypeModule }): boolean {
+  return HALTES.includes(m.type)
+}
+/** Les libellés des natures nées APRÈS les premières cartes : une carte
+ *  publiée avant elles ne les nomme pas, et doit rester lisible. */
+const LIBELLES_DEFAUT: Partial<Record<TypeModule, string>> = {
+  economat: 'ÉCONOMAT',
+  repos: 'REPOS',
+}
+/** Le CRAN DE CONFINEMENT le plus haut qu'un module puisse porter. */
+export const CRAN_MAX = 3
 
 /** La silhouette dessinée : octogone (le fût), rond (le nœud), dôme (le terminal). */
 export type FormeModule = 'octogone' | 'rond' | 'octogone-dome'
@@ -93,6 +124,11 @@ export interface ModuleCarte {
   /** L'ORBE QUE LE MODULE RECÈLE (une cache) : pris quand le module est
    *  épuisé, une seule fois par poste — un id d'ORBES. Absent : rien. */
   orbe?: string
+  /** LE CONFINEMENT SUPÉRIEUR — l'élite de Slay the Spire, et le §9.3 du
+   *  document fonctionnel : « plus difficile, plus généreux ». Chaque cran
+   *  monte la difficulté des salles du module d'un cran de rampe et
+   *  multiplie la mémoire gravée à leur sas. 0 : l'ordinaire. */
+  cran: number
   desc: string
 }
 
@@ -202,8 +238,9 @@ export function parseCarte(entree: unknown): {
   else
     for (const t of TYPES_MODULE) {
       const v = o.types[t]
-      if (!estChaine(v)) erreurs.push(`types.${t} manque`)
-      else types[t] = v
+      if (estChaine(v)) types[t] = v
+      else if (LIBELLES_DEFAUT[t]) types[t] = LIBELLES_DEFAUT[t]!
+      else erreurs.push(`types.${t} manque`)
     }
 
   const modules: ModuleCarte[] = []
@@ -220,8 +257,11 @@ export function parseCarte(entree: unknown): {
         if (!estNombre(m[k])) erreurs.push(`${ou} : ${k} (nombre) requis`)
       if (!FORMES_MODULE.includes(m.forme as FormeModule)) erreurs.push(`${ou} : forme inconnue « ${String(m.forme)} »`)
       if (m.orbe !== undefined && m.orbe !== null && !estChaine(m.orbe)) erreurs.push(`${ou} : orbe doit être une chaîne`)
+      if (m.cran !== undefined && !estNombre(m.cran)) erreurs.push(`${ou} : cran doit être un nombre`)
       if (erreurs.some((e) => e.startsWith(ou))) return
       const orbe = estChaine(m.orbe) && m.orbe.trim() !== '' ? m.orbe.trim() : undefined
+      // le cran est né après les premières cartes : absent, c'est l'ordinaire
+      const cran = estNombre(m.cran) ? Math.max(0, Math.min(CRAN_MAX, Math.round(m.cran))) : 0
       modules.push({
         id: (m.id as string).trim(),
         nom: m.nom as string,
@@ -236,6 +276,7 @@ export function parseCarte(entree: unknown): {
         niveaux: m.niveaux as number,
         biome: estChaine(m.biome) ? m.biome.trim() : '',
         ...(orbe ? { orbe } : {}),
+        cran,
         desc: estChaine(m.desc) ? m.desc : '',
       })
     })
@@ -341,8 +382,8 @@ export function serialiseCarte(c: CarteStation): string {
     modules: c.modules.map((m) => ({
       id: m.id, nom: m.nom, type: m.type, zone: m.zone, x: m.x, y: m.y, w: m.w, h: m.h,
       temp: m.temp, forme: m.forme, niveaux: m.niveaux, biome: m.biome,
-      ...(m.orbe ? { orbe: m.orbe } : {}), desc: m.desc,
-    })),
+      ...(m.orbe ? { orbe: m.orbe } : {}), ...(m.cran > 0 ? { cran: m.cran } : {}), desc: m.desc,
+    })) as ModuleCarte[],
     liens: c.liens.map((l) => ({ de: l.de, vers: l.vers, type: l.type })),
     typesLiens: Object.fromEntries(
       Object.entries(c.typesLiens).map(([k, s]) => {
@@ -478,43 +519,29 @@ export function accessibles(c: CarteStation, depart: string): Set<string> {
 /** LE TRAJET EN NIVEAUX : combien de salles séparent le départ de
  *  l'objectif, au plus court et au plus long, en suivant les coursives dans
  *  leur sens (la longueur d'une run n'est plus un réglage : elle découle de
- *  la carte). Null : l'objectif est inatteignable. Les chemins simples
- *  s'énumèrent — la carte a une dizaine de modules, pas mille. */
+ *  la carte). Null : l'objectif est inatteignable. */
 export function longueursTrajet(c: CarteStation): { min: number; max: number } | null {
-  const niv = new Map(c.modules.map((m) => [m.id, Math.max(0, m.niveaux)]))
-  if (!niv.has(c.regles.depart) || !niv.has(c.regles.objectif)) return null
-  let min = Infinity
-  let max = -Infinity
-  let budget = 20000 // au-delà, la carte est un plat de nouilles : on s'arrête
-  const marche = (id: string, total: number, vus: Set<string>): void => {
-    if (budget-- <= 0) return
-    const t = total + (niv.get(id) ?? 0)
-    if (id === c.regles.objectif) {
-      min = Math.min(min, t)
-      max = Math.max(max, t)
-      return
-    }
-    for (const l of liensDepuis(c, id)) {
-      if (vus.has(l.vers) || !niv.has(l.vers)) continue
-      vus.add(l.vers)
-      marche(l.vers, t, vus)
-      vus.delete(l.vers)
-    }
-  }
-  marche(c.regles.depart, 0, new Set([c.regles.depart]))
-  return Number.isFinite(min) ? { min, max } : null
+  const routes = routesVersObjectif(c)
+  if (routes.length === 0) return null
+  const longueurs = routes.map((r) => longueurRoute(c, r))
+  return { min: Math.min(...longueurs), max: Math.max(...longueurs) }
 }
 
-/** LE PLUS COURT CHEMIN EN NIVEAUX d'un module à un autre, en suivant les
- *  coursives dans leur sens — les niveaux du module de DÉPART ne comptent
- *  pas (on y est déjà), ceux de l'arrivée si. Null : inatteignable. C'est
- *  ce qui reste à jouer, au mieux, depuis là où l'on est. */
-export function plusCourtVers(c: CarteStation, de: string, vers: string): number | null {
+/** LE PLUS COURT CHEMIN d'un module à un autre, en suivant les coursives
+ *  dans leur sens, pesé en NIVEAUX — les niveaux du module de DÉPART ne
+ *  comptent pas (on y est déjà), ceux de l'arrivée si. Rend la suite des
+ *  modules, départ et arrivée compris ; null : inatteignable. C'est ce que
+ *  le survol de la carte projette : « par ici, tant de salles jusqu'à
+ *  l'observatoire, en passant par là ». */
+export function cheminLePlusCourt(c: CarteStation, de: string, vers: string): string[] | null {
   const niv = new Map(c.modules.map((m) => [m.id, Math.max(0, m.niveaux)]))
   if (!niv.has(de) || !niv.has(vers)) return null
-  if (de === vers) return 0
-  // Dijkstra sur une dizaine de sommets : la file est une liste triée
+  if (de === vers) return [de]
+  // Dijkstra sur une dizaine de sommets : la file est une liste triée. À
+  // poids égal, l'ordre des coursives dans le JSON départage — la
+  // projection ne saute pas d'une route à l'autre entre deux survols.
   const dist = new Map<string, number>([[de, 0]])
+  const avant = new Map<string, string>()
   const file: string[] = [de]
   const clos = new Set<string>()
   while (file.length) {
@@ -522,17 +549,61 @@ export function plusCourtVers(c: CarteStation, de: string, vers: string): number
     const id = file.shift()!
     if (clos.has(id)) continue
     clos.add(id)
-    if (id === vers) return dist.get(id) ?? null
+    if (id === vers) break
     for (const l of liensDepuis(c, id)) {
       if (!niv.has(l.vers)) continue
       const d = (dist.get(id) ?? 0) + (niv.get(l.vers) ?? 0)
       if (d < (dist.get(l.vers) ?? Infinity)) {
         dist.set(l.vers, d)
+        avant.set(l.vers, id)
         file.push(l.vers)
       }
     }
   }
-  return null
+  if (!clos.has(vers)) return null
+  const chemin = [vers]
+  while (chemin[0] !== de) chemin.unshift(avant.get(chemin[0])!)
+  return chemin
+}
+
+/** LE PLUS COURT CHEMIN EN NIVEAUX d'un module à un autre : ce qui reste à
+ *  jouer, au mieux, depuis là où l'on est. Null : inatteignable. */
+export function plusCourtVers(c: CarteStation, de: string, vers: string): number | null {
+  const chemin = cheminLePlusCourt(c, de, vers)
+  if (!chemin) return null
+  return chemin.slice(1).reduce((t, id) => t + Math.max(0, moduleParId(c, id)?.niveaux ?? 0), 0)
+}
+
+/** TOUTES LES ROUTES du départ à l'objectif — les chemins simples, dans
+ *  l'ordre des coursives. C'est la matière des règles de carte à la Slay
+ *  the Spire : combien de routes, à quelle distance, avec quelles haltes.
+ *  Bornée : au-delà de `max` routes, la carte est un plat de nouilles et la
+ *  liste s'arrête là. */
+export function routesVersObjectif(c: CarteStation, max = 500): string[][] {
+  const ids = new Set(c.modules.map((m) => m.id))
+  if (!ids.has(c.regles.depart) || !ids.has(c.regles.objectif)) return []
+  const out: string[][] = []
+  const marche = (id: string, chemin: string[]): void => {
+    if (out.length >= max) return
+    if (id === c.regles.objectif) {
+      out.push([...chemin])
+      return
+    }
+    for (const l of liensDepuis(c, id)) {
+      if (chemin.includes(l.vers) || !ids.has(l.vers)) continue
+      chemin.push(l.vers)
+      marche(l.vers, chemin)
+      chemin.pop()
+    }
+  }
+  marche(c.regles.depart, [c.regles.depart])
+  return out
+}
+
+/** LA LONGUEUR D'UNE ROUTE, en salles : la somme des niveaux des modules
+ *  qu'elle traverse. */
+export function longueurRoute(c: CarteStation, route: readonly string[]): number {
+  return route.reduce((t, id) => t + Math.max(0, moduleParId(c, id)?.niveaux ?? 0), 0)
 }
 
 /** LES BIOMES DE LA CARTE : un par code, dans l'ordre des modules, avec
