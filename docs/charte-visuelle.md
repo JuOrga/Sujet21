@@ -121,6 +121,7 @@ elle **devient la référence** de sa famille : on la dépose dans
 | famille | référence |
 | --- | --- |
 | sas de raccord, veilleuses ambre | `docs/reference/sas-raccord-reference.png` |
+| la station vue du dehors (les planches de l'approche, `assets-ia.md` §26) | `docs/reference/station-reference.png` — la planche `approche-3` livrée le 15/09 |
 | les autres | à désigner à la prochaine image réussie |
 
 ## 7. Les familles et leurs mesures
