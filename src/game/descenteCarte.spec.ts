@@ -76,6 +76,18 @@ describe('la descente sur la carte', () => {
     expect(choixModules(c, e, []).map((x) => `${x.module.id}:${x.retour ? 'retour' : x.lien.type}`)).toEqual(['OBS:alt'])
   })
 
+  it('un module traversé est épuisé pour la run, même en y rentrant par une coursive ordinaire', () => {
+    // une carte qui boucle : l'économat renvoie vers S1 — S1 a déjà été joué
+    const boucle = cloneCarte(c)
+    boucle.liens.push({ de: 'ECO', vers: 'S1', type: 'alt' })
+    const e = { module: 'ECO', niveau: 0, visites: ['HUB', 'T2', 'N', 'S1'] }
+    const r = entreModule(boucle, e, 'S1', [])!
+    expect(r.niveau).toBe(3) // épuisé : ses salles ne se rejouent pas
+    expect(moduleFini(boucle, r)).toBe(true)
+    // un module jamais traversé s'entame à zéro
+    expect(entreModule(boucle, e, 'OBS', [])!.niveau).toBe(0)
+  })
+
   it('un module se finit salle par salle ; l’objectif s’atteint au bout du sien', () => {
     let e = entreModule(c, departCarte(c), 'T2', [])!
     expect(moduleFini(c, e)).toBe(false)

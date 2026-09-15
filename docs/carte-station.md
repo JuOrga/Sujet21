@@ -51,7 +51,12 @@ coursive** (couleur, trait, coque, tirets, condition, badge).
 Le panneau de gauche liste modules et coursives, et la **vérification** :
 un identifiant en double, une coursive vers un module inconnu, un module
 que nul ne peut atteindre, un objectif hors de portée, deux modules qui se
-chevauchent. Cliquer un verdict sélectionne le fautif.
+chevauchent, une halte avec des salles. Puis **les règles de route**
+(`verifieRoutes`), celles que le générateur de carte de Slay the Spire
+garantit à chaque acte, en attentions : au moins deux routes vers
+l'objectif ; des routes à distance équivalente, à une salle près (§9.3) ;
+jamais deux confinements supérieurs d'affilée ; un arrêt (halte ou cache)
+sur chaque route. Cliquer un verdict sélectionne le fautif.
 
 **Aperçu jeu** rejoue le comportement voulu in-game : le sujet part du
 module de départ, seuls les modules au bout d'une coursive partant de sa
@@ -209,9 +214,11 @@ HUB ─vapeur T3 ─┘        └─ S3 CHAUFFERIE (+1) ┴─ REP ALCÔVE ─�
 - **Une cache n'est pas un piège.** D'un module d'où l'objectif est hors
   de portée (un cul-de-sac), la carte offre le **retour** vers le module
   d'où l'on vient — le dernier traversé qui y mène par une coursive, pas
-  la cache qu'on quitte. Au retour, le module est déjà épuisé : ses salles
-  ne se rejouent pas, la carte se rouvre aussitôt. La vérification de
-  l'éditeur signale chaque module d'où l'objectif est hors de portée.
+  la cache qu'on quitte. La vérification de l'éditeur signale chaque
+  module d'où l'objectif est hors de portée (la carte livrée n'en a plus).
+- **Un module traversé est épuisé pour la run**, au retour comme par une
+  coursive ordinaire : ses salles ne se rejouent pas (ni leur mémoire), la
+  carte se rouvre aussitôt.
 - **La pioche suit le biome** : un tableau qui porte un `biome` ne se
   propose que dans le module de ce biome ; un tableau sans biome est
   universel (la bibliothèque n'est pas encore réétiquetée) ; une salle

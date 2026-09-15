@@ -10,6 +10,7 @@ import {
   longueurRoute,
   plusCourtVers,
   routesVersObjectif,
+  verifieRoutes,
   cloneCarte,
   couleurTemperature,
   orbeRequis,
@@ -314,6 +315,57 @@ describe('les routes', () => {
     // les haltes n'ont pas de salle ; les secteurs du bord portent le cran
     expect(CARTE_LIVREE.modules.filter(estHalte).map((m) => `${m.id}:${m.niveaux}`)).toEqual(['ECO:0', 'REP:0'])
     expect(CARTE_LIVREE.modules.filter((m) => m.cran > 0).map((m) => m.id)).toEqual(['S1', 'S3'])
+  })
+})
+
+describe('verifieRoutes — les règles de route, à la Slay the Spire', () => {
+  it('la carte livrée les respecte toutes', () => {
+    expect(verifieRoutes(CARTE_LIVREE)).toEqual([])
+  })
+
+  it('une seule route vers l’objectif : le plan n’offre aucun choix', () => {
+    const c = cloneCarte(CARTE_LIVREE)
+    c.liens = c.liens.filter((l) => !['T1', 'T3', 'S1', 'S3', 'REP'].includes(l.vers))
+    const v = verifieRoutes(c)
+    expect(v.some((x) => /une seule route/.test(x.message))).toBe(true)
+  })
+
+  it('des routes à distance inéquivalente se signalent (§9.3) — à une salle près, non', () => {
+    const c = cloneCarte(CARTE_LIVREE)
+    c.modules[6].niveaux = 1 // CONDUITS se raccourcit : 7 contre 10
+    expect(verifieRoutes(c).some((x) => /distance équivalente.*de 7 à 10/.test(x.message))).toBe(true)
+    // la carte livrée va de 9 à 10 : toléré
+    expect(verifieRoutes(CARTE_LIVREE).some((x) => /distance équivalente/.test(x.message))).toBe(false)
+  })
+
+  it('deux confinements supérieurs d’affilée se signalent, la paire nommée', () => {
+    const c = cloneCarte(CARTE_LIVREE)
+    c.modules[8].cran = 1 // la cache nord après le cryostat
+    const v = verifieRoutes(c).filter((x) => /d’affilée/.test(x.message))
+    expect(v).toHaveLength(1)
+    expect(v[0].message).toContain('S1 → S1b')
+    expect(v[0].module).toBe('S1b')
+  })
+
+  it('une route sans arrêt se signale ; une carte sans halte aussi', () => {
+    const c = cloneCarte(CARTE_LIVREE)
+    c.liens.push({ de: 'S2', vers: 'OBS', type: 'alt' }) // un raccourci sans arrêt
+    const v = verifieRoutes(c)
+    expect(v.some((x) => /3 routes sur 21 sans arrêt/.test(x.message))).toBe(true)
+    // une cache est un arrêt : les routes qui y passent ne se signalent pas
+    expect(verifieRoutes(CARTE_LIVREE).some((x) => /sans arrêt/.test(x.message))).toBe(false)
+    const nue = cloneCarte(CARTE_LIVREE)
+    for (const m of nue.modules) if (estHalte(m)) m.type = 'jonction'
+    expect(verifieRoutes(nue).some((x) => /aucune halte/.test(x.message))).toBe(true)
+  })
+
+  it('une halte avec des salles est une erreur de fond', () => {
+    const c = cloneCarte(CARTE_LIVREE)
+    c.modules[9].niveaux = 2 // l'économat
+    const v = verifieCarte(c)
+    expect(v.some((x) => x.niveau === 'erreur' && x.module === 'ECO' && /halte/.test(x.message))).toBe(true)
+    // sans réclamer de biome : une halte n'en a pas
+    expect(v.some((x) => x.module === 'ECO' && /biome/.test(x.message))).toBe(false)
   })
 })
 

@@ -645,8 +645,10 @@ export function verifieCarte(c: CarteStation): VerdictCarte[] {
       v.push({ niveau: 'erreur', message: `${m.id} : niveaux doit être un entier positif ou nul (${m.niveaux})`, module: m.id })
     if (m.orbe && !orbeConnu(m.orbe))
       v.push({ niveau: 'erreur', message: `${m.id} : orbe inconnu « ${m.orbe} » — ids : ${ORBES.map((o) => o.id).join(', ')}`, module: m.id })
-    if (m.niveaux > 0 && m.biome.trim() === '')
+    if (m.niveaux > 0 && m.biome.trim() === '' && !estHalte(m))
       v.push({ niveau: 'attention', message: `${m.id} : ${m.niveaux} niveau${m.niveaux > 1 ? 'x' : ''} sans code de biome — la pioche ne saura pas quels tableaux lui donner`, module: m.id })
+    if (estHalte(m) && m.niveaux > 0)
+      v.push({ niveau: 'erreur', message: `${m.id} : une halte (${c.types[m.type]}) n’a pas de salle — niveaux doit être 0 (${m.niveaux})`, module: m.id })
     if (m.x - m.w / 2 < 0 || m.y - m.h / 2 < 0 || m.x + m.w / 2 > c.scene.width || m.y + m.h / 2 > c.scene.height)
       v.push({ niveau: 'attention', message: `${m.id} déborde de la scène`, module: m.id })
   }
@@ -688,5 +690,48 @@ export function verifieCarte(c: CarteStation): VerdictCarte[] {
   }
   for (const d of c.decor)
     if (!ids.has(d.ancrage)) v.push({ niveau: 'attention', message: `décor ${d.id} : ancrage « ${d.ancrage} » inconnu` })
+  v.push(...verifieRoutes(c))
+  return v
+}
+
+/** LES RÈGLES DE ROUTE — ce que le générateur de carte de Slay the Spire
+ *  garantit à chaque acte, ici vérifié sur le plan dessiné :
+ *  · au moins DEUX routes vers l'objectif, sinon le plan n'offre aucun choix ;
+ *  · des routes à DISTANCE ÉQUIVALENTE, à une salle près (§9.3 : « sortir
+ *    hors protocole ne raccourcit pas le parcours, il le déplace ») ;
+ *  · jamais deux CONFINEMENTS SUPÉRIEURS d'affilée — l'élite se paie, elle
+ *    ne s'enchaîne pas ;
+ *  · un ARRÊT sur chaque route — une halte (économat, repos) ou une cache :
+ *    une route qui ne fait qu'enchaîner les secteurs ne se choisit pas, elle
+ *    se subit.
+ *  Des attentions, pas des erreurs : le concepteur peut vouloir une carte
+ *  qui les enfreint — mais il le saura. */
+export function verifieRoutes(c: CarteStation): VerdictCarte[] {
+  const v: VerdictCarte[] = []
+  const routes = routesVersObjectif(c)
+  if (routes.length === 0) return v // l'objectif inatteignable est déjà une erreur
+  if (routes.length === 1)
+    v.push({ niveau: 'attention', message: `une seule route mène à ${c.regles.objectif} (${routes[0].join(' → ')}) : le plan n’offre aucun choix` })
+  const longueurs = routes.map((r) => longueurRoute(c, r))
+  const min = Math.min(...longueurs)
+  const max = Math.max(...longueurs)
+  if (max - min > 1)
+    v.push({ niveau: 'attention', message: `les routes ne sont pas à distance équivalente : de ${min} à ${max} salles — sortir du protocole doit déplacer le parcours, pas le raccourcir (§9.3)` })
+  const enchaines = new Set<string>()
+  for (const r of routes)
+    for (let i = 1; i < r.length; i++) {
+      const a = moduleParId(c, r[i - 1])
+      const b = moduleParId(c, r[i])
+      if (a && b && a.cran > 0 && b.cran > 0) enchaines.add(`${a.id} → ${b.id}`)
+    }
+  for (const paire of enchaines)
+    v.push({ niveau: 'attention', message: `deux confinements supérieurs d’affilée (${paire}) : l’élite se paie, elle ne s’enchaîne pas`, module: paire.split(' → ')[1] })
+  const haltes = c.modules.filter(estHalte).map((m) => m.id)
+  if (haltes.length === 0)
+    v.push({ niveau: 'attention', message: 'aucune halte (économat ou repos) sur la carte : le joueur descend sans jamais pouvoir se refaire' })
+  const arrets = c.modules.filter((m) => estHalte(m) || m.type === 'coffre').map((m) => m.id)
+  const sans = routes.filter((r) => !r.some((id) => arrets.includes(id)))
+  if (sans.length > 0 && arrets.length > 0)
+    v.push({ niveau: 'attention', message: `${sans.length} route${sans.length > 1 ? 's' : ''} sur ${routes.length} sans arrêt (économat, repos ou cache) — par exemple ${sans[0].join(' → ')}` })
   return v
 }

@@ -132,9 +132,12 @@ export function entreModule(
 ): EtatCarteRun | null {
   const choix = choixModules(c, e, orbes).find((x) => x.module.id === id)
   if (!choix || choix.orbeManquant) return null
-  // au RETOUR, le module est déjà épuisé : ses salles ne se rejouent pas,
-  // la carte se rouvre aussitôt sur ses coursives
-  const niveau = choix.retour ? Math.max(0, choix.module.niveaux) : 0
+  // UN MODULE TRAVERSÉ EST ÉPUISÉ POUR LA RUN — au retour sur ses pas, et
+  // tout autant par une coursive ordinaire : sur une carte qui boucle, un
+  // joueur rentrait dans un secteur déjà joué et en rejouait les salles
+  // (et leur mémoire). La carte se rouvre aussitôt sur ses coursives.
+  const dejaTraverse = choix.retour || e.visites.includes(id)
+  const niveau = dejaTraverse ? Math.max(0, choix.module.niveaux) : 0
   return { module: id, niveau, visites: [...e.visites, e.module] }
 }
 
