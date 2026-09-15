@@ -43,7 +43,9 @@
     "coffre": "CACHE",
     "boss": "TERMINAL",
     "economat": "ÉCONOMAT",
-    "repos": "REPOS"
+    "repos": "REPOS",
+    "don": "BONBONNE",
+    "inconnu": "INCONNU"
   },
   "modules": [
     {
@@ -174,7 +176,7 @@
       "type": "coffre",
       "zone": 4,
       "x": 1000,
-      "y": 130,
+      "y": 128,
       "w": 84,
       "h": 84,
       "temp": -10,
@@ -190,7 +192,7 @@
       "type": "economat",
       "zone": 4,
       "x": 1000,
-      "y": 300,
+      "y": 256,
       "w": 84,
       "h": 84,
       "temp": 22,
@@ -200,12 +202,27 @@
       "desc": "Le Semblable troque contre du condensat. Une halte sans salle, puis l’observatoire."
     },
     {
+      "id": "INC",
+      "nom": "?",
+      "type": "inconnu",
+      "zone": 4,
+      "x": 1000,
+      "y": 384,
+      "w": 84,
+      "h": 84,
+      "temp": 20,
+      "forme": "octogone",
+      "niveaux": 1,
+      "biome": "INC",
+      "desc": "Nature inconnue : une halte, une cache, un don ou un combat surchauffé — on ne le sait qu’en entrant. Puis l’observatoire."
+    },
+    {
       "id": "REP",
       "nom": "ALCÔVE",
       "type": "repos",
       "zone": 4,
       "x": 1000,
-      "y": 470,
+      "y": 512,
       "w": 84,
       "h": 84,
       "temp": 20,
@@ -309,6 +326,11 @@
     },
     {
       "de": "S2",
+      "vers": "INC",
+      "type": "alt"
+    },
+    {
+      "de": "S2",
       "vers": "REP",
       "type": "alt"
     },
@@ -331,6 +353,11 @@
       "de": "ECO",
       "vers": "OBS",
       "type": "main"
+    },
+    {
+      "de": "INC",
+      "vers": "OBS",
+      "type": "alt"
     },
     {
       "de": "REP",

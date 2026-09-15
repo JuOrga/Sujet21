@@ -85,10 +85,16 @@ dépôt (annulable).
 - `scene` : la taille de la scène (1600 × 804), le repère de tout le reste.
 - `zones[]` : `id`, `code` (« Z-02 »), `nom`, `couleur`.
 - `types` : le libellé de chaque nature de module — `sas`, `jonction`,
-  `combat`, `enigme`, `coffre`, `boss`, et les deux HALTES sans salle,
-  `economat` (la salle du Semblable, intercalée à l'entrée) et `repos` (un
-  choix, puis la carte se rouvre). Une carte d'avant les haltes ne les
-  nomme pas : la lecture leur donne un libellé par défaut.
+  `combat`, `enigme`, `coffre`, `boss`, les trois HALTES sans salle,
+  `economat` (la salle du Semblable, intercalée à l'entrée), `repos` (un
+  choix, puis la carte se rouvre) et `don` (une bonbonne oubliée : on la
+  prend), et `inconnu`, le **module « ? »** dont la nature ne se révèle
+  qu'à l'entrée — économat, repos, don, cache, ou combat surchauffé (un
+  cran de plus que le module n'en porte), tirée à parts égales, la même
+  pour tous les postes un jour de descente du jour, gravée dans la
+  sauvegarde (`revelations`). Ses `niveaux` ne jouent que s'il se révèle
+  cache ou combat. Une carte d'avant ces natures ne les nomme pas : la
+  lecture leur donne un libellé par défaut.
 - `modules[]` : `id`, `nom`, `type`, `zone`, `x`, `y` (**le centre**),
   `w`, `h`, `temp` (°C), `forme` (`octogone` | `rond` | `octogone-dome`),
   `niveaux` (**un module est un biome** : le nombre de salles qu'on y joue
@@ -159,8 +165,8 @@ HUB ─vapeur T3 ─┘        └─ S3 CHAUFFERIE (+1) ┴─ REP ALCÔVE ─�
   confinement supérieur, plus dur et plus généreux) ; le secteur du
   milieu est la voie sûre.
 - **Une halte différente sur chaque route.** S1 mène à la cache nord ou
-  à l'économat ; S2 à l'économat ou à l'alcôve de repos ; S3 à l'alcôve ou
-  à la cache sud. Les coursives se croisent comme les voies d'un acte de
+  à l'économat ; S2 à l'économat, au « ? » ou à l'alcôve de repos ; S3 à
+  l'alcôve ou à la cache sud. Les coursives se croisent comme les voies d'un acte de
   Slay the Spire : on choisit la halte autant que le secteur.
 - **La scène passe à 1800 de large** pour loger la colonne des haltes
   sans toucher aux fûts du concepteur ; l'observatoire et le télescope
@@ -244,7 +250,11 @@ HUB ─vapeur T3 ─┘        └─ S3 CHAUFFERIE (+1) ┴─ REP ALCÔVE ─�
   qui décide. Entrer dans un module `repos` ouvre l'ALCÔVE dans la
   cérémonie (`offresRepos`) : un second souffle (+1 vie), de la réserve
   (+0,5 L en bonbonne) ou du condensat (+40 cL), une seule des trois, les
-  offres sans effet grisées ; puis la carte se rouvre.
+  offres sans effet grisées ; puis la carte se rouvre. Un module `don`
+  offre une bonbonne oubliée (+0,5 L, ou +40 cL de condensat si la
+  bonbonne est pleine). Un module `inconnu` se révèle à l'entrée
+  (`reveleInconnu`) et se joue sous sa nature (`moduleCourant` rend le
+  module révélé) ; le plan le dessine ensuite sous cette nature.
 - **La pioche suit le biome** : un tableau qui porte un `biome` ne se
   propose que dans le module de ce biome ; un tableau sans biome est
   universel (la bibliothèque n'est pas encore réétiquetée) ; une salle

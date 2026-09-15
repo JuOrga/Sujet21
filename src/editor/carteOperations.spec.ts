@@ -71,7 +71,7 @@ describe('ajouter, dupliquer, supprimer, renommer', () => {
     expect(m.id).toBe('M1')
     expect(m.zone).toBe(3) // à côté de l'observatoire
     expect(m.cran).toBe(0) // l'ordinaire, jamais un confinement par mégarde
-    expect(c.modules).toHaveLength(14)
+    expect(c.modules).toHaveLength(15)
     expect(ajouteModule(c, 0, 0, 8).id).toBe('M2')
   })
 
@@ -80,7 +80,7 @@ describe('ajouter, dupliquer, supprimer, renommer', () => {
     expect(supprimeModule(c, 'N')).toBe(true)
     expect(c.modules.some((m) => m.id === 'N')).toBe(false)
     expect(c.liens.some((l) => l.de === 'N' || l.vers === 'N')).toBe(false)
-    expect(c.liens).toHaveLength(13)
+    expect(c.liens).toHaveLength(15)
     expect(supprimeModule(c, 'N')).toBe(false)
   })
 
@@ -106,9 +106,9 @@ describe('ajouter, dupliquer, supprimer, renommer', () => {
 describe('les coursives', () => {
   it('trace, refuse le doublon, le lien sur soi et le bout inconnu', () => {
     const c = carte()
-    expect(ajouteLien(c, 'S1b', 'ECO', 'alt')).toBe(19)
+    expect(ajouteLien(c, 'S1b', 'ECO', 'alt')).toBe(21)
     expect(ajouteLien(c, 'S1b', 'ECO', 'main')).toBe(-1) // même départ, même arrivée
-    expect(ajouteLien(c, 'ECO', 'S1b', 'alt')).toBe(20) // l'inverse est un autre lien
+    expect(ajouteLien(c, 'ECO', 'S1b', 'alt')).toBe(22) // l'inverse est un autre lien
     expect(ajouteLien(c, 'OBS', 'OBS', 'main')).toBe(-1)
     expect(ajouteLien(c, 'OBS', 'X', 'main')).toBe(-1)
     expect(ajouteLien(c, 'OBS', 'S3b', 'teleport')).toBe(-1)
@@ -128,7 +128,7 @@ describe('les coursives', () => {
     expect(modifieLien(c, 3, { vers: 'T1' })).toBe(false) // sur soi
     expect(modifieLien(c, 3, { de: 'T2' })).toBe(false) // T2 → N existe
     expect(supprimeLien(c, 3)).toBe(true)
-    expect(c.liens).toHaveLength(18)
+    expect(c.liens).toHaveLength(20)
     expect(supprimeLien(c, 40)).toBe(false)
   })
 })

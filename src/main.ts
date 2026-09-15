@@ -108,7 +108,10 @@ import {
   climatDuModule,
   difficulteSousCran,
   ditProjection,
+  moduleEffectif,
+  offreDon,
   projectionDepuis,
+  reveleInconnu,
   offresRepos,
   REPOS_CONDENSAT_CL,
   REPOS_RESERVE_L,
@@ -5785,6 +5788,7 @@ function optionsStation(): OptionsDessin {
     retour: enRunCarte()
       ? (choixModules(carte, carteRun, orbesAcquis()).find((x) => x.retour)?.module.id ?? null)
       : null,
+    revelations: enRunCarte() ? carteRun.revelations : {},
   }
 }
 
@@ -13101,6 +13105,7 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
     orbes,
     afficherTemp: true,
     retour: choix.find((x) => x.retour)?.module.id ?? null,
+    revelations: carteRun.revelations,
   })
   const fiche = document.createElement('p')
   fiche.className = 'mb-station-fiche'
@@ -13125,7 +13130,8 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
     })
   }
   const dit = (id: string | null): void => {
-    const mod = id ? moduleParId(carte, id) : undefined
+    // un « ? » révélé se lit sous sa nature ; non révélé, il garde son secret
+    const mod = id ? moduleEffectif(carte, carteRun, moduleParId(carte, id)) : undefined
     const vise = mod && choix.some((c) => c.module.id === id) ? mod.id : null
     projette(vise)
     if (!mod) {
@@ -13143,8 +13149,12 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
         ? 'vous êtes ici'
         : 'aucune coursive n’y mène d’ici'
     const projection = vise ? projectionDepuis(carte, vise) : null
+    const nature =
+      mod.type === 'inconnu'
+        ? 'nature inconnue — se révèle à l’entrée'
+        : `${carte.types[mod.type].toLowerCase()} · ${mod.niveaux > 0 ? `${mod.niveaux} salle${mod.niveaux > 1 ? 's' : ''}` : 'sans salle'}`
     fiche.textContent =
-      `${mod.nom} · ${carte.types[mod.type].toLowerCase()} · ${mod.niveaux > 0 ? `${mod.niveaux} salle${mod.niveaux > 1 ? 's' : ''}` : 'sans salle'}` +
+      `${mod.nom} · ${nature}` +
       (mod.cran > 0 ? ` · confinement +${mod.cran}, mémoire ×${primeMemoire(mod)}` : '') +
       ` · ${mod.temp}°C · ${acces}` +
       (projection ? ` — ${ditProjection(carte, projection)}` : '')
@@ -13200,6 +13210,14 @@ function entreModuleRun(id: string): void {
   const suivant = entreModule(carte, carteRun, id, orbesAcquis())
   if (!suivant) return
   carteRun = suivant
+  // LE « ? » SE RÉVÈLE à l'entrée — le même tirage pour tous les postes le
+  // jour d'une descente du jour, sinon le hasard du poste
+  carteRun = reveleInconnu(
+    carte,
+    carteRun,
+    id,
+    descenteDuJour() ? aleaDeGraine(`${new Date().toISOString().slice(0, 10)}@?${id}`) : Math.random,
+  )
   const m = moduleEnCours()
   // LES HALTES, à la manière du marchand et du feu de camp de Slay the
   // Spire : l'ÉCONOMAT est une salle qu'on joue (la cérémonie se ferme, le
@@ -13214,6 +13232,10 @@ function entreModuleRun(id: string): void {
   }
   if (m?.type === 'repos') {
     mbMontreRepos(m)
+    return
+  }
+  if (m?.type === 'don') {
+    mbMontreDon(m)
     return
   }
   if (moduleFini(carte, carteRun)) {
@@ -13268,6 +13290,41 @@ function mbMontreRepos(m: ModuleCarte): void {
     })
     host.appendChild(btn)
   })
+}
+
+/** LE DON — une bonbonne oubliée dans une halte : une seule offre, on la
+ *  prend, la carte se rouvre. De la réserve, ou du condensat si la
+ *  bonbonne est pleine. */
+function mbMontreDon(m: ModuleCarte): void {
+  mbEtape = 'repos'
+  mbScene.classList.remove('mb-large')
+  mbQuestion('UNE HALTE — PRENEZ')
+  mbEl('mb-choix-titre').textContent = `${m.nom} — ${carte.types[m.type]} : QUELQU’UN A LAISSÉ ÇA LÀ`
+  mbEl('mb-etal').hidden = true
+  mbEl('mb-passer').hidden = true
+  const host = mbCartes()
+  host.innerHTML = ''
+  host.classList.add('mb-trio')
+  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  const o = offreDon({ bonbonne: run.bonbonneLiters, cap: capBonbonne() })
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'mb-carte mb-repos'
+  btn.style.gridColumn = '2'
+  btn.innerHTML = `<i class="mb-repos-icone">${o.icone}</i><b>${esc(o.nom)}</b><small>${esc(o.detail)}</small>`
+  let elu = false
+  btn.addEventListener('click', () => {
+    if (elu) return
+    elu = true
+    if (o.id === 'reserve')
+      run.bonbonneLiters = Math.min(capBonbonne(), run.bonbonneLiters + REPOS_RESERVE_L)
+    else gagneCondensat(REPOS_CONDENSAT_CL)
+    majBoutonsRun()
+    sauveRun()
+    bande.ponctuation('sting-record', 0.6)
+    mbMontreCarte('suite')
+  })
+  host.appendChild(btn)
 }
 
 /** Une carte du choix de la voie. */

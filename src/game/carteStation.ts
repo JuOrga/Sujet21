@@ -74,6 +74,8 @@ export type TypeModule =
   | 'boss'
   | 'economat'
   | 'repos'
+  | 'don'
+  | 'inconnu'
 export const TYPES_MODULE: readonly TypeModule[] = [
   'sas',
   'jonction',
@@ -83,9 +85,30 @@ export const TYPES_MODULE: readonly TypeModule[] = [
   'boss',
   'economat',
   'repos',
+  'don',
+  'inconnu',
 ]
-/** Les natures SANS SALLE où l'on s'arrête : la carte les exige à zéro niveau. */
-export const HALTES: readonly TypeModule[] = ['economat', 'repos']
+/** Les natures SANS SALLE où l'on s'arrête : la carte les exige à zéro
+ *  niveau. Le DON est une bonbonne oubliée : on la prend, la carte se rouvre. */
+export const HALTES: readonly TypeModule[] = ['economat', 'repos', 'don']
+/** LE MODULE « ? » — le nœud inconnu de Slay the Spire : sa nature ne se
+ *  révèle qu'à l'entrée, tirée parmi celles-ci. Le joueur choisit la route
+ *  sans savoir ce qu'il y trouvera — une halte, une cache, un don, ou un
+ *  combat SURCHAUFFÉ (un cran de plus que le module n'en porte). */
+export const REVELATIONS: readonly TypeModule[] = ['economat', 'repos', 'don', 'coffre', 'combat']
+/** Le module tel qu'il se joue une fois sa nature révélée : la nature
+ *  remplace le point d'interrogation dans le nom, une halte n'a plus de
+ *  salle, un combat prend un cran de plus. Pur : la révélation elle-même
+ *  (le tirage, l'état de la run) est l'affaire de descenteCarte.ts. */
+export function moduleRevele(c: CarteStation, m: ModuleCarte, nature: TypeModule): ModuleCarte {
+  return {
+    ...m,
+    type: nature,
+    nom: `${m.nom} — ${c.types[nature]}`,
+    niveaux: HALTES.includes(nature) ? 0 : m.niveaux,
+    cran: nature === 'combat' ? Math.min(CRAN_MAX, m.cran + 1) : m.cran,
+  }
+}
 export function estHalte(m: { type: TypeModule }): boolean {
   return HALTES.includes(m.type)
 }
@@ -94,6 +117,8 @@ export function estHalte(m: { type: TypeModule }): boolean {
 const LIBELLES_DEFAUT: Partial<Record<TypeModule, string>> = {
   economat: 'ÉCONOMAT',
   repos: 'REPOS',
+  don: 'BONBONNE',
+  inconnu: 'INCONNU',
 }
 /** Le CRAN DE CONFINEMENT le plus haut qu'un module puisse porter. */
 export const CRAN_MAX = 3
@@ -733,7 +758,8 @@ export function verifieRoutes(c: CarteStation): VerdictCarte[] {
   const haltes = c.modules.filter(estHalte).map((m) => m.id)
   if (haltes.length === 0)
     v.push({ niveau: 'attention', message: 'aucune halte (économat ou repos) sur la carte : le joueur descend sans jamais pouvoir se refaire' })
-  const arrets = c.modules.filter((m) => estHalte(m) || m.type === 'coffre').map((m) => m.id)
+  // un « ? » peut se révéler halte ou cache : il compte pour un arrêt
+  const arrets = c.modules.filter((m) => estHalte(m) || m.type === 'coffre' || m.type === 'inconnu').map((m) => m.id)
   const sans = routes.filter((r) => !r.some((id) => arrets.includes(id)))
   if (sans.length > 0 && arrets.length > 0)
     v.push({ niveau: 'attention', message: `${sans.length} route${sans.length > 1 ? 's' : ''} sur ${routes.length} sans arrêt (économat, repos ou cache) — par exemple ${sans[0].join(' → ')}` })

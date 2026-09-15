@@ -25,6 +25,7 @@ import {
   orbeRequis,
   liensDepuis,
   moduleParId,
+  moduleRevele,
   traceLien,
   zoneDe,
   type CarteStation,
@@ -55,6 +56,8 @@ export interface OptionsDessin {
   /** le module joignable EN REVENANT SUR SES PAS (l'objectif est hors de
    *  portée d'ici) : il s'allume comme une cible, sans coursive */
   retour?: string | null
+  /** les « ? » révélés de la run : le plan les dessine sous leur nature */
+  revelations?: Record<string, TypeModule>
 }
 
 /** Les glyphes des natures de module — le dessin, pas la donnée : un
@@ -68,6 +71,8 @@ export const GLYPHES: Record<TypeModule, string> = {
   boss: '⬢',
   economat: '⚖',
   repos: '☾',
+  don: '✦',
+  inconnu: '?',
 }
 
 const COURANT = '#a7ddf5' // le givre : la couleur du « vous êtes ici »
@@ -338,8 +343,11 @@ function vecteurs(m: ModuleCarte, accent: string, P: CarteStation['palette']): s
   return corps
 }
 
-function module(c: CarteStation, m: ModuleCarte, k: number, o: OptionsDessin): string {
+function module(c: CarteStation, m0: ModuleCarte, k: number, o: OptionsDessin): string {
   const P = c.palette
+  // un « ? » révélé se dessine sous sa nature — glyphe, nom, cran
+  const nature = o.revelations?.[m0.id]
+  const m = m0.type === 'inconnu' && nature ? moduleRevele(c, m0, nature) : m0
   const zc = zoneDe(c, m)?.couleur ?? P.texteSecondaire
   const rond = m.forme === 'rond'
   const boss = m.type === 'boss'

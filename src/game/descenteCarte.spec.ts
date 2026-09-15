@@ -4,7 +4,10 @@ import {
   choixModules,
   climatDuModule,
   ditProjection,
+  moduleCourant,
+  offreDon,
   offresRepos,
+  reveleInconnu,
   projectionDepuis,
   departCarte,
   difficulteSousCran,
@@ -43,7 +46,7 @@ describe('plusCourtVers — le plus court chemin en niveaux', () => {
 describe('la descente sur la carte', () => {
   it('part du HUB, un module sans salle : la carte s’ouvre tout de suite', () => {
     const e = departCarte(c)
-    expect(e).toEqual({ module: 'HUB', niveau: 0, visites: [] })
+    expect(e).toEqual({ module: 'HUB', niveau: 0, visites: [], revelations: {} })
     expect(moduleFini(c, e)).toBe(true)
     expect(objectifAtteint(c, e)).toBe(false)
   })
@@ -63,19 +66,19 @@ describe('la descente sur la carte', () => {
     const e = departCarte(c)
     expect(entreModule(c, e, 'T1', [])).toBeNull()
     expect(entreModule(c, e, 'OBS', [])).toBeNull()
-    expect(entreModule(c, e, 'T2', [])).toEqual({ module: 'T2', niveau: 0, visites: ['HUB'] })
+    expect(entreModule(c, e, 'T2', [])).toEqual({ module: 'T2', niveau: 0, visites: ['HUB'], revelations: {} })
     expect(entreModule(c, e, 'T1', ['solidification'])?.module).toBe('T1')
   })
 
   it('une cache n’est pas un piège : quand l’objectif est hors de portée, on revient sur ses pas', () => {
     // HUB → T1 → N → S1 → S1b, sur la carte au cul-de-sac : de la cache,
     // rien ne repart — sauf le retour
-    const e = { module: 'S1b', niveau: 1, visites: ['HUB', 'T1', 'N', 'S1'] }
+    const e = { module: 'S1b', niveau: 1, visites: ['HUB', 'T1', 'N', 'S1'], revelations: {} }
     const choix = choixModules(sansSuite, e, [])
     expect(choix.map((x) => `${x.module.id}:${x.retour ? 'retour' : x.lien.type}`)).toEqual(['S1:retour'])
     const r = entreModule(sansSuite, e, 'S1', [])!
     // S1 est déjà épuisé : la carte se rouvre sans rejouer ses salles
-    expect(r).toEqual({ module: 'S1', niveau: 3, visites: ['HUB', 'T1', 'N', 'S1', 'S1b'] })
+    expect(r).toEqual({ module: 'S1', niveau: 3, visites: ['HUB', 'T1', 'N', 'S1', 'S1b'], revelations: {} })
     // de S1, l'objectif est atteignable par l'économat : aucun retour offert
     const c2 = choixModules(sansSuite, r, [])
     expect(c2.map((x) => `${x.module.id}:${x.retour ? 'retour' : x.lien.type}`)).toEqual(['S1b:alt', 'ECO:alt'])
@@ -87,7 +90,7 @@ describe('la descente sur la carte', () => {
     // une carte qui boucle : l'économat renvoie vers S1 — S1 a déjà été joué
     const boucle = cloneCarte(c)
     boucle.liens.push({ de: 'ECO', vers: 'S1', type: 'alt' })
-    const e = { module: 'ECO', niveau: 0, visites: ['HUB', 'T2', 'N', 'S1'] }
+    const e = { module: 'ECO', niveau: 0, visites: ['HUB', 'T2', 'N', 'S1'], revelations: {} }
     const r = entreModule(boucle, e, 'S1', [])!
     expect(r.niveau).toBe(3) // épuisé : ses salles ne se rejouent pas
     expect(moduleFini(boucle, r)).toBe(true)
@@ -123,13 +126,13 @@ describe('la descente sur la carte', () => {
     expect(longueurRun(c, e, 1)).toBe(9) // 1 franchie + 2 restantes + 6
     // un détour par T1 (3) puis S1 (3) puis la cache S1b (1) : la salle de
     // la cache s'ajoute, puis l'observatoire (3) — 10
-    const d = { module: 'S1b', niveau: 0, visites: ['HUB', 'T1', 'N', 'S1'] }
+    const d = { module: 'S1b', niveau: 0, visites: ['HUB', 'T1', 'N', 'S1'], revelations: {} }
     expect(longueurRun(c, d, 6)).toBe(10)
     // sur une carte au cul-de-sac, l'objectif n'est plus atteignable d'ici :
     // il ne reste que le module
     expect(longueurRun(sansSuite, d, 6)).toBe(7)
     // jamais plus petite que le rang
-    expect(longueurRun(c, { module: 'OBS', niveau: 3, visites: [] }, 12)).toBe(12)
+    expect(longueurRun(c, { module: 'OBS', niveau: 3, visites: [], revelations: {} }, 12)).toBe(12)
   })
 
   it('les orbes se lisent dans le cycle : transformations tissées et états atteints', () => {
@@ -152,6 +155,7 @@ describe('la descente sur la carte', () => {
       module: 'S2',
       niveau: 1,
       visites: ['HUB', 'N'],
+      revelations: {},
     })
     // une carte qui change de départ : l'état suit
     const c2 = cloneCarte(c)
@@ -246,5 +250,42 @@ describe('projectionDepuis — le survol qui projette', () => {
     expect(ditProjection(c, projectionDepuis(c, 'OBS')!)).toBe('par ici : 3 salles jusqu’à OBSERVATOIRE · sans arrêt')
     expect(projectionDepuis(sansSuite, 'S1b')).toBeNull()
     expect(projectionDepuis(c, 'X')).toBeNull()
+  })
+})
+
+describe('le module « ? » — la nature se révèle à l’entrée', () => {
+  const dansINC = { module: 'INC', niveau: 0, visites: ['HUB', 'T2', 'N', 'S2'], revelations: {} }
+
+  it('tire une nature parmi REVELATIONS, la grave, et ne retire jamais', () => {
+    const r = reveleInconnu(c, dansINC, 'INC', () => 0.99)
+    expect(r.revelations).toEqual({ INC: 'combat' })
+    expect(reveleInconnu(c, r, 'INC', () => 0).revelations).toEqual({ INC: 'combat' })
+    // un module qui n'est pas un « ? » : rien
+    expect(reveleInconnu(c, dansINC, 'S2', () => 0)).toBe(dansINC)
+    expect(reveleInconnu(c, dansINC, 'X', () => 0)).toBe(dansINC)
+  })
+
+  it('le module courant se joue sous sa nature : une halte est épuisée, un combat surchauffé a sa salle', () => {
+    expect(moduleCourant(c, dansINC)?.type).toBe('inconnu')
+    const halte = reveleInconnu(c, dansINC, 'INC', () => 0) // economat
+    expect(moduleCourant(c, halte)?.type).toBe('economat')
+    expect(moduleFini(c, halte)).toBe(true)
+    expect(longueurRun(c, halte, 6)).toBe(9) // la salle du « ? » ne compte plus
+    const combat = reveleInconnu(c, dansINC, 'INC', () => 0.99)
+    expect(moduleCourant(c, combat)?.cran).toBe(1)
+    expect(moduleFini(c, combat)).toBe(false)
+    expect(longueurRun(c, combat, 6)).toBe(10)
+  })
+
+  it('la révélation traverse la sauvegarde, et se nettoie', () => {
+    const lu = litEtatCarteRun({ module: 'INC', niveau: 0, visites: [], revelations: { INC: 'repos', S2: 'combat', X: 'don', OBS: 'boss' } }, c)
+    expect(lu.revelations).toEqual({ INC: 'repos' })
+    // une carte sans « ? » : l'entrée se fait sans révélation
+    expect(entreModule(c, departCarte(c), 'T2', [])!.revelations).toEqual({})
+  })
+
+  it('offreDon : de la réserve s’il y a de la place, sinon du condensat', () => {
+    expect(offreDon({ bonbonne: 0.5, cap: 2 })).toMatchObject({ id: 'reserve', nom: 'UNE BONBONNE OUBLIÉE', possible: true })
+    expect(offreDon({ bonbonne: 2, cap: 2 })).toMatchObject({ id: 'condensat', nom: 'UN FÛT DE CONDENSAT', possible: true })
   })
 })

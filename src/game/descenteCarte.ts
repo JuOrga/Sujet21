@@ -24,11 +24,14 @@ import {
   estHalte,
   liensDepuis,
   moduleParId,
+  moduleRevele,
   orbeRequis,
   plusCourtVers,
+  REVELATIONS,
   type CarteStation,
   type LienCarte,
   type ModuleCarte,
+  type TypeModule,
 } from './carteStation'
 import { TRANSFOS_CYCLE, transfoTenue } from './cycle'
 import type { OptionsGen } from './generateur'
@@ -41,14 +44,43 @@ export interface EtatCarteRun {
   niveau: number
   /** les modules traversés, dans l'ordre */
   visites: string[]
+  /** LES RÉVÉLATIONS : la nature tirée pour chaque module « ? » entré —
+   *  par id. Écrite dans la sauvegarde : un « ? » révélé ne se retire pas. */
+  revelations: Record<string, TypeModule>
 }
 
 export function departCarte(c: CarteStation): EtatCarteRun {
-  return { module: c.regles.depart, niveau: 0, visites: [] }
+  return { module: c.regles.depart, niveau: 0, visites: [], revelations: {} }
 }
 
+/** LE MODULE TEL QU'IL SE JOUE : un « ? » révélé prend sa nature tirée
+ *  (moduleRevele) ; tout autre module est lui-même. */
+export function moduleEffectif(c: CarteStation, e: EtatCarteRun, m: ModuleCarte | undefined): ModuleCarte | undefined {
+  if (!m) return undefined
+  const nature = e.revelations[m.id]
+  return m.type === 'inconnu' && nature ? moduleRevele(c, m, nature) : m
+}
+
+/** Le module où l'on joue, révélé s'il y a lieu : c'est lui que lisent
+ *  moduleFini, niveauxRestants et la posture des salles. */
 export function moduleCourant(c: CarteStation, e: EtatCarteRun): ModuleCarte | undefined {
-  return moduleParId(c, e.module)
+  return moduleEffectif(c, e, moduleParId(c, e.module))
+}
+
+/** RÉVÉLER UN « ? » : sa nature se tire parmi REVELATIONS au premier
+ *  passage, et se grave dans l'état de la run. Un module déjà révélé, ou
+ *  qui n'est pas un « ? », rend l'état tel quel. `alea` vient de l'appelant :
+ *  la descente du jour tire le même « ? » pour tous les postes. */
+export function reveleInconnu(
+  c: CarteStation,
+  e: EtatCarteRun,
+  id: string,
+  alea: () => number,
+): EtatCarteRun {
+  const m = moduleParId(c, id)
+  if (!m || m.type !== 'inconnu' || e.revelations[id]) return e
+  const nature = REVELATIONS[Math.min(REVELATIONS.length - 1, Math.floor(alea() * REVELATIONS.length))]
+  return { ...e, revelations: { ...e.revelations, [id]: nature } }
 }
 
 /** Le module est-il ÉPUISÉ — toutes ses salles franchies ? Un module
@@ -141,7 +173,7 @@ export function entreModule(
   // (et leur mémoire). La carte se rouvre aussitôt sur ses coursives.
   const dejaTraverse = choix.retour || e.visites.includes(id)
   const niveau = dejaTraverse ? Math.max(0, choix.module.niveaux) : 0
-  return { module: id, niveau, visites: [...e.visites, e.module] }
+  return { module: id, niveau, visites: [...e.visites, e.module], revelations: e.revelations }
 }
 
 /** LA LONGUEUR DE LA RUN, déduite du trajet : les salles déjà franchies,
@@ -179,7 +211,14 @@ export function litEtatCarteRun(brut: unknown, c: CarteStation): EtatCarteRun {
   const visites = Array.isArray(o.visites)
     ? o.visites.filter((v): v is string => typeof v === 'string' && !!moduleParId(c, v))
     : []
-  return { module: o.module, niveau, visites }
+  // les révélations d'une sauvegarde : seules celles d'un « ? » encore sur
+  // la carte, vers une nature qui existe — le reste se retirera à l'entrée
+  const revelations: Record<string, TypeModule> = {}
+  if (typeof o.revelations === 'object' && o.revelations !== null)
+    for (const [id, nature] of Object.entries(o.revelations as Record<string, unknown>))
+      if (moduleParId(c, id)?.type === 'inconnu' && REVELATIONS.includes(nature as TypeModule))
+        revelations[id] = nature as TypeModule
+  return { module: o.module, niveau, visites, revelations }
 }
 
 // ---- LA NATURE DU MODULE COMMANDE LA SALLE -------------------------------
@@ -325,4 +364,13 @@ export function ditProjection(c: CarteStation, p: ProjectionRoute): string {
     (p.arrets.length ? ` · ${p.arrets.join(', ')}` : ' · sans arrêt') +
     (p.crans > 0 ? ` · confinement +${p.crans} sur la route` : '')
   )
+}
+
+/** LE DON — une bonbonne oubliée : de la réserve s'il y a de la place,
+ *  sinon du condensat. Une seule offre, on la prend, la carte se rouvre. */
+export function offreDon(run: { bonbonne: number; cap: number }): OffreRepos {
+  const [, reserve, condensat] = offresRepos({ vies: 0, viesMax: 1, bonbonne: run.bonbonne, cap: run.cap })
+  return reserve.possible
+    ? { ...reserve, nom: 'UNE BONBONNE OUBLIÉE' }
+    : { ...condensat, nom: 'UN FÛT DE CONDENSAT' }
 }
