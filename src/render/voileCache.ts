@@ -502,3 +502,118 @@ export function dessineDissolutionParoi(
   poser(g, c, t, vue, 1)
   return true
 }
+
+// ---- LE MODE SOBRE : l'ancien voile, tel quel ----------------------------
+//
+// Le réglage PARAMÈTRES « voile des cachettes » permet de revenir au voile
+// d'avant (a7c88ad) : le rectangle plein dans la forme, quatre nappes à
+// peine visibles, un liseré d'un pixel, et une levée qui fond d'un bloc en
+// 0,9 s. Ni mémo ni calque : il se dessine directement sur le canevas des
+// effets, comme il l'a toujours fait. Gardé à l'identique, à dessein — le
+// joueur qui le choisit veut retrouver ce qu'il connaît.
+
+/** La durée de la levée de l'ancien voile (s). */
+export const VOILE_SOBRE_DUREE = 0.9
+
+/** L'opacité de l'ancien voile : 1 fermé, fondu linéaire à la levée. */
+export function alphaSobre(levee: number, elapsed: number): number {
+  if (levee === Infinity) return 1
+  return Math.max(0, Math.min(1, 1 - (elapsed - levee) / VOILE_SOBRE_DUREE))
+}
+
+/** Le chemin de l'ancien voile : la boîte à l'écran (sans rotation, comme
+ *  avant) et le contour exact. Null si la boîte est hors champ. */
+function tracerSobre(
+  g: CanvasRenderingContext2D,
+  cache: FormeBox,
+  vue: VueVoile,
+): { a: { sx: number; sy: number }; w: number; h: number; chemin: () => void } | null {
+  const a = vue.versEcran(cache.minX, cache.maxY)
+  const b = vue.versEcran(cache.maxX, cache.minY)
+  const w = b.sx - a.sx
+  const h = b.sy - a.sy
+  if (b.sx < 0 || a.sx > vue.vw || b.sy < 0 || a.sy > vue.vh) return null
+  const chemin = (): void => {
+    const pts = formeOutline(cache, 56)
+    g.beginPath()
+    for (let k = 0; k < pts.length; k++) {
+      const sp = vue.versEcran(pts[k].x, pts[k].y)
+      if (k === 0) g.moveTo(sp.sx, sp.sy)
+      else g.lineTo(sp.sx, sp.sy)
+    }
+    g.closePath()
+  }
+  return { a, w, h, chemin }
+}
+
+/** L'ancien brouillard d'une cachette (style par défaut). Rend false si
+ *  rien n'a été dessiné. */
+export function dessineVoileSobre(
+  g: CanvasRenderingContext2D,
+  cache: FormeBox,
+  etat: EtatVoile,
+  elapsed: number,
+  vue: VueVoile,
+  indice: number,
+): boolean {
+  const alpha = alphaSobre(etat.levee, elapsed)
+  if (alpha <= 0) return false
+  const t = tracerSobre(g, cache, vue)
+  if (!t) return false
+  const { a, w, h, chemin } = t
+  g.save()
+  chemin()
+  g.clip()
+  g.globalAlpha = alpha
+  g.fillStyle = '#0d1320'
+  g.fillRect(a.sx, a.sy, w, h)
+  for (let k = 0; k < 4; k++) {
+    const ph = indice * 7.3 + k * 2.1
+    const nx = a.sx + w * (0.5 + 0.42 * Math.sin(elapsed * 0.11 + ph * 1.7))
+    const ny = a.sy + h * (0.5 + 0.42 * Math.cos(elapsed * 0.089 + ph))
+    const r = Math.max(w, h) * (0.3 + 0.1 * Math.sin(ph * 3.7))
+    const grad = g.createRadialGradient(nx, ny, 0, nx, ny, Math.max(8, r))
+    grad.addColorStop(0, 'rgba(52,68,92,0.24)')
+    grad.addColorStop(1, 'rgba(52,68,92,0)')
+    g.fillStyle = grad
+    g.fillRect(a.sx, a.sy, w, h)
+  }
+  g.restore()
+  // le liseré, à peine plus clair : le pan se devine sans se trahir
+  g.save()
+  g.globalAlpha = alpha * 0.45
+  g.strokeStyle = 'rgba(74,94,120,0.55)'
+  g.lineWidth = 1
+  chemin()
+  g.stroke()
+  g.restore()
+  return true
+}
+
+/** L'ancienne dissolution de la paroi factice : la teinte de paroi fond
+ *  d'un bloc dans le contour exact. Rend false si rien n'a été dessiné. */
+export function dessineDissolutionParoiSobre(
+  g: CanvasRenderingContext2D,
+  cache: FormeBox,
+  etat: EtatVoile,
+  elapsed: number,
+  vue: VueVoile,
+): boolean {
+  if (etat.levee === Infinity) return false
+  const alpha = alphaSobre(etat.levee, elapsed)
+  if (alpha <= 0) return false
+  const t = tracerSobre(g, cache, vue)
+  if (!t) return false
+  const { a, w, h, chemin } = t
+  g.save()
+  chemin()
+  g.clip()
+  g.globalAlpha = alpha * 0.92
+  g.fillStyle = PAROI
+  g.fillRect(a.sx, a.sy, w, h)
+  g.globalAlpha = alpha * 0.5
+  g.fillStyle = PAROI_HAUT
+  g.fillRect(a.sx, a.sy, w, h * 0.5)
+  g.restore()
+  return true
+}

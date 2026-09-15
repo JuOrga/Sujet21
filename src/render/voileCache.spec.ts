@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   alphaReste,
+  alphaSobre,
   alphaVoile,
   avanceFront,
   dessineDissolutionParoi,
+  dessineDissolutionParoiSobre,
   dessineVoile,
+  dessineVoileSobre,
   ESTAMPILLE,
   estampilleVisible,
   instantNappes,
@@ -15,6 +18,7 @@ import {
   signatureVoile,
   TRAITS_FONDU,
   VOILE_DUREE,
+  VOILE_SOBRE_DUREE,
   type EtatVoile,
   type VueVoile,
 } from './voileCache'
@@ -309,5 +313,48 @@ describe('le dessin du brouillard', () => {
     expect(
       dessineDissolutionParoi(finie.g.g, CACHE, leve(VOILE_DUREE + 1), 10, finie.vue),
     ).toBe(false)
+  })
+})
+
+describe('le mode SOBRE : l’ancien voile, tel quel', () => {
+  it('fond d’un bloc en 0,9 s', () => {
+    expect(alphaSobre(Infinity, 99)).toBe(1)
+    expect(alphaSobre(3, 3)).toBe(1)
+    expect(alphaSobre(3, 3 + VOILE_SOBRE_DUREE / 2)).toBeCloseTo(0.5, 9)
+    expect(alphaSobre(3, 3 + VOILE_SOBRE_DUREE)).toBeCloseTo(0, 9)
+  })
+
+  it('se dessine directement sur le canevas des effets : ni mémo, ni calque', () => {
+    const { g, c, m, vue } = scene()
+    expect(dessineVoileSobre(g.g, CACHE, voile, 5, vue, 0)).toBe(true)
+    expect(c.appels).toEqual([])
+    expect(m.appels).toEqual([])
+    // le rectangle plein dans la forme, quatre nappes, le liseré d’un pixel
+    expect(compte(g.appels, 'clip')).toBe(1)
+    expect(compte(g.appels, 'createRadialGradient')).toBe(4)
+    expect(compte(g.appels, 'stroke')).toBe(1)
+    expect(g.appels).not.toContain('drawImage')
+    expect(g.textes).toEqual([])
+  })
+
+  it('levé ou hors champ : rien', () => {
+    const { g, vue } = scene()
+    expect(dessineVoileSobre(g.g, CACHE, leve(VOILE_SOBRE_DUREE + 0.01), 10, vue, 0)).toBe(false)
+    const loin = { minX: 9000, minY: 9000, maxX: 9400, maxY: 9400 }
+    expect(dessineVoileSobre(g.g, loin, voile, 5, vue, 0)).toBe(false)
+    expect(g.appels).toEqual([])
+  })
+
+  it('la paroi factice fond d’un bloc, jamais tant qu’elle est voilée', () => {
+    const fermee = scene()
+    expect(dessineDissolutionParoiSobre(fermee.g.g, CACHE, voile, 5, fermee.vue)).toBe(false)
+    expect(fermee.g.appels).toEqual([])
+    const ouverte = scene()
+    expect(
+      dessineDissolutionParoiSobre(ouverte.g.g, CACHE, leve(0.3), 10, ouverte.vue),
+    ).toBe(true)
+    expect(compte(ouverte.g.appels, 'fillRect')).toBe(2)
+    expect(ouverte.g.appels).not.toContain('arc')
+    expect(ouverte.c.appels).toEqual([])
   })
 })

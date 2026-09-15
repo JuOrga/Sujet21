@@ -167,7 +167,12 @@ import {
   valeurProposee,
 } from './game/leviers'
 import { dansForme } from './game/formes'
-import { dessineDissolutionParoi, dessineVoile } from './render/voileCache'
+import {
+  dessineDissolutionParoi,
+  dessineDissolutionParoiSobre,
+  dessineVoile,
+  dessineVoileSobre,
+} from './render/voileCache'
 import {
   DOMAINE_NOMS,
   catalogueMarkdown,
@@ -3378,6 +3383,11 @@ appliqueSimHz()
 // deux rapports de performance, mêmes conditions, seul ce réglage change —
 // l'écart chiffre le coût réel des graphismes sur la machine du joueur.
 let decorRiche = localStorage.getItem('sujet21-decor') !== 'sobre'
+// LE VOILE DES CACHETTES : le brouillard (défaut, voileCache.ts) ou le
+// voile SOBRE d'avant — le rectangle plein, les nappes discrètes, le liseré.
+// Un choix de goût autant que de coût : le joueur qui préfère l'ancien le
+// retrouve tel quel.
+let voileSobre = localStorage.getItem('sujet21-voile') === 'sobre'
 // LE CIEL DU DEHORS. Trois fonds pour le vide, du plus riche au plus léger :
 // la PLAQUE (une image de 4096², un champ profond), la TUILE d'intérim
 // (l'ancien fond, deux petites textures répétées), le PROCÉDURAL (rien à
@@ -3598,6 +3608,29 @@ const paramsEl = document.getElementById('params') as HTMLDivElement
     }
   }
   renderDecor()
+
+  const choixVoile = document.getElementById('params-voile') as HTMLDivElement
+  const renderVoile = (): void => {
+    if (!choixVoile) return
+    choixVoile.innerHTML = ''
+    for (const [sobre, label] of [
+      [false, 'BROUILLARD'],
+      [true, 'SOBRE'],
+    ] as const) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = label
+      b.className = voileSobre === sobre ? 'actif' : ''
+      b.addEventListener('click', () => {
+        voileSobre = sobre
+        localStorage.setItem('sujet21-voile', sobre ? 'sobre' : 'brouillard')
+        perf.reset()
+        renderVoile()
+      })
+      choixVoile.appendChild(b)
+    }
+  }
+  renderVoile()
 
   const choixCiel = document.getElementById('params-ciel') as HTMLDivElement
   const renderCiel = (): void => {
@@ -3965,6 +3998,7 @@ function rapportPerf(): Record<string, unknown> {
       resolution: resChoix,
       resolutionDynamique: resDynamique(),
       graphismes: decorRiche ? 'riches' : 'sobres',
+      voile: voileSobre ? 'sobre' : 'brouillard',
       liquide: eauRiche ? 'riche' : 'sobre',
       eclairage: lumiereActive ? 'actif' : 'coupe',
       eclairageVolume: lumiereActive && lumiereEauActive ? 'actif' : 'coupe',
@@ -9080,8 +9114,14 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       y: (c.minY + c.maxY) / 2,
     }
     const etat = { levee: cachesLevee[i], entreeX: entree.x, entreeY: entree.y }
-    if (c.style === 'paroi') dessineDissolutionParoi(g, c, etat, elapsed, vue)
-    else dessineVoile(g, c, etat, elapsed, vue, i)
+    if (voileSobre) {
+      if (c.style === 'paroi') dessineDissolutionParoiSobre(g, c, etat, elapsed, vue)
+      else dessineVoileSobre(g, c, etat, elapsed, vue, i)
+    } else if (c.style === 'paroi') {
+      dessineDissolutionParoi(g, c, etat, elapsed, vue)
+    } else {
+      dessineVoile(g, c, etat, elapsed, vue, i)
+    }
   }
 }
 
