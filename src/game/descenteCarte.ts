@@ -221,3 +221,13 @@ export function difficulteSousCran(difficulte: number, m: ModuleCarte | undefine
 export function primeMemoire(m: ModuleCarte | undefined): number {
   return 1 + Math.max(0, m?.cran ?? 0)
 }
+
+/** LE CLIMAT DU MODULE : sa température pose le climat des dangers des
+ *  salles générées — sous 10 °C le froid (hublots fendus), dès 45 °C le
+ *  chaud (chaudières), entre les deux l'auto. Une route froide se joue en
+ *  glace, une route chaude en vapeur : deux joueurs aux mémoires
+ *  différentes ne prennent plus la même route. */
+export function climatDuModule(m: ModuleCarte | undefined): OptionsGen['climat'] {
+  if (!m) return 0
+  return m.temp < 10 ? 1 : m.temp >= 45 ? 2 : 0
+}

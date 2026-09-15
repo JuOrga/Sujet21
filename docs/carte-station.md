@@ -227,6 +227,12 @@ HUB ─vapeur T3 ─┘        └─ S3 CHAUFFERIE (+1) ┴─ REP ALCÔVE ─�
   la difficulté du rang d'autant (`difficulteSousCran`, borné à 9) et
   multiplie la mémoire gravée au sas par 1 + cran (`primeMemoire`) ; le
   titre du choix de salle et la fiche de la carte l'annoncent.
+- **La température fait le climat** (`climatDuModule`) : sous 10 °C les
+  dangers des salles générées sont des hublots fendus (le froid), dès
+  45 °C des chaudières (le chaud), entre les deux le pile ou face d'avant.
+  Le climat voyage dans le code de la salle (option `climat`, bits hauts
+  du suffixe `~`) : un ancien code se décode inchangé. Une route froide
+  se joue en glace, une route chaude en vapeur — la route est le build.
 - **La pioche suit le biome** : un tableau qui porte un `biome` ne se
   propose que dans le module de ce biome ; un tableau sans biome est
   universel (la bibliothèque n'est pas encore réétiquetée) ; une salle

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { CARTE_LIVREE, cloneCarte, plusCourtVers } from './carteStation'
 import {
   choixModules,
+  climatDuModule,
   departCarte,
   difficulteSousCran,
   postureDuModule,
@@ -185,5 +186,19 @@ describe('la nature du module commande la salle', () => {
     expect(primeMemoire(undefined)).toBe(1)
     // la carte livrée : les secteurs du bord paient double
     expect(c.modules.filter((x) => primeMemoire(x) === 2).map((x) => x.id)).toEqual(['S1', 'S3'])
+  })
+})
+
+describe('climatDuModule — la température fait le climat des dangers', () => {
+  it('froid sous 10 °C, chaud dès 45 °C, auto entre les deux ; sans module, auto', () => {
+    const t = (temp: number) => climatDuModule({ ...c.modules[5], temp })
+    expect([t(-25), t(5), t(9)]).toEqual([1, 1, 1])
+    expect([t(10), t(30), t(44)]).toEqual([0, 0, 0])
+    expect([t(45), t(72)]).toEqual([2, 2])
+    expect(climatDuModule(undefined)).toBe(0)
+    // la carte livrée : le cryostat et la cache nord au froid, la
+    // chaufferie et la cache sud au chaud, les conduits en auto
+    expect(c.modules.filter((m) => climatDuModule(m) === 1).map((m) => m.id)).toEqual(['T1', 'S1', 'S1b'])
+    expect(c.modules.filter((m) => climatDuModule(m) === 2).map((m) => m.id)).toEqual(['T3', 'S3', 'S3b'])
   })
 })

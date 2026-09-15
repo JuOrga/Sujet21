@@ -105,6 +105,7 @@ import {
 import { dessinCarteSVG, type OptionsDessin } from './game/dessinCarte'
 import {
   choixModules,
+  climatDuModule,
   difficulteSousCran,
   postureDuModule,
   primeMemoire,
@@ -13278,6 +13279,8 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
       alea,
     ),
     ampleur: ampleurAuRang(rangSuivant, planEffectif()),
+    // la TEMPÉRATURE du module fait le climat des dangers : froid ou chaud
+    climat: climatDuModule(module),
     // la nature du module prime sur le réglage du rang — sauf les premiers
     // rangs sans danger, que la posture respecte (sansDanger)
     ...postureDuModule(module, regl.dangers === 1),

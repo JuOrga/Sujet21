@@ -4505,6 +4505,9 @@ export class LevelEditor {
         mecanismes: Number(
           (this.el('edg-mecanismes') as HTMLSelectElement).value,
         ) as OptionsGen['mecanismes'],
+        climat: Number(
+          (this.el('edg-climat') as HTMLSelectElement).value,
+        ) as OptionsGen['climat'],
       }
     }
     const genere = (): void => {
