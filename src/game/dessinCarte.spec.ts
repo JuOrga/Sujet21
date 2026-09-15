@@ -81,7 +81,7 @@ describe('dessinCarteSVG — le plan, depuis les données', () => {
     expect(jeu).not.toContain('cs-grille')
     expect(jeu).not.toContain('cs-sens')
     // les niveaux du biome ne se lisent qu'en édition
-    expect(svg).toContain('3 NIV. · T2')
+    expect(svg).toContain('6 NIV. · T2')
     expect(jeu).not.toContain('NIV.')
     expect(jeu).not.toContain('data-poignee')
   })

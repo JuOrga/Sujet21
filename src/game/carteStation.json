@@ -74,7 +74,7 @@
       "h": 136,
       "temp": -25,
       "forme": "octogone",
-      "niveaux": 3,
+      "niveaux": 6,
       "biome": "T1",
       "desc": "Ne s’ouvre qu’avec l’orbe de solidification. Les faisceaux gardent les passages ; le froid, lui, vient de la coque."
     },
@@ -89,7 +89,7 @@
       "h": 136,
       "temp": 18,
       "forme": "octogone",
-      "niveaux": 3,
+      "niveaux": 6,
       "biome": "T2",
       "desc": "Voie libre. Les dangers y sont fréquents, sans énigme à lire."
     },
@@ -104,7 +104,7 @@
       "h": 136,
       "temp": 72,
       "forme": "octogone",
-      "niveaux": 3,
+      "niveaux": 6,
       "biome": "T3",
       "desc": "Ne s’ouvre qu’avec l’orbe de vaporisation. Chaudières à chaque bord."
     },
@@ -134,7 +134,7 @@
       "h": 100,
       "temp": 5,
       "forme": "octogone",
-      "niveaux": 3,
+      "niveaux": 6,
       "biome": "S1",
       "cran": 1,
       "desc": "Confinement supérieur : plus dur d’un cran, la mémoire y vaut double. Le froid mord depuis la coque."
@@ -150,7 +150,7 @@
       "h": 100,
       "temp": 30,
       "forme": "octogone",
-      "niveaux": 3,
+      "niveaux": 6,
       "biome": "S2",
       "desc": "La voie sûre : ni prime, ni piège. Elle mène à l’économat comme à l’alcôve."
     },
@@ -165,7 +165,7 @@
       "h": 100,
       "temp": 55,
       "forme": "octogone",
-      "niveaux": 3,
+      "niveaux": 6,
       "biome": "S3",
       "cran": 1,
       "desc": "Confinement supérieur : les faisceaux gardent chaque passage, la mémoire y vaut double. Les chaudières tournent."
@@ -258,7 +258,7 @@
       "h": 166,
       "temp": 40,
       "forme": "octogone-dome",
-      "niveaux": 3,
+      "niveaux": 6,
       "biome": "OBS",
       "desc": "Module terminal. Un télescope spatial y est amarré."
     }

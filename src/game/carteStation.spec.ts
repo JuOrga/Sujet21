@@ -207,15 +207,15 @@ describe('biomesDeCarte — la liste que la planche et l’éditeur proposent', 
 })
 
 describe('un module est un biome — niveaux et trajet', () => {
-  it('la carte livrée compte ses niveaux : 9 salles au plus court, 10 par une cache', () => {
-    // HUB(0) → T2(3) → N(0) → S2(3) → ECO(0) → OBS(3) = 9 ; par une cache
-    // (1 salle), 10 : l'orbe se paie d'une salle, jamais d'un cul-de-sac
-    expect(longueursTrajet(CARTE_LIVREE)).toEqual({ min: 9, max: 10 })
+  it('la carte livrée compte ses niveaux : 18 salles au plus court, 19 par une cache', () => {
+    // HUB(0) → T2(6) → N(0) → S2(6) → ECO(0) → OBS(6) = 18 ; par une cache
+    // (1 salle), 19 : l'orbe se paie d'une salle, jamais d'un cul-de-sac
+    expect(longueursTrajet(CARTE_LIVREE)).toEqual({ min: 18, max: 19 })
     const c = cloneCarte(CARTE_LIVREE)
     c.modules[8].niveaux = 0 // la cache nord devient une halte
     c.modules[10].niveaux = 0 // le « ? » aussi
     c.modules[12].niveaux = 0
-    expect(longueursTrajet(c)).toEqual({ min: 9, max: 9 })
+    expect(longueursTrajet(c)).toEqual({ min: 18, max: 18 })
   })
 
   it('un module d’où l’objectif est hors de portée se signale — le joueur reviendra sur ses pas', () => {
@@ -328,7 +328,7 @@ describe('les routes', () => {
   it('les trois secteurs sont à distance égale de l’observatoire, une halte différente sur chaque route', () => {
     // le contrat du §9.3 : sortir hors protocole ne raccourcit pas le
     // parcours, il le déplace — trois secteurs, six salles chacun jusqu'au bout
-    for (const s of ['S1', 'S2', 'S3']) expect(plusCourtVers(CARTE_LIVREE, s, 'OBS')).toBe(3)
+    for (const s of ['S1', 'S2', 'S3']) expect(plusCourtVers(CARTE_LIVREE, s, 'OBS')).toBe(6)
     expect(liensDepuis(CARTE_LIVREE, 'S1').map((l) => l.vers)).toEqual(['S1b', 'ECO'])
     expect(liensDepuis(CARTE_LIVREE, 'S2').map((l) => l.vers)).toEqual(['ECO', 'INC', 'REP'])
     expect(liensDepuis(CARTE_LIVREE, 'S3').map((l) => l.vers)).toEqual(['REP', 'S3b'])
@@ -352,9 +352,9 @@ describe('verifieRoutes — les règles de route, à la Slay the Spire', () => {
 
   it('des routes à distance inéquivalente se signalent (§9.3) — à une salle près, non', () => {
     const c = cloneCarte(CARTE_LIVREE)
-    c.modules[6].niveaux = 1 // CONDUITS se raccourcit : 7 contre 10
-    expect(verifieRoutes(c).some((x) => /distance équivalente.*de 7 à 10/.test(x.message))).toBe(true)
-    // la carte livrée va de 9 à 10 : toléré
+    c.modules[6].niveaux = 1 // CONDUITS se raccourcit : 13 contre 19
+    expect(verifieRoutes(c).some((x) => /distance équivalente.*de 13 à 19/.test(x.message))).toBe(true)
+    // la carte livrée va de 18 à 19 : toléré
     expect(verifieRoutes(CARTE_LIVREE).some((x) => /distance équivalente/.test(x.message))).toBe(false)
   })
 

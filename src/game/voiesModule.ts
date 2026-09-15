@@ -116,10 +116,12 @@ export function dessinMiniCarteSVG(
 ): string {
   const n = mc.rangs.length
   if (n === 0) return ''
-  const PAS_X = 96
-  const PAS_Y = 34
-  const X0 = 48
-  const Y0 = 22
+  // SIX RANGS doivent tenir sous les portes, sur un téléphone comme sur un
+  // écran large : le pas est serré et le SVG se met à l'échelle (viewBox)
+  const PAS_X = 72
+  const PAS_Y = 32
+  const X0 = 36
+  const Y0 = 20
   const w = X0 * 2 + PAS_X * (n - 1)
   const h = Y0 * 2 + PAS_Y * (mc.voies - 1) + 14
   const x = (r: number): number => X0 + r * PAS_X
