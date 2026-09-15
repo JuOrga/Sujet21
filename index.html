@@ -9003,8 +9003,7 @@
         letter-spacing: 0.04em;
         color: #7f9cb0;
         min-height: 1.6em;
-        /* le mot s'allonge passé douze secondes (temps écoulé, ce qui reste,
-           qui travaille) : il se replie en paragraphe plutôt que de traverser
+        /* si le mot venait à s'allonger, il se replie plutôt que de traverser
            l'écran d'un trait */
         max-width: 62ch;
         line-height: 1.55;
@@ -10792,32 +10791,30 @@
         // (dans sonne) que le jeu est vivant. Pas de réarmement ici — une
         // minuterie par image serait du gaspillage ; la date suffit.
         //
-        // Passé douze secondes, le mot dit CE QUI SE PASSE, parce que le
-        // compte s'arrête longtemps sur le dernier programme (le shader de
-        // composition, le plus gros des sept — plusieurs minutes vues sur
-        // Chrome, 15/09/2026) et qu'un chiffre immobile ressemble à une
-        // panne : le temps écoulé, qui avance à la seconde, le nom de ce
-        // qui reste (`reste`, dit par le jeu), et QUI travaille — le
-        // compilateur de shaders du pilote, sur le processeur. L'ancien mot
-        // accusait « la carte graphique » : faux, et un joueur avec une
-        // grosse carte ne pouvait qu'en douter.
-        window.__sujet21Compile = function (fait, total, reste) {
+        // Passé douze secondes, le mot change : « chargement toujours en
+        // cours… 6/7 — 57 s ». Le compte s'arrête longtemps sur le dernier
+        // programme (le shader de composition, le plus gros des sept —
+        // plusieurs minutes vues sur Chrome, 15/09/2026) et un chiffre
+        // immobile ressemble à une panne : le temps écoulé, qui avance à la
+        // seconde, est le seul signe de vie qu'on ait. Deux mots ont été
+        // essayés avant et refusés par le concepteur : « la carte graphique
+        // est lente » (faux : c'est le compilateur de shaders du pilote, sur
+        // le processeur, et un joueur avec une RTX 4060 Ti ne pouvait qu'en
+        // douter), puis un paragraphe qui l'expliquait (trop long pour un
+        // écran de chargement). L'explication vit dans le panneau de la
+        // borne, cinq minutes plus loin, pas ici.
+        window.__sujet21Compile = function (fait, total) {
           if (demarre || montre) return
           pouls = Date.now()
           if (!compileDepuis) compileDepuis = pouls
           compileFait = fait
           compileTotal = total
-          var mot = ETAPES.rendu + (total > 0 ? ' ' + fait + '/' + total : '')
+          var compte = total > 0 ? ' ' + fait + '/' + total : ''
           var ecoule = pouls - compileDepuis
-          if (ecoule >= VEILLE_MS) {
-            mot +=
-              ' — ' +
-              duree(ecoule) +
-              (reste ? ' — reste ' + reste : '') +
-              '. C’est le compilateur de shaders du pilote qui travaille, sur le' +
-              ' processeur : la carte graphique n’y est pour rien. On patiente,' +
-              ' ne rechargez pas.'
-          }
+          var mot =
+            ecoule >= VEILLE_MS
+              ? 'chargement toujours en cours…' + compte + ' — ' + duree(ecoule)
+              : ETAPES.rendu + compte
           if (mot !== motCompile) {
             motCompile = mot
             ditEtape(mot)
