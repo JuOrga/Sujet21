@@ -31,6 +31,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '15/09/2026 12:17',
+    title: 'LE VOILE DES CACHETTES AU CHOIX : BROUILLARD ou SOBRE, dans PARAMÈTRES',
+    notes: [
+      'LA DEMANDE : « je souhaite pouvoir revenir à l’ancien système de cache via les paramètres, est-ce possible ? » — oui. Le nouveau brouillard reste le défaut ; l’ancien voile revient tel quel, à la demande.',
+      'CE QUI CHANGE : un réglage LE VOILE DES CACHETTES dans PARAMÈTRES, à côté des graphismes du décor — BROUILLARD (défaut) ou SOBRE — mémorisé au poste (sujet21-voile) comme les autres. En SOBRE, le module voileCache.ts dessine l’ancien voile à l’identique (dessineVoileSobre) : le rectangle plein dans la forme, quatre nappes à 24 %, le liseré d’un pixel, la levée qui fond d’un bloc en 0,9 s, et la paroi factice qui fond de même — directement sur le canevas des effets, sans mémo ni calque, comme avant. Le rapport de performance note le mode choisi (config.voile) : deux rapports envoyés dans les deux modes se comparent.',
+      'CE QUI NE CHANGE PAS : le brouillard par défaut, sa levée depuis le point d’entrée, le mémo par cachette ; la physique et le masquage sous voile, identiques dans les deux modes.',
+      'VÉRIFIÉ : quatre tests neufs (render/voileCache.spec.ts) — le fondu en 0,9 s, le dessin direct sans mémo ni calque (une forme, quatre nappes, un trait, aucun drawImage), rien quand c’est levé ou hors champ, la paroi factice qui fond d’un bloc. 1219 verts dans 114 fichiers, type-check à 0, build propre.',
+    ],
+  },
+  {
     date: '15/09/2026 10:58',
     title: 'LE MOT DU CHARGEMENT, COURT : « chargement toujours en cours… 6/7 — 57 s »',
     notes: [
