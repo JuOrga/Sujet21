@@ -38,11 +38,12 @@ logique en fait cinq salles de démonstration sans ajouter un seul mécanisme.
 Des rails à champ qui convoient la vapeur et l'ionisent en plasma.
 
 **La boucle.** Le hub du laboratoire Méduse, le sas de lancement, la carte
-de la station à routes ramifiées (un module est un biome ; au bout de ses
-salles la carte s'ouvre et la coursive suivante se choisit, sous cadenas
-tant que l'orbe manque ; la longueur d'une run découle du trajet ; trois
-secteurs à distance égale de l'objectif, les haltes — économat, alcôve de
-repos — et les caches placées une par route, le confinement supérieur qui
+de la station à routes ramifiées (un module est un biome de SIX salles ;
+au bout d'elles la carte s'ouvre et la coursive suivante se choisit, sous
+cadenas tant que l'orbe manque ; la longueur d'une run découle du trajet —
+trente salles au plus court, en cinq biomes : trois actes, l'approche et
+le terminal ; une colonne de haltes entre deux actes — économat, alcôve de
+repos, bonbonne oubliée, caches, « ? » —, le confinement supérieur qui
 paie double, la nature et la température du module qui font la salle, le
 survol qui projette la route jusqu'à l'observatoire, le module « ? » qui
 ne se révèle qu'à l'entrée, et dans chaque module une mini-carte à trois

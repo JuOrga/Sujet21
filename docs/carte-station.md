@@ -142,35 +142,37 @@ y = clamp(cible.y, HUB.y − 110, HUB.y + 110) ». Le 110 est h/2 − 36 pour
 un fût de 292 : `traceLien` l'applique à tout module plus haut que large,
 à chaque bout. Un second hub se comportera comme le premier.
 
-## Les routes (15/09/2026)
+## Les routes et les cinq biomes (15/09/2026)
 
-Le plan du 03/09 n'avait qu'une route réelle (seul S2 menait à
-l'observatoire ; S1 et S3 étaient des détours vers une cache, puis
-retour) et rien ne distinguait un module d'un autre en jeu : la nature
-n'était qu'un glyphe, la température qu'un chiffre. Le plan refait
-emprunte à Slay the Spire ce qui fait la matière d'un choix de route :
+Le plan du 03/09 n'avait qu'une route réelle et trois salles par module.
+Le plan refait tient en **trois actes de six salles, une approche et un
+terminal** — cinq biomes, trente salles au plus court :
 
 ```
-HUB ─glace─ T1 ─┐        ┌─ S1 CRYOSTAT (+1) ──┬─ S1b CACHE NORD ─┐
-HUB ─main── T2 ─┼─ N ────┼─ S2 CONDUITS ───────┼─ ECO ÉCONOMAT ───┼─ OBS
-HUB ─vapeur T3 ─┘        └─ S3 CHAUFFERIE (+1) ┴─ REP ALCÔVE ─────┘
-                                                └─ S3b CACHE SUD ─┘
+                 ACTE 1            halte        ACTE 2         halte         ACTE 3        halte
+HUB ─glace─ T1 TRANSFO GLACE ─┐  ┌ ÉCONOMAT ┐ ┌ C1 CRYOSTAT(+1) ┐ ┌ CACHE N ┐ ┌ P1 PUITS FROID(+1) ┐ ┌ ÉCONOMAT ┐
+HUB ─main── T2 AUCUNE TRANSFO ─┼N1┼ « ? »    ┼─┼ C2 CONDUITS     ┼─┼ BONBONNE ┼─┼ P2 SOUTES          ┼─┤          ├ ANTICHAMBRE ─ OBSERVATOIRE
+HUB ─vapeur T3 TRANSFO GAZ ───┘  └ ALCÔVE   ┘ └ C3 CHAUFFERIE(+1)┘ └ CACHE S ┘ └ P3 RÉACTEUR(+1)    ┘ └ ALCÔVE   ┘
 ```
 
-- **Trois secteurs à distance égale** de l'observatoire depuis le nœud
-  (le contrat du §9.3 : sortir hors protocole ne raccourcit pas le
-  parcours, il le déplace). Dix-huit routes simples, 9 salles chacune —
-  10 par une cache : l'orbe se paie d'une salle, jamais d'un cul-de-sac.
-- **Les secteurs du bord portent le cran** (S1 froid, S3 chaud : le
-  confinement supérieur, plus dur et plus généreux) ; le secteur du
-  milieu est la voie sûre.
-- **Une halte différente sur chaque route.** S1 mène à la cache nord ou
-  à l'économat ; S2 à l'économat, au « ? » ou à l'alcôve de repos ; S3 à
-  l'alcôve ou à la cache sud. Les coursives se croisent comme les voies d'un acte de
-  Slay the Spire : on choisit la halte autant que le secteur.
-- **La scène passe à 1800 de large** pour loger la colonne des haltes
-  sans toucher aux fûts du concepteur ; l'observatoire et le télescope
-  glissent de 200 vers la droite.
+- **Cinq biomes de six salles** sur la route la plus courte : les
+  transformateurs, les coursives, les profondeurs, l'antichambre et
+  l'observatoire — 30 salles, 31 par le « ? » (la seule halte qui porte
+  une salle). Quatre-vingt-seize routes simples, toutes à une salle près :
+  le contrat du §9.3 est tenu.
+- **Une colonne de haltes entre deux actes**, et chaque module d'acte
+  ouvre sur DEUX haltes voisines — jamais la même paire que son voisin :
+  on choisit la halte autant que le secteur, comme les voies d'un acte de
+  Slay the Spire.
+- **Quatre modules sous confinement supérieur** (cryostat, chaufferie,
+  puits froid, réacteur) : la route froide et la route chaude sont les
+  élites, la route du milieu est sûre.
+- **Les caches n'ont plus de salle** : on ouvre, on prend l'orbe, la carte
+  se rouvre — d'où `prendOrbeDuModule`, appelé à l'entrée d'une cache sans
+  salle autant qu'au sas de la dernière salle d'un module qui en a.
+- **La scène passe à 2500 × 804** pour loger dix colonnes ; l'arc de coque
+  ne bouge pas (le HUB reste à x = 263), l'observatoire et le télescope
+  glissent à droite.
 
 ## La conception retenue (concepteur, 03/09/2026)
 

@@ -13293,6 +13293,28 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
   host.appendChild(fiche)
 }
 
+/** LA CACHE REND SON ORBE quand le module qui le recèle est ÉPUISÉ — une
+ *  fois par poste, jamais sous un outil (rien de mérité ne s'écrit). Deux
+ *  moments l'appellent, et il en faut deux : le sas de la dernière salle
+ *  d'une cache qui se joue, ET l'entrée dans une cache SANS salle (une
+ *  chambre au trésor, qu'on ouvre et qu'on quitte) — sans ce second appel,
+ *  une cache à zéro niveau ne donnait jamais rien, en silence. */
+function prendOrbeDuModule(): void {
+  const mod = moduleEnCours()
+  if (!mod?.orbe || !moduleFini(carte, carteRun)) return
+  // un orbe déjà en poche ou déjà tissé ne se gagne pas deux fois : la
+  // cache se vide quand même, et le toast le dit tel quel
+  const dejaTenu = records.aOrbe(mod.orbe) || records.eveilTient(mod.orbe)
+  if (!records.videCache(mod.id, mod.orbe)) return
+  const nomOrbe = ORBES.find((o) => o.id === mod.orbe)?.nom ?? mod.orbe
+  toastFile.push(
+    dejaTenu
+      ? { nom: `LA CACHE EST VIDE — l’orbe ${nomOrbe}, vous l’aviez déjà`, icone: '🔮', sur: mod.nom }
+      : { nom: `ORBE D’ESSENCE — ${nomOrbe.toUpperCase()}`, icone: '🔮', sur: `TROUVÉ DANS ${mod.nom}` },
+  )
+  majMemoireUI()
+}
+
 /** Entrer dans un module de la carte : un nœud rouvre la carte, un biome
  *  présente ses salles. */
 function entreModuleRun(id: string): void {
@@ -13328,6 +13350,8 @@ function entreModuleRun(id: string): void {
     return
   }
   if (moduleFini(carte, carteRun)) {
+    // une CACHE SANS SALLE : on l'ouvre, on prend, la carte se rouvre
+    if (!testLevel) prendOrbeDuModule()
     mbMontreCarte('suite')
     return
   }
@@ -17058,31 +17082,8 @@ function corpsImage(now: number): boolean {
     // suit en direct (profondeur record, descentes entamées)
     voieRang += 1 // la descente avance : c'est la progression, pas un titre
     carteRun = franchitSalle(carteRun) // et le module se vide d'une salle
-    // LA CACHE : un module qui recèle un orbe le donne quand il est épuisé,
-    // une fois par poste — jamais sous un outil (rien de mérité ne s'écrit)
-    const modFini = moduleEnCours()
-    if (modFini?.orbe && moduleFini(carte, carteRun) && !sasOutil) {
-      // un orbe déjà en poche ou déjà tissé ne se gagne pas deux fois : la
-      // cache se vide quand même, et le toast le dit tel quel
-      const dejaTenu = records.aOrbe(modFini.orbe) || records.eveilTient(modFini.orbe)
-      if (records.videCache(modFini.id, modFini.orbe)) {
-        const nomOrbe = ORBES.find((o) => o.id === modFini.orbe)?.nom ?? modFini.orbe
-        toastFile.push(
-          dejaTenu
-            ? {
-                nom: `LA CACHE EST VIDE — l’orbe ${nomOrbe}, vous l’aviez déjà`,
-                icone: '🔮',
-                sur: modFini.nom,
-              }
-            : {
-                nom: `ORBE D’ESSENCE — ${nomOrbe.toUpperCase()}`,
-                icone: '🔮',
-                sur: `TROUVÉ DANS ${modFini.nom}`,
-              },
-        )
-        majMemoireUI()
-      }
-    }
+    // LA CACHE : un module qui recèle un orbe le donne quand il est épuisé
+    if (!sasOutil) prendOrbeDuModule()
     voieVues.add(level.code) // la pioche ne la reproposera pas de la run
     if (!sasOutil) {
       const p = chargePalmaresVoie()
