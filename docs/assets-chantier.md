@@ -100,7 +100,7 @@ l'ordre qu'on veut.
 | C9 | `cine/miroir-1..3.webp` | §22d-f | la fin de l'arc sur les siennes |
 | C10 | `cycle-icones.webp` | §23a | les états et les transformations sans emoji |
 | C11 | `trophees-icones.webp` | §23b | |
-| C12 | `cine/approche-1..6.webp` | §26 | l'ouverture commence dehors : la planète, la station, le hublot — la planche 3 d'abord, elle fait référence pour les autres |
+| C12 | ~~`cine/approche-1..6.webp`~~ ✅ livré le 15/09 | §26 | l'ouverture commence dehors : la planète, la station, le hublot — la planche 3 est la référence de la station |
 
 ### Bloc D — sans générateur : les vidéos du codex
 

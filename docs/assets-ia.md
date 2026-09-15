@@ -210,10 +210,12 @@ Planches livrées, dans `public/assets/cine/` :
 | `depart-1.webp` | le module vide, la cuve crevée | L'OUVERTURE + LE DÉPART |
 | `depart-2.webp` | le couloir vert vers le sas | L'OUVERTURE + LE DÉPART |
 | `depart-3.webp` | le seuil du sas, l'aspiration cyan | L'OUVERTURE + LE DÉPART |
-
-Six planches de plus sont commandées **en tête** de l'OUVERTURE — la
-planète vue de l'espace, puis la station de plus en plus près, jusqu'au
-hublot du module Méduse : `approche-1..6.webp`, §26.
+| `approche-1.webp` | la planète à anneau, seule | L'OUVERTURE (en tête, §26) |
+| `approche-2.webp` | le limbe, un point brillant | L'OUVERTURE |
+| `approche-3.webp` | la station entière | L'OUVERTURE — la référence de la station |
+| `approche-4.webp` | l'arc et le hub au premier plan | L'OUVERTURE |
+| `approche-5.webp` | le module Méduse, son hublot | L'OUVERTURE |
+| `approche-6.webp` | le hublot, la cuve derrière la vitre | L'OUVERTURE |
 
 ---
 
@@ -1183,7 +1185,16 @@ with no readable writing, cold palette
 
 ---
 
-## 26. L'APPROCHE — six planches avant l'ouverture : de la planète au module Méduse
+## 26. L'APPROCHE — six planches avant l'ouverture : de la planète au module Méduse ✅ LIVRÉ (15/09)
+
+**Livré le 15/09/2026**, les six planches en tête de `CINEMATIQUE_ESSAI`.
+Mesuré par `prepare.py` à la livraison : luminance de 0,03 (la planète
+seule) à 0,18 (l'arc et le hub), 0 % de pixels chauds, de 20 à 234 Ko.
+La planche 3 est devenue `docs/reference/station-reference.png` : c'est
+elle qui fait foi sur la station vue du dehors. Deux fournées ont été
+nécessaires — la première avait une Terre, un soleil et une lune dans le
+cadre, du texte peint sur la coque, un écran plat derrière le hublot ;
+d'où les négatifs durcis ci-dessous, à garder tels quels.
 
 L'OUVERTURE commence aujourd'hui **dans** la cuve (`ouverture-1.webp`,
 « Module Méduse. Une cuve, une substance. »). Le concepteur veut qu'elle
