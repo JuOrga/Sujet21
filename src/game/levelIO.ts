@@ -42,7 +42,7 @@ import {
   type ZoneDef,
   type ZoneForce,
 } from './level'
-import type { ChasseDef } from './level'
+import { PORTE_SENS_DEFAUT, type ChasseDef } from './level'
 import { ARTICLES_ETAL_IDS } from './economat'
 import { ARTICLES_COMPTOIR_IDS, ROLES_ANCRE } from './hub'
 import { REPARATIONS } from './reparations'
@@ -599,6 +599,18 @@ export function parseLevel(input: unknown): {
       canal,
     }
     if (q.regle === 'et') porte.regle = 'et'
+    // la MATÉRIALISATION : une façon connue, ou rien (d'un coup). Ses
+    // réglages ne s'écrivent que s'ils s'écartent du défaut — comme ceux
+    // d'une chasse, le défaut vit dans le code.
+    if (q.materialisation === 'rideau' || q.materialisation === 'eventail') {
+      porte.materialisation = q.materialisation
+      if (q.sens !== undefined) porte.sens = Math.round(num(q.sens, PORTE_SENS_DEFAUT))
+      if (q.pivot !== undefined)
+        porte.pivot = Math.max(0, Math.min(7, Math.round(num(q.pivot, 0))))
+      if (q.horaire === true) porte.horaire = true
+      if (q.allure !== undefined && num(q.allure) > 0)
+        porte.allure = Math.round(num(q.allure))
+    }
     if (porte.maxX - porte.minX < 1 || porte.maxY - porte.minY < 1) {
       rejets.push('une porte a été écartée (taille nulle)')
       continue

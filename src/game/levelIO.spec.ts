@@ -407,6 +407,29 @@ it('conserve les mécanismes laser (émetteurs, cibles, portes) à l’aller-ret
   ).toBe(true)
 })
 
+it('la matérialisation d’une porte survit à l’aller-retour, et une façon inconnue retombe sur « d’un coup »', () => {
+  const src = {
+    ...TABLEAUX[0],
+    cibles: [{ x: 700, y: -300, r: 30 }],
+    portes: [
+      { minX: 100, minY: -200, maxX: 140, maxY: 200, canal: 1, materialisation: 'rideau' as const, sens: 0, allure: 120 },
+      { minX: 200, minY: -200, maxX: 240, maxY: 200, canal: 1, materialisation: 'eventail' as const, pivot: 3, horaire: true as const },
+      { minX: 300, minY: -200, maxX: 340, maxY: 200, canal: 1 },
+    ],
+  }
+  const { level, rejets } = parseLevel(JSON.parse(serializeLevel(src)))
+  expect(rejets).toEqual([])
+  expect(level!.portes).toEqual(src.portes)
+  // une façon inconnue, ou des réglages sans façon : rien ne passe
+  const brut = JSON.parse(serializeLevel(src)) as { portes: Record<string, unknown>[] }
+  brut.portes[0].materialisation = 'tourbillon'
+  brut.portes[2].sens = 45
+  brut.portes[2].allure = 90
+  const again = parseLevel(brut)
+  expect(again.level!.portes![0]).toEqual({ minX: 100, minY: -200, maxX: 140, maxY: 200, canal: 1 })
+  expect(again.level!.portes![2]).toEqual({ minX: 300, minY: -200, maxX: 340, maxY: 200, canal: 1 })
+})
+
 it('canaux : le n° d’une cible survit, l’héritage porte.cible (indice) se traduit', () => {
   const src = {
     ...TABLEAUX[0],

@@ -15,6 +15,7 @@ import { SpatialGrid } from './grid'
 import { makeKernels, computeRestDensity, type Kernels } from './kernels'
 import { labelComponents } from './components'
 import { boxContact, Sponge, type ClosestPoint } from './obstacles'
+import type { FormeBox } from '../game/formes'
 import {
   MAT_CHAUD,
   MAT_FROID,
@@ -581,9 +582,11 @@ export class FluidSim {
   // bulkhead : un champ qu'on voit au travers n'a pas à coucher d'ombre.
   // Essayé une fois (marquer la porte « pleine hauteur » pour qu'elle ombre
   // comme un mur) : le drapeau n'atteignait rien, et il n'aurait pas dû.
-  setDoors(
-    portes: { minX: number; minY: number; maxX: number; maxY: number }[],
-  ): void {
+  //
+  // Une porte EN TRAIN DE SE FERMER arrive tronquée par la coupe de son
+  // front (porte.ts) : la paroi n'existe que derrière lui, et le contact
+  // pousse ce qu'il rencontre devant lui — d'où la propulsion.
+  setDoors(portes: FormeBox[]): void {
     this.boxes = [
       ...this.baseBoxes,
       ...portes.map((p) => ({ ...p, material: MAT_WALL })),

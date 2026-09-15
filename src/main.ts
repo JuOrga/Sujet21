@@ -166,7 +166,7 @@ import {
   valeurLevier,
   valeurProposee,
 } from './game/leviers'
-import { dansForme } from './game/formes'
+import { dansForme, type FormeBox } from './game/formes'
 import {
   dessineDissolutionParoi,
   dessineDissolutionParoiSobre,
@@ -254,6 +254,7 @@ import {
 } from './game/level'
 import type { LevelEditor } from './editor/editor'
 import type { EditeurCarte } from './editor/editeurCarte'
+import { porteAvance, porteBoite, portePolygone } from './game/porte'
 import { EcranCodex } from './game/ecranCodex'
 import { EcranMarchand } from './game/ecranMarchand'
 import { EcranAvaries } from './game/ecranAvaries'
@@ -263,6 +264,7 @@ import {
   avancerRecepteurs,
   cibleActive,
   canalActif,
+  type PorteFermee,
   type TraceResultat,
 } from './game/laser'
 import { BOUTON, Manette } from './game/manette'
@@ -7704,6 +7706,11 @@ const laserEtat = {
   // première coupure scelle) — machine à états pure, voir laser.ts
   recepteurs: creerEtatRecepteurs(0),
   portesOuvertes: [] as boolean[],
+  // LA MATÉRIALISATION, par porte : 0 la paroi n'existe pas, 1 elle est
+  // pleine, entre les deux son front avance (porte.ts). Une porte d'un coup
+  // saute de l'un à l'autre. Au chargement, les portes closes sont PLEINES
+  // sans cérémonie : le rideau ne se joue qu'aux bascules.
+  portesAvance: [] as number[],
   doorsKey: '', // signature des portes fermées envoyées au solveur
   // LES CHASSES : qui souffle en cet instant, et le reste de bouffée (s)
   // d'une chasse déclenchée par séquence
@@ -7915,7 +7922,9 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   })
   const z = camera.zoom
 
-  // portes : barrières d'énergie — pleines quand closes, un cadre quand ouvertes
+  // portes : barrières d'énergie — pleines quand closes, un cadre quand
+  // ouvertes, et entre les deux la PART MATÉRIALISÉE seule, bordée par son
+  // front : ce que le solveur oppose au corps est exactement ce qu'on voit
   for (let i = 0; i < portes.length; i++) {
     const p = portes[i]
     // sous un voile de cachette : la porte se tait (elle flotterait
@@ -7923,21 +7932,34 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     if (dansCacheVoilee((p.minX + p.maxX) / 2, (p.minY + p.maxY) / 2)) continue
     const a = S(p.minX, p.maxY)
     const b = S(p.maxX, p.minY)
-    const ouverte = laserEtat.portesOuvertes[i]
-    if (ouverte) {
+    const avance =
+      laserEtat.portesAvance[i] ?? (laserEtat.portesOuvertes[i] ? 0 : 1)
+    if (avance < 1) {
+      // le cadre de ce qui reste à combler (ou de tout, porte ouverte)
       g.strokeStyle = 'rgba(90,220,170,0.45)'
       g.setLineDash([5, 7])
       g.lineWidth = 1.5
       g.strokeRect(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy)
       g.setLineDash([])
-    } else {
+    }
+    if (avance > 0) {
+      const { contour, front } = portePolygone(p, avance)
       const puls = 0.75 + 0.25 * Math.sin(elapsed * 3.1 + i)
+      g.save()
+      g.beginPath()
+      for (let k = 0; k < contour.length; k++) {
+        const q = S(contour[k].x, contour[k].y)
+        if (k === 0) g.moveTo(q.sx, q.sy)
+        else g.lineTo(q.sx, q.sy)
+      }
+      g.closePath()
       g.fillStyle = `rgba(255,72,72,${(0.16 * puls).toFixed(3)})`
-      g.fillRect(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy)
+      g.fill()
       g.strokeStyle = `rgba(255,96,96,${(0.85 * puls).toFixed(3)})`
       g.lineWidth = 2
-      g.strokeRect(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy)
-      // barreaux d'énergie
+      g.stroke()
+      // barreaux d'énergie, rognés à la part matérialisée
+      g.clip()
       g.strokeStyle = `rgba(255,110,110,${(0.35 * puls).toFixed(3)})`
       g.lineWidth = 1
       g.beginPath()
@@ -7954,6 +7976,18 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
         }
       }
       g.stroke()
+      g.restore()
+      // le FRONT : la ligne vive qui avance — c'est elle qui pousse
+      if (front.length === 2) {
+        const f0 = S(front[0].x, front[0].y)
+        const f1 = S(front[1].x, front[1].y)
+        g.strokeStyle = 'rgba(255,200,190,0.95)'
+        g.lineWidth = 3
+        g.beginPath()
+        g.moveTo(f0.sx, f0.sy)
+        g.lineTo(f1.sx, f1.sy)
+        g.stroke()
+      }
     }
   }
 
@@ -12061,6 +12095,7 @@ function resetLasers(): void {
   laserEtat.ionisePrec = []
   laserEtat.recepteurs = creerEtatRecepteurs((level.cibles ?? []).length)
   laserEtat.portesOuvertes = (level.portes ?? []).map(() => false)
+  laserEtat.portesAvance = (level.portes ?? []).map(() => 1)
   laserEtat.doorsKey = ''
   laserEtat.chassesActives = (level.chasses ?? []).map(() => false)
   laserEtat.chasseBouffee = (level.chasses ?? []).map(() => 0)
@@ -15774,14 +15809,41 @@ function corpsImage(now: number): boolean {
       if (laserEtat.portesOuvertes.length !== portes.length) {
         laserEtat.portesOuvertes = portes.map(() => false)
       }
+      if (laserEtat.portesAvance.length !== portes.length) {
+        laserEtat.portesAvance = portes.map(() => 1)
+      }
       for (let i = 0; i < portes.length; i++) {
         if (sequenceur.etat.brechesOuvertes.has(i))
           laserEtat.portesOuvertes[i] = true
       }
-      // le solveur ne reçoit que les portes closes — recomposé au changement
-      const closes = portes.filter((_, i) => !laserEtat.portesOuvertes[i])
+      // LE FRONT AVANCE AU TEMPS DE JEU : autant de temps que la physique
+      // vient d'en simuler — une pause, une cinématique, le figent avec
+      // elle. Une porte sans matérialisation saute à sa cible.
+      const dtJeu = stepsFaits * params.dt
+      for (let i = 0; i < portes.length; i++) {
+        laserEtat.portesAvance[i] = porteAvance(
+          portes[i],
+          laserEtat.portesAvance[i],
+          laserEtat.portesOuvertes[i],
+          dtJeu,
+        )
+      }
+      // le solveur ne reçoit que ce qui EXISTE des portes : la paroi pleine
+      // d'une porte close, le rectangle tronqué d'une porte qui se ferme —
+      // recomposé au changement, donc à chaque image tant qu'un front bouge
+      const closes: FormeBox[] = []
+      for (let i = 0; i < portes.length; i++) {
+        const b = porteBoite(portes[i], laserEtat.portesAvance[i])
+        if (b) closes.push(b)
+      }
       const cle = closes
-        .map((p) => `${p.minX},${p.minY},${p.maxX},${p.maxY}`)
+        .map(
+          (b) =>
+            `${b.minX},${b.minY},${b.maxX},${b.maxY}` +
+            (b.coupe
+              ? `|${b.coupe.x.toFixed(2)},${b.coupe.y.toFixed(2)},${b.coupe.nx.toFixed(4)},${b.coupe.ny.toFixed(4)}`
+              : ''),
+        )
         .join(';')
       if (cle !== laserEtat.doorsKey) {
         laserEtat.doorsKey = cle
@@ -16069,8 +16131,16 @@ function corpsImage(now: number): boolean {
     const portes = level.portes ?? []
     if (laserEtat.recepteurs.vues.length !== cibles.length) resetLasers()
     // portes fermées AVANT ce traçage : un faisceau ne traverse pas une porte
-    // encore close — elle s'ouvrira pour l'image suivante
-    const fermees = portes.filter((_, i) => !laserEtat.portesOuvertes[i])
+    // encore close — elle s'ouvrira pour l'image suivante. Une porte dont le
+    // front avance n'absorbe que là où sa paroi existe déjà.
+    const fermees: PorteFermee[] = []
+    for (let i = 0; i < portes.length; i++) {
+      const b = porteBoite(
+        portes[i],
+        laserEtat.portesAvance[i] ?? (laserEtat.portesOuvertes[i] ? 0 : 1),
+      )
+      if (b) fermees.push(b)
+    }
     const rIce = params.particleSpacing * 1.3
     // le rayon du champ qui DÉFINIT la surface du liquide (dioptres)
     const rEau = params.laserMirrorSmooth * 0.6
