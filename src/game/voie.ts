@@ -45,6 +45,12 @@ export interface PlanVoie {
    * d'épreuve du générateur, et la façon de jouer une descente inédite
    * quand la bibliothèque est déjà connue par cœur. */
   ecrites: boolean
+  /** GÉNÉRER SI LE POOL MANQUE — ne vaut que générées coupées. Chaque
+   * porte salle de la mini-carte pioche alors un tableau écrit DE LA
+   * MÉCANIQUE DE SON NŒUD. S'il n'y en a aucun : actif, la porte se génère
+   * (et le manque se note pour le concepteur) ; coupé, elle pioche un
+   * tableau d'une autre mécanique, et ne se génère que le pool à sec. */
+  genereSiManque: boolean
   // ---- LA FORME DE LA RAMPE ----------------------------------------------
   // Ces cinq réglages étaient des nombres écrits dans le code de diffAuRang
   // et reglageAuRang. Ce ne sont pas des détails d'implémentation : ce sont
@@ -96,6 +102,7 @@ export const PLAN_VOIE_DEFAUTS: PlanVoie = {
   graineDuJour: false,
   generees: true,
   ecrites: true,
+  genereSiManque: true,
   sommetRecul: 1,
   respiration: 3,
   finale: 60,
@@ -138,6 +145,8 @@ export function clampPlanVoie(p: Partial<PlanVoie> | null): PlanVoie {
     generees: p?.generees !== false,
     // idem pour les tableaux écrits : un plan d'avant ce réglage les garde
     ecrites: p?.ecrites !== false,
+    // et pour la porte générée faute de tableau : l'ordinaire, générer
+    genereSiManque: p?.genereSiManque !== false,
     // LES RÉGLAGES DE RAMPE SONT NÉS APRÈS le stockage : un plan enregistré
     // avant eux n'en porte aucun, et doit retrouver EXACTEMENT la descente
     // qu'il décrivait — d'où des défauts qui sont les anciennes constantes.

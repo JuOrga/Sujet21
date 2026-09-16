@@ -115,6 +115,7 @@ import {
   type NoeudVoie,
   type ReglagesTissage,
 } from './game/voiesModule'
+import { CLE_MANQUES, inventairePool, litManques, noteManque, type Manque } from './game/manques'
 import {
   ditEffet,
   ESSENCE_PLANCHER,
@@ -6313,6 +6314,97 @@ function dscTable(): HTMLElement {
   return t
 }
 
+/** LES MANQUES DU POOL : l'inventaire (ce que la bibliothèque a, par biome
+ *  de la carte, mécanique et moment — une case vide est un tableau à
+ *  écrire) et le relevé de ce que le jeu a dû générer faute de tableau.
+ *  Le concepteur a demandé « un moyen de savoir facilement où il manque
+ *  des salles à créer pour remplacer les générées » (16/09). */
+function dscManques(): HTMLElement {
+  const d = document.createElement('div')
+  const aide = document.createElement('p')
+  aide.className = 'dsc-aide'
+  aide.innerHTML =
+    'Générées coupées, chaque porte de la mini-carte pioche un tableau écrit de la MÉCANIQUE de son nœud, dans le BIOME ' +
+    'du module. L’inventaire compte ces tableaux, case par case : <b>début · milieu · fin</b>. Un tableau sans biome compte ' +
+    'pour tous ; un tableau sans code d’atelier ne compte nulle part. Une case à <b>0</b> est une salle à écrire. ' +
+    'Le relevé, dessous, dit ce que le jeu a réellement dû générer sur ce poste.'
+  d.appendChild(aide)
+  const biomes = [...new Set(carte.modules.map((mod) => mod.biome).filter((b) => b.length > 0))]
+  const inv = inventairePool(descenteBibliotheque(), biomes)
+  const t = document.createElement('table')
+  t.className = 'dsc-table'
+  const thead = document.createElement('thead')
+  const trh = document.createElement('tr')
+  for (const e of ['BIOME', ...([0, 1, 2, 3] as const).map((mec) => MECANIQUE_NOMS[mec].toUpperCase())]) {
+    const th = document.createElement('th')
+    th.textContent = e
+    trh.appendChild(th)
+  }
+  thead.appendChild(trh)
+  t.appendChild(thead)
+  const tb = document.createElement('tbody')
+  for (const biome of biomes) {
+    const tr = document.createElement('tr')
+    const tdB = document.createElement('td')
+    tdB.textContent = biome
+    tr.appendChild(tdB)
+    for (const mec of [0, 1, 2, 3] as const) {
+      const td = document.createElement('td')
+      const parMoment = ([1, 2, 3] as const).map(
+        (mom) => inv.find((c) => c.biome === biome && c.mecanique === mec && c.moment === mom)?.codes.length ?? 0,
+      )
+      parMoment.forEach((n, i) => {
+        const s = document.createElement('span')
+        s.className = 'dsc-badge' + (n === 0 ? ' dsc-manque' : '')
+        s.textContent = String(n)
+        s.title = `${['début', 'milieu', 'fin'][i]} · ${MECANIQUE_NOMS[mec]} · ${biome} : ${n} tableau${n > 1 ? 'x' : ''}`
+        td.appendChild(s)
+      })
+      tr.appendChild(td)
+    }
+    tb.appendChild(tr)
+  }
+  t.appendChild(tb)
+  d.appendChild(t)
+  const releve = litManquesDuPoste()
+  const p = document.createElement('p')
+  p.className = 'dsc-aide'
+  if (releve.length === 0) {
+    p.textContent = 'Relevé du poste : aucune porte générée faute de tableau jusqu’ici.'
+    d.appendChild(p)
+    return d
+  }
+  p.innerHTML = `<b>Relevé du poste</b> — ${releve.length} manque${releve.length > 1 ? 's' : ''} vu${releve.length > 1 ? 's' : ''} en jeu :`
+  d.appendChild(p)
+  const ul = document.createElement('ul')
+  ul.className = 'dsc-manques'
+  for (const mq of releve) {
+    const li = document.createElement('li')
+    li.textContent =
+      `${MECANIQUE_NOMS[mq.mecanique]} · ${MOMENT_COURT[mq.moment].toLowerCase()} · diff. ${mq.difficulte}` +
+      ` — ${mq.biome || 'sans biome'}${mq.module ? ` (${mq.module})` : ''} — ${mq.fois} fois`
+    ul.appendChild(li)
+  }
+  d.appendChild(ul)
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.textContent = 'EFFACER LE RELEVÉ'
+  btn.addEventListener('click', () => {
+    try {
+      coffre.stockage.removeItem(CLE_MANQUES)
+    } catch {
+      // sans gravité
+    }
+    renderDescente()
+    descenteDit('Relevé des manques effacé.')
+  })
+  const outils = document.createElement('div')
+  outils.className = 'dsc-outils'
+  outils.appendChild(btn)
+  d.appendChild(outils)
+  return d
+}
+
 /** LE BILAN AFFICHÉ : ce que cent descentes proposent — et surtout ce
  *  qu'elles ne proposent JAMAIS. */
 function dscBilan(): HTMLElement {
@@ -6635,6 +6727,14 @@ function renderDescente(): void {
       },
     ),
     dscCoche(
+      'GÉNÉRER SI LE POOL MANQUE',
+      'générées coupées : une porte sans tableau écrit de sa mécanique se génère (et le manque se note) — coupé, elle pioche une autre mécanique',
+      () => voiePlan.genereSiManque,
+      (v) => {
+        voiePlan.genereSiManque = v
+      },
+    ),
+    dscCoche(
       'TABLEAUX ÉCRITS',
       'la pioche du pool pose un tableau fait main en face — coupés alors que les générées tiennent, la descente est TOUT PROCÉDURALE',
       () => voiePlan.ecrites,
@@ -6853,6 +6953,9 @@ function renderDescente(): void {
     ),
   )
   corps.appendChild(g4)
+
+  corps.appendChild(dscSec('LES MANQUES DU POOL — où écrire des tableaux pour remplacer les générées'))
+  corps.appendChild(dscManques())
 
   corps.appendChild(dscSec('LES OUTILS — éprouver le plan sans le jouer'))
   corps.appendChild(dscOutils())
@@ -13260,6 +13363,25 @@ function mbApresRecompense(): void {
   mbMontreSallesDuModule()
 }
 
+/** LE RELEVÉ DES MANQUES du pool, gardé sur le poste : chaque porte
+ *  générée faute de tableau de sa mécanique s'y compte. L'écran LA DESCENTE
+ *  le montre ; un outil (essai, éditeur) ne note rien. */
+function litManquesDuPoste(): Manque[] {
+  try {
+    return litManques(JSON.parse(coffre.stockage.getItem(CLE_MANQUES) ?? '[]'))
+  } catch {
+    return []
+  }
+}
+function noteManqueDuPool(m: Omit<Manque, 'fois' | 'dernier'>): void {
+  if (testLevel) return
+  try {
+    coffre.stockage.setItem(CLE_MANQUES, JSON.stringify(noteManque(litManquesDuPoste(), m)))
+  } catch {
+    // stockage indisponible : le relevé attendra
+  }
+}
+
 /** Les salles du module en cours : la voie (générées + pioche du biome),
  *  ou le vieux choix du pool, ou la fin ordinaire. */
 function mbMontreSallesDuModule(): void {
@@ -13666,16 +13788,25 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   // fois le même dans un choix ; le pool à sec se génère quand même (la
   // voie ne meurt jamais). Le concepteur, 16/09 : « le même système que
   // lorsque la génération est activée, mais des cartes déjà présentes ».
+  // Et quand le pool n'a AUCUN tableau de la mécanique du nœud : sous
+  // « générer si le pool manque », la porte se génère et LE MANQUE SE NOTE
+  // (le relevé de l'écran LA DESCENTE dit au concepteur quoi écrire) ;
+  // sinon elle pioche une autre mécanique, et ne se génère que le pool à sec.
   const prisIci = new Set<string>()
-  const piocheDuPool = (mec: CodeAtelier['mecanique']): LevelDef | null => {
+  const piocheDuPool = (mec: CodeAtelier['mecanique']): { lv: LevelDef | null; manque: boolean } => {
     const exclus = new Set<string>([...voieVues, ...prisIci])
     const memeMecanique = (lv: LevelDef): boolean =>
       jouable(lv) && decodeCodeAtelier(lv.code)?.mecanique === mec
-    const lv =
-      piocheEcrite(seq, { moment, mecanique: mec, difficulte }, exclus, memeMecanique, alea, null, voiePlan.poids) ??
-      piocheEcrite(seq, { moment, mecanique: 3, difficulte }, exclus, jouable, alea, jouee, voiePlan.poids)
-    if (lv) prisIci.add(lv.code)
-    return lv
+    const meme = piocheEcrite(seq, { moment, mecanique: mec, difficulte }, exclus, memeMecanique, alea, null, voiePlan.poids)
+    if (meme) {
+      prisIci.add(meme.code)
+      return { lv: meme, manque: false }
+    }
+    noteManqueDuPool({ biome: biomeCourant, mecanique: mec, moment, difficulte, module: module?.id ?? '' })
+    if (voiePlan.genereSiManque) return { lv: null, manque: true }
+    const autre = piocheEcrite(seq, { moment, mecanique: 3, difficulte }, exclus, jouable, alea, jouee, voiePlan.poids)
+    if (autre) prisIci.add(autre.code)
+    return { lv: autre, manque: true }
   }
   // LA MINI-CARTE À VOIES : les portes du rang sont les nœuds joignables
   // depuis celui qu'on vient d'ouvrir — chacun décidé au tissage (sa
@@ -13800,19 +13931,24 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
         })
         continue
       }
-      const ecr = !voiePlan.ecrites
-        ? null
-        : !sallesGenerees()
-          ? piocheDuPool(p.mecanique)
-          : p.ecrite
-            ? pioche()
-            : null
+      let ecr: LevelDef | null = null
+      let manque = false
+      if (voiePlan.ecrites) {
+        if (!sallesGenerees()) {
+          const r = piocheDuPool(p.mecanique)
+          ecr = r.lv
+          manque = r.manque
+        } else if (p.ecrite) ecr = pioche()
+      }
       if (ecr) {
         cartes.push({
           lv: ecr,
           cahier: decodeCodeAtelier(ecr.code),
           generee: false,
-          etiquette: `VOIE ${p.voie + 1} · TABLEAU DU POOL`,
+          // un tableau d'une AUTRE mécanique que le nœud : la porte le dit
+          etiquette: manque
+            ? `VOIE ${p.voie + 1} · TABLEAU DU POOL — PAS DE ${MECANIQUE_NOMS[p.mecanique].toUpperCase()} AU POOL`
+            : `VOIE ${p.voie + 1} · TABLEAU DU POOL`,
           voie: p.voie,
         })
         continue
@@ -13823,7 +13959,10 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
           lv: g.lv,
           cahier: g.cahier,
           generee: true,
-          etiquette: `VOIE ${p.voie + 1} · ${etiquetteGeneree(g.figure, p.voie)}`,
+          // générée FAUTE DE TABLEAU : le concepteur le lit sur la porte même
+          etiquette: manque
+            ? `VOIE ${p.voie + 1} · GÉNÉRÉE — LE POOL MANQUE (${MECANIQUE_NOMS[p.mecanique]})`
+            : `VOIE ${p.voie + 1} · ${etiquetteGeneree(g.figure, p.voie)}`,
           voie: p.voie,
         })
     }

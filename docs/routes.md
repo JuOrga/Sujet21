@@ -209,7 +209,8 @@ code sans nom.
 
 | Section | Réglages |
 | --- | --- |
-| Le plan | plafond de difficulté, descente du jour, salles générées (coupées : toutes les portes de la mini-carte piochent dans le pool), tableaux écrits |
+| Le plan | plafond de difficulté, descente du jour, salles générées (coupées : la même mini-carte, chaque porte pioche un tableau écrit de la mécanique de son nœud), **générer si le pool manque** (sans tableau de cette mécanique : générée et manque noté ; coupé : une autre mécanique), tableaux écrits |
+| **Les manques du pool** | l'inventaire biome × mécanique × moment (une case à 0 est un tableau à écrire) et le relevé des portes générées faute de tableau sur ce poste |
 | La rampe | recul du sommet, respiration, finale |
 | La posture des rangs | rangs sans danger, cadence labyrinthe, cadence contraste, figures au début et ensuite |
 | **Les voies et les rencontres** | **part de rencontres** (0 à 60 %), **rang minimal**, **bifurcation** (0 à 100 %), **économats**, **alcôves** et **bonbonnes par module** (0 à 2) |

@@ -268,10 +268,14 @@ HUB ─vapeur T3 TRANSFO GAZ ───┘ └ C3 CHAUFFERIE (+1, cache)┘ └ P
   nœud du pool sans tableau jouable se génère avec sa mécanique. Salles
   générées coupées au plan, la mini-carte est LA MÊME (mêmes nœuds, mêmes
   mécaniques, mêmes figures) : seule la source change, chaque porte pioche
-  un tableau déjà écrit de la mécanique de son nœud — d'une autre à
-  défaut, jamais deux fois le même dans un choix, généré si le pool est à
-  sec. Sans graine (un outil, une sauvegarde d'avant), le choix
-  historique tient : trois générées et le pool en quatrième.
+  un tableau déjà écrit de la mécanique de son nœud, jamais deux fois le
+  même dans un choix. Sans tableau de cette mécanique : sous « générer si
+  le pool manque » (l'ordinaire), la porte se génère et LE MANQUE SE NOTE
+  sur le poste (`src/game/manques.ts`, l'écran LA DESCENTE le montre avec
+  l'inventaire du pool par biome × mécanique × moment) ; coupé, elle
+  pioche une autre mécanique. Sans graine (un outil, une sauvegarde
+  d'avant), le choix historique tient : trois générées et le pool en
+  quatrième.
 - **Les salles ÉVÉNEMENT** (`src/game/evenements.ts`) : un nœud sur trois
   environ, passé le premier rang du module, n'est pas une salle mais une
   RENCONTRE — aucun tableau à jouer, un écran dans la cérémonie. La porte
