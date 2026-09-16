@@ -1183,8 +1183,6 @@ function reglagesTissage(m: ModuleCarte): ReglagesTissage {
     repos: voiePlan.reposParModule,
     dons: voiePlan.donsParModule,
     coffre: !!m.orbe,
-    // générées coupées : toutes les portes piochent dans le pool
-    toutEcrit: !voiePlan.generees,
   }
 }
 function sauvePlanVoie(): void {
@@ -6630,7 +6628,7 @@ function renderDescente(): void {
     ),
     dscCoche(
       'SALLES GÉNÉRÉES',
-      'des salles fabriquées derrière les portes de la mini-carte — coupées, toutes les portes piochent dans le pool',
+      'des salles fabriquées derrière les portes de la mini-carte — coupées, la même mini-carte, mais chaque porte pioche un tableau déjà écrit',
       () => voiePlan.generees,
       (v) => {
         voiePlan.generees = v
@@ -13267,9 +13265,9 @@ function mbApresRecompense(): void {
 function mbMontreSallesDuModule(): void {
   const seq = playedLevels()
   // LA MINI-CARTE VIT SANS LES GÉNÉRÉES : générées coupées, ses portes
-  // piochent toutes dans le pool (le tissage les écrit toutes). Elle ne se
-  // tait que sans tissage, ou quand plus rien ne peut se proposer (ni
-  // générées ni écrites) — là, le vieux choix du pool, ou la fin
+  // piochent toutes dans le pool (voir piocheDuPool). Elle ne se tait que
+  // sans tissage, ou quand plus rien ne peut se proposer (ni générées ni
+  // écrites) — là, le vieux choix du pool, ou la fin
   if (sallesGenerees() || (voiePlan.ecrites && carteRun.tissage)) {
     const duo = propositionsVoie(seq)
     if (duo) {
@@ -13661,6 +13659,24 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
     (lv.exige ?? []).every((e) => (e === 'glace' ? solidTenue : vapoTenue))
   const pioche = (): LevelDef | null =>
     piocheEcrite(seq, { moment, mecanique: 3, difficulte }, voieVues, jouable, alea, jouee, voiePlan.poids)
+  // SANS SALLES GÉNÉRÉES (le réglage du plan coupé) : la mini-carte est la
+  // même — mêmes nœuds, mêmes mécaniques, mêmes figures —, seule la SOURCE
+  // change : derrière chaque porte, un tableau DÉJÀ ÉCRIT de la mécanique
+  // du nœud, d'une autre mécanique si le pool n'en a plus, jamais deux
+  // fois le même dans un choix ; le pool à sec se génère quand même (la
+  // voie ne meurt jamais). Le concepteur, 16/09 : « le même système que
+  // lorsque la génération est activée, mais des cartes déjà présentes ».
+  const prisIci = new Set<string>()
+  const piocheDuPool = (mec: CodeAtelier['mecanique']): LevelDef | null => {
+    const exclus = new Set<string>([...voieVues, ...prisIci])
+    const memeMecanique = (lv: LevelDef): boolean =>
+      jouable(lv) && decodeCodeAtelier(lv.code)?.mecanique === mec
+    const lv =
+      piocheEcrite(seq, { moment, mecanique: mec, difficulte }, exclus, memeMecanique, alea, null, voiePlan.poids) ??
+      piocheEcrite(seq, { moment, mecanique: 3, difficulte }, exclus, jouable, alea, jouee, voiePlan.poids)
+    if (lv) prisIci.add(lv.code)
+    return lv
+  }
   // LA MINI-CARTE À VOIES : les portes du rang sont les nœuds joignables
   // depuis celui qu'on vient d'ouvrir — chacun décidé au tissage (sa
   // mécanique, figure ou non, tableau du pool ou générée). Sans voies (un
@@ -13784,7 +13800,13 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
         })
         continue
       }
-      const ecr = p.ecrite && voiePlan.ecrites ? pioche() : null
+      const ecr = !voiePlan.ecrites
+        ? null
+        : !sallesGenerees()
+          ? piocheDuPool(p.mecanique)
+          : p.ecrite
+            ? pioche()
+            : null
       if (ecr) {
         cartes.push({
           lv: ecr,

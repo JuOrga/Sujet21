@@ -266,10 +266,12 @@ HUB ─vapeur T3 TRANSFO GAZ ───┘ └ C3 CHAUFFERIE (+1, cache)┘ └ P
   la grille se dessine au-dessus des portes (`dessinMiniCarteSVG`), viser
   une porte allume son nœud. La salle ne se fabrique qu'à l'ouverture ; un
   nœud du pool sans tableau jouable se génère avec sa mécanique. Salles
-  générées coupées au plan, la mini-carte reste : toutes ses portes sont
-  des tableaux du pool (`toutEcrit`). Sans graine (un outil, une
-  sauvegarde d'avant), le choix historique tient : trois générées et le
-  pool en quatrième.
+  générées coupées au plan, la mini-carte est LA MÊME (mêmes nœuds, mêmes
+  mécaniques, mêmes figures) : seule la source change, chaque porte pioche
+  un tableau déjà écrit de la mécanique de son nœud — d'une autre à
+  défaut, jamais deux fois le même dans un choix, généré si le pool est à
+  sec. Sans graine (un outil, une sauvegarde d'avant), le choix
+  historique tient : trois générées et le pool en quatrième.
 - **Les salles ÉVÉNEMENT** (`src/game/evenements.ts`) : un nœud sur trois
   environ, passé le premier rang du module, n'est pas une salle mais une
   RENCONTRE — aucun tableau à jouer, un écran dans la cérémonie. La porte
