@@ -145,7 +145,7 @@
       "biome": "cryo",
       "orbe": "sublimation",
       "cran": 1,
-      "desc": "Confinement supérieur : plus dur d’un cran, la mémoire y vaut double. Le froid mord depuis la coque, et une cache y dort."
+      "desc": "Confinement supérieur : plus dur d’un cran, la mémoire y vaut double. Le froid mord depuis la coque, et une cache y dort — la voie froide paie tôt."
     },
     {
       "id": "C2",
@@ -175,9 +175,7 @@
       "forme": "octogone",
       "niveaux": 6,
       "biome": "chaud",
-      "orbe": "condensation",
-      "cran": 1,
-      "desc": "Confinement supérieur : plus dur d’un cran, la mémoire y vaut double. Les chaudières tournent encore, et une cache y dort."
+      "desc": "Les chaudières tournent encore. La voie chaude ne se paie pas ici — elle se paie au réacteur, et cher."
     },
     {
       "id": "P1",
@@ -205,9 +203,9 @@
       "h": 112,
       "temp": 12,
       "forme": "octogone",
-      "niveaux": 6,
+      "niveaux": 3,
       "biome": "tempere",
-      "desc": "Ce que le laboratoire n’a jamais déchargé. Vaste, tiède, encombré."
+      "desc": "LA VOIE COURTE : trois salles au lieu de six. Moins de sas, donc moins de récompenses, et une rampe plus raide — on arrive plus tôt, plus pauvre."
     },
     {
       "id": "P3",
@@ -222,7 +220,9 @@
       "forme": "octogone",
       "niveaux": 6,
       "biome": "chaud",
-      "desc": "La chaleur de la station vient d’ici, et elle ne s’arrête pas."
+      "orbe": "condensation",
+      "cran": 2,
+      "desc": "Confinement supérieur ×2 : deux crans de plus, la mémoire y vaut triple. La chaleur de la station vient d’ici, et une cache dort derrière — la voie chaude paie tard, et gros."
     },
     {
       "id": "ANTI",
@@ -237,8 +237,7 @@
       "forme": "octogone",
       "niveaux": 6,
       "biome": "antichambre",
-      "cran": 1,
-      "desc": "Confinement supérieur. L’approche de l’observatoire : les portes y sont toutes logiques, le froid de l’espace passe le plancher, et la station garde."
+      "desc": "L’approche de l’observatoire : les portes y sont toutes logiques, le froid de l’espace passe le plancher. Une respiration avant le terminal."
     },
     {
       "id": "OBS",
@@ -253,7 +252,8 @@
       "forme": "octogone-dome",
       "niveaux": 6,
       "biome": "observatoire",
-      "desc": "Module terminal. Un télescope spatial y est amarré, et le sas du dehors est derrière."
+      "cran": 1,
+      "desc": "Module terminal, sous confinement supérieur : plus dur d’un cran, la mémoire y vaut double — pour tout le monde. Un télescope spatial y est amarré, et le sas du dehors est derrière."
     }
   ],
   "liens": [

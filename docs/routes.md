@@ -59,7 +59,7 @@ Les deux s'emboîtent : la carte décide du **biome** (la température, le
 cran, la nature dominante, la cache), la mini-carte décide du **rythme**
 (salle, rencontre, halte) et ferme les voies qu'on n'a pas prises. La
 longueur d'une run n'est pas un réglage : elle découle du trajet — trente
-salles sur la carte livrée, cinq biomes de six.
+salles sur la carte livrée, vingt-sept par la voie courte des soutes.
 
 ---
 
@@ -75,8 +75,10 @@ Une coursive peut exiger un **orbe d'essence de conscience** (glace :
 solidification, vapeur : vaporisation). Un cadenas lit un ACQUIS durable,
 pas l'état du corps à l'instant : la carte se lit comme une progression.
 Le contrat du §9.3 du document fonctionnel tient : un déblocage ouvre un
-chemin **latéral**, jamais un raccourci — toutes les routes de la carte
-livrée font trente salles, à une près.
+chemin **latéral**, jamais un raccourci — les routes de la carte livrée
+font trente salles, sauf celles qui passent par les soutes (vingt-sept),
+et cette voie courte n'est pas un raccourci : elle se paie en récompenses
+et en rampe (§2.7). La vérification tolère trois salles d'écart, pas plus.
 
 *Ce que le joueur lit* : le cadenas sur le plan, l'orbe qui manque dans la
 fiche, la secousse quand il insiste.
@@ -155,6 +157,29 @@ s'évitent en changeant de voie — et c'est ce qui en fait un choix : viser
 l'alcôve, c'est renoncer à la salle d'à côté.
 
 ---
+
+### 2.7 Les trois tempos — la symétrie cassée
+
+La première carte à cinq biomes posait la même question à chaque acte :
+le bord, sous cran et avec sa cache, ou le milieu, sûr. Et toutes les
+routes se rejoignaient sur une antichambre sous cran. Depuis le 16/09,
+chaque voie a **son tempo** :
+
+| Voie | Acte 2 | Acte 3 | Ce qu'elle promet |
+| --- | --- | --- | --- |
+| **Froide** (cryo) | CRYOSTAT, cran 1, cache (sublimation) | PUITS FROID, calme | **payer tôt** : la mémoire double et l'orbe dès le milieu, puis on souffle |
+| **Tempérée** | CONDUITS, énigme, rien | SOUTES, **trois salles** | **payer en salles** : vingt-sept au lieu de trente — trois sas de moins, donc moins de mémoire et de condensat, et une rampe plus raide |
+| **Chaude** | CHAUFFERIE, rien | RÉACTEUR, **cran 2**, cache (condensation) | **payer tard, et gros** : la mémoire triple sur six salles à 80 °C, l'orbe derrière |
+
+L'antichambre respire (aucun cran), et **le terminal est sous
+confinement pour tout le monde** : la fin est un sommet, pas une voie.
+Jamais deux crans d'affilée. Les coursives permettent de changer de voie à
+chaque acte, donc de composer : froid tôt puis soutes, tempéré puis
+réacteur.
+
+*Ce que le joueur lit* : le « +1 » et le « +2 » au coin des fûts, les
+« 3 salles » des soutes dans la fiche, la longueur qui passe de 27 à 30
+quand il quitte la voie courte.
 
 ## 3. Les natures de salle
 

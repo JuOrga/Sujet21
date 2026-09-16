@@ -43,7 +43,9 @@ Des rails à champ qui convoient la vapeur et l'ionisent en plasma.
 de la station à routes ramifiées (un module est un biome de SIX salles ;
 au bout d'elles la carte s'ouvre et la coursive suivante se choisit, sous
 cadenas tant que l'orbe manque ; la longueur d'une run découle du trajet —
-trente salles, en cinq biomes : trois actes, l'approche et le terminal ;
+trente salles, vingt-sept par la voie courte, en cinq biomes : trois
+actes, l'approche et le terminal ; la voie froide paie tôt, la chaude
+tard, celle du milieu en salles ;
 la grande carte ne montre que des biomes, le confinement supérieur qui
 paie double, la nature et la température du module qui font la salle, le
 survol qui dit ce qu'on trouvera dans un module et ce que sa porte ferme ;

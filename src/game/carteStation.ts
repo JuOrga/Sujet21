@@ -786,6 +786,14 @@ export function verifieCarte(c: CarteStation): VerdictCarte[] {
  *    ne s'enchaîne pas ;
  *  Des attentions, pas des erreurs : le concepteur peut vouloir une carte
  *  qui les enfreint — mais il le saura. */
+/** L'ÉCART DE LONGUEUR toléré entre deux routes, en salles. Le §9.3 veut
+ *  que sortir du protocole DÉPLACE le parcours sans le raccourcir — mais
+ *  une VOIE COURTE qui se paie ailleurs (moins de sas, donc moins de
+ *  récompenses, et une rampe plus raide) est un choix, pas un raccourci
+ *  (le concepteur, 16/09 : casser la symétrie de la carte). Au-delà de
+ *  trois salles, c'est un raccourci. */
+export const ECART_ROUTES_MAX = 3
+
 export function verifieRoutes(c: CarteStation): VerdictCarte[] {
   const v: VerdictCarte[] = []
   const routes = routesVersObjectif(c)
@@ -795,8 +803,8 @@ export function verifieRoutes(c: CarteStation): VerdictCarte[] {
   const longueurs = routes.map((r) => longueurRoute(c, r))
   const min = Math.min(...longueurs)
   const max = Math.max(...longueurs)
-  if (max - min > 1)
-    v.push({ niveau: 'attention', message: `les routes ne sont pas à distance équivalente : de ${min} à ${max} salles — sortir du protocole doit déplacer le parcours, pas le raccourcir (§9.3)` })
+  if (max - min > ECART_ROUTES_MAX)
+    v.push({ niveau: 'attention', message: `les routes ne sont pas à distance équivalente : de ${min} à ${max} salles — sortir du protocole doit déplacer le parcours, pas le raccourcir (§9.3) ; une voie courte se tolère jusqu’à ${ECART_ROUTES_MAX} salles d’écart` })
   const enchaines = new Set<string>()
   for (const r of routes)
     for (let i = 1; i < r.length; i++) {

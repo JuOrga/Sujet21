@@ -40,11 +40,12 @@ delete avecInc.modules[avecInc.modules.length - 1].orbe
 avecInc.liens.push({ de: 'T2', vers: 'INC', type: 'alt' }, { de: 'INC', vers: 'C2', type: 'alt' })
 
 describe('plusCourtVers — le plus court chemin en niveaux', () => {
-  it('du HUB à l’observatoire : 30 salles — cinq biomes de six', () => {
-    // HUB(0) T(6) N1(0) halte(0) C(6) halte(0) P(6) halte(0) ANTI(6) OBS(6)
-    expect(plusCourtVers(c, 'HUB', 'OBS')).toBe(30)
-    expect(plusCourtVers(c, 'C2', 'OBS')).toBe(18)
+  it('du HUB à l’observatoire : 27 salles par la voie courte, 30 par les bords', () => {
+    // HUB(0) T(6) C(6) SOUTES(3) ANTI(6) OBS(6) = 27 ; par P1 ou P3, 30
+    expect(plusCourtVers(c, 'HUB', 'OBS')).toBe(27)
+    expect(plusCourtVers(c, 'P1', 'OBS')).toBe(12)
     expect(plusCourtVers(c, 'P2', 'OBS')).toBe(12)
+    expect(plusCourtVers(c, 'C2', 'OBS')).toBe(15) // par la voie courte des soutes
     expect(plusCourtVers(c, 'ANTI', 'OBS')).toBe(6)
     expect(plusCourtVers(c, 'OBS', 'OBS')).toBe(0)
   })
@@ -136,12 +137,14 @@ describe('la descente sur la carte', () => {
   })
 
   it('la longueur de la run découle du trajet et s’affine en route', () => {
+    // du hub, la plus courte passe par les soutes (trois salles) : 27 ;
+    // elle s'allonge à 30 dès qu'on s'engage sur une voie du bord
     let e = departCarte(c)
-    expect(longueurRun(c, e, 0)).toBe(30)
+    expect(longueurRun(c, e, 0)).toBe(27)
     e = entreModule(c, e, 'T2', [])!
-    expect(longueurRun(c, e, 0)).toBe(30)
+    expect(longueurRun(c, e, 0)).toBe(27)
     e = franchitSalle(e)
-    expect(longueurRun(c, e, 1)).toBe(30) // 1 franchie + 5 restantes + 24
+    expect(longueurRun(c, e, 1)).toBe(27) // 1 franchie + 5 restantes + 21
     // un détour par T1 (3) puis S1 (3) puis la cache S1b (1) : la salle de
     // la cache s'ajoute, puis l'observatoire (3) — 10
     const d = { module: 'P1', niveau: 0, visites: ['HUB', 'T1', 'C1'], revelations: {}, tissage: '', trace: [], graineRun: '' }
@@ -213,7 +216,8 @@ describe('la nature du module commande la salle', () => {
     expect(primeMemoire(m('combat', 1))).toBe(2)
     expect(primeMemoire(undefined)).toBe(1)
     // la carte livrée : les secteurs du bord paient double
-    expect(c.modules.filter((x) => primeMemoire(x) === 2).map((x) => x.id)).toEqual(['C1', 'C3', 'ANTI'])
+    expect(c.modules.filter((x) => primeMemoire(x) === 2).map((x) => x.id)).toEqual(['C1', 'OBS'])
+    expect(primeMemoire(c.modules.find((x) => x.id === 'P3'))).toBe(3) // le réacteur, cran 2
     // LA PRIME SE RÈGLE (le plan) : 50 % par cran → ×1,5 au cran 1 ; 0 : le confinement ne paie pas
     expect(primeMemoire(m('combat', 1), 0.5)).toBe(1.5)
     expect(primeMemoire(m('combat', 2), 0.5)).toBe(2)
@@ -264,15 +268,15 @@ describe('projectionDepuis — le survol qui projette', () => {
     const p = projectionDepuis(c, 'C1')!
     expect(p.chemin[0]).toBe('C1')
     expect(p.chemin[p.chemin.length - 1]).toBe('OBS')
-    expect(p.salles).toBe(24) // C1 (6) + P (6) + ANTI (6) + OBS (6)
-    expect(p.crans).toBe(2) // le cryostat, puis l'antichambre — la suite évite les soutes
+    expect(p.salles).toBe(21) // C1 (6) + SOUTES (3, la voie courte) + ANTI (6) + OBS (6)
+    expect(p.crans).toBe(2) // le cryostat, puis le terminal
     expect(p.prochains).toEqual(['PUITS FROID', 'SOUTES'])
     expect(ditProjection(c, p)).toBe(
-      'ouvre ensuite PUITS FROID ou SOUTES · au plus court (allumé) : 24 salles jusqu’à OBSERVATOIRE · 2 confinements sur cette route',
+      'ouvre ensuite PUITS FROID ou SOUTES · au plus court (allumé) : 21 salles jusqu’à OBSERVATOIRE · 2 confinements sur cette route',
     )
-    // depuis la voie libre, la route la moins confinée : l'antichambre seule
+    // depuis la voie libre, la route la moins confinée : le terminal seul
     const n = projectionDepuis(c, 'T2')!
-    expect(n.salles).toBe(30)
+    expect(n.salles).toBe(27)
     expect(n.crans).toBe(1)
     // ce qui distingue deux portes voisines dont les routes se rejoignent :
     // ce qu'elles ouvrent tout de suite après
@@ -306,11 +310,11 @@ describe('le module « ? » — la nature se révèle à l’entrée', () => {
     const halte = reveleInconnu(avecInc, dansINC, 'INC', () => 0) // economat
     expect(moduleCourant(avecInc, halte)?.type).toBe('economat')
     expect(moduleFini(avecInc, halte)).toBe(true)
-    expect(longueurRun(avecInc, halte, 6)).toBe(30) // la salle du « ? » ne compte plus
+    expect(longueurRun(avecInc, halte, 6)).toBe(27) // la salle du « ? » ne compte plus (27 : par les soutes)
     const combat = reveleInconnu(avecInc, dansINC, 'INC', () => 0.99)
     expect(moduleCourant(avecInc, combat)?.cran).toBe(1)
     expect(moduleFini(avecInc, combat)).toBe(false)
-    expect(longueurRun(avecInc, combat, 6)).toBe(31)
+    expect(longueurRun(avecInc, combat, 6)).toBe(28)
   })
 
   it('la révélation traverse la sauvegarde, et se nettoie', () => {

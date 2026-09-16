@@ -156,21 +156,27 @@ La grande carte ne montre **que des biomes** — décision du concepteur du
 16/09 : les haltes (économat, alcôve, bonbonne, cache) et le « ? » vivent
 dans la mini-carte de chaque module (`voiesModule.ts`), jamais sur la
 station. Le plan tient en **trois actes de six salles, une approche et un
-terminal** — cinq biomes, trente salles sur chacune des dix-sept routes :
+terminal** — cinq biomes, dix-sept routes de trente salles, vingt-sept
+par la voie courte des soutes :
 
 ```
-HUB ─glace─ T1 TRANSFO GLACE ─┐ ┌ C1 CRYOSTAT (+1, cache) ┐ ┌ P1 PUITS FROID ┐
-HUB ─main── T2 AUCUNE TRANSFO ─┼─┼ C2 CONDUITS              ┼─┼ P2 SOUTES      ┼─ ANTICHAMBRE (+1) ─ OBSERVATOIRE
-HUB ─vapeur T3 TRANSFO GAZ ───┘ └ C3 CHAUFFERIE (+1, cache)┘ └ P3 RÉACTEUR    ┘
+HUB ─glace─ T1 TRANSFO GLACE ─┐ ┌ C1 CRYOSTAT (+1, cache) ┐ ┌ P1 PUITS FROID          ┐
+HUB ─main── T2 AUCUNE TRANSFO ─┼─┼ C2 CONDUITS              ┼─┼ P2 SOUTES (3 salles)    ┼─ ANTICHAMBRE ─ OBSERVATOIRE (+1)
+HUB ─vapeur T3 TRANSFO GAZ ───┘ └ C3 CHAUFFERIE            ┘ └ P3 RÉACTEUR (+2, cache) ┘
 ```
 
 - **Chaque module ouvre sur deux ou trois du suivant**, jamais la même
   paire que son voisin : la route diverge dès la première porte. Le
   survol d'un module éteint ce qu'il ferme, et dit ce qu'on y trouvera.
-- **Trois modules sous confinement supérieur** (cryostat, chaufferie,
-  antichambre), jamais deux d'affilée : la vérification y veille.
+- **La symétrie est cassée** (le concepteur, 16/09) : la voie froide paie
+  tôt (le cryostat, cran 1 et sa cache), la voie chaude paie tard et gros
+  (le réacteur, cran 2 et sa cache), la voie du milieu paie en salles (les
+  soutes, trois au lieu de six). L'antichambre respire, le terminal est
+  sous confinement pour tout le monde. Jamais deux crans d'affilée : la
+  vérification y veille, et tolère trois salles d'écart entre les routes
+  (`ECART_ROUTES_MAX`).
 - **Les caches** viennent de l'orbe du module (`orbe`) : la mini-carte du
-  cryostat et de la chaufferie pose un nœud cache, une fois par poste.
+  cryostat et du réacteur pose un nœud cache, une fois par poste.
 - **La scène fait 2100 × 804** ; l'arc de coque ne bouge pas (le HUB reste
   à x = 263), l'observatoire et le télescope glissent à droite.
 
