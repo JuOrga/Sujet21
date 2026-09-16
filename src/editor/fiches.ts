@@ -23,7 +23,10 @@ import {
   MAT_SURCHAUFFEUR,
   MAT_VIDE,
   MAT_BAIE,
+  PORTE_ALLURE_DEFAUT,
+  PORTE_SENS_DEFAUT,
 } from '../game/level'
+import { PORTE_PIVOT_NOMS, porteDuree } from '../game/porte'
 
 export interface FicheLigne {
   cle: string // la puce (EAU, GLACE, VAPEUR, LASER, ·)
@@ -253,6 +256,7 @@ export const FICHES_GENRES: Record<string, Fiche> = {
     lignes: [
       { cle: '·', txt: 'Fermée tant que sa pastille est éteinte.' },
       { cle: '·', txt: 'Ouverte, elle devient traversante — en pointillé.' },
+      { cle: '·', txt: 'D’un coup, la paroi apparaît et coupe ce qui est au milieu. En RIDEAU ou en ÉVENTAIL, un front la déploie et pousse le corps devant lui — propulsé, jamais déchiré.' },
     ],
   },
   'genre:chasse': {
@@ -476,17 +480,28 @@ export function lignesVives(sel: SelFiche, level: LevelDef): FicheLigne[] {
     }
     case 'porte': {
       const p = (level.portes ?? [])[sel.index ?? -1]
-      if (!p || p.canal < 0) return []
-      return [
-        {
+      if (!p) return []
+      const l: FicheLigne[] = []
+      if (p.canal >= 0)
+        l.push({
           cle: '·',
           txt: `Canal n° ${p.canal} · ${
             p.regle === 'et'
               ? 'Règle ET : toutes les pastilles du canal doivent être actives ensemble.'
               : 'Règle OU : une seule pastille active suffit.'
           }`,
-        },
-      ]
+        })
+      if (p.materialisation === 'rideau')
+        l.push({
+          cle: '·',
+          txt: `Rideau : le front avance à ${p.sens ?? PORTE_SENS_DEFAUT}° (${p.allure ?? PORTE_ALLURE_DEFAUT} u/s) — fermeture en ${porteDuree(p).toFixed(2)} s.`,
+        })
+      else if (p.materialisation === 'eventail')
+        l.push({
+          cle: '·',
+          txt: `Éventail sur ${PORTE_PIVOT_NOMS[p.pivot ?? 0].toLowerCase()}, sens ${p.horaire ? 'horaire' : 'trigonométrique'} (${p.allure ?? PORTE_ALLURE_DEFAUT} u/s) — fermeture en ${porteDuree(p).toFixed(2)} s.`,
+        })
+      return l
     }
     case 'zone': {
       const z = (level.zones ?? [])[sel.index ?? -1]

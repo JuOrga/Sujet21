@@ -15,6 +15,7 @@ import { SpatialGrid } from './grid'
 import { makeKernels, computeRestDensity, type Kernels } from './kernels'
 import { labelComponents } from './components'
 import { boxContact, Sponge, type ClosestPoint } from './obstacles'
+import type { FormeBox } from '../game/formes'
 import {
   MAT_CHAUD,
   MAT_FROID,
@@ -499,6 +500,7 @@ export class FluidSim {
   private heatBoxes: ObstacleBox[] = []
   private grilleBoxes: ObstacleBox[] = []
   private chemBoxes: ObstacleBox[] = [] // parois neutres + hydrophile/phobe (bandes et amortis)
+  private baseChemBoxes: ObstacleBox[] = [] // les mêmes, DÉCOR SEUL (sans les portes)
   private surchIdx: number[] = [] // indices des surchauffeurs dans boxes
   private heatCarry = 0
   private gasIdleCarry = 0
@@ -549,8 +551,13 @@ export class FluidSim {
   // par pas) : les passes d'aura et de chimie balayaient TOUTES les boîtes
   // pour CHAQUE particule à CHAQUE pas — sur un tableau chargé, l'essentiel
   // du parcours ne concernait pas le matériau cherché.
+  //
+  // ELLES SE CALCULENT SUR LE DÉCOR SEUL (baseBoxes), jamais sur les portes.
+  // Une porte est toujours une PAROI : elle n'entre que dans `chemBoxes`,
+  // et jamais dans le froid, le chaud, la grille ou le surchauffeur. C'est
+  // ce qui permet à setDoors de ne rien recalculer — voir sa note.
   private refreshBoxCaches(): void {
-    const boxes = this.boxes
+    const boxes = this.baseBoxes
     this.hasCold = boxes.some((b) => b.material === MAT_FROID)
     this.hasHeat = boxes.some((b) => b.material === MAT_CHAUD)
     this.hasGrille = boxes.some((b) => b.material === MAT_GRILLE)
@@ -558,12 +565,15 @@ export class FluidSim {
     this.coldBoxes = boxes.filter((b) => b.material === MAT_FROID)
     this.heatBoxes = boxes.filter((b) => b.material === MAT_CHAUD)
     this.grilleBoxes = boxes.filter((b) => b.material === MAT_GRILLE)
-    this.chemBoxes = boxes.filter(
+    this.baseChemBoxes = boxes.filter(
       (b) =>
         b.material === MAT_WALL ||
         b.material === MAT_HYDROPHILE ||
         b.material === MAT_HYDROPHOBE,
     )
+    this.chemBoxes = this.baseChemBoxes
+    // Les indices du surchauffeur pointent dans `boxes` : les portes
+    // s'ajoutant TOUJOURS en fin de liste, ceux du décor restent justes.
     this.surchIdx = []
     for (let bi = 0; bi < boxes.length; bi++) {
       if (boxes[bi].material === MAT_SURCHAUFFEUR) this.surchIdx.push(bi)
@@ -581,14 +591,26 @@ export class FluidSim {
   // bulkhead : un champ qu'on voit au travers n'a pas à coucher d'ombre.
   // Essayé une fois (marquer la porte « pleine hauteur » pour qu'elle ombre
   // comme un mur) : le drapeau n'atteignait rien, et il n'aurait pas dû.
-  setDoors(
-    portes: { minX: number; minY: number; maxX: number; maxY: number }[],
-  ): void {
-    this.boxes = [
-      ...this.baseBoxes,
-      ...portes.map((p) => ({ ...p, material: MAT_WALL })),
-    ]
-    this.refreshBoxCaches()
+  //
+  // Une porte EN TRAIN DE SE FERMER arrive tronquée par la coupe de son
+  // front (porte.ts) : la paroi n'existe que derrière lui, et le contact
+  // pousse ce qu'il rencontre devant lui — d'où la propulsion.
+  // APPELÉ À CHAQUE SOUS-PAS tant qu'un front avance (main.ts) : il ne doit
+  // donc rien recalculer du décor. Il ne l'a jamais eu à faire — une porte
+  // est une PAROI, elle n'appartient qu'à `chemBoxes`, et les caches du
+  // décor sont posés une fois pour toutes par refreshBoxCaches. Avant ce
+  // partage, chaque appel refaisait quatre `some`, quatre `filter` et un
+  // parcours complet : 16 µs à 50 parois, 90 µs à 400 (mesuré le
+  // 15/09/2026), à multiplier par le nombre de sous-pas d'une image.
+  setDoors(portes: FormeBox[]): void {
+    if (portes.length === 0) {
+      this.boxes = this.baseBoxes
+      this.chemBoxes = this.baseChemBoxes
+      return
+    }
+    const murs = portes.map((p) => ({ ...p, material: MAT_WALL }))
+    this.boxes = [...this.baseBoxes, ...murs]
+    this.chemBoxes = [...this.baseChemBoxes, ...murs]
   }
 
   // Normale de la surface de glace en (x, y), pour le miroir laser. Deux
