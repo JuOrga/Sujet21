@@ -145,7 +145,17 @@ export function portesDuRang(mc: MiniCarte, rang: number, voieDOuLOnVient: numbe
 
 /** LE DESSIN de la mini-carte, en SVG : les rangs de gauche à droite, les
  *  voies de haut en bas, le chemin déjà joué (`trace`, une voie par salle
- *  franchie), et les portes du rang courant allumées. Pur : une chaîne. */
+ *  franchie), et les portes du rang courant allumées. Pur : une chaîne.
+ *
+ *  LES NŒUDS SONT DES TUILES, PAS DES POINTS. La première version posait
+ *  des cercles de onze pixels avec un caractère dedans : illisible sur un
+ *  Deck, et rien d'un jeu (revue du 16/09). Chaque nœud est un octogone —
+ *  la silhouette des modules de la station, pour que la mini-carte se lise
+ *  comme un zoom du plan — avec une ICÔNE VECTORIELLE de sa nature : la
+ *  goutte (eau), le flocon (glace), les volutes (vapeur), les trois anneaux
+ *  (toutes), la carte (pool), l'étoile (figure), le point d'interrogation
+ *  (rencontre). Les couleurs viennent des classes CSS (mv-m0 … mv-m3,
+ *  mv-pool, mv-evenement) : la charte les tient, pas le dessin. */
 export function dessinMiniCarteSVG(
   mc: MiniCarte,
   o: { rang: number; trace: readonly number[]; portes: readonly number[] },
@@ -153,23 +163,36 @@ export function dessinMiniCarteSVG(
   const n = mc.rangs.length
   if (n === 0) return ''
   // SIX RANGS doivent tenir sous les portes, sur un téléphone comme sur un
-  // écran large : le pas est serré et le SVG se met à l'échelle (viewBox)
-  const PAS_X = 72
-  const PAS_Y = 32
-  const X0 = 36
-  const Y0 = 20
+  // écran large : le SVG se met à l'échelle par son viewBox
+  const PAS_X = 92
+  const PAS_Y = 50
+  const X0 = 48
+  const Y0 = 32
+  const S = 18 // la demi-taille d'une tuile
   const w = X0 * 2 + PAS_X * (n - 1)
-  const h = Y0 * 2 + PAS_Y * (mc.voies - 1) + 14
+  const h = Y0 * 2 + PAS_Y * (mc.voies - 1) + 18
   const x = (r: number): number => X0 + r * PAS_X
   const y = (v: number): number => Y0 + v * PAS_Y
-  const glyphe = (nd: NoeudVoie): string =>
-    nd.nature === 'evenement' ? '?' : nd.ecrite ? '▤' : nd.figure ? '✧' : ['○', '❄', '♨', '◎'][nd.mecanique] ?? '○'
+  // l'octogone de la station, centré : les coins coupés à 22 % / 28 %
+  const a = 0.56 * S
+  const b = 0.44 * S
+  const tuile = `${-a},${-S} ${a},${-S} ${S},${-b} ${S},${b} ${a},${S} ${-a},${S} ${-S},${b} ${-S},${-b}`
+  const icone = (nd: NoeudVoie): string =>
+    nd.nature === 'evenement'
+      ? 'rencontre'
+      : nd.ecrite
+        ? 'pool'
+        : nd.figure
+          ? 'figure'
+          : (['eau', 'glace', 'vapeur', 'toutes'] as const)[nd.mecanique] ?? 'eau'
   const nom = (nd: NoeudVoie): string =>
     nd.nature === 'evenement'
       ? 'une rencontre — on ne sait pas laquelle'
       : nd.ecrite
         ? 'tableau du pool'
         : `${nd.figure ? 'figure' : 'salle'} · ${['eau', 'glace', 'vapeur', 'toutes'][nd.mecanique] ?? 'eau'}`
+  const teinte = (nd: NoeudVoie): string =>
+    nd.nature === 'evenement' ? 'mv-evenement' : nd.ecrite ? 'mv-pool' : `mv-m${nd.mecanique}`
   let liens = ''
   let noeuds = ''
   for (const rang of mc.rangs)
@@ -178,23 +201,51 @@ export function dessinMiniCarteSVG(
       for (const s of nd.suivants) {
         const joue = joueIci && o.trace[nd.rang + 1] === s
         const ouvre = joueIci && nd.rang + 1 === o.rang && o.portes.includes(s)
-        liens += `<line class="mv-lien${joue ? ' mv-joue' : ''}${ouvre ? ' mv-ouvre' : ''}" x1="${x(nd.rang)}" y1="${y(nd.voie)}" x2="${x(nd.rang + 1)}" y2="${y(s)}"/>`
+        liens += `<line class="mv-lien${joue ? ' mv-joue' : ''}${ouvre ? ' mv-ouvre' : ''}" x1="${x(nd.rang) + S}" y1="${y(nd.voie)}" x2="${x(nd.rang + 1) - S}" y2="${y(s)}"/>`
       }
       const porte = nd.rang === o.rang && o.portes.includes(nd.voie)
       const cl =
-        'mv-noeud' + (nd.nature === 'evenement' ? ' mv-evenement' : '') +
+        'mv-noeud ' + teinte(nd) +
         (joueIci ? ' mv-joue' : '') + (porte ? ' mv-porte' : '') +
-        (nd.rang < o.rang && !joueIci ? ' mv-ferme' : '')
+        (nd.rang < o.rang && !joueIci ? ' mv-ferme' : '') +
+        (nd.rang > o.rang ? ' mv-loin' : '')
       noeuds +=
         `<g class="${cl}" data-rang="${nd.rang}" data-voie="${nd.voie}" transform="translate(${x(nd.rang)} ${y(nd.voie)})">` +
         `<title>salle ${nd.rang + 1}, voie ${nd.voie + 1} — ${nom(nd)}</title>` +
-        `<circle r="11"/><text>${glyphe(nd)}</text></g>`
+        `<polygon class="mv-halo" points="${tuile}"/>` +
+        `<polygon class="mv-tuile" points="${tuile}"/>` +
+        `<use href="#mv-i-${icone(nd)}" x="-11" y="-11" width="22" height="22"/>` +
+        (joueIci ? `<circle class="mv-coche" cx="${S - 3}" cy="${-S + 3}" r="4"/>` : '') +
+        `</g>`
     }
   let titres = ''
   for (let r = 0; r < n; r++)
-    titres += `<text class="mv-titre${r === o.rang ? ' mv-courant' : ''}" x="${x(r)}" y="${h - 4}">SALLE ${r + 1}</text>`
+    titres += `<text class="mv-titre${r === o.rang ? ' mv-courant' : ''}" x="${x(r)}" y="${h - 6}">SALLE ${r + 1}</text>`
   return (
     `<svg class="mv-svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="les voies du module">` +
+    ICONES_MINI_CARTE +
     `<g class="mv-liens">${liens}</g><g class="mv-noeuds">${noeuds}</g>${titres}</svg>`
   )
 }
+
+/** LES ICÔNES, en symboles SVG dessinés dans un repère 24 × 24 — le trait
+ *  hérite de la couleur du nœud (currentColor). Une goutte, un flocon, des
+ *  volutes, trois anneaux, une carte, une étoile, un point d'interrogation :
+ *  le vocabulaire de la mini-carte, lisible sans légende. */
+export const ICONES_MINI_CARTE =
+  '<defs>' +
+  // l'eau : la goutte
+  '<symbol id="mv-i-eau" viewBox="0 0 24 24"><path d="M12 3 C12 3 6 10 6 14.5 A6 6 0 0 0 18 14.5 C18 10 12 3 12 3 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9.5 15 A2.5 2.5 0 0 0 12 17.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" opacity=".7"/></symbol>' +
+  // la glace : le flocon
+  '<symbol id="mv-i-glace" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"/><path d="M12 3l-2.4 2.4M12 3l2.4 2.4M12 21l-2.4-2.4M12 21l2.4-2.4M4.2 7.5l3.3.2M4.2 7.5l.2 3.3M19.8 16.5l-3.3-.2M19.8 16.5l-.2-3.3M4.2 16.5l.2-3.3M4.2 16.5l3.3-.2M19.8 7.5l-.2 3.3M19.8 7.5l-3.3.2"/></g></symbol>' +
+  // la vapeur : trois volutes qui montent
+  '<symbol id="mv-i-vapeur" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M7 20c-2-2-2-4 0-6s2-4 0-6M12 20c-2-2-2-4 0-6s2-4 0-6M17 20c-2-2-2-4 0-6s2-4 0-6"/></g></symbol>' +
+  // toutes les mécaniques : trois anneaux liés
+  '<symbol id="mv-i-toutes" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4.2"/><circle cx="7.5" cy="15.5" r="4.2"/><circle cx="16.5" cy="15.5" r="4.2"/></g></symbol>' +
+  // le tableau du pool : une carte
+  '<symbol id="mv-i-pool" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M8.5 8.5h7M8.5 12h7M8.5 15.5h4.5"/></g></symbol>' +
+  // la figure : l'étoile à quatre pointes
+  '<symbol id="mv-i-figure" viewBox="0 0 24 24"><path d="M12 2.5 L14.2 9.8 L21.5 12 L14.2 14.2 L12 21.5 L9.8 14.2 L2.5 12 L9.8 9.8 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>' +
+  // la rencontre : le point d'interrogation, gras
+  '<symbol id="mv-i-rencontre" viewBox="0 0 24 24"><path d="M8.5 9a3.5 3.5 0 1 1 5.2 3.1c-1.3.8-1.7 1.5-1.7 3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/></symbol>' +
+  '</defs>'

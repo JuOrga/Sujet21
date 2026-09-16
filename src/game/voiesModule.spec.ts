@@ -72,7 +72,7 @@ describe('dessinMiniCarteSVG — la grille dessinée', () => {
     const svg = dessinMiniCarteSVG(mc, { rang: 1, trace: [2], portes: mc.rangs[0][2].suivants })
     expect(svg.startsWith('<svg')).toBe(true)
     expect((svg.match(/class="mv-noeud[ "]/g) ?? []).length).toBe(9)
-    expect((svg.match(/mv-noeud mv-joue/g) ?? []).length).toBe(1)
+    expect((svg.match(/class="mv-coche"/g) ?? []).length).toBe(1) // la coche du nœud joué
     expect((svg.match(/ mv-porte"/g) ?? []).length).toBe(mc.rangs[0][2].suivants.length)
     expect(svg).toContain('SALLE 3')
     expect(dessinMiniCarteSVG(tisse('d', 0), { rang: 0, trace: [], portes: [] })).toBe('')
