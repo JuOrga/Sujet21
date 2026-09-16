@@ -43,6 +43,13 @@ export interface ReglagesTissage {
   repos: number
   dons: number
   coffre: boolean
+  /** SANS SALLES GÉNÉRÉES (le réglage du plan coupé) : chaque nœud salle
+   *  est un tableau du pool. La mini-carte doit vivre quel que soit ce
+   *  réglage — couper les générées la faisait disparaître, et les salles
+   *  se jouaient hors voies, la trace en retard sur le niveau (revue du
+   *  16/09). Faux : une voie par rang porte le pool, les autres se
+   *  génèrent. */
+  toutEcrit: boolean
 }
 export const TISSAGE_DEFAUT: ReglagesTissage = {
   partEvenement: 0.2,
@@ -52,6 +59,7 @@ export const TISSAGE_DEFAUT: ReglagesTissage = {
   repos: 1,
   dons: 0,
   coffre: false,
+  toutEcrit: false,
 }
 
 /** La nature d'un nœud : une salle à jouer, une rencontre à traverser, ou
@@ -89,7 +97,8 @@ export interface MiniCarte {
  *    (le module peut chevaucher deux tiers de la descente) ;
  *  · `figures` — combien des trois voies sont des figures, au début et
  *    ensuite (le réglage du plan) ;
- *  · `ecrites` — une voie par rang porte un tableau du pool.
+ *  · `ecrites` — une voie par rang porte un tableau du pool (toutes, sous
+ *    `reglages.toutEcrit`) ; faux, aucune.
  *  Chaque nœud mène au moins à sa propre voie au rang suivant, et à une
  *  voisine une fois sur deux environ : tout nœud a un successeur, tout nœud
  *  d'un rang suivant a un prédécesseur — aucune voie morte. */
@@ -110,7 +119,10 @@ export function tisseMiniCarte(
   for (let r = 0; r < n; r++) {
     const mecaniques = mecaniquesDuChoix(null, alea, null, permises)
     const modes = figuresDuChoix(momentAuRang(r), alea, figures.debut, figures.suite)
+    // le tirage se fait même quand toutes les voies sont écrites : la
+    // graine reste alignée quel que soit le réglage
     const voieEcrite = ecrites ? Math.min(VOIES - 1, Math.floor(alea() * VOIES)) : -1
+    const toutEcrit = ecrites && reglages.toutEcrit
     // LES NŒUDS ÉVÉNEMENT. Le tirage se fait à CHAQUE rang, le premier
     // compris, pour que la graine reste alignée quel que soit le réglage —
     // mais les rangs sous `rangMin` n'en portent jamais (on entre dans un
@@ -138,7 +150,7 @@ export function tisseMiniCarte(
         mecanique: mecaniques[v] ?? mecaniques[0],
         figure: modes[v] ?? false,
         // un nœud événement n'a pas de tableau : il n'a pas de salle
-        ecrite: v === voieEcrite && !evs[v],
+        ecrite: (toutEcrit || v === voieEcrite) && !evs[v],
         nature: evs[v] ? 'evenement' : 'salle',
         suivants,
       })

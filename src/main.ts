@@ -1183,6 +1183,8 @@ function reglagesTissage(m: ModuleCarte): ReglagesTissage {
     repos: voiePlan.reposParModule,
     dons: voiePlan.donsParModule,
     coffre: !!m.orbe,
+    // générées coupées : toutes les portes piochent dans le pool
+    toutEcrit: !voiePlan.generees,
   }
 }
 function sauvePlanVoie(): void {
@@ -6628,7 +6630,7 @@ function renderDescente(): void {
     ),
     dscCoche(
       'SALLES GÉNÉRÉES',
-      'trois salles fabriquées proposées à chaque récompense',
+      'des salles fabriquées derrière les portes de la mini-carte — coupées, toutes les portes piochent dans le pool',
       () => voiePlan.generees,
       (v) => {
         voiePlan.generees = v
@@ -13264,7 +13266,11 @@ function mbApresRecompense(): void {
  *  ou le vieux choix du pool, ou la fin ordinaire. */
 function mbMontreSallesDuModule(): void {
   const seq = playedLevels()
-  if (sallesGenerees()) {
+  // LA MINI-CARTE VIT SANS LES GÉNÉRÉES : générées coupées, ses portes
+  // piochent toutes dans le pool (le tissage les écrit toutes). Elle ne se
+  // tait que sans tissage, ou quand plus rien ne peut se proposer (ni
+  // générées ni écrites) — là, le vieux choix du pool, ou la fin
+  if (sallesGenerees() || (voiePlan.ecrites && carteRun.tissage)) {
     const duo = propositionsVoie(seq)
     if (duo) {
       mbMontreSallesVoie(duo)

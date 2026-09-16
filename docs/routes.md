@@ -209,7 +209,7 @@ code sans nom.
 
 | Section | Réglages |
 | --- | --- |
-| Le plan | plafond de difficulté, descente du jour, salles générées, tableaux écrits |
+| Le plan | plafond de difficulté, descente du jour, salles générées (coupées : toutes les portes de la mini-carte piochent dans le pool), tableaux écrits |
 | La rampe | recul du sommet, respiration, finale |
 | La posture des rangs | rangs sans danger, cadence labyrinthe, cadence contraste, figures au début et ensuite |
 | **Les voies et les rencontres** | **part de rencontres** (0 à 60 %), **rang minimal**, **bifurcation** (0 à 100 %), **économats**, **alcôves** et **bonbonnes par module** (0 à 2) |

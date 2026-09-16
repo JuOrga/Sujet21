@@ -4,7 +4,7 @@ import { dessinMiniCarteSVG, portesDuRang, tisseMiniCarte, TISSAGE_DEFAUT, types
 
 // SANS HALTE par défaut : les tests des salles et des rencontres regardent la
 // grille nue ; les haltes ont leur propre bloc
-const NU = { ...TISSAGE_DEFAUT, economats: 0, repos: 0, dons: 0, coffre: false }
+const NU = { ...TISSAGE_DEFAUT, economats: 0, repos: 0, dons: 0, coffre: false, toutEcrit: false }
 const tisse = (graine: string, niveaux = 3, permises: (0 | 1 | 2 | 3)[] = [0, 1, 2, 3], ecrites = true) =>
   tisseMiniCarte(niveaux, aleaDeGraine(graine), permises, () => 2, { debut: 1, suite: 2 }, ecrites, NU)
 
@@ -47,6 +47,29 @@ describe('tisseMiniCarte — la grille de voies d’un module', () => {
     }
     const sans = tisse('p', 3, [0, 1], false)
     for (const r of sans.rangs) expect(r.some((n) => n.ecrite)).toBe(false)
+  })
+
+  it('sans salles générées (toutEcrit), chaque salle est un tableau du pool — et la grille est la même', () => {
+    // générées coupées au plan : la mini-carte ne disparaît pas, ses portes
+    // piochent toutes dans le pool (revue du 16/09) ; les rencontres restent
+    // des rencontres, et les liaisons ne bougent pas (la graine reste alignée)
+    const tout = tisseMiniCarte(6, aleaDeGraine('q'), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, {
+      ...NU,
+      partEvenement: 0.3,
+      toutEcrit: true,
+    })
+    const une = tisseMiniCarte(6, aleaDeGraine('q'), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, {
+      ...NU,
+      partEvenement: 0.3,
+    })
+    for (const r of tout.rangs)
+      for (const n of r) expect(n.ecrite).toBe(n.nature === 'salle')
+    expect(tout.rangs.map((r) => r.map((n) => [n.nature, n.suivants]))).toEqual(
+      une.rangs.map((r) => r.map((n) => [n.nature, n.suivants])),
+    )
+    // sans tableaux écrits du tout, rien ne s'écrit, même « tout écrit »
+    const rien = tisseMiniCarte(3, aleaDeGraine('q'), [0, 1], () => 2, { debut: 1, suite: 2 }, false, { ...NU, toutEcrit: true })
+    for (const r of rien.rangs) expect(r.some((n) => n.ecrite)).toBe(false)
   })
 
   it('les figures suivent le réglage du plan : deux par rang au milieu', () => {
