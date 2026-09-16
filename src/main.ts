@@ -1222,6 +1222,9 @@ function reglagesTissage(m: ModuleCarte): ReglagesTissage {
     favori: mecaniqueDuBiome(carte, m.biome),
     partFavori: voiePlan.partBiome / 100,
     partPrime: voiePlan.partPrime / 100,
+    // le module objectif se boucle au sas de sa dernière salle : ce rang
+    // n'a ni rencontre ni halte
+    dernierRangSalles: m.id === carte.regles.objectif,
   }
 }
 function sauvePlanVoie(): void {
@@ -13902,6 +13905,12 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
 function prendOrbeDuModule(): void {
   const mod = moduleEnCours()
   if (!mod?.orbe || !moduleFini(carte, carteRun)) return
+  // UN MODULE TISSÉ porte sa cache EN NŒUD de sa mini-carte (reglagesTissage,
+  // coffre: !!m.orbe) : l'orbe se prend là, ou pas — le sas de la dernière
+  // salle ne le donnait pas moins, et le nœud n'était plus un choix (revue
+  // du 16/09). Seule une cache sans salle, ou un module d'avant les voies,
+  // rend son orbe à l'épuisement.
+  if (carteRun.tissage && mod.niveaux > 0 && mod.type !== 'coffre') return
   // un orbe déjà en poche ou déjà tissé ne se gagne pas deux fois : la
   // cache se vide quand même, et le toast le dit tel quel
   const dejaTenu = records.aOrbe(mod.orbe) || records.eveilTient(mod.orbe)
@@ -14056,6 +14065,9 @@ interface CarteVoie {
   nature?: Exclude<NatureNoeud, 'salle'>
   /** la salle est SCELLÉE : plus dure d'un cran, elle paie plus au sas */
   prime?: PrimeNoeud
+  /** le pool manquait pour cette porte : à noter au relevé quand le choix se
+   *  prend (pas à chaque rendu des portes — une reprise les rebâtit) */
+  manqueNote?: Omit<Manque, 'fois' | 'dernier'>
 }
 
 /** LA VOIE SEMI-PROCÉDURALE : le choix du rang suivant, tiré du PLAN de
@@ -14123,20 +14135,26 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   // (le relevé de l'écran LA DESCENTE dit au concepteur quoi écrire) ;
   // sinon elle pioche une autre mécanique, et ne se génère que le pool à sec.
   const prisIci = new Set<string>()
-  const piocheDuPool = (mec: CodeAtelier['mecanique'], diff = difficulte): { lv: LevelDef | null; manque: boolean } => {
+  const piocheDuPool = (
+    mec: CodeAtelier['mecanique'],
+    diff = difficulte,
+  ): { lv: LevelDef | null; manque: Omit<Manque, 'fois' | 'dernier'> | null } => {
     const exclus = new Set<string>([...voieVues, ...prisIci])
     const memeMecanique = (lv: LevelDef): boolean =>
       jouable(lv) && decodeCodeAtelier(lv.code)?.mecanique === mec
     const meme = piocheEcrite(seq, { moment, mecanique: mec, difficulte: diff }, exclus, memeMecanique, alea, null, voiePlan.poids)
     if (meme) {
       prisIci.add(meme.code)
-      return { lv: meme, manque: false }
+      return { lv: meme, manque: null }
     }
-    noteManqueDuPool({ biome: biomeCourant, mecanique: mec, moment, difficulte: diff, module: module?.id ?? '' })
-    if (voiePlan.genereSiManque) return { lv: null, manque: true }
+    // le manque se NOTE quand le choix se prend (mbMontreSallesVoie), pas
+    // ici : les portes se rebâtissent à chaque rendu, et une reprise de
+    // sauvegarde recomptait le même trou (revue du 16/09)
+    const manque = { biome: biomeCourant, mecanique: mec, moment, difficulte: diff, module: module?.id ?? '' }
+    if (voiePlan.genereSiManque) return { lv: null, manque }
     const autre = piocheEcrite(seq, { moment, mecanique: 3, difficulte: diff }, exclus, jouable, alea, jouee, voiePlan.poids)
     if (autre) prisIci.add(autre.code)
-    return { lv: autre, manque: true }
+    return { lv: autre, manque }
   }
   // LA MINI-CARTE À VOIES : les portes du rang sont les nœuds joignables
   // depuis celui qu'on vient d'ouvrir — chacun décidé au tissage (sa
@@ -14267,14 +14285,15 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
       const diffPorte = p.prime ? Math.min(9, difficulte + 1) : difficulte
       const suffixePrime = p.prime ? ` · PRIME : ${NOMS_PRIME[p.prime].toUpperCase()}` : ''
       let ecr: LevelDef | null = null
-      let manque = false
+      let manqueNote: Omit<Manque, 'fois' | 'dernier'> | null = null
       if (voiePlan.ecrites) {
         if (!sallesGenerees()) {
           const r = piocheDuPool(p.mecanique, diffPorte)
           ecr = r.lv
-          manque = r.manque
+          manqueNote = r.manque
         } else if (p.ecrite) ecr = pioche()
       }
+      const manque = manqueNote !== null
       if (ecr) {
         cartes.push({
           lv: ecr,
@@ -14287,6 +14306,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
               : `VOIE ${p.voie + 1} · TABLEAU DU POOL`) + suffixePrime,
           voie: p.voie,
           ...(p.prime ? { prime: p.prime } : {}),
+          ...(manqueNote ? { manqueNote } : {}),
         })
         continue
       }
@@ -14303,6 +14323,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
               : `VOIE ${p.voie + 1} · ${etiquetteGeneree(g.figure, p.voie)}`) + suffixePrime,
           voie: p.voie,
           ...(p.prime ? { prime: p.prime } : {}),
+          ...(manqueNote ? { manqueNote } : {}),
         })
     }
     // une porte au moins : sinon le filet historique ci-dessous
@@ -14407,9 +14428,18 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
     host.appendChild(voies)
   }
   host.appendChild(mbConsignePortes(cartes.length))
+  // LES MANQUES DU POOL se notent quand le choix se prend, une fois : ce
+  // sont les trous que ce choix a réellement présentés au joueur
+  let manquesNotes = false
+  const noteLesManques = (): void => {
+    if (manquesNotes) return
+    manquesNotes = true
+    for (const c of cartes) if (c.manqueNote) noteManqueDuPool(c.manqueNote)
+  }
   cartes.forEach((c, i) => {
     const porte = c.nature
       ? mbPorteNoeud(i, c.etiquette, c.nature, () => {
+          noteLesManques()
           if (c.voie !== undefined) carteRun = choisitVoie(carteRun, c.voie)
           ouvreNoeud(c.nature!)
         })
@@ -14422,6 +14452,7 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
             cahier: c.cahier,
           },
           () => {
+            noteLesManques()
             // la porte ouverte s'inscrit dans la trace : la salle suivante
             // ne s'ouvrira que depuis ce nœud de la mini-carte
             if (c.voie !== undefined) carteRun = choisitVoie(carteRun, c.voie)
@@ -14798,8 +14829,16 @@ function appliqueEffets(effets: readonly EffetEvenement[]): string[] {
       case 'revele': {
         // la carte se lit d'avance : chaque « ? » encore fermé prend sa
         // nature maintenant, et le plan la montre
+        // le même tirage que l'entrée d'un « ? » : la descente du jour révèle
+        // la même chose pour tous les postes
         for (const m of carte.modules)
-          if (m.type === 'inconnu') carteRun = reveleInconnu(carte, carteRun, m.id, Math.random)
+          if (m.type === 'inconnu')
+            carteRun = reveleInconnu(
+              carte,
+              carteRun,
+              m.id,
+              descenteDuJour() ? aleaDeGraine(`${new Date().toISOString().slice(0, 10)}@?${m.id}`) : Math.random,
+            )
         lignes.push('🗺️ les modules « ? » de la station se lisent d’avance')
         break
       }

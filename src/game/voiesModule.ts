@@ -55,6 +55,11 @@ export interface ReglagesTissage {
    *  à prime — une seule par rang, jamais sous rangMin, jamais sur une
    *  rencontre ni une halte */
   partPrime: number
+  /** LE DERNIER RANG N'EST QUE SALLES : ni rencontre ni halte. Pour le
+   *  module OBJECTIF, c'est vital — l'expédition ne se boucle qu'au sas de
+   *  sa dernière salle ; une rencontre ou une halte au dernier rang menait
+   *  à une carte sans coursive, la run ne finissait jamais (revue du 16/09). */
+  dernierRangSalles: boolean
 }
 export const TISSAGE_DEFAUT: ReglagesTissage = {
   partEvenement: 0.2,
@@ -67,6 +72,7 @@ export const TISSAGE_DEFAUT: ReglagesTissage = {
   favori: null,
   partFavori: 0,
   partPrime: 0.15,
+  dernierRangSalles: false,
 }
 
 /** La nature d'un nœud : une salle à jouer, une rencontre à traverser, ou
@@ -167,6 +173,8 @@ export function tisseMiniCarte(
     const evs = [0, 1, 2].map(() => alea() < part)
     if (r < rangMin || evs.every(Boolean)) evs[0] = false
     if (r < rangMin) evs[1] = evs[2] = false
+    // le dernier rang d'un module qui doit se boucler au sas : des salles
+    if (reglages.dernierRangSalles && r === n - 1) evs[0] = evs[1] = evs[2] = false
     const voiesSalle = [0, 1, 2].filter((v) => !evs[v])
     const voieEcrite = ecrites ? voiesSalle[Math.min(voiesSalle.length - 1, Math.floor(tEcrite * voiesSalle.length))] : -1
     const rang: NoeudVoie[] = []
@@ -229,13 +237,20 @@ export function tisseMiniCarte(
           (nd) =>
             nd.rang >= rangMin &&
             nd.nature === nature &&
+            // jamais au dernier rang d'un module qui se boucle au sas
+            !(reglages.dernierRangSalles && nd.rang === n - 1) &&
             // remplacer une salle doit en laisser une ; remplacer une rencontre n'en coûte aucune
             rangs[nd.rang].filter((x) => x.nature === 'salle').length > (nature === 'salle' ? 1 : 0),
         )
-    // une halte prend d'abord la place d'une salle ; quand les rencontres
-    // ont tout pris, elle prend celle d'une rencontre — la halte est promise
-    // par le plan, la rencontre n'est qu'un tirage
-    const candidats = libres('salle').length > 0 ? libres('salle') : libres('evenement')
+    // une halte prend d'abord la place d'une salle QUI N'EST PAS LA VOIE DU
+    // POOL (« une voie du pool par rang » se tient — la halte effaçait la
+    // seule porte écrite du rang, revue du 16/09), puis celle du pool s'il
+    // ne reste qu'elle ; quand les rencontres ont tout pris, elle prend
+    // celle d'une rencontre — la halte est promise par le plan, la
+    // rencontre n'est qu'un tirage
+    const sallesLibres = libres('salle')
+    const sansPool = sallesLibres.filter((nd) => !nd.ecrite)
+    const candidats = sansPool.length > 0 ? sansPool : sallesLibres.length > 0 ? sallesLibres : libres('evenement')
     if (candidats.length === 0) continue
     const nd = candidats[Math.min(candidats.length - 1, Math.floor(tirage * candidats.length))]
     nd.nature = nature

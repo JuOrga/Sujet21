@@ -642,12 +642,20 @@ export function plusCourtVers(c: CarteStation, de: string, vers: string): number
  *  the Spire : combien de routes, à quelle distance, avec quelles haltes.
  *  Bornée : au-delà de `max` routes, la carte est un plat de nouilles et la
  *  liste s'arrête là. */
+/** LE BUDGET DE LA MARCHE : au-delà de tant de pas, on rend ce qu'on a.
+ *  Sur une carte qui boucle (l'éditeur en passe par là : un amas de
+ *  modules liés dans les deux sens, l'objectif pas encore raccordé), les
+ *  chemins simples sont en nombre factoriel et la vérification, qui tourne
+ *  à chaque geste, figeait l'onglet (revue du 16/09). */
+export const PAS_ROUTES_MAX = 20000
+
 export function routesVersObjectif(c: CarteStation, max = 500): string[][] {
   const ids = new Set(c.modules.map((m) => m.id))
   if (!ids.has(c.regles.depart) || !ids.has(c.regles.objectif)) return []
   const out: string[][] = []
+  let pas = 0
   const marche = (id: string, chemin: string[]): void => {
-    if (out.length >= max) return
+    if (out.length >= max || ++pas > PAS_ROUTES_MAX) return
     if (id === c.regles.objectif) {
       out.push([...chemin])
       return

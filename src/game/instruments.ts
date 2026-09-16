@@ -436,7 +436,10 @@ export const CONTREPARTIES: InstrumentDef[] = [
     nom: 'Classé fuite prioritaire',
     desc: 'Le vaisseau vous suit à la trace : la visée se dérègle.',
     icone: '📡',
-    effets: [{ levier: 'visee', valeur: 0.7 }],
+    // le levier « visee » va dans le sens BAS = BON (le temps ralentit plus
+    // à la visée) : la contrepartie monte donc la valeur — à 0,7 elle
+    // AIDAIT le joueur (revue du 16/09)
+    effets: [{ levier: 'visee', valeur: 1.4 }],
     contrepartie: true,
   },
   {

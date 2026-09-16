@@ -4,7 +4,7 @@ import { dessinMiniCarteSVG, portesDuRang, tisseMiniCarte, TISSAGE_DEFAUT, types
 
 // SANS HALTE par défaut : les tests des salles et des rencontres regardent la
 // grille nue ; les haltes ont leur propre bloc
-const NU = { ...TISSAGE_DEFAUT, economats: 0, repos: 0, dons: 0, coffre: false, partPrime: 0 }
+const NU = { ...TISSAGE_DEFAUT, economats: 0, repos: 0, dons: 0, coffre: false, partPrime: 0, dernierRangSalles: false }
 const tisse = (graine: string, niveaux = 3, permises: (0 | 1 | 2 | 3)[] = [0, 1, 2, 3], ecrites = true) =>
   tisseMiniCarte(niveaux, aleaDeGraine(graine), permises, () => 2, { debut: 1, suite: 2 }, ecrites, NU)
 
@@ -47,6 +47,32 @@ describe('tisseMiniCarte — la grille de voies d’un module', () => {
     }
     const sans = tisse('p', 3, [0, 1], false)
     for (const r of sans.rangs) expect(r.some((n) => n.ecrite)).toBe(false)
+  })
+
+  it('une halte ne prend jamais la voie du pool tant qu’une autre salle reste, et le dernier rang de l’objectif n’est que salles', () => {
+    for (let i = 0; i < 30; i++) {
+      // les réglages livrés : un économat, une alcôve, des rencontres — et
+      // pourtant une voie du pool par rang, toujours
+      const mc = tisseMiniCarte(6, aleaDeGraine(`h${i}`), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, {
+        ...TISSAGE_DEFAUT,
+        economats: 1,
+        repos: 1,
+        dons: 1,
+        coffre: true,
+      })
+      for (const r of mc.rangs) expect(r.filter((n) => n.ecrite)).toHaveLength(1)
+      // le module objectif : son dernier rang se boucle au sas, donc que des salles
+      const fin = tisseMiniCarte(6, aleaDeGraine(`h${i}`), [0, 1, 2, 3], () => 3, { debut: 1, suite: 2 }, true, {
+        ...TISSAGE_DEFAUT,
+        partEvenement: 0.6,
+        economats: 2,
+        repos: 2,
+        dons: 2,
+        coffre: true,
+        dernierRangSalles: true,
+      })
+      expect(fin.rangs[5].every((n) => n.nature === 'salle')).toBe(true)
+    }
   })
 
   it('la prime : au plus une par rang, jamais sous rangMin, jamais sur une rencontre ni une halte, et la grille reste la même', () => {

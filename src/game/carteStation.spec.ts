@@ -14,6 +14,7 @@ import {
   moduleRevele,
   verifieRoutes,
   ECART_ROUTES_MAX,
+  PAS_ROUTES_MAX,
   cloneCarte,
   couleurTemperature,
   orbeRequis,
@@ -386,6 +387,22 @@ describe('les routes', () => {
     expect(CARTE_LIVREE.modules.filter((m) => m.cran > 0).map((m) => `${m.id}:${m.cran}`)).toEqual(['C1:1', 'P3:2', 'OBS:1'])
     expect(CARTE_LIVREE.modules.filter((m) => m.orbe).map((m) => `${m.id}:${m.orbe}`)).toEqual(['C1:sublimation', 'P3:condensation'])
     expect(CARTE_LIVREE.modules.find((m) => m.id === 'P2')!.niveaux).toBe(3)
+  })
+})
+
+describe('routesVersObjectif — la marche a un budget', () => {
+  it('un amas qui boucle sans atteindre l’objectif rend vite, sans figer', () => {
+    // douze modules liés dans les deux sens, l'objectif pas raccordé : les
+    // chemins simples sont en nombre factoriel — la vérification tourne à
+    // chaque geste de l'éditeur, elle ne doit jamais y passer la nuit
+    const c = cloneCarte(CARTE_LIVREE)
+    const ids = c.modules.filter((m) => m.id !== 'HUB' && m.id !== 'OBS').map((m) => m.id)
+    c.liens = [{ de: 'HUB', vers: ids[0], type: 'main' }]
+    for (const a of ids) for (const b of ids) if (a !== b) c.liens.push({ de: a, vers: b, type: 'alt' })
+    const t0 = performance.now()
+    expect(routesVersObjectif(c)).toEqual([])
+    expect(performance.now() - t0).toBeLessThan(2000)
+    expect(PAS_ROUTES_MAX).toBe(20000)
   })
 })
 
