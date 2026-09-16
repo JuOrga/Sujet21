@@ -33,7 +33,7 @@ import {
   type LaserDef,
   type ObstacleBox,
 } from './level'
-import { dansForme } from './formes'
+import { dansForme, type Coupe } from './formes'
 import { MILIEU_EAU, MILIEU_GLACE, MILIEU_VAPEUR, type Bounds } from '../sim/solver'
 
 export { MILIEU_EAU, MILIEU_GLACE, MILIEU_VAPEUR }
@@ -64,10 +64,15 @@ export interface Rect {
   maxY: number
 }
 
+// Une porte FERMÉE — ou en train de se fermer : un rectangle tronqué par
+// la coupe de son front (porte.ts). Le faisceau bute là où la paroi existe
+// déjà, et passe encore là où elle n'est pas.
+export type PorteFermee = Rect & { coupe?: Coupe }
+
 export interface TraceMonde {
   bounds: Bounds
   boxes: ObstacleBox[]
-  portesFermees: Rect[]
+  portesFermees: PorteFermee[]
   cibles: CiblePoint[]
   /** Normale de la surface de glace en (x, y), ou null si pas de glace là.
    * L'éditeur passe null pour l'ensemble : il trace sans miroir. */
@@ -118,10 +123,11 @@ export interface TraceResultat {
   railsSuivis: number[]
 }
 
-function dansRect(x: number, y: number, r: Rect & { angle?: number; forme?: number; p0?: number; p1?: number }): boolean {
-  // une FORME (disque, capsule, coin, arc) : le signe de son champ — la
-  // marche par pas de 5 u fait le reste, comme pour les rectangles
-  if (r.forme) return dansForme(r, x, y)
+function dansRect(x: number, y: number, r: Rect & { angle?: number; forme?: number; p0?: number; p1?: number; coupe?: Coupe }): boolean {
+  // une FORME (disque, capsule, coin, arc) ou une COUPE (porte en train de
+  // se fermer) : le signe de son champ — la marche par pas de 5 u fait le
+  // reste, comme pour les rectangles
+  if (r.forme || r.coupe) return dansForme(r, x, y)
   if (r.angle) {
     const cx = (r.minX + r.maxX) / 2
     const cy = (r.minY + r.maxY) / 2
@@ -263,7 +269,7 @@ export function intervalleRayon(
 class FiltreBoites {
   // les boîtes qui comptent (parois, miroirs, portes fermées), dans l'ordre
   // du tableau — l'ordre départage deux miroirs superposés comme avant
-  private readonly boites: (Rect & { angle?: number; forme?: number; p0?: number; p1?: number })[] = []
+  private readonly boites: (Rect & { angle?: number; forme?: number; p0?: number; p1?: number; coupe?: Coupe })[] = []
   private readonly env: Enveloppe[] = []
   private readonly miroir: boolean[] = []
   // les candidats du segment droit courant, et leur intervalle de distance
@@ -273,7 +279,7 @@ class FiltreBoites {
   private n = 0
   private readonly scratch = { tIn: 0, tOut: 0 }
 
-  constructor(boxes: ObstacleBox[], portesFermees: Rect[]) {
+  constructor(boxes: ObstacleBox[], portesFermees: PorteFermee[]) {
     for (const b of boxes) {
       if (!absorbe(b)) continue // transparente : jamais testée
       this.boites.push(b)

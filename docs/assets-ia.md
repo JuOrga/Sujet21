@@ -210,6 +210,12 @@ Planches livrées, dans `public/assets/cine/` :
 | `depart-1.webp` | le module vide, la cuve crevée | L'OUVERTURE + LE DÉPART |
 | `depart-2.webp` | le couloir vert vers le sas | L'OUVERTURE + LE DÉPART |
 | `depart-3.webp` | le seuil du sas, l'aspiration cyan | L'OUVERTURE + LE DÉPART |
+| `approche-1.webp` | la planète à anneau, seule | L'OUVERTURE (en tête, §26) |
+| `approche-2.webp` | le limbe, un point brillant | L'OUVERTURE |
+| `approche-3.webp` | la station entière | L'OUVERTURE — la référence de la station |
+| `approche-4.webp` | l'arc et le hub au premier plan | L'OUVERTURE |
+| `approche-5.webp` | le module Méduse, son hublot | L'OUVERTURE |
+| `approche-6.webp` | le hublot, la cuve derrière la vitre | L'OUVERTURE |
 
 ---
 
@@ -1176,3 +1182,256 @@ with no readable writing, cold palette
 | 21-L | À travers l'évent | un évent, une nuée qui le traverse sur un rail |
 | 21-M | La traversée des états | trois portes, trois verrous en enfilade |
 | 21-G | La dérive | une cuve sans cloisons, deux ricochets tracés |
+
+---
+
+## 26. L'APPROCHE — six planches avant l'ouverture : de la planète au module Méduse ✅ LIVRÉ (15/09)
+
+**Livré le 15/09/2026**, les six planches en tête de `CINEMATIQUE_ESSAI`.
+Mesuré par `prepare.py` à la livraison : luminance de 0,03 (la planète
+seule) à 0,18 (l'arc et le hub), 0 % de pixels chauds, de 20 à 234 Ko.
+La planche 3 est devenue `docs/reference/station-reference.png` : c'est
+elle qui fait foi sur la station vue du dehors. Deux fournées ont été
+nécessaires — la première avait une Terre, un soleil et une lune dans le
+cadre, du texte peint sur la coque, un écran plat derrière le hublot ;
+d'où les négatifs durcis ci-dessous, à garder tels quels.
+
+L'OUVERTURE commence aujourd'hui **dans** la cuve (`ouverture-1.webp`,
+« Module Méduse. Une cuve, une substance. »). Le concepteur veut qu'elle
+commence **dehors** : la planète vue de l'espace, puis la station, de plus
+en plus près, jusqu'au hublot du module Méduse — et la coupe sur la cuve.
+Six planches, même famille que §11 (**1600×900**, marge de 5 % sur les
+bords, aucun texte, luminance ≤ 0,50, ≤ 260 Ko), nommées
+`cine/approche-1..6.webp`. Elles s'insèrent **en tête** de l'OUVERTURE
+(`CINEMATIQUE_ESSAI` dans `src/game/cinematique.ts`) ; LE DÉPART, qui se
+rejoue à chaque run, ne les reprend pas — on ne refait pas l'approche à
+chaque lancement.
+
+### Deux points que le canon ne tranchait pas, tranchés ici
+
+- **La planète.** Rien dans le scénario ne nomme la Terre, et deux images
+  livrées se contredisaient à moitié : `plafond-planete.webp` montre une
+  **planète gazeuse** bleu-gris à bandes, le prompt de l'observatoire
+  (`docs/carte-station/assets-prompts.md`) dit **« ringed planet »**. Les
+  deux se réconcilient : une **géante gazeuse froide, à bandes, ceinte d'un
+  anneau fin**. Pas la Terre — ni continents, ni océans, ni lumières de
+  villes : la palette reste froide, et la station orbite là où un télescope
+  a quelque chose à regarder.
+- **La station.** Sa silhouette **est celle de la carte**
+  (`src/game/carteStation.json`) — c'est la règle du scénario : « on doit
+  reconnaître la station comme on reconnaît l'ISS sur une infographie ».
+  De gauche à droite : l'arc de coque en croissant portant le module
+  Méduse (le hub, haut et étroit), trois coursives vers trois modules
+  octogonaux empilés, un nœud rond, trois petits modules dont deux se
+  prolongent en capsules isolées, le grand observatoire octogonal à dôme
+  vitré avec le télescope amarré, puis le mât incliné aux quatre panneaux
+  solaires et à l'antenne parabolique. L'orientation ne change **jamais** :
+  l'arc à gauche, le mât à droite, dans les six planches.
+
+### Ce qui tient la station d'une planche à l'autre
+
+Un préambule ne suffit pas (charte §6) : six générations de la même
+description donnent six stations. Trois gestes, dans cet ordre :
+
+1. **Le SOCLE ci-dessous ouvre chaque prompt, tel quel.** Il remplace le
+   préambule de la charte §5 pour cette famille : une planche de
+   cinématique est un cadre, pas une pièce posée à plat dans la cuve (§22
+   fait déjà l'entorse avec « wide cinematic frame »). Il porte la fiche
+   d'identité de la planète, de la station et de la lumière, et chaque
+   planche ne dit ensuite que son cadrage.
+2. **Générer la planche 3 en premier** — la station entière, le plan
+   d'ensemble. Tant qu'elle n'est pas juste (les onze modules, l'arc, le
+   mât, le télescope, dans le bon ordre), rien d'autre ne se génère. Quand
+   elle est bonne, elle **devient la référence de la famille** :
+   `docs/reference/station-reference.png` (charte §6), et les planches 4,
+   5 et 6 se génèrent **avec elle en référence d'image** : Midjourney
+   `--sref <planche 3>` et le même `--seed` (ou `--oref` sur la planche 3
+   en v7, qui tient l'objet et pas seulement le style) ; Stable Diffusion /
+   Flux : IP-Adapter sur la planche 3 (poids 0,7) et ControlNet *depth* sur
+   son recadrage quand la disposition dérive ; DALL·E / GPT : joindre la
+   planche 3 et demander « the same station as in the attached image, seen
+   closer ».
+3. **Les planches 1 et 2 en dernier.** La station y est un point ou
+   absente : la cohérence ne s'y joue pas, la planète y suffit — et la
+   planète se tient par le socle seul (bandes horizontales, croissant en
+   haut à gauche, nuit à droite, anneau presque de profil).
+
+Ce qui ne bouge pas non plus : **la lumière**. Une seule clé, en haut à
+gauche, d'une étoile hors cadre ; un rebond bleu froid de la planète par
+en dessous ; jamais de soleil dans le cadre, jamais de flare. Une planche
+éclairée d'ailleurs saute à l'œil dans l'enchaînement, plus qu'un rivet de
+travers.
+
+**Les étoiles restent minuscules** (`ciel.md`, le test d'acceptation) : le
+lecteur zoome dans la planche, une étoile de quarante pixels devient une
+tache. **La planète reste sombre** : c'est elle qui ferait sortir la
+planche du plafond de luminance de la famille — un croissant éclairé, le
+reste dans la nuit.
+
+### Le socle — à coller en tête des six prompts, tel quel
+
+```
+Retro-futuristic 1970s orbital laboratory, wide cinematic frame, 16:9,
+concept-art matte painting with crisp hard-surface detail. Muted cold
+palette: near-black space #030710, steel blue-grey hulls #0a1420 to
+#2a3542, one thin cyan painted line #63b7e6 along every hull, amber only
+on tiny indicator lamps #f2c98e. Low brightness, no text, no watermark.
+
+THE PLANET, identical in every frame: a cold gas giant, pale blue-grey
+cloud bands running horizontally with faint darker storm streaks, a thin
+flat ring seen almost edge-on and tilted slightly down to the right; the
+planet mostly in shadow, a soft crescent lit from the upper left, its
+night side to the right. Not Earth: no continents, no oceans, no city
+lights.
+
+THE STATION, identical in every frame, the same layout as the game's map:
+a Skylab-era modular laboratory of dark riveted steel plates with weld
+seams and worn paint. From left to right: a large crescent-shaped hull
+arc with an elongated vertical module docked on its inner side (the
+Méduse hub, the tallest module, one round lit porthole); three straight
+corridors leaving the hub to the right toward three stacked octagonal
+modules; the three corridors converging into a small round junction
+node; from the node, three short corridors to three small octagonal
+modules, the upper and lower ones each extending to one more isolated
+dead-end pod; the middle one leading to a LARGE octagonal observatory
+module topped with a glass dome; a Hubble-like space telescope tube
+docked to the observatory by a short bent tube; and at the far right a
+long tilted truss boom carrying four gridded solar panels and a
+parabolic dish. Tiny amber lamps at the docking rings, a few cold white
+portholes, no other light on the station.
+
+THE LIGHT, identical in every frame: one key light from the upper left,
+from a star outside the frame; a faint cool blue bounce from the planet
+below; stars very small and sparse; no sun in frame, no lens flare, no
+bloom.
+```
+
+Négatif commun de la famille (remplace le négatif commun de la charte) :
+
+```
+Earth, continents, oceans, city lights, sun in frame, lens flare, bloom,
+bokeh, depth of field, blur, film grain, vignette, warm colors, bright
+lighting, people, astronaut, rocket, text, logo, flag, watermark, border,
+frame, sleek white sci-fi, holograms, neon
+```
+
+Chez Midjourney : `--ar 16:9 --style raw`, et le même `--seed` sur les six.
+Générer au moins en 1600 de large ; `prepare.py` livre à 1600×900 et mesure.
+
+### 26a. `approche-1.webp` — la planète, seule
+```
+[SOCLE §26]
+Deep space. The planet is small, about one fifth of the frame width,
+placed on the left third of the frame, a thin lit crescent on its
+upper-left edge, the ring a fine line across it. Around it only the
+near-black void and sparse pinpoint stars. Nothing else: no station
+visible at this distance. Vast, silent, cold.
+```
+Négatif : négatif §26 + `station, spaceship, large stars, nebula`
+
+### 26b. `approche-2.webp` — le limbe, et un point
+```
+[SOCLE §26]
+Closer: the planet now fills the left two thirds of the frame, its
+horizontal cloud bands readable, the ring cutting the frame as a thin
+bright line. Just above the lit limb, against the black void, ONE tiny
+bright speck with a barely visible cyan glint: the station, at orbital
+distance, too far to have a shape. The right third of the frame is the
+void and a few faint stars.
+```
+Négatif : négatif §26 + `recognizable station shape, large stars, nebula`
+
+### 26c. `approche-3.webp` — la station entière — LA RÉFÉRENCE, à générer en premier
+```
+[SOCLE §26]
+Establishing shot of the whole station in orbit, centered, spanning
+about half of the frame width, seen from a slightly high three-quarter
+angle so that every module and corridor of the layout is readable at
+once, like an infographic silhouette: the crescent arc and the tall
+Méduse hub on the left, the three stacked modules, the round node, the
+small pods, the domed observatory with the telescope docked, the tilted
+solar boom and the dish on the right. Behind it the planet's cloud bands
+fill the lower two thirds of the frame, the black void and the ring line
+above. The station is lit from the upper left, its shadowed side faintly
+blue from the planet. Nothing else in frame.
+```
+Négatif : négatif §26 + `second station, extra modules, symmetrical
+station, ISS, large stars`
+
+Vérifier avant d'aller plus loin : onze modules, l'arc à gauche, le mât à
+droite, le dôme et le télescope à l'avant-dernier rang, un seul hub haut.
+Un module de trop ou un mât à gauche se reproduira sur les trois planches
+suivantes.
+
+### 26d. `approche-4.webp` — plus près, les modules
+```
+[SOCLE §26]
+Closer, in the exact layout of the attached reference: the station
+overflows the frame. In the foreground on the left, the crescent hull
+arc and the tall Méduse hub fill the height of the frame, riveted
+plates, weld seams, worn paint, cable trays, the round porthole lit cold
+white; the three corridors run into the depth of the frame toward the
+stacked modules and the round node; further back the domed observatory
+and the telescope tube; the solar boom and the dish small at the far
+right edge. The planet's cloud bands fill the whole background, the ring
+crossing the top of the frame. Same light, same station.
+```
+Négatif : négatif §26 + `extra modules, large stars, planet visible as a
+whole disc`
+
+### 26e. `approche-5.webp` — le module Méduse
+```
+[SOCLE §26]
+Close on the Méduse hub alone, the same module as in the attached
+reference, filling the frame: the elongated octagonal module docked on
+the inner side of the crescent arc, its hull a wall of dark riveted
+steel plates with weld seams, chipped paint, flanged pipes and cable
+trays running along it, the single thin cyan painted line, a docking
+ring with a row of tiny amber lamps, and at the center of the frame ONE
+round porthole with thin cross mullions lit cold white #d6e8f5 from
+inside. The arc's ribs recede on the left, one corridor leaves on the
+right. Only a sliver of the planet's cloud bands at the bottom of the
+frame, the void above.
+```
+Négatif : négatif §26 + `whole station, planet as a disc, large stars,
+many windows`
+
+### 26f. `approche-6.webp` — le hublot, et la coupe sur la cuve
+```
+[SOCLE §26]
+The porthole of the Méduse hub fills the frame: a heavy round steel
+frame with bolts, thin cross mullions, glass frosted at the rim and
+beaded with condensation. Through the glass, deep inside a dark
+laboratory, the pale cyan glow #63b7e6 of a tall glass containment
+cylinder, and in it a small translucent shape floating in liquid — a
+hint, not a scene, the rest of the room lost in shadow. The dark hull
+plates around the frame, one tiny amber lamp beside it.
+```
+Négatif : négatif §26 + `people, faces, hands, readable screens, bright
+interior`
+
+Le hublot reprend celui de `plafond-planete.webp` (cadre rond, croisillon
+fin) et la cuve est celle d'`ouverture-1.webp` : le cylindre de verre et la
+lueur cyan. C'est le raccord — la planche suivante est l'intérieur de ce
+qu'on vient de voir par la vitre.
+
+### Le montage, pour la table (une proposition, pas un prompt)
+
+Toutes **muettes** : la première réplique de l'ouverture, « Module Méduse.
+Une cuve, une substance. », tombe sur la cuve, juste après le hublot, et
+c'est là qu'elle porte. Le lecteur zoome dans chaque planche : six
+zooms enchaînés font un seul travelling.
+
+| planche | effet | durée | fondu |
+| --- | --- | --- | --- |
+| `approche-1` | zoom-avant | 6 s | noir |
+| `approche-2` | zoom-avant | 5 s | aucun |
+| `approche-3` | pan-droite | 6 s | aucun |
+| `approche-4` | zoom-avant | 5 s | aucun |
+| `approche-5` | zoom-avant | 4,5 s | aucun |
+| `approche-6` | zoom-avant | 4 s | aucun |
+
+`ouverture-1` garde son fondu au noir : la coupe du hublot à la cuve passe
+par le noir. La piste (silence, ou `cuve-tiede` avancée de six planches)
+se règle à la table de montage. Comme les autres planches, celles-ci ne se
+chargent qu'à la lecture de la cinématique.

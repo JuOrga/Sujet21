@@ -2015,6 +2015,11 @@ function transposeNiveau(level: LevelDef, preuves: PreuveDef[]): void {
     em.angle = 90 - em.angle // (dx, dy) → (dy, dx)
   }
   for (const c of level.cibles ?? []) swapPt(c)
+  // Les portes n'ont ici que leur rectangle : le générateur ne pose jamais
+  // de MATÉRIALISATION (porte.ts). S'il s'y mettait, `sens` se retournerait
+  // comme l'angle d'un émetteur (90 − sens), `pivot` en miroir de la
+  // diagonale (8 − pivot mod 8) et `horaire` s'inverserait — sans quoi le
+  // rideau tomberait de travers dans une salle transposée.
   for (const p of level.portes ?? []) swapRect(p)
   for (const r of level.rails ?? []) for (const pt of r.points) swapPt(pt)
   for (const c of level.caches ?? []) {
@@ -2055,6 +2060,9 @@ function miroirXNiveau(level: LevelDef, preuves: PreuveDef[]): void {
     em.angle = 180 - em.angle // (dx, dy) → (−dx, dy)
   }
   for (const c of level.cibles ?? []) c.x = -c.x
+  // même remarque qu'à la transposition : pas de matérialisation posée ici.
+  // En miroir, `sens` deviendrait 180 − sens, `pivot` 2 − pivot (mod 8), et
+  // `horaire` s'inverserait.
   for (const p of level.portes ?? []) flipRect(p)
   for (const r of level.rails ?? []) for (const pt of r.points) pt.x = -pt.x
   for (const c of level.caches ?? []) {

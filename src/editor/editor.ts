@@ -47,7 +47,21 @@ import {
   type RailDef,
   type RoleAncre,
 } from '../game/level'
-import { CHASSE_ALLURE_DEFAUT, CHASSE_DUREE_DEFAUT } from '../game/level'
+import {
+  CHASSE_ALLURE_DEFAUT,
+  CHASSE_DUREE_DEFAUT,
+  PORTE_ALLURE_DEFAUT,
+  PORTE_SENS_DEFAUT,
+  type PorteMaterialisation,
+} from '../game/level'
+import {
+  PORTE_MATERIALISATION_NOMS,
+  PORTE_PIVOT_NOMS,
+  porteCoupe,
+  porteDuree,
+  portePart,
+  portePolygone,
+} from '../game/porte'
 import {
   ARTICLES_COMPTOIR,
   ROLES_ANCRE,
@@ -5849,6 +5863,67 @@ export class LevelEditor {
           `<option value="et"${q.regle === 'et' ? ' selected' : ''}>ET — toutes les cibles du canal</option>` +
           `</select></label>`,
       )
+      // LA MATÉRIALISATION : comment la paroi apparaît à la fermeture (et
+      // s'efface à l'ouverture). Les réglages propres à chaque façon
+      // s'affichent tous : changer la façon relit la fiche (voir le
+      // rafraîchissement sur 'change'), inutile de les cacher.
+      const mat = q.materialisation ?? ''
+      rows.push(
+        `<label class="ed-f"><span>Matérialisation</span><select id="p-pmat">` +
+          (Object.keys(PORTE_MATERIALISATION_NOMS) as (PorteMaterialisation | '')[])
+            .map(
+              (k) =>
+                `<option value="${k}"${mat === k ? ' selected' : ''}>${PORTE_MATERIALISATION_NOMS[k]}</option>`,
+            )
+            .join('') +
+          `</select></label>`,
+      )
+      if (mat === 'rideau') {
+        rows.push(
+          rangeField(
+            'Sens du front (°) — −90 du haut vers le bas, 0 vers l’est',
+            'p-psens',
+            q.sens ?? PORTE_SENS_DEFAUT,
+            -180,
+            180,
+            1,
+          ),
+        )
+      }
+      if (mat === 'eventail') {
+        rows.push(
+          `<label class="ed-f"><span>Charnière</span><select id="p-ppivot">` +
+            PORTE_PIVOT_NOMS.map(
+              (n, k) => `<option value="${k}"${(q.pivot ?? 0) === k ? ' selected' : ''}>${n}</option>`,
+            ).join('') +
+            `</select></label>`,
+        )
+        rows.push(
+          `<label class="ed-f"><span>Rotation</span><select id="p-prot">` +
+            `<option value="trigo"${!q.horaire ? ' selected' : ''}>Trigonométrique (anti-horaire)</option>` +
+            `<option value="horaire"${q.horaire ? ' selected' : ''}>Horaire</option>` +
+            `</select></label>`,
+        )
+      }
+      if (mat) {
+        rows.push(numField('Allure du front (u/s)', 'p-pall', q.allure ?? PORTE_ALLURE_DEFAUT, 10))
+        // LA PART À MI-COURSE dit ce que la durée ne dit pas. Le rideau est
+        // régulier (50 % à mi-course, toujours) ; l'éventail balaie un
+        // angle, et sur une porte étroite et longue pivotée sur un coin il
+        // ne matérialise presque rien pendant la première moitié du temps
+        // avant de se remplir d'un coup — le défaut même qu'on corrige.
+        // Mieux vaut le chiffre sous les yeux de l'auteur qu'une surprise
+        // en jeu : il lui reste à choisir une autre charnière.
+        const part = Math.round(portePart(q, 0.5) * 100)
+        rows.push(
+          `<p class="ed-empty">Fermeture complète en ${porteDuree(q).toFixed(2)} s à cette allure. À mi-course, ${part} % du panneau est matérialisé.</p>`,
+        )
+        if (part < 25 || part > 75) {
+          rows.push(
+            `<div class="ed-v warn">! Matérialisation très irrégulière : l’essentiel du panneau apparaît d’un coup. Une charnière sur le milieu d’un côté, ou une porte moins allongée, répartissent mieux — la poussée sur le corps, elle, reste bornée à l’allure.</div>`,
+          )
+        }
+      }
       rows.push(
         numField('X min', 'p-minX', q.minX),
         numField('X max', 'p-maxX', q.maxX),
@@ -5859,6 +5934,9 @@ export class LevelEditor {
       )
       rows.push(
         `<p class="ed-empty">La porte s’ouvre par le canal : le N° affiché sur les pastilles. La règle ne joue que si plusieurs pastilles portent ce numéro. Canal −1 : porte SCÉNARISÉE, qu’aucun faisceau n’ouvre.</p>`,
+      )
+      rows.push(
+        `<p class="ed-empty">D’UN COUP, la paroi apparaît : un corps pris au milieu est coupé en deux. Avec un RIDEAU ou un ÉVENTAIL, un front la déploie et POUSSE ce qu’il rencontre — le corps est propulsé, jamais déchiré. L’ouverture rejoue le même geste à rebours.</p>`,
       )
     } else if (s.kind === 'rail') {
       const r = (this.level.rails ?? [])[s.index]
@@ -6597,6 +6675,46 @@ export class LevelEditor {
       q.canal = canal >= 1 ? canal : -1
       if (text('p-pregle') === 'et') q.regle = 'et'
       else delete q.regle
+      // la matérialisation : ses réglages ne s'écrivent qu'à l'écart du
+      // défaut, et disparaissent tous avec elle (une porte d'un coup n'a
+      // ni sens ni charnière). Un champ absent de la fiche (l'autre façon)
+      // laisse la valeur en place : `val` rend 0 pour un champ manquant,
+      // d'où la garde sur sa présence.
+      const mat = text('p-pmat')
+      if (mat === 'rideau' || mat === 'eventail') {
+        q.materialisation = mat
+        if (mat === 'rideau') {
+          // les réglages de l'AUTRE façon s'en vont : sans ce ménage, un
+          // aller-retour éventail → rideau → éventail ressuscitait une
+          // charnière que l'auteur croyait abandonnée, et le fichier
+          // gardait des champs que rien ne lit.
+          delete q.pivot
+          delete q.horaire
+          if (this.host.querySelector('#p-psens')) {
+            const sens = Math.round(val('p-psens'))
+            if (sens !== PORTE_SENS_DEFAUT) q.sens = sens
+            else delete q.sens
+          }
+        } else {
+          delete q.sens
+          if (this.host.querySelector('#p-ppivot')) {
+            const pivot = Math.round(val('p-ppivot'))
+            if (pivot >= 1 && pivot <= 7) q.pivot = pivot
+            else delete q.pivot
+            if (text('p-prot') === 'horaire') q.horaire = true
+            else delete q.horaire
+          }
+        }
+        const allure = Math.round(val('p-pall'))
+        if (allure >= 1 && allure !== PORTE_ALLURE_DEFAUT) q.allure = allure
+        else delete q.allure
+      } else {
+        delete q.materialisation
+        delete q.sens
+        delete q.pivot
+        delete q.horaire
+        delete q.allure
+      }
       Object.assign(
         q,
         this.normalized(
@@ -7410,6 +7528,60 @@ export class LevelEditor {
         p.sx + 4,
         p.sy - 4,
       )
+      // LA MATÉRIALISATION se lit sur la carte : la part déjà déployée à
+      // mi-course, et son front en trait vif — la flèche dit où il va. On
+      // voit d'un coup d'œil de quel côté le corps sera poussé.
+      if (q.materialisation) {
+        // l'aperçu se prend à MI-AIRE, pas à mi-course : sur un éventail
+        // étroit, la mi-course ne montre qu'un éclat dans un coin (6 % sur
+        // une porte 40 × 340 pivotée sur un angle) et ne dit rien de la
+        // forme balayée. On cherche l'avancement qui en matérialise la
+        // moitié — vingt pas de dichotomie, c'est un dessin d'éditeur.
+        let lo = 0
+        let hi = 1
+        for (let k = 0; k < 20; k++) {
+          const mid = (lo + hi) / 2
+          if (portePart(q, mid) < 0.5) lo = mid
+          else hi = mid
+        }
+        const { contour, front } = portePolygone(q, (lo + hi) / 2)
+        g.fillStyle = 'rgba(255,90,90,0.22)'
+        g.beginPath()
+        for (let k = 0; k < contour.length; k++) {
+          const c = this.toScreen(contour[k].x, contour[k].y)
+          if (k === 0) g.moveTo(c.sx, c.sy)
+          else g.lineTo(c.sx, c.sy)
+        }
+        g.closePath()
+        g.fill()
+        if (front.length === 2) {
+          const f0 = this.toScreen(front[0].x, front[0].y)
+          const f1 = this.toScreen(front[1].x, front[1].y)
+          g.strokeStyle = '#ffd2c8'
+          g.lineWidth = 2.5
+          g.beginPath()
+          g.moveTo(f0.sx, f0.sy)
+          g.lineTo(f1.sx, f1.sy)
+          g.stroke()
+          // la flèche : du milieu du front, vers ce qui reste à combler
+          const k = porteCoupe(q, (lo + hi) / 2)
+          const mx = (front[0].x + front[1].x) / 2
+          const my = (front[0].y + front[1].y) / 2
+          const L = Math.min(40, Math.hypot(q.maxX - q.minX, q.maxY - q.minY) / 4)
+          const m0 = this.toScreen(mx, my)
+          const m1 = this.toScreen(mx + k.nx * L, my + k.ny * L)
+          const ax = m1.sx - m0.sx
+          const ay = m1.sy - m0.sy
+          const al = Math.hypot(ax, ay) || 1
+          g.beginPath()
+          g.moveTo(m0.sx, m0.sy)
+          g.lineTo(m1.sx, m1.sy)
+          g.moveTo(m1.sx - (ax * 6 + ay * 4) / al, m1.sy - (ay * 6 - ax * 4) / al)
+          g.lineTo(m1.sx, m1.sy)
+          g.lineTo(m1.sx - (ax * 6 - ay * 4) / al, m1.sy - (ay * 6 + ax * 4) / al)
+          g.stroke()
+        }
+      }
     }
     // chasses : le rectangle, et des chevrons dans le sens du souffle — le
     // même dessin qu'en jeu, immobile

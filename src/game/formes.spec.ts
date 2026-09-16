@@ -521,3 +521,38 @@ describe('la COQUE : une forme creuse d’un seul tenant', () => {
     expect(dansForme(b, 190, 190)).toBe(false) // les angles restent coupés
   })
 })
+
+describe('formes — la coupe (un demi-plan qui tronque)', () => {
+  const rect: FormeBox = { minX: -100, minY: -100, maxX: 100, maxY: 100 }
+  // ne garder que ce qui est SOUS y = 0 : normale sortante vers +y
+  const coupe = { x: 0, y: 0, nx: 0, ny: 1 }
+
+  it('dansForme respecte la coupe, même sur le rectangle (chemin rapide contourné)', () => {
+    expect(dansForme(rect, 0, 50)).toBe(true)
+    expect(dansForme({ ...rect, coupe }, 0, 50)).toBe(false)
+    expect(dansForme({ ...rect, coupe }, 0, -50)).toBe(true)
+  })
+
+  it('le champ est le MAX des deux : au ras de la coupe, sa normale l’emporte sur celle du bord', () => {
+    const c = contact({ ...rect, coupe }, -80, -5)
+    expect(c.dist).toBeCloseTo(-5, 6) // à 5 de la coupe, à 20 du bord gauche
+    expect(c.nx).toBeCloseTo(0, 6)
+    expect(c.ny).toBeCloseTo(1, 6)
+    // loin de la coupe, le bord reprend la main
+    const d = contact({ ...rect, coupe }, -95, -60)
+    expect(d.dist).toBeCloseTo(-5, 6)
+    expect(d.nx).toBeCloseTo(-1, 6)
+  })
+
+  it('dehors par la coupe : la distance est celle à la ligne', () => {
+    const c = contact({ ...rect, coupe }, 0, 30)
+    expect(c.dist).toBeCloseTo(30, 6)
+    expect(c.ny).toBeCloseTo(1, 6)
+  })
+
+  it('la coupe se lit en monde : une boîte pivotée garde la même ligne de coupe', () => {
+    const b: FormeBox = { ...rect, angle: 90, coupe }
+    expect(dansForme(b, 0, 50)).toBe(false)
+    expect(dansForme(b, 0, -50)).toBe(true)
+  })
+})

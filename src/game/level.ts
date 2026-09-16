@@ -454,6 +454,25 @@ export interface CibleDef {
 
 // Une porte est une paroi asservie : FERMÉE tant que sa cible est éteinte,
 // ouverte (et traversante) tant qu'elle est allumée.
+//
+// LA MATÉRIALISATION (2026) : la façon dont la paroi APPARAÎT quand la
+// porte se ferme — et s'efface quand elle s'ouvre, le même geste à rebours.
+// Absente, la porte apparaît d'un coup (l'historique) : les particules
+// prises dedans sont repoussées vers la face la plus proche, et un corps
+// au milieu est COUPÉ EN DEUX. Avec un front qui avance, la paroi n'existe
+// que derrière lui : ce qu'il rencontre est POUSSÉ devant, comme par une
+// chasse — le corps est propulsé, jamais déchiré. Deux façons d'avancer :
+//  · RIDEAU : un front droit qui traverse le rectangle dans la direction
+//    `sens` (degrés trigonométriques : −90 du haut vers le bas, 0 d'ouest
+//    en est…) — un rideau qui tombe, un volet qui coulisse ;
+//  · ÉVENTAIL : un front qui PIVOTE autour d'une charnière posée sur le
+//    bord du rectangle (`pivot` : un coin ou le milieu d'un côté), dans le
+//    sens trigonométrique ou horaire — la porte se déploie en arc de cercle.
+// `allure` règle la vitesse du front (u/s) ; pour l'éventail c'est celle
+// de son extrémité la plus lointaine, pour que deux portes de même allure
+// se ferment au même rythme quelle que soit leur façon.
+export type PorteMaterialisation = 'rideau' | 'eventail'
+
 export interface PorteDef {
   minX: number
   minY: number
@@ -467,7 +486,24 @@ export interface PorteDef {
   // Quand PLUSIEURS pastilles portent ce numéro : 'et' exige qu'elles
   // soient TOUTES actives en même temps ; absente ('ou'), une seule suffit.
   regle?: 'et'
+  // Absente : d'un coup. Voir le commentaire de tête.
+  materialisation?: PorteMaterialisation
+  // RIDEAU : la direction du front, en degrés. Absente : PORTE_SENS_DEFAUT.
+  sens?: number
+  // ÉVENTAIL : la charnière, 0..7 en tournant depuis le coin sud-ouest
+  // (0 SO, 1 S, 2 SE, 3 E, 4 NE, 5 N, 6 NO, 7 O). Absente : 0.
+  pivot?: number
+  // ÉVENTAIL : le front tourne dans le sens HORAIRE. Absente : trigonométrique.
+  horaire?: true
+  // La vitesse du front (u/s). Absente : PORTE_ALLURE_DEFAUT.
+  allure?: number
 }
+// −90° : du haut vers le bas — le rideau qui tombe, le cas qu'on demande
+// en premier. 300 u/s : l'allure de l'aspiration du sas (exitPull) — un
+// front qui pousse franchement sans écraser le corps sur la paroi d'en face
+// (voir la note de la chasse, plus bas : à 700, l'éjecteur tuait).
+export const PORTE_SENS_DEFAUT = -90
+export const PORTE_ALLURE_DEFAUT = 300
 
 // UNE CHASSE : un courant de poussée posé dans le tableau — le moyen
 // d'ÉJECTER le volume jouable d'une salle. Une porte qui se ferme ne pousse
