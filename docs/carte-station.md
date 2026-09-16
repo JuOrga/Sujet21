@@ -7,6 +7,10 @@
 > cinq zones, des conditions d'accès selon l'état du sujet (eau · glace ·
 > vapeur), deux haltes et deux secteurs sous confinement supérieur.
 
+> La MÉCANIQUE des routes — ce qu'une route met en jeu, où chaque paramètre
+> se règle, les natures de salle et les pistes propres au jeu — est dans
+> [`routes.md`](routes.md). Ici : la carte, ses données, son dessin, son éditeur.
+
 ## Où sont les choses
 
 | Fichier | Rôle |

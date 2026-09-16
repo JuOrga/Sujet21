@@ -4,7 +4,9 @@ Roguelike ambiant et inertiel : vous êtes un volume d'eau qui s'échappe d'un
 laboratoire orbital. En gravité nulle, la seule façon d'avancer est d'éjecter
 une partie de soi-même — **se déplacer, c'est rétrécir**.
 
-Le document de référence est [`docs/doc-fonctionnel.md`](docs/doc-fonctionnel.md).
+Le document de référence est [`docs/doc-fonctionnel.md`](docs/doc-fonctionnel.md) ;
+le système de routes (la carte, les voies, les rencontres, leurs réglages
+et les pistes) est dans [`docs/routes.md`](docs/routes.md).
 
 ## État — version 0.21.425, une run jouable de bout en bout
 
