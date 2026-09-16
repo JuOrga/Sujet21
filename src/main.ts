@@ -14990,12 +14990,18 @@ function quitteAuMenu(): void {
   clefCachette = false
   run.ended = false
   purgeCondensat()
-  auHub = false
   testLevel = null
+  // ON REVIENT À L'ÉTAT DU CHARGEMENT : le hub derrière la fiche, et le
+  // bouton COMMENCER qui y entre. Le drapeau à FAUX prenait le chemin de la
+  // navigation directe (?tableau=N) dans closeHome, qui relance la salle
+  // courante : après « quitter la descente », COMMENCER repartait en salle
+  // 1 sans passer par le hub (revue du 16/09).
+  auHub = true
   hasPlayed = false // la partie est close : le bouton redit COMMENCER
   document.body.classList.remove('playing')
   input.paused = true
   homeRestartBtn.hidden = true
+  restart() // le décor du hub reprend sa place derrière la fiche
   majVoieHud()
   majBoutonsRun()
   openHome()
