@@ -16,6 +16,7 @@ import {
   INSTRUMENTS,
   type InstrumentDef,
   descriptionInstrument,
+  CONTREPARTIES,
 } from './instruments'
 import { levierDef, type Effet } from './leviers'
 
@@ -95,7 +96,10 @@ export function reprendRecompensesPubliees(): number {
 
 /** Le catalogue COMPLET : les cartes livrées, puis celles qui se jouent. */
 export function catalogueRecompenses(): InstrumentDef[] {
-  return [...INSTRUMENTS, ...recompensesJouees()]
+  // les CONTREPARTIES entrent dans le catalogue de LECTURE (le jeu doit
+  // savoir lire une carte qu'un événement a collée) sans jamais entrer dans
+  // le tirage d'un palier — tirageInstruments les écarte sur leur drapeau
+  return [...INSTRUMENTS, ...CONTREPARTIES, ...recompensesJouees()]
 }
 
 function ecrit(): void {

@@ -22,6 +22,7 @@
 
 import { memeCarte, refusPublication } from '../game/cartePartage'
 import {
+  CRAN_MAX,
   CARTE_LIVREE,
   FORMES_MODULE,
   TYPES_MODULE,
@@ -257,7 +258,7 @@ export class EditeurCarte {
   /** L'état de l'aperçu, dans les termes de la descente : le module courant
    *  y est toujours tenu pour épuisé (l'aperçu ne joue pas les salles). */
   private etatApercu(module = this.courant): EtatCarteRun {
-    return { module, niveau: moduleParId(this.carte, module)?.niveaux ?? 0, visites: this.visites }
+    return { module, niveau: moduleParId(this.carte, module)?.niveaux ?? 0, visites: this.visites, revelations: {}, tissage: '', trace: [], graineRun: '' }
   }
 
   private options(): OptionsDessin {
@@ -420,7 +421,10 @@ export class EditeurCarte {
       this.champ(P + 'w', 'largeur', m.w, 'type="number" step="1" min="32"') +
       this.champ(P + 'h', 'hauteur', m.h, 'type="number" step="1" min="32"') +
       `</div>` +
+      `<div class="ce-grille2">` +
       this.champ(P + 'temp', 'Température (°C)', m.temp, 'type="number" step="1"') +
+      this.champ(P + 'cran', 'Confinement (+cran)', m.cran, `type="number" step="1" min="0" max="${CRAN_MAX}" title="Le confinement supérieur : chaque cran monte la difficulté des salles du module d’un cran et multiplie la mémoire gravée à leur sas — plus dur, plus généreux. 0 : l’ordinaire"`) +
+      `</div>` +
       `<label class="ce-f" title="Une cache : l’orbe pris quand le module est épuisé, une fois par poste"><span>Orbe recelé</span><select id="ce-orbe">` +
       `<option value=""${m.orbe ? '' : ' selected'}>— aucun —</option>` +
       ORBES.map((o) => `<option value="${esc(o.id)}"${m.orbe === o.id ? ' selected' : ''}>${esc(o.id)} · ${esc(o.nom)}</option>`).join('') +
@@ -1068,7 +1072,7 @@ export class EditeurCarte {
         const n = ajouteModule(c, m.x + m.w + 24, m.y, this.pas())
         Object.assign(n, {
           nom: m.nom, type: m.type, zone: m.zone, w: m.w, h: m.h, temp: m.temp, forme: m.forme,
-          niveaux: m.niveaux, biome: m.biome, desc: m.desc, ...(m.orbe ? { orbe: m.orbe } : {}),
+          niveaux: m.niveaux, biome: m.biome, cran: m.cran, desc: m.desc, ...(m.orbe ? { orbe: m.orbe } : {}),
         })
         this.selection = n.id
         this.change()

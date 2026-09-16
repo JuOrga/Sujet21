@@ -96,15 +96,59 @@ import {
   CARTE_LIVREE,
   type CarteStation,
   ORBES,
+  accessibles,
+  biomeEffectif,
   biomesDeCarte,
+  mecaniqueDuBiome,
+  plusCourtVers,
   couleurTemperature,
   moduleParId,
   zoneDe,
   type ModuleCarte,
 } from './game/carteStation'
+import {
+  dessinMiniCarteSVG,
+  portesDuRang,
+  tisseMiniCarte,
+  ICONES_MINI_CARTE,
+  typesDuModule,
+  type MiniCarte,
+  type NatureNoeud,
+  type NoeudVoie,
+  type ReglagesTissage,
+  type PrimeNoeud,
+  NOMS_PRIME,
+  PRIMES,
+} from './game/voiesModule'
+import { CLE_MANQUES, inventairePool, litManques, noteManque, type Manque } from './game/manques'
+import {
+  ditEffet,
+  offresDe,
+  resoutChoix,
+  tireEvenement,
+  type ChoixEvenement,
+  type EffetEvenement,
+  type EtatJoueur,
+  type EvenementDef,
+} from './game/evenements'
 import { dessinCarteSVG, type OptionsDessin } from './game/dessinCarte'
 import {
+  choisitVoie,
   choixModules,
+  climatDuModule,
+  derniereVoie,
+  difficulteSousCran,
+  ditProjection,
+  graineModule,
+  moduleEffectif,
+  niveauxRestants,
+  offreDon,
+  projectionDepuis,
+  reveleInconnu,
+  offresRepos,
+  type DonsHalte,
+  postureDuModule,
+  primeMemoire,
   departCarte,
   entreModule,
   franchitSalle,
@@ -474,6 +518,21 @@ const run = {
   // La MÉMOIRE gravée pendant cette run (l'affichage du butin ; le solde
   // vrai vit dans les registres et survit à tout).
   memoireGagnee: 0,
+  // L'ESSENCE MAXIMALE, en part du plein : le volume avec lequel le corps
+  // NAÎT à chaque salle. Une salle SACRIFICE (evenements.ts) la rogne, et
+  // c'est la seule perte du jeu qui ne se rattrape pas en route — d'où le
+  // plancher, sous lequel la run deviendrait une impasse.
+  essence: 1,
+  // LE CONFINEMENT PROMIS : des crans que la station ajoute à la PROCHAINE
+  // salle jouée, parce qu'un événement l'a réveillée. Consommé à l'entrée.
+  confinementDu: 0,
+  // les salles événement déjà traversées cette run : on ne rejoue pas deux
+  // fois la même rencontre tant qu'il en reste d'autres
+  evenementsVus: [] as string[],
+  // LA PRIME DE LA SALLE EN COURS : posée à l'ouverture d'une porte à prime
+  // de la mini-carte, servie au sas (mémoire ×2, condensat ×2, tirage
+  // garanti), effacée à l'entrée de la salle suivante
+  primeSalle: null as PrimeNoeud | null,
 }
 const VIES_MAX = 3 // plafond, étalonnage et instruments compris
 // Sonde de test : l'état de la run depuis la console (comme __sim, __cam)
@@ -538,6 +597,28 @@ function carteDef(id: string): InstrumentDef | null {
 // __run) — « __levier('bonbonne') » dit tout de suite ce que les cartes
 // embarquées pèsent sur un réglage.
 ;(window as unknown as { __levier: (id: LevierId) => number }).__levier = lev
+
+/** LE VOLUME DE DÉPART EFFECTIF d'une salle, en particules : le plein du
+ *  tableau, rogné par l'ESSENCE MAXIMALE de la run (une salle sacrifice).
+ *  TOUTE lecture du « plein du corps » passe par ici — le versement
+ *  automatique, la jauge, le trophée « sans une goutte », le dossier :
+ *  sinon le jeu croirait le corps en manque de ce qu'il n'a jamais eu. */
+function volumeDepart(lv: { spawn: { n: number } } = level): number {
+  return Math.max(1, Math.round(lv.spawn.n * Math.max(essencePlancher(), run.essence)))
+}
+/** LE PLANCHER D'ESSENCE du plan (en part du plein) : le curseur de
+ *  LA DESCENTE, sinon la constante d'avant. */
+function essencePlancher(): number {
+  return Math.max(0.05, Math.min(1, voiePlan.essencePlancher / 100))
+}
+/** CE QU'UNE HALTE REND, lu du plan. */
+function donsHalte(): DonsHalte {
+  return { reserveL: voiePlan.halteReserveCl / 100, condensatCl: voiePlan.halteCondensatCl }
+}
+/** LA PRIME DE MÉMOIRE du module, au taux du plan. */
+function primeMemoireDu(m: ModuleCarte | undefined): number {
+  return primeMemoire(m, voiePlan.memoireParCran / 100)
+}
 
 function capBonbonne(): number {
   // une contrepartie peut rogner la bonbonne — jamais en dessous de deux
@@ -711,7 +792,7 @@ function createSim(level: LevelDef): FluidSim {
     params.plasmaRailRadius * 2.5,
     params.plasmaRailRadius,
   )
-  sim.spawnDisc(level.spawn.x, level.spawn.y, level.spawn.n, KIND_PLAYER)
+  sim.spawnDisc(level.spawn.x, level.spawn.y, volumeDepart(level), KIND_PLAYER)
   // né dans une zone qui impose la vapeur : le corps EST un nuage dès la
   // première image — sinon le compteur annonce des dashs qui ne partent pas,
   // le temps que la vaporisation progressive s'achève
@@ -859,6 +940,11 @@ const voieVues = new Set<string>()
 // se font au contact des alcôves de l'étal.
 let economatIntercalaire: LevelDef | null = null
 let economatVisiteCetteRun = false
+// L'ÉCONOMAT COMME NŒUD DE LA CARTE : quand le plan porte un module
+// économat, c'est lui qui décide — on y entre par sa coursive, et
+// l'intercalation automatique de mi-descente se tait. Une carte sans
+// économat (un outil, une carte d'avant les haltes) garde l'ancien réflexe.
+const carteAUnEconomat = (): boolean => carte.modules.some((m) => m.type === 'economat')
 // APPELER LE SEMBLABLE (outil de conception, banc et pupitre) : l'Économat
 // s'intercale d'ordinaire tout seul, une fois par run et à mi-descente —
 // impossible à convoquer pour l'essayer. Armé ici, il prend la prochaine
@@ -1053,8 +1139,93 @@ function longueurRun(): number {
 function planEffectif(): PlanVoie {
   return { ...voiePlan, longueur: longueurRun() }
 }
+/** LA LONGUEUR DE LA CARTE : la plus courte route du départ à l'objectif,
+ *  en salles — ce que dure une descente neuve. Le plan la lit, il ne la
+ *  règle plus (revue du 16/09 : « la longueur ne compte plus »). */
+function longueurCarte(): number {
+  return longueurRunCarte(carte, departCarte(carte), 0)
+}
+/** Le plan tel que l'écran LA DESCENTE le déroule : les réglages du poste
+ *  sur la longueur de la carte — la même que le jeu, sans dépendre du rang
+ *  où l'on en est. */
+function planEcran(): PlanVoie {
+  return { ...voiePlan, longueur: longueurCarte() }
+}
 function moduleEnCours(): ModuleCarte | undefined {
   return moduleCourant(carte, carteRun)
+}
+/** LA GRAINE DE LA RUN : la descente du jour donne la date — le même
+ *  tissage pour tous les postes ; sinon le poste en tire une au départ.
+ *  Chaque module en dérive la sienne (graineModule), ce qui permet de
+ *  tisser un module AVANT d'y entrer : le survol dit ce qu'on y trouvera. */
+function graineRun(): string {
+  return descenteDuJour()
+    ? new Date().toISOString().slice(0, 10)
+    : `r${Math.floor(Math.random() * 36 ** 8).toString(36)}`
+}
+/** La graine du tissage d'un module qu'on entre : dérivée de la run, ou
+ *  tirée sur place pour une sauvegarde d'avant la graine de run. */
+function graineTissage(id: string): string {
+  return graineModule(carteRun, id) || `${id}#${Math.floor(Math.random() * 36 ** 6).toString(36)}`
+}
+/** TISSER UN MODULE depuis une graine, au rang de descente où l'on y
+ *  entre — pour le module en cours comme pour un module qu'on survole. */
+function tisseModule(m: ModuleCarte, graine: string, rangEntree: number): MiniCarte | null {
+  if (m.niveaux <= 0 || !graine) return null
+  const acquis = records.eveilAcquis()
+  const verrous = records.verrousCycle()
+  const permises = mecaniquesPermises(
+    transfoTenue('solidification', acquis, verrous),
+    transfoTenue('vaporisation', acquis, verrous),
+  )
+  return tisseMiniCarte(
+    m.niveaux,
+    aleaDeGraine(graine),
+    permises,
+    (r) => momentAuRang(rangEntree + 1 + r, planEffectif()),
+    { debut: voiePlan.figuresDebut, suite: voiePlan.figuresSuite },
+    voiePlan.ecrites,
+    reglagesTissage(m),
+  )
+}
+/** LA MINI-CARTE À VOIES du module en cours, retissée depuis sa graine —
+ *  null sans graine (un outil, une carte d'avant) ou sans salle. */
+function miniCarteDuModule(): MiniCarte | null {
+  const m = moduleEnCours()
+  if (!m) return null
+  // le rang de la descente à l'entrée du module : les salles déjà
+  // franchies dedans se retranchent du rang courant
+  return tisseModule(m, carteRun.tissage, voieRang - carteRun.niveau)
+}
+/** CE QU'ON TROUVERA dans un module qu'on n'a pas encore entré — les types,
+ *  pas les comptes (le concepteur, 16/09). Le rang d'entrée s'estime par le
+ *  plus court chemin ; seule la part des figures en dépend. */
+function typesDuModuleVise(m: ModuleCarte): string[] {
+  const graine = graineModule(carteRun, m.id)
+  if (!graine || m.niveaux <= 0) return []
+  const loin = plusCourtVers(carte, carteRun.module, m.id) ?? m.niveaux
+  const mc = tisseModule(m, graine, voieRang + niveauxRestants(carte, carteRun) + loin - m.niveaux)
+  return mc ? typesDuModule(mc) : []
+}
+/** LES RÉGLAGES DU TISSAGE d'un module : ceux du plan, plus la cache si le
+ *  module recèle un orbe — c'est la carte qui le dit, pas le plan. */
+function reglagesTissage(m: ModuleCarte): ReglagesTissage {
+  return {
+    partEvenement: voiePlan.partEvenement / 100,
+    rangMin: voiePlan.rangMinEvenement,
+    bifurcation: voiePlan.bifurcation / 100,
+    economats: voiePlan.economatsParModule,
+    repos: voiePlan.reposParModule,
+    dons: voiePlan.donsParModule,
+    coffre: !!m.orbe,
+    // le biome du module pèse sa mécanique favorite (la carte le dit)
+    favori: mecaniqueDuBiome(carte, m.biome),
+    partFavori: voiePlan.partBiome / 100,
+    partPrime: voiePlan.partPrime / 100,
+    // le module objectif se boucle au sas de sa dernière salle : ce rang
+    // n'a ni rencontre ni halte
+    dernierRangSalles: m.id === carte.regles.objectif,
+  }
 }
 function sauvePlanVoie(): void {
   try {
@@ -4407,6 +4578,10 @@ interface RunSauvee {
   memoireGagnee?: number // le butin de mémoire déjà gravé cette run
   economatVisite?: boolean // l'annexe du Semblable a-t-elle déjà servi ?
   carte?: unknown // où l'on en est sur la carte (descenteCarte.ts)
+  essence?: number // l'essence maximale rognée par les sacrifices
+  confinementDu?: number // les crans promis à la prochaine salle
+  evenementsVus?: string[] // les rencontres déjà traversées
+  primeSalle?: string // la prime de la salle en cours (voiesModule.ts)
 }
 function runSauvee(): RunSauvee | null {
   try {
@@ -4433,6 +4608,13 @@ function runSauvee(): RunSauvee | null {
       memoireGagnee: typeof d.memoireGagnee === 'number' ? d.memoireGagnee : undefined,
       economatVisite: typeof d.economatVisite === 'boolean' ? d.economatVisite : undefined,
       carte: d.carte,
+      // une sauvegarde d'avant les salles événement : essence pleine, rien promis
+      essence: typeof d.essence === 'number' ? d.essence : undefined,
+      confinementDu: typeof d.confinementDu === 'number' ? d.confinementDu : undefined,
+      evenementsVus: Array.isArray(d.evenementsVus)
+        ? d.evenementsVus.filter((x): x is string => typeof x === 'string')
+        : undefined,
+      primeSalle: typeof d.primeSalle === 'string' ? d.primeSalle : undefined,
     }
   } catch {
     return null
@@ -4462,6 +4644,10 @@ function sauveRun(): void {
           memoireGagnee: run.memoireGagnee,
           economatVisite: economatVisiteCetteRun,
           carte: carteRun,
+          essence: run.essence,
+          confinementDu: run.confinementDu,
+          evenementsVus: run.evenementsVus,
+          primeSalle: run.primeSalle ?? undefined,
         }),
       )
   } catch {
@@ -4497,6 +4683,12 @@ function reprendreRun(save: RunSauvee): void {
   economatIntercalaire = null
   economatVisiteCetteRun = save.economatVisite ?? false
   carteRun = litEtatCarteRun(save.carte, carte)
+  // l'essence rognée par les sacrifices survit à la reprise — sinon un
+  // sacrifice se rendrait en fermant l'onglet
+  run.essence = Math.max(essencePlancher(), Math.min(1, save.essence ?? 1))
+  run.confinementDu = Math.max(0, Math.round(save.confinementDu ?? 0))
+  run.evenementsVus = (save.evenementsVus ?? []).slice()
+  run.primeSalle = PRIMES.includes(save.primeSalle as PrimeNoeud) ? (save.primeSalle as PrimeNoeud) : null
   hasPlayed = true
   document.body.classList.add('playing')
   input.paused = false
@@ -5293,9 +5485,12 @@ function renderPlanche(): void {
   // glisser) ne se règle que sur la vue complète : un rang n'a de sens
   // que dans la liste entière.
   const biomes = biomesDeCarte(carte)
+  // le biome effectif d'une salle (un ancien code de module suit son biome)
+  // — lu ici, avant que la vignette n'appelle « carte » son élément
+  const biomeDe = (code: string | undefined): string => biomeEffectif(carte, code)
   const filtres = document.getElementById('planche-filtres')
   if (filtres) {
-    const nb = (code: string): number => toutes.filter((s) => (s.level.biome ?? '') === code).length
+    const nb = (code: string): number => toutes.filter((s) => biomeDe(s.level.biome) === code).length
     const bouton = (val: string | null, libelle: string, n: number, titre: string): string =>
       `<button type="button" data-filtre="${val === null ? '*' : val}" class="${plancheFiltre === val ? 'on' : ''}${n === 0 && val ? ' vide' : ''}" title="${titre}">${libelle} <b>${n}</b></button>`
     filtres.innerHTML =
@@ -5314,7 +5509,7 @@ function renderPlanche(): void {
   const visibles =
     plancheFiltre === null
       ? toutes
-      : toutes.filter((s) => (s.level.biome ?? '') === plancheFiltre)
+      : toutes.filter((s) => biomeDe(s.level.biome) === plancheFiltre)
   const ordonnable = plancheFiltre === null
   corps.innerHTML = ''
   visibles.forEach((s, i) => {
@@ -5390,10 +5585,12 @@ function renderPlanche(): void {
       // LE BIOME : le module de la carte qui propose ce tableau
       `<select class="pl-biome" title="Le BIOME : le module de la carte de la station qui peut proposer ce tableau. Universel : tout module le pioche. La liste vient de carteStation.json — un module ajouté dans l'éditeur de carte apparaît ici.">` +
       `<option value=""${s.level.biome ? '' : ' selected'}>— universel —</option>` +
+      // un tableau encore marqué d'un code de module (« C1 ») se montre
+      // dans le biome de ce module : rien à réétiqueter pour qu'il joue
       biomes
-        .map((b) => `<option value="${esc(b.code)}"${s.level.biome === b.code ? ' selected' : ''}>${esc(b.code)} · ${esc(b.nom)}</option>`)
+        .map((b) => `<option value="${esc(b.code)}"${biomeDe(s.level.biome) === b.code ? ' selected' : ''}>${esc(b.code)} · ${esc(b.nom)}</option>`)
         .join('') +
-      (s.level.biome && !biomes.some((b) => b.code === s.level.biome)
+      (s.level.biome && !biomes.some((b) => b.code === biomeDe(s.level.biome))
         ? `<option value="${esc(s.level.biome)}" selected>${esc(s.level.biome)} (plus sur la carte)</option>`
         : '') +
       `</select>`
@@ -5773,6 +5970,7 @@ function optionsStation(): OptionsDessin {
     retour: enRunCarte()
       ? (choixModules(carte, carteRun, orbesAcquis()).find((x) => x.retour)?.module.id ?? null)
       : null,
+    revelations: enRunCarte() ? carteRun.revelations : {},
   }
 }
 
@@ -5907,6 +6105,7 @@ stationEl?.addEventListener('pointerdown', (e) => {
   plan?.addEventListener('pointermove', (e) => viseStation(lit(e)))
   plan?.addEventListener('pointerleave', () => viseStation(null))
   plan?.addEventListener('focusin', (e) => viseStation(lit(e)))
+  plan?.addEventListener('pad-vise', (e) => viseStation(lit(e))) // la manette survole aussi
   plan?.addEventListener('click', (e) => viseStation(lit(e)))
 }
 
@@ -6062,7 +6261,7 @@ function descenteBibliotheque(): LevelDef[] {
 function tirageDescenteCourant(): RangTirage[] {
   return tireDescente(
     descenteBibliotheque(),
-    voiePlan,
+    planEcran(),
     descenteGraine,
     descenteMemoires,
   )
@@ -6074,7 +6273,7 @@ function tirageDescenteCourant(): RangTirage[] {
 function dscRampe(): HTMLElement {
   const d = document.createElement('div')
   d.className = 'dsc-rampe'
-  const rangs = apercuDescente(voiePlan)
+  const rangs = apercuDescente(planEcran())
   const haut = Math.max(1, ...rangs.map((r) => r.difficulte))
   for (const r of rangs) {
     const s = document.createElement('span')
@@ -6092,7 +6291,7 @@ function dscRampe(): HTMLElement {
 /** LA TABLE : une ligne par rang. Sans tirage, elle dit ce que le plan
  *  commande ; après un tirage, elle ajoute ce que la pioche a choisi. */
 function dscTable(): HTMLElement {
-  const rangs = apercuDescente(voiePlan)
+  const rangs = apercuDescente(planEcran())
   const t = document.createElement('table')
   t.className = 'dsc-table'
   const entetes = [
@@ -6125,7 +6324,7 @@ function dscTable(): HTMLElement {
       else td.appendChild(contenu)
       tr.appendChild(td)
     }
-    cell(`${r.rang} / ${voiePlan.longueur}`)
+    cell(`${r.rang} / ${longueurCarte()}`)
     cell(MOMENT_COURT[r.moment])
     cell(String(r.difficulte))
     cell(AMPLEUR_NOMS[r.ampleur])
@@ -6165,6 +6364,167 @@ function dscTable(): HTMLElement {
   return t
 }
 
+/** LES MOMENTS QU'UN BIOME JOUE : d'après la carte, quels tiers de la
+ *  descente ses modules occupent (les transformateurs le début, le cœur
+ *  début et milieu, l'antichambre milieu et fin…). La grille des manques
+ *  ne demande des tableaux que pour ces moments-là : une case que le jeu
+ *  ne piochera jamais n'est pas un manque. */
+function momentsDuBiome(): Map<string, Set<CodeAtelier['moment']>> {
+  const plan = planEcran()
+  const out = new Map<string, Set<CodeAtelier['moment']>>()
+  for (const mod of carte.modules) {
+    const code = mod.biome.trim()
+    if (!code || mod.niveaux <= 0) continue
+    const jusque = plusCourtVers(carte, carte.regles.depart, mod.id)
+    if (jusque === null) continue
+    const avant = jusque - mod.niveaux // les salles jouées avant d'entrer
+    const set = out.get(code) ?? new Set<CodeAtelier['moment']>()
+    for (let r = 1; r <= mod.niveaux; r++) set.add(momentAuRang(avant + r, plan))
+    out.set(code, set)
+  }
+  return out
+}
+
+/** LES MANQUES DU POOL : l'inventaire (ce que la bibliothèque a, par biome
+ *  de la carte et moment que ce biome joue, une case par mécanique — une
+ *  case vide est un tableau à écrire, et la liste du bas les nomme une à
+ *  une) et le relevé de ce que le jeu a dû générer faute de tableau. Le
+ *  concepteur a demandé « un moyen de savoir facilement où il manque des
+ *  salles à créer pour remplacer les générées » (16/09) — et, la première
+ *  grille lue, « du mal à savoir ce qu'il manque » : d'où la liste en clair.
+ *  Les tableaux marqués d'un code de module suivent le biome du module. */
+function dscManques(): HTMLElement {
+  const d = document.createElement('div')
+  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  const biomes = biomesDeCarte(carte)
+  const bib = descenteBibliotheque().map((lv) => (lv.biome ? { ...lv, biome: biomeEffectif(carte, lv.biome) } : lv))
+  const inv = inventairePool(bib, biomes.map((b) => b.code))
+  const moments = momentsDuBiome()
+  const muets = bib.filter((lv) => !decodeCodeAtelier(lv.code)).length
+  const nombre = (biome: string, mec: CodeAtelier['mecanique'], mom: CodeAtelier['moment']): number =>
+    inv.find((c) => c.biome === biome && c.mecanique === mec && c.moment === mom)?.codes.length ?? 0
+  const MOMENT_MOT: Record<CodeAtelier['moment'], string> = { 1: 'début', 2: 'milieu', 3: 'fin' }
+  // LES CASES VIDES, dans l'ordre où elles se voient en jeu : l'eau d'abord
+  // (la seule mécanique du débutant), puis le début avant la fin, puis le biome
+  const vides: { biome: string; nom: string; mec: CodeAtelier['mecanique']; mom: CodeAtelier['moment'] }[] = []
+  for (const b of biomes)
+    for (const mom of [1, 2, 3] as const) {
+      if (!moments.get(b.code)?.has(mom)) continue
+      for (const mec of [0, 1, 2, 3] as const) if (nombre(b.code, mec, mom) === 0) vides.push({ biome: b.code, nom: b.nom, mec, mom })
+    }
+  vides.sort((a, b) => a.mec - b.mec || a.mom - b.mom || biomes.findIndex((x) => x.code === a.biome) - biomes.findIndex((x) => x.code === b.biome))
+
+  const aide = document.createElement('p')
+  aide.className = 'dsc-aide'
+  aide.innerHTML =
+    'Générées coupées, chaque porte de la mini-carte pioche un tableau écrit de la <b>mécanique</b> de son nœud, dans le ' +
+    '<b>biome</b> du module, au <b>moment</b> de la descente où l’on est. La grille compte ces tableaux, une ligne par biome et ' +
+    'par moment que ce biome joue réellement (la carte le dit), une case par mécanique. Un tableau sans biome compte pour ' +
+    'tous ; un tableau marqué d’un ancien code de module compte pour le biome de ce module ; un tableau sans code ' +
+    'd’atelier ne compte nulle part. <b>Une case à zéro est une salle à écrire</b> — la liste sous la grille les nomme, ' +
+    'les plus vues en jeu d’abord.'
+  d.appendChild(aide)
+
+  const t = document.createElement('table')
+  t.className = 'dsc-table'
+  const thead = document.createElement('thead')
+  const trh = document.createElement('tr')
+  for (const e of ['BIOME', 'MOMENT', ...([0, 1, 2, 3] as const).map((mec) => MECANIQUE_NOMS[mec].toUpperCase())]) {
+    const th = document.createElement('th')
+    th.textContent = e
+    trh.appendChild(th)
+  }
+  thead.appendChild(trh)
+  t.appendChild(thead)
+  const tb = document.createElement('tbody')
+  for (const b of biomes) {
+    const joues = ([1, 2, 3] as const).filter((mom) => moments.get(b.code)?.has(mom))
+    joues.forEach((mom, i) => {
+      const tr = document.createElement('tr')
+      if (mom === 2) tr.className = 'dsc-mom2'
+      if (mom === 3) tr.className = 'dsc-mom3'
+      const tdB = document.createElement('td')
+      tdB.textContent = i === 0 ? `${b.nom} (${b.code})` : ''
+      tr.appendChild(tdB)
+      const tdM = document.createElement('td')
+      tdM.textContent = MOMENT_MOT[mom]
+      tr.appendChild(tdM)
+      for (const mec of [0, 1, 2, 3] as const) {
+        const td = document.createElement('td')
+        const n = nombre(b.code, mec, mom)
+        const s = document.createElement('span')
+        s.className = 'dsc-badge' + (n === 0 ? ' dsc-manque' : '')
+        s.textContent = n === 0 ? '0 · à écrire' : String(n)
+        s.title = `${b.nom} · ${MOMENT_MOT[mom]} · ${MECANIQUE_NOMS[mec]} : ${n} tableau${n > 1 ? 'x' : ''} jouable${n > 1 ? 's' : ''}`
+        td.appendChild(s)
+        tr.appendChild(td)
+      }
+      tb.appendChild(tr)
+    })
+  }
+  t.appendChild(tb)
+  d.appendChild(t)
+
+  const bilan = document.createElement('p')
+  bilan.className = 'dsc-aide'
+  bilan.innerHTML =
+    `<b>${vides.length}</b> case${vides.length > 1 ? 's' : ''} à écrire · <b>${bib.length}</b> tableau${bib.length > 1 ? 'x' : ''} dans la bibliothèque, ` +
+    `dont <b>${muets}</b> muet${muets > 1 ? 's' : ''} (sans code 21XX-MMD : jamais compté${muets > 1 ? 's' : ''}, pioché${muets > 1 ? 's' : ''} en dernier).`
+  d.appendChild(bilan)
+  if (vides.length > 0) {
+    const ul = document.createElement('ul')
+    ul.className = 'dsc-manques'
+    for (const v of vides) {
+      const li = document.createElement('li')
+      // le code à donner au tableau qui remplira la case : le moment, la
+      // mécanique, et la difficulté qui reste au choix
+      li.innerHTML =
+        `<b>${MECANIQUE_NOMS[v.mec].toUpperCase()}</b> · ${MOMENT_MOT[v.mom]} · ${esc(v.nom)} — ` +
+        `code <code>21__-${v.mom}${v.mec}_</code>, biome « ${esc(v.biome)} » ou universel`
+      ul.appendChild(li)
+    }
+    d.appendChild(ul)
+  }
+
+  const releve = litManquesDuPoste()
+  const p = document.createElement('p')
+  p.className = 'dsc-aide'
+  if (releve.length === 0) {
+    p.textContent = 'Relevé du poste : aucune porte générée faute de tableau jusqu’ici.'
+    d.appendChild(p)
+    return d
+  }
+  p.innerHTML = `<b>Relevé du poste</b> — ${releve.length} manque${releve.length > 1 ? 's' : ''} vu${releve.length > 1 ? 's' : ''} en jeu :`
+  d.appendChild(p)
+  const ul = document.createElement('ul')
+  ul.className = 'dsc-manques'
+  for (const mq of releve) {
+    const li = document.createElement('li')
+    li.textContent =
+      `${MECANIQUE_NOMS[mq.mecanique]} · ${MOMENT_MOT[mq.moment]} · diff. ${mq.difficulte}` +
+      ` — ${mq.biome || 'sans biome'}${mq.module ? ` (${mq.module})` : ''} — ${mq.fois} fois`
+    ul.appendChild(li)
+  }
+  d.appendChild(ul)
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.textContent = 'EFFACER LE RELEVÉ'
+  btn.addEventListener('click', () => {
+    try {
+      coffre.stockage.removeItem(CLE_MANQUES)
+    } catch {
+      // sans gravité
+    }
+    renderDescente()
+    descenteDit('Relevé des manques effacé.')
+  })
+  const outils = document.createElement('div')
+  outils.className = 'dsc-outils'
+  outils.appendChild(btn)
+  d.appendChild(outils)
+  return d
+}
+
 /** LE BILAN AFFICHÉ : ce que cent descentes proposent — et surtout ce
  *  qu'elles ne proposent JAMAIS. */
 function dscBilan(): HTMLElement {
@@ -6184,7 +6544,7 @@ function dscBilan(): HTMLElement {
   }
   const total = b.parMecanique.reduce((s, n) => s + n, 0) || 1
   ligne(
-    `<b>${b.descentes}</b> descentes tirées · <b>${b.ecritesParDescente.toFixed(1)}</b> tableaux écrits par descente en moyenne (sur ${voiePlan.longueur} rangs) · <b>${b.parCode.length}</b> tableaux distincts proposés.`,
+    `<b>${b.descentes}</b> descentes tirées · <b>${b.ecritesParDescente.toFixed(1)}</b> tableaux écrits par descente en moyenne (sur ${longueurCarte()} rangs) · <b>${b.parCode.length}</b> tableaux distincts proposés.`,
   )
   ligne(
     'Cartes générées par mécanique : ' +
@@ -6262,7 +6622,7 @@ function dscOutils(): HTMLElement {
       const t0 = performance.now()
       descenteBilanFait = bilanDescentes(
         descenteBibliotheque(),
-        voiePlan,
+        planEcran(),
         descenteCombien,
         descenteGraine || descenteGraineNeuve(),
         descenteMemoires,
@@ -6448,7 +6808,7 @@ function renderDescente(): void {
   aide.className = 'dsc-aide'
   aide.innerHTML =
     'Tout ce qui décide du <b>déroulement d’une run</b> se règle ici, et se lit tout de suite dans la table du bas : ' +
-    'le <b>plan</b> (longueur, plafond de difficulté, ce qui se propose), la <b>forme de la rampe</b>, la <b>posture</b> ' +
+    'le <b>plan</b> (plafond de difficulté, ce qui se propose), la <b>forme de la rampe</b>, la <b>posture</b> ' +
     'des rangs et les <b>quatre poids</b> de l’algorithme qui choisit les tableaux du pool. Chaque réglage s’enregistre ' +
     'aussitôt sur ce poste (le <b>brouillon</b>) et prend effet à la <b>prochaine descente</b> ; <b>PUBLIER</b> le fait jouer ' +
     'pour tout le monde. Rien n’est généré ici : on déroule les décisions, ' +
@@ -6459,17 +6819,21 @@ function renderDescente(): void {
   corps.appendChild(dscPartage())
 
   corps.appendChild(dscSec('LE PLAN'))
+  // LA LONGUEUR N'EST PLUS UN RÉGLAGE : elle découle de la carte (la plus
+  // courte route du hub à l'observatoire). Le cran restait à l'écran alors
+  // que le jeu ne le lisait plus (planEffectif l'écrase) — il disait un
+  // chiffre pour rien, et la table du bas déroulait un plan d'une autre
+  // longueur que la descente jouée (revue du 16/09).
+  const aideLongueur = document.createElement('p')
+  aideLongueur.className = 'dsc-aide'
+  aideLongueur.innerHTML =
+    `La <b>longueur</b> n’est pas un réglage : elle découle de la carte de la station — <b>${longueurCarte()} salles</b> ` +
+    'du hub à l’objectif par la plus courte route (la rampe, les moments et la table du bas se déroulent dessus). ' +
+    'Pour la changer, changer la carte (<code>?carte</code>).'
+  corps.appendChild(aideLongueur)
   const g1 = document.createElement('div')
   g1.className = 'dsc-grille'
   g1.append(
-    dscCran(
-      'LONGUEUR',
-      'le nombre de salles de la descente — la voie se boucle au bout',
-      () => voiePlan.longueur,
-      (v) => {
-        voiePlan.longueur = v
-      },
-    ),
     dscCran(
       'DIFFICULTÉ MAX',
       'le plafond que la rampe atteint au sommet',
@@ -6480,10 +6844,18 @@ function renderDescente(): void {
     ),
     dscCoche(
       'SALLES GÉNÉRÉES',
-      'trois salles fabriquées proposées à chaque récompense',
+      'des salles fabriquées derrière les portes de la mini-carte — coupées, la même mini-carte, mais chaque porte pioche un tableau déjà écrit',
       () => voiePlan.generees,
       (v) => {
         voiePlan.generees = v
+      },
+    ),
+    dscCoche(
+      'GÉNÉRER SI LE POOL MANQUE',
+      'générées coupées : une porte sans tableau écrit de sa mécanique se génère (et le manque se note) — coupé, elle pioche une autre mécanique',
+      () => voiePlan.genereSiManque,
+      (v) => {
+        voiePlan.genereSiManque = v
       },
     ),
     dscCoche(
@@ -6586,6 +6958,145 @@ function renderDescente(): void {
   )
   corps.appendChild(g3)
 
+  corps.appendChild(dscSec('LES VOIES ET LES RENCONTRES — la mini-carte d’un module'))
+  const aideVoies = document.createElement('p')
+  aideVoies.className = 'dsc-aide'
+  aideVoies.innerHTML =
+    'Dans un module, les salles se tissent en RANGS sur trois VOIES : ouvrir une porte ferme les autres. Une part des nœuds ' +
+    'n’est pas une salle mais une RENCONTRE — du texte, un choix, un prix. Ces trois réglages font la forme de la grille ; ' +
+    'la graine du jour la rend commune à tous les postes.'
+  corps.appendChild(aideVoies)
+  const g3b = document.createElement('div')
+  g3b.className = 'dsc-grille'
+  g3b.append(
+    dscCran(
+      'PART DE RENCONTRES',
+      'la part des nœuds qui sont une rencontre plutôt qu’une salle, passé le rang minimal — 0 : aucune, jamais les trois d’un rang',
+      () => voiePlan.partEvenement,
+      (v) => {
+        voiePlan.partEvenement = v
+      },
+      5,
+      (v) => `${v} %`,
+    ),
+    dscCran(
+      'RANG MINIMAL',
+      'le premier rang d’un module où une rencontre peut se poser — 1 : on entre toujours par une salle',
+      () => voiePlan.rangMinEvenement,
+      (v) => {
+        voiePlan.rangMinEvenement = v
+      },
+    ),
+    dscCran(
+      'BIFURCATION',
+      'la chance qu’une voie ouvre aussi sur une voisine au rang suivant — 0 : trois couloirs parallèles, 100 : tout mène partout',
+      () => voiePlan.bifurcation,
+      (v) => {
+        voiePlan.bifurcation = v
+      },
+      5,
+      (v) => `${v} %`,
+    ),
+    dscCran(
+      'ÉCONOMATS PAR MODULE',
+      'le comptoir du Semblable, posé en nœud de la mini-carte — 0 : aucun',
+      () => voiePlan.economatsParModule,
+      (v) => {
+        voiePlan.economatsParModule = v
+      },
+    ),
+    dscCran(
+      'ALCÔVES PAR MODULE',
+      'le repos : un souffle, de la réserve ou du condensat — 0 : aucune',
+      () => voiePlan.reposParModule,
+      (v) => {
+        voiePlan.reposParModule = v
+      },
+    ),
+    dscCran(
+      'SALLES À PRIME',
+      'la part des rangs qui portent une salle scellée : plus dure d’un cran, elle paie plus au sas (mémoire ×2, condensat ×2 ou tirage garanti) — une par rang au plus ; 0 : aucune',
+      () => voiePlan.partPrime,
+      (v) => {
+        voiePlan.partPrime = v
+      },
+      5,
+      (v) => `${v} %`,
+    ),
+    dscCran(
+      'PART DU BIOME',
+      'la chance qu’une voie prenne la mécanique favorite de son biome (cryo : glace, chaud : vapeur) — jamais les trois voies d’un rang ; 0 : le biome ne pèse pas',
+      () => voiePlan.partBiome,
+      (v) => {
+        voiePlan.partBiome = v
+      },
+      10,
+      (v) => `${v} %`,
+    ),
+    dscCran(
+      'BONBONNES PAR MODULE',
+      'une réserve oubliée, sans choix — 0 : aucune. La cache, elle, vient de l’orbe du module sur la carte',
+      () => voiePlan.donsParModule,
+      (v) => {
+        voiePlan.donsParModule = v
+      },
+    ),
+  )
+  corps.appendChild(g3b)
+
+  corps.appendChild(dscSec('CE QUE PÈSE UNE ROUTE — risque contre récompense'))
+  const aidePese = document.createElement('p')
+  aidePese.className = 'dsc-aide'
+  aidePese.innerHTML =
+    'Les nombres qui décident si un détour vaut la salle d’à côté, jusqu’où un joueur peut parier sur lui-même, et ce que ' +
+    'paie la route difficile. Ils étaient écrits dans le code ; ils se trouvent en jouant.'
+  corps.appendChild(aidePese)
+  const g3c = document.createElement('div')
+  g3c.className = 'dsc-grille'
+  g3c.append(
+    dscCran(
+      'RÉSERVE D’UNE HALTE',
+      'ce que l’alcôve ou la bonbonne oubliée rend en bonbonne',
+      () => voiePlan.halteReserveCl,
+      (v) => {
+        voiePlan.halteReserveCl = v
+      },
+      10,
+      (v) => `${(v / 100).toFixed(1).replace('.', ',')} L`,
+    ),
+    dscCran(
+      'CONDENSAT D’UNE HALTE',
+      'ce que l’alcôve ou le fût rend dans la bourse',
+      () => voiePlan.halteCondensatCl,
+      (v) => {
+        voiePlan.halteCondensatCl = v
+      },
+      10,
+      (v) => `${v} cL`,
+    ),
+    dscCran(
+      'PLANCHER D’ESSENCE',
+      'l’essence maximale ne descend jamais sous cette part du plein — un sacrifice de trop ne fait pas une impasse',
+      () => voiePlan.essencePlancher,
+      (v) => {
+        voiePlan.essencePlancher = v
+      },
+      5,
+      (v) => `${v} %`,
+    ),
+    dscCran(
+      'PRIME DE MÉMOIRE PAR CRAN',
+      'la mémoire du sas se multiplie par 1 + cran × prime — 100 : ×2 au cran 1, ×3 au cran 2 ; 0 : le confinement ne paie pas',
+      () => voiePlan.memoireParCran,
+      (v) => {
+        voiePlan.memoireParCran = v
+      },
+      25,
+      (v) => `${v} %`,
+    ),
+  )
+  corps.appendChild(g3c)
+
   corps.appendChild(
     dscSec('L’ALGORITHME DE PIOCHE — ce qui choisit le tableau du pool'),
   )
@@ -6639,6 +7150,9 @@ function renderDescente(): void {
     ),
   )
   corps.appendChild(g4)
+
+  corps.appendChild(dscSec('LES MANQUES DU POOL — où écrire des tableaux pour remplacer les générées'))
+  corps.appendChild(dscManques())
 
   corps.appendChild(dscSec('LES OUTILS — éprouver le plan sans le jouer'))
   corps.appendChild(dscOutils())
@@ -7587,6 +8101,7 @@ function navigueMenu(couche: CoucheMenu, dt: number): void {
     const prochain = plusProcheVers(vise, els, dx, dy)
     if (prochain) vise = prochain
   }
+  const avant = focusParCouche.get(couche.id) ?? null
   focusParCouche.set(couche.id, vise)
   // le liseré s'affiche si la MANETTE a la main (a parlé plus récemment
   // que le pointeur) — pas de fenêtre de temps : sur un menu au rendu
@@ -7594,12 +8109,30 @@ function navigueMenu(couche: CoucheMenu, dt: number): void {
   // l'écran : celui de la couche active — l'écran de dessous rend le sien
   // (il le retrouvera par la mémoire de focus en revenant).
   const padALaMain = manette.lastActivity > input.lastPointerAt
+  const avaitLisere = vise.classList.contains('pad-focus')
   for (const el of document.querySelectorAll<HTMLElement>('.pad-focus'))
     if (el !== vise) el.classList.remove('pad-focus')
   vise.classList.toggle('pad-focus', padALaMain)
   if (dx !== 0 || dy !== 0)
     vise.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-  if (manette.edge(BOUTON.A)) vise.click()
+  // LE SURVOL À LA MANETTE : viser un élément vaut le survoler. La carte de
+  // la station, les portes de la mini-carte, l'écran LA STATION lisent le
+  // pointeur et le focus clavier pour peindre leur fiche et leur
+  // projection ; la manette ne posait ni l'un ni l'autre (revue du 16/09).
+  // Un événement « pad-vise » part quand la visée change (ou quand la
+  // manette reprend la main sur la même cible), « pad-quitte » part de
+  // l'ancienne cible ; ces écrans les écoutent comme un survol et sa fin.
+  if (padALaMain && (vise !== avant || !avaitLisere)) {
+    if (avant && avant !== vise)
+      avant.dispatchEvent(new CustomEvent('pad-quitte', { bubbles: true }))
+    vise.dispatchEvent(new CustomEvent('pad-vise', { bubbles: true }))
+  }
+  // A ouvre. Un module de la carte est un <g> SVG : il porte role="button"
+  // mais pas click() (HTMLElement seulement) — on lui envoie l'événement
+  if (manette.edge(BOUTON.A)) {
+    if (typeof (vise as { click?: unknown }).click === 'function') vise.click()
+    else vise.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+  }
 }
 // sonde du banc d'essai : l'état de la navigation manette, lisible du dehors
 let manettePolls = 0
@@ -10511,7 +11044,7 @@ function verserBonbonne(
   // la règle qui décide s'il faut verser, elle, lit `liters()` (halo
   // compris). Les deux ne parlaient donc pas de la même chose, et l'écart
   // se versait en trop.
-  const manque = Math.max(0, level.spawn.n - sim.aliveCount())
+  const manque = Math.max(0, volumeDepart() - sim.aliveCount())
   // LA DOSE borne le versement AUTOMATIQUE ; le geste, lui, remplit d'un
   // trait — c'est une décision du joueur, elle a le droit d'être franche.
   const plafond =
@@ -12579,6 +13112,8 @@ let mbEtape:
   | 'etalonnage'
   | 'draft'
   | 'carte'
+  | 'repos'
+  | 'evenement'
   | 'salles'
   | 'fin' = 'bilan'
 let mbDraftsRestants = 0
@@ -12603,10 +13138,23 @@ function avanceSalle(): void {
   // à la cérémonie (salleChoisie) attend sagement la sortie de l'annexe.
   if (economatIntercalaire && estEconomat(level)) {
     economatIntercalaire = null
+    // on SORT de l'économat-nœud : la halte n'a pas de salle, la carte se
+    // rouvre sur ses coursives — rien d'autre ne se joue ici
+    const m = moduleEnCours()
+    if (m && m.type === 'economat' && moduleFini(carte, carteRun)) {
+      montreCarteRun('suite')
+      return
+    }
+    // l'ÉCONOMAT-NŒUD de la mini-carte : on en sort, le module reprend
+    if (carteRun.tissage) {
+      montreSuiteRun()
+      return
+    }
   } else if (
     !auHub &&
     !testLevel &&
-    (economatForce || !economatVisiteCetteRun)
+    // un module TISSÉ porte ses propres économats : le réflexe de mi-descente se tait
+    (economatForce || (!economatVisiteCetteRun && !carteAUnEconomat() && !carteRun.tissage))
   ) {
     const total = longueurRun()
     const rang = voieRang
@@ -12815,9 +13363,9 @@ function mbMontreVersement(): void {
     else delete scene.dataset.vers
   }
   for (const [btn, cote] of [[cb, 'g'], [cx, 'd']] as const) {
-    for (const ev of ['pointerenter', 'focusin'] as const)
+    for (const ev of ['pointerenter', 'focusin', 'pad-vise'] as const)
       btn.addEventListener(ev, () => { if (!btn.disabled) vise(cote) })
-    for (const ev of ['pointerleave', 'focusout'] as const)
+    for (const ev of ['pointerleave', 'focusout', 'pad-quitte'] as const)
       btn.addEventListener(ev, () => vise(''))
   }
   scene.append(cb, goutte, cx)
@@ -12968,7 +13516,11 @@ function mbVerseXp(litres: number): void {
   const avantXp = run.xp
   const avant = paliersAtteints(run.xp)
   run.xp += litres
-  mbDraftsRestants = paliersAtteints(run.xp) - avant
+  // LE TIRAGE GARANTI de la salle scellée s'ajoute aux paliers franchis ;
+  // la prime est servie, elle s'éteint ici (les portes suivantes en posent
+  // une autre ou aucune)
+  mbDraftsRestants = paliersAtteints(run.xp) - avant + (run.primeSalle === 'tirage' ? 1 : 0)
+  run.primeSalle = null
   mbEtape = 'etalonnage'
   // le bilan est lu : il se replie en bandeau, la jauge prend la scène —
   // et le tirage qui suit tient dans l'écran du Deck sans ascenseur
@@ -13058,9 +13610,9 @@ function mbMontreDraft(): void {
       btn.classList.add('mb-pauvre')
       btn.disabled = true
     }
-    for (const ev of ['pointerenter', 'focusin'] as const)
+    for (const ev of ['pointerenter', 'focusin', 'pad-vise'] as const)
       btn.addEventListener(ev, () => { if (!elu) isole(pli) })
-    for (const ev of ['pointerleave', 'focusout'] as const)
+    for (const ev of ['pointerleave', 'focusout', 'pad-quitte'] as const)
       btn.addEventListener(ev, () => { if (!elu) isole(null) })
     mbIncline(btn, pli)
     // la carte tombée sur sa face fait son petit bruit : une par une
@@ -13125,11 +13677,34 @@ function mbApresRecompense(): void {
   mbMontreSallesDuModule()
 }
 
+/** LE RELEVÉ DES MANQUES du pool, gardé sur le poste : chaque porte
+ *  générée faute de tableau de sa mécanique s'y compte. L'écran LA DESCENTE
+ *  le montre ; un outil (essai, éditeur) ne note rien. */
+function litManquesDuPoste(): Manque[] {
+  try {
+    return litManques(JSON.parse(coffre.stockage.getItem(CLE_MANQUES) ?? '[]'))
+  } catch {
+    return []
+  }
+}
+function noteManqueDuPool(m: Omit<Manque, 'fois' | 'dernier'>): void {
+  if (testLevel) return
+  try {
+    coffre.stockage.setItem(CLE_MANQUES, JSON.stringify(noteManque(litManquesDuPoste(), m)))
+  } catch {
+    // stockage indisponible : le relevé attendra
+  }
+}
+
 /** Les salles du module en cours : la voie (générées + pioche du biome),
  *  ou le vieux choix du pool, ou la fin ordinaire. */
 function mbMontreSallesDuModule(): void {
   const seq = playedLevels()
-  if (sallesGenerees()) {
+  // LA MINI-CARTE VIT SANS LES GÉNÉRÉES : générées coupées, ses portes
+  // piochent toutes dans le pool (voir piocheDuPool). Elle ne se tait que
+  // sans tissage, ou quand plus rien ne peut se proposer (ni générées ni
+  // écrites) — là, le vieux choix du pool, ou la fin
+  if (sallesGenerees() || (voiePlan.ecrites && carteRun.tissage)) {
     const duo = propositionsVoie(seq)
     if (duo) {
       mbMontreSallesVoie(duo)
@@ -13194,17 +13769,58 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
     orbes,
     afficherTemp: true,
     retour: choix.find((x) => x.retour)?.module.id ?? null,
+    revelations: carteRun.revelations,
   })
   const fiche = document.createElement('p')
   fiche.className = 'mb-station-fiche'
+  // LA FICHE A TROIS LIGNES, TOUJOURS : le module, ce qu'on y trouve, la
+  // route. Une fiche d'une ligne qui passait à trois au survol poussait la
+  // carte vers le bas — l'écran « sautait » (revue du 16/09, soir). Chaque
+  // ligne tient sur une ligne (points de suspension au-delà, le texte
+  // entier en infobulle) : la carte ne bouge plus d'un pixel.
+  const escF = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')
+  const lignes = (a: string, b: string, c: string): void => {
+    fiche.innerHTML = [a, b, c].map((t) => `<span title="${escF(t)}">${escF(t)}</span>`).join('')
+  }
   const ouvertes = choix.filter((x) => !x.orbeManquant).length
   const defaut = `${ouvertes} coursive${ouvertes > 1 ? 's' : ''} ouverte${ouvertes > 1 ? 's' : ''} · descente ${voieRang} / ${longueurRun()} salles`
+  const aideDefaut = [
+    'survolez une porte : sa fiche, ce qu’on y trouve, et la route la plus courte jusqu’à l’objectif s’allume sur le plan',
+    'les modules qui s’éteignent ne seront plus joignables par cette porte — c’est ce qu’elle ferme',
+  ] as const
   const litId = (e: Event): string | null =>
     (e.target as Element | null)?.closest?.('[data-mod]')?.getAttribute('data-mod') ?? null
+  // LE SURVOL QUI PROJETTE : la route la plus courte depuis le module visé
+  // jusqu'à l'objectif s'allume sur le plan — modules et coursives — et la
+  // fiche la mesure. Le SVG n'est pas rebâti : des classes basculent, comme
+  // sur l'écran LA STATION (rebâtir relancerait le halo et volerait le focus).
+  const projette = (id: string | null): void => {
+    for (const el of scene.querySelectorAll('.cs-projet, .cs-hors')) el.classList.remove('cs-projet', 'cs-hors')
+    if (!id) return
+    const p = projectionDepuis(carte, id)
+    if (!p) return
+    // CE QUI SE FERME : les modules que cette porte ne permet plus
+    // d'atteindre s'éteignent — c'est ainsi que trois portes dont les
+    // routes se rejoignent plus loin se distinguent quand même (revue du
+    // 16/09 : la route projetée était la même pour les trois)
+    const joignables = accessibles(carte, id)
+    for (const m of carte.modules)
+      if (!joignables.has(m.id) && m.id !== carteRun.module && !carteRun.visites.includes(m.id))
+        scene.querySelector(`[data-mod="${CSS.escape(m.id)}"]`)?.classList.add('cs-hors')
+    p.chemin.forEach((m, i) => {
+      scene.querySelector(`[data-mod="${CSS.escape(m)}"]`)?.classList.add('cs-projet')
+      if (i === 0) return
+      const k = carte.liens.findIndex((l) => l.de === p.chemin[i - 1] && l.vers === m)
+      if (k >= 0) scene.querySelector(`.cs-route[data-lien="${k}"]`)?.classList.add('cs-projet')
+    })
+  }
   const dit = (id: string | null): void => {
-    const mod = id ? moduleParId(carte, id) : undefined
+    // un « ? » révélé se lit sous sa nature ; non révélé, il garde son secret
+    const mod = id ? moduleEffectif(carte, carteRun, moduleParId(carte, id)) : undefined
+    const vise = mod && choix.some((c) => c.module.id === id) ? mod.id : null
+    projette(vise)
     if (!mod) {
-      fiche.textContent = defaut
+      lignes(defaut, aideDefaut[0], aideDefaut[1])
       return
     }
     const x = choix.find((c) => c.module.id === id)
@@ -13217,13 +13833,28 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
       : id === carteRun.module
         ? 'vous êtes ici'
         : 'aucune coursive n’y mène d’ici'
-    fiche.textContent =
-      `${mod.nom} · ${mod.niveaux > 0 ? `${mod.niveaux} salle${mod.niveaux > 1 ? 's' : ''}` : 'sans salle'} · ${mod.temp}°C · ${acces}`
+    const projection = vise ? projectionDepuis(carte, vise) : null
+    // CE QU'ON Y TROUVERA, par types : les mécaniques des salles, les
+    // formes, les rencontres et les haltes de sa mini-carte — pas les
+    // comptes (le concepteur, 16/09)
+    const types = vise && mod.niveaux > 0 ? typesDuModuleVise(mod) : []
+    const nature =
+      mod.type === 'inconnu'
+        ? 'nature inconnue — se révèle à l’entrée'
+        : `${carte.types[mod.type].toLowerCase()} · ${mod.niveaux > 0 ? `${mod.niveaux} salle${mod.niveaux > 1 ? 's' : ''}` : 'sans salle'}`
+    lignes(
+      `${mod.nom} · ${nature}` +
+        (mod.cran > 0 ? ` · confinement +${mod.cran}, mémoire ×${primeMemoireDu(mod)}` : '') +
+        ` · ${mod.temp}°C · ${acces}`,
+      types.length ? `on y trouve : ${types.join(', ')}` : '',
+      projection ? ditProjection(carte, projection) : '',
+    )
   }
   dit(null)
   scene.addEventListener('pointerover', (e) => dit(litId(e)))
   scene.addEventListener('pointerout', () => dit(null))
   scene.addEventListener('focusin', (e) => dit(litId(e)))
+  scene.addEventListener('pad-vise', (e) => dit(litId(e))) // la manette survole aussi
   let elu = false
   const elit = (x: (typeof choix)[number]): void => {
     if (elu) return
@@ -13265,13 +13896,71 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
   host.appendChild(fiche)
 }
 
+/** LA CACHE REND SON ORBE quand le module qui le recèle est ÉPUISÉ — une
+ *  fois par poste, jamais sous un outil (rien de mérité ne s'écrit). Deux
+ *  moments l'appellent, et il en faut deux : le sas de la dernière salle
+ *  d'une cache qui se joue, ET l'entrée dans une cache SANS salle (une
+ *  chambre au trésor, qu'on ouvre et qu'on quitte) — sans ce second appel,
+ *  une cache à zéro niveau ne donnait jamais rien, en silence. */
+function prendOrbeDuModule(): void {
+  const mod = moduleEnCours()
+  if (!mod?.orbe || !moduleFini(carte, carteRun)) return
+  // UN MODULE TISSÉ porte sa cache EN NŒUD de sa mini-carte (reglagesTissage,
+  // coffre: !!m.orbe) : l'orbe se prend là, ou pas — le sas de la dernière
+  // salle ne le donnait pas moins, et le nœud n'était plus un choix (revue
+  // du 16/09). Seule une cache sans salle, ou un module d'avant les voies,
+  // rend son orbe à l'épuisement.
+  if (carteRun.tissage && mod.niveaux > 0 && mod.type !== 'coffre') return
+  // un orbe déjà en poche ou déjà tissé ne se gagne pas deux fois : la
+  // cache se vide quand même, et le toast le dit tel quel
+  const dejaTenu = records.aOrbe(mod.orbe) || records.eveilTient(mod.orbe)
+  if (!records.videCache(mod.id, mod.orbe)) return
+  const nomOrbe = ORBES.find((o) => o.id === mod.orbe)?.nom ?? mod.orbe
+  toastFile.push(
+    dejaTenu
+      ? { nom: `LA CACHE EST VIDE — l’orbe ${nomOrbe}, vous l’aviez déjà`, icone: '🔮', sur: mod.nom }
+      : { nom: `ORBE D’ESSENCE — ${nomOrbe.toUpperCase()}`, icone: '🔮', sur: `TROUVÉ DANS ${mod.nom}` },
+  )
+  majMemoireUI()
+}
+
 /** Entrer dans un module de la carte : un nœud rouvre la carte, un biome
  *  présente ses salles. */
 function entreModuleRun(id: string): void {
   const suivant = entreModule(carte, carteRun, id, orbesAcquis())
   if (!suivant) return
-  carteRun = suivant
+  carteRun = { ...suivant, tissage: graineTissage(id) }
+  // LE « ? » SE RÉVÈLE à l'entrée — le même tirage pour tous les postes le
+  // jour d'une descente du jour, sinon le hasard du poste
+  carteRun = reveleInconnu(
+    carte,
+    carteRun,
+    id,
+    descenteDuJour() ? aleaDeGraine(`${new Date().toISOString().slice(0, 10)}@?${id}`) : Math.random,
+  )
+  const m = moduleEnCours()
+  // LES HALTES, à la manière du marchand et du feu de camp de Slay the
+  // Spire : l'ÉCONOMAT est une salle qu'on joue (la cérémonie se ferme, le
+  // Semblable s'intercale tout de suite — economatForce prend la prochaine
+  // salle quoi qu'il arrive), l'ALCÔVE DE REPOS pose son choix dans la
+  // cérémonie même. Dans les deux cas, la carte se rouvre ensuite.
+  if (m?.type === 'economat') {
+    economatForce = true
+    fermeMiseEnBonbonne()
+    avanceSalle()
+    return
+  }
+  if (m?.type === 'repos') {
+    mbMontreRepos(m)
+    return
+  }
+  if (m?.type === 'don') {
+    mbMontreDon(m)
+    return
+  }
   if (moduleFini(carte, carteRun)) {
+    // une CACHE SANS SALLE : on l'ouvre, on prend, la carte se rouvre
+    if (!testLevel) prendOrbeDuModule()
     mbMontreCarte('suite')
     return
   }
@@ -13280,12 +13969,105 @@ function entreModuleRun(id: string): void {
   mbMontreSallesDuModule()
 }
 
+/** L'ALCÔVE DE REPOS : trois offres, une seule se prend — un second
+ *  souffle (une vie), de la réserve (la bonbonne), du condensat (la
+ *  bourse). Le choix se juge sur ce qu'on possède : une offre qui ne
+ *  donnerait rien reste visible mais grisée. Puis la carte se rouvre. */
+function mbMontreRepos(m: ModuleCarte, suite: () => void = () => mbMontreCarte('suite')): void {
+  mbEtape = 'repos'
+  mbScene.classList.remove('mb-large')
+  mbQuestion('UNE HALTE — UNE SEULE OFFRE')
+  mbEl('mb-choix-titre').textContent = `${m.nom} — ${carte.types[m.type]} : PRENEZ UNE OFFRE, PUIS LA CARTE SE ROUVRE`
+  mbEl('mb-etal').hidden = true
+  mbEl('mb-passer').hidden = true
+  const host = mbCartes()
+  host.innerHTML = ''
+  host.classList.add('mb-trio')
+  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  const offres = offresRepos(
+    {
+      vies: run.vies,
+      viesMax: VIES_MAX,
+      bonbonne: run.bonbonneLiters,
+      cap: capBonbonne(),
+    },
+    donsHalte(),
+  )
+  let elu = false
+  offres.forEach((o, i) => {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'mb-carte mb-repos' + (o.possible ? '' : ' mb-pauvre')
+    btn.disabled = !o.possible
+    btn.style.setProperty('--i', String(i))
+    btn.innerHTML = `<i class="mb-repos-icone">${o.icone}</i><b>${esc(o.nom)}</b><small>${esc(o.detail)}</small>`
+    btn.addEventListener('click', () => {
+      if (elu) return
+      elu = true
+      if (o.id === 'souffle') run.vies = Math.min(VIES_MAX, run.vies + 1)
+      else if (o.id === 'reserve')
+        run.bonbonneLiters = Math.min(capBonbonne(), run.bonbonneLiters + donsHalte().reserveL)
+      else gagneCondensat(donsHalte().condensatCl)
+      majBoutonsRun()
+      sauveRun() // la halte prise s'écrit : une reprise ne la rejoue pas
+      bande.ponctuation('sting-record', 0.6)
+      suite()
+    })
+    host.appendChild(btn)
+  })
+}
+
+/** LE DON — une bonbonne oubliée dans une halte : une seule offre, on la
+ *  prend, la carte se rouvre. De la réserve, ou du condensat si la
+ *  bonbonne est pleine. */
+function mbMontreDon(m: ModuleCarte, suite: () => void = () => mbMontreCarte('suite')): void {
+  mbEtape = 'repos'
+  mbScene.classList.remove('mb-large')
+  mbQuestion('UNE HALTE — PRENEZ')
+  mbEl('mb-choix-titre').textContent = `${m.nom} — ${carte.types[m.type]} : QUELQU’UN A LAISSÉ ÇA LÀ`
+  mbEl('mb-etal').hidden = true
+  mbEl('mb-passer').hidden = true
+  const host = mbCartes()
+  host.innerHTML = ''
+  host.classList.add('mb-trio')
+  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  const o = offreDon({ bonbonne: run.bonbonneLiters, cap: capBonbonne() }, donsHalte())
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'mb-carte mb-repos'
+  btn.style.gridColumn = '2'
+  btn.innerHTML = `<i class="mb-repos-icone">${o.icone}</i><b>${esc(o.nom)}</b><small>${esc(o.detail)}</small>`
+  let elu = false
+  btn.addEventListener('click', () => {
+    if (elu) return
+    elu = true
+    if (o.id === 'reserve')
+      run.bonbonneLiters = Math.min(capBonbonne(), run.bonbonneLiters + donsHalte().reserveL)
+    else gagneCondensat(donsHalte().condensatCl)
+    majBoutonsRun()
+    sauveRun()
+    bande.ponctuation('sting-record', 0.6)
+    suite()
+  })
+  host.appendChild(btn)
+}
+
 /** Une carte du choix de la voie. */
 interface CarteVoie {
-  lv: LevelDef
+  /** null : la porte n'est pas une salle mais une RENCONTRE (evenements.ts) */
+  lv: LevelDef | null
   cahier: CodeAtelier | null
   generee: boolean
   etiquette: string
+  /** la voie de la mini-carte que cette porte ouvre — absente sans voies */
+  voie?: number
+  /** un nœud qui n'est PAS une salle : rencontre ou halte — aucun tableau */
+  nature?: Exclude<NatureNoeud, 'salle'>
+  /** la salle est SCELLÉE : plus dure d'un cran, elle paie plus au sas */
+  prime?: PrimeNoeud
+  /** le pool manquait pour cette porte : à noter au relevé quand le choix se
+   *  prend (pas à chaque rendu des portes — une reprise les rebâtit) */
+  manqueNote?: Omit<Manque, 'fois' | 'dernier'>
 }
 
 /** LA VOIE SEMI-PROCÉDURALE : le choix du rang suivant, tiré du PLAN de
@@ -13299,7 +14081,15 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   const rangSuivant = voieRang + 1 // la salle que le choix désigne, dans le plan
   if (rangSuivant > longueurRun()) return null // la fin se joue au sas
   const moment = momentAuRang(rangSuivant, planEffectif())
-  const difficulte = diffAuRang(rangSuivant, planEffectif())
+  // LE MODULE fait la salle : son cran monte la rampe, sa nature pose la
+  // posture (dangers, faisceaux, cachette) — voir descenteCarte.ts
+  const module = moduleEnCours()
+  // le cran du module, plus les crans PROMIS par un événement (la station
+  // s'est réveillée) — ceux-là se consomment à l'entrée de la salle
+  const difficulte = Math.min(
+    9,
+    difficulteSousCran(diffAuRang(rangSuivant, planEffectif()), module) + run.confinementDu,
+  )
   const jour = new Date().toISOString().slice(0, 10)
   const alea = descenteDuJour()
     ? aleaDeGraine(`${jour}@${rangSuivant}`)
@@ -13327,22 +14117,53 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   const biomeCourant = moduleEnCours()?.biome ?? ''
   const marqueBiome = (lv: LevelDef): LevelDef =>
     biomeCourant ? { ...lv, biome: biomeCourant } : lv
-  const ecrite = voiePlan.ecrites
-    ? piocheEcrite(
-        seq,
-        { moment, mecanique: 3, difficulte },
-        voieVues,
-        // un tableau qui EXIGE un état non tissé n'est pas jouable
-        (lv) =>
-          (!lv.biome || !biomeCourant || lv.biome === biomeCourant) &&
-          (lv.exige ?? []).every((e) =>
-            e === 'glace' ? solidTenue : vapoTenue,
-          ),
-        alea,
-        jouee,
-        voiePlan.poids,
-      )
-    : null
+  // un tableau qui EXIGE un état non tissé n'est pas jouable
+  const jouable = (lv: LevelDef): boolean =>
+    (!lv.biome || !biomeCourant || biomeEffectif(carte, lv.biome) === biomeCourant) &&
+    (lv.exige ?? []).every((e) => (e === 'glace' ? solidTenue : vapoTenue))
+  const pioche = (): LevelDef | null =>
+    piocheEcrite(seq, { moment, mecanique: 3, difficulte }, voieVues, jouable, alea, jouee, voiePlan.poids)
+  // SANS SALLES GÉNÉRÉES (le réglage du plan coupé) : la mini-carte est la
+  // même — mêmes nœuds, mêmes mécaniques, mêmes figures —, seule la SOURCE
+  // change : derrière chaque porte, un tableau DÉJÀ ÉCRIT de la mécanique
+  // du nœud, d'une autre mécanique si le pool n'en a plus, jamais deux
+  // fois le même dans un choix ; le pool à sec se génère quand même (la
+  // voie ne meurt jamais). Le concepteur, 16/09 : « le même système que
+  // lorsque la génération est activée, mais des cartes déjà présentes ».
+  // Et quand le pool n'a AUCUN tableau de la mécanique du nœud : sous
+  // « générer si le pool manque », la porte se génère et LE MANQUE SE NOTE
+  // (le relevé de l'écran LA DESCENTE dit au concepteur quoi écrire) ;
+  // sinon elle pioche une autre mécanique, et ne se génère que le pool à sec.
+  const prisIci = new Set<string>()
+  const piocheDuPool = (
+    mec: CodeAtelier['mecanique'],
+    diff = difficulte,
+  ): { lv: LevelDef | null; manque: Omit<Manque, 'fois' | 'dernier'> | null } => {
+    const exclus = new Set<string>([...voieVues, ...prisIci])
+    const memeMecanique = (lv: LevelDef): boolean =>
+      jouable(lv) && decodeCodeAtelier(lv.code)?.mecanique === mec
+    const meme = piocheEcrite(seq, { moment, mecanique: mec, difficulte: diff }, exclus, memeMecanique, alea, null, voiePlan.poids)
+    if (meme) {
+      prisIci.add(meme.code)
+      return { lv: meme, manque: null }
+    }
+    // le manque se NOTE quand le choix se prend (mbMontreSallesVoie), pas
+    // ici : les portes se rebâtissent à chaque rendu, et une reprise de
+    // sauvegarde recomptait le même trou (revue du 16/09)
+    const manque = { biome: biomeCourant, mecanique: mec, moment, difficulte: diff, module: module?.id ?? '' }
+    if (voiePlan.genereSiManque) return { lv: null, manque }
+    const autre = piocheEcrite(seq, { moment, mecanique: 3, difficulte: diff }, exclus, jouable, alea, jouee, voiePlan.poids)
+    if (autre) prisIci.add(autre.code)
+    return { lv: autre, manque }
+  }
+  // LA MINI-CARTE À VOIES : les portes du rang sont les nœuds joignables
+  // depuis celui qu'on vient d'ouvrir — chacun décidé au tissage (sa
+  // mécanique, figure ou non, tableau du pool ou générée). Sans voies (un
+  // outil, une carte d'avant), le choix historique tient : trois générées
+  // et le pool en quatrième
+  const mini = miniCarteDuModule()
+  const portes: NoeudVoie[] = mini ? portesDuRang(mini, carteRun.niveau, derniereVoie(carteRun)) : []
+  const ecrite = voiePlan.ecrites && portes.length === 0 ? pioche() : null
   const aEcrite = ecrite ? decodeCodeAtelier(ecrite.code) : null
   // la mécanique de la salle qu'on VIENT de jouer s'évite : la foulée varie
   const [mecaA, mecaB, mecaC] = mecaniquesDuChoix(
@@ -13369,7 +14190,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   )
   const optionsDuRang = (
     mec: CodeAtelier['mecanique'],
-    carte: number,
+    estFigure: boolean,
   ): OptionsGen => ({
     ...OPTIONS_DEFAUT,
     dangers: regl.dangers,
@@ -13377,7 +14198,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
     contraste: regl.contraste,
     familles: (regl.purete ? masqueMecanique(mec) : 127) & masqueCycle,
     figure: figureDeLaCarte(
-      modesFigure[carte] ?? false,
+      estFigure,
       moment,
       mec,
       solidTenue,
@@ -13385,6 +14206,11 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
       alea,
     ),
     ampleur: ampleurAuRang(rangSuivant, planEffectif()),
+    // la TEMPÉRATURE du module fait le climat des dangers : froid ou chaud
+    climat: climatDuModule(module),
+    // la nature du module prime sur le réglage du rang — sauf les premiers
+    // rangs sans danger, que la posture respecte (sansDanger)
+    ...postureDuModule(module, regl.dangers === 1),
   })
   const variante = (n: number): string =>
     descenteDuJour()
@@ -13396,13 +14222,14 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   const genere = (
     mecanique: CodeAtelier['mecanique'],
     n: number,
-    carte: number,
+    estFigure: boolean,
+    diff = difficulte,
   ): { lv: LevelDef; cahier: CodeAtelier; figure: number } | null => {
-    const cahier: CodeAtelier = { moment, mecanique, difficulte }
+    const cahier: CodeAtelier = { moment, mecanique, difficulte: diff }
     // les options se tirent UNE FOIS par carte (la famille de figure est un
     // tirage) : les variantes de secours redonnent la même salle, pas une
     // autre famille — et l'étiquette de la carte reste vraie
-    const opts = optionsDuRang(mecanique, carte)
+    const opts = optionsDuRang(mecanique, estFigure)
     // une figure qui ne se prouve pas ne coûte pas la carte : le repli est
     // la salle à compartiments, le système historique
     for (const o of opts.figure !== 0 ? [opts, { ...opts, figure: 0 }] : [opts])
@@ -13419,9 +14246,93 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
       }
     return null
   }
-  // Le choix porte TOUJOURS TROIS salles générées, trois mécaniques — la
-  // suite écrite (si la séquence en offre une) s'y ajoute en quatrième
-  // carte : la voie reste procédurale d'abord, l'écrite est une option.
+  // une figure s'annonce PAR SA FAMILLE : le joueur apprend à les
+  // reconnaître d'un rang à l'autre, et le choix se prend sur la forme
+  // autant que sur la mécanique
+  const etiquettesGen = [
+    'SALLE GÉNÉRÉE — INÉDITE, PROUVÉE',
+    'SALLE GÉNÉRÉE — L’AUTRE MÉCANIQUE',
+    'SALLE GÉNÉRÉE — LA TROISIÈME MÉCANIQUE',
+  ]
+  const etiquetteGeneree = (figure: number, i: number): string => {
+    const fam = FIGURE_FAMILLES[figure - 2]
+    return fam
+      ? `SALLE GÉNÉRÉE — FIGURE : ${FIGURE_NOMS[fam].toUpperCase()}`
+      : etiquettesGen[Math.min(i, etiquettesGen.length - 1)]
+  }
+  // LES PORTES DE LA MINI-CARTE : une carte par nœud joignable. Le nœud du
+  // pool pioche à l'instant ; pool vide (tout vu, rien de jouable), il se
+  // génère avec sa mécanique — la voie ne meurt jamais sur un pool sec
+  if (portes.length > 0) {
+    const cartes: CarteVoie[] = []
+    for (const p of portes) {
+      // UNE RENCONTRE ne se prépare pas : la porte dit qu'il y a quelque
+      // chose, jamais quoi — l'événement se tire à l'ouverture, comme le
+      // « ? » d'un Slay the Spire
+      if (p.nature !== 'salle') {
+        cartes.push({
+          lv: null,
+          cahier: null,
+          generee: false,
+          etiquette: `VOIE ${p.voie + 1} · ${NOMS_NOEUD[p.nature].etiquette}`,
+          voie: p.voie,
+          nature: p.nature,
+        })
+        continue
+      }
+      // LA PRIME : la salle scellée est plus dure d'un cran (borné à 9), et
+      // la porte le dit avec ce qu'elle paie
+      const diffPorte = p.prime ? Math.min(9, difficulte + 1) : difficulte
+      const suffixePrime = p.prime ? ` · PRIME : ${NOMS_PRIME[p.prime].toUpperCase()}` : ''
+      let ecr: LevelDef | null = null
+      let manqueNote: Omit<Manque, 'fois' | 'dernier'> | null = null
+      if (voiePlan.ecrites) {
+        if (!sallesGenerees()) {
+          const r = piocheDuPool(p.mecanique, diffPorte)
+          ecr = r.lv
+          manqueNote = r.manque
+        } else if (p.ecrite) ecr = pioche()
+      }
+      const manque = manqueNote !== null
+      if (ecr) {
+        cartes.push({
+          lv: ecr,
+          cahier: decodeCodeAtelier(ecr.code),
+          generee: false,
+          // un tableau d'une AUTRE mécanique que le nœud : la porte le dit
+          etiquette:
+            (manque
+              ? `VOIE ${p.voie + 1} · TABLEAU DU POOL — PAS DE ${MECANIQUE_NOMS[p.mecanique].toUpperCase()} AU POOL`
+              : `VOIE ${p.voie + 1} · TABLEAU DU POOL`) + suffixePrime,
+          voie: p.voie,
+          ...(p.prime ? { prime: p.prime } : {}),
+          ...(manqueNote ? { manqueNote } : {}),
+        })
+        continue
+      }
+      const g = genere(p.mecanique, 1 + p.voie, p.figure, diffPorte)
+      if (g)
+        cartes.push({
+          lv: g.lv,
+          cahier: g.cahier,
+          generee: true,
+          // générée FAUTE DE TABLEAU : le concepteur le lit sur la porte même
+          etiquette:
+            (manque
+              ? `VOIE ${p.voie + 1} · GÉNÉRÉE — LE POOL MANQUE (${MECANIQUE_NOMS[p.mecanique]})`
+              : `VOIE ${p.voie + 1} · ${etiquetteGeneree(g.figure, p.voie)}`) + suffixePrime,
+          voie: p.voie,
+          ...(p.prime ? { prime: p.prime } : {}),
+          ...(manqueNote ? { manqueNote } : {}),
+        })
+    }
+    // une porte au moins : sinon le filet historique ci-dessous
+    if (cartes.length >= 1) return cartes
+  }
+  // Sans voies, le choix porte TOUJOURS TROIS salles générées, trois
+  // mécaniques — la suite écrite (si la séquence en offre une) s'y ajoute
+  // en quatrième carte : la voie reste procédurale d'abord, l'écrite est
+  // une option.
   const cartes: CarteVoie[] = []
   // le tableau pioché (déjà filtré sur ce qu'il EXIGE) ouvre le choix :
   // la voie reste procédurale d'abord, l'écrit est une option
@@ -13432,22 +14343,8 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
       generee: false,
       etiquette: 'TABLEAU DU POOL',
     })
-  const etiquettesGen = [
-    'SALLE GÉNÉRÉE — INÉDITE, PROUVÉE',
-    'SALLE GÉNÉRÉE — L’AUTRE MÉCANIQUE',
-    'SALLE GÉNÉRÉE — LA TROISIÈME MÉCANIQUE',
-  ]
-  // une figure s'annonce PAR SA FAMILLE : le joueur apprend à les
-  // reconnaître d'un rang à l'autre, et le choix se prend sur la forme
-  // autant que sur la mécanique
-  const etiquetteGeneree = (figure: number, i: number): string => {
-    const fam = FIGURE_FAMILLES[figure - 2]
-    return fam
-      ? `SALLE GÉNÉRÉE — FIGURE : ${FIGURE_NOMS[fam].toUpperCase()}`
-      : etiquettesGen[Math.min(i, etiquettesGen.length - 1)]
-  }
   ;[mecaA, mecaB, mecaC].forEach((mec, i) => {
-    const g = genere(mec, i + 1, i)
+    const g = genere(mec, i + 1, modesFigure[i] ?? false)
     if (g)
       cartes.push({
         lv: g.lv,
@@ -13463,7 +14360,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
     for (const mec of permises) {
       if (cartes.filter((c) => c.generee).length >= 3) break
       if (cartes.some((c) => c.generee && c.cahier?.mecanique === mec)) continue
-      const gx = genere(mec, 5 + mec, cartes.filter((c) => c.generee).length)
+      const gx = genere(mec, 5 + mec, modesFigure[cartes.filter((c) => c.generee).length] ?? false)
       if (gx)
         cartes.push({
           lv: gx.lv,
@@ -13500,6 +14397,9 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
     // salle se compte dans le module avant de se compter dans la descente
     `${moduleEnCours()?.nom ?? 'LA VOIE SE SÉPARE'} — SALLE ${Math.min(moduleEnCours()?.niveaux ?? 1, carteRun.niveau + 1)} / ${moduleEnCours()?.niveaux ?? '?'}` +
     ` · DESCENTE ${rangSuivant} / ${longueurRun()}` +
+    // le CONFINEMENT SUPÉRIEUR s'annonce : plus dur, plus généreux
+    ((moduleEnCours()?.cran ?? 0) > 0 ? ` · CONFINEMENT +${moduleEnCours()!.cran} · MÉMOIRE ×${primeMemoireDu(moduleEnCours())}` : '') +
+    (run.confinementDu > 0 ? ` · LA STATION EST RÉVEILLÉE +${run.confinementDu}` : '') +
     (descenteDuJour() ? ' · DESCENTE DU JOUR' : '') +
     stadeNeuf
   // les JAUGES restent en scène, comme à la fin ordinaire : le choix se
@@ -13513,25 +14413,71 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
   // trois portes : trois colonnes ; quatre (l'écrite en plus) : en rang
   host.classList.toggle('mb-trio', cartes.length === 3)
   host.appendChild(mbJauges())
+  // LA MINI-CARTE À VOIES du module, au-dessus des portes : le chemin déjà
+  // ouvert, les portes de ce rang allumées, et ce qu'elles ouvrent ensuite
+  // — on choisit une porte en voyant où elle mène
+  const mini = miniCarteDuModule()
+  if (mini && cartes.some((c) => c.voie !== undefined)) {
+    const voies = document.createElement('div')
+    voies.className = 'mb-voies'
+    voies.innerHTML = dessinMiniCarteSVG(mini, {
+      rang: carteRun.niveau,
+      trace: carteRun.trace,
+      portes: cartes.map((c) => c.voie).filter((v): v is number => v !== undefined),
+    })
+    host.appendChild(voies)
+  }
   host.appendChild(mbConsignePortes(cartes.length))
+  // LES MANQUES DU POOL se notent quand le choix se prend, une fois : ce
+  // sont les trous que ce choix a réellement présentés au joueur
+  let manquesNotes = false
+  const noteLesManques = (): void => {
+    if (manquesNotes) return
+    manquesNotes = true
+    for (const c of cartes) if (c.manqueNote) noteManqueDuPool(c.manqueNote)
+  }
   cartes.forEach((c, i) => {
-    host.appendChild(
-      mbPorte(
-        c.lv,
-        i,
-        {
-          etiquette: c.etiquette,
-          classe: c.generee ? 'mb-voie-gen' : 'mb-voie-pool',
-          cahier: c.cahier,
-        },
-        () => {
-          if (c.generee) {
-            voieGenereeChoisie = c.lv
-            noteSalleElue(c.lv) // le butin retient l'élue : rejouable, publiable
-          } else salleChoisie = c.lv
-        },
-      ),
-    )
+    const porte = c.nature
+      ? mbPorteNoeud(i, c.etiquette, c.nature, () => {
+          noteLesManques()
+          if (c.voie !== undefined) carteRun = choisitVoie(carteRun, c.voie)
+          ouvreNoeud(c.nature!)
+        })
+      : mbPorte(
+          c.lv!,
+          i,
+          {
+            etiquette: c.etiquette,
+            classe: c.generee ? 'mb-voie-gen' : 'mb-voie-pool',
+            cahier: c.cahier,
+          },
+          () => {
+            noteLesManques()
+            // la porte ouverte s'inscrit dans la trace : la salle suivante
+            // ne s'ouvrira que depuis ce nœud de la mini-carte
+            if (c.voie !== undefined) carteRun = choisitVoie(carteRun, c.voie)
+            // LA PRIME DE LA PORTE : la salle scellée se jouera pour ce qu'elle paie
+            run.primeSalle = c.prime ?? null
+            // LE CONFINEMENT PROMIS EST SERVI : les trois portes ont été
+            // fabriquées avec ces crans en plus, la dette s'éteint ici —
+            // sinon la station resterait fâchée pour le reste de la run
+            run.confinementDu = 0
+            if (c.generee) {
+              voieGenereeChoisie = c.lv
+              noteSalleElue(c.lv!) // le butin retient l'élue : rejouable, publiable
+            } else salleChoisie = c.lv
+          },
+        )
+    // viser une porte allume son nœud sur la mini-carte
+    if (c.voie !== undefined) {
+      const noeud = (): Element | null =>
+        host.querySelector(`.mv-noeud[data-rang="${carteRun.niveau}"][data-voie="${c.voie}"]`)
+      for (const ev of ['pointerenter', 'focusin', 'pad-vise'] as const)
+        porte.addEventListener(ev, () => noeud()?.classList.add('mv-vise'))
+      for (const ev of ['pointerleave', 'focusout', 'pad-quitte'] as const)
+        porte.addEventListener(ev, () => noeud()?.classList.remove('mv-vise'))
+    }
+    host.appendChild(porte)
   })
 }
 
@@ -13635,6 +14581,360 @@ function mbPorte(
   return btn
 }
 
+/** CE QUE DIT LA PORTE d'un nœud qui n'est pas une salle : l'étiquette de
+ *  la voie, le titre, la phrase, et l'icône de la mini-carte en grand. */
+const NOMS_NOEUD: Record<Exclude<NatureNoeud, 'salle'>, { etiquette: string; titre: string; texte: string; icone: string }> = {
+  evenement: {
+    etiquette: 'RENCONTRE',
+    titre: 'SIGNAL',
+    texte: 'Quelque chose vit encore derrière cette porte. Le plan du module ne dit pas quoi.',
+    icone: 'rencontre',
+  },
+  economat: {
+    etiquette: 'ÉCONOMAT',
+    titre: 'LE SEMBLABLE',
+    texte: 'Le comptoir du Sujet 12, derrière sa grille. Il troque contre du condensat.',
+    icone: 'economat',
+  },
+  repos: {
+    etiquette: 'ALCÔVE',
+    titre: 'REPOS',
+    texte: 'Une alcôve tiède. Un second souffle, de la réserve ou du condensat — un seul des trois.',
+    icone: 'repos',
+  },
+  don: {
+    etiquette: 'BONBONNE',
+    titre: 'UNE RÉSERVE OUBLIÉE',
+    texte: 'Quelqu’un a laissé sa bonbonne là et n’est jamais revenu la chercher.',
+    icone: 'don',
+  },
+  coffre: {
+    etiquette: 'CACHE',
+    titre: 'LA CACHE',
+    texte: 'Une chambre close. Un orbe d’essence y dort depuis onze ans.',
+    icone: 'coffre',
+  },
+}
+
+/** LA PORTE D'UN NŒUD SANS SALLE : elle ne montre aucun plan — il n'y a pas
+ *  de tableau derrière. L'icône de la mini-carte en grand, le titre, la
+ *  phrase. Pour une rencontre, on ne sait pas laquelle attend. */
+function mbPorteNoeud(i: number, etiquette: string, nature: Exclude<NatureNoeud, 'salle'>, ouvre: () => void): HTMLButtonElement {
+  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  const d = NOMS_NOEUD[nature]
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = `mb-porte mb-porte-ev mb-porte-${nature}`
+  btn.style.setProperty('--i', String(i))
+  btn.innerHTML =
+    `<span class="mb-porte-vue mb-ev-vue"><span class="mb-porte-no">PORTE ${i + 1}</span>` +
+    `<svg class="mb-ev-icone" viewBox="0 0 24 24" aria-hidden="true">${ICONES_MINI_CARTE}<use href="#mv-i-${d.icone}" width="24" height="24"/></svg></span>` +
+    `<em class="mb-porte-tag mb-voie-ev">${esc(etiquette)}</em>` +
+    `<b>${esc(d.titre)}</b><small>${esc(d.texte)}</small>` +
+    `<span class="mb-porte-entrer">ENTRER ▸</span>`
+  btn.addEventListener('click', () => {
+    const host = btn.parentElement
+    if (!host || host.classList.contains('mb-elu')) return
+    host.classList.add('mb-elu')
+    btn.classList.add('mb-elue')
+    bande.ponctuation('sting-collecte', 0.7)
+    mbFlash()
+    window.setTimeout(() => {
+      if (miseEnBonbonne) ouvre()
+    }, sansAnimation() ? 0 : 420)
+  })
+  return btn
+}
+
+/** OUVRIR UN NŒUD qui n'est pas une salle. La rencontre se tire et se
+ *  joue dans la cérémonie ; l'ÉCONOMAT est une salle qu'on joue (la
+ *  cérémonie se ferme, le Semblable s'intercale) ; l'alcôve, la bonbonne
+ *  et la cache posent leur choix ou leur don dans la cérémonie. Tous
+ *  reprennent ensuite le module là où il en est (mbApresHalte). */
+function ouvreNoeud(nature: Exclude<NatureNoeud, 'salle'>): void {
+  const m = moduleEnCours()
+  switch (nature) {
+    case 'evenement':
+      mbMontreEvenement()
+      return
+    case 'economat':
+      economatForce = true
+      fermeMiseEnBonbonne()
+      avanceSalle()
+      return
+    case 'repos':
+      if (m) mbMontreRepos(m, mbApresHalte)
+      return
+    case 'don':
+      if (m) mbMontreDon(m, mbApresHalte)
+      return
+    case 'coffre':
+      if (m) mbMontreCache(m)
+      return
+  }
+}
+
+/** APRÈS UNE HALTE OU UNE RENCONTRE : le nœud est un nœud comme un autre,
+ *  il consomme sa place dans le module et son rang dans la descente — sans
+ *  quoi la longueur annoncée et la mini-carte ne parleraient plus du même
+ *  chemin. Puis les portes suivantes, ou la carte si le module est épuisé. */
+function mbApresHalte(): void {
+  voieRang += 1
+  carteRun = franchitSalle(carteRun)
+  sauveRun()
+  if (moduleFini(carte, carteRun)) mbMontreCarte('suite')
+  else mbMontreSallesDuModule()
+}
+
+/** LA CÉRÉMONIE S'OUVRE EN PLEINE RUN, sans bilan : après l'économat-nœud,
+ *  dont le sas ne collecte rien, il faut rendre la main au module — les
+ *  portes suivantes, ou la carte. Le miroir de montreCarteRun. */
+function montreSuiteRun(): void {
+  miseEnBonbonne = true
+  mbBilanCourant = null
+  mbVeil.hidden = false
+  mbScene.classList.add('mb-compact')
+  mbEl('mb-releve').hidden = true
+  mbEl('mb-etal').hidden = true
+  mbEl('mb-passer').hidden = true
+  mbEl('mb-choix').hidden = false
+  mbApresHalte()
+}
+
+/** LA CACHE : l'orbe que le module recèle se prend ici, une fois par
+ *  poste — la cache s'ouvre, dit ce qu'elle rend, et le module reprend. */
+function mbMontreCache(m: ModuleCarte): void {
+  mbEtape = 'repos'
+  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  mbScene.classList.remove('mb-large')
+  mbQuestion('LA CACHE')
+  mbEl('mb-choix-titre').textContent = `${m.nom} — UNE CHAMBRE CLOSE`
+  mbEl('mb-etal').hidden = true
+  mbEl('mb-passer').hidden = true
+  const host = mbCartes()
+  host.innerHTML = ''
+  const orbe = m.orbe ?? ''
+  const nomOrbe = ORBES.find((o) => o.id === orbe)?.nom ?? orbe
+  const dejaTenu = !!orbe && (records.aOrbe(orbe) || records.eveilTient(orbe))
+  // sous un outil rien ne s'écrit ; sinon la cache se vide, une fois par poste
+  const prise = !!orbe && !testLevel && records.videCache(m.id, orbe)
+  if (prise) majMemoireUI()
+  const texte = !orbe
+    ? 'La chambre est vide. Quelqu’un est passé avant vous.'
+    : prise
+      ? dejaTenu
+        ? `L’orbe ${nomOrbe} y dormait — vous l’aviez déjà. La chambre est vide désormais.`
+        : `L’orbe d’essence de conscience — ${nomOrbe}. Il vous suit.`
+      : 'Vous avez déjà ouvert cette cache sur ce poste : elle est vide.'
+  const bilan = document.createElement('div')
+  bilan.className = 'mb-ev-recit mb-ev-issue'
+  bilan.innerHTML = `<em>${esc(m.nom)}</em><p>${esc(texte)}</p>` + (prise && !dejaTenu ? `<ul class="mb-ev-gains"><li>🔮 orbe d’essence — ${esc(nomOrbe)}</li></ul>` : '')
+  host.appendChild(bilan)
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'mb-continuer'
+  btn.textContent = 'REPRENDRE LA DESCENTE ▸'
+  btn.addEventListener('click', () => {
+    if (btn.disabled) return
+    btn.disabled = true
+    bande.ponctuation('sting-record', 0.6)
+    mbApresHalte()
+  })
+  host.appendChild(btn)
+  btn.focus()
+}
+
+/** L'ÉTAT DE LA RUN que les offres d'un événement consultent — juste assez
+ *  pour qu'une offre sache dire qu'elle ne donnerait rien. */
+function etatJoueurEvenement(): EtatJoueur {
+  return {
+    bonbonne: run.bonbonneLiters,
+    cap: capBonbonne(),
+    vies: run.vies,
+    viesMax: VIES_MAX,
+    essence: run.essence,
+    plancher: essencePlancher(),
+    orbeAPrendre: ORBES.some((o) => !records.aOrbe(o.id) && !records.eveilTient(o.id)),
+    inconnuALire: carte.modules.some(
+      (m) => m.type === 'inconnu' && !carteRun.revelations[m.id],
+    ),
+  }
+}
+
+/** APPLIQUER UNE ISSUE : chaque effet du vocabulaire d'evenements.ts tire
+ *  sur un levier réel de la run. Rend les lignes à afficher — ce qu'on a
+ *  VRAIMENT gagné, pas ce qui était promis (une réserve pleine ne rend pas
+ *  la moitié d'une offre en silence). */
+function appliqueEffets(effets: readonly EffetEvenement[]): string[] {
+  const lignes: string[] = []
+  for (const e of effets) {
+    switch (e.quoi) {
+      case 'bonbonne': {
+        const avant = run.bonbonneLiters
+        run.bonbonneLiters = Math.max(0, Math.min(capBonbonne(), run.bonbonneLiters + e.litres))
+        const d = run.bonbonneLiters - avant
+        lignes.push(`🫙 réserve ${d >= 0 ? '+' : ''}${d.toFixed(1).replace('.', ',')} L`)
+        break
+      }
+      case 'condensat':
+        if (e.cl >= 0) gagneCondensat(e.cl)
+        else depenseCondensat(-e.cl)
+        lignes.push(`💧 condensat ${e.cl >= 0 ? '+' : ''}${Math.round(e.cl)} cL`)
+        break
+      case 'memoire':
+        gagneMemoireRun(e.n)
+        lignes.push(`🧠 mémoire +${Math.round(e.n)}`)
+        break
+      case 'vies': {
+        const avant = run.vies
+        run.vies = Math.max(0, Math.min(VIES_MAX, run.vies + e.n))
+        if (run.vies !== avant)
+          lignes.push(`💠 ${run.vies - avant > 0 ? '+' : ''}${run.vies - avant} échantillon de secours`)
+        break
+      }
+      case 'essence': {
+        const avant = run.essence
+        run.essence = Math.max(essencePlancher(), Math.min(1, run.essence + e.part))
+        lignes.push(
+          `🜄 essence maximale ${Math.round((run.essence - avant) * 100)} % — le corps naîtra à ${Math.round(run.essence * 100)} % du plein`,
+        )
+        break
+      }
+      case 'instrument': {
+        const vivier = catalogueRecompenses().filter((d) =>
+          e.bon
+            ? !d.contrepartie &&
+              !run.instruments.includes(d.id) &&
+              (!d.effets.some((x) => x.levier === 'vies') || run.vies < VIES_MAX)
+            : d.contrepartie === true && !run.instruments.includes(d.id),
+        )
+        const pris = vivier[Math.floor(Math.random() * vivier.length)]
+        if (!pris) break
+        const gainVies = valeurLevier(pris.effets, 'vies')
+        if (gainVies > 0) run.vies = Math.min(VIES_MAX, run.vies + gainVies)
+        if (pris.effets.some((x) => x.levier !== 'vies')) run.instruments.push(pris.id)
+        majInstrumentsUI()
+        lignes.push(`${pris.icone} ${e.bon ? '' : 'CONTREPARTIE — '}${pris.nom} : ${pris.desc}`)
+        break
+      }
+      case 'orbe': {
+        const libre = ORBES.filter((o) => !records.aOrbe(o.id) && !records.eveilTient(o.id))
+        const pris = libre[Math.floor(Math.random() * libre.length)]
+        if (pris && records.gagneOrbe(pris.id)) {
+          majMemoireUI()
+          lignes.push(`🔮 orbe d’essence — ${pris.nom}`)
+        }
+        break
+      }
+      case 'revele': {
+        // la carte se lit d'avance : chaque « ? » encore fermé prend sa
+        // nature maintenant, et le plan la montre
+        // le même tirage que l'entrée d'un « ? » : la descente du jour révèle
+        // la même chose pour tous les postes
+        for (const m of carte.modules)
+          if (m.type === 'inconnu')
+            carteRun = reveleInconnu(
+              carte,
+              carteRun,
+              m.id,
+              descenteDuJour() ? aleaDeGraine(`${new Date().toISOString().slice(0, 10)}@?${m.id}`) : Math.random,
+            )
+        lignes.push('🗺️ les modules « ? » de la station se lisent d’avance')
+        break
+      }
+      case 'confinement':
+        run.confinementDu += Math.max(0, Math.round(e.crans))
+        lignes.push(`⚠️ confinement +${e.crans} à la prochaine salle`)
+        break
+      case 'rien':
+        break
+    }
+  }
+  majBoutonsRun()
+  return lignes
+}
+
+/** LA SALLE ÉVÉNEMENT : un lieu, un texte, deux ou trois offres — puis ce
+ *  que ça donne, et la descente reprend. L'événement se TIRE ici (le joueur
+ *  ne savait pas lequel l'attendait) parmi ceux qu'il n'a pas encore vus de
+ *  la run ; la descente du jour en donne le même à tous les postes. */
+function mbMontreEvenement(): void {
+  mbEtape = 'evenement'
+  const alea = descenteDuJour()
+    ? aleaDeGraine(`${new Date().toISOString().slice(0, 10)}@ev${voieRang}`)
+    : Math.random
+  const ev = tireEvenement(run.evenementsVus, alea)
+  if (!run.evenementsVus.includes(ev.id)) run.evenementsVus.push(ev.id)
+  mbPeintEvenement(ev, alea)
+}
+
+function mbPeintEvenement(ev: EvenementDef, alea: () => number): void {
+  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  mbScene.classList.remove('mb-large')
+  mbScene.classList.add('mb-compact')
+  mbQuestion(ev.titre)
+  mbEl('mb-choix-titre').textContent =
+    `${moduleEnCours()?.nom ?? 'LA STATION'} — RENCONTRE · DESCENTE ${voieRang + 1} / ${longueurRun()}`
+  mbEl('mb-etal').hidden = true
+  mbEl('mb-passer').hidden = true
+  const host = mbCartes()
+  host.innerHTML = ''
+  host.classList.add('mb-trio')
+  const recit = document.createElement('div')
+  recit.className = 'mb-ev-recit'
+  recit.innerHTML = `<em>${esc(ev.lieu)}</em><p>${esc(ev.texte)}</p>`
+  host.appendChild(recit)
+  let elu = false
+  offresDe(ev, etatJoueurEvenement()).forEach(({ choix, possible }, i) => {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'mb-carte mb-ev-offre' + (possible ? '' : ' mb-pauvre')
+    btn.disabled = !possible
+    btn.style.setProperty('--i', String(i))
+    btn.innerHTML =
+      `<b>${esc(choix.libelle)}</b><small>${esc(choix.detail)}</small>` +
+      (choix.issues.length > 1
+        ? `<em class="mb-ev-pari">⚄ ${choix.issues.length} issues possibles</em>`
+        : `<em class="mb-ev-sur">▸ sans risque</em>`)
+    btn.addEventListener('click', () => {
+      if (elu) return
+      elu = true
+      mbTranche(ev, choix, alea)
+    })
+    host.appendChild(btn)
+  })
+}
+
+/** LE CHOIX EST PRIS : l'issue se tire, les effets s'appliquent, et l'écran
+ *  dit ce qui vient d'arriver avant de rendre la main. */
+function mbTranche(ev: EvenementDef, choix: ChoixEvenement, alea: () => number): void {
+  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  const issue = resoutChoix(choix, alea)
+  const lignes = appliqueEffets(issue.effets)
+  bande.ponctuation('sting-record', 0.6)
+  mbQuestion(ev.titre)
+  const host = mbCartes()
+  host.innerHTML = ''
+  const bilan = document.createElement('div')
+  bilan.className = 'mb-ev-recit mb-ev-issue'
+  const dites = lignes.length > 0 ? lignes : [issue.effets.map(ditEffet).join(' · ') || 'rien']
+  bilan.innerHTML =
+    `<em>${esc(choix.libelle)}</em><p>${esc(issue.texte)}</p>` +
+    `<ul class="mb-ev-gains">${dites.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>`
+  host.appendChild(bilan)
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'mb-continuer'
+  btn.textContent = 'REPRENDRE LA DESCENTE ▸'
+  btn.addEventListener('click', () => {
+    if (btn.disabled) return
+    btn.disabled = true
+    mbApresHalte()
+  })
+  host.appendChild(btn)
+  btn.focus()
+}
+
 /** La FIN : l'état des jauges, et CONTINUER mène à la salle suivante. */
 function mbMontreFin(): void {
   mbEtape = 'fin'
@@ -13680,7 +14980,8 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
   mbVeil.style.setProperty('--mb-rang', verdict.teinte)
   mbEl('mb-releve').hidden = false
   mbEl('mb-titre').textContent = 'SALLE FRANCHIE'
-  mbEl('mb-sur').textContent = `MISE EN BONBONNE · ${level.code}`
+  mbEl('mb-sur').textContent =
+    `MISE EN BONBONNE · ${level.code}` + (run.primeSalle ? ` · PRIME : ${NOMS_PRIME[run.primeSalle].toUpperCase()}` : '')
   mbEl('mb-rang').hidden = true
   mbEl('mb-corps').classList.remove('mb-on')
   mbEl('mb-rang-lettre').textContent = verdict.rang
@@ -14068,6 +15369,12 @@ function newExpedition(avecCarte = false): void {
   run.xp = 0
   run.livreTotal = 0
   run.memoireGagnee = 0
+  // le corps repart ENTIER : les sacrifices d'une run ne suivent pas dans
+  // la suivante (le laboratoire recommence avec un échantillon neuf)
+  run.essence = 1
+  run.confinementDu = 0
+  run.evenementsVus = []
+  run.primeSalle = null
   // les éclats de mémoire repoussent : une nouvelle run, une nouvelle chance
   eclatsPrisRun.clear()
   purgeCondensat() // la bourse d'une run commence toujours vide
@@ -14077,7 +15384,7 @@ function newExpedition(avecCarte = false): void {
   // les PROVISIONS du comptoir se livrent maintenant — après la remise à
   // zéro (le viatique s'ajoute à une bonbonne vide), avant la première salle
   appliqueProvisions()
-  carteRun = departCarte(carte)
+  carteRun = { ...departCarte(carte), graineRun: graineRun() }
   premiereSalleDeLaRun = avecCarte
   if (avecCarte) {
     // AU SAS DE LANCEMENT, la carte s'ouvre : le premier module se choisit
@@ -14233,12 +15540,18 @@ function quitteAuMenu(): void {
   clefCachette = false
   run.ended = false
   purgeCondensat()
-  auHub = false
   testLevel = null
+  // ON REVIENT À L'ÉTAT DU CHARGEMENT : le hub derrière la fiche, et le
+  // bouton COMMENCER qui y entre. Le drapeau à FAUX prenait le chemin de la
+  // navigation directe (?tableau=N) dans closeHome, qui relance la salle
+  // courante : après « quitter la descente », COMMENCER repartait en salle
+  // 1 sans passer par le hub (revue du 16/09).
+  auHub = true
   hasPlayed = false // la partie est close : le bouton redit COMMENCER
   document.body.classList.remove('playing')
   input.paused = true
   homeRestartBtn.hidden = true
+  restart() // le décor du hub reprend sa place derrière la fiche
   majVoieHud()
   majBoutonsRun()
   openHome()
@@ -14461,22 +15774,12 @@ const chipEditor = touchButton(
   'tb-chip tb-editor',
 )
 chipEditor.style.display = 'none'
-// LE HUB À TOUT MOMENT (outil de conception) : le module d'accueil est
-// atteignable depuis n'importe quelle salle, sans repasser par la fiche ni
-// abandonner la run. Réservé au mode concepteur (data-dev, comme les autres
-// outils) : en partie publique, quitter une salle d'un doigt casserait la
-// descente. La run n'est pas purgée — bonbonne, XP et instruments restent ;
-// c'est le sas du hub qui relance une descente.
-const chipHub = touchButton(
-  '⌂ HUB',
-  'aller au hub tout de suite (mode concepteur) — la salle en cours est quittée, la run n’est pas purgée',
-  () => {
-    if (miseEnBonbonne) fermeMiseEnBonbonne()
-    entrerHub()
-  },
-  'tb-chip tb-hub',
-)
-chipHub.dataset.dev = ''
+// (La puce « ⌂ HUB » — le hub à tout moment, outil de conception — a été
+// retirée le 16/09 : elle menait au hub AVEC une run en cours, et le sas
+// reprenait cette run en silence — le joueur croyait commencer et se
+// retrouvait en salle 4. On n'arrive au hub qu'en mourant, en bouclant
+// l'expédition, ou par le menu ; et dans ces trois cas la sauvegarde est
+// effacée.)
 
 // La barre du bas passe sur deux lignes quand elle se remplit (le bouton de
 // retour à l'éditeur, par exemple). On publie sa hauteur réelle en variable
@@ -14819,7 +16122,7 @@ function majDossier(): void {
   mission += '</section>'
 
   // ---- TON CORPS : ce qu'il reste, et ce qui presse
-  const depart = sim.baseVolume > 0 ? sim.baseVolume : level.spawn.n
+  const depart = sim.baseVolume > 0 ? sim.baseVolume : volumeDepart()
   const frac = depart > 0 ? sim.playerCount / depart : 0
   const coque = Math.round(21 - 81 * chillNow())
   const critique = litres < params.criticalVolumeLiters * 1.7
@@ -16439,26 +17742,22 @@ function corpsImage(now: number): boolean {
     (drunk || reached || rejointSasHub) &&
     auHub
   ) {
-    // LE SAS DE LANCEMENT : au hub, le sas ne collecte rien — il LANCE la
-    // run. Reprise de l'expédition sauvée s'il y en a une, salle 1 sinon.
+    // LE SAS DE LANCEMENT : au hub, le sas ne collecte rien — il LANCE une
+    // descente NEUVE. Il ne reprend plus de sauvegarde : on n'arrive au hub
+    // qu'en mourant, en bouclant l'expédition ou par le menu, et ces trois
+    // chemins l'effacent. Une sauvegarde qui traînerait encore (une autre
+    // version, un outil) serait reprise en silence — le joueur croirait
+    // commencer et se retrouverait en salle 4 (revue du 16/09) : elle
+    // s'efface ici. La reprise, c'est le bouton du menu, qui l'annonce.
     auHub = false
-    // les sorties GARDÉES lancent une descente NEUVE (on repart du premier
-    // rang) ; le sas principal, lui, reprend la descente sauvée s'il y en a
-    const descenteNeuve = surSasGivre || surSasVapeur
     voieDuJourForcee = surSasVapeur
     audio.collect()
     bande.ponctuation('sting-collecte', 0.85)
     // LE SCÉNARIO : la cinématique du départ, s'il y en a une — la run
     // attend qu'elle finisse (la simulation est en pause pendant ce temps)
     void joueMoment('lancement-run').then(() => {
-      // les sorties gardées lancent toujours une descente NEUVE : la
-      // sauvegarde appartient à l'expédition écrite du sas principal
-      const save = descenteNeuve ? null : runSauvee()
-      if (save) {
-        reprendreRun(save)
-      } else {
-        newExpedition(true)
-      }
+      effaceRun()
+      newExpedition(true)
     })
   } else if (
     !tableauDone &&
@@ -16520,11 +17819,12 @@ function corpsImage(now: number): boolean {
     // chaque centilitre livré nourrit le CONDENSAT (la bourse de la RUN,
     // purgée à la fin) — y compris sur la
     // dernière salle : rien de ce qui atteint le sas n'est jamais perdu
-    gagneCondensat(surplus * 100 * rendement)
+    // LA PRIME DE CONDENSAT : la salle scellée paie double dans la bourse
+    gagneCondensat(surplus * 100 * rendement * (run.primeSalle === 'condensat' ? 2 : 1))
     // Trophées de collecte : « Sans une goutte » (≥ 95 % du volume de
     // départ livré) et « Opérateur de nuit » (21 collectes cumulées)
     if (!sasOutil) {
-      if (surplus >= 0.95 * level.spawn.n * params.litersPerParticle)
+      if (surplus >= 0.95 * volumeDepart() * params.litersPerParticle)
         trophees.debloque('sans-une-goutte')
       if (trophees.compte('collectes') >= 21)
         trophees.debloque('operateur-de-nuit')
@@ -16551,12 +17851,17 @@ function corpsImage(now: number): boolean {
     // optique consigne mieux)
     const primeMur =
       stationDebout('mur-records', records.estRepare('mur-records')) && (newVolume || newChrono) ? 2 : 0
+    // LE CONFINEMENT SUPÉRIEUR paie : la mémoire du sas se multiplie par
+    // 1 + cran du module — « plus difficile, plus généreux » (§9.3)
     gagneMemoireRun(
-      5 +
+      (5 +
         (premiereFois ? 5 : 0) +
         (newVolume ? 2 : 0) +
         (newChrono ? 2 : 0) +
-        primeMur,
+        primeMur) *
+        primeMemoireDu(moduleEnCours()) *
+        // LA PRIME DE MÉMOIRE : la salle scellée paie double au sas
+        (run.primeSalle === 'memoire' ? 2 : 1),
     )
     // Publication au tableau d'honneur partagé : le serveur ne garde que le
     // meilleur — la réponse remet les registres affichés à jour.
@@ -16603,31 +17908,8 @@ function corpsImage(now: number): boolean {
     // suit en direct (profondeur record, descentes entamées)
     voieRang += 1 // la descente avance : c'est la progression, pas un titre
     carteRun = franchitSalle(carteRun) // et le module se vide d'une salle
-    // LA CACHE : un module qui recèle un orbe le donne quand il est épuisé,
-    // une fois par poste — jamais sous un outil (rien de mérité ne s'écrit)
-    const modFini = moduleEnCours()
-    if (modFini?.orbe && moduleFini(carte, carteRun) && !sasOutil) {
-      // un orbe déjà en poche ou déjà tissé ne se gagne pas deux fois : la
-      // cache se vide quand même, et le toast le dit tel quel
-      const dejaTenu = records.aOrbe(modFini.orbe) || records.eveilTient(modFini.orbe)
-      if (records.videCache(modFini.id, modFini.orbe)) {
-        const nomOrbe = ORBES.find((o) => o.id === modFini.orbe)?.nom ?? modFini.orbe
-        toastFile.push(
-          dejaTenu
-            ? {
-                nom: `LA CACHE EST VIDE — l’orbe ${nomOrbe}, vous l’aviez déjà`,
-                icone: '🔮',
-                sur: modFini.nom,
-              }
-            : {
-                nom: `ORBE D’ESSENCE — ${nomOrbe.toUpperCase()}`,
-                icone: '🔮',
-                sur: `TROUVÉ DANS ${modFini.nom}`,
-              },
-        )
-        majMemoireUI()
-      }
-    }
+    // LA CACHE : un module qui recèle un orbe le donne quand il est épuisé
+    if (!sasOutil) prendOrbeDuModule()
     voieVues.add(level.code) // la pioche ne la reproposera pas de la run
     if (!sasOutil) {
       const p = chargePalmaresVoie()
@@ -16730,7 +18012,7 @@ function corpsImage(now: number): boolean {
       montreMiseEnBonbonne({
         surplus,
         prime,
-        pct: surplus / Math.max(0.01, level.spawn.n * params.litersPerParticle),
+        pct: surplus / Math.max(0.01, volumeDepart() * params.litersPerParticle),
         temps: run.tableauTime,
         newVolume,
         newChrono,
@@ -17023,7 +18305,7 @@ function corpsImage(now: number): boolean {
   // le versement est possible : le verre s'ourle de vert pour inviter au geste
   const peutVerser =
     run.bonbonneLiters >= params.litersPerParticle &&
-    sim.playerCount < level.spawn.n &&
+    sim.playerCount < volumeDepart() &&
     !input.freezeIntent &&
     !input.gasIntent
   bonbonneEl.classList.toggle('verse-ok', peutVerser)
@@ -17102,7 +18384,7 @@ function corpsImage(now: number): boolean {
   const etatVersement = {
     auHub,
     litres: sim.liters(),
-    litresPleins: level.spawn.n * params.litersPerParticle,
+    litresPleins: volumeDepart() * params.litersPerParticle,
     empeche:
       input.paused ||
       input.freezeIntent ||
@@ -17128,7 +18410,7 @@ function corpsImage(now: number): boolean {
       dose:
         doseVersementAuto(
           sim.liters(),
-          level.spawn.n * params.litersPerParticle,
+          volumeDepart() * params.litersPerParticle,
         ) / params.litersPerParticle,
       discret: true,
     })

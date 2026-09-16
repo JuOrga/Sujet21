@@ -1492,6 +1492,10 @@
         font-size: calc(9.5px * var(--ui)); letter-spacing: 0.06em;
       }
       .dsc-vide { color: var(--dim); font-style: italic; }
+      /* l'inventaire du pool : une case à zéro est un tableau à écrire */
+      .dsc-badge.dsc-manque { color: #ff9a7a; border-color: rgba(255, 154, 122, 0.55); }
+      .dsc-manques { margin: 4px 0 8px; padding-left: 18px; font-size: calc(11px * var(--ui)); }
+      .dsc-manques li { margin: 2px 0; }
       .dsc-outils { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
       .dsc-outils button {
         padding: 8px 11px; border: 1px solid var(--line); border-radius: 6px;
@@ -6415,6 +6419,8 @@
       #carte-editeur .ce-orbes .ce-etat { flex: none; padding: 5px 8px; font-size: calc(10.5px * var(--ui)); text-transform: none; letter-spacing: 0.04em; }
       .cs-niv { font-size: 10px; letter-spacing: 0.12em; text-anchor: middle; pointer-events: none; }
 
+      /* la visée manette sur un module du plan : le même liseré que la sélection */
+      .cs-mod.pad-focus { filter: drop-shadow(0 0 12px rgba(238, 248, 255, 0.8)); outline: none; }
       /* ==== LE DESSIN DE LA CARTE (game/dessinCarte.ts) — vaut pour l'éditeur
          comme pour un futur écran de jeu. Les couleurs de la carte voyagent
          en attributs (elles viennent des données) ; ici, les états. */
@@ -6426,6 +6432,11 @@
       .cs-route.cs-active { filter: drop-shadow(0 0 6px var(--c)); animation: cs-flux 1.2s linear infinite; }
       .cs-route.cs-principale:not(.cs-active):not(.cs-parcourue) { filter: drop-shadow(0 0 6px var(--c)); }
       .cs-route.cs-lien-sel { stroke: #eef8ff; filter: drop-shadow(0 0 8px #eef8ff); }
+      /* le survol qui projette : la route la plus courte jusqu'à l'objectif */
+      .cs-route.cs-projet { stroke: #eef8ff; opacity: 1; filter: drop-shadow(0 0 7px #eef8ff); }
+      .cs-mod.cs-projet { filter: drop-shadow(0 0 10px rgba(238, 248, 255, 0.75)); }
+      /* ce que la porte survolée FERME : les modules qu'on ne pourra plus joindre */
+      .cs-mod.cs-hors { opacity: 0.22 !important; filter: none; transition: opacity 0.18s ease; }
       .cs-sens { fill: none; opacity: 0.85; }
       .cs-lien-prise { cursor: pointer; }
       .cs-brouillon { stroke: #eef8ff; stroke-width: 2; stroke-dasharray: 8 6; fill: none; pointer-events: none; }
@@ -6442,6 +6453,7 @@
       .cs-glyphe { text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
       .cs-cadenas { text-anchor: middle; dominant-baseline: central; font-size: 15px; }
       .cs-coche { text-anchor: middle; dominant-baseline: central; font-size: 10px; fill: #63b7e6; }
+      .cs-cran { text-anchor: middle; dominant-baseline: central; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; paint-order: stroke; stroke: #030710; stroke-width: 3px; }
       .cs-nom { font-family: var(--font-display); font-size: 11px; letter-spacing: 0.1em; text-anchor: middle; pointer-events: none; }
       .cs-temp text { font-size: 12px; text-anchor: start; }
       .cs-temp { pointer-events: none; }
@@ -8371,6 +8383,51 @@
       }
       .mb-prix.mb-offert { color: var(--mb-menthe); }
       .mb-carte.mb-pauvre { opacity: 0.45; cursor: not-allowed; }
+      /* ---- LES SALLES ÉVÉNEMENT (game/evenements.ts) ---- */
+      /* la porte d'une rencontre : pas de plan, un point d'interrogation */
+      .mb-ev-vue { display: grid; place-items: center; background: linear-gradient(180deg, #16233a, #0b1220); }
+      .mb-ev-vue i {
+        font-style: normal; font-family: var(--font-display);
+        font-size: calc(46px * var(--ui)); color: var(--mb-or, #ffd977);
+        text-shadow: 0 0 18px rgba(255, 217, 119, 0.45); animation: mb-ev-bat 2.6s ease-in-out infinite;
+      }
+      @keyframes mb-ev-bat { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
+      .mb-porte-tag.mb-voie-ev { color: var(--mb-or, #ffd977); border-color: rgba(255, 217, 119, 0.4); }
+      .mb-porte-ev:hover, .mb-porte-ev:focus-visible {
+        border-color: var(--mb-or, #ffd977);
+        box-shadow: 0 22px 44px rgba(0, 0, 0, 0.55), 0 0 30px rgba(255, 217, 119, 0.25);
+      }
+      /* le récit : le lieu en italique, le lore dessous — la seule prose du jeu */
+      .mb-ev-recit {
+        grid-column: 1 / -1; max-width: 62ch; margin: 0 auto; text-align: left;
+        border-left: 2px solid rgba(255, 217, 119, 0.5); padding: 2px 0 2px 16px;
+      }
+      .mb-ev-recit em {
+        display: block; font-style: normal; font-family: var(--font-display);
+        font-size: calc(9.5px * var(--ui)); letter-spacing: 0.22em; color: var(--mb-or, #ffd977);
+      }
+      .mb-ev-recit p {
+        margin: 8px 0 0; font-size: calc(13px * var(--ui)); line-height: 1.65; color: #cfe2ef;
+      }
+      .mb-ev-gains {
+        margin: 12px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 5px;
+      }
+      .mb-ev-gains li {
+        font-size: calc(12.5px * var(--ui)); color: #d5f3e8; letter-spacing: 0.03em;
+      }
+      .mb-ev-issue { border-left-color: var(--mb-menthe); }
+      .mb-ev-issue em { color: var(--mb-menthe); }
+      .mb-carte.mb-ev-offre {
+        min-height: 128px; justify-content: center; gap: 7px; text-align: center;
+      }
+      .mb-ev-offre b { font-family: var(--font-display); letter-spacing: 0.14em; }
+      .mb-ev-pari, .mb-ev-sur {
+        font-style: normal; font-size: calc(10px * var(--ui)); letter-spacing: 0.14em; color: #7f9cb0;
+      }
+      .mb-ev-pari { color: var(--mb-or, #ffd977); }
+      /* l'alcôve de repos : trois offres, l'icône en tête */
+      .mb-carte.mb-repos { min-height: 170px; justify-content: center; gap: 8px; }
+      .mb-repos-icone { font-style: normal; font-size: calc(30px * var(--ui)); line-height: 1; }
       /* ---- LE VERSEMENT : la goutte du surplus au centre, une plaque de
          chaque côté (la RÉSERVE et son bocal, la MAÎTRISE et son anneau).
          Viser une plaque fait COULER le flux de la goutte vers elle ; la
@@ -8644,6 +8701,46 @@
       }
       .mb-cartes:has(.mb-porte) { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
       .mb-cartes.mb-trio { grid-template-columns: repeat(3, 1fr); max-width: 940px; margin: 0 auto; width: 100%; }
+      /* la mini-carte à voies du module (game/voiesModule.ts) : rangs de
+         gauche à droite, voies de haut en bas — des TUILES octogonales, la
+         silhouette des modules de la station, une icône par nature */
+      .mb-voies { grid-column: 1 / -1; display: flex; justify-content: center; padding: 4px 0 6px; overflow-x: auto; }
+      .mv-svg { max-width: 100%; height: auto; font-family: var(--font-mono); }
+      .mv-lien { stroke: #2a3d52; stroke-width: 2.5; stroke-linecap: round; }
+      .mv-lien.mv-joue { stroke: var(--mb-menthe); stroke-width: 3; filter: drop-shadow(0 0 5px rgba(109, 255, 184, 0.5)); }
+      .mv-lien.mv-ouvre { stroke: #9fb6c8; stroke-width: 2.5; stroke-dasharray: 5 5; animation: cs-flux 1.2s linear infinite; }
+      /* la teinte d'un nœud : sa nature (currentColor nourrit l'icône) */
+      .mv-noeud { color: #7f9cb0; }
+      .mv-noeud.mv-m0 { color: #63b7e6; }
+      .mv-noeud.mv-m1 { color: #a7ddf5; }
+      .mv-noeud.mv-m2 { color: #f2c98e; }
+      .mv-noeud.mv-m3 { color: #c99aff; }
+      .mv-noeud.mv-pool { color: var(--mb-or, #ffd977); }
+      .mv-noeud.mv-evenement { color: var(--mb-or, #ffd977); }
+      .mv-halo { fill: none; stroke: transparent; stroke-width: 6; transition: stroke 0.16s ease; }
+      .mv-tuile { fill: #0e1724; stroke: currentColor; stroke-width: 1.5; stroke-opacity: 0.55; transition: fill 0.16s ease, stroke-opacity 0.16s ease; }
+      .mv-noeud use { opacity: 0.9; }
+      .mv-noeud.mv-loin .mv-tuile { stroke-opacity: 0.3; }
+      .mv-noeud.mv-loin use { opacity: 0.5; }
+      .mv-noeud.mv-ferme { opacity: 0.28; }
+      .mv-noeud.mv-joue .mv-tuile { fill: rgba(109, 255, 184, 0.14); stroke: var(--mb-menthe); stroke-opacity: 1; }
+      .mv-noeud.mv-joue use { opacity: 1; }
+      .mv-coche { fill: var(--mb-menthe); stroke: #071018; stroke-width: 1.5; }
+      /* la PRIME d'un nœud : un losange au coin, teinté par ce qu'elle paie */
+      .mv-prime { stroke: #071018; stroke-width: 1; }
+      .mv-prime-memoire { fill: #6dffb8; }
+      .mv-prime-condensat { fill: #63b7e6; }
+      .mv-prime-tirage { fill: #ffd977; }
+      .mv-noeud.mv-porte .mv-tuile { fill: #14202f; stroke: #eaf6ff; stroke-opacity: 1; stroke-width: 2; }
+      .mv-noeud.mv-porte .mv-halo { stroke: currentColor; stroke-opacity: 0.35; animation: mv-bat 1.8s ease-in-out infinite; }
+      .mv-noeud.mv-porte use { opacity: 1; filter: drop-shadow(0 0 4px currentColor); }
+      .mv-noeud.mv-vise .mv-tuile { fill: currentColor; }
+      .mv-noeud.mv-vise use { color: #071018; filter: none; }
+      .mv-noeud.mv-evenement.mv-porte .mv-tuile { fill: rgba(255, 217, 119, 0.12); }
+      @keyframes mv-bat { 0%, 100% { stroke-width: 6; stroke-opacity: 0.35; } 50% { stroke-width: 10; stroke-opacity: 0.12; } }
+      .mv-titre { fill: #55708c; font-size: 9px; letter-spacing: 0.22em; text-anchor: middle; font-family: var(--font-display); }
+      .mv-titre.mv-courant { fill: #d5f3e8; }
+      @media (prefers-reduced-motion: reduce) { .mv-lien.mv-ouvre, .mv-noeud.mv-porte .mv-halo { animation: none; } }
       /* les jauges en tête du choix : on décide en voyant ce qu'on possède */
       .mb-jauges {
         grid-column: 1 / -1; display: flex; justify-content: center; align-items: center;
@@ -8675,10 +8772,16 @@
         25% { transform: translateX(-6px); }
         75% { transform: translateX(6px); }
       }
+      /* trois lignes réservées, une ligne par ligne : la fiche ne pousse
+         jamais la carte (l'écran « sautait » au survol des portes) */
       .mb-station-fiche {
-        margin: 6px 0 0; min-height: 1.5em; text-align: center;
+        margin: 6px 0 0; min-height: calc(3 * 1.55em); text-align: center;
         font-size: calc(12px * var(--ui)); letter-spacing: 0.06em; color: #8ba3b8;
       }
+      .mb-station-fiche span {
+        display: block; line-height: 1.55em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .mb-station-fiche span:first-child { color: #cfe2ef; }
       .mb-passer {
         margin: 4px 0 0; text-align: center; font-family: var(--font-display);
         font-size: calc(8px * var(--ui)); letter-spacing: 0.3em; color: #55708c;
@@ -9415,6 +9518,12 @@
               <option value="2">Rares</option>
               <option value="3">Fréquents</option>
             </select></label>
+          <label class="ed-f" title="Le climat des dangers : la température du module de la carte le pose en run — froid : hublots fendus sur la coque ; chaud : chaudières"><span>Climat</span>
+            <select id="edg-climat">
+              <option value="0">Auto</option>
+              <option value="1">Froid</option>
+              <option value="2">Chaud</option>
+            </select></label>
           <label class="ed-f"><span>Cachette</span>
             <select id="edg-cachette">
               <option value="0">Auto</option>
@@ -9807,7 +9916,7 @@
         <div class="pup-corps">
           <div class="pup-sec">LE HUB</div>
           <div class="pup-grid">
-            <button type="button" data-pup="hub-principal"><b>Partir par le sas principal</b><small>quitte le hub sans y nager : le sas de l’eau, donc l’expédition ÉCRITE — et la sauvegarde reprend s’il y en a une. Le hub se joue sans enjeu : rien n’est consigné aux registres</small></button>
+            <button type="button" data-pup="hub-principal"><b>Partir par le sas principal</b><small>quitte le hub sans y nager : le sas de l’eau, donc une descente NEUVE (la reprise d’une sauvegarde, c’est le bouton du menu). Le hub se joue sans enjeu : rien n’est consigné aux registres</small></button>
           </div>
           <div class="pup-sec">CÉRÉMONIE DE FIN DE SALLE</div>
           <div class="pup-grid">
