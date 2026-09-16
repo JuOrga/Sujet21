@@ -63,6 +63,14 @@ describe('le catalogue des rencontres', () => {
         // dès qu'elle est certaine
         if (c.issues.every((i) => i.effets.some((e) => e.quoi === 'essence')))
           expect(offre.possible).toBe(false)
+        // LE PLANCHER SE RÈGLE (le plan) : au plancher du plan, même fermeture ;
+        // un plancher plus bas rouvre l'offre au même joueur
+        const auPlancherDuPlan: EtatJoueur = { ...riche, essence: 0.6, plancher: 0.6 }
+        const large: EtatJoueur = { ...riche, essence: 0.6, plancher: 0.2 }
+        if (c.issues.every((i) => i.effets.some((e) => e.quoi === 'essence'))) {
+          expect(offresDe(ev, auPlancherDuPlan).find((o) => o.choix === c)!.possible).toBe(false)
+          if (perte >= -0.4) expect(offresDe(ev, large).find((o) => o.choix === c)!.possible).toBe(true)
+        }
       }
   })
 

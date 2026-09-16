@@ -118,7 +118,6 @@ import {
 import { CLE_MANQUES, inventairePool, litManques, noteManque, type Manque } from './game/manques'
 import {
   ditEffet,
-  ESSENCE_PLANCHER,
   offresDe,
   resoutChoix,
   tireEvenement,
@@ -142,8 +141,7 @@ import {
   projectionDepuis,
   reveleInconnu,
   offresRepos,
-  REPOS_CONDENSAT_CL,
-  REPOS_RESERVE_L,
+  type DonsHalte,
   postureDuModule,
   primeMemoire,
   departCarte,
@@ -595,7 +593,20 @@ function carteDef(id: string): InstrumentDef | null {
  *  automatique, la jauge, le trophée « sans une goutte », le dossier :
  *  sinon le jeu croirait le corps en manque de ce qu'il n'a jamais eu. */
 function volumeDepart(lv: { spawn: { n: number } } = level): number {
-  return Math.max(1, Math.round(lv.spawn.n * Math.max(ESSENCE_PLANCHER, run.essence)))
+  return Math.max(1, Math.round(lv.spawn.n * Math.max(essencePlancher(), run.essence)))
+}
+/** LE PLANCHER D'ESSENCE du plan (en part du plein) : le curseur de
+ *  LA DESCENTE, sinon la constante d'avant. */
+function essencePlancher(): number {
+  return Math.max(0.05, Math.min(1, voiePlan.essencePlancher / 100))
+}
+/** CE QU'UNE HALTE REND, lu du plan. */
+function donsHalte(): DonsHalte {
+  return { reserveL: voiePlan.halteReserveCl / 100, condensatCl: voiePlan.halteCondensatCl }
+}
+/** LA PRIME DE MÉMOIRE du module, au taux du plan. */
+function primeMemoireDu(m: ModuleCarte | undefined): number {
+  return primeMemoire(m, voiePlan.memoireParCran / 100)
 }
 
 function capBonbonne(): number {
@@ -4653,7 +4664,7 @@ function reprendreRun(save: RunSauvee): void {
   carteRun = litEtatCarteRun(save.carte, carte)
   // l'essence rognée par les sacrifices survit à la reprise — sinon un
   // sacrifice se rendrait en fermant l'onglet
-  run.essence = Math.max(ESSENCE_PLANCHER, Math.min(1, save.essence ?? 1))
+  run.essence = Math.max(essencePlancher(), Math.min(1, save.essence ?? 1))
   run.confinementDu = Math.max(0, Math.round(save.confinementDu ?? 0))
   run.evenementsVus = (save.evenementsVus ?? []).slice()
   hasPlayed = true
@@ -6915,6 +6926,59 @@ function renderDescente(): void {
     ),
   )
   corps.appendChild(g3b)
+
+  corps.appendChild(dscSec('CE QUE PÈSE UNE ROUTE — risque contre récompense'))
+  const aidePese = document.createElement('p')
+  aidePese.className = 'dsc-aide'
+  aidePese.innerHTML =
+    'Les nombres qui décident si un détour vaut la salle d’à côté, jusqu’où un joueur peut parier sur lui-même, et ce que ' +
+    'paie la route difficile. Ils étaient écrits dans le code ; ils se trouvent en jouant.'
+  corps.appendChild(aidePese)
+  const g3c = document.createElement('div')
+  g3c.className = 'dsc-grille'
+  g3c.append(
+    dscCran(
+      'RÉSERVE D’UNE HALTE',
+      'ce que l’alcôve ou la bonbonne oubliée rend en bonbonne',
+      () => voiePlan.halteReserveCl,
+      (v) => {
+        voiePlan.halteReserveCl = v
+      },
+      10,
+      (v) => `${(v / 100).toFixed(1).replace('.', ',')} L`,
+    ),
+    dscCran(
+      'CONDENSAT D’UNE HALTE',
+      'ce que l’alcôve ou le fût rend dans la bourse',
+      () => voiePlan.halteCondensatCl,
+      (v) => {
+        voiePlan.halteCondensatCl = v
+      },
+      10,
+      (v) => `${v} cL`,
+    ),
+    dscCran(
+      'PLANCHER D’ESSENCE',
+      'l’essence maximale ne descend jamais sous cette part du plein — un sacrifice de trop ne fait pas une impasse',
+      () => voiePlan.essencePlancher,
+      (v) => {
+        voiePlan.essencePlancher = v
+      },
+      5,
+      (v) => `${v} %`,
+    ),
+    dscCran(
+      'PRIME DE MÉMOIRE PAR CRAN',
+      'la mémoire du sas se multiplie par 1 + cran × prime — 100 : ×2 au cran 1, ×3 au cran 2 ; 0 : le confinement ne paie pas',
+      () => voiePlan.memoireParCran,
+      (v) => {
+        voiePlan.memoireParCran = v
+      },
+      25,
+      (v) => `${v} %`,
+    ),
+  )
+  corps.appendChild(g3c)
 
   corps.appendChild(
     dscSec('L’ALGORITHME DE PIOCHE — ce qui choisit le tableau du pool'),
@@ -13533,7 +13597,7 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
         : `${carte.types[mod.type].toLowerCase()} · ${mod.niveaux > 0 ? `${mod.niveaux} salle${mod.niveaux > 1 ? 's' : ''}` : 'sans salle'}`
     fiche.textContent =
       `${mod.nom} · ${nature}` +
-      (mod.cran > 0 ? ` · confinement +${mod.cran}, mémoire ×${primeMemoire(mod)}` : '') +
+      (mod.cran > 0 ? ` · confinement +${mod.cran}, mémoire ×${primeMemoireDu(mod)}` : '') +
       ` · ${mod.temp}°C · ${acces}` +
       (types.length ? ` · on y trouve : ${types.join(', ')}` : '') +
       (projection ? ` — ${ditProjection(carte, projection)}` : '')
@@ -13666,12 +13730,15 @@ function mbMontreRepos(m: ModuleCarte, suite: () => void = () => mbMontreCarte('
   host.innerHTML = ''
   host.classList.add('mb-trio')
   const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
-  const offres = offresRepos({
-    vies: run.vies,
-    viesMax: VIES_MAX,
-    bonbonne: run.bonbonneLiters,
-    cap: capBonbonne(),
-  })
+  const offres = offresRepos(
+    {
+      vies: run.vies,
+      viesMax: VIES_MAX,
+      bonbonne: run.bonbonneLiters,
+      cap: capBonbonne(),
+    },
+    donsHalte(),
+  )
   let elu = false
   offres.forEach((o, i) => {
     const btn = document.createElement('button')
@@ -13685,8 +13752,8 @@ function mbMontreRepos(m: ModuleCarte, suite: () => void = () => mbMontreCarte('
       elu = true
       if (o.id === 'souffle') run.vies = Math.min(VIES_MAX, run.vies + 1)
       else if (o.id === 'reserve')
-        run.bonbonneLiters = Math.min(capBonbonne(), run.bonbonneLiters + REPOS_RESERVE_L)
-      else gagneCondensat(REPOS_CONDENSAT_CL)
+        run.bonbonneLiters = Math.min(capBonbonne(), run.bonbonneLiters + donsHalte().reserveL)
+      else gagneCondensat(donsHalte().condensatCl)
       majBoutonsRun()
       sauveRun() // la halte prise s'écrit : une reprise ne la rejoue pas
       bande.ponctuation('sting-record', 0.6)
@@ -13710,7 +13777,7 @@ function mbMontreDon(m: ModuleCarte, suite: () => void = () => mbMontreCarte('su
   host.innerHTML = ''
   host.classList.add('mb-trio')
   const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
-  const o = offreDon({ bonbonne: run.bonbonneLiters, cap: capBonbonne() })
+  const o = offreDon({ bonbonne: run.bonbonneLiters, cap: capBonbonne() }, donsHalte())
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.className = 'mb-carte mb-repos'
@@ -13721,8 +13788,8 @@ function mbMontreDon(m: ModuleCarte, suite: () => void = () => mbMontreCarte('su
     if (elu) return
     elu = true
     if (o.id === 'reserve')
-      run.bonbonneLiters = Math.min(capBonbonne(), run.bonbonneLiters + REPOS_RESERVE_L)
-    else gagneCondensat(REPOS_CONDENSAT_CL)
+      run.bonbonneLiters = Math.min(capBonbonne(), run.bonbonneLiters + donsHalte().reserveL)
+    else gagneCondensat(donsHalte().condensatCl)
     majBoutonsRun()
     sauveRun()
     bande.ponctuation('sting-record', 0.6)
@@ -14054,7 +14121,7 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
     `${moduleEnCours()?.nom ?? 'LA VOIE SE SÉPARE'} — SALLE ${Math.min(moduleEnCours()?.niveaux ?? 1, carteRun.niveau + 1)} / ${moduleEnCours()?.niveaux ?? '?'}` +
     ` · DESCENTE ${rangSuivant} / ${longueurRun()}` +
     // le CONFINEMENT SUPÉRIEUR s'annonce : plus dur, plus généreux
-    ((moduleEnCours()?.cran ?? 0) > 0 ? ` · CONFINEMENT +${moduleEnCours()!.cran} · MÉMOIRE ×${primeMemoire(moduleEnCours())}` : '') +
+    ((moduleEnCours()?.cran ?? 0) > 0 ? ` · CONFINEMENT +${moduleEnCours()!.cran} · MÉMOIRE ×${primeMemoireDu(moduleEnCours())}` : '') +
     (run.confinementDu > 0 ? ` · LA STATION EST RÉVEILLÉE +${run.confinementDu}` : '') +
     (descenteDuJour() ? ' · DESCENTE DU JOUR' : '') +
     stadeNeuf
@@ -14397,6 +14464,7 @@ function etatJoueurEvenement(): EtatJoueur {
     vies: run.vies,
     viesMax: VIES_MAX,
     essence: run.essence,
+    plancher: essencePlancher(),
     orbeAPrendre: ORBES.some((o) => !records.aOrbe(o.id) && !records.eveilTient(o.id)),
     inconnuALire: carte.modules.some(
       (m) => m.type === 'inconnu' && !carteRun.revelations[m.id],
@@ -14437,7 +14505,7 @@ function appliqueEffets(effets: readonly EffetEvenement[]): string[] {
       }
       case 'essence': {
         const avant = run.essence
-        run.essence = Math.max(ESSENCE_PLANCHER, Math.min(1, run.essence + e.part))
+        run.essence = Math.max(essencePlancher(), Math.min(1, run.essence + e.part))
         lignes.push(
           `🜄 essence maximale ${Math.round((run.essence - avant) * 100)} % — le corps naîtra à ${Math.round(run.essence * 100)} % du plein`,
         )
@@ -17501,7 +17569,7 @@ function corpsImage(now: number): boolean {
         (newVolume ? 2 : 0) +
         (newChrono ? 2 : 0) +
         primeMur) *
-        primeMemoire(moduleEnCours()),
+        primeMemoireDu(moduleEnCours()),
     )
     // Publication au tableau d'honneur partagé : le serveur ne garde que le
     // meilleur — la réponse remet les registres affichés à jour.

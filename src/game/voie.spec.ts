@@ -144,6 +144,16 @@ describe('voie — le plan de descente', () => {
     expect(ancien.respiration).toBe(3)
     expect(ancien.finale).toBe(60)
     expect(ancien.rangsSansDanger).toBe(2)
+    // ce que pèse une route : les défauts sont les anciennes constantes
+    expect(ancien.halteReserveCl).toBe(50)
+    expect(ancien.halteCondensatCl).toBe(40)
+    expect(ancien.essencePlancher).toBe(40)
+    expect(ancien.memoireParCran).toBe(100)
+    // et leurs bornes : jamais un plancher qui interdit tout sacrifice, ni sous 10 %
+    const borne = clampPlanVoie({ essencePlancher: 100, memoireParCran: 999, halteReserveCl: -5 } as Partial<PlanVoie>)
+    expect(borne.essencePlancher).toBe(90)
+    expect(borne.memoireParCran).toBe(300)
+    expect(borne.halteReserveCl).toBe(0)
     expect(ancien.cadenceLaby).toBe(2)
     expect(ancien.cadenceContraste).toBe(2)
     expect(ancien.figuresDebut).toBe(1)

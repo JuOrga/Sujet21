@@ -324,9 +324,10 @@ export function difficulteSousCran(difficulte: number, m: ModuleCarte | undefine
 }
 
 /** LA PRIME DE MÉMOIRE d'un module : « plus difficile, plus généreux » —
- *  la mémoire gravée au sas de ses salles se multiplie par 1 + cran. */
-export function primeMemoire(m: ModuleCarte | undefined): number {
-  return 1 + Math.max(0, m?.cran ?? 0)
+ *  la mémoire gravée au sas de ses salles se multiplie par 1 + cran × prime
+ *  (`parCran`, 1 = +100 % par cran : ×2 au cran 1 ; le plan le règle). */
+export function primeMemoire(m: ModuleCarte | undefined, parCran = 1): number {
+  return 1 + Math.max(0, m?.cran ?? 0) * Math.max(0, parCran)
 }
 
 /** LE CLIMAT DU MODULE : sa température pose le climat des dangers des
@@ -345,8 +346,15 @@ export function climatDuModule(m: ModuleCarte | undefined): OptionsGen['climat']
 // souffle (une vie, la survie), la réserve (la bonbonne, la livraison), le
 // condensat (la bourse, l'achat). Puis la carte se rouvre.
 
+// Ce qu'une halte rend : les défauts d'avant le plan (le plan les règle
+// désormais — halteReserveCl, halteCondensatCl — et les passe en `dons`).
 export const REPOS_RESERVE_L = 0.5
 export const REPOS_CONDENSAT_CL = 40
+export interface DonsHalte {
+  reserveL: number
+  condensatCl: number
+}
+export const DONS_HALTE_DEFAUT: DonsHalte = { reserveL: REPOS_RESERVE_L, condensatCl: REPOS_CONDENSAT_CL }
 
 export interface OffreRepos {
   id: 'souffle' | 'reserve' | 'condensat'
@@ -360,12 +368,15 @@ export interface OffreRepos {
 /** Les trois offres de l'alcôve, jugées sur ce que la run possède : une
  *  offre qui ne donnerait rien se montre grisée — le choix reste lisible,
  *  il ne ment pas. */
-export function offresRepos(run: {
-  vies: number
-  viesMax: number
-  bonbonne: number
-  cap: number
-}): OffreRepos[] {
+export function offresRepos(
+  run: {
+    vies: number
+    viesMax: number
+    bonbonne: number
+    cap: number
+  },
+  dons: DonsHalte = DONS_HALTE_DEFAUT,
+): OffreRepos[] {
   return [
     {
       id: 'souffle',
@@ -377,14 +388,14 @@ export function offresRepos(run: {
     {
       id: 'reserve',
       nom: 'RÉSERVE',
-      detail: run.bonbonne < run.cap ? `+${REPOS_RESERVE_L.toFixed(1).replace('.', ',')} L en bonbonne` : 'bonbonne pleine',
+      detail: run.bonbonne < run.cap ? `+${dons.reserveL.toFixed(1).replace('.', ',')} L en bonbonne` : 'bonbonne pleine',
       icone: '🫙',
       possible: run.bonbonne < run.cap,
     },
     {
       id: 'condensat',
       nom: 'CONDENSAT',
-      detail: `+${REPOS_CONDENSAT_CL} cL dans la bourse`,
+      detail: `+${Math.round(dons.condensatCl)} cL dans la bourse`,
       icone: '💧',
       possible: true,
     },
@@ -449,8 +460,8 @@ export function ditProjection(c: CarteStation, p: ProjectionRoute): string {
 
 /** LE DON — une bonbonne oubliée : de la réserve s'il y a de la place,
  *  sinon du condensat. Une seule offre, on la prend, la carte se rouvre. */
-export function offreDon(run: { bonbonne: number; cap: number }): OffreRepos {
-  const [, reserve, condensat] = offresRepos({ vies: 0, viesMax: 1, bonbonne: run.bonbonne, cap: run.cap })
+export function offreDon(run: { bonbonne: number; cap: number }, dons: DonsHalte = DONS_HALTE_DEFAUT): OffreRepos {
+  const [, reserve, condensat] = offresRepos({ vies: 0, viesMax: 1, bonbonne: run.bonbonne, cap: run.cap }, dons)
   return reserve.possible
     ? { ...reserve, nom: 'UNE BONBONNE OUBLIÉE' }
     : { ...condensat, nom: 'UN FÛT DE CONDENSAT' }

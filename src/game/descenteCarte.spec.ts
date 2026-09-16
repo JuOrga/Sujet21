@@ -214,6 +214,11 @@ describe('la nature du module commande la salle', () => {
     expect(primeMemoire(undefined)).toBe(1)
     // la carte livrée : les secteurs du bord paient double
     expect(c.modules.filter((x) => primeMemoire(x) === 2).map((x) => x.id)).toEqual(['C1', 'C3', 'ANTI'])
+    // LA PRIME SE RÈGLE (le plan) : 50 % par cran → ×1,5 au cran 1 ; 0 : le confinement ne paie pas
+    expect(primeMemoire(m('combat', 1), 0.5)).toBe(1.5)
+    expect(primeMemoire(m('combat', 2), 0.5)).toBe(2)
+    expect(primeMemoire(m('combat', 2), 0)).toBe(1)
+    expect(primeMemoire(m('combat', 1), -3)).toBe(1) // jamais une prime négative
   })
 })
 
@@ -237,6 +242,11 @@ describe('offresRepos — l’alcôve, une seule offre', () => {
     expect(o.map((x) => `${x.id}:${x.possible}`)).toEqual(['souffle:true', 'reserve:true', 'condensat:true'])
     expect(o[1].detail).toBe('+0,5 L en bonbonne')
     expect(o[2].detail).toBe('+40 cL dans la bourse')
+    // CE QU'UNE HALTE REND SE RÈGLE (le plan) : les offres le disent au chiffre
+    const r = offresRepos({ vies: 1, viesMax: 3, bonbonne: 0.2, cap: 2 }, { reserveL: 1.2, condensatCl: 75 })
+    expect(r[1].detail).toBe('+1,2 L en bonbonne')
+    expect(r[2].detail).toBe('+75 cL dans la bourse')
+    expect(offreDon({ bonbonne: 0.5, cap: 2 }, { reserveL: 1.2, condensatCl: 75 }).detail).toBe('+1,2 L en bonbonne')
   })
 
   it('une offre qui ne donnerait rien reste visible mais impossible, et le dit', () => {

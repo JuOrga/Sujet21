@@ -91,6 +91,20 @@ export interface PlanVoie {
   economatsParModule: number
   reposParModule: number
   donsParModule: number
+  // ---- CE QUE PÈSE UNE ROUTE ---------------------------------------------
+  // Trois nombres qui règlent l'équilibre risque · récompense d'une route,
+  // et qui étaient écrits dans le code (routes.md §4.3, « ce qui devrait
+  // rejoindre le banc ») : ils se trouvent en jouant, pas en lisant.
+  /** ce qu'une halte rend en bonbonne, en centilitres (l'alcôve, la bonbonne oubliée) */
+  halteReserveCl: number
+  /** ce qu'une halte rend en condensat, en centilitres */
+  halteCondensatCl: number
+  /** L'ESSENCE NE TOMBE JAMAIS SOUS CE PLANCHER, en pourcents du plein :
+   *  un sacrifice de trop transformerait la run en impasse */
+  essencePlancher: number
+  /** LA PRIME DE MÉMOIRE PAR CRAN, en pourcents : la mémoire du sas se
+   *  multiplie par 1 + cran × prime — 100 : ×2 au cran 1, ×3 au cran 2 */
+  memoireParCran: number
   // ---- L'ALGORITHME DE PIOCHE --------------------------------------------
   /** les quatre poids de l'écart au cahier (cf. poule.ts) */
   poids: PoidsPioche
@@ -117,6 +131,10 @@ export const PLAN_VOIE_DEFAUTS: PlanVoie = {
   economatsParModule: 1,
   reposParModule: 1,
   donsParModule: 0,
+  halteReserveCl: 50,
+  halteCondensatCl: 40,
+  essencePlancher: 40,
+  memoireParCran: 100,
   poids: { ...POIDS_PIOCHE_DEFAUTS },
 }
 
@@ -176,6 +194,13 @@ export function clampPlanVoie(p: Partial<PlanVoie> | null): PlanVoie {
     economatsParModule: entier(p?.economatsParModule, PLAN_VOIE_DEFAUTS.economatsParModule, 0, 2),
     reposParModule: entier(p?.reposParModule, PLAN_VOIE_DEFAUTS.reposParModule, 0, 2),
     donsParModule: entier(p?.donsParModule, PLAN_VOIE_DEFAUTS.donsParModule, 0, 2),
+    // les défauts sont les anciennes constantes : un plan d'avant ces
+    // curseurs retrouve exactement la route qu'il décrivait
+    halteReserveCl: entier(p?.halteReserveCl, PLAN_VOIE_DEFAUTS.halteReserveCl, 0, 300),
+    halteCondensatCl: entier(p?.halteCondensatCl, PLAN_VOIE_DEFAUTS.halteCondensatCl, 0, 200),
+    // jamais sous 10 % (le corps ne tiendrait plus une salle) ni à 100 % (plus de sacrifice possible)
+    essencePlancher: entier(p?.essencePlancher, PLAN_VOIE_DEFAUTS.essencePlancher, 10, 90),
+    memoireParCran: entier(p?.memoireParCran, PLAN_VOIE_DEFAUTS.memoireParCran, 0, 300),
     poids: clampPoidsPioche(p?.poids ?? null),
   }
 }

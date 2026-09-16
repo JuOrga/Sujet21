@@ -72,6 +72,9 @@ export interface EtatJoueur {
   viesMax: number
   /** la part d'essence qui reste (1 = le plein) */
   essence: number
+  /** le plancher sous lequel un sacrifice ne descend pas (le plan le
+   *  règle ; absent : ESSENCE_PLANCHER) */
+  plancher?: number
   /** reste-t-il un orbe à trouver ? */
   orbeAPrendre: boolean
   /** reste-t-il un « ? » non révélé sur la carte ? */
@@ -104,7 +107,7 @@ export interface EvenementDef {
 export const ESSENCE_PLANCHER = 0.4
 
 const sacrifiable = (part: number) => (e: EtatJoueur): boolean =>
-  e.essence + part >= ESSENCE_PLANCHER - 1e-9
+  e.essence + part >= (e.plancher ?? ESSENCE_PLANCHER) - 1e-9
 
 export const EVENEMENTS: readonly EvenementDef[] = [
   // ——— LE SOIN ————————————————————————————————————————————————

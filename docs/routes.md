@@ -227,6 +227,7 @@ code sans nom.
 | La rampe | recul du sommet, respiration, finale |
 | La posture des rangs | rangs sans danger, cadence labyrinthe, cadence contraste, figures au début et ensuite |
 | **Les voies et les rencontres** | **part de rencontres** (0 à 60 %), **rang minimal**, **bifurcation** (0 à 100 %), **économats**, **alcôves** et **bonbonnes par module** (0 à 2) |
+| **Ce que pèse une route** | **réserve** et **condensat d'une halte**, **plancher d'essence** (10 à 90 %), **prime de mémoire par cran** (0 à 300 %) |
 | La pioche | les quatre poids de l'écart au cahier |
 
 Le plan se publie (magasin `/api/reglages`) : ce que le concepteur règle
@@ -236,18 +237,19 @@ joue pour tout le monde.
 
 | Constante | Fichier | Rôle |
 | --- | --- | --- |
-| `ESSENCE_PLANCHER` | `evenements.ts` | l'essence ne descend jamais sous 40 % du plein |
+| `ESSENCE_PLANCHER` | `evenements.ts` | le plancher d'essence d'avant le plan (40 %) — le curseur PLANCHER D'ESSENCE le remplace |
 | `REVELATIONS` | `carteStation.ts` | ce qu'un « ? » peut devenir |
-| `REPOS_RESERVE_L`, `REPOS_CONDENSAT_CL` | `descenteCarte.ts` | ce que l'alcôve et le don rendent |
+| `REPOS_RESERVE_L`, `REPOS_CONDENSAT_CL` | `descenteCarte.ts` | ce que l'alcôve et le don rendaient avant le plan — les curseurs RÉSERVE et CONDENSAT D'UNE HALTE les remplacent |
 | `EVENEMENTS` | `evenements.ts` | le catalogue des rencontres : textes, offres, issues, effets |
 | `CONTREPARTIES` | `instruments.ts` | les cartes qui coûtent |
 | `postureDuModule`, `climatDuModule` | `descenteCarte.ts` | ce que la nature et la température imposent |
 | `VOIE_INCONNUE` | `descenteCarte.ts` | le rang franchi sans porte dans la trace de la mini-carte |
 | `inventairePool`, `noteManque` | `manques.ts` | l'inventaire du pool par biome × mécanique × moment, et le relevé des portes générées faute de tableau |
 
-Ce qui devrait **rejoindre le banc** à la prochaine étape : les valeurs des
-haltes (réserve, condensat), le plancher d'essence, le multiplicateur de
-mémoire par cran — trois curseurs de plus dans LA DESCENTE.
+Les valeurs des haltes, le plancher d'essence et la prime de mémoire par
+cran **ont rejoint le banc** (16/09) : la section « ce que pèse une route »
+de LA DESCENTE. Les constantes restent comme défauts, pour qu'un plan
+d'avant retrouve exactement la route qu'il décrivait.
 
 ---
 
@@ -329,8 +331,8 @@ pas**. Chaque cible touchée est une goutte perdue. C'est la phrase du jeu
 
 ## 6. L'ordre proposé
 
-1. **Les trois curseurs manquants au banc** (haltes, plancher d'essence,
-   mémoire par cran) — une soirée.
+1. ~~Les trois curseurs manquants au banc~~ — fait le 16/09 (« ce que pèse
+   une route »).
 2. **La coque qui compose avec le climat** (§5.1) — le plus grand effet
    pour le moins de code : une lecture de plus dans `climatDuModule`.
 3. **Un mini-jeu** pour prouver la forme (§3.2, la pesée), comme nature de
