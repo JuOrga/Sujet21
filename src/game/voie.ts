@@ -110,6 +110,11 @@ export interface PlanVoie {
    *  vapeur en chaud) — jamais les trois voies d'un rang ; 0 : le biome
    *  ne pèse pas */
   partBiome: number
+  /** LA PART DES RANGS À PRIME, en pourcents : la chance qu'un rang de la
+   *  mini-carte porte une salle scellée (plus dure d'un cran, qui paie plus
+   *  au sas : mémoire ×2, condensat ×2 ou tirage garanti) — une par rang au
+   *  plus ; 0 : aucune */
+  partPrime: number
   // ---- L'ALGORITHME DE PIOCHE --------------------------------------------
   /** les quatre poids de l'écart au cahier (cf. poule.ts) */
   poids: PoidsPioche
@@ -141,6 +146,7 @@ export const PLAN_VOIE_DEFAUTS: PlanVoie = {
   essencePlancher: 40,
   memoireParCran: 100,
   partBiome: 50,
+  partPrime: 15,
   poids: { ...POIDS_PIOCHE_DEFAUTS },
 }
 
@@ -208,6 +214,8 @@ export function clampPlanVoie(p: Partial<PlanVoie> | null): PlanVoie {
     essencePlancher: entier(p?.essencePlancher, PLAN_VOIE_DEFAUTS.essencePlancher, 10, 90),
     memoireParCran: entier(p?.memoireParCran, PLAN_VOIE_DEFAUTS.memoireParCran, 0, 300),
     partBiome: entier(p?.partBiome, PLAN_VOIE_DEFAUTS.partBiome, 0, 100),
+    // au plus 40 % : au-delà, la prime n'est plus un choix, c'est la règle
+    partPrime: entier(p?.partPrime, PLAN_VOIE_DEFAUTS.partPrime, 0, 40),
     poids: clampPoidsPioche(p?.poids ?? null),
   }
 }

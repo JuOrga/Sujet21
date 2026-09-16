@@ -4,7 +4,7 @@ import { dessinMiniCarteSVG, portesDuRang, tisseMiniCarte, TISSAGE_DEFAUT, types
 
 // SANS HALTE par défaut : les tests des salles et des rencontres regardent la
 // grille nue ; les haltes ont leur propre bloc
-const NU = { ...TISSAGE_DEFAUT, economats: 0, repos: 0, dons: 0, coffre: false }
+const NU = { ...TISSAGE_DEFAUT, economats: 0, repos: 0, dons: 0, coffre: false, partPrime: 0 }
 const tisse = (graine: string, niveaux = 3, permises: (0 | 1 | 2 | 3)[] = [0, 1, 2, 3], ecrites = true) =>
   tisseMiniCarte(niveaux, aleaDeGraine(graine), permises, () => 2, { debut: 1, suite: 2 }, ecrites, NU)
 
@@ -47,6 +47,34 @@ describe('tisseMiniCarte — la grille de voies d’un module', () => {
     }
     const sans = tisse('p', 3, [0, 1], false)
     for (const r of sans.rangs) expect(r.some((n) => n.ecrite)).toBe(false)
+  })
+
+  it('la prime : au plus une par rang, jamais sous rangMin, jamais sur une rencontre ni une halte, et la grille reste la même', () => {
+    const base = { ...NU, partEvenement: 0.3, rangMin: 1 }
+    const sans = tisseMiniCarte(6, aleaDeGraine('pr'), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, base)
+    const tout = tisseMiniCarte(6, aleaDeGraine('pr'), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, { ...base, partPrime: 1 })
+    expect(sans.rangs.flat().every((n) => n.prime === null)).toBe(true)
+    for (const r of tout.rangs) {
+      const primes = r.filter((n) => n.prime !== null)
+      expect(primes.length).toBe(r[0].rang === 0 ? 0 : 1) // le premier rang, jamais
+      for (const n of primes) expect(n.nature).toBe('salle')
+    }
+    expect(tout.rangs.map((r) => r.map((n) => [n.nature, n.mecanique, n.suivants]))).toEqual(
+      sans.rangs.map((r) => r.map((n) => [n.nature, n.mecanique, n.suivants])),
+    )
+    // une halte posée sur la salle primée efface la prime (pas de sas, rien à primer)
+    const haltes = tisseMiniCarte(6, aleaDeGraine('pr'), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, {
+      ...base,
+      partPrime: 1,
+      economats: 2,
+      repos: 2,
+      dons: 2,
+    })
+    for (const n of haltes.rangs.flat()) if (n.nature !== 'salle') expect(n.prime).toBeNull()
+    expect(typesDuModule(tout)).toContain('salle à prime')
+    expect(typesDuModule(sans)).not.toContain('salle à prime')
+    // le dessin marque la prime d'un losange
+    expect(dessinMiniCarteSVG(tout, { rang: 1, trace: [0], portes: [0, 1, 2] })).toMatch(/mv-prime mv-prime-(memoire|condensat|tirage)/)
   })
 
   it('le biome pèse : la mécanique favorite sort plus, jamais sur les trois voies, et la grille reste la même', () => {
@@ -146,6 +174,9 @@ describe('les nœuds ÉVÉNEMENT dans la grille', () => {
 
 describe('les réglages du tissage — ce que le concepteur tourne au banc', () => {
   it('part de rencontres à zéro : aucune ; rang minimal : rien avant', () => {
+    // sur deux rangs éligibles à 60 %, un tirage sans aucune rencontre
+    // reste possible (0,4⁶) : on compte sur vingt graines, pas sur chacune
+    let avecRencontre = 0
     for (let i = 0; i < 20; i++) {
       const sans = tisseMiniCarte(6, aleaDeGraine(`z${i}`), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, {
         ...NU,
@@ -158,8 +189,9 @@ describe('les réglages du tissage — ce que le concepteur tourne au banc', () 
         rangMin: 4,
       })
       for (const r of tard.rangs.slice(0, 4)) expect(r.every((n) => n.nature === 'salle')).toBe(true)
-      expect(tard.rangs.slice(4).flat().some((n) => n.nature === 'evenement')).toBe(true)
+      if (tard.rangs.slice(4).flat().some((n) => n.nature === 'evenement')) avecRencontre++
     }
+    expect(avecRencontre).toBeGreaterThan(15)
   })
 
   it('bifurcation à zéro : trois couloirs parallèles ; à un : tout mène aux voisines', () => {

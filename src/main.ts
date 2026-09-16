@@ -116,6 +116,9 @@ import {
   type NatureNoeud,
   type NoeudVoie,
   type ReglagesTissage,
+  type PrimeNoeud,
+  NOMS_PRIME,
+  PRIMES,
 } from './game/voiesModule'
 import { CLE_MANQUES, inventairePool, litManques, noteManque, type Manque } from './game/manques'
 import {
@@ -524,6 +527,10 @@ const run = {
   // les salles événement déjà traversées cette run : on ne rejoue pas deux
   // fois la même rencontre tant qu'il en reste d'autres
   evenementsVus: [] as string[],
+  // LA PRIME DE LA SALLE EN COURS : posée à l'ouverture d'une porte à prime
+  // de la mini-carte, servie au sas (mémoire ×2, condensat ×2, tirage
+  // garanti), effacée à l'entrée de la salle suivante
+  primeSalle: null as PrimeNoeud | null,
 }
 const VIES_MAX = 3 // plafond, étalonnage et instruments compris
 // Sonde de test : l'état de la run depuis la console (comme __sim, __cam)
@@ -1212,6 +1219,7 @@ function reglagesTissage(m: ModuleCarte): ReglagesTissage {
     // le biome du module pèse sa mécanique favorite (la carte le dit)
     favori: mecaniqueDuBiome(carte, m.biome),
     partFavori: voiePlan.partBiome / 100,
+    partPrime: voiePlan.partPrime / 100,
   }
 }
 function sauvePlanVoie(): void {
@@ -4568,6 +4576,7 @@ interface RunSauvee {
   essence?: number // l'essence maximale rognée par les sacrifices
   confinementDu?: number // les crans promis à la prochaine salle
   evenementsVus?: string[] // les rencontres déjà traversées
+  primeSalle?: string // la prime de la salle en cours (voiesModule.ts)
 }
 function runSauvee(): RunSauvee | null {
   try {
@@ -4600,6 +4609,7 @@ function runSauvee(): RunSauvee | null {
       evenementsVus: Array.isArray(d.evenementsVus)
         ? d.evenementsVus.filter((x): x is string => typeof x === 'string')
         : undefined,
+      primeSalle: typeof d.primeSalle === 'string' ? d.primeSalle : undefined,
     }
   } catch {
     return null
@@ -4632,6 +4642,7 @@ function sauveRun(): void {
           essence: run.essence,
           confinementDu: run.confinementDu,
           evenementsVus: run.evenementsVus,
+          primeSalle: run.primeSalle ?? undefined,
         }),
       )
   } catch {
@@ -4672,6 +4683,7 @@ function reprendreRun(save: RunSauvee): void {
   run.essence = Math.max(essencePlancher(), Math.min(1, save.essence ?? 1))
   run.confinementDu = Math.max(0, Math.round(save.confinementDu ?? 0))
   run.evenementsVus = (save.evenementsVus ?? []).slice()
+  run.primeSalle = PRIMES.includes(save.primeSalle as PrimeNoeud) ? (save.primeSalle as PrimeNoeud) : null
   hasPlayed = true
   document.body.classList.add('playing')
   input.paused = false
@@ -6995,6 +7007,16 @@ function renderDescente(): void {
       (v) => {
         voiePlan.reposParModule = v
       },
+    ),
+    dscCran(
+      'SALLES À PRIME',
+      'la part des rangs qui portent une salle scellée : plus dure d’un cran, elle paie plus au sas (mémoire ×2, condensat ×2 ou tirage garanti) — une par rang au plus ; 0 : aucune',
+      () => voiePlan.partPrime,
+      (v) => {
+        voiePlan.partPrime = v
+      },
+      5,
+      (v) => `${v} %`,
     ),
     dscCran(
       'PART DU BIOME',
@@ -13376,7 +13398,11 @@ function mbVerseXp(litres: number): void {
   const avantXp = run.xp
   const avant = paliersAtteints(run.xp)
   run.xp += litres
-  mbDraftsRestants = paliersAtteints(run.xp) - avant
+  // LE TIRAGE GARANTI de la salle scellée s'ajoute aux paliers franchis ;
+  // la prime est servie, elle s'éteint ici (les portes suivantes en posent
+  // une autre ou aucune)
+  mbDraftsRestants = paliersAtteints(run.xp) - avant + (run.primeSalle === 'tirage' ? 1 : 0)
+  run.primeSalle = null
   mbEtape = 'etalonnage'
   // le bilan est lu : il se replie en bandeau, la jauge prend la scène —
   // et le tirage qui suit tient dans l'écran du Deck sans ascenseur
@@ -13913,6 +13939,8 @@ interface CarteVoie {
   voie?: number
   /** un nœud qui n'est PAS une salle : rencontre ou halte — aucun tableau */
   nature?: Exclude<NatureNoeud, 'salle'>
+  /** la salle est SCELLÉE : plus dure d'un cran, elle paie plus au sas */
+  prime?: PrimeNoeud
 }
 
 /** LA VOIE SEMI-PROCÉDURALE : le choix du rang suivant, tiré du PLAN de
@@ -13980,18 +14008,18 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
   // (le relevé de l'écran LA DESCENTE dit au concepteur quoi écrire) ;
   // sinon elle pioche une autre mécanique, et ne se génère que le pool à sec.
   const prisIci = new Set<string>()
-  const piocheDuPool = (mec: CodeAtelier['mecanique']): { lv: LevelDef | null; manque: boolean } => {
+  const piocheDuPool = (mec: CodeAtelier['mecanique'], diff = difficulte): { lv: LevelDef | null; manque: boolean } => {
     const exclus = new Set<string>([...voieVues, ...prisIci])
     const memeMecanique = (lv: LevelDef): boolean =>
       jouable(lv) && decodeCodeAtelier(lv.code)?.mecanique === mec
-    const meme = piocheEcrite(seq, { moment, mecanique: mec, difficulte }, exclus, memeMecanique, alea, null, voiePlan.poids)
+    const meme = piocheEcrite(seq, { moment, mecanique: mec, difficulte: diff }, exclus, memeMecanique, alea, null, voiePlan.poids)
     if (meme) {
       prisIci.add(meme.code)
       return { lv: meme, manque: false }
     }
-    noteManqueDuPool({ biome: biomeCourant, mecanique: mec, moment, difficulte, module: module?.id ?? '' })
+    noteManqueDuPool({ biome: biomeCourant, mecanique: mec, moment, difficulte: diff, module: module?.id ?? '' })
     if (voiePlan.genereSiManque) return { lv: null, manque: true }
-    const autre = piocheEcrite(seq, { moment, mecanique: 3, difficulte }, exclus, jouable, alea, jouee, voiePlan.poids)
+    const autre = piocheEcrite(seq, { moment, mecanique: 3, difficulte: diff }, exclus, jouable, alea, jouee, voiePlan.poids)
     if (autre) prisIci.add(autre.code)
     return { lv: autre, manque: true }
   }
@@ -14062,8 +14090,9 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
     mecanique: CodeAtelier['mecanique'],
     n: number,
     estFigure: boolean,
+    diff = difficulte,
   ): { lv: LevelDef; cahier: CodeAtelier; figure: number } | null => {
-    const cahier: CodeAtelier = { moment, mecanique, difficulte }
+    const cahier: CodeAtelier = { moment, mecanique, difficulte: diff }
     // les options se tirent UNE FOIS par carte (la famille de figure est un
     // tirage) : les variantes de secours redonnent la même salle, pas une
     // autre famille — et l'étiquette de la carte reste vraie
@@ -14118,11 +14147,15 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
         })
         continue
       }
+      // LA PRIME : la salle scellée est plus dure d'un cran (borné à 9), et
+      // la porte le dit avec ce qu'elle paie
+      const diffPorte = p.prime ? Math.min(9, difficulte + 1) : difficulte
+      const suffixePrime = p.prime ? ` · PRIME : ${NOMS_PRIME[p.prime].toUpperCase()}` : ''
       let ecr: LevelDef | null = null
       let manque = false
       if (voiePlan.ecrites) {
         if (!sallesGenerees()) {
-          const r = piocheDuPool(p.mecanique)
+          const r = piocheDuPool(p.mecanique, diffPorte)
           ecr = r.lv
           manque = r.manque
         } else if (p.ecrite) ecr = pioche()
@@ -14133,24 +14166,28 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
           cahier: decodeCodeAtelier(ecr.code),
           generee: false,
           // un tableau d'une AUTRE mécanique que le nœud : la porte le dit
-          etiquette: manque
-            ? `VOIE ${p.voie + 1} · TABLEAU DU POOL — PAS DE ${MECANIQUE_NOMS[p.mecanique].toUpperCase()} AU POOL`
-            : `VOIE ${p.voie + 1} · TABLEAU DU POOL`,
+          etiquette:
+            (manque
+              ? `VOIE ${p.voie + 1} · TABLEAU DU POOL — PAS DE ${MECANIQUE_NOMS[p.mecanique].toUpperCase()} AU POOL`
+              : `VOIE ${p.voie + 1} · TABLEAU DU POOL`) + suffixePrime,
           voie: p.voie,
+          ...(p.prime ? { prime: p.prime } : {}),
         })
         continue
       }
-      const g = genere(p.mecanique, 1 + p.voie, p.figure)
+      const g = genere(p.mecanique, 1 + p.voie, p.figure, diffPorte)
       if (g)
         cartes.push({
           lv: g.lv,
           cahier: g.cahier,
           generee: true,
           // générée FAUTE DE TABLEAU : le concepteur le lit sur la porte même
-          etiquette: manque
-            ? `VOIE ${p.voie + 1} · GÉNÉRÉE — LE POOL MANQUE (${MECANIQUE_NOMS[p.mecanique]})`
-            : `VOIE ${p.voie + 1} · ${etiquetteGeneree(g.figure, p.voie)}`,
+          etiquette:
+            (manque
+              ? `VOIE ${p.voie + 1} · GÉNÉRÉE — LE POOL MANQUE (${MECANIQUE_NOMS[p.mecanique]})`
+              : `VOIE ${p.voie + 1} · ${etiquetteGeneree(g.figure, p.voie)}`) + suffixePrime,
           voie: p.voie,
+          ...(p.prime ? { prime: p.prime } : {}),
         })
     }
     // une porte au moins : sinon le filet historique ci-dessous
@@ -14273,6 +14310,8 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
             // la porte ouverte s'inscrit dans la trace : la salle suivante
             // ne s'ouvrira que depuis ce nœud de la mini-carte
             if (c.voie !== undefined) carteRun = choisitVoie(carteRun, c.voie)
+            // LA PRIME DE LA PORTE : la salle scellée se jouera pour ce qu'elle paie
+            run.primeSalle = c.prime ?? null
             // LE CONFINEMENT PROMIS EST SERVI : les trois portes ont été
             // fabriquées avec ces crans en plus, la dette s'éteint ici —
             // sinon la station resterait fâchée pour le reste de la run
@@ -14787,7 +14826,8 @@ function montreMiseEnBonbonne(b: BilanSalle): void {
   mbVeil.style.setProperty('--mb-rang', verdict.teinte)
   mbEl('mb-releve').hidden = false
   mbEl('mb-titre').textContent = 'SALLE FRANCHIE'
-  mbEl('mb-sur').textContent = `MISE EN BONBONNE · ${level.code}`
+  mbEl('mb-sur').textContent =
+    `MISE EN BONBONNE · ${level.code}` + (run.primeSalle ? ` · PRIME : ${NOMS_PRIME[run.primeSalle].toUpperCase()}` : '')
   mbEl('mb-rang').hidden = true
   mbEl('mb-corps').classList.remove('mb-on')
   mbEl('mb-rang-lettre').textContent = verdict.rang
@@ -15180,6 +15220,7 @@ function newExpedition(avecCarte = false): void {
   run.essence = 1
   run.confinementDu = 0
   run.evenementsVus = []
+  run.primeSalle = null
   // les éclats de mémoire repoussent : une nouvelle run, une nouvelle chance
   eclatsPrisRun.clear()
   purgeCondensat() // la bourse d'une run commence toujours vide
@@ -17620,7 +17661,8 @@ function corpsImage(now: number): boolean {
     // chaque centilitre livré nourrit le CONDENSAT (la bourse de la RUN,
     // purgée à la fin) — y compris sur la
     // dernière salle : rien de ce qui atteint le sas n'est jamais perdu
-    gagneCondensat(surplus * 100 * rendement)
+    // LA PRIME DE CONDENSAT : la salle scellée paie double dans la bourse
+    gagneCondensat(surplus * 100 * rendement * (run.primeSalle === 'condensat' ? 2 : 1))
     // Trophées de collecte : « Sans une goutte » (≥ 95 % du volume de
     // départ livré) et « Opérateur de nuit » (21 collectes cumulées)
     if (!sasOutil) {
@@ -17659,7 +17701,9 @@ function corpsImage(now: number): boolean {
         (newVolume ? 2 : 0) +
         (newChrono ? 2 : 0) +
         primeMur) *
-        primeMemoireDu(moduleEnCours()),
+        primeMemoireDu(moduleEnCours()) *
+        // LA PRIME DE MÉMOIRE : la salle scellée paie double au sas
+        (run.primeSalle === 'memoire' ? 2 : 1),
     )
     // Publication au tableau d'honneur partagé : le serveur ne garde que le
     // meilleur — la réponse remet les registres affichés à jour.

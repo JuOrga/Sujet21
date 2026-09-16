@@ -181,6 +181,22 @@ réacteur.
 « 3 salles » des soutes dans la fiche, la longueur qui passe de 27 à 30
 quand il quitte la voie courte.
 
+### 2.8 Les primes de nœud — les voies diffèrent par le gain
+
+Dans Slay the Spire, l'élite promet une relique, et c'est ce qui fait
+prendre le risque. Ici, chaque salle rendait la même chose au sas : deux
+voies au même rang ne différaient que par ce qu'on y joue. Depuis le
+16/09, un rang sur six environ (réglable) porte une **salle à prime**, un
+losange au coin de sa tuile : plus dure d'un cran, elle paie **la mémoire
+double**, **le condensat double** ou **un tirage d'instrument garanti**,
+tiré au tissage. Une seule par rang, jamais au premier, jamais sur une
+rencontre ni une halte : viser la prime, c'est renoncer à la salle d'à
+côté, et c'est la deuxième dimension du choix de voie.
+
+*Ce que le joueur lit* : le losange teinté sur la tuile (vert mémoire,
+bleu condensat, or tirage), « PRIME : MÉMOIRE ×2 » sur la carte de la
+porte et en tête de la mise en bonbonne.
+
 ## 3. Les natures de salle
 
 Ce qui existe, ce qui est proposé.
@@ -198,6 +214,7 @@ Ce qui existe, ce qui est proposé.
 | **Alcôve (repos)** | nœud de la mini-carte | un souffle, de la réserve ou du condensat — un seul des trois | alcôves par module ; `REPOS_RESERVE_L`, `REPOS_CONDENSAT_CL` |
 | **Bonbonne oubliée (don)** | nœud de la mini-carte | de la réserve, ou du condensat si elle est pleine | bonbonnes par module |
 | **Cache** | nœud de la mini-carte | un orbe d'essence, une fois par poste | `orbe` du module (éditeur de carte) |
+| **Salle à prime** | un nœud salle, marqué d'un losange | la salle scellée : plus dure d'un cran, elle paie plus au sas — mémoire ×2, condensat ×2 ou tirage d'instrument garanti ; une par rang au plus, jamais au premier rang | salles à prime (LA DESCENTE) |
 
 Le modèle de carte garde les natures de module `economat`, `repos`, `don`,
 `inconnu` et `coffre` : l'éditeur peut encore poser une halte ou un « ? »
@@ -257,7 +274,7 @@ code sans nom.
 | **Les manques du pool** | l'inventaire par biome et par moment que ce biome joue réellement (une ligne par couple, une case par mécanique ; une case à 0 est un tableau à écrire, et la liste sous la grille les nomme avec le code à donner), le compte des tableaux muets, et le relevé des portes générées faute de tableau sur ce poste |
 | La rampe | recul du sommet, respiration, finale |
 | La posture des rangs | rangs sans danger, cadence labyrinthe, cadence contraste, figures au début et ensuite |
-| **Les voies et les rencontres** | **part de rencontres** (0 à 60 %), **rang minimal**, **bifurcation** (0 à 100 %), **part du biome** (0 à 100 % : la chance qu'une voie prenne la mécanique favorite de son biome), **économats**, **alcôves** et **bonbonnes par module** (0 à 2) |
+| **Les voies et les rencontres** | **part de rencontres** (0 à 60 %), **rang minimal**, **bifurcation** (0 à 100 %), **salles à prime** (0 à 40 % des rangs), **part du biome** (0 à 100 % : la chance qu'une voie prenne la mécanique favorite de son biome), **économats**, **alcôves** et **bonbonnes par module** (0 à 2) |
 | **Ce que pèse une route** | **réserve** et **condensat d'une halte**, **plancher d'essence** (10 à 90 %), **prime de mémoire par cran** (0 à 300 %) |
 | La pioche | les quatre poids de l'écart au cahier |
 

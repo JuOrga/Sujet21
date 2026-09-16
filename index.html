@@ -8726,6 +8726,11 @@
       .mv-noeud.mv-joue .mv-tuile { fill: rgba(109, 255, 184, 0.14); stroke: var(--mb-menthe); stroke-opacity: 1; }
       .mv-noeud.mv-joue use { opacity: 1; }
       .mv-coche { fill: var(--mb-menthe); stroke: #071018; stroke-width: 1.5; }
+      /* la PRIME d'un nœud : un losange au coin, teinté par ce qu'elle paie */
+      .mv-prime { stroke: #071018; stroke-width: 1; }
+      .mv-prime-memoire { fill: #6dffb8; }
+      .mv-prime-condensat { fill: #63b7e6; }
+      .mv-prime-tirage { fill: #ffd977; }
       .mv-noeud.mv-porte .mv-tuile { fill: #14202f; stroke: #eaf6ff; stroke-opacity: 1; stroke-width: 2; }
       .mv-noeud.mv-porte .mv-halo { stroke: currentColor; stroke-opacity: 0.35; animation: mv-bat 1.8s ease-in-out infinite; }
       .mv-noeud.mv-porte use { opacity: 1; filter: drop-shadow(0 0 4px currentColor); }

@@ -51,6 +51,10 @@ export interface ReglagesTissage {
    *  de jeu — « ma glace servira là » — et pas seulement un décor. */
   favori: CodeAtelier['mecanique'] | null
   partFavori: number
+  /** LA PART DES RANGS À PRIME (0..1) : la chance qu'un rang porte une salle
+   *  à prime — une seule par rang, jamais sous rangMin, jamais sur une
+   *  rencontre ni une halte */
+  partPrime: number
 }
 export const TISSAGE_DEFAUT: ReglagesTissage = {
   partEvenement: 0.2,
@@ -62,6 +66,7 @@ export const TISSAGE_DEFAUT: ReglagesTissage = {
   coffre: false,
   favori: null,
   partFavori: 0,
+  partPrime: 0.15,
 }
 
 /** La nature d'un nœud : une salle à jouer, une rencontre à traverser, ou
@@ -69,6 +74,21 @@ export const TISSAGE_DEFAUT: ReglagesTissage = {
  *  à orbe. Le concepteur a tranché (16/09) : les haltes vivent dans la
  *  mini-carte, jamais sur la grande carte, qui ne montre que des biomes. */
 export type NatureNoeud = 'salle' | 'evenement' | 'economat' | 'repos' | 'don' | 'coffre'
+
+/** LA PRIME D'UN NŒUD : une salle « scellée », plus dure d'un cran, qui
+ *  paie plus au sas — la mémoire double, le condensat double, ou un tirage
+ *  d'instrument garanti. C'est l'élite de Slay the Spire à l'échelle du
+ *  nœud : deux voies au même rang se distinguent par ce qu'on en tire, pas
+ *  seulement par ce qu'on y joue (le concepteur, 16/09 : « les portes se
+ *  distinguent par type, pas par gain »). Au plus une par rang : c'est un
+ *  choix de voie. */
+export type PrimeNoeud = 'memoire' | 'condensat' | 'tirage'
+export const PRIMES: readonly PrimeNoeud[] = ['memoire', 'condensat', 'tirage']
+export const NOMS_PRIME: Record<PrimeNoeud, string> = {
+  memoire: 'mémoire ×2',
+  condensat: 'condensat ×2',
+  tirage: 'tirage garanti',
+}
 export const HALTES_NOEUD: readonly NatureNoeud[] = ['economat', 'repos', 'don', 'coffre']
 
 export interface NoeudVoie {
@@ -83,6 +103,8 @@ export interface NoeudVoie {
   ecrite: boolean
   /** salle à jouer, ou ÉVÉNEMENT (aucune salle : un écran, un choix) */
   nature: NatureNoeud
+  /** la PRIME de la salle — plus dure d'un cran, elle paie plus ; null : aucune */
+  prime: PrimeNoeud | null
   /** les voies joignables au rang suivant (vide au dernier rang) */
   suivants: number[]
 }
@@ -132,7 +154,11 @@ export function tisseMiniCarte(
       mecaniques[v] = favori
     }
     const modes = figuresDuChoix(momentAuRang(r), alea, figures.debut, figures.suite)
-    const voieEcrite = ecrites ? Math.min(VOIES - 1, Math.floor(alea() * VOIES)) : -1
+    // LA VOIE DU POOL se tire TOUJOURS (la graine reste alignée), mais se
+    // pose parmi les voies qui sont des salles : une rencontre n'a pas de
+    // tableau, et « une voie du pool par rang » doit être tenu — tirée sur
+    // une rencontre, elle disparaissait du rang
+    const tEcrite = alea()
     // LES NŒUDS ÉVÉNEMENT. Le tirage se fait à CHAQUE rang, le premier
     // compris, pour que la graine reste alignée quel que soit le réglage —
     // mais les rangs sous `rangMin` n'en portent jamais (on entre dans un
@@ -141,6 +167,8 @@ export function tisseMiniCarte(
     const evs = [0, 1, 2].map(() => alea() < part)
     if (r < rangMin || evs.every(Boolean)) evs[0] = false
     if (r < rangMin) evs[1] = evs[2] = false
+    const voiesSalle = [0, 1, 2].filter((v) => !evs[v])
+    const voieEcrite = ecrites ? voiesSalle[Math.min(voiesSalle.length - 1, Math.floor(tEcrite * voiesSalle.length))] : -1
     const rang: NoeudVoie[] = []
     for (let v = 0; v < VOIES; v++) {
       const suivants: number[] = []
@@ -162,8 +190,22 @@ export function tisseMiniCarte(
         // un nœud événement n'a pas de tableau : il n'a pas de salle
         ecrite: v === voieEcrite && !evs[v],
         nature: evs[v] ? 'evenement' : 'salle',
+        prime: null,
         suivants,
       })
+    }
+    // LA PRIME DU RANG : trois tirages, TOUJOURS (la graine reste alignée
+    // quel que soit le réglage) — le rang en porte-t-il une, sur quelle
+    // voie, laquelle. Jamais sous rangMin, jamais sur une rencontre ; une
+    // halte posée ensuite l'efface (une halte n'a pas de sas).
+    const tp = alea()
+    const tv = alea()
+    const tf = alea()
+    if (r >= rangMin && tp < Math.max(0, Math.min(1, reglages.partPrime))) {
+      const salles = rang.filter((nd) => nd.nature === 'salle')
+      if (salles.length > 0)
+        salles[Math.min(salles.length - 1, Math.floor(tv * salles.length))].prime =
+          PRIMES[Math.min(PRIMES.length - 1, Math.floor(tf * PRIMES.length))]
     }
     rangs.push(rang)
   }
@@ -198,6 +240,7 @@ export function tisseMiniCarte(
     const nd = candidats[Math.min(candidats.length - 1, Math.floor(tirage * candidats.length))]
     nd.nature = nature
     nd.ecrite = false
+    nd.prime = null // une halte n'a pas de sas : rien à primer
   }
   return { voies: VOIES, rangs }
 }
@@ -215,6 +258,7 @@ export function typesDuModule(mc: MiniCarte): string[] {
   for (let m = 0; m < 4; m++) if (salles.some((n) => n.mecanique === m && !n.ecrite)) out.push(meca[m])
   if (salles.some((n) => n.figure && !n.ecrite)) out.push('figures')
   if (salles.some((n) => n.ecrite)) out.push('tableau du pool')
+  if (salles.some((n) => n.prime)) out.push('salle à prime')
   if (noeuds.some((n) => n.nature === 'evenement')) out.push('rencontre')
   if (noeuds.some((n) => n.nature === 'economat')) out.push('économat')
   if (noeuds.some((n) => n.nature === 'repos')) out.push('alcôve')
@@ -293,7 +337,8 @@ export function dessinMiniCarteSVG(
         ? NOMS_HALTE[nd.nature] ?? nd.nature
         : nd.ecrite
           ? 'tableau du pool'
-          : `${nd.figure ? 'figure' : 'salle'} · ${['eau', 'glace', 'vapeur', 'toutes'][nd.mecanique] ?? 'eau'}`
+          : `${nd.figure ? 'figure' : 'salle'} · ${['eau', 'glace', 'vapeur', 'toutes'][nd.mecanique] ?? 'eau'}` +
+            (nd.prime ? ` · PRIME : ${NOMS_PRIME[nd.prime]} (plus dure d’un cran)` : '')
   const teinte = (nd: NoeudVoie): string =>
     nd.nature === 'evenement'
       ? 'mv-evenement'
@@ -325,6 +370,10 @@ export function dessinMiniCarteSVG(
         `<polygon class="mv-tuile" points="${tuile}"/>` +
         `<use href="#mv-i-${icone(nd)}" x="-11" y="-11" width="22" height="22"/>` +
         (joueIci ? `<circle class="mv-coche" cx="${S - 3}" cy="${-S + 3}" r="4"/>` : '') +
+        // LA PRIME : un losange au coin bas droit, teinté par ce qu'elle paie
+        (nd.prime
+          ? `<polygon class="mv-prime mv-prime-${nd.prime}" points="${S - 3},${S - 10} ${S + 4},${S - 3} ${S - 3},${S + 4} ${S - 10},${S - 3}"/>`
+          : '') +
         `</g>`
     }
   let titres = ''
