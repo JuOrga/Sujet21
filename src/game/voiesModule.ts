@@ -33,15 +33,33 @@ export const VOIES = 3
 export interface ReglagesTissage {
   /** la part de rencontres parmi les nœuds éligibles (0..1) */
   partEvenement: number
-  /** le premier rang où une rencontre peut se poser */
+  /** le premier rang où une rencontre ou une halte peut se poser */
   rangMin: number
   /** la chance qu'une voie bifurque aussi vers une voisine (0..1) */
   bifurcation: number
+  /** LES HALTES du module : combien d'économats, d'alcôves, de bonbonnes ;
+   *  et la cache, si le module recèle un orbe (c'est la carte qui le dit) */
+  economats: number
+  repos: number
+  dons: number
+  coffre: boolean
 }
-export const TISSAGE_DEFAUT: ReglagesTissage = { partEvenement: 0.2, rangMin: 1, bifurcation: 0.45 }
+export const TISSAGE_DEFAUT: ReglagesTissage = {
+  partEvenement: 0.2,
+  rangMin: 1,
+  bifurcation: 0.45,
+  economats: 1,
+  repos: 1,
+  dons: 0,
+  coffre: false,
+}
 
-/** La nature d'un nœud : une salle à jouer, ou une rencontre à traverser. */
-export type NatureNoeud = 'salle' | 'evenement'
+/** La nature d'un nœud : une salle à jouer, une rencontre à traverser, ou
+ *  une HALTE — l'économat, l'alcôve de repos, la bonbonne oubliée, la cache
+ *  à orbe. Le concepteur a tranché (16/09) : les haltes vivent dans la
+ *  mini-carte, jamais sur la grande carte, qui ne montre que des biomes. */
+export type NatureNoeud = 'salle' | 'evenement' | 'economat' | 'repos' | 'don' | 'coffre'
+export const HALTES_NOEUD: readonly NatureNoeud[] = ['economat', 'repos', 'don', 'coffre']
 
 export interface NoeudVoie {
   /** la salle du module, 0-based */
@@ -127,7 +145,60 @@ export function tisseMiniCarte(
     }
     rangs.push(rang)
   }
+  // LES HALTES SE POSENT APRÈS : sur des nœuds « salle » des rangs
+  // éligibles, jamais deux sur le même nœud, et jamais au prix de la
+  // dernière salle d'un rang — il reste toujours une voie qui se joue. Le
+  // tirage consomme toujours le même nombre d'aléas par halte demandée,
+  // pour que la graine reste alignée quel que soit le réglage.
+  const demandes: NatureNoeud[] = [
+    ...Array<NatureNoeud>(Math.max(0, Math.floor(reglages.economats))).fill('economat'),
+    ...Array<NatureNoeud>(Math.max(0, Math.floor(reglages.repos))).fill('repos'),
+    ...Array<NatureNoeud>(Math.max(0, Math.floor(reglages.dons))).fill('don'),
+    ...(reglages.coffre ? (['coffre'] as NatureNoeud[]) : []),
+  ]
+  for (const nature of demandes) {
+    const tirage = alea()
+    const libres = (nature: NatureNoeud): NoeudVoie[] =>
+      rangs
+        .flat()
+        .filter(
+          (nd) =>
+            nd.rang >= rangMin &&
+            nd.nature === nature &&
+            // remplacer une salle doit en laisser une ; remplacer une rencontre n'en coûte aucune
+            rangs[nd.rang].filter((x) => x.nature === 'salle').length > (nature === 'salle' ? 1 : 0),
+        )
+    // une halte prend d'abord la place d'une salle ; quand les rencontres
+    // ont tout pris, elle prend celle d'une rencontre — la halte est promise
+    // par le plan, la rencontre n'est qu'un tirage
+    const candidats = libres('salle').length > 0 ? libres('salle') : libres('evenement')
+    if (candidats.length === 0) continue
+    const nd = candidats[Math.min(candidats.length - 1, Math.floor(tirage * candidats.length))]
+    nd.nature = nature
+    nd.ecrite = false
+  }
   return { voies: VOIES, rangs }
+}
+
+/** CE QU'ON TROUVERA dans le module, par ses types — pas les comptes. C'est
+ *  ce que le survol d'un module dit sur la grande carte (le concepteur,
+ *  16/09 : « juste ce qu'il y aura en type, pas forcément le nombre »). Dans
+ *  l'ordre où le joueur les lit : les mécaniques des salles, puis les
+ *  formes, puis les rencontres et les haltes. */
+export function typesDuModule(mc: MiniCarte): string[] {
+  const noeuds = mc.rangs.flat()
+  const out: string[] = []
+  const salles = noeuds.filter((n) => n.nature === 'salle')
+  const meca = ['eau', 'glace', 'vapeur', 'toutes mécaniques'] as const
+  for (let m = 0; m < 4; m++) if (salles.some((n) => n.mecanique === m && !n.ecrite)) out.push(meca[m])
+  if (salles.some((n) => n.figure && !n.ecrite)) out.push('figures')
+  if (salles.some((n) => n.ecrite)) out.push('tableau du pool')
+  if (noeuds.some((n) => n.nature === 'evenement')) out.push('rencontre')
+  if (noeuds.some((n) => n.nature === 'economat')) out.push('économat')
+  if (noeuds.some((n) => n.nature === 'repos')) out.push('alcôve')
+  if (noeuds.some((n) => n.nature === 'don')) out.push('bonbonne')
+  if (noeuds.some((n) => n.nature === 'coffre')) out.push('cache')
+  return out
 }
 
 /** LES PORTES du rang : les nœuds qu'on peut ouvrir. Au premier rang, les
@@ -178,21 +249,37 @@ export function dessinMiniCarteSVG(
   const b = 0.44 * S
   const tuile = `${-a},${-S} ${a},${-S} ${S},${-b} ${S},${b} ${a},${S} ${-a},${S} ${-S},${b} ${-S},${-b}`
   const icone = (nd: NoeudVoie): string =>
-    nd.nature === 'evenement'
-      ? 'rencontre'
+    nd.nature !== 'salle'
+      ? nd.nature === 'evenement'
+        ? 'rencontre'
+        : nd.nature
       : nd.ecrite
         ? 'pool'
         : nd.figure
           ? 'figure'
           : (['eau', 'glace', 'vapeur', 'toutes'] as const)[nd.mecanique] ?? 'eau'
+  const NOMS_HALTE: Record<string, string> = {
+    economat: 'l’économat — le Semblable troque contre du condensat',
+    repos: 'l’alcôve de repos — un souffle, de la réserve ou du condensat',
+    don: 'une bonbonne oubliée',
+    coffre: 'une cache — un orbe d’essence y dort',
+  }
   const nom = (nd: NoeudVoie): string =>
     nd.nature === 'evenement'
       ? 'une rencontre — on ne sait pas laquelle'
-      : nd.ecrite
-        ? 'tableau du pool'
-        : `${nd.figure ? 'figure' : 'salle'} · ${['eau', 'glace', 'vapeur', 'toutes'][nd.mecanique] ?? 'eau'}`
+      : nd.nature !== 'salle'
+        ? NOMS_HALTE[nd.nature] ?? nd.nature
+        : nd.ecrite
+          ? 'tableau du pool'
+          : `${nd.figure ? 'figure' : 'salle'} · ${['eau', 'glace', 'vapeur', 'toutes'][nd.mecanique] ?? 'eau'}`
   const teinte = (nd: NoeudVoie): string =>
-    nd.nature === 'evenement' ? 'mv-evenement' : nd.ecrite ? 'mv-pool' : `mv-m${nd.mecanique}`
+    nd.nature === 'evenement'
+      ? 'mv-evenement'
+      : nd.nature !== 'salle'
+        ? `mv-halte mv-${nd.nature}`
+        : nd.ecrite
+          ? 'mv-pool'
+          : `mv-m${nd.mecanique}`
   let liens = ''
   let noeuds = ''
   for (const rang of mc.rangs)
@@ -248,4 +335,12 @@ export const ICONES_MINI_CARTE =
   '<symbol id="mv-i-figure" viewBox="0 0 24 24"><path d="M12 2.5 L14.2 9.8 L21.5 12 L14.2 14.2 L12 21.5 L9.8 14.2 L2.5 12 L9.8 9.8 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>' +
   // la rencontre : le point d'interrogation, gras
   '<symbol id="mv-i-rencontre" viewBox="0 0 24 24"><path d="M8.5 9a3.5 3.5 0 1 1 5.2 3.1c-1.3.8-1.7 1.5-1.7 3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/></symbol>' +
+  // l'économat : la balance du Semblable
+  '<symbol id="mv-i-economat" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v17M7 20h10M4 9h16M6.5 9l-3 6h6l-3-6ZM17.5 9l-3 6h6l-3-6Z"/></g></symbol>' +
+  // l'alcôve : la lune, le repos
+  '<symbol id="mv-i-repos" viewBox="0 0 24 24"><path d="M15.5 3.5a8.5 8.5 0 1 0 5 15.5 7 7 0 0 1-5-15.5Z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>' +
+  // la bonbonne oubliée : le flacon
+  '<symbol id="mv-i-don" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 3h5M10 3v4.5L6.5 12v7a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-7L14 7.5V3"/><path d="M7.5 15.5h9" opacity=".6"/></g></symbol>' +
+  // la cache : le losange, l'orbe qui dort
+  '<symbol id="mv-i-coffre" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3 21 12 12 21 3 12Z"/><path d="M12 8.5 15.5 12 12 15.5 8.5 12Z" fill="currentColor" opacity=".55"/></g></symbol>' +
   '</defs>'

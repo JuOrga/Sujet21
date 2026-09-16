@@ -98,6 +98,7 @@ import {
   ORBES,
   accessibles,
   biomesDeCarte,
+  plusCourtVers,
   couleurTemperature,
   moduleParId,
   zoneDe,
@@ -107,8 +108,12 @@ import {
   dessinMiniCarteSVG,
   portesDuRang,
   tisseMiniCarte,
+  ICONES_MINI_CARTE,
+  typesDuModule,
   type MiniCarte,
+  type NatureNoeud,
   type NoeudVoie,
+  type ReglagesTissage,
 } from './game/voiesModule'
 import {
   ditEffet,
@@ -129,7 +134,9 @@ import {
   derniereVoie,
   difficulteSousCran,
   ditProjection,
+  graineModule,
   moduleEffectif,
+  niveauxRestants,
   offreDon,
   projectionDepuis,
   reveleInconnu,
@@ -1112,41 +1119,71 @@ function planEffectif(): PlanVoie {
 function moduleEnCours(): ModuleCarte | undefined {
   return moduleCourant(carte, carteRun)
 }
-/** LA GRAINE DU TISSAGE d'un module : la descente du jour en donne une par
- *  module, la même pour tous les postes ; sinon le poste en tire une à
- *  l'entrée — elle s'écrit dans la sauvegarde, la mini-carte se retisse. */
-function graineTissage(id: string): string {
+/** LA GRAINE DE LA RUN : la descente du jour donne la date — le même
+ *  tissage pour tous les postes ; sinon le poste en tire une au départ.
+ *  Chaque module en dérive la sienne (graineModule), ce qui permet de
+ *  tisser un module AVANT d'y entrer : le survol dit ce qu'on y trouvera. */
+function graineRun(): string {
   return descenteDuJour()
-    ? `${new Date().toISOString().slice(0, 10)}@${id}`
-    : `${id}#${Math.floor(Math.random() * 36 ** 6).toString(36)}`
+    ? new Date().toISOString().slice(0, 10)
+    : `r${Math.floor(Math.random() * 36 ** 8).toString(36)}`
 }
-/** LA MINI-CARTE À VOIES du module en cours, retissée depuis sa graine —
- *  null sans graine (un outil, une carte d'avant) ou sans salle. */
-function miniCarteDuModule(): MiniCarte | null {
-  const m = moduleEnCours()
-  if (!m || m.niveaux <= 0 || !carteRun.tissage) return null
+/** La graine du tissage d'un module qu'on entre : dérivée de la run, ou
+ *  tirée sur place pour une sauvegarde d'avant la graine de run. */
+function graineTissage(id: string): string {
+  return graineModule(carteRun, id) || `${id}#${Math.floor(Math.random() * 36 ** 6).toString(36)}`
+}
+/** TISSER UN MODULE depuis une graine, au rang de descente où l'on y
+ *  entre — pour le module en cours comme pour un module qu'on survole. */
+function tisseModule(m: ModuleCarte, graine: string, rangEntree: number): MiniCarte | null {
+  if (m.niveaux <= 0 || !graine) return null
   const acquis = records.eveilAcquis()
   const verrous = records.verrousCycle()
   const permises = mecaniquesPermises(
     transfoTenue('solidification', acquis, verrous),
     transfoTenue('vaporisation', acquis, verrous),
   )
-  // le rang de la descente à l'entrée du module : les salles déjà
-  // franchies dedans se retranchent du rang courant
-  const rangEntree = voieRang - carteRun.niveau
   return tisseMiniCarte(
     m.niveaux,
-    aleaDeGraine(carteRun.tissage),
+    aleaDeGraine(graine),
     permises,
     (r) => momentAuRang(rangEntree + 1 + r, planEffectif()),
     { debut: voiePlan.figuresDebut, suite: voiePlan.figuresSuite },
     voiePlan.ecrites,
-    {
-      partEvenement: voiePlan.partEvenement / 100,
-      rangMin: voiePlan.rangMinEvenement,
-      bifurcation: voiePlan.bifurcation / 100,
-    },
+    reglagesTissage(m),
   )
+}
+/** LA MINI-CARTE À VOIES du module en cours, retissée depuis sa graine —
+ *  null sans graine (un outil, une carte d'avant) ou sans salle. */
+function miniCarteDuModule(): MiniCarte | null {
+  const m = moduleEnCours()
+  if (!m) return null
+  // le rang de la descente à l'entrée du module : les salles déjà
+  // franchies dedans se retranchent du rang courant
+  return tisseModule(m, carteRun.tissage, voieRang - carteRun.niveau)
+}
+/** CE QU'ON TROUVERA dans un module qu'on n'a pas encore entré — les types,
+ *  pas les comptes (le concepteur, 16/09). Le rang d'entrée s'estime par le
+ *  plus court chemin ; seule la part des figures en dépend. */
+function typesDuModuleVise(m: ModuleCarte): string[] {
+  const graine = graineModule(carteRun, m.id)
+  if (!graine || m.niveaux <= 0) return []
+  const loin = plusCourtVers(carte, carteRun.module, m.id) ?? m.niveaux
+  const mc = tisseModule(m, graine, voieRang + niveauxRestants(carte, carteRun) + loin - m.niveaux)
+  return mc ? typesDuModule(mc) : []
+}
+/** LES RÉGLAGES DU TISSAGE d'un module : ceux du plan, plus la cache si le
+ *  module recèle un orbe — c'est la carte qui le dit, pas le plan. */
+function reglagesTissage(m: ModuleCarte): ReglagesTissage {
+  return {
+    partEvenement: voiePlan.partEvenement / 100,
+    rangMin: voiePlan.rangMinEvenement,
+    bifurcation: voiePlan.bifurcation / 100,
+    economats: voiePlan.economatsParModule,
+    repos: voiePlan.reposParModule,
+    dons: voiePlan.donsParModule,
+    coffre: !!m.orbe,
+  }
 }
 function sauvePlanVoie(): void {
   try {
@@ -6734,6 +6771,30 @@ function renderDescente(): void {
       },
       5,
       (v) => `${v} %`,
+    ),
+    dscCran(
+      'ÉCONOMATS PAR MODULE',
+      'le comptoir du Semblable, posé en nœud de la mini-carte — 0 : aucun',
+      () => voiePlan.economatsParModule,
+      (v) => {
+        voiePlan.economatsParModule = v
+      },
+    ),
+    dscCran(
+      'ALCÔVES PAR MODULE',
+      'le repos : un souffle, de la réserve ou du condensat — 0 : aucune',
+      () => voiePlan.reposParModule,
+      (v) => {
+        voiePlan.reposParModule = v
+      },
+    ),
+    dscCran(
+      'BONBONNES PAR MODULE',
+      'une réserve oubliée, sans choix — 0 : aucune. La cache, elle, vient de l’orbe du module sur la carte',
+      () => voiePlan.donsParModule,
+      (v) => {
+        voiePlan.donsParModule = v
+      },
     ),
   )
   corps.appendChild(g3b)
@@ -12651,10 +12712,16 @@ function avanceSalle(): void {
       montreCarteRun('suite')
       return
     }
+    // l'ÉCONOMAT-NŒUD de la mini-carte : on en sort, le module reprend
+    if (carteRun.tissage) {
+      montreSuiteRun()
+      return
+    }
   } else if (
     !auHub &&
     !testLevel &&
-    (economatForce || (!economatVisiteCetteRun && !carteAUnEconomat()))
+    // un module TISSÉ porte ses propres économats : le réflexe de mi-descente se tait
+    (economatForce || (!economatVisiteCetteRun && !carteAUnEconomat() && !carteRun.tissage))
   ) {
     const total = longueurRun()
     const rang = voieRang
@@ -13294,6 +13361,10 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
         ? 'vous êtes ici'
         : 'aucune coursive n’y mène d’ici'
     const projection = vise ? projectionDepuis(carte, vise) : null
+    // CE QU'ON Y TROUVERA, par types : les mécaniques des salles, les
+    // formes, les rencontres et les haltes de sa mini-carte — pas les
+    // comptes (le concepteur, 16/09)
+    const types = vise && mod.niveaux > 0 ? typesDuModuleVise(mod) : []
     const nature =
       mod.type === 'inconnu'
         ? 'nature inconnue — se révèle à l’entrée'
@@ -13302,6 +13373,7 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
       `${mod.nom} · ${nature}` +
       (mod.cran > 0 ? ` · confinement +${mod.cran}, mémoire ×${primeMemoire(mod)}` : '') +
       ` · ${mod.temp}°C · ${acces}` +
+      (types.length ? ` · on y trouve : ${types.join(', ')}` : '') +
       (projection ? ` — ${ditProjection(carte, projection)}` : '')
   }
   dit(null)
@@ -13420,7 +13492,7 @@ function entreModuleRun(id: string): void {
  *  souffle (une vie), de la réserve (la bonbonne), du condensat (la
  *  bourse). Le choix se juge sur ce qu'on possède : une offre qui ne
  *  donnerait rien reste visible mais grisée. Puis la carte se rouvre. */
-function mbMontreRepos(m: ModuleCarte): void {
+function mbMontreRepos(m: ModuleCarte, suite: () => void = () => mbMontreCarte('suite')): void {
   mbEtape = 'repos'
   mbScene.classList.remove('mb-large')
   mbQuestion('UNE HALTE — UNE SEULE OFFRE')
@@ -13455,7 +13527,7 @@ function mbMontreRepos(m: ModuleCarte): void {
       majBoutonsRun()
       sauveRun() // la halte prise s'écrit : une reprise ne la rejoue pas
       bande.ponctuation('sting-record', 0.6)
-      mbMontreCarte('suite')
+      suite()
     })
     host.appendChild(btn)
   })
@@ -13464,7 +13536,7 @@ function mbMontreRepos(m: ModuleCarte): void {
 /** LE DON — une bonbonne oubliée dans une halte : une seule offre, on la
  *  prend, la carte se rouvre. De la réserve, ou du condensat si la
  *  bonbonne est pleine. */
-function mbMontreDon(m: ModuleCarte): void {
+function mbMontreDon(m: ModuleCarte, suite: () => void = () => mbMontreCarte('suite')): void {
   mbEtape = 'repos'
   mbScene.classList.remove('mb-large')
   mbQuestion('UNE HALTE — PRENEZ')
@@ -13491,7 +13563,7 @@ function mbMontreDon(m: ModuleCarte): void {
     majBoutonsRun()
     sauveRun()
     bande.ponctuation('sting-record', 0.6)
-    mbMontreCarte('suite')
+    suite()
   })
   host.appendChild(btn)
 }
@@ -13505,8 +13577,8 @@ interface CarteVoie {
   etiquette: string
   /** la voie de la mini-carte que cette porte ouvre — absente sans voies */
   voie?: number
-  /** une salle ÉVÉNEMENT : aucun tableau, un écran et un choix */
-  evenement?: true
+  /** un nœud qui n'est PAS une salle : rencontre ou halte — aucun tableau */
+  nature?: Exclude<NatureNoeud, 'salle'>
 }
 
 /** LA VOIE SEMI-PROCÉDURALE : le choix du rang suivant, tiré du PLAN de
@@ -13674,14 +13746,14 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
       // UNE RENCONTRE ne se prépare pas : la porte dit qu'il y a quelque
       // chose, jamais quoi — l'événement se tire à l'ouverture, comme le
       // « ? » d'un Slay the Spire
-      if (p.nature === 'evenement') {
+      if (p.nature !== 'salle') {
         cartes.push({
           lv: null,
           cahier: null,
           generee: false,
-          etiquette: `VOIE ${p.voie + 1} · RENCONTRE`,
+          etiquette: `VOIE ${p.voie + 1} · ${NOMS_NOEUD[p.nature].etiquette}`,
           voie: p.voie,
-          evenement: true,
+          nature: p.nature,
         })
         continue
       }
@@ -13809,10 +13881,10 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
   }
   host.appendChild(mbConsignePortes(cartes.length))
   cartes.forEach((c, i) => {
-    const porte = c.evenement
-      ? mbPorteEvenement(i, c.etiquette, () => {
+    const porte = c.nature
+      ? mbPorteNoeud(i, c.etiquette, c.nature, () => {
           if (c.voie !== undefined) carteRun = choisitVoie(carteRun, c.voie)
-          mbMontreEvenement()
+          ouvreNoeud(c.nature!)
         })
       : mbPorte(
           c.lv!,
@@ -13949,19 +14021,56 @@ function mbPorte(
   return btn
 }
 
-/** LA PORTE D'UNE RENCONTRE : elle ne montre aucun plan — il n'y a pas de
- *  salle derrière, et on ne sait pas laquelle des rencontres attend. Un
- *  glyphe, et la promesse qu'il s'y passera quelque chose. */
-function mbPorteEvenement(i: number, etiquette: string, ouvre: () => void): HTMLButtonElement {
+/** CE QUE DIT LA PORTE d'un nœud qui n'est pas une salle : l'étiquette de
+ *  la voie, le titre, la phrase, et l'icône de la mini-carte en grand. */
+const NOMS_NOEUD: Record<Exclude<NatureNoeud, 'salle'>, { etiquette: string; titre: string; texte: string; icone: string }> = {
+  evenement: {
+    etiquette: 'RENCONTRE',
+    titre: 'SIGNAL',
+    texte: 'Quelque chose vit encore derrière cette porte. Le plan du module ne dit pas quoi.',
+    icone: 'rencontre',
+  },
+  economat: {
+    etiquette: 'ÉCONOMAT',
+    titre: 'LE SEMBLABLE',
+    texte: 'Le comptoir du Sujet 12, derrière sa grille. Il troque contre du condensat.',
+    icone: 'economat',
+  },
+  repos: {
+    etiquette: 'ALCÔVE',
+    titre: 'REPOS',
+    texte: 'Une alcôve tiède. Un second souffle, de la réserve ou du condensat — un seul des trois.',
+    icone: 'repos',
+  },
+  don: {
+    etiquette: 'BONBONNE',
+    titre: 'UNE RÉSERVE OUBLIÉE',
+    texte: 'Quelqu’un a laissé sa bonbonne là et n’est jamais revenu la chercher.',
+    icone: 'don',
+  },
+  coffre: {
+    etiquette: 'CACHE',
+    titre: 'LA CACHE',
+    texte: 'Une chambre close. Un orbe d’essence y dort depuis onze ans.',
+    icone: 'coffre',
+  },
+}
+
+/** LA PORTE D'UN NŒUD SANS SALLE : elle ne montre aucun plan — il n'y a pas
+ *  de tableau derrière. L'icône de la mini-carte en grand, le titre, la
+ *  phrase. Pour une rencontre, on ne sait pas laquelle attend. */
+function mbPorteNoeud(i: number, etiquette: string, nature: Exclude<NatureNoeud, 'salle'>, ouvre: () => void): HTMLButtonElement {
   const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  const d = NOMS_NOEUD[nature]
   const btn = document.createElement('button')
   btn.type = 'button'
-  btn.className = 'mb-porte mb-porte-ev'
+  btn.className = `mb-porte mb-porte-ev mb-porte-${nature}`
   btn.style.setProperty('--i', String(i))
   btn.innerHTML =
-    `<span class="mb-porte-vue mb-ev-vue"><span class="mb-porte-no">PORTE ${i + 1}</span><i>?</i></span>` +
+    `<span class="mb-porte-vue mb-ev-vue"><span class="mb-porte-no">PORTE ${i + 1}</span>` +
+    `<svg class="mb-ev-icone" viewBox="0 0 24 24" aria-hidden="true">${ICONES_MINI_CARTE}<use href="#mv-i-${d.icone}" width="24" height="24"/></svg></span>` +
     `<em class="mb-porte-tag mb-voie-ev">${esc(etiquette)}</em>` +
-    `<b>SIGNAL</b><small>Quelque chose vit encore derrière cette porte. Le plan du module ne dit pas quoi.</small>` +
+    `<b>${esc(d.titre)}</b><small>${esc(d.texte)}</small>` +
     `<span class="mb-porte-entrer">ENTRER ▸</span>`
   btn.addEventListener('click', () => {
     const host = btn.parentElement
@@ -13975,6 +14084,104 @@ function mbPorteEvenement(i: number, etiquette: string, ouvre: () => void): HTML
     }, sansAnimation() ? 0 : 420)
   })
   return btn
+}
+
+/** OUVRIR UN NŒUD qui n'est pas une salle. La rencontre se tire et se
+ *  joue dans la cérémonie ; l'ÉCONOMAT est une salle qu'on joue (la
+ *  cérémonie se ferme, le Semblable s'intercale) ; l'alcôve, la bonbonne
+ *  et la cache posent leur choix ou leur don dans la cérémonie. Tous
+ *  reprennent ensuite le module là où il en est (mbApresHalte). */
+function ouvreNoeud(nature: Exclude<NatureNoeud, 'salle'>): void {
+  const m = moduleEnCours()
+  switch (nature) {
+    case 'evenement':
+      mbMontreEvenement()
+      return
+    case 'economat':
+      economatForce = true
+      fermeMiseEnBonbonne()
+      avanceSalle()
+      return
+    case 'repos':
+      if (m) mbMontreRepos(m, mbApresHalte)
+      return
+    case 'don':
+      if (m) mbMontreDon(m, mbApresHalte)
+      return
+    case 'coffre':
+      if (m) mbMontreCache(m)
+      return
+  }
+}
+
+/** APRÈS UNE HALTE OU UNE RENCONTRE : le nœud est un nœud comme un autre,
+ *  il consomme sa place dans le module et son rang dans la descente — sans
+ *  quoi la longueur annoncée et la mini-carte ne parleraient plus du même
+ *  chemin. Puis les portes suivantes, ou la carte si le module est épuisé. */
+function mbApresHalte(): void {
+  voieRang += 1
+  carteRun = franchitSalle(carteRun)
+  sauveRun()
+  if (moduleFini(carte, carteRun)) mbMontreCarte('suite')
+  else mbMontreSallesDuModule()
+}
+
+/** LA CÉRÉMONIE S'OUVRE EN PLEINE RUN, sans bilan : après l'économat-nœud,
+ *  dont le sas ne collecte rien, il faut rendre la main au module — les
+ *  portes suivantes, ou la carte. Le miroir de montreCarteRun. */
+function montreSuiteRun(): void {
+  miseEnBonbonne = true
+  mbBilanCourant = null
+  mbVeil.hidden = false
+  mbScene.classList.add('mb-compact')
+  mbEl('mb-releve').hidden = true
+  mbEl('mb-etal').hidden = true
+  mbEl('mb-passer').hidden = true
+  mbEl('mb-choix').hidden = false
+  mbApresHalte()
+}
+
+/** LA CACHE : l'orbe que le module recèle se prend ici, une fois par
+ *  poste — la cache s'ouvre, dit ce qu'elle rend, et le module reprend. */
+function mbMontreCache(m: ModuleCarte): void {
+  mbEtape = 'repos'
+  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  mbScene.classList.remove('mb-large')
+  mbQuestion('LA CACHE')
+  mbEl('mb-choix-titre').textContent = `${m.nom} — UNE CHAMBRE CLOSE`
+  mbEl('mb-etal').hidden = true
+  mbEl('mb-passer').hidden = true
+  const host = mbCartes()
+  host.innerHTML = ''
+  const orbe = m.orbe ?? ''
+  const nomOrbe = ORBES.find((o) => o.id === orbe)?.nom ?? orbe
+  const dejaTenu = !!orbe && (records.aOrbe(orbe) || records.eveilTient(orbe))
+  // sous un outil rien ne s'écrit ; sinon la cache se vide, une fois par poste
+  const prise = !!orbe && !testLevel && records.videCache(m.id, orbe)
+  if (prise) majMemoireUI()
+  const texte = !orbe
+    ? 'La chambre est vide. Quelqu’un est passé avant vous.'
+    : prise
+      ? dejaTenu
+        ? `L’orbe ${nomOrbe} y dormait — vous l’aviez déjà. La chambre est vide désormais.`
+        : `L’orbe d’essence de conscience — ${nomOrbe}. Il vous suit.`
+      : 'Vous avez déjà ouvert cette cache sur ce poste : elle est vide.'
+  const bilan = document.createElement('div')
+  bilan.className = 'mb-ev-recit mb-ev-issue'
+  bilan.innerHTML = `<em>${esc(m.nom)}</em><p>${esc(texte)}</p>` + (prise && !dejaTenu ? `<ul class="mb-ev-gains"><li>🔮 orbe d’essence — ${esc(nomOrbe)}</li></ul>` : '')
+  host.appendChild(bilan)
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'mb-continuer'
+  btn.textContent = 'REPRENDRE LA DESCENTE ▸'
+  btn.addEventListener('click', () => {
+    if (btn.disabled) return
+    btn.disabled = true
+    bande.ponctuation('sting-record', 0.6)
+    mbApresHalte()
+  })
+  host.appendChild(btn)
+  btn.focus()
 }
 
 /** L'ÉTAT DE LA RUN que les offres d'un événement consultent — juste assez
@@ -14153,14 +14360,7 @@ function mbTranche(ev: EvenementDef, choix: ChoixEvenement, alea: () => number):
   btn.addEventListener('click', () => {
     if (btn.disabled) return
     btn.disabled = true
-    // une RENCONTRE est un nœud comme un autre : elle consomme sa place
-    // dans le module et son rang dans la descente — sans quoi la longueur
-    // annoncée et la mini-carte ne parleraient plus du même chemin
-    voieRang += 1
-    carteRun = franchitSalle(carteRun)
-    sauveRun()
-    if (moduleFini(carte, carteRun)) mbMontreCarte('suite')
-    else mbMontreSallesDuModule()
+    mbApresHalte()
   })
   host.appendChild(btn)
   btn.focus()
@@ -14613,7 +14813,7 @@ function newExpedition(avecCarte = false): void {
   // les PROVISIONS du comptoir se livrent maintenant — après la remise à
   // zéro (le viatique s'ajoute à une bonbonne vide), avant la première salle
   appliqueProvisions()
-  carteRun = departCarte(carte)
+  carteRun = { ...departCarte(carte), graineRun: graineRun() }
   premiereSalleDeLaRun = avecCarte
   if (avecCarte) {
     // AU SAS DE LANCEMENT, la carte s'ouvre : le premier module se choisit

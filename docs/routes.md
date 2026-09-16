@@ -9,22 +9,44 @@
 
 ---
 
-## 1. Les trois échelles d'une route
+## 1. Les deux échelles d'une route
 
-Une run se choisit à trois échelles, et chaque échelle a son écran :
+Une run se choisit à deux échelles, et chaque échelle a son écran.
 
-| Échelle | Ce qu'on choisit | Où | Fréquence |
-| --- | --- | --- | --- |
-| **La station** | le module suivant : un biome, une halte, un « ? » | la carte, dans la cérémonie | à la sortie de chaque module |
-| **Le module** | la voie : une tuile de la mini-carte, salle ou rencontre | au-dessus des portes | à chaque salle |
-| **La salle** | la porte : le tableau qu'on va jouer | les portes | à chaque salle |
+### 1.1 La station — la grande carte
 
-Les trois s'emboîtent : la carte décide du **biome** (donc de la
-température, du cran, de la nature dominante), la mini-carte décide du
-**rythme** (salle, rencontre, tableau du pool, figure) et ferme les voies
-qu'on n'a pas prises, la porte décide du **tableau**. La longueur d'une run
-n'est pas un réglage : elle découle du trajet — trente salles au plus court
-sur la carte livrée, cinq biomes de six.
+![La grande carte de la station : douze modules, tous des biomes, du hub à l'observatoire](routes/station.png)
+
+La station est découpée en **modules**. Chaque module est un **biome** : un
+ensemble de six salles, une nature dominante (combat, énigme), une
+température, parfois un cran de confinement. Plusieurs modules peuvent
+porter le même biome. La grande carte ne montre **que** des biomes — ni
+haltes, ni « ? », ni types de tableau : ceux-là vivent dans le module.
+
+On y choisit **le module suivant**, à la sortie de chaque module. Le survol
+d'un module dit ce qu'on y trouvera, par types et sans compter — « on y
+trouve : eau, glace, figures, rencontre, économat, alcôve » —, ce que la
+porte ouvre juste après, et ce qu'elle ferme (les modules qu'on ne pourra
+plus joindre s'éteignent).
+
+### 1.2 Le module — la mini-carte
+
+![La mini-carte d'un module : six rangs sur trois voies, les tuiles des salles, des rencontres et des haltes](routes/mini-carte.png)
+
+Dans un module, les six salles se **tissent** en six rangs sur trois voies,
+depuis une graine (celle du jour, commune à tous les postes, ou celle de
+la run). Entre deux salles, la mini-carte montre ce qui vient : chaque
+tuile porte l'icône de sa nature — une salle (eau, glace, vapeur, toutes
+mécaniques ; figure ; tableau du pool), une **rencontre** (le « ? », on ne
+sait pas laquelle), ou une **halte** (l'économat, l'alcôve, la bonbonne
+oubliée, la cache à orbe). Les portes proposées sont les tuiles joignables
+depuis celle qu'on vient d'ouvrir : **ouvrir une porte ferme les autres**.
+
+Les deux s'emboîtent : la carte décide du **biome** (la température, le
+cran, la nature dominante, la cache), la mini-carte décide du **rythme**
+(salle, rencontre, halte) et ferme les voies qu'on n'a pas prises. La
+longueur d'une run n'est pas un réglage : elle découle du trajet — trente
+salles sur la carte livrée, cinq biomes de six.
 
 ---
 
@@ -106,10 +128,13 @@ Ce qui fait dépendre la fin du début :
 
 ### 2.6 Les salles bonus — les haltes
 
-Entre deux actes, une colonne de haltes, et chaque module d'acte ouvre sur
-deux d'entre elles, jamais la même paire que son voisin. Ce sont les
-« nœuds typés » qui font qu'une route se choisit : on vise l'économat, on
-vise l'alcôve, on tente le « ? ».
+Les haltes sont des **nœuds de la mini-carte**, posés au tissage du
+module : tant d'économats, d'alcôves et de bonbonnes par module (le plan
+de descente en décide), et une cache quand le module recèle un orbe (la
+carte en décide). Elles prennent la place d'une salle, jamais au premier
+rang, jamais la dernière salle d'un rang. Comme les rencontres, elles
+s'évitent en changeant de voie — et c'est ce qui en fait un choix : viser
+l'alcôve, c'est renoncer à la salle d'à côté.
 
 ---
 
@@ -121,15 +146,20 @@ Ce qui existe, ce qui est proposé.
 
 | Nature | Où | Ce que c'est | Ce qui se règle |
 | --- | --- | --- | --- |
-| **Combat** | module | des salles à dangers fréquents, sans énigme au faisceau | la nature du module (éditeur de carte) |
-| **Énigme** | module | aucun danger, une énigme au faisceau garde le passage | idem |
-| **Cache** | halte | un orbe d'essence, une fois par poste, sans salle | `orbe` du module |
-| **Économat** | halte | le Semblable troque contre du condensat | la salle ECO de la bibliothèque |
-| **Alcôve (repos)** | halte | un souffle, de la réserve ou du condensat — un seul des trois | `REPOS_RESERVE_L`, `REPOS_CONDENSAT_CL` |
-| **Bonbonne oubliée (don)** | halte | de la réserve, ou du condensat si elle est pleine | idem |
-| **« ? » (inconnu)** | halte | se révèle à l'entrée : économat, repos, don, cache ou combat surchauffé | `REVELATIONS`, `niveaux` du module |
-| **Rencontre (événement)** | nœud de la mini-carte | du lore, deux ou trois offres, des issues pesées | la part, le rang minimal (LA DESCENTE), le catalogue `evenements.ts` |
-| **Terminal** | module | la Pompe (`boss-pompe.md`) | — |
+| **Combat** | module (grande carte) | des salles à dangers fréquents, sans énigme au faisceau | la nature du module (éditeur de carte) |
+| **Énigme** | module (grande carte) | aucun danger, une énigme au faisceau garde le passage | idem |
+| **Terminal** | module (grande carte) | la Pompe (`boss-pompe.md`) | — |
+| **Salle** | nœud de la mini-carte | un tableau à jouer : sa mécanique, figure ou compartiments, tableau du pool ou générée | le plan (figures, tableaux écrits, pioche) |
+| **Rencontre** | nœud de la mini-carte | du lore, deux ou trois offres, des issues pesées | la part, le rang minimal (LA DESCENTE), le catalogue `evenements.ts` |
+| **Économat** | nœud de la mini-carte | le Semblable troque contre du condensat | économats par module (LA DESCENTE) |
+| **Alcôve (repos)** | nœud de la mini-carte | un souffle, de la réserve ou du condensat — un seul des trois | alcôves par module ; `REPOS_RESERVE_L`, `REPOS_CONDENSAT_CL` |
+| **Bonbonne oubliée (don)** | nœud de la mini-carte | de la réserve, ou du condensat si elle est pleine | bonbonnes par module |
+| **Cache** | nœud de la mini-carte | un orbe d'essence, une fois par poste | `orbe` du module (éditeur de carte) |
+
+Le modèle de carte garde les natures de module `economat`, `repos`, `don`,
+`inconnu` et `coffre` : l'éditeur peut encore poser une halte ou un « ? »
+sur la grande carte, et le jeu sait les jouer — mais la carte livrée n'en
+a plus, par décision du concepteur (16/09).
 
 ### 3.2 Ce qui est proposé — les mini-jeux sur la physique du corps
 
@@ -167,13 +197,13 @@ code sans nom.
 | Paramètre | Sur quoi | Effet |
 | --- | --- | --- |
 | `niveaux` | module | le nombre de salles (six sur la carte livrée) |
-| `type` | module | la nature : combat, énigme, cache, économat, repos, don, inconnu, terminal |
+| `type` | module | la nature : combat, énigme, terminal (les haltes et le « ? » restent possibles, mais vivent dans la mini-carte) |
 | `temp` | module | le climat des dangers ; la couleur du plan |
 | `cran` | module | +cran de difficulté, ×(1 + cran) mémoire |
-| `orbe` | module | l'orbe que la cache recèle |
+| `orbe` | module | l'orbe que recèle la cache posée dans la mini-carte du module |
 | `biome` | module | le filtre des tableaux du pool |
 | `condition` | type de coursive | l'orbe exigé (`orbe == solidification`) |
-| la vérification | carte | deux routes minimum, distance équivalente, jamais deux crans d'affilée, un arrêt par route |
+| la vérification | carte | deux routes minimum, distance équivalente, jamais deux crans d'affilée |
 
 ### 4.2 L'écran LA DESCENTE (le plan de voie)
 
@@ -182,7 +212,7 @@ code sans nom.
 | Le plan | plafond de difficulté, descente du jour, salles générées, tableaux écrits |
 | La rampe | recul du sommet, respiration, finale |
 | La posture des rangs | rangs sans danger, cadence labyrinthe, cadence contraste, figures au début et ensuite |
-| **Les voies et les rencontres** | **part de rencontres** (0 à 60 %), **rang minimal**, **bifurcation** (0 à 100 %) |
+| **Les voies et les rencontres** | **part de rencontres** (0 à 60 %), **rang minimal**, **bifurcation** (0 à 100 %), **économats**, **alcôves** et **bonbonnes par module** (0 à 2) |
 | La pioche | les quatre poids de l'écart au cahier |
 
 Le plan se publie (magasin `/api/reglages`) : ce que le concepteur règle

@@ -146,37 +146,31 @@ y = clamp(cible.y, HUB.y − 110, HUB.y + 110) ». Le 110 est h/2 − 36 pour
 un fût de 292 : `traceLien` l'applique à tout module plus haut que large,
 à chaque bout. Un second hub se comportera comme le premier.
 
-## Les routes et les cinq biomes (15/09/2026)
+## Les routes et les cinq biomes (16/09/2026)
 
-Le plan du 03/09 n'avait qu'une route réelle et trois salles par module.
-Le plan refait tient en **trois actes de six salles, une approche et un
-terminal** — cinq biomes, trente salles au plus court :
+![La carte livrée](routes/station.png)
+
+La grande carte ne montre **que des biomes** — décision du concepteur du
+16/09 : les haltes (économat, alcôve, bonbonne, cache) et le « ? » vivent
+dans la mini-carte de chaque module (`voiesModule.ts`), jamais sur la
+station. Le plan tient en **trois actes de six salles, une approche et un
+terminal** — cinq biomes, trente salles sur chacune des dix-sept routes :
 
 ```
-                 ACTE 1            halte        ACTE 2         halte         ACTE 3        halte
-HUB ─glace─ T1 TRANSFO GLACE ─┐  ┌ ÉCONOMAT ┐ ┌ C1 CRYOSTAT(+1) ┐ ┌ CACHE N ┐ ┌ P1 PUITS FROID(+1) ┐ ┌ ÉCONOMAT ┐
-HUB ─main── T2 AUCUNE TRANSFO ─┼N1┼ « ? »    ┼─┼ C2 CONDUITS     ┼─┼ BONBONNE ┼─┼ P2 SOUTES          ┼─┤          ├ ANTICHAMBRE ─ OBSERVATOIRE
-HUB ─vapeur T3 TRANSFO GAZ ───┘  └ ALCÔVE   ┘ └ C3 CHAUFFERIE(+1)┘ └ CACHE S ┘ └ P3 RÉACTEUR(+1)    ┘ └ ALCÔVE   ┘
+HUB ─glace─ T1 TRANSFO GLACE ─┐ ┌ C1 CRYOSTAT (+1, cache) ┐ ┌ P1 PUITS FROID ┐
+HUB ─main── T2 AUCUNE TRANSFO ─┼─┼ C2 CONDUITS              ┼─┼ P2 SOUTES      ┼─ ANTICHAMBRE (+1) ─ OBSERVATOIRE
+HUB ─vapeur T3 TRANSFO GAZ ───┘ └ C3 CHAUFFERIE (+1, cache)┘ └ P3 RÉACTEUR    ┘
 ```
 
-- **Cinq biomes de six salles** sur la route la plus courte : les
-  transformateurs, les coursives, les profondeurs, l'antichambre et
-  l'observatoire — 30 salles, 31 par le « ? » (la seule halte qui porte
-  une salle). Quatre-vingt-seize routes simples, toutes à une salle près :
-  le contrat du §9.3 est tenu.
-- **Une colonne de haltes entre deux actes**, et chaque module d'acte
-  ouvre sur DEUX haltes voisines — jamais la même paire que son voisin :
-  on choisit la halte autant que le secteur, comme les voies d'un acte de
-  Slay the Spire.
-- **Quatre modules sous confinement supérieur** (cryostat, chaufferie,
-  puits froid, réacteur) : la route froide et la route chaude sont les
-  élites, la route du milieu est sûre.
-- **Les caches n'ont plus de salle** : on ouvre, on prend l'orbe, la carte
-  se rouvre — d'où `prendOrbeDuModule`, appelé à l'entrée d'une cache sans
-  salle autant qu'au sas de la dernière salle d'un module qui en a.
-- **La scène passe à 2500 × 804** pour loger dix colonnes ; l'arc de coque
-  ne bouge pas (le HUB reste à x = 263), l'observatoire et le télescope
-  glissent à droite.
+- **Chaque module ouvre sur deux ou trois du suivant**, jamais la même
+  paire que son voisin : la route diverge dès la première porte. Le
+  survol d'un module éteint ce qu'il ferme, et dit ce qu'on y trouvera.
+- **Trois modules sous confinement supérieur** (cryostat, chaufferie,
+  antichambre), jamais deux d'affilée : la vérification y veille.
+- **Les caches** viennent de l'orbe du module (`orbe`) : la mini-carte du
+  cryostat et de la chaufferie pose un nœud cache, une fois par poste.
+- **La scène fait 2100 × 804** ; l'arc de coque ne bouge pas (le HUB reste
+  à x = 263), l'observatoire et le télescope glissent à droite.
 
 ## La conception retenue (concepteur, 03/09/2026)
 

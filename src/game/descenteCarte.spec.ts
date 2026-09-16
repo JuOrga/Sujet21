@@ -30,7 +30,13 @@ const c = CARTE_LIVREE
 // avoir — le retour sur ses pas reste une règle du jeu, et se teste ici sur
 // une cache nord dont on a coupé les coursives de sortie
 const sansSuite = cloneCarte(CARTE_LIVREE)
-sansSuite.liens = sansSuite.liens.filter((l) => l.de !== 'CN')
+sansSuite.liens = sansSuite.liens.filter((l) => l.de !== 'P1')
+// LA CARTE AVEC UN « ? » : la carte livrée n'en a plus (l'inconnu vit dans la
+// mini-carte), mais l'éditeur peut en poser un ; le module se teste ici
+const avecInc = cloneCarte(CARTE_LIVREE)
+avecInc.modules.push({ ...avecInc.modules[5], id: 'INC', nom: '?', type: 'inconnu', niveaux: 1, biome: 'INC', cran: 0, x: 630, y: 402 })
+delete avecInc.modules[avecInc.modules.length - 1].orbe
+avecInc.liens.push({ de: 'T2', vers: 'INC', type: 'alt' }, { de: 'INC', vers: 'C2', type: 'alt' })
 
 describe('plusCourtVers — le plus court chemin en niveaux', () => {
   it('du HUB à l’observatoire : 30 salles — cinq biomes de six', () => {
@@ -42,8 +48,8 @@ describe('plusCourtVers — le plus court chemin en niveaux', () => {
     expect(plusCourtVers(c, 'OBS', 'OBS')).toBe(0)
   })
   it('un cul-de-sac ne mène nulle part ; un module inconnu non plus', () => {
-    expect(plusCourtVers(c, 'CN', 'OBS')).toBe(18) // la cache livrée continue
-    expect(plusCourtVers(sansSuite, 'CN', 'OBS')).toBeNull()
+    expect(plusCourtVers(c, 'P1', 'OBS')).toBe(12) // la carte livrée continue
+    expect(plusCourtVers(sansSuite, 'P1', 'OBS')).toBeNull()
     expect(plusCourtVers(c, 'X', 'OBS')).toBeNull()
   })
 })
@@ -51,7 +57,7 @@ describe('plusCourtVers — le plus court chemin en niveaux', () => {
 describe('la descente sur la carte', () => {
   it('part du HUB, un module sans salle : la carte s’ouvre tout de suite', () => {
     const e = departCarte(c)
-    expect(e).toEqual({ module: 'HUB', niveau: 0, visites: [], revelations: {}, tissage: '', trace: [] })
+    expect(e).toEqual({ module: 'HUB', niveau: 0, visites: [], revelations: {}, tissage: '', trace: [], graineRun: '' })
     expect(moduleFini(c, e)).toBe(true)
     expect(objectifAtteint(c, e)).toBe(false)
   })
@@ -71,14 +77,14 @@ describe('la descente sur la carte', () => {
     const e = departCarte(c)
     expect(entreModule(c, e, 'T1', [])).toBeNull()
     expect(entreModule(c, e, 'OBS', [])).toBeNull()
-    expect(entreModule(c, e, 'T2', [])).toEqual({ module: 'T2', niveau: 0, visites: ['HUB'], revelations: {}, tissage: '', trace: [] })
+    expect(entreModule(c, e, 'T2', [])).toEqual({ module: 'T2', niveau: 0, visites: ['HUB'], revelations: {}, tissage: '', trace: [], graineRun: '' })
     expect(entreModule(c, e, 'T1', ['solidification'])?.module).toBe('T1')
   })
 
   it('une cache n’est pas un piège : quand l’objectif est hors de portée, on revient sur ses pas', () => {
     // HUB → T1 → N → S1 → S1b, sur la carte au cul-de-sac : de la cache,
     // rien ne repart — sauf le retour
-    const e = { module: 'CN', niveau: 0, visites: ['HUB', 'T1', 'ECO1', 'C1'], revelations: {}, tissage: '', trace: [] }
+    const e = { module: 'P1', niveau: 6, visites: ['HUB', 'T1', 'C1'], revelations: {}, tissage: '', trace: [], graineRun: '' }
     const choix = choixModules(sansSuite, e, [])
     expect(choix.map((x) => `${x.module.id}:${x.retour ? 'retour' : x.lien.type}`)).toEqual(['C1:retour'])
     const r = entreModule(sansSuite, e, 'C1', [])!
@@ -86,23 +92,23 @@ describe('la descente sur la carte', () => {
     expect(r).toEqual({
       module: 'C1',
       niveau: 6,
-      visites: ['HUB', 'T1', 'ECO1', 'C1', 'CN'],
+      visites: ['HUB', 'T1', 'C1', 'P1'],
       revelations: {},
       tissage: '',
       trace: [],
+      graineRun: '',
     })
-    // de C1, l'objectif reste atteignable par la bonbonne : aucun retour
+    // de C1, l'objectif reste atteignable par les soutes : aucun retour
     expect(choixModules(sansSuite, r, []).some((x) => x.retour)).toBe(false)
-    // sur la carte livrée, la cache continue vers les profondeurs
-    expect(choixModules(c, e, []).map((x) => `${x.module.id}:${x.lien.type}`)).toEqual(['P1:alt', 'P2:alt'])
+    // sur la carte livrée, le puits froid continue vers l'antichambre
+    expect(choixModules(c, e, []).map((x) => `${x.module.id}:${x.lien.type}`)).toEqual(['ANTI:alt'])
   })
 
   it('un module traversé est épuisé pour la run, même en y rentrant par une coursive ordinaire', () => {
     // une carte qui boucle : l'économat renvoie vers S1 — S1 a déjà été joué
     const boucle = cloneCarte(c)
-    boucle.liens.push({ de: 'CN', vers: 'C1', type: 'alt' })
-    boucle.liens.push({ de: 'CN', vers: 'ANTI', type: 'alt' })
-    const e = { module: 'CN', niveau: 0, visites: ['HUB', 'T2', 'ECO1', 'C1'], revelations: {}, tissage: '', trace: [] }
+    boucle.liens.push({ de: 'P1', vers: 'C1', type: 'alt' })
+    const e = { module: 'P1', niveau: 6, visites: ['HUB', 'T2', 'C1'], revelations: {}, tissage: '', trace: [], graineRun: '' }
     const r = entreModule(boucle, e, 'C1', [])!
     expect(r.niveau).toBe(6) // épuisé : ses salles ne se rejouent pas
     expect(moduleFini(boucle, r)).toBe(true)
@@ -118,15 +124,14 @@ describe('la descente sur la carte', () => {
     expect(moduleFini(c, e)).toBe(false)
     e = franchitSalle(franchitSalle(franchitSalle(franchitSalle(e))))
     expect(moduleFini(c, e)).toBe(true)
-    e = entreModule(c, e, 'ECO1', [])!
-    expect(moduleFini(c, e)).toBe(true) // une halte n'a pas de salle
-    e = entreModule(c, six(entreModule(c, e, 'C2', [])!), 'CN', [])!
-    e = entreModule(c, six(entreModule(c, e, 'P2', [])!), 'ECO2', [])!
-    e = entreModule(c, six(entreModule(c, e, 'ANTI', [])!), 'OBS', [])!
+    e = six(entreModule(c, e, 'C2', [])!)
+    e = six(entreModule(c, e, 'P2', [])!)
+    e = six(entreModule(c, e, 'ANTI', [])!)
+    e = entreModule(c, e, 'OBS', [])!
     expect(objectifAtteint(c, e)).toBe(false)
     e = six(e)
     expect(objectifAtteint(c, e)).toBe(true)
-    expect(e.visites).toEqual(['HUB', 'T2', 'ECO1', 'C2', 'CN', 'P2', 'ECO2', 'ANTI'])
+    expect(e.visites).toEqual(['HUB', 'T2', 'C2', 'P2', 'ANTI'])
   })
 
   it('la longueur de la run découle du trajet et s’affine en route', () => {
@@ -138,13 +143,13 @@ describe('la descente sur la carte', () => {
     expect(longueurRun(c, e, 1)).toBe(30) // 1 franchie + 5 restantes + 24
     // un détour par T1 (3) puis S1 (3) puis la cache S1b (1) : la salle de
     // la cache s'ajoute, puis l'observatoire (3) — 10
-    const d = { module: 'CN', niveau: 0, visites: ['HUB', 'T1', 'ECO1', 'C1'], revelations: {}, tissage: '', trace: [] }
-    expect(longueurRun(c, d, 12)).toBe(30) // 12 franchies + la cache (0) + 18
+    const d = { module: 'P1', niveau: 0, visites: ['HUB', 'T1', 'C1'], revelations: {}, tissage: '', trace: [], graineRun: '' }
+    expect(longueurRun(c, d, 12)).toBe(30) // 12 franchies + 6 restantes + 12
     // sur une carte au cul-de-sac, l'objectif n'est plus atteignable d'ici :
     // il ne reste que le module
-    expect(longueurRun(sansSuite, d, 12)).toBe(12)
+    expect(longueurRun(sansSuite, d, 12)).toBe(18)
     // jamais plus petite que le rang
-    expect(longueurRun(c, { module: 'OBS', niveau: 6, visites: [], revelations: {}, tissage: '', trace: [] }, 30)).toBe(30)
+    expect(longueurRun(c, { module: 'OBS', niveau: 6, visites: [], revelations: {}, tissage: '', trace: [], graineRun: '' }, 30)).toBe(30)
   })
 
   it('les orbes se lisent dans le cycle : transformations tissées et états atteints', () => {
@@ -170,6 +175,7 @@ describe('la descente sur la carte', () => {
       revelations: {},
       tissage: '',
       trace: [],
+      graineRun: '',
     })
     // une carte qui change de départ : l'état suit
     const c2 = cloneCarte(c)
@@ -206,7 +212,7 @@ describe('la nature du module commande la salle', () => {
     expect(primeMemoire(m('combat', 1))).toBe(2)
     expect(primeMemoire(undefined)).toBe(1)
     // la carte livrée : les secteurs du bord paient double
-    expect(c.modules.filter((x) => primeMemoire(x) === 2).map((x) => x.id)).toEqual(['C1', 'C3', 'P1', 'P3'])
+    expect(c.modules.filter((x) => primeMemoire(x) === 2).map((x) => x.id)).toEqual(['C1', 'C3', 'ANTI'])
   })
 })
 
@@ -219,8 +225,8 @@ describe('climatDuModule — la température fait le climat des dangers', () => 
     expect(climatDuModule(undefined)).toBe(0)
     // la carte livrée : le cryostat et la cache nord au froid, la
     // chaufferie et la cache sud au chaud, les conduits en auto
-    expect(c.modules.filter((m) => climatDuModule(m) === 1).map((m) => m.id)).toEqual(['T1', 'C1', 'CN', 'P1', 'ANTI'])
-    expect(c.modules.filter((m) => climatDuModule(m) === 2).map((m) => m.id)).toEqual(['T3', 'C3', 'CS', 'P3'])
+    expect(c.modules.filter((m) => climatDuModule(m) === 1).map((m) => m.id)).toEqual(['T1', 'C1', 'P1', 'ANTI'])
+    expect(c.modules.filter((m) => climatDuModule(m) === 2).map((m) => m.id)).toEqual(['T3', 'C3', 'P3'])
   })
 })
 
@@ -243,64 +249,62 @@ describe('offresRepos — l’alcôve, une seule offre', () => {
 })
 
 describe('projectionDepuis — le survol qui projette', () => {
-  it('mesure la route la plus courte depuis un module : salles, arrêts, confinements', () => {
+  it('mesure la route la plus courte depuis un module : salles, confinements, et ce qui s’ouvre ensuite', () => {
     const p = projectionDepuis(c, 'C1')!
     expect(p.chemin[0]).toBe('C1')
     expect(p.chemin[p.chemin.length - 1]).toBe('OBS')
-    expect(p.salles).toBe(24) // C1 (6) + halte (0) + P (6) + halte (0) + ANTI (6) + OBS (6)
-    expect(p.crans).toBe(1) // le cryostat, et rien d'autre : la suite évite l'élite
-    expect(p.arrets.length).toBeGreaterThan(0)
-    expect(ditProjection(c, p)).toContain('par ici : 24 salles jusqu’à OBSERVATOIRE')
-    expect(ditProjection(c, p)).toContain('confinement +1 sur la route')
-    // depuis un transformateur, la voie la plus sûre : aucun confinement
+    expect(p.salles).toBe(24) // C1 (6) + P (6) + ANTI (6) + OBS (6)
+    expect(p.crans).toBe(2) // le cryostat, puis l'antichambre — la suite évite les soutes
+    expect(p.prochains).toEqual(['PUITS FROID', 'SOUTES'])
+    expect(ditProjection(c, p)).toBe(
+      'par ici : 24 salles jusqu’à OBSERVATOIRE · ensuite PUITS FROID ou SOUTES · confinement +2 sur la route',
+    )
+    // depuis la voie libre, la route la moins confinée : l'antichambre seule
     const n = projectionDepuis(c, 'T2')!
     expect(n.salles).toBe(30)
-    expect(n.crans).toBe(0)
-    expect(ditProjection(c, n)).toContain('par ici : 30 salles jusqu’à OBSERVATOIRE')
+    expect(n.crans).toBe(1)
     // ce qui distingue deux portes voisines dont les routes se rejoignent :
     // ce qu'elles ouvrent tout de suite après
-    expect(projectionDepuis(c, 'T1')!.prochains).toEqual(['ÉCONOMAT', '?'])
-    expect(projectionDepuis(c, 'T3')!.prochains).toEqual(['?', 'ALCÔVE'])
-    expect(ditProjection(c, projectionDepuis(c, 'T3')!)).toContain('ensuite ? ou ALCÔVE')
+    expect(projectionDepuis(c, 'T1')!.prochains).toEqual(['CRYOSTAT', 'CONDUITS'])
+    expect(projectionDepuis(c, 'T3')!.prochains).toEqual(['CONDUITS', 'CHAUFFERIE'])
+    expect(ditProjection(c, projectionDepuis(c, 'T3')!)).toContain('ensuite CONDUITS ou CHAUFFERIE')
   })
 
-  it('une cache compte comme arrêt ; sans arrêt, la fiche le dit ; un cul-de-sac n’a pas de projection', () => {
-    const p = projectionDepuis(c, 'CN')!
-    expect(p.arrets[0]).toBe('CACHE NORD')
-    expect(p.salles).toBe(18)
-    expect(ditProjection(c, projectionDepuis(c, 'ANTI')!)).toBe('par ici : 12 salles jusqu’à OBSERVATOIRE · sans arrêt')
-    expect(projectionDepuis(sansSuite, 'CN')).toBeNull()
+  it('les haltes ne sont plus des arrêts de la grande carte ; un cul-de-sac n’a pas de projection', () => {
+    expect(projectionDepuis(c, 'P1')!.arrets).toEqual([])
+    expect(ditProjection(c, projectionDepuis(c, 'ANTI')!)).toBe('par ici : 12 salles jusqu’à OBSERVATOIRE · confinement +1 sur la route')
+    expect(projectionDepuis(sansSuite, 'P1')).toBeNull()
     expect(projectionDepuis(c, 'X')).toBeNull()
   })
 })
 
 describe('le module « ? » — la nature se révèle à l’entrée', () => {
-  const dansINC = { module: 'INC1', niveau: 0, visites: ['HUB', 'T2'], revelations: {}, tissage: '', trace: [] }
+  const dansINC = { module: 'INC', niveau: 0, visites: ['HUB', 'T2'], revelations: {}, tissage: '', trace: [], graineRun: '' }
 
   it('tire une nature parmi REVELATIONS, la grave, et ne retire jamais', () => {
-    const r = reveleInconnu(c, dansINC, 'INC1', () => 0.99)
-    expect(r.revelations).toEqual({ INC1: 'combat' })
-    expect(reveleInconnu(c, r, 'INC1', () => 0).revelations).toEqual({ INC1: 'combat' })
+    const r = reveleInconnu(avecInc, dansINC, 'INC', () => 0.99)
+    expect(r.revelations).toEqual({ INC: 'combat' })
+    expect(reveleInconnu(avecInc, r, 'INC', () => 0).revelations).toEqual({ INC: 'combat' })
     // un module qui n'est pas un « ? » : rien
-    expect(reveleInconnu(c, dansINC, 'C2', () => 0)).toBe(dansINC)
-    expect(reveleInconnu(c, dansINC, 'X', () => 0)).toBe(dansINC)
+    expect(reveleInconnu(avecInc, dansINC, 'C2', () => 0)).toBe(dansINC)
+    expect(reveleInconnu(avecInc, dansINC, 'X', () => 0)).toBe(dansINC)
   })
 
   it('le module courant se joue sous sa nature : une halte est épuisée, un combat surchauffé a sa salle', () => {
-    expect(moduleCourant(c, dansINC)?.type).toBe('inconnu')
-    const halte = reveleInconnu(c, dansINC, 'INC1', () => 0) // economat
-    expect(moduleCourant(c, halte)?.type).toBe('economat')
-    expect(moduleFini(c, halte)).toBe(true)
-    expect(longueurRun(c, halte, 6)).toBe(30) // la salle du « ? » ne compte plus
-    const combat = reveleInconnu(c, dansINC, 'INC1', () => 0.99)
-    expect(moduleCourant(c, combat)?.cran).toBe(1)
-    expect(moduleFini(c, combat)).toBe(false)
-    expect(longueurRun(c, combat, 6)).toBe(31)
+    expect(moduleCourant(avecInc, dansINC)?.type).toBe('inconnu')
+    const halte = reveleInconnu(avecInc, dansINC, 'INC', () => 0) // economat
+    expect(moduleCourant(avecInc, halte)?.type).toBe('economat')
+    expect(moduleFini(avecInc, halte)).toBe(true)
+    expect(longueurRun(avecInc, halte, 6)).toBe(30) // la salle du « ? » ne compte plus
+    const combat = reveleInconnu(avecInc, dansINC, 'INC', () => 0.99)
+    expect(moduleCourant(avecInc, combat)?.cran).toBe(1)
+    expect(moduleFini(avecInc, combat)).toBe(false)
+    expect(longueurRun(avecInc, combat, 6)).toBe(31)
   })
 
   it('la révélation traverse la sauvegarde, et se nettoie', () => {
-    const lu = litEtatCarteRun({ module: 'INC1', niveau: 0, visites: [], revelations: { INC1: 'repos', C2: 'combat', X: 'don', OBS: 'boss' } }, c)
-    expect(lu.revelations).toEqual({ INC1: 'repos' })
+    const lu = litEtatCarteRun({ module: 'INC', niveau: 0, visites: [], revelations: { INC: 'repos', C2: 'combat', X: 'don', OBS: 'boss' } }, avecInc)
+    expect(lu.revelations).toEqual({ INC: 'repos' })
     // une carte sans « ? » : l'entrée se fait sans révélation
     expect(entreModule(c, departCarte(c), 'T2', [])!.revelations).toEqual({})
   })

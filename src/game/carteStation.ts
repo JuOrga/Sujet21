@@ -730,9 +730,6 @@ export function verifieCarte(c: CarteStation): VerdictCarte[] {
  *    hors protocole ne raccourcit pas le parcours, il le déplace ») ;
  *  · jamais deux CONFINEMENTS SUPÉRIEURS d'affilée — l'élite se paie, elle
  *    ne s'enchaîne pas ;
- *  · un ARRÊT sur chaque route — une halte (économat, repos) ou une cache :
- *    une route qui ne fait qu'enchaîner les secteurs ne se choisit pas, elle
- *    se subit.
  *  Des attentions, pas des erreurs : le concepteur peut vouloir une carte
  *  qui les enfreint — mais il le saura. */
 export function verifieRoutes(c: CarteStation): VerdictCarte[] {
@@ -755,13 +752,10 @@ export function verifieRoutes(c: CarteStation): VerdictCarte[] {
     }
   for (const paire of enchaines)
     v.push({ niveau: 'attention', message: `deux confinements supérieurs d’affilée (${paire}) : l’élite se paie, elle ne s’enchaîne pas`, module: paire.split(' → ')[1] })
-  const haltes = c.modules.filter(estHalte).map((m) => m.id)
-  if (haltes.length === 0)
-    v.push({ niveau: 'attention', message: 'aucune halte (économat ou repos) sur la carte : le joueur descend sans jamais pouvoir se refaire' })
-  // un « ? » peut se révéler halte ou cache : il compte pour un arrêt
-  const arrets = c.modules.filter((m) => estHalte(m) || m.type === 'coffre' || m.type === 'inconnu').map((m) => m.id)
-  const sans = routes.filter((r) => !r.some((id) => arrets.includes(id)))
-  if (sans.length > 0 && arrets.length > 0)
-    v.push({ niveau: 'attention', message: `${sans.length} route${sans.length > 1 ? 's' : ''} sur ${routes.length} sans arrêt (économat, repos ou cache) — par exemple ${sans[0].join(' → ')}` })
+  // LES HALTES NE SONT PLUS UNE RÈGLE DE ROUTE : le concepteur les a
+  // descendues dans la mini-carte de chaque module (16/09) — l'économat,
+  // l'alcôve, la bonbonne, la cache s'y posent depuis le plan de descente.
+  // La grande carte ne montre que des biomes ; on ne lui reproche donc
+  // plus de manquer d'arrêts.
   return v
 }

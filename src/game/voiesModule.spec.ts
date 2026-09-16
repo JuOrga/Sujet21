@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { aleaDeGraine } from './voie'
-import { dessinMiniCarteSVG, portesDuRang, tisseMiniCarte, TISSAGE_DEFAUT, VOIES } from './voiesModule'
+import { dessinMiniCarteSVG, portesDuRang, tisseMiniCarte, TISSAGE_DEFAUT, typesDuModule, VOIES } from './voiesModule'
 
+// SANS HALTE par défaut : les tests des salles et des rencontres regardent la
+// grille nue ; les haltes ont leur propre bloc
+const NU = { ...TISSAGE_DEFAUT, economats: 0, repos: 0, dons: 0, coffre: false }
 const tisse = (graine: string, niveaux = 3, permises: (0 | 1 | 2 | 3)[] = [0, 1, 2, 3], ecrites = true) =>
-  tisseMiniCarte(niveaux, aleaDeGraine(graine), permises, () => 2, { debut: 1, suite: 2 }, ecrites)
+  tisseMiniCarte(niveaux, aleaDeGraine(graine), permises, () => 2, { debut: 1, suite: 2 }, ecrites, NU)
 
 describe('tisseMiniCarte — la grille de voies d’un module', () => {
   it('trois voies par rang, autant de rangs que de salles, et rien pour un module sans salle', () => {
@@ -120,12 +123,12 @@ describe('les réglages du tissage — ce que le concepteur tourne au banc', () 
   it('part de rencontres à zéro : aucune ; rang minimal : rien avant', () => {
     for (let i = 0; i < 20; i++) {
       const sans = tisseMiniCarte(6, aleaDeGraine(`z${i}`), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, {
-        ...TISSAGE_DEFAUT,
+        ...NU,
         partEvenement: 0,
       })
       expect(sans.rangs.flat().every((n) => n.nature === 'salle')).toBe(true)
       const tard = tisseMiniCarte(6, aleaDeGraine(`z${i}`), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, {
-        ...TISSAGE_DEFAUT,
+        ...NU,
         partEvenement: 0.6,
         rangMin: 4,
       })
@@ -135,17 +138,62 @@ describe('les réglages du tissage — ce que le concepteur tourne au banc', () 
   })
 
   it('bifurcation à zéro : trois couloirs parallèles ; à un : tout mène aux voisines', () => {
-    const droit = tisseMiniCarte(4, aleaDeGraine('b'), [0], () => 1, { debut: 0, suite: 0 }, false, { ...TISSAGE_DEFAUT, bifurcation: 0 })
+    const droit = tisseMiniCarte(4, aleaDeGraine('b'), [0], () => 1, { debut: 0, suite: 0 }, false, { ...NU, bifurcation: 0 })
     for (const r of droit.rangs.slice(0, -1)) for (const n of r) expect(n.suivants).toEqual([n.voie])
-    const tout = tisseMiniCarte(4, aleaDeGraine('b'), [0], () => 1, { debut: 0, suite: 0 }, false, { ...TISSAGE_DEFAUT, bifurcation: 1 })
+    const tout = tisseMiniCarte(4, aleaDeGraine('b'), [0], () => 1, { debut: 0, suite: 0 }, false, { ...NU, bifurcation: 1 })
     expect(tout.rangs[0][1].suivants).toEqual([0, 1, 2])
     expect(tout.rangs[0][0].suivants).toEqual([0, 1])
   })
 
   it('les réglages n’ajoutent aucun tirage : la même graine donne la même grille quel que soit le réglage des salles', () => {
     // la part change QUELS nœuds sont des rencontres, pas la géométrie ni les mécaniques
-    const a = tisseMiniCarte(6, aleaDeGraine('g'), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, { ...TISSAGE_DEFAUT, partEvenement: 0 })
-    const b = tisseMiniCarte(6, aleaDeGraine('g'), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, { ...TISSAGE_DEFAUT, partEvenement: 0.5 })
+    const a = tisseMiniCarte(6, aleaDeGraine('g'), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, { ...NU, partEvenement: 0 })
+    const b = tisseMiniCarte(6, aleaDeGraine('g'), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, { ...NU, partEvenement: 0.5 })
     expect(a.rangs.flat().map((n) => `${n.mecanique}${n.suivants.join('')}`)).toEqual(b.rangs.flat().map((n) => `${n.mecanique}${n.suivants.join('')}`))
+  })
+})
+
+describe('les HALTES dans la grille — l’économat, l’alcôve, la bonbonne, la cache', () => {
+  const avec = (graine: string, r: Partial<typeof TISSAGE_DEFAUT> = {}) =>
+    tisseMiniCarte(6, aleaDeGraine(graine), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, { ...TISSAGE_DEFAUT, ...r })
+
+  it('pose exactement ce que le plan demande, jamais au premier rang, jamais la dernière salle d’un rang', () => {
+    for (let i = 0; i < 40; i++) {
+      const mc = avec(`h${i}`, { economats: 1, repos: 1, dons: 1, coffre: true })
+      const n = mc.rangs.flat()
+      expect(n.filter((x) => x.nature === 'economat')).toHaveLength(1)
+      expect(n.filter((x) => x.nature === 'repos')).toHaveLength(1)
+      expect(n.filter((x) => x.nature === 'don')).toHaveLength(1)
+      expect(n.filter((x) => x.nature === 'coffre')).toHaveLength(1)
+      expect(mc.rangs[0].every((x) => x.nature === 'salle')).toBe(true)
+      for (const r of mc.rangs) expect(r.some((x) => x.nature === 'salle')).toBe(true)
+      for (const x of n) if (x.nature !== 'salle') expect(x.ecrite).toBe(false)
+    }
+  })
+
+  it('à zéro, aucune ; sans orbe sur la carte, aucune cache', () => {
+    const mc = avec('k', { economats: 0, repos: 0, dons: 0, coffre: false })
+    expect(mc.rangs.flat().every((x) => x.nature === 'salle' || x.nature === 'evenement')).toBe(true)
+  })
+
+  it('typesDuModule dit ce qu’on trouvera, par types, sans compter', () => {
+    const t = typesDuModule(avec('t', { economats: 1, repos: 1, dons: 0, coffre: true, partEvenement: 0.5 }))
+    expect(t).toContain('économat')
+    expect(t).toContain('alcôve')
+    expect(t).toContain('cache')
+    expect(t).not.toContain('bonbonne')
+    expect(t.some((x) => ['eau', 'glace', 'vapeur', 'toutes mécaniques'].includes(x))).toBe(true)
+    // les mécaniques d'abord, les haltes ensuite : l'ordre de lecture
+    expect(t.indexOf('économat')).toBeGreaterThan(t.findIndex((x) => ['eau', 'glace', 'vapeur', 'toutes mécaniques'].includes(x)))
+    expect(new Set(t).size).toBe(t.length)
+  })
+
+  it('le dessin donne une icône et une teinte de halte à chaque nœud de halte', () => {
+    const mc = avec('d2', { economats: 1, repos: 1, dons: 1, coffre: true })
+    const svg = dessinMiniCarteSVG(mc, { rang: 0, trace: [], portes: [0, 1, 2] })
+    for (const h of ['economat', 'repos', 'don', 'coffre']) {
+      expect(svg).toContain(`mv-halte mv-${h}`)
+      expect(svg).toContain(`href="#mv-i-${h}"`)
+    }
   })
 })

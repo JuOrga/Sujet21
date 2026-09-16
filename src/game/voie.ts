@@ -79,6 +79,12 @@ export interface PlanVoie {
   rangMinEvenement: number
   /** la chance qu'une voie bifurque aussi vers une voisine, en pourcents — 0 : voies parallèles */
   bifurcation: number
+  /** LES HALTES PAR MODULE — l'économat, l'alcôve, la bonbonne oubliée,
+   *  posés en nœuds de la mini-carte (la cache, elle, vient de l'orbe du
+   *  module sur la carte). 0 : aucune. */
+  economatsParModule: number
+  reposParModule: number
+  donsParModule: number
   // ---- L'ALGORITHME DE PIOCHE --------------------------------------------
   /** les quatre poids de l'écart au cahier (cf. poule.ts) */
   poids: PoidsPioche
@@ -101,6 +107,9 @@ export const PLAN_VOIE_DEFAUTS: PlanVoie = {
   partEvenement: 20,
   rangMinEvenement: 1,
   bifurcation: 45,
+  economatsParModule: 1,
+  reposParModule: 1,
+  donsParModule: 0,
   poids: { ...POIDS_PIOCHE_DEFAUTS },
 }
 
@@ -155,6 +164,9 @@ export function clampPlanVoie(p: Partial<PlanVoie> | null): PlanVoie {
     partEvenement: entier(p?.partEvenement, PLAN_VOIE_DEFAUTS.partEvenement, 0, 60),
     rangMinEvenement: entier(p?.rangMinEvenement, PLAN_VOIE_DEFAUTS.rangMinEvenement, 0, 5),
     bifurcation: entier(p?.bifurcation, PLAN_VOIE_DEFAUTS.bifurcation, 0, 100),
+    economatsParModule: entier(p?.economatsParModule, PLAN_VOIE_DEFAUTS.economatsParModule, 0, 2),
+    reposParModule: entier(p?.reposParModule, PLAN_VOIE_DEFAUTS.reposParModule, 0, 2),
+    donsParModule: entier(p?.donsParModule, PLAN_VOIE_DEFAUTS.donsParModule, 0, 2),
     poids: clampPoidsPioche(p?.poids ?? null),
   }
 }

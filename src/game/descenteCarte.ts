@@ -52,10 +52,20 @@ export interface EtatCarteRun {
    *  voie ouverte à chaque salle, dans l'ordre. */
   tissage: string
   trace: number[]
+  /** LA GRAINE DE LA RUN : celle dont dérive le tissage de CHAQUE module
+   *  (`graine@module`), tirée au départ — la descente du jour donne la
+   *  date. C'est ce qui permet de tisser un module AVANT d'y entrer, pour
+   *  dire au survol ce qu'on y trouvera. Vide : d'avant, ou un outil. */
+  graineRun: string
+}
+
+/** La graine du tissage d'un module, dérivée de celle de la run. */
+export function graineModule(e: EtatCarteRun, id: string): string {
+  return e.graineRun ? `${e.graineRun}@${id}` : ''
 }
 
 export function departCarte(c: CarteStation): EtatCarteRun {
-  return { module: c.regles.depart, niveau: 0, visites: [], revelations: {}, tissage: '', trace: [] }
+  return { module: c.regles.depart, niveau: 0, visites: [], revelations: {}, tissage: '', trace: [], graineRun: '' }
 }
 
 /** OUVRIR UNE PORTE de la mini-carte : la voie choisie pour la salle qui
@@ -194,7 +204,16 @@ export function entreModule(
   // (et leur mémoire). La carte se rouvre aussitôt sur ses coursives.
   const dejaTraverse = choix.retour || e.visites.includes(id)
   const niveau = dejaTraverse ? Math.max(0, choix.module.niveaux) : 0
-  return { module: id, niveau, visites: [...e.visites, e.module], revelations: e.revelations, tissage, trace: [] }
+  return {
+    module: id,
+    niveau,
+    visites: [...e.visites, e.module],
+    revelations: e.revelations,
+    // la graine du module : celle donnée, sinon dérivée de la run
+    tissage: tissage || graineModule(e, id),
+    trace: [],
+    graineRun: e.graineRun,
+  }
 }
 
 /** LA LONGUEUR DE LA RUN, déduite du trajet : les salles déjà franchies,
@@ -243,7 +262,8 @@ export function litEtatCarteRun(brut: unknown, c: CarteStation): EtatCarteRun {
   const trace = Array.isArray(o.trace)
     ? o.trace.filter((v): v is number => typeof v === 'number' && Number.isFinite(v)).map((v) => Math.max(0, Math.floor(v)))
     : []
-  return { module: o.module, niveau, visites, revelations, tissage, trace }
+  const graineRun = typeof o.graineRun === 'string' ? o.graineRun : ''
+  return { module: o.module, niveau, visites, revelations, tissage, trace, graineRun }
 }
 
 // ---- LA NATURE DU MODULE COMMANDE LA SALLE -------------------------------
@@ -401,7 +421,7 @@ export function ditProjection(c: CarteStation, p: ProjectionRoute): string {
   return (
     `par ici : ${p.salles} salle${p.salles > 1 ? 's' : ''} jusqu’à ${objectif}` +
     puis +
-    (p.arrets.length ? ` · ${p.arrets.join(', ')}` : ' · sans arrêt') +
+    (p.arrets.length ? ` · ${p.arrets.join(', ')}` : '') +
     (p.crans > 0 ? ` · confinement +${p.crans} sur la route` : '')
   )
 }
