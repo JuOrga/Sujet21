@@ -15475,22 +15475,12 @@ const chipEditor = touchButton(
   'tb-chip tb-editor',
 )
 chipEditor.style.display = 'none'
-// LE HUB À TOUT MOMENT (outil de conception) : le module d'accueil est
-// atteignable depuis n'importe quelle salle, sans repasser par la fiche ni
-// abandonner la run. Réservé au mode concepteur (data-dev, comme les autres
-// outils) : en partie publique, quitter une salle d'un doigt casserait la
-// descente. La run n'est pas purgée — bonbonne, XP et instruments restent ;
-// c'est le sas du hub qui relance une descente.
-const chipHub = touchButton(
-  '⌂ HUB',
-  'aller au hub tout de suite (mode concepteur) — la salle en cours est quittée, la run n’est pas purgée',
-  () => {
-    if (miseEnBonbonne) fermeMiseEnBonbonne()
-    entrerHub()
-  },
-  'tb-chip tb-hub',
-)
-chipHub.dataset.dev = ''
+// (La puce « ⌂ HUB » — le hub à tout moment, outil de conception — a été
+// retirée le 16/09 : elle menait au hub AVEC une run en cours, et le sas
+// reprenait cette run en silence — le joueur croyait commencer et se
+// retrouvait en salle 4. On n'arrive au hub qu'en mourant, en bouclant
+// l'expédition, ou par le menu ; et dans ces trois cas la sauvegarde est
+// effacée.)
 
 // La barre du bas passe sur deux lignes quand elle se remplit (le bouton de
 // retour à l'éditeur, par exemple). On publie sa hauteur réelle en variable
@@ -17449,26 +17439,22 @@ function corpsImage(now: number): boolean {
     (drunk || reached || rejointSasHub) &&
     auHub
   ) {
-    // LE SAS DE LANCEMENT : au hub, le sas ne collecte rien — il LANCE la
-    // run. Reprise de l'expédition sauvée s'il y en a une, salle 1 sinon.
+    // LE SAS DE LANCEMENT : au hub, le sas ne collecte rien — il LANCE une
+    // descente NEUVE. Il ne reprend plus de sauvegarde : on n'arrive au hub
+    // qu'en mourant, en bouclant l'expédition ou par le menu, et ces trois
+    // chemins l'effacent. Une sauvegarde qui traînerait encore (une autre
+    // version, un outil) serait reprise en silence — le joueur croirait
+    // commencer et se retrouverait en salle 4 (revue du 16/09) : elle
+    // s'efface ici. La reprise, c'est le bouton du menu, qui l'annonce.
     auHub = false
-    // les sorties GARDÉES lancent une descente NEUVE (on repart du premier
-    // rang) ; le sas principal, lui, reprend la descente sauvée s'il y en a
-    const descenteNeuve = surSasGivre || surSasVapeur
     voieDuJourForcee = surSasVapeur
     audio.collect()
     bande.ponctuation('sting-collecte', 0.85)
     // LE SCÉNARIO : la cinématique du départ, s'il y en a une — la run
     // attend qu'elle finisse (la simulation est en pause pendant ce temps)
     void joueMoment('lancement-run').then(() => {
-      // les sorties gardées lancent toujours une descente NEUVE : la
-      // sauvegarde appartient à l'expédition écrite du sas principal
-      const save = descenteNeuve ? null : runSauvee()
-      if (save) {
-        reprendreRun(save)
-      } else {
-        newExpedition(true)
-      }
+      effaceRun()
+      newExpedition(true)
     })
   } else if (
     !tableauDone &&
