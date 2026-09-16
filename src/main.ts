@@ -1117,6 +1117,18 @@ function longueurRun(): number {
 function planEffectif(): PlanVoie {
   return { ...voiePlan, longueur: longueurRun() }
 }
+/** LA LONGUEUR DE LA CARTE : la plus courte route du départ à l'objectif,
+ *  en salles — ce que dure une descente neuve. Le plan la lit, il ne la
+ *  règle plus (revue du 16/09 : « la longueur ne compte plus »). */
+function longueurCarte(): number {
+  return longueurRunCarte(carte, departCarte(carte), 0)
+}
+/** Le plan tel que l'écran LA DESCENTE le déroule : les réglages du poste
+ *  sur la longueur de la carte — la même que le jeu, sans dépendre du rang
+ *  où l'on en est. */
+function planEcran(): PlanVoie {
+  return { ...voiePlan, longueur: longueurCarte() }
+}
 function moduleEnCours(): ModuleCarte | undefined {
   return moduleCourant(carte, carteRun)
 }
@@ -6211,7 +6223,7 @@ function descenteBibliotheque(): LevelDef[] {
 function tirageDescenteCourant(): RangTirage[] {
   return tireDescente(
     descenteBibliotheque(),
-    voiePlan,
+    planEcran(),
     descenteGraine,
     descenteMemoires,
   )
@@ -6223,7 +6235,7 @@ function tirageDescenteCourant(): RangTirage[] {
 function dscRampe(): HTMLElement {
   const d = document.createElement('div')
   d.className = 'dsc-rampe'
-  const rangs = apercuDescente(voiePlan)
+  const rangs = apercuDescente(planEcran())
   const haut = Math.max(1, ...rangs.map((r) => r.difficulte))
   for (const r of rangs) {
     const s = document.createElement('span')
@@ -6241,7 +6253,7 @@ function dscRampe(): HTMLElement {
 /** LA TABLE : une ligne par rang. Sans tirage, elle dit ce que le plan
  *  commande ; après un tirage, elle ajoute ce que la pioche a choisi. */
 function dscTable(): HTMLElement {
-  const rangs = apercuDescente(voiePlan)
+  const rangs = apercuDescente(planEcran())
   const t = document.createElement('table')
   t.className = 'dsc-table'
   const entetes = [
@@ -6274,7 +6286,7 @@ function dscTable(): HTMLElement {
       else td.appendChild(contenu)
       tr.appendChild(td)
     }
-    cell(`${r.rang} / ${voiePlan.longueur}`)
+    cell(`${r.rang} / ${longueurCarte()}`)
     cell(MOMENT_COURT[r.moment])
     cell(String(r.difficulte))
     cell(AMPLEUR_NOMS[r.ampleur])
@@ -6424,7 +6436,7 @@ function dscBilan(): HTMLElement {
   }
   const total = b.parMecanique.reduce((s, n) => s + n, 0) || 1
   ligne(
-    `<b>${b.descentes}</b> descentes tirées · <b>${b.ecritesParDescente.toFixed(1)}</b> tableaux écrits par descente en moyenne (sur ${voiePlan.longueur} rangs) · <b>${b.parCode.length}</b> tableaux distincts proposés.`,
+    `<b>${b.descentes}</b> descentes tirées · <b>${b.ecritesParDescente.toFixed(1)}</b> tableaux écrits par descente en moyenne (sur ${longueurCarte()} rangs) · <b>${b.parCode.length}</b> tableaux distincts proposés.`,
   )
   ligne(
     'Cartes générées par mécanique : ' +
@@ -6502,7 +6514,7 @@ function dscOutils(): HTMLElement {
       const t0 = performance.now()
       descenteBilanFait = bilanDescentes(
         descenteBibliotheque(),
-        voiePlan,
+        planEcran(),
         descenteCombien,
         descenteGraine || descenteGraineNeuve(),
         descenteMemoires,
@@ -6688,7 +6700,7 @@ function renderDescente(): void {
   aide.className = 'dsc-aide'
   aide.innerHTML =
     'Tout ce qui décide du <b>déroulement d’une run</b> se règle ici, et se lit tout de suite dans la table du bas : ' +
-    'le <b>plan</b> (longueur, plafond de difficulté, ce qui se propose), la <b>forme de la rampe</b>, la <b>posture</b> ' +
+    'le <b>plan</b> (plafond de difficulté, ce qui se propose), la <b>forme de la rampe</b>, la <b>posture</b> ' +
     'des rangs et les <b>quatre poids</b> de l’algorithme qui choisit les tableaux du pool. Chaque réglage s’enregistre ' +
     'aussitôt sur ce poste (le <b>brouillon</b>) et prend effet à la <b>prochaine descente</b> ; <b>PUBLIER</b> le fait jouer ' +
     'pour tout le monde. Rien n’est généré ici : on déroule les décisions, ' +
@@ -6699,17 +6711,21 @@ function renderDescente(): void {
   corps.appendChild(dscPartage())
 
   corps.appendChild(dscSec('LE PLAN'))
+  // LA LONGUEUR N'EST PLUS UN RÉGLAGE : elle découle de la carte (la plus
+  // courte route du hub à l'observatoire). Le cran restait à l'écran alors
+  // que le jeu ne le lisait plus (planEffectif l'écrase) — il disait un
+  // chiffre pour rien, et la table du bas déroulait un plan d'une autre
+  // longueur que la descente jouée (revue du 16/09).
+  const aideLongueur = document.createElement('p')
+  aideLongueur.className = 'dsc-aide'
+  aideLongueur.innerHTML =
+    `La <b>longueur</b> n’est pas un réglage : elle découle de la carte de la station — <b>${longueurCarte()} salles</b> ` +
+    'du hub à l’objectif par la plus courte route (la rampe, les moments et la table du bas se déroulent dessus). ' +
+    'Pour la changer, changer la carte (<code>?carte</code>).'
+  corps.appendChild(aideLongueur)
   const g1 = document.createElement('div')
   g1.className = 'dsc-grille'
   g1.append(
-    dscCran(
-      'LONGUEUR',
-      'le nombre de salles de la descente — la voie se boucle au bout',
-      () => voiePlan.longueur,
-      (v) => {
-        voiePlan.longueur = v
-      },
-    ),
     dscCran(
       'DIFFICULTÉ MAX',
       'le plafond que la rampe atteint au sommet',
