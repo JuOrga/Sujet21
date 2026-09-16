@@ -10,6 +10,7 @@ import {
   offreDon,
   offresRepos,
   reveleInconnu,
+  VOIE_INCONNUE,
   projectionDepuis,
   departCarte,
   difficulteSousCran,
@@ -174,7 +175,7 @@ describe('la descente sur la carte', () => {
       visites: ['HUB', 'T2'],
       revelations: {},
       tissage: '',
-      trace: [],
+      trace: [VOIE_INCONNUE], // une salle franchie, aucune voie connue
       graineRun: '',
     })
     // une carte qui change de départ : l'état suit
@@ -333,14 +334,34 @@ describe('la mini-carte à voies dans l’état de la run', () => {
     expect(entreModule(c, departCarte(c), 'T2', [])!.tissage).toBe('')
   })
 
+  it('une salle franchie sans porte laisse un trou : la trace reste au rang de la salle', () => {
+    // deux salles franchies sans qu'aucune porte ne s'écrive (une
+    // sauvegarde d'une autre version, une salle du pool hors voies)
+    let e = entreModule(c, departCarte(c), 'T2', [], 'jour@T2')!
+    e = franchitSalle(franchitSalle(e))
+    expect(derniereVoie(e)).toBeNull() // origine inconnue : les trois portes s'ouvrent
+    // la porte ouverte pour la salle 3 s'écrit À L'INDEX 2, pas au bout d'une
+    // trace vide — sinon la mini-carte la dessinait en salle 1
+    e = choisitVoie(e, 1)
+    expect(e.trace).toEqual([VOIE_INCONNUE, VOIE_INCONNUE, 1])
+    e = franchitSalle(e)
+    expect(derniereVoie(e)).toBe(1)
+    expect(choisitVoie(e, 0).trace).toEqual([VOIE_INCONNUE, VOIE_INCONNUE, 1, 0])
+  })
+
   it('la sauvegarde garde le tissage et la trace, et se nettoie', () => {
     const lu = litEtatCarteRun({ module: 'C2', niveau: 2, visites: [], tissage: 'x@S2', trace: [1, 'b', 2.7, -1] }, c)
     expect(lu.tissage).toBe('x@S2')
-    expect(lu.trace).toEqual([1, 2, 0])
-    expect(derniereVoie(lu)).toBe(2)
+    // ce qui n'est pas une voie garde sa place (inconnue) : le chemin ne glisse pas
+    expect(lu.trace).toEqual([1, VOIE_INCONNUE, 2, VOIE_INCONNUE])
+    expect(derniereVoie(lu)).toBeNull() // la salle 2 n'a pas de voie connue
     // une sauvegarde d'avant les voies : origine inconnue, les trois portes s'ouvriront
     const vieux = litEtatCarteRun({ module: 'C2', niveau: 2, visites: [] }, c)
     expect(vieux.tissage).toBe('')
+    expect(vieux.trace).toEqual([VOIE_INCONNUE, VOIE_INCONNUE]) // comblée jusqu'au niveau
     expect(derniereVoie(vieux)).toBeNull()
+    // une trace en retard sur le niveau se comble : la porte suivante s'écrira au bon rang
+    const retard = litEtatCarteRun({ module: 'C2', niveau: 3, visites: [], trace: [0] }, c)
+    expect(choisitVoie(retard, 2).trace).toEqual([0, VOIE_INCONNUE, VOIE_INCONNUE, 2])
   })
 })

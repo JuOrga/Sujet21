@@ -68,19 +68,35 @@ export function departCarte(c: CarteStation): EtatCarteRun {
   return { module: c.regles.depart, niveau: 0, visites: [], revelations: {}, tissage: '', trace: [], graineRun: '' }
 }
 
+/** LA VOIE INCONNUE : une salle franchie sans porte ouverte — une
+ *  sauvegarde d'une autre version, une salle du pool hors voies. La trace
+ *  garde sa place pour que les suivantes restent AU BON RANG. */
+export const VOIE_INCONNUE = -1
+
 /** OUVRIR UNE PORTE de la mini-carte : la voie choisie pour la salle qui
- *  vient s'ajoute à la trace — la salle suivante ne s'ouvrira que depuis
- *  ce nœud. */
+ *  vient s'écrit dans la trace À L'INDEX DE SON RANG — la salle suivante
+ *  ne s'ouvrira que depuis ce nœud.
+ *
+ *  Écrire « au bout » ne suffit pas : quand la trace a pris du retard sur
+ *  le niveau (une salle franchie sans porte), chaque porte ouverte
+ *  ensuite se dessinait des colonnes à gauche de la salle en cours — sur
+ *  la mini-carte, le chemin joué et les portes se sont retrouvés à trois
+ *  colonnes d'écart (revue du 16/09). Les rangs manquants se comblent
+ *  d'une voie inconnue. */
 export function choisitVoie(e: EtatCarteRun, voie: number): EtatCarteRun {
-  return { ...e, trace: [...e.trace.slice(0, e.niveau), Math.max(0, Math.floor(voie))] }
+  const trace = e.trace.slice(0, e.niveau)
+  while (trace.length < e.niveau) trace.push(VOIE_INCONNUE)
+  trace.push(Math.max(0, Math.floor(voie)))
+  return { ...e, trace }
 }
 
 /** La voie d'où l'on vient pour la salle `niveau` : null au premier rang,
- *  ou quand la trace n'en sait rien (sauvegarde d'avant les voies). */
+ *  ou quand la trace n'en sait rien (sauvegarde d'avant les voies, salle
+ *  franchie sans porte). */
 export function derniereVoie(e: EtatCarteRun): number | null {
   if (e.niveau === 0) return null
   const v = e.trace[e.niveau - 1]
-  return typeof v === 'number' && Number.isFinite(v) ? v : null
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null
 }
 
 /** LE MODULE TEL QU'IL SE JOUE : un « ? » révélé prend sa nature tirée
@@ -259,9 +275,14 @@ export function litEtatCarteRun(brut: unknown, c: CarteStation): EtatCarteRun {
       if (moduleParId(c, id)?.type === 'inconnu' && REVELATIONS.includes(nature as TypeModule))
         revelations[id] = nature as TypeModule
   const tissage = typeof o.tissage === 'string' ? o.tissage : ''
+  // la trace, une voie par salle franchie, à l'index du rang : ce qui n'est
+  // pas un nombre devient une voie inconnue (la place se garde, sinon tout
+  // le chemin glisse vers la gauche), et une trace plus courte que le
+  // niveau se comble de même
   const trace = Array.isArray(o.trace)
-    ? o.trace.filter((v): v is number => typeof v === 'number' && Number.isFinite(v)).map((v) => Math.max(0, Math.floor(v)))
+    ? o.trace.map((v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : VOIE_INCONNUE))
     : []
+  while (trace.length < niveau) trace.push(VOIE_INCONNUE)
   const graineRun = typeof o.graineRun === 'string' ? o.graineRun : ''
   return { module: o.module, niveau, visites, revelations, tissage, trace, graineRun }
 }
