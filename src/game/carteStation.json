@@ -47,6 +47,28 @@
     "don": "BONBONNE",
     "inconnu": "INCONNU"
   },
+  "biomes": {
+    "cryo": {
+      "nom": "CRYO",
+      "mecanique": 1
+    },
+    "tempere": {
+      "nom": "TEMPÉRÉ",
+      "mecanique": null
+    },
+    "chaud": {
+      "nom": "CHAUD",
+      "mecanique": 2
+    },
+    "antichambre": {
+      "nom": "ANTICHAMBRE",
+      "mecanique": 3
+    },
+    "observatoire": {
+      "nom": "OBSERVATOIRE",
+      "mecanique": null
+    }
+  },
   "modules": [
     {
       "id": "HUB",
@@ -75,7 +97,7 @@
       "temp": -25,
       "forme": "octogone",
       "niveaux": 6,
-      "biome": "T1",
+      "biome": "cryo",
       "desc": "Ne s’ouvre qu’avec l’orbe de solidification. Les faisceaux gardent les passages ; le froid vient de la coque."
     },
     {
@@ -90,7 +112,7 @@
       "temp": 18,
       "forme": "octogone",
       "niveaux": 6,
-      "biome": "T2",
+      "biome": "tempere",
       "desc": "Voie libre. Les dangers y sont fréquents, sans énigme à lire."
     },
     {
@@ -105,7 +127,7 @@
       "temp": 72,
       "forme": "octogone",
       "niveaux": 6,
-      "biome": "T3",
+      "biome": "chaud",
       "desc": "Ne s’ouvre qu’avec l’orbe de vaporisation. Chaudières à chaque bord."
     },
     {
@@ -120,7 +142,7 @@
       "temp": -10,
       "forme": "octogone",
       "niveaux": 6,
-      "biome": "C1",
+      "biome": "cryo",
       "orbe": "sublimation",
       "cran": 1,
       "desc": "Confinement supérieur : plus dur d’un cran, la mémoire y vaut double. Le froid mord depuis la coque, et une cache y dort."
@@ -137,7 +159,7 @@
       "temp": 26,
       "forme": "octogone",
       "niveaux": 6,
-      "biome": "C2",
+      "biome": "tempere",
       "desc": "La voie sûre : ni prime, ni piège. Les faisceaux gardent les passages."
     },
     {
@@ -152,7 +174,7 @@
       "temp": 58,
       "forme": "octogone",
       "niveaux": 6,
-      "biome": "C3",
+      "biome": "chaud",
       "orbe": "condensation",
       "cran": 1,
       "desc": "Confinement supérieur : plus dur d’un cran, la mémoire y vaut double. Les chaudières tournent encore, et une cache y dort."
@@ -169,7 +191,7 @@
       "temp": -40,
       "forme": "octogone",
       "niveaux": 6,
-      "biome": "P1",
+      "biome": "cryo",
       "desc": "Le plus froid de la station : la coque n’y est plus chauffée depuis onze ans."
     },
     {
@@ -184,7 +206,7 @@
       "temp": 12,
       "forme": "octogone",
       "niveaux": 6,
-      "biome": "P2",
+      "biome": "tempere",
       "desc": "Ce que le laboratoire n’a jamais déchargé. Vaste, tiède, encombré."
     },
     {
@@ -199,7 +221,7 @@
       "temp": 80,
       "forme": "octogone",
       "niveaux": 6,
-      "biome": "P3",
+      "biome": "chaud",
       "desc": "La chaleur de la station vient d’ici, et elle ne s’arrête pas."
     },
     {
@@ -214,7 +236,7 @@
       "temp": 5,
       "forme": "octogone",
       "niveaux": 6,
-      "biome": "ANTI",
+      "biome": "antichambre",
       "cran": 1,
       "desc": "Confinement supérieur. L’approche de l’observatoire : les portes y sont toutes logiques, le froid de l’espace passe le plancher, et la station garde."
     },
@@ -230,7 +252,7 @@
       "temp": 40,
       "forme": "octogone-dome",
       "niveaux": 6,
-      "biome": "OBS",
+      "biome": "observatoire",
       "desc": "Module terminal. Un télescope spatial y est amarré, et le sas du dehors est derrière."
     }
   ],

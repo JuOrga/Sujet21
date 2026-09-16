@@ -97,7 +97,9 @@ import {
   type CarteStation,
   ORBES,
   accessibles,
+  biomeEffectif,
   biomesDeCarte,
+  mecaniqueDuBiome,
   plusCourtVers,
   couleurTemperature,
   moduleParId,
@@ -1207,6 +1209,9 @@ function reglagesTissage(m: ModuleCarte): ReglagesTissage {
     repos: voiePlan.reposParModule,
     dons: voiePlan.donsParModule,
     coffre: !!m.orbe,
+    // le biome du module pèse sa mécanique favorite (la carte le dit)
+    favori: mecaniqueDuBiome(carte, m.biome),
+    partFavori: voiePlan.partBiome / 100,
   }
 }
 function sauvePlanVoie(): void {
@@ -5463,9 +5468,12 @@ function renderPlanche(): void {
   // glisser) ne se règle que sur la vue complète : un rang n'a de sens
   // que dans la liste entière.
   const biomes = biomesDeCarte(carte)
+  // le biome effectif d'une salle (un ancien code de module suit son biome)
+  // — lu ici, avant que la vignette n'appelle « carte » son élément
+  const biomeDe = (code: string | undefined): string => biomeEffectif(carte, code)
   const filtres = document.getElementById('planche-filtres')
   if (filtres) {
-    const nb = (code: string): number => toutes.filter((s) => (s.level.biome ?? '') === code).length
+    const nb = (code: string): number => toutes.filter((s) => biomeDe(s.level.biome) === code).length
     const bouton = (val: string | null, libelle: string, n: number, titre: string): string =>
       `<button type="button" data-filtre="${val === null ? '*' : val}" class="${plancheFiltre === val ? 'on' : ''}${n === 0 && val ? ' vide' : ''}" title="${titre}">${libelle} <b>${n}</b></button>`
     filtres.innerHTML =
@@ -5484,7 +5492,7 @@ function renderPlanche(): void {
   const visibles =
     plancheFiltre === null
       ? toutes
-      : toutes.filter((s) => (s.level.biome ?? '') === plancheFiltre)
+      : toutes.filter((s) => biomeDe(s.level.biome) === plancheFiltre)
   const ordonnable = plancheFiltre === null
   corps.innerHTML = ''
   visibles.forEach((s, i) => {
@@ -5560,10 +5568,12 @@ function renderPlanche(): void {
       // LE BIOME : le module de la carte qui propose ce tableau
       `<select class="pl-biome" title="Le BIOME : le module de la carte de la station qui peut proposer ce tableau. Universel : tout module le pioche. La liste vient de carteStation.json — un module ajouté dans l'éditeur de carte apparaît ici.">` +
       `<option value=""${s.level.biome ? '' : ' selected'}>— universel —</option>` +
+      // un tableau encore marqué d'un code de module (« C1 ») se montre
+      // dans le biome de ce module : rien à réétiqueter pour qu'il joue
       biomes
-        .map((b) => `<option value="${esc(b.code)}"${s.level.biome === b.code ? ' selected' : ''}>${esc(b.code)} · ${esc(b.nom)}</option>`)
+        .map((b) => `<option value="${esc(b.code)}"${biomeDe(s.level.biome) === b.code ? ' selected' : ''}>${esc(b.code)} · ${esc(b.nom)}</option>`)
         .join('') +
-      (s.level.biome && !biomes.some((b) => b.code === s.level.biome)
+      (s.level.biome && !biomes.some((b) => b.code === biomeDe(s.level.biome))
         ? `<option value="${esc(s.level.biome)}" selected>${esc(s.level.biome)} (plus sur la carte)</option>`
         : '') +
       `</select>`
@@ -6337,28 +6347,72 @@ function dscTable(): HTMLElement {
   return t
 }
 
+/** LES MOMENTS QU'UN BIOME JOUE : d'après la carte, quels tiers de la
+ *  descente ses modules occupent (les transformateurs le début, le cœur
+ *  début et milieu, l'antichambre milieu et fin…). La grille des manques
+ *  ne demande des tableaux que pour ces moments-là : une case que le jeu
+ *  ne piochera jamais n'est pas un manque. */
+function momentsDuBiome(): Map<string, Set<CodeAtelier['moment']>> {
+  const plan = planEcran()
+  const out = new Map<string, Set<CodeAtelier['moment']>>()
+  for (const mod of carte.modules) {
+    const code = mod.biome.trim()
+    if (!code || mod.niveaux <= 0) continue
+    const jusque = plusCourtVers(carte, carte.regles.depart, mod.id)
+    if (jusque === null) continue
+    const avant = jusque - mod.niveaux // les salles jouées avant d'entrer
+    const set = out.get(code) ?? new Set<CodeAtelier['moment']>()
+    for (let r = 1; r <= mod.niveaux; r++) set.add(momentAuRang(avant + r, plan))
+    out.set(code, set)
+  }
+  return out
+}
+
 /** LES MANQUES DU POOL : l'inventaire (ce que la bibliothèque a, par biome
- *  de la carte, mécanique et moment — une case vide est un tableau à
- *  écrire) et le relevé de ce que le jeu a dû générer faute de tableau.
- *  Le concepteur a demandé « un moyen de savoir facilement où il manque
- *  des salles à créer pour remplacer les générées » (16/09). */
+ *  de la carte et moment que ce biome joue, une case par mécanique — une
+ *  case vide est un tableau à écrire, et la liste du bas les nomme une à
+ *  une) et le relevé de ce que le jeu a dû générer faute de tableau. Le
+ *  concepteur a demandé « un moyen de savoir facilement où il manque des
+ *  salles à créer pour remplacer les générées » (16/09) — et, la première
+ *  grille lue, « du mal à savoir ce qu'il manque » : d'où la liste en clair.
+ *  Les tableaux marqués d'un code de module suivent le biome du module. */
 function dscManques(): HTMLElement {
   const d = document.createElement('div')
+  const esc = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  const biomes = biomesDeCarte(carte)
+  const bib = descenteBibliotheque().map((lv) => (lv.biome ? { ...lv, biome: biomeEffectif(carte, lv.biome) } : lv))
+  const inv = inventairePool(bib, biomes.map((b) => b.code))
+  const moments = momentsDuBiome()
+  const muets = bib.filter((lv) => !decodeCodeAtelier(lv.code)).length
+  const nombre = (biome: string, mec: CodeAtelier['mecanique'], mom: CodeAtelier['moment']): number =>
+    inv.find((c) => c.biome === biome && c.mecanique === mec && c.moment === mom)?.codes.length ?? 0
+  const MOMENT_MOT: Record<CodeAtelier['moment'], string> = { 1: 'début', 2: 'milieu', 3: 'fin' }
+  // LES CASES VIDES, dans l'ordre où elles se voient en jeu : l'eau d'abord
+  // (la seule mécanique du débutant), puis le début avant la fin, puis le biome
+  const vides: { biome: string; nom: string; mec: CodeAtelier['mecanique']; mom: CodeAtelier['moment'] }[] = []
+  for (const b of biomes)
+    for (const mom of [1, 2, 3] as const) {
+      if (!moments.get(b.code)?.has(mom)) continue
+      for (const mec of [0, 1, 2, 3] as const) if (nombre(b.code, mec, mom) === 0) vides.push({ biome: b.code, nom: b.nom, mec, mom })
+    }
+  vides.sort((a, b) => a.mec - b.mec || a.mom - b.mom || biomes.findIndex((x) => x.code === a.biome) - biomes.findIndex((x) => x.code === b.biome))
+
   const aide = document.createElement('p')
   aide.className = 'dsc-aide'
   aide.innerHTML =
-    'Générées coupées, chaque porte de la mini-carte pioche un tableau écrit de la MÉCANIQUE de son nœud, dans le BIOME ' +
-    'du module. L’inventaire compte ces tableaux, case par case : <b>début · milieu · fin</b>. Un tableau sans biome compte ' +
-    'pour tous ; un tableau sans code d’atelier ne compte nulle part. Une case à <b>0</b> est une salle à écrire. ' +
-    'Le relevé, dessous, dit ce que le jeu a réellement dû générer sur ce poste.'
+    'Générées coupées, chaque porte de la mini-carte pioche un tableau écrit de la <b>mécanique</b> de son nœud, dans le ' +
+    '<b>biome</b> du module, au <b>moment</b> de la descente où l’on est. La grille compte ces tableaux, une ligne par biome et ' +
+    'par moment que ce biome joue réellement (la carte le dit), une case par mécanique. Un tableau sans biome compte pour ' +
+    'tous ; un tableau marqué d’un ancien code de module compte pour le biome de ce module ; un tableau sans code ' +
+    'd’atelier ne compte nulle part. <b>Une case à zéro est une salle à écrire</b> — la liste sous la grille les nomme, ' +
+    'les plus vues en jeu d’abord.'
   d.appendChild(aide)
-  const biomes = [...new Set(carte.modules.map((mod) => mod.biome).filter((b) => b.length > 0))]
-  const inv = inventairePool(descenteBibliotheque(), biomes)
+
   const t = document.createElement('table')
   t.className = 'dsc-table'
   const thead = document.createElement('thead')
   const trh = document.createElement('tr')
-  for (const e of ['BIOME', ...([0, 1, 2, 3] as const).map((mec) => MECANIQUE_NOMS[mec].toUpperCase())]) {
+  for (const e of ['BIOME', 'MOMENT', ...([0, 1, 2, 3] as const).map((mec) => MECANIQUE_NOMS[mec].toUpperCase())]) {
     const th = document.createElement('th')
     th.textContent = e
     trh.appendChild(th)
@@ -6366,29 +6420,55 @@ function dscManques(): HTMLElement {
   thead.appendChild(trh)
   t.appendChild(thead)
   const tb = document.createElement('tbody')
-  for (const biome of biomes) {
-    const tr = document.createElement('tr')
-    const tdB = document.createElement('td')
-    tdB.textContent = biome
-    tr.appendChild(tdB)
-    for (const mec of [0, 1, 2, 3] as const) {
-      const td = document.createElement('td')
-      const parMoment = ([1, 2, 3] as const).map(
-        (mom) => inv.find((c) => c.biome === biome && c.mecanique === mec && c.moment === mom)?.codes.length ?? 0,
-      )
-      parMoment.forEach((n, i) => {
+  for (const b of biomes) {
+    const joues = ([1, 2, 3] as const).filter((mom) => moments.get(b.code)?.has(mom))
+    joues.forEach((mom, i) => {
+      const tr = document.createElement('tr')
+      if (mom === 2) tr.className = 'dsc-mom2'
+      if (mom === 3) tr.className = 'dsc-mom3'
+      const tdB = document.createElement('td')
+      tdB.textContent = i === 0 ? `${b.nom} (${b.code})` : ''
+      tr.appendChild(tdB)
+      const tdM = document.createElement('td')
+      tdM.textContent = MOMENT_MOT[mom]
+      tr.appendChild(tdM)
+      for (const mec of [0, 1, 2, 3] as const) {
+        const td = document.createElement('td')
+        const n = nombre(b.code, mec, mom)
         const s = document.createElement('span')
         s.className = 'dsc-badge' + (n === 0 ? ' dsc-manque' : '')
-        s.textContent = String(n)
-        s.title = `${['début', 'milieu', 'fin'][i]} · ${MECANIQUE_NOMS[mec]} · ${biome} : ${n} tableau${n > 1 ? 'x' : ''}`
+        s.textContent = n === 0 ? '0 · à écrire' : String(n)
+        s.title = `${b.nom} · ${MOMENT_MOT[mom]} · ${MECANIQUE_NOMS[mec]} : ${n} tableau${n > 1 ? 'x' : ''} jouable${n > 1 ? 's' : ''}`
         td.appendChild(s)
-      })
-      tr.appendChild(td)
-    }
-    tb.appendChild(tr)
+        tr.appendChild(td)
+      }
+      tb.appendChild(tr)
+    })
   }
   t.appendChild(tb)
   d.appendChild(t)
+
+  const bilan = document.createElement('p')
+  bilan.className = 'dsc-aide'
+  bilan.innerHTML =
+    `<b>${vides.length}</b> case${vides.length > 1 ? 's' : ''} à écrire · <b>${bib.length}</b> tableau${bib.length > 1 ? 'x' : ''} dans la bibliothèque, ` +
+    `dont <b>${muets}</b> muet${muets > 1 ? 's' : ''} (sans code 21XX-MMD : jamais compté${muets > 1 ? 's' : ''}, pioché${muets > 1 ? 's' : ''} en dernier).`
+  d.appendChild(bilan)
+  if (vides.length > 0) {
+    const ul = document.createElement('ul')
+    ul.className = 'dsc-manques'
+    for (const v of vides) {
+      const li = document.createElement('li')
+      // le code à donner au tableau qui remplira la case : le moment, la
+      // mécanique, et la difficulté qui reste au choix
+      li.innerHTML =
+        `<b>${MECANIQUE_NOMS[v.mec].toUpperCase()}</b> · ${MOMENT_MOT[v.mom]} · ${esc(v.nom)} — ` +
+        `code <code>21__-${v.mom}${v.mec}_</code>, biome « ${esc(v.biome)} » ou universel`
+      ul.appendChild(li)
+    }
+    d.appendChild(ul)
+  }
+
   const releve = litManquesDuPoste()
   const p = document.createElement('p')
   p.className = 'dsc-aide'
@@ -6404,7 +6484,7 @@ function dscManques(): HTMLElement {
   for (const mq of releve) {
     const li = document.createElement('li')
     li.textContent =
-      `${MECANIQUE_NOMS[mq.mecanique]} · ${MOMENT_COURT[mq.moment].toLowerCase()} · diff. ${mq.difficulte}` +
+      `${MECANIQUE_NOMS[mq.mecanique]} · ${MOMENT_MOT[mq.moment]} · diff. ${mq.difficulte}` +
       ` — ${mq.biome || 'sans biome'}${mq.module ? ` (${mq.module})` : ''} — ${mq.fois} fois`
     ul.appendChild(li)
   }
@@ -6915,6 +6995,16 @@ function renderDescente(): void {
       (v) => {
         voiePlan.reposParModule = v
       },
+    ),
+    dscCran(
+      'PART DU BIOME',
+      'la chance qu’une voie prenne la mécanique favorite de son biome (cryo : glace, chaud : vapeur) — jamais les trois voies d’un rang ; 0 : le biome ne pèse pas',
+      () => voiePlan.partBiome,
+      (v) => {
+        voiePlan.partBiome = v
+      },
+      10,
+      (v) => `${v} %`,
     ),
     dscCran(
       'BONBONNES PAR MODULE',
@@ -13860,7 +13950,7 @@ function propositionsVoie(seq: LevelDef[]): CarteVoie[] | null {
     biomeCourant ? { ...lv, biome: biomeCourant } : lv
   // un tableau qui EXIGE un état non tissé n'est pas jouable
   const jouable = (lv: LevelDef): boolean =>
-    (!lv.biome || !biomeCourant || lv.biome === biomeCourant) &&
+    (!lv.biome || !biomeCourant || biomeEffectif(carte, lv.biome) === biomeCourant) &&
     (lv.exige ?? []).every((e) => (e === 'glace' ? solidTenue : vapoTenue))
   const pioche = (): LevelDef | null =>
     piocheEcrite(seq, { moment, mecanique: 3, difficulte }, voieVues, jouable, alea, jouee, voiePlan.poids)

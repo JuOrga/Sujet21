@@ -94,11 +94,16 @@ couleur du nom.
 
 ### 2.3 Le biome — ce que la pioche ose
 
-Un module est un biome : sa `nature` pose la posture des salles (combat :
-dangers fréquents, pas d'énigme ; énigme : aucun danger, un faisceau à
-lire ; cache : la cachette toujours), son `biome` filtre les tableaux du
-pool, et la mini-carte tisse ses six salles avec les mécaniques que les
-mémoires permettent.
+Un module porte un biome, et plusieurs modules partagent le même : la
+carte livrée en a cinq — **cryo** (T1, C1, P1), **tempéré** (T2, C2, P2),
+**chaud** (T3, C3, P3), **antichambre**, **observatoire**. La `nature` du
+module pose la posture des salles (combat : dangers fréquents, pas
+d'énigme ; énigme : aucun danger, un faisceau à lire), son `biome` filtre
+les tableaux du pool, et **pèse au tissage** : une part réglable des voies
+de la mini-carte prend la mécanique favorite du biome — la glace en cryo,
+la vapeur en chaud, toutes en antichambre —, jamais les trois voies d'un
+rang. Choisir la voie froide sur la grande carte, c'est savoir que sa
+glace y servira.
 
 *Ce que le joueur lit* : le glyphe du module, la nature dans la fiche, les
 icônes de la mini-carte.
@@ -214,7 +219,8 @@ code sans nom.
 | `temp` | module | le climat des dangers ; la couleur du plan |
 | `cran` | module | +cran de difficulté, ×(1 + cran) mémoire |
 | `orbe` | module | l'orbe que recèle la cache posée dans la mini-carte du module |
-| `biome` | module | le filtre des tableaux du pool |
+| `biome` | module | le code du biome (plusieurs modules le partagent) : le filtre des tableaux du pool, la mécanique favorite au tissage |
+| `biomes` | carte | la fiche de chaque biome : son nom, sa mécanique favorite (0 eau, 1 glace, 2 vapeur, 3 toutes, null aucune) — dans le JSON pour l'instant |
 | `condition` | type de coursive | l'orbe exigé (`orbe == solidification`) |
 | la vérification | carte | deux routes minimum, distance équivalente, jamais deux crans d'affilée |
 
@@ -223,10 +229,10 @@ code sans nom.
 | Section | Réglages |
 | --- | --- |
 | Le plan | plafond de difficulté, descente du jour, salles générées (coupées : la même mini-carte, chaque porte pioche un tableau écrit de la mécanique de son nœud), **générer si le pool manque** (sans tableau de cette mécanique : générée et manque noté ; coupé : une autre mécanique), tableaux écrits — la longueur n'y est plus : elle découle de la carte, l'écran la lit et déroule rampe, table et tirage dessus |
-| **Les manques du pool** | l'inventaire biome × mécanique × moment (une case à 0 est un tableau à écrire) et le relevé des portes générées faute de tableau sur ce poste |
+| **Les manques du pool** | l'inventaire par biome et par moment que ce biome joue réellement (une ligne par couple, une case par mécanique ; une case à 0 est un tableau à écrire, et la liste sous la grille les nomme avec le code à donner), le compte des tableaux muets, et le relevé des portes générées faute de tableau sur ce poste |
 | La rampe | recul du sommet, respiration, finale |
 | La posture des rangs | rangs sans danger, cadence labyrinthe, cadence contraste, figures au début et ensuite |
-| **Les voies et les rencontres** | **part de rencontres** (0 à 60 %), **rang minimal**, **bifurcation** (0 à 100 %), **économats**, **alcôves** et **bonbonnes par module** (0 à 2) |
+| **Les voies et les rencontres** | **part de rencontres** (0 à 60 %), **rang minimal**, **bifurcation** (0 à 100 %), **part du biome** (0 à 100 % : la chance qu'une voie prenne la mécanique favorite de son biome), **économats**, **alcôves** et **bonbonnes par module** (0 à 2) |
 | **Ce que pèse une route** | **réserve** et **condensat d'une halte**, **plancher d'essence** (10 à 90 %), **prime de mémoire par cran** (0 à 300 %) |
 | La pioche | les quatre poids de l'écart au cahier |
 

@@ -49,6 +49,31 @@ describe('tisseMiniCarte — la grille de voies d’un module', () => {
     for (const r of sans.rangs) expect(r.some((n) => n.ecrite)).toBe(false)
   })
 
+  it('le biome pèse : la mécanique favorite sort plus, jamais sur les trois voies, et la grille reste la même', () => {
+    const base = { ...NU, partEvenement: 0.3 }
+    const sans = tisseMiniCarte(6, aleaDeGraine('bio'), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, base)
+    const glace = tisseMiniCarte(6, aleaDeGraine('bio'), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, {
+      ...base,
+      favori: 1,
+      partFavori: 1,
+    })
+    const compte = (mc: ReturnType<typeof tisse>, mec: number): number =>
+      mc.rangs.flat().filter((n) => n.mecanique === mec).length
+    expect(compte(glace, 1)).toBeGreaterThan(compte(sans, 1))
+    // à part entière (100 %), deux voies sur trois : jamais les trois
+    for (const r of glace.rangs) {
+      expect(r.filter((n) => n.mecanique === 1)).toHaveLength(2)
+      expect(r.some((n) => n.mecanique !== 1)).toBe(true)
+    }
+    // la GRILLE ne bouge pas : mêmes natures, mêmes liaisons (la graine reste alignée)
+    expect(glace.rangs.map((r) => r.map((n) => [n.nature, n.suivants]))).toEqual(
+      sans.rangs.map((r) => r.map((n) => [n.nature, n.suivants])),
+    )
+    // une favorite que les mémoires ne permettent pas ne pèse rien
+    const interdit = tisseMiniCarte(6, aleaDeGraine('bio'), [0, 2], () => 2, { debut: 1, suite: 2 }, true, { ...base, favori: 1, partFavori: 1 })
+    expect(compte(interdit, 1)).toBe(0)
+  })
+
   it('les figures suivent le réglage du plan : deux par rang au milieu', () => {
     const mc = tisse('f')
     for (const r of mc.rangs) expect(r.filter((n) => n.figure)).toHaveLength(2)

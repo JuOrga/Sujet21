@@ -43,6 +43,14 @@ export interface ReglagesTissage {
   repos: number
   dons: number
   coffre: boolean
+  /** LE BIOME PÈSE : la mécanique que le biome du module favorise (la
+   *  carte le dit — la glace en cryo, la vapeur en chaud), null sans ;
+   *  `partFavori` (0..1) : la chance qu'une voie la prenne. Jamais les
+   *  trois voies d'un rang : il reste toujours une autre mécanique à jouer.
+   *  C'est ce qui donne au choix d'une voie sur la grande carte un sens
+   *  de jeu — « ma glace servira là » — et pas seulement un décor. */
+  favori: CodeAtelier['mecanique'] | null
+  partFavori: number
 }
 export const TISSAGE_DEFAUT: ReglagesTissage = {
   partEvenement: 0.2,
@@ -52,6 +60,8 @@ export const TISSAGE_DEFAUT: ReglagesTissage = {
   repos: 1,
   dons: 0,
   coffre: false,
+  favori: null,
+  partFavori: 0,
 }
 
 /** La nature d'un nœud : une salle à jouer, une rencontre à traverser, ou
@@ -106,9 +116,21 @@ export function tisseMiniCarte(
   const part = Math.max(0, Math.min(1, reglages.partEvenement))
   const bif = Math.max(0, Math.min(1, reglages.bifurcation))
   const rangMin = Math.max(0, Math.floor(reglages.rangMin))
+  const favori = reglages.favori !== null && permises.includes(reglages.favori) ? reglages.favori : null
+  const partFavori = Math.max(0, Math.min(1, reglages.partFavori))
   const rangs: NoeudVoie[][] = []
   for (let r = 0; r < n; r++) {
-    const mecaniques = mecaniquesDuChoix(null, alea, null, permises)
+    const mecaniques = [...mecaniquesDuChoix(null, alea, null, permises)]
+    // LE BIOME PÈSE : chaque voie tire (TOUJOURS, pour que la graine reste
+    // alignée quel que soit le réglage), et prend la mécanique favorite si
+    // le tirage tombe sous la part — sauf la dernière voie qui ne la porte
+    // pas encore : un rang garde toujours une autre mécanique
+    for (let v = 0; v < VOIES; v++) {
+      const t = alea()
+      if (favori === null || t >= partFavori || mecaniques[v] === favori) continue
+      if (mecaniques.filter((x) => x !== favori).length <= 1) continue
+      mecaniques[v] = favori
+    }
     const modes = figuresDuChoix(momentAuRang(r), alea, figures.debut, figures.suite)
     const voieEcrite = ecrites ? Math.min(VOIES - 1, Math.floor(alea() * VOIES)) : -1
     // LES NŒUDS ÉVÉNEMENT. Le tirage se fait à CHAQUE rang, le premier

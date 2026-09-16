@@ -16,7 +16,9 @@ import {
   cloneCarte,
   couleurTemperature,
   orbeRequis,
+  biomeEffectif,
   biomesDeCarte,
+  mecaniqueDuBiome,
   longueursTrajet,
   ORBES,
   liensDepuis,
@@ -49,6 +51,15 @@ describe('carteStation.json — la source de vérité', () => {
     expect(CARTE_LIVREE.modules.some((m) => estHalte(m) || m.type === 'inconnu' || m.type === 'coffre')).toBe(false)
     expect(CARTE_LIVREE.regles.depart).toBe('HUB')
     expect(CARTE_LIVREE.regles.objectif).toBe('OBS')
+    // CINQ BIOMES, PAS DOUZE (le concepteur, 16/09) : la voie froide, la
+    // voie tempérée, la voie chaude, l'antichambre, l'observatoire — et
+    // chacun a sa fiche, avec la mécanique qu'il favorise au tissage
+    expect(biomesDeCarte(CARTE_LIVREE).map((b) => b.code)).toEqual(['cryo', 'tempere', 'chaud', 'antichambre', 'observatoire'])
+    expect(CARTE_LIVREE.modules.filter((m) => m.biome === 'cryo').map((m) => m.id)).toEqual(['T1', 'C1', 'P1'])
+    expect(CARTE_LIVREE.modules.filter((m) => m.biome === 'chaud').map((m) => m.id)).toEqual(['T3', 'C3', 'P3'])
+    expect(mecaniqueDuBiome(CARTE_LIVREE, 'cryo')).toBe(1)
+    expect(mecaniqueDuBiome(CARTE_LIVREE, 'chaud')).toBe(2)
+    expect(mecaniqueDuBiome(CARTE_LIVREE, 'tempere')).toBeNull()
   })
 
   it('ne présente aucune ERREUR de fond (les attentions sont tolérées)', () => {
@@ -196,17 +207,28 @@ describe('les conditions d’accès — un orbe acquis, pas l’état du corps',
 })
 
 describe('biomesDeCarte — la liste que la planche et l’éditeur proposent', () => {
-  it('un biome par code, seuls les modules à salles, sans doublon', () => {
-    expect(biomesDeCarte(CARTE_LIVREE).map((b) => b.code)).toEqual([
-      'T1', 'T2', 'T3', 'C1', 'C2', 'C3', 'P1', 'P2', 'P3', 'ANTI', 'OBS',
+  it('un biome par code, dans l’ordre des modules, seuls les modules à salles, sans doublon', () => {
+    expect(biomesDeCarte(CARTE_LIVREE).map((b) => `${b.code}:${b.nom}`)).toEqual([
+      'cryo:CRYO', 'tempere:TEMPÉRÉ', 'chaud:CHAUD', 'antichambre:ANTICHAMBRE', 'observatoire:OBSERVATOIRE',
     ])
     const c = cloneCarte(CARTE_LIVREE)
-    c.modules[1].biome = 'T2' // T1 rejoint le biome de T2
+    c.modules[1].biome = 'tempere' // T1 rejoint la voie tempérée
     c.modules.find((m) => m.id === 'C1')!.niveaux = 0 // le cryostat n’a plus de salle
-    expect(biomesDeCarte(c).map((b) => b.code)).toEqual([
-      'T2', 'T3', 'C2', 'C3', 'P1', 'P2', 'P3', 'ANTI', 'OBS',
-    ])
-    expect(biomesDeCarte(c)[0].nom).toBe('TRANSFO GLACE') // le premier qui le porte nomme le biome
+    expect(biomesDeCarte(c).map((b) => b.code)).toEqual(['tempere', 'chaud', 'cryo', 'antichambre', 'observatoire'])
+    // sans fiche, le premier module qui porte le biome le nomme
+    c.modules.find((m) => m.id === 'P1')!.biome = 'abysses'
+    expect(biomesDeCarte(c).find((b) => b.code === 'abysses')!.nom).toBe('PUITS FROID')
+    expect(verifieCarte(c).some((v) => v.niveau === 'attention' && v.module === 'P1' && v.message.includes('fiche'))).toBe(true)
+  })
+
+  it('biomeEffectif : un tableau marqué d’un code de module suit le biome de ce module', () => {
+    // les tableaux d'avant le regroupement portaient « C1 » : ils jouent en cryo
+    expect(biomeEffectif(CARTE_LIVREE, 'C1')).toBe('cryo')
+    expect(biomeEffectif(CARTE_LIVREE, 'P3')).toBe('chaud')
+    expect(biomeEffectif(CARTE_LIVREE, 'cryo')).toBe('cryo')
+    expect(biomeEffectif(CARTE_LIVREE, '')).toBe('')
+    expect(biomeEffectif(CARTE_LIVREE, undefined)).toBe('')
+    expect(biomeEffectif(CARTE_LIVREE, 'inconnu')).toBe('inconnu')
   })
 })
 

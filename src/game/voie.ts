@@ -105,6 +105,11 @@ export interface PlanVoie {
   /** LA PRIME DE MÉMOIRE PAR CRAN, en pourcents : la mémoire du sas se
    *  multiplie par 1 + cran × prime — 100 : ×2 au cran 1, ×3 au cran 2 */
   memoireParCran: number
+  /** LA PART DU BIOME au tissage, en pourcents : la chance qu'une voie
+   *  prenne la mécanique favorite de son biome (la glace en cryo, la
+   *  vapeur en chaud) — jamais les trois voies d'un rang ; 0 : le biome
+   *  ne pèse pas */
+  partBiome: number
   // ---- L'ALGORITHME DE PIOCHE --------------------------------------------
   /** les quatre poids de l'écart au cahier (cf. poule.ts) */
   poids: PoidsPioche
@@ -135,6 +140,7 @@ export const PLAN_VOIE_DEFAUTS: PlanVoie = {
   halteCondensatCl: 40,
   essencePlancher: 40,
   memoireParCran: 100,
+  partBiome: 50,
   poids: { ...POIDS_PIOCHE_DEFAUTS },
 }
 
@@ -201,6 +207,7 @@ export function clampPlanVoie(p: Partial<PlanVoie> | null): PlanVoie {
     // jamais sous 10 % (le corps ne tiendrait plus une salle) ni à 100 % (plus de sacrifice possible)
     essencePlancher: entier(p?.essencePlancher, PLAN_VOIE_DEFAUTS.essencePlancher, 10, 90),
     memoireParCran: entier(p?.memoireParCran, PLAN_VOIE_DEFAUTS.memoireParCran, 0, 300),
+    partBiome: entier(p?.partBiome, PLAN_VOIE_DEFAUTS.partBiome, 0, 100),
     poids: clampPoidsPioche(p?.poids ?? null),
   }
 }

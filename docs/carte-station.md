@@ -103,8 +103,10 @@ dépôt (annulable).
   `w`, `h`, `temp` (°C), `forme` (`octogone` | `rond` | `octogone-dome`),
   `niveaux` (**un module est un biome** : le nombre de salles qu'on y joue
   avant que la carte ne s'ouvre à nouveau ; 0 pour un lieu sans salle,
-  hub ou nœud), `biome` (le code du biome dans la nomenclature atelier,
-  la pioche ne tirera que des tableaux qui le portent), `orbe` (optionnel :
+  hub ou nœud), `biome` (le code du biome — `cryo`, `tempere`, `chaud`,
+  `antichambre`, `observatoire` sur la carte livrée ; plusieurs modules
+  partagent un biome, la pioche ne tirera que des tableaux qui le portent
+  ou universels), `orbe` (optionnel :
   l'orbe que le module recèle — une cache), `cran` (optionnel, 0 à 3 : le
   **confinement supérieur** du §9.3, « plus difficile, plus généreux » —
   chaque cran monte la difficulté des salles du module d'un cran de rampe
@@ -185,8 +187,14 @@ HUB ─vapeur T3 TRANSFO GAZ ───┘ └ C3 CHAUFFERIE (+1, cache)┘ └ P
    temps.
 3. **Les tableaux portent un code de biome**, ajouté à la nomenclature
    atelier moment · mécanique · difficulté (101, 223…). La pioche ne tire que
-   des tableaux du biome du module. Les tableaux existants sont à
-   réétiqueter, et à compléter là où un biome est vide.
+   des tableaux du biome du module. Depuis le 16/09 les modules se
+   **regroupent** en cinq biomes (`biomes` dans le JSON : un nom et la
+   mécanique favorite — la glace en cryo, la vapeur en chaud, « toutes » en
+   antichambre) ; un tableau encore marqué d'un code de module (« C1 »)
+   suit le biome de ce module (`biomeEffectif`), rien n'est à réétiqueter
+   pour qu'il joue. Le biome **pèse au tissage** de la mini-carte : une
+   part réglable des voies prend sa mécanique favorite, jamais les trois
+   d'un rang.
 4. **Les cadenas sont des barrières durables.** Une coursive glace ne
    s'ouvre que si l'orbe de solidification est acquis. Les orbes s'achètent
    au **marchand du hub** contre de la mémoire (la monnaie durable ; le

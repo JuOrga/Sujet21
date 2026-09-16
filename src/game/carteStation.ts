@@ -213,10 +213,22 @@ export interface ReglesCarte {
   temperatureCouleur: Record<string, string>
 }
 
+/** UN BIOME de la carte : son nom (celui que la planche, l'éditeur et
+ *  la grille des manques affichent) et la MÉCANIQUE qu'il favorise au
+ *  tissage de la mini-carte — la glace dans le froid, la vapeur dans le
+ *  chaud ; null : aucune, le tirage reste égal. Les modules portent le
+ *  code du biome ; cette table le décrit. */
+export interface BiomeCarte {
+  nom: string
+  mecanique: 0 | 1 | 2 | 3 | null
+}
+
 export interface CarteStation {
   scene: { width: number; height: number }
   zones: ZoneCarte[]
   types: Record<TypeModule, string>
+  /** les fiches des biomes, par code — une carte d'avant n'en a pas */
+  biomes: Record<string, BiomeCarte>
   modules: ModuleCarte[]
   liens: LienCarte[]
   typesLiens: Record<string, StyleLien>
@@ -266,6 +278,25 @@ export function parseCarte(entree: unknown): {
       if (estChaine(v)) types[t] = v
       else if (LIBELLES_DEFAUT[t]) types[t] = LIBELLES_DEFAUT[t]!
       else erreurs.push(`types.${t} manque`)
+    }
+
+  // LES BIOMES : une table optionnelle (les cartes d'avant le 16/09 n'en
+  // ont pas : leurs biomes se nomment alors par le premier module qui les
+  // porte, sans mécanique favorite)
+  const biomes: Record<string, BiomeCarte> = {}
+  if (o.biomes !== undefined && !estObjet(o.biomes)) erreurs.push('biomes doit être un objet { code: { nom, mecanique } }')
+  else if (estObjet(o.biomes))
+    for (const [code, b] of Object.entries(o.biomes)) {
+      if (!estObjet(b) || !estChaine(b.nom)) {
+        erreurs.push(`biomes.${code} : nom requis`)
+        continue
+      }
+      const mec = b.mecanique
+      if (mec !== undefined && mec !== null && !(estNombre(mec) && [0, 1, 2, 3].includes(mec))) {
+        erreurs.push(`biomes.${code} : mecanique doit valoir 0, 1, 2, 3 ou null`)
+        continue
+      }
+      biomes[code] = { nom: b.nom, mecanique: estNombre(mec) ? (mec as 0 | 1 | 2 | 3) : null }
     }
 
   const modules: ModuleCarte[] = []
@@ -391,7 +422,7 @@ export function parseCarte(entree: unknown): {
   return {
     carte: {
       scene: { width: scene.width as number, height: scene.height as number },
-      zones, types, modules, liens, typesLiens, decor, palette, regles,
+      zones, types, biomes, modules, liens, typesLiens, decor, palette, regles,
     },
     erreurs,
   }
@@ -404,6 +435,9 @@ export function serialiseCarte(c: CarteStation): string {
     scene: { width: c.scene.width, height: c.scene.height },
     zones: c.zones.map((z) => ({ id: z.id, code: z.code, nom: z.nom, couleur: z.couleur })),
     types: Object.fromEntries(TYPES_MODULE.map((t) => [t, c.types[t]])) as Record<TypeModule, string>,
+    biomes: Object.fromEntries(
+      Object.entries(c.biomes).map(([code, b]) => [code, { nom: b.nom, mecanique: b.mecanique }]),
+    ),
     modules: c.modules.map((m) => ({
       id: m.id, nom: m.nom, type: m.type, zone: m.zone, x: m.x, y: m.y, w: m.w, h: m.h,
       temp: m.temp, forme: m.forme, niveaux: m.niveaux, biome: m.biome,
@@ -644,9 +678,27 @@ export function biomesDeCarte(c: CarteStation): { code: string; nom: string }[] 
   for (const m of c.modules) {
     const code = m.biome.trim()
     if (!code || m.niveaux <= 0 || out.some((b) => b.code === code)) continue
-    out.push({ code, nom: m.nom })
+    // la fiche du biome le nomme ; sans fiche, le premier module qui le porte
+    out.push({ code, nom: c.biomes[code]?.nom ?? m.nom })
   }
   return out
+}
+
+/** LE BIOME EFFECTIF d'un code porté par un tableau. Avant le 16/09 chaque
+ *  module était son propre biome et les tableaux se marquaient du code du
+ *  module (« C1 ») ; depuis, les modules se regroupent (« cryo »). Un
+ *  tableau encore marqué d'un code de module suit le biome de ce module —
+ *  la bibliothèque n'a pas à être réétiquetée pour rester jouable. */
+export function biomeEffectif(c: CarteStation, code: string | undefined): string {
+  const k = (code ?? '').trim()
+  if (!k) return ''
+  const mod = moduleParId(c, k)
+  return mod ? mod.biome.trim() || k : k
+}
+
+/** LA MÉCANIQUE FAVORITE d'un biome, null sans fiche ou sans favorite. */
+export function mecaniqueDuBiome(c: CarteStation, code: string): 0 | 1 | 2 | 3 | null {
+  return c.biomes[code.trim()]?.mecanique ?? null
 }
 
 // ---- LA VÉRIFICATION DE FOND ----------------------------------------------
@@ -676,6 +728,8 @@ export function verifieCarte(c: CarteStation): VerdictCarte[] {
       v.push({ niveau: 'erreur', message: `${m.id} : orbe inconnu « ${m.orbe} » — ids : ${ORBES.map((o) => o.id).join(', ')}`, module: m.id })
     if (m.niveaux > 0 && m.biome.trim() === '' && !estHalte(m))
       v.push({ niveau: 'attention', message: `${m.id} : ${m.niveaux} niveau${m.niveaux > 1 ? 'x' : ''} sans code de biome — la pioche ne saura pas quels tableaux lui donner`, module: m.id })
+    else if (m.niveaux > 0 && m.biome.trim() !== '' && !c.biomes[m.biome.trim()])
+      v.push({ niveau: 'attention', message: `${m.id} : le biome « ${m.biome.trim()} » n’a pas de fiche (nom, mécanique favorite) dans biomes`, module: m.id })
     if (estHalte(m) && m.niveaux > 0)
       v.push({ niveau: 'erreur', message: `${m.id} : une halte (${c.types[m.type]}) n’a pas de salle — niveaux doit être 0 (${m.niveaux})`, module: m.id })
     if (m.x - m.w / 2 < 0 || m.y - m.h / 2 < 0 || m.x + m.w / 2 > c.scene.width || m.y + m.h / 2 > c.scene.height)
