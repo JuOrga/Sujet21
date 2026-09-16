@@ -8767,10 +8767,16 @@
         25% { transform: translateX(-6px); }
         75% { transform: translateX(6px); }
       }
+      /* trois lignes réservées, une ligne par ligne : la fiche ne pousse
+         jamais la carte (l'écran « sautait » au survol des portes) */
       .mb-station-fiche {
-        margin: 6px 0 0; min-height: 1.5em; text-align: center;
+        margin: 6px 0 0; min-height: calc(3 * 1.55em); text-align: center;
         font-size: calc(12px * var(--ui)); letter-spacing: 0.06em; color: #8ba3b8;
       }
+      .mb-station-fiche span {
+        display: block; line-height: 1.55em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .mb-station-fiche span:first-child { color: #cfe2ef; }
       .mb-passer {
         margin: 4px 0 0; text-align: center; font-family: var(--font-display);
         font-size: calc(8px * var(--ui)); letter-spacing: 0.3em; color: #55708c;

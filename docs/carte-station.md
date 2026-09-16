@@ -216,9 +216,12 @@ HUB ─vapeur T3 TRANSFO GAZ ───┘ └ C3 CHAUFFERIE (+1, cache)┘ └ P
   rouvre. Un module fermé dit l'orbe qui manque (et secoue la scène), un
   module hors de portée dit qu'aucune coursive n'y mène. **Survoler un
   module joignable projette** la route la plus courte qui en part jusqu'à
-  l'objectif (`projectionDepuis`) : modules et coursives s'allument, la
-  fiche mesure — « par ici : 6 salles jusqu'à OBSERVATOIRE · ÉCONOMAT ·
-  confinement +1 sur la route ». Le module élu
+  l'objectif (`projectionDepuis`) : modules et coursives s'allument, les
+  modules que cette porte ne permet plus de joindre s'éteignent, et la
+  fiche — trois lignes de hauteur fixe, pour que la carte ne bouge pas —
+  dit le module, ce qu'on y trouve, et la route : « ouvre ensuite PUITS
+  FROID ou SOUTES · au plus court (allumé) : 24 salles jusqu'à
+  OBSERVATOIRE · 2 confinements sur cette route ». Le module élu
   s'agrandit (la scène zoome sur lui), puis ses salles arrivent en
   vignettes — le choix habituel de la voie, titré du nom du module et de la
   salle dans le module. Un nœud (module sans salle) rouvre la carte aussitôt.

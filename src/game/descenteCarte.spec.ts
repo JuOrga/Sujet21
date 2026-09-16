@@ -268,7 +268,7 @@ describe('projectionDepuis — le survol qui projette', () => {
     expect(p.crans).toBe(2) // le cryostat, puis l'antichambre — la suite évite les soutes
     expect(p.prochains).toEqual(['PUITS FROID', 'SOUTES'])
     expect(ditProjection(c, p)).toBe(
-      'par ici : 24 salles jusqu’à OBSERVATOIRE · ensuite PUITS FROID ou SOUTES · confinement +2 sur la route',
+      'ouvre ensuite PUITS FROID ou SOUTES · au plus court (allumé) : 24 salles jusqu’à OBSERVATOIRE · 2 confinements sur cette route',
     )
     // depuis la voie libre, la route la moins confinée : l'antichambre seule
     const n = projectionDepuis(c, 'T2')!
@@ -278,12 +278,12 @@ describe('projectionDepuis — le survol qui projette', () => {
     // ce qu'elles ouvrent tout de suite après
     expect(projectionDepuis(c, 'T1')!.prochains).toEqual(['CRYOSTAT', 'CONDUITS'])
     expect(projectionDepuis(c, 'T3')!.prochains).toEqual(['CONDUITS', 'CHAUFFERIE'])
-    expect(ditProjection(c, projectionDepuis(c, 'T3')!)).toContain('ensuite CONDUITS ou CHAUFFERIE')
+    expect(ditProjection(c, projectionDepuis(c, 'T3')!)).toContain('ouvre ensuite CONDUITS ou CHAUFFERIE')
   })
 
   it('les haltes ne sont plus des arrêts de la grande carte ; un cul-de-sac n’a pas de projection', () => {
     expect(projectionDepuis(c, 'P1')!.arrets).toEqual([])
-    expect(ditProjection(c, projectionDepuis(c, 'ANTI')!)).toBe('par ici : 12 salles jusqu’à OBSERVATOIRE · confinement +1 sur la route')
+    expect(ditProjection(c, projectionDepuis(c, 'ANTI')!)).toBe('au plus court (allumé) : 12 salles jusqu’à OBSERVATOIRE · 1 confinement sur cette route')
     expect(projectionDepuis(sansSuite, 'P1')).toBeNull()
     expect(projectionDepuis(c, 'X')).toBeNull()
   })

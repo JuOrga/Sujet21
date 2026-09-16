@@ -13629,8 +13629,21 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
   })
   const fiche = document.createElement('p')
   fiche.className = 'mb-station-fiche'
+  // LA FICHE A TROIS LIGNES, TOUJOURS : le module, ce qu'on y trouve, la
+  // route. Une fiche d'une ligne qui passait à trois au survol poussait la
+  // carte vers le bas — l'écran « sautait » (revue du 16/09, soir). Chaque
+  // ligne tient sur une ligne (points de suspension au-delà, le texte
+  // entier en infobulle) : la carte ne bouge plus d'un pixel.
+  const escF = (t: string): string => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')
+  const lignes = (a: string, b: string, c: string): void => {
+    fiche.innerHTML = [a, b, c].map((t) => `<span title="${escF(t)}">${escF(t)}</span>`).join('')
+  }
   const ouvertes = choix.filter((x) => !x.orbeManquant).length
   const defaut = `${ouvertes} coursive${ouvertes > 1 ? 's' : ''} ouverte${ouvertes > 1 ? 's' : ''} · descente ${voieRang} / ${longueurRun()} salles`
+  const aideDefaut = [
+    'survolez une porte : sa fiche, ce qu’on y trouve, et la route la plus courte jusqu’à l’objectif s’allume sur le plan',
+    'les modules qui s’éteignent ne seront plus joignables par cette porte — c’est ce qu’elle ferme',
+  ] as const
   const litId = (e: Event): string | null =>
     (e.target as Element | null)?.closest?.('[data-mod]')?.getAttribute('data-mod') ?? null
   // LE SURVOL QUI PROJETTE : la route la plus courte depuis le module visé
@@ -13663,7 +13676,7 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
     const vise = mod && choix.some((c) => c.module.id === id) ? mod.id : null
     projette(vise)
     if (!mod) {
-      fiche.textContent = defaut
+      lignes(defaut, aideDefaut[0], aideDefaut[1])
       return
     }
     const x = choix.find((c) => c.module.id === id)
@@ -13685,12 +13698,13 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
       mod.type === 'inconnu'
         ? 'nature inconnue — se révèle à l’entrée'
         : `${carte.types[mod.type].toLowerCase()} · ${mod.niveaux > 0 ? `${mod.niveaux} salle${mod.niveaux > 1 ? 's' : ''}` : 'sans salle'}`
-    fiche.textContent =
+    lignes(
       `${mod.nom} · ${nature}` +
-      (mod.cran > 0 ? ` · confinement +${mod.cran}, mémoire ×${primeMemoireDu(mod)}` : '') +
-      ` · ${mod.temp}°C · ${acces}` +
-      (types.length ? ` · on y trouve : ${types.join(', ')}` : '') +
-      (projection ? ` — ${ditProjection(carte, projection)}` : '')
+        (mod.cran > 0 ? ` · confinement +${mod.cran}, mémoire ×${primeMemoireDu(mod)}` : '') +
+        ` · ${mod.temp}°C · ${acces}`,
+      types.length ? `on y trouve : ${types.join(', ')}` : '',
+      projection ? ditProjection(carte, projection) : '',
+    )
   }
   dit(null)
   scene.addEventListener('pointerover', (e) => dit(litId(e)))

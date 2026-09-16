@@ -447,14 +447,16 @@ export function ditProjection(c: CarteStation, p: ProjectionRoute): string {
   // LES PROCHAINS d'abord : trois transformateurs mènent aux mêmes
   // profondeurs, et la route la plus courte se confondait d'une porte à
   // l'autre (revue du 16/09) — ce qui les distingue, c'est ce qu'ils
-  // ouvrent tout de suite après, et le reste ne vient qu'ensuite
+  // ouvrent tout de suite après, et le reste ne vient qu'ensuite. La
+  // phrase dit ce que le plan ALLUME (« au plus court ») : le concepteur
+  // n'avait pas compris ce que « par ici » mesurait (revue du 16/09, soir).
   const prochains = p.prochains.filter((n) => n !== objectif) // « ensuite l'objectif » ne dit rien
-  const puis = prochains.length > 0 ? ` · ensuite ${prochains.join(' ou ')}` : ''
+  const puis = prochains.length > 0 ? `ouvre ensuite ${prochains.join(' ou ')} · ` : ''
   return (
-    `par ici : ${p.salles} salle${p.salles > 1 ? 's' : ''} jusqu’à ${objectif}` +
     puis +
+    `au plus court (allumé) : ${p.salles} salle${p.salles > 1 ? 's' : ''} jusqu’à ${objectif}` +
     (p.arrets.length ? ` · ${p.arrets.join(', ')}` : '') +
-    (p.crans > 0 ? ` · confinement +${p.crans} sur la route` : '')
+    (p.crans > 0 ? ` · ${p.crans} confinement${p.crans > 1 ? 's' : ''} sur cette route` : '')
   )
 }
 
