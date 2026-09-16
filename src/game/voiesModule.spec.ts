@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { aleaDeGraine } from './voie'
-import { dessinMiniCarteSVG, portesDuRang, tisseMiniCarte, VOIES } from './voiesModule'
+import { dessinMiniCarteSVG, portesDuRang, tisseMiniCarte, TISSAGE_DEFAUT, VOIES } from './voiesModule'
 
 const tisse = (graine: string, niveaux = 3, permises: (0 | 1 | 2 | 3)[] = [0, 1, 2, 3], ecrites = true) =>
   tisseMiniCarte(niveaux, aleaDeGraine(graine), permises, () => 2, { debut: 1, suite: 2 }, ecrites)
@@ -113,5 +113,39 @@ describe('les nœuds ÉVÉNEMENT dans la grille', () => {
     const evs = mc.rangs.flat().filter((n) => n.nature === 'evenement').length
     expect((svg.match(/mv-noeud mv-evenement/g) ?? []).length).toBe(evs)
     if (evs > 0) expect(svg).toContain('une rencontre — on ne sait pas laquelle')
+  })
+})
+
+describe('les réglages du tissage — ce que le concepteur tourne au banc', () => {
+  it('part de rencontres à zéro : aucune ; rang minimal : rien avant', () => {
+    for (let i = 0; i < 20; i++) {
+      const sans = tisseMiniCarte(6, aleaDeGraine(`z${i}`), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, {
+        ...TISSAGE_DEFAUT,
+        partEvenement: 0,
+      })
+      expect(sans.rangs.flat().every((n) => n.nature === 'salle')).toBe(true)
+      const tard = tisseMiniCarte(6, aleaDeGraine(`z${i}`), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, {
+        ...TISSAGE_DEFAUT,
+        partEvenement: 0.6,
+        rangMin: 4,
+      })
+      for (const r of tard.rangs.slice(0, 4)) expect(r.every((n) => n.nature === 'salle')).toBe(true)
+      expect(tard.rangs.slice(4).flat().some((n) => n.nature === 'evenement')).toBe(true)
+    }
+  })
+
+  it('bifurcation à zéro : trois couloirs parallèles ; à un : tout mène aux voisines', () => {
+    const droit = tisseMiniCarte(4, aleaDeGraine('b'), [0], () => 1, { debut: 0, suite: 0 }, false, { ...TISSAGE_DEFAUT, bifurcation: 0 })
+    for (const r of droit.rangs.slice(0, -1)) for (const n of r) expect(n.suivants).toEqual([n.voie])
+    const tout = tisseMiniCarte(4, aleaDeGraine('b'), [0], () => 1, { debut: 0, suite: 0 }, false, { ...TISSAGE_DEFAUT, bifurcation: 1 })
+    expect(tout.rangs[0][1].suivants).toEqual([0, 1, 2])
+    expect(tout.rangs[0][0].suivants).toEqual([0, 1])
+  })
+
+  it('les réglages n’ajoutent aucun tirage : la même graine donne la même grille quel que soit le réglage des salles', () => {
+    // la part change QUELS nœuds sont des rencontres, pas la géométrie ni les mécaniques
+    const a = tisseMiniCarte(6, aleaDeGraine('g'), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, { ...TISSAGE_DEFAUT, partEvenement: 0 })
+    const b = tisseMiniCarte(6, aleaDeGraine('g'), [0, 1, 2, 3], () => 2, { debut: 1, suite: 2 }, true, { ...TISSAGE_DEFAUT, partEvenement: 0.5 })
+    expect(a.rangs.flat().map((n) => `${n.mecanique}${n.suivants.join('')}`)).toEqual(b.rangs.flat().map((n) => `${n.mecanique}${n.suivants.join('')}`))
   })
 })

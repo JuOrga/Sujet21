@@ -68,6 +68,17 @@ export interface PlanVoie {
   figuresDebut: number
   /** combien des trois cartes sont des FIGURES dès le milieu */
   figuresSuite: number
+  // ---- LES VOIES ET LES RENCONTRES (voiesModule.ts) ----------------------
+  // Le concepteur a trouvé « trop de points d'interrogation » dans la
+  // mini-carte (revue du 16/09) : la part des rencontres était un nombre
+  // écrit dans le code. Ce sont des décisions de rythme, elles se règlent
+  // ici, au banc, comme la rampe.
+  /** la part de nœuds RENCONTRE passé le premier rang, en pourcents — 0 : aucune */
+  partEvenement: number
+  /** le premier rang d'un module où une rencontre peut se poser (0 : dès l'entrée) */
+  rangMinEvenement: number
+  /** la chance qu'une voie bifurque aussi vers une voisine, en pourcents — 0 : voies parallèles */
+  bifurcation: number
   // ---- L'ALGORITHME DE PIOCHE --------------------------------------------
   /** les quatre poids de l'écart au cahier (cf. poule.ts) */
   poids: PoidsPioche
@@ -87,6 +98,9 @@ export const PLAN_VOIE_DEFAUTS: PlanVoie = {
   cadenceContraste: 2,
   figuresDebut: 1,
   figuresSuite: 2,
+  partEvenement: 20,
+  rangMinEvenement: 1,
+  bifurcation: 45,
   poids: { ...POIDS_PIOCHE_DEFAUTS },
 }
 
@@ -137,6 +151,10 @@ export function clampPlanVoie(p: Partial<PlanVoie> | null): PlanVoie {
     // au plus trois : le choix ne porte que trois cartes générées
     figuresDebut: entier(p?.figuresDebut, PLAN_VOIE_DEFAUTS.figuresDebut, 0, 3),
     figuresSuite: entier(p?.figuresSuite, PLAN_VOIE_DEFAUTS.figuresSuite, 0, 3),
+    // au plus 60 % : au-delà, un module ne se joue plus, il se lit
+    partEvenement: entier(p?.partEvenement, PLAN_VOIE_DEFAUTS.partEvenement, 0, 60),
+    rangMinEvenement: entier(p?.rangMinEvenement, PLAN_VOIE_DEFAUTS.rangMinEvenement, 0, 5),
+    bifurcation: entier(p?.bifurcation, PLAN_VOIE_DEFAUTS.bifurcation, 0, 100),
     poids: clampPoidsPioche(p?.poids ?? null),
   }
 }

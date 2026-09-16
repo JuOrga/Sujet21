@@ -1141,6 +1141,11 @@ function miniCarteDuModule(): MiniCarte | null {
     (r) => momentAuRang(rangEntree + 1 + r, planEffectif()),
     { debut: voiePlan.figuresDebut, suite: voiePlan.figuresSuite },
     voiePlan.ecrites,
+    {
+      partEvenement: voiePlan.partEvenement / 100,
+      rangMin: voiePlan.rangMinEvenement,
+      bifurcation: voiePlan.bifurcation / 100,
+    },
   )
 }
 function sauvePlanVoie(): void {
@@ -6690,6 +6695,48 @@ function renderDescente(): void {
     ),
   )
   corps.appendChild(g3)
+
+  corps.appendChild(dscSec('LES VOIES ET LES RENCONTRES — la mini-carte d’un module'))
+  const aideVoies = document.createElement('p')
+  aideVoies.className = 'dsc-aide'
+  aideVoies.innerHTML =
+    'Dans un module, les salles se tissent en RANGS sur trois VOIES : ouvrir une porte ferme les autres. Une part des nœuds ' +
+    'n’est pas une salle mais une RENCONTRE — du texte, un choix, un prix. Ces trois réglages font la forme de la grille ; ' +
+    'la graine du jour la rend commune à tous les postes.'
+  corps.appendChild(aideVoies)
+  const g3b = document.createElement('div')
+  g3b.className = 'dsc-grille'
+  g3b.append(
+    dscCran(
+      'PART DE RENCONTRES',
+      'la part des nœuds qui sont une rencontre plutôt qu’une salle, passé le rang minimal — 0 : aucune, jamais les trois d’un rang',
+      () => voiePlan.partEvenement,
+      (v) => {
+        voiePlan.partEvenement = v
+      },
+      5,
+      (v) => `${v} %`,
+    ),
+    dscCran(
+      'RANG MINIMAL',
+      'le premier rang d’un module où une rencontre peut se poser — 1 : on entre toujours par une salle',
+      () => voiePlan.rangMinEvenement,
+      (v) => {
+        voiePlan.rangMinEvenement = v
+      },
+    ),
+    dscCran(
+      'BIFURCATION',
+      'la chance qu’une voie ouvre aussi sur une voisine au rang suivant — 0 : trois couloirs parallèles, 100 : tout mène partout',
+      () => voiePlan.bifurcation,
+      (v) => {
+        voiePlan.bifurcation = v
+      },
+      5,
+      (v) => `${v} %`,
+    ),
+  )
+  corps.appendChild(g3b)
 
   corps.appendChild(
     dscSec('L’ALGORITHME DE PIOCHE — ce qui choisit le tableau du pool'),

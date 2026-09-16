@@ -115,6 +115,12 @@ describe('voie — le plan de descente', () => {
 
   it('le clamp ramène tout plan dans les bornes — et les défauts comblent', () => {
     expect(clampPlanVoie(null)).toEqual(PLAN_VOIE_DEFAUTS)
+    // les réglages des voies et des rencontres se bornent : une part au-delà
+    // de 60 % ferait d'un module une lecture, pas un jeu
+    const v = clampPlanVoie({ partEvenement: 95, rangMinEvenement: -2, bifurcation: 140 })
+    expect([v.partEvenement, v.rangMinEvenement, v.bifurcation]).toEqual([60, 0, 100])
+    // un plan d'avant ces réglages les reçoit à leur défaut
+    expect(clampPlanVoie({ longueur: 12 }).partEvenement).toBe(PLAN_VOIE_DEFAUTS.partEvenement)
     expect(clampPlanVoie({ longueur: 999, diffMax: -4 })).toEqual({
       ...PLAN_VOIE_DEFAUTS,
       longueur: 40,

@@ -23,12 +23,22 @@ import { figuresDuChoix, mecaniquesDuChoix } from './voie'
 /** Le nombre de voies d'un module — trois, comme les trois portes d'avant. */
 export const VOIES = 3
 
-/** LA PART DE NŒUDS ÉVÉNEMENT, passé le premier rang. Six salles de suite,
- *  c'est six fois le même geste ; un nœud sur trois environ n'est donc pas
- *  une salle mais une RENCONTRE (evenements.ts) — du texte, un choix, un
- *  prix. Le joueur peut toujours l'éviter en prenant une autre voie : c'est
- *  ce qui en fait un choix et non une interruption. */
-export const PART_EVENEMENT = 0.32
+/** LES RÉGLAGES DU TISSAGE — ceux du plan (voie.ts), rapportés en parts.
+ *  Six salles de suite, c'est six fois le même geste : une part des nœuds
+ *  n'est donc pas une salle mais une RENCONTRE (evenements.ts) — du texte,
+ *  un choix, un prix. Le joueur peut toujours l'éviter en prenant une autre
+ *  voie : c'est ce qui en fait un choix et non une interruption. Le
+ *  concepteur règle la part au banc — « trop de points d'interrogation »
+ *  (revue du 16/09) se corrige là, pas dans le code. */
+export interface ReglagesTissage {
+  /** la part de rencontres parmi les nœuds éligibles (0..1) */
+  partEvenement: number
+  /** le premier rang où une rencontre peut se poser */
+  rangMin: number
+  /** la chance qu'une voie bifurque aussi vers une voisine (0..1) */
+  bifurcation: number
+}
+export const TISSAGE_DEFAUT: ReglagesTissage = { partEvenement: 0.2, rangMin: 1, bifurcation: 0.45 }
 
 /** La nature d'un nœud : une salle à jouer, ou une rencontre à traverser. */
 export type NatureNoeud = 'salle' | 'evenement'
@@ -72,21 +82,25 @@ export function tisseMiniCarte(
   momentAuRang: (rang: number) => CodeAtelier['moment'],
   figures: { debut: number; suite: number },
   ecrites: boolean,
+  reglages: ReglagesTissage = TISSAGE_DEFAUT,
 ): MiniCarte {
   const n = Math.max(0, Math.floor(niveaux))
+  const part = Math.max(0, Math.min(1, reglages.partEvenement))
+  const bif = Math.max(0, Math.min(1, reglages.bifurcation))
+  const rangMin = Math.max(0, Math.floor(reglages.rangMin))
   const rangs: NoeudVoie[][] = []
   for (let r = 0; r < n; r++) {
     const mecaniques = mecaniquesDuChoix(null, alea, null, permises)
     const modes = figuresDuChoix(momentAuRang(r), alea, figures.debut, figures.suite)
     const voieEcrite = ecrites ? Math.min(VOIES - 1, Math.floor(alea() * VOIES)) : -1
     // LES NŒUDS ÉVÉNEMENT. Le tirage se fait à CHAQUE rang, le premier
-    // compris, pour que la graine reste alignée quel que soit le tracé —
-    // mais le rang 0 n'en porte jamais : on entre dans un biome par une
-    // salle, sinon le module ne se présente pas. Et jamais les TROIS d'un
-    // rang : il doit toujours rester une voie qui se joue.
-    const evs = [0, 1, 2].map(() => alea() < PART_EVENEMENT)
-    if (r === 0 || evs.every(Boolean)) evs[0] = false
-    if (r === 0) evs[1] = evs[2] = false
+    // compris, pour que la graine reste alignée quel que soit le réglage —
+    // mais les rangs sous `rangMin` n'en portent jamais (on entre dans un
+    // biome par une salle, sinon le module ne se présente pas), et jamais
+    // les TROIS d'un rang : il doit toujours rester une voie qui se joue.
+    const evs = [0, 1, 2].map(() => alea() < part)
+    if (r < rangMin || evs.every(Boolean)) evs[0] = false
+    if (r < rangMin) evs[1] = evs[2] = false
     const rang: NoeudVoie[] = []
     for (let v = 0; v < VOIES; v++) {
       const suivants: number[] = []
@@ -94,8 +108,8 @@ export function tisseMiniCarte(
         // la voie continue tout droit, et bifurque vers une voisine une
         // fois sur deux environ — les tirages se font TOUJOURS, même au
         // bord, pour que la graine reste alignée quel que soit le tracé
-        const gauche = alea() < 0.45
-        const droite = alea() < 0.45
+        const gauche = alea() < bif
+        const droite = alea() < bif
         if (gauche && v > 0) suivants.push(v - 1)
         suivants.push(v)
         if (droite && v < VOIES - 1) suivants.push(v + 1)
