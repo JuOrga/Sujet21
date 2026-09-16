@@ -365,6 +365,10 @@ export interface ProjectionRoute {
   arrets: string[]
   /** la somme des crans de confinement sur la route */
   crans: number
+  /** ce qui s'ouvre JUSTE APRÈS le module survolé, par leur nom — c'est là
+   *  que deux portes voisines se distinguent quand leurs routes se
+   *  rejoignent ensuite */
+  prochains: string[]
 }
 
 /** La route la plus courte depuis un module jusqu'à l'objectif, mesurée.
@@ -378,14 +382,25 @@ export function projectionDepuis(c: CarteStation, id: string): ProjectionRoute |
     salles: modules.reduce((t, m) => t + Math.max(0, m.niveaux), 0),
     arrets: modules.filter((m) => estHalte(m) || m.type === 'coffre').map((m) => m.nom),
     crans: modules.reduce((t, m) => t + Math.max(0, m.cran), 0),
+    prochains: liensDepuis(c, id)
+      .map((l) => moduleParId(c, l.vers))
+      .filter((m): m is ModuleCarte => !!m)
+      .map((m) => m.nom),
   }
 }
 
 /** La projection en une ligne, pour la fiche de la carte. */
 export function ditProjection(c: CarteStation, p: ProjectionRoute): string {
   const objectif = moduleParId(c, c.regles.objectif)?.nom ?? c.regles.objectif
+  // LES PROCHAINS d'abord : trois transformateurs mènent aux mêmes
+  // profondeurs, et la route la plus courte se confondait d'une porte à
+  // l'autre (revue du 16/09) — ce qui les distingue, c'est ce qu'ils
+  // ouvrent tout de suite après, et le reste ne vient qu'ensuite
+  const prochains = p.prochains.filter((n) => n !== objectif) // « ensuite l'objectif » ne dit rien
+  const puis = prochains.length > 0 ? ` · ensuite ${prochains.join(' ou ')}` : ''
   return (
     `par ici : ${p.salles} salle${p.salles > 1 ? 's' : ''} jusqu’à ${objectif}` +
+    puis +
     (p.arrets.length ? ` · ${p.arrets.join(', ')}` : ' · sans arrêt') +
     (p.crans > 0 ? ` · confinement +${p.crans} sur la route` : '')
   )

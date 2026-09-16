@@ -36,7 +36,6 @@ describe('plusCourtVers — le plus court chemin en niveaux', () => {
   it('du HUB à l’observatoire : 30 salles — cinq biomes de six', () => {
     // HUB(0) T(6) N1(0) halte(0) C(6) halte(0) P(6) halte(0) ANTI(6) OBS(6)
     expect(plusCourtVers(c, 'HUB', 'OBS')).toBe(30)
-    expect(plusCourtVers(c, 'N1', 'OBS')).toBe(24)
     expect(plusCourtVers(c, 'C2', 'OBS')).toBe(18)
     expect(plusCourtVers(c, 'P2', 'OBS')).toBe(12)
     expect(plusCourtVers(c, 'ANTI', 'OBS')).toBe(6)
@@ -79,7 +78,7 @@ describe('la descente sur la carte', () => {
   it('une cache n’est pas un piège : quand l’objectif est hors de portée, on revient sur ses pas', () => {
     // HUB → T1 → N → S1 → S1b, sur la carte au cul-de-sac : de la cache,
     // rien ne repart — sauf le retour
-    const e = { module: 'CN', niveau: 0, visites: ['HUB', 'T1', 'N1', 'ECO1', 'C1'], revelations: {}, tissage: '', trace: [] }
+    const e = { module: 'CN', niveau: 0, visites: ['HUB', 'T1', 'ECO1', 'C1'], revelations: {}, tissage: '', trace: [] }
     const choix = choixModules(sansSuite, e, [])
     expect(choix.map((x) => `${x.module.id}:${x.retour ? 'retour' : x.lien.type}`)).toEqual(['C1:retour'])
     const r = entreModule(sansSuite, e, 'C1', [])!
@@ -87,7 +86,7 @@ describe('la descente sur la carte', () => {
     expect(r).toEqual({
       module: 'C1',
       niveau: 6,
-      visites: ['HUB', 'T1', 'N1', 'ECO1', 'C1', 'CN'],
+      visites: ['HUB', 'T1', 'ECO1', 'C1', 'CN'],
       revelations: {},
       tissage: '',
       trace: [],
@@ -103,7 +102,7 @@ describe('la descente sur la carte', () => {
     const boucle = cloneCarte(c)
     boucle.liens.push({ de: 'CN', vers: 'C1', type: 'alt' })
     boucle.liens.push({ de: 'CN', vers: 'ANTI', type: 'alt' })
-    const e = { module: 'CN', niveau: 0, visites: ['HUB', 'T2', 'N1', 'ECO1', 'C1'], revelations: {}, tissage: '', trace: [] }
+    const e = { module: 'CN', niveau: 0, visites: ['HUB', 'T2', 'ECO1', 'C1'], revelations: {}, tissage: '', trace: [] }
     const r = entreModule(boucle, e, 'C1', [])!
     expect(r.niveau).toBe(6) // épuisé : ses salles ne se rejouent pas
     expect(moduleFini(boucle, r)).toBe(true)
@@ -119,9 +118,6 @@ describe('la descente sur la carte', () => {
     expect(moduleFini(c, e)).toBe(false)
     e = franchitSalle(franchitSalle(franchitSalle(franchitSalle(e))))
     expect(moduleFini(c, e)).toBe(true)
-    e = entreModule(c, e, 'N1', [])!
-    expect(moduleFini(c, e)).toBe(true) // le nœud n'a pas de salle
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     e = entreModule(c, e, 'ECO1', [])!
     expect(moduleFini(c, e)).toBe(true) // une halte n'a pas de salle
     e = entreModule(c, six(entreModule(c, e, 'C2', [])!), 'CN', [])!
@@ -130,7 +126,7 @@ describe('la descente sur la carte', () => {
     expect(objectifAtteint(c, e)).toBe(false)
     e = six(e)
     expect(objectifAtteint(c, e)).toBe(true)
-    expect(e.visites).toEqual(['HUB', 'T2', 'N1', 'ECO1', 'C2', 'CN', 'P2', 'ECO2', 'ANTI'])
+    expect(e.visites).toEqual(['HUB', 'T2', 'ECO1', 'C2', 'CN', 'P2', 'ECO2', 'ANTI'])
   })
 
   it('la longueur de la run découle du trajet et s’affine en route', () => {
@@ -142,7 +138,7 @@ describe('la descente sur la carte', () => {
     expect(longueurRun(c, e, 1)).toBe(30) // 1 franchie + 5 restantes + 24
     // un détour par T1 (3) puis S1 (3) puis la cache S1b (1) : la salle de
     // la cache s'ajoute, puis l'observatoire (3) — 10
-    const d = { module: 'CN', niveau: 0, visites: ['HUB', 'T1', 'N1', 'ECO1', 'C1'], revelations: {}, tissage: '', trace: [] }
+    const d = { module: 'CN', niveau: 0, visites: ['HUB', 'T1', 'ECO1', 'C1'], revelations: {}, tissage: '', trace: [] }
     expect(longueurRun(c, d, 12)).toBe(30) // 12 franchies + la cache (0) + 18
     // sur une carte au cul-de-sac, l'objectif n'est plus atteignable d'ici :
     // il ne reste que le module
@@ -167,10 +163,10 @@ describe('la descente sur la carte', () => {
   it('une sauvegarde d’avant la carte, ou périmée, repart du départ', () => {
     expect(litEtatCarteRun(undefined, c)).toEqual(departCarte(c))
     expect(litEtatCarteRun({ module: 'DISPARU', niveau: 2 }, c)).toEqual(departCarte(c))
-    expect(litEtatCarteRun({ module: 'C2', niveau: 1.7, visites: ['HUB', 'X', 'N1'] }, c)).toEqual({
+    expect(litEtatCarteRun({ module: 'C2', niveau: 1.7, visites: ['HUB', 'X', 'T2'] }, c)).toEqual({
       module: 'C2',
       niveau: 1,
-      visites: ['HUB', 'N1'],
+      visites: ['HUB', 'T2'],
       revelations: {},
       tissage: '',
       trace: [],
@@ -256,11 +252,16 @@ describe('projectionDepuis — le survol qui projette', () => {
     expect(p.arrets.length).toBeGreaterThan(0)
     expect(ditProjection(c, p)).toContain('par ici : 24 salles jusqu’à OBSERVATOIRE')
     expect(ditProjection(c, p)).toContain('confinement +1 sur la route')
-    // depuis le nœud, la voie la plus sûre : aucun confinement, que des haltes
-    const n = projectionDepuis(c, 'N1')!
-    expect(n.salles).toBe(24)
+    // depuis un transformateur, la voie la plus sûre : aucun confinement
+    const n = projectionDepuis(c, 'T2')!
+    expect(n.salles).toBe(30)
     expect(n.crans).toBe(0)
-    expect(ditProjection(c, n)).toContain('par ici : 24 salles jusqu’à OBSERVATOIRE')
+    expect(ditProjection(c, n)).toContain('par ici : 30 salles jusqu’à OBSERVATOIRE')
+    // ce qui distingue deux portes voisines dont les routes se rejoignent :
+    // ce qu'elles ouvrent tout de suite après
+    expect(projectionDepuis(c, 'T1')!.prochains).toEqual(['ÉCONOMAT', '?'])
+    expect(projectionDepuis(c, 'T3')!.prochains).toEqual(['?', 'ALCÔVE'])
+    expect(ditProjection(c, projectionDepuis(c, 'T3')!)).toContain('ensuite ? ou ALCÔVE')
   })
 
   it('une cache compte comme arrêt ; sans arrêt, la fiche le dit ; un cul-de-sac n’a pas de projection', () => {
@@ -274,7 +275,7 @@ describe('projectionDepuis — le survol qui projette', () => {
 })
 
 describe('le module « ? » — la nature se révèle à l’entrée', () => {
-  const dansINC = { module: 'INC1', niveau: 0, visites: ['HUB', 'T2', 'N1'], revelations: {}, tissage: '', trace: [] }
+  const dansINC = { module: 'INC1', niveau: 0, visites: ['HUB', 'T2'], revelations: {}, tissage: '', trace: [] }
 
   it('tire une nature parmi REVELATIONS, la grave, et ne retire jamais', () => {
     const r = reveleInconnu(c, dansINC, 'INC1', () => 0.99)

@@ -115,26 +115,11 @@
       "desc": "Ne s’ouvre qu’avec l’orbe de vaporisation. Chaudières à chaque bord."
     },
     {
-      "id": "N1",
-      "nom": "NŒUD",
-      "type": "jonction",
-      "zone": 2,
-      "x": 650,
-      "y": 402,
-      "w": 60,
-      "h": 60,
-      "temp": 20,
-      "forme": "rond",
-      "niveaux": 0,
-      "biome": "",
-      "desc": "Les trois transformateurs convergent. Trois haltes s’ouvrent."
-    },
-    {
       "id": "ECO1",
       "nom": "ÉCONOMAT",
       "type": "economat",
       "zone": 4,
-      "x": 790,
+      "x": 740,
       "y": 230,
       "w": 76,
       "h": 76,
@@ -149,7 +134,7 @@
       "nom": "?",
       "type": "inconnu",
       "zone": 4,
-      "x": 790,
+      "x": 740,
       "y": 402,
       "w": 76,
       "h": 76,
@@ -164,7 +149,7 @@
       "nom": "ALCÔVE",
       "type": "repos",
       "zone": 4,
-      "x": 790,
+      "x": 740,
       "y": 574,
       "w": 76,
       "h": 76,
@@ -394,31 +379,36 @@
     },
     {
       "de": "T1",
-      "vers": "N1",
-      "type": "alt"
-    },
-    {
-      "de": "T2",
-      "vers": "N1",
-      "type": "main"
-    },
-    {
-      "de": "T3",
-      "vers": "N1",
-      "type": "alt"
-    },
-    {
-      "de": "N1",
       "vers": "ECO1",
       "type": "alt"
     },
     {
-      "de": "N1",
+      "de": "T1",
+      "vers": "INC1",
+      "type": "alt"
+    },
+    {
+      "de": "T2",
+      "vers": "ECO1",
+      "type": "alt"
+    },
+    {
+      "de": "T2",
       "vers": "INC1",
       "type": "main"
     },
     {
-      "de": "N1",
+      "de": "T2",
+      "vers": "REP1",
+      "type": "alt"
+    },
+    {
+      "de": "T3",
+      "vers": "INC1",
+      "type": "alt"
+    },
+    {
+      "de": "T3",
       "vers": "REP1",
       "type": "alt"
     },

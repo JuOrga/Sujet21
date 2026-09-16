@@ -71,17 +71,17 @@ describe('ajouter, dupliquer, supprimer, renommer', () => {
     expect(m.id).toBe('M1')
     expect(m.zone).toBe(5) // à côté de l'observatoire
     expect(m.cran).toBe(0) // l'ordinaire, jamais un confinement par mégarde
-    expect(c.modules).toHaveLength(22)
+    expect(c.modules).toHaveLength(21)
     expect(ajouteModule(c, 0, 0, 8).id).toBe('M2')
   })
 
   it('supprimer un module emporte ses coursives', () => {
     const c = carte()
-    expect(supprimeModule(c, 'N1')).toBe(true)
-    expect(c.modules.some((m) => m.id === 'N1')).toBe(false)
-    expect(c.liens.some((l) => l.de === 'N1' || l.vers === 'N1')).toBe(false)
-    expect(c.liens).toHaveLength(28) // 34 moins trois entrantes et trois sortantes
-    expect(supprimeModule(c, 'N1')).toBe(false)
+    expect(supprimeModule(c, 'INC1')).toBe(true)
+    expect(c.modules.some((m) => m.id === 'INC1')).toBe(false)
+    expect(c.liens.some((l) => l.de === 'INC1' || l.vers === 'INC1')).toBe(false)
+    expect(c.liens).toHaveLength(30) // 35 moins trois entrantes et deux sortantes
+    expect(supprimeModule(c, 'INC1')).toBe(false)
   })
 
   it('renommer suit partout : coursives, décor, règles', () => {
@@ -106,9 +106,9 @@ describe('ajouter, dupliquer, supprimer, renommer', () => {
 describe('les coursives', () => {
   it('trace, refuse le doublon, le lien sur soi et le bout inconnu', () => {
     const c = carte()
-    expect(ajouteLien(c, 'CN', 'ECO1', 'alt')).toBe(34)
+    expect(ajouteLien(c, 'CN', 'ECO1', 'alt')).toBe(35)
     expect(ajouteLien(c, 'CN', 'ECO1', 'main')).toBe(-1) // même départ, même arrivée
-    expect(ajouteLien(c, 'ECO1', 'CN', 'alt')).toBe(35) // l'inverse est un autre lien
+    expect(ajouteLien(c, 'ECO1', 'CN', 'alt')).toBe(36) // l'inverse est un autre lien
     expect(ajouteLien(c, 'OBS', 'OBS', 'main')).toBe(-1)
     expect(ajouteLien(c, 'OBS', 'X', 'main')).toBe(-1)
     expect(ajouteLien(c, 'OBS', 'CS', 'teleport')).toBe(-1)
@@ -124,11 +124,11 @@ describe('les coursives', () => {
 
   it('modifie un bout ou le type, en refusant ce qui ferait doublon', () => {
     const c = carte()
-    expect(modifieLien(c, 3, { type: 'main' })).toBe(true) // T1 → N1
+    expect(modifieLien(c, 3, { type: 'main' })).toBe(true) // T1 → ECO1
     expect(modifieLien(c, 3, { vers: 'T1' })).toBe(false) // sur soi
-    expect(modifieLien(c, 3, { de: 'T2' })).toBe(false) // T2 → N1 existe
+    expect(modifieLien(c, 3, { de: 'T2' })).toBe(false) // T2 → ECO1 existe
     expect(supprimeLien(c, 3)).toBe(true)
-    expect(c.liens).toHaveLength(33)
+    expect(c.liens).toHaveLength(34)
     expect(supprimeLien(c, 40)).toBe(false)
   })
 })

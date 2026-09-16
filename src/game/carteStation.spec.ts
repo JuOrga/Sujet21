@@ -41,9 +41,9 @@ describe('carteStation.json — la source de vérité', () => {
     expect(carte).not.toBeNull()
   })
 
-  it('est la carte à cinq biomes : 21 modules, 34 coursives, 6 zones', () => {
-    expect(CARTE_LIVREE.modules).toHaveLength(21)
-    expect(CARTE_LIVREE.liens).toHaveLength(34)
+  it('est la carte à cinq biomes : 20 modules, 35 coursives, 6 zones', () => {
+    expect(CARTE_LIVREE.modules).toHaveLength(20)
+    expect(CARTE_LIVREE.liens).toHaveLength(35)
     expect(CARTE_LIVREE.zones).toHaveLength(6)
     expect(CARTE_LIVREE.regles.depart).toBe('HUB')
     expect(CARTE_LIVREE.regles.objectif).toBe('OBS')
@@ -148,7 +148,7 @@ describe('traceLien — la règle des coursives du hub', () => {
   })
 
   it('un module plus large que haut part de son centre', () => {
-    const t = traceLien(CARTE_LIVREE, lien('T1', 'N1'))!
+    const t = traceLien(CARTE_LIVREE, lien('T1', 'INC1'))!
     expect(t.y1).toBe(210)
     expect(t.y2).toBe(402)
   })
@@ -252,8 +252,8 @@ describe('cheminLePlusCourt et routesVersObjectif — la matière des règles de
     expect(cheminLePlusCourt(CARTE_LIVREE, 'OBS', 'OBS')).toEqual(['OBS'])
     // à salles égales, la voie sans confinement passe devant : la route
     // projetée depuis le nœud ne traverse aucun module sous cran
-    const n1 = cheminLePlusCourt(CARTE_LIVREE, 'N1', 'OBS')!
-    expect(n1[0]).toBe('N1')
+    const n1 = cheminLePlusCourt(CARTE_LIVREE, 'T2', 'OBS')!
+    expect(n1[0]).toBe('T2')
     expect(n1[n1.length - 1]).toBe('OBS')
     expect(n1.reduce((t, id) => t + (CARTE_LIVREE.modules.find((m) => m.id === id)?.cran ?? 0), 0)).toBe(0)
     expect(cheminLePlusCourt(CARTE_LIVREE, 'OBS', 'HUB')).toBeNull()
@@ -325,7 +325,7 @@ describe('les routes', () => {
 
   it('tout est atteignable depuis le départ', () => {
     const vus = accessibles(CARTE_LIVREE, 'HUB')
-    expect(vus.size).toBe(21)
+    expect(vus.size).toBe(20)
   })
 
   it('les trois actes sont à distance égale de l’objectif, et chacun ouvre sur deux haltes', () => {
@@ -339,6 +339,11 @@ describe('les routes', () => {
     for (const s of ['P1', 'P2', 'P3']) expect(plusCourtVers(CARTE_LIVREE, s, 'OBS')).toBe(12)
     // chaque module d'acte ouvre sur DEUX haltes, et deux voisins n'offrent
     // jamais la même paire : la halte se choisit autant que le secteur
+    // dès la première porte, la route diverge : chaque transformateur
+    // ouvre sur deux haltes, jamais la même paire que son voisin
+    expect(liensDepuis(CARTE_LIVREE, 'T1').map((l) => l.vers)).toEqual(['ECO1', 'INC1'])
+    expect(liensDepuis(CARTE_LIVREE, 'T2').map((l) => l.vers)).toEqual(['ECO1', 'INC1', 'REP1'])
+    expect(liensDepuis(CARTE_LIVREE, 'T3').map((l) => l.vers)).toEqual(['INC1', 'REP1'])
     expect(liensDepuis(CARTE_LIVREE, 'C1').map((l) => l.vers)).toEqual(['CN', 'DON'])
     expect(liensDepuis(CARTE_LIVREE, 'C2').map((l) => l.vers)).toEqual(['CN', 'CS'])
     expect(liensDepuis(CARTE_LIVREE, 'C3').map((l) => l.vers)).toEqual(['DON', 'CS'])

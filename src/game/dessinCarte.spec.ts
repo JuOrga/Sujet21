@@ -19,18 +19,21 @@ describe('dessinCarteSVG — le plan, depuis les données', () => {
     const svg = dessinCarteSVG(CARTE_LIVREE, base)
     expect(svg.startsWith('<svg')).toBe(true)
     expect(svg).toContain('viewBox="0 0 2500 804"')
-    expect(compte(svg, /class="cs-mod /g)).toBe(21)
+    expect(compte(svg, /class="cs-mod /g)).toBe(20)
     // le cran se marque sur les deux secteurs du bord, et nulle part ailleurs
     expect(compte(svg, /class="cs-cran"/g)).toBe(4)
     // la ligne de route colorée : une par coursive (les prises en plus en édition)
-    expect(compte(svg, /class="cs-route[ "]/g)).toBe(34)
-    expect(compte(svg, /class="cs-lien-prise"/g)).toBe(34)
+    expect(compte(svg, /class="cs-route[ "]/g)).toBe(35)
+    expect(compte(svg, /class="cs-lien-prise"/g)).toBe(35)
   })
 
   it('reprend la maquette : octogone 22/78/28/72, rond pour la jonction, dôme pour le terminal', () => {
     expect(octogone(0, 0, 100, 50)).toBe('22,0 78,0 100,14 100,36 78,50 22,50 0,36 0,14')
-    const svg = dessinCarteSVG(CARTE_LIVREE, base)
-    expect(svg).toMatch(/data-mod="N1"[^>]*>.*?<circle cx="650" cy="402"/s)
+    // la carte livrée n'a plus de nœud : on en pose un pour le dessin
+    const c = cloneCarte(CARTE_LIVREE)
+    c.modules.push({ ...c.modules[1], id: 'NOEUD', type: 'jonction', forme: 'rond', x: 650, y: 402, w: 60, h: 60, niveaux: 0, biome: '' })
+    const svg = dessinCarteSVG(c, base)
+    expect(svg).toMatch(/data-mod="NOEUD"[^>]*>.*?<circle cx="650" cy="402"/s)
     expect(svg).toMatch(/data-mod="OBS"[^>]*>.*?url\(#cs-dome\)/s)
   })
 
@@ -39,7 +42,7 @@ describe('dessinCarteSVG — le plan, depuis les données', () => {
     expect(svg).toContain('❄ GLACE')
     expect(svg).toContain('💨 GAZ')
     // paroi, sol, anneaux « 4 44 » — pour les 12 coursives
-    expect(compte(svg, /stroke-dasharray="4 44"/g)).toBe(34)
+    expect(compte(svg, /stroke-dasharray="4 44"/g)).toBe(35)
   })
 
   it('applique la règle du hub au tracé (sortie bornée à ±110)', () => {
@@ -75,7 +78,7 @@ describe('dessinCarteSVG — le plan, depuis les données', () => {
   it('le mode éditeur ajoute grille, flèches de sens et poignées du module choisi', () => {
     const svg = dessinCarteSVG(CARTE_LIVREE, { ...base, selection: 'T2' })
     expect(svg).toContain('id="cs-grille"')
-    expect(compte(svg, /class="cs-sens"/g)).toBe(34)
+    expect(compte(svg, /class="cs-sens"/g)).toBe(35)
     expect(compte(svg, /data-poignee="/g)).toBe(4)
     const jeu = dessinCarteSVG(CARTE_LIVREE, { ...base, mode: 'jeu', courant: 'HUB' })
     expect(jeu).not.toContain('cs-grille')

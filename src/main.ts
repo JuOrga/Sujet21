@@ -96,6 +96,7 @@ import {
   CARTE_LIVREE,
   type CarteStation,
   ORBES,
+  accessibles,
   biomesDeCarte,
   couleurTemperature,
   moduleParId,
@@ -13207,10 +13208,18 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
   // fiche la mesure. Le SVG n'est pas rebâti : des classes basculent, comme
   // sur l'écran LA STATION (rebâtir relancerait le halo et volerait le focus).
   const projette = (id: string | null): void => {
-    for (const el of scene.querySelectorAll('.cs-projet')) el.classList.remove('cs-projet')
+    for (const el of scene.querySelectorAll('.cs-projet, .cs-hors')) el.classList.remove('cs-projet', 'cs-hors')
     if (!id) return
     const p = projectionDepuis(carte, id)
     if (!p) return
+    // CE QUI SE FERME : les modules que cette porte ne permet plus
+    // d'atteindre s'éteignent — c'est ainsi que trois portes dont les
+    // routes se rejoignent plus loin se distinguent quand même (revue du
+    // 16/09 : la route projetée était la même pour les trois)
+    const joignables = accessibles(carte, id)
+    for (const m of carte.modules)
+      if (!joignables.has(m.id) && m.id !== carteRun.module && !carteRun.visites.includes(m.id))
+        scene.querySelector(`[data-mod="${CSS.escape(m.id)}"]`)?.classList.add('cs-hors')
     p.chemin.forEach((m, i) => {
       scene.querySelector(`[data-mod="${CSS.escape(m)}"]`)?.classList.add('cs-projet')
       if (i === 0) return

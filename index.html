@@ -6429,6 +6429,8 @@
       /* le survol qui projette : la route la plus courte jusqu'à l'objectif */
       .cs-route.cs-projet { stroke: #eef8ff; opacity: 1; filter: drop-shadow(0 0 7px #eef8ff); }
       .cs-mod.cs-projet { filter: drop-shadow(0 0 10px rgba(238, 248, 255, 0.75)); }
+      /* ce que la porte survolée FERME : les modules qu'on ne pourra plus joindre */
+      .cs-mod.cs-hors { opacity: 0.22 !important; filter: none; transition: opacity 0.18s ease; }
       .cs-sens { fill: none; opacity: 0.85; }
       .cs-lien-prise { cursor: pointer; }
       .cs-brouillon { stroke: #eef8ff; stroke-width: 2; stroke-dasharray: 8 6; fill: none; pointer-events: none; }
