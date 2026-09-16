@@ -24,7 +24,8 @@ porter le même biome. La grande carte ne montre **que** des biomes — ni
 haltes, ni « ? », ni types de tableau : ceux-là vivent dans le module.
 
 On y choisit **le module suivant**, à la sortie de chaque module. Le survol
-d'un module dit ce qu'on y trouvera, par types et sans compter — « on y
+d'un module — à la souris, au clavier ou à la manette, viser vaut
+survoler — dit ce qu'on y trouvera, par types et sans compter — « on y
 trouve : eau, glace, figures, rencontre, économat, alcôve » —, ce que la
 porte ouvre juste après, et ce qu'elle ferme (les modules qu'on ne pourra
 plus joindre s'éteignent).
@@ -41,6 +42,18 @@ mécaniques ; figure ; tableau du pool), une **rencontre** (le « ? », on ne
 sait pas laquelle), ou une **halte** (l'économat, l'alcôve, la bonbonne
 oubliée, la cache à orbe). Les portes proposées sont les tuiles joignables
 depuis celle qu'on vient d'ouvrir : **ouvrir une porte ferme les autres**.
+Le chemin déjà joué se coche rang par rang ; les rangs passés sans porte
+(une sauvegarde d'une autre version) restent gris, et le rang suivant
+ouvre ses trois tuiles.
+
+**D'où viennent les salles.** Générées actives (l'ordinaire), une voie par
+rang porte un tableau du pool, les deux autres se fabriquent à l'ouverture
+de la porte. Générées coupées, **la mini-carte est la même** : chaque
+porte salle pioche un tableau déjà écrit **de la mécanique de son nœud**,
+dans le biome du module, jamais deux fois le même dans un choix. S'il n'y
+en a aucun, l'option « générer si le pool manque » fabrique la salle et
+la porte le dit (« GÉNÉRÉE — LE POOL MANQUE (glace) ») ; le manque se
+note pour le concepteur (§4.2).
 
 Les deux s'emboîtent : la carte décide du **biome** (la température, le
 cran, la nature dominante, la cache), la mini-carte décide du **rythme**
@@ -149,7 +162,7 @@ Ce qui existe, ce qui est proposé.
 | **Combat** | module (grande carte) | des salles à dangers fréquents, sans énigme au faisceau | la nature du module (éditeur de carte) |
 | **Énigme** | module (grande carte) | aucun danger, une énigme au faisceau garde le passage | idem |
 | **Terminal** | module (grande carte) | la Pompe (`boss-pompe.md`) | — |
-| **Salle** | nœud de la mini-carte | un tableau à jouer : sa mécanique, figure ou compartiments, tableau du pool ou générée | le plan (figures, tableaux écrits, pioche) |
+| **Salle** | nœud de la mini-carte | un tableau à jouer : sa mécanique, figure ou compartiments, tableau du pool ou générée — générées coupées, un tableau écrit de la mécanique du nœud, généré s'il n'y en a pas | le plan (salles générées, générer si le pool manque, figures, tableaux écrits, pioche) |
 | **Rencontre** | nœud de la mini-carte | du lore, deux ou trois offres, des issues pesées | la part, le rang minimal (LA DESCENTE), le catalogue `evenements.ts` |
 | **Économat** | nœud de la mini-carte | le Semblable troque contre du condensat | économats par module (LA DESCENTE) |
 | **Alcôve (repos)** | nœud de la mini-carte | un souffle, de la réserve ou du condensat — un seul des trois | alcôves par module ; `REPOS_RESERVE_L`, `REPOS_CONDENSAT_CL` |
@@ -209,7 +222,7 @@ code sans nom.
 
 | Section | Réglages |
 | --- | --- |
-| Le plan | plafond de difficulté, descente du jour, salles générées (coupées : la même mini-carte, chaque porte pioche un tableau écrit de la mécanique de son nœud), **générer si le pool manque** (sans tableau de cette mécanique : générée et manque noté ; coupé : une autre mécanique), tableaux écrits |
+| Le plan | plafond de difficulté, descente du jour, salles générées (coupées : la même mini-carte, chaque porte pioche un tableau écrit de la mécanique de son nœud), **générer si le pool manque** (sans tableau de cette mécanique : générée et manque noté ; coupé : une autre mécanique), tableaux écrits — la longueur n'y est plus : elle découle de la carte, l'écran la lit et déroule rampe, table et tirage dessus |
 | **Les manques du pool** | l'inventaire biome × mécanique × moment (une case à 0 est un tableau à écrire) et le relevé des portes générées faute de tableau sur ce poste |
 | La rampe | recul du sommet, respiration, finale |
 | La posture des rangs | rangs sans danger, cadence labyrinthe, cadence contraste, figures au début et ensuite |
@@ -229,6 +242,8 @@ joue pour tout le monde.
 | `EVENEMENTS` | `evenements.ts` | le catalogue des rencontres : textes, offres, issues, effets |
 | `CONTREPARTIES` | `instruments.ts` | les cartes qui coûtent |
 | `postureDuModule`, `climatDuModule` | `descenteCarte.ts` | ce que la nature et la température imposent |
+| `VOIE_INCONNUE` | `descenteCarte.ts` | le rang franchi sans porte dans la trace de la mini-carte |
+| `inventairePool`, `noteManque` | `manques.ts` | l'inventaire du pool par biome × mécanique × moment, et le relevé des portes générées faute de tableau |
 
 Ce qui devrait **rejoindre le banc** à la prochaine étape : les valeurs des
 haltes (réserve, condensat), le plancher d'essence, le multiplicateur de
