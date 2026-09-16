@@ -6415,6 +6415,8 @@
       #carte-editeur .ce-orbes .ce-etat { flex: none; padding: 5px 8px; font-size: calc(10.5px * var(--ui)); text-transform: none; letter-spacing: 0.04em; }
       .cs-niv { font-size: 10px; letter-spacing: 0.12em; text-anchor: middle; pointer-events: none; }
 
+      /* la visée manette sur un module du plan : le même liseré que la sélection */
+      .cs-mod.pad-focus { filter: drop-shadow(0 0 12px rgba(238, 248, 255, 0.8)); outline: none; }
       /* ==== LE DESSIN DE LA CARTE (game/dessinCarte.ts) — vaut pour l'éditeur
          comme pour un futur écran de jeu. Les couleurs de la carte voyagent
          en attributs (elles viennent des données) ; ici, les états. */

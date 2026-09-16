@@ -6054,6 +6054,7 @@ stationEl?.addEventListener('pointerdown', (e) => {
   plan?.addEventListener('pointermove', (e) => viseStation(lit(e)))
   plan?.addEventListener('pointerleave', () => viseStation(null))
   plan?.addEventListener('focusin', (e) => viseStation(lit(e)))
+  plan?.addEventListener('pad-vise', (e) => viseStation(lit(e))) // la manette survole aussi
   plan?.addEventListener('click', (e) => viseStation(lit(e)))
 }
 
@@ -7800,6 +7801,7 @@ function navigueMenu(couche: CoucheMenu, dt: number): void {
     const prochain = plusProcheVers(vise, els, dx, dy)
     if (prochain) vise = prochain
   }
+  const avant = focusParCouche.get(couche.id) ?? null
   focusParCouche.set(couche.id, vise)
   // le liseré s'affiche si la MANETTE a la main (a parlé plus récemment
   // que le pointeur) — pas de fenêtre de temps : sur un menu au rendu
@@ -7807,12 +7809,30 @@ function navigueMenu(couche: CoucheMenu, dt: number): void {
   // l'écran : celui de la couche active — l'écran de dessous rend le sien
   // (il le retrouvera par la mémoire de focus en revenant).
   const padALaMain = manette.lastActivity > input.lastPointerAt
+  const avaitLisere = vise.classList.contains('pad-focus')
   for (const el of document.querySelectorAll<HTMLElement>('.pad-focus'))
     if (el !== vise) el.classList.remove('pad-focus')
   vise.classList.toggle('pad-focus', padALaMain)
   if (dx !== 0 || dy !== 0)
     vise.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-  if (manette.edge(BOUTON.A)) vise.click()
+  // LE SURVOL À LA MANETTE : viser un élément vaut le survoler. La carte de
+  // la station, les portes de la mini-carte, l'écran LA STATION lisent le
+  // pointeur et le focus clavier pour peindre leur fiche et leur
+  // projection ; la manette ne posait ni l'un ni l'autre (revue du 16/09).
+  // Un événement « pad-vise » part quand la visée change (ou quand la
+  // manette reprend la main sur la même cible), « pad-quitte » part de
+  // l'ancienne cible ; ces écrans les écoutent comme un survol et sa fin.
+  if (padALaMain && (vise !== avant || !avaitLisere)) {
+    if (avant && avant !== vise)
+      avant.dispatchEvent(new CustomEvent('pad-quitte', { bubbles: true }))
+    vise.dispatchEvent(new CustomEvent('pad-vise', { bubbles: true }))
+  }
+  // A ouvre. Un module de la carte est un <g> SVG : il porte role="button"
+  // mais pas click() (HTMLElement seulement) — on lui envoie l'événement
+  if (manette.edge(BOUTON.A)) {
+    if (typeof (vise as { click?: unknown }).click === 'function') vise.click()
+    else vise.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+  }
 }
 // sonde du banc d'essai : l'état de la navigation manette, lisible du dehors
 let manettePolls = 0
@@ -12930,9 +12950,9 @@ function mbMontreVersement(): void {
     else delete scene.dataset.vers
   }
   for (const [btn, cote] of [[cb, 'g'], [cx, 'd']] as const) {
-    for (const ev of ['pointerenter', 'focusin'] as const)
+    for (const ev of ['pointerenter', 'focusin', 'pad-vise'] as const)
       btn.addEventListener(ev, () => { if (!btn.disabled) vise(cote) })
-    for (const ev of ['pointerleave', 'focusout'] as const)
+    for (const ev of ['pointerleave', 'focusout', 'pad-quitte'] as const)
       btn.addEventListener(ev, () => vise(''))
   }
   scene.append(cb, goutte, cx)
@@ -13173,9 +13193,9 @@ function mbMontreDraft(): void {
       btn.classList.add('mb-pauvre')
       btn.disabled = true
     }
-    for (const ev of ['pointerenter', 'focusin'] as const)
+    for (const ev of ['pointerenter', 'focusin', 'pad-vise'] as const)
       btn.addEventListener(ev, () => { if (!elu) isole(pli) })
-    for (const ev of ['pointerleave', 'focusout'] as const)
+    for (const ev of ['pointerleave', 'focusout', 'pad-quitte'] as const)
       btn.addEventListener(ev, () => { if (!elu) isole(null) })
     mbIncline(btn, pli)
     // la carte tombée sur sa face fait son petit bruit : une par une
@@ -13380,6 +13400,7 @@ function mbMontreCarte(raison: 'depart' | 'suite'): void {
   scene.addEventListener('pointerover', (e) => dit(litId(e)))
   scene.addEventListener('pointerout', () => dit(null))
   scene.addEventListener('focusin', (e) => dit(litId(e)))
+  scene.addEventListener('pad-vise', (e) => dit(litId(e))) // la manette survole aussi
   let elu = false
   const elit = (x: (typeof choix)[number]): void => {
     if (elu) return
@@ -13912,9 +13933,9 @@ function mbMontreSallesVoie(cartes: CarteVoie[]): void {
     if (c.voie !== undefined) {
       const noeud = (): Element | null =>
         host.querySelector(`.mv-noeud[data-rang="${carteRun.niveau}"][data-voie="${c.voie}"]`)
-      for (const ev of ['pointerenter', 'focusin'] as const)
+      for (const ev of ['pointerenter', 'focusin', 'pad-vise'] as const)
         porte.addEventListener(ev, () => noeud()?.classList.add('mv-vise'))
-      for (const ev of ['pointerleave', 'focusout'] as const)
+      for (const ev of ['pointerleave', 'focusout', 'pad-quitte'] as const)
         porte.addEventListener(ev, () => noeud()?.classList.remove('mv-vise'))
     }
     host.appendChild(porte)
