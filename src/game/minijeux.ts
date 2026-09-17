@@ -679,6 +679,10 @@ export interface ReglesCibles {
   plafond: number
   /** les paliers de points : juste ≥ [0], proche ≥ [1], loin ≥ [2] */
   paliers: [number, number, number]
+  /** la série : deux touches à moins de ce délai (s) se suivent — la deuxième vaut ×2, la troisième ×3 */
+  serieDelai: number
+  /** le plafond du multiplicateur de série */
+  serieMax: number
 }
 
 export interface CiblesDef {
@@ -691,8 +695,18 @@ export interface EtatCibles {
   points: number
   touches: number
   fini: boolean
+  /** LA SÉRIE : des touches rapprochées (à moins de serieDelai l'une de
+   *  l'autre) se multiplient — ×2 la deuxième, ×3 la troisième et au-delà */
+  serie: number
+  /** l'instant de la dernière touche (s), −∞ avant la première */
+  derniereTouche: number
 }
-export const ETAT_CIBLES_NEUF: EtatCibles = { points: 0, touches: 0, fini: false }
+export const ETAT_CIBLES_NEUF: EtatCibles = { points: 0, touches: 0, fini: false, serie: 0, derniereTouche: -Infinity }
+
+/** LE MULTIPLICATEUR d'une série : 1, 2, 3 (plafonné à serieMax). */
+export function multiplicateurSerie(serie: number, r: ReglesCibles): number {
+  return Math.max(1, Math.min(r.serieMax, serie))
+}
 
 /** UNE TOUCHE : la mire touchée et la taille (en particules) de ce qui l'a touchée. */
 export interface ToucheMire {
@@ -711,14 +725,19 @@ export function avanceCibles(e: EtatCibles, t: number, touches: readonly ToucheM
   if (e.fini) return e
   let points = e.points
   let n = e.touches
+  let serie = e.serie
+  let derniere = e.derniereTouche
   for (const tc of touches) {
     const m = mires[tc.mire]
     if (!m) continue
-    points += pointsTouche(m, tc.taille, corpsDepart, r)
+    // la série : rapprochée de la précédente, elle continue ; sinon elle repart
+    serie = t - derniere <= r.serieDelai ? serie + 1 : 1
+    derniere = t
+    points += pointsTouche(m, tc.taille, corpsDepart, r) * multiplicateurSerie(serie, r)
     n++
   }
-  if (t >= r.duree) return { points, touches: n, fini: true }
-  return points === e.points && n === e.touches ? e : { points, touches: n, fini: false }
+  if (t >= r.duree) return { points, touches: n, fini: true, serie, derniereTouche: derniere }
+  return n === e.touches ? e : { points, touches: n, fini: false, serie, derniereTouche: derniere }
 }
 
 /** LE VERDICT DES CIBLES : les points aux paliers. */
@@ -736,11 +755,13 @@ export const VERDICTS_CIBLES: Record<NoteTrait['verdict'], string> = {
 }
 
 /** LE PRESET « TIR DE GLACE » : ce que le tableau recouvre du banc — le
- *  geste lui-même (une part de 10 % du corps par éclat, 900 u/s à pleine
- *  puissance), et une glace qui rebondit franchement sur les bandes. */
+ *  geste lui-même (une part de 10 % du corps par éclat, 1 800 u/s à pleine
+ *  puissance : « il faudrait pouvoir tirer plus fort », le concepteur, 17/09 —
+ *  mesuré : un éclat ne traverse pas un sol de 40 u jusqu'à 2 600 u/s), et
+ *  une glace qui rebondit franchement sur les bandes. */
 export const REGLAGES_CIBLES: Partial<SimParams> = {
   glaceTir: 0.1,
-  glaceTirVitesse: 900,
+  glaceTirVitesse: 1800,
   iceRestitution: 0.8,
   hydrophobeIceRestitution: 1.1,
 }
@@ -766,6 +787,8 @@ export const REGLES_CIBLES: ReglesCibles = {
   // toutes les quatre à cinq secondes, un tir posé vaut dix — soixante
   // points, c'est six tirs en plein en trente secondes
   paliers: [60, 30, 10],
+  serieDelai: 2,
+  serieMax: 3,
 }
 export const MIRES_CIBLES: MireDef[] = [
   { x: -800, y: Y_MIRES, r: 70, points: 10 },

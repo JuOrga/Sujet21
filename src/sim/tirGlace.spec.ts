@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PARAMS, type SimParams } from './params'
 import { ECLAT_MIN, FluidSim, KIND_PLAYER, type Bounds } from './solver'
+import { MAT_HYDROPHOBE, MAT_WALL } from '../game/level'
+import { REGLAGES_CIBLES } from '../game/minijeux'
 
 const OPEN: Bounds = { minX: -3000, minY: -3000, maxX: 3000, maxY: 3000 }
 
@@ -112,5 +114,23 @@ describe('le tir de glace — un éclat du corps gelé file vers le doigt', () =
     // un corps posé sur une mire : pas une touche (il tient au corps)
     const s2 = corpsGele(200)
     expect(s2.touchesMires([{ x: 0, y: 0, r: 300 }])).toEqual([])
+  })
+
+  it('à la vitesse du mini-jeu, un éclat tiré droit sur un sol de 40 u ne le traverse pas, neutre ou hydrophobe', () => {
+    for (const mat of [MAT_HYDROPHOBE, MAT_WALL]) {
+      const s = new FluidSim({ ...DEFAULT_PARAMS, ...REGLAGES_CIBLES }, { minX: -1300, minY: -1000, maxX: 1300, maxY: 900 }, 2048)
+      s.setLevel([{ minX: -1300, minY: -1000, maxX: 1300, maxY: -960, material: mat }], [])
+      s.spawnDisc(0, -300, 900, KIND_PLAYER)
+      s.freezeIntent = true
+      const dt = s.params.dt
+      for (let t = 0; t < 1.5; t += dt) s.step(dt)
+      expect(s.lanceEclat(0, -3000)).toBeGreaterThan(0)
+      let yMin = Infinity
+      for (let t = 0; t < 2; t += dt) {
+        s.step(dt)
+        for (let i = 0; i < s.count; i++) if (s.kind[i] !== KIND_PLAYER) yMin = Math.min(yMin, s.posY[i])
+      }
+      expect(yMin).toBeGreaterThan(-960)
+    }
   })
 })
