@@ -91,6 +91,9 @@ export interface PlanVoie {
   economatsParModule: number
   reposParModule: number
   donsParModule: number
+  /** LES MINI-JEUX par module (la pesée) : un nœud de la mini-carte, une
+   *  salle où la physique est le jeu — 0 : aucun */
+  minijeuxParModule: number
   // ---- CE QUE PÈSE UNE ROUTE ---------------------------------------------
   // Trois nombres qui règlent l'équilibre risque · récompense d'une route,
   // et qui étaient écrits dans le code (routes.md §4.3, « ce qui devrait
@@ -141,6 +144,7 @@ export const PLAN_VOIE_DEFAUTS: PlanVoie = {
   economatsParModule: 1,
   reposParModule: 1,
   donsParModule: 0,
+  minijeuxParModule: 1,
   halteReserveCl: 50,
   halteCondensatCl: 40,
   essencePlancher: 40,
@@ -206,6 +210,7 @@ export function clampPlanVoie(p: Partial<PlanVoie> | null): PlanVoie {
     economatsParModule: entier(p?.economatsParModule, PLAN_VOIE_DEFAUTS.economatsParModule, 0, 2),
     reposParModule: entier(p?.reposParModule, PLAN_VOIE_DEFAUTS.reposParModule, 0, 2),
     donsParModule: entier(p?.donsParModule, PLAN_VOIE_DEFAUTS.donsParModule, 0, 2),
+    minijeuxParModule: entier(p?.minijeuxParModule, PLAN_VOIE_DEFAUTS.minijeuxParModule, 0, 2),
     // les défauts sont les anciennes constantes : un plan d'avant ces
     // curseurs retrouve exactement la route qu'il décrivait
     halteReserveCl: entier(p?.halteReserveCl, PLAN_VOIE_DEFAUTS.halteReserveCl, 0, 300),

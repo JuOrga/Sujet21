@@ -121,6 +121,7 @@ import {
   PRIMES,
 } from './game/voiesModule'
 import { CLE_MANQUES, inventairePool, litManques, noteManque, type Manque } from './game/manques'
+import { estMiniJeu, notePesee, tableauPesee, tirePesee, VERDICTS_PESEE, type NotePesee } from './game/minijeux'
 import {
   ditEffet,
   offresDe,
@@ -952,6 +953,11 @@ const carteAUnEconomat = (): boolean => carte.modules.some((m) => m.type === 'ec
 // s'efface QUE lorsqu'il a servi : armé au hub, il tient jusqu'à la
 // première traversée ; armé en salle, il ouvre la suivante.
 let economatForce = false
+// LE MINI-JEU choisi à la porte de la mini-carte : sa salle, construite en
+// code (minijeux.ts), s'intercale comme l'économat-nœud ; son sas mesure au
+// lieu de collecter, puis le module reprend
+let minijeuIntercalaire: LevelDef | null = null
+let minijeuForce = false
 // la CLEF DE CACHETTE achetée : les voiles du PROCHAIN tableau tombent
 let clefCachette = false
 // les achats déjà servis dans CETTE visite de l'Économat, et l'état
@@ -1218,6 +1224,7 @@ function reglagesTissage(m: ModuleCarte): ReglagesTissage {
     repos: voiePlan.reposParModule,
     dons: voiePlan.donsParModule,
     coffre: !!m.orbe,
+    minijeux: voiePlan.minijeuxParModule,
     // le biome du module pèse sa mécanique favorite (la carte le dit)
     favori: mecaniqueDuBiome(carte, m.biome),
     partFavori: voiePlan.partBiome / 100,
@@ -1301,6 +1308,7 @@ function applyLevel(): void {
       (auHub
         ? hubJoue()
         : (economatIntercalaire ??
+          minijeuIntercalaire ??
           voieIntercalaire ??
           playedLevels()[levelIndex] ??
           playedLevels()[0])),
@@ -4681,6 +4689,8 @@ function reprendreRun(save: RunSauvee): void {
   majCondensatUI()
   run.memoireGagnee = Math.max(0, Math.round(save.memoireGagnee ?? 0))
   economatIntercalaire = null
+  minijeuIntercalaire = null
+  minijeuForce = false
   economatVisiteCetteRun = save.economatVisite ?? false
   carteRun = litEtatCarteRun(save.carte, carte)
   // l'essence rognée par les sacrifices survit à la reprise — sinon un
@@ -7032,6 +7042,14 @@ function renderDescente(): void {
       },
       10,
       (v) => `${v} %`,
+    ),
+    dscCran(
+      'MINI-JEUX PAR MODULE',
+      'la pesée : verser exactement ce que la cuve demande, la précision paie en mémoire — 0 : aucun',
+      () => voiePlan.minijeuxParModule,
+      (v) => {
+        voiePlan.minijeuxParModule = v
+      },
     ),
     dscCran(
       'BONBONNES PAR MODULE',
@@ -13133,11 +13151,23 @@ function avanceSalle(): void {
     restart()
     return
   }
+  // LE MINI-JEU choisi à la porte s'intercale, comme l'économat-nœud : sa
+  // salle se joue, son sas mesure, puis le module reprend — la séquence
+  // écrite ne bouge pas
+  if (minijeuForce && minijeuIntercalaire) {
+    minijeuForce = false
+    economatIntercalaire = null // la pesée passe devant tout autre intercalaire
+    voieIntercalaire = null
+    restart()
+    return
+  }
   // L'ÉCONOMAT : on en SORT (la séquence reprend son cours), ou il
   // s'INTERCALE — une fois par run, à mi-descente. Le choix de salle fait
   // à la cérémonie (salleChoisie) attend sagement la sortie de l'annexe.
   if (economatIntercalaire && estEconomat(level)) {
     economatIntercalaire = null
+    minijeuIntercalaire = null
+    minijeuForce = false
     // on SORT de l'économat-nœud : la halte n'a pas de salle, la carte se
     // rouvre sur ses coursives — rien d'autre ne se joue ici
     const m = moduleEnCours()
@@ -14614,6 +14644,12 @@ const NOMS_NOEUD: Record<Exclude<NatureNoeud, 'salle'>, { etiquette: string; tit
     texte: 'Une chambre close. Un orbe d’essence y dort depuis onze ans.',
     icone: 'coffre',
   },
+  minijeu: {
+    etiquette: 'MINI-JEU',
+    titre: 'LA PESÉE',
+    texte: 'Une cuve graduée. Versez-y exactement ce qu’elle demande — ni plus, ni moins. La précision paie en mémoire.',
+    icone: 'minijeu',
+  },
 }
 
 /** LA PORTE D'UN NŒUD SANS SALLE : elle ne montre aucun plan — il n'y a pas
@@ -14671,7 +14707,55 @@ function ouvreNoeud(nature: Exclude<NatureNoeud, 'salle'>): void {
     case 'coffre':
       if (m) mbMontreCache(m)
       return
+    case 'minijeu': {
+      // LA PESÉE : le trait se tire à la graine du module et du rang (le même
+      // pour tous les postes en descente du jour), sur le volume de départ
+      // que la salle donnera au corps — l'essence rognée comprise
+      const gabarit = tableauPesee(1)
+      const volumeL = volumeDepart(gabarit) * params.litersPerParticle
+      const alea = aleaDeGraine(`${carteRun.tissage || graineRun()}@pesee${carteRun.niveau}`)
+      minijeuIntercalaire = tableauPesee(tirePesee(volumeL, alea))
+      minijeuForce = true
+      fermeMiseEnBonbonne()
+      avanceSalle()
+      return
+    }
   }
+}
+
+/** LE RÉSULTAT DE LA PESÉE : une carte, le trait, ce qu'on a versé, le
+ *  verdict et la mémoire gagnée — puis le module reprend (mbApresHalte). */
+function mbMontreResultatPesee(res: NotePesee, verseL: number, cibleL: number, suite: () => void): void {
+  miseEnBonbonne = true
+  mbBilanCourant = null
+  mbVeil.hidden = false
+  mbScene.classList.add('mb-compact')
+  mbScene.classList.remove('mb-large')
+  mbEl('mb-releve').hidden = true
+  mbEl('mb-etal').hidden = true
+  mbEl('mb-passer').hidden = true
+  mbEl('mb-choix').hidden = false
+  mbEtape = 'repos'
+  mbQuestion('LA PESÉE')
+  mbEl('mb-choix-titre').textContent = `TRAIT À ${fmtL(cibleL)} — VERSÉ ${fmtL(verseL)} · ÉCART ${Math.round(res.ecart * 100)} %`
+  const host = mbCartes()
+  host.innerHTML = ''
+  host.classList.add('mb-trio')
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'mb-carte mb-repos'
+  btn.style.gridColumn = '2'
+  btn.innerHTML =
+    `<i class="mb-repos-icone">⚗️</i><b>${VERDICTS_PESEE[res.verdict]}</b>` +
+    `<small>${res.memoire > 0 ? `+${res.memoire} mémoire` : 'rien — le trait est loin'} · continuer</small>`
+  let elu = false
+  btn.addEventListener('click', () => {
+    if (elu) return
+    elu = true
+    bande.ponctuation(res.verdict === 'juste' ? 'sting-record' : 'sting-collecte', 0.6)
+    suite()
+  })
+  host.appendChild(btn)
 }
 
 /** APRÈS UNE HALTE OU UNE RENCONTRE : le nœud est un nœud comme un autre,
@@ -15379,6 +15463,8 @@ function newExpedition(avecCarte = false): void {
   eclatsPrisRun.clear()
   purgeCondensat() // la bourse d'une run commence toujours vide
   economatIntercalaire = null
+  minijeuIntercalaire = null
+  minijeuForce = false
   economatVisiteCetteRun = false
   clefCachette = false
   // les PROVISIONS du comptoir se livrent maintenant — après la remise à
@@ -15437,6 +15523,8 @@ function retourAuLabo(): void {
   // LA PURGE : le labo confisque la matière de la run — la mémoire reste
   purgeCondensat()
   economatIntercalaire = null
+  minijeuIntercalaire = null
+  minijeuForce = false
   economatVisiteCetteRun = false
   clefCachette = false
   entrerHub()
@@ -15536,6 +15624,8 @@ function quitteAuMenu(): void {
   voieVues.clear()
   levelIndex = 0
   economatIntercalaire = null
+  minijeuIntercalaire = null
+  minijeuForce = false
   economatVisiteCetteRun = false
   clefCachette = false
   run.ended = false
@@ -17660,7 +17750,15 @@ function corpsImage(now: number): boolean {
   // « un peu d'aspiration » : un dixième du volume de départ en bonbonne
   // suffit — la route coûte de l'eau (chaque impulsion éjecte), exiger la
   // moitié du volume INITIAL rendait le bouton inatteignable en vraie partie
-  const aspireAssez = sim.swallowed >= Math.max(20, sim.baseVolume * 0.1)
+  // à la PESÉE, on peut peser dès la première goutte versée : c'est le
+  // joueur qui décide quand la cuve a son compte
+  const aspireAssez = estMiniJeu(level) ? sim.swallowed > 0 : sim.swallowed >= Math.max(20, sim.baseVolume * 0.1)
+  // le bouton dit ce que la cuve a bu contre le trait, en direct
+  const texteBouton =
+    estMiniJeu(level) && level.minijeu
+      ? `PESER — ${fmtL(sim.swallowed * params.litersPerParticle)} / ${fmtL(level.minijeu.cible)}`
+      : 'CONTINUER — CONCLURE L’ESSAI'
+  if (btnContinuer.textContent !== texteBouton) btnContinuer.textContent = texteBouton
   // Une traversée déclarée par un OUTIL de conception. La salle se conclut
   // pour de bon — cérémonie, condensat, descente qui avance — mais RIEN DE
   // CE QUI SE MÉRITE ne s'écrit : ni record du protocole, ni tableau
@@ -17789,6 +17887,18 @@ function corpsImage(now: number): boolean {
     )
     // la cinématique de CONCLUSION : par-dessus le bilan, qui l'attend derrière
     if (level.cineApres) void lireCineParCode(level.cineApres)
+  } else if (!tableauDone && !sim.dispersed && drunk && estMiniJeu(level) && level.minijeu) {
+    // LE SAS DE LA PESÉE mesure : ce que la cuve a bu contre le trait. Rien
+    // ne se consigne aux registres (pas un tableau du protocole), la mémoire
+    // se gagne au barème, la salle compte comme une halte — un rang de la
+    // descente, une salle du module — et le module reprend.
+    audio.collect()
+    const verseL = sim.swallowed * params.litersPerParticle
+    const res = notePesee(verseL, level.minijeu.cible)
+    bande.ponctuation(res.verdict === 'juste' ? 'sting-record' : 'sting-collecte', 0.85)
+    gagneMemoireRun(res.memoire)
+    minijeuIntercalaire = null
+    mbMontreResultatPesee(res, verseL, level.minijeu.cible, mbApresHalte)
   } else if (
     !tableauDone &&
     !sim.dispersed &&

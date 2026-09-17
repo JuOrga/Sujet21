@@ -830,6 +830,9 @@ export interface LevelDef {
   // est UNIVERSEL — tout module peut le piocher : c'est ce qui laisse la
   // bibliothèque jouable tant que le réétiquetage n'est pas fait.
   biome?: string
+  // LE MINI-JEU que ce tableau joue (src/game/minijeux.ts) : son sas ne
+  // collecte pas, il MESURE — la pesée y lit ce qu'on a versé contre le trait
+  minijeu?: { type: 'pesee'; cible: number }
   // Lit musical imposé par le tableau. Sans valeur, la cuve suit le
   // refroidissement de la coque (tiède → glaciale) : c'est le cas général,
   // les tableaux n'ont pas à choisir une musique pour exister.

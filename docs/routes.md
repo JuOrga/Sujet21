@@ -215,6 +215,7 @@ Ce qui existe, ce qui est proposé.
 | **Bonbonne oubliée (don)** | nœud de la mini-carte | de la réserve, ou du condensat si elle est pleine | bonbonnes par module |
 | **Cache** | nœud de la mini-carte | un orbe d'essence, une fois par poste | `orbe` du module (éditeur de carte) |
 | **Salle à prime** | un nœud salle, marqué d'un losange | la salle scellée : plus dure d'un cran, elle paie plus au sas — mémoire ×2, condensat ×2 ou tirage d'instrument garanti ; une par rang au plus, jamais au premier rang | salles à prime (LA DESCENTE) |
+| **Mini-jeu : la pesée** | nœud de la mini-carte, posé comme une halte | une cuve graduée, un trait tiré entre 35 et 70 % du volume de départ : on y verse exactement ce qu'elle demande — au trait la mémoire triple, proche elle vaut, loin la moitié, ratée rien ; la cuve garde ce qu'on lui donne | mini-jeux par module (LA DESCENTE) ; `BAREME_PESEE` (`minijeux.ts`) |
 
 Le modèle de carte garde les natures de module `economat`, `repos`, `don`,
 `inconnu` et `coffre` : l'éditeur peut encore poser une halte ou un « ? »
@@ -231,7 +232,7 @@ ou comptée, où la physique EST le jeu :
 
 | Mini-jeu | Ce qu'on fait | Ce qu'on mesure | Ce qu'on gagne |
 | --- | --- | --- | --- |
-| **La pesée** | remplir une cuve graduée avec exactement N litres de soi, ni plus ni moins | l'écart au trait | la précision paie en mémoire : ±5 % ×3, ±15 % ×1 |
+| **La pesée** — *fait le 17/09* | remplir une cuve graduée avec exactement N litres de soi, ni plus ni moins | l'écart au trait | la précision paie en mémoire : ±5 % ×3, ±15 % ×1, ±30 % ×½ |
 | **La scission** | se couper en deux masses égales sur deux plateaux de balance | l'égalité des deux masses au bout de dix secondes | un instrument si la balance est à l'équilibre |
 | **Le tamis** | passer une grille fine sans perdre plus de X % — en vapeur c'est facile, en eau c'est un art | le volume perdu | du condensat au prorata de ce qui passe |
 | **La tenue** | rester en glace sur une plaque chaude le plus longtemps possible | le temps avant la fonte | une prime de glace au sas |
@@ -274,7 +275,7 @@ code sans nom.
 | **Les manques du pool** | l'inventaire par biome et par moment que ce biome joue réellement (une ligne par couple, une case par mécanique ; une case à 0 est un tableau à écrire, et la liste sous la grille les nomme avec le code à donner), le compte des tableaux muets, et le relevé des portes générées faute de tableau sur ce poste |
 | La rampe | recul du sommet, respiration, finale |
 | La posture des rangs | rangs sans danger, cadence labyrinthe, cadence contraste, figures au début et ensuite |
-| **Les voies et les rencontres** | **part de rencontres** (0 à 60 %), **rang minimal**, **bifurcation** (0 à 100 %), **salles à prime** (0 à 40 % des rangs), **part du biome** (0 à 100 % : la chance qu'une voie prenne la mécanique favorite de son biome), **économats**, **alcôves** et **bonbonnes par module** (0 à 2) |
+| **Les voies et les rencontres** | **part de rencontres** (0 à 60 %), **rang minimal**, **bifurcation** (0 à 100 %), **salles à prime** (0 à 40 % des rangs), **part du biome** (0 à 100 % : la chance qu'une voie prenne la mécanique favorite de son biome), **économats**, **alcôves**, **mini-jeux** et **bonbonnes par module** (0 à 2) |
 | **Ce que pèse une route** | **réserve** et **condensat d'une halte**, **plancher d'essence** (10 à 90 %), **prime de mémoire par cran** (0 à 300 %) |
 | La pioche | les quatre poids de l'écart au cahier |
 
@@ -383,8 +384,9 @@ pas**. Chaque cible touchée est une goutte perdue. C'est la phrase du jeu
    une route »).
 2. **La coque qui compose avec le climat** (§5.1) — le plus grand effet
    pour le moins de code : une lecture de plus dans `climatDuModule`.
-3. **Un mini-jeu** pour prouver la forme (§3.2, la pesée), comme nature de
-   nœud de la mini-carte.
+3. ~~Un mini-jeu pour prouver la forme~~ — fait le 17/09 : la pesée est
+   une nature de nœud de la mini-carte (`minijeux.ts`) ; les cinq autres
+   suivent la même forme (une salle construite en code, un sas qui mesure).
 4. **Les traces des Semblables** (§5.4) — le lore qui s'écrit tout seul.
 5. **L'alerte** (§5.5), puis **les coursives à deux sens** (§5.3), puis
    **les trois départs** (§5.6) — chacun redessine la carte, et c'est le

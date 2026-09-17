@@ -43,6 +43,9 @@ export interface ReglagesTissage {
   repos: number
   dons: number
   coffre: boolean
+  /** LES MINI-JEUX par module (la pesée…) : des salles où la physique est le
+   *  jeu, posées comme des haltes — un nœud, une porte, une salle construite */
+  minijeux: number
   /** LE BIOME PÈSE : la mécanique que le biome du module favorise (la
    *  carte le dit — la glace en cryo, la vapeur en chaud), null sans ;
    *  `partFavori` (0..1) : la chance qu'une voie la prenne. Jamais les
@@ -69,6 +72,7 @@ export const TISSAGE_DEFAUT: ReglagesTissage = {
   repos: 1,
   dons: 0,
   coffre: false,
+  minijeux: 1,
   favori: null,
   partFavori: 0,
   partPrime: 0.15,
@@ -79,7 +83,7 @@ export const TISSAGE_DEFAUT: ReglagesTissage = {
  *  une HALTE — l'économat, l'alcôve de repos, la bonbonne oubliée, la cache
  *  à orbe. Le concepteur a tranché (16/09) : les haltes vivent dans la
  *  mini-carte, jamais sur la grande carte, qui ne montre que des biomes. */
-export type NatureNoeud = 'salle' | 'evenement' | 'economat' | 'repos' | 'don' | 'coffre'
+export type NatureNoeud = 'salle' | 'evenement' | 'economat' | 'repos' | 'don' | 'coffre' | 'minijeu'
 
 /** LA PRIME D'UN NŒUD : une salle « scellée », plus dure d'un cran, qui
  *  paie plus au sas — la mémoire double, le condensat double, ou un tirage
@@ -95,7 +99,7 @@ export const NOMS_PRIME: Record<PrimeNoeud, string> = {
   condensat: 'condensat ×2',
   tirage: 'tirage garanti',
 }
-export const HALTES_NOEUD: readonly NatureNoeud[] = ['economat', 'repos', 'don', 'coffre']
+export const HALTES_NOEUD: readonly NatureNoeud[] = ['economat', 'repos', 'don', 'coffre', 'minijeu']
 
 export interface NoeudVoie {
   /** la salle du module, 0-based */
@@ -227,6 +231,7 @@ export function tisseMiniCarte(
     ...Array<NatureNoeud>(Math.max(0, Math.floor(reglages.repos))).fill('repos'),
     ...Array<NatureNoeud>(Math.max(0, Math.floor(reglages.dons))).fill('don'),
     ...(reglages.coffre ? (['coffre'] as NatureNoeud[]) : []),
+    ...Array<NatureNoeud>(Math.max(0, Math.floor(reglages.minijeux))).fill('minijeu'),
   ]
   for (const nature of demandes) {
     const tirage = alea()
@@ -279,6 +284,7 @@ export function typesDuModule(mc: MiniCarte): string[] {
   if (noeuds.some((n) => n.nature === 'repos')) out.push('alcôve')
   if (noeuds.some((n) => n.nature === 'don')) out.push('bonbonne')
   if (noeuds.some((n) => n.nature === 'coffre')) out.push('cache')
+  if (noeuds.some((n) => n.nature === 'minijeu')) out.push('mini-jeu')
   return out
 }
 
@@ -344,6 +350,7 @@ export function dessinMiniCarteSVG(
     repos: 'l’alcôve de repos — un souffle, de la réserve ou du condensat',
     don: 'une bonbonne oubliée',
     coffre: 'une cache — un orbe d’essence y dort',
+    minijeu: 'un mini-jeu — la pesée : verser exactement ce que la cuve demande',
   }
   const nom = (nd: NoeudVoie): string =>
     nd.nature === 'evenement'
@@ -428,5 +435,6 @@ export const ICONES_MINI_CARTE =
   // la bonbonne oubliée : le flacon
   '<symbol id="mv-i-don" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 3h5M10 3v4.5L6.5 12v7a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-7L14 7.5V3"/><path d="M7.5 15.5h9" opacity=".6"/></g></symbol>' +
   // la cache : le losange, l'orbe qui dort
+  '<symbol id="mv-i-minijeu" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h10v16a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2Z"/><path d="M7 8h3M7 12h3M7 16h3"/><path d="M9 13.5c1.5-1 4.5-1 6 0V19H9Z" fill="currentColor" opacity=".5" stroke="none"/></g></symbol>' +
   '<symbol id="mv-i-coffre" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3 21 12 12 21 3 12Z"/><path d="M12 8.5 15.5 12 12 15.5 8.5 12Z" fill="currentColor" opacity=".55"/></g></symbol>' +
   '</defs>'
