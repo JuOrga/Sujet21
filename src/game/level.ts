@@ -548,6 +548,49 @@ export interface ChasseDef {
 export const CHASSE_ALLURE_DEFAUT = 350
 export const CHASSE_DUREE_DEFAUT = 3
 
+// UN PUITS DE GRAVITÉ : un point du tableau qui ATTIRE le corps. Pas un
+// courant — le sas, le vortex et les chasses sont des champs de VITESSES,
+// faits pour converger, et leurs notes disent pourquoi : « une force pure
+// ferait orbiter ». Ici c'est le but : le puits est la seule ACCÉLÉRATION
+// pure du solveur, la seule qui fasse orbiter. Sa loi (game/puits.ts) :
+// un CŒUR HARMONIQUE (a = force · r / rayon — pas de singularité, orbites
+// elliptiques centrées, période indépendante du rayon : dans le cœur, tout
+// tourne en T = 2π·√(rayon/force)) et un halo KÉPLÉRIEN au-delà
+// (a = force · rayon² / r²), continu au bord du cœur. Une portée optionnelle
+// éteint le champ en fondu sur son dernier quart. Le concepteur (17/09) :
+// « des puits de gravité permettant d'obtenir des orbites du volume ».
+export interface PuitsDef {
+  x: number
+  y: number
+  // L'ACCÉLÉRATION AU BORD DU CŒUR (u/s²) — la « masse » du puits. Absente :
+  // PUITS_FORCE_DEFAUT.
+  force?: number
+  // LE RAYON DU CŒUR (u). Absent : PUITS_RAYON_DEFAUT.
+  rayon?: number
+  // LA PORTÉE (u) au-delà de laquelle le puits n'agit plus, en fondu
+  // linéaire sur le dernier quart (PUITS_FONDU). Absente : tout le tableau.
+  portee?: number
+}
+// LES ORBITES VIVENT DANS LE CŒUR, LA LISIÈRE DÉCHIRE. Mesuré le 17/09
+// (sim/puits.spec.ts) : un corps de 400 ou 900 particules lancé en orbite
+// circulaire À L'INTÉRIEUR du cœur (0,5 à 0,8 rayon) garde 100 % de lui-même
+// sur quatre secondes et tient son rayon à ±1 % — la marée harmonique est
+// COMPRESSIVE (deux particules sont rappelées l'une vers l'autre à
+// proportion de leur écart), elle aide la cohésion. Lancé AU BORD du cœur,
+// il en perd 45 % : la moitié du corps est dans le halo képlérien, où la
+// marée s'inverse et ÉTIRE (≈ 3Ω²·r), et la lisière est une ligne de
+// cisaillement. Règle de conception : une orbite se pose à moins de 0,8
+// rayon du puits, le halo ne sert qu'aux transferts, traversés vite.
+// 300 u : un cœur qui loge une orbite de 200 u pour un corps de 900 (≈ 105 u
+// de rayon) sans approcher la lisière. 540 u/s² : T = 2π·√(300/540) = 4,7 s
+// pour toute orbite du cœur ; vitesse circulaire au bord √(540·300) = 402 u/s,
+// à 0,7 rayon 282 u/s ; vitesse d'évasion au bord 569 u/s, loin sous
+// maxSpeed (3 000). Une éjection de 10 % du corps à 1 400 u/s donne ≈ 140 u/s :
+// de quoi courber une orbite à vue, à un coût qui se compte.
+export const PUITS_RAYON_DEFAUT = 300
+export const PUITS_FORCE_DEFAUT = 540
+export const PUITS_FONDU = 0.25
+
 // Une CACHETTE : un pan de la carte voilé tant que l'échantillon n'y est
 // pas entré — le voile se dissipe à l'entrée du corps et reste levé pour
 // l'essai (Recommencer re-voile). Purement visuel : la physique du tableau
@@ -756,6 +799,7 @@ export interface LevelDef {
   cibles?: CibleDef[]
   portes?: PorteDef[]
   chasses?: ChasseDef[] // courants de poussée : l'éjection sans déchirure
+  puits?: PuitsDef[] // puits de gravité : le corps y orbite
   rails?: RailDef[]
   caches?: CacheDef[] // cachettes voilées (brouillard levé à l'entrée du corps)
   condensats?: CondensatPose[] // pastilles posées main (sinon : semis auto)

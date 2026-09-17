@@ -14,6 +14,8 @@ import type { NoyauxWasm } from './wasm'
 import { SpatialGrid } from './grid'
 import { makeKernels, computeRestDensity, type Kernels } from './kernels'
 import { labelComponents } from './components'
+import { accelerationPuits, type Accel } from '../game/puits'
+import type { PuitsDef } from '../game/level'
 import { boxContact, Sponge, type ClosestPoint } from './obstacles'
 import type { FormeBox } from '../game/formes'
 import {
@@ -1423,6 +1425,20 @@ export class FluidSim {
     }
   }
 
+  // L'IMPULSION DU TABLEAU : le corps naît LANCÉ, à une vitesse exacte —
+  // la seule autre façon de lui donner une vitesse précise en jeu est une
+  // chasse (un servo) ou le dash de vapeur. Posée sur toutes les particules
+  // du corps (le patron du dash), puis les statistiques à jour pour que la
+  // première image, et la ligne prédite, lisent déjà cette vitesse.
+  lanceCorps(vx: number, vy: number): void {
+    for (let i = 0; i < this.count; i++) {
+      if (this.kind[i] !== KIND_PLAYER) continue
+      this.velX[i] = vx
+      this.velY[i] = vy
+    }
+    this.updatePlayerStats()
+  }
+
   // Le dash de vapeur (« air dash » à la Ori) : UNE impulsion qui envoie
   // tout le nuage vers le point visé — pas de recul, pas d'éjection, pas de
   // pilotage continu. Les impulsions sont COMPTÉES : la réserve est pleine
@@ -1766,6 +1782,31 @@ export class FluidSim {
       this.velY[i] += (ty - this.velY[i]) * k
     }
   }
+
+  // LES PUITS DE GRAVITÉ : la seule ACCÉLÉRATION PURE du solveur. Les trois
+  // champs ci-dessus sont des servos de vitesse, faits pour converger — leurs
+  // notes disent qu'« une force pure ferait orbiter » ; un puits est fait
+  // pour ça. Appliqué AVANT le pas, comme les autres champs : l'impulsion
+  // entre dans la prédiction (prd = pos + vel·dt), la pression garde le corps
+  // d'un seul tenant, la re-dérivation des vitesses la conserve. Aucun filtre
+  // d'état : la glace la reçoit par la moyenne d'icePass (translation, et
+  // l'écart devient une marée en rotation) ; la vapeur la subit directement,
+  // mais gasDrag (1,3/s) la fait spiraler vers le cœur — un nuage n'orbite
+  // pas, il est capturé (docs/puits.md). La loi vit dans game/puits.ts, la
+  // même que celle du prédicteur : ce que la ligne dit est ce que le corps
+  // subit.
+  applyPuits(puits: readonly PuitsDef[], dt: number): void {
+    if (puits.length === 0) return
+    const acc = this.accPuits
+    for (let i = 0; i < this.count; i++) {
+      acc.ax = 0
+      acc.ay = 0
+      if (!accelerationPuits(puits, this.posX[i], this.posY[i], acc)) continue
+      this.velX[i] += acc.ax * dt
+      this.velY[i] += acc.ay * dt
+    }
+  }
+  private readonly accPuits: Accel = { ax: 0, ay: 0 }
 
   // Re-tri spatial périodique : après une séparation (gerbe, éclaboussure),
   // des particules voisines dans l'ESPACE se retrouvent éparpillées dans les
