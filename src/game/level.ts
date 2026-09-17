@@ -831,8 +831,10 @@ export interface LevelDef {
   // bibliothèque jouable tant que le réétiquetage n'est pas fait.
   biome?: string
   // LE MINI-JEU que ce tableau joue (src/game/minijeux.ts) : son sas ne
-  // collecte pas, il MESURE — la pesée y lit ce qu'on a versé contre le trait
-  minijeu?: { type: 'pesee'; cible: number }
+  // collecte pas, il MESURE — le couperet y pèse ce que la lame tranche du
+  // corps au-delà du trait. Le type est déclaré ici en structure pour que
+  // level.ts n'importe pas minijeux.ts (qui importe level.ts).
+  minijeu?: { type: 'couperet'; cible: number; trait: number; rythme: { periode: number; garde: number } }
   // Lit musical imposé par le tableau. Sans valeur, la cuve suit le
   // refroidissement de la coque (tiède → glaciale) : c'est le cas général,
   // les tableaux n'ont pas à choisir une musique pour exister.

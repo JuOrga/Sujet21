@@ -43,7 +43,7 @@ export interface ReglagesTissage {
   repos: number
   dons: number
   coffre: boolean
-  /** LES MINI-JEUX par module (la pesée…) : des salles où la physique est le
+  /** LES MINI-JEUX par module (le couperet…) : des salles où la physique est le
    *  jeu, posées comme des haltes — un nœud, une porte, une salle construite */
   minijeux: number
   /** LE BIOME PÈSE : la mécanique que le biome du module favorise (la
@@ -350,7 +350,7 @@ export function dessinMiniCarteSVG(
     repos: 'l’alcôve de repos — un souffle, de la réserve ou du condensat',
     don: 'une bonbonne oubliée',
     coffre: 'une cache — un orbe d’essence y dort',
-    minijeu: 'un mini-jeu — la pesée : verser exactement ce que la cuve demande',
+    minijeu: 'un mini-jeu — le couperet : laisser dépasser du trait exactement ce que la lame doit trancher',
   }
   const nom = (nd: NoeudVoie): string =>
     nd.nature === 'evenement'

@@ -121,7 +121,16 @@ import {
   PRIMES,
 } from './game/voiesModule'
 import { CLE_MANQUES, inventairePool, litManques, noteManque, type Manque } from './game/manques'
-import { estMiniJeu, notePesee, tableauPesee, tirePesee, VERDICTS_PESEE, type NotePesee } from './game/minijeux'
+import {
+  compteAuDela,
+  estMiniJeu,
+  noteTrait,
+  phaseCouperet,
+  tableauCouperet,
+  tireTrait,
+  VERDICTS_TRAIT,
+  type NoteTrait,
+} from './game/minijeux'
 import {
   ditEffet,
   offresDe,
@@ -954,10 +963,15 @@ const carteAUnEconomat = (): boolean => carte.modules.some((m) => m.type === 'ec
 // première traversée ; armé en salle, il ouvre la suivante.
 let economatForce = false
 // LE MINI-JEU choisi à la porte de la mini-carte : sa salle, construite en
-// code (minijeux.ts), s'intercale comme l'économat-nœud ; son sas mesure au
-// lieu de collecter, puis le module reprend
+// code (minijeux.ts), s'intercale comme l'économat-nœud ; sa lame pèse au
+// lieu que le sas collecte, puis le module reprend
 let minijeuIntercalaire: LevelDef | null = null
 let minijeuForce = false
+// LE COUPERET en cours : la lame était-elle baissée au sous-pas précédent
+// (la pesée se fait à l'instant où elle tombe, une seule fois), et ce
+// qu'elle a tranché au-delà du trait — posé, la salle conclut à l'image
+let couperetLamePrec = false
+let couperetResultat: { peseL: number } | null = null
 // la CLEF DE CACHETTE achetée : les voiles du PROCHAIN tableau tombent
 let clefCachette = false
 // les achats déjà servis dans CETTE visite de l'Économat, et l'état
@@ -7045,7 +7059,7 @@ function renderDescente(): void {
     ),
     dscCran(
       'MINI-JEUX PAR MODULE',
-      'la pesée : verser exactement ce que la cuve demande, la précision paie en mémoire — 0 : aucun',
+      'le couperet : laisser dépasser du trait exactement ce que la lame doit trancher, la précision paie en mémoire — 0 : aucun',
       () => voiePlan.minijeuxParModule,
       (v) => {
         voiePlan.minijeuxParModule = v
@@ -8545,6 +8559,39 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
         g.stroke()
       }
     }
+  }
+
+  // LE COUPERET : le trait au sol (une ligne vive à travers le col), le
+  // compte à rebours de la lame et, en direct, ce que le corps laisse
+  // dépasser contre le trait demandé — c'est la jauge du mini-jeu, lue dans
+  // sa silhouette ET en chiffres, pour qu'on sache ce que la lame va peser
+  if (level.minijeu?.type === 'couperet') {
+    const mj = level.minijeu
+    const haut = S(mj.trait, 800)
+    const bas = S(mj.trait, -800)
+    g.save()
+    g.strokeStyle = 'rgba(255,200,120,0.55)'
+    g.setLineDash([6, 8])
+    g.lineWidth = Math.max(1, 2 * z)
+    g.beginPath()
+    g.moveTo(haut.sx, haut.sy)
+    g.lineTo(bas.sx, bas.sy)
+    g.stroke()
+    g.setLineDash([])
+    const n = compteAuDela(sim.count, sim.posX, mj.trait, (i) => sim.kind[i] === KIND_PLAYER)
+    const auDela = couperetResultat ? couperetResultat.peseL : n * params.litersPerParticle
+    const ph = phaseCouperet(run.tableauTime, mj.rythme)
+    const lame = couperetResultat ? 'LAME TOMBÉE' : ph.tombee ? 'LAME' : `LAME DANS ${ph.avant.toFixed(1).replace('.', ',')} s`
+    const t = Math.max(12, Math.min(28, 90 * z))
+    const anc = S(mj.trait, -340)
+    g.textAlign = 'center'
+    g.font = `600 ${Math.round(t * 0.8)}px ui-monospace, monospace`
+    g.fillStyle = ph.tombee || couperetResultat ? 'rgba(255,110,110,0.95)' : ph.avant < 1 ? 'rgba(255,200,120,0.95)' : 'rgba(200,220,235,0.8)'
+    g.fillText(lame, anc.sx, anc.sy)
+    g.font = `${Math.round(t)}px ui-monospace, monospace`
+    g.fillStyle = 'rgba(255,255,255,0.92)'
+    g.fillText(`AU-DELÀ ${fmtL(auDela)} / ${fmtL(mj.cible)}`, anc.sx, anc.sy + t * 1.25)
+    g.restore()
   }
 
   // chasses : des courants de poussée — des chevrons qui FILENT dans le sens
@@ -12409,9 +12456,9 @@ function lanceManoeuvre(quoi: string): void {
         )
         break
       }
-      case 'pesee': {
-        // la salle du mini-jeu, seule : on la joue, le sas dit le verdict
-        lancePeseeEssai()
+      case 'couperet': {
+        // la salle du mini-jeu, seule : on la joue, la lame dit le verdict
+        lanceCouperetEssai()
         pupitreEl.hidden = true
         closeHome()
         break
@@ -12676,6 +12723,7 @@ function majPortes(dt: number): void {
     if (sequenceur.etat.brechesOuvertes.has(i))
       laserEtat.portesOuvertes[i] = true
   }
+  majCouperet()
   // un tableau SANS émetteur n'attend rien d'un faisceau : ses portes se
   // posent dès la première image (voir posePortes)
   if (!laserEtat.portesPose && (level.lasers?.length ?? 0) === 0) posePortes()
@@ -12709,6 +12757,30 @@ function majPortes(dt: number): void {
   }
 }
 
+/** LA LAME DU COUPERET : la première porte du tableau, tenue au rythme du
+ *  mini-jeu — ouverte, puis baissée `garde` secondes toutes les `periode`
+ *  secondes (phaseCouperet, sur le temps simulé de la salle). LA PESÉE se
+ *  fait à l'instant précis où elle tombe, AVANT que le solveur ne pose la
+ *  paroi : on compte ce qui, du corps, dépasse le trait — les gouttes libres
+ *  ne comptent pas. La lame qui tombe à vide (rien du corps au-delà) se
+ *  relève et le rythme continue ; celle qui tranche quelque chose reste
+ *  baissée : la part est scellée dans la cuve, la salle conclut à l'image. */
+function majCouperet(): void {
+  const mj = level.minijeu
+  if (!mj || mj.type !== 'couperet' || (level.portes?.length ?? 0) === 0) return
+  if (couperetResultat) {
+    laserEtat.portesOuvertes[0] = false
+    return
+  }
+  const ph = phaseCouperet(run.tableauTime, mj.rythme)
+  if (ph.tombee && !couperetLamePrec) {
+    const n = compteAuDela(sim.count, sim.posX, mj.trait, (i) => sim.kind[i] === KIND_PLAYER)
+    if (n > 0) couperetResultat = { peseL: n * params.litersPerParticle }
+  }
+  couperetLamePrec = ph.tombee
+  laserEtat.portesOuvertes[0] = !ph.tombee
+}
+
 /** LA POSE : chaque porte prend l'état de son canal d'un coup, sans jouer
  *  sa matérialisation. Appelée une fois par tableau, quand l'état des
  *  canaux est connu. Sans elle, une porte ouverte dès le départ partait de
@@ -12735,6 +12807,8 @@ function resetLasers(): void {
   laserEtat.portesAvance = (level.portes ?? []).map(() => 1)
   laserEtat.portesPose = false
   laserEtat.doorsKey = ''
+  couperetLamePrec = false
+  couperetResultat = null
   laserEtat.chassesActives = (level.chasses ?? []).map(() => false)
   laserEtat.chasseBouffee = (level.chasses ?? []).map(() => 0)
   lastRailTime = 0
@@ -13163,7 +13237,7 @@ function avanceSalle(): void {
   // écrite ne bouge pas
   if (minijeuForce && minijeuIntercalaire) {
     minijeuForce = false
-    economatIntercalaire = null // la pesée passe devant tout autre intercalaire
+    economatIntercalaire = null // le mini-jeu passe devant tout autre intercalaire
     voieIntercalaire = null
     restart()
     return
@@ -14715,13 +14789,13 @@ function ouvreNoeud(nature: Exclude<NatureNoeud, 'salle'>): void {
       if (m) mbMontreCache(m)
       return
     case 'minijeu': {
-      // LA PESÉE : le trait se tire à la graine du module et du rang (le même
-      // pour tous les postes en descente du jour), sur le volume de départ
-      // que la salle donnera au corps — l'essence rognée comprise
-      const gabarit = tableauPesee(1)
+      // LE COUPERET : le trait se tire à la graine du module et du rang (le
+      // même pour tous les postes en descente du jour), sur le volume de
+      // départ que la salle donnera au corps — l'essence rognée comprise
+      const gabarit = tableauCouperet(1)
       const volumeL = volumeDepart(gabarit) * params.litersPerParticle
-      const alea = aleaDeGraine(`${carteRun.tissage || graineRun()}@pesee${carteRun.niveau}`)
-      minijeuIntercalaire = tableauPesee(tirePesee(volumeL, alea))
+      const alea = aleaDeGraine(`${carteRun.tissage || graineRun()}@couperet${carteRun.niveau}`)
+      minijeuIntercalaire = tableauCouperet(tireTrait(volumeL, alea))
       minijeuForce = true
       fermeMiseEnBonbonne()
       avanceSalle()
@@ -14730,9 +14804,9 @@ function ouvreNoeud(nature: Exclude<NatureNoeud, 'salle'>): void {
   }
 }
 
-/** LE RÉSULTAT DE LA PESÉE : une carte, le trait, ce qu'on a versé, le
+/** LE RÉSULTAT DU COUPERET : une carte, le trait, ce que la lame a pesé, le
  *  verdict et la mémoire gagnée — puis le module reprend (mbApresHalte). */
-function mbMontreResultatPesee(res: NotePesee, verseL: number, cibleL: number, suite: () => void): void {
+function mbMontreResultatCouperet(res: NoteTrait, peseL: number, cibleL: number, suite: () => void): void {
   miseEnBonbonne = true
   mbBilanCourant = null
   mbVeil.hidden = false
@@ -14743,8 +14817,8 @@ function mbMontreResultatPesee(res: NotePesee, verseL: number, cibleL: number, s
   mbEl('mb-passer').hidden = true
   mbEl('mb-choix').hidden = false
   mbEtape = 'repos'
-  mbQuestion('LA PESÉE')
-  mbEl('mb-choix-titre').textContent = `TRAIT À ${fmtL(cibleL)} — VERSÉ ${fmtL(verseL)} · ÉCART ${Math.round(res.ecart * 100)} %`
+  mbQuestion('LE COUPERET')
+  mbEl('mb-choix-titre').textContent = `TRAIT À ${fmtL(cibleL)} — TRANCHÉ ${fmtL(peseL)} · ÉCART ${Math.round(res.ecart * 100)} %`
   const host = mbCartes()
   host.innerHTML = ''
   host.classList.add('mb-trio')
@@ -14753,7 +14827,7 @@ function mbMontreResultatPesee(res: NotePesee, verseL: number, cibleL: number, s
   btn.className = 'mb-carte mb-repos'
   btn.style.gridColumn = '2'
   btn.innerHTML =
-    `<i class="mb-repos-icone">⚗️</i><b>${VERDICTS_PESEE[res.verdict]}</b>` +
+    `<i class="mb-repos-icone">🔪</i><b>${VERDICTS_TRAIT[res.verdict]}</b>` +
     `<small>${res.memoire > 0 ? `+${res.memoire} mémoire` : 'rien — le trait est loin'} · continuer</small>`
   let elu = false
   btn.addEventListener('click', () => {
@@ -15447,23 +15521,23 @@ function restart(): void {
   restart()
 }
 
-// JOUER LA PESÉE EN ESSAI (le pupitre, et la sonde __pesee(cible?)) : la
-// salle du mini-jeu seule, hors run — le sas mesure et dit le verdict, rien
-// ne se gagne, retour au protocole. Le trait : celui donné, sinon tiré au
-// hasard du poste sur le volume de départ de la salle. C'est ainsi qu'on
+// JOUER LE COUPERET EN ESSAI (le pupitre, et la sonde __couperet(cible?)) :
+// la salle du mini-jeu seule, hors run — la lame pèse et dit le verdict,
+// rien ne se gagne, retour au protocole. Le trait : celui donné, sinon tiré
+// au hasard du poste sur le volume de départ de la salle. C'est ainsi qu'on
 // éprouve un mini-jeu sans lancer de descente (le concepteur, 17/09).
-function lancePeseeEssai(cible?: number): void {
-  const gabarit = tableauPesee(1)
+function lanceCouperetEssai(cible?: number): void {
+  const gabarit = tableauCouperet(1)
   const volumeL = volumeDepart(gabarit) * params.litersPerParticle
-  const trait = cible !== undefined && Number.isFinite(cible) && cible > 0 ? Math.round(cible * 10) / 10 : tirePesee(volumeL, Math.random)
+  const trait = cible !== undefined && Number.isFinite(cible) && cible > 0 ? Math.round(cible * 10) / 10 : tireTrait(volumeL, Math.random)
   if (miseEnBonbonne) fermeMiseEnBonbonne()
   auHub = false
   hasPlayed = true
   document.body.classList.add('playing')
-  testLevel = tableauPesee(trait)
+  testLevel = tableauCouperet(trait)
   restart()
 }
-;(window as unknown as { __pesee: (cible?: number) => void }).__pesee = lancePeseeEssai
+;(window as unknown as { __couperet: (cible?: number) => void }).__couperet = lanceCouperetEssai
 
 function newExpedition(avecCarte = false): void {
   levelIndex = 0
@@ -17269,6 +17343,9 @@ function corpsImage(now: number): boolean {
           sim.applyVortex(vortex.x, vortex.y, params.dt, life)
           vortex.timer -= params.dt
         }
+        // au COUPERET, la cuve attend sa part : le sas n'aspire rien tant que
+        // la lame n'a pas tranché — sinon arroser le sas de loin pèserait
+        sim.exitRadiusFactor = level.minijeu?.type === 'couperet' && !couperetResultat ? 0 : lev('sasPortee')
         sim.applyExitSuction(exitMouth.x, exitMouth.y, params.dt)
         // les CHASSES qui soufflent : le courant s'applique au pas, comme le
         // sas — et la bouffée d'une chasse déclenchée s'épuise au temps de jeu
@@ -17775,14 +17852,10 @@ function corpsImage(now: number): boolean {
   // « un peu d'aspiration » : un dixième du volume de départ en bonbonne
   // suffit — la route coûte de l'eau (chaque impulsion éjecte), exiger la
   // moitié du volume INITIAL rendait le bouton inatteignable en vraie partie
-  // à la PESÉE, on peut peser dès la première goutte versée : c'est le
-  // joueur qui décide quand la cuve a son compte
-  const aspireAssez = estMiniJeu(level) ? sim.swallowed > 0 : sim.swallowed >= Math.max(20, sim.baseVolume * 0.1)
-  // le bouton dit ce que la cuve a bu contre le trait, en direct
-  const texteBouton =
-    estMiniJeu(level) && level.minijeu
-      ? `PESER — ${fmtL(sim.swallowed * params.litersPerParticle)} / ${fmtL(level.minijeu.cible)}`
-      : 'CONTINUER — CONCLURE L’ESSAI'
+  // au COUPERET, rien ne s'aspire : c'est la lame qui conclut, jamais le
+  // bouton — la cuve ne boit qu'après la chute, et la salle finit à l'image
+  const aspireAssez = estMiniJeu(level) ? false : sim.swallowed >= Math.max(20, sim.baseVolume * 0.1)
+  const texteBouton = 'CONTINUER — CONCLURE L’ESSAI'
   if (btnContinuer.textContent !== texteBouton) btnContinuer.textContent = texteBouton
   // Une traversée déclarée par un OUTIL de conception. La salle se conclut
   // pour de bon — cérémonie, condensat, descente qui avance — mais RIEN DE
@@ -17810,8 +17883,12 @@ function corpsImage(now: number): boolean {
       !input.paused &&
       document.body.classList.contains('playing'),
   )
+  // un mini-jeu ne se conclut jamais en atteignant la cuve : c'est sa lame
+  // qui tranche — sans quoi nager dans la cuve avant la chute finirait la
+  // salle comme une salle ordinaire
   const reached =
     !drainActive &&
+    !estMiniJeu(level) &&
     pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit)
   // au HUB, pas d'engloutissement à attendre : dès que le CORPS est dans la
   // bouche du sas, la run part — le sas de lancement est une porte, pas un
@@ -17882,22 +17959,24 @@ function corpsImage(now: number): boolean {
       effaceRun()
       newExpedition(true)
     })
-  } else if (!tableauDone && !sim.dispersed && drunk && estMiniJeu(level) && level.minijeu) {
-    // LE SAS DE LA PESÉE mesure : ce que la cuve a bu contre le trait. Rien
-    // ne se consigne aux registres (pas un tableau du protocole), la mémoire
-    // se gagne au barème, la salle compte comme une halte — un rang de la
-    // descente, une salle du module — et le module reprend. EN ESSAI (le
-    // pupitre, __pesee) : le verdict s'affiche, rien ne se gagne, retour au
-    // protocole — c'est ainsi qu'on éprouve le mini-jeu sans lancer de run.
+  } else if (!tableauDone && !sim.dispersed && couperetResultat && estMiniJeu(level) && level.minijeu) {
+    // LA LAME DU COUPERET a pesé : ce qu'elle a tranché au-delà du trait,
+    // contre le trait demandé. Rien ne se consigne aux registres (pas un
+    // tableau du protocole), la mémoire se gagne au barème, la salle compte
+    // comme une halte — un rang de la descente, une salle du module — et le
+    // module reprend. EN ESSAI (le pupitre, __couperet) : le verdict
+    // s'affiche, rien ne se gagne, retour au protocole — c'est ainsi qu'on
+    // éprouve le mini-jeu sans lancer de run.
     audio.collect()
-    const verseL = sim.swallowed * params.litersPerParticle
-    const res = notePesee(verseL, level.minijeu.cible)
+    const peseL = couperetResultat.peseL
+    couperetResultat = null
+    const res = noteTrait(peseL, level.minijeu.cible)
     bande.ponctuation(res.verdict === 'juste' ? 'sting-record' : 'sting-collecte', 0.85)
     if (testLevel) {
       run.ended = true
       showOverlay(
-        `LA PESÉE — ${VERDICTS_PESEE[res.verdict]}`,
-        `${fmtL(verseL)} versés pour ${fmtL(level.minijeu.cible)} demandés — écart ${Math.round(res.ecart * 100)} %. ` +
+        `LE COUPERET — ${VERDICTS_TRAIT[res.verdict]}`,
+        `${fmtL(peseL)} tranchés pour ${fmtL(level.minijeu.cible)} demandés — écart ${Math.round(res.ecart * 100)} %. ` +
           `En run, cela vaudrait ${res.memoire > 0 ? `+${res.memoire} mémoire` : 'rien'} ; en essai, les registres ne bougent pas.`,
         'success',
         'RETOUR AU PROTOCOLE',
@@ -17905,7 +17984,7 @@ function corpsImage(now: number): boolean {
     } else {
       gagneMemoireRun(res.memoire)
       minijeuIntercalaire = null
-      mbMontreResultatPesee(res, verseL, level.minijeu.cible, mbApresHalte)
+      mbMontreResultatCouperet(res, peseL, level.minijeu.cible, mbApresHalte)
     }
   } else if (
     !tableauDone &&

@@ -91,7 +91,7 @@ export interface PlanVoie {
   economatsParModule: number
   reposParModule: number
   donsParModule: number
-  /** LES MINI-JEUX par module (la pesée) : un nœud de la mini-carte, une
+  /** LES MINI-JEUX par module (le couperet) : un nœud de la mini-carte, une
    *  salle où la physique est le jeu — 0 : aucun */
   minijeuxParModule: number
   // ---- CE QUE PÈSE UNE ROUTE ---------------------------------------------

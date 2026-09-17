@@ -215,7 +215,7 @@ Ce qui existe, ce qui est proposé.
 | **Bonbonne oubliée (don)** | nœud de la mini-carte | de la réserve, ou du condensat si elle est pleine | bonbonnes par module |
 | **Cache** | nœud de la mini-carte | un orbe d'essence, une fois par poste | `orbe` du module (éditeur de carte) |
 | **Salle à prime** | un nœud salle, marqué d'un losange | la salle scellée : plus dure d'un cran, elle paie plus au sas — mémoire ×2, condensat ×2 ou tirage d'instrument garanti ; une par rang au plus, jamais au premier rang | salles à prime (LA DESCENTE) |
-| **Mini-jeu : la pesée** | nœud de la mini-carte, posé comme une halte | une cuve graduée, un trait tiré entre 35 et 70 % du volume de départ : on y verse exactement ce qu'elle demande — au trait la mémoire triple, proche elle vaut, loin la moitié, ratée rien ; la cuve garde ce qu'on lui donne. S'essaie sans run : le pupitre « Jouer la pesée (essai) », ou `__pesee(1.5)` en console | mini-jeux par module (LA DESCENTE) ; `BAREME_PESEE` (`minijeux.ts`) |
+| **Mini-jeu : le couperet** | nœud de la mini-carte, posé comme une halte | un trait au sol, une lame qui tombe toutes les 4 s et reste baissée 1 s, un trait tiré entre 35 et 70 % du volume de départ : on met son corps à cheval sur le trait et on en laisse dépasser exactement ce qu'il demande — ce que la lame tranche au-delà, **d'un seul tenant avec le corps**, est pesé, la cuve le boit, on repart avec le reste ; les gouttes jetées ne pèsent rien, et la cuve n'aspire rien avant la chute. Au trait la mémoire triple, proche elle vaut, loin la moitié, ratée rien. S'essaie sans run : le pupitre « Jouer le couperet (essai) », ou `__couperet(1.5)` en console | mini-jeux par module (LA DESCENTE) ; `BAREME_TRAIT`, `RYTHME_COUPERET`, `COL_COUPERET` (`minijeux.ts`) |
 
 Le modèle de carte garde les natures de module `economat`, `repos`, `don`,
 `inconnu` et `coffre` : l'éditeur peut encore poser une halte ou un « ? »
@@ -227,13 +227,29 @@ a plus, par décision du concepteur (16/09).
 Le concepteur veut des salles qui soient des **mini-jeux à partir du volume
 du joueur**. Sujet 21 a un atout qu'aucun deck-builder n'a : le corps est
 une simulation de fluide, et tout ce qu'on lui fait faire est déjà une
-règle. Six propositions, chacune une salle sans sas ordinaire, chronométrée
-ou comptée, où la physique EST le jeu :
+règle. Des propositions, chacune une salle sans sas ordinaire, chronométrée
+ou comptée, où la physique EST le jeu.
+
+**La leçon de la pesée (17/09).** Le premier mini-jeu demandait de *verser*
+N litres dans une cuve. Joué, il s'est effondré : le sas boit tout ce qui
+arrive, et le seul verbe du jeu est jeter — la meilleure façon de jouer
+était de se caler dos au mur et d'arroser le sas depuis l'autre bout de la
+salle. Le défaut était dans la règle, pas dans le réglage : tout mini-jeu
+qui compte ce qui entre dans un trou finit pareil. Deux règles en sont
+sorties, et tout mini-jeu à venir doit les tenir :
+
+1. **On pèse le corps, pas les gouttes.** Le solveur sait ce qui « fait
+   corps » (la composante connexe du joueur, celle des gouttes en prêt) ;
+   une goutte lancée au loin ne compte pas.
+2. **Entrer doit être un geste du corps** — se placer, s'étirer dans un
+   col, geler — ce qu'une goutte tirée du fond de la salle ne sait pas
+   faire.
 
 | Mini-jeu | Ce qu'on fait | Ce qu'on mesure | Ce qu'on gagne |
 | --- | --- | --- | --- |
-| **La pesée** — *fait le 17/09* | remplir une cuve graduée avec exactement N litres de soi, ni plus ni moins | l'écart au trait | la précision paie en mémoire : ±5 % ×3, ±15 % ×1, ±30 % ×½ |
-| **La scission** | se couper en deux masses égales sur deux plateaux de balance | l'égalité des deux masses au bout de dix secondes | un instrument si la balance est à l'équilibre |
+| **Le couperet** — *fait le 17/09, remplace la pesée* | mettre son corps à cheval sur un trait et en laisser dépasser exactement N litres ; la lame tombe en rythme et tranche | ce qui dépasse le trait et fait corps, à l'instant de la chute | la précision paie en mémoire : ±5 % ×3, ±15 % ×1, ±30 % ×½ |
+| **La balance** (la scission) | se mettre à cheval sur la cloison entre deux bacs, moitié dans chaque | l'égalité des deux moitiés (5 % près) tenue trois secondes — le corps seul compte | un instrument |
+| **La pesée en glace** (variante) | se doser en jetant, puis geler et glisser en bloc à travers un rideau lamellaire que seule la glace passe | le bloc arrivé dans la cuve | comme le couperet — à vérifier : si le gel volontaire prend les gouttes en vol, limiter le gel au corps principal |
 | **Le tamis** | passer une grille fine sans perdre plus de X % — en vapeur c'est facile, en eau c'est un art | le volume perdu | du condensat au prorata de ce qui passe |
 | **La tenue** | rester en glace sur une plaque chaude le plus longtemps possible | le temps avant la fonte | une prime de glace au sas |
 | **Le pont** | figer un jet pour faire pont au-dessus d'un vide, et le traverser avant qu'il ne fonde | réussir ou tomber | l'accès à une cache derrière |
@@ -384,9 +400,10 @@ pas**. Chaque cible touchée est une goutte perdue. C'est la phrase du jeu
    une route »).
 2. **La coque qui compose avec le climat** (§5.1) — le plus grand effet
    pour le moins de code : une lecture de plus dans `climatDuModule`.
-3. ~~Un mini-jeu pour prouver la forme~~ — fait le 17/09 : la pesée est
-   une nature de nœud de la mini-carte (`minijeux.ts`) ; les cinq autres
-   suivent la même forme (une salle construite en code, un sas qui mesure).
+3. ~~Un mini-jeu pour prouver la forme~~ — fait le 17/09 : le couperet est
+   une nature de nœud de la mini-carte (`minijeux.ts`), après une pesée
+   jouée puis retirée (voir §3.2, la leçon) ; les autres suivent la même
+   forme (une salle construite en code, une mesure sur le corps).
 4. **Les traces des Semblables** (§5.4) — le lore qui s'écrit tout seul.
 5. **L'alerte** (§5.5), puis **les coursives à deux sens** (§5.3), puis
    **les trois départs** (§5.6) — chacun redessine la carte, et c'est le
