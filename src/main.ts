@@ -8656,8 +8656,10 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       ? 'FINI'
       : paletEtat.enCours
         ? `LANCER ${num} / ${r.lancers} — LA GLACE GLISSE`
-        : paletEtat.avis ?? `LANCER ${Math.min(r.lancers, num + 1)} / ${r.lancers} — GELEZ (F) AVANT LA LIGNE`
-    g.fillStyle = paletEtat.avis && !paletEtat.enCours ? 'rgba(255,110,110,0.95)' : 'rgba(255,255,255,0.92)'
+        : paletEtat.arme
+          ? `LANCER ${Math.min(r.lancers, num + 1)} / ${r.lancers} — PRENEZ DE LA VITESSE, LA LIGNE VOUS GÈLE`
+          : `REVENEZ DERRIÈRE LA LIGNE POUR LE LANCER ${Math.min(r.lancers, num + 1)}`
+    g.fillStyle = !paletEtat.arme && !paletEtat.enCours ? 'rgba(255,200,120,0.95)' : 'rgba(255,255,255,0.92)'
     g.fillText(consigne, anc.sx, anc.sy)
     g.font = `${Math.round(t * 0.7)}px ui-monospace, monospace`
     g.fillStyle = 'rgba(200,220,235,0.85)'
@@ -17331,6 +17333,10 @@ function corpsImage(now: number): boolean {
   }
   sim.freezeIntent = input.freezeIntent
   sim.gasIntent = input.gasIntent
+  // AU PALET, la ligne gèle : tant qu'un lancer est en cours, le corps est
+  // tenu en glace quoi que fasse le joueur — le lancer fini, l'intention
+  // redevient la sienne et la glace fond (thawTime du mini-jeu)
+  if (level.minijeu?.type === 'palet' && paletEtat.enCours) sim.freezeIntent = true
   // La BASCULE en vapeur — G, chaudière à 95 %, zone forcée : toute cause —
   // se règle à l'instant du basculement : péage de 20 % du volume actif
   // (gerbe de gouttes récupérables). Le compteur de dashs, lui, dépend de

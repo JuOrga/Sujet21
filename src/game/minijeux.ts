@@ -22,10 +22,14 @@
 // tenant avec vous est pesé, la cuve le boit, vous repartez avec le reste.
 // On lit son volume dans sa silhouette — c'est le pilier du jeu.
 //
-// LE PALET (le curling) suit. On gèle avant la ligne, on glisse, et la glace
-// doit s'arrêter le plus près du centre de la maison. « Geler, c'est parier
-// sur une trajectoire » (le document fonctionnel) : ici c'est tout le jeu.
-// Trois lancers, le meilleur compte, chaque relance coûte de la masse.
+// LE PALET (le curling) suit. On prend de la vitesse sur la piste d'élan,
+// LA LIGNE GÈLE le corps quand il la franchit (le concepteur, 17/09 : « il
+// faudrait que cela transforme automatiquement en glace une fois la ligne
+// franchie »), et la glace doit s'arrêter le plus près du centre de la
+// maison. « Geler, c'est parier sur une trajectoire » (le document
+// fonctionnel) : ici c'est tout le jeu, et la vitesse à la ligne est le
+// seul geste. Trois lancers, le meilleur compte, chaque relance coûte de la
+// masse — il faut revenir derrière la ligne pour relancer.
 //
 // LES RÉGLAGES PROPRES AU MINI-JEU. Le solveur est piloté par une centaine
 // de paramètres nommés, mais aucun tableau ne pouvait les surcharger : un
@@ -122,11 +126,12 @@ export const VERDICTS_TRAIT: Record<NoteTrait['verdict'], string> = {
 
 // ---- LE PALET -------------------------------------------------------------
 
-/** LES RÈGLES DU PALET : la ligne de lancer (on doit avoir COMMENCÉ à geler
- *  à gauche d'elle), la maison (son centre, ses trois cercles : au centre,
- *  dans la maison, au bord), le nombre de lancers, et ce qui fait qu'un
- *  lancer est fini — la glace au repos (vitesse sous `reposVitesse` pendant
- *  `reposDuree`), dégelée (part gelée sous `partGel`), ou `dureeMax` écoulée. */
+/** LES RÈGLES DU PALET : la ligne de lancer (la franchir GÈLE le corps et
+ *  lance), la maison (son centre, ses trois cercles : au centre, dans la
+ *  maison, au bord), le nombre de lancers, et ce qui fait qu'un lancer est
+ *  fini — la glace au repos (vitesse sous `reposVitesse` pendant
+ *  `reposDuree`), dégelée (part gelée sous `partGel`, une fois prise), ou
+ *  `dureeMax` écoulée. */
 export interface ReglesPalet {
   ligne: number
   maison: { x: number; y: number }
@@ -144,9 +149,9 @@ export const REGLES_PALET: ReglesPalet = {
   maison: { x: 900, y: 0 },
   rayons: [110, 250, 420],
   lancers: 3,
-  reposVitesse: 25,
+  reposVitesse: 40,
   reposDuree: 0.6,
-  dureeMax: 12,
+  dureeMax: 14,
   partGel: 0.8,
 }
 
@@ -160,16 +165,16 @@ export interface Lancer {
 
 export interface EtatPalet {
   lancers: Lancer[]
-  /** le lancer en cours : depuis quand, et depuis quand la glace est au repos (−1 : elle bouge) */
-  enCours: { debut: number; reposDepuis: number } | null
-  /** la glace était-elle prise à l'observation précédente (pour voir le gel COMMENCER) */
-  geleAvant: boolean
-  /** un avis court à montrer (« GELEZ AVANT LA LIGNE »), ou rien */
-  avis: string | null
+  /** le lancer en cours : depuis quand, la glace a-t-elle PRIS (le gel met
+   *  un instant), et depuis quand elle est au repos (−1 : elle bouge) */
+  enCours: { debut: number; pris: boolean; reposDepuis: number } | null
+  /** le corps a été vu derrière la ligne depuis le dernier lancer : le
+   *  prochain franchissement lance */
+  arme: boolean
   fini: boolean
 }
 
-export const ETAT_PALET_NEUF: EtatPalet = { lancers: [], enCours: null, geleAvant: false, avis: null, fini: false }
+export const ETAT_PALET_NEUF: EtatPalet = { lancers: [], enCours: null, arme: false, fini: false }
 
 /** Ce que le jeu observe du corps à chaque image. */
 export interface ObservationPalet {
@@ -196,37 +201,34 @@ export const VERDICTS_PALET: Record<NoteTrait['verdict'], string> = {
   rate: 'HORS JEU',
 }
 
-/** LE PALET AVANCE d'une observation : un lancer COMMENCE quand la glace
- *  prend (et compte seulement si elle prend à gauche de la ligne — sinon
- *  l'avis le dit et rien ne se joue) ; il FINIT quand la glace s'arrête, se
- *  dégèle ou traîne trop ; après le dernier lancer, c'est fini. Pur : rend
- *  un état neuf, jamais ne touche l'ancien. */
+/** LE PALET AVANCE d'une observation : le corps vu derrière la ligne ARME
+ *  le lancer ; le franchissement de la ligne le LANCE (c'est le jeu qui
+ *  gèle alors le corps — `enCours` non nul vaut ordre de gel) ; il FINIT
+ *  quand la glace, une fois prise, s'arrête, se dégèle ou traîne trop ;
+ *  après le dernier lancer, c'est fini. Pur : rend un état neuf, jamais ne
+ *  touche l'ancien. */
 export function avancePalet(e: EtatPalet, o: ObservationPalet, r: ReglesPalet = REGLES_PALET): EtatPalet {
   if (e.fini) return e
-  let enCours = e.enCours
-  let avis = e.avis
   const lancers = e.lancers
-  if (!enCours) {
-    if (o.gele && !e.geleAvant) {
-      if (o.x < r.ligne) {
-        enCours = { debut: o.t, reposDepuis: -1 }
-        avis = null
-      } else avis = 'GELEZ AVANT LA LIGNE'
-    }
-    return { lancers, enCours, geleAvant: o.gele, avis, fini: false }
+  if (!e.enCours) {
+    if (o.x < r.ligne) return e.arme ? e : { ...e, arme: true }
+    if (!e.arme) return e
+    return { lancers, enCours: { debut: o.t, pris: o.gele, reposDepuis: -1 }, arme: false, fini: false }
   }
+  const c = e.enCours
   let fin: Lancer['fin'] | null = null
-  let reposDepuis = enCours.reposDepuis
-  if (!o.gele) fin = 'degel'
-  else if (o.t - enCours.debut >= r.dureeMax) fin = 'temps'
-  else if (o.vitesse < r.reposVitesse) {
+  let reposDepuis = c.reposDepuis
+  const pris = c.pris || o.gele
+  if (c.pris && !o.gele) fin = 'degel'
+  else if (o.t - c.debut >= r.dureeMax) fin = 'temps'
+  else if (pris && o.vitesse < r.reposVitesse) {
     if (reposDepuis < 0) reposDepuis = o.t
     else if (o.t - reposDepuis >= r.reposDuree) fin = 'repos'
   } else reposDepuis = -1
-  if (!fin) return { lancers, enCours: { debut: enCours.debut, reposDepuis }, geleAvant: o.gele, avis, fini: false }
+  if (!fin) return { lancers, enCours: { debut: c.debut, pris, reposDepuis }, arme: false, fini: false }
   const distance = Math.hypot(o.x - r.maison.x, o.y - r.maison.y)
   const faits = [...lancers, { distance, verdict: notePalet(distance, r.rayons).verdict, fin }]
-  return { lancers: faits, enCours: null, geleAvant: o.gele, avis: null, fini: faits.length >= r.lancers }
+  return { lancers: faits, enCours: null, arme: false, fini: faits.length >= r.lancers }
 }
 
 /** LE MEILLEUR LANCER : le plus près du centre, ou rien si aucun n'est fait. */
@@ -243,13 +245,20 @@ export function meilleurLancer(e: EtatPalet): Lancer | null {
  *  reçoivent, un freinage hydrophile net — de quoi jouer la bande. */
 export const REGLAGES_PALET: Partial<SimParams> = {
   freezeSelfTime: 0.25,
+  thawTime: 0.8, // le dégel après un lancer ne fait pas attendre
   iceRestitution: 0.85,
   hydrophobeIceRestitution: 1.25,
   hydrophobeIceKick: 320,
   hydrophileIceDrag: 4,
-  // la pierre s'essouffle : à 0,45/s, une glace lancée à 600 u/s parcourt
+  // PRENDRE DE LA VITESSE COÛTE : le corps gagne ejectSpeed × la part de
+  // lui-même qu'il éjecte. À 1 400 u/s (le jeu), atteindre 400 u/s demande
+  // 29 % du corps — « pas évident de prendre assez de vitesse » (le
+  // concepteur). À 2 800, 14 % ; et l'élan se prend deux fois plus vite.
+  ejectSpeed: 2800,
+  ejectRate: 64,
+  // la pierre s'essouffle : à 0,3/s, une glace lancée à 400 u/s parcourt
   // ~1 300 u avant l'arrêt — de la ligne de lancer au centre de la maison
-  iceSlideDrag: 0.45,
+  iceSlideDrag: 0.3,
 }
 
 /** LE RYTHME DE LA LAME : elle tombe toutes les `periode` secondes et reste
@@ -335,19 +344,20 @@ export function tableauCouperet(cible: number, rythme: RythmeCouperet = RYTHME_C
   }
 }
 
-/** LA SALLE DU PALET : la piste. On naît à gauche, la ligne de lancer est
- *  au tiers, la maison (trois cercles) aux deux tiers. Deux bumpers
- *  hydrophobes sur les longs côtés permettent de jouer la bande, un butoir
- *  hydrophile au fond freine ce qui va trop loin. Pas de sas : trois
- *  lancers, le meilleur compte, la salle conclut. */
+/** LA SALLE DU PALET : la piste. On naît à gauche sur la piste d'élan, la
+ *  ligne de lancer est au tiers (la franchir gèle), la maison (trois
+ *  cercles) aux deux tiers. Deux bumpers hydrophobes sur les longs côtés
+ *  permettent de jouer la bande, un butoir hydrophile au fond freine ce qui
+ *  va trop loin. Pas de sas : trois lancers, le meilleur compte, la salle
+ *  conclut. */
 export function tableauPalet(regles: ReglesPalet = REGLES_PALET, reglages: Partial<SimParams> = REGLAGES_PALET): LevelDef {
   const { ligne, maison } = regles
   return {
     name: 'Le palet',
     code: CODE_PALET,
     journal:
-      `Une piste, une ligne, une maison. Gelez (F) avant la ligne et glissez : la glace doit s'arrêter le plus près du centre. ` +
-      `Trois lancers, le meilleur compte — chaque relance coûte de la masse. Les bandes hydrophobes renvoient, le butoir du fond freine. Au centre, la mémoire triple.`,
+      `Une piste d'élan, une ligne, une maison. Prenez de la vitesse : la ligne vous gèle quand vous la franchissez, et la glace doit s'arrêter le plus près du centre. ` +
+      `Trois lancers, le meilleur compte — revenez derrière la ligne pour relancer, chaque élan coûte de la masse. Les bandes hydrophobes renvoient, le butoir du fond freine. Au centre, la mémoire triple.`,
     par: 4,
     bounds: { minX: -1600, minY: -800, maxX: 1600, maxY: 800 },
     spawn: { x: -1150, y: 0, n: 900 },
@@ -365,9 +375,9 @@ export function tableauPalet(regles: ReglesPalet = REGLES_PALET, reglages: Parti
     sponges: [],
     labels: [
       { x: -1150, y: -260, text: 'LE PALET', tone: 'mur' },
-      { x: -1150, y: 300, text: '1 · GELEZ (F) AVANT LA LIGNE', tone: 'mur' },
-      { x: ligne, y: -700, text: 'LIGNE DE LANCER', tone: 'mur' },
-      { x: (ligne + maison.x) / 2, y: 300, text: '2 · GLISSEZ JUSQU’AU CENTRE DE LA MAISON', tone: 'mur' },
+      { x: -1150, y: 300, text: '1 · PRENEZ DE LA VITESSE', tone: 'mur' },
+      { x: ligne, y: -700, text: 'LA LIGNE VOUS GÈLE', tone: 'mur' },
+      { x: (ligne + maison.x) / 2, y: 300, text: '2 · LA GLACE GLISSE : ARRÊTEZ-LA AU CENTRE', tone: 'mur' },
       { x: maison.x, y: -560, text: `3 LANCERS · LE MEILLEUR COMPTE`, tone: 'mur' },
     ],
     minijeu: { type: 'palet', regles, reglages },

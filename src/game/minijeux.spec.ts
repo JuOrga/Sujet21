@@ -106,7 +106,7 @@ import {
 } from './minijeux'
 
 describe('le palet — les lancers et la maison', () => {
-  const r = { ...REGLES_PALET, ligne: -400, maison: { x: 900, y: 0 }, rayons: [110, 250, 420] as [number, number, number], lancers: 3, reposVitesse: 25, reposDuree: 0.6, dureeMax: 12, partGel: 0.8 }
+  const r = { ...REGLES_PALET, ligne: -400, maison: { x: 900, y: 0 }, rayons: [110, 250, 420] as [number, number, number], lancers: 3, reposVitesse: 25, reposDuree: 0.6, dureeMax: 14, partGel: 0.8 }
   const obs = (t: number, gele: boolean, x: number, vitesse: number, y = 0): ObservationPalet => ({ t, gele, x, y, vitesse })
 
   it('le verdict d’un lancer suit les trois cercles, au barème du trait', () => {
@@ -117,14 +117,19 @@ describe('le palet — les lancers et la maison', () => {
     expect(VERDICTS_PALET.juste).toBe('AU CENTRE')
   })
 
-  it('un lancer commence quand la glace prend à gauche de la ligne, et finit quand elle s’arrête', () => {
+  it('le corps derrière la ligne arme ; la franchir lance ; la glace prise qui s’arrête finit le lancer', () => {
     let e = ETAT_PALET_NEUF
+    expect(e.arme).toBe(false)
     e = avancePalet(e, obs(0, false, -1000, 0), r)
-    expect(e.enCours).toBeNull()
-    e = avancePalet(e, obs(0.5, true, -800, 500), r) // la glace prend, à gauche de la ligne
+    expect(e.arme).toBe(true)
+    e = avancePalet(e, obs(0.5, false, -380, 500), r) // la ligne est franchie : le lancer part, le gel est ordonné
+    expect(e.enCours).toMatchObject({ debut: 0.5, pris: false })
+    expect(e.arme).toBe(false)
+    e = avancePalet(e, obs(0.6, false, -330, 500), r) // la glace n'a pas encore pris : pas un dégel
     expect(e.enCours).not.toBeNull()
-    expect(e.avis).toBeNull()
-    e = avancePalet(e, obs(2, true, 700, 40), r) // elle glisse encore
+    e = avancePalet(e, obs(0.8, true, -230, 480), r)
+    expect(e.enCours?.pris).toBe(true)
+    e = avancePalet(e, obs(2, true, 700, 60), r) // elle glisse encore
     expect(e.lancers).toHaveLength(0)
     e = avancePalet(e, obs(3, true, 860, 10), r) // presque arrêtée
     e = avancePalet(e, obs(3.4, true, 862, 8), r) // 0,4 s au repos : pas encore
@@ -135,25 +140,26 @@ describe('le palet — les lancers et la maison', () => {
     expect(e.lancers[0].distance).toBeCloseTo(38)
     expect(e.enCours).toBeNull()
     expect(e.fini).toBe(false)
+    // rester à droite ne relance rien : il faut repasser derrière la ligne
+    e = avancePalet(e, obs(4, false, 500, 0), r)
+    expect(e.enCours).toBeNull()
+    expect(e.arme).toBe(false)
+    e = avancePalet(e, obs(5, false, -600, 0), r)
+    expect(e.arme).toBe(true)
   })
 
-  it('geler à droite de la ligne ne compte pas et le dit ; se dégeler ou traîner finit le lancer', () => {
-    let e = avancePalet(ETAT_PALET_NEUF, obs(1, true, 0, 300), r) // gelé après la ligne
-    expect(e.enCours).toBeNull()
-    expect(e.avis).toBe('GELEZ AVANT LA LIGNE')
-    // rester gelé ne relance rien : il faut que le gel COMMENCE à gauche
-    e = avancePalet(e, obs(2, true, -600, 300), r)
-    expect(e.enCours).toBeNull()
-    e = avancePalet(e, obs(3, false, -600, 0), r)
-    e = avancePalet(e, obs(3.5, true, -600, 400), r)
-    expect(e.enCours).not.toBeNull()
+  it('se dégeler en route ou traîner finit le lancer là où la glace est', () => {
+    let e = avancePalet(ETAT_PALET_NEUF, obs(0, false, -600, 0), r)
+    e = avancePalet(e, obs(1, true, -300, 400), r)
+    expect(e.enCours?.pris).toBe(true)
     // dégelée en route : le lancer finit là où elle est
     e = avancePalet(e, obs(5, false, 500, 300), r)
     expect(e.lancers[0]).toMatchObject({ fin: 'degel' })
     expect(e.lancers[0].distance).toBeCloseTo(400)
-    // le temps : douze secondes de glisse sans repos
-    e = avancePalet(e, obs(6, true, -700, 200), r)
-    e = avancePalet(e, obs(19, true, 1200, 200), r)
+    // le temps : quatorze secondes de glisse sans repos
+    e = avancePalet(e, obs(6, false, -700, 200), r)
+    e = avancePalet(e, obs(7, true, -300, 200), r)
+    e = avancePalet(e, obs(21, true, 1200, 200), r)
     expect(e.lancers[1]).toMatchObject({ fin: 'temps' })
   })
 
@@ -161,14 +167,14 @@ describe('le palet — les lancers et la maison', () => {
     let e = ETAT_PALET_NEUF
     for (const x of [300, 880, 1400]) {
       e = avancePalet(e, obs(0, false, -900, 0), r)
-      e = avancePalet(e, obs(1, true, -900, 500), r)
+      e = avancePalet(e, obs(1, true, -300, 500), r)
       e = avancePalet(e, obs(2, true, x, 0), r)
       e = avancePalet(e, obs(3, true, x, 0), r)
     }
     expect(e.lancers).toHaveLength(3)
     expect(e.fini).toBe(true)
     expect(meilleurLancer(e)!.distance).toBeCloseTo(20)
-    expect(avancePalet(e, obs(4, true, -900, 500), r)).toBe(e) // plus rien ne bouge
+    expect(avancePalet(e, obs(4, false, -900, 0), r)).toBe(e) // plus rien ne bouge
     expect(meilleurLancer(ETAT_PALET_NEUF)).toBeNull()
   })
 
@@ -177,6 +183,7 @@ describe('le palet — les lancers et la maison', () => {
     expect(lv.minijeu?.type).toBe('palet')
     expect(lv.minijeu?.reglages).toEqual(REGLAGES_PALET)
     expect(REGLAGES_PALET.iceSlideDrag).toBeGreaterThan(0)
+    expect(REGLAGES_PALET.ejectSpeed).toBeGreaterThan(1400) // l'élan se prend sans se vider
     expect(lv.spawn.x).toBeLessThan(REGLES_PALET.ligne)
     expect(REGLES_PALET.ligne).toBeLessThan(REGLES_PALET.maison.x)
     expect(lv.exit.minX).toBeGreaterThan(lv.bounds.maxX)
