@@ -150,7 +150,6 @@ import {
   type Lancer,
   type NoteTrait,
 } from './game/minijeux'
-import { traceTrajectoire, type Trajectoire } from './game/trajectoire'
 import {
   ditEffet,
   offresDe,
@@ -8775,13 +8774,11 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     g.restore()
   }
 
-  // LES PUITS DE GRAVITÉ et LA LIGNE PRÉDITE. Chaque puits : son cœur (un
-  // anneau — dedans, les orbites sont sûres ; la lisière déchire), sa portée
-  // en pointillé s'il en a une, une croix au centre. Puis, depuis le centre
-  // du corps et à sa vitesse, la trajectoire que le point-masse annonce
-  // (traceTrajectoire, la même loi que le solveur) : un pointillé qui pâlit
-  // avec le temps, un tic à chaque rebond. C'est la jauge de la décision :
-  // laisser porter mène là ; éjecter courbe la ligne, à vue.
+  // LES PUITS DE GRAVITÉ. Chaque puits : son cœur (un anneau — dedans, les
+  // orbites sont sûres ; la lisière déchire), sa portée en pointillé s'il en
+  // a une, une croix au centre. La ligne prédite du point-masse ne se
+  // dessine pas en jeu : elle est un outil de conception, dans l'éditeur (le
+  // concepteur, 17/09). En jeu, seule la PRÉVISION EXACTE se demande (P).
   if ((level.puits?.length ?? 0) > 0) {
     const puits = level.puits!
     g.save()
@@ -8811,36 +8808,6 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       g.moveTo(c.sx, c.sy - 6)
       g.lineTo(c.sx, c.sy + 6)
       g.stroke()
-    }
-    if (!sim.dispersed && !impulsionEnAttente) {
-      const tr = trajectoirePrevue()
-      const pts = tr.points
-      g.lineWidth = Math.max(1, 2 * z)
-      g.setLineDash([6, 8])
-      // par tronçons, pour pâlir avec le temps
-      const tronçon = Math.max(1, Math.floor(pts.length / 12))
-      for (let k = 0; k + 1 < pts.length; k += tronçon) {
-        const fin = Math.min(pts.length - 1, k + tronçon)
-        const alpha = 0.85 * (1 - pts[k].t / PREVISION_DUREE)
-        g.strokeStyle = `rgba(255,230,160,${alpha.toFixed(3)})`
-        g.beginPath()
-        const a = S(pts[k].x, pts[k].y)
-        g.moveTo(a.sx, a.sy)
-        for (let j = k + 1; j <= fin; j++) {
-          const q = S(pts[j].x, pts[j].y)
-          g.lineTo(q.sx, q.sy)
-        }
-        g.stroke()
-      }
-      g.setLineDash([])
-      for (const ev of tr.evenements) {
-        const e = S(ev.x, ev.y)
-        g.strokeStyle = ev.type === 'colle' ? 'rgba(120,220,255,0.9)' : 'rgba(255,200,120,0.9)'
-        g.lineWidth = 2
-        g.beginPath()
-        g.arc(e.sx, e.sy, 5, 0, Math.PI * 2)
-        g.stroke()
-      }
     }
     // LA PRÉVISION EXACTE, en trait plein, qui grandit tant qu'elle se calcule
     if (prevision && prevision.points.length > 1) {
@@ -13114,10 +13081,6 @@ function majOrbites(): void {
   }
 }
 
-/** LA DURÉE de la ligne prédite (s) : six secondes, plus d'une période de
- *  cœur — assez pour voir où une orbite mène, pas assez pour encombrer. */
-const PREVISION_DUREE = 6
-
 // LA PRÉVISION EXACTE : une COPIE DU SOLVEUR, prise sur l'état du corps à
 // l'instant de la demande, avance À PART et écrit la vraie trajectoire de
 // son centre — là où la ligne pointillée (un point-masse) dévie : les
@@ -13163,42 +13126,6 @@ function avancePrevisionExacte(): void {
   }
 }
 
-/** LA TRAJECTOIRE PRÉDITE depuis l'état du corps à cette image : son centre,
- *  sa vitesse, son rayon ; les parois du tableau et les portes fermées ;
- *  l'état décide du reste — la glace rebondit à sa restitution, la vapeur
- *  s'essouffle (gasDrag), l'eau ne rebondit pas (mesuré). */
-function trajectoirePrevue(): Trajectoire {
-  sim.updatePlayerStats() // le relabel ne rafraîchit les statistiques que tous les cinq pas
-  const n = sim.count
-  let gels = 0
-  let gaz = 0
-  for (let i = 0; i < n; i++) {
-    if (sim.frozen[i] === 1) gels++
-    else if (sim.gaseous[i] === 1) gaz++
-  }
-  const enGlace = n > 0 && gels / n >= 0.5
-  const enVapeur = n > 0 && gaz / n >= 0.5
-  const boxes: ObstacleBox[] = [...level.boxes]
-  const portes = level.portes ?? []
-  for (let i = 0; i < portes.length; i++) {
-    const b = porteBoite(portes[i], laserEtat.portesAvance[i] ?? (laserEtat.portesOuvertes[i] ? 0 : 1))
-    if (b) boxes.push({ ...b, material: MAT_WALL })
-  }
-  return traceTrajectoire(
-    { x: sim.stats.centroidX, y: sim.stats.centroidY, vx: sim.stats.velX, vy: sim.stats.velY },
-    {
-      bounds: level.bounds,
-      boxes,
-      puits: level.puits ?? [],
-      rayonCorps: sim.stats.rmsRadius,
-      restitution: enGlace ? params.iceRestitution : undefined,
-      frottement: enVapeur ? params.gasDrag : 0,
-      duree: PREVISION_DUREE,
-      dt: params.dt,
-    },
-  )
-}
-
 /** L'IMPULSION DE DÉPART est servie dès que l'entrée de caméra est finie
  *  (ou coupée par le premier geste) : le corps part exactement comme le
  *  tableau le dit, sous les yeux du joueur, et les puits s'allument. */
@@ -13208,9 +13135,6 @@ function sertImpulsion(): void {
   impulsionEnAttente = null
   const a = (imp.angle * Math.PI) / 180
   sim.lanceCorps(Math.cos(a) * imp.vitesse, Math.sin(a) * imp.vitesse)
-  // aux orbites, la vraie trajectoire s'écrit dès le lancer : elle se
-  // calcule pendant que le corps commence son premier virage
-  if (level.minijeu?.type === 'orbites') lancePrevisionExacte()
 }
 
 /** LE PALET, à l'image : ce que le jeu observe du corps (la glace est-elle

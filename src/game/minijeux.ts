@@ -616,7 +616,7 @@ export function tableauOrbites(regles: ReglesOrbites = REGLES_ORBITES): LevelDef
     name: 'Les orbites',
     code: CODE_ORBITES,
     journal:
-      `Trois puits de gravité, et vous êtes lancé : la ligne pointillée dit où l'orbite vous porte. ` +
+      `Trois puits de gravité, et vous êtes lancé : leur gravité vous porte d'un virage à l'autre. ` +
       `Passez les trois anneaux dans l'ordre et finissez dans le croissant. Laisser porter ne coûte rien ; éjecter corrige la ligne, et chaque goutte compte. ` +
       `Intact au croissant, la mémoire triple ; chaque anneau manqué retire un palier.`,
     par: 4,
@@ -628,7 +628,7 @@ export function tableauOrbites(regles: ReglesOrbites = REGLES_ORBITES): LevelDef
     sponges: [],
     labels: [
       { x: -900, y: 930, text: 'LES ORBITES', tone: 'mur' },
-      { x: -900, y: 650, text: '1 · VOUS ÊTES LANCÉ : LA LIGNE DIT OÙ VOUS ALLEZ', tone: 'mur' },
+      { x: -900, y: 650, text: '1 · VOUS ÊTES LANCÉ : LA GRAVITÉ VOUS PORTE', tone: 'mur' },
       { x: -700, y: -200, text: '2 · PASSEZ LES TROIS ANNEAUX — ÉJECTER CORRIGE, ET COÛTE', tone: 'mur' },
       { x: -700, y: 330, text: '3 · FINISSEZ DANS LE CROISSANT', tone: 'mur' },
     ],
