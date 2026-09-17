@@ -267,9 +267,10 @@ menu retrouve le preset dont les valeurs sont celles du tableau, ou dit
 ceux du mini-jeu, le temps de la salle, et rend tout à la suivante.
 `levelIO` ne relit que les clés du banc, finies, et dit celles qu'il
 écarte. Le preset « ⚙ Tir de glace » livré avec le banc porte le geste :
-1 800 u/s à pleine puissance (« il faudrait pouvoir tirer plus fort », le
-concepteur ; mesuré sur le solveur : un éclat ne traverse pas un sol de
-40 u jusqu'à 2 600 u/s, neutre ou hydrophobe — `tirGlace.spec`).
+2 600 u/s à pleine puissance (« plus de vitesse d'éjection », le
+concepteur, deux fois ; mesuré sur le solveur : un éclat ne traverse pas
+un sol de 40 u jusqu'à 2 600 u/s, neutre ou hydrophobe — `tirGlace.spec` ;
+c'est le plafond mesuré, on n'ira pas plus haut sans le remesurer).
 
 **Ce qui se sent** (le concepteur : « des effets satisfaisants et
 gamifiés »). Une **jauge des paliers** au bord droit de la salle, graduée

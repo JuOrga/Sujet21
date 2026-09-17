@@ -31,6 +31,17 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/09/2026 22:20',
+    title: 'LES CIBLES, en main : plus de NaN, la jauge qui se remplit, des effets et un compte voyants, le tir à 2 600, la flèche pleine, le stick remis à l’endroit',
+    notes: [
+      'LE RETOUR (capture) : « MANQUÉ · NaN POINT · 2 TOUCHES », la jauge vide ; les effets et le compteur pas assez voyants ; plus de vitesse d’éjection ; une flèche plus grande à 100 % ; au joystick, le tir inversé.',
+      'LE NaN : la salle jouée était une copie publiée AVANT la série — ses règles n’avaient ni serieDelai ni serieMax, et Math.min(undefined, …) faisait NaN à la première touche. Deux correctifs : levelIO comble les règles relues avec celles du code (par type : cibles, orbites, palet, rafales, le rythme du couperet), et multiplicateurSerie tient sans les champs. Tests de garde des deux côtés.',
+      'LE HUD DES CIBLES EST EN PIXELS D’ÉCRAN : au zoom de la salle, le compte passait sous les barres. La jauge des paliers au bord droit de l’écran, plus large, sur fond sombre ; le compte et le chrono en haut au centre, gros, le chrono qui grossit et rougit les dix dernières secondes ; le bilan en grand au milieu, sur fond sombre. LA TOUCHE : l’écran s’allume un dixième de seconde, deux cercles épais s’ouvrent, un disque s’éteint, le chiffre en pixels d’écran est gros et cerné de sombre (lisible à tout zoom), la série au-dessus.',
+      'LE TIR : 2 600 u/s à pleine puissance — le plafond mesuré sans traversée, on n’ira pas plus haut sans remesurer. LA FLÈCHE : sa pointe grossit avec la puissance (--p) ; à 100 %, la ligne s’épaissit, s’allume, la pointe double. LE STICK : le tir suivait la règle de l’eau (le point de visée derrière, l’éjection pousse) ; il suit maintenant celle du dash — le stick dit où l’on envoie.',
+      'VÉRIFIÉ : levelIO.spec (une copie sans les champs de série reçoit les défauts), minijeux.spec (le multiplicateur et le compte sans les champs) ; type-check à 0, 1 380 tests verts, build propre. Le rendu est à regarder en main.',
+    ],
+  },
+  {
     date: '17/09/2026 21:35',
     title: 'LES CIBLES SE SENTENT : la jauge des paliers, la touche qui grossit et sonne, la série, la fin du compteur — et les règles dans l’éditeur',
     notes: [

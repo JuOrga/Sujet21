@@ -705,7 +705,10 @@ export const ETAT_CIBLES_NEUF: EtatCibles = { points: 0, touches: 0, fini: false
 
 /** LE MULTIPLICATEUR d'une série : 1, 2, 3 (plafonné à serieMax). */
 export function multiplicateurSerie(serie: number, r: ReglesCibles): number {
-  return Math.max(1, Math.min(r.serieMax, serie))
+  // une copie relue sans serieMax (publiée avant que la série existe) vaut le
+  // défaut du code, jamais NaN — la revue du 17/09 : « NaN POINT · 2 TOUCHES »
+  const max = Number.isFinite(r.serieMax) ? r.serieMax : REGLES_CIBLES.serieMax
+  return Math.max(1, Math.min(max, serie))
 }
 
 /** UNE TOUCHE : la mire touchée et la taille (en particules) de ce qui l'a touchée. */
@@ -731,7 +734,7 @@ export function avanceCibles(e: EtatCibles, t: number, touches: readonly ToucheM
     const m = mires[tc.mire]
     if (!m) continue
     // la série : rapprochée de la précédente, elle continue ; sinon elle repart
-    serie = t - derniere <= r.serieDelai ? serie + 1 : 1
+    serie = t - derniere <= (Number.isFinite(r.serieDelai) ? r.serieDelai : REGLES_CIBLES.serieDelai) ? serie + 1 : 1
     derniere = t
     points += pointsTouche(m, tc.taille, corpsDepart, r) * multiplicateurSerie(serie, r)
     n++
@@ -755,13 +758,14 @@ export const VERDICTS_CIBLES: Record<NoteTrait['verdict'], string> = {
 }
 
 /** LE PRESET « TIR DE GLACE » : ce que le tableau recouvre du banc — le
- *  geste lui-même (une part de 10 % du corps par éclat, 1 800 u/s à pleine
- *  puissance : « il faudrait pouvoir tirer plus fort », le concepteur, 17/09 —
- *  mesuré : un éclat ne traverse pas un sol de 40 u jusqu'à 2 600 u/s), et
+ *  geste lui-même (une part de 10 % du corps par éclat, 2 600 u/s à pleine
+ *  puissance : « plus de vitesse d'éjection », le concepteur, 17/09, deux
+ *  fois — mesuré : un éclat ne traverse pas un sol de 40 u jusqu'à 2 600 u/s,
+ *  c'est le plafond mesuré), et
  *  une glace qui rebondit franchement sur les bandes. */
 export const REGLAGES_CIBLES: Partial<SimParams> = {
   glaceTir: 0.1,
-  glaceTirVitesse: 1800,
+  glaceTirVitesse: 2600,
   iceRestitution: 0.8,
   hydrophobeIceRestitution: 1.1,
 }
