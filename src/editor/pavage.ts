@@ -26,7 +26,7 @@
 // indices par famille) et les réglages, et modifie le tableau EN PLACE ;
 // l'éditeur committe ensuite. Tout ce qu'il décide se teste.
 
-import type { LevelDef, PorteDef, StructureDef } from '../game/level'
+import { PUITS_RAYON_DEFAUT, type LevelDef, type PorteDef, type StructureDef } from '../game/level'
 import {
   cotesOuverts,
   epaisseurDessinee,
@@ -72,6 +72,7 @@ export const FAMILLES_MOTIF = [
   'rails',
   'lumieres',
   'decals',
+  'puits',
 ] as const
 export type FamilleMotif = (typeof FAMILLES_MOTIF)[number]
 
@@ -190,6 +191,10 @@ export function rectDe(level: LevelDef, f: FamilleMotif, i: number): Rect | null
       const c = (level.cibles ?? [])[i]
       return pt(c, c?.r ?? R_CIBLE_DEFAUT)
     }
+    case 'puits': {
+      const pu = (level.puits ?? [])[i]
+      return pt(pu, pu?.rayon ?? PUITS_RAYON_DEFAUT)
+    }
     case 'condensats':
       return pt((level.condensats ?? [])[i], R_POINT)
     case 'eclats':
@@ -292,6 +297,7 @@ export const FAMILLE_DE_SORTE: Record<string, FamilleMotif> = {
   rail: 'rails',
   lumiere: 'lumieres',
   decal: 'decals',
+  puits: 'puits',
 }
 
 export const NOMS_UNIQUES: Record<string, string> = {
@@ -684,6 +690,7 @@ export function pave(
   }
   if (motif.lasers.length > 0)
     level.lasers = ajoute(level.lasers, points(level.lasers, motif.lasers))
+  if (motif.puits.length > 0) level.puits = ajoute(level.puits, points(level.puits, motif.puits))
   if (motif.condensats.length > 0)
     level.condensats = ajoute(
       level.condensats,

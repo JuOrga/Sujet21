@@ -1,8 +1,8 @@
 # Les puits de gravité — la loi, ses nombres, ce qu'on peut en attendre
 
 *Livraison 1 (17/09/2026) : la physique, l'impulsion de départ, la
-trajectoire prédite, le mini-jeu « Les orbites ». L'éditeur suit
-(livraison 2, §6).*
+trajectoire prédite, le mini-jeu « Les orbites ». Livraison 2 (le même
+jour) : l'éditeur, §6.*
 
 ## 1. Ce qu'est un puits
 
@@ -79,8 +79,9 @@ frottement (la vapeur). Restitution **mesurée** sur le vrai solveur
 (`trajectoire.spec.ts`) : un corps ne rebondit pas sur un mur neutre (1 à
 2 % revient — l'eau épouse la paroi), l'hydrophobe renvoie à 0,6-0,8,
 l'hydrophile colle. Non modélisé : les éponges, les pertes des grilles.
-Dessinée à chaque image en pointillé, sur six secondes, un cercle à
-chaque rebond.
+Elle ne se dessine **que dans l'éditeur** : c'est un outil de conception
+(le concepteur, 17/09 : « je l'imaginais que dans l'éditeur »). En jeu,
+rien ne trahit l'avenir — seule la prévision exacte se demande.
 
 **La prévision exacte** (touche **P**, redéfinissable) : une copie du
 solveur (`FluidSim.copiePourPrevision`, l'état de chaque particule et le
@@ -88,7 +89,7 @@ tableau entier) avance à part, par tranches de 6 ms par image, et écrit en
 trait plein la vraie trajectoire du centre sur trois secondes. Effacée à
 toute éjection ou changement d'état, et à chaque salle. Un pas à 900
 particules coûte quelques millisecondes : la ligne se lit en train de
-s'écrire. Le mini-jeu la lance au moment du lancer.
+s'écrire.
 
 ## 5. Le mini-jeu « Les orbites »
 
@@ -117,12 +118,30 @@ passe le premier anneau et s'approche du deuxième sans se disperser. Si
 la physique ou les puits changent, on refait la recherche — jamais on ne
 déplace un anneau à la main.
 
-## 6. Livraison 2 — l'éditeur
+## 6. L'éditeur (`?editeur`)
 
-Outil « puits » (poser au clic, glisser pour le rayon), fiche `force /
-rayon / portee`, fiche du départ avec `impulsion` (angle, vitesse) et un
-glisser depuis le départ, les anneaux des puits et la ligne prédite
-dessinés en direct (`traceTrajectoire` depuis le départ, comme le
-faisceau des lasers), un bouton « Prévision exacte » sur un solveur sans
-écran. Le stockage est déjà prêt : `levelIO` lit, écrit et valide les
-puits et l'impulsion.
+- **L'outil « Puits de gravité »** (palette Mécanismes) : un clic pose le
+  puits, le glisser qui suit règle le rayon du cœur (moins de 40 u : le
+  défaut reste). Il se sélectionne au centre, se déplace, se duplique
+  (D), se supprime, se copie-colle et se pave comme une pastille.
+- **Sa fiche** : la force (curseur, 50 à 3 000 u/s²), le rayon du cœur
+  (40 à 1 200 u), la portée (0 : tout le tableau), X et Y. Le défaut
+  efface la clé : le fichier ne porte que ce qui diffère du code. La fiche
+  dit la période du cœur, la vitesse circulaire au bord et l'évasion, et
+  rappelle la règle : les orbites vivent dans le cœur.
+- **La fiche du départ** gagne l'impulsion : l'angle (curseur, 0 est, 90
+  nord) et la vitesse (0 : né immobile). Une flèche la dessine au départ.
+- **La ligne prédite** se dessine depuis le départ dès qu'il y a une
+  impulsion ou un puits : douze secondes de point-masse (`traceTrajectoire`,
+  la loi du solveur, les parois, les portes comptées fermées), un
+  pointillé qui pâlit, un cercle à chaque rebond, les secondes tous les
+  deux secondes. Elle se recalcule à chaque réglage : un curseur qui bouge
+  déplace la ligne.
+- **« Prévision exacte »** (bouton de la barre) : le vrai solveur, sans
+  écran, sur ce tableau — le corps né au départ, lancé, sous les puits —
+  écrit en trait plein la trajectoire de son centre sur douze secondes,
+  par tranches pour que l'éditeur reste vivant. Toute modification
+  l'efface.
+- Le survol raconte le puits (la bulle savante) ; `checkLevel` avertit
+  d'un puits hors cuve, d'un départ au fond d'un cœur sans impulsion, de
+  deux cœurs qui se recouvrent.

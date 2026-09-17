@@ -31,6 +31,16 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/09/2026 11:40',
+    title: 'LES PUITS DANS L’ÉDITEUR : poser, régler la force par puits, lancer le départ, et lire la trajectoire avant de jouer',
+    notes: [
+      'LA DEMANDE : « pour la ligne en pointillé je l’imaginais que dans l’éditeur pour la conception. Je suppose qu’il faut pouvoir régler l’intensité de la gravité par puits. » La ligne pointillée quitte donc le jeu (elle y trahissait l’avenir) ; en jeu ne reste que la prévision exacte, à la demande (P). La force se réglait déjà par puits dans les données : l’éditeur l’expose.',
+      'L’OUTIL « PUITS DE GRAVITÉ » (palette Mécanismes) : un clic pose, le glisser règle le rayon du cœur ; sélection au centre, déplacement, duplication, suppression, copier-coller et pavage comme une pastille. SA FICHE : la force (curseur 50-3 000 u/s²), le rayon du cœur (40-1 200 u), la portée, X et Y — le défaut efface la clé —, et elle dit la période du cœur, la vitesse circulaire, l’évasion, et la règle : les orbites vivent dans le cœur.',
+      'LA FICHE DU DÉPART gagne l’impulsion (angle et vitesse), dessinée en flèche. LA LIGNE PRÉDITE se dessine depuis le départ dès qu’il y a une impulsion ou un puits : douze secondes de point-masse, parois et portes fermées comprises, les secondes marquées ; elle se recalcule à chaque réglage. « PRÉVISION EXACTE » (barre) : le vrai solveur, sans écran, court sur le tableau par tranches et écrit la trajectoire du corps en trait plein ; toute modification l’efface.',
+      'VÉRIFIÉ : 1 355 tests verts (deux neufs : le puits se copie, se colle et son emprise est son cœur ; la fiche du puits et le lancer du départ), type-check à 0, build propre. L’éditeur lui-même est injouable ici (pas de navigateur) : la pose au glisser, les curseurs et la ligne qui suit sont à éprouver en main.',
+    ],
+  },
+  {
     date: '17/09/2026 10:50',
     title: 'LES PUITS DE GRAVITÉ : le corps orbite, sa trajectoire s’écrit d’avance, et LES ORBITES le prouvent',
     notes: [

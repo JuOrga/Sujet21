@@ -9352,6 +9352,7 @@
           <input type="checkbox" id="ed-snap" checked style="width:auto" /></label>
         <label class="ed-f" style="width:auto" title="ALIGNEMENT AUTOMATIQUE : en déplaçant une pièce, elle se colle aux bords, aux centres et aux écarts égaux de ses voisines (traits pointillés). Décochez pour poser exactement où vous lâchez — ou tenez ALT le temps d'un geste. Le réglage est retenu d'une séance à l'autre."><span>Alignement</span>
           <input type="checkbox" id="ed-align" checked style="width:auto" /></label>
+        <button type="button" id="ed-prevision" title="LA PRÉVISION EXACTE : le vrai solveur court sur ce tableau, sans écran — le corps né au départ, lancé par l'impulsion, sous les puits — et écrit en trait plein la trajectoire de son centre sur douze secondes. Quelques secondes de calcul, par tranches ; la ligne pointillée, elle, est un point-masse.">Prévision exacte</button>
         <button type="button" id="ed-play" class="primary">Essayer</button>
         <button type="button" id="ed-quit">↩ Accueil</button>
       </div>
@@ -9400,6 +9401,7 @@
           <span class="k">Mécanismes</span>
           <button type="button" class="ed-tool" data-tool="laser"><i style="background:#ff6a5a"></i>Émetteur laser</button>
           <button type="button" class="ed-tool" data-tool="cible"><i style="background:#6dffb8"></i>Cible</button>
+          <button type="button" class="ed-tool" data-tool="puits" title="UN PUITS DE GRAVITÉ : un point qui attire le corps — la seule force pure du solveur, celle qui fait orbiter. Cliquez pour le poser, glissez pour régler le rayon du cœur ; force, rayon et portée à droite. Les orbites vivent DANS le cœur : à la lisière, le corps se déchire. La ligne pointillée depuis le départ dit où l'impulsion mène."><i style="background:#b4a0ff"></i>Puits de gravité</button>
           <button type="button" class="ed-tool" data-tool="porte"><i style="background:#ff5a5a"></i>Porte asservie</button>
           <button type="button" class="ed-tool" data-tool="chasse" title="Un COURANT DE POUSSÉE : tout ce qui est dans le rectangle est entraîné dans sa direction — le moyen d'éjecter le corps d'une salle sans le couper comme le ferait une porte qui se ferme. Permanente sans canal ; asservie à ses pastilles avec un canal ; une séquence peut la déclencher pour une bouffée."><i style="background:#4fc8ff"></i>Chasse</button>
           <button type="button" class="ed-tool" data-tool="condensat"><i style="background:#8cd7ff"></i>Pastille de condensat</button>
