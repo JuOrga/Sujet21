@@ -123,6 +123,25 @@ describe('FluidSim.applyPuits — la seule accélération pure du solveur', () =
     expect(Math.abs(s.stats.centroidY)).toBeGreaterThan(50)
   })
 
+  it('un bloc de glace garde sa taille sous un puits : il reçoit la moyenne du champ, pas une traction par particule', () => {
+    // la ronde du 17/09 : par particule, le cœur (a ∝ r) tirait plus sur le
+    // bord loin que sur le bord près et la projection rigide ne redresse que
+    // les vitesses — le bloc se tassait de 1 u/s (rms 73 → 64 en dix secondes)
+    const s = makeSim()
+    const P: PuitsDef = { x: 0, y: 0, force: 600, rayon: 350 }
+    s.spawnDisc(200, 0, 900, KIND_PLAYER)
+    s.freezeIntent = true
+    orbite(s, [], 1.5) // le gel prend
+    s.updatePlayerStats()
+    const rmsAvant = s.stats.rmsRadius
+    for (let i = 0; i < s.count; i++) if (s.frozen[i] === 1) s.velY[i] = vitesseCirculaire(P, 200)
+    orbite(s, [P], 10)
+    s.updatePlayerStats()
+    expect(Math.abs(s.stats.rmsRadius - rmsAvant)).toBeLessThan(1)
+    // et le centre suit toujours le point-masse : un cercle à 200 u
+    expect(Math.hypot(s.stats.centroidX, s.stats.centroidY)).toBeCloseTo(200, -1)
+  })
+
   it('deux puits se superposent : au point d’équilibre rien ne bouge ; hors portée, rien non plus', () => {
     const s = makeSim()
     const deux: PuitsDef[] = [{ ...PUITS, x: -300 }, { ...PUITS, x: 300 }]

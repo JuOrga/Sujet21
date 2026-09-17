@@ -150,6 +150,8 @@ import {
   type Lancer,
   type NoteTrait,
 } from './game/minijeux'
+import { sansSas, tableauRonde } from './game/ronde'
+import { dureeChuteCoeur, grainsPuits, porteeVisible, rayonNoyau } from './game/puitsDessin'
 import {
   ditEffet,
   offresDe,
@@ -8777,39 +8779,60 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     g.restore()
   }
 
-  // LES PUITS DE GRAVITÉ. Chaque puits : son cœur (un anneau — dedans, les
-  // orbites sont sûres ; la lisière déchire), sa portée en pointillé s'il en
-  // a une, une croix au centre. La ligne prédite du point-masse ne se
-  // dessine pas en jeu : elle est un outil de conception, dans l'éditeur (le
-  // concepteur, 17/09). En jeu, seule la PRÉVISION EXACTE se demande (P).
+  // LES PUITS DE GRAVITÉ. Plus d'anneau en jeu (le concepteur, 17/09) : une
+  // AURA — un halo qui s'éteint avec la distance —, un NOYAU au centre (la
+  // masse, sa taille dit la force) et LA CHUTE (puitsDessin.ts) : des grains
+  // qui tombent droit vers le centre à l'accélération du solveur, en cadence
+  // dans le cœur (isochrone), à la traîne dans le halo — aucun sens de
+  // rotation, la gravité n'en a pas. On lit le puits, son étendue et sa
+  // lisière sans un trait. La ligne prédite du point-masse ne se dessine
+  // pas en jeu : c'est un outil de conception, dans l'éditeur. En jeu, seule
+  // la PRÉVISION EXACTE se demande (P).
   if ((level.puits?.length ?? 0) > 0) {
     const puits = level.puits!
+    const tChute = performance.now() / 1000
     g.save()
-    for (const p of puits) {
+    for (let i = 0; i < puits.length; i++) {
+      const p = puits[i]
       const c = S(p.x, p.y)
       const R = (p.rayon ?? PUITS_RAYON_DEFAUT) * z
+      const aura = porteeVisible(p) * z
+      // l'aura : un dégradé, vif au centre, éteint à la portée visible
+      const grad = g.createRadialGradient(c.sx, c.sy, 0, c.sx, c.sy, aura)
+      grad.addColorStop(0, 'rgba(190,170,255,0.22)')
+      grad.addColorStop(Math.min(1, R / Math.max(1, aura)), 'rgba(180,160,255,0.07)')
+      grad.addColorStop(1, 'rgba(180,160,255,0)')
+      g.fillStyle = grad
       g.beginPath()
-      g.arc(c.sx, c.sy, R, 0, Math.PI * 2)
-      g.fillStyle = 'rgba(180,160,255,0.06)'
+      g.arc(c.sx, c.sy, aura, 0, Math.PI * 2)
       g.fill()
-      g.strokeStyle = 'rgba(180,160,255,0.75)'
-      g.lineWidth = 1.5
-      g.stroke()
-      if (p.portee) {
+      // les grains et leurs traînes, derrière eux, vers l'extérieur
+      // (l'écran a l'axe y vers le bas)
+      g.lineCap = 'round'
+      for (const gr of grainsPuits(p, tChute, i)) {
+        const q = S(gr.x, gr.y)
+        const rayon = Math.max(1, gr.taille * z)
+        const traine = Math.min(70 * z, gr.vitesse * 0.1 * z)
+        g.strokeStyle = `rgba(200,185,255,${0.5 * gr.alpha})`
+        g.lineWidth = Math.max(1, rayon * 0.9)
         g.beginPath()
-        g.arc(c.sx, c.sy, p.portee * z, 0, Math.PI * 2)
-        g.strokeStyle = 'rgba(180,160,255,0.3)'
-        g.setLineDash([4, 8])
+        g.moveTo(q.sx - gr.tx * traine, q.sy + gr.ty * traine)
+        g.lineTo(q.sx, q.sy)
         g.stroke()
-        g.setLineDash([])
+        g.fillStyle = `rgba(230,220,255,${gr.alpha})`
+        g.beginPath()
+        g.arc(q.sx, q.sy, rayon, 0, Math.PI * 2)
+        g.fill()
       }
-      g.strokeStyle = 'rgba(220,210,255,0.9)'
-      g.lineWidth = 1.5
+      // le noyau : une masse sombre, un liseré qui respire au rythme des chutes
+      const rn = rayonNoyau(p) * z
+      const souffle = 0.6 + 0.4 * (0.5 + 0.5 * Math.cos((tChute / dureeChuteCoeur(p)) * Math.PI * 2))
+      g.fillStyle = 'rgba(30,20,60,0.9)'
       g.beginPath()
-      g.moveTo(c.sx - 6, c.sy)
-      g.lineTo(c.sx + 6, c.sy)
-      g.moveTo(c.sx, c.sy - 6)
-      g.lineTo(c.sx, c.sy + 6)
+      g.arc(c.sx, c.sy, rn, 0, Math.PI * 2)
+      g.fill()
+      g.strokeStyle = `rgba(225,210,255,${0.55 + 0.4 * souffle})`
+      g.lineWidth = Math.max(1.5, 2.5 * z)
       g.stroke()
     }
     // LA PRÉVISION EXACTE, en trait plein, qui grandit tant qu'elle se calcule
@@ -10525,7 +10548,7 @@ function rebuildRenderBoxes(): void {
   renderBoxes = [
     ...level.boxes.slice(0, Math.max(1, MAX_BOXES - 1 - factices.length)),
     ...factices,
-    ...(estMiniJeu(level) ? [] : [{ ...level.exit, material: MAT_EXIT }]),
+    ...(sansSas(level) ? [] : [{ ...level.exit, material: MAT_EXIT }]),
   ]
 }
 // ---- LE PACK PRÉSENCE : le Sujet est vivant ----
@@ -12715,6 +12738,12 @@ function lanceManoeuvre(quoi: string): void {
       }
       case 'orbites': {
         lanceOrbitesEssai()
+        pupitreEl.hidden = true
+        closeHome()
+        break
+      }
+      case 'ronde': {
+        lanceRondeEssai()
         pupitreEl.hidden = true
         closeHome()
         break
@@ -16047,6 +16076,18 @@ function lanceOrbitesEssai(): void {
 }
 ;(window as unknown as { __orbites: () => void }).__orbites = lanceOrbitesEssai
 
+// VOIR LA RONDE (le pupitre, et la sonde __ronde()) : le tableau de
+// démonstration des puits — en glace, lancé, sans fin
+function lanceRondeEssai(): void {
+  if (miseEnBonbonne) fermeMiseEnBonbonne()
+  auHub = false
+  hasPlayed = true
+  document.body.classList.add('playing')
+  testLevel = tableauRonde()
+  restart()
+}
+;(window as unknown as { __ronde: () => void }).__ronde = lanceRondeEssai
+
 function newExpedition(avecCarte = false): void {
   levelIndex = 0
   voieRang = 0 // une descente neuve repart du premier rang du plan
@@ -17859,7 +17900,7 @@ function corpsImage(now: number): boolean {
         }
         // un MINI-JEU n'a pas de sas : rien n'aspire, jamais — la lame
         // conclut ; sinon arroser un sas de loin pèserait
-        sim.exitRadiusFactor = estMiniJeu(level) ? 0 : lev('sasPortee')
+        sim.exitRadiusFactor = sansSas(level) ? 0 : lev('sasPortee')
         sim.applyExitSuction(exitMouth.x, exitMouth.y, params.dt)
         // les CHASSES qui soufflent : le courant s'applique au pas, comme le
         // sas — et la bouffée d'une chasse déclenchée s'épuise au temps de jeu
@@ -18379,7 +18420,7 @@ function corpsImage(now: number): boolean {
   // dans un MINI-JEU, rien ne s'aspire et le bouton ne sert pas : c'est le
   // jeu qui conclut (la lame du couperet ; au palet, le choix après chaque
   // lancer — relancer ou valider)
-  const aspireAssez = estMiniJeu(level) ? false : sim.swallowed >= Math.max(20, sim.baseVolume * 0.1)
+  const aspireAssez = sansSas(level) ? false : sim.swallowed >= Math.max(20, sim.baseVolume * 0.1)
   const texteBouton = 'CONTINUER — CONCLURE L’ESSAI'
   if (btnContinuer.textContent !== texteBouton) btnContinuer.textContent = texteBouton
   // Une traversée déclarée par un OUTIL de conception. La salle se conclut
@@ -18413,7 +18454,7 @@ function corpsImage(now: number): boolean {
   // salle comme une salle ordinaire
   const reached =
     !drainActive &&
-    !estMiniJeu(level) &&
+    !sansSas(level) &&
     pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit)
   // au HUB, pas d'engloutissement à attendre : dès que le CORPS est dans la
   // bouche du sas, la run part — le sas de lancement est une porte, pas un

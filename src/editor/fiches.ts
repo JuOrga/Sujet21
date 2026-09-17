@@ -229,6 +229,7 @@ export const FICHES_GENRES: Record<string, Fiche> = {
       { cle: '·', txt: 'Cœur harmonique : dedans, toute orbite a la même période, le corps reste entier.' },
       { cle: '·', txt: 'Halo au-delà : la marée étire — les orbites vivent dans le cœur, la lisière déchire.' },
       { cle: '·', txt: 'La ligne pointillée depuis le départ dit où l’impulsion mène ; « Prévision exacte » fait courir le solveur.' },
+      { cle: '·', txt: 'En jeu : une aura, un noyau, et des grains qui tombent vers le centre — en cadence dans le cœur, à la traîne au-delà. La gravité n’a pas de sens.' },
     ],
   },
   'genre:cible-tor': {

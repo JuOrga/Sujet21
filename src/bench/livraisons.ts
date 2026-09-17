@@ -31,6 +31,26 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/09/2026 16:05',
+    title: 'LE PUITS SE DESSINE : plus d’anneau en jeu — une aura, un noyau, et LA CHUTE, des grains qui tombent en cadence',
+    notes: [
+      'LA DEMANDE : « supprime le cercle visible en jeu du puits, et fais un design sympa avec des particules pour identifier les puits et leur aura ». Un premier jet faisait TOURNER des lueurs autour du puits, avec un sens réglable — le concepteur l’a retiré lui-même : « il n’y a pas de sens dans la gravité, parfois le sens des particules est à contre-courant ». Ce qui est vrai d’un puits, c’est que tout y tombe, droit vers le centre : c’est cela qu’on montre. Le champ sens n’existe plus.',
+      'LA CHUTE (game/puitsDessin.ts, pur) : quatorze grains lâchés dans le cœur, dix au bord de l’aura, chacun tombe droit vers le centre à l’accélération du solveur (intégrée une fois par réglage, en cache), s’éteint au noyau et renaît ; une traîne derrière lui, vers l’extérieur. LE CŒUR EST ISOCHRONE et ça se voit : lâchés ensemble de distances différentes, les grains du cœur arrivent ensemble, en T/4 = (π/2)·√(rayon/force) — une respiration ; ceux du halo traînent. LE NOYAU : une masse sombre au centre, sa taille dit la force (bornée par le cœur), son liseré respire au rythme des chutes. L’AURA : un dégradé qui s’éteint à la portée, sinon à 1,6 rayon. L’éditeur garde l’anneau du cœur et la portée (des outils de conception) et ajoute la chute figée et le noyau.',
+      'VÉRIFIÉ : puitsDessin.spec (déterminisme, chaque grain tombe vers le centre et jamais hors de l’aura, l’isochronie du cœur — à 80 % de T/4 tous près du noyau, juste après plus aucun —, l’aura bornée à la portée, le noyau borné par le cœur), levelIO (une clé sens dans un fichier est ignorée), fiches ; type-check à 0, build propre. Injouable ici : le rendu est à regarder en main — la taille des grains, l’éclat de l’aura, la longueur des traînes et la pause entre deux chutes sont des nombres du dessin, à tourner.',
+    ],
+  },
+  {
+    date: '17/09/2026 15:25',
+    title: 'LA RONDE : en glace, le corps tourne sans fin entre trois puits — une orbite fermée tirée, pas devinée',
+    notes: [
+      'LA DEMANDE (croquis) : « un niveau où le volume tourne non stop autour de ces 3 centres de gravité, en glace ». Trois puits alignés, la trajectoire en huit à trois lobes (le sens s’inverse à chaque lobe) qui se referme sur elle-même.',
+      'LE TABLEAU (game/ronde.ts, « Voir la ronde (démo) » au pupitre, __ronde()) : trois puits sur x = 0 (écart 800, cœur 350, force 600), toute la salle en zone de glace, le bloc lancé de (−200, 0) droit vers le haut à 451 u/s. Un tour en 13,45 s, sans fin ; rien ne se pilote, on regarde. Sans sas — la règle sansSas (mini-jeux et ronde) remplace estMiniJeu aux quatre endroits du sas.',
+      'L’ORBITE EST TIRÉE (ronde.recherche.spec.ts) : une orbite périodique dans un champ à trois centres, par symétrie — partir de (−a, 0) droit vers le haut, recouper y = 0 à angle droit après le puits du haut ; deux inconnues, une condition, une famille tirée par bissection. LA STABILITÉ SE MESURE : 1 u d’écart au départ reste quelques unités après vingt tours tant que le croisement est dans le cœur, se déchire au-delà ; les orbites à plusieurs tours par lobe sont toutes instables. Le cœur fait la forme (300 : lobes plats ; 350 : ronds ; 450 : étranglés), la force ne fait que le tempo.',
+      'LE CORPS N’EST PAS UN POINT, DEUX FOIS. D’abord un défaut du solveur : sous un puits, un bloc de glace se tassait de 1 u/s (rms 73 → 55 en 20 s, 73 → 22 en douze tours) — le cœur tirait plus sur le bord loin que sur le bord près et la projection rigide ne redresse que les vitesses ; applyPuits donne maintenant à chaque bloc la MOYENNE de son champ (test de garde : le rayon ne bouge plus d’une unité en dix secondes). Ensuite la physique : dans le halo en 1/r², cette moyenne diffère de la valeur au centre — lancé sur l’orbite du point-masse, le bloc s’écartait de 300 u par tour. La recherche tire avec le champ moyenné sur le disque du corps ; la famille tient jusqu’à a = 210, le tableau prend 200.',
+      'VÉRIFIÉ sur le vrai solveur (sim/ronde.spec.ts, six tours ; mesuré vingt-cinq tours, 336 s) : le bloc repasse par (−200 ± 0,6, 0) à chaque tour, période 13,45 s, entier, sans se tasser, avec la vitesse arrondie à l’entier que l’éditeur écrirait. Type-check à 0, build propre. Injouable ici : la ronde à l’écran est à regarder en main.',
+    ],
+  },
+  {
     date: '17/09/2026 14:01',
     title: 'LA REVUE DES PUITS : le corps arrivait en morceaux au croissant — la salle des orbites se retrouve, et neuf défauts se corrigent',
     notes: [
