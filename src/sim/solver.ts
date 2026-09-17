@@ -176,10 +176,6 @@ export class FluidSim {
   chill = 0
   // Vitesse normale du dernier choc de bloc de glace (consommé par l'audio)
   iceImpact = 0
-  // LES COUPS DE BUMPER : chaque choc d'un bloc de glace sur une paroi
-  // hydrophobe, compté depuis le début du tableau — le mini-jeu du flipper
-  // y lit ses points (main.ts lisse les chocs qui s'étalent sur deux pas)
-  bumperHits = 0
   // Gouttes bues par les éponges depuis le début (consommé par l'audio)
   spongeBites = 0
   // LIVRÉ PAR LE CHAMP : cette particule est sortie par la bouche d'un rail,
@@ -3541,7 +3537,6 @@ export class FluidSim {
               (surPhobe ? p.hydrophobeIceRestitution : surPhile ? 0 : rest)
             if (surPhobe && vnOut < p.hydrophobeIceKick)
               vnOut = p.hydrophobeIceKick
-            if (surPhobe) this.bumperHits++
             const j = (vnOut - vn) / denom
             vx += (j * nx) / cnt
             vy += (j * ny) / cnt
