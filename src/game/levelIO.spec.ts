@@ -1353,6 +1353,7 @@ describe('les puits de gravité et l’impulsion de départ font l’aller-retou
       puits: [
         { x: 0, y: 0, force: 540, rayon: 300, portee: 900 },
         { x: 400.4, y: -100 }, // les défauts vivent dans le code : rien ne s'écrit
+        { x: 450, y: 0, sens: -1 }, // une clé inconnue (le sens, retiré : la gravité n'en a pas) : ignorée
         { x: 500, y: 0, rayon: 0 }, // écarté
         { x: 600, y: 0, force: -5 }, // écarté
         { x: 'abc', y: 0 }, // écarté
@@ -1362,6 +1363,7 @@ describe('les puits de gravité et l’impulsion de départ font l’aller-retou
     expect(level!.puits).toEqual([
       { x: 0, y: 0, force: 540, rayon: 300, portee: 900 },
       { x: 400.4, y: -100 },
+      { x: 450, y: 0 },
     ])
     const relu = parseLevel(JSON.parse(serializeLevel(level!)))
     expect(relu.level!.puits).toEqual(level!.puits)
