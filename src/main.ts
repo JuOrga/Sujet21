@@ -1062,6 +1062,7 @@ let ciblesJauge = 0
 let ciblesPalierT = -Infinity
 let ciblesMireT: number[] = []
 let ciblesTic = -1
+let ciblesFlashT = -Infinity // l'instant de la dernière touche : l'écran s'éclaire
 // LE BILAN : à zéro, le monde se fige, le total se compte, le verdict se
 // tamponne — puis seulement la carte (BILAN_COMPTE, BILAN_TAMPON, BILAN_FIN en s)
 let ciblesBilan: { t0: number } | null = null
@@ -8837,100 +8838,141 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       const age = elapsed - e.t
       if (age < 0 || age > 1.1) continue
       const c = S(e.x, e.y)
+      // deux cercles qui s'ouvrent, épais, et un disque qui s'éteint
+      const vie = 1 - age / 1.1
+      g.fillStyle = `rgba(255,230,160,${(0.35 * vie * vie).toFixed(3)})`
       g.beginPath()
-      g.arc(c.sx, c.sy, (20 + (100 + 160 * e.force) * age) * z, 0, Math.PI * 2)
-      g.strokeStyle = `rgba(255,230,160,${(1 - age / 1.1).toFixed(3)})`
-      g.lineWidth = 2 + 3 * e.force
-      g.stroke()
+      g.arc(c.sx, c.sy, (60 + 120 * e.force) * z * (0.6 + 0.4 * age), 0, Math.PI * 2)
+      g.fill()
+      for (const k of [0, 0.18]) {
+        const a2 = age - k
+        if (a2 < 0) continue
+        g.beginPath()
+        g.arc(c.sx, c.sy, (20 + (180 + 240 * e.force) * a2) * z, 0, Math.PI * 2)
+        g.strokeStyle = `rgba(255,230,160,${(vie * (1 - a2)).toFixed(3)})`
+        g.lineWidth = 4 + 6 * e.force
+        g.stroke()
+      }
       if (e.points > 0) {
-        const taille = Math.max(14, Math.min(48, (90 + 110 * e.force) * z)) * (age < 0.12 ? 1 + (0.12 - age) * 4 : 1)
-        g.fillStyle = `rgba(255,240,180,${(1 - age / 1.1).toFixed(3)})`
-        g.font = `800 ${Math.round(taille)}px ui-monospace, monospace`
+        // le chiffre : gros, sur un fond sombre, en pixels d'écran (lisible à tout zoom)
+        const taille = (34 + 30 * e.force) * (age < 0.15 ? 1 + (0.15 - age) * 5 : 1)
+        const yTxt = c.sy - 40 * z - 60 * age
+        g.font = `900 ${Math.round(taille)}px ui-monospace, monospace`
         g.textAlign = 'center'
-        g.fillText(`+${e.points}`, c.sx, c.sy - (30 + 90 * age) * z)
+        g.lineWidth = Math.max(4, taille * 0.18)
+        g.strokeStyle = `rgba(30,10,40,${(0.9 * vie).toFixed(3)})`
+        g.strokeText(`+${e.points}`, c.sx, yTxt)
+        g.fillStyle = `rgba(255,240,180,${vie.toFixed(3)})`
+        g.fillText(`+${e.points}`, c.sx, yTxt)
         if (e.serie >= 2) {
-          g.font = `700 ${Math.round(taille * 0.6)}px ui-monospace, monospace`
-          g.fillStyle = `rgba(255,150,120,${(1 - age / 1.1).toFixed(3)})`
-          g.fillText(`SÉRIE ×${e.serie}`, c.sx, c.sy - (30 + 90 * age) * z - taille * 0.9)
+          g.font = `800 ${Math.round(taille * 0.55)}px ui-monospace, monospace`
+          g.strokeText(`SÉRIE ×${e.serie}`, c.sx, yTxt - taille * 0.95)
+          g.fillStyle = `rgba(255,150,120,${vie.toFixed(3)})`
+          g.fillText(`SÉRIE ×${e.serie}`, c.sx, yTxt - taille * 0.95)
         }
       }
     }
     if (level.minijeu?.type === 'cibles') {
       const r = level.minijeu.regles
-      const t = Math.max(12, Math.min(28, 90 * z))
       const tJeu = run.tableauTime - orbitesT0
       const reste = Math.max(0, r.duree - tJeu)
-      // LA JAUGE DES PALIERS, au bord droit de la salle : graduée aux trois
+      // TOUT LE HUD DES CIBLES EST EN PIXELS D'ÉCRAN, pas dans le monde : au
+      // zoom de la salle, le compte et la jauge passaient sous les barres ou
+      // devenaient illisibles (le concepteur, 17/09 : « plus voyant »)
+      const W = vw
+      const H = vh
+      // L'ÉCLAIR D'UNE TOUCHE : l'écran s'allume un dixième de seconde
+      const flash = elapsed - ciblesFlashT
+      if (flash >= 0 && flash < 0.14) {
+        g.fillStyle = `rgba(255,235,170,${(0.28 * (1 - flash / 0.14)).toFixed(3)})`
+        g.fillRect(0, 0, W, H)
+      }
+      // LA JAUGE DES PALIERS, au bord droit de l'écran : graduée aux trois
       // paliers avec leur verdict, elle se remplit avec les points (en
       // glissant), pulse au palier franchi ; le haut vaut le premier palier
-      // et un quart de plus — au-delà, elle déborde et le dit
+      // et un quart de plus
       const plein = r.paliers[0] * 1.25
       ciblesJauge += (ciblesEtat.points - ciblesJauge) * Math.min(1, dtFx * 6)
-      const bas = S(level.bounds.maxX - 70, level.bounds.minY + 120)
-      const haut = S(level.bounds.maxX - 70, level.bounds.maxY - 140)
-      const larg = Math.max(8, 36 * z)
-      const H = bas.sy - haut.sy
-      g.fillStyle = 'rgba(255,255,255,0.08)'
-      g.fillRect(bas.sx - larg / 2, haut.sy, larg, H)
+      const jx = W - 46
+      const jHaut = 110
+      const jBas = H - 150
+      const larg = 22
+      const HJ = jBas - jHaut
+      g.fillStyle = 'rgba(0,0,0,0.35)'
+      g.fillRect(jx - larg / 2 - 4, jHaut - 4, larg + 8, HJ + 8)
+      g.fillStyle = 'rgba(255,255,255,0.1)'
+      g.fillRect(jx - larg / 2, jHaut, larg, HJ)
       const part = Math.min(1, ciblesJauge / plein)
-      const pulse = elapsed - ciblesPalierT < 0.5 ? 1 + 0.6 * (1 - (elapsed - ciblesPalierT) / 0.5) : 1
+      const depuisPalier = elapsed - ciblesPalierT
+      const pulse = depuisPalier < 0.5 ? 1 + 0.7 * (1 - depuisPalier / 0.5) : 1
       const teinte = ciblesJauge >= r.paliers[0] ? '140,255,190' : ciblesJauge >= r.paliers[1] ? '255,200,120' : '255,150,150'
-      g.fillStyle = `rgba(${teinte},${(0.55 + 0.4 * (pulse - 1)).toFixed(3)})`
-      g.fillRect(bas.sx - (larg * pulse) / 2, bas.sy - H * part, larg * pulse, H * part)
-      g.strokeStyle = 'rgba(255,255,255,0.35)'
+      g.fillStyle = `rgba(${teinte},${(0.75 + 0.25 * (pulse - 1)).toFixed(3)})`
+      g.fillRect(jx - (larg * pulse) / 2, jBas - HJ * part, larg * pulse, HJ * part)
+      g.strokeStyle = 'rgba(255,255,255,0.5)'
       g.lineWidth = 1
-      g.strokeRect(bas.sx - larg / 2, haut.sy, larg, H)
-      g.font = `600 ${Math.round(t * 0.6)}px ui-monospace, monospace`
+      g.strokeRect(jx - larg / 2, jHaut, larg, HJ)
+      g.font = '700 12px ui-monospace, monospace'
       g.textAlign = 'right'
       const verdicts = [VERDICTS_CIBLES.juste, VERDICTS_CIBLES.proche, VERDICTS_CIBLES.loin]
       r.paliers.forEach((p, i) => {
-        const y = bas.sy - H * Math.min(1, p / plein)
+        const y = jBas - HJ * Math.min(1, p / plein)
         const atteint = ciblesEtat.points >= p
-        g.strokeStyle = atteint ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)'
+        g.strokeStyle = atteint ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.45)'
+        g.lineWidth = atteint ? 2 : 1
         g.beginPath()
-        g.moveTo(bas.sx - larg / 2 - 6, y)
-        g.lineTo(bas.sx + larg / 2, y)
+        g.moveTo(jx - larg / 2 - 8, y)
+        g.lineTo(jx + larg / 2, y)
         g.stroke()
-        g.fillStyle = atteint ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.5)'
-        g.fillText(`${verdicts[i]} ${p}`, bas.sx - larg / 2 - 10, y + t * 0.22)
+        g.fillStyle = atteint ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.55)'
+        g.fillText(`${verdicts[i]} ${p}`, jx - larg / 2 - 12, y + 4)
       })
+      // LE COMPTE ET LE CHRONO, en haut au centre, gros : les dix dernières
+      // secondes, le chrono grossit, rougit et bat
       g.textAlign = 'center'
-      g.font = `800 ${Math.round(t * 0.9)}px ui-monospace, monospace`
-      g.fillStyle = 'rgba(255,255,255,0.95)'
-      g.fillText(String(ciblesEtat.points), bas.sx, bas.sy + t * 1.1)
-      // LE CHRONO en tête de salle : les dix dernières secondes grossissent et battent
-      const anc = S(0, level.bounds.maxY - 60)
-      if (ciblesBilan) {
+      const cx = W / 2
+      const dernieres = reste <= 10 && reste > 0 && !ciblesBilan
+      const bat = dernieres ? 1.3 + 0.3 * Math.max(0, 1 - (Math.ceil(reste) - reste) * 4) : 1
+      if (!ciblesBilan) {
+        g.fillStyle = 'rgba(0,0,0,0.45)'
+        g.fillRect(cx - 150, 52, 300, 62)
+        g.font = '900 34px ui-monospace, monospace'
+        g.fillStyle = 'rgba(255,255,255,0.96)'
+        g.fillText(`${ciblesEtat.points} PTS`, cx - 60, 96)
+        g.font = `${dernieres ? 900 : 700} ${Math.round(30 * bat)}px ui-monospace, monospace`
+        g.fillStyle = dernieres ? 'rgba(255,150,130,0.98)' : 'rgba(255,230,170,0.95)'
+        g.fillText(impulsionEnAttente ? '—' : `${Math.ceil(reste)} s`, cx + 70, 96)
+        if (impulsionEnAttente) {
+          g.font = '600 14px ui-monospace, monospace'
+          g.fillStyle = 'rgba(255,255,255,0.8)'
+          g.fillText('LE LANCER ATTEND LA FIN DU PLAN LARGE', cx, 132)
+        }
+      } else {
         // LE BILAN : le total se compte chiffre à chiffre, puis le verdict se tamponne
         const age = elapsed - ciblesBilan.t0
         const compte = Math.round(ciblesEtat.points * Math.min(1, age / BILAN_COMPTE))
-        const gros = Math.max(28, Math.min(120, 320 * z))
-        g.font = `800 ${Math.round(gros)}px ui-monospace, monospace`
-        g.fillStyle = 'rgba(255,255,255,0.96)'
-        const centre = S(0, level.bounds.minY + (level.bounds.maxY - level.bounds.minY) * 0.55)
-        g.fillText(`${compte}`, centre.sx, centre.sy)
-        g.font = `600 ${Math.round(gros * 0.32)}px ui-monospace, monospace`
-        g.fillText(`POINT${compte > 1 ? 'S' : ''} · ${ciblesEtat.touches} TOUCHE${ciblesEtat.touches > 1 ? 'S' : ''}`, centre.sx, centre.sy + gros * 0.5)
+        const gros = Math.max(72, Math.min(160, H * 0.2))
+        const cy = H * 0.45
+        g.fillStyle = 'rgba(0,0,0,0.55)'
+        g.fillRect(cx - 260, cy - gros * 1.25, 520, gros * 2.1)
+        g.font = `900 ${Math.round(gros)}px ui-monospace, monospace`
+        g.fillStyle = 'rgba(255,255,255,0.98)'
+        g.fillText(`${compte}`, cx, cy)
+        g.font = `700 ${Math.round(gros * 0.3)}px ui-monospace, monospace`
+        g.fillStyle = 'rgba(255,230,170,0.95)'
+        g.fillText(`POINT${compte > 1 ? 'S' : ''} · ${ciblesEtat.touches} TOUCHE${ciblesEtat.touches > 1 ? 'S' : ''}`, cx, cy + gros * 0.5)
         if (age >= BILAN_TAMPON) {
           const k = Math.min(1, (age - BILAN_TAMPON) / 0.25)
           const note = noteCibles(ciblesEtat.points, r)
-          const echelle = 2.2 - 1.2 * k
+          const echelle = 2.4 - 1.4 * k
           g.save()
-          g.translate(centre.sx, centre.sy - gros * 0.95)
+          g.translate(cx, cy - gros * 0.85)
           g.rotate(-0.08)
           g.scale(echelle, echelle)
-          g.font = `900 ${Math.round(gros * 0.42)}px ui-monospace, monospace`
-          g.fillStyle = `rgba(${note.verdict === 'juste' ? '140,255,190' : note.verdict === 'rate' ? '255,120,120' : '255,200,120'},${(0.35 + 0.6 * k).toFixed(3)})`
+          g.font = `900 ${Math.round(gros * 0.4)}px ui-monospace, monospace`
+          g.fillStyle = `rgba(${note.verdict === 'juste' ? '140,255,190' : note.verdict === 'rate' ? '255,120,120' : '255,200,120'},${(0.35 + 0.63 * k).toFixed(3)})`
           g.fillText(VERDICTS_CIBLES[note.verdict], 0, 0)
           g.restore()
         }
-      } else {
-        const dernieres = reste <= 10 && reste > 0
-        const bat = dernieres ? 1.25 + 0.25 * Math.max(0, 1 - (Math.ceil(reste) - reste) * 4) : 1
-        g.font = `${dernieres ? 800 : 600} ${Math.round(t * 0.85 * bat)}px ui-monospace, monospace`
-        g.fillStyle = dernieres ? 'rgba(255,170,150,0.96)' : 'rgba(255,255,255,0.92)'
-        const consigne = impulsionEnAttente ? 'LE LANCER ATTEND LA FIN DU PLAN LARGE' : dernieres ? `${Math.ceil(reste)}` : `${Math.ceil(reste)} s`
-        g.fillText(consigne, anc.sx, anc.sy)
       }
     }
     g.restore()
@@ -13345,6 +13387,7 @@ function majCibles(): void {
       const pts = Math.round(m.points * Math.min(r.plafond, tc.taille / reference)) * multiplicateurSerie(serie, r)
       ciblesEclairs.push({ x: tc.x, y: tc.y, t: elapsed, points: pts, force, serie })
       ciblesMireT[tc.mire] = elapsed
+      ciblesFlashT = elapsed
       audio.toucheMire(force)
       if (force >= 0.5) {
         // une touche pleine se sent : la cuve tremble un instant
@@ -13575,6 +13618,7 @@ function resetLasers(): void {
   ciblesPalierT = -Infinity
   ciblesMireT = []
   ciblesTic = -1
+  ciblesFlashT = -Infinity
   ciblesBilan = null
   document.body.classList.remove('coup')
   tir.aiming = false
@@ -17948,7 +17992,10 @@ function corpsImage(now: number): boolean {
         // la direction lisible même stick à peine poussé
         const rPx =
           (0.15 + 0.85 * manette.force) * params.gasDashRange * camera.zoom
-        const sens = input.gasIntent ? 1 : -1 // eau : le point d'éjection est derrière
+        // eau : le point d'éjection est derrière (l'éjection pousse) ; vapeur
+        // et TIR DE GLACE : le stick dit où l'on envoie (« au joystick c'est
+        // inversé », le concepteur, 17/09 — le tir suivait la règle de l'eau)
+        const sens = input.gasIntent || (params.glaceTir > 0 && input.freezeIntent) ? 1 : -1
         manetteCurseur.x = scx + manette.dirX * rPx * sens
         manetteCurseur.y = scy + manette.dirY * rPx * sens
         if (manette.agit) {
@@ -19674,6 +19721,13 @@ function corpsImage(now: number): boolean {
     const puissance = Math.min(1, dMonde / Math.max(1, params.gasDashRange))
     const eclat = Math.round(sim.playerCount * params.glaceTir)
     dashCostEl.textContent = `ÉCLAT ${Math.round(puissance * 100)} % · ${eclat} grain${eclat > 1 ? 's' : ''} sur ${sim.playerCount}`
+    // la flèche grossit avec la puissance, et s'allume à 100 %
+    dashAimEl.style.setProperty('--p', puissance.toFixed(3))
+    dashAimEl.classList.toggle('plein', puissance >= 0.999)
+  }
+  if (!tir.aiming) {
+    dashAimEl.style.setProperty('--p', '1')
+    dashAimEl.classList.remove('plein')
   }
   dashAimEl.classList.toggle('visible', dash.aiming || tir.aiming)
   dashCostEl.classList.toggle('visible', dash.aiming || tir.aiming)

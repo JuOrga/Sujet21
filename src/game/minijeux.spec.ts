@@ -372,6 +372,12 @@ describe('les cibles — des éclats de glace, des mires, trente secondes', () =
     expect(avanceCibles(fin, 40, [{ mire: 1, taille: 90 }], mires, 900, r)).toBe(fin)
     expect(multiplicateurSerie(0, r)).toBe(1)
     expect(multiplicateurSerie(9, r)).toBe(r.serieMax)
+    // des règles sans série (une copie d'avant) : le défaut, jamais NaN
+    const sans = { ...r } as Partial<typeof r>
+    delete sans.serieMax
+    delete sans.serieDelai
+    expect(multiplicateurSerie(2, sans as typeof r)).toBe(2)
+    expect(avanceCibles(ETAT_CIBLES_NEUF, 1, [{ mire: 0, taille: 90 }], mires, 900, sans as typeof r).points).toBe(10)
   })
 
   it('le verdict aux paliers', () => {

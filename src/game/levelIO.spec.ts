@@ -1464,6 +1464,14 @@ describe('un mini-jeu survit à l’enregistrement', () => {
     const faux = parseLevel({ ...JSON.parse(serializeLevel(lv)), minijeu: { type: 'flipper', regles: {} } })
     expect(faux.level!.minijeu).toBeUndefined()
     expect(faux.rejets).toEqual(['le mini-jeu a été écarté (type inconnu)'])
+    // une copie publiée AVANT la série (sans serieDelai ni serieMax) : les
+    // défauts du code comblent — sans quoi le compte faisait NaN
+    const brut = JSON.parse(serializeLevel(lv))
+    delete brut.minijeu.regles.serieDelai
+    delete brut.minijeu.regles.serieMax
+    const ancien = parseLevel(brut).level!
+    expect((ancien.minijeu as { regles: { serieMax: number; serieDelai: number } }).regles.serieMax).toBe(3)
+    expect((ancien.minijeu as { regles: { serieMax: number; serieDelai: number } }).regles.serieDelai).toBe(2)
     // la validation : des paliers qui ne décroissent pas, une durée trop courte
     expect(checkLevel(lv).some((v) => /paliers|dure moins/.test(v.message))).toBe(false)
     const mal = { ...lv, minijeu: { ...lv.minijeu!, regles: { ...(lv.minijeu as { regles: object }).regles, paliers: [10, 30, 60] as [number, number, number], duree: 3 } } }
