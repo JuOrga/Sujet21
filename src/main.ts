@@ -137,6 +137,7 @@ import {
   VERDICTS_PALET,
   VERDICTS_TRAIT,
   type EtatPalet,
+  type Lancer,
   type NoteTrait,
 } from './game/minijeux'
 import {
@@ -993,8 +994,11 @@ let minijeuResultat: { note: NoteTrait; titre: string; detail: string; mesure: n
 // LE COUPERET en cours : la lame était-elle baissée au sous-pas précédent
 // (la pesée se fait à l'instant où elle tombe, une seule fois)
 let couperetLamePrec = false
-// LE PALET en cours : ses lancers, avancés à l'image (avancePalet, pur)
+// LE PALET en cours : ses lancers, avancés à l'image (avancePalet, pur),
+// et combien ont déjà été montrés (un lancer fini ouvre le choix : relancer
+// ou valider — une fois)
 let paletEtat: EtatPalet = ETAT_PALET_NEUF
+let paletLancersVus = 0
 // LES RÉGLAGES d'un mini-jeu en cours : les valeurs du banc qu'il a
 // remplacées, pour les rendre à la salle suivante
 let reglagesRendus: Partial<SimParams> = {}
@@ -12877,9 +12881,9 @@ function majCouperet(): void {
  *  prise, où est son centre, à quelle vitesse) passe à avancePalet, qui
  *  tient les lancers. Le dernier lancer fini — ou le joueur qui conclut
  *  avec au moins un lancer fait — pose le verdict du meilleur. */
-function majPalet(conclure: boolean): void {
+function majPalet(): void {
   const mj = level.minijeu
-  if (!mj || mj.type !== 'palet' || minijeuResultat) return
+  if (!mj || mj.type !== 'palet' || minijeuResultat || miseEnBonbonne) return
   const n = sim.count
   let gels = 0
   for (let i = 0; i < n; i++) if (sim.frozen[i] === 1) gels++
@@ -12894,8 +12898,19 @@ function majPalet(conclure: boolean): void {
     },
     mj.regles,
   )
+  if (paletEtat.lancers.length <= paletLancersVus) return
+  // UN LANCER VIENT DE FINIR. Le dernier conclut ; sinon le joueur choisit :
+  // relancer (remise en place, même volume de départ) ou valider le meilleur
+  paletLancersVus = paletEtat.lancers.length
+  if (paletEtat.fini) validePalet()
+  else mbMontreChoixPalet(paletEtat.lancers[paletEtat.lancers.length - 1])
+}
+
+/** VALIDER LE PALET : le meilleur lancer fait le verdict. */
+function validePalet(): void {
+  const mj = level.minijeu
   const best = meilleurLancer(paletEtat)
-  if (!best || !(paletEtat.fini || conclure)) return
+  if (!mj || mj.type !== 'palet' || !best) return
   const note = notePalet(best.distance, mj.regles.rayons)
   minijeuResultat = {
     note,
@@ -12903,6 +12918,59 @@ function majPalet(conclure: boolean): void {
     titre: `LE PALET — ${VERDICTS_PALET[note.verdict]}`,
     detail: `${paletEtat.lancers.length} lancer${paletEtat.lancers.length > 1 ? 's' : ''}, le meilleur à ${Math.round(best.distance)} u du centre`,
   }
+}
+
+/** RELANCER : la piste se remet en place — le corps renaît au départ avec
+ *  le volume de base — et les lancers faits restent. Le concepteur (17/09) :
+ *  « une fois un essai, remettre en place avec même volume de base ». */
+function relancePalet(): void {
+  const garde = paletEtat
+  restart() // resetLasers y remet le palet à neuf : on restaure après
+  paletEtat = { ...garde, enCours: null, arme: false }
+  paletLancersVus = garde.lancers.length
+}
+
+/** LE CHOIX APRÈS UN LANCER : deux cartes — relancer, ou valider le
+ *  meilleur. Le bouton CONTINUER du sas ne convient pas ici (« en plein
+ *  milieu alors qu'on doit repartir ») : la remise en place est le geste. */
+function mbMontreChoixPalet(dernier: Lancer): void {
+  const mj = level.minijeu
+  if (!mj || mj.type !== 'palet') return
+  const num = paletEtat.lancers.length
+  const best = meilleurLancer(paletEtat)!
+  miseEnBonbonne = true
+  mbBilanCourant = null
+  mbVeil.hidden = false
+  mbScene.classList.add('mb-compact')
+  mbScene.classList.remove('mb-large')
+  mbEl('mb-releve').hidden = true
+  mbEl('mb-etal').hidden = true
+  mbEl('mb-passer').hidden = true
+  mbEl('mb-choix').hidden = false
+  mbEtape = 'repos'
+  mbQuestion('LE PALET')
+  mbEl('mb-choix-titre').textContent = `LANCER ${num} / ${mj.regles.lancers} — ${Math.round(dernier.distance)} u DU CENTRE · ${VERDICTS_PALET[dernier.verdict]}`
+  const host = mbCartes()
+  host.innerHTML = ''
+  host.classList.add('mb-trio')
+  let elu = false
+  const carte = (col: number, icone: string, titre: string, sous: string, action: () => void): void => {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'mb-carte mb-repos'
+    btn.style.gridColumn = String(col)
+    btn.innerHTML = `<i class="mb-repos-icone">${icone}</i><b>${titre}</b><small>${sous}</small>`
+    btn.addEventListener('click', () => {
+      if (elu) return
+      elu = true
+      bande.ponctuation('sting-collecte', 0.6)
+      fermeMiseEnBonbonne()
+      action()
+    })
+    host.appendChild(btn)
+  }
+  carte(1, '🥌', `LANCER ${num + 1} / ${mj.regles.lancers}`, 'remise en place au départ, même volume de base', relancePalet)
+  carte(3, '✓', 'VALIDER', `garder le meilleur : ${Math.round(best.distance)} u · ${VERDICTS_PALET[best.verdict]}`, validePalet)
 }
 
 /** LA POSE : chaque porte prend l'état de son canal d'un coup, sans jouer
@@ -12934,6 +13002,7 @@ function resetLasers(): void {
   couperetLamePrec = false
   minijeuResultat = null
   paletEtat = ETAT_PALET_NEUF
+  paletLancersVus = 0
   laserEtat.chassesActives = (level.chasses ?? []).map(() => false)
   laserEtat.chasseBouffee = (level.chasses ?? []).map(() => 0)
   lastRailTime = 0
@@ -17997,14 +18066,11 @@ function corpsImage(now: number): boolean {
   // « un peu d'aspiration » : un dixième du volume de départ en bonbonne
   // suffit — la route coûte de l'eau (chaque impulsion éjecte), exiger la
   // moitié du volume INITIAL rendait le bouton inatteignable en vraie partie
-  // dans un MINI-JEU, rien ne s'aspire : c'est le jeu qui conclut (la lame
-  // du couperet, le dernier lancer du palet). Au palet seulement, le bouton
-  // permet de conclure plus tôt, dès qu'un lancer est fait
-  const paletEnCours = level.minijeu?.type === 'palet' && paletEtat.lancers.length > 0 && !minijeuResultat
-  const aspireAssez = estMiniJeu(level) ? paletEnCours : sim.swallowed >= Math.max(20, sim.baseVolume * 0.1)
-  const texteBouton = paletEnCours
-    ? `CONCLURE — ${paletEtat.lancers.length} LANCER${paletEtat.lancers.length > 1 ? 'S' : ''} SUR ${level.minijeu?.type === 'palet' ? level.minijeu.regles.lancers : 0}`
-    : 'CONTINUER — CONCLURE L’ESSAI'
+  // dans un MINI-JEU, rien ne s'aspire et le bouton ne sert pas : c'est le
+  // jeu qui conclut (la lame du couperet ; au palet, le choix après chaque
+  // lancer — relancer ou valider)
+  const aspireAssez = estMiniJeu(level) ? false : sim.swallowed >= Math.max(20, sim.baseVolume * 0.1)
+  const texteBouton = 'CONTINUER — CONCLURE L’ESSAI'
   if (btnContinuer.textContent !== texteBouton) btnContinuer.textContent = texteBouton
   // Une traversée déclarée par un OUTIL de conception. La salle se conclut
   // pour de bon — cérémonie, condensat, descente qui avance — mais RIEN DE
@@ -18108,7 +18174,7 @@ function corpsImage(now: number): boolean {
       effaceRun()
       newExpedition(true)
     })
-  } else if (!tableauDone && !sim.dispersed && estMiniJeu(level) && level.minijeu && (majPalet(drunk), minijeuResultat)) {
+  } else if (!tableauDone && !sim.dispersed && estMiniJeu(level) && level.minijeu && (majPalet(), minijeuResultat)) {
     // LE MINI-JEU A CONCLU : la lame du couperet a pesé, le palet a fait
     // ses lancers (ou le joueur a conclu). Rien ne se consigne aux registres
     // (pas un tableau du protocole), la mémoire se gagne au barème, la
