@@ -194,10 +194,9 @@ describe('le palet — les lancers et la maison', () => {
 
   it('le tirage au catalogue rend chaque mini-jeu, et jamais autre chose', () => {
     expect(tireMiniJeu(() => 0)).toBe('couperet')
-    expect(tireMiniJeu(() => 0.3)).toBe('palet')
-    expect(tireMiniJeu(() => 0.6)).toBe('rafales')
-    expect(tireMiniJeu(() => 0.99)).toBe('souffle')
-    expect(tireMiniJeu(() => 1)).toBe('souffle')
+    expect(tireMiniJeu(() => 0.5)).toBe('palet')
+    expect(tireMiniJeu(() => 0.99)).toBe('rafales')
+    expect(tireMiniJeu(() => 1)).toBe('rafales')
     const vus = new Set<string>()
     for (let i = 0; i < 40; i++) vus.add(tireMiniJeu(aleaDeGraine(`m${i}`)))
     expect([...vus].sort()).toEqual([...MINI_JEUX].sort())
@@ -241,41 +240,5 @@ describe('les rafales — la traversée et ce qu’il en reste', () => {
     expect(lv.spawn.x).toBeLessThan(lv.chasses![0].minX)
     expect(lv.exit.minX).toBeGreaterThan(lv.bounds.maxX)
     expect(lv.labels.filter((l) => /^[12] · /.test(l.text))).toHaveLength(2)
-  })
-})
-
-import { dansRect, noteSouffle, REGLAGES_SOUFFLE, REGLES_SOUFFLE, tableauSouffle, VERDICTS_SOUFFLE } from './minijeux'
-import { MAT_GRILLE } from './level'
-
-describe('le souffle — le slalom en vapeur', () => {
-  it('le verdict suit le temps, au barème du trait', () => {
-    const p = REGLES_SOUFFLE.paliers
-    expect(noteSouffle(10, p)).toMatchObject({ verdict: 'juste', memoire: 15 })
-    expect(noteSouffle(12, p).verdict).toBe('juste')
-    expect(noteSouffle(15, p)).toMatchObject({ verdict: 'proche', memoire: 5 })
-    expect(noteSouffle(22, p)).toMatchObject({ verdict: 'loin', memoire: 3 })
-    expect(noteSouffle(40, p)).toMatchObject({ verdict: 'rate', memoire: 0 })
-    expect(VERDICTS_SOUFFLE.juste).toBe('EN UN SOUFFLE')
-    expect(dansRect(1500, 0, REGLES_SOUFFLE.arrivee)).toBe(true)
-    expect(dansRect(1300, 0, REGLES_SOUFFLE.arrivee)).toBe(false)
-  })
-
-  it('le slalom : la vapeur imposée partout, des grilles en quinconce qui laissent chacune un passage, les dashs sans compte — et pas de sas', () => {
-    const lv = tableauSouffle()
-    expect(lv.minijeu?.type).toBe('souffle')
-    expect(lv.minijeu?.reglages).toEqual(REGLAGES_SOUFFLE)
-    expect(REGLAGES_SOUFFLE.gasIdleLossRate).toBeGreaterThan(2) // le temps s'évapore
-    expect(lv.dashBudget).toBeGreaterThanOrEqual(20)
-    expect(lv.zones?.[0]).toMatchObject({ force: 'vapeur', minX: lv.bounds.minX, maxX: lv.bounds.maxX })
-    const grilles = lv.boxes.filter((b) => b.material === MAT_GRILLE)
-    expect(grilles).toHaveLength(4)
-    // chaque grille laisse 300 u de passage, en haut puis en bas, en alternance
-    const passages = grilles.map((g) => (g.minY > lv.bounds.minY ? 'bas' : 'haut'))
-    expect(passages).toEqual(['haut', 'bas', 'haut', 'bas'])
-    for (const g of grilles) expect(g.maxY - g.minY).toBe(1200 - 300)
-    for (let i = 1; i < grilles.length; i++) expect(grilles[i].minX).toBeGreaterThan(grilles[i - 1].maxX)
-    expect(lv.spawn.x).toBeLessThan(grilles[0].minX)
-    expect(REGLES_SOUFFLE.arrivee.minX).toBeGreaterThan(grilles[3].maxX)
-    expect(lv.exit.minX).toBeGreaterThan(lv.bounds.maxX)
   })
 })

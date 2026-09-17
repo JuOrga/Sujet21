@@ -125,24 +125,20 @@ import {
   arriveRafales,
   avancePalet,
   compteAuDela,
-  dansRect,
   estMiniJeu,
   ETAT_PALET_NEUF,
   meilleurLancer,
   notePalet,
   noteRafales,
-  noteSouffle,
   noteTrait,
   phaseCouperet,
   tableauCouperet,
   tableauPalet,
   tableauRafales,
-  tableauSouffle,
   tireMiniJeu,
   tireTrait,
   VERDICTS_PALET,
   VERDICTS_RAFALES,
-  VERDICTS_SOUFFLE,
   VERDICTS_TRAIT,
   type EtatPalet,
   type Lancer,
@@ -7097,7 +7093,7 @@ function renderDescente(): void {
     ),
     dscCran(
       'MINI-JEUX PAR MODULE',
-      'le couperet, le palet, les rafales ou le souffle, tirés à la graine : la précision paie en mémoire — 0 : aucun',
+      'le couperet, le palet ou les rafales, tirés à la graine : la précision paie en mémoire — 0 : aucun',
       () => voiePlan.minijeuxParModule,
       (v) => {
         voiePlan.minijeuxParModule = v
@@ -8708,38 +8704,6 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     g.fillStyle = 'rgba(255,255,255,0.92)'
     const part = sim.baseVolume > 0 ? Math.round((100 * sim.playerCount) / sim.baseVolume) : 0
     g.fillText(`IL VOUS RESTE ${part} %`, anc.sx, anc.sy + t * 1.15)
-    g.restore()
-  }
-
-  // LE SOUFFLE : l'arrivée, le chrono (au vert tant qu'on est dans le
-  // premier palier, à l'orange puis au rouge après), et ce qu'il reste du nuage
-  if (level.minijeu?.type === 'souffle') {
-    const r = level.minijeu.regles
-    g.save()
-    const a = S(r.arrivee.minX, r.arrivee.maxY)
-    const b = S(r.arrivee.maxX, r.arrivee.minY)
-    g.strokeStyle = 'rgba(140,255,190,0.7)'
-    g.setLineDash([6, 8])
-    g.lineWidth = 2
-    g.strokeRect(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy)
-    g.setLineDash([])
-    const temps = minijeuResultat ? minijeuResultat.mesure : run.tableauTime
-    const t = Math.max(12, Math.min(28, 90 * z))
-    const anc = S(0, 520)
-    g.textAlign = 'center'
-    g.font = `600 ${Math.round(t * 0.85)}px ui-monospace, monospace`
-    g.fillStyle = minijeuResultat
-      ? 'rgba(140,255,190,0.95)'
-      : temps <= r.paliers[0]
-        ? 'rgba(200,255,220,0.9)'
-        : temps <= r.paliers[1]
-          ? 'rgba(255,200,120,0.95)'
-          : 'rgba(255,110,110,0.95)'
-    g.fillText(`${minijeuResultat ? 'ARRIVÉ EN' : ''} ${temps.toFixed(1).replace('.', ',')} s`.trim(), anc.sx, anc.sy)
-    g.font = `${Math.round(t * 0.8)}px ui-monospace, monospace`
-    g.fillStyle = 'rgba(255,255,255,0.92)'
-    const part = sim.baseVolume > 0 ? Math.round((100 * sim.playerCount) / sim.baseVolume) : 0
-    g.fillText(`NUAGE ${part} %`, anc.sx, anc.sy + t * 1.15)
     g.restore()
   }
 
@@ -12626,12 +12590,6 @@ function lanceManoeuvre(quoi: string): void {
         closeHome()
         break
       }
-      case 'souffle': {
-        lanceSouffleEssai()
-        pupitreEl.hidden = true
-        closeHome()
-        break
-      }
       case 'hub-principal': {
         const r = passeLeHub('principal')
         if (r === 'ok') {
@@ -12973,23 +12931,6 @@ function majRafales(): void {
     mesure: part,
     titre: `LES RAFALES — ${VERDICTS_RAFALES[note.verdict]}`,
     detail: `${fmtL(sim.playerCount * params.litersPerParticle)} à l'arrivée sur ${fmtL(sim.baseVolume * params.litersPerParticle)} au départ — ${Math.round(part * 100)} % gardés, en ${run.tableauTime.toFixed(1).replace('.', ',')} s`,
-  }
-}
-
-/** LE SOUFFLE, à l'image : le nuage dont le centre entre dans l'arrivée a
- *  traversé ; le temps fait le verdict, ce qu'il reste se dit à côté. */
-function majSouffle(): void {
-  const mj = level.minijeu
-  if (!mj || mj.type !== 'souffle' || minijeuResultat) return
-  if (!dansRect(sim.stats.centroidX, sim.stats.centroidY, mj.regles.arrivee)) return
-  const temps = run.tableauTime
-  const note = noteSouffle(temps, mj.regles.paliers)
-  const part = sim.baseVolume > 0 ? Math.round((100 * sim.playerCount) / sim.baseVolume) : 0
-  minijeuResultat = {
-    note,
-    mesure: temps,
-    titre: `LE SOUFFLE — ${VERDICTS_SOUFFLE[note.verdict]}`,
-    detail: `arrivé en ${temps.toFixed(1).replace('.', ',')} s, ${part} % du nuage gardés`,
   }
 }
 
@@ -15107,7 +15048,6 @@ function ouvreNoeud(nature: Exclude<NatureNoeud, 'salle'>): void {
       const quel = tireMiniJeu(alea)
       if (quel === 'palet') minijeuIntercalaire = tableauPalet()
       else if (quel === 'rafales') minijeuIntercalaire = tableauRafales()
-      else if (quel === 'souffle') minijeuIntercalaire = tableauSouffle()
       else {
         const volumeL = volumeDepart(tableauCouperet(1)) * params.litersPerParticle
         minijeuIntercalaire = tableauCouperet(tireTrait(volumeL, alea))
@@ -15144,7 +15084,7 @@ function mbMontreResultatMiniJeu(r: NonNullable<typeof minijeuResultat>, suite: 
   btn.className = 'mb-carte mb-repos'
   btn.style.gridColumn = '2'
   btn.innerHTML =
-    `<i class="mb-repos-icone">${level.minijeu?.type === 'palet' ? '🥌' : level.minijeu?.type === 'rafales' ? '🌬️' : level.minijeu?.type === 'souffle' ? '💨' : '🔪'}</i><b>${r.titre.split(' — ')[1] ?? ''}</b>` +
+    `<i class="mb-repos-icone">${level.minijeu?.type === 'palet' ? '🥌' : level.minijeu?.type === 'rafales' ? '🌬️' : '🔪'}</i><b>${r.titre.split(' — ')[1] ?? ''}</b>` +
     `<small>${res.memoire > 0 ? `+${res.memoire} mémoire` : 'rien — le trait est loin'} · continuer</small>`
   let elu = false
   btn.addEventListener('click', () => {
@@ -15876,16 +15816,6 @@ function lanceRafalesEssai(): void {
   restart()
 }
 ;(window as unknown as { __rafales: () => void }).__rafales = lanceRafalesEssai
-// JOUER LE SOUFFLE EN ESSAI (le pupitre, et la sonde __souffle())
-function lanceSouffleEssai(): void {
-  if (miseEnBonbonne) fermeMiseEnBonbonne()
-  auHub = false
-  hasPlayed = true
-  document.body.classList.add('playing')
-  testLevel = tableauSouffle()
-  restart()
-}
-;(window as unknown as { __souffle: () => void }).__souffle = lanceSouffleEssai
 
 function newExpedition(avecCarte = false): void {
   levelIndex = 0
@@ -18319,7 +18249,7 @@ function corpsImage(now: number): boolean {
       effaceRun()
       newExpedition(true)
     })
-  } else if (!tableauDone && !sim.dispersed && estMiniJeu(level) && level.minijeu && (majPalet(), majRafales(), majSouffle(), minijeuResultat)) {
+  } else if (!tableauDone && !sim.dispersed && estMiniJeu(level) && level.minijeu && (majPalet(), majRafales(), minijeuResultat)) {
     // LE MINI-JEU A CONCLU : la lame du couperet a pesé, le palet a fait
     // ses lancers (ou le joueur a conclu). Rien ne se consigne aux registres
     // (pas un tableau du protocole), la mémoire se gagne au barème, la

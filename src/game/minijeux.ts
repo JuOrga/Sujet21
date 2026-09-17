@@ -37,10 +37,10 @@
 // rendus à la sortie — une glace qui rebondit comme une bille, un gel qui
 // prend vite. C'est ce qui permet d'accorder la physique au jeu sans
 // toucher au banc.
-import { MAT_GRILLE, MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_WALL, type LevelDef, type ObstacleBox, type PorteDef } from './level'
+import { MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_WALL, type LevelDef, type ObstacleBox, type PorteDef } from './level'
 import type { SimParams } from '../sim/params'
 
-export type MiniJeuId = 'couperet' | 'palet' | 'rafales' | 'souffle'
+export type MiniJeuId = 'couperet' | 'palet' | 'rafales'
 
 /** LE COUPERET : ce que porte son tableau. */
 export interface CouperetDef {
@@ -62,15 +62,14 @@ export interface PaletDef {
 }
 
 /** Ce que porte un tableau de mini-jeu (LevelDef.minijeu). */
-export type MiniJeuDef = CouperetDef | PaletDef | RafalesDef | SouffleDef
+export type MiniJeuDef = CouperetDef | PaletDef | RafalesDef
 
 export const CODE_COUPERET = 'MJ-COUPERET'
 export const CODE_PALET = 'MJ-PALET'
 export const CODE_RAFALES = 'MJ-RAFALES'
-export const CODE_SOUFFLE = 'MJ-SOUFFLE'
 
 /** LE CATALOGUE : les mini-jeux qu'un nœud de la mini-carte peut servir. */
-export const MINI_JEUX: readonly MiniJeuId[] = ['couperet', 'palet', 'rafales', 'souffle']
+export const MINI_JEUX: readonly MiniJeuId[] = ['couperet', 'palet', 'rafales']
 
 /** LE TIRAGE du mini-jeu d'un nœud : au hasard du catalogue, à la graine. */
 export function tireMiniJeu(alea: () => number): MiniJeuId {
@@ -78,11 +77,11 @@ export function tireMiniJeu(alea: () => number): MiniJeuId {
   return MINI_JEUX[i]
 }
 
-export const NOMS_MINI_JEU: Record<MiniJeuId, string> = { couperet: 'LE COUPERET', palet: 'LE PALET', rafales: 'LES RAFALES', souffle: 'LE SOUFFLE' }
+export const NOMS_MINI_JEU: Record<MiniJeuId, string> = { couperet: 'LE COUPERET', palet: 'LE PALET', rafales: 'LES RAFALES' }
 
 /** Ce tableau est-il un mini-jeu ? (il n'a pas de sas : il mesure) */
 export function estMiniJeu(level: { code: string; minijeu?: MiniJeuDef }): boolean {
-  return !!level.minijeu || level.code === CODE_COUPERET || level.code === CODE_PALET || level.code === CODE_RAFALES || level.code === CODE_SOUFFLE
+  return !!level.minijeu || level.code === CODE_COUPERET || level.code === CODE_PALET || level.code === CODE_RAFALES
 }
 
 /** LE TRAIT : une part du volume de départ, entre 35 et 70 %, arrondie au
@@ -433,7 +432,8 @@ export const VERDICTS_RAFALES: Record<NoteTrait['verdict'], string> = {
 
 /** Le corps a-t-il traversé ? (son centre est dans l'arrivée) */
 export function arriveRafales(x: number, y: number, r: ReglesRafales = REGLES_RAFALES): boolean {
-  return dansRect(x, y, r.arrivee)
+  const a = r.arrivee
+  return x >= a.minX && x <= a.maxX && y >= a.minY && y <= a.maxY
 }
 
 /** LE COULOIR DES RAFALES : on naît à gauche ; trois tronçons sont balayés
@@ -482,95 +482,5 @@ export function tableauRafales(regles: ReglesRafales = REGLES_RAFALES): LevelDef
       { x: 1490, y: -300, text: 'ARRIVÉE', tone: 'mur' },
     ],
     minijeu: { type: 'rafales', regles },
-  }
-}
-
-// ---- LE SOUFFLE ----------------------------------------------------------------
-//
-// LE SOUFFLE. Une salle qui impose la vapeur, un slalom de grilles, et une
-// perte au repos montée : plus on traîne, plus on s'évapore. Le dash de
-// vapeur — la visée au ralenti, le départ au relâchement — est le geste le
-// plus agréable du jeu, et on ne le sollicite jamais en série : ici les
-// dashs sont sans compte, mais chacun chasse une part du nuage. Les grilles
-// laissent passer la vapeur en la rognant (grilleGasLoss) et laissent un
-// passage à leur bout, en quinconce : traverser coûte du nuage, contourner
-// coûte du temps — et le temps aussi s'évapore. Mesure : le temps jusqu'à
-// l'arrivée ; ce qu'il reste se lit à côté.
-
-export interface ReglesSouffle {
-  arrivee: { minX: number; minY: number; maxX: number; maxY: number }
-  /** les temps, en secondes : ≤ t0 en un souffle, ≤ t1 vif, ≤ t2 essoufflé, sinon dissipé */
-  paliers: [number, number, number]
-}
-
-export const REGLES_SOUFFLE: ReglesSouffle = {
-  arrivee: { minX: 1380, minY: -600, maxX: 1600, maxY: 600 },
-  paliers: [12, 18, 26],
-}
-
-export interface SouffleDef {
-  type: 'souffle'
-  regles: ReglesSouffle
-  reglages?: Partial<SimParams>
-}
-
-export function noteSouffle(temps: number, paliers: ReglesSouffle['paliers'], bareme: BaremeTrait = BAREME_TRAIT): NoteTrait {
-  const verdict: NoteTrait['verdict'] = temps <= paliers[0] ? 'juste' : temps <= paliers[1] ? 'proche' : temps <= paliers[2] ? 'loin' : 'rate'
-  const facteur = verdict === 'juste' ? bareme.juste : verdict === 'proche' ? bareme.proche : verdict === 'loin' ? bareme.loin : 0
-  return { ecart: temps, verdict, memoire: Math.round(bareme.base * facteur) }
-}
-
-export const VERDICTS_SOUFFLE: Record<NoteTrait['verdict'], string> = {
-  juste: 'EN UN SOUFFLE',
-  proche: 'VIF',
-  loin: 'ESSOUFFLÉ',
-  rate: 'DISSIPÉ',
-}
-
-/** Un point est-il dans un rectangle ? (l'arrivée des traversées) */
-export function dansRect(x: number, y: number, a: { minX: number; minY: number; maxX: number; maxY: number }): boolean {
-  return x >= a.minX && x <= a.maxX && y >= a.minY && y <= a.maxY
-}
-
-/** LES RÉGLAGES DU SOUFFLE : chaque dash chasse moins de nuage qu'en jeu
- *  (on en enchaîne dix), mais le repos s'évapore six fois plus vite — c'est
- *  le temps qui coûte, pas le geste. */
-export const REGLAGES_SOUFFLE: Partial<SimParams> = {
-  gasDashExhaust: 0.07,
-  gasIdleLossRate: 12,
-}
-
-/** LE SLALOM DU SOUFFLE : on naît à gauche, en vapeur (la salle entière
- *  l'impose) ; quatre grilles barrent le couloir en quinconce, chacune
- *  laissant un passage à un bout ; l'arrivée est à droite. Les dashs sont
- *  sans compte (dashBudget). Pas de sas. */
-export function tableauSouffle(regles: ReglesSouffle = REGLES_SOUFFLE, reglages: Partial<SimParams> = REGLAGES_SOUFFLE): LevelDef {
-  // une grille de toute la hauteur moins un passage de 300 u, en haut ou en bas
-  const grille = (x: number, passageEnHaut: boolean): ObstacleBox =>
-    passageEnHaut
-      ? { minX: x - 30, minY: -600, maxX: x + 30, maxY: 300, material: MAT_GRILLE }
-      : { minX: x - 30, minY: -300, maxX: x + 30, maxY: 600, material: MAT_GRILLE }
-  return {
-    name: 'Le souffle',
-    code: CODE_SOUFFLE,
-    journal:
-      `Un couloir de grilles en quinconce, et vous êtes vapeur : la salle l'impose. Les dashs sont sans compte, mais chacun chasse un peu de nuage, ` +
-      `et le nuage qui attend s'évapore. La vapeur passe les grilles en s'y rognant ; leur bout laisse un passage. ` +
-      `Ce qui compte, c'est le temps jusqu'à l'arrivée : en moins de ${regles.paliers[0]} s, la mémoire triple.`,
-    par: 4,
-    bounds: { minX: -1600, minY: -600, maxX: 1600, maxY: 600 },
-    spawn: { x: -1300, y: 0, n: 900 },
-    exit: { minX: 1700, minY: -60, maxX: 1760, maxY: 60 },
-    dashBudget: 99,
-    boxes: [grille(-700, true), grille(-140, false), grille(420, true), grille(980, false)],
-    sponges: [],
-    zones: [{ minX: -1600, minY: -600, maxX: 1600, maxY: 600, force: 'vapeur' }],
-    labels: [
-      { x: -1300, y: -300, text: 'LE SOUFFLE', tone: 'mur' },
-      { x: -1300, y: 300, text: '1 · VISEZ, RELÂCHEZ : LE DASH PART', tone: 'mur' },
-      { x: 140, y: 0, text: '2 · TRAVERSER UNE GRILLE ROGNE LE NUAGE, LA CONTOURNER PREND DU TEMPS', tone: 'mur' },
-      { x: 1490, y: -300, text: 'ARRIVÉE', tone: 'mur' },
-    ],
-    minijeu: { type: 'souffle', regles, reglages },
   }
 }
