@@ -268,3 +268,30 @@ describe('FluidSim — la glace : bloc balistique, soudure, dégel', () => {
     expect(sim.posX[j]).toBeLessThan(506)
   })
 })
+
+describe('FluidSim — la glisse freinée (iceSlideDrag, le mini-jeu du palet)', () => {
+  function palet(overrides: Partial<SimParams>): FluidSim {
+    const sim = new FluidSim({ ...DEFAULT_PARAMS, ...overrides }, OPEN, 2048)
+    sim.setLevel([], [])
+    sim.spawnDisc(0, 0, 60, KIND_PLAYER)
+    sim.freezeIntent = true
+    for (let i = 0; i < sim.count; i++) {
+      sim.frozen[i] = 1
+      sim.frost[i] = 1
+      sim.velX[i] = 600
+      sim.velY[i] = 0
+    }
+    sim.relabel()
+    run(sim, 1)
+    sim.updatePlayerStats()
+    return sim
+  }
+  it('à zéro (le jeu), une glace lancée dans le vide garde sa vitesse ; montée (le palet), elle s’essouffle', () => {
+    const libre = palet({ iceSlideDrag: 0 })
+    expect(libre.stats.velX).toBeGreaterThan(600 * 0.9)
+    const freinee = palet({ iceSlideDrag: 0.45 })
+    // e^(−0,45) ≈ 0,64 après une seconde
+    expect(freinee.stats.velX).toBeLessThan(600 * 0.72)
+    expect(freinee.stats.velX).toBeGreaterThan(600 * 0.55)
+  })
+})

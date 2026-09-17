@@ -8717,6 +8717,7 @@
       .mv-noeud.mv-m3 { color: #c99aff; }
       .mv-noeud.mv-pool { color: var(--mb-or, #ffd977); }
       .mv-noeud.mv-evenement { color: var(--mb-or, #ffd977); }
+      .mv-noeud.mv-minijeu { color: #ff9ad5; } /* le mini-jeu : la physique est le jeu */
       .mv-halo { fill: none; stroke: transparent; stroke-width: 6; transition: stroke 0.16s ease; }
       .mv-tuile { fill: #0e1724; stroke: currentColor; stroke-width: 1.5; stroke-opacity: 0.55; transition: fill 0.16s ease, stroke-opacity 0.16s ease; }
       .mv-noeud use { opacity: 0.9; }
@@ -9922,6 +9923,9 @@
           <div class="pup-grid">
             <button type="button" data-pup="valider-salle"><b>Valider la salle en cours</b><small>le sas est déclaré franchi : vraie cérémonie, la descente avance — les registres, eux, ne bougent pas (ni record, ni palmarès, ni trophée)</small></button>
             <button type="button" data-pup="economat"><b>Appeler le Semblable</b><small>l’Économat s’intercale à la prochaine salle, même déjà visité cette run — le drapeau tient jusqu’à ce qu’il ait servi</small></button>
+            <button type="button" data-pup="couperet"><b>Jouer le couperet (essai)</b><small>la salle du mini-jeu seule, hors run : le trait se tire au hasard, la lame tombe en rythme et dit le verdict, rien ne se gagne — retour au protocole ensuite</small></button>
+            <button type="button" data-pup="palet"><b>Jouer le palet (essai)</b><small>la piste seule, hors run : prenez de la vitesse, la ligne gèle, trois lancers, le meilleur compte — rien ne se gagne, retour au protocole ensuite</small></button>
+            <button type="button" data-pup="rafales"><b>Jouer les rafales (essai)</b><small>le couloir seul, hors run : traversez entre deux souffles, les éponges des bords boivent ce qui s’y plaque — rien ne se gagne, retour au protocole ensuite</small></button>
             <button type="button" data-pup="ceremonie-2"><b>Petit surplus</b><small>mise en bonbonne, 2 L</small></button>
             <button type="button" data-pup="ceremonie-5"><b>Surplus moyen</b><small>5 L — franchit un palier</small></button>
             <button type="button" data-pup="ceremonie-12"><b>Gros surplus</b><small>12 L — plusieurs paliers</small></button>

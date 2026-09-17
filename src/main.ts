@@ -122,6 +122,29 @@ import {
 } from './game/voiesModule'
 import { CLE_MANQUES, inventairePool, litManques, noteManque, type Manque } from './game/manques'
 import {
+  arriveRafales,
+  avancePalet,
+  compteAuDela,
+  estMiniJeu,
+  ETAT_PALET_NEUF,
+  meilleurLancer,
+  notePalet,
+  noteRafales,
+  noteTrait,
+  phaseCouperet,
+  tableauCouperet,
+  tableauPalet,
+  tableauRafales,
+  tireMiniJeu,
+  tireTrait,
+  VERDICTS_PALET,
+  VERDICTS_RAFALES,
+  VERDICTS_TRAIT,
+  type EtatPalet,
+  type Lancer,
+  type NoteTrait,
+} from './game/minijeux'
+import {
   ditEffet,
   offresDe,
   resoutChoix,
@@ -749,6 +772,17 @@ function appliqueMoteur(s: FluidSim): void {
 }
 
 function createSim(level: LevelDef): FluidSim {
+  // LES RÉGLAGES DU MINI-JEU : rendus d'abord (la salle précédente en
+  // avait peut-être), puis ceux de cette salle, s'il y en a — le banc n'est
+  // jamais modifié, il est recouvert le temps de la salle
+  Object.assign(params, reglagesRendus)
+  reglagesRendus = {}
+  if (level.minijeu?.reglages) {
+    for (const k of Object.keys(level.minijeu.reglages) as (keyof SimParams)[]) {
+      reglagesRendus[k] = params[k]
+      params[k] = level.minijeu.reglages[k] as never
+    }
+  }
   const sim = new FluidSim(params, level.bounds, CAPACITY)
   appliqueMoteur(sim)
   // les dashs sont la RÉSERVE DU TABLEAU : N par écran (le tableau peut
@@ -952,6 +986,26 @@ const carteAUnEconomat = (): boolean => carte.modules.some((m) => m.type === 'ec
 // s'efface QUE lorsqu'il a servi : armé au hub, il tient jusqu'à la
 // première traversée ; armé en salle, il ouvre la suivante.
 let economatForce = false
+// LE MINI-JEU choisi à la porte de la mini-carte : sa salle, construite en
+// code (minijeux.ts), s'intercale comme l'économat-nœud ; sa lame pèse au
+// lieu que le sas collecte, puis le module reprend
+let minijeuIntercalaire: LevelDef | null = null
+let minijeuForce = false
+// LE VERDICT D'UN MINI-JEU : posé par le mini-jeu lui-même (la lame du
+// couperet qui tranche, le dernier lancer du palet), la salle conclut à
+// l'image — la note au barème, le titre et le détail de la carte
+let minijeuResultat: { note: NoteTrait; titre: string; detail: string; mesure: number } | null = null
+// LE COUPERET en cours : la lame était-elle baissée au sous-pas précédent
+// (la pesée se fait à l'instant où elle tombe, une seule fois)
+let couperetLamePrec = false
+// LE PALET en cours : ses lancers, avancés à l'image (avancePalet, pur),
+// et combien ont déjà été montrés (un lancer fini ouvre le choix : relancer
+// ou valider — une fois)
+let paletEtat: EtatPalet = ETAT_PALET_NEUF
+let paletLancersVus = 0
+// LES RÉGLAGES d'un mini-jeu en cours : les valeurs du banc qu'il a
+// remplacées, pour les rendre à la salle suivante
+let reglagesRendus: Partial<SimParams> = {}
 // la CLEF DE CACHETTE achetée : les voiles du PROCHAIN tableau tombent
 let clefCachette = false
 // les achats déjà servis dans CETTE visite de l'Économat, et l'état
@@ -1218,6 +1272,7 @@ function reglagesTissage(m: ModuleCarte): ReglagesTissage {
     repos: voiePlan.reposParModule,
     dons: voiePlan.donsParModule,
     coffre: !!m.orbe,
+    minijeux: voiePlan.minijeuxParModule,
     // le biome du module pèse sa mécanique favorite (la carte le dit)
     favori: mecaniqueDuBiome(carte, m.biome),
     partFavori: voiePlan.partBiome / 100,
@@ -1301,6 +1356,7 @@ function applyLevel(): void {
       (auHub
         ? hubJoue()
         : (economatIntercalaire ??
+          minijeuIntercalaire ??
           voieIntercalaire ??
           playedLevels()[levelIndex] ??
           playedLevels()[0])),
@@ -4681,6 +4737,8 @@ function reprendreRun(save: RunSauvee): void {
   majCondensatUI()
   run.memoireGagnee = Math.max(0, Math.round(save.memoireGagnee ?? 0))
   economatIntercalaire = null
+  minijeuIntercalaire = null
+  minijeuForce = false
   economatVisiteCetteRun = save.economatVisite ?? false
   carteRun = litEtatCarteRun(save.carte, carte)
   // l'essence rognée par les sacrifices survit à la reprise — sinon un
@@ -7034,6 +7092,14 @@ function renderDescente(): void {
       (v) => `${v} %`,
     ),
     dscCran(
+      'MINI-JEUX PAR MODULE',
+      'le couperet, le palet ou les rafales, tirés à la graine : la précision paie en mémoire — 0 : aucun',
+      () => voiePlan.minijeuxParModule,
+      (v) => {
+        voiePlan.minijeuxParModule = v
+      },
+    ),
+    dscCran(
       'BONBONNES PAR MODULE',
       'une réserve oubliée, sans choix — 0 : aucune. La cache, elle, vient de l’orbe du module sur la carte',
       () => voiePlan.donsParModule,
@@ -8527,6 +8593,118 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
         g.stroke()
       }
     }
+  }
+
+  // LE COUPERET : le trait au sol (une ligne vive à travers le col), le
+  // compte à rebours de la lame et, en direct, ce que le corps laisse
+  // dépasser contre le trait demandé — c'est la jauge du mini-jeu, lue dans
+  // sa silhouette ET en chiffres, pour qu'on sache ce que la lame va peser
+  if (level.minijeu?.type === 'couperet') {
+    const mj = level.minijeu
+    const haut = S(mj.trait, 800)
+    const bas = S(mj.trait, -800)
+    g.save()
+    g.strokeStyle = 'rgba(255,200,120,0.55)'
+    g.setLineDash([6, 8])
+    g.lineWidth = Math.max(1, 2 * z)
+    g.beginPath()
+    g.moveTo(haut.sx, haut.sy)
+    g.lineTo(bas.sx, bas.sy)
+    g.stroke()
+    g.setLineDash([])
+    const n = compteAuDela(sim.count, sim.posX, mj.trait, (i) => sim.kind[i] === KIND_PLAYER)
+    const auDela = minijeuResultat ? minijeuResultat.mesure : n * params.litersPerParticle
+    const ph = phaseCouperet(run.tableauTime, mj.rythme)
+    const lame = minijeuResultat ? 'TRANCHÉ' : ph.tombee ? 'LA LAME TOMBE' : `LA LAME TOMBE DANS ${ph.avant.toFixed(1).replace('.', ',')} s`
+    const t = Math.max(12, Math.min(28, 90 * z))
+    const anc = S(mj.trait, -340)
+    g.textAlign = 'center'
+    g.font = `600 ${Math.round(t * 0.8)}px ui-monospace, monospace`
+    g.fillStyle = ph.tombee || minijeuResultat ? 'rgba(255,110,110,0.95)' : ph.avant < 1 ? 'rgba(255,200,120,0.95)' : 'rgba(200,220,235,0.8)'
+    g.fillText(lame, anc.sx, anc.sy)
+    g.font = `${Math.round(t)}px ui-monospace, monospace`
+    g.fillStyle = 'rgba(255,255,255,0.92)'
+    g.fillText(`À DROITE DU TRAIT ${fmtL(auDela)} / ${fmtL(mj.cible)}`, anc.sx, anc.sy + t * 1.25)
+    g.restore()
+  }
+
+  // LE PALET : la ligne de lancer, la maison (trois cercles), et la
+  // consigne du moment — quel lancer, gelez avant la ligne, la glace
+  // glisse, puis chaque lancer fini avec sa distance et son verdict
+  if (level.minijeu?.type === 'palet') {
+    const r = level.minijeu.regles
+    g.save()
+    const h = S(r.ligne, 800)
+    const b = S(r.ligne, -800)
+    g.strokeStyle = 'rgba(255,200,120,0.55)'
+    g.setLineDash([6, 8])
+    g.lineWidth = Math.max(1, 2 * z)
+    g.beginPath()
+    g.moveTo(h.sx, h.sy)
+    g.lineTo(b.sx, b.sy)
+    g.stroke()
+    g.setLineDash([])
+    const c = S(r.maison.x, r.maison.y)
+    const teintes = ['rgba(255,110,110,0.9)', 'rgba(255,200,120,0.8)', 'rgba(140,200,255,0.7)']
+    for (let k = 2; k >= 0; k--) {
+      g.beginPath()
+      g.arc(c.sx, c.sy, r.rayons[k] * z, 0, Math.PI * 2)
+      g.fillStyle = teintes[k].replace(/[\d.]+\)$/, '0.08)')
+      g.fill()
+      g.strokeStyle = teintes[k]
+      g.lineWidth = 2
+      g.stroke()
+    }
+    const t = Math.max(12, Math.min(28, 90 * z))
+    const anc = S(r.ligne, -560)
+    g.textAlign = 'center'
+    g.font = `600 ${Math.round(t * 0.8)}px ui-monospace, monospace`
+    const num = paletEtat.lancers.length + (paletEtat.enCours ? 1 : 0)
+    const consigne = minijeuResultat
+      ? 'FINI'
+      : paletEtat.enCours
+        ? `LANCER ${num} / ${r.lancers} — LA GLACE GLISSE`
+        : paletEtat.arme
+          ? `LANCER ${Math.min(r.lancers, num + 1)} / ${r.lancers} — PRENEZ DE LA VITESSE, LA LIGNE VOUS GÈLE`
+          : `REVENEZ DERRIÈRE LA LIGNE POUR LE LANCER ${Math.min(r.lancers, num + 1)}`
+    g.fillStyle = !paletEtat.arme && !paletEtat.enCours ? 'rgba(255,200,120,0.95)' : 'rgba(255,255,255,0.92)'
+    g.fillText(consigne, anc.sx, anc.sy)
+    g.font = `${Math.round(t * 0.7)}px ui-monospace, monospace`
+    g.fillStyle = 'rgba(200,220,235,0.85)'
+    paletEtat.lancers.forEach((l, i) => {
+      g.fillText(`${i + 1}. ${Math.round(l.distance)} u — ${VERDICTS_PALET[l.verdict]}`, anc.sx, anc.sy + t * (1.1 + i * 0.95))
+    })
+    g.restore()
+  }
+
+  // LES RAFALES : l'arrivée (un cadre), le compte à rebours du souffle et
+  // ce qu'il reste du corps contre le départ — la jauge du mini-jeu
+  if (level.minijeu?.type === 'rafales') {
+    const r = level.minijeu.regles
+    g.save()
+    const a = S(r.arrivee.minX, r.arrivee.maxY)
+    const b = S(r.arrivee.maxX, r.arrivee.minY)
+    g.strokeStyle = 'rgba(140,255,190,0.7)'
+    g.setLineDash([6, 8])
+    g.lineWidth = 2
+    g.strokeRect(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy)
+    g.setLineDash([])
+    const ph = phaseCouperet(run.tableauTime, r.rythme)
+    const t = Math.max(12, Math.min(28, 90 * z))
+    const anc = S(0, 520)
+    g.textAlign = 'center'
+    g.font = `600 ${Math.round(t * 0.85)}px ui-monospace, monospace`
+    g.fillStyle = minijeuResultat ? 'rgba(140,255,190,0.95)' : ph.tombee ? 'rgba(255,110,110,0.95)' : ph.avant < 1 ? 'rgba(255,200,120,0.95)' : 'rgba(200,220,235,0.85)'
+    g.fillText(
+      minijeuResultat ? 'TRAVERSÉ' : ph.tombee ? 'RAFALE !' : `RAFALE DANS ${ph.avant.toFixed(1).replace('.', ',')} s`,
+      anc.sx,
+      anc.sy,
+    )
+    g.font = `${Math.round(t * 0.8)}px ui-monospace, monospace`
+    g.fillStyle = 'rgba(255,255,255,0.92)'
+    const part = sim.baseVolume > 0 ? Math.round((100 * sim.playerCount) / sim.baseVolume) : 0
+    g.fillText(`IL VOUS RESTE ${part} %`, anc.sx, anc.sy + t * 1.15)
+    g.restore()
   }
 
   // chasses : des courants de poussée — des chevrons qui FILENT dans le sens
@@ -10220,10 +10398,12 @@ function rebuildRenderBoxes(): void {
         c.style === 'paroi' && (cachesLevee[i] ?? Infinity) === Infinity,
     )
     .map(({ style: _style, ...reste }) => ({ ...reste, material: MAT_WALL }))
+  // un mini-jeu n'a pas de sas : sa sortie (exigée par LevelDef) est hors
+  // des bornes et ne se dessine pas — la lame conclut, rien n'aspire
   renderBoxes = [
     ...level.boxes.slice(0, Math.max(1, MAX_BOXES - 1 - factices.length)),
     ...factices,
-    { ...level.exit, material: MAT_EXIT },
+    ...(estMiniJeu(level) ? [] : [{ ...level.exit, material: MAT_EXIT }]),
   ]
 }
 // ---- LE PACK PRÉSENCE : le Sujet est vivant ----
@@ -12391,6 +12571,25 @@ function lanceManoeuvre(quoi: string): void {
         )
         break
       }
+      case 'couperet': {
+        // la salle du mini-jeu, seule : on la joue, la lame dit le verdict
+        lanceCouperetEssai()
+        pupitreEl.hidden = true
+        closeHome()
+        break
+      }
+      case 'palet': {
+        lancePaletEssai()
+        pupitreEl.hidden = true
+        closeHome()
+        break
+      }
+      case 'rafales': {
+        lanceRafalesEssai()
+        pupitreEl.hidden = true
+        closeHome()
+        break
+      }
       case 'hub-principal': {
         const r = passeLeHub('principal')
         if (r === 'ok') {
@@ -12651,6 +12850,7 @@ function majPortes(dt: number): void {
     if (sequenceur.etat.brechesOuvertes.has(i))
       laserEtat.portesOuvertes[i] = true
   }
+  majCouperet()
   // un tableau SANS émetteur n'attend rien d'un faisceau : ses portes se
   // posent dès la première image (voir posePortes)
   if (!laserEtat.portesPose && (level.lasers?.length ?? 0) === 0) posePortes()
@@ -12684,6 +12884,152 @@ function majPortes(dt: number): void {
   }
 }
 
+/** LA LAME DU COUPERET : la première porte du tableau, tenue au rythme du
+ *  mini-jeu — ouverte, puis baissée `garde` secondes toutes les `periode`
+ *  secondes (phaseCouperet, sur le temps simulé de la salle). LA PESÉE se
+ *  fait à l'instant précis où elle tombe, AVANT que le solveur ne pose la
+ *  paroi : on compte ce qui, du corps, dépasse le trait — les gouttes libres
+ *  ne comptent pas. La lame qui tombe à vide (rien du corps au-delà) se
+ *  relève et le rythme continue ; celle qui tranche quelque chose reste
+ *  baissée : la part est scellée dans la cuve, la salle conclut à l'image. */
+function majCouperet(): void {
+  const mj = level.minijeu
+  if (!mj || mj.type !== 'couperet' || (level.portes?.length ?? 0) === 0) return
+  if (minijeuResultat) {
+    laserEtat.portesOuvertes[0] = false
+    return
+  }
+  const ph = phaseCouperet(run.tableauTime, mj.rythme)
+  if (ph.tombee && !couperetLamePrec) {
+    const n = compteAuDela(sim.count, sim.posX, mj.trait, (i) => sim.kind[i] === KIND_PLAYER)
+    if (n > 0) {
+      const peseL = n * params.litersPerParticle
+      const note = noteTrait(peseL, mj.cible)
+      minijeuResultat = {
+        note,
+        mesure: peseL,
+        titre: `LE COUPERET — ${VERDICTS_TRAIT[note.verdict]}`,
+        detail: `${fmtL(peseL)} tranchés pour ${fmtL(mj.cible)} demandés — écart ${Math.round(note.ecart * 100)} %`,
+      }
+    }
+  }
+  couperetLamePrec = ph.tombee
+  laserEtat.portesOuvertes[0] = !ph.tombee
+}
+
+/** LES RAFALES, à l'image : le corps dont le centre entre dans l'arrivée a
+ *  traversé ; ce qu'il lui reste, contre son volume de départ, fait le
+ *  verdict. */
+function majRafales(): void {
+  const mj = level.minijeu
+  if (!mj || mj.type !== 'rafales' || minijeuResultat) return
+  if (!arriveRafales(sim.stats.centroidX, sim.stats.centroidY, mj.regles)) return
+  const part = sim.baseVolume > 0 ? sim.playerCount / sim.baseVolume : 0
+  const note = noteRafales(part, mj.regles.paliers)
+  minijeuResultat = {
+    note,
+    mesure: part,
+    titre: `LES RAFALES — ${VERDICTS_RAFALES[note.verdict]}`,
+    detail: `${fmtL(sim.playerCount * params.litersPerParticle)} à l'arrivée sur ${fmtL(sim.baseVolume * params.litersPerParticle)} au départ — ${Math.round(part * 100)} % gardés, en ${run.tableauTime.toFixed(1).replace('.', ',')} s`,
+  }
+}
+
+/** LE PALET, à l'image : ce que le jeu observe du corps (la glace est-elle
+ *  prise, où est son centre, à quelle vitesse) passe à avancePalet, qui
+ *  tient les lancers. Le dernier lancer fini — ou le joueur qui conclut
+ *  avec au moins un lancer fait — pose le verdict du meilleur. */
+function majPalet(): void {
+  const mj = level.minijeu
+  if (!mj || mj.type !== 'palet' || minijeuResultat || miseEnBonbonne) return
+  const n = sim.count
+  let gels = 0
+  for (let i = 0; i < n; i++) if (sim.frozen[i] === 1) gels++
+  paletEtat = avancePalet(
+    paletEtat,
+    {
+      t: run.tableauTime,
+      gele: n > 0 && gels / n >= mj.regles.partGel,
+      x: sim.stats.centroidX,
+      y: sim.stats.centroidY,
+      vitesse: Math.hypot(sim.stats.velX, sim.stats.velY),
+    },
+    mj.regles,
+  )
+  if (paletEtat.lancers.length <= paletLancersVus) return
+  // UN LANCER VIENT DE FINIR. Le dernier conclut ; sinon le joueur choisit :
+  // relancer (remise en place, même volume de départ) ou valider le meilleur
+  paletLancersVus = paletEtat.lancers.length
+  if (paletEtat.fini) validePalet()
+  else mbMontreChoixPalet(paletEtat.lancers[paletEtat.lancers.length - 1])
+}
+
+/** VALIDER LE PALET : le meilleur lancer fait le verdict. */
+function validePalet(): void {
+  const mj = level.minijeu
+  const best = meilleurLancer(paletEtat)
+  if (!mj || mj.type !== 'palet' || !best) return
+  const note = notePalet(best.distance, mj.regles.rayons)
+  minijeuResultat = {
+    note,
+    mesure: best.distance,
+    titre: `LE PALET — ${VERDICTS_PALET[note.verdict]}`,
+    detail: `${paletEtat.lancers.length} lancer${paletEtat.lancers.length > 1 ? 's' : ''}, le meilleur à ${Math.round(best.distance)} u du centre`,
+  }
+}
+
+/** RELANCER : la piste se remet en place — le corps renaît au départ avec
+ *  le volume de base — et les lancers faits restent. Le concepteur (17/09) :
+ *  « une fois un essai, remettre en place avec même volume de base ». */
+function relancePalet(): void {
+  const garde = paletEtat
+  restart() // resetLasers y remet le palet à neuf : on restaure après
+  paletEtat = { ...garde, enCours: null, arme: false }
+  paletLancersVus = garde.lancers.length
+}
+
+/** LE CHOIX APRÈS UN LANCER : deux cartes — relancer, ou valider le
+ *  meilleur. Le bouton CONTINUER du sas ne convient pas ici (« en plein
+ *  milieu alors qu'on doit repartir ») : la remise en place est le geste. */
+function mbMontreChoixPalet(dernier: Lancer): void {
+  const mj = level.minijeu
+  if (!mj || mj.type !== 'palet') return
+  const num = paletEtat.lancers.length
+  const best = meilleurLancer(paletEtat)!
+  miseEnBonbonne = true
+  mbBilanCourant = null
+  mbVeil.hidden = false
+  mbScene.classList.add('mb-compact')
+  mbScene.classList.remove('mb-large')
+  mbEl('mb-releve').hidden = true
+  mbEl('mb-etal').hidden = true
+  mbEl('mb-passer').hidden = true
+  mbEl('mb-choix').hidden = false
+  mbEtape = 'repos'
+  mbQuestion('LE PALET')
+  mbEl('mb-choix-titre').textContent = `LANCER ${num} / ${mj.regles.lancers} — ${Math.round(dernier.distance)} u DU CENTRE · ${VERDICTS_PALET[dernier.verdict]}`
+  const host = mbCartes()
+  host.innerHTML = ''
+  host.classList.add('mb-trio')
+  let elu = false
+  const carte = (col: number, icone: string, titre: string, sous: string, action: () => void): void => {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'mb-carte mb-repos'
+    btn.style.gridColumn = String(col)
+    btn.innerHTML = `<i class="mb-repos-icone">${icone}</i><b>${titre}</b><small>${sous}</small>`
+    btn.addEventListener('click', () => {
+      if (elu) return
+      elu = true
+      bande.ponctuation('sting-collecte', 0.6)
+      fermeMiseEnBonbonne()
+      action()
+    })
+    host.appendChild(btn)
+  }
+  carte(1, '🥌', `LANCER ${num + 1} / ${mj.regles.lancers}`, 'remise en place au départ, même volume de base', relancePalet)
+  carte(3, '✓', 'VALIDER', `garder le meilleur : ${Math.round(best.distance)} u · ${VERDICTS_PALET[best.verdict]}`, validePalet)
+}
+
 /** LA POSE : chaque porte prend l'état de son canal d'un coup, sans jouer
  *  sa matérialisation. Appelée une fois par tableau, quand l'état des
  *  canaux est connu. Sans elle, une porte ouverte dès le départ partait de
@@ -12710,6 +13056,10 @@ function resetLasers(): void {
   laserEtat.portesAvance = (level.portes ?? []).map(() => 1)
   laserEtat.portesPose = false
   laserEtat.doorsKey = ''
+  couperetLamePrec = false
+  minijeuResultat = null
+  paletEtat = ETAT_PALET_NEUF
+  paletLancersVus = 0
   laserEtat.chassesActives = (level.chasses ?? []).map(() => false)
   laserEtat.chasseBouffee = (level.chasses ?? []).map(() => 0)
   lastRailTime = 0
@@ -13133,11 +13483,23 @@ function avanceSalle(): void {
     restart()
     return
   }
+  // LE MINI-JEU choisi à la porte s'intercale, comme l'économat-nœud : sa
+  // salle se joue, son sas mesure, puis le module reprend — la séquence
+  // écrite ne bouge pas
+  if (minijeuForce && minijeuIntercalaire) {
+    minijeuForce = false
+    economatIntercalaire = null // le mini-jeu passe devant tout autre intercalaire
+    voieIntercalaire = null
+    restart()
+    return
+  }
   // L'ÉCONOMAT : on en SORT (la séquence reprend son cours), ou il
   // s'INTERCALE — une fois par run, à mi-descente. Le choix de salle fait
   // à la cérémonie (salleChoisie) attend sagement la sortie de l'annexe.
   if (economatIntercalaire && estEconomat(level)) {
     economatIntercalaire = null
+    minijeuIntercalaire = null
+    minijeuForce = false
     // on SORT de l'économat-nœud : la halte n'a pas de salle, la carte se
     // rouvre sur ses coursives — rien d'autre ne se joue ici
     const m = moduleEnCours()
@@ -14614,6 +14976,12 @@ const NOMS_NOEUD: Record<Exclude<NatureNoeud, 'salle'>, { etiquette: string; tit
     texte: 'Une chambre close. Un orbe d’essence y dort depuis onze ans.',
     icone: 'coffre',
   },
+  minijeu: {
+    etiquette: 'MINI-JEU',
+    titre: 'LA PESÉE',
+    texte: 'Une cuve graduée. Versez-y exactement ce qu’elle demande — ni plus, ni moins. La précision paie en mémoire.',
+    icone: 'minijeu',
+  },
 }
 
 /** LA PORTE D'UN NŒUD SANS SALLE : elle ne montre aucun plan — il n'y a pas
@@ -14671,7 +15039,61 @@ function ouvreNoeud(nature: Exclude<NatureNoeud, 'salle'>): void {
     case 'coffre':
       if (m) mbMontreCache(m)
       return
+    case 'minijeu': {
+      // LE MINI-JEU se tire au catalogue, à la graine du module et du rang
+      // (le même pour tous les postes en descente du jour) ; le trait du
+      // couperet, sur le volume de départ que la salle donnera au corps —
+      // l'essence rognée comprise
+      const alea = aleaDeGraine(`${carteRun.tissage || graineRun()}@minijeu${carteRun.niveau}`)
+      const quel = tireMiniJeu(alea)
+      if (quel === 'palet') minijeuIntercalaire = tableauPalet()
+      else if (quel === 'rafales') minijeuIntercalaire = tableauRafales()
+      else {
+        const volumeL = volumeDepart(tableauCouperet(1)) * params.litersPerParticle
+        minijeuIntercalaire = tableauCouperet(tireTrait(volumeL, alea))
+      }
+      minijeuForce = true
+      fermeMiseEnBonbonne()
+      avanceSalle()
+      return
+    }
   }
+}
+
+/** LE RÉSULTAT D'UN MINI-JEU : une carte, le détail de la mesure, le
+ *  verdict et la mémoire gagnée — puis le module reprend (mbApresHalte). */
+function mbMontreResultatMiniJeu(r: NonNullable<typeof minijeuResultat>, suite: () => void): void {
+  const res = r.note
+  miseEnBonbonne = true
+  mbBilanCourant = null
+  mbVeil.hidden = false
+  mbScene.classList.add('mb-compact')
+  mbScene.classList.remove('mb-large')
+  mbEl('mb-releve').hidden = true
+  mbEl('mb-etal').hidden = true
+  mbEl('mb-passer').hidden = true
+  mbEl('mb-choix').hidden = false
+  mbEtape = 'repos'
+  mbQuestion(r.titre.split(' — ')[0])
+  mbEl('mb-choix-titre').textContent = r.detail.toUpperCase()
+  const host = mbCartes()
+  host.innerHTML = ''
+  host.classList.add('mb-trio')
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'mb-carte mb-repos'
+  btn.style.gridColumn = '2'
+  btn.innerHTML =
+    `<i class="mb-repos-icone">${level.minijeu?.type === 'palet' ? '🥌' : level.minijeu?.type === 'rafales' ? '🌬️' : '🔪'}</i><b>${r.titre.split(' — ')[1] ?? ''}</b>` +
+    `<small>${res.memoire > 0 ? `+${res.memoire} mémoire` : 'rien — le trait est loin'} · continuer</small>`
+  let elu = false
+  btn.addEventListener('click', () => {
+    if (elu) return
+    elu = true
+    bande.ponctuation(res.verdict === 'juste' ? 'sting-record' : 'sting-collecte', 0.6)
+    suite()
+  })
+  host.appendChild(btn)
 }
 
 /** APRÈS UNE HALTE OU UNE RENCONTRE : le nœud est un nœud comme un autre,
@@ -15356,6 +15778,45 @@ function restart(): void {
   restart()
 }
 
+// JOUER LE COUPERET EN ESSAI (le pupitre, et la sonde __couperet(cible?)) :
+// la salle du mini-jeu seule, hors run — la lame pèse et dit le verdict,
+// rien ne se gagne, retour au protocole. Le trait : celui donné, sinon tiré
+// au hasard du poste sur le volume de départ de la salle. C'est ainsi qu'on
+// éprouve un mini-jeu sans lancer de descente (le concepteur, 17/09).
+function lanceCouperetEssai(cible?: number): void {
+  const gabarit = tableauCouperet(1)
+  const volumeL = volumeDepart(gabarit) * params.litersPerParticle
+  const trait = cible !== undefined && Number.isFinite(cible) && cible > 0 ? Math.round(cible * 10) / 10 : tireTrait(volumeL, Math.random)
+  if (miseEnBonbonne) fermeMiseEnBonbonne()
+  auHub = false
+  hasPlayed = true
+  document.body.classList.add('playing')
+  testLevel = tableauCouperet(trait)
+  restart()
+}
+;(window as unknown as { __couperet: (cible?: number) => void }).__couperet = lanceCouperetEssai
+// JOUER LE PALET EN ESSAI (le pupitre, et la sonde __palet()) : la piste
+// seule, hors run — trois lancers, le verdict, rien ne se gagne
+function lancePaletEssai(): void {
+  if (miseEnBonbonne) fermeMiseEnBonbonne()
+  auHub = false
+  hasPlayed = true
+  document.body.classList.add('playing')
+  testLevel = tableauPalet()
+  restart()
+}
+;(window as unknown as { __palet: () => void }).__palet = lancePaletEssai
+// JOUER LES RAFALES EN ESSAI (le pupitre, et la sonde __rafales())
+function lanceRafalesEssai(): void {
+  if (miseEnBonbonne) fermeMiseEnBonbonne()
+  auHub = false
+  hasPlayed = true
+  document.body.classList.add('playing')
+  testLevel = tableauRafales()
+  restart()
+}
+;(window as unknown as { __rafales: () => void }).__rafales = lanceRafalesEssai
+
 function newExpedition(avecCarte = false): void {
   levelIndex = 0
   voieRang = 0 // une descente neuve repart du premier rang du plan
@@ -15379,6 +15840,8 @@ function newExpedition(avecCarte = false): void {
   eclatsPrisRun.clear()
   purgeCondensat() // la bourse d'une run commence toujours vide
   economatIntercalaire = null
+  minijeuIntercalaire = null
+  minijeuForce = false
   economatVisiteCetteRun = false
   clefCachette = false
   // les PROVISIONS du comptoir se livrent maintenant — après la remise à
@@ -15437,6 +15900,8 @@ function retourAuLabo(): void {
   // LA PURGE : le labo confisque la matière de la run — la mémoire reste
   purgeCondensat()
   economatIntercalaire = null
+  minijeuIntercalaire = null
+  minijeuForce = false
   economatVisiteCetteRun = false
   clefCachette = false
   entrerHub()
@@ -15536,6 +16001,8 @@ function quitteAuMenu(): void {
   voieVues.clear()
   levelIndex = 0
   economatIntercalaire = null
+  minijeuIntercalaire = null
+  minijeuForce = false
   economatVisiteCetteRun = false
   clefCachette = false
   run.ended = false
@@ -17003,6 +17470,10 @@ function corpsImage(now: number): boolean {
   }
   sim.freezeIntent = input.freezeIntent
   sim.gasIntent = input.gasIntent
+  // AU PALET, la ligne gèle : tant qu'un lancer est en cours, le corps est
+  // tenu en glace quoi que fasse le joueur — le lancer fini, l'intention
+  // redevient la sienne et la glace fond (thawTime du mini-jeu)
+  if (level.minijeu?.type === 'palet' && paletEtat.enCours) sim.freezeIntent = true
   // La BASCULE en vapeur — G, chaudière à 95 %, zone forcée : toute cause —
   // se règle à l'instant du basculement : péage de 20 % du volume actif
   // (gerbe de gouttes récupérables). Le compteur de dashs, lui, dépend de
@@ -17154,6 +17625,9 @@ function corpsImage(now: number): boolean {
           sim.applyVortex(vortex.x, vortex.y, params.dt, life)
           vortex.timer -= params.dt
         }
+        // un MINI-JEU n'a pas de sas : rien n'aspire, jamais — la lame
+        // conclut ; sinon arroser un sas de loin pèserait
+        sim.exitRadiusFactor = estMiniJeu(level) ? 0 : lev('sasPortee')
         sim.applyExitSuction(exitMouth.x, exitMouth.y, params.dt)
         // les CHASSES qui soufflent : le courant s'applique au pas, comme le
         // sas — et la bouffée d'une chasse déclenchée s'épuise au temps de jeu
@@ -17221,6 +17695,13 @@ function corpsImage(now: number): boolean {
           laserEtat.chasseBouffee[i] > 0 ||
           c.canal === undefined ||
           canalActif(cibles, c.canal, c.regle, laserEtat.recepteurs, now)
+      }
+      // AUX RAFALES, les chasses sont scénarisées et c'est le rythme qui les
+      // allume — toutes ensemble, une seconde toutes les quatre — tant que
+      // la traversée n'est pas conclue
+      if (level.minijeu?.type === 'rafales') {
+        const souffle = !minijeuResultat && phaseCouperet(run.tableauTime, level.minijeu.regles.rythme).tombee
+        for (let i = 0; i < chasses.length; i++) laserEtat.chassesActives[i] = souffle
       }
     }
   }
@@ -17660,7 +18141,12 @@ function corpsImage(now: number): boolean {
   // « un peu d'aspiration » : un dixième du volume de départ en bonbonne
   // suffit — la route coûte de l'eau (chaque impulsion éjecte), exiger la
   // moitié du volume INITIAL rendait le bouton inatteignable en vraie partie
-  const aspireAssez = sim.swallowed >= Math.max(20, sim.baseVolume * 0.1)
+  // dans un MINI-JEU, rien ne s'aspire et le bouton ne sert pas : c'est le
+  // jeu qui conclut (la lame du couperet ; au palet, le choix après chaque
+  // lancer — relancer ou valider)
+  const aspireAssez = estMiniJeu(level) ? false : sim.swallowed >= Math.max(20, sim.baseVolume * 0.1)
+  const texteBouton = 'CONTINUER — CONCLURE L’ESSAI'
+  if (btnContinuer.textContent !== texteBouton) btnContinuer.textContent = texteBouton
   // Une traversée déclarée par un OUTIL de conception. La salle se conclut
   // pour de bon — cérémonie, condensat, descente qui avance — mais RIEN DE
   // CE QUI SE MÉRITE ne s'écrit : ni record du protocole, ni tableau
@@ -17687,8 +18173,12 @@ function corpsImage(now: number): boolean {
       !input.paused &&
       document.body.classList.contains('playing'),
   )
+  // un mini-jeu ne se conclut jamais en atteignant la cuve : c'est sa lame
+  // qui tranche — sans quoi nager dans la cuve avant la chute finirait la
+  // salle comme une salle ordinaire
   const reached =
     !drainActive &&
+    !estMiniJeu(level) &&
     pointInBox(sim.stats.centroidX, sim.stats.centroidY, level.exit)
   // au HUB, pas d'engloutissement à attendre : dès que le CORPS est dans la
   // bouche du sas, la run part — le sas de lancement est une porte, pas un
@@ -17759,6 +18249,31 @@ function corpsImage(now: number): boolean {
       effaceRun()
       newExpedition(true)
     })
+  } else if (!tableauDone && !sim.dispersed && estMiniJeu(level) && level.minijeu && (majPalet(), majRafales(), minijeuResultat)) {
+    // LE MINI-JEU A CONCLU : la lame du couperet a pesé, le palet a fait
+    // ses lancers (ou le joueur a conclu). Rien ne se consigne aux registres
+    // (pas un tableau du protocole), la mémoire se gagne au barème, la
+    // salle compte comme une halte — un rang de la descente, une salle du
+    // module — et le module reprend. EN ESSAI (le pupitre, __couperet,
+    // __palet) : le verdict s'affiche, rien ne se gagne, retour au
+    // protocole — c'est ainsi qu'on éprouve un mini-jeu sans lancer de run.
+    audio.collect()
+    const r = minijeuResultat
+    const res = r.note
+    bande.ponctuation(res.verdict === 'juste' ? 'sting-record' : 'sting-collecte', 0.85)
+    if (testLevel) {
+      run.ended = true
+      showOverlay(
+        r.titre,
+        `${r.detail}. En run, cela vaudrait ${res.memoire > 0 ? `+${res.memoire} mémoire` : 'rien'} ; en essai, les registres ne bougent pas.`,
+        'success',
+        'RETOUR AU PROTOCOLE',
+      )
+    } else {
+      gagneMemoireRun(res.memoire)
+      minijeuIntercalaire = null
+      mbMontreResultatMiniJeu(r, mbApresHalte)
+    }
   } else if (
     !tableauDone &&
     !sim.dispersed &&
