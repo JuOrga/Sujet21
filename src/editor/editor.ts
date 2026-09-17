@@ -54,10 +54,15 @@ import {
   PORTE_SENS_DEFAUT,
   PUITS_FORCE_DEFAUT,
   PUITS_RAYON_DEFAUT,
+  MIRE_POINTS_DEFAUT,
+  MIRE_R_DEFAUT,
   type PorteMaterialisation,
 } from '../game/level'
 import { traceTrajectoire } from '../game/trajectoire'
 import { periodeCoeur } from '../game/puits'
+import { tableauCibles, tableauCouperet, tableauOrbites, tableauPalet, tableauRafales } from '../game/minijeux'
+import { tableauRonde } from '../game/ronde'
+import { builtinPresets, loadStoredPresets, type Preset } from '../bench/presets'
 import { grainsPuits, rayonNoyau } from '../game/puitsDessin'
 import { FluidSim, KIND_PLAYER } from '../sim/solver'
 import {
@@ -334,6 +339,7 @@ type Tool =
   | { kind: 'laser' }
   | { kind: 'cible' }
   | { kind: 'puits' }
+  | { kind: 'mire' }
   | { kind: 'porte' }
   | { kind: 'chasse' }
   // Le MÉTA : la pastille de condensat (la monnaie de run, bue au contact)
@@ -371,6 +377,7 @@ type Sel =
   | { kind: 'laser'; index: number }
   | { kind: 'cible'; index: number }
   | { kind: 'puits'; index: number }
+  | { kind: 'mire'; index: number }
   | { kind: 'porte'; index: number }
   | { kind: 'chasse'; index: number }
   | { kind: 'condensat'; index: number }
@@ -547,6 +554,8 @@ export class LevelEditor {
     | { mode: 'aim'; index: number }
     // le puits vient d'être posé : glisser règle son rayon
     | { mode: 'rayon'; index: number }
+    // la mire vient d'être posée : glisser règle son rayon
+    | { mode: 'rayonMire'; index: number }
     // un nœud de rail au bout du doigt. `trace` : le point vient d'être
     // POSÉ à l'outil Rail (le relâcher juge alors s'il compte) ; sans lui,
     // c'est un coude existant qu'on reprend, et il reste où on le laisse.
@@ -1003,6 +1012,10 @@ export class LevelEditor {
       const r = pu?.rayon ?? PUITS_RAYON_DEFAUT
       return pu ? { minX: pu.x - r, minY: pu.y - r, maxX: pu.x + r, maxY: pu.y + r } : null
     }
+    if (s.kind === 'mire') {
+      const m = (this.level.mires ?? [])[s.index]
+      return m ? { minX: m.x - m.r, minY: m.y - m.r, maxX: m.x + m.r, maxY: m.y + m.r } : null
+    }
     if (s.kind === 'condensat') {
       const c = (this.level.condensats ?? [])[s.index]
       return c
@@ -1093,6 +1106,12 @@ export class LevelEditor {
       if (pu) {
         pu.x += dx
         pu.y += dy
+      }
+    } else if (s.kind === 'mire') {
+      const m = (this.level.mires ?? [])[s.index]
+      if (m) {
+        m.x += dx
+        m.y += dy
       }
     } else if (s.kind === 'condensat') {
       const c = (this.level.condensats ?? [])[s.index]
@@ -1324,6 +1343,10 @@ export class LevelEditor {
       if (Math.hypot(puits[i].x - x, puits[i].y - y) < Math.max(28, 30 / this.zoom)) {
         return { kind: 'puits', index: i }
       }
+    }
+    const mires = this.level.mires ?? []
+    for (let i = mires.length - 1; i >= 0; i--) {
+      if (Math.hypot(mires[i].x - x, mires[i].y - y) < mires[i].r + 8) return { kind: 'mire', index: i }
     }
     const condensats = this.level.condensats ?? []
     for (let i = condensats.length - 1; i >= 0; i--) {
@@ -2405,6 +2428,14 @@ export class LevelEditor {
               oy: w.y - pu.y,
               start: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
             }
+          } else if (hit.kind === 'mire') {
+            const m = (this.level.mires ?? [])[hit.index]
+            this.drag = {
+              mode: 'move',
+              ox: w.x - m.x,
+              oy: w.y - m.y,
+              start: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+            }
           } else if (hit.kind === 'condensat') {
             const c = (this.level.condensats ?? [])[hit.index]
             this.drag = {
@@ -2759,6 +2790,15 @@ export class LevelEditor {
         this.draw()
         return
       }
+      if (this.tool.kind === 'mire') {
+        if (!this.level.mires) this.level.mires = []
+        this.level.mires.push({ x: this.snapped(w.x), y: this.snapped(w.y), r: MIRE_R_DEFAUT, points: MIRE_POINTS_DEFAUT })
+        const index = this.level.mires.length - 1
+        this.sel = { kind: 'mire', index }
+        this.drag = { mode: 'rayonMire', index } // glisser pour régler le rayon
+        this.draw()
+        return
+      }
       if (this.tool.kind === 'rail') {
         // UN RAIL NE SE SOUDE PLUS À SON VOISIN. Auparavant, presser près
         // de l'extrémité de N'IMPORTE QUEL rail prolongeait ce rail : deux
@@ -2965,6 +3005,12 @@ export class LevelEditor {
           if (r >= 40 && r !== PUITS_RAYON_DEFAUT) pu.rayon = r
           else delete pu.rayon
         }
+      } else if (d.mode === 'rayonMire') {
+        const m = (this.level.mires ?? [])[d.index]
+        if (m) {
+          const r = Math.round(Math.hypot(w.x - m.x, w.y - m.y) / 5) * 5
+          if (r >= 20) m.r = Math.min(600, r) // un glisser trop court laisse le défaut
+        }
       } else if (d.mode === 'railpt') {
         const r = (this.level.rails ?? [])[d.index]
         const p = r?.points[d.point]
@@ -3051,6 +3097,10 @@ export class LevelEditor {
           const pu = (this.level.puits ?? [])[this.sel.index]
           pu.x = this.snapped(w.x - d.ox)
           pu.y = this.snapped(w.y - d.oy)
+        } else if (this.sel?.kind === 'mire') {
+          const m = (this.level.mires ?? [])[this.sel.index]
+          m.x = this.snapped(w.x - d.ox)
+          m.y = this.snapped(w.y - d.oy)
         } else if (this.sel?.kind === 'condensat') {
           const c = (this.level.condensats ?? [])[this.sel.index]
           c.x = this.snapped(w.x - d.ox)
@@ -3762,6 +3812,7 @@ export class LevelEditor {
     else if (s.kind === 'marchand') delete this.level.marchand
     else if (s.kind === 'eclat') (this.level.eclats ?? []).splice(s.index, 1)
     else if (s.kind === 'puits') (this.level.puits ?? []).splice(s.index, 1)
+    else if (s.kind === 'mire') (this.level.mires ?? []).splice(s.index, 1)
     else if (s.kind === 'cible') {
       // les numéros sont LOGIQUES : avant de retirer la pastille, chaque
       // survivante fige le sien — rien ne se renumérote, les portes tiennent
@@ -4045,6 +4096,10 @@ export class LevelEditor {
       const pu = (this.level.puits ?? [])[s.index]
       this.level.puits!.push({ ...pu, x: pu.x + off })
       this.sel = { kind: 'puits', index: this.level.puits!.length - 1 }
+    } else if (s.kind === 'mire') {
+      const m = (this.level.mires ?? [])[s.index]
+      this.level.mires!.push({ ...m, x: m.x + off })
+      this.sel = { kind: 'mire', index: this.level.mires!.length - 1 }
     } else if (s.kind === 'condensat') {
       const c = (this.level.condensats ?? [])[s.index]
       this.level.condensats!.push({ ...c, x: c.x + off })
@@ -4223,6 +4278,7 @@ export class LevelEditor {
         else if (key === 'laser') this.setTool({ kind: 'laser' })
         else if (key === 'cible') this.setTool({ kind: 'cible' })
         else if (key === 'puits') this.setTool({ kind: 'puits' })
+        else if (key === 'mire') this.setTool({ kind: 'mire' })
         else if (key === 'condensat') this.setTool({ kind: 'condensat' })
         else if (key === 'fiole') this.setTool({ kind: 'fiole' })
         else if (key.startsWith('plot:'))
@@ -4272,6 +4328,15 @@ export class LevelEditor {
       ...TABLEAUX_ECOLE,
       ...TABLEAUX,
       TABLEAU_1BIS,
+      // les salles des MINI-JEUX et la ronde : construites par le code, elles
+      // s'ouvrent ici en copie (le concepteur, 17/09 : « comment trouver la
+      // salle dans l'éditeur ? ») — leur mini-jeu et leurs réglages suivent
+      tableauCouperet(2),
+      tableauPalet(),
+      tableauRafales(),
+      tableauOrbites(),
+      tableauCibles(),
+      tableauRonde(),
     ]
     selLivres.innerHTML = livres
       .map((t, i) => `<option value="${i}">${t.code} — ${t.name}</option>`)
@@ -4365,6 +4430,19 @@ export class LevelEditor {
     // la frappe ne pousse pas d'instantané à chaque touche : c'est la sortie
     // du champ (change) qui grave l'étape dans l'historique
     this.el('ed-dashs').addEventListener('change', () => this.histoire())
+    // LA PHYSIQUE DU TABLEAU : un preset du banc, COPIÉ dans le tableau (le
+    // fichier reste autonome : si le preset change ou disparaît, le tableau
+    // garde ce qu'il a) ; « celle du banc » efface la clé
+    this.el('ed-preset').addEventListener('change', () => {
+      const titre = (this.el('ed-preset') as HTMLSelectElement).value
+      const p = this.presetsConnus().find((q) => q.title === titre)
+      if (p) this.level.reglages = { ...p.params }
+      else delete this.level.reglages
+      this.persist()
+      this.validate()
+      this.syncForm()
+      this.commit(p ? `Physique : ${p.title} (${Object.keys(p.params).length} réglages copiés).` : 'Physique : celle du banc.')
+    })
     // LE CYCLE en descente : ce tableau suit-il les mémoires tissées, ou
     // laisse-t-il les trois états au bouton (leçons, tableaux d'atelier) ?
     this.el('ed-etats').addEventListener('change', () => {
@@ -5193,6 +5271,34 @@ export class LevelEditor {
     )
   }
 
+  /** Les presets que le menu propose : ceux du banc (livrés et enregistrés ici). */
+  private presetsConnus(): Preset[] {
+    const vus = new Set<string>()
+    const out: Preset[] = []
+    for (const p of [...builtinPresets(), ...loadStoredPresets()]) {
+      if (vus.has(p.title)) continue
+      vus.add(p.title)
+      out.push(p)
+    }
+    return out
+  }
+
+  /** Le menu de la physique : les presets, et l'état du tableau — celui qui
+   *  correspond à ses réglages, ou « réglages propres » s'ils ne sont ceux
+   *  d'aucun (un preset modifié depuis, ou un fichier venu d'ailleurs). */
+  private syncPreset(): void {
+    const sel = this.el('ed-preset') as HTMLSelectElement
+    const presets = this.presetsConnus()
+    const r = this.level.reglages
+    const cle = (o: object): string => JSON.stringify(Object.entries(o).sort(([a], [b]) => (a < b ? -1 : 1)))
+    const courant = r && Object.keys(r).length > 0 ? presets.find((p) => cle(p.params) === cle(r))?.title ?? '(propres)' : ''
+    sel.innerHTML =
+      `<option value="">— celle du banc —</option>` +
+      (courant === '(propres)' ? `<option value="(propres)">réglages propres (${Object.keys(r!).length})</option>` : '') +
+      presets.map((p) => `<option value="${p.title.replace(/"/g, '&quot;')}">${p.title} (${Object.keys(p.params).length})</option>`).join('')
+    sel.value = courant
+  }
+
   private syncForm(): void {
     ;(this.el('ed-name') as HTMLInputElement).value = this.level.name
     ;(this.el('ed-code') as HTMLInputElement).value = this.level.code
@@ -5212,6 +5318,7 @@ export class LevelEditor {
     )
     ;(this.el('ed-dashs') as HTMLInputElement).value =
       this.level.dashBudget === undefined ? '' : String(this.level.dashBudget)
+    this.syncPreset()
     ;(this.el('ed-etats') as HTMLSelectElement).value =
       this.level.etats === 'libres' ? 'libres' : 'cycle'
     ;(this.el('ed-exige-glace') as HTMLInputElement).checked =
@@ -5722,6 +5829,14 @@ export class LevelEditor {
       rows.push(
         `<p class="ed-empty">UN PUITS DE GRAVITÉ attire tout ce qui est en portée — la seule force pure du solveur, celle qui fait orbiter. Dans le cœur, toute orbite a la même période : ${T.toFixed(1).replace('.', ',')} s ; vitesse circulaire au bord ${Math.round(vc)} u/s, évasion ${Math.round(vc * Math.SQRT2)} u/s. LES ORBITES VIVENT DANS LE CŒUR (à moins de 0,8 rayon) : à la lisière, le corps se déchire. Deux cœurs ne doivent pas se recouvrir. En jeu, pas d'anneau : une aura, un noyau, et des grains qui tombent vers le centre à l'accélération du puits — en cadence dans le cœur (isochrone), à la traîne dans le halo.</p>`,
       )
+    } else if (s.kind === 'mire') {
+      const m = (this.level.mires ?? [])[s.index]
+      rows.push(numField('Points d’une touche pleine', 'p-mpts', m.points, 1))
+      rows.push(numField('Rayon (u)', 'p-mr', m.r, 5))
+      rows.push(numField('X', 'p-mx', m.x), numField('Y', 'p-my', m.y))
+      rows.push(
+        `<p class="ed-empty">UNE MIRE : une cible à points pour les ÉCLATS DE GLACE. Une touche vaut ses points au prorata de la taille de l'éclat (le premier tir vaut plein, un amas jusqu'au double) ; l'éclat disparaît, la mire reste. Le tir n'existe que si le tableau l'active : la physique « ⚙ Tir de glace » (panneau Tableau).</p>`,
+      )
     } else if (s.kind === 'cible') {
       const t = (this.level.cibles ?? [])[s.index]
       const canal = canalDeCible(this.level.cibles ?? [], s.index)
@@ -6183,6 +6298,8 @@ export class LevelEditor {
                       ? `Lampe nº ${s.index + 1}`
                       : s.kind === 'puits'
                         ? 'Puits de gravité'
+                        : s.kind === 'mire'
+                        ? `Mire (${(this.level.mires ?? [])[s.index]?.points ?? 0} pts)`
                         : s.kind === 'cible'
                         ? `Cible nº ${canalDeCible(this.level.cibles ?? [], s.index)}`
                         : s.kind === 'condensat'
@@ -6657,6 +6774,12 @@ export class LevelEditor {
       else delete pu.portee
       pu.x = val('p-pux')
       pu.y = val('p-puy')
+    } else if (s.kind === 'mire') {
+      const m = (this.level.mires ?? [])[s.index]
+      m.points = Math.max(1, Math.round(val('p-mpts')))
+      m.r = Math.max(8, Math.round(val('p-mr')))
+      m.x = val('p-mx')
+      m.y = val('p-my')
     } else if (s.kind === 'cible') {
       const t = (this.level.cibles ?? [])[s.index]
       // le n° est LOGIQUE : il se pose sur la pastille et les portes le
@@ -8243,6 +8366,32 @@ export class LevelEditor {
         g.fillStyle = 'rgba(210,198,255,0.85)'
         g.font = LevelEditor.POLICE_LABEL
         g.fillText(`PUITS ${pu.force ?? PUITS_FORCE_DEFAUT}`, c.sx + 10, c.sy - 10)
+      }
+    }
+    // LES MIRES : des cercles concentriques et les points, comme en jeu
+    {
+      const mires = this.level.mires ?? []
+      for (let i = 0; i < mires.length; i++) {
+        const m = mires[i]
+        const c = this.toScreen(m.x, m.y)
+        const R = m.r * this.zoom
+        const sel = this.sel?.kind === 'mire' && this.sel.index === i
+        for (let k = 3; k >= 1; k--) {
+          g.beginPath()
+          g.arc(c.sx, c.sy, (R * k) / 3, 0, Math.PI * 2)
+          g.fillStyle = k % 2 === 1 ? 'rgba(255,120,120,0.18)' : 'rgba(255,240,240,0.12)'
+          g.fill()
+        }
+        g.beginPath()
+        g.arc(c.sx, c.sy, R, 0, Math.PI * 2)
+        g.strokeStyle = sel ? '#ffd2d2' : 'rgba(255,150,150,0.85)'
+        g.lineWidth = sel ? 2.5 : 1.5
+        g.stroke()
+        g.fillStyle = 'rgba(255,255,255,0.92)'
+        g.font = LevelEditor.POLICE_LABEL
+        g.textAlign = 'center'
+        g.fillText(`${m.points} pts`, c.sx, c.sy + 4)
+        g.textAlign = 'start'
       }
     }
     // LA LIGNE PRÉDITE depuis le départ (l'impulsion, les puits, les parois,

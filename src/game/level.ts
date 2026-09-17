@@ -3,6 +3,7 @@
 // Les obstacles sont de la chimie, pas de la géométrie (§6).
 
 import type { MiniJeuDef } from './minijeux'
+import type { SimParams } from '../sim/params'
 import type { Bounds } from '../sim/solver'
 import { dansForme } from './formes'
 import type { EcranPupitre } from './pupitres'
@@ -590,6 +591,22 @@ export interface PuitsDef {
 // à 0,7 rayon 282 u/s ; vitesse d'évasion au bord 569 u/s, loin sous
 // maxSpeed (3 000). Une éjection de 10 % du corps à 1 400 u/s donne ≈ 140 u/s :
 // de quoi courber une orbite à vue, à un coût qui se compte.
+// UNE MIRE : une cible à points (le mini-jeu des cibles, 17/09). Un cercle
+// que les ÉCLATS DE GLACE tirés par le corps viennent toucher : la touche
+// rapporte ses points (au prorata de la taille de l'éclat, voir
+// minijeux.ts), l'éclat disparaît, la mire RESTE — on peut la toucher sans
+// fin. Le concepteur : « il faut créer les cibles dans l'éditeur et pouvoir
+// régler le nombre de points de chaque cible, la taille à paramétrer ».
+// Rien à voir avec CibleDef, la pastille réceptrice des lasers.
+export interface MireDef {
+  x: number
+  y: number
+  r: number // le rayon (u)
+  points: number // ce que vaut une touche pleine
+}
+export const MIRE_R_DEFAUT = 70
+export const MIRE_POINTS_DEFAUT = 10
+
 export const PUITS_RAYON_DEFAUT = 300
 export const PUITS_FORCE_DEFAUT = 540
 export const PUITS_FONDU = 0.25
@@ -820,6 +837,7 @@ export interface LevelDef {
   portes?: PorteDef[]
   chasses?: ChasseDef[] // courants de poussée : l'éjection sans déchirure
   puits?: PuitsDef[] // puits de gravité : le corps y orbite
+  mires?: MireDef[] // cibles à points : les éclats de glace les touchent
   rails?: RailDef[]
   caches?: CacheDef[] // cachettes voilées (brouillard levé à l'entrée du corps)
   condensats?: CondensatPose[] // pastilles posées main (sinon : semis auto)
@@ -880,6 +898,13 @@ export interface LevelDef {
   // bascule, quel que soit le volume). Absent : le réglage du banc
   // (gasDashBudget).
   dashBudget?: number
+  // LA PHYSIQUE DU TABLEAU (le concepteur, 17/09 : « pour chaque tableau on
+  // doit pouvoir forcer un preset de la physique du volume ») : des valeurs
+  // du banc recouvertes le temps de la salle — un preset du banc copié dans
+  // le tableau par l'éditeur, le fichier reste autonome. Les mini-jeux
+  // portent les leurs (minijeu.reglages), appliquées par-dessus. Ce qui
+  // n'est pas dans le banc (SimParams) est ignoré à la lecture.
+  reglages?: Partial<SimParams>
   // LE CYCLE DES ÉTATS en descente : absent (ou 'cycle'), les
   // transformations MANUELLES obéissent aux mémoires tissées — 'libres',
   // les trois états restent au bouton quoi qu'il en soit (tableaux

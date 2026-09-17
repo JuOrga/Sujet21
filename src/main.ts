@@ -128,6 +128,12 @@ import {
   compteAuDela,
   estMiniJeu,
   ETAT_ORBITES_NEUF,
+  ETAT_CIBLES_NEUF,
+  avanceCibles,
+  noteCibles,
+  tableauCibles,
+  VERDICTS_CIBLES,
+  type EtatCibles,
   ETAT_PALET_NEUF,
   meilleurLancer,
   noteOrbites,
@@ -787,10 +793,14 @@ function createSim(level: LevelDef): FluidSim {
   // jamais modifié, il est recouvert le temps de la salle
   Object.assign(params, reglagesRendus)
   reglagesRendus = {}
-  if (level.minijeu?.reglages) {
-    for (const k of Object.keys(level.minijeu.reglages) as (keyof SimParams)[]) {
-      reglagesRendus[k] = params[k]
-      params[k] = level.minijeu.reglages[k] as never
+  // LES RÉGLAGES DU TABLEAU (un preset du banc copié par l'éditeur), puis
+  // ceux du mini-jeu par-dessus — chaque clé recouverte est rendue à la
+  // salle suivante, une seule fois même si les deux la portent
+  for (const src of [level.reglages, level.minijeu?.reglages]) {
+    if (!src) continue
+    for (const k of Object.keys(src) as (keyof SimParams)[]) {
+      if (!(k in reglagesRendus)) reglagesRendus[k] = params[k]
+      params[k] = src[k] as never
     }
   }
   const sim = new FluidSim(params, level.bounds, CAPACITY)
@@ -1026,6 +1036,10 @@ let paletLancersVus = 0
 // de l'entrée de caméra, que la physique traverse immobile
 let orbitesEtat: EtatOrbites = ETAT_ORBITES_NEUF
 let orbitesT0 = 0
+// LES CIBLES en cours : les points et les touches (avanceCibles, pur), et
+// les dernières touches pour l'éclair du dessin (où, quand, combien)
+let ciblesEtat: EtatCibles = ETAT_CIBLES_NEUF
+let ciblesEclairs: { x: number; y: number; t: number; points: number }[] = []
 // LES RÉGLAGES d'un mini-jeu en cours : les valeurs du banc qu'il a
 // remplacées, pour les rendre à la salle suivante
 let reglagesRendus: Partial<SimParams> = {}
@@ -8295,6 +8309,9 @@ const endgame = {
 // Dash de vapeur : viser fige le temps, relâcher lance le nuage (« air
 // dash »). On ne retient qu'une chose entre deux images : était-on en visée.
 const dash = { aiming: false }
+// Le tir de glace : même mémoire, même geste — en glace, quand le tableau
+// l'active (params.glaceTir), viser ralentit, relâcher tire un éclat
+const tir = { aiming: false }
 // Front montant de l'intention vapeur : la TRANSFORMATION (péage + dashs)
 // se paie au basculement, quelle qu'en soit la cause.
 let gasIntentAvant = false
@@ -8524,6 +8541,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       caches.length +
       (level.chasses?.length ?? 0) + // un tableau qui n'a QU'une chasse se dessine aussi
       (level.puits?.length ?? 0) + // les puits et la ligne prédite
+      (level.mires?.length ?? 0) + // les cibles à points
       pastilles.length +
       eclatsEssai.length +
       (level.plots?.length ?? 0) +
@@ -8746,6 +8764,65 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
           ? `ANNEAU ${orbitesEtat.anneauxPasses + 1} / ${r.anneaux.length} — IL VOUS RESTE ${part} %`
           : `AU CROISSANT — IL VOUS RESTE ${part} %`
     g.fillText(consigne, anc.sx, anc.sy)
+    g.restore()
+  }
+
+  // LES MIRES (les cibles à points) : des cercles concentriques, les points
+  // au centre ; une touche fait un éclair et écrit ses points. Le chrono et
+  // le compte des cibles en tête de salle.
+  if ((level.mires?.length ?? 0) > 0) {
+    g.save()
+    for (const m of level.mires!) {
+      const c = S(m.x, m.y)
+      const R = m.r * z
+      for (let k = 3; k >= 1; k--) {
+        g.beginPath()
+        g.arc(c.sx, c.sy, (R * k) / 3, 0, Math.PI * 2)
+        g.fillStyle = k % 2 === 1 ? 'rgba(255,120,120,0.16)' : 'rgba(255,240,240,0.12)'
+        g.fill()
+      }
+      g.beginPath()
+      g.arc(c.sx, c.sy, R, 0, Math.PI * 2)
+      g.strokeStyle = 'rgba(255,150,150,0.85)'
+      g.lineWidth = 2
+      g.stroke()
+      g.fillStyle = 'rgba(255,255,255,0.92)'
+      g.font = `700 ${Math.max(11, Math.min(26, 80 * z))}px ui-monospace, monospace`
+      g.textAlign = 'center'
+      g.fillText(String(m.points), c.sx, c.sy + Math.max(4, 28 * z))
+    }
+    // les éclairs des touches : un cercle qui s'ouvre et les points qui montent
+    for (const e of ciblesEclairs) {
+      const age = elapsed - e.t
+      if (age < 0 || age > 1) continue
+      const c = S(e.x, e.y)
+      g.beginPath()
+      g.arc(c.sx, c.sy, (20 + 140 * age) * z, 0, Math.PI * 2)
+      g.strokeStyle = `rgba(255,230,160,${(1 - age).toFixed(3)})`
+      g.lineWidth = 3
+      g.stroke()
+      if (e.points > 0) {
+        g.fillStyle = `rgba(255,240,180,${(1 - age).toFixed(3)})`
+        g.font = `700 ${Math.max(14, Math.min(34, 110 * z))}px ui-monospace, monospace`
+        g.textAlign = 'center'
+        g.fillText(`+${e.points}`, c.sx, c.sy - (30 + 90 * age) * z)
+      }
+    }
+    if (level.minijeu?.type === 'cibles') {
+      const r = level.minijeu.regles
+      const t = Math.max(12, Math.min(28, 90 * z))
+      const anc = S(0, level.bounds.maxY - 60)
+      g.textAlign = 'center'
+      g.font = `600 ${Math.round(t * 0.85)}px ui-monospace, monospace`
+      g.fillStyle = 'rgba(255,255,255,0.92)'
+      const reste = Math.max(0, r.duree - (run.tableauTime - orbitesT0))
+      const consigne = minijeuResultat
+        ? `FINI — ${ciblesEtat.points} POINTS`
+        : impulsionEnAttente
+          ? 'LE LANCER ATTEND LA FIN DU PLAN LARGE'
+          : `${ciblesEtat.points} POINTS — ${Math.ceil(reste)} s`
+      g.fillText(consigne, anc.sx, anc.sy)
+    }
     g.restore()
   }
 
@@ -12748,6 +12825,12 @@ function lanceManoeuvre(quoi: string): void {
         closeHome()
         break
       }
+      case 'cibles': {
+        lanceCiblesEssai()
+        pupitreEl.hidden = true
+        closeHome()
+        break
+      }
       case 'hub-principal': {
         const r = passeLeHub('principal')
         if (r === 'ok') {
@@ -13114,6 +13197,33 @@ function majOrbites(): void {
   }
 }
 
+/** LES CIBLES, à l'image : les éclats libres qui touchent une mire sont
+ *  comptés et retirés (touchesMires), les points vont à la taille, le chrono
+ *  part du lancer et conclut. */
+function majCibles(): void {
+  const mj = level.minijeu
+  if (!mj || mj.type !== 'cibles' || minijeuResultat || impulsionEnAttente) return
+  const t = run.tableauTime - orbitesT0
+  const mires = level.mires ?? []
+  const touches = sim.touchesMires(mires)
+  const avant = ciblesEtat.points
+  ciblesEtat = avanceCibles(ciblesEtat, t, touches, mires, sim.baseVolume, mj.regles)
+  if (touches.length > 0) {
+    const gagne = ciblesEtat.points - avant
+    for (const tc of touches) ciblesEclairs.push({ x: tc.x, y: tc.y, t: elapsed, points: touches.length === 1 ? gagne : 0 })
+    if (ciblesEclairs.length > 12) ciblesEclairs.splice(0, ciblesEclairs.length - 12)
+    audio.collect()
+  }
+  if (!ciblesEtat.fini) return
+  const note = noteCibles(ciblesEtat.points, mj.regles)
+  minijeuResultat = {
+    note,
+    mesure: ciblesEtat.points,
+    titre: `LES CIBLES — ${VERDICTS_CIBLES[note.verdict]}`,
+    detail: `${ciblesEtat.points} point${ciblesEtat.points > 1 ? 's' : ''} en ${ciblesEtat.touches} touche${ciblesEtat.touches > 1 ? 's' : ''}, ${Math.round((100 * sim.playerCount) / Math.max(1, sim.baseVolume))} % du corps gardés`,
+  }
+}
+
 // LA PRÉVISION EXACTE : une COPIE DU SOLVEUR, prise sur l'état du corps à
 // l'instant de la demande, avance À PART et écrit la vraie trajectoire de
 // son centre — là où la ligne pointillée (un point-masse) dévie : les
@@ -13308,6 +13418,9 @@ function resetLasers(): void {
   paletLancersVus = 0
   orbitesEtat = ETAT_ORBITES_NEUF
   orbitesT0 = 0
+  ciblesEtat = ETAT_CIBLES_NEUF
+  ciblesEclairs = []
+  tir.aiming = false
   laserEtat.chassesActives = (level.chasses ?? []).map(() => false)
   laserEtat.chasseBouffee = (level.chasses ?? []).map(() => 0)
   lastRailTime = 0
@@ -15297,6 +15410,7 @@ function ouvreNoeud(nature: Exclude<NatureNoeud, 'salle'>): void {
       if (quel === 'palet') minijeuIntercalaire = tableauPalet()
       else if (quel === 'rafales') minijeuIntercalaire = tableauRafales()
       else if (quel === 'orbites') minijeuIntercalaire = tableauOrbites()
+      else if (quel === 'cibles') minijeuIntercalaire = tableauCibles()
       else {
         const volumeL = volumeDepart(tableauCouperet(1)) * params.litersPerParticle
         minijeuIntercalaire = tableauCouperet(tireTrait(volumeL, alea))
@@ -15333,7 +15447,7 @@ function mbMontreResultatMiniJeu(r: NonNullable<typeof minijeuResultat>, suite: 
   btn.className = 'mb-carte mb-repos'
   btn.style.gridColumn = '2'
   btn.innerHTML =
-    `<i class="mb-repos-icone">${level.minijeu?.type === 'palet' ? '🥌' : level.minijeu?.type === 'rafales' ? '🌬️' : level.minijeu?.type === 'orbites' ? '🪐' : '🔪'}</i><b>${r.titre.split(' — ')[1] ?? ''}</b>` +
+    `<i class="mb-repos-icone">${level.minijeu?.type === 'palet' ? '🥌' : level.minijeu?.type === 'rafales' ? '🌬️' : level.minijeu?.type === 'orbites' ? '🪐' : level.minijeu?.type === 'cibles' ? '🎯' : '🔪'}</i><b>${r.titre.split(' — ')[1] ?? ''}</b>` +
     `<small>${res.memoire > 0 ? `+${res.memoire} mémoire` : 'rien — le trait est loin'} · continuer</small>`
   let elu = false
   btn.addEventListener('click', () => {
@@ -16075,6 +16189,17 @@ function lanceOrbitesEssai(): void {
   restart()
 }
 ;(window as unknown as { __orbites: () => void }).__orbites = lanceOrbitesEssai
+
+// JOUER LES CIBLES EN ESSAI (le pupitre, et la sonde __cibles())
+function lanceCiblesEssai(): void {
+  if (miseEnBonbonne) fermeMiseEnBonbonne()
+  auHub = false
+  hasPlayed = true
+  document.body.classList.add('playing')
+  testLevel = tableauCibles()
+  restart()
+}
+;(window as unknown as { __cibles: () => void }).__cibles = lanceCiblesEssai
 
 // VOIR LA RONDE (le pupitre, et la sonde __ronde()) : le tableau de
 // démonstration des puits — en glace, lancé, sans fin
@@ -17779,12 +17904,17 @@ function corpsImage(now: number): boolean {
   // de recul, pas d'éjection ; la DISTANCE du doigt règle la puissance.
   const vif = !input.paused && !tableauDone && !sim.dispersed && !endgame.spent
   const dashAiming = vif && input.gasIntent && input.aimActive
+  // LE TIR DE GLACE (le mini-jeu des cibles) : le même geste que le dash, en
+  // glace, seulement quand le tableau l'active — la visée ralentit le temps,
+  // la relâche détache un éclat (sim.lanceEclat) ; pas de tir tant que
+  // l'impulsion de départ attend, ni une fois le verdict posé
+  const tirAiming = vif && params.glaceTir > 0 && input.freezeIntent && !input.gasIntent && input.aimActive && !impulsionEnAttente && !minijeuResultat
   // Le ralenti s'entend : tout le mixage plonge sous un passe-bas (et
   // baisse de moitié), un cœur au ralenti bat, la texture du temps suspendu
   // s'ouvre — seule à rester nette —, et l'air revient au dash.
   // (le ralenti d'annonce de l'éveil s'entend aussi : même texture suspendue)
   // l'agonie ferme l'ouïe comme le temps suspendu : le monde s'éloigne
-  const suspendu = dashAiming || eveil.ralenti < 0.7 || presence.agonieT0 >= 0
+  const suspendu = dashAiming || tirAiming || eveil.ralenti < 0.7 || presence.agonieT0 >= 0
   audio.setSlowMo(suspendu)
   bande.setSuspendu(suspendu)
   if (dash.aiming && !dashAiming) {
@@ -17804,6 +17934,16 @@ function corpsImage(now: number): boolean {
     }
   }
   dash.aiming = dashAiming
+  if (tir.aiming && !tirAiming) {
+    if (vif && params.glaceTir > 0 && input.freezeIntent && !input.aimActive && !input.aimAnnulee && !minijeuResultat) {
+      const n = sim.lanceEclat(aim.x, aim.y)
+      if (n > 0) {
+        manette.rumble(0.5, 70)
+        prevision = null // un tir change la trajectoire du corps (le recul n'existe pas, mais sa masse)
+      }
+    }
+  }
+  tir.aiming = tirAiming
 
   // ---- Impulsion SANS direction : le geste se retourne vers soi ----
   // Stick au neutre (manette), ou doigt/pointeur posé SUR le corps : au lieu
@@ -17833,7 +17973,7 @@ function corpsImage(now: number): boolean {
     // que l'œil les cherche. Le temps réel (elapsed, la scène, l'écran)
     // n'est pas touché : seul le monde décélère.
     const warpNow =
-      (dashAiming
+      (dashAiming || tirAiming
         ? params.timeWarp * params.gasAimSlow * lev('visee')
         : params.timeWarp) *
       eveil.ralenti *
@@ -17879,6 +18019,7 @@ function corpsImage(now: number): boolean {
         if (
           input.aimActive &&
           !input.gasIntent &&
+          !tirAiming &&
           !sim.dispersed &&
           !endgame.spent
         ) {
@@ -18525,7 +18666,7 @@ function corpsImage(now: number): boolean {
       effaceRun()
       newExpedition(true)
     })
-  } else if (!tableauDone && !sim.dispersed && estMiniJeu(level) && level.minijeu && (majPalet(), majRafales(), majOrbites(), minijeuResultat)) {
+  } else if (!tableauDone && !sim.dispersed && estMiniJeu(level) && level.minijeu && (majPalet(), majRafales(), majOrbites(), majCibles(), minijeuResultat)) {
     // LE MINI-JEU A CONCLU : la lame du couperet a pesé, le palet a fait
     // ses lancers (ou le joueur a conclu). Rien ne se consigne aux registres
     // (pas un tableau du protocole), la mémoire se gagne au barème, la
@@ -19362,8 +19503,23 @@ function corpsImage(now: number): boolean {
           ? `À SEC — la zone impose la vapeur, elle ne recharge pas : un surchauffeur`
           : `À SEC — retransformez-vous, ou frôlez un surchauffeur`
   }
-  dashAimEl.classList.toggle('visible', dash.aiming)
-  dashCostEl.classList.toggle('visible', dash.aiming)
+  if (tir.aiming) {
+    const sx = vw * 0.5 + (sim.stats.centroidX - camera.x) * camera.zoom
+    const sy = vh * 0.5 - (sim.stats.centroidY - camera.y) * camera.zoom
+    const ex = input.aimClientX
+    const ey = input.aimClientY
+    const len = Math.hypot(ex - sx, ey - sy)
+    const ang = Math.atan2(ey - sy, ex - sx)
+    dashAimEl.style.transform = `translate(${sx.toFixed(1)}px, ${sy.toFixed(1)}px) rotate(${((ang * 180) / Math.PI).toFixed(2)}deg)`
+    dashAimEl.style.width = `${Math.max(0, len - 14).toFixed(1)}px`
+    dashCostEl.style.transform = `translate(${(ex + 18).toFixed(1)}px, ${(ey - 30).toFixed(1)}px)`
+    const dMonde = Math.hypot(aim.x - sim.stats.centroidX, aim.y - sim.stats.centroidY)
+    const puissance = Math.min(1, dMonde / Math.max(1, params.gasDashRange))
+    const eclat = Math.round(sim.playerCount * params.glaceTir)
+    dashCostEl.textContent = `ÉCLAT ${Math.round(puissance * 100)} % · ${eclat} grain${eclat > 1 ? 's' : ''} sur ${sim.playerCount}`
+  }
+  dashAimEl.classList.toggle('visible', dash.aiming || tir.aiming)
+  dashCostEl.classList.toggle('visible', dash.aiming || tir.aiming)
   let frozenCount = 0
   let gasCount = 0
   for (let i = 0; i < sim.count; i++) {

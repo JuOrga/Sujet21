@@ -157,3 +157,14 @@ describe('la fiche du puits de gravité et l’impulsion du départ', () => {
     expect(immobile.lignes.map((l) => l.txt).join(' ')).not.toContain('Lancé')
   })
 })
+
+describe('la fiche de la mire', () => {
+  it('la mire dit ses points et son rayon, et que le tir doit être activé par le tableau', () => {
+    const lv = { ...niveau, mires: [{ x: 0, y: 0, r: 90, points: 5 }] }
+    const f = ficheElement({ kind: 'mire', index: 0 }, lv)!
+    expect(f.titre).toBe('Mire (cible à points)')
+    const txt = f.lignes.map((l) => l.txt).join(' ')
+    expect(txt).toContain('5 points la touche pleine, rayon 90 u.')
+    expect(txt).toContain('Tir de glace')
+  })
+})
