@@ -697,7 +697,6 @@ export function parseLevel(input: unknown): {
     if (forceBrut !== undefined) p.force = Math.round(forceBrut)
     if (rayonBrut !== undefined) p.rayon = Math.round(rayonBrut)
     if (q.portee !== undefined && num(q.portee) > 0) p.portee = Math.round(num(q.portee))
-    if (q.sens === -1) p.sens = -1 // le seul sens qui s'écrit : direct est le défaut
     puits.push(p)
   }
   if (puits.length > 0) level.puits = puits

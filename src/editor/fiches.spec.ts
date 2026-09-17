@@ -140,17 +140,17 @@ describe('les fiches de la bulle savante', () => {
 })
 
 describe('la fiche du puits de gravité et l’impulsion du départ', () => {
-  it('le puits dit sa force, son cœur, sa portée et le sens de ses lueurs ; le départ dit son lancer', () => {
+  it('le puits dit sa force, son cœur et sa portée ; le départ dit son lancer', () => {
     const lv = {
       ...niveau,
       spawn: { x: 0, y: 0, n: 700, impulsion: { angle: -50, vitesse: 310 } },
-      puits: [{ x: 100, y: 100 }, { x: 500, y: 0, force: 900, rayon: 200, portee: 700, sens: -1 as const }],
+      puits: [{ x: 100, y: 100 }, { x: 500, y: 0, force: 900, rayon: 200, portee: 700 }],
     }
     const defaut = ficheElement({ kind: 'puits', index: 0 }, lv)!
     expect(defaut.titre).toBe('Puits de gravité')
-    expect(defaut.lignes.map((l) => l.txt).join(' ')).toContain('Force 540 u/s², cœur de 300 u, lueurs en sens direct.')
+    expect(defaut.lignes.map((l) => l.txt).join(' ')).toContain('Force 540 u/s², cœur de 300 u.')
     const regle = ficheElement({ kind: 'puits', index: 1 }, lv)!
-    expect(regle.lignes.map((l) => l.txt).join(' ')).toContain('Force 900 u/s², cœur de 200 u, portée 700 u, lueurs en sens horaire.')
+    expect(regle.lignes.map((l) => l.txt).join(' ')).toContain('Force 900 u/s², cœur de 200 u, portée 700 u.')
     const depart = ficheElement({ kind: 'spawn' }, lv)!
     expect(depart.lignes.map((l) => l.txt).join(' ')).toContain('Lancé à 310 u/s, cap -50°.')
     const immobile = ficheElement({ kind: 'spawn' }, niveau)!

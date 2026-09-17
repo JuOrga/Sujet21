@@ -151,7 +151,7 @@ import {
   type NoteTrait,
 } from './game/minijeux'
 import { sansSas, tableauRonde } from './game/ronde'
-import { lueursPuits, porteeVisible } from './game/puitsDessin'
+import { dureeChuteCoeur, grainsPuits, porteeVisible, rayonNoyau } from './game/puitsDessin'
 import {
   ditEffet,
   offresDe,
@@ -8780,16 +8780,17 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
   }
 
   // LES PUITS DE GRAVITÉ. Plus d'anneau en jeu (le concepteur, 17/09) : une
-  // AURA — un halo qui s'éteint avec la distance — et des LUEURS en orbite
-  // (puitsDessin.ts), qui tournent à la vitesse d'une orbite à leur
-  // distance, d'un bloc dans le cœur, à la traîne au-delà : on lit le
-  // puits, son étendue et son sens sans un trait. Chaque lueur tire une
-  // traîne dans le sens de sa course. La ligne prédite du point-masse ne se
-  // dessine pas en jeu : c'est un outil de conception, dans l'éditeur. En
-  // jeu, seule la PRÉVISION EXACTE se demande (P).
+  // AURA — un halo qui s'éteint avec la distance —, un NOYAU au centre (la
+  // masse, sa taille dit la force) et LA CHUTE (puitsDessin.ts) : des grains
+  // qui tombent droit vers le centre à l'accélération du solveur, en cadence
+  // dans le cœur (isochrone), à la traîne dans le halo — aucun sens de
+  // rotation, la gravité n'en a pas. On lit le puits, son étendue et sa
+  // lisière sans un trait. La ligne prédite du point-masse ne se dessine
+  // pas en jeu : c'est un outil de conception, dans l'éditeur. En jeu, seule
+  // la PRÉVISION EXACTE se demande (P).
   if ((level.puits?.length ?? 0) > 0) {
     const puits = level.puits!
-    const tLueurs = performance.now() / 1000
+    const tChute = performance.now() / 1000
     g.save()
     for (let i = 0; i < puits.length; i++) {
       const p = puits[i]
@@ -8805,29 +8806,34 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
       g.beginPath()
       g.arc(c.sx, c.sy, aura, 0, Math.PI * 2)
       g.fill()
-      // le centre : un point qui bat doucement
-      const battement = 0.75 + 0.25 * Math.sin(tLueurs * 2.2 + i)
-      g.fillStyle = `rgba(230,220,255,${0.9 * battement})`
-      g.beginPath()
-      g.arc(c.sx, c.sy, Math.max(2, 5 * z), 0, Math.PI * 2)
-      g.fill()
-      // les lueurs et leurs traînes (l'écran a l'axe y vers le bas)
-      for (const l of lueursPuits(p, tLueurs, i)) {
-        const q = S(l.x, l.y)
-        const rayon = Math.max(1, l.taille * z)
-        const traine = Math.min(60 * z, l.vitesse * 0.12 * z)
-        g.strokeStyle = `rgba(200,185,255,${0.45 * l.alpha})`
+      // les grains et leurs traînes, derrière eux, vers l'extérieur
+      // (l'écran a l'axe y vers le bas)
+      g.lineCap = 'round'
+      for (const gr of grainsPuits(p, tChute, i)) {
+        const q = S(gr.x, gr.y)
+        const rayon = Math.max(1, gr.taille * z)
+        const traine = Math.min(70 * z, gr.vitesse * 0.1 * z)
+        g.strokeStyle = `rgba(200,185,255,${0.5 * gr.alpha})`
         g.lineWidth = Math.max(1, rayon * 0.9)
-        g.lineCap = 'round'
         g.beginPath()
-        g.moveTo(q.sx - l.tx * traine, q.sy + l.ty * traine)
+        g.moveTo(q.sx - gr.tx * traine, q.sy + gr.ty * traine)
         g.lineTo(q.sx, q.sy)
         g.stroke()
-        g.fillStyle = `rgba(230,220,255,${l.alpha})`
+        g.fillStyle = `rgba(230,220,255,${gr.alpha})`
         g.beginPath()
         g.arc(q.sx, q.sy, rayon, 0, Math.PI * 2)
         g.fill()
       }
+      // le noyau : une masse sombre, un liseré qui respire au rythme des chutes
+      const rn = rayonNoyau(p) * z
+      const souffle = 0.6 + 0.4 * (0.5 + 0.5 * Math.cos((tChute / dureeChuteCoeur(p)) * Math.PI * 2))
+      g.fillStyle = 'rgba(30,20,60,0.9)'
+      g.beginPath()
+      g.arc(c.sx, c.sy, rn, 0, Math.PI * 2)
+      g.fill()
+      g.strokeStyle = `rgba(225,210,255,${0.55 + 0.4 * souffle})`
+      g.lineWidth = Math.max(1.5, 2.5 * z)
+      g.stroke()
     }
     // LA PRÉVISION EXACTE, en trait plein, qui grandit tant qu'elle se calcule
     if (prevision && prevision.points.length > 1) {

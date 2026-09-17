@@ -58,7 +58,7 @@ import {
 } from '../game/level'
 import { traceTrajectoire } from '../game/trajectoire'
 import { periodeCoeur } from '../game/puits'
-import { lueursPuits } from '../game/puitsDessin'
+import { grainsPuits, rayonNoyau } from '../game/puitsDessin'
 import { FluidSim, KIND_PLAYER } from '../sim/solver'
 import {
   PORTE_MATERIALISATION_NOMS,
@@ -5716,17 +5716,11 @@ export class LevelEditor {
       rows.push(rangeField('Force (u/s², au bord du cœur)', 'p-puf', pu.force ?? PUITS_FORCE_DEFAUT, 50, 3000, 10))
       rows.push(rangeField('Rayon du cœur (u)', 'p-pur', pu.rayon ?? PUITS_RAYON_DEFAUT, 40, 1200, 10))
       rows.push(numField('Portée (u, 0 : tout le tableau)', 'p-pup', pu.portee ?? 0, 10))
-      rows.push(
-        `<label class="ed-f"><span>Sens des lueurs (décor)</span><select id="p-pusens">` +
-          `<option value="direct"${pu.sens !== -1 ? ' selected' : ''}>↺ direct (trigonométrique)</option>` +
-          `<option value="horaire"${pu.sens === -1 ? ' selected' : ''}>↻ horaire</option>` +
-          `</select></label>`,
-      )
       rows.push(numField('X', 'p-pux', pu.x), numField('Y', 'p-puy', pu.y))
       const T = periodeCoeur(pu)
       const vc = Math.sqrt((pu.force ?? PUITS_FORCE_DEFAUT) * (pu.rayon ?? PUITS_RAYON_DEFAUT))
       rows.push(
-        `<p class="ed-empty">UN PUITS DE GRAVITÉ attire tout ce qui est en portée — la seule force pure du solveur, celle qui fait orbiter. Dans le cœur, toute orbite a la même période : ${T.toFixed(1).replace('.', ',')} s ; vitesse circulaire au bord ${Math.round(vc)} u/s, évasion ${Math.round(vc * Math.SQRT2)} u/s. LES ORBITES VIVENT DANS LE CŒUR (à moins de 0,8 rayon) : à la lisière, le corps se déchire. Deux cœurs ne doivent pas se recouvrir. En jeu, pas d'anneau : une aura et des lueurs qui tournent à la vitesse d'une orbite à leur distance — leur sens est un décor, la gravité n'en a pas ; il dit au joueur dans quel sens le tableau l'invite à tourner.</p>`,
+        `<p class="ed-empty">UN PUITS DE GRAVITÉ attire tout ce qui est en portée — la seule force pure du solveur, celle qui fait orbiter. Dans le cœur, toute orbite a la même période : ${T.toFixed(1).replace('.', ',')} s ; vitesse circulaire au bord ${Math.round(vc)} u/s, évasion ${Math.round(vc * Math.SQRT2)} u/s. LES ORBITES VIVENT DANS LE CŒUR (à moins de 0,8 rayon) : à la lisière, le corps se déchire. Deux cœurs ne doivent pas se recouvrir. En jeu, pas d'anneau : une aura, un noyau, et des grains qui tombent vers le centre à l'accélération du puits — en cadence dans le cœur (isochrone), à la traîne dans le halo.</p>`,
       )
     } else if (s.kind === 'cible') {
       const t = (this.level.cibles ?? [])[s.index]
@@ -6661,8 +6655,6 @@ export class LevelEditor {
       const portee = Math.round(val('p-pup'))
       if (portee > 0) pu.portee = portee
       else delete pu.portee
-      if (text('p-pusens') === 'horaire') pu.sens = -1
-      else delete pu.sens
       pu.x = val('p-pux')
       pu.y = val('p-puy')
     } else if (s.kind === 'cible') {
@@ -8224,25 +8216,33 @@ export class LevelEditor {
         g.moveTo(c.sx, c.sy - 7)
         g.lineTo(c.sx, c.sy + 7)
         g.stroke()
-        // les lueurs du jeu, figées à cet instant : leurs traînes disent le sens
-        for (const l of lueursPuits(pu, performance.now() / 1000, i)) {
-          const q = this.toScreen(l.x, l.y)
-          const rayon = Math.max(1, l.taille * this.zoom)
-          const traine = Math.min(60 * this.zoom, l.vitesse * 0.12 * this.zoom)
-          g.strokeStyle = `rgba(200,185,255,${0.45 * l.alpha})`
+        // la chute du jeu, figée à cet instant : des grains qui tombent vers
+        // le centre, leur traîne derrière eux ; et le noyau
+        for (const gr of grainsPuits(pu, performance.now() / 1000, i)) {
+          const q = this.toScreen(gr.x, gr.y)
+          const rayon = Math.max(1, gr.taille * this.zoom)
+          const traine = Math.min(70 * this.zoom, gr.vitesse * 0.1 * this.zoom)
+          g.strokeStyle = `rgba(200,185,255,${0.5 * gr.alpha})`
           g.lineWidth = Math.max(1, rayon * 0.9)
           g.beginPath()
-          g.moveTo(q.sx - l.tx * traine, q.sy + l.ty * traine)
+          g.moveTo(q.sx - gr.tx * traine, q.sy + gr.ty * traine)
           g.lineTo(q.sx, q.sy)
           g.stroke()
-          g.fillStyle = `rgba(230,220,255,${l.alpha})`
+          g.fillStyle = `rgba(230,220,255,${gr.alpha})`
           g.beginPath()
           g.arc(q.sx, q.sy, rayon, 0, Math.PI * 2)
           g.fill()
         }
+        g.fillStyle = 'rgba(30,20,60,0.9)'
+        g.beginPath()
+        g.arc(c.sx, c.sy, rayonNoyau(pu) * this.zoom, 0, Math.PI * 2)
+        g.fill()
+        g.strokeStyle = 'rgba(225,210,255,0.8)'
+        g.lineWidth = 1.5
+        g.stroke()
         g.fillStyle = 'rgba(210,198,255,0.85)'
         g.font = LevelEditor.POLICE_LABEL
-        g.fillText(`PUITS ${pu.force ?? PUITS_FORCE_DEFAUT} ${pu.sens === -1 ? '↻' : '↺'}`, c.sx + 10, c.sy - 10)
+        g.fillText(`PUITS ${pu.force ?? PUITS_FORCE_DEFAUT}`, c.sx + 10, c.sy - 10)
       }
     }
     // LA LIGNE PRÉDITE depuis le départ (l'impulsion, les puits, les parois,

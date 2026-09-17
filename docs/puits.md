@@ -21,7 +21,6 @@ l'éditeur : ce que la ligne dit est ce que le corps subit.
 | `force` | l'accélération au bord du cœur (u/s²) | `PUITS_FORCE_DEFAUT` = 540 |
 | `rayon` | le rayon du cœur (u) | `PUITS_RAYON_DEFAUT` = 300 |
 | `portee` | au-delà, plus rien ; fondu linéaire sur le dernier quart | absente : tout le tableau |
-| `sens` | le sens des lueurs qui tournent autour du puits, `1` direct, `-1` horaire — **un décor** : la gravité n'a pas de sens, le tableau invite | absent : direct |
 
 **La loi.** Dans le cœur, harmonique : `a = force · r / rayon` — pas de
 singularité au centre, les orbites sont des ellipses centrées sur le puits,
@@ -116,16 +115,19 @@ souffle du sas, ni les chasses, ni le vortex — dans une salle qui les
 mêle aux puits, la ligne s'en écarte (à ajouter si une telle salle naît).
 
 **Le dessin en jeu** (`src/game/puitsDessin.ts`, pur ; le concepteur, 17/09 :
-« supprime le cercle visible en jeu, des particules qui tournent autour de
-chaque puits pour identifier les puits, leur aura et leur sens »). Plus
-d'anneau : une **aura** (un dégradé qui s'éteint à la portée, sinon à
-1,6 rayon), un centre qui bat, et des **lueurs en orbite** qui disent vrai
-— chacune tourne à la vitesse angulaire d'une orbite circulaire à sa
-distance : d'un bloc dans le cœur (isochrone, une roue), à la traîne
-au-delà (le halo) — on voit la lisière sans la tracer. Une traîne dans le
-sens de la course. L'éditeur garde l'anneau du cœur et la portée (des
-outils de conception) et ajoute les lueurs figées, plus le sens dans la
-fiche.
+« supprime le cercle visible en jeu, des particules pour identifier les
+puits et leur aura » — puis, devant des lueurs qui tournaient : « il n'y
+a pas de sens dans la gravité »). Plus d'anneau : une **aura** (un dégradé
+qui s'éteint à la portée, sinon à 1,6 rayon), un **noyau** au centre (la
+masse, sa taille dit la force) et **la chute** : des grains qui tombent
+droit vers le centre, lâchés sans vitesse, à l'accélération du solveur,
+et renaissent. Aucun sens de rotation. Le cœur a une propriété qui se
+voit : harmonique, un grain lâché de n'importe quelle distance du cœur
+arrive au centre au même instant, T/4 = (π/2)·√(rayon/force) — les
+grains du cœur tombent en cadence, une respiration, et le liseré du
+noyau respire avec eux ; ceux du halo traînent. On lit l'étendue,
+l'allure et la lisière sans un trait. L'éditeur garde l'anneau du cœur et
+la portée (des outils de conception) et ajoute la chute figée.
 
 ## 5. Le mini-jeu « Les orbites »
 

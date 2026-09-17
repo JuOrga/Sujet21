@@ -570,11 +570,6 @@ export interface PuitsDef {
   // LA PORTÉE (u) au-delà de laquelle le puits n'agit plus, en fondu
   // linéaire sur le dernier quart (PUITS_FONDU). Absente : tout le tableau.
   portee?: number
-  // LE SENS DES LUEURS qui tournent autour du puits (puitsDessin.ts) : 1
-  // direct (trigonométrique, celui de la physique vue d'en haut), −1
-  // horaire. UN DÉCOR : la gravité n'a pas de sens ; le tableau dit ainsi
-  // au joueur dans quel sens il l'invite à tourner. Absent : direct.
-  sens?: 1 | -1
 }
 // LES ORBITES VIVENT DANS LE CŒUR, LA LISIÈRE DÉCHIRE. Mesuré le 17/09
 // (sim/puits.spec.ts) : un corps de 400 ou 900 particules lancé en orbite
