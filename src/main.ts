@@ -8581,7 +8581,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     const n = compteAuDela(sim.count, sim.posX, mj.trait, (i) => sim.kind[i] === KIND_PLAYER)
     const auDela = couperetResultat ? couperetResultat.peseL : n * params.litersPerParticle
     const ph = phaseCouperet(run.tableauTime, mj.rythme)
-    const lame = couperetResultat ? 'LAME TOMBÉE' : ph.tombee ? 'LAME' : `LAME DANS ${ph.avant.toFixed(1).replace('.', ',')} s`
+    const lame = couperetResultat ? 'TRANCHÉ' : ph.tombee ? 'LA LAME TOMBE' : `LA LAME TOMBE DANS ${ph.avant.toFixed(1).replace('.', ',')} s`
     const t = Math.max(12, Math.min(28, 90 * z))
     const anc = S(mj.trait, -340)
     g.textAlign = 'center'
@@ -8590,7 +8590,7 @@ function drawMecanismes(vw: number, vh: number, dpr: number): void {
     g.fillText(lame, anc.sx, anc.sy)
     g.font = `${Math.round(t)}px ui-monospace, monospace`
     g.fillStyle = 'rgba(255,255,255,0.92)'
-    g.fillText(`AU-DELÀ ${fmtL(auDela)} / ${fmtL(mj.cible)}`, anc.sx, anc.sy + t * 1.25)
+    g.fillText(`À DROITE DU TRAIT ${fmtL(auDela)} / ${fmtL(mj.cible)}`, anc.sx, anc.sy + t * 1.25)
     g.restore()
   }
 
@@ -10285,10 +10285,12 @@ function rebuildRenderBoxes(): void {
         c.style === 'paroi' && (cachesLevee[i] ?? Infinity) === Infinity,
     )
     .map(({ style: _style, ...reste }) => ({ ...reste, material: MAT_WALL }))
+  // un mini-jeu n'a pas de sas : sa sortie (exigée par LevelDef) est hors
+  // des bornes et ne se dessine pas — la lame conclut, rien n'aspire
   renderBoxes = [
     ...level.boxes.slice(0, Math.max(1, MAX_BOXES - 1 - factices.length)),
     ...factices,
-    { ...level.exit, material: MAT_EXIT },
+    ...(estMiniJeu(level) ? [] : [{ ...level.exit, material: MAT_EXIT }]),
   ]
 }
 // ---- LE PACK PRÉSENCE : le Sujet est vivant ----
@@ -17343,9 +17345,9 @@ function corpsImage(now: number): boolean {
           sim.applyVortex(vortex.x, vortex.y, params.dt, life)
           vortex.timer -= params.dt
         }
-        // au COUPERET, la cuve attend sa part : le sas n'aspire rien tant que
-        // la lame n'a pas tranché — sinon arroser le sas de loin pèserait
-        sim.exitRadiusFactor = level.minijeu?.type === 'couperet' && !couperetResultat ? 0 : lev('sasPortee')
+        // un MINI-JEU n'a pas de sas : rien n'aspire, jamais — la lame
+        // conclut ; sinon arroser un sas de loin pèserait
+        sim.exitRadiusFactor = estMiniJeu(level) ? 0 : lev('sasPortee')
         sim.applyExitSuction(exitMouth.x, exitMouth.y, params.dt)
         // les CHASSES qui soufflent : le courant s'applique au pas, comme le
         // sas — et la bouffée d'une chasse déclenchée s'épuise au temps de jeu

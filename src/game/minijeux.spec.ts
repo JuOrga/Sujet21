@@ -76,11 +76,14 @@ describe('le couperet — la lame et la pesée du corps', () => {
     expect((lame.minX + lame.maxX) / 2).toBe(COL_COUPERET.trait)
     expect(lame.minY).toBe(-COL_COUPERET.demiHauteur)
     expect(lame.maxY).toBe(COL_COUPERET.demiHauteur)
-    // le pad hydrophile est derrière le trait, la cuve plus loin encore
+    // le pad hydrophile est derrière le trait ; pas de sas : la sortie exigée
+    // par LevelDef est hors des bornes, hors de portée du corps
     const pad = lv.boxes.find((b) => b.material === MAT_HYDROPHILE)!
     expect(pad.minX).toBeGreaterThan(COL_COUPERET.trait)
-    expect(lv.exit.minX).toBeGreaterThan(pad.maxX)
-    expect(lv.exit.maxX).toBeLessThanOrEqual(lv.bounds.maxX)
+    expect(lv.exit.minX).toBeGreaterThan(lv.bounds.maxX)
+    // la consigne est dans la salle, en trois pancartes numérotées
+    expect(lv.labels.filter((l) => /^[123] · /.test(l.text))).toHaveLength(3)
+    expect(lv.labels.some((l) => l.text.includes('1,7 L À DROITE'))).toBe(true)
     // le départ est en deçà du trait et dans aucune boîte
     expect(lv.spawn.x).toBeLessThan(COL_COUPERET.trait)
     for (const b of lv.boxes)

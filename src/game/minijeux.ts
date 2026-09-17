@@ -122,10 +122,13 @@ function box(minX: number, minY: number, maxX: number, maxY: number, material = 
 export const COL_COUPERET = { trait: 620, demiLargeur: 60, demiHauteur: 210 }
 
 /** LA SALLE DU COUPERET : on naît à gauche ; au milieu, deux montants
- *  serrent un col et la lame y tombe en rythme ; à droite, LA CUVE (le sas)
- *  boit ce que la lame a tranché. Un pad hydrophile derrière le trait aide
- *  à tenir sa place, une margelle devant permet de se poser. Le sas ne boit
- *  rien avant la chute : la cuve attend sa part. */
+ *  serrent un col et la lame y tombe en rythme ; à droite, rien — la part
+ *  tranchée reste scellée derrière la lame, il n'y a PAS de sas (le
+ *  concepteur, 17/09 : « pas besoin de sas au final »). Le rectangle de
+ *  sortie que LevelDef exige est posé hors des bornes et ne se dessine pas.
+ *  Un pad hydrophile derrière le trait aide à tenir sa place, une margelle
+ *  devant permet de se poser. La consigne est écrite dans la salle, en
+ *  trois pancartes numérotées : on doit comprendre sans lire le journal. */
 export function tableauCouperet(cible: number, rythme: RythmeCouperet = RYTHME_COUPERET): LevelDef {
   const l = `${cible.toFixed(1).replace('.', ',')} L`
   const { trait, demiLargeur, demiHauteur } = COL_COUPERET
@@ -134,12 +137,13 @@ export function tableauCouperet(cible: number, rythme: RythmeCouperet = RYTHME_C
     name: 'Le couperet',
     code: CODE_COUPERET,
     journal:
-      `Un trait au sol, une lame au-dessus qui tombe toutes les ${rythme.periode} secondes. Mettez-vous à cheval sur le trait et laissez-en dépasser exactement ${l} : ` +
-      `ce que la lame tranche au-delà est pesé, la cuve le boit, vous repartez avec le reste. Seul ce qui fait corps compte — les gouttes jetées ne pèsent rien. La précision paie en mémoire.`,
+      `Nagez jusqu'au trait et placez-y votre corps à cheval, de façon qu'exactement ${l} dépassent à droite. ` +
+      `La lame tombe toutes les ${rythme.periode} secondes : ce qu'elle tranche à droite du trait est pesé, vous repartez avec le reste. ` +
+      `Seul ce qui fait corps compte — les gouttes jetées ne pèsent rien. Au trait, la mémoire triple.`,
     par: 4,
     bounds: { minX: -1600, minY: -800, maxX: 1600, maxY: 800 },
     spawn: { x: -1100, y: 0, n: 900 },
-    exit: { minX: 1380, minY: -130, maxX: 1560, maxY: 130 },
+    exit: { minX: 1700, minY: -60, maxX: 1760, maxY: 60 },
     boxes: [
       // les deux montants du col : le corps s'y étire pour passer le trait
       box(trait - demiLargeur, -800, trait + demiLargeur, -demiHauteur, MAT_WALL, 5),
@@ -152,9 +156,12 @@ export function tableauCouperet(cible: number, rythme: RythmeCouperet = RYTHME_C
     portes: [lame],
     sponges: [],
     labels: [
+      { x: -1100, y: -260, text: 'LE COUPERET', tone: 'mur' },
+      { x: -1100, y: 300, text: '1 · NAGEZ JUSQU’AU TRAIT', tone: 'mur' },
       { x: trait, y: -demiHauteur - 60, text: `TRAIT ${l}`, tone: 'mur' },
-      { x: -1100, y: -220, text: 'LE COUPERET', tone: 'mur' },
-      { x: 1470, y: -200, text: 'LA CUVE', tone: 'mur' },
+      { x: trait, y: demiHauteur + 180, text: `2 · LAISSEZ DÉPASSER ${l} À DROITE DU TRAIT`, tone: 'mur' },
+      { x: trait + 520, y: -300, text: `3 · LA LAME TOMBE TOUTES LES ${rythme.periode} s`, tone: 'mur' },
+      { x: trait + 520, y: -380, text: 'CE QUI DÉPASSE EST PESÉ, LE RESTE REPART', tone: 'mur' },
     ],
     minijeu: { type: 'couperet', cible, trait, rythme },
   }
