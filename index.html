@@ -8774,9 +8774,18 @@
         75% { transform: translateX(6px); }
       }
       /* trois lignes réservées, une ligne par ligne : la fiche ne pousse
-         jamais la carte (l'écran « sautait » au survol des portes) */
+         jamais la carte (l'écran « sautait » au survol des portes).
+         ET ELLE NE L'ÉLARGIT PAS NON PLUS : la colonne de la grille est un
+         « 1fr », c'est-à-dire minmax(auto, 1fr) — sans « min-width: 0 », une
+         ligne en nowrap plus longue que la scène élargissait la colonne à sa
+         mesure au lieu de se couper, et la carte (100 % de la colonne)
+         suivait : mesuré à 1024 × 768, le plan passait de 995 à 1067 px au
+         survol d'AUCUNE TRANSFO et revenait au survol suivant — le « léger
+         décalage » de la carte à chaque changement de porte (revue du 17/09).
+         Avec la largeur tenue, les points de suspension font enfin leur
+         travail. */
       .mb-station-fiche {
-        margin: 6px 0 0; min-height: calc(3 * 1.55em); text-align: center;
+        margin: 6px 0 0; min-width: 0; overflow: hidden; min-height: calc(3 * 1.55em); text-align: center;
         font-size: calc(12px * var(--ui)); letter-spacing: 0.06em; color: #8ba3b8;
       }
       .mb-station-fiche span {
