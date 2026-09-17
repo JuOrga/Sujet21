@@ -2,6 +2,7 @@
 // volume plein, il n'y a pas d'eau à ramasser, on sort par un sas.
 // Les obstacles sont de la chimie, pas de la géométrie (§6).
 
+import type { MiniJeuDef } from './minijeux'
 import type { Bounds } from '../sim/solver'
 import { dansForme } from './formes'
 import type { EcranPupitre } from './pupitres'
@@ -830,11 +831,11 @@ export interface LevelDef {
   // est UNIVERSEL — tout module peut le piocher : c'est ce qui laisse la
   // bibliothèque jouable tant que le réétiquetage n'est pas fait.
   biome?: string
-  // LE MINI-JEU que ce tableau joue (src/game/minijeux.ts) : son sas ne
-  // collecte pas, il MESURE — le couperet y pèse ce que la lame tranche du
-  // corps au-delà du trait. Le type est déclaré ici en structure pour que
-  // level.ts n'importe pas minijeux.ts (qui importe level.ts).
-  minijeu?: { type: 'couperet'; cible: number; trait: number; rythme: { periode: number; garde: number } }
+  // LE MINI-JEU que ce tableau joue (src/game/minijeux.ts) : pas de sas, il
+  // MESURE — le couperet pèse ce que la lame tranche du corps, le palet la
+  // distance de la glace au centre. Import DE TYPE seul : minijeux.ts
+  // importe level.ts, et un type ne fait pas de cycle à l'exécution.
+  minijeu?: MiniJeuDef
   // Lit musical imposé par le tableau. Sans valeur, la cuve suit le
   // refroidissement de la coque (tiède → glaciale) : c'est le cas général,
   // les tableaux n'ont pas à choisir une musique pour exister.

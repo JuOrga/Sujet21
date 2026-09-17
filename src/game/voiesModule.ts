@@ -350,7 +350,7 @@ export function dessinMiniCarteSVG(
     repos: 'l’alcôve de repos — un souffle, de la réserve ou du condensat',
     don: 'une bonbonne oubliée',
     coffre: 'une cache — un orbe d’essence y dort',
-    minijeu: 'un mini-jeu — le couperet : laisser dépasser du trait exactement ce que la lame doit trancher',
+    minijeu: 'un mini-jeu — le couperet (laisser dépasser du trait ce que la lame doit trancher) ou le palet (geler, glisser, s’arrêter au centre)',
   }
   const nom = (nd: NoeudVoie): string =>
     nd.nature === 'evenement'

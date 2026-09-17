@@ -90,3 +90,107 @@ describe('le couperet — la lame et la pesée du corps', () => {
       expect(lv.spawn.x >= b.minX && lv.spawn.x <= b.maxX && lv.spawn.y >= b.minY && lv.spawn.y <= b.maxY).toBe(false)
   })
 })
+
+import {
+  avancePalet,
+  ETAT_PALET_NEUF,
+  meilleurLancer,
+  MINI_JEUX,
+  notePalet,
+  REGLAGES_PALET,
+  REGLES_PALET,
+  tableauPalet,
+  tireMiniJeu,
+  VERDICTS_PALET,
+  type ObservationPalet,
+} from './minijeux'
+
+describe('le palet — les lancers et la maison', () => {
+  const r = { ...REGLES_PALET, ligne: -400, maison: { x: 900, y: 0 }, rayons: [110, 250, 420] as [number, number, number], lancers: 3, reposVitesse: 25, reposDuree: 0.6, dureeMax: 12, partGel: 0.8 }
+  const obs = (t: number, gele: boolean, x: number, vitesse: number, y = 0): ObservationPalet => ({ t, gele, x, y, vitesse })
+
+  it('le verdict d’un lancer suit les trois cercles, au barème du trait', () => {
+    expect(notePalet(50, r.rayons)).toMatchObject({ verdict: 'juste', memoire: 15 })
+    expect(notePalet(200, r.rayons)).toMatchObject({ verdict: 'proche', memoire: 5 })
+    expect(notePalet(400, r.rayons)).toMatchObject({ verdict: 'loin', memoire: 3 })
+    expect(notePalet(800, r.rayons)).toMatchObject({ verdict: 'rate', memoire: 0 })
+    expect(VERDICTS_PALET.juste).toBe('AU CENTRE')
+  })
+
+  it('un lancer commence quand la glace prend à gauche de la ligne, et finit quand elle s’arrête', () => {
+    let e = ETAT_PALET_NEUF
+    e = avancePalet(e, obs(0, false, -1000, 0), r)
+    expect(e.enCours).toBeNull()
+    e = avancePalet(e, obs(0.5, true, -800, 500), r) // la glace prend, à gauche de la ligne
+    expect(e.enCours).not.toBeNull()
+    expect(e.avis).toBeNull()
+    e = avancePalet(e, obs(2, true, 700, 40), r) // elle glisse encore
+    expect(e.lancers).toHaveLength(0)
+    e = avancePalet(e, obs(3, true, 860, 10), r) // presque arrêtée
+    e = avancePalet(e, obs(3.4, true, 862, 8), r) // 0,4 s au repos : pas encore
+    expect(e.lancers).toHaveLength(0)
+    e = avancePalet(e, obs(3.7, true, 862, 8), r) // 0,7 s : le lancer est fini
+    expect(e.lancers).toHaveLength(1)
+    expect(e.lancers[0]).toMatchObject({ fin: 'repos', verdict: 'juste' })
+    expect(e.lancers[0].distance).toBeCloseTo(38)
+    expect(e.enCours).toBeNull()
+    expect(e.fini).toBe(false)
+  })
+
+  it('geler à droite de la ligne ne compte pas et le dit ; se dégeler ou traîner finit le lancer', () => {
+    let e = avancePalet(ETAT_PALET_NEUF, obs(1, true, 0, 300), r) // gelé après la ligne
+    expect(e.enCours).toBeNull()
+    expect(e.avis).toBe('GELEZ AVANT LA LIGNE')
+    // rester gelé ne relance rien : il faut que le gel COMMENCE à gauche
+    e = avancePalet(e, obs(2, true, -600, 300), r)
+    expect(e.enCours).toBeNull()
+    e = avancePalet(e, obs(3, false, -600, 0), r)
+    e = avancePalet(e, obs(3.5, true, -600, 400), r)
+    expect(e.enCours).not.toBeNull()
+    // dégelée en route : le lancer finit là où elle est
+    e = avancePalet(e, obs(5, false, 500, 300), r)
+    expect(e.lancers[0]).toMatchObject({ fin: 'degel' })
+    expect(e.lancers[0].distance).toBeCloseTo(400)
+    // le temps : douze secondes de glisse sans repos
+    e = avancePalet(e, obs(6, true, -700, 200), r)
+    e = avancePalet(e, obs(19, true, 1200, 200), r)
+    expect(e.lancers[1]).toMatchObject({ fin: 'temps' })
+  })
+
+  it('après le dernier lancer c’est fini, et le meilleur est le plus près du centre', () => {
+    let e = ETAT_PALET_NEUF
+    for (const x of [300, 880, 1400]) {
+      e = avancePalet(e, obs(0, false, -900, 0), r)
+      e = avancePalet(e, obs(1, true, -900, 500), r)
+      e = avancePalet(e, obs(2, true, x, 0), r)
+      e = avancePalet(e, obs(3, true, x, 0), r)
+    }
+    expect(e.lancers).toHaveLength(3)
+    expect(e.fini).toBe(true)
+    expect(meilleurLancer(e)!.distance).toBeCloseTo(20)
+    expect(avancePalet(e, obs(4, true, -900, 500), r)).toBe(e) // plus rien ne bouge
+    expect(meilleurLancer(ETAT_PALET_NEUF)).toBeNull()
+  })
+
+  it('la piste porte sa ligne, sa maison, ses réglages, ses pancartes — et pas de sas', () => {
+    const lv = tableauPalet()
+    expect(lv.minijeu?.type).toBe('palet')
+    expect(lv.minijeu?.reglages).toEqual(REGLAGES_PALET)
+    expect(REGLAGES_PALET.iceSlideDrag).toBeGreaterThan(0)
+    expect(lv.spawn.x).toBeLessThan(REGLES_PALET.ligne)
+    expect(REGLES_PALET.ligne).toBeLessThan(REGLES_PALET.maison.x)
+    expect(lv.exit.minX).toBeGreaterThan(lv.bounds.maxX)
+    expect(lv.labels.filter((l) => /^[12] · /.test(l.text))).toHaveLength(2)
+    for (const b of lv.boxes)
+      expect(lv.spawn.x >= b.minX && lv.spawn.x <= b.maxX && lv.spawn.y >= b.minY && lv.spawn.y <= b.maxY).toBe(false)
+  })
+
+  it('le tirage au catalogue rend chaque mini-jeu, et jamais autre chose', () => {
+    expect(tireMiniJeu(() => 0)).toBe('couperet')
+    expect(tireMiniJeu(() => 0.99)).toBe('palet')
+    expect(tireMiniJeu(() => 1)).toBe('palet')
+    const vus = new Set<string>()
+    for (let i = 0; i < 40; i++) vus.add(tireMiniJeu(aleaDeGraine(`m${i}`)))
+    expect([...vus].sort()).toEqual([...MINI_JEUX].sort())
+  })
+})

@@ -168,6 +168,7 @@ export interface SimParams {
   hydrophobeIceRestitution: number // rebond du PALET sur l'hydrophobe (>1 : le bumper rend plus qu'il ne reçoit)
   hydrophobeIceKick: number // vitesse d'éjection minimale du palet (u/s) — la pichenette du bumper
   hydrophileIceDrag: number // freinage du palet au contact hydrophile (1/s)
+  iceSlideDrag: number // freinage de la glace EN GLISSE LIBRE (1/s) — 0 en jeu (dans le vide, une dérive reste une trajectoire) ; le mini-jeu du palet le monte pour qu'une pierre s'arrête d'elle-même
   hydroGasWeight: number // poids des bandes chimiques sur la vapeur (fraction de l'effet plein)
   hydroGasReach: number // portée des bandes pour la vapeur (multiple de hydroBand)
   spongeDrag: number // traînée dans une cellule absorbante (1/s)
@@ -327,6 +328,7 @@ export const DEFAULT_PARAMS: SimParams = {
   // Le mouillage retient : ~moitié de la vitesse perdue en 0,3 s de glisse
   // (avec le mordant global 1.35) — le palet s'essouffle visiblement.
   hydrophileIceDrag: 1.8,
+  iceSlideDrag: 0,
   // La vapeur sent les bandes en sourdine (35 % de l'effet plein) mais de
   // LOIN (2,5 × la portée) : le nuage s'infléchit comme sous une gravité
   // légère, sans jamais être happé ni claqué.

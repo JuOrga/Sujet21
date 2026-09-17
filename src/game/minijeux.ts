@@ -21,26 +21,62 @@
 // exactement N litres, et la lame tranche : ce qui est au-delà ET d'un seul
 // tenant avec vous est pesé, la cuve le boit, vous repartez avec le reste.
 // On lit son volume dans sa silhouette — c'est le pilier du jeu.
-import { MAT_HYDROPHILE, MAT_WALL, type LevelDef, type ObstacleBox, type PorteDef } from './level'
+//
+// LE PALET (le curling) suit. On gèle avant la ligne, on glisse, et la glace
+// doit s'arrêter le plus près du centre de la maison. « Geler, c'est parier
+// sur une trajectoire » (le document fonctionnel) : ici c'est tout le jeu.
+// Trois lancers, le meilleur compte, chaque relance coûte de la masse.
+//
+// LES RÉGLAGES PROPRES AU MINI-JEU. Le solveur est piloté par une centaine
+// de paramètres nommés, mais aucun tableau ne pouvait les surcharger : un
+// mini-jeu porte les siens (`reglages`), appliqués à l'entrée de sa salle et
+// rendus à la sortie — une glace qui rebondit comme une bille, un gel qui
+// prend vite. C'est ce qui permet d'accorder la physique au jeu sans
+// toucher au banc.
+import { MAT_HYDROPHILE, MAT_HYDROPHOBE, MAT_WALL, type LevelDef, type ObstacleBox, type PorteDef } from './level'
+import type { SimParams } from '../sim/params'
 
-export type MiniJeuId = 'couperet'
+export type MiniJeuId = 'couperet' | 'palet'
 
-/** Ce que porte un tableau de mini-jeu (LevelDef.minijeu). */
-export interface MiniJeuDef {
-  type: MiniJeuId
+/** LE COUPERET : ce que porte son tableau. */
+export interface CouperetDef {
+  type: 'couperet'
   /** les litres demandés au-delà du trait */
   cible: number
   /** l'abscisse du trait (monde) : la lame tombe dessus */
   trait: number
   /** le rythme de la lame */
   rythme: RythmeCouperet
+  reglages?: Partial<SimParams>
 }
 
-export const CODE_COUPERET = 'MJ-COUPERET'
+/** LE PALET : ce que porte son tableau. */
+export interface PaletDef {
+  type: 'palet'
+  regles: ReglesPalet
+  reglages?: Partial<SimParams>
+}
 
-/** Ce tableau est-il un mini-jeu ? (son sas ne collecte pas : il mesure) */
+/** Ce que porte un tableau de mini-jeu (LevelDef.minijeu). */
+export type MiniJeuDef = CouperetDef | PaletDef
+
+export const CODE_COUPERET = 'MJ-COUPERET'
+export const CODE_PALET = 'MJ-PALET'
+
+/** LE CATALOGUE : les mini-jeux qu'un nœud de la mini-carte peut servir. */
+export const MINI_JEUX: readonly MiniJeuId[] = ['couperet', 'palet']
+
+/** LE TIRAGE du mini-jeu d'un nœud : au hasard du catalogue, à la graine. */
+export function tireMiniJeu(alea: () => number): MiniJeuId {
+  const i = Math.min(MINI_JEUX.length - 1, Math.floor(Math.max(0, Math.min(0.999999, alea())) * MINI_JEUX.length))
+  return MINI_JEUX[i]
+}
+
+export const NOMS_MINI_JEU: Record<MiniJeuId, string> = { couperet: 'LE COUPERET', palet: 'LE PALET' }
+
+/** Ce tableau est-il un mini-jeu ? (il n'a pas de sas : il mesure) */
 export function estMiniJeu(level: { code: string; minijeu?: MiniJeuDef }): boolean {
-  return !!level.minijeu || level.code === CODE_COUPERET
+  return !!level.minijeu || level.code === CODE_COUPERET || level.code === CODE_PALET
 }
 
 /** LE TRAIT : une part du volume de départ, entre 35 et 70 %, arrondie au
@@ -82,6 +118,138 @@ export const VERDICTS_TRAIT: Record<NoteTrait['verdict'], string> = {
   proche: 'PROCHE',
   loin: 'LOIN DU TRAIT',
   rate: 'RATÉ',
+}
+
+// ---- LE PALET -------------------------------------------------------------
+
+/** LES RÈGLES DU PALET : la ligne de lancer (on doit avoir COMMENCÉ à geler
+ *  à gauche d'elle), la maison (son centre, ses trois cercles : au centre,
+ *  dans la maison, au bord), le nombre de lancers, et ce qui fait qu'un
+ *  lancer est fini — la glace au repos (vitesse sous `reposVitesse` pendant
+ *  `reposDuree`), dégelée (part gelée sous `partGel`), ou `dureeMax` écoulée. */
+export interface ReglesPalet {
+  ligne: number
+  maison: { x: number; y: number }
+  /** les rayons, du centre au bord : ≤ r0 au centre, ≤ r1 dans la maison, ≤ r2 au bord */
+  rayons: [number, number, number]
+  lancers: number
+  reposVitesse: number
+  reposDuree: number
+  dureeMax: number
+  partGel: number
+}
+
+export const REGLES_PALET: ReglesPalet = {
+  ligne: -400,
+  maison: { x: 900, y: 0 },
+  rayons: [110, 250, 420],
+  lancers: 3,
+  reposVitesse: 25,
+  reposDuree: 0.6,
+  dureeMax: 12,
+  partGel: 0.8,
+}
+
+export interface Lancer {
+  /** la distance du centre du corps au centre de la maison, à la fin du lancer */
+  distance: number
+  verdict: NoteTrait['verdict']
+  /** pourquoi le lancer a fini : au repos, dégelé, ou le temps */
+  fin: 'repos' | 'degel' | 'temps'
+}
+
+export interface EtatPalet {
+  lancers: Lancer[]
+  /** le lancer en cours : depuis quand, et depuis quand la glace est au repos (−1 : elle bouge) */
+  enCours: { debut: number; reposDepuis: number } | null
+  /** la glace était-elle prise à l'observation précédente (pour voir le gel COMMENCER) */
+  geleAvant: boolean
+  /** un avis court à montrer (« GELEZ AVANT LA LIGNE »), ou rien */
+  avis: string | null
+  fini: boolean
+}
+
+export const ETAT_PALET_NEUF: EtatPalet = { lancers: [], enCours: null, geleAvant: false, avis: null, fini: false }
+
+/** Ce que le jeu observe du corps à chaque image. */
+export interface ObservationPalet {
+  t: number
+  /** la glace est prise (part gelée ≥ partGel) */
+  gele: boolean
+  x: number
+  y: number
+  vitesse: number
+}
+
+/** LE VERDICT D'UN LANCER par sa distance au centre : les mêmes quatre
+ *  paliers que le trait, le même barème de mémoire. */
+export function notePalet(distance: number, rayons: ReglesPalet['rayons'], bareme: BaremeTrait = BAREME_TRAIT): NoteTrait {
+  const verdict: NoteTrait['verdict'] = distance <= rayons[0] ? 'juste' : distance <= rayons[1] ? 'proche' : distance <= rayons[2] ? 'loin' : 'rate'
+  const facteur = verdict === 'juste' ? bareme.juste : verdict === 'proche' ? bareme.proche : verdict === 'loin' ? bareme.loin : 0
+  return { ecart: distance, verdict, memoire: Math.round(bareme.base * facteur) }
+}
+
+export const VERDICTS_PALET: Record<NoteTrait['verdict'], string> = {
+  juste: 'AU CENTRE',
+  proche: 'DANS LA MAISON',
+  loin: 'AU BORD',
+  rate: 'HORS JEU',
+}
+
+/** LE PALET AVANCE d'une observation : un lancer COMMENCE quand la glace
+ *  prend (et compte seulement si elle prend à gauche de la ligne — sinon
+ *  l'avis le dit et rien ne se joue) ; il FINIT quand la glace s'arrête, se
+ *  dégèle ou traîne trop ; après le dernier lancer, c'est fini. Pur : rend
+ *  un état neuf, jamais ne touche l'ancien. */
+export function avancePalet(e: EtatPalet, o: ObservationPalet, r: ReglesPalet = REGLES_PALET): EtatPalet {
+  if (e.fini) return e
+  let enCours = e.enCours
+  let avis = e.avis
+  const lancers = e.lancers
+  if (!enCours) {
+    if (o.gele && !e.geleAvant) {
+      if (o.x < r.ligne) {
+        enCours = { debut: o.t, reposDepuis: -1 }
+        avis = null
+      } else avis = 'GELEZ AVANT LA LIGNE'
+    }
+    return { lancers, enCours, geleAvant: o.gele, avis, fini: false }
+  }
+  let fin: Lancer['fin'] | null = null
+  let reposDepuis = enCours.reposDepuis
+  if (!o.gele) fin = 'degel'
+  else if (o.t - enCours.debut >= r.dureeMax) fin = 'temps'
+  else if (o.vitesse < r.reposVitesse) {
+    if (reposDepuis < 0) reposDepuis = o.t
+    else if (o.t - reposDepuis >= r.reposDuree) fin = 'repos'
+  } else reposDepuis = -1
+  if (!fin) return { lancers, enCours: { debut: enCours.debut, reposDepuis }, geleAvant: o.gele, avis, fini: false }
+  const distance = Math.hypot(o.x - r.maison.x, o.y - r.maison.y)
+  const faits = [...lancers, { distance, verdict: notePalet(distance, r.rayons).verdict, fin }]
+  return { lancers: faits, enCours: null, geleAvant: o.gele, avis: null, fini: faits.length >= r.lancers }
+}
+
+/** LE MEILLEUR LANCER : le plus près du centre, ou rien si aucun n'est fait. */
+export function meilleurLancer(e: EtatPalet): Lancer | null {
+  let best: Lancer | null = null
+  for (const l of e.lancers) if (!best || l.distance < best.distance) best = l
+  return best
+}
+
+/** LES RÉGLAGES DU PALET : une glace qui prend vite, rebondit franchement
+ *  sur les parois et S'ESSOUFFLE en glissant (en jeu elle ne freine jamais :
+ *  dans le vide, une dérive reste une trajectoire — ici il faut qu'un lancer
+ *  ait une longueur), des bumpers hydrophobes qui rendent plus qu'ils ne
+ *  reçoivent, un freinage hydrophile net — de quoi jouer la bande. */
+export const REGLAGES_PALET: Partial<SimParams> = {
+  freezeSelfTime: 0.25,
+  iceRestitution: 0.85,
+  hydrophobeIceRestitution: 1.25,
+  hydrophobeIceKick: 320,
+  hydrophileIceDrag: 4,
+  // la pierre s'essouffle : à 0,45/s, une glace lancée à 600 u/s parcourt
+  // ~1 300 u avant l'arrêt — de la ligne de lancer au centre de la maison
+  iceSlideDrag: 0.45,
 }
 
 /** LE RYTHME DE LA LAME : elle tombe toutes les `periode` secondes et reste
@@ -164,5 +332,44 @@ export function tableauCouperet(cible: number, rythme: RythmeCouperet = RYTHME_C
       { x: trait + 520, y: -380, text: 'CE QUI DÉPASSE EST PESÉ, LE RESTE REPART', tone: 'mur' },
     ],
     minijeu: { type: 'couperet', cible, trait, rythme },
+  }
+}
+
+/** LA SALLE DU PALET : la piste. On naît à gauche, la ligne de lancer est
+ *  au tiers, la maison (trois cercles) aux deux tiers. Deux bumpers
+ *  hydrophobes sur les longs côtés permettent de jouer la bande, un butoir
+ *  hydrophile au fond freine ce qui va trop loin. Pas de sas : trois
+ *  lancers, le meilleur compte, la salle conclut. */
+export function tableauPalet(regles: ReglesPalet = REGLES_PALET, reglages: Partial<SimParams> = REGLAGES_PALET): LevelDef {
+  const { ligne, maison } = regles
+  return {
+    name: 'Le palet',
+    code: CODE_PALET,
+    journal:
+      `Une piste, une ligne, une maison. Gelez (F) avant la ligne et glissez : la glace doit s'arrêter le plus près du centre. ` +
+      `Trois lancers, le meilleur compte — chaque relance coûte de la masse. Les bandes hydrophobes renvoient, le butoir du fond freine. Au centre, la mémoire triple.`,
+    par: 4,
+    bounds: { minX: -1600, minY: -800, maxX: 1600, maxY: 800 },
+    spawn: { x: -1150, y: 0, n: 900 },
+    exit: { minX: 1700, minY: -60, maxX: 1760, maxY: 60 },
+    boxes: [
+      // les bumpers : la bande, pour qui veut contourner
+      box(ligne + 200, -800, maison.x - 200, -740, MAT_HYDROPHOBE),
+      box(ligne + 200, 740, maison.x - 200, 800, MAT_HYDROPHOBE),
+      // le butoir du fond : hydrophile, il freine la glace au lieu de la renvoyer
+      box(1480, -800, 1600, 800, MAT_HYDROPHILE),
+      // deux plots devant la maison : un couloir droit passe, la bande aussi
+      box(maison.x - 520, -800, maison.x - 460, -560, MAT_WALL, 5),
+      box(maison.x - 520, 560, maison.x - 460, 800, MAT_WALL, 5),
+    ],
+    sponges: [],
+    labels: [
+      { x: -1150, y: -260, text: 'LE PALET', tone: 'mur' },
+      { x: -1150, y: 300, text: '1 · GELEZ (F) AVANT LA LIGNE', tone: 'mur' },
+      { x: ligne, y: -700, text: 'LIGNE DE LANCER', tone: 'mur' },
+      { x: (ligne + maison.x) / 2, y: 300, text: '2 · GLISSEZ JUSQU’AU CENTRE DE LA MAISON', tone: 'mur' },
+      { x: maison.x, y: -560, text: `3 LANCERS · LE MEILLEUR COMPTE`, tone: 'mur' },
+    ],
+    minijeu: { type: 'palet', regles, reglages },
   }
 }

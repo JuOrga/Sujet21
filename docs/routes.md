@@ -216,6 +216,7 @@ Ce qui existe, ce qui est proposé.
 | **Cache** | nœud de la mini-carte | un orbe d'essence, une fois par poste | `orbe` du module (éditeur de carte) |
 | **Salle à prime** | un nœud salle, marqué d'un losange | la salle scellée : plus dure d'un cran, elle paie plus au sas — mémoire ×2, condensat ×2 ou tirage d'instrument garanti ; une par rang au plus, jamais au premier rang | salles à prime (LA DESCENTE) |
 | **Mini-jeu : le couperet** | nœud de la mini-carte, posé comme une halte | un trait au sol, une lame qui tombe toutes les 4 s et reste baissée 1 s, un trait tiré entre 35 et 70 % du volume de départ : on met son corps à cheval sur le trait et on en laisse dépasser exactement ce qu'il demande — ce que la lame tranche au-delà, **d'un seul tenant avec le corps**, est pesé, on repart avec le reste ; les gouttes jetées ne pèsent rien. Pas de sas dans cette salle : la lame conclut. La consigne est écrite dans la salle, en trois pancartes numérotées. Au trait la mémoire triple, proche elle vaut, loin la moitié, ratée rien. S'essaie sans run : le pupitre « Jouer le couperet (essai) », ou `__couperet(1.5)` en console | mini-jeux par module (LA DESCENTE) ; `BAREME_TRAIT`, `RYTHME_COUPERET`, `COL_COUPERET` (`minijeux.ts`) |
+| **Mini-jeu : le palet** | nœud de la mini-carte, tiré à la graine avec le couperet | une piste, une ligne de lancer, une maison de trois cercles : on gèle (F) **avant la ligne**, on glisse, et la glace doit s'arrêter le plus près du centre. Trois lancers, le meilleur compte, chaque relance coûte de la masse ; un lancer finit quand la glace s'arrête, se dégèle ou traîne 12 s. Au centre la mémoire triple, dans la maison elle vaut, au bord la moitié, hors jeu rien. **Ses propres réglages** (`REGLAGES_PALET`) recouvrent le banc le temps de la salle : gel rapide, glace qui rebondit, bumpers hydrophobes qui rendent plus qu'ils ne reçoivent, et une glisse freinée (`iceSlideDrag`, nulle partout ailleurs) pour qu'un lancer ait une longueur. S'essaie sans run : le pupitre « Jouer le palet (essai) », ou `__palet()` | `REGLES_PALET`, `REGLAGES_PALET` (`minijeux.ts`) |
 
 Le modèle de carte garde les natures de module `economat`, `repos`, `don`,
 `inconnu` et `coffre` : l'éditeur peut encore poser une halte ou un « ? »
@@ -245,9 +246,19 @@ sorties, et tout mini-jeu à venir doit les tenir :
    col, geler — ce qu'une goutte tirée du fond de la salle ne sait pas
    faire.
 
+**Les réglages propres à un mini-jeu.** Le solveur est piloté par une
+centaine de paramètres nommés (`params.ts`), mais aucun tableau ne pouvait
+les surcharger. Un mini-jeu porte les siens (`minijeu.reglages`, un
+`Partial<SimParams>`) : appliqués à la création du solveur de sa salle,
+rendus à la salle suivante — le banc n'est jamais modifié, il est
+recouvert le temps de la salle. C'est ce qui permet une glace qui rebondit
+comme une bille ou un gel qui prend en un quart de seconde sans toucher au
+jeu.
+
 | Mini-jeu | Ce qu'on fait | Ce qu'on mesure | Ce qu'on gagne |
 | --- | --- | --- | --- |
 | **Le couperet** — *fait le 17/09, remplace la pesée* | mettre son corps à cheval sur un trait et en laisser dépasser exactement N litres ; la lame tombe en rythme et tranche | ce qui dépasse le trait et fait corps, à l'instant de la chute | la précision paie en mémoire : ±5 % ×3, ±15 % ×1, ±30 % ×½ |
+| **Le palet** (le curling) — *fait le 17/09* | geler avant la ligne et glisser jusqu'au centre de la maison ; les bandes hydrophobes renvoient, le butoir hydrophile freine | la distance de la glace au centre quand elle s'arrête, le meilleur de trois lancers | même barème, par cercle |
 | **La balance** (la scission) | se mettre à cheval sur la cloison entre deux bacs, moitié dans chaque | l'égalité des deux moitiés (5 % près) tenue trois secondes — le corps seul compte | un instrument |
 | **La pesée en glace** (variante) | se doser en jetant, puis geler et glisser en bloc à travers un rideau lamellaire que seule la glace passe | le bloc arrivé dans la cuve | comme le couperet — à vérifier : si le gel volontaire prend les gouttes en vol, limiter le gel au corps principal |
 | **Le tamis** | passer une grille fine sans perdre plus de X % — en vapeur c'est facile, en eau c'est un art | le volume perdu | du condensat au prorata de ce qui passe |

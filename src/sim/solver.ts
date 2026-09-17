@@ -3555,6 +3555,15 @@ export class FluidSim {
           omega *= damp
         }
       }
+      if (p.iceSlideDrag > 0) {
+        // LA GLISSE FREINÉE : nulle en jeu (une dérive reste une trajectoire),
+        // montée par le mini-jeu du palet — une pierre de curling qui
+        // s'essouffle d'elle-même, pour qu'un lancer ait une longueur
+        const damp = Math.exp(-p.iceSlideDrag * dt)
+        vx *= damp
+        vy *= damp
+        omega *= damp
+      }
       if (omega > MAX_SPIN) omega = MAX_SPIN
       else if (omega < -MAX_SPIN) omega = -MAX_SPIN
 
