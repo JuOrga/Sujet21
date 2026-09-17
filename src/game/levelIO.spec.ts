@@ -1347,7 +1347,7 @@ describe('les puits de gravité et l’impulsion de départ font l’aller-retou
     boxes: [],
   }
 
-  it('un puits complet et un puits aux défauts omis relus tels quels ; un rayon nul ou une force nulle écartés, et dits', () => {
+  it('un puits complet et un puits aux défauts omis relus tels quels ; un rayon nul, une force nulle ou un centre illisible écartés, et dits — chacun pour sa raison', () => {
     const { level, rejets } = parseLevel({
       ...base,
       puits: [
@@ -1358,7 +1358,7 @@ describe('les puits de gravité et l’impulsion de départ font l’aller-retou
         { x: 'abc', y: 0 }, // écarté
       ],
     })
-    expect(rejets).toEqual(['un puits a été écarté (rayon nul)', 'un puits a été écarté (rayon nul)', 'un puits a été écarté (rayon nul)'])
+    expect(rejets).toEqual(['un puits a été écarté (rayon nul)', 'un puits a été écarté (force nulle)', 'un puits a été écarté (centre illisible)'])
     expect(level!.puits).toEqual([
       { x: 0, y: 0, force: 540, rayon: 300, portee: 900 },
       { x: 400.4, y: -100 },
@@ -1382,7 +1382,7 @@ describe('les puits de gravité et l’impulsion de départ font l’aller-retou
     expect(parseLevel(base).level!.spawn.impulsion).toBeUndefined()
   })
 
-  it('la validation : un puits hors cuve est une erreur, l’impulsion trop forte aussi ; un départ au fond d’un cœur sans impulsion et deux cœurs qui se recouvrent avertissent', () => {
+  it('la validation : un puits hors cuve est une erreur, l’impulsion trop forte aussi ; un départ au fond d’un cœur sans impulsion, deux cœurs qui se recouvrent et une portée sous le cœur avertissent', () => {
     const lv = parseLevel({ ...base, puits: [{ x: 0, y: 0 }] }).level!
     const propre = checkLevel(lv)
     expect(propre.some((v) => /puits|impulsion/.test(v.message))).toBe(false)
@@ -1397,5 +1397,8 @@ describe('les puits de gravité et l’impulsion de départ font l’aller-retou
       checkLevel({ ...lv, puits: [{ x: 0, y: 0 }, { x: 400, y: 0 }] }).some((v) => v.niveau === 'avertissement' && /recouvrent/.test(v.message)),
     ).toBe(true)
     expect(checkLevel({ ...lv, puits: [{ x: -400, y: 0 }, { x: 400, y: 0, rayon: 300 }] }).some((v) => /recouvrent/.test(v.message))).toBe(false)
+    // une portée plus courte que le cœur : la gravité s'éteint avant la lisière dessinée
+    expect(checkLevel({ ...lv, puits: [{ x: 0, y: 0, rayon: 300, portee: 200 }] }).some((v) => v.niveau === 'avertissement' && /portée plus courte/.test(v.message))).toBe(true)
+    expect(checkLevel({ ...lv, puits: [{ x: 0, y: 0, rayon: 300, portee: 900 }] }).some((v) => /portée plus courte/.test(v.message))).toBe(false)
   })
 })

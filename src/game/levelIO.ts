@@ -668,7 +668,7 @@ export function parseLevel(input: unknown): {
     const vitesse = Math.round(num(imp.vitesse, 0))
     if (typeof sp.impulsion === 'object' && sp.impulsion !== null && vitesse > 0)
       level.spawn.impulsion = { angle: Math.round(num(imp.angle, 0)), vitesse }
-    else rejets.push('l’impulsion de départ a été écartée (vitesse nulle)')
+    else rejets.push(vitesse < 0 ? 'l’impulsion de départ a été écartée (vitesse négative)' : 'l’impulsion de départ a été écartée (vitesse nulle)')
   }
 
   // Les PUITS DE GRAVITÉ : un centre, et les réglages optionnels — absents,
@@ -681,8 +681,16 @@ export function parseLevel(input: unknown): {
     const y = num(q.y, NaN)
     const rayonBrut = q.rayon !== undefined ? num(q.rayon) : undefined
     const forceBrut = q.force !== undefined ? num(q.force) : undefined
-    if (!Number.isFinite(x) || !Number.isFinite(y) || (rayonBrut !== undefined && rayonBrut <= 0) || (forceBrut !== undefined && forceBrut <= 0)) {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      rejets.push('un puits a été écarté (centre illisible)')
+      continue
+    }
+    if (rayonBrut !== undefined && rayonBrut <= 0) {
       rejets.push('un puits a été écarté (rayon nul)')
+      continue
+    }
+    if (forceBrut !== undefined && forceBrut <= 0) {
+      rejets.push('un puits a été écarté (force nulle)')
       continue
     }
     const p: PuitsDef = { x, y }
@@ -1211,6 +1219,12 @@ export function checkLevel(brut: LevelDef): Verdict[] {
   for (const p of puits) {
     if (!inBounds(p.x, p.y)) v.push({ niveau: 'erreur', message: 'Un puits de gravité est hors de la cuve.' })
     const R = p.rayon ?? PUITS_RAYON_DEFAUT
+    if (p.portee !== undefined && p.portee < R) {
+      v.push({
+        niveau: 'avertissement',
+        message: 'Un puits a une portée plus courte que son cœur : la gravité s’éteint avant la lisière, le cœur dessiné ment.',
+      })
+    }
     if (!level.spawn.impulsion && Math.hypot(level.spawn.x - p.x, level.spawn.y - p.y) < R) {
       v.push({
         niveau: 'avertissement',
