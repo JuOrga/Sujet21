@@ -411,6 +411,9 @@ export class FluidSim {
     this.souffle = new Float32Array(capacity)
     this.duCorps = new Uint8Array(capacity)
     this.iceVxSum = new Float32Array(capacity)
+    this.puitsAxSum = new Float32Array(capacity)
+    this.puitsAySum = new Float32Array(capacity)
+    this.puitsCnt = new Int32Array(capacity)
     this.iceVySum = new Float32Array(capacity)
     this.iceCnt = new Int32Array(capacity)
     this.iceNxSum = new Float32Array(capacity)
@@ -1800,15 +1803,77 @@ export class FluidSim {
   applyPuits(puits: readonly PuitsDef[], dt: number): void {
     if (puits.length === 0) return
     const acc = this.accPuits
-    for (let i = 0; i < this.count; i++) {
+    const n = this.count
+    const { frozen, velX, velY, posX, posY } = this
+    // LA GLACE REÇOIT LA MOYENNE DE SON BLOC. Un bloc rigide subit la somme
+    // des forces sur son centre ; particule par particule, le cœur
+    // harmonique (a ∝ r) tirait plus fort sur le bord lointain que sur le
+    // bord proche, et la projection rigide d'icePass redresse les VITESSES,
+    // pas les positions (prd = pos + v·dt garde la poussée différentielle) :
+    // le bloc se tassait de 1 u/s — mesuré le 17/09, rms 73 → 55 en 20 s
+    // dans un cœur de 350 u à 600 u/s², 73 → 22 en douze tours de ronde.
+    // Une accélération uniforme par bloc, la moyenne de ses particules, le
+    // garde entier et fait de son centre un point-masse exact (le cœur est
+    // linéaire : la moyenne EST la valeur au centre). Les étiquettes de
+    // blocs sont celles du dernier icePass ; en attendant le premier (gel à
+    // l'instant), chaque particule reçoit la sienne.
+    const blocs = this.iceComps
+    let glace = false
+    if (!this.iceDirty && blocs > 0) {
+      for (let i = 0; i < n; i++) {
+        if (frozen[i] === 1) {
+          glace = true
+          break
+        }
+      }
+    }
+    if (glace) {
+      const ax = this.puitsAxSum
+      const ay = this.puitsAySum
+      const cnt = this.puitsCnt
+      ax.fill(0, 0, blocs)
+      ay.fill(0, 0, blocs)
+      cnt.fill(0, 0, blocs)
+      const labels = this.iceLabels
+      for (let i = 0; i < n; i++) {
+        acc.ax = 0
+        acc.ay = 0
+        const agit = accelerationPuits(puits, posX[i], posY[i], acc)
+        if (frozen[i] === 1) {
+          const c = labels[i]
+          if (c >= 0 && c < blocs) {
+            ax[c] += acc.ax
+            ay[c] += acc.ay
+            cnt[c]++
+            continue
+          }
+        }
+        if (!agit) continue
+        velX[i] += acc.ax * dt
+        velY[i] += acc.ay * dt
+      }
+      for (let i = 0; i < n; i++) {
+        if (frozen[i] !== 1) continue
+        const c = labels[i]
+        if (c < 0 || c >= blocs || cnt[c] === 0) continue
+        velX[i] += (ax[c] / cnt[c]) * dt
+        velY[i] += (ay[c] / cnt[c]) * dt
+      }
+      return
+    }
+    for (let i = 0; i < n; i++) {
       acc.ax = 0
       acc.ay = 0
-      if (!accelerationPuits(puits, this.posX[i], this.posY[i], acc)) continue
-      this.velX[i] += acc.ax * dt
-      this.velY[i] += acc.ay * dt
+      if (!accelerationPuits(puits, posX[i], posY[i], acc)) continue
+      velX[i] += acc.ax * dt
+      velY[i] += acc.ay * dt
     }
   }
   private readonly accPuits: Accel = { ax: 0, ay: 0 }
+  // les sommes par bloc de glace d'applyPuits (voir là-bas)
+  private readonly puitsAxSum: Float32Array
+  private readonly puitsAySum: Float32Array
+  private readonly puitsCnt: Int32Array
 
   // LA COPIE DE PRÉVISION : un second solveur, sur le même tableau (parois,
   // portes fermées, éponges et leur saturation), avec l'état exact de chaque
