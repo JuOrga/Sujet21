@@ -378,7 +378,7 @@ describe('les cibles — des éclats de glace, des mires, trente secondes', () =
     expect(lv.mires!.map((m) => m.points)).toEqual([10, 5, 10])
     for (const m of lv.mires!) expect(m.y).toBeLessThan(lv.puits![0].y - 350)
     expect(lv.zones![0].force).toBe('glace')
-    expect(lv.minijeu?.reglages).toBe(REGLAGES_CIBLES)
+    expect(lv.reglages).toBe(REGLAGES_CIBLES)
     expect(REGLAGES_CIBLES.glaceTir).toBeGreaterThan(0)
     expect(lv.boxes.filter((b) => b.material === MAT_HYDROPHOBE).length).toBeGreaterThanOrEqual(3)
     expect(lv.boxes.every((b) => b.maxY < lv.puits![0].y - 350)).toBe(true) // rien ne barre la ronde

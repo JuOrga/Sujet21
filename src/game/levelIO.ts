@@ -44,6 +44,7 @@ import {
 } from './level'
 import { IMPULSION_VITESSE_MAX, MIRE_POINTS_DEFAUT, MIRE_R_DEFAUT, PORTE_SENS_DEFAUT, PUITS_RAYON_DEFAUT, type ChasseDef, type MireDef, type PuitsDef } from './level'
 import { DEFAULT_PARAMS, type SimParams } from '../sim/params'
+import { MINI_JEUX, type MiniJeuDef, type MiniJeuId } from './minijeux'
 import { ARTICLES_ETAL_IDS } from './economat'
 import { ARTICLES_COMPTOIR_IDS, ROLES_ANCRE } from './hub'
 import { REPARATIONS } from './reparations'
@@ -717,6 +718,28 @@ export function parseLevel(input: unknown): {
   }
   if (mires.length > 0) level.mires = mires
 
+  // LE MINI-JEU : le type (du catalogue) et ses règles sont relus tels
+  // quels — les règles sont celles du code, l'éditeur ne les édite pas ;
+  // ses réglages se filtrent comme ceux du tableau. Sans cela, une salle
+  // de mini-jeu ouverte dans l'éditeur redevenait une salle ordinaire.
+  if (o.minijeu && typeof o.minijeu === 'object') {
+    const mj = o.minijeu as Record<string, unknown>
+    const type = typeof mj.type === 'string' && (MINI_JEUX as readonly string[]).includes(mj.type) ? (mj.type as MiniJeuId) : null
+    if (type && (type === 'couperet' || (mj.regles && typeof mj.regles === 'object'))) {
+      const copie = JSON.parse(JSON.stringify(mj)) as Record<string, unknown>
+      if (copie.reglages && typeof copie.reglages === 'object') {
+        const src = copie.reglages as Record<string, unknown>
+        const reglages: Partial<SimParams> = {}
+        for (const k of Object.keys(src)) {
+          if (k in DEFAULT_PARAMS && typeof src[k] === 'number' && Number.isFinite(src[k])) reglages[k as keyof SimParams] = src[k] as never
+          else rejets.push(`un réglage du mini-jeu a été écarté (${k} : inconnu du banc ou illisible)`)
+        }
+        copie.reglages = reglages
+      }
+      level.minijeu = copie as unknown as MiniJeuDef
+    } else rejets.push('le mini-jeu a été écarté (type inconnu)')
+  }
+
   // LES RÉGLAGES du tableau : seules les clés du banc, finies, sont lues —
   // une clé inconnue (un banc plus ancien, une faute) est écartée, et dite
   if (o.reglages && typeof o.reglages === 'object') {
@@ -1056,6 +1079,7 @@ export function serializeLevel(level: LevelDef): string {
   if (level.chasses && level.chasses.length > 0) out.chasses = level.chasses
   if (level.puits && level.puits.length > 0) out.puits = level.puits
   if (level.mires && level.mires.length > 0) out.mires = level.mires
+  if (level.minijeu) out.minijeu = level.minijeu
   if (level.reglages && Object.keys(level.reglages).length > 0) out.reglages = level.reglages
   if (level.rails && level.rails.length > 0) out.rails = level.rails
   if (level.caches && level.caches.length > 0) out.caches = level.caches

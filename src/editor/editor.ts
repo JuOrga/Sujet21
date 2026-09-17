@@ -60,6 +60,8 @@ import {
 } from '../game/level'
 import { traceTrajectoire } from '../game/trajectoire'
 import { periodeCoeur } from '../game/puits'
+import { tableauCibles, tableauCouperet, tableauOrbites, tableauPalet, tableauRafales } from '../game/minijeux'
+import { tableauRonde } from '../game/ronde'
 import { builtinPresets, loadStoredPresets, type Preset } from '../bench/presets'
 import { grainsPuits, rayonNoyau } from '../game/puitsDessin'
 import { FluidSim, KIND_PLAYER } from '../sim/solver'
@@ -4326,6 +4328,15 @@ export class LevelEditor {
       ...TABLEAUX_ECOLE,
       ...TABLEAUX,
       TABLEAU_1BIS,
+      // les salles des MINI-JEUX et la ronde : construites par le code, elles
+      // s'ouvrent ici en copie (le concepteur, 17/09 : « comment trouver la
+      // salle dans l'éditeur ? ») — leur mini-jeu et leurs réglages suivent
+      tableauCouperet(2),
+      tableauPalet(),
+      tableauRafales(),
+      tableauOrbites(),
+      tableauCibles(),
+      tableauRonde(),
     ]
     selLivres.innerHTML = livres
       .map((t, i) => `<option value="${i}">${t.code} — ${t.name}</option>`)

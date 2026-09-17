@@ -810,6 +810,9 @@ export function tableauCibles(regles: ReglesCibles = REGLES_CIBLES, mires: MireD
       { x: -400, y: -880, text: '2 · TOUCHEZ LES CIBLES : LES POINTS VONT À LA TAILLE DE L’ÉCLAT', tone: 'mur' },
       { x: 400, y: -880, text: `3 · ${regles.duree} SECONDES — CHAQUE TIR VOUS RÉTRÉCIT`, tone: 'mur' },
     ],
-    minijeu: { type: 'cibles', regles, reglages: REGLAGES_CIBLES },
+    // les réglages à la RACINE (LevelDef.reglages), pas dans le mini-jeu : c'est
+    // le mécanisme de l'éditeur — le menu « Physique » montre « ⚙ Tir de glace »
+    reglages: REGLAGES_CIBLES,
+    minijeu: { type: 'cibles', regles },
   }
 }

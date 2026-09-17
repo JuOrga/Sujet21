@@ -267,3 +267,10 @@ menu retrouve le preset dont les valeurs sont celles du tableau, ou dit
 ceux du mini-jeu, le temps de la salle, et rend tout à la suivante.
 `levelIO` ne relit que les clés du banc, finies, et dit celles qu'il
 écarte. Le preset « ⚙ Tir de glace » livré avec le banc porte le geste.
+
+**Trouver la salle dans l'éditeur** : panneau de droite, « Modèles gravés
+dans le jeu — ouvrir une copie », `MJ-CIBLES — Les cibles` (les autres
+mini-jeux et la ronde y sont aussi). Le mini-jeu, ses mires et ses
+réglages suivent la copie : « Essayer » joue la salle avec son chrono et
+son compte. `levelIO` relit le mini-jeu tel quel (le type du catalogue,
+ses règles) et filtre ses réglages comme ceux du tableau.

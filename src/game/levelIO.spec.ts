@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MIRE_POINTS_DEFAUT, MIRE_R_DEFAUT } from './level'
+import { tableauCibles, tableauOrbites } from './minijeux'
 import {
   checkLevel,
   decodeCode21,
@@ -1446,5 +1447,22 @@ describe('les mires et les réglages du tableau', () => {
     expect(checkLevel({ ...lv, mires: [{ x: 9000, y: 0, r: 60, points: 1 }] }).some((v) => v.niveau === 'erreur' && /mire.*hors de la cuve/.test(v.message))).toBe(true)
     expect(checkLevel(lv).some((v) => v.niveau === 'avertissement' && /sans le tir de glace/.test(v.message))).toBe(true)
     expect(checkLevel({ ...lv, reglages: { glaceTir: 0.1 } }).some((v) => /sans le tir de glace/.test(v.message))).toBe(false)
+  })
+})
+
+describe('un mini-jeu survit à l’enregistrement', () => {
+  it('la salle des cibles se relit avec son mini-jeu, ses mires et ses réglages ; un type inconnu est écarté et dit', () => {
+    const lv = tableauCibles()
+    const relu = parseLevel(JSON.parse(serializeLevel(lv)))
+    expect(relu.rejets).toEqual([])
+    expect(relu.level!.minijeu).toEqual(lv.minijeu)
+    expect(relu.level!.mires).toEqual(lv.mires)
+    expect(relu.level!.reglages).toEqual(lv.reglages)
+    expect(relu.level!.puits).toEqual(lv.puits)
+    const orbites = parseLevel(JSON.parse(serializeLevel(tableauOrbites())))
+    expect(orbites.level!.minijeu?.type).toBe('orbites')
+    const faux = parseLevel({ ...JSON.parse(serializeLevel(lv)), minijeu: { type: 'flipper', regles: {} } })
+    expect(faux.level!.minijeu).toBeUndefined()
+    expect(faux.rejets).toEqual(['le mini-jeu a été écarté (type inconnu)'])
   })
 })
