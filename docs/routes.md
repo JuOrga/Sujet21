@@ -215,6 +215,9 @@ Ce qui existe, ce qui est proposé.
 | **Bonbonne oubliée (don)** | nœud de la mini-carte | de la réserve, ou du condensat si elle est pleine | bonbonnes par module |
 | **Cache** | nœud de la mini-carte | un orbe d'essence, une fois par poste | `orbe` du module (éditeur de carte) |
 | **Salle à prime** | un nœud salle, marqué d'un losange | la salle scellée : plus dure d'un cran, elle paie plus au sas — mémoire ×2, condensat ×2 ou tirage d'instrument garanti ; une par rang au plus, jamais au premier rang | salles à prime (LA DESCENTE) |
+| **Mini-jeu : le couperet** | nœud de la mini-carte, posé comme une halte | un trait au sol, une lame qui tombe toutes les 4 s et reste baissée 1 s, un trait tiré entre 35 et 70 % du volume de départ : on met son corps à cheval sur le trait et on en laisse dépasser exactement ce qu'il demande — ce que la lame tranche au-delà, **d'un seul tenant avec le corps**, est pesé, on repart avec le reste ; les gouttes jetées ne pèsent rien. Pas de sas dans cette salle : la lame conclut. La consigne est écrite dans la salle, en trois pancartes numérotées. Au trait la mémoire triple, proche elle vaut, loin la moitié, ratée rien. S'essaie sans run : le pupitre « Jouer le couperet (essai) », ou `__couperet(1.5)` en console | mini-jeux par module (LA DESCENTE) ; `BAREME_TRAIT`, `RYTHME_COUPERET`, `COL_COUPERET` (`minijeux.ts`) |
+| **Mini-jeu : le palet** | nœud de la mini-carte, tiré à la graine avec le couperet | une piste d'élan, une ligne de lancer, une maison de trois cercles : on prend de la vitesse, **la ligne gèle le corps quand il la franchit**, et la glace doit s'arrêter le plus près du centre. Trois lancers, le meilleur compte ; après chaque lancer, deux cartes : relancer (remise en place au départ, même volume de base) ou valider le meilleur ; un lancer finit quand la glace s'arrête, se dégèle ou traîne 12 s. Au centre la mémoire triple, dans la maison elle vaut, au bord la moitié, hors jeu rien. **Ses propres réglages** (`REGLAGES_PALET`) recouvrent le banc le temps de la salle : gel rapide, dégel rapide, éjection deux fois plus vive (l'élan se prend sans se vider : 14 % du corps pour 400 u/s au lieu de 29 %), glace qui rebondit, bumpers hydrophobes qui rendent plus qu'ils ne reçoivent, et une glisse freinée (`iceSlideDrag`, nulle partout ailleurs) pour qu'un lancer ait une longueur. S'essaie sans run : le pupitre « Jouer le palet (essai) », ou `__palet()` | `REGLES_PALET`, `REGLAGES_PALET` (`minijeux.ts`) |
+| **Mini-jeu : les rafales** | nœud de la mini-carte, tiré à la graine avec les deux autres | un couloir en trois tronçons balayés par des courants transversaux (haut, bas, haut) qui soufflent tous ensemble au rythme de la lame (calme 3 s, souffle 1 s, le premier après 4 s), des éponges sur les deux bords qui boivent ce que le souffle y plaque, l'arrivée à droite. On traverse entre deux souffles ; ce qui compte est la part du volume de départ qu'il reste à l'arrivée : ≥ 90 % intact (mémoire ×3), ≥ 70 % écorné (×1), ≥ 45 % entamé (×½), sinon vidé. Une seule manche. Les chasses sont scénarisées (canal négatif), c'est le jeu qui les allume. S'essaie sans run : « Jouer les rafales (essai) », `__rafales()` | `REGLES_RAFALES` (`minijeux.ts`) |
 
 Le modèle de carte garde les natures de module `economat`, `repos`, `don`,
 `inconnu` et `coffre` : l'éditeur peut encore poser une halte ou un « ? »
@@ -226,13 +229,62 @@ a plus, par décision du concepteur (16/09).
 Le concepteur veut des salles qui soient des **mini-jeux à partir du volume
 du joueur**. Sujet 21 a un atout qu'aucun deck-builder n'a : le corps est
 une simulation de fluide, et tout ce qu'on lui fait faire est déjà une
-règle. Six propositions, chacune une salle sans sas ordinaire, chronométrée
-ou comptée, où la physique EST le jeu :
+règle. Des propositions, chacune une salle sans sas ordinaire, chronométrée
+ou comptée, où la physique EST le jeu.
+
+**La leçon de la pesée (17/09).** Le premier mini-jeu demandait de *verser*
+N litres dans une cuve. Joué, il s'est effondré : le sas boit tout ce qui
+arrive, et le seul verbe du jeu est jeter — la meilleure façon de jouer
+était de se caler dos au mur et d'arroser le sas depuis l'autre bout de la
+salle. Le défaut était dans la règle, pas dans le réglage : tout mini-jeu
+qui compte ce qui entre dans un trou finit pareil. Deux règles en sont
+sorties, et tout mini-jeu à venir doit les tenir :
+
+1. **On pèse le corps, pas les gouttes.** Le solveur sait ce qui « fait
+   corps » (la composante connexe du joueur, celle des gouttes en prêt) ;
+   une goutte lancée au loin ne compte pas.
+2. **Entrer doit être un geste du corps** — se placer, s'étirer dans un
+   col, geler — ce qu'une goutte tirée du fond de la salle ne sait pas
+   faire.
+
+**La leçon du flipper (17/09).** Essayé puis retiré le jour même : le corps
+en bille de glace, tiré par un courant, deux flippers en portes éventail.
+Joué : « aucun contrôle possible, je ne vois pas l'intérêt ». La règle
+qu'il violait : **le corps doit rester le sujet**. En glace il ne se pilote
+plus (c'est le prix du gel, voulu), et la seule entrée qui restait était
+extérieure au corps — deux pales. Un mini-jeu où le corps est passif retire
+le verbe du jeu au lieu de le tendre. Le couperet et le palet gardent le
+verbe : se placer, prendre de la vitesse.
+
+**La leçon du souffle (17/09).** Essayé puis retiré le jour même : un
+slalom de grilles en vapeur, dashs sans compte, le temps qui s'évapore.
+Joué : « aucun intérêt à part avancer tout droit, rien d'intéressant ou
+marrant ». Deux fautes. La première : **le meilleur coup était évident et
+unique** (traverser tout droit, la vapeur passe les grilles), donc aucune
+décision à prendre d'un instant à l'autre. La seconde : **le coût qu'on
+lui opposait était invisible** (le rognage des grilles, quelques particules
+par seconde), et un coût qu'on ne voit pas n'est pas un choix. Un
+mini-jeu doit mettre le joueur devant une alternative lisible à chaque
+seconde — le couperet (dépasser plus ou moins), le palet (plus ou moins
+vite), les rafales (passer maintenant ou attendre) — et faire voir ce que
+chaque branche coûte.
+
+**Les réglages propres à un mini-jeu.** Le solveur est piloté par une
+centaine de paramètres nommés (`params.ts`), mais aucun tableau ne pouvait
+les surcharger. Un mini-jeu porte les siens (`minijeu.reglages`, un
+`Partial<SimParams>`) : appliqués à la création du solveur de sa salle,
+rendus à la salle suivante — le banc n'est jamais modifié, il est
+recouvert le temps de la salle. C'est ce qui permet une glace qui rebondit
+comme une bille ou un gel qui prend en un quart de seconde sans toucher au
+jeu.
 
 | Mini-jeu | Ce qu'on fait | Ce qu'on mesure | Ce qu'on gagne |
 | --- | --- | --- | --- |
-| **La pesée** | remplir une cuve graduée avec exactement N litres de soi, ni plus ni moins | l'écart au trait | la précision paie en mémoire : ±5 % ×3, ±15 % ×1 |
-| **La scission** | se couper en deux masses égales sur deux plateaux de balance | l'égalité des deux masses au bout de dix secondes | un instrument si la balance est à l'équilibre |
+| **Le couperet** — *fait le 17/09, remplace la pesée* | mettre son corps à cheval sur un trait et en laisser dépasser exactement N litres ; la lame tombe en rythme et tranche | ce qui dépasse le trait et fait corps, à l'instant de la chute | la précision paie en mémoire : ±5 % ×3, ±15 % ×1, ±30 % ×½ |
+| **Le palet** (le curling) — *fait le 17/09* | prendre de la vitesse, la ligne gèle, glisser jusqu'au centre de la maison ; les bandes hydrophobes renvoient, le butoir hydrophile freine | la distance de la glace au centre quand elle s'arrête, le meilleur de trois lancers | même barème, par cercle |
+| **Les rafales** — *fait le 17/09* | traverser un couloir entre deux souffles ; les courants latéraux soufflent en rythme, les éponges des bords boivent ce qui s'y plaque | la part du volume de départ gardée à l'arrivée | même barème, par palier |
+| **La balance** (la scission) | se mettre à cheval sur la cloison entre deux bacs, moitié dans chaque | l'égalité des deux moitiés (5 % près) tenue trois secondes — le corps seul compte | un instrument |
+| **La pesée en glace** (variante) | se doser en jetant, puis geler et glisser en bloc à travers un rideau lamellaire que seule la glace passe | le bloc arrivé dans la cuve | comme le couperet — à vérifier : si le gel volontaire prend les gouttes en vol, limiter le gel au corps principal |
 | **Le tamis** | passer une grille fine sans perdre plus de X % — en vapeur c'est facile, en eau c'est un art | le volume perdu | du condensat au prorata de ce qui passe |
 | **La tenue** | rester en glace sur une plaque chaude le plus longtemps possible | le temps avant la fonte | une prime de glace au sas |
 | **Le pont** | figer un jet pour faire pont au-dessus d'un vide, et le traverser avant qu'il ne fonde | réussir ou tomber | l'accès à une cache derrière |
@@ -274,7 +326,7 @@ code sans nom.
 | **Les manques du pool** | l'inventaire par biome et par moment que ce biome joue réellement (une ligne par couple, une case par mécanique ; une case à 0 est un tableau à écrire, et la liste sous la grille les nomme avec le code à donner), le compte des tableaux muets, et le relevé des portes générées faute de tableau sur ce poste |
 | La rampe | recul du sommet, respiration, finale |
 | La posture des rangs | rangs sans danger, cadence labyrinthe, cadence contraste, figures au début et ensuite |
-| **Les voies et les rencontres** | **part de rencontres** (0 à 60 %), **rang minimal**, **bifurcation** (0 à 100 %), **salles à prime** (0 à 40 % des rangs), **part du biome** (0 à 100 % : la chance qu'une voie prenne la mécanique favorite de son biome), **économats**, **alcôves** et **bonbonnes par module** (0 à 2) |
+| **Les voies et les rencontres** | **part de rencontres** (0 à 60 %), **rang minimal**, **bifurcation** (0 à 100 %), **salles à prime** (0 à 40 % des rangs), **part du biome** (0 à 100 % : la chance qu'une voie prenne la mécanique favorite de son biome), **économats**, **alcôves**, **mini-jeux** et **bonbonnes par module** (0 à 2) |
 | **Ce que pèse une route** | **réserve** et **condensat d'une halte**, **plancher d'essence** (10 à 90 %), **prime de mémoire par cran** (0 à 300 %) |
 | La pioche | les quatre poids de l'écart au cahier |
 
@@ -383,8 +435,10 @@ pas**. Chaque cible touchée est une goutte perdue. C'est la phrase du jeu
    une route »).
 2. **La coque qui compose avec le climat** (§5.1) — le plus grand effet
    pour le moins de code : une lecture de plus dans `climatDuModule`.
-3. **Un mini-jeu** pour prouver la forme (§3.2, la pesée), comme nature de
-   nœud de la mini-carte.
+3. ~~Un mini-jeu pour prouver la forme~~ — fait le 17/09 : le couperet est
+   une nature de nœud de la mini-carte (`minijeux.ts`), après une pesée
+   jouée puis retirée (voir §3.2, la leçon) ; les autres suivent la même
+   forme (une salle construite en code, une mesure sur le corps).
 4. **Les traces des Semblables** (§5.4) — le lore qui s'écrit tout seul.
 5. **L'alerte** (§5.5), puis **les coursives à deux sens** (§5.3), puis
    **les trois départs** (§5.6) — chacun redessine la carte, et c'est le
