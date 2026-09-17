@@ -301,11 +301,12 @@ describe('les orbites — trois puits, trois anneaux, un croissant', () => {
     expect(VERDICTS_ORBITES.juste).toBe('EN ORBITE')
   })
 
-  it('la salle : trois puits en quinconce aux réglages par défaut, le départ lancé, le croissant hydrophile au rayon de la cible, ouvert vers le corps — et pas de sas', () => {
+  it('la salle : trois puits en quinconce au cœur de 450 (le vrai corps déchire à 300), le départ lancé, le croissant hydrophile au rayon de la cible, ouvert vers le corps — et pas de sas', () => {
     const lv = tableauOrbites()
     expect(lv.minijeu?.type).toBe('orbites')
     expect(lv.puits).toHaveLength(3)
     expect(lv.puits!.map((p) => Math.sign(p.x))).toEqual([-1, 1, -1])
+    expect(lv.puits!.map((p) => p.rayon)).toEqual([450, 450, 450])
     expect(lv.spawn.impulsion).toEqual(r.depart.impulsion)
     const c = croissantOrbites(r.cible, CROISSANT_ORBITES_ANGLE)
     expect(lv.boxes).toEqual([c])
@@ -315,6 +316,6 @@ describe('les orbites — trois puits, trois anneaux, un croissant', () => {
     expect(lv.labels.filter((l) => /^[123] · /.test(l.text))).toHaveLength(3)
     // les cœurs ne se recouvrent pas
     for (let i = 0; i < 3; i++)
-      for (let j = i + 1; j < 3; j++) expect(Math.hypot(lv.puits![i].x - lv.puits![j].x, lv.puits![i].y - lv.puits![j].y)).toBeGreaterThan(600)
+      for (let j = i + 1; j < 3; j++) expect(Math.hypot(lv.puits![i].x - lv.puits![j].x, lv.puits![i].y - lv.puits![j].y)).toBeGreaterThan(2 * lv.puits![i].rayon!)
   })
 })

@@ -580,7 +580,10 @@ export interface PuitsDef {
 // il en perd 45 % : la moitié du corps est dans le halo képlérien, où la
 // marée s'inverse et ÉTIRE (≈ 3Ω²·r), et la lisière est une ligne de
 // cisaillement. Règle de conception : une orbite se pose à moins de 0,8
-// rayon du puits, le halo ne sert qu'aux transferts, traversés vite.
+// rayon du puits, le halo ne sert qu'aux transferts, traversés vite. Et un
+// ENCHAÎNEMENT de virages demande plus (la revue du 17/09, docs/puits.md
+// §2) : chaque virage étire le corps, le suivant déchire la traîne — les
+// orbites prennent des cœurs de 450 sous une force de 300, pas les défauts.
 // 300 u : un cœur qui loge une orbite de 200 u pour un corps de 900 (≈ 105 u
 // de rayon) sans approcher la lisière. 540 u/s² : T = 2π·√(300/540) = 4,7 s
 // pour toute orbite du cœur ; vitesse circulaire au bord √(540·300) = 402 u/s,

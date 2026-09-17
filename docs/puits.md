@@ -47,8 +47,22 @@ cohésion. Lancé **au bord** du cœur, il perd 45 % : la moitié du corps est
 dans le halo, où la marée s'inverse et étire (≈ 3Ω²·r), et la lisière est
 une ligne de cisaillement. Le test garde le phénomène, pas une valeur.
 
+**Et un enchaînement déchire ce qu'un virage ne fait qu'étirer.** Mesuré
+le 17/09 (la revue, sur le vrai corps dans la vraie salle des orbites) :
+un seul passage à 0,5-0,75 rayon garde 100 % du corps quels que soient
+force et rayon, mais l'étire (rms 73 → 200 u à force 540, cœur 300 ;
+→ 120 u à force 180) — le virage suivant déchire la traîne. Et un corps
+qui s'éloigne **lentement** d'un cœur s'étire dans son halo (le dos, plus
+près, est freiné plus que le front) : rms 80 → 150 u en 1,5 s. Sur trois
+virages, aux défauts (cœur 300, force 540), le meilleur lancer laissait
+55 % du corps ; cœur 450 et force 300, il arrive entier. D'où les puits
+des orbites, hors défauts.
+
 **Règles de conception.** Une orbite se pose à moins de 0,8 rayon du
-puits. Le halo ne sert qu'aux transferts, traversés vite. Deux cœurs ne se
+puits — et un enchaînement de virages à moins de 0,75 rayon, dans des
+cœurs larges (450 pour un corps de 900) sous une force modérée (300). Le
+halo ne sert qu'aux transferts, traversés vite ; une cible se pose juste
+à la sortie d'un cœur, avant que le halo n'étire. Deux cœurs ne se
 recouvrent pas (`checkLevel` avertit). Un lancer utile est entre la
 vitesse circulaire et la vitesse d'évasion.
 
@@ -87,36 +101,45 @@ rien ne trahit l'avenir — seule la prévision exacte se demande.
 solveur (`FluidSim.copiePourPrevision`, l'état de chaque particule et le
 tableau entier) avance à part, par tranches de 6 ms par image, et écrit en
 trait plein la vraie trajectoire du centre sur trois secondes. Effacée à
-toute éjection ou changement d'état, et à chaque salle. Un pas à 900
+toute éjection ou changement d'état, et à chaque salle ; muette tant que
+l'impulsion de départ attend (le corps n'est pas lancé). Un pas à 900
 particules coûte quelques millisecondes : la ligne se lit en train de
-s'écrire.
+s'écrire. **Elle ne joue que les puits** : la copie ne reçoit ni le
+souffle du sas, ni les chasses, ni le vortex — dans une salle qui les
+mêle aux puits, la ligne s'en écarte (à ajouter si une telle salle naît).
 
 ## 5. Le mini-jeu « Les orbites »
 
 Trois puits **en quinconce** (le croquis les alignait ; mesuré : alignés,
 trois lancers sur huit mille enroulent les trois puits et aucun sans
 rebondir sur un bord — en quinconce, des centaines, aux sens alternés),
-aux réglages par défaut. Le corps naît lancé (angle −50°, 310 u/s) et la
-ligne dit où il va : un virage autour du premier puits, un autour du
-deuxième de l'autre côté, un autour du troisième, puis il remonte le bord
-gauche jusqu'au **croissant**, un arc hydrophile où il se colle. Trois
+au cœur de 450 u et à la force de 300 u/s² (pas les défauts : voir §2,
+le corps arrivait en morceaux). Le corps naît lancé (angle 36°, 260 u/s)
+et la gravité le porte : un virage autour du premier puits, un autour du
+deuxième de l'autre côté, un autour du troisième, puis il sort de ce cœur
+vers le **croissant**, un arc hydrophile où il se colle. Trois
 anneaux jalonnent ce chemin, dans l'ordre. À chaque seconde : **laisser
-porter** (gratuit, la ligne dit où ça mène) ou **corriger** d'une
-éjection (chaque goutte coûte, la ligne se courbe à vue). Verdict : la
+porter** (gratuit, le prochain anneau dit où aller, P dessine la
+trajectoire exacte) ou **corriger** d'une éjection (chaque goutte coûte,
+la jauge et la silhouette le disent). Verdict : la
 part du volume gardée (intact ≥ 90 %, écorné ≥ 70 %, entamé ≥ 45 %), un
 palier de moins par anneau manqué, rien sans le croissant.
 
-Le lancer, les anneaux (posés à mi-virage) et la cible (1,2 s après le
-troisième virage) ont été **trouvés par une recherche**, pas à la main :
-`RECHERCHE_ORBITES=1 pnpm vitest run src/game/orbites.recherche.spec.ts`
-balaie la hauteur du départ, l'angle et la vitesse, exige un vrai virage
-autour de chaque puits (au moins un tiers de tour, à 0,3-0,95 rayon du
-centre — traverser le cœur en plein milieu balaie 180° sans tourner) et
-imprime les meilleurs. Deux tests de garde : le point-masse passe les
-anneaux et finit dans la cible ; le **vrai solveur** (900 particules)
-passe le premier anneau et s'approche du deuxième sans se disperser. Si
-la physique ou les puits changent, on refait la recherche — jamais on ne
-déplace un anneau à la main.
+Le lancer, les anneaux (posés à mi-virage) et la cible (une demi-seconde
+après la sortie du troisième cœur) ont été **trouvés par une recherche**,
+pas à la main : `RECHERCHE_ORBITES=1 RECHERCHE_ORBITES_F=300
+RECHERCHE_ORBITES_R=450 RECHERCHE_ORBITES_VRAIS=64 pnpm vitest run
+src/game/orbites.recherche.spec.ts` balaie la hauteur du départ, l'angle
+et la vitesse, exige un vrai virage autour de chaque puits (au moins un
+tiers de tour, à 0,3-0,75 rayon du centre — traverser le cœur en plein
+milieu balaie 180° sans tourner), puis **le vrai corps rejoue les
+meilleurs dans la vraie salle** (croissant compris, relabel au pas du jeu)
+et imprime la part gardée au verdict. Deux tests de garde : le point-masse
+passe les anneaux et finit dans la cible ; le **vrai solveur** (900
+particules) refait toute la salle, passe les trois anneaux, finit dans le
+croissant et y arrive au-dessus du premier palier — le meilleur verdict
+s'obtient sans un geste. Si la physique ou les puits changent, on refait
+la recherche — jamais on ne déplace un anneau ni un palier à la main.
 
 ## 6. L'éditeur (`?editeur`)
 

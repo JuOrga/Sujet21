@@ -31,6 +31,18 @@ export interface Delivery {
 
 export const DELIVERIES: Delivery[] = [
   {
+    date: '17/09/2026 14:01',
+    title: 'LA REVUE DES PUITS : le corps arrivait en morceaux au croissant — la salle des orbites se retrouve, et neuf défauts se corrigent',
+    notes: [
+      'LA DEMANDE : « pr sur dev et review ». Trois relectures adverses du diff (physique, jeu, éditeur), chaque trouvaille vérifiée dans le code ou mesurée sur le solveur avant d’être retenue.',
+      'LE DÉFAUT MAJEUR, MESURÉ : le lancer gelé des orbites était parfait pour le point-masse et laissait 8 % du corps au croissant — un verdict PERDU sur le chemin idéal, les paliers inatteignables sans un geste. La cause : un virage pris à 0,93 rayon étire le corps (rms 73 → 250 u) et le suivant déchire la traîne ; puis un corps qui s’éloigne lentement d’un cœur s’étire dans son halo. La recherche gagne un SECOND ÉTAGE — le vrai corps rejoue les meilleurs lancers dans la vraie salle, croissant compris, relabel au pas du jeu — et la part gardée tranche : cœur 300 → 55 % au mieux (force 300), cœur 450 → 73 % (force 400), 100 % (force 300). Les orbites prennent cœur 450, force 300, un lancer à 36° et 260 u/s, la cible une demi-seconde après la sortie du troisième cœur ; le corps arrive entier, verdict en 8,8 s. La garde du solveur refait désormais TOUTE la salle et exige le premier palier.',
+      'LA TRAJECTOIRE PRÉDITE : une paroi tournée était rejetée sur sa boîte plate (la ligne la traversait) — cercle englobant, comme le solveur ; la membrane, que l’eau traverse, n’est plus une paroi ; un puits qui plaque le corps contre la cuve ne sème plus un anneau par pas ; le départ compte dans les passages.',
+      'LA PRÉVISION EXACTE EN JEU : P ne dessinait rien en glace ni en vapeur (la ligne s’effaçait à chaque image où l’état était tel, au lieu du changement) ; demandée pendant l’entrée de caméra, elle tombait dans un puits que le corps ne voyait pas et survivait au lancer ; l’horloge des orbites comptait l’entrée immobile. DANS L’ÉDITEUR : annuler/rétablir et fermer laissaient courir le solveur invisible ; le glisser du rayon écrivait le défaut et dépassait le plafond de la fiche. LEVELIO : chaque puits écarté dit sa raison, une portée sous le cœur avertit. LES TEXTES : le pupitre et le journal promettaient une ligne qui n’est plus en jeu ; un test de la copie de prévision ne testait rien.',
+      'DOCUMENTÉ, PAS CORRIGÉ : la prévision exacte ne joue que les puits (ni sas, ni chasses, ni vortex) — aucune salle ne les mêle ; le bouton, le code et docs/puits.md le disent.',
+      'VÉRIFIÉ : type-check à 0, tous les tests verts (trois neufs : la paroi tournée, la membrane et le bord ; les raisons du rejet ; la portée sous le cœur ; la garde des orbites sur toute la salle), build propre. La revue est publiée sur la PR #425. Injouable ici : la sensation du nouveau réglage (période 7,7 s, plus lente qu’avant) est à éprouver en main.',
+    ],
+  },
+  {
     date: '17/09/2026 11:40',
     title: 'LES PUITS DANS L’ÉDITEUR : poser, régler la force par puits, lancer le départ, et lire la trajectoire avant de jouer',
     notes: [

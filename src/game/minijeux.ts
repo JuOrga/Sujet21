@@ -489,14 +489,15 @@ export function tableauRafales(regles: ReglesRafales = REGLES_RAFALES): LevelDef
 
 // ---- LES ORBITES ---------------------------------------------------------------
 //
-// LES ORBITES. Trois puits de gravité alignés, le corps LANCÉ à une vitesse
-// exacte, et la ligne prédite qui dit où il va : autour du premier puits,
+// LES ORBITES. Trois puits de gravité en quinconce, le corps LANCÉ à une
+// vitesse exacte, et la gravité qui le porte : autour du premier puits,
 // entre les deux, autour du deuxième de l'autre côté, autour du troisième,
 // puis dans le croissant (le croquis du concepteur, 17/09). Trois anneaux
 // jalonnent ce chemin, dans l'ordre. À chaque seconde, l'alternative est
-// lisible : LAISSER PORTER (gratuit — la ligne dit où ça mène) ou CORRIGER
-// d'une éjection (chaque goutte coûte, la jauge et la silhouette le disent,
-// la ligne se courbe à vue). Ce qui compte : la part du volume gardée, un
+// lisible : LAISSER PORTER (gratuit — le prochain anneau dit où ça mène, et
+// P dessine la trajectoire exacte) ou CORRIGER d'une éjection (chaque
+// goutte coûte, la jauge et la silhouette le disent ; la ligne pointillée
+// du point-masse, elle, reste dans l'éditeur). Ce qui compte : la part gardée, un
 // palier de moins par anneau manqué, et rien si l'on ne finit pas dans le
 // croissant. Le corps reste liquide et pilotable : c'est lui le sujet.
 
@@ -578,59 +579,74 @@ export function croissantOrbites(cible: { x: number; y: number; r: number }, ang
 // LES PUITS DES ORBITES : trois, EN QUINCONCE (le croquis les alignait ;
 // mesuré par la recherche le 17/09 : alignés à 700 u, trois lancers sur
 // huit mille enroulent les trois puits et aucun sans rebondir sur un bord ;
-// en quinconce à ±350 u, six cents lancers propres, en moins de neuf
-// secondes, aux sens alternés — le slalom du croquis). Réglages par défaut
-// (cœur 300, force 540).
+// en quinconce à ±350 u, des centaines de lancers propres).
+// UN CŒUR DE 450 ET UNE FORCE DE 300, PAS LES DÉFAUTS (la revue du 17/09,
+// sur le vrai corps) : aux défauts (300, 540), le meilleur enchaînement de
+// trois virages laissait 55 % du corps au croissant — 8 % pour le lancer
+// alors gelé. Un virage pris près de la lisière étire le corps (rms 73 →
+// 200 u), le suivant déchire la traîne ; et un corps qui s'éloigne
+// lentement d'un cœur s'étire dans son halo (la marée). Mesuré, le vrai
+// corps dans la vraie salle (croissant compris, relabel au pas du jeu) sur
+// les meilleurs lancers du point-masse : cœur 300 → 55 % au mieux ; cœur
+// 450 → 73 % (force 400), 100 % (force 300, deux lancers voisins, jamais
+// sous 100 % en route, verdict en 8,8 s). Les cœurs restent disjoints
+// (955 u d'un puits à l'autre, 900 de cœurs) ; période du cœur 7,7 s.
 const PUITS_ORBITES: PuitsDef[] = [
-  { x: -350, y: 650 },
-  { x: 350, y: 0 },
-  { x: -350, y: -650 },
+  { x: -350, y: 650, force: 300, rayon: 450 },
+  { x: 350, y: 0, force: 300, rayon: 450 },
+  { x: -350, y: -650, force: 300, rayon: 450 },
 ]
 
 export const REGLES_ORBITES: ReglesOrbites = {
   puits: PUITS_ORBITES,
   // L'IMPULSION, LES ANNEAUX ET LA CIBLE : trouvés par orbites.recherche.spec.ts
-  // le 17/09 (RECHERCHE_ORBITES=1 pnpm vitest run src/game/orbites.recherche.spec.ts,
-  // balayage y0 −600…900, angle −60…40°, vitesse 150…600 ; 1 742 lancers
-  // enroulent les trois puits d'un vrai virage — au moins un tiers de tour, à
-  // 0,3-0,95 rayon du centre —, celui-ci en 10,1 s : autour du premier à
-  // 187 u en sens direct, du deuxième à 283 u et du troisième à 174 u en sens
-  // horaire, puis il remonte le bord gauche). Les anneaux sont posés à
-  // mi-virage, la cible 1,2 s après le troisième. À refaire si les puits,
-  // leur force ou leur rayon changent.
-  depart: { x: -900, y: 800, impulsion: { angle: -50, vitesse: 310 } },
+  // le 17/09 (RECHERCHE_ORBITES=1 RECHERCHE_ORBITES_F=300 RECHERCHE_ORBITES_R=450
+  // RECHERCHE_ORBITES_VRAIS=64 pnpm vitest run src/game/orbites.recherche.spec.ts,
+  // balayage y0 −600…900, angle −60…40°, vitesse 150…600 ; 782 lancers
+  // enroulent les trois puits d'un vrai virage — au moins un tiers de tour,
+  // à 0,3-0,75 rayon du centre —, et le VRAI CORPS rejoue les 64 meilleurs
+  // dans la vraie salle : celui-ci arrive ENTIER (100 %, jamais sous 100 %
+  // en route), verdict en 8,8 s : autour du premier à 181 u, du deuxième à
+  // 170 u, du troisième à 161 u, tous en sens horaire, puis il sort du
+  // troisième cœur vers le croissant, cap 122°). Les anneaux sont posés à
+  // mi-virage, la cible une demi-seconde après la sortie du troisième cœur
+  // (le corps encore rond). À refaire si les puits, leur force ou leur
+  // rayon changent.
+  depart: { x: -900, y: 750, impulsion: { angle: 36, vitesse: 260 } },
   anneaux: [
-    { x: -425, y: 478, r: 90 },
-    { x: 588, y: 157, r: 90 },
-    { x: -425, y: -807, r: 90 },
+    { x: -303, y: 825, r: 90 },
+    { x: 528, y: -21, r: 90 },
+    { x: -434, y: -791, r: 90 },
   ],
-  cible: { x: -884, y: 15, r: 260 },
+  cible: { x: -900, y: -459, r: 260 },
   dureeMax: 20,
   paliers: [0.9, 0.7, 0.45],
 }
-/** L'ORIENTATION DU CROISSANT : le corps arrive en remontant (cap 86°) — la bande se pose au-dessus, l'ouverture en dessous. */
-export const CROISSANT_ORBITES_ANGLE = 86
+/** L'ORIENTATION DU CROISSANT : le corps arrive en montant vers la gauche (cap 122°) — la bande se pose en face, l'ouverture vers le bas-droite d'où il vient. */
+export const CROISSANT_ORBITES_ANGLE = 122
 
-export function tableauOrbites(regles: ReglesOrbites = REGLES_ORBITES): LevelDef {
+/** La salle des orbites. `angleCroissant` : l'orientation de la bande (la
+ *  recherche en essaie d'autres, avec d'autres règles ; le jeu prend la gelée). */
+export function tableauOrbites(regles: ReglesOrbites = REGLES_ORBITES, angleCroissant: number = CROISSANT_ORBITES_ANGLE): LevelDef {
   return {
     name: 'Les orbites',
     code: CODE_ORBITES,
     journal:
       `Trois puits de gravité, et vous êtes lancé : leur gravité vous porte d'un virage à l'autre. ` +
-      `Passez les trois anneaux dans l'ordre et finissez dans le croissant. Laisser porter ne coûte rien ; éjecter corrige la ligne, et chaque goutte compte. ` +
+      `Passez les trois anneaux dans l'ordre et finissez dans le croissant. Laisser porter ne coûte rien ; éjecter corrige la route, et chaque goutte compte. ` +
       `Intact au croissant, la mémoire triple ; chaque anneau manqué retire un palier.`,
     par: 4,
     bounds: { minX: -1200, minY: -1000, maxX: 1200, maxY: 1000 },
     spawn: { x: regles.depart.x, y: regles.depart.y, n: 900, impulsion: regles.depart.impulsion },
     exit: { minX: 1300, minY: -60, maxX: 1360, maxY: 60 },
-    boxes: [croissantOrbites(regles.cible, CROISSANT_ORBITES_ANGLE)],
+    boxes: [croissantOrbites(regles.cible, angleCroissant)],
     puits: regles.puits,
     sponges: [],
     labels: [
       { x: -900, y: 930, text: 'LES ORBITES', tone: 'mur' },
-      { x: -900, y: 650, text: '1 · VOUS ÊTES LANCÉ : LA GRAVITÉ VOUS PORTE', tone: 'mur' },
-      { x: -700, y: -200, text: '2 · PASSEZ LES TROIS ANNEAUX — ÉJECTER CORRIGE, ET COÛTE', tone: 'mur' },
-      { x: -700, y: 330, text: '3 · FINISSEZ DANS LE CROISSANT', tone: 'mur' },
+      { x: -900, y: 600, text: '1 · VOUS ÊTES LANCÉ : LA GRAVITÉ VOUS PORTE', tone: 'mur' },
+      { x: 850, y: -850, text: '2 · PASSEZ LES TROIS ANNEAUX — ÉJECTER CORRIGE, ET COÛTE', tone: 'mur' },
+      { x: -900, y: -60, text: '3 · FINISSEZ DANS LE CROISSANT', tone: 'mur' },
     ],
     minijeu: { type: 'orbites', regles },
   }
