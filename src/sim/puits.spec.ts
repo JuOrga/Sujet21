@@ -149,16 +149,18 @@ describe('FluidSim.copiePourPrevision — une copie qui avance comme l’origina
     expect(c.count).toBe(s.count)
     expect(c.playerCount).toBe(s.playerCount)
     const dt = s.params.dt
+    // l'original ne bouge pas pendant que la copie avance : une somme de
+    // contrôle de ses positions, prise avant, retrouvée après
+    const somme = (a: Float32Array): number => a.subarray(0, s.count).reduce((t, v) => t + v, 0)
+    const sommeAvant = somme(s.posX) + somme(s.posY) + somme(s.velX)
     for (let k = 0; k < Math.round(1 / dt); k++) {
       c.applyPuits([PUITS], dt)
       c.step(dt)
     }
     c.updatePlayerStats()
-    const xAvant = s.posX[0]
+    expect(somme(s.posX) + somme(s.posY) + somme(s.velX)).toBe(sommeAvant)
     orbite(s, [PUITS], 1)
     s.updatePlayerStats()
-    // l'original n'a pas bougé pendant que la copie avançait
-    expect(s.posX[0]).not.toBe(xAvant)
     expect(Math.hypot(c.stats.centroidX - s.stats.centroidX, c.stats.centroidY - s.stats.centroidY)).toBeLessThan(2)
     expect(c.dispersed).toBe(false)
   })
